@@ -1,0 +1,487 @@
+import * as d3 from "d3"
+import {
+	hsl,
+	interpolateBlues,
+	interpolateBuPu,
+	interpolateRainbow,
+	max,
+	mean,
+	min,
+	type ScaleLinear,
+	scaleLinear,
+} from "d3"
+import { WORLD } from "@/model"
+import { PRESSURE } from "@/model/cells/pressure"
+import { TEMPERATURE } from "@/model/cells/temperature"
+import { WEATHER, WIND } from "@/model/cells/weather"
+import { NATION } from "@/model/nations"
+import { PROVINCE } from "@/model/provinces"
+import { Province } from "@/model/provinces/types"
+import { SHAPER_DISPLAY } from "@/model/shapers/display"
+import { MATH } from "@/model/utilities/math"
+import { Vertex } from "@/model/utilities/voronoi/types"
+import { MAP_SHAPES } from "../shapes"
+import { MAP_METRICS } from "../shapes/metrics"
+import { DrawMapParams } from "../shapes/types"
+import { MapMode } from "../types"
+
+function monthFromTime(time?: number): number | undefined {
+	if (time === undefined) return undefined
+	return new Date(time).getMonth()
+}
+
+const wasteland = "#bcbcbc"
+
+let lastWorldId: string | null = null
+let wealthScale: ScaleLinear<number, number> | null = null
+let wealthScaleTime: number | undefined = undefined
+let devScale: ScaleLinear<number, number> | null = null
+let devScaleTime: number | undefined = undefined
+let popScale: ScaleLinear<number, number> | null = null
+let popScaleTime: number | undefined = undefined
+let pressureScale: ScaleLinear<number, number> | null = null
+let pressureScaleMonth: number | undefined = undefined
+let windScale: ScaleLinear<number, number> | null = null
+let windScaleMonth: number | undefined = undefined
+
+const provinceBorders: Record<
+	number,
+	{
+		path: Vertex[][]
+	}
+> = {}
+
+const nationBorders: Record<
+	number,
+	{
+		path: Vertex[][]
+		color: string
+		members: number[]
+	}
+> = {}
+
+function clearCaches() {
+	Object.keys(provinceBorders).forEach((k) => delete provinceBorders[Number(k)])
+	Object.keys(nationBorders).forEach((k) => delete nationBorders[Number(k)])
+}
+
+function clearNationCache() {
+	Object.keys(nationBorders).forEach((k) => delete nationBorders[Number(k)])
+}
+
+function getWealthScale(time?: number) {
+	if (
+		wealthScale &&
+		wealthScaleTime === time &&
+		lastWorldId === window.world.id
+	) {
+		return wealthScale
+	}
+
+	const nations = NATION.nations(time)
+	const scores = nations.map((n) => NATION.wealth.optimal(n, time))
+	const maxScore = max(scores) || 1
+	const minScore = min(scores) || 0
+
+	wealthScale = scaleLinear()
+		.domain([Math.min(0, minScore), maxScore])
+		.range([0, 1])
+	wealthScaleTime = time
+	lastWorldId = window.world.id
+	return wealthScale
+}
+
+function getDevScale(time?: number) {
+	if (devScale && devScaleTime === time && lastWorldId === window.world.id) {
+		return devScale
+	}
+
+	const provinces = window.world.provinces.filter((p) => !p.desolate)
+	const scores = provinces.map((p) => PROVINCE.development.get(p, time))
+	const maxScore = max(scores) || 1
+	const minScore = min(scores) || 0
+
+	devScale = scaleLinear()
+		.domain([Math.min(0, minScore), maxScore])
+		.range([0, 1])
+	devScaleTime = time
+	lastWorldId = window.world.id
+	return devScale
+}
+
+function getPopScale(time?: number) {
+	if (popScale && popScaleTime === time && lastWorldId === window.world.id) {
+		return popScale
+	}
+
+	const provinces = window.world.provinces.filter((p) => !p.desolate)
+	const densities = provinces.map((p) =>
+		MATH.conversion.area.sqMi.sqKm(PROVINCE.population.density(p, time)),
+	)
+	// We'll use a log scale approach by transforming the domain, or simply linear
+	// The user asked for "just like wealth" which is linear min->max, so let's check wealth first.
+	// Wealth is using scaleLinear [min, max] -> [0, 1].
+	// Population density varies wildly, so linear might be dominated by outliers,
+	// but the request is specific: "just like wealth based on max and min".
+	// However, for population, a power or log scale is visibly better.
+	// Let's stick to the user's "just like wealth" request structure (min/max normalization),
+	// but maybe keep the sqrt/pow transformation if it makes sense, OR purely linear if they want standard normalization.
+
+	// Wealth implementation:
+	// wealthScale = scaleLinear().domain([min, max]).range([0, 1])
+
+	// Let's do the same for population density
+	const maxD = max(densities) || 1
+	const minD = min(densities) || 0
+
+	// Using a power scale (squareroot-ish) is better for vis, but "just like wealth" implies linear normalization.
+	// I'll try to stick to a slightly adjusted linear or power scale that maps the domain.
+	// Wealth uses scaleLinear. I will use scalePow with exponent 0.5 to dampen high density spikes,
+	// mapping [min, max] -> [0, 1].
+
+	popScale = d3
+		.scalePow()
+		.exponent(0.4) // Using slight power curve to make differences visible
+		.domain([minD, maxD])
+		.range([0, 1])
+
+	lastWorldId = window.world.id
+	popScaleTime = time
+	return popScale
+}
+
+function getPressureScale(month: number) {
+	if (
+		pressureScale &&
+		pressureScaleMonth === month &&
+		lastWorldId === window.world.id
+	) {
+		return pressureScale
+	}
+
+	const pressures = window.world.provinces.map((p) =>
+		PRESSURE.monthly(PROVINCE.cell(p), month),
+	)
+	const maxP = max(pressures) || 1040
+	const minP = min(pressures) || 940
+
+	// Diverging scale: map [min, 1013.25, max] to [-1, 0, 1]
+	pressureScale = scaleLinear()
+		.domain([minP, 1013.25, maxP])
+		.range([-1, 0, 1])
+		.clamp(true)
+
+	lastWorldId = window.world.id
+	pressureScaleMonth = month
+	return pressureScale
+}
+
+function getWindScale(month: number) {
+	if (
+		windScale &&
+		windScaleMonth === month &&
+		lastWorldId === window.world.id
+	) {
+		return windScale
+	}
+
+	const speeds = window.world.provinces.map(
+		(p) => WIND.month({ cell: PROVINCE.cell(p), month }).speed,
+	)
+	const maxS = max(speeds) || 10
+	const minS = min(speeds) || 0
+
+	windScale = scaleLinear().domain([minS, maxS]).range([0, 1])
+
+	lastWorldId = window.world.id
+	windScaleMonth = month
+	return windScale
+}
+
+function getStripePattern(
+	ctx: CanvasRenderingContext2D,
+	color: string,
+	scale: number,
+): CanvasPattern | null {
+	const pCanvas = document.createElement("canvas")
+	const pCtx = pCanvas.getContext("2d")
+	if (!pCtx) return null
+
+	const size = 16 - Math.floor(16 / scale)
+	pCanvas.width = size
+	pCanvas.height = size
+
+	pCtx.strokeStyle = color
+	pCtx.lineWidth = 4
+
+	// Draw diagonal lines that tile seamlessly
+	pCtx.beginPath()
+	pCtx.moveTo(-2, size + 2)
+	pCtx.lineTo(size + 2, -2)
+	pCtx.stroke()
+
+	pCtx.beginPath()
+	pCtx.moveTo(-2, 2)
+	pCtx.lineTo(2, -2)
+	pCtx.stroke()
+
+	pCtx.beginPath()
+	pCtx.moveTo(size - 2, size + 2)
+	pCtx.lineTo(size + 2, size - 2)
+	pCtx.stroke()
+
+	const pattern = ctx.createPattern(pCanvas, "repeat")
+	return pattern
+}
+
+const modes: Record<MapMode, (province: Province, time?: number) => string> = {
+	climate: (province: Province) => {
+		const cells = province.cells.land.map((c) => window.world.cells[c])
+		return MAP_METRICS.climate.tempColor(
+			mean(cells.map((cell) => cell.heat.mean)),
+		)
+	},
+	vegetation: (province: Province) => {
+		const cell = window.world.cells[province.cell]
+		return MAP_METRICS.vegetation.color[
+			cell.vegetation as keyof typeof MAP_METRICS.vegetation.color
+		]
+	},
+	terrain: (province: Province) => {
+		const cell = window.world.cells[province.cell]
+		if (cell.topography === "marsh")
+			return MAP_METRICS.terrain.categorical.marsh
+		if (cell.topography === "coastal") return "hsla(157, 21%, 57%, 1)"
+
+		const cells = province.cells.land.map((c) => window.world.cells[c])
+		const avgH = mean(cells.map((c) => c.h)) || 0
+		return MAP_METRICS.terrain.color(WORLD.elevation.heightToKM(avgH))
+	},
+	provinces: (province: Province) => province.color,
+	nations: (province: Province, time?: number) => {
+		const nation =
+			NATION.rebels.overlord(province, time) ?? PROVINCE.nation(province, time)
+		const c = hsl(nation.color)
+		c.l = 0.92
+		return c.toString()
+	},
+	cultures: (province: Province) => {
+		const culture = window.world.cultures[province.culture]
+		return culture?.color || wasteland
+	},
+	religion: (province: Province) => {
+		const faith = window.world.faiths[province.faith]
+		return faith?.color || wasteland
+	},
+	optimalWealth: (province: Province, time?: number) => {
+		if (province.desolate) return interpolateBlues(0)
+		const score = NATION.wealth.optimal(province, time)
+		return interpolateBlues(getWealthScale(time)(score))
+	},
+	population: (province: Province, time?: number) => {
+		if (province.desolate) return d3.interpolateOranges(0)
+		const densityPerKm = MATH.conversion.area.sqMi.sqKm(
+			PROVINCE.population.density(province, time),
+		)
+		return d3.interpolateOranges(getPopScale(time)(densityPerKm))
+	},
+	development: (province: Province, time?: number) => {
+		if (province.desolate) return interpolateBuPu(0)
+		const score = PROVINCE.development.get(province, time)
+		return interpolateBuPu(getDevScale(time)(score))
+	},
+	rainfall: (province: Province, time?: number) => {
+		const cell = PROVINCE.cell(province)
+		const m = monthFromTime(time)
+		const monthlyRain = WEATHER.rain.month({ cell, month: m })
+		return MAP_METRICS.rain.color(monthlyRain)
+	},
+	temperature: (province: Province, time?: number) => {
+		const cells = province.cells.land.map((c) => window.world.cells[c])
+		const m = monthFromTime(time)
+		if (m !== undefined) {
+			return MAP_METRICS.temperature.color(
+				mean(cells.map((c) => TEMPERATURE.monthly.mean({ cell: c, month: m }))),
+			)
+		}
+		return MAP_METRICS.temperature.color(mean(cells.map((c) => c.heat.mean)))
+	},
+	wind: (province: Province, time?: number) => {
+		const cell = PROVINCE.cell(province)
+		const m = monthFromTime(time) ?? 0
+		const wind = WIND.month({ cell, month: m })
+		const t = getWindScale(m)(wind.speed)
+		const color = hsl(interpolateRainbow(wind.direction / 360))
+		color.l = 0.98 - t * 0.85 // Extremely light (0.98) for slow, very dark (0.13) for fast
+		color.s = 0.3 + t * 0.7 // More saturated for faster winds
+		return color.toString()
+	},
+	pressure: (province: Province, time?: number) => {
+		const cell = PROVINCE.cell(province)
+		const m = monthFromTime(time) ?? 0
+		const t = getPressureScale(m)(PRESSURE.monthly(cell, m))
+		return d3.interpolateRdBu(1 - (t + 1) / 2) // Map [-1, 1] back to [0, 1]
+	},
+}
+
+export const DRAW_BORDERS = {
+	clearNationCache,
+	provinces: ({
+		ctx,
+		projection,
+		mapMode,
+		hoveredProvince,
+		visible,
+		time,
+	}: DrawMapParams) => {
+		const scale = MAP_SHAPES.scale.derived(projection)
+		const linear = MAP_SHAPES.path.linear(projection)
+		const { provinces } = window.world
+
+		if (window.world.id !== lastWorldId) {
+			lastWorldId = window.world.id
+			clearCaches()
+		}
+
+		if (Object.keys(provinceBorders).length === 0) {
+			provinces.forEach((province) => {
+				provinceBorders[province.idx] = {
+					path: SHAPER_DISPLAY.borders.provinces([province]),
+				}
+			})
+		}
+
+		if (mapMode === "nations" && Object.keys(nationBorders).length === 0) {
+			const nations = window.world.provinces.filter(
+				(p) => PROVINCE.parent.get(p, time) === undefined && !p.desolate,
+			)
+			nations.forEach((nation) => {
+				if (NATION.rebels.active(nation, time)) return
+				const provinces = NATION.provinces(nation, time)
+				const rebels = NATION.rebels.get(nation, time)
+				const combined = [...provinces, ...rebels]
+				nationBorders[nation.idx] = {
+					path: SHAPER_DISPLAY.borders.provinces(combined),
+					color: nation.color,
+					members: combined.map((p) => p.idx),
+				}
+			})
+		}
+
+		// Drawing Fills
+		provinces
+			.filter((p) => visible.has(p.idx))
+			.forEach((province) => {
+				const styles = provinceBorders[province.idx]
+				if (mapMode === "nations" && province.desolate) {
+					ctx.fillStyle = wasteland
+				} else {
+					ctx.fillStyle = modes[mapMode](province, time)
+				}
+
+				styles?.path.forEach((border) => {
+					ctx.save()
+					const p = MAP_SHAPES.polygon({
+						points: border,
+						path: linear,
+						direction: "inner",
+					})
+					ctx.clip(p)
+					ctx.fill(p)
+
+					// DRAW OCCUPATION STRIPES
+					const war = PROVINCE.occupations.get(province, time)
+					const rebel = NATION.rebels.active(
+						PROVINCE.nation(province, time),
+						time,
+					)
+					if (rebel && war === undefined && mapMode === "nations") {
+						const pattern = getStripePattern(ctx, "black", scale)
+						ctx.fillStyle = pattern
+						ctx.fill(p)
+					} else if (war !== undefined && mapMode === "nations" && !rebel) {
+						const attacker = window.world.provinces[war.attacker]
+						const pattern = getStripePattern(ctx, attacker.color, scale)
+						ctx.fillStyle = pattern
+						ctx.fill(p)
+					}
+
+					ctx.restore()
+				})
+			})
+
+		ctx.strokeStyle = "rgba(0,0,0,0.15)"
+		ctx.lineWidth = scale * 0.5
+		provinces
+			.filter((p) => visible.has(p.idx))
+			.forEach((province) => {
+				const styles = provinceBorders[province.idx]
+				styles?.path.forEach((border) => {
+					const p = MAP_SHAPES.polygon({
+						points: border,
+						path: linear,
+						direction: "inner",
+					})
+					ctx.stroke(p)
+				})
+			})
+
+		if (mapMode === "nations") {
+			Object.entries(nationBorders)
+				.sort((a, b) => b[1].members.length - a[1].members.length)
+				.forEach(([, styles]) => {
+					const isVisible = styles.members.some((m) => visible.has(m))
+					if (!isVisible) return
+
+					ctx.strokeStyle = styles.color
+					ctx.lineWidth = scale * 2 // Thicker to account for half being clipped
+					styles.path.forEach((border) => {
+						const p = MAP_SHAPES.polygon({
+							points: border,
+							path: linear,
+							direction: "inner",
+						})
+						ctx.save()
+						ctx.clip(p)
+						ctx.stroke(p)
+						ctx.restore()
+					})
+				})
+		}
+
+		// Hover Highlight
+		if (hoveredProvince !== undefined) {
+			const province = window.world.provinces[hoveredProvince]
+			const nation = PROVINCE.nation(province, time)
+			if (nation) {
+				const members = NATION.provinces(nation, time)
+				ctx.fillStyle = "rgba(8, 8, 8, 0.2)"
+				members.forEach((p) => {
+					const styles = provinceBorders[p.idx]
+					styles?.path.forEach((border) => {
+						const poly = MAP_SHAPES.polygon({
+							points: border,
+							path: linear,
+							direction: "inner",
+						})
+						ctx.fill(poly)
+					})
+				})
+
+				const styles = provinceBorders[province.idx]
+				if (styles) {
+					ctx.lineWidth = scale * 0.5
+					ctx.strokeStyle = "white"
+					styles.path.forEach((border) => {
+						const p = MAP_SHAPES.polygon({
+							points: border,
+							path: linear,
+							direction: "inner",
+						})
+						ctx.stroke(p)
+					})
+				}
+			}
+		}
+	},
+}

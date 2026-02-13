@@ -1,0 +1,268 @@
+import {
+	CategoryScale,
+	Chart as ChartJS,
+	Filler,
+	Legend,
+	LinearScale,
+	LineElement,
+	PointElement,
+	Title,
+	Tooltip,
+} from "chart.js"
+import React from "react"
+import { TEMPERATURE } from "@/model/cells/temperature"
+import { PROVINCE } from "@/model/provinces"
+import { Province } from "@/model/provinces/types"
+import { MATH } from "@/model/utilities/math"
+import { TEXT } from "@/model/utilities/text"
+import { START_DATE, TIME } from "@/model/utilities/time"
+import { MAP_METRICS } from "../../shapes/metrics"
+import { EventCounts, RebellionOutcomeCounts, WarOutcomeCounts } from "../index"
+import { DistributionChart } from "../NationTab/DistributionChart"
+import { ActiveTrendsChart, SIZE_BUCKETS } from "./ActiveTrendsChart"
+
+export { SIZE_BUCKETS }
+
+ChartJS.register(
+	CategoryScale,
+	LinearScale,
+	PointElement,
+	LineElement,
+	Title,
+	Tooltip,
+	Filler,
+	Legend,
+)
+
+const WINDOW_YEARS = 50
+
+interface SimulationTabProps {
+	distributionHistory: {
+		time: number
+		dist: number[]
+		devDist: number[]
+		avgDev: number
+		activeWars: number
+		activeCivilWars: number
+		eventCounts: EventCounts
+		warOutcomes: WarOutcomeCounts
+		rebellionOutcomes: RebellionOutcomeCounts
+	}[]
+	nationDistribution: number[]
+	renderTime: number
+	currentTime: number // "modern day" - the latest simulation time
+	onTimeSelect?: (time: number) => void
+}
+
+export const SimulationTab: React.FC<SimulationTabProps> = ({
+	distributionHistory,
+	renderTime,
+	currentTime,
+	onTimeSelect,
+}) => {
+	const halfWindow = TIME.delta.year(WINDOW_YEARS / 2)
+	const startBoundary = START_DATE
+
+	let windowStart = renderTime - halfWindow
+	let windowEnd = renderTime + halfWindow
+
+	if (windowStart < startBoundary) {
+		windowStart = startBoundary
+		windowEnd = startBoundary + TIME.delta.year(WINDOW_YEARS)
+	}
+
+	if (windowEnd > currentTime) {
+		windowEnd = currentTime
+		windowStart = Math.max(
+			startBoundary,
+			currentTime - TIME.delta.year(WINDOW_YEARS),
+		)
+	}
+
+	const windowedHistory = distributionHistory.filter(
+		(entry) => entry.time >= windowStart && entry.time <= windowEnd,
+	)
+
+	const labels = windowedHistory.map(
+		(entry) => `Y${TIME.date.toYear(entry.time)}`,
+	)
+
+	const rangeStartLabel = `Y${TIME.date.toYear(windowStart)}`
+	const rangeEndLabel = `Y${TIME.date.toYear(windowEnd)}`
+
+	const getDistribution = (
+		getter: (p: Province) => { label: string; color: string } | null,
+	) => {
+		const counts: Record<
+			string,
+			{ count: number; color: string; label: string }
+		> = {}
+		window.world.provinces.forEach((p: Province) => {
+			const res = getter(p)
+			if (!res) return
+			if (!counts[res.label]) {
+				counts[res.label] = { count: 0, color: res.color, label: res.label }
+			}
+			counts[res.label].count++
+		})
+		return Object.values(counts).sort((a, b) => b.count - a.count)
+	}
+
+	return (
+		<>
+			{(() => {
+				const worldTotalPopulation = window.world.provinces.reduce(
+					(sum, p) => sum + (PROVINCE.population.total(p, renderTime) || 0),
+					0,
+				)
+				const worldTotalUrban = window.world.provinces.reduce(
+					(sum, p) => sum + (PROVINCE.population.urban.get(p, renderTime) || 0),
+					0,
+				)
+
+				return (
+					<div className="grid grid-cols-3 gap-4 mb-4 pl-1">
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								World Population
+							</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">
+								{new Intl.NumberFormat("en-US", {
+									notation: "compact",
+									maximumFractionDigits: 2,
+								}).format(worldTotalPopulation)}
+								<span className="text-xs text-gray-500 font-normal ml-1">
+									people
+								</span>
+							</div>
+						</div>
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								Urbanization
+							</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">
+								{new Intl.NumberFormat("en-US", {
+									style: "percent",
+									maximumFractionDigits: 1,
+								}).format(
+									worldTotalPopulation > 0
+										? worldTotalUrban / worldTotalPopulation
+										: 0,
+								)}
+							</div>
+						</div>
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								World Land Area
+							</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">
+								{new Intl.NumberFormat("en-US", {
+									notation: "compact",
+									maximumFractionDigits: 2,
+								}).format(
+									MATH.conversion.area.sqMi.sqKm(
+										window.world.provinces.reduce(
+											(sum, p) => sum + p.land * window.world.cell.area,
+											0,
+										),
+									),
+								)}
+								<span className="text-xs text-gray-500 font-normal ml-1">
+									km²
+								</span>
+							</div>
+						</div>
+					</div>
+				)
+			})()}
+
+			<div className="grid grid-cols-3 gap-4 mb-4">
+				<DistributionChart
+					title="Climate"
+					data={getDistribution((p) => {
+						const c = PROVINCE.cell(p)
+						return c.climate
+							? {
+									label: TEXT.titleCase(c.climate),
+									color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
+								}
+							: null
+					})}
+				/>
+				<DistributionChart
+					title="Vegetation"
+					data={getDistribution((p) => {
+						const c = PROVINCE.cell(p)
+						return c.vegetation
+							? {
+									label: TEXT.titleCase(c.vegetation),
+									color:
+										MAP_METRICS.vegetation.color[
+											c.vegetation as keyof typeof MAP_METRICS.vegetation.color
+										] || "#ccc",
+								}
+							: null
+					})}
+				/>
+				<DistributionChart
+					title="Topography"
+					data={getDistribution((p) => {
+						const c = PROVINCE.cell(p)
+						return c.topography
+							? {
+									label: TEXT.titleCase(c.topography),
+									color:
+										MAP_METRICS.terrain.categorical[
+											c.topography as keyof typeof MAP_METRICS.terrain.categorical
+										] || "#ccc",
+								}
+							: null
+					})}
+				/>
+			</div>
+
+			{(() => {
+				const avgTemp = TEMPERATURE.global.mean()
+				const maxTemp = TEMPERATURE.global.max()
+				const minTemp = TEMPERATURE.global.min()
+				return (
+					<div className="flex gap-4 mb-4 pl-1 text-[10px] font-mono">
+						<span className="flex items-center gap-1">
+							<span className="text-gray-400 uppercase">Avg Temp</span>
+							<span
+								className="w-2.5 h-2.5 border border-gray-400"
+								style={{ backgroundColor: TEMPERATURE.color(avgTemp) }}
+							/>
+							<span className="text-gray-700">{avgTemp.toFixed(1)}°C</span>
+						</span>
+						<span className="flex items-center gap-1">
+							<span className="text-gray-400 uppercase">Max</span>
+							<span
+								className="w-2.5 h-2.5 border border-gray-400"
+								style={{ backgroundColor: TEMPERATURE.color(maxTemp) }}
+							/>
+							<span className="text-gray-700">{maxTemp.toFixed(1)}°C</span>
+						</span>
+						<span className="flex items-center gap-1">
+							<span className="text-gray-400 uppercase">Min</span>
+							<span
+								className="w-2.5 h-2.5 border border-gray-400"
+								style={{ backgroundColor: TEMPERATURE.color(minTemp) }}
+							/>
+							<span className="text-gray-700">{minTemp.toFixed(1)}°C</span>
+						</span>
+					</div>
+				)
+			})()}
+
+			<ActiveTrendsChart
+				windowedHistory={windowedHistory}
+				labels={labels}
+				rangeStartLabel={rangeStartLabel}
+				rangeEndLabel={rangeEndLabel}
+				renderTime={renderTime}
+				onTimeSelect={onTimeSelect}
+			/>
+		</>
+	)
+}

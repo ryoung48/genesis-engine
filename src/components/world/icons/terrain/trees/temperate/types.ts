@@ -1,0 +1,10 @@
+export type temperate_icon =
+	| "temperate_1"
+	| "temperate_2"
+	| "temperate_3"
+	| "temperate_4"
+	| "temperate_5"
+	| "temperate_6"
+	| "temperate_7"
+	| "temperate_8"
+	| "temperate_9"
