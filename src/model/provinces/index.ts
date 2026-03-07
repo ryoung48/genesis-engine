@@ -197,9 +197,8 @@ export const PROVINCE = {
 			window.world.provinces.forEach((province) => {
 				const cell = PROVINCE.cell(province)
 				const landmark = window.world.landmarks[cell.landmark]
-				const landScore = !landmark
-					? 0.5
-					: landmark.type === "continent"
+				const landScore =
+					landmark.type === "continent"
 						? 1
 						: landmark.type === "island"
 							? 0.8

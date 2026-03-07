@@ -135,7 +135,7 @@ export const SHAPER_MOUNTAINS = {
 			regions.filter(
 				(r, idx) =>
 					!coasts[idx] &&
-					window.world.landmarks[r.landmark]?.type === "continent",
+					window.world.landmarks[r.landmark].type === "continent",
 			),
 		)
 		const plateaus: Record<number, { landmark: number; h: number }> = {}
@@ -172,7 +172,7 @@ export const SHAPER_MOUNTAINS = {
 		land.forEach((l) => {
 			const landmark = window.world.landmarks[l.landmark]
 			l.h =
-				landmark?.type === "isle" && window.dice.random > 0.4
+				landmark.type === "isle" && window.dice.random > 0.4
 					? window.dice.weightedChoice([
 							{
 								w: 0.2,
@@ -293,7 +293,7 @@ export const SHAPER_MOUNTAINS = {
 					else if (cell.isCoast && cell.beach) {
 						cell.topography =
 							CELL.neighbors(cell).filter((c) => c.isWater).length === 1 &&
-							landmark?.type !== "isle" &&
+							landmark.type !== "isle" &&
 							window.dice.random > 0.6
 								? "marsh"
 								: "coastal"

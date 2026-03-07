@@ -62,13 +62,6 @@ export const CULTURE = {
 				}
 			})
 		}
-
-		// Assign orphaned provinces (isolated islands with no neighbor links)
-		provinces.forEach((p) => {
-			if (p.culture === -1) {
-				CULTURE.spawn({ province: p })
-			}
-		})
 	},
 
 	/**
