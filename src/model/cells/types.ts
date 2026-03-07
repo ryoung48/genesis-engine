@@ -38,6 +38,7 @@ export interface Cell extends Point {
 	wasLake?: boolean
 	beach?: boolean
 	ocean?: boolean
+	oceanRegion?: number
 	shallow?: boolean
 	moisture: { east: number; west: number }
 	rain?: {

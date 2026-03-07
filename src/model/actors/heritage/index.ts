@@ -143,13 +143,6 @@ export const HERITAGE = {
 			})
 		}
 
-		// Claim any cultures not reached by the BFS (isolated islands, etc.)
-		cultures.forEach((culture) => {
-			if (culture.heritage === -1) {
-				HERITAGE.spawn({ culture })
-			}
-		})
-
 		HERITAGE.colorize()
 	},
 }

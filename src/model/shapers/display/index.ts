@@ -66,44 +66,40 @@ export const SHAPER_DISPLAY = {
 		},
 	},
 	_islands: () => {
-		// all land landmarks at depth >= 1 whose parent still exists
-		const landmarks = WORLD.landmarks("land").filter(
-			(i) => {
-				const lm = window.world.landmarks[i]
-				return (lm.depth ?? 0) >= 1 &&
-					(lm.parent === undefined || window.world.landmarks[lm.parent] !== undefined)
-			},
-		)
+		// land (ocean)
 		const islands = drawCoasts({
-			landmarks: landmarks,
+			landmarks: WORLD.landmarks("land"),
 			coastFilter: (i) => (e) =>
-				e.land === i &&
-				(window.world.landmarks[e.water]?.depth ?? 0) <
-					(window.world.landmarks[i]?.depth ?? 0),
+				e.land === i && window.world.landmarks[e.water].type === "ocean",
 		})
 		window.world.display.islands = islands.reduce(
 			(dict: Display["islands"], { path, idx }) => {
-				dict[idx] = { path, idx, depth: window.world.landmarks[idx].depth ?? 1 }
+				dict[idx] = { path, idx }
 				return dict
 			},
 			{},
 		)
 	},
 	_lakes: () => {
-		// all water landmarks at depth >= 1
-		const watermarks = WORLD.landmarks("water").filter(
-			(i) => (window.world.landmarks[i].depth ?? 0) >= 1,
-		)
+		// land (ocean)
 		const lakes = drawCoasts({
-			landmarks: watermarks,
-			coastFilter: (i) => (e) =>
-				e.water === i &&
-				(window.world.landmarks[e.land]?.depth ?? 0) <
-					(window.world.landmarks[i]?.depth ?? 0),
+			landmarks: WORLD.landmarks("water").filter(
+				(i) => window.world.landmarks[i].type !== "ocean",
+			),
+			coastFilter: (i) => (e) => e.water === i,
 		})
+
+		// create ocean curve
+		const lakeEdges = WORLD.cells
+			.water()
+			.filter((cell) => cell.isWater && cell.shallow && !cell.ocean)
 		window.world.display.lakes = lakes.reduce(
 			(dict: Display["lakes"], { path, idx }) => {
-				dict[idx] = { path, idx, depth: window.world.landmarks[idx].depth ?? 1 }
+				dict[idx] = {
+					path,
+					idx,
+					border: lakeEdges.some((cell) => cell.landmark === idx),
+				}
 				return dict
 			},
 			{},

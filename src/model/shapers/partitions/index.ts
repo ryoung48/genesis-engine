@@ -22,7 +22,7 @@ const claimCell = {
 			if (!province.islands[cell.landmark]) province.islands[cell.landmark] = 0
 			province.islands[cell.landmark] += 1
 			province.cells.land.push(cell.idx)
-		} else if (window.world.landmarks[cell.landmark]?.type === "ocean") {
+		} else if (window.world.landmarks[cell.landmark].type === "ocean") {
 			province.ocean += cell.isWater ? 1 : 0
 		} else {
 			if (!province.lakes[cell.landmark]) province.lakes[cell.landmark] = 0
@@ -63,7 +63,7 @@ export const SHAPER_PARTITIONS = {
 			const cell = window.world.cells[province.cell]
 			claimCell.province(cell, province)
 			const { climate } = cell
-			if (climate === "arctic" || cell.rain.annual < 1) province.desolate = true
+			if (climate === "arctic") province.desolate = true
 			return cell
 		})
 		const { boundaries } = SHAPER_MOUNTAINS

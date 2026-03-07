@@ -61,32 +61,6 @@ const nationBorders: Record<
 	}
 > = {}
 
-// Per-frame Path2D cache — avoids rebuilding the same polygon multiple times
-// within a single render (fill pass, stroke pass, hover pass).
-// Invalidated at the start of each frame via beginFrame().
-let framePolygons: Record<string, Path2D> = {}
-
-function beginFrame() {
-	framePolygons = {}
-}
-
-function getPolygon(params: {
-	points: Vertex[]
-	path: (_object: d3.GeoPermissibleObjects) => string
-	direction: "inner" | "outer"
-	key: string
-}): Path2D {
-	const cached = framePolygons[params.key]
-	if (cached) return cached
-	const p = MAP_SHAPES.polygon({
-		points: params.points,
-		path: params.path,
-		direction: params.direction,
-	})
-	framePolygons[params.key] = p
-	return p
-}
-
 function clearCaches() {
 	Object.keys(provinceBorders).forEach((k) => delete provinceBorders[Number(k)])
 	Object.keys(nationBorders).forEach((k) => delete nationBorders[Number(k)])
@@ -344,117 +318,35 @@ const modes: Record<MapMode, (province: Province, time?: number) => string> = {
 	},
 }
 
-function ensureProvinceBorders() {
-	const { provinces } = window.world
-
-	if (window.world.id !== lastWorldId) {
-		lastWorldId = window.world.id
-		clearCaches()
-	}
-
-	if (Object.keys(provinceBorders).length === 0) {
-		provinces.forEach((province) => {
-			provinceBorders[province.idx] = {
-				path: SHAPER_DISPLAY.borders.provinces([province]),
-			}
-		})
-	}
-}
-
 export const DRAW_BORDERS = {
-	beginFrame,
 	clearNationCache,
 	setDiplomacyTarget: (nationIdx: number | null) => {
 		diplomacyTarget = nationIdx
 	},
-	/** Fill provinces with map-mode colors + province border strokes. Optional landmark filter. */
-	fillProvinces: ({
+	provinces: ({
 		ctx,
 		projection,
 		mapMode,
-		visible,
-		time,
-	}: DrawMapParams, landmarkFilter?: Set<number>) => {
-		const scale = MAP_SHAPES.scale.derived(projection)
-		const linear = MAP_SHAPES.path.linear(projection)
-
-		ensureProvinceBorders()
-
-		const { provinces } = window.world
-
-		// Pre-filter once
-		const drawn = provinces.filter((p) => {
-			if (!visible.has(p.idx)) return false
-			if (!landmarkFilter) return true
-			const cell = window.world.cells[p.cell]
-			return landmarkFilter.has(cell.landmark)
-		})
-
-		// Drawing Fills
-		drawn.forEach((province) => {
-			const styles = provinceBorders[province.idx]
-			if (mapMode === "nations" && province.desolate) {
-				ctx.fillStyle = wasteland
-			} else {
-				ctx.fillStyle = modes[mapMode](province, time)
-			}
-
-			styles?.path.forEach((border, bIdx) => {
-				ctx.save()
-				const p = getPolygon({
-					points: border,
-					path: linear,
-					direction: "inner",
-					key: `p${province.idx}_${bIdx}`,
-				})
-				ctx.clip(p)
-				ctx.fill(p)
-
-				// DRAW OCCUPATION STRIPES
-				const war = PROVINCE.occupations.get(province, time)
-				const rebel = WAR.rebels.active(PROVINCE.nation(province, time), time)
-				if (rebel && war === undefined && mapMode === "nations") {
-					const pattern = getStripePattern(ctx, "black", scale)
-					ctx.fillStyle = pattern
-					ctx.fill(p)
-				} else if (war !== undefined && mapMode === "nations" && !rebel) {
-					const attacker = window.world.provinces[war.attacker]
-					const pattern = getStripePattern(ctx, attacker.color, scale)
-					ctx.fillStyle = pattern
-					ctx.fill(p)
-				}
-
-				ctx.restore()
-			})
-		})
-
-		ctx.strokeStyle = "rgba(0,0,0,0.15)"
-		ctx.lineWidth = scale * 0.5
-		drawn.forEach((province) => {
-			const styles = provinceBorders[province.idx]
-			styles?.path.forEach((border, bIdx) => {
-				const p = getPolygon({
-					points: border,
-					path: linear,
-					direction: "inner",
-					key: `p${province.idx}_${bIdx}`,
-				})
-				ctx.stroke(p)
-			})
-		})
-	},
-	/** Draw nation border overlays (called once after all depth layers). */
-	nationBorders: ({
-		ctx,
-		projection,
-		mapMode,
+		hoveredProvince,
 		visible,
 		time,
 	}: DrawMapParams) => {
 		const scale = MAP_SHAPES.scale.derived(projection)
 		const linear = MAP_SHAPES.path.linear(projection)
+		const { provinces } = window.world
 
-		ensureProvinceBorders()
+		if (window.world.id !== lastWorldId) {
+			lastWorldId = window.world.id
+			clearCaches()
+		}
+
+		if (Object.keys(provinceBorders).length === 0) {
+			provinces.forEach((province) => {
+				provinceBorders[province.idx] = {
+					path: SHAPER_DISPLAY.borders.provinces([province]),
+				}
+			})
+		}
 
 		if (mapMode === "nations" && Object.keys(nationBorders).length === 0) {
 			const nations = window.world.provinces.filter(
@@ -473,21 +365,75 @@ export const DRAW_BORDERS = {
 			})
 		}
 
+		// Drawing Fills
+		provinces
+			.filter((p) => visible.has(p.idx))
+			.forEach((province) => {
+				const styles = provinceBorders[province.idx]
+				if (mapMode === "nations" && province.desolate) {
+					ctx.fillStyle = wasteland
+				} else {
+					ctx.fillStyle = modes[mapMode](province, time)
+				}
+
+				styles?.path.forEach((border) => {
+					ctx.save()
+					const p = MAP_SHAPES.polygon({
+						points: border,
+						path: linear,
+						direction: "inner",
+					})
+					ctx.clip(p)
+					ctx.fill(p)
+
+					// DRAW OCCUPATION STRIPES
+					const war = PROVINCE.occupations.get(province, time)
+					const rebel = WAR.rebels.active(PROVINCE.nation(province, time), time)
+					if (rebel && war === undefined && mapMode === "nations") {
+						const pattern = getStripePattern(ctx, "black", scale)
+						ctx.fillStyle = pattern
+						ctx.fill(p)
+					} else if (war !== undefined && mapMode === "nations" && !rebel) {
+						const attacker = window.world.provinces[war.attacker]
+						const pattern = getStripePattern(ctx, attacker.color, scale)
+						ctx.fillStyle = pattern
+						ctx.fill(p)
+					}
+
+					ctx.restore()
+				})
+			})
+
+		ctx.strokeStyle = "rgba(0,0,0,0.15)"
+		ctx.lineWidth = scale * 0.5
+		provinces
+			.filter((p) => visible.has(p.idx))
+			.forEach((province) => {
+				const styles = provinceBorders[province.idx]
+				styles?.path.forEach((border) => {
+					const p = MAP_SHAPES.polygon({
+						points: border,
+						path: linear,
+						direction: "inner",
+					})
+					ctx.stroke(p)
+				})
+			})
+
 		if (mapMode === "nations") {
 			Object.entries(nationBorders)
 				.sort((a, b) => b[1].members.length - a[1].members.length)
-				.forEach(([key, styles]) => {
+				.forEach(([, styles]) => {
 					const isVisible = styles.members.some((m) => visible.has(m))
 					if (!isVisible) return
 
 					ctx.strokeStyle = styles.color
-					ctx.lineWidth = scale * 2
-					styles.path.forEach((border, bIdx) => {
-						const p = getPolygon({
+					ctx.lineWidth = scale * 2 // Thicker to account for half being clipped
+					styles.path.forEach((border) => {
+						const p = MAP_SHAPES.polygon({
 							points: border,
 							path: linear,
 							direction: "inner",
-							key: `n${key}_${bIdx}`,
 						})
 						ctx.save()
 						ctx.clip(p)
@@ -496,20 +442,8 @@ export const DRAW_BORDERS = {
 					})
 				})
 		}
-	},
-	/** Draw hover highlight (called once at end). */
-	hover: ({
-		ctx,
-		projection,
-		hoveredProvince,
-		visible,
-		time,
-	}: DrawMapParams) => {
-		const scale = MAP_SHAPES.scale.derived(projection)
-		const linear = MAP_SHAPES.path.linear(projection)
 
-		ensureProvinceBorders()
-
+		// Hover Highlight
 		if (hoveredProvince !== undefined) {
 			const province = window.world.provinces[hoveredProvince]
 			const nation = PROVINCE.nation(province, time)
@@ -518,12 +452,11 @@ export const DRAW_BORDERS = {
 				ctx.fillStyle = "rgba(8, 8, 8, 0.2)"
 				members.forEach((p) => {
 					const styles = provinceBorders[p.idx]
-					styles?.path.forEach((border, bIdx) => {
-						const poly = getPolygon({
+					styles?.path.forEach((border) => {
+						const poly = MAP_SHAPES.polygon({
 							points: border,
 							path: linear,
 							direction: "inner",
-							key: `p${p.idx}_${bIdx}`,
 						})
 						ctx.fill(poly)
 					})
@@ -533,21 +466,16 @@ export const DRAW_BORDERS = {
 				if (styles) {
 					ctx.lineWidth = scale * 0.5
 					ctx.strokeStyle = "white"
-					styles.path.forEach((border, bIdx) => {
-						const p = getPolygon({
+					styles.path.forEach((border) => {
+						const p = MAP_SHAPES.polygon({
 							points: border,
 							path: linear,
 							direction: "inner",
-							key: `p${province.idx}_${bIdx}`,
 						})
 						ctx.stroke(p)
 					})
 				}
 			}
 		}
-	},
-	/** Get map-mode color for a province. */
-	getProvinceColor: (province: Province, mapMode: MapMode, time?: number): string => {
-		return modes[mapMode](province, time)
 	},
 }
