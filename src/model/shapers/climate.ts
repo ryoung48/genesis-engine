@@ -13,7 +13,7 @@ export const SHAPER_CLIMATES = {
 		const lakes = WORLD.cells.lakes.get()
 		const shallow = lakes.filter((cell) => cell.shallow)
 		WORLD.features("water")
-			.filter((idx) => window.world.landmarks[idx].type !== "ocean")
+			.filter((idx) => window.world.landmarks[idx]?.type !== "ocean")
 			.forEach((landmark) => {
 				const border = shallow.filter((cell) => cell.landmark === landmark)
 				const arid = border.some((cell) => {

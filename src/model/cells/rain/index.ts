@@ -131,7 +131,7 @@ export const RAIN = {
 		const wet = 30
 		const ocean = WORLD.cells
 			.water()
-			.filter((cell: Cell) => cell.ocean && cell.landDist > 10)
+			.filter((cell: Cell) => cell.ocean)
 		const affected = window.world.cells.filter(
 			(cell: Cell) => cell.shallow || !cell.ocean,
 		)
