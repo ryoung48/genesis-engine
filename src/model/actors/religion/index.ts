@@ -1,16 +1,27 @@
 import { WORLD } from "@/model"
 import { PROVINCE } from "@/model/provinces"
+import { LANGUAGE } from "../language/languages"
 import { Faith } from "../faith/types"
 import { Religion } from "./types"
 
 export const RELIGION = {
 	spawn: ({ faith }: { faith: Faith }) => {
+		// Use the heritage language of the origin faith's first culture
+		const originCulture = window.world.cultures[Array.from(faith.cultures)[0]]
+		const heritage = originCulture
+			? window.world.heritages[originCulture.heritage]
+			: null
+		const lang = heritage?.language
+		const name = lang
+			? LANGUAGE.word.unique({ lang, key: "religion" }).word
+			: ""
 		const religion: Religion = {
 			idx: window.world.religions.length,
 			faiths: new Set([faith.idx]),
 			color: "#ccc",
 			hue: 0,
 			neighbors: new Set(),
+			name,
 		}
 		RELIGION.claim(religion, faith)
 		window.world.religions.push(religion)

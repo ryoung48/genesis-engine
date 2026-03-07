@@ -1,6 +1,15 @@
 interface Note {
 	time: number
-	tag: "rebellion" | "succession" | "war started" | "battle" | "war ended"
+	tag:
+		| "rebellion"
+		| "succession"
+		| "war started"
+		| "battle"
+		| "war ended"
+		| "alliance formed"
+		| "alliance broken"
+		| "regency started"
+		| "regency ended"
 	agents: number[]
 }
 
@@ -62,12 +71,27 @@ interface WarEnded extends Note {
 	stalemate?: string
 }
 
+interface RegencyStarted extends Note {
+	tag: "regency started"
+	nation: number
+	leader: number
+	age: number
+}
+
+interface RegencyEnded extends Note {
+	tag: "regency ended"
+	nation: number
+	leader: number
+}
+
 export type HistoryNote =
 	| Rebellion
 	| Succession
 	| WarStarted
 	| Battle
 	| WarEnded
+	| RegencyStarted
+	| RegencyEnded
 
 type BaseEvent = { time: number }
 
@@ -101,9 +125,23 @@ export interface CensusEvent extends BaseEvent {
 	previous: number
 }
 
+export interface DiplomacyEvent extends BaseEvent {
+	type: "diplomacy"
+	nation: number
+	previous: number
+}
+
+export interface RegencyEndEvent extends BaseEvent {
+	type: "regency"
+	province: number
+	leader: number
+}
+
 export type FutureEvent =
 	| WarEvent
 	| BattleEvent
 	| SuccessionEvent
 	| TaxEvent
 	| CensusEvent
+	| DiplomacyEvent
+	| RegencyEndEvent

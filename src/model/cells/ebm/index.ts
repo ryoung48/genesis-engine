@@ -10,6 +10,7 @@ import { INSOLATION } from "./insolation"
 
 export interface EBMConfig {
 	orbital: typeof EMB_CONSTANTS.orbital
+	stellar?: typeof EMB_CONSTANTS.stellar
 	landFraction?: number[]
 }
 
@@ -156,6 +157,7 @@ export class EnergyBalanceModel {
 		const { _insolation, _daylight_hours } = INSOLATION.compute(
 			this.lats,
 			this.config.orbital,
+			this.config.stellar,
 		)
 		this.insolation = _insolation
 		this.daylightHours = _daylight_hours
@@ -237,6 +239,7 @@ export const EBM = {
 			const world = window.world
 			const config: EBMConfig = {
 				orbital: { ...EMB_CONSTANTS.orbital },
+				stellar: { ...EMB_CONSTANTS.stellar },
 			}
 
 			if (world) {
@@ -246,6 +249,8 @@ export const EBM = {
 					config.orbital.ECCENTRICITY = world.eccentricity
 				if (world.perihelion !== undefined)
 					config.orbital.PERIHELION = world.perihelion
+				if (world.tSun !== undefined && config.stellar)
+					config.stellar.T_SUN = world.tSun
 			}
 
 			defaultInstance = new EnergyBalanceModel(config)
@@ -263,12 +268,18 @@ export const EBM = {
 
 			scales.heat.avg = d3.scaleLinear().domain(lats_deg).range(temperature_avg)
 			scales.heat.daily = range(time.DAYS_PER_YEAR).map((dayIdx) =>
-				d3.scaleLinear().domain(lats_deg).range(lats_deg.map((_, i) => temperature[i][dayIdx])),
+				d3
+					.scaleLinear()
+					.domain(lats_deg)
+					.range(lats_deg.map((_, i) => temperature[i][dayIdx])),
 			)
 			scales.heat.min = d3.scaleLinear().domain(lats_deg).range(temperature_min)
 			scales.heat.max = d3.scaleLinear().domain(lats_deg).range(temperature_max)
 			scales.daylight.daily = range(time.DAYS_PER_YEAR).map((dayIdx) =>
-				d3.scaleLinear().domain(lats_deg).range(lats_deg.map((_, i) => daylightHours[i][dayIdx])),
+				d3
+					.scaleLinear()
+					.domain(lats_deg)
+					.range(lats_deg.map((_, i) => daylightHours[i][dayIdx])),
 			)
 		}
 

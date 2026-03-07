@@ -1,0 +1,11 @@
+export type Relation =
+	| "overlord"
+	| "vassal"
+	| "personal_union_senior"
+	| "personal_union_junior"
+	| "ally"
+	| "friendly"
+	| "neutral"
+	| "suspicious"
+	| "rival"
+	| "war"

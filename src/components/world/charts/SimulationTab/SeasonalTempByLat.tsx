@@ -9,6 +9,8 @@ interface SeasonalTempByLatProps {
 	sampledDays: number[]
 	dayLabels: string[]
 	colorFn?: (temp: number) => string
+	unit?: string
+	fullHeight?: boolean
 }
 
 const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
@@ -17,6 +19,8 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 	sampledDays,
 	dayLabels,
 	colorFn,
+	unit,
+	fullHeight = false,
 }) => {
 	const numLatitudes = latRange.length
 	const datasetsTemp = []
@@ -54,8 +58,14 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 	}
 
 	return (
-		<div className="mt-4">
-			<div style={{ height: "400px", overflow: "hidden" }}>
+		<div className={`mt-4 ${fullHeight ? "h-full flex flex-col min-h-0" : ""}`}>
+			<div
+				style={
+					fullHeight
+						? { flex: 1, minHeight: 0 }
+						: { height: "400px", overflow: "hidden" }
+				}
+			>
 				<Bar
 					data={dataTemp}
 					options={{
@@ -72,7 +82,7 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 										const lat = ctx.dataset.label
 										const temp =
 											heat[ctx.datasetIndex][sampledDays[ctx.dataIndex]]
-										return `${lat}, Day ${day}: ${temp.toFixed(1)}°C`
+										return `${lat}, Day ${day}: ${temp.toFixed(1)}${unit || "°C"}`
 									},
 								},
 							},
@@ -95,7 +105,7 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 							y: {
 								stacked: true,
 								ticks: {
-									callback: (val, index) => {
+									callback: (_val, index) => {
 										const lat = latRange[index]
 										return lat !== undefined ? `${lat.toFixed(0)}°` : ""
 									},

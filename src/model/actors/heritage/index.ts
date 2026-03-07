@@ -1,16 +1,22 @@
 import { WORLD } from "@/model"
 import { PROVINCE } from "@/model/provinces"
+import { LANGUAGE } from "../language/languages"
 import { Culture } from "../culture/types"
 import { Heritage } from "./types"
 
 export const HERITAGE = {
 	spawn: ({ culture }: { culture: Culture }) => {
+		const seed = window.dice.randint(0, 2147483647).toString()
+		const language = LANGUAGE.spawn(seed)
+		const name = LANGUAGE.word.unique({ lang: language, key: "heritage" }).word
 		const heritage: Heritage = {
 			idx: window.world.heritages.length,
 			cultures: new Set([culture.idx]),
 			color: "#ccc",
 			hue: 0,
 			neighbors: new Set(),
+			language,
+			name,
 		}
 		HERITAGE.claim(heritage, culture)
 		window.world.heritages.push(heritage)
@@ -19,6 +25,13 @@ export const HERITAGE = {
 	claim: (heritage: Heritage, culture: Culture) => {
 		culture.heritage = heritage.idx
 		heritage.cultures.add(culture.idx)
+
+		// Give culture a dialect of the heritage language + a unique name
+		culture.language = LANGUAGE.dialect(heritage.language)
+		culture.name = LANGUAGE.word.unique({
+			lang: culture.language,
+			key: "culture",
+		}).word
 
 		culture.provinces.forEach((pIdx) => {
 			const province = window.world.provinces[pIdx]

@@ -130,8 +130,13 @@ export const TEMPERATURE = {
 	},
 	color: (celsius: number): string => tempScale(celsius),
 	daily: {
-		mean: ({ cell, day }: DailyTemperatureParams): number => {
+		mean: ({
+			cell,
+			day,
+			h = cell.elevation,
+		}: DailyTemperatureParams): number => {
 			const zonalAvgCelsius = EBM.model.scales.heat.daily[day](cell.y)
+			if (cell.ocean) return zonalAvgCelsius
 			const annualAvgCelsius = EBM.model.scales.heat.avg(cell.y)
 
 			// Continentality / Thermal Inertia
@@ -142,11 +147,11 @@ export const TEMPERATURE = {
 			const distMiles =
 				(cell.isWater ? -cell.landDist : cell.oceanDist) *
 				window.world.cell.length
-			const inertiaFactor = 0.5 + 1 * Math.tanh(distMiles / 1000)
+			const inertiaFactor = 1 + 0.75 * Math.tanh(distMiles / 1000)
 
 			const localSeaLevelTemp = annualAvgCelsius + deviation * inertiaFactor
 
-			return elevationCorrection(cell.elevation, localSeaLevelTemp)
+			return elevationCorrection(h, localSeaLevelTemp)
 		},
 	},
 	describe: (celsius: number): string => {
@@ -202,6 +207,16 @@ export const TEMPERATURE = {
 				)
 			}
 			return cell.heat.monthly[month]
+		},
+		meanE: ({ cell, month }: MonthlyTemperatureParams): number => {
+			if (cell.heat?.monthlyE?.[month] === undefined) {
+				cell.heat.monthlyE[month] = mean(
+					TIME.month
+						.days(month)
+						.map((day) => TEMPERATURE.daily.mean({ cell, day, h: 0 })),
+				)
+			}
+			return cell.heat.monthlyE[month]
 		},
 		/** Returns the minimum daily temperature for the month */
 		min: ({ cell, month }: MonthlyTemperatureParams): number => {

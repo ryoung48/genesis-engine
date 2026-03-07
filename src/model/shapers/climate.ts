@@ -1,11 +1,11 @@
-import { mean, range, scaleLinear } from "d3"
+import { mean, scaleLinear } from "d3"
 import { WORLD } from ".."
 import { CELL } from "../cells"
 import { RAIN } from "../cells/rain"
 import { TEMPERATURE } from "../cells/temperature"
 import { WEATHER } from "../cells/weather"
+import { WIND } from "../cells/wind"
 import { MATH } from "../utilities/math"
-import { POINT } from "../utilities/points"
 import { SHAPER_MOUNTAINS } from "./topagraphy"
 
 export const SHAPER_CLIMATES = {
@@ -35,84 +35,13 @@ export const SHAPER_CLIMATES = {
 		WORLD.cells.reshape()
 	},
 	_rain: () => {
-		const scale = scaleLinear([4, 8], [1, 1.5])(window.world.resolution)
-		const wet = 30
-		const ocean = WORLD.cells
-			.water()
-			.filter((cell) => cell.ocean && cell.landDist > 10)
-		const affected = window.world.cells.filter(
-			(cell) => cell.shallow || !cell.ocean,
-		)
-
-		const assignRain = (attr: "east" | "west") => {
-			const visited = new Set<number>()
-			ocean.forEach((cell) => {
-				cell.rain[attr] = wet
-				visited.add(cell.idx)
-			})
-			const queue = [...ocean]
-			while (queue.length > 0) {
-				const cell = queue.shift()
-				const impact = (cell.ocean ? 0.5 : cell.isWater ? 0.25 : -0.8) / scale
-				const rain = Math.max(
-					Math.min(Math.max(cell.rain[attr], 0) + impact, wet),
-					0,
-				)
-
-				// Coriolis deflection based on latitude and hemisphere
-				const lat = Math.abs(cell.y)
-				const hemisphere = cell.y >= 0 ? 1 : -1
-
-				// Trade winds (0-30°) deflect toward equator, westerlies (30+) deflect toward poles
-				let validDirs: string[]
-				if (attr === "east") {
-					// Trade winds: from east, deflecting toward equator
-					// NH: deflect south (SW), SH: deflect north (NW)
-					validDirs = lat < 30 ? ["W", hemisphere > 0 ? "SW" : "NW"] : ["W"] // Minimal deflection at higher latitudes
-				} else {
-					// Westerlies: from west, deflecting toward poles
-					// NH: deflect north (NE), SH: deflect south (SE)
-					validDirs = lat > 25 ? ["E", hemisphere > 0 ? "NE" : "SE"] : ["E"] // Tropics have less westerly influence
-				}
-
-				const neighbors = CELL.neighbors(cell).filter(
-					(n) =>
-						(!visited.has(n.idx) || (!n.isWater && rain > n.rain[attr])) &&
-						validDirs.includes(POINT.direction.geo(cell, n)),
-				)
-				neighbors.forEach((n) => {
-					queue.push(n)
-					n.rain[attr] = rain
-					visited.add(n.idx)
-				})
-			}
-			range(1).forEach(() => {
-				affected.forEach((cell) => {
-					cell.rain[attr] = mean(
-						CELL.neighbors(cell)
-							.concat([cell])
-							.filter((n) => n.rain[attr] >= 0 && (n.shallow || !n.ocean))
-							.map((n) => n.rain[attr]),
-					)
-					if (isNaN(cell.rain[attr])) cell.rain[attr] = 0
-				})
-			})
-		}
-		assignRain("east")
-		assignRain("west")
+		// 1. Compute moisture advection from oceans
+		RAIN.assignAdvection()
 
 		const lakes = WORLD.cells.lakes.get()
 		const cells = WORLD.cells.land().concat(lakes)
 
-		// Normalize weights before passing to monthly assignment
-		cells.forEach((cell) => {
-			cell.rain.east /= wet
-			cell.rain.west /= wet
-			if (cell.rain.east > cell.rain.west) cell.rain.west = 0
-			else cell.rain.east = 0
-		})
-
-		// Assign monthly rain using thermal equator-driven zones
+		// 2. Assign monthly rain using thermal equator-driven zones
 		RAIN.assignMonthly(cells)
 	},
 	_heat: () => {
@@ -122,6 +51,7 @@ export const SHAPER_CLIMATES = {
 			cell.heat.max = TEMPERATURE.annual.max(cell)
 			cell.heat.mean = TEMPERATURE.annual.mean(cell)
 			cell.heat.monthly = []
+			cell.heat.monthlyE = []
 		})
 	},
 	_climate: () => {
@@ -243,16 +173,11 @@ export const SHAPER_CLIMATES = {
 				cell.heat.mean = averageHeat
 				if (latitude === tropical) {
 					cell.climate = "tropical"
-					if (rain > humidity.humid) cell.vegetation = "jungle"
-					else if (rain > humidity.wet)
-						cell.vegetation = window.dice.weightedChoice([
-							{ v: "jungle", w: 70 },
-							{ v: "forest", w: 30 },
-						])
+					if (rain > humidity.wet) cell.vegetation = "jungle"
 					else if (rain > humidity.moist)
 						cell.vegetation = window.dice.weightedChoice([
 							{ v: "forest", w: 70 },
-							{ v: "woods", w: 30 },
+							{ v: "jungle", w: 30 },
 						])
 					else if (rain > humidity.moderate)
 						cell.vegetation = window.dice.weightedChoice([
@@ -429,5 +354,6 @@ export const SHAPER_CLIMATES = {
 		SHAPER_CLIMATES._lakes()
 		SHAPER_CLIMATES._coastlines()
 		SHAPER_MOUNTAINS._topography()
+		WIND.build()
 	},
 }

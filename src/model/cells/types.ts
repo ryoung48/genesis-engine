@@ -40,12 +40,10 @@ export interface Cell extends Point {
 	ocean?: boolean
 	oceanRegion?: number
 	shallow?: boolean
-	monsoon?: boolean
+	moisture: { east: number; west: number }
 	rain?: {
 		annual: number
 		monthly: number[]
-		east: number
-		west: number
 		weights?: {
 			itcz: number
 			suppression: number
@@ -54,7 +52,14 @@ export interface Cell extends Point {
 			w: number
 		}[]
 	}
-	heat?: { mean: number; max: number; min: number; monthly?: number[] }
+	heat?: {
+		mean: number
+		max: number
+		min: number
+		monthly?: number[]
+		monthlyE?: number[]
+	}
+	wind?: { monthly: number[]; annual: number }
 	topography?: "coastal" | "marsh" | "flat" | "hills" | "plateau" | "mountains"
 	vegetation?: Vegetation
 	climate?: Climate

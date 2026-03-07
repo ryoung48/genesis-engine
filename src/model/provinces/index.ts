@@ -1,11 +1,10 @@
 import { CELL } from "../cells"
 import { Cell } from "../cells/types"
-import { War } from "../history/wars/types"
-import { START_DATE, TIME } from "../utilities/time"
-import { Province, ProvinceNeighborParams, Relation } from "./types"
+import { START_DATE } from "../utilities/time"
+import { Province, ProvinceNeighborParams } from "./types"
 
 const EMPTY = -1
-const START_POP = 250e6
+const START_POP = 215e6
 export const HAB = {
 	climate: {
 		arctic: 0.01,
@@ -71,6 +70,9 @@ export const PROVINCE = {
 		const otherCell = PROVINCE.cell(other)
 		return CELL.distance(cell, otherCell)
 	},
+	history: {
+		find: findHistory,
+	},
 	consumption: {
 		delta: (province: Province, delta: number) => {
 			const lastEntry = province._consumption[province._consumption.length - 1]
@@ -89,22 +91,6 @@ export const PROVINCE = {
 		get: (province: Province, time?: number) => {
 			return findHistory(province._consumption, { consumption: 0 }, time)
 				.consumption
-		},
-	},
-	leader: {
-		add: (province: Province, end?: number) => {
-			const death =
-				end ?? window.world.time + TIME.delta.year(window.dice.uniform(1, 60))
-			const event = {
-				time: window.world.time,
-				end: death,
-				idx: province._leader.length,
-			}
-			province._leader.push(event)
-			return event
-		},
-		get: (province: Province, time?: number) => {
-			return findHistory(province._leader, { end: START_DATE }, time).end
 		},
 	},
 	occupations: {
@@ -261,42 +247,6 @@ export const PROVINCE = {
 			}
 		},
 	},
-	relation: {
-		get: (params: { province: Province; other: Province; time?: number }) => {
-			const { province, other, time } = params
-			const { relation } = findHistory<
-				{ relation: Relation },
-				Province["_relations"][number][number]
-			>(province._relations[other.idx], { relation: "neutral" }, time)
-			return relation
-		},
-		set: (params: {
-			province: Province
-			other: Province
-			relation: Relation
-		}) => {
-			const { province, other, relation } = params
-			const lastEntry =
-				province._relations[other.idx][
-					province._relations[other.idx].length - 1
-				]
-			if (relation === lastEntry?.relation) return
-			if (lastEntry && lastEntry.time === window.world.time) {
-				lastEntry.relation = relation
-				const prior =
-					province._relations[other.idx][
-						province._relations[other.idx].length - 2
-					]
-				if (prior && prior.relation === relation)
-					province._relations[other.idx].pop()
-			} else {
-				province._relations[other.idx].push({
-					time: window.world.time,
-					relation,
-				})
-			}
-		},
-	},
 	children: {
 		_get: (province: Province, time?: number) => {
 			const { children } = findHistory(
@@ -340,27 +290,6 @@ export const PROVINCE = {
 			const next = new Set(children)
 			const diff = curr.difference(next)
 			PROVINCE.children._dedup(province, diff)
-		},
-	},
-	wars: {
-		active: (province: Province, time?: number): War[] => {
-			const targetTime = time ?? window.world.time
-			return PROVINCE.wars
-				.get(province, targetTime)
-				.filter(
-					(w) =>
-						w.startTime <= targetTime &&
-						(w.endTime === undefined || w.endTime > targetTime),
-				)
-		},
-		get: (province: Province, time?: number): War[] => {
-			const targetTime = time ?? window.world.time
-			return province._wars
-				.map((idx) => window.world.wars[idx])
-				.filter((w) => w.startTime <= targetTime)
-		},
-		add: (province: Province, war: War) => {
-			province._wars.push(war.idx)
 		},
 	},
 	nation: (province: Province, time?: number): Province => {

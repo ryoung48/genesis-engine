@@ -6,6 +6,7 @@ export type Faith = {
 	color: string
 	neighbors: Set<number>
 	religion: number
+	name: string
 }
 
 export type FaithSpawnParams = {

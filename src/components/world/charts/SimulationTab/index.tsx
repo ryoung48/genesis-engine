@@ -17,7 +17,12 @@ import { MATH } from "@/model/utilities/math"
 import { TEXT } from "@/model/utilities/text"
 import { START_DATE, TIME } from "@/model/utilities/time"
 import { MAP_METRICS } from "../../shapes/metrics"
-import { EventCounts, RebellionOutcomeCounts, WarOutcomeCounts } from "../index"
+import {
+	EventCounts,
+	RebellionOutcomeCounts,
+	RelationCounts,
+	WarOutcomeCounts,
+} from "../index"
 import { DistributionChart } from "../NationTab/DistributionChart"
 import { ActiveTrendsChart, SIZE_BUCKETS } from "./ActiveTrendsChart"
 
@@ -41,12 +46,15 @@ interface SimulationTabProps {
 		time: number
 		dist: number[]
 		devDist: number[]
+		nationDevDist: number[]
+		nationAvgDev: number
 		avgDev: number
 		activeWars: number
 		activeCivilWars: number
 		eventCounts: EventCounts
 		warOutcomes: WarOutcomeCounts
 		rebellionOutcomes: RebellionOutcomeCounts
+		relationCounts: RelationCounts
 	}[]
 	nationDistribution: number[]
 	renderTime: number
@@ -121,26 +129,26 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 				)
 
 				return (
-					<div className="grid grid-cols-3 gap-4 mb-4 pl-1">
-						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-								World Population
+					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 px-1">
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Population
 							</div>
-							<div className="text-xl font-bold text-gray-900 leading-none">
+							<div className="text-sm font-bold text-gray-900 leading-none">
 								{new Intl.NumberFormat("en-US", {
 									notation: "compact",
 									maximumFractionDigits: 2,
 								}).format(worldTotalPopulation)}
-								<span className="text-xs text-gray-500 font-normal ml-1">
+								<span className="text-[10px] text-gray-500 font-normal ml-0.5">
 									people
 								</span>
 							</div>
 						</div>
-						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
 								Urbanization
 							</div>
-							<div className="text-xl font-bold text-gray-900 leading-none">
+							<div className="text-sm font-bold text-gray-900 leading-none">
 								{new Intl.NumberFormat("en-US", {
 									style: "percent",
 									maximumFractionDigits: 1,
@@ -151,11 +159,11 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 								)}
 							</div>
 						</div>
-						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-								World Land Area
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Land Area
 							</div>
-							<div className="text-xl font-bold text-gray-900 leading-none">
+							<div className="text-sm font-bold text-gray-900 leading-none">
 								{new Intl.NumberFormat("en-US", {
 									notation: "compact",
 									maximumFractionDigits: 2,
@@ -167,7 +175,7 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 										),
 									),
 								)}
-								<span className="text-xs text-gray-500 font-normal ml-1">
+								<span className="text-[10px] text-gray-500 font-normal ml-0.5">
 									km²
 								</span>
 							</div>
@@ -183,9 +191,9 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						const c = PROVINCE.cell(p)
 						return c.climate
 							? {
-									label: TEXT.titleCase(c.climate),
-									color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
-								}
+								label: TEXT.titleCase(c.climate),
+								color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
+							}
 							: null
 					})}
 				/>
@@ -195,12 +203,12 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						const c = PROVINCE.cell(p)
 						return c.vegetation
 							? {
-									label: TEXT.titleCase(c.vegetation),
-									color:
-										MAP_METRICS.vegetation.color[
-											c.vegetation as keyof typeof MAP_METRICS.vegetation.color
-										] || "#ccc",
-								}
+								label: TEXT.titleCase(c.vegetation),
+								color:
+									MAP_METRICS.vegetation.color[
+									c.vegetation as keyof typeof MAP_METRICS.vegetation.color
+									] || "#ccc",
+							}
 							: null
 					})}
 				/>
@@ -210,12 +218,12 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						const c = PROVINCE.cell(p)
 						return c.topography
 							? {
-									label: TEXT.titleCase(c.topography),
-									color:
-										MAP_METRICS.terrain.categorical[
-											c.topography as keyof typeof MAP_METRICS.terrain.categorical
-										] || "#ccc",
-								}
+								label: TEXT.titleCase(c.topography),
+								color:
+									MAP_METRICS.terrain.categorical[
+									c.topography as keyof typeof MAP_METRICS.terrain.categorical
+									] || "#ccc",
+							}
 							: null
 					})}
 				/>

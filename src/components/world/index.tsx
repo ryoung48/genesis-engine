@@ -9,7 +9,7 @@ import { START_DATE } from "@/model/utilities/time"
 import { Vertex } from "@/model/utilities/voronoi/types"
 import { ACTION } from "./actions"
 
-import { ChartPanel } from "./charts"
+import { ChartPanel, EntityRef } from "./charts"
 import { DRAW_LANDMARKS } from "./coast"
 import { DRAW_BORDERS } from "./coloration"
 import { MapControls } from "./controls"
@@ -91,6 +91,7 @@ const paint = ({
 }) => {
 	ctx.fillStyle = "white"
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+	DRAW_BORDERS.setDiplomacyTarget(selectedNation ?? null)
 	DRAW_LANDMARKS.oceans({ ctx, projection, mapMode, visible })
 	DRAW_BORDERS.provinces({
 		ctx,
@@ -105,14 +106,24 @@ const paint = ({
 	DRAW_EMBELLISHMENTS.graticule({ ctx, projection, mapMode, visible })
 
 	// Draw thermal equator line overlay
-	if (showTEQ && (mapMode === "temperature" || mapMode === "rainfall")) {
+	if (
+		showTEQ &&
+		(mapMode === "temperature" || mapMode === "rainfall" || mapMode === "wind")
+	) {
 		const month = time !== undefined ? new Date(time).getMonth() : 0
-		DRAW_EMBELLISHMENTS.thermalEquator({ ctx, projection, mapMode, visible, month })
+		DRAW_EMBELLISHMENTS.thermalEquator({
+			ctx,
+			projection,
+			mapMode,
+			visible,
+			month,
+		})
 	}
 	if (
 		(mapMode === "nations" ||
 			mapMode === "optimalWealth" ||
-			mapMode === "population") &&
+			mapMode === "population" ||
+			mapMode === "diplomacy") &&
 		visible.has(selectedNation)
 	) {
 		DRAW_HIERARCHY.nation({
@@ -184,11 +195,12 @@ const WorldMap: React.FC = () => {
 	const projectionRef = useRef<GeoProjection>(null)
 	const scaleOverlayRef = useRef<ScaleOverlayHandle>(null)
 
-	// Selected nation for detail view (clicked province's nation)
+	// Selected nation for detail view (derived from entity stack)
 	const [selectedNation, setSelectedNation] = useState<number | null>(null)
 
-	// Selected war for detail view (clicked from history)
-	const [selectedWar, setSelectedWar] = useState<number | null>(null)
+	// Entity navigation stack for chart panel
+	const [entityStack, setEntityStack] = useState<EntityRef[]>([])
+	const [activeDepth, setActiveDepth] = useState<0 | 1 | 2>(0)
 
 	// Selected time for historical view (undefined = live)
 	const [selectedTime, setSelectedTime] = useState<number | undefined>(
@@ -392,15 +404,6 @@ const WorldMap: React.FC = () => {
 	const animationFrameRef = useRef<number | null>(null)
 	const lastTickTimeRef = useRef<number>(0)
 
-	// Tab state for chart panel
-	const [chartTab, setChartTab] = useState<
-		"simulation" | "nation" | "province" | "war"
-	>("simulation")
-
-	// Selected province for province detail view
-	const [selectedProvinceIdx, setSelectedProvinceIdx] = useState<number | null>(
-		null,
-	)
 
 	// Animation loop for history simulation
 	useEffect(() => {
@@ -422,7 +425,7 @@ const WorldMap: React.FC = () => {
 				lastTickTimeRef.current = timestamp
 
 				// Process 3000 events per tick
-				const newTime = HISTORY.tick(10)
+				const newTime = HISTORY.tick(3000)
 
 				// Clear nation border cache so borders update
 				DRAW_BORDERS.clearNationCache()
@@ -472,32 +475,45 @@ const WorldMap: React.FC = () => {
 					const clickedProvince = province
 					if (!clickedProvince) return
 
-					// If on nation tab, clicking opens nation tab for that province's nation
-					// Otherwise, clicking opens province tab for that province
-					if (chartTab === "nation") {
-						const nation = PROVINCE.nation(clickedProvince, timeToRender)
-						if (nation && nation.idx !== -1 && !nation.desolate) {
-							setSelectedNation(nation.idx)
-							// Stay on nation tab
+					// Culture map mode → navigate to heritage > culture
+					if (mapMode === "cultures" && clickedProvince.culture >= 0) {
+						const culture = window.world.cultures[clickedProvince.culture]
+						if (culture && culture.heritage >= 0) {
+							setSelectedNation(null)
+							setEntityStack([
+								{ type: "heritage", idx: culture.heritage },
+								{ type: "culture", idx: culture.idx },
+							])
+							// If already viewing a culture, stay at culture depth; otherwise show heritage
+							const viewingCulture = activeDepth === 2 && entityStack.some((e) => e.type === "culture")
+							setActiveDepth(viewingCulture ? 2 : 1)
+							return
 						}
+					}
+
+					const nation = PROVINCE.nation(clickedProvince, timeToRender)
+					if (nation && nation.idx !== -1 && !nation.desolate) {
+						setSelectedNation(nation.idx)
+						setEntityStack([
+							{ type: "nation", idx: nation.idx },
+							{ type: "province", idx: clickedProvince.idx },
+						])
+						setActiveDepth(mapMode === "nations" || mapMode === "diplomacy" ? 1 : 2)
 					} else {
-						// Open province tab for the clicked province
-						setSelectedProvinceIdx(clickedProvince.idx)
-						setChartTab("province")
+						setEntityStack([{ type: "province", idx: clickedProvince.idx }])
+						setActiveDepth(2)
 					}
 				}}
 			></canvas>
 
 			{/* Simulation Controls & Chart - Upper Right */}
-			<div className="absolute top-4 right-4 bg-white p-4 border border-slate-200 text-black min-w-[600px] max-w-[150px] shadow-sm">
+			<div className="absolute top-4 right-4 bg-white p-4 border border-slate-200 text-black min-w-[600px] max-w-[150px] shadow-sm flex flex-col max-h-[80vh]">
 				{/* Chart Panel */}
 				<ChartPanel
-					chartTab={chartTab}
-					setChartTab={setChartTab}
-					selectedNation={selectedNation}
-					selectedProvince={selectedProvinceIdx}
-					selectedWar={selectedWar}
-					setSelectedWar={setSelectedWar}
+					entityStack={entityStack}
+					setEntityStack={setEntityStack}
+					activeDepth={activeDepth}
+					setActiveDepth={setActiveDepth}
 					currentTime={currentTime}
 					renderTime={timeToRender}
 					onTimeSelect={handleTimeSelect}

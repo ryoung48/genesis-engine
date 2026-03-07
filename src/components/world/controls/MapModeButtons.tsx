@@ -8,8 +8,10 @@ interface MapModeButtonsProps {
 
 const MAP_MODE_OPTIONS = [
 	{ mode: "nations", label: "NAT", fullLabel: "Nations" },
+	{ mode: "diplomacy", label: "DIP", fullLabel: "Diplomacy" },
 	{ mode: "cultures", label: "CUL", fullLabel: "Cultures" },
 	{ mode: "religion", label: "REL", fullLabel: "Religion" },
+	{ mode: "dynasties", label: "DYN", fullLabel: "Dynasties" },
 	{ mode: "climate", label: "CLM", fullLabel: "Climate" },
 	{ mode: "vegetation", label: "VEG", fullLabel: "Vegetation" },
 	{ mode: "terrain", label: "TER", fullLabel: "Topography" },
@@ -17,8 +19,7 @@ const MAP_MODE_OPTIONS = [
 	{ mode: "development", label: "DEV", fullLabel: "Development" },
 	{ mode: "rainfall", label: "RAN", fullLabel: "Rainfall" },
 	{ mode: "temperature", label: "TMP", fullLabel: "Temperature" },
-	// { mode: "wind", label: "WND", fullLabel: "Wind" },
-	// { mode: "pressure", label: "PRS", fullLabel: "Pressure" },
+	{ mode: "wind", label: "WND", fullLabel: "Wind" },
 ] as const
 
 export const MapModeButtons: React.FC<MapModeButtonsProps> = ({
@@ -31,11 +32,10 @@ export const MapModeButtons: React.FC<MapModeButtonsProps> = ({
 				<button
 					key={option.mode}
 					onClick={() => setMapMode(option.mode as MapMode)}
-					className={`px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors outline-none cursor-pointer ${
-						mapMode === option.mode
+					className={`px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors outline-none cursor-pointer ${mapMode === option.mode
 							? "bg-slate-900 text-white"
 							: "bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-					}`}
+						}`}
 					title={option.fullLabel}
 				>
 					{option.label}

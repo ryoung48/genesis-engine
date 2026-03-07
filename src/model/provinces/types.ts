@@ -1,4 +1,4 @@
-export type Relation = "ally" | "friendly" | "neutral" | "suspicious"
+import { Relation } from "../nations/relations/types"
 
 export interface Province {
 	idx: number
@@ -26,7 +26,15 @@ export interface Province {
 		targetUrban: number
 	}
 	_development: { time: number; development: number }[]
-	_leader: { time: number; end: number; idx: number }[]
+	_leader: {
+		time: number
+		end: number
+		idx: number
+		dynasty: number
+		claim: "strong" | "average" | "weak" | "none"
+		name?: string
+		birthTime: number
+	}[]
 	_occupations: { time: number; occupier: number }[]
 	_wars: number[]
 	_consumption: { time: number; consumption: number }[]

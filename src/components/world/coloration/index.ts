@@ -3,7 +3,6 @@ import {
 	hsl,
 	interpolateBlues,
 	interpolateBuPu,
-	interpolateRainbow,
 	max,
 	mean,
 	min,
@@ -11,10 +10,13 @@ import {
 	scaleLinear,
 } from "d3"
 import { WORLD } from "@/model"
-import { PRESSURE } from "@/model/cells/pressure"
 import { TEMPERATURE } from "@/model/cells/temperature"
-import { WEATHER, WIND } from "@/model/cells/weather"
+import { WEATHER } from "@/model/cells/weather"
+import { WIND } from "@/model/cells/wind"
 import { NATION } from "@/model/nations"
+import { RELATIONS } from "@/model/nations/relations"
+import { Relation } from "@/model/nations/relations/types"
+import { WAR } from "@/model/nations/wars"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { SHAPER_DISPLAY } from "@/model/shapers/display"
@@ -24,6 +26,7 @@ import { MAP_SHAPES } from "../shapes"
 import { MAP_METRICS } from "../shapes/metrics"
 import { DrawMapParams } from "../shapes/types"
 import { MapMode } from "../types"
+import { LEADER } from "@/model/provinces/leader"
 
 function monthFromTime(time?: number): number | undefined {
 	if (time === undefined) return undefined
@@ -32,6 +35,8 @@ function monthFromTime(time?: number): number | undefined {
 
 const wasteland = "#bcbcbc"
 
+let diplomacyTarget: number | null = null
+
 let lastWorldId: string | null = null
 let wealthScale: ScaleLinear<number, number> | null = null
 let wealthScaleTime: number | undefined = undefined
@@ -39,10 +44,6 @@ let devScale: ScaleLinear<number, number> | null = null
 let devScaleTime: number | undefined = undefined
 let popScale: ScaleLinear<number, number> | null = null
 let popScaleTime: number | undefined = undefined
-let pressureScale: ScaleLinear<number, number> | null = null
-let pressureScaleMonth: number | undefined = undefined
-let windScale: ScaleLinear<number, number> | null = null
-let windScaleMonth: number | undefined = undefined
 
 const provinceBorders: Record<
 	number,
@@ -150,54 +151,6 @@ function getPopScale(time?: number) {
 	return popScale
 }
 
-function getPressureScale(month: number) {
-	if (
-		pressureScale &&
-		pressureScaleMonth === month &&
-		lastWorldId === window.world.id
-	) {
-		return pressureScale
-	}
-
-	const pressures = window.world.provinces.map((p) =>
-		PRESSURE.monthly(PROVINCE.cell(p), month),
-	)
-	const maxP = max(pressures) || 1040
-	const minP = min(pressures) || 940
-
-	// Diverging scale: map [min, 1013.25, max] to [-1, 0, 1]
-	pressureScale = scaleLinear()
-		.domain([minP, 1013.25, maxP])
-		.range([-1, 0, 1])
-		.clamp(true)
-
-	lastWorldId = window.world.id
-	pressureScaleMonth = month
-	return pressureScale
-}
-
-function getWindScale(month: number) {
-	if (
-		windScale &&
-		windScaleMonth === month &&
-		lastWorldId === window.world.id
-	) {
-		return windScale
-	}
-
-	const speeds = window.world.provinces.map(
-		(p) => WIND.month({ cell: PROVINCE.cell(p), month }).speed,
-	)
-	const maxS = max(speeds) || 10
-	const minS = min(speeds) || 0
-
-	windScale = scaleLinear().domain([minS, maxS]).range([0, 1])
-
-	lastWorldId = window.world.id
-	windScaleMonth = month
-	return windScale
-}
-
 function getStripePattern(
 	ctx: CanvasRenderingContext2D,
 	color: string,
@@ -260,7 +213,7 @@ const modes: Record<MapMode, (province: Province, time?: number) => string> = {
 	provinces: (province: Province) => province.color,
 	nations: (province: Province, time?: number) => {
 		const nation =
-			NATION.rebels.overlord(province, time) ?? PROVINCE.nation(province, time)
+			WAR.rebels.overlord(province, time) ?? PROVINCE.nation(province, time)
 		const c = hsl(nation.color)
 		c.l = 0.92
 		return c.toString()
@@ -268,6 +221,14 @@ const modes: Record<MapMode, (province: Province, time?: number) => string> = {
 	cultures: (province: Province) => {
 		const culture = window.world.cultures[province.culture]
 		return culture?.color || wasteland
+	},
+	dynasties: (province: Province, time?: number) => {
+		if (province.desolate) return wasteland
+		const ruler = PROVINCE.nation(province, time)
+		const dynastyIdx = LEADER.dynasty.get(ruler, time)
+		if (dynastyIdx < 0) return wasteland
+		const dynasty = window.world.dynasties[dynastyIdx]
+		return dynasty?.color || wasteland
 	},
 	religion: (province: Province) => {
 		const faith = window.world.faiths[province.faith]
@@ -307,25 +268,61 @@ const modes: Record<MapMode, (province: Province, time?: number) => string> = {
 		return MAP_METRICS.temperature.color(mean(cells.map((c) => c.heat.mean)))
 	},
 	wind: (province: Province, time?: number) => {
-		const cell = PROVINCE.cell(province)
-		const m = monthFromTime(time) ?? 0
-		const wind = WIND.month({ cell, month: m })
-		const t = getWindScale(m)(wind.speed)
-		const color = hsl(interpolateRainbow(wind.direction / 360))
-		color.l = 0.98 - t * 0.85 // Extremely light (0.98) for slow, very dark (0.13) for fast
-		color.s = 0.3 + t * 0.7 // More saturated for faster winds
-		return color.toString()
+		const cells = province.cells.land.map((c) => window.world.cells[c])
+		const m = monthFromTime(time)
+		if (m !== undefined) {
+			const avg = mean(cells.map((c) => c.wind?.monthly?.[m] ?? 0))
+			return WIND.color(avg)
+		}
+		const avg = mean(cells.map((c) => c.wind?.annual ?? 0))
+		return WIND.color(avg)
 	},
-	pressure: (province: Province, time?: number) => {
-		const cell = PROVINCE.cell(province)
-		const m = monthFromTime(time) ?? 0
-		const t = getPressureScale(m)(PRESSURE.monthly(cell, m))
-		return d3.interpolateRdBu(1 - (t + 1) / 2) // Map [-1, 1] back to [0, 1]
+	diplomacy: (province: Province, time?: number) => {
+		if (province.desolate) return wasteland
+		if (diplomacyTarget === null) {
+			// Fallback to nations mode if no target selected
+			const nation =
+				WAR.rebels.overlord(province, time) ?? PROVINCE.nation(province, time)
+			const c = hsl(nation.color)
+			c.l = 0.92
+			return c.toString()
+		}
+		const target = window.world.provinces[diplomacyTarget]
+		const nation = PROVINCE.nation(province, time)
+
+		// Selected nation itself
+		if (nation.idx === diplomacyTarget) return "#ffffff"
+
+		const RELATION_COLORS: Record<Relation, string> = {
+			war: "#971212ff", // red-700 (darker than rival)
+			rival: "#ef4444", // red-500
+			suspicious: "#f59e0b",
+			neutral: "#9ca3af",
+			friendly: "#22c55e",
+			ally: "#3b82f6",
+			vassal: "#be86f3ff", // purple-500
+			overlord: "#7c3aed", // violet-600 (distinct from vassal)
+			personal_union_senior: "#f472b6", // pink-400
+			personal_union_junior: "#fbcfe8", // pink-200
+		}
+
+		// Only sovereign nations have meaningful relations
+		if (!NATION.sovereign(nation, time)) return "#e5e7eb"
+
+		const relation = RELATIONS.get({
+			nation: target,
+			other: nation,
+			time,
+		})
+		return RELATION_COLORS[relation]
 	},
 }
 
 export const DRAW_BORDERS = {
 	clearNationCache,
+	setDiplomacyTarget: (nationIdx: number | null) => {
+		diplomacyTarget = nationIdx
+	},
 	provinces: ({
 		ctx,
 		projection,
@@ -356,9 +353,9 @@ export const DRAW_BORDERS = {
 				(p) => PROVINCE.parent.get(p, time) === undefined && !p.desolate,
 			)
 			nations.forEach((nation) => {
-				if (NATION.rebels.active(nation, time)) return
+				if (WAR.rebels.active(nation, time)) return
 				const provinces = NATION.provinces(nation, time)
-				const rebels = NATION.rebels.get(nation, time)
+				const rebels = WAR.rebels.get(nation, time)
 				const combined = [...provinces, ...rebels]
 				nationBorders[nation.idx] = {
 					path: SHAPER_DISPLAY.borders.provinces(combined),
@@ -391,10 +388,7 @@ export const DRAW_BORDERS = {
 
 					// DRAW OCCUPATION STRIPES
 					const war = PROVINCE.occupations.get(province, time)
-					const rebel = NATION.rebels.active(
-						PROVINCE.nation(province, time),
-						time,
-					)
+					const rebel = WAR.rebels.active(PROVINCE.nation(province, time), time)
 					if (rebel && war === undefined && mapMode === "nations") {
 						const pattern = getStripePattern(ctx, "black", scale)
 						ctx.fillStyle = pattern

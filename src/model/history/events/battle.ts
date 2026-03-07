@@ -10,8 +10,8 @@
  * - Both sides fall below 10% optimal wealth → war ends in exhaustion (attacker keeps occupied)
  */
 
-import { WAR } from "@/model/history/wars"
 import { NATION } from "@/model/nations"
+import { WAR } from "@/model/nations/wars"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { TIME } from "@/model/utilities/time"
@@ -21,7 +21,7 @@ const EXHAUSTION_THRESHOLD = 0.25 // War ends if both below 25% optimal wealth
 
 const exhausted = (nation: Province) => {
 	const optimal = NATION.wealth.optimal(nation)
-	return WAR.stats.strength({ nation }) < optimal * EXHAUSTION_THRESHOLD
+	return WAR.strength.solo({ nation }) < optimal * EXHAUSTION_THRESHOLD
 }
 
 /**
@@ -65,8 +65,6 @@ const COST_MULTIPLIERS: Record<VictoryDegree, number> = {
 }
 
 const calculateCost = (params: {
-	attacker: Province
-	defender: Province
 	target: Province
 	restoration: boolean
 	attackerDegree: VictoryDegree
@@ -79,15 +77,34 @@ const calculateCost = (params: {
 	return { attackerCost, defenderCost }
 }
 
+const distributeCosts = (
+	leader: Province,
+	allies: Province[],
+	totalCost: number,
+) => {
+	PROVINCE.consumption.delta(leader, totalCost)
+	const allyCost = totalCost * 0.4
+	const allyStrengths = allies.map((ally) => {
+		return { ally, str: WAR.strength.solo({ nation: ally }) }
+	})
+	const totalStr = allyStrengths.reduce((sum, a) => sum + a.str, 0)
+	if (totalStr === 0) return
+	for (const { ally, str } of allyStrengths) {
+		PROVINCE.consumption.delta(ally, allyCost * (str / totalStr))
+	}
+}
+
 export const BATTLE_EVENT = {
 	run: (event: BattleEvent) => {
 		const war = window.world.wars[event.war]
 		if (war.endTime !== undefined) return
 
-		const attacker = window.world.provinces[event.attacker]
-		const defender = window.world.provinces[event.defender]
+		const { attacker, defender } = WAR.participants({ war })
 
-		if (!NATION.sovereign(attacker) || !NATION.sovereign(defender)) {
+		if (
+			!NATION.sovereign(attacker.leader) ||
+			!NATION.sovereign(defender.leader)
+		) {
 			WAR.resolve({
 				war,
 				stalemate: "nations no longer sovereign",
@@ -108,9 +125,11 @@ export const BATTLE_EVENT = {
 			return
 		}
 
-		const odds = 1 - WAR.stats.threat({ attacker, defender })
-		const roll = window.dice.random
-		const outcome = roll < odds
+		const odds = 1 - WAR.threat({
+			attacker: attacker.leader,
+			defender: defender.leader,
+		})
+		const outcome = window.dice.random < odds
 		const margin = window.dice.uniform(0, 1)
 
 		// Determine victory degree for both sides
@@ -119,15 +138,15 @@ export const BATTLE_EVENT = {
 		const defenderDegree = getVictoryDegree(margin, !attackerWon)
 
 		const { attackerCost, defenderCost } = calculateCost({
-			attacker,
-			defender,
 			target,
 			restoration,
 			attackerDegree,
 			defenderDegree,
 		})
-		PROVINCE.consumption.delta(attacker, attackerCost)
-		PROVINCE.consumption.delta(defender, defenderCost)
+
+		// Distribute costs: leader pays 60%, allies split 40%
+		distributeCosts(attacker.leader, attacker.allies, attackerCost)
+		distributeCosts(defender.leader, defender.allies, defenderCost)
 
 		if (outcome) {
 			if (restoration) {
@@ -157,8 +176,8 @@ export const BATTLE_EVENT = {
 			defenderCost,
 		})
 
-		const atkExhausted = exhausted(attacker)
-		const defExhausted = exhausted(defender)
+		const atkExhausted = exhausted(attacker.leader)
+		const defExhausted = exhausted(defender.leader)
 
 		if (outcome && restoration && war.occupied.length === 0) {
 			WAR.resolve({

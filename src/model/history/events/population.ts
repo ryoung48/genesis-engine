@@ -1,4 +1,4 @@
-import { scaleLinear } from "d3"
+import { mean, scaleLinear } from "d3"
 import { NATION } from "@/model/nations"
 import { TIME } from "@/model/utilities/time"
 import { PROVINCE } from "../../provinces"
@@ -9,27 +9,31 @@ import { CensusEvent } from "../types"
 // const POP_GROWTH = 0.001 // ~0.1% annual growth (MDME: 0.1-0.3% in good times)
 const MAX_ADJUSTMENT_RATE = 0.005
 const URBAN_GROWTH = 0.1
-const URBAN_RATIO = 0.05 // 5% urban (MDME: cities + towns)
 const CITY_MIN = 8000 // MDME: cities are 8000+
 const TOWN_MIN = 1000 // MDME: towns are 1000-8000
 const SECOND_CITY_RATIO = 0.5 // MDME: 20-80% of largest (avg 50%)
 const CITY_DECAY = 0.75 // MDME: each city 10-40% smaller (avg 25% reduction)
 
-const devToGrowthRate = scaleLinear()
-	.domain([0.0, 0.05, 0.2, 0.55, 0.7])
-	.range([0.0, 0.001, 0.0015, 0.002, 0.0025])
+const urbanPopToDev = scaleLinear()
+	.domain([1_000, 5_000, 20_000, 100_000, 1_000_000])
+	.range([0.05, 0.1, 0.25, 0.65, 0.95])
 	.clamp(true)
 
-const urbanPopToDev = scaleLinear()
-	.domain([1_000, 5_000, 20_000, 50_000, 100_000, 500_000, 1_000_000])
-	.range([0.01, 0.05, 0.1, 0.2, 0.3, 0.55, 0.7])
+const devToGrowthRate = scaleLinear()
+	.domain([0.0, 0.15, 0.35, 0.55, 0.75, 0.95])
+	.range([0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.002])
+	.clamp(true)
+
+const devToUrbanRate = scaleLinear()
+	.domain([0.0, 0.15, 0.35, 0.55, 0.75, 0.95])
+	.range([0.04, 0.05, 0.06, 0.07, 0.08, 0.09])
 	.clamp(true)
 
 export const POPULATION_EVENT = {
 	init: () => {
 		POPULATION_EVENT.spawn()
 		POPULATION_EVENT.urbanization(true)
-		POPULATION_EVENT.development()
+		POPULATION_EVENT.development(true)
 	},
 	urbanization: (init?: boolean) => {
 		NATION.nations().forEach((nation) => {
@@ -38,7 +42,8 @@ export const POPULATION_EVENT = {
 				(acc, province) => acc + PROVINCE.population.rural.get(province),
 				0,
 			)
-			const totalUrban = (URBAN_RATIO * totalBase) / (1 - URBAN_RATIO)
+			const urbanRate = devToUrbanRate(PROVINCE.development.get(nation))
+			const totalUrban = (urbanRate * totalBase) / (1 - urbanRate)
 
 			// Sort provinces by optimal wealth descending to determine rank
 			const sorted = [...provinces].sort(
@@ -147,11 +152,11 @@ export const POPULATION_EVENT = {
 			})
 		})
 	},
-	development: () => {
+	development: (init?: boolean) => {
 		// Decay constants
-		const BASE_DECAY = 0.75
-		const FOREIGN_DECAY = 0.5 // Higher decay (lower multiplier) for foreign provinces
-		const COASTAL_BONUS = 1.15 // Lower decay (higher multiplier) for coastal provinces
+		const BASE_DECAY = 0.85
+		const FOREIGN_DECAY = 0.75 // Higher decay (lower multiplier) for foreign provinces
+		const COASTAL_BONUS = 1.1 // Lower decay (higher multiplier) for coastal provinces
 
 		// Gather all cities and their initial development + source nation
 		const cities = window.world.provinces
@@ -226,16 +231,25 @@ export const POPULATION_EVENT = {
 			}
 		}
 
-		// Apply development: combine base + city influence, only update if higher
+		// Apply development: blend current toward target, allowing decay
+		const DEV_RISE = 0.1 // 10% of gap per tick when rising
+		const DEV_FALL = 0.05 // 5% of gap per tick when falling
 		window.world.provinces
 			.filter((p) => !p.desolate)
 			.forEach((province) => {
 				const cityDev = devFromCities.get(province.idx) ?? 0
 				const urbanPop = PROVINCE.population.urban.get(province)
-				const dev = urbanPopToDev(urbanPop)
+				const localDev = urbanPopToDev(urbanPop)
+				const targetDev = Math.max(cityDev, localDev)
 
-				const currentDev = PROVINCE.development.get(province)
-				PROVINCE.development.set(province, Math.max(currentDev, cityDev, dev))
+				if (init) {
+					PROVINCE.development.set(province, targetDev)
+				} else {
+					const currentDev = PROVINCE.development.get(province)
+					const gap = targetDev - currentDev
+					const rate = gap > 0 ? DEV_RISE : DEV_FALL
+					PROVINCE.development.set(province, currentDev + gap * rate)
+				}
 			})
 	},
 	run: (event: CensusEvent) => {

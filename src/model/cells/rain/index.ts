@@ -1,8 +1,9 @@
 import { interpolateViridis, mean, range, scaleLinear } from "d3"
-
+import { WORLD } from "../.."
 import { MATH } from "../../utilities/math"
-import { TEMPERATURE } from "../temperature"
+import { POINT } from "../../utilities/points"
 import { CELL } from "../"
+import { TEMPERATURE } from "../temperature"
 import { Cell } from "../types"
 import { GetMonthlyRainParams } from "./types"
 
@@ -65,7 +66,7 @@ const eastStormScale = scaleLinear()
 	.clamp(true)
 
 /** Polar front — TEQ ± 50°: range [40, 60] */
-const polarFrontScale = scaleLinear()
+const westerliesScale = scaleLinear()
 	.domain([40, 50, 90])
 	.range([0, 1, 0.8])
 	.clamp(true)
@@ -103,13 +104,10 @@ const computeWeight = (
 	const eastStorms = eastStormScale(dist) * east
 
 	// 4. Polar front
-	const polar = polarFrontScale(dist) * west
+	const polar = westerliesScale(dist) * west
 
 	return {
-		w: Math.min(
-			Math.max(itcz * suppression, eastStorms, polar),
-			1,
-		),
+		w: Math.min(Math.max(itcz * suppression, eastStorms, polar), 1),
 		itcz,
 		suppression,
 		eastStorms,
@@ -124,6 +122,89 @@ let _teqCache: Map<number, number[]> = new Map()
 export const RAIN = {
 	/** Returns the cached TEQ data (lonBin → latitude per month). */
 	teqCache: () => _teqCache,
+	/**
+	 * Compute global moisture advection from oceans to land.
+	 * Uses Coriolis deflection to simulate trade winds and westerlies.
+	 */
+	assignAdvection: () => {
+		const scale = scaleLinear([4, 8], [1, 1.5])(window.world.resolution)
+		const wet = 30
+		const ocean = WORLD.cells
+			.water()
+			.filter((cell: Cell) => cell.ocean && cell.landDist > 10)
+		const affected = window.world.cells.filter(
+			(cell: Cell) => cell.shallow || !cell.ocean,
+		)
+
+		const assignRain = (attr: "east" | "west") => {
+			const visited = new Set<number>()
+			ocean.forEach((cell: Cell) => {
+				cell.moisture[attr] = wet
+				visited.add(cell.idx)
+			})
+			const queue = [...ocean]
+			while (queue.length > 0) {
+				const cell = queue.shift()
+				const impact = (cell.ocean ? 0.5 : cell.isWater ? 0.25 : -0.8) / scale
+				const moisture = Math.max(
+					Math.min(Math.max(cell.moisture[attr], 0) + impact, wet),
+					0,
+				)
+
+				// Coriolis deflection based on latitude and hemisphere
+				const lat = Math.abs(cell.y)
+				const hemisphere = cell.y >= 0 ? 1 : -1
+
+				// Trade winds (0-30°) deflect toward equator, westerlies (30+) deflect toward poles
+				let validDirs: string[]
+				if (attr === "east") {
+					// Trade winds: from east, deflecting toward equator
+					// NH: deflect south (SW), SH: deflect north (NW)
+					validDirs = lat < 30 ? ["W", hemisphere > 0 ? "SW" : "NW"] : ["W"] // Minimal deflection at higher latitudes
+				} else {
+					// Westerlies: from west, deflecting toward poles
+					// NH: deflect north (NE), SH: deflect south (SE)
+					validDirs = lat > 25 ? ["E", hemisphere > 0 ? "NE" : "SE"] : ["E"] // Tropics have less westerly influence
+				}
+
+				const neighbors = CELL.neighbors(cell).filter(
+					(n) =>
+						(!visited.has(n.idx) ||
+							(!n.isWater && moisture > n.moisture[attr])) &&
+						validDirs.includes(POINT.direction.geo(cell, n)),
+				)
+				neighbors.forEach((n) => {
+					queue.push(n)
+					n.moisture[attr] = moisture
+					visited.add(n.idx)
+				})
+			}
+			range(1).forEach(() => {
+				affected.forEach((cell: Cell) => {
+					cell.moisture[attr] = mean(
+						CELL.neighbors(cell)
+							.concat([cell])
+							.filter((n) => n.moisture[attr] >= 0 && (n.shallow || !n.ocean))
+							.map((n) => n.moisture[attr]),
+					)
+					if (isNaN(cell.moisture[attr])) cell.moisture[attr] = 0
+				})
+			})
+		}
+		assignRain("east")
+		assignRain("west")
+
+		const lakes = WORLD.cells.lakes.get()
+		const land = WORLD.cells.land().concat(lakes)
+
+		// Normalize weights before passing to monthly assignment
+		land.forEach((cell: Cell) => {
+			cell.moisture.east /= wet
+			cell.moisture.west /= wet
+			if (cell.moisture.east > cell.moisture.west) cell.moisture.west = 0
+			else cell.moisture.east = 0
+		})
+	},
 	annual: {
 		color: (mm: number) => interpolateViridis(RAIN.annual.scale(mm)),
 		scale: scaleLinear(
@@ -139,13 +220,15 @@ export const RAIN = {
 	 */
 	assignMonthly: (cells: Cell[]) => {
 		// 1. Bin all world cells by longitude for TEQ computation
-		const lonBinWidth = 15
+		const lonBinWidth = 10
 		const lonBins = new Map<number, Cell[]>()
-		window.world.cells.filter(c => !c.isWater || Math.abs(c.y) < 5).forEach((cell) => {
-			const bin = Math.round(cell.x / lonBinWidth) * lonBinWidth
-			if (!lonBins.has(bin)) lonBins.set(bin, [])
-			lonBins.get(bin).push(cell)
-		})
+		window.world.cells
+			.filter((c) => !c.isWater || Math.abs(c.y) < 10)
+			.forEach((cell) => {
+				const bin = Math.round(cell.x / lonBinWidth) * lonBinWidth
+				if (!lonBins.has(bin)) lonBins.set(bin, [])
+				lonBins.get(bin).push(cell)
+			})
 
 		// 2. Precompute TEQ per longitude bin per month (store in module-level cache)
 		// Take the cell-based TEQ or the global EBM TEQ, whichever is the hotter latitude.
@@ -170,8 +253,8 @@ export const RAIN = {
 
 		// 3. Compute monthly rain for each cell
 		cells.forEach((cell) => {
-			const east = cell.rain.east
-			const west = cell.rain.west
+			const east = cell.moisture.east
+			const west = cell.moisture.west
 			cell.rain.weights = []
 			cell.rain.monthly = range(12).map((month) => {
 				const teq = cellTeq(cell, month)
@@ -224,6 +307,11 @@ export const RAIN = {
 			const { cell } = params
 			return cell.rain.monthly[params.month]
 		},
+	},
+	SCALES: {
+		itcz: itczScale,
+		subsidence: subsidenceScale,
+		westerlies: westerliesScale,
 	},
 	thresholds,
 }

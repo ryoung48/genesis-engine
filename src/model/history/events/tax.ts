@@ -9,6 +9,7 @@ import { NATION } from "@/model/nations"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { TIME } from "@/model/utilities/time"
+import { WAR } from "../../nations/wars"
 import { TaxEvent } from "../types"
 
 /**
@@ -19,7 +20,7 @@ const peaceFraction = (nation: Province, previous: number): number => {
 	const start = previous
 	const end = window.world.time
 	const duration = end - start
-	const wars = PROVINCE.wars.get(nation)
+	const wars = WAR.nation.get(nation)
 
 	// Calculate total time spent at war during the past year
 	let warTime = 0

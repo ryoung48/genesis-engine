@@ -1,3 +1,4 @@
+import { Language } from "../language/languages/types"
 import { Culture } from "../../actors/culture/types"
 
 export type Heritage = {
@@ -6,6 +7,8 @@ export type Heritage = {
 	color: string
 	hue: number
 	neighbors: Set<number>
+	language: Language
+	name: string
 }
 
 export type HeritageSpawnParams = {

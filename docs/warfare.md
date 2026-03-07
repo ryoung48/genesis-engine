@@ -337,7 +337,7 @@ Geographic isolation forces independence. This:
 
 - [ ] **Attrition**: Armies suffer losses from supply problems, disease, weather.
 
-- [ ] **Allies and coalitions**: Multiple nations joining wars on each side.
+- [x] **Allies and coalitions**: Multiple nations joining wars on each side. See [relations-and-diplomacy.md](relations-and-diplomacy.md).
 
 - [ ] **Mercenaries**: Hire temporary military strength at economic cost.
 

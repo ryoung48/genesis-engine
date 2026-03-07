@@ -10,13 +10,14 @@ export type MapMode =
 	| "terrain"
 	| "cultures"
 	| "religion"
+	| "dynasties"
 	| "optimalWealth"
 	| "population"
 	| "development"
 	| "rainfall"
 	| "temperature"
 	| "wind"
-	| "pressure"
+	| "diplomacy"
 
 export type WorldPaintParams = {
 	ctx: CanvasRenderingContext2D

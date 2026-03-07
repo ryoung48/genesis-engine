@@ -1,404 +1,247 @@
-import { CELL } from ".."
-import { EMB_CONSTANTS } from "../ebm/constants"
-import { PRESSURE } from "../pressure"
-import { TEMPERATURE } from "../temperature"
-import type { Cell } from "../types"
+/**
+ * Wind estimation based on three-cell atmospheric circulation.
+ *
+ * Two modes:
+ *  1. `calculateEbmWind` — zonal-mean signed wind from EBM lat×day grids (preview).
+ *  2. `assignMonthly` / `build` — per-cell monthly wind speed using each cell's
+ *     temperature, vegetation roughness, topography, and ocean distance.
+ *
+ * The Ekman-balanced core is shared: |V| = R·dT/dy / √(f² + k²), modulated
+ * by the three-cell zonal profile. Cell-level factors then scale the result:
+ *   - vegetation → surface roughness drag
+ *   - topography → sheltering or funnelling
+ *   - ocean distance → coastal exposure boost
+ *
+ * Returns signed zonal wind: negative = easterly, positive = westerly.
+ */
+import * as d3 from "d3"
+import { interpolateBlues, interpolateReds, mean, range, scaleLinear } from "d3"
 
-const Rd = 287 // Specific gas constant for dry air [J/(kg·K)]
+import { WORLD } from "../.."
+import { TIME } from "../../utilities/time"
+import { CELL } from "../"
+import { EBM } from "../ebm"
+import { RAIN } from "../rain"
+import { Cell, Vegetation } from "../types"
 
 /**
- * Compute pressure gradient vector at a cell using least-squares
- * fit over Voronoi neighbors. Returns gradient in Pa/m.
+ * Signed zonal wind profile as a function of degrees from the thermal equator.
+ * Negative = easterly, positive = westerly.
+ *
+ * Zone alignment with rain model:
+ *   0–28°  ITCZ / Hadley trades  (easterly)
+ *  20–40°  Subsidence belt        (weak, transition)
+ *  40–90°  Ferrel westerlies      (westerly)
+ *  65–90°  Polar cell             (easterly)
  */
-function pressureGradient(cell: Cell, month: number) {
-	const R = window.world.radius * 1609.34
-	const latRad = (cell.y * Math.PI) / 180
-	const cosLat = Math.max(0.001, Math.cos(latRad))
+const zonalProfile = scaleLinear()
+	.domain([0, 15, 28, 35, 45, 60, 75, 90, 120, 150, 180])
+	.range([-0.5, -0.6, -0.2, 0.2, 1.4, 0.4, -0.4, -0.5, -0.7, -0.5, -0.3])
+	.clamp(true)
 
-	// Compute typical neighbor distance for this cell
-	let totalDist = 0
-	for (const neighbor of CELL.neighbors(cell)) {
-		const dx = (neighbor.x - cell.x) * (Math.PI / 180) * R * cosLat
-		const dy = (neighbor.y - cell.y) * (Math.PI / 180) * R
-		totalDist += Math.sqrt(dx * dx + dy * dy)
-	}
-	const avgDist = totalDist / CELL.neighbors(cell).length
-	const minDist2 = avgDist * 0.2 * (avgDist * 0.2) // skip if < 20% of avg spacing
+// --- Cell-level modifiers ---
 
-	let sumWdx2 = 0
-	let sumWdy2 = 0
-	let sumWdxdy = 0
-	let sumWdxdP = 0
-	let sumWdydP = 0
-
-	for (const neighbor of CELL.neighbors(cell)) {
-		const dx = (neighbor.x - cell.x) * (Math.PI / 180) * R * cosLat
-		const dy = (neighbor.y - cell.y) * (Math.PI / 180) * R
-		const dP =
-			(PRESSURE.monthly(neighbor, month) - PRESSURE.monthly(cell, month)) * 100 // hPa → Pa
-
-		const dist2 = dx * dx + dy * dy
-		if (dist2 < minDist2) continue // skip degenerate neighbors
-		if (dist2 === 0) continue
-		const w = 1 / dist2 // 1/dist² for tighter locality
-
-		sumWdx2 += w * dx * dx
-		sumWdy2 += w * dy * dy
-		sumWdxdy += w * dx * dy
-		sumWdxdP += w * dx * dP
-		sumWdydP += w * dy * dP
-	}
-
-	const det = sumWdx2 * sumWdy2 - sumWdxdy * sumWdxdy
-	if (Math.abs(det) < 1e-20) return { dPdx: 0, dPdy: 0 }
-
-	return {
-		dPdx: (sumWdy2 * sumWdxdP - sumWdxdy * sumWdydP) / det,
-		dPdy: (sumWdx2 * sumWdydP - sumWdxdy * sumWdxdP) / det,
-	}
+/** Surface roughness multiplier by vegetation type (lower = more drag). */
+const roughness: Record<Vegetation, number> = {
+	desert: 1.0,
+	sparse: 0.9,
+	grasslands: 0.8,
+	woods: 0.65,
+	forest: 0.55,
+	jungle: 0.45,
 }
 
-/**
- * Wind estimation based on atmospheric circulation and moisture transport.
- * Uses rain.east/west values as proxies for wind strength since they decay
- * with distance from ocean (similar to wind friction over land).
- */
+/** Topography multiplier — sheltering vs exposure. */
+const topoFactor: Record<string, number> = {
+	coastal: 1.0,
+	marsh: 0.9,
+	flat: 1.0,
+	hills: 0.75,
+	plateau: 0.65,
+	mountains: 0.5,
+}
+
+/** Inland friction decay from ocean-baseline wind (miles). */
+const coastalExposure = scaleLinear()
+	.domain([0, 100, 500, 1500])
+	.range([1.0, 0.9, 0.85, 0.75])
+	.clamp(true)
+
+// --- Physics Constants ---
+const R_PLANET = 6.371e6 // meters
+const R_AIR = 287 // J/kg·K
+const OMEGA = (2 * Math.PI) / (24 * 3600) // rad/s
+const K_FRICTION = 0.75e-4 // s⁻¹
+const DEG = 180 / Math.PI
+const RAD = Math.PI / 180
+
+/** Calculate Ekman magnitude given a temperature grid and latitude array (radians). */
+const getEkmanMagnitude = (
+	tempGrid: number[][],
+	latsRad: number[],
+	i: number,
+	day: number,
+): number => {
+	const numLat = latsRad.length
+	let dT: number, dy: number
+	if (i === 0) {
+		dT = tempGrid[i + 1][day] - tempGrid[i][day]
+		dy = R_PLANET * (latsRad[i + 1] - latsRad[i])
+	} else if (i === numLat - 1) {
+		dT = tempGrid[i][day] - tempGrid[i - 1][day]
+		dy = R_PLANET * (latsRad[i] - latsRad[i - 1])
+	} else {
+		dT = tempGrid[i + 1][day] - tempGrid[i - 1][day]
+		dy = R_PLANET * (latsRad[i + 1] - latsRad[i - 1])
+	}
+	const gradT = Math.abs(dT / dy)
+	const f = Math.abs(2 * OMEGA * Math.sin(latsRad[i]))
+	return (R_AIR * gradT) / Math.sqrt(f * f + K_FRICTION * K_FRICTION)
+}
+
+/** Calculate zonal profile multiplier based on latitude and thermal equator (degrees). */
+const getProfileMultiplier = (latDeg: number, teqDeg: number): number => {
+	const dist = Math.abs(latDeg - teqDeg)
+	const teqDisplacement = Math.abs(teqDeg) / 90
+	const profileWeight = 1 - 0.7 * teqDisplacement
+	const rawProfile = zonalProfile(dist) as unknown as number
+	const direction = Math.sign(rawProfile) || -1
+	return profileWeight * rawProfile + (1 - profileWeight) * direction
+}
+
+/** Compute unsigned Ekman wind magnitude [lat][day] from the EBM heat grid. */
+const _ekmanMagnitude = (): number[][] => {
+	const ebm = EBM.model
+	const numDays = EBM.constants.time.DAYS_PER_YEAR
+	const latsRad = ebm.lats.map((d) => d * RAD)
+	const numLat = latsRad.length
+
+	const mag: number[][] = new Array(numLat)
+		.fill(0)
+		.map(() => new Array(numDays).fill(0))
+
+	for (let day = 0; day < numDays; day++) {
+		for (let i = 0; i < numLat; i++) {
+			mag[i][day] = getEkmanMagnitude(ebm.heat, latsRad, i, day)
+		}
+	}
+	return mag
+}
+
 export const WIND = {
+	zones: { zonalProfile },
+
 	/**
-	 * Estimate monthly wind vector (u, v) for a cell.
-	 * u = east-west component (positive = westerly, blowing from west to east)
-	 * v = north-south component (positive = southerly, blowing from south to north)
+	 * Signed wind color: red = easterly, blue = westerly.
+	 * `absMax` sets the scale ceiling (defaults to 15 m/s).
 	 */
-	month: (params: { cell: Cell; month: number }) => {
-		const { cell, month } = params
-		const { dPdx, dPdy } = pressureGradient(cell, month)
-		const absLat = Math.abs(cell.y)
-
-		// Coriolis parameter (signed: positive NH, negative SH)
-		const Omega = (2 * Math.PI) / (EMB_CONSTANTS.time.HOURS_PER_DAY * 3600)
-		const latRad = (cell.y * Math.PI) / 180
-		const f = 2 * Omega * Math.sin(latRad)
-
-		// Clamp magnitude near equator, preserve hemisphere sign
-		const f_min = 2 * Omega * Math.sin((10 * Math.PI) / 180)
-		const f_eff = Math.abs(f) < f_min ? Math.sign(f || 1) * f_min : f
-
-		// Air density from local pressure
-		const TmeanK = TEMPERATURE.global.mean() + 273.15
-		const rho = (PRESSURE.monthly(cell, month) * 100) / (Rd * TmeanK)
-
-		// Geostrophic wind: signed f handles hemisphere automatically
-		//   NH (f>0): low to north (dPdy>0) → u_g westward ✓
-		//   SH (f<0): low to south (dPdy<0) → flips correctly ✓
-		const u_g = -(1 / (rho * f_eff)) * dPdy // eastward component [m/s]
-		const v_g = (1 / (rho * f_eff)) * dPdx // northward component [m/s]
-
-		// Surface friction: reduce speed + rotate toward low pressure
-		//   NH: rotate left (CCW, +angle)
-		//   SH: rotate right (CW, -angle) — handled by hemisphere sign
-		const isWater = cell.isWater
-		const frictionFactor = isWater ? 0.7 : 0.5
-		const hemisphereSign = f >= 0 ? 1 : -1
-		const alpha = (isWater ? 15 : 25) * (Math.PI / 180) * hemisphereSign
-
-		const geoAngle = Math.atan2(v_g, u_g)
-		const finalAngle = geoAngle + alpha
-
-		const rawSpeed = Math.sqrt(u_g * u_g + v_g * v_g) * frictionFactor
-
-		// Baroclinic eddy enhancement of westerlies
-		// The mean pressure gradient underestimates midlatitude westerlies
-		// because baroclinic eddies transfer momentum into the mean flow.
-		// Peaks at ~50° latitude.
-		const eddyLat = 50
-		const eddyBoost = 1 + 1.5 * Math.exp(-Math.pow((absLat - eddyLat) / 15, 2))
-
-		// "Doldrums" damping: force winds to be weak (but not zero) at equator
-		// Geostrophic balance fails at f=0, so we must manually damp the
-		// otherwise linear pressure gradient.
-		// Squared ramp (lat/12)^2 gives a wide, calm equatorial trough.
-		// We add a 0.15 floor so it's not "literally zero".
-		const dampingEnd = 25
-		const t = Math.min(1, absLat / dampingEnd)
-		const smoothStep = t * t * (3 - 2 * t)
-		const equatorialDamping = 0.15 + 0.85 * smoothStep
-		const speed = rawSpeed * equatorialDamping
-
-		const uRaw = speed * Math.cos(finalAngle)
-		const vRaw = speed * Math.sin(finalAngle)
-
-		const isWesterly = uRaw > 0
-		const boost = isWesterly && speed * eddyBoost < 15 ? eddyBoost : 1
-
-		return {
-			u: uRaw * boost, // m/s eastward
-			v: vRaw * boost, // m/s northward
-			speed: speed * boost,
-			// Meteorological convention: 0°=N, 90°=E, wind comes FROM this direction
-			direction: (((270 - finalAngle * (180 / Math.PI)) % 360) + 360) % 360,
-		}
+	color: (val: number, absMax = 15) => {
+		const t = Math.min(Math.abs(val) / absMax, 1) * 0.85 + 0.15
+		return val < 0 ? interpolateReds(t) : interpolateBlues(t)
 	},
 
 	/**
-	 * Get annual average wind vector
+	 * Calculate signed zonal wind for EBM model (preview / visualization).
+	 * @param temperature  [lat][day] in °C (gradient is unit-agnostic)
+	 * @param latsRad      latitude array in radians
+	 * @param teqByDay     thermal-equator latitude per day in degrees
+	 * @returns            [lat][day] signed wind in m/s (neg=easterly, pos=westerly)
 	 */
-	annual: (cell: Cell): { u: number; v: number; speed: number } => {
-		let uSum = 0
-		let vSum = 0
-		for (let month = 0; month < 12; month++) {
-			const wind = WIND.month({ cell, month })
-			uSum += wind.u
-			vSum += wind.v
-		}
-		const u = uSum / 12
-		const v = vSum / 12
-		return { u, v, speed: Math.sqrt(u ** 2 + v ** 2) }
-	},
+	calculateEbmWind: (
+		temperature: number[][],
+		latsRad: number[],
+		teqByDay: number[],
+	) => {
+		const numLat = latsRad.length
+		const numDays = temperature[0].length
 
-	/**
-	 * Get compass direction from wind vector
-	 * Returns the direction wind is blowing FROM (meteorological convention)
-	 */
-	direction: (u: number, v: number): string => {
-		// Wind direction: where wind is coming FROM
-		// atan2 gives angle of where wind is going TO, so we flip
-		const angle = (Math.atan2(-u, -v) * 180) / Math.PI
-		const deg = ((angle % 360) + 360) % 360
-		const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-		return dirs[Math.round(deg / 45) % 8]
-	},
+		const wind: number[][] = new Array(numLat)
+			.fill(0)
+			.map(() => new Array(numDays).fill(0))
 
-	/**
-	 * Describe wind speed in Beaufort-like terms
-	 */
-	describe: (speed: number): string => {
-		if (speed < 0.5) return "calm"
-		if (speed < 2) return "light"
-		if (speed < 4) return "gentle"
-		if (speed < 6) return "moderate"
-		if (speed < 8) return "fresh"
-		if (speed < 11) return "strong"
-		if (speed < 14) return "gale"
-		return "storm"
-	},
-}
-
-export function calculateWindField(month: number = 0) {
-	let maxSpeed = 0
-	let minSpeed = Infinity
-	let sumSpeed = 0
-	let maxSpeedCell: Cell | null = null
-
-	// Band accumulators: track average u,v per latitude band
-	const bands: Record<
-		string,
-		{
-			u: number
-			v: number
-			count: number
-			speeds: number[]
-			pressures: number[]
-		}
-	> = {}
-
-	const ranges = ["0-10", "10-20", "20-30", "30-45", "45-60", "60-75", "75-90"]
-	for (const hemi of ["NH", "SH"]) {
-		for (const range of ranges) {
-			bands[`${hemi} ${range}`] = {
-				u: 0,
-				v: 0,
-				count: 0,
-				speeds: [],
-				pressures: [],
+		for (let day = 0; day < numDays; day++) {
+			const teqDeg = teqByDay[day]
+			for (let i = 0; i < numLat; i++) {
+				const magnitude = getEkmanMagnitude(temperature, latsRad, i, day)
+				const profile = getProfileMultiplier(latsRad[i] * DEG, teqDeg)
+				wind[i][day] = magnitude * profile
 			}
 		}
-	}
+		return wind
+	},
 
-	function getBand(lat: number): string | null {
-		const hemi = lat >= 0 ? "NH" : "SH"
-		const absLat = Math.abs(lat)
-		let range = ""
-		if (absLat < 10) range = "0-10"
-		else if (absLat < 20) range = "10-20"
-		else if (absLat < 30) range = "20-30"
-		else if (absLat < 45) range = "30-45"
-		else if (absLat < 60) range = "45-60"
-		else if (absLat < 75) range = "60-75"
-		else range = "75-90"
-		return `${hemi} ${range}`
-	}
+	/**
+	 * Assign monthly signed zonal wind (m/s) to each cell.
+	 * Ekman magnitude comes from the EBM temperature gradient; the zonal
+	 * profile (trades vs westerlies) is offset by RAIN's longitude-varying
+	 * thermal equator so wind zones track the same TEQ as precipitation.
+	 */
+	assignMonthly: (cells: Cell[]) => {
+		const ebm = EBM.model
 
-	window.world.cells.forEach((cell) => {
-		const wind = WIND.month({ cell, month })
+		// 1. Monthly-averaged Ekman magnitude by latitude
+		const mag2d = _ekmanMagnitude()
+		const monthlyEkman = range(12).map((month) => {
+			const days = TIME.month.days(month)
+			const avgByLat = ebm.lats.map((_, i) =>
+				mean(days.map((d) => mag2d[i][d])),
+			)
+			return d3.scaleLinear().domain(ebm.lats).range(avgByLat).clamp(true)
+		})
 
-		sumSpeed += wind.speed
-		if (wind.speed > maxSpeed) {
-			maxSpeed = wind.speed
-			maxSpeedCell = cell
+		// 2. Longitude-varying TEQ from rain model
+		const teqCache = RAIN.teqCache()
+		const lonBinWidth = 10
+		const cellTeq = (cell: Cell, month: number): number => {
+			const bin = Math.round(cell.x / lonBinWidth) * lonBinWidth
+			return teqCache.get(bin)?.[month] ?? 0
 		}
-		if (wind.speed < minSpeed) minSpeed = wind.speed
 
-		const band = getBand(cell.y)
-		if (band && bands[band]) {
-			bands[band].u += wind.u
-			bands[band].v += wind.v
-			bands[band].count++
-			bands[band].speeds.push(wind.speed)
-			bands[band].pressures.push(PRESSURE.monthly(cell, month))
-		}
-	})
+		// 3. Per-cell: Ekman magnitude × zonal profile (rain TEQ) × modifiers
+		cells.forEach((cell) => {
+			const veg = roughness[cell.vegetation] ?? 1.0
+			const topo = topoFactor[cell.topography] ?? 1.0
+			const coastal = coastalExposure(cell.oceanDist * window.world.cell.length)
+			const mod = veg * topo * coastal
 
-	const cellCount = window.world.cells.length
-	const avgSpeed = sumSpeed / cellCount
+			const monthly = range(12).map((month) => {
+				const magnitude = monthlyEkman[month](cell.y)
+				const teq = cellTeq(cell, month)
+				return magnitude * getProfileMultiplier(cell.y, teq) * mod
+			})
 
-	// --- Summary ---
-	console.log(
-		`[Wind] Month ${month + 1}: ` +
-			`Min ${minSpeed.toFixed(1)} m/s, Max ${maxSpeed.toFixed(1)} m/s, Avg ${avgSpeed.toFixed(1)} m/s`,
-	)
+			cell.wind = {
+				monthly,
+				annual: mean(monthly.map(Math.abs)),
+			}
+		})
 
-	if (maxSpeedCell) {
-		const pressure = PRESSURE.monthly(maxSpeedCell, month)
-		console.log(
-			`[Wind] Strongest: ${maxSpeed.toFixed(1)} m/s at ` +
-				`lat ${maxSpeedCell.y.toFixed(1)}, lon ${maxSpeedCell.x.toFixed(1)}, ` +
-				`pressure ${pressure.toFixed(1)} hPa, ` +
-				`water: ${maxSpeedCell.isWater}`,
-		)
-	}
+		// Neighbor smoothing (2 passes)
+		range(2).forEach(() => {
+			cells.forEach((cell) => {
+				const neighbors = CELL.neighbors(cell)
+					.concat([cell])
+					.filter((n) => n.wind?.monthly && !n.isWater)
+				if (neighbors.length === 0) return
+				cell.wind.monthly = range(12).map((month) => {
+					const avg = mean(neighbors.map((n) => n.wind.monthly[month]))
+					return avg ?? cell.wind.monthly[month]
+				})
+			})
+		})
 
-	// --- Latitude band diagnostics ---
-	// Expected (Earth-like NH):
-	//   0-10:  weak, u near 0 or slightly negative (doldrums / weak easterlies)
-	//  10-30:  u negative (easterly trades), v negative (toward equator) → NE trades
-	//  30-45:  u positive (westerlies), v positive (poleward)
-	//  45-60:  u strongly positive (strong westerlies)
-	//  60-75:  u weakening or turning easterly (polar easterlies)
-	//  75-90:  u negative (polar easterlies), weak speeds
-	console.log(
-		"[Wind] Latitude Bands (avg u, avg v, avg speed, expected pattern):",
-	)
-	const expectations: Record<string, string> = {
-		"NH 0-10": "weak / doldrums",
-		"NH 10-20": "u<0 v<0 (NE trades)",
-		"NH 20-30": "u<0 v<0 (NE trades)",
-		"NH 30-45": "u>0 (westerlies emerging)",
-		"NH 45-60": "u>0 strong (westerlies)",
-		"NH 60-75": "u weakening (polar transition)",
-		"NH 75-90": "u<0 weak (polar easterlies)",
-		"SH 0-10": "weak / doldrums",
-		"SH 10-20": "u<0 v>0 (SE trades)",
-		"SH 20-30": "u<0 v>0 (SE trades)",
-		"SH 30-45": "u>0 (westerlies emerging)",
-		"SH 45-60": "u>0 strong (westerlies)",
-		"SH 60-75": "u weakening (polar transition)",
-		"SH 75-90": "u<0 weak (polar easterlies)",
-	}
+		// Recompute annual after smoothing
+		cells.forEach((cell) => {
+			cell.wind.annual = mean(cell.wind.monthly.map(Math.abs))
+		})
+	},
 
-	const sortedBands = Object.entries(bands).sort((a, b) => {
-		const getVal = (key: string) => {
-			const [hemi, range] = key.split(" ")
-			const lat = parseInt(range.split("-")[0])
-			// SH values are negative, NH are positive.
-			// Add tiny offset to SH to distinguish from NH at the Equator (lat 0)
-			return hemi === "NH" ? lat : -lat - 0.1
-		}
-		return getVal(a[0]) - getVal(b[0])
-	})
-
-	for (const [band, data] of sortedBands) {
-		if (data.count === 0) continue
-		const avgU = data.u / data.count
-		const avgV = data.v / data.count
-		const avgSpd = data.speeds.reduce((a, b) => a + b, 0) / data.speeds.length
-		const avgP =
-			data.pressures.reduce((a, b) => a + b, 0) / data.pressures.length
-		const maxSpd = Math.max(...data.speeds)
-
-		// Wind direction label from u,v
-		const dir = (avgU >= 0 ? "W→E" : "E→W") + " " + (avgV >= 0 ? "S→N" : "N→S")
-
-		console.log(
-			`  ${band}°: P=${avgP.toFixed(1)} u=${avgU.toFixed(2)} v=${avgV.toFixed(2)} ` +
-				`avg=${avgSpd.toFixed(1)} max=${maxSpd.toFixed(1)} m/s ` +
-				`[${dir}] expected: ${expectations[band]}`,
-		)
-	}
-
-	// --- Sanity checks ---
-	if (avgSpeed < 1)
-		console.warn("[Wind] ⚠ Avg speed < 1 m/s — pressure gradients too weak?")
-	if (avgSpeed > 25)
-		console.warn("[Wind] ⚠ Avg speed > 25 m/s — pressure gradients too strong?")
-	if (maxSpeed > 50)
-		console.warn(
-			"[Wind] ⚠ Max speed > 50 m/s — check equatorial clamping or gradient calc",
-		)
-
-	const trade = bands["NH 10-20"]
-	if (trade && trade.count > 0 && trade.u / trade.count > 0) {
-		console.warn(
-			"[Wind] ⚠ Trades blowing west→east — friction rotation may be wrong",
-		)
-	}
-
-	const westerly = bands["NH 45-60"]
-	if (westerly && westerly.count > 0 && westerly.u / westerly.count < 0) {
-		console.warn(
-			"[Wind] ⚠ Westerlies blowing east→west — geostrophic rotation may be wrong",
-		)
-	}
-
-	// // --- P_lat gradient analysis ---
-	// // P = -A(lat) * cos(6θ)  where A(lat) = 20*sin(lat)
-	// console.log(
-	// 	"[Wind] Theoretical P_lat gradient by latitude (dP/dlat in hPa/degree):",
-	// )
-	// const checkLats = [
-	// 	5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85,
-	// ]
-	// for (const lat of checkLats) {
-	// 	const latRad = (lat * Math.PI) / 180
-	// 	// Numerical derivative
-	// 	const eps = 0.01 * (Math.PI / 180)
-	// 	const lat1 = latRad - eps
-	// 	const lat2 = latRad + eps
-	// 	const P1 = -20 * Math.sin(Math.abs(lat1)) * Math.cos(6 * lat1)
-	// 	const P2 = -20 * Math.sin(Math.abs(lat2)) * Math.cos(6 * lat2)
-	// 	const dPdLat = (P2 - P1) / (2 * 0.01) // hPa per degree
-
-	// 	const sign = dPdLat >= 0 ? "+" : ""
-	// 	console.log(`  ${lat}°: ${sign}${dPdLat.toFixed(3)} hPa/deg`)
-	// }
-
-	// // --- Compare average pressure gradients by band ---
-	// console.log("[Wind] Average pressure gradient magnitude by latitude band:")
-	// const bandGradients: Record<string, number[]> = {
-	// 	"0-10": [],
-	// 	"10-20": [],
-	// 	"20-30": [],
-	// 	"30-45": [],
-	// 	"45-60": [],
-	// 	"60-75": [],
-	// 	"75-90": [],
-	// }
-	// window.world.cells.forEach((cell) => {
-	// 	if (cell.y >= 0) {
-	// 		const band = getBand(cell.y)
-	// 		if (band && bandGradients[band]) {
-	// 			const grad = pressureGradient(cell, month)
-	// 			bandGradients[band].push(Math.sqrt(grad.dPdx ** 2 + grad.dPdy ** 2))
-	// 		}
-	// 	}
-	// })
-	// for (const [band, grads] of Object.entries(bandGradients)) {
-	// 	if (grads.length === 0) continue
-	// 	const avgGrad = grads.reduce((a, b) => a + b, 0) / grads.length
-	// 	const maxGrad = Math.max(...grads)
-	// 	console.log(
-	// 		`  ${band}°: avg |∇P|=${avgGrad.toFixed(4)} Pa/m, max=${maxGrad.toFixed(4)} Pa/m`,
-	// 	)
-	// }
-
-	return { maxSpeed, minSpeed, avgSpeed }
+	/**
+	 * Build wind data for all land cells (+ lakes).
+	 * Should be called after rain (needs TEQ cache) and heat are assigned.
+	 */
+	build: () => {
+		const cells = WORLD.cells.land()
+		WIND.assignMonthly(cells)
+	},
 }

@@ -1,4 +1,5 @@
 import React from "react"
+import { NAMES } from "@/model/actors/language/names"
 import { World } from "@/model/types"
 
 declare global {
@@ -33,13 +34,13 @@ export const NationLink: React.FC<NationLinkProps> = ({
 				onZoomToProvince?.(id)
 				onNationSelect?.(id)
 			}}
-			title={`Click to fly to Nation #${id}`}
+			title={`Click to fly to ${NAMES.nation(id)}`}
 		>
 			<span
 				className="w-1.5 h-1.5 rounded-full flex-shrink-0"
 				style={{ backgroundColor: resolvedColor }}
 			/>
-			<span>Nation # {id}</span>
+			<span>{NAMES.nation(id)}</span>
 		</button>
 	)
 }

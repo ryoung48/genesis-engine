@@ -1,14 +1,17 @@
 import { ChartData, ChartOptions, TooltipItem } from "chart.js"
 import * as d3 from "d3"
 import React, { useState } from "react"
+import { ETHOS_WEIGHTS } from "@/model/actors/culture/ethos"
+import { TRADITIONS } from "@/model/actors/culture/traditions"
+import { EBM } from "@/model/cells/ebm"
 import { TIME } from "@/model/utilities/time"
 import {
 	EVENT_TYPES,
 	EventCounts,
 	RebellionOutcomeCounts,
+	RelationCounts,
 	WarOutcomeCounts,
 } from "../index"
-import { EBM } from "@/model/cells/ebm"
 import SeasonalTempByLat from "./SeasonalTempByLat"
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -33,6 +36,32 @@ const REBELLION_COLORS: Record<string, string> = {
 const REBELLION_LABELS: Record<string, string> = {
 	normal: "Normal Rebellion",
 	succession: "Succession Triggered",
+}
+
+const RELATION_COLORS: Record<string, string> = {
+	war: "#b91c1c", // red-700
+	rival: "#ef4444", // red-500
+	suspicious: "#f59e0b", // amber-500
+	neutral: "#9ca3af", // gray-400
+	friendly: "#22c55e", // green-500
+	ally: "#3b82f6", // blue-500
+	vassal: "#a855f7", // purple-500
+	overlord: "#7c3aed", // violet-600
+	personal_union_senior: "#f472b6", // pink-400
+	personal_union_junior: "#fbcfe8", // pink-200
+}
+
+const RELATION_LABELS: Record<string, string> = {
+	war: "At War",
+	rival: "Rival",
+	suspicious: "Suspicious",
+	neutral: "Neutral",
+	friendly: "Friendly",
+	ally: "Ally",
+	vassal: "Vassal",
+	overlord: "Overlord",
+	personal_union_senior: "PU Senior",
+	personal_union_junior: "PU Junior",
 }
 
 import { Tabs } from "../Tabs"
@@ -79,12 +108,15 @@ interface ActiveTrendsChartProps {
 		time: number
 		dist: number[]
 		devDist: number[]
+		nationDevDist: number[]
+		nationAvgDev: number
 		avgDev: number
 		activeWars: number
 		activeCivilWars: number
 		eventCounts: EventCounts
 		warOutcomes: WarOutcomeCounts
 		rebellionOutcomes: RebellionOutcomeCounts
+		relationCounts: RelationCounts
 	}[]
 	labels: string[]
 	rangeStartLabel: string
@@ -108,6 +140,8 @@ type SimulationTabID =
 	| "wars"
 	| "outcomes"
 	| "rebellions"
+	| "diplomacy"
+	| "culture"
 	| "seasonal_temp"
 
 export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
@@ -120,6 +154,7 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 }) => {
 	const [tab, setTab] = useState<SimulationTabID>("nations")
 	const [seasonalTab, setSeasonalTab] = useState<"absolute" | "dy">("absolute")
+	const [devSubTab, setDevSubTab] = useState<"provinces" | "nations">("provinces")
 
 	const isEmpty = windowedHistory.length <= 1
 	const yearRange = isEmpty ? "" : `${rangeStartLabel}-${rangeEndLabel}`
@@ -147,6 +182,8 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 			time: 0,
 			dist: [],
 			devDist: [],
+			nationDevDist: [],
+			nationAvgDev: 0,
 			avgDev: 0,
 			activeWars: 0,
 			activeCivilWars: 0,
@@ -167,6 +204,18 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				normal: 0,
 				succession: 0,
 			} as RebellionOutcomeCounts,
+			relationCounts: {
+				rival: 0,
+				suspicious: 0,
+				neutral: 0,
+				friendly: 0,
+				ally: 0,
+				war: 0,
+				vassal: 0,
+				overlord: 0,
+				personal_union_senior: 0,
+				personal_union_junior: 0,
+			} as RelationCounts,
 		},
 	)
 
@@ -263,9 +312,14 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 			)
 		}
 		if (tab === "development") {
+			const isNations = devSubTab === "nations"
+			const distKey = isNations ? "nationDevDist" : "devDist"
+			const avgKey = isNations ? "nationAvgDev" : "avgDev"
+			const totalLabel = isNations ? "Total Nations" : "Total Provinces"
+
 			const activeDatasets = DEV_BUCKETS.map((label, idx) => ({
 				label: `${label} Development`,
-				data: windowedHistory.map((h) => h.devDist?.[idx] || 0),
+				data: windowedHistory.map((h) => h[distKey]?.[idx] || 0),
 				fill: true,
 				backgroundColor: DEV_COLORS[idx],
 				borderColor: DEV_COLORS[idx],
@@ -278,42 +332,64 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				datasets: activeDatasets,
 			}
 			return (
-				<TrendChartBase
-					yearRange={yearRange}
-					isEmpty={isEmpty}
-					data={devData}
-					options={{
-						...commonOptions,
-						scales: {
-							...commonOptions.scales,
-							y: { ...commonOptions.scales?.y, stacked: true },
-						},
-						plugins: {
-							...commonOptions.plugins,
-							tooltip: {
-								...commonOptions.plugins?.tooltip,
-								callbacks: {
-									footer: (items) => {
-										const total = items.reduce(
-											(sum, item) => sum + (item.raw as number),
-											0,
-										)
-										return `Total Provinces: ${total}`
+				<>
+					<div className="flex justify-end gap-2 mb-2">
+						<button
+							className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none ${devSubTab === "provinces"
+								? "bg-gray-800 text-white border-gray-800"
+								: "text-gray-500 border-gray-300 hover:bg-gray-50"
+								}`}
+							onClick={() => setDevSubTab("provinces")}
+						>
+							Provinces
+						</button>
+						<button
+							className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none ${devSubTab === "nations"
+								? "bg-gray-800 text-white border-gray-800"
+								: "text-gray-500 border-gray-300 hover:bg-gray-50"
+								}`}
+							onClick={() => setDevSubTab("nations")}
+						>
+							Nations
+						</button>
+					</div>
+					<TrendChartBase
+						yearRange={yearRange}
+						isEmpty={isEmpty}
+						data={devData}
+						options={{
+							...commonOptions,
+							scales: {
+								...commonOptions.scales,
+								y: { ...commonOptions.scales?.y, stacked: true },
+							},
+							plugins: {
+								...commonOptions.plugins,
+								tooltip: {
+									...commonOptions.plugins?.tooltip,
+									callbacks: {
+										footer: (items) => {
+											const total = items.reduce(
+												(sum, item) => sum + (item.raw as number),
+												0,
+											)
+											return `${totalLabel}: ${total}`
+										},
 									},
 								},
 							},
-						},
-					}}
-					footerItems={DEV_BUCKETS.map((label, idx) => ({
-						label,
-						color: DEV_COLORS[idx],
-						value: renderEntry.devDist?.[idx] || 0,
-					})).filter((item) => item.value > 0)}
-					totalValue={renderEntry.avgDev?.toFixed(2) || "0.00"}
-					totalLabel="Average"
-					activeLineIdx={activeLineIdx}
-					onIdxSelect={handleIdxSelect}
-				/>
+						}}
+						footerItems={DEV_BUCKETS.map((label, idx) => ({
+							label,
+							color: DEV_COLORS[idx],
+							value: renderEntry[distKey]?.[idx] || 0,
+						})).filter((item) => item.value > 0)}
+						totalValue={renderEntry[avgKey]?.toFixed(2) || "0.00"}
+						totalLabel="Average"
+						activeLineIdx={activeLineIdx}
+						onIdxSelect={handleIdxSelect}
+					/>
+				</>
 			)
 		}
 		if (tab === "events") {
@@ -557,6 +633,72 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				/>
 			)
 		}
+		if (tab === "diplomacy") {
+			const relationTypes: (keyof RelationCounts)[] = [
+				"war",
+				"rival",
+				"suspicious",
+				"neutral",
+				"friendly",
+				"ally",
+				"vassal",
+				"overlord",
+				"personal_union_senior",
+				"personal_union_junior",
+			]
+			const relationsData: ChartData<"line"> = {
+				labels,
+				datasets: relationTypes.map((type) => ({
+					label: RELATION_LABELS[type],
+					data: windowedHistory.map((h) => h.relationCounts[type] || 0),
+					fill: true,
+					backgroundColor: RELATION_COLORS[type],
+					borderColor: RELATION_COLORS[type],
+					pointRadius: 0,
+					tension: 0.2,
+				})),
+			}
+			return (
+				<TrendChartBase
+					yearRange={yearRange}
+					isEmpty={isEmpty}
+					data={relationsData}
+					options={{
+						...commonOptions,
+						scales: {
+							...commonOptions.scales,
+							y: { ...commonOptions.scales?.y, stacked: true },
+						},
+						plugins: {
+							...commonOptions.plugins,
+							tooltip: {
+								...commonOptions.plugins?.tooltip,
+								callbacks: {
+									footer: (items) => {
+										const total = items.reduce(
+											(sum, item) => sum + (item.raw as number),
+											0,
+										)
+										return `Total Relations: ${total}`
+									},
+								},
+							},
+						},
+					}}
+					footerItems={relationTypes.map((type) => ({
+						label: RELATION_LABELS[type],
+						color: RELATION_COLORS[type],
+						value: renderEntry.relationCounts[type] || 0,
+					}))}
+					totalValue={relationTypes.reduce(
+						(sum, type) => sum + (renderEntry.relationCounts[type] || 0),
+						0,
+					)}
+					activeLineIdx={activeLineIdx}
+					onIdxSelect={handleIdxSelect}
+				/>
+			)
+		}
 		if (tab === "seasonal_temp") {
 			const { heat, lats } = EBM.model
 			const { time } = EBM.constants
@@ -590,18 +732,18 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				<div className="flex flex-col">
 					<div className="flex justify-end gap-2 mb-2">
 						<button
-							className={`px-2 py-1 text-xs border rounded ${seasonalTab === "absolute"
-									? "bg-gray-800 text-white border-gray-800"
-									: "text-gray-600 border-gray-300 hover:bg-gray-50"
+							className={`px-2 py-1 text-xs border rounded-none ${seasonalTab === "absolute"
+								? "bg-gray-800 text-white border-gray-800"
+								: "text-gray-600 border-gray-300 hover:bg-gray-50"
 								}`}
 							onClick={() => setSeasonalTab("absolute")}
 						>
 							Absolute
 						</button>
 						<button
-							className={`px-2 py-1 text-xs border rounded ${seasonalTab === "dy"
-									? "bg-gray-800 text-white border-gray-800"
-									: "text-gray-600 border-gray-300 hover:bg-gray-50"
+							className={`px-2 py-1 text-xs border rounded-none ${seasonalTab === "dy"
+								? "bg-gray-800 text-white border-gray-800"
+								: "text-gray-600 border-gray-300 hover:bg-gray-50"
 								}`}
 							onClick={() => setSeasonalTab("dy")}
 						>
@@ -619,6 +761,151 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				</div>
 			)
 		}
+		if (tab === "culture") {
+			// Heritage size distribution (number of cultures per heritage)
+			const heritages = window.world.heritages ?? []
+
+			// Ethos distribution across cultures
+			const cultures = window.world.cultures ?? []
+			const ethosCounts: Record<string, number> = {}
+			cultures.forEach((c) => {
+				ethosCounts[c.ethos] = (ethosCounts[c.ethos] || 0) + 1
+			})
+			const ETHOS_COLORS: Record<string, string> = {
+				bellicose: "#ef4444",
+				bureaucratic: "#6366f1",
+				ceremonious: "#f59e0b",
+				communal: "#22c55e",
+				egalitarian: "#3b82f6",
+				spiritual: "#a855f7",
+				stoic: "#64748b",
+			}
+			const ethosDist = ETHOS_WEIGHTS.map((e) => ({
+				label: e.name,
+				count: ethosCounts[e.ethos] || 0,
+				color: ETHOS_COLORS[e.ethos] || "#ccc",
+			})).filter((d) => d.count > 0)
+				.sort((a, b) => b.count - a.count)
+
+			// Tradition usage counts
+			const traditionCounts: Record<string, number> = {}
+			cultures.forEach((c) => {
+				c.traditions.forEach((key) => {
+					traditionCounts[key] = (traditionCounts[key] || 0) + 1
+				})
+			})
+			const sorted = Object.entries(traditionCounts)
+				.map(([key, count]) => ({
+					key,
+					name: TRADITIONS.find((t) => t.key === key)?.name ?? key,
+					count,
+				}))
+				.sort((a, b) => b.count - a.count)
+			const top5 = sorted.slice(0, 5)
+			const bottom5 = sorted.slice(-5).reverse()
+
+			return (
+				<div>
+					{/* Summary stats */}
+					<div className="grid grid-cols-3 gap-4 mb-4 px-1">
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Heritages</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">{heritages.length}</div>
+						</div>
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Cultures</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">{cultures.length}</div>
+						</div>
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Traditions</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">{Object.keys(traditionCounts).length}</div>
+						</div>
+					</div>
+
+					{/* Heritage size distribution (bucketed) */}
+					{(() => {
+						const HERITAGE_BUCKETS = [
+							{ label: "1-2", min: 1, max: 2, color: "#c7d2fe" },
+							{ label: "3-5", min: 3, max: 5, color: "#818cf8" },
+							{ label: "6-10", min: 6, max: 10, color: "#6366f1" },
+							{ label: "11-20", min: 11, max: 20, color: "#4338ca" },
+							{ label: "21+", min: 21, max: Infinity, color: "#1e1b4b" },
+						]
+						const bucketCounts = HERITAGE_BUCKETS.map((b) => ({
+							...b,
+							count: heritages.filter((h) => h.cultures.size >= b.min && h.cultures.size <= b.max).length,
+						})).filter((b) => b.count > 0)
+						const total = bucketCounts.reduce((s, b) => s + b.count, 0)
+						return (
+							<div className="mb-3">
+								<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Heritage Size (cultures per heritage)</div>
+								<div className="flex h-2.5 overflow-hidden bg-gray-100">
+									{bucketCounts.map((b, i) => (
+										<div
+											key={i}
+											style={{ width: `${(b.count / total) * 100}%`, backgroundColor: b.color }}
+											title={`${b.label} cultures: ${b.count} heritages`}
+										/>
+									))}
+								</div>
+								<div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+									{bucketCounts.map((b, i) => (
+										<div key={i} className="flex items-center gap-1">
+											<div className="w-1.5 h-1.5" style={{ backgroundColor: b.color }} />
+											<span className="text-[9px] text-gray-500 whitespace-nowrap">{b.label} ({b.count})</span>
+										</div>
+									))}
+								</div>
+							</div>
+						)
+					})()}
+
+					{/* Ethos distribution */}
+					<div className="mb-3">
+						<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Ethos Distribution</div>
+						<div className="flex h-2.5 overflow-hidden bg-gray-100">
+							{ethosDist.map((d, i) => (
+								<div
+									key={i}
+									style={{ width: `${(d.count / cultures.length) * 100}%`, backgroundColor: d.color }}
+									title={`${d.label}: ${d.count}`}
+								/>
+							))}
+						</div>
+						<div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+							{ethosDist.map((d, i) => (
+								<div key={i} className="flex items-center gap-1">
+									<div className="w-1.5 h-1.5" style={{ backgroundColor: d.color }} />
+									<span className="text-[9px] text-gray-500 whitespace-nowrap">{d.label} ({d.count})</span>
+								</div>
+							))}
+						</div>
+					</div>
+
+					{/* Traditions: most & least used */}
+					<div className="grid grid-cols-2 gap-4">
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Most Common</div>
+							{top5.map((t) => (
+								<div key={t.key} className="flex items-center justify-between text-[9px] font-mono py-0.5">
+									<span className="text-gray-700 truncate mr-2">{t.name}</span>
+									<span className="text-gray-400 flex-shrink-0">{t.count}</span>
+								</div>
+							))}
+						</div>
+						<div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Least Common</div>
+							{bottom5.map((t) => (
+								<div key={t.key} className="flex items-center justify-between text-[9px] font-mono py-0.5">
+									<span className="text-gray-700 truncate mr-2">{t.name}</span>
+									<span className="text-gray-400 flex-shrink-0">{t.count}</span>
+								</div>
+							))}
+						</div>
+					</div>
+				</div>
+			)
+		}
 		return null
 	}
 
@@ -627,12 +914,13 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 			<Tabs
 				tabs={[
 					{ id: "nations", label: "Nations" },
+					{ id: "diplomacy", label: "Diplomacy" },
 					{ id: "development", label: "Development" },
 					{ id: "events", label: "Events" },
 					{ id: "wars", label: "Active Wars" },
 					{ id: "outcomes", label: "War Results" },
 					{ id: "rebellions", label: "Rebellions" },
-					{ id: "seasonal_temp", label: "Seasonal Temp" },
+					{ id: "culture", label: "Culture" },
 				]}
 				activeTab={tab}
 				onTabSelect={(id) => setTab(id as SimulationTabID)}

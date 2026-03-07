@@ -1,10 +1,8 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
 import { deviation, mean, scaleThreshold } from "d3"
-import { CELL } from "../cells"
 import { PROVINCE } from "../provinces"
-import { Province, Relation } from "../provinces/types"
+import { Province } from "../provinces/types"
 import { ARRAY } from "../utilities/array"
-import { MATH } from "../utilities/math"
 import { NationNeighborParams } from "./types"
 
 const domainLimit = scaleThreshold<number, number>()
@@ -238,47 +236,6 @@ export const NATION = {
 			PROVINCE.children.remove(overlord, [domain.idx])
 		},
 	},
-	relation: {
-		get: (params: { province: Province; other: Province; time?: number }) => {
-			return PROVINCE.relation.get(params)
-		},
-		set: (params: {
-			province: Province
-			other: Province
-			relation: Relation
-		}) => {
-			const { province, other, relation } = params
-			PROVINCE.relation.set({ province, other, relation })
-			PROVINCE.relation.set({ province: other, other: province, relation })
-		},
-	},
-	rebels: {
-		get: (nation: Province, time?: number) => {
-			return PROVINCE.wars
-				.active(nation, time)
-				.filter((w) => w.rebel)
-				.map((w) => {
-					const rebel = window.world.provinces[w.defender]
-					return NATION.provinces(rebel, time)
-				})
-				.flat()
-		},
-		active: (province: Province, time?: number) => {
-			const nation = PROVINCE.nation(province, time)
-			return PROVINCE.wars
-				.active(nation, time)
-				.filter((w) => w.rebel)
-				.some((w) => window.world.provinces[w.defender] === nation)
-		},
-		overlord: (province: Province, time?: number) => {
-			const nation = PROVINCE.nation(province, time)
-			const war = PROVINCE.wars
-				.active(nation, time)
-				.filter((w) => w.rebel)
-				.find((w) => window.world.provinces[w.defender] === nation)
-			return window.world.provinces[war?.attacker]
-		},
-	},
 	wealth: {
 		raw: (nation: Province) => nation.habitability,
 		_current: (nation: Province, time?: number, exclude?: Province): number => {
@@ -338,52 +295,5 @@ export const NATION = {
 				: provinces > 1
 					? "duchy"
 					: "county"
-	},
-	build: () => {
-		const provinces = window.world.provinces.filter((p) => !p.desolate)
-		const { groups } = ARRAY.distribute<Province>({
-			items: provinces,
-			percentages: MATH.normalize([0.025, 0.05, 0.1, 0.2, 0.3, 0.4]),
-			buckets: [
-				[50, 100],
-				[25, 49],
-				[10, 24],
-				[5, 9],
-				[2, 4],
-				[1, 1],
-			],
-			neighbors: (p) => PROVINCE.neighbors({ province: p }),
-			score: (p, start) => {
-				const pCell = window.world.cells[p.cell]
-				const startCell = window.world.cells[start.cell]
-				const d = CELL.distance(pCell, startCell)
-				const coastalBoost = pCell.topography === "coastal" ? 2 : 1
-				return (1 / (d + 0.1)) * coastalBoost
-			},
-			sorted: (items) =>
-				items.sort((a, b) => {
-					const aCell = window.world.cells[a.cell]
-					const bCell = window.world.cells[b.cell]
-					const aCoastal = aCell.topography === "coastal" ? 1 : 0
-					const bCoastal = bCell.topography === "coastal" ? 1 : 0
-					return bCoastal - aCoastal
-				}),
-		})
-
-		groups.forEach((group) => {
-			const sorted = group.sort(
-				(a, b) => NATION.wealth.raw(b) - NATION.wealth.raw(a),
-			)
-			const capital = sorted[0]
-			PROVINCE.parent.remove(capital)
-			PROVINCE.occupations.add(capital, undefined)
-			const reminder = sorted.slice(1)
-			NATION.domains.add(capital, reminder)
-			reminder
-				.filter((subject) => subject._children.length === 0)
-				.forEach((subject) => {
-					PROVINCE.children.add(subject, [])
-				})
-		})
 	},
 }

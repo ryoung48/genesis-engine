@@ -10,4 +10,5 @@ export interface MonthlyTemperatureParams extends TemperatureParams {
 
 export interface DailyTemperatureParams extends TemperatureParams {
 	day: number
+	h?: number
 }

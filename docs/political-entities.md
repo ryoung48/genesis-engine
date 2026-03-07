@@ -27,15 +27,7 @@ The province abstraction serves several purposes:
 
 ### Production Distribution
 
-Production follows a gaussian distribution around 5:
-
-```
-production = 5 + gaussian(0, 1) * 2
-minimum = 0.5
-maximum = ~7 (practical limit from distribution)
-```
-
-**Design justification**: The gaussian distribution creates a realistic spread of wealthy and poor provinces without extreme outliers. Most provinces cluster around average (5), with a few exceptionally rich or poor territories that become strategic targets or backwaters.
+Production follows a gaussian distribution around 5. This creates a realistic spread of wealthy and poor provinces without extreme outliers. Most provinces cluster around average, with a few exceptionally rich or poor territories that become strategic targets or backwaters.
 
 ### Historical Records
 
@@ -47,64 +39,19 @@ Each province maintains time-indexed records of:
 
 This enables queries like "Who ruled Province X in Year 500?" or "How long was Province Y occupied during the Great War?"
 
-## Nations & Subjects
+## Nations
 
-Nations are the active political entities—they make decisions, wage wars, and shape history. A nation consists of a capital province plus zero or more subject provinces.
+Nations are the active political entities—they make decisions, wage wars, and shape history. A nation is defined by a sovereign **capital province** that holds independent authority.
 
-### The Subject System
+### Sovereignty
 
-Subjects are provinces under the control of an overlord nation. This is conceptually similar to "cores" in Europa Universalis IV—they represent direct territorial control rather than feudal vassalage.
+A province is considered a sovereign nation if it is not subject to any other political entity. Sovereign nations:
 
-**Key characteristics:**
+- Conduct diplomacy (alliances, rivalries)
+- Declare and join wars
+- Manage their own economy and development
 
-- Subjects contribute tribute (25% of wealth) to their overlord
-- Subjects can have their own subjects (hierarchical)
-- Maximum 6 direct subjects before overextension penalties
-- Subjects must maintain land connectivity to overlord
-
-### Why a Subject Limit?
-
-The 6-subject limit serves several gameplay purposes:
-
-1. **Prevents runaway expansion**: Without limits, successful nations snowball indefinitely
-2. **Creates internal pressure**: Large empires must manage overextension
-3. **Historical accuracy**: Real empires faced administrative limits on direct control
-4. **Encourages hierarchy**: Nations must work through subject-of-subject chains for large empires
-
-**Overextension penalty**: Nations with >6 subjects suffer 10% reduction in optimal wealth, representing administrative inefficiency.
-
-### Hierarchy Depth
-
-There is no limit on hierarchy depth. A nation can have subjects who have subjects who have subjects. This enables:
-
-- Empires with complex internal structure
-- Buffer states and client kingdoms
-- Gradual absorption through multiple succession events
-
-### Connectivity Requirements
-
-Subjects must maintain a land route to their overlord:
-
-```
-connected = BFS_pathfind(subject, overlord) through friendly territory
-```
-
-**Disconnection consequences**: If a subject becomes geographically isolated (enemy conquest cuts the connection), they automatically rebel and become independent.
-
-**Design justification**: This prevents absurd situations like controlling distant provinces with no ability to project power. It also creates strategic gameplay around cutting enemy supply lines.
-
-### Relation Types
-
-Nations track diplomatic relations:
-
-| Relation | Description | Gameplay Effect |
-|----------|-------------|-----------------|
-| Ally | Formal alliance | May join wars (TODO) |
-| Friendly | Positive disposition | Less likely to attack |
-| Neutral | Default state | Standard behavior |
-| Suspicious | Negative disposition | More likely to attack |
-
-Relations are bidirectional and time-indexed, enabling historical queries.
+See `docs/relations-and-diplomacy.md` for details on how nations interact.
 
 ## Leaders & Succession
 
@@ -112,50 +59,13 @@ Each nation has a leader who embodies its decision-making. Leaders have finite l
 
 ### Leader Lifespan
 
-```
-lifespan = random(1, 60) years
-```
-
-This wide range creates varied narrative outcomes:
-- Short reigns (1-10 years): Rapid succession crises, unstable periods
-- Medium reigns (10-30 years): Standard historical pattern
-- Long reigns (30-60 years): Empire-building stability, followed by succession crisis
-
-**Design justification**: The uniform distribution is simple but effective. More sophisticated models could use age-based mortality curves, but the uniform distribution creates sufficient narrative variety.
+Leaders act as the central agent for the nation during their reign. Lifespans are currently modeled with a uniform distribution (1-60 years) to create narrative variety:
+- Short reigns: Rapid succession crises, unstable periods
+- Long reigns: Empire-building stability
 
 ### Succession Events
 
-When a leader dies:
-
-1. **Succession event fires** for the nation
-2. **Each subject evaluates rebellion** with 25% probability
-3. **Rebellions cascade** as subjects of rebelling subjects also evaluate
-4. **Disconnected subjects** automatically rebel
-
-### Rebellion Probability
-
-The 25% base rebellion chance represents:
-- Legitimacy crisis during transition
-- Ambitious local rulers seizing opportunity
-- Breakdown of personal loyalty networks
-
-**Why 25%?** This rate produces historically plausible succession outcomes:
-- Most successions are peaceful (75% per subject)
-- Large empires (many subjects) frequently see some rebellion
-- Cascading rebellions can fragment empires dramatically
-
-### Cascading Rebellions
-
-When a subject rebels, their subjects must also evaluate:
-
-```
-for each rebelling_subject:
-    for each sub_subject of rebelling_subject:
-        if random() < 0.25:
-            sub_subject rebels
-```
-
-This creates dramatic "empire collapse" moments where a single succession triggers chain reactions.
+When a leader dies, a succession event occurs. This represents a transfer of power and is a critical moment where the nation's stability is tested.
 
 ---
 
@@ -165,23 +75,19 @@ This creates dramatic "empire collapse" moments where a single succession trigge
 
 - [ ] **Dynasty system**: Track ruling families across generations. Enables marriage alliances, inheritance claims, and dynastic wars. Succession would pass within dynasty before triggering rebellion checks.
 
-- [ ] **Legitimacy mechanic**: New rulers start with low legitimacy that builds over time. Low legitimacy increases rebellion probability and reduces subject loyalty.
+- [ ] **Legitimacy mechanic**: New rulers start with low legitimacy that builds over time. Low legitimacy increases rebellion probability.
 
 - [ ] **Claims and cores**: Separate "claims" (legal right to territory) from "cores" (actual control). Nations can have claims on provinces they don't own, providing casus belli.
 
-- [ ] **Alliance system**: Implement the ally relation type with actual gameplay effects—allies join defensive wars, can be called into offensive wars.
-
 ### Medium Priority
 
-- [ ] **Government types**: Different political structures (monarchy, republic, theocracy) with varying succession rules, subject limits, and bonuses.
+- [ ] **Government types**: Different political structures (monarchy, republic, theocracy) with varying succession rules and bonuses.
 
 - [ ] **Regencies**: Child rulers trigger regency periods with increased instability and reduced effectiveness.
 
 - [ ] **Civil wars**: Large-scale internal conflicts beyond simple rebellion—pretender claimants, religious schisms, regional separatism.
 
 - [ ] **Diplomatic actions**: Peace treaties, tribute arrangements, royal marriages, non-aggression pacts.
-
-- [ ] **Subject types**: Differentiate between integrated provinces, autonomous subjects, and tributary states with different tribute rates and rebellion probabilities.
 
 ### Low Priority
 
@@ -195,8 +101,4 @@ This creates dramatic "empire collapse" moments where a single succession trigge
 
 ### Technical Debt
 
-- [ ] **Relation decay**: Relations should drift toward neutral over time without active maintenance.
-
 - [ ] **Historical narrative generation**: Auto-generate readable summaries of province/nation history from the time-indexed records.
-
-- [ ] **Efficient hierarchy queries**: Cache overlord chains for performance in deep hierarchies.

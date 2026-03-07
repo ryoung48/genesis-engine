@@ -1,16 +1,21 @@
 import { WORLD } from "@/model"
 import { PROVINCE } from "@/model/provinces"
+import { LANGUAGE } from "../language/languages"
 import { Culture } from "../culture/types"
 import { Faith, FaithSpawnParams } from "./types"
 
 export const FAITH = {
 	spawn: ({ culture }: FaithSpawnParams) => {
+		const name = culture.language
+			? LANGUAGE.word.unique({ lang: culture.language, key: "faith" }).word
+			: ""
 		const faith: Faith = {
 			idx: window.world.faiths.length,
 			cultures: new Set([culture.idx]),
 			color: "#ccc", // Placeholder color
 			neighbors: new Set(),
 			religion: -1,
+			name,
 		}
 		FAITH.claim(faith, culture)
 		window.world.faiths.push(faith)

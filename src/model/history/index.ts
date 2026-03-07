@@ -1,4 +1,5 @@
 import { BATTLE_EVENT } from "./events/battle"
+import { DIPLOMACY_EVENT } from "./events/diplomacy"
 import { POPULATION_EVENT } from "./events/population"
 import { SUCCESSION_EVENT } from "./events/succession"
 import { TAX_EVENT } from "./events/tax"
@@ -7,9 +8,10 @@ import { WAR_EVENT } from "./events/war"
 export const HISTORY = {
 	// Initialize the simulation without running it
 	init: () => {
-		// WAR_EVENT.init()
-		// SUCCESSION_EVENT.init()
-		// TAX_EVENT.init()
+		WAR_EVENT.init()
+		SUCCESSION_EVENT.init()
+		TAX_EVENT.init()
+		DIPLOMACY_EVENT.init()
 		POPULATION_EVENT.init()
 	},
 
@@ -42,6 +44,23 @@ export const HISTORY = {
 				case "census":
 					POPULATION_EVENT.run(currentEvent)
 					break
+				case "diplomacy":
+					DIPLOMACY_EVENT.run(currentEvent)
+					break
+				case "regency": {
+					const province = window.world.provinces[currentEvent.province]
+					const current = province._leader[province._leader.length - 1]
+					if (current?.idx === currentEvent.leader) {
+						window.world.past.push({
+							tag: "regency ended",
+							time: window.world.time,
+							agents: [province.idx],
+							nation: province.idx,
+							leader: currentEvent.leader,
+						})
+					}
+					break
+				}
 			}
 		}
 		return window.world.time

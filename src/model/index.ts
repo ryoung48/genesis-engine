@@ -216,6 +216,8 @@ export const WORLD = {
 		obliquity = 23.5,
 		eccentricity = 0.017,
 		perihelion = 102,
+		tSun = 5778,
+		landFraction = 0.3,
 	}: WorldSpawn) => {
 		// load the dice
 		console.log(seed)
@@ -233,6 +235,8 @@ export const WORLD = {
 			obliquity,
 			eccentricity,
 			perihelion,
+			tSun,
+			landFraction,
 			time: START_DATE,
 			cells: [],
 			cell: { length, count, area },
@@ -247,6 +251,7 @@ export const WORLD = {
 			provinces: [],
 			cultures: [],
 			heritages: [],
+			dynasties: [],
 			faiths: [],
 			religions: [],
 			future: new PriorityQueue((a, b) => a.time - b.time),

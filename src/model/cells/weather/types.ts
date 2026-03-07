@@ -1,5 +1,4 @@
-import { Climate } from "../types"
-import { Cell } from "../types"
+import { Cell, Climate } from "../types"
 
 export type TimeOfDay = "dawn" | "morning" | "afternoon" | "dusk" | "night"
 

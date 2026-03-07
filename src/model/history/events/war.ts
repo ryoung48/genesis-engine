@@ -1,10 +1,27 @@
 import { CELL } from "@/model/cells"
-import { WAR } from "@/model/history/wars"
 import { NATION } from "@/model/nations"
+import { RELATIONS } from "@/model/nations/relations"
+import { Relation } from "@/model/nations/relations/types"
+import { WAR } from "@/model/nations/wars"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { TIME } from "@/model/utilities/time"
 import { WarEvent } from "../types"
+
+// Relation-based threat threshold for attack willingness
+// 0 = never attack this relation
+const ATTACK_THRESHOLD: Record<Relation, number> = {
+	war: 0.9, // already at war — most eager
+	rival: 0.8,
+	suspicious: 0.6,
+	neutral: 0.45,
+	friendly: 0.1, // never attack
+	ally: 0, // never attack
+	vassal: 0, // never attack
+	overlord: 0, // never attack
+	personal_union_senior: 0, // never attack
+	personal_union_junior: 0, // never attack
+}
 
 const nextEvent = (province: Province, years?: number) => {
 	window.world.future.enqueue({
@@ -24,24 +41,36 @@ export const WAR_EVENT = {
 	},
 	run: (event: WarEvent) => {
 		const nation = window.world.provinces[event.nation]
-		const overlord = PROVINCE.parent.get(nation)
+		const ruler = PROVINCE.parent.get(nation)
+		const overlord = RELATIONS.overlord(nation)
 
 		// Only independent nations can act
-		// Must have subjects, and not be fatigued from recent war
-		if (!overlord && PROVINCE.children.get(nation).length > 0) {
-			const wars = PROVINCE.wars.active(nation)
+		if (!ruler && !overlord) {
+			const wars = WAR.nation.get(nation)
 			// Find weaker neighbors, preferring distant ones (frontier expansion)
+			// Use effectiveStrength for deterrence (accounts for defender's allies)
 			const neighbors = NATION.neighbors({ nation })
-				.map((n) => ({
-					n,
-					war: wars.find((w) => w.defender === n.idx || w.attacker === n.idx),
-					w: WAR.stats.threat({ attacker: nation, defender: n }),
-					d: CELL.distance(
-						window.world.cells[nation.cell],
-						window.world.cells[n.cell],
-					),
-				}))
-				.filter(({ w, war }) => w < 0.6 && !war)
+				.map((n) => {
+					const relation = RELATIONS.get({
+						nation,
+						other: n,
+					})
+					const threshold = ATTACK_THRESHOLD[relation]
+					return {
+						n,
+						relation,
+						threshold,
+						war: wars.find((w) => w.defender === n.idx || w.attacker === n.idx),
+						w: WAR.threat({ attacker: nation, defender: n }),
+						d: CELL.distance(
+							window.world.cells[nation.cell],
+							window.world.cells[n.cell],
+						),
+					}
+				})
+				.filter(
+					({ w, war, threshold }) => threshold > 0 && w < threshold && !war,
+				)
 				.sort((a, b) => b.d - a.d)
 
 			if (neighbors.length) {
@@ -52,14 +81,14 @@ export const WAR_EVENT = {
 				}
 			}
 		} else if (
-			overlord === PROVINCE.nation(nation) &&
-			!PROVINCE.wars.active(overlord).length &&
+			ruler === PROVINCE.nation(nation) &&
+			!WAR.nation.get(ruler).length &&
 			NATION.neighbors({ nation }).length > 0
 		) {
 			// Exclude the prospective rebel from overlord's wealth calculation
 			// to get accurate post-rebellion strength comparison
-			const threat = WAR.stats.threat({
-				attacker: overlord,
+			const threat = WAR.threat({
+				attacker: ruler,
 				defender: nation,
 				exclude: nation,
 			})
@@ -67,13 +96,13 @@ export const WAR_EVENT = {
 				window.world.past.push({
 					tag: "rebellion",
 					time: window.world.time,
-					agents: [overlord.idx, nation.idx],
-					overlord: overlord.idx,
+					agents: [ruler.idx, nation.idx],
+					overlord: ruler.idx,
 					subject: nation.idx,
 				})
 				NATION.domains.release(nation)
 				if (window.dice.random > threat)
-					WAR.start({ attacker: overlord, defender: nation, rebel: true }) // Civil war
+					WAR.start({ attacker: ruler, defender: nation, rebel: true }) // Civil war
 				NATION.connections(nation)
 			}
 		}

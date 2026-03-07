@@ -152,9 +152,8 @@ export const CELL = {
 			rain: {
 				annual: -1,
 				monthly: [],
-				east: -1,
-				west: -1,
 			},
+			moisture: { east: -1, west: -1 },
 			heat: { min: -1, max: -1, mean: -1 },
 		}
 		return cell

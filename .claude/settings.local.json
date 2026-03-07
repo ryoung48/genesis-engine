@@ -1,5 +1,15 @@
 {
-	"permissions": {
-		"allow": ["Bash(npx tsc:*)", "Bash(xxd:*)", "Bash(npx vite build:*)"]
-	}
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(xxd:*)",
+      "Bash(npx vite build:*)",
+      "Bash(npx vitest:*)",
+      "Bash($env:LANGUAGE_SAMPLES=1)",
+      "Bash(pnpm exec vitest:*)",
+      "Bash(LANGUAGE_SAMPLES=1 pnpm exec vitest:*)",
+      "Bash(python3:*)",
+      "Bash(node -e:*)"
+    ]
+  }
 }

@@ -5,7 +5,8 @@ import { Heritage } from "./actors/heritage/types"
 import { Religion } from "./actors/religion/types"
 import { Cell } from "./cells/types"
 import { FutureEvent, HistoryNote } from "./history/types"
-import { War } from "./history/wars/types"
+import { Dynasty } from "./provinces/leader/types"
+import { War } from "./nations/wars/types"
 import { Province } from "./provinces/types"
 import { Display } from "./shapers/display/types"
 import { GeoVoronoiDiagram } from "./utilities/voronoi/types"
@@ -57,12 +58,15 @@ export interface World {
 	faiths: Faith[]
 	religions: Religion[]
 	future: PriorityQueue<FutureEvent>
+	dynasties: Dynasty[]
 	wars: War[]
 	past: HistoryNote[]
 	// EBM Configuration (Persisted)
 	obliquity: number
 	eccentricity: number
 	perihelion: number
+	tSun: number
+	landFraction: number
 }
 
 export type WorldSpawn = {
@@ -70,6 +74,7 @@ export type WorldSpawn = {
 	obliquity?: number
 	eccentricity?: number
 	perihelion?: number
+	tSun?: number
 	landFraction?: number
 }
 

@@ -2,8 +2,13 @@ import { EMB_CONSTANTS } from "./constants"
 
 /* eslint-disable camelcase */
 export const INSOLATION = {
-	compute: (lats: number[], orbital: typeof EMB_CONSTANTS.orbital) => {
-		const { time, stellar, grid } = EMB_CONSTANTS
+	compute: (
+		lats: number[],
+		orbital: typeof EMB_CONSTANTS.orbital,
+		stellarOverride?: typeof EMB_CONSTANTS.stellar,
+	) => {
+		const { time, stellar: defaultStellar, grid } = EMB_CONSTANTS
+		const stellar = stellarOverride || defaultStellar
 		const _insolation: number[][] = new Array(grid.NUM_LAT)
 			.fill(0)
 			.map(() => new Array(time.DAYS_PER_YEAR).fill(0))
