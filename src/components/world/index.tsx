@@ -91,9 +91,9 @@ const paint = ({
 }) => {
 	ctx.fillStyle = "white"
 	ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+	DRAW_BORDERS.beginFrame()
 	DRAW_BORDERS.setDiplomacyTarget(selectedNation ?? null)
-	DRAW_LANDMARKS.oceans({ ctx, projection, mapMode, visible })
-	DRAW_BORDERS.provinces({
+	DRAW_LANDMARKS.render({
 		ctx,
 		projection,
 		mapMode,
@@ -101,7 +101,22 @@ const paint = ({
 		visible,
 		time,
 	})
-	DRAW_LANDMARKS.lakes({ ctx, projection, mapMode, visible })
+	DRAW_BORDERS.nationBorders({
+		ctx,
+		projection,
+		mapMode,
+		hoveredProvince,
+		visible,
+		time,
+	})
+	DRAW_BORDERS.hover({
+		ctx,
+		projection,
+		mapMode,
+		hoveredProvince,
+		visible,
+		time,
+	})
 	// DRAW_TERRAIN.icons({ ctx, projection, cachedImages, visible })
 	DRAW_EMBELLISHMENTS.graticule({ ctx, projection, mapMode, visible })
 
@@ -524,7 +539,7 @@ const WorldMap: React.FC = () => {
 				/>
 			</div>
 
-			<StatsCard province={province} cursor={cursor} time={timeToRender} />
+			<StatsCard province={province} cell={cell} cursor={cursor} time={timeToRender} />
 
 			<MapControls
 				isPlaying={isPlaying}

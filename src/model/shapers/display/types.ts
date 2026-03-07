@@ -2,12 +2,9 @@ interface PathSegment {
 	path: [number, number][]
 }
 
-interface CoastSegment extends PathSegment {
+export interface CoastSegment extends PathSegment {
 	idx: number
-}
-
-interface LakeSegment extends CoastSegment {
-	border: boolean
+	depth: number
 }
 
 export interface RegionSegment extends PathSegment {
@@ -16,5 +13,5 @@ export interface RegionSegment extends PathSegment {
 
 export interface Display {
 	islands: Record<number, CoastSegment>
-	lakes: Record<number, LakeSegment>
+	lakes: Record<number, CoastSegment>
 }

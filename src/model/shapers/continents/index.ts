@@ -32,7 +32,9 @@ export const SHAPER_CONTINENTS = {
 			queue = queue.concat(neighbors)
 		}
 	},
-	_coastGen: (landFraction?: number) => {
+	_coastGen: (landFraction = 0.3) => {
+		const landHeavy = landFraction > 0.5
+		const frac = landHeavy ? 1 - landFraction : landFraction
 		// start from fractal noise
 		const elev = SIMPLEX.continents(window.world.cells, {
 			octaves: 12,
@@ -41,9 +43,7 @@ export const SHAPER_CONTINENTS = {
 		})
 		let cutoff = 0.4
 		let land = 0
-		const target = landFraction
-			? [landFraction - 0.05, landFraction + 0.05]
-			: [0.25, 0.35]
+		const target = [frac - 0.05, frac + 0.05]
 		while (land < target[0] || land > target[1]) {
 			land = elev.filter((e) => e > cutoff).length / window.world.cells.length
 			if (land > target[1]) cutoff += 0.02
@@ -54,6 +54,11 @@ export const SHAPER_CONTINENTS = {
 				(window.world.cells[i].h = e > cutoff ? WORLD.elevation.seaLevel : 0),
 		)
 		console.log("land ratio: " + land + " | cutoff: " + cutoff)
+		if (landHeavy) {
+			window.world.cells.forEach((cell) => {
+				cell.h = cell.h >= WORLD.elevation.seaLevel ? 0 : WORLD.elevation.seaLevel
+			})
+		}
 	},
 	_setup: () => {
 		// create initial points
