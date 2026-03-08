@@ -93,6 +93,10 @@ export const LEADER = {
 					dynasty = window.dice.choice(other)
 				}
 
+				if(!window.world.cultures[province.culture].language) {
+					console.log("no culture for province", province)
+				}
+
 				if (dynasty < 0) {
 					dynasty = LEADER.dynasty.add(province.culture)
 				}

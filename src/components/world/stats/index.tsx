@@ -11,7 +11,6 @@ import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { MATH } from "@/model/utilities/math"
 import { NAMES } from "@/model/actors/language/names"
-import { GRAVITY } from "@/model/trade/gravity"
 import { MAP_METRICS } from "../shapes/metrics"
 import { LEADER } from "@/model/provinces/leader"
 import { MapMode } from "../types"
@@ -463,45 +462,6 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 								{PROVINCE.development.get(province, time).toFixed(2)}
 							</span>
 						</div>
-						<div className="flex justify-between items-center text-[12px] mb-1">
-							<span className="font-mono text-slate-400 uppercase tracking-wide">
-								Gravity
-							</span>
-							{(() => {
-								console.log(selectedNation, province.idx)
-								if (selectedNation == null || selectedNation === province.idx) return <span className="font-mono font-bold text-slate-900">—</span>
-								const target = window.world.provinces[selectedNation]
-								if (!target) return <span className="font-mono font-bold text-slate-900">—</span>
-								const g = GRAVITY.score(target, province, time)
-								return (
-									<span className="font-mono font-bold text-slate-900">
-										{g < 0.01 ? "—" : g.toFixed(2)}
-									</span>
-								)
-							})()}
-						</div>
-						{mapMode === "gravity" && selectedNation != null && selectedNation !== province.idx && (() => {
-							const target = window.world.provinces[selectedNation]
-							if (!target) return null
-							const popA = PROVINCE.population.urban.get(target, time)
-							const popB = PROVINCE.population.urban.get(province, time)
-							const dist = PROVINCE.distance({ province: target, other: province })
-							const mass = Math.pow(popA * popB, GRAVITY.config.massFactor)
-							const distFactor = Math.pow(dist, GRAVITY.config.distanceDecay)
-							const g = dist < 1 ? 0 : mass / distFactor
-							const fmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 })
-							return (
-								<div className="mt-1 p-1.5 bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-600 space-y-0.5">
-									<div className="text-slate-400 mb-1">vs {NAMES.province(target.idx)}</div>
-									<div className="flex justify-between"><span>pop₁</span><span className="text-slate-900">{fmt.format(popA)}</span></div>
-									<div className="flex justify-between"><span>pop₂</span><span className="text-slate-900">{fmt.format(popB)}</span></div>
-									<div className="flex justify-between"><span>dist</span><span className="text-slate-900">{dist.toFixed(0)} mi</span></div>
-									<div className="flex justify-between"><span>mass<sup>{GRAVITY.config.massFactor}</sup></span><span className="text-slate-900">{fmt.format(mass)}</span></div>
-									<div className="flex justify-between"><span>dist<sup>{GRAVITY.config.distanceDecay}</sup></span><span className="text-slate-900">{fmt.format(distFactor)}</span></div>
-									<div className="flex justify-between border-t border-slate-200 pt-0.5 mt-0.5"><span className="font-bold">score</span><span className="font-bold text-slate-900">{g < 0.01 ? "—" : g.toFixed(2)}</span></div>
-								</div>
-							)
-						})()}
 					</div>
 				)}
 			</div>

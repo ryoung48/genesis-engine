@@ -143,6 +143,13 @@ export const HERITAGE = {
 			})
 		}
 
+		// mark all provinces without culture as desolate
+		window.world.provinces.forEach((p) => {
+			if (p.heritage === -1) {
+				p.desolate = true
+			}
+		})
+
 		HERITAGE.colorize()
 	},
 }

@@ -35,23 +35,13 @@ export interface World {
 			name?: string
 			type: "ocean" | "lake" | "sea" | "continent" | "island" | "isle"
 			water: boolean
-			sea?: boolean
 			size: number
 			cell: number
 			parent?: number
+			depth?: number
 		}
 	>
 	mountains: { size: number; cell: number; name?: string }[]
-	oceanRegions: {
-		idx: number
-		cell: number
-		borders: number[]
-		neighbors: number[]
-		cells: number[]
-		ocean: number
-		distanceFromContinent: number
-		type?: "ocean" | "sea"
-	}[]
 	provinces: Province[]
 	cultures: Culture[]
 	heritages: Heritage[]

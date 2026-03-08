@@ -37,10 +37,12 @@ export const WORLD = {
 			get: () => WORLD.cells.water().filter((cell) => !cell.ocean),
 			merge: ({ lakes, lake }: MergeLakeParams) => {
 				const lakeCells = lakes.filter((cell) => cell.landmark === lake)
-				const { landmark } = lakeCells
+				if (lakeCells.length === 0) return lakeCells
+				const neighbor = lakeCells
 					.map((cell) => CELL.neighbors(cell))
 					.flat()
-					.find((cell) => cell.landmark !== lake)
+					.find((cell) => cell.landmark !== lake && cell.landmark)
+				const landmark = neighbor?.landmark
 				lakeCells.forEach((cell) => {
 					cell.landmark = landmark
 					cell.isWater = true
@@ -48,15 +50,25 @@ export const WORLD = {
 					cell.h = WORLD.elevation.seaLevel - 0.01
 				})
 				delete window.world.landmarks[lake]
-				window.world.landmarks[landmark].size += lakeCells.length
+				if (landmark && window.world.landmarks[landmark]) {
+					window.world.landmarks[landmark].size += lakeCells.length
+				}
 				return lakeCells
 			},
 			remove: ({ lakes, lake }: RemoveLakeParams) => {
 				const lakeCells = lakes.filter((cell) => cell.landmark === lake)
-				const shallow = lakeCells.find((cell) => cell.shallow)
-				const { landmark } = CELL.neighbors(shallow).find(
-					(cell) => cell.landmark !== lake,
-				)
+				if (lakeCells.length === 0) return lakeCells
+				// Find an adjacent non-lake landmark to absorb cells into
+				const neighbor = lakeCells
+					.flatMap((cell) => CELL.neighbors(cell))
+					.find(
+						(cell) =>
+							cell.landmark !== lake &&
+							cell.landmark &&
+							window.world.landmarks[cell.landmark],
+					)
+				if (!neighbor) return []
+				const landmark = neighbor.landmark
 				lakeCells.forEach((cell) => {
 					cell.landmark = landmark
 					cell.isWater = false
@@ -70,8 +82,28 @@ export const WORLD = {
 							n.isCoast = coast.length > 0
 						})
 				})
+				// Absorb any child landmarks of the deleted lake into its parent
+				const lakeParent = window.world.landmarks[lake]?.parent
+				Object.entries(window.world.landmarks).forEach(([k, lm]) => {
+					if (lm.parent === lake) {
+						const childIdx = parseInt(k)
+						// Reassign child cells to the lake's parent landmark
+						window.world.cells.forEach((cell) => {
+							if (cell.landmark === childIdx) {
+								cell.landmark = lakeParent ?? landmark
+								cell.isWater = lm.water
+							}
+						})
+						if (lakeParent !== undefined && window.world.landmarks[lakeParent]) {
+							window.world.landmarks[lakeParent].size += lm.size
+						}
+						delete window.world.landmarks[childIdx]
+					}
+				})
 				delete window.world.landmarks[lake]
-				window.world.landmarks[landmark].size += lakeCells.length
+				if (landmark && window.world.landmarks[landmark]) {
+					window.world.landmarks[landmark].size += lakeCells.length
+				}
 				return lakeCells
 			},
 		},
@@ -133,7 +165,7 @@ export const WORLD = {
 			.map(([k]) => parseInt(k))
 	},
 	placement: {
-		spacing: { regions: 350, provinces: 105, oceans: 800, oceanRegions: 325 },
+		spacing: { regions: 350, provinces: 105 },
 		autoSpacing: (count: number, area: number) =>
 			Math.sqrt(area / count) * 0.75,
 		limit: (spacing: number) =>
@@ -146,7 +178,7 @@ export const WORLD = {
 		}: WorldPlacementParams) => {
 			const grid: Record<string, Cell[]> = {}
 
-			const level = S2_EXTENDED.getS2LevelFromDistance(spacing)
+			const level = Math.max(1, Math.min(30, S2_EXTENDED.getS2LevelFromDistance(spacing)))
 
 			function getGridCell(cell: Cell): string {
 				return S2.latLngToKey(cell.y, cell.x, level)
@@ -247,7 +279,6 @@ export const WORLD = {
 			radius: 3.959e3, // miles
 			landmarks: {},
 			mountains: [],
-			oceanRegions: [],
 			provinces: [],
 			cultures: [],
 			heritages: [],

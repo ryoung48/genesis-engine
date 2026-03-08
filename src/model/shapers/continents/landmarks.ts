@@ -1,6 +1,5 @@
 import { WORLD } from "../.."
 import { CELL } from "../../cells"
-import { Cell } from "../../cells/types"
 
 export const LANDMARKS = {
 	land: (idx: number) => {
@@ -83,6 +82,8 @@ export const LANDMARKS = {
 			idx += 1
 		}
 		WORLD.cells.reshape()
+		// assign parents
+		LANDMARKS._assignParents()
 		// remove super lakes
 		const lakes = WORLD.cells.lakes.get()
 		WORLD.landmarks("water")
@@ -104,9 +105,9 @@ export const LANDMARKS = {
 		WORLD.cells.reshape()
 	},
 	water: (idx: number) => {
+		const total = window.world.cells.length
 		// mark water cells
 		let water = WORLD.cells.water()
-		const waterBodies: Record<number, Cell[]> = {}
 		// iterate through all bodies of water
 		while (water.length > 0) {
 			let queue = [water[0].idx]
@@ -138,26 +139,90 @@ export const LANDMARKS = {
 			}
 			// mark bodies of water
 			const curr = water.filter((poly) => poly.landmark === idx)
-			waterBodies[idx] = curr
 			const landmark = window.world.landmarks[idx]
 			landmark.size = curr.length
+			const ratio = landmark.size / total
+			if (ratio < 0.001) landmark.type = "lake"
+			else if (ratio < 0.01) landmark.type = "sea"
+			// flip ocean markers
+			if (landmark.type !== "ocean")
+				curr.forEach((p) => (p.ocean = false))
 			// only consider cells that haven't been marked
 			water = water.filter((poly) => !poly.landmark)
 			// increment the water feature index after a completed floodfill
 			idx += 1
 		}
-		// mark ocean
-		const ocean = Object.entries(waterBodies).reduce((max, curr) => {
-			return max?.[1].length > curr[1].length ? max : curr
-		}, null)
-		Object.keys(waterBodies)
-			.filter((k) => k !== ocean?.[0])
-			.forEach((k) => {
-				window.world.landmarks[parseInt(k)].type = "lake"
-				waterBodies[parseInt(k)].forEach((p) => {
-					p.ocean = false
+		return idx
+	},
+	_assignParents: () => {
+		const landmarks = window.world.landmarks
+		// for each landmark, find distinct opposite-type neighbors
+		Object.entries(landmarks).forEach(([key, landmark]) => {
+			const idx = parseInt(key)
+			const cells = window.world.cells.filter((c) => c.landmark === idx)
+			// collect all neighboring landmarks of opposite type
+			const neighborLandmarks = new Set<number>()
+			cells.forEach((cell) => {
+				CELL.neighbors(cell).forEach((n) => {
+					if (n.landmark !== undefined && n.landmark !== idx) {
+						const nLandmark = landmarks[n.landmark]
+						if (nLandmark && nLandmark.water !== landmark.water) {
+							neighborLandmarks.add(n.landmark)
+						}
+					}
 				})
 			})
-		return idx
+			if (neighborLandmarks.size >= 1) {
+				// pick the largest opposite-type neighbor as parent,
+				// but only if it's larger (it encloses us)
+				const largest = [...neighborLandmarks].reduce((a, b) =>
+					landmarks[a].size > landmarks[b].size ? a : b,
+				)
+				if (landmarks[largest].size > landmark.size) {
+					landmark.parent = largest
+				}
+			}
+		})
+		// compute depth by walking the parent chain
+		const computeDepth = (idx: number): number => {
+			const landmark = landmarks[idx]
+			if (landmark.depth !== undefined) return landmark.depth
+			if (landmark.parent === undefined) {
+				landmark.depth = 0
+				return 0
+			}
+			landmark.depth = computeDepth(landmark.parent) + 1
+			return landmark.depth
+		}
+		Object.keys(landmarks).forEach((key) => computeDepth(parseInt(key)))
+		// absorb lake isles — small land bodies with a single water parent
+		Object.entries(landmarks).forEach(([key, landmark]) => {
+			const idx = parseInt(key)
+			if (!landmark.water && landmark.parent !== undefined) {
+				const parentLandmark = landmarks[landmark.parent]
+				if (landmark.depth > 2) {
+					// absorb this land into the parent water body
+					const cells = window.world.cells.filter((c) => c.landmark === idx)
+					cells.forEach((p) => {
+						p.landmark = landmark.parent
+						p.isWater = true
+						p.isCoast = false
+						p.ocean = false
+						p.h = 0
+					})
+					// update shallow status for neighbors
+					cells.forEach((p) => {
+						CELL.neighbors(p)
+							.filter((n) => n.isWater)
+							.forEach((n) => {
+								const coast = CELL.neighbors(n).filter((c) => !c.isWater)
+								n.shallow = coast.length > 0
+							})
+					})
+					parentLandmark.size += cells.length
+					delete landmarks[idx]
+				}
+			}
+		})
 	},
 }

@@ -63,7 +63,7 @@ export const SHAPER_PARTITIONS = {
 			const cell = window.world.cells[province.cell]
 			claimCell.province(cell, province)
 			const { climate } = cell
-			if (climate === "arctic") province.desolate = true
+			if (climate === "arctic" || cell.rain.annual < 1) province.desolate = true
 			return cell
 		})
 		const { boundaries } = SHAPER_MOUNTAINS
