@@ -21,10 +21,8 @@ export interface World {
 	id: string
 	time: number
 	diagram?: GeoVoronoiDiagram
-	resolution: number
 	cells: Cell[]
 	cell: { length: number; area: number; count: number }
-	scale: number
 	display: Display
 	// geography
 	radius: number
@@ -66,6 +64,8 @@ export type WorldSpawn = {
 	perihelion?: number
 	tSun?: number
 	landFraction?: number
+	radius?: number
+	resolution?: number
 }
 
 export type WorldPlacementParams = {

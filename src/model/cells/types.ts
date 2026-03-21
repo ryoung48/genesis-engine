@@ -15,6 +15,8 @@ export type Climate =
 	| "temperate"
 	| "subtropical"
 	| "tropical"
+	| "infernal"
+	| "chaotic"
 
 export interface Cell extends Point {
 	idx: number
@@ -26,12 +28,12 @@ export interface Cell extends Point {
 	// mountains
 	isMountains?: boolean
 	mountain?: number
+	chain?: number
 	plateau?: boolean
 	// location
 	location: number
 	province: number
 	// features
-	h: number
 	elevation: number
 	landmark: number
 	isWater?: boolean
@@ -60,12 +62,13 @@ export interface Cell extends Point {
 		monthlyE?: number[]
 	}
 	wind?: { monthly: number[]; annual: number }
+	biome?: { zone: string; color: [number, number, number] }
 	topography?: "coastal" | "marsh" | "flat" | "hills" | "plateau" | "mountains"
 	vegetation?: Vegetation
 	climate?: Climate
 	// distances
 	oceanDist: number
-	mountainDist: number
+	highlandDist: number
 	landDist: number
 }
 

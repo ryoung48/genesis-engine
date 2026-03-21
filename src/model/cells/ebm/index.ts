@@ -12,6 +12,7 @@ export interface EBMConfig {
 	orbital: typeof EMB_CONSTANTS.orbital
 	stellar?: typeof EMB_CONSTANTS.stellar
 	landFraction?: number[]
+	radius?: number // planet radius in meters
 }
 
 export class EnergyBalanceModel {
@@ -44,13 +45,15 @@ export class EnergyBalanceModel {
 	}
 
 	heatDiffusion(tIdx: number): number[] {
-		const { grid, time } = EMB_CONSTANTS // Use constants for grid/time as they are structural
+		const { grid, time, planet } = EMB_CONSTANTS // Use constants for grid/time as they are structural
 		const earthDayHours = 24.0
 		const rotationFactor = Math.pow(earthDayHours / time.HOURS_PER_DAY, 0.5)
+		const radiusRatio = planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
+		const radiusFactor = radiusRatio * radiusRatio // D scales as 1/R²
 
 		const diffuser = (latDeg: number) => {
 			const absLat = Math.abs(latDeg)
-			return 0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))
+			return (0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) * radiusFactor
 		}
 
 		const T: number[] = this.temperature.map((row) => row[tIdx])
@@ -251,6 +254,8 @@ export const EBM = {
 					config.orbital.PERIHELION = world.perihelion
 				if (world.tSun !== undefined && config.stellar)
 					config.stellar.T_SUN = world.tSun
+				if (world.radius !== undefined)
+					config.radius = world.radius * 1000 // km to meters
 			}
 
 			defaultInstance = new EnergyBalanceModel(config)

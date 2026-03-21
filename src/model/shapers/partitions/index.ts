@@ -13,6 +13,7 @@ import { FAITH } from "../../actors/faith"
 import { HERITAGE } from "../../actors/heritage"
 import { RELIGION } from "../../actors/religion"
 import { SHAPER_MOUNTAINS } from "../topagraphy"
+import { EBM } from "@/model/cells/ebm"
 
 const claimCell = {
 	province: (cell: Cell, province: Province) => {
@@ -31,8 +32,6 @@ const claimCell = {
 	},
 }
 
-const PROVINCE_COUNT = 3500
-
 export const SHAPER_PARTITIONS = {
 	build: () => {
 		SHAPER_PARTITIONS._provinces()
@@ -47,13 +46,15 @@ export const SHAPER_PARTITIONS = {
 	},
 	_provinces: () => {
 		const land = WORLD.cells.land()
+		const totalArea = land.length * window.world.cell.area
+		const count = totalArea / 45e3
 		const spacing = WORLD.placement.autoSpacing(
-			PROVINCE_COUNT,
+			count,
 			land.length * window.world.cell.area,
 		)
 		WORLD.placement
 			.run({
-				count: PROVINCE_COUNT,
+				count,
 				spacing,
 				whitelist: land,
 			})
@@ -63,7 +64,13 @@ export const SHAPER_PARTITIONS = {
 			const cell = window.world.cells[province.cell]
 			claimCell.province(cell, province)
 			const { climate } = cell
-			if (climate === "arctic" || cell.rain.annual < 1) province.desolate = true
+			if (
+				climate === "arctic" ||
+				climate === "subarctic" ||
+				cell.heat.max > EBM.constants.chaotic.max ||
+				cell.rain.annual < 10
+			)
+				province.desolate = true
 			return cell
 		})
 		const { boundaries } = SHAPER_MOUNTAINS

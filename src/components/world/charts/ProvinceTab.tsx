@@ -24,7 +24,6 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip)
 interface ProvinceTabProps {
 	selectedProvince: number | null
 	renderTime: number
-	onNationSelect?: () => void
 	onHeritageSelect?: (heritageIdx: number) => void
 	onCultureSelect?: (cultureIdx: number) => void
 }
@@ -59,7 +58,6 @@ const fmtPct = new Intl.NumberFormat("en-US", {
 export const ProvinceTab: React.FC<ProvinceTabProps> = ({
 	selectedProvince,
 	renderTime,
-	onNationSelect,
 	onHeritageSelect,
 	onCultureSelect,
 }) => {
@@ -142,8 +140,8 @@ export const ProvinceTab: React.FC<ProvinceTabProps> = ({
 	const spreadTemp = maxTemp - minTemp
 
 	// Rain stats
-	const annualRain = monthlyRain.reduce((s, r) => s + r, 0)
-	const avgRain = annualRain / 12
+	const annualRain = cell.rain.annual
+	const avgRain = monthlyRain.reduce((s, r) => s + r, 0) / 12
 
 	// Daylight stats
 	const avgDaylight = monthlyDaylight.reduce((s, d) => s + d, 0) / (monthlyDaylight.length || 1)
@@ -236,6 +234,7 @@ export const ProvinceTab: React.FC<ProvinceTabProps> = ({
 			case "rain":
 				return (
 					<div className="flex justify-center gap-6 text-[10px]">
+						<div className="text-center"><div className="text-gray-400">Annual</div><div className="font-bold">{Math.round(annualRain)} mm</div></div>
 						<div className="text-center"><div className="text-gray-400">Avg</div><div className="font-bold">{Math.round(avgRain)} mm</div></div>
 						<div className="text-center"><div className="text-gray-400">Min</div><div className="font-bold">{Math.round(Math.min(...monthlyRain))} mm</div></div>
 						<div className="text-center"><div className="text-gray-400">Max</div><div className="font-bold">{Math.round(Math.max(...monthlyRain))} mm</div></div>

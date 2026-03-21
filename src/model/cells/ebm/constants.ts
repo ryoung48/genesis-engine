@@ -1,5 +1,8 @@
 export const EMB_CONSTANTS = {
-	chaotic: { min: 0, max: 40 },
+	chaotic: { min: 10, max: 50 },
+	planet: {
+		EARTH_RADIUS: 6.371e6, // meters
+	},
 	stellar: {
 		T_SUN: 5778.0 * 1, // Sun's surface temperature [K]
 		R_SUN: 6.9634e8, // Sun's radius [m]

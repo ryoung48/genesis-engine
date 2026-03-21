@@ -109,9 +109,7 @@ export const DRAW_EMBELLISHMENTS = {
 		// Draw Label
 		const mx = (start[0] + end[0]) / 2
 		const my = (start[1] + end[1]) / 2 - 15
-		const distKm = MATH.conversion.distance.miles.km(
-			MATH.distance.geo(p1, p2) * window.world.radius,
-		)
+		const distKm = MATH.distance.geo(p1, p2) * window.world.radius
 
 		const label =
 			units === "metric"

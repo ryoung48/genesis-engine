@@ -1,11 +1,12 @@
 ﻿import React, { useState } from "react"
 import { GenesisEngine } from "./components/landing/GenesisEngine"
 import { LanguageLab } from "./components/landing/LanguageLab"
+import { OrogenView } from "./components/orogen"
 import { LoadingScreen } from "./components/loading/LoadingScreen"
 import WorldMap from "./components/world"
 import { EARTH_DEFAULTS, LOADING_STEPS } from "./constants/app"
 import { useEbmPreview } from "./hooks/useEbmPreview"
-import { useWorldGeneration } from "./hooks/useWorldGeneration"
+import { HeightmapPreset, useWorldGeneration } from "./hooks/useWorldGeneration"
 import { ViewState } from "./types/app"
 
 function App() {
@@ -16,8 +17,10 @@ function App() {
 	const [obliquity, setObliquity] = useState(EARTH_DEFAULTS.obliquity)
 	const [eccentricity, setEccentricity] = useState(EARTH_DEFAULTS.eccentricity)
 	const [perihelion, setPerihelion] = useState(EARTH_DEFAULTS.perihelion)
-	const [tSun, setTSun] = useState(EARTH_DEFAULTS.tSun)
+	const [sunTempFactor, setSunTempFactor] = useState(EARTH_DEFAULTS.sunTempFactor)
 	const [landFraction, setLandFraction] = useState(EARTH_DEFAULTS.landFraction)
+	const [radiusFactor, setRadiusFactor] = useState(EARTH_DEFAULTS.radiusFactor)
+	const [heightmap, setHeightmap] = useState<HeightmapPreset | undefined>(undefined)
 	const [previewTab, setPreviewTab] = useState<
 		"temperature" | "insolation" | "daylight" | "circulation" | "wind" | "language"
 	>("temperature")
@@ -26,8 +29,9 @@ function App() {
 		obliquity,
 		eccentricity,
 		perihelion,
-		tSun,
+		tSun: sunTempFactor * 5778,
 		landFraction,
+		radius: radiusFactor * 6371,
 	})
 
 	const {
@@ -46,8 +50,10 @@ function App() {
 			obliquity,
 			eccentricity,
 			perihelion,
-			tSun,
+			tSun: sunTempFactor * 5778,
 			landFraction,
+			radius: radiusFactor * 6371,
+			heightmap,
 			setView,
 		})
 	}
@@ -65,11 +71,16 @@ function App() {
 					setEccentricity={setEccentricity}
 					perihelion={perihelion}
 					setPerihelion={setPerihelion}
-					tSun={tSun}
-					setTSun={setTSun}
+					sunTempFactor={sunTempFactor}
+					setSunTempFactor={setSunTempFactor}
 					landFraction={landFraction}
 					setLandFraction={setLandFraction}
+					radiusFactor={radiusFactor}
+					setRadiusFactor={setRadiusFactor}
+					heightmap={heightmap}
+					setHeightmap={setHeightmap}
 					onLaunch={onLaunch}
+					onOrogenClick={() => setView("orogen")}
 					ebmPreview={ebmPreview}
 					previewTab={previewTab}
 					setPreviewTab={setPreviewTab}
@@ -79,6 +90,10 @@ function App() {
 
 			{view === "names" && (
 				<LanguageLab onBack={() => setView("start")} />
+			)}
+
+			{view === "orogen" && (
+				<OrogenView onBack={() => setView("start")} />
 			)}
 
 			{view === "loading" && (

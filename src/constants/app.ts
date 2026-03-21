@@ -15,6 +15,7 @@ export const EARTH_DEFAULTS = {
 	obliquity: 23.5,
 	eccentricity: 0.017,
 	perihelion: 102,
-	tSun: 5778,
+	sunTempFactor: 1.0,
 	landFraction: 0.3,
+	radiusFactor: 1.0,
 }

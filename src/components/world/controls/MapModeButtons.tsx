@@ -13,6 +13,7 @@ const MAP_MODE_OPTIONS = [
 	{ mode: "religion", label: "REL", fullLabel: "Religion" },
 	{ mode: "dynasties", label: "DYN", fullLabel: "Dynasties" },
 	{ mode: "climate", label: "CLM", fullLabel: "Climate" },
+	{ mode: "biome", label: "BIO", fullLabel: "Biome" },
 	{ mode: "vegetation", label: "VEG", fullLabel: "Vegetation" },
 	{ mode: "terrain", label: "TER", fullLabel: "Topography" },
 	{ mode: "population", label: "POP", fullLabel: "Population" },

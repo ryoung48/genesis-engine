@@ -1,4 +1,11 @@
-import { interpolatePlasma, interpolatePurples, mean, scaleLinear } from "d3"
+import {
+	interpolatePlasma,
+	interpolatePurples,
+	interpolateRdBu,
+	mean,
+	scaleDiverging,
+	scaleLinear,
+} from "d3"
 import { useMemo } from "react"
 import { EBM, EnergyBalanceModel } from "../model/cells/ebm"
 import { WIND } from "../model/cells/wind"
@@ -9,10 +16,11 @@ interface EbmConfig {
 	perihelion: number
 	tSun: number
 	landFraction: number
+	radius: number
 }
 
 export function useEbmPreview(config: EbmConfig) {
-	const { obliquity, eccentricity, perihelion, tSun, landFraction } = config
+	const { obliquity, eccentricity, perihelion, tSun, landFraction, radius } = config
 
 	return useMemo(() => {
 		const modelConfig = {
@@ -26,6 +34,7 @@ export function useEbmPreview(config: EbmConfig) {
 				T_SUN: tSun,
 			},
 			landFraction: new Array(EBM.constants.grid.NUM_LAT).fill(landFraction),
+			radius: radius * 1000, // km to meters
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
@@ -56,6 +65,30 @@ export function useEbmPreview(config: EbmConfig) {
 		const daylightScale = scaleLinear([0, 24], [1, 0])
 		const daylightColorFn = (hours: number) =>
 			interpolatePurples(daylightScale(hours))
+
+		const gradient = model.temperature.map((row, latIdx) => {
+			const prevIdx = Math.max(0, latIdx - 1)
+			const nextIdx = Math.min(model.temperature.length - 1, latIdx + 1)
+			const latSpan = model.lats_deg[nextIdx] - model.lats_deg[prevIdx] || 1
+
+			return row.map((_, dayIdx) => {
+				const dT = model.temperature[nextIdx][dayIdx] - model.temperature[prevIdx][dayIdx]
+				return dT / latSpan
+			})
+		})
+
+		let gradientAbsMax = 0
+		for (const row of gradient) {
+			for (const val of row) {
+				const abs = Math.abs(val)
+				if (abs > gradientAbsMax) gradientAbsMax = abs
+			}
+		}
+		const gradientScale = scaleDiverging((t) => t)
+			.domain([-(gradientAbsMax || 0.1), 0, gradientAbsMax || 0.1])
+			.clamp(true)
+		const gradientColorFn = (val: number) =>
+			interpolateRdBu(1 - gradientScale(val))
 
 		// Find thermal equator per day
 		const teqByDay: number[] = []
@@ -101,6 +134,8 @@ export function useEbmPreview(config: EbmConfig) {
 			insolColorFn,
 			daylight: model.daylightHours,
 			daylightColorFn,
+			gradient,
+			gradientColorFn,
 			teqByDay,
 			wind,
 			windColorFn,
@@ -108,5 +143,5 @@ export function useEbmPreview(config: EbmConfig) {
 			sampledDays,
 			dayLabels,
 		}
-	}, [obliquity, eccentricity, perihelion, tSun, landFraction])
+	}, [obliquity, eccentricity, perihelion, tSun, landFraction, radius])
 }

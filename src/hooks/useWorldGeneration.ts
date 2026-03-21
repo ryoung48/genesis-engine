@@ -7,8 +7,33 @@ import { SHAPER_CONTINENTS } from "../model/shapers/continents"
 import { SHAPER_DISPLAY } from "../model/shapers/display"
 import { SHAPER_PARTITIONS } from "../model/shapers/partitions"
 import { SHAPER_MOUNTAINS } from "../model/shapers/topagraphy"
+import { SHAPER_HEIGHTMAP } from "../model/shapers/heightmap"
 import { TIME } from "../model/utilities/time"
 import { LoadingStep, ViewState } from "../types/app"
+
+export interface HeightmapPreset {
+	url: string
+	seaLevel: number
+	resolution: number
+}
+
+function loadImageData(src: string): Promise<ImageData> {
+	return new Promise((resolve, reject) => {
+		const img = new Image()
+		img.crossOrigin = "anonymous"
+		img.onload = () => {
+			const canvas = document.createElement("canvas")
+			canvas.width = img.width
+			canvas.height = img.height
+			const ctx = canvas.getContext("2d")
+			if (!ctx) { reject(new Error("Could not get canvas context")); return }
+			ctx.drawImage(img, 0, 0)
+			resolve(ctx.getImageData(0, 0, img.width, img.height))
+		}
+		img.onerror = () => reject(new Error("Failed to load image"))
+		img.src = src
+	})
+}
 
 interface WorldGenParams {
 	seed: string
@@ -17,6 +42,8 @@ interface WorldGenParams {
 	perihelion: number
 	tSun: number
 	landFraction: number
+	radius: number
+	heightmap?: HeightmapPreset
 	setView: (view: ViewState) => void
 }
 
@@ -44,6 +71,8 @@ export function useWorldGeneration() {
 		perihelion,
 		tSun,
 		landFraction,
+		radius,
+		heightmap,
 		setView,
 	}: WorldGenParams) => {
 		const worldSeed = seed.trim() || crypto.randomUUID().slice(0, 8)
@@ -85,15 +114,26 @@ export function useWorldGeneration() {
 			perihelion,
 			tSun,
 			landFraction,
+			radius,
+			resolution: heightmap?.resolution,
 		})
-		SHAPER_CONTINENTS.build(landFraction)
+		if (heightmap) {
+			const imageData = await loadImageData(heightmap.url)
+			SHAPER_HEIGHTMAP.continents(imageData, heightmap.seaLevel)
+		} else {
+			SHAPER_CONTINENTS.build(landFraction)
+		}
 		completeStep(0)
 		console.timeEnd("Continents")
 		await TIME.delay(catchupDelay)
 
 		console.time("Mountains")
 		await runStep(LOADING_STEPS[1], 1)
-		SHAPER_MOUNTAINS.build()
+		if (heightmap) {
+			SHAPER_HEIGHTMAP.topography()
+		} else {
+			SHAPER_MOUNTAINS.build()
+		}
 		completeStep(1)
 		console.timeEnd("Mountains")
 		await TIME.delay(catchupDelay)

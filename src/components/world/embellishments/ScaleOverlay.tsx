@@ -31,9 +31,7 @@ export const ScaleOverlay = React.forwardRef<ScaleOverlayHandle, Props>(
 
 				if (p1 && p2) {
 					const radians = MATH.distance.geo(p1, p2)
-					const width = MATH.conversion.distance.miles.km(
-						radians * window.world.radius * multiplier,
-					)
+					const width = radians * window.world.radius * multiplier
 					setState({ width })
 				}
 			},

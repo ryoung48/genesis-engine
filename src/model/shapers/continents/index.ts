@@ -51,12 +51,12 @@ export const SHAPER_CONTINENTS = {
 		}
 		elev.forEach(
 			(e, i) =>
-				(window.world.cells[i].h = e > cutoff ? WORLD.elevation.seaLevel : 0),
+				(window.world.cells[i].elevation = e > cutoff ? WORLD.elevation.seaLevel : 0),
 		)
 		console.log("land ratio: " + land + " | cutoff: " + cutoff)
 		if (landHeavy) {
 			window.world.cells.forEach((cell) => {
-				cell.h = cell.h >= WORLD.elevation.seaLevel ? 0 : WORLD.elevation.seaLevel
+				cell.elevation = cell.elevation >= WORLD.elevation.seaLevel ? 0 : WORLD.elevation.seaLevel
 			})
 		}
 	},

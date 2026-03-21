@@ -6,6 +6,45 @@ const elevation = [
 	0, 300, 600, 1200, 2000, 3000, 4000, 6000, 9000, 12000, 16000, 20000, 26000,
 ].map(MATH.conversion.distance.feet.km)
 
+const elevationScale = d3.scaleLinear(elevation, [
+	"#A6BF97",
+	"#8AAB78",
+	"#B0B784",
+	"#D6D2AD",
+	"#D1C99B",
+	"#C0AA79",
+	"#937B57",
+	"#736248",
+	"#867764",
+	"#B3AA99",
+	"#CCC4B7",
+	"#ECE9E2",
+	"#F4F3EF",
+])
+
+const terrainScales: Record<string, d3.ScaleLinear<string, string>> = {
+	flat: d3
+		.scaleLinear<string>()
+		.domain([0, 0.1, 0.2])
+		.range(["#A6BF97", "#8AAB78", "#B0B784"])
+		.clamp(true),
+	hills: d3
+		.scaleLinear<string>()
+		.domain([0.15, 0.35, 0.6])
+		.range(["#B0B784", "#D6D2AD", "#D1C99B"])
+		.clamp(true),
+	plateau: d3
+		.scaleLinear<string>()
+		.domain([0.5, 1.5, 3.5])
+		.range(["#B8976A", "#C0AA79", "#CBAB72"])
+		.clamp(true),
+	mountains: d3
+		.scaleLinear<string>()
+		.domain([0.6, 2, 4, 5.5])
+		.range(["#BDA882", "#736248", "#B3AA99", "#F4F3EF"])
+		.clamp(true),
+}
+
 const metric = true
 
 export const MAP_METRICS = {
@@ -15,6 +54,7 @@ export const MAP_METRICS = {
 		color: (k: number) => d3.interpolateBrBG(k),
 	},
 	climate: {
+		chaotic: "#c293ff",
 		colors: {
 			arctic: "#d3efff",
 			subarctic: "#7fd0ff",
@@ -22,10 +62,12 @@ export const MAP_METRICS = {
 			temperate: "#e6f598",
 			subtropical: "#ffa75b",
 			tropical: "#ff7785",
+			infernal: "#7e4349",
+			chaotic: "#c293ff",
 		} as Record<string, string>,
 		tempColor: d3
 			.scaleLinear<string>()
-			.domain([-15, -12, -2, 10, 20, 30, 40])
+			.domain([-10, -5, 4, 10, 20, 30, 40])
 			.range([
 				"#d3efff",
 				"#7fd0ff",
@@ -33,7 +75,7 @@ export const MAP_METRICS = {
 				"#e6f598",
 				"#ffa75b",
 				"#ff7785",
-				"#c293ff",
+				"#7e4349ff",
 			])
 			.clamp(true),
 	},
@@ -46,21 +88,10 @@ export const MAP_METRICS = {
 			plateau: "#c2b091", // Arid highland tan
 			mountains: "#707372", // Granite mountain gray
 		},
-		color: d3.scaleLinear(elevation, [
-			"#A6BF97",
-			"#8AAB78",
-			"#B0B784",
-			"#D6D2AD",
-			"#D1C99B",
-			"#C0AA79",
-			"#937B57",
-			"#736248",
-			"#867764",
-			"#B3AA99",
-			"#CCC4B7",
-			"#ECE9E2",
-			"#F4F3EF",
-		]),
+		color: (km: number, topography?: string) => {
+			const scale = topography && terrainScales[topography]
+			return (scale ? scale(km) : elevationScale(km)) as unknown as string
+		},
 		format: (km: number, p = 2) =>
 			metric
 				? `${km.toFixed(p)} km`

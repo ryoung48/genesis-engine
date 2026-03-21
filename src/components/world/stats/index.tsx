@@ -11,16 +11,14 @@ import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { MATH } from "@/model/utilities/math"
 import { NAMES } from "@/model/actors/language/names"
+import { classify } from "@/model/cells/climate/pasta"
 import { MAP_METRICS } from "../shapes/metrics"
 import { LEADER } from "@/model/provinces/leader"
-import { MapMode } from "../types"
 
 interface StatsCardProps {
 	province: Province
 	cursor: { x: number; y: number }
 	time: number
-	selectedNation?: number | null
-	mapMode?: MapMode
 }
 
 function decimalToDMS(lat: number, lon: number): string {
@@ -42,8 +40,6 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 	province,
 	cursor,
 	time,
-	selectedNation,
-	mapMode,
 }) => {
 	const curr = window.world.cells[province.cell]
 	const nation =
@@ -89,6 +85,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 	const monthlyRain = WEATHER.rain.month({ cell: curr, month: currentMonth })
 	const monthlyWind = curr.wind?.monthly?.[currentMonth] ?? 0
 	const windDirection = monthlyWind < 0 ? "E" : "W"
+	const provinceElevationKm = curr.elevation
 
 	return (
 		<div className="absolute top-4 left-4 bg-white border border-slate-200 p-4 shadow-sm text-slate-900 min-w-[220px] rounded-none">
@@ -110,13 +107,8 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 						<div
 							className="w-2 h-2 border border-black/10"
 							style={{
-								backgroundColor: MAP_METRICS.climate.tempColor(
-									mean(
-										province.cells.land.map(
-											(c) => window.world.cells[c].heat.mean,
-										),
-									) || 0,
-								),
+								backgroundColor:
+									MAP_METRICS.climate.colors[curr.climate ?? ""] || "#bcbcbc",
 							}}
 						/>
 						<span className="font-mono font-bold text-slate-900 capitalize">
@@ -124,6 +116,31 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 						</span>
 					</div>
 				</div>
+				{/* {curr.heat?.monthly && curr.rain?.monthly && (
+					<div className="flex justify-between items-center text-[12px]">
+						<span className="font-mono text-slate-400 uppercase tracking-wide">
+							Biome
+						</span>
+						<div className="flex items-center gap-2">
+							{(() => {
+								const { zone, color } = classify(curr)
+								return (
+									<>
+										<div
+											className="w-2 h-2 border border-black/10"
+											style={{
+												backgroundColor: `rgb(${color[0]},${color[1]},${color[2]})`,
+											}}
+										/>
+										<span className="font-mono font-bold text-slate-900">
+											{zone}
+										</span>
+									</>
+								)
+							})()}
+						</div>
+					</div>
+				)} */}
 				<div className="flex justify-between items-center text-[12px]">
 					<span className="font-mono text-slate-400 uppercase tracking-wide">
 						Vegetation
@@ -157,18 +174,23 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 										: curr.topography === "coastal"
 											? "hsla(157, 21%, 57%, 1)"
 											: MAP_METRICS.terrain.color(
-												WORLD.elevation.heightToKM(
-													mean(
-														province.cells.land.map(
-															(c) => window.world.cells[c].h,
-														),
-													) || 0,
-												),
+												provinceElevationKm,
+												curr.topography,
 											),
 							}}
 						/>
 						<span className="font-mono font-bold text-slate-900 capitalize">
 							{curr.topography}
+						</span>
+					</div>
+				</div>
+				<div className="flex justify-between items-center text-[12px]">
+					<span className="font-mono text-slate-400 uppercase tracking-wide">
+						Elevation
+					</span>
+					<div className="flex items-center gap-2">
+						<span className="font-mono font-bold text-slate-900">
+							{provinceElevationKm.toFixed(2)} km
 						</span>
 					</div>
 				</div>
@@ -448,8 +470,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 								Density
 							</span>
 							<span className="font-mono font-bold text-slate-900">
-								{MATH.conversion.area.sqMi
-									.sqKm(PROVINCE.population.density(province, time))
+								{PROVINCE.population.density(province, time)
 									.toFixed(1)}
 								/km²
 							</span>

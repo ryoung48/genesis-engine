@@ -1,10 +1,10 @@
+import { WORLD } from ".."
 import { CELL } from "../cells"
 import { Cell } from "../cells/types"
 import { START_DATE } from "../utilities/time"
 import { Province, ProvinceNeighborParams } from "./types"
 
 const EMPTY = -1
-const START_POP = 215e6
 export const HAB = {
 	climate: {
 		arctic: 0.01,
@@ -13,6 +13,8 @@ export const HAB = {
 		temperate: 1.25,
 		subtropical: 1,
 		tropical: 0.8,
+		infernal: 0.01,
+		chaotic: 0.01
 	},
 	vegetation: {
 		desert: 0.1,
@@ -216,8 +218,10 @@ export const PROVINCE = {
 				(acc, province) => acc + province.habitability,
 				0,
 			)
+			const habitabilityScore = WORLD.habitability()
+			const pops = 215e6 * habitabilityScore / 2.78
 			window.world.provinces.forEach((province) => {
-				const population = (province.habitability / total) * START_POP
+				const population = (province.habitability / total) * pops
 				PROVINCE.population.rural.set(province, population)
 			})
 		},

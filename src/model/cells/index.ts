@@ -143,12 +143,11 @@ export const CELL = {
 			score: 0,
 			province: -1,
 			location: -1,
-			h: 0,
 			elevation: 0,
 			landmark: 0,
 			oceanDist: 0,
 			landDist: 0,
-			mountainDist: -1,
+			highlandDist: -1,
 			rain: {
 				annual: -1,
 				monthly: [],

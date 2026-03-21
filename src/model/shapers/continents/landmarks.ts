@@ -24,7 +24,7 @@ export const LANDMARKS = {
 				current.landmark = idx
 				current.isWater = false
 				const water = CELL.neighbors(current).filter(
-					(p) => p.h < WORLD.elevation.seaLevel,
+					(p) => p.elevation < WORLD.elevation.seaLevel,
 				)
 				current.isCoast = water.length > 0
 				const ocean = water.filter((cell) => cell.ocean)
@@ -42,7 +42,7 @@ export const LANDMARKS = {
 					CELL.neighbors(current)
 						.filter(
 							(p) =>
-								p.h >= WORLD.elevation.seaLevel &&
+								p.elevation >= WORLD.elevation.seaLevel &&
 								!p.landmark &&
 								!queue.includes(p.idx),
 						)
@@ -58,7 +58,7 @@ export const LANDMARKS = {
 					p.isWater = true
 					p.isCoast = false
 					p.ocean = false
-					p.h = 0
+					p.elevation = 0
 				})
 				island.forEach((p) => {
 					CELL.neighbors(p)
@@ -130,7 +130,7 @@ export const LANDMARKS = {
 					CELL.neighbors(current)
 						.filter(
 							(p) =>
-								p.h < WORLD.elevation.seaLevel &&
+								p.elevation < WORLD.elevation.seaLevel &&
 								!p.landmark &&
 								!queue.includes(p.idx),
 						)
@@ -208,7 +208,7 @@ export const LANDMARKS = {
 						p.isWater = true
 						p.isCoast = false
 						p.ocean = false
-						p.h = 0
+						p.elevation = 0
 					})
 					// update shallow status for neighbors
 					cells.forEach((p) => {

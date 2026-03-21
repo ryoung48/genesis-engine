@@ -1,4 +1,4 @@
-import {
+﻿import {
 	CategoryScale,
 	Chart as ChartJS,
 	Filler,
@@ -13,7 +13,6 @@ import React from "react"
 import { TEMPERATURE } from "@/model/cells/temperature"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
-import { MATH } from "@/model/utilities/math"
 import { TEXT } from "@/model/utilities/text"
 import { START_DATE, TIME } from "@/model/utilities/time"
 import { MAP_METRICS } from "../../shapes/metrics"
@@ -25,6 +24,7 @@ import {
 } from "../index"
 import { DistributionChart } from "../NationTab/DistributionChart"
 import { ActiveTrendsChart, SIZE_BUCKETS } from "./ActiveTrendsChart"
+import { WORLD } from "@/model"
 
 export { SIZE_BUCKETS }
 
@@ -119,14 +119,31 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 	return (
 		<>
 			{(() => {
+				const habitableProvinces = window.world.provinces.filter((p) => !p.desolate)
 				const worldTotalPopulation = window.world.provinces.reduce(
 					(sum, p) => sum + (PROVINCE.population.total(p, renderTime) || 0),
 					0,
 				)
+				const habitabilityScore = WORLD.habitability()
 				const worldTotalUrban = window.world.provinces.reduce(
 					(sum, p) => sum + (PROVINCE.population.urban.get(p, renderTime) || 0),
 					0,
 				)
+				const landAreaSqKm = window.world.provinces.reduce(
+						(sum, p) => sum + p.land * window.world.cell.area,
+						0,
+					)
+				const avgProvinceAreaSqKm =
+					habitableProvinces.length > 0
+						? habitableProvinces.reduce(
+								(sum, p) => sum + p.land * window.world.cell.area,
+								0,
+							) / habitableProvinces.length
+						: 0
+				const worldSurfaceAreaSqKm = 4 * Math.PI * window.world.radius ** 2
+				const landPercent =
+					worldSurfaceAreaSqKm > 0 ? landAreaSqKm / worldSurfaceAreaSqKm : 0
+				const sunStrengthSol = window.world.tSun / 5778
 
 				return (
 					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 px-1">
@@ -161,22 +178,73 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						</div>
 						<div className="flex gap-1.5 items-baseline">
 							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Habitability
+							</div>
+							<div className="text-sm font-bold text-gray-900 leading-none">
+								{new Intl.NumberFormat("en-US", {
+									notation: "compact",
+									maximumFractionDigits: 2,
+								}).format(habitabilityScore)}
+							</div>
+						</div>
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
 								Land Area
 							</div>
 							<div className="text-sm font-bold text-gray-900 leading-none">
 								{new Intl.NumberFormat("en-US", {
 									notation: "compact",
 									maximumFractionDigits: 2,
-								}).format(
-									MATH.conversion.area.sqMi.sqKm(
-										window.world.provinces.reduce(
-											(sum, p) => sum + p.land * window.world.cell.area,
-											0,
-										),
-									),
-								)}
+								}).format(landAreaSqKm)}
 								<span className="text-[10px] text-gray-500 font-normal ml-0.5">
 									km²
+								</span>
+								<span className="text-[10px] text-gray-500 font-normal ml-1">
+									({new Intl.NumberFormat("en-US", {
+										style: "percent",
+										maximumFractionDigits: 1,
+									}).format(landPercent)})
+								</span>
+							</div>
+						</div>
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Avg Province Area
+							</div>
+							<div className="text-sm font-bold text-gray-900 leading-none">
+								{new Intl.NumberFormat("en-US", {
+									notation: "compact",
+									maximumFractionDigits: 2,
+								}).format(avgProvinceAreaSqKm)}
+								<span className="text-[10px] text-gray-500 font-normal ml-0.5">
+									km²
+								</span>
+							</div>
+						</div>
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Tilt
+							</div>
+							<div className="text-sm font-bold text-gray-900 leading-none">
+								{window.world.obliquity.toFixed(1)}°
+							</div>
+						</div>
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Eccentricity
+							</div>
+							<div className="text-sm font-bold text-gray-900 leading-none">
+								{window.world.eccentricity.toFixed(3)}
+							</div>
+						</div>
+						<div className="flex gap-1.5 items-baseline">
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+								Sun Strength
+							</div>
+							<div className="text-sm font-bold text-gray-900 leading-none">
+								{sunStrengthSol.toFixed(3)}
+								<span className="text-[10px] text-gray-500 font-normal ml-0.5">
+									Sol
 								</span>
 							</div>
 						</div>
@@ -241,7 +309,7 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 								className="w-2.5 h-2.5 border border-gray-400"
 								style={{ backgroundColor: TEMPERATURE.color(avgTemp) }}
 							/>
-							<span className="text-gray-700">{avgTemp.toFixed(1)}°C</span>
+							<span className="text-gray-700">{avgTemp.toFixed(1)}° C</span>
 						</span>
 						<span className="flex items-center gap-1">
 							<span className="text-gray-400 uppercase">Max</span>
@@ -249,7 +317,7 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 								className="w-2.5 h-2.5 border border-gray-400"
 								style={{ backgroundColor: TEMPERATURE.color(maxTemp) }}
 							/>
-							<span className="text-gray-700">{maxTemp.toFixed(1)}°C</span>
+							<span className="text-gray-700">{maxTemp.toFixed(1)}° C</span>
 						</span>
 						<span className="flex items-center gap-1">
 							<span className="text-gray-400 uppercase">Min</span>
@@ -257,7 +325,7 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 								className="w-2.5 h-2.5 border border-gray-400"
 								style={{ backgroundColor: TEMPERATURE.color(minTemp) }}
 							/>
-							<span className="text-gray-700">{minTemp.toFixed(1)}°C</span>
+							<span className="text-gray-700">{minTemp.toFixed(1)}° C</span>
 						</span>
 					</div>
 				)

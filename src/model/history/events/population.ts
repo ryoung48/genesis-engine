@@ -200,7 +200,7 @@ export const POPULATION_EVENT = {
 
 				// Skip far neighbors (e.g., distant islands)
 				const distance = PROVINCE.distance({ province, other: neighbor })
-				const MAX_SPREAD_DISTANCE = 1000
+				const MAX_SPREAD_DISTANCE = 1500
 				if (distance > MAX_SPREAD_DISTANCE) continue
 
 				let decay = BASE_DECAY

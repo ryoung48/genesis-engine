@@ -18,6 +18,7 @@ export type MapMode =
 	| "temperature"
 	| "wind"
 	| "diplomacy"
+	| "biome"
 
 export type WorldPaintParams = {
 	ctx: CanvasRenderingContext2D

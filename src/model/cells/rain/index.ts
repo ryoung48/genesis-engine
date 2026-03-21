@@ -77,8 +77,8 @@ const westerliesScale = scaleLinear()
  * air moisture capacity (Clausius-Clapeyron).
  */
 const ceilingScale = scaleLinear()
-	.domain([-14, -8, 2, 12, 18, 35])
-	.range([40, 62, 83, 125, 165, 250])
+	.domain([-14, -8, 2, 12, 18, 35, 50])
+	.range([40, 62, 83, 125, 165, 250, 40])
 	.clamp(true)
 
 /**
@@ -127,7 +127,7 @@ export const RAIN = {
 	 * Uses Coriolis deflection to simulate trade winds and westerlies.
 	 */
 	assignAdvection: () => {
-		const scale = scaleLinear([4, 8], [1, 1.5])(window.world.resolution)
+		const scale = 94.5 / window.world.cell.length
 		const wet = 30
 		const ocean = WORLD.cells
 			.water()
@@ -145,7 +145,11 @@ export const RAIN = {
 			const queue = [...ocean]
 			while (queue.length > 0) {
 				const cell = queue.shift()
-				const impact = (cell.ocean ? 0.5 : cell.isWater ? 0.25 : -0.8) / scale
+				const orographic =
+				(cell.isMountains && cell.elevation >= 4) || (cell.plateau && cell.elevation >= 1.5)
+					? -3
+					: -0.9
+			const impact = (cell.ocean ? 0.5 : cell.isWater ? 0.25 : orographic) / scale
 				const moisture = Math.max(
 					Math.min(Math.max(cell.moisture[attr], 0) + impact, wet),
 					0,
@@ -264,7 +268,6 @@ export const RAIN = {
 				const monthTemp = TEMPERATURE.monthly.mean({ cell, month })
 				return weight.w * ceilingScale(monthTemp)
 			})
-			cell.rain.annual = cell.rain.monthly.reduce((s, v) => s + v, 0)
 		})
 
 		// 4. Neighbor smoothing (3 passes across all 12 months)
@@ -279,6 +282,11 @@ export const RAIN = {
 					return avg ?? cell.rain.monthly[month]
 				})
 			})
+		})
+
+		// 5. Compute annual rain for each cell
+		cells.forEach((cell) => {
+			cell.rain.annual = cell.rain.monthly.reduce((s, v) => s + v, 0)
 		})
 	},
 	describe: (rainfall: number, key: "monthly" | "annual") => {

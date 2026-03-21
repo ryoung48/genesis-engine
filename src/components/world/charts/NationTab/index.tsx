@@ -565,7 +565,7 @@ export const NationTab: React.FC<NationTabProps> = ({
 									{new Intl.NumberFormat("en-US", {
 										notation: "compact",
 										maximumFractionDigits: 1,
-									}).format(MATH.conversion.area.sqMi.sqKm(totalArea))}
+									}).format(totalArea)}
 									<span className="text-[10px] text-gray-500 font-normal ml-0.5">
 										km²
 									</span>

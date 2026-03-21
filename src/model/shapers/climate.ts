@@ -1,12 +1,12 @@
-import { mean, scaleLinear } from "d3"
+import { mean } from "d3"
 import { WORLD } from ".."
 import { CELL } from "../cells"
 import { RAIN } from "../cells/rain"
 import { TEMPERATURE } from "../cells/temperature"
 import { WEATHER } from "../cells/weather"
 import { WIND } from "../cells/wind"
-import { MATH } from "../utilities/math"
 import { SHAPER_MOUNTAINS } from "./topagraphy"
+import { EBM } from "../cells/ebm"
 
 export const SHAPER_CLIMATES = {
 	_lakes: () => {
@@ -28,7 +28,7 @@ export const SHAPER_CLIMATES = {
 					WORLD.cells.lakes
 						.remove({ lakes, lake: landmark })
 						.forEach((cell) => {
-							cell.h = WORLD.elevation.compute(cell)
+							cell.elevation = WORLD.elevation.compute(cell)
 						})
 				}
 			})
@@ -55,123 +55,90 @@ export const SHAPER_CLIMATES = {
 		})
 	},
 	_climate: () => {
-		const domain = 1.8
 		const humidity = WEATHER.rain.scale.annual
-		const rainRanges = {
-			arctic: [humidity.parched, humidity.arid, humidity.dry, humidity.low],
-			subarctic: [
-				humidity.parched,
-				humidity.arid,
-				humidity.dry,
-				humidity.low,
-				humidity.moderate,
-			],
-			boreal: [
-				humidity.parched,
-				humidity.arid,
-				humidity.dry,
-				humidity.low,
-				humidity.moderate,
-				humidity.moist,
-			],
-			cool: [
-				humidity.parched,
-				humidity.arid,
-				humidity.dry,
-				humidity.low,
-				humidity.moderate,
-				humidity.moist,
-				humidity.wet,
-			],
-			warm: [
-				humidity.parched,
-				humidity.arid,
-				humidity.dry,
-				humidity.low,
-				humidity.moderate,
-				humidity.moist,
-				humidity.wet,
-				humidity.humid,
-			],
-			subtropical: [
-				humidity.parched,
-				humidity.arid,
-				humidity.dry,
-				humidity.low,
-				humidity.moderate,
-				humidity.moist,
-				humidity.wet,
-				humidity.humid,
-			],
-			tropical: [
-				humidity.parched,
-				humidity.arid,
-				humidity.dry,
-				humidity.low,
-				humidity.moderate,
-				humidity.moist,
-				humidity.wet,
-				humidity.humid,
-				humidity.saturated,
-			],
-		}
-		const temperatureModeration = scaleLinear()
-			.domain([10, 30, 80, 200])
-			.range([0, 1.5, 3, 8])
-			.clamp(true)
-		const latitudeModeration = scaleLinear()
-			.domain([5, 25])
-			.range([-1, 1])
-			.clamp(true)
-		const scale = (key: keyof typeof rainRanges) =>
-			scaleLinear()
-				.domain(
-					MATH.scaleDiscrete(rainRanges[key].length).map((i) => i * domain),
-				)
-				.range(rainRanges[key])
-		const arctic = scale("arctic")
-		const subarctic = scale("subarctic")
-		const boreal = scale("boreal")
-		const cool = scale("cool")
-		const warm = scale("warm")
-		const subtropical = scale("subtropical")
-		const tropical = scale("tropical")
 		const lakes = WORLD.cells.lakes.get()
 		WORLD.cells
 			.land()
 			.concat(lakes)
 			.forEach((cell) => {
-				const averageHeat = mean([cell.heat.min, cell.heat.max])
-				const latitude =
-					averageHeat > 24
-						? tropical
-						: averageHeat > 18
-							? subtropical
-							: averageHeat > 12
-								? warm
-								: averageHeat > 2
-									? cool
-									: averageHeat > -8
-										? boreal
-										: averageHeat > -14
-											? subarctic
-											: arctic
+				const minHeat = Math.min(...cell.heat.monthly)
+				const maxHeat = Math.max(...cell.heat.monthly)
+				const averageHeat = mean(cell.heat.monthly)
+				const isChaotic =
+					minHeat < EBM.constants.chaotic.min && maxHeat > EBM.constants.chaotic.max
+				const isInfernal = averageHeat > EBM.constants.chaotic.max
+				const climate = isChaotic
+					? 'chaotic'
+					: isInfernal
+						? 'infernal'
+						: averageHeat > 24
+							? 'tropical'
+							: averageHeat > 18
+								? 'subtropical'
+								: averageHeat > 12
+									? 'warm'
+									: averageHeat > 6
+										? 'cool'
+										: averageHeat > -3
+											? 'boreal'
+											: averageHeat > -9
+												? 'subarctic'
+												: 'arctic'
 				const rain = cell.rain.annual
-				const minRain = Math.min(...cell.rain.monthly)
-				const maxRain = Math.max(...cell.rain.monthly)
-				const rainfallModWinter = temperatureModeration(minRain)
-				const rainfallModSummer = temperatureModeration(maxRain)
-				const latitudeMod = latitudeModeration(Math.abs(cell.y))
-				const southern = cell.y < 0
-				if (southern) {
-					cell.heat.max += rainfallModSummer * latitudeMod
-					cell.heat.min -= rainfallModWinter
-				} else {
-					cell.heat.max -= rainfallModSummer
-					cell.heat.min += rainfallModWinter * latitudeMod
-				}
+				cell.heat.max = maxHeat
+				cell.heat.min = minHeat
 				cell.heat.mean = averageHeat
-				if (latitude === tropical) {
+				if (climate === 'chaotic') {
+					cell.climate = "chaotic"
+					if (rain > humidity.wet)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "jungle", w: 20 },
+							{ v: "forest", w: 40 },
+							{ v: "woods", w: 40 },
+						])
+					else if (rain > humidity.moist)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "forest", w: 30 },
+							{ v: "woods", w: 40 },
+							{ v: "grasslands", w: 30 },
+						])
+					else if (rain > humidity.moderate)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "woods", w: 30 },
+							{ v: "grasslands", w: 50 },
+							{ v: "sparse", w: 20 },
+						])
+					else if (rain > humidity.low)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "grasslands", w: 40 },
+							{ v: "sparse", w: 40 },
+							{ v: "desert", w: 20 },
+						])
+					else if (rain > humidity.dry)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "sparse", w: 60 },
+							{ v: "desert", w: 40 },
+						])
+					else cell.vegetation = "desert"
+				} else if (climate === 'infernal') {
+					cell.climate = "infernal"
+					if (rain > humidity.moderate)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "sparse", w: 60 },
+							{ v: "grasslands", w: 40 },
+						])
+					else if (rain > humidity.low)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "sparse", w: 70 },
+							{ v: "desert", w: 30 },
+						])
+					else if (rain > humidity.dry)
+						cell.vegetation = window.dice.weightedChoice([
+							{ v: "sparse", w: 40 },
+							{ v: "desert", w: 60 },
+						])
+					else cell.vegetation = "desert"
+				} else if (climate === 'tropical') {
 					cell.climate = "tropical"
 					if (rain > humidity.wet) cell.vegetation = "jungle"
 					else if (rain > humidity.moist)
@@ -200,7 +167,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (latitude === subtropical) {
+				} else if (climate === 'subtropical') {
 					cell.climate = "subtropical"
 					if (rain > humidity.wet) cell.vegetation = "jungle"
 					else if (rain > humidity.moist)
@@ -229,7 +196,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (latitude === warm) {
+				} else if (climate === 'warm') {
 					cell.climate = "temperate"
 					if (rain > humidity.wet) cell.vegetation = "forest"
 					else if (rain > humidity.moist)
@@ -250,7 +217,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (latitude === cool) {
+				} else if (climate === 'cool') {
 					cell.climate = "temperate"
 					if (rain > humidity.moist) cell.vegetation = "forest"
 					else if (rain > humidity.moderate)
@@ -270,7 +237,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (latitude === boreal) {
+				} else if (climate === 'boreal') {
 					cell.climate = "boreal"
 					if (rain > humidity.moderate) cell.vegetation = "forest"
 					else if (rain > humidity.low)
@@ -289,7 +256,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (latitude === subarctic) {
+				} else if (climate === 'subarctic') {
 					cell.climate = "subarctic"
 					if (rain > humidity.low)
 						cell.vegetation = window.dice.weightedChoice([
