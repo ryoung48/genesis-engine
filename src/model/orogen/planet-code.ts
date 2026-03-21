@@ -4,6 +4,7 @@
  */
 
 import type { OrogenParams } from "./types"
+import { DEFAULT_PLANET_RADIUS_KM } from "./units"
 
 const SLIDERS = [
 	{ min: 5000,  step: 1000, count: 2556 }, // 0: Detail (N)
@@ -83,7 +84,9 @@ export function encodePlanetCode(seed: number, params: OrogenParams): string {
 	packed = packed * BigInt(RADICES[1])  + BigInt(prcIdx)
 	packed = packed * BigInt(RADICES[0])  + BigInt(lcIdx)
 
-	return packed.toString(36).padStart(BASE_LEN, "0")
+	const base = packed.toString(36).padStart(BASE_LEN, "0")
+	const radiusKm = Math.round(params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM)
+	return radiusKm === DEFAULT_PLANET_RADIUS_KM ? base : `${base}-r${radiusKm}`
 }
 
 export interface DecodedPlanetCode {
@@ -101,6 +104,7 @@ export interface DecodedPlanetCode {
 	terrainWarp: number
 	continentSizeVariety: number
 	landCoverage: number
+	planetRadiusKm: number
 }
 
 interface DecodeConfig {
@@ -179,6 +183,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 
 	const dashIdx = code.indexOf("-")
 	const base = dashIdx === -1 ? code : code.slice(0, dashIdx)
+	const suffix = dashIdx === -1 ? "" : code.slice(dashIdx + 1)
 
 	const config = DECODE_FORMATS[base.length]
 	if (!config) return null
@@ -203,6 +208,13 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 	if (seed < 0 || seed >= SEED_MAX) return null
 	Object.assign(raw, config.defaults)
 
+	let planetRadiusKm = DEFAULT_PLANET_RADIUS_KM
+	if (suffix) {
+		const radiusMatch = /^r(\d+)$/.exec(suffix)
+		if (!radiusMatch) return null
+		planetRadiusKm = Math.max(1000, parseInt(radiusMatch[1], 10))
+	}
+
 	return {
 		seed,
 		numPoints: raw.numPoints ?? raw.N ?? 204000,
@@ -218,5 +230,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		terrainWarp: raw.terrainWarp ?? 0.75,
 		continentSizeVariety: raw.continentSizeVariety ?? 0.35,
 		landCoverage: raw.landCoverage ?? 0.30,
+		planetRadiusKm,
 	}
 }

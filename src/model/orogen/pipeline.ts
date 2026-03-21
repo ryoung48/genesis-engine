@@ -22,7 +22,7 @@ import {
 } from "./erosion"
 import { assignVegetation, assignClimateZones } from "./vegetation"
 import { computeRivers } from "./rivers"
-import { assignTopography } from "./topography"
+import { meanEdgeLengthKm } from "./units"
 
 type StageTiming = {
 	Stage: string
@@ -265,11 +265,9 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	t0 = performance.now()
 	const oceanDist = new Float32Array(mesh.numRegions)
 	{
-		const { adjOffset, adjList, neighborDist } = mesh
+		const { adjOffset, adjList } = mesh
 		// Average edge length on unit sphere → km (Earth radius)
-		let edgeSum = 0
-		for (let i = 0; i < neighborDist.length; i++) edgeSum += neighborDist[i]
-		const avgEdgeKm = (edgeSum / neighborDist.length) * 6371
+		const avgEdgeKm = meanEdgeLengthKm(mesh, params.planetRadiusKm)
 
 		// BFS from all ocean cells simultaneously
 		const visited = new Uint8Array(mesh.numRegions)
@@ -312,7 +310,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.time("orogen:advection")
 	onProgress?.("Computing moisture advection...", 95)
 	t0 = performance.now()
-	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate)
+	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, params.planetRadiusKm)
 	pipelineTiming.push({ Stage: "Moisture advection", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:advection")
 
@@ -349,14 +347,6 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Vegetation assignment", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:vegetation")
 
-	// 20. Topography classification
-	console.time("orogen:topography")
-	onProgress?.("Classifying topography...", 99)
-	t0 = performance.now()
-	const topography = assignTopography(mesh, elevation, distFields, boundary, oceanDist, rainfall)
-	pipelineTiming.push({ Stage: "Topography classification", ms: (performance.now() - t0).toFixed(1) })
-	console.timeEnd("orogen:topography")
-
 	console.timeEnd("orogen:total")
 	onProgress?.("Done", 100)
 
@@ -374,6 +364,5 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		climateZones,
 		vegetation,
 		rivers,
-		topography,
 	}
 }

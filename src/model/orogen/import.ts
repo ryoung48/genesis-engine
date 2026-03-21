@@ -17,7 +17,7 @@ import {
 } from "./erosion"
 import { assignVegetation, assignClimateZones } from "./vegetation"
 import { computeRivers } from "./rivers"
-import { assignTopography } from "./topography"
+import { meanEdgeLengthKm } from "./units"
 
 export interface ImportParams {
 	seed: number
@@ -32,6 +32,7 @@ export interface ImportParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	planetRadiusKm?: number
 }
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -300,10 +301,8 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	onProgress?.("Computing ocean distance...", 55)
 	const oceanDist = new Float32Array(mesh.numRegions)
 	{
-		const { adjOffset, adjList, neighborDist } = mesh
-		let edgeSum = 0
-		for (let i = 0; i < neighborDist.length; i++) edgeSum += neighborDist[i]
-		const avgEdgeKm = (edgeSum / neighborDist.length) * 6371
+		const { adjOffset, adjList } = mesh
+		const avgEdgeKm = meanEdgeLengthKm(mesh, params.planetRadiusKm)
 
 		const visited = new Uint8Array(mesh.numRegions)
 		const queue: number[] = []
@@ -346,13 +345,14 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		thermalErosion: params.thermalErosion,
 		ridgeSharpening: params.ridgeSharpening,
 		glacialErosion: params.glacialErosion,
+		planetRadiusKm: params.planetRadiusKm,
 	}
 	const landFraction = computeLandFraction(mesh, elevation)
 	const climate = computeTemperature(mesh, elevation, landFraction, orogenParams, oceanDist)
 
 	// Moisture advection
 	onProgress?.("Computing moisture...", 80)
-	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate)
+	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, params.planetRadiusKm)
 
 	// Rainfall
 	onProgress?.("Computing rainfall...", 85)
@@ -371,10 +371,6 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	onProgress?.("Assigning vegetation...", 95)
 	const vegetation = assignVegetation(mesh, elevation, climate, rainfall)
 
-	// Topography
-	onProgress?.("Classifying topography...", 97)
-	const topography = assignTopography(mesh, elevation, distFields, boundary, oceanDist, rainfall)
-
 	onProgress?.("Done", 100)
 
 	return {
@@ -391,6 +387,5 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		climateZones,
 		vegetation,
 		rivers,
-		topography,
 	}
 }

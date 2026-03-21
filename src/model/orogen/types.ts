@@ -64,6 +64,7 @@ export interface OrogenParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	planetRadiusKm?: number
 	obliquity?: number    // axial tilt in degrees, default 23.5
 	eccentricity?: number // orbital eccentricity, default 0
 }
@@ -148,6 +149,4 @@ export interface OrogenWorld {
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation?: Uint8Array
 	rivers?: OrogenRivers
-	/** Per-cell topography code (0=ocean, 1=mountains, 2=plateau, 3=hills, 4=flat, 5=coastal, 6=marsh) */
-	topography?: Uint8Array
 }

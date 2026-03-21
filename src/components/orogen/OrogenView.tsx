@@ -6,18 +6,24 @@ import type {
 	SerializedOrogenWorld,
 } from "@/model/orogen/worker-types"
 import { createOrogenScene, type OrogenScene, type OrogenViewMode } from "./renderer"
-import { elevToHeightKm, temperatureColor, precipitationColor, moistureDualColor, vegetationColor, climateZoneColor, climateTempColor, topographyColor, type ColorMode } from "./colors"
+import { elevToHeightKm, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, type ColorMode } from "./colors"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/vegetation"
-import { TOPO_LABELS } from "@/model/orogen/topography"
 import { computeThermalEquatorLine } from "@/model/orogen/rain"
+import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "@/model/orogen/units"
 
-function darkenVegetationAtElevation(color: [number, number, number], elevation: number): [number, number, number] {
+function darkenVegetationAtElevation(
+	color: [number, number, number],
+	elevation: number,
+): [number, number, number] {
 	const heightKm = Math.max(0, elevToHeightKm(elevation))
 	const shade = 1 - Math.min(0.55, heightKm * 0.075)
 	return [color[0] * shade, color[1] * shade, color[2] * shade]
 }
 
-function darkenClimateAtElevation(color: [number, number, number], elevation: number): [number, number, number] {
+function darkenClimateAtElevation(
+	color: [number, number, number],
+	elevation: number,
+): [number, number, number] {
 	const heightKm = Math.max(0, elevToHeightKm(elevation))
 	const shade = 1 - Math.min(0.45, heightKm * 0.06)
 	return [color[0] * shade, color[1] * shade, color[2] * shade]
@@ -49,6 +55,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [showThermalEquator, setShowThermalEquator] = useState(false)
 	const [showRivers, setShowRivers] = useState(false)
 	const [gridSpacing, setGridSpacing] = useState(15)
+	const [controlTab, setControlTab] = useState<"world" | "view">("world")
+	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
 	const [hoverInfo, setHoverInfo] = useState<{
 		region: number
 		x: number
@@ -67,6 +75,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [continentSizeVariety, setContinentSizeVariety] = useState(0.35)
 	const [landCoverage, setLandCoverage] = useState(0.3)
 	const [roughness, setRoughness] = useState(0.40)
+	const [planetRadiusKm, setPlanetRadiusKm] = useState(DEFAULT_PLANET_RADIUS_KM)
 	// Terrain Sculpting — orogen defaults
 	const [terrainWarp, setTerrainWarp] = useState(0.75)
 	const [smoothing, setSmoothing] = useState(0.1)
@@ -146,20 +155,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			: world.rainfall.monthly[(rainfallMonth - 1) * world.mesh.numRegions + hoverInfo.region])
 		: null
 
-	const hoverMoisture = hoverInfo && world?.rainfall
-		? { east: world.rainfall.east[hoverInfo.region], west: world.rainfall.west[hoverInfo.region] }
-		: null
-
 	const hoverClimateZone = hoverInfo && world?.climateZones && world.elevation[hoverInfo.region] > 0
 		? CLIMATE_LABELS[world.climateZones[hoverInfo.region]] ?? null
 		: null
 
 	const hoverBiome = hoverInfo && world?.vegetation && world.elevation[hoverInfo.region] > 0
 		? BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null
-		: null
-
-	const hoverTopo = hoverInfo && world?.topography && world.elevation[hoverInfo.region] > 0
-		? TOPO_LABELS[world.topography[hoverInfo.region]] ?? null
 		: null
 
 	const hoverOceanDist = hoverInfo && world?.oceanDist
@@ -241,37 +242,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			return rgb
 		}
 
-		if (colorMode === "moisture" && world.rainfall) {
-			for (let r = 0; r < N; r++) {
-				if (world.elevation[r] <= 0) {
-					rgb[3 * r] = 0.05; rgb[3 * r + 1] = 0.08; rgb[3 * r + 2] = 0.18
-				} else {
-					const [cr, cg, cb] = darkenClimateAtElevation(
-						moistureDualColor(world.rainfall.east[r], world.rainfall.west[r]),
-						world.elevation[r],
-					)
-					rgb[3 * r] = cr; rgb[3 * r + 1] = cg; rgb[3 * r + 2] = cb
-				}
-			}
-			return rgb
-		}
-
 		if (colorMode === "vegetation" && world.vegetation) {
 			for (let r = 0; r < N; r++) {
 				const [cr, cg, cb] = darkenVegetationAtElevation(
 					vegetationColor(world.vegetation[r]),
 					world.elevation[r],
 				)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-			}
-			return rgb
-		}
-
-		if (colorMode === "topography" && world.topography) {
-			for (let r = 0; r < N; r++) {
-				const [cr, cg, cb] = topographyColor(world.topography[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -402,6 +378,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			numContinents: overrides?.numContinents ?? numContinents,
 			continentSizeVariety: overrides?.continentSizeVariety ?? continentSizeVariety,
 			landCoverage: overrides?.landCoverage ?? landCoverage,
+			planetRadiusKm: overrides?.planetRadiusKm ?? planetRadiusKm,
 			jitter: overrides?.jitter ?? jitter,
 			roughness: overrides?.roughness ?? roughness,
 			terrainWarp: overrides?.terrainWarp ?? terrainWarp,
@@ -458,7 +435,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		const request: OrogenWorkerRequest = { type: "generate", params }
 		worker.postMessage(request)
 	}, [numPoints, numPlates, numContinents, continentSizeVariety,
-		landCoverage, jitter, roughness, terrainWarp, smoothing,
+		landCoverage, planetRadiusKm, jitter, roughness, terrainWarp, smoothing,
 		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion])
 
 	const handleGenerate = useCallback(() => {
@@ -483,6 +460,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setNumContinents(decoded.numContinents)
 		setContinentSizeVariety(decoded.continentSizeVariety)
 		setLandCoverage(decoded.landCoverage)
+		setPlanetRadiusKm(decoded.planetRadiusKm)
 		setRoughness(decoded.roughness)
 		setTerrainWarp(decoded.terrainWarp)
 		setSmoothing(decoded.smoothing)
@@ -576,6 +554,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 				grayscale,
 				imageWidth,
 				imageHeight,
+				planetRadiusKm,
 				terrainWarp,
 				smoothing,
 				hydraulicErosion,
@@ -585,7 +564,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			},
 		}
 		worker.postMessage(request, [grayscale.buffer])
-	}, [seed, numPoints, jitter, terrainWarp, smoothing, hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion])
+	}, [seed, numPoints, jitter, planetRadiusKm, terrainWarp, smoothing, hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion])
 
 	const handleFileImport = useCallback(async (file: File) => {
 		try {
@@ -618,6 +597,15 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			set: setNumPoints,
 		},
 		{
+			label: "Radius",
+			value: planetRadiusKm,
+			display: `${(planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x Earth`,
+			min: DEFAULT_PLANET_RADIUS_KM * 0.5,
+			max: DEFAULT_PLANET_RADIUS_KM * 4,
+			step: 100,
+			set: setPlanetRadiusKm,
+		},
+		{
 			label: "Irregularity",
 			value: jitter,
 			display: jitter.toFixed(2),
@@ -645,7 +633,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			set: setNumContinents,
 		},
 		{
-			label: "Continent Size Variety",
+			label: "Size Variety",
 			value: continentSizeVariety,
 			display: continentSizeVariety.toFixed(2),
 			min: 0,
@@ -730,12 +718,87 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 	]
 
+	const planetStats = useMemo(() => {
+		const activeParams = world?.params
+		const obliquity = activeParams?.obliquity ?? 23.5
+		const eccentricity = activeParams?.eccentricity ?? 0
+		const radiusKm = activeParams?.planetRadiusKm ?? planetRadiusKm
+		const surfaceAreaKm2 = 4 * Math.PI * radiusKm * radiusKm
+
+		let avgCellLengthKm: number | null = null
+		if (world) avgCellLengthKm = meanEdgeLengthKm(world.mesh, radiusKm)
+
+		let landAreaKm2: number | null = null
+		let landPercent: number | null = null
+		if (world?.elevation) {
+			let landCells = 0
+			for (let i = 0; i < world.elevation.length; i++) {
+				if (world.elevation[i] > 0) landCells++
+			}
+			landPercent = (landCells / Math.max(1, world.elevation.length)) * 100
+			landAreaKm2 = surfaceAreaKm2 * (landPercent / 100)
+		}
+
+		let avgAnnualTempC: number | null = null
+		if (world?.climate?.temperature_avg) {
+			let sum = 0
+			for (let i = 0; i < world.climate.temperature_avg.length; i++) sum += world.climate.temperature_avg[i]
+			avgAnnualTempC = sum / Math.max(1, world.climate.temperature_avg.length)
+		}
+
+		let avgAnnualPrecipMm: number | null = null
+		if (world?.rainfall?.annual) {
+			let sum = 0
+			for (let i = 0; i < world.rainfall.annual.length; i++) sum += world.rainfall.annual[i]
+			avgAnnualPrecipMm = sum / Math.max(1, world.rainfall.annual.length)
+		}
+
+		return [
+			{ label: "Tilt", value: `${obliquity.toFixed(1)}°` },
+			{ label: "Ecc", value: eccentricity.toFixed(3) },
+			{ label: "Radius", value: `${(radiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x` },
+			{ label: "Cell", value: avgCellLengthKm !== null ? `${avgCellLengthKm.toFixed(0)} km` : "—" },
+			{ label: "Land Area", value: landAreaKm2 !== null && landPercent !== null ? `${(landAreaKm2 / 1_000_000).toFixed(1)}M km² (${landPercent.toFixed(1)}%)` : "—" },
+			{ label: "Avg Temp", value: avgAnnualTempC !== null ? `${avgAnnualTempC.toFixed(1)} °C` : "—" },
+			{ label: "Avg Rain", value: avgAnnualPrecipMm !== null ? `${avgAnnualPrecipMm.toFixed(0)} mm` : "—" },
+		]
+	}, [planetRadiusKm, world])
+
+	const renderSliderGroup = (
+		items: typeof worldSliders,
+		columns: "single" | "double" = "double",
+	) => (
+		<div className={columns === "double" ? "grid grid-cols-1 xl:grid-cols-2 gap-1.5" : "space-y-1.5"}>
+			{items.map((p) => (
+				<div key={p.label} className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
+					<div className="flex justify-between items-baseline gap-3">
+						<label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+							{p.label}
+						</label>
+						<span className="font-mono text-[10px] text-slate-400">
+							{p.display}
+						</span>
+					</div>
+					<input
+						type="range"
+						min={p.min}
+						max={p.max}
+						step={p.step}
+						value={p.value}
+						onChange={(e) => p.set(parseFloat(e.target.value))}
+						className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+					/>
+				</div>
+			))}
+		</div>
+	)
+
 	return (
-		<div className="w-full h-full flex">
+		<div className="w-full h-full flex flex-col xl:flex-row bg-slate-100">
 			{/* Sidebar */}
-			<div className="w-[320px] shrink-0 h-full flex flex-col px-8 py-8 border-r border-slate-100 bg-white">
+			<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col px-4 py-4 lg:px-5 lg:py-5 border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
 				{/* Header */}
-				<div className="flex items-center gap-3 mb-8">
+				<div className="flex items-center gap-3 mb-5">
 					<div className="w-7 h-7 bg-slate-900 rounded-md flex items-center justify-center">
 						<svg
 							width="14"
@@ -767,89 +830,239 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 				</div>
 
 				{/* Title */}
-				<div className="mb-8">
-					<div className="flex items-center gap-3 mb-3">
+				<div className="mb-5">
+					<div className="flex items-center gap-3 mb-2">
 						<div className="h-px w-8 bg-slate-300" />
 						<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.3em]">
 							Planet Forge
 						</span>
 					</div>
-					<h1 className="text-4xl font-black tracking-tighter leading-[0.85] mb-3">
+					<h1 className="text-3xl font-black tracking-tighter leading-[0.88] mb-2">
 						<span className="text-slate-900">TECTONIC</span>
 						<br />
 						<span className="text-slate-300">LAB</span>
 					</h1>
-					<p className="text-slate-400 text-sm leading-relaxed">
+					<p className="text-slate-400 text-xs leading-relaxed">
 						Tectonic plate simulation with collision-driven
 						mountains, hydraulic erosion, and 3D globe rendering.
 					</p>
 				</div>
 
-				{/* Parameters */}
-				<div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
-					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-						Shape Your World
-					</span>
-
-					<div className="space-y-2.5">
-						{worldSliders.map((p) => (
-							<div key={p.label} className="space-y-0.5">
-								<div className="flex justify-between items-baseline">
-									<label className="text-[11px] font-medium text-slate-500">
-										{p.label}
-									</label>
-									<span className="font-mono text-[11px] text-slate-400">
-										{p.display}
-									</span>
-								</div>
-								<input
-									type="range"
-									min={p.min}
-									max={p.max}
-									step={p.step}
-									value={p.value}
-									onChange={(e) =>
-										p.set(parseFloat(e.target.value))
-									}
-									className="w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-								/>
-							</div>
-						))}
-					</div>
-
-					<div className="pt-3 border-t border-slate-100">
-						<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-							Terrain Sculpting
-						</span>
-					</div>
-
-					<div className="space-y-2.5">
-						{sculptSliders.map((p) => (
-							<div key={p.label} className="space-y-0.5">
-								<div className="flex justify-between items-baseline">
-									<label className="text-[11px] font-medium text-slate-500">
-										{p.label}
-									</label>
-									<span className="font-mono text-[11px] text-slate-400">
-										{p.display}
-									</span>
-								</div>
-								<input
-									type="range"
-									min={p.min}
-									max={p.max}
-									step={p.step}
-									value={p.value}
-									onChange={(e) =>
-										p.set(parseFloat(e.target.value))
-									}
-									className="w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-								/>
-							</div>
-						))}
-					</div>
+				<div className="grid grid-cols-2 gap-2 mb-4">
+					{([
+						["world", "World"],
+						["view", "View"],
+					] as const).map(([tab, label]) => (
+						<button
+							key={tab}
+							onClick={() => setControlTab(tab)}
+							className={`rounded-xl px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] transition-all ${
+								controlTab === tab
+									? "bg-slate-900 text-white"
+									: "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+							}`}
+						>
+							{label}
+						</button>
+					))}
 				</div>
 
+				{controlTab === "world" && (
+					<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
+						<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
+							{([
+								["planet", "Planet"],
+								["terrain", "Terrain"],
+							] as const).map(([tab, label]) => (
+								<button
+									key={tab}
+									onClick={() => setWorldTab(tab)}
+									className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
+										worldTab === tab
+											? "bg-white text-slate-900 shadow-sm"
+											: "text-slate-500 hover:text-slate-700"
+									}`}
+								>
+									{label}
+								</button>
+							))}
+						</div>
+
+						{worldTab === "planet" && (
+							<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
+								<div className="mb-3">
+									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+										Shape Your World
+									</span>
+									<p className="mt-1 text-xs text-slate-500">
+										Planet scale, tectonic layout, and land distribution.
+									</p>
+								</div>
+								{renderSliderGroup(worldSliders)}
+							</div>
+						)}
+
+						{worldTab === "terrain" && (
+							<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
+								<div className="mb-3">
+									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+										Terrain Sculpting
+									</span>
+									<p className="mt-1 text-xs text-slate-500">
+										Post-process elevation with warp, smoothing, and erosion.
+									</p>
+								</div>
+								{renderSliderGroup(sculptSliders)}
+							</div>
+						)}
+
+						<div className="space-y-2.5 pt-4 mt-1 border-t border-slate-100">
+							<div className="space-y-1.5">
+								<div className={`flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 focus-within:ring-2 transition-all ${codeError ? "ring-2 ring-red-400" : "focus-within:ring-slate-900/10"}`}>
+									<input
+										type="text"
+										value={planetCodeInput}
+										onChange={(e) => {
+											setPlanetCodeInput(e.target.value)
+											setCodeError(false)
+										}}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												if (planetCodeInput && planetCodeInput !== planetCode) handleLoadCode()
+												else handleRegenerate()
+											}
+										}}
+										placeholder="Planet code"
+										className="flex-1 bg-transparent border-none font-mono text-sm text-slate-900 focus:ring-0 focus:outline-none placeholder:text-slate-300"
+									/>
+									{planetCode && (
+										<button
+											onClick={() => {
+												navigator.clipboard.writeText(planetCode)
+											}}
+											className="p-1 text-slate-300 hover:text-slate-900 transition-colors"
+											title="Copy planet code"
+										>
+											<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+												<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+												<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+											</svg>
+										</button>
+									)}
+									<button
+										onClick={handleLoadCode}
+										disabled={!planetCodeInput || generating}
+										className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+											planetCodeInput && !generating
+												? "bg-blue-500 text-white hover:bg-blue-600"
+												: "bg-slate-200 text-slate-400 cursor-not-allowed"
+										}`}
+									>
+										Load
+									</button>
+								</div>
+								{codeError && (
+									<p className="text-[11px] text-red-500 font-medium">Invalid planet code</p>
+								)}
+							</div>
+
+							<div className="flex items-center gap-2">
+								<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">Seed</span>
+								<span className="font-mono text-[11px] text-slate-500 flex-1">{seed}</span>
+								<button
+									onClick={() => setSeed(Math.floor(Math.random() * 16777216))}
+									disabled={generating}
+									className="p-1 text-slate-300 hover:text-slate-900 transition-colors disabled:opacity-50"
+									title="Randomize seed"
+								>
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+										<path d="M1 4v6h6M23 20v-6h-6" />
+										<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+									</svg>
+								</button>
+							</div>
+
+							<div className="flex gap-2">
+								<button
+									onClick={handleGenerate}
+									disabled={generating}
+									className="flex-1 bg-slate-900 text-white py-3 px-4 rounded-lg hover:bg-black transition-all flex justify-between items-center group text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									<span className="flex items-center gap-2">
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2"
+										>
+											<polygon
+												points="5 3 19 12 5 21 5 3"
+												fill="currentColor"
+											/>
+										</svg>
+										{generating ? "Generating..." : "New World"}
+									</span>
+								</button>
+								<button
+									onClick={handleRegenerate}
+									disabled={generating}
+									className="py-3 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+									title="Regenerate with current seed &amp; settings"
+								>
+									Rebuild
+								</button>
+							</div>
+
+							<div className="flex gap-2">
+								<input
+									ref={fileInputRef}
+									type="file"
+									accept="image/png,image/jpeg,image/webp"
+									className="hidden"
+									onChange={(e) => {
+										const file = e.target.files?.[0]
+										if (file) handleFileImport(file)
+										e.target.value = ""
+									}}
+								/>
+								<button
+									onClick={() => fileInputRef.current?.click()}
+									disabled={generating}
+									className="flex-1 py-2.5 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+									title="Import an equirectangular B&W heightmap (PNG, JPEG, WebP)"
+								>
+									Import Heightmap
+								</button>
+								<button
+									onClick={handleEarthImport}
+									disabled={generating}
+									className="py-2.5 px-4 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-all text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+									title="Load Earth's heightmap"
+								>
+									Earth
+								</button>
+							</div>
+
+							<div className="space-y-1">
+								<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
+									<span>{generating ? generationLabel : "Generation"}</span>
+									<span>{Math.round(generationProgress)}%</span>
+								</div>
+								<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+									<div
+										className="h-full rounded-full bg-slate-900 transition-all duration-200"
+										style={{ width: `${Math.max(0, Math.min(100, generationProgress))}%` }}
+									/>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{controlTab === "view" && (
+					<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
 				{/* Map Mode */}
 				<div className="space-y-2 pt-4 border-t border-slate-100">
 					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
@@ -928,10 +1141,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					<div className="flex gap-1">
 						{([
 							["precipitation", "Rain"],
-							["moisture", "Moisture"],
 							["vegetation", "Veg"],
 							["climate", "Climate"],
-							["topography", "Topo"],
 						] as const).map(([mode, label]) => (
 							<button
 								key={mode}
@@ -996,7 +1207,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					</div>
 				)}
 
-				<div className="space-y-3 pt-4 border-t border-slate-100">
+					<div className="space-y-3 pt-4 border-t border-slate-100">
 					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
 						Overlays
 					</span>
@@ -1060,150 +1271,34 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					</div>
 				</div>
 
-				{/* Planet Code + Generate */}
-				<div className="space-y-3 pt-6 border-t border-slate-100 mt-auto">
-					<div className="space-y-1.5">
-						<div className={`flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 focus-within:ring-2 transition-all ${codeError ? "ring-2 ring-red-400" : "focus-within:ring-slate-900/10"}`}>
-							<input
-								type="text"
-								value={planetCodeInput}
-								onChange={(e) => {
-									setPlanetCodeInput(e.target.value)
-									setCodeError(false)
-								}}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										if (planetCodeInput && planetCodeInput !== planetCode) handleLoadCode()
-										else handleRegenerate()
-									}
-								}}
-								placeholder="Planet code"
-								className="flex-1 bg-transparent border-none font-mono text-sm text-slate-900 focus:ring-0 focus:outline-none placeholder:text-slate-300"
-							/>
-							{planetCode && (
-								<button
-									onClick={() => {
-										navigator.clipboard.writeText(planetCode)
-									}}
-									className="p-1 text-slate-300 hover:text-slate-900 transition-colors"
-									title="Copy planet code"
-								>
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-										<path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-									</svg>
-								</button>
-							)}
-							<button
-								onClick={handleLoadCode}
-								disabled={!planetCodeInput || generating}
-								className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
-									planetCodeInput && !generating
-										? "bg-blue-500 text-white hover:bg-blue-600"
-										: "bg-slate-200 text-slate-400 cursor-not-allowed"
-								}`}
-							>
-								Load
-							</button>
-						</div>
-						{codeError && (
-							<p className="text-[11px] text-red-500 font-medium">Invalid planet code</p>
-						)}
-					</div>
-
-					{/* Seed display */}
-					<div className="flex items-center gap-2">
-						<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">Seed</span>
-						<span className="font-mono text-[11px] text-slate-500 flex-1">{seed}</span>
-						<button
-							onClick={() => setSeed(Math.floor(Math.random() * 16777216))}
-							disabled={generating}
-							className="p-1 text-slate-300 hover:text-slate-900 transition-colors disabled:opacity-50"
-							title="Randomize seed"
-						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-								<path d="M1 4v6h6M23 20v-6h-6" />
-								<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-							</svg>
-						</button>
-					</div>
-
-					<div className="flex gap-2">
-						<button
-							onClick={handleGenerate}
-							disabled={generating}
-							className="flex-1 bg-slate-900 text-white py-3 px-4 rounded-lg hover:bg-black transition-all flex justify-between items-center group text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							<span className="flex items-center gap-2">
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-								>
-									<polygon
-										points="5 3 19 12 5 21 5 3"
-										fill="currentColor"
-									/>
-								</svg>
-								{generating ? "Generating..." : "New World"}
-							</span>
-						</button>
-						<button
-							onClick={handleRegenerate}
-							disabled={generating}
-							className="py-3 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-							title="Regenerate with current seed &amp; settings"
-						>
-							Rebuild
-						</button>
-					</div>
-
-					<div className="flex gap-2">
-						<input
-							ref={fileInputRef}
-							type="file"
-							accept="image/png,image/jpeg,image/webp"
-							className="hidden"
-							onChange={(e) => {
-								const file = e.target.files?.[0]
-								if (file) handleFileImport(file)
-								e.target.value = ""
-							}}
-						/>
-						<button
-							onClick={() => fileInputRef.current?.click()}
-							disabled={generating}
-							className="flex-1 py-2.5 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-							title="Import an equirectangular B&W heightmap (PNG, JPEG, WebP)"
-						>
-							Import Heightmap
-						</button>
-						<button
-							onClick={handleEarthImport}
-							disabled={generating}
-							className="py-2.5 px-4 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-all text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-							title="Load Earth's heightmap"
-						>
-							Earth
-						</button>
-					</div>
-
-					<div className="space-y-1">
-						<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
-							<span>{generating ? generationLabel : "Generation"}</span>
-							<span>{Math.round(generationProgress)}%</span>
-						</div>
-						<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-							<div
-								className="h-full rounded-full bg-slate-900 transition-all duration-200"
-								style={{ width: `${Math.max(0, Math.min(100, generationProgress))}%` }}
-							/>
+					<div className="pt-4 mt-1 border-t border-slate-100">
+						<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+							<div className="mb-2 flex items-center justify-between gap-3">
+								<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+									Planet Stats
+								</span>
+								<span className="text-[10px] text-slate-400">
+									{world ? "Current world" : "No world loaded"}
+								</span>
+							</div>
+							<div className="grid grid-cols-2 gap-x-3 gap-y-2">
+								{planetStats.map((stat) => (
+									<div key={stat.label} className="min-w-0">
+										<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+											{stat.label}
+										</div>
+										<div className="truncate font-mono text-[11px] text-slate-700">
+											{stat.value}
+										</div>
+									</div>
+								))}
+							</div>
 						</div>
 					</div>
+					</div>
+				)}
 
+				<div className="pt-4 mt-3 border-t border-slate-100">
 					<button
 						onClick={onBack}
 						className="w-full py-2 px-4 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all"
@@ -1214,7 +1309,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			</div>
 
 			{/* Canvas */}
-			<div ref={viewportRef} className="flex-1 h-full relative bg-[#050510]">
+			<div ref={viewportRef} className="flex-1 h-[56vh] xl:h-full relative bg-[#050510]">
 				<canvas
 					ref={canvasRef}
 					className="w-full h-full block"
@@ -1263,16 +1358,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 								</div>
 							</>
 						)}
-						{hoverMoisture !== null && (hoverMoisture.east > 0 || hoverMoisture.west > 0) && (
-							<>
-								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Moisture
-								</div>
-								<div className="mt-1 font-mono text-sm text-slate-100">
-									E {(hoverMoisture.east * 100).toFixed(0)}% W {(hoverMoisture.west * 100).toFixed(0)}%
-								</div>
-							</>
-						)}
 						{hoverClimateZone && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
@@ -1290,16 +1375,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100 capitalize">
 									{hoverBiome}
-								</div>
-							</>
-						)}
-						{hoverTopo && (
-							<>
-								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Terrain
-								</div>
-								<div className="mt-1 font-mono text-sm text-slate-100 capitalize">
-									{hoverTopo}
 								</div>
 							</>
 						)}

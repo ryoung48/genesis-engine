@@ -2,7 +2,7 @@
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "precipitation" | "moisture" | "vegetation" | "climate" | "topography"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "precipitation" | "vegetation" | "climate"
 
 const oceanColorStops: [number, number, number][] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],
@@ -154,18 +154,18 @@ export function temperatureColor(celsius: number): [number, number, number] {
 }
 
 /**
- * Precipitation color ramp: tan (dry) → green → teal → blue → purple (wet).
- * Input: monthly mm (0–250+) or annual mm (0–3000+).
+ * Precipitation color ramp: tan (dry) -> green -> teal -> blue -> purple (wet).
+ * Input: monthly mm (0-250+) or annual mm (0-3000+).
  */
 const precipStops: { mm: number; r: number; g: number; b: number }[] = [
-	{ mm: 0,    r: 0.76, g: 0.70, b: 0.50 },
-	{ mm: 10,   r: 0.85, g: 0.78, b: 0.45 },
-	{ mm: 40,   r: 0.70, g: 0.82, b: 0.42 },
-	{ mm: 83,   r: 0.40, g: 0.75, b: 0.45 },
-	{ mm: 125,  r: 0.20, g: 0.65, b: 0.55 },
-	{ mm: 165,  r: 0.15, g: 0.50, b: 0.70 },
-	{ mm: 250,  r: 0.15, g: 0.30, b: 0.80 },
-	{ mm: 400,  r: 0.30, g: 0.15, b: 0.70 },
+	{ mm: 0, r: 0.76, g: 0.70, b: 0.50 },
+	{ mm: 10, r: 0.85, g: 0.78, b: 0.45 },
+	{ mm: 40, r: 0.70, g: 0.82, b: 0.42 },
+	{ mm: 83, r: 0.40, g: 0.75, b: 0.45 },
+	{ mm: 125, r: 0.20, g: 0.65, b: 0.55 },
+	{ mm: 165, r: 0.15, g: 0.50, b: 0.70 },
+	{ mm: 250, r: 0.15, g: 0.30, b: 0.80 },
+	{ mm: 400, r: 0.30, g: 0.15, b: 0.70 },
 ]
 
 export function precipitationColor(mm: number): [number, number, number] {
@@ -186,44 +186,16 @@ export function precipitationColor(mm: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
-/**
- * Dual-channel moisture color: east (trade winds) = blue, west (westerlies) = orange.
- * Where both are zero → dark gray.
- */
-export function moistureDualColor(east: number, west: number): [number, number, number] {
-	const e = Math.max(0, Math.min(1, east))
-	const w = Math.max(0, Math.min(1, west))
-	if (e < 0.01 && w < 0.01) return [0.25, 0.25, 0.25]
-	// East: gray → blue
-	// West: gray → orange
-	return [
-		lerp(0.35, e > w ? 0.10 : 0.95, Math.max(e, w)),
-		lerp(0.35, e > w ? 0.30 : 0.55, Math.max(e, w)),
-		lerp(0.35, e > w ? 0.90 : 0.15, Math.max(e, w)),
-	]
-}
-
-/**
- * Vegetation biome colors:
- *   0 ocean     → dark blue
- *   1 desert    → sandy tan
- *   2 sparse    → dry olive
- *   3 grasslands → warm green
- *   4 woods     → medium green
- *   5 forest    → dark green
- *   6 jungle    → deep emerald
- */
-// Aligned with MAP_METRICS.climate.colors in shapes/metrics.ts
 const climateZoneColors: [number, number, number][] = [
-	[0.05, 0.08, 0.18],    // 0 ocean
-	[0xd3/255, 0xef/255, 0xff/255],  // 1 arctic     #d3efff
-	[0x7f/255, 0xd0/255, 0xff/255],  // 2 subarctic  #7fd0ff
-	[0x91/255, 0xff/255, 0xdc/255],  // 3 boreal     #91ffdc
-	[0xe6/255, 0xf5/255, 0x98/255],  // 4 temperate  #e6f598
-	[0xff/255, 0xa7/255, 0x5b/255],  // 5 subtropical #ffa75b
-	[0xff/255, 0x77/255, 0x85/255],  // 6 tropical   #ff7785
-	[0x7e/255, 0x43/255, 0x49/255],  // 7 infernal   #7e4349
-	[0xc2/255, 0x93/255, 0xff/255],  // 8 chaotic    #c293ff
+	[0.05, 0.08, 0.18],
+	[0xd3 / 255, 0xef / 255, 0xff / 255],
+	[0x7f / 255, 0xd0 / 255, 0xff / 255],
+	[0x91 / 255, 0xff / 255, 0xdc / 255],
+	[0xe6 / 255, 0xf5 / 255, 0x98 / 255],
+	[0xff / 255, 0xa7 / 255, 0x5b / 255],
+	[0xff / 255, 0x77 / 255, 0x85 / 255],
+	[0x7e / 255, 0x43 / 255, 0x49 / 255],
+	[0xc2 / 255, 0x93 / 255, 0xff / 255],
 ]
 
 export function climateZoneColor(zoneCode: number): [number, number, number] {
@@ -233,17 +205,15 @@ export function climateZoneColor(zoneCode: number): [number, number, number] {
 /**
  * Continuous climate color ramp by mean temperature.
  * Matches MAP_METRICS.climate.tempColor from shapes/metrics.ts.
- * domain: [-10, -5, 4, 10, 20, 30, 40]
- * range:  #d3efff → #7fd0ff → #91ffdc → #e6f598 → #ffa75b → #ff7785 → #7e4349
  */
 const climateTempStops: { t: number; r: number; g: number; b: number }[] = [
-	{ t: -10, r: 0xd3/255, g: 0xef/255, b: 0xff/255 },
-	{ t:  -5, r: 0x7f/255, g: 0xd0/255, b: 0xff/255 },
-	{ t:   4, r: 0x91/255, g: 0xff/255, b: 0xdc/255 },
-	{ t:  10, r: 0xe6/255, g: 0xf5/255, b: 0x98/255 },
-	{ t:  20, r: 0xff/255, g: 0xa7/255, b: 0x5b/255 },
-	{ t:  30, r: 0xff/255, g: 0x77/255, b: 0x85/255 },
-	{ t:  40, r: 0x7e/255, g: 0x43/255, b: 0x49/255 },
+	{ t: -10, r: 0xd3 / 255, g: 0xef / 255, b: 0xff / 255 },
+	{ t: -5, r: 0x7f / 255, g: 0xd0 / 255, b: 0xff / 255 },
+	{ t: 4, r: 0x91 / 255, g: 0xff / 255, b: 0xdc / 255 },
+	{ t: 10, r: 0xe6 / 255, g: 0xf5 / 255, b: 0x98 / 255 },
+	{ t: 20, r: 0xff / 255, g: 0xa7 / 255, b: 0x5b / 255 },
+	{ t: 30, r: 0xff / 255, g: 0x77 / 255, b: 0x85 / 255 },
+	{ t: 40, r: 0x7e / 255, g: 0x43 / 255, b: 0x49 / 255 },
 ]
 
 export function climateTempColor(celsius: number): [number, number, number] {
@@ -264,34 +234,18 @@ export function climateTempColor(celsius: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
-// Aligned with MAP_METRICS.vegetation.color in shapes/metrics.ts
 const biomeColors: [number, number, number][] = [
-	[0.05, 0.08, 0.18],    // 0 ocean
-	[0xe8/255, 0xcc/255, 0xa7/255],  // 1 desert    #e8cca7
-	[0xb9/255, 0xbc/255, 0x91/255],  // 2 sparse    #b9bc91
-	[0x9d/255, 0xb4/255, 0x7b/255],  // 3 grasslands #9db47b
-	[0x7d/255, 0x8c/255, 0x5c/255],  // 4 woods     #7d8c5c
-	[0x4d/255, 0x61/255, 0x3c/255],  // 5 forest    #4d613c
-	[0x2d/255, 0x4d/255, 0x29/255],  // 6 jungle    #2d4d29
+	[0.05, 0.08, 0.18],
+	[0xe8 / 255, 0xcc / 255, 0xa7 / 255],
+	[0xb9 / 255, 0xbc / 255, 0x91 / 255],
+	[0x9d / 255, 0xb4 / 255, 0x7b / 255],
+	[0x7d / 255, 0x8c / 255, 0x5c / 255],
+	[0x4d / 255, 0x61 / 255, 0x3c / 255],
+	[0x2d / 255, 0x4d / 255, 0x29 / 255],
 ]
 
 export function vegetationColor(biomeCode: number): [number, number, number] {
 	return biomeColors[biomeCode] ?? biomeColors[0]
-}
-
-// Topography category colors (aligned with MAP_METRICS.terrain.categorical)
-const topoColors: [number, number, number][] = [
-	[0x03/255, 0x03/255, 0x08/255],  // 0 ocean     #030308
-	[0x70/255, 0x73/255, 0x72/255],  // 1 mountains  #707372
-	[0xc2/255, 0xb0/255, 0x91/255],  // 2 plateau    #c2b091
-	[0x7d/255, 0x8c/255, 0x5c/255],  // 3 hills      #7d8c5c
-	[0xa8/255, 0xbc/255, 0x81/255],  // 4 flat        #a8bc81
-	[0x6b/255, 0x9e/255, 0x8e/255],  // 5 coastal     hsl(157,21%,57%) ≈ #6b9e8e
-	[0x7a/255, 0xbd/255, 0xb4/255],  // 6 marsh       #7abdb4
-]
-
-export function topographyColor(code: number): [number, number, number] {
-	return topoColors[code] ?? topoColors[0]
 }
 
 export function getColor(elev: number, mode: ColorMode): [number, number, number] {

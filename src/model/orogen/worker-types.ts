@@ -33,7 +33,6 @@ export interface SerializedOrogenWorld {
 	climateZones?: Uint8Array
 	vegetation?: Uint8Array
 	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number }
-	topography?: Uint8Array
 }
 
 export type OrogenWorkerRequest =
@@ -56,6 +55,7 @@ export type OrogenWorkerRequest =
 			thermalErosion: number
 			ridgeSharpening: number
 			glacialErosion: number
+			planetRadiusKm?: number
 		}
 	}
 

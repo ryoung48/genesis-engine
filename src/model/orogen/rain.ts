@@ -5,6 +5,7 @@
  */
 import type { SphereMesh, OrogenClimate } from "./types"
 import { elevToHeightKm } from "./climate"
+import { meanEdgeLengthKm } from "./units"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -151,14 +152,13 @@ export function computeAdvection(
 	elevation: Float32Array,
 	distCoast: Float32Array,
 	climate?: OrogenClimate,
+	planetRadiusKm?: number,
 ): { east: Float32Array; west: Float32Array } {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
 	const wet = 30
 
-	let edgeSum = 0
-	for (let i = 0; i < neighborDist.length; i++) edgeSum += neighborDist[i]
-	const avgEdgeKm = (edgeSum / neighborDist.length) * 6371
+	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
 	const scale = 94.5 / avgEdgeKm
 	const deepOceanThreshold = 1260 / avgEdgeKm
 

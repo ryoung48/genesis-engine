@@ -683,7 +683,7 @@ export function createOrogenScene(
 	}
 
 	function buildGlobeThermalEquator(points: [number, number][]): THREE.Line {
-		const radius = 1.05 // above max terrain displacement (1.0 + 1.0*0.04 = 1.04)
+		const radius = 1.05
 		// Build control points on sphere
 		const controlPoints = points.map(([lonDeg, latDeg]) => {
 			const lon = THREE.MathUtils.degToRad(lonDeg)
@@ -761,7 +761,7 @@ export function createOrogenScene(
 			if (!mat) {
 				const t = (binned - MIN_WIDTH) / (MAX_WIDTH - MIN_WIDTH)
 				mat = new LineMaterial({
-					color: 0x0978ab,
+					color: 0xbadaef,
 					opacity: 0.55 + t * 0.4,
 					linewidth: binned,
 					transparent: true,
@@ -851,7 +851,7 @@ export function createOrogenScene(
 	}
 
 	function buildGlobeRivers(rivers: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number }): THREE.Group {
-		const V = 0.04 // must match terrain displacement
+		const V = 0.04
 		const LIFT = 0.003 // small offset above terrain surface
 		const toGlobe = (lonDeg: number, latDeg: number, elev: number): [number, number, number] => {
 			const lon = THREE.MathUtils.degToRad(lonDeg)

@@ -49,7 +49,6 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		climateZones: world.climateZones,
 		vegetation: world.vegetation,
 		rivers: world.rivers,
-		topography: world.topography,
 	}
 }
 
@@ -98,10 +97,6 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 
 	if (world.vegetation) {
 		transfer.push(world.vegetation.buffer)
-	}
-
-	if (world.topography) {
-		transfer.push(world.topography.buffer)
 	}
 
 	return transfer
