@@ -179,8 +179,8 @@ export function blendElevation(
 
 	// Rift BFS
 	const coastAndRiftStart = performance.now()
-	const RIFT_HALF_WIDTH_BASE = 4
-	const riftHalfWidth = Math.max(2, Math.round(RIFT_HALF_WIDTH_BASE * scaleFactor))
+	const RIFT_HALF_WIDTH_BASE = 6
+	const riftHalfWidth = Math.max(3, Math.round(RIFT_HALF_WIDTH_BASE * scaleFactor))
 	const riftDist = new Float32Array(numRegions).fill(Infinity)
 	const riftSeeds: number[] = []
 	for (let r = 0; r < numRegions; r++) {
@@ -199,6 +199,31 @@ export function blendElevation(
 				const nr = adjList[ni]
 				if (nd < riftDist[nr] && r_plate[nr] === plate && !r_isOcean[nr]) {
 					riftDist[nr] = nd; riftSeeds.push(nr)
+				}
+			}
+		}
+	}
+
+	// Pull-apart basin BFS (continental transform boundaries)
+	const PULL_APART_HW_BASE = 3
+	const pullApartHalfWidth = Math.max(2, Math.round(PULL_APART_HW_BASE * scaleFactor))
+	const pullApartDist = new Float32Array(numRegions).fill(Infinity)
+	const pullApartSeeds: number[] = []
+	for (let r = 0; r < numRegions; r++) {
+		if (r_boundaryType[r] === 3 && !r_hasOcean[r]) {
+			pullApartSeeds.push(r); pullApartDist[r] = 0
+		}
+	}
+	{
+		let qi = 0
+		while (qi < pullApartSeeds.length) {
+			const r = pullApartSeeds[qi++]
+			const nd = pullApartDist[r] + 1
+			if (nd > pullApartHalfWidth) continue
+			for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
+				const nr = adjList[ni]
+				if (nd < pullApartDist[nr] && !r_isOcean[nr]) {
+					pullApartDist[nr] = nd; pullApartSeeds.push(nr)
 				}
 			}
 		}
@@ -378,26 +403,44 @@ export function blendElevation(
 			{
 				const rd = riftDist[r]
 				if (rd !== Infinity) {
-					const floorEnd = Math.max(1, Math.round(1.5 * scaleFactor))
-					const shoulderEnd = Math.max(2, Math.round(2.5 * scaleFactor))
+					const floorEnd = Math.max(2, Math.round(2.5 * scaleFactor))
+					const shoulderEnd = Math.max(3, Math.round(4 * scaleFactor))
 					let riftEffect = 0
 					if (rd <= 0.5) {
-						riftEffect = -0.15
-						riftEffect += rnfbm(x * 8, y * 8, z * 8) * 0.04
+						riftEffect = -0.25
+						riftEffect += rnfbm(x * 8, y * 8, z * 8) * 0.05
 					} else if (rd <= floorEnd) {
 						const t = rd / floorEnd
-						riftEffect = -0.12 * (1 - t * 0.3)
-						riftEffect += rnfbm(x * 8, y * 8, z * 8) * 0.03 * (1 - t)
+						riftEffect = -0.20 * (1 - t * 0.3)
+						riftEffect += rnfbm(x * 8, y * 8, z * 8) * 0.04 * (1 - t)
 					} else if (rd <= shoulderEnd) {
 						const t = (rd - floorEnd) / (shoulderEnd - floorEnd)
-						riftEffect = 0.03 * (1 - t)
+						riftEffect = 0.04 * (1 - t)
 					} else if (riftHalfWidth > shoulderEnd) {
 						const t = (rd - shoulderEnd) / (riftHalfWidth - shoulderEnd)
 						const fadeT = Math.min(1, t)
 						const fade = fadeT * fadeT * (3 - 2 * fadeT)
-						riftEffect = 0.03 * (1 - fade) * 0.2
+						riftEffect = 0.04 * (1 - fade) * 0.2
 					}
 					elev[r] += riftEffect
+				}
+			}
+
+			// Pull-apart basins (continental transform faults)
+			{
+				const pd = pullApartDist[r]
+				if (pd !== Infinity) {
+					let paEffect = 0
+					if (pd <= 0.5) {
+						paEffect = -0.18
+						paEffect += rnfbm(x * 10, y * 10, z * 10) * 0.04
+					} else if (pd <= pullApartHalfWidth) {
+						const t = pd / pullApartHalfWidth
+						const fade = t * t * (3 - 2 * t)
+						paEffect = -0.12 * (1 - fade)
+						paEffect += rnfbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
+					}
+					elev[r] += paEffect
 				}
 			}
 

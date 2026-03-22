@@ -29,14 +29,14 @@ const CHAOTIC_MAX = 50
  */
 export function assignClimateZones(
 	mesh: SphereMesh,
-	elevation: Float32Array,
+	isLand: Uint8Array,
 	climate: OrogenClimate,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const zones = new Uint8Array(N) // 0 = ocean by default
 
 	for (let r = 0; r < N; r++) {
-		if (elevation[r] <= 0) continue
+		if (!isLand[r]) continue
 
 		const avg = climate.temperature_avg[r]
 
@@ -92,7 +92,7 @@ const WET    = 2200
  */
 export function assignVegetation(
 	mesh: SphereMesh,
-	elevation: Float32Array,
+	isLand: Uint8Array,
 	climate: OrogenClimate,
 	rainfall: OrogenRainfall,
 ): Uint8Array {
@@ -100,7 +100,7 @@ export function assignVegetation(
 	const biome = new Uint8Array(N) // 0 = ocean by default
 
 	for (let r = 0; r < N; r++) {
-		if (elevation[r] <= 0) continue // ocean
+		if (!isLand[r]) continue // ocean
 
 		const temp = climate.temperature_avg[r]
 		const rain = rainfall.annual[r]

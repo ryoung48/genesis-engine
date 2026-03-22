@@ -21,6 +21,8 @@ interface EarthDefaults {
 	eccentricity: number
 	perihelion: number
 	sunTempFactor: number
+	hoursPerDay: number
+	daysPerYear: number
 	landFraction: number
 	radiusFactor: number
 }
@@ -37,6 +39,10 @@ interface GenesisEngineProps {
 	setPerihelion: (v: number) => void
 	sunTempFactor: number
 	setSunTempFactor: (v: number) => void
+	hoursPerDay: number
+	setHoursPerDay: (v: number) => void
+	daysPerYear: number
+	setDaysPerYear: (v: number) => void
 	landFraction: number
 	setLandFraction: (v: number) => void
 	radiusFactor: number
@@ -63,6 +69,10 @@ export const GenesisEngine = ({
 	setPerihelion,
 	sunTempFactor,
 	setSunTempFactor,
+	hoursPerDay,
+	setHoursPerDay,
+	daysPerYear,
+	setDaysPerYear,
 	landFraction,
 	setLandFraction,
 	radiusFactor,
@@ -153,6 +163,8 @@ export const GenesisEngine = ({
 								setEccentricity(earthDefaults.eccentricity)
 								setPerihelion(earthDefaults.perihelion)
 								setSunTempFactor(earthDefaults.sunTempFactor)
+								setHoursPerDay(earthDefaults.hoursPerDay)
+								setDaysPerYear(earthDefaults.daysPerYear)
 								setLandFraction(earthDefaults.landFraction)
 								setRadiusFactor(earthDefaults.radiusFactor)
 							}}
@@ -200,6 +212,24 @@ export const GenesisEngine = ({
 									max: 1.1,
 									step: 0.001,
 									set: setSunTempFactor,
+								},
+								{
+									label: "Hours / Day",
+									value: hoursPerDay,
+									display: `${hoursPerDay.toFixed(0)} h`,
+									min: 8,
+									max: 48,
+									step: 1,
+									set: setHoursPerDay,
+								},
+								{
+									label: "Days / Year",
+									value: daysPerYear,
+									display: `${daysPerYear.toFixed(0)} d`,
+									min: 100,
+									max: 1000,
+									step: 5,
+									set: setDaysPerYear,
 								},
 								{
 									label: "Land",

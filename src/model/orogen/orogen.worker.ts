@@ -27,6 +27,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		plateAssignment: world.plateAssignment,
 		elevation: world.elevation,
 		params: world.params,
+		continentCount: world.continentCount,
 		climate: world.climate
 			? {
 				temperature_avg: world.climate.temperature_avg,
@@ -48,6 +49,8 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 			: undefined,
 		climateZones: world.climateZones,
 		vegetation: world.vegetation,
+		isLand: world.isLand,
+		riverLand: world.riverLand,
 		rivers: world.rivers,
 	}
 }
@@ -97,6 +100,19 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 
 	if (world.vegetation) {
 		transfer.push(world.vegetation.buffer)
+	}
+
+	if (world.isLand) {
+		transfer.push(world.isLand.buffer)
+	}
+
+	if (world.riverLand) {
+		transfer.push(world.riverLand.buffer)
+	}
+
+	if (world.rivers?.lakes) {
+		transfer.push(world.rivers.lakes.buffer)
+		transfer.push(world.rivers.waterLevel.buffer)
 	}
 
 	return transfer

@@ -16,6 +16,8 @@ export const EARTH_DEFAULTS = {
 	eccentricity: 0.017,
 	perihelion: 102,
 	sunTempFactor: 1.0,
+	hoursPerDay: 24,
+	daysPerYear: 365,
 	landFraction: 0.3,
 	radiusFactor: 1.0,
 }

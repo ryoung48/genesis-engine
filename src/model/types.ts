@@ -54,6 +54,8 @@ export interface World {
 	eccentricity: number
 	perihelion: number
 	tSun: number
+	hoursPerDay: number
+	daysPerYear: number
 	landFraction: number
 }
 
@@ -63,6 +65,8 @@ export type WorldSpawn = {
 	eccentricity?: number
 	perihelion?: number
 	tSun?: number
+	hoursPerDay?: number
+	daysPerYear?: number
 	landFraction?: number
 	radius?: number
 	resolution?: number

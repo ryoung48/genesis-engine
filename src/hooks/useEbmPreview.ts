@@ -15,12 +15,14 @@ interface EbmConfig {
 	eccentricity: number
 	perihelion: number
 	tSun: number
+	hoursPerDay: number
+	daysPerYear: number
 	landFraction: number
 	radius: number
 }
 
 export function useEbmPreview(config: EbmConfig) {
-	const { obliquity, eccentricity, perihelion, tSun, landFraction, radius } = config
+	const { obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius } = config
 
 	return useMemo(() => {
 		const modelConfig = {
@@ -32,6 +34,10 @@ export function useEbmPreview(config: EbmConfig) {
 			stellar: {
 				...EBM.constants.stellar,
 				T_SUN: tSun,
+			},
+			time: {
+				HOURS_PER_DAY: hoursPerDay,
+				YEAR_LENGTH_DAYS: daysPerYear,
 			},
 			landFraction: new Array(EBM.constants.grid.NUM_LAT).fill(landFraction),
 			radius: radius * 1000, // km to meters
@@ -62,7 +68,7 @@ export function useEbmPreview(config: EbmConfig) {
 		const insolColorFn = (val: number) =>
 			interpolatePlasma(insolColorScale(val))
 
-		const daylightScale = scaleLinear([0, 24], [1, 0])
+		const daylightScale = scaleLinear([0, hoursPerDay], [1, 0])
 		const daylightColorFn = (hours: number) =>
 			interpolatePurples(daylightScale(hours))
 
@@ -143,5 +149,5 @@ export function useEbmPreview(config: EbmConfig) {
 			sampledDays,
 			dayLabels,
 		}
-	}, [obliquity, eccentricity, perihelion, tSun, landFraction, radius])
+	}, [obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius])
 }

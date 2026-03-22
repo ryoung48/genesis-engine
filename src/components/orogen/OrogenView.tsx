@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { encodePlanetCode, decodePlanetCode } from "@/model/orogen/planet-code"
 import type {
 	OrogenWorkerRequest,
@@ -6,10 +6,18 @@ import type {
 	SerializedOrogenWorld,
 } from "@/model/orogen/worker-types"
 import { createOrogenScene, type OrogenScene, type OrogenViewMode } from "./renderer"
-import { elevToHeightKm, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, type ColorMode } from "./colors"
+import { elevToHeightKm, elevationToColor, getColor, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, type ColorMode } from "./colors"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/vegetation"
 import { computeThermalEquatorLine } from "@/model/orogen/rain"
-import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "@/model/orogen/units"
+import {
+	DEFAULT_DAYS_PER_YEAR,
+	DEFAULT_ECCENTRICITY,
+	DEFAULT_HOURS_PER_DAY,
+	DEFAULT_OBLIQUITY_DEG,
+	DEFAULT_PLANET_RADIUS_KM,
+	DEFAULT_SUN_TEMP_FACTOR,
+	meanEdgeLengthKm,
+} from "@/model/orogen/units"
 
 function darkenVegetationAtElevation(
 	color: [number, number, number],
@@ -35,6 +43,28 @@ interface OrogenViewProps {
 
 export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const monthLabels = ["Annual", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+	const DEFAULT_WORLD_PARAMS = {
+		numPoints: 204000,
+		jitter: 0.75,
+		numPlates: 80,
+		landDistribution: 0.25,
+		continentSizeVariety: 0.35,
+		landCoverage: 0.3,
+		roughness: 0.40,
+		planetRadiusKm: DEFAULT_PLANET_RADIUS_KM,
+		obliquity: DEFAULT_OBLIQUITY_DEG,
+		eccentricity: DEFAULT_ECCENTRICITY,
+		sunTempFactor: DEFAULT_SUN_TEMP_FACTOR,
+		daysPerYear: DEFAULT_DAYS_PER_YEAR,
+		hoursPerDay: DEFAULT_HOURS_PER_DAY,
+		terrainWarp: 0.75,
+		smoothing: 0.1,
+		hydraulicErosion: 0.5,
+		thermalErosion: 0.1,
+		ridgeSharpening: 0.50,
+		glacialErosion: 0.50,
+		craters: 0,
+	} as const
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const viewportRef = useRef<HTMLDivElement>(null)
 	const sceneRef = useRef<OrogenScene | null>(null)
@@ -67,22 +97,29 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [planetCode, setPlanetCode] = useState("")
 	const [planetCodeInput, setPlanetCodeInput] = useState("")
 	const [codeError, setCodeError] = useState(false)
-	// Shape Your World — orogen defaults
-	const [numPoints, setNumPoints] = useState(204000)
-	const [jitter, setJitter] = useState(0.75)
-	const [numPlates, setNumPlates] = useState(80)
-	const [numContinents, setNumContinents] = useState(4)
-	const [continentSizeVariety, setContinentSizeVariety] = useState(0.35)
-	const [landCoverage, setLandCoverage] = useState(0.3)
-	const [roughness, setRoughness] = useState(0.40)
-	const [planetRadiusKm, setPlanetRadiusKm] = useState(DEFAULT_PLANET_RADIUS_KM)
-	// Terrain Sculpting — orogen defaults
-	const [terrainWarp, setTerrainWarp] = useState(0.75)
-	const [smoothing, setSmoothing] = useState(0.1)
-	const [hydraulicErosion, setHydraulicErosion] = useState(0.5)
-	const [thermalErosion, setThermalErosion] = useState(0.1)
-	const [ridgeSharpening, setRidgeSharpening] = useState(0.50)
-	const [glacialErosion, setGlacialErosion] = useState(0.50)
+	// Shape Your World - orogen defaults
+	const [numPoints, setNumPoints] = useState(DEFAULT_WORLD_PARAMS.numPoints)
+	const [jitter, setJitter] = useState(DEFAULT_WORLD_PARAMS.jitter)
+	const [numPlates, setNumPlates] = useState(DEFAULT_WORLD_PARAMS.numPlates)
+	const [landDistribution, setLandDistribution] = useState(DEFAULT_WORLD_PARAMS.landDistribution)
+	const [continentSizeVariety, setContinentSizeVariety] = useState(DEFAULT_WORLD_PARAMS.continentSizeVariety)
+	const [landCoverage, setLandCoverage] = useState(DEFAULT_WORLD_PARAMS.landCoverage)
+	const [roughness, setRoughness] = useState(DEFAULT_WORLD_PARAMS.roughness)
+	const [planetRadiusKm, setPlanetRadiusKm] = useState(DEFAULT_WORLD_PARAMS.planetRadiusKm)
+	const [obliquity, setObliquity] = useState(DEFAULT_WORLD_PARAMS.obliquity)
+	const [eccentricity, setEccentricity] = useState(DEFAULT_WORLD_PARAMS.eccentricity)
+	const [sunTempFactor, setSunTempFactor] = useState(DEFAULT_WORLD_PARAMS.sunTempFactor)
+	const [daysPerYear, setDaysPerYear] = useState(DEFAULT_WORLD_PARAMS.daysPerYear)
+	const [hoursPerDay, setHoursPerDay] = useState(DEFAULT_WORLD_PARAMS.hoursPerDay)
+	const [tidallyLocked, setTidallyLocked] = useState(false)
+	// Terrain Sculpting - orogen defaults
+	const [terrainWarp, setTerrainWarp] = useState(DEFAULT_WORLD_PARAMS.terrainWarp)
+	const [smoothing, setSmoothing] = useState(DEFAULT_WORLD_PARAMS.smoothing)
+	const [hydraulicErosion, setHydraulicErosion] = useState(DEFAULT_WORLD_PARAMS.hydraulicErosion)
+	const [thermalErosion, setThermalErosion] = useState(DEFAULT_WORLD_PARAMS.thermalErosion)
+	const [ridgeSharpening, setRidgeSharpening] = useState(DEFAULT_WORLD_PARAMS.ridgeSharpening)
+	const [glacialErosion, setGlacialErosion] = useState(DEFAULT_WORLD_PARAMS.glacialErosion)
+	const [craters, setCraters] = useState(DEFAULT_WORLD_PARAMS.craters)
 
 	// Initialize Three.js scene
 	useEffect(() => {
@@ -163,12 +200,30 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		? BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null
 		: null
 
+	const hoverRiverLand = hoverInfo && world?.riverLand
+		? world.riverLand[hoverInfo.region]
+		: null
+
+	const hoverIsLand = hoverInfo && world?.isLand
+		? world.isLand[hoverInfo.region]
+		: null
+
 	const hoverOceanDist = hoverInfo && world?.oceanDist
 		? world.oceanDist[hoverInfo.region]
 		: null
 
 	const hoverDistCoast = hoverInfo && world?.distCoast && world.elevation[hoverInfo.region] <= 0
 		? world.distCoast[hoverInfo.region]
+		: null
+
+
+	const coastHopLengthKm = useMemo(() => {
+		if (!world) return null
+		return meanEdgeLengthKm(world.mesh, world.params.planetRadiusKm)
+	}, [world])
+
+	const hoverDistCoastKm = hoverDistCoast !== null && coastHopLengthKm !== null
+		? (Number.isFinite(hoverDistCoast) ? hoverDistCoast * coastHopLengthKm : Infinity)
 		: null
 
 	const hoverCardLeft = (() => {
@@ -243,14 +298,22 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 
 		if (colorMode === "vegetation" && world.vegetation) {
+			const lakes = world.rivers?.lakes
 			for (let r = 0; r < N; r++) {
-				const [cr, cg, cb] = darkenVegetationAtElevation(
-					vegetationColor(world.vegetation[r]),
-					world.elevation[r],
-				)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
+				if (lakes?.[r]) {
+					const [cr, cg, cb] = getColor(Math.min(0, world.elevation[r]), "terrain")
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else {
+					const [cr, cg, cb] = darkenVegetationAtElevation(
+						vegetationColor(world.vegetation[r]),
+						world.elevation[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
 			}
 			return rgb
 		}
@@ -279,6 +342,43 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
+
+		// Terrain / heightmap modes — use isLand to color depressions and lakes
+		if (world.isLand) {
+			// Sea-level land color (first land stop) → depression teal
+			const seaR = 0xAC / 255, seaG = 0xD0 / 255, seaB = 0xA5 / 255
+			const depR = 0xA7 / 255, depG = 0xDF / 255, depB = 0xD2 / 255
+			const lakes = world.rivers?.lakes
+			for (let r = 0; r < N; r++) {
+				const e = world.elevation[r]
+				if (lakes?.[r]) {
+					// Lake cell — use elevation for depth, clamp positive elevations to 0
+					const [cr, cg, cb] = getColor(Math.min(0, e), "terrain")
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (world.isLand[r] && e <= 0) {
+					// Below-sea-level land depression (not filled with water)
+					const depthKm = -elevToHeightKm(e)
+					const t = Math.min(1, Math.sqrt(depthKm / 1))
+					rgb[3 * r] = seaR + (depR - seaR) * t
+					rgb[3 * r + 1] = seaG + (depG - seaG) * t
+					rgb[3 * r + 2] = seaB + (depB - seaB) * t
+				} else if (!world.isLand[r]) {
+					// Ocean cell — always use water color, clamp elevation to <= 0
+					const [cr, cg, cb] = getColor(Math.min(0, e), "terrain")
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else {
+					const [cr, cg, cb] = getColor(e, colorMode)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
 			}
 			return rgb
 		}
@@ -365,6 +465,30 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		sceneRef.current?.commitMapCenterLongitude()
 	}, [])
 
+	const resetWorldDefaults = useCallback(() => {
+		setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
+		setJitter(DEFAULT_WORLD_PARAMS.jitter)
+		setNumPlates(DEFAULT_WORLD_PARAMS.numPlates)
+		setLandDistribution(DEFAULT_WORLD_PARAMS.landDistribution)
+		setContinentSizeVariety(DEFAULT_WORLD_PARAMS.continentSizeVariety)
+		setLandCoverage(DEFAULT_WORLD_PARAMS.landCoverage)
+		setRoughness(DEFAULT_WORLD_PARAMS.roughness)
+		setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
+		setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
+		setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
+		setSunTempFactor(DEFAULT_WORLD_PARAMS.sunTempFactor)
+		setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
+		setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
+		setTidallyLocked(false)
+		setTerrainWarp(DEFAULT_WORLD_PARAMS.terrainWarp)
+		setSmoothing(DEFAULT_WORLD_PARAMS.smoothing)
+		setHydraulicErosion(DEFAULT_WORLD_PARAMS.hydraulicErosion)
+		setThermalErosion(DEFAULT_WORLD_PARAMS.thermalErosion)
+		setRidgeSharpening(DEFAULT_WORLD_PARAMS.ridgeSharpening)
+		setGlacialErosion(DEFAULT_WORLD_PARAMS.glacialErosion)
+		setCraters(DEFAULT_WORLD_PARAMS.craters)
+	}, [])
+
 	const generateWorld = useCallback((overrideSeed: number, overrides?: Record<string, number>) => {
 		setGenerating(true)
 		setGenerationProgress(0)
@@ -375,10 +499,16 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			seed: overrideSeed,
 			numPoints: overrides?.numPoints ?? numPoints,
 			numPlates: overrides?.numPlates ?? numPlates,
-			numContinents: overrides?.numContinents ?? numContinents,
+			landDistribution: overrides?.landDistribution ?? landDistribution,
 			continentSizeVariety: overrides?.continentSizeVariety ?? continentSizeVariety,
 			landCoverage: overrides?.landCoverage ?? landCoverage,
 			planetRadiusKm: overrides?.planetRadiusKm ?? planetRadiusKm,
+			obliquity: (overrides?.tidallyLocked ? true : tidallyLocked) ? 0 : (overrides?.obliquity ?? obliquity),
+			eccentricity: overrides?.eccentricity ?? eccentricity,
+			sunTempFactor: overrides?.sunTempFactor ?? sunTempFactor,
+			daysPerYear: overrides?.daysPerYear ?? daysPerYear,
+			hoursPerDay: overrides?.hoursPerDay ?? hoursPerDay,
+			tidallyLocked: overrides?.tidallyLocked ? true : tidallyLocked,
 			jitter: overrides?.jitter ?? jitter,
 			roughness: overrides?.roughness ?? roughness,
 			terrainWarp: overrides?.terrainWarp ?? terrainWarp,
@@ -387,6 +517,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			thermalErosion: overrides?.thermalErosion ?? thermalErosion,
 			ridgeSharpening: overrides?.ridgeSharpening ?? ridgeSharpening,
 			glacialErosion: overrides?.glacialErosion ?? glacialErosion,
+			craters: overrides?.craters ?? craters,
 		}
 
 		workerRef.current?.terminate()
@@ -434,9 +565,9 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 		const request: OrogenWorkerRequest = { type: "generate", params }
 		worker.postMessage(request)
-	}, [numPoints, numPlates, numContinents, continentSizeVariety,
-		landCoverage, planetRadiusKm, jitter, roughness, terrainWarp, smoothing,
-		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion])
+	}, [numPoints, numPlates, landDistribution, continentSizeVariety,
+		landCoverage, planetRadiusKm, obliquity, eccentricity, sunTempFactor, daysPerYear, hoursPerDay, tidallyLocked, jitter, roughness, terrainWarp, smoothing,
+		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, craters])
 
 	const handleGenerate = useCallback(() => {
 		generateWorld(Math.floor(Math.random() * 16777216))
@@ -457,10 +588,16 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setNumPoints(decoded.numPoints)
 		setJitter(decoded.jitter)
 		setNumPlates(decoded.numPlates)
-		setNumContinents(decoded.numContinents)
+		setLandDistribution(decoded.landDistribution)
 		setContinentSizeVariety(decoded.continentSizeVariety)
 		setLandCoverage(decoded.landCoverage)
 		setPlanetRadiusKm(decoded.planetRadiusKm)
+		setObliquity(decoded.obliquity)
+		setEccentricity(decoded.eccentricity)
+		setSunTempFactor(decoded.sunTempFactor)
+		setDaysPerYear(decoded.daysPerYear)
+		setHoursPerDay(decoded.hoursPerDay)
+		setTidallyLocked(decoded.tidallyLocked)
 		setRoughness(decoded.roughness)
 		setTerrainWarp(decoded.terrainWarp)
 		setSmoothing(decoded.smoothing)
@@ -468,6 +605,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setThermalErosion(decoded.thermalErosion)
 		setRidgeSharpening(decoded.ridgeSharpening)
 		setGlacialErosion(decoded.glacialErosion)
+		setCraters(decoded.craters ?? 0)
 		setCodeError(false)
 		// Generate immediately with the decoded params (bypasses stale state)
 		generateWorld(decoded.seed, decoded)
@@ -555,16 +693,23 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 				imageWidth,
 				imageHeight,
 				planetRadiusKm,
+				obliquity,
+				eccentricity,
+				sunTempFactor,
+				daysPerYear,
+				hoursPerDay,
+				tidallyLocked,
 				terrainWarp,
 				smoothing,
 				hydraulicErosion,
 				thermalErosion,
 				ridgeSharpening,
 				glacialErosion,
+				craters,
 			},
 		}
 		worker.postMessage(request, [grayscale.buffer])
-	}, [seed, numPoints, jitter, planetRadiusKm, terrainWarp, smoothing, hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion])
+	}, [seed, numPoints, jitter, planetRadiusKm, obliquity, eccentricity, sunTempFactor, daysPerYear, hoursPerDay, tidallyLocked, terrainWarp, smoothing, hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, craters])
 
 	const handleFileImport = useCallback(async (file: File) => {
 		try {
@@ -586,18 +731,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 	}, [loadImageAsGrayscale, importHeightmap])
 
-	const worldSliders = [
-		{
-			label: "Detail",
-			value: numPoints,
-			display: numPoints.toLocaleString(),
-			min: 5000,
-			max: 2560000,
-			step: 1000,
-			set: setNumPoints,
-		},
+	const planetSliders = [
 		{
 			label: "Radius",
+			help: "Sets the planet's physical size for climate and distance calculations.",
 			value: planetRadiusKm,
 			display: `${(planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x Earth`,
 			min: DEFAULT_PLANET_RADIUS_KM * 0.5,
@@ -606,7 +743,94 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			set: setPlanetRadiusKm,
 		},
 		{
+			label: "Axial Tilt",
+			help: "Sets seasonal tilt from 0 to 180 degrees. Tilts above 90 are treated as retrograde and flip seasonal rainfall timing.",
+			value: tidallyLocked ? 0 : obliquity,
+			display: tidallyLocked ? "0.0°" : `${obliquity.toFixed(1)}°`,
+			min: 0,
+			max: 180,
+			step: 0.5,
+			set: setObliquity,
+			disabled: tidallyLocked,
+		},
+		{
+			label: "Eccentricity",
+			help: "Controls how circular or stretched the orbit is, increasing seasonal contrast as it rises.",
+			value: eccentricity,
+			display: eccentricity.toFixed(3),
+			min: 0,
+			max: 0.2,
+			step: 0.001,
+			set: setEccentricity,
+		},
+		{
+			label: "Sun Temp",
+			help: "Scales stellar temperature relative to Sol. 1.0x matches the Sun, 0.5x is half as hot.",
+			value: sunTempFactor,
+			display: `${sunTempFactor.toFixed(2)}x`,
+			min: 0.9,
+			max: 1.2,
+			step: 0.01,
+			set: setSunTempFactor,
+		},
+		{
+			label: "Year Length",
+			help: "Sets the orbital year length in local days. Seasonal pacing changes without increasing sim resolution.",
+			value: daysPerYear,
+			display: `${daysPerYear.toFixed(0)} d`,
+			min: 100,
+			max: 1000,
+			step: 5,
+			set: setDaysPerYear,
+			disabled: tidallyLocked,
+		},
+		{
+			label: "Day Length",
+			help: "Sets the rotation period in local hours. Shorter days mix heat more strongly; longer days reduce that effect.",
+			value: hoursPerDay,
+			display: `${hoursPerDay.toFixed(1)} h`,
+			min: 8,
+			max: 48,
+			step: 0.5,
+			set: setHoursPerDay,
+			disabled: tidallyLocked,
+		},
+		{
+			label: "Land Distribution",
+			help: "Controls how concentrated the minority phase is: land below 50%, water above 50%.",
+			value: landDistribution,
+			display: landDistribution.toFixed(2),
+			min: 0,
+			max: 1,
+			step: 0.05,
+			set: setLandDistribution,
+		},
+		{
+			label: "Land Coverage",
+			help: "Sets the overall land-to-ocean balance for the world.",
+			value: landCoverage,
+			display: `${(landCoverage * 100).toFixed(0)}%`,
+			min: 0,
+			max: 1,
+			step: 0.01,
+			set: setLandCoverage,
+		},
+	]
+
+	const terrainSliders = [
+		{
+			label: "Detail",
+			help: "Higher detail sharpens coastlines and terrain, but takes longer to build.",
+			value: numPoints,
+			display: numPoints.toLocaleString(),
+			min: 5000,
+			max: 2560000,
+			step: 1000,
+			set: setNumPoints,
+		},
+		{
 			label: "Irregularity",
+			help: "Controls how even or organic the underlying mesh feels.",
 			value: jitter,
 			display: jitter.toFixed(2),
 			min: 0,
@@ -616,6 +840,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 		{
 			label: "Plates",
+			help: "More plates create more tectonic boundaries, coasts, and mountain belts.",
 			value: numPlates,
 			display: String(numPlates),
 			min: 4,
@@ -624,16 +849,18 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			set: setNumPlates,
 		},
 		{
-			label: "Continents",
-			value: numContinents,
-			display: String(numContinents),
-			min: 1,
-			max: 10,
-			step: 1,
-			set: setNumContinents,
+			label: "Roughness",
+			help: "Adds fractal detail to mountains, ridges, and coastlines.",
+			value: roughness,
+			display: roughness.toFixed(2),
+			min: 0,
+			max: 0.5,
+			step: 0.01,
+			set: setRoughness,
 		},
 		{
 			label: "Size Variety",
+			help: "Makes landmasses or seas more equal-sized or more uneven.",
 			value: continentSizeVariety,
 			display: continentSizeVariety.toFixed(2),
 			min: 0,
@@ -642,28 +869,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			set: setContinentSizeVariety,
 		},
 		{
-			label: "Land Coverage",
-			value: landCoverage,
-			display: `${(landCoverage * 100).toFixed(0)}%`,
-			min: 0,
-			max: 1,
-			step: 0.01,
-			set: setLandCoverage,
-		},
-		{
-			label: "Roughness",
-			value: roughness,
-			display: roughness.toFixed(2),
-			min: 0,
-			max: 0.5,
-			step: 0.01,
-			set: setRoughness,
-		},
-	]
-
-	const sculptSliders = [
-		{
 			label: "Terrain Warp",
+			help: "Twists the raw terrain field into more organic coastlines and ridges.",
 			value: terrainWarp,
 			display: terrainWarp.toFixed(2),
 			min: 0,
@@ -673,6 +880,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 		{
 			label: "Smoothing",
+			help: "Softens hard tectonic edges and blends abrupt elevation transitions.",
 			value: smoothing,
 			display: smoothing.toFixed(2),
 			min: 0,
@@ -682,6 +890,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 		{
 			label: "Hydraulic Erosion",
+			help: "Cuts river valleys and drainage networks into the terrain.",
 			value: hydraulicErosion,
 			display: hydraulicErosion.toFixed(2),
 			min: 0,
@@ -691,6 +900,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 		{
 			label: "Thermal Erosion",
+			help: "Moves loose material downhill, softening ridges and steep slopes.",
 			value: thermalErosion,
 			display: thermalErosion.toFixed(2),
 			min: 0,
@@ -700,6 +910,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 		{
 			label: "Ridge Sharpening",
+			help: "Pushes ridgelines above their surroundings for a stronger mountain silhouette.",
 			value: ridgeSharpening,
 			display: ridgeSharpening.toFixed(2),
 			min: 0,
@@ -709,6 +920,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		},
 		{
 			label: "Glacial Erosion",
+			help: "Carves fjords, basins, and U-shaped valleys into cold high terrain.",
 			value: glacialErosion,
 			display: glacialErosion.toFixed(2),
 			min: 0,
@@ -716,12 +928,25 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			step: 0.05,
 			set: setGlacialErosion,
 		},
+		{
+			label: "Craters",
+			help: "Stamps impact craters onto the surface. Higher values produce more and larger craters.",
+			value: craters,
+			display: craters.toFixed(2),
+			min: 0,
+			max: 1,
+			step: 0.05,
+			set: setCraters,
+		},
 	]
 
 	const planetStats = useMemo(() => {
 		const activeParams = world?.params
-		const obliquity = activeParams?.obliquity ?? 23.5
-		const eccentricity = activeParams?.eccentricity ?? 0
+		const obliquityValue = activeParams?.obliquity ?? obliquity
+		const eccentricityValue = activeParams?.eccentricity ?? eccentricity
+		const sunTempFactorValue = activeParams?.sunTempFactor ?? sunTempFactor
+		const daysPerYearValue = activeParams?.daysPerYear ?? daysPerYear
+		const hoursPerDayValue = activeParams?.hoursPerDay ?? hoursPerDay
 		const radiusKm = activeParams?.planetRadiusKm ?? planetRadiusKm
 		const surfaceAreaKm2 = 4 * Math.PI * radiusKm * radiusKm
 
@@ -753,28 +978,39 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			avgAnnualPrecipMm = sum / Math.max(1, world.rainfall.annual.length)
 		}
 
+		const isTidal = activeParams?.tidallyLocked ?? tidallyLocked
 		return [
-			{ label: "Tilt", value: `${obliquity.toFixed(1)}°` },
-			{ label: "Ecc", value: eccentricity.toFixed(3) },
+			...(isTidal ? [{ label: "Lock", value: "Tidal" }] : []),
+			{ label: "Tilt", value: `${obliquityValue.toFixed(1)}°` },
+			{ label: "Ecc", value: eccentricityValue.toFixed(3) },
+			{ label: "Sun", value: `${sunTempFactorValue.toFixed(2)}x` },
+			{ label: "Year", value: `${daysPerYearValue.toFixed(0)} d` },
+			{ label: "Day", value: `${hoursPerDayValue.toFixed(1)} h` },
 			{ label: "Radius", value: `${(radiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x` },
+			{ label: "Continents", value: world?.continentCount != null ? String(world.continentCount) : "—" },
 			{ label: "Cell", value: avgCellLengthKm !== null ? `${avgCellLengthKm.toFixed(0)} km` : "—" },
 			{ label: "Land Area", value: landAreaKm2 !== null && landPercent !== null ? `${(landAreaKm2 / 1_000_000).toFixed(1)}M km² (${landPercent.toFixed(1)}%)` : "—" },
 			{ label: "Avg Temp", value: avgAnnualTempC !== null ? `${avgAnnualTempC.toFixed(1)} °C` : "—" },
 			{ label: "Avg Rain", value: avgAnnualPrecipMm !== null ? `${avgAnnualPrecipMm.toFixed(0)} mm` : "—" },
 		]
-	}, [planetRadiusKm, world])
+	}, [daysPerYear, eccentricity, hoursPerDay, obliquity, planetRadiusKm, sunTempFactor, tidallyLocked, world])
 
 	const renderSliderGroup = (
-		items: typeof worldSliders,
+		items: typeof planetSliders,
 		columns: "single" | "double" = "double",
 	) => (
 		<div className={columns === "double" ? "grid grid-cols-1 xl:grid-cols-2 gap-1.5" : "space-y-1.5"}>
 			{items.map((p) => (
-				<div key={p.label} className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
+				<div key={p.label} className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${"disabled" in p && p.disabled ? " opacity-40 pointer-events-none" : ""}`}>
 					<div className="flex justify-between items-baseline gap-3">
-						<label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-							{p.label}
-						</label>
+						<div className="group relative flex items-center min-w-0">
+							<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+								{p.label}
+							</label>
+							<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+								{p.help}
+							</div>
+						</div>
 						<span className="font-mono text-[10px] text-slate-400">
 							{p.display}
 						</span>
@@ -786,6 +1022,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						step={p.step}
 						value={p.value}
 						onChange={(e) => p.set(parseFloat(e.target.value))}
+						disabled={"disabled" in p && !!p.disabled}
 						className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
 					/>
 				</div>
@@ -869,50 +1106,56 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 				{controlTab === "world" && (
 					<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-						<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
-							{([
-								["planet", "Planet"],
-								["terrain", "Terrain"],
-							] as const).map(([tab, label]) => (
-								<button
-									key={tab}
-									onClick={() => setWorldTab(tab)}
-									className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
-										worldTab === tab
-											? "bg-white text-slate-900 shadow-sm"
-											: "text-slate-500 hover:text-slate-700"
-									}`}
-								>
-									{label}
-								</button>
-							))}
+						<div className="flex items-center justify-between gap-2">
+							<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
+								{([
+									["planet", "Planet"],
+									["terrain", "Terrain"],
+								] as const).map(([tab, label]) => (
+									<button
+										key={tab}
+										onClick={() => setWorldTab(tab)}
+										className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
+											worldTab === tab
+												? "bg-white text-slate-900 shadow-sm"
+												: "text-slate-500 hover:text-slate-700"
+										}`}
+									>
+										{label}
+									</button>
+								))}
+							</div>
+							<button
+								type="button"
+								onClick={resetWorldDefaults}
+								className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+							>
+								Reset
+							</button>
 						</div>
 
 						{worldTab === "planet" && (
 							<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
-								<div className="mb-3">
-									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-										Shape Your World
-									</span>
-									<p className="mt-1 text-xs text-slate-500">
-										Planet scale, tectonic layout, and land distribution.
-									</p>
-								</div>
-								{renderSliderGroup(worldSliders)}
+								<label className="flex items-center gap-2 mb-2 px-1 cursor-pointer select-none">
+									<input
+										type="checkbox"
+										checked={tidallyLocked}
+										onChange={(e) => {
+											setTidallyLocked(e.target.checked)
+											if (e.target.checked) setObliquity(0)
+										}}
+										className="accent-slate-900 h-3.5 w-3.5"
+									/>
+									<span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Tidally Locked</span>
+									<span className="text-[9px] text-slate-400 ml-auto">One side always faces the star</span>
+								</label>
+								{renderSliderGroup(planetSliders)}
 							</div>
 						)}
 
 						{worldTab === "terrain" && (
 							<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
-								<div className="mb-3">
-									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-										Terrain Sculpting
-									</span>
-									<p className="mt-1 text-xs text-slate-500">
-										Post-process elevation with warp, smoothing, and erosion.
-									</p>
-								</div>
-								{renderSliderGroup(sculptSliders)}
+								{renderSliderGroup(terrainSliders)}
 							</div>
 						)}
 
@@ -1328,6 +1571,11 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						<div className="mt-1 font-mono text-sm text-slate-100">
 							{hoverElevationKm.toFixed(2)} km
 						</div>
+						{hoverIsLand !== null && (
+							<div className="mt-1 font-mono text-[10px] text-slate-400">
+								isLand={hoverIsLand} riverLand={hoverRiverLand ?? '?'} lake={hoverInfo && world?.rivers?.lakes ? world.rivers.lakes[hoverInfo.region] : '?'}
+							</div>
+						)}
 						{hoverCoordinates && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
@@ -1394,17 +1642,16 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 									Dist Coast
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100">
-									{hoverDistCoast === Infinity ? "∞" : hoverDistCoast.toFixed(0)} hops
+                                    {hoverDistCoastKm === Infinity
+                                        ? '∞'
+                                        : hoverDistCoastKm !== null && hoverDistCoastKm < 100
+                                            ? hoverDistCoastKm.toFixed(0)
+                                            : hoverDistCoastKm !== null
+                                                ? Math.round(hoverDistCoastKm).toLocaleString()
+                                                : '—'} km
 								</div>
 							</>
 						)}
-					</div>
-				)}
-				{!world && !generating && (
-					<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-						<p className="text-slate-500 text-sm font-mono">
-							Click Generate to build a world
-						</p>
 					</div>
 				)}
 			</div>

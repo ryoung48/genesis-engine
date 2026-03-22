@@ -53,7 +53,7 @@ export interface OrogenParams {
 	seed: number
 	numPoints: number
 	numPlates: number
-	numContinents: number
+	landDistribution: number
 	continentSizeVariety: number
 	landCoverage: number
 	jitter: number
@@ -64,9 +64,14 @@ export interface OrogenParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	craters?: number           // 0 = none, 1 = heavily cratered
 	planetRadiusKm?: number
 	obliquity?: number    // axial tilt in degrees, default 23.5
-	eccentricity?: number // orbital eccentricity, default 0
+	eccentricity?: number // orbital eccentricity, default 0.0167
+	sunTempFactor?: number // stellar temperature factor, 1.0 = Sol
+	daysPerYear?: number // orbital year length in local days, default 365
+	hoursPerDay?: number // rotation period expressed as local hours per day, default 24
+	tidallyLocked?: boolean // true = one hemisphere always faces the star
 }
 
 /** Result of findCollisions for one plate layer */
@@ -130,6 +135,10 @@ export interface OrogenRivers {
 	maxFlow: number
 	/** Flow threshold (minimum flow for a river cell) */
 	minFlow: number
+	/** Per-cell lake flag (1 = lake surface, 0 = not) */
+	lakes: Uint8Array
+	/** Per-cell water surface elevation (only meaningful for lake cells) */
+	waterLevel: Float32Array
 }
 
 export interface OrogenWorld {
@@ -149,4 +158,7 @@ export interface OrogenWorld {
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation?: Uint8Array
 	rivers?: OrogenRivers
+	isLand?: Uint8Array
+	riverLand?: Uint8Array
+	continentCount?: number
 }

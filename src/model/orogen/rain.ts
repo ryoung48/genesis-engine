@@ -3,9 +3,9 @@
  * Computes moisture advection and monthly rainfall using typed-array-based
  * SphereMesh and OrogenClimate data (no Cell/window.world dependencies).
  */
-import type { SphereMesh, OrogenClimate } from "./types"
+import type { SphereMesh, OrogenClimate, OrogenParams } from "./types"
 import { elevToHeightKm } from "./climate"
-import { meanEdgeLengthKm } from "./units"
+import { getDaysPerYear, getHoursPerDay, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "./units"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -31,11 +31,47 @@ function angleDeltaDeg(a: number, b: number): number {
 	return Math.abs(d)
 }
 
+function clamp(x: number, min: number, max: number): number {
+	return Math.max(min, Math.min(max, x))
+}
+
+const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 35, 50], [40, 62, 83, 125, 165, 250, 40], x)
+
 const itczScale = (x: number) => piecewise([0, 8, 18, 28], [1, 0.7, 0.2, 0], x)
 const subsidenceScale = (x: number) => piecewise([20, 25, 30, 35, 40], [0, 0.5, 1, 0.5, 0], x)
 const eastStormScale = (x: number) => piecewise([15, 35, 90], [0, 0.8, 1], x)
 const westerliesScale = (x: number) => piecewise([40, 50, 90], [0, 1, 0.8], x)
-const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 35, 50], [40, 62, 83, 125, 165, 250, 40], x)
+
+type CirculationControls = {
+	hadleyWidth: number
+	hadleyWetStrength: number
+	hadleyDryStrength: number
+}
+
+function getCirculationControls(
+	params?: Pick<OrogenParams, "daysPerYear" | "hoursPerDay" | "tidallyLocked">,
+): CirculationControls {
+	// Tidally locked: no rotation-driven Coriolis, so the Hadley cell spans
+	// much wider and convection concentrates near the substellar point.
+	if (isTidallyLocked(params?.tidallyLocked)) {
+		return {
+			hadleyWidth: 1.8,
+			hadleyWetStrength: 1.6,
+			hadleyDryStrength: 0.5,
+		}
+	}
+
+	const hoursPerDay = getHoursPerDay(params?.hoursPerDay)
+	const daysPerYear = getDaysPerYear(params?.daysPerYear)
+	const seasonalStrength = Math.pow(daysPerYear / 365, 0.25)
+	const rotationWidth = Math.pow(hoursPerDay / 24, 0.35)
+
+	return {
+		hadleyWidth: clamp(rotationWidth, 0.65, 1.9),
+		hadleyWetStrength: clamp(seasonalStrength, 0.7, 1.8),
+		hadleyDryStrength: clamp(Math.pow(daysPerYear / 365, 0.3), 0.7, 1.9),
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Thermal equator computation (extracted from OrogenView.tsx)
@@ -152,12 +188,14 @@ export function computeAdvection(
 	elevation: Float32Array,
 	distCoast: Float32Array,
 	climate?: OrogenClimate,
-	planetRadiusKm?: number,
+	params?: number | Pick<OrogenParams, "planetRadiusKm">,
+	isLand?: Uint8Array,
 ): { east: Float32Array; west: Float32Array } {
 	const N = mesh.numRegions
-	const { adjOffset, adjList, neighborDist } = mesh
+	const { adjOffset, adjList } = mesh
 	const wet = 30
 
+	const planetRadiusKm = typeof params === "number" ? params : params?.planetRadiusKm
 	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
 	const scale = 94.5 / avgEdgeKm
 	const deepOceanThreshold = 1260 / avgEdgeKm
@@ -184,13 +222,17 @@ export function computeAdvection(
 
 	const isDeepOcean = new Uint8Array(N)
 	for (let r = 0; r < N; r++) {
-		if (elevation[r] <= 0 && distCoast[r] > deepOceanThreshold) isDeepOcean[r] = 1
+		if (!isLand?.[r] && elevation[r] <= 0 && distCoast[r] > deepOceanThreshold) isDeepOcean[r] = 1
 	}
 
-	const isLand = new Uint8Array(N)
-	for (let r = 0; r < N; r++) {
-		if (elevation[r] > 0) isLand[r] = 1
-	}
+	// Use provided land mask, or fall back to elevation-based classification
+	const land: Uint8Array = isLand ?? (() => {
+		const mask = new Uint8Array(N)
+		for (let r = 0; r < N; r++) {
+			if (elevation[r] > 0) mask[r] = 1
+		}
+		return mask
+	})()
 
 	const east = new Float32Array(N)
 	const west = new Float32Array(N)
@@ -245,7 +287,7 @@ export function computeAdvection(
 			const r = queue[head++]
 			const heightKm = elevToHeightKm(elevation[r])
 			const orographic = heightKm > 2 ? -1.8 : -0.6
-			const impact = (elevation[r] <= 0 ? 0.5 : orographic) / scale
+			const impact = (!land[r] ? 0.5 : orographic) / scale
 			const m = Math.max(Math.min(Math.max(moisture[r], 0) + impact, wet), 0)
 
 			const lat1 = latDeg[r] * DEG2RAD
@@ -255,7 +297,7 @@ export function computeAdvection(
 
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
-				if (visited[nb] && elevation[nb] <= 0) continue
+				if (visited[nb] && !land[nb]) continue
 
 				const lat2 = latDeg[nb] * DEG2RAD
 				const dLon = lonDeg[nb] * DEG2RAD - lon1
@@ -269,7 +311,7 @@ export function computeAdvection(
 					moisture[nb] = m
 					visited[nb] = 1
 					queue.push(nb)
-				} else if (isLand[nb] && m > moisture[nb]) {
+				} else if (land[nb] && m > moisture[nb]) {
 					moisture[nb] = m
 				}
 			}
@@ -277,7 +319,7 @@ export function computeAdvection(
 
 		const smoothed = new Float32Array(N)
 		for (let r = 0; r < N; r++) {
-			if (!isLand[r]) {
+			if (!land[r]) {
 				smoothed[r] = moisture[r]
 				continue
 			}
@@ -285,7 +327,7 @@ export function computeAdvection(
 			let count = 1
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
-				if (isLand[nb]) {
+				if (land[nb]) {
 					sum += moisture[nb]
 					count++
 				}
@@ -320,16 +362,109 @@ function computeWeight(
 	teq: number,
 	eastMoisture: number,
 	westMoisture: number,
+	controls: CirculationControls,
 ): number {
 	const dist = Math.abs(cellLat - teq)
 	const moisture = Math.max(eastMoisture, westMoisture)
-
-	const itcz = itczScale(dist) * moisture
-	const suppression = 1 - subsidenceScale(dist)
+	const tropicalDist = dist / controls.hadleyWidth
+	const itcz = itczScale(tropicalDist) * moisture * controls.hadleyWetStrength
+	const suppression = 1 - clamp(
+		subsidenceScale(tropicalDist) * controls.hadleyDryStrength,
+		0,
+		1,
+	)
 	const eastStorms = eastStormScale(dist) * eastMoisture
 	const polar = westerliesScale(dist) * westMoisture
+	return clamp(Math.max(itcz * suppression, eastStorms, polar), 0, 1)
+}
 
-	return Math.min(Math.max(itcz * suppression, eastStorms, polar), 1)
+// ---------------------------------------------------------------------------
+// Tidally locked rainfall: convection-driven from substellar point
+// ---------------------------------------------------------------------------
+
+/** Substellar point direction — lon=0, lat=0 on a unit sphere */
+const SUBSTELLAR_X = 1, SUBSTELLAR_Y = 0, SUBSTELLAR_Z = 0
+
+/**
+ * Rainfall for a tidally locked planet. Convective uplift concentrates
+ * near the substellar point; rain tapers smoothly toward the terminator
+ * and is near-zero on the nightside. Uses temperature and moisture
+ * availability (ocean proximity) rather than latitude-band circulation.
+ */
+function computeTidalRain(
+	mesh: SphereMesh,
+	climate: OrogenClimate,
+	isLand: Uint8Array,
+): { monthly: Float32Array; annual: Float32Array } {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+
+	// Compute angular distance from substellar point for each cell
+	const cosTheta = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		cosTheta[r] = Math.max(-1, Math.min(1,
+			mesh.r_xyz[3 * r] * SUBSTELLAR_X +
+			mesh.r_xyz[3 * r + 1] * SUBSTELLAR_Y +
+			mesh.r_xyz[3 * r + 2] * SUBSTELLAR_Z))
+	}
+
+	// Smooth convective rainfall: peaks at substellar, tapers to zero at
+	// the terminator. Uses a single smooth cos⁴ falloff — no piecewise bands.
+	// Dayside only (θ < 90°); nightside gets nothing.
+	const monthly = new Float32Array(N * 12)
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		// cosTheta > 0 = dayside, ≤ 0 = nightside
+		const ct = cosTheta[r]
+		// Smooth weight: cos⁴ gives a natural bell shape peaking at substellar
+		// and reaching zero exactly at the terminator (cosθ=0)
+		const weight = ct > 0 ? ct * ct * ct * ct : 0
+
+		const temp = climate.temperature_avg[r]
+		const ceiling = ceilingScale(temp)
+		const rain = weight * ceiling
+		for (let month = 0; month < 12; month++) {
+			monthly[month * N + r] = rain
+		}
+	}
+
+	// Smooth 3 passes (same as regular model)
+	for (let pass = 0; pass < 3; pass++) {
+		for (let month = 0; month < 12; month++) {
+			const offset = month * N
+			const smoothed = new Float32Array(N)
+			for (let r = 0; r < N; r++) {
+				if (!isLand[r]) continue
+				let sum = 0
+				let count = 0
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					const nb = adjList[j]
+					if (isLand[nb]) {
+						sum += monthly[offset + nb]
+						count++
+					}
+				}
+				sum += monthly[offset + r]
+				count++
+				smoothed[r] = sum / count
+			}
+			for (let r = 0; r < N; r++) {
+				if (isLand[r]) monthly[offset + r] = smoothed[r]
+			}
+		}
+	}
+
+	const annual = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		let sum = 0
+		for (let month = 0; month < 12; month++) {
+			sum += monthly[month * N + r]
+		}
+		annual[r] = sum
+	}
+
+	return { monthly, annual }
 }
 
 /**
@@ -337,13 +472,20 @@ function computeWeight(
  */
 export function computeMonthlyRain(
 	mesh: SphereMesh,
-	elevation: Float32Array,
 	climate: OrogenClimate,
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
+	isLand: Uint8Array,
+	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked">,
 ): { monthly: Float32Array; annual: Float32Array } {
+	if (isTidallyLocked(params?.tidallyLocked)) {
+		return computeTidalRain(mesh, climate, isLand)
+	}
+
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
+	const reverseCirculation = isRetrogradeObliquity(params?.obliquity)
+	const circulation = getCirculationControls(params)
 
 	const latDeg = new Float32Array(N)
 	const lonDeg = new Float32Array(N)
@@ -368,20 +510,15 @@ export function computeMonthlyRain(
 		teqPerMonth[month] = computeThermalEquator(mesh, monthTemps)
 	}
 
-	const isLand = new Uint8Array(N)
-	for (let r = 0; r < N; r++) {
-		if (elevation[r] > 0) isLand[r] = 1
-	}
-
 	const monthly = new Float32Array(N * 12)
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
-		const e = eastAdv[r]
-		const w = westAdv[r]
+		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
+		const w = reverseCirculation ? eastAdv[r] : westAdv[r]
 		const bin = regionBin[r]
 		for (let month = 0; month < 12; month++) {
 			const teq = teqPerMonth[month][bin]
-			const weight = computeWeight(latDeg[r], teq, e, w)
+			const weight = computeWeight(latDeg[r], teq, e, w, circulation)
 			const monthTemp = climate.temperature_monthly[month * N + r]
 			monthly[month * N + r] = weight * ceilingScale(monthTemp)
 		}

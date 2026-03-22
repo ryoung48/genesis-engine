@@ -18,6 +18,8 @@ function App() {
 	const [eccentricity, setEccentricity] = useState(EARTH_DEFAULTS.eccentricity)
 	const [perihelion, setPerihelion] = useState(EARTH_DEFAULTS.perihelion)
 	const [sunTempFactor, setSunTempFactor] = useState(EARTH_DEFAULTS.sunTempFactor)
+	const [hoursPerDay, setHoursPerDay] = useState(EARTH_DEFAULTS.hoursPerDay)
+	const [daysPerYear, setDaysPerYear] = useState(EARTH_DEFAULTS.daysPerYear)
 	const [landFraction, setLandFraction] = useState(EARTH_DEFAULTS.landFraction)
 	const [radiusFactor, setRadiusFactor] = useState(EARTH_DEFAULTS.radiusFactor)
 	const [heightmap, setHeightmap] = useState<HeightmapPreset | undefined>(undefined)
@@ -30,6 +32,8 @@ function App() {
 		eccentricity,
 		perihelion,
 		tSun: sunTempFactor * 5778,
+		hoursPerDay,
+		daysPerYear,
 		landFraction,
 		radius: radiusFactor * 6371,
 	})
@@ -51,6 +55,8 @@ function App() {
 			eccentricity,
 			perihelion,
 			tSun: sunTempFactor * 5778,
+			hoursPerDay,
+			daysPerYear,
 			landFraction,
 			radius: radiusFactor * 6371,
 			heightmap,
@@ -73,6 +79,10 @@ function App() {
 					setPerihelion={setPerihelion}
 					sunTempFactor={sunTempFactor}
 					setSunTempFactor={setSunTempFactor}
+					hoursPerDay={hoursPerDay}
+					setHoursPerDay={setHoursPerDay}
+					daysPerYear={daysPerYear}
+					setDaysPerYear={setDaysPerYear}
 					landFraction={landFraction}
 					setLandFraction={setLandFraction}
 					radiusFactor={radiusFactor}

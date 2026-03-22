@@ -17,7 +17,8 @@ import {
 } from "./erosion"
 import { assignVegetation, assignClimateZones } from "./vegetation"
 import { computeRivers } from "./rivers"
-import { meanEdgeLengthKm } from "./units"
+import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm } from "./units"
+import { countContinents } from "./stats"
 
 export interface ImportParams {
 	seed: number
@@ -33,6 +34,12 @@ export interface ImportParams {
 	ridgeSharpening: number
 	glacialErosion: number
 	planetRadiusKm?: number
+	obliquity?: number
+	eccentricity?: number
+	sunTempFactor?: number
+	daysPerYear?: number
+	hoursPerDay?: number
+	tidallyLocked?: boolean
 }
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -334,7 +341,7 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		seed: params.seed,
 		numPoints: params.numPoints,
 		numPlates: plateIds.length,
-		numContinents: 0,
+		landDistribution: 0.25,
 		continentSizeVariety: 0,
 		landCoverage: 0.3,
 		jitter: params.jitter,
@@ -346,30 +353,42 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		ridgeSharpening: params.ridgeSharpening,
 		glacialErosion: params.glacialErosion,
 		planetRadiusKm: params.planetRadiusKm,
+		obliquity: params.obliquity ?? DEFAULT_OBLIQUITY_DEG,
+		eccentricity: params.eccentricity ?? DEFAULT_ECCENTRICITY,
+		sunTempFactor: params.sunTempFactor ?? DEFAULT_SUN_TEMP_FACTOR,
+		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
+		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
+		tidallyLocked: params.tidallyLocked,
 	}
-	const landFraction = computeLandFraction(mesh, elevation)
+	// Build land mask from final elevation
+	const isLand = new Uint8Array(mesh.numRegions)
+	for (let r = 0; r < mesh.numRegions; r++) {
+		if (elevation[r] > 0) isLand[r] = 1
+	}
+
+	const landFraction = computeLandFraction(mesh, isLand)
 	const climate = computeTemperature(mesh, elevation, landFraction, orogenParams, oceanDist)
 
 	// Moisture advection
 	onProgress?.("Computing moisture...", 80)
-	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, params.planetRadiusKm)
+	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, orogenParams, isLand)
 
 	// Rainfall
 	onProgress?.("Computing rainfall...", 85)
-	const rain = computeMonthlyRain(mesh, elevation, climate, eastAdv, westAdv)
+	const rain = computeMonthlyRain(mesh, climate, eastAdv, westAdv, isLand, orogenParams)
 	const rainfall: OrogenRainfall = { monthly: rain.monthly, annual: rain.annual, east: eastAdv, west: westAdv }
 
 	// Rivers
 	onProgress?.("Computing rivers...", 90)
-	const rivers = computeRivers(mesh, elevation, rainfall, climate)
+	const rivers = computeRivers(mesh, elevation, rainfall, climate, isLand)
 
 	// Climate zones
 	onProgress?.("Classifying climate zones...", 93)
-	const climateZones = assignClimateZones(mesh, elevation, climate)
+	const climateZones = assignClimateZones(mesh, isLand, climate)
 
 	// Vegetation
 	onProgress?.("Assigning vegetation...", 95)
-	const vegetation = assignVegetation(mesh, elevation, climate, rainfall)
+	const vegetation = assignVegetation(mesh, isLand, climate, rainfall)
 
 	onProgress?.("Done", 100)
 
@@ -387,5 +406,7 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		climateZones,
 		vegetation,
 		rivers,
+		isLand,
+		continentCount: countContinents(mesh, isLand),
 	}
 }

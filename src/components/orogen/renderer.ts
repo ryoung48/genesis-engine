@@ -744,8 +744,8 @@ export function createOrogenScene(
 		const w = canvas.clientWidth || 1
 		const h = canvas.clientHeight || 1
 
-		const MIN_WIDTH = 0.4
-		const MAX_WIDTH = 3.5
+		const MIN_WIDTH = 0.15
+		const MAX_WIDTH = 1.2
 		const BIN_STEP = 0.3
 		// Normalize flow relative to threshold→max range for better spread
 		const logMin = Math.log(1 + rivers.minFlow)
@@ -761,7 +761,7 @@ export function createOrogenScene(
 			if (!mat) {
 				const t = (binned - MIN_WIDTH) / (MAX_WIDTH - MIN_WIDTH)
 				mat = new LineMaterial({
-					color: 0xbadaef,
+					color: 0x0978ab,
 					opacity: 0.55 + t * 0.4,
 					linewidth: binned,
 					transparent: true,

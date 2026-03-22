@@ -13,6 +13,10 @@ export interface EBMConfig {
 	stellar?: typeof EMB_CONSTANTS.stellar
 	landFraction?: number[]
 	radius?: number // planet radius in meters
+	time?: {
+		YEAR_LENGTH_DAYS?: number
+		HOURS_PER_DAY?: number
+	}
 }
 
 export class EnergyBalanceModel {
@@ -46,8 +50,9 @@ export class EnergyBalanceModel {
 
 	heatDiffusion(tIdx: number): number[] {
 		const { grid, time, planet } = EMB_CONSTANTS // Use constants for grid/time as they are structural
+		const hoursPerDay = this.config.time?.HOURS_PER_DAY || time.HOURS_PER_DAY
 		const earthDayHours = 24.0
-		const rotationFactor = Math.pow(earthDayHours / time.HOURS_PER_DAY, 0.5)
+		const rotationFactor = Math.pow(earthDayHours / hoursPerDay, 0.5)
 		const radiusRatio = planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
 		const radiusFactor = radiusRatio * radiusRatio // D scales as 1/R²
 
@@ -179,7 +184,9 @@ export class EnergyBalanceModel {
 		this.initModel()
 		const { grid, time } = EMB_CONSTANTS
 		const secondsPerDay = 24 * 3600
-		const dt = dtDays * secondsPerDay
+		const yearLengthDays = this.config.time?.YEAR_LENGTH_DAYS || time.DAYS_PER_YEAR
+		const secondsPerSampleDay = (yearLengthDays / time.DAYS_PER_YEAR) * secondsPerDay
+		const dt = dtDays * secondsPerSampleDay
 		const stepsPerDay = Math.floor(1.0 / dtDays)
 		const totalSteps = time.DAYS_PER_YEAR * stepsPerDay * years
 
@@ -254,6 +261,11 @@ export const EBM = {
 					config.orbital.PERIHELION = world.perihelion
 				if (world.tSun !== undefined && config.stellar)
 					config.stellar.T_SUN = world.tSun
+				if (world.daysPerYear !== undefined || world.hoursPerDay !== undefined)
+					config.time = {
+						YEAR_LENGTH_DAYS: world.daysPerYear,
+						HOURS_PER_DAY: world.hoursPerDay,
+					}
 				if (world.radius !== undefined)
 					config.radius = world.radius * 1000 // km to meters
 			}

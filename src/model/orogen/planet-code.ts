@@ -4,13 +4,25 @@
  */
 
 import type { OrogenParams } from "./types"
-import { DEFAULT_PLANET_RADIUS_KM } from "./units"
+import {
+	DEFAULT_DAYS_PER_YEAR,
+	DEFAULT_ECCENTRICITY,
+	DEFAULT_HOURS_PER_DAY,
+	DEFAULT_OBLIQUITY_DEG,
+	DEFAULT_PLANET_RADIUS_KM,
+	DEFAULT_SUN_TEMP_FACTOR,
+	getDaysPerYear,
+	getEccentricity,
+	getHoursPerDay,
+	getObliquityDeg,
+	getSunTempFactor,
+} from "./units"
 
 const SLIDERS = [
 	{ min: 5000,  step: 1000, count: 2556 }, // 0: Detail (N)
 	{ min: 0,     step: 0.05, count: 21   }, // 1: Irregularity (jitter)
 	{ min: 4,     step: 1,    count: 117  }, // 2: Plates (P)
-	{ min: 1,     step: 1,    count: 10   }, // 3: Continents
+	{ min: 0,     step: 1 / 9, count: 10 }, // 3: Land Distribution
 	{ min: 0,     step: 0.01, count: 51   }, // 4: Roughness
 	{ min: 0,     step: 0.05, count: 21   }, // 5: Smoothing
 	{ min: 0,     step: 0.05, count: 21   }, // 6: Glacial Erosion
@@ -52,7 +64,7 @@ export function encodePlanetCode(seed: number, params: OrogenParams): string {
 	const nIdx   = toIndex(params.numPoints, SLIDERS[0])
 	const jIdx   = toIndex(params.jitter, SLIDERS[1])
 	const pIdx   = toIndex(params.numPlates, SLIDERS[2])
-	const cnIdx  = toIndex(params.numContinents, SLIDERS[3])
+	const ldIdx  = toIndex(params.landDistribution, SLIDERS[3])
 	const nsIdx  = toIndex(params.roughness, SLIDERS[4])
 	const smIdx  = toIndex(params.smoothing, SLIDERS[5])
 	const glIdx  = toIndex(params.glacialErosion, SLIDERS[6])
@@ -70,7 +82,7 @@ export function encodePlanetCode(seed: number, params: OrogenParams): string {
 	packed = packed * BigInt(RADICES[15]) + BigInt(nIdx)
 	packed = packed * BigInt(RADICES[14]) + BigInt(jIdx)
 	packed = packed * BigInt(RADICES[13]) + BigInt(pIdx)
-	packed = packed * BigInt(RADICES[12]) + BigInt(cnIdx)
+	packed = packed * BigInt(RADICES[12]) + BigInt(ldIdx)
 	packed = packed * BigInt(RADICES[11]) + BigInt(nsIdx)
 	packed = packed * BigInt(RADICES[10]) + BigInt(smIdx)
 	packed = packed * BigInt(RADICES[9])  + BigInt(glIdx)
@@ -86,7 +98,22 @@ export function encodePlanetCode(seed: number, params: OrogenParams): string {
 
 	const base = packed.toString(36).padStart(BASE_LEN, "0")
 	const radiusKm = Math.round(params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM)
-	return radiusKm === DEFAULT_PLANET_RADIUS_KM ? base : `${base}-r${radiusKm}`
+	const suffixes: string[] = []
+	if (radiusKm !== DEFAULT_PLANET_RADIUS_KM) suffixes.push(`r${radiusKm}`)
+	const obliquity = Math.round(getObliquityDeg(params.obliquity) * 10)
+	if (obliquity !== Math.round(DEFAULT_OBLIQUITY_DEG * 10)) suffixes.push(`o${obliquity}`)
+	const eccentricity = Math.round(getEccentricity(params.eccentricity) * 10000)
+	if (eccentricity !== Math.round(DEFAULT_ECCENTRICITY * 10000)) suffixes.push(`e${eccentricity}`)
+	const sunTempFactor = Math.round(getSunTempFactor(params.sunTempFactor) * 1000)
+	if (sunTempFactor !== Math.round(DEFAULT_SUN_TEMP_FACTOR * 1000)) suffixes.push(`s${sunTempFactor}`)
+	const daysPerYear = Math.round(getDaysPerYear(params.daysPerYear))
+	if (daysPerYear !== DEFAULT_DAYS_PER_YEAR) suffixes.push(`y${daysPerYear}`)
+	const hoursPerDay = Math.round(getHoursPerDay(params.hoursPerDay) * 10)
+	if (hoursPerDay !== Math.round(DEFAULT_HOURS_PER_DAY * 10)) suffixes.push(`h${hoursPerDay}`)
+	if (params.tidallyLocked) suffixes.push("t1")
+	const cratersVal = Math.round((params.craters ?? 0) * 100)
+	if (cratersVal > 0) suffixes.push(`c${cratersVal}`)
+	return suffixes.length > 0 ? `${base}-${suffixes.join("-")}` : base
 }
 
 export interface DecodedPlanetCode {
@@ -94,7 +121,7 @@ export interface DecodedPlanetCode {
 	numPoints: number
 	jitter: number
 	numPlates: number
-	numContinents: number
+	landDistribution: number
 	roughness: number
 	smoothing: number
 	glacialErosion: number
@@ -105,6 +132,13 @@ export interface DecodedPlanetCode {
 	continentSizeVariety: number
 	landCoverage: number
 	planetRadiusKm: number
+	obliquity: number
+	eccentricity: number
+	sunTempFactor: number
+	daysPerYear: number
+	hoursPerDay: number
+	tidallyLocked: boolean
+	craters?: number
 }
 
 interface DecodeConfig {
@@ -120,7 +154,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 			["landCoverage", 15], ["precipitationOffset", 14], ["temperatureOffset", 13],
 			["continentSizeVariety", 12], ["terrainWarp", 11], ["soilCreep", 10], ["ridgeSharpening", 9],
 			["thermalErosion", 8], ["hydraulicErosion", 7], ["glacialErosion", 6],
-			["smoothing", 5], ["roughness", 4], ["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["smoothing", 5], ["roughness", 4], ["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: {},
 	},
@@ -130,7 +164,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 			["precipitationOffset", 14], ["temperatureOffset", 13], ["continentSizeVariety", 12],
 			["terrainWarp", 11], ["soilCreep", 10], ["ridgeSharpening", 9],
 			["thermalErosion", 8], ["hydraulicErosion", 7], ["glacialErosion", 6],
-			["smoothing", 5], ["roughness", 4], ["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["smoothing", 5], ["roughness", 4], ["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: { landCoverage: 0.3 },
 	},
@@ -139,7 +173,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 		fields: [
 			["terrainWarp", 11], ["soilCreep", 10], ["ridgeSharpening", 9],
 			["thermalErosion", 8], ["hydraulicErosion", 7], ["glacialErosion", 6],
-			["smoothing", 5], ["roughness", 4], ["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["smoothing", 5], ["roughness", 4], ["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: { continentSizeVariety: 0, temperatureOffset: 0, precipitationOffset: 0, landCoverage: 0.3 },
 	},
@@ -148,7 +182,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 		fields: [
 			["soilCreep", 10], ["ridgeSharpening", 9], ["thermalErosion", 8], ["hydraulicErosion", 7],
 			["glacialErosion", 6], ["smoothing", 5], ["roughness", 4],
-			["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: { terrainWarp: 0.5, continentSizeVariety: 0, temperatureOffset: 0, precipitationOffset: 0, landCoverage: 0.3 },
 	},
@@ -156,7 +190,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 		radices: [21, 21, 21, 21, 21, 51, 10, 117, 21, 2559],
 		fields: [
 			["soilCreep", 10], ["ridgeSharpening", 9], ["thermalErosion", 8], ["hydraulicErosion", 7],
-			["smoothing", 5], ["roughness", 4], ["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["smoothing", 5], ["roughness", 4], ["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: { terrainWarp: 0.5, glacialErosion: 0, continentSizeVariety: 0, temperatureOffset: 0, precipitationOffset: 0, landCoverage: 0.3 },
 	},
@@ -164,7 +198,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 		radices: [21, 21, 21, 51, 10, 117, 21, 2559],
 		fields: [
 			["thermalErosion", 8], ["hydraulicErosion", 7], ["smoothing", 5], ["roughness", 4],
-			["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: { terrainWarp: 0.5, glacialErosion: 0, ridgeSharpening: 0.35, soilCreep: 0.05, continentSizeVariety: 0, temperatureOffset: 0, precipitationOffset: 0, landCoverage: 0.3 },
 	},
@@ -172,7 +206,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 		radices: [21, 21, 51, 10, 117, 21, 2559],
 		fields: [
 			["hydraulicErosion", 7], ["smoothing", 5], ["roughness", 4],
-			["numContinents", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
+			["landDistribution", 3], ["numPlates", 2], ["jitter", 1], ["numPoints", 0],
 		],
 		defaults: { terrainWarp: 0.5, glacialErosion: 0, thermalErosion: 0.1, ridgeSharpening: 0.35, soilCreep: 0.05, continentSizeVariety: 0, temperatureOffset: 0, precipitationOffset: 0, landCoverage: 0.3 },
 	},
@@ -181,9 +215,7 @@ const DECODE_FORMATS: Record<number, DecodeConfig> = {
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 	code = code.trim().toLowerCase()
 
-	const dashIdx = code.indexOf("-")
-	const base = dashIdx === -1 ? code : code.slice(0, dashIdx)
-	const suffix = dashIdx === -1 ? "" : code.slice(dashIdx + 1)
+	const [base, ...suffixes] = code.split("-")
 
 	const config = DECODE_FORMATS[base.length]
 	if (!config) return null
@@ -209,10 +241,55 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 	Object.assign(raw, config.defaults)
 
 	let planetRadiusKm = DEFAULT_PLANET_RADIUS_KM
-	if (suffix) {
+	let obliquity = DEFAULT_OBLIQUITY_DEG
+	let eccentricity = DEFAULT_ECCENTRICITY
+	let sunTempFactor = DEFAULT_SUN_TEMP_FACTOR
+	let daysPerYear = DEFAULT_DAYS_PER_YEAR
+	let hoursPerDay = DEFAULT_HOURS_PER_DAY
+	let tidallyLocked = false
+	let craters = 0
+	for (const suffix of suffixes) {
+		if (!suffix) return null
+		if (suffix === "t1") {
+			tidallyLocked = true
+			continue
+		}
 		const radiusMatch = /^r(\d+)$/.exec(suffix)
-		if (!radiusMatch) return null
-		planetRadiusKm = Math.max(1000, parseInt(radiusMatch[1], 10))
+		if (radiusMatch) {
+			planetRadiusKm = Math.max(1000, parseInt(radiusMatch[1], 10))
+			continue
+		}
+		const obliquityMatch = /^o(\d+)$/.exec(suffix)
+		if (obliquityMatch) {
+			obliquity = Math.max(0, Math.min(180, parseInt(obliquityMatch[1], 10) / 10))
+			continue
+		}
+		const eccentricityMatch = /^e(\d+)$/.exec(suffix)
+		if (eccentricityMatch) {
+			eccentricity = Math.max(0, Math.min(0.99, parseInt(eccentricityMatch[1], 10) / 10000))
+			continue
+		}
+		const sunTempMatch = /^s(\d+)$/.exec(suffix)
+		if (sunTempMatch) {
+			sunTempFactor = Math.max(0.1, Math.min(10, parseInt(sunTempMatch[1], 10) / 1000))
+			continue
+		}
+		const yearMatch = /^y(\d+)$/.exec(suffix)
+		if (yearMatch) {
+			daysPerYear = Math.max(30, Math.min(5000, parseInt(yearMatch[1], 10)))
+			continue
+		}
+		const hoursMatch = /^h(\d+)$/.exec(suffix)
+		if (hoursMatch) {
+			hoursPerDay = Math.max(1, Math.min(240, parseInt(hoursMatch[1], 10) / 10))
+			continue
+		}
+		const cratersMatch = /^c(\d+)$/.exec(suffix)
+		if (cratersMatch) {
+			craters = Math.max(0, Math.min(1, parseInt(cratersMatch[1], 10) / 100))
+			continue
+		}
+		return null
 	}
 
 	return {
@@ -220,7 +297,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		numPoints: raw.numPoints ?? raw.N ?? 204000,
 		jitter: raw.jitter ?? 0.75,
 		numPlates: raw.numPlates ?? raw.P ?? 80,
-		numContinents: raw.numContinents ?? 4,
+		landDistribution: raw.landDistribution ?? 0.25,
 		roughness: raw.roughness ?? 0.40,
 		smoothing: raw.smoothing ?? 0.10,
 		glacialErosion: raw.glacialErosion ?? 0.50,
@@ -231,5 +308,12 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		continentSizeVariety: raw.continentSizeVariety ?? 0.35,
 		landCoverage: raw.landCoverage ?? 0.30,
 		planetRadiusKm,
+		obliquity,
+		eccentricity,
+		sunTempFactor,
+		daysPerYear,
+		hoursPerDay,
+		tidallyLocked,
+		craters: craters > 0 ? craters : undefined,
 	}
 }

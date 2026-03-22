@@ -26,13 +26,16 @@ export interface SerializedOrogenWorld {
 	plateAssignment: Int32Array
 	elevation: Float32Array
 	params: OrogenParams
+	continentCount?: number
 	climate?: SerializedOrogenClimate
 	oceanDist?: Float32Array
 	distCoast?: Float32Array
 	rainfall?: { monthly: Float32Array; annual: Float32Array; east: Float32Array; west: Float32Array }
 	climateZones?: Uint8Array
 	vegetation?: Uint8Array
-	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number }
+	isLand?: Uint8Array
+	riverLand?: Uint8Array
+	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; lakes: Uint8Array; waterLevel: Float32Array }
 }
 
 export type OrogenWorkerRequest =
@@ -56,6 +59,12 @@ export type OrogenWorkerRequest =
 			ridgeSharpening: number
 			glacialErosion: number
 			planetRadiusKm?: number
+			obliquity?: number
+			eccentricity?: number
+			sunTempFactor?: number
+			daysPerYear?: number
+			hoursPerDay?: number
+			tidallyLocked?: boolean
 		}
 	}
 

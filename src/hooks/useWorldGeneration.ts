@@ -41,6 +41,8 @@ interface WorldGenParams {
 	eccentricity: number
 	perihelion: number
 	tSun: number
+	hoursPerDay: number
+	daysPerYear: number
 	landFraction: number
 	radius: number
 	heightmap?: HeightmapPreset
@@ -70,6 +72,8 @@ export function useWorldGeneration() {
 		eccentricity,
 		perihelion,
 		tSun,
+		hoursPerDay,
+		daysPerYear,
 		landFraction,
 		radius,
 		heightmap,
@@ -113,6 +117,8 @@ export function useWorldGeneration() {
 			eccentricity,
 			perihelion,
 			tSun,
+			hoursPerDay,
+			daysPerYear,
 			landFraction,
 			radius,
 			resolution: heightmap?.resolution,

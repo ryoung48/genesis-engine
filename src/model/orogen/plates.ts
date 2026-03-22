@@ -261,7 +261,7 @@ export function assignOceanLand(
 	r_plate: Int32Array,
 	plateSeeds: Set<number>,
 	seed: number,
-	numContinents: number,
+	landDistribution: number,
 	continentSizeVariety: number = 0,
 	landCoverage: number = 0.3,
 ): Set<number> {
@@ -321,23 +321,37 @@ export function assignOceanLand(
 	}
 
 	const targetLandArea = landCoverage * numRegions
+	const sparseIsLand = landCoverage <= 0.5
+	const targetSparseArea = (sparseIsLand ? landCoverage : 1 - landCoverage) * numRegions
+	if (targetSparseArea <= 0) {
+		const plateIsOcean = new Set<number>()
+		if (landCoverage <= 0) {
+			for (const pid of plateIds) plateIsOcean.add(pid)
+		}
+		return plateIsOcean
+	}
+	const sparseCoverage = Math.min(landCoverage, 1 - landCoverage)
+	const maxSeedCount = Math.max(1, Math.min(numPlates, Math.round(1 + Math.sqrt(numPlates) * (0.6 + sparseCoverage * 1.6))))
+	const targetSeedCount = Math.max(1, Math.min(
+		maxSeedCount,
+		Math.round(1 + landDistribution * (maxSeedCount - 1)),
+	))
 
-	// 3. Pick continent seeds via farthest-point sampling
-	const effectiveNum = Math.min(numContinents, numPlates)
-	const continentSeeds: number[] = []
+	// 3. Pick sparse-phase seeds via farthest-point sampling
+	const sparseSeeds: number[] = []
 	const chosen = new Set<number>()
 
 	const first = plateIds[Math.floor(rng() * numPlates)]
-	continentSeeds.push(first)
+	sparseSeeds.push(first)
 	chosen.add(first)
 
-	for (let s = 1; s < effectiveNum; s++) {
+	for (let s = 1; s < targetSeedCount; s++) {
 		const candidates: { pid: number; score: number }[] = []
 		for (const pid of plateIds) {
 			if (chosen.has(pid)) continue
 			const cx = plateCentroid[pid]
 			let minDist = Infinity
-			for (const existing of continentSeeds) {
+			for (const existing of sparseSeeds) {
 				const ex = plateCentroid[existing]
 				const dx = cx[0] - ex[0], dy = cx[1] - ex[1], dz = cx[2] - ex[2]
 				const d = dx * dx + dy * dy + dz * dz
@@ -346,43 +360,44 @@ export function assignOceanLand(
 			const rawAreaFactor = Math.sqrt(numRegions / numPlates) / Math.sqrt(plateArea[pid] || 1)
 			const areaFactor = 1 + (rawAreaFactor - 1) * (1 - continentSizeVariety * 0.5)
 			const compact = 0.3 + 0.7 * plateCompact[pid]
-			candidates.push({ pid, score: minDist * areaFactor * compact })
+			const spreadWeight = 0.35 + landDistribution * 1.15
+			candidates.push({ pid, score: minDist * spreadWeight * areaFactor * compact })
 		}
 		if (candidates.length === 0) break
 		candidates.sort((a, b) => b.score - a.score)
 		const topK = Math.min(candidates.length, 3)
 		const pick = candidates[Math.floor(rng() * topK)]
-		continentSeeds.push(pick.pid)
+		sparseSeeds.push(pick.pid)
 		chosen.add(pick.pid)
 	}
 
-	// Trim seeds if they exceed land budget
+	// Trim seeds if they exceed the sparse-phase budget
 	let seedArea = 0
-	for (const pid of continentSeeds) seedArea += plateArea[pid]
-	while (continentSeeds.length > 1 && seedArea > targetLandArea) {
+	for (const pid of sparseSeeds) seedArea += plateArea[pid]
+	while (sparseSeeds.length > 1 && seedArea > targetSparseArea) {
 		let maxIdx = 0
-		for (let i = 1; i < continentSeeds.length; i++) {
-			if (plateArea[continentSeeds[i]] > plateArea[continentSeeds[maxIdx]]) maxIdx = i
+		for (let i = 1; i < sparseSeeds.length; i++) {
+			if (plateArea[sparseSeeds[i]] > plateArea[sparseSeeds[maxIdx]]) maxIdx = i
 		}
-		seedArea -= plateArea[continentSeeds[maxIdx]]
-		chosen.delete(continentSeeds[maxIdx])
-		continentSeeds.splice(maxIdx, 1)
+		seedArea -= plateArea[sparseSeeds[maxIdx]]
+		chosen.delete(sparseSeeds[maxIdx])
+		sparseSeeds.splice(maxIdx, 1)
 	}
 
-	// 4. Initialize continent assignment
-	const plateContinent: Record<number, number | undefined> = {}
-	for (let c = 0; c < continentSeeds.length; c++) {
-		plateContinent[continentSeeds[c]] = c
+	// 4. Initialize sparse-phase assignment
+	const plateCluster: Record<number, number | undefined> = {}
+	for (let c = 0; c < sparseSeeds.length; c++) {
+		plateCluster[sparseSeeds[c]] = c
 	}
-	let landArea = seedArea
+	let sparseArea = seedArea
 
-	// 5. Round-robin growth with per-continent targets
-	const growTarget = targetLandArea * 0.9
-	const numC = continentSeeds.length
-	const continentTarget = new Float64Array(numC)
-	const continentArea = new Float64Array(numC)
+	// 5. Round-robin growth with per-cluster targets
+	const growTarget = targetSparseArea
+	const numC = sparseSeeds.length
+	const clusterTarget = new Float64Array(numC)
+	const clusterArea = new Float64Array(numC)
 	for (let c = 0; c < numC; c++) {
-		continentArea[c] = plateArea[continentSeeds[c]]
+		clusterArea[c] = plateArea[sparseSeeds[c]]
 	}
 
 	if (continentSizeVariety > 0 && numC > 1) {
@@ -393,31 +408,35 @@ export function assignOceanLand(
 		}
 		const totalWeight = weights.reduce((a, b) => a + b, 0)
 		for (let c = 0; c < numC; c++) {
-			continentTarget[c] = growTarget * weights[c] / totalWeight
+			clusterTarget[c] = growTarget * weights[c] / totalWeight
 		}
 	} else {
 		const equal = growTarget / Math.max(numC, 1)
-		for (let c = 0; c < numC; c++) continentTarget[c] = equal
+		for (let c = 0; c < numC; c++) clusterTarget[c] = equal
 	}
 
 	let progress = true
-	while (progress && landArea < growTarget) {
+	while (progress && sparseArea < growTarget) {
 		progress = false
-		for (let c = 0; c < numC && landArea < growTarget; c++) {
-			if (continentArea[c] >= continentTarget[c]) continue
+		for (let c = 0; c < numC && sparseArea < growTarget; c++) {
+			if (clusterArea[c] >= clusterTarget[c]) continue
 
 			const candidates: { pid: number; score: number }[] = []
 			for (const pid of plateIds) {
-				if (plateContinent[pid] !== undefined) continue
+				if (plateCluster[pid] !== undefined) continue
 				let touchesSelf = false, touchesOther = false
 				let sameCount = 0
 				for (const adj of (plateAdj[pid] || [])) {
-					const ac = plateContinent[adj]
+					const ac = plateCluster[adj]
 					if (ac === c) { touchesSelf = true; sameCount++ }
 					else if (ac !== undefined) { touchesOther = true; break }
 				}
 				if (touchesSelf && !touchesOther) {
-					candidates.push({ pid, score: sameCount + plateCompact[pid] * 3 + rng() * 0.5 })
+					const areaBias = 1 / Math.sqrt(Math.max(1, plateArea[pid]))
+					const compactBias = landDistribution < 0.5
+						? plateCompact[pid] * (1.8 - landDistribution * 1.6)
+						: (1 - plateCompact[pid]) * ((landDistribution - 0.5) * 1.6)
+					candidates.push({ pid, score: sameCount + compactBias + areaBias + rng() * 0.5 })
 				}
 			}
 			if (candidates.length === 0) continue
@@ -426,65 +445,63 @@ export function assignOceanLand(
 			const topK = Math.min(candidates.length, 3)
 			const pick = candidates[Math.floor(rng() * topK)]
 
-			plateContinent[pick.pid] = c
-			continentArea[c] += plateArea[pick.pid]
-			landArea += plateArea[pick.pid]
+			plateCluster[pick.pid] = c
+			clusterArea[c] += plateArea[pick.pid]
+			sparseArea += plateArea[pick.pid]
 			progress = true
 		}
 	}
 
-	// 6. Absorb trapped interior seas
-	const oceanComponents: number[][] = []
-	const visited = new Set<number>()
-	for (const pid of plateIds) {
-		if (plateContinent[pid] !== undefined || visited.has(pid)) continue
-		const component = [pid]
-		visited.add(pid)
-		for (let qi = 0; qi < component.length; qi++) {
-			for (const adj of (plateAdj[component[qi]] || [])) {
-				if (plateContinent[adj] === undefined && !visited.has(adj)) {
-					visited.add(adj)
-					component.push(adj)
+	// 6. Light cleanup for land-sparse worlds: absorb enclosed inland seas into land.
+	if (sparseIsLand) {
+		const oceanComponents: number[][] = []
+		const visited = new Set<number>()
+		for (const pid of plateIds) {
+			if (plateCluster[pid] !== undefined || visited.has(pid)) continue
+			const component = [pid]
+			visited.add(pid)
+			for (let qi = 0; qi < component.length; qi++) {
+				for (const adj of (plateAdj[component[qi]] || [])) {
+					if (plateCluster[adj] === undefined && !visited.has(adj)) {
+						visited.add(adj)
+						component.push(adj)
+					}
 				}
 			}
+			oceanComponents.push(component)
 		}
-		oceanComponents.push(component)
-	}
 
-	let mainIdx = 0
-	for (let i = 1; i < oceanComponents.length; i++) {
-		let areaI = 0, areaM = 0
-		for (const p of oceanComponents[i]) areaI += plateArea[p]
-		for (const p of oceanComponents[mainIdx]) areaM += plateArea[p]
-		if (areaI > areaM) mainIdx = i
-	}
+		let mainIdx = 0
+		for (let i = 1; i < oceanComponents.length; i++) {
+			let areaI = 0, areaM = 0
+			for (const p of oceanComponents[i]) areaI += plateArea[p]
+			for (const p of oceanComponents[mainIdx]) areaM += plateArea[p]
+			if (areaI > areaM) mainIdx = i
+		}
 
-	const absorbCap = targetLandArea * 1.1
-	for (let i = 0; i < oceanComponents.length; i++) {
-		if (i === mainIdx) continue
-		const component = oceanComponents[i]
-		const bordering = new Set<number>()
-		for (const op of component) {
-			for (const adj of (plateAdj[op] || [])) {
-				if (plateContinent[adj] !== undefined) bordering.add(plateContinent[adj]!)
+		for (let i = 0; i < oceanComponents.length; i++) {
+			if (i === mainIdx) continue
+			const component = oceanComponents[i]
+			const bordering = new Set<number>()
+			for (const op of component) {
+				for (const adj of (plateAdj[op] || [])) {
+					if (plateCluster[adj] !== undefined) bordering.add(plateCluster[adj]!)
+				}
+				if (bordering.size > 1) break
 			}
-			if (bordering.size > 1) break
-		}
-		if (bordering.size === 1) {
-			let compArea = 0
-			for (const op of component) compArea += plateArea[op]
-			if (landArea + compArea <= absorbCap) {
+			if (bordering.size === 1) {
 				const c = bordering.values().next().value!
-				for (const op of component) plateContinent[op] = c
-				landArea += compArea
+				for (const op of component) plateCluster[op] = c
 			}
 		}
 	}
 
-	// 7. Build plateIsOcean set
+	// 7. Build plateIsOcean set from the sparse-phase assignment.
 	const plateIsOcean = new Set<number>()
 	for (const pid of plateIds) {
-		if (plateContinent[pid] === undefined) plateIsOcean.add(pid)
+		const inSparsePhase = plateCluster[pid] !== undefined
+		const isOcean = sparseIsLand ? !inSparsePhase : inSparsePhase
+		if (isOcean) plateIsOcean.add(pid)
 	}
 	return plateIsOcean
 }

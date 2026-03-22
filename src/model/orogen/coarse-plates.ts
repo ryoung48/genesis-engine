@@ -29,7 +29,7 @@ export interface CoarsePlateResult {
 export function generateCoarsePlates(
 	seed: number,
 	numPlates: number,
-	numContinents: number,
+	landDistribution: number,
 	continentSizeVariety: number,
 	landCoverage: number,
 ): CoarsePlateResult {
@@ -46,7 +46,7 @@ export function generateCoarsePlates(
 
 	// assignOceanLand creates its own RNG internally (seed+42)
 	const coarsePlateIsOcean = assignOceanLand(
-		coarseMesh, coarse_r_plate, coarsePlateSeeds, seed, numContinents, continentSizeVariety, landCoverage,
+		coarseMesh, coarse_r_plate, coarsePlateSeeds, seed, landDistribution, continentSizeVariety, landCoverage,
 	)
 
 	return {
