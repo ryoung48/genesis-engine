@@ -32,10 +32,18 @@ export interface SerializedOrogenWorld {
 	distCoast?: Float32Array
 	rainfall?: { monthly: Float32Array; annual: Float32Array; east: Float32Array; west: Float32Array }
 	climateZones?: Uint8Array
+	pastaClimate?: Uint8Array
+	koppenClimate?: Uint8Array
 	vegetation?: Uint8Array
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
 	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; lakes: Uint8Array; waterLevel: Float32Array }
+	oceanCurrents?: { oceanWarmth: Float32Array; coastalWarmth: Float32Array }
+	wind?: {
+		wind_east_monthly: Float32Array
+		wind_north_monthly: Float32Array
+		wind_speed_monthly: Float32Array
+	}
 }
 
 export type OrogenWorkerRequest =
@@ -65,6 +73,7 @@ export type OrogenWorkerRequest =
 			daysPerYear?: number
 			hoursPerDay?: number
 			tidallyLocked?: boolean
+			pressure?: number
 		}
 	}
 

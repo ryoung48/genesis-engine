@@ -7,6 +7,8 @@ import * as d3 from "d3"
 
 import { EnergyBalanceModel } from "../cells/ebm/index"
 import { EMB_CONSTANTS } from "../cells/ebm/constants"
+import { INSOLATION } from "../cells/ebm/insolation"
+import { TIME } from "../utilities/time"
 import type { SphereMesh, OrogenParams, OrogenClimate } from "./types"
 import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getSunTempFactor, isTidallyLocked } from "./units"
 
@@ -50,6 +52,117 @@ export function computeLandFraction(mesh: SphereMesh, isLand: Uint8Array): numbe
 
 /** Substellar point direction — lon=0, lat=0 on a unit sphere */
 const SUBSTELLAR: [number, number, number] = [1, 0, 0]
+
+function computeMonthlyOrbitalFlux(params: OrogenParams): number[] {
+	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
+	const effectiveTSun = T_SUN * getSunTempFactor(params.sunTempFactor)
+	const s0 = SIGMA * Math.pow(effectiveTSun, 4) * Math.pow(R_SUN, 2) / Math.pow(AU, 2)
+	const ecc = getEccentricity(params.eccentricity)
+	const PI = Math.PI
+	const perihelionRad = (EMB_CONSTANTS.orbital.PERIHELION * Math.PI) / 180
+	const longP = perihelionRad + PI
+	const equinoxOffsetRad = (40 * 2 * Math.PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
+
+	const calcEccFromTrue = (trueAnomaly: number, eccentricity: number): number => {
+		if (trueAnomaly > PI) {
+			return 2 * PI - Math.acos(
+				(eccentricity + Math.cos(trueAnomaly)) /
+				(1 + eccentricity * Math.cos(trueAnomaly)),
+			)
+		}
+		return Math.acos(
+			(eccentricity + Math.cos(trueAnomaly)) /
+			(1 + eccentricity * Math.cos(trueAnomaly)),
+		)
+	}
+
+	let trueL = -equinoxOffsetRad
+	let trueA = trueL - longP
+	while (trueA < 0) trueA += 2 * PI
+	let eccA = calcEccFromTrue(trueA, ecc)
+	let meanL = eccA - ecc * Math.sin(eccA) + longP
+
+	const dailyFlux = new Array<number>(EMB_CONSTANTS.time.DAYS_PER_YEAR).fill(0)
+	for (let day = 0; day < EMB_CONSTANTS.time.DAYS_PER_YEAR; day++) {
+		if (day !== 0) {
+			meanL += (2 * PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
+			const meanA = meanL - longP
+			eccA = meanA
+			for (let iter = 0; iter < 10; iter++) eccA = meanA + ecc * Math.sin(eccA)
+			while (eccA >= 2 * PI) eccA -= 2 * PI
+			while (eccA < 0) eccA += 2 * PI
+			trueA = eccA > PI
+				? 2 * PI - Math.acos((Math.cos(eccA) - ecc) / (1 - ecc * Math.cos(eccA)))
+				: Math.acos((Math.cos(eccA) - ecc) / (1 - ecc * Math.cos(eccA)))
+			trueL = trueA + longP
+		}
+
+		while (trueL > 2 * PI) trueL -= 2 * PI
+		while (trueL < 0) trueL += 2 * PI
+
+		const astroDist = (1 - ecc * ecc) / (1 + ecc * Math.cos(trueA))
+		dailyFlux[day] = s0 / (astroDist * astroDist)
+	}
+
+	return Array.from({ length: 12 }, (_, month) => {
+		const days = TIME.month.days(month)
+		return days.reduce((sum, day) => sum + dailyFlux[day], 0) / Math.max(1, days.length)
+	})
+}
+
+export function computeMonthlyInsolation(mesh: SphereMesh, params: OrogenParams): Float32Array {
+	const N = mesh.numRegions
+	const monthly = new Float32Array(N * 12)
+
+	if (isTidallyLocked(params.tidallyLocked)) {
+		const monthlyFlux = computeMonthlyOrbitalFlux(params)
+		for (let r = 0; r < N; r++) {
+			const x = mesh.r_xyz[3 * r]
+			const y = mesh.r_xyz[3 * r + 1]
+			const z = mesh.r_xyz[3 * r + 2]
+			const cosTheta = Math.max(0, Math.min(1,
+				x * SUBSTELLAR[0] + y * SUBSTELLAR[1] + z * SUBSTELLAR[2]))
+			for (let month = 0; month < 12; month++) {
+				monthly[month * N + r] = monthlyFlux[month] * cosTheta
+			}
+		}
+		return monthly
+	}
+
+	const lats = Array.from(
+		{ length: EMB_CONSTANTS.grid.NUM_LAT },
+		(_, i) => -Math.PI / 2 + (Math.PI * i) / (EMB_CONSTANTS.grid.NUM_LAT - 1),
+	)
+	const latsDeg = lats.map((lat) => lat * (180 / Math.PI))
+	const { _insolation } = INSOLATION.compute(
+		lats,
+		{
+			...EMB_CONSTANTS.orbital,
+			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
+			ECCENTRICITY: getEccentricity(params.eccentricity),
+			PERIHELION: 90,
+		},
+		{
+			...EMB_CONSTANTS.stellar,
+			T_SUN: EMB_CONSTANTS.stellar.T_SUN * getSunTempFactor(params.sunTempFactor),
+		},
+	)
+	const monthlyScales = Array.from({ length: 12 }, (_, month) => {
+		const days = TIME.month.days(month)
+		const avgByLat = _insolation.map((row) => days.reduce((sum, day) => sum + row[day], 0) / Math.max(1, days.length))
+		return d3.scaleLinear<number>().domain(latsDeg).range(avgByLat)
+	})
+
+	for (let r = 0; r < N; r++) {
+		const z = mesh.r_xyz[3 * r + 2]
+		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
+		for (let month = 0; month < 12; month++) {
+			monthly[month * N + r] = monthlyScales[month](latDeg) as number
+		}
+	}
+
+	return monthly
+}
 
 /**
  * Compute per-cell temperature for a tidally locked planet using a

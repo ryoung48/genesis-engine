@@ -20,7 +20,11 @@ import {
 	sharpenRidges,
 	applySoilCreep,
 } from "./erosion"
+import { computeOceanCurrents } from "./ocean-currents"
+import { computeWind } from "./wind"
 import { assignVegetation, assignClimateZones } from "./vegetation"
+import { assignPastaClimate } from "./pasta"
+import { assignKoppenClimate } from "./koppen"
 import { computeRivers } from "./rivers"
 import { meanEdgeLengthKm } from "./units"
 import { countContinents } from "./stats"
@@ -439,6 +443,52 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Moisture advection", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:advection")
 
+	// 15b. Ocean currents — warm/cold coast classification from advection fields
+	console.time("orogen:oceanCurrents")
+	onProgress?.("Computing ocean currents...", 96)
+	t0 = performance.now()
+	const oceanCurrents = computeOceanCurrents(mesh, eastAdv, westAdv, isLand, climate, params)
+	pipelineTiming.push({ Stage: "Ocean currents (warmth + coastal diffusion)", ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:oceanCurrents")
+
+	// 15c. Apply ocean warmth as temperature modifier
+	// Ocean cells: SST shift up to ±12°C scaled by warmth
+	// Land cells: coastal warmth fades inland, up to ±8°C at the coast
+	if (climate) {
+		const N = mesh.numRegions
+		for (let month = 0; month < 12; month++) {
+			const offset = month * N
+			for (let r = 0; r < N; r++) {
+				if (!isLand[r]) {
+					climate.temperature_monthly[offset + r] += oceanCurrents.oceanWarmth[r] * 12
+				} else {
+					climate.temperature_monthly[offset + r] += oceanCurrents.coastalWarmth[r] * 8
+				}
+			}
+		}
+		// Recompute avg/min/max from modified monthly
+		for (let r = 0; r < N; r++) {
+			let sum = 0, min = Infinity, max = -Infinity
+			for (let month = 0; month < 12; month++) {
+				const t = climate.temperature_monthly[month * N + r]
+				sum += t
+				if (t < min) min = t
+				if (t > max) max = t
+			}
+			climate.temperature_avg[r] = sum / 12
+			climate.temperature_min[r] = min
+			climate.temperature_max[r] = max
+		}
+	}
+
+	// 15d. Wind fields (monthly vectors + normalized speed)
+	console.time("orogen:wind")
+	onProgress?.("Computing wind fields...", 96)
+	t0 = performance.now()
+	const wind = climate ? computeWind(mesh, elevation, isLand, climate, params) : undefined
+	pipelineTiming.push({ Stage: "Wind fields (12 months)", ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:wind")
+
 	// 16. Monthly rainfall
 	console.time("orogen:rainfall")
 	onProgress?.("Computing rainfall...", 97)
@@ -517,6 +567,21 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.timeEnd("orogen:climateZones")
 
 	// 19. Vegetation assignment
+	console.time("orogen:pasta")
+	onProgress?.("Classifying pasta climate...", 99)
+	t0 = performance.now()
+	const pastaClimate = assignPastaClimate(mesh, isLand, climate, rainfall, params)
+	pipelineTiming.push({ Stage: "Pasta climate assignment", ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:pasta")
+
+	console.time("orogen:koppen")
+	onProgress?.("Classifying Koppen climate...", 99)
+	t0 = performance.now()
+	const koppenClimate = assignKoppenClimate(mesh, isLand, climate, rainfall)
+	pipelineTiming.push({ Stage: "Koppen climate assignment", ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:koppen")
+
+	// 20. Vegetation assignment
 	console.time("orogen:vegetation")
 	onProgress?.("Assigning vegetation...", 99)
 	t0 = performance.now()
@@ -539,10 +604,14 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		oceanDist,
 		rainfall,
 		climateZones,
+		pastaClimate,
+		koppenClimate,
 		vegetation,
 		rivers,
 		isLand,
 		riverLand,
+		oceanCurrents,
+		wind,
 		continentCount: countContinents(mesh, isLand),
 	}
 }

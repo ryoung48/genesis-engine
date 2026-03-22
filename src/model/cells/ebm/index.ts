@@ -60,7 +60,7 @@ export class EnergyBalanceModel {
 
 		const diffuser = (latDeg: number) => {
 			const absLat = Math.abs(latDeg)
-			return 0.3 * radiusFactor * pressureFactor * rotationFactor
+			return (0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) * radiusFactor * pressureFactor * rotationFactor
 		}
 
 		const T: number[] = this.temperature.map((row) => row[tIdx])

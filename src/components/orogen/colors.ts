@@ -2,7 +2,7 @@
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "precipitation" | "vegetation" | "climate"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "oceanCurrents" | "windSpeed"
 
 const oceanColorStops: [number, number, number][] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],
@@ -246,6 +246,49 @@ const biomeColors: [number, number, number][] = [
 
 export function vegetationColor(biomeCode: number): [number, number, number] {
 	return biomeColors[biomeCode] ?? biomeColors[0]
+}
+
+/**
+ * Diverging warm/cold ocean current color ramp.
+ * -1 (cold, deep blue) → 0 (neutral gray) → +1 (warm, deep red/orange).
+ */
+const oceanCurrentStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: -1.0, r: 0.12, g: 0.15, b: 0.60 },
+	{ v: -0.5, r: 0.20, g: 0.45, b: 0.80 },
+	{ v: -0.15, r: 0.55, g: 0.75, b: 0.90 },
+	{ v:  0.0, r: 0.80, g: 0.80, b: 0.80 },
+	{ v:  0.15, r: 0.95, g: 0.70, b: 0.50 },
+	{ v:  0.5, r: 0.90, g: 0.40, b: 0.20 },
+	{ v:  1.0, r: 0.65, g: 0.12, b: 0.08 },
+]
+
+export function oceanCurrentColor(warmth: number): [number, number, number] {
+	const clamped = Math.max(-1, Math.min(1, warmth))
+	for (let i = 0; i < oceanCurrentStops.length - 1; i++) {
+		const a = oceanCurrentStops[i]
+		const b = oceanCurrentStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = oceanCurrentStops[oceanCurrentStops.length - 1]
+	return [last.r, last.g, last.b]
+}
+
+export function windSpeedColor(speed: number): [number, number, number] {
+	if (speed < 2.4) return [0xe6 / 255, 0xff / 255, 0xf0 / 255]
+	if (speed < 4.9) return [0xc6 / 255, 0xff / 255, 0xd7 / 255]
+	if (speed < 7.5) return [0xa5 / 255, 0xff / 255, 0xd7 / 255]
+	if (speed < 10.0) return [0x98 / 255, 0xff / 255, 0xe8 / 255]
+	if (speed < 12.5) return [0x8c / 255, 0xff / 255, 0xf8 / 255]
+	if (speed < 15.0) return [0x5a / 255, 0xff / 255, 0xff / 255]
+	if (speed < 17.5) return [0x23 / 255, 0xff / 255, 0xff / 255]
+	return [0x00 / 255, 0xf0 / 255, 0xff / 255]
 }
 
 export function getColor(elev: number, mode: ColorMode): [number, number, number] {

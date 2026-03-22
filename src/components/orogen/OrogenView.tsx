@@ -6,8 +6,10 @@ import type {
 	SerializedOrogenWorld,
 } from "@/model/orogen/worker-types"
 import { createOrogenScene, type OrogenScene, type OrogenViewMode } from "./renderer"
-import { elevToHeightKm, elevationToColor, getColor, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, type ColorMode } from "./colors"
+import { elevToHeightKm, elevationToColor, getColor, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, type ColorMode } from "./colors"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/vegetation"
+import { PASTA_LABELS, pastaClimateColor, pastaClimateName } from "@/model/orogen/pasta"
+import { KOPPEN_LABELS, koppenClimateColor } from "@/model/orogen/koppen"
 import { computeThermalEquatorLine } from "@/model/orogen/rain"
 import {
 	DEFAULT_DAYS_PER_YEAR,
@@ -78,6 +80,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [colorMode, setColorMode] = useState<ColorMode>("terrain")
 	const [temperatureMonth, setTemperatureMonth] = useState(0)
 	const [rainfallMonth, setRainfallMonth] = useState(0)
+	const [windMonth, setWindMonth] = useState(0)
 	const [viewMode, setViewMode] = useState<OrogenViewMode>("globe")
 	const [mapCenterLongitude, setMapCenterLongitude] = useState(0)
 	const [showWireframe, setShowWireframe] = useState(false)
@@ -200,6 +203,17 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		? CLIMATE_LABELS[world.climateZones[hoverInfo.region]] ?? null
 		: null
 
+	const hoverPastaClimate = hoverInfo && world?.pastaClimate
+		? {
+			code: PASTA_LABELS[world.pastaClimate[hoverInfo.region]] ?? null,
+			name: pastaClimateName(world.pastaClimate[hoverInfo.region]),
+		}
+		: null
+
+	const hoverKoppenClimate = hoverInfo && world?.koppenClimate && world.elevation[hoverInfo.region] > 0
+		? KOPPEN_LABELS[world.koppenClimate[hoverInfo.region]] ?? null
+		: null
+
 	const hoverBiome = hoverInfo && world?.vegetation && world.elevation[hoverInfo.region] > 0
 		? BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null
 		: null
@@ -220,6 +234,27 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		? world.distCoast[hoverInfo.region]
 		: null
 
+	const hoverWind = hoverInfo && world?.wind
+		? (() => {
+			const r = hoverInfo.region
+			const N = world.mesh.numRegions
+			const m = windMonth === 0 ? -1 : windMonth - 1
+			if (m < 0) {
+				let eSum = 0, nSum = 0, sSum = 0
+				for (let i = 0; i < 12; i++) {
+					eSum += world.wind.wind_east_monthly[i * N + r]
+					nSum += world.wind.wind_north_monthly[i * N + r]
+					sSum += world.wind.wind_speed_monthly[i * N + r]
+				}
+				return { east: eSum / 12, north: nSum / 12, speed: sSum / 12 }
+			}
+			return {
+				east: world.wind.wind_east_monthly[m * N + r],
+				north: world.wind.wind_north_monthly[m * N + r],
+				speed: world.wind.wind_speed_monthly[m * N + r],
+			}
+		})()
+		: null
 
 	const coastHopLengthKm = useMemo(() => {
 		if (!world) return null
@@ -239,6 +274,17 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const hoverCardTop = hoverInfo
 		? Math.max(16, hoverInfo.y - 18)
 		: 0
+
+	const isClimateMode =
+		colorMode === "climate" ||
+		colorMode === "pastaClimate" ||
+		colorMode === "koppenClimate"
+
+	const isTemperatureMode =
+		colorMode === "temperature" ||
+		colorMode === "biotemperature"
+
+	const isWindMode = colorMode === "windSpeed"
 
 	// Precompute per-region RGB colors for data-driven modes
 	const regionColors = useMemo(() => {
@@ -325,6 +371,26 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			return rgb
 		}
 
+		if (colorMode === "pastaClimate" && world.pastaClimate) {
+			for (let r = 0; r < N; r++) {
+				const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
+
+		if (colorMode === "koppenClimate" && world.koppenClimate) {
+			for (let r = 0; r < N; r++) {
+				const [cr, cg, cb] = koppenClimateColor(world.koppenClimate[r])
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
+
 		if (colorMode === "climate" && world.climate) {
 			const CHAOTIC_MIN = 10
 			const CHAOTIC_MAX = 50
@@ -346,6 +412,43 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					cg += (chaoticRgb[1] - cg) * t
 					cb += (chaoticRgb[2] - cb) * t
 				}
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
+
+		if (colorMode === "windSpeed" && world.wind) {
+			if (windMonth === 0) {
+				// Annual average speed
+				for (let r = 0; r < N; r++) {
+					let sum = 0
+					for (let m = 0; m < 12; m++) sum += world.wind.wind_speed_monthly[m * N + r]
+					const [cr, cg, cb] = windSpeedColor(sum / 12)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
+			} else {
+				const off = (windMonth - 1) * N
+				for (let r = 0; r < N; r++) {
+					const [cr, cg, cb] = windSpeedColor(world.wind.wind_speed_monthly[off + r])
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
+			}
+			return rgb
+		}
+
+		if (colorMode === "oceanCurrents" && world.oceanCurrents) {
+			const { oceanWarmth, coastalWarmth } = world.oceanCurrents
+			for (let r = 0; r < N; r++) {
+				const value = world.isLand?.[r]
+					? coastalWarmth[r]
+					: oceanWarmth[r]
+				const [cr, cg, cb] = oceanCurrentColor(value)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -391,7 +494,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 
 		return null
-	}, [colorMode, temperatureMonth, rainfallMonth, world])
+	}, [colorMode, temperatureMonth, rainfallMonth, windMonth, world])
 
 	// Compute thermal equator: for each longitude bin, find latitude of max temperature
 	const thermalEquator = useMemo(() => {
@@ -425,6 +528,42 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	useEffect(() => {
 		sceneRef.current?.setRiversVisible(showRivers)
 	}, [showRivers])
+
+	// Wind arrows: compute per-month or annual average vectors
+	const windArrowData = useMemo(() => {
+		if (!world?.wind || !isWindMode) return null
+		const N = world.mesh.numRegions
+		const { wind_east_monthly, wind_north_monthly, wind_speed_monthly } = world.wind
+		if (windMonth === 0) {
+			const east = new Float32Array(N)
+			const north = new Float32Array(N)
+			const speed = new Float32Array(N)
+			for (let r = 0; r < N; r++) {
+				let ex = 0, nx = 0, sp = 0
+				for (let m = 0; m < 12; m++) {
+					ex += wind_east_monthly[m * N + r]
+					nx += wind_north_monthly[m * N + r]
+					sp += wind_speed_monthly[m * N + r]
+				}
+				east[r] = ex / 12
+				north[r] = nx / 12
+				speed[r] = sp / 12
+			}
+			return { east, north, speed }
+		}
+		const off = (windMonth - 1) * N
+		return {
+			east: wind_east_monthly.subarray(off, off + N) as Float32Array,
+			north: wind_north_monthly.subarray(off, off + N) as Float32Array,
+			speed: wind_speed_monthly.subarray(off, off + N) as Float32Array,
+		}
+	}, [world, windMonth, isWindMode])
+
+	useEffect(() => {
+		if (!sceneRef.current) return
+		sceneRef.current.setWindArrows(windArrowData)
+		sceneRef.current.setWindArrowsVisible(isWindMode)
+	}, [windArrowData, isWindMode])
 
 	useEffect(() => {
 		if (!sceneRef.current) return
@@ -515,6 +654,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			sunTempFactor: overrides?.sunTempFactor ?? sunTempFactor,
 			daysPerYear: overrides?.daysPerYear ?? daysPerYear,
 			hoursPerDay: overrides?.hoursPerDay ?? hoursPerDay,
+			pressure: 1.0,
 			tidallyLocked: overrides?.tidallyLocked ? true : tidallyLocked,
 			jitter: overrides?.jitter ?? jitter,
 			roughness: overrides?.roughness ?? roughness,
@@ -570,7 +710,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			if (workerRef.current === worker) workerRef.current = null
 		}
 
-		const request: OrogenWorkerRequest = { type: "generate", params }
+	const request: OrogenWorkerRequest = { type: "generate", params }
 		worker.postMessage(request)
 	}, [numPoints, numPlates, landDistribution, continentSizeVariety,
 		landCoverage, planetRadiusKm, obliquity, eccentricity, sunTempFactor, daysPerYear, hoursPerDay, tidallyLocked, jitter, roughness, terrainWarp, smoothing,
@@ -705,6 +845,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 				sunTempFactor,
 				daysPerYear,
 				hoursPerDay,
+				pressure: 1.0,
 				tidallyLocked,
 				terrainWarp,
 				smoothing,
@@ -985,6 +1126,13 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			avgAnnualPrecipMm = sum / Math.max(1, world.rainfall.annual.length)
 		}
 
+		let avgAnnualWindMs: number | null = null
+		if (world?.wind?.wind_speed_monthly) {
+			let sum = 0
+			for (let i = 0; i < world.wind.wind_speed_monthly.length; i++) sum += world.wind.wind_speed_monthly[i]
+			avgAnnualWindMs = sum / Math.max(1, world.wind.wind_speed_monthly.length)
+		}
+
 		const isTidal = activeParams?.tidallyLocked ?? tidallyLocked
 		return [
 			...(isTidal ? [{ label: "Lock", value: "Tidal" }] : []),
@@ -999,6 +1147,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			{ label: "Land Area", value: landAreaKm2 !== null && landPercent !== null ? `${(landAreaKm2 / 1_000_000).toFixed(1)}M km² (${landPercent.toFixed(1)}%)` : "—" },
 			{ label: "Avg Temp", value: avgAnnualTempC !== null ? `${avgAnnualTempC.toFixed(1)} °C` : "—" },
 			{ label: "Avg Rain", value: avgAnnualPrecipMm !== null ? `${avgAnnualPrecipMm.toFixed(0)} mm` : "—" },
+			{ label: "Avg Wind", value: avgAnnualWindMs !== null ? `${avgAnnualWindMs.toFixed(1)} m/s` : "—" },
 		]
 	}, [daysPerYear, eccentricity, hoursPerDay, obliquity, planetRadiusKm, sunTempFactor, tidallyLocked, world])
 
@@ -1374,13 +1523,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							["terrain", "Terrain"],
 							["landHeightmap", "Height"],
 							["temperature", "Temp"],
-							["biotemperature", "Biotemp"],
 						] as const).map(([mode, label]) => (
 							<button
 								key={mode}
 								onClick={() => setColorMode(mode)}
 								className={`flex-1 py-1.5 px-2 rounded text-[11px] font-medium transition-all ${
-									colorMode === mode
+									(mode === "temperature" ? isTemperatureMode : colorMode === mode)
 										? "bg-slate-900 text-white"
 										: "bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
 								}`}
@@ -1394,6 +1542,24 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							["precipitation", "Rain"],
 							["vegetation", "Veg"],
 							["climate", "Climate"],
+							["oceanCurrents", "Currents"],
+						] as const).map(([mode, label]) => (
+							<button
+								key={mode}
+								onClick={() => setColorMode(mode)}
+								className={`flex-1 py-1.5 px-2 rounded text-[11px] font-medium transition-all ${
+									(mode === "climate" ? isClimateMode : colorMode === mode)
+										? "bg-slate-900 text-white"
+										: "bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+								}`}
+							>
+								{label}
+							</button>
+						))}
+					</div>
+					<div className="flex gap-1">
+						{([
+							["windSpeed", "Wind"],
 						] as const).map(([mode, label]) => (
 							<button
 								key={mode}
@@ -1409,6 +1575,49 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						))}
 					</div>
 				</div>
+
+				{isTemperatureMode && (
+					<div className="space-y-2 pt-4 border-t border-slate-100">
+						<div className="flex justify-between items-baseline">
+							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+								Temperature Type
+							</span>
+							<span className="font-mono text-[11px] text-slate-400">
+								{colorMode === "biotemperature" ? "Biotemp" : "Classic"}
+							</span>
+						</div>
+						<select
+							value={colorMode}
+							onChange={(e) => setColorMode(e.target.value as ColorMode)}
+							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
+						>
+							<option value="temperature">Classic</option>
+							<option value="biotemperature">Biotemp</option>
+						</select>
+					</div>
+				)}
+
+				{isClimateMode && (
+					<div className="space-y-2 pt-4 border-t border-slate-100">
+						<div className="flex justify-between items-baseline">
+							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+								Climate Type
+							</span>
+							<span className="font-mono text-[11px] text-slate-400">
+								{colorMode === "climate" ? "Basic" : colorMode === "pastaClimate" ? "Pasta" : "Koppen"}
+							</span>
+						</div>
+						<select
+							value={colorMode}
+							onChange={(e) => setColorMode(e.target.value as ColorMode)}
+							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
+						>
+							<option value="climate">Basic</option>
+							<option value="pastaClimate">Pasta</option>
+							<option value="koppenClimate">Koppen</option>
+						</select>
+					</div>
+				)}
 
 				{colorMode === "temperature" && (
 					<div className="space-y-2 pt-4 border-t border-slate-100">
@@ -1447,6 +1656,30 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						<select
 							value={rainfallMonth}
 							onChange={(e) => setRainfallMonth(Number(e.target.value))}
+							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
+						>
+							{monthLabels.map((label, index) => (
+								<option key={label} value={index}>
+									{label}
+								</option>
+							))}
+						</select>
+					</div>
+				)}
+
+				{isWindMode && (
+					<div className="space-y-2 pt-4 border-t border-slate-100">
+						<div className="flex justify-between items-baseline">
+							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+								Wind Period
+							</span>
+							<span className="font-mono text-[11px] text-slate-400">
+								{monthLabels[windMonth]}
+							</span>
+						</div>
+						<select
+							value={windMonth}
+							onChange={(e) => setWindMonth(Number(e.target.value))}
 							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
 						>
 							{monthLabels.map((label, index) => (
@@ -1623,13 +1856,33 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 								</div>
 							</>
 						)}
-						{hoverClimateZone && (
+						{colorMode === "climate" && hoverClimateZone && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
 									Climate
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100 capitalize">
 									{hoverClimateZone}
+								</div>
+							</>
+						)}
+						{colorMode === "pastaClimate" && hoverPastaClimate && (
+							<>
+								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Pasta
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100">
+									{hoverPastaClimate.name}{hoverPastaClimate.code ? ` (${hoverPastaClimate.code})` : ""}
+								</div>
+							</>
+						)}
+						{colorMode === "koppenClimate" && hoverKoppenClimate && (
+							<>
+								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Koppen
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100">
+									{hoverKoppenClimate}
 								</div>
 							</>
 						)}
@@ -1666,6 +1919,23 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
                                             : hoverDistCoastKm !== null
                                                 ? Math.round(hoverDistCoastKm).toLocaleString()
                                                 : '—'} km
+								</div>
+							</>
+						)}
+						{isWindMode && hoverWind && (
+							<>
+								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Wind {windMonth === 0 ? "Annual" : monthLabels[windMonth]}
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100">
+									{(() => {
+										const { east: we, north: wn, speed: ws } = hoverWind
+										const deg = Math.atan2(-we, -wn) * 180 / Math.PI
+										const from = ((deg % 360) + 360) % 360
+										const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+										const dir = dirs[Math.round(from / 45) % 8]
+										return `${dir} (${from.toFixed(0)}°) · ${ws.toFixed(2)}`
+									})()}
 								</div>
 							</>
 						)}

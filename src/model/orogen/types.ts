@@ -122,6 +122,22 @@ export interface OrogenClimate {
 	landFraction: number[]          // 36-band land fraction used by EBM
 }
 
+export interface OrogenOceanCurrents {
+	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */
+	oceanWarmth: Float32Array
+	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean/deep interior. */
+	coastalWarmth: Float32Array
+}
+
+export interface OrogenWind {
+	/** Per-cell eastward wind component, [month * N + r] */
+	wind_east_monthly: Float32Array
+	/** Per-cell northward wind component, [month * N + r] */
+	wind_north_monthly: Float32Array
+	/** Per-cell wind speed (0–1 normalized), [month * N + r] */
+	wind_speed_monthly: Float32Array
+}
+
 export interface OrogenRainfall {
 	monthly: Float32Array   // [month * N + r] mm
 	annual: Float32Array    // per-cell annual mm
@@ -156,6 +172,14 @@ export interface OrogenWorld {
 	rainfall?: OrogenRainfall
 	/** Per-cell climate zone code (0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic) */
 	climateZones?: Uint8Array
+	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
+	pastaClimate?: Uint8Array
+	/** Per-cell Koppen climate code (index into KOPPEN_CLASSES) */
+	koppenClimate?: Uint8Array
+	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
+	oceanCurrents?: OrogenOceanCurrents
+	/** Monthly wind fields */
+	wind?: OrogenWind
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation?: Uint8Array
 	rivers?: OrogenRivers

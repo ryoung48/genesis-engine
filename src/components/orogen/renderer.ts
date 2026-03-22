@@ -31,6 +31,8 @@ export interface OrogenScene {
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number } | null): void
 	setRiversVisible(visible: boolean): void
+	setWindArrows(data: { east: Float32Array; north: Float32Array; speed: Float32Array } | null): void
+	setWindArrowsVisible(visible: boolean): void
 }
 
 export function createOrogenScene(
@@ -173,6 +175,10 @@ export function createOrogenScene(
 	let riverData: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number } | null = null
 	let riversVisible = false
 	let riverMaterials: LineMaterial[] = []
+	let globeWindArrows: THREE.LineSegments | null = null
+	let mapWindArrows: THREE.LineSegments | null = null
+	let windArrowData: { east: Float32Array; north: Float32Array; speed: Float32Array } | null = null
+	let windArrowsVisible = false
 	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
 	let hoveredRegion = -1
 	const raycaster = new THREE.Raycaster()
@@ -892,6 +898,143 @@ export function createOrogenScene(
 		})
 	}
 
+	/**
+	 * Push 3 line-segments (shaft + 2 barbs) for one arrow.
+	 * tail → tip is the shaft; two barbs angle back 30° from the tip.
+	 */
+	function pushArrow3D(
+		positions: number[], colors: number[],
+		tx: number, ty: number, tz: number,  // tail
+		hx: number, hy: number, hz: number,  // head (tip)
+		perpX: number, perpY: number, perpZ: number, // perpendicular in tangent plane (unit length)
+		barbFrac: number,
+	) {
+		// Shaft
+		positions.push(tx, ty, tz, hx, hy, hz)
+		colors.push(0, 0, 0, 0, 0, 0)
+		// Barb vectors: 30° back from tip on each side
+		const dx = hx - tx, dy = hy - ty, dz = hz - tz
+		const shaftLen = Math.sqrt(dx * dx + dy * dy + dz * dz)
+		if (shaftLen < 1e-10) return
+		// Normalize shaft direction
+		const ux = dx / shaftLen, uy = dy / shaftLen, uz = dz / shaftLen
+		const bLen = barbFrac * shaftLen
+		// cos(150°) ≈ -0.866, sin(150°) ≈ 0.5
+		for (const sign of [1, -1]) {
+			const bx = (-0.866 * ux + sign * 0.5 * perpX) * bLen
+			const by = (-0.866 * uy + sign * 0.5 * perpY) * bLen
+			const bz = (-0.866 * uz + sign * 0.5 * perpZ) * bLen
+			positions.push(hx, hy, hz, hx + bx, hy + by, hz + bz)
+			colors.push(0, 0, 0, 0, 0, 0)
+		}
+	}
+
+	function buildGlobeWindArrows(data: { east: Float32Array; north: Float32Array; speed: Float32Array }): THREE.LineSegments {
+		if (!currentWorld) return new THREE.LineSegments()
+		const { r_xyz, numRegions } = currentWorld.mesh
+		const isLand = currentWorld.isLand
+		const { east, north, speed } = data
+		const step = Math.max(1, Math.floor(numRegions / 2000))
+		const positions: number[] = []
+		const colors: number[] = []
+		const shaftLen = 0.035
+		const barbFrac = 0.35
+
+		for (let r = 0; r < numRegions; r += step) {
+			const s = speed[r]
+			if (s < 0.02) continue
+			const x = r_xyz[3 * r], y = r_xyz[3 * r + 1], z = r_xyz[3 * r + 2]
+			const lon = Math.atan2(y, x)
+			const lat = Math.asin(Math.max(-1, Math.min(1, z)))
+			const sinLon = Math.sin(lon), cosLon = Math.cos(lon)
+			const sinLat = Math.sin(lat), cosLat = Math.cos(lat)
+			// Tangent basis on sphere
+			const eHatX = -sinLon, eHatY = cosLon, eHatZ = 0
+			const nHatX = -sinLat * cosLon, nHatY = -sinLat * sinLon, nHatZ = cosLat
+			// Normalize direction
+			const mag = Math.sqrt(east[r] * east[r] + north[r] * north[r])
+			if (mag < 1e-8) continue
+			const de = east[r] / mag, dn = north[r] / mag
+			// Direction in 3D
+			const dirX = de * eHatX + dn * nHatX
+			const dirY = de * eHatY + dn * nHatY
+			const dirZ = de * eHatZ + dn * nHatZ
+			// Perpendicular in tangent plane (rotate 90°)
+			const perpX = -dn * eHatX + de * nHatX
+			const perpY = -dn * eHatY + de * nHatY
+			const perpZ = -dn * eHatZ + de * nHatZ
+			const lift = isLand?.[r] ? 1.035 : 1.01
+			const ox = x * lift, oy = y * lift, oz = z * lift
+			const tipX = ox + dirX * shaftLen
+			const tipY = oy + dirY * shaftLen
+			const tipZ = oz + dirZ * shaftLen
+			pushArrow3D(positions, colors, ox, oy, oz, tipX, tipY, tipZ, perpX, perpY, perpZ, barbFrac)
+		}
+
+		const geometry = new THREE.BufferGeometry()
+		geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+		geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+		const material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: true, depthWrite: false })
+		const lines = new THREE.LineSegments(geometry, material)
+		lines.renderOrder = 20
+		return lines
+	}
+
+	function buildMapWindArrows(data: { east: Float32Array; north: Float32Array; speed: Float32Array }): THREE.LineSegments {
+		if (!currentWorld) return new THREE.LineSegments()
+		const { r_xyz, numRegions } = currentWorld.mesh
+		const { east, north, speed } = data
+		const pi = Math.PI
+		const sc = 2 / pi
+		const centerLon = currentMapCenterLongitudeDeg * pi / 180
+		const step = Math.max(1, Math.floor(numRegions / 2000))
+		const positions: number[] = []
+		const colors: number[] = []
+		const shaftLen = 0.035
+		const barbFrac = 0.35
+
+		const wrapLon = (lon: number) => {
+			let l = lon - centerLon
+			if (l > pi) l -= 2 * pi
+			else if (l < -pi) l += 2 * pi
+			return l
+		}
+
+		for (let r = 0; r < numRegions; r += step) {
+			const s = speed[r]
+			if (s < 0.02) continue
+			const x = r_xyz[3 * r], y = r_xyz[3 * r + 1], z = r_xyz[3 * r + 2]
+			const lon = wrapLon(Math.atan2(y, x))
+			const lat = Math.asin(Math.max(-1, Math.min(1, z)))
+			const mx = lon * sc, my = lat * sc
+			const mag = Math.sqrt(east[r] * east[r] + north[r] * north[r])
+			if (mag < 1e-8) continue
+			const de = east[r] / mag, dn = north[r] / mag
+			const len = shaftLen * sc
+			const tipX = mx + de * len, tipY = my + dn * len
+			// Shaft
+			positions.push(mx, my, 0.003, tipX, tipY, 0.003)
+			colors.push(0, 0, 0, 0, 0, 0)
+			// Barbs (2D rotation ±150°)
+			const c150 = -0.866, s150 = 0.5
+			const bLen = barbFrac * len
+			for (const sign of [1, -1]) {
+				const bx = (c150 * de + sign * s150 * (-dn)) * bLen
+				const by = (c150 * dn + sign * s150 * de) * bLen
+				positions.push(tipX, tipY, 0.003, tipX + bx, tipY + by, 0.003)
+				colors.push(0, 0, 0, 0, 0, 0)
+			}
+		}
+
+		const geometry = new THREE.BufferGeometry()
+		geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+		geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+		const material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false })
+		const lines = new THREE.LineSegments(geometry, material)
+		lines.renderOrder = 20
+		return lines
+	}
+
 	function rebuildOverlays() {
 		disposeObject3D(terrainWireframe)
 		disposeObject3D(mapWireframe)
@@ -901,6 +1044,8 @@ export function createOrogenScene(
 		disposeObject3D(mapThermalEquator)
 		disposeRiverGroup(globeRivers)
 		disposeRiverGroup(mapRivers)
+		disposeObject3D(globeWindArrows)
+		disposeObject3D(mapWindArrows)
 		terrainWireframe = null
 		mapWireframe = null
 		globeGrid = null
@@ -909,6 +1054,8 @@ export function createOrogenScene(
 		mapThermalEquator = null
 		globeRivers = null
 		mapRivers = null
+		globeWindArrows = null
+		mapWindArrows = null
 		riverMaterials = []
 
 		if (wireframeVisible && currentWorld) {
@@ -937,6 +1084,12 @@ export function createOrogenScene(
 			scene.add(globeRivers)
 			scene.add(mapRivers)
 		}
+		if (windArrowsVisible && windArrowData) {
+			globeWindArrows = buildGlobeWindArrows(windArrowData)
+			mapWindArrows = buildMapWindArrows(windArrowData)
+			scene.add(globeWindArrows)
+			scene.add(mapWindArrows)
+		}
 		updateOverlayVisibility()
 	}
 
@@ -960,6 +1113,11 @@ export function createOrogenScene(
 		if (mapRivers) {
 			mapRivers.visible = riversVisible && currentViewMode === "map"
 			if (mapMesh) mapRivers.position.copy(mapMesh.position)
+		}
+		if (globeWindArrows) globeWindArrows.visible = windArrowsVisible && currentViewMode === "globe"
+		if (mapWindArrows) {
+			mapWindArrows.visible = windArrowsVisible && currentViewMode === "map"
+			if (mapMesh) mapWindArrows.position.copy(mapMesh.position)
 		}
 	}
 
@@ -1177,6 +1335,17 @@ export function createOrogenScene(
 		rebuildOverlays()
 	}
 
+	function setWindArrows(data: { east: Float32Array; north: Float32Array; speed: Float32Array } | null) {
+		windArrowData = data
+		rebuildOverlays()
+	}
+
+	function setWindArrowsVisible(visible: boolean) {
+		if (windArrowsVisible === visible) return
+		windArrowsVisible = visible
+		rebuildOverlays()
+	}
+
 	return {
 		dispose,
 		resize,
@@ -1193,5 +1362,7 @@ export function createOrogenScene(
 		setThermalEquator,
 		setRivers,
 		setRiversVisible,
+		setWindArrows,
+		setWindArrowsVisible,
 	}
 }

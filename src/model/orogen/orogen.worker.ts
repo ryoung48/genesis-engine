@@ -48,10 +48,25 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 			}
 			: undefined,
 		climateZones: world.climateZones,
+		pastaClimate: world.pastaClimate,
+		koppenClimate: world.koppenClimate,
 		vegetation: world.vegetation,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
 		rivers: world.rivers,
+		oceanCurrents: world.oceanCurrents
+			? {
+				oceanWarmth: world.oceanCurrents.oceanWarmth,
+				coastalWarmth: world.oceanCurrents.coastalWarmth,
+			}
+			: undefined,
+		wind: world.wind
+			? {
+				wind_east_monthly: world.wind.wind_east_monthly,
+				wind_north_monthly: world.wind.wind_north_monthly,
+				wind_speed_monthly: world.wind.wind_speed_monthly,
+			}
+			: undefined,
 	}
 }
 
@@ -98,6 +113,14 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.climateZones.buffer)
 	}
 
+	if (world.pastaClimate) {
+		transfer.push(world.pastaClimate.buffer)
+	}
+
+	if (world.koppenClimate) {
+		transfer.push(world.koppenClimate.buffer)
+	}
+
 	if (world.vegetation) {
 		transfer.push(world.vegetation.buffer)
 	}
@@ -113,6 +136,17 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.rivers?.lakes) {
 		transfer.push(world.rivers.lakes.buffer)
 		transfer.push(world.rivers.waterLevel.buffer)
+	}
+
+	if (world.oceanCurrents) {
+		transfer.push(world.oceanCurrents.oceanWarmth.buffer)
+		transfer.push(world.oceanCurrents.coastalWarmth.buffer)
+	}
+
+	if (world.wind) {
+		transfer.push(world.wind.wind_east_monthly.buffer)
+		transfer.push(world.wind.wind_north_monthly.buffer)
+		transfer.push(world.wind.wind_speed_monthly.buffer)
 	}
 
 	return transfer

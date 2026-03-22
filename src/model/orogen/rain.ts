@@ -78,7 +78,7 @@ function getCirculationControls(
 // ---------------------------------------------------------------------------
 
 const TEQ_NUM_BINS = 120 // 3 deg per bin
-const TEQ_HALF_WIN = 3   // circular smoothing window
+const TEQ_HALF_WIN = 10   // circular smoothing window
 
 /**
  * Compute per-longitude-bin thermal equator latitude for a given temperature field.

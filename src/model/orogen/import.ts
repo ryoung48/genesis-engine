@@ -7,6 +7,8 @@ import type { OrogenParams, OrogenWorld, SphereMesh, BoundaryInfo, DistanceField
 import { createRng } from "./rng"
 import { buildSphereMesh } from "./mesh"
 import { computeLandFraction, computeTemperature } from "./climate"
+import { computeOceanCurrents } from "./ocean-currents"
+import { computeWind } from "./wind"
 import { computeAdvection, computeMonthlyRain } from "./rain"
 import {
 	warpTerrain,
@@ -16,6 +18,8 @@ import {
 	applySoilCreep,
 } from "./erosion"
 import { assignVegetation, assignClimateZones } from "./vegetation"
+import { assignPastaClimate } from "./pasta"
+import { assignKoppenClimate } from "./koppen"
 import { computeRivers } from "./rivers"
 import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm } from "./units"
 import { countContinents } from "./stats"
@@ -40,6 +44,7 @@ export interface ImportParams {
 	daysPerYear?: number
 	hoursPerDay?: number
 	tidallyLocked?: boolean
+	pressure?: number
 }
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -359,6 +364,7 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
 		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
 		tidallyLocked: params.tidallyLocked,
+		pressure: params.pressure ?? 1.0,
 	}
 	// Build land mask from final elevation
 	const isLand = new Uint8Array(mesh.numRegions)
@@ -373,6 +379,41 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	onProgress?.("Computing moisture...", 80)
 	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, orogenParams, isLand)
 
+	// Ocean currents
+	onProgress?.("Computing ocean currents...", 82)
+	const oceanCurrents = computeOceanCurrents(mesh, eastAdv, westAdv, isLand, climate, orogenParams)
+
+	// Apply ocean warmth as temperature modifier
+	if (climate) {
+		const N = mesh.numRegions
+		for (let month = 0; month < 12; month++) {
+			const offset = month * N
+			for (let r = 0; r < N; r++) {
+				if (!isLand[r]) {
+					climate.temperature_monthly[offset + r] += oceanCurrents.oceanWarmth[r] * 12
+				} else {
+					climate.temperature_monthly[offset + r] += oceanCurrents.coastalWarmth[r] * 8
+				}
+			}
+		}
+		for (let r = 0; r < N; r++) {
+			let sum = 0, min = Infinity, max = -Infinity
+			for (let month = 0; month < 12; month++) {
+				const t = climate.temperature_monthly[month * N + r]
+				sum += t
+				if (t < min) min = t
+				if (t > max) max = t
+			}
+			climate.temperature_avg[r] = sum / 12
+			climate.temperature_min[r] = min
+			climate.temperature_max[r] = max
+		}
+	}
+
+	// Wind fields
+	onProgress?.("Computing wind fields...", 84)
+	const wind = climate ? computeWind(mesh, elevation, isLand, climate, orogenParams) : undefined
+
 	// Rainfall
 	onProgress?.("Computing rainfall...", 85)
 	const rain = computeMonthlyRain(mesh, climate, eastAdv, westAdv, isLand, orogenParams)
@@ -386,8 +427,16 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	onProgress?.("Classifying climate zones...", 93)
 	const climateZones = assignClimateZones(mesh, isLand, climate)
 
+	// Pasta climate
+	onProgress?.("Classifying pasta climate...", 94)
+	const pastaClimate = assignPastaClimate(mesh, isLand, climate, rainfall, orogenParams)
+
+	// Koppen climate
+	onProgress?.("Classifying Koppen climate...", 95)
+	const koppenClimate = assignKoppenClimate(mesh, isLand, climate, rainfall)
+
 	// Vegetation
-	onProgress?.("Assigning vegetation...", 95)
+	onProgress?.("Assigning vegetation...", 96)
 	const vegetation = assignVegetation(mesh, isLand, climate, rainfall)
 
 	onProgress?.("Done", 100)
@@ -404,9 +453,13 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		oceanDist,
 		rainfall,
 		climateZones,
+		pastaClimate,
+		koppenClimate,
 		vegetation,
 		rivers,
 		isLand,
+		oceanCurrents,
+		wind,
 		continentCount: countContinents(mesh, isLand),
 	}
 }
