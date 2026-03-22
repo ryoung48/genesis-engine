@@ -25,6 +25,7 @@ interface EarthDefaults {
 	daysPerYear: number
 	landFraction: number
 	radiusFactor: number
+	pressure: number
 }
 
 interface GenesisEngineProps {
@@ -47,6 +48,8 @@ interface GenesisEngineProps {
 	setLandFraction: (v: number) => void
 	radiusFactor: number
 	setRadiusFactor: (v: number) => void
+	pressure: number
+	setPressure: (v: number) => void
 	heightmap: HeightmapPreset | undefined
 	setHeightmap: (v: HeightmapPreset | undefined) => void
 	onLaunch: () => void
@@ -77,6 +80,8 @@ export const GenesisEngine = ({
 	setLandFraction,
 	radiusFactor,
 	setRadiusFactor,
+	pressure,
+	setPressure,
 	heightmap,
 	setHeightmap,
 	onLaunch,
@@ -152,7 +157,7 @@ export const GenesisEngine = ({
 				</div>
 
 				{/* Parameters */}
-				<div className="flex-1 min-h-0 space-y-4">
+				<div className="flex-1 min-h-0 overflow-y-auto space-y-4">
 					<div className="flex items-baseline justify-between">
 						<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
 							Parameters
@@ -167,6 +172,7 @@ export const GenesisEngine = ({
 								setDaysPerYear(earthDefaults.daysPerYear)
 								setLandFraction(earthDefaults.landFraction)
 								setRadiusFactor(earthDefaults.radiusFactor)
+								setPressure(earthDefaults.pressure)
 							}}
 							className="font-mono text-[10px] text-slate-300 hover:text-slate-900 transition-colors uppercase tracking-wider"
 						>
@@ -248,6 +254,15 @@ export const GenesisEngine = ({
 									max: 4,
 									step: 0.1,
 									set: setRadiusFactor,
+								},
+								{
+									label: "Pressure",
+									value: pressure,
+									display: `${pressure.toFixed(1)} bar`,
+									min: 0.1,
+									max: 10,
+									step: 0.1,
+									set: setPressure,
 								},
 							] as {
 								label: string

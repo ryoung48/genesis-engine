@@ -44,6 +44,7 @@ interface WorldGenParams {
 	hoursPerDay: number
 	daysPerYear: number
 	landFraction: number
+	pressure: number
 	radius: number
 	heightmap?: HeightmapPreset
 	setView: (view: ViewState) => void
@@ -75,6 +76,7 @@ export function useWorldGeneration() {
 		hoursPerDay,
 		daysPerYear,
 		landFraction,
+		pressure,
 		radius,
 		heightmap,
 		setView,
@@ -120,6 +122,7 @@ export function useWorldGeneration() {
 			hoursPerDay,
 			daysPerYear,
 			landFraction,
+			pressure,
 			radius,
 			resolution: heightmap?.resolution,
 		})

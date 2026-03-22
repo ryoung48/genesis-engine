@@ -13,6 +13,7 @@ export interface EBMConfig {
 	stellar?: typeof EMB_CONSTANTS.stellar
 	landFraction?: number[]
 	radius?: number // planet radius in meters
+	pressure?: number // atmospheric pressure in bars (Earth = 1.0)
 	time?: {
 		YEAR_LENGTH_DAYS?: number
 		HOURS_PER_DAY?: number
@@ -55,17 +56,18 @@ export class EnergyBalanceModel {
 		const rotationFactor = Math.pow(earthDayHours / hoursPerDay, 0.5)
 		const radiusRatio = planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
 		const radiusFactor = radiusRatio * radiusRatio // D scales as 1/R²
+		const pressureFactor = Math.pow(this.config.pressure ?? 1.0, 0.5) // denser atm → more transport
 
 		const diffuser = (latDeg: number) => {
 			const absLat = Math.abs(latDeg)
-			return (0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) * radiusFactor
+			return 0.3 * radiusFactor * pressureFactor * rotationFactor
 		}
 
 		const T: number[] = this.temperature.map((row) => row[tIdx])
 
 		const fluxSN: number[] = new Array(grid.NUM_LAT + 1).fill(0)
 		for (let i = 1; i < grid.NUM_LAT; i++) {
-			const effectiveD = diffuser(this.lats_deg[i]) * rotationFactor
+			const effectiveD = diffuser(this.lats_deg[i])
 			const xBoundary = 0.5 * (this.sin_lats[i] + this.sin_lats[i - 1])
 			const dTdx =
 				Math.abs(this.sin_lats[i] - this.sin_lats[i - 1]) > 0
@@ -79,7 +81,7 @@ export class EnergyBalanceModel {
 
 		const fluxNS: number[] = new Array(grid.NUM_LAT + 1).fill(0)
 		for (let i = 0; i < grid.NUM_LAT; i++) {
-			const effectiveD = diffuser(this.lats_deg[i]) * rotationFactor
+			const effectiveD = diffuser(this.lats_deg[i])
 			const xBoundary = 0.5 * (this.sin_lats[i + 1] + this.sin_lats[i])
 			const dTdx =
 				Math.abs(this.sin_lats[i + 1] - this.sin_lats[i]) > 0
@@ -105,6 +107,10 @@ export class EnergyBalanceModel {
 
 	stepTemperature(tIdx: number, dt: number): void {
 		const { grid, surface, time } = EMB_CONSTANTS
+		const p = this.config.pressure ?? 1.0
+		// Greenhouse scales logarithmically with pressure (band saturation)
+		const olrA = surface.OLR_A + 15 * Math.log(1 / p)
+		const olrB = surface.OLR_B * Math.pow(1 / p, 0.15)
 		const nextIdx = (tIdx + 1) % time.DAYS_PER_YEAR
 		const absorbed: number[] = new Array(grid.NUM_LAT).fill(0)
 		for (let i = 0; i < grid.NUM_LAT; i++) {
@@ -113,8 +119,8 @@ export class EnergyBalanceModel {
 
 		for (let i = 0; i < grid.NUM_LAT; i++) {
 			this.olr[i][tIdx] =
-				surface.OLR_A +
-				surface.OLR_B * (this.temperature[i][tIdx] - surface.OLR_T_REF)
+				olrA +
+				olrB * (this.temperature[i][tIdx] - surface.OLR_T_REF)
 		}
 
 		const diffTerm = this.heatDiffusion(tIdx)
@@ -136,6 +142,10 @@ export class EnergyBalanceModel {
 
 	initModel() {
 		const { grid, time, thermal } = EMB_CONSTANTS
+		const p = this.config.pressure ?? 1.0
+		// Thinner atmosphere → weaker thermal coupling → larger seasonal swings
+		// At 1 bar: 1.0 (unchanged from original), scales with pressure
+		const pressureCapFactor = Math.pow(p, 0.7)
 
 		// Use provided land fraction or calculate default
 		this.land_fraction = this.config.landFraction || ALBEDO.landFraction()
@@ -154,8 +164,8 @@ export class EnergyBalanceModel {
 		for (let i = 0; i < grid.NUM_LAT; i++) {
 			this.dx.push(this.sin_lat_bounds[i + 1] - this.sin_lat_bounds[i])
 			this.heat_capacity.push(
-				thermal.LAND_HEAT_CAPACITY * this.land_fraction[i] +
-					thermal.OCEAN_HEAT_CAPACITY * (1 - this.land_fraction[i]),
+				(thermal.LAND_HEAT_CAPACITY * this.land_fraction[i] +
+					thermal.OCEAN_HEAT_CAPACITY * (1 - this.land_fraction[i])) * pressureCapFactor,
 			)
 			this.temperature.push(new Array(time.DAYS_PER_YEAR).fill(288.0))
 			this.albedo.push(new Array(time.DAYS_PER_YEAR).fill(0))
@@ -268,6 +278,8 @@ export const EBM = {
 					}
 				if (world.radius !== undefined)
 					config.radius = world.radius * 1000 // km to meters
+				if (world.pressure !== undefined)
+					config.pressure = world.pressure
 			}
 
 			defaultInstance = new EnergyBalanceModel(config)

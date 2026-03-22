@@ -57,6 +57,7 @@ export interface World {
 	hoursPerDay: number
 	daysPerYear: number
 	landFraction: number
+	pressure: number
 }
 
 export type WorldSpawn = {
@@ -69,6 +70,7 @@ export type WorldSpawn = {
 	daysPerYear?: number
 	landFraction?: number
 	radius?: number
+	pressure?: number
 	resolution?: number
 }
 

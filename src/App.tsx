@@ -22,6 +22,7 @@ function App() {
 	const [daysPerYear, setDaysPerYear] = useState(EARTH_DEFAULTS.daysPerYear)
 	const [landFraction, setLandFraction] = useState(EARTH_DEFAULTS.landFraction)
 	const [radiusFactor, setRadiusFactor] = useState(EARTH_DEFAULTS.radiusFactor)
+	const [pressure, setPressure] = useState(EARTH_DEFAULTS.pressure)
 	const [heightmap, setHeightmap] = useState<HeightmapPreset | undefined>(undefined)
 	const [previewTab, setPreviewTab] = useState<
 		"temperature" | "insolation" | "daylight" | "circulation" | "wind" | "language"
@@ -36,6 +37,7 @@ function App() {
 		daysPerYear,
 		landFraction,
 		radius: radiusFactor * 6371,
+		pressure,
 	})
 
 	const {
@@ -58,6 +60,7 @@ function App() {
 			hoursPerDay,
 			daysPerYear,
 			landFraction,
+			pressure,
 			radius: radiusFactor * 6371,
 			heightmap,
 			setView,
@@ -87,6 +90,8 @@ function App() {
 					setLandFraction={setLandFraction}
 					radiusFactor={radiusFactor}
 					setRadiusFactor={setRadiusFactor}
+					pressure={pressure}
+					setPressure={setPressure}
 					heightmap={heightmap}
 					setHeightmap={setHeightmap}
 					onLaunch={onLaunch}

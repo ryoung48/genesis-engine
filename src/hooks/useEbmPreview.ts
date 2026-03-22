@@ -19,10 +19,11 @@ interface EbmConfig {
 	daysPerYear: number
 	landFraction: number
 	radius: number
+	pressure: number
 }
 
 export function useEbmPreview(config: EbmConfig) {
-	const { obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius } = config
+	const { obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius, pressure } = config
 
 	return useMemo(() => {
 		const modelConfig = {
@@ -41,6 +42,7 @@ export function useEbmPreview(config: EbmConfig) {
 			},
 			landFraction: new Array(EBM.constants.grid.NUM_LAT).fill(landFraction),
 			radius: radius * 1000, // km to meters
+			pressure,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
@@ -149,5 +151,5 @@ export function useEbmPreview(config: EbmConfig) {
 			sampledDays,
 			dayLabels,
 		}
-	}, [obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius])
+	}, [obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius, pressure])
 }

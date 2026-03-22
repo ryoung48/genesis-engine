@@ -186,6 +186,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			: world.climate.temperature_monthly[(temperatureMonth - 1) * world.mesh.numRegions + hoverInfo.region])
 		: null
 
+	const hoverBiotemperature = hoverInfo && world?.climate
+		? Math.max(0, world.climate.temperature_avg[hoverInfo.region])
+		: null
+
 	const hoverRainfall = hoverInfo && world?.rainfall && world.elevation[hoverInfo.region] > 0
 		? (rainfallMonth === 0
 			? world.rainfall.annual[hoverInfo.region]
@@ -242,7 +246,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		const N = world.mesh.numRegions
 		const rgb = new Float32Array(N * 3)
 
-		if (colorMode === "temperature" && world.climate) {
+		if ((colorMode === "temperature" || colorMode === "biotemperature") && world.climate) {
 			const temps = temperatureMonth === 0
 				? world.climate.temperature_avg
 				: world.climate.temperature_monthly.subarray(
@@ -250,7 +254,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					temperatureMonth * N,
 				)
 			for (let r = 0; r < N; r++) {
-				const [cr, cg, cb] = temperatureColor(temps[r])
+				const temp = colorMode === "biotemperature"
+					? Math.max(0, world.climate.temperature_avg[r])
+					: temps[r]
+				const [cr, cg, cb] = temperatureColor(temp)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -1367,6 +1374,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							["terrain", "Terrain"],
 							["landHeightmap", "Height"],
 							["temperature", "Temp"],
+							["biotemperature", "Biotemp"],
 						] as const).map(([mode, label]) => (
 							<button
 								key={mode}
@@ -1586,7 +1594,16 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 								</div>
 							</>
 						)}
-						{hoverTemperature !== null && (
+						{colorMode === "biotemperature" && hoverBiotemperature !== null ? (
+							<>
+								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Biotemperature
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100">
+									{hoverBiotemperature.toFixed(1)} °C
+								</div>
+							</>
+						) : hoverTemperature !== null && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
 									Temperature {temperatureMonth === 0 ? "Annual" : monthLabels[temperatureMonth]}

@@ -20,4 +20,5 @@ export const EARTH_DEFAULTS = {
 	daysPerYear: 365,
 	landFraction: 0.3,
 	radiusFactor: 1.0,
+	pressure: 1.0,
 }

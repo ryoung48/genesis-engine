@@ -2,7 +2,7 @@
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "precipitation" | "vegetation" | "climate"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "precipitation" | "vegetation" | "climate"
 
 const oceanColorStops: [number, number, number][] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],

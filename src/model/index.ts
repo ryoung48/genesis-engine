@@ -243,6 +243,7 @@ export const WORLD = {
     hoursPerDay = 24,
     daysPerYear = 365,
     landFraction = 0.3,
+    pressure = 1.0,
     radius: radiusKm = 6371,
     resolution = 2,
   }: WorldSpawn) => {
@@ -266,6 +267,7 @@ export const WORLD = {
       hoursPerDay,
       daysPerYear,
       landFraction,
+      pressure,
       time: START_DATE,
       cells: [],
       cell: { length, count, area },

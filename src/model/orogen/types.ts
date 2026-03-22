@@ -72,6 +72,7 @@ export interface OrogenParams {
 	daysPerYear?: number // orbital year length in local days, default 365
 	hoursPerDay?: number // rotation period expressed as local hours per day, default 24
 	tidallyLocked?: boolean // true = one hemisphere always faces the star
+	pressure?: number // atmospheric pressure in bars, default 1.0
 }
 
 /** Result of findCollisions for one plate layer */

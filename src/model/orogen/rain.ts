@@ -476,7 +476,7 @@ export function computeMonthlyRain(
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
 	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked">,
+	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure">,
 ): { monthly: Float32Array; annual: Float32Array } {
 	if (isTidallyLocked(params?.tidallyLocked)) {
 		return computeTidalRain(mesh, climate, isLand)
@@ -486,6 +486,9 @@ export function computeMonthlyRain(
 	const { adjOffset, adjList } = mesh
 	const reverseCirculation = isRetrogradeObliquity(params?.obliquity)
 	const circulation = getCirculationControls(params)
+	// Lower pressure → easier evaporation → more rain; higher → suppressed
+	// ~1/p^0.4: 0.1bar→2.5x, 0.25→1.6x, 0.5→1.3x, 1→1x, 2→0.76x, 4→0.57x, 10→0.40x
+	const pressureRainFactor = Math.pow(1 / (params?.pressure ?? 1.0), 0.4)
 
 	const latDeg = new Float32Array(N)
 	const lonDeg = new Float32Array(N)
@@ -520,7 +523,7 @@ export function computeMonthlyRain(
 			const teq = teqPerMonth[month][bin]
 			const weight = computeWeight(latDeg[r], teq, e, w, circulation)
 			const monthTemp = climate.temperature_monthly[month * N + r]
-			monthly[month * N + r] = weight * ceilingScale(monthTemp)
+			monthly[month * N + r] = weight * ceilingScale(monthTemp) * pressureRainFactor
 		}
 	}
 
