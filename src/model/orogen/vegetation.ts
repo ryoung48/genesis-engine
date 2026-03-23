@@ -55,7 +55,7 @@ export function assignClimateZones(
 		if (isChaotic) zones[r] = 8
 		else if (isInfernal) zones[r] = 7
 		else if (avg > 24) zones[r] = 6   // tropical
-		else if (avg > 18) zones[r] = 5   // subtropical
+		else if (avg > 16) zones[r] = 5   // subtropical
 		else if (avg > 6) zones[r] = 4    // temperate (warm + cool)
 		else if (avg > -3) zones[r] = 3   // boreal
 		else if (avg > -9) zones[r] = 2   // subarctic

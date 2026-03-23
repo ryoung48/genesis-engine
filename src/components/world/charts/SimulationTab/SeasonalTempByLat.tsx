@@ -11,6 +11,9 @@ interface SeasonalTempByLatProps {
 	colorFn?: (temp: number) => string
 	unit?: string
 	fullHeight?: boolean
+	showScale?: boolean
+	showXAxis?: boolean
+	tooltipLabel?: (params: { lat: number; day: number; temp: number }) => string
 }
 
 const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
@@ -21,6 +24,9 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 	colorFn,
 	unit,
 	fullHeight = false,
+	showScale = true,
+	showXAxis = true,
+	tooltipLabel,
 }) => {
 	const numLatitudes = latRange.length
 	const datasetsTemp = []
@@ -28,21 +34,20 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 	let tempMin = Infinity
 	let tempMax = -Infinity
 
-	// We loop through latitudes. Note: EBM heat is [NUM_LAT][DAYS_PER_YEAR]
 	for (let latIdx = 0; latIdx < numLatitudes; latIdx++) {
 		const data: number[] = []
 		const backgroundColor: string[] = []
 
 		for (const step of sampledDays) {
 			const temp = heat[latIdx][step]
-			data.push(1) // dummy height for stacking
+			data.push(1)
 			backgroundColor.push(colorFn ? colorFn(temp) : TEMPERATURE.color(temp))
 			if (temp > tempMax) tempMax = temp
 			if (temp < tempMin) tempMin = temp
 		}
 
 		datasetsTemp.push({
-			label: `Lat ${latRange[latIdx].toFixed(1)}°`,
+			label: `Lat ${latRange[latIdx].toFixed(1)}\u00B0`,
 			data,
 			backgroundColor,
 			barThickness: "flex" as const,
@@ -58,7 +63,7 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 	}
 
 	return (
-		<div className={`mt-4 ${fullHeight ? "h-full flex flex-col min-h-0" : ""}`}>
+		<div className={`${fullHeight ? "h-full flex flex-col min-h-0" : "mt-4"}`}>
 			<div
 				style={
 					fullHeight
@@ -79,10 +84,11 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 								callbacks: {
 									label: (ctx) => {
 										const day = sampledDays[ctx.dataIndex] + 1
-										const lat = ctx.dataset.label
-										const temp =
-											heat[ctx.datasetIndex][sampledDays[ctx.dataIndex]]
-										return `${lat}, Day ${day}: ${temp.toFixed(1)}${unit || "°C"}`
+										const lat = latRange[ctx.datasetIndex]
+										const temp = heat[ctx.datasetIndex][sampledDays[ctx.dataIndex]]
+										return tooltipLabel
+											? tooltipLabel({ lat, day, temp })
+											: `${ctx.dataset.label}, Day ${day}: ${temp.toFixed(1)}${unit || "\u00B0C"}`
 									},
 								},
 							},
@@ -91,23 +97,25 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 							x: {
 								stacked: true,
 								ticks: {
+									display: showXAxis,
 									maxTicksLimit: 12,
 									autoSkip: true,
 									font: { size: 9, family: "monospace" },
 								},
 								title: {
-									display: true,
+									display: showXAxis,
 									text: "Day of Year",
 									font: { size: 10, family: "monospace", weight: "bold" },
 								},
 								grid: { display: false },
+								border: { display: showXAxis },
 							},
 							y: {
 								stacked: true,
 								ticks: {
 									callback: (_val, index) => {
 										const lat = latRange[index]
-										return lat !== undefined ? `${lat.toFixed(0)}°` : ""
+										return lat !== undefined ? `${lat.toFixed(0)}\u00B0` : ""
 									},
 									autoSkip: false,
 									stepSize: 1,
@@ -124,7 +132,9 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 					}}
 				/>
 			</div>
-			<TemperatureScale tempMin={tempMin} tempMax={tempMax} colorFn={colorFn} />
+			{showScale && (
+				<TemperatureScale tempMin={tempMin} tempMax={tempMax} colorFn={colorFn} />
+			)}
 		</div>
 	)
 }

@@ -280,15 +280,36 @@ export function oceanCurrentColor(warmth: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
+/**
+ * Wind speed color ramp: light gray-green (calm) → saturated cyan-teal (fast).
+ * Input: raw wind speed in m/s, clamped to a fixed 0–20 m/s display range.
+ */
+const windSpeedStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: 0.0, r: 0xe8 / 255, g: 0xef / 255, b: 0xec / 255 },
+	{ v: 0.1, r: 0xd6 / 255, g: 0xe6 / 255, b: 0xe0 / 255 },
+	{ v: 0.2, r: 0xc4 / 255, g: 0xdd / 255, b: 0xd6 / 255 },
+	{ v: 0.3, r: 0xae / 255, g: 0xe0 / 255, b: 0xd6 / 255 },
+	{ v: 0.4, r: 0x8f / 255, g: 0xde / 255, b: 0xd5 / 255 },
+	{ v: 0.5, r: 0x6f / 255, g: 0xd9 / 255, b: 0xd3 / 255 },
+	{ v: 0.6, r: 0x4f / 255, g: 0xd4 / 255, b: 0xd1 / 255 },
+	{ v: 0.7, r: 0x33 / 255, g: 0xcd / 255, b: 0xcf / 255 },
+	{ v: 0.8, r: 0x1f / 255, g: 0xc5 / 255, b: 0xcb / 255 },
+	{ v: 0.9, r: 0x10 / 255, g: 0xbc / 255, b: 0xc6 / 255 },
+	{ v: 1.0, r: 0x06 / 255, g: 0xb3 / 255, b: 0xc0 / 255 },
+]
+
 export function windSpeedColor(speed: number): [number, number, number] {
-	if (speed < 2.4) return [0xe6 / 255, 0xff / 255, 0xf0 / 255]
-	if (speed < 4.9) return [0xc6 / 255, 0xff / 255, 0xd7 / 255]
-	if (speed < 7.5) return [0xa5 / 255, 0xff / 255, 0xd7 / 255]
-	if (speed < 10.0) return [0x98 / 255, 0xff / 255, 0xe8 / 255]
-	if (speed < 12.5) return [0x8c / 255, 0xff / 255, 0xf8 / 255]
-	if (speed < 15.0) return [0x5a / 255, 0xff / 255, 0xff / 255]
-	if (speed < 17.5) return [0x23 / 255, 0xff / 255, 0xff / 255]
-	return [0x00 / 255, 0xf0 / 255, 0xff / 255]
+	const clamped = Math.max(0, Math.min(1, speed / 20))
+	for (let i = 0; i < windSpeedStops.length - 1; i++) {
+		const a = windSpeedStops[i]
+		const b = windSpeedStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [a.r + t * (b.r - a.r), a.g + t * (b.g - a.g), a.b + t * (b.b - a.b)]
+		}
+	}
+	const last = windSpeedStops[windSpeedStops.length - 1]
+	return [last.r, last.g, last.b]
 }
 
 export function getColor(elev: number, mode: ColorMode): [number, number, number] {

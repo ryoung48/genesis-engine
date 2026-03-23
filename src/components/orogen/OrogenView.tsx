@@ -10,7 +10,9 @@ import { elevToHeightKm, elevationToColor, getColor, temperatureColor, precipita
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/vegetation"
 import { PASTA_LABELS, pastaClimateColor, pastaClimateName } from "@/model/orogen/pasta"
 import { KOPPEN_LABELS, koppenClimateColor } from "@/model/orogen/koppen"
+import { ENABLE_PASTA_CLASSIFICATION } from "@/model/orogen/features"
 import { computeThermalEquatorLine } from "@/model/orogen/rain"
+import { OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
 import {
 	DEFAULT_DAYS_PER_YEAR,
 	DEFAULT_ECCENTRICITY,
@@ -170,6 +172,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		? elevToHeightKm(world.elevation[hoverInfo.region] ?? 0)
 		: null
 
+	const hoverTopography = hoverInfo && world?.topography
+		? OROGEN_TOPOGRAPHY_LABELS[world.topography[hoverInfo.region]] ?? null
+		: null
+
 	const hoverCoordinates = useMemo(() => {
 		if (!hoverInfo || !world) return null
 		const base = hoverInfo.region * 3
@@ -277,7 +283,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 	const isClimateMode =
 		colorMode === "climate" ||
-		colorMode === "pastaClimate" ||
+		(ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate") ||
 		colorMode === "koppenClimate"
 
 	const isTemperatureMode =
@@ -371,7 +377,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			return rgb
 		}
 
-		if (colorMode === "pastaClimate" && world.pastaClimate) {
+		if (ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate" && world.pastaClimate) {
 			for (let r = 0; r < N; r++) {
 				const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
 				rgb[3 * r] = cr
@@ -510,6 +516,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	}, [temperatureMonth, world])
 
 	// Update color mode + region colors
+	useEffect(() => {
+		if (!ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate") {
+			setColorMode("climate")
+		}
+	}, [colorMode])
+
 	useEffect(() => {
 		if (!sceneRef.current) return
 		sceneRef.current.setRegionColors(regionColors)
@@ -1576,7 +1588,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					</div>
 				</div>
 
-				{isTemperatureMode && (
+				{/* {isTemperatureMode && (
 					<div className="space-y-2 pt-4 border-t border-slate-100">
 						<div className="flex justify-between items-baseline">
 							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
@@ -1595,7 +1607,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							<option value="biotemperature">Biotemp</option>
 						</select>
 					</div>
-				)}
+				)} */}
 
 				{isClimateMode && (
 					<div className="space-y-2 pt-4 border-t border-slate-100">
@@ -1604,7 +1616,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 								Climate Type
 							</span>
 							<span className="font-mono text-[11px] text-slate-400">
-								{colorMode === "climate" ? "Basic" : colorMode === "pastaClimate" ? "Pasta" : "Koppen"}
+								{colorMode === "climate" ? "Basic" : colorMode === "koppenClimate" ? "Koppen" : "Basic"}
 							</span>
 						</div>
 						<select
@@ -1613,7 +1625,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
 						>
 							<option value="climate">Basic</option>
-							<option value="pastaClimate">Pasta</option>
+							{ENABLE_PASTA_CLASSIFICATION && <option value="pastaClimate">Pasta</option>}
 							<option value="koppenClimate">Koppen</option>
 						</select>
 					</div>
@@ -1810,7 +1822,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							Elevation
 						</div>
 						<div className="mt-1 font-mono text-sm text-slate-100">
-							{hoverElevationKm.toFixed(2)} km
+							{hoverElevationKm.toFixed(2)} km{hoverTopography ? ` (${hoverTopography})` : ""}
 						</div>
 						{hoverIsLand !== null && (
 							<div className="mt-1 font-mono text-[10px] text-slate-400">

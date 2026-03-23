@@ -1,0 +1,1 @@
+export const ENABLE_PASTA_CLASSIFICATION = false

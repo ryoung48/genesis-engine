@@ -20,6 +20,7 @@ import {
 import { assignVegetation, assignClimateZones } from "./vegetation"
 import { assignPastaClimate } from "./pasta"
 import { assignKoppenClimate } from "./koppen"
+import { ENABLE_PASTA_CLASSIFICATION } from "./features"
 import { computeRivers } from "./rivers"
 import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm } from "./units"
 import { countContinents } from "./stats"
@@ -392,7 +393,7 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 				if (!isLand[r]) {
 					climate.temperature_monthly[offset + r] += oceanCurrents.oceanWarmth[r] * 12
 				} else {
-					climate.temperature_monthly[offset + r] += oceanCurrents.coastalWarmth[r] * 8
+					climate.temperature_monthly[offset + r] += oceanCurrents.coastalWarmth[r] * 5
 				}
 			}
 		}
@@ -428,8 +429,12 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	const climateZones = assignClimateZones(mesh, isLand, climate)
 
 	// Pasta climate
-	onProgress?.("Classifying pasta climate...", 94)
-	const pastaClimate = assignPastaClimate(mesh, isLand, climate, rainfall, orogenParams)
+	const pastaClimate = ENABLE_PASTA_CLASSIFICATION
+		? (() => {
+			onProgress?.("Classifying pasta climate...", 94)
+			return assignPastaClimate(mesh, isLand, climate, rainfall, orogenParams)
+		})()
+		: undefined
 
 	// Koppen climate
 	onProgress?.("Classifying Koppen climate...", 95)

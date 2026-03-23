@@ -13,7 +13,6 @@ import type { SphereMesh, OrogenClimate, OrogenParams } from "./types"
 import { computeThermalEquator } from "./rain"
 import { meanEdgeLengthKm } from "./units"
 
-const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
 
 export interface OceanCurrentResult {

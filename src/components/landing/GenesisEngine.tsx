@@ -91,6 +91,18 @@ export const GenesisEngine = ({
 	setPreviewTab,
 	earthDefaults,
 }: GenesisEngineProps) => {
+	const annualAverageByLat = React.useMemo(
+		() =>
+			ebmPreview.heat.map((row) =>
+				row.length > 0 ? row.reduce((sum, value) => sum + value, 0) / row.length : 0,
+			),
+		[ebmPreview.heat],
+	)
+	const annualAverageHeat = React.useMemo(
+		() => annualAverageByLat.map((temp) => [temp]),
+		[annualAverageByLat],
+	)
+
 	return (
 		<div
 			className={`w-full h-full flex relative ${isExiting ? "animate-[cm-fade-out_500ms_ease-out_forwards]" : ""
@@ -448,13 +460,41 @@ export const GenesisEngine = ({
 				<div className="flex-1 min-h-0 flex flex-col">
 					{previewTab === "language" && <LanguageLab />}
 					{previewTab === "temperature" && (
-						<SeasonalTempByLat
-							heat={ebmPreview.heat}
-							latRange={ebmPreview.lats}
-							sampledDays={ebmPreview.sampledDays}
-							dayLabels={ebmPreview.dayLabels}
-							fullHeight={true}
-						/>
+						<div className="mt-4 h-full min-h-0 flex gap-4">
+							<div className="flex-1 min-w-0">
+								<SeasonalTempByLat
+									heat={ebmPreview.heat}
+									latRange={ebmPreview.lats}
+									sampledDays={ebmPreview.sampledDays}
+									dayLabels={ebmPreview.dayLabels}
+									fullHeight={true}
+								/>
+							</div>
+							<div className="w-24 shrink-0 flex flex-col">
+								<div className="flex items-center justify-between mb-2">
+									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+										Annual
+									</span>
+									<span className="font-mono text-[10px] text-slate-300 uppercase tracking-[0.2em]">
+										Avg
+									</span>
+								</div>
+								<div className="flex-1 min-h-0 rounded-2xl border border-slate-200/80 bg-white/75 backdrop-blur-sm px-2 py-3">
+									<SeasonalTempByLat
+										heat={annualAverageHeat}
+										latRange={ebmPreview.lats}
+										sampledDays={[0]}
+										dayLabels={["AVG"]}
+										fullHeight={true}
+										showScale={false}
+										showXAxis={false}
+										tooltipLabel={({ lat, temp }) =>
+											`${lat.toFixed(0)}\u00B0: ${temp.toFixed(1)}\u00B0C`
+										}
+									/>
+								</div>
+							</div>
+						</div>
 					)}
 					{previewTab === "gradient" && (
 						<SeasonalTempByLat
@@ -534,6 +574,6 @@ export const GenesisEngine = ({
 					)}
 				</div>
 			</div>
-		</div >
+		</div>
 	)
 }

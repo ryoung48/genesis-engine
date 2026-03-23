@@ -158,6 +158,15 @@ export interface OrogenRivers {
 	waterLevel: Float32Array
 }
 
+export const OROGEN_TOPOGRAPHY_LABELS = [
+	"flat",
+	"hills",
+	"plateus",
+	"mountains",
+	"marsh",
+	"coastal",
+] as const
+
 export interface OrogenWorld {
 	mesh: SphereMesh
 	plates: TectonicPlate[]
@@ -182,6 +191,8 @@ export interface OrogenWorld {
 	wind?: OrogenWind
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation?: Uint8Array
+	/** Per-cell topography code, index into OROGEN_TOPOGRAPHY_LABELS */
+	topography?: Uint8Array
 	rivers?: OrogenRivers
 	isLand?: Uint8Array
 	riverLand?: Uint8Array

@@ -35,6 +35,7 @@ export interface SerializedOrogenWorld {
 	pastaClimate?: Uint8Array
 	koppenClimate?: Uint8Array
 	vegetation?: Uint8Array
+	topography?: Uint8Array
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
 	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; lakes: Uint8Array; waterLevel: Float32Array }
