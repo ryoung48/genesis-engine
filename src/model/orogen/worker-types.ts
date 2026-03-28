@@ -18,6 +18,7 @@ export interface SerializedOrogenClimate {
 	temperature_min: Float32Array
 	temperature_max: Float32Array
 	temperature_monthly: Float32Array
+	daylight_hours_monthly?: Float32Array
 	landFraction: number[]
 }
 
@@ -33,6 +34,9 @@ export interface SerializedOrogenWorld {
 	rainfall?: { monthly: Float32Array; annual: Float32Array; east: Float32Array; west: Float32Array }
 	climateZones?: Uint8Array
 	pastaClimate?: Uint8Array
+	iceThickness?: Float32Array
+	iceMinMonthly?: Float32Array
+	iceMaxMonthly?: Float32Array
 	koppenClimate?: Uint8Array
 	vegetation?: Uint8Array
 	topography?: Uint8Array

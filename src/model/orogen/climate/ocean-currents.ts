@@ -89,6 +89,38 @@ export function computeOceanCurrents(
 		return teqByBin[bin]
 	}
 
+	// ── Label connected ocean basins and filter lakes ───────────────────
+	const basinLabel = new Int32Array(N).fill(-1)
+	let numBasins = 0
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || basinLabel[r] >= 0) continue
+		const label = numBasins++
+		const stack = [r]
+		basinLabel[r] = label
+		while (stack.length > 0) {
+			const c = stack.pop()!
+			for (let j = adjOffset[c], jEnd = adjOffset[c + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (!isLand[nb] && basinLabel[nb] < 0) {
+					basinLabel[nb] = label
+					stack.push(nb)
+				}
+			}
+		}
+	}
+
+	const MIN_BASIN_SIZE = Math.max(10, Math.floor(N * 0.001))
+	const basinSizeArr = new Int32Array(numBasins)
+	for (let r = 0; r < N; r++) {
+		if (basinLabel[r] >= 0) basinSizeArr[basinLabel[r]]++
+	}
+	const isLake = new Uint8Array(N)
+	for (let r = 0; r < N; r++) {
+		if (basinLabel[r] >= 0 && basinSizeArr[basinLabel[r]] < MIN_BASIN_SIZE) {
+			isLake[r] = 1
+		}
+	}
+
 	// ── Step 1: Classify coastal ocean cells as warm or cold ────────────
 	// A coastal ocean cell is one adjacent to at least one land cell.
 	// Sample the dominant advection field from neighboring land to determine
@@ -134,7 +166,7 @@ export function computeOceanCurrents(
 	// First pass: seed coastal ocean cells
 	const coastalSeeds: number[] = []
 	for (let r = 0; r < N; r++) {
-		if (isLand[r]) continue
+		if (isLand[r] || isLake[r]) continue
 
 		// Check if this ocean cell is adjacent to land
 		let landEast = 0, landWest = 0, landCount = 0
@@ -203,7 +235,7 @@ export function computeOceanCurrents(
 		if (d >= fadeHops) continue
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			if (!isLand[nb] && dist[nb] === -1) {
+			if (!isLand[nb] && !isLake[nb] && dist[nb] === -1) {
 				dist[nb] = d
 				// Fade warmth with distance
 				const fade = 1 - d / fadeHops
@@ -283,4 +315,39 @@ export function computeOceanCurrents(
 	}
 
 	return { oceanWarmth, coastalWarmth }
+}
+
+/**
+ * Apply ocean current temperature effects to the climate in-place.
+ *
+ * Warm currents (Gulf Stream, Kuroshio) raise SST and coastal land temps;
+ * cold currents (California, Benguela, Humboldt) lower them.
+ *
+ * Ocean:  up to ±5°C for strong currents
+ * Land:   up to ±3°C at coast, fading inland (coastalWarmth already fades)
+ */
+export function applyCurrentTemperatureEffect(
+	mesh: SphereMesh,
+	climate: OrogenClimate,
+	isLand: Uint8Array,
+	currents: OceanCurrentResult,
+): void {
+	const N = mesh.numRegions
+	const OCEAN_MAX = 5.0
+	const LAND_MAX = 3.0
+
+	for (let r = 0; r < N; r++) {
+		const w = isLand[r] ? currents.coastalWarmth[r] : currents.oceanWarmth[r]
+		if (Math.abs(w) < 0.01) continue
+
+		const maxEffect = isLand[r] ? LAND_MAX : OCEAN_MAX
+		const delta = w * maxEffect
+
+		climate.temperature_avg[r] += delta
+		climate.temperature_min[r] += delta
+		climate.temperature_max[r] += delta
+		for (let m = 0; m < 12; m++) {
+			climate.temperature_monthly[m * N + r] += delta
+		}
+	}
 }

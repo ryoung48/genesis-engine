@@ -36,6 +36,40 @@ export const KOPPEN_CLASSES = [
 
 export const KOPPEN_LABELS = KOPPEN_CLASSES.map((entry) => entry.code) as ReadonlyArray<string>
 
+const KOPPEN_TRUE_COLOR_MAP = {
+	Af: [42, 65, 15],
+	Am: [53, 74, 19],
+	Aw: [73, 87, 32],
+	As: [73, 87, 32],
+	BWh: [213, 183, 133],
+	BWk: [178, 153, 112],
+	BSh: [123, 112, 66],
+	BSk: [128, 117, 74],
+	Csa: [112, 104, 58],
+	Csb: [66, 75, 31],
+	Csc: [66, 75, 31],
+	Cwa: [78, 88, 36],
+	Cwb: [79, 81, 38],
+	Cwc: [135, 114, 68],
+	Cfa: [65, 80, 27],
+	Cfb: [62, 77, 27],
+	Cfc: [68, 78, 48],
+	Dsa: [148, 131, 85],
+	Dsb: [96, 92, 50],
+	Dsc: [66, 70, 31],
+	Dsd: [57, 66, 23],
+	Dwa: [74, 89, 34],
+	Dwb: [67, 83, 32],
+	Dwc: [57, 72, 23],
+	Dwd: [65, 71, 28],
+	Dfa: [66, 85, 29],
+	Dfb: [55, 75, 21],
+	Dfc: [52, 64, 20],
+	Dfd: [62, 71, 25],
+	ET: [122, 119, 92],
+	EF: [204, 217, 232],
+} as const
+
 const CLASS_ID: Record<string, number> = Object.fromEntries(
 	KOPPEN_CLASSES.map((entry, index) => [entry.code, index]),
 )
@@ -177,4 +211,15 @@ export function assignKoppenClimate(
 
 export function koppenClimateColor(classId: number): [number, number, number] {
 	return KOPPEN_CLASSES[classId]?.color ?? KOPPEN_CLASSES[0].color
+}
+
+export function koppenClimateName(classId: number): string {
+	return KOPPEN_CLASSES[classId]?.name ?? KOPPEN_CLASSES[0].name
+}
+
+export function koppenTrueColor(classId: number): [number, number, number] {
+	const code = KOPPEN_LABELS[classId]
+	if (!code || code === "Ocean") return [10 / 255, 10 / 255, 51 / 255]
+	const rgb = KOPPEN_TRUE_COLOR_MAP[code as keyof typeof KOPPEN_TRUE_COLOR_MAP]
+	return rgb ? [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255] : [10 / 255, 10 / 255, 51 / 255]
 }

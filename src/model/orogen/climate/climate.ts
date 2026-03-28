@@ -9,6 +9,7 @@ import { INSOLATION } from "../../cells/ebm/insolation"
 import { TIME } from "../../utilities/time"
 import type { SphereMesh, OrogenParams, OrogenClimate } from "../types"
 import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getSunTempFactor, isTidallyLocked } from "../units"
+import { SimplexNoise } from "../simplex-noise"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -170,6 +171,61 @@ export function computeMonthlyInsolation(mesh: SphereMesh, params: OrogenParams)
 	return monthly
 }
 
+export function computeMonthlyDaylightHours(mesh: SphereMesh, params: OrogenParams): Float32Array {
+	const N = mesh.numRegions
+	const monthly = new Float32Array(N * 12)
+	const hoursPerDay = getHoursPerDay(params.hoursPerDay)
+
+	if (isTidallyLocked(params.tidallyLocked)) {
+		for (let r = 0; r < N; r++) {
+			const x = mesh.r_xyz[3 * r]
+			const y = mesh.r_xyz[3 * r + 1]
+			const z = mesh.r_xyz[3 * r + 2]
+			const cosTheta = x * SUBSTELLAR[0] + y * SUBSTELLAR[1] + z * SUBSTELLAR[2]
+			const daylight = cosTheta > 1e-6 ? hoursPerDay : cosTheta < -1e-6 ? 0 : hoursPerDay / 2
+			for (let month = 0; month < 12; month++) {
+				monthly[month * N + r] = daylight
+			}
+		}
+		return monthly
+	}
+
+	const lats = Array.from(
+		{ length: EMB_CONSTANTS.grid.NUM_LAT },
+		(_, i) => -Math.PI / 2 + (Math.PI * i) / (EMB_CONSTANTS.grid.NUM_LAT - 1),
+	)
+	const { _daylight_hours } = INSOLATION.compute(
+		lats,
+		{
+			...EMB_CONSTANTS.orbital,
+			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
+			ECCENTRICITY: getEccentricity(params.eccentricity),
+			PERIHELION: 90,
+		},
+		{
+			...EMB_CONSTANTS.stellar,
+			T_SUN: EMB_CONSTANTS.stellar.T_SUN * getSunTempFactor(params.sunTempFactor),
+		},
+	)
+	const monthlyRanges: number[][] = new Array(12)
+	for (let month = 0; month < 12; month++) {
+		const days = TIME.month.days(month)
+		monthlyRanges[month] = _daylight_hours.map((row) => (
+			days.reduce((sum, day) => sum + row[day], 0) / Math.max(1, days.length)
+		) * (hoursPerDay / 24))
+	}
+
+	for (let r = 0; r < N; r++) {
+		const z = mesh.r_xyz[3 * r + 2]
+		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
+		for (let month = 0; month < 12; month++) {
+			monthly[month * N + r] = interpolateLatBand(monthlyRanges[month], latDeg)
+		}
+	}
+
+	return monthly
+}
+
 /**
  * Compute per-cell temperature for a tidally locked planet using a
  * Legendre polynomial expansion around the substellar point.
@@ -190,6 +246,7 @@ function computeTidalTemperature(
 	const N = mesh.numRegions
 	const sunFactor = getSunTempFactor(params.sunTempFactor)
 	const ecc = getEccentricity(params.eccentricity)
+	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
 
 	// Solar constant: S₀ = σ·T⁴·R²/AU²
 	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
@@ -273,6 +330,7 @@ function computeTidalTemperature(
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		daylight_hours_monthly,
 		landFraction,
 	}
 }
@@ -284,6 +342,7 @@ export function computeTemperature(
 	landFraction: number[],
 	params: OrogenParams,
 	oceanDist?: Float32Array,
+	isLand?: Uint8Array,
 ): OrogenClimate {
 	if (isTidallyLocked(params.tidallyLocked)) {
 		return computeTidalTemperature(mesh, elevation, landFraction, params, oceanDist)
@@ -306,6 +365,7 @@ export function computeTemperature(
 		landFraction,
 	})
 	ebm.runModel(30, 0.5)
+	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
 
 	// Build interpolation ranges: latitude bands → zonal temperature
 	let dayStart = 0
@@ -361,11 +421,48 @@ export function computeTemperature(
 		}
 	}
 
+	// ── Ocean SST noise: break up straight latitude bands ──────────────
+	// Two octaves of simplex noise on the unit sphere, applied only to
+	// ocean cells. Amplitude tapers toward the equator (tropics are more
+	// uniform) and toward the poles (already cold-clamped).
+	if (isLand) {
+		const seed = params.seed ?? 0
+		const sn1 = new SimplexNoise(seed + 3001)
+		const sn2 = new SimplexNoise(seed + 3002)
+		const FREQ1 = 3.0   // broad swirls
+		const FREQ2 = 7.0   // smaller eddies
+		const AMP1 = 3.0    // °C
+		const AMP2 = 1.2    // °C
+
+		for (let r = 0; r < N; r++) {
+			if (isLand[r]) continue
+			const x = mesh.r_xyz[3 * r]
+			const y = mesh.r_xyz[3 * r + 1]
+			const z = mesh.r_xyz[3 * r + 2]
+
+			// Latitude taper: strongest at mid-latitudes (~30-60°), weaker at equator and poles
+			const absZ = Math.abs(z) // sin(lat) on unit sphere
+			const taper = Math.min(1, absZ / 0.35) // full above ~20°, fades to zero at equator
+
+			const n = sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1
+				+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
+			const offset = n * taper
+
+			temperature_avg[r] += offset
+			temperature_min[r] += offset
+			temperature_max[r] += offset
+			for (let month = 0; month < 12; month++) {
+				temperature_monthly[month * N + r] += offset
+			}
+		}
+	}
+
 	return {
 		temperature_avg,
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		daylight_hours_monthly,
 		landFraction,
 	}
 }

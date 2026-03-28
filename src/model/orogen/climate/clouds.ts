@@ -1,12 +1,9 @@
 /**
  * Procedural cloud coverage generation on a sphere mesh.
  *
- * 1. Large cloud masses: low-freq FBM, domain-warped, thresholded for soft blobs
- * 2. Internal texture: higher-freq FBM varies density within masses
- * 3. Small puffy clusters: mid-freq sparse blobs
- * 4. Swirl: hemisphere-aware spiral distortion for weather systems
- * 5. Precipitation mask: suppress clouds over dry land regions
- * 6. Pressure + ocean scaling: thicker atmospheres on wet worlds → denser cloud cover
+ * Single cloud type: zonally stretched, domain-warped frontal bands across all latitudes.
+ * Pressure controls coverage (not thickness): at 1 bar looks normal, at 0.5 bar sparse,
+ * at 10 bar clouds everywhere but not thicker.
  */
 import type { OrogenParams, OrogenRainfall } from "../types"
 import { SimplexNoise } from "../simplex-noise"
@@ -37,110 +34,95 @@ function tangentFrame(x: number, y: number, z: number) {
 	}
 }
 
+const DEG2RAD = Math.PI / 180
+const RAD2DEG = 180 / Math.PI
+const TEQ_NUM_BINS = 120
+
 export function computeClouds(
 	mesh: { numRegions: number; r_xyz: Float32Array },
 	rainfall: OrogenRainfall,
 	isLand: Uint8Array,
 	params: OrogenParams,
+	monthlyTEQ?: Float32Array[],
 ): Float32Array {
 	const N = mesh.numRegions
 	const { r_xyz } = mesh
 	const seed = params.seed
 
-	const shapeNoise = new SimplexNoise(seed + 6000)
-	const detailNoise = new SimplexNoise(seed + 6001)
-	const warpNoiseA = new SimplexNoise(seed + 6003)
-	const warpNoiseB = new SimplexNoise(seed + 6004)
-	const puffNoise = new SimplexNoise(seed + 6005)
-	const puffMask = new SimplexNoise(seed + 6006)
-	const blendNoise = new SimplexNoise(seed + 6007)
-	const coverageNoise = new SimplexNoise(seed + 6008)
-	const swirlLocNoise = new SimplexNoise(seed + 6009)
-	const swirlAngNoise = new SimplexNoise(seed + 6010)
+	const frontNoise     = new SimplexNoise(seed + 6000)
+	const detailNoise    = new SimplexNoise(seed + 6001)
+	const warpEastNoise  = new SimplexNoise(seed + 6003)
+	const warpNorthNoise = new SimplexNoise(seed + 6004)
+	const coverageNoise  = new SimplexNoise(seed + 6008)
 
 	const clouds = new Float32Array(N)
 
-	const hoursPerDay = params.hoursPerDay ?? 24
-	const rotationSign = hoursPerDay >= 0 ? 1 : -1
+	// Average monthly TEQ into a single annual TEQ (degrees)
+	const teqBins = new Float32Array(TEQ_NUM_BINS)
+	if (monthlyTEQ && monthlyTEQ.length === 12) {
+		for (let b = 0; b < TEQ_NUM_BINS; b++) {
+			let sum = 0
+			for (let m = 0; m < 12; m++) sum += monthlyTEQ[m][b]
+			teqBins[b] = sum / 12
+		}
+	}
 
-	// Pressure & ocean fraction scaling
+	// Pressure controls coverage area, not thickness
+	// At 0.5 bar: coverage threshold rises (sparse), at 10 bar: threshold drops (everywhere)
 	const pressure = params.pressure ?? 1.0
 	let landCount = 0
 	for (let r = 0; r < N; r++) if (isLand[r]) landCount++
-	const oceanFraction = 1 - landCount / N
+	const oceanFrac = 1 - landCount / N
+	const oceanMoisture = Math.pow(oceanFrac, 0.6)
 
-	// pressureFactor: 0 at ≤0.5 bar, 1 at 1 bar, ramps up with sqrt above 1 bar
-	// oceanMoisture: 0..1, how much evaporation feeds clouds
-	// Combined into a density boost: at 1 bar + 70% ocean → ~1.0 (no change)
-	const pressureFactor = pressure <= 0.5 ? 0 : Math.sqrt(Math.max(0, pressure))
-	const oceanMoisture = Math.pow(oceanFraction, 0.6) // diminishing returns above ~50% ocean
-	// cloudBoost: ~1.0 for Earth-like, up to ~2.5 for 10bar water worlds, down to ~0.4 for thin/dry
-	const cloudBoost = pressureFactor * (0.3 + 0.7 * oceanMoisture)
-	// Coverage threshold shifts: lower = more area gets clouds
-	const covLoBase = -0.2
-	const covHiBase = 0.3
-	const covShift = -0.3 * Math.min(1, (cloudBoost - 1) * 0.8) // shifts down for high boost
-	const covLo = covLoBase + covShift
-	const covHi = covHiBase + covShift
-	// Cloud mass threshold shifts similarly
-	const massLoBase = -0.15
-	const massHiBase = 0.35
-	const massShift = -0.25 * Math.min(1, (cloudBoost - 1) * 0.8)
-	const massLo = massLoBase + massShift
-	const massHi = massHiBase + massShift
-	// Dry-land suppression weakens at high pressure (moisture everywhere)
-	const dryLandMin = Math.min(1, 0.3 * Math.max(0, cloudBoost - 1))
+	// Coverage threshold: higher = fewer clouds pass, lower = more coverage
+	// At p=1: ~0 (normal), p=0.5: ~+0.25 (sparser), p=10: ~-0.35 (everywhere)
+	const logPressure = Math.log2(Math.max(0.1, pressure))  // -3.3 at 0.1, 0 at 1, 3.3 at 10
+	const coverageShift = logPressure * 0.1                   // -0.33 at 0.1, 0 at 1, +0.33 at 10
+	const coverageBase = coverageShift - 0.1 * oceanMoisture // wetter worlds → slightly more coverage
+
+	// Dry-land suppression weakens at high pressure
+	const dryLandMin = Math.min(1, 0.15 * Math.max(0, logPressure))
+
+	const lonBinWidth = 360 / TEQ_NUM_BINS
 
 	for (let r = 0; r < N; r++) {
 		const x = r_xyz[3 * r]
 		const y = r_xyz[3 * r + 1]
 		const z = r_xyz[3 * r + 2]
 
-		// (1) Large-scale coverage zones
-		const cov = norm(coverageNoise.fbm(x * 1.2, y * 1.2, z * 1.2, 3, 0.5))
-		const coverage = smoothstep(covLo, covHi, cov)
-		if (coverage < 0.001) continue
-
-		// (2) Domain warp for organic shapes
+		const absLatRad = Math.abs(Math.asin(z))
 		const { ex, ey, ez, nx, ny, nz } = tangentFrame(x, y, z)
-		const dE = norm(warpNoiseA.fbm(x * 1.5 + 31.7, y * 1.5 + 47.3, z * 1.5 + 19.1, 4, 0.5)) * 0.18
-		const dN = norm(warpNoiseB.fbm(x * 1.5 + 73.1, y * 1.5 + 11.9, z * 1.5 + 59.3, 4, 0.5)) * 0.18
-		let wx = x + ex * dE + nx * dN
-		let wy = y + ey * dE + ny * dN
-		let wz = z + ez * dE + nz * dN
 
-		// (3) Large cloud masses: low-freq blobs
-		const shape = norm(shapeNoise.fbm(wx * 2, wy * 2, wz * 2, 5, 0.5))
-		// Wide smoothstep for soft puffy edges
-		let cloudMass = smoothstep(massLo, massHi, shape)
+		// Zonally stretched coords (compress x,y / stretch z — no atan2 seam)
+		const stretch = 1.3 + 1.5 * Math.pow(Math.sin(absLatRad + 0.1), 1.2)
+		const invS = 1 / stretch
+		const sx = x * invS, sy = y * invS, sz = z * stretch
 
-		// (4) Internal texture: detail within masses
-		const detail = norm(detailNoise.fbm(wx * 7, wy * 7, wz * 7, 4, 0.45))
-		const texture = detail * 0.25 + 0.75 // 0.5 to 1.0
-		const largeCloud = cloudMass * texture
+		// Asymmetric domain warp — streaky along bands, organic across
+		const dE = norm(warpEastNoise.fbm(sx * 1.8 + 31.7, sy * 1.8 + 47.3, sz * 1.8 + 19.1, 4, 0.5)) * 0.28
+		const dN = norm(warpNorthNoise.fbm(sx * 1.8 + 73.1, sy * 1.8 + 11.9, sz * 1.8 + 59.3, 4, 0.5)) * 0.15
+		const wx = sx + ex * dE + nx * dN
+		const wy = sy + ey * dE + ny * dN
+		const wz = sz + ez * dE + nz * dN
 
-		// (5) Small puffy clusters: more of them, scattered everywhere
-		const pv = norm(puffNoise.fbm(x * 10, y * 10, z * 10, 4, 0.45))
-		const pm = norm(puffMask.fbm(x * 2.5, y * 2.5, z * 2.5, 3, 0.5))
-		// Wide smoothstep range for soft, feathered puff edges
-		const puffShape = smoothstep(-0.15, 0.6, pv)
-		const puffCloud = puffShape * smoothstep(-0.2, 0.4, pm)
+		// Cloud shape
+		const shape = norm(frontNoise.fbm(wx * 2.5, wy * 2.5, wz * 2.5, 5, 0.5))
+		let cloud = smoothstep(-0.15 - coverageBase, 0.4 - coverageBase, shape)
 
-		// (6) Blend — give puffs more weight so they're visible
-		const bt = norm(blendNoise.fbm(x * 3, y * 3, z * 3, 3, 0.5)) * 0.5 + 0.5
-		let cloud = largeCloud * (1 - bt * 0.5) + puffCloud * bt * 0.6
+		// Internal texture
+		const detail = norm(detailNoise.fbm(wx * 8, wy * 8, wz * 8, 4, 0.45))
+		cloud *= detail * 0.25 + 0.75
 
-		// Soft coverage fade
-		cloud *= smoothstep(0.0, 0.3, coverage)
+		// Coverage variation — breaks up uniform regions
+		const cov = norm(coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5))
+		cloud *= smoothstep(-0.6 - coverageBase * 0.5, 0.2 - coverageBase * 0.5, cov)
 
-		// (7) Precipitation mask: only for land, weakened at high pressure
+		// Dry-land suppression
 		if (isLand[r]) {
 			const dryMask = smoothstep(30, 250, rainfall.annual[r])
 			cloud *= dryLandMin + (1 - dryLandMin) * dryMask
 		}
-
-		// (8) Density boost from pressure + ocean moisture
-		cloud *= cloudBoost
 
 		clouds[r] = Math.max(0, Math.min(1, cloud))
 	}

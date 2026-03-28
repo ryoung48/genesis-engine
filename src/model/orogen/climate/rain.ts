@@ -6,6 +6,7 @@
 import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
 import { elevToHeightKm } from "./climate"
 import { getDaysPerYear, getHoursPerDay, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "../units"
+import { SimplexNoise } from "../simplex-noise"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -476,7 +477,7 @@ export function computeMonthlyRain(
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
 	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure">,
+	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure" | "seed">,
 	monthlyTEQ?: Float32Array[],
 ): { monthly: Float32Array; annual: Float32Array } {
 	if (isTidallyLocked(params?.tidallyLocked)) {
@@ -527,6 +528,33 @@ export function computeMonthlyRain(
 			const weight = computeWeight(latDeg[r], teq, e, w, circulation)
 			const monthTemp = climate.temperature_monthly[month * N + r]
 			monthly[month * N + r] = weight * ceilingScale(monthTemp) * pressureRainFactor
+		}
+	}
+
+	// ── Precipitation noise: break up uniform rainfall bands ───────────
+	// Two octaves of simplex noise, applied as a multiplicative factor
+	// (0.55–1.45) so dry areas stay dry and wet areas get organic variation.
+	{
+		const seed = params?.seed ?? 0
+		const sn1 = new SimplexNoise(seed + 4001)
+		const sn2 = new SimplexNoise(seed + 4002)
+		const FREQ1 = 3.5
+		const FREQ2 = 8.0
+		const AMP1 = 0.28
+		const AMP2 = 0.12
+
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r]) continue
+			const x = mesh.r_xyz[3 * r]
+			const y = mesh.r_xyz[3 * r + 1]
+			const z = mesh.r_xyz[3 * r + 2]
+			const n = sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1
+				+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
+			// Multiplicative: clamp factor to [0.55, 1.45]
+			const factor = Math.max(0.55, Math.min(1.45, 1 + n))
+			for (let month = 0; month < 12; month++) {
+				monthly[month * N + r] *= factor
+			}
 		}
 	}
 

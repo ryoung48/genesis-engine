@@ -20,9 +20,10 @@ import {
 	sharpenRidges,
 	applySoilCreep,
 } from "./erosion"
-import { computeOceanCurrents } from "./climate/ocean-currents"
+import { computeOceanCurrents, applyCurrentTemperatureEffect } from "./climate/ocean-currents"
 import { computeWind } from "./climate/wind"
 import { assignVegetation, assignClimateZones } from "./climate/vegetation"
+import { computeIceAccumulation } from "./climate/ice"
 import { assignPastaClimate } from "./climate/pasta"
 import { assignKoppenClimate } from "./climate/koppen"
 import { ENABLE_PASTA_CLASSIFICATION, ENABLE_PROVINCES, ENABLE_WIND_FIELDS } from "./features"
@@ -484,7 +485,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Computing climate...", 93)
 	t0 = performance.now()
 	const landFraction = computeLandFraction(mesh, isLand)
-	const climate = computeTemperature(mesh, elevation, landFraction, params, oceanDist)
+	const climate = computeTemperature(mesh, elevation, landFraction, params, oceanDist, isLand)
 	pipelineTiming.push({ Stage: "EBM temperature", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:climate")
 
@@ -496,8 +497,18 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Moisture advection", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:advection")
 
-	// 15b. Ocean currents — disabled pending rework
-	const oceanCurrents = undefined
+	// 15b. Ocean currents
+	console.time("orogen:ocean-currents")
+	onProgress?.("Computing ocean currents...", 95)
+	t0 = performance.now()
+	const oceanCurrents = climate
+		? computeOceanCurrents(mesh, eastAdv, westAdv, isLand, climate, params)
+		: undefined
+	if (oceanCurrents) {
+		applyCurrentTemperatureEffect(mesh, climate, isLand, oceanCurrents)
+	}
+	pipelineTiming.push({ Stage: "Ocean currents", ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:ocean-currents")
 
 	// Pre-compute monthly thermal equators once (shared by wind + rainfall)
 	const monthlyTEQ: Float32Array[] | undefined = climate ? (() => {
@@ -613,13 +624,22 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Climate zone assignment", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:climateZones")
 
-	// 19. Vegetation assignment
+	// 19a. Ice accumulation
+	console.time("orogen:ice")
+	onProgress?.("Computing ice accumulation...", 98)
+	t0 = performance.now()
+	const iceResult = computeIceAccumulation(mesh, climate, rainfall, isLand, distFields.distCoast)
+	const { iceThickness, iceMinMonthly, iceMaxMonthly } = iceResult
+	pipelineTiming.push({ Stage: "Ice accumulation", ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:ice")
+
+	// 19b. Pasta climate classification
 	let pastaClimate: Uint8Array | undefined
 	if (ENABLE_PASTA_CLASSIFICATION) {
 		console.time("orogen:pasta")
 		onProgress?.("Classifying pasta climate...", 99)
 		t0 = performance.now()
-		pastaClimate = assignPastaClimate(mesh, isLand, climate, rainfall, params)
+		pastaClimate = assignPastaClimate(mesh, isLand, climate, rainfall, params, iceThickness, iceMinMonthly, iceMaxMonthly)
 		pipelineTiming.push({ Stage: "Pasta climate assignment", ms: (performance.now() - t0).toFixed(1) })
 		console.timeEnd("orogen:pasta")
 	}
@@ -689,6 +709,9 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		rainfall,
 		climateZones,
 		pastaClimate,
+		iceThickness,
+		iceMinMonthly,
+		iceMaxMonthly,
 		koppenClimate,
 		vegetation,
 		topography,
@@ -701,5 +724,6 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		oceanCurrents,
 		wind,
 		continentCount: countContinents(mesh, isLand),
+		monthlyTEQ,
 	}
 }

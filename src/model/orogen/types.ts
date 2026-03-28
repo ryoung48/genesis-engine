@@ -119,6 +119,7 @@ export interface OrogenClimate {
 	temperature_min: Float32Array   // per-cell annual min °C
 	temperature_max: Float32Array   // per-cell annual max °C
 	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
+	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
 	landFraction: number[]          // 36-band land fraction used by EBM
 }
 
@@ -206,6 +207,12 @@ export interface OrogenWorld {
 	climateZones?: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
 	pastaClimate?: Uint8Array
+	/** Per-cell ice thickness in mm water equivalent (0 for ice-free) */
+	iceThickness?: Float32Array
+	/** Per-cell minimum ice across final-year months (mm w.e.) — for sea ice classification */
+	iceMinMonthly?: Float32Array
+	/** Per-cell maximum ice across final-year months (mm w.e.) — for sea ice classification */
+	iceMaxMonthly?: Float32Array
 	/** Per-cell Koppen climate code (index into KOPPEN_CLASSES) */
 	koppenClimate?: Uint8Array
 	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
@@ -223,4 +230,6 @@ export interface OrogenWorld {
 	landmarks?: import("./provinces/landmarks").OrogenLandmarks
 	population?: import("./provinces/population").ProvincePopulation
 	continentCount?: number
+	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
+	monthlyTEQ?: Float32Array[]
 }

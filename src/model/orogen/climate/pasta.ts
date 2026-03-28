@@ -3,15 +3,15 @@ import type { OrogenClimate, OrogenParams, OrogenRainfall, SphereMesh } from "..
 import { computeMonthlyInsolation } from "./climate"
 
 const ZONE_COLOR_MAP = {
-	Ofi: [226, 248, 255],
-	Ofd: [185, 227, 255],
-	Ofg: [137, 169, 190],
-	Og: [79, 119, 150],
-	Oc: [113, 171, 216],
-	Ot: [9, 120, 171],
-	Oh: [6, 79, 147],
-	Or: [1, 45, 86],
-	Oe: [81, 9, 170],
+	Ofi: [220, 245, 255],
+	Ofd: [170, 225, 255],
+	Ofg: [130, 195, 235],
+	Og: [90, 165, 215],
+	Oc: [50, 145, 220],
+	Ot: [20, 110, 200],
+	Oh: [15, 80, 185],
+	Or: [40, 50, 170],
+	Oe: [120, 40, 200],
 	TUr: [0, 0, 255],
 	TUrp: [4, 0, 191],
 	TUf: [41, 112, 255],
@@ -107,6 +107,113 @@ const ZONE_COLOR_MAP = {
 	Ahc: [236, 243, 230],
 	Ahh: [255, 224, 224],
 	Ahe: [239, 210, 238],
+} as const
+
+const ZONE_TRUE_COLOR_MAP = {
+	Ofi: [240, 240, 240],
+	Ofd: [10, 10, 51],
+	Ofg: [10, 10, 51],
+	Og: [10, 10, 51],
+	Oc: [10, 10, 51],
+	Ot: [10, 10, 51],
+	Oh: [10, 10, 51],
+	Or: [10, 10, 51],
+	Oe: [10, 10, 51],
+	TUr: [41, 63, 13],
+	TUrp: [42, 65, 16],
+	TUf: [55, 74, 20],
+	TUfp: [59, 80, 24],
+	TUs: [75, 85, 33],
+	TUsp: [89, 102, 47],
+	TUA: [107, 105, 53],
+	TUAp: [124, 116, 63],
+	TQf: [59, 78, 23],
+	TQfp: [54, 73, 24],
+	TQs: [75, 80, 35],
+	TQsp: [67, 76, 30],
+	TQA: [107, 105, 53],
+	TQAp: [124, 116, 63],
+	TF: [78, 84, 66],
+	TG: [98, 91, 59],
+	CTf: [59, 78, 23],
+	CTfp: [54, 73, 24],
+	CTs: [75, 80, 35],
+	CTsp: [67, 76, 30],
+	CDa: [60, 78, 23],
+	CDap: [36, 54, 15],
+	CDb: [55, 75, 21],
+	CDbp: [38, 62, 11],
+	CEa: [60, 63, 29],
+	CEap: [38, 52, 18],
+	CEb: [49, 61, 18],
+	CEbp: [52, 64, 25],
+	CEc: [62, 71, 24],
+	CEcp: [64, 74, 27],
+	CMa: [60, 73, 26],
+	CMb: [51, 63, 22],
+	CAMa: [103, 97, 54],
+	CAMb: [118, 108, 68],
+	CAa: [105, 98, 58],
+	CAap: [58, 68, 25],
+	CAb: [102, 100, 55],
+	CAbp: [94, 87, 55],
+	CFa: [78, 84, 66],
+	CFb: [93, 88, 54],
+	CG: [98, 91, 59],
+	CI: [240, 240, 240],
+	HTf: [55, 74, 20],
+	HTfp: [59, 80, 24],
+	HTs: [75, 85, 33],
+	HTsp: [89, 102, 47],
+	HDa: [60, 78, 23],
+	HDap: [36, 54, 15],
+	HDb: [55, 75, 21],
+	HDbp: [38, 62, 11],
+	HDc: [62, 71, 24],
+	HDcp: [64, 74, 27],
+	HMa: [60, 73, 26],
+	HMb: [51, 63, 22],
+	HMc: [51, 63, 22],
+	HAMa: [103, 97, 54],
+	HAMb: [118, 108, 68],
+	HAMc: [118, 108, 68],
+	HAa: [107, 105, 53],
+	HAap: [124, 116, 63],
+	HAb: [107, 105, 53],
+	HAbp: [124, 116, 63],
+	HAc: [107, 105, 53],
+	HAcp: [124, 116, 63],
+	HFa: [78, 84, 66],
+	HFb: [93, 88, 54],
+	HFc: [93, 88, 54],
+	HG: [98, 91, 59],
+	ETf: [59, 78, 23],
+	ETfp: [54, 73, 24],
+	ETs: [75, 80, 35],
+	ETsp: [67, 76, 30],
+	EDa: [60, 78, 23],
+	EDap: [36, 54, 15],
+	EDb: [55, 75, 21],
+	EDbp: [38, 62, 11],
+	EMa: [60, 73, 26],
+	EMb: [51, 63, 22],
+	EAMa: [103, 97, 54],
+	EAMb: [118, 108, 68],
+	EAa: [105, 98, 58],
+	EAap: [58, 68, 25],
+	EAb: [102, 100, 55],
+	EAbp: [94, 87, 55],
+	EFa: [78, 84, 66],
+	EFb: [93, 88, 54],
+	EG: [98, 91, 59],
+	Ada: [167, 137, 95],
+	Aha: [238, 210, 156],
+	Adc: [177, 153, 110],
+	Ahc: [208, 181, 141],
+	Adh: [167, 137, 95],
+	Ahh: [238, 210, 156],
+	Ade: [177, 153, 110],
+	Ahe: [208, 181, 141],
 } as const
 
 export const PASTA_LABELS = ["ocean", ...Object.keys(ZONE_COLOR_MAP)] as const
@@ -221,27 +328,44 @@ export const PASTA_NAMES: Record<(typeof PASTA_LABELS)[number], string> = {
 
 const ZONE_INDEX = new Map<string, number>(PASTA_LABELS.map((label, index) => [label, index]))
 
-function gdm(temp: number, month: number, base: number, platStart: number, platEnd: number, comp: number): number {
+// Pre-resolved zone indices — avoids Map lookups and string allocations in the hot loop
+const Z = Object.fromEntries(
+	PASTA_LABELS.map((label, index) => [label, index]),
+) as Record<string, number>
+
+// Pre-compute days per month (avoid allocating range arrays in the hot loop)
+const DAYS_PER_MONTH = new Float64Array(12)
+for (let m = 0; m < 12; m++) DAYS_PER_MONTH[m] = TIME.month.days(m).length
+
+function gdm(temp: number, monthDays: number, base: number, platStart: number, platEnd: number, comp: number): number {
 	const max = platStart - base
 	const backSlope = max / (comp - platEnd)
 	let gdd = temp - base
 	if (temp > platStart) gdd = max
 	if (temp > platEnd) gdd = max - backSlope * (temp - platEnd)
-	return Math.max(0, gdd) * TIME.month.days(month).length
+	return (gdd > 0 ? gdd : 0) * monthDays
 }
 
 function gddiDay(insolationWm2: number, baseline: number): number {
 	const effective = insolationWm2 * 0.5
-	return Math.min(20, Math.max(0, (effective - baseline) / 10))
+	const v = (effective - baseline) * 0.1
+	return v < 0 ? 0 : v > 20 ? 20 : v
 }
 
-function longestRun(monthly: number[]): number {
-	if (monthly.every((v) => v > 0)) return Infinity
-	const start = monthly.findIndex((v) => v === 0)
+function longestRun(monthly: Float64Array): number {
+	let allPositive = true
+	let start = -1
+	for (let i = 0; i < 12; i++) {
+		if (monthly[i] <= 0) {
+			allPositive = false
+			if (start < 0) start = i
+		}
+	}
+	if (allPositive) return Infinity
 	let maxSum = 0
 	let runSum = 0
-	for (let i = 0; i < monthly.length; i++) {
-		const value = monthly[(start + i) % monthly.length]
+	for (let i = 0; i < 12; i++) {
+		const value = monthly[(start + i) % 12]
 		if (value > 0) {
 			runSum += value
 			if (runSum > maxSum) maxSum = runSum
@@ -252,31 +376,30 @@ function longestRun(monthly: number[]): number {
 	return maxSum
 }
 
-function gddTotal(gdd: number[], gint: number[] | null = null, threshold = 1250): number {
-	const n = gdd.length
-	const giAcc = gint ? gint.slice() : new Array<number>(n).fill(1e6)
+function gddTotal(gdd: Float64Array, gint: Float64Array, gddAcc: Float64Array, giAcc: Float64Array, threshold: number): number {
+	for (let t = 0; t < 12; t++) giAcc[t] = gint[t]
 
-	if (gint) {
-		for (let pass = 0; pass < 2; pass++) {
-			for (let t = 0; t < n; t++) {
-				const prev = t === 0 ? giAcc[n - 1] : giAcc[t - 1]
-				giAcc[t] = gint[t] > 0 ? gint[t] + prev : 0
-			}
+	for (let pass = 0; pass < 2; pass++) {
+		for (let t = 0; t < 12; t++) {
+			const prev = t === 0 ? giAcc[11] : giAcc[t - 1]
+			giAcc[t] = gint[t] > 0 ? gint[t] + prev : 0
 		}
-		if (giAcc.every((v) => v > 0)) giAcc[n - 1] = 1e6
-		for (let pass = 0; pass < 2; pass++) {
-			for (let t = 0; t < n; t++) {
-				const tn = n - (t + 1)
-				const prev = ((tn - 1) % n + n) % n
-				if (gint[tn] > 0 && gint[prev] > 0) giAcc[prev] = giAcc[tn]
-			}
+	}
+	let allPos = true
+	for (let t = 0; t < 12; t++) if (giAcc[t] <= 0) { allPos = false; break }
+	if (allPos) giAcc[11] = 1e6
+	for (let pass = 0; pass < 2; pass++) {
+		for (let t = 0; t < 12; t++) {
+			const tn = 11 - t
+			const prev = ((tn - 1) % 12 + 12) % 12
+			if (gint[tn] > 0 && gint[prev] > 0) giAcc[prev] = giAcc[tn]
 		}
 	}
 
-	const gddAcc = gdd.slice()
+	for (let t = 0; t < 12; t++) gddAcc[t] = gdd[t]
 	for (let pass = 0; pass < 2; pass++) {
-		for (let t = 0; t < n; t++) {
-			const prev = t === 0 ? gddAcc[n - 1] : gddAcc[t - 1]
+		for (let t = 0; t < 12; t++) {
+			const prev = t === 0 ? gddAcc[11] : gddAcc[t - 1]
 			const sum = gdd[t] + prev
 			if (gdd[t] > 0) gddAcc[t] = sum
 			else if (giAcc[t] > threshold) gddAcc[t] = 0
@@ -284,89 +407,136 @@ function gddTotal(gdd: number[], gint: number[] | null = null, threshold = 1250)
 		}
 	}
 
-	return gddAcc.every((v) => v > 0) ? Infinity : Math.max(...gddAcc)
+	allPos = true
+	let max = -Infinity
+	for (let t = 0; t < 12; t++) {
+		if (gddAcc[t] <= 0) allPos = false
+		if (gddAcc[t] > max) max = gddAcc[t]
+	}
+	return allPos ? Infinity : max
 }
 
-function pet(monthlyTemps: number[]): number[] {
-	return monthlyTemps.map((temp, month) => Math.max(0, (temp * 7) / 30 * TIME.month.days(month).length))
+// Inlined PET: max(0, temp * 5.5 / 30 * days)
+// Coefficient 5.5/30 ≈ 0.183 aligns closer to Penman-Monteith tropical PET
+// (was 7/30 ≈ 0.233 which overestimated, suppressing tropical rainforest classification)
+function petMonth(temp: number, days: number): number {
+	const v = temp * 5.5 / 30 * days
+	return v > 0 ? v : 0
 }
 
-function estimateSeaIceFraction(temp: number): number {
-	const freezePoint = -1.8
-	if (temp <= freezePoint - 10) return 1
-	if (temp >= freezePoint + 4) return 0
-	return Math.max(0, Math.min(1, (freezePoint + 4 - temp) / 14))
-}
+function computeAet(temps: Float64Array, rain: Float64Array, petBuf: Float64Array, aetBuf: Float64Array): void {
+	for (let m = 0; m < 12; m++) petBuf[m] = petMonth(temps[m], DAYS_PER_MONTH[m])
 
-function aet(monthlyTemps: number[], monthlyRain: number[]): number[] {
-	const petM = pet(monthlyTemps)
-	const result = new Array<number>(12).fill(0)
 	let soil = 25
-
 	for (let iter = 0; iter < 20; iter++) {
 		const startSoil = soil
-		for (let month = 0; month < 12; month++) {
-			const p = monthlyRain[month]
-			const pe = petM[month]
+		for (let m = 0; m < 12; m++) {
+			const p = rain[m]
+			const pe = petBuf[m]
 			if (p >= pe) {
-				soil = Math.min(50, soil + (p - pe))
-				result[month] = pe
+				soil = soil + (p - pe)
+				if (soil > 50) soil = 50
+				aetBuf[m] = pe
 			} else {
 				const deficit = pe - p
 				const soilEvap = soil > 25
-					? Math.min(soil, deficit)
-					: Math.min(soil, deficit * (soil / 25))
+					? (soil < deficit ? soil : deficit)
+					: (deficit * (soil / 25) < soil ? deficit * (soil / 25) : soil)
 				soil -= soilEvap
-				result[month] = p + soilEvap
+				aetBuf[m] = p + soilEvap
 			}
 		}
 		if (Math.abs(soil - startSoil) < 1) break
 	}
-
-	return result
 }
 
-function classifyPasta(monthlyTemps: number[], monthlyRain: number[], monthlyInsolation: number[], isOcean: boolean): string {
-	const warmest = Math.max(...monthlyTemps)
-	const coldest = Math.min(...monthlyTemps)
-	const annualPrecip = monthlyRain.reduce((sum, value) => sum + value, 0)
-	const aetM = aet(monthlyTemps, monthlyRain)
-	const petM = pet(monthlyTemps)
+function classifyOcean(
+	temps: Float64Array, insol: Float64Array,
+	mGDDz: Float64Array, mGInt: Float64Array,
+	gddAccBuf: Float64Array, giAccBuf: Float64Array,
+	iceMin: number, iceMax: number,
+): number {
+	let warmest = -Infinity, coldest = Infinity
+	for (let m = 0; m < 12; m++) {
+		const t = temps[m]
+		if (t > warmest) warmest = t
+		if (t < coldest) coldest = t
+	}
 
-	let petSum = 0
-	let aetSum = 0
-	let petGdd = 0
-	let aetGdd = 0
-	let precGdd = 0
-	let gddWeightSum = 0
-	const mGDD: number[] = []
-	const mGDDz: number[] = []
-	const mGInt: number[] = []
+	// Only need gddz for ocean classification
+	for (let m = 0; m < 12; m++) {
+		const days = DAYS_PER_MONTH[m]
+		const g0 = gdm(temps[m], days, 0, 20, 40, 60)
+		const lightZero = gddiDay(insol[m], 0)
+		const effectiveGDDz = g0 < lightZero * days ? g0 : lightZero * days
+		mGDDz[m] = g0 > 0 && lightZero > 0 ? g0 : 0
+		const v = 15 * days - effectiveGDDz
+		mGInt[m] = v > 0 ? v : 0
+	}
+	const gddz = gddTotal(mGDDz, mGInt, gddAccBuf, giAccBuf, 1250)
 
-	for (let month = 0; month < 12; month++) {
-		const temp = monthlyTemps[month]
-		const days = TIME.month.days(month).length
-		const g5 = gdm(temp, month, 5, 25, 40, 50)
-		const g0 = gdm(temp, month, 0, 20, 40, 60)
-		const lightStd = gddiDay(monthlyInsolation[month], 20)
-		const lightZero = gddiDay(monthlyInsolation[month], 0)
+	// Sea ice from ice accumulation model (1cm snow ≈ 10% cover, per Pasta spec):
+	//   minIce > 80mm (8cm) all months → permanent ice (Ofi)
+	//   maxIce > 20mm (2cm) any month  → seasonal ice (Ofd/Ofg)
+	if (iceMin > 80) return Z.Ofi
+	if (iceMax > 20) return gddz >= 50 ? Z.Ofd : Z.Ofg
+	if (gddz < 50) return Z.Og
+	if (warmest > 60) return Z.Or
+	if (coldest > 18) return warmest > 40 ? Z.Oh : Z.Ot
+	if (warmest > 40) return Z.Oe
+	return Z.Oc
+}
+
+// MinIce > 10cm (100mm w.e.) for CI, per Worldbuilding Pasta spec
+const ICE_THRESHOLD = 100
+
+function classifyLand(
+	temps: Float64Array, rain: Float64Array, insol: Float64Array,
+	petBuf: Float64Array, aetBuf: Float64Array,
+	mGDD: Float64Array, mGDDz: Float64Array, mGInt: Float64Array,
+	gddAccBuf: Float64Array, giAccBuf: Float64Array,
+	iceVal: number,
+): number {
+	let warmest = -Infinity, coldest = Infinity, annualPrecip = 0
+	for (let m = 0; m < 12; m++) {
+		const t = temps[m]
+		if (t > warmest) warmest = t
+		if (t < coldest) coldest = t
+		annualPrecip += rain[m]
+	}
+
+	// Ice classification per Pasta spec:
+	// CI if MinIce > 10cm, BUT persistent ice removed if absolute max temp > 0°C
+	if (iceVal > ICE_THRESHOLD && warmest <= 0) return Z.CI
+
+	computeAet(temps, rain, petBuf, aetBuf)
+
+	let petSum = 0, aetSum = 0, petGdd = 0, aetGdd = 0, precGdd = 0, gddWeightSum = 0
+	for (let m = 0; m < 12; m++) {
+		const temp = temps[m]
+		const days = DAYS_PER_MONTH[m]
+		const g5 = gdm(temp, days, 5, 25, 40, 50)
+		const g0 = gdm(temp, days, 0, 20, 40, 60)
+		const lightStd = gddiDay(insol[m], 20)
+		const lightZero = gddiDay(insol[m], 0)
 		const ceiling = 15 * days
-		const effectiveGDDz = Math.min(g0, lightZero * days)
+		const effectiveGDDz = g0 < lightZero * days ? g0 : lightZero * days
 
-		mGDD.push(g5 > 0 && lightStd > 0 ? g5 : 0)
-		mGDDz.push(g0 > 0 && lightZero > 0 ? g0 : 0)
-		mGInt.push(Math.max(0, ceiling - effectiveGDDz))
+		mGDD[m] = g5 > 0 && lightStd > 0 ? g5 : 0
+		mGDDz[m] = g0 > 0 && lightZero > 0 ? g0 : 0
+		mGInt[m] = ceiling - effectiveGDDz
+		if (mGInt[m] < 0) mGInt[m] = 0
 
-		petSum += petM[month]
-		aetSum += aetM[month]
-		petGdd += petM[month] * g5
-		aetGdd += aetM[month] * g5
-		precGdd += monthlyRain[month] * g5
+		petSum += petBuf[m]
+		aetSum += aetBuf[m]
+		petGdd += petBuf[m] * g5
+		aetGdd += aetBuf[m] * g5
+		precGdd += rain[m] * g5
 		gddWeightSum += g5
 	}
 
-	const gdd = gddTotal(mGDD, mGInt)
-	const gddz = gddTotal(mGDDz, mGInt)
+	const gdd = gddTotal(mGDD, mGInt, gddAccBuf, giAccBuf, 1250)
+	const gddz = gddTotal(mGDDz, mGInt, gddAccBuf, giAccBuf, 1250)
 	const gint = longestRun(mGInt)
 	const ar = petSum > 0 ? aetSum / petSum : 1
 	const gar = petGdd > 0 ? aetGdd / petGdd : 1
@@ -374,7 +544,6 @@ function classifyPasta(monthlyTemps: number[], monthlyRain: number[], monthlyIns
 	const gpr = gddWeightSum > 0 ? precGdd / gddWeightSum : 0
 	const grs = aetAvg > 0 ? gpr / aetAvg : 1
 	const evr = annualPrecip > 0 ? aetSum / annualPrecip : 1
-	const ice = warmest <= 0 && annualPrecip > 25
 
 	const cool = coldest > 0 && coldest <= 17
 	const cold = coldest > -30 && coldest <= 0
@@ -386,107 +555,112 @@ function classifyPasta(monthlyTemps: number[], monthlyRain: number[], monthlyIns
 	const groupC = warmest < 40 && coldest <= 17
 	const groupH = warmest >= 40 && coldest > 17
 
-	const seaIceFractions = monthlyTemps.map(estimateSeaIceFraction)
-	const maxSeaIce = Math.max(...seaIceFractions)
-	const minSeaIce = Math.min(...seaIceFractions)
-
-	if (isOcean) {
-		if (minSeaIce > 0.8) return "Ofi"
-		if (maxSeaIce > 0.2) return gddz >= 50 ? "Ofd" : "Ofg"
-		if (gddz < 50) return "Og"
-		if (warmest > 60) return "Or"
-		if (coldest > 18) return warmest > 40 ? "Oh" : "Ot"
-		if (warmest > 40) return "Oe"
-		return "Oc"
-	}
-
-	if (ice) return "CI"
-
 	if (gddz < 50) {
-		if (groupT) return "TG"
-		if (groupC) return "CG"
-		if (groupH) return "HG"
-		return "EG"
+		if (groupT) return Z.TG
+		if (groupC) return Z.CG
+		if (groupH) return Z.HG
+		return Z.EG
 	}
 
 	if (ar < 0.2) {
-		const prefix = ar < 0.06 ? "Ah" : "Ad"
-		if (warmest < 60 && coldest > 0) return `${prefix}a`
-		if (warmest < 60) return `${prefix}c`
-		if (coldest > 0) return `${prefix}h`
-		return `${prefix}e`
+		if (ar < 0.06) {
+			if (warmest < 60 && coldest > 0) return Z.Aha
+			if (warmest < 60) return Z.Ahc
+			if (coldest > 0) return Z.Ahh
+			return Z.Ahe
+		}
+		if (warmest < 60 && coldest > 0) return Z.Ada
+		if (warmest < 60) return Z.Adc
+		if (coldest > 0) return Z.Adh
+		return Z.Ade
 	}
 
 	if (gdd < 350) {
-		if (groupT) return "TF"
-		if (groupC) return cool ? "CFa" : "CFb"
+		if (groupT) return Z.TF
+		if (groupC) return cool ? Z.CFa : Z.CFb
 		if (groupH) {
-			if (hot) return "HFa"
-			if (torrid) return "HFb"
-			return "HFc"
+			if (hot) return Z.HFa
+			if (torrid) return Z.HFb
+			return Z.HFc
 		}
-		if (hot && cool) return "EFa"
-		return "EFb"
+		if (hot && cool) return Z.EFa
+		return Z.EFb
 	}
-
-	const p = pluvial ? "p" : ""
 
 	if (groupT) {
 		const eu = gint < 1250
-		if (gar < 0.5) return `${eu ? "TUA" : "TQA"}${p}`
+		if (gar < 0.5) return eu
+			? (pluvial ? Z.TUAp : Z.TUA)
+			: (pluvial ? Z.TQAp : Z.TQA)
 		if (eu) {
-			if (ar > 0.9) return evr < 0.4 ? "TUrp" : "TUr"
-			if (ar > 0.75) return `TUf${p}`
-			return `TUs${p}`
+			if (ar > 0.9) return evr < 0.4 ? Z.TUrp : Z.TUr
+			if (ar > 0.75) return pluvial ? Z.TUfp : Z.TUf
+			return pluvial ? Z.TUsp : Z.TUs
 		}
-		return ar > 0.75 ? `TQf${p}` : `TQs${p}`
+		return ar > 0.75
+			? (pluvial ? Z.TQfp : Z.TQf)
+			: (pluvial ? Z.TQsp : Z.TQs)
 	}
 
 	if (groupC) {
 		if (gar < 0.5) {
-			if (lowGrS) return cool ? "CAMa" : "CAMb"
-			return cool ? `CAa${p}` : `CAb${p}`
+			if (lowGrS) return cool ? Z.CAMa : Z.CAMb
+			return cool
+				? (pluvial ? Z.CAap : Z.CAa)
+				: (pluvial ? Z.CAbp : Z.CAb)
 		}
-		if (lowGrS) return cool ? "CMa" : "CMb"
-		if (gint < 1250 && cool) return ar > 0.75 ? `CTf${p}` : `CTs${p}`
+		if (lowGrS) return cool ? Z.CMa : Z.CMb
+		if (gint < 1250 && cool) return ar > 0.75
+			? (pluvial ? Z.CTfp : Z.CTf)
+			: (pluvial ? Z.CTsp : Z.CTs)
 		if (gdd < 1300) {
-			if (cool) return `CEa${p}`
-			if (cold) return `CEb${p}`
-			return `CEc${p}`
+			if (cool) return pluvial ? Z.CEap : Z.CEa
+			if (cold) return pluvial ? Z.CEbp : Z.CEb
+			return pluvial ? Z.CEcp : Z.CEc
 		}
-		return cool ? `CDa${p}` : `CDb${p}`
+		return cool
+			? (pluvial ? Z.CDap : Z.CDa)
+			: (pluvial ? Z.CDbp : Z.CDb)
 	}
 
 	if (groupH) {
 		if (gar < 0.5) {
 			if (lowGrS) {
-				if (hot) return "HAMa"
-				if (torrid) return "HAMb"
-				return "HAMc"
+				if (hot) return Z.HAMa
+				if (torrid) return Z.HAMb
+				return Z.HAMc
 			}
-			if (hot) return `HAa${p}`
-			if (torrid) return `HAb${p}`
-			return `HAc${p}`
+			if (hot) return pluvial ? Z.HAap : Z.HAa
+			if (torrid) return pluvial ? Z.HAbp : Z.HAb
+			return pluvial ? Z.HAcp : Z.HAc
 		}
 		if (lowGrS) {
-			if (hot) return "HMa"
-			if (torrid) return "HMb"
-			return "HMc"
+			if (hot) return Z.HMa
+			if (torrid) return Z.HMb
+			return Z.HMc
 		}
-		if (gint < 1250 && hot) return ar > 0.75 ? `HTf${p}` : `HTs${p}`
-		if (hot) return `HDa${p}`
-		if (torrid) return `HDb${p}`
-		return `HDc${p}`
+		if (gint < 1250 && hot) return ar > 0.75
+			? (pluvial ? Z.HTfp : Z.HTf)
+			: (pluvial ? Z.HTsp : Z.HTs)
+		if (hot) return pluvial ? Z.HDap : Z.HDa
+		if (torrid) return pluvial ? Z.HDbp : Z.HDb
+		return pluvial ? Z.HDcp : Z.HDc
 	}
 
 	const ss = hot && cool
 	if (gar < 0.5) {
-		if (lowGrS) return ss ? "EAMa" : "EAMb"
-		return ss ? `EAa${p}` : `EAb${p}`
+		if (lowGrS) return ss ? Z.EAMa : Z.EAMb
+		return ss
+			? (pluvial ? Z.EAap : Z.EAa)
+			: (pluvial ? Z.EAbp : Z.EAb)
 	}
-	if (lowGrS) return ss ? "EMa" : "EMb"
-	if (gint < 1250 && ss) return ar > 0.75 ? `ETf${p}` : `ETs${p}`
-	return ss ? `EDa${p}` : `EDb${p}`
+	if (lowGrS) return ss ? Z.EMa : Z.EMb
+	if (gint < 1250 && ss) return ar > 0.75
+		? (pluvial ? Z.ETfp : Z.ETf)
+		: (pluvial ? Z.ETsp : Z.ETs)
+	return ss
+		? (pluvial ? Z.EDap : Z.EDa)
+		: (pluvial ? Z.EDbp : Z.EDb)
 }
 
 export function assignPastaClimate(
@@ -495,18 +669,46 @@ export function assignPastaClimate(
 	climate: OrogenClimate,
 	rainfall: OrogenRainfall,
 	params: OrogenParams,
+	iceThickness?: Float32Array,
+	iceMinMonthly?: Float32Array,
+	iceMaxMonthly?: Float32Array,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const output = new Uint8Array(N)
 	const insolation = computeMonthlyInsolation(mesh, params)
 
+	// Pre-allocate all working buffers — reused for every region
+	const temps = new Float64Array(12)
+	const rain = new Float64Array(12)
+	const insol = new Float64Array(12)
+	const petBuf = new Float64Array(12)
+	const aetBuf = new Float64Array(12)
+	const mGDD = new Float64Array(12)
+	const mGDDz = new Float64Array(12)
+	const mGInt = new Float64Array(12)
+	const gddAccBuf = new Float64Array(12)
+	const giAccBuf = new Float64Array(12)
+
 	for (let r = 0; r < N; r++) {
-		const monthlyTemps = Array.from({ length: 12 }, (_, month) => climate.temperature_monthly[month * N + r])
-		const monthlyRain = isLand[r]
-			? Array.from({ length: 12 }, (_, month) => rainfall.monthly[month * N + r])
-			: new Array<number>(12).fill(0)
-		const monthlyInsolation = Array.from({ length: 12 }, (_, month) => insolation[month * N + r])
-		output[r] = ZONE_INDEX.get(classifyPasta(monthlyTemps, monthlyRain, monthlyInsolation, !isLand[r])) ?? 0
+		for (let m = 0; m < 12; m++) {
+			temps[m] = climate.temperature_monthly[m * N + r]
+			insol[m] = insolation[m * N + r]
+		}
+		if (!isLand[r]) {
+			// Ocean: skip AET/PET, only needs temps + insolation + ice
+			output[r] = classifyOcean(
+				temps, insol, mGDDz, mGInt, gddAccBuf, giAccBuf,
+				iceMinMonthly ? iceMinMonthly[r] : 0,
+				iceMaxMonthly ? iceMaxMonthly[r] : 0,
+			)
+		} else {
+			for (let m = 0; m < 12; m++) rain[m] = rainfall.monthly[m * N + r]
+			output[r] = classifyLand(
+				temps, rain, insol,
+				petBuf, aetBuf, mGDD, mGDDz, mGInt, gddAccBuf, giAccBuf,
+				iceThickness ? iceThickness[r] : 0,
+			)
+		}
 	}
 
 	return output
@@ -517,6 +719,13 @@ export function pastaClimateColor(zoneCode: number): [number, number, number] {
 	const label = PASTA_LABELS[zoneCode]
 	const rgb = ZONE_COLOR_MAP[label as keyof typeof ZONE_COLOR_MAP]
 	return rgb ? [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255] : [0.05, 0.08, 0.18]
+}
+
+export function pastaTrueColor(zoneCode: number): [number, number, number] {
+	if (zoneCode <= 0 || zoneCode >= PASTA_LABELS.length) return [10 / 255, 10 / 255, 51 / 255]
+	const label = PASTA_LABELS[zoneCode]
+	const rgb = ZONE_TRUE_COLOR_MAP[label as keyof typeof ZONE_TRUE_COLOR_MAP]
+	return rgb ? [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255] : [10 / 255, 10 / 255, 51 / 255]
 }
 
 export function pastaClimateName(zoneCode: number): string {
