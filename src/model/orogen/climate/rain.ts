@@ -3,9 +3,9 @@
  * Computes moisture advection and monthly rainfall using typed-array-based
  * SphereMesh and OrogenClimate data (no Cell/window.world dependencies).
  */
-import type { SphereMesh, OrogenClimate, OrogenParams } from "./types"
+import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
 import { elevToHeightKm } from "./climate"
-import { getDaysPerYear, getHoursPerDay, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "./units"
+import { getDaysPerYear, getHoursPerDay, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "../units"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -429,12 +429,12 @@ function computeTidalRain(
 	}
 
 	// Smooth 3 passes (same as regular model)
+	const smoothBuf = new Float32Array(N)
 	for (let pass = 0; pass < 3; pass++) {
 		for (let month = 0; month < 12; month++) {
 			const offset = month * N
-			const smoothed = new Float32Array(N)
 			for (let r = 0; r < N; r++) {
-				if (!isLand[r]) continue
+				if (!isLand[r]) { smoothBuf[r] = 0; continue }
 				let sum = 0
 				let count = 0
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
@@ -446,10 +446,10 @@ function computeTidalRain(
 				}
 				sum += monthly[offset + r]
 				count++
-				smoothed[r] = sum / count
+				smoothBuf[r] = sum / count
 			}
 			for (let r = 0; r < N; r++) {
-				if (isLand[r]) monthly[offset + r] = smoothed[r]
+				if (isLand[r]) monthly[offset + r] = smoothBuf[r]
 			}
 		}
 	}
@@ -477,6 +477,7 @@ export function computeMonthlyRain(
 	westAdv: Float32Array,
 	isLand: Uint8Array,
 	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure">,
+	monthlyTEQ?: Float32Array[],
 ): { monthly: Float32Array; annual: Float32Array } {
 	if (isTidallyLocked(params?.tidallyLocked)) {
 		return computeTidalRain(mesh, climate, isLand)
@@ -507,11 +508,13 @@ export function computeMonthlyRain(
 			Math.floor((lonDeg[r] + 180) / lonBinWidth)))
 	}
 
-	const teqPerMonth: Float32Array[] = new Array(12)
-	for (let month = 0; month < 12; month++) {
-		const monthTemps = climate.temperature_monthly.subarray(month * N, (month + 1) * N)
-		teqPerMonth[month] = computeThermalEquator(mesh, monthTemps)
-	}
+	const teqPerMonth: Float32Array[] = monthlyTEQ ?? (() => {
+		const result: Float32Array[] = new Array(12)
+		for (let month = 0; month < 12; month++) {
+			result[month] = computeThermalEquator(mesh, climate.temperature_monthly.subarray(month * N, (month + 1) * N))
+		}
+		return result
+	})()
 
 	const monthly = new Float32Array(N * 12)
 	for (let r = 0; r < N; r++) {
@@ -527,12 +530,12 @@ export function computeMonthlyRain(
 		}
 	}
 
+	const smoothBuf = new Float32Array(N)
 	for (let pass = 0; pass < 3; pass++) {
 		for (let month = 0; month < 12; month++) {
 			const offset = month * N
-			const smoothed = new Float32Array(N)
 			for (let r = 0; r < N; r++) {
-				if (!isLand[r]) continue
+				if (!isLand[r]) { smoothBuf[r] = 0; continue }
 				let sum = 0
 				let count = 0
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
@@ -544,10 +547,10 @@ export function computeMonthlyRain(
 				}
 				sum += monthly[offset + r]
 				count++
-				smoothed[r] = sum / count
+				smoothBuf[r] = sum / count
 			}
 			for (let r = 0; r < N; r++) {
-				if (isLand[r]) monthly[offset + r] = smoothed[r]
+				if (isLand[r]) monthly[offset + r] = smoothBuf[r]
 			}
 		}
 	}

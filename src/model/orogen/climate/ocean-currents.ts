@@ -9,9 +9,9 @@
  * No tangent frames or explicit wind vectors required — piggybacks on the
  * advection infrastructure that already encodes wind regime per cell.
  */
-import type { SphereMesh, OrogenClimate, OrogenParams } from "./types"
+import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
 import { computeThermalEquator } from "./rain"
-import { meanEdgeLengthKm } from "./units"
+import { meanEdgeLengthKm } from "../units"
 
 const RAD2DEG = 180 / Math.PI
 

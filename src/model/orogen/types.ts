@@ -145,6 +145,25 @@ export interface OrogenRainfall {
 	west: Float32Array      // per-cell normalized west moisture (0–1)
 }
 
+export interface OrogenProvinces {
+	/** Per-region province index (-1 = ocean/unassigned) */
+	regionProvince: Int32Array
+	/** Seed (capital) region for each province */
+	seeds: Int32Array
+	/** Number of provinces */
+	count: number
+	/** Per-province desolate flag (1 = uninhabitable) */
+	desolate: Uint8Array
+	/** Province adjacency — CSR offset, length count+1 */
+	adjOffset: Int32Array
+	/** Province adjacency — neighbor indices */
+	adjList: Int32Array
+	/** Per-province land region count */
+	size: Int32Array
+	/** Per-province RGB colors, length count*3 */
+	colors: Float32Array
+}
+
 export interface OrogenRivers {
 	/** Each river is a polyline of [lonDeg, latDeg, flow, elevation] quads */
 	lines: [number, number, number, number][][]
@@ -152,6 +171,8 @@ export interface OrogenRivers {
 	maxFlow: number
 	/** Flow threshold (minimum flow for a river cell) */
 	minFlow: number
+	/** Per-cell flag for cells that belong to a rendered river polyline */
+	visible: Uint8Array
 	/** Per-cell lake flag (1 = lake surface, 0 = not) */
 	lakes: Uint8Array
 	/** Per-cell water surface elevation (only meaningful for lake cells) */
@@ -165,6 +186,8 @@ export const OROGEN_TOPOGRAPHY_LABELS = [
 	"mountains",
 	"marsh",
 	"coastal",
+	"ocean",
+	"lake",
 ] as const
 
 export interface OrogenWorld {
@@ -196,5 +219,8 @@ export interface OrogenWorld {
 	rivers?: OrogenRivers
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
+	provinces?: OrogenProvinces
+	landmarks?: import("./provinces/landmarks").OrogenLandmarks
+	population?: import("./provinces/population").ProvincePopulation
 	continentCount?: number
 }

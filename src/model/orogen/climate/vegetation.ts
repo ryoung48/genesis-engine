@@ -3,7 +3,7 @@
  * Classifies each land cell into a biome and climate zone based on temperature
  * and rainfall, mirroring the logic from src/model/shapers/climate.ts.
  */
-import type { SphereMesh, OrogenClimate, OrogenRainfall } from "./types"
+import type { SphereMesh, OrogenClimate, OrogenRainfall } from "../types"
 
 /**
  * Climate zone codes stored in a Uint8Array:

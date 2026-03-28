@@ -1,4 +1,4 @@
-import type { SphereMesh, OrogenClimate, OrogenParams } from "./types"
+import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
 import { computeThermalEquator } from "./rain"
 import {
 	getDaysPerYear,
@@ -6,7 +6,7 @@ import {
 	getPlanetRadiusKm,
 	isRetrogradeObliquity,
 	isTidallyLocked,
-} from "./units"
+} from "../units"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -45,9 +45,9 @@ function interpolateBands(values: Float32Array, latDeg: number): number {
 	return values[i0] * (1 - t) + values[i1] * t
 }
 
-function smoothField(mesh: SphereMesh, field: Float32Array, passes: number): void {
+function smoothField(mesh: SphereMesh, field: Float32Array, passes: number, tmp?: Float32Array): void {
 	const { adjOffset, adjList, numRegions: N } = mesh
-	const tmp = new Float32Array(N)
+	const buf = tmp ?? new Float32Array(N)
 	for (let pass = 0; pass < passes; pass++) {
 		for (let r = 0; r < N; r++) {
 			let sum = field[r]
@@ -56,9 +56,9 @@ function smoothField(mesh: SphereMesh, field: Float32Array, passes: number): voi
 				sum += field[adjList[j]]
 				count++
 			}
-			tmp[r] = sum / count
+			buf[r] = sum / count
 		}
-		field.set(tmp)
+		field.set(buf)
 	}
 }
 
@@ -243,6 +243,7 @@ export function computeWind(
 	isLand: Uint8Array,
 	climate: OrogenClimate,
 	params?: Pick<OrogenParams, "planetRadiusKm" | "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure">,
+	monthlyTEQ?: Float32Array[],
 ): WindResult {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
@@ -290,13 +291,17 @@ export function computeWind(
 	const wind_north_monthly = new Float32Array(N * NUM_MONTHS)
 	const wind_speed_monthly = new Float32Array(N * NUM_MONTHS)
 
+	// Pool reusable buffers across months
+	const smoothBuf = new Float32Array(N)
+	const east = new Float32Array(N)
+	const north = new Float32Array(N)
+	const tlocked = isTidallyLocked(params?.tidallyLocked)
+
 	for (let month = 0; month < NUM_MONTHS; month++) {
 		const offset = month * N
-		const monthTemps = climate.temperature_monthly.subarray(offset, offset + N)
-		const teqByLon = computeThermalEquator(mesh, monthTemps, TEQ_BINS)
-
-		const east = new Float32Array(N)
-		const north = new Float32Array(N)
+		const teqByLon = monthlyTEQ
+			? monthlyTEQ[month]
+			: computeThermalEquator(mesh, climate.temperature_monthly.subarray(offset, offset + N), TEQ_BINS)
 
 		for (let r = 0; r < N; r++) {
 			const teq = teqByLon[lonBin[r]]
@@ -306,7 +311,7 @@ export function computeWind(
 				latDeg[r],
 				teq,
 				controls.hadleyWidth,
-				isTidallyLocked(params?.tidallyLocked),
+				tlocked,
 			) * controls.meridionalScale
 			const drag = continentalityDampener(isLand[r], landNeighborFrac[r])
 
@@ -314,17 +319,15 @@ export function computeWind(
 			north[r] = baseMagnitude * meridional * drag
 		}
 
-		smoothField(mesh, east, 2)
-		smoothField(mesh, north, 2)
+		smoothField(mesh, east, 2, smoothBuf)
+		smoothField(mesh, north, 2, smoothBuf)
 
-		const speeds = new Float32Array(N)
 		for (let r = 0; r < N; r++) {
-			speeds[r] = Math.hypot(east[r], north[r])
+			wind_speed_monthly[offset + r] = Math.hypot(east[r], north[r])
 		}
 
 		wind_east_monthly.set(east, offset)
 		wind_north_monthly.set(north, offset)
-		wind_speed_monthly.set(speeds, offset)
 	}
 
 	return { wind_east_monthly, wind_north_monthly, wind_speed_monthly }

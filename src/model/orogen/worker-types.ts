@@ -38,12 +38,33 @@ export interface SerializedOrogenWorld {
 	topography?: Uint8Array
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
-	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; lakes: Uint8Array; waterLevel: Float32Array }
+	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; visible: Uint8Array; lakes: Uint8Array; waterLevel: Float32Array }
 	oceanCurrents?: { oceanWarmth: Float32Array; coastalWarmth: Float32Array }
 	wind?: {
 		wind_east_monthly: Float32Array
 		wind_north_monthly: Float32Array
 		wind_speed_monthly: Float32Array
+	}
+	provinces?: {
+		regionProvince: Int32Array
+		seeds: Int32Array
+		count: number
+		desolate: Uint8Array
+		adjOffset: Int32Array
+		adjList: Int32Array
+		size: Int32Array
+		colors: Float32Array
+	}
+	landmarks?: {
+		regionLandmark: Int32Array
+		type: Uint8Array
+		size: Int32Array
+		count: number
+	}
+	population?: {
+		habitability: Float32Array
+		population: Float32Array
+		totalPopulation: number
 	}
 }
 

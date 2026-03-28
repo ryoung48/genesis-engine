@@ -11,8 +11,8 @@ import { buildSuperPlates } from "./super-plates"
 import { classifyBoundaries } from "./collision"
 import { computeDistanceFields, blendElevation } from "./elevation"
 import { applyHotspots } from "./hotspots"
-import { computeLandFraction, computeTemperature, elevToHeightKm } from "./climate"
-import { computeAdvection, computeMonthlyRain } from "./rain"
+import { computeLandFraction, computeTemperature, elevToHeightKm } from "./climate/climate"
+import { computeAdvection, computeMonthlyRain, computeThermalEquator } from "./climate/rain"
 import {
 	warpTerrain,
 	smoothElevation,
@@ -20,16 +20,19 @@ import {
 	sharpenRidges,
 	applySoilCreep,
 } from "./erosion"
-import { computeOceanCurrents } from "./ocean-currents"
-import { computeWind } from "./wind"
-import { assignVegetation, assignClimateZones } from "./vegetation"
-import { assignPastaClimate } from "./pasta"
-import { assignKoppenClimate } from "./koppen"
-import { ENABLE_PASTA_CLASSIFICATION } from "./features"
-import { computeRivers } from "./rivers"
+import { computeOceanCurrents } from "./climate/ocean-currents"
+import { computeWind } from "./climate/wind"
+import { assignVegetation, assignClimateZones } from "./climate/vegetation"
+import { assignPastaClimate } from "./climate/pasta"
+import { assignKoppenClimate } from "./climate/koppen"
+import { ENABLE_PASTA_CLASSIFICATION, ENABLE_PROVINCES, ENABLE_WIND_FIELDS } from "./features"
+import { computeRivers } from "./topography/rivers"
 import { meanEdgeLengthKm } from "./units"
 import { countContinents } from "./stats"
 import { applyCraters } from "./craters"
+import { computeProvinces } from "./provinces/provinces"
+import { computeLandmarks } from "./provinces/landmarks"
+import { computePopulation } from "./provinces/population"
 
 type StageTiming = {
 	Stage: string
@@ -56,6 +59,15 @@ function classifyTopography(
 	const { adjOffset, adjList } = mesh
 
 	for (let r = 0; r < mesh.numRegions; r++) {
+		
+		if (lakes[r]) {
+			topography[r] = 7
+			continue
+		}
+		if (!isLand[r]) {
+			topography[r] = 6
+			continue
+		}
 		topography[r] = classifyTopographyBase(elevation[r])
 	}
 
@@ -386,7 +398,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		console.time("orogen:craters")
 		onProgress?.("Applying craters...", 83)
 		t0 = performance.now()
-		applyCraters(mesh, elevation, params.seed, params.craters)
+		applyCraters(mesh, elevation, params.seed, params.craters, params.planetRadiusKm)
 		pipelineTiming.push({ Stage: `Craters (intensity=${params.craters.toFixed(2)})`, ms: (performance.now() - t0).toFixed(1) })
 		console.timeEnd("orogen:craters")
 	}
@@ -484,57 +496,37 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Moisture advection", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:advection")
 
-	// 15b. Ocean currents — warm/cold coast classification from advection fields
-	console.time("orogen:oceanCurrents")
-	onProgress?.("Computing ocean currents...", 96)
-	t0 = performance.now()
-	const oceanCurrents = computeOceanCurrents(mesh, eastAdv, westAdv, isLand, climate, params)
-	pipelineTiming.push({ Stage: "Ocean currents (warmth + coastal diffusion)", ms: (performance.now() - t0).toFixed(1) })
-	console.timeEnd("orogen:oceanCurrents")
+	// 15b. Ocean currents — disabled pending rework
+	const oceanCurrents = undefined
 
-	// 15c. Apply ocean warmth as temperature modifier
-	// Ocean cells: SST shift up to ±12°C scaled by warmth
-	// Land cells: coastal warmth fades inland, up to ±5°C at the coast
-	if (climate) {
+	// Pre-compute monthly thermal equators once (shared by wind + rainfall)
+	const monthlyTEQ: Float32Array[] | undefined = climate ? (() => {
 		const N = mesh.numRegions
+		const result: Float32Array[] = new Array(12)
 		for (let month = 0; month < 12; month++) {
-			const offset = month * N
-			for (let r = 0; r < N; r++) {
-				if (!isLand[r]) {
-					climate.temperature_monthly[offset + r] += oceanCurrents.oceanWarmth[r] * 12
-				} else {
-					climate.temperature_monthly[offset + r] += oceanCurrents.coastalWarmth[r] * 5
-				}
-			}
+			result[month] = computeThermalEquator(mesh, climate.temperature_monthly.subarray(month * N, (month + 1) * N))
 		}
-		// Recompute avg/min/max from modified monthly
-		for (let r = 0; r < N; r++) {
-			let sum = 0, min = Infinity, max = -Infinity
-			for (let month = 0; month < 12; month++) {
-				const t = climate.temperature_monthly[month * N + r]
-				sum += t
-				if (t < min) min = t
-				if (t > max) max = t
-			}
-			climate.temperature_avg[r] = sum / 12
-			climate.temperature_min[r] = min
-			climate.temperature_max[r] = max
-		}
-	}
+		return result
+	})() : undefined
 
 	// 15d. Wind fields (monthly vectors + normalized speed)
-	console.time("orogen:wind")
-	onProgress?.("Computing wind fields...", 96)
-	t0 = performance.now()
-	const wind = climate ? computeWind(mesh, elevation, isLand, climate, params) : undefined
-	pipelineTiming.push({ Stage: "Wind fields (12 months)", ms: (performance.now() - t0).toFixed(1) })
-	console.timeEnd("orogen:wind")
+	const wind = ENABLE_WIND_FIELDS
+		? (() => {
+			console.time("orogen:wind")
+			onProgress?.("Computing wind fields...", 96)
+			t0 = performance.now()
+			const result = climate ? computeWind(mesh, elevation, isLand, climate, params, monthlyTEQ) : undefined
+			pipelineTiming.push({ Stage: "Wind fields (12 months)", ms: (performance.now() - t0).toFixed(1) })
+			console.timeEnd("orogen:wind")
+			return result
+		})()
+		: undefined
 
 	// 16. Monthly rainfall
 	console.time("orogen:rainfall")
 	onProgress?.("Computing rainfall...", 97)
 	t0 = performance.now()
-	const rain = computeMonthlyRain(mesh, climate, eastAdv, westAdv, isLand, params)
+	const rain = computeMonthlyRain(mesh, climate, eastAdv, westAdv, isLand, params, monthlyTEQ)
 	const rainfall = { monthly: rain.monthly, annual: rain.annual, east: eastAdv, west: westAdv }
 	pipelineTiming.push({ Stage: "Monthly rainfall", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:rainfall")
@@ -599,6 +591,18 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		if (smallOcean[r]) rivers.lakes[r] = 1
 	}
 
+	// Clear isLand for lake cells so downstream systems treat them as water
+	for (let r = 0; r < mesh.numRegions; r++) {
+		if (rivers.lakes[r]) isLand[r] = 0
+	}
+
+	// Landmass / water body labeling
+	console.time("orogen:landmarks")
+	t0 = performance.now()
+	const landmarks = computeLandmarks(mesh, isLand)
+	pipelineTiming.push({ Stage: `Landmarks (${landmarks.count})`, ms: (performance.now() - t0).toFixed(1) })
+	console.timeEnd("orogen:landmarks")
+
 	const topography = classifyTopography(mesh, elevation, isLand, rivers.lakes)
 
 	// 18. Climate zone assignment
@@ -635,6 +639,40 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Vegetation assignment", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:vegetation")
 
+	// 21. Province partitioning
+	let provinces
+	if (ENABLE_PROVINCES) {
+		console.time("orogen:provinces")
+		onProgress?.("Partitioning provinces...", 99)
+		t0 = performance.now()
+		provinces = computeProvinces(mesh, isLand, topography, params.seed, {
+			climateZones,
+			rainfall,
+			planetRadiusKm: params.planetRadiusKm,
+		})
+		pipelineTiming.push({
+			Stage: `Provinces (${provinces.count} provinces)`,
+			ms: (performance.now() - t0).toFixed(1),
+		})
+		console.timeEnd("orogen:provinces")
+	}
+
+	// 22. Province population
+	let population
+	if (provinces && climateZones && vegetation) {
+		console.time("orogen:population")
+		t0 = performance.now()
+		population = computePopulation(
+			provinces, landmarks, climateZones, vegetation, topography,
+			params.seed, params.planetRadiusKm, mesh.numRegions,
+		)
+		pipelineTiming.push({
+			Stage: `Population (${Math.round(population.totalPopulation).toLocaleString()})`,
+			ms: (performance.now() - t0).toFixed(1),
+		})
+		console.timeEnd("orogen:population")
+	}
+
 	console.timeEnd("orogen:total")
 	onProgress?.("Done", 100)
 
@@ -657,6 +695,9 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		rivers,
 		isLand,
 		riverLand,
+		provinces,
+		landmarks,
+		population,
 		oceanCurrents,
 		wind,
 		continentCount: countContinents(mesh, isLand),

@@ -548,12 +548,23 @@ export function blendElevation(
 
 		} else {
 			// ---- Ocean floor ----
+			// Shelf width varies: passive margins are wide & shallow,
+			// convergent margins are narrow & steep.
 			const dc = distCoast[r]
+			const isPassive = !coastConvergent[r]
+			const shelfScale = isPassive ? 1.8 : 0.6
+			const shelfEnd = 5 * shelfScale
+			const slopeEnd = shelfEnd + 7 * shelfScale
 			let oceanBase: number
-			if (dc < 5) {
-				oceanBase = -0.04 - 0.06 * (dc / 5)
-			} else if (dc < 12) {
-				oceanBase = -0.10 - 0.25 * ((dc - 5) / 7)
+			if (dc < shelfEnd) {
+				// Continental shelf — gentle slope
+				const shelfDepth = isPassive ? -0.03 : -0.05
+				const shelfDrop = isPassive ? -0.04 : -0.08
+				oceanBase = shelfDepth + shelfDrop * (dc / shelfEnd)
+			} else if (dc < slopeEnd) {
+				// Continental slope — steeper drop to abyssal plain
+				const topDepth = isPassive ? -0.07 : -0.13
+				oceanBase = topDepth - 0.25 * ((dc - shelfEnd) / (slopeEnd - shelfEnd))
 			} else {
 				oceanBase = -0.35 + nfbm(x * 2, y * 2, z * 2, 3) * 0.03
 			}

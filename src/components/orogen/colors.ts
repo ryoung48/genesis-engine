@@ -1,8 +1,10 @@
+import * as d3 from "d3"
+
 /**
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "oceanCurrents" | "windSpeed"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "oceanCurrents" | "windSpeed" | "provinces" | "population"
 
 const oceanColorStops: [number, number, number][] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],
@@ -41,6 +43,55 @@ const landColorStops: [number, number, number][] = [
 
 function lerp(a: number, b: number, t: number): number {
 	return a + (b - a) * t
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+	const normalized = hex.trim()
+	const r = Number.parseInt(normalized.slice(0, 2), 16) / 255
+	const g = Number.parseInt(normalized.slice(2, 4), 16) / 255
+	const b = Number.parseInt(normalized.slice(4, 6), 16) / 255
+	return [r, g, b]
+}
+
+function hexScheme(stops: string): [number, number, number][] {
+	const colors: [number, number, number][] = []
+	for (let i = 0; i < stops.length; i += 6) {
+		colors.push(hexToRgb(stops.slice(i, i + 6)))
+	}
+	return colors
+}
+
+function createRamp(schemes: [number, number, number][][]) {
+	return (t: number): [number, number, number] => {
+		const clamped = Math.max(0, Math.min(1, t))
+		const n = schemes.length
+		if (n === 0) return [0, 0, 0]
+		if (n === 1) {
+			const scheme = schemes[0]
+			if (!scheme || scheme.length === 0) return [0, 0, 0]
+			if (scheme.length === 1) return scheme[0]
+			const scaled = clamped * (scheme.length - 1)
+			const i = Math.min(scheme.length - 2, Math.floor(scaled))
+			const localT = scaled - i
+			const a = scheme[i]
+			const b = scheme[i + 1]
+			return [
+				lerp(a[0], b[0], localT),
+				lerp(a[1], b[1], localT),
+				lerp(a[2], b[2], localT),
+			]
+		}
+		const scaled = clamped * (n - 1)
+		const i = Math.min(n - 2, Math.floor(scaled))
+		const localT = scaled - i
+		const a = schemes[i][schemes[i].length - 1]
+		const b = schemes[i + 1][schemes[i + 1].length - 1]
+		return [
+			lerp(a[0], b[0], localT),
+			lerp(a[1], b[1], localT),
+			lerp(a[2], b[2], localT),
+		]
+	}
 }
 
 /**
@@ -153,10 +204,6 @@ export function temperatureColor(celsius: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
-/**
- * Precipitation color ramp: tan (dry) -> green -> teal -> blue -> purple (wet).
- * Input: monthly mm (0-250+) or annual mm (0-3000+).
- */
 const precipStops: { mm: number; r: number; g: number; b: number }[] = [
 	{ mm: 0, r: 0.76, g: 0.70, b: 0.50 },
 	{ mm: 10, r: 0.85, g: 0.78, b: 0.45 },
@@ -168,13 +215,13 @@ const precipStops: { mm: number; r: number; g: number; b: number }[] = [
 	{ mm: 400, r: 0.30, g: 0.15, b: 0.70 },
 ]
 
-export function precipitationColor(mm: number): [number, number, number] {
-	const clamped = Math.max(precipStops[0].mm, Math.min(precipStops[precipStops.length - 1].mm, mm))
+export function precipitationNormalizedColor(normalized: number): [number, number, number] {
+	const mm = Math.max(0, Math.min(1, normalized)) * 400
 	for (let i = 0; i < precipStops.length - 1; i++) {
 		const a = precipStops[i]
 		const b = precipStops[i + 1]
-		if (clamped <= b.mm) {
-			const t = (clamped - a.mm) / (b.mm - a.mm)
+		if (mm <= b.mm) {
+			const t = (mm - a.mm) / (b.mm - a.mm)
 			return [
 				a.r + t * (b.r - a.r),
 				a.g + t * (b.g - a.g),
@@ -184,6 +231,10 @@ export function precipitationColor(mm: number): [number, number, number] {
 	}
 	const last = precipStops[precipStops.length - 1]
 	return [last.r, last.g, last.b]
+}
+
+export function precipitationColor(mm: number): [number, number, number] {
+	return precipitationNormalizedColor(mm / 400)
 }
 
 const climateZoneColors: [number, number, number][] = [
@@ -310,6 +361,11 @@ export function windSpeedColor(speed: number): [number, number, number] {
 	}
 	const last = windSpeedStops[windSpeedStops.length - 1]
 	return [last.r, last.g, last.b]
+}
+
+export function populationColor(normalizedDensity: number): [number, number, number] {
+	const color = d3.rgb(d3.interpolateOranges(Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4)))
+	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
 export function getColor(elev: number, mode: ColorMode): [number, number, number] {

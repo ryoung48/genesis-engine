@@ -6,12 +6,14 @@ import type {
 	SerializedOrogenWorld,
 } from "@/model/orogen/worker-types"
 import { createOrogenScene, type OrogenScene, type OrogenViewMode } from "./renderer"
-import { elevToHeightKm, elevationToColor, getColor, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, type ColorMode } from "./colors"
-import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/vegetation"
-import { PASTA_LABELS, pastaClimateColor, pastaClimateName } from "@/model/orogen/pasta"
-import { KOPPEN_LABELS, koppenClimateColor } from "@/model/orogen/koppen"
-import { ENABLE_PASTA_CLASSIFICATION } from "@/model/orogen/features"
-import { computeThermalEquatorLine } from "@/model/orogen/rain"
+import { elevToHeightKm, getColor, temperatureColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, type ColorMode } from "./colors"
+import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/climate/vegetation"
+import { PASTA_LABELS, pastaClimateColor, pastaClimateName } from "@/model/orogen/climate/pasta"
+import { KOPPEN_LABELS, koppenClimateColor } from "@/model/orogen/climate/koppen"
+import { LANDMARK_TYPES } from "@/model/orogen/provinces/landmarks"
+import { ENABLE_PASTA_CLASSIFICATION, ENABLE_PROVINCES, ENABLE_WIND_FIELDS } from "@/model/orogen/features"
+import { computeClouds } from "@/model/orogen/climate/clouds"
+import { computeThermalEquatorLine } from "@/model/orogen/climate/rain"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
 import {
 	DEFAULT_DAYS_PER_YEAR,
@@ -47,6 +49,7 @@ interface OrogenViewProps {
 
 export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const monthLabels = ["Annual", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+	const PLANET_CODE_STORAGE_KEY = "orogen:lastPlanetCode"
 	const DEFAULT_WORLD_PARAMS = {
 		numPoints: 204000,
 		jitter: 0.75,
@@ -68,6 +71,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		ridgeSharpening: 0.50,
 		glacialErosion: 0.50,
 		craters: 0,
+		pressure: 1.0,
 	} as const
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const viewportRef = useRef<HTMLDivElement>(null)
@@ -80,15 +84,25 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [generationProgress, setGenerationProgress] = useState(0)
 	const [generationLabel, setGenerationLabel] = useState("Idle")
 	const [colorMode, setColorMode] = useState<ColorMode>("terrain")
-	const [temperatureMonth, setTemperatureMonth] = useState(0)
-	const [rainfallMonth, setRainfallMonth] = useState(0)
-	const [windMonth, setWindMonth] = useState(0)
+	const [globalMonth, setGlobalMonth] = useState(1) // 1-12=Jan-Dec
+	const [timeOfDay, setTimeOfDay] = useState(12) // hours (0 to hoursPerDay)
+	const [tempAnnual, setTempAnnual] = useState(true)
+	const [rainAnnual, setRainAnnual] = useState(true)
+	const [windAnnual, setWindAnnual] = useState(true)
+	// Derived per-mode month: 0 when annual, globalMonth when monthly
+	const temperatureMonth = tempAnnual ? 0 : globalMonth
+	const rainfallMonth = rainAnnual ? 0 : globalMonth
+	const windMonth = windAnnual ? 0 : globalMonth
 	const [viewMode, setViewMode] = useState<OrogenViewMode>("globe")
+	const [fullAmbient, setFullAmbient] = useState(false)
 	const [mapCenterLongitude, setMapCenterLongitude] = useState(0)
 	const [showWireframe, setShowWireframe] = useState(false)
 	const [showGrid, setShowGrid] = useState(true)
 	const [showThermalEquator, setShowThermalEquator] = useState(false)
 	const [showRivers, setShowRivers] = useState(false)
+	const [showClouds, setShowClouds] = useState(false)
+	const [timeExpanded, setTimeExpanded] = useState(false)
+	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
 	const [gridSpacing, setGridSpacing] = useState(15)
 	const [controlTab, setControlTab] = useState<"world" | "view">("world")
 	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
@@ -99,8 +113,14 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	} | null>(null)
 
 	const [seed, setSeed] = useState(() => Math.floor(Math.random() * 16777216))
-	const [planetCode, setPlanetCode] = useState("")
-	const [planetCodeInput, setPlanetCodeInput] = useState("")
+	const [planetCode, setPlanetCode] = useState(() => {
+		if (typeof window === "undefined") return ""
+		return window.localStorage.getItem(PLANET_CODE_STORAGE_KEY) ?? ""
+	})
+	const [planetCodeInput, setPlanetCodeInput] = useState(() => {
+		if (typeof window === "undefined") return ""
+		return window.localStorage.getItem(PLANET_CODE_STORAGE_KEY) ?? ""
+	})
 	const [codeError, setCodeError] = useState(false)
 	// Shape Your World - orogen defaults
 	const [numPoints, setNumPoints] = useState(DEFAULT_WORLD_PARAMS.numPoints)
@@ -117,6 +137,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [daysPerYear, setDaysPerYear] = useState(DEFAULT_WORLD_PARAMS.daysPerYear)
 	const [hoursPerDay, setHoursPerDay] = useState(DEFAULT_WORLD_PARAMS.hoursPerDay)
 	const [tidallyLocked, setTidallyLocked] = useState(false)
+	const [pressure, setPressure] = useState(DEFAULT_WORLD_PARAMS.pressure)
 	// Terrain Sculpting - orogen defaults
 	const [terrainWarp, setTerrainWarp] = useState(DEFAULT_WORLD_PARAMS.terrainWarp)
 	const [smoothing, setSmoothing] = useState(DEFAULT_WORLD_PARAMS.smoothing)
@@ -163,10 +184,22 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	}, [world])
 
 	useEffect(() => {
+		if (!sceneRef.current) return
+		sceneRef.current.setAtmospherePressure(world?.params.pressure ?? pressure)
+	}, [world, pressure])
+
+	useEffect(() => {
 		if (!world) {
 			setHoverInfo(null)
 		}
 	}, [world])
+
+	useEffect(() => {
+		if (typeof window === "undefined") return
+		if (planetCode) {
+			window.localStorage.setItem(PLANET_CODE_STORAGE_KEY, planetCode)
+		}
+	}, [PLANET_CODE_STORAGE_KEY, planetCode])
 
 	const hoverElevationKm = hoverInfo && world
 		? elevToHeightKm(world.elevation[hoverInfo.region] ?? 0)
@@ -205,7 +238,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			: world.rainfall.monthly[(rainfallMonth - 1) * world.mesh.numRegions + hoverInfo.region])
 		: null
 
-	const hoverClimateZone = hoverInfo && world?.climateZones && world.elevation[hoverInfo.region] > 0
+	const hoverClimateZone = hoverInfo && world?.climateZones && world?.isLand?.[hoverInfo.region]
 		? CLIMATE_LABELS[world.climateZones[hoverInfo.region]] ?? null
 		: null
 
@@ -216,16 +249,28 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 		: null
 
-	const hoverKoppenClimate = hoverInfo && world?.koppenClimate && world.elevation[hoverInfo.region] > 0
+	const hoverKoppenClimate = hoverInfo && world?.koppenClimate && world?.isLand?.[hoverInfo.region]
 		? KOPPEN_LABELS[world.koppenClimate[hoverInfo.region]] ?? null
 		: null
 
-	const hoverBiome = hoverInfo && world?.vegetation && world.elevation[hoverInfo.region] > 0
+	const hoverBiome = hoverInfo && world?.vegetation && world?.isLand?.[hoverInfo.region]
 		? BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null
 		: null
 
-	const hoverRiverLand = hoverInfo && world?.riverLand
-		? world.riverLand[hoverInfo.region]
+	const hoverProvince = hoverInfo && world?.provinces
+		? world.provinces.regionProvince[hoverInfo.region]
+		: null
+
+	const hoverLandmark = hoverInfo && world?.landmarks
+		? (() => {
+			const landmarkId = world.landmarks.regionLandmark[hoverInfo.region]
+			if (landmarkId < 0) return null
+			return {
+				id: landmarkId,
+				type: LANDMARK_TYPES[world.landmarks.type[landmarkId]] ?? null,
+				size: world.landmarks.size[landmarkId] ?? null,
+			}
+		})()
 		: null
 
 	const hoverIsLand = hoverInfo && world?.isLand
@@ -462,6 +507,54 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			return rgb
 		}
 
+		if (colorMode === "provinces" && world.provinces) {
+			const { regionProvince, colors: provColors, desolate } = world.provinces
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0) {
+					// Ocean
+					rgb[3 * r] = 0.05; rgb[3 * r + 1] = 0.08; rgb[3 * r + 2] = 0.18
+				} else if (desolate[p]) {
+					// Desolate provinces — desaturated gray
+					rgb[3 * r] = 0.35; rgb[3 * r + 1] = 0.33; rgb[3 * r + 2] = 0.32
+				} else {
+					rgb[3 * r] = provColors[3 * p]
+					rgb[3 * r + 1] = provColors[3 * p + 1]
+					rgb[3 * r + 2] = provColors[3 * p + 2]
+				}
+			}
+			return rgb
+		}
+
+		if (colorMode === "population" && world.provinces && world.population) {
+			const { regionProvince, desolate } = world.provinces
+			const { population: pop } = world.population
+			// Find max population density for normalization
+			const { size } = world.provinces
+			let maxDensity = 0
+			for (let i = 0; i < world.provinces.count; i++) {
+				if (!desolate[i] && size[i] > 0) {
+					const d = pop[i] / size[i]
+					if (d > maxDensity) maxDensity = d
+				}
+			}
+			const invMax = maxDensity > 0 ? 1 / maxDensity : 0
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0) {
+					rgb[3 * r] = 0.05; rgb[3 * r + 1] = 0.08; rgb[3 * r + 2] = 0.18
+				} else if (desolate[p]) {
+					rgb[3 * r] = 0.35; rgb[3 * r + 1] = 0.33; rgb[3 * r + 2] = 0.32
+				} else {
+					const [cr, cg, cb] = populationColor((pop[p] / Math.max(1, size[p])) * invMax)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
+			}
+			return rgb
+		}
+
 		// Terrain / heightmap modes — use isLand to color depressions and lakes
 		if (world.isLand) {
 			// Sea-level land color (first land stop) → depression teal
@@ -502,6 +595,29 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		return null
 	}, [colorMode, temperatureMonth, rainfallMonth, windMonth, world])
 
+	// Compute clouds on-the-fly when overlay is toggled on
+	const cloudData = useMemo(() => {
+		if (!showClouds || !world?.rainfall || !world?.isLand) return null
+		return computeClouds(world.mesh, world.rainfall, world.isLand, world.params)
+	}, [showClouds, world])
+
+	// Apply cloud overlay on top of whatever color mode is active
+	const regionColorsWithClouds = useMemo(() => {
+		if (!regionColors || !cloudData) return regionColors
+		const N = cloudData.length
+		const rgb = new Float32Array(regionColors)
+		for (let r = 0; r < N; r++) {
+			const c = cloudData[r]
+			if (c > 0) {
+				const i = 3 * r
+				rgb[i] = rgb[i] + (1 - rgb[i]) * c
+				rgb[i + 1] = rgb[i + 1] + (1 - rgb[i + 1]) * c
+				rgb[i + 2] = rgb[i + 2] + (1 - rgb[i + 2]) * c
+			}
+		}
+		return rgb
+	}, [regionColors, cloudData])
+
 	// Compute thermal equator: for each longitude bin, find latitude of max temperature
 	const thermalEquator = useMemo(() => {
 		if (!world?.climate) return null
@@ -520,12 +636,18 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		if (!ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate") {
 			setColorMode("climate")
 		}
+		if (!ENABLE_WIND_FIELDS && colorMode === "windSpeed") {
+			setColorMode("terrain")
+		}
+		if (!ENABLE_PROVINCES && (colorMode === "provinces" || colorMode === "population")) {
+			setColorMode("terrain")
+		}
 	}, [colorMode])
 
 	useEffect(() => {
 		if (!sceneRef.current) return
-		sceneRef.current.setRegionColors(regionColors)
-	}, [regionColors])
+		sceneRef.current.setRegionColors(regionColorsWithClouds)
+	}, [regionColorsWithClouds])
 
 	useEffect(() => {
 		if (!sceneRef.current) return
@@ -540,6 +662,19 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	useEffect(() => {
 		sceneRef.current?.setRiversVisible(showRivers)
 	}, [showRivers])
+
+	// Sync sun position to global month + time of day + obliquity
+	useEffect(() => {
+		if (!sceneRef.current) return
+		const effectiveTime = tidallyLocked ? hoursPerDay / 2 : timeOfDay
+		sceneRef.current.setSunPosition(globalMonth, obliquity, effectiveTime, hoursPerDay)
+	}, [globalMonth, obliquity, timeOfDay, hoursPerDay, tidallyLocked])
+
+	// Sync full-ambient lighting mode
+	useEffect(() => {
+		if (!sceneRef.current) return
+		sceneRef.current.setFullAmbient(fullAmbient)
+	}, [fullAmbient])
 
 	// Wind arrows: compute per-month or annual average vectors
 	const windArrowData = useMemo(() => {
@@ -638,6 +773,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
 		setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
 		setTidallyLocked(false)
+		setPressure(DEFAULT_WORLD_PARAMS.pressure)
 		setTerrainWarp(DEFAULT_WORLD_PARAMS.terrainWarp)
 		setSmoothing(DEFAULT_WORLD_PARAMS.smoothing)
 		setHydraulicErosion(DEFAULT_WORLD_PARAMS.hydraulicErosion)
@@ -666,7 +802,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			sunTempFactor: overrides?.sunTempFactor ?? sunTempFactor,
 			daysPerYear: overrides?.daysPerYear ?? daysPerYear,
 			hoursPerDay: overrides?.hoursPerDay ?? hoursPerDay,
-			pressure: 1.0,
+			pressure: overrides?.pressure ?? pressure,
 			tidallyLocked: overrides?.tidallyLocked ? true : tidallyLocked,
 			jitter: overrides?.jitter ?? jitter,
 			roughness: overrides?.roughness ?? roughness,
@@ -726,7 +862,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		worker.postMessage(request)
 	}, [numPoints, numPlates, landDistribution, continentSizeVariety,
 		landCoverage, planetRadiusKm, obliquity, eccentricity, sunTempFactor, daysPerYear, hoursPerDay, tidallyLocked, jitter, roughness, terrainWarp, smoothing,
-		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, craters])
+		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, craters, pressure])
 
 	const handleGenerate = useCallback(() => {
 		generateWorld(Math.floor(Math.random() * 16777216))
@@ -802,7 +938,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setGenerationProgress(0)
 		setGenerationLabel("Importing heightmap...")
 		setPlanetCode("")
-		setPlanetCodeInput("")
 
 		workerRef.current?.terminate()
 		const worker = new Worker(
@@ -857,7 +992,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 				sunTempFactor,
 				daysPerYear,
 				hoursPerDay,
-				pressure: 1.0,
+				pressure,
 				tidallyLocked,
 				terrainWarp,
 				smoothing,
@@ -897,8 +1032,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			help: "Sets the planet's physical size for climate and distance calculations.",
 			value: planetRadiusKm,
 			display: `${(planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x Earth`,
-			min: DEFAULT_PLANET_RADIUS_KM * 0.5,
-			max: DEFAULT_PLANET_RADIUS_KM * 4,
+			min: Math.round(DEFAULT_PLANET_RADIUS_KM * 0.5 / 100) * 100,
+			max: Math.round(DEFAULT_PLANET_RADIUS_KM * 4 / 100) * 100,
 			step: 100,
 			set: setPlanetRadiusKm,
 		},
@@ -954,6 +1089,16 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			step: 0.5,
 			set: setHoursPerDay,
 			disabled: tidallyLocked,
+		},
+		{
+			label: "Pressure",
+			help: "Atmospheric pressure in bars. Lower pressure increases evaporation and cloud formation; higher pressure suppresses it.",
+			value: pressure,
+			display: `${pressure.toFixed(1)} bar`,
+			min: 0.1,
+			max: 10,
+			step: 0.1,
+			set: setPressure,
 		},
 		{
 			label: "Land Distribution",
@@ -1138,13 +1283,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			avgAnnualPrecipMm = sum / Math.max(1, world.rainfall.annual.length)
 		}
 
-		let avgAnnualWindMs: number | null = null
-		if (world?.wind?.wind_speed_monthly) {
-			let sum = 0
-			for (let i = 0; i < world.wind.wind_speed_monthly.length; i++) sum += world.wind.wind_speed_monthly[i]
-			avgAnnualWindMs = sum / Math.max(1, world.wind.wind_speed_monthly.length)
-		}
-
+		const pressureValue = activeParams?.pressure ?? pressure
 		const isTidal = activeParams?.tidallyLocked ?? tidallyLocked
 		return [
 			...(isTidal ? [{ label: "Lock", value: "Tidal" }] : []),
@@ -1153,15 +1292,17 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			{ label: "Sun", value: `${sunTempFactorValue.toFixed(2)}x` },
 			{ label: "Year", value: `${daysPerYearValue.toFixed(0)} d` },
 			{ label: "Day", value: `${hoursPerDayValue.toFixed(1)} h` },
+			{ label: "Pressure", value: `${pressureValue.toFixed(1)} bar` },
 			{ label: "Radius", value: `${(radiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x` },
 			{ label: "Continents", value: world?.continentCount != null ? String(world.continentCount) : "—" },
+			{ label: "Provinces", value: world?.provinces?.count != null ? String(world.provinces.count) : "—" },
+			{ label: "Population", value: world?.population?.totalPopulation != null ? `${(world.population.totalPopulation / 1_000_000).toFixed(1)}M` : "—" },
 			{ label: "Cell", value: avgCellLengthKm !== null ? `${avgCellLengthKm.toFixed(0)} km` : "—" },
 			{ label: "Land Area", value: landAreaKm2 !== null && landPercent !== null ? `${(landAreaKm2 / 1_000_000).toFixed(1)}M km² (${landPercent.toFixed(1)}%)` : "—" },
 			{ label: "Avg Temp", value: avgAnnualTempC !== null ? `${avgAnnualTempC.toFixed(1)} °C` : "—" },
 			{ label: "Avg Rain", value: avgAnnualPrecipMm !== null ? `${avgAnnualPrecipMm.toFixed(0)} mm` : "—" },
-			{ label: "Avg Wind", value: avgAnnualWindMs !== null ? `${avgAnnualWindMs.toFixed(1)} m/s` : "—" },
 		]
-	}, [daysPerYear, eccentricity, hoursPerDay, obliquity, planetRadiusKm, sunTempFactor, tidallyLocked, world])
+	}, [daysPerYear, eccentricity, hoursPerDay, obliquity, planetRadiusKm, pressure, sunTempFactor, tidallyLocked, world])
 
 	const renderSliderGroup = (
 		items: typeof planetSliders,
@@ -1474,119 +1615,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 				{controlTab === "view" && (
 					<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-				{/* Map Mode */}
-				<div className="space-y-2 pt-4 border-t border-slate-100">
-					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-						View
-					</span>
-					<div className="flex gap-1">
-						{([
-							["globe", "Globe"],
-							["map", "Map"],
-						] as const).map(([mode, label]) => (
-							<button
-								key={mode}
-								onClick={() => setViewMode(mode)}
-								className={`flex-1 py-1.5 px-2 rounded text-[11px] font-medium transition-all ${
-									viewMode === mode
-										? "bg-slate-900 text-white"
-										: "bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-								}`}
-							>
-								{label}
-							</button>
-						))}
-					</div>
-				</div>
 
-				{viewMode === "map" && (
-					<div className="space-y-2 pt-4 border-t border-slate-100">
-						<div className="flex justify-between items-baseline">
-							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-								Center Longitude
-							</span>
-							<span className="font-mono text-[11px] text-slate-400">
-								<span ref={mapCenterLongitudeValueRef}>
-									{formatLongitude(mapCenterLongitude)}
-								</span>
-							</span>
-						</div>
-						<input
-							type="range"
-							min={-180}
-							max={180}
-							step={1}
-							defaultValue={mapCenterLongitude}
-							onChange={(e) => handleMapCenterLongitudeInput(parseFloat(e.target.value))}
-							onMouseUp={(e) => commitMapCenterLongitude(parseFloat((e.currentTarget as HTMLInputElement).value))}
-							onTouchEnd={(e) => commitMapCenterLongitude(parseFloat((e.currentTarget as HTMLInputElement).value))}
-							onKeyUp={(e) => commitMapCenterLongitude(parseFloat((e.currentTarget as HTMLInputElement).value))}
-							className="w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-						/>
-					</div>
-				)}
-
-				<div className="space-y-2 pt-4 border-t border-slate-100">
-					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-						Map Mode
-					</span>
-					<div className="flex gap-1">
-						{([
-							["terrain", "Terrain"],
-							["landHeightmap", "Height"],
-							["temperature", "Temp"],
-						] as const).map(([mode, label]) => (
-							<button
-								key={mode}
-								onClick={() => setColorMode(mode)}
-								className={`flex-1 py-1.5 px-2 rounded text-[11px] font-medium transition-all ${
-									(mode === "temperature" ? isTemperatureMode : colorMode === mode)
-										? "bg-slate-900 text-white"
-										: "bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-								}`}
-							>
-								{label}
-							</button>
-						))}
-					</div>
-					<div className="flex gap-1">
-						{([
-							["precipitation", "Rain"],
-							["vegetation", "Veg"],
-							["climate", "Climate"],
-							["oceanCurrents", "Currents"],
-						] as const).map(([mode, label]) => (
-							<button
-								key={mode}
-								onClick={() => setColorMode(mode)}
-								className={`flex-1 py-1.5 px-2 rounded text-[11px] font-medium transition-all ${
-									(mode === "climate" ? isClimateMode : colorMode === mode)
-										? "bg-slate-900 text-white"
-										: "bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-								}`}
-							>
-								{label}
-							</button>
-						))}
-					</div>
-					<div className="flex gap-1">
-						{([
-							["windSpeed", "Wind"],
-						] as const).map(([mode, label]) => (
-							<button
-								key={mode}
-								onClick={() => setColorMode(mode)}
-								className={`flex-1 py-1.5 px-2 rounded text-[11px] font-medium transition-all ${
-									colorMode === mode
-										? "bg-slate-900 text-white"
-										: "bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-								}`}
-							>
-								{label}
-							</button>
-						))}
-					</div>
-				</div>
 
 				{/* {isTemperatureMode && (
 					<div className="space-y-2 pt-4 border-t border-slate-100">
@@ -1609,7 +1638,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					</div>
 				)} */}
 
-				{isClimateMode && (
+				{/* {isClimateMode && (
 					<div className="space-y-2 pt-4 border-t border-slate-100">
 						<div className="flex justify-between items-baseline">
 							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
@@ -1629,142 +1658,132 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							<option value="koppenClimate">Koppen</option>
 						</select>
 					</div>
-				)}
+				)} */}
 
-				{colorMode === "temperature" && (
-					<div className="space-y-2 pt-4 border-t border-slate-100">
-						<div className="flex justify-between items-baseline">
-							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-								Temperature Period
-							</span>
-							<span className="font-mono text-[11px] text-slate-400">
-								{monthLabels[temperatureMonth]}
-							</span>
+					<div className="pt-4 border-t border-slate-100">
+					<button
+						onClick={() => setTimeExpanded(!timeExpanded)}
+						className="flex w-full items-center justify-between"
+					>
+						<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">Time</span>
+						<span className="text-[10px] text-slate-300">{timeExpanded ? "\u25B2" : "\u25BC"}</span>
+					</button>
+					{timeExpanded && (
+						<div className="space-y-3 mt-3">
+							<div>
+								<div className="flex justify-between items-baseline mb-1">
+									<span className="text-[11px] font-medium text-slate-500">Month</span>
+									<span className="font-mono text-[11px] text-slate-400">{monthLabels[globalMonth]}</span>
+								</div>
+								<input
+									type="range"
+									min={1}
+									max={12}
+									step={1}
+									value={globalMonth}
+									onChange={(e) => setGlobalMonth(Number(e.target.value))}
+									className="w-full accent-slate-900"
+								/>
+							</div>
+							<div className={tidallyLocked ? "opacity-50" : ""}>
+								<div className="flex justify-between items-baseline mb-1">
+									<span className="text-[11px] font-medium text-slate-500">Time of Day</span>
+									<span className="font-mono text-[11px] text-slate-400">{tidallyLocked ? "Locked" : `${Math.floor(timeOfDay)}:${String(Math.floor((timeOfDay % 1) * 60)).padStart(2, "0")}`}</span>
+								</div>
+								<input
+									type="range"
+									min={0}
+									max={hoursPerDay}
+									step={0.25}
+									value={tidallyLocked ? hoursPerDay / 2 : timeOfDay}
+									onChange={(e) => setTimeOfDay(Number(e.target.value))}
+									disabled={tidallyLocked}
+									className="w-full accent-slate-900 disabled:cursor-not-allowed"
+								/>
+							</div>
 						</div>
-						<select
-							value={temperatureMonth}
-							onChange={(e) => setTemperatureMonth(Number(e.target.value))}
-							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
-						>
-							{monthLabels.map((label, index) => (
-								<option key={label} value={index}>
-									{label}
-								</option>
-							))}
-						</select>
-					</div>
-				)}
+					)}
+				</div>
 
-				{colorMode === "precipitation" && (
-					<div className="space-y-2 pt-4 border-t border-slate-100">
-						<div className="flex justify-between items-baseline">
-							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-								Rainfall Period
-							</span>
-							<span className="font-mono text-[11px] text-slate-400">
-								{monthLabels[rainfallMonth]}
-							</span>
-						</div>
-						<select
-							value={rainfallMonth}
-							onChange={(e) => setRainfallMonth(Number(e.target.value))}
-							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
-						>
-							{monthLabels.map((label, index) => (
-								<option key={label} value={index}>
-									{label}
-								</option>
-							))}
-						</select>
-					</div>
-				)}
-
-				{isWindMode && (
-					<div className="space-y-2 pt-4 border-t border-slate-100">
-						<div className="flex justify-between items-baseline">
-							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-								Wind Period
-							</span>
-							<span className="font-mono text-[11px] text-slate-400">
-								{monthLabels[windMonth]}
-							</span>
-						</div>
-						<select
-							value={windMonth}
-							onChange={(e) => setWindMonth(Number(e.target.value))}
-							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900"
-						>
-							{monthLabels.map((label, index) => (
-								<option key={label} value={index}>
-									{label}
-								</option>
-							))}
-						</select>
-					</div>
-				)}
-
-					<div className="space-y-3 pt-4 border-t border-slate-100">
-					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-						Overlays
-					</span>
-					<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
-						<span>Wireframe</span>
-						<input
-							type="checkbox"
-							checked={showWireframe}
-							onChange={(e) => setShowWireframe(e.target.checked)}
-							className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
-						/>
-					</label>
-					<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
-						<span>Rivers</span>
-						<input
-							type="checkbox"
-							checked={showRivers}
-							onChange={(e) => setShowRivers(e.target.checked)}
-							className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
-						/>
-					</label>
-					<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
-						<span>Thermal Equator</span>
-						<input
-							type="checkbox"
-							checked={showThermalEquator}
-							onChange={(e) => setShowThermalEquator(e.target.checked)}
-							className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
-						/>
-					</label>
-					<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
-						<span>Grid Lines</span>
-						<input
-							type="checkbox"
-							checked={showGrid}
-							onChange={(e) => setShowGrid(e.target.checked)}
-							className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
-						/>
-					</label>
-					<div className={showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"}>
-						<div className="flex justify-between items-baseline">
-							<label className="text-[11px] font-medium text-slate-500">
-								Grid Spacing
+				<div className="pt-4 border-t border-slate-100">
+					<button
+						onClick={() => setOverlaysExpanded(!overlaysExpanded)}
+						className="flex w-full items-center justify-between"
+					>
+						<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">Overlays</span>
+						<span className="text-[10px] text-slate-300">{overlaysExpanded ? "\u25B2" : "\u25BC"}</span>
+					</button>
+					{overlaysExpanded && (
+						<div className="space-y-3 mt-3">
+							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
+								<span>Wireframe</span>
+								<input
+									type="checkbox"
+									checked={showWireframe}
+									onChange={(e) => setShowWireframe(e.target.checked)}
+									className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+								/>
 							</label>
-							<span className="font-mono text-[11px] text-slate-400">
-								{gridSpacing}°
-							</span>
+							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
+								<span>Rivers</span>
+								<input
+									type="checkbox"
+									checked={showRivers}
+									onChange={(e) => setShowRivers(e.target.checked)}
+									className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+								/>
+							</label>
+							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
+								<span>Clouds</span>
+								<input
+									type="checkbox"
+									checked={showClouds}
+									onChange={(e) => setShowClouds(e.target.checked)}
+									className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+								/>
+							</label>
+							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
+								<span>Thermal Equator</span>
+								<input
+									type="checkbox"
+									checked={showThermalEquator}
+									onChange={(e) => setShowThermalEquator(e.target.checked)}
+									className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+								/>
+							</label>
+							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-500">
+								<span>Grid Lines</span>
+								<input
+									type="checkbox"
+									checked={showGrid}
+									onChange={(e) => setShowGrid(e.target.checked)}
+									className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
+								/>
+							</label>
+							<div className={showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"}>
+								<div className="flex justify-between items-baseline">
+									<label className="text-[11px] font-medium text-slate-500">
+										Grid Spacing
+									</label>
+									<span className="font-mono text-[11px] text-slate-400">
+										{gridSpacing}°
+									</span>
+								</div>
+								<select
+									value={gridSpacing}
+									onChange={(e) => setGridSpacing(Number(e.target.value))}
+									disabled={!showGrid}
+									className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900 disabled:cursor-not-allowed"
+								>
+									{[30, 15, 10, 5, 2.5].map((value) => (
+										<option key={value} value={value}>
+											{value}°
+										</option>
+									))}
+								</select>
+							</div>
 						</div>
-						<select
-							value={gridSpacing}
-							onChange={(e) => setGridSpacing(Number(e.target.value))}
-							disabled={!showGrid}
-							className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium text-slate-600 outline-none transition focus:border-slate-900 disabled:cursor-not-allowed"
-						>
-							{[30, 15, 10, 5, 2.5].map((value) => (
-								<option key={value} value={value}>
-									{value}°
-								</option>
-							))}
-						</select>
-					</div>
+					)}
 				</div>
 
 					<div className="pt-4 mt-1 border-t border-slate-100">
@@ -1810,6 +1829,22 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					ref={canvasRef}
 					className="w-full h-full block"
 				/>
+				{viewMode === "globe" && (
+					<button
+						onClick={() => setFullAmbient(v => !v)}
+						title={fullAmbient ? "Switch to sunlit" : "Switch to full ambient"}
+						className={`absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
+							fullAmbient
+								? "border-white/20 bg-white/15 text-yellow-300"
+								: "border-white/10 bg-slate-950/75 text-slate-400 hover:text-slate-200"
+						} backdrop-blur-sm`}
+					>
+						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+							<path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" />
+							<circle cx="8" cy="8" r="3" />
+						</svg>
+					</button>
+				)}
 				{hoverInfo && hoverElevationKm !== null && (
 					<div
 						className="pointer-events-none absolute z-10 min-w-32 rounded-xl border border-white/10 bg-slate-950/85 px-3 py-2 text-white shadow-2xl backdrop-blur-sm"
@@ -1818,7 +1853,32 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 							top: hoverCardTop,
 						}}
 					>
-						<div className="font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+						{hoverCoordinates && (
+							<>
+								<div className="font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Coordinates
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100">
+									{hoverCoordinates}
+								</div>
+							</>
+						)}
+						{hoverLandmark && (
+							<>
+								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Landmark
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100 capitalize">
+									{hoverLandmark.type ?? "unknown"} #{hoverLandmark.id}
+								</div>
+								{hoverLandmark.size !== null && (
+									<div className="mt-1 font-mono text-xs text-slate-400">
+										{hoverLandmark.size} cells
+									</div>
+								)}
+							</>
+						)}
+						<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
 							Elevation
 						</div>
 						<div className="mt-1 font-mono text-sm text-slate-100">
@@ -1826,18 +1886,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						</div>
 						{hoverIsLand !== null && (
 							<div className="mt-1 font-mono text-[10px] text-slate-400">
-								isLand={hoverIsLand} riverLand={hoverRiverLand ?? '?'} lake={hoverInfo && world?.rivers?.lakes ? world.rivers.lakes[hoverInfo.region] : '?'}
+								land={hoverIsLand} lake={hoverInfo && world?.rivers?.lakes ? world.rivers.lakes[hoverInfo.region] : '?'} river={hoverInfo && world?.rivers?.visible ? world.rivers.visible[hoverInfo.region] : '?'}
 							</div>
-						)}
-						{hoverCoordinates && (
-							<>
-								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Coordinates
-								</div>
-								<div className="mt-1 font-mono text-sm text-slate-100">
-									{hoverCoordinates}
-								</div>
-							</>
 						)}
 						{colorMode === "biotemperature" && hoverBiotemperature !== null ? (
 							<>
@@ -1851,7 +1901,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						) : hoverTemperature !== null && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Temperature {temperatureMonth === 0 ? "Annual" : monthLabels[temperatureMonth]}
+									Temperature {tempAnnual ? "Annual" : monthLabels[globalMonth]}
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100">
 									{hoverTemperature.toFixed(1)} °C
@@ -1861,14 +1911,14 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						{hoverRainfall !== null && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Rainfall {rainfallMonth === 0 ? "Annual" : monthLabels[rainfallMonth]}
+									Rainfall {rainAnnual ? "Annual" : monthLabels[globalMonth]}
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100">
 									{hoverRainfall.toFixed(0)} mm
 								</div>
 							</>
 						)}
-						{colorMode === "climate" && hoverClimateZone && (
+						{hoverClimateZone && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
 									Climate
@@ -1901,11 +1951,51 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						{hoverBiome && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Biome
+									Vegetation
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100 capitalize">
 									{hoverBiome}
 								</div>
+							</>
+						)}
+						{hoverProvince !== null && hoverProvince >= 0 && (
+							<>
+								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
+									Province
+								</div>
+								<div className="mt-1 font-mono text-sm text-slate-100">
+									#{hoverProvince}{world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}{world?.provinces?.size ? ` · ${world.provinces.size[hoverProvince]} cells` : ""}
+								</div>
+								{world?.provinces?.adjOffset && !world.provinces.desolate[hoverProvince!] && (() => {
+									const p = hoverProvince!
+									const off = world.provinces!.adjOffset
+									const adj = world.provinces!.adjList
+									const des = world.provinces!.desolate
+									const nbs: number[] = []
+									for (let i = off[p]; i < off[p + 1]; i++) {
+										if (!des[adj[i]]) nbs.push(adj[i])
+									}
+									return nbs.length > 0 ? (
+										<div className="mt-1 font-mono text-xs text-slate-400">
+											neighbors: {nbs.map(n => `#${n}`).join(", ")}
+										</div>
+									) : null
+								})()}
+								{world?.population && !world.provinces!.desolate[hoverProvince!] && (() => {
+									const p = hoverProvince!
+									const pop = world.population.population[p]
+									if (pop <= 0) return null
+									const popStr = pop >= 1_000_000 ? `${(pop / 1_000_000).toFixed(1)}M` : pop >= 1_000 ? `${(pop / 1_000).toFixed(0)}K` : Math.round(pop).toLocaleString()
+									const radiusKm = world.params.planetRadiusKm ?? 6371
+									const cellAreaKm2 = (4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
+									const areaKm2 = world.provinces!.size[p] * cellAreaKm2
+									const density = pop / areaKm2
+									return (
+										<div className="mt-1 font-mono text-xs text-slate-400">
+											pop: {popStr} · {density.toFixed(1)}/km²
+										</div>
+									)
+								})()}
 							</>
 						)}
 						{hoverOceanDist !== null && hoverOceanDist > 0 && (
@@ -1937,7 +2027,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						{isWindMode && hoverWind && (
 							<>
 								<div className="mt-2 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
-									Wind {windMonth === 0 ? "Annual" : monthLabels[windMonth]}
+									Wind {windAnnual ? "Annual" : monthLabels[globalMonth]}
 								</div>
 								<div className="mt-1 font-mono text-sm text-slate-100">
 									{(() => {
@@ -1953,6 +2043,82 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						)}
 					</div>
 				)}
+				{/* Map mode bar */}
+				<div className="absolute bottom-0 left-0 right-0 flex justify-center pb-3 pointer-events-none">
+					<div className="pointer-events-auto inline-flex items-center rounded-xl border border-white/10 bg-slate-950/75 p-1 gap-0.5 backdrop-blur-sm">
+						{([
+							["globe", "Globe"],
+							["map", "Map"],
+						] as const).map(([mode, label]) => (
+							<button
+								key={mode}
+								onClick={() => setViewMode(mode)}
+								className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+									viewMode === mode
+										? "bg-white/15 text-white shadow-sm"
+										: "text-slate-400 hover:text-slate-200"
+								}`}
+							>
+								{label}
+							</button>
+						))}
+						<div className="w-px h-4 bg-white/10 mx-0.5" />
+						{([
+							["terrain", "Terrain"],
+							["landHeightmap", "Height"],
+							["temperature", "Temp"],
+							["precipitation", "Rain"],
+							["vegetation", "Veg"],
+							["climate", "Climate"],
+
+							...(ENABLE_WIND_FIELDS ? [["windSpeed", "Wind"]] : []),
+							...(ENABLE_PROVINCES ? [["provinces", "Provinces"], ["population", "Pop"]] : []),
+						] as [string, string][]).map(([mode, label]) => {
+							const isActive = mode === "temperature" ? isTemperatureMode
+								: mode === "climate" ? isClimateMode
+								: colorMode === mode
+							return (
+								<button
+									key={mode}
+									onClick={() => setColorMode(mode as ColorMode)}
+									className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+										isActive
+											? "bg-white/15 text-white shadow-sm"
+											: "text-slate-400 hover:text-slate-200"
+									}`}
+								>
+									{label}
+								</button>
+							)
+						})}
+						{(isTemperatureMode || colorMode === "precipitation" || isWindMode) && (
+							<>
+								<div className="w-px h-4 bg-white/10 mx-0.5" />
+								{([true, false] as const).map((isAnnual) => {
+									const active = isTemperatureMode ? tempAnnual
+										: colorMode === "precipitation" ? rainAnnual
+										: windAnnual
+									const setter = isTemperatureMode ? setTempAnnual
+										: colorMode === "precipitation" ? setRainAnnual
+										: setWindAnnual
+									return (
+										<button
+											key={isAnnual ? "annual" : "monthly"}
+											onClick={() => setter(isAnnual)}
+											className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+												active === isAnnual
+													? "bg-white/15 text-white shadow-sm"
+													: "text-slate-400 hover:text-slate-200"
+											}`}
+										>
+											{isAnnual ? "Annual" : "Monthly"}
+										</button>
+									)
+								})}
+							</>
+						)}
+					</div>
+				</div>
 			</div>
 		</div>
 	)

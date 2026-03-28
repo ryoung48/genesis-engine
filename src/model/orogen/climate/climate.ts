@@ -3,17 +3,24 @@
  * Computes land fraction from mesh elevation, runs the energy balance model,
  * and maps zonal temperatures to per-cell with elevation lapse rate correction.
  */
-import * as d3 from "d3"
-
-import { EnergyBalanceModel } from "../cells/ebm/index"
-import { EMB_CONSTANTS } from "../cells/ebm/constants"
-import { INSOLATION } from "../cells/ebm/insolation"
-import { TIME } from "../utilities/time"
-import type { SphereMesh, OrogenParams, OrogenClimate } from "./types"
-import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getSunTempFactor, isTidallyLocked } from "./units"
+import { EnergyBalanceModel } from "../../cells/ebm/index"
+import { EMB_CONSTANTS } from "../../cells/ebm/constants"
+import { INSOLATION } from "../../cells/ebm/insolation"
+import { TIME } from "../../utilities/time"
+import type { SphereMesh, OrogenParams, OrogenClimate } from "../types"
+import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getSunTempFactor, isTidallyLocked } from "../units"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+const LAT_STEP_INV = (NUM_LAT - 1) / 180 // O(1) uniform-grid interpolation
+
+/** Fast piecewise-linear interpolation for uniformly-spaced latitude bands (-90..90). */
+function interpolateLatBand(range: number[], latDeg: number): number {
+	const pos = Math.max(0, Math.min(NUM_LAT - 1, (latDeg + 90) * LAT_STEP_INV))
+	const i0 = Math.min(NUM_LAT - 2, pos | 0)
+	const t = pos - i0
+	return range[i0] + t * (range[i0 + 1] - range[i0])
+}
 
 /** Convert raw mesh elevation to physical height in km (inlined from colors.ts) */
 export function elevToHeightKm(elev: number): number {
@@ -133,7 +140,6 @@ export function computeMonthlyInsolation(mesh: SphereMesh, params: OrogenParams)
 		{ length: EMB_CONSTANTS.grid.NUM_LAT },
 		(_, i) => -Math.PI / 2 + (Math.PI * i) / (EMB_CONSTANTS.grid.NUM_LAT - 1),
 	)
-	const latsDeg = lats.map((lat) => lat * (180 / Math.PI))
 	const { _insolation } = INSOLATION.compute(
 		lats,
 		{
@@ -147,17 +153,17 @@ export function computeMonthlyInsolation(mesh: SphereMesh, params: OrogenParams)
 			T_SUN: EMB_CONSTANTS.stellar.T_SUN * getSunTempFactor(params.sunTempFactor),
 		},
 	)
-	const monthlyScales = Array.from({ length: 12 }, (_, month) => {
+	const monthlyRanges: number[][] = new Array(12)
+	for (let month = 0; month < 12; month++) {
 		const days = TIME.month.days(month)
-		const avgByLat = _insolation.map((row) => days.reduce((sum, day) => sum + row[day], 0) / Math.max(1, days.length))
-		return d3.scaleLinear<number>().domain(latsDeg).range(avgByLat)
-	})
+		monthlyRanges[month] = _insolation.map((row) => days.reduce((sum, day) => sum + row[day], 0) / Math.max(1, days.length))
+	}
 
 	for (let r = 0; r < N; r++) {
 		const z = mesh.r_xyz[3 * r + 2]
 		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
 		for (let month = 0; month < 12; month++) {
-			monthly[month * N + r] = monthlyScales[month](latDeg) as number
+			monthly[month * N + r] = interpolateLatBand(monthlyRanges[month], latDeg)
 		}
 	}
 
@@ -301,19 +307,19 @@ export function computeTemperature(
 	})
 	ebm.runModel(30, 0.5)
 
-	// Build interpolation scales: latitude degrees → zonal temperature
-	const scaleAvg = d3.scaleLinear().domain(ebm.lats_deg).range(ebm.temperature_avg)
-	const scaleMin = d3.scaleLinear().domain(ebm.lats_deg).range(ebm.temperature_min)
-	const scaleMax = d3.scaleLinear().domain(ebm.lats_deg).range(ebm.temperature_max)
+	// Build interpolation ranges: latitude bands → zonal temperature
 	let dayStart = 0
-	const scaleMonthly = MONTH_DAY_COUNTS.map((days) => {
+	const monthlyRanges: number[][] = new Array(12)
+	for (let m = 0; m < 12; m++) {
 		const start = dayStart
-		const end = start + days
+		const end = start + MONTH_DAY_COUNTS[m]
 		dayStart = end
-		return d3.scaleLinear().domain(ebm.lats_deg).range(
-			ebm.temperature.map((row) => (d3.mean(row.slice(start, end)) ?? 0)),
-		)
-	})
+		monthlyRanges[m] = ebm.temperature.map((row) => {
+			let sum = 0
+			for (let d = start; d < end; d++) sum += row[d]
+			return sum / (end - start)
+		})
+	}
 
 	const N = mesh.numRegions
 	const temperature_avg = new Float32Array(N)
@@ -331,7 +337,7 @@ export function computeTemperature(
 		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
 		const lapseCorrection = elevation[r] > 0 ? elevToHeightKm(elevation[r]) * LAPSE_RATE : 0
 
-		const annualAvg = (scaleAvg(latDeg) as number) - lapseCorrection
+		const annualAvg = interpolateLatBand(ebm.temperature_avg, latDeg) - lapseCorrection
 		temperature_avg[r] = annualAvg
 
 		// Continentality: scale seasonal deviation from annual mean
@@ -343,13 +349,13 @@ export function computeTemperature(
 		const maxAmplitude = 0.75 * Math.max(0, polarTaper)
 		const inertiaFactor = oceanDist ? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000) : 1
 
-		const zonalMin = (scaleMin(latDeg) as number) - lapseCorrection
-		const zonalMax = (scaleMax(latDeg) as number) - lapseCorrection
+		const zonalMin = interpolateLatBand(ebm.temperature_min, latDeg) - lapseCorrection
+		const zonalMax = interpolateLatBand(ebm.temperature_max, latDeg) - lapseCorrection
 		temperature_min[r] = annualAvg + (zonalMin - annualAvg) * inertiaFactor
 		temperature_max[r] = annualAvg + (zonalMax - annualAvg) * inertiaFactor
 
 		for (let month = 0; month < 12; month++) {
-			const zonalMonth = (scaleMonthly[month](latDeg) as number) - lapseCorrection
+			const zonalMonth = interpolateLatBand(monthlyRanges[month], latDeg) - lapseCorrection
 			temperature_monthly[month * N + r] =
 				annualAvg + (zonalMonth - annualAvg) * inertiaFactor
 		}

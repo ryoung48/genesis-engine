@@ -1,4 +1,4 @@
-import type { SphereMesh, OrogenClimate, OrogenRainfall, OrogenRivers } from "./types"
+import type { SphereMesh, OrogenClimate, OrogenRainfall, OrogenRivers } from "../types"
 
 /**
  * Min-heap keyed on an external Float32Array.
@@ -236,12 +236,14 @@ export function computeRivers(
 		.sort((a, b) => elevation[b] - elevation[a])
 
 	const traced = new Uint8Array(N)
+	const visible = new Uint8Array(N)
 	const lines: [number, number, number, number][][] = []
 	let maxFlow = 0
 
 	for (const start of riverCells) {
 		if (traced[start]) continue
 		const line: [number, number, number, number][] = []
+		const lineCells: number[] = []
 		let cur = start
 
 		while (cur >= 0) {
@@ -254,6 +256,7 @@ export function computeRivers(
 				f,
 				elevation[cur],
 			])
+			lineCells.push(cur)
 
 			if (!land[cur]) break
 			if (cur !== start && traced[cur]) break // include this junction cell, then stop
@@ -280,13 +283,19 @@ export function computeRivers(
 					flow[next],
 					elevation[next],
 				])
+				lineCells.push(next)
 				break
 			}
 			cur = next
 		}
 
-		if (line.length >= 2) lines.push(line)
+		if (line.length >= 2) {
+			lines.push(line)
+			for (const cell of lineCells) {
+				if (land[cell]) visible[cell] = 1
+			}
+		}
 	}
 
-	return { lines, maxFlow, minFlow: threshold, lakes, waterLevel }
+	return { lines, maxFlow, minFlow: threshold, visible, lakes, waterLevel }
 }

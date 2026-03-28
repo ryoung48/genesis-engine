@@ -20,6 +20,7 @@ export function applyCraters(
 	elevation: Float32Array,
 	seed: number,
 	intensity: number,
+	planetRadiusKm = 3185,
 ): void {
 	if (intensity <= 0) return
 
@@ -27,8 +28,12 @@ export function applyCraters(
 	const rng = createRng(seed + 4242)
 	const noise = new SimplexNoise(seed + 4243)
 
-	// Quadratic scaling: low intensity = few craters, high = many
-	const count = Math.round(intensity * intensity * 120)
+	// Reference radius: 0.5× Earth ≈ 3185 km — current sizes calibrated here
+	const refRadius = 3185
+	const radiusRatio = planetRadiusKm / refRadius
+
+	// Count scales with √radius — gentle increase so craters stay visible on large planets
+	const count = Math.round(intensity * intensity * 120 * Math.sqrt(radiusRatio))
 	if (count === 0) return
 
 	// Generate crater list
@@ -42,8 +47,10 @@ export function applyCraters(
 		const cy = sinPhi * Math.sin(theta)
 		const cz = cosPhi
 
-		// Large craters: angular radius 0.04–0.15 rad (~250–950 km on Earth)
-		const radius = 0.04 + rng.random() * 0.11
+		// Angular radius scales with 1/√radius — softer than pure inverse
+		// so craters remain visually prominent on larger planets
+		const baseRadius = 0.04 + rng.random() * 0.11
+		const radius = baseRadius / Math.sqrt(radiusRatio)
 		// Depth scales with radius (bigger craters are deeper) and intensity
 		const depth = (0.15 + rng.random() * 0.25) * (radius / 0.10) * intensity
 		const rimHeight = depth * 0.25

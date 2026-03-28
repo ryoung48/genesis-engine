@@ -1,5 +1,5 @@
-import { TIME } from "../utilities/time"
-import type { OrogenClimate, OrogenParams, OrogenRainfall, SphereMesh } from "./types"
+import { TIME } from "../../utilities/time"
+import type { OrogenClimate, OrogenParams, OrogenRainfall, SphereMesh } from "../types"
 import { computeMonthlyInsolation } from "./climate"
 
 const ZONE_COLOR_MAP = {

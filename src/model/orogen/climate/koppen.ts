@@ -1,4 +1,4 @@
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from "./types"
+import type { OrogenClimate, OrogenRainfall, SphereMesh } from "../types"
 
 export const KOPPEN_CLASSES = [
 	{ code: "Ocean", name: "Ocean", color: [0.29, 0.44, 0.65] as [number, number, number] },
@@ -65,27 +65,48 @@ export function assignKoppenClimate(
 	const N = mesh.numRegions
 	const classes = new Uint8Array(N)
 
+	// Reusable buffers — avoid per-cell allocations
+	const mTemps = new Float64Array(12)
+	const mRain = new Float64Array(12)
+
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
 
-		const monthlyTemps = Array.from({ length: 12 }, (_, month) => climate.temperature_monthly[month * N + r])
-		const monthlyRain = Array.from({ length: 12 }, (_, month) => rainfall.monthly[month * N + r])
-		const hot = Math.max(...monthlyTemps)
-		const cold = Math.min(...monthlyTemps)
-		const annualTemp = monthlyTemps.reduce((sum, value) => sum + value, 0) / 12
-		const annualRain = monthlyRain.reduce((sum, value) => sum + value, 0)
-		const driestMonth = Math.min(...monthlyRain)
-		const monthsAbove10 = monthlyTemps.filter((value) => value >= 10).length
+		// Single-pass stats collection
+		let hot = -Infinity, cold = Infinity, tempSum = 0
+		let rainSum = 0, driestMonth = Infinity
+		let monthsAbove10 = 0
+		let nhSummerTempSum = 0, nhWinterTempSum = 0
+		for (let month = 0; month < 12; month++) {
+			const t = climate.temperature_monthly[month * N + r]
+			const rain = rainfall.monthly[month * N + r]
+			mTemps[month] = t
+			mRain[month] = rain
+			if (t > hot) hot = t
+			if (t < cold) cold = t
+			tempSum += t
+			rainSum += rain
+			if (rain < driestMonth) driestMonth = rain
+			if (t >= 10) monthsAbove10++
+			// NH summer = months 4-9, NH winter = 0-3,10,11
+			if (month >= 4 && month <= 9) nhSummerTempSum += t
+			else nhWinterTempSum += t
+		}
+		const annualTemp = tempSum / 12
+		const annualRain = rainSum
 
-		// Determine local summer/winter from temperature, not latitude
-		const { summer, winter } = getLocalSeasons(monthlyTemps)
-		let summerRain = 0, winterRain = 0
-		for (const m of summer) summerRain += monthlyRain[m]
-		for (const m of winter) winterRain += monthlyRain[m]
-		const driestSummer = Math.min(...summer.map((index) => monthlyRain[index]))
-		const driestWinter = Math.min(...winter.map((index) => monthlyRain[index]))
-		const wettestSummer = Math.max(...summer.map((index) => monthlyRain[index]))
-		const wettestWinter = Math.max(...winter.map((index) => monthlyRain[index]))
+		// Inline local season determination + driest/wettest computation
+		const isNH = nhSummerTempSum >= nhWinterTempSum
+		const s0 = isNH ? 5 : 11, s1 = isNH ? 6 : 0, s2 = isNH ? 7 : 1
+		const w0 = isNH ? 11 : 5, w1 = isNH ? 0 : 6, w2 = isNH ? 1 : 7
+		const sr0 = mRain[s0], sr1 = mRain[s1], sr2 = mRain[s2]
+		const wr0 = mRain[w0], wr1 = mRain[w1], wr2 = mRain[w2]
+		const summerRain = sr0 + sr1 + sr2
+		const winterRain = wr0 + wr1 + wr2
+		const driestSummer = Math.min(sr0, sr1, sr2)
+		const driestWinter = Math.min(wr0, wr1, wr2)
+		const wettestSummer = Math.max(sr0, sr1, sr2)
+		const wettestWinter = Math.max(wr0, wr1, wr2)
 		const summerFrac = annualRain > 0 ? summerRain / annualRain : 0.5
 
 		// E group: polar

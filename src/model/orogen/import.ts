@@ -6,10 +6,10 @@
 import type { OrogenParams, OrogenWorld, SphereMesh, BoundaryInfo, DistanceFields, OrogenRainfall } from "./types"
 import { createRng } from "./rng"
 import { buildSphereMesh } from "./mesh"
-import { computeLandFraction, computeTemperature } from "./climate"
-import { computeOceanCurrents } from "./ocean-currents"
-import { computeWind } from "./wind"
-import { computeAdvection, computeMonthlyRain } from "./rain"
+import { computeLandFraction, computeTemperature } from "./climate/climate"
+import { computeOceanCurrents } from "./climate/ocean-currents"
+import { computeWind } from "./climate/wind"
+import { computeAdvection, computeMonthlyRain } from "./climate/rain"
 import {
 	warpTerrain,
 	smoothElevation,
@@ -17,11 +17,11 @@ import {
 	sharpenRidges,
 	applySoilCreep,
 } from "./erosion"
-import { assignVegetation, assignClimateZones } from "./vegetation"
-import { assignPastaClimate } from "./pasta"
-import { assignKoppenClimate } from "./koppen"
-import { ENABLE_PASTA_CLASSIFICATION } from "./features"
-import { computeRivers } from "./rivers"
+import { assignVegetation, assignClimateZones } from "./climate/vegetation"
+import { assignPastaClimate } from "./climate/pasta"
+import { assignKoppenClimate } from "./climate/koppen"
+import { ENABLE_PASTA_CLASSIFICATION, ENABLE_WIND_FIELDS } from "./features"
+import { computeRivers } from "./topography/rivers"
 import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm } from "./units"
 import { countContinents } from "./stats"
 
@@ -412,8 +412,12 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	}
 
 	// Wind fields
-	onProgress?.("Computing wind fields...", 84)
-	const wind = climate ? computeWind(mesh, elevation, isLand, climate, orogenParams) : undefined
+	const wind = ENABLE_WIND_FIELDS
+		? (() => {
+			onProgress?.("Computing wind fields...", 84)
+			return climate ? computeWind(mesh, elevation, isLand, climate, orogenParams) : undefined
+		})()
+		: undefined
 
 	// Rainfall
 	onProgress?.("Computing rainfall...", 85)

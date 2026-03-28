@@ -33,6 +33,9 @@ export interface OrogenScene {
 	setRiversVisible(visible: boolean): void
 	setWindArrows(data: { east: Float32Array; north: Float32Array; speed: Float32Array } | null): void
 	setWindArrowsVisible(visible: boolean): void
+	setSunPosition(month: number, obliquityDeg: number, timeOfDay: number, hoursPerDay: number): void
+	setAtmospherePressure(pressureBar: number): void
+	setFullAmbient(enabled: boolean): void
 }
 
 export function createOrogenScene(
@@ -69,6 +72,7 @@ export function createOrogenScene(
 
 	const mapControls = new OrbitControls(mapCamera, canvas)
 	mapControls.enableRotate = false
+	mapControls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }
 	mapControls.enableDamping = true
 	mapControls.dampingFactor = 0.09
 	mapControls.panSpeed = 1.4
@@ -76,12 +80,13 @@ export function createOrogenScene(
 	mapControls.enableZoom = true
 	mapControls.minZoom = 0.5
 	mapControls.maxZoom = 20
+	mapControls.zoomToCursor = true
 	mapControls.enabled = false
 
-	// Lighting
-	const ambient = new THREE.AmbientLight(0xaabbcc, 3.5)
+	// Lighting — low ambient so day/night contrast is visible
+	const ambient = new THREE.AmbientLight(0x667788, 0.6)
 	scene.add(ambient)
-	const sun = new THREE.DirectionalLight(0xfff8ee, 1.5)
+	const sun = new THREE.DirectionalLight(0xfff8ee, 4.0)
 	sun.position.set(5, 3, 4)
 	scene.add(sun)
 
@@ -102,33 +107,48 @@ export function createOrogenScene(
 	const atmosGeo = new THREE.SphereGeometry(1.12, 48, 36)
 	const atmosMat = new THREE.ShaderMaterial({
 		uniforms: {
-			c: { value: new THREE.Color(0.35, 0.6, 1.0) },
+			atmosphereColor: { value: new THREE.Color(0.52, 0.68, 0.98) },
+			sunDirection: { value: sun.position.clone().normalize() },
+			atmosphereStrength: { value: 1.0 },
 		},
 		vertexShader: `
-			varying vec3 vNormal;
-			varying vec3 vPosition;
+			varying vec3 vWorldNormal;
+			varying vec3 vWorldPosition;
 			void main() {
-				vNormal = normalize(normalMatrix * normal);
-				vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-				gl_Position = projectionMatrix * vec4(vPosition, 1.0);
+				vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+				vWorldPosition = worldPosition.xyz;
+				vWorldNormal = normalize(mat3(modelMatrix) * normal);
+				gl_Position = projectionMatrix * viewMatrix * worldPosition;
 			}
 		`,
 		fragmentShader: `
-			uniform vec3 c;
-			varying vec3 vNormal;
-			varying vec3 vPosition;
+			uniform vec3 atmosphereColor;
+			uniform vec3 sunDirection;
+			uniform float atmosphereStrength;
+			varying vec3 vWorldNormal;
+			varying vec3 vWorldPosition;
 			void main() {
-				vec3 viewDir = normalize(-vPosition);
-				float rim = 1.0 - max(dot(viewDir, vNormal), 0.0);
-				gl_FragColor = vec4(c, pow(rim, 3.5) * 0.55);
+				vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+				float rim = pow(1.0 - max(dot(viewDir, normalize(vWorldNormal)), 0.0), 5.0);
+				float daylight = smoothstep(-0.15, 0.65, dot(normalize(vWorldNormal), normalize(sunDirection)));
+				float alpha = rim * mix(0.03, 0.18, daylight) * atmosphereStrength;
+				gl_FragColor = vec4(atmosphereColor, alpha);
 			}
 		`,
 		transparent: true,
-		side: THREE.FrontSide,
+		side: THREE.BackSide,
 		depthWrite: false,
 	})
 	const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat)
 	scene.add(atmosMesh)
+
+	function setAtmospherePressure(pressureBar: number) {
+		const clamped = Math.max(0.1, Math.min(10, Number.isFinite(pressureBar) ? pressureBar : 1))
+		const pressureFactor = Math.pow(clamped, 0.4)
+		atmosMat.uniforms.atmosphereStrength.value = 0.7 + pressureFactor * 0.45
+		const shellScale = 1.105 + pressureFactor * 0.02
+		atmosMesh.scale.setScalar(shellScale / 1.12)
+	}
 
 	// Starfield
 	const starCount = 3000
@@ -1150,7 +1170,7 @@ export function createOrogenScene(
 		} else {
 			waterMat.color.set(0x0c3a6e)
 			waterMat.opacity = 0.4
-			waterMat.specular.set(0x4488bb)
+			waterMat.specular.set(0x000000)
 		}
 		rebuildTerrain()
 	}
@@ -1191,18 +1211,12 @@ export function createOrogenScene(
 		rebuildOverlays()
 	}
 
-	function setMapCenterLongitude(longitudeDeg: number) {
-		currentMapCenterLongitudeDeg = longitudeDeg
-		if (mapMesh) {
-			const builtLonDeg = mapMesh.userData.builtCenterLonDeg ?? 0
-			const dx = ((builtLonDeg - currentMapCenterLongitudeDeg) * Math.PI / 180) * (2 / Math.PI)
-			mapMesh.position.x = dx
-		}
-		updateOverlayVisibility()
+	function setMapCenterLongitude(_longitudeDeg: number) {
+		// No-op — free pan/zoom replaces center longitude control
 	}
 
 	function commitMapCenterLongitude() {
-		if (currentWorld && currentViewMode === "map") rebuildTerrain()
+		// No-op — free pan/zoom replaces center longitude control
 	}
 
 	function emitHover(info: OrogenHoverInfo | null) {
@@ -1346,6 +1360,47 @@ export function createOrogenScene(
 		rebuildOverlays()
 	}
 
+	/**
+	 * Position the sun from month (season → latitude) and time-of-day (→ longitude).
+	 * month 0 = equinox, 1-12 = Jan-Dec.
+	 * timeOfDay in hours [0, hoursPerDay). hoursPerDay controls full rotation.
+	 */
+	function setSunPosition(month: number, obliquityDeg: number, timeOfDay: number, hoursPerDay: number) {
+		const oblRad = obliquityDeg * Math.PI / 180
+		// June (month 6) = northern summer solstice (+obliquity)
+		// December (month 12) = southern summer solstice (-obliquity)
+		const subSolarLat = month === 0
+			? 0
+			: oblRad * Math.sin(2 * Math.PI * (month - 4) / 12)
+		const cosLat = Math.cos(subSolarLat)
+		const sinLat = Math.sin(subSolarLat)
+		// Longitude from time of day — offset so noon faces the default camera
+		const lon = Math.PI + 2 * Math.PI * (timeOfDay / (hoursPerDay || 24))
+		const dist = 10
+		sun.position.set(
+			dist * cosLat * Math.cos(lon),
+			dist * cosLat * Math.sin(lon),
+			dist * sinLat,
+		)
+		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
+	}
+
+	function setFullAmbient(enabled: boolean) {
+		if (enabled) {
+			ambient.color.set(0xffffff)
+			ambient.intensity = 2.5
+			sun.intensity = 0
+			atmosMesh.visible = false
+			waterMat.specular.set(0x000000)
+		} else {
+			ambient.color.set(0x667788)
+			ambient.intensity = 0.6
+			sun.intensity = 4.0
+			if (currentViewMode === "globe") atmosMesh.visible = true
+			waterMat.specular.set(currentColorMode === "terrain" ? 0x88bfe8 : 0x000000)
+		}
+	}
+
 	return {
 		dispose,
 		resize,
@@ -1364,5 +1419,8 @@ export function createOrogenScene(
 		setRiversVisible,
 		setWindArrows,
 		setWindArrowsVisible,
+		setSunPosition,
+		setAtmospherePressure,
+		setFullAmbient,
 	}
 }

@@ -68,6 +68,33 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				wind_speed_monthly: world.wind.wind_speed_monthly,
 			}
 			: undefined,
+		provinces: world.provinces
+			? {
+				regionProvince: world.provinces.regionProvince,
+				seeds: world.provinces.seeds,
+				count: world.provinces.count,
+				desolate: world.provinces.desolate,
+				adjOffset: world.provinces.adjOffset,
+				adjList: world.provinces.adjList,
+				size: world.provinces.size,
+				colors: world.provinces.colors,
+			}
+			: undefined,
+		landmarks: world.landmarks
+			? {
+				regionLandmark: world.landmarks.regionLandmark,
+				type: world.landmarks.type,
+				size: world.landmarks.size,
+				count: world.landmarks.count,
+			}
+			: undefined,
+		population: world.population
+			? {
+				habitability: world.population.habitability,
+				population: world.population.population,
+				totalPopulation: world.population.totalPopulation,
+			}
+			: undefined,
 	}
 }
 
@@ -139,6 +166,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	}
 
 	if (world.rivers?.lakes) {
+		transfer.push(world.rivers.visible.buffer)
 		transfer.push(world.rivers.lakes.buffer)
 		transfer.push(world.rivers.waterLevel.buffer)
 	}
@@ -152,6 +180,27 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.wind.wind_east_monthly.buffer)
 		transfer.push(world.wind.wind_north_monthly.buffer)
 		transfer.push(world.wind.wind_speed_monthly.buffer)
+	}
+
+	if (world.provinces) {
+		transfer.push(world.provinces.regionProvince.buffer)
+		transfer.push(world.provinces.seeds.buffer)
+		transfer.push(world.provinces.desolate.buffer)
+		transfer.push(world.provinces.adjOffset.buffer)
+		transfer.push(world.provinces.adjList.buffer)
+		transfer.push(world.provinces.size.buffer)
+		transfer.push(world.provinces.colors.buffer)
+	}
+
+	if (world.landmarks) {
+		transfer.push(world.landmarks.regionLandmark.buffer)
+		transfer.push(world.landmarks.type.buffer)
+		transfer.push(world.landmarks.size.buffer)
+	}
+
+	if (world.population) {
+		transfer.push(world.population.habitability.buffer)
+		transfer.push(world.population.population.buffer)
 	}
 
 	return transfer
