@@ -36,7 +36,20 @@ export const DEFAULT_WORLD_PARAMS = {
 	ridgeSharpening: 0.50,
 	glacialErosion: 0.50,
 	craters: 0,
+	tectonicMode: 0,
 	pressure: 1.0,
 	antistellarLon: DEFAULT_ANTISTELLAR_LON,
 	perihelion: DEFAULT_PERIHELION,
+} as const
+
+/** Terrain defaults for stagnant lid mode — overrides only the params that differ */
+export const STAGNANT_TERRAIN_OVERRIDES = {
+	roughness: 0.35,
+	terrainWarp: 0.50,
+	smoothing: 0.20,
+	hydraulicErosion: 0.25,
+	thermalErosion: 0.15,
+	ridgeSharpening: 0.15,
+	glacialErosion: 0.25,
+	craters: 0.25,
 } as const

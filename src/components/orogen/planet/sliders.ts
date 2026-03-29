@@ -1,5 +1,5 @@
 import { DEFAULT_PLANET_RADIUS_KM } from "@/model/orogen/units"
-import { DEFAULT_WORLD_PARAMS } from "./constants"
+import { DEFAULT_WORLD_PARAMS, STAGNANT_TERRAIN_OVERRIDES } from "./constants"
 
 export interface SliderDef {
 	label: string
@@ -14,6 +14,7 @@ export interface SliderDef {
 }
 
 export function buildPlanetSliders(state: {
+	tectonicMode: number
 	planetRadiusKm: number
 	obliquity: number
 	eccentricity: number
@@ -154,6 +155,7 @@ export function buildPlanetSliders(state: {
 }
 
 export function buildTerrainSliders(state: {
+	tectonicMode: number
 	numPoints: number
 	jitter: number
 	numPlates: number
@@ -166,6 +168,7 @@ export function buildTerrainSliders(state: {
 	ridgeSharpening: number
 	glacialErosion: number
 	craters: number
+	setTectonicMode: (v: number) => void
 	setNumPoints: (v: number) => void
 	setJitter: (v: number) => void
 	setNumPlates: (v: number) => void
@@ -179,7 +182,18 @@ export function buildTerrainSliders(state: {
 	setGlacialErosion: (v: number) => void
 	setCraters: (v: number) => void
 }): SliderDef[] {
+	const isStagnant = state.tectonicMode === 1
 	return [
+		{
+			label: "Tectonic Mode",
+			help: "Active: Earth-like plate tectonics with subduction. Stagnant Lid: single lithosphere with coronae, volcanic provinces, and rift zones (Venus/Mars/Moon-like).",
+			value: state.tectonicMode,
+			display: isStagnant ? "Stagnant" : "Active",
+			min: 0,
+			max: 1,
+			step: 1,
+			set: state.setTectonicMode,
+		},
 		{
 			label: "Detail",
 			help: "Higher detail sharpens coastlines and terrain, but takes longer to build.",
@@ -209,6 +223,7 @@ export function buildTerrainSliders(state: {
 			max: 120,
 			step: 1,
 			set: state.setNumPlates,
+			disabled: isStagnant,
 		},
 		{
 			label: "Roughness",
@@ -229,6 +244,7 @@ export function buildTerrainSliders(state: {
 			max: 1,
 			step: 0.05,
 			set: state.setContinentSizeVariety,
+			disabled: isStagnant,
 		},
 		{
 			label: "Terrain Warp",
@@ -303,7 +319,8 @@ export function buildTerrainSliders(state: {
 	]
 }
 
-export function resetWorldDefaults(setters: {
+export function resetWorldDefaults(tectonicMode: number, setters: {
+	setTectonicMode: (v: number) => void
 	setNumPoints: (v: number) => void
 	setJitter: (v: number) => void
 	setNumPlates: (v: number) => void
@@ -329,28 +346,32 @@ export function resetWorldDefaults(setters: {
 	setGlacialErosion: (v: number) => void
 	setCraters: (v: number) => void
 }): void {
-	setters.setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
-	setters.setJitter(DEFAULT_WORLD_PARAMS.jitter)
-	setters.setNumPlates(DEFAULT_WORLD_PARAMS.numPlates)
-	setters.setLandDistribution(DEFAULT_WORLD_PARAMS.landDistribution)
-	setters.setContinentSizeVariety(DEFAULT_WORLD_PARAMS.continentSizeVariety)
-	setters.setLandCoverage(DEFAULT_WORLD_PARAMS.landCoverage)
-	setters.setRoughness(DEFAULT_WORLD_PARAMS.roughness)
-	setters.setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
-	setters.setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
-	setters.setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
-	setters.setSunTempFactor(DEFAULT_WORLD_PARAMS.sunTempFactor)
-	setters.setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
-	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
+	const isStagnant = tectonicMode === 1
+	const t = isStagnant ? { ...DEFAULT_WORLD_PARAMS, ...STAGNANT_TERRAIN_OVERRIDES } : DEFAULT_WORLD_PARAMS
+
+	setters.setTectonicMode(tectonicMode)
+	setters.setNumPoints(t.numPoints)
+	setters.setJitter(t.jitter)
+	setters.setNumPlates(t.numPlates)
+	setters.setLandDistribution(t.landDistribution)
+	setters.setContinentSizeVariety(t.continentSizeVariety)
+	setters.setLandCoverage(t.landCoverage)
+	setters.setRoughness(t.roughness)
+	setters.setPlanetRadiusKm(t.planetRadiusKm)
+	setters.setObliquity(t.obliquity)
+	setters.setEccentricity(t.eccentricity)
+	setters.setSunTempFactor(t.sunTempFactor)
+	setters.setDaysPerYear(t.daysPerYear)
+	setters.setHoursPerDay(t.hoursPerDay)
 	setters.setTidallyLocked(false)
-	setters.setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
-	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
-	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
-	setters.setTerrainWarp(DEFAULT_WORLD_PARAMS.terrainWarp)
-	setters.setSmoothing(DEFAULT_WORLD_PARAMS.smoothing)
-	setters.setHydraulicErosion(DEFAULT_WORLD_PARAMS.hydraulicErosion)
-	setters.setThermalErosion(DEFAULT_WORLD_PARAMS.thermalErosion)
-	setters.setRidgeSharpening(DEFAULT_WORLD_PARAMS.ridgeSharpening)
-	setters.setGlacialErosion(DEFAULT_WORLD_PARAMS.glacialErosion)
-	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
+	setters.setAntistellarLon(t.antistellarLon)
+	setters.setPerihelion(t.perihelion)
+	setters.setPressure(t.pressure)
+	setters.setTerrainWarp(t.terrainWarp)
+	setters.setSmoothing(t.smoothing)
+	setters.setHydraulicErosion(t.hydraulicErosion)
+	setters.setThermalErosion(t.thermalErosion)
+	setters.setRidgeSharpening(t.ridgeSharpening)
+	setters.setGlacialErosion(t.glacialErosion)
+	setters.setCraters(t.craters)
 }

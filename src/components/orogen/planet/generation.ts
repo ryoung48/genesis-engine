@@ -96,8 +96,13 @@ export function generateWorld(
 	callbacks.setWorld(null)
 
 	const tidallyLocked = overrides?.tidallyLocked ? true : currentParams.tidallyLocked
+	const rawMode = overrides?.tectonicMode ?? currentParams.tectonicMode
+	const tectonicMode = typeof rawMode === "string"
+		? (rawMode as "active" | "stagnant")
+		: (["active", "stagnant"] as const)[rawMode as number] ?? "active"
 	const params = {
 		seed: overrideSeed,
+		tectonicMode,
 		numPoints: overrides?.numPoints ?? currentParams.numPoints,
 		numPlates: overrides?.numPlates ?? currentParams.numPlates,
 		landDistribution: overrides?.landDistribution ?? currentParams.landDistribution,

@@ -8,6 +8,123 @@ import type { SphereMesh, TectonicPlate } from "./types"
 import { createRng } from "./rng"
 import { SimplexNoise } from "./simplex-noise"
 
+/**
+ * Static hotspots for stagnant lid worlds — dome features without
+ * plate-velocity-driven chain trails.
+ */
+export function applyStaticHotspots(
+	mesh: SphereMesh,
+	elevation: Float32Array,
+	seed: number,
+	count: number,
+): Float32Array {
+	const { numRegions, r_xyz } = mesh
+	const hotspotContrib = new Float32Array(numRegions)
+
+	const DOME_SIGMA = 0.008
+	const DOME_STRENGTH = 0.55
+	const SWELL_SIGMA_MULT = 2.5
+	const SWELL_STR_MULT = 0.12
+
+	const hsRng = createRng(seed + 999)
+	const hsPosRng = createRng(seed + 1001)
+	const hsNoise = new SimplexNoise(seed + 501)
+	const hsNoise2 = new SimplexNoise(seed + 502)
+
+	interface StaticDome {
+		x: number; y: number; z: number
+		strength: number; sigma: number
+		cosThreshPeak: number; invS2: number
+		swellStrength: number; cosThreshSwell: number; invS2Swell: number
+	}
+
+	const domes: StaticDome[] = []
+
+	for (let h = 0; h < count; h++) {
+		const strength = DOME_STRENGTH * (0.4 + hsRng.random() * 1.2)
+		const sigma = DOME_SIGMA * (0.5 + hsRng.random() * 1.0)
+
+		const theta = 2 * Math.PI * hsPosRng.random()
+		const cosPhiVal = 2 * hsPosRng.random() - 1
+		const sinPhiVal = Math.sqrt(1 - cosPhiVal * cosPhiVal)
+		const hx = sinPhiVal * Math.cos(theta)
+		const hy = sinPhiVal * Math.sin(theta)
+		const hz = cosPhiVal
+
+		const isOcean = elevation[findNearestR(mesh, hx, hy, hz)] <= 0
+		const boost = isOcean ? 1.8 : 1.0
+
+		const swSigma = sigma * SWELL_SIGMA_MULT
+		domes.push({
+			x: hx, y: hy, z: hz,
+			strength: strength * boost,
+			sigma,
+			cosThreshPeak: Math.cos(sigma * 5.5),
+			invS2: -0.5 / (sigma * sigma),
+			swellStrength: strength * SWELL_STR_MULT,
+			cosThreshSwell: Math.cos(swSigma * 3),
+			invS2Swell: -0.5 / (swSigma * swSigma),
+		})
+	}
+
+	for (let r = 0; r < numRegions; r++) {
+		const rx = r_xyz[3 * r], ry = r_xyz[3 * r + 1], rz = r_xyz[3 * r + 2]
+
+		let nearSwell = false, nearPeak = false
+		for (const dm of domes) {
+			const cdot = dm.x * rx + dm.y * ry + dm.z * rz
+			if (cdot > dm.cosThreshSwell) {
+				nearSwell = true
+				if (cdot > dm.cosThreshPeak) { nearPeak = true; break }
+			}
+		}
+		if (!nearSwell) continue
+
+		let shapeWarpSq = 1.0
+		if (nearPeak) {
+			const warpScale = 8
+			const wx = hsNoise2.fbm(rx * warpScale + 5.1, ry * warpScale + 3.7, rz * warpScale + 9.2, 2) * 0.4
+			const wy = hsNoise2.fbm(rx * warpScale + 11.3, ry * warpScale + 7.1, rz * warpScale + 2.9, 2) * 0.4
+			const wz = hsNoise2.fbm(rx * warpScale + 1.7, ry * warpScale + 13.5, rz * warpScale + 6.4, 2) * 0.4
+			const shapeWarp = 1.0 + 0.40 * hsNoise.fbm((rx + wx) * 20 + 3.2, (ry + wy) * 20 + 7.8, (rz + wz) * 20 + 1.5, 4)
+			shapeWarpSq = shapeWarp * shapeWarp
+		}
+
+		let totalUplift = 0, totalSwellUplift = 0
+		for (const dm of domes) {
+			const dot = dm.x * rx + dm.y * ry + dm.z * rz
+			if (dot > dm.cosThreshSwell) {
+				const swAngleSq = 2 * (1 - dot)
+				totalSwellUplift += dm.swellStrength * Math.exp(swAngleSq * dm.invS2Swell)
+			}
+			if (dot < dm.cosThreshPeak) continue
+			const angleSq = 2 * (1 - dot)
+			totalUplift += dm.strength * Math.exp(angleSq * shapeWarpSq * dm.invS2)
+		}
+
+		const combinedUplift = totalSwellUplift + totalUplift
+		if (combinedUplift > 0.001) {
+			const texBase = 0.7 * hsNoise.ridgedFbm(rx * 12, ry * 12, rz * 12, 4, 2.0, 0.5, 1.0)
+			const texDetail = 0.3 * hsNoise.ridgedFbm(rx * 30, ry * 30, rz * 30, 3, 2.0, 0.5, 1.0)
+			const volc = 0.4 + 0.8 * (texBase + texDetail)
+			const uplift = totalSwellUplift + Math.max(0, totalUplift) * volc
+			elevation[r] += uplift
+			hotspotContrib[r] = uplift
+		}
+	}
+
+	return hotspotContrib
+}
+
+function findNearestR(mesh: SphereMesh, px: number, py: number, pz: number): number {
+	let bestDot = -2, bestR = 0
+	for (let r = 0; r < mesh.numRegions; r++) {
+		const dot = px * mesh.r_xyz[3 * r] + py * mesh.r_xyz[3 * r + 1] + pz * mesh.r_xyz[3 * r + 2]
+		if (dot > bestDot) { bestDot = dot; bestR = r }
+	}
+	return bestR
+}
+
 function plateVelocityAt(
 	plate: TectonicPlate,
 	x: number,

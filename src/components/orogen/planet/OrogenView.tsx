@@ -153,6 +153,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [ridgeSharpening, setRidgeSharpening] = useState(initialDecodedCode?.ridgeSharpening ?? DEFAULT_WORLD_PARAMS.ridgeSharpening)
 	const [glacialErosion, setGlacialErosion] = useState(initialDecodedCode?.glacialErosion ?? DEFAULT_WORLD_PARAMS.glacialErosion)
 	const [craters, setCraters] = useState(initialDecodedCode?.craters ?? DEFAULT_WORLD_PARAMS.craters)
+	const [tectonicMode, setTectonicMode] = useState(initialDecodedCode?.tectonicMode === "stagnant" ? 1 : DEFAULT_WORLD_PARAMS.tectonicMode)
 
 	// --- Three.js scene lifecycle ---
 	useEffect(() => {
@@ -413,12 +414,13 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	}), [])
 
 	const currentParams = useMemo(() => ({
+		tectonicMode,
 		numPoints, numPlates, landDistribution, continentSizeVariety,
 		landCoverage, planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 		daysPerYear, hoursPerDay, tidallyLocked, antistellarLon, jitter, roughness,
 		terrainWarp, smoothing, hydraulicErosion, thermalErosion,
 		ridgeSharpening, glacialErosion, craters, pressure,
-	}), [numPoints, numPlates, landDistribution, continentSizeVariety,
+	}), [tectonicMode, numPoints, numPlates, landDistribution, continentSizeVariety,
 		landCoverage, planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 		daysPerYear, hoursPerDay, tidallyLocked, antistellarLon, jitter, roughness,
 		terrainWarp, smoothing, hydraulicErosion, thermalErosion,
@@ -458,7 +460,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	}, [handleGenerateWorld, planetCodeInput, resolveSeedInput, seed])
 
 	const setters = useMemo(() => ({
-		setNumPoints, setJitter, setNumPlates, setLandDistribution,
+		setTectonicMode, setNumPoints, setJitter, setNumPlates, setLandDistribution,
 		setContinentSizeVariety, setLandCoverage, setRoughness,
 		setPlanetRadiusKm, setObliquity, setEccentricity, setPerihelion,
 		setSunTempFactor, setDaysPerYear, setHoursPerDay,
@@ -492,6 +494,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setters.setRidgeSharpening(decoded.ridgeSharpening)
 		setters.setGlacialErosion(decoded.glacialErosion)
 		setters.setCraters(decoded.craters ?? 0)
+		setters.setTectonicMode(decoded.tectonicMode === "stagnant" ? 1 : 0)
 	}, [setters])
 	const handleApplyCode = useCallback(() => {
 		const trimmed = planetCodeInput.trim()
@@ -547,7 +550,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 	}, [handleImportHeightmap])
 
-	const handleResetDefaults = useCallback(() => resetWorldDefaults(setters), [setters])
+	const handleResetDefaults = useCallback(() => resetWorldDefaults(tectonicMode, setters), [tectonicMode, setters])
 	const handleRandomizeCode = useCallback(() => {
 		const nextSeed = makeRandomSeed()
 		setSeed(nextSeed)
@@ -576,6 +579,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 	// --- Slider definitions ---
 	const planetSliders = buildPlanetSliders({
+		tectonicMode,
 		planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 		daysPerYear, hoursPerDay, pressure, landDistribution, landCoverage,
 		tidallyLocked, antistellarLon,
@@ -584,10 +588,11 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setAntistellarLon,
 	})
 	const terrainSliders = buildTerrainSliders({
+		tectonicMode,
 		numPoints, jitter, numPlates, roughness, continentSizeVariety,
 		terrainWarp, smoothing, hydraulicErosion, thermalErosion,
 		ridgeSharpening, glacialErosion, craters,
-		setNumPoints, setJitter, setNumPlates, setRoughness, setContinentSizeVariety,
+		setTectonicMode, setNumPoints, setJitter, setNumPlates, setRoughness, setContinentSizeVariety,
 		setTerrainWarp, setSmoothing, setHydraulicErosion, setThermalErosion,
 		setRidgeSharpening, setGlacialErosion, setCraters,
 	})

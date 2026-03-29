@@ -49,7 +49,10 @@ export interface PlateVec {
 	omega: number
 }
 
+export type TectonicMode = "active" | "stagnant"
+
 export interface OrogenParams {
+	tectonicMode?: TectonicMode
 	seed: number
 	numPoints: number
 	numPlates: number

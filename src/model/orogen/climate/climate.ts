@@ -407,8 +407,6 @@ export function computeTemperature(
 		return computeTidalTemperature(mesh, elevation, landFraction, params, oceanDist, elevation_km)
 	}
 
-	console.log(JSON.stringify(params))
-
 	const ebm = new EnergyBalanceModel({
 		orbital: {
 			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
