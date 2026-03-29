@@ -67,6 +67,7 @@ export interface OrogenParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	volcanism?: number
 	craters?: number           // 0 = none, 1 = heavily cratered
 	planetRadiusKm?: number
 	obliquity?: number    // axial tilt in degrees, default 23.5
@@ -151,6 +152,16 @@ export interface OrogenRainfall {
 	west: Float32Array      // per-cell normalized west moisture (0–1)
 }
 
+export interface OrogenHazards {
+	earthquake: Float32Array
+	volcano: Float32Array
+	danger: Float32Array
+}
+
+export interface OrogenVolcanism {
+	hotspot: Float32Array
+}
+
 export interface OrogenProvinces {
 	/** Per-region province index (-1 = ocean/unassigned) */
 	regionProvince: Int32Array
@@ -210,6 +221,8 @@ export interface OrogenWorld {
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
 	oceanDist?: Float32Array
 	rainfall?: OrogenRainfall
+	hazards?: OrogenHazards
+	volcanism?: OrogenVolcanism
 	/** Per-cell climate zone code (0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic) */
 	climateZones?: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */

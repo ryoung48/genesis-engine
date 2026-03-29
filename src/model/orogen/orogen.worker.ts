@@ -49,6 +49,18 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				west: world.rainfall.west,
 			}
 			: undefined,
+		hazards: world.hazards
+			? {
+				earthquake: world.hazards.earthquake,
+				volcano: world.hazards.volcano,
+				danger: world.hazards.danger,
+			}
+			: undefined,
+		volcanism: world.volcanism
+			? {
+				hotspot: world.volcanism.hotspot,
+			}
+			: undefined,
 		climateZones: world.climateZones,
 		pastaClimate: world.pastaClimate,
 		pastaDebug: world.pastaDebug,
@@ -145,6 +157,18 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.rainfall.east.buffer,
 			world.rainfall.west.buffer,
 		)
+	}
+
+	if (world.hazards) {
+		transfer.push(
+			world.hazards.earthquake.buffer,
+			world.hazards.volcano.buffer,
+			world.hazards.danger.buffer,
+		)
+	}
+
+	if (world.volcanism) {
+		transfer.push(world.volcanism.hotspot.buffer)
 	}
 
 	if (world.climateZones) {

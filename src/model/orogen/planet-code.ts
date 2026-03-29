@@ -57,6 +57,7 @@ const FIELD_SPECS: FieldSpec[] = [
 	{ name: "antistellarLon", min: 0, step: 1, count: 361, read: (p) => getAntistellarLon(p.antistellarLon) },
 	{ name: "perihelion", min: 0, step: 1, count: 361, read: (p) => getPerihelion(p.perihelion) },
 	{ name: "pressure", min: 0.1, step: 0.1, count: 100, read: (p) => clampPressure(p.pressure) },
+	{ name: "volcanism", min: 0, step: 0.05, count: 21, read: (p) => clampUnit(p.volcanism ?? 0.5) },
 	{ name: "craters", min: 0, step: 0.05, count: 21, read: (p) => clampUnit(p.craters ?? 0) },
 	{ name: "tectonicMode", min: 0, step: 1, count: 2, read: (p) => (p.tectonicMode === "stagnant" || p.tectonicMode as unknown === 1) ? 1 : 0 },
 ]
@@ -128,6 +129,7 @@ export interface DecodedPlanetCode {
 	antistellarLon: number
 	perihelion: number
 	pressure: number
+	volcanism: number
 	craters?: number
 	tectonicMode?: "active" | "stagnant"
 }
@@ -182,6 +184,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		antistellarLon: decodedFields.antistellarLon,
 		perihelion: decodedFields.perihelion,
 		pressure: decodedFields.pressure,
+		volcanism: decodedFields.volcanism,
 		craters: craters > 0 ? craters : undefined,
 		tectonicMode: decodedFields.tectonicMode >= 0.5 ? "stagnant" : "active",
 	}

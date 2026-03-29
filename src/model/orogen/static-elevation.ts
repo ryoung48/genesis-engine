@@ -7,6 +7,14 @@ import type { SphereMesh } from "./types"
 import { SimplexNoise } from "./simplex-noise"
 import { createRng } from "./rng"
 
+function clampUnit(value: number): number {
+	return Math.max(0, Math.min(1, value))
+}
+
+function lerp(min: number, max: number, t: number): number {
+	return min + (max - min) * t
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 /** Random unit vector on the sphere */
@@ -159,17 +167,21 @@ function addVolcanicProvinces(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	seed: number,
-	count: number,
+	volcanism: number,
 ): void {
+	const v = clampUnit(volcanism)
+	const count = Math.round(lerp(2, 12, v))
+	const heightMin = lerp(0.10, 0.25, v) * v
+	const heightMax = lerp(0.25, 0.50, v) * v
 	const rng = createRng(seed + 4001)
 	const shapeNoise = new SimplexNoise(seed + 4002)
 	const warpNoise = new SimplexNoise(seed + 4003)
 	const { numRegions, r_xyz } = mesh
 
-	for (let v = 0; v < count; v++) {
+	for (let i = 0; i < count; i++) {
 		const center = randomUnitVec(rng)
 		const sigma = 0.02 + rng.random() * 0.05
-		const height = 0.15 + rng.random() * 0.35
+		const height = heightMin + rng.random() * Math.max(0, heightMax - heightMin)
 		const cosThresh = Math.cos(sigma * 5)
 
 		for (let r = 0; r < numRegions; r++) {
@@ -282,6 +294,7 @@ export function generateStaticElevation(
 	roughness: number,
 	landCoverage: number,
 	landDistribution: number,
+	volcanism: number,
 ): Float32Array {
 	const elevation = new Float32Array(mesh.numRegions)
 	const rng = createRng(seed + 2000)
@@ -304,9 +317,8 @@ export function generateStaticElevation(
 	const numCoronae = 8 + Math.floor(rng.random() * 8)
 	addCoronae(mesh, elevation, seed, numCoronae)
 
-	// 5. Volcanic provinces (4–8 large shield volcanoes)
-	const numVolcanoes = 4 + Math.floor(rng.random() * 5)
-	addVolcanicProvinces(mesh, elevation, seed, numVolcanoes)
+	// 5. Volcanic provinces
+	addVolcanicProvinces(mesh, elevation, seed, volcanism)
 
 	// 6. Rift zones (2–5 chasmata)
 	const numRifts = 2 + Math.floor(rng.random() * 4)

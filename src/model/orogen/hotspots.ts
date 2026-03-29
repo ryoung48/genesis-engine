@@ -8,6 +8,29 @@ import type { SphereMesh, TectonicPlate } from "./types"
 import { createRng } from "./rng"
 import { SimplexNoise } from "./simplex-noise"
 
+function clampUnit(value: number): number {
+	return Math.max(0, Math.min(1, value))
+}
+
+function lerp(min: number, max: number, t: number): number {
+	return min + (max - min) * t
+}
+
+function mapActiveHotspotCount(volcanism: number): number {
+	const v = clampUnit(volcanism)
+	return Math.round(v <= 0.5 ? lerp(2, 5, v / 0.5) : lerp(5, 10, (v - 0.5) / 0.5))
+}
+
+function mapActiveChainLength(volcanism: number): number {
+	const v = clampUnit(volcanism)
+	return Math.round(v <= 0.5 ? lerp(3, 6, v / 0.5) : lerp(6, 10, (v - 0.5) / 0.5))
+}
+
+function mapActiveDomeStrength(volcanism: number): number {
+	const v = clampUnit(volcanism)
+	return v <= 0.5 ? lerp(0, 0.6, v / 0.5) : lerp(0.6, 0.9, (v - 0.5) / 0.5)
+}
+
 /**
  * Static hotspots for stagnant lid worlds — dome features without
  * plate-velocity-driven chain trails.
@@ -16,13 +39,15 @@ export function applyStaticHotspots(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	seed: number,
-	count: number,
+	volcanism: number,
 ): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
+	const v = clampUnit(volcanism)
+	const count = Math.round(lerp(3, 14, v))
 
 	const DOME_SIGMA = 0.008
-	const DOME_STRENGTH = 0.55
+	const DOME_STRENGTH = lerp(0.3, 0.9, v) * v
 	const SWELL_SIGMA_MULT = 2.5
 	const SWELL_STR_MULT = 0.12
 
@@ -160,16 +185,18 @@ export function applyHotspots(
 	plateAssignment: Int32Array,
 	elevation: Float32Array,
 	seed: number,
+	volcanism: number,
 ): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
+	const v = clampUnit(volcanism)
 
-	const NUM_HOTSPOTS = 5
-	const CHAIN_LENGTH = 6
+	const NUM_HOTSPOTS = mapActiveHotspotCount(v)
+	const CHAIN_LENGTH = mapActiveChainLength(v)
 	const CHAIN_DECAY = 0.75
 	const CHAIN_SPACING = 0.06
 	const DOME_SIGMA = 0.006
-	const DOME_STRENGTH = 0.60
+	const DOME_STRENGTH = mapActiveDomeStrength(v)
 	const SWELL_SIGMA_MULT = 2
 	const SWELL_STR_MULT = 0.10
 

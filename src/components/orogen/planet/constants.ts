@@ -35,6 +35,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	thermalErosion: 0.1,
 	ridgeSharpening: 0.50,
 	glacialErosion: 0.50,
+	volcanism: 0.5,
 	craters: 0,
 	tectonicMode: 0,
 	pressure: 1.0,
@@ -51,5 +52,6 @@ export const STAGNANT_TERRAIN_OVERRIDES = {
 	thermalErosion: 0.15,
 	ridgeSharpening: 0.15,
 	glacialErosion: 0.25,
+	volcanism: 0.60,
 	craters: 0.25,
 } as const

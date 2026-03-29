@@ -4,7 +4,7 @@ import * as d3 from "d3"
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "provinces" | "population" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "dangerZones" | "hotspots" | "provinces" | "population" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
 
 /** Light blue used for ocean on thematic maps (non-terrain/satellite modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -370,6 +370,29 @@ export function windSpeedColor(speed: number): [number, number, number] {
 	}
 	const last = windSpeedStops[windSpeedStops.length - 1]
 	return [last.r, last.g, last.b]
+}
+
+export function dangerColor(score: number): [number, number, number] {
+	const color = d3.rgb(d3.interpolateRgbBasis([
+		"#eff6ff",
+		"#facc15",
+		"#f97316",
+		"#dc2626",
+		"#fff7ed",
+	])(Math.max(0, Math.min(1, score))))
+	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
+export function hotspotColor(score: number): [number, number, number] {
+	const color = d3.rgb(d3.interpolateRgbBasis([
+		"#0f172a",
+		"#1d4ed8",
+		"#22d3ee",
+		"#facc15",
+		"#fb7185",
+		"#fff7ed",
+	])(Math.max(0, Math.min(1, score))))
+	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
 export function populationColor(normalizedDensity: number): [number, number, number] {

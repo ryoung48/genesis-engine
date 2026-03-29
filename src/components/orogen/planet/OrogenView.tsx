@@ -19,7 +19,7 @@ import {
 	getHoverKoppenClimate, getHoverBiome, getHoverProvince,
 	getHoverLandmark, getHoverIsLand, getHoverOceanDist,
 	getHoverDistCoast, getHoverWind, getCoastHopLengthKm,
-	getHoverDistCoastKm, getHoverClimateDisplay,
+	getHoverDistCoastKm, getHoverClimateDisplay, getHoverHazards, getHoverHotspot,
 	type HoverInfo,
 } from "./hover"
 import { computePlanetStats } from "./planet-stats"
@@ -152,6 +152,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [thermalErosion, setThermalErosion] = useState(initialDecodedCode?.thermalErosion ?? DEFAULT_WORLD_PARAMS.thermalErosion)
 	const [ridgeSharpening, setRidgeSharpening] = useState(initialDecodedCode?.ridgeSharpening ?? DEFAULT_WORLD_PARAMS.ridgeSharpening)
 	const [glacialErosion, setGlacialErosion] = useState(initialDecodedCode?.glacialErosion ?? DEFAULT_WORLD_PARAMS.glacialErosion)
+	const [volcanism, setVolcanism] = useState(initialDecodedCode?.volcanism ?? DEFAULT_WORLD_PARAMS.volcanism)
 	const [craters, setCraters] = useState(initialDecodedCode?.craters ?? DEFAULT_WORLD_PARAMS.craters)
 	const [tectonicMode, setTectonicMode] = useState(initialDecodedCode?.tectonicMode === "stagnant" ? 1 : DEFAULT_WORLD_PARAMS.tectonicMode)
 
@@ -197,8 +198,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		if (!ENABLE_PASTA_CLASSIFICATION && (colorMode === "pastaClimate" || colorMode === "satellite")) setColorMode("climate")
 		if (!ENABLE_WIND_FIELDS && colorMode === "windSpeed") setColorMode("terrain")
 		if (!ENABLE_PROVINCES && (colorMode === "provinces" || colorMode === "population")) setColorMode("terrain")
+		if (world && !world.hazards && colorMode === "dangerZones") setColorMode("terrain")
+		if (world && !world.volcanism && colorMode === "hotspots") setColorMode("terrain")
 		if (colorMode === "landHeightmap") setColorMode("terrain")
-	}, [colorMode])
+	}, [colorMode, world?.hazards, world?.volcanism])
 
 	// --- Hover computations ---
 	const hoverElevationKm = getHoverElevationKm(hoverInfo, world)
@@ -219,6 +222,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const hoverOceanDist = getHoverOceanDist(hoverInfo, world)
 	const hoverDistCoast = getHoverDistCoast(hoverInfo, world)
 	const hoverWind = getHoverWind(hoverInfo, world, windMonth)
+	const hoverHazards = getHoverHazards(hoverInfo, world)
+	const hoverHotspot = getHoverHotspot(hoverInfo, world)
 	const coastHopLengthKm = useMemo(() => getCoastHopLengthKm(world), [world])
 	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast, coastHopLengthKm)
 	const hoverDaylightHours =
@@ -244,8 +249,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	// --- Region colors ---
 	const regionColors = useMemo(() => {
 		if (!world) return null
-		return computeRegionColors(world, colorMode, temperatureMonth, rainfallMonth, windMonth)
-	}, [colorMode, temperatureMonth, rainfallMonth, windMonth, world])
+		return computeRegionColors(world, colorMode, temperatureMonth, rainfallMonth, windMonth, viewMode)
+	}, [colorMode, temperatureMonth, rainfallMonth, viewMode, windMonth, world])
 
 	const cloudData = useMemo(() => {
 		if (!showClouds || !world?.rainfall || !world?.isLand) return null
@@ -419,12 +424,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		landCoverage, planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 		daysPerYear, hoursPerDay, tidallyLocked, antistellarLon, jitter, roughness,
 		terrainWarp, smoothing, hydraulicErosion, thermalErosion,
-		ridgeSharpening, glacialErosion, craters, pressure,
+		ridgeSharpening, glacialErosion, volcanism, craters, pressure,
 	}), [tectonicMode, numPoints, numPlates, landDistribution, continentSizeVariety,
 		landCoverage, planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 		daysPerYear, hoursPerDay, tidallyLocked, antistellarLon, jitter, roughness,
 		terrainWarp, smoothing, hydraulicErosion, thermalErosion,
-		ridgeSharpening, glacialErosion, craters, pressure])
+		ridgeSharpening, glacialErosion, volcanism, craters, pressure])
 	const derivedPlanetCode = useMemo(() => encodePlanetCode(seed, { seed, ...currentParams }), [currentParams, seed])
 
 	useEffect(() => {
@@ -466,7 +471,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setSunTempFactor, setDaysPerYear, setHoursPerDay,
 		setTidallyLocked, setAntistellarLon, setPressure, setTerrainWarp, setSmoothing,
 		setHydraulicErosion, setThermalErosion, setRidgeSharpening,
-		setGlacialErosion, setCraters,
+		setGlacialErosion, setVolcanism, setCraters,
 	}), [])
 	const applyDecodedCode = useCallback((decoded: NonNullable<ReturnType<typeof decodePlanetCode>>) => {
 		setSeed(decoded.seed)
@@ -493,6 +498,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setters.setThermalErosion(decoded.thermalErosion)
 		setters.setRidgeSharpening(decoded.ridgeSharpening)
 		setters.setGlacialErosion(decoded.glacialErosion)
+		setters.setVolcanism(decoded.volcanism)
 		setters.setCraters(decoded.craters ?? 0)
 		setters.setTectonicMode(decoded.tectonicMode === "stagnant" ? 1 : 0)
 	}, [setters])
@@ -523,12 +529,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		const importParams = {
 			seed, numPoints, jitter, planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 			daysPerYear, hoursPerDay, pressure, tidallyLocked, antistellarLon, terrainWarp, smoothing,
-			hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, craters,
+			hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, volcanism, craters,
 		}
 		importHeightmap(grayscale, imageWidth, imageHeight, importParams, generationCallbacks)
 	}, [seed, numPoints, jitter, planetRadiusKm, obliquity, eccentricity, perihelion, sunTempFactor,
 		daysPerYear, hoursPerDay, tidallyLocked, antistellarLon, terrainWarp, smoothing,
-		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, craters, pressure, generationCallbacks])
+		hydraulicErosion, thermalErosion, ridgeSharpening, glacialErosion, volcanism, craters, pressure, generationCallbacks])
 
 	const handleFileImport = useCallback(async (file: File) => {
 		try {
@@ -591,10 +597,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		tectonicMode,
 		numPoints, jitter, numPlates, roughness, continentSizeVariety,
 		terrainWarp, smoothing, hydraulicErosion, thermalErosion,
-		ridgeSharpening, glacialErosion, craters,
+		ridgeSharpening, glacialErosion, volcanism, craters,
 		setTectonicMode, setNumPoints, setJitter, setNumPlates, setRoughness, setContinentSizeVariety,
 		setTerrainWarp, setSmoothing, setHydraulicErosion, setThermalErosion,
-		setRidgeSharpening, setGlacialErosion, setCraters,
+		setRidgeSharpening, setGlacialErosion, setVolcanism, setCraters,
 	})
 
 	// --- Planet stats ---
@@ -635,6 +641,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						hoverProvince={hoverProvince}
 						hoverOceanDist={hoverOceanDist} hoverDistCoast={hoverDistCoast} hoverDistCoastKm={hoverDistCoastKm}
 						hoverWind={hoverWind}
+						hoverHazards={hoverHazards}
+						hoverHotspot={hoverHotspot}
 						colorMode={colorMode} isClimateMode={isClimateMode} isSatelliteMode={isSatelliteMode} isWindMode={isWindMode}
 						tempAnnual={tempAnnual} rainAnnual={rainAnnual} windAnnual={windAnnual}
 						globalMonth={globalMonth}

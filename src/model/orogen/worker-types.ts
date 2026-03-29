@@ -33,6 +33,8 @@ export interface SerializedOrogenWorld {
 	oceanDist?: Float32Array
 	distCoast?: Float32Array
 	rainfall?: { monthly: Float32Array; annual: Float32Array; east: Float32Array; west: Float32Array }
+	hazards?: { earthquake: Float32Array; volcano: Float32Array; danger: Float32Array }
+	volcanism?: { hotspot: Float32Array }
 	climateZones?: Uint8Array
 	pastaClimate?: Uint8Array
 	pastaDebug?: {
@@ -104,6 +106,8 @@ export type OrogenWorkerRequest =
 			thermalErosion: number
 			ridgeSharpening: number
 			glacialErosion: number
+			volcanism?: number
+			craters?: number
 			planetRadiusKm?: number
 			obliquity?: number
 			eccentricity?: number

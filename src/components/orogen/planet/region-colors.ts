@@ -1,6 +1,6 @@
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
-import { getColor, temperatureColor, temperatureDeltaColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, OCEAN_LIGHT_BLUE } from "../colors"
+import { getColor, temperatureColor, temperatureDeltaColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, dangerColor, hotspotColor, OCEAN_LIGHT_BLUE } from "../colors"
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import { koppenClimateColor, koppenTrueColor } from "@/model/orogen/climate/koppen"
 import { ENABLE_PASTA_CLASSIFICATION } from "@/model/orogen/features"
@@ -12,9 +12,14 @@ export function computeRegionColors(
 	temperatureMonth: number,
 	rainfallMonth: number,
 	windMonth: number,
+	viewMode: "globe" | "map" = "globe",
 ): Float32Array | null {
 	const N = world.mesh.numRegions
 	const rgb = new Float32Array(N * 3)
+	const darkenMapWaterTemperature = viewMode === "map" && (colorMode === "temperature" || colorMode === "biotemperature")
+	const darkenMapWaterPastaClimate = viewMode === "map" && colorMode === "pastaClimate"
+	const darkenMapWaterOceanCurrents = viewMode === "map" && colorMode === "oceanCurrents"
+	const mapWaterDarkenFactor = 0.74
 
 	if ((colorMode === "temperature" || colorMode === "biotemperature" || colorMode === "temperatureDelta") && world.climate) {
 		const temps = temperatureMonth === 0
@@ -31,9 +36,11 @@ export function computeRegionColors(
 						? Math.max(0, world.climate.temperature_avg[r])
 						: temps[r],
 				)
-			rgb[3 * r] = cr
-			rgb[3 * r + 1] = cg
-			rgb[3 * r + 2] = cb
+			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
+			const factor = darkenMapWaterTemperature && isWater ? mapWaterDarkenFactor : 1
+			rgb[3 * r] = cr * factor
+			rgb[3 * r + 1] = cg * factor
+			rgb[3 * r + 2] = cb * factor
 		}
 		return rgb
 	}
@@ -99,9 +106,11 @@ export function computeRegionColors(
 	if (ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate" && world.pastaClimate) {
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
-			rgb[3 * r] = cr
-			rgb[3 * r + 1] = cg
-			rgb[3 * r + 2] = cb
+			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
+			const factor = darkenMapWaterPastaClimate && isWater ? mapWaterDarkenFactor : 1
+			rgb[3 * r] = cr * factor
+			rgb[3 * r + 1] = cg * factor
+			rgb[3 * r + 2] = cb * factor
 		}
 		return rgb
 	}
@@ -222,13 +231,55 @@ export function computeRegionColors(
 	if (colorMode === "oceanCurrents" && world.oceanCurrents) {
 		const { oceanWarmth, coastalWarmth } = world.oceanCurrents
 		for (let r = 0; r < N; r++) {
-			const value = world.isLand?.[r]
+			const isLand = !!world.isLand?.[r]
+			const value = isLand
 				? coastalWarmth[r]
 				: oceanWarmth[r]
 			const [cr, cg, cb] = oceanCurrentColor(value)
-			rgb[3 * r] = cr
-			rgb[3 * r + 1] = cg
-			rgb[3 * r + 2] = cb
+			const factor = darkenMapWaterOceanCurrents && !isLand ? mapWaterDarkenFactor : 1
+			rgb[3 * r] = cr * factor
+			rgb[3 * r + 1] = cg * factor
+			rgb[3 * r + 2] = cb * factor
+		}
+		return rgb
+	}
+
+	if (colorMode === "dangerZones" && world.hazards) {
+		for (let r = 0; r < N; r++) {
+			const isLand = !!world.isLand?.[r]
+			const [cr, cg, cb] = isLand
+				? darkenVegetationAtElevation(
+					dangerColor(world.hazards.danger[r]),
+					world.elevation_km[r],
+				)
+				: dangerColor(world.hazards.danger[r])
+			const factor = viewMode === "map" && !isLand ? 0.78 : 1
+			rgb[3 * r] = cr * factor
+			rgb[3 * r + 1] = cg * factor
+			rgb[3 * r + 2] = cb * factor
+		}
+		return rgb
+	}
+
+	if (colorMode === "hotspots" && world.volcanism) {
+		let maxHotspot = 0
+		for (let r = 0; r < N; r++) {
+			if (world.volcanism.hotspot[r] > maxHotspot) maxHotspot = world.volcanism.hotspot[r]
+		}
+		const invMax = maxHotspot > 1e-6 ? 1 / maxHotspot : 0
+		for (let r = 0; r < N; r++) {
+			const isLand = !!world.isLand?.[r]
+			const score = Math.max(0, Math.min(1, world.volcanism.hotspot[r] * invMax))
+			const [cr, cg, cb] = isLand
+				? darkenVegetationAtElevation(
+					hotspotColor(score),
+					world.elevation_km[r],
+				)
+				: hotspotColor(score)
+			const factor = viewMode === "map" && !isLand ? 0.82 : 1
+			rgb[3 * r] = cr * factor
+			rgb[3 * r + 1] = cg * factor
+			rgb[3 * r + 2] = cb * factor
 		}
 		return rgb
 	}

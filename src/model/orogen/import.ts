@@ -26,6 +26,7 @@ import { computeRivers } from "./topography/rivers"
 import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm, getMaxElevationKm, getMaxOceanDepthKm } from "./units"
 import { elevToHeightKm } from "./climate/climate"
 import { countContinents } from "./stats"
+import { computeHazards } from "./hazards"
 
 export interface ImportParams {
 	seed: number
@@ -40,6 +41,7 @@ export interface ImportParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	volcanism?: number
 	planetRadiusKm?: number
 	obliquity?: number
 	eccentricity?: number
@@ -219,6 +221,7 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		thermalErosion: params.thermalErosion,
 		ridgeSharpening: params.ridgeSharpening,
 		glacialErosion: params.glacialErosion,
+		volcanism: params.volcanism ?? 0.5,
 		planetRadiusKm: params.planetRadiusKm,
 		obliquity: params.obliquity ?? DEFAULT_OBLIQUITY_DEG,
 		eccentricity: params.eccentricity ?? DEFAULT_ECCENTRICITY,
@@ -321,6 +324,8 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	onProgress?.("Assigning vegetation...", 96)
 	const vegetation = assignVegetation(mesh, isLand, climate, rainfall)
 
+	const hazards = computeHazards(mesh, boundary, distFields, elevation_km, isLand, "active")
+
 	onProgress?.("Done", 100)
 
 	return {
@@ -335,6 +340,8 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		climate,
 		oceanDist,
 		rainfall,
+		hazards,
+		volcanism: { hotspot: new Float32Array(mesh.numRegions) },
 		climateZones,
 		pastaClimate,
 		pastaDebug,

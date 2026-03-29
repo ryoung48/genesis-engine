@@ -126,6 +126,7 @@ export function generateWorld(
 		thermalErosion: overrides?.thermalErosion ?? currentParams.thermalErosion,
 		ridgeSharpening: overrides?.ridgeSharpening ?? currentParams.ridgeSharpening,
 		glacialErosion: overrides?.glacialErosion ?? currentParams.glacialErosion,
+		volcanism: overrides?.volcanism ?? currentParams.volcanism,
 		craters: overrides?.craters ?? currentParams.craters,
 	}
 
@@ -186,6 +187,7 @@ export function importHeightmap(
 			thermalErosion: importParams.thermalErosion as number,
 			ridgeSharpening: importParams.ridgeSharpening as number,
 			glacialErosion: importParams.glacialErosion as number,
+			volcanism: importParams.volcanism as number,
 			craters: importParams.craters as number,
 		},
 	}

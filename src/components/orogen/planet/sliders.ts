@@ -167,6 +167,7 @@ export function buildTerrainSliders(state: {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	volcanism: number
 	craters: number
 	setTectonicMode: (v: number) => void
 	setNumPoints: (v: number) => void
@@ -180,6 +181,7 @@ export function buildTerrainSliders(state: {
 	setThermalErosion: (v: number) => void
 	setRidgeSharpening: (v: number) => void
 	setGlacialErosion: (v: number) => void
+	setVolcanism: (v: number) => void
 	setCraters: (v: number) => void
 }): SliderDef[] {
 	const isStagnant = state.tectonicMode === 1
@@ -307,6 +309,16 @@ export function buildTerrainSliders(state: {
 			set: state.setGlacialErosion,
 		},
 		{
+			label: "Volcanism",
+			help: "Scales hotspot activity in active mode and hotspot plus volcanic-province uplift in stagnant lid mode.",
+			value: state.volcanism,
+			display: state.volcanism.toFixed(2),
+			min: 0,
+			max: 1,
+			step: 0.05,
+			set: state.setVolcanism,
+		},
+		{
 			label: "Craters",
 			help: "Stamps impact craters onto the surface. Higher values produce more and larger craters.",
 			value: state.craters,
@@ -344,6 +356,7 @@ export function resetWorldDefaults(tectonicMode: number, setters: {
 	setThermalErosion: (v: number) => void
 	setRidgeSharpening: (v: number) => void
 	setGlacialErosion: (v: number) => void
+	setVolcanism: (v: number) => void
 	setCraters: (v: number) => void
 }): void {
 	const isStagnant = tectonicMode === 1
@@ -373,5 +386,6 @@ export function resetWorldDefaults(tectonicMode: number, setters: {
 	setters.setThermalErosion(t.thermalErosion)
 	setters.setRidgeSharpening(t.ridgeSharpening)
 	setters.setGlacialErosion(t.glacialErosion)
+	setters.setVolcanism(t.volcanism)
 	setters.setCraters(t.craters)
 }

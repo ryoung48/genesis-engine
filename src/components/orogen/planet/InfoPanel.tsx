@@ -3,6 +3,7 @@ import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import {
 	climateTempColor,
 	climateZoneColor,
+	dangerColor,
 	type ColorMode,
 	vegetationColor,
 } from "../colors"
@@ -10,7 +11,7 @@ import { DAYLIGHT } from "@/model/cells/daylight"
 import { koppenClimateColor, koppenTrueColor } from "@/model/orogen/climate/koppen"
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import type { PlanetStat } from "./planet-stats"
-import type { HoverInfo, HoverLandmark, HoverWind } from "./hover"
+import type { HoverHazards, HoverHotspot, HoverInfo, HoverLandmark, HoverWind } from "./hover"
 import { monthLabels } from "./constants"
 
 const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
@@ -168,6 +169,8 @@ interface InfoPanelProps {
 	hoverDistCoast: number | null
 	hoverDistCoastKm: number | null
 	hoverWind: HoverWind | null
+	hoverHazards: HoverHazards | null
+	hoverHotspot: HoverHotspot | null
 	showPastaDebug: boolean
 	colorMode: ColorMode
 	isClimateMode: boolean
@@ -212,6 +215,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverDistCoast,
 	hoverDistCoastKm,
 	hoverWind,
+	hoverHazards,
+	hoverHotspot,
 	showPastaDebug,
 	colorMode,
 	isWindMode,
@@ -315,6 +320,23 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					)}
 					{hoverIceSummary && <Row label="Ice" value={hoverIceSummary} />}
 					{hoverIceDebug && <div className="font-mono text-[8px] text-slate-500">{hoverIceDebug}</div>}
+					{hoverHazards && (
+						<>
+							<SwatchRow
+								label="Danger"
+								value={`${Math.round(hoverHazards.danger * 100)}%${
+									hoverHazards.danger >= 0.2
+										? hoverHazards.earthquake >= hoverHazards.volcano
+											? " (quakes)"
+											: " (volcanic)"
+										: ""
+								}`}
+								color={rgbToCss(dangerColor(hoverHazards.danger))}
+							/>
+							<Row label="Quakes" value={`${Math.round(hoverHazards.earthquake * 100)}%`} />
+							<Row label="Volcano" value={`${Math.round(hoverHazards.volcano * 100)}%`} />
+						</>
+					)}
 					{hoverClimateDisplay && <SwatchRow label="Climate" value={hoverClimateDisplay} color={climateColor} />}
 					{hoverBiome && <SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />}
 					{hoverProvince !== null && hoverProvince >= 0 && (

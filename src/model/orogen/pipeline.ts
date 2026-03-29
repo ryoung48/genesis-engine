@@ -37,6 +37,7 @@ import { computePopulation } from "./provinces/population"
 import { generateStaticElevation } from "./static-elevation"
 import { applyStaticHotspots } from "./hotspots"
 import { deriveSyntheticPlates, buildSyntheticPlates, buildDummyBoundary, computeSimpleDistanceFields } from "./synthetic-plates"
+import { computeHazards } from "./hazards"
 
 type StageTiming = {
 	Stage: string
@@ -150,6 +151,7 @@ function computeFinalCoastDistances(mesh: SphereMesh, isLand: Uint8Array): {
 
 export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressFn): OrogenWorld {
 	const rng = createRng(params.seed)
+	const volcanism = Math.max(0, Math.min(1, params.volcanism ?? 0.5))
 	const pipelineTiming: StageTiming[] = []
 	const elevationTiming: StageTiming[] = []
 	const postTiming: StageTiming[] = []
@@ -302,7 +304,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	elevationStageStart = performance.now()
 	r_hotspot = params.landCoverage <= 0
 		? new Float32Array(mesh.numRegions)
-		: applyHotspots(mesh, plates, plateAssignment, elevation, params.seed)
+		: applyHotspots(mesh, plates, plateAssignment, elevation, params.seed, volcanism)
 	elevationTiming.push({ Stage: "Hotspot volcanism", ms: (performance.now() - elevationStageStart).toFixed(1) })
 	console.timeEnd("orogen:hotspots")
 
@@ -323,7 +325,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.time("orogen:static-elevation")
 	onProgress?.("Generating stagnant lid terrain...", 30)
 	t0 = performance.now()
-	elevation = generateStaticElevation(mesh, params.seed, params.roughness, params.landCoverage, params.landDistribution)
+	elevation = generateStaticElevation(mesh, params.seed, params.roughness, params.landCoverage, params.landDistribution, volcanism)
 	pipelineTiming.push({ Stage: "Static elevation (stagnant lid)", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:static-elevation")
 
@@ -331,12 +333,11 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.time("orogen:static-hotspots")
 	onProgress?.("Applying hotspots...", 50)
 	t0 = performance.now()
-	const hotspotCount = 8
 	const hotspotContrib = params.landCoverage <= 0
 		? new Float32Array(mesh.numRegions)
-		: applyStaticHotspots(mesh, elevation, params.seed, hotspotCount)
+		: applyStaticHotspots(mesh, elevation, params.seed, volcanism)
 	r_hotspot = hotspotContrib
-	pipelineTiming.push({ Stage: `Static hotspots (${hotspotCount})`, ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({ Stage: `Static hotspots (volcanism=${volcanism.toFixed(2)})`, ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:static-hotspots")
 
 	// Peak compression
@@ -720,6 +721,8 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "Vegetation assignment", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:vegetation")
 
+	const hazards = computeHazards(mesh, boundary, distFields, elevation_km, isLand, tectonicMode, r_hotspot)
+
 	// 21. Province partitioning
 	let provinces
 	if (ENABLE_PROVINCES) {
@@ -769,6 +772,8 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		climate,
 		oceanDist,
 		rainfall,
+		hazards,
+		volcanism: { hotspot: r_hotspot },
 		climateZones,
 		pastaClimate,
 		pastaDebug,

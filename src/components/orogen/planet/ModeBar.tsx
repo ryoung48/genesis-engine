@@ -97,6 +97,8 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				["temperature", "Temp"],
 				["precipitation", "Rain"],
 				["vegetation", "Veg"],
+				["dangerZones", "Danger"],
+				["hotspots", "Hotspots"],
 				["climate", "Climate"],
 				["oceanCurrents", "Currents"],
 				...(ENABLE_WIND_FIELDS ? [["windSpeed", "Wind"]] : []),

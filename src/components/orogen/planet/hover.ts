@@ -25,6 +25,16 @@ export interface HoverWind {
 	speed: number
 }
 
+export interface HoverHazards {
+	earthquake: number
+	volcano: number
+	danger: number
+}
+
+export interface HoverHotspot {
+	value: number
+}
+
 export function getHoverElevationKm(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): number | null {
 	return hoverInfo && world
 		? world.elevation_km[hoverInfo.region] ?? 0
@@ -184,6 +194,24 @@ export function getHoverWind(hoverInfo: HoverInfo | null, world: SerializedOroge
 		north: world.wind.wind_north_monthly[m * N + r],
 		speed: world.wind.wind_speed_monthly[m * N + r],
 	}
+}
+
+export function getHoverHazards(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): HoverHazards | null {
+	return hoverInfo && world?.hazards
+		? {
+			earthquake: world.hazards.earthquake[hoverInfo.region],
+			volcano: world.hazards.volcano[hoverInfo.region],
+			danger: world.hazards.danger[hoverInfo.region],
+		}
+		: null
+}
+
+export function getHoverHotspot(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): HoverHotspot | null {
+	return hoverInfo && world?.volcanism
+		? {
+			value: world.volcanism.hotspot[hoverInfo.region],
+		}
+		: null
 }
 
 export function getCoastHopLengthKm(world: SerializedOrogenWorld | null): number | null {
