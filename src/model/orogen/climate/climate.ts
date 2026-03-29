@@ -8,7 +8,7 @@ import { EMB_CONSTANTS } from "../../cells/ebm/constants"
 import { INSOLATION } from "../../cells/ebm/insolation"
 import { TIME } from "../../utilities/time"
 import type { SphereMesh, OrogenParams, OrogenClimate } from "../types"
-import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getSunTempFactor, isTidallyLocked } from "../units"
+import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getPerihelion, getPlanetRadiusKm, getSubstellarDir, getSunTempFactor, isTidallyLocked } from "../units"
 import { SimplexNoise } from "../simplex-noise"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
@@ -23,12 +23,14 @@ function interpolateLatBand(range: number[], latDeg: number): number {
 	return range[i0] + t * (range[i0 + 1] - range[i0])
 }
 
-/** Convert raw mesh elevation to physical height in km (inlined from colors.ts) */
-export function elevToHeightKm(elev: number): number {
-	if (elev <= 0) return elev * 10
+/** Convert raw mesh elevation to physical height in km.
+ *  maxElevKm controls peak mountain height (default 6, Earth-like).
+ *  maxDepthKm controls ocean floor depth at elev=-1 (default 10). */
+export function elevToHeightKm(elev: number, maxElevKm = 6, maxDepthKm = 10): number {
+	if (elev <= 0) return elev * maxDepthKm
 	const t = Math.min(elev, 1)
 	const t2 = t * t
-	return 6 * t2 * t2 * (5 - 4 * t)
+	return maxElevKm * t2 * t2 * (5 - 4 * t)
 }
 
 /** Bin regions into 36 latitude bands, count land fraction per band. */
@@ -58,16 +60,13 @@ export function computeLandFraction(mesh: SphereMesh, isLand: Uint8Array): numbe
 // Tidally locked analytic temperature model
 // ---------------------------------------------------------------------------
 
-/** Substellar point direction — lon=0, lat=0 on a unit sphere */
-const SUBSTELLAR: [number, number, number] = [1, 0, 0]
-
 function computeMonthlyOrbitalFlux(params: OrogenParams): number[] {
 	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
 	const effectiveTSun = T_SUN * getSunTempFactor(params.sunTempFactor)
 	const s0 = SIGMA * Math.pow(effectiveTSun, 4) * Math.pow(R_SUN, 2) / Math.pow(AU, 2)
 	const ecc = getEccentricity(params.eccentricity)
 	const PI = Math.PI
-	const perihelionRad = (EMB_CONSTANTS.orbital.PERIHELION * Math.PI) / 180
+	const perihelionRad = (getPerihelion(params.perihelion) * Math.PI) / 180
 	const longP = perihelionRad + PI
 	const equinoxOffsetRad = (40 * 2 * Math.PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
 
@@ -123,13 +122,14 @@ export function computeMonthlyInsolation(mesh: SphereMesh, params: OrogenParams)
 	const monthly = new Float32Array(N * 12)
 
 	if (isTidallyLocked(params.tidallyLocked)) {
+		const sub = getSubstellarDir(params.antistellarLon)
 		const monthlyFlux = computeMonthlyOrbitalFlux(params)
 		for (let r = 0; r < N; r++) {
 			const x = mesh.r_xyz[3 * r]
 			const y = mesh.r_xyz[3 * r + 1]
 			const z = mesh.r_xyz[3 * r + 2]
 			const cosTheta = Math.max(0, Math.min(1,
-				x * SUBSTELLAR[0] + y * SUBSTELLAR[1] + z * SUBSTELLAR[2]))
+				x * sub[0] + y * sub[1] + z * sub[2]))
 			for (let month = 0; month < 12; month++) {
 				monthly[month * N + r] = monthlyFlux[month] * cosTheta
 			}
@@ -147,7 +147,7 @@ export function computeMonthlyInsolation(mesh: SphereMesh, params: OrogenParams)
 			...EMB_CONSTANTS.orbital,
 			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
 			ECCENTRICITY: getEccentricity(params.eccentricity),
-			PERIHELION: 90,
+			PERIHELION: getPerihelion(params.perihelion),
 		},
 		{
 			...EMB_CONSTANTS.stellar,
@@ -177,11 +177,12 @@ export function computeMonthlyDaylightHours(mesh: SphereMesh, params: OrogenPara
 	const hoursPerDay = getHoursPerDay(params.hoursPerDay)
 
 	if (isTidallyLocked(params.tidallyLocked)) {
+		const sub = getSubstellarDir(params.antistellarLon)
 		for (let r = 0; r < N; r++) {
 			const x = mesh.r_xyz[3 * r]
 			const y = mesh.r_xyz[3 * r + 1]
 			const z = mesh.r_xyz[3 * r + 2]
-			const cosTheta = x * SUBSTELLAR[0] + y * SUBSTELLAR[1] + z * SUBSTELLAR[2]
+			const cosTheta = x * sub[0] + y * sub[1] + z * sub[2]
 			const daylight = cosTheta > 1e-6 ? hoursPerDay : cosTheta < -1e-6 ? 0 : hoursPerDay / 2
 			for (let month = 0; month < 12; month++) {
 				monthly[month * N + r] = daylight
@@ -200,7 +201,7 @@ export function computeMonthlyDaylightHours(mesh: SphereMesh, params: OrogenPara
 			...EMB_CONSTANTS.orbital,
 			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
 			ECCENTRICITY: getEccentricity(params.eccentricity),
-			PERIHELION: 90,
+			PERIHELION: getPerihelion(params.perihelion),
 		},
 		{
 			...EMB_CONSTANTS.stellar,
@@ -242,10 +243,15 @@ function computeTidalTemperature(
 	landFraction: number[],
 	params: OrogenParams,
 	oceanDist?: Float32Array,
+	elevation_km?: Float32Array,
 ): OrogenClimate {
 	const N = mesh.numRegions
+	const sub = getSubstellarDir(params.antistellarLon)
 	const sunFactor = getSunTempFactor(params.sunTempFactor)
 	const ecc = getEccentricity(params.eccentricity)
+	const yearDays = getDaysPerYear(params.daysPerYear)
+	const radiusM = getPlanetRadiusKm(params.planetRadiusKm) * 1000
+	const pressure = params.pressure ?? 1.0
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
 
 	// Solar constant: S₀ = σ·T⁴·R²/AU²
@@ -260,9 +266,18 @@ function computeTidalTemperature(
 	const GREENHOUSE_OFFSET = 33
 	const T_mean_C = T_eq - 273.15 + GREENHOUSE_OFFSET
 
+	// Mirror the EBM heat transport scaling so larger/slower/denser worlds
+	// redistribute heat more efficiently, while smaller/faster/thinner worlds
+	// keep stronger day-night contrasts.
+	const radiusRatio = EMB_CONSTANTS.planet.EARTH_RADIUS / radiusM
+	const radiusFactor = radiusRatio * radiusRatio
+	const pressureFactor = Math.pow(pressure, 0.5)
+	const yearFactor = Math.pow(yearDays / EMB_CONSTANTS.time.DAYS_PER_YEAR, 0.25)
+	const transportFactor = radiusFactor * pressureFactor * yearFactor
+
 	// Redistribution factor: 1.0 = perfectly uniform, 0.0 = no redistribution
-	// 0.5 = moderate atmosphere (Earth-like for tidally locked M-dwarf HZ)
-	const redistribution = 0.5
+	// Earth-like defaults to 0.5 and varies smoothly with the same factors as EBM D.
+	const redistribution = Math.max(0.2, Math.min(0.85, 0.5 + 0.18 * Math.tanh((transportFactor - 1) * 1.5)))
 	const contrast = 1 - redistribution
 
 	// Legendre coefficients:
@@ -275,7 +290,8 @@ function computeTidalTemperature(
 	// Eccentricity-driven global oscillation amplitude (small)
 	const eccAmplitude = ecc * 8 // up to ~1.6°C for ecc=0.2
 
-	const LAPSE_RATE = 6.5 // °C per km
+	const gravityRatio = getPlanetRadiusKm(params.planetRadiusKm) / 6371
+	const LAPSE_RATE = 6.5 * gravityRatio // °C per km, scaled by surface gravity
 	const KM_TO_MI = 0.621371
 
 	const temperature_avg = new Float32Array(N)
@@ -290,7 +306,7 @@ function computeTidalTemperature(
 
 		// Angular distance from substellar point
 		const cosTheta = Math.max(-1, Math.min(1,
-			x * SUBSTELLAR[0] + y * SUBSTELLAR[1] + z * SUBSTELLAR[2]))
+			x * sub[0] + y * sub[1] + z * sub[2]))
 
 		// Legendre polynomials
 		const P1 = cosTheta
@@ -299,7 +315,8 @@ function computeTidalTemperature(
 		let T = T_mean_C + A1 * P1 + A2 * P2
 
 		// Lapse rate correction for elevated terrain
-		const lapseCorrection = elevation[r] > 0 ? elevToHeightKm(elevation[r]) * LAPSE_RATE : 0
+		const hKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
+		const lapseCorrection = hKm > 0 ? hKm * LAPSE_RATE : 0
 		T -= lapseCorrection
 
 		// Continentality moderation — inland areas have slightly more extreme temps
@@ -325,6 +342,47 @@ function computeTidalTemperature(
 		}
 	}
 
+	// Temperature noise: break up perfectly smooth concentric isotherms.
+	// Two octaves of simplex noise on the unit sphere, applied to all cells.
+	// Amplitude tapers near the substellar point (convection keeps it uniform)
+	// and on the deep nightside (radiative cooling dominates).
+	{
+		const seed = params.seed ?? 0
+		const sn1 = new SimplexNoise(seed + 3001)
+		const sn2 = new SimplexNoise(seed + 3002)
+		const FREQ1 = 3.0   // broad swirls
+		const FREQ2 = 7.0   // smaller eddies
+		const AMP1 = 3.0    // °C
+		const AMP2 = 1.2    // °C
+
+		for (let r = 0; r < N; r++) {
+			const x = mesh.r_xyz[3 * r]
+			const y = mesh.r_xyz[3 * r + 1]
+			const z = mesh.r_xyz[3 * r + 2]
+
+			// cosTheta from substellar: 1 at substellar, -1 at antistellar
+			const ct = Math.max(-1, Math.min(1,
+				x * sub[0] + y * sub[1] + z * sub[2]))
+			// Taper: strongest in the mid-dayside and terminator zone (~30-120°),
+			// weaker at the substellar peak and deep nightside
+			const taper = Math.min(
+				1 - Math.max(0, ct - 0.5) * 2,  // fade near substellar (ct > 0.5 → θ < 60°)
+				1 + Math.min(0, ct + 0.5) * 2,   // fade on deep nightside (ct < -0.5 → θ > 120°)
+			)
+
+			const n = sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1
+				+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
+			const offset = n * Math.max(0, taper)
+
+			temperature_avg[r] += offset
+			temperature_min[r] += offset
+			temperature_max[r] += offset
+			for (let month = 0; month < 12; month++) {
+				temperature_monthly[month * N + r] += offset
+			}
+		}
+	}
+
 	return {
 		temperature_avg,
 		temperature_min,
@@ -343,16 +401,19 @@ export function computeTemperature(
 	params: OrogenParams,
 	oceanDist?: Float32Array,
 	isLand?: Uint8Array,
+	elevation_km?: Float32Array,
 ): OrogenClimate {
 	if (isTidallyLocked(params.tidallyLocked)) {
-		return computeTidalTemperature(mesh, elevation, landFraction, params, oceanDist)
+		return computeTidalTemperature(mesh, elevation, landFraction, params, oceanDist, elevation_km)
 	}
+
+	console.log(JSON.stringify(params))
 
 	const ebm = new EnergyBalanceModel({
 		orbital: {
 			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
 			ECCENTRICITY: getEccentricity(params.eccentricity),
-			PERIHELION: 90,
+			PERIHELION: getPerihelion(params.perihelion),
 		},
 		stellar: {
 			...EMB_CONSTANTS.stellar,
@@ -362,11 +423,12 @@ export function computeTemperature(
 			YEAR_LENGTH_DAYS: getDaysPerYear(params.daysPerYear),
 			HOURS_PER_DAY: getHoursPerDay(params.hoursPerDay),
 		},
+		pressure: params.pressure ?? 1.0,
+		radius: getPlanetRadiusKm(params.planetRadiusKm) * 1000,
 		landFraction,
 	})
 	ebm.runModel(30, 0.5)
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
-
 	// Build interpolation ranges: latitude bands → zonal temperature
 	let dayStart = 0
 	const monthlyRanges: number[][] = new Array(12)
@@ -387,7 +449,8 @@ export function computeTemperature(
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
 
-	const LAPSE_RATE = 6.5 // °C per km
+	const gravityRatio = getPlanetRadiusKm(params.planetRadiusKm) / 6371
+	const LAPSE_RATE = 6.5 * gravityRatio // °C per km, scaled by surface gravity
 
 	// Convert ocean distance from km to miles for continentality model
 	const KM_TO_MI = 0.621371
@@ -395,7 +458,8 @@ export function computeTemperature(
 	for (let r = 0; r < N; r++) {
 		const z = mesh.r_xyz[3 * r + 2]
 		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
-		const lapseCorrection = elevation[r] > 0 ? elevToHeightKm(elevation[r]) * LAPSE_RATE : 0
+		const hKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
+		const lapseCorrection = hKm > 0 ? hKm * LAPSE_RATE : 0
 
 		const annualAvg = interpolateLatBand(ebm.temperature_avg, latDeg) - lapseCorrection
 		temperature_avg[r] = annualAvg

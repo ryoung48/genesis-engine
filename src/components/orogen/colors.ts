@@ -4,7 +4,10 @@ import * as d3 from "d3"
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "oceanCurrents" | "windSpeed" | "provinces" | "population"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "provinces" | "population" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
+
+/** Light blue used for ocean on thematic maps (non-terrain/satellite modes). */
+export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
 
 const oceanColorStops: [number, number, number][] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],
@@ -97,22 +100,21 @@ function createRamp(schemes: [number, number, number][][]) {
 /**
  * Convert raw mesh elevation to physical height in km.
  * Hybrid S-curve: quartic start gives flatlands, steepest near 0.75, derivative -> 0 at top.
- * Ocean mapped linearly (~5 km at -0.5).
+ * maxElevKm controls peak height (radius-dependent), maxDepthKm controls ocean floor depth.
  */
-export function elevToHeightKm(elev: number): number {
-	if (elev <= 0) return elev * 10
+export function elevToHeightKm(elev: number, maxElevKm = 6, maxDepthKm = 10): number {
+	if (elev <= 0) return elev * maxDepthKm
 	const t = Math.min(elev, 1)
 	const t2 = t * t
-	return 6 * t2 * t2 * (5 - 4 * t)
+	return maxElevKm * t2 * t2 * (5 - 4 * t)
 }
 
 /**
  * Terrain color ramp using the shared world metrics palette for land,
  * while keeping the existing ocean palette.
+ * Accepts elevation in km (use elevation_km array, not raw).
  */
-export function elevationToColor(e: number): [number, number, number] {
-	const km = elevToHeightKm(e)
-
+export function elevationToColor(km: number, maxElevKm = 6): [number, number, number] {
 	if (km <= 0) {
 		const t = 1 - Math.max(0, Math.min(1, (km + 5) / 5))
 		const scaled = t * (oceanColorStops.length - 1)
@@ -127,7 +129,7 @@ export function elevationToColor(e: number): [number, number, number] {
 		]
 	}
 
-	const t = Math.max(0, Math.min(1, km / 6))
+	const t = Math.max(0, Math.min(1, km / maxElevKm))
 	const scaled = t * (landColorStops.length - 1)
 	const i = Math.min(landColorStops.length - 2, Math.floor(scaled))
 	const localT = scaled - i
@@ -141,21 +143,22 @@ export function elevationToColor(e: number): [number, number, number] {
 }
 
 /**
- * Grayscale heightmap: fixed range -5 km -> 6 km.
- * Same physical height always maps to the same shade.
+ * Grayscale heightmap: maps km range to grayscale.
+ * Accepts elevation in km.
  */
-export function heightmapColor(elevation: number): [number, number, number] {
-	const h = elevToHeightKm(elevation)
-	const t = Math.max(0, Math.min(1, (h + 5) / 11))
+export function heightmapColor(km: number, maxElevKm = 6, maxDepthKm = 10): [number, number, number] {
+	const range = maxDepthKm / 2 + maxElevKm
+	const t = Math.max(0, Math.min(1, (km + maxDepthKm / 2) / range))
 	return [t, t, t]
 }
 
 /**
- * Land heightmap: ocean = black, land on 0 -> 6 km scale.
+ * Land heightmap: ocean = black, land on 0 -> maxElev km scale.
+ * Accepts elevation in km.
  */
-export function landHeightmapColor(elevation: number): [number, number, number] {
-	if (elevation <= 0) return [0, 0, 0]
-	const t = Math.max(0, Math.min(1, elevToHeightKm(elevation) / 6))
+export function landHeightmapColor(km: number, maxElevKm = 6): [number, number, number] {
+	if (km <= 0) return [0, 0, 0]
+	const t = Math.max(0, Math.min(1, km / maxElevKm))
 	return [t, t, t]
 }
 
@@ -204,6 +207,12 @@ export function temperatureColor(celsius: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
+export function temperatureDeltaColor(celsiusDelta: number): [number, number, number] {
+	const normalized = Math.pow(Math.max(0, Math.min(1, celsiusDelta / 60)), 0.8)
+	const color = d3.rgb(d3.interpolateYlOrRd(normalized))
+	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
 const precipStops: { mm: number; r: number; g: number; b: number }[] = [
 	{ mm: 0, r: 0.76, g: 0.70, b: 0.50 },
 	{ mm: 10, r: 0.85, g: 0.78, b: 0.45 },
@@ -238,7 +247,7 @@ export function precipitationColor(mm: number): [number, number, number] {
 }
 
 const climateZoneColors: [number, number, number][] = [
-	[0.05, 0.08, 0.18],
+	OCEAN_LIGHT_BLUE,
 	[0xd3 / 255, 0xef / 255, 0xff / 255],
 	[0x7f / 255, 0xd0 / 255, 0xff / 255],
 	[0x91 / 255, 0xff / 255, 0xdc / 255],
@@ -286,7 +295,7 @@ export function climateTempColor(celsius: number): [number, number, number] {
 }
 
 const biomeColors: [number, number, number][] = [
-	[0.05, 0.08, 0.18],
+	OCEAN_LIGHT_BLUE,
 	[0xe8 / 255, 0xcc / 255, 0xa7 / 255],
 	[0xb9 / 255, 0xbc / 255, 0x91 / 255],
 	[0x9d / 255, 0xb4 / 255, 0x7b / 255],
@@ -368,13 +377,13 @@ export function populationColor(normalizedDensity: number): [number, number, num
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
-export function getColor(elev: number, mode: ColorMode): [number, number, number] {
+export function getColor(km: number, mode: ColorMode, maxElevKm = 6, maxDepthKm = 10): [number, number, number] {
 	switch (mode) {
 		case "heightmap":
-			return heightmapColor(elev)
+			return heightmapColor(km, maxElevKm, maxDepthKm)
 		case "landHeightmap":
-			return landHeightmapColor(elev)
+			return landHeightmapColor(km, maxElevKm)
 		default:
-			return elevationToColor(elev)
+			return elevationToColor(km, maxElevKm)
 	}
 }

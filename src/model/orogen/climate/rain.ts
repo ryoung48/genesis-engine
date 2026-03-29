@@ -5,7 +5,7 @@
  */
 import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
 import { elevToHeightKm } from "./climate"
-import { getDaysPerYear, getHoursPerDay, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "../units"
+import { getDaysPerYear, getHoursPerDay, getSubstellarDir, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "../units"
 import { SimplexNoise } from "../simplex-noise"
 
 const DEG2RAD = Math.PI / 180
@@ -36,10 +36,10 @@ function clamp(x: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, x))
 }
 
-const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 35, 50], [40, 62, 83, 125, 165, 250, 40], x)
+const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 40, 60, 90], [40, 62, 83, 125, 165, 300, 150, 0], x)
 
 const itczScale = (x: number) => piecewise([0, 8, 18, 28], [1, 0.7, 0.2, 0], x)
-const subsidenceScale = (x: number) => piecewise([20, 25, 30, 35, 40], [0, 0.5, 1, 0.5, 0], x)
+const subsidenceScale = (x: number) => piecewise([15, 20, 25, 30, 35, 40], [0, 0.5, 1, 1, 0.5, 0], x)
 const eastStormScale = (x: number) => piecewise([15, 35, 90], [0, 0.8, 1], x)
 const westerliesScale = (x: number) => piecewise([40, 50, 90], [0, 1, 0.8], x)
 
@@ -191,6 +191,7 @@ export function computeAdvection(
 	climate?: OrogenClimate,
 	params?: number | Pick<OrogenParams, "planetRadiusKm">,
 	isLand?: Uint8Array,
+	elevation_km?: Float32Array,
 ): { east: Float32Array; west: Float32Array } {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
@@ -286,7 +287,7 @@ export function computeAdvection(
 		let head = 0
 		while (head < queue.length) {
 			const r = queue[head++]
-			const heightKm = elevToHeightKm(elevation[r])
+			const heightKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
 			const orographic = heightKm > 2 ? -1.8 : -0.6
 			const impact = (!land[r] ? 0.5 : orographic) / scale
 			const m = Math.max(Math.min(Math.max(moisture[r], 0) + impact, wet), 0)
@@ -383,9 +384,6 @@ function computeWeight(
 // Tidally locked rainfall: convection-driven from substellar point
 // ---------------------------------------------------------------------------
 
-/** Substellar point direction — lon=0, lat=0 on a unit sphere */
-const SUBSTELLAR_X = 1, SUBSTELLAR_Y = 0, SUBSTELLAR_Z = 0
-
 /**
  * Rainfall for a tidally locked planet. Convective uplift concentrates
  * near the substellar point; rain tapers smoothly toward the terminator
@@ -396,34 +394,79 @@ function computeTidalRain(
 	mesh: SphereMesh,
 	climate: OrogenClimate,
 	isLand: Uint8Array,
+	params?: Pick<OrogenParams, "seed" | "antistellarLon" | "pressure">,
 ): { monthly: Float32Array; annual: Float32Array } {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
+	const sub = getSubstellarDir(params?.antistellarLon)
+	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
+
+	// Higher pressure → more heat redistribution → more moisture transport
+	// past the terminator. logP: -3.3 at 0.1, 0 at 1, 3.3 at 10
+	const logP = Math.log2(Math.max(0.1, pressure))
+	// Terminator convergence strength:
+	//   0.1bar → ~0.02, 1bar → 0.1, 3bar → 0.25, 10bar → 0.5
+	const terminatorStrength = clamp(0.1 + logP * 0.12, 0.02, 0.55)
+	// Nightside drizzle: zero at ≤1bar, ramps up only at high pressure
+	//   1bar → 0, 3bar → ~0.05, 10bar → ~0.13
+	const nightsideDrizzle = clamp((logP - 0.5) * 0.05, 0, 0.15)
 
 	// Compute angular distance from substellar point for each cell
 	const cosTheta = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		cosTheta[r] = Math.max(-1, Math.min(1,
-			mesh.r_xyz[3 * r] * SUBSTELLAR_X +
-			mesh.r_xyz[3 * r + 1] * SUBSTELLAR_Y +
-			mesh.r_xyz[3 * r + 2] * SUBSTELLAR_Z))
+			mesh.r_xyz[3 * r] * sub[0] +
+			mesh.r_xyz[3 * r + 1] * sub[1] +
+			mesh.r_xyz[3 * r + 2] * sub[2]))
 	}
 
-	// Smooth convective rainfall: peaks at substellar, tapers to zero at
-	// the terminator. Uses a single smooth cos⁴ falloff — no piecewise bands.
-	// Dayside only (θ < 90°); nightside gets nothing.
+	// Noise to break up perfectly smooth concentric rainfall rings.
+	const seed = params?.seed ?? 0
+	const sn1 = new SimplexNoise(seed + 4001)
+	const sn2 = new SimplexNoise(seed + 4002)
+	const FREQ1 = 3.0
+	const FREQ2 = 7.0
+	const AMP1 = 0.35
+	const AMP2 = 0.15
+
+	// Three rainfall sources:
+	// 1) Substellar convection: cos⁴ falloff, peaks at substellar
+	// 2) Terminator convergence: ring where warm dayside air meets cold nightside
+	// 3) Nightside drizzle: advected moisture condensing in cold sinking air
 	const monthly = new Float32Array(N * 12)
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
-		// cosTheta > 0 = dayside, ≤ 0 = nightside
 		const ct = cosTheta[r]
-		// Smooth weight: cos⁴ gives a natural bell shape peaking at substellar
-		// and reaching zero exactly at the terminator (cosθ=0)
-		const weight = ct > 0 ? ct * ct * ct * ct : 0
+		const thetaDeg = Math.acos(clamp(ct, -1, 1)) * (180 / Math.PI)
 
 		const temp = climate.temperature_avg[r]
 		const ceiling = ceilingScale(temp)
-		const rain = weight * ceiling
+
+		// 1) Substellar convection: cos⁴, dayside only
+		const convection = ct > 0 ? ct * ct * ct * ct : 0
+
+		// 2) Terminator convergence ring: bell curve peaking ~85° from substellar
+		//    Warm moist air collides with cold nightside air → forced uplift
+		const termDist = Math.abs(thetaDeg - 85)
+		const terminator = Math.exp(-termDist * termDist / (2 * 18 * 18)) * terminatorStrength
+
+		// 3) Nightside drizzle: gentle falloff past the terminator
+		//    Advected moisture condenses as it cools; fades toward antistellar
+		const nightside = ct < 0.1
+			? nightsideDrizzle * clamp(1 - (thetaDeg - 95) / 70, 0, 1)
+			: 0
+
+		const weight = convection + terminator + nightside
+
+		// Multiplicative noise: breaks up uniform concentric bands
+		const x = mesh.r_xyz[3 * r]
+		const y = mesh.r_xyz[3 * r + 1]
+		const z = mesh.r_xyz[3 * r + 2]
+		const n = sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1
+			+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
+		const noiseMul = Math.max(0, 1 + n)
+
+		const rain = weight * ceiling * noiseMul
 		for (let month = 0; month < 12; month++) {
 			monthly[month * N + r] = rain
 		}
@@ -477,11 +520,11 @@ export function computeMonthlyRain(
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
 	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure" | "seed">,
+	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "antistellarLon" | "pressure" | "seed">,
 	monthlyTEQ?: Float32Array[],
 ): { monthly: Float32Array; annual: Float32Array } {
 	if (isTidallyLocked(params?.tidallyLocked)) {
-		return computeTidalRain(mesh, climate, isLand)
+		return computeTidalRain(mesh, climate, isLand, params)
 	}
 
 	const N = mesh.numRegions

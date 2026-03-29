@@ -72,6 +72,8 @@ export interface OrogenParams {
 	daysPerYear?: number // orbital year length in local days, default 365
 	hoursPerDay?: number // rotation period expressed as local hours per day, default 24
 	tidallyLocked?: boolean // true = one hemisphere always faces the star
+	antistellarLon?: number // longitude of the antistellar point in degrees (0-360), default 180
+	perihelion?: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
 }
 
@@ -198,6 +200,8 @@ export interface OrogenWorld {
 	boundary: BoundaryInfo
 	distFields: DistanceFields
 	elevation: Float32Array
+	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
+	elevation_km: Float32Array
 	params: OrogenParams
 	climate?: OrogenClimate
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
@@ -207,6 +211,8 @@ export interface OrogenWorld {
 	climateZones?: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
 	pastaClimate?: Uint8Array
+	/** Per-cell pasta classification debug metrics */
+	pastaDebug?: import("./climate/pasta").PastaDebug
 	/** Per-cell ice thickness in mm water equivalent (0 for ice-free) */
 	iceThickness?: Float32Array
 	/** Per-cell minimum ice across final-year months (mm w.e.) — for sea ice classification */

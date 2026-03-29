@@ -1,16 +1,25 @@
-﻿import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom"
+import { LoadingScreen } from "./components/loading/LoadingScreen"
 import { GenesisEngine } from "./components/landing/GenesisEngine"
 import { LanguageLab } from "./components/landing/LanguageLab"
 import { OrogenView } from "./components/orogen"
-import { LoadingScreen } from "./components/loading/LoadingScreen"
 import WorldMap from "./components/world"
 import { EARTH_DEFAULTS, LOADING_STEPS } from "./constants/app"
 import { useEbmPreview } from "./hooks/useEbmPreview"
-import { HeightmapPreset, useWorldGeneration } from "./hooks/useWorldGeneration"
-import { ViewState } from "./types/app"
+import { type HeightmapPreset, useWorldGeneration } from "./hooks/useWorldGeneration"
+import type { ViewState } from "./types/app"
+
+function getViewForPath(pathname: string): ViewState {
+	if (pathname === "/tectonic-lab") return "orogen"
+	if (pathname === "/language-lab") return "names"
+	return "start"
+}
 
 function App() {
-	const [view, setView] = useState<ViewState>("start")
+	const navigate = useNavigate()
+	const location = useLocation()
+	const [view, setView] = useState<ViewState>(() => getViewForPath(location.pathname))
 	const [seed, setSeed] = useState(
 		() => localStorage.getItem("chaos-machine-last-seed") || "",
 	)
@@ -67,51 +76,29 @@ function App() {
 		})
 	}
 
+	useEffect(() => {
+		if (view === "loading" || view === "complete") return
+		setView(getViewForPath(location.pathname))
+	}, [location.pathname, view])
+
+	useEffect(() => {
+		if (view === "loading" || view === "complete") return
+		if (view === "orogen" && location.pathname !== "/tectonic-lab") {
+			navigate("/tectonic-lab", { replace: true })
+			return
+		}
+		if (view === "names" && location.pathname !== "/language-lab") {
+			navigate("/language-lab", { replace: true })
+			return
+		}
+		if (view === "start" && location.pathname !== "/") {
+			navigate("/", { replace: true })
+		}
+	}, [location.pathname, navigate, view])
+
 	return (
 		<div className="w-screen h-screen bg-white text-slate-900 font-sans overflow-hidden relative selection:bg-slate-900 selection:text-white">
-			{view === "start" && (
-				<GenesisEngine
-					isExiting={isExiting}
-					seed={seed}
-					setSeed={setSeed}
-					obliquity={obliquity}
-					setObliquity={setObliquity}
-					eccentricity={eccentricity}
-					setEccentricity={setEccentricity}
-					perihelion={perihelion}
-					setPerihelion={setPerihelion}
-					sunTempFactor={sunTempFactor}
-					setSunTempFactor={setSunTempFactor}
-					hoursPerDay={hoursPerDay}
-					setHoursPerDay={setHoursPerDay}
-					daysPerYear={daysPerYear}
-					setDaysPerYear={setDaysPerYear}
-					landFraction={landFraction}
-					setLandFraction={setLandFraction}
-					radiusFactor={radiusFactor}
-					setRadiusFactor={setRadiusFactor}
-					pressure={pressure}
-					setPressure={setPressure}
-					heightmap={heightmap}
-					setHeightmap={setHeightmap}
-					onLaunch={onLaunch}
-					onOrogenClick={() => setView("orogen")}
-					ebmPreview={ebmPreview}
-					previewTab={previewTab}
-					setPreviewTab={setPreviewTab}
-					earthDefaults={EARTH_DEFAULTS}
-				/>
-			)}
-
-			{view === "names" && (
-				<LanguageLab onBack={() => setView("start")} />
-			)}
-
-			{view === "orogen" && (
-				<OrogenView onBack={() => setView("start")} />
-			)}
-
-			{view === "loading" && (
+			{view === "loading" ? (
 				<LoadingScreen
 					isExiting={isExiting}
 					loadingProgress={loadingProgress}
@@ -121,16 +108,61 @@ function App() {
 					logs={logs}
 					currentStep={currentStep}
 				/>
-			)}
-
-			{view === "complete" && (
+			) : view === "complete" ? (
 				<div className="w-full h-full animate-[cm-fade-in_800ms_ease-out]">
 					<WorldMap />
 				</div>
+			) : (
+				<Routes>
+					<Route
+						path="/"
+						element={
+							<GenesisEngine
+								isExiting={isExiting}
+								seed={seed}
+								setSeed={setSeed}
+								obliquity={obliquity}
+								setObliquity={setObliquity}
+								eccentricity={eccentricity}
+								setEccentricity={setEccentricity}
+								perihelion={perihelion}
+								setPerihelion={setPerihelion}
+								sunTempFactor={sunTempFactor}
+								setSunTempFactor={setSunTempFactor}
+								hoursPerDay={hoursPerDay}
+								setHoursPerDay={setHoursPerDay}
+								daysPerYear={daysPerYear}
+								setDaysPerYear={setDaysPerYear}
+								landFraction={landFraction}
+								setLandFraction={setLandFraction}
+								radiusFactor={radiusFactor}
+								setRadiusFactor={setRadiusFactor}
+								pressure={pressure}
+								setPressure={setPressure}
+								heightmap={heightmap}
+								setHeightmap={setHeightmap}
+								onLaunch={onLaunch}
+								onOrogenClick={() => navigate("/tectonic-lab")}
+								ebmPreview={ebmPreview}
+								previewTab={previewTab}
+								setPreviewTab={setPreviewTab}
+								earthDefaults={EARTH_DEFAULTS}
+							/>
+						}
+					/>
+					<Route
+						path="/language-lab"
+						element={<LanguageLab onBack={() => navigate("/")} />}
+					/>
+					<Route
+						path="/tectonic-lab"
+						element={<OrogenView onBack={() => navigate("/")} />}
+					/>
+					<Route path="*" element={<Navigate to="/" replace />} />
+				</Routes>
 			)}
 		</div>
 	)
 }
 
 export default App
-

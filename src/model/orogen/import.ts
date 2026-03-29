@@ -22,7 +22,8 @@ import { assignPastaClimate } from "./climate/pasta"
 import { assignKoppenClimate } from "./climate/koppen"
 import { ENABLE_PASTA_CLASSIFICATION, ENABLE_WIND_FIELDS } from "./features"
 import { computeRivers } from "./topography/rivers"
-import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm } from "./units"
+import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEFAULT_OBLIQUITY_DEG, DEFAULT_SUN_TEMP_FACTOR, meanEdgeLengthKm, getMaxElevationKm, getMaxOceanDepthKm } from "./units"
+import { elevToHeightKm } from "./climate/climate"
 import { countContinents } from "./stats"
 
 export interface ImportParams {
@@ -45,6 +46,8 @@ export interface ImportParams {
 	daysPerYear?: number
 	hoursPerDay?: number
 	tidallyLocked?: boolean
+	antistellarLon?: number
+	perihelion?: number
 	pressure?: number
 }
 
@@ -365,6 +368,8 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
 		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
 		tidallyLocked: params.tidallyLocked,
+		antistellarLon: params.antistellarLon,
+		perihelion: params.perihelion,
 		pressure: params.pressure ?? 1.0,
 	}
 	// Build land mask from final elevation
@@ -373,12 +378,20 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		if (elevation[r] > 0) isLand[r] = 1
 	}
 
+	// Convert raw elevation to km (radius-scaled)
+	const maxElevKm = getMaxElevationKm(params.planetRadiusKm)
+	const maxDepthKm = getMaxOceanDepthKm(params.planetRadiusKm)
+	const elevation_km = new Float32Array(mesh.numRegions)
+	for (let r = 0; r < mesh.numRegions; r++) {
+		elevation_km[r] = elevToHeightKm(elevation[r], maxElevKm, maxDepthKm)
+	}
+
 	const landFraction = computeLandFraction(mesh, isLand)
-	const climate = computeTemperature(mesh, elevation, landFraction, orogenParams, oceanDist)
+	const climate = computeTemperature(mesh, elevation, landFraction, orogenParams, oceanDist, isLand, elevation_km)
 
 	// Moisture advection
 	onProgress?.("Computing moisture...", 80)
-	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, orogenParams, isLand)
+	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, orogenParams, isLand, elevation_km)
 
 	// Ocean currents
 	onProgress?.("Computing ocean currents...", 82)
@@ -433,12 +446,14 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 	const climateZones = assignClimateZones(mesh, isLand, climate)
 
 	// Pasta climate
-	const pastaClimate = ENABLE_PASTA_CLASSIFICATION
+	const pastaResult = ENABLE_PASTA_CLASSIFICATION
 		? (() => {
 			onProgress?.("Classifying pasta climate...", 94)
 			return assignPastaClimate(mesh, isLand, climate, rainfall, orogenParams)
 		})()
 		: undefined
+	const pastaClimate = pastaResult?.zones
+	const pastaDebug = pastaResult?.debug
 
 	// Koppen climate
 	onProgress?.("Classifying Koppen climate...", 95)
@@ -457,12 +472,14 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 		boundary,
 		distFields,
 		elevation,
+		elevation_km,
 		params: orogenParams,
 		climate,
 		oceanDist,
 		rainfall,
 		climateZones,
 		pastaClimate,
+		pastaDebug,
 		koppenClimate,
 		vegetation,
 		rivers,

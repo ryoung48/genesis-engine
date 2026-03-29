@@ -54,6 +54,44 @@ export function isTidallyLocked(tidallyLocked?: boolean): boolean {
 	return tidallyLocked === true
 }
 
+export const DEFAULT_ANTISTELLAR_LON = 180
+export const DEFAULT_PERIHELION = 102
+
+export function getAntistellarLon(antistellarLon?: number): number {
+	if (typeof antistellarLon !== "number" || !Number.isFinite(antistellarLon)) return DEFAULT_ANTISTELLAR_LON
+	return ((antistellarLon % 360) + 360) % 360
+}
+
+export function getPerihelion(perihelion?: number): number {
+	if (typeof perihelion !== "number" || !Number.isFinite(perihelion)) return DEFAULT_PERIHELION
+	return ((perihelion % 360) + 360) % 360
+}
+
+/** Unit vector pointing at the substellar point (antistellar + 180°, lat=0). */
+export function getSubstellarDir(antistellarLon?: number): [number, number, number] {
+	const antiDeg = getAntistellarLon(antistellarLon)
+	const subRad = ((antiDeg + 180) % 360) * (Math.PI / 180)
+	return [Math.cos(subRad), Math.sin(subRad), 0]
+}
+
+/**
+ * Max mountain height scales ~1/g, and g ∝ R for rocky bodies of similar density.
+ * Earth (6371 km) → 6 km practical tectonic max.
+ */
+export function getMaxElevationKm(planetRadiusKm?: number): number {
+	const R = getPlanetRadiusKm(planetRadiusKm)
+	return Math.max(3, Math.min(15, 6 * (DEFAULT_PLANET_RADIUS_KM / R)))
+}
+
+/**
+ * Ocean depth scales weakly with gravity — isostasy is a density ratio.
+ * Earth → 10 km max depth. Mild power-law scaling with radius.
+ */
+export function getMaxOceanDepthKm(planetRadiusKm?: number): number {
+	const R = getPlanetRadiusKm(planetRadiusKm)
+	return 10 * Math.pow(R / DEFAULT_PLANET_RADIUS_KM, 0.3)
+}
+
 export function meanEdgeLengthKm(mesh: MeshWithOptionalNeighborDist, planetRadiusKm?: number): number {
 	const radiusKm = getPlanetRadiusKm(planetRadiusKm)
 	if (!mesh.neighborDist?.length) {

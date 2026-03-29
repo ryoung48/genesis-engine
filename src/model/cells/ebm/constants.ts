@@ -18,7 +18,7 @@ export const EMB_CONSTANTS = {
 		ALBEDO: { ICE: 0.65, LAND: 0.35, OCEAN: 0.25 },
 		// Linearized OLR: OLR = A + B * (T - T_REF)
 		// Tuned for Earth-like temps: ~26°C equator, ~-20°C poles, ~15°C global
-		OLR_A: 240, // W/m² - baseline outgoing radiation at T_REF
+		OLR_A: 238, // W/m² - baseline outgoing radiation at T_REF
 		OLR_B: 2.8, // W/(m²·K) - climate sensitivity parameter
 		OLR_T_REF: 288, // K - reference temperature (~15°C)
 	},

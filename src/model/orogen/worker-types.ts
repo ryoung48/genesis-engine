@@ -26,6 +26,7 @@ export interface SerializedOrogenWorld {
 	mesh: SerializedSphereMesh
 	plateAssignment: Int32Array
 	elevation: Float32Array
+	elevation_km: Float32Array
 	params: OrogenParams
 	continentCount?: number
 	climate?: SerializedOrogenClimate
@@ -34,6 +35,17 @@ export interface SerializedOrogenWorld {
 	rainfall?: { monthly: Float32Array; annual: Float32Array; east: Float32Array; west: Float32Array }
 	climateZones?: Uint8Array
 	pastaClimate?: Uint8Array
+	pastaDebug?: {
+		gdd: Float32Array
+		gddz: Float32Array
+		gint: Float32Array
+		ar: Float32Array
+		gar: Float32Array
+		grs: Float32Array
+		evr: Float32Array
+		minT: Float32Array
+		maxT: Float32Array
+	}
 	iceThickness?: Float32Array
 	iceMinMonthly?: Float32Array
 	iceMaxMonthly?: Float32Array
@@ -99,6 +111,8 @@ export type OrogenWorkerRequest =
 			daysPerYear?: number
 			hoursPerDay?: number
 			tidallyLocked?: boolean
+			antistellarLon?: number
+			perihelion?: number
 			pressure?: number
 		}
 	}

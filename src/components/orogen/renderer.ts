@@ -27,6 +27,9 @@ export interface OrogenScene {
 	setMapCenterLongitude(longitudeDeg: number): void
 	commitMapCenterLongitude(): void
 	setHoverHandler(handler: ((info: OrogenHoverInfo | null) => void) | null): void
+	setClickHandler(handler: ((info: OrogenHoverInfo) => void) | null): void
+	setMeasureLine(startXYZ: [number, number, number] | null, endXYZ: [number, number, number] | null): void
+	projectToScreen(xyz: [number, number, number]): [number, number] | null
 	/** Set thermal equator points as [lonDeg, latDeg][] or null to hide */
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number } | null): void
@@ -84,9 +87,12 @@ export function createOrogenScene(
 	mapControls.enabled = false
 
 	// Lighting — low ambient so day/night contrast is visible
-	const ambient = new THREE.AmbientLight(0x667788, 0.6)
+	const DEFAULT_AMBIENT_INTENSITY = 0.55
+	const DEFAULT_SUN_INTENSITY = 2.8
+	const DEFAULT_WATER_SPECULAR = 0x5f8fb5
+	const ambient = new THREE.AmbientLight(0x667788, DEFAULT_AMBIENT_INTENSITY)
 	scene.add(ambient)
-	const sun = new THREE.DirectionalLight(0xfff8ee, 4.0)
+	const sun = new THREE.DirectionalLight(0xfff8ee, DEFAULT_SUN_INTENSITY)
 	sun.position.set(5, 3, 4)
 	scene.add(sun)
 
@@ -97,7 +103,7 @@ export function createOrogenScene(
 		transparent: true,
 		opacity: 0.12,
 		shininess: 120,
-		specular: 0x88bfe8,
+		specular: DEFAULT_WATER_SPECULAR,
 		depthWrite: false,
 	})
 	const waterMesh = new THREE.Mesh(waterGeo, waterMat)
@@ -200,9 +206,14 @@ export function createOrogenScene(
 	let windArrowData: { east: Float32Array; north: Float32Array; speed: Float32Array } | null = null
 	let windArrowsVisible = false
 	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
+	let clickHandler: ((info: OrogenHoverInfo) => void) | null = null
 	let hoveredRegion = -1
 	const raycaster = new THREE.Raycaster()
 	const pointer = new THREE.Vector2()
+	let globeMeasureLine: THREE.Line | null = null
+	let mapMeasureLine: THREE.Line | null = null
+	let globeMeasureDots: THREE.Group | null = null
+	let mapMeasureDots: THREE.Group | null = null
 
 	function updateMapCameraFrustum() {
 		const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight)
@@ -224,7 +235,7 @@ export function createOrogenScene(
 	}
 
 	function buildTerrainMesh(world: SerializedOrogenWorld, colorMode: ColorMode): THREE.Mesh {
-		const { mesh, elevation } = world
+		const { mesh, elevation, elevation_km } = world
 		const { numSides, numTriangles, s_begin_r, s_end_r, s_inner_t, s_outer_t, r_xyz, t_xyz } =
 			mesh
 		const useRegionColors = currentRegionColors && currentRegionColors.length >= mesh.numRegions * 3
@@ -234,12 +245,14 @@ export function createOrogenScene(
 		const V = 0.04
 
 		const tElevation = new Float32Array(numTriangles)
+		const tElevationKm = new Float32Array(numTriangles)
 		for (let t = 0; t < numTriangles; t++) {
 			const s0 = 3 * t
 			const a = s_begin_r[s0]
 			const b = s_begin_r[s0 + 1]
 			const c = s_begin_r[s0 + 2]
 			tElevation[t] = (elevation[a] + elevation[b] + elevation[c]) / 3
+			tElevationKm[t] = (elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
 		}
 
 		// Count valid sides (both triangles exist)
@@ -269,21 +282,21 @@ export function createOrogenScene(
 					y: t_xyz[3 * tInner + 1],
 					z: t_xyz[3 * tInner + 2],
 					elev: tElevation[tInner],
-					colorElev: tElevation[tInner],
+					colorElev: tElevationKm[tInner],
 				},
 				{
 					x: r_xyz[3 * rBegin],
 					y: r_xyz[3 * rBegin + 1],
 					z: r_xyz[3 * rBegin + 2],
 					elev: elevation[rBegin],
-					colorElev: elevation[rBegin],
+					colorElev: elevation_km[rBegin],
 				},
 				{
 					x: t_xyz[3 * tOuter],
 					y: t_xyz[3 * tOuter + 1],
 					z: t_xyz[3 * tOuter + 2],
 					elev: tElevation[tOuter],
-					colorElev: tElevation[tOuter],
+					colorElev: tElevationKm[tOuter],
 				},
 			]
 
@@ -304,7 +317,7 @@ export function createOrogenScene(
 					colors[vi + 1] = currentRegionColors![3 * rBegin + 1]
 					colors[vi + 2] = currentRegionColors![3 * rBegin + 2]
 				} else {
-					const colorElev = isSmoothHeightmap ? p.colorElev : elevation[rBegin]
+					const colorElev = isSmoothHeightmap ? p.colorElev : elevation_km[rBegin]
 					const [cr, cg, cb] = getColor(colorElev, colorMode)
 					colors[vi] = cr
 					colors[vi + 1] = cg
@@ -423,7 +436,7 @@ export function createOrogenScene(
 	}
 
 	function buildMapMesh(world: SerializedOrogenWorld, colorMode: ColorMode): THREE.Mesh {
-		const { mesh, elevation } = world
+		const { mesh, elevation, elevation_km } = world
 		const { numSides, s_begin_r, s_inner_t, s_outer_t, r_xyz, t_xyz } = mesh
 		const useRegionColors = currentRegionColors && currentRegionColors.length >= mesh.numRegions * 3
 		const isHeightmap = colorMode === "heightmap"
@@ -433,13 +446,13 @@ export function createOrogenScene(
 		const sx = 2 / pi
 		const centerLon = currentMapCenterLongitudeDeg * pi / 180
 
-		const tElevation = new Float32Array(mesh.numTriangles)
+		const tElevationKm = new Float32Array(mesh.numTriangles)
 		for (let t = 0; t < mesh.numTriangles; t++) {
 			const s0 = 3 * t
 			const a = s_begin_r[s0]
 			const b = s_begin_r[s0 + 1]
 			const c = s_begin_r[s0 + 2]
-			tElevation[t] = (elevation[a] + elevation[b] + elevation[c]) / 3
+			tElevationKm[t] = (elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
 		}
 
 		const posArr = new Float32Array(numSides * 2 * 9)
@@ -485,8 +498,8 @@ export function createOrogenScene(
 					currentRegionColors![3 * rBegin + 2],
 				])
 				: (isSmoothHeightmap
-					? [tElevation[tInner], tElevation[tOuter], elevation[rBegin]]
-					: [elevation[rBegin], elevation[rBegin], elevation[rBegin]]
+					? [tElevationKm[tInner], tElevationKm[tOuter], elevation_km[rBegin]]
+					: [elevation_km[rBegin], elevation_km[rBegin], elevation_km[rBegin]]
 				).map((value) => getColor(value, colorMode))
 
 			const writeTri = (
@@ -608,6 +621,46 @@ export function createOrogenScene(
 		lines.position.set(0, 0, 0)
 		lines.visible = wireframeVisible && currentViewMode === "map"
 		return lines
+	}
+
+	function applyFaceRegionColors(
+		meshObj: THREE.Mesh | null,
+		faceToRegion: Int32Array,
+		regionColors: Float32Array | null,
+	): boolean {
+		if (!meshObj || !regionColors) return false
+		const geometry = meshObj.geometry
+		const colorAttr = geometry.getAttribute("color")
+		if (!(colorAttr instanceof THREE.BufferAttribute)) return false
+		const colorArray = colorAttr.array
+		if (!(colorArray instanceof Float32Array)) return false
+		const faceCount = Math.min(faceToRegion.length, Math.floor(colorArray.length / 9))
+		for (let face = 0; face < faceCount; face++) {
+			const region = faceToRegion[face]
+			const colorBase = region * 3
+			const r = regionColors[colorBase]
+			const g = regionColors[colorBase + 1]
+			const b = regionColors[colorBase + 2]
+			const faceBase = face * 9
+			colorArray[faceBase] = r
+			colorArray[faceBase + 1] = g
+			colorArray[faceBase + 2] = b
+			colorArray[faceBase + 3] = r
+			colorArray[faceBase + 4] = g
+			colorArray[faceBase + 5] = b
+			colorArray[faceBase + 6] = r
+			colorArray[faceBase + 7] = g
+			colorArray[faceBase + 8] = b
+		}
+		colorAttr.needsUpdate = true
+		return true
+	}
+
+	function recolorMeshesInPlace(): boolean {
+		if (!currentRegionColors) return false
+		const terrainUpdated = applyFaceRegionColors(terrainMesh, terrainFaceToRegion, currentRegionColors)
+		const mapUpdated = applyFaceRegionColors(mapMesh, mapFaceToRegion, currentRegionColors)
+		return terrainUpdated || mapUpdated
 	}
 
 	function buildGlobeGrid(spacingDeg: number): THREE.LineSegments {
@@ -1139,6 +1192,16 @@ export function createOrogenScene(
 			mapWindArrows.visible = windArrowsVisible && currentViewMode === "map"
 			if (mapMesh) mapWindArrows.position.copy(mapMesh.position)
 		}
+		if (globeMeasureLine) globeMeasureLine.visible = currentViewMode === "globe"
+		if (mapMeasureLine) {
+			mapMeasureLine.visible = currentViewMode === "map"
+			if (mapMesh) mapMeasureLine.position.copy(mapMesh.position)
+		}
+		if (globeMeasureDots) globeMeasureDots.visible = currentViewMode === "globe"
+		if (mapMeasureDots) {
+			mapMeasureDots.visible = currentViewMode === "map"
+			if (mapMesh) mapMeasureDots.position.copy(mapMesh.position)
+		}
 	}
 
 	function rebuildTerrain() {
@@ -1166,19 +1229,19 @@ export function createOrogenScene(
 		if (mode === "terrain") {
 			waterMat.color.set(0xffffff)
 			waterMat.opacity = 0.12
-			waterMat.specular.set(0x88bfe8)
+			waterMat.specular.set(DEFAULT_WATER_SPECULAR)
 		} else {
 			waterMat.color.set(0x0c3a6e)
 			waterMat.opacity = 0.4
 			waterMat.specular.set(0x000000)
 		}
-		rebuildTerrain()
+		if (!recolorMeshesInPlace()) rebuildTerrain()
 	}
 
 	function setRegionColors(colors: Float32Array | null) {
 		if (currentRegionColors === colors) return
 		currentRegionColors = colors
-		rebuildTerrain()
+		if (!recolorMeshesInPlace()) rebuildTerrain()
 	}
 
 	function setViewMode(mode: OrogenViewMode) {
@@ -1282,6 +1345,13 @@ export function createOrogenScene(
 			mapControls.update()
 			renderer.render(scene, mapCamera)
 		} else {
+			if (globeMeasureDots && globeMeasureDots.visible) {
+				const dist = camera.position.length()
+				const scale = dist * 0.001
+				for (const child of globeMeasureDots.children) {
+					child.scale.setScalar(scale)
+				}
+			}
 			controls.update()
 			renderer.render(scene, camera)
 		}
@@ -1300,13 +1370,46 @@ export function createOrogenScene(
 
 	updateMapCameraFrustum()
 
+	let pointerDownPos: { x: number; y: number } | null = null
+	function handlePointerDown(event: PointerEvent) {
+		pointerDownPos = { x: event.clientX, y: event.clientY }
+	}
+
+	function handleClick(event: PointerEvent) {
+		if (!clickHandler || !currentWorld) return
+		if (pointerDownPos) {
+			const dx = event.clientX - pointerDownPos.x
+			const dy = event.clientY - pointerDownPos.y
+			if (dx * dx + dy * dy > 25) return
+		}
+		const rect = canvas.getBoundingClientRect()
+		const width = Math.max(rect.width, 1)
+		const height = Math.max(rect.height, 1)
+		pointer.x = ((event.clientX - rect.left) / width) * 2 - 1
+		pointer.y = -(((event.clientY - rect.top) / height) * 2 - 1)
+		raycaster.setFromCamera(pointer, currentViewMode === "map" ? mapCamera : camera)
+		const target = currentViewMode === "map" ? mapMesh : terrainMesh
+		if (!target) return
+		const hits = raycaster.intersectObject(target, true)
+		const hit = hits[0]
+		if (!hit || hit.faceIndex == null) return
+		const faceToRegion = currentViewMode === "map" ? mapFaceToRegion : terrainFaceToRegion
+		const region = faceToRegion[hit.faceIndex] ?? -1
+		if (region < 0) return
+		clickHandler({ region, clientX: event.clientX - rect.left, clientY: event.clientY - rect.top })
+	}
+
 	canvas.addEventListener("pointermove", updateHover)
 	canvas.addEventListener("pointerleave", clearHover)
+	canvas.addEventListener("pointerdown", handlePointerDown)
+	canvas.addEventListener("pointerup", handleClick)
 
 	function dispose() {
 		cancelAnimationFrame(animId)
 		canvas.removeEventListener("pointermove", updateHover)
 		canvas.removeEventListener("pointerleave", clearHover)
+		canvas.removeEventListener("pointerdown", handlePointerDown)
+		canvas.removeEventListener("pointerup", handleClick)
 		controls.dispose()
 		mapControls.dispose()
 		renderer.dispose()
@@ -1331,6 +1434,148 @@ export function createOrogenScene(
 	function setHoverHandler(handler: ((info: OrogenHoverInfo | null) => void) | null) {
 		hoverHandler = handler
 		if (!handler) clearHover()
+	}
+
+	function setClickHandler(handler: ((info: OrogenHoverInfo) => void) | null) {
+		clickHandler = handler
+	}
+
+	function setMeasureLine(startXYZ: [number, number, number] | null, endXYZ: [number, number, number] | null) {
+		disposeObject3D(globeMeasureLine)
+		disposeObject3D(mapMeasureLine)
+		disposeObject3D(globeMeasureDots)
+		disposeObject3D(mapMeasureDots)
+		globeMeasureLine = null
+		mapMeasureLine = null
+		globeMeasureDots = null
+		mapMeasureDots = null
+
+		if (!startXYZ || !endXYZ) return
+
+		const arcRadius = 1.02
+		const sx = 2 / Math.PI
+		const centerLon = currentMapCenterLongitudeDeg * Math.PI / 180
+		const w = canvas.clientWidth || 1
+		const h = canvas.clientHeight || 1
+
+		const s = new THREE.Vector3(...startXYZ).normalize()
+		const e = new THREE.Vector3(...endXYZ).normalize()
+		const angle = s.angleTo(e)
+		const numSegments = Math.max(2, Math.ceil(angle / 0.02))
+		const globePositions: number[] = []
+		const mapPositions: number[] = []
+
+		for (let i = 0; i <= numSegments; i++) {
+			const t = i / numSegments
+			let pt: THREE.Vector3
+			if (angle < 0.001) {
+				pt = s.clone()
+			} else {
+				const sinA = Math.sin(angle)
+				const a = Math.sin((1 - t) * angle) / sinA
+				const b = Math.sin(t * angle) / sinA
+				pt = new THREE.Vector3(
+					s.x * a + e.x * b,
+					s.y * a + e.y * b,
+					s.z * a + e.z * b,
+				)
+			}
+			pt.normalize().multiplyScalar(arcRadius)
+			globePositions.push(pt.x, pt.y, pt.z)
+			const lat = Math.asin(Math.max(-1, Math.min(1, pt.z / arcRadius)))
+			let lon = Math.atan2(pt.y / arcRadius, pt.x / arcRadius) - centerLon
+			if (lon > Math.PI) lon -= 2 * Math.PI
+			else if (lon < -Math.PI) lon += 2 * Math.PI
+			mapPositions.push(lon * sx, lat * sx, 0.003)
+		}
+
+		const globeLineGeo = new LineGeometry()
+		globeLineGeo.setPositions(globePositions)
+		const globeLineMat = new LineMaterial({
+			color: 0x000000,
+			linewidth: 2,
+			resolution: new THREE.Vector2(w, h),
+			depthWrite: false,
+			depthTest: false,
+			dashed: true,
+			dashSize: 0.008,
+			gapSize: 0.006,
+		})
+		const globeLine2 = new Line2(globeLineGeo, globeLineMat)
+		globeLine2.computeLineDistances()
+		globeLine2.renderOrder = 999
+		globeLine2.visible = currentViewMode === "globe"
+		globeMeasureLine = globeLine2 as unknown as THREE.Line
+		scene.add(globeMeasureLine)
+
+		const mapLineGeo = new LineGeometry()
+		mapLineGeo.setPositions(mapPositions)
+		const mapLineMat = new LineMaterial({
+			color: 0x000000,
+			linewidth: 2,
+			resolution: new THREE.Vector2(w, h),
+			depthWrite: false,
+			depthTest: false,
+			dashed: true,
+			dashSize: 0.008,
+			gapSize: 0.006,
+		})
+		const mapLine2 = new Line2(mapLineGeo, mapLineMat)
+		mapLine2.computeLineDistances()
+		mapLine2.renderOrder = 999
+		mapLine2.visible = currentViewMode === "map"
+		if (mapMesh) mapLine2.position.copy(mapMesh.position)
+		mapMeasureLine = mapLine2 as unknown as THREE.Line
+		scene.add(mapMeasureLine)
+
+		globeMeasureDots = new THREE.Group()
+		const dotGeo = new THREE.SphereGeometry(1, 8, 8)
+		const dotMat = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false })
+		for (const xyz of [s.clone().multiplyScalar(arcRadius), e.clone().multiplyScalar(arcRadius)]) {
+			const dot = new THREE.Mesh(dotGeo, dotMat)
+			dot.position.copy(xyz)
+			dot.renderOrder = 999
+			globeMeasureDots.add(dot)
+		}
+		globeMeasureDots.visible = currentViewMode === "globe"
+		scene.add(globeMeasureDots)
+
+		mapMeasureDots = new THREE.Group()
+		const mapDotGeo = new THREE.CircleGeometry(0.008, 12)
+		const startMapPt = new THREE.Vector3(mapPositions[0], mapPositions[1], mapPositions[2])
+		const endMapPt = new THREE.Vector3(mapPositions[mapPositions.length - 3], mapPositions[mapPositions.length - 2], mapPositions[mapPositions.length - 1])
+		for (const pt of [startMapPt, endMapPt]) {
+			const dot = new THREE.Mesh(mapDotGeo, dotMat.clone())
+			dot.position.copy(pt)
+			dot.renderOrder = 999
+			mapMeasureDots.add(dot)
+		}
+		mapMeasureDots.visible = currentViewMode === "map"
+		if (mapMesh) mapMeasureDots.position.copy(mapMesh.position)
+		scene.add(mapMeasureDots)
+	}
+
+	function projectToScreen(xyz: [number, number, number]): [number, number] | null {
+		const cam = currentViewMode === "map" ? mapCamera : camera
+		const v = new THREE.Vector3(...xyz)
+		if (currentViewMode === "map") {
+			const sx = 2 / Math.PI
+			const centerLon = currentMapCenterLongitudeDeg * Math.PI / 180
+			const len = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+			const lat = Math.asin(Math.max(-1, Math.min(1, v.z / len)))
+			let lon = Math.atan2(v.y / len, v.x / len) - centerLon
+			if (lon > Math.PI) lon -= 2 * Math.PI
+			else if (lon < -Math.PI) lon += 2 * Math.PI
+			v.set(lon * sx, lat * sx, 0.003)
+			if (mapMesh) v.add(mapMesh.position)
+		} else {
+			v.normalize().multiplyScalar(1.005)
+		}
+		v.project(cam)
+		if (v.z > 1) return null
+		const w = canvas.clientWidth
+		const h = canvas.clientHeight
+		return [(v.x * 0.5 + 0.5) * w, (-v.y * 0.5 + 0.5) * h]
 	}
 
 	function setThermalEquator(points: [number, number][] | null) {
@@ -1394,10 +1639,10 @@ export function createOrogenScene(
 			waterMat.specular.set(0x000000)
 		} else {
 			ambient.color.set(0x667788)
-			ambient.intensity = 0.6
-			sun.intensity = 4.0
+			ambient.intensity = DEFAULT_AMBIENT_INTENSITY
+			sun.intensity = DEFAULT_SUN_INTENSITY
 			if (currentViewMode === "globe") atmosMesh.visible = true
-			waterMat.specular.set(currentColorMode === "terrain" ? 0x88bfe8 : 0x000000)
+			waterMat.specular.set(currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000)
 		}
 	}
 
@@ -1414,6 +1659,9 @@ export function createOrogenScene(
 		setMapCenterLongitude,
 		commitMapCenterLongitude,
 		setHoverHandler,
+		setClickHandler,
+		setMeasureLine,
+		projectToScreen,
 		setThermalEquator,
 		setRivers,
 		setRiversVisible,

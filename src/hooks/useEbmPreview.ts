@@ -24,7 +24,6 @@ interface EbmConfig {
 
 export function useEbmPreview(config: EbmConfig) {
 	const { obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius, pressure } = config
-
 	return useMemo(() => {
 		const modelConfig = {
 			orbital: {

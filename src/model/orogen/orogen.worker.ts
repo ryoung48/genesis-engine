@@ -26,6 +26,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		},
 		plateAssignment: world.plateAssignment,
 		elevation: world.elevation,
+		elevation_km: world.elevation_km,
 		params: world.params,
 		continentCount: world.continentCount,
 		climate: world.climate
@@ -34,6 +35,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				temperature_min: world.climate.temperature_min,
 				temperature_max: world.climate.temperature_max,
 				temperature_monthly: world.climate.temperature_monthly,
+				daylight_hours_monthly: world.climate.daylight_hours_monthly,
 				landFraction: world.climate.landFraction,
 			}
 			: undefined,
@@ -49,6 +51,10 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 			: undefined,
 		climateZones: world.climateZones,
 		pastaClimate: world.pastaClimate,
+		pastaDebug: world.pastaDebug,
+		iceThickness: world.iceThickness,
+		iceMinMonthly: world.iceMinMonthly,
+		iceMaxMonthly: world.iceMaxMonthly,
 		koppenClimate: world.koppenClimate,
 		vegetation: world.vegetation,
 		topography: world.topography,
@@ -109,6 +115,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		world.mesh.s_outer_t.buffer,
 		world.plateAssignment.buffer,
 		world.elevation.buffer,
+		world.elevation_km.buffer,
 	]
 
 	if (world.climate) {
@@ -118,6 +125,9 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.climate.temperature_max.buffer,
 			world.climate.temperature_monthly.buffer,
 		)
+		if (world.climate.daylight_hours_monthly) {
+			transfer.push(world.climate.daylight_hours_monthly.buffer)
+		}
 	}
 
 	if (world.oceanDist) {
@@ -145,8 +155,26 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.pastaClimate.buffer)
 	}
 
+	if (world.pastaDebug) {
+		for (const arr of Object.values(world.pastaDebug)) {
+			transfer.push((arr as Float32Array).buffer)
+		}
+	}
+
 	if (world.koppenClimate) {
 		transfer.push(world.koppenClimate.buffer)
+	}
+
+	if (world.iceThickness) {
+		transfer.push(world.iceThickness.buffer)
+	}
+
+	if (world.iceMinMonthly) {
+		transfer.push(world.iceMinMonthly.buffer)
+	}
+
+	if (world.iceMaxMonthly) {
+		transfer.push(world.iceMaxMonthly.buffer)
 	}
 
 	if (world.vegetation) {

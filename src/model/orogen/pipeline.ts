@@ -28,7 +28,7 @@ import { assignPastaClimate } from "./climate/pasta"
 import { assignKoppenClimate } from "./climate/koppen"
 import { ENABLE_PASTA_CLASSIFICATION, ENABLE_PROVINCES, ENABLE_WIND_FIELDS } from "./features"
 import { computeRivers } from "./topography/rivers"
-import { meanEdgeLengthKm } from "./units"
+import { meanEdgeLengthKm, getMaxElevationKm, getMaxOceanDepthKm } from "./units"
 import { countContinents } from "./stats"
 import { applyCraters } from "./craters"
 import { computeProvinces } from "./provinces/provinces"
@@ -42,8 +42,7 @@ type StageTiming = {
 
 type ProgressFn = (label: string, pct?: number) => void
 
-function classifyTopographyBase(elevation: number): number {
-	const heightKm = elevToHeightKm(elevation)
+function classifyTopographyBase(heightKm: number): number {
 	if (heightKm < 0.3) return 0
 	if (heightKm < 1) return 1
 	if (heightKm < 2) return 2
@@ -52,7 +51,7 @@ function classifyTopographyBase(elevation: number): number {
 
 function classifyTopography(
 	mesh: SphereMesh,
-	elevation: Float32Array,
+	elevation_km: Float32Array,
 	isLand: Uint8Array,
 	lakes: Uint8Array,
 ): Uint8Array {
@@ -60,7 +59,7 @@ function classifyTopography(
 	const { adjOffset, adjList } = mesh
 
 	for (let r = 0; r < mesh.numRegions; r++) {
-		
+
 		if (lakes[r]) {
 			topography[r] = 7
 			continue
@@ -69,7 +68,7 @@ function classifyTopography(
 			topography[r] = 6
 			continue
 		}
-		topography[r] = classifyTopographyBase(elevation[r])
+		topography[r] = classifyTopographyBase(elevation_km[r])
 	}
 
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -404,6 +403,14 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		console.timeEnd("orogen:craters")
 	}
 
+	// Convert raw [0,1] elevation to physical km (radius-scaled)
+	const maxElevKm = getMaxElevationKm(params.planetRadiusKm)
+	const maxDepthKm = getMaxOceanDepthKm(params.planetRadiusKm)
+	const elevation_km = new Float32Array(mesh.numRegions)
+	for (let r = 0; r < mesh.numRegions; r++) {
+		elevation_km[r] = elevToHeightKm(elevation[r], maxElevKm, maxDepthKm)
+	}
+
 	// Final land mask — ocean flood-fill determines which below-sea-level cells
 	// are connected to the ocean (become ocean) vs enclosed inland basins (stay land).
 	const isLand = new Uint8Array(mesh.numRegions)
@@ -485,7 +492,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Computing climate...", 93)
 	t0 = performance.now()
 	const landFraction = computeLandFraction(mesh, isLand)
-	const climate = computeTemperature(mesh, elevation, landFraction, params, oceanDist, isLand)
+	const climate = computeTemperature(mesh, elevation, landFraction, params, oceanDist, isLand, elevation_km)
 	pipelineTiming.push({ Stage: "EBM temperature", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:climate")
 
@@ -493,7 +500,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.time("orogen:advection")
 	onProgress?.("Computing moisture advection...", 95)
 	t0 = performance.now()
-	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, params, isLand)
+	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, params, isLand, elevation_km)
 	pipelineTiming.push({ Stage: "Moisture advection", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:advection")
 
@@ -614,7 +621,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: `Landmarks (${landmarks.count})`, ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:landmarks")
 
-	const topography = classifyTopography(mesh, elevation, isLand, rivers.lakes)
+	const topography = classifyTopography(mesh, elevation_km, isLand, rivers.lakes)
 
 	// 18. Climate zone assignment
 	console.time("orogen:climateZones")
@@ -635,11 +642,14 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 
 	// 19b. Pasta climate classification
 	let pastaClimate: Uint8Array | undefined
+	let pastaDebug: import("./climate/pasta").PastaDebug | undefined
 	if (ENABLE_PASTA_CLASSIFICATION) {
 		console.time("orogen:pasta")
 		onProgress?.("Classifying pasta climate...", 99)
 		t0 = performance.now()
-		pastaClimate = assignPastaClimate(mesh, isLand, climate, rainfall, params, iceThickness, iceMinMonthly, iceMaxMonthly)
+		const pastaResult = assignPastaClimate(mesh, isLand, climate, rainfall, params, iceThickness, iceMinMonthly, iceMaxMonthly)
+		pastaClimate = pastaResult.zones
+		pastaDebug = pastaResult.debug
 		pipelineTiming.push({ Stage: "Pasta climate assignment", ms: (performance.now() - t0).toFixed(1) })
 		console.timeEnd("orogen:pasta")
 	}
@@ -703,12 +713,14 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		boundary,
 		distFields,
 		elevation,
+		elevation_km,
 		params,
 		climate,
 		oceanDist,
 		rainfall,
 		climateZones,
 		pastaClimate,
+		pastaDebug,
 		iceThickness,
 		iceMinMonthly,
 		iceMaxMonthly,
