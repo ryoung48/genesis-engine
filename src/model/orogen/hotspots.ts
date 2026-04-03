@@ -46,7 +46,7 @@ export function applyStaticHotspots(
 	const v = clampUnit(volcanism)
 	const count = Math.round(lerp(3, 14, v))
 
-	const DOME_SIGMA = 0.008
+	const DOME_SIGMA = 0.04
 	const DOME_STRENGTH = lerp(0.3, 0.9, v) * v
 	const SWELL_SIGMA_MULT = 2.5
 	const SWELL_STR_MULT = 0.12
@@ -55,12 +55,19 @@ export function applyStaticHotspots(
 	const hsPosRng = createRng(seed + 1001)
 	const hsNoise = new SimplexNoise(seed + 501)
 	const hsNoise2 = new SimplexNoise(seed + 502)
+	const hsNoise3 = new SimplexNoise(seed + 503)
 
 	interface StaticDome {
 		x: number; y: number; z: number
 		strength: number; sigma: number
 		cosThreshPeak: number; invS2: number
 		swellStrength: number; cosThreshSwell: number; invS2Swell: number
+		hasCaldera: boolean; calderaSigma: number
+		calderaDepth: number; invS2Caldera: number
+		riftAngles: number[]
+		// tangent frame for rift/caldera angular measurement
+		ux: number; uy: number; uz: number
+		vx: number; vy: number; vz: number
 	}
 
 	const domes: StaticDome[] = []
@@ -79,6 +86,29 @@ export function applyStaticHotspots(
 		const isOcean = elevation[findNearestR(mesh, hx, hy, hz)] <= 0
 		const boost = isOcean ? 1.8 : 1.0
 
+		// Build tangent frame from an arbitrary reference direction
+		let refX = 0, refY = 0, refZ = 1
+		if (Math.abs(hz) > 0.9) { refX = 1; refZ = 0 }
+		// Project ref onto tangent plane and normalize
+		const rd = refX * hx + refY * hy + refZ * hz
+		let ux = refX - rd * hx, uy = refY - rd * hy, uz = refZ - rd * hz
+		const uLen = Math.sqrt(ux * ux + uy * uy + uz * uz) || 1
+		ux /= uLen; uy /= uLen; uz /= uLen
+		const vx_ = hy * uz - hz * uy, vy_ = hz * ux - hx * uz, vz_ = hx * uy - hy * ux
+
+		// Radial rift arms: 3–5 arms in a star pattern
+		const numRifts = 3 + Math.floor(hsRng.random() * 3)
+		const baseRiftAngle = hsNoise3.noise3D(hx * 10, hy * 10, hz * 10) * Math.PI
+		const riftAngles: number[] = []
+		for (let i = 0; i < numRifts; i++) {
+			riftAngles.push(baseRiftAngle + (2 * Math.PI * i) / numRifts)
+		}
+
+		// Caldera on strong domes (land: summit depression, ocean: central uplift in basin)
+		const hasCaldera = strength * boost > 0.15
+		const calderaSigma = sigma * 0.25
+		const calderaDepth = strength * boost * 0.20
+
 		const swSigma = sigma * SWELL_SIGMA_MULT
 		domes.push({
 			x: hx, y: hy, z: hz,
@@ -89,6 +119,13 @@ export function applyStaticHotspots(
 			swellStrength: strength * SWELL_STR_MULT,
 			cosThreshSwell: Math.cos(swSigma * 3),
 			invS2Swell: -0.5 / (swSigma * swSigma),
+			hasCaldera,
+			calderaSigma,
+			calderaDepth,
+			invS2Caldera: -0.5 / (calderaSigma * calderaSigma),
+			riftAngles,
+			ux, uy, uz,
+			vx: vx_, vy: vy_, vz: vz_,
 		})
 	}
 
@@ -118,13 +155,41 @@ export function applyStaticHotspots(
 		let totalUplift = 0, totalSwellUplift = 0
 		for (const dm of domes) {
 			const dot = dm.x * rx + dm.y * ry + dm.z * rz
+
 			if (dot > dm.cosThreshSwell) {
 				const swAngleSq = 2 * (1 - dot)
 				totalSwellUplift += dm.swellStrength * Math.exp(swAngleSq * dm.invS2Swell)
 			}
+
 			if (dot < dm.cosThreshPeak) continue
-			const angleSq = 2 * (1 - dot)
-			totalUplift += dm.strength * Math.exp(angleSq * shapeWarpSq * dm.invS2)
+
+			const offX = rx - dot * dm.x, offY = ry - dot * dm.y, offZ = rz - dot * dm.z
+			const parComp = offX * dm.ux + offY * dm.uy + offZ * dm.uz
+			const perpComp = offX * dm.vx + offY * dm.vy + offZ * dm.vz
+			const angleSq = parComp * parComp + perpComp * perpComp
+
+			let gauss = Math.exp(angleSq * shapeWarpSq * dm.invS2)
+
+			// Radial rift zones — star-pattern ridges radiating from center
+			if (dm.riftAngles.length > 0 && gauss > 0.01) {
+				const angle = Math.atan2(perpComp, parComp)
+				let maxRift = 0
+				for (const ra of dm.riftAngles) {
+					let da = angle - ra
+					da = da - Math.round(da / (2 * Math.PI)) * 2 * Math.PI
+					const c2 = Math.cos(da)
+					const riftFactor = c2 ** 4
+					if (riftFactor > maxRift) maxRift = riftFactor
+				}
+				gauss *= 1.0 + 0.5 * maxRift
+			}
+
+			totalUplift += dm.strength * gauss
+
+			// Caldera — summit depression on the largest domes
+			if (dm.hasCaldera) {
+				totalUplift -= dm.calderaDepth * Math.exp(angleSq * dm.invS2Caldera)
+			}
 		}
 
 		const combinedUplift = totalSwellUplift + totalUplift

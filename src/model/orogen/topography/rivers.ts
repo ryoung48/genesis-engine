@@ -1,4 +1,5 @@
-import type { SphereMesh, OrogenClimate, OrogenRainfall, OrogenRivers } from "../types"
+import type { SphereMesh, OrogenClimate, OrogenHydrology, OrogenParams, OrogenRainfall, OrogenRivers } from "../types"
+import { getDaysPerYear, getHoursPerDay, getPlanetRadiusKm } from "../units"
 
 /**
  * Min-heap keyed on an external Float32Array.
@@ -51,16 +52,45 @@ class MinHeap {
 	}
 }
 
+function smoothstep(edge0: number, edge1: number, x: number): number {
+	if (edge0 === edge1) return x < edge0 ? 0 : 1
+	const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
+	return t * t * (3 - 2 * t)
+}
+
+function polylineLengthKm(line: [number, number, number, number][], radiusKm: number): number {
+	let sum = 0
+	for (let i = 1; i < line.length; i++) {
+		const [lon0, lat0] = line[i - 1]
+		const [lon1, lat1] = line[i]
+		const phi0 = lat0 * Math.PI / 180
+		const phi1 = lat1 * Math.PI / 180
+		const lam0 = lon0 * Math.PI / 180
+		const lam1 = lon1 * Math.PI / 180
+		const sin0 = Math.sin(phi0), cos0 = Math.cos(phi0)
+		const sin1 = Math.sin(phi1), cos1 = Math.cos(phi1)
+		const cosTheta = sin0 * sin1 + cos0 * cos1 * Math.cos(lam1 - lam0)
+		sum += Math.acos(Math.max(-1, Math.min(1, cosTheta))) * radiusKm
+	}
+	return sum
+}
+
 export function computeRivers(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	rainfall: OrogenRainfall,
 	climate: OrogenClimate,
+	hydrology: OrogenHydrology,
 	isLand?: Uint8Array,
+	params?: Pick<OrogenParams, "planetRadiusKm" | "daysPerYear" | "hoursPerDay">,
 ): OrogenRivers {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
 	const DEG = 180 / Math.PI
+	const radiusKm = getPlanetRadiusKm(params?.planetRadiusKm)
+	const radiusM = radiusKm * 1000
+	const cellAreaM2 = (4 * Math.PI * radiusM * radiusM) / Math.max(1, N)
+	const secondsPerYear = getDaysPerYear(params?.daysPerYear) * getHoursPerDay(params?.hoursPerDay) * 3600
 
 	// ── 1. Priority-flood drainage ──────────────────────────────────
 	const drainTarget = new Int32Array(N).fill(-1)
@@ -121,21 +151,70 @@ export function computeRivers(
 		}
 	}
 
-	// ── 2. Flow accumulation ────────────────────────────────────────
+	// ── 2. Flow accumulation (per-month) ───────────────────────────
+	// Use the Pasta AET (actual evapotranspiration) soil-water balance model
+	// to compute runoff = rainfall - AET. This accounts for temperature-driven
+	// PET, soil moisture storage (500mm bucket), and saturation excess.
+	const flow_monthly = new Float32Array(12 * N)
 	const flow = new Float32Array(N)
-	for (let i = 0; i < processOrder.length; i++) {
-		const r = processOrder[i]
-		let thawedRain = 0
-		for (let month = 0; month < 12; month++) {
-			const idx = month * N + r
-			if (climate.temperature_monthly[idx] > 0) thawedRain += rainfall.monthly[idx]
-		}
-		flow[r] = thawedRain
+	const secondsPerMonth = secondsPerYear / 12
+	const hydro = hydrology
+	const aetMonthly = hydro.aet_monthly
+	const aridityMonthly = hydro.aridity_monthly
+	const runoffBoost = new Float32Array(N)
+	const passThroughElevBoost = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const elev = smoothstep(0, 0.5, elevation[r])
+		runoffBoost[r] = 1 + elev * 0.5
+		passThroughElevBoost[r] = elev * 0.003
 	}
-	for (let i = processOrder.length - 1; i >= 0; i--) {
-		const r = processOrder[i]
-		const target = drainTarget[r]
-		if (target >= 0) flow[target] += flow[r]
+
+	// Per-cell pass-through: gentle loss from riparian ET, scaled by monthly PET.
+	// This keeps hot/dry months leakier than cool/wet months instead of using one annual value.
+	const monthlyPetHigh = 2000 / 12
+	const passThroughMonth = new Float32Array(N)
+	const flowToTarget = new Float32Array(N)
+
+	for (let month = 0; month < 12; month++) {
+		const mOff = month * N
+		for (let r = 0; r < N; r++) {
+			const idx = mOff + r
+			if (!land[r]) {
+				passThroughMonth[r] = 0
+				flowToTarget[r] = 0
+				continue
+			}
+			const runoffMm = Math.max(0, rainfall.monthly[idx] - aetMonthly[idx]) * runoffBoost[r]
+			flowToTarget[r] = runoffMm > 0
+				? (runoffMm / 1000) * cellAreaM2 / secondsPerMonth
+				: 0
+			const pet = climate.pet_monthly[idx]
+			const loss = 0.001 + smoothstep(0, monthlyPetHigh, pet) * 0.004
+			passThroughMonth[r] = Math.min(0.999, 1 - loss + passThroughElevBoost[r])
+		}
+
+		// Downstream accumulation for this month
+		for (let i = processOrder.length - 1; i >= 0; i--) {
+			const r = processOrder[i]
+			const target = drainTarget[r]
+			if (target >= 0) {
+				const temp = climate.temperature_monthly[mOff + target]
+				let pt = passThroughMonth[target]
+				pt *= 0.9 + 0.1 * smoothstep(0.2, 0.9, aridityMonthly[mOff + target])
+				if (temp <= 0) pt *= smoothstep(-20, 0, temp)
+				else if (temp >= 90) pt *= smoothstep(150, 90, temp)
+				flowToTarget[target] += flowToTarget[r] * pt
+			}
+		}
+
+		for (let r = 0; r < N; r++) flow_monthly[mOff + r] = flowToTarget[r]
+	}
+
+	// Annual average flow (mean of monthly)
+	for (let r = 0; r < N; r++) {
+		let sum = 0
+		for (let month = 0; month < 12; month++) sum += flow_monthly[month * N + r]
+		flow[r] = sum / 12
 	}
 
 	// ── 2b. Flow-based lake filling ─────────────────────────────────
@@ -165,7 +244,7 @@ export function computeRivers(
 
 	if (nextBasin > 0) {
 		// Collect cells per basin, sum LOCAL rainfall (not upstream river flow)
-		const basinCells: number[][] = Array.from({ length: nextBasin }, () => [])
+		const basinCells: number[][] = Array.from({ length: nextBasin }, (): number[] => [])
 		const basinRain = new Float32Array(nextBasin)
 
 		for (let r = 0; r < N; r++) {
@@ -183,15 +262,25 @@ export function computeRivers(
 		const DESERT_THRESHOLD = 250 // mm/yr — below this, too arid for lakes
 
 		for (let bid = 0; bid < nextBasin; bid++) {
-			const cells = basinCells[bid]
-			if (cells.length === 0) continue
+			const allCells = basinCells[bid]
+			const cells = allCells.filter(cell => rainfall.annual[cell] > DESERT_THRESHOLD)
+			if (cells.length === 0) {
+				for (const cell of allCells) waterLevel[cell] = elevation[cell]
+				continue
+			}
 
 			const inflow = basinRain[bid]
-			if (inflow <= 0) continue
+			if (inflow <= 0) {
+				for (const cell of allCells) waterLevel[cell] = elevation[cell]
+				continue
+			}
 
 			// Skip basins in arid regions
 			const avgRain = inflow / cells.length
-			if (avgRain < DESERT_THRESHOLD) continue
+			if (avgRain < DESERT_THRESHOLD) {
+				for (const cell of allCells) waterLevel[cell] = elevation[cell]
+				continue
+			}
 
 			// Sort by elevation ascending (fill from bottom)
 			cells.sort((a, b) => elevation[a] - elevation[b])
@@ -215,8 +304,8 @@ export function computeRivers(
 				waterLevel[c] = lakeSurface
 			}
 			// Clear waterLevel for basin cells NOT in the lake
-			for (let i = filledCount; i < cells.length; i++) {
-				waterLevel[cells[i]] = elevation[cells[i]]
+			for (const cell of allCells) {
+				if (!lakes[cell]) waterLevel[cell] = elevation[cell]
 			}
 		}
 	}
@@ -227,7 +316,14 @@ export function computeRivers(
 	for (let i = 0; i < landCount; i++) landFlows[i] = flow[processOrder[i]]
 	landFlows.sort()
 
-	const thresholdIdx = Math.floor(landCount * (1 - 0.05))
+	const landCoverage = landCount / N
+	const majorRiverFraction = (() => {
+		if (landCoverage <= 0.3) return 0.05
+		if (landCoverage >= 0.9) return 0.01
+		const t = (landCoverage - 0.3) / 0.6
+		return 0.05 + (0.01 - 0.05) * t
+	})()
+	const thresholdIdx = Math.floor(landCount * (1 - majorRiverFraction))
 	const threshold = landFlows[thresholdIdx] || 1
 
 	// ── 4. Extract river polylines with per-vertex flow + elevation ──
@@ -238,7 +334,16 @@ export function computeRivers(
 	const traced = new Uint8Array(N)
 	const visible = new Uint8Array(N)
 	const lines: [number, number, number, number][][] = []
+	const riverId = new Int32Array(N).fill(-1)
+	const riverLengthKm = new Float32Array(N)
+	const terminal = new Uint8Array(N)
+	const terminalCoastal = new Uint8Array(N)
+	const terminalInterior = new Uint8Array(N)
+	const terminalSeen = new Int32Array(N)
+	const riverSystemLengths: number[] = []
+	let nextRiverId = 0
 	let maxFlow = 0
+	let terminalStamp = 1
 
 	for (const start of riverCells) {
 		if (traced[start]) continue
@@ -264,6 +369,7 @@ export function computeRivers(
 
 			const next = drainTarget[cur]
 			if (next < 0) break
+			if (land[next] && flow[next] < threshold) break
 			if (!land[next]) {
 				const ox = r_xyz[3 * next], oy = r_xyz[3 * next + 1], oz = r_xyz[3 * next + 2]
 				line.push([
@@ -290,12 +396,61 @@ export function computeRivers(
 		}
 
 		if (line.length >= 2) {
+			// Assign river ID: if this polyline merges into an already-IDed river,
+			// adopt that river's ID (same river system). Otherwise assign a new one.
+			const lastCell = lineCells[lineCells.length - 1]
+			const id = riverId[lastCell] >= 0 ? riverId[lastCell] : nextRiverId++
+			const lineLengthKm = polylineLengthKm(line, radiusKm)
 			lines.push(line)
+			riverSystemLengths[id] = (riverSystemLengths[id] ?? 0) + lineLengthKm
 			for (const cell of lineCells) {
 				if (land[cell]) visible[cell] = 1
+				if (riverId[cell] < 0) riverId[cell] = id
 			}
 		}
 	}
 
-	return { lines, maxFlow, minFlow: threshold, visible, lakes, waterLevel }
+	for (let r = 0; r < N; r++) {
+		const id = riverId[r]
+		if (id >= 0) riverLengthKm[r] = riverSystemLengths[id] ?? 0
+	}
+
+	for (let r = 0; r < N; r++) {
+		if (!visible[r]) continue
+		const next = drainTarget[r]
+		if (next >= 0 && land[next] && visible[next] && riverId[next] === riverId[r]) continue
+
+		let cur = next
+		const stamp = terminalStamp++
+		while (cur >= 0 && land[cur] && terminalSeen[cur] !== stamp) {
+			terminalSeen[cur] = stamp
+			if (lakes[cur] || basinId[cur] >= 0) {
+				terminal[r] = 1
+				terminalInterior[r] = 1
+				break
+			}
+			cur = drainTarget[cur]
+		}
+		if (!terminal[r] && (cur < 0 || !land[cur])) {
+			terminal[r] = 1
+			terminalCoastal[r] = 1
+		}
+	}
+
+	return {
+		lines,
+		maxFlow,
+		minFlow: threshold,
+		flow,
+		flow_monthly,
+		riverId,
+		riverLengthKm,
+		terminal,
+		terminalCoastal,
+		terminalInterior,
+		visible,
+		lakes,
+		basinId,
+		waterLevel,
+	}
 }

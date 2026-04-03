@@ -4,7 +4,7 @@ import * as d3 from "d3"
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "temperature" | "biotemperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "dangerZones" | "hotspots" | "provinces" | "population" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "slope" | "topography" | "temperature" | "biotemperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "dangerZones" | "hotspots" | "nations" | "population" | "basins" | "terrainFeatures" | "terrainFeaturesLand" | "terrainFeaturesOcean" | "terrainFeaturesCoast" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
 
 /** Light blue used for ocean on thematic maps (non-terrain/satellite modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -400,12 +400,25 @@ export function populationColor(normalizedDensity: number): [number, number, num
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
+export function slopeColor(normalizedSlope: number): [number, number, number] {
+	const color = d3.rgb(d3.interpolateRgbBasis([
+		"#f8fafc",
+		"#d9f99d",
+		"#facc15",
+		"#f97316",
+		"#7f1d1d",
+	])(Math.pow(Math.max(0, Math.min(1, normalizedSlope)), 0.7)))
+	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
 export function getColor(km: number, mode: ColorMode, maxElevKm = 6, maxDepthKm = 10): [number, number, number] {
 	switch (mode) {
 		case "heightmap":
 			return heightmapColor(km, maxElevKm, maxDepthKm)
 		case "landHeightmap":
 			return landHeightmapColor(km, maxElevKm)
+		case "slope":
+			return slopeColor(Math.max(0, Math.min(1, km)))
 		default:
 			return elevationToColor(km, maxElevKm)
 	}

@@ -2,7 +2,14 @@
  * Distance fields and elevation assignment.
  * Faithful port of orogen's elevation.js distance-field + elevation logic.
  */
-import type { SphereMesh, PlateVec, BoundaryInfo, DistanceFields } from "./types"
+import type {
+	SphereMesh,
+	PlateVec,
+	BoundaryInfo,
+	DistanceFields,
+	OrogenTerrainFeatures,
+} from "./types"
+import { OROGEN_TERRAIN_FEATURE } from "./types"
 import { createRng } from "./rng"
 import { SimplexNoise } from "./simplex-noise"
 
@@ -117,13 +124,26 @@ export function blendElevation(
 	roughness: number,
 	seed: number,
 	timing?: StageTiming[],
-): Float32Array {
+): { elevation: Float32Array; terrainFeatures: OrogenTerrainFeatures } {
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const { distMountain, distOcean, distCoastline, distCoast, distCoastLand } = distFields
 	const { r_stress, r_subductFactor, r_boundaryType, r_bothOcean, r_hasOcean } = boundary
 
 	const elev = new Float32Array(numRegions)
+	const featureMask = new Uint32Array(numRegions)
+	const dominantFeature = new Uint8Array(numRegions)
+	const dominantMagnitude = new Float32Array(numRegions)
 	const noiseMag = roughness
+
+	function markFeature(r: number, feature: number, delta: number) {
+		const magnitude = Math.abs(delta)
+		if (magnitude <= 1e-5) return
+		featureMask[r] |= 1 << (feature - 1)
+		if (magnitude > dominantMagnitude[r]) {
+			dominantMagnitude[r] = magnitude
+			dominantFeature[r] = feature
+		}
+	}
 
 	const noise = new SimplexNoise(seed)
 	const foldNoise = new SimplexNoise(seed + 557)
@@ -423,6 +443,7 @@ export function blendElevation(
 						riftEffect = 0.04 * (1 - fade) * 0.2
 					}
 					elev[r] += riftEffect
+					markFeature(r, OROGEN_TERRAIN_FEATURE.RIFT_VALLEY, riftEffect)
 				}
 			}
 
@@ -441,6 +462,7 @@ export function blendElevation(
 						paEffect += rnfbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
 					}
 					elev[r] += paEffect
+					markFeature(r, OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN, paEffect)
 				}
 			}
 
@@ -461,6 +483,7 @@ export function blendElevation(
 						baEffect = -0.10 * backArcStress[r] * (1 - s) * orogenyFactor
 					}
 					elev[r] += baEffect
+					markFeature(r, OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
 				}
 			}
 
@@ -484,7 +507,9 @@ export function blendElevation(
 					const ampMod = 0.6 + 0.4 * fnfbm(x * 4 + 88.1, y * 4 + 62.3, z * 4 + 41.7, 2)
 					const elevBoost = 1 + 4 * Math.max(0, elev[r])
 					const foldAmp = foldActivity * Math.max(0, 1 - sf * 1.5) * noiseMag * 0.8 * elevBoost
-					elev[r] += foldCentered * foldAmp * ampMod
+					const foldEffect = foldCentered * foldAmp * ampMod
+					elev[r] += foldEffect
+					markFeature(r, OROGEN_TERRAIN_FEATURE.FOLD_RIDGES, foldEffect)
 				}
 			}
 
@@ -538,12 +563,16 @@ export function blendElevation(
 				const interiorUplift = INTERIOR_BASE + tectonicActivity * INTERIOR_TECTONIC
 				const baseBias = -0.08 * (1 - sDown) + interiorUplift * sUp
 				const mod = 1.0 + 0.2 * nfbm(x * 2 + 19.3, y * 2 + 7.6, z * 2 + 13.1, 2)
-				elev[r] += baseBias * mod
+				const interiorEffect = baseBias * mod
+				elev[r] += interiorEffect
+				markFeature(r, OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR, interiorEffect)
 			}
 
 			// Plateau uplift boost
 			if (isPlateauZone && tectonicActivity > 0.1) {
-				elev[r] += 0.025 * tectonicActivity * (1 - sf)
+				const plateauEffect = 0.025 * tectonicActivity * (1 - sf)
+				elev[r] += plateauEffect
+				markFeature(r, OROGEN_TERRAIN_FEATURE.PLATEAU_UPLIFT, plateauEffect)
 			}
 
 		} else {
@@ -577,19 +606,25 @@ export function blendElevation(
 				const t = rd / ridgeHalfWidth
 				const ridgeFade = (1 - t) * (1 - t)
 				const ridgeN = ridgedFbm(x * 3, y * 3, z * 3, 4)
-				elev[r] += (0.12 * ridgeN + 0.06) * ridgeFade
+				const ridgeEffect = (0.12 * ridgeN + 0.06) * ridgeFade
+				elev[r] += ridgeEffect
+				markFeature(r, OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE, ridgeEffect)
 			}
 
 			// Fracture zones
 			const fd = fractureDist[r]
 			if (fd !== Infinity && fd <= fractureHalfWidth) {
 				const ft = fd / fractureHalfWidth
-				elev[r] -= 0.03 * (1 - ft)
+				const fractureEffect = -0.03 * (1 - ft)
+				elev[r] += fractureEffect
+				markFeature(r, OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE, fractureEffect)
 			}
 
 			// Trenches
 			if (btype === 1) {
-				elev[r] -= 0.15 + 0.15 * stressNorm
+				const trenchEffect = -(0.15 + 0.15 * stressNorm)
+				elev[r] += trenchEffect
+				markFeature(r, OROGEN_TERRAIN_FEATURE.TRENCH, trenchEffect)
 			}
 
 			// Back-arc basin (ocean)
@@ -609,6 +644,7 @@ export function blendElevation(
 						baEffect = -0.10 * backArcStress[r] * (1 - s) * orogenyFactor
 					}
 					elev[r] += baEffect
+					markFeature(r, OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
 				}
 			}
 
@@ -649,6 +685,7 @@ export function blendElevation(
 			let coastNoise1 = n1 * coastAmp * falloff1 * stressAmp1
 			if (subSup > 0 && coastNoise1 > 0) coastNoise1 *= (1 - subSup)
 			elev[r] += coastNoise1
+			markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, coastNoise1)
 
 			// Layer 3: Coastline-aware domain warping
 			const warpReach = isPassiveCoast ? 1.2 : 1.5
@@ -663,6 +700,7 @@ export function blendElevation(
 				let warpDelta = (warpN - origN) * falloffW
 				if (subSup > 0 && warpDelta > 0) warpDelta *= (1 - subSup)
 				elev[r] += warpDelta
+				markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, warpDelta)
 			}
 
 			// Layer 2: Island scattering
@@ -675,6 +713,7 @@ export function blendElevation(
 					let bump = excess * excess * 0.18 * (1 + sn * 2) * distFade
 					bump *= (1 - subSup / 0.3)
 					elev[r] += bump
+					markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, bump)
 				}
 			}
 		}
@@ -726,11 +765,19 @@ export function blendElevation(
 			const threshold = 0.30
 			if (n > threshold) {
 				const excess = (n - threshold) / (1 - threshold)
-				elev[r] += excess * excess * 0.55 * distWeight * (0.5 + arcStress[r])
+				const arcEffect = excess * excess * 0.55 * distWeight * (0.5 + arcStress[r])
+				elev[r] += arcEffect
+				markFeature(r, OROGEN_TERRAIN_FEATURE.ISLAND_ARC, arcEffect)
 			}
 		}
 	}
 	timing?.push({ Stage: "Island arcs", ms: (performance.now() - islandArcsStart).toFixed(1) })
 
-	return elev
+	return {
+		elevation: elev,
+		terrainFeatures: {
+			featureMask,
+			dominantFeature,
+		},
+	}
 }

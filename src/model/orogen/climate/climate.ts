@@ -10,6 +10,7 @@ import { TIME } from "../../utilities/time"
 import type { SphereMesh, OrogenParams, OrogenClimate } from "../types"
 import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getPerihelion, getPlanetRadiusKm, getSubstellarDir, getSunTempFactor, isTidallyLocked } from "../units"
 import { SimplexNoise } from "../simplex-noise"
+import { fillPetMonthlyFromTemperature } from "./hydrology"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -298,6 +299,7 @@ function computeTidalTemperature(
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
+	const pet_monthly = new Float32Array(N * 12)
 
 	for (let r = 0; r < N; r++) {
 		const x = mesh.r_xyz[3 * r]
@@ -383,11 +385,14 @@ function computeTidalTemperature(
 		}
 	}
 
+	fillPetMonthlyFromTemperature(temperature_monthly, pet_monthly, getDaysPerYear(params.daysPerYear) / 12)
+
 	return {
 		temperature_avg,
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		pet_monthly,
 		daylight_hours_monthly,
 		landFraction,
 	}
@@ -446,6 +451,7 @@ export function computeTemperature(
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
+	const pet_monthly = new Float32Array(N * 12)
 
 	const gravityRatio = getPlanetRadiusKm(params.planetRadiusKm) / 6371
 	const LAPSE_RATE = 6.5 * gravityRatio // °C per km, scaled by surface gravity
@@ -519,11 +525,14 @@ export function computeTemperature(
 		}
 	}
 
+	fillPetMonthlyFromTemperature(temperature_monthly, pet_monthly, getDaysPerYear(params.daysPerYear) / 12)
+
 	return {
 		temperature_avg,
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		pet_monthly,
 		daylight_hours_monthly,
 		landFraction,
 	}

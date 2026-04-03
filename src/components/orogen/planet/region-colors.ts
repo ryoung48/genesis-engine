@@ -1,14 +1,97 @@
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
-import { getColor, temperatureColor, temperatureDeltaColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, dangerColor, hotspotColor, OCEAN_LIGHT_BLUE } from "../colors"
+import type { PopulationMapMode } from "@/components/world/types"
+import type { NationMapMode } from "./ModeBar"
+import { getColor, temperatureColor, temperatureDeltaColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, dangerColor, hotspotColor, slopeColor, OCEAN_LIGHT_BLUE } from "../colors"
+import { OROGEN_TERRAIN_FEATURE } from "@/model/orogen/types"
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import { koppenClimateColor, koppenTrueColor } from "@/model/orogen/climate/koppen"
 import { ENABLE_PASTA_CLASSIFICATION } from "@/model/orogen/features"
 import { darkenVegetationAtElevation, darkenClimateAtElevation } from "./color-helpers"
 
+function basinColor(id: number): [number, number, number] {
+	if (id < 0) return OCEAN_LIGHT_BLUE
+	let h = (id * 2654435761) >>> 0
+	h ^= h >>> 16
+	const hue = (h % 360) / 360
+	const sat = 0.45 + (((h >>> 9) % 40) / 100)
+	const light = 0.42 + (((h >>> 17) % 18) / 100)
+	let r = light
+	let g = light
+	let b = light
+	if (sat > 0) {
+		const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat
+		const p = 2 * light - q
+		const hueToRgb = (t: number) => {
+			let x = t
+			if (x < 0) x += 1
+			if (x > 1) x -= 1
+			if (x < 1 / 6) return p + (q - p) * 6 * x
+			if (x < 1 / 2) return q
+			if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6
+			return p
+		}
+		r = hueToRgb(hue + 1 / 3)
+		g = hueToRgb(hue)
+		b = hueToRgb(hue - 1 / 3)
+	}
+	return [r, g, b]
+}
+
+const TERRAIN_FEATURE_COLORS: Record<number, [number, number, number]> = {
+	[OROGEN_TERRAIN_FEATURE.RIFT_VALLEY]: [0.82, 0.29, 0.22],
+	[OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN]: [0.70, 0.22, 0.18],
+	[OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN]: [0.95, 0.55, 0.22],
+	[OROGEN_TERRAIN_FEATURE.FOLD_RIDGES]: [0.55, 0.24, 0.13],
+	[OROGEN_TERRAIN_FEATURE.PLATEAU_UPLIFT]: [0.80, 0.65, 0.28],
+	[OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR]: [0.45, 0.63, 0.21],
+	[OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE]: [0.17, 0.73, 0.88],
+	[OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE]: [0.18, 0.47, 0.92],
+	[OROGEN_TERRAIN_FEATURE.TRENCH]: [0.07, 0.17, 0.46],
+	[OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING]: [0.98, 0.90, 0.50],
+	[OROGEN_TERRAIN_FEATURE.ISLAND_ARC]: [0.90, 0.40, 0.72],
+}
+
+export function getTerrainFeatureColor(feature: number): [number, number, number] | null {
+	return TERRAIN_FEATURE_COLORS[feature] ?? null
+}
+
+const LAND_FEATURE_MASK =
+	(1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.FOLD_RIDGES - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.PLATEAU_UPLIFT - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR - 1))
+
+const OCEAN_FEATURE_MASK =
+	(1 << (OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.TRENCH - 1)) |
+	(1 << (OROGEN_TERRAIN_FEATURE.ISLAND_ARC - 1))
+
+const COAST_FEATURE_MASK = 1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1)
+
+const TOPOGRAPHY_COLORS: Record<number, [number, number, number]> = {
+	0: [0x6c / 255, 0x9d / 255, 0x35 / 255], // flat
+	1: [0x72 / 255, 0x84 / 255, 0x76 / 255], // hill
+	2: [0x92 / 255, 0x76 / 255, 0x2d / 255], // plateau
+	3: [0x6c / 255, 0x2c / 255, 0x14 / 255], // mountains
+	4: [0x2d / 255, 0x8e / 255, 0x72 / 255], // marsh
+	5: [0x7e / 255, 0x8a / 255, 0x57 / 255], // coastal
+	6: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // ocean
+	7: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // lake
+}
+
+export function getTopographyColor(topography: number): [number, number, number] | null {
+	return TOPOGRAPHY_COLORS[topography] ?? null
+}
+
 export function computeRegionColors(
 	world: SerializedOrogenWorld,
 	colorMode: ColorMode,
+	nationMode: NationMapMode,
+	populationMode: PopulationMapMode,
 	temperatureMonth: number,
 	rainfallMonth: number,
 	windMonth: number,
@@ -20,6 +103,34 @@ export function computeRegionColors(
 	const darkenMapWaterPastaClimate = viewMode === "map" && colorMode === "pastaClimate"
 	const darkenMapWaterOceanCurrents = viewMode === "map" && colorMode === "oceanCurrents"
 	const mapWaterDarkenFactor = 0.74
+
+	if (colorMode === "slope") {
+		const slopeScoreByRegion = world.slopeScore
+		for (let r = 0; r < N; r++) {
+			const slopeScore = slopeScoreByRegion?.[r] ?? 0
+			const [cr, cg, cb] = slopeColor(slopeScore)
+			if (world.isLand?.[r]) {
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else {
+				rgb[3 * r] = cr * 0.45
+				rgb[3 * r + 1] = cg * 0.55
+				rgb[3 * r + 2] = Math.min(1, cb * 0.8 + 0.18)
+			}
+		}
+		return rgb
+	}
+
+	if (colorMode === "topography" && world.topography) {
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = TOPOGRAPHY_COLORS[world.topography[r]] ?? [1, 1, 1]
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
 
 	if ((colorMode === "temperature" || colorMode === "biotemperature" || colorMode === "temperatureDelta") && world.climate) {
 		const temps = temperatureMonth === 0
@@ -284,6 +395,42 @@ export function computeRegionColors(
 		return rgb
 	}
 
+	if (colorMode === "nations" && world.provinces) {
+		if (nationMode === "provinces") {
+			const { regionProvince, colors: provColors, desolate } = world.provinces
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0) {
+					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]; rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]; rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+				} else if (desolate[p]) {
+					rgb[3 * r] = 0.35; rgb[3 * r + 1] = 0.33; rgb[3 * r + 2] = 0.32
+				} else {
+					rgb[3 * r] = provColors[3 * p]
+					rgb[3 * r + 1] = provColors[3 * p + 1]
+					rgb[3 * r + 2] = provColors[3 * p + 2]
+				}
+			}
+			return rgb
+		}
+		if (world.nations) {
+			const { regionProvince, desolate } = world.provinces
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				const n = p >= 0 ? world.nations.assignment[p] : -1
+				if (p < 0) {
+					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]; rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]; rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+				} else if (desolate[p] || n < 0) {
+					rgb[3 * r] = 0.35; rgb[3 * r + 1] = 0.33; rgb[3 * r + 2] = 0.32
+				} else {
+					rgb[3 * r] = world.nations.colors[3 * n]
+					rgb[3 * r + 1] = world.nations.colors[3 * n + 1]
+					rgb[3 * r + 2] = world.nations.colors[3 * n + 2]
+				}
+			}
+			return rgb
+		}
+	}
+
 	if (colorMode === "provinces" && world.provinces) {
 		const { regionProvince, colors: provColors, desolate } = world.provinces
 		for (let r = 0; r < N; r++) {
@@ -301,15 +448,17 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "population" && world.provinces && world.population) {
+	if (colorMode === "population" && world.provinces) {
 		const { regionProvince, desolate } = world.provinces
-		const { population: pop } = world.population
+		const pop = world.population?.population
 		const { size } = world.provinces
 		let maxDensity = 0
-		for (let i = 0; i < world.provinces.count; i++) {
-			if (!desolate[i] && size[i] > 0) {
-				const d = pop[i] / size[i]
-				if (d > maxDensity) maxDensity = d
+		if (populationMode === "density" && pop) {
+			for (let i = 0; i < world.provinces.count; i++) {
+				if (!desolate[i] && size[i] > 0) {
+					const d = pop[i] / size[i]
+					if (d > maxDensity) maxDensity = d
+				}
 			}
 		}
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
@@ -320,11 +469,93 @@ export function computeRegionColors(
 			} else if (desolate[p]) {
 				rgb[3 * r] = 0.35; rgb[3 * r + 1] = 0.33; rgb[3 * r + 2] = 0.32
 			} else {
-				const [cr, cg, cb] = populationColor((pop[p] / Math.max(1, size[p])) * invMax)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
+				if (populationMode === "density" && pop) {
+					const [cr, cg, cb] = populationColor((pop[p] / Math.max(1, size[p])) * invMax)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else {
+					const cultureIdx = world.cultures?.assignment[p] ?? -1
+					const heritageIdx = cultureIdx >= 0 ? world.heritages?.assignment[cultureIdx] ?? -1 : -1
+					const faithIdx = cultureIdx >= 0 ? world.faiths?.assignment[cultureIdx] ?? -1 : -1
+					const religionIdx = faithIdx >= 0 ? world.religions?.assignment[faithIdx] ?? -1 : -1
+					const idx = populationMode === "culture"
+						? cultureIdx
+						: populationMode === "heritage"
+							? heritageIdx
+							: populationMode === "faith"
+								? faithIdx
+								: religionIdx
+					const partition = populationMode === "culture"
+						? world.cultures
+						: populationMode === "heritage"
+							? world.heritages
+							: populationMode === "faith"
+								? world.faiths
+								: world.religions
+					if (!partition || idx < 0) {
+						rgb[3 * r] = 0.35
+						rgb[3 * r + 1] = 0.33
+						rgb[3 * r + 2] = 0.32
+					} else {
+						rgb[3 * r] = partition.colors[3 * idx]
+						rgb[3 * r + 1] = partition.colors[3 * idx + 1]
+						rgb[3 * r + 2] = partition.colors[3 * idx + 2]
+					}
+				}
 			}
+		}
+		return rgb
+	}
+
+	if (colorMode === "basins" && world.rivers?.basinId) {
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = basinColor(world.rivers.basinId[r] ?? -1)
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
+	if (
+		(colorMode === "terrainFeatures" ||
+			colorMode === "terrainFeaturesLand" ||
+			colorMode === "terrainFeaturesOcean" ||
+			colorMode === "terrainFeaturesCoast") &&
+		world.terrainFeatures
+	) {
+		const { featureMask, dominantFeature } = world.terrainFeatures
+		const filterMask = colorMode === "terrainFeaturesLand"
+			? LAND_FEATURE_MASK
+			: colorMode === "terrainFeaturesOcean"
+				? OCEAN_FEATURE_MASK
+				: colorMode === "terrainFeaturesCoast"
+					? COAST_FEATURE_MASK
+					: 0xffffffff
+		for (let r = 0; r < N; r++) {
+			const base = getColor(world.elevation_km[r], "terrain")
+			const mask = featureMask[r] & filterMask
+			if (!mask) {
+				rgb[3 * r] = base[0] * 0.32
+				rgb[3 * r + 1] = base[1] * 0.32
+				rgb[3 * r + 2] = base[2] * 0.32
+				continue
+			}
+			let feature = dominantFeature[r]
+			if (!(mask & (1 << (feature - 1)))) {
+				feature = 0
+				for (let bit = 1; bit <= 11; bit++) {
+					if (mask & (1 << (bit - 1))) {
+						feature = bit
+						break
+					}
+				}
+			}
+			const accent = TERRAIN_FEATURE_COLORS[feature] ?? [1, 1, 1]
+			rgb[3 * r] = base[0] * 0.2 + accent[0] * 0.8
+			rgb[3 * r + 1] = base[1] * 0.2 + accent[1] * 0.8
+			rgb[3 * r + 2] = base[2] * 0.2 + accent[2] * 0.8
 		}
 		return rgb
 	}

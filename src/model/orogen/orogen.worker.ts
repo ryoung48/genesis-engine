@@ -26,6 +26,12 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		},
 		plateAssignment: world.plateAssignment,
 		elevation: world.elevation,
+		terrainFeatures: world.terrainFeatures
+			? {
+				featureMask: world.terrainFeatures.featureMask,
+				dominantFeature: world.terrainFeatures.dominantFeature,
+			}
+			: undefined,
 		elevation_km: world.elevation_km,
 		params: world.params,
 		continentCount: world.continentCount,
@@ -35,6 +41,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				temperature_min: world.climate.temperature_min,
 				temperature_max: world.climate.temperature_max,
 				temperature_monthly: world.climate.temperature_monthly,
+				pet_monthly: world.climate.pet_monthly,
 				daylight_hours_monthly: world.climate.daylight_hours_monthly,
 				landFraction: world.climate.landFraction,
 			}
@@ -70,6 +77,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		koppenClimate: world.koppenClimate,
 		vegetation: world.vegetation,
 		topography: world.topography,
+		slopeScore: world.slopeScore,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
 		rivers: world.rivers,
@@ -96,6 +104,61 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				adjList: world.provinces.adjList,
 				size: world.provinces.size,
 				colors: world.provinces.colors,
+			}
+			: undefined,
+		nations: world.nations
+			? {
+				assignment: world.nations.assignment,
+				seeds: world.nations.seeds,
+				count: world.nations.count,
+				adjOffset: world.nations.adjOffset,
+				adjList: world.nations.adjList,
+				size: world.nations.size,
+				colors: world.nations.colors,
+			}
+			: undefined,
+		cultures: world.cultures
+			? {
+				assignment: world.cultures.assignment,
+				seeds: world.cultures.seeds,
+				count: world.cultures.count,
+				adjOffset: world.cultures.adjOffset,
+				adjList: world.cultures.adjList,
+				size: world.cultures.size,
+				colors: world.cultures.colors,
+			}
+			: undefined,
+		heritages: world.heritages
+			? {
+				assignment: world.heritages.assignment,
+				seeds: world.heritages.seeds,
+				count: world.heritages.count,
+				adjOffset: world.heritages.adjOffset,
+				adjList: world.heritages.adjList,
+				size: world.heritages.size,
+				colors: world.heritages.colors,
+			}
+			: undefined,
+		faiths: world.faiths
+			? {
+				assignment: world.faiths.assignment,
+				seeds: world.faiths.seeds,
+				count: world.faiths.count,
+				adjOffset: world.faiths.adjOffset,
+				adjList: world.faiths.adjList,
+				size: world.faiths.size,
+				colors: world.faiths.colors,
+			}
+			: undefined,
+		religions: world.religions
+			? {
+				assignment: world.religions.assignment,
+				seeds: world.religions.seeds,
+				count: world.religions.count,
+				adjOffset: world.religions.adjOffset,
+				adjList: world.religions.adjList,
+				size: world.religions.size,
+				colors: world.religions.colors,
 			}
 			: undefined,
 		landmarks: world.landmarks
@@ -130,12 +193,20 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		world.elevation_km.buffer,
 	]
 
+	if (world.terrainFeatures) {
+		transfer.push(
+			world.terrainFeatures.featureMask.buffer,
+			world.terrainFeatures.dominantFeature.buffer,
+		)
+	}
+
 	if (world.climate) {
 		transfer.push(
 			world.climate.temperature_avg.buffer,
 			world.climate.temperature_min.buffer,
 			world.climate.temperature_max.buffer,
 			world.climate.temperature_monthly.buffer,
+			world.climate.pet_monthly.buffer,
 		)
 		if (world.climate.daylight_hours_monthly) {
 			transfer.push(world.climate.daylight_hours_monthly.buffer)
@@ -209,6 +280,10 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.topography.buffer)
 	}
 
+	if (world.slopeScore) {
+		transfer.push(world.slopeScore.buffer)
+	}
+
 	if (world.isLand) {
 		transfer.push(world.isLand.buffer)
 	}
@@ -218,8 +293,13 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	}
 
 	if (world.rivers?.lakes) {
+		transfer.push(world.rivers.flow.buffer)
+		transfer.push(world.rivers.flow_monthly.buffer)
+		transfer.push(world.rivers.riverId.buffer)
+		transfer.push(world.rivers.riverLengthKm.buffer)
 		transfer.push(world.rivers.visible.buffer)
 		transfer.push(world.rivers.lakes.buffer)
+		transfer.push(world.rivers.basinId.buffer)
 		transfer.push(world.rivers.waterLevel.buffer)
 	}
 
@@ -242,6 +322,51 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.provinces.adjList.buffer)
 		transfer.push(world.provinces.size.buffer)
 		transfer.push(world.provinces.colors.buffer)
+	}
+
+	if (world.nations) {
+		transfer.push(world.nations.assignment.buffer)
+		transfer.push(world.nations.seeds.buffer)
+		transfer.push(world.nations.adjOffset.buffer)
+		transfer.push(world.nations.adjList.buffer)
+		transfer.push(world.nations.size.buffer)
+		transfer.push(world.nations.colors.buffer)
+	}
+
+	if (world.cultures) {
+		transfer.push(world.cultures.assignment.buffer)
+		transfer.push(world.cultures.seeds.buffer)
+		transfer.push(world.cultures.adjOffset.buffer)
+		transfer.push(world.cultures.adjList.buffer)
+		transfer.push(world.cultures.size.buffer)
+		transfer.push(world.cultures.colors.buffer)
+	}
+
+	if (world.heritages) {
+		transfer.push(world.heritages.assignment.buffer)
+		transfer.push(world.heritages.seeds.buffer)
+		transfer.push(world.heritages.adjOffset.buffer)
+		transfer.push(world.heritages.adjList.buffer)
+		transfer.push(world.heritages.size.buffer)
+		transfer.push(world.heritages.colors.buffer)
+	}
+
+	if (world.faiths) {
+		transfer.push(world.faiths.assignment.buffer)
+		transfer.push(world.faiths.seeds.buffer)
+		transfer.push(world.faiths.adjOffset.buffer)
+		transfer.push(world.faiths.adjList.buffer)
+		transfer.push(world.faiths.size.buffer)
+		transfer.push(world.faiths.colors.buffer)
+	}
+
+	if (world.religions) {
+		transfer.push(world.religions.assignment.buffer)
+		transfer.push(world.religions.seeds.buffer)
+		transfer.push(world.religions.adjOffset.buffer)
+		transfer.push(world.religions.adjList.buffer)
+		transfer.push(world.religions.size.buffer)
+		transfer.push(world.religions.colors.buffer)
 	}
 
 	if (world.landmarks) {

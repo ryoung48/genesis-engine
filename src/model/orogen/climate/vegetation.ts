@@ -79,7 +79,7 @@ export const BIOME_LABELS = ["ocean", "desert", "sparse", "grasslands", "woods",
 export type BiomeCode = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 // Rain thresholds (annual mm) — derived from the existing humidity scale
-const ARID   = 100
+export const ARID_RAINFALL_THRESHOLD = 100
 const DRY    = 250
 const LOW    = 500
 const MOD    = 900
@@ -127,7 +127,7 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 		if (rain > MOD) return 5      // forest (taiga)
 		if (rain > LOW) return 4      // woods
 		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID) return 2     // sparse
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
 		return 1                      // desert
 	}
 
@@ -137,7 +137,7 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 		if (rain > MOD) return 5      // forest
 		if (rain > LOW) return 4      // woods
 		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID) return 2     // sparse
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
 		return 1                      // desert
 	}
 
@@ -148,7 +148,7 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 		if (rain > MOD) return 4      // woods
 		if (rain > LOW) return 4      // woods
 		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID) return 2     // sparse
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
 		return 1                      // desert
 	}
 
@@ -159,7 +159,7 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 		if (rain > MOD) return 5      // forest
 		if (rain > LOW) return 4      // woods
 		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID) return 2     // sparse
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
 		return 1                      // desert
 	}
 
@@ -169,6 +169,6 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 	if (rain > MOD) return 5          // forest
 	if (rain > LOW) return 4          // woods
 	if (rain > DRY) return 3          // grasslands
-	if (rain > ARID) return 2         // sparse
+	if (rain > ARID_RAINFALL_THRESHOLD) return 2         // sparse
 	return 1                          // desert
 }

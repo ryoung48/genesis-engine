@@ -3,6 +3,7 @@
  * Computes moisture advection and monthly rainfall using typed-array-based
  * SphereMesh and OrogenClimate data (no Cell/window.world dependencies).
  */
+import { PriorityQueue } from "@datastructures-js/priority-queue"
 import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
 import { elevToHeightKm } from "./climate"
 import { getDaysPerYear, getHoursPerDay, getSubstellarDir, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "../units"
@@ -34,6 +35,12 @@ function angleDeltaDeg(a: number, b: number): number {
 
 function clamp(x: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, x))
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+	if (edge0 === edge1) return x < edge0 ? 0 : 1
+	const t = clamp((x - edge0) / (edge1 - edge0), 0, 1)
+	return t * t * (3 - 2 * t)
 }
 
 const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 40, 60, 90], [40, 62, 83, 125, 165, 300, 150, 0], x)
@@ -182,7 +189,7 @@ export function computeThermalEquatorLine(
 
 /**
  * Compute east/west moisture advection fields.
- * BFS from deep-ocean sources with latitude-band wind steering.
+ * Best-first propagation from weighted ocean sources with latitude-band wind steering.
  */
 export function computeAdvection(
 	mesh: SphereMesh,
@@ -222,9 +229,34 @@ export function computeAdvection(
 			Math.floor((lonDeg[r] + 180) / lonBinWidth)))
 	}
 
-	const isDeepOcean = new Uint8Array(N)
+	const basinLabel = new Int32Array(N).fill(-1)
+	let basinCount = 0
 	for (let r = 0; r < N; r++) {
-		if (!isLand?.[r] && elevation[r] <= 0 && distCoast[r] > deepOceanThreshold) isDeepOcean[r] = 1
+		if (isLand?.[r] || elevation[r] > 0 || basinLabel[r] >= 0) continue
+		const basin = basinCount++
+		const stack = [r]
+		basinLabel[r] = basin
+		while (stack.length > 0) {
+			const current = stack.pop()!
+			for (let j = adjOffset[current], jEnd = adjOffset[current + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if ((isLand?.[nb] || elevation[nb] > 0) || basinLabel[nb] >= 0) continue
+				basinLabel[nb] = basin
+				stack.push(nb)
+			}
+		}
+	}
+	const minBasinSize = Math.max(1, Math.floor(N * 0.005))
+	const basinSize = new Int32Array(basinCount)
+	for (let r = 0; r < N; r++) {
+		if (basinLabel[r] >= 0) basinSize[basinLabel[r]]++
+	}
+
+	const sourceMoisture = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!isLand?.[r] && elevation[r] <= 0 && basinLabel[r] >= 0 && basinSize[basinLabel[r]] >= minBasinSize) {
+			sourceMoisture[r] = wet * smoothstep(0, deepOceanThreshold, distCoast[r])
+		}
 	}
 
 	// Use provided land mask, or fall back to elevation-based classification
@@ -273,20 +305,25 @@ export function computeAdvection(
 
 	const assignRain = (attr: "east" | "west") => {
 		const moisture = attr === "east" ? east : west
-		const visited = new Uint8Array(N)
-		const queue: number[] = []
+		const settled = new Uint8Array(N)
+		const queue = new PriorityQueue<{ region: number; moisture: number }>(
+			(a, b) => b.moisture - a.moisture,
+		)
 
 		for (let r = 0; r < N; r++) {
-			if (isDeepOcean[r]) {
-				moisture[r] = wet
-				visited[r] = 1
-				queue.push(r)
+			if (!land[r] && sourceMoisture[r] > 1e-3) {
+				moisture[r] = sourceMoisture[r]
+				queue.enqueue({ region: r, moisture: sourceMoisture[r] })
 			}
 		}
 
-		let head = 0
-		while (head < queue.length) {
-			const r = queue[head++]
+		while (!queue.isEmpty()) {
+			const next = queue.dequeue()
+			if (!next) break
+			const r = next.region
+			if (settled[r]) continue
+			if (next.moisture + 1e-3 < moisture[r]) continue
+			settled[r] = 1
 			const heightKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
 			const orographic = heightKm > 2 ? -1.8 : -0.6
 			const impact = (!land[r] ? 0.5 : orographic) / scale
@@ -299,8 +336,6 @@ export function computeAdvection(
 
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
-				if (visited[nb] && !land[nb]) continue
-
 				const lat2 = latDeg[nb] * DEG2RAD
 				const dLon = lonDeg[nb] * DEG2RAD - lon1
 				const bearing = (Math.atan2(
@@ -309,12 +344,9 @@ export function computeAdvection(
 				) * RAD2DEG + 360) % 360
 
 				if (!isValidFlow(attr, r, bearing)) continue
-				if (!visited[nb]) {
+				if (!settled[nb] && m > moisture[nb] + 1e-3) {
 					moisture[nb] = m
-					visited[nb] = 1
-					queue.push(nb)
-				} else if (land[nb] && m > moisture[nb]) {
-					moisture[nb] = m
+					queue.enqueue({ region: nb, moisture: m })
 				}
 			}
 		}

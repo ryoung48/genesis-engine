@@ -112,6 +112,44 @@ export interface DistanceFields {
 	distCoastLand: Float32Array
 }
 
+export const OROGEN_TERRAIN_FEATURE_LABELS = [
+	"none",
+	"rift valley",
+	"pull-apart basin",
+	"back-arc basin",
+	"fold ridges",
+	"plateau uplift",
+	"continental interior",
+	"mid-ocean ridge",
+	"fracture zone",
+	"trench",
+	"coastal roughening",
+	"island arc",
+] as const
+
+export type OrogenTerrainFeatureId = typeof OROGEN_TERRAIN_FEATURE_LABELS[number]
+
+export const OROGEN_TERRAIN_FEATURE = {
+	RIFT_VALLEY: 1,
+	PULL_APART_BASIN: 2,
+	BACK_ARC_BASIN: 3,
+	FOLD_RIDGES: 4,
+	PLATEAU_UPLIFT: 5,
+	CONTINENTAL_INTERIOR: 6,
+	MID_OCEAN_RIDGE: 7,
+	FRACTURE_ZONE: 8,
+	TRENCH: 9,
+	COASTAL_ROUGHENING: 10,
+	ISLAND_ARC: 11,
+} as const
+
+export interface OrogenTerrainFeatures {
+	/** Per-cell bitmask of terrain features applied during blendElevation. */
+	featureMask: Uint32Array
+	/** Per-cell strongest contributing feature, index into OROGEN_TERRAIN_FEATURE_LABELS. */
+	dominantFeature: Uint8Array
+}
+
 export interface SuperPlateData {
 	r_superPlate: Int32Array
 	superPlateVec: Map<number, PlateVec>
@@ -125,6 +163,7 @@ export interface OrogenClimate {
 	temperature_min: Float32Array   // per-cell annual min °C
 	temperature_max: Float32Array   // per-cell annual max °C
 	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
+	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
 	landFraction: number[]          // 36-band land fraction used by EBM
 }
@@ -150,6 +189,11 @@ export interface OrogenRainfall {
 	annual: Float32Array    // per-cell annual mm
 	east: Float32Array      // per-cell normalized east moisture (0–1)
 	west: Float32Array      // per-cell normalized west moisture (0–1)
+}
+
+export interface OrogenHydrology {
+	aet_monthly: Float32Array // [month * N + r] mm
+	aridity_monthly: Float32Array // [month * N + r] AET / PET
 }
 
 export interface OrogenHazards {
@@ -181,25 +225,59 @@ export interface OrogenProvinces {
 	colors: Float32Array
 }
 
+export interface OrogenPartition {
+	/** Per-node partition index (-1 = inactive/unassigned) */
+	assignment: Int32Array
+	/** Seed node for each partition */
+	seeds: Int32Array
+	/** Number of partitions */
+	count: number
+	/** Partition adjacency — CSR offset, length count+1 */
+	adjOffset: Int32Array
+	/** Partition adjacency — neighbor indices */
+	adjList: Int32Array
+	/** Per-partition node count */
+	size: Int32Array
+	/** Per-partition RGB colors, length count*3 */
+	colors: Float32Array
+}
+
 export interface OrogenRivers {
 	/** Each river is a polyline of [lonDeg, latDeg, flow, elevation] quads */
 	lines: [number, number, number, number][][]
 	/** Maximum flow value for normalization */
 	maxFlow: number
-	/** Flow threshold (minimum flow for a river cell) */
+	/** Flow threshold (minimum flow for a river cell), in m3/s */
 	minFlow: number
+	/** Per-cell mean discharge from upstream thawed-rain runoff, in m3/s */
+	flow: Float32Array
+	/** Per-cell monthly discharge, length 12*N, indexed [month*N + r], in m3/s */
+	flow_monthly: Float32Array
 	/** Per-cell flag for cells that belong to a rendered river polyline */
 	visible: Uint8Array
+	/** Per-cell river system ID (-1 = not a river cell). Tributaries share the main river's ID. */
+	riverId: Int32Array
+	/** Per-cell total length of the visible river system, in km. */
+	riverLengthKm: Float32Array
+	/** Per-cell terminal flag for the last visible river cell before its sink. */
+	terminal: Uint8Array
+	/** Terminal river cells that drain into ocean or other non-land water. */
+	terminalCoastal: Uint8Array
+	/** Terminal river cells that end in inland basins, lakes, or playas. */
+	terminalInterior: Uint8Array
 	/** Per-cell lake flag (1 = lake surface, 0 = not) */
 	lakes: Uint8Array
+	/** Per-cell enclosed basin ID (-1 = not assigned to a basin) */
+	basinId: Int32Array
 	/** Per-cell water surface elevation (only meaningful for lake cells) */
 	waterLevel: Float32Array
 }
 
+
 export const OROGEN_TOPOGRAPHY_LABELS = [
 	"flat",
-	"hills",
-	"plateus",
+	"hill",
+	"plateau",
 	"mountains",
 	"marsh",
 	"coastal",
@@ -214,6 +292,7 @@ export interface OrogenWorld {
 	boundary: BoundaryInfo
 	distFields: DistanceFields
 	elevation: Float32Array
+	terrainFeatures?: OrogenTerrainFeatures
 	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
 	elevation_km: Float32Array
 	params: OrogenParams
@@ -245,10 +324,17 @@ export interface OrogenWorld {
 	vegetation?: Uint8Array
 	/** Per-cell topography code, index into OROGEN_TOPOGRAPHY_LABELS */
 	topography?: Uint8Array
+	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
+	slopeScore?: Float32Array
 	rivers?: OrogenRivers
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
 	provinces?: OrogenProvinces
+	nations?: OrogenPartition
+	cultures?: OrogenPartition
+	heritages?: OrogenPartition
+	faiths?: OrogenPartition
+	religions?: OrogenPartition
 	landmarks?: import("./provinces/landmarks").OrogenLandmarks
 	population?: import("./provinces/population").ProvincePopulation
 	continentCount?: number

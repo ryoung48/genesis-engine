@@ -218,14 +218,13 @@ export function buildTerrainSliders(state: {
 		},
 		{
 			label: "Plates",
-			help: "More plates create more tectonic boundaries, coasts, and mountain belts.",
+			help: "More plates create more tectonic boundaries, coasts, and terrain partitions in both active and stagnant-lid worlds.",
 			value: state.numPlates,
 			display: String(state.numPlates),
 			min: 4,
 			max: 120,
 			step: 1,
 			set: state.setNumPlates,
-			disabled: isStagnant,
 		},
 		{
 			label: "Roughness",
@@ -239,14 +238,13 @@ export function buildTerrainSliders(state: {
 		},
 		{
 			label: "Size Variety",
-			help: "Makes landmasses or seas more equal-sized or more uneven.",
+			help: "Makes plate-driven landmasses or seas more equal-sized or more uneven in both tectonic modes.",
 			value: state.continentSizeVariety,
 			display: state.continentSizeVariety.toFixed(2),
 			min: 0,
 			max: 1,
 			step: 0.05,
 			set: state.setContinentSizeVariety,
-			disabled: isStagnant,
 		},
 		{
 			label: "Terrain Warp",

@@ -18,6 +18,7 @@ export interface SerializedOrogenClimate {
 	temperature_min: Float32Array
 	temperature_max: Float32Array
 	temperature_monthly: Float32Array
+	pet_monthly: Float32Array
 	daylight_hours_monthly?: Float32Array
 	landFraction: number[]
 }
@@ -26,6 +27,10 @@ export interface SerializedOrogenWorld {
 	mesh: SerializedSphereMesh
 	plateAssignment: Int32Array
 	elevation: Float32Array
+	terrainFeatures?: {
+		featureMask: Uint32Array
+		dominantFeature: Uint8Array
+	}
 	elevation_km: Float32Array
 	params: OrogenParams
 	continentCount?: number
@@ -54,9 +59,10 @@ export interface SerializedOrogenWorld {
 	koppenClimate?: Uint8Array
 	vegetation?: Uint8Array
 	topography?: Uint8Array
+	slopeScore?: Float32Array
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
-	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; visible: Uint8Array; lakes: Uint8Array; waterLevel: Float32Array }
+	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; flow: Float32Array; flow_monthly: Float32Array; riverId: Int32Array; riverLengthKm: Float32Array; visible: Uint8Array; lakes: Uint8Array; basinId: Int32Array; waterLevel: Float32Array }
 	oceanCurrents?: { oceanWarmth: Float32Array; coastalWarmth: Float32Array }
 	wind?: {
 		wind_east_monthly: Float32Array
@@ -68,6 +74,51 @@ export interface SerializedOrogenWorld {
 		seeds: Int32Array
 		count: number
 		desolate: Uint8Array
+		adjOffset: Int32Array
+		adjList: Int32Array
+		size: Int32Array
+		colors: Float32Array
+	}
+	nations?: {
+		assignment: Int32Array
+		seeds: Int32Array
+		count: number
+		adjOffset: Int32Array
+		adjList: Int32Array
+		size: Int32Array
+		colors: Float32Array
+	}
+	cultures?: {
+		assignment: Int32Array
+		seeds: Int32Array
+		count: number
+		adjOffset: Int32Array
+		adjList: Int32Array
+		size: Int32Array
+		colors: Float32Array
+	}
+	heritages?: {
+		assignment: Int32Array
+		seeds: Int32Array
+		count: number
+		adjOffset: Int32Array
+		adjList: Int32Array
+		size: Int32Array
+		colors: Float32Array
+	}
+	faiths?: {
+		assignment: Int32Array
+		seeds: Int32Array
+		count: number
+		adjOffset: Int32Array
+		adjList: Int32Array
+		size: Int32Array
+		colors: Float32Array
+	}
+	religions?: {
+		assignment: Int32Array
+		seeds: Int32Array
+		count: number
 		adjOffset: Int32Array
 		adjList: Int32Array
 		size: Int32Array

@@ -1,6 +1,6 @@
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
-import { OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
+import { OROGEN_TERRAIN_FEATURE_LABELS, OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/climate/vegetation"
 import { PASTA_LABELS, pastaClimateName } from "@/model/orogen/climate/pasta"
 import { KOPPEN_LABELS, koppenClimateName } from "@/model/orogen/climate/koppen"
@@ -33,6 +33,24 @@ export interface HoverHazards {
 
 export interface HoverHotspot {
 	value: number
+}
+
+export interface HoverRiver {
+	flow: number
+	flow_monthly: number[]
+	riverId: number
+	lengthKm: number
+}
+
+export interface HoverTerrainFeature {
+	dominant: string | null
+	all: string[]
+}
+
+export function getHoverBasinId(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): number | null {
+	return hoverInfo && world?.rivers?.basinId
+		? world.rivers.basinId[hoverInfo.region] ?? -1
+		: null
 }
 
 export function getHoverElevationKm(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): number | null {
@@ -212,6 +230,38 @@ export function getHoverHotspot(hoverInfo: HoverInfo | null, world: SerializedOr
 			value: world.volcanism.hotspot[hoverInfo.region],
 		}
 		: null
+}
+
+export function getHoverRiver(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): HoverRiver | null {
+	if (!(hoverInfo && world?.rivers?.visible && world.rivers.flow)) return null
+	const r = hoverInfo.region
+	if (!world.rivers.visible[r]) return null
+	const N = world.mesh.numRegions
+	const monthly: number[] = []
+	if (world.rivers.flow_monthly) {
+		for (let m = 0; m < 12; m++) monthly.push(world.rivers.flow_monthly[m * N + r])
+	}
+	return {
+		flow: world.rivers.flow[r],
+		flow_monthly: monthly,
+		riverId: world.rivers.riverId?.[r] ?? -1,
+		lengthKm: world.rivers.riverLengthKm?.[r] ?? 0,
+	}
+}
+
+export function getHoverTerrainFeature(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): HoverTerrainFeature | null {
+	if (!(hoverInfo && world?.terrainFeatures)) return null
+	const r = hoverInfo.region
+	const mask = world.terrainFeatures.featureMask[r]
+	if (!mask) return null
+	const all: string[] = []
+	for (let bit = 1; bit < OROGEN_TERRAIN_FEATURE_LABELS.length; bit++) {
+		if (mask & (1 << (bit - 1))) all.push(OROGEN_TERRAIN_FEATURE_LABELS[bit])
+	}
+	return {
+		dominant: OROGEN_TERRAIN_FEATURE_LABELS[world.terrainFeatures.dominantFeature[r]] ?? null,
+		all,
+	}
 }
 
 export function getCoastHopLengthKm(world: SerializedOrogenWorld | null): number | null {

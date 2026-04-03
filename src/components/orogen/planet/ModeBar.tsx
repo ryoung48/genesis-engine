@@ -1,13 +1,20 @@
 import React from "react"
 import type { OrogenViewMode } from "../renderer"
 import type { ColorMode } from "../colors"
+import type { PopulationMapMode } from "@/components/world/types"
 import { ENABLE_PASTA_CLASSIFICATION, ENABLE_PROVINCES, ENABLE_WIND_FIELDS } from "@/model/orogen/features"
+
+export type NationMapMode = "borders" | "provinces"
 
 interface ModeBarProps {
 	viewMode: OrogenViewMode
 	setViewMode: (v: OrogenViewMode) => void
 	colorMode: ColorMode
 	setColorMode: (v: ColorMode) => void
+	nationMode: NationMapMode
+	setNationMode: (v: NationMapMode) => void
+	populationMode: PopulationMapMode
+	setPopulationMode: (v: PopulationMapMode) => void
 	isClimateMode: boolean
 	isTemperatureMode: boolean
 	isSatelliteMode: boolean
@@ -26,13 +33,25 @@ interface ModeBarProps {
 export const ModeBar: React.FC<ModeBarProps> = ({
 	viewMode, setViewMode,
 	colorMode, setColorMode,
+	nationMode, setNationMode,
+	populationMode, setPopulationMode,
 	isClimateMode, isTemperatureMode, isSatelliteMode, isWindMode,
 	isMeasuring, setIsMeasuring,
 	tempAnnual, setTempAnnual,
 	rainAnnual, setRainAnnual,
 	windAnnual, setWindAnnual,
 	showPastaDebug,
-}) => (
+}) => {
+	const isTerrainMode =
+		colorMode === "terrain" ||
+		colorMode === "slope" ||
+		colorMode === "topography" ||
+		colorMode === "basins" ||
+		colorMode === "dangerZones" ||
+		colorMode === "hotspots" ||
+		colorMode === "terrainFeatures"
+
+	return (
 	<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center pb-3 pointer-events-none gap-1.5">
 		{showPastaDebug && (
 			<div className="pointer-events-auto inline-flex items-center rounded-xl border border-white/10 bg-slate-950/75 p-1 gap-0.5 backdrop-blur-sm">
@@ -97,14 +116,12 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				["temperature", "Temp"],
 				["precipitation", "Rain"],
 				["vegetation", "Veg"],
-				["dangerZones", "Danger"],
-				["hotspots", "Hotspots"],
 				["climate", "Climate"],
-				["oceanCurrents", "Currents"],
 				...(ENABLE_WIND_FIELDS ? [["windSpeed", "Wind"]] : []),
-				...(ENABLE_PROVINCES ? [["provinces", "Provinces"], ["population", "Pop"]] : []),
+				...(ENABLE_PROVINCES ? [["nations", "Nations"], ["population", "Pop"]] : []),
 			] as [string, string][]).map(([mode, label]) => {
-				const isActive = mode === "temperature" ? isTemperatureMode
+				const isActive = mode === "terrain" ? isTerrainMode
+					: mode === "temperature" ? isTemperatureMode
 					: mode === "climate" ? isClimateMode
 					: mode === "satellite" ? isSatelliteMode
 					: colorMode === mode
@@ -122,13 +139,40 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					</button>
 				)
 			})}
+			{isTerrainMode && (
+				<>
+					<div className="w-px h-4 bg-white/10 mx-0.5" />
+					{([
+						["terrain", "Elevation"],
+						["slope", "Slope"],
+						["topography", "Topography"],
+						["terrainFeatures", "Features"],
+						["basins", "Basins"],
+						["dangerZones", "Danger"],
+						["hotspots", "Hotspots"],
+					] as [ColorMode, string][]).map(([mode, label]) => (
+						<button
+							key={mode}
+							onClick={() => setColorMode(mode)}
+							className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+								colorMode === mode
+									? "bg-white/15 text-white shadow-sm"
+									: "text-slate-400 hover:text-slate-200"
+							}`}
+						>
+							{label}
+						</button>
+					))}
+				</>
+			)}
 			{isClimateMode && (
 				<>
 					<div className="w-px h-4 bg-white/10 mx-0.5" />
 					{([
 						["climate", "Basic"],
-						["koppenClimate", "Koppen"],
 						...(ENABLE_PASTA_CLASSIFICATION ? [["pastaClimate", "Pasta"]] : []),
+						["koppenClimate", "Koppen"],
+						["oceanCurrents", "Currents"],
 					] as [string, string][]).map(([mode, label]) => (
 						<button
 							key={mode}
@@ -212,6 +256,52 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					})}
 				</>
 			)}
+			{colorMode === "population" && (
+				<>
+					<div className="w-px h-4 bg-white/10 mx-0.5" />
+					{([
+						["density", "Density"],
+						["culture", "Culture"],
+						["heritage", "Heritage"],
+						["faith", "Faith"],
+						["religion", "Religion"],
+					] as [PopulationMapMode, string][]).map(([mode, label]) => (
+						<button
+							key={mode}
+							onClick={() => setPopulationMode(mode)}
+							className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+								populationMode === mode
+									? "bg-white/15 text-white shadow-sm"
+									: "text-slate-400 hover:text-slate-200"
+							}`}
+						>
+							{label}
+						</button>
+					))}
+				</>
+			)}
+			{colorMode === "nations" && (
+				<>
+					<div className="w-px h-4 bg-white/10 mx-0.5" />
+					{([
+						["borders", "Borders"],
+						["provinces", "Provinces"],
+					] as [NationMapMode, string][]).map(([mode, label]) => (
+						<button
+							key={mode}
+							onClick={() => setNationMode(mode)}
+							className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+								nationMode === mode
+									? "bg-white/15 text-white shadow-sm"
+									: "text-slate-400 hover:text-slate-200"
+							}`}
+						>
+							{label}
+						</button>
+					))}
+				</>
+			)}
 		</div>
 	</div>
-)
+	)
+}

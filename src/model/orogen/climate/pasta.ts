@@ -1,4 +1,4 @@
-import type { OrogenClimate, OrogenParams, OrogenRainfall, SphereMesh } from "../types"
+import type { OrogenClimate, OrogenHydrology, OrogenParams, OrogenRainfall, SphereMesh } from "../types"
 import { computeMonthlyInsolation } from "./climate"
 import { getDaysPerYear } from "../units"
 
@@ -418,40 +418,6 @@ function gddTotal(gdd: Float64Array, gint: Float64Array, gddAcc: Float64Array, g
 	return allPos ? Infinity : max
 }
 
-// Inlined PET: max(0, temp * 5.5 / 30 * days)
-// Coefficient 5.5/30 ≈ 0.183 aligns closer to Penman-Monteith tropical PET
-// (was 7/30 ≈ 0.233 which overestimated, suppressing tropical rainforest classification)
-function petMonth(temp: number, dpm: number): number {
-	const v = temp * 5.5 / 30 * dpm
-	return v > 0 ? v : 0
-}
-
-function computeAet(temps: Float64Array, rain: Float64Array, petBuf: Float64Array, aetBuf: Float64Array, dpm: number): void {
-	for (let m = 0; m < 12; m++) petBuf[m] = petMonth(temps[m], dpm)
-
-	let soil = 250
-	for (let iter = 0; iter < 20; iter++) {
-		const startSoil = soil
-		for (let m = 0; m < 12; m++) {
-			const p = rain[m]
-			const pe = petBuf[m]
-			if (p >= pe) {
-				soil = soil + (p - pe)
-				if (soil > 500) soil = 500
-				aetBuf[m] = pe
-			} else {
-				const deficit = pe - p
-				const soilEvap = soil > 250
-					? (soil < deficit ? soil : deficit)
-					: (deficit * (soil / 250) < soil ? deficit * (soil / 250) : soil)
-				soil -= soilEvap
-				aetBuf[m] = p + soilEvap
-			}
-		}
-		if (Math.abs(soil - startSoil) < 1) break
-	}
-}
-
 function classifyOcean(
 	temps: Float64Array, insol: Float64Array,
 	mGDDz: Float64Array, mGInt: Float64Array,
@@ -522,8 +488,6 @@ function classifyLand(
 		_landDebug.ar = 0; _landDebug.gar = 0; _landDebug.grs = 0; _landDebug.evr = 0
 		return Z.CI
 	}
-
-	computeAet(temps, rain, petBuf, aetBuf, dpm)
 
 	let petSum = 0, aetSum = 0, petGdd = 0, aetGdd = 0, precGdd = 0, gddWeightSum = 0
 	for (let m = 0; m < 12; m++) {
@@ -701,6 +665,7 @@ export function assignPastaClimate(
 	isLand: Uint8Array,
 	climate: OrogenClimate,
 	rainfall: OrogenRainfall,
+	hydrology: OrogenHydrology,
 	params: OrogenParams,
 	iceThickness?: Float32Array,
 	iceMinMonthly?: Float32Array,
@@ -762,7 +727,12 @@ export function assignPastaClimate(
 			const gddz = gddTotal(mGDDz, mGInt, gddAccBuf, giAccBuf, 1250)
 			debug.gddz[r] = gddz
 		} else {
-			for (let m = 0; m < 12; m++) rain[m] = rainfall.monthly[m * N + r]
+			for (let m = 0; m < 12; m++) {
+				const idx = m * N + r
+				rain[m] = rainfall.monthly[idx]
+				petBuf[m] = climate.pet_monthly[idx]
+				aetBuf[m] = hydrology.aet_monthly[idx]
+			}
 			output[r] = classifyLand(
 				temps, rain, insol,
 				petBuf, aetBuf, mGDD, mGDDz, mGInt, gddAccBuf, giAccBuf,

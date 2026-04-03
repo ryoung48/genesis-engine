@@ -6,7 +6,6 @@
 import type { OrogenProvinces } from "../types"
 import type { OrogenLandmarks } from "./landmarks"
 import { createRng } from "../rng"
-import { meanEdgeLengthKm } from "../units"
 
 // Habitability factors indexed by orogen codes
 
