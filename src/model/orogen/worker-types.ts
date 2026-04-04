@@ -1,4 +1,9 @@
-import type { OrogenNationHierarchy, OrogenParams, OrogenPartition, OrogenProvinces } from "./types"
+import type {
+	OrogenNationHierarchy,
+	OrogenParams,
+	OrogenPartition,
+	OrogenProvinces,
+} from "./types"
 
 export interface SerializedSphereMesh {
 	numRegions: number
@@ -41,8 +46,17 @@ export interface SerializedOrogenWorld {
 	climate?: SerializedOrogenClimate
 	oceanDist?: Float32Array
 	distCoast?: Float32Array
-	rainfall?: { monthly: Float32Array; annual: Float32Array; east: Float32Array; west: Float32Array }
-	hazards?: { earthquake: Float32Array; volcano: Float32Array; danger: Float32Array }
+	rainfall?: {
+		monthly: Float32Array
+		annual: Float32Array
+		east: Float32Array
+		west: Float32Array
+	}
+	hazards?: {
+		earthquake: Float32Array
+		volcano: Float32Array
+		danger: Float32Array
+	}
 	volcanism?: { hotspot: Float32Array }
 	climateZones?: Uint8Array
 	pastaClimate?: Uint8Array
@@ -66,8 +80,27 @@ export interface SerializedOrogenWorld {
 	slopeScore?: Float32Array
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
-	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; flow: Float32Array; flow_monthly: Float32Array; riverId: Int32Array; riverLengthKm: Float32Array; visible: Uint8Array; lakes: Uint8Array; basinId: Int32Array; waterLevel: Float32Array }
-	oceanCurrents?: { oceanWarmth: Float32Array; coastalWarmth: Float32Array; temperatureDelta: Float32Array }
+	rivers?: {
+		lines: [number, number, number, number][][]
+		maxFlow: number
+		minFlow: number
+		flow: Float32Array
+		flow_monthly: Float32Array
+		riverId: Int32Array
+		riverLengthKm: Float32Array
+		visible: Uint8Array
+		lakes: Uint8Array
+		basinId: Int32Array
+		waterLevel: Float32Array
+	}
+	oceanCurrents?: {
+		oceanWarmth: Float32Array
+		coastalWarmth: Float32Array
+		oceanWarmthMonthly?: Float32Array
+		coastalWarmthMonthly?: Float32Array
+		temperatureDeltaMonthly?: Float32Array
+		temperatureDelta: Float32Array
+	}
 	wind?: {
 		wind_east_monthly: Float32Array
 		wind_north_monthly: Float32Array
@@ -88,6 +121,7 @@ export interface SerializedOrogenWorld {
 	population?: {
 		habitability: Float32Array
 		population: Float32Array
+		habitabilityScore: number
 		totalPopulation: number
 	}
 	monthlyTEQ?: Float32Array[]
@@ -95,51 +129,51 @@ export interface SerializedOrogenWorld {
 
 export type OrogenWorkerRequest =
 	| {
-		type: "generate"
-		params: OrogenParams
-	}
+			type: "generate"
+			params: OrogenParams
+	  }
 	| {
-		type: "import"
-		params: {
-			seed: number
-			numPoints: number
-			jitter: number
-			grayscale: Uint8Array
-			imageWidth: number
-			imageHeight: number
-			terrainWarp: number
-			smoothing: number
-			hydraulicErosion: number
-			thermalErosion: number
-			ridgeSharpening: number
-			glacialErosion: number
-			volcanism?: number
-			craters?: number
-			planetRadiusKm?: number
-			obliquity?: number
-			eccentricity?: number
-			sunTempFactor?: number
-			daysPerYear?: number
-			hoursPerDay?: number
-			tidallyLocked?: boolean
-			antistellarLon?: number
-			perihelion?: number
-			pressure?: number
-		}
-	}
+			type: "import"
+			params: {
+				seed: number
+				numPoints: number
+				jitter: number
+				grayscale: Uint8Array
+				imageWidth: number
+				imageHeight: number
+				terrainWarp: number
+				smoothing: number
+				hydraulicErosion: number
+				thermalErosion: number
+				ridgeSharpening: number
+				glacialErosion: number
+				volcanism?: number
+				craters?: number
+				planetRadiusKm?: number
+				obliquity?: number
+				eccentricity?: number
+				sunTempFactor?: number
+				daysPerYear?: number
+				hoursPerDay?: number
+				tidallyLocked?: boolean
+				antistellarLon?: number
+				perihelion?: number
+				pressure?: number
+			}
+	  }
 
 export type OrogenWorkerResponse =
 	| {
-		type: "progress"
-		label: string
-		pct?: number
-	}
+			type: "progress"
+			label: string
+			pct?: number
+	  }
 	| {
-		type: "done"
-		world: SerializedOrogenWorld
-	}
+			type: "done"
+			world: SerializedOrogenWorld
+	  }
 	| {
-		type: "error"
-		message: string
-		stack?: string
-	}
+			type: "error"
+			message: string
+			stack?: string
+	  }

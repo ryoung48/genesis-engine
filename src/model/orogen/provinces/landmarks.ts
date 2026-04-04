@@ -5,7 +5,13 @@
  */
 import type { SphereMesh } from "../types"
 
-export type LandmarkType = "continent" | "island" | "isle" | "ocean" | "sea" | "lake"
+export type LandmarkType =
+	| "continent"
+	| "island"
+	| "isle"
+	| "ocean"
+	| "sea"
+	| "lake"
 
 export interface OrogenLandmarks {
 	/** Per-region landmark index */
@@ -20,11 +26,11 @@ export interface OrogenLandmarks {
 
 export const LANDMARK_TYPES: LandmarkType[] = [
 	"continent", // 0
-	"island",    // 1
-	"isle",      // 2
-	"ocean",     // 3
-	"sea",       // 4
-	"lake",      // 5
+	"island", // 1
+	"isle", // 2
+	"ocean", // 3
+	"sea", // 4
+	"lake", // 5
 ]
 
 const TYPE_CONTINENT = 0

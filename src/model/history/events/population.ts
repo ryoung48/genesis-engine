@@ -1,4 +1,4 @@
-import { mean, scaleLinear } from "d3"
+import { scaleLinear } from "d3"
 import { NATION } from "@/model/nations"
 import { TIME } from "@/model/utilities/time"
 import { PROVINCE } from "../../provinces"

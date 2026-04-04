@@ -3,16 +3,19 @@
  * blankets onto the elevation field. Applied after all terrain post-processing
  * so craters remain crisp and visible.
  */
-import type { SphereMesh } from "./types"
+
 import { createRng } from "./rng"
 import { SimplexNoise } from "./simplex-noise"
+import type { SphereMesh } from "./types"
 
 interface Crater {
-	cx: number; cy: number; cz: number
-	radius: number      // angular radius in radians
-	depth: number       // bowl depth (elevation units)
-	rimHeight: number   // rim elevation boost
-	cosThresh: number   // early-out: cos(radius * 2.5)
+	cx: number
+	cy: number
+	cz: number
+	radius: number // angular radius in radians
+	depth: number // bowl depth (elevation units)
+	rimHeight: number // rim elevation boost
+	cosThresh: number // early-out: cos(radius * 2.5)
 }
 
 export function applyCraters(
@@ -52,11 +55,13 @@ export function applyCraters(
 		const baseRadius = 0.04 + rng.random() * 0.11
 		const radius = baseRadius / Math.sqrt(radiusRatio)
 		// Depth scales with radius (bigger craters are deeper) and intensity
-		const depth = (0.15 + rng.random() * 0.25) * (radius / 0.10) * intensity
+		const depth = (0.15 + rng.random() * 0.25) * (radius / 0.1) * intensity
 		const rimHeight = depth * 0.25
 
 		craters.push({
-			cx, cy, cz,
+			cx,
+			cy,
+			cz,
 			radius,
 			depth,
 			rimHeight,
@@ -85,7 +90,7 @@ export function applyCraters(
 			// Great-circle angular distance + noise warp
 			const angDist = Math.acos(Math.min(1, Math.max(-1, dot)))
 			const d = angDist + warp
-			const t = d / cr.radius  // normalized distance (0 = center, 1 = rim)
+			const t = d / cr.radius // normalized distance (0 = center, 1 = rim)
 
 			let delta = 0
 

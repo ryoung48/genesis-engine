@@ -1,6 +1,6 @@
 import { Cell } from "../../types"
-import { gdm } from "./common"
 import { aet } from "./aridity"
+import { gdm } from "./common"
 
 /**
  * Growth Supply (GrS).

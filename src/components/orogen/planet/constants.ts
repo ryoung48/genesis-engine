@@ -9,7 +9,21 @@ import {
 	DEFAULT_SUN_TEMP_FACTOR,
 } from "@/model/orogen/units"
 
-export const monthLabels = ["Annual", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+export const monthLabels = [
+	"Annual",
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec",
+]
 export const gridSpacingOptions = [30, 15, 10, 5, 2.5]
 export const PLANET_CODE_STORAGE_KEY = "orogen:lastPlanetCode"
 export const RECENT_CODES_STORAGE_KEY = "orogen:recentCodes"
@@ -22,7 +36,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	landDistribution: 0.25,
 	continentSizeVariety: 0.35,
 	landCoverage: 0.3,
-	roughness: 0.40,
+	roughness: 0.4,
 	planetRadiusKm: DEFAULT_PLANET_RADIUS_KM,
 	obliquity: DEFAULT_OBLIQUITY_DEG,
 	eccentricity: DEFAULT_ECCENTRICITY,
@@ -33,8 +47,8 @@ export const DEFAULT_WORLD_PARAMS = {
 	smoothing: 0.1,
 	hydraulicErosion: 0.5,
 	thermalErosion: 0.1,
-	ridgeSharpening: 0.50,
-	glacialErosion: 0.50,
+	ridgeSharpening: 0.5,
+	glacialErosion: 0.5,
 	volcanism: 0.5,
 	craters: 0,
 	tectonicMode: 0,
@@ -46,12 +60,12 @@ export const DEFAULT_WORLD_PARAMS = {
 /** Terrain defaults for stagnant lid mode — overrides only the params that differ */
 export const STAGNANT_TERRAIN_OVERRIDES = {
 	roughness: 0.35,
-	terrainWarp: 0.50,
-	smoothing: 0.20,
+	terrainWarp: 0.5,
+	smoothing: 0.2,
 	hydraulicErosion: 0.25,
 	thermalErosion: 0.15,
 	ridgeSharpening: 0.15,
 	glacialErosion: 0.25,
-	volcanism: 0.60,
+	volcanism: 0.6,
 	craters: 0.25,
 } as const

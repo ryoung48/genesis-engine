@@ -3,7 +3,7 @@
  * Classifies each land cell into a biome and climate zone based on temperature
  * and rainfall, mirroring the logic from src/model/shapers/climate.ts.
  */
-import type { SphereMesh, OrogenClimate, OrogenRainfall } from "../types"
+import type { OrogenClimate, OrogenRainfall, SphereMesh } from "../types"
 
 /**
  * Climate zone codes stored in a Uint8Array:
@@ -17,7 +17,17 @@ import type { SphereMesh, OrogenClimate, OrogenRainfall } from "../types"
  *   7 = infernal
  *   8 = chaotic
  */
-export const CLIMATE_LABELS = ["ocean", "arctic", "subarctic", "boreal", "temperate", "subtropical", "tropical", "infernal", "chaotic"] as const
+export const CLIMATE_LABELS = [
+	"ocean",
+	"arctic",
+	"subarctic",
+	"boreal",
+	"temperate",
+	"subtropical",
+	"tropical",
+	"infernal",
+	"chaotic",
+] as const
 export type ClimateCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 
 export const TEMPERATURE_BOUNDARY_SUBARCTIC = -14
@@ -53,12 +63,17 @@ export function assignClimateZones(
 
 		if (isChaotic) zones[r] = 8
 		else if (isInfernal) zones[r] = 7
-		else if (avg > TEMPERATURE_BOUNDARY_TROPICAL) zones[r] = 6      // tropical
-		else if (avg > TEMPERATURE_BOUNDARY_SUBTROPICAL) zones[r] = 5   // subtropical
-		else if (avg > TEMPERATURE_BOUNDARY_TEMPERATE) zones[r] = 4     // temperate (warm + cool)
-		else if (avg > TEMPERATURE_BOUNDARY_BOREAL) zones[r] = 3        // boreal
-		else if (avg > TEMPERATURE_BOUNDARY_SUBARCTIC) zones[r] = 2        // subarctic
-		else zones[r] = 1                 // arctic
+		else if (avg > TEMPERATURE_BOUNDARY_TROPICAL)
+			zones[r] = 6 // tropical
+		else if (avg > TEMPERATURE_BOUNDARY_SUBTROPICAL)
+			zones[r] = 5 // subtropical
+		else if (avg > TEMPERATURE_BOUNDARY_TEMPERATE)
+			zones[r] = 4 // temperate (warm + cool)
+		else if (avg > TEMPERATURE_BOUNDARY_BOREAL)
+			zones[r] = 3 // boreal
+		else if (avg > TEMPERATURE_BOUNDARY_SUBARCTIC)
+			zones[r] = 2 // subarctic
+		else zones[r] = 1 // arctic
 	}
 
 	return zones
@@ -74,16 +89,24 @@ export function assignClimateZones(
  *   5 = forest
  *   6 = jungle
  */
-export const BIOME_LABELS = ["ocean", "desert", "sparse", "grasslands", "woods", "forest", "jungle"] as const
+export const BIOME_LABELS = [
+	"ocean",
+	"desert",
+	"sparse",
+	"grasslands",
+	"woods",
+	"forest",
+	"jungle",
+] as const
 export type BiomeCode = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
 // Rain thresholds (annual mm) — derived from the existing humidity scale
 export const ARID_RAINFALL_THRESHOLD = 100
-const DRY    = 250
-const LOW    = 500
-const MOD    = 900
-const MOIST  = 1500
-const WET    = 2200
+const DRY = 250
+const LOW = 500
+const MOD = 900
+const MOIST = 1500
+const WET = 2200
 
 /**
  * Assign a biome to each land cell based on temperature zone and annual rainfall.
@@ -116,47 +139,47 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 
 	// Subarctic
 	if (temp <= TEMPERATURE_BOUNDARY_BOREAL) {
-		if (rain > LOW) return 2     // sparse tundra
-		if (rain > DRY) return 2     // sparse
-		return 1                      // desert
+		if (rain > LOW) return 2 // sparse tundra
+		if (rain > DRY) return 2 // sparse
+		return 1 // desert
 	}
 
 	// Boreal
 	if (temp <= TEMPERATURE_BOUNDARY_TEMPERATE) {
-		if (rain > MOD) return 5      // forest (taiga)
-		if (rain > LOW) return 4      // woods
-		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
-		return 1                      // desert
+		if (rain > MOD) return 5 // forest (taiga)
+		if (rain > LOW) return 4 // woods
+		if (rain > DRY) return 3 // grasslands
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+		return 1 // desert
 	}
 
 	// Temperate
 	if (temp <= TEMPERATURE_BOUNDARY_SUBTROPICAL) {
-		if (rain > MOIST) return 5    // forest
-		if (rain > MOD) return 5      // forest
-		if (rain > LOW) return 4      // woods
-		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
-		return 1                      // desert
+		if (rain > MOIST) return 5 // forest
+		if (rain > MOD) return 5 // forest
+		if (rain > LOW) return 4 // woods
+		if (rain > DRY) return 3 // grasslands
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+		return 1 // desert
 	}
 
 	// Subtropical
 	if (temp <= TEMPERATURE_BOUNDARY_TROPICAL) {
-		if (rain > WET) return 6      // jungle
-		if (rain > MOIST) return 5    // forest
-		if (rain > MOD) return 5      // forest
-		if (rain > LOW) return 4      // woods
-		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
-		return 1                      // desert
+		if (rain > WET) return 6 // jungle
+		if (rain > MOIST) return 5 // forest
+		if (rain > MOD) return 5 // forest
+		if (rain > LOW) return 4 // woods
+		if (rain > DRY) return 3 // grasslands
+		if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+		return 1 // desert
 	}
 
 	// Tropical
-	if (rain > WET) return 6          // jungle
-	if (rain > MOIST) return 6        // jungle
-	if (rain > MOD) return 5          // forest
-	if (rain > LOW) return 4          // woods
-	if (rain > DRY) return 3          // grasslands
-	if (rain > ARID_RAINFALL_THRESHOLD) return 2         // sparse
-	return 1                          // desert
+	if (rain > WET) return 6 // jungle
+	if (rain > MOIST) return 6 // jungle
+	if (rain > MOD) return 5 // forest
+	if (rain > LOW) return 4 // woods
+	if (rain > DRY) return 3 // grasslands
+	if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+	return 1 // desert
 }

@@ -301,11 +301,17 @@ export const WarTab: React.FC<WarTabProps> = ({
 											style={{ backgroundColor: dotColor }}
 										/>
 										{tags.secondary ? (
-											<div className="flex truncate border rounded-sm overflow-hidden flex-shrink-0" style={{ borderColor: dotColor }}>
+											<div
+												className="flex truncate border rounded-sm overflow-hidden flex-shrink-0"
+												style={{ borderColor: dotColor }}
+											>
 												<span className="text-[8px] font-bold uppercase px-1.5 py-0.5 bg-gray-100 text-gray-600">
 													{tags.primary}
 												</span>
-												<span className="text-[8px] font-bold uppercase px-1.5 py-0.5 text-white" style={{ backgroundColor: dotColor }}>
+												<span
+													className="text-[8px] font-bold uppercase px-1.5 py-0.5 text-white"
+													style={{ backgroundColor: dotColor }}
+												>
 													{tags.secondary}
 												</span>
 											</div>

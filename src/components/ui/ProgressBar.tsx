@@ -1,5 +1,3 @@
-import React from "react"
-
 export const ProgressBar = ({ progress }: { progress: number }) => {
 	const segments = 40
 	const filled = Math.floor((progress / 100) * segments)

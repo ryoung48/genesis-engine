@@ -4,12 +4,21 @@
  * to construct the dummy BoundaryInfo / DistanceFields that downstream
  * climate + river systems require.
  */
-import type { SphereMesh, BoundaryInfo, DistanceFields, TectonicPlate } from "./types"
+import type {
+	BoundaryInfo,
+	DistanceFields,
+	SphereMesh,
+	TectonicPlate,
+} from "./types"
 
 export function deriveSyntheticPlates(
 	mesh: SphereMesh,
 	elevation: Float32Array,
-): { plateAssignment: Int32Array; plateIds: number[]; plateIsOcean: Set<number> } {
+): {
+	plateAssignment: Int32Array
+	plateIds: number[]
+	plateIsOcean: Set<number>
+} {
 	const N = mesh.numRegions
 	const r_plate = new Int32Array(N).fill(-1)
 	const plateIds: number[] = []
@@ -30,7 +39,7 @@ export function deriveSyntheticPlates(
 			for (let ni = adjOffset[cur], end = adjOffset[cur + 1]; ni < end; ni++) {
 				const nb = adjList[ni]
 				if (r_plate[nb] >= 0) continue
-				if ((elevation[nb] <= 0) === isOcean) {
+				if (elevation[nb] <= 0 === isOcean) {
 					r_plate[nb] = r
 					queue.push(nb)
 				}
@@ -71,7 +80,11 @@ export function buildDummyBoundary(
 			mountain_r.add(r)
 		}
 		if (elevation[r] > 0) {
-			for (let j = mesh.adjOffset[r], jEnd = mesh.adjOffset[r + 1]; j < jEnd; j++) {
+			for (
+				let j = mesh.adjOffset[r], jEnd = mesh.adjOffset[r + 1];
+				j < jEnd;
+				j++
+			) {
 				if (elevation[mesh.adjList[j]] <= 0) {
 					coastline_r.add(r)
 					break
@@ -106,7 +119,7 @@ export function computeSimpleDistanceFields(
 	for (let r = 0; r < N; r++) {
 		const isOcean = elevation[r] <= 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			if ((elevation[adjList[j]] <= 0) !== isOcean) {
+			if (elevation[adjList[j]] <= 0 !== isOcean) {
 				distCoast[r] = 0
 				coastQueue.push(r)
 				if (!isOcean) {

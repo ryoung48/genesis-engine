@@ -52,7 +52,7 @@ export interface PlateVec {
 export type TectonicMode = "active" | "stagnant"
 
 export interface OrogenParams {
-	tectonicMode?: TectonicMode
+	tectonicMode?: TectonicMode | 0 | 1
 	seed: number
 	numPoints: number
 	numPlates: number
@@ -68,9 +68,9 @@ export interface OrogenParams {
 	ridgeSharpening: number
 	glacialErosion: number
 	volcanism?: number
-	craters?: number           // 0 = none, 1 = heavily cratered
+	craters?: number // 0 = none, 1 = heavily cratered
 	planetRadiusKm?: number
-	obliquity?: number    // axial tilt in degrees, default 23.5
+	obliquity?: number // axial tilt in degrees, default 23.5
 	eccentricity?: number // orbital eccentricity, default 0.0167
 	sunTempFactor?: number // stellar temperature factor, 1.0 = Sol
 	daysPerYear?: number // orbital year length in local days, default 365
@@ -127,7 +127,8 @@ export const OROGEN_TERRAIN_FEATURE_LABELS = [
 	"island arc",
 ] as const
 
-export type OrogenTerrainFeatureId = typeof OROGEN_TERRAIN_FEATURE_LABELS[number]
+export type OrogenTerrainFeatureId =
+	(typeof OROGEN_TERRAIN_FEATURE_LABELS)[number]
 
 export const OROGEN_TERRAIN_FEATURE = {
 	RIFT_VALLEY: 1,
@@ -159,15 +160,15 @@ export interface SuperPlateData {
 }
 
 export interface OrogenClimate {
-	temperature_avg: Float32Array   // per-cell annual mean °C
-	temperature_min: Float32Array   // per-cell annual min °C
-	temperature_max: Float32Array   // per-cell annual max °C
+	temperature_avg: Float32Array // per-cell annual mean °C
+	temperature_min: Float32Array // per-cell annual min °C
+	temperature_max: Float32Array // per-cell annual max °C
 	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
 	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temp range °C (for Hargreaves td)
 	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
-	landFraction: number[]          // 36-band land fraction used by EBM
+	landFraction: number[] // 36-band land fraction used by EBM
 }
 
 export interface OrogenOceanCurrents {
@@ -175,6 +176,12 @@ export interface OrogenOceanCurrents {
 	oceanWarmth: Float32Array
 	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean/deep interior. */
 	coastalWarmth: Float32Array
+	/** Per-cell monthly ocean warmth, flattened [month * N + r]. Optional seasonal field. */
+	oceanWarmthMonthly?: Float32Array
+	/** Per-cell monthly coastal warmth, flattened [month * N + r]. Optional seasonal field. */
+	coastalWarmthMonthly?: Float32Array
+	/** Per-cell monthly temperature delta applied by ocean currents, flattened [month * N + r]. */
+	temperatureDeltaMonthly?: Float32Array
 	/** Per-cell temperature delta applied by ocean currents (°C). Zero where no effect. */
 	temperatureDelta: Float32Array
 }
@@ -189,10 +196,10 @@ export interface OrogenWind {
 }
 
 export interface OrogenRainfall {
-	monthly: Float32Array   // [month * N + r] mm
-	annual: Float32Array    // per-cell annual mm
-	east: Float32Array      // per-cell normalized east moisture (0–1)
-	west: Float32Array      // per-cell normalized west moisture (0–1)
+	monthly: Float32Array // [month * N + r] mm
+	annual: Float32Array // per-cell annual mm
+	east: Float32Array // per-cell normalized east moisture (0–1)
+	west: Float32Array // per-cell normalized west moisture (0–1)
 }
 
 export interface OrogenHydrology {
@@ -293,7 +300,6 @@ export interface OrogenRivers {
 	/** Per-cell water surface elevation (only meaningful for lake cells) */
 	waterLevel: Float32Array
 }
-
 
 export const OROGEN_TOPOGRAPHY_LABELS = [
 	"flat",

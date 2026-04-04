@@ -1,6 +1,6 @@
+import { TEXT } from "@/model/utilities/text"
 import { LANGUAGE } from "./languages"
 import { Language } from "./languages/types"
-import { TEXT } from "@/model/utilities/text"
 
 /**
  * Lazily generate and cache names for provinces and nations
@@ -25,7 +25,9 @@ export const NAMES = {
 		if (cached) return cached
 		const lang = langFor(provinceIdx)
 		if (!lang) return `#${provinceIdx}`
-		const name = TEXT.titleCase(LANGUAGE.word.unique({ lang, key: "settlement" }).word)
+		const name = TEXT.titleCase(
+			LANGUAGE.word.unique({ lang, key: "settlement" }).word,
+		)
 		_provinceNames.set(provinceIdx, name)
 		return name
 	},
@@ -34,7 +36,9 @@ export const NAMES = {
 		if (cached) return cached
 		const lang = langFor(capitalIdx)
 		if (!lang) return `#${capitalIdx}`
-		const name = TEXT.titleCase(LANGUAGE.word.unique({ lang, key: "region" }).word)
+		const name = TEXT.titleCase(
+			LANGUAGE.word.unique({ lang, key: "region" }).word,
+		)
 		_nationNames.set(capitalIdx, name)
 		return name
 	},
@@ -43,7 +47,9 @@ export const NAMES = {
 		if (cached) return cached
 		const lang = langFor(provinceIdx)
 		if (!lang) return `River #${provinceIdx}`
-		const name = TEXT.titleCase(LANGUAGE.word.unique({ lang, key: "river" }).word)
+		const name = TEXT.titleCase(
+			LANGUAGE.word.unique({ lang, key: "river" }).word,
+		)
 		_riverNames.set(provinceIdx, name)
 		return name
 	},
@@ -52,7 +58,9 @@ export const NAMES = {
 		if (cached) return cached
 		const lang = langFor(provinceIdx)
 		if (!lang) return `Mount #${provinceIdx}`
-		const name = TEXT.titleCase(LANGUAGE.word.unique({ lang, key: "mountain" }).word)
+		const name = TEXT.titleCase(
+			LANGUAGE.word.unique({ lang, key: "mountain" }).word,
+		)
 		_mountainNames.set(provinceIdx, name)
 		return name
 	},

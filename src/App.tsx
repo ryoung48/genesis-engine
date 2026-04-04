@@ -1,13 +1,25 @@
-import React, { useEffect, useState } from "react"
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom"
-import { LoadingScreen } from "./components/loading/LoadingScreen"
-import { GenesisEngine } from "./components/landing/GenesisEngine"
+import { useEffect, useState } from "react"
+import {
+	Navigate,
+	Route,
+	Routes,
+	useLocation,
+	useNavigate,
+} from "react-router-dom"
+import {
+	GenesisEngine,
+	type PreviewTab,
+} from "./components/landing/GenesisEngine"
 import { LanguageLab } from "./components/landing/LanguageLab"
+import { LoadingScreen } from "./components/loading/LoadingScreen"
 import { OrogenView } from "./components/orogen"
 import WorldMap from "./components/world"
 import { EARTH_DEFAULTS, LOADING_STEPS } from "./constants/app"
 import { useEbmPreview } from "./hooks/useEbmPreview"
-import { type HeightmapPreset, useWorldGeneration } from "./hooks/useWorldGeneration"
+import {
+	type HeightmapPreset,
+	useWorldGeneration,
+} from "./hooks/useWorldGeneration"
 import type { ViewState } from "./types/app"
 
 function getViewForPath(pathname: string): ViewState {
@@ -19,23 +31,27 @@ function getViewForPath(pathname: string): ViewState {
 function App() {
 	const navigate = useNavigate()
 	const location = useLocation()
-	const [view, setView] = useState<ViewState>(() => getViewForPath(location.pathname))
+	const [view, setView] = useState<ViewState>(() =>
+		getViewForPath(location.pathname),
+	)
 	const [seed, setSeed] = useState(
 		() => localStorage.getItem("chaos-machine-last-seed") || "",
 	)
 	const [obliquity, setObliquity] = useState(EARTH_DEFAULTS.obliquity)
 	const [eccentricity, setEccentricity] = useState(EARTH_DEFAULTS.eccentricity)
 	const [perihelion, setPerihelion] = useState(EARTH_DEFAULTS.perihelion)
-	const [sunTempFactor, setSunTempFactor] = useState(EARTH_DEFAULTS.sunTempFactor)
+	const [sunTempFactor, setSunTempFactor] = useState(
+		EARTH_DEFAULTS.sunTempFactor,
+	)
 	const [hoursPerDay, setHoursPerDay] = useState(EARTH_DEFAULTS.hoursPerDay)
 	const [daysPerYear, setDaysPerYear] = useState(EARTH_DEFAULTS.daysPerYear)
 	const [landFraction, setLandFraction] = useState(EARTH_DEFAULTS.landFraction)
 	const [radiusFactor, setRadiusFactor] = useState(EARTH_DEFAULTS.radiusFactor)
 	const [pressure, setPressure] = useState(EARTH_DEFAULTS.pressure)
-	const [heightmap, setHeightmap] = useState<HeightmapPreset | undefined>(undefined)
-	const [previewTab, setPreviewTab] = useState<
-		"temperature" | "insolation" | "daylight" | "circulation" | "wind" | "language"
-	>("temperature")
+	const [heightmap, setHeightmap] = useState<HeightmapPreset | undefined>(
+		undefined,
+	)
+	const [previewTab, setPreviewTab] = useState<PreviewTab>("temperature")
 
 	const ebmPreview = useEbmPreview({
 		obliquity,

@@ -1,4 +1,3 @@
-import { WORLD } from "@/model"
 import { CoastSegment } from "@/model/shapers/display/types"
 import { DRAW_BORDERS } from "../coloration"
 import { MAP_SHAPES } from "../shapes"
@@ -156,7 +155,9 @@ export const DRAW_LANDMARKS = {
 			ctx.fillStyle = "#c1c1c1" // land gray
 		}
 		ctx.beginPath()
-		ctx.fill(new Path2D(MAP_SHAPES.path.curveClosed(projection)({ type: "Sphere" })))
+		ctx.fill(
+			new Path2D(MAP_SHAPES.path.curveClosed(projection)({ type: "Sphere" })),
+		)
 		ctx.restore()
 
 		// If background is land, fill depth-0 provinces immediately
@@ -228,13 +229,33 @@ export const DRAW_LANDMARKS = {
 
 			// 1) Fill water bodies (ocean and non-ocean separately)
 			if (waterAtDepth.length > 0) {
-				const oceanSegs = waterAtDepth.filter((seg) => landmarks[seg.idx]?.type === "ocean")
-				const freshSegs = waterAtDepth.filter((seg) => landmarks[seg.idx]?.type !== "ocean")
+				const oceanSegs = waterAtDepth.filter(
+					(seg) => landmarks[seg.idx]?.type === "ocean",
+				)
+				const freshSegs = waterAtDepth.filter(
+					(seg) => landmarks[seg.idx]?.type !== "ocean",
+				)
 				if (oceanSegs.length > 0) {
-					drawWaves({ ctx, segments: oceanSegs, scale, linear, curvePath, waterStyle: styles.oceans, fill: true })
+					drawWaves({
+						ctx,
+						segments: oceanSegs,
+						scale,
+						linear,
+						curvePath,
+						waterStyle: styles.oceans,
+						fill: true,
+					})
 				}
 				if (freshSegs.length > 0) {
-					drawWaves({ ctx, segments: freshSegs, scale, linear, curvePath, waterStyle: styles.lakes, fill: true })
+					drawWaves({
+						ctx,
+						segments: freshSegs,
+						scale,
+						linear,
+						curvePath,
+						waterStyle: styles.lakes,
+						fill: true,
+					})
 				}
 			}
 
@@ -242,8 +263,16 @@ export const DRAW_LANDMARKS = {
 			waterAtDepth
 				.filter((seg) => landmarks[seg.idx]?.type === "ocean")
 				.forEach((seg) => {
-					const clip = MAP_SHAPES.polygon({ points: seg.path, path: curvePath, direction: "inner" })
-					const edge = MAP_SHAPES.polygon({ points: seg.path, path: linear, direction: "inner" })
+					const clip = MAP_SHAPES.polygon({
+						points: seg.path,
+						path: curvePath,
+						direction: "inner",
+					})
+					const edge = MAP_SHAPES.polygon({
+						points: seg.path,
+						path: linear,
+						direction: "inner",
+					})
 					drawClippedWaves(clip, edge, styles.oceans)
 				})
 
@@ -264,11 +293,25 @@ export const DRAW_LANDMARKS = {
 					const parent = landmarks[seg.idx]?.parent
 					const parentSeg = lakes[parent!]
 
-					const parentClip = MAP_SHAPES.polygon({ points: parentSeg.path, path: curvePath, direction: "inner" })
-					const islandClip = MAP_SHAPES.polygon({ points: seg.path, path: curvePath, direction: "inner" })
-					const edge = MAP_SHAPES.polygon({ points: seg.path, path: linear, direction: "inner" })
-					const segStyle = landmarks[parentSeg.idx]?.type === "ocean"
-						? styles.oceans : styles.lakes
+					const parentClip = MAP_SHAPES.polygon({
+						points: parentSeg.path,
+						path: curvePath,
+						direction: "inner",
+					})
+					const islandClip = MAP_SHAPES.polygon({
+						points: seg.path,
+						path: curvePath,
+						direction: "inner",
+					})
+					const edge = MAP_SHAPES.polygon({
+						points: seg.path,
+						path: linear,
+						direction: "inner",
+					})
+					const segStyle =
+						landmarks[parentSeg.idx]?.type === "ocean"
+							? styles.oceans
+							: styles.lakes
 
 					const waterOnly = new Path2D()
 					waterOnly.addPath(parentClip)

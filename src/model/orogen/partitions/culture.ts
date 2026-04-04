@@ -2,7 +2,10 @@ import type { OrogenPartition, OrogenProvinces } from "../types"
 import { computeGraphPartition } from "./shared"
 
 export function computeCultures(
-	provinces: Pick<OrogenProvinces, "count" | "desolate" | "adjOffset" | "adjList">,
+	provinces: Pick<
+		OrogenProvinces,
+		"count" | "desolate" | "adjOffset" | "adjList"
+	>,
 	seed: number,
 ): OrogenPartition {
 	const active = new Uint8Array(provinces.count)

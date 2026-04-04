@@ -5,9 +5,10 @@
  * Pressure controls coverage (not thickness): at 1 bar looks normal, at 0.5 bar sparse,
  * at 10 bar clouds everywhere but not thicker.
  */
+
+import { SimplexNoise } from "../simplex-noise"
 import type { OrogenParams, OrogenRainfall } from "../types"
 import { getSubstellarDir, isTidallyLocked } from "../units"
-import { SimplexNoise } from "../simplex-noise"
 
 function norm(v: number): number {
 	return Math.max(-1, Math.min(1, v))
@@ -22,20 +23,25 @@ function tangentFrame(x: number, y: number, z: number) {
 	let ex: number, ey: number, ez: number
 	if (Math.abs(z) < 0.99) {
 		const m = Math.sqrt(x * x + y * y) || 1
-		ex = y / m; ey = -x / m; ez = 0
+		ex = y / m
+		ey = -x / m
+		ez = 0
 	} else {
 		const m = Math.sqrt(z * z + x * x) || 1
-		ex = -z / m; ey = 0; ez = x / m
+		ex = -z / m
+		ey = 0
+		ez = x / m
 	}
 	return {
-		ex, ey, ez,
+		ex,
+		ey,
+		ez,
 		nx: y * ez - z * ey,
 		ny: z * ex - x * ez,
 		nz: x * ey - y * ex,
 	}
 }
 
-const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
 const TEQ_NUM_BINS = 120
 
@@ -45,7 +51,8 @@ function tidalCloudEnvelope(thetaDeg: number): number {
 	const cap = 1 - smoothstep(15, 40, thetaDeg) * 0.5
 
 	// Terminator condensation ring: peaks ~85deg
-	const ring = smoothstep(60, 80, thetaDeg) * (1 - smoothstep(95, 115, thetaDeg))
+	const ring =
+		smoothstep(60, 80, thetaDeg) * (1 - smoothstep(95, 115, thetaDeg))
 
 	// Nightside suppression: sinking air, clear skies
 	const nightFade = 1 - smoothstep(95, 130, thetaDeg)
@@ -63,11 +70,11 @@ function computeTidalClouds(
 	const { r_xyz } = mesh
 	const seed = params.seed
 
-	const frontNoise     = new SimplexNoise(seed + 6000)
-	const detailNoise    = new SimplexNoise(seed + 6001)
-	const warpTanNoise   = new SimplexNoise(seed + 6003)
-	const warpRadNoise   = new SimplexNoise(seed + 6004)
-	const coverageNoise  = new SimplexNoise(seed + 6008)
+	const frontNoise = new SimplexNoise(seed + 6000)
+	const detailNoise = new SimplexNoise(seed + 6001)
+	const warpTanNoise = new SimplexNoise(seed + 6003)
+	const warpRadNoise = new SimplexNoise(seed + 6004)
+	const coverageNoise = new SimplexNoise(seed + 6008)
 
 	const sub = getSubstellarDir(params.antistellarLon)
 	const clouds = new Float32Array(N)
@@ -94,15 +101,20 @@ function computeTidalClouds(
 		const thetaDeg = theta * RAD2DEG
 
 		const envelope = tidalCloudEnvelope(thetaDeg)
-		if (envelope < 0.01) { clouds[r] = 0; continue }
+		if (envelope < 0.01) {
+			clouds[r] = 0
+			continue
+		}
 
 		// Radial stretching: compress along substellar axis,
 		// stretch perpendicular to create concentric ring patterns
 		const stretch = 1.3 + 1.5 * Math.pow(Math.sin(theta + 0.1), 1.2)
 		const invS = 1 / stretch
 		// Decompose position into substellar-axis and perpendicular components
-		const axial = cosTheta  // component along substellar axis
-		const px = x - axial * sub[0], py = y - axial * sub[1], pz = z - axial * sub[2]
+		const axial = cosTheta // component along substellar axis
+		const px = x - axial * sub[0],
+			py = y - axial * sub[1],
+			pz = z - axial * sub[2]
 		// Stretched coords: compress axial, stretch perpendicular
 		const sx = sub[0] * axial * invS + px * stretch
 		const sy = sub[1] * axial * invS + py * stretch
@@ -110,14 +122,34 @@ function computeTidalClouds(
 
 		// Domain warp in radial/tangential frame relative to substellar axis
 		const perpLen = Math.sqrt(px * px + py * py + pz * pz) || 1
-		const radX = px / perpLen, radY = py / perpLen, radZ = pz / perpLen
+		const radX = px / perpLen,
+			radY = py / perpLen,
+			radZ = pz / perpLen
 		// Tangential = cross(position, radial)
 		const tanX = y * radZ - z * radY
 		const tanY = z * radX - x * radZ
 		const tanZ = x * radY - y * radX
 
-		const dTan = norm(warpTanNoise.fbm(sx * 1.8 + 31.7, sy * 1.8 + 47.3, sz * 1.8 + 19.1, 4, 0.5)) * 0.28
-		const dRad = norm(warpRadNoise.fbm(sx * 1.8 + 73.1, sy * 1.8 + 11.9, sz * 1.8 + 59.3, 4, 0.5)) * 0.15
+		const dTan =
+			norm(
+				warpTanNoise.fbm(
+					sx * 1.8 + 31.7,
+					sy * 1.8 + 47.3,
+					sz * 1.8 + 19.1,
+					4,
+					0.5,
+				),
+			) * 0.28
+		const dRad =
+			norm(
+				warpRadNoise.fbm(
+					sx * 1.8 + 73.1,
+					sy * 1.8 + 11.9,
+					sz * 1.8 + 59.3,
+					4,
+					0.5,
+				),
+			) * 0.15
 
 		const wx = sx + tanX * dTan + radX * dRad
 		const wy = sy + tanY * dTan + radY * dRad
@@ -135,8 +167,14 @@ function computeTidalClouds(
 		cloud *= detail * 0.25 + 0.75
 
 		// Coverage variation
-		const cov = norm(coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5))
-		cloud *= smoothstep(-0.6 - coverageBase * 0.5, 0.2 - coverageBase * 0.5, cov)
+		const cov = norm(
+			coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5),
+		)
+		cloud *= smoothstep(
+			-0.6 - coverageBase * 0.5,
+			0.2 - coverageBase * 0.5,
+			cov,
+		)
 
 		// Dry-land suppression
 		if (isLand[r]) {
@@ -165,11 +203,11 @@ export function computeClouds(
 	const { r_xyz } = mesh
 	const seed = params.seed
 
-	const frontNoise     = new SimplexNoise(seed + 6000)
-	const detailNoise    = new SimplexNoise(seed + 6001)
-	const warpEastNoise  = new SimplexNoise(seed + 6003)
+	const frontNoise = new SimplexNoise(seed + 6000)
+	const detailNoise = new SimplexNoise(seed + 6001)
+	const warpEastNoise = new SimplexNoise(seed + 6003)
 	const warpNorthNoise = new SimplexNoise(seed + 6004)
-	const coverageNoise  = new SimplexNoise(seed + 6008)
+	const coverageNoise = new SimplexNoise(seed + 6008)
 
 	const clouds = new Float32Array(N)
 
@@ -193,14 +231,12 @@ export function computeClouds(
 
 	// Coverage threshold: higher = fewer clouds pass, lower = more coverage
 	// At p=1: ~0 (normal), p=0.5: ~+0.25 (sparser), p=10: ~-0.35 (everywhere)
-	const logPressure = Math.log2(Math.max(0.1, pressure))  // -3.3 at 0.1, 0 at 1, 3.3 at 10
-	const coverageShift = logPressure * 0.1                   // -0.33 at 0.1, 0 at 1, +0.33 at 10
+	const logPressure = Math.log2(Math.max(0.1, pressure)) // -3.3 at 0.1, 0 at 1, 3.3 at 10
+	const coverageShift = logPressure * 0.1 // -0.33 at 0.1, 0 at 1, +0.33 at 10
 	const coverageBase = coverageShift - 0.1 * oceanMoisture // wetter worlds → slightly more coverage
 
 	// Dry-land suppression weakens at high pressure
 	const dryLandMin = Math.min(1, 0.15 * Math.max(0, logPressure))
-
-	const lonBinWidth = 360 / TEQ_NUM_BINS
 
 	for (let r = 0; r < N; r++) {
 		const x = r_xyz[3 * r]
@@ -213,11 +249,31 @@ export function computeClouds(
 		// Zonally stretched coords (compress x,y / stretch z — no atan2 seam)
 		const stretch = 1.3 + 1.5 * Math.pow(Math.sin(absLatRad + 0.1), 1.2)
 		const invS = 1 / stretch
-		const sx = x * invS, sy = y * invS, sz = z * stretch
+		const sx = x * invS,
+			sy = y * invS,
+			sz = z * stretch
 
 		// Asymmetric domain warp — streaky along bands, organic across
-		const dE = norm(warpEastNoise.fbm(sx * 1.8 + 31.7, sy * 1.8 + 47.3, sz * 1.8 + 19.1, 4, 0.5)) * 0.28
-		const dN = norm(warpNorthNoise.fbm(sx * 1.8 + 73.1, sy * 1.8 + 11.9, sz * 1.8 + 59.3, 4, 0.5)) * 0.15
+		const dE =
+			norm(
+				warpEastNoise.fbm(
+					sx * 1.8 + 31.7,
+					sy * 1.8 + 47.3,
+					sz * 1.8 + 19.1,
+					4,
+					0.5,
+				),
+			) * 0.28
+		const dN =
+			norm(
+				warpNorthNoise.fbm(
+					sx * 1.8 + 73.1,
+					sy * 1.8 + 11.9,
+					sz * 1.8 + 59.3,
+					4,
+					0.5,
+				),
+			) * 0.15
 		const wx = sx + ex * dE + nx * dN
 		const wy = sy + ey * dE + ny * dN
 		const wz = sz + ez * dE + nz * dN
@@ -231,8 +287,14 @@ export function computeClouds(
 		cloud *= detail * 0.25 + 0.75
 
 		// Coverage variation — breaks up uniform regions
-		const cov = norm(coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5))
-		cloud *= smoothstep(-0.6 - coverageBase * 0.5, 0.2 - coverageBase * 0.5, cov)
+		const cov = norm(
+			coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5),
+		)
+		cloud *= smoothstep(
+			-0.6 - coverageBase * 0.5,
+			0.2 - coverageBase * 0.5,
+			cov,
+		)
 
 		// Dry-land suppression
 		if (isLand[r]) {

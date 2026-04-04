@@ -33,10 +33,11 @@ export const MapModeButtons: React.FC<MapModeButtonsProps> = ({
 				<button
 					key={option.mode}
 					onClick={() => setMapMode(option.mode as MapMode)}
-					className={`px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors outline-none cursor-pointer ${mapMode === option.mode
+					className={`px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider transition-colors outline-none cursor-pointer ${
+						mapMode === option.mode
 							? "bg-slate-900 text-white"
 							: "bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-						}`}
+					}`}
 					title={option.fullLabel}
 				>
 					{option.label}

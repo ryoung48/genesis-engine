@@ -96,7 +96,7 @@ export function computeIceAccumulation(
 					// Also accumulate more near coast (fast ice is thicker)
 					const cb = coastBoost[r]
 					const freezeThresh = -2 + cb * 3 // -2°C open ocean → +1°C at coast
-					const accumRate = 10 + cb * 8     // 10mm open ocean → 18mm at coast
+					const accumRate = 10 + cb * 8 // 10mm open ocean → 18mm at coast
 
 					if (temp < freezeThresh) {
 						ice[r] += accumRate

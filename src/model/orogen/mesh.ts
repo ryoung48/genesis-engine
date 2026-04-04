@@ -4,8 +4,8 @@
  * Faithful port of orogen's sphere-mesh.js.
  */
 import Delaunator from "delaunator"
-import type { SphereMesh } from "./types"
 import type { OrogenRng } from "./rng"
+import type { SphereMesh } from "./types"
 
 /**
  * Fibonacci sphere with jitter — evenly-distributed points on a unit sphere.
@@ -30,9 +30,8 @@ function generateFibonacciSphere(
 		if (jitter > 0) {
 			const jLat = rng.random() - rng.random()
 			const jLon = rng.random() - rng.random()
-			const nextZ = Math.max(-1, z - ((dz * 2 * Math.PI * r) / s))
-			latDeg +=
-				jitter * jLat * (latDeg - (Math.asin(nextZ) * 180) / Math.PI)
+			const nextZ = Math.max(-1, z - (dz * 2 * Math.PI * r) / s)
+			latDeg += jitter * jLat * (latDeg - (Math.asin(nextZ) * 180) / Math.PI)
 			lonDeg += jitter * jLon * ((s / r) * (180 / Math.PI))
 		}
 

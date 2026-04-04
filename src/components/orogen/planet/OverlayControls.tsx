@@ -25,16 +25,26 @@ interface OverlayControlsProps {
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
-	overlaysExpanded, setOverlaysExpanded,
-	isMeasuring, setIsMeasuring,
-	showWireframe, setShowWireframe,
-	showRivers, setShowRivers,
-	showClouds, setShowClouds,
-	showThermalEquator, setShowThermalEquator,
-	showGrid, setShowGrid,
-	showNationBorders, setShowNationBorders,
-	gridSpacing, setGridSpacing,
-	sidebarOpen, onToggleSidebar,
+	overlaysExpanded,
+	setOverlaysExpanded,
+	isMeasuring,
+	setIsMeasuring,
+	showWireframe,
+	setShowWireframe,
+	showRivers,
+	setShowRivers,
+	showClouds,
+	setShowClouds,
+	showThermalEquator,
+	setShowThermalEquator,
+	showGrid,
+	setShowGrid,
+	showNationBorders,
+	setShowNationBorders,
+	gridSpacing,
+	setGridSpacing,
+	sidebarOpen,
+	onToggleSidebar,
 }) => (
 	<div className="absolute bottom-3 left-3 z-20 pointer-events-none">
 		<div className="pointer-events-auto flex flex-col items-start gap-2">
@@ -115,7 +125,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 							/>
 						</label>
-						<div className={showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"}>
+						<div
+							className={showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"}
+						>
 							<div className="flex justify-between items-baseline">
 								<label className="text-[11px] font-medium text-slate-300">
 									Grid Spacing
@@ -130,7 +142,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								max={gridSpacingOptions.length - 1}
 								step={1}
 								value={Math.max(0, gridSpacingOptions.indexOf(gridSpacing))}
-								onChange={(e) => setGridSpacing(gridSpacingOptions[Number(e.target.value)] ?? gridSpacingOptions[0])}
+								onChange={(e) =>
+									setGridSpacing(
+										gridSpacingOptions[Number(e.target.value)] ??
+											gridSpacingOptions[0],
+									)
+								}
 								disabled={!showGrid}
 								className="w-full accent-slate-100 disabled:cursor-not-allowed"
 							/>
@@ -145,9 +162,25 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 						title="Show sidebar"
 						className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/80 text-slate-200 shadow-lg backdrop-blur-md transition-all hover:bg-slate-950/95"
 					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-white">
-							<circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-							<path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" strokeWidth="1.5" />
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							className="text-white"
+						>
+							<circle
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								strokeWidth="2"
+							/>
+							<path
+								d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+								stroke="currentColor"
+								strokeWidth="1.5"
+							/>
 						</svg>
 					</button>
 				)}
@@ -160,7 +193,17 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 							: "border-white/10 bg-slate-950/80 text-slate-200 hover:bg-slate-950/95"
 					} backdrop-blur-md`}
 				>
-					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.5"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						aria-hidden="true"
+					>
 						<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
 						<path d="M4.5 2.5v11M8 2.5v11M11.5 2.5v11" opacity="0.45" />
 					</svg>

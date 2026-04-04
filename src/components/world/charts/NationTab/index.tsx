@@ -6,17 +6,20 @@ import { RELATIONS } from "@/model/nations/relations"
 import { Relation } from "@/model/nations/relations/types"
 import { WAR } from "@/model/nations/wars"
 import { PROVINCE } from "@/model/provinces"
+import { LEADER } from "@/model/provinces/leader"
 import { Province } from "@/model/provinces/types"
-import { MATH } from "@/model/utilities/math"
 import { TEXT } from "@/model/utilities/text"
 import { TIME } from "@/model/utilities/time"
 import { MAP_METRICS } from "../../shapes/metrics"
 import { Column, SortableTable } from "../SortableTable"
 import { Tabs } from "../Tabs"
 import { DistributionChart } from "./DistributionChart"
-import { getDisplayTags, getEventDescription, getEventDotColor } from "./EventDetails"
+import {
+	getDisplayTags,
+	getEventDescription,
+	getEventDotColor,
+} from "./EventDetails"
 import { NationLink } from "./NationLink"
-import { LEADER } from "@/model/provinces/leader"
 
 interface NationTabProps {
 	selectedNation: number | null
@@ -51,13 +54,19 @@ export const NationTab: React.FC<NationTabProps> = ({
 	const leaderName = NAMES.leader(selectedNation ?? -1, renderTime)
 	const dynastyIdx = capital ? LEADER.dynasty.get(capital, renderTime) : -1
 	const dynastyName = dynastyIdx >= 0 ? NAMES.dynasty(dynastyIdx) : ""
-	const leaderEntry = capital?._leader.find(
-		(e) => e.time <= renderTime && e.end > renderTime,
-	) ?? capital?._leader[capital._leader.length - 1]
-	const leaderAge = leaderEntry?.birthTime !== undefined
-		? Math.max(0, Math.round(TIME.date.diffYears(renderTime, leaderEntry.birthTime)))
-		: null
-	const formattedLeader = dynastyName ? `${leaderName} ${dynastyName}` : leaderName
+	const leaderEntry =
+		capital?._leader.find((e) => e.time <= renderTime && e.end > renderTime) ??
+		capital?._leader[capital._leader.length - 1]
+	const leaderAge =
+		leaderEntry?.birthTime !== undefined
+			? Math.max(
+					0,
+					Math.round(TIME.date.diffYears(renderTime, leaderEntry.birthTime)),
+				)
+			: null
+	const formattedLeader = dynastyName
+		? `${leaderName} ${dynastyName}`
+		: leaderName
 
 	if (selectedNation === null || !province) {
 		return (
@@ -101,7 +110,9 @@ export const NationTab: React.FC<NationTabProps> = ({
 				// All events for this nation, sorted by time
 				let allEvents = (window.world?.past || [])
 					.filter((e: HistoryNote) => e.agents.includes(selectedNation))
-					.sort((a: HistoryNote, b: HistoryNote) => a.time - b.time) as HistoryNote[]
+					.sort(
+						(a: HistoryNote, b: HistoryNote) => a.time - b.time,
+					) as HistoryNote[]
 
 				// Group related tags for filters
 				const TAG_GROUPS: Record<string, string> = {
@@ -113,12 +124,14 @@ export const NationTab: React.FC<NationTabProps> = ({
 				const getGroup = (tag: string) => TAG_GROUPS[tag] || tag
 
 				// Unique groups for filter chips
-				const availableTags = Array.from(new Set(allEvents.map((e) => getGroup(e.tag))))
+				const availableTags = Array.from(
+					new Set(allEvents.map((e) => getGroup(e.tag))),
+				)
 
 				// Apply filter if selected
 				const allRawEvents = allEvents
 				if (selectedTag) {
-					allEvents = allEvents.filter(e => getGroup(e.tag) === selectedTag)
+					allEvents = allEvents.filter((e) => getGroup(e.tag) === selectedTag)
 				}
 
 				// Find the split point: events at, before, and after renderTime
@@ -155,11 +168,17 @@ export const NationTab: React.FC<NationTabProps> = ({
 									{dateStr}
 								</button>
 								{tags.secondary ? (
-									<div className="flex truncate border rounded-sm overflow-hidden" style={{ borderColor: dotColor }}>
+									<div
+										className="flex truncate border rounded-sm overflow-hidden"
+										style={{ borderColor: dotColor }}
+									>
 										<span className="text-[8px] font-bold uppercase px-1.5 py-0.5 bg-gray-100 text-gray-600">
 											{tags.primary}
 										</span>
-										<span className="text-[8px] font-bold uppercase px-1.5 py-0.5 text-white" style={{ backgroundColor: dotColor }}>
+										<span
+											className="text-[8px] font-bold uppercase px-1.5 py-0.5 text-white"
+											style={{ backgroundColor: dotColor }}
+										>
 											{tags.secondary}
 										</span>
 									</div>
@@ -197,10 +216,11 @@ export const NationTab: React.FC<NationTabProps> = ({
 						{availableTags.length > 0 && (
 							<div className="flex flex-wrap gap-1 mb-3 pt-1">
 								<button
-									className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${selectedTag === null
-										? "bg-indigo-100 border-indigo-200 text-indigo-800 font-bold"
-										: "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
-										}`}
+									className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${
+										selectedTag === null
+											? "bg-indigo-100 border-indigo-200 text-indigo-800 font-bold"
+											: "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+									}`}
 									onClick={() => setSelectedTag(null)}
 								>
 									All Events ({allRawEvents.length})
@@ -208,13 +228,15 @@ export const NationTab: React.FC<NationTabProps> = ({
 								{availableTags.map((t) => (
 									<button
 										key={t}
-										className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors uppercase ${selectedTag === t
-											? "bg-indigo-100 border-indigo-200 text-indigo-800 font-bold"
-											: "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
-											}`}
+										className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors uppercase ${
+											selectedTag === t
+												? "bg-indigo-100 border-indigo-200 text-indigo-800 font-bold"
+												: "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+										}`}
 										onClick={() => setSelectedTag(t)}
 									>
-										{t} ({allRawEvents.filter((e) => getGroup(e.tag) === t).length})
+										{t} (
+										{allRawEvents.filter((e) => getGroup(e.tag) === t).length})
 									</button>
 								))}
 							</div>
@@ -288,7 +310,9 @@ export const NationTab: React.FC<NationTabProps> = ({
 								title="Faith"
 								data={getDistribution((p) => {
 									const f = window.world.faiths[p.faith]
-									return f ? { label: f.name || `Faith ${f.idx}`, color: f.color } : null
+									return f
+										? { label: f.name || `Faith ${f.idx}`, color: f.color }
+										: null
 								})}
 							/>
 						</div>
@@ -424,13 +448,13 @@ export const NationTab: React.FC<NationTabProps> = ({
 								return { n, war, threat, relation }
 							})
 
-							const rel = RELATIONS.all(nation, renderTime).map(rels => ({
+							const rel = RELATIONS.all(nation, renderTime).map((rels) => ({
 								...rels,
 								threat: WAR.threat({
 									attacker: nation,
 									defender: rels.nation,
 									time: renderTime,
-								})
+								}),
 							}))
 
 							const columns: Column<(typeof rel)[number]>[] = [
@@ -516,7 +540,11 @@ export const NationTab: React.FC<NationTabProps> = ({
 									{dynastyIdx >= 0 && (
 										<div
 											className="w-2 h-2 border border-black/10"
-											style={{ backgroundColor: window.world.dynasties[dynastyIdx]?.color || "#bcbcbc" }}
+											style={{
+												backgroundColor:
+													window.world.dynasties[dynastyIdx]?.color ||
+													"#bcbcbc",
+											}}
 										/>
 									)}
 									{formattedLeader}
@@ -524,7 +552,9 @@ export const NationTab: React.FC<NationTabProps> = ({
 										<span className="text-[10px] text-gray-500 font-normal">
 											age {leaderAge}
 											{leaderAge < 16 && (
-												<span className="text-purple-500 font-semibold ml-1">(regency)</span>
+												<span className="text-purple-500 font-semibold ml-1">
+													(regency)
+												</span>
 											)}
 										</span>
 									)}
@@ -589,9 +619,9 @@ export const NationTab: React.FC<NationTabProps> = ({
 									const c = PROVINCE.cell(p)
 									return c.climate
 										? {
-											label: TEXT.titleCase(c.climate),
-											color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
-										}
+												label: TEXT.titleCase(c.climate),
+												color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
+											}
 										: null
 								})}
 							/>
@@ -601,12 +631,12 @@ export const NationTab: React.FC<NationTabProps> = ({
 									const c = PROVINCE.cell(p)
 									return c.vegetation
 										? {
-											label: TEXT.titleCase(c.vegetation),
-											color:
-												MAP_METRICS.vegetation.color[
-												c.vegetation as keyof typeof MAP_METRICS.vegetation.color
-												] || "#ccc",
-										}
+												label: TEXT.titleCase(c.vegetation),
+												color:
+													MAP_METRICS.vegetation.color[
+														c.vegetation as keyof typeof MAP_METRICS.vegetation.color
+													] || "#ccc",
+											}
 										: null
 								})}
 							/>
@@ -616,12 +646,12 @@ export const NationTab: React.FC<NationTabProps> = ({
 									const c = PROVINCE.cell(p)
 									return c.topography
 										? {
-											label: TEXT.titleCase(c.topography),
-											color:
-												MAP_METRICS.terrain.categorical[
-												c.topography as keyof typeof MAP_METRICS.terrain.categorical
-												] || "#ccc",
-										}
+												label: TEXT.titleCase(c.topography),
+												color:
+													MAP_METRICS.terrain.categorical[
+														c.topography as keyof typeof MAP_METRICS.terrain.categorical
+													] || "#ccc",
+											}
 										: null
 								})}
 							/>

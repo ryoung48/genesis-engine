@@ -1,4 +1,10 @@
-import type { BoundaryInfo, DistanceFields, OrogenHazards, SphereMesh, TectonicMode } from "./types"
+import type {
+	BoundaryInfo,
+	DistanceFields,
+	OrogenHazards,
+	SphereMesh,
+	TectonicMode,
+} from "./types"
 
 function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))
@@ -18,11 +24,17 @@ function gradualFalloff(distance: number, reach: number, power = 1.35): number {
 function percentile(values: number[], q: number): number {
 	if (values.length === 0) return 0
 	values.sort((a, b) => a - b)
-	const index = Math.min(values.length - 1, Math.max(0, Math.floor(q * (values.length - 1))))
+	const index = Math.min(
+		values.length - 1,
+		Math.max(0, Math.floor(q * (values.length - 1))),
+	)
 	return values[index]
 }
 
-function normalizeField(values: Float32Array, percentileQ: number): Float32Array {
+function normalizeField(
+	values: Float32Array,
+	percentileQ: number,
+): Float32Array {
 	const samples: number[] = []
 	for (let i = 0; i < values.length; i++) {
 		const value = values[i]
@@ -78,7 +90,7 @@ export function computeHazards(
 	distFields: DistanceFields,
 	elevationKm: Float32Array,
 	isLand: Uint8Array,
-	tectonicMode: TectonicMode,
+	tectonicMode: TectonicMode | 0 | 1,
 	hotspot?: Float32Array,
 ): OrogenHazards {
 	const N = elevationKm.length
@@ -87,7 +99,9 @@ export function computeHazards(
 	const danger = new Float32Array(N)
 
 	const stressNorm = normalizeField(boundary.r_stress, 0.97)
-	const hotspotNorm = hotspot ? normalizeField(hotspot, 0.95) : new Float32Array(N)
+	const hotspotNorm = hotspot
+		? normalizeField(hotspot, 0.95)
+		: new Float32Array(N)
 
 	const tectonicReach = Math.max(7, Math.round(16 * Math.sqrt(N / 10000)))
 	const coastalReach = Math.max(5, Math.round(12 * Math.sqrt(N / 10000)))
@@ -101,7 +115,10 @@ export function computeHazards(
 			boundaryStressValues.push(stressNorm[r])
 		}
 	}
-	const boundaryStressCutoff = Math.max(0.3, percentile(boundaryStressValues, 0.82))
+	const boundaryStressCutoff = Math.max(
+		0.3,
+		percentile(boundaryStressValues, 0.82),
+	)
 
 	for (let r = 0; r < N; r++) {
 		const type = boundary.r_boundaryType[r]
@@ -121,7 +138,8 @@ export function computeHazards(
 		if (isStrongBoundary) {
 			if (type === 1) seed = 0.42 + stress * 0.5
 			else if (type === 3) seed = 0.3 + stress * 0.42
-			else if (type === 2) seed = (bothOcean ? 0.08 : 0.18) + stress * (bothOcean ? 0.16 : 0.24)
+			else if (type === 2)
+				seed = (bothOcean ? 0.08 : 0.18) + stress * (bothOcean ? 0.16 : 0.24)
 		}
 		if (hasOcean || bothOcean) seed *= 1.02
 		if (seed > 0.2) {
@@ -130,15 +148,29 @@ export function computeHazards(
 		}
 	}
 
-	const quakeBelt = propagateInfluence(mesh, quakeSeeds, quakeSeedBase, 0.84, 0.09)
+	const quakeBelt = propagateInfluence(
+		mesh,
+		quakeSeeds,
+		quakeSeedBase,
+		0.84,
+		0.09,
+	)
 
 	for (let r = 0; r < N; r++) {
 		const type = boundary.r_boundaryType[r]
 		const subduct = clamp01(boundary.r_subductFactor[r])
 		const stress = stressNorm[r]
 		const localStress = smoothstep(0.06, 0.5, stress)
-		const mountainProximity = gradualFalloff(distFields.distMountain[r], tectonicReach, 0.9)
-		const coastalBoundaryProximity = gradualFalloff(distFields.distCoastline[r], coastalReach, 1.05)
+		const mountainProximity = gradualFalloff(
+			distFields.distMountain[r],
+			tectonicReach,
+			0.9,
+		)
+		const coastalBoundaryProximity = gradualFalloff(
+			distFields.distCoastline[r],
+			coastalReach,
+			1.05,
+		)
 		const volcanicProximity = Number.isFinite(distFields.distMountain[r])
 			? 1 - smoothstep(0, volcanicReach, distFields.distMountain[r])
 			: 0
@@ -146,7 +178,9 @@ export function computeHazards(
 		const relief = smoothstep(0.6, 4.5, Math.max(0, elevationKm[r]))
 		const land = isLand[r] ? 1 : 0
 		const activeBoundary = type === 1 || type === 2 || type === 3
-		const activeMargin = activeBoundary && (boundary.r_hasOcean[r] === 1 || boundary.r_bothOcean[r] === 1)
+		const activeMargin =
+			activeBoundary &&
+			(boundary.r_hasOcean[r] === 1 || boundary.r_bothOcean[r] === 1)
 		const mountainousVolcanicZone = mountainProximity >= 0.2 && relief >= 0.12
 		const hotspotVolcanicZone = hotspotScore >= 0.1
 
@@ -155,26 +189,41 @@ export function computeHazards(
 			quakeBelt[r],
 			quakeSeedBase[r] * 0.95,
 			mountainProximity * (0.05 + 0.22 * localStress),
-			coastalBoundaryProximity * (activeMargin ? (0.015 + 0.1 * localStress) : (0.002 + 0.02 * localStress)),
+			coastalBoundaryProximity *
+				(activeMargin ? 0.015 + 0.1 * localStress : 0.002 + 0.02 * localStress),
 		)
 		if (quakeSeedBase[r] > 0) {
 			if (type === 1) quake = Math.max(quake, 0.12 + localStress * 0.66)
 			else if (type === 2) quake = Math.max(quake, 0.01 + localStress * 0.28)
 			else if (type === 3) quake = Math.max(quake, 0.05 + localStress * 0.42)
 		}
-		if (!activeBoundary && coastalBoundaryProximity > 0) quake = Math.min(quake, Math.max(quakeBelt[r], coastalBoundaryProximity * 0.06))
-		if (localStress < 0.12 && quakeBelt[r] < 0.15 && mountainProximity < 0.12) quake *= 0.18
-		if (type === 2 && boundary.r_bothOcean[r] === 1 && localStress < 0.24) quake *= 0.3
+		if (!activeBoundary && coastalBoundaryProximity > 0)
+			quake = Math.min(
+				quake,
+				Math.max(quakeBelt[r], coastalBoundaryProximity * 0.06),
+			)
+		if (localStress < 0.12 && quakeBelt[r] < 0.15 && mountainProximity < 0.12)
+			quake *= 0.18
+		if (type === 2 && boundary.r_bothOcean[r] === 1 && localStress < 0.24)
+			quake *= 0.3
 		if (type === 3 && localStress < 0.16) quake *= 0.55
 		if (!land && !boundary.r_hasOcean[r]) quake *= 0.55
 
 		let volc = hotspotScore * 0.95
 		if (type === 1) {
 			const arcFactor = boundary.r_hasOcean[r] ? 1 - subduct * 0.55 : 0.45
-			volc = Math.max(volc, (0.16 + 0.5 * localStress + 0.16 * relief) * volcanicProximity * arcFactor)
+			volc = Math.max(
+				volc,
+				(0.16 + 0.5 * localStress + 0.16 * relief) *
+					volcanicProximity *
+					arcFactor,
+			)
 		} else if (type === 2) {
 			const ridgeFactor = boundary.r_bothOcean[r] ? 0.65 : 0.4
-			volc = Math.max(volc, (0.06 + 0.46 * localStress) * volcanicProximity * ridgeFactor)
+			volc = Math.max(
+				volc,
+				(0.06 + 0.46 * localStress) * volcanicProximity * ridgeFactor,
+			)
 		}
 		volc = Math.max(volc, volcanicProximity * relief * 0.18)
 		if (hotspotScore < 0.07 && volcanicProximity < 0.1) volc *= 0.3
@@ -196,14 +245,22 @@ export function computeHazards(
 	for (let r = 0; r < N; r++) {
 		if (strongEarthquakeSeeds[r] > 0) strongSeedList.push(r)
 	}
-	const diffusedEarthquake = propagateInfluence(mesh, strongSeedList, strongEarthquakeSeeds, 0.78, 0.24)
+	const diffusedEarthquake = propagateInfluence(
+		mesh,
+		strongSeedList,
+		strongEarthquakeSeeds,
+		0.78,
+		0.24,
+	)
 	for (let r = 0; r < N; r++) {
 		earthquake[r] = diffusedEarthquake[r]
-		danger[r] = clamp01(Math.max(
-			earthquake[r] * 0.98,
-			volcano[r],
-			earthquake[r] * 0.45 + volcano[r] * 0.55,
-		))
+		danger[r] = clamp01(
+			Math.max(
+				earthquake[r] * 0.98,
+				volcano[r],
+				earthquake[r] * 0.45 + volcano[r] * 0.55,
+			),
+		)
 	}
 
 	return { earthquake, volcano, danger }

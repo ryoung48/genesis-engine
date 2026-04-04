@@ -1,8 +1,8 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
 
 import { MATH } from "../../utilities/math"
-import * as Navigation from "./types"
 import { PROVINCE } from ".."
+import * as Navigation from "./types"
 
 /**
  * Reconstructs the shortest path from the start cell to the end cell using the visited object.
@@ -78,7 +78,7 @@ export const NAVIGATION = {
 				if (next === end) {
 					// only consider neighbors that haven't already been visited
 					if (visited[next] === undefined) {
-            const nloc = PROVINCE.cell(neighbor)
+						const nloc = PROVINCE.cell(neighbor)
 						const [nx, ny] = [nloc.x, nloc.y]
 						const [cx, cy] = [ploc.x, ploc.y]
 						const [dx, dy] = [dloc.x, dloc.y]

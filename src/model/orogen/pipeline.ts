@@ -2,50 +2,74 @@
  * Orogen pipeline orchestrator: generates a complete tectonic world.
  * Faithful port of orogen's planet-worker.js pipeline order.
  */
-import type { OrogenParams, OrogenWorld, SphereMesh } from "./types"
-import { createRng } from "./rng"
-import { buildSphereMesh } from "./mesh"
-import { generateCoarsePlates, projectCoarsePlates } from "./coarse-plates"
-import { smoothAndReconnectPlates } from "./plates"
-import { buildSuperPlates } from "./super-plates"
-import { classifyBoundaries } from "./collision"
-import { computeDistanceFields, blendElevation } from "./elevation"
-import { applyHotspots } from "./hotspots"
-import { computeLandFraction, computeTemperature, elevToHeightKm } from "./climate/climate"
-import { computeAdvection, computeMonthlyRain, computeThermalEquator } from "./climate/rain"
-import { computeHydrologyFields, refreshClimatePetMonthly } from "./climate/hydrology"
 import {
-	warpTerrain,
-	smoothElevation,
+	computeLandFraction,
+	computeTemperature,
+	elevToHeightKm,
+} from "./climate/climate"
+import {
+	computeHydrologyFields,
+	refreshClimatePetMonthly,
+} from "./climate/hydrology"
+import { computeIceAccumulation } from "./climate/ice"
+import { assignKoppenClimate } from "./climate/koppen"
+import {
+	applyCurrentTemperatureEffect,
+	computeOceanCurrents,
+} from "./climate/ocean-currents"
+import { assignPastaClimate } from "./climate/pasta"
+import {
+	computeAdvection,
+	computeMonthlyRain,
+	computeThermalEquator,
+} from "./climate/rain"
+import { assignClimateZones, assignVegetation } from "./climate/vegetation"
+import { computeWind } from "./climate/wind"
+import { generateCoarsePlates, projectCoarsePlates } from "./coarse-plates"
+import { classifyBoundaries } from "./collision"
+import { applyCraters } from "./craters"
+import { blendElevation, computeDistanceFields } from "./elevation"
+import {
+	applySoilCreep,
 	erodeComposite,
 	sharpenRidges,
-	applySoilCreep,
+	smoothElevation,
+	warpTerrain,
 } from "./erosion"
-import { computeOceanCurrents, applyCurrentTemperatureEffect } from "./climate/ocean-currents"
-import { computeWind } from "./climate/wind"
-import { assignVegetation, assignClimateZones } from "./climate/vegetation"
-import { computeIceAccumulation } from "./climate/ice"
-import { assignPastaClimate } from "./climate/pasta"
-import { assignKoppenClimate } from "./climate/koppen"
-import { ENABLE_PASTA_CLASSIFICATION, ENABLE_PROVINCES, ENABLE_WIND_FIELDS } from "./features"
-import { computeRivers } from "./topography/rivers"
-import { classifyTopography } from "./topography/classification"
-import { meanEdgeLengthKm, getMaxElevationKm, getMaxOceanDepthKm } from "./units"
-import { countContinents } from "./stats"
-import { applyCraters } from "./craters"
-import { computeProvinces } from "./provinces/provinces"
+import {
+	ENABLE_PASTA_CLASSIFICATION,
+	ENABLE_PROVINCES,
+	ENABLE_WIND_FIELDS,
+} from "./features"
+import { computeHazards } from "./hazards"
+import { applyHotspots, applyStaticHotspots } from "./hotspots"
+import { buildSphereMesh } from "./mesh"
+import { computeCultures } from "./partitions/culture"
+import { computeFaiths } from "./partitions/faith"
+import { computeHeritages } from "./partitions/heritage"
+import { computeNations } from "./partitions/nations"
+import { computeReligions } from "./partitions/religion"
+import { deriveChildColors } from "./partitions/shared"
+import { smoothAndReconnectPlates } from "./plates"
 import { computeLandmarks } from "./provinces/landmarks"
 import { computePopulation } from "./provinces/population"
-import { computeCultures } from "./partitions/culture"
-import { computeHeritages } from "./partitions/heritage"
-import { computeFaiths } from "./partitions/faith"
-import { computeReligions } from "./partitions/religion"
-import { computeNations } from "./partitions/nations"
-import { deriveChildColors } from "./partitions/shared"
+import { computeProvinces } from "./provinces/provinces"
+import { createRng } from "./rng"
 import { generateStaticElevation } from "./static-elevation"
-import { applyStaticHotspots } from "./hotspots"
-import { buildDummyBoundary, computeSimpleDistanceFields } from "./synthetic-plates"
-import { computeHazards } from "./hazards"
+import { countContinents } from "./stats"
+import { buildSuperPlates } from "./super-plates"
+import {
+	buildDummyBoundary,
+	computeSimpleDistanceFields,
+} from "./synthetic-plates"
+import { classifyTopography } from "./topography/classification"
+import { computeRivers } from "./topography/rivers"
+import type { OrogenParams, OrogenWorld, SphereMesh } from "./types"
+import {
+	getMaxElevationKm,
+	getMaxOceanDepthKm,
+	meanEdgeLengthKm,
+} from "./units"
 
 type StageTiming = {
 	Stage: string
@@ -54,7 +78,10 @@ type StageTiming = {
 
 type ProgressFn = (label: string, pct?: number) => void
 
-function computeFinalCoastDistances(mesh: SphereMesh, isLand: Uint8Array): {
+function computeFinalCoastDistances(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+): {
 	distCoast: Float32Array
 	distCoastLand: Float32Array
 } {
@@ -109,7 +136,10 @@ function computeFinalCoastDistances(mesh: SphereMesh, isLand: Uint8Array): {
 	return { distCoast, distCoastLand }
 }
 
-export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressFn): OrogenWorld {
+export function generateOrogenWorld(
+	params: OrogenParams,
+	onProgress?: ProgressFn,
+): OrogenWorld {
 	const rng = createRng(params.seed)
 	const volcanism = Math.max(0, Math.min(1, params.volcanism ?? 0.5))
 	const pipelineTiming: StageTiming[] = []
@@ -122,7 +152,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.time("orogen:mesh")
 	let t0 = performance.now()
 	const mesh = buildSphereMesh(params.numPoints, params.jitter, rng)
-	pipelineTiming.push({ Stage: "Sphere mesh (Fibonacci + Delaunay + pole)", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Sphere mesh (Fibonacci + Delaunay + pole)",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:mesh")
 
 	const tectonicMode = params.tectonicMode ?? "active"
@@ -160,9 +193,16 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Projecting plates...", 24)
 	t0 = performance.now()
 	const r_plate = projectCoarsePlates(
-		mesh, coarse.coarseMesh, coarse.coarse_r_plate, params.seed, params.numPlates,
+		mesh,
+		coarse.coarseMesh,
+		coarse.coarse_r_plate,
+		params.seed,
+		params.numPlates,
 	)
-	pipelineTiming.push({ Stage: "Project coarse → hi-res", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Project coarse → hi-res",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:project")
 
 	// 4. Smooth projected boundaries + reconnect fragments
@@ -171,7 +211,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	t0 = performance.now()
 	const plateIds = Array.from(coarse.coarsePlateSeeds)
 	smoothAndReconnectPlates(mesh, r_plate, plateIds, 3)
-	pipelineTiming.push({ Stage: "Smooth projected plates", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Smooth projected plates",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:smooth-plates")
 
 	// Build TectonicPlate[] and plateAssignment (shared by both paths)
@@ -197,129 +240,180 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	}
 
 	if (tectonicMode === "active") {
+		// ── Active plate tectonics path (stages 5–11) ─────────────────────
 
-	// ── Active plate tectonics path (stages 5–11) ─────────────────────
+		// 5. Plate density (ocean: 3.0–3.5, land: 2.4–2.9)
+		const plateDensity = new Map<number, number>()
+		const densityRng = createRng(params.seed + 777)
+		for (const pid of plateIds) {
+			const oceanDensity = 3.0 + densityRng.random() * 0.5
+			const landDensity = 2.4 + densityRng.random() * 0.5
+			plateDensity.set(
+				pid,
+				coarse.coarsePlateIsOcean.has(pid) ? oceanDensity : landDensity,
+			)
+		}
 
-	// 5. Plate density (ocean: 3.0–3.5, land: 2.4–2.9)
-	const plateDensity = new Map<number, number>()
-	const densityRng = createRng(params.seed + 777)
-	for (const pid of plateIds) {
-		const oceanDensity = 3.0 + densityRng.random() * 0.5
-		const landDensity = 2.4 + densityRng.random() * 0.5
-		plateDensity.set(pid, coarse.coarsePlateIsOcean.has(pid) ? oceanDensity : landDensity)
-	}
+		// 6. Build super plates (skip if < 8 plates)
+		let superPlateData = null
+		if (params.numPlates >= 8) {
+			console.time("orogen:super-plates")
+			onProgress?.("Building super plates...", 38)
+			t0 = performance.now()
+			superPlateData = buildSuperPlates(
+				mesh,
+				r_plate,
+				plateIds,
+				coarse.coarsePlateVec,
+				coarse.coarsePlateIsOcean,
+				plateDensity,
+			)
+			pipelineTiming.push({
+				Stage: `Super plates (${superPlateData.numSuperPlates} groups from ${params.numPlates} plates)`,
+				ms: (performance.now() - t0).toFixed(1),
+			})
+			console.timeEnd("orogen:super-plates")
+		}
 
-	// 6. Build super plates (skip if < 8 plates)
-	let superPlateData = null
-	if (params.numPlates >= 8) {
-		console.time("orogen:super-plates")
-		onProgress?.("Building super plates...", 38)
+		// 7. Collision + stress (dual-layer with super plates)
+		console.time("orogen:collision")
+		onProgress?.("Computing tectonic stress...", 46)
 		t0 = performance.now()
-		superPlateData = buildSuperPlates(
-			mesh, r_plate, plateIds,
-			coarse.coarsePlateVec, coarse.coarsePlateIsOcean, plateDensity,
+		boundary = classifyBoundaries(
+			mesh,
+			r_plate,
+			plateIds,
+			coarse.coarsePlateVec,
+			coarse.coarsePlateIsOcean,
+			plateDensity,
+			superPlateData,
+			params.seed,
+			5,
+			elevationTiming,
 		)
+		console.timeEnd("orogen:collision")
+
+		// 8. Distance fields
+		console.time("orogen:distance-fields")
+		onProgress?.("Propagating distance fields...", 54)
+		let elevationStageStart = performance.now()
+		distFields = computeDistanceFields(
+			mesh,
+			r_plate,
+			coarse.coarsePlateIsOcean,
+			boundary,
+			params.seed,
+		)
+		elevationTiming.push({
+			Stage: "Distance fields (6x BFS)",
+			ms: (performance.now() - elevationStageStart).toFixed(1),
+		})
+		console.timeEnd("orogen:distance-fields")
+
+		// 9. Elevation assignment
+		console.time("orogen:elevation")
+		onProgress?.("Assigning elevation...", 62)
+		const blendResult = blendElevation(
+			mesh,
+			r_plate,
+			coarse.coarsePlateVec,
+			coarse.coarsePlateIsOcean,
+			distFields,
+			boundary,
+			params.roughness,
+			params.seed,
+			elevationTiming,
+		)
+		elevation = blendResult.elevation
+		terrainFeatures = blendResult.terrainFeatures
 		pipelineTiming.push({
-			Stage: `Super plates (${superPlateData.numSuperPlates} groups from ${params.numPlates} plates)`,
+			Stage: "Elevation (collisions + stress + distance fields + assignment)",
 			ms: (performance.now() - t0).toFixed(1),
 		})
-		console.timeEnd("orogen:super-plates")
-	}
+		console.timeEnd("orogen:elevation")
 
-	// 7. Collision + stress (dual-layer with super plates)
-	console.time("orogen:collision")
-	onProgress?.("Computing tectonic stress...", 46)
-	t0 = performance.now()
-	boundary = classifyBoundaries(
-		mesh, r_plate, plateIds,
-		coarse.coarsePlateVec, coarse.coarsePlateIsOcean,
-		plateDensity, superPlateData, params.seed, 5, elevationTiming,
-	)
-	console.timeEnd("orogen:collision")
+		// 10. Hotspot volcanism
+		console.time("orogen:hotspots")
+		onProgress?.("Applying hotspots...", 70)
+		elevationStageStart = performance.now()
+		r_hotspot =
+			params.landCoverage <= 0
+				? new Float32Array(mesh.numRegions)
+				: applyHotspots(
+						mesh,
+						plates,
+						plateAssignment,
+						elevation,
+						params.seed,
+						volcanism,
+					)
+		elevationTiming.push({
+			Stage: "Hotspot volcanism",
+			ms: (performance.now() - elevationStageStart).toFixed(1),
+		})
+		console.timeEnd("orogen:hotspots")
 
-	// 8. Distance fields
-	console.time("orogen:distance-fields")
-	onProgress?.("Propagating distance fields...", 54)
-	let elevationStageStart = performance.now()
-	distFields = computeDistanceFields(
-		mesh, r_plate, coarse.coarsePlateIsOcean, boundary, params.seed,
-	)
-	elevationTiming.push({ Stage: "Distance fields (6x BFS)", ms: (performance.now() - elevationStageStart).toFixed(1) })
-	console.timeEnd("orogen:distance-fields")
-
-	// 9. Elevation assignment
-	console.time("orogen:elevation")
-	onProgress?.("Assigning elevation...", 62)
-	const blendResult = blendElevation(
-		mesh, r_plate, coarse.coarsePlateVec, coarse.coarsePlateIsOcean,
-		plateIds, distFields, boundary,
-		params.roughness, params.seed, elevationTiming,
-	)
-	elevation = blendResult.elevation
-	terrainFeatures = blendResult.terrainFeatures
-	pipelineTiming.push({
-		Stage: "Elevation (collisions + stress + distance fields + assignment)",
-		ms: (performance.now() - t0).toFixed(1),
-	})
-	console.timeEnd("orogen:elevation")
-
-	// 10. Hotspot volcanism
-	console.time("orogen:hotspots")
-	onProgress?.("Applying hotspots...", 70)
-	elevationStageStart = performance.now()
-	r_hotspot = params.landCoverage <= 0
-		? new Float32Array(mesh.numRegions)
-		: applyHotspots(mesh, plates, plateAssignment, elevation, params.seed, volcanism)
-	elevationTiming.push({ Stage: "Hotspot volcanism", ms: (performance.now() - elevationStageStart).toFixed(1) })
-	console.timeEnd("orogen:hotspots")
-
-	// 11. Peak compression (orogen: Math.pow(elev, 0.92) for positive elevations)
-	console.time("orogen:peak-compression")
-	onProgress?.("Compressing peaks...", 75)
-	elevationStageStart = performance.now()
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (elevation[r] > 0) elevation[r] = Math.pow(elevation[r], 0.92)
-	}
-	elevationTiming.push({ Stage: "Peak compression", ms: (performance.now() - elevationStageStart).toFixed(1) })
-	console.timeEnd("orogen:peak-compression")
-
+		// 11. Peak compression (orogen: Math.pow(elev, 0.92) for positive elevations)
+		console.time("orogen:peak-compression")
+		onProgress?.("Compressing peaks...", 75)
+		elevationStageStart = performance.now()
+		for (let r = 0; r < mesh.numRegions; r++) {
+			if (elevation[r] > 0) elevation[r] = Math.pow(elevation[r], 0.92)
+		}
+		elevationTiming.push({
+			Stage: "Peak compression",
+			ms: (performance.now() - elevationStageStart).toFixed(1),
+		})
+		console.timeEnd("orogen:peak-compression")
 	} else {
+		// ── Stagnant lid path (plates determine land/ocean, noise drives terrain) ──
 
-	// ── Stagnant lid path (plates determine land/ocean, noise drives terrain) ──
+		// Build per-region ocean mask from plate classification
+		const plateOceanMask = new Uint8Array(mesh.numRegions)
+		for (let r = 0; r < mesh.numRegions; r++) {
+			if (coarse.coarsePlateIsOcean.has(r_plate[r])) plateOceanMask[r] = 1
+		}
 
-	// Build per-region ocean mask from plate classification
-	const plateOceanMask = new Uint8Array(mesh.numRegions)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (coarse.coarsePlateIsOcean.has(r_plate[r])) plateOceanMask[r] = 1
-	}
+		console.time("orogen:static-elevation")
+		onProgress?.("Generating stagnant lid terrain...", 50)
+		t0 = performance.now()
+		elevation = generateStaticElevation(
+			mesh,
+			params.seed,
+			params.roughness,
+			params.landCoverage,
+			volcanism,
+			plateOceanMask,
+		)
+		pipelineTiming.push({
+			Stage: "Static elevation (stagnant lid, plate-masked)",
+			ms: (performance.now() - t0).toFixed(1),
+		})
+		console.timeEnd("orogen:static-elevation")
 
-	console.time("orogen:static-elevation")
-	onProgress?.("Generating stagnant lid terrain...", 50)
-	t0 = performance.now()
-		elevation = generateStaticElevation(mesh, params.seed, params.roughness, params.landCoverage, volcanism, plateOceanMask)
-	pipelineTiming.push({ Stage: "Static elevation (stagnant lid, plate-masked)", ms: (performance.now() - t0).toFixed(1) })
-	console.timeEnd("orogen:static-elevation")
+		// Static hotspots (no plate velocity needed)
+		console.time("orogen:static-hotspots")
+		onProgress?.("Applying hotspots...", 60)
+		t0 = performance.now()
+		const hotspotContrib =
+			params.landCoverage <= 0
+				? new Float32Array(mesh.numRegions)
+				: applyStaticHotspots(mesh, elevation, params.seed, volcanism)
+		r_hotspot = hotspotContrib
+		pipelineTiming.push({
+			Stage: `Static hotspots (volcanism=${volcanism.toFixed(2)})`,
+			ms: (performance.now() - t0).toFixed(1),
+		})
+		console.timeEnd("orogen:static-hotspots")
 
-	// Static hotspots (no plate velocity needed)
-	console.time("orogen:static-hotspots")
-	onProgress?.("Applying hotspots...", 60)
-	t0 = performance.now()
-	const hotspotContrib = params.landCoverage <= 0
-		? new Float32Array(mesh.numRegions)
-		: applyStaticHotspots(mesh, elevation, params.seed, volcanism)
-	r_hotspot = hotspotContrib
-	pipelineTiming.push({ Stage: `Static hotspots (volcanism=${volcanism.toFixed(2)})`, ms: (performance.now() - t0).toFixed(1) })
-	console.timeEnd("orogen:static-hotspots")
+		// Peak compression
+		for (let r = 0; r < mesh.numRegions; r++) {
+			if (elevation[r] > 0) elevation[r] = Math.pow(elevation[r], 0.92)
+		}
 
-	// Peak compression
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (elevation[r] > 0) elevation[r] = Math.pow(elevation[r], 0.92)
-	}
-
-	// Dummy boundary/distance data for downstream climate + rivers
-	boundary = buildDummyBoundary(mesh, elevation)
-	distFields = computeSimpleDistanceFields(mesh, elevation)
-
+		// Dummy boundary/distance data for downstream climate + rivers
+		boundary = buildDummyBoundary(mesh, elevation)
+		distFields = computeSimpleDistanceFields(mesh, elevation)
 	} // end tectonic mode branch
 
 	// 12. Terrain post-processing (orogen order)
@@ -365,10 +459,18 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		const kThermal = params.thermalErosion * 0.15
 		const postStageStart = performance.now()
 		erodeComposite(
-			mesh, elevation, r_isOcean,
-			hIters, hK, 0.5, 1.0,
-			tIters, talusSlope, kThermal,
-			gIters, params.glacialErosion,
+			mesh,
+			elevation,
+			r_isOcean,
+			hIters,
+			hK,
+			0.5,
+			1.0,
+			tIters,
+			talusSlope,
+			kThermal,
+			gIters,
+			params.glacialErosion,
 		)
 		postTiming.push({
 			Stage: `Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`,
@@ -391,7 +493,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	// Always-on soil creep
 	const postStageStart = performance.now()
 	applySoilCreep(mesh, elevation, r_isOcean, 3, 0.1125)
-	postTiming.push({ Stage: "Soil creep (3 iters)", ms: (performance.now() - postStageStart).toFixed(1) })
+	postTiming.push({
+		Stage: "Soil creep (3 iters)",
+		ms: (performance.now() - postStageStart).toFixed(1),
+	})
 
 	// Honor exact coverage extremes after all terrain shaping.
 	if (params.landCoverage <= 0) {
@@ -404,7 +509,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		}
 	}
 
-	pipelineTiming.push({ Stage: "Terrain post-processing (total)", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Terrain post-processing (total)",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:post")
 
 	// Pre-crater land mask — captures tectonic land/ocean boundary before impacts
@@ -418,8 +526,17 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		console.time("orogen:craters")
 		onProgress?.("Applying craters...", 83)
 		t0 = performance.now()
-		applyCraters(mesh, elevation, params.seed, params.craters, params.planetRadiusKm)
-		pipelineTiming.push({ Stage: `Craters (intensity=${params.craters.toFixed(2)})`, ms: (performance.now() - t0).toFixed(1) })
+		applyCraters(
+			mesh,
+			elevation,
+			params.seed,
+			params.craters,
+			params.planetRadiusKm,
+		)
+		pipelineTiming.push({
+			Stage: `Craters (intensity=${params.craters.toFixed(2)})`,
+			ms: (performance.now() - t0).toFixed(1),
+		})
 		console.timeEnd("orogen:craters")
 	}
 
@@ -460,16 +577,18 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if (!flooded[r]) isLand[r] = 1
 		}
-
 	}
 
-    console.time("orogen:coastDist")
-    t0 = performance.now()
-    const finalCoastDist = computeFinalCoastDistances(mesh, isLand)
-    distFields.distCoast = finalCoastDist.distCoast
-    distFields.distCoastLand = finalCoastDist.distCoastLand
-    pipelineTiming.push({ Stage: "Final coast distance (BFS)", ms: (performance.now() - t0).toFixed(1) })
-    console.timeEnd("orogen:coastDist")
+	console.time("orogen:coastDist")
+	t0 = performance.now()
+	const finalCoastDist = computeFinalCoastDistances(mesh, isLand)
+	distFields.distCoast = finalCoastDist.distCoast
+	distFields.distCoastLand = finalCoastDist.distCoastLand
+	pipelineTiming.push({
+		Stage: "Final coast distance (BFS)",
+		ms: (performance.now() - t0).toFixed(1),
+	})
+	console.timeEnd("orogen:coastDist")
 	// 13. Ocean distance (BFS hop count â†’ km)
 	console.time("orogen:oceanDist")
 	t0 = performance.now()
@@ -504,7 +623,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 			}
 		}
 	}
-	pipelineTiming.push({ Stage: "Ocean distance (BFS)", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Ocean distance (BFS)",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:oceanDist")
 
 	// 14. Climate â€" EBM temperature + continentality
@@ -512,18 +634,53 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Computing climate...", 93)
 	t0 = performance.now()
 	const landFraction = computeLandFraction(mesh, isLand)
-	const climate = computeTemperature(mesh, elevation, landFraction, params, oceanDist, isLand, elevation_km)
-	pipelineTiming.push({ Stage: "EBM temperature", ms: (performance.now() - t0).toFixed(1) })
+	const climate = computeTemperature(
+		mesh,
+		elevation,
+		landFraction,
+		params,
+		oceanDist,
+		isLand,
+		elevation_km,
+	)
+	pipelineTiming.push({
+		Stage: "EBM temperature",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:climate")
 
 	const currentLandmarks = computeLandmarks(mesh, isLand)
+	const monthlyTEQ: Float32Array[] | undefined = climate
+		? (() => {
+				const N = mesh.numRegions
+				const result: Float32Array[] = new Array(12)
+				for (let month = 0; month < 12; month++) {
+					result[month] = computeThermalEquator(
+						mesh,
+						climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+					)
+				}
+				return result
+			})()
+		: undefined
 
 	// 15. Moisture advection
 	console.time("orogen:advection")
 	onProgress?.("Computing moisture advection...", 95)
 	t0 = performance.now()
-	const { east: eastAdv, west: westAdv } = computeAdvection(mesh, elevation, distFields.distCoast, climate, params, isLand, elevation_km)
-	pipelineTiming.push({ Stage: "Moisture advection", ms: (performance.now() - t0).toFixed(1) })
+	const { east: eastAdv, west: westAdv } = computeAdvection(
+		mesh,
+		elevation,
+		distFields.distCoast,
+		climate,
+		params,
+		isLand,
+		elevation_km,
+	)
+	pipelineTiming.push({
+		Stage: "Moisture advection",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:advection")
 
 	// 15b. Ocean currents
@@ -531,45 +688,73 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Computing ocean currents...", 95)
 	t0 = performance.now()
 	const oceanCurrents = climate
-		? computeOceanCurrents(mesh, isLand, climate, distFields.distCoast, currentLandmarks, params)
+		? computeOceanCurrents(
+				mesh,
+				isLand,
+				climate,
+				distFields.distCoast,
+				currentLandmarks,
+				params,
+				monthlyTEQ,
+			)
 		: undefined
 	if (oceanCurrents) {
-		applyCurrentTemperatureEffect(mesh, climate, isLand, oceanCurrents)
+		applyCurrentTemperatureEffect(
+			mesh,
+			climate,
+			isLand,
+			oceanCurrents,
+			monthlyTEQ,
+		)
 		refreshClimatePetMonthly(climate, params)
 	}
-	pipelineTiming.push({ Stage: "Ocean currents", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Ocean currents",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:ocean-currents")
-
-	// Pre-compute monthly thermal equators once (shared by wind + rainfall)
-	const monthlyTEQ: Float32Array[] | undefined = climate ? (() => {
-		const N = mesh.numRegions
-		const result: Float32Array[] = new Array(12)
-		for (let month = 0; month < 12; month++) {
-			result[month] = computeThermalEquator(mesh, climate.temperature_monthly.subarray(month * N, (month + 1) * N))
-		}
-		return result
-	})() : undefined
 
 	// 15d. Wind fields (monthly vectors + normalized speed)
 	const wind = ENABLE_WIND_FIELDS
 		? (() => {
-			console.time("orogen:wind")
-			onProgress?.("Computing wind fields...", 96)
-			t0 = performance.now()
-			const result = climate ? computeWind(mesh, elevation, isLand, climate, params, monthlyTEQ) : undefined
-			pipelineTiming.push({ Stage: "Wind fields (12 months)", ms: (performance.now() - t0).toFixed(1) })
-			console.timeEnd("orogen:wind")
-			return result
-		})()
+				console.time("orogen:wind")
+				onProgress?.("Computing wind fields...", 96)
+				t0 = performance.now()
+				const result = climate
+					? computeWind(mesh, elevation, isLand, climate, params, monthlyTEQ)
+					: undefined
+				pipelineTiming.push({
+					Stage: "Wind fields (12 months)",
+					ms: (performance.now() - t0).toFixed(1),
+				})
+				console.timeEnd("orogen:wind")
+				return result
+			})()
 		: undefined
 
 	// 16. Monthly rainfall
 	console.time("orogen:rainfall")
 	onProgress?.("Computing rainfall...", 97)
 	t0 = performance.now()
-	const rain = computeMonthlyRain(mesh, climate, eastAdv, westAdv, isLand, params, monthlyTEQ)
-	const rainfall = { monthly: rain.monthly, annual: rain.annual, east: eastAdv, west: westAdv }
-	pipelineTiming.push({ Stage: "Monthly rainfall", ms: (performance.now() - t0).toFixed(1) })
+	const rain = computeMonthlyRain(
+		mesh,
+		climate,
+		eastAdv,
+		westAdv,
+		isLand,
+		params,
+		monthlyTEQ,
+	)
+	const rainfall = {
+		monthly: rain.monthly,
+		annual: rain.annual,
+		east: eastAdv,
+		west: westAdv,
+	}
+	pipelineTiming.push({
+		Stage: "Monthly rainfall",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:rainfall")
 
 	// 17. Detect small ocean patches (< 0.1% of land area) — these become lakes.
@@ -626,14 +811,28 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Assigning vegetation...", 96)
 	t0 = performance.now()
 	const vegetation = assignVegetation(mesh, isLand, climate, rainfall)
-	pipelineTiming.push({ Stage: "Vegetation assignment", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Vegetation assignment",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:vegetation")
 
 	console.time("orogen:rivers")
 	onProgress?.("Computing rivers...", 97)
 	t0 = performance.now()
-	const rivers = computeRivers(mesh, elevation, rainfall, climate, hydrology, riverLand, params)
-	pipelineTiming.push({ Stage: "Rivers", ms: (performance.now() - t0).toFixed(1) })
+	const rivers = computeRivers(
+		mesh,
+		elevation,
+		rainfall,
+		climate,
+		hydrology,
+		riverLand,
+		params,
+	)
+	pipelineTiming.push({
+		Stage: "Rivers",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:rivers")
 
 	// Mark small ocean cells as lakes in the river output
@@ -650,7 +849,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	console.time("orogen:landmarks")
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
-	pipelineTiming.push({ Stage: `Landmarks (${landmarks.count})`, ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: `Landmarks (${landmarks.count})`,
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:landmarks")
 
 	const { topography, slopeScore } = classifyTopography({
@@ -668,16 +870,28 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Classifying climate zones...", 98)
 	t0 = performance.now()
 	const climateZones = assignClimateZones(mesh, isLand, climate)
-	pipelineTiming.push({ Stage: "Climate zone assignment", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Climate zone assignment",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:climateZones")
 
 	// 19a. Ice accumulation
 	console.time("orogen:ice")
 	onProgress?.("Computing ice accumulation...", 98)
 	t0 = performance.now()
-	const iceResult = computeIceAccumulation(mesh, climate, rainfall, isLand, distFields.distCoast)
+	const iceResult = computeIceAccumulation(
+		mesh,
+		climate,
+		rainfall,
+		isLand,
+		distFields.distCoast,
+	)
 	const { iceThickness, iceMinMonthly, iceMaxMonthly } = iceResult
-	pipelineTiming.push({ Stage: "Ice accumulation", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Ice accumulation",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:ice")
 
 	// 19b. Pasta climate classification
@@ -687,10 +901,23 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		console.time("orogen:pasta")
 		onProgress?.("Classifying pasta climate...", 99)
 		t0 = performance.now()
-		const pastaResult = assignPastaClimate(mesh, isLand, climate, rainfall, hydrology, params, iceThickness, iceMinMonthly, iceMaxMonthly)
+		const pastaResult = assignPastaClimate(
+			mesh,
+			isLand,
+			climate,
+			rainfall,
+			hydrology,
+			params,
+			iceThickness,
+			iceMinMonthly,
+			iceMaxMonthly,
+		)
 		pastaClimate = pastaResult.zones
 		pastaDebug = pastaResult.debug
-		pipelineTiming.push({ Stage: "Pasta climate assignment", ms: (performance.now() - t0).toFixed(1) })
+		pipelineTiming.push({
+			Stage: "Pasta climate assignment",
+			ms: (performance.now() - t0).toFixed(1),
+		})
 		console.timeEnd("orogen:pasta")
 	}
 
@@ -698,7 +925,10 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Classifying Koppen climate...", 99)
 	t0 = performance.now()
 	const koppenClimate = assignKoppenClimate(mesh, isLand, climate, rainfall)
-	pipelineTiming.push({ Stage: "Koppen climate assignment", ms: (performance.now() - t0).toFixed(1) })
+	pipelineTiming.push({
+		Stage: "Koppen climate assignment",
+		ms: (performance.now() - t0).toFixed(1),
+	})
 	console.timeEnd("orogen:koppen")
 
 	// Clear vegetation for lake cells (lakes were identified after vegetation)
@@ -706,7 +936,15 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		if (rivers.lakes[r]) vegetation[r] = 0
 	}
 
-	const hazards = computeHazards(mesh, boundary, distFields, elevation_km, isLand, tectonicMode, r_hotspot)
+	const hazards = computeHazards(
+		mesh,
+		boundary,
+		distFields,
+		elevation_km,
+		isLand,
+		tectonicMode,
+		r_hotspot,
+	)
 
 	// 21. Province partitioning
 	let provinces
@@ -732,8 +970,14 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 		console.time("orogen:population")
 		t0 = performance.now()
 		population = computePopulation(
-			provinces, landmarks, climateZones, vegetation, topography,
-			params.seed, params.planetRadiusKm, mesh.numRegions,
+			provinces,
+			landmarks,
+			climateZones,
+			vegetation,
+			topography,
+			params.seed,
+			params.planetRadiusKm,
+			mesh.numRegions,
 		)
 		pipelineTiming.push({
 			Stage: `Population (${Math.round(population.totalPopulation).toLocaleString()})`,

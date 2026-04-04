@@ -2,8 +2,15 @@
  * Collision detection, stress propagation, and dual-layer super plate blending.
  * Faithful port of orogen's elevation.js collision/stress logic.
  */
-import type { SphereMesh, PlateVec, CollisionResult, BoundaryInfo, SuperPlateData } from "./types"
+
 import { SimplexNoise } from "./simplex-noise"
+import type {
+	BoundaryInfo,
+	CollisionResult,
+	PlateVec,
+	SphereMesh,
+	SuperPlateData,
+} from "./types"
 
 const COLLISION_THRESHOLD = 0.75
 type StageTiming = { Stage: string; ms: string }
@@ -11,11 +18,15 @@ type StageTiming = { Stage: string; ms: string }
 function plateVelocityAt(
 	plateVec: Map<number, PlateVec>,
 	plateId: number,
-	x: number, y: number, z: number,
+	x: number,
+	y: number,
+	z: number,
 ): [number, number, number] {
 	const pv = plateVec.get(plateId)
 	if (!pv) return [0, 0, 0]
-	const px = pv.pole[0], py = pv.pole[1], pz = pv.pole[2]
+	const px = pv.pole[0],
+		py = pv.pole[1],
+		pz = pv.pole[2]
 	const omega = pv.omega
 	return [
 		omega * (py * z - pz * y),
@@ -48,7 +59,8 @@ export function findCollisions(
 	// Pair intensity cache for consistent per-plate-pair randomization
 	const pairCache = new Map<number, number>()
 	function getPairIntensity(a: number, b: number): number {
-		const lo = Math.min(a, b), hi = Math.max(a, b)
+		const lo = Math.min(a, b),
+			hi = Math.max(a, b)
 		const key = lo * 1000003 + hi
 		const cached = pairCache.get(key)
 		if (cached !== undefined) return cached
@@ -70,23 +82,45 @@ export function findCollisions(
 		for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
 			const nb = adjList[ni]
 			if (myPlate !== r_plate[nb]) {
-				const ri3 = 3 * r, ni3 = 3 * nb
+				const ri3 = 3 * r,
+					ni3 = 3 * nb
 				const dx = r_xyz[ri3] - r_xyz[ni3]
 				const dy = r_xyz[ri3 + 1] - r_xyz[ni3 + 1]
 				const dz = r_xyz[ri3 + 2] - r_xyz[ni3 + 2]
 				const dBefore = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
-				const v1 = plateVelocityAt(plateVec, myPlate, r_xyz[ri3], r_xyz[ri3 + 1], r_xyz[ri3 + 2])
-				const v2 = plateVelocityAt(plateVec, r_plate[nb], r_xyz[ni3], r_xyz[ni3 + 1], r_xyz[ni3 + 2])
-				const ax = r_xyz[ri3] + v1[0] * dt, ay = r_xyz[ri3 + 1] + v1[1] * dt, az = r_xyz[ri3 + 2] + v1[2] * dt
-				const bx = r_xyz[ni3] + v2[0] * dt, by = r_xyz[ni3 + 1] + v2[1] * dt, bz = r_xyz[ni3 + 2] + v2[2] * dt
-				const adx = ax - bx, ady = ay - by, adz = az - bz
+				const v1 = plateVelocityAt(
+					plateVec,
+					myPlate,
+					r_xyz[ri3],
+					r_xyz[ri3 + 1],
+					r_xyz[ri3 + 2],
+				)
+				const v2 = plateVelocityAt(
+					plateVec,
+					r_plate[nb],
+					r_xyz[ni3],
+					r_xyz[ni3 + 1],
+					r_xyz[ni3 + 2],
+				)
+				const ax = r_xyz[ri3] + v1[0] * dt,
+					ay = r_xyz[ri3 + 1] + v1[1] * dt,
+					az = r_xyz[ri3 + 2] + v1[2] * dt
+				const bx = r_xyz[ni3] + v2[0] * dt,
+					by = r_xyz[ni3 + 1] + v2[1] * dt,
+					bz = r_xyz[ni3 + 2] + v2[2] * dt
+				const adx = ax - bx,
+					ady = ay - by,
+					adz = az - bz
 				const dAfter = Math.sqrt(adx * adx + ady * ady + adz * adz)
 				const comp = dBefore - dAfter
 
 				if (comp > bestComp) {
-					bestComp = comp; best = nb
-					const rvx = v1[0] - v2[0], rvy = v1[1] - v2[1], rvz = v1[2] - v2[2]
+					bestComp = comp
+					best = nb
+					const rvx = v1[0] - v2[0],
+						rvy = v1[1] - v2[1],
+						rvz = v1[2] - v2[2]
 					const bnLen = dBefore || 1
 					bestNormalComp = -(rvx * dx + rvy * dy + rvz * dz) / bnLen
 				}
@@ -97,8 +131,8 @@ export function findCollisions(
 			const collided = bestComp > COLLISION_THRESHOLD * dt
 			const rOcean = plateIsOcean.has(myPlate) ? 1 : 0
 			const nOcean = plateIsOcean.has(r_plate[best]) ? 1 : 0
-			r_bothOcean[r] = (rOcean && nOcean) ? 1 : 0
-			r_hasOcean[r] = (rOcean || nOcean) ? 1 : 0
+			r_bothOcean[r] = rOcean && nOcean ? 1 : 0
+			r_hasOcean[r] = rOcean || nOcean ? 1 : 0
 
 			const thresh = 0.3 * dt
 			if (bestNormalComp > thresh) r_boundaryType[r] = 1
@@ -116,24 +150,36 @@ export function findCollisions(
 			const baseFactor = 0.5 + 0.5 * Math.tanh(densityDiff * 8)
 			const densityContrast = Math.abs(densityDiff)
 			const undulationStrength = Math.exp(-densityContrast * 12)
-			const x = r_xyz[3 * r], y = r_xyz[3 * r + 1], z = r_xyz[3 * r + 2]
-			const undulation = noise.fbm(x * 6, y * 6, z * 6, undulOctaves) * 0.4 * undulationStrength
+			const x = r_xyz[3 * r],
+				y = r_xyz[3 * r + 1],
+				z = r_xyz[3 * r + 2]
+			const undulation =
+				noise.fbm(x * 6, y * 6, z * 6, undulOctaves) * 0.4 * undulationStrength
 			r_subductFactor[r] = Math.max(0, Math.min(1, baseFactor + undulation))
 
 			if (rOcean && nOcean) {
-				(collided ? coastline_r : ocean_r).add(r)
+				;(collided ? coastline_r : ocean_r).add(r)
 			} else if (!rOcean && !nOcean) {
 				if (collided) {
 					if (r_subductFactor[r] < 0.55) mountain_r.add(r)
 					else coastline_r.add(r)
 				}
 			} else {
-				(collided ? mountain_r : coastline_r).add(r)
+				;(collided ? mountain_r : coastline_r).add(r)
 			}
 		}
 	}
 
-	return { mountain_r, coastline_r, ocean_r, r_stress, r_subductFactor, r_boundaryType, r_bothOcean, r_hasOcean }
+	return {
+		mountain_r,
+		coastline_r,
+		ocean_r,
+		r_stress,
+		r_subductFactor,
+		r_boundaryType,
+		r_bothOcean,
+		r_hasOcean,
+	}
 }
 
 /**
@@ -200,18 +246,33 @@ export function classifyBoundaries(
 
 	// Small-plate collisions (always computed)
 	const collisionsStart = performance.now()
-	const smallCol = findCollisions(mesh, r_xyz, plateIsOcean, r_plate, plateVec, plateDensity, noise)
+	const smallCol = findCollisions(
+		mesh,
+		r_xyz,
+		plateIsOcean,
+		r_plate,
+		plateVec,
+		plateDensity,
+		noise,
+	)
 
 	const hasSuperPlates = superPlateData != null
 	let superCol: CollisionResult | null = null
 	if (hasSuperPlates) {
 		superCol = findCollisions(
-			mesh, r_xyz, superPlateData.superPlateIsOcean,
-			superPlateData.r_superPlate, superPlateData.superPlateVec,
-			superPlateData.superPlateDensity, noise,
+			mesh,
+			r_xyz,
+			superPlateData.superPlateIsOcean,
+			superPlateData.r_superPlate,
+			superPlateData.superPlateVec,
+			superPlateData.superPlateDensity,
+			noise,
 		)
 	}
-	timing?.push({ Stage: "Collisions (dual)", ms: (performance.now() - collisionsStart).toFixed(1) })
+	timing?.push({
+		Stage: "Collisions (dual)",
+		ms: (performance.now() - collisionsStart).toFixed(1),
+	})
 
 	let mountain_r: Set<number>
 	let coastline_r: Set<number>
@@ -226,7 +287,16 @@ export function classifyBoundaries(
 	const SUPER_W = 0.95
 
 	if (!hasSuperPlates || !superCol) {
-		({ mountain_r, coastline_r, ocean_r, r_stress, r_subductFactor, r_boundaryType, r_bothOcean, r_hasOcean } = smallCol)
+		;({
+			mountain_r,
+			coastline_r,
+			ocean_r,
+			r_stress,
+			r_subductFactor,
+			r_boundaryType,
+			r_bothOcean,
+			r_hasOcean,
+		} = smallCol)
 	} else {
 		// Union seed sets
 		mountain_r = new Set([...superCol.mountain_r, ...smallCol.mountain_r])
@@ -244,11 +314,13 @@ export function classifyBoundaries(
 		{
 			let maxSuperStress = 0
 			for (let r = 0; r < numRegions; r++) {
-				if (superCol.r_stress[r] > maxSuperStress) maxSuperStress = superCol.r_stress[r]
+				if (superCol.r_stress[r] > maxSuperStress)
+					maxSuperStress = superCol.r_stress[r]
 			}
 			const invMax = maxSuperStress > 1e-6 ? 1 / maxSuperStress : 0
 			for (let r = 0; r < numRegions; r++) {
-				const sS = smallCol.r_stress[r], sP = superCol.r_stress[r]
+				const sS = smallCol.r_stress[r],
+					sP = superCol.r_stress[r]
 				const proximity = Math.min(1, sP * invMax * 3)
 				const effectiveSmallW = SMALL_W * (SMALL_W + (1 - SMALL_W) * proximity)
 				r_stress[r] = effectiveSmallW * sS + SUPER_W * sP
@@ -258,12 +330,18 @@ export function classifyBoundaries(
 		// SubductFactor blend
 		r_subductFactor = new Float32Array(numRegions)
 		for (let r = 0; r < numRegions; r++) {
-			const wS = SMALL_W * smallCol.r_stress[r], wP = SUPER_W * superCol.r_stress[r]
+			const wS = SMALL_W * smallCol.r_stress[r],
+				wP = SUPER_W * superCol.r_stress[r]
 			const total = wS + wP
 			if (total > 1e-6) {
-				r_subductFactor[r] = (wS * smallCol.r_subductFactor[r] + wP * superCol.r_subductFactor[r]) / total
+				r_subductFactor[r] =
+					(wS * smallCol.r_subductFactor[r] +
+						wP * superCol.r_subductFactor[r]) /
+					total
 			} else {
-				r_subductFactor[r] = SMALL_W * smallCol.r_subductFactor[r] + SUPER_W * superCol.r_subductFactor[r]
+				r_subductFactor[r] =
+					SMALL_W * smallCol.r_subductFactor[r] +
+					SUPER_W * superCol.r_subductFactor[r]
 			}
 		}
 
@@ -272,7 +350,8 @@ export function classifyBoundaries(
 		for (let r = 0; r < numRegions; r++) {
 			const wS = SMALL_W * smallCol.r_stress[r]
 			const wP = SUPER_W * superCol.r_stress[r]
-			r_boundaryType[r] = wS > wP ? smallCol.r_boundaryType[r] : superCol.r_boundaryType[r]
+			r_boundaryType[r] =
+				wS > wP ? smallCol.r_boundaryType[r] : superCol.r_boundaryType[r]
 		}
 
 		// Boolean flags
@@ -294,16 +373,43 @@ export function classifyBoundaries(
 	const stressStart = performance.now()
 
 	if (!hasSuperPlates || !superCol) {
-		propagateStress(mesh, r_stress, r_subductFactor, r_plate, plateIsOcean, decayFactor, subductDecayFactor, numPasses)
+		propagateStress(
+			mesh,
+			r_stress,
+			r_subductFactor,
+			r_plate,
+			plateIsOcean,
+			decayFactor,
+			subductDecayFactor,
+			numPasses,
+		)
 	} else {
 		// Dual stress propagation: each layer within its own plates, then blend
 		const smallStress = new Float32Array(smallCol.r_stress)
 		const smallSubduct = new Float32Array(smallCol.r_subductFactor)
-		propagateStress(mesh, smallStress, smallSubduct, r_plate, plateIsOcean, decayFactor, subductDecayFactor, numPasses)
+		propagateStress(
+			mesh,
+			smallStress,
+			smallSubduct,
+			r_plate,
+			plateIsOcean,
+			decayFactor,
+			subductDecayFactor,
+			numPasses,
+		)
 
 		const superStress = new Float32Array(superCol.r_stress)
 		const superSubduct = new Float32Array(superCol.r_subductFactor)
-		propagateStress(mesh, superStress, superSubduct, superPlateData!.r_superPlate, superPlateData!.superPlateIsOcean, decayFactor, subductDecayFactor, numPasses)
+		propagateStress(
+			mesh,
+			superStress,
+			superSubduct,
+			superPlateData!.r_superPlate,
+			superPlateData!.superPlateIsOcean,
+			decayFactor,
+			subductDecayFactor,
+			numPasses,
+		)
 
 		// Blend propagated stress
 		for (let r = 0; r < numRegions; r++) {
@@ -312,31 +418,50 @@ export function classifyBoundaries(
 
 		// Update subduct factor from propagated values
 		for (let r = 0; r < numRegions; r++) {
-			const wS = SMALL_W * smallStress[r], wP = SUPER_W * superStress[r]
+			const wS = SMALL_W * smallStress[r],
+				wP = SUPER_W * superStress[r]
 			const total = wS + wP
 			if (total > 1e-6) {
-				r_subductFactor[r] = (wS * smallSubduct[r] + wP * superSubduct[r]) / total
+				r_subductFactor[r] =
+					(wS * smallSubduct[r] + wP * superSubduct[r]) / total
 			}
 		}
 	}
-	timing?.push({ Stage: "Stress propagation (dual)", ms: (performance.now() - stressStart).toFixed(1) })
+	timing?.push({
+		Stage: "Stress propagation (dual)",
+		ms: (performance.now() - stressStart).toFixed(1),
+	})
 
 	// Plate interiors: find a representative hi-res region per plate
 	{
 		const plateRep = new Map<number, number>()
 		for (let r = 0; r < numRegions; r++) {
 			const pid = r_plate[r]
-			if (!plateRep.has(pid) && !mountain_r.has(r) && !coastline_r.has(r) && !ocean_r.has(r)) {
+			if (
+				!plateRep.has(pid) &&
+				!mountain_r.has(r) &&
+				!coastline_r.has(r) &&
+				!ocean_r.has(r)
+			) {
 				plateRep.set(pid, r)
 			}
 		}
 		for (const pid of plateSeeds) {
 			const rep = plateRep.get(pid)
 			if (rep !== undefined) {
-				(plateIsOcean.has(pid) ? ocean_r : coastline_r).add(rep)
+				;(plateIsOcean.has(pid) ? ocean_r : coastline_r).add(rep)
 			}
 		}
 	}
 
-	return { mountain_r, coastline_r, ocean_r, r_stress, r_subductFactor, r_boundaryType, r_bothOcean, r_hasOcean }
+	return {
+		mountain_r,
+		coastline_r,
+		ocean_r,
+		r_stress,
+		r_subductFactor,
+		r_boundaryType,
+		r_bothOcean,
+		r_hasOcean,
+	}
 }

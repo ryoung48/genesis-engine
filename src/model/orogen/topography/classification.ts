@@ -1,6 +1,6 @@
-import type { OrogenRivers, SphereMesh } from "../types"
-import { SimplexNoise } from "../simplex-noise"
 import { BIOME_LABELS } from "../climate/vegetation"
+import { SimplexNoise } from "../simplex-noise"
+import type { OrogenRivers, SphereMesh } from "../types"
 
 const TOPO_FLAT = 0
 const TOPO_HILL = 1
@@ -50,7 +50,8 @@ export function computeSlopeScore(
 	}
 
 	const sorted = Array.from(smoothedSlope).sort((a, b) => a - b)
-	const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
+	const p95 =
+		sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
 	const scaleRef = Math.max(1e-3, p95)
 	for (let r = 0; r < N; r++) {
 		smoothedSlope[r] = Math.max(0, Math.min(1, smoothedSlope[r] / scaleRef))
@@ -63,26 +64,34 @@ export function classifyTopography(params: {
 	mesh: SphereMesh
 	elevationKm: Float32Array
 	isLand: Uint8Array
-	rivers: Pick<OrogenRivers, "lakes" | "visible" | "terminal" | "terminalCoastal" | "terminalInterior">
+	rivers: Pick<
+		OrogenRivers,
+		"lakes" | "visible" | "terminal" | "terminalCoastal" | "terminalInterior"
+	>
 	vegetation?: Uint8Array
 	slopeScore?: Float32Array
 	planetRadiusKm?: number
 	seed?: number
 }): { topography: Uint8Array; slopeScore: Float32Array } {
-	const { mesh, elevationKm, isLand, rivers, vegetation, planetRadiusKm } = params
-	const slopeScore = params.slopeScore ?? computeSlopeScore(mesh, elevationKm, planetRadiusKm)
+	const { mesh, elevationKm, isLand, rivers, vegetation, planetRadiusKm } =
+		params
+	const slopeScore =
+		params.slopeScore ?? computeSlopeScore(mesh, elevationKm, planetRadiusKm)
 	const topography = new Uint8Array(mesh.numRegions)
 	const { adjOffset, adjList, r_xyz } = mesh
 	const { lakes } = rivers
 	const adjacentLake = new Uint8Array(mesh.numRegions)
 	const adjacentOcean = new Uint8Array(mesh.numRegions)
 	const adjacentTerminal = new Uint8Array(mesh.numRegions)
+	const adjacentRiver = new Uint8Array(mesh.numRegions)
 	const marsh = new Uint8Array(mesh.numRegions)
 	const marshNoise = new Float32Array(mesh.numRegions)
 	const noise1 = new SimplexNoise((params.seed ?? 0) + 7101)
 	const noise2 = new SimplexNoise((params.seed ?? 0) + 7102)
 	const noise3 = new SimplexNoise((params.seed ?? 0) + 7103)
 	const desertBiome = BIOME_LABELS.indexOf("desert")
+	const marshNoiseThreshold = 0.48
+	const marshScoreThreshold = 0.64
 
 	function isMarshCandidate(r: number): boolean {
 		const isDesert = vegetation?.[r] === desertBiome
@@ -116,6 +125,7 @@ export function classifyTopography(params: {
 			const nb = adjList[j]
 			if (lakes[nb]) adjacentLake[r] = 1
 			if (!isLand[nb] && !lakes[nb]) adjacentOcean[r] = 1
+			if (rivers.visible[nb] || rivers.terminal[nb]) adjacentRiver[r] = 1
 			if (rivers.terminal[nb]) adjacentTerminal[r] = 1
 		}
 	}
@@ -123,6 +133,7 @@ export function classifyTopography(params: {
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (!isMarshCandidate(r)) continue
 		if (vegetation?.[r] === desertBiome) continue
+		if (rivers.visible[r] || rivers.terminal[r]) adjacentRiver[r] = 1
 		if (rivers.terminal[r]) {
 			marsh[r] = 1
 			continue
@@ -136,10 +147,19 @@ export function classifyTopography(params: {
 		const elevationFactor = Math.max(0, Math.min(1, 1 - elevation / 0.22))
 		const slopeFactor = Math.max(0, Math.min(1, 1 - slope / 0.11))
 		const lakeBonus = adjacentLake[r] ? 0.14 : 0
+		const riverBonus = adjacentRiver[r] ? 0.08 : 0
 		const terminalBonus = adjacentTerminal[r] ? 0.14 : 0
-		const coastalBonus = adjacentOcean[r] ? 0.03 : 0
-		const marshScore = noiseBias * 0.58 + elevationFactor * 0.17 + slopeFactor * 0.13 + lakeBonus + terminalBonus + coastalBonus
-		if (noiseBias >= 0.56 && marshScore >= 0.67) marsh[r] = 1
+		const coastalBonus = adjacentOcean[r] ? 0.1 : 0
+		const marshScore =
+			noiseBias * 0.58 +
+			elevationFactor * 0.17 +
+			slopeFactor * 0.13 +
+			lakeBonus +
+			riverBonus +
+			terminalBonus +
+			coastalBonus
+		if (noiseBias >= marshNoiseThreshold && marshScore >= marshScoreThreshold)
+			marsh[r] = 1
 	}
 
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -156,15 +176,22 @@ export function classifyTopography(params: {
 			topography[r] = TOPO_COASTAL
 			continue
 		}
-		if ((elevation >= 2.2 && slope >= 0.3) || (elevation >= 1.2 && slope >= 0.45) || (elevation > 0.5 && slope > 0.6)) {
+		if (
+			(elevation >= 2.2 && slope >= 0.3) ||
+			(elevation >= 1.2 && slope >= 0.45) ||
+			(elevation > 0.5 && slope > 0.6)
+		) {
 			topography[r] = TOPO_MOUNTAIN
 			continue
 		}
-		if ((elevation >= 1.0 && slope < 0.30) || (elevation >= 0.8 && slope < 0.20)) {
+		if (
+			(elevation >= 1.0 && slope < 0.3) ||
+			(elevation >= 0.8 && slope < 0.2)
+		) {
 			topography[r] = TOPO_PLATEAU
 			continue
 		}
-		if (elevation > 0.1 && slope >= 0.20) {
+		if (elevation > 0.1 && slope >= 0.2) {
 			topography[r] = TOPO_HILL
 			continue
 		}

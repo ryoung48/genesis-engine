@@ -4,10 +4,17 @@
  * SphereMesh and OrogenClimate data (no Cell/window.world dependencies).
  */
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
-import { elevToHeightKm } from "./climate"
-import { getDaysPerYear, getHoursPerDay, getSubstellarDir, isRetrogradeObliquity, isTidallyLocked, meanEdgeLengthKm } from "../units"
 import { SimplexNoise } from "../simplex-noise"
+import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
+import {
+	getDaysPerYear,
+	getHoursPerDay,
+	getSubstellarDir,
+	isRetrogradeObliquity,
+	isTidallyLocked,
+	meanEdgeLengthKm,
+} from "../units"
+import { elevToHeightKm } from "./climate"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -43,10 +50,16 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 	return t * t * (3 - 2 * t)
 }
 
-const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 40, 60, 90], [40, 62, 83, 125, 165, 300, 150, 0], x)
+const ceilingScale = (x: number) =>
+	piecewise(
+		[-14, -8, 2, 12, 18, 40, 60, 90],
+		[40, 62, 83, 125, 165, 300, 150, 0],
+		x,
+	)
 
 const itczScale = (x: number) => piecewise([0, 8, 18, 28], [1, 0.7, 0.2, 0], x)
-const subsidenceScale = (x: number) => piecewise([15, 20, 25, 30, 35, 40], [0, 0.5, 1, 1, 0.5, 0], x)
+const subsidenceScale = (x: number) =>
+	piecewise([15, 20, 25, 30, 35, 40], [0, 0.5, 1, 1, 0.5, 0], x)
 const eastStormScale = (x: number) => piecewise([10, 35, 90], [0, 0.8, 1], x)
 const westerliesScale = (x: number) => piecewise([40, 50, 90], [0, 1, 0.8], x)
 
@@ -55,6 +68,8 @@ type CirculationControls = {
 	hadleyWetStrength: number
 	hadleyDryStrength: number
 }
+
+type ThermalEquatorMesh = Pick<SphereMesh, "numRegions" | "r_xyz">
 
 function getCirculationControls(
 	params?: Pick<OrogenParams, "daysPerYear" | "hoursPerDay" | "tidallyLocked">,
@@ -86,14 +101,14 @@ function getCirculationControls(
 // ---------------------------------------------------------------------------
 
 const TEQ_NUM_BINS = 120 // 3 deg per bin
-const TEQ_HALF_WIN = 10   // circular smoothing window
+const TEQ_HALF_WIN = 10 // circular smoothing window
 
 /**
  * Compute per-longitude-bin thermal equator latitude for a given temperature field.
  * Returns a Float32Array of length NUM_BINS with the smoothed TEQ latitude per bin.
  */
 export function computeThermalEquator(
-	mesh: SphereMesh,
+	mesh: ThermalEquatorMesh,
 	temps: Float32Array,
 	numBins: number = TEQ_NUM_BINS,
 ): Float32Array {
@@ -107,8 +122,10 @@ export function computeThermalEquator(
 		const z = mesh.r_xyz[3 * r + 2]
 		const lonDeg = Math.atan2(y, x) * RAD2DEG
 		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
-		const bin = Math.max(0, Math.min(numBins - 1,
-			Math.floor((lonDeg + 180) / 360 * numBins)))
+		const bin = Math.max(
+			0,
+			Math.min(numBins - 1, Math.floor(((lonDeg + 180) / 360) * numBins)),
+		)
 		if (temps[r] > binMaxTemp[bin]) {
 			binMaxTemp[bin] = temps[r]
 			binMaxLat[bin] = latDeg
@@ -120,7 +137,7 @@ export function computeThermalEquator(
 		let sum = 0
 		let count = 0
 		for (let d = -TEQ_HALF_WIN; d <= TEQ_HALF_WIN; d++) {
-			const j = ((i + d) % numBins + numBins) % numBins
+			const j = (((i + d) % numBins) + numBins) % numBins
 			if (binMaxTemp[j] !== -Infinity) {
 				sum += binMaxLat[j]
 				count++
@@ -137,7 +154,7 @@ export function computeThermalEquator(
  * Returns null if insufficient data.
  */
 export function computeThermalEquatorLine(
-	mesh: SphereMesh,
+	mesh: ThermalEquatorMesh,
 	temps: Float32Array,
 	numBins: number = TEQ_NUM_BINS,
 ): [number, number][] | null {
@@ -151,8 +168,10 @@ export function computeThermalEquatorLine(
 		const z = mesh.r_xyz[3 * r + 2]
 		const lonDeg = Math.atan2(y, x) * RAD2DEG
 		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
-		const bin = Math.max(0, Math.min(numBins - 1,
-			Math.floor((lonDeg + 180) / 360 * numBins)))
+		const bin = Math.max(
+			0,
+			Math.min(numBins - 1, Math.floor(((lonDeg + 180) / 360) * numBins)),
+		)
 		if (temps[r] > binMaxTemp[bin]) {
 			binMaxTemp[bin] = temps[r]
 			binMaxLat[bin] = latDeg
@@ -164,7 +183,7 @@ export function computeThermalEquatorLine(
 		let sum = 0
 		let count = 0
 		for (let d = -TEQ_HALF_WIN; d <= TEQ_HALF_WIN; d++) {
-			const j = ((i + d) % numBins + numBins) % numBins
+			const j = (((i + d) % numBins) + numBins) % numBins
 			if (binMaxTemp[j] !== -Infinity) {
 				sum += binMaxLat[j]
 				count++
@@ -199,12 +218,15 @@ export function computeAdvection(
 	params?: number | Pick<OrogenParams, "planetRadiusKm">,
 	isLand?: Uint8Array,
 	elevation_km?: Float32Array,
-): { east: Float32Array; west: Float32Array } {
+): {
+	east: Float32Array
+	west: Float32Array
+} {
 	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
 	const wet = 30
 
-	const planetRadiusKm = typeof params === "number" ? params : params?.planetRadiusKm
+	const planetRadiusKm =
+		typeof params === "number" ? params : params?.planetRadiusKm
 	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
 	const scale = 94.5 / avgEdgeKm
 	const deepOceanThreshold = 1260 / avgEdgeKm
@@ -219,169 +241,217 @@ export function computeAdvection(
 		lonDeg[r] = Math.atan2(y, x) * RAD2DEG
 	}
 
-	const teqByLon = climate
-		? computeThermalEquator(mesh, climate.temperature_avg)
-		: new Float32Array(TEQ_NUM_BINS)
 	const lonBinWidth = 360 / TEQ_NUM_BINS
 	const regionBin = new Int32Array(N)
 	for (let r = 0; r < N; r++) {
-		regionBin[r] = Math.max(0, Math.min(TEQ_NUM_BINS - 1,
-			Math.floor((lonDeg[r] + 180) / lonBinWidth)))
-	}
-
-	const basinLabel = new Int32Array(N).fill(-1)
-	let basinCount = 0
-	for (let r = 0; r < N; r++) {
-		if (isLand?.[r] || elevation[r] > 0 || basinLabel[r] >= 0) continue
-		const basin = basinCount++
-		const stack = [r]
-		basinLabel[r] = basin
-		while (stack.length > 0) {
-			const current = stack.pop()!
-			for (let j = adjOffset[current], jEnd = adjOffset[current + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if ((isLand?.[nb] || elevation[nb] > 0) || basinLabel[nb] >= 0) continue
-				basinLabel[nb] = basin
-				stack.push(nb)
-			}
-		}
-	}
-	const minBasinSize = Math.max(1, Math.floor(N * 0.005))
-	const basinSize = new Int32Array(basinCount)
-	for (let r = 0; r < N; r++) {
-		if (basinLabel[r] >= 0) basinSize[basinLabel[r]]++
-	}
-
-	const sourceMoisture = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		if (!isLand?.[r] && elevation[r] <= 0 && basinLabel[r] >= 0 && basinSize[basinLabel[r]] >= minBasinSize) {
-			sourceMoisture[r] = wet * smoothstep(0, deepOceanThreshold, distCoast[r])
-		}
-	}
-
-	// Use provided land mask, or fall back to elevation-based classification
-	const land: Uint8Array = isLand ?? (() => {
-		const mask = new Uint8Array(N)
-		for (let r = 0; r < N; r++) {
-			if (elevation[r] > 0) mask[r] = 1
-		}
-		return mask
-	})()
-
-	const east = new Float32Array(N)
-	const west = new Float32Array(N)
-
-	const isValidFlow = (attr: "east" | "west", r: number, bearing: number): boolean => {
-		const lat = latDeg[r]
-		const absLat = Math.abs(lat)
-		const teq = teqByLon[regionBin[r]]
-		const distToTeq = Math.abs(lat - teq)
-		const eastward = Math.sin(bearing * DEG2RAD)
-		const northward = Math.cos(bearing * DEG2RAD)
-
-		if (attr === "east") {
-			const zonalStrength = piecewise([0, 10, 25, 35, 50], [0.7, 1, 1, 0.4, 0], absLat)
-			const meridionalStrength = piecewise([0, 5, 15, 30, 40], [0, 0.2, 0.55, 0.8, 0], distToTeq)
-			const teqDir = teq > lat ? 1 : teq < lat ? -1 : 0
-			const flowEast = -zonalStrength
-			const flowNorth = teqDir * meridionalStrength
-			const flowNorm = Math.hypot(flowEast, flowNorth)
-			if (flowNorm < 1e-6) return angleDeltaDeg(bearing, 270) <= 55
-			const alignment = (eastward * flowEast + northward * flowNorth) / flowNorm
-			return alignment >= 0.35
-		}
-
-		const subtropicalJet = piecewise([20, 28, 32, 40], [0, 0.75, 1.1, 0.3], absLat)
-		const polarJet = piecewise([45, 52, 60, 70], [0, 0.45, 0.9, 0], absLat)
-		const zonalStrength = Math.max(0.7, subtropicalJet, polarJet)
-		const polewardStrength = piecewise([22, 30, 45, 60, 75], [0, 0.2, 0.55, 0.35, 0], absLat)
-		const poleDir = lat >= teq ? 1 : -1
-		const flowEast = zonalStrength
-		const flowNorth = poleDir * polewardStrength
-		const flowNorm = Math.hypot(flowEast, flowNorth)
-		const alignment = (eastward * flowEast + northward * flowNorth) / flowNorm
-		return alignment >= 0.4
-	}
-
-	const assignRain = (attr: "east" | "west") => {
-		const moisture = attr === "east" ? east : west
-		const settled = new Uint8Array(N)
-		const queue = new PriorityQueue<{ region: number; moisture: number }>(
-			(a, b) => b.moisture - a.moisture,
+		regionBin[r] = Math.max(
+			0,
+			Math.min(TEQ_NUM_BINS - 1, Math.floor((lonDeg[r] + 180) / lonBinWidth)),
 		)
+	}
 
-		for (let r = 0; r < N; r++) {
-			if (!land[r] && sourceMoisture[r] > 1e-3) {
-				moisture[r] = sourceMoisture[r]
-				queue.enqueue({ region: r, moisture: sourceMoisture[r] })
+	const { adjOffset, adjList } = mesh
+	const land: Uint8Array =
+		isLand ??
+		(() => {
+			const mask = new Uint8Array(N)
+			for (let r = 0; r < N; r++) {
+				if (elevation[r] > 0) mask[r] = 1
 			}
-		}
+			return mask
+		})()
 
-		while (!queue.isEmpty()) {
-			const next = queue.dequeue()
-			if (!next) break
-			const r = next.region
-			if (settled[r]) continue
-			if (next.moisture + 1e-3 < moisture[r]) continue
-			settled[r] = 1
-			const heightKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
-			const orographic = heightKm > 2 ? -1.8 : -0.6
-			const impact = (!land[r] ? 0.5 : orographic) / scale
-			const m = Math.max(Math.min(Math.max(moisture[r], 0) + impact, wet), 0)
-
-			const lat1 = latDeg[r] * DEG2RAD
-			const lon1 = lonDeg[r] * DEG2RAD
-			const sinLat1 = Math.sin(lat1)
-			const cosLat1 = Math.cos(lat1)
-
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				const lat2 = latDeg[nb] * DEG2RAD
-				const dLon = lonDeg[nb] * DEG2RAD - lon1
-				const bearing = (Math.atan2(
-					Math.sin(dLon) * Math.cos(lat2),
-					cosLat1 * Math.sin(lat2) - sinLat1 * Math.cos(lat2) * Math.cos(dLon),
-				) * RAD2DEG + 360) % 360
-
-				if (!isValidFlow(attr, r, bearing)) continue
-				if (!settled[nb] && m > moisture[nb] + 1e-3) {
-					moisture[nb] = m
-					queue.enqueue({ region: nb, moisture: m })
+	const computePair = (teqByLon: Float32Array) => {
+		const basinLabel = new Int32Array(N).fill(-1)
+		let basinCount = 0
+		for (let r = 0; r < N; r++) {
+			if (land[r] || elevation[r] > 0 || basinLabel[r] >= 0) continue
+			const basin = basinCount++
+			const stack = [r]
+			basinLabel[r] = basin
+			while (stack.length > 0) {
+				const current = stack.pop()!
+				for (
+					let j = adjOffset[current], jEnd = adjOffset[current + 1];
+					j < jEnd;
+					j++
+				) {
+					const nb = adjList[j]
+					if (land[nb] || elevation[nb] > 0 || basinLabel[nb] >= 0) continue
+					basinLabel[nb] = basin
+					stack.push(nb)
 				}
 			}
 		}
-
-		const smoothed = new Float32Array(N)
+		const minBasinSize = Math.max(1, Math.floor(N * 0.005))
+		const basinSize = new Int32Array(basinCount)
 		for (let r = 0; r < N; r++) {
-			if (!land[r]) {
-				smoothed[r] = moisture[r]
-				continue
+			if (basinLabel[r] >= 0) basinSize[basinLabel[r]]++
+		}
+
+		const sourceMoisture = new Float32Array(N)
+		for (let r = 0; r < N; r++) {
+			if (
+				!land[r] &&
+				elevation[r] <= 0 &&
+				basinLabel[r] >= 0 &&
+				basinSize[basinLabel[r]] >= minBasinSize
+			) {
+				sourceMoisture[r] =
+					wet * smoothstep(0, deepOceanThreshold, distCoast[r])
 			}
-			let sum = moisture[r]
-			let count = 1
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if (land[nb]) {
-					sum += moisture[nb]
-					count++
+		}
+
+		const east = new Float32Array(N)
+		const west = new Float32Array(N)
+
+		const isValidFlow = (
+			attr: "east" | "west",
+			r: number,
+			bearing: number,
+		): boolean => {
+			const lat = latDeg[r]
+			const absLat = Math.abs(lat)
+			const teq = teqByLon[regionBin[r]]
+			const distToTeq = Math.abs(lat - teq)
+			const eastward = Math.sin(bearing * DEG2RAD)
+			const northward = Math.cos(bearing * DEG2RAD)
+
+			if (attr === "east") {
+				const zonalStrength = piecewise(
+					[0, 10, 25, 35, 50],
+					[0.7, 1, 1, 0.4, 0],
+					absLat,
+				)
+				const meridionalStrength = piecewise(
+					[0, 5, 15, 30, 40],
+					[0, 0.2, 0.55, 0.8, 0],
+					distToTeq,
+				)
+				const teqDir = teq > lat ? 1 : teq < lat ? -1 : 0
+				const flowEast = -zonalStrength
+				const flowNorth = teqDir * meridionalStrength
+				const flowNorm = Math.hypot(flowEast, flowNorth)
+				if (flowNorm < 1e-6) return angleDeltaDeg(bearing, 270) <= 55
+				const alignment =
+					(eastward * flowEast + northward * flowNorth) / flowNorm
+				return alignment >= 0.35
+			}
+
+			const subtropicalJet = piecewise(
+				[20, 28, 32, 40],
+				[0, 0.75, 1.1, 0.3],
+				absLat,
+			)
+			const polarJet = piecewise([45, 52, 60, 70], [0, 0.45, 0.9, 0], absLat)
+			const zonalStrength = Math.max(0.7, subtropicalJet, polarJet)
+			const polewardStrength = piecewise(
+				[22, 30, 45, 60, 75],
+				[0, 0.2, 0.55, 0.35, 0],
+				absLat,
+			)
+			const poleDir = lat >= teq ? 1 : -1
+			const flowEast = zonalStrength
+			const flowNorth = poleDir * polewardStrength
+			const flowNorm = Math.hypot(flowEast, flowNorth)
+			const alignment = (eastward * flowEast + northward * flowNorth) / flowNorm
+			return alignment >= 0.4
+		}
+
+		const assignRain = (attr: "east" | "west") => {
+			const moisture = attr === "east" ? east : west
+			const settled = new Uint8Array(N)
+			const queue = new PriorityQueue<{ region: number; moisture: number }>(
+				(a, b) => b.moisture - a.moisture,
+			)
+
+			for (let r = 0; r < N; r++) {
+				if (!land[r] && sourceMoisture[r] > 1e-3) {
+					moisture[r] = sourceMoisture[r]
+					queue.enqueue({ region: r, moisture: sourceMoisture[r] })
 				}
 			}
-			smoothed[r] = sum / count
+
+			while (!queue.isEmpty()) {
+				const next = queue.dequeue()
+				if (!next) break
+				const r = next.region
+				if (settled[r]) continue
+				if (next.moisture + 1e-3 < moisture[r]) continue
+				settled[r] = 1
+				const heightKm = elevation_km
+					? elevation_km[r]
+					: elevToHeightKm(elevation[r])
+				const orographic = heightKm > 2 ? -1.8 : -0.6
+				const impact = (!land[r] ? 0.5 : orographic) / scale
+				const m = Math.max(Math.min(Math.max(moisture[r], 0) + impact, wet), 0)
+
+				const lat1 = latDeg[r] * DEG2RAD
+				const lon1 = lonDeg[r] * DEG2RAD
+				const sinLat1 = Math.sin(lat1)
+				const cosLat1 = Math.cos(lat1)
+
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					const nb = adjList[j]
+					const lat2 = latDeg[nb] * DEG2RAD
+					const dLon = lonDeg[nb] * DEG2RAD - lon1
+					const bearing =
+						(Math.atan2(
+							Math.sin(dLon) * Math.cos(lat2),
+							cosLat1 * Math.sin(lat2) -
+								sinLat1 * Math.cos(lat2) * Math.cos(dLon),
+						) *
+							RAD2DEG +
+							360) %
+						360
+
+					if (!isValidFlow(attr, r, bearing)) continue
+					if (!settled[nb] && m > moisture[nb] + 1e-3) {
+						moisture[nb] = m
+						queue.enqueue({ region: nb, moisture: m })
+					}
+				}
+			}
+
+			const smoothed = new Float32Array(N)
+			for (let r = 0; r < N; r++) {
+				if (!land[r]) {
+					smoothed[r] = moisture[r]
+					continue
+				}
+				let sum = moisture[r]
+				let count = 1
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					const nb = adjList[j]
+					if (land[nb]) {
+						sum += moisture[nb]
+						count++
+					}
+				}
+				smoothed[r] = sum / count
+			}
+			for (let r = 0; r < N; r++) moisture[r] = smoothed[r]
 		}
-		for (let r = 0; r < N; r++) moisture[r] = smoothed[r]
+
+		assignRain("east")
+		assignRain("west")
+
+		for (let r = 0; r < N; r++) {
+			east[r] /= wet
+			west[r] /= wet
+			if (east[r] > west[r]) west[r] = 0
+			else east[r] = 0
+		}
+
+		return { east, west }
 	}
 
-	assignRain("east")
-	assignRain("west")
+	const annualTeq = climate
+		? computeThermalEquator(mesh, climate.temperature_avg)
+		: new Float32Array(TEQ_NUM_BINS)
+	const annual = computePair(annualTeq)
 
-	for (let r = 0; r < N; r++) {
-		east[r] /= wet
-		west[r] /= wet
-		if (east[r] > west[r]) west[r] = 0
-		else east[r] = 0
-	}
-
-	return { east, west }
+	return annual
 }
 
 // ---------------------------------------------------------------------------
@@ -402,11 +472,8 @@ function computeWeight(
 	const moisture = Math.max(eastMoisture, westMoisture)
 	const tropicalDist = dist / controls.hadleyWidth
 	const itcz = itczScale(tropicalDist) * moisture * controls.hadleyWetStrength
-	const suppression = 1 - clamp(
-		subsidenceScale(tropicalDist) * controls.hadleyDryStrength,
-		0,
-		1,
-	)
+	const suppression =
+		1 - clamp(subsidenceScale(tropicalDist) * controls.hadleyDryStrength, 0, 1)
 	const eastStorms = eastStormScale(dist) * eastMoisture
 	const polar = westerliesScale(dist) * westMoisture
 	return clamp(Math.max(itcz * suppression, eastStorms, polar), 0, 1)
@@ -446,10 +513,15 @@ function computeTidalRain(
 	// Compute angular distance from substellar point for each cell
 	const cosTheta = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		cosTheta[r] = Math.max(-1, Math.min(1,
-			mesh.r_xyz[3 * r] * sub[0] +
-			mesh.r_xyz[3 * r + 1] * sub[1] +
-			mesh.r_xyz[3 * r + 2] * sub[2]))
+		cosTheta[r] = Math.max(
+			-1,
+			Math.min(
+				1,
+				mesh.r_xyz[3 * r] * sub[0] +
+					mesh.r_xyz[3 * r + 1] * sub[1] +
+					mesh.r_xyz[3 * r + 2] * sub[2],
+			),
+		)
 	}
 
 	// Noise to break up perfectly smooth concentric rainfall rings.
@@ -480,13 +552,13 @@ function computeTidalRain(
 		// 2) Terminator convergence ring: bell curve peaking ~85° from substellar
 		//    Warm moist air collides with cold nightside air → forced uplift
 		const termDist = Math.abs(thetaDeg - 85)
-		const terminator = Math.exp(-termDist * termDist / (2 * 18 * 18)) * terminatorStrength
+		const terminator =
+			Math.exp((-termDist * termDist) / (2 * 18 * 18)) * terminatorStrength
 
 		// 3) Nightside drizzle: gentle falloff past the terminator
 		//    Advected moisture condenses as it cools; fades toward antistellar
-		const nightside = ct < 0.1
-			? nightsideDrizzle * clamp(1 - (thetaDeg - 95) / 70, 0, 1)
-			: 0
+		const nightside =
+			ct < 0.1 ? nightsideDrizzle * clamp(1 - (thetaDeg - 95) / 70, 0, 1) : 0
 
 		const weight = convection + terminator + nightside
 
@@ -494,8 +566,9 @@ function computeTidalRain(
 		const x = mesh.r_xyz[3 * r]
 		const y = mesh.r_xyz[3 * r + 1]
 		const z = mesh.r_xyz[3 * r + 2]
-		const n = sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1
-			+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
+		const n =
+			sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1 +
+			sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
 		const noiseMul = Math.max(0, 1 + n)
 
 		const rain = weight * ceiling * noiseMul
@@ -510,7 +583,10 @@ function computeTidalRain(
 		for (let month = 0; month < 12; month++) {
 			const offset = month * N
 			for (let r = 0; r < N; r++) {
-				if (!isLand[r]) { smoothBuf[r] = 0; continue }
+				if (!isLand[r]) {
+					smoothBuf[r] = 0
+					continue
+				}
 				let sum = 0
 				let count = 0
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
@@ -552,7 +628,16 @@ export function computeMonthlyRain(
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
 	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "antistellarLon" | "pressure" | "seed">,
+	params?: Pick<
+		OrogenParams,
+		| "obliquity"
+		| "daysPerYear"
+		| "hoursPerDay"
+		| "tidallyLocked"
+		| "antistellarLon"
+		| "pressure"
+		| "seed"
+	>,
 	monthlyTEQ?: Float32Array[],
 ): { monthly: Float32Array; annual: Float32Array } {
 	if (isTidallyLocked(params?.tidallyLocked)) {
@@ -580,17 +665,24 @@ export function computeMonthlyRain(
 	const lonBinWidth = 360 / TEQ_NUM_BINS
 	const regionBin = new Int32Array(N)
 	for (let r = 0; r < N; r++) {
-		regionBin[r] = Math.max(0, Math.min(TEQ_NUM_BINS - 1,
-			Math.floor((lonDeg[r] + 180) / lonBinWidth)))
+		regionBin[r] = Math.max(
+			0,
+			Math.min(TEQ_NUM_BINS - 1, Math.floor((lonDeg[r] + 180) / lonBinWidth)),
+		)
 	}
 
-	const teqPerMonth: Float32Array[] = monthlyTEQ ?? (() => {
-		const result: Float32Array[] = new Array(12)
-		for (let month = 0; month < 12; month++) {
-			result[month] = computeThermalEquator(mesh, climate.temperature_monthly.subarray(month * N, (month + 1) * N))
-		}
-		return result
-	})()
+	const teqPerMonth: Float32Array[] =
+		monthlyTEQ ??
+		(() => {
+			const result: Float32Array[] = new Array(12)
+			for (let month = 0; month < 12; month++) {
+				result[month] = computeThermalEquator(
+					mesh,
+					climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+				)
+			}
+			return result
+		})()
 
 	const monthly = new Float32Array(N * 12)
 	for (let r = 0; r < N; r++) {
@@ -602,7 +694,8 @@ export function computeMonthlyRain(
 			const teq = teqPerMonth[month][bin]
 			const weight = computeWeight(latDeg[r], teq, e, w, circulation)
 			const monthTemp = climate.temperature_monthly[month * N + r]
-			monthly[month * N + r] = weight * ceilingScale(monthTemp) * pressureRainFactor
+			monthly[month * N + r] =
+				weight * ceilingScale(monthTemp) * pressureRainFactor
 		}
 	}
 
@@ -623,8 +716,9 @@ export function computeMonthlyRain(
 			const x = mesh.r_xyz[3 * r]
 			const y = mesh.r_xyz[3 * r + 1]
 			const z = mesh.r_xyz[3 * r + 2]
-			const n = sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1
-				+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
+			const n =
+				sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1 +
+				sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
 			// Multiplicative: clamp factor to [0.55, 1.45]
 			const factor = Math.max(0.55, Math.min(1.45, 1 + n))
 			for (let month = 0; month < 12; month++) {
@@ -638,7 +732,10 @@ export function computeMonthlyRain(
 		for (let month = 0; month < 12; month++) {
 			const offset = month * N
 			for (let r = 0; r < N; r++) {
-				if (!isLand[r]) { smoothBuf[r] = 0; continue }
+				if (!isLand[r]) {
+					smoothBuf[r] = 0
+					continue
+				}
 				let sum = 0
 				let count = 0
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {

@@ -154,7 +154,9 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 }) => {
 	const [tab, setTab] = useState<SimulationTabID>("nations")
 	const [seasonalTab, setSeasonalTab] = useState<"absolute" | "dy">("absolute")
-	const [devSubTab, setDevSubTab] = useState<"provinces" | "nations">("provinces")
+	const [devSubTab, setDevSubTab] = useState<"provinces" | "nations">(
+		"provinces",
+	)
 
 	const isEmpty = windowedHistory.length <= 1
 	const yearRange = isEmpty ? "" : `${rangeStartLabel}-${rangeEndLabel}`
@@ -335,19 +337,21 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				<>
 					<div className="flex justify-end gap-2 mb-2">
 						<button
-							className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none ${devSubTab === "provinces"
-								? "bg-gray-800 text-white border-gray-800"
-								: "text-gray-500 border-gray-300 hover:bg-gray-50"
-								}`}
+							className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none ${
+								devSubTab === "provinces"
+									? "bg-gray-800 text-white border-gray-800"
+									: "text-gray-500 border-gray-300 hover:bg-gray-50"
+							}`}
 							onClick={() => setDevSubTab("provinces")}
 						>
 							Provinces
 						</button>
 						<button
-							className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none ${devSubTab === "nations"
-								? "bg-gray-800 text-white border-gray-800"
-								: "text-gray-500 border-gray-300 hover:bg-gray-50"
-								}`}
+							className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none ${
+								devSubTab === "nations"
+									? "bg-gray-800 text-white border-gray-800"
+									: "text-gray-500 border-gray-300 hover:bg-gray-50"
+							}`}
 							onClick={() => setDevSubTab("nations")}
 						>
 							Nations
@@ -732,19 +736,21 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				<div className="flex flex-col">
 					<div className="flex justify-end gap-2 mb-2">
 						<button
-							className={`px-2 py-1 text-xs border rounded-none ${seasonalTab === "absolute"
-								? "bg-gray-800 text-white border-gray-800"
-								: "text-gray-600 border-gray-300 hover:bg-gray-50"
-								}`}
+							className={`px-2 py-1 text-xs border rounded-none ${
+								seasonalTab === "absolute"
+									? "bg-gray-800 text-white border-gray-800"
+									: "text-gray-600 border-gray-300 hover:bg-gray-50"
+							}`}
 							onClick={() => setSeasonalTab("absolute")}
 						>
 							Absolute
 						</button>
 						<button
-							className={`px-2 py-1 text-xs border rounded-none ${seasonalTab === "dy"
-								? "bg-gray-800 text-white border-gray-800"
-								: "text-gray-600 border-gray-300 hover:bg-gray-50"
-								}`}
+							className={`px-2 py-1 text-xs border rounded-none ${
+								seasonalTab === "dy"
+									? "bg-gray-800 text-white border-gray-800"
+									: "text-gray-600 border-gray-300 hover:bg-gray-50"
+							}`}
 							onClick={() => setSeasonalTab("dy")}
 						>
 							Delta (dY)
@@ -784,7 +790,8 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 				label: e.name,
 				count: ethosCounts[e.ethos] || 0,
 				color: ETHOS_COLORS[e.ethos] || "#ccc",
-			})).filter((d) => d.count > 0)
+			}))
+				.filter((d) => d.count > 0)
 				.sort((a, b) => b.count - a.count)
 
 			// Tradition usage counts
@@ -809,16 +816,28 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 					{/* Summary stats */}
 					<div className="grid grid-cols-3 gap-4 mb-4 px-1">
 						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Heritages</div>
-							<div className="text-xl font-bold text-gray-900 leading-none">{heritages.length}</div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								Heritages
+							</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">
+								{heritages.length}
+							</div>
 						</div>
 						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Cultures</div>
-							<div className="text-xl font-bold text-gray-900 leading-none">{cultures.length}</div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								Cultures
+							</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">
+								{cultures.length}
+							</div>
 						</div>
 						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Traditions</div>
-							<div className="text-xl font-bold text-gray-900 leading-none">{Object.keys(traditionCounts).length}</div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								Traditions
+							</div>
+							<div className="text-xl font-bold text-gray-900 leading-none">
+								{Object.keys(traditionCounts).length}
+							</div>
 						</div>
 					</div>
 
@@ -833,17 +852,24 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 						]
 						const bucketCounts = HERITAGE_BUCKETS.map((b) => ({
 							...b,
-							count: heritages.filter((h) => h.cultures.size >= b.min && h.cultures.size <= b.max).length,
+							count: heritages.filter(
+								(h) => h.cultures.size >= b.min && h.cultures.size <= b.max,
+							).length,
 						})).filter((b) => b.count > 0)
 						const total = bucketCounts.reduce((s, b) => s + b.count, 0)
 						return (
 							<div className="mb-3">
-								<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Heritage Size (cultures per heritage)</div>
+								<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+									Heritage Size (cultures per heritage)
+								</div>
 								<div className="flex h-2.5 overflow-hidden bg-gray-100">
 									{bucketCounts.map((b, i) => (
 										<div
 											key={i}
-											style={{ width: `${(b.count / total) * 100}%`, backgroundColor: b.color }}
+											style={{
+												width: `${(b.count / total) * 100}%`,
+												backgroundColor: b.color,
+											}}
 											title={`${b.label} cultures: ${b.count} heritages`}
 										/>
 									))}
@@ -851,8 +877,13 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 								<div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
 									{bucketCounts.map((b, i) => (
 										<div key={i} className="flex items-center gap-1">
-											<div className="w-1.5 h-1.5" style={{ backgroundColor: b.color }} />
-											<span className="text-[9px] text-gray-500 whitespace-nowrap">{b.label} ({b.count})</span>
+											<div
+												className="w-1.5 h-1.5"
+												style={{ backgroundColor: b.color }}
+											/>
+											<span className="text-[9px] text-gray-500 whitespace-nowrap">
+												{b.label} ({b.count})
+											</span>
 										</div>
 									))}
 								</div>
@@ -862,12 +893,17 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 
 					{/* Ethos distribution */}
 					<div className="mb-3">
-						<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Ethos Distribution</div>
+						<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+							Ethos Distribution
+						</div>
 						<div className="flex h-2.5 overflow-hidden bg-gray-100">
 							{ethosDist.map((d, i) => (
 								<div
 									key={i}
-									style={{ width: `${(d.count / cultures.length) * 100}%`, backgroundColor: d.color }}
+									style={{
+										width: `${(d.count / cultures.length) * 100}%`,
+										backgroundColor: d.color,
+									}}
 									title={`${d.label}: ${d.count}`}
 								/>
 							))}
@@ -875,8 +911,13 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 						<div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
 							{ethosDist.map((d, i) => (
 								<div key={i} className="flex items-center gap-1">
-									<div className="w-1.5 h-1.5" style={{ backgroundColor: d.color }} />
-									<span className="text-[9px] text-gray-500 whitespace-nowrap">{d.label} ({d.count})</span>
+									<div
+										className="w-1.5 h-1.5"
+										style={{ backgroundColor: d.color }}
+									/>
+									<span className="text-[9px] text-gray-500 whitespace-nowrap">
+										{d.label} ({d.count})
+									</span>
 								</div>
 							))}
 						</div>
@@ -885,18 +926,28 @@ export const ActiveTrendsChart: React.FC<ActiveTrendsChartProps> = ({
 					{/* Traditions: most & least used */}
 					<div className="grid grid-cols-2 gap-4">
 						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Most Common</div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								Most Common
+							</div>
 							{top5.map((t) => (
-								<div key={t.key} className="flex items-center justify-between text-[9px] font-mono py-0.5">
+								<div
+									key={t.key}
+									className="flex items-center justify-between text-[9px] font-mono py-0.5"
+								>
 									<span className="text-gray-700 truncate mr-2">{t.name}</span>
 									<span className="text-gray-400 flex-shrink-0">{t.count}</span>
 								</div>
 							))}
 						</div>
 						<div>
-							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Least Common</div>
+							<div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+								Least Common
+							</div>
 							{bottom5.map((t) => (
-								<div key={t.key} className="flex items-center justify-between text-[9px] font-mono py-0.5">
+								<div
+									key={t.key}
+									className="flex items-center justify-between text-[9px] font-mono py-0.5"
+								>
 									<span className="text-gray-700 truncate mr-2">{t.name}</span>
 									<span className="text-gray-400 flex-shrink-0">{t.count}</span>
 								</div>

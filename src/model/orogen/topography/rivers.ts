@@ -1,4 +1,11 @@
-import type { SphereMesh, OrogenClimate, OrogenHydrology, OrogenParams, OrogenRainfall, OrogenRivers } from "../types"
+import type {
+	OrogenClimate,
+	OrogenHydrology,
+	OrogenParams,
+	OrogenRainfall,
+	OrogenRivers,
+	SphereMesh,
+} from "../types"
 import { getDaysPerYear, getHoursPerDay, getPlanetRadiusKm } from "../units"
 
 /**
@@ -58,17 +65,22 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 	return t * t * (3 - 2 * t)
 }
 
-function polylineLengthKm(line: [number, number, number, number][], radiusKm: number): number {
+function polylineLengthKm(
+	line: [number, number, number, number][],
+	radiusKm: number,
+): number {
 	let sum = 0
 	for (let i = 1; i < line.length; i++) {
 		const [lon0, lat0] = line[i - 1]
 		const [lon1, lat1] = line[i]
-		const phi0 = lat0 * Math.PI / 180
-		const phi1 = lat1 * Math.PI / 180
-		const lam0 = lon0 * Math.PI / 180
-		const lam1 = lon1 * Math.PI / 180
-		const sin0 = Math.sin(phi0), cos0 = Math.cos(phi0)
-		const sin1 = Math.sin(phi1), cos1 = Math.cos(phi1)
+		const phi0 = (lat0 * Math.PI) / 180
+		const phi1 = (lat1 * Math.PI) / 180
+		const lam0 = (lon0 * Math.PI) / 180
+		const lam1 = (lon1 * Math.PI) / 180
+		const sin0 = Math.sin(phi0),
+			cos0 = Math.cos(phi0)
+		const sin1 = Math.sin(phi1),
+			cos1 = Math.cos(phi1)
 		const cosTheta = sin0 * sin1 + cos0 * cos1 * Math.cos(lam1 - lam0)
 		sum += Math.acos(Math.max(-1, Math.min(1, cosTheta))) * radiusKm
 	}
@@ -90,7 +102,10 @@ export function computeRivers(
 	const radiusKm = getPlanetRadiusKm(params?.planetRadiusKm)
 	const radiusM = radiusKm * 1000
 	const cellAreaM2 = (4 * Math.PI * radiusM * radiusM) / Math.max(1, N)
-	const secondsPerYear = getDaysPerYear(params?.daysPerYear) * getHoursPerDay(params?.hoursPerDay) * 3600
+	const secondsPerYear =
+		getDaysPerYear(params?.daysPerYear) *
+		getHoursPerDay(params?.hoursPerDay) *
+		3600
 
 	// ── 1. Priority-flood drainage ──────────────────────────────────
 	const drainTarget = new Int32Array(N).fill(-1)
@@ -107,13 +122,15 @@ export function computeRivers(
 	const heap = new MinHeap(key)
 
 	// Use provided land mask, or fall back to elevation-based classification
-	const land: Uint8Array = isLand ?? (() => {
-		const mask = new Uint8Array(N)
-		for (let r = 0; r < N; r++) {
-			if (elevation[r] > 0) mask[r] = 1
-		}
-		return mask
-	})()
+	const land: Uint8Array =
+		isLand ??
+		(() => {
+			const mask = new Uint8Array(N)
+			for (let r = 0; r < N; r++) {
+				if (elevation[r] > 0) mask[r] = 1
+			}
+			return mask
+		})()
 
 	// Track effective water surface for lake detection
 	const waterLevel = new Float32Array(N)
@@ -184,10 +201,10 @@ export function computeRivers(
 				flowToTarget[r] = 0
 				continue
 			}
-			const runoffMm = Math.max(0, rainfall.monthly[idx] - aetMonthly[idx]) * runoffBoost[r]
-			flowToTarget[r] = runoffMm > 0
-				? (runoffMm / 1000) * cellAreaM2 / secondsPerMonth
-				: 0
+			const runoffMm =
+				Math.max(0, rainfall.monthly[idx] - aetMonthly[idx]) * runoffBoost[r]
+			flowToTarget[r] =
+				runoffMm > 0 ? ((runoffMm / 1000) * cellAreaM2) / secondsPerMonth : 0
 			const pet = climate.pet_monthly[idx]
 			const loss = 0.001 + smoothstep(0, monthlyPetHigh, pet) * 0.004
 			passThroughMonth[r] = Math.min(0.999, 1 - loss + passThroughElevBoost[r])
@@ -226,7 +243,8 @@ export function computeRivers(
 
 	// Flood-fill to label connected basin components
 	for (let r = 0; r < N; r++) {
-		if (!land[r] || waterLevel[r] <= elevation[r] + 1e-6 || basinId[r] >= 0) continue
+		if (!land[r] || waterLevel[r] <= elevation[r] + 1e-6 || basinId[r] >= 0)
+			continue
 		const id = nextBasin++
 		const stack = [r]
 		basinId[r] = id
@@ -234,7 +252,11 @@ export function computeRivers(
 			const c = stack.pop()!
 			for (let j = adjOffset[c]; j < adjOffset[c + 1]; j++) {
 				const nb = adjList[j]
-				if (basinId[nb] < 0 && land[nb] && waterLevel[nb] > elevation[nb] + 1e-6) {
+				if (
+					basinId[nb] < 0 &&
+					land[nb] &&
+					waterLevel[nb] > elevation[nb] + 1e-6
+				) {
 					basinId[nb] = id
 					stack.push(nb)
 				}
@@ -244,7 +266,10 @@ export function computeRivers(
 
 	if (nextBasin > 0) {
 		// Collect cells per basin, sum LOCAL rainfall (not upstream river flow)
-		const basinCells: number[][] = Array.from({ length: nextBasin }, (): number[] => [])
+		const basinCells: number[][] = Array.from(
+			{ length: nextBasin },
+			(): number[] => [],
+		)
 		const basinRain = new Float32Array(nextBasin)
 
 		for (let r = 0; r < N; r++) {
@@ -263,7 +288,9 @@ export function computeRivers(
 
 		for (let bid = 0; bid < nextBasin; bid++) {
 			const allCells = basinCells[bid]
-			const cells = allCells.filter(cell => rainfall.annual[cell] > DESERT_THRESHOLD)
+			const cells = allCells.filter(
+				(cell) => rainfall.annual[cell] > DESERT_THRESHOLD,
+			)
 			if (cells.length === 0) {
 				for (const cell of allCells) waterLevel[cell] = elevation[cell]
 				continue
@@ -328,7 +355,7 @@ export function computeRivers(
 
 	// ── 4. Extract river polylines with per-vertex flow + elevation ──
 	const riverCells = processOrder
-		.filter(r => flow[r] >= threshold)
+		.filter((r) => flow[r] >= threshold)
 		.sort((a, b) => elevation[b] - elevation[a])
 
 	const traced = new Uint8Array(N)
@@ -352,7 +379,9 @@ export function computeRivers(
 		let cur = start
 
 		while (cur >= 0) {
-			const x = r_xyz[3 * cur], y = r_xyz[3 * cur + 1], z = r_xyz[3 * cur + 2]
+			const x = r_xyz[3 * cur],
+				y = r_xyz[3 * cur + 1],
+				z = r_xyz[3 * cur + 2]
 			const f = flow[cur]
 			if (f > maxFlow) maxFlow = f
 			line.push([
@@ -371,7 +400,9 @@ export function computeRivers(
 			if (next < 0) break
 			if (land[next] && flow[next] < threshold) break
 			if (!land[next]) {
-				const ox = r_xyz[3 * next], oy = r_xyz[3 * next + 1], oz = r_xyz[3 * next + 2]
+				const ox = r_xyz[3 * next],
+					oy = r_xyz[3 * next + 1],
+					oz = r_xyz[3 * next + 2]
 				line.push([
 					Math.atan2(oy, ox) * DEG,
 					Math.asin(Math.max(-1, Math.min(1, oz))) * DEG,
@@ -382,7 +413,9 @@ export function computeRivers(
 			}
 			// If next cell was already traced, add it for visual junction then stop
 			if (traced[next]) {
-				const ox = r_xyz[3 * next], oy = r_xyz[3 * next + 1], oz = r_xyz[3 * next + 2]
+				const ox = r_xyz[3 * next],
+					oy = r_xyz[3 * next + 1],
+					oz = r_xyz[3 * next + 2]
 				line.push([
 					Math.atan2(oy, ox) * DEG,
 					Math.asin(Math.max(-1, Math.min(1, oz))) * DEG,
@@ -418,7 +451,13 @@ export function computeRivers(
 	for (let r = 0; r < N; r++) {
 		if (!visible[r]) continue
 		const next = drainTarget[r]
-		if (next >= 0 && land[next] && visible[next] && riverId[next] === riverId[r]) continue
+		if (
+			next >= 0 &&
+			land[next] &&
+			visible[next] &&
+			riverId[next] === riverId[r]
+		)
+			continue
 
 		let cur = next
 		const stamp = terminalStamp++

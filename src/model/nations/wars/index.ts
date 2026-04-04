@@ -214,7 +214,11 @@ export const WAR = {
 		if (!victory) NATION.connections(defender.leader)
 
 		// Downgrade "war" to "suspicious" for all opposing pairs
-		RELATIONS.set({ nation: attacker.leader, other: defender.leader, relation: "suspicious" })
+		RELATIONS.set({
+			nation: attacker.leader,
+			other: defender.leader,
+			relation: "suspicious",
+		})
 
 		// If total victory, neighbors of attacker become suspicious (fear of expansion)
 		if (victory) {

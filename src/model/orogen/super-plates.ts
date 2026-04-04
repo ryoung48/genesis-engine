@@ -4,7 +4,7 @@
  * fine-grained detail from individual plate interactions.
  * Faithful port of orogen's super-plates.js.
  */
-import type { SphereMesh, PlateVec, SuperPlateData } from "./types"
+import type { PlateVec, SphereMesh, SuperPlateData } from "./types"
 
 export function buildSuperPlates(
 	mesh: SphereMesh,
@@ -67,7 +67,7 @@ export function buildSuperPlates(
 	let nextSuperPlate = 0
 
 	for (const comp of components) {
-		const k = Math.max(1, Math.round(target * comp.length / numPlates))
+		const k = Math.max(1, Math.round((target * comp.length) / numPlates))
 
 		if (k <= 1) {
 			const spId = nextSuperPlate++
@@ -96,10 +96,12 @@ export function buildSuperPlates(
 				const visited = new Set<number>()
 				for (const s of startPids) dist.set(s, 0)
 				for (let iter = 0; iter < comp.length; iter++) {
-					let cur = -1, minD = Infinity
+					let cur = -1,
+						minD = Infinity
 					for (const pid of comp) {
 						if (!visited.has(pid) && dist.get(pid)! < minD) {
-							minD = dist.get(pid)!; cur = pid
+							minD = dist.get(pid)!
+							cur = pid
 						}
 					}
 					if (cur === -1) break
@@ -116,7 +118,8 @@ export function buildSuperPlates(
 			dijkstraFrom([comp[0]])
 
 			for (let si = 1; si < k; si++) {
-				let farthest = comp[0], maxDist = -1
+				let farthest = comp[0],
+					maxDist = -1
 				for (const pid of comp) {
 					if (dist.get(pid)! > maxDist) {
 						maxDist = dist.get(pid)!
@@ -130,7 +133,10 @@ export function buildSuperPlates(
 			// Multi-source Dijkstra assignment
 			const assignment = new Map<number, number>()
 			const d = new Map<number, number>()
-			for (const pid of comp) { assignment.set(pid, -1); d.set(pid, Infinity) }
+			for (const pid of comp) {
+				assignment.set(pid, -1)
+				d.set(pid, Infinity)
+			}
 			const visited = new Set<number>()
 			for (let si = 0; si < seeds.length; si++) {
 				const spId = nextSuperPlate + si
@@ -138,10 +144,12 @@ export function buildSuperPlates(
 				d.set(seeds[si], 0)
 			}
 			for (let iter = 0; iter < comp.length; iter++) {
-				let cur = -1, minD = Infinity
+				let cur = -1,
+					minD = Infinity
 				for (const pid of comp) {
 					if (!visited.has(pid) && d.get(pid)! < minD) {
-						minD = d.get(pid)!; cur = pid
+						minD = d.get(pid)!
+						cur = pid
 					}
 				}
 				if (cur === -1) break
@@ -176,7 +184,9 @@ export function buildSuperPlates(
 	const spLz = new Float64Array(numSuperPlates)
 	const spOmegaSum = new Float64Array(numSuperPlates)
 	const spAreaSum = new Float64Array(numSuperPlates)
-	const spLargestPlate: (null | { pid: number; area: number })[] = new Array(numSuperPlates).fill(null)
+	const spLargestPlate: (null | { pid: number; area: number })[] = new Array(
+		numSuperPlates,
+	).fill(null)
 
 	for (const pid of plateSeeds) {
 		const spId = plateToSuperPlate.get(pid)!
@@ -184,7 +194,9 @@ export function buildSuperPlates(
 		if (!pv) continue
 		const area = plateArea.get(pid) || 0
 		const omega = pv.omega
-		const px = pv.pole[0], py = pv.pole[1], pz = pv.pole[2]
+		const px = pv.pole[0],
+			py = pv.pole[1],
+			pz = pv.pole[2]
 
 		spLx[spId] += area * omega * px
 		spLy[spId] += area * omega * py
@@ -199,7 +211,9 @@ export function buildSuperPlates(
 
 	const superPlateVec = new Map<number, PlateVec>()
 	for (let sp = 0; sp < numSuperPlates; sp++) {
-		const lx = spLx[sp], ly = spLy[sp], lz = spLz[sp]
+		const lx = spLx[sp],
+			ly = spLy[sp],
+			lz = spLz[sp]
 		const lLen = Math.sqrt(lx * lx + ly * ly + lz * lz)
 
 		if (lLen < 1e-8 || spAreaSum[sp] < 1) {
@@ -256,5 +270,11 @@ export function buildSuperPlates(
 		)
 	}
 
-	return { r_superPlate, superPlateVec, superPlateIsOcean, superPlateDensity, numSuperPlates }
+	return {
+		r_superPlate,
+		superPlateVec,
+		superPlateIsOcean,
+		superPlateDensity,
+		numSuperPlates,
+	}
 }

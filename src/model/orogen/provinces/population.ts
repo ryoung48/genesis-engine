@@ -3,14 +3,17 @@
  * Computes per-province habitability and distributes population proportionally.
  * O(provinceCount) time, typed arrays.
  */
+
+import { createRng } from "../rng"
 import type { OrogenProvinces } from "../types"
 import type { OrogenLandmarks } from "./landmarks"
-import { createRng } from "../rng"
 
 // Habitability factors indexed by orogen codes
 
 // climateZones: 0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic
-const HAB_CLIMATE = new Float32Array([0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01])
+const HAB_CLIMATE = new Float32Array([
+	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,
+])
 
 // vegetation: 0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle
 const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
@@ -26,6 +29,8 @@ export interface ProvincePopulation {
 	habitability: Float32Array
 	/** Per-province rural population */
 	population: Float32Array
+	/** Aggregated global habitability score */
+	habitabilityScore: number
 	/** Total world population */
 	totalPopulation: number
 }
@@ -73,13 +78,13 @@ export function computePopulation(
 	const sphereAreaKm2 = 4 * Math.PI * (planetRadiusKm ?? 6371) ** 2
 	const cellAreaKm2 = sphereAreaKm2 / N
 
-	let habScore = 0
+	let habitabilityScore = 0
 	for (let i = 0; i < count; i++) {
-		habScore += size[i] * cellAreaKm2 * habitability[i]
+		habitabilityScore += size[i] * cellAreaKm2 * habitability[i]
 	}
-	habScore /= 1e9
+	habitabilityScore /= 1.481e9
 
-	const totalPop = 215e6 * habScore
+	const totalPop = 215e6 * habitabilityScore
 
 	const population = new Float32Array(count)
 	if (totalHab > 0) {
@@ -88,5 +93,10 @@ export function computePopulation(
 		}
 	}
 
-	return { habitability, population, totalPopulation: totalPop }
+	return {
+		habitability,
+		population,
+		habitabilityScore,
+		totalPopulation: totalPop,
+	}
 }

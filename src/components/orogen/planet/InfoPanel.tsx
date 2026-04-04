@@ -1,19 +1,31 @@
 import React from "react"
+import { DAYLIGHT } from "@/model/cells/daylight"
+import {
+	koppenClimateColor,
+	koppenTrueColor,
+} from "@/model/orogen/climate/koppen"
+import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
+import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model/orogen/types"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import {
+	type ColorMode,
 	climateTempColor,
 	climateZoneColor,
 	dangerColor,
-	type ColorMode,
 	vegetationColor,
 } from "../colors"
-import { DAYLIGHT } from "@/model/cells/daylight"
-import { koppenClimateColor, koppenTrueColor } from "@/model/orogen/climate/koppen"
-import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
-import type { PlanetStat } from "./planet-stats"
-import type { HoverHazards, HoverHotspot, HoverInfo, HoverLandmark, HoverOceanCurrents, HoverRiver, HoverTerrainFeature, HoverWind } from "./hover"
 import { monthLabels } from "./constants"
-import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model/orogen/types"
+import type {
+	HoverHazards,
+	HoverHotspot,
+	HoverInfo,
+	HoverLandmark,
+	HoverOceanCurrents,
+	HoverRiver,
+	HoverTerrainFeature,
+	HoverWind,
+} from "./hover"
+import type { PlanetStat } from "./planet-stats"
 import { getTerrainFeatureColor, getTopographyColor } from "./region-colors"
 
 const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
@@ -50,9 +62,13 @@ function MiniBarChart({
 	return (
 		<div>
 			<div className="mb-2 flex items-baseline justify-between">
-				<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">{label}</span>
+				<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">
+					{label}
+				</span>
 				<span className="font-mono text-[9px] text-slate-500">
-					{annualValue !== undefined ? `${annualPrefix} ${formatValue ? formatValue(annualValue) : annualValue.toFixed(annualDigits)} ${unit}` : ""}
+					{annualValue !== undefined
+						? `${annualPrefix} ${formatValue ? formatValue(annualValue) : annualValue.toFixed(annualDigits)} ${unit}`
+						: ""}
 				</span>
 			</div>
 			<div className="relative flex h-[28px] gap-px">
@@ -65,10 +81,13 @@ function MiniBarChart({
 				{values.map((v, i) => {
 					const barH = Math.abs(v) / range
 					const isSelected = i === globalMonth - 1
-					const valueLabel = formatValue ? formatValue(v) : v.toFixed(label === "Temp" ? 1 : 0)
-					const labelBottom = v >= 0
-						? `calc(${(1 - zeroY) * 100 + barH * zeroY * 100}% + 2px)`
-						: `calc(${(1 - zeroY) * 100}% + 2px)`
+					const valueLabel = formatValue
+						? formatValue(v)
+						: v.toFixed(label === "Temp" ? 1 : 0)
+					const labelBottom =
+						v >= 0
+							? `calc(${(1 - zeroY) * 100 + barH * zeroY * 100}% + 2px)`
+							: `calc(${(1 - zeroY) * 100}% + 2px)`
 					return (
 						<div
 							key={i}
@@ -148,39 +167,75 @@ function flowColor(v: number): string {
 	return "#1d4ed8"
 }
 
+function currentImpactColor(v: number): string {
+	return v >= 0 ? "#f59e0b" : "#38bdf8"
+}
+
 function Row({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex items-baseline justify-between">
-			<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">{label}</span>
+			<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">
+				{label}
+			</span>
 			<span className="font-mono text-[10px] text-slate-100">{value}</span>
 		</div>
 	)
 }
 
-function SwatchRow({ label, value, color }: { label: string; value: string; color: string | null }) {
+function SwatchRow({
+	label,
+	value,
+	color,
+}: {
+	label: string
+	value: string
+	color: string | null
+}) {
 	return (
 		<div className="flex items-baseline justify-between gap-2">
-			<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">{label}</span>
+			<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">
+				{label}
+			</span>
 			<span className="flex items-center gap-1.5 font-mono text-[10px] text-slate-100">
-				{color && <span className="h-2 w-2 border border-white/15" style={{ backgroundColor: color }} />}
+				{color && (
+					<span
+						className="h-2 w-2 border border-white/15"
+						style={{ backgroundColor: color }}
+					/>
+				)}
 				<span>{value}</span>
 			</span>
 		</div>
 	)
 }
 
-function MultiSwatchRow({ label, values }: { label: string; values: Array<{ label: string; color: string | null }> }) {
+function MultiSwatchRow({
+	label,
+	values,
+}: {
+	label: string
+	values: Array<{ label: string; color: string | null }>
+}) {
 	return (
 		<div className="flex items-baseline justify-between gap-2">
-			<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">{label}</span>
+			<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">
+				{label}
+			</span>
 			<span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 font-mono text-[10px] text-slate-100">
 				{values.map((value, index) => (
 					<React.Fragment key={`${value.label}-${index}`}>
 						<span className="inline-flex items-center gap-1.5">
-							{value.color && <span className="h-2 w-2 border border-white/15" style={{ backgroundColor: value.color }} />}
+							{value.color && (
+								<span
+									className="h-2 w-2 border border-white/15"
+									style={{ backgroundColor: value.color }}
+								/>
+							)}
 							<span>{value.label}</span>
 						</span>
-						{index < values.length - 1 && <span className="text-slate-500">,</span>}
+						{index < values.length - 1 && (
+							<span className="text-slate-500">,</span>
+						)}
 					</React.Fragment>
 				))}
 			</span>
@@ -194,9 +249,12 @@ function rgbToCss([r, g, b]: [number, number, number]): string {
 
 function formatCompactNumber(value: number): string {
 	if (!Number.isFinite(value)) return "0"
-	if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(value >= 10_000_000_000 ? 0 : 1).replace(/\.0$/, "")}B`
-	if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`
-	if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, "")}k`
+	if (value >= 1_000_000_000)
+		return `${(value / 1_000_000_000).toFixed(value >= 10_000_000_000 ? 0 : 1).replace(/\.0$/, "")}B`
+	if (value >= 1_000_000)
+		return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`
+	if (value >= 1_000)
+		return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1).replace(/\.0$/, "")}k`
 	return value
 		.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)
 		.replace(/\.0+$/, "")
@@ -242,7 +300,9 @@ interface InfoPanelProps {
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
 }
 
-export const GlobalInfoPanel: React.FC<{ planetStats: PlanetStat[] }> = ({ planetStats }) => {
+export const GlobalInfoPanel: React.FC<{ planetStats: PlanetStat[] }> = ({
+	planetStats,
+}) => {
 	const visibleStats = planetStats.filter((stat) => hasDisplayValue(stat.value))
 
 	return (
@@ -290,9 +350,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		const precip: number[] = []
 		const daylight: number[] = []
 		for (let m = 0; m < 12; m++) {
-			temps.push(world.climate ? world.climate.temperature_monthly[m * N + r] : 0)
+			temps.push(
+				world.climate ? world.climate.temperature_monthly[m * N + r] : 0,
+			)
 			precip.push(world.rainfall ? world.rainfall.monthly[m * N + r] : 0)
-			daylight.push(world.climate?.daylight_hours_monthly ? world.climate.daylight_hours_monthly[m * N + r] : 0)
+			daylight.push(
+				world.climate?.daylight_hours_monthly
+					? world.climate.daylight_hours_monthly[m * N + r]
+					: 0,
+			)
 		}
 		const isLand = world.isLand?.[r]
 		const iceThickness = world.iceThickness?.[r] ?? 0
@@ -307,7 +373,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			? (hoverLandmark.size / world.mesh.numRegions) * 100
 			: null
 	const annualTemp = world.climate.temperature_avg[hoverRegion]
-	const annualPrecip = chartData ? chartData.precip.reduce((sum, value) => sum + value, 0) : null
+	const annualPrecip = chartData
+		? chartData.precip.reduce((sum, value) => sum + value, 0)
+		: null
 	const climateColor =
 		hoverRegion === null || !world
 			? null
@@ -321,40 +389,60 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							? rgbToCss(koppenTrueColor(world.koppenClimate[hoverRegion]))
 							: world.climateZones
 								? rgbToCss(
-									colorMode === "climate" && world.climate
-										? climateTempColor(world.climate.temperature_avg[hoverRegion])
-										: climateZoneColor(world.climateZones[hoverRegion]),
-								)
+										colorMode === "climate" && world.climate
+											? climateTempColor(
+													world.climate.temperature_avg[hoverRegion],
+												)
+											: climateZoneColor(world.climateZones[hoverRegion]),
+									)
 								: null
 	const vegetationSwatch =
-		hoverRegion !== null && world?.vegetation ? rgbToCss(vegetationColor(world.vegetation[hoverRegion])) : null
+		hoverRegion !== null && world?.vegetation
+			? rgbToCss(vegetationColor(world.vegetation[hoverRegion]))
+			: null
 	const topographySwatch =
-		hoverRegion !== null && world?.topography ? (() => {
-			const color = getTopographyColor(world.topography[hoverRegion])
-			return color ? rgbToCss(color) : null
-		})() : null
+		hoverRegion !== null && world?.topography
+			? (() => {
+					const color = getTopographyColor(world.topography[hoverRegion])
+					return color ? rgbToCss(color) : null
+				})()
+			: null
 	const terrainFeatureSwatches = hoverTerrainFeature
-		? Array.from(new Set([
-			hoverTerrainFeature.dominant,
-			...hoverTerrainFeature.all,
-		].filter((feature): feature is string => Boolean(feature)))).map((feature) => {
-			const featureIndex = OROGEN_TERRAIN_FEATURE_LABELS.indexOf(feature as typeof OROGEN_TERRAIN_FEATURE_LABELS[number])
-			const featureColor = featureIndex >= 0 ? getTerrainFeatureColor(featureIndex) : null
-			return {
-				label: feature,
-				color: featureColor ? rgbToCss(featureColor) : null,
-			}
-		})
+		? Array.from(
+				new Set(
+					[hoverTerrainFeature.dominant, ...hoverTerrainFeature.all].filter(
+						(feature): feature is string => Boolean(feature),
+					),
+				),
+			).map((feature) => {
+				const featureIndex = OROGEN_TERRAIN_FEATURE_LABELS.indexOf(
+					feature as (typeof OROGEN_TERRAIN_FEATURE_LABELS)[number],
+				)
+				const featureColor =
+					featureIndex >= 0 ? getTerrainFeatureColor(featureIndex) : null
+				return {
+					label: feature,
+					color: featureColor ? rgbToCss(featureColor) : null,
+				}
+			})
 		: []
 	const slopeScoreByRegion = world?.slopeScore ?? null
 	const hoverSlopePercent =
-		hoverRegion !== null && slopeScoreByRegion ? slopeScoreByRegion[hoverRegion] * 100 : null
+		hoverRegion !== null && slopeScoreByRegion
+			? slopeScoreByRegion[hoverRegion] * 100
+			: null
+	const hasCurrentImpact =
+		hoverOceanCurrents !== null &&
+		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
 
 	return (
 		<div className="pointer-events-auto absolute top-3 left-3 z-20 w-64 rounded-2xl border border-white/10 bg-slate-950/85 px-3 py-2 text-white shadow-2xl backdrop-blur-md">
 			<div ref={hoverCardRef} className="space-y-0.5">
 				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
-				<Row label="Elev" value={`${hoverElevationKm.toFixed(2)} km${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`} />
+				<Row
+					label="Elev"
+					value={`${hoverElevationKm.toFixed(2)} km${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
+				/>
 				{hoverLandmark && (
 					<Row
 						label="Landmark"
@@ -362,10 +450,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					/>
 				)}
 				{colorMode === "temperatureDelta" && hoverTemperatureDelta !== null && (
-					<Row label="Temp Δ" value={`${hoverTemperatureDelta.toFixed(1)} °C`} />
+					<Row
+						label="Temp Δ"
+						value={`${hoverTemperatureDelta.toFixed(1)} °C`}
+					/>
 				)}
 				{hoverIceSummary && <Row label="Ice" value={hoverIceSummary} />}
-				{/* {terrainFeatureSwatches.length > 0 && <MultiSwatchRow label="Features" values={terrainFeatureSwatches} />} */}
+				{colorMode === "terrainFeatures" &&
+					terrainFeatureSwatches.length > 0 && (
+						<MultiSwatchRow label="Features" values={terrainFeatureSwatches} />
+					)}
 				{hoverHazards && (
 					<>
 						<SwatchRow
@@ -381,15 +475,23 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						/>
 					</>
 				)}
-				{hoverTopography && <SwatchRow label="Topography" value={hoverTopography} color={topographySwatch} />}
-				{hoverClimateDisplay && <SwatchRow label="Climate" value={hoverClimateDisplay} color={climateColor} />}
-				{colorMode === "oceanCurrents" && hoverOceanCurrents !== null && (
-					<Row
-						label="Current"
-						value={`${hoverOceanCurrents.warmth >= 0 ? "warm" : "cold"}${Math.abs(hoverOceanCurrents.delta) >= 0.1 ? ` · ${hoverOceanCurrents.delta >= 0 ? "+" : ""}${hoverOceanCurrents.delta.toFixed(1)} °C` : ""}`}
+				{hoverTopography && (
+					<SwatchRow
+						label="Topography"
+						value={hoverTopography}
+						color={topographySwatch}
 					/>
 				)}
-				{hoverBiome && <SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />}
+				{hoverClimateDisplay && (
+					<SwatchRow
+						label="Climate"
+						value={hoverClimateDisplay}
+						color={climateColor}
+					/>
+				)}
+				{hoverBiome && (
+					<SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />
+				)}
 				{hoverProvince !== null && hoverProvince >= 0 && (
 					<>
 						<Row
@@ -409,10 +511,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 											? `${(pop / 1_000).toFixed(0)}K`
 											: Math.round(pop).toLocaleString()
 								const radiusKm = world.params.planetRadiusKm ?? 6371
-								const cellAreaKm2 = (4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
+								const cellAreaKm2 =
+									(4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
 								const areaKm2 = world.provinces.size[p] * cellAreaKm2
 								const density = pop / areaKm2
-								return <Row label="Pop" value={`${popStr} · ${density.toFixed(1)}/km²`} />
+								return (
+									<Row
+										label="Pop"
+										value={`${popStr} · ${density.toFixed(1)}/km²`}
+									/>
+								)
 							})()}
 					</>
 				)}
@@ -449,7 +557,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							unit="h"
 							colorFn={(v) => DAYLIGHT.color(v)}
 							globalMonth={globalMonth}
-							annualValue={chartData.daylight.reduce((sum, value) => sum + value, 0) / chartData.daylight.length}
+							annualValue={
+								chartData.daylight.reduce((sum, value) => sum + value, 0) /
+								chartData.daylight.length
+							}
 							annualDigits={1}
 							annualPrefix="AVG"
 							showValues
@@ -477,6 +588,24 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								showValues
 							/>
 						)}
+						{colorMode === "oceanCurrents" &&
+							hasCurrentImpact &&
+							hoverOceanCurrents !== null && (
+								<div className="space-y-1 border-t border-white/5 pt-1">
+									<MiniBarChart
+										values={hoverOceanCurrents.monthlyDelta}
+										label="Ocean Current"
+										unit="°C"
+										colorFn={(v) => currentImpactColor(v)}
+										globalMonth={globalMonth}
+										formatValue={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`}
+										annualValue={hoverOceanCurrents.averageDelta}
+										annualDigits={1}
+										annualPrefix={`${hoverOceanCurrents.mode} · avg`}
+										showValues
+									/>
+								</div>
+							)}
 						{hoverRiver && hoverRiver.flow_monthly.length === 12 && (
 							<MiniBarChart
 								values={hoverRiver.flow_monthly}
@@ -500,5 +629,3 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		</div>
 	)
 }
-
-

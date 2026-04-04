@@ -14,17 +14,23 @@ export type Tradition = {
 }
 
 // ─── Condition helpers ────────────────────────────────────────────────────────
-const isForest = (c: Cell) => c.vegetation === "woods" || c.vegetation === "forest"
+const isForest = (c: Cell) =>
+	c.vegetation === "woods" || c.vegetation === "forest"
 const isJungle = (c: Cell) => c.vegetation === "jungle"
 const isDesert = (c: Cell) => c.vegetation === "desert"
-const isDry = (c: Cell) => c.vegetation === "desert" || c.vegetation === "sparse"
+const isDry = (c: Cell) =>
+	c.vegetation === "desert" || c.vegetation === "sparse"
 const isGrassland = (c: Cell) => c.vegetation === "grasslands"
 const isHills = (c: Cell) => c.topography === "hills"
 const isMountains = (c: Cell) => c.topography === "mountains" || !!c.isMountains
 const isMarsh = (c: Cell) => c.topography === "marsh"
-const isFlat = (c: Cell) => c.topography === "flat" || c.topography === "coastal" || c.topography === "plateau"
+const isFlat = (c: Cell) =>
+	c.topography === "flat" ||
+	c.topography === "coastal" ||
+	c.topography === "plateau"
 const isCoastal = (c: Cell) => c.topography === "coastal"
-const isWarm = (c: Cell) => c.climate === "subtropical" || c.climate === "tropical"
+const isWarm = (c: Cell) =>
+	c.climate === "subtropical" || c.climate === "tropical"
 const isFarmland = (c: Cell) => isGrassland(c) && isFlat(c)
 const always = (_c: Cell) => true
 
@@ -390,7 +396,7 @@ export const TRADITIONS: Tradition[] = [
 		key: "merciful_blinding",
 		name: "Merciful Blinding",
 		description:
-			"Prefers mutilation to execution, using sanctioned blinding as \"mercy\" and earning piety for harsh restraint.",
+			'Prefers mutilation to execution, using sanctioned blinding as "mercy" and earning piety for harsh restraint.',
 		category: "warfare",
 		preferredEthos: ["ceremonious", "stoic"],
 		condition: always,
@@ -600,7 +606,7 @@ export const TRADITIONS: Tradition[] = [
 		key: "thunder_drums",
 		name: "Thunder Drums",
 		description:
-			"Massive drums are used as long-distance communication and as ritual instruments said to \"wake\" the storm.",
+			'Massive drums are used as long-distance communication and as ritual instruments said to "wake" the storm.',
 		category: "ritual",
 		preferredEthos: ["spiritual", "bellicose"],
 		condition: always,

@@ -2,19 +2,23 @@ import React, { useCallback, useMemo, useState } from "react"
 import { LANGUAGE } from "@/model/actors/language/languages"
 import { PhonemeCatalog } from "@/model/actors/language/languages/types"
 
-
-function toPercentages(dist: { v: string; w: number }[]): Array<{ v: string; pct: number }> {
+function toPercentages(
+	dist: { v: string; w: number }[],
+): Array<{ v: string; pct: number }> {
 	const total = dist.reduce((s, x) => s + x.w, 0)
 	return dist
-		.map(({ v, w }) => ({ v, pct: total > 0 ? Math.round((w / total) * 100) : 0 }))
+		.map(({ v, w }) => ({
+			v,
+			pct: total > 0 ? Math.round((w / total) * 100) : 0,
+		}))
 		.sort((a, b) => b.pct - a.pct)
 }
 
-const WordSection: React.FC<{ title: string; words: string[]; cols?: number }> = ({
-	title,
-	words,
-	cols = 2,
-}) => (
+const WordSection: React.FC<{
+	title: string
+	words: string[]
+	cols?: number
+}> = ({ title, words, cols = 2 }) => (
 	<div>
 		<div className="font-mono text-[9px] uppercase tracking-widest text-slate-400 mb-1.5">
 			{title}
@@ -85,16 +89,20 @@ export const LanguageLab: React.FC<LanguageLabProps> = ({
 	onBack,
 	initialSeed = "nexus",
 }) => {
-	const [seed, setSeed] = useState(initialSeed)
+	const [_seed, setSeed] = useState(initialSeed)
 	const [draft, setDraft] = useState(initialSeed)
 	const [lang, setLang] = useState(() => LANGUAGE.spawn(initialSeed))
 	const [sampleVersion, setSampleVersion] = useState(0)
-	const [rightTab, setRightTab] = useState<"consonants" | "vowels">("consonants")
+	const [rightTab, setRightTab] = useState<"consonants" | "vowels">(
+		"consonants",
+	)
 
 	const data = useMemo(() => {
 		const gen = (key: string, n: number) =>
-			Array.from({ length: n }, () =>
-				LANGUAGE.word.simple({ lang, key, repeat: sampleVersion > 0 }).word,
+			Array.from(
+				{ length: n },
+				() =>
+					LANGUAGE.word.simple({ lang, key, repeat: sampleVersion > 0 }).word,
 			)
 
 		return {
@@ -131,7 +139,9 @@ export const LanguageLab: React.FC<LanguageLabProps> = ({
 	const classification = useMemo(() => LANGUAGE.classify(lang), [lang])
 
 	const endingLabel =
-		lang.ending === PhonemeCatalog.MIDDLE_VOWEL ? "vowel endings" : "consonant endings"
+		lang.ending === PhonemeCatalog.MIDDLE_VOWEL
+			? "vowel endings"
+			: "consonant endings"
 	const stopLabel =
 		lang.stop === "'"
 			? `apostrophe · ${Math.round(lang.stopChance * 100)}%`
@@ -252,7 +262,9 @@ export const LanguageLab: React.FC<LanguageLabProps> = ({
 							<Chip>{lang.phonemeClass}</Chip>
 							<Chip>{endingLabel}</Chip>
 							{classification.extType && <Chip>{classification.extType}</Chip>}
-							{classification.orthoStyle && <Chip>{classification.orthoStyle}</Chip>}
+							{classification.orthoStyle && (
+								<Chip>{classification.orthoStyle}</Chip>
+							)}
 							{classification.hasGemination && <Chip>gemination</Chip>}
 							{stopLabel && <Chip>{stopLabel}</Chip>}
 							{lang.surnames.patronymic && <Chip>patronymic</Chip>}
@@ -262,19 +274,51 @@ export const LanguageLab: React.FC<LanguageLabProps> = ({
 					<div className="flex-1 min-h-0 overflow-y-auto">
 						{rightTab === "vowels" && (
 							<div className="space-y-5">
-								<PhonemeSection title="Vowels · Start" entries={data.vStart} cap={10} />
-								<PhonemeSection title="Vowels · Front" entries={data.vFront} cap={10} />
-								<PhonemeSection title="Vowels · Middle" entries={data.vMiddle} cap={10} />
-								<PhonemeSection title="Vowels · Back" entries={data.vBack} cap={10} />
-								<PhonemeSection title="Vowels · End" entries={data.vEnd} cap={10} />
+								<PhonemeSection
+									title="Vowels · Start"
+									entries={data.vStart}
+									cap={10}
+								/>
+								<PhonemeSection
+									title="Vowels · Front"
+									entries={data.vFront}
+									cap={10}
+								/>
+								<PhonemeSection
+									title="Vowels · Middle"
+									entries={data.vMiddle}
+									cap={10}
+								/>
+								<PhonemeSection
+									title="Vowels · Back"
+									entries={data.vBack}
+									cap={10}
+								/>
+								<PhonemeSection
+									title="Vowels · End"
+									entries={data.vEnd}
+									cap={10}
+								/>
 							</div>
 						)}
 
 						{rightTab === "consonants" && (
 							<div className="space-y-5">
-								<PhonemeSection title="Consonants · Initial" entries={data.cStart} cap={10} />
-								<PhonemeSection title="Consonants · Medial" entries={data.cMid} cap={10} />
-								<PhonemeSection title="Consonants · Final" entries={data.cEnd} cap={10} />
+								<PhonemeSection
+									title="Consonants · Initial"
+									entries={data.cStart}
+									cap={10}
+								/>
+								<PhonemeSection
+									title="Consonants · Medial"
+									entries={data.cMid}
+									cap={10}
+								/>
+								<PhonemeSection
+									title="Consonants · Final"
+									entries={data.cEnd}
+									cap={10}
+								/>
 							</div>
 						)}
 					</div>
@@ -284,8 +328,8 @@ export const LanguageLab: React.FC<LanguageLabProps> = ({
 			{onBack && (
 				<div className="flex-none px-6 py-2 border-t border-slate-100 bg-slate-50/40">
 					<span className="font-mono text-[9px] text-slate-300 uppercase tracking-widest">
-						Change seed to regenerate · All words are phonologically consistent per language
-						rules
+						Change seed to regenerate · All words are phonologically consistent
+						per language rules
 					</span>
 				</div>
 			)}

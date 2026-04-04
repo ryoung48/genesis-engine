@@ -1,7 +1,7 @@
 import { WORLD } from "@/model"
 import { PROVINCE } from "@/model/provinces"
-import { LANGUAGE } from "../language/languages"
 import { Faith } from "../faith/types"
+import { LANGUAGE } from "../language/languages"
 import { Religion } from "./types"
 
 export const RELIGION = {

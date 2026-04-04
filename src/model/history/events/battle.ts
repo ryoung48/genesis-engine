@@ -125,10 +125,12 @@ export const BATTLE_EVENT = {
 			return
 		}
 
-		const odds = 1 - WAR.threat({
-			attacker: attacker.leader,
-			defender: defender.leader,
-		})
+		const odds =
+			1 -
+			WAR.threat({
+				attacker: attacker.leader,
+				defender: defender.leader,
+			})
 		const outcome = window.dice.random < odds
 		const margin = window.dice.uniform(0, 1)
 

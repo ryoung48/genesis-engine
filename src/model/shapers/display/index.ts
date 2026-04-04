@@ -67,13 +67,14 @@ export const SHAPER_DISPLAY = {
 	},
 	_islands: () => {
 		// all land landmarks at depth >= 1 whose parent still exists
-		const landmarks = WORLD.landmarks("land").filter(
-			(i) => {
-				const lm = window.world.landmarks[i]
-				return (lm.depth ?? 0) >= 1 &&
-					(lm.parent === undefined || window.world.landmarks[lm.parent] !== undefined)
-			},
-		)
+		const landmarks = WORLD.landmarks("land").filter((i) => {
+			const lm = window.world.landmarks[i]
+			return (
+				(lm.depth ?? 0) >= 1 &&
+				(lm.parent === undefined ||
+					window.world.landmarks[lm.parent] !== undefined)
+			)
+		})
 		const islands = drawCoasts({
 			landmarks: landmarks,
 			coastFilter: (i) => (e) =>

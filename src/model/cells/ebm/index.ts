@@ -54,13 +54,19 @@ export class EnergyBalanceModel {
 		const hoursPerDay = this.config.time?.HOURS_PER_DAY || time.HOURS_PER_DAY
 		const earthDayHours = 24.0
 		const rotationFactor = Math.pow(earthDayHours / hoursPerDay, 0.5)
-		const radiusRatio = planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
+		const radiusRatio =
+			planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
 		const radiusFactor = radiusRatio * radiusRatio // D scales as 1/R²
 		const pressureFactor = Math.pow(this.config.pressure ?? 1.0, 0.5) // denser atm → more transport
 
 		const diffuser = (latDeg: number) => {
 			const absLat = Math.abs(latDeg)
-			return (0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) * radiusFactor * pressureFactor * rotationFactor
+			return (
+				(0.1 + 0.5 * Math.exp(-Math.pow((absLat - 45) / 25, 2))) *
+				radiusFactor *
+				pressureFactor *
+				rotationFactor
+			)
 		}
 
 		const T: number[] = this.temperature.map((row) => row[tIdx])
@@ -119,8 +125,7 @@ export class EnergyBalanceModel {
 
 		for (let i = 0; i < grid.NUM_LAT; i++) {
 			this.olr[i][tIdx] =
-				olrA +
-				olrB * (this.temperature[i][tIdx] - surface.OLR_T_REF)
+				olrA + olrB * (this.temperature[i][tIdx] - surface.OLR_T_REF)
 		}
 
 		const diffTerm = this.heatDiffusion(tIdx)
@@ -165,7 +170,8 @@ export class EnergyBalanceModel {
 			this.dx.push(this.sin_lat_bounds[i + 1] - this.sin_lat_bounds[i])
 			this.heat_capacity.push(
 				(thermal.LAND_HEAT_CAPACITY * this.land_fraction[i] +
-					thermal.OCEAN_HEAT_CAPACITY * (1 - this.land_fraction[i])) * pressureCapFactor,
+					thermal.OCEAN_HEAT_CAPACITY * (1 - this.land_fraction[i])) *
+					pressureCapFactor,
 			)
 			this.temperature.push(new Array(time.DAYS_PER_YEAR).fill(288.0))
 			this.albedo.push(new Array(time.DAYS_PER_YEAR).fill(0))
@@ -194,8 +200,10 @@ export class EnergyBalanceModel {
 		this.initModel()
 		const { grid, time } = EMB_CONSTANTS
 		const secondsPerDay = 24 * 3600
-		const yearLengthDays = this.config.time?.YEAR_LENGTH_DAYS || time.DAYS_PER_YEAR
-		const secondsPerSampleDay = (yearLengthDays / time.DAYS_PER_YEAR) * secondsPerDay
+		const yearLengthDays =
+			this.config.time?.YEAR_LENGTH_DAYS || time.DAYS_PER_YEAR
+		const secondsPerSampleDay =
+			(yearLengthDays / time.DAYS_PER_YEAR) * secondsPerDay
 		const dt = dtDays * secondsPerSampleDay
 		const stepsPerDay = Math.floor(1.0 / dtDays)
 		const totalSteps = time.DAYS_PER_YEAR * stepsPerDay * years
@@ -276,10 +284,8 @@ export const EBM = {
 						YEAR_LENGTH_DAYS: world.daysPerYear,
 						HOURS_PER_DAY: world.hoursPerDay,
 					}
-				if (world.radius !== undefined)
-					config.radius = world.radius * 1000 // km to meters
-				if (world.pressure !== undefined)
-					config.pressure = world.pressure
+				if (world.radius !== undefined) config.radius = world.radius * 1000 // km to meters
+				if (world.pressure !== undefined) config.pressure = world.pressure
 			}
 
 			defaultInstance = new EnergyBalanceModel(config)

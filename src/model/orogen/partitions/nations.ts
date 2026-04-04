@@ -1,11 +1,11 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from "../types"
-import { generatePartitionColorsWithSeed } from "./shared"
 import {
 	buildChildrenCSR,
 	buildSovereign,
 	computeGravity,
 	rebalanceHierarchy,
 } from "./hierarchy"
+import { generatePartitionColorsWithSeed } from "./shared"
 
 const NATION_PERCENTAGES = normalize([0.025, 0.05, 0.1, 0.2, 0.3, 0.4])
 const NATION_BUCKETS: [number, number][] = [
@@ -76,7 +76,8 @@ export function computeNations(params: {
 
 		const frontier = new Set<number>()
 		for (
-			let j = provinces.adjOffset[seedProvince], jEnd = provinces.adjOffset[seedProvince + 1];
+			let j = provinces.adjOffset[seedProvince],
+				jEnd = provinces.adjOffset[seedProvince + 1];
 			j < jEnd;
 			j++
 		) {
@@ -145,7 +146,8 @@ export function computeNations(params: {
 			for (let i = 0; i < members.length; i++) {
 				const province = members[i]
 				for (
-					let j = provinces.adjOffset[province], jEnd = provinces.adjOffset[province + 1];
+					let j = provinces.adjOffset[province],
+						jEnd = provinces.adjOffset[province + 1];
 					j < jEnd;
 					j++
 				) {
@@ -336,7 +338,10 @@ function buildNationPlan(total: number): {
 		const avg = (minSize + maxSize) / 2
 		const minCount = Math.max(1, Math.ceil(budget / maxSize))
 		const maxCount = Math.max(1, Math.floor(budget / minSize))
-		const count = Math.max(minCount, Math.min(maxCount, Math.round(budget / avg)))
+		const count = Math.max(
+			minCount,
+			Math.min(maxCount, Math.round(budget / avg)),
+		)
 		targetNationCount[i] = count
 		const sizes = spreadBucketSizes(budget, minSize, maxSize, count)
 		for (let j = 0; j < count; j++) targets.push(sizes[j])
@@ -354,7 +359,8 @@ function spreadBucketSizes(
 	maxSize: number,
 	count: number,
 ): Int32Array {
-	if (count <= 1) return new Int32Array([Math.max(minSize, Math.min(maxSize, budget))])
+	if (count <= 1)
+		return new Int32Array([Math.max(minSize, Math.min(maxSize, budget))])
 
 	const sizes = new Int32Array(count)
 	const span = maxSize - minSize
@@ -367,10 +373,12 @@ function spreadBucketSizes(
 	while (remaining !== 0) {
 		let changed = false
 		if (remaining > 0) {
-			const order = Array.from({ length: count }, (_, idx) => idx).sort((a, b) => {
-				if (sizes[a] !== sizes[b]) return sizes[a] - sizes[b]
-				return a - b
-			})
+			const order = Array.from({ length: count }, (_, idx) => idx).sort(
+				(a, b) => {
+					if (sizes[a] !== sizes[b]) return sizes[a] - sizes[b]
+					return a - b
+				},
+			)
 			for (let i = 0; i < order.length && remaining > 0; i++) {
 				const idx = order[i]
 				if (sizes[idx] >= maxSize) continue
@@ -379,10 +387,12 @@ function spreadBucketSizes(
 				changed = true
 			}
 		} else {
-			const order = Array.from({ length: count }, (_, idx) => idx).sort((a, b) => {
-				if (sizes[a] !== sizes[b]) return sizes[b] - sizes[a]
-				return a - b
-			})
+			const order = Array.from({ length: count }, (_, idx) => idx).sort(
+				(a, b) => {
+					if (sizes[a] !== sizes[b]) return sizes[b] - sizes[a]
+					return a - b
+				},
+			)
 			for (let i = 0; i < order.length && remaining < 0; i++) {
 				const idx = order[i]
 				if (sizes[idx] <= minSize) continue
@@ -417,12 +427,24 @@ function bestClaim(
 			continue
 		}
 		let sharedBorder = 0
-		for (let j = adjOffset[candidate], jEnd = adjOffset[candidate + 1]; j < jEnd; j++) {
+		for (
+			let j = adjOffset[candidate], jEnd = adjOffset[candidate + 1];
+			j < jEnd;
+			j++
+		) {
 			if (assignment[adjList[j]] === nation) sharedBorder++
 		}
 		const seedPenalty = candidate === seedProvince ? -1e6 : 0
-		const d = provinceSeedDistance(seedProvince, candidate, provinceSeeds, r_xyz)
-		const score = (1 / (d + 0.1)) * coastalScore[candidate] + sharedBorder * 0.05 + seedPenalty
+		const d = provinceSeedDistance(
+			seedProvince,
+			candidate,
+			provinceSeeds,
+			r_xyz,
+		)
+		const score =
+			(1 / (d + 0.1)) * coastalScore[candidate] +
+			sharedBorder * 0.05 +
+			seedPenalty
 		if (score > bestScore) {
 			bestScore = score
 			best = candidate
@@ -444,7 +466,11 @@ function claimProvinceDynamic(
 	assignment[province] = nation
 	sizes[nation]++
 	frontier.delete(province)
-	for (let j = adjOffset[province], jEnd = adjOffset[province + 1]; j < jEnd; j++) {
+	for (
+		let j = adjOffset[province], jEnd = adjOffset[province + 1];
+		j < jEnd;
+		j++
+	) {
 		const nb = adjList[j]
 		if (active[nb] && assignment[nb] < 0) frontier.add(nb)
 	}
@@ -476,9 +502,11 @@ function selectSeed(
 			const nb = adjList[j]
 			if (active[nb] && assignment[nb] < 0) openNeighbors++
 		}
-		const expansion = 1 + Math.min(openNeighbors, Math.max(1, Math.round(Math.sqrt(target))))
+		const expansion =
+			1 + Math.min(openNeighbors, Math.max(1, Math.round(Math.sqrt(target))))
 		const sizeFactor = Math.min(componentSize, target) / Math.max(1, target)
-		const score = coastalScore[p] * blockedPenalty * expansion * (1 + sizeFactor)
+		const score =
+			coastalScore[p] * blockedPenalty * expansion * (1 + sizeFactor)
 		if (componentSize >= target && score > bestScore) {
 			bestScore = score
 			best = p
@@ -521,7 +549,8 @@ function buildOpenComponents(
 	const componentId = new Int32Array(assignment.length).fill(-1)
 	const sizes: number[] = []
 	for (let start = 0; start < assignment.length; start++) {
-		if (!active[start] || assignment[start] >= 0 || componentId[start] >= 0) continue
+		if (!active[start] || assignment[start] >= 0 || componentId[start] >= 0)
+			continue
 		const cid = sizes.length
 		let size = 0
 		const queue = [start]

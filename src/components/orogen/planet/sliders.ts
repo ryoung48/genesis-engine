@@ -45,8 +45,8 @@ export function buildPlanetSliders(state: {
 			help: "Sets the planet's physical size for climate and distance calculations.",
 			value: state.planetRadiusKm,
 			display: `${(state.planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x Earth`,
-			min: Math.round(DEFAULT_PLANET_RADIUS_KM * 0.5 / 100) * 100,
-			max: Math.round(DEFAULT_PLANET_RADIUS_KM * 4 / 100) * 100,
+			min: Math.round((DEFAULT_PLANET_RADIUS_KM * 0.5) / 100) * 100,
+			max: Math.round((DEFAULT_PLANET_RADIUS_KM * 4) / 100) * 100,
 			step: 100,
 			set: state.setPlanetRadiusKm,
 		},
@@ -87,7 +87,7 @@ export function buildPlanetSliders(state: {
 			value: state.eccentricity,
 			display: state.eccentricity.toFixed(3),
 			min: 0,
-			max: 0.2,
+			max: 0.6,
 			step: 0.001,
 			set: state.setEccentricity,
 		},
@@ -111,26 +111,34 @@ export function buildPlanetSliders(state: {
 			step: 5,
 			set: state.setDaysPerYear,
 		},
-		...(!state.tidallyLocked ? [{
-			label: "Day Length",
-			help: "Sets the rotation period in local hours. Shorter days mix heat more strongly; longer days reduce that effect.",
-			value: state.hoursPerDay,
-			display: `${state.hoursPerDay.toFixed(1)} h`,
-			min: 8,
-			max: 48,
-			step: 0.5,
-			set: state.setHoursPerDay,
-		}] : []),
-		...(state.tidallyLocked ? [{
-			label: "Antistellar Lon",
-			help: "Longitude of the antistellar point (permanent dark side center).",
-			value: state.antistellarLon,
-			display: `${state.antistellarLon.toFixed(0)}\u00B0`,
-			min: 0,
-			max: 360,
-			step: 1,
-			set: state.setAntistellarLon,
-		}] : []),
+		...(!state.tidallyLocked
+			? [
+					{
+						label: "Day Length",
+						help: "Sets the rotation period in local hours. Shorter days mix heat more strongly; longer days reduce that effect.",
+						value: state.hoursPerDay,
+						display: `${state.hoursPerDay.toFixed(1)} h`,
+						min: 8,
+						max: 48,
+						step: 0.5,
+						set: state.setHoursPerDay,
+					},
+				]
+			: []),
+		...(state.tidallyLocked
+			? [
+					{
+						label: "Antistellar Lon",
+						help: "Longitude of the antistellar point (permanent dark side center).",
+						value: state.antistellarLon,
+						display: `${state.antistellarLon.toFixed(0)}\u00B0`,
+						min: 0,
+						max: 360,
+						step: 1,
+						set: state.setAntistellarLon,
+					},
+				]
+			: []),
 		{
 			label: "Land Distribution",
 			help: "Controls how concentrated the minority phase is: land below 50%, water above 50%.",
@@ -155,7 +163,7 @@ export function buildPlanetSliders(state: {
 }
 
 export function buildTerrainSliders(state: {
-	tectonicMode: number
+	tectonicMode: 0 | 1
 	numPoints: number
 	jitter: number
 	numPlates: number
@@ -169,7 +177,7 @@ export function buildTerrainSliders(state: {
 	glacialErosion: number
 	volcanism: number
 	craters: number
-	setTectonicMode: (v: number) => void
+	setTectonicMode: (v: 0 | 1) => void
 	setNumPoints: (v: number) => void
 	setJitter: (v: number) => void
 	setNumPlates: (v: number) => void
@@ -194,7 +202,7 @@ export function buildTerrainSliders(state: {
 			min: 0,
 			max: 1,
 			step: 1,
-			set: state.setTectonicMode,
+			set: (v) => state.setTectonicMode(v as 0 | 1),
 		},
 		{
 			label: "Detail",
@@ -329,36 +337,41 @@ export function buildTerrainSliders(state: {
 	]
 }
 
-export function resetWorldDefaults(tectonicMode: number, setters: {
-	setTectonicMode: (v: number) => void
-	setNumPoints: (v: number) => void
-	setJitter: (v: number) => void
-	setNumPlates: (v: number) => void
-	setLandDistribution: (v: number) => void
-	setContinentSizeVariety: (v: number) => void
-	setLandCoverage: (v: number) => void
-	setRoughness: (v: number) => void
-	setPlanetRadiusKm: (v: number) => void
-	setObliquity: (v: number) => void
-	setEccentricity: (v: number) => void
-	setSunTempFactor: (v: number) => void
-	setDaysPerYear: (v: number) => void
-	setHoursPerDay: (v: number) => void
-	setTidallyLocked: (v: boolean) => void
-	setAntistellarLon: (v: number) => void
-	setPerihelion: (v: number) => void
-	setPressure: (v: number) => void
-	setTerrainWarp: (v: number) => void
-	setSmoothing: (v: number) => void
-	setHydraulicErosion: (v: number) => void
-	setThermalErosion: (v: number) => void
-	setRidgeSharpening: (v: number) => void
-	setGlacialErosion: (v: number) => void
-	setVolcanism: (v: number) => void
-	setCraters: (v: number) => void
-}): void {
+export function resetWorldDefaults(
+	tectonicMode: 0 | 1,
+	setters: {
+		setTectonicMode: (v: 0 | 1) => void
+		setNumPoints: (v: number) => void
+		setJitter: (v: number) => void
+		setNumPlates: (v: number) => void
+		setLandDistribution: (v: number) => void
+		setContinentSizeVariety: (v: number) => void
+		setLandCoverage: (v: number) => void
+		setRoughness: (v: number) => void
+		setPlanetRadiusKm: (v: number) => void
+		setObliquity: (v: number) => void
+		setEccentricity: (v: number) => void
+		setSunTempFactor: (v: number) => void
+		setDaysPerYear: (v: number) => void
+		setHoursPerDay: (v: number) => void
+		setTidallyLocked: (v: boolean) => void
+		setAntistellarLon: (v: number) => void
+		setPerihelion: (v: number) => void
+		setPressure: (v: number) => void
+		setTerrainWarp: (v: number) => void
+		setSmoothing: (v: number) => void
+		setHydraulicErosion: (v: number) => void
+		setThermalErosion: (v: number) => void
+		setRidgeSharpening: (v: number) => void
+		setGlacialErosion: (v: number) => void
+		setVolcanism: (v: number) => void
+		setCraters: (v: number) => void
+	},
+): void {
 	const isStagnant = tectonicMode === 1
-	const t = isStagnant ? { ...DEFAULT_WORLD_PARAMS, ...STAGNANT_TERRAIN_OVERRIDES } : DEFAULT_WORLD_PARAMS
+	const t = isStagnant
+		? { ...DEFAULT_WORLD_PARAMS, ...STAGNANT_TERRAIN_OVERRIDES }
+		: DEFAULT_WORLD_PARAMS
 
 	setters.setTectonicMode(tectonicMode)
 	setters.setNumPoints(t.numPoints)

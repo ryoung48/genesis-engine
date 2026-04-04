@@ -1,7 +1,7 @@
 import React from "react"
-import type { HistoryNote, VictoryDegree } from "@/model/history/types"
 import type { Ethos } from "@/model/actors/culture/types"
 import { NAMES } from "@/model/actors/language/names"
+import type { HistoryNote, VictoryDegree } from "@/model/history/types"
 import { NATION } from "@/model/nations"
 import { RELATIONS } from "@/model/nations/relations"
 import { WAR } from "@/model/nations/wars"
@@ -149,11 +149,19 @@ const scalePhraseForCost = (cost: number, seed: number): string => {
 		)
 	if (cost < 30)
 		return pick(
-			["a major battle", "a high-casualty engagement", "a significant conflict"],
+			[
+				"a major battle",
+				"a high-casualty engagement",
+				"a significant conflict",
+			],
 			seed,
 		)
 	return pick(
-		["a large-scale battle", "a battle resulting in massive casualties", "a heavily destructive engagement"],
+		[
+			"a large-scale battle",
+			"a battle resulting in massive casualties",
+			"a heavily destructive engagement",
+		],
 		seed,
 	)
 }
@@ -167,16 +175,31 @@ const oddsFlavor = (
 ): string | null => {
 	if (won && odds < 0.25)
 		return pick(
-			["despite severe numerical disadvantage", "in an unexpected tactical upset", "against unfavorable odds"],
+			[
+				"despite severe numerical disadvantage",
+				"in an unexpected tactical upset",
+				"against unfavorable odds",
+			],
 			seed,
 		)
 	if (!won && odds > 0.75)
 		return pick(
-			["despite significant numerical superiority", "in a major logistical failure", "a notable tactical collapse"],
+			[
+				"despite significant numerical superiority",
+				"in a major logistical failure",
+				"a notable tactical collapse",
+			],
 			seed,
 		)
 	if (won && odds > 0.85)
-		return pick(["leveraging strong numerical advantages", "a conventional outcome", "securing an expected victory"], seed)
+		return pick(
+			[
+				"leveraging strong numerical advantages",
+				"a conventional outcome",
+				"securing an expected victory",
+			],
+			seed,
+		)
 	return null
 }
 
@@ -190,11 +213,38 @@ const countPriorBattles = (warIdx: number, beforeTime: number): number => {
 	return count
 }
 
-const streakPhrase = (warIdx: number, time: number, seed: number): string | null => {
+const streakPhrase = (
+	warIdx: number,
+	time: number,
+	seed: number,
+): string | null => {
 	const n = countPriorBattles(warIdx, time)
-	if (n === 0) return pick(["the first engagement of the conflict", "opening hostilities", "the initial military action"], seed)
-	if (n >= 8) return pick([`the ${ordinal(n + 1)} major engagement characterizing this protracted conflict`, "a continuation of extended hostilities", `the ${ordinal(n + 1)} battle in a series of attritional clashes`], seed)
-	if (n >= 4) return pick([`the ${ordinal(n + 1)} battle of the campaign`, `part of ongoing military operations`], seed)
+	if (n === 0)
+		return pick(
+			[
+				"the first engagement of the conflict",
+				"opening hostilities",
+				"the initial military action",
+			],
+			seed,
+		)
+	if (n >= 8)
+		return pick(
+			[
+				`the ${ordinal(n + 1)} major engagement characterizing this protracted conflict`,
+				"a continuation of extended hostilities",
+				`the ${ordinal(n + 1)} battle in a series of attritional clashes`,
+			],
+			seed,
+		)
+	if (n >= 4)
+		return pick(
+			[
+				`the ${ordinal(n + 1)} battle of the campaign`,
+				`part of ongoing military operations`,
+			],
+			seed,
+		)
 	return null
 }
 
@@ -208,7 +258,10 @@ const terrainFlavor = (provinceIdx: number, seed: number): string | null => {
 
 	if (topography === "mountains") {
 		if (climate === "arctic" || climate === "subarctic")
-			return pick(["in high-altitude arctic terrain", "in mountainous glacial regions"], seed)
+			return pick(
+				["in high-altitude arctic terrain", "in mountainous glacial regions"],
+				seed,
+			)
 		return pick(["in mountainous terrain", "in high-altitude conditions"], seed)
 	}
 	if (topography === "marsh") {
@@ -229,7 +282,10 @@ const terrainFlavor = (provinceIdx: number, seed: number): string | null => {
 	if (vegetation === "desert")
 		return pick(["in arid conditions", "in desert terrain"], seed)
 	if (vegetation === "jungle")
-		return pick(["in dense jungle terrain", "in tropical rainforest conditions"], seed)
+		return pick(
+			["in dense jungle terrain", "in tropical rainforest conditions"],
+			seed,
+		)
 	if (climate === "arctic")
 		return pick(["in arctic conditions", "in tundra terrain"], seed)
 
@@ -242,13 +298,30 @@ const seasonPhrase = (time: number, seed: number): string | null => {
 	const month = Math.floor((time / TIME.constants.monthMS) % 12)
 	const season = TIME.season(month)
 	if (season === "winter")
-		return pick(["during a winter campaign", "in winter conditions", "during the winter months"], seed)
+		return pick(
+			[
+				"during a winter campaign",
+				"in winter conditions",
+				"during the winter months",
+			],
+			seed,
+		)
 	if (season === "summer")
-		return pick(["during a summer campaign", "in summer conditions", "during the summer months"], seed)
+		return pick(
+			[
+				"during a summer campaign",
+				"in summer conditions",
+				"during the summer months",
+			],
+			seed,
+		)
 	if (season === "spring" && seed % 3 === 0)
 		return pick(["in early spring", "following the spring thaw"], seed)
 	if (season === "autumn" && seed % 3 === 0)
-		return pick(["during the autumn campaign", "preceding the winter months"], seed)
+		return pick(
+			["during the autumn campaign", "preceding the winter months"],
+			seed,
+		)
 	return null
 }
 
@@ -314,18 +387,30 @@ const occupationPhrase = (
 	}
 
 	if (occupiedCount <= 1)
-		return pick(["establishing an initial occupation front", "securing the first territorial gains"], seed)
-	if (occupiedCount <= 4) return `with ${occupiedCount} provinces subsequently occupied`
+		return pick(
+			[
+				"establishing an initial occupation front",
+				"securing the first territorial gains",
+			],
+			seed,
+		)
+	if (occupiedCount <= 4)
+		return `with ${occupiedCount} provinces subsequently occupied`
 	return `maintaining occupation over ${occupiedCount} provinces`
 }
 
 // ─── Feature 6: War duration ────────────────────────────────────────
 
-const warDurationPhrase = (warIdx: number, endTime: number, seed: number): string | null => {
+const warDurationPhrase = (
+	warIdx: number,
+	endTime: number,
+	seed: number,
+): string | null => {
 	const war = window.world.wars[warIdx]
 	if (!war) return null
 	const years = Math.round(TIME.date.diffYears(endTime, war.startTime))
-	if (years < 1) return pick(["concluding rapidly", "a short-lived conflict"], seed)
+	if (years < 1)
+		return pick(["concluding rapidly", "a short-lived conflict"], seed)
 	if (years <= 3) return `a ${years}-year conflict`
 	if (years <= 10) return `after ${years} years of hostilities`
 	if (years <= 25) return `following ${years} years of protracted warfare`
@@ -345,7 +430,8 @@ const reignPhrase = (
 	const entry = province._leader.find((e) => e.idx === leaderIdx)
 	if (!entry) return null
 	const years = Math.round(TIME.date.diffYears(time, entry.time))
-	if (years < 1) return pick(["following a brief reign", "after a short tenure"], seed)
+	if (years < 1)
+		return pick(["following a brief reign", "after a short tenure"], seed)
 	if (years <= 5) return `after a ${years}-year reign`
 	if (years <= 20) return `after ${years} years in power`
 	if (years <= 40) return `after a ${years}-year rule`
@@ -372,9 +458,15 @@ const grudgePhrase = (
 	}
 	if (priorWarCount === 0) return null
 	if (priorWarCount === 1)
-		return pick(["renewing previous hostilities", "in a continuation of prior conflict"], seed)
+		return pick(
+			["renewing previous hostilities", "in a continuation of prior conflict"],
+			seed,
+		)
 	if (priorWarCount === 2)
-		return pick(["the third war between the two powers", "a recurring conflict"], seed)
+		return pick(
+			["the third war between the two powers", "a recurring conflict"],
+			seed,
+		)
 	return `the ${ordinal(priorWarCount + 1)} instance of armed conflict between the nations`
 }
 
@@ -391,18 +483,31 @@ const alliancePhrase = (
 	const participants = WAR.participants({ war, time })
 	const weAreAttacker = viewingNation === war.attacker
 	const ourSide = weAreAttacker ? participants.attacker : participants.defender
-	const enemySide = weAreAttacker ? participants.defender : participants.attacker
+	const enemySide = weAreAttacker
+		? participants.defender
+		: participants.attacker
 	const ourAllies = ourSide.allies.length
 	const enemyAllies = enemySide.allies.length
 
 	if (ourAllies === 0 && enemyAllies >= 2)
-		return pick(["fighting against a coalition", `facing multiple powers (${enemyAllies + 1})`], seed)
+		return pick(
+			[
+				"fighting against a coalition",
+				`facing multiple powers (${enemyAllies + 1})`,
+			],
+			seed,
+		)
 	if (ourAllies === 0 && enemyAllies === 1)
 		return "facing combined enemy forces"
 	if (ourAllies >= 2 && enemyAllies === 0)
-		return pick([`supported by a coalition of ${ourAllies} allies`, "with allied military support"], seed)
-	if (ourAllies === 1 && enemyAllies === 0)
-		return "with allied support"
+		return pick(
+			[
+				`supported by a coalition of ${ourAllies} allies`,
+				"with allied military support",
+			],
+			seed,
+		)
+	if (ourAllies === 1 && enemyAllies === 0) return "with allied support"
 	return null
 }
 
@@ -419,9 +524,23 @@ const provinceSignificancePhrase = (
 	const dev = PROVINCE.development.get(province, time)
 
 	if (pop > 100e3 || dev > 8)
-		return pick(["a major population center,", "a high-development region,", "a strategically significant province,"], seed)
+		return pick(
+			[
+				"a major population center,",
+				"a high-development region,",
+				"a strategically significant province,",
+			],
+			seed,
+		)
 	if (pop < 2000 && dev === 0)
-		return pick(["a low-population frontier region,", "an underdeveloped area,", "a sparsely populated province,"], seed)
+		return pick(
+			[
+				"a low-population frontier region,",
+				"an underdeveloped area,",
+				"a sparsely populated province,",
+			],
+			seed,
+		)
 	return null
 }
 
@@ -434,14 +553,12 @@ const landmarkPhrase = (provinceIdx: number, seed: number): string | null => {
 
 	if (cell.mountain !== undefined) {
 		const mountain = window.world.mountains[cell.mountain]
-		if (mountain?.name)
-			return `near the ${mountain.name} formation`
+		if (mountain?.name) return `near the ${mountain.name} formation`
 	}
 
 	const landmark = window.world.landmarks[cell.landmark]
 	if (landmark && (landmark.type === "island" || landmark.type === "isle")) {
-		if (landmark.name)
-			return `on the island of ${landmark.name}`
+		if (landmark.name) return `on the island of ${landmark.name}`
 		return pick(["in an insular environment", "on the island"], seed)
 	}
 
@@ -475,12 +592,36 @@ const warStreakPhrase = (
 
 	if (firstWon) {
 		if (streak >= 5)
-			return pick([`a ${ordinal(streak + 1)} consecutive tactical victory`, `${streak} successful engagements in a row`], seed)
-		return pick([`a ${ordinal(streak + 1)} consecutive tactical victory`, `a ${streak}-win streak`], seed)
+			return pick(
+				[
+					`a ${ordinal(streak + 1)} consecutive tactical victory`,
+					`${streak} successful engagements in a row`,
+				],
+				seed,
+			)
+		return pick(
+			[
+				`a ${ordinal(streak + 1)} consecutive tactical victory`,
+				`a ${streak}-win streak`,
+			],
+			seed,
+		)
 	}
 	if (streak >= 5)
-		return pick(["continuing a pattern of military setbacks", `a ${streak}-battle strategic losing streak continues`], seed)
-	return pick([`a ${ordinal(streak + 1)} consecutive tactical defeat`, "a continuation of tactical losses"], seed)
+		return pick(
+			[
+				"continuing a pattern of military setbacks",
+				`a ${streak}-battle strategic losing streak continues`,
+			],
+			seed,
+		)
+	return pick(
+		[
+			`a ${ordinal(streak + 1)} consecutive tactical defeat`,
+			"a continuation of tactical losses",
+		],
+		seed,
+	)
 }
 
 // ─── Feature 13: Named battle titles ────────────────────────────────
@@ -489,7 +630,9 @@ const battleTypeName = (
 	event: Extract<HistoryNote, { tag: "battle" }>,
 ): string => {
 	const province = window.world.provinces[event.province]
-	const urbanPop = province ? PROVINCE.population.urban.get(province, event.time) : 0
+	const urbanPop = province
+		? PROVINCE.population.urban.get(province, event.time)
+		: 0
 	const totalCost = event.attackerCost + event.defenderCost
 	const seed = event.time + event.province
 
@@ -500,10 +643,16 @@ const battleTypeName = (
 		type = pick(["Skirmish", "Raid", "Incursion"], seed + 1)
 	} else if (urbanPop > 20e3 && totalCost > 5) {
 		type = pick(["Siege", "Sack", "Fall"], seed + 1)
-	} else if (totalCost >= 8 && (event.victoryDegree === "decisive" || event.victoryDegree === "crushing")) {
+	} else if (
+		totalCost >= 8 &&
+		(event.victoryDegree === "decisive" || event.victoryDegree === "crushing")
+	) {
 		type = pick(["Massacre", "Slaughter", "Bloodbath"], seed + 1)
 		preposition = pick(["at", "of"], seed + 2)
-	} else if (event.victoryDegree === "close" || event.victoryDegree === "pyrrhic") {
+	} else if (
+		event.victoryDegree === "close" ||
+		event.victoryDegree === "pyrrhic"
+	) {
 		type = pick(["Stand", "Holding", "Defense"], seed + 1)
 		preposition = "at"
 	} else {
@@ -553,32 +702,64 @@ const getViewingEthos = (nationIdx: number): Ethos | null => {
 
 const ETHOS_FLAVOR: Record<Ethos, { win: string[]; loss: string[] }> = {
 	bellicose: {
-		win: ["demonstrating martial superiority", "reinforcing military dominance", "achieving tactical objectives"],
-		loss: ["sustaining a notable military setback", "suffering a loss of martial prestige", "failing military objectives"],
+		win: [
+			"demonstrating martial superiority",
+			"reinforcing military dominance",
+			"achieving tactical objectives",
+		],
+		loss: [
+			"sustaining a notable military setback",
+			"suffering a loss of martial prestige",
+			"failing military objectives",
+		],
 	},
 	bureaucratic: {
 		win: ["formalizing provincial control", "restoring administrative order"],
-		loss: ["necessitating administrative reorganization", "disrupting local governance"],
+		loss: [
+			"necessitating administrative reorganization",
+			"disrupting local governance",
+		],
 	},
 	communal: {
-		win: ["representing a collective military success", "strengthening communal security"],
+		win: [
+			"representing a collective military success",
+			"strengthening communal security",
+		],
 		loss: ["imposing shared societal costs", "requiring collective resilience"],
 	},
 	spiritual: {
 		win: ["interpreted as divine mandate", "bolstering religious legitimacy"],
-		loss: ["prompting religious reassessment", "challenging theological narratives"],
+		loss: [
+			"prompting religious reassessment",
+			"challenging theological narratives",
+		],
 	},
 	stoic: {
 		win: ["achieved with disciplined precision", "executed methodically"],
-		loss: ["absorbed with minimal societal disruption", "endured systematically"],
+		loss: [
+			"absorbed with minimal societal disruption",
+			"endured systematically",
+		],
 	},
 	ceremonious: {
-		win: ["commemorated by the state apparatus", "enhancing sovereign prestige"],
-		loss: ["damaging state prestige", "prompting formal reassessments of strategy"],
+		win: [
+			"commemorated by the state apparatus",
+			"enhancing sovereign prestige",
+		],
+		loss: [
+			"damaging state prestige",
+			"prompting formal reassessments of strategy",
+		],
 	},
 	egalitarian: {
-		win: ["reflecting successful mass mobilization", "demonstrating populist military efficacy"],
-		loss: ["distributing the consequences of defeat broadly", "prompting decentralized reorganization"],
+		win: [
+			"reflecting successful mass mobilization",
+			"demonstrating populist military efficacy",
+		],
+		loss: [
+			"distributing the consequences of defeat broadly",
+			"prompting decentralized reorganization",
+		],
 	},
 }
 
@@ -595,80 +776,171 @@ const ethosFlavorPhrase = (
 // ─── War declaration templates ──────────────────────────────────────
 
 const warDeclaredVerb = (odds: number, seed: number): string => {
-	if (odds > 0.7) return pick(["formally declared war on", "initiated hostilities against", "began military operations against"], seed)
-	if (odds > 0.4) return pick(["declared war on", "commenced armed conflict with", "opened hostilities against"], seed)
-	return pick(["declared war despite significant tactical disadvantages against", "initiated a high-risk conflict with", "entered a militarily disadvantageous war against"], seed)
+	if (odds > 0.7)
+		return pick(
+			[
+				"formally declared war on",
+				"initiated hostilities against",
+				"began military operations against",
+			],
+			seed,
+		)
+	if (odds > 0.4)
+		return pick(
+			[
+				"declared war on",
+				"commenced armed conflict with",
+				"opened hostilities against",
+			],
+			seed,
+		)
+	return pick(
+		[
+			"declared war despite significant tactical disadvantages against",
+			"initiated a high-risk conflict with",
+			"entered a militarily disadvantageous war against",
+		],
+		seed,
+	)
 }
 
 // ─── War ended templates ────────────────────────────────────────────
 
 const warWonVerb = (transferCount: number, seed: number): string => {
-	if (transferCount >= 5) return pick(["achieved total victory over", "subjugated", "secured an unconditional surrender from"], seed)
-	if (transferCount > 0) return pick(["successfully concluded the war against", "forced concessions from", "defeated"], seed)
-	return pick(["achieved a status quo victory against", "prevailed in a war of attrition against", "secured a technical victory over"], seed)
+	if (transferCount >= 5)
+		return pick(
+			[
+				"achieved total victory over",
+				"subjugated",
+				"secured an unconditional surrender from",
+			],
+			seed,
+		)
+	if (transferCount > 0)
+		return pick(
+			[
+				"successfully concluded the war against",
+				"forced concessions from",
+				"defeated",
+			],
+			seed,
+		)
+	return pick(
+		[
+			"achieved a status quo victory against",
+			"prevailed in a war of attrition against",
+			"secured a technical victory over",
+		],
+		seed,
+	)
 }
 
 const warLostVerb = (seed: number): string =>
-	pick(["was defeated in the war by", "capitulated to", "surrendered to", "formally yielded to"], seed)
+	pick(
+		[
+			"was defeated in the war by",
+			"capitulated to",
+			"surrendered to",
+			"formally yielded to",
+		],
+		seed,
+	)
 
 const stalemateVerb = (seed: number): string =>
 	pick(
-		["concluded hostilities in a stalemate with", "reached a military impasse with", "agreed to a white peace with"],
+		[
+			"concluded hostilities in a stalemate with",
+			"reached a military impasse with",
+			"agreed to a white peace with",
+		],
 		seed,
 	)
 
 // ─── Succession templates ───────────────────────────────────────────
 
-const leaderAge = (entry: { birthTime: number; time: number } | undefined): number | null => {
+const leaderAge = (
+	entry: { birthTime: number; time: number } | undefined,
+): number | null => {
 	if (!entry || entry.birthTime === undefined) return null
 	return Math.round(TIME.date.diffYears(entry.time, entry.birthTime))
 }
 
-const leaderAgeAt = (entry: { birthTime: number } | undefined, time: number): number | null => {
+const leaderAgeAt = (
+	entry: { birthTime: number } | undefined,
+	time: number,
+): number | null => {
 	if (!entry || entry.birthTime === undefined) return null
 	return Math.round(TIME.date.diffYears(time, entry.birthTime))
 }
 
-const successionPhrase = (nationIdx: number, time: number, seed: number): string => {
+const successionPhrase = (
+	nationIdx: number,
+	time: number,
+	seed: number,
+): string => {
 	const oldLeader = NAMES.leader(nationIdx, time - 1)
 	const newLeader = NAMES.leader(nationIdx, time)
 
 	const province = window.world.provinces[nationIdx]
-	const oldEntry = province?._leader.find((e) => e.end <= time && e.end > time - TIME.delta.year(1))
-	const newEntry = province?._leader.find((e) => e.time === time || (e.time <= time && e.end > time))
+	const oldEntry = province?._leader.find(
+		(e) => e.end <= time && e.end > time - TIME.delta.year(1),
+	)
+	const newEntry = province?._leader.find(
+		(e) => e.time === time || (e.time <= time && e.end > time),
+	)
 
 	const oldAge = oldEntry ? leaderAgeAt(oldEntry, oldEntry.end) : null
 	const newAge = leaderAge(newEntry)
 
 	// Age-flavored cause of death for the old ruler
-	const deathCause = oldAge !== null && oldAge > 60
-		? pick([`${oldLeader} died of old age at ${oldAge}`, `${oldLeader}, aged ${oldAge}, passed away`], seed)
-		: pick([
-			`${oldLeader} was assassinated`,
-			`${oldLeader} died in battle`,
-			`${oldLeader} succumbed to illness`,
-			`Following the sudden demise of ${oldLeader}`,
-			`${oldLeader} abdicated`,
-		], seed)
+	const deathCause =
+		oldAge !== null && oldAge > 60
+			? pick(
+					[
+						`${oldLeader} died of old age at ${oldAge}`,
+						`${oldLeader}, aged ${oldAge}, passed away`,
+					],
+					seed,
+				)
+			: pick(
+					[
+						`${oldLeader} was assassinated`,
+						`${oldLeader} died in battle`,
+						`${oldLeader} succumbed to illness`,
+						`Following the sudden demise of ${oldLeader}`,
+						`${oldLeader} abdicated`,
+					],
+					seed,
+				)
 
 	// Age-flavored accession for the new ruler
-	const accessionFlavor = newAge !== null && newAge < 16
-		? pick([
-			`a child of ${newAge}, ${newLeader} inherits the realm under a regency council`,
-			`the ${newAge}-year-old ${newLeader} ascends, ruling under regency`,
-			`${newLeader}, a mere child of ${newAge}, takes the throne under the guidance of a regent`,
-		], seed + 5)
-		: newAge !== null && newAge > 50
-			? pick([
-				`the elderly ${newLeader}, aged ${newAge}, assumes power`,
-				`${newLeader}, already ${newAge} years old, takes the throne`,
-			], seed + 5)
-			: pick([
-				`${newLeader} seized the throne`,
-				`${newLeader} ascended to power`,
-				`the realm falls to ${newLeader}`,
-				`${newLeader} claimed leadership`,
-			], seed + 5)
+	const accessionFlavor =
+		newAge !== null && newAge < 16
+			? pick(
+					[
+						`a child of ${newAge}, ${newLeader} inherits the realm under a regency council`,
+						`the ${newAge}-year-old ${newLeader} ascends, ruling under regency`,
+						`${newLeader}, a mere child of ${newAge}, takes the throne under the guidance of a regent`,
+					],
+					seed + 5,
+				)
+			: newAge !== null && newAge > 50
+				? pick(
+						[
+							`the elderly ${newLeader}, aged ${newAge}, assumes power`,
+							`${newLeader}, already ${newAge} years old, takes the throne`,
+						],
+						seed + 5,
+					)
+				: pick(
+						[
+							`${newLeader} seized the throne`,
+							`${newLeader} ascended to power`,
+							`the realm falls to ${newLeader}`,
+							`${newLeader} claimed leadership`,
+						],
+						seed + 5,
+					)
 
 	return `${deathCause}; ${accessionFlavor}`
 }
@@ -678,9 +950,18 @@ const claimPhrase = (claim: string, seed: number): string | null => {
 	if (claim === "average")
 		return pick(["with a contested claim", "with a disputed succession"], seed)
 	if (claim === "weak")
-		return pick(["with a tenuous claim to the throne", "whose legitimacy is widely questioned"], seed)
+		return pick(
+			[
+				"with a tenuous claim to the throne",
+				"whose legitimacy is widely questioned",
+			],
+			seed,
+		)
 	if (claim === "none")
-		return pick(["with no legitimate claim", "a ruler without dynastic legitimacy"], seed)
+		return pick(
+			["with no legitimate claim", "a ruler without dynastic legitimacy"],
+			seed,
+		)
 	return null
 }
 
@@ -703,7 +984,7 @@ const dynastyShiftPhrase = (
 }
 
 const puFormationPhrase = (
-	nationIdx: number,
+	_nationIdx: number,
 	seniorIdx: number,
 	seed: number,
 ): string | null => {
@@ -722,19 +1003,31 @@ const puFormationPhrase = (
 
 const rebellionVerb = (seed: number): string =>
 	pick(
-		["initiated a rebellion against", "declared independence from", "engaged in an armed uprising against"],
+		[
+			"initiated a rebellion against",
+			"declared independence from",
+			"engaged in an armed uprising against",
+		],
 		seed,
 	)
 
 const rebellionDisconnectedVerb = (seed: number): string =>
 	pick(
-		["seceded from", "formally separated from", "broke diplomatic ties and departed from"],
+		[
+			"seceded from",
+			"formally separated from",
+			"broke diplomatic ties and departed from",
+		],
 		seed,
 	)
 
 const rebellionSuccessionFlavor = (seed: number): string =>
 	pick(
-		["during a period of succession instability", "coinciding with the leadership transition", "exploiting administrative vulnerability during succession"],
+		[
+			"during a period of succession instability",
+			"coinciding with the leadership transition",
+			"exploiting administrative vulnerability during succession",
+		],
 		seed,
 	)
 
@@ -789,10 +1082,23 @@ export const getWarName = (warIdx: number): string => {
 		if (idx !== -1) sequenceIdx = idx + 1
 	}
 
-	const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
-	const numeralSuffix = sequenceIdx > 0 && sequenceIdx < romanNumerals.length
-		? ` ${romanNumerals[sequenceIdx]}`
-		: ""
+	const romanNumerals = [
+		"",
+		"I",
+		"II",
+		"III",
+		"IV",
+		"V",
+		"VI",
+		"VII",
+		"VIII",
+		"IX",
+		"X",
+	]
+	const numeralSuffix =
+		sequenceIdx > 0 && sequenceIdx < romanNumerals.length
+			? ` ${romanNumerals[sequenceIdx]}`
+			: ""
 
 	// If there's a roman numeral, force the name to use nation names
 	if (numeralSuffix) {
@@ -849,12 +1155,12 @@ export const getWarName = (warIdx: number): string => {
 		}
 
 		const provName = NAMES.province(maxProv)
-		const durationYears = Math.max(1, Math.round(
-			TIME.date.diffYears(
-				war.endTime || window.world.time,
-				war.startTime,
+		const durationYears = Math.max(
+			1,
+			Math.round(
+				TIME.date.diffYears(war.endTime || window.world.time, war.startTime),
 			),
-		))
+		)
 
 		if (maxCount >= 3) {
 			name = pick(
@@ -976,9 +1282,14 @@ export const getEventDescription = (
 			const flavor = oddsFlavor(myOdds, won, seed + 2)
 
 			// Location: significance > terrain > plain " in "
-			const significance = provinceSignificancePhrase(event.province, event.time, seed + 8)
+			const significance = provinceSignificancePhrase(
+				event.province,
+				event.time,
+				seed + 8,
+			)
 			const terrain = terrainFlavor(event.province, seed + 4)
-			const locationPrefix = significance ?? (terrain ? ` in ${terrain}` : " in")
+			const locationPrefix =
+				significance ?? (terrain ? ` in ${terrain}` : " in")
 
 			// Trailing phrases — collect and render (Features 2, 4, 5, 9, 11, 14)
 			const trailing: string[] = []
@@ -992,11 +1303,20 @@ export const getEventDescription = (
 			if (al) trailing.push(al)
 			const ssn = seasonPhrase(event.time, seed + 5)
 			if (ssn) trailing.push(ssn)
-			const ef = ethosFlavorPhrase(getViewingEthos(viewingNation), won, seed + 10)
+			const ef = ethosFlavorPhrase(
+				getViewingEthos(viewingNation),
+				won,
+				seed + 10,
+			)
 			if (ef) trailing.push(ef)
 
 			// Streak: prefer consecutive win/loss streak over generic (Feature 12)
-			const wsPhrase = warStreakPhrase(event.war, event.time, viewingNation, seed + 11)
+			const wsPhrase = warStreakPhrase(
+				event.war,
+				event.time,
+				viewingNation,
+				seed + 11,
+			)
 			const stPhrase = streakPhrase(event.war, event.time, seed + 3)
 			const streak = wsPhrase ?? stPhrase
 
@@ -1005,11 +1325,16 @@ export const getEventDescription = (
 					<WarBadge warIdx={event.war} onWarSelect={onWarSelect} />
 					<RankedNation id={viewingNation} />
 					{verb}
-					<RankedNation id={enemy} />
-					{" "}
-					{locationPrefix}
-					{locationPrefix !== " in" && !locationPrefix?.endsWith("in ") && !locationPrefix?.endsWith("at ") ? " " : ""}
-					<ProvinceLink id={event.province} onZoomToProvince={onZoomToProvince} />
+					<RankedNation id={enemy} /> {locationPrefix}
+					{locationPrefix !== " in" &&
+					!locationPrefix?.endsWith("in ") &&
+					!locationPrefix?.endsWith("at ")
+						? " "
+						: ""}
+					<ProvinceLink
+						id={event.province}
+						onZoomToProvince={onZoomToProvince}
+					/>
 					{": "}
 					<span
 						className="font-bold"
@@ -1018,7 +1343,8 @@ export const getEventDescription = (
 						{VICTORY_LABELS[viewerDegree]}
 					</span>
 					<span className="text-gray-400">
-						{" "}({Math.round(myOdds * 100)}% odds)
+						{" "}
+						({Math.round(myOdds * 100)}% odds)
 					</span>
 					{" — "}
 					{scale}
@@ -1029,9 +1355,7 @@ export const getEventDescription = (
 							{phrase}
 						</span>
 					))}
-					{streak && (
-						<span className="text-gray-400 italic"> ({streak})</span>
-					)}
+					{streak && <span className="text-gray-400 italic"> ({streak})</span>}
 				</>
 			)
 		}
@@ -1042,34 +1366,51 @@ export const getEventDescription = (
 			const verb = warDeclaredVerb(myOdds, seed)
 
 			// Feature 8: Historical grudges
-			const grudge = grudgePhrase(event.attacker, event.defender, event.war, seed + 3)
+			const grudge = grudgePhrase(
+				event.attacker,
+				event.defender,
+				event.war,
+				seed + 3,
+			)
 
 			return (
 				<>
 					<WarBadge warIdx={event.war} onWarSelect={onWarSelect} />
-					<RankedNation id={weAttacked ? viewingNation : enemy} />
-					{" "}
-					{verb}
-					{" "}
+					<RankedNation id={weAttacked ? viewingNation : enemy} /> {verb}{" "}
 					<RankedNation id={weAttacked ? enemy : viewingNation} />
 					<span className="text-gray-400">
-						{" "}({Math.round(myOdds * 100)}% chance)
+						{" "}
+						({Math.round(myOdds * 100)}% chance)
 					</span>
 					{myOdds < 0.3 && (
 						<span className="text-gray-400 italic">
-							{" "}— {pick(["a bold gamble", "a reckless venture", "a desperate throw of the dice"], seed + 1)}
+							{" "}
+							—{" "}
+							{pick(
+								[
+									"a bold gamble",
+									"a reckless venture",
+									"a desperate throw of the dice",
+								],
+								seed + 1,
+							)}
 						</span>
 					)}
 					{myOdds > 0.8 && (
 						<span className="text-gray-400 italic">
-							{" "}— {pick(["sensing weakness", "smelling blood", "striking while the iron is hot"], seed + 1)}
+							{" "}
+							—{" "}
+							{pick(
+								[
+									"sensing weakness",
+									"smelling blood",
+									"striking while the iron is hot",
+								],
+								seed + 1,
+							)}
 						</span>
 					)}
-					{grudge && (
-						<span className="text-gray-400 italic">
-							{" "}— {grudge}
-						</span>
-					)}
+					{grudge && <span className="text-gray-400 italic"> — {grudge}</span>}
 				</>
 			)
 		}
@@ -1085,26 +1426,19 @@ export const getEventDescription = (
 				return (
 					<>
 						<WarBadge warIdx={event.war} onWarSelect={onWarSelect} />
-						<RankedNation id={viewingNation} />
-						{" "}
-						{verb}
-						{" "}
+						<RankedNation id={viewingNation} /> {verb}{" "}
 						<RankedNation id={enemy} />
 						{" — "}
 						<span className="italic text-gray-500">{event.stalemate}</span>
 						{duration && (
-							<span className="text-gray-400 italic">
-								{" "}— {duration}
-							</span>
+							<span className="text-gray-400 italic"> — {duration}</span>
 						)}
 					</>
 				)
 			}
 
 			const transferCount = event.transferred.length
-			const verb = won
-				? warWonVerb(transferCount, seed)
-				: warLostVerb(seed)
+			const verb = won ? warWonVerb(transferCount, seed) : warLostVerb(seed)
 			const gains =
 				transferCount > 0
 					? ` — ${transferCount} province${transferCount > 1 ? "s" : ""} ${won ? "seized" : "lost"}`
@@ -1113,26 +1447,38 @@ export const getEventDescription = (
 			return (
 				<>
 					<WarBadge warIdx={event.war} onWarSelect={onWarSelect} />
-					<RankedNation id={viewingNation} />
-					{" "}
-					{verb}
-					{" "}
-					<RankedNation id={enemy} />
+					<RankedNation id={viewingNation} /> {verb} <RankedNation id={enemy} />
 					{gains}
 					{transferCount === 0 && won && (
 						<span className="text-gray-400 italic">
-							{" "}— {pick(["a war fought for nothing", "a hollow triumph", "victory without spoils"], seed + 1)}
+							{" "}
+							—{" "}
+							{pick(
+								[
+									"a war fought for nothing",
+									"a hollow triumph",
+									"victory without spoils",
+								],
+								seed + 1,
+							)}
 						</span>
 					)}
 					{transferCount >= 5 && won && (
 						<span className="text-gray-400 italic">
-							{" "}— {pick(["total conquest", "a devastating blow", "the balance of power shifts"], seed + 1)}
+							{" "}
+							—{" "}
+							{pick(
+								[
+									"total conquest",
+									"a devastating blow",
+									"the balance of power shifts",
+								],
+								seed + 1,
+							)}
 						</span>
 					)}
 					{duration && (
-						<span className="text-gray-400 italic">
-							{" "}— {duration}
-						</span>
+						<span className="text-gray-400 italic"> — {duration}</span>
 					)}
 				</>
 			)
@@ -1140,7 +1486,12 @@ export const getEventDescription = (
 		case "succession": {
 			const phrase = successionPhrase(event.nation, event.time, seed)
 			// Feature 7: Ruler longevity
-			const reign = reignPhrase(event.nation, event.leader, event.time, seed + 1)
+			const reign = reignPhrase(
+				event.nation,
+				event.leader,
+				event.time,
+				seed + 1,
+			)
 
 			// Dynasty shift and claim details
 			const province = window.world.provinces[event.nation]
@@ -1153,7 +1504,9 @@ export const getEventDescription = (
 			const claimNote = claim ? claimPhrase(claim, seed + 3) : null
 
 			// Check if a PU was formed at this succession
-			const puSenior = province ? RELATIONS.overlord(province, event.time) : undefined
+			const puSenior = province
+				? RELATIONS.overlord(province, event.time)
+				: undefined
 			const puRel = puSenior
 				? RELATIONS.get({ nation: province, other: puSenior, time: event.time })
 				: undefined
@@ -1168,25 +1521,15 @@ export const getEventDescription = (
 					{": "}
 					{phrase}
 					{claimNote && (
-						<span className="text-amber-600 italic">
-							{" "}— {claimNote}
-						</span>
+						<span className="text-amber-600 italic"> — {claimNote}</span>
 					)}
 					{dynastyShift && (
-						<span className="text-purple-600 italic">
-							{" "}— {dynastyShift}
-						</span>
+						<span className="text-purple-600 italic"> — {dynastyShift}</span>
 					)}
 					{puNote && (
-						<span className="text-indigo-600 font-semibold">
-							{" "}— {puNote}
-						</span>
+						<span className="text-indigo-600 font-semibold"> — {puNote}</span>
 					)}
-					{reign && (
-						<span className="text-gray-400 italic">
-							{" "}— {reign}
-						</span>
-					)}
+					{reign && <span className="text-gray-400 italic"> — {reign}</span>}
 				</>
 			)
 		}
@@ -1199,13 +1542,16 @@ export const getEventDescription = (
 				const verb = rebellionDisconnectedVerb(seed)
 				return (
 					<>
-						<Nation id={event.subject} />
-						{" "}
-						{verb}
-						{" "}
-						<Nation id={event.overlord} />
-						{" "}
-						— {pick(["too distant to control", "beyond the reach of their overlord", "severed by geography"], seed + 2)}
+						<Nation id={event.subject} /> {verb} <Nation id={event.overlord} />{" "}
+						—{" "}
+						{pick(
+							[
+								"too distant to control",
+								"beyond the reach of their overlord",
+								"severed by geography",
+							],
+							seed + 2,
+						)}
 						{trigger}
 					</>
 				)
@@ -1214,38 +1560,43 @@ export const getEventDescription = (
 			const verb = rebellionVerb(seed)
 			return (
 				<>
-					<Nation id={event.subject} />
-					{" "}
-					{verb}
-					{" "}
-					<Nation id={event.overlord} />
+					<Nation id={event.subject} /> {verb} <Nation id={event.overlord} />
 					{trigger}
 				</>
 			)
 		}
 		case "regency started": {
-			const flavor = pick([
-				"A regent council has been appointed to govern",
-				"The realm falls under regency",
-				"A council of regents assumes power",
-				"Guardians of the crown take the reins",
-			], seed)
+			const flavor = pick(
+				[
+					"A regent council has been appointed to govern",
+					"The realm falls under regency",
+					"A council of regents assumes power",
+					"Guardians of the crown take the reins",
+				],
+				seed,
+			)
 			return (
 				<>
 					<Nation id={event.nation} />
 					{": "}
 					{flavor}
-					{" until the young ruler, aged {0}, comes of age".replace("{0}", String(event.age))}
+					{" until the young ruler, aged {0}, comes of age".replace(
+						"{0}",
+						String(event.age),
+					)}
 				</>
 			)
 		}
 		case "regency ended": {
-			const flavor = pick([
-				"The young ruler comes of age and assumes full authority",
-				"The regency ends as the ruler reaches maturity",
-				"Having come of age, the ruler dismisses the regent council",
-				"The crown passes from regent to ruler at last",
-			], seed)
+			const flavor = pick(
+				[
+					"The young ruler comes of age and assumes full authority",
+					"The regency ends as the ruler reaches maturity",
+					"Having come of age, the ruler dismisses the regent council",
+					"The crown passes from regent to ruler at last",
+				],
+				seed,
+			)
 			return (
 				<>
 					<Nation id={event.nation} />
@@ -1375,11 +1726,17 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 									}}
 								/>
 								{tags.secondary ? (
-									<div className="flex truncate border rounded-sm overflow-hidden" style={{ borderColor: dotColor }}>
+									<div
+										className="flex truncate border rounded-sm overflow-hidden"
+										style={{ borderColor: dotColor }}
+									>
 										<span className="text-[8px] font-bold uppercase px-1.5 py-0.5 bg-gray-100 text-gray-600">
 											{tags.primary}
 										</span>
-										<span className="text-[8px] font-bold uppercase px-1.5 py-0.5 text-white" style={{ backgroundColor: dotColor }}>
+										<span
+											className="text-[8px] font-bold uppercase px-1.5 py-0.5 text-white"
+											style={{ backgroundColor: dotColor }}
+										>
 											{tags.secondary}
 										</span>
 									</div>

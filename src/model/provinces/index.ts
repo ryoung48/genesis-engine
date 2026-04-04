@@ -14,7 +14,7 @@ export const HAB = {
 		subtropical: 1,
 		tropical: 0.8,
 		infernal: 0.01,
-		chaotic: 0.01
+		chaotic: 0.01,
 	},
 	vegetation: {
 		desert: 0.1,
@@ -219,7 +219,7 @@ export const PROVINCE = {
 				0,
 			)
 			const habitabilityScore = WORLD.habitability()
-			const pops = 215e6 * habitabilityScore / 2.78
+			const pops = (215e6 * habitabilityScore) / 2.78
 			window.world.provinces.forEach((province) => {
 				const population = (province.habitability / total) * pops
 				PROVINCE.population.rural.set(province, population)

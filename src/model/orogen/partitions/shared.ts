@@ -1,5 +1,5 @@
-import type { OrogenPartition } from "../types"
 import { createRng } from "../rng"
+import type { OrogenPartition } from "../types"
 
 type GraphPartitionParams = {
 	nodeCount: number
@@ -163,7 +163,7 @@ export function deriveChildColors(params: {
 		for (let i = 0; i < siblings.length; i++) {
 			const child = siblings[i]
 			const offset =
-				siblings.length <= 1 ? 0 : ((i / (siblings.length - 1)) - 0.5) * 2 * span
+				siblings.length <= 1 ? 0 : (i / (siblings.length - 1) - 0.5) * 2 * span
 			const hue = (baseH + offset + (rng.random() - 0.5) * 0.01 + 1) % 1
 			const sat = clamp01(baseS + (rng.random() - 0.5) * 0.12)
 			const lit = clamp01(baseL + (rng.random() - 0.5) * 0.14)

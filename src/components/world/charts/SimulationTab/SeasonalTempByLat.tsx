@@ -85,7 +85,8 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 									label: (ctx) => {
 										const day = sampledDays[ctx.dataIndex] + 1
 										const lat = latRange[ctx.datasetIndex]
-										const temp = heat[ctx.datasetIndex][sampledDays[ctx.dataIndex]]
+										const temp =
+											heat[ctx.datasetIndex][sampledDays[ctx.dataIndex]]
 										return tooltipLabel
 											? tooltipLabel({ lat, day, temp })
 											: `${ctx.dataset.label}, Day ${day}: ${temp.toFixed(1)}${unit || "\u00B0C"}`
@@ -133,7 +134,11 @@ const SeasonalTempByLat: React.FC<SeasonalTempByLatProps> = ({
 				/>
 			</div>
 			{showScale && (
-				<TemperatureScale tempMin={tempMin} tempMax={tempMax} colorFn={colorFn} />
+				<TemperatureScale
+					tempMin={tempMin}
+					tempMax={tempMax}
+					colorFn={colorFn}
+				/>
 			)}
 		</div>
 	)

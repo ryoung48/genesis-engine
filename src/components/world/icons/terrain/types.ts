@@ -15,6 +15,12 @@ export type TerrainIcon =
 	| tree__icon
 	| element__icon
 
+export interface TerrainIconPlacement {
+	type: string
+	x: number
+	y: number
+}
+
 export type DrawTerrainIconParams = {
 	ctx: CanvasRenderingContext2D
 	cachedImages: CachedImages

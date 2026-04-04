@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
-import { generateOrogenWorld } from "./pipeline"
 import { importOrogenWorld } from "./import"
+import { generateOrogenWorld } from "./pipeline"
 import type {
 	OrogenWorkerRequest,
 	OrogenWorkerResponse,
@@ -10,7 +10,9 @@ import type {
 
 declare const self: DedicatedWorkerGlobalScope
 
-function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): SerializedOrogenWorld {
+function serializeWorld(
+	world: ReturnType<typeof generateOrogenWorld>,
+): SerializedOrogenWorld {
 	return {
 		mesh: {
 			numRegions: world.mesh.numRegions,
@@ -28,45 +30,45 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		elevation: world.elevation,
 		terrainFeatures: world.terrainFeatures
 			? {
-				featureMask: world.terrainFeatures.featureMask,
-				dominantFeature: world.terrainFeatures.dominantFeature,
-			}
+					featureMask: world.terrainFeatures.featureMask,
+					dominantFeature: world.terrainFeatures.dominantFeature,
+				}
 			: undefined,
 		elevation_km: world.elevation_km,
 		params: world.params,
 		continentCount: world.continentCount,
 		climate: world.climate
 			? {
-				temperature_avg: world.climate.temperature_avg,
-				temperature_min: world.climate.temperature_min,
-				temperature_max: world.climate.temperature_max,
-				temperature_monthly: world.climate.temperature_monthly,
-				pet_monthly: world.climate.pet_monthly,
-				daylight_hours_monthly: world.climate.daylight_hours_monthly,
-				landFraction: world.climate.landFraction,
-			}
+					temperature_avg: world.climate.temperature_avg,
+					temperature_min: world.climate.temperature_min,
+					temperature_max: world.climate.temperature_max,
+					temperature_monthly: world.climate.temperature_monthly,
+					pet_monthly: world.climate.pet_monthly,
+					daylight_hours_monthly: world.climate.daylight_hours_monthly,
+					landFraction: world.climate.landFraction,
+				}
 			: undefined,
 		oceanDist: world.oceanDist,
 		distCoast: world.distFields?.distCoast,
 		rainfall: world.rainfall
 			? {
-				monthly: world.rainfall.monthly,
-				annual: world.rainfall.annual,
-				east: world.rainfall.east,
-				west: world.rainfall.west,
-			}
+					monthly: world.rainfall.monthly,
+					annual: world.rainfall.annual,
+					east: world.rainfall.east,
+					west: world.rainfall.west,
+				}
 			: undefined,
 		hazards: world.hazards
 			? {
-				earthquake: world.hazards.earthquake,
-				volcano: world.hazards.volcano,
-				danger: world.hazards.danger,
-			}
+					earthquake: world.hazards.earthquake,
+					volcano: world.hazards.volcano,
+					danger: world.hazards.danger,
+				}
 			: undefined,
 		volcanism: world.volcanism
 			? {
-				hotspot: world.volcanism.hotspot,
-			}
+					hotspot: world.volcanism.hotspot,
+				}
 			: undefined,
 		climateZones: world.climateZones,
 		pastaClimate: world.pastaClimate,
@@ -83,105 +85,110 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 		rivers: world.rivers,
 		oceanCurrents: world.oceanCurrents
 			? {
-				oceanWarmth: world.oceanCurrents.oceanWarmth,
-				coastalWarmth: world.oceanCurrents.coastalWarmth,
-				temperatureDelta: world.oceanCurrents.temperatureDelta,
-			}
+					oceanWarmth: world.oceanCurrents.oceanWarmth,
+					coastalWarmth: world.oceanCurrents.coastalWarmth,
+					oceanWarmthMonthly: world.oceanCurrents.oceanWarmthMonthly,
+					coastalWarmthMonthly: world.oceanCurrents.coastalWarmthMonthly,
+					temperatureDeltaMonthly: world.oceanCurrents.temperatureDeltaMonthly,
+					temperatureDelta: world.oceanCurrents.temperatureDelta,
+				}
 			: undefined,
 		wind: world.wind
 			? {
-				wind_east_monthly: world.wind.wind_east_monthly,
-				wind_north_monthly: world.wind.wind_north_monthly,
-				wind_speed_monthly: world.wind.wind_speed_monthly,
-			}
+					wind_east_monthly: world.wind.wind_east_monthly,
+					wind_north_monthly: world.wind.wind_north_monthly,
+					wind_speed_monthly: world.wind.wind_speed_monthly,
+				}
 			: undefined,
 		provinces: world.provinces
 			? {
-				regionProvince: world.provinces.regionProvince,
-				seeds: world.provinces.seeds,
-				count: world.provinces.count,
-				desolate: world.provinces.desolate,
-				adjOffset: world.provinces.adjOffset,
-				adjList: world.provinces.adjList,
-				size: world.provinces.size,
-				colors: world.provinces.colors,
-			}
+					regionProvince: world.provinces.regionProvince,
+					seeds: world.provinces.seeds,
+					count: world.provinces.count,
+					desolate: world.provinces.desolate,
+					landmassId: world.provinces.landmassId,
+					adjOffset: world.provinces.adjOffset,
+					adjList: world.provinces.adjList,
+					size: world.provinces.size,
+					colors: world.provinces.colors,
+				}
 			: undefined,
 		nations: world.nations
 			? {
-				assignment: world.nations.assignment,
-				seeds: world.nations.seeds,
-				count: world.nations.count,
-				adjOffset: world.nations.adjOffset,
-				adjList: world.nations.adjList,
-				size: world.nations.size,
-				colors: world.nations.colors,
-				parent: world.nations.parent,
-				depth: world.nations.depth,
-				childOffset: world.nations.childOffset,
-				childList: world.nations.childList,
-				sovereign: world.nations.sovereign,
-				gravity: world.nations.gravity,
-			}
+					assignment: world.nations.assignment,
+					seeds: world.nations.seeds,
+					count: world.nations.count,
+					adjOffset: world.nations.adjOffset,
+					adjList: world.nations.adjList,
+					size: world.nations.size,
+					colors: world.nations.colors,
+					parent: world.nations.parent,
+					depth: world.nations.depth,
+					childOffset: world.nations.childOffset,
+					childList: world.nations.childList,
+					sovereign: world.nations.sovereign,
+					gravity: world.nations.gravity,
+				}
 			: undefined,
 		cultures: world.cultures
 			? {
-				assignment: world.cultures.assignment,
-				seeds: world.cultures.seeds,
-				count: world.cultures.count,
-				adjOffset: world.cultures.adjOffset,
-				adjList: world.cultures.adjList,
-				size: world.cultures.size,
-				colors: world.cultures.colors,
-			}
+					assignment: world.cultures.assignment,
+					seeds: world.cultures.seeds,
+					count: world.cultures.count,
+					adjOffset: world.cultures.adjOffset,
+					adjList: world.cultures.adjList,
+					size: world.cultures.size,
+					colors: world.cultures.colors,
+				}
 			: undefined,
 		heritages: world.heritages
 			? {
-				assignment: world.heritages.assignment,
-				seeds: world.heritages.seeds,
-				count: world.heritages.count,
-				adjOffset: world.heritages.adjOffset,
-				adjList: world.heritages.adjList,
-				size: world.heritages.size,
-				colors: world.heritages.colors,
-			}
+					assignment: world.heritages.assignment,
+					seeds: world.heritages.seeds,
+					count: world.heritages.count,
+					adjOffset: world.heritages.adjOffset,
+					adjList: world.heritages.adjList,
+					size: world.heritages.size,
+					colors: world.heritages.colors,
+				}
 			: undefined,
 		faiths: world.faiths
 			? {
-				assignment: world.faiths.assignment,
-				seeds: world.faiths.seeds,
-				count: world.faiths.count,
-				adjOffset: world.faiths.adjOffset,
-				adjList: world.faiths.adjList,
-				size: world.faiths.size,
-				colors: world.faiths.colors,
-			}
+					assignment: world.faiths.assignment,
+					seeds: world.faiths.seeds,
+					count: world.faiths.count,
+					adjOffset: world.faiths.adjOffset,
+					adjList: world.faiths.adjList,
+					size: world.faiths.size,
+					colors: world.faiths.colors,
+				}
 			: undefined,
 		religions: world.religions
 			? {
-				assignment: world.religions.assignment,
-				seeds: world.religions.seeds,
-				count: world.religions.count,
-				adjOffset: world.religions.adjOffset,
-				adjList: world.religions.adjList,
-				size: world.religions.size,
-				colors: world.religions.colors,
-			}
+					assignment: world.religions.assignment,
+					seeds: world.religions.seeds,
+					count: world.religions.count,
+					adjOffset: world.religions.adjOffset,
+					adjList: world.religions.adjList,
+					size: world.religions.size,
+					colors: world.religions.colors,
+				}
 			: undefined,
 		landmarks: world.landmarks
 			? {
-				regionLandmark: world.landmarks.regionLandmark,
-				type: world.landmarks.type,
-				size: world.landmarks.size,
-				count: world.landmarks.count,
-			}
+					regionLandmark: world.landmarks.regionLandmark,
+					type: world.landmarks.type,
+					size: world.landmarks.size,
+					count: world.landmarks.count,
+				}
 			: undefined,
 		population: world.population
 			? {
-				habitability: world.population.habitability,
-				population: world.population.population,
-				totalPopulation: world.population.totalPopulation,
-			}
+					habitability: world.population.habitability,
+					population: world.population.population,
+					habitabilityScore: world.population.habitabilityScore,
+					totalPopulation: world.population.totalPopulation,
+				}
 			: undefined,
 		monthlyTEQ: world.monthlyTEQ,
 	}
@@ -300,6 +307,19 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.riverLand.buffer)
 	}
 
+	if (world.provinces) {
+		transfer.push(
+			world.provinces.regionProvince.buffer,
+			world.provinces.seeds.buffer,
+			world.provinces.desolate.buffer,
+			world.provinces.landmassId.buffer,
+			world.provinces.adjOffset.buffer,
+			world.provinces.adjList.buffer,
+			world.provinces.size.buffer,
+			world.provinces.colors.buffer,
+		)
+	}
+
 	if (world.rivers?.lakes) {
 		transfer.push(world.rivers.flow.buffer)
 		transfer.push(world.rivers.flow_monthly.buffer)
@@ -314,6 +334,12 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.oceanCurrents) {
 		transfer.push(world.oceanCurrents.oceanWarmth.buffer)
 		transfer.push(world.oceanCurrents.coastalWarmth.buffer)
+		if (world.oceanCurrents.oceanWarmthMonthly)
+			transfer.push(world.oceanCurrents.oceanWarmthMonthly.buffer)
+		if (world.oceanCurrents.coastalWarmthMonthly)
+			transfer.push(world.oceanCurrents.coastalWarmthMonthly.buffer)
+		if (world.oceanCurrents.temperatureDeltaMonthly)
+			transfer.push(world.oceanCurrents.temperatureDeltaMonthly.buffer)
 		transfer.push(world.oceanCurrents.temperatureDelta.buffer)
 	}
 
@@ -323,14 +349,10 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.wind.wind_speed_monthly.buffer)
 	}
 
-	if (world.provinces) {
-		transfer.push(world.provinces.regionProvince.buffer)
-		transfer.push(world.provinces.seeds.buffer)
-		transfer.push(world.provinces.desolate.buffer)
-		transfer.push(world.provinces.adjOffset.buffer)
-		transfer.push(world.provinces.adjList.buffer)
-		transfer.push(world.provinces.size.buffer)
-		transfer.push(world.provinces.colors.buffer)
+	if (world.monthlyTEQ) {
+		for (const teq of world.monthlyTEQ) {
+			transfer.push(teq.buffer)
+		}
 	}
 
 	if (world.nations) {
@@ -395,7 +417,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.population.population.buffer)
 	}
 
-	return transfer
+	return Array.from(new Set(transfer))
 }
 
 self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {

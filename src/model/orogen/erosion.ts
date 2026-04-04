@@ -1,5 +1,5 @@
-import type { SphereMesh } from "./types"
 import { SimplexNoise } from "./simplex-noise"
+import type { SphereMesh } from "./types"
 
 // ----------------------------------------------------------------
 //  Inline binary min-heap keyed on external Float32Array
@@ -37,15 +37,9 @@ class MinHeap {
 				let smallest = i
 				const l = 2 * i + 1,
 					r = 2 * i + 2
-				if (
-					l < n &&
-					this._key[this._data[l]] < this._key[this._data[smallest]]
-				)
+				if (l < n && this._key[this._data[l]] < this._key[this._data[smallest]])
 					smallest = l
-				if (
-					r < n &&
-					this._key[this._data[r]] < this._key[this._data[smallest]]
-				)
+				if (r < n && this._key[this._data[r]] < this._key[this._data[smallest]])
 					smallest = r
 				if (smallest === i) break
 				const tmp = this._data[i]
@@ -95,8 +89,7 @@ function priorityFloodCarve(
 	}
 	let mainOceanLabel = 0
 	for (let i = 1; i < componentSizes.length; i++) {
-		if (componentSizes[i] > componentSizes[mainOceanLabel])
-			mainOceanLabel = i
+		if (componentSizes[i] > componentSizes[mainOceanLabel]) mainOceanLabel = i
 	}
 	const isOpenOcean = new Uint8Array(N)
 	for (let r = 0; r < N; r++) {
@@ -288,9 +281,7 @@ export function warpTerrain(
 			for (let i = adjOffset[cur], iEnd = adjOffset[cur + 1]; i < iEnd; i++) {
 				const nb = adjList[i]
 				const dot =
-					wx * r_xyz[3 * nb] +
-					wy * r_xyz[3 * nb + 1] +
-					wz * r_xyz[3 * nb + 2]
+					wx * r_xyz[3 * nb] + wy * r_xyz[3 * nb + 1] + wz * r_xyz[3 * nb + 2]
 				if (dot > bestDot) {
 					bestDot = dot
 					cur = nb
@@ -310,7 +301,10 @@ export function warpTerrain(
 		const warped = out[r]
 		let bias = warpBias
 		if (r_hotspot) {
-			const hotFrac = Math.min(1, Math.abs(r_hotspot[r]) / (Math.abs(orig) || 1))
+			const hotFrac = Math.min(
+				1,
+				Math.abs(r_hotspot[r]) / (Math.abs(orig) || 1),
+			)
 			bias *= 1 - 0.8 * hotFrac
 		}
 		if (warped > orig) {
@@ -432,7 +426,7 @@ export function erodeComposite(
 
 		glacIdx = new Float32Array(N)
 		// At strength=1 glaciation starts at ~50° latitude; at 0.5 it starts at ~70°
-		const thresholdLat = Math.PI / 2 - glacialStrength * Math.PI / 4.5
+		const thresholdLat = Math.PI / 2 - (glacialStrength * Math.PI) / 4.5
 
 		for (let r = 0; r < N; r++) {
 			if (r_isOcean[r]) continue
@@ -441,7 +435,9 @@ export function erodeComposite(
 			const latFactor = smoothstep(polarDist, thresholdLat, Math.PI / 2)
 			const elevFactor = smoothstep(elev[r], 0.5, 0.9)
 			const latScale = smoothstep(polarDist, Math.PI / 8, Math.PI / 3)
-			glacIdx[r] = Math.max(latFactor, elevFactor * 0.3 * (0.3 + 0.7 * latScale)) * glacialStrength
+			glacIdx[r] =
+				Math.max(latFactor, elevFactor * 0.3 * (0.3 + 0.7 * latScale)) *
+				glacialStrength
 		}
 
 		iceTarget = new Int32Array(N)
@@ -495,11 +491,15 @@ export function erodeComposite(
 				const r = landCells[i]
 				if (glacIdx![r] <= 0) continue
 				const h = elev[r]
-				let bestNb = -1, bestDrop = 0
+				let bestNb = -1,
+					bestDrop = 0
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
 					const drop = h - elev[nb]
-					if (drop > bestDrop) { bestDrop = drop; bestNb = nb }
+					if (drop > bestDrop) {
+						bestDrop = drop
+						bestNb = nb
+					}
 				}
 				if (bestNb >= 0) iceTarget![r] = bestNb
 			}
@@ -520,7 +520,8 @@ export function erodeComposite(
 				const r = landCells[i]
 				if (iceFlow![r] <= gFlowThreshold) continue
 
-				const deepening = gCarveRate * Math.pow(iceFlow![r], 0.6) * glacialStrength
+				const deepening =
+					gCarveRate * Math.pow(iceFlow![r], 0.6) * glacialStrength
 				elev[r] -= deepening
 
 				// Valley widening for U-shape
@@ -555,7 +556,10 @@ export function erodeComposite(
 				if (glacIdx![r] <= 0.2 || iceFlow![r] <= gFjordThreshold) continue
 				let isCoastal = false
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-					if (r_isOcean[adjList[j]]) { isCoastal = true; break }
+					if (r_isOcean[adjList[j]]) {
+						isCoastal = true
+						break
+					}
 				}
 				if (isCoastal) {
 					elev[r] -= gFjordCarve * Math.pow(iceFlow![r], 0.5)
@@ -639,8 +643,7 @@ export function erodeComposite(
 					let receiverSlope = 0
 					if (drainOfTarget >= 0 && cellDist[target] > 0) {
 						receiverSlope =
-							Math.abs(elev[target] - elev[drainOfTarget]) /
-							cellDist[target]
+							Math.abs(elev[target] - elev[drainOfTarget]) / cellDist[target]
 					}
 					const depositFrac = 0.5 / (1 + receiverSlope * 50)
 					const deposit = eroded * depositFrac
@@ -696,9 +699,13 @@ export function erodeComposite(
 		const tmp = new Float32Array(elev)
 		for (let r = 0; r < N; r++) {
 			if (r_isOcean[r] || glacIdx[r] <= 0) continue
-			let sum = 0, count = 0
+			let sum = 0,
+				count = 0
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				if (!r_isOcean[adjList[j]]) { sum += elev[adjList[j]]; count++ }
+				if (!r_isOcean[adjList[j]]) {
+					sum += elev[adjList[j]]
+					count++
+				}
 			}
 			if (count > 0) {
 				const avg = sum / count

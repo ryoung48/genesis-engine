@@ -12,11 +12,14 @@ type MeshWithOptionalNeighborDist = Pick<SphereMesh, "numRegions"> & {
 }
 
 export function getPlanetRadiusKm(planetRadiusKm?: number): number {
-	return planetRadiusKm && planetRadiusKm > 0 ? planetRadiusKm : DEFAULT_PLANET_RADIUS_KM
+	return planetRadiusKm && planetRadiusKm > 0
+		? planetRadiusKm
+		: DEFAULT_PLANET_RADIUS_KM
 }
 
 export function getObliquityDeg(obliquity?: number): number {
-	if (typeof obliquity !== "number" || !Number.isFinite(obliquity)) return DEFAULT_OBLIQUITY_DEG
+	if (typeof obliquity !== "number" || !Number.isFinite(obliquity))
+		return DEFAULT_OBLIQUITY_DEG
 	const normalized = ((obliquity % 360) + 360) % 360
 	return normalized > 180 ? 360 - normalized : normalized
 }
@@ -31,22 +34,26 @@ export function isRetrogradeObliquity(obliquity?: number): boolean {
 }
 
 export function getEccentricity(eccentricity?: number): number {
-	if (typeof eccentricity !== "number" || !Number.isFinite(eccentricity)) return DEFAULT_ECCENTRICITY
+	if (typeof eccentricity !== "number" || !Number.isFinite(eccentricity))
+		return DEFAULT_ECCENTRICITY
 	return Math.max(0, Math.min(0.99, eccentricity))
 }
 
 export function getSunTempFactor(sunTempFactor?: number): number {
-	if (typeof sunTempFactor !== "number" || !Number.isFinite(sunTempFactor)) return DEFAULT_SUN_TEMP_FACTOR
+	if (typeof sunTempFactor !== "number" || !Number.isFinite(sunTempFactor))
+		return DEFAULT_SUN_TEMP_FACTOR
 	return Math.max(0.1, Math.min(10, sunTempFactor))
 }
 
 export function getDaysPerYear(daysPerYear?: number): number {
-	if (typeof daysPerYear !== "number" || !Number.isFinite(daysPerYear)) return DEFAULT_DAYS_PER_YEAR
+	if (typeof daysPerYear !== "number" || !Number.isFinite(daysPerYear))
+		return DEFAULT_DAYS_PER_YEAR
 	return Math.max(30, Math.min(5000, daysPerYear))
 }
 
 export function getHoursPerDay(hoursPerDay?: number): number {
-	if (typeof hoursPerDay !== "number" || !Number.isFinite(hoursPerDay)) return DEFAULT_HOURS_PER_DAY
+	if (typeof hoursPerDay !== "number" || !Number.isFinite(hoursPerDay))
+		return DEFAULT_HOURS_PER_DAY
 	return Math.max(1, Math.min(240, hoursPerDay))
 }
 
@@ -58,17 +65,21 @@ export const DEFAULT_ANTISTELLAR_LON = 180
 export const DEFAULT_PERIHELION = 102
 
 export function getAntistellarLon(antistellarLon?: number): number {
-	if (typeof antistellarLon !== "number" || !Number.isFinite(antistellarLon)) return DEFAULT_ANTISTELLAR_LON
+	if (typeof antistellarLon !== "number" || !Number.isFinite(antistellarLon))
+		return DEFAULT_ANTISTELLAR_LON
 	return ((antistellarLon % 360) + 360) % 360
 }
 
 export function getPerihelion(perihelion?: number): number {
-	if (typeof perihelion !== "number" || !Number.isFinite(perihelion)) return DEFAULT_PERIHELION
+	if (typeof perihelion !== "number" || !Number.isFinite(perihelion))
+		return DEFAULT_PERIHELION
 	return ((perihelion % 360) + 360) % 360
 }
 
 /** Unit vector pointing at the substellar point (antistellar + 180°, lat=0). */
-export function getSubstellarDir(antistellarLon?: number): [number, number, number] {
+export function getSubstellarDir(
+	antistellarLon?: number,
+): [number, number, number] {
 	const antiDeg = getAntistellarLon(antistellarLon)
 	const subRad = ((antiDeg + 180) % 360) * (Math.PI / 180)
 	return [Math.cos(subRad), Math.sin(subRad), 0]
@@ -92,7 +103,10 @@ export function getMaxOceanDepthKm(planetRadiusKm?: number): number {
 	return 10 * Math.pow(R / DEFAULT_PLANET_RADIUS_KM, 0.3)
 }
 
-export function meanEdgeLengthKm(mesh: MeshWithOptionalNeighborDist, planetRadiusKm?: number): number {
+export function meanEdgeLengthKm(
+	mesh: MeshWithOptionalNeighborDist,
+	planetRadiusKm?: number,
+): number {
 	const radiusKm = getPlanetRadiusKm(planetRadiusKm)
 	if (!mesh.neighborDist?.length) {
 		const sphereAreaKm2 = 4 * Math.PI * radiusKm * radiusKm
@@ -100,6 +114,7 @@ export function meanEdgeLengthKm(mesh: MeshWithOptionalNeighborDist, planetRadiu
 		return Math.sqrt((2 * meanCellAreaKm2) / (3 * Math.sqrt(3)))
 	}
 	let edgeSum = 0
-	for (let i = 0; i < mesh.neighborDist.length; i++) edgeSum += mesh.neighborDist[i]
+	for (let i = 0; i < mesh.neighborDist.length; i++)
+		edgeSum += mesh.neighborDist[i]
 	return (edgeSum / Math.max(1, mesh.neighborDist.length)) * radiusKm
 }

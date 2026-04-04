@@ -1,40 +1,166 @@
 import type { OrogenClimate, OrogenRainfall, SphereMesh } from "../types"
 
 export const KOPPEN_CLASSES = [
-	{ code: "Ocean", name: "Ocean", color: [0.29, 0.44, 0.65] as [number, number, number] },
-	{ code: "Af", name: "Tropical rainforest", color: [0.0, 0.0, 1.0] as [number, number, number] },
-	{ code: "Am", name: "Tropical monsoon", color: [0.0, 0.47, 1.0] as [number, number, number] },
-	{ code: "Aw", name: "Tropical savanna", color: [0.27, 0.67, 0.98] as [number, number, number] },
-	{ code: "BWh", name: "Hot desert", color: [1.0, 0.0, 0.0] as [number, number, number] },
-	{ code: "BWk", name: "Cold desert", color: [1.0, 0.59, 0.59] as [number, number, number] },
-	{ code: "BSh", name: "Hot steppe", color: [0.96, 0.65, 0.0] as [number, number, number] },
-	{ code: "BSk", name: "Cold steppe", color: [1.0, 0.86, 0.39] as [number, number, number] },
-	{ code: "Cfa", name: "Humid subtropical", color: [0.78, 1.0, 0.31] as [number, number, number] },
-	{ code: "Cfb", name: "Oceanic", color: [0.39, 1.0, 0.31] as [number, number, number] },
-	{ code: "Cfc", name: "Subpolar oceanic", color: [0.2, 0.78, 0.0] as [number, number, number] },
-	{ code: "Csa", name: "Hot-summer Mediterranean", color: [1.0, 1.0, 0.0] as [number, number, number] },
-	{ code: "Csb", name: "Warm-summer Mediterranean", color: [0.78, 0.78, 0.0] as [number, number, number] },
-	{ code: "Csc", name: "Cold-summer Mediterranean", color: [0.59, 0.59, 0.0] as [number, number, number] },
-	{ code: "Cwa", name: "Humid subtropical (monsoon)", color: [0.59, 1.0, 0.59] as [number, number, number] },
-	{ code: "Cwb", name: "Subtropical highland", color: [0.39, 0.78, 0.39] as [number, number, number] },
-	{ code: "Cwc", name: "Cold subtropical highland", color: [0.2, 0.59, 0.2] as [number, number, number] },
-	{ code: "Dfa", name: "Hot-summer continental", color: [0.0, 1.0, 1.0] as [number, number, number] },
-	{ code: "Dfb", name: "Warm-summer continental", color: [0.22, 0.78, 1.0] as [number, number, number] },
-	{ code: "Dfc", name: "Subarctic", color: [0.0, 0.49, 0.49] as [number, number, number] },
-	{ code: "Dfd", name: "Extremely cold subarctic", color: [0.0, 0.27, 0.37] as [number, number, number] },
-	{ code: "Dsa", name: "Hot-summer continental (dry summer)", color: [0.9, 0.5, 1.0] as [number, number, number] },
-	{ code: "Dsb", name: "Warm-summer continental (dry summer)", color: [0.7, 0.35, 0.85] as [number, number, number] },
-	{ code: "Dsc", name: "Subarctic (dry summer)", color: [0.5, 0.2, 0.65] as [number, number, number] },
-	{ code: "Dsd", name: "Extremely cold subarctic (dry summer)", color: [0.35, 0.1, 0.45] as [number, number, number] },
-	{ code: "Dwa", name: "Hot-summer continental (monsoon)", color: [0.67, 0.69, 1.0] as [number, number, number] },
-	{ code: "Dwb", name: "Warm-summer continental (monsoon)", color: [0.43, 0.47, 0.78] as [number, number, number] },
-	{ code: "Dwc", name: "Subarctic (monsoon)", color: [0.29, 0.31, 0.78] as [number, number, number] },
-	{ code: "Dwd", name: "Extremely cold subarctic (monsoon)", color: [0.2, 0.0, 0.53] as [number, number, number] },
-	{ code: "ET", name: "Tundra", color: [0.7, 0.7, 0.7] as [number, number, number] },
-	{ code: "EF", name: "Ice cap", color: [0.41, 0.41, 0.41] as [number, number, number] },
+	{
+		code: "Ocean",
+		name: "Ocean",
+		color: [0.29, 0.44, 0.65] as [number, number, number],
+	},
+	{
+		code: "Af",
+		name: "Tropical rainforest",
+		color: [0.0, 0.0, 1.0] as [number, number, number],
+	},
+	{
+		code: "Am",
+		name: "Tropical monsoon",
+		color: [0.0, 0.47, 1.0] as [number, number, number],
+	},
+	{
+		code: "Aw",
+		name: "Tropical savanna",
+		color: [0.27, 0.67, 0.98] as [number, number, number],
+	},
+	{
+		code: "BWh",
+		name: "Hot desert",
+		color: [1.0, 0.0, 0.0] as [number, number, number],
+	},
+	{
+		code: "BWk",
+		name: "Cold desert",
+		color: [1.0, 0.59, 0.59] as [number, number, number],
+	},
+	{
+		code: "BSh",
+		name: "Hot steppe",
+		color: [0.96, 0.65, 0.0] as [number, number, number],
+	},
+	{
+		code: "BSk",
+		name: "Cold steppe",
+		color: [1.0, 0.86, 0.39] as [number, number, number],
+	},
+	{
+		code: "Cfa",
+		name: "Humid subtropical",
+		color: [0.78, 1.0, 0.31] as [number, number, number],
+	},
+	{
+		code: "Cfb",
+		name: "Oceanic",
+		color: [0.39, 1.0, 0.31] as [number, number, number],
+	},
+	{
+		code: "Cfc",
+		name: "Subpolar oceanic",
+		color: [0.2, 0.78, 0.0] as [number, number, number],
+	},
+	{
+		code: "Csa",
+		name: "Hot-summer Mediterranean",
+		color: [1.0, 1.0, 0.0] as [number, number, number],
+	},
+	{
+		code: "Csb",
+		name: "Warm-summer Mediterranean",
+		color: [0.78, 0.78, 0.0] as [number, number, number],
+	},
+	{
+		code: "Csc",
+		name: "Cold-summer Mediterranean",
+		color: [0.59, 0.59, 0.0] as [number, number, number],
+	},
+	{
+		code: "Cwa",
+		name: "Humid subtropical (monsoon)",
+		color: [0.59, 1.0, 0.59] as [number, number, number],
+	},
+	{
+		code: "Cwb",
+		name: "Subtropical highland",
+		color: [0.39, 0.78, 0.39] as [number, number, number],
+	},
+	{
+		code: "Cwc",
+		name: "Cold subtropical highland",
+		color: [0.2, 0.59, 0.2] as [number, number, number],
+	},
+	{
+		code: "Dfa",
+		name: "Hot-summer continental",
+		color: [0.0, 1.0, 1.0] as [number, number, number],
+	},
+	{
+		code: "Dfb",
+		name: "Warm-summer continental",
+		color: [0.22, 0.78, 1.0] as [number, number, number],
+	},
+	{
+		code: "Dfc",
+		name: "Subarctic",
+		color: [0.0, 0.49, 0.49] as [number, number, number],
+	},
+	{
+		code: "Dfd",
+		name: "Extremely cold subarctic",
+		color: [0.0, 0.27, 0.37] as [number, number, number],
+	},
+	{
+		code: "Dsa",
+		name: "Hot-summer continental (dry summer)",
+		color: [0.9, 0.5, 1.0] as [number, number, number],
+	},
+	{
+		code: "Dsb",
+		name: "Warm-summer continental (dry summer)",
+		color: [0.7, 0.35, 0.85] as [number, number, number],
+	},
+	{
+		code: "Dsc",
+		name: "Subarctic (dry summer)",
+		color: [0.5, 0.2, 0.65] as [number, number, number],
+	},
+	{
+		code: "Dsd",
+		name: "Extremely cold subarctic (dry summer)",
+		color: [0.35, 0.1, 0.45] as [number, number, number],
+	},
+	{
+		code: "Dwa",
+		name: "Hot-summer continental (monsoon)",
+		color: [0.67, 0.69, 1.0] as [number, number, number],
+	},
+	{
+		code: "Dwb",
+		name: "Warm-summer continental (monsoon)",
+		color: [0.43, 0.47, 0.78] as [number, number, number],
+	},
+	{
+		code: "Dwc",
+		name: "Subarctic (monsoon)",
+		color: [0.29, 0.31, 0.78] as [number, number, number],
+	},
+	{
+		code: "Dwd",
+		name: "Extremely cold subarctic (monsoon)",
+		color: [0.2, 0.0, 0.53] as [number, number, number],
+	},
+	{
+		code: "ET",
+		name: "Tundra",
+		color: [0.7, 0.7, 0.7] as [number, number, number],
+	},
+	{
+		code: "EF",
+		name: "Ice cap",
+		color: [0.41, 0.41, 0.41] as [number, number, number],
+	},
 ] as const
 
-export const KOPPEN_LABELS = KOPPEN_CLASSES.map((entry) => entry.code) as ReadonlyArray<string>
+export const KOPPEN_LABELS = KOPPEN_CLASSES.map(
+	(entry) => entry.code,
+) as ReadonlyArray<string>
 
 const KOPPEN_TRUE_COLOR_MAP = {
 	Af: [42, 65, 15],
@@ -74,22 +200,6 @@ const CLASS_ID: Record<string, number> = Object.fromEntries(
 	KOPPEN_CLASSES.map((entry, index) => [entry.code, index]),
 )
 
-/** Determine local summer/winter months from temperature, not latitude.
- *  Compares mean temp of NH-summer months (May-Oct) vs NH-winter months (Nov-Apr).
- *  Whichever half is warmer is the local summer. */
-function getLocalSeasons(monthlyTemps: number[]): { summer: number[]; winter: number[] } {
-	const nhSummer = [4, 5, 6, 7, 8, 9]
-	const nhWinter = [10, 11, 0, 1, 2, 3]
-	let nhSummerMean = 0, nhWinterMean = 0
-	for (const m of nhSummer) nhSummerMean += monthlyTemps[m]
-	for (const m of nhWinter) nhWinterMean += monthlyTemps[m]
-	// If NH summer is warmer (or equal), treat as NH; otherwise flip
-	if (nhSummerMean >= nhWinterMean) {
-		return { summer: [5, 6, 7], winter: [11, 0, 1] }
-	}
-	return { summer: [11, 0, 1], winter: [5, 6, 7] }
-}
-
 export function assignKoppenClimate(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
@@ -107,10 +217,14 @@ export function assignKoppenClimate(
 		if (!isLand[r]) continue
 
 		// Single-pass stats collection
-		let hot = -Infinity, cold = Infinity, tempSum = 0
-		let rainSum = 0, driestMonth = Infinity
+		let hot = -Infinity,
+			cold = Infinity,
+			tempSum = 0
+		let rainSum = 0,
+			driestMonth = Infinity
 		let monthsAbove10 = 0
-		let nhSummerTempSum = 0, nhWinterTempSum = 0
+		let nhSummerTempSum = 0,
+			nhWinterTempSum = 0
 		for (let month = 0; month < 12; month++) {
 			const t = climate.temperature_monthly[month * N + r]
 			const rain = rainfall.monthly[month * N + r]
@@ -131,12 +245,19 @@ export function assignKoppenClimate(
 
 		// Inline local season determination + driest/wettest computation
 		const isNH = nhSummerTempSum >= nhWinterTempSum
-		const s0 = isNH ? 5 : 11, s1 = isNH ? 6 : 0, s2 = isNH ? 7 : 1
-		const w0 = isNH ? 11 : 5, w1 = isNH ? 0 : 6, w2 = isNH ? 1 : 7
-		const sr0 = mRain[s0], sr1 = mRain[s1], sr2 = mRain[s2]
-		const wr0 = mRain[w0], wr1 = mRain[w1], wr2 = mRain[w2]
+		const s0 = isNH ? 5 : 11,
+			s1 = isNH ? 6 : 0,
+			s2 = isNH ? 7 : 1
+		const w0 = isNH ? 11 : 5,
+			w1 = isNH ? 0 : 6,
+			w2 = isNH ? 1 : 7
+		const sr0 = mRain[s0],
+			sr1 = mRain[s1],
+			sr2 = mRain[s2]
+		const wr0 = mRain[w0],
+			wr1 = mRain[w1],
+			wr2 = mRain[w2]
 		const summerRain = sr0 + sr1 + sr2
-		const winterRain = wr0 + wr1 + wr2
 		const driestSummer = Math.min(sr0, sr1, sr2)
 		const driestWinter = Math.min(wr0, wr1, wr2)
 		const wettestSummer = Math.max(sr0, sr1, sr2)
@@ -221,5 +342,7 @@ export function koppenTrueColor(classId: number): [number, number, number] {
 	const code = KOPPEN_LABELS[classId]
 	if (!code || code === "Ocean") return [10 / 255, 10 / 255, 51 / 255]
 	const rgb = KOPPEN_TRUE_COLOR_MAP[code as keyof typeof KOPPEN_TRUE_COLOR_MAP]
-	return rgb ? [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255] : [10 / 255, 10 / 255, 51 / 255]
+	return rgb
+		? [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255]
+		: [10 / 255, 10 / 255, 51 / 255]
 }

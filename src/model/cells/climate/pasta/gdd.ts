@@ -4,8 +4,8 @@ import {
 	BASELINE_STANDARD,
 	BASELINE_ZERO,
 	DEFAULT_PAR_RATIO,
-	gddTotal,
 	gddiDay,
+	gddTotal,
 	gdm,
 	longestRun,
 	monthlyInsolationScales,
@@ -28,10 +28,7 @@ export interface GDDTotals {
  * - GDDi, GDDiz: annual insolation-based GDD (simple sum, no seasonal logic).
  * - GInt: longest consecutive growth interruption (longestRun).
  */
-export function gddTotals(
-	cell: Cell,
-	parRatio = DEFAULT_PAR_RATIO,
-): GDDTotals {
+export function gddTotals(cell: Cell, parRatio = DEFAULT_PAR_RATIO): GDDTotals {
 	const scales = monthlyInsolationScales()
 
 	const mGDD: number[] = []

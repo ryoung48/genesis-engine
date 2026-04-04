@@ -2,8 +2,9 @@
  * Static elevation generator for stagnant lid worlds.
  * Produces terrain from a single base simplex-noise field.
  */
-import type { SphereMesh } from "./types"
+
 import { SimplexNoise } from "./simplex-noise"
+import type { SphereMesh } from "./types"
 
 /**
  * Base terrain: multi-octave simplex noise at continent scale.
@@ -20,23 +21,93 @@ function addBaseNoise(
 	const { numRegions, r_xyz } = mesh
 	const persistence = 0.52 + roughness * 0.18
 	for (let r = 0; r < numRegions; r++) {
-		const x = r_xyz[3 * r], y = r_xyz[3 * r + 1], z = r_xyz[3 * r + 2]
-		const warpX = detailNoise.fbm(x * 1.6 + 17.3, y * 1.6 + 9.1, z * 1.6 + 23.7, 2, 0.5) * 0.30
-		const warpY = detailNoise.fbm(x * 1.6 + 31.9, y * 1.6 + 14.7, z * 1.6 + 5.3, 2, 0.5) * 0.30
-		const warpZ = detailNoise.fbm(x * 1.6 + 7.1, y * 1.6 + 28.4, z * 1.6 + 12.9, 2, 0.5) * 0.30
+		const x = r_xyz[3 * r],
+			y = r_xyz[3 * r + 1],
+			z = r_xyz[3 * r + 2]
+		const warpX =
+			detailNoise.fbm(x * 1.6 + 17.3, y * 1.6 + 9.1, z * 1.6 + 23.7, 2, 0.5) *
+			0.3
+		const warpY =
+			detailNoise.fbm(x * 1.6 + 31.9, y * 1.6 + 14.7, z * 1.6 + 5.3, 2, 0.5) *
+			0.3
+		const warpZ =
+			detailNoise.fbm(x * 1.6 + 7.1, y * 1.6 + 28.4, z * 1.6 + 12.9, 2, 0.5) *
+			0.3
 		const wx = x + warpX
 		const wy = y + warpY
 		const wz = z + warpZ
 
-		const mega = Math.max(0, baseNoise.fbm(wx * 0.7 + 88.3, wy * 0.7 + 44.1, wz * 0.7 + 61.7, 3, persistence))
-		const broad = Math.max(0, baseNoise.fbm(wx * 1.4, wy * 1.4, wz * 1.4, 5, persistence))
-		const mid = Math.max(0, detailNoise.fbm(wx * 2.6 + 51.2, wy * 2.6 + 19.8, wz * 2.6 + 37.4, 4, persistence))
-		const ridgeMask = 0.35 + 0.65 * Math.max(0, detailNoise.fbm(wx * 2.4 + 12.1, wy * 2.4 + 33.6, wz * 2.4 + 18.5, 3, 0.5))
-		const ridged = Math.max(0, detailNoise.ridgedFbm(wx * 3.5 + 41.2, wy * 3.5 + 13.8, wz * 3.5 + 29.4, 4, 2.0, 0.5, 1.0) - 0.45) * ridgeMask
-		const detail = Math.max(0, baseNoise.fbm(wx * 7.0 + 63.5, wy * 7.0 + 22.7, wz * 7.0 + 48.1, 3, 0.5))
-		const fine = Math.max(0, detailNoise.fbm(wx * 12.0 + 71.6, wy * 12.0 + 18.4, wz * 12.0 + 52.3, 3, 0.48))
+		const mega = Math.max(
+			0,
+			baseNoise.fbm(
+				wx * 0.7 + 88.3,
+				wy * 0.7 + 44.1,
+				wz * 0.7 + 61.7,
+				3,
+				persistence,
+			),
+		)
+		const broad = Math.max(
+			0,
+			baseNoise.fbm(wx * 1.4, wy * 1.4, wz * 1.4, 5, persistence),
+		)
+		const mid = Math.max(
+			0,
+			detailNoise.fbm(
+				wx * 2.6 + 51.2,
+				wy * 2.6 + 19.8,
+				wz * 2.6 + 37.4,
+				4,
+				persistence,
+			),
+		)
+		const ridgeMask =
+			0.35 +
+			0.65 *
+				Math.max(
+					0,
+					detailNoise.fbm(
+						wx * 2.4 + 12.1,
+						wy * 2.4 + 33.6,
+						wz * 2.4 + 18.5,
+						3,
+						0.5,
+					),
+				)
+		const ridged =
+			Math.max(
+				0,
+				detailNoise.ridgedFbm(
+					wx * 3.5 + 41.2,
+					wy * 3.5 + 13.8,
+					wz * 3.5 + 29.4,
+					4,
+					2.0,
+					0.5,
+					1.0,
+				) - 0.45,
+			) * ridgeMask
+		const detail = Math.max(
+			0,
+			baseNoise.fbm(wx * 7.0 + 63.5, wy * 7.0 + 22.7, wz * 7.0 + 48.1, 3, 0.5),
+		)
+		const fine = Math.max(
+			0,
+			detailNoise.fbm(
+				wx * 12.0 + 71.6,
+				wy * 12.0 + 18.4,
+				wz * 12.0 + 52.3,
+				3,
+				0.48,
+			),
+		)
 
-		const noise = mega * 0.35 + broad * 0.50 + mid * 0.40 + ridged * 0.30 + (detail + fine * 0.6) * 0.18
+		const noise =
+			mega * 0.35 +
+			broad * 0.5 +
+			mid * 0.4 +
+			ridged * 0.3 +
+			(detail + fine * 0.6) * 0.18
 		const sign = plateOceanMask[r] ? -1 : 1
 		elevation[r] += sign * noise
 	}
@@ -120,7 +191,9 @@ function applyPlateBias(
 
 	for (let r = 0; r < N; r++) {
 		if (dist[r] > coastRoughenDist) continue
-		const x = r_xyz[3 * r], y = r_xyz[3 * r + 1], z = r_xyz[3 * r + 2]
+		const x = r_xyz[3 * r],
+			y = r_xyz[3 * r + 1],
+			z = r_xyz[3 * r + 2]
 		const t = dist[r] / coastRoughenDist
 
 		// Layer 1: Low-frequency coastal warping (broad bays/peninsulas)
@@ -130,32 +203,54 @@ function applyPlateBias(
 
 		// Layer 2: Mid-frequency coastal noise
 		const n1mid = cNoise2.fbm(x * 14 + 3.7, y * 14 + 7.1, z * 14 + 2.3, 5, 0.55)
-		elevation[r] += n1mid * 0.10 * falloff1
+		elevation[r] += n1mid * 0.1 * falloff1
 
 		// Layer 3: High-frequency coastal jaggedness
-		const n1hi = cNoise3.fbm(x * 28 + 41.2, y * 28 + 17.9, z * 28 + 8.6, 4, 0.50)
+		const n1hi = cNoise3.fbm(x * 28 + 41.2, y * 28 + 17.9, z * 28 + 8.6, 4, 0.5)
 		elevation[r] += n1hi * 0.05 * falloff1
 
 		// Layer 4: Ridged coastal features (headlands/cliffs)
-		const ridgeN = cNoise.ridgedFbm(x * 10 + 55.3, y * 10 + 32.1, z * 10 + 19.7, 3, 2.0, 0.5, 1.0)
+		const ridgeN = cNoise.ridgedFbm(
+			x * 10 + 55.3,
+			y * 10 + 32.1,
+			z * 10 + 19.7,
+			3,
+			2.0,
+			0.5,
+			1.0,
+		)
 		elevation[r] += (ridgeN - 0.5) * 0.07 * falloff1
 
 		// Layer 5: Coastline-aware domain warping
 		const falloffW = Math.max(0, 1 - t * 1.3)
 		if (falloffW > 0) {
 			const warpAmt = 0.4 * falloffW
-			const dwx = cNoise3.fbm(x * 6 + 11.3, y * 6 + 4.7, z * 6 + 8.2, 3, 0.6) * warpAmt
-			const dwy = cNoise3.fbm(x * 6 + 2.9, y * 6 + 9.4, z * 6 + 1.6, 3, 0.6) * warpAmt
-			const dwz = cNoise3.fbm(x * 6 + 7.5, y * 6 + 0.3, z * 6 + 5.9, 3, 0.6) * warpAmt
+			const dwx =
+				cNoise3.fbm(x * 6 + 11.3, y * 6 + 4.7, z * 6 + 8.2, 3, 0.6) * warpAmt
+			const dwy =
+				cNoise3.fbm(x * 6 + 2.9, y * 6 + 9.4, z * 6 + 1.6, 3, 0.6) * warpAmt
+			const dwz =
+				cNoise3.fbm(x * 6 + 7.5, y * 6 + 0.3, z * 6 + 5.9, 3, 0.6) * warpAmt
 			const origN = cNoise.fbm(x * 8, y * 8, z * 8, 4, 0.5) * 0.08
-			const warpN = cNoise.fbm((x + dwx) * 8, (y + dwy) * 8, (z + dwz) * 8, 4, 0.5) * 0.08
+			const warpN =
+				cNoise.fbm((x + dwx) * 8, (y + dwy) * 8, (z + dwz) * 8, 4, 0.5) * 0.08
 			elevation[r] += (warpN - origN) * falloffW
 		}
 
 		// Layer 6: Island scattering near ocean coasts
-		if (plateOceanMask[r] && dist[r] > 0 && dist[r] <= Math.max(4, Math.round(4 * scaleFactor))) {
-			const islandN = cNoise2.fbm(x * 35 + 5.1, y * 35 + 9.3, z * 35 + 2.7, 4, 0.5)
-			const threshold = 0.20
+		if (
+			plateOceanMask[r] &&
+			dist[r] > 0 &&
+			dist[r] <= Math.max(4, Math.round(4 * scaleFactor))
+		) {
+			const islandN = cNoise2.fbm(
+				x * 35 + 5.1,
+				y * 35 + 9.3,
+				z * 35 + 2.7,
+				4,
+				0.5,
+			)
+			const threshold = 0.2
 			if (islandN > threshold) {
 				const excess = (islandN - threshold) / (1 - threshold)
 				const distFade = 1 - dist[r] / Math.max(4, Math.round(4 * scaleFactor))
@@ -177,7 +272,14 @@ export function generateStaticElevation(
 	const baseNoise = new SimplexNoise(seed + 2001)
 	const detailNoise = new SimplexNoise(seed + 2002)
 
-	addBaseNoise(mesh, elevation, baseNoise, detailNoise, roughness, plateOceanMask)
+	addBaseNoise(
+		mesh,
+		elevation,
+		baseNoise,
+		detailNoise,
+		roughness,
+		plateOceanMask,
+	)
 	applyPlateBias(mesh, elevation, plateOceanMask, seed)
 
 	return elevation

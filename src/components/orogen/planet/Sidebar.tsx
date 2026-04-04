@@ -28,11 +28,23 @@ interface SidebarProps {
 	onClose?: () => void
 }
 
-function renderSliderGroup(items: SliderDef[], columns: "single" | "double" = "double") {
+function renderSliderGroup(
+	items: SliderDef[],
+	columns: "single" | "double" = "double",
+) {
 	return (
-		<div className={columns === "double" ? "grid grid-cols-1 xl:grid-cols-2 gap-1.5" : "space-y-1.5"}>
+		<div
+			className={
+				columns === "double"
+					? "grid grid-cols-1 xl:grid-cols-2 gap-1.5"
+					: "space-y-1.5"
+			}
+		>
 			{items.map((p) => (
-				<div key={p.label} className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}>
+				<div
+					key={p.label}
+					className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
+				>
 					<div className="flex justify-between items-baseline gap-3">
 						<div className="group relative flex items-center min-w-0">
 							<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -63,11 +75,29 @@ function renderSliderGroup(items: SliderDef[], columns: "single" | "double" = "d
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-	worldTab, setWorldTab, resetWorldDefaults,
-	tidallyLocked, setTidallyLocked, setObliquity,
-	planetSliders, terrainSliders,
-	planetCode, codeInput, setCodeInput, onApplyCode, codeError, recentCodes, onSelectRecentCode, onRandomizeCode, generating, generationLabel, generationProgress,
-	handleGenerate, handleFileImport, handleEarthImport, onClose,
+	worldTab,
+	setWorldTab,
+	resetWorldDefaults,
+	tidallyLocked,
+	setTidallyLocked,
+	setObliquity,
+	planetSliders,
+	terrainSliders,
+	planetCode,
+	codeInput,
+	setCodeInput,
+	onApplyCode,
+	codeError,
+	recentCodes,
+	onSelectRecentCode,
+	onRandomizeCode,
+	generating,
+	generationLabel,
+	generationProgress,
+	handleGenerate,
+	handleFileImport,
+	handleEarthImport,
+	onClose,
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const [showRecentCodes, setShowRecentCodes] = useState(false)
@@ -77,9 +107,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			{/* Header */}
 			<div className="flex items-center gap-3 mb-5">
 				<div className="w-7 h-7 bg-slate-900 rounded-md flex items-center justify-center">
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-white">
-						<circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-						<path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" strokeWidth="1.5" />
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						className="text-white"
+					>
+						<circle
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							strokeWidth="2"
+						/>
+						<path
+							d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+							stroke="currentColor"
+							strokeWidth="1.5"
+						/>
 					</svg>
 				</div>
 				<span className="font-bold text-sm tracking-tight">TECTONIC LAB</span>
@@ -88,7 +134,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
 					title="Hide sidebar"
 				>
-					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<line x1="18" y1="6" x2="6" y2="18" />
+						<line x1="6" y1="6" x2="18" y2="18" />
+					</svg>
 				</button>
 			</div>
 
@@ -96,7 +155,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 			<div className="mb-5">
 				<div className="flex items-center gap-3 mb-2">
 					<div className="h-px w-8 bg-slate-300" />
-					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.3em]">Planet Forge</span>
+					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.3em]">
+						Planet Forge
+					</span>
 				</div>
 				<h1 className="text-3xl font-black tracking-tighter leading-[0.88] mb-2">
 					<span className="text-slate-900">TECTONIC</span>
@@ -104,18 +165,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					<span className="text-slate-300">LAB</span>
 				</h1>
 				<p className="text-slate-400 text-xs leading-relaxed">
-					Tectonic plate simulation with collision-driven
-					mountains, hydraulic erosion, and 3D globe rendering.
+					Tectonic plate simulation with collision-driven mountains, hydraulic
+					erosion, and 3D globe rendering.
 				</p>
 			</div>
 
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
 				<div className="flex items-center justify-between gap-2">
 					<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
-						{([
-							["planet", "Planet"],
-							["terrain", "Terrain"],
-						] as const).map(([tab, label]) => (
+						{(
+							[
+								["planet", "Planet"],
+								["terrain", "Terrain"],
+							] as const
+						).map(([tab, label]) => (
 							<button
 								key={tab}
 								onClick={() => setWorldTab(tab)}
@@ -150,8 +213,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 								}}
 								className="accent-slate-900 h-3.5 w-3.5"
 							/>
-							<span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Tidally Locked</span>
-							<span className="text-[9px] text-slate-400 ml-auto">One side always faces the star</span>
+							<span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+								Tidally Locked
+							</span>
+							<span className="text-[9px] text-slate-400 ml-auto">
+								One side always faces the star
+							</span>
 						</label>
 						{renderSliderGroup(planetSliders)}
 					</div>
@@ -166,7 +233,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 				<div className="space-y-2.5 pt-3 mt-1 border-t border-slate-100">
 					<div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
 						<div className="flex items-center gap-2">
-							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">Code</span>
+							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+								Code
+							</span>
 							<input
 								type="text"
 								value={codeInput}
@@ -200,14 +269,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 								className="p-1 text-slate-300 hover:text-slate-900 transition-colors disabled:opacity-50"
 								title="New code"
 							>
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+								>
 									<path d="M1 4v6h6M23 20v-6h-6" />
 									<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
 								</svg>
 							</button>
 						</div>
 						{codeError && (
-							<p className="mt-1 border-t border-slate-200 pt-2 text-[11px] font-medium text-red-500">Invalid code</p>
+							<p className="mt-1 border-t border-slate-200 pt-2 text-[11px] font-medium text-red-500">
+								Invalid code
+							</p>
 						)}
 						{showRecentCodes && recentCodes.length > 0 && (
 							<div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-200 pt-2">
@@ -241,7 +319,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 							className="flex-1 bg-slate-900 text-white py-2.5 px-3.5 rounded-lg hover:bg-black transition-all flex justify-between items-center group text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							<span className="flex items-center gap-2">
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+								<svg
+									width="14"
+									height="14"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+								>
 									<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
 								</svg>
 								{generating ? "Generating..." : "Generate"}
@@ -250,7 +335,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 					</div>
 
 					<div className="space-y-1.5">
-						<div className="px-1 font-mono text-[10px] text-slate-400 uppercase tracking-[0.18em]">Import</div>
+						<div className="px-1 font-mono text-[10px] text-slate-400 uppercase tracking-[0.18em]">
+							Import
+						</div>
 						<div className="flex gap-2">
 							<input
 								ref={fileInputRef}
@@ -290,7 +377,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 						<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
 							<div
 								className="h-full rounded-full bg-slate-900 transition-all duration-200"
-								style={{ width: `${Math.max(0, Math.min(100, generationProgress))}%` }}
+								style={{
+									width: `${Math.max(0, Math.min(100, generationProgress))}%`,
+								}}
 							/>
 						</div>
 					</div>

@@ -1,7 +1,7 @@
 import { Cell } from "../../types"
 import { aridity } from "./aridity"
 import { evaporationRatio } from "./evaporation-ratio"
-import { gddTotals, GDDTotals } from "./gdd"
+import { GDDTotals, gddTotals } from "./gdd"
 import { growthSupply } from "./growth-supply"
 import { iceCover } from "./ice"
 
@@ -11,40 +11,40 @@ import { iceCover } from "./ice"
 
 const ZONE_COLORS: Record<string, [number, number, number]> = {
 	// Tropical — Eutropical
-	TUr:  [0, 0, 255],
+	TUr: [0, 0, 255],
 	TUrp: [4, 0, 191],
-	TUf:  [41, 112, 255],
+	TUf: [41, 112, 255],
 	TUfp: [26, 80, 188],
-	TUs:  [145, 180, 255],
+	TUs: [145, 180, 255],
 	TUsp: [95, 125, 196],
-	TUA:  [199, 216, 255],
+	TUA: [199, 216, 255],
 	TUAp: [136, 157, 206],
 	// Tropical — Quasitropical
-	TQf:  [55, 210, 192],
+	TQf: [55, 210, 192],
 	TQfp: [48, 141, 130],
-	TQs:  [117, 245, 230],
+	TQs: [117, 245, 230],
 	TQsp: [114, 197, 188],
-	TQA:  [186, 253, 245],
+	TQA: [186, 253, 245],
 	TQAp: [174, 219, 213],
 	// Tropical — Marginal / Barren
 	TF: [83, 83, 147],
 	TG: [30, 28, 109],
 	// Cold — Subtropical
-	CTf:  [84, 218, 34],
+	CTf: [84, 218, 34],
 	CTfp: [54, 158, 16],
-	CTs:  [167, 253, 129],
+	CTs: [167, 253, 129],
 	CTsp: [120, 192, 89],
 	// Cold — Temperate
-	CDa:  [14, 251, 93],
+	CDa: [14, 251, 93],
 	CDap: [0, 194, 65],
-	CDb:  [0, 219, 117],
+	CDb: [0, 219, 117],
 	CDbp: [5, 158, 66],
 	// Cold — Boreal
-	CEa:  [172, 251, 214],
+	CEa: [172, 251, 214],
 	CEap: [133, 214, 176],
-	CEb:  [112, 240, 186],
+	CEb: [112, 240, 186],
 	CEbp: [54, 171, 120],
-	CEc:  [65, 251, 251],
+	CEc: [65, 251, 251],
 	CEcp: [4, 182, 185],
 	// Cold — Submediterranean
 	CMa: [180, 240, 51],
@@ -53,26 +53,26 @@ const ZONE_COLORS: Record<string, [number, number, number]> = {
 	CAMa: [251, 255, 0],
 	CAMb: [162, 172, 27],
 	// Cold — Semiarid
-	CAa:  [215, 194, 117],
+	CAa: [215, 194, 117],
 	CAap: [161, 139, 54],
-	CAb:  [197, 219, 118],
+	CAb: [197, 219, 118],
 	CAbp: [132, 171, 84],
 	// Cold — Tundra / Barren / Ice
 	CFa: [172, 203, 210],
 	CFb: [180, 188, 192],
-	CG:  [153, 153, 153],
-	CI:  [94, 94, 94],
+	CG: [153, 153, 153],
+	CI: [94, 94, 94],
 	// Hot — Supertropical
-	HTf:  [255, 102, 0],
+	HTf: [255, 102, 0],
 	HTfp: [147, 59, 1],
-	HTs:  [253, 151, 83],
+	HTs: [253, 151, 83],
 	HTsp: [198, 89, 16],
 	// Hot — Swelter
-	HDa:  [255, 66, 66],
+	HDa: [255, 66, 66],
 	HDap: [223, 48, 48],
-	HDb:  [255, 0, 0],
+	HDb: [255, 0, 0],
 	HDbp: [199, 0, 0],
-	HDc:  [181, 33, 48],
+	HDc: [181, 33, 48],
 	HDcp: [137, 11, 26],
 	// Hot — Subparamediterranean
 	HMa: [253, 157, 30],
@@ -83,26 +83,26 @@ const ZONE_COLORS: Record<string, [number, number, number]> = {
 	HAMb: [212, 160, 17],
 	HAMc: [177, 137, 27],
 	// Hot — Semiarid
-	HAa:  [245, 200, 163],
+	HAa: [245, 200, 163],
 	HAap: [209, 161, 122],
-	HAb:  [230, 164, 148],
+	HAb: [230, 164, 148],
 	HAbp: [202, 129, 109],
-	HAc:  [210, 121, 121],
+	HAc: [210, 121, 121],
 	HAcp: [178, 83, 83],
 	// Hot — Parch / Barren
 	HFa: [154, 106, 106],
 	HFb: [136, 89, 89],
 	HFc: [119, 60, 60],
-	HG:  [71, 31, 31],
+	HG: [71, 31, 31],
 	// Extraseasonal — Extratropical
-	ETf:  [128, 0, 255],
+	ETf: [128, 0, 255],
 	ETfp: [99, 0, 199],
-	ETs:  [181, 115, 247],
+	ETs: [181, 115, 247],
 	ETsp: [143, 90, 196],
 	// Extraseasonal — Extracontinental
-	EDa:  [225, 0, 255],
+	EDa: [225, 0, 255],
 	EDap: [158, 0, 179],
-	EDb:  [249, 108, 218],
+	EDb: [249, 108, 218],
 	EDbp: [181, 79, 159],
 	// Extraseasonal — Subextramediterranean
 	EMa: [255, 26, 205],
@@ -111,14 +111,14 @@ const ZONE_COLORS: Record<string, [number, number, number]> = {
 	EAMa: [255, 0, 123],
 	EAMb: [178, 31, 102],
 	// Extraseasonal — Semiarid
-	EAa:  [193, 139, 159],
+	EAa: [193, 139, 159],
 	EAap: [160, 106, 125],
-	EAb:  [255, 184, 248],
+	EAb: [255, 184, 248],
 	EAbp: [200, 116, 193],
 	// Extraseasonal — Pulse / Barren
 	EFa: [189, 148, 194],
 	EFb: [157, 118, 162],
-	EG:  [89, 52, 91],
+	EG: [89, 52, 91],
 	// Arid — Semidesert
 	Ada: [232, 230, 162],
 	Adc: [205, 221, 186],

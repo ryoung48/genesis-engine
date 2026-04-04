@@ -1,9 +1,11 @@
 import { WORLD } from "@/model"
 import { CELL } from "@/model/cells"
+import { EBM } from "@/model/cells/ebm"
 import { Cell } from "@/model/cells/types"
 import { NATION } from "@/model/nations"
 import { RELATIONS } from "@/model/nations/relations"
 import { Relation } from "@/model/nations/relations/types"
+import type { OrogenNationHierarchy } from "@/model/orogen/types"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
 import { CULTURE } from "../../actors/culture"
@@ -11,8 +13,6 @@ import { FAITH } from "../../actors/faith"
 import { HERITAGE } from "../../actors/heritage"
 import { RELIGION } from "../../actors/religion"
 import { SHAPER_MOUNTAINS } from "../topagraphy"
-import { EBM } from "@/model/cells/ebm"
-import type { OrogenNationHierarchy } from "@/model/orogen/types"
 
 const claimCell = {
 	province: (cell: Cell, province: Province) => {

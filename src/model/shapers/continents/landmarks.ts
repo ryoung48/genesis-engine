@@ -145,8 +145,7 @@ export const LANDMARKS = {
 			if (ratio < 0.001) landmark.type = "lake"
 			else if (ratio < 0.01) landmark.type = "sea"
 			// flip ocean markers
-			if (landmark.type !== "ocean")
-				curr.forEach((p) => (p.ocean = false))
+			if (landmark.type !== "ocean") curr.forEach((p) => (p.ocean = false))
 			// only consider cells that haven't been marked
 			water = water.filter((poly) => !poly.landmark)
 			// increment the water feature index after a completed floodfill

@@ -1,4 +1,3 @@
-import React from "react"
 import { LoadingStep } from "../../types/app"
 import { GenesisOrb } from "../ui/GenesisOrb"
 import { ProgressBar } from "../ui/ProgressBar"

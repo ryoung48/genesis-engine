@@ -23,7 +23,17 @@ interface EbmConfig {
 }
 
 export function useEbmPreview(config: EbmConfig) {
-	const { obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius, pressure } = config
+	const {
+		obliquity,
+		eccentricity,
+		perihelion,
+		tSun,
+		hoursPerDay,
+		daysPerYear,
+		landFraction,
+		radius,
+		pressure,
+	} = config
 	return useMemo(() => {
 		const modelConfig = {
 			orbital: {
@@ -79,7 +89,9 @@ export function useEbmPreview(config: EbmConfig) {
 			const latSpan = model.lats_deg[nextIdx] - model.lats_deg[prevIdx] || 1
 
 			return row.map((_, dayIdx) => {
-				const dT = model.temperature[nextIdx][dayIdx] - model.temperature[prevIdx][dayIdx]
+				const dT =
+					model.temperature[nextIdx][dayIdx] -
+					model.temperature[prevIdx][dayIdx]
 				return dT / latSpan
 			})
 		})
@@ -150,5 +162,15 @@ export function useEbmPreview(config: EbmConfig) {
 			sampledDays,
 			dayLabels,
 		}
-	}, [obliquity, eccentricity, perihelion, tSun, hoursPerDay, daysPerYear, landFraction, radius, pressure])
+	}, [
+		obliquity,
+		eccentricity,
+		perihelion,
+		tSun,
+		hoursPerDay,
+		daysPerYear,
+		landFraction,
+		radius,
+		pressure,
+	])
 }

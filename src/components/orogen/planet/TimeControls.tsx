@@ -15,10 +15,14 @@ interface TimeControlsProps {
 }
 
 export const TimeControls: React.FC<TimeControlsProps> = ({
-	timeExpanded, setTimeExpanded,
-	globalMonth, setGlobalMonth,
-	timeOfDay, setTimeOfDay,
-	tidallyLocked, hoursPerDay,
+	timeExpanded,
+	setTimeExpanded,
+	globalMonth,
+	setGlobalMonth,
+	timeOfDay,
+	setTimeOfDay,
+	tidallyLocked,
+	hoursPerDay,
 	detailsOpen,
 	onToggleDetails,
 }) => (
@@ -40,8 +44,12 @@ export const TimeControls: React.FC<TimeControlsProps> = ({
 					<div className="space-y-3">
 						<div>
 							<div className="mb-1 flex justify-between items-baseline">
-								<span className="text-[11px] font-medium text-slate-300">Month</span>
-								<span className="font-mono text-[11px] text-slate-400">{monthLabels[globalMonth]}</span>
+								<span className="text-[11px] font-medium text-slate-300">
+									Month
+								</span>
+								<span className="font-mono text-[11px] text-slate-400">
+									{monthLabels[globalMonth]}
+								</span>
 							</div>
 							<input
 								type="range"
@@ -55,8 +63,14 @@ export const TimeControls: React.FC<TimeControlsProps> = ({
 						</div>
 						<div className={tidallyLocked ? "opacity-50" : ""}>
 							<div className="mb-1 flex justify-between items-baseline">
-								<span className="text-[11px] font-medium text-slate-300">Time of Day</span>
-								<span className="font-mono text-[11px] text-slate-400">{tidallyLocked ? "Locked" : `${Math.floor(timeOfDay)}:${String(Math.floor((timeOfDay % 1) * 60)).padStart(2, "0")}`}</span>
+								<span className="text-[11px] font-medium text-slate-300">
+									Time of Day
+								</span>
+								<span className="font-mono text-[11px] text-slate-400">
+									{tidallyLocked
+										? "Locked"
+										: `${Math.floor(timeOfDay)}:${String(Math.floor((timeOfDay % 1) * 60)).padStart(2, "0")}`}
+								</span>
 							</div>
 							<input
 								type="range"
@@ -79,7 +93,17 @@ export const TimeControls: React.FC<TimeControlsProps> = ({
 						title="Show details"
 						className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/80 text-slate-200 shadow-lg backdrop-blur-md transition-all hover:bg-slate-950/95"
 					>
-						<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 16 16"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.5"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							aria-hidden="true"
+						>
 							<path d="M2.5 3.5h11" />
 							<path d="M2.5 8h11" />
 							<path d="M2.5 12.5h7" />
@@ -95,7 +119,17 @@ export const TimeControls: React.FC<TimeControlsProps> = ({
 							: "border-white/10 bg-slate-950/80 text-slate-200 hover:bg-slate-950/95"
 					} backdrop-blur-md`}
 				>
-					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.5"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						aria-hidden="true"
+					>
 						<circle cx="8" cy="8" r="5.5" />
 						<path d="M8 4.75V8l2.25 1.5" />
 					</svg>

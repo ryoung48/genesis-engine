@@ -1,10 +1,10 @@
 import { WORLD } from "@/model"
 import { PROVINCE } from "@/model/provinces"
-import { Language } from "../language/languages/types"
 import { Province } from "../../provinces/types"
-import { Culture, CultureSpawnParams } from "./types"
+import { Language } from "../language/languages/types"
 import { pickEthos } from "./ethos"
 import { TRADITIONS } from "./traditions"
+import { Culture, CultureSpawnParams } from "./types"
 
 export const CULTURE = {
 	spawn: ({ province }: CultureSpawnParams) => {
@@ -116,7 +116,10 @@ export const CULTURE = {
 			}).filter((s): s is { v: string; w: number } => s !== null)
 
 			// Weighted pick without replacement using dice primitives
-			const picked = window.dice.weightedSample(eligible, TRADITIONS_PER_CULTURE)
+			const picked = window.dice.weightedSample(
+				eligible,
+				TRADITIONS_PER_CULTURE,
+			)
 
 			culture.traditions = picked
 

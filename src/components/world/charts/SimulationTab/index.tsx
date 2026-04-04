@@ -10,6 +10,7 @@
 	Tooltip,
 } from "chart.js"
 import React from "react"
+import { WORLD } from "@/model"
 import { TEMPERATURE } from "@/model/cells/temperature"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
@@ -24,7 +25,6 @@ import {
 } from "../index"
 import { DistributionChart } from "../NationTab/DistributionChart"
 import { ActiveTrendsChart, SIZE_BUCKETS } from "./ActiveTrendsChart"
-import { WORLD } from "@/model"
 
 export { SIZE_BUCKETS }
 
@@ -119,7 +119,9 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 	return (
 		<>
 			{(() => {
-				const habitableProvinces = window.world.provinces.filter((p) => !p.desolate)
+				const habitableProvinces = window.world.provinces.filter(
+					(p) => !p.desolate,
+				)
 				const worldTotalPopulation = window.world.provinces.reduce(
 					(sum, p) => sum + (PROVINCE.population.total(p, renderTime) || 0),
 					0,
@@ -130,9 +132,9 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 					0,
 				)
 				const landAreaSqKm = window.world.provinces.reduce(
-						(sum, p) => sum + p.land * window.world.cell.area,
-						0,
-					)
+					(sum, p) => sum + p.land * window.world.cell.area,
+					0,
+				)
 				const avgProvinceAreaSqKm =
 					habitableProvinces.length > 0
 						? habitableProvinces.reduce(
@@ -200,10 +202,12 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 									km²
 								</span>
 								<span className="text-[10px] text-gray-500 font-normal ml-1">
-									({new Intl.NumberFormat("en-US", {
+									(
+									{new Intl.NumberFormat("en-US", {
 										style: "percent",
 										maximumFractionDigits: 1,
-									}).format(landPercent)})
+									}).format(landPercent)}
+									)
 								</span>
 							</div>
 						</div>
@@ -259,9 +263,9 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						const c = PROVINCE.cell(p)
 						return c.climate
 							? {
-								label: TEXT.titleCase(c.climate),
-								color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
-							}
+									label: TEXT.titleCase(c.climate),
+									color: MAP_METRICS.climate.colors[c.climate] || "#ccc",
+								}
 							: null
 					})}
 				/>
@@ -271,12 +275,12 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						const c = PROVINCE.cell(p)
 						return c.vegetation
 							? {
-								label: TEXT.titleCase(c.vegetation),
-								color:
-									MAP_METRICS.vegetation.color[
-									c.vegetation as keyof typeof MAP_METRICS.vegetation.color
-									] || "#ccc",
-							}
+									label: TEXT.titleCase(c.vegetation),
+									color:
+										MAP_METRICS.vegetation.color[
+											c.vegetation as keyof typeof MAP_METRICS.vegetation.color
+										] || "#ccc",
+								}
 							: null
 					})}
 				/>
@@ -286,12 +290,12 @@ export const SimulationTab: React.FC<SimulationTabProps> = ({
 						const c = PROVINCE.cell(p)
 						return c.topography
 							? {
-								label: TEXT.titleCase(c.topography),
-								color:
-									MAP_METRICS.terrain.categorical[
-									c.topography as keyof typeof MAP_METRICS.terrain.categorical
-									] || "#ccc",
-							}
+									label: TEXT.titleCase(c.topography),
+									color:
+										MAP_METRICS.terrain.categorical[
+											c.topography as keyof typeof MAP_METRICS.terrain.categorical
+										] || "#ccc",
+								}
 							: null
 					})}
 				/>

@@ -1,12 +1,12 @@
 import { mean } from "d3"
 import { WORLD } from ".."
 import { CELL } from "../cells"
+import { EBM } from "../cells/ebm"
 import { RAIN } from "../cells/rain"
 import { TEMPERATURE } from "../cells/temperature"
 import { WEATHER } from "../cells/weather"
 import { WIND } from "../cells/wind"
 import { SHAPER_MOUNTAINS } from "./topagraphy"
-import { EBM } from "../cells/ebm"
 
 export const SHAPER_CLIMATES = {
 	_lakes: () => {
@@ -65,30 +65,31 @@ export const SHAPER_CLIMATES = {
 				const maxHeat = Math.max(...cell.heat.monthly)
 				const averageHeat = mean(cell.heat.monthly)
 				const isChaotic =
-					minHeat < EBM.constants.chaotic.min && maxHeat > EBM.constants.chaotic.max
+					minHeat < EBM.constants.chaotic.min &&
+					maxHeat > EBM.constants.chaotic.max
 				const isInfernal = averageHeat > EBM.constants.chaotic.max
 				const climate = isChaotic
-					? 'chaotic'
+					? "chaotic"
 					: isInfernal
-						? 'infernal'
+						? "infernal"
 						: averageHeat > 24
-							? 'tropical'
+							? "tropical"
 							: averageHeat > 18
-								? 'subtropical'
+								? "subtropical"
 								: averageHeat > 12
-									? 'warm'
+									? "warm"
 									: averageHeat > 6
-										? 'cool'
+										? "cool"
 										: averageHeat > -3
-											? 'boreal'
+											? "boreal"
 											: averageHeat > -9
-												? 'subarctic'
-												: 'arctic'
+												? "subarctic"
+												: "arctic"
 				const rain = cell.rain.annual
 				cell.heat.max = maxHeat
 				cell.heat.min = minHeat
 				cell.heat.mean = averageHeat
-				if (climate === 'chaotic') {
+				if (climate === "chaotic") {
 					cell.climate = "chaotic"
 					if (rain > humidity.wet)
 						cell.vegetation = window.dice.weightedChoice([
@@ -120,7 +121,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 40 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'infernal') {
+				} else if (climate === "infernal") {
 					cell.climate = "infernal"
 					if (rain > humidity.moderate)
 						cell.vegetation = window.dice.weightedChoice([
@@ -138,7 +139,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 60 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'tropical') {
+				} else if (climate === "tropical") {
 					cell.climate = "tropical"
 					if (rain > humidity.wet) cell.vegetation = "jungle"
 					else if (rain > humidity.moist)
@@ -167,7 +168,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'subtropical') {
+				} else if (climate === "subtropical") {
 					cell.climate = "subtropical"
 					if (rain > humidity.wet) cell.vegetation = "jungle"
 					else if (rain > humidity.moist)
@@ -196,7 +197,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'warm') {
+				} else if (climate === "warm") {
 					cell.climate = "temperate"
 					if (rain > humidity.wet) cell.vegetation = "forest"
 					else if (rain > humidity.moist)
@@ -217,7 +218,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'cool') {
+				} else if (climate === "cool") {
 					cell.climate = "temperate"
 					if (rain > humidity.moist) cell.vegetation = "forest"
 					else if (rain > humidity.moderate)
@@ -237,7 +238,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'boreal') {
+				} else if (climate === "boreal") {
 					cell.climate = "boreal"
 					if (rain > humidity.moderate) cell.vegetation = "forest"
 					else if (rain > humidity.low)
@@ -256,7 +257,7 @@ export const SHAPER_CLIMATES = {
 							{ v: "desert", w: 20 },
 						])
 					else cell.vegetation = "desert"
-				} else if (climate === 'subarctic') {
+				} else if (climate === "subarctic") {
 					cell.climate = "subarctic"
 					if (rain > humidity.low)
 						cell.vegetation = window.dice.weightedChoice([

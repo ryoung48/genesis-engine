@@ -1,5 +1,5 @@
-import { Language } from "../language/languages/types"
 import { Province } from "../../provinces/types"
+import { Language } from "../language/languages/types"
 
 export type Ethos =
 	| "bellicose"

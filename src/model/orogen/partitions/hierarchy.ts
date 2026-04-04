@@ -155,7 +155,12 @@ export function rebalanceHierarchy(params: {
 	const distances = new Float32Array(members.length)
 	let mean = 0
 	for (let i = 0; i < members.length; i++) {
-		const distance = provinceSeedDistance(capital, members[i], provinceSeeds, r_xyz)
+		const distance = provinceSeedDistance(
+			capital,
+			members[i],
+			provinceSeeds,
+			r_xyz,
+		)
 		distances[i] = distance
 		mean += distance
 	}
@@ -185,7 +190,9 @@ export function rebalanceHierarchy(params: {
 			const province = members[i]
 			const centerDistance = distances[i]
 			const centerPenalty =
-				std === 0 ? 1 : Math.max(1, Math.abs((centerDistance - mean) / std)) ** 2
+				std === 0
+					? 1
+					: Math.max(1, Math.abs((centerDistance - mean) / std)) ** 2
 			let minDist = 1
 			if (seedCount > 0) {
 				minDist = Infinity
@@ -280,7 +287,8 @@ export function buildSovereign(
 			trail.push(current)
 			current = parent[current]
 		}
-		const root = current >= 0 ? sovereign[current] : trail[trail.length - 1] ?? -1
+		const root =
+			current >= 0 ? sovereign[current] : (trail[trail.length - 1] ?? -1)
 		for (let i = 0; i < trail.length; i++) sovereign[trail[i]] = root
 	}
 	return sovereign

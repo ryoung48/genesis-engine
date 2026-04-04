@@ -1,7 +1,7 @@
 import { WORLD } from "@/model"
 import { PROVINCE } from "@/model/provinces"
-import { LANGUAGE } from "../language/languages"
 import { Culture } from "../culture/types"
+import { LANGUAGE } from "../language/languages"
 import { Heritage } from "./types"
 
 export const HERITAGE = {

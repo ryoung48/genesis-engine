@@ -1,8 +1,8 @@
-import { PROVINCE } from ".."
-import { START_DATE, TIME } from "@/model/utilities/time"
-import { Province } from "../types"
-import { TEXT } from "@/model/utilities/text"
 import { LANGUAGE } from "@/model/actors/language/languages"
+import { TEXT } from "@/model/utilities/text"
+import { START_DATE, TIME } from "@/model/utilities/time"
+import { PROVINCE } from ".."
+import { Province } from "../types"
 import { Dynasty } from "./types"
 
 export const LEADER = {
@@ -32,7 +32,13 @@ export const LEADER = {
 	get: (province: Province, time?: number) => {
 		return PROVINCE.history.find(
 			province._leader,
-			{ end: START_DATE, idx: 0, dynasty: -1, claim: "none", birthTime: START_DATE },
+			{
+				end: START_DATE,
+				idx: 0,
+				dynasty: -1,
+				claim: "none",
+				birthTime: START_DATE,
+			},
 			time,
 		)
 	},
@@ -93,7 +99,7 @@ export const LEADER = {
 					dynasty = window.dice.choice(other)
 				}
 
-				if(!window.world.cultures[province.culture].language) {
+				if (!window.world.cultures[province.culture].language) {
 					console.log("no culture for province", province)
 				}
 

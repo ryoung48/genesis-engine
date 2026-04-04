@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from "react"
+import { NAMES } from "@/model/actors/language/names"
 import { NATION } from "@/model/nations"
-
 import { RELATIONS } from "@/model/nations/relations"
 import { PROVINCE } from "@/model/provinces"
-import { NAMES } from "@/model/actors/language/names"
 import { TIME } from "@/model/utilities/time"
 import { CultureTab } from "./CultureTab"
 import { HeritageTab } from "./HeritageTab"
@@ -68,9 +67,13 @@ const entityLabel = (entity: EntityRef): string => {
 		case "war":
 			return `War #${entity.idx}`
 		case "heritage":
-			return window.world.heritages?.[entity.idx]?.name || `Heritage ${entity.idx}`
+			return (
+				window.world.heritages?.[entity.idx]?.name || `Heritage ${entity.idx}`
+			)
 		case "culture":
-			return window.world.cultures?.[entity.idx]?.name || `Culture ${entity.idx}`
+			return (
+				window.world.cultures?.[entity.idx]?.name || `Culture ${entity.idx}`
+			)
 	}
 }
 
@@ -114,7 +117,10 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 		onZoomToProvince,
 	} = props
 
-	const topEntity = activeDepth > 0 && entityStack.length > 0 ? (entityStack[activeDepth - 1] ?? entityStack[entityStack.length - 1]) : null
+	const topEntity =
+		activeDepth > 0 && entityStack.length > 0
+			? (entityStack[activeDepth - 1] ?? entityStack[entityStack.length - 1])
+			: null
 
 	// Distribution state - kept here so it persists across tab switches
 	const [nationDistribution, setNationDistribution] = useState<number[]>(() =>
@@ -265,7 +271,8 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 				const bucket = Math.min(9, Math.floor(dev * 10))
 				nationDevDist[bucket]++
 			})
-			const nationAvgDev = nationCountDev > 0 ? nationTotalDev / nationCountDev : 0
+			const nationAvgDev =
+				nationCountDev > 0 ? nationTotalDev / nationCountDev : 0
 
 			setDistributionHistory((prev) => {
 				const newHistory = [
@@ -291,7 +298,9 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 	}, [currentTime])
 
 	const pushEntity = (entity: EntityRef) => {
-		const parent = entityStack.find((e) => e.type === "nation" || e.type === "heritage")
+		const parent = entityStack.find(
+			(e) => e.type === "nation" || e.type === "heritage",
+		)
 		setEntityStack(parent ? [parent, entity] : [entity])
 		setActiveDepth(2)
 	}
@@ -364,25 +373,27 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 					/>
 				)
 			case "culture":
-				return (
-					<CultureTab
-						selectedCulture={topEntity.idx}
-					/>
-				)
+				return <CultureTab selectedCulture={topEntity.idx} />
 		}
 	}
 
 	// Fixed 3-slot breadcrumb used as tabs
-	const midEntry = entityStack.find((e) => e.type === "nation" || e.type === "heritage") ?? null
+	const midEntry =
+		entityStack.find((e) => e.type === "nation" || e.type === "heritage") ??
+		null
 	const detailEntry =
-		entityStack.find((e) => e.type === "province" || e.type === "war" || e.type === "culture") ?? null
+		entityStack.find(
+			(e) => e.type === "province" || e.type === "war" || e.type === "culture",
+		) ?? null
 	const atWorld = activeDepth === 0 || entityStack.length === 0
 	const atMid = !atWorld && activeDepth === 1
 	const atDetail = !atWorld && activeDepth === 2
 
 	// Placeholder label for slot 3 adapts to what's in the stack
 	const detailPlaceholder = midEntry
-		? (midEntry.type === "heritage" ? "Culture" : "Province")
+		? midEntry.type === "heritage"
+			? "Culture"
+			: "Province"
 		: "—"
 
 	return (
@@ -392,10 +403,11 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 				{/* Slot 1: World */}
 				<button
 					onClick={() => setActiveDepth(0)}
-					className={`transition-colors ${atWorld
-						? "text-slate-900 font-bold cursor-default"
-						: "text-slate-400 hover:text-slate-700 cursor-pointer"
-						}`}
+					className={`transition-colors ${
+						atWorld
+							? "text-slate-900 font-bold cursor-default"
+							: "text-slate-400 hover:text-slate-700 cursor-pointer"
+					}`}
 				>
 					World
 				</button>
@@ -406,10 +418,11 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 				{midEntry ? (
 					<button
 						onClick={() => setActiveDepth(1)}
-						className={`flex items-center gap-1 transition-colors whitespace-nowrap ${atMid
-							? "text-slate-900 font-bold cursor-default"
-							: "text-slate-400 hover:text-slate-700 cursor-pointer"
-							}`}
+						className={`flex items-center gap-1 transition-colors whitespace-nowrap ${
+							atMid
+								? "text-slate-900 font-bold cursor-default"
+								: "text-slate-400 hover:text-slate-700 cursor-pointer"
+						}`}
 					>
 						{entityColor(midEntry) && (
 							<div
@@ -429,10 +442,11 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 				{detailEntry ? (
 					<button
 						onClick={() => setActiveDepth(2)}
-						className={`flex items-center gap-1 transition-colors whitespace-nowrap ${atDetail
-							? "text-slate-900 font-bold cursor-default"
-							: "text-slate-400 hover:text-slate-700 cursor-pointer"
-							}`}
+						className={`flex items-center gap-1 transition-colors whitespace-nowrap ${
+							atDetail
+								? "text-slate-900 font-bold cursor-default"
+								: "text-slate-400 hover:text-slate-700 cursor-pointer"
+						}`}
 					>
 						{entityColor(detailEntry) && (
 							<div
@@ -443,9 +457,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = (props) => {
 						{entityLabel(detailEntry)}
 					</button>
 				) : (
-					<span className="text-slate-200">
-						{detailPlaceholder}
-					</span>
+					<span className="text-slate-200">{detailPlaceholder}</span>
 				)}
 			</div>
 

@@ -3,8 +3,9 @@
  * Competitive multi-source BFS on SphereMesh CSR adjacency.
  * O(N) time, all typed arrays, no object allocation in hot path.
  */
-import type { SphereMesh, OrogenProvinces, OrogenRainfall } from "../types"
+
 import { createRng } from "../rng"
+import type { OrogenProvinces, OrogenRainfall, SphereMesh } from "../types"
 import { meanEdgeLengthKm } from "../units"
 
 export function computeProvinces(
@@ -37,7 +38,10 @@ export function computeProvinces(
 		const areaTarget = options?.targetAreaKm2 ?? 45_000
 		const avgEdgeKm = meanEdgeLengthKm(mesh, options?.planetRadiusKm)
 		const regionAreaKm2 = avgEdgeKm * avgEdgeKm * Math.sqrt(3) * 0.5
-		targetCount = Math.max(1, Math.round((landCount * regionAreaKm2) / areaTarget))
+		targetCount = Math.max(
+			1,
+			Math.round((landCount * regionAreaKm2) / areaTarget),
+		)
 	}
 
 	// Compute seed spacing in hops from target density
@@ -171,7 +175,7 @@ export function computeProvinces(
 	// 5b. Sea-crossing adjacency: competitive BFS from coastal cells into ocean.
 	// When two province frontiers meet in the ocean, link them.
 	{
-		const oceanProv = new Int32Array(N).fill(-1)  // province that claimed each ocean cell
+		const oceanProv = new Int32Array(N).fill(-1) // province that claimed each ocean cell
 		const queue: number[] = []
 
 		// Seed: every non-desolate land cell that has at least one ocean neighbor
@@ -180,7 +184,10 @@ export function computeProvinces(
 			if (p < 0 || desolate[p]) continue
 			let coastal = false
 			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				if (!isLand[adjList[j]]) { coastal = true; break }
+				if (!isLand[adjList[j]]) {
+					coastal = true
+					break
+				}
 			}
 			if (!coastal) continue
 			// Seed adjacent ocean cells at distance 1
@@ -253,7 +260,11 @@ export function computeProvinces(
 		while (head < tail) {
 			const p = queue[head++]
 			area += size[p]
-			for (let i = provAdjOffset[p], iEnd = provAdjOffset[p + 1]; i < iEnd; i++) {
+			for (
+				let i = provAdjOffset[p], iEnd = provAdjOffset[p + 1];
+				i < iEnd;
+				i++
+			) {
 				const nb = provAdjList[i]
 				if (desolate[nb] || componentId[nb] >= 0) continue
 				componentId[nb] = componentCount
@@ -297,24 +308,42 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 	const c = (1 - Math.abs(2 * l - 1)) * s
 	const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
 	const m = l - c / 2
-	let r = 0, g = 0, b = 0
-	if (h < 60) { r = c; g = x }
-	else if (h < 120) { r = x; g = c }
-	else if (h < 180) { g = c; b = x }
-	else if (h < 240) { g = x; b = c }
-	else if (h < 300) { r = x; b = c }
-	else { r = c; b = x }
+	let r = 0,
+		g = 0,
+		b = 0
+	if (h < 60) {
+		r = c
+		g = x
+	} else if (h < 120) {
+		r = x
+		g = c
+	} else if (h < 180) {
+		g = c
+		b = x
+	} else if (h < 240) {
+		g = x
+		b = c
+	} else if (h < 300) {
+		r = x
+		b = c
+	} else {
+		r = c
+		b = x
+	}
 	return [r + m, g + m, b + m]
 }
 
-function generateProvinceColors(count: number, rng: { random(): number }): Float32Array {
+function generateProvinceColors(
+	count: number,
+	rng: { random(): number },
+): Float32Array {
 	const colors = new Float32Array(count * 3)
 	const GOLDEN_RATIO = 0.618033988749895
 	let hue = rng.random()
 	for (let i = 0; i < count; i++) {
 		hue = (hue + GOLDEN_RATIO) % 1
 		const sat = 0.45 + rng.random() * 0.3
-		const lit = 0.40 + rng.random() * 0.25
+		const lit = 0.4 + rng.random() * 0.25
 		const [r, g, b] = hslToRgb(hue * 360, sat, lit)
 		colors[3 * i] = r
 		colors[3 * i + 1] = g

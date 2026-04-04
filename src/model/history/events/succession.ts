@@ -8,10 +8,10 @@
 import { NATION } from "@/model/nations"
 import { RELATIONS } from "@/model/nations/relations"
 import { PROVINCE } from "@/model/provinces"
+import { LEADER } from "@/model/provinces/leader"
 import { Province } from "@/model/provinces/types"
 import { TIME } from "@/model/utilities/time"
 import { SuccessionEvent } from "../types"
-import { LEADER } from "@/model/provinces/leader"
 
 export const SUCCESSION_EVENT = {
 	init: () => {
@@ -57,7 +57,12 @@ export const SUCCESSION_EVENT = {
 				? PROVINCE.children.get(parent).filter((p) => p !== province)
 				: []
 			const children = PROVINCE.children.get(province)
-			const candidates = [...foreign, ...(parent ? [parent] : []), ...siblings, ...children]
+			const candidates = [
+				...foreign,
+				...(parent ? [parent] : []),
+				...siblings,
+				...children,
+			]
 			// No heir → new dynasty immediately (old bloodline ends)
 			if (candidates.length === 0) {
 				leader.dynasty = LEADER.dynasty.add(province.culture)

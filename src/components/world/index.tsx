@@ -56,11 +56,11 @@ const visibleProvinces = (
 	const visible = new Set(
 		center
 			? window.world.provinces
-				.filter((p) => {
-					const cell = window.world.cells[p.cell]
-					return geoDistance(center, [cell.x, cell.y]) < threshold
-				})
-				.map((p) => p.idx)
+					.filter((p) => {
+						const cell = window.world.cells[p.cell]
+						return geoDistance(center, [cell.x, cell.y]) < threshold
+					})
+					.map((p) => p.idx)
 			: window.world.provinces.map((p) => p.idx),
 	)
 
@@ -419,7 +419,6 @@ const WorldMap: React.FC = () => {
 	const animationFrameRef = useRef<number | null>(null)
 	const lastTickTimeRef = useRef<number>(0)
 
-
 	// Animation loop for history simulation
 	useEffect(() => {
 		if (!isPlaying) {
@@ -500,7 +499,9 @@ const WorldMap: React.FC = () => {
 								{ type: "culture", idx: culture.idx },
 							])
 							// If already viewing a culture, stay at culture depth; otherwise show heritage
-							const viewingCulture = activeDepth === 2 && entityStack.some((e) => e.type === "culture")
+							const viewingCulture =
+								activeDepth === 2 &&
+								entityStack.some((e) => e.type === "culture")
 							setActiveDepth(viewingCulture ? 2 : 1)
 							return
 						}
@@ -513,7 +514,9 @@ const WorldMap: React.FC = () => {
 							{ type: "nation", idx: nation.idx },
 							{ type: "province", idx: clickedProvince.idx },
 						])
-						setActiveDepth(mapMode === "nations" || mapMode === "diplomacy" ? 1 : 2)
+						setActiveDepth(
+							mapMode === "nations" || mapMode === "diplomacy" ? 1 : 2,
+						)
 					} else {
 						setEntityStack([{ type: "province", idx: clickedProvince.idx }])
 						setActiveDepth(2)

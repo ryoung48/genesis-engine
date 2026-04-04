@@ -1,5 +1,3 @@
-import React from "react"
-
 export const GenesisOrb = ({ className }: { className?: string }) => (
 	<div className={`relative flex items-center justify-center ${className}`}>
 		{/* Outer glow */}

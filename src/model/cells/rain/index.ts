@@ -146,10 +146,12 @@ export const RAIN = {
 			while (queue.length > 0) {
 				const cell = queue.shift()
 				const orographic =
-				(cell.isMountains && cell.elevation >= 4) || (cell.plateau && cell.elevation >= 1.5)
-					? -3
-					: -0.9
-			const impact = (cell.ocean ? 0.5 : cell.isWater ? 0.25 : orographic) / scale
+					(cell.isMountains && cell.elevation >= 4) ||
+					(cell.plateau && cell.elevation >= 1.5)
+						? -3
+						: -0.9
+				const impact =
+					(cell.ocean ? 0.5 : cell.isWater ? 0.25 : orographic) / scale
 				const moisture = Math.max(
 					Math.min(Math.max(cell.moisture[attr], 0) + impact, wet),
 					0,

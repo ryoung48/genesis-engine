@@ -24,7 +24,7 @@ export function pet(cell: Cell): number[] {
 	for (let month = 0; month < 12; month++) {
 		const temp = cell.heat.monthly[month]
 		const nDays = TIME.month.days(month).length
-		result.push(Math.max(0, (temp * 7) / 30 * nDays))
+		result.push(Math.max(0, ((temp * 7) / 30) * nDays))
 	}
 	return result
 }

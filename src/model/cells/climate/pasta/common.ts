@@ -149,7 +149,7 @@ export function gddTotal(
 		for (let pass = 0; pass < 2; pass++) {
 			for (let t = 0; t < n; t++) {
 				const tn = n - (t + 1)
-				const prev = ((tn - 1) % n + n) % n
+				const prev = (((tn - 1) % n) + n) % n
 				if (gint[tn] > 0 && gint[prev] > 0) {
 					giAcc[prev] = giAcc[tn]
 				}
@@ -175,7 +175,9 @@ export function gddTotal(
 
 	const gddOut = gddAcc.every((v) => v > 0) ? Infinity : Math.max(...gddAcc)
 	const gintOut = gint
-		? giAcc.every((v) => v > 0) ? Infinity : Math.max(...giAcc)
+		? giAcc.every((v) => v > 0)
+			? Infinity
+			: Math.max(...giAcc)
 		: 0
 
 	return { gdd: gddOut, gint: gintOut }

@@ -4,11 +4,12 @@
  * high-res mesh with FBM noise perturbation for fractal boundaries.
  * Faithful port of orogen's coarse-plates.js.
  */
-import type { SphereMesh, PlateVec } from "./types"
-import { makeRng } from "./rng"
+
 import { buildSphereMesh } from "./mesh"
-import { generatePlates, assignOceanLand } from "./plates"
+import { assignOceanLand, generatePlates } from "./plates"
+import { makeRng } from "./rng"
 import { SimplexNoise } from "./simplex-noise"
+import type { PlateVec, SphereMesh } from "./types"
 
 const N_COARSE = 20000
 const COARSE_JITTER = 0.75
@@ -37,16 +38,26 @@ export function generateCoarsePlates(
 	const coarseRng = makeRng(seed + 137)
 	const coarseMesh = buildSphereMesh(N_COARSE, COARSE_JITTER, {
 		random: () => coarseRng(),
-		randint: (a: number, b: number) => a + Math.floor(coarseRng() * (b - a + 1)),
+		randint: (a: number, b: number) =>
+			a + Math.floor(coarseRng() * (b - a + 1)),
 	})
 
 	// generatePlates creates its own dual RNGs internally (seed+0.5 and seed)
-	const { r_plate: coarse_r_plate, plateSeeds: coarsePlateSeeds, plateVec: coarsePlateVec } =
-		generatePlates(coarseMesh, numPlates, seed)
+	const {
+		r_plate: coarse_r_plate,
+		plateSeeds: coarsePlateSeeds,
+		plateVec: coarsePlateVec,
+	} = generatePlates(coarseMesh, numPlates, seed)
 
 	// assignOceanLand creates its own RNG internally (seed+42)
 	const coarsePlateIsOcean = assignOceanLand(
-		coarseMesh, coarse_r_plate, coarsePlateSeeds, seed, landDistribution, continentSizeVariety, landCoverage,
+		coarseMesh,
+		coarse_r_plate,
+		coarsePlateSeeds,
+		seed,
+		landDistribution,
+		continentSizeVariety,
+		landCoverage,
 	)
 
 	return {
@@ -89,26 +100,40 @@ export function projectCoarsePlates(
 	let cur = 0
 
 	for (let r = 0; r < N; r++) {
-		const ox = r_xyz[3 * r], oy = r_xyz[3 * r + 1], oz = r_xyz[3 * r + 2]
+		const ox = r_xyz[3 * r],
+			oy = r_xyz[3 * r + 1],
+			oz = r_xyz[3 * r + 2]
 
 		// FBM perturbation: shift lookup point for fractal boundaries
-		let dx = 0, dy = 0, dz = 0
-		let amp = perturbAmp, freq = BASE_FREQ
+		let dx = 0,
+			dy = 0,
+			dz = 0
+		let amp = perturbAmp,
+			freq = BASE_FREQ
 		for (let oct = 0; oct < 4; oct++) {
 			dx += noise.noise3D(ox * freq, oy * freq, oz * freq) * amp
-			dy += noise.noise3D(ox * freq + 100, oy * freq + 100, oz * freq + 100) * amp
-			dz += noise.noise3D(ox * freq + 200, oy * freq + 200, oz * freq + 200) * amp
+			dy +=
+				noise.noise3D(ox * freq + 100, oy * freq + 100, oz * freq + 100) * amp
+			dz +=
+				noise.noise3D(ox * freq + 200, oy * freq + 200, oz * freq + 200) * amp
 			amp *= 0.5
 			freq *= 2
 		}
 
 		// Project perturbed point back onto unit sphere
-		let px = ox + dx, py = oy + dy, pz = oz + dz
+		let px = ox + dx,
+			py = oy + dy,
+			pz = oz + dz
 		const len = Math.sqrt(px * px + py * py + pz * pz) || 1
-		px /= len; py /= len; pz /= len
+		px /= len
+		py /= len
+		pz /= len
 
 		// Greedy walk: find nearest coarse region to the perturbed point
-		let bestDot = px * coarse_xyz[3 * cur] + py * coarse_xyz[3 * cur + 1] + pz * coarse_xyz[3 * cur + 2]
+		let bestDot =
+			px * coarse_xyz[3 * cur] +
+			py * coarse_xyz[3 * cur + 1] +
+			pz * coarse_xyz[3 * cur + 2]
 
 		let improved = true
 		let steps = 0
@@ -117,7 +142,10 @@ export function projectCoarsePlates(
 			steps++
 			for (let i = cOff[cur], iEnd = cOff[cur + 1]; i < iEnd; i++) {
 				const nb = cAdj[i]
-				const d = px * coarse_xyz[3 * nb] + py * coarse_xyz[3 * nb + 1] + pz * coarse_xyz[3 * nb + 2]
+				const d =
+					px * coarse_xyz[3 * nb] +
+					py * coarse_xyz[3 * nb + 1] +
+					pz * coarse_xyz[3 * nb + 2]
 				if (d > bestDot) {
 					bestDot = d
 					cur = nb
@@ -129,8 +157,14 @@ export function projectCoarsePlates(
 		// Fallback: if greedy walk hit the step limit, brute-force search
 		if (steps >= MAX_WALK) {
 			for (let c = 0; c < NC; c++) {
-				const d = px * coarse_xyz[3 * c] + py * coarse_xyz[3 * c + 1] + pz * coarse_xyz[3 * c + 2]
-				if (d > bestDot) { bestDot = d; cur = c }
+				const d =
+					px * coarse_xyz[3 * c] +
+					py * coarse_xyz[3 * c + 1] +
+					pz * coarse_xyz[3 * c + 2]
+				if (d > bestDot) {
+					bestDot = d
+					cur = c
+				}
 			}
 		}
 

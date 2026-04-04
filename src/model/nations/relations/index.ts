@@ -120,8 +120,7 @@ export const RELATIONS = {
 	overlord: (province: Province, time?: number): Province | undefined => {
 		return RELATIONS.all(province, time).find(
 			(r) =>
-				r.relation === "overlord" ||
-				r.relation === "personal_union_senior",
+				r.relation === "overlord" || r.relation === "personal_union_senior",
 		)?.nation
 	},
 }

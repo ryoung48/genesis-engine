@@ -1,5 +1,5 @@
-import { PhonemeClass, OrthoStyle, PhonemeCatalog } from "../types"
 import { Dice } from "../../../../utilities/dice"
+import { OrthoStyle, PhonemeCatalog, PhonemeClass } from "../types"
 import { validTerms } from "."
 
 // Consonants (pre-orthography) that belong to each phoneme class
@@ -614,45 +614,47 @@ export const buildConsonants = (params: {
 		],
 		strict,
 	)
-  const complexG = [
-			"ddh",
-			"ddr",
-			"drr",
-      'ggdr',
-      'ggm',
-      'ggr',
-      'ggs',
-      'ggʒ',
-      'gmm',
-      'kkh',
-      'kkm',
-      'kkr',
-			"llm",
-      'nŋ',
-      'sgg',
-      'sggr',
-      'ssk',
-      'ssm',
-      'ssr',
-      'sʃ',
-		]
-  const baseG = [
-			"cc",
-			"dd",
-			"ff",
-			"gg",
-			"kk",
-			"ll",
-			"mm",
-			"nn",
-			"pp",
-			"rr",
-			"ss",
-			"tt",
-			"zz",
-		]
+	const complexG = [
+		"ddh",
+		"ddr",
+		"drr",
+		"ggdr",
+		"ggm",
+		"ggr",
+		"ggs",
+		"ggʒ",
+		"gmm",
+		"kkh",
+		"kkm",
+		"kkr",
+		"llm",
+		"nŋ",
+		"sgg",
+		"sggr",
+		"ssk",
+		"ssm",
+		"ssr",
+		"sʃ",
+	]
+	const baseG = [
+		"cc",
+		"dd",
+		"ff",
+		"gg",
+		"kk",
+		"ll",
+		"mm",
+		"nn",
+		"pp",
+		"rr",
+		"ss",
+		"tt",
+		"zz",
+	]
 	const dMid = validTerms(
-		params.ending === PhonemeCatalog.MIDDLE_CONSONANT ? [...complexG, ...baseG] : baseG,
+		params.ending === PhonemeCatalog.MIDDLE_CONSONANT
+			? [...complexG, ...baseG]
+			: baseG,
 		strict,
 	)
 	const gemination = params.dice

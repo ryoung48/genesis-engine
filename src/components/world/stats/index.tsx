@@ -1,6 +1,5 @@
-import { mean } from "d3"
 import React from "react"
-import { WORLD } from "@/model"
+import { NAMES } from "@/model/actors/language/names"
 import { CELL } from "@/model/cells"
 import { TEMPERATURE } from "@/model/cells/temperature"
 import { WEATHER } from "@/model/cells/weather"
@@ -8,12 +7,10 @@ import { WIND } from "@/model/cells/wind"
 import { NATION } from "@/model/nations"
 import { WAR } from "@/model/nations/wars"
 import { PROVINCE } from "@/model/provinces"
+import { LEADER } from "@/model/provinces/leader"
 import { Province } from "@/model/provinces/types"
 import { MATH } from "@/model/utilities/math"
-import { NAMES } from "@/model/actors/language/names"
-import { classify } from "@/model/cells/climate/pasta"
 import { MAP_METRICS } from "../shapes/metrics"
-import { LEADER } from "@/model/provinces/leader"
 
 interface StatsCardProps {
 	province: Province
@@ -151,7 +148,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 							style={{
 								backgroundColor:
 									MAP_METRICS.vegetation.color[
-									curr.vegetation as keyof typeof MAP_METRICS.vegetation.color
+										curr.vegetation as keyof typeof MAP_METRICS.vegetation.color
 									] || "#bcbcbc",
 							}}
 						/>
@@ -174,9 +171,9 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 										: curr.topography === "coastal"
 											? "hsla(157, 21%, 57%, 1)"
 											: MAP_METRICS.terrain.color(
-												provinceElevationKm,
-												curr.topography,
-											),
+													provinceElevationKm,
+													curr.topography,
+												),
 							}}
 						/>
 						<span className="font-mono font-bold text-slate-900 capitalize">
@@ -297,7 +294,8 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 										}}
 									/>
 									<span className="font-mono font-bold text-slate-900">
-										{window.world.heritages[province.heritage]?.name || `Heritage`}
+										{window.world.heritages[province.heritage]?.name ||
+											`Heritage`}
 									</span>
 								</div>
 							</div>
@@ -336,7 +334,8 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 										}}
 									/>
 									<span className="font-mono font-bold text-slate-900">
-										{window.world.religions[province.religion]?.name || `Religion`}
+										{window.world.religions[province.religion]?.name ||
+											`Religion`}
 									</span>
 								</div>
 							</div>
@@ -470,8 +469,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 								Density
 							</span>
 							<span className="font-mono font-bold text-slate-900">
-								{PROVINCE.population.density(province, time)
-									.toFixed(1)}
+								{PROVINCE.population.density(province, time).toFixed(1)}
 								/km²
 							</span>
 						</div>

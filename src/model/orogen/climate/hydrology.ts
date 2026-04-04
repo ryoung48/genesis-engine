@@ -1,7 +1,17 @@
-import type { OrogenClimate, OrogenHydrology, OrogenParams, OrogenRainfall } from "../types"
+import type {
+	OrogenClimate,
+	OrogenHydrology,
+	OrogenParams,
+	OrogenRainfall,
+} from "../types"
 import { getDaysPerYear } from "../units"
 
-export function petMonthHargreaves(tas: number, td: number, raWm2: number, dpm: number): number {
+export function petMonthHargreaves(
+	tas: number,
+	td: number,
+	raWm2: number,
+	dpm: number,
+): number {
 	const raMJ = raWm2 * 0.0864
 	const petDay = 0.0023 * (tas + 17.8) * Math.sqrt(Math.max(2, td)) * raMJ
 	return Math.max(0, petDay) * dpm
@@ -15,12 +25,23 @@ export function fillPetMonthlyHargreaves(
 	dpm: number,
 ): void {
 	for (let i = 0; i < temperatureMonthly.length; i++) {
-		petMonthly[i] = petMonthHargreaves(temperatureMonthly[i], rangeMonthly[i], insolationMonthly[i], dpm)
+		petMonthly[i] = petMonthHargreaves(
+			temperatureMonthly[i],
+			rangeMonthly[i],
+			insolationMonthly[i],
+			dpm,
+		)
 	}
 }
 
 export function refreshClimatePetMonthly(
-	climate: Pick<OrogenClimate, "temperature_monthly" | "temperature_monthly_range" | "insolation_monthly" | "pet_monthly">,
+	climate: Pick<
+		OrogenClimate,
+		| "temperature_monthly"
+		| "temperature_monthly_range"
+		| "insolation_monthly"
+		| "pet_monthly"
+	>,
 	params?: Pick<OrogenParams, "daysPerYear">,
 ): void {
 	fillPetMonthlyHargreaves(
@@ -49,9 +70,14 @@ export function computeAetFromPet(
 				aetBuf[m] = pe
 			} else {
 				const deficit = pe - p
-				const soilEvap = soil > 250
-					? (soil < deficit ? soil : deficit)
-					: (deficit * (soil / 250) < soil ? deficit * (soil / 250) : soil)
+				const soilEvap =
+					soil > 250
+						? soil < deficit
+							? soil
+							: deficit
+						: deficit * (soil / 250) < soil
+							? deficit * (soil / 250)
+							: soil
 				soil -= soilEvap
 				aetBuf[m] = p + soilEvap
 			}

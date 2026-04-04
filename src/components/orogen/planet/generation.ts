@@ -1,9 +1,42 @@
-import type { OrogenWorkerRequest, OrogenWorkerResponse, SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import { decodePlanetCode, encodePlanetCode } from "@/model/orogen/planet-code"
+import type { OrogenParams } from "@/model/orogen/types"
+import type {
+	OrogenWorkerRequest,
+	OrogenWorkerResponse,
+	SerializedOrogenWorld,
+} from "@/model/orogen/worker-types"
 
 export { decodePlanetCode }
 
-export function loadImageAsGrayscale(src: string | File): Promise<{ grayscale: Uint8Array; width: number; height: number }> {
+export type GenerationParams = OrogenParams
+
+export interface ImportHeightmapParams {
+	seed: number
+	numPoints: number
+	jitter: number
+	terrainWarp: number
+	smoothing: number
+	hydraulicErosion: number
+	thermalErosion: number
+	ridgeSharpening: number
+	glacialErosion: number
+	volcanism: number
+	planetRadiusKm: number
+	obliquity: number
+	eccentricity: number
+	sunTempFactor: number
+	daysPerYear: number
+	hoursPerDay: number
+	tidallyLocked: boolean
+	antistellarLon: number
+	perihelion: number
+	pressure: number
+	craters: number
+}
+
+export function loadImageAsGrayscale(
+	src: string | File,
+): Promise<{ grayscale: Uint8Array; width: number; height: number }> {
 	return new Promise((resolve, reject) => {
 		const img = new Image()
 		img.onload = () => {
@@ -16,7 +49,9 @@ export function loadImageAsGrayscale(src: string | File): Promise<{ grayscale: U
 			const grayscale = new Uint8Array(img.width * img.height)
 			for (let i = 0; i < grayscale.length; i++) {
 				grayscale[i] = Math.round(
-					0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2],
+					0.299 * data[i * 4] +
+						0.587 * data[i * 4 + 1] +
+						0.114 * data[i * 4 + 2],
 				)
 			}
 			resolve({ grayscale, width: img.width, height: img.height })
@@ -44,7 +79,10 @@ export interface GenerationCallbacks {
 
 function createWorker(
 	callbacks: GenerationCallbacks,
-	onDone: (message: OrogenWorkerResponse & { type: "done" }, worker: Worker) => void,
+	onDone: (
+		message: OrogenWorkerResponse & { type: "done" },
+		worker: Worker,
+	) => void,
 	failLabel: string,
 ): Worker {
 	callbacks.workerRef.current?.terminate()
@@ -58,7 +96,9 @@ function createWorker(
 		const message = event.data
 		if (message.type === "progress") {
 			callbacks.setGenerationLabel(message.label)
-			callbacks.setGenerationProgress((current: number) => message.pct ?? current)
+			callbacks.setGenerationProgress(
+				(current: number) => message.pct ?? current,
+			)
 			return
 		}
 		if (message.type === "done") {
@@ -69,7 +109,8 @@ function createWorker(
 		callbacks.setGenerationLabel(failLabel)
 		callbacks.setGenerating(false)
 		worker.terminate()
-		if (callbacks.workerRef.current === worker) callbacks.workerRef.current = null
+		if (callbacks.workerRef.current === worker)
+			callbacks.workerRef.current = null
 	}
 
 	worker.onerror = (event) => {
@@ -77,7 +118,8 @@ function createWorker(
 		callbacks.setGenerationLabel(failLabel)
 		callbacks.setGenerating(false)
 		worker.terminate()
-		if (callbacks.workerRef.current === worker) callbacks.workerRef.current = null
+		if (callbacks.workerRef.current === worker)
+			callbacks.workerRef.current = null
 	}
 
 	return worker
@@ -85,8 +127,8 @@ function createWorker(
 
 export function generateWorld(
 	overrideSeed: number,
-	overrides: Record<string, number | boolean> | undefined,
-	currentParams: Record<string, number | boolean>,
+	overrides: Partial<GenerationParams> | undefined,
+	currentParams: GenerationParams,
 	callbacks: GenerationCallbacks,
 ): void {
 	callbacks.setGenerating(true)
@@ -95,21 +137,30 @@ export function generateWorld(
 	callbacks.setSeed(overrideSeed)
 	callbacks.setWorld(null)
 
-	const tidallyLocked = overrides?.tidallyLocked ? true : currentParams.tidallyLocked
+	console.log(overrides, currentParams)
+
+	const tidallyLocked = overrides?.tidallyLocked
+		? true
+		: currentParams.tidallyLocked
 	const rawMode = overrides?.tectonicMode ?? currentParams.tectonicMode
-	const tectonicMode = typeof rawMode === "string"
-		? (rawMode as "active" | "stagnant")
-		: (["active", "stagnant"] as const)[rawMode as number] ?? "active"
+	const tectonicMode =
+		typeof rawMode === "string"
+			? (rawMode as "active" | "stagnant")
+			: ((["active", "stagnant"] as const)[rawMode as number] ?? "active")
 	const params = {
 		seed: overrideSeed,
 		tectonicMode,
 		numPoints: overrides?.numPoints ?? currentParams.numPoints,
 		numPlates: overrides?.numPlates ?? currentParams.numPlates,
-		landDistribution: overrides?.landDistribution ?? currentParams.landDistribution,
-		continentSizeVariety: overrides?.continentSizeVariety ?? currentParams.continentSizeVariety,
+		landDistribution:
+			overrides?.landDistribution ?? currentParams.landDistribution,
+		continentSizeVariety:
+			overrides?.continentSizeVariety ?? currentParams.continentSizeVariety,
 		landCoverage: overrides?.landCoverage ?? currentParams.landCoverage,
 		planetRadiusKm: overrides?.planetRadiusKm ?? currentParams.planetRadiusKm,
-		obliquity: tidallyLocked ? 0 : (overrides?.obliquity ?? currentParams.obliquity),
+		obliquity: tidallyLocked
+			? 0
+			: (overrides?.obliquity ?? currentParams.obliquity),
 		eccentricity: overrides?.eccentricity ?? currentParams.eccentricity,
 		perihelion: overrides?.perihelion ?? currentParams.perihelion,
 		sunTempFactor: overrides?.sunTempFactor ?? currentParams.sunTempFactor,
@@ -122,28 +173,35 @@ export function generateWorld(
 		roughness: overrides?.roughness ?? currentParams.roughness,
 		terrainWarp: overrides?.terrainWarp ?? currentParams.terrainWarp,
 		smoothing: overrides?.smoothing ?? currentParams.smoothing,
-		hydraulicErosion: overrides?.hydraulicErosion ?? currentParams.hydraulicErosion,
+		hydraulicErosion:
+			overrides?.hydraulicErosion ?? currentParams.hydraulicErosion,
 		thermalErosion: overrides?.thermalErosion ?? currentParams.thermalErosion,
-		ridgeSharpening: overrides?.ridgeSharpening ?? currentParams.ridgeSharpening,
+		ridgeSharpening:
+			overrides?.ridgeSharpening ?? currentParams.ridgeSharpening,
 		glacialErosion: overrides?.glacialErosion ?? currentParams.glacialErosion,
 		volcanism: overrides?.volcanism ?? currentParams.volcanism,
 		craters: overrides?.craters ?? currentParams.craters,
-	}
+	} as OrogenParams
 
 	const request: OrogenWorkerRequest = { type: "generate", params }
 	requestAnimationFrame(() => {
-		const worker = createWorker(callbacks, (message, w) => {
-			const code = encodePlanetCode(overrideSeed, params)
-			callbacks.pushRecentCode(code)
-			callbacks.setPlanetCode(code)
-			callbacks.setPlanetCodeInput(code)
-			callbacks.setWorld(message.world)
-			callbacks.setGenerationLabel("Done")
-			callbacks.setGenerationProgress(100)
-			callbacks.setGenerating(false)
-			w.terminate()
-			if (callbacks.workerRef.current === w) callbacks.workerRef.current = null
-		}, "Generation failed")
+		const worker = createWorker(
+			callbacks,
+			(message, w) => {
+				const code = encodePlanetCode(overrideSeed, params)
+				callbacks.pushRecentCode(code)
+				callbacks.setPlanetCode(code)
+				callbacks.setPlanetCodeInput(code)
+				callbacks.setWorld(message.world)
+				callbacks.setGenerationLabel("Done")
+				callbacks.setGenerationProgress(100)
+				callbacks.setGenerating(false)
+				w.terminate()
+				if (callbacks.workerRef.current === w)
+					callbacks.workerRef.current = null
+			},
+			"Generation failed",
+		)
 		worker.postMessage(request)
 	})
 }
@@ -152,7 +210,7 @@ export function importHeightmap(
 	grayscale: Uint8Array,
 	imageWidth: number,
 	imageHeight: number,
-	importParams: Record<string, number | boolean>,
+	importParams: ImportHeightmapParams,
 	callbacks: GenerationCallbacks,
 ): void {
 	callbacks.setGenerating(true)
@@ -192,14 +250,19 @@ export function importHeightmap(
 		},
 	}
 	requestAnimationFrame(() => {
-		const worker = createWorker(callbacks, (message, w) => {
-			callbacks.setWorld(message.world)
-			callbacks.setGenerationLabel("Done")
-			callbacks.setGenerationProgress(100)
-			callbacks.setGenerating(false)
-			w.terminate()
-			if (callbacks.workerRef.current === w) callbacks.workerRef.current = null
-		}, "Import failed")
+		const worker = createWorker(
+			callbacks,
+			(message, w) => {
+				callbacks.setWorld(message.world)
+				callbacks.setGenerationLabel("Done")
+				callbacks.setGenerationProgress(100)
+				callbacks.setGenerating(false)
+				w.terminate()
+				if (callbacks.workerRef.current === w)
+					callbacks.workerRef.current = null
+			},
+			"Import failed",
+		)
 		worker.postMessage(request, [grayscale.buffer])
 	})
 }

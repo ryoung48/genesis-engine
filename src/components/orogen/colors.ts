@@ -1,10 +1,10 @@
 import * as d3 from "d3"
 import {
 	CHAOTIC_MAX,
-	TEMPERATURE_BOUNDARY_SUBARCTIC,
 	TEMPERATURE_BOUNDARY_BOREAL,
-	TEMPERATURE_BOUNDARY_TEMPERATE,
+	TEMPERATURE_BOUNDARY_SUBARCTIC,
 	TEMPERATURE_BOUNDARY_SUBTROPICAL,
+	TEMPERATURE_BOUNDARY_TEMPERATE,
 	TEMPERATURE_BOUNDARY_TROPICAL,
 } from "@/model/orogen/climate/vegetation"
 
@@ -12,7 +12,44 @@ import {
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "slope" | "topography" | "temperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "dangerZones" | "hotspots" | "nations" | "population" | "provinces" | "gravity" | "basins" | "terrainFeatures" | "terrainFeaturesLand" | "terrainFeaturesOcean" | "terrainFeaturesCoast" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
+export type ColorMode =
+	| "terrain"
+	| "heightmap"
+	| "landHeightmap"
+	| "slope"
+	| "topography"
+	| "temperature"
+	| "temperatureDelta"
+	| "precipitation"
+	| "moisture"
+	| "vegetation"
+	| "climate"
+	| "pastaClimate"
+	| "koppenClimate"
+	| "satellite"
+	| "satelliteKoppen"
+	| "oceanCurrents"
+	| "windSpeed"
+	| "dangerZones"
+	| "hotspots"
+	| "nations"
+	| "population"
+	| "provinces"
+	| "gravity"
+	| "basins"
+	| "terrainFeatures"
+	| "terrainFeaturesLand"
+	| "terrainFeaturesOcean"
+	| "terrainFeaturesCoast"
+	| "debugGdd"
+	| "debugGddz"
+	| "debugGint"
+	| "debugAr"
+	| "debugGar"
+	| "debugGrs"
+	| "debugEvr"
+	| "debugMinT"
+	| "debugMaxT"
 
 /** Light blue used for ocean on thematic maps (non-terrain/satellite modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -61,7 +98,11 @@ function lerp(a: number, b: number, t: number): number {
  * Hybrid S-curve: quartic start gives flatlands, steepest near 0.75, derivative -> 0 at top.
  * maxElevKm controls peak height (radius-dependent), maxDepthKm controls ocean floor depth.
  */
-export function elevToHeightKm(elev: number, maxElevKm = 6, maxDepthKm = 10): number {
+export function elevToHeightKm(
+	elev: number,
+	maxElevKm = 6,
+	maxDepthKm = 10,
+): number {
 	if (elev <= 0) return elev * maxDepthKm
 	const t = Math.min(elev, 1)
 	const t2 = t * t
@@ -73,7 +114,10 @@ export function elevToHeightKm(elev: number, maxElevKm = 6, maxDepthKm = 10): nu
  * while keeping the existing ocean palette.
  * Accepts elevation in km (use elevation_km array, not raw).
  */
-export function elevationToColor(km: number, maxElevKm = 6): [number, number, number] {
+export function elevationToColor(
+	km: number,
+	maxElevKm = 6,
+): [number, number, number] {
 	if (km <= 0) {
 		const t = 1 - Math.max(0, Math.min(1, (km + 5) / 5))
 		const scaled = t * (oceanColorStops.length - 1)
@@ -105,7 +149,11 @@ export function elevationToColor(km: number, maxElevKm = 6): [number, number, nu
  * Grayscale heightmap: maps km range to grayscale.
  * Accepts elevation in km.
  */
-export function heightmapColor(km: number, maxElevKm = 6, maxDepthKm = 10): [number, number, number] {
+export function heightmapColor(
+	km: number,
+	maxElevKm = 6,
+	maxDepthKm = 10,
+): [number, number, number] {
 	const range = maxDepthKm / 2 + maxElevKm
 	const t = Math.max(0, Math.min(1, (km + maxDepthKm / 2) / range))
 	return [t, t, t]
@@ -115,7 +163,10 @@ export function heightmapColor(km: number, maxElevKm = 6, maxDepthKm = 10): [num
  * Land heightmap: ocean = black, land on 0 -> maxElev km scale.
  * Accepts elevation in km.
  */
-export function landHeightmapColor(km: number, maxElevKm = 6): [number, number, number] {
+export function landHeightmapColor(
+	km: number,
+	maxElevKm = 6,
+): [number, number, number] {
 	if (km <= 0) return [0, 0, 0]
 	const t = Math.max(0, Math.min(1, km / maxElevKm))
 	return [t, t, t]
@@ -166,24 +217,28 @@ export function temperatureColor(celsius: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
-export function temperatureDeltaColor(celsiusDelta: number): [number, number, number] {
+export function temperatureDeltaColor(
+	celsiusDelta: number,
+): [number, number, number] {
 	const normalized = Math.pow(Math.max(0, Math.min(1, celsiusDelta / 60)), 0.8)
 	const color = d3.rgb(d3.interpolateYlOrRd(normalized))
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
 const precipStops: { mm: number; r: number; g: number; b: number }[] = [
-	{ mm: 0, r: 0.76, g: 0.70, b: 0.50 },
+	{ mm: 0, r: 0.76, g: 0.7, b: 0.5 },
 	{ mm: 10, r: 0.85, g: 0.78, b: 0.45 },
-	{ mm: 40, r: 0.70, g: 0.82, b: 0.42 },
-	{ mm: 83, r: 0.40, g: 0.75, b: 0.45 },
-	{ mm: 125, r: 0.20, g: 0.65, b: 0.55 },
-	{ mm: 165, r: 0.15, g: 0.50, b: 0.70 },
-	{ mm: 250, r: 0.15, g: 0.30, b: 0.80 },
-	{ mm: 400, r: 0.30, g: 0.15, b: 0.70 },
+	{ mm: 40, r: 0.7, g: 0.82, b: 0.42 },
+	{ mm: 83, r: 0.4, g: 0.75, b: 0.45 },
+	{ mm: 125, r: 0.2, g: 0.65, b: 0.55 },
+	{ mm: 165, r: 0.15, g: 0.5, b: 0.7 },
+	{ mm: 250, r: 0.15, g: 0.3, b: 0.8 },
+	{ mm: 400, r: 0.3, g: 0.15, b: 0.7 },
 ]
 
-export function precipitationNormalizedColor(normalized: number): [number, number, number] {
+export function precipitationNormalizedColor(
+	normalized: number,
+): [number, number, number] {
 	const mm = Math.max(0, Math.min(1, normalized)) * 400
 	for (let i = 0; i < precipStops.length - 1; i++) {
 		const a = precipStops[i]
@@ -203,6 +258,66 @@ export function precipitationNormalizedColor(normalized: number): [number, numbe
 
 export function precipitationColor(mm: number): [number, number, number] {
 	return precipitationNormalizedColor(mm / 400)
+}
+
+const moistureStops: { t: number; r: number; g: number; b: number }[] = [
+	{ t: 0, r: 0.95, g: 0.99, b: 0.98 },
+	{ t: 0.2, r: 0.81, g: 0.96, b: 0.97 },
+	{ t: 0.45, r: 0.53, g: 0.87, b: 0.94 },
+	{ t: 0.7, r: 0.22, g: 0.67, b: 0.88 },
+	{ t: 1, r: 0.09, g: 0.31, b: 0.6 },
+]
+
+export function moistureColor(normalized: number): [number, number, number] {
+	const clamped = Math.max(0, Math.min(1, normalized))
+	for (let i = 0; i < moistureStops.length - 1; i++) {
+		const a = moistureStops[i]
+		const b = moistureStops[i + 1]
+		if (clamped <= b.t) {
+			const t = (clamped - a.t) / (b.t - a.t)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = moistureStops[moistureStops.length - 1]
+	return [last.r, last.g, last.b]
+}
+
+const eastMoistureTints: [number, number, number][] = [
+	[0.98, 0.95, 0.9],
+	[0.97, 0.8, 0.52],
+	[0.95, 0.58, 0.3],
+	[0.75, 0.28, 0.18],
+	[0.4, 0.12, 0.18],
+]
+
+const westMoistureTints: [number, number, number][] = [
+	[0.97, 0.97, 0.92],
+	[0.83, 0.95, 0.77],
+	[0.54, 0.86, 0.6],
+	[0.2, 0.65, 0.62],
+	[0.12, 0.34, 0.62],
+]
+
+export function moistureDirectionalColor(
+	normalized: number,
+	isEastDominant: boolean,
+): [number, number, number] {
+	const tintStops = isEastDominant ? eastMoistureTints : westMoistureTints
+	const clamped = Math.max(0, Math.min(1, normalized))
+	const scaled = clamped * (tintStops.length - 1)
+	const i = Math.min(tintStops.length - 2, Math.floor(scaled))
+	const localT = scaled - i
+	const a = tintStops[i]
+	const b = tintStops[i + 1]
+	return [
+		a[0] + (b[0] - a[0]) * localT,
+		a[1] + (b[1] - a[1]) * localT,
+		a[2] + (b[2] - a[2]) * localT,
+	]
 }
 
 const climateZoneColors: [number, number, number][] = [
@@ -230,17 +345,56 @@ function midpoint(a: number, b: number): number {
  * Matches MAP_METRICS.climate.tempColor from shapes/metrics.ts.
  */
 const climateTempStops: { t: number; r: number; g: number; b: number }[] = [
-	{ t: TEMPERATURE_BOUNDARY_SUBARCTIC, r: 0xd3 / 255, g: 0xef / 255, b: 0xff / 255 },
-	{ t: midpoint(TEMPERATURE_BOUNDARY_SUBARCTIC, TEMPERATURE_BOUNDARY_BOREAL), r: 0x7f / 255, g: 0xd0 / 255, b: 0xff / 255 },
-	{ t: midpoint(TEMPERATURE_BOUNDARY_BOREAL, TEMPERATURE_BOUNDARY_TEMPERATE), r: 0x91 / 255, g: 0xff / 255, b: 0xdc / 255 },
-	{ t: midpoint(TEMPERATURE_BOUNDARY_TEMPERATE, TEMPERATURE_BOUNDARY_SUBTROPICAL), r: 0xe6 / 255, g: 0xf5 / 255, b: 0x98 / 255 },
-	{ t: midpoint(TEMPERATURE_BOUNDARY_SUBTROPICAL, TEMPERATURE_BOUNDARY_TROPICAL), r: 0xff / 255, g: 0xa7 / 255, b: 0x5b / 255 },
-	{ t: midpoint(TEMPERATURE_BOUNDARY_TROPICAL, CHAOTIC_MAX), r: 0xff / 255, g: 0x77 / 255, b: 0x85 / 255 },
+	{
+		t: TEMPERATURE_BOUNDARY_SUBARCTIC,
+		r: 0xd3 / 255,
+		g: 0xef / 255,
+		b: 0xff / 255,
+	},
+	{
+		t: midpoint(TEMPERATURE_BOUNDARY_SUBARCTIC, TEMPERATURE_BOUNDARY_BOREAL),
+		r: 0x7f / 255,
+		g: 0xd0 / 255,
+		b: 0xff / 255,
+	},
+	{
+		t: midpoint(TEMPERATURE_BOUNDARY_BOREAL, TEMPERATURE_BOUNDARY_TEMPERATE),
+		r: 0x91 / 255,
+		g: 0xff / 255,
+		b: 0xdc / 255,
+	},
+	{
+		t: midpoint(
+			TEMPERATURE_BOUNDARY_TEMPERATE,
+			TEMPERATURE_BOUNDARY_SUBTROPICAL,
+		),
+		r: 0xe6 / 255,
+		g: 0xf5 / 255,
+		b: 0x98 / 255,
+	},
+	{
+		t: midpoint(
+			TEMPERATURE_BOUNDARY_SUBTROPICAL,
+			TEMPERATURE_BOUNDARY_TROPICAL,
+		),
+		r: 0xff / 255,
+		g: 0xa7 / 255,
+		b: 0x5b / 255,
+	},
+	{
+		t: midpoint(TEMPERATURE_BOUNDARY_TROPICAL, CHAOTIC_MAX),
+		r: 0xff / 255,
+		g: 0x77 / 255,
+		b: 0x85 / 255,
+	},
 	{ t: CHAOTIC_MAX, r: 0x7e / 255, g: 0x43 / 255, b: 0x49 / 255 },
 ]
 
 export function climateTempColor(celsius: number): [number, number, number] {
-	const clamped = Math.max(climateTempStops[0].t, Math.min(climateTempStops[climateTempStops.length - 1].t, celsius))
+	const clamped = Math.max(
+		climateTempStops[0].t,
+		Math.min(climateTempStops[climateTempStops.length - 1].t, celsius),
+	)
 	for (let i = 0; i < climateTempStops.length - 1; i++) {
 		const a = climateTempStops[i]
 		const b = climateTempStops[i + 1]
@@ -276,13 +430,13 @@ export function vegetationColor(biomeCode: number): [number, number, number] {
  * -1 (cold, deep blue) → 0 (neutral gray) → +1 (warm, deep red/orange).
  */
 const oceanCurrentStops: { v: number; r: number; g: number; b: number }[] = [
-	{ v: -1.0, r: 0.12, g: 0.15, b: 0.60 },
-	{ v: -0.5, r: 0.20, g: 0.45, b: 0.80 },
-	{ v: -0.15, r: 0.55, g: 0.75, b: 0.90 },
-	{ v:  0.0, r: 0.80, g: 0.80, b: 0.80 },
-	{ v:  0.15, r: 0.95, g: 0.70, b: 0.50 },
-	{ v:  0.5, r: 0.90, g: 0.40, b: 0.20 },
-	{ v:  1.0, r: 0.65, g: 0.12, b: 0.08 },
+	{ v: -1.0, r: 0.12, g: 0.15, b: 0.6 },
+	{ v: -0.5, r: 0.2, g: 0.45, b: 0.8 },
+	{ v: -0.15, r: 0.55, g: 0.75, b: 0.9 },
+	{ v: 0.0, r: 0.8, g: 0.8, b: 0.8 },
+	{ v: 0.15, r: 0.95, g: 0.7, b: 0.5 },
+	{ v: 0.5, r: 0.9, g: 0.4, b: 0.2 },
+	{ v: 1.0, r: 0.65, g: 0.12, b: 0.08 },
 ]
 
 export function oceanCurrentColor(warmth: number): [number, number, number] {
@@ -328,7 +482,11 @@ export function windSpeedColor(speed: number): [number, number, number] {
 		const b = windSpeedStops[i + 1]
 		if (clamped <= b.v) {
 			const t = (clamped - a.v) / (b.v - a.v)
-			return [a.r + t * (b.r - a.r), a.g + t * (b.g - a.g), a.b + t * (b.b - a.b)]
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
 		}
 	}
 	const last = windSpeedStops[windSpeedStops.length - 1]
@@ -336,57 +494,76 @@ export function windSpeedColor(speed: number): [number, number, number] {
 }
 
 export function dangerColor(score: number): [number, number, number] {
-	const color = d3.rgb(d3.interpolateRgbBasis([
-		"#eff6ff",
-		"#facc15",
-		"#f97316",
-		"#dc2626",
-		"#fff7ed",
-	])(Math.max(0, Math.min(1, score))))
+	const color = d3.rgb(
+		d3.interpolateRgbBasis([
+			"#eff6ff",
+			"#facc15",
+			"#f97316",
+			"#dc2626",
+			"#fff7ed",
+		])(Math.max(0, Math.min(1, score))),
+	)
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
 export function hotspotColor(score: number): [number, number, number] {
-	const color = d3.rgb(d3.interpolateRgbBasis([
-		"#0f172a",
-		"#1d4ed8",
-		"#22d3ee",
-		"#facc15",
-		"#fb7185",
-		"#fff7ed",
-	])(Math.max(0, Math.min(1, score))))
+	const color = d3.rgb(
+		d3.interpolateRgbBasis([
+			"#0f172a",
+			"#1d4ed8",
+			"#22d3ee",
+			"#facc15",
+			"#fb7185",
+			"#fff7ed",
+		])(Math.max(0, Math.min(1, score))),
+	)
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
-export function populationColor(normalizedDensity: number): [number, number, number] {
-	const color = d3.rgb(d3.interpolateOranges(Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4)))
+export function populationColor(
+	normalizedDensity: number,
+): [number, number, number] {
+	const color = d3.rgb(
+		d3.interpolateOranges(
+			Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4),
+		),
+	)
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
 export function gravityColor(t: number): [number, number, number] {
-	const color = d3.rgb(d3.interpolateRgbBasis([
-		"#0b1f3a",
-		"#0f6ba8",
-		"#27c7d9",
-		"#f4d35e",
-		"#f97316",
-		"#b91c1c",
-	])(Math.pow(Math.max(0, Math.min(1, t)), 0.55)))
+	const color = d3.rgb(
+		d3.interpolateRgbBasis([
+			"#0b1f3a",
+			"#0f6ba8",
+			"#27c7d9",
+			"#f4d35e",
+			"#f97316",
+			"#b91c1c",
+		])(Math.pow(Math.max(0, Math.min(1, t)), 0.55)),
+	)
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
 export function slopeColor(normalizedSlope: number): [number, number, number] {
-	const color = d3.rgb(d3.interpolateRgbBasis([
-		"#f8fafc",
-		"#d9f99d",
-		"#facc15",
-		"#f97316",
-		"#7f1d1d",
-	])(Math.pow(Math.max(0, Math.min(1, normalizedSlope)), 0.7)))
+	const color = d3.rgb(
+		d3.interpolateRgbBasis([
+			"#f8fafc",
+			"#d9f99d",
+			"#facc15",
+			"#f97316",
+			"#7f1d1d",
+		])(Math.pow(Math.max(0, Math.min(1, normalizedSlope)), 0.7)),
+	)
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
-export function getColor(km: number, mode: ColorMode, maxElevKm = 6, maxDepthKm = 10): [number, number, number] {
+export function getColor(
+	km: number,
+	mode: ColorMode,
+	maxElevKm = 6,
+	maxDepthKm = 10,
+): [number, number, number] {
 	switch (mode) {
 		case "heightmap":
 			return heightmapColor(km, maxElevKm, maxDepthKm)

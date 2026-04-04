@@ -5,14 +5,7 @@
 
 import type { OrogenParams } from "./types"
 import {
-	DEFAULT_ANTISTELLAR_LON,
-	DEFAULT_DAYS_PER_YEAR,
-	DEFAULT_ECCENTRICITY,
-	DEFAULT_HOURS_PER_DAY,
-	DEFAULT_OBLIQUITY_DEG,
-	DEFAULT_PERIHELION,
 	DEFAULT_PLANET_RADIUS_KM,
-	DEFAULT_SUN_TEMP_FACTOR,
 	getAntistellarLon,
 	getDaysPerYear,
 	getEccentricity,
@@ -22,9 +15,9 @@ import {
 	getSunTempFactor,
 } from "./units"
 
-const SEED_MAX = 16777216
 const DEFAULT_PRESSURE = 1.0
 
+const SEED_MAX = 16777216
 type FieldSpec = {
 	name: string
 	min: number
@@ -34,37 +27,185 @@ type FieldSpec = {
 }
 
 const FIELD_SPECS: FieldSpec[] = [
-	{ name: "numPoints", min: 5000, step: 1000, count: 2556, read: (p) => p.numPoints },
+	{
+		name: "numPoints",
+		min: 5000,
+		step: 1000,
+		count: 2556,
+		read: (p) => p.numPoints,
+	},
 	{ name: "jitter", min: 0, step: 0.05, count: 21, read: (p) => p.jitter },
 	{ name: "numPlates", min: 4, step: 1, count: 117, read: (p) => p.numPlates },
-	{ name: "landDistribution", min: 0, step: 0.05, count: 21, read: (p) => p.landDistribution },
-	{ name: "roughness", min: 0, step: 0.01, count: 51, read: (p) => p.roughness },
-	{ name: "smoothing", min: 0, step: 0.05, count: 21, read: (p) => p.smoothing },
-	{ name: "glacialErosion", min: 0, step: 0.05, count: 21, read: (p) => p.glacialErosion },
-	{ name: "hydraulicErosion", min: 0, step: 0.05, count: 21, read: (p) => p.hydraulicErosion },
-	{ name: "thermalErosion", min: 0, step: 0.05, count: 21, read: (p) => p.thermalErosion },
-	{ name: "ridgeSharpening", min: 0, step: 0.05, count: 21, read: (p) => p.ridgeSharpening },
-	{ name: "terrainWarp", min: 0, step: 0.05, count: 21, read: (p) => p.terrainWarp },
-	{ name: "continentSizeVariety", min: 0, step: 0.05, count: 21, read: (p) => p.continentSizeVariety },
-	{ name: "landCoverage", min: 0, step: 0.01, count: 101, read: (p) => p.landCoverage },
-	{ name: "planetRadiusKm", min: 3200, step: 100, count: 224, read: (p) => p.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM },
-	{ name: "obliquity", min: 0, step: 0.5, count: 361, read: (p) => getObliquityDeg(p.obliquity) },
-	{ name: "eccentricity", min: 0, step: 0.001, count: 201, read: (p) => getEccentricity(p.eccentricity) },
-	{ name: "sunTempFactor", min: 0.9, step: 0.01, count: 31, read: (p) => getSunTempFactor(p.sunTempFactor) },
-	{ name: "daysPerYear", min: 100, step: 5, count: 181, read: (p) => getDaysPerYear(p.daysPerYear) },
-	{ name: "hoursPerDay", min: 8, step: 0.5, count: 81, read: (p) => getHoursPerDay(p.hoursPerDay) },
-	{ name: "tidallyLocked", min: 0, step: 1, count: 2, read: (p) => (p.tidallyLocked ? 1 : 0) },
-	{ name: "antistellarLon", min: 0, step: 1, count: 361, read: (p) => getAntistellarLon(p.antistellarLon) },
-	{ name: "perihelion", min: 0, step: 1, count: 361, read: (p) => getPerihelion(p.perihelion) },
-	{ name: "pressure", min: 0.1, step: 0.1, count: 100, read: (p) => clampPressure(p.pressure) },
-	{ name: "volcanism", min: 0, step: 0.05, count: 21, read: (p) => clampUnit(p.volcanism ?? 0.5) },
-	{ name: "craters", min: 0, step: 0.05, count: 21, read: (p) => clampUnit(p.craters ?? 0) },
-	{ name: "tectonicMode", min: 0, step: 1, count: 2, read: (p) => (p.tectonicMode === "stagnant" || p.tectonicMode as unknown === 1) ? 1 : 0 },
+	{
+		name: "landDistribution",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.landDistribution,
+	},
+	{
+		name: "roughness",
+		min: 0,
+		step: 0.01,
+		count: 51,
+		read: (p) => p.roughness,
+	},
+	{
+		name: "smoothing",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.smoothing,
+	},
+	{
+		name: "glacialErosion",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.glacialErosion,
+	},
+	{
+		name: "hydraulicErosion",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.hydraulicErosion,
+	},
+	{
+		name: "thermalErosion",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.thermalErosion,
+	},
+	{
+		name: "ridgeSharpening",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.ridgeSharpening,
+	},
+	{
+		name: "terrainWarp",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.terrainWarp,
+	},
+	{
+		name: "continentSizeVariety",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => p.continentSizeVariety,
+	},
+	{
+		name: "landCoverage",
+		min: 0,
+		step: 0.01,
+		count: 101,
+		read: (p) => p.landCoverage,
+	},
+	{
+		name: "planetRadiusKm",
+		min: 3200,
+		step: 100,
+		count: 224,
+		read: (p) => p.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM,
+	},
+	{
+		name: "obliquity",
+		min: 0,
+		step: 0.5,
+		count: 361,
+		read: (p) => getObliquityDeg(p.obliquity),
+	},
+	{
+		name: "eccentricity",
+		min: 0,
+		step: 0.001,
+		count: 601,
+		read: (p) => getEccentricity(p.eccentricity),
+	},
+	{
+		name: "sunTempFactor",
+		min: 0.9,
+		step: 0.01,
+		count: 31,
+		read: (p) => getSunTempFactor(p.sunTempFactor),
+	},
+	{
+		name: "daysPerYear",
+		min: 100,
+		step: 5,
+		count: 181,
+		read: (p) => getDaysPerYear(p.daysPerYear),
+	},
+	{
+		name: "hoursPerDay",
+		min: 8,
+		step: 0.5,
+		count: 81,
+		read: (p) => getHoursPerDay(p.hoursPerDay),
+	},
+	{
+		name: "tidallyLocked",
+		min: 0,
+		step: 1,
+		count: 2,
+		read: (p) => (p.tidallyLocked ? 1 : 0),
+	},
+	{
+		name: "antistellarLon",
+		min: 0,
+		step: 1,
+		count: 361,
+		read: (p) => getAntistellarLon(p.antistellarLon),
+	},
+	{
+		name: "perihelion",
+		min: 0,
+		step: 1,
+		count: 361,
+		read: (p) => getPerihelion(p.perihelion),
+	},
+	{
+		name: "pressure",
+		min: 0.1,
+		step: 0.1,
+		count: 100,
+		read: (p) => clampPressure(p.pressure),
+	},
+	{
+		name: "volcanism",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => clampUnit(p.volcanism ?? 0.5),
+	},
+	{
+		name: "craters",
+		min: 0,
+		step: 0.05,
+		count: 21,
+		read: (p) => clampUnit(p.craters ?? 0),
+	},
+	{
+		name: "tectonicMode",
+		min: 0,
+		step: 1,
+		count: 2,
+		read: (p) =>
+			p.tectonicMode === "stagnant" || (p.tectonicMode as unknown) === 1
+				? 1
+				: 0,
+	},
 ]
 
 const BASE_LEN = (() => {
 	let packed = BigInt(SEED_MAX - 1)
-	for (const field of FIELD_SPECS) packed = packed * BigInt(field.count) + BigInt(field.count - 1)
+	for (const field of FIELD_SPECS)
+		packed = packed * BigInt(field.count) + BigInt(field.count - 1)
 	return packed.toString(36).length
 })()
 
@@ -74,15 +215,25 @@ function clampUnit(value: number): number {
 }
 
 function clampPressure(value?: number): number {
-	if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_PRESSURE
+	if (typeof value !== "number" || !Number.isFinite(value))
+		return DEFAULT_PRESSURE
 	return Math.max(0.1, Math.min(10, value))
 }
 
-function toIndex(value: number, field: Pick<FieldSpec, "min" | "step" | "count">): number {
-	return Math.max(0, Math.min(field.count - 1, Math.round((value - field.min) / field.step)))
+function toIndex(
+	value: number,
+	field: Pick<FieldSpec, "min" | "step" | "count">,
+): number {
+	return Math.max(
+		0,
+		Math.min(field.count - 1, Math.round((value - field.min) / field.step)),
+	)
 }
 
-function fromIndex(index: number, field: Pick<FieldSpec, "min" | "step">): number {
+function fromIndex(
+	index: number,
+	field: Pick<FieldSpec, "min" | "step">,
+): number {
 	const raw = field.min + index * field.step
 	const decimals = field.step < 1 ? String(field.step).split(".")[1].length : 0
 	return decimals > 0 ? parseFloat(raw.toFixed(decimals)) : raw
@@ -99,7 +250,8 @@ function parseBase36(str: string): bigint {
 export function encodePlanetCode(seed: number, params: OrogenParams): string {
 	let packed = BigInt(seed)
 	for (const field of FIELD_SPECS) {
-		packed = packed * BigInt(field.count) + BigInt(toIndex(field.read(params), field))
+		packed =
+			packed * BigInt(field.count) + BigInt(toIndex(field.read(params), field))
 	}
 	return packed.toString(36).padStart(BASE_LEN, "0")
 }

@@ -1,5 +1,4 @@
-import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
-import { computeThermalEquator } from "./rain"
+import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
 import {
 	getDaysPerYear,
 	getHoursPerDay,
@@ -7,6 +6,7 @@ import {
 	isRetrogradeObliquity,
 	isTidallyLocked,
 } from "../units"
+import { computeThermalEquator } from "./rain"
 
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
@@ -38,14 +38,23 @@ function piecewise(domain: number[], range: number[], x: number): number {
 }
 
 function interpolateBands(values: Float32Array, latDeg: number): number {
-	const pos = clamp((latDeg + 90) / 180 * (NUM_LAT_BANDS - 1), 0, NUM_LAT_BANDS - 1)
+	const pos = clamp(
+		((latDeg + 90) / 180) * (NUM_LAT_BANDS - 1),
+		0,
+		NUM_LAT_BANDS - 1,
+	)
 	const i0 = Math.floor(pos)
 	const i1 = Math.min(NUM_LAT_BANDS - 1, i0 + 1)
 	const t = pos - i0
 	return values[i0] * (1 - t) + values[i1] * t
 }
 
-function smoothField(mesh: SphereMesh, field: Float32Array, passes: number, tmp?: Float32Array): void {
+function smoothField(
+	mesh: SphereMesh,
+	field: Float32Array,
+	passes: number,
+	tmp?: Float32Array,
+): void {
 	const { adjOffset, adjList, numRegions: N } = mesh
 	const buf = tmp ?? new Float32Array(N)
 	for (let pass = 0; pass < passes; pass++) {
@@ -130,13 +139,13 @@ function computeMonthlyBandTemperatures(
 	return result
 }
 
-  function zonalProfile(distDeg: number): number {
-      return piecewise(
-          [0,   5,   12,  22,  30,  35,  45,  55,  65,  75,  90],
-          [-0.1, -0.2, -0.6, -0.4, -0.1, 0.3, 0.9, 0.5, 0.1, -0.3, -0.4],
-          distDeg,
-      )
-  }
+function zonalProfile(distDeg: number): number {
+	return piecewise(
+		[0, 5, 12, 22, 30, 35, 45, 55, 65, 75, 90],
+		[-0.1, -0.2, -0.6, -0.4, -0.1, 0.3, 0.9, 0.5, 0.1, -0.3, -0.4],
+		distDeg,
+	)
+}
 
 type CirculationControls = {
 	hadleyWidth: number
@@ -145,7 +154,10 @@ type CirculationControls = {
 }
 
 function getCirculationControls(
-	params?: Pick<OrogenParams, "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure">,
+	params?: Pick<
+		OrogenParams,
+		"daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure"
+	>,
 ): CirculationControls {
 	if (isTidallyLocked(params?.tidallyLocked)) {
 		return {
@@ -161,14 +173,25 @@ function getCirculationControls(
 
 	return {
 		hadleyWidth: clamp(Math.pow(dayHours / 24, 0.35), 0.65, 1.9),
-		zonalScale: clamp(Math.pow(24 / dayHours, 0.2) * Math.pow(pressure, 0.08), 0.65, 1.6),
-		meridionalScale: clamp(Math.pow(yearDays / 365, 0.15) / Math.pow(pressure, 0.08), 0.6, 1.8),
+		zonalScale: clamp(
+			Math.pow(24 / dayHours, 0.2) * Math.pow(pressure, 0.08),
+			0.65,
+			1.6,
+		),
+		meridionalScale: clamp(
+			Math.pow(yearDays / 365, 0.15) / Math.pow(pressure, 0.08),
+			0.6,
+			1.8,
+		),
 	}
 }
 
 function computeMonthlyEkman(
 	monthlyBandTemps: Float32Array[],
-	params?: Pick<OrogenParams, "planetRadiusKm" | "hoursPerDay" | "pressure" | "tidallyLocked">,
+	params?: Pick<
+		OrogenParams,
+		"planetRadiusKm" | "hoursPerDay" | "pressure" | "tidallyLocked"
+	>,
 ): Float32Array[] {
 	const radiusM = getPlanetRadiusKm(params?.planetRadiusKm) * 1000
 	const hoursPerDay = getHoursPerDay(params?.hoursPerDay)
@@ -179,7 +202,8 @@ function computeMonthlyEkman(
 	const friction = 0.75e-4 / Math.sqrt(pressure)
 	const latStepRad = Math.PI / (NUM_LAT_BANDS - 1)
 	const bandLatsRad = new Float64Array(NUM_LAT_BANDS)
-	for (let i = 0; i < NUM_LAT_BANDS; i++) bandLatsRad[i] = (-90 + i * (180 / (NUM_LAT_BANDS - 1))) * DEG2RAD
+	for (let i = 0; i < NUM_LAT_BANDS; i++)
+		bandLatsRad[i] = (-90 + i * (180 / (NUM_LAT_BANDS - 1))) * DEG2RAD
 
 	return monthlyBandTemps.map((temps) => {
 		const ekman = new Float32Array(NUM_LAT_BANDS)
@@ -196,13 +220,18 @@ function computeMonthlyEkman(
 			}
 			const gradT = Math.abs(dT / Math.max(dy, 1))
 			const f = Math.abs(2 * omega * Math.sin(bandLatsRad[i]))
-			ekman[i] = AIR_GAS_CONSTANT * gradT / Math.sqrt(f * f + friction * friction)
+			ekman[i] =
+				(AIR_GAS_CONSTANT * gradT) / Math.sqrt(f * f + friction * friction)
 		}
 		return ekman
 	})
 }
 
-function getProfileMultiplier(latDeg: number, teqDeg: number, hadleyWidth: number): number {
+function getProfileMultiplier(
+	latDeg: number,
+	teqDeg: number,
+	hadleyWidth: number,
+): number {
 	const dist = Math.abs(latDeg - teqDeg) / hadleyWidth
 	const teqDisplacement = Math.abs(teqDeg) / 90
 	const profileWeight = 1 - 0.7 * teqDisplacement
@@ -211,25 +240,46 @@ function getProfileMultiplier(latDeg: number, teqDeg: number, hadleyWidth: numbe
 	return profileWeight * raw + (1 - profileWeight) * direction
 }
 
-function getMeridionalMultiplier(latDeg: number, teqDeg: number, hadleyWidth: number, tidallyLocked: boolean): number {
+function getMeridionalMultiplier(
+	latDeg: number,
+	teqDeg: number,
+	hadleyWidth: number,
+	tidallyLocked: boolean,
+): number {
 	const signedDist = (latDeg - teqDeg) / hadleyWidth
 	const absDist = Math.abs(signedDist)
 
 	if (tidallyLocked) {
-		const towardThermalEquator = piecewise([0, 3, 12, 30, 60, 90], [0.0, 0.15, 0.85, 0.55, 0.15, 0], absDist)
+		const towardThermalEquator = piecewise(
+			[0, 3, 12, 30, 60, 90],
+			[0.0, 0.15, 0.85, 0.55, 0.15, 0],
+			absDist,
+		)
 		return Math.sign(teqDeg - latDeg) * towardThermalEquator
 	}
 
 	if (absDist < 30) {
-		return Math.sign(teqDeg - latDeg) * piecewise([0, 3, 12, 22, 30], [0.0, 0.15, 0.8, 0.5, 0.0], absDist)
+		return (
+			Math.sign(teqDeg - latDeg) *
+			piecewise([0, 3, 12, 22, 30], [0.0, 0.15, 0.8, 0.5, 0.0], absDist)
+		)
 	}
 	if (absDist < 60) {
-		return Math.sign(latDeg - teqDeg) * piecewise([25, 38, 52, 60], [0, 0.2, 0.4, 0.15], absDist)
+		return (
+			Math.sign(latDeg - teqDeg) *
+			piecewise([25, 38, 52, 60], [0, 0.2, 0.4, 0.15], absDist)
+		)
 	}
-	return Math.sign(teqDeg - latDeg) * piecewise([55, 70, 90], [0, 0.18, 0.28], absDist)
+	return (
+		Math.sign(teqDeg - latDeg) *
+		piecewise([55, 70, 90], [0, 0.18, 0.28], absDist)
+	)
 }
 
-function continentalityDampener(isLand: number, landNeighborFrac: number): number {
+function continentalityDampener(
+	isLand: number,
+	landNeighborFrac: number,
+): number {
 	if (!isLand) return 1
 	// Coastal land cells get partial ocean benefit
 	// Deep interior land gets full friction penalty
@@ -242,7 +292,15 @@ export function computeWind(
 	_elevation: Float32Array,
 	isLand: Uint8Array,
 	climate: OrogenClimate,
-	params?: Pick<OrogenParams, "planetRadiusKm" | "obliquity" | "daysPerYear" | "hoursPerDay" | "tidallyLocked" | "pressure">,
+	params?: Pick<
+		OrogenParams,
+		| "planetRadiusKm"
+		| "obliquity"
+		| "daysPerYear"
+		| "hoursPerDay"
+		| "tidallyLocked"
+		| "pressure"
+	>,
 	monthlyTEQ?: Float32Array[],
 ): WindResult {
 	const N = mesh.numRegions
@@ -261,19 +319,23 @@ export function computeWind(
 		}
 		landNeighborFrac[r] = total > 0 ? landCount / total : 0
 	}
-	const monthlyBandTemps = computeMonthlyBandTemperatures(climate, (() => {
-		const latBandByRegion = new Uint8Array(N)
-		for (let r = 0; r < N; r++) {
-			const z = mesh.r_xyz[3 * r + 2]
-			const latDeg = Math.asin(clamp(z, -1, 1)) * RAD2DEG
-			latBandByRegion[r] = clamp(
-				Math.round((latDeg + 90) / 180 * (NUM_LAT_BANDS - 1)),
-				0,
-				NUM_LAT_BANDS - 1,
-			)
-		}
-		return latBandByRegion
-	})(), N)
+	const monthlyBandTemps = computeMonthlyBandTemperatures(
+		climate,
+		(() => {
+			const latBandByRegion = new Uint8Array(N)
+			for (let r = 0; r < N; r++) {
+				const z = mesh.r_xyz[3 * r + 2]
+				const latDeg = Math.asin(clamp(z, -1, 1)) * RAD2DEG
+				latBandByRegion[r] = clamp(
+					Math.round(((latDeg + 90) / 180) * (NUM_LAT_BANDS - 1)),
+					0,
+					NUM_LAT_BANDS - 1,
+				)
+			}
+			return latBandByRegion
+		})(),
+		N,
+	)
 	const monthlyEkman = computeMonthlyEkman(monthlyBandTemps, params)
 
 	const latDeg = new Float32Array(N)
@@ -284,7 +346,11 @@ export function computeWind(
 		const z = mesh.r_xyz[3 * r + 2]
 		latDeg[r] = Math.asin(clamp(z, -1, 1)) * RAD2DEG
 		const lonDeg = Math.atan2(y, x) * RAD2DEG
-		lonBin[r] = clamp(Math.floor((lonDeg + 180) / 360 * TEQ_BINS), 0, TEQ_BINS - 1)
+		lonBin[r] = clamp(
+			Math.floor(((lonDeg + 180) / 360) * TEQ_BINS),
+			0,
+			TEQ_BINS - 1,
+		)
 	}
 
 	const wind_east_monthly = new Float32Array(N * NUM_MONTHS)
@@ -301,18 +367,22 @@ export function computeWind(
 		const offset = month * N
 		const teqByLon = monthlyTEQ
 			? monthlyTEQ[month]
-			: computeThermalEquator(mesh, climate.temperature_monthly.subarray(offset, offset + N), TEQ_BINS)
+			: computeThermalEquator(
+					mesh,
+					climate.temperature_monthly.subarray(offset, offset + N),
+					TEQ_BINS,
+				)
 
 		for (let r = 0; r < N; r++) {
 			const teq = teqByLon[lonBin[r]]
 			const baseMagnitude = interpolateBands(monthlyEkman[month], latDeg[r])
-			const zonal = getProfileMultiplier(latDeg[r], teq, controls.hadleyWidth) * controls.zonalScale * reverseZonal
-			const meridional = getMeridionalMultiplier(
-				latDeg[r],
-				teq,
-				controls.hadleyWidth,
-				tlocked,
-			) * controls.meridionalScale
+			const zonal =
+				getProfileMultiplier(latDeg[r], teq, controls.hadleyWidth) *
+				controls.zonalScale *
+				reverseZonal
+			const meridional =
+				getMeridionalMultiplier(latDeg[r], teq, controls.hadleyWidth, tlocked) *
+				controls.meridionalScale
 			const drag = continentalityDampener(isLand[r], landNeighborFrac[r])
 
 			east[r] = baseMagnitude * zonal * drag

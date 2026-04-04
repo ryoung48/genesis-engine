@@ -5,9 +5,9 @@ import { HISTORY } from "../model/history"
 import { SHAPER_CLIMATES } from "../model/shapers/climate"
 import { SHAPER_CONTINENTS } from "../model/shapers/continents"
 import { SHAPER_DISPLAY } from "../model/shapers/display"
+import { SHAPER_HEIGHTMAP } from "../model/shapers/heightmap"
 import { SHAPER_PARTITIONS } from "../model/shapers/partitions"
 import { SHAPER_MOUNTAINS } from "../model/shapers/topagraphy"
-import { SHAPER_HEIGHTMAP } from "../model/shapers/heightmap"
 import { TIME } from "../model/utilities/time"
 import { LoadingStep, ViewState } from "../types/app"
 
@@ -26,7 +26,10 @@ function loadImageData(src: string): Promise<ImageData> {
 			canvas.width = img.width
 			canvas.height = img.height
 			const ctx = canvas.getContext("2d")
-			if (!ctx) { reject(new Error("Could not get canvas context")); return }
+			if (!ctx) {
+				reject(new Error("Could not get canvas context"))
+				return
+			}
 			ctx.drawImage(img, 0, 0)
 			resolve(ctx.getImageData(0, 0, img.width, img.height))
 		}

@@ -6,18 +6,26 @@ function makeRng(seed: number): () => number {
 	}
 }
 
+const G: [number, number, number][] = [
+	[1, 1, 0],
+	[-1, 1, 0],
+	[1, -1, 0],
+	[-1, -1, 0],
+	[1, 0, 1],
+	[-1, 0, 1],
+	[1, 0, -1],
+	[-1, 0, -1],
+	[0, 1, 1],
+	[0, -1, 1],
+	[0, 1, -1],
+	[0, -1, -1],
+]
+
 export class SimplexNoise {
-	private readonly G: [number, number, number][]
 	private readonly perm: Uint8Array
 	private readonly pm12: Uint8Array
 
 	constructor(seed: number = 0) {
-		this.G = [
-			[1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-			[1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-			[0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
-		]
-
 		const rng = makeRng(seed)
 		const p = new Uint8Array(256)
 		for (let i = 0; i < 256; i++) p[i] = i
@@ -52,18 +60,48 @@ export class SimplexNoise {
 		let i2: number, j2: number, k2: number
 		if (x0 >= y0) {
 			if (y0 >= z0) {
-				i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 1; k2 = 0
+				i1 = 1
+				j1 = 0
+				k1 = 0
+				i2 = 1
+				j2 = 1
+				k2 = 0
 			} else if (x0 >= z0) {
-				i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 0; k2 = 1
+				i1 = 1
+				j1 = 0
+				k1 = 0
+				i2 = 1
+				j2 = 0
+				k2 = 1
 			} else {
-				i1 = 0; j1 = 0; k1 = 1; i2 = 1; j2 = 0; k2 = 1
+				i1 = 0
+				j1 = 0
+				k1 = 1
+				i2 = 1
+				j2 = 0
+				k2 = 1
 			}
 		} else if (y0 < z0) {
-			i1 = 0; j1 = 0; k1 = 1; i2 = 0; j2 = 1; k2 = 1
+			i1 = 0
+			j1 = 0
+			k1 = 1
+			i2 = 0
+			j2 = 1
+			k2 = 1
 		} else if (x0 < z0) {
-			i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1
+			i1 = 0
+			j1 = 1
+			k1 = 0
+			i2 = 0
+			j2 = 1
+			k2 = 1
 		} else {
-			i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0
+			i1 = 0
+			j1 = 1
+			k1 = 0
+			i2 = 1
+			j2 = 1
+			k2 = 0
 		}
 
 		const x1 = x0 - i1 + H
@@ -79,38 +117,47 @@ export class SimplexNoise {
 		const ii = i & 255
 		const jj = j & 255
 		const kk = k & 255
-		const { perm: P, pm12: M, G: g } = this
-		let n0 = 0, n1 = 0, n2 = 0, n3 = 0
+		const { perm: P, pm12: M } = this
+		let n0 = 0,
+			n1 = 0,
+			n2 = 0,
+			n3 = 0
 
 		let a = 0.6 - x0 * x0 - y0 * y0 - z0 * z0
 		if (a > 0) {
 			a *= a
-			const v = g[M[ii + P[jj + P[kk]]]]
+			const v = G[M[ii + P[jj + P[kk]]]]
 			n0 = a * a * (v[0] * x0 + v[1] * y0 + v[2] * z0)
 		}
 		let b = 0.6 - x1 * x1 - y1 * y1 - z1 * z1
 		if (b > 0) {
 			b *= b
-			const v = g[M[ii + i1 + P[jj + j1 + P[kk + k1]]]]
+			const v = G[M[ii + i1 + P[jj + j1 + P[kk + k1]]]]
 			n1 = b * b * (v[0] * x1 + v[1] * y1 + v[2] * z1)
 		}
 		let c = 0.6 - x2 * x2 - y2 * y2 - z2 * z2
 		if (c > 0) {
 			c *= c
-			const v = g[M[ii + i2 + P[jj + j2 + P[kk + k2]]]]
+			const v = G[M[ii + i2 + P[jj + j2 + P[kk + k2]]]]
 			n2 = c * c * (v[0] * x2 + v[1] * y2 + v[2] * z2)
 		}
 		let d = 0.6 - x3 * x3 - y3 * y3 - z3 * z3
 		if (d > 0) {
 			d *= d
-			const v = g[M[ii + 1 + P[jj + 1 + P[kk + 1]]]]
+			const v = G[M[ii + 1 + P[jj + 1 + P[kk + 1]]]]
 			n3 = d * d * (v[0] * x3 + v[1] * y3 + v[2] * z3)
 		}
 
 		return 32 * (n0 + n1 + n2 + n3)
 	}
 
-	fbm(x: number, y: number, z: number, octaves = 5, persistence = 2 / 3): number {
+	fbm(
+		x: number,
+		y: number,
+		z: number,
+		octaves = 5,
+		persistence = 2 / 3,
+	): number {
 		let sum = 0
 		let max = 0
 		let amp = 1
@@ -123,7 +170,15 @@ export class SimplexNoise {
 		return sum / max
 	}
 
-	ridgedFbm(x: number, y: number, z: number, octaves = 6, lacunarity = 2.0, gain = 0.5, offset = 1.0): number {
+	ridgedFbm(
+		x: number,
+		y: number,
+		z: number,
+		octaves = 6,
+		lacunarity = 2.0,
+		gain = 0.5,
+		offset = 1.0,
+	): number {
 		let sum = 0
 		let freq = 1
 		let amp = 1

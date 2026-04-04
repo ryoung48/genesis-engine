@@ -1,5 +1,5 @@
 import { interpolateBlues, interpolateOranges, interpolateReds } from "d3"
-import React from "react"
+import { useMemo } from "react"
 import type { useEbmPreview } from "@/hooks/useEbmPreview"
 import type { HeightmapPreset } from "@/hooks/useWorldGeneration"
 import { ConstellationBackground } from "../ui/ConstellationBackground"
@@ -7,7 +7,7 @@ import SeasonalTempByLat from "../world/charts/SimulationTab/SeasonalTempByLat"
 import ZonalCirculationChart from "../world/charts/SimulationTab/ZonalCirculationChart"
 import { LanguageLab } from "./LanguageLab"
 
-type PreviewTab =
+export type PreviewTab =
 	| "temperature"
 	| "gradient"
 	| "insolation"
@@ -91,22 +91,25 @@ export const GenesisEngine = ({
 	setPreviewTab,
 	earthDefaults,
 }: GenesisEngineProps) => {
-	const annualAverageByLat = React.useMemo(
+	const annualAverageByLat = useMemo(
 		() =>
 			ebmPreview.heat.map((row) =>
-				row.length > 0 ? row.reduce((sum, value) => sum + value, 0) / row.length : 0,
+				row.length > 0
+					? row.reduce((sum, value) => sum + value, 0) / row.length
+					: 0,
 			),
 		[ebmPreview.heat],
 	)
-	const annualAverageHeat = React.useMemo(
+	const annualAverageHeat = useMemo(
 		() => annualAverageByLat.map((temp) => [temp]),
 		[annualAverageByLat],
 	)
 
 	return (
 		<div
-			className={`w-full h-full flex relative ${isExiting ? "animate-[cm-fade-out_500ms_ease-out_forwards]" : ""
-				}`}
+			className={`w-full h-full flex relative ${
+				isExiting ? "animate-[cm-fade-out_500ms_ease-out_forwards]" : ""
+			}`}
 		>
 			<ConstellationBackground />
 
@@ -316,18 +319,26 @@ export const GenesisEngine = ({
 								heightmap
 									? undefined
 									: {
-										url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/World_elevation_map.png/3840px-World_elevation_map.png",
-										seaLevel: 0.565,
-										resolution: 4,
-									},
+											url: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/World_elevation_map.png/3840px-World_elevation_map.png",
+											seaLevel: 0.565,
+											resolution: 4,
+										},
 							)
 						}
-						className={`w-full py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${heightmap
+						className={`w-full py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+							heightmap
 								? "bg-slate-900 text-white hover:bg-black"
 								: "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-							}`}
+						}`}
 					>
-						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+						<svg
+							width="12"
+							height="12"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+						>
 							<circle cx="12" cy="12" r="10" />
 							<path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
 						</svg>
@@ -341,7 +352,14 @@ export const GenesisEngine = ({
 							onClick={onOrogenClick}
 							className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all flex items-center justify-center gap-2"
 						>
-							<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+							>
 								<circle cx="12" cy="12" r="10" />
 								<path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
 							</svg>
