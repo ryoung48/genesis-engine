@@ -163,6 +163,8 @@ export interface OrogenClimate {
 	temperature_min: Float32Array   // per-cell annual min °C
 	temperature_max: Float32Array   // per-cell annual max °C
 	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
+	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temp range °C (for Hargreaves td)
+	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
 	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
 	landFraction: number[]          // 36-band land fraction used by EBM
@@ -173,6 +175,8 @@ export interface OrogenOceanCurrents {
 	oceanWarmth: Float32Array
 	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean/deep interior. */
 	coastalWarmth: Float32Array
+	/** Per-cell temperature delta applied by ocean currents (°C). Zero where no effect. */
+	temperatureDelta: Float32Array
 }
 
 export interface OrogenWind {
@@ -215,6 +219,8 @@ export interface OrogenProvinces {
 	count: number
 	/** Per-province desolate flag (1 = uninhabitable) */
 	desolate: Uint8Array
+	/** Per-province landmass (connected component) index, -1 for desolate */
+	landmassId: Int32Array
 	/** Province adjacency — CSR offset, length count+1 */
 	adjOffset: Int32Array
 	/** Province adjacency — neighbor indices */
@@ -240,6 +246,21 @@ export interface OrogenPartition {
 	size: Int32Array
 	/** Per-partition RGB colors, length count*3 */
 	colors: Float32Array
+}
+
+export interface OrogenNationHierarchy extends OrogenPartition {
+	/** Per-province parent index (-1 = sovereign root) */
+	parent: Int32Array
+	/** Per-province hierarchy depth (0 = root) */
+	depth: Int32Array
+	/** Province children in CSR form, length count+1 */
+	childOffset: Int32Array
+	/** Flattened province children list */
+	childList: Int32Array
+	/** Per-province sovereign root */
+	sovereign: Int32Array
+	/** Per-province settlement gravity */
+	gravity: Float32Array
 }
 
 export interface OrogenRivers {
@@ -330,7 +351,7 @@ export interface OrogenWorld {
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
 	provinces?: OrogenProvinces
-	nations?: OrogenPartition
+	nations?: OrogenNationHierarchy
 	cultures?: OrogenPartition
 	heritages?: OrogenPartition
 	faiths?: OrogenPartition

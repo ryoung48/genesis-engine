@@ -47,7 +47,7 @@ const ceilingScale = (x: number) => piecewise([-14, -8, 2, 12, 18, 40, 60, 90], 
 
 const itczScale = (x: number) => piecewise([0, 8, 18, 28], [1, 0.7, 0.2, 0], x)
 const subsidenceScale = (x: number) => piecewise([15, 20, 25, 30, 35, 40], [0, 0.5, 1, 1, 0.5, 0], x)
-const eastStormScale = (x: number) => piecewise([15, 35, 90], [0, 0.8, 1], x)
+const eastStormScale = (x: number) => piecewise([10, 35, 90], [0, 0.8, 1], x)
 const westerliesScale = (x: number) => piecewise([40, 50, 90], [0, 1, 0.8], x)
 
 type CirculationControls = {

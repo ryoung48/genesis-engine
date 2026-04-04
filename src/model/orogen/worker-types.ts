@@ -1,4 +1,4 @@
-import type { OrogenParams } from "./types"
+import type { OrogenNationHierarchy, OrogenParams, OrogenPartition, OrogenProvinces } from "./types"
 
 export interface SerializedSphereMesh {
 	numRegions: number
@@ -22,6 +22,10 @@ export interface SerializedOrogenClimate {
 	daylight_hours_monthly?: Float32Array
 	landFraction: number[]
 }
+
+type SerializedPartition = OrogenPartition
+type SerializedProvinces = OrogenProvinces
+type SerializedNationHierarchy = OrogenNationHierarchy
 
 export interface SerializedOrogenWorld {
 	mesh: SerializedSphereMesh
@@ -63,67 +67,18 @@ export interface SerializedOrogenWorld {
 	isLand?: Uint8Array
 	riverLand?: Uint8Array
 	rivers?: { lines: [number, number, number, number][][]; maxFlow: number; minFlow: number; flow: Float32Array; flow_monthly: Float32Array; riverId: Int32Array; riverLengthKm: Float32Array; visible: Uint8Array; lakes: Uint8Array; basinId: Int32Array; waterLevel: Float32Array }
-	oceanCurrents?: { oceanWarmth: Float32Array; coastalWarmth: Float32Array }
+	oceanCurrents?: { oceanWarmth: Float32Array; coastalWarmth: Float32Array; temperatureDelta: Float32Array }
 	wind?: {
 		wind_east_monthly: Float32Array
 		wind_north_monthly: Float32Array
 		wind_speed_monthly: Float32Array
 	}
-	provinces?: {
-		regionProvince: Int32Array
-		seeds: Int32Array
-		count: number
-		desolate: Uint8Array
-		adjOffset: Int32Array
-		adjList: Int32Array
-		size: Int32Array
-		colors: Float32Array
-	}
-	nations?: {
-		assignment: Int32Array
-		seeds: Int32Array
-		count: number
-		adjOffset: Int32Array
-		adjList: Int32Array
-		size: Int32Array
-		colors: Float32Array
-	}
-	cultures?: {
-		assignment: Int32Array
-		seeds: Int32Array
-		count: number
-		adjOffset: Int32Array
-		adjList: Int32Array
-		size: Int32Array
-		colors: Float32Array
-	}
-	heritages?: {
-		assignment: Int32Array
-		seeds: Int32Array
-		count: number
-		adjOffset: Int32Array
-		adjList: Int32Array
-		size: Int32Array
-		colors: Float32Array
-	}
-	faiths?: {
-		assignment: Int32Array
-		seeds: Int32Array
-		count: number
-		adjOffset: Int32Array
-		adjList: Int32Array
-		size: Int32Array
-		colors: Float32Array
-	}
-	religions?: {
-		assignment: Int32Array
-		seeds: Int32Array
-		count: number
-		adjOffset: Int32Array
-		adjList: Int32Array
-		size: Int32Array
-		colors: Float32Array
-	}
+	provinces?: SerializedProvinces
+	nations?: SerializedNationHierarchy
+	cultures?: SerializedPartition
+	heritages?: SerializedPartition
+	faiths?: SerializedPartition
+	religions?: SerializedPartition
 	landmarks?: {
 		regionLandmark: Int32Array
 		type: Uint8Array
@@ -135,6 +90,7 @@ export interface SerializedOrogenWorld {
 		population: Float32Array
 		totalPopulation: number
 	}
+	monthlyTEQ?: Float32Array[]
 }
 
 export type OrogenWorkerRequest =

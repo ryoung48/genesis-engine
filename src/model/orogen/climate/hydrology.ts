@@ -1,25 +1,32 @@
 import type { OrogenClimate, OrogenHydrology, OrogenParams, OrogenRainfall } from "../types"
 import { getDaysPerYear } from "../units"
 
-export function petMonth(temp: number, dpm: number): number {
-	const v = temp * 5.5 / 30 * dpm
-	return v > 0 ? v : 0
+export function petMonthHargreaves(tas: number, td: number, raWm2: number, dpm: number): number {
+	const raMJ = raWm2 * 0.0864
+	const petDay = 0.0023 * (tas + 17.8) * Math.sqrt(Math.max(2, td)) * raMJ
+	return Math.max(0, petDay) * dpm
 }
 
-export function fillPetMonthlyFromTemperature(
+export function fillPetMonthlyHargreaves(
 	temperatureMonthly: Float32Array,
+	rangeMonthly: Float32Array,
+	insolationMonthly: Float32Array,
 	petMonthly: Float32Array,
 	dpm: number,
 ): void {
-	for (let i = 0; i < temperatureMonthly.length; i++) petMonthly[i] = petMonth(temperatureMonthly[i], dpm)
+	for (let i = 0; i < temperatureMonthly.length; i++) {
+		petMonthly[i] = petMonthHargreaves(temperatureMonthly[i], rangeMonthly[i], insolationMonthly[i], dpm)
+	}
 }
 
 export function refreshClimatePetMonthly(
-	climate: Pick<OrogenClimate, "temperature_monthly" | "pet_monthly">,
+	climate: Pick<OrogenClimate, "temperature_monthly" | "temperature_monthly_range" | "insolation_monthly" | "pet_monthly">,
 	params?: Pick<OrogenParams, "daysPerYear">,
 ): void {
-	fillPetMonthlyFromTemperature(
+	fillPetMonthlyHargreaves(
 		climate.temperature_monthly,
+		climate.temperature_monthly_range,
+		climate.insolation_monthly,
 		climate.pet_monthly,
 		getDaysPerYear(params?.daysPerYear) / 12,
 	)
@@ -51,17 +58,6 @@ export function computeAetFromPet(
 		}
 		if (Math.abs(soil - startSoil) < 1) break
 	}
-}
-
-export function computeAet(
-	temps: Float64Array,
-	rain: Float64Array,
-	petBuf: Float64Array,
-	aetBuf: Float64Array,
-	dpm: number,
-): void {
-	for (let m = 0; m < 12; m++) petBuf[m] = petMonth(temps[m], dpm)
-	computeAetFromPet(rain, petBuf, aetBuf)
 }
 
 export function computeHydrologyFields(

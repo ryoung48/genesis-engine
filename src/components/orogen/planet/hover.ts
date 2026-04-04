@@ -42,6 +42,11 @@ export interface HoverRiver {
 	lengthKm: number
 }
 
+export interface HoverOceanCurrents {
+	warmth: number
+	delta: number
+}
+
 export interface HoverTerrainFeature {
 	dominant: string | null
 	all: string[]
@@ -83,12 +88,6 @@ export function getHoverTemperature(hoverInfo: HoverInfo | null, world: Serializ
 		? (temperatureMonth === 0
 			? world.climate.temperature_avg[hoverInfo.region]
 			: world.climate.temperature_monthly[(temperatureMonth - 1) * world.mesh.numRegions + hoverInfo.region])
-		: null
-}
-
-export function getHoverBiotemperature(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): number | null {
-	return hoverInfo && world?.climate
-		? Math.max(0, world.climate.temperature_avg[hoverInfo.region])
 		: null
 }
 
@@ -247,6 +246,17 @@ export function getHoverRiver(hoverInfo: HoverInfo | null, world: SerializedOrog
 		riverId: world.rivers.riverId?.[r] ?? -1,
 		lengthKm: world.rivers.riverLengthKm?.[r] ?? 0,
 	}
+}
+
+export function getHoverOceanCurrents(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): HoverOceanCurrents | null {
+	if (!(hoverInfo && world?.oceanCurrents)) return null
+	const r = hoverInfo.region
+	const isLand = !!world.isLand?.[r]
+	const warmth = isLand
+		? world.oceanCurrents.coastalWarmth[r]
+		: world.oceanCurrents.oceanWarmth[r]
+	const delta = world.oceanCurrents.temperatureDelta?.[r] ?? 0
+	return { warmth, delta }
 }
 
 export function getHoverTerrainFeature(hoverInfo: HoverInfo | null, world: SerializedOrogenWorld | null): HoverTerrainFeature | null {

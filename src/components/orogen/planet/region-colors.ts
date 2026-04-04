@@ -2,11 +2,12 @@ import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
 import type { PopulationMapMode } from "@/components/world/types"
 import type { NationMapMode } from "./ModeBar"
-import { getColor, temperatureColor, temperatureDeltaColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, dangerColor, hotspotColor, slopeColor, OCEAN_LIGHT_BLUE } from "../colors"
+import { getColor, temperatureColor, temperatureDeltaColor, precipitationColor, vegetationColor, climateZoneColor, climateTempColor, oceanCurrentColor, windSpeedColor, populationColor, gravityColor, dangerColor, hotspotColor, slopeColor, OCEAN_LIGHT_BLUE } from "../colors"
 import { OROGEN_TERRAIN_FEATURE } from "@/model/orogen/types"
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import { koppenClimateColor, koppenTrueColor } from "@/model/orogen/climate/koppen"
 import { ENABLE_PASTA_CLASSIFICATION } from "@/model/orogen/features"
+import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/orogen/climate/vegetation"
 import { darkenVegetationAtElevation, darkenClimateAtElevation } from "./color-helpers"
 
 function basinColor(id: number): [number, number, number] {
@@ -99,7 +100,7 @@ export function computeRegionColors(
 ): Float32Array | null {
 	const N = world.mesh.numRegions
 	const rgb = new Float32Array(N * 3)
-	const darkenMapWaterTemperature = viewMode === "map" && (colorMode === "temperature" || colorMode === "biotemperature")
+	const darkenMapWaterTemperature = viewMode === "map" && colorMode === "temperature"
 	const darkenMapWaterPastaClimate = viewMode === "map" && colorMode === "pastaClimate"
 	const darkenMapWaterOceanCurrents = viewMode === "map" && colorMode === "oceanCurrents"
 	const mapWaterDarkenFactor = 0.74
@@ -132,7 +133,7 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if ((colorMode === "temperature" || colorMode === "biotemperature" || colorMode === "temperatureDelta") && world.climate) {
+	if ((colorMode === "temperature" || colorMode === "temperatureDelta") && world.climate) {
 		const temps = temperatureMonth === 0
 			? world.climate.temperature_avg
 			: world.climate.temperature_monthly.subarray(
@@ -142,11 +143,7 @@ export function computeRegionColors(
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = colorMode === "temperatureDelta"
 				? temperatureDeltaColor(world.climate.temperature_max[r] - world.climate.temperature_min[r])
-				: temperatureColor(
-					colorMode === "biotemperature"
-						? Math.max(0, world.climate.temperature_avg[r])
-						: temps[r],
-				)
+				: temperatureColor(temps[r])
 			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
 			const factor = darkenMapWaterTemperature && isWater ? mapWaterDarkenFactor : 1
 			rgb[3 * r] = cr * factor
@@ -257,11 +254,12 @@ export function computeRegionColors(
 	}
 
 	if (colorMode.startsWith("debug") && world.pastaDebug) {
-		const debugKey = {
+		const debugModeToKey = {
 			debugGdd: "gdd", debugGddz: "gddz", debugGint: "gint",
 			debugAr: "ar", debugGar: "gar", debugGrs: "grs", debugEvr: "evr",
 			debugMinT: "minT", debugMaxT: "maxT",
-		}[colorMode] as keyof typeof world.pastaDebug
+		} as const
+		const debugKey = debugModeToKey[colorMode as keyof typeof debugModeToKey]
 		const data = world.pastaDebug[debugKey]
 		// Find min/max for normalization (land only for most, all for minT/maxT)
 		let lo = Infinity, hi = -Infinity
@@ -292,8 +290,6 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "climate" && world.climate) {
-		const CHAOTIC_MIN = 10
-		const CHAOTIC_MAX = 50
 		const BLEND_THRESHOLD = 15
 		const chaoticRgb = climateZoneColor(8)
 		for (let r = 0; r < N; r++) {
@@ -340,13 +336,11 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "oceanCurrents" && world.oceanCurrents) {
-		const { oceanWarmth, coastalWarmth } = world.oceanCurrents
+		const { temperatureDelta } = world.oceanCurrents
 		for (let r = 0; r < N; r++) {
 			const isLand = !!world.isLand?.[r]
-			const value = isLand
-				? coastalWarmth[r]
-				: oceanWarmth[r]
-			const [cr, cg, cb] = oceanCurrentColor(value)
+			const colorValue = Math.max(-1, Math.min(1, (temperatureDelta?.[r] ?? 0) / 15))
+			const [cr, cg, cb] = oceanCurrentColor(colorValue)
 			const factor = darkenMapWaterOceanCurrents && !isLand ? mapWaterDarkenFactor : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
@@ -461,7 +455,14 @@ export function computeRegionColors(
 				}
 			}
 		}
+		let maxGravity = 0
+		if (populationMode === "gravity" && world.nations?.gravity) {
+			for (let i = 0; i < world.provinces.count; i++) {
+				if (!desolate[i] && world.nations.gravity[i] > maxGravity) maxGravity = world.nations.gravity[i]
+			}
+		}
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
+		const invGravityMax = maxGravity > 0 ? 1 / maxGravity : 0
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
 			if (p < 0) {
@@ -471,6 +472,11 @@ export function computeRegionColors(
 			} else {
 				if (populationMode === "density" && pop) {
 					const [cr, cg, cb] = populationColor((pop[p] / Math.max(1, size[p])) * invMax)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (populationMode === "gravity" && world.nations?.gravity) {
+					const [cr, cg, cb] = gravityColor(world.nations.gravity[p] * invGravityMax)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb

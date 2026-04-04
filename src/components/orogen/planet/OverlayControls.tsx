@@ -4,6 +4,8 @@ import { gridSpacingOptions } from "./constants"
 interface OverlayControlsProps {
 	overlaysExpanded: boolean
 	setOverlaysExpanded: (v: boolean | ((prev: boolean) => boolean)) => void
+	isMeasuring: boolean
+	setIsMeasuring: (v: boolean) => void
 	showWireframe: boolean
 	setShowWireframe: (v: boolean) => void
 	showRivers: boolean
@@ -14,23 +16,24 @@ interface OverlayControlsProps {
 	setShowThermalEquator: (v: boolean) => void
 	showGrid: boolean
 	setShowGrid: (v: boolean) => void
+	showNationBorders: boolean
+	setShowNationBorders: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
-	showPastaDebug: boolean
-	setShowPastaDebug: (v: boolean) => void
 	sidebarOpen?: boolean
 	onToggleSidebar?: () => void
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	overlaysExpanded, setOverlaysExpanded,
+	isMeasuring, setIsMeasuring,
 	showWireframe, setShowWireframe,
 	showRivers, setShowRivers,
 	showClouds, setShowClouds,
 	showThermalEquator, setShowThermalEquator,
 	showGrid, setShowGrid,
+	showNationBorders, setShowNationBorders,
 	gridSpacing, setGridSpacing,
-	showPastaDebug, setShowPastaDebug,
 	sidebarOpen, onToggleSidebar,
 }) => (
 	<div className="absolute bottom-3 left-3 z-20 pointer-events-none">
@@ -49,6 +52,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 						</button>
 					</div>
 					<div className="space-y-3">
+						<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+							<span>Measure</span>
+							<input
+								type="checkbox"
+								checked={isMeasuring}
+								onChange={(e) => setIsMeasuring(e.target.checked)}
+								className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+							/>
+						</label>
 						<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
 							<span>Wireframe</span>
 							<input
@@ -86,6 +98,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 							/>
 						</label>
 						<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+							<span>Nation Borders</span>
+							<input
+								type="checkbox"
+								checked={showNationBorders}
+								onChange={(e) => setShowNationBorders(e.target.checked)}
+								className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+							/>
+						</label>
+						<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
 							<span>Grid Lines</span>
 							<input
 								type="checkbox"
@@ -114,15 +135,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								className="w-full accent-slate-100 disabled:cursor-not-allowed"
 							/>
 						</div>
-						<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-							<span>Pasta Debug</span>
-							<input
-								type="checkbox"
-								checked={showPastaDebug}
-								onChange={(e) => setShowPastaDebug(e.target.checked)}
-								className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-							/>
-						</label>
 					</div>
 				</div>
 			)}

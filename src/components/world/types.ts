@@ -20,6 +20,14 @@ export type MapMode =
 	| "diplomacy"
 	| "biome"
 
+export type PopulationMapMode =
+	| "density"
+	| "culture"
+	| "heritage"
+	| "faith"
+	| "religion"
+	| "gravity"
+
 export type WorldPaintParams = {
 	ctx: CanvasRenderingContext2D
 	projection: GeoProjection

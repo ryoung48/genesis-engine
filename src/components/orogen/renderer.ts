@@ -20,6 +20,8 @@ export interface OrogenScene {
 	updateWorld(world: SerializedOrogenWorld): void
 	setColorMode(mode: ColorMode): void
 	setRegionColors(colors: Float32Array | null): void
+	setHoveredRegion(region: number | null): void
+	setNationBordersVisible(visible: boolean): void
 	setViewMode(mode: OrogenViewMode): void
 	setWireframeVisible(visible: boolean): void
 	setGridVisible(visible: boolean): void
@@ -203,11 +205,15 @@ export function createOrogenScene(
 	let riverMaterials: LineMaterial[] = []
 	let globeWindArrows: THREE.LineSegments | null = null
 	let mapWindArrows: THREE.LineSegments | null = null
+	let globeHoverNationBorder: THREE.LineSegments | null = null
+	let mapHoverNationBorder: THREE.LineSegments | null = null
 	let windArrowData: { east: Float32Array; north: Float32Array; speed: Float32Array } | null = null
 	let windArrowsVisible = false
 	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
 	let clickHandler: ((info: OrogenHoverInfo) => void) | null = null
 	let hoveredRegion = -1
+	let hoveredNation = -1
+	let nationBordersVisible = false
 	const raycaster = new THREE.Raycaster()
 	const pointer = new THREE.Vector2()
 	let globeMeasureLine: THREE.Line | null = null
@@ -621,6 +627,138 @@ export function createOrogenScene(
 		lines.position.set(0, 0, 0)
 		lines.visible = wireframeVisible && currentViewMode === "map"
 		return lines
+	}
+
+	function buildHoveredNationBorderGlobe(world: SerializedOrogenWorld, nation: number): THREE.LineSegments | null {
+		if (!world.nations || !world.provinces) return null
+		const { mesh, elevation } = world
+		const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t, t_xyz } = mesh
+		const { regionProvince } = world.provinces
+		const positions: number[] = []
+		const V = 0.04
+
+		for (let s = 0; s < numSides; s++) {
+			const opp = halfedges[s]
+			if (opp < 0 || s > opp) continue
+			const r0 = s_begin_r[s]
+			const r1 = s_begin_r[opp]
+			const p0 = regionProvince[r0]
+			const p1 = regionProvince[r1]
+			const n0 = p0 >= 0 ? world.nations.assignment[p0] : -1
+			const n1 = p1 >= 0 ? world.nations.assignment[p1] : -1
+			if (n0 === n1 || (n0 !== nation && n1 !== nation)) continue
+
+			const tInner = s_inner_t[s]
+			const tOuter = s_outer_t[s]
+			if (tInner < 0 || tOuter < 0) continue
+
+			const avgElev = (elevation[r0] + elevation[r1]) * 0.5
+			const radius = 1.006 + (avgElev > 0 ? avgElev * V : avgElev * V * 0.3)
+			positions.push(
+				t_xyz[3 * tInner] * radius,
+				t_xyz[3 * tInner + 1] * radius,
+				t_xyz[3 * tInner + 2] * radius,
+				t_xyz[3 * tOuter] * radius,
+				t_xyz[3 * tOuter + 1] * radius,
+				t_xyz[3 * tOuter + 2] * radius,
+			)
+		}
+
+		if (positions.length === 0) return null
+		const geometry = new THREE.BufferGeometry()
+		geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(positions), 3))
+		const material = new THREE.LineBasicMaterial({
+			color: 0x020617,
+			transparent: true,
+			opacity: 0.95,
+			depthWrite: false,
+		})
+		const lines = new THREE.LineSegments(geometry, material)
+		lines.visible = currentViewMode === "globe" && nationBordersVisible
+		return lines
+	}
+
+	function buildHoveredNationBorderMap(world: SerializedOrogenWorld, nation: number): THREE.LineSegments | null {
+		if (!world.nations || !world.provinces) return null
+		const { mesh } = world
+		const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t, t_xyz } = mesh
+		const { regionProvince } = world.provinces
+		const positions: number[] = []
+		const pi = Math.PI
+		const sx = 2 / pi
+		const centerLon = currentMapCenterLongitudeDeg * pi / 180
+
+		const wrapLon = (lon: number) => {
+			let l = lon - centerLon
+			if (l > pi) l -= 2 * pi
+			else if (l < -pi) l += 2 * pi
+			return l
+		}
+
+		const project = (x: number, y: number, z: number) => ({
+			lon: wrapLon(Math.atan2(y, x)),
+			lat: Math.asin(Math.max(-1, Math.min(1, z))),
+		})
+
+		const writeSegment = (lon0: number, lat0: number, lon1: number, lat1: number) => {
+			positions.push(lon0 * sx, lat0 * sx, 0.003, lon1 * sx, lat1 * sx, 0.003)
+		}
+
+		for (let s = 0; s < numSides; s++) {
+			const opp = halfedges[s]
+			if (opp < 0 || s > opp) continue
+			const r0 = s_begin_r[s]
+			const r1 = s_begin_r[opp]
+			const p0 = regionProvince[r0]
+			const p1 = regionProvince[r1]
+			const n0 = p0 >= 0 ? world.nations.assignment[p0] : -1
+			const n1 = p1 >= 0 ? world.nations.assignment[p1] : -1
+			if (n0 === n1 || (n0 !== nation && n1 !== nation)) continue
+
+			const tInner = s_inner_t[s]
+			const tOuter = s_outer_t[s]
+			if (tInner < 0 || tOuter < 0) continue
+
+			const a = project(t_xyz[3 * tInner], t_xyz[3 * tInner + 1], t_xyz[3 * tInner + 2])
+			const b = project(t_xyz[3 * tOuter], t_xyz[3 * tOuter + 1], t_xyz[3 * tOuter + 2])
+			let lon0 = a.lon
+			let lon1 = b.lon
+
+			if (Math.abs(lon1 - lon0) > Math.PI) {
+				if (lon0 < lon1) lon0 += 2 * Math.PI
+				else lon1 += 2 * Math.PI
+				writeSegment(lon0, a.lat, lon1, b.lat)
+				writeSegment(lon0 - 2 * Math.PI, a.lat, lon1 - 2 * Math.PI, b.lat)
+			} else {
+				writeSegment(lon0, a.lat, lon1, b.lat)
+			}
+		}
+
+		if (positions.length === 0) return null
+		const geometry = new THREE.BufferGeometry()
+		geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(positions), 3))
+		const material = new THREE.LineBasicMaterial({
+			color: 0x020617,
+			transparent: true,
+			opacity: 0.95,
+			depthWrite: false,
+		})
+		const lines = new THREE.LineSegments(geometry, material)
+		lines.visible = currentViewMode === "map" && nationBordersVisible
+		return lines
+	}
+
+	function rebuildHoveredNationBorder() {
+		disposeObject3D(globeHoverNationBorder)
+		disposeObject3D(mapHoverNationBorder)
+		globeHoverNationBorder = null
+		mapHoverNationBorder = null
+		if (!currentWorld || hoveredNation < 0 || !nationBordersVisible) return
+		globeHoverNationBorder = buildHoveredNationBorderGlobe(currentWorld, hoveredNation)
+		mapHoverNationBorder = buildHoveredNationBorderMap(currentWorld, hoveredNation)
+		if (globeHoverNationBorder) scene.add(globeHoverNationBorder)
+		if (mapHoverNationBorder) scene.add(mapHoverNationBorder)
+		updateOverlayVisibility()
 	}
 
 	function applyFaceRegionColors(
@@ -1115,6 +1253,8 @@ export function createOrogenScene(
 		disposeObject3D(mapGrid)
 		disposeObject3D(globeThermalEquator)
 		disposeObject3D(mapThermalEquator)
+		disposeObject3D(globeHoverNationBorder)
+		disposeObject3D(mapHoverNationBorder)
 		disposeRiverGroup(globeRivers)
 		disposeRiverGroup(mapRivers)
 		disposeObject3D(globeWindArrows)
@@ -1125,6 +1265,8 @@ export function createOrogenScene(
 		mapGrid = null
 		globeThermalEquator = null
 		mapThermalEquator = null
+		globeHoverNationBorder = null
+		mapHoverNationBorder = null
 		globeRivers = null
 		mapRivers = null
 		globeWindArrows = null
@@ -1163,6 +1305,7 @@ export function createOrogenScene(
 			scene.add(globeWindArrows)
 			scene.add(mapWindArrows)
 		}
+		rebuildHoveredNationBorder()
 		updateOverlayVisibility()
 	}
 
@@ -1171,6 +1314,11 @@ export function createOrogenScene(
 		if (mapWireframe) {
 			mapWireframe.visible = wireframeVisible && currentViewMode === "map"
 			if (mapMesh) mapWireframe.position.copy(mapMesh.position)
+		}
+		if (globeHoverNationBorder) globeHoverNationBorder.visible = currentViewMode === "globe" && nationBordersVisible
+		if (mapHoverNationBorder) {
+			mapHoverNationBorder.visible = currentViewMode === "map" && nationBordersVisible
+			if (mapMesh) mapHoverNationBorder.position.copy(mapMesh.position)
 		}
 		if (globeGrid) globeGrid.visible = gridVisible && currentViewMode === "globe"
 		if (mapGrid) {
@@ -1220,6 +1368,15 @@ export function createOrogenScene(
 
 	function updateWorld(world: SerializedOrogenWorld) {
 		currentWorld = world
+		if (hoveredRegion >= 0) {
+			const hoveredProvince = world.provinces?.regionProvince?.[hoveredRegion] ?? -1
+			hoveredNation =
+				hoveredProvince >= 0 && world.nations
+					? world.nations.assignment[hoveredProvince]
+					: -1
+		} else {
+			hoveredNation = -1
+		}
 		rebuildTerrain()
 	}
 
@@ -1242,6 +1399,27 @@ export function createOrogenScene(
 		if (currentRegionColors === colors) return
 		currentRegionColors = colors
 		if (!recolorMeshesInPlace()) rebuildTerrain()
+	}
+
+	function setHoveredRegion(region: number | null) {
+		hoveredRegion = region ?? -1
+		if (!currentWorld || hoveredRegion < 0 || !nationBordersVisible) {
+			hoveredNation = -1
+			rebuildHoveredNationBorder()
+			return
+		}
+		const hoveredProvince = currentWorld.provinces?.regionProvince?.[hoveredRegion] ?? -1
+		hoveredNation =
+			hoveredProvince >= 0 && currentWorld.nations
+				? currentWorld.nations.assignment[hoveredProvince]
+				: -1
+		rebuildHoveredNationBorder()
+	}
+
+	function setNationBordersVisible(visible: boolean) {
+		if (nationBordersVisible === visible) return
+		nationBordersVisible = visible
+		rebuildHoveredNationBorder()
 	}
 
 	function setViewMode(mode: OrogenViewMode) {
@@ -1289,6 +1467,8 @@ export function createOrogenScene(
 	function clearHover() {
 		if (hoveredRegion === -1) return
 		hoveredRegion = -1
+		hoveredNation = -1
+		rebuildHoveredNationBorder()
 		emitHover(null)
 	}
 
@@ -1326,6 +1506,17 @@ export function createOrogenScene(
 		}
 
 		hoveredRegion = region
+		if (currentWorld && nationBordersVisible) {
+			const hoveredProvince = currentWorld.provinces?.regionProvince?.[region] ?? -1
+			const nextHoveredNation =
+				hoveredProvince >= 0 && currentWorld.nations
+					? currentWorld.nations.assignment[hoveredProvince]
+					: -1
+			if (nextHoveredNation !== hoveredNation) {
+				hoveredNation = nextHoveredNation
+				rebuildHoveredNationBorder()
+			}
+		}
 		emitHover({
 			region,
 			clientX: event.clientX - rect.left,
@@ -1421,6 +1612,8 @@ export function createOrogenScene(
 		disposeObject3D(mapGrid)
 		disposeObject3D(globeThermalEquator)
 		disposeObject3D(mapThermalEquator)
+		disposeObject3D(globeHoverNationBorder)
+		disposeObject3D(mapHoverNationBorder)
 		disposeRiverGroup(globeRivers)
 		disposeRiverGroup(mapRivers)
 		waterGeo.dispose()
@@ -1652,6 +1845,8 @@ export function createOrogenScene(
 		updateWorld,
 		setColorMode,
 		setRegionColors,
+		setHoveredRegion,
+		setNationBordersVisible,
 		setViewMode,
 		setWireframeVisible,
 		setGridVisible,

@@ -85,6 +85,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 			? {
 				oceanWarmth: world.oceanCurrents.oceanWarmth,
 				coastalWarmth: world.oceanCurrents.coastalWarmth,
+				temperatureDelta: world.oceanCurrents.temperatureDelta,
 			}
 			: undefined,
 		wind: world.wind
@@ -115,6 +116,12 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				adjList: world.nations.adjList,
 				size: world.nations.size,
 				colors: world.nations.colors,
+				parent: world.nations.parent,
+				depth: world.nations.depth,
+				childOffset: world.nations.childOffset,
+				childList: world.nations.childList,
+				sovereign: world.nations.sovereign,
+				gravity: world.nations.gravity,
 			}
 			: undefined,
 		cultures: world.cultures
@@ -176,6 +183,7 @@ function serializeWorld(world: ReturnType<typeof generateOrogenWorld>): Serializ
 				totalPopulation: world.population.totalPopulation,
 			}
 			: undefined,
+		monthlyTEQ: world.monthlyTEQ,
 	}
 }
 
@@ -306,6 +314,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.oceanCurrents) {
 		transfer.push(world.oceanCurrents.oceanWarmth.buffer)
 		transfer.push(world.oceanCurrents.coastalWarmth.buffer)
+		transfer.push(world.oceanCurrents.temperatureDelta.buffer)
 	}
 
 	if (world.wind) {
@@ -331,6 +340,12 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		transfer.push(world.nations.adjList.buffer)
 		transfer.push(world.nations.size.buffer)
 		transfer.push(world.nations.colors.buffer)
+		transfer.push(world.nations.parent.buffer)
+		transfer.push(world.nations.depth.buffer)
+		transfer.push(world.nations.childOffset.buffer)
+		transfer.push(world.nations.childList.buffer)
+		transfer.push(world.nations.sovereign.buffer)
+		transfer.push(world.nations.gravity.buffer)
 	}
 
 	if (world.cultures) {

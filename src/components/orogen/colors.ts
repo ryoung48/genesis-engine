@@ -1,10 +1,18 @@
 import * as d3 from "d3"
+import {
+	CHAOTIC_MAX,
+	TEMPERATURE_BOUNDARY_SUBARCTIC,
+	TEMPERATURE_BOUNDARY_BOREAL,
+	TEMPERATURE_BOUNDARY_TEMPERATE,
+	TEMPERATURE_BOUNDARY_SUBTROPICAL,
+	TEMPERATURE_BOUNDARY_TROPICAL,
+} from "@/model/orogen/climate/vegetation"
 
 /**
  * Orogen elevation and temperature color mapping.
  */
 
-export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "slope" | "topography" | "temperature" | "biotemperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "dangerZones" | "hotspots" | "nations" | "population" | "basins" | "terrainFeatures" | "terrainFeaturesLand" | "terrainFeaturesOcean" | "terrainFeaturesCoast" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
+export type ColorMode = "terrain" | "heightmap" | "landHeightmap" | "slope" | "topography" | "temperature" | "temperatureDelta" | "precipitation" | "vegetation" | "climate" | "pastaClimate" | "koppenClimate" | "satellite" | "satelliteKoppen" | "oceanCurrents" | "windSpeed" | "dangerZones" | "hotspots" | "nations" | "population" | "provinces" | "gravity" | "basins" | "terrainFeatures" | "terrainFeaturesLand" | "terrainFeaturesOcean" | "terrainFeaturesCoast" | "debugGdd" | "debugGddz" | "debugGint" | "debugAr" | "debugGar" | "debugGrs" | "debugEvr" | "debugMinT" | "debugMaxT"
 
 /** Light blue used for ocean on thematic maps (non-terrain/satellite modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -46,55 +54,6 @@ const landColorStops: [number, number, number][] = [
 
 function lerp(a: number, b: number, t: number): number {
 	return a + (b - a) * t
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-	const normalized = hex.trim()
-	const r = Number.parseInt(normalized.slice(0, 2), 16) / 255
-	const g = Number.parseInt(normalized.slice(2, 4), 16) / 255
-	const b = Number.parseInt(normalized.slice(4, 6), 16) / 255
-	return [r, g, b]
-}
-
-function hexScheme(stops: string): [number, number, number][] {
-	const colors: [number, number, number][] = []
-	for (let i = 0; i < stops.length; i += 6) {
-		colors.push(hexToRgb(stops.slice(i, i + 6)))
-	}
-	return colors
-}
-
-function createRamp(schemes: [number, number, number][][]) {
-	return (t: number): [number, number, number] => {
-		const clamped = Math.max(0, Math.min(1, t))
-		const n = schemes.length
-		if (n === 0) return [0, 0, 0]
-		if (n === 1) {
-			const scheme = schemes[0]
-			if (!scheme || scheme.length === 0) return [0, 0, 0]
-			if (scheme.length === 1) return scheme[0]
-			const scaled = clamped * (scheme.length - 1)
-			const i = Math.min(scheme.length - 2, Math.floor(scaled))
-			const localT = scaled - i
-			const a = scheme[i]
-			const b = scheme[i + 1]
-			return [
-				lerp(a[0], b[0], localT),
-				lerp(a[1], b[1], localT),
-				lerp(a[2], b[2], localT),
-			]
-		}
-		const scaled = clamped * (n - 1)
-		const i = Math.min(n - 2, Math.floor(scaled))
-		const localT = scaled - i
-		const a = schemes[i][schemes[i].length - 1]
-		const b = schemes[i + 1][schemes[i + 1].length - 1]
-		return [
-			lerp(a[0], b[0], localT),
-			lerp(a[1], b[1], localT),
-			lerp(a[2], b[2], localT),
-		]
-	}
 }
 
 /**
@@ -262,18 +221,22 @@ export function climateZoneColor(zoneCode: number): [number, number, number] {
 	return climateZoneColors[zoneCode] ?? climateZoneColors[0]
 }
 
+function midpoint(a: number, b: number): number {
+	return (a + b) / 2
+}
+
 /**
  * Continuous climate color ramp by mean temperature.
  * Matches MAP_METRICS.climate.tempColor from shapes/metrics.ts.
  */
 const climateTempStops: { t: number; r: number; g: number; b: number }[] = [
-	{ t: -10, r: 0xd3 / 255, g: 0xef / 255, b: 0xff / 255 },
-	{ t: -5, r: 0x7f / 255, g: 0xd0 / 255, b: 0xff / 255 },
-	{ t: 4, r: 0x91 / 255, g: 0xff / 255, b: 0xdc / 255 },
-	{ t: 10, r: 0xe6 / 255, g: 0xf5 / 255, b: 0x98 / 255 },
-	{ t: 20, r: 0xff / 255, g: 0xa7 / 255, b: 0x5b / 255 },
-	{ t: 30, r: 0xff / 255, g: 0x77 / 255, b: 0x85 / 255 },
-	{ t: 40, r: 0x7e / 255, g: 0x43 / 255, b: 0x49 / 255 },
+	{ t: TEMPERATURE_BOUNDARY_SUBARCTIC, r: 0xd3 / 255, g: 0xef / 255, b: 0xff / 255 },
+	{ t: midpoint(TEMPERATURE_BOUNDARY_SUBARCTIC, TEMPERATURE_BOUNDARY_BOREAL), r: 0x7f / 255, g: 0xd0 / 255, b: 0xff / 255 },
+	{ t: midpoint(TEMPERATURE_BOUNDARY_BOREAL, TEMPERATURE_BOUNDARY_TEMPERATE), r: 0x91 / 255, g: 0xff / 255, b: 0xdc / 255 },
+	{ t: midpoint(TEMPERATURE_BOUNDARY_TEMPERATE, TEMPERATURE_BOUNDARY_SUBTROPICAL), r: 0xe6 / 255, g: 0xf5 / 255, b: 0x98 / 255 },
+	{ t: midpoint(TEMPERATURE_BOUNDARY_SUBTROPICAL, TEMPERATURE_BOUNDARY_TROPICAL), r: 0xff / 255, g: 0xa7 / 255, b: 0x5b / 255 },
+	{ t: midpoint(TEMPERATURE_BOUNDARY_TROPICAL, CHAOTIC_MAX), r: 0xff / 255, g: 0x77 / 255, b: 0x85 / 255 },
+	{ t: CHAOTIC_MAX, r: 0x7e / 255, g: 0x43 / 255, b: 0x49 / 255 },
 ]
 
 export function climateTempColor(celsius: number): [number, number, number] {
@@ -397,6 +360,18 @@ export function hotspotColor(score: number): [number, number, number] {
 
 export function populationColor(normalizedDensity: number): [number, number, number] {
 	const color = d3.rgb(d3.interpolateOranges(Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4)))
+	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
+export function gravityColor(t: number): [number, number, number] {
+	const color = d3.rgb(d3.interpolateRgbBasis([
+		"#0b1f3a",
+		"#0f6ba8",
+		"#27c7d9",
+		"#f4d35e",
+		"#f97316",
+		"#b91c1c",
+	])(Math.pow(Math.max(0, Math.min(1, t)), 0.55)))
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 

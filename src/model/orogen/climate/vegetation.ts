@@ -20,9 +20,15 @@ import type { SphereMesh, OrogenClimate, OrogenRainfall } from "../types"
 export const CLIMATE_LABELS = ["ocean", "arctic", "subarctic", "boreal", "temperate", "subtropical", "tropical", "infernal", "chaotic"] as const
 export type ClimateCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 
+export const TEMPERATURE_BOUNDARY_SUBARCTIC = -14
+export const TEMPERATURE_BOUNDARY_BOREAL = -6
+export const TEMPERATURE_BOUNDARY_TEMPERATE = 6
+export const TEMPERATURE_BOUNDARY_SUBTROPICAL = 16
+export const TEMPERATURE_BOUNDARY_TROPICAL = 24
+
 // Chaotic thresholds (from EBM constants)
-const CHAOTIC_MIN = 10
-const CHAOTIC_MAX = 50
+export const CHAOTIC_MIN = 0
+export const CHAOTIC_MAX = 40
 
 /**
  * Assign a climate zone to each land cell based on temperature.
@@ -39,26 +45,19 @@ export function assignClimateZones(
 		if (!isLand[r]) continue
 
 		const avg = climate.temperature_avg[r]
+		const min = climate.temperature_min[r]
+		const max = climate.temperature_max[r]
 
-		// Compute monthly min/max for chaotic/infernal detection
-		let minMonth = avg
-		let maxMonth = avg
-		for (let m = 0; m < 12; m++) {
-			const t = climate.temperature_monthly[m * N + r]
-			if (t < minMonth) minMonth = t
-			if (t > maxMonth) maxMonth = t
-		}
-
-		const isChaotic = minMonth < CHAOTIC_MIN && maxMonth > CHAOTIC_MAX
+		const isChaotic = min < CHAOTIC_MIN && max > CHAOTIC_MAX
 		const isInfernal = avg > CHAOTIC_MAX
 
 		if (isChaotic) zones[r] = 8
 		else if (isInfernal) zones[r] = 7
-		else if (avg > 24) zones[r] = 6   // tropical
-		else if (avg > 16) zones[r] = 5   // subtropical
-		else if (avg > 6) zones[r] = 4    // temperate (warm + cool)
-		else if (avg > -3) zones[r] = 3   // boreal
-		else if (avg > -9) zones[r] = 2   // subarctic
+		else if (avg > TEMPERATURE_BOUNDARY_TROPICAL) zones[r] = 6      // tropical
+		else if (avg > TEMPERATURE_BOUNDARY_SUBTROPICAL) zones[r] = 5   // subtropical
+		else if (avg > TEMPERATURE_BOUNDARY_TEMPERATE) zones[r] = 4     // temperate (warm + cool)
+		else if (avg > TEMPERATURE_BOUNDARY_BOREAL) zones[r] = 3        // boreal
+		else if (avg > TEMPERATURE_BOUNDARY_SUBARCTIC) zones[r] = 2        // subarctic
 		else zones[r] = 1                 // arctic
 	}
 
@@ -113,17 +112,17 @@ export function assignVegetation(
 
 function classifyBiome(temp: number, rain: number): BiomeCode {
 	// Arctic / ice cap
-	if (temp <= -9) return 1 // desert (ice desert)
+	if (temp <= TEMPERATURE_BOUNDARY_SUBARCTIC) return 1 // desert (ice desert)
 
 	// Subarctic
-	if (temp <= -3) {
+	if (temp <= TEMPERATURE_BOUNDARY_BOREAL) {
 		if (rain > LOW) return 2     // sparse tundra
 		if (rain > DRY) return 2     // sparse
 		return 1                      // desert
 	}
 
 	// Boreal
-	if (temp <= 6) {
+	if (temp <= TEMPERATURE_BOUNDARY_TEMPERATE) {
 		if (rain > MOD) return 5      // forest (taiga)
 		if (rain > LOW) return 4      // woods
 		if (rain > DRY) return 3      // grasslands
@@ -131,8 +130,8 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 		return 1                      // desert
 	}
 
-	// Cool temperate
-	if (temp <= 12) {
+	// Temperate
+	if (temp <= TEMPERATURE_BOUNDARY_SUBTROPICAL) {
 		if (rain > MOIST) return 5    // forest
 		if (rain > MOD) return 5      // forest
 		if (rain > LOW) return 4      // woods
@@ -141,19 +140,8 @@ function classifyBiome(temp: number, rain: number): BiomeCode {
 		return 1                      // desert
 	}
 
-	// Warm temperate
-	if (temp <= 18) {
-		if (rain > WET) return 5      // forest
-		if (rain > MOIST) return 5    // forest
-		if (rain > MOD) return 4      // woods
-		if (rain > LOW) return 4      // woods
-		if (rain > DRY) return 3      // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2     // sparse
-		return 1                      // desert
-	}
-
 	// Subtropical
-	if (temp <= 24) {
+	if (temp <= TEMPERATURE_BOUNDARY_TROPICAL) {
 		if (rain > WET) return 6      // jungle
 		if (rain > MOIST) return 5    // forest
 		if (rain > MOD) return 5      // forest

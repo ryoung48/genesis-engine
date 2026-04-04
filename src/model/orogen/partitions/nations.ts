@@ -1,5 +1,11 @@
-import type { OrogenPartition, OrogenProvinces } from "../types"
+import type { OrogenNationHierarchy, OrogenProvinces } from "../types"
 import { generatePartitionColorsWithSeed } from "./shared"
+import {
+	buildChildrenCSR,
+	buildSovereign,
+	computeGravity,
+	rebalanceHierarchy,
+} from "./hierarchy"
 
 const NATION_PERCENTAGES = normalize([0.025, 0.05, 0.1, 0.2, 0.3, 0.4])
 const NATION_BUCKETS: [number, number][] = [
@@ -15,10 +21,11 @@ const COASTAL = 5
 export function computeNations(params: {
 	provinces: OrogenProvinces
 	topography: Uint8Array
+	habitability: Float32Array
 	r_xyz: Float32Array
 	seed: number
-}): OrogenPartition {
-	const { provinces, topography, r_xyz, seed } = params
+}): OrogenNationHierarchy {
+	const { provinces, topography, habitability, r_xyz, seed } = params
 	const provinceCount = provinces.count
 	if (provinceCount === 0) return emptyPartition(provinceCount)
 
@@ -216,6 +223,39 @@ export function computeNations(params: {
 		targetNationCount: plan.targetNationCount,
 	})
 
+	const nationMembers = groupByNation(assignment, nationCount, provinceCount)
+	const parent = new Int32Array(provinceCount).fill(-1)
+	const depth = new Int32Array(provinceCount)
+	for (let nation = 0; nation < nationCount; nation++) {
+		const members = nationMembers[nation]
+		const capital = seeds[nation]
+		const subjects = members.filter((province) => province !== capital)
+		if (subjects.length === 0) continue
+		rebalanceHierarchy({
+			capital,
+			members: Int32Array.from(subjects),
+			parent,
+			depth,
+			currentDepth: 0,
+			habitability,
+			provinceSeeds: provinces.seeds,
+			r_xyz,
+			adjOffset: provinces.adjOffset,
+			adjList: provinces.adjList,
+			provinceCount,
+		})
+	}
+
+	const { childOffset, childList } = buildChildrenCSR(parent, provinceCount)
+	const sovereign = buildSovereign(parent, provinceCount)
+	const gravity = computeGravity({
+		habitability,
+		childOffset,
+		childList,
+		depth,
+		provinceCount,
+	})
+
 	return {
 		assignment,
 		seeds: new Int32Array(seeds),
@@ -224,6 +264,12 @@ export function computeNations(params: {
 		adjList,
 		size,
 		colors: generatePartitionColorsWithSeed(nationCount, seed + 5201),
+		parent,
+		depth,
+		childOffset,
+		childList,
+		sovereign,
+		gravity,
 	}
 }
 
@@ -292,17 +338,7 @@ function buildNationPlan(total: number): {
 		const maxCount = Math.max(1, Math.floor(budget / minSize))
 		const count = Math.max(minCount, Math.min(maxCount, Math.round(budget / avg)))
 		targetNationCount[i] = count
-		const sizes = new Int32Array(count).fill(minSize)
-		let remaining = budget - count * minSize
-		let cursor = 0
-		while (remaining > 0) {
-			const idx = cursor % count
-			if (sizes[idx] < maxSize) {
-				sizes[idx]++
-				remaining--
-			}
-			cursor++
-		}
+		const sizes = spreadBucketSizes(budget, minSize, maxSize, count)
 		for (let j = 0; j < count; j++) targets.push(sizes[j])
 	}
 	return {
@@ -310,6 +346,55 @@ function buildNationPlan(total: number): {
 		targetNationCount,
 		targets: targets.sort((a, b) => b - a),
 	}
+}
+
+function spreadBucketSizes(
+	budget: number,
+	minSize: number,
+	maxSize: number,
+	count: number,
+): Int32Array {
+	if (count <= 1) return new Int32Array([Math.max(minSize, Math.min(maxSize, budget))])
+
+	const sizes = new Int32Array(count)
+	const span = maxSize - minSize
+	for (let i = 0; i < count; i++) {
+		const t = count === 1 ? 0.5 : i / (count - 1)
+		sizes[i] = Math.round(minSize + span * t)
+	}
+
+	let remaining = budget - sizes.reduce((sum, value) => sum + value, 0)
+	while (remaining !== 0) {
+		let changed = false
+		if (remaining > 0) {
+			const order = Array.from({ length: count }, (_, idx) => idx).sort((a, b) => {
+				if (sizes[a] !== sizes[b]) return sizes[a] - sizes[b]
+				return a - b
+			})
+			for (let i = 0; i < order.length && remaining > 0; i++) {
+				const idx = order[i]
+				if (sizes[idx] >= maxSize) continue
+				sizes[idx]++
+				remaining--
+				changed = true
+			}
+		} else {
+			const order = Array.from({ length: count }, (_, idx) => idx).sort((a, b) => {
+				if (sizes[a] !== sizes[b]) return sizes[b] - sizes[a]
+				return a - b
+			})
+			for (let i = 0; i < order.length && remaining < 0; i++) {
+				const idx = order[i]
+				if (sizes[idx] <= minSize) continue
+				sizes[idx]--
+				remaining++
+				changed = true
+			}
+		}
+		if (!changed) break
+	}
+
+	return sizes
 }
 
 function bestClaim(
@@ -488,7 +573,21 @@ function normalize(values: number[]): number[] {
 	return values.map((value) => value / sum)
 }
 
-function emptyPartition(nodeCount: number): OrogenPartition {
+function groupByNation(
+	assignment: Int32Array,
+	nationCount: number,
+	provinceCount: number,
+): number[][] {
+	const members: number[][] = new Array(nationCount)
+	for (let i = 0; i < nationCount; i++) members[i] = []
+	for (let province = 0; province < provinceCount; province++) {
+		const nation = assignment[province]
+		if (nation >= 0) members[nation].push(province)
+	}
+	return members
+}
+
+function emptyPartition(nodeCount: number): OrogenNationHierarchy {
 	return {
 		assignment: new Int32Array(nodeCount).fill(-1),
 		seeds: new Int32Array(0),
@@ -497,5 +596,11 @@ function emptyPartition(nodeCount: number): OrogenPartition {
 		adjList: new Int32Array(0),
 		size: new Int32Array(0),
 		colors: new Float32Array(0),
+		parent: new Int32Array(nodeCount).fill(-1),
+		depth: new Int32Array(nodeCount),
+		childOffset: new Int32Array(nodeCount + 1),
+		childList: new Int32Array(0),
+		sovereign: new Int32Array(nodeCount).fill(-1),
+		gravity: new Float32Array(nodeCount),
 	}
 }

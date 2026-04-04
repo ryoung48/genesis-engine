@@ -2,7 +2,7 @@
  * Orogen pipeline orchestrator: generates a complete tectonic world.
  * Faithful port of orogen's planet-worker.js pipeline order.
  */
-import type { OrogenParams, OrogenWorld, PlateVec, SphereMesh } from "./types"
+import type { OrogenParams, OrogenWorld, SphereMesh } from "./types"
 import { createRng } from "./rng"
 import { buildSphereMesh } from "./mesh"
 import { generateCoarsePlates, projectCoarsePlates } from "./coarse-plates"
@@ -516,6 +516,8 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	pipelineTiming.push({ Stage: "EBM temperature", ms: (performance.now() - t0).toFixed(1) })
 	console.timeEnd("orogen:climate")
 
+	const currentLandmarks = computeLandmarks(mesh, isLand)
+
 	// 15. Moisture advection
 	console.time("orogen:advection")
 	onProgress?.("Computing moisture advection...", 95)
@@ -529,7 +531,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 	onProgress?.("Computing ocean currents...", 95)
 	t0 = performance.now()
 	const oceanCurrents = climate
-		? computeOceanCurrents(mesh, eastAdv, westAdv, isLand, climate, params)
+		? computeOceanCurrents(mesh, isLand, climate, distFields.distCoast, currentLandmarks, params)
 		: undefined
 	if (oceanCurrents) {
 		applyCurrentTemperatureEffect(mesh, climate, isLand, oceanCurrents)
@@ -752,6 +754,7 @@ export function generateOrogenWorld(params: OrogenParams, onProgress?: ProgressF
 			nations = computeNations({
 				provinces,
 				topography,
+				habitability: population.habitability,
 				r_xyz: mesh.r_xyz,
 				seed: params.seed,
 			})

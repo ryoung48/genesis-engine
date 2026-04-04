@@ -10,7 +10,7 @@ import { TIME } from "../../utilities/time"
 import type { SphereMesh, OrogenParams, OrogenClimate } from "../types"
 import { getDaysPerYear, getEffectiveObliquityDeg, getEccentricity, getHoursPerDay, getPerihelion, getPlanetRadiusKm, getSubstellarDir, getSunTempFactor, isTidallyLocked } from "../units"
 import { SimplexNoise } from "../simplex-noise"
-import { fillPetMonthlyFromTemperature } from "./hydrology"
+import { fillPetMonthlyHargreaves } from "./hydrology"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -299,7 +299,14 @@ function computeTidalTemperature(
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
+	const temperature_monthly_range = new Float32Array(N * 12)
+	const insolation_monthly = new Float32Array(N * 12)
 	const pet_monthly = new Float32Array(N * 12)
+
+	// Tidal locked: no seasons, so within-month temp range ≈ eccentricity amplitude.
+	// Use a floor of 5°C so Hargreaves PET stays non-zero on near-circular orbits.
+	const tidalTd = Math.max(5, 2 * eccAmplitude)
+	const monthlyFlux = computeMonthlyOrbitalFlux(params)
 
 	for (let r = 0; r < N; r++) {
 		const x = mesh.r_xyz[3 * r]
@@ -331,16 +338,12 @@ function computeTidalTemperature(
 			T += cosTheta > 0 ? inlandShift : -inlandShift
 		}
 
-		temperature_avg[r] = T
-
-		// No seasons — min/max differ only by eccentricity oscillation
-		temperature_min[r] = T - eccAmplitude
-		temperature_max[r] = T + eccAmplitude
-
 		// All 12 monthly slots get the same value (tiny eccentricity wobble spread as sine)
 		for (let month = 0; month < 12; month++) {
 			const phase = Math.sin((month / 12) * 2 * Math.PI)
 			temperature_monthly[month * N + r] = T + eccAmplitude * phase
+			temperature_monthly_range[month * N + r] = tidalTd
+			insolation_monthly[month * N + r] = monthlyFlux[month] * Math.max(0, cosTheta)
 		}
 	}
 
@@ -376,22 +379,36 @@ function computeTidalTemperature(
 				+ sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
 			const offset = n * Math.max(0, taper)
 
-			temperature_avg[r] += offset
-			temperature_min[r] += offset
-			temperature_max[r] += offset
 			for (let month = 0; month < 12; month++) {
 				temperature_monthly[month * N + r] += offset
 			}
 		}
 	}
 
-	fillPetMonthlyFromTemperature(temperature_monthly, pet_monthly, getDaysPerYear(params.daysPerYear) / 12)
+	for (let r = 0; r < N; r++) {
+		let sum = 0
+		let min = Infinity
+		let max = -Infinity
+		for (let month = 0; month < 12; month++) {
+			const value = temperature_monthly[month * N + r]
+			sum += value
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+		temperature_avg[r] = sum / 12
+		temperature_min[r] = min
+		temperature_max[r] = max
+	}
+
+	fillPetMonthlyHargreaves(temperature_monthly, temperature_monthly_range, insolation_monthly, pet_monthly, getDaysPerYear(params.daysPerYear) / 12)
 
 	return {
 		temperature_avg,
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		temperature_monthly_range,
+		insolation_monthly,
 		pet_monthly,
 		daylight_hours_monthly,
 		landFraction,
@@ -432,14 +449,29 @@ export function computeTemperature(
 	})
 	ebm.runModel(30, 0.5)
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
-	// Build interpolation ranges: latitude bands → zonal temperature
+	// Build interpolation ranges: latitude bands → zonal temperature, range, and insolation
 	let dayStart = 0
 	const monthlyRanges: number[][] = new Array(12)
+	const monthlyRangeRanges: number[][] = new Array(12)
+	const monthlyInsolRanges: number[][] = new Array(12)
 	for (let m = 0; m < 12; m++) {
 		const start = dayStart
 		const end = start + MONTH_DAY_COUNTS[m]
 		dayStart = end
 		monthlyRanges[m] = ebm.temperature.map((row) => {
+			let sum = 0
+			for (let d = start; d < end; d++) sum += row[d]
+			return sum / (end - start)
+		})
+		monthlyRangeRanges[m] = ebm.temperature.map((row) => {
+			let min = Infinity, max = -Infinity
+			for (let d = start; d < end; d++) {
+				if (row[d] < min) min = row[d]
+				if (row[d] > max) max = row[d]
+			}
+			return max - min
+		})
+		monthlyInsolRanges[m] = ebm.insolation.map((row) => {
 			let sum = 0
 			for (let d = start; d < end; d++) sum += row[d]
 			return sum / (end - start)
@@ -451,6 +483,8 @@ export function computeTemperature(
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
+	const temperature_monthly_range = new Float32Array(N * 12)
+	const insolation_monthly = new Float32Array(N * 12)
 	const pet_monthly = new Float32Array(N * 12)
 
 	const gravityRatio = getPlanetRadiusKm(params.planetRadiusKm) / 6371
@@ -466,7 +500,6 @@ export function computeTemperature(
 		const lapseCorrection = hKm > 0 ? hKm * LAPSE_RATE : 0
 
 		const annualAvg = interpolateLatBand(ebm.temperature_avg, latDeg) - lapseCorrection
-		temperature_avg[r] = annualAvg
 
 		// Continentality: scale seasonal deviation from annual mean
 		// Ocean (0 mi): factor ≈ 0.78 (damped), coast (~300 mi): factor ≈ 1.0, deep inland: → 1.75
@@ -477,15 +510,13 @@ export function computeTemperature(
 		const maxAmplitude = 0.75 * Math.max(0, polarTaper)
 		const inertiaFactor = oceanDist ? 1 + maxAmplitude * Math.tanh((distMiles - 300) / 1000) : 1
 
-		const zonalMin = interpolateLatBand(ebm.temperature_min, latDeg) - lapseCorrection
-		const zonalMax = interpolateLatBand(ebm.temperature_max, latDeg) - lapseCorrection
-		temperature_min[r] = annualAvg + (zonalMin - annualAvg) * inertiaFactor
-		temperature_max[r] = annualAvg + (zonalMax - annualAvg) * inertiaFactor
-
 		for (let month = 0; month < 12; month++) {
 			const zonalMonth = interpolateLatBand(monthlyRanges[month], latDeg) - lapseCorrection
 			temperature_monthly[month * N + r] =
 				annualAvg + (zonalMonth - annualAvg) * inertiaFactor
+			// Range scales with continentality; insolation is purely astronomical
+			temperature_monthly_range[month * N + r] = interpolateLatBand(monthlyRangeRanges[month], latDeg) * inertiaFactor
+			insolation_monthly[month * N + r] = interpolateLatBand(monthlyInsolRanges[month], latDeg)
 		}
 	}
 
@@ -525,13 +556,30 @@ export function computeTemperature(
 		}
 	}
 
-	fillPetMonthlyFromTemperature(temperature_monthly, pet_monthly, getDaysPerYear(params.daysPerYear) / 12)
+	for (let r = 0; r < N; r++) {
+		let sum = 0
+		let min = Infinity
+		let max = -Infinity
+		for (let month = 0; month < 12; month++) {
+			const value = temperature_monthly[month * N + r]
+			sum += value
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+		temperature_avg[r] = sum / 12
+		temperature_min[r] = min
+		temperature_max[r] = max
+	}
+
+	fillPetMonthlyHargreaves(temperature_monthly, temperature_monthly_range, insolation_monthly, pet_monthly, getDaysPerYear(params.daysPerYear) / 12)
 
 	return {
 		temperature_avg,
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		temperature_monthly_range,
+		insolation_monthly,
 		pet_monthly,
 		daylight_hours_monthly,
 		landFraction,

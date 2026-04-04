@@ -326,12 +326,12 @@ export const PASTA_NAMES: Record<(typeof PASTA_LABELS)[number], string> = {
 	Ahe: "Hyperseasonal Desert",
 }
 
-const TH_COOL = 10
-const TH_COLD = -10
-const TH_FRIGID = -40
-const TH_HOT = 50
-const TH_TORRID = 70
-const TH_BOIL = 100
+const TH_COOL = 17
+const TH_COLD = 0
+const TH_FRIGID = -30
+const TH_HOT = 40
+const TH_TORRID = 60
+const TH_BOIL = 90
 
 // Pre-resolved zone indices — avoids Map lookups and string allocations in the hot loop
 const Z = Object.fromEntries(
@@ -424,13 +424,8 @@ function classifyOcean(
 	gddAccBuf: Float64Array, giAccBuf: Float64Array,
 	iceMin: number, iceMax: number,
 	dpm: number,
+	warmest: number, coldest: number,
 ): number {
-	let warmest = -Infinity, coldest = Infinity
-	for (let m = 0; m < 12; m++) {
-		const t = temps[m]
-		if (t > warmest) warmest = t
-		if (t < coldest) coldest = t
-	}
 
 	// Only need gddz for ocean classification
 	for (let m = 0; m < 12; m++) {
@@ -472,14 +467,10 @@ function classifyLand(
 	gddAccBuf: Float64Array, giAccBuf: Float64Array,
 	iceVal: number,
 	dpm: number,
+	warmest: number, coldest: number,
 ): number {
-	let warmest = -Infinity, coldest = Infinity, annualPrecip = 0
-	for (let m = 0; m < 12; m++) {
-		const t = temps[m]
-		if (t > warmest) warmest = t
-		if (t < coldest) coldest = t
-		annualPrecip += rain[m]
-	}
+	let annualPrecip = 0
+	for (let m = 0; m < 12; m++) annualPrecip += rain[m]
 
 	// Ice classification per Pasta spec:
 	// CI if MinIce > 10cm, BUT persistent ice removed if absolute max temp > 0°C
@@ -706,12 +697,8 @@ export function assignPastaClimate(
 			insol[m] = insolation[m * N + r]
 		}
 
-		// Compute minT/maxT for all regions
-		let warmest = -Infinity, coldest = Infinity
-		for (let m = 0; m < 12; m++) {
-			if (temps[m] > warmest) warmest = temps[m]
-			if (temps[m] < coldest) coldest = temps[m]
-		}
+		const warmest = climate.temperature_max[r]
+		const coldest = climate.temperature_min[r]
 		debug.minT[r] = coldest
 		debug.maxT[r] = warmest
 
@@ -722,6 +709,7 @@ export function assignPastaClimate(
 				iceMinMonthly ? iceMinMonthly[r] : 0,
 				iceMaxMonthly ? iceMaxMonthly[r] : 0,
 				dpm,
+				warmest, coldest,
 			)
 			// Ocean debug: compute gddz only
 			const gddz = gddTotal(mGDDz, mGInt, gddAccBuf, giAccBuf, 1250)
@@ -738,6 +726,7 @@ export function assignPastaClimate(
 				petBuf, aetBuf, mGDD, mGDDz, mGInt, gddAccBuf, giAccBuf,
 				iceThickness ? iceThickness[r] : 0,
 				dpm,
+				warmest, coldest,
 			)
 			// Land debug: recompute key metrics (buffers still hold values from classifyLand)
 			const gdd = gddTotal(mGDD, mGInt, gddAccBuf, giAccBuf, 1250)

@@ -148,7 +148,7 @@ export function computeProvinces(
 				continue
 			}
 		}
-		if (rainfall && rainfall.annual[r] < 1) {
+		if (rainfall && rainfall.annual[r] < 5) {
 			desolate[i] = 1
 		}
 	}
@@ -237,6 +237,47 @@ export function computeProvinces(
 
 	// ── Phase 6: Province colors (golden-ratio hue spacing) ────────────
 
+	const landmassId = new Int32Array(provinceCount).fill(-1)
+	const componentId = new Int32Array(provinceCount).fill(-1)
+	const componentArea: number[] = []
+	const queue = new Int32Array(provinceCount)
+
+	let componentCount = 0
+	for (let start = 0; start < provinceCount; start++) {
+		if (desolate[start] || componentId[start] >= 0) continue
+		let head = 0
+		let tail = 0
+		let area = 0
+		queue[tail++] = start
+		componentId[start] = componentCount
+		while (head < tail) {
+			const p = queue[head++]
+			area += size[p]
+			for (let i = provAdjOffset[p], iEnd = provAdjOffset[p + 1]; i < iEnd; i++) {
+				const nb = provAdjList[i]
+				if (desolate[nb] || componentId[nb] >= 0) continue
+				componentId[nb] = componentCount
+				queue[tail++] = nb
+			}
+		}
+		componentArea.push(area)
+		componentCount++
+	}
+
+	let totalLandArea = 0
+	for (let p = 0; p < provinceCount; p++) totalLandArea += size[p]
+	const isolatedThreshold = totalLandArea * 0.01
+
+	for (let p = 0; p < provinceCount; p++) {
+		if (desolate[p]) continue
+		const component = componentId[p]
+		if (component >= 0 && componentArea[component] < isolatedThreshold) {
+			desolate[p] = 1
+			continue
+		}
+		landmassId[p] = component
+	}
+
 	const colors = generateProvinceColors(provinceCount, rng)
 
 	return {
@@ -244,6 +285,7 @@ export function computeProvinces(
 		seeds: seedsArr,
 		count: provinceCount,
 		desolate,
+		landmassId,
 		adjOffset: provAdjOffset,
 		adjList: provAdjList,
 		size,
@@ -287,6 +329,7 @@ function emptyProvinces(N: number): OrogenProvinces {
 		seeds: new Int32Array(0),
 		count: 0,
 		desolate: new Uint8Array(0),
+		landmassId: new Int32Array(0),
 		adjOffset: new Int32Array(1),
 		adjList: new Int32Array(0),
 		size: new Int32Array(0),

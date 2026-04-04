@@ -10,6 +10,8 @@ interface TimeControlsProps {
 	setTimeOfDay: (v: number) => void
 	tidallyLocked: boolean
 	hoursPerDay: number
+	detailsOpen?: boolean
+	onToggleDetails?: () => void
 }
 
 export const TimeControls: React.FC<TimeControlsProps> = ({
@@ -17,6 +19,8 @@ export const TimeControls: React.FC<TimeControlsProps> = ({
 	globalMonth, setGlobalMonth,
 	timeOfDay, setTimeOfDay,
 	tidallyLocked, hoursPerDay,
+	detailsOpen,
+	onToggleDetails,
 }) => (
 	<div className="absolute bottom-3 right-3 z-20 pointer-events-none">
 		<div className="pointer-events-auto flex flex-col items-end gap-2">
@@ -68,21 +72,36 @@ export const TimeControls: React.FC<TimeControlsProps> = ({
 					</div>
 				</div>
 			)}
-			<button
-				onClick={() => setTimeExpanded((value) => !value)}
-				title={timeExpanded ? "Hide time controls" : "Show time controls"}
-				className={`flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] shadow-lg transition-all ${
-					timeExpanded
-						? "border-white/20 bg-white/15 text-white"
-						: "border-white/10 bg-slate-950/80 text-slate-200 hover:bg-slate-950/95"
-				} backdrop-blur-md`}
-			>
-				<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-					<circle cx="8" cy="8" r="5.5" />
-					<path d="M8 4.75V8l2.25 1.5" />
-				</svg>
-				<span>Time</span>
-			</button>
+			<div className="flex items-center gap-2">
+				{!detailsOpen && onToggleDetails && (
+					<button
+						onClick={onToggleDetails}
+						title="Show details"
+						className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/80 text-slate-200 shadow-lg backdrop-blur-md transition-all hover:bg-slate-950/95"
+					>
+						<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+							<path d="M2.5 3.5h11" />
+							<path d="M2.5 8h11" />
+							<path d="M2.5 12.5h7" />
+						</svg>
+					</button>
+				)}
+				<button
+					onClick={() => setTimeExpanded((value) => !value)}
+					title={timeExpanded ? "Hide time controls" : "Show time controls"}
+					className={`flex items-center gap-2 rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] shadow-lg transition-all ${
+						timeExpanded
+							? "border-white/20 bg-white/15 text-white"
+							: "border-white/10 bg-slate-950/80 text-slate-200 hover:bg-slate-950/95"
+					} backdrop-blur-md`}
+				>
+					<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+						<circle cx="8" cy="8" r="5.5" />
+						<path d="M8 4.75V8l2.25 1.5" />
+					</svg>
+					<span>Time</span>
+				</button>
+			</div>
 		</div>
 	</div>
 )

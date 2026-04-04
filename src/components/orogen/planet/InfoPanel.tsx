@@ -11,7 +11,7 @@ import { DAYLIGHT } from "@/model/cells/daylight"
 import { koppenClimateColor, koppenTrueColor } from "@/model/orogen/climate/koppen"
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import type { PlanetStat } from "./planet-stats"
-import type { HoverHazards, HoverHotspot, HoverInfo, HoverLandmark, HoverRiver, HoverTerrainFeature, HoverWind } from "./hover"
+import type { HoverHazards, HoverHotspot, HoverInfo, HoverLandmark, HoverOceanCurrents, HoverRiver, HoverTerrainFeature, HoverWind } from "./hover"
 import { monthLabels } from "./constants"
 import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model/orogen/types"
 import { getTerrainFeatureColor, getTopographyColor } from "./region-colors"
@@ -26,7 +26,9 @@ function MiniBarChart({
 	globalMonth,
 	annualValue,
 	annualDigits = 0,
+	annualPrefix = "ann",
 	formatValue,
+	showValues = false,
 }: {
 	values: number[]
 	label: string
@@ -35,7 +37,9 @@ function MiniBarChart({
 	globalMonth: number
 	annualValue?: number
 	annualDigits?: number
+	annualPrefix?: string
 	formatValue?: (v: number) => string
+	showValues?: boolean
 }) {
 	const max = Math.max(...values.map(Math.abs), 0.001)
 	const min = Math.min(...values, 0)
@@ -45,11 +49,10 @@ function MiniBarChart({
 
 	return (
 		<div>
-			<div className="mb-0.5 flex items-baseline justify-between">
+			<div className="mb-2 flex items-baseline justify-between">
 				<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">{label}</span>
 				<span className="font-mono text-[9px] text-slate-500">
-					{(formatValue ? formatValue(values[globalMonth - 1] ?? 0) : values[globalMonth - 1]?.toFixed(label === "Temp" ? 1 : 0))} {unit}
-					{annualValue !== undefined ? ` · ann ${formatValue ? formatValue(annualValue) : annualValue.toFixed(annualDigits)} ${unit}` : ""}
+					{annualValue !== undefined ? `${annualPrefix} ${formatValue ? formatValue(annualValue) : annualValue.toFixed(annualDigits)} ${unit}` : ""}
 				</span>
 			</div>
 			<div className="relative flex h-[28px] gap-px">
@@ -62,12 +65,26 @@ function MiniBarChart({
 				{values.map((v, i) => {
 					const barH = Math.abs(v) / range
 					const isSelected = i === globalMonth - 1
+					const valueLabel = formatValue ? formatValue(v) : v.toFixed(label === "Temp" ? 1 : 0)
+					const labelBottom = v >= 0
+						? `calc(${(1 - zeroY) * 100 + barH * zeroY * 100}% + 2px)`
+						: `calc(${(1 - zeroY) * 100}% + 2px)`
 					return (
 						<div
 							key={i}
 							className="relative h-full flex-1"
 							title={`${monthLabels[i + 1]}: ${formatValue ? formatValue(v) : v.toFixed(label === "Temp" ? 1 : 0)} ${unit}`}
 						>
+							{showValues && (
+								<span
+									className={`pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap font-mono text-[6px] leading-none ${isSelected ? "text-white" : "text-slate-500"}`}
+									style={{
+										bottom: labelBottom,
+									}}
+								>
+									{valueLabel}
+								</span>
+							)}
 							{v >= 0 ? (
 								<div
 									className={`absolute left-0 right-0 rounded-t-[1px] transition-all ${isSelected ? "opacity-100" : "opacity-70"}`}
@@ -198,16 +215,12 @@ interface InfoPanelProps {
 	hoverCoordinates: string | null
 	hoverLandmark: HoverLandmark | null
 	hoverIsLand: boolean | null
-	hoverTemperature: number | null
-	hoverBiotemperature: number | null
 	hoverTemperatureDelta: number | null
 	hoverRainfall: number | null
 	hoverClimateDisplay: string | null
-	hoverIceDebug: string | null
 	hoverIceSummary: string | null
 	hoverBiome: string | null
 	hoverProvince: number | null
-	hoverBasinId: number | null
 	hoverOceanDist: number | null
 	hoverDistCoast: number | null
 	hoverDistCoastKm: number | null
@@ -216,7 +229,7 @@ interface InfoPanelProps {
 	hoverHotspot: HoverHotspot | null
 	hoverRiver: HoverRiver | null
 	hoverTerrainFeature: HoverTerrainFeature | null
-	showPastaDebug: boolean
+	hoverOceanCurrents: HoverOceanCurrents | null
 	colorMode: ColorMode
 	isClimateMode: boolean
 	isSatelliteMode: boolean
@@ -249,14 +262,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverTopography,
 	hoverCoordinates,
 	hoverLandmark,
-	hoverBiotemperature,
 	hoverTemperatureDelta,
 	hoverClimateDisplay,
-	hoverIceDebug,
 	hoverIceSummary,
 	hoverBiome,
 	hoverProvince,
-	hoverBasinId,
 	hoverOceanDist,
 	hoverDistCoast,
 	hoverDistCoastKm,
@@ -264,7 +274,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverHazards,
 	hoverRiver,
 	hoverTerrainFeature,
-	showPastaDebug,
+	hoverOceanCurrents,
 	colorMode,
 	isWindMode,
 	windAnnual,
@@ -296,8 +306,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		hoverLandmark?.size != null && world?.mesh.numRegions
 			? (hoverLandmark.size / world.mesh.numRegions) * 100
 			: null
-	const annualTemp =
-		chartData ? chartData.temps.reduce((sum, value) => sum + value, 0) / chartData.temps.length : null
+	const annualTemp = world.climate.temperature_avg[hoverRegion]
 	const annualPrecip = chartData ? chartData.precip.reduce((sum, value) => sum + value, 0) : null
 	const climateColor =
 		hoverRegion === null || !world
@@ -341,168 +350,155 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const hoverSlopePercent =
 		hoverRegion !== null && slopeScoreByRegion ? slopeScoreByRegion[hoverRegion] * 100 : null
 
-	if (showPastaDebug) {
-		return (
-			<div className="pointer-events-auto absolute top-3 left-3 z-20 w-64 rounded-2xl border border-white/10 bg-slate-950/85 px-3 py-2 text-white shadow-2xl backdrop-blur-md">
-				<div ref={hoverCardRef} className="space-y-0.5">
-					{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
-					{hoverClimateDisplay && <SwatchRow label="Climate" value={hoverClimateDisplay} color={climateColor} />}
-					{hoverRegion !== null && world?.pastaDebug && (
-						<>
-							<Row label="GDD" value={world.pastaDebug.gdd[hoverRegion].toFixed(0)} />
-							<Row label="GDDz" value={world.pastaDebug.gddz[hoverRegion].toFixed(0)} />
-							<Row label="GInt" value={world.pastaDebug.gint[hoverRegion] >= 99999 ? "∞" : world.pastaDebug.gint[hoverRegion].toFixed(0)} />
-							<Row label="AR" value={world.pastaDebug.ar[hoverRegion].toFixed(3)} />
-							<Row label="GAR" value={world.pastaDebug.gar[hoverRegion].toFixed(3)} />
-							<Row label="GrS" value={world.pastaDebug.grs[hoverRegion].toFixed(3)} />
-							<Row label="EvR" value={world.pastaDebug.evr[hoverRegion].toFixed(3)} />
-							<Row label="MinT" value={`${world.pastaDebug.minT[hoverRegion].toFixed(1)} °C`} />
-							<Row label="MaxT" value={`${world.pastaDebug.maxT[hoverRegion].toFixed(1)} °C`} />
-						</>
-					)}
-				</div>
-			</div>
-		)
-	}
-
 	return (
 		<div className="pointer-events-auto absolute top-3 left-3 z-20 w-64 rounded-2xl border border-white/10 bg-slate-950/85 px-3 py-2 text-white shadow-2xl backdrop-blur-md">
 			<div ref={hoverCardRef} className="space-y-0.5">
-					{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
-					<Row label="Elev" value={`${hoverElevationKm.toFixed(2)} km${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`} />
-					{hoverLandmark && (
-						<Row
-							label="Landmark"
-							value={`${hoverLandmark.type ?? "unknown"} #${hoverLandmark.id}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
+				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
+				<Row label="Elev" value={`${hoverElevationKm.toFixed(2)} km${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`} />
+				{hoverLandmark && (
+					<Row
+						label="Landmark"
+						value={`${hoverLandmark.type ?? "unknown"} #${hoverLandmark.id}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
+					/>
+				)}
+				{colorMode === "temperatureDelta" && hoverTemperatureDelta !== null && (
+					<Row label="Temp Δ" value={`${hoverTemperatureDelta.toFixed(1)} °C`} />
+				)}
+				{hoverIceSummary && <Row label="Ice" value={hoverIceSummary} />}
+				{/* {terrainFeatureSwatches.length > 0 && <MultiSwatchRow label="Features" values={terrainFeatureSwatches} />} */}
+				{hoverHazards && (
+					<>
+						<SwatchRow
+							label="Danger"
+							value={`${Math.round(hoverHazards.danger * 100)}%${
+								hoverHazards.danger >= 0.2
+									? hoverHazards.earthquake >= hoverHazards.volcano
+										? " (quakes)"
+										: " (volcanic)"
+									: ""
+							}`}
+							color={rgbToCss(dangerColor(hoverHazards.danger))}
 						/>
-					)}
-					{colorMode === "biotemperature" && hoverBiotemperature !== null && (
-						<Row label="Biotemp" value={`${hoverBiotemperature.toFixed(1)} °C`} />
-					)}
-					{colorMode === "temperatureDelta" && hoverTemperatureDelta !== null && (
-						<Row label="Temp Δ" value={`${hoverTemperatureDelta.toFixed(1)} °C`} />
-					)}
-					{hoverIceSummary && <Row label="Ice" value={hoverIceSummary} />}
-					{hoverIceDebug && <div className="font-mono text-[8px] text-slate-500">{hoverIceDebug}</div>}
-					{/* {terrainFeatureSwatches.length > 0 && <MultiSwatchRow label="Features" values={terrainFeatureSwatches} />} */}
-					{hoverHazards && (
-						<>
-							<SwatchRow
-								label="Danger"
-								value={`${Math.round(hoverHazards.danger * 100)}%${
-									hoverHazards.danger >= 0.2
-										? hoverHazards.earthquake >= hoverHazards.volcano
-											? " (quakes)"
-											: " (volcanic)"
-										: ""
-								}`}
-								color={rgbToCss(dangerColor(hoverHazards.danger))}
-							/>
-						</>
-					)}
-					{hoverTopography && <SwatchRow label="Topography" value={hoverTopography} color={topographySwatch} />}
-					{hoverClimateDisplay && <SwatchRow label="Climate" value={hoverClimateDisplay} color={climateColor} />}
-					{hoverBiome && <SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />}
-					{hoverProvince !== null && hoverProvince >= 0 && (
-						<>
-							<Row
-								label="Province"
-								value={`#${hoverProvince}${world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}`}
-							/>
-							{world?.population &&
-								!world.provinces!.desolate[hoverProvince] &&
-								(() => {
-									const p = hoverProvince
-									const pop = world.population.population[p]
-									if (pop <= 0) return null
-									const popStr =
-										pop >= 1_000_000
-											? `${(pop / 1_000_000).toFixed(1)}M`
-											: pop >= 1_000
-												? `${(pop / 1_000).toFixed(0)}K`
-												: Math.round(pop).toLocaleString()
-									const radiusKm = world.params.planetRadiusKm ?? 6371
-									const cellAreaKm2 = (4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
-									const areaKm2 = world.provinces.size[p] * cellAreaKm2
-									const density = pop / areaKm2
-									return <Row label="Pop" value={`${popStr} · ${density.toFixed(1)}/km²`} />
-								})()}
-						</>
-					)}
-					{/* {hoverBasinId !== null && <Row label="Basin" value={String(hoverBasinId)} />} */}
-					{hoverOceanDist !== null && hoverOceanDist > 0 && (
+					</>
+				)}
+				{hoverTopography && <SwatchRow label="Topography" value={hoverTopography} color={topographySwatch} />}
+				{hoverClimateDisplay && <SwatchRow label="Climate" value={hoverClimateDisplay} color={climateColor} />}
+				{colorMode === "oceanCurrents" && hoverOceanCurrents !== null && (
+					<Row
+						label="Current"
+						value={`${hoverOceanCurrents.warmth >= 0 ? "warm" : "cold"}${Math.abs(hoverOceanCurrents.delta) >= 0.1 ? ` · ${hoverOceanCurrents.delta >= 0 ? "+" : ""}${hoverOceanCurrents.delta.toFixed(1)} °C` : ""}`}
+					/>
+				)}
+				{hoverBiome && <SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />}
+				{hoverProvince !== null && hoverProvince >= 0 && (
+					<>
 						<Row
-							label="Ocean dist"
-							value={`${hoverOceanDist < 100 ? hoverOceanDist.toFixed(0) : Math.round(hoverOceanDist).toLocaleString()} km`}
+							label="Province"
+							value={`#${hoverProvince}${world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}`}
 						/>
-					)}
-					{hoverDistCoast !== null && (
-						<Row
-							label="Coast dist"
-							value={`${hoverDistCoastKm === Infinity ? "∞" : hoverDistCoastKm !== null && hoverDistCoastKm < 100 ? hoverDistCoastKm.toFixed(0) : hoverDistCoastKm !== null ? Math.round(hoverDistCoastKm).toLocaleString() : "—"} km`}
-						/>
-					)}
-					{isWindMode && hoverWind && (
-						<Row
-							label={`Wind ${windAnnual ? "avg" : monthLabels[globalMonth]}`}
-							value={(() => {
-								const { east: we, north: wn, speed: ws } = hoverWind
-								const deg = (Math.atan2(-we, -wn) * 180) / Math.PI
-								const from = ((deg % 360) + 360) % 360
-								const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-								const dir = dirs[Math.round(from / 45) % 8]
-								return `${dir} ${from.toFixed(0)}° · ${ws.toFixed(2)}`
+						{world?.population &&
+							!world.provinces!.desolate[hoverProvince] &&
+							(() => {
+								const p = hoverProvince
+								const pop = world.population.population[p]
+								if (pop <= 0) return null
+								const popStr =
+									pop >= 1_000_000
+										? `${(pop / 1_000_000).toFixed(1)}M`
+										: pop >= 1_000
+											? `${(pop / 1_000).toFixed(0)}K`
+											: Math.round(pop).toLocaleString()
+								const radiusKm = world.params.planetRadiusKm ?? 6371
+								const cellAreaKm2 = (4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
+								const areaKm2 = world.provinces.size[p] * cellAreaKm2
+								const density = pop / areaKm2
+								return <Row label="Pop" value={`${popStr} · ${density.toFixed(1)}/km²`} />
 							})()}
+					</>
+				)}
+				{hoverOceanDist !== null && hoverOceanDist > 0 && (
+					<Row
+						label="Ocean dist"
+						value={`${hoverOceanDist < 100 ? hoverOceanDist.toFixed(0) : Math.round(hoverOceanDist).toLocaleString()} km`}
+					/>
+				)}
+				{hoverDistCoast !== null && (
+					<Row
+						label="Coast dist"
+						value={`${hoverDistCoastKm === Infinity ? "∞" : hoverDistCoastKm !== null && hoverDistCoastKm < 100 ? hoverDistCoastKm.toFixed(0) : hoverDistCoastKm !== null ? Math.round(hoverDistCoastKm).toLocaleString() : "—"} km`}
+					/>
+				)}
+				{isWindMode && hoverWind && (
+					<Row
+						label={`Wind ${windAnnual ? "avg" : monthLabels[globalMonth]}`}
+						value={(() => {
+							const { east: we, north: wn, speed: ws } = hoverWind
+							const deg = (Math.atan2(-we, -wn) * 180) / Math.PI
+							const from = ((deg % 360) + 360) % 360
+							const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+							const dir = dirs[Math.round(from / 45) % 8]
+							return `${dir} ${from.toFixed(0)}° · ${ws.toFixed(2)}`
+						})()}
+					/>
+				)}
+				{chartData && world?.climate && (
+					<div className="space-y-2 border-t border-white/5 pt-1">
+						<MiniBarChart
+							values={chartData.daylight}
+							label="Daylight"
+							unit="h"
+							colorFn={(v) => DAYLIGHT.color(v)}
+							globalMonth={globalMonth}
+							annualValue={chartData.daylight.reduce((sum, value) => sum + value, 0) / chartData.daylight.length}
+							annualDigits={1}
+							annualPrefix="AVG"
+							showValues
 						/>
-					)}
-					{chartData && world?.climate && (
-						<div className="space-y-2 border-t border-white/5 pt-1">
+						<MiniBarChart
+							values={chartData.temps}
+							label="Temp"
+							unit="°C"
+							colorFn={(v) => tempColor(v)}
+							globalMonth={globalMonth}
+							annualValue={annualTemp ?? undefined}
+							annualDigits={1}
+							annualPrefix="AVG"
+							showValues
+						/>
+						{!!chartData.isLand && (
 							<MiniBarChart
-								values={chartData.daylight}
-								label="Daylight"
-								unit="h"
-								colorFn={(v) => DAYLIGHT.color(v)}
+								values={chartData.precip}
+								label="Precip"
+								unit="mm"
+								colorFn={(v) => rainColor(v)}
 								globalMonth={globalMonth}
+								annualValue={annualPrecip ?? undefined}
+								annualDigits={0}
+								showValues
 							/>
+						)}
+						{hoverRiver && hoverRiver.flow_monthly.length === 12 && (
 							<MiniBarChart
-								values={chartData.temps}
-								label="Temp"
-								unit="°C"
-								colorFn={(v) => tempColor(v)}
+								values={hoverRiver.flow_monthly}
+								label={`River #${hoverRiver.riverId}`}
+								unit="m³/s"
+								colorFn={(v) => flowColor(v)}
 								globalMonth={globalMonth}
-								annualValue={annualTemp ?? undefined}
-								annualDigits={1}
+								annualValue={hoverRiver.flow}
+								formatValue={formatCompactNumber}
+								showValues
 							/>
-							{!!chartData.isLand && (
-								<MiniBarChart
-									values={chartData.precip}
-									label="Precip"
-									unit="mm"
-									colorFn={(v) => rainColor(v)}
-									globalMonth={globalMonth}
-									annualValue={annualPrecip ?? undefined}
-									annualDigits={0}
-								/>
-							)}
-							{hoverRiver && hoverRiver.flow_monthly.length === 12 && (
-								<MiniBarChart
-									values={hoverRiver.flow_monthly}
-									label={`River #${hoverRiver.riverId}`}
-									unit="m³/s"
-									colorFn={(v) => flowColor(v)}
-									globalMonth={globalMonth}
-									annualValue={hoverRiver.flow}
-									formatValue={formatCompactNumber}
-								/>
-							)}
-							{hoverRiver && hoverRiver.lengthKm > 0 && (
-								<div className="-mt-1 font-mono text-[9px] text-slate-500">
-									Length {formatCompactNumber(hoverRiver.lengthKm)} km
-								</div>
-							)}
-						</div>
-					)}
+						)}
+						{hoverRiver && hoverRiver.lengthKm > 0 && (
+							<div className="-mt-1 font-mono text-[9px] text-slate-500">
+								Length {formatCompactNumber(hoverRiver.lengthKm)} km
+							</div>
+						)}
+					</div>
+				)}
 			</div>
 		</div>
 	)
 }
+
+

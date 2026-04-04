@@ -8,7 +8,7 @@ import { createRng } from "./rng"
 import { buildSphereMesh } from "./mesh"
 import { deriveSyntheticPlates, buildSyntheticPlates, buildDummyBoundary, computeSimpleDistanceFields } from "./synthetic-plates"
 import { computeLandFraction, computeTemperature } from "./climate/climate"
-import { computeOceanCurrents } from "./climate/ocean-currents"
+import { computeOceanCurrents, applyCurrentTemperatureEffect } from "./climate/ocean-currents"
 import { computeHydrologyFields, refreshClimatePetMonthly } from "./climate/hydrology"
 import { computeWind } from "./climate/wind"
 import { computeAdvection, computeMonthlyRain } from "./climate/rain"
@@ -29,6 +29,7 @@ import { DEFAULT_DAYS_PER_YEAR, DEFAULT_ECCENTRICITY, DEFAULT_HOURS_PER_DAY, DEF
 import { elevToHeightKm } from "./climate/climate"
 import { countContinents } from "./stats"
 import { computeHazards } from "./hazards"
+import { computeLandmarks } from "./provinces/landmarks"
 
 export interface ImportParams {
 	seed: number
@@ -251,6 +252,7 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 
 	const landFraction = computeLandFraction(mesh, isLand)
 	const climate = computeTemperature(mesh, elevation, landFraction, orogenParams, oceanDist, isLand, elevation_km)
+	const currentLandmarks = computeLandmarks(mesh, isLand)
 
 	// Moisture advection
 	onProgress?.("Computing moisture...", 80)
@@ -258,33 +260,11 @@ export function importOrogenWorld(params: ImportParams, onProgress?: ProgressFn)
 
 	// Ocean currents
 	onProgress?.("Computing ocean currents...", 82)
-	const oceanCurrents = computeOceanCurrents(mesh, eastAdv, westAdv, isLand, climate, orogenParams)
+	const oceanCurrents = computeOceanCurrents(mesh, isLand, climate, distFields.distCoast, currentLandmarks, orogenParams)
 
 	// Apply ocean warmth as temperature modifier
 	if (climate) {
-		const N = mesh.numRegions
-		for (let month = 0; month < 12; month++) {
-			const offset = month * N
-			for (let r = 0; r < N; r++) {
-				if (!isLand[r]) {
-					climate.temperature_monthly[offset + r] += oceanCurrents.oceanWarmth[r] * 12
-				} else {
-					climate.temperature_monthly[offset + r] += oceanCurrents.coastalWarmth[r] * 5
-				}
-			}
-		}
-		for (let r = 0; r < N; r++) {
-			let sum = 0, min = Infinity, max = -Infinity
-			for (let month = 0; month < 12; month++) {
-				const t = climate.temperature_monthly[month * N + r]
-				sum += t
-				if (t < min) min = t
-				if (t > max) max = t
-			}
-			climate.temperature_avg[r] = sum / 12
-			climate.temperature_min[r] = min
-			climate.temperature_max[r] = max
-		}
+		applyCurrentTemperatureEffect(mesh, climate, isLand, oceanCurrents)
 		refreshClimatePetMonthly(climate, orogenParams)
 	}
 

@@ -1,25 +1,28 @@
 /**
  * Ocean current warmth model.
  *
- * Classifies coastal ocean cells as warm or cold using the existing moisture
- * advection fields (east/west) and TEQ-relative latitude bands. Then BFS-
- * propagates the warmth signal through ocean cells with distance fade, and
- * diffuses the result onto nearby land cells.
- *
- * No tangent frames or explicit wind vectors required — piggybacks on the
- * advection infrastructure that already encodes wind regime per cell.
+ * Seeds warm/cold coastal ocean cells from continental coastline geometry plus
+ * TEQ-relative latitude bands, then propagates that signal offshore and onto
+ * nearby continental land.
  */
 import type { SphereMesh, OrogenClimate, OrogenParams } from "../types"
+import type { OrogenLandmarks } from "../provinces/landmarks"
 import { computeThermalEquator } from "./rain"
 import { meanEdgeLengthKm } from "../units"
 
 const RAD2DEG = 180 / Math.PI
+const DEG2RAD = Math.PI / 180
+const TYPE_CONTINENT = 0
+const TYPE_LAKE = 5
+const USE_COASTAL_SEED_SHORT_CIRCUIT = false
 
 export interface OceanCurrentResult {
 	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */
 	oceanWarmth: Float32Array
 	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean and deep interior. */
 	coastalWarmth: Float32Array
+	/** Per-cell temperature delta applied by ocean currents (°C). Zero where no effect. */
+	temperatureDelta: Float32Array
 }
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -27,50 +30,152 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 	return t * t * (3 - 2 * t)
 }
 
-/**
- * Laplacian smoothing restricted to ocean cells.
- */
-function smoothOcean(
-	mesh: SphereMesh,
-	field: Float32Array,
-	isLand: Uint8Array,
-	passes: number,
-): void {
-	const { adjOffset, adjList, numRegions: N } = mesh
-	const tmp = new Float32Array(N)
-	for (let pass = 0; pass < passes; pass++) {
-		for (let r = 0; r < N; r++) {
-			if (isLand[r]) { tmp[r] = field[r]; continue }
-			let sum = field[r], count = 1
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if (!isLand[nb]) { sum += field[nb]; count++ }
-			}
-			tmp[r] = sum / count
+function piecewise(xs: number[], ys: number[], x: number): number {
+	if (x <= xs[0]) return ys[0]
+	for (let i = 1; i < xs.length; i++) {
+		if (x <= xs[i]) {
+			const t = (x - xs[i - 1]) / (xs[i] - xs[i - 1])
+			return ys[i - 1] + (ys[i] - ys[i - 1]) * t
 		}
-		field.set(tmp)
 	}
+	return ys[ys.length - 1]
+}
+
+function wrapLonDeltaDeg(delta: number): number {
+	if (delta > 180) return delta - 360
+	if (delta < -180) return delta + 360
+	return delta
+}
+
+function directionalOceanOpen(
+	start: number,
+	dir: 1 | -1,
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	isContinent: Uint8Array,
+	isLake: Uint8Array,
+	latDeg: Float32Array,
+	lonDeg: Float32Array,
+	maxSteps: number,
+): number {
+	const { adjOffset, adjList } = mesh
+	const visited = new Uint8Array(mesh.numRegions)
+	let current = start
+	visited[current] = 1
+
+	for (let step = 0; step < maxSteps; step++) {
+		let bestOcean = -1
+		let bestScore = -Infinity
+
+		for (let j = adjOffset[current], jEnd = adjOffset[current + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (visited[nb] || isLake[nb]) continue
+
+			const dLon = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[current]) * dir
+			const dLat = Math.abs(latDeg[nb] - latDeg[current])
+
+			if (isContinent[nb] && dLon > 0.02 && dLat < 8) return -1
+			if (isLand[nb]) continue
+			if (dLon <= 0) continue
+
+			const score = dLon - dLat * 0.2
+			if (score > bestScore) {
+				bestScore = score
+				bestOcean = nb
+			}
+		}
+
+		if (bestOcean < 0) return current
+		current = bestOcean
+		visited[current] = 1
+	}
+
+	return current
+}
+
+function propagateOceanInfluence(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	isLake: Uint8Array,
+	seeds: Float32Array,
+): Float32Array {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const influence = new Float32Array(N)
+	const queue: number[] = []
+	let head = 0
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r] || seeds[r] <= 0) continue
+		influence[r] = seeds[r]
+		queue.push(r)
+	}
+
+	while (head < queue.length) {
+		const r = queue[head++]
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (isLand[nb] || isLake[nb]) continue
+			if (influence[nb] > 0) continue
+			influence[nb] = influence[r]
+			queue.push(nb)
+		}
+	}
+
+	return influence
+}
+
+function computeOceanSeedDistance(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	isLake: Uint8Array,
+	seeds: Float32Array,
+): Int32Array {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const dist = new Int32Array(N).fill(-1)
+	const queue = new Int32Array(N)
+	let head = 0
+	let tail = 0
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r] || seeds[r] <= 0) continue
+		dist[r] = 0
+		queue[tail++] = r
+	}
+
+	while (head < tail) {
+		const r = queue[head++]
+		const nextDist = dist[r] + 1
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
+			dist[nb] = nextDist
+			queue[tail++] = nb
+		}
+	}
+
+	return dist
 }
 
 /**
  * Compute ocean current warmth and diffused coastal warmth.
  *
- * Pipeline position: after computeAdvection (needs eastAdv, westAdv) and
- * computeTemperature (needs climate for TEQ).
+ * Pipeline position: after computeTemperature and after an initial landmarks
+ * pass on the pre-lake land mask.
  */
 export function computeOceanCurrents(
 	mesh: SphereMesh,
-	eastAdv: Float32Array,
-	westAdv: Float32Array,
 	isLand: Uint8Array,
 	climate: OrogenClimate,
+	distCoast: Float32Array,
+	landmarks: OrogenLandmarks,
 	params?: Pick<OrogenParams, "planetRadiusKm">,
 ): OceanCurrentResult {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 
-	// ── Precompute lat/lon and TEQ ──────────────────────────────────────
 	const latDeg = new Float32Array(N)
 	const lonDeg = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
@@ -79,198 +184,172 @@ export function computeOceanCurrents(
 		lonDeg[r] = Math.atan2(mesh.r_xyz[3 * r + 1], mesh.r_xyz[3 * r]) * RAD2DEG
 	}
 
-	const TEQ_BINS = 120
-	const teqByBin = computeThermalEquator(mesh, climate.temperature_avg, TEQ_BINS)
-	const lonBinWidth = 360 / TEQ_BINS
-
-	function teqAt(r: number): number {
-		const bin = Math.max(0, Math.min(TEQ_BINS - 1,
-			Math.floor((lonDeg[r] + 180) / lonBinWidth)))
-		return teqByBin[bin]
-	}
-
-	// ── Label connected ocean basins and filter lakes ───────────────────
-	const basinLabel = new Int32Array(N).fill(-1)
-	let numBasins = 0
-	for (let r = 0; r < N; r++) {
-		if (isLand[r] || basinLabel[r] >= 0) continue
-		const label = numBasins++
-		const stack = [r]
-		basinLabel[r] = label
-		while (stack.length > 0) {
-			const c = stack.pop()!
-			for (let j = adjOffset[c], jEnd = adjOffset[c + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if (!isLand[nb] && basinLabel[nb] < 0) {
-					basinLabel[nb] = label
-					stack.push(nb)
-				}
-			}
-		}
-	}
-
-	const MIN_BASIN_SIZE = Math.max(10, Math.floor(N * 0.001))
-	const basinSizeArr = new Int32Array(numBasins)
-	for (let r = 0; r < N; r++) {
-		if (basinLabel[r] >= 0) basinSizeArr[basinLabel[r]]++
-	}
+	const isContinent = new Uint8Array(N)
 	const isLake = new Uint8Array(N)
 	for (let r = 0; r < N; r++) {
-		if (basinLabel[r] >= 0 && basinSizeArr[basinLabel[r]] < MIN_BASIN_SIZE) {
-			isLake[r] = 1
-		}
+		const landmark = landmarks.regionLandmark[r]
+		if (landmark < 0) continue
+		const type = landmarks.type[landmark]
+		if (isLand[r] && type === TYPE_CONTINENT) isContinent[r] = 1
+		if (!isLand[r] && type === TYPE_LAKE) isLake[r] = 1
 	}
-
-	// ── Step 1: Classify coastal ocean cells as warm or cold ────────────
-	// A coastal ocean cell is one adjacent to at least one land cell.
-	// Sample the dominant advection field from neighboring land to determine
-	// which wind regime is pushing moisture (and thus water) here.
-	//
-	// Trades (near TEQ): eastAdv dominates → water piled on western coast → warm
-	// Westerlies (far from TEQ): westAdv dominates → warm on western boundary too
-	//   (western intensification: poleward return flow is warm)
-	//
-	// The sign convention:
-	//   warmth > 0 = warm current (western boundary / trade accumulation side)
-	//   warmth < 0 = cold current (eastern boundary / upwelling side)
 
 	const oceanWarmth = new Float32Array(N)
 
-	// Threshold in BFS hops for warmth fade (~800 km worth of hops)
-	const fadeHops = Math.max(5, Math.round(800 / avgEdgeKm))
-
-	// Smooth bell-shaped strength envelopes for each wind regime.
-	// Raised cosine: peaks at center, tapers to zero over the full width.
-	// No flat plateaus — strength is always changing, giving gradual transitions.
-	//   Trades:     center ~18° from TEQ, half-width 16° (covers ~2–34°)
-	//   Westerlies: center ~45°,         half-width 16° (covers ~29–61°)
-	//   Polar:      center ~72°,         half-width 14° (covers ~58–86°), weak
-	function bell(d: number, center: number, halfWidth: number): number {
-		const x = Math.abs(d - center) / halfWidth
-		if (x >= 1) return 0
-		return 0.5 * (1 + Math.cos(Math.PI * x))
-	}
 	function tradeStrength(d: number): number {
-		// Asymmetric: slower ramp from ITCZ side (extra suppression near equator)
-		const base = bell(d, 18, 16)
-		const itczSuppression = d < 8 ? smoothstep(8, 3, d) : 0
-		return base * (1 - itczSuppression)
+		return d >= 5 && d <= 30 ? 1 : 0
 	}
 	function westerliesStrength(d: number): number {
-		return bell(d, 45, 16)
+		return d >= 30 && d <= 70 ? 1 : 0
 	}
 	function polarStrength(d: number): number {
-		return bell(d, 72, 14) * 0.4
+		return d >= 70 && d <= 90 ? 1 : 0
 	}
 
-	// First pass: seed coastal ocean cells
-	const coastalSeeds: number[] = []
+	const coastMask = new Uint8Array(N)
+	const localZonal = new Float32Array(N)
+	const localMeridional = new Float32Array(N)
+	const coastOceanCount = new Uint8Array(N)
 	for (let r = 0; r < N; r++) {
-		if (isLand[r] || isLake[r]) continue
-
-		// Check if this ocean cell is adjacent to land
-		let landEast = 0, landWest = 0, landCount = 0
+		if (!isContinent[r]) continue
+		let zonal = 0
+		let meridional = 0
+		let oceanCount = 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			if (isLand[nb]) {
-				landCount++
-				landEast += eastAdv[nb]
-				landWest += westAdv[nb]
+			if (isLand[nb] || isLake[nb]) continue
+			oceanCount++
+			const dLonDeg = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r])
+			const meanLatRad = ((latDeg[r] + latDeg[nb]) * 0.5) * DEG2RAD
+			zonal += dLonDeg * Math.cos(meanLatRad)
+			meridional += latDeg[nb] - latDeg[r]
+		}
+		if (oceanCount === 0) continue
+		coastMask[r] = 1
+		localZonal[r] = zonal
+		localMeridional[r] = meridional
+		coastOceanCount[r] = oceanCount
+	}
+
+	const openScanSteps = Math.max(1, Math.round(4000 / avgEdgeKm))
+	const openOceanCoastKm = 300
+
+	// Strict coastal orientation filter: only strongly east/west-facing continental margins seed currents.
+	const warmSeed = new Float32Array(N)
+	const coldSeed = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!coastMask[r]) continue
+
+		const oceanNeighbors: number[] = []
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (isLand[nb] || isLake[nb]) continue
+			oceanNeighbors.push(nb)
+		}
+		if (oceanNeighbors.length === 0) continue
+
+		if (coastOceanCount[r] >= 3 && oceanNeighbors.length <= 3) continue
+		const zonal = localZonal[r]
+		const meridional = localMeridional[r]
+		const absZonal = Math.abs(zonal)
+		const absMeridional = Math.abs(meridional)
+		if (absZonal < 0.2 || absZonal < absMeridional * 1) continue
+
+		const eastFacing = zonal > 0
+		let hasOpenOcean = false
+		for (const nb of oceanNeighbors) {
+			const dLon = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r])
+			if ((eastFacing && dLon <= 0) || (!eastFacing && dLon >= 0)) continue
+			const scanEnd = directionalOceanOpen(nb, eastFacing ? 1 : -1, mesh, isLand, isContinent, isLake, latDeg, lonDeg, openScanSteps)
+			if (scanEnd >= 0 && distCoast[scanEnd] * avgEdgeKm >= openOceanCoastKm) {
+				hasOpenOcean = true
+				break
 			}
 		}
-		if (landCount === 0) continue
+		if (!hasOpenOcean) continue
 
-		// Average advection from neighboring land
-		const avgEast = landEast / landCount
-		const avgWest = landWest / landCount
+		const distFromEquator = Math.abs(latDeg[r])
 
-		const teq = teqAt(r)
-		const distFromTeq = Math.abs(latDeg[r] - teq)
-
-		// Evaluate each regime's contribution, weighted by its envelope
 		let warmth = 0
 
-		// Trade wind contribution
-		const tStr = tradeStrength(distFromTeq)
-		if (tStr > 0) {
-			let tw = 0
-			if (avgEast > avgWest + 0.05) tw = 0.8        // warm: trade accumulation (western coast)
-			else if (avgWest > avgEast + 0.05) tw = -0.6   // cold: upwelling (eastern coast)
-			warmth += tw * tStr
-		}
+		const tStr = tradeStrength(distFromEquator)
+		if (tStr > 0) warmth += (eastFacing ? 1 : -1) * tStr
 
-		// Westerlies contribution
-		const wStr = westerliesStrength(distFromTeq)
-		if (wStr > 0) {
-			let ww = 0
-			if (avgWest > avgEast + 0.05) ww = 0.6        // warm: western boundary poleward flow
-			else if (avgEast > avgWest + 0.05) ww = -0.5   // cold: eastern boundary equatorward flow
-			warmth += ww * wStr
-		}
+		const wStr = westerliesStrength(distFromEquator)
+		if (wStr > 0) warmth += (eastFacing ? -1 : 1) * wStr
 
-		// Polar contribution (weak, generally cold)
-		const pStr = polarStrength(distFromTeq)
-		if (pStr > 0) {
-			warmth += -0.2 * pStr
-		}
+		const pStr = polarStrength(distFromEquator)
+		if (pStr > 0) warmth += -1 * pStr
 
-		oceanWarmth[r] = Math.max(-1, Math.min(1, warmth))
-		if (Math.abs(warmth) > 0.01) coastalSeeds.push(r)
+		if (Math.abs(warmth) <= 0.01) continue
+		warmth = warmth > 0 ? 1 : -1
+
+		for (const nb of oceanNeighbors) {
+			if (warmth > 0) warmSeed[nb] = Math.max(warmSeed[nb], warmth)
+			else coldSeed[nb] = Math.max(coldSeed[nb], -warmth)
+		}
 	}
 
-	// ── Step 2: BFS warmth through ocean cells with distance fade ───────
-	const dist = new Int32Array(N).fill(-1)
-	const queue = new Int32Array(N)
-	let qLen = 0
-
-	for (const s of coastalSeeds) {
-		dist[s] = 0
-		queue[qLen++] = s
-	}
-
-	let head = 0
-	while (head < qLen) {
-		const r = queue[head++]
-		const d = dist[r] + 1
-		if (d >= fadeHops) continue
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (!isLand[nb] && !isLake[nb] && dist[nb] === -1) {
-				dist[nb] = d
-				// Fade warmth with distance
-				const fade = 1 - d / fadeHops
-				oceanWarmth[nb] = oceanWarmth[r] * fade
-				queue[qLen++] = nb
+	if (USE_COASTAL_SEED_SHORT_CIRCUIT) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r] || isLake[r]) continue
+			const warm = warmSeed[r]
+			const cold = coldSeed[r]
+			const total = warm + cold
+			if (total <= 0.001) continue
+			oceanWarmth[r] = (warm - cold) / total
+		}
+	} else {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r] || isLake[r]) continue
+			const distFromEquator = Math.abs(latDeg[r])
+			if (distFromEquator <= 10) warmSeed[r] = 1
+			if (distFromEquator >= 68) {
+				const polarSeed = Math.min(1, (distFromEquator - 68) / 10)
+				coldSeed[r] = Math.max(coldSeed[r], 0.35 + polarSeed * 0.55)
 			}
 		}
+
+		const warmInfluence = propagateOceanInfluence(mesh, isLand, isLake, warmSeed)
+		const coldInfluence = propagateOceanInfluence(mesh, isLand, isLake, coldSeed)
+		const warmDist = computeOceanSeedDistance(mesh, isLand, isLake, warmSeed)
+		const coldDist = computeOceanSeedDistance(mesh, isLand, isLake, coldSeed)
+
+		for (let r = 0; r < N; r++) {
+			if (isLand[r] || isLake[r]) continue
+			const warm = warmInfluence[r]
+			const cold = coldInfluence[r]
+			if (warm <= 0.001 && cold <= 0.001) continue
+			if (warm > 0.001 && cold <= 0.001) { oceanWarmth[r] = 1; continue }
+			if (cold > 0.001 && warm <= 0.001) { oceanWarmth[r] = -1; continue }
+
+			const wDist = Math.max(0, warmDist[r])
+			const cDist = Math.max(0, coldDist[r])
+			const wScore = 1 / (1 + wDist)
+			const cScore = 1 / (1 + cDist)
+			oceanWarmth[r] = (wScore - cScore) / (wScore + cScore)
+		}
 	}
 
-	// ── Step 3: Smooth ocean warmth ─────────────────────────────────────
-	const smoothPasses = Math.max(3, Math.round(500 / avgEdgeKm))
-	smoothOcean(mesh, oceanWarmth, isLand, smoothPasses)
-
-	// Clamp to [-1, 1]
 	for (let r = 0; r < N; r++) {
 		oceanWarmth[r] = Math.max(-1, Math.min(1, oceanWarmth[r]))
 		if (isLand[r]) oceanWarmth[r] = 0
 	}
 
-	// ── Step 4: Diffuse warmth onto coastal land ────────────────────────
-	// BFS from coastal land cells, seeded with average warmth of adjacent
-	// ocean neighbors, fading with hop distance inland (~600 km range).
 	const coastalWarmth = new Float32Array(N)
 	const landFadeHops = Math.max(4, Math.round(600 / avgEdgeKm))
 	const landDist = new Int32Array(N).fill(-1)
 	const landQueue = new Int32Array(N)
 	let lqLen = 0
+	let landHead = 0
 
-	// Seed: land cells adjacent to ocean
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
-		let warmSum = 0, oceanCount = 0
+		let warmSum = 0
+		let oceanCount = 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			if (!isLand[nb]) {
+			if (!isLand[nb] && !isLake[nb]) {
 				warmSum += oceanWarmth[nb]
 				oceanCount++
 			}
@@ -281,9 +360,8 @@ export function computeOceanCurrents(
 		landQueue[lqLen++] = r
 	}
 
-	head = 0
-	while (head < lqLen) {
-		const r = landQueue[head++]
+	while (landHead < lqLen) {
+		const r = landQueue[landHead++]
 		const d = landDist[r] + 1
 		if (d >= landFadeHops) continue
 		const fade = 1 - d / landFadeHops
@@ -297,24 +375,7 @@ export function computeOceanCurrents(
 		}
 	}
 
-	// Light smoothing on land
-	const landSmooth = new Float32Array(N)
-	for (let pass = 0; pass < 2; pass++) {
-		for (let r = 0; r < N; r++) {
-			if (!isLand[r]) { landSmooth[r] = 0; continue }
-			let sum = coastalWarmth[r], count = 1
-			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-				const nb = adjList[j]
-				if (isLand[nb]) { sum += coastalWarmth[nb]; count++ }
-			}
-			landSmooth[r] = sum / count
-		}
-		for (let r = 0; r < N; r++) {
-			if (isLand[r]) coastalWarmth[r] = landSmooth[r]
-		}
-	}
-
-	return { oceanWarmth, coastalWarmth }
+	return { oceanWarmth, coastalWarmth, temperatureDelta: new Float32Array(N) }
 }
 
 /**
@@ -333,16 +394,36 @@ export function applyCurrentTemperatureEffect(
 	currents: OceanCurrentResult,
 ): void {
 	const N = mesh.numRegions
-	const OCEAN_MAX = 5.0
-	const LAND_MAX = 3.0
+	const latDeg = new Float32Array(N)
+	const lonDeg = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const z = mesh.r_xyz[3 * r + 2]
+		latDeg[r] = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
+		lonDeg[r] = Math.atan2(mesh.r_xyz[3 * r + 1], mesh.r_xyz[3 * r]) * RAD2DEG
+	}
+
+	const TEQ_BINS = 120
+	const teqByBin = computeThermalEquator(mesh, climate.temperature_avg, TEQ_BINS)
+	const lonBinWidth = 360 / TEQ_BINS
+
+	function teqAt(r: number): number {
+		const bin = Math.max(0, Math.min(TEQ_BINS - 1,
+			Math.floor((lonDeg[r] + 180) / lonBinWidth)))
+		return teqByBin[bin]
+	}
 
 	for (let r = 0; r < N; r++) {
 		const w = isLand[r] ? currents.coastalWarmth[r] : currents.oceanWarmth[r]
 		if (Math.abs(w) < 0.01) continue
 
-		const maxEffect = isLand[r] ? LAND_MAX : OCEAN_MAX
+		const distFromTEQ = Math.abs(latDeg[r] - teqAt(r))
+		const warmMaxAtLat = piecewise([0, 20, 40, 60, 80], [1, 2, 8, 15, 10], distFromTEQ)
+		const coldMaxAtLat = piecewise([0, 20, 40, 60, 80], [1, 2, 5, 10, 7], distFromTEQ)
+		let maxEffect = w > 0 ? warmMaxAtLat : coldMaxAtLat
+		if (isLand[r]) maxEffect *= 0.6
 		const delta = w * maxEffect
 
+		currents.temperatureDelta[r] = delta
 		climate.temperature_avg[r] += delta
 		climate.temperature_min[r] += delta
 		climate.temperature_max[r] += delta
