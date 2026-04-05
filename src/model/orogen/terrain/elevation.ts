@@ -3,16 +3,16 @@
  * Faithful port of orogen's elevation.js distance-field + elevation logic.
  */
 
-import { createRng } from "./rng"
-import { SimplexNoise } from "./simplex-noise"
 import type {
 	BoundaryInfo,
 	DistanceFields,
 	OrogenTerrainFeatures,
 	PlateVec,
 	SphereMesh,
-} from "./types"
-import { OROGEN_TERRAIN_FEATURE } from "./types"
+} from "../types"
+import { OROGEN_TERRAIN_FEATURE } from "../types"
+import { createRng } from "../util/rng"
+import { SimplexNoise } from "../util/simplex-noise"
 
 type StageTiming = { Stage: string; ms: string }
 

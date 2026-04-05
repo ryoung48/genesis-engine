@@ -4,9 +4,9 @@
  * so craters remain crisp and visible.
  */
 
-import { createRng } from "./rng"
-import { SimplexNoise } from "./simplex-noise"
-import type { SphereMesh } from "./types"
+import type { SphereMesh } from "../types"
+import { createRng } from "../util/rng"
+import { SimplexNoise } from "../util/simplex-noise"
 
 interface Crater {
 	cx: number

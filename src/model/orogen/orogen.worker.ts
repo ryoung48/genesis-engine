@@ -20,7 +20,11 @@ function serializeWorld(
 			numSides: world.mesh.numSides,
 			r_xyz: world.mesh.r_xyz,
 			t_xyz: world.mesh.t_xyz,
+			triangles: world.mesh.triangles,
 			halfedges: world.mesh.halfedges,
+			adjOffset: world.mesh.adjOffset,
+			adjList: world.mesh.adjList,
+			neighborDist: world.mesh.neighborDist,
 			s_begin_r: world.mesh.s_begin_r,
 			s_end_r: world.mesh.s_end_r,
 			s_inner_t: world.mesh.s_inner_t,
@@ -36,6 +40,7 @@ function serializeWorld(
 			: undefined,
 		elevation_km: world.elevation_km,
 		params: world.params,
+		timings: world.timings,
 		continentCount: world.continentCount,
 		climate: world.climate
 			? {
@@ -43,6 +48,10 @@ function serializeWorld(
 					temperature_min: world.climate.temperature_min,
 					temperature_max: world.climate.temperature_max,
 					temperature_monthly: world.climate.temperature_monthly,
+					temperature_monthly_nolapse:
+						world.climate.temperature_monthly_nolapse,
+					temperature_monthly_range: world.climate.temperature_monthly_range,
+					insolation_monthly: world.climate.insolation_monthly,
 					pet_monthly: world.climate.pet_monthly,
 					daylight_hours_monthly: world.climate.daylight_hours_monthly,
 					landFraction: world.climate.landFraction,
@@ -79,6 +88,7 @@ function serializeWorld(
 		koppenClimate: world.koppenClimate,
 		vegetation: world.vegetation,
 		topography: world.topography,
+		coastal: world.coastal,
 		slopeScore: world.slopeScore,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
@@ -198,7 +208,11 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	const transfer: Transferable[] = [
 		world.mesh.r_xyz.buffer,
 		world.mesh.t_xyz.buffer,
+		world.mesh.triangles.buffer,
 		world.mesh.halfedges.buffer,
+		world.mesh.adjOffset.buffer,
+		world.mesh.adjList.buffer,
+		world.mesh.neighborDist.buffer,
 		world.mesh.s_begin_r.buffer,
 		world.mesh.s_end_r.buffer,
 		world.mesh.s_inner_t.buffer,
@@ -221,6 +235,9 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.climate.temperature_min.buffer,
 			world.climate.temperature_max.buffer,
 			world.climate.temperature_monthly.buffer,
+			world.climate.temperature_monthly_nolapse.buffer,
+			world.climate.temperature_monthly_range.buffer,
+			world.climate.insolation_monthly.buffer,
 			world.climate.pet_monthly.buffer,
 		)
 		if (world.climate.daylight_hours_monthly) {
@@ -293,6 +310,10 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 
 	if (world.topography) {
 		transfer.push(world.topography.buffer)
+	}
+
+	if (world.coastal) {
+		transfer.push(world.coastal.buffer)
 	}
 
 	if (world.slopeScore) {

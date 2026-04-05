@@ -1,7 +1,7 @@
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	meanEdgeLengthKm,
-} from "@/model/orogen/units"
+} from "@/model/orogen/util/units"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 
 export interface PlanetStat {
@@ -89,11 +89,7 @@ export function computePlanetStats(
 
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = activeParams?.tidallyLocked ?? params.tidallyLocked
-	const habitabilityScore =
-		world?.population?.habitabilityScore ??
-		(world?.population?.totalPopulation != null
-			? world.population.totalPopulation / 215_000_000
-			: null)
+	const habitabilityScore = world?.population?.habitabilityScore ?? 0
 	return [
 		{
 			label: "Habitability",

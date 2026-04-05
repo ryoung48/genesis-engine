@@ -4,8 +4,8 @@
  * Faithful port of orogen's sphere-mesh.js.
  */
 import Delaunator from "delaunator"
-import type { OrogenRng } from "./rng"
 import type { SphereMesh } from "./types"
+import type { OrogenRng } from "./util/rng"
 
 /**
  * Fibonacci sphere with jitter — evenly-distributed points on a unit sphere.

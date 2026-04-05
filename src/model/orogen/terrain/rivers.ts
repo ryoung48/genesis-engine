@@ -6,7 +6,11 @@ import type {
 	OrogenRivers,
 	SphereMesh,
 } from "../types"
-import { getDaysPerYear, getHoursPerDay, getPlanetRadiusKm } from "../units"
+import {
+	getDaysPerYear,
+	getHoursPerDay,
+	getPlanetRadiusKm,
+} from "../util/units"
 
 /**
  * Min-heap keyed on an external Float32Array.

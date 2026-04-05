@@ -3,8 +3,8 @@
  * Produces terrain from a single base simplex-noise field.
  */
 
-import { SimplexNoise } from "./simplex-noise"
-import type { SphereMesh } from "./types"
+import type { SphereMesh } from "../types"
+import { SimplexNoise } from "../util/simplex-noise"
 
 /**
  * Base terrain: multi-octave simplex noise at continent scale.

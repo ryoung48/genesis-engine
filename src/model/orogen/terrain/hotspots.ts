@@ -5,9 +5,9 @@
  * drift elongation, summit calderas, and radial rift-zone ridges.
  */
 
-import { createRng } from "./rng"
-import { SimplexNoise } from "./simplex-noise"
-import type { SphereMesh, TectonicPlate } from "./types"
+import type { SphereMesh, TectonicPlate } from "../types"
+import { createRng } from "../util/rng"
+import { SimplexNoise } from "../util/simplex-noise"
 
 function clampUnit(value: number): number {
 	return Math.max(0, Math.min(1, value))

@@ -3,13 +3,14 @@ import type { PopulationMapMode } from "@/components/world/types"
 import { computeClouds } from "@/model/orogen/climate/clouds"
 import { computeThermalEquatorLine } from "@/model/orogen/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/climate/vegetation"
+import { computeWind } from "@/model/orogen/climate/wind"
 import {
 	ENABLE_PASTA_CLASSIFICATION,
 	ENABLE_PROVINCES,
-	ENABLE_WIND_FIELDS,
 } from "@/model/orogen/features"
-import { encodePlanetCode } from "@/model/orogen/planet-code"
+import type { StageTiming } from "@/model/orogen/types"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
+import { encodePlanetCode } from "@/model/orogen/util/planet-code"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
 import { climateZoneColor, vegetationColor } from "../colors"
@@ -75,6 +76,7 @@ import {
 	resetWorldDefaults,
 } from "./sliders"
 import { TimeControls } from "./TimeControls"
+import { TOPO_LAKE, TOPO_OCEAN } from "@/model/orogen/terrain/classification"
 
 interface OrogenViewProps {
 	onBack: () => void
@@ -144,6 +146,9 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const sceneRef = useRef<OrogenScene | null>(null)
 	const workerRef = useRef<Worker | null>(null)
 	const lastWorldRef = useRef<SerializedOrogenWorld | null>(null)
+	const windCacheRef = useRef<
+		WeakMap<SerializedOrogenWorld, NonNullable<SerializedOrogenWorld["wind"]>>
+	>(new WeakMap())
 	const mapCenterLongitudeValueRef = useRef<HTMLSpanElement>(null)
 	const hoverCardRef = useRef<HTMLDivElement>(null)
 
@@ -152,6 +157,9 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [generating, setGenerating] = useState(false)
 	const [generationProgress, setGenerationProgress] = useState(0)
 	const [generationLabel, setGenerationLabel] = useState("Idle")
+	const [generationTimings, setGenerationTimings] = useState<
+		StageTiming[] | null
+	>(null)
 	const [colorMode, setColorMode] = useState<ColorMode>("terrain")
 	const [nationMode, setNationMode] = useState<NationMapMode>("borders")
 	const [populationMode, setPopulationMode] =
@@ -361,7 +369,11 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		sceneRef.current?.setAtmospherePressure(world?.params.pressure ?? pressure)
 	}, [world, pressure])
 	useEffect(() => {
-		if (!world) setHoverInfo(null)
+		if (!world) {
+			setHoverInfo(null)
+			return
+		}
+		setGenerationTimings(world.timings ?? null)
 	}, [world])
 	useEffect(() => {
 		if (!world) {
@@ -394,8 +406,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			(colorMode === "pastaClimate" || colorMode === "satellite")
 		)
 			setColorMode("climate")
-		if (!ENABLE_WIND_FIELDS && colorMode === "windSpeed")
-			setColorMode("terrain")
 		if (
 			!ENABLE_PROVINCES &&
 			(colorMode === "nations" ||
@@ -417,47 +427,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 	}, [colorMode, world?.hazards, world?.volcanism, world])
 
-	// --- Hover computations ---
-	const hoverElevationKm = getHoverElevationKm(hoverInfo, world)
-	const hoverTopography = getHoverTopography(hoverInfo, world)
-	const hoverCoordinates = useMemo(
-		() => getHoverCoordinates(hoverInfo, world),
-		[hoverInfo, world],
-	)
-	const hoverTemperatureDelta = getHoverTemperatureDelta(hoverInfo, world)
-	const hoverRainfall = getHoverRainfall(hoverInfo, world, rainfallMonth)
-	const hoverClimateZone = getHoverClimateZone(hoverInfo, world)
-	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, world)
-	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, world)
-	const hoverBiome = getHoverBiome(hoverInfo, world)
-	const hoverProvince = getHoverProvince(hoverInfo, world)
-	const hoverLandmark = getHoverLandmark(hoverInfo, world)
-	const hoverIsLand = getHoverIsLand(hoverInfo, world)
-	const hoverOceanDist = getHoverOceanDist(hoverInfo, world)
-	const hoverDistCoast = getHoverDistCoast(hoverInfo, world)
-	const hoverWind = getHoverWind(hoverInfo, world, windMonth)
-	const hoverHazards = getHoverHazards(hoverInfo, world)
-	const hoverHotspot = getHoverHotspot(hoverInfo, world)
-	const hoverRiver = getHoverRiver(hoverInfo, world)
-	const hoverTerrainFeature = getHoverTerrainFeature(hoverInfo, world)
-	const hoverOceanCurrents = getHoverOceanCurrents(hoverInfo, world)
-	const coastHopLengthKm = useMemo(() => getCoastHopLengthKm(world), [world])
-	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast, coastHopLengthKm)
-	const hoverIceSummary = (() => {
-		if (!(hoverInfo && world)) return null
-		const r = hoverInfo.region
-		const iceThickness = world.iceThickness?.[r] ?? 0
-		const iceMin = world.iceMinMonthly?.[r] ?? 0
-		const iceMax = world.iceMaxMonthly?.[r] ?? 0
-		if (iceThickness <= 0 && iceMax <= 0) return null
-		return `${(iceThickness / 1000).toFixed(2)} m (${(iceMin / 1000).toFixed(2)}-${(iceMax / 1000).toFixed(2)})`
-	})()
-
 	const isClimateMode =
 		colorMode === "climate" ||
 		colorMode === "vegetation" ||
 		colorMode === "temperature" ||
 		colorMode === "precipitation" ||
+		colorMode === "windSpeed" ||
 		colorMode === "moisture" ||
 		(ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate") ||
 		colorMode === "koppenClimate" ||
@@ -465,6 +440,83 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const isWindMode = colorMode === "windSpeed"
 	const isSatelliteMode =
 		colorMode === "satellite" || colorMode === "satelliteKoppen"
+
+	const cachedWind = world ? windCacheRef.current.get(world) : undefined
+
+	const lazyWind = useMemo(() => {
+		if (
+			cachedWind ||
+			!isWindMode ||
+			!world?.climate ||
+			!world?.isLand ||
+			!world?.distCoast ||
+			!world.monthlyTEQ
+		) {
+			return cachedWind
+		}
+		const computed = computeWind(
+			world.mesh,
+			world.elevation,
+			world.isLand,
+			world.distCoast,
+			world.climate,
+			world.params,
+			world.monthlyTEQ,
+		)
+		windCacheRef.current.set(world, computed)
+		return computed
+	}, [cachedWind, isWindMode, world])
+
+	const worldForDisplay = useMemo(
+		() => (world && lazyWind ? { ...world, wind: lazyWind } : world),
+		[world, lazyWind],
+	)
+
+	// --- Hover computations ---
+	const hoverElevationKm = getHoverElevationKm(hoverInfo, worldForDisplay)
+	const hoverTopography = getHoverTopography(hoverInfo, worldForDisplay)
+	const hoverCoordinates = useMemo(
+		() => getHoverCoordinates(hoverInfo, worldForDisplay),
+		[hoverInfo, worldForDisplay],
+	)
+	const hoverTemperatureDelta = getHoverTemperatureDelta(
+		hoverInfo,
+		worldForDisplay,
+	)
+	const hoverRainfall = getHoverRainfall(
+		hoverInfo,
+		worldForDisplay,
+		rainfallMonth,
+	)
+	const hoverClimateZone = getHoverClimateZone(hoverInfo, worldForDisplay)
+	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
+	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
+	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay)
+	const hoverProvince = getHoverProvince(hoverInfo, worldForDisplay)
+	const hoverLandmark = getHoverLandmark(hoverInfo, worldForDisplay)
+	const hoverIsLand = getHoverIsLand(hoverInfo, worldForDisplay)
+	const hoverOceanDist = getHoverOceanDist(hoverInfo, worldForDisplay)
+	const hoverDistCoast = getHoverDistCoast(hoverInfo, worldForDisplay)
+	const hoverWind = getHoverWind(hoverInfo, worldForDisplay, windMonth)
+	const hoverHazards = getHoverHazards(hoverInfo, worldForDisplay)
+	const hoverHotspot = getHoverHotspot(hoverInfo, worldForDisplay)
+	const hoverRiver = getHoverRiver(hoverInfo, worldForDisplay)
+	const hoverTerrainFeature = getHoverTerrainFeature(hoverInfo, worldForDisplay)
+	const hoverOceanCurrents = getHoverOceanCurrents(hoverInfo, worldForDisplay)
+	const coastHopLengthKm = useMemo(
+		() => getCoastHopLengthKm(worldForDisplay),
+		[worldForDisplay],
+	)
+	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast, coastHopLengthKm)
+	const hoverIceSummary = (() => {
+		if (!(hoverInfo && worldForDisplay)) return null
+		const r = hoverInfo.region
+		const iceThickness = worldForDisplay.iceThickness?.[r] ?? 0
+		const iceMin = worldForDisplay.iceMinMonthly?.[r] ?? 0
+		const iceMax = worldForDisplay.iceMaxMonthly?.[r] ?? 0
+		if (iceThickness <= 0 && iceMax <= 0) return null
+		return `${(iceThickness / 1000).toFixed(2)} m (${(iceMin / 1000).toFixed(2)}-${(iceMax / 1000).toFixed(2)})`
+	})()
 	const hoverClimateDisplay = getHoverClimateDisplay(
 		colorMode,
 		hoverPastaClimate,
@@ -474,9 +526,9 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 	// --- Region colors ---
 	const regionColors = useMemo(() => {
-		if (!world) return null
+		if (!worldForDisplay) return null
 		return computeRegionColors(
-			world,
+			worldForDisplay,
 			colorMode,
 			nationMode,
 			populationMode,
@@ -495,7 +547,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		viewMode,
 		windMonth,
 		currentMonth,
-		world,
+		worldForDisplay,
 	])
 
 	const cloudData = useMemo(() => {
@@ -517,19 +569,19 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (!world) {
+		if (!worldForDisplay) {
 			scene.updateWorld(null)
 			lastWorldRef.current = null
 			return
 		}
-		if (lastWorldRef.current !== world) {
+		if (lastWorldRef.current !== worldForDisplay) {
 			scene.setRegionColors(regionColorsWithClouds)
-			scene.updateWorld(world)
-			lastWorldRef.current = world
+			scene.updateWorld(worldForDisplay)
+			lastWorldRef.current = worldForDisplay
 			return
 		}
 		scene.setRegionColors(regionColorsWithClouds)
-	}, [regionColorsWithClouds, world])
+	}, [regionColorsWithClouds, worldForDisplay])
 
 	const thermalEquator = useMemo(() => {
 		if (!world?.climate) return null
@@ -706,7 +758,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					const color = getTopographyColor(index)
 					return color ? rgbToCss(color) : "rgb(148, 163, 184)"
 				},
-				new Set([6, 7]),
+				new Set([TOPO_LAKE, TOPO_OCEAN]),
 			),
 		[world?.topography],
 	)
@@ -788,10 +840,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 	// --- Wind arrows ---
 	const windArrowData = useMemo(() => {
-		if (!world?.wind || !isWindMode) return null
-		const N = world.mesh.numRegions
+		if (!worldForDisplay?.wind || !isWindMode) return null
+		const N = worldForDisplay.mesh.numRegions
 		const { wind_east_monthly, wind_north_monthly, wind_speed_monthly } =
-			world.wind
+			worldForDisplay.wind
 		if (windMonth === 0) {
 			const east = new Float32Array(N),
 				north = new Float32Array(N),
@@ -817,7 +869,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			north: wind_north_monthly.subarray(off, off + N) as Float32Array,
 			speed: wind_speed_monthly.subarray(off, off + N) as Float32Array,
 		}
-	}, [world, windMonth, isWindMode])
+	}, [worldForDisplay, windMonth, isWindMode])
 
 	useEffect(() => {
 		sceneRef.current?.setWindArrows(windArrowData)
@@ -1293,6 +1345,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					generating={generating}
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
+					generationTimings={generationTimings}
 					handleGenerate={handleGenerate}
 					handleFileImport={handleFileImport}
 					handleEarthImport={handleEarthImport}
@@ -1336,12 +1389,11 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						colorMode={colorMode}
 						isClimateMode={isClimateMode}
 						isSatelliteMode={isSatelliteMode}
-						isWindMode={isWindMode}
 						tempAnnual={tempAnnual}
 						rainAnnual={rainAnnual}
 						windAnnual={windAnnual}
 						globalMonth={globalMonth}
-						world={world}
+						world={worldForDisplay}
 						hoverCardRef={hoverCardRef}
 					/>
 				) : (
@@ -1484,7 +1536,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					setPopulationMode={setPopulationMode}
 					isClimateMode={isClimateMode}
 					isSatelliteMode={isSatelliteMode}
-					isWindMode={isWindMode}
 					tempAnnual={tempAnnual}
 					setTempAnnual={setTempAnnual}
 					rainAnnual={rainAnnual}

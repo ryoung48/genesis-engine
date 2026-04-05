@@ -104,9 +104,8 @@ const TOPOGRAPHY_COLORS: Record<number, [number, number, number]> = {
 	2: [0x92 / 255, 0x76 / 255, 0x2d / 255], // plateau
 	3: [0x6c / 255, 0x2c / 255, 0x14 / 255], // mountains
 	4: [0x2d / 255, 0x8e / 255, 0x72 / 255], // marsh
-	5: [0x7e / 255, 0x8a / 255, 0x57 / 255], // coastal
-	6: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // ocean
-	7: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // lake
+	5: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // ocean
+	6: [0x75 / 255, 0xaf / 255, 0xd4 / 255], // lake
 }
 
 export function getTopographyColor(
@@ -136,6 +135,7 @@ export function computeRegionColors(
 		viewMode === "map" && colorMode === "oceanCurrents"
 	const darkenMapWaterMoisture = viewMode === "map" && colorMode === "moisture"
 	const mapWaterDarkenFactor = 0.74
+	const windOceanDarkenFactor = 0.8
 
 	if (colorMode === "slope") {
 		const slopeScoreByRegion = world.slopeScore
@@ -437,15 +437,18 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "windSpeed" && world.wind) {
+		const lakes = world.rivers?.lakes
 		if (windMonth === 0) {
 			for (let r = 0; r < N; r++) {
-				let sum = 0
+				let speedSum = 0
 				for (let m = 0; m < 12; m++)
-					sum += world.wind.wind_speed_monthly[m * N + r]
-				const [cr, cg, cb] = windSpeedColor(sum / 12)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
+					speedSum += world.wind.wind_speed_monthly[m * N + r]
+				const [cr, cg, cb] = windSpeedColor(speedSum / 12)
+				const isOcean = !world.isLand?.[r] && !lakes?.[r]
+				const factor = isOcean ? windOceanDarkenFactor : 1
+				rgb[3 * r] = cr * factor
+				rgb[3 * r + 1] = cg * factor
+				rgb[3 * r + 2] = cb * factor
 			}
 		} else {
 			const off = (windMonth - 1) * N
@@ -453,9 +456,11 @@ export function computeRegionColors(
 				const [cr, cg, cb] = windSpeedColor(
 					world.wind.wind_speed_monthly[off + r],
 				)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
+				const isOcean = !world.isLand?.[r] && !lakes?.[r]
+				const factor = isOcean ? windOceanDarkenFactor : 1
+				rgb[3 * r] = cr * factor
+				rgb[3 * r + 1] = cg * factor
+				rgb[3 * r + 2] = cb * factor
 			}
 		}
 		return rgb

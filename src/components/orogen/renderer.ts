@@ -1681,14 +1681,19 @@ export function createOrogenScene(
 	function setColorMode(mode: ColorMode) {
 		if (mode === currentColorMode) return
 		currentColorMode = mode
-		if (mode === "terrain") {
+		const useTerrainWaterMaterial = mode === "terrain" || mode === "windSpeed"
+		if (useTerrainWaterMaterial) {
 			waterMat.color.set(0xffffff)
 			waterMat.opacity = 0.12
 			waterMat.specular.set(DEFAULT_WATER_SPECULAR)
 		} else {
 			waterMat.color.set(0x0c3a6e)
-			waterMat.opacity = 0.4
+			waterMat.opacity = 0.12
 			waterMat.specular.set(0x000000)
+		}
+		if (currentViewMode === "globe") {
+			waterMesh.visible = true
+			atmosMesh.visible = sun.intensity > 0
 		}
 		if (!recolorMeshesInPlace()) rebuildTerrain()
 	}
@@ -1729,7 +1734,7 @@ export function createOrogenScene(
 		if (terrainMesh) terrainMesh.visible = !isMap
 		if (mapMesh) mapMesh.visible = isMap
 		waterMesh.visible = !isMap
-		atmosMesh.visible = !isMap
+		atmosMesh.visible = !isMap && sun.intensity > 0
 		updateOverlayVisibility()
 	}
 
@@ -2185,7 +2190,9 @@ export function createOrogenScene(
 			sun.intensity = DEFAULT_SUN_INTENSITY
 			if (currentViewMode === "globe") atmosMesh.visible = true
 			waterMat.specular.set(
-				currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000,
+				currentColorMode === "terrain" || currentColorMode === "windSpeed"
+					? DEFAULT_WATER_SPECULAR
+					: 0x000000,
 			)
 		}
 	}

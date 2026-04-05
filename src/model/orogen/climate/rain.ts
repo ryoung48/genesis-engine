@@ -4,8 +4,8 @@
  * SphereMesh and OrogenClimate data (no Cell/window.world dependencies).
  */
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import { SimplexNoise } from "../simplex-noise"
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
+import { SimplexNoise } from "../util/simplex-noise"
 import {
 	getDaysPerYear,
 	getHoursPerDay,
@@ -13,7 +13,7 @@ import {
 	isRetrogradeObliquity,
 	isTidallyLocked,
 	meanEdgeLengthKm,
-} from "../units"
+} from "../util/units"
 import { elevToHeightKm } from "./climate"
 
 const DEG2RAD = Math.PI / 180
@@ -467,8 +467,9 @@ function computeWeight(
 	eastMoisture: number,
 	westMoisture: number,
 	controls: CirculationControls,
+	bandOffsetDeg: number = 0,
 ): number {
-	const dist = Math.abs(cellLat - teq)
+	const dist = Math.abs(cellLat - (teq + bandOffsetDeg))
 	const moisture = Math.max(eastMoisture, westMoisture)
 	const tropicalDist = dist / controls.hadleyWidth
 	const itcz = itczScale(tropicalDist) * moisture * controls.hadleyWetStrength
@@ -477,6 +478,63 @@ function computeWeight(
 	const eastStorms = eastStormScale(dist) * eastMoisture
 	const polar = westerliesScale(dist) * westMoisture
 	return clamp(Math.max(itcz * suppression, eastStorms, polar), 0, 1)
+}
+
+function computeRainBandWarpField(
+	mesh: SphereMesh,
+	seed: number,
+	amplitudeDeg: number,
+): Float32Array {
+	const N = mesh.numRegions
+	const warpXNoise = new SimplexNoise(seed + 4011)
+	const warpYNoise = new SimplexNoise(seed + 4012)
+	const warpZNoise = new SimplexNoise(seed + 4013)
+	const bandNoise = new SimplexNoise(seed + 4014)
+	const detailNoise = new SimplexNoise(seed + 4015)
+	const warp = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		const x = mesh.r_xyz[3 * r]
+		const y = mesh.r_xyz[3 * r + 1]
+		const z = mesh.r_xyz[3 * r + 2]
+
+		const dx = warpXNoise.fbm(
+			x * 1.25 + 17.3,
+			y * 1.25 + 9.1,
+			z * 1.25 + 23.7,
+			3,
+			0.55,
+		)
+		const dy = warpYNoise.fbm(
+			x * 1.25 + 31.9,
+			y * 1.25 + 14.7,
+			z * 1.25 + 5.3,
+			3,
+			0.55,
+		)
+		const dz = warpZNoise.fbm(
+			x * 1.25 + 7.1,
+			y * 1.25 + 28.4,
+			z * 1.25 + 12.9,
+			3,
+			0.55,
+		)
+		const wx = x + dx * 0.3
+		const wy = y + dy * 0.3
+		const wz = z + dz * 0.3
+
+		const broad = bandNoise.fbm(wx * 1.8, wy * 1.8, wz * 1.8, 4, 0.55)
+		const detail = detailNoise.fbm(
+			wx * 5.0 + 43.1,
+			wy * 5.0 + 18.7,
+			wz * 5.0 + 29.4,
+			3,
+			0.5,
+		)
+		warp[r] = (broad * 0.72 + detail * 0.28) * amplitudeDeg
+	}
+
+	return warp
 }
 
 // ---------------------------------------------------------------------------
@@ -532,6 +590,7 @@ function computeTidalRain(
 	const FREQ2 = 7.0
 	const AMP1 = 0.35
 	const AMP2 = 0.15
+	const boundaryWarpDeg = computeRainBandWarpField(mesh, seed, 8)
 
 	// Three rainfall sources:
 	// 1) Substellar convection: cos⁴ falloff, peaks at substellar
@@ -541,7 +600,7 @@ function computeTidalRain(
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
 		const ct = cosTheta[r]
-		const thetaDeg = Math.acos(clamp(ct, -1, 1)) * (180 / Math.PI)
+		const thetaDeg = Math.acos(clamp(ct, -1, 1)) * RAD2DEG + boundaryWarpDeg[r]
 
 		const temp = climate.temperature_avg[r]
 		const ceiling = ceilingScale(temp)
@@ -685,6 +744,7 @@ export function computeMonthlyRain(
 		})()
 
 	const monthly = new Float32Array(N * 12)
+	const boundaryWarpDeg = computeRainBandWarpField(mesh, params?.seed ?? 0, 5.5)
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
 		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
@@ -692,7 +752,14 @@ export function computeMonthlyRain(
 		const bin = regionBin[r]
 		for (let month = 0; month < 12; month++) {
 			const teq = teqPerMonth[month][bin]
-			const weight = computeWeight(latDeg[r], teq, e, w, circulation)
+			const weight = computeWeight(
+				latDeg[r],
+				teq,
+				e,
+				w,
+				circulation,
+				boundaryWarpDeg[r],
+			)
 			const monthTemp = climate.temperature_monthly[month * N + r]
 			monthly[month * N + r] =
 				weight * ceilingScale(monthTemp) * pressureRainFactor

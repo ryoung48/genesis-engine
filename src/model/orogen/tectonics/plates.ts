@@ -10,8 +10,8 @@
  * - assignOceanLand creates its own makeRng(seed+42)
  */
 
-import { makeRandInt, makeRng } from "./rng"
-import type { PlateVec, SphereMesh } from "./types"
+import type { PlateVec, SphereMesh } from "../types"
+import { makeRandInt, makeRng } from "../util/rng"
 
 export interface GeneratePlatesResult {
 	r_plate: Int32Array

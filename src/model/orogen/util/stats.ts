@@ -1,4 +1,4 @@
-import type { SphereMesh } from "./types"
+import type { SphereMesh } from "../types"
 
 export function countContinents(mesh: SphereMesh, isLand: Uint8Array): number {
 	const { numRegions, adjOffset, adjList } = mesh

@@ -3,6 +3,7 @@ import type {
 	OrogenParams,
 	OrogenPartition,
 	OrogenProvinces,
+	StageTiming,
 } from "./types"
 
 export interface SerializedSphereMesh {
@@ -11,7 +12,11 @@ export interface SerializedSphereMesh {
 	numSides: number
 	r_xyz: Float32Array
 	t_xyz: Float32Array
+	triangles: Int32Array
 	halfedges: Int32Array
+	adjOffset: Int32Array
+	adjList: Int32Array
+	neighborDist: Float32Array
 	s_begin_r: Int32Array
 	s_end_r: Int32Array
 	s_inner_t: Int32Array
@@ -23,8 +28,11 @@ export interface SerializedOrogenClimate {
 	temperature_min: Float32Array
 	temperature_max: Float32Array
 	temperature_monthly: Float32Array
+	temperature_monthly_nolapse: Float32Array
+	temperature_monthly_range: Float32Array
+	insolation_monthly: Float32Array
 	pet_monthly: Float32Array
-	daylight_hours_monthly?: Float32Array
+	daylight_hours_monthly: Float32Array
 	landFraction: number[]
 }
 
@@ -42,6 +50,7 @@ export interface SerializedOrogenWorld {
 	}
 	elevation_km: Float32Array
 	params: OrogenParams
+	timings?: StageTiming[]
 	continentCount?: number
 	climate?: SerializedOrogenClimate
 	oceanDist?: Float32Array
@@ -77,6 +86,7 @@ export interface SerializedOrogenWorld {
 	koppenClimate?: Uint8Array
 	vegetation?: Uint8Array
 	topography?: Uint8Array
+	coastal?: Uint8Array
 	slopeScore?: Float32Array
 	isLand?: Uint8Array
 	riverLand?: Uint8Array

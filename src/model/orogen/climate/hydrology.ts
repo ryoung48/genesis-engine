@@ -4,7 +4,7 @@ import type {
 	OrogenParams,
 	OrogenRainfall,
 } from "../types"
-import { getDaysPerYear } from "../units"
+import { getDaysPerYear } from "../util/units"
 
 export function petMonthHargreaves(
 	tas: number,

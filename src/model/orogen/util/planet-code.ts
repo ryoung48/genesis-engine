@@ -3,7 +3,7 @@
  * fixed-width base36 string. No suffixes, no legacy decoding.
  */
 
-import type { OrogenParams } from "./types"
+import type { OrogenParams } from "../types"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getAntistellarLon,

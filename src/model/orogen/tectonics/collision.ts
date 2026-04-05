@@ -3,14 +3,14 @@
  * Faithful port of orogen's elevation.js collision/stress logic.
  */
 
-import { SimplexNoise } from "./simplex-noise"
 import type {
 	BoundaryInfo,
 	CollisionResult,
 	PlateVec,
 	SphereMesh,
 	SuperPlateData,
-} from "./types"
+} from "../types"
+import { SimplexNoise } from "../util/simplex-noise"
 
 const COLLISION_THRESHOLD = 0.75
 type StageTiming = { Stage: string; ms: string }

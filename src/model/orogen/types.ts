@@ -151,6 +151,11 @@ export interface OrogenTerrainFeatures {
 	dominantFeature: Uint8Array
 }
 
+export interface StageTiming {
+	Stage: string
+	ms: string
+}
+
 export interface SuperPlateData {
 	r_superPlate: Int32Array
 	superPlateVec: Map<number, PlateVec>
@@ -164,6 +169,7 @@ export interface OrogenClimate {
 	temperature_min: Float32Array // per-cell annual min °C
 	temperature_max: Float32Array // per-cell annual max °C
 	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
+	temperature_monthly_nolapse: Float32Array // flattened [month * numRegions + region] mean °C before terrain lapse correction
 	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temp range °C (for Hargreaves td)
 	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²
 	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
@@ -307,7 +313,6 @@ export const OROGEN_TOPOGRAPHY_LABELS = [
 	"plateau",
 	"mountains",
 	"marsh",
-	"coastal",
 	"ocean",
 	"lake",
 ] as const
@@ -323,6 +328,7 @@ export interface OrogenWorld {
 	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
 	elevation_km: Float32Array
 	params: OrogenParams
+	timings?: StageTiming[]
 	climate?: OrogenClimate
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
 	oceanDist?: Float32Array
@@ -351,6 +357,8 @@ export interface OrogenWorld {
 	vegetation?: Uint8Array
 	/** Per-cell topography code, index into OROGEN_TOPOGRAPHY_LABELS */
 	topography?: Uint8Array
+	/** Per-cell coastal flag (1 = borders ocean or lake, 0 = otherwise). */
+	coastal?: Uint8Array
 	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
 	slopeScore?: Float32Array
 	rivers?: OrogenRivers
@@ -362,8 +370,8 @@ export interface OrogenWorld {
 	heritages?: OrogenPartition
 	faiths?: OrogenPartition
 	religions?: OrogenPartition
-	landmarks?: import("./provinces/landmarks").OrogenLandmarks
-	population?: import("./provinces/population").ProvincePopulation
+	landmarks?: import("./terrain/landmarks").OrogenLandmarks
+	population?: import("./partitions/population").ProvincePopulation
 	continentCount?: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]

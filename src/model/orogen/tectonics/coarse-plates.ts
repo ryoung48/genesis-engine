@@ -5,11 +5,11 @@
  * Faithful port of orogen's coarse-plates.js.
  */
 
-import { buildSphereMesh } from "./mesh"
+import { buildSphereMesh } from "../mesh"
+import type { PlateVec, SphereMesh } from "../types"
+import { makeRng } from "../util/rng"
+import { SimplexNoise } from "../util/simplex-noise"
 import { assignOceanLand, generatePlates } from "./plates"
-import { makeRng } from "./rng"
-import { SimplexNoise } from "./simplex-noise"
-import type { PlateVec, SphereMesh } from "./types"
 
 const N_COARSE = 20000
 const COARSE_JITTER = 0.75

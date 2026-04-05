@@ -8,8 +8,8 @@ import { EMB_CONSTANTS } from "../../cells/ebm/constants"
 import { EnergyBalanceModel } from "../../cells/ebm/index"
 import { INSOLATION } from "../../cells/ebm/insolation"
 import { TIME } from "../../utilities/time"
-import { SimplexNoise } from "../simplex-noise"
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
+import { SimplexNoise } from "../util/simplex-noise"
 import {
 	getDaysPerYear,
 	getEccentricity,
@@ -20,7 +20,7 @@ import {
 	getSubstellarDir,
 	getSunTempFactor,
 	isTidallyLocked,
-} from "../units"
+} from "../util/units"
 import { fillPetMonthlyHargreaves } from "./hydrology"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
@@ -352,6 +352,7 @@ function computeTidalTemperature(
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
+	const temperature_monthly_nolapse = new Float32Array(N * 12)
 	const temperature_monthly_range = new Float32Array(N * 12)
 	const insolation_monthly = new Float32Array(N * 12)
 	const pet_monthly = new Float32Array(N * 12)
@@ -396,7 +397,9 @@ function computeTidalTemperature(
 		// All 12 monthly slots get the same value (tiny eccentricity wobble spread as sine)
 		for (let month = 0; month < 12; month++) {
 			const phase = Math.sin((month / 12) * 2 * Math.PI)
-			temperature_monthly[month * N + r] = T + eccAmplitude * phase
+			const monthValue = T + eccAmplitude * phase
+			temperature_monthly[month * N + r] = monthValue
+			temperature_monthly_nolapse[month * N + r] = monthValue + lapseCorrection
 			temperature_monthly_range[month * N + r] = tidalTd
 			insolation_monthly[month * N + r] =
 				monthlyFlux[month] * Math.max(0, cosTheta)
@@ -437,6 +440,7 @@ function computeTidalTemperature(
 
 			for (let month = 0; month < 12; month++) {
 				temperature_monthly[month * N + r] += offset
+				temperature_monthly_nolapse[month * N + r] += offset
 			}
 		}
 	}
@@ -469,6 +473,7 @@ function computeTidalTemperature(
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		temperature_monthly_nolapse,
 		temperature_monthly_range,
 		insolation_monthly,
 		pet_monthly,
@@ -554,6 +559,7 @@ export function computeTemperature(
 	const temperature_min = new Float32Array(N)
 	const temperature_max = new Float32Array(N)
 	const temperature_monthly = new Float32Array(N * 12)
+	const temperature_monthly_nolapse = new Float32Array(N * 12)
 	const temperature_monthly_range = new Float32Array(N * 12)
 	const insolation_monthly = new Float32Array(N * 12)
 	const pet_monthly = new Float32Array(N * 12)
@@ -585,10 +591,12 @@ export function computeTemperature(
 			: 1
 
 		for (let month = 0; month < 12; month++) {
-			const zonalMonth =
-				interpolateLatBand(monthlyRanges[month], latDeg) - lapseCorrection
+			const zonalMonthNoLapse = interpolateLatBand(monthlyRanges[month], latDeg)
+			const zonalMonth = zonalMonthNoLapse - lapseCorrection
 			temperature_monthly[month * N + r] =
 				annualAvg + (zonalMonth - annualAvg) * inertiaFactor
+			temperature_monthly_nolapse[month * N + r] =
+				annualAvg + lapseCorrection + (zonalMonth - annualAvg) * inertiaFactor
 			// Range scales with continentality; insolation is purely astronomical
 			temperature_monthly_range[month * N + r] =
 				interpolateLatBand(monthlyRangeRanges[month], latDeg) * inertiaFactor
@@ -632,6 +640,7 @@ export function computeTemperature(
 			temperature_max[r] += offset
 			for (let month = 0; month < 12; month++) {
 				temperature_monthly[month * N + r] += offset
+				temperature_monthly_nolapse[month * N + r] += offset
 			}
 		}
 	}
@@ -664,6 +673,7 @@ export function computeTemperature(
 		temperature_min,
 		temperature_max,
 		temperature_monthly,
+		temperature_monthly_nolapse,
 		temperature_monthly_range,
 		insolation_monthly,
 		pet_monthly,

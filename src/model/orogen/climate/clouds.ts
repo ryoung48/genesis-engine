@@ -6,9 +6,9 @@
  * at 10 bar clouds everywhere but not thicker.
  */
 
-import { SimplexNoise } from "../simplex-noise"
 import type { OrogenParams, OrogenRainfall } from "../types"
-import { getSubstellarDir, isTidallyLocked } from "../units"
+import { SimplexNoise } from "../util/simplex-noise"
+import { getSubstellarDir, isTidallyLocked } from "../util/units"
 
 function norm(v: number): number {
 	return Math.max(-1, Math.min(1, v))

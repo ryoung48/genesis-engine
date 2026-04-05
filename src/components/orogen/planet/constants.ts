@@ -7,7 +7,7 @@ import {
 	DEFAULT_PERIHELION,
 	DEFAULT_PLANET_RADIUS_KM,
 	DEFAULT_SUN_TEMP_FACTOR,
-} from "@/model/orogen/units"
+} from "@/model/orogen/util/units"
 
 export const monthLabels = [
 	"Annual",

@@ -1,5 +1,5 @@
-import { SimplexNoise } from "./simplex-noise"
-import type { SphereMesh } from "./types"
+import type { SphereMesh } from "../types"
+import { SimplexNoise } from "../util/simplex-noise"
 
 // ----------------------------------------------------------------
 //  Inline binary min-heap keyed on external Float32Array

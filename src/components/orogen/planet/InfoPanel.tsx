@@ -13,6 +13,7 @@ import {
 	climateZoneColor,
 	dangerColor,
 	vegetationColor,
+	windSpeedColor,
 } from "../colors"
 import { monthLabels } from "./constants"
 import type {
@@ -171,6 +172,14 @@ function currentImpactColor(v: number): string {
 	return v >= 0 ? "#f59e0b" : "#38bdf8"
 }
 
+function formatWindVector({ east, north, speed }: HoverWind): string {
+	const deg = (Math.atan2(-east, -north) * 180) / Math.PI
+	const from = ((deg % 360) + 360) % 360
+	const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+	const dir = dirs[Math.round(from / 45) % 8]
+	return `${dir} ${from.toFixed(0)}° · ${speed.toFixed(2)} m/s`
+}
+
 function Row({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex items-baseline justify-between">
@@ -291,7 +300,6 @@ interface InfoPanelProps {
 	colorMode: ColorMode
 	isClimateMode: boolean
 	isSatelliteMode: boolean
-	isWindMode: boolean
 	tempAnnual: boolean
 	rainAnnual: boolean
 	windAnnual: boolean
@@ -336,7 +344,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverTerrainFeature,
 	hoverOceanCurrents,
 	colorMode,
-	isWindMode,
 	windAnnual,
 	globalMonth,
 	world,
@@ -365,6 +372,20 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		const iceMin = world.iceMinMonthly?.[r] ?? 0
 		const iceMax = world.iceMaxMonthly?.[r] ?? 0
 		return { temps, precip, daylight, isLand, iceThickness, iceMin, iceMax }
+	})()
+	const windData = (() => {
+		if (!hoverInfo || !world?.wind) return null
+		const r = hoverInfo.region
+		const N = world.mesh.numRegions
+		const speeds: number[] = []
+		for (let m = 0; m < 12; m++) {
+			speeds.push(world.wind.wind_speed_monthly[m * N + r])
+		}
+		return {
+			speeds,
+			annualSpeed:
+				speeds.reduce((sum, value) => sum + value, 0) / speeds.length,
+		}
 	})()
 
 	const hoverRegion = hoverInfo?.region ?? null
@@ -536,17 +557,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						value={`${hoverDistCoastKm === Infinity ? "∞" : hoverDistCoastKm !== null && hoverDistCoastKm < 100 ? hoverDistCoastKm.toFixed(0) : hoverDistCoastKm !== null ? Math.round(hoverDistCoastKm).toLocaleString() : "—"} km`}
 					/>
 				)}
-				{isWindMode && hoverWind && (
+				{hoverWind && (
 					<Row
 						label={`Wind ${windAnnual ? "avg" : monthLabels[globalMonth]}`}
-						value={(() => {
-							const { east: we, north: wn, speed: ws } = hoverWind
-							const deg = (Math.atan2(-we, -wn) * 180) / Math.PI
-							const from = ((deg % 360) + 360) % 360
-							const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-							const dir = dirs[Math.round(from / 45) % 8]
-							return `${dir} ${from.toFixed(0)}° · ${ws.toFixed(2)}`
-						})()}
+						value={formatWindVector(hoverWind)}
 					/>
 				)}
 				{chartData && world?.climate && (
@@ -585,6 +599,19 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								globalMonth={globalMonth}
 								annualValue={annualPrecip ?? undefined}
 								annualDigits={0}
+								showValues
+							/>
+						)}
+						{windData && (
+							<MiniBarChart
+								values={windData.speeds}
+								label="Wind"
+								unit="m/s"
+								colorFn={(v) => rgbToCss(windSpeedColor(v))}
+								globalMonth={globalMonth}
+								annualValue={windData.annualSpeed}
+								annualDigits={2}
+								annualPrefix="AVG"
 								showValues
 							/>
 						)}

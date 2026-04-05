@@ -1,5 +1,19 @@
-import React, { useRef, useState } from "react"
+import {
+	BarElement,
+	CategoryScale,
+	type ChartData,
+	Chart as ChartJS,
+	type ChartOptions,
+	Legend,
+	LinearScale,
+	Tooltip,
+} from "chart.js"
+import React, { useMemo, useRef, useState } from "react"
+import { Bar } from "react-chartjs-2"
+import type { StageTiming } from "@/model/orogen/types"
 import type { SliderDef } from "./sliders"
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 
 interface SidebarProps {
 	worldTab: "planet" | "terrain"
@@ -21,6 +35,7 @@ interface SidebarProps {
 	generating: boolean
 	generationLabel: string
 	generationProgress: number
+	generationTimings?: StageTiming[] | null
 	handleGenerate: () => void
 	handleFileImport: (file: File) => void
 	handleEarthImport: () => void
@@ -74,6 +89,122 @@ function renderSliderGroup(
 	)
 }
 
+function formatTimingSeconds(ms: number): string {
+	return `${(ms / 1000).toFixed(ms >= 10000 ? 0 : 2)} s`
+}
+
+function stripTimingPrefix(stage: string): string {
+	return stage.startsWith("orogen:") ? stage.slice("orogen:".length) : stage
+}
+
+const GenerationTimingChart: React.FC<{
+	timings?: StageTiming[] | null
+}> = ({ timings }) => {
+	const chartState = useMemo(() => {
+		if (!timings?.length) return null
+
+		const orderedEntries = timings
+			.map((entry) => {
+				const ms = Number.parseFloat(entry.ms)
+				return Number.isFinite(ms)
+					? { label: stripTimingPrefix(entry.Stage), ms }
+					: null
+			})
+			.filter((entry): entry is { label: string; ms: number } => entry !== null)
+			.sort((a, b) => b.ms - a.ms)
+
+		if (!orderedEntries.length) return null
+
+		const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
+		const otherMs = orderedEntries
+			.filter((entry) => entry.ms < 100)
+			.reduce((sum, entry) => sum + entry.ms, 0)
+		const entries =
+			otherMs > 0
+				? [...largeEntries, { label: "Other", ms: otherMs }]
+				: largeEntries
+		entries.sort((a, b) => b.ms - a.ms)
+
+		if (!entries.length) return null
+
+		const labels = entries.map((entry) => entry.label)
+		const values = entries.map((entry) => entry.ms)
+		const backgroundColor = entries.map((_, idx) =>
+			idx === 0 ? "#0f172a" : idx < 4 ? "#1e293b" : "#334155",
+		)
+
+		const data: ChartData<"bar"> = {
+			labels,
+			datasets: [
+				{
+					label: "ms",
+					data: values,
+					backgroundColor,
+					borderSkipped: false,
+					borderRadius: 6,
+					maxBarThickness: 18,
+				},
+			],
+		}
+
+		const options: ChartOptions<"bar"> = {
+			indexAxis: "y",
+			responsive: true,
+			maintainAspectRatio: false,
+			plugins: {
+				legend: { display: false },
+				tooltip: {
+					callbacks: {
+						title: (items) => {
+							const idx = items[0]?.dataIndex ?? 0
+							return entries[idx]?.label ?? ""
+						},
+						label: (item) => `${formatTimingSeconds(Number(item.raw))}`,
+					},
+				},
+			},
+			scales: {
+				x: {
+					beginAtZero: true,
+					grid: { color: "rgba(148, 163, 184, 0.18)" },
+					ticks: {
+						font: { size: 9, family: "monospace" },
+						callback: (value) => formatTimingSeconds(Number(value)),
+					},
+				},
+				y: {
+					grid: { display: false },
+					ticks: {
+						font: { size: 9, family: "monospace" },
+					},
+				},
+			},
+		}
+
+		return {
+			data,
+			options,
+			height: Math.max(180, Math.min(420, entries.length * 24 + 56)),
+		}
+	}, [timings])
+
+	if (!chartState) {
+		return (
+			<div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
+				<p className="text-[11px] leading-relaxed text-slate-400">
+					Run a generation or import to collect stage timings.
+				</p>
+			</div>
+		)
+	}
+
+	return (
+		<div style={{ height: chartState.height }}>
+			<Bar data={chartState.data} options={chartState.options} />
+		</div>
+	)
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
 	worldTab,
 	setWorldTab,
@@ -94,6 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 	generating,
 	generationLabel,
 	generationProgress,
+	generationTimings,
 	handleGenerate,
 	handleFileImport,
 	handleEarthImport,
@@ -101,6 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const [showRecentCodes, setShowRecentCodes] = useState(false)
+	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col px-4 py-4 lg:px-5 lg:py-5 border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -128,7 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 						/>
 					</svg>
 				</div>
-				<span className="font-bold text-sm tracking-tight">TECTONIC LAB</span>
+				<span className="font-bold text-sm tracking-tight">GENESIS ENGINE</span>
 				<button
 					onClick={onClose}
 					className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
@@ -149,25 +282,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 						<line x1="6" y1="6" x2="18" y2="18" />
 					</svg>
 				</button>
-			</div>
-
-			{/* Title */}
-			<div className="mb-5">
-				<div className="flex items-center gap-3 mb-2">
-					<div className="h-px w-8 bg-slate-300" />
-					<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.3em]">
-						Planet Forge
-					</span>
-				</div>
-				<h1 className="text-3xl font-black tracking-tighter leading-[0.88] mb-2">
-					<span className="text-slate-900">TECTONIC</span>
-					<br />
-					<span className="text-slate-300">LAB</span>
-				</h1>
-				<p className="text-slate-400 text-xs leading-relaxed">
-					Tectonic plate simulation with collision-driven mountains, hydraulic
-					erosion, and 3D globe rendering.
-				</p>
 			</div>
 
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
@@ -231,56 +345,71 @@ export const Sidebar: React.FC<SidebarProps> = ({
 				)}
 
 				<div className="space-y-2.5 pt-3 mt-1 border-t border-slate-100">
-					<div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-						<div className="flex items-center gap-2">
-							<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-								Code
-							</span>
-							<input
-								type="text"
-								value={codeInput}
-								onChange={(e) => setCodeInput(e.target.value)}
-								onBlur={onApplyCode}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										e.preventDefault()
-										onApplyCode()
-									}
-								}}
-								disabled={generating}
-								placeholder="Planet code"
-								className={`min-w-0 flex-1 bg-transparent border-none font-mono text-[11px] focus:ring-0 focus:outline-none placeholder:text-slate-300 disabled:opacity-50 ${
-									codeError ? "text-red-500" : "text-slate-700"
-								}`}
-							/>
-							{recentCodes.length > 0 && (
-								<button
-									type="button"
-									onClick={() => setShowRecentCodes((current) => !current)}
-									disabled={generating}
-									className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-								>
-									{showRecentCodes ? "Hide Recent" : "Recent"}
-								</button>
-							)}
-							<button
-								onClick={onRandomizeCode}
-								disabled={generating}
-								className="p-1 text-slate-300 hover:text-slate-900 transition-colors disabled:opacity-50"
-								title="New code"
-							>
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-								>
-									<path d="M1 4v6h6M23 20v-6h-6" />
-									<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-								</svg>
-							</button>
+					<div className="space-y-2">
+						<input
+							ref={fileInputRef}
+							type="file"
+							accept="image/png,image/jpeg,image/webp"
+							className="hidden"
+							onChange={(e) => {
+								const file = e.target.files?.[0]
+								if (file) handleFileImport(file)
+								e.target.value = ""
+							}}
+						/>
+						<div className="flex items-stretch gap-2">
+							<div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+								<div className="flex items-center gap-2">
+									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+										Code
+									</span>
+									<input
+										type="text"
+										value={codeInput}
+										onChange={(e) => setCodeInput(e.target.value)}
+										onBlur={onApplyCode}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault()
+												onApplyCode()
+											}
+										}}
+										disabled={generating}
+										placeholder="Planet code"
+										className={`min-w-0 flex-1 bg-transparent border-none font-mono text-[11px] focus:ring-0 focus:outline-none placeholder:text-slate-300 disabled:opacity-50 ${
+											codeError ? "text-red-500" : "text-slate-700"
+										}`}
+									/>
+									{recentCodes.length > 0 && (
+										<button
+											type="button"
+											onClick={() => setShowRecentCodes((current) => !current)}
+											disabled={generating}
+											className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+										>
+											{showRecentCodes ? "Hide Recent" : "Recent"}
+										</button>
+									)}
+									<button
+										onClick={onRandomizeCode}
+										disabled={generating}
+										className="p-1 text-slate-300 hover:text-slate-900 transition-colors disabled:opacity-50"
+										title="New code"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2"
+										>
+											<path d="M1 4v6h6M23 20v-6h-6" />
+											<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
+										</svg>
+									</button>
+								</div>
+							</div>
 						</div>
 						{codeError && (
 							<p className="mt-1 border-t border-slate-200 pt-2 text-[11px] font-medium text-red-500">
@@ -332,41 +461,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 								{generating ? "Generating..." : "Generate"}
 							</span>
 						</button>
-					</div>
-
-					<div className="space-y-1.5">
-						<div className="px-1 font-mono text-[10px] text-slate-400 uppercase tracking-[0.18em]">
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							disabled={generating}
+							className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+							title="Import an equirectangular B&W heightmap (PNG, JPEG, WebP)"
+						>
 							Import
-						</div>
-						<div className="flex gap-2">
-							<input
-								ref={fileInputRef}
-								type="file"
-								accept="image/png,image/jpeg,image/webp"
-								className="hidden"
-								onChange={(e) => {
-									const file = e.target.files?.[0]
-									if (file) handleFileImport(file)
-									e.target.value = ""
-								}}
-							/>
-							<button
-								onClick={() => fileInputRef.current?.click()}
-								disabled={generating}
-								className="flex-1 py-2 px-3 rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-all text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-								title="Import an equirectangular B&W heightmap (PNG, JPEG, WebP)"
-							>
-								Import Heightmap
-							</button>
-							<button
-								onClick={handleEarthImport}
-								disabled={generating}
-								className="py-2 px-3 rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-all text-[11px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-								title="Load Earth's heightmap"
-							>
-								Earth
-							</button>
-						</div>
+						</button>
+						<button
+							type="button"
+							onClick={handleEarthImport}
+							disabled={generating}
+							className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+							title="Load Earth's heightmap"
+						>
+							Earth
+						</button>
 					</div>
 
 					<div className="space-y-1">
@@ -381,6 +493,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
 									width: `${Math.max(0, Math.min(100, generationProgress))}%`,
 								}}
 							/>
+						</div>
+					</div>
+
+					<div className="pt-1">
+						<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
+							<button
+								type="button"
+								onClick={() => setShowGenerationTimings((current) => !current)}
+								className="flex w-full items-center justify-between gap-3 text-left"
+							>
+								<div>
+									<div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+										Timing
+									</div>
+								</div>
+								<div className="flex items-center gap-2">
+									<span className="font-mono text-[10px] text-slate-400">
+										{generationTimings?.length
+											? formatTimingSeconds(
+													generationTimings.reduce(
+														(sum, entry) =>
+															sum + (Number.parseFloat(entry.ms) || 0),
+														0,
+													),
+												)
+											: "--"}
+									</span>
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										className={`text-slate-400 transition-transform ${showGenerationTimings ? "rotate-180" : ""}`}
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</div>
+							</button>
+							{showGenerationTimings && (
+								<div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+									<GenerationTimingChart timings={generationTimings} />
+								</div>
+							)}
 						</div>
 					</div>
 				</div>

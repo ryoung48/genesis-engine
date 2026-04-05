@@ -1,4 +1,4 @@
-import type { SphereMesh } from "./types"
+import type { SphereMesh } from "../types"
 
 export const DEFAULT_PLANET_RADIUS_KM = 6371
 export const DEFAULT_OBLIQUITY_DEG = 23.5

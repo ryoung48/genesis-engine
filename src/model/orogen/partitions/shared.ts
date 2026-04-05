@@ -1,5 +1,5 @@
-import { createRng } from "../rng"
 import type { OrogenPartition } from "../types"
+import { createRng } from "../util/rng"
 
 type GraphPartitionParams = {
 	nodeCount: number

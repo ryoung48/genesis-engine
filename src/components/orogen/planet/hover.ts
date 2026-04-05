@@ -1,12 +1,12 @@
 import { KOPPEN_LABELS, koppenClimateName } from "@/model/orogen/climate/koppen"
 import { PASTA_LABELS, pastaClimateName } from "@/model/orogen/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/climate/vegetation"
-import { LANDMARK_TYPES } from "@/model/orogen/provinces/landmarks"
+import { LANDMARK_TYPES } from "@/model/orogen/terrain/landmarks"
 import {
 	OROGEN_TERRAIN_FEATURE_LABELS,
 	OROGEN_TOPOGRAPHY_LABELS,
 } from "@/model/orogen/types"
-import { meanEdgeLengthKm } from "@/model/orogen/units"
+import { meanEdgeLengthKm } from "@/model/orogen/util/units"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
 

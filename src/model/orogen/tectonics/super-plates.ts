@@ -4,7 +4,7 @@
  * fine-grained detail from individual plate interactions.
  * Faithful port of orogen's super-plates.js.
  */
-import type { PlateVec, SphereMesh, SuperPlateData } from "./types"
+import type { PlateVec, SphereMesh, SuperPlateData } from "../types"
 
 export function buildSuperPlates(
 	mesh: SphereMesh,

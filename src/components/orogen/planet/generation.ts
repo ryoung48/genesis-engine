@@ -1,5 +1,8 @@
-import { decodePlanetCode, encodePlanetCode } from "@/model/orogen/planet-code"
 import type { OrogenParams } from "@/model/orogen/types"
+import {
+	decodePlanetCode,
+	encodePlanetCode,
+} from "@/model/orogen/util/planet-code"
 import type {
 	OrogenWorkerRequest,
 	OrogenWorkerResponse,

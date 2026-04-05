@@ -16,16 +16,14 @@ const NATION_BUCKETS: [number, number][] = [
 	[2, 4],
 	[1, 1],
 ]
-const COASTAL = 5
-
 export function computeNations(params: {
 	provinces: OrogenProvinces
-	topography: Uint8Array
+	coastal: Uint8Array
 	habitability: Float32Array
 	r_xyz: Float32Array
 	seed: number
 }): OrogenNationHierarchy {
-	const { provinces, topography, habitability, r_xyz, seed } = params
+	const { provinces, coastal, habitability, r_xyz, seed } = params
 	const provinceCount = provinces.count
 	if (provinceCount === 0) return emptyPartition(provinceCount)
 
@@ -36,7 +34,7 @@ export function computeNations(params: {
 		if (provinces.desolate[p]) continue
 		active[p] = 1
 		activeCount++
-		coastalScore[p] = topography[provinces.seeds[p]] === COASTAL ? 2 : 1
+		coastalScore[p] = coastal[provinces.seeds[p]] ? 2 : 1
 	}
 	if (activeCount === 0) return emptyPartition(provinceCount)
 

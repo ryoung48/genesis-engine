@@ -4,9 +4,9 @@
  * O(provinceCount) time, typed arrays.
  */
 
-import { createRng } from "../rng"
+import type { OrogenLandmarks } from "../terrain/landmarks"
 import type { OrogenProvinces } from "../types"
-import type { OrogenLandmarks } from "./landmarks"
+import { createRng } from "../util/rng"
 
 // Habitability factors indexed by orogen codes
 
@@ -18,8 +18,9 @@ const HAB_CLIMATE = new Float32Array([
 // vegetation: 0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle
 const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
 
-// topography: 0=flat, 1=hills, 2=plateaus, 3=mountains, 4=marsh, 5=coastal, 6=ocean, 7=lake
-const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 1.25, 0, 0])
+// topography: 0=flat, 1=hills, 2=plateaus, 3=mountains, 4=marsh, 5=ocean, 6=lake
+const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
+const HAB_COASTAL = 1.25
 
 // landmark type: 0=continent, 1=island, 2=isle, 3=ocean, 4=sea, 5=lake
 const HAB_LANDMARK = new Float32Array([1.0, 0.8, 0.5, 0, 0, 0])
@@ -41,15 +42,24 @@ export function computePopulation(
 	climateZones: Uint8Array,
 	vegetation: Uint8Array,
 	topography: Uint8Array,
+	coastal: Uint8Array,
+	riverVisible: Uint8Array,
 	seed: number,
 	planetRadiusKm?: number,
 	numRegions?: number,
 ): ProvincePopulation {
-	const { count, seeds, desolate, size } = provinces
+	const { count, seeds, desolate, size, regionProvince } = provinces
 	const rng = createRng(seed + 77777)
 
 	const habitability = new Float32Array(count)
+	const waterAccess = new Uint8Array(count)
 	let totalHab = 0
+
+	for (let r = 0; r < regionProvince.length; r++) {
+		const province = regionProvince[r]
+		if (province < 0) continue
+		if (coastal[r] || riverVisible[r]) waterAccess[province] = 1
+	}
 
 	for (let i = 0; i < count; i++) {
 		if (desolate[i]) continue
@@ -58,12 +68,14 @@ export function computePopulation(
 		const cz = climateZones[r]
 		const veg = vegetation[r]
 		const topo = topography[r]
+		const coastalFactor = waterAccess[i] ? HAB_COASTAL : 1
 		const lm = landmarks.type[landmarks.regionLandmark[r]]
 
 		const score =
 			(HAB_CLIMATE[cz] ?? 0) *
 			(HAB_VEGETATION[veg] ?? 0) *
 			(HAB_TOPOGRAPHY[topo] ?? 0) *
+			coastalFactor *
 			(HAB_LANDMARK[lm] ?? 0) *
 			size[i] *
 			(0.8 + rng.random() * 0.4) // uniform(0.8, 1.2)
@@ -82,7 +94,7 @@ export function computePopulation(
 	for (let i = 0; i < count; i++) {
 		habitabilityScore += size[i] * cellAreaKm2 * habitability[i]
 	}
-	habitabilityScore /= 1.481e9
+	habitabilityScore /= 1.53e9
 
 	const totalPop = 215e6 * habitabilityScore
 

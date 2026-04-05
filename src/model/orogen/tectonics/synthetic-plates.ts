@@ -9,7 +9,7 @@ import type {
 	DistanceFields,
 	SphereMesh,
 	TectonicPlate,
-} from "./types"
+} from "../types"
 
 export function deriveSyntheticPlates(
 	mesh: SphereMesh,

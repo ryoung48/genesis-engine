@@ -5,7 +5,7 @@ import type {
 	OrogenRainfall,
 	SphereMesh,
 } from "../types"
-import { getDaysPerYear } from "../units"
+import { getDaysPerYear } from "../util/units"
 import { computeMonthlyInsolation } from "./climate"
 
 const ZONE_COLOR_MAP = {

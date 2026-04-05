@@ -25,36 +25,36 @@ import {
 	computeThermalEquator,
 } from "./climate/rain"
 import { assignClimateZones, assignVegetation } from "./climate/vegetation"
-import { computeWind } from "./climate/wind"
+import { ENABLE_PASTA_CLASSIFICATION } from "./features"
+import { buildSphereMesh } from "./mesh"
+import { computePopulation } from "./partitions/population"
+import {
+	buildDummyBoundary,
+	buildSyntheticPlates,
+	computeSimpleDistanceFields,
+	deriveSyntheticPlates,
+} from "./tectonics/synthetic-plates"
+import { classifyTopography } from "./terrain/classification"
 import {
 	applySoilCreep,
 	erodeComposite,
 	sharpenRidges,
 	smoothElevation,
 	warpTerrain,
-} from "./erosion"
-import { ENABLE_PASTA_CLASSIFICATION, ENABLE_WIND_FIELDS } from "./features"
-import { computeHazards } from "./hazards"
-import { buildSphereMesh } from "./mesh"
-import { computeLandmarks } from "./provinces/landmarks"
-import { computePopulation } from "./provinces/population"
-import { computeProvinces } from "./provinces/provinces"
-import { createRng } from "./rng"
-import { countContinents } from "./stats"
-import {
-	buildDummyBoundary,
-	buildSyntheticPlates,
-	computeSimpleDistanceFields,
-	deriveSyntheticPlates,
-} from "./synthetic-plates"
-import { classifyTopography } from "./topography/classification"
-import { computeRivers } from "./topography/rivers"
+} from "./terrain/erosion"
+import { computeHazards } from "./terrain/hazards"
+import { computeLandmarks } from "./terrain/landmarks"
+import { computeProvinces } from "./terrain/provinces"
+import { computeRivers } from "./terrain/rivers"
 import type {
 	OrogenParams,
 	OrogenRainfall,
 	OrogenWorld,
 	SphereMesh,
+	StageTiming,
 } from "./types"
+import { createRng } from "./util/rng"
+import { countContinents } from "./util/stats"
 import {
 	DEFAULT_DAYS_PER_YEAR,
 	DEFAULT_ECCENTRICITY,
@@ -64,7 +64,7 @@ import {
 	getMaxElevationKm,
 	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
-} from "./units"
+} from "./util/units"
 
 export interface ImportParams {
 	seed: number
@@ -93,6 +93,19 @@ export interface ImportParams {
 }
 
 type ProgressFn = (label: string, pct?: number) => void
+
+function createTimingRecorder() {
+	const timings: StageTiming[] = []
+	return {
+		timings,
+		record(stage: string, startMs: number) {
+			timings.push({
+				Stage: stage,
+				ms: (performance.now() - startMs).toFixed(1),
+			})
+		},
+	}
+}
 
 // ── Bilinear sampling ──────────────────────────────────────────────
 
@@ -163,23 +176,29 @@ export function importOrogenWorld(
 	params: ImportParams,
 	onProgress?: ProgressFn,
 ): OrogenWorld {
+	const { timings, record } = createTimingRecorder()
 	const rng = createRng(params.seed)
 
 	onProgress?.("Building sphere mesh...", 5)
+	let t0 = performance.now()
 	const mesh = buildSphereMesh(params.numPoints, params.jitter, rng)
+	record("Sphere mesh (Fibonacci + Delaunay + pole)", t0)
 
 	onProgress?.("Sampling heightmap...", 15)
+	t0 = performance.now()
 	const elevation = sampleHeightmap(
 		mesh,
 		params.grayscale,
 		params.imageWidth,
 		params.imageHeight,
 	)
+	record("Heightmap sampling", t0)
 
 	// Post-processing
 	onProgress?.("Post-processing terrain...", 25)
 
 	if (params.terrainWarp > 0) {
+		t0 = performance.now()
 		warpTerrain(
 			mesh,
 			elevation,
@@ -187,6 +206,7 @@ export function importOrogenWorld(
 			params.terrainWarp,
 			new Float32Array(mesh.numRegions),
 		)
+		record(`Terrain warp (strength=${params.terrainWarp.toFixed(2)})`, t0)
 	}
 
 	const r_isOcean = new Uint8Array(mesh.numRegions)
@@ -197,7 +217,9 @@ export function importOrogenWorld(
 	if (params.smoothing > 0) {
 		const smoothIters = Math.round(1 + params.smoothing * 4)
 		const smoothStr = 0.2 + params.smoothing * 0.5
+		t0 = performance.now()
 		smoothElevation(mesh, elevation, r_isOcean, smoothIters, smoothStr)
+		record(`Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`, t0)
 	}
 
 	const gIters = Math.round(params.glacialErosion * 10)
@@ -207,6 +229,7 @@ export function importOrogenWorld(
 		const tIters = Math.round(params.thermalErosion * 10)
 		const talusSlope = 1.2 - params.thermalErosion * 0.4
 		const kThermal = params.thermalErosion * 0.15
+		t0 = performance.now()
 		erodeComposite(
 			mesh,
 			elevation,
@@ -221,18 +244,24 @@ export function importOrogenWorld(
 			gIters,
 			params.glacialErosion,
 		)
+		record(`Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`, t0)
 	}
 
 	if (params.ridgeSharpening > 0) {
 		const rsIters = Math.round(1 + params.ridgeSharpening * 3)
 		const rsStr = params.ridgeSharpening * 0.08
+		t0 = performance.now()
 		sharpenRidges(mesh, elevation, r_isOcean, rsIters, rsStr)
+		record(`Ridge sharpening (${rsIters} iters)`, t0)
 	}
 
+	t0 = performance.now()
 	applySoilCreep(mesh, elevation, r_isOcean, 3, 0.1125)
+	record("Soil creep (3 iters)", t0)
 
 	// Derive synthetic plates
 	onProgress?.("Deriving plates...", 45)
+	t0 = performance.now()
 	const { plateAssignment, plateIds, plateIsOcean } = deriveSyntheticPlates(
 		mesh,
 		elevation,
@@ -240,9 +269,11 @@ export function importOrogenWorld(
 	const plates = buildSyntheticPlates(plateIds, plateIsOcean)
 	const boundary = buildDummyBoundary(mesh, elevation)
 	const distFields = computeSimpleDistanceFields(mesh, elevation)
+	record("Synthetic plates + boundary", t0)
 
 	// Ocean distance
 	onProgress?.("Computing ocean distance...", 55)
+	t0 = performance.now()
 	const oceanDist = new Float32Array(mesh.numRegions)
 	{
 		const { adjOffset, adjList } = mesh
@@ -271,6 +302,7 @@ export function importOrogenWorld(
 			}
 		}
 	}
+	record("Ocean distance (BFS)", t0)
 
 	// Climate
 	onProgress?.("Computing climate...", 65)
@@ -302,6 +334,7 @@ export function importOrogenWorld(
 		pressure: params.pressure ?? 1.0,
 	}
 	// Build land mask from final elevation
+	t0 = performance.now()
 	const isLand = new Uint8Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (elevation[r] > 0) isLand[r] = 1
@@ -314,7 +347,9 @@ export function importOrogenWorld(
 	for (let r = 0; r < mesh.numRegions; r++) {
 		elevation_km[r] = elevToHeightKm(elevation[r], maxElevKm, maxDepthKm)
 	}
+	record("Land mask + elevation km", t0)
 
+	t0 = performance.now()
 	const landFraction = computeLandFraction(mesh, isLand)
 	const climate = computeTemperature(
 		mesh,
@@ -326,6 +361,8 @@ export function importOrogenWorld(
 		elevation_km,
 	)
 	const currentLandmarks = computeLandmarks(mesh, isLand)
+	record("Climate temperature", t0)
+	t0 = performance.now()
 	const monthlyTEQ: Float32Array[] | undefined = climate
 		? (() => {
 				const N = mesh.numRegions
@@ -339,9 +376,11 @@ export function importOrogenWorld(
 				return result
 			})()
 		: undefined
+	record("Thermal equator", t0)
 
 	// Moisture advection
 	onProgress?.("Computing moisture...", 80)
+	t0 = performance.now()
 	const { east: eastAdv, west: westAdv } = computeAdvection(
 		mesh,
 		elevation,
@@ -351,9 +390,11 @@ export function importOrogenWorld(
 		isLand,
 		elevation_km,
 	)
+	record("Moisture advection", t0)
 
 	// Ocean currents
 	onProgress?.("Computing ocean currents...", 82)
+	t0 = performance.now()
 	const oceanCurrents = computeOceanCurrents(
 		mesh,
 		isLand,
@@ -375,19 +416,11 @@ export function importOrogenWorld(
 		)
 		refreshClimatePetMonthly(climate, orogenParams)
 	}
-
-	// Wind fields
-	const wind = ENABLE_WIND_FIELDS
-		? (() => {
-				onProgress?.("Computing wind fields...", 84)
-				return climate
-					? computeWind(mesh, elevation, isLand, climate, orogenParams)
-					: undefined
-			})()
-		: undefined
+	record("Ocean currents", t0)
 
 	// Rainfall
 	onProgress?.("Computing rainfall...", 85)
+	t0 = performance.now()
 	const rain = computeMonthlyRain(
 		mesh,
 		climate,
@@ -402,14 +435,20 @@ export function importOrogenWorld(
 		east: eastAdv,
 		west: westAdv,
 	}
+	record("Monthly rainfall", t0)
+	t0 = performance.now()
 	const hydrology = computeHydrologyFields(climate, rainfall, isLand)
+	record("Hydrology fields", t0)
 
 	// Vegetation
 	onProgress?.("Assigning vegetation...", 88)
+	t0 = performance.now()
 	const vegetation = assignVegetation(mesh, isLand, climate, rainfall)
+	record("Vegetation assignment", t0)
 
 	// Rivers
 	onProgress?.("Computing rivers...", 90)
+	t0 = performance.now()
 	const rivers = computeRivers(
 		mesh,
 		elevation,
@@ -419,13 +458,15 @@ export function importOrogenWorld(
 		isLand,
 		orogenParams,
 	)
+	record("Rivers", t0)
 
 	// Clear vegetation for lake cells
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (rivers.lakes[r]) vegetation[r] = 0
 	}
 
-	const { topography, slopeScore } = classifyTopography({
+	t0 = performance.now()
+	const { topography, coastal, slopeScore } = classifyTopography({
 		mesh,
 		elevationKm: elevation_km,
 		isLand,
@@ -434,23 +475,29 @@ export function importOrogenWorld(
 		planetRadiusKm: params.planetRadiusKm,
 		seed: params.seed,
 	})
+	record("Topography classification", t0)
 
 	// Climate zones
 	onProgress?.("Classifying climate zones...", 93)
+	t0 = performance.now()
 	const climateZones = assignClimateZones(mesh, isLand, climate)
+	record("Climate zone assignment", t0)
 
 	// Provinces
 	onProgress?.("Partitioning provinces...", 94)
+	t0 = performance.now()
 	const provinces = computeProvinces(mesh, isLand, topography, params.seed, {
 		climateZones,
 		rainfall,
 		planetRadiusKm: params.planetRadiusKm,
 	})
+	record("Provinces", t0)
 
 	// Pasta climate
 	const pastaResult = ENABLE_PASTA_CLASSIFICATION
 		? (() => {
 				onProgress?.("Classifying pasta climate...", 95)
+				t0 = performance.now()
 				return assignPastaClimate(
 					mesh,
 					isLand,
@@ -463,24 +510,32 @@ export function importOrogenWorld(
 		: undefined
 	const pastaClimate = pastaResult?.zones
 	const pastaDebug = pastaResult?.debug
+	if (pastaResult) record("Pasta climate assignment", t0)
 
 	// Koppen climate
 	onProgress?.("Classifying Koppen climate...", 96)
+	t0 = performance.now()
 	const koppenClimate = assignKoppenClimate(mesh, isLand, climate, rainfall)
+	record("Koppen climate assignment", t0)
 
 	// Province population
 	onProgress?.("Computing population...", 97)
+	t0 = performance.now()
 	const population = computePopulation(
 		provinces,
 		currentLandmarks,
 		climateZones,
 		vegetation,
 		topography,
+		coastal,
+		rivers.visible,
 		params.seed,
 		params.planetRadiusKm,
 		mesh.numRegions,
 	)
+	record("Population", t0)
 
+	t0 = performance.now()
 	const hazards = computeHazards(
 		mesh,
 		boundary,
@@ -489,6 +544,7 @@ export function importOrogenWorld(
 		isLand,
 		"active",
 	)
+	record("Hazards", t0)
 
 	onProgress?.("Done", 100)
 
@@ -512,13 +568,14 @@ export function importOrogenWorld(
 		koppenClimate,
 		vegetation,
 		topography,
+		coastal,
 		slopeScore,
 		rivers,
 		isLand,
 		provinces,
 		population,
 		oceanCurrents,
-		wind,
 		continentCount: countContinents(mesh, isLand),
+		timings,
 	}
 }

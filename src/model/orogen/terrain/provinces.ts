@@ -4,9 +4,9 @@
  * O(N) time, all typed arrays, no object allocation in hot path.
  */
 
-import { createRng } from "../rng"
 import type { OrogenProvinces, OrogenRainfall, SphereMesh } from "../types"
-import { meanEdgeLengthKm } from "../units"
+import { createRng } from "../util/rng"
+import { meanEdgeLengthKm } from "../util/units"
 
 export function computeProvinces(
 	mesh: SphereMesh,

@@ -1,4 +1,4 @@
-import { DEFAULT_PLANET_RADIUS_KM } from "@/model/orogen/units"
+import { DEFAULT_PLANET_RADIUS_KM } from "@/model/orogen/util/units"
 import { DEFAULT_WORLD_PARAMS, STAGNANT_TERRAIN_OVERRIDES } from "./constants"
 
 export interface SliderDef {

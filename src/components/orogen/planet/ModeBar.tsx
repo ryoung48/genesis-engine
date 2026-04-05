@@ -3,7 +3,6 @@ import type { PopulationMapMode } from "@/components/world/types"
 import {
 	ENABLE_PASTA_CLASSIFICATION,
 	ENABLE_PROVINCES,
-	ENABLE_WIND_FIELDS,
 } from "@/model/orogen/features"
 import type { ColorMode } from "../colors"
 
@@ -18,7 +17,6 @@ interface ModeBarProps {
 	setPopulationMode: (v: PopulationMapMode) => void
 	isClimateMode: boolean
 	isSatelliteMode: boolean
-	isWindMode: boolean
 	tempAnnual: boolean
 	setTempAnnual: (v: boolean) => void
 	rainAnnual: boolean
@@ -38,7 +36,6 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	setPopulationMode,
 	isClimateMode,
 	isSatelliteMode,
-	isWindMode,
 	tempAnnual,
 	setTempAnnual,
 	rainAnnual,
@@ -99,6 +96,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					["oceanCurrents", "Currents"],
 					["temperature", "Temp"],
 					["precipitation", "Rain"],
+					// ["windSpeed", "Wind"],
 				] as [ColorMode, string][]
 			).map(([mode, label]) => {
 				const isActive =
@@ -142,10 +140,23 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				</>
 			)
 
-			if (colorMode === "temperature" || colorMode === "precipitation") {
-				const active = colorMode === "temperature" ? tempAnnual : rainAnnual
+			if (
+				colorMode === "temperature" ||
+				colorMode === "precipitation" ||
+				colorMode === "windSpeed"
+			) {
+				const active =
+					colorMode === "temperature"
+						? tempAnnual
+						: colorMode === "precipitation"
+							? rainAnnual
+							: windAnnual
 				const setter =
-					colorMode === "temperature" ? setTempAnnual : setRainAnnual
+					colorMode === "temperature"
+						? setTempAnnual
+						: colorMode === "precipitation"
+							? setRainAnnual
+							: setWindAnnual
 				return (
 					<div className="inline-flex items-center gap-0.5 rounded-xl border border-white/10 bg-slate-950/75 p-1 backdrop-blur-sm">
 						{climateButtons}
@@ -270,7 +281,6 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					[
 						["terrain", "Terrain"],
 						["climate", "Climate"],
-						...(ENABLE_WIND_FIELDS ? [["windSpeed", "Wind"]] : []),
 						...(ENABLE_PROVINCES
 							? [
 									["population", "Population"],
@@ -299,30 +309,6 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 						</button>
 					)
 				})}
-				{(colorMode === "precipitation" || isWindMode) && (
-					<>
-						<div className="w-px h-4 bg-white/10 mx-0.5" />
-						{([true, false] as const).map((isAnnual) => {
-							const active =
-								colorMode === "precipitation" ? rainAnnual : windAnnual
-							const setter =
-								colorMode === "precipitation" ? setRainAnnual : setWindAnnual
-							return (
-								<button
-									key={isAnnual ? "annual" : "monthly"}
-									onClick={() => setter(isAnnual)}
-									className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
-										active === isAnnual
-											? "bg-white/15 text-white shadow-sm"
-											: "text-slate-400 hover:text-slate-200"
-									}`}
-								>
-									{isAnnual ? "Annual" : "Monthly"}
-								</button>
-							)
-						})}
-					</>
-				)}
 			</div>
 		</div>
 	)

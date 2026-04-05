@@ -1,15 +1,14 @@
 import { BIOME_LABELS } from "../climate/vegetation"
-import { SimplexNoise } from "../simplex-noise"
 import type { OrogenRivers, SphereMesh } from "../types"
+import { SimplexNoise } from "../util/simplex-noise"
 
 const TOPO_FLAT = 0
 const TOPO_HILL = 1
 const TOPO_PLATEAU = 2
 const TOPO_MOUNTAIN = 3
 const TOPO_MARSH = 4
-const TOPO_COASTAL = 5
-const TOPO_OCEAN = 6
-const TOPO_LAKE = 7
+export const TOPO_OCEAN = 5
+export const TOPO_LAKE = 6
 
 export function computeSlopeScore(
 	mesh: SphereMesh,
@@ -72,12 +71,17 @@ export function classifyTopography(params: {
 	slopeScore?: Float32Array
 	planetRadiusKm?: number
 	seed?: number
-}): { topography: Uint8Array; slopeScore: Float32Array } {
+}): {
+	topography: Uint8Array
+	coastal: Uint8Array
+	slopeScore: Float32Array
+} {
 	const { mesh, elevationKm, isLand, rivers, vegetation, planetRadiusKm } =
 		params
 	const slopeScore =
 		params.slopeScore ?? computeSlopeScore(mesh, elevationKm, planetRadiusKm)
 	const topography = new Uint8Array(mesh.numRegions)
+	const coastal = new Uint8Array(mesh.numRegions)
 	const { adjOffset, adjList, r_xyz } = mesh
 	const { lakes } = rivers
 	const adjacentLake = new Uint8Array(mesh.numRegions)
@@ -167,13 +171,10 @@ export function classifyTopography(params: {
 
 		const elevation = elevationKm[r]
 		const slope = slopeScore[r]
+		if (adjacentOcean[r] || adjacentLake[r]) coastal[r] = 1
 
 		if (marsh[r]) {
 			topography[r] = TOPO_MARSH
-			continue
-		}
-		if (adjacentOcean[r] && elevation < 0.55 && slope < 0.42) {
-			topography[r] = TOPO_COASTAL
 			continue
 		}
 		if (
@@ -198,5 +199,5 @@ export function classifyTopography(params: {
 		topography[r] = TOPO_FLAT
 	}
 
-	return { topography, slopeScore }
+	return { topography, coastal, slopeScore }
 }

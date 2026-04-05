@@ -462,21 +462,22 @@ export function oceanCurrentColor(warmth: number): [number, number, number] {
  * Input: raw wind speed in m/s, clamped to a fixed 0–20 m/s display range.
  */
 const windSpeedStops: { v: number; r: number; g: number; b: number }[] = [
-	{ v: 0.0, r: 0xe8 / 255, g: 0xef / 255, b: 0xec / 255 },
-	{ v: 0.1, r: 0xd6 / 255, g: 0xe6 / 255, b: 0xe0 / 255 },
-	{ v: 0.2, r: 0xc4 / 255, g: 0xdd / 255, b: 0xd6 / 255 },
-	{ v: 0.3, r: 0xae / 255, g: 0xe0 / 255, b: 0xd6 / 255 },
-	{ v: 0.4, r: 0x8f / 255, g: 0xde / 255, b: 0xd5 / 255 },
-	{ v: 0.5, r: 0x6f / 255, g: 0xd9 / 255, b: 0xd3 / 255 },
-	{ v: 0.6, r: 0x4f / 255, g: 0xd4 / 255, b: 0xd1 / 255 },
-	{ v: 0.7, r: 0x33 / 255, g: 0xcd / 255, b: 0xcf / 255 },
-	{ v: 0.8, r: 0x1f / 255, g: 0xc5 / 255, b: 0xcb / 255 },
-	{ v: 0.9, r: 0x10 / 255, g: 0xbc / 255, b: 0xc6 / 255 },
-	{ v: 1.0, r: 0x06 / 255, g: 0xb3 / 255, b: 0xc0 / 255 },
+	{ v: 0.0, r: 0xf7 / 255, g: 0xfb / 255, b: 0xfd / 255 },
+	{ v: 0.1, r: 0xde / 255, g: 0xef / 255, b: 0xfb / 255 },
+	{ v: 0.2, r: 0xb9 / 255, g: 0xdb / 255, b: 0xf7 / 255 },
+	{ v: 0.3, r: 0x7d / 255, g: 0xc2 / 255, b: 0xf0 / 255 },
+	{ v: 0.4, r: 0x39 / 255, g: 0xad / 255, b: 0xe5 / 255 },
+	{ v: 0.5, r: 0x17 / 255, g: 0xc3 / 255, b: 0xc8 / 255 },
+	{ v: 0.6, r: 0x39 / 255, g: 0xc9 / 255, b: 0x8b / 255 },
+	{ v: 0.7, r: 0x95 / 255, g: 0xd4 / 255, b: 0x3a / 255 },
+	{ v: 0.8, r: 0xf0 / 255, g: 0xd2 / 255, b: 0x3c / 255 },
+	{ v: 0.9, r: 0xf5 / 255, g: 0x97 / 255, b: 0x2a / 255 },
+	{ v: 1.0, r: 0xdf / 255, g: 0x4b / 255, b: 0x1d / 255 },
 ]
 
 export function windSpeedColor(speed: number): [number, number, number] {
-	const clamped = Math.max(0, Math.min(1, speed / 20))
+	const normalized = Math.max(0, Math.min(1, speed / 20))
+	const clamped = Math.pow(normalized, 0.65)
 	for (let i = 0; i < windSpeedStops.length - 1; i++) {
 		const a = windSpeedStops[i]
 		const b = windSpeedStops[i + 1]
@@ -491,6 +492,20 @@ export function windSpeedColor(speed: number): [number, number, number] {
 	}
 	const last = windSpeedStops[windSpeedStops.length - 1]
 	return [last.r, last.g, last.b]
+}
+
+export function windDirectionColor(
+	speed: number,
+	eastward: number,
+): [number, number, number] {
+	const intensity = Math.pow(Math.max(0, Math.min(1, speed / 20)), 0.8)
+	const target: [number, number, number] =
+		eastward >= 0 ? [0.56, 0.24, 0.86] : [0.18, 0.43, 0.98]
+	return [
+		1 + (target[0] - 1) * intensity,
+		1 + (target[1] - 1) * intensity,
+		1 + (target[2] - 1) * intensity,
+	]
 }
 
 export function dangerColor(score: number): [number, number, number] {

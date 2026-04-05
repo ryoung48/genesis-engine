@@ -6,9 +6,9 @@
  * nearby continental land.
  */
 
-import type { OrogenLandmarks } from "../provinces/landmarks"
+import type { OrogenLandmarks } from "../terrain/landmarks"
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
-import { meanEdgeLengthKm } from "../units"
+import { meanEdgeLengthKm } from "../util/units"
 import { computeThermalEquator } from "./rain"
 
 const RAD2DEG = 180 / Math.PI
