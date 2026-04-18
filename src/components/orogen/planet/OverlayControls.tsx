@@ -20,8 +20,8 @@ interface OverlayControlsProps {
 	setShowNationBorders: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
-	sidebarOpen?: boolean
-	onToggleSidebar?: () => void
+	generationPanelOpen?: boolean
+	onToggleGenerationPanel?: () => void
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
@@ -43,8 +43,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowNationBorders,
 	gridSpacing,
 	setGridSpacing,
-	sidebarOpen,
-	onToggleSidebar,
+	generationPanelOpen,
+	onToggleGenerationPanel,
 }) => (
 	<div className="absolute bottom-3 left-3 z-20 pointer-events-none">
 		<div className="pointer-events-auto flex flex-col items-start gap-2">
@@ -156,10 +156,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 				</div>
 			)}
 			<div className="flex items-center gap-2">
-				{!sidebarOpen && onToggleSidebar && (
+				{!generationPanelOpen && onToggleGenerationPanel && (
 					<button
-						onClick={onToggleSidebar}
-						title="Show sidebar"
+						onClick={onToggleGenerationPanel}
+						title="Show generation panel"
 						className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/80 text-slate-200 shadow-lg backdrop-blur-md transition-all hover:bg-slate-950/95"
 					>
 						<svg

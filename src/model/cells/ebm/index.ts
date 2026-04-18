@@ -53,7 +53,8 @@ export class EnergyBalanceModel {
 		const { grid, time, planet } = EMB_CONSTANTS // Use constants for grid/time as they are structural
 		const hoursPerDay = this.config.time?.HOURS_PER_DAY || time.HOURS_PER_DAY
 		const earthDayHours = 24.0
-		const rotationFactor = Math.pow(earthDayHours / hoursPerDay, 0.5)
+		// Longer days strengthen meridional heat transport in this model.
+		const rotationFactor = Math.pow(hoursPerDay / earthDayHours, 0.5)
 		const radiusRatio =
 			planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
 		const radiusFactor = radiusRatio * radiusRatio // D scales as 1/R²

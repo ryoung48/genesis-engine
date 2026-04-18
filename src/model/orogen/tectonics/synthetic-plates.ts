@@ -10,6 +10,7 @@ import type {
 	SphereMesh,
 	TectonicPlate,
 } from "../types"
+import { computeCoastDistances } from "../util/stats"
 
 export function deriveSyntheticPlates(
 	mesh: SphereMesh,
@@ -110,53 +111,9 @@ export function computeSimpleDistanceFields(
 	elevation: Float32Array,
 ): DistanceFields {
 	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const distCoastLand = new Float32Array(N).fill(Infinity)
-	const distCoast = new Float32Array(N).fill(Infinity)
-
-	const coastQueue: number[] = []
-	const landQueue: number[] = []
-	for (let r = 0; r < N; r++) {
-		const isOcean = elevation[r] <= 0
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			if (elevation[adjList[j]] <= 0 !== isOcean) {
-				distCoast[r] = 0
-				coastQueue.push(r)
-				if (!isOcean) {
-					distCoastLand[r] = 0
-					landQueue.push(r)
-				}
-				break
-			}
-		}
-	}
-
-	let head = 0
-	while (head < coastQueue.length) {
-		const r = coastQueue[head++]
-		const d = distCoast[r] + 1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (d < distCoast[nb]) {
-				distCoast[nb] = d
-				coastQueue.push(nb)
-			}
-		}
-	}
-
-	head = 0
-	while (head < landQueue.length) {
-		const r = landQueue[head++]
-		const d = distCoastLand[r] + 1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (d < distCoastLand[nb] && elevation[nb] > 0) {
-				distCoastLand[nb] = d
-				landQueue.push(nb)
-			}
-		}
-	}
-
+	const isLand = new Uint8Array(N)
+	for (let r = 0; r < N; r++) isLand[r] = elevation[r] > 0 ? 1 : 0
+	const { distCoast, distCoastLand } = computeCoastDistances(mesh, isLand)
 	return {
 		distMountain: new Float32Array(N),
 		distOcean: new Float32Array(N),

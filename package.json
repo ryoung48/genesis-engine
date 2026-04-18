@@ -9,7 +9,7 @@
 		"build": "tsc -b && vite build",
 		"lint": "biome check --write --unsafe",
 		"preview": "vite preview",
-		"test": "vitest"
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@datastructures-js/priority-queue": "^6.3.5",

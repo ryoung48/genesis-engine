@@ -16,7 +16,7 @@ import { TIME } from "../../utilities/time"
 import type { OrogenClimate, OrogenRainfall, SphereMesh } from "../types"
 
 // Positive degree-day melt factor: 4 mm w.e. per degree-day
-const MELT_FACTOR = 4.0
+const MELT_FACTOR = 6.0
 
 // Pre-compute days per month
 const DAYS_PER_MONTH = new Float64Array(12)
@@ -36,7 +36,7 @@ export function computeIceAccumulation(
 	climate: OrogenClimate,
 	rainfall: OrogenRainfall,
 	isLand: Uint8Array,
-	distCoast?: Float32Array,
+	distCoast: Float32Array,
 	cycles = 15,
 ): IceResult {
 	const N = mesh.numRegions
@@ -49,13 +49,11 @@ export function computeIceAccumulation(
 	// Boost fades over ~8 BFS hops from coastline.
 	const COAST_FADE = 8
 	const coastBoost = new Float32Array(N)
-	if (distCoast) {
-		for (let r = 0; r < N; r++) {
-			if (isLand[r]) continue
-			const d = distCoast[r]
-			if (d < COAST_FADE) {
-				coastBoost[r] = 1 - d / COAST_FADE // 1.0 at coast, 0 at fade distance
-			}
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		const d = distCoast[r]
+		if (d < COAST_FADE) {
+			coastBoost[r] = 1 - d / COAST_FADE // 1.0 at coast, 0 at fade distance
 		}
 	}
 
@@ -95,8 +93,8 @@ export function computeIceAccumulation(
 					// Near coast: threshold up to +1°C (shallow water freezes easier)
 					// Also accumulate more near coast (fast ice is thicker)
 					const cb = coastBoost[r]
-					const freezeThresh = -2 + cb * 3 // -2°C open ocean → +1°C at coast
-					const accumRate = 10 + cb * 8 // 10mm open ocean → 18mm at coast
+					const freezeThresh = -2 + cb * 2 // -2°C open ocean → +0°C at coast
+					const accumRate = 10 + cb * 5 // 10mm open ocean → 18mm at coast
 
 					if (temp < freezeThresh) {
 						ice[r] += accumRate

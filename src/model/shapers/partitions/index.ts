@@ -5,9 +5,10 @@ import { Cell } from "@/model/cells/types"
 import { NATION } from "@/model/nations"
 import { RELATIONS } from "@/model/nations/relations"
 import { Relation } from "@/model/nations/relations/types"
-import type { OrogenNationHierarchy } from "@/model/orogen/types"
 import { PROVINCE } from "@/model/provinces"
 import { Province } from "@/model/provinces/types"
+import { ARRAY } from "@/model/utilities/array"
+import { MATH } from "@/model/utilities/math"
 import { CULTURE } from "../../actors/culture"
 import { FAITH } from "../../actors/faith"
 import { HERITAGE } from "../../actors/heritage"
@@ -107,38 +108,51 @@ export const SHAPER_PARTITIONS = {
 		}
 	},
 	_nations: () => {
-		const hierarchy = (
-			window.world as typeof window.world & {
-				orogen?: { nations?: OrogenNationHierarchy }
-			}
-		).orogen?.nations
-		if (hierarchy) {
-			for (let p = 0; p < hierarchy.parent.length; p++) {
-				const province = window.world.provinces[p]
-				if (!province || province.desolate) continue
-				PROVINCE.children.add(province, [])
-				PROVINCE.occupations.add(province, undefined)
-				const parentIdx = hierarchy.parent[p]
-				if (parentIdx >= 0) {
-					PROVINCE.parent.add(province, parentIdx)
-				} else {
-					PROVINCE.parent.remove(province)
-				}
-			}
+		const provinces = window.world.provinces.filter((p) => !p.desolate)
+		const { groups } = ARRAY.distribute<Province>({
+			items: provinces,
+			percentages: MATH.normalize([0.025, 0.05, 0.1, 0.2, 0.3, 0.4]),
+			buckets: [
+				[50, 100],
+				[25, 49],
+				[10, 24],
+				[5, 9],
+				[2, 4],
+				[1, 1],
+			],
+			neighbors: (p) => PROVINCE.neighbors({ province: p }),
+			score: (p, start) => {
+				const pCell = window.world.cells[p.cell]
+				const startCell = window.world.cells[start.cell]
+				const d = CELL.distance(pCell, startCell)
+				const coastalBoost = pCell.topography === "coastal" ? 2 : 1
+				return (1 / (d + 0.1)) * coastalBoost
+			},
+			sorted: (items) =>
+				items.sort((a, b) => {
+					const aCell = window.world.cells[a.cell]
+					const bCell = window.world.cells[b.cell]
+					const aCoastal = aCell.topography === "coastal" ? 1 : 0
+					const bCoastal = bCell.topography === "coastal" ? 1 : 0
+					return bCoastal - aCoastal
+				}),
+		})
 
-			for (let p = 0; p < hierarchy.childOffset.length - 1; p++) {
-				const province = window.world.provinces[p]
-				if (!province || province.desolate) continue
-				const start = hierarchy.childOffset[p]
-				const end = hierarchy.childOffset[p + 1]
-				if (end > start) {
-					PROVINCE.children.add(
-						province,
-						Array.from(hierarchy.childList.subarray(start, end)),
-					)
-				}
-			}
-		}
+		groups.forEach((group) => {
+			const sorted = group.sort(
+				(a, b) => NATION.wealth.raw(b) - NATION.wealth.raw(a),
+			)
+			const capital = sorted[0]
+			PROVINCE.parent.remove(capital)
+			PROVINCE.occupations.add(capital, undefined)
+			const reminder = sorted.slice(1)
+			NATION.domains.add(capital, reminder)
+			reminder
+				.filter((subject) => subject._children.length === 0)
+				.forEach((subject) => {
+					PROVINCE.children.add(subject, [])
+				})
+		})
 
 		// Initialize relations between neighboring sovereign nations
 		// [rival, suspicious, neutral, friendly, ally]

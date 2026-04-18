@@ -5,16 +5,7 @@ import type {
 	SphereMesh,
 	TectonicMode,
 } from "../types"
-
-function clamp01(value: number): number {
-	return Math.max(0, Math.min(1, value))
-}
-
-function smoothstep(edge0: number, edge1: number, value: number): number {
-	if (edge0 === edge1) return value >= edge1 ? 1 : 0
-	const t = clamp01((value - edge0) / (edge1 - edge0))
-	return t * t * (3 - 2 * t)
-}
+import { clamp01, smoothstep } from "../util/math"
 
 function gradualFalloff(distance: number, reach: number, power = 1.35): number {
 	if (!Number.isFinite(distance)) return 0

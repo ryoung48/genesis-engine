@@ -5,13 +5,17 @@
  */
 import { PriorityQueue } from "@datastructures-js/priority-queue"
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
+import {
+	clamp,
+	getRegionLatLonDegrees,
+	piecewise,
+	smoothstep,
+} from "../util/math"
 import { SimplexNoise } from "../util/simplex-noise"
 import {
-	getDaysPerYear,
-	getHoursPerDay,
+	DEFAULT_ANTISTELLAR_LON,
 	getSubstellarDir,
 	isRetrogradeObliquity,
-	isTidallyLocked,
 	meanEdgeLengthKm,
 } from "../util/units"
 import { elevToHeightKm } from "./climate"
@@ -19,35 +23,9 @@ import { elevToHeightKm } from "./climate"
 const DEG2RAD = Math.PI / 180
 const RAD2DEG = 180 / Math.PI
 
-// ---------------------------------------------------------------------------
-// Piecewise-linear interpolation (replaces d3.scaleLinear, clamped)
-// ---------------------------------------------------------------------------
-
-function piecewise(domain: number[], range: number[], x: number): number {
-	if (x <= domain[0]) return range[0]
-	if (x >= domain[domain.length - 1]) return range[range.length - 1]
-	for (let i = 1; i < domain.length; i++) {
-		if (x <= domain[i]) {
-			const t = (x - domain[i - 1]) / (domain[i] - domain[i - 1])
-			return range[i - 1] + t * (range[i] - range[i - 1])
-		}
-	}
-	return range[range.length - 1]
-}
-
 function angleDeltaDeg(a: number, b: number): number {
 	const d = ((a - b + 540) % 360) - 180
 	return Math.abs(d)
-}
-
-function clamp(x: number, min: number, max: number): number {
-	return Math.max(min, Math.min(max, x))
-}
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-	if (edge0 === edge1) return x < edge0 ? 0 : 1
-	const t = clamp((x - edge0) / (edge1 - edge0), 0, 1)
-	return t * t * (3 - 2 * t)
 }
 
 const ceilingScale = (x: number) =>
@@ -57,44 +35,18 @@ const ceilingScale = (x: number) =>
 		x,
 	)
 
-const itczScale = (x: number) => piecewise([0, 8, 18, 28], [1, 0.7, 0.2, 0], x)
+const itczScale = (x: number) =>
+	piecewise([0, 0.26, 0.6, 0.93], [1, 0.7, 0.2, 0], x)
 const subsidenceScale = (x: number) =>
-	piecewise([15, 20, 25, 30, 35, 40], [0, 0.5, 1, 1, 0.5, 0], x)
-const eastStormScale = (x: number) => piecewise([10, 35, 90], [0, 0.8, 1], x)
-const westerliesScale = (x: number) => piecewise([40, 50, 90], [0, 1, 0.8], x)
+	piecewise([0.5, 0.66, 0.83, 1, 1.16, 1.33], [0, 0.5, 1, 1, 0.5, 0], x)
+const eastStormScale = (x: number) => piecewise([0.33, 1.16, 3], [0, 0.8, 1], x)
+const westerliesScale = (x: number) =>
+	piecewise([1.33, 1.66, 3], [0, 1, 0.8], x)
 
-type CirculationControls = {
-	hadleyWidth: number
-	hadleyWetStrength: number
-	hadleyDryStrength: number
-}
+const hadleyWidth = (x: number) =>
+	piecewise([6, 12, 24, 48, 96, 192, 384], [18, 25, 30, 40, 55, 65, 70], x)
 
 type ThermalEquatorMesh = Pick<SphereMesh, "numRegions" | "r_xyz">
-
-function getCirculationControls(
-	params?: Pick<OrogenParams, "daysPerYear" | "hoursPerDay" | "tidallyLocked">,
-): CirculationControls {
-	// Tidally locked: no rotation-driven Coriolis, so the Hadley cell spans
-	// much wider and convection concentrates near the substellar point.
-	if (isTidallyLocked(params?.tidallyLocked)) {
-		return {
-			hadleyWidth: 1.8,
-			hadleyWetStrength: 1.6,
-			hadleyDryStrength: 0.5,
-		}
-	}
-
-	const hoursPerDay = getHoursPerDay(params?.hoursPerDay)
-	const daysPerYear = getDaysPerYear(params?.daysPerYear)
-	const seasonalStrength = Math.pow(daysPerYear / 365, 0.25)
-	const rotationWidth = Math.pow(hoursPerDay / 24, 0.35)
-
-	return {
-		hadleyWidth: clamp(rotationWidth, 0.65, 1.9),
-		hadleyWetStrength: clamp(seasonalStrength, 0.7, 1.8),
-		hadleyDryStrength: clamp(Math.pow(daysPerYear / 365, 0.3), 0.7, 1.9),
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Thermal equator computation (extracted from OrogenView.tsx)
@@ -103,15 +55,11 @@ function getCirculationControls(
 const TEQ_NUM_BINS = 120 // 3 deg per bin
 const TEQ_HALF_WIN = 10 // circular smoothing window
 
-/**
- * Compute per-longitude-bin thermal equator latitude for a given temperature field.
- * Returns a Float32Array of length NUM_BINS with the smoothed TEQ latitude per bin.
- */
-export function computeThermalEquator(
+function computeTEQBins(
 	mesh: ThermalEquatorMesh,
 	temps: Float32Array,
-	numBins: number = TEQ_NUM_BINS,
-): Float32Array {
+	numBins: number,
+): { binMaxTemp: Float32Array; smoothLat: Float32Array } {
 	const N = mesh.numRegions
 	const binMaxTemp = new Float32Array(numBins).fill(-Infinity)
 	const binMaxLat = new Float32Array(numBins)
@@ -146,7 +94,19 @@ export function computeThermalEquator(
 		smoothLat[i] = count > 0 ? sum / count : 0
 	}
 
-	return smoothLat
+	return { binMaxTemp, smoothLat }
+}
+
+/**
+ * Compute per-longitude-bin thermal equator latitude for a given temperature field.
+ * Returns a Float32Array of length NUM_BINS with the smoothed TEQ latitude per bin.
+ */
+export function computeThermalEquator(
+	mesh: ThermalEquatorMesh,
+	temps: Float32Array,
+	numBins: number = TEQ_NUM_BINS,
+): Float32Array {
+	return computeTEQBins(mesh, temps, numBins).smoothLat
 }
 
 /**
@@ -158,40 +118,7 @@ export function computeThermalEquatorLine(
 	temps: Float32Array,
 	numBins: number = TEQ_NUM_BINS,
 ): [number, number][] | null {
-	const N = mesh.numRegions
-	const binMaxTemp = new Float32Array(numBins).fill(-Infinity)
-	const binMaxLat = new Float32Array(numBins)
-
-	for (let r = 0; r < N; r++) {
-		const x = mesh.r_xyz[3 * r]
-		const y = mesh.r_xyz[3 * r + 1]
-		const z = mesh.r_xyz[3 * r + 2]
-		const lonDeg = Math.atan2(y, x) * RAD2DEG
-		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
-		const bin = Math.max(
-			0,
-			Math.min(numBins - 1, Math.floor(((lonDeg + 180) / 360) * numBins)),
-		)
-		if (temps[r] > binMaxTemp[bin]) {
-			binMaxTemp[bin] = temps[r]
-			binMaxLat[bin] = latDeg
-		}
-	}
-
-	const smoothLat = new Float32Array(numBins)
-	for (let i = 0; i < numBins; i++) {
-		let sum = 0
-		let count = 0
-		for (let d = -TEQ_HALF_WIN; d <= TEQ_HALF_WIN; d++) {
-			const j = (((i + d) % numBins) + numBins) % numBins
-			if (binMaxTemp[j] !== -Infinity) {
-				sum += binMaxLat[j]
-				count++
-			}
-		}
-		smoothLat[i] = count > 0 ? sum / count : 0
-	}
-
+	const { binMaxTemp, smoothLat } = computeTEQBins(mesh, temps, numBins)
 	const points: [number, number][] = []
 	for (let i = 0; i < numBins; i++) {
 		if (binMaxTemp[i] === -Infinity) continue
@@ -214,9 +141,9 @@ export function computeAdvection(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	distCoast: Float32Array,
-	climate?: OrogenClimate,
-	params?: number | Pick<OrogenParams, "planetRadiusKm">,
-	isLand?: Uint8Array,
+	climate: OrogenClimate | undefined,
+	params: number | Pick<OrogenParams, "planetRadiusKm"> | undefined,
+	isLand: Uint8Array,
 	elevation_km?: Float32Array,
 ): {
 	east: Float32Array
@@ -231,15 +158,7 @@ export function computeAdvection(
 	const scale = 94.5 / avgEdgeKm
 	const deepOceanThreshold = 1260 / avgEdgeKm
 
-	const latDeg = new Float32Array(N)
-	const lonDeg = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		const z = mesh.r_xyz[3 * r + 2]
-		latDeg[r] = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
-		const x = mesh.r_xyz[3 * r]
-		const y = mesh.r_xyz[3 * r + 1]
-		lonDeg[r] = Math.atan2(y, x) * RAD2DEG
-	}
+	const { latDeg, lonDeg } = getRegionLatLonDegrees(mesh)
 
 	const lonBinWidth = 360 / TEQ_NUM_BINS
 	const regionBin = new Int32Array(N)
@@ -251,15 +170,7 @@ export function computeAdvection(
 	}
 
 	const { adjOffset, adjList } = mesh
-	const land: Uint8Array =
-		isLand ??
-		(() => {
-			const mask = new Uint8Array(N)
-			for (let r = 0; r < N; r++) {
-				if (elevation[r] > 0) mask[r] = 1
-			}
-			return mask
-		})()
+	const land = isLand
 
 	const computePair = (teqByLon: Float32Array) => {
 		const basinLabel = new Int32Array(N).fill(-1)
@@ -466,18 +377,17 @@ function computeWeight(
 	teq: number,
 	eastMoisture: number,
 	westMoisture: number,
-	controls: CirculationControls,
+	daysPerYear: number,
 	bandOffsetDeg: number = 0,
 ): number {
-	const dist = Math.abs(cellLat - (teq + bandOffsetDeg))
+	const hadley = hadleyWidth(daysPerYear)
+	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
 	const moisture = Math.max(eastMoisture, westMoisture)
-	const tropicalDist = dist / controls.hadleyWidth
-	const itcz = itczScale(tropicalDist) * moisture * controls.hadleyWetStrength
-	const suppression =
-		1 - clamp(subsidenceScale(tropicalDist) * controls.hadleyDryStrength, 0, 1)
+	const itcz = itczScale(dist) * moisture
+	const suppression = 1 - clamp(subsidenceScale(dist), 0, 1)
 	const eastStorms = eastStormScale(dist) * eastMoisture
-	const polar = westerliesScale(dist) * westMoisture
-	return clamp(Math.max(itcz * suppression, eastStorms, polar), 0, 1)
+	const westerlies = westerliesScale(dist) * westMoisture
+	return clamp(Math.max(itcz * suppression, eastStorms, westerlies), 0, 1)
 }
 
 function computeRainBandWarpField(
@@ -555,7 +465,9 @@ function computeTidalRain(
 ): { monthly: Float32Array; annual: Float32Array } {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const sub = getSubstellarDir(params?.antistellarLon)
+	const sub = getSubstellarDir(
+		params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON,
+	)
 	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
 
 	// Higher pressure → more heat redistribution → more moisture transport
@@ -687,39 +599,21 @@ export function computeMonthlyRain(
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
 	isLand: Uint8Array,
-	params?: Pick<
-		OrogenParams,
-		| "obliquity"
-		| "daysPerYear"
-		| "hoursPerDay"
-		| "tidallyLocked"
-		| "antistellarLon"
-		| "pressure"
-		| "seed"
-	>,
+	params?: OrogenParams,
 	monthlyTEQ?: Float32Array[],
 ): { monthly: Float32Array; annual: Float32Array } {
-	if (isTidallyLocked(params?.tidallyLocked)) {
+	if (params?.tidallyLocked) {
 		return computeTidalRain(mesh, climate, isLand, params)
 	}
 
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const reverseCirculation = isRetrogradeObliquity(params?.obliquity)
-	const circulation = getCirculationControls(params)
+	const reverseCirculation = isRetrogradeObliquity(params?.obliquity ?? 0)
 	// Lower pressure → easier evaporation → more rain; higher → suppressed
 	// ~1/p^0.4: 0.1bar→2.5x, 0.25→1.6x, 0.5→1.3x, 1→1x, 2→0.76x, 4→0.57x, 10→0.40x
 	const pressureRainFactor = Math.pow(1 / (params?.pressure ?? 1.0), 0.4)
 
-	const latDeg = new Float32Array(N)
-	const lonDeg = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		const z = mesh.r_xyz[3 * r + 2]
-		latDeg[r] = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
-		const x = mesh.r_xyz[3 * r]
-		const y = mesh.r_xyz[3 * r + 1]
-		lonDeg[r] = Math.atan2(y, x) * RAD2DEG
-	}
+	const { latDeg, lonDeg } = getRegionLatLonDegrees(mesh)
 
 	const lonBinWidth = 360 / TEQ_NUM_BINS
 	const regionBin = new Int32Array(N)
@@ -757,7 +651,7 @@ export function computeMonthlyRain(
 				teq,
 				e,
 				w,
-				circulation,
+				params.hoursPerDay,
 				boundaryWarpDeg[r],
 			)
 			const monthTemp = climate.temperature_monthly[month * N + r]

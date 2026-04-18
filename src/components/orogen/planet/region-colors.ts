@@ -5,7 +5,6 @@ import {
 } from "@/model/orogen/climate/koppen"
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/orogen/climate/vegetation"
-import { ENABLE_PASTA_CLASSIFICATION } from "@/model/orogen/features"
 import { OROGEN_TERRAIN_FEATURE } from "@/model/orogen/types"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
@@ -13,6 +12,8 @@ import {
 	climateTempColor,
 	climateZoneColor,
 	dangerColor,
+	developmentColor,
+	dtrColor,
 	getColor,
 	gravityColor,
 	hotspotColor,
@@ -121,9 +122,11 @@ export function computeRegionColors(
 	populationMode: PopulationMapMode,
 	temperatureMonth: number,
 	rainfallMonth: number,
+	dtrMonth: number,
 	windMonth: number,
 	currentMonth: number,
 	viewMode: "globe" | "map" = "globe",
+	occupiedRegions?: Set<number>,
 ): Float32Array | null {
 	const N = world.mesh.numRegions
 	const rgb = new Float32Array(N * 3)
@@ -296,11 +299,7 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (
-		ENABLE_PASTA_CLASSIFICATION &&
-		colorMode === "pastaClimate" &&
-		world.pastaClimate
-	) {
+	if (colorMode === "pastaClimate" && world.pastaClimate) {
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
 			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
@@ -313,11 +312,7 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (
-		ENABLE_PASTA_CLASSIFICATION &&
-		colorMode === "satellite" &&
-		world.pastaClimate
-	) {
+	if (colorMode === "satellite" && world.pastaClimate) {
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = pastaTrueColor(world.pastaClimate[r])
 			rgb[3 * r] = cr
@@ -429,6 +424,24 @@ export function computeRegionColors(
 				cg += (chaoticRgb[1] - cg) * t
 				cb += (chaoticRgb[2] - cb) * t
 			}
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
+	if (colorMode === "dtr" && world.dtr_annual) {
+		const monthly = dtrMonth === 0 ? null : world.dtr_monthly
+		const offset = monthly ? (dtrMonth - 1) * N : 0
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = world.isLand?.[r]
+				? dtrColor(
+						monthly
+							? (monthly[offset + r] ?? world.dtr_annual[r])
+							: world.dtr_annual[r],
+					)
+				: OCEAN_LIGHT_BLUE
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -555,19 +568,22 @@ export function computeRegionColors(
 			const { regionProvince, desolate } = world.provinces
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
-				const n = p >= 0 ? world.nations.assignment[p] : -1
 				if (p < 0) {
 					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
 					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
 					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
-				} else if (desolate[p] || n < 0) {
+				} else if (desolate[p] || world.nations.assignment[p] < 0) {
 					rgb[3 * r] = 0.35
 					rgb[3 * r + 1] = 0.33
 					rgb[3 * r + 2] = 0.32
+				} else if (occupiedRegions?.has(r)) {
+					rgb[3 * r] = 0
+					rgb[3 * r + 1] = 0
+					rgb[3 * r + 2] = 0
 				} else {
-					rgb[3 * r] = world.nations.colors[3 * n]
-					rgb[3 * r + 1] = world.nations.colors[3 * n + 1]
-					rgb[3 * r + 2] = world.nations.colors[3 * n + 2]
+					rgb[3 * r] = world.nations.colors[3 * p]
+					rgb[3 * r + 1] = world.nations.colors[3 * p + 1]
+					rgb[3 * r + 2] = world.nations.colors[3 * p + 2]
 				}
 			}
 			return rgb
@@ -615,8 +631,16 @@ export function computeRegionColors(
 					maxGravity = world.nations.gravity[i]
 			}
 		}
+		let maxDevelopment = 0
+		if (populationMode === "development" && world.development) {
+			for (let i = 0; i < world.provinces.count; i++) {
+				if (!desolate[i] && world.development[i] > maxDevelopment)
+					maxDevelopment = world.development[i]
+			}
+		}
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
 		const invGravityMax = maxGravity > 0 ? 1 / maxGravity : 0
+		const invDevelopmentMax = maxDevelopment > 0 ? 1 / maxDevelopment : 0
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
 			if (p < 0) {
@@ -638,6 +662,13 @@ export function computeRegionColors(
 				} else if (populationMode === "gravity" && world.nations?.gravity) {
 					const [cr, cg, cb] = gravityColor(
 						world.nations.gravity[p] * invGravityMax,
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (populationMode === "development" && world.development) {
+					const [cr, cg, cb] = developmentColor(
+						world.development[p] * invDevelopmentMax,
 					)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg

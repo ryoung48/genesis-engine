@@ -92,7 +92,7 @@ export const WAR_EVENT = {
 				defender: nation,
 				exclude: nation,
 			})
-			if (threat > 0.4 && window.dice.random < threat) {
+			if (threat > 0.1 && window.dice.random < threat) {
 				window.world.past.push({
 					tag: "rebellion",
 					time: window.world.time,

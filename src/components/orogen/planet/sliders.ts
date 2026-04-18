@@ -1,5 +1,8 @@
+import { SLIDER_RANGES } from "@/model/orogen/util/slider-ranges"
 import { DEFAULT_PLANET_RADIUS_KM } from "@/model/orogen/util/units"
 import { DEFAULT_WORLD_PARAMS, STAGNANT_TERRAIN_OVERRIDES } from "./constants"
+
+const SR = SLIDER_RANGES
 
 export interface SliderDef {
 	label: string
@@ -45,9 +48,7 @@ export function buildPlanetSliders(state: {
 			help: "Sets the planet's physical size for climate and distance calculations.",
 			value: state.planetRadiusKm,
 			display: `${(state.planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x Earth`,
-			min: Math.round((DEFAULT_PLANET_RADIUS_KM * 0.5) / 100) * 100,
-			max: Math.round((DEFAULT_PLANET_RADIUS_KM * 4) / 100) * 100,
-			step: 100,
+			...SR.planetRadiusKm,
 			set: state.setPlanetRadiusKm,
 		},
 		{
@@ -55,9 +56,7 @@ export function buildPlanetSliders(state: {
 			help: "Scales stellar temperature relative to Sol. 1.0x matches the Sun, 0.5x is half as hot.",
 			value: state.sunTempFactor,
 			display: `${state.sunTempFactor.toFixed(2)}x`,
-			min: 0.9,
-			max: 1.2,
-			step: 0.01,
+			...SR.sunTempFactor,
 			set: state.setSunTempFactor,
 		},
 		{
@@ -65,9 +64,7 @@ export function buildPlanetSliders(state: {
 			help: "Atmospheric pressure in bars. Lower pressure increases evaporation and cloud formation; higher pressure suppresses it.",
 			value: state.pressure,
 			display: `${state.pressure.toFixed(1)} bar`,
-			min: 0.1,
-			max: 10,
-			step: 0.1,
+			...SR.pressure,
 			set: state.setPressure,
 		},
 		{
@@ -75,9 +72,7 @@ export function buildPlanetSliders(state: {
 			help: "Sets seasonal tilt from 0 to 180 degrees. Tilts above 90 are treated as retrograde and flip seasonal rainfall timing.",
 			value: state.tidallyLocked ? 0 : state.obliquity,
 			display: state.tidallyLocked ? "0.0°" : `${state.obliquity.toFixed(1)}°`,
-			min: 0,
-			max: 180,
-			step: 0.5,
+			...SR.obliquity,
 			set: state.setObliquity,
 			disabled: state.tidallyLocked,
 		},
@@ -86,9 +81,7 @@ export function buildPlanetSliders(state: {
 			help: "Controls how circular or stretched the orbit is, increasing seasonal contrast as it rises.",
 			value: state.eccentricity,
 			display: state.eccentricity.toFixed(3),
-			min: 0,
-			max: 0.6,
-			step: 0.001,
+			...SR.eccentricity,
 			set: state.setEccentricity,
 		},
 		{
@@ -96,9 +89,7 @@ export function buildPlanetSliders(state: {
 			help: "Orbital angle of closest approach to the star in degrees. Affects when peak insolation occurs during the year.",
 			value: state.perihelion,
 			display: `${state.perihelion.toFixed(0)}\u00B0`,
-			min: 0,
-			max: 360,
-			step: 1,
+			...SR.perihelion,
 			set: state.setPerihelion,
 		},
 		{
@@ -106,9 +97,7 @@ export function buildPlanetSliders(state: {
 			help: "Sets the orbital year length in local days. Seasonal pacing changes without increasing sim resolution.",
 			value: state.daysPerYear,
 			display: `${state.daysPerYear.toFixed(0)} d`,
-			min: 100,
-			max: 1000,
-			step: 5,
+			...SR.daysPerYear,
 			set: state.setDaysPerYear,
 		},
 		...(!state.tidallyLocked
@@ -117,10 +106,8 @@ export function buildPlanetSliders(state: {
 						label: "Day Length",
 						help: "Sets the rotation period in local hours. Shorter days mix heat more strongly; longer days reduce that effect.",
 						value: state.hoursPerDay,
-						display: `${state.hoursPerDay.toFixed(1)} h`,
-						min: 8,
-						max: 48,
-						step: 0.5,
+						display: `${(state.hoursPerDay / 24).toFixed(2)}x Earth`,
+						...SR.hoursPerDay,
 						set: state.setHoursPerDay,
 					},
 				]
@@ -132,9 +119,7 @@ export function buildPlanetSliders(state: {
 						help: "Longitude of the antistellar point (permanent dark side center).",
 						value: state.antistellarLon,
 						display: `${state.antistellarLon.toFixed(0)}\u00B0`,
-						min: 0,
-						max: 360,
-						step: 1,
+						...SR.antistellarLon,
 						set: state.setAntistellarLon,
 					},
 				]
@@ -144,9 +129,7 @@ export function buildPlanetSliders(state: {
 			help: "Controls how concentrated the minority phase is: land below 50%, water above 50%.",
 			value: state.landDistribution,
 			display: state.landDistribution.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.landDistribution,
 			set: state.setLandDistribution,
 		},
 		{
@@ -154,9 +137,7 @@ export function buildPlanetSliders(state: {
 			help: "Sets the overall land-to-ocean balance for the world.",
 			value: state.landCoverage,
 			display: `${(state.landCoverage * 100).toFixed(0)}%`,
-			min: 0,
-			max: 1,
-			step: 0.01,
+			...SR.landCoverage,
 			set: state.setLandCoverage,
 		},
 	]
@@ -199,9 +180,7 @@ export function buildTerrainSliders(state: {
 			help: "Active: Earth-like plate tectonics with subduction. Stagnant Lid: single lithosphere with coronae, volcanic provinces, and rift zones (Venus/Mars/Moon-like).",
 			value: state.tectonicMode,
 			display: isStagnant ? "Stagnant" : "Active",
-			min: 0,
-			max: 1,
-			step: 1,
+			...SR.tectonicMode,
 			set: (v) => state.setTectonicMode(v as 0 | 1),
 		},
 		{
@@ -209,9 +188,7 @@ export function buildTerrainSliders(state: {
 			help: "Higher detail sharpens coastlines and terrain, but takes longer to build.",
 			value: state.numPoints,
 			display: state.numPoints.toLocaleString(),
-			min: 5000,
-			max: 2560000,
-			step: 1000,
+			...SR.numPoints,
 			set: state.setNumPoints,
 		},
 		{
@@ -219,9 +196,7 @@ export function buildTerrainSliders(state: {
 			help: "Controls how even or organic the underlying mesh feels.",
 			value: state.jitter,
 			display: state.jitter.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.jitter,
 			set: state.setJitter,
 		},
 		{
@@ -229,9 +204,7 @@ export function buildTerrainSliders(state: {
 			help: "More plates create more tectonic boundaries, coasts, and terrain partitions in both active and stagnant-lid worlds.",
 			value: state.numPlates,
 			display: String(state.numPlates),
-			min: 4,
-			max: 120,
-			step: 1,
+			...SR.numPlates,
 			set: state.setNumPlates,
 		},
 		{
@@ -239,9 +212,7 @@ export function buildTerrainSliders(state: {
 			help: "Adds fractal detail to mountains, ridges, and coastlines.",
 			value: state.roughness,
 			display: state.roughness.toFixed(2),
-			min: 0,
-			max: 0.5,
-			step: 0.01,
+			...SR.roughness,
 			set: state.setRoughness,
 		},
 		{
@@ -249,9 +220,7 @@ export function buildTerrainSliders(state: {
 			help: "Makes plate-driven landmasses or seas more equal-sized or more uneven in both tectonic modes.",
 			value: state.continentSizeVariety,
 			display: state.continentSizeVariety.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.continentSizeVariety,
 			set: state.setContinentSizeVariety,
 		},
 		{
@@ -259,9 +228,7 @@ export function buildTerrainSliders(state: {
 			help: "Twists the raw terrain field into more organic coastlines and ridges.",
 			value: state.terrainWarp,
 			display: state.terrainWarp.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.terrainWarp,
 			set: state.setTerrainWarp,
 		},
 		{
@@ -269,9 +236,7 @@ export function buildTerrainSliders(state: {
 			help: "Softens hard tectonic edges and blends abrupt elevation transitions.",
 			value: state.smoothing,
 			display: state.smoothing.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.smoothing,
 			set: state.setSmoothing,
 		},
 		{
@@ -279,9 +244,7 @@ export function buildTerrainSliders(state: {
 			help: "Cuts river valleys and drainage networks into the terrain.",
 			value: state.hydraulicErosion,
 			display: state.hydraulicErosion.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.hydraulicErosion,
 			set: state.setHydraulicErosion,
 		},
 		{
@@ -289,9 +252,7 @@ export function buildTerrainSliders(state: {
 			help: "Moves loose material downhill, softening ridges and steep slopes.",
 			value: state.thermalErosion,
 			display: state.thermalErosion.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.thermalErosion,
 			set: state.setThermalErosion,
 		},
 		{
@@ -299,9 +260,7 @@ export function buildTerrainSliders(state: {
 			help: "Pushes ridgelines above their surroundings for a stronger mountain silhouette.",
 			value: state.ridgeSharpening,
 			display: state.ridgeSharpening.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.ridgeSharpening,
 			set: state.setRidgeSharpening,
 		},
 		{
@@ -309,9 +268,7 @@ export function buildTerrainSliders(state: {
 			help: "Carves fjords, basins, and U-shaped valleys into cold high terrain.",
 			value: state.glacialErosion,
 			display: state.glacialErosion.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.glacialErosion,
 			set: state.setGlacialErosion,
 		},
 		{
@@ -319,9 +276,7 @@ export function buildTerrainSliders(state: {
 			help: "Scales hotspot activity in active mode and hotspot plus volcanic-province uplift in stagnant lid mode.",
 			value: state.volcanism,
 			display: state.volcanism.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.volcanism,
 			set: state.setVolcanism,
 		},
 		{
@@ -329,9 +284,7 @@ export function buildTerrainSliders(state: {
 			help: "Stamps impact craters onto the surface. Higher values produce more and larger craters.",
 			value: state.craters,
 			display: state.craters.toFixed(2),
-			min: 0,
-			max: 1,
-			step: 0.05,
+			...SR.craters,
 			set: state.setCraters,
 		},
 	]

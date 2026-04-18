@@ -27,6 +27,7 @@ export function computePlanetStats(
 	const activeParams = world?.params
 	const obliquityValue = activeParams?.obliquity ?? params.obliquity
 	const eccentricityValue = activeParams?.eccentricity ?? params.eccentricity
+	const perihelionValue = activeParams?.perihelion ?? params.perihelion
 	const sunTempFactorValue = activeParams?.sunTempFactor ?? params.sunTempFactor
 	const daysPerYearValue = activeParams?.daysPerYear ?? params.daysPerYear
 	const hoursPerDayValue = activeParams?.hoursPerDay ?? params.hoursPerDay
@@ -45,6 +46,11 @@ export function computePlanetStats(
 		}
 		landPercent = (landCells / Math.max(1, world.elevation.length)) * 100
 		landAreaKm2 = surfaceAreaKm2 * (landPercent / 100)
+	}
+
+	let avgProvinceAreaKm2: number | null = null
+	if (landAreaKm2 !== null && world?.provinces?.count) {
+		avgProvinceAreaKm2 = landAreaKm2 / world.provinces.count
 	}
 
 	let avgAnnualTempC: number | null = null
@@ -87,6 +93,13 @@ export function computePlanetStats(
 		avgAnnualPrecipMm = sum / Math.max(1, world.rainfall.annual.length)
 	}
 
+	let avgDtrC: number | null = null
+	if (world?.dtr_annual) {
+		let sum = 0
+		for (let i = 0; i < world.dtr_annual.length; i++) sum += world.dtr_annual[i]
+		avgDtrC = sum / Math.max(1, world.dtr_annual.length)
+	}
+
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = activeParams?.tidallyLocked ?? params.tidallyLocked
 	const habitabilityScore = world?.population?.habitabilityScore ?? 0
@@ -96,8 +109,9 @@ export function computePlanetStats(
 			value: habitabilityScore != null ? habitabilityScore.toFixed(3) : "0.000",
 		},
 		...(isTidal ? [{ label: "Lock", value: "Tidal" }] : []),
-		{ label: "Tilt", value: `${obliquityValue.toFixed(1)}°` },
+		{ label: "Tilt", value: `${obliquityValue.toFixed(1)} deg` },
 		{ label: "Ecc", value: eccentricityValue.toFixed(3) },
+		{ label: "Perihelion", value: `${perihelionValue.toFixed(0)} deg` },
 		{ label: "Sun", value: `${sunTempFactorValue.toFixed(2)}x` },
 		{ label: "Year", value: `${daysPerYearValue.toFixed(0)} d` },
 		{ label: "Day", value: `${hoursPerDayValue.toFixed(1)} h` },
@@ -108,47 +122,58 @@ export function computePlanetStats(
 		},
 		{
 			label: "Continents",
-			value: world?.continentCount != null ? String(world.continentCount) : "—",
+			value: world?.continentCount != null ? String(world.continentCount) : "-",
 		},
 		{
 			label: "Provinces",
 			value:
-				world?.provinces?.count != null ? String(world.provinces.count) : "—",
+				world?.provinces?.count != null ? String(world.provinces.count) : "-",
+		},
+		{
+			label: "Avg Province Area",
+			value:
+				avgProvinceAreaKm2 !== null
+					? `${(avgProvinceAreaKm2 / 1_000).toFixed(0)}k km^2`
+					: "-",
 		},
 		{
 			label: "Population",
 			value:
 				world?.population?.totalPopulation != null
 					? `${(world.population.totalPopulation / 1_000_000).toFixed(1)}M`
-					: "—",
+					: "-",
 		},
 		{
 			label: "Cell",
 			value:
-				avgCellLengthKm !== null ? `${avgCellLengthKm.toFixed(0)} km` : "—",
+				avgCellLengthKm !== null ? `${avgCellLengthKm.toFixed(0)} km` : "-",
 		},
 		{
 			label: "Land Area",
 			value:
 				landAreaKm2 !== null && landPercent !== null
-					? `${(landAreaKm2 / 1_000_000).toFixed(1)}M km² (${landPercent.toFixed(1)}%)`
-					: "—",
+					? `${(landAreaKm2 / 1_000_000).toFixed(1)}M km^2 (${landPercent.toFixed(1)}%)`
+					: "-",
 		},
 		{
 			label: "Avg Temp",
-			value: avgAnnualTempC !== null ? `${avgAnnualTempC.toFixed(1)} °C` : "—",
+			value: avgAnnualTempC !== null ? `${avgAnnualTempC.toFixed(1)} C` : "-",
 		},
 		{
-			label: "Δ Temp",
+			label: "Delta Temp",
 			value:
-				maxAnnualTempC !== null
-					? `${(maxAnnualTempC - minAnnualTempC).toFixed(1)} °C`
-					: "—",
+				minAnnualTempC !== null && maxAnnualTempC !== null
+					? `${(maxAnnualTempC - minAnnualTempC).toFixed(1)} C`
+					: "-",
 		},
 		{
 			label: "Avg Rain",
 			value:
-				avgAnnualPrecipMm !== null ? `${avgAnnualPrecipMm.toFixed(0)} mm` : "—",
+				avgAnnualPrecipMm !== null ? `${avgAnnualPrecipMm.toFixed(0)} mm` : "-",
+		},
+		{
+			label: "Avg DTR",
+			value: avgDtrC !== null ? `${avgDtrC.toFixed(1)} C` : "-",
 		},
 	]
 }

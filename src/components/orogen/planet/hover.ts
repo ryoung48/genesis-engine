@@ -58,13 +58,10 @@ export interface HoverTerrainFeature {
 	all: string[]
 }
 
-export function getHoverBasinId(
-	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
-): number | null {
-	return hoverInfo && world?.rivers?.basinId
-		? (world.rivers.basinId[hoverInfo.region] ?? -1)
-		: null
+export interface HoverDtr {
+	value: number
+	annual: number
+	monthly: number[]
 }
 
 export function getHoverElevationKm(
@@ -135,6 +132,28 @@ export function getHoverRainfall(
 					(rainfallMonth - 1) * world.mesh.numRegions + hoverInfo.region
 				]
 		: null
+}
+
+export function getHoverDtr(
+	hoverInfo: HoverInfo | null,
+	world: SerializedOrogenWorld | null,
+	dtrMonth: number,
+): HoverDtr | null {
+	if (!(hoverInfo && world?.dtr_annual)) return null
+	const r = hoverInfo.region
+	const annual = world.dtr_annual[r]
+	const monthly: number[] = []
+	if (world.dtr_monthly) {
+		const N = world.mesh.numRegions
+		for (let m = 0; m < 12; m++) {
+			monthly.push(world.dtr_monthly[m * N + r] ?? annual)
+		}
+	}
+	return {
+		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
+		annual,
+		monthly,
+	}
 }
 
 export function getHoverClimateZone(

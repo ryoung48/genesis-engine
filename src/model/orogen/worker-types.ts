@@ -1,3 +1,4 @@
+import type { HistoryNote } from "./history"
 import type {
 	OrogenNationHierarchy,
 	OrogenParams,
@@ -51,28 +52,30 @@ export interface SerializedOrogenWorld {
 	elevation_km: Float32Array
 	params: OrogenParams
 	timings?: StageTiming[]
-	continentCount?: number
-	climate?: SerializedOrogenClimate
-	oceanDist?: Float32Array
+	continentCount: number
+	climate: SerializedOrogenClimate
+	oceanDist: Float32Array
 	distCoast?: Float32Array
-	rainfall?: {
+	rainfall: {
 		monthly: Float32Array
 		annual: Float32Array
 		east: Float32Array
 		west: Float32Array
 	}
-	hazards?: {
+	hazards: {
 		earthquake: Float32Array
 		volcano: Float32Array
 		danger: Float32Array
 	}
-	volcanism?: { hotspot: Float32Array }
-	climateZones?: Uint8Array
-	pastaClimate?: Uint8Array
+	volcanism: { hotspot: Float32Array }
+	climateZones: Uint8Array
+	pastaClimate: Uint8Array
 	pastaDebug?: {
 		gdd: Float32Array
 		gddz: Float32Array
 		gint: Float32Array
+		gdd_monthly: Float32Array
+		gint_monthly: Float32Array
 		ar: Float32Array
 		gar: Float32Array
 		grs: Float32Array
@@ -80,17 +83,22 @@ export interface SerializedOrogenWorld {
 		minT: Float32Array
 		maxT: Float32Array
 	}
-	iceThickness?: Float32Array
-	iceMinMonthly?: Float32Array
-	iceMaxMonthly?: Float32Array
-	koppenClimate?: Uint8Array
-	vegetation?: Uint8Array
-	topography?: Uint8Array
-	coastal?: Uint8Array
-	slopeScore?: Float32Array
-	isLand?: Uint8Array
-	riverLand?: Uint8Array
-	rivers?: {
+	hydrology: {
+		aet_monthly: Float32Array
+	}
+	iceThickness: Float32Array
+	iceMinMonthly: Float32Array
+	iceMaxMonthly: Float32Array
+	koppenClimate: Uint8Array
+	vegetation: Uint8Array
+	topography: Uint8Array
+	coastal: Uint8Array
+	slopeScore: Float32Array
+	isLand: Uint8Array
+	riverLand: Uint8Array
+	dtr_annual: Float32Array
+	dtr_monthly: Float32Array
+	rivers: {
 		lines: [number, number, number, number][][]
 		maxFlow: number
 		minFlow: number
@@ -128,6 +136,8 @@ export interface SerializedOrogenWorld {
 		size: Int32Array
 		count: number
 	}
+	development?: Float32Array
+	urbanPopulation?: Float32Array
 	population?: {
 		habitability: Float32Array
 		population: Float32Array
@@ -137,10 +147,88 @@ export interface SerializedOrogenWorld {
 	monthlyTEQ?: Float32Array[]
 }
 
+export interface SerializedProvinceTimelineInt {
+	times: Float64Array
+	values: Int32Array
+	offsets: Int32Array
+}
+
+export interface SerializedProvinceTimelineFloat {
+	times: Float64Array
+	values: Float32Array
+	offsets: Int32Array
+}
+
+export interface SerializedRelationTimelines {
+	aIdx: Int32Array
+	bIdx: Int32Array
+	offsets: Int32Array
+	times: Float64Array
+	values: Int32Array
+}
+
+export interface SerializedTimelines {
+	P: number
+	startTimeMs: number
+	endTimeMs: number
+	parent: SerializedProvinceTimelineInt
+	assignment: SerializedProvinceTimelineInt
+	populationRural: SerializedProvinceTimelineFloat
+	populationUrban: SerializedProvinceTimelineFloat
+	development: SerializedProvinceTimelineFloat
+	consumption: SerializedProvinceTimelineFloat
+	leaderDynasty: SerializedProvinceTimelineInt
+	leaderClaim: SerializedProvinceTimelineInt
+	occupation: SerializedProvinceTimelineInt
+	relations: SerializedRelationTimelines
+	nationColorKeys: Int32Array
+	nationColorValues: Float32Array
+	wars: Array<{
+		idx: number
+		attacker: number
+		defender: number
+		startTime: number
+		endTime?: number
+		rebel: boolean
+	}>
+}
+
+export interface SerializedHistoryFrame {
+	timeMs: number
+	assignment: Int32Array
+	parent: Int32Array
+	sovereign: Int32Array
+	colors: Float32Array
+	adjOffset: Int32Array
+	adjList: Int32Array
+	populationTotal: Float32Array
+	populationUrban: Float32Array
+	development: Float32Array
+	consumption: Float32Array
+	nationWealth: Float32Array
+	nationOptimalWealth: Float32Array
+	activeWars: Array<{
+		idx: number
+		attacker: number
+		defender: number
+		rebel: boolean
+		occupied: number[]
+	}>
+	sovereignCount: number
+	totalPopulation: number
+}
+
 export type OrogenWorkerRequest =
 	| {
 			type: "generate"
 			params: OrogenParams
+	  }
+	| {
+			type: "simulate"
+			tickMs?: number
+	  }
+	| {
+			type: "pause"
 	  }
 	| {
 			type: "import"
@@ -186,4 +274,15 @@ export type OrogenWorkerResponse =
 			type: "error"
 			message: string
 			stack?: string
+	  }
+	| {
+			type: "sim-progress"
+			timeMs: number
+			frame: SerializedHistoryFrame
+	  }
+	| {
+			type: "sim-done"
+			timeMs: number
+			timelines: SerializedTimelines
+			events: HistoryNote[]
 	  }

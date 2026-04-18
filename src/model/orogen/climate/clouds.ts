@@ -7,17 +7,9 @@
  */
 
 import type { OrogenParams, OrogenRainfall } from "../types"
+import { clamp, smoothstep } from "../util/math"
 import { SimplexNoise } from "../util/simplex-noise"
-import { getSubstellarDir, isTidallyLocked } from "../util/units"
-
-function norm(v: number): number {
-	return Math.max(-1, Math.min(1, v))
-}
-
-function smoothstep(lo: number, hi: number, x: number): number {
-	const t = Math.max(0, Math.min(1, (x - lo) / (hi - lo)))
-	return t * t * (3 - 2 * t)
-}
+import { getSubstellarDir } from "../util/units"
 
 function tangentFrame(x: number, y: number, z: number) {
 	let ex: number, ey: number, ez: number
@@ -96,7 +88,7 @@ function computeTidalClouds(
 		const z = r_xyz[3 * r + 2]
 
 		// Angular distance from substellar point
-		const cosTheta = norm(x * sub[0] + y * sub[1] + z * sub[2])
+		const cosTheta = clamp(x * sub[0] + y * sub[1] + z * sub[2], -1, 1)
 		const theta = Math.acos(cosTheta)
 		const thetaDeg = theta * RAD2DEG
 
@@ -131,7 +123,7 @@ function computeTidalClouds(
 		const tanZ = x * radY - y * radX
 
 		const dTan =
-			norm(
+			clamp(
 				warpTanNoise.fbm(
 					sx * 1.8 + 31.7,
 					sy * 1.8 + 47.3,
@@ -139,9 +131,11 @@ function computeTidalClouds(
 					4,
 					0.5,
 				),
+				-1,
+				1,
 			) * 0.28
 		const dRad =
-			norm(
+			clamp(
 				warpRadNoise.fbm(
 					sx * 1.8 + 73.1,
 					sy * 1.8 + 11.9,
@@ -149,6 +143,8 @@ function computeTidalClouds(
 					4,
 					0.5,
 				),
+				-1,
+				1,
 			) * 0.15
 
 		const wx = sx + tanX * dTan + radX * dRad
@@ -156,19 +152,29 @@ function computeTidalClouds(
 		const wz = sz + tanZ * dTan + radZ * dRad
 
 		// Cloud shape
-		const shape = norm(frontNoise.fbm(wx * 2.5, wy * 2.5, wz * 2.5, 5, 0.5))
+		const shape = clamp(
+			frontNoise.fbm(wx * 2.5, wy * 2.5, wz * 2.5, 5, 0.5),
+			-1,
+			1,
+		)
 		let cloud = smoothstep(-0.15 - coverageBase, 0.4 - coverageBase, shape)
 
 		// Apply tidal envelope
 		cloud *= envelope
 
 		// Internal texture
-		const detail = norm(detailNoise.fbm(wx * 8, wy * 8, wz * 8, 4, 0.45))
+		const detail = clamp(
+			detailNoise.fbm(wx * 8, wy * 8, wz * 8, 4, 0.45),
+			-1,
+			1,
+		)
 		cloud *= detail * 0.25 + 0.75
 
 		// Coverage variation
-		const cov = norm(
+		const cov = clamp(
 			coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5),
+			-1,
+			1,
 		)
 		cloud *= smoothstep(
 			-0.6 - coverageBase * 0.5,
@@ -195,7 +201,7 @@ export function computeClouds(
 	params: OrogenParams,
 	monthlyTEQ?: Float32Array[],
 ): Float32Array {
-	if (isTidallyLocked(params?.tidallyLocked)) {
+	if (params?.tidallyLocked) {
 		return computeTidalClouds(mesh, rainfall, isLand, params)
 	}
 
@@ -255,7 +261,7 @@ export function computeClouds(
 
 		// Asymmetric domain warp — streaky along bands, organic across
 		const dE =
-			norm(
+			clamp(
 				warpEastNoise.fbm(
 					sx * 1.8 + 31.7,
 					sy * 1.8 + 47.3,
@@ -263,9 +269,11 @@ export function computeClouds(
 					4,
 					0.5,
 				),
+				-1,
+				1,
 			) * 0.28
 		const dN =
-			norm(
+			clamp(
 				warpNorthNoise.fbm(
 					sx * 1.8 + 73.1,
 					sy * 1.8 + 11.9,
@@ -273,22 +281,34 @@ export function computeClouds(
 					4,
 					0.5,
 				),
+				-1,
+				1,
 			) * 0.15
 		const wx = sx + ex * dE + nx * dN
 		const wy = sy + ey * dE + ny * dN
 		const wz = sz + ez * dE + nz * dN
 
 		// Cloud shape
-		const shape = norm(frontNoise.fbm(wx * 2.5, wy * 2.5, wz * 2.5, 5, 0.5))
+		const shape = clamp(
+			frontNoise.fbm(wx * 2.5, wy * 2.5, wz * 2.5, 5, 0.5),
+			-1,
+			1,
+		)
 		let cloud = smoothstep(-0.15 - coverageBase, 0.4 - coverageBase, shape)
 
 		// Internal texture
-		const detail = norm(detailNoise.fbm(wx * 8, wy * 8, wz * 8, 4, 0.45))
+		const detail = clamp(
+			detailNoise.fbm(wx * 8, wy * 8, wz * 8, 4, 0.45),
+			-1,
+			1,
+		)
 		cloud *= detail * 0.25 + 0.75
 
 		// Coverage variation — breaks up uniform regions
-		const cov = norm(
+		const cov = clamp(
 			coverageNoise.fbm(x * 1.5 + 100, y * 1.5 + 100, z * 1.5 + 100, 3, 0.5),
+			-1,
+			1,
 		)
 		cloud *= smoothstep(
 			-0.6 - coverageBase * 0.5,

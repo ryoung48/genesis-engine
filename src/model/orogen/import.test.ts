@@ -1,0 +1,150 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import type { ImportParams } from "./import"
+import { importOrogenWorld } from "./import"
+
+function makeParams(overrides: Partial<ImportParams> = {}): ImportParams {
+	// 64×32 all-ocean image (value 0 = below sea level)
+	const grayscale = new Uint8Array(64 * 32)
+	return {
+		seed: 42,
+		numPoints: 1000,
+		jitter: 0.5,
+		grayscale,
+		imageWidth: 64,
+		imageHeight: 32,
+		terrainWarp: 0,
+		smoothing: 0,
+		hydraulicErosion: 0,
+		thermalErosion: 0,
+		ridgeSharpening: 0,
+		glacialErosion: 0,
+		...overrides,
+	}
+}
+
+function makeGrayscale(
+	width: number,
+	height: number,
+	value: number,
+): Uint8Array {
+	return new Uint8Array(width * height).fill(value)
+}
+
+beforeAll(() => {
+	vi.spyOn(console, "time").mockImplementation(() => undefined)
+	vi.spyOn(console, "timeEnd").mockImplementation(() => undefined)
+	vi.spyOn(console, "table").mockImplementation(() => undefined)
+})
+
+afterAll(() => {
+	vi.restoreAllMocks()
+})
+
+const TEST_TIMEOUT = 60_000
+
+describe("importOrogenWorld", () => {
+	it(
+		"produces correct array sizes for all output fields",
+		() => {
+			const world = importOrogenWorld(makeParams())
+			const N = world.mesh.numRegions
+
+			expect(N).toBeGreaterThan(0)
+			expect(world.elevation.length).toBe(N)
+			expect(world.elevation_km.length).toBe(N)
+			expect(world.isLand.length).toBe(N)
+			expect(world.plateAssignment.length).toBe(N)
+
+			expect(world.climate.temperature_avg.length).toBe(N)
+			expect(world.climate.temperature_monthly.length).toBe(12 * N)
+			expect(world.rainfall.annual.length).toBe(N)
+			expect(world.rainfall.monthly.length).toBe(12 * N)
+			expect(world.rivers.flow.length).toBe(N)
+			expect(world.vegetation.length).toBe(N)
+			expect(world.topography.length).toBe(N)
+			expect(world.climateZones.length).toBe(N)
+			expect(world.koppenClimate.length).toBe(N)
+			expect(world.hazards.danger.length).toBe(N)
+			expect(world.volcanism.hotspot.length).toBe(N)
+			expect(world.iceThickness.length).toBe(N)
+			expect(world.dtr_annual.length).toBe(N)
+			expect(world.oceanDist.length).toBe(N)
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
+		"is deterministic for a given seed",
+		() => {
+			const p = makeParams({ seed: 99 })
+			const a = importOrogenWorld(p)
+			const b = importOrogenWorld(p)
+			expect(a.mesh.numRegions).toBe(b.mesh.numRegions)
+			expect(a.elevation).toEqual(b.elevation)
+			expect(a.isLand).toEqual(b.isLand)
+			expect(a.rainfall.annual).toEqual(b.rainfall.annual)
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
+		"satisfies pipeline invariants: land elevation positive, provinces match land",
+		() => {
+			// Use a non-trivial image with some land (value > 0)
+			const width = 64
+			const height = 32
+			const grayscale = new Uint8Array(width * height)
+			// Fill top half white (land), bottom half black (ocean)
+			grayscale.fill(255, 0, (width * height) / 2)
+			const world = importOrogenWorld(
+				makeParams({ grayscale, imageWidth: width, imageHeight: height }),
+			)
+			const N = world.mesh.numRegions
+			const isLand = world.isLand!
+			const lakes = world.rivers!.lakes
+			const regionProvince = world.provinces!.regionProvince
+
+			for (let r = 0; r < N; r++) {
+				if (isLand[r]) {
+					expect(world.elevation[r] > 0 || lakes[r] === 1).toBe(true)
+				}
+				const assigned = regionProvince[r] !== -1
+				expect(assigned).toBe(isLand[r] === 1)
+			}
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
+		"produces an all-ocean world from a uniform black image",
+		() => {
+			const world = importOrogenWorld(
+				makeParams({
+					grayscale: makeGrayscale(64, 32, 0),
+				}),
+			)
+			const isLand = world.isLand!
+			let landCells = 0
+			for (let r = 0; r < isLand.length; r++) if (isLand[r]) landCells++
+			expect(landCells).toBe(0)
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
+		"produces a mostly-land world from a uniform white image",
+		() => {
+			const world = importOrogenWorld(
+				makeParams({
+					grayscale: makeGrayscale(64, 32, 255),
+				}),
+			)
+			const isLand = world.isLand!
+			let landCells = 0
+			for (let r = 0; r < isLand.length; r++) if (isLand[r]) landCells++
+			// Almost all cells should be land (lakes may carve a few)
+			expect(landCells).toBeGreaterThan(isLand.length * 0.95)
+		},
+		TEST_TIMEOUT,
+	)
+})

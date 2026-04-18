@@ -6,6 +6,7 @@
  */
 
 import type { SphereMesh, TectonicPlate } from "../types"
+import { eulerVelocityAt } from "../util/math"
 import { createRng } from "../util/rng"
 import { SimplexNoise } from "../util/simplex-noise"
 
@@ -299,17 +300,6 @@ function findNearestR(
 	return bestR
 }
 
-function plateVelocityAt(
-	plate: TectonicPlate,
-	x: number,
-	y: number,
-	z: number,
-): [number, number, number] {
-	const [px, py, pz] = plate.pole
-	const w = plate.omega
-	return [w * (py * z - pz * y), w * (pz * x - px * z), w * (px * y - py * x)]
-}
-
 interface Dome {
 	x: number
 	y: number
@@ -415,20 +405,6 @@ export function applyHotspots(
 		return { ux, uy, uz, vx, vy, vz }
 	}
 
-	const findNearestR = (px: number, py: number, pz: number): number => {
-		let bestDot = -2,
-			bestR = 0
-		for (let r = 0; r < numRegions; r++) {
-			const dot =
-				px * r_xyz[3 * r] + py * r_xyz[3 * r + 1] + pz * r_xyz[3 * r + 2]
-			if (dot > bestDot) {
-				bestDot = dot
-				bestR = r
-			}
-		}
-		return bestR
-	}
-
 	const riftAnglesForDome = (
 		ci: number,
 		cl: number,
@@ -459,9 +435,9 @@ export function applyHotspots(
 		const hy = sinPhiVal * Math.sin(theta)
 		const hz = cosPhiVal
 
-		const centerR = findNearestR(hx, hy, hz)
+		const centerR = findNearestR(mesh, hx, hy, hz)
 		const plate = plates[plateAssignment[centerR]]
-		const drift = plateVelocityAt(plate, hx, hy, hz)
+		const drift = eulerVelocityAt(plate.pole, plate.omega, hx, hy, hz)
 		const driftLen = Math.sqrt(
 			drift[0] * drift[0] + drift[1] * drift[1] + drift[2] * drift[2],
 		)

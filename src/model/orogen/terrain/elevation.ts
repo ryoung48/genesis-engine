@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Distance fields and elevation assignment.
  * Faithful port of orogen's elevation.js distance-field + elevation logic.
  */
@@ -148,6 +148,33 @@ export function computeDistanceFields(
 }
 
 /**
+ * BFS that propagates hop-count distances from pre-seeded nodes up to halfWidth hops.
+ * `canVisit(nr, r)` gates whether neighbor `nr` (from current node `r`) may be visited.
+ */
+function boundedBfs(
+	dist: Float32Array,
+	seeds: number[],
+	halfWidth: number,
+	adjOffset: Int32Array,
+	adjList: Int32Array,
+	canVisit: (nr: number, r: number) => boolean,
+): void {
+	let qi = 0
+	while (qi < seeds.length) {
+		const r = seeds[qi++]
+		const nd = dist[r] + 1
+		if (nd > halfWidth) continue
+		for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
+			const nr = adjList[ni]
+			if (nd < dist[nr] && canVisit(nr, r)) {
+				dist[nr] = nd
+				seeds.push(nr)
+			}
+		}
+	}
+}
+
+/**
  * Assign elevation from distance fields, stress, noise, and tectonic features.
  * Faithful port of orogen's main elevation loop.
  */
@@ -190,7 +217,7 @@ export function blendElevation(
 
 	// Source uses default persistence (2/3) for most fbm calls.
 	// Only detail/fine noise uses explicit 0.5.
-	function nfbm(x: number, y: number, z: number, octaves = 5): number {
+	function fbm(x: number, y: number, z: number, octaves = 5): number {
 		return noise.fbm(x, y, z, octaves)
 	}
 
@@ -198,11 +225,11 @@ export function blendElevation(
 		return noise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
 	}
 
-	function fnfbm(x: number, y: number, z: number, octaves = 4): number {
+	function foldFbm(x: number, y: number, z: number, octaves = 4): number {
 		return foldNoise.fbm(x, y, z, octaves)
 	}
 
-	function rnfbm(x: number, y: number, z: number, octaves = 3): number {
+	function riftFbm(x: number, y: number, z: number, octaves = 3): number {
 		return riftNoise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
 	}
 
@@ -214,17 +241,16 @@ export function blendElevation(
 
 	// 95th-percentile stress normalization
 	let maxStress = 0
-	const stressVals: number[] = []
+	const stressVals = new Float32Array(numRegions)
+	let stressCount = 0
 	for (let r = 0; r < numRegions; r++) {
-		if (r_stress[r] > 0.01) stressVals.push(r_stress[r])
+		if (r_stress[r] > 0.01) stressVals[stressCount++] = r_stress[r]
 		if (r_stress[r] > maxStress) maxStress = r_stress[r]
 	}
-	if (stressVals.length > 0) {
-		stressVals.sort((a, b) => a - b)
+	if (stressCount > 0) {
+		stressVals.subarray(0, stressCount).sort()
 		maxStress =
-			stressVals[
-				Math.min(stressVals.length - 1, Math.floor(stressVals.length * 0.97))
-			]
+			stressVals[Math.min(stressCount - 1, Math.floor(stressCount * 0.97))]
 	}
 	if (maxStress < 0.01) maxStress = 1
 
@@ -257,22 +283,14 @@ export function blendElevation(
 			riftDist[r] = 0
 		}
 	}
-	{
-		let qi = 0
-		while (qi < riftSeeds.length) {
-			const r = riftSeeds[qi++]
-			const nd = riftDist[r] + 1
-			if (nd > riftHalfWidth) continue
-			const plate = r_plate[r]
-			for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
-				const nr = adjList[ni]
-				if (nd < riftDist[nr] && r_plate[nr] === plate && !r_isOcean[nr]) {
-					riftDist[nr] = nd
-					riftSeeds.push(nr)
-				}
-			}
-		}
-	}
+	boundedBfs(
+		riftDist,
+		riftSeeds,
+		riftHalfWidth,
+		adjOffset,
+		adjList,
+		(nr, r) => r_plate[nr] === r_plate[r] && !r_isOcean[nr],
+	)
 
 	// Pull-apart basin BFS (continental transform boundaries)
 	const PULL_APART_HW_BASE = 3
@@ -288,21 +306,14 @@ export function blendElevation(
 			pullApartDist[r] = 0
 		}
 	}
-	{
-		let qi = 0
-		while (qi < pullApartSeeds.length) {
-			const r = pullApartSeeds[qi++]
-			const nd = pullApartDist[r] + 1
-			if (nd > pullApartHalfWidth) continue
-			for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
-				const nr = adjList[ni]
-				if (nd < pullApartDist[nr] && !r_isOcean[nr]) {
-					pullApartDist[nr] = nd
-					pullApartSeeds.push(nr)
-				}
-			}
-		}
-	}
+	boundedBfs(
+		pullApartDist,
+		pullApartSeeds,
+		pullApartHalfWidth,
+		adjOffset,
+		adjList,
+		(nr, _r) => !r_isOcean[nr],
+	)
 	timing?.push({
 		Stage: "Coast boundary + rift BFS",
 		ms: (performance.now() - coastAndRiftStart).toFixed(1),
@@ -320,21 +331,14 @@ export function blendElevation(
 			ridgeDist[r] = 0
 		}
 	}
-	{
-		let qi = 0
-		while (qi < ridgeSeeds.length) {
-			const r = ridgeSeeds[qi++]
-			const nd = ridgeDist[r] + 1
-			if (nd > ridgeHalfWidth) continue
-			for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
-				const nr = adjList[ni]
-				if (nd < ridgeDist[nr] && r_isOcean[nr]) {
-					ridgeDist[nr] = nd
-					ridgeSeeds.push(nr)
-				}
-			}
-		}
-	}
+	boundedBfs(
+		ridgeDist,
+		ridgeSeeds,
+		ridgeHalfWidth,
+		adjOffset,
+		adjList,
+		(nr, _r) => !!r_isOcean[nr],
+	)
 
 	// Fracture zone BFS
 	const FRAC_HW_BASE = 3
@@ -347,21 +351,14 @@ export function blendElevation(
 			fractureDist[r] = 0
 		}
 	}
-	{
-		let qi = 0
-		while (qi < fractureSeeds.length) {
-			const r = fractureSeeds[qi++]
-			const nd = fractureDist[r] + 1
-			if (nd > fractureHalfWidth) continue
-			for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
-				const nr = adjList[ni]
-				if (nd < fractureDist[nr] && r_isOcean[nr]) {
-					fractureDist[nr] = nd
-					fractureSeeds.push(nr)
-				}
-			}
-		}
-	}
+	boundedBfs(
+		fractureDist,
+		fractureSeeds,
+		fractureHalfWidth,
+		adjOffset,
+		adjList,
+		(nr, _r) => !!r_isOcean[nr],
+	)
 
 	// Back-arc basin BFS
 	const baStart = Math.max(1, Math.round(2 * scaleFactor))
@@ -407,12 +404,12 @@ export function blendElevation(
 		}
 	}
 	const maxCD = Math.max(8, Math.round(8 * scaleFactor))
-	const dBdry = new Float32Array(numRegions).fill(maxCD + 1)
+	const r_coastDist = new Float32Array(numRegions).fill(maxCD + 1)
 	const coastStressMax = new Float32Array(numRegions)
 	const coastSubductMax = new Float32Array(numRegions)
 	const coastConvergent = new Uint8Array(numRegions)
 	for (const r of coastBdry) {
-		dBdry[r] = 0
+		r_coastDist[r] = 0
 		coastStressMax[r] = Math.min(1, r_stress[r] / maxStress)
 		coastSubductMax[r] = r_subductFactor[r]
 		coastConvergent[r] = r_boundaryType[r] === 1 ? 1 : 0
@@ -421,17 +418,20 @@ export function blendElevation(
 		let qi = 0
 		while (qi < coastBdry.length) {
 			const r = coastBdry[qi++]
-			const nd = dBdry[r] + 1
+			const nd = r_coastDist[r] + 1
 			if (nd > maxCD) continue
 			for (let ni = adjOffset[r], niEnd = adjOffset[r + 1]; ni < niEnd; ni++) {
 				const nr = adjList[ni]
-				if (nd < dBdry[nr]) {
-					dBdry[nr] = nd
+				if (nd < r_coastDist[nr]) {
+					r_coastDist[nr] = nd
 					coastStressMax[nr] = coastStressMax[r]
 					coastSubductMax[nr] = coastSubductMax[r]
 					coastConvergent[nr] = coastConvergent[r]
 					coastBdry.push(nr)
-				} else if (nd === dBdry[nr] && coastStressMax[r] > coastStressMax[nr]) {
+				} else if (
+					nd === r_coastDist[nr] &&
+					coastStressMax[r] > coastStressMax[nr]
+				) {
 					coastStressMax[nr] = coastStressMax[r]
 					coastSubductMax[nr] = coastSubductMax[r]
 					coastConvergent[nr] = coastConvergent[r]
@@ -469,9 +469,9 @@ export function blendElevation(
 			y = r_xyz[3 * r + 1],
 			z = r_xyz[3 * r + 2]
 
-		const wx = x + warpScale * nfbm(x + 5.3, y + 1.7, z + 3.1, warpOctaves)
-		const wy = y + warpScale * nfbm(x + 8.1, y + 2.9, z + 7.3, warpOctaves)
-		const wz = z + warpScale * nfbm(x + 1.4, y + 6.2, z + 4.8, warpOctaves)
+		const wx = x + warpScale * fbm(x + 5.3, y + 1.7, z + 3.1, warpOctaves)
+		const wy = y + warpScale * fbm(x + 8.1, y + 2.9, z + 7.3, warpOctaves)
+		const wz = z + warpScale * fbm(x + 1.4, y + 6.2, z + 4.8, warpOctaves)
 
 		// Orogenic power noise
 		const rawOro = noise.noise3D(x * 1.5 + 33.7, y * 1.5 + 11.2, z * 1.5 + 22.9)
@@ -491,7 +491,7 @@ export function blendElevation(
 				const uplift = stressMag * (1 - sf)
 				const depress = stressMag * 0.4 * sf
 				const heightVar =
-					0.6 + 0.8 * nfbm(x * 8 + 13.7, y * 8 + 9.2, z * 8 + 4.5, 3)
+					0.6 + 0.8 * fbm(x * 8 + 13.7, y * 8 + 9.2, z * 8 + 4.5, 3)
 				elev[r] += (uplift - depress) * heightVar
 			}
 
@@ -510,11 +510,11 @@ export function blendElevation(
 					let riftEffect = 0
 					if (rd <= 0.5) {
 						riftEffect = -0.25
-						riftEffect += rnfbm(x * 8, y * 8, z * 8) * 0.05
+						riftEffect += riftFbm(x * 8, y * 8, z * 8) * 0.05
 					} else if (rd <= floorEnd) {
 						const t = rd / floorEnd
 						riftEffect = -0.2 * (1 - t * 0.3)
-						riftEffect += rnfbm(x * 8, y * 8, z * 8) * 0.04 * (1 - t)
+						riftEffect += riftFbm(x * 8, y * 8, z * 8) * 0.04 * (1 - t)
 					} else if (rd <= shoulderEnd) {
 						const t = (rd - floorEnd) / (shoulderEnd - floorEnd)
 						riftEffect = 0.04 * (1 - t)
@@ -536,12 +536,12 @@ export function blendElevation(
 					let paEffect = 0
 					if (pd <= 0.5) {
 						paEffect = -0.18
-						paEffect += rnfbm(x * 10, y * 10, z * 10) * 0.04
+						paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.04
 					} else if (pd <= pullApartHalfWidth) {
 						const t = pd / pullApartHalfWidth
 						const fade = t * t * (3 - 2 * t)
 						paEffect = -0.12 * (1 - fade)
-						paEffect += rnfbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
+						paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
 					}
 					elev[r] += paEffect
 					markFeature(r, OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN, paEffect)
@@ -586,13 +586,13 @@ export function blendElevation(
 				if (pv && foldActivity > 0.01) {
 					const u = x * pv.pole[0] + y * pv.pole[1] + z * pv.pole[2]
 					const phaseWarp =
-						fnfbm(x * 3 + 55.3, y * 3 + 33.7, z * 3 + 17.2, 2) * 0.08
+						foldFbm(x * 3 + 55.3, y * 3 + 33.7, z * 3 + 17.2, 2) * 0.08
 					const FOLD_FREQ = 30
 					const phase = (u + phaseWarp) * FOLD_FREQ * Math.PI
 					const ridge = 1 - Math.abs(Math.sin(phase))
 					const foldCentered = ridge - 0.36
 					const ampMod =
-						0.6 + 0.4 * fnfbm(x * 4 + 88.1, y * 4 + 62.3, z * 4 + 41.7, 2)
+						0.6 + 0.4 * foldFbm(x * 4 + 88.1, y * 4 + 62.3, z * 4 + 41.7, 2)
 					const elevBoost = 1 + 4 * Math.max(0, elev[r])
 					const foldAmp =
 						foldActivity *
@@ -612,7 +612,7 @@ export function blendElevation(
 
 			// Noise
 			const blend = Math.min(1, stressNorm * 3)
-			const smoothNoise = nfbm(wx, wy, wz) * noiseMag
+			const smoothNoise = fbm(wx, wy, wz) * noiseMag
 			const ridgedNoisev = ridgedFbm(wx, wy, wz) * noiseMag * 1.5
 			const noiseVal = smoothNoise * (1 - blend) + ridgedNoisev * blend
 			const detailNoise =
@@ -679,7 +679,7 @@ export function blendElevation(
 				const interiorUplift =
 					INTERIOR_BASE + tectonicActivity * INTERIOR_TECTONIC
 				const baseBias = -0.08 * (1 - sDown) + interiorUplift * sUp
-				const mod = 1.0 + 0.2 * nfbm(x * 2 + 19.3, y * 2 + 7.6, z * 2 + 13.1, 2)
+				const mod = 1.0 + 0.2 * fbm(x * 2 + 19.3, y * 2 + 7.6, z * 2 + 13.1, 2)
 				const interiorEffect = baseBias * mod
 				elev[r] += interiorEffect
 				markFeature(
@@ -715,7 +715,7 @@ export function blendElevation(
 				const topDepth = isPassive ? -0.07 : -0.13
 				oceanBase = topDepth - 0.25 * ((dc - shelfEnd) / (slopeEnd - shelfEnd))
 			} else {
-				oceanBase = -0.35 + nfbm(x * 2, y * 2, z * 2, 3) * 0.03
+				oceanBase = -0.35 + fbm(x * 2, y * 2, z * 2, 3) * 0.03
 			}
 
 			elev[r] = Math.min(elev[r], oceanBase)
@@ -770,7 +770,7 @@ export function blendElevation(
 			}
 
 			// Ocean noise
-			elev[r] += nfbm(wx, wy, wz) * noiseMag * 0.3
+			elev[r] += fbm(wx, wy, wz) * noiseMag * 0.3
 		}
 	}
 	timing?.push({
@@ -786,7 +786,7 @@ export function blendElevation(
 		const cNoise2 = new SimplexNoise(seed + 133)
 		const cNoise3 = new SimplexNoise(seed + 211)
 
-		function cnfbm(
+		function coastFbm(
 			n: SimplexNoise,
 			x: number,
 			y: number,
@@ -798,11 +798,11 @@ export function blendElevation(
 		}
 
 		for (let r = 0; r < numRegions; r++) {
-			if (dBdry[r] > coastRoughenDist) continue
+			if (r_coastDist[r] > coastRoughenDist) continue
 			const x = r_xyz[3 * r],
 				y = r_xyz[3 * r + 1],
 				z = r_xyz[3 * r + 2]
-			const t = dBdry[r] / coastRoughenDist
+			const t = r_coastDist[r] / coastRoughenDist
 			const sn = Math.min(
 				1,
 				Math.max(coastStressMax[r], r_stress[r] / maxStress),
@@ -820,7 +820,7 @@ export function blendElevation(
 			const stressAmp1 = 1 + sn * 5
 			const coastFreq = isPassiveCoast ? 12 : 18
 			const coastAmp = isPassiveCoast ? 0.08 : 0.12
-			const n1 = cnfbm(
+			const n1 = coastFbm(
 				cNoise,
 				x * coastFreq + 3.7,
 				y * coastFreq + 7.1,
@@ -839,16 +839,16 @@ export function blendElevation(
 			if (falloffW > 0) {
 				const warpAmt = 0.35 * falloffW * (1 + sn * 2)
 				const dwx =
-					cnfbm(cNoise3, x * 6 + 11.3, y * 6 + 4.7, z * 6 + 8.2, 3, 0.6) *
+					coastFbm(cNoise3, x * 6 + 11.3, y * 6 + 4.7, z * 6 + 8.2, 3, 0.6) *
 					warpAmt
 				const dwy =
-					cnfbm(cNoise3, x * 6 + 2.9, y * 6 + 9.4, z * 6 + 1.6, 3, 0.6) *
+					coastFbm(cNoise3, x * 6 + 2.9, y * 6 + 9.4, z * 6 + 1.6, 3, 0.6) *
 					warpAmt
 				const dwz =
-					cnfbm(cNoise3, x * 6 + 7.5, y * 6 + 0.3, z * 6 + 5.9, 3, 0.6) *
+					coastFbm(cNoise3, x * 6 + 7.5, y * 6 + 0.3, z * 6 + 5.9, 3, 0.6) *
 					warpAmt
-				const origN = nfbm(x, y, z) * noiseMag
-				const warpN = nfbm(x + dwx, y + dwy, z + dwz) * noiseMag
+				const origN = fbm(x, y, z) * noiseMag
+				const warpN = fbm(x + dwx, y + dwy, z + dwz) * noiseMag
 				let warpDelta = (warpN - origN) * falloffW
 				if (subSup > 0 && warpDelta > 0) warpDelta *= 1 - subSup
 				elev[r] += warpDelta
@@ -858,11 +858,11 @@ export function blendElevation(
 			// Layer 2: Island scattering
 			if (
 				r_isOcean[r] &&
-				dBdry[r] > 0 &&
-				dBdry[r] <= Math.max(4, Math.round(4 * scaleFactor)) &&
+				r_coastDist[r] > 0 &&
+				r_coastDist[r] <= Math.max(4, Math.round(4 * scaleFactor)) &&
 				subSup < 0.3
 			) {
-				const islandN = cnfbm(
+				const islandN = coastFbm(
 					cNoise2,
 					x * 35 + 5.1,
 					y * 35 + 9.3,
@@ -874,7 +874,7 @@ export function blendElevation(
 				if (islandN > threshold) {
 					const excess = (islandN - threshold) / (1 - threshold)
 					const distFade =
-						1 - dBdry[r] / Math.max(4, Math.round(4 * scaleFactor))
+						1 - r_coastDist[r] / Math.max(4, Math.round(4 * scaleFactor))
 					let bump = excess * excess * 0.18 * (1 + sn * 2) * distFade
 					bump *= 1 - subSup / 0.3
 					elev[r] += bump

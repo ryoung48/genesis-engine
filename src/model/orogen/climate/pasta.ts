@@ -5,7 +5,6 @@ import type {
 	OrogenRainfall,
 	SphereMesh,
 } from "../types"
-import { getDaysPerYear } from "../util/units"
 import { computeMonthlyInsolation } from "./climate"
 
 const ZONE_COLOR_MAP = {
@@ -19,7 +18,7 @@ const ZONE_COLOR_MAP = {
 	Or: [40, 50, 170],
 	Oe: [120, 40, 200],
 	TUr: [0, 0, 255],
-	TUrp: [4, 0, 191],
+	TUrp: [0, 0, 160],
 	TUf: [41, 112, 255],
 	TUfp: [26, 80, 188],
 	TUs: [145, 180, 255],
@@ -332,12 +331,18 @@ export const PASTA_NAMES: Record<(typeof PASTA_LABELS)[number], string> = {
 	Ahe: "Hyperseasonal Desert",
 }
 
-const TH_COOL = 17
-const TH_COLD = 0
+const TH_COOL = 15
+const TH_COLD = -10
 const TH_FRIGID = -30
 const TH_HOT = 40
 const TH_TORRID = 60
 const TH_BOIL = 90
+
+const OCEAN = {
+	torrid: TH_TORRID,
+	hot: TH_HOT,
+	cold: TH_COOL,
+}
 
 // Pre-resolved zone indices — avoids Map lookups and string allocations in the hot loop
 const Z = Object.fromEntries(
@@ -470,34 +475,14 @@ function classifyOcean(
 	if (iceMin > 80) return Z.Ofi
 	if (iceMax > 20) return gddz >= 50 ? Z.Ofd : Z.Ofg
 	if (gddz < 50) return Z.Og
-	if (warmest > TH_TORRID) return Z.Or
-	if (coldest > TH_COOL) return warmest > TH_HOT ? Z.Oh : Z.Ot
-	if (warmest > TH_HOT) return Z.Oe
+	if (warmest > OCEAN.torrid) return Z.Or
+	if (coldest > OCEAN.cold) return warmest > OCEAN.hot ? Z.Oh : Z.Ot
+	if (warmest > OCEAN.hot) return Z.Oe
 	return Z.Oc
 }
 
 // MinIce > 10cm (100mm w.e.) for CI, per Worldbuilding Pasta spec
 const ICE_THRESHOLD = 100
-
-interface LandDebugOut {
-	gdd: number
-	gddz: number
-	gint: number
-	ar: number
-	gar: number
-	grs: number
-	evr: number
-}
-
-const _landDebug: LandDebugOut = {
-	gdd: 0,
-	gddz: 0,
-	gint: 0,
-	ar: 0,
-	gar: 0,
-	grs: 0,
-	evr: 0,
-}
 
 function classifyLand(
 	temps: Float64Array,
@@ -517,19 +502,6 @@ function classifyLand(
 ): number {
 	let annualPrecip = 0
 	for (let m = 0; m < 12; m++) annualPrecip += rain[m]
-
-	// Ice classification per Pasta spec:
-	// CI if MinIce > 10cm, BUT persistent ice removed if absolute max temp > 0°C
-	if (iceVal > ICE_THRESHOLD && warmest <= 0) {
-		_landDebug.gdd = 0
-		_landDebug.gddz = 0
-		_landDebug.gint = 0
-		_landDebug.ar = 0
-		_landDebug.gar = 0
-		_landDebug.grs = 0
-		_landDebug.evr = 0
-		return Z.CI
-	}
 
 	let petSum = 0,
 		aetSum = 0,
@@ -569,24 +541,28 @@ function classifyLand(
 	const gpr = gddWeightSum > 0 ? precGdd / gddWeightSum : 0
 	const grs = aetAvg > 0 ? gpr / aetAvg : 1
 	const evr = annualPrecip > 0 ? aetSum / annualPrecip : 1
-
-	_landDebug.gdd = gdd === Infinity ? 99999 : gdd
-	_landDebug.gddz = gddz === Infinity ? 99999 : gddz
-	_landDebug.gint = gint === Infinity ? 99999 : gint
-	_landDebug.ar = ar
-	_landDebug.gar = gar
-	_landDebug.grs = grs
-	_landDebug.evr = evr
+	// Growing-season precipitation-to-PET ratio: how much does growing-season
+	// rainfall exceed atmospheric demand? GDD-weighting discounts winter months
+	// (g5 ≈ 0 below 5°C), so winter snowpack doesn't inflate the numerator.
+	// This correctly requires extraordinary growing-season wetness for the pluvial
+	// flag, unlike evr which fires too easily in cold climates where PET is low.
+	const gsPrecipToPet = petGdd > 0 ? precGdd / petGdd : 1
 
 	const cool = coldest > TH_COLD && coldest <= TH_COOL
 	const cold = coldest > TH_FRIGID && coldest <= TH_COLD
 	const hot = warmest >= TH_HOT && warmest < TH_TORRID
 	const torrid = warmest >= TH_TORRID && warmest < TH_BOIL
 	const lowGrS = grs < 0.8
-	const pluvial = evr < 0.45
+	const pluvial = gsPrecipToPet > 2.5
 	const groupT = warmest < TH_HOT && coldest > TH_COOL
 	const groupC = warmest < TH_HOT && coldest <= TH_COOL
 	const groupH = warmest >= TH_HOT && coldest > TH_COOL
+
+	// Ice classification per Pasta spec:
+	// CI if MinIce > 10cm, BUT persistent ice removed if absolute max temp > 0°C
+	if (iceVal > ICE_THRESHOLD && warmest <= 0) {
+		return Z.CI
+	}
 
 	if (gddz < 50) {
 		if (groupT) return Z.TG
@@ -625,7 +601,7 @@ function classifyLand(
 		if (gar < 0.5)
 			return eu ? (pluvial ? Z.TUAp : Z.TUA) : pluvial ? Z.TQAp : Z.TQA
 		if (eu) {
-			if (ar > 0.9) return evr < 0.4 ? Z.TUrp : Z.TUr
+			if (ar > 0.9 && gsPrecipToPet > 1.1) return evr < 0.4 ? Z.TUrp : Z.TUr
 			if (ar > 0.75) return pluvial ? Z.TUfp : Z.TUf
 			return pluvial ? Z.TUsp : Z.TUs
 		}
@@ -686,6 +662,8 @@ export interface PastaDebug {
 	gdd: Float32Array
 	gddz: Float32Array
 	gint: Float32Array
+	gdd_monthly: Float32Array
+	gint_monthly: Float32Array
 	ar: Float32Array
 	gar: Float32Array
 	grs: Float32Array
@@ -706,7 +684,7 @@ export function assignPastaClimate(
 	iceMaxMonthly?: Float32Array,
 ): { zones: Uint8Array; debug: PastaDebug } {
 	const N = mesh.numRegions
-	const dpm = getDaysPerYear(params.daysPerYear) / 12
+	const dpm = params.daysPerYear / 12
 	const output = new Uint8Array(N)
 	const insolation = computeMonthlyInsolation(mesh, params)
 
@@ -714,6 +692,8 @@ export function assignPastaClimate(
 		gdd: new Float32Array(N),
 		gddz: new Float32Array(N),
 		gint: new Float32Array(N),
+		gdd_monthly: new Float32Array(12 * N),
+		gint_monthly: new Float32Array(12 * N),
 		ar: new Float32Array(N),
 		gar: new Float32Array(N),
 		grs: new Float32Array(N),
@@ -739,7 +719,6 @@ export function assignPastaClimate(
 			temps[m] = climate.temperature_monthly[m * N + r]
 			insol[m] = insolation[m * N + r]
 		}
-
 		const warmest = climate.temperature_max[r]
 		const coldest = climate.temperature_min[r]
 		debug.minT[r] = coldest
@@ -819,6 +798,10 @@ export function assignPastaClimate(
 			debug.gdd[r] = gdd
 			debug.gddz[r] = gddz
 			debug.gint[r] = gint === Infinity ? 99999 : gint
+			for (let m = 0; m < 12; m++) {
+				debug.gdd_monthly[m * N + r] = mGDD[m]
+				debug.gint_monthly[m * N + r] = mGInt[m]
+			}
 			debug.ar[r] = ar
 			debug.gar[r] = gar
 			debug.grs[r] = grs

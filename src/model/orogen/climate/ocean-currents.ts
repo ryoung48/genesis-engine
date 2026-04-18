@@ -8,10 +8,10 @@
 
 import type { OrogenLandmarks } from "../terrain/landmarks"
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
+import { getRegionLatLonDegrees } from "../util/math"
 import { meanEdgeLengthKm } from "../util/units"
 import { computeThermalEquator } from "./rain"
 
-const RAD2DEG = 180 / Math.PI
 const DEG2RAD = Math.PI / 180
 const TYPE_CONTINENT = 0
 const TYPE_LAKE = 5
@@ -51,21 +51,6 @@ function wrapLonDeltaDeg(delta: number): number {
 	if (delta > 180) return delta - 360
 	if (delta < -180) return delta + 360
 	return delta
-}
-
-function getRegionLatLonDegrees(mesh: SphereMesh): {
-	latDeg: Float32Array
-	lonDeg: Float32Array
-} {
-	const N = mesh.numRegions
-	const latDeg = new Float32Array(N)
-	const lonDeg = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		const z = mesh.r_xyz[3 * r + 2]
-		latDeg[r] = Math.asin(Math.max(-1, Math.min(1, z))) * RAD2DEG
-		lonDeg[r] = Math.atan2(mesh.r_xyz[3 * r + 1], mesh.r_xyz[3 * r]) * RAD2DEG
-	}
-	return { latDeg, lonDeg }
 }
 
 interface CoastSite {
@@ -378,13 +363,11 @@ function computeOceanSeedDistance(
 export function computeOceanCurrents(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: OrogenClimate,
 	distCoast: Float32Array,
 	landmarks: OrogenLandmarks,
 	params?: Pick<OrogenParams, "planetRadiusKm">,
 	monthlyTEQ?: Float32Array[],
 ): OceanCurrentResult {
-	void climate
 	const N = mesh.numRegions
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 	const { latDeg, lonDeg } = getRegionLatLonDegrees(mesh)

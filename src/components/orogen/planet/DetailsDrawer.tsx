@@ -1,75 +1,89 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
+import type { HistoryNote } from "@/model/orogen/history"
+import {
+	type NationSection,
+	resolveDrawerStateOnOpen,
+	type WorldSection,
+} from "./details/drawer-state"
+import { NationDetails } from "./details/NationDetails"
+import type { NationHistoryPoint } from "./details/NationHistoryChart"
+import {
+	type DetailsDrawerBaseProps,
+	type NationDetailsData,
+} from "./details/shared"
+import { WorldDetails } from "./details/WorldDetails"
 
-interface NationDetails {
-	id: number
-	provinceCount: number
-	totalPopulation: number
-}
-
-interface DistributionBucket {
-	label: string
-	count: number
-	color: string
-}
-
-interface DetailsDrawerProps {
+interface DetailsDrawerProps extends DetailsDrawerBaseProps {
 	open: boolean
 	onToggle: () => void
-	nation: NationDetails | null
-	nationCount: number | null
-	nationSizeDistribution: DistributionBucket[]
-	climateDistribution: DistributionBucket[]
-	vegetationDistribution: DistributionBucket[]
-	topographyDistribution: DistributionBucket[]
-}
-
-function formatPopulation(value: number): string {
-	if (!Number.isFinite(value) || value <= 0) return "0"
-	return Math.round(value).toLocaleString()
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="flex items-baseline justify-between gap-3">
-			<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
-				{label}
-			</span>
-			<span className="text-right font-mono text-[12px] text-slate-950">
-				{value}
-			</span>
-		</div>
-	)
+	nation: NationDetailsData | null
+	nationHistory?: NationHistoryPoint[]
+	windowedEvents?: HistoryNote[]
+	allPastEvents?: HistoryNote[]
+	selectedTimeMs?: number
+	currentTimeMs?: number
+	onTimeSelect?: (timeMs: number) => void
+	onNationClick?: (nationId: number) => void
 }
 
 export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	open,
 	onToggle,
 	nation,
-	nationCount,
+	planetStats,
+	worldPopulation,
+	activeWarCount,
+	averageDevelopment,
+	nationAverageDevelopment,
+	developmentDistribution,
+	nationDevelopmentDistribution,
 	nationSizeDistribution,
+	conflictDistribution,
+	relationDistribution,
 	climateDistribution,
 	vegetationDistribution,
 	topographyDistribution,
+	nationHistory,
+	windowedEvents,
+	allPastEvents,
+	selectedTimeMs,
+	currentTimeMs,
+	onTimeSelect,
+	onNationClick,
 }) => {
 	const [tab, setTab] = useState<"world" | "nation">("world")
+	const [worldSection, setWorldSection] = useState<WorldSection>("planetary")
+	const [nationSection, setNationSection] = useState<NationSection>("political")
+	const previousNationIdRef = useRef<number | null>(null)
 
 	useEffect(() => {
-		if (open) {
-			setTab("world")
+		if (!open) return
+		const nextState = resolveDrawerStateOnOpen({
+			current: { tab, worldSection, nationSection },
+			selectedNationId: nation?.id ?? null,
+			previousNationId: previousNationIdRef.current,
+		})
+		if (nextState.tab !== tab) setTab(nextState.tab)
+		if (nextState.worldSection !== worldSection) {
+			setWorldSection(nextState.worldSection)
 		}
-	}, [open])
+		if (nextState.nationSection !== nationSection) {
+			setNationSection(nextState.nationSection)
+		}
+		previousNationIdRef.current = nation?.id ?? null
+	}, [open, nation?.id, tab, worldSection, nationSection])
 
 	if (!open) {
 		return null
 	}
 
 	return (
-		<div className="w-full xl:w-[360px] xl:max-w-[30vw] shrink-0 h-auto xl:h-full flex flex-col px-4 py-4 lg:px-5 lg:py-5 border-t xl:border-t-0 xl:border-l border-slate-200 bg-white/95 backdrop-blur-sm">
-			<div className="flex items-center gap-3 mb-5">
-				<div className="w-7 h-7 bg-slate-900 rounded-md flex items-center justify-center">
+		<div className="flex h-auto w-full shrink-0 flex-col border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur-sm xl:h-full xl:w-[340px] xl:max-w-[28vw] xl:border-t-0 xl:border-l">
+			<div className="mb-3 flex items-center gap-2">
+				<div className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900">
 					<svg
-						width="14"
-						height="14"
+						width="12"
+						height="12"
 						viewBox="0 0 24 24"
 						fill="none"
 						className="text-white"
@@ -82,10 +96,10 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 						/>
 					</svg>
 				</div>
-				<span className="font-bold text-sm tracking-tight">DETAILS</span>
+				<span className="text-xs font-bold tracking-tight">DETAILS</span>
 				<button
 					onClick={onToggle}
-					className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+					className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
 					title="Hide details"
 				>
 					<svg
@@ -105,8 +119,8 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 				</button>
 			</div>
 
-			<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
-				<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
+			<div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+				<div className="inline-flex w-fit gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5">
 					{(
 						[
 							["world", "World"],
@@ -116,7 +130,7 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 						<button
 							key={nextTab}
 							onClick={() => setTab(nextTab)}
-							className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
+							className={`rounded-md px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] transition-all ${
 								tab === nextTab
 									? "bg-white text-slate-900 shadow-sm"
 									: "text-slate-500 hover:text-slate-700"
@@ -127,129 +141,38 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 					))}
 				</div>
 
-				{tab === "world" && (
-					<>
-						<DetailRow
-							label="Total Nations"
-							value={nationCount != null ? nationCount.toLocaleString() : "N/A"}
-						/>
-						<DistributionChart
-							title="Nation Size"
-							buckets={nationSizeDistribution}
-						/>
-						<DistributionChart title="Climate" buckets={climateDistribution} />
-						<DistributionChart
-							title="Vegetation"
-							buckets={vegetationDistribution}
-						/>
-						<DistributionChart
-							title="Topography"
-							buckets={topographyDistribution}
-						/>
-					</>
+				{tab === "world" ? (
+					<WorldDetails
+						section={worldSection}
+						onSectionChange={setWorldSection}
+						planetStats={planetStats}
+						worldPopulation={worldPopulation}
+						activeWarCount={activeWarCount}
+						averageDevelopment={averageDevelopment}
+						nationAverageDevelopment={nationAverageDevelopment}
+						developmentDistribution={developmentDistribution}
+						nationDevelopmentDistribution={nationDevelopmentDistribution}
+						nationSizeDistribution={nationSizeDistribution}
+						conflictDistribution={conflictDistribution}
+						relationDistribution={relationDistribution}
+						climateDistribution={climateDistribution}
+						vegetationDistribution={vegetationDistribution}
+						topographyDistribution={topographyDistribution}
+					/>
+				) : (
+					<NationDetails
+						nation={nation}
+						section={nationSection}
+						onSectionChange={setNationSection}
+						nationHistory={nationHistory}
+						windowedEvents={windowedEvents}
+						allPastEvents={allPastEvents}
+						selectedTimeMs={selectedTimeMs}
+						currentTimeMs={currentTimeMs}
+						onTimeSelect={onTimeSelect}
+						onNationClick={onNationClick}
+					/>
 				)}
-
-				{tab === "nation" && (
-					<>
-						<details
-							open
-							className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3"
-						>
-							<summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-								Political
-							</summary>
-							<div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-								<DetailRow
-									label="Nation ID"
-									value={nation ? `#${nation.id}` : "N/A"}
-								/>
-								<DetailRow
-									label="Provinces"
-									value={nation ? nation.provinceCount.toLocaleString() : "N/A"}
-								/>
-							</div>
-						</details>
-
-						<details
-							open
-							className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3"
-						>
-							<summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-								Demographics
-							</summary>
-							<div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
-								<DetailRow
-									label="Population"
-									value={
-										nation ? formatPopulation(nation.totalPopulation) : "N/A"
-									}
-								/>
-							</div>
-						</details>
-					</>
-				)}
-			</div>
-		</div>
-	)
-}
-
-function DistributionChart({
-	title,
-	buckets,
-}: {
-	title: string
-	buckets: DistributionBucket[]
-}) {
-	const totalCount = buckets.reduce((sum, bucket) => sum + bucket.count, 0)
-
-	if (totalCount === 0) {
-		return null
-	}
-
-	return (
-		<div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-3">
-			<div className="mb-2 flex items-baseline justify-between gap-3">
-				<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-					{title}
-				</span>
-				<span className="font-mono text-[9px] text-slate-400">
-					{totalCount.toLocaleString()}
-				</span>
-			</div>
-			<div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-				{buckets
-					.filter((bucket) => bucket.count > 0)
-					.map((bucket) => (
-						<div
-							key={bucket.label}
-							className="h-full inline-block align-top transition-all"
-							style={{
-								width: `${(bucket.count / totalCount) * 100}%`,
-								backgroundColor: bucket.color,
-							}}
-							title={`${bucket.label}: ${bucket.count.toLocaleString()}`}
-						/>
-					))}
-			</div>
-			<div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-				{buckets
-					.filter((bucket) => bucket.count > 0)
-					.map((bucket) => {
-						const share = (bucket.count / totalCount) * 100
-						return (
-							<div key={bucket.label} className="flex items-center gap-1.5">
-								<span
-									className="h-1.5 w-1.5 rounded-full"
-									style={{ backgroundColor: bucket.color }}
-								/>
-								<span className="font-mono text-[9px] text-slate-500">
-									{bucket.label} ({bucket.count.toLocaleString()},{" "}
-									{share.toFixed(1)}
-									%)
-								</span>
-							</div>
-						)
-					})}
 			</div>
 		</div>
 	)

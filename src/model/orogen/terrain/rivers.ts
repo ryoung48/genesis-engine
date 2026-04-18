@@ -6,68 +6,8 @@ import type {
 	OrogenRivers,
 	SphereMesh,
 } from "../types"
-import {
-	getDaysPerYear,
-	getHoursPerDay,
-	getPlanetRadiusKm,
-} from "../util/units"
-
-/**
- * Min-heap keyed on an external Float32Array.
- */
-class MinHeap {
-	private _key: Float32Array
-	private _data: number[] = []
-
-	constructor(keyArray: Float32Array) {
-		this._key = keyArray
-	}
-	get size() {
-		return this._data.length
-	}
-	push(cell: number) {
-		this._data.push(cell)
-		let i = this._data.length - 1
-		while (i > 0) {
-			const parent = (i - 1) >> 1
-			if (this._key[this._data[i]] >= this._key[this._data[parent]]) break
-			const tmp = this._data[i]
-			this._data[i] = this._data[parent]
-			this._data[parent] = tmp
-			i = parent
-		}
-	}
-	pop(): number {
-		const top = this._data[0]
-		const last = this._data.pop()!
-		if (this._data.length > 0) {
-			this._data[0] = last
-			let i = 0
-			const n = this._data.length
-			for (;;) {
-				let smallest = i
-				const l = 2 * i + 1,
-					r = 2 * i + 2
-				if (l < n && this._key[this._data[l]] < this._key[this._data[smallest]])
-					smallest = l
-				if (r < n && this._key[this._data[r]] < this._key[this._data[smallest]])
-					smallest = r
-				if (smallest === i) break
-				const tmp = this._data[i]
-				this._data[i] = this._data[smallest]
-				this._data[smallest] = tmp
-				i = smallest
-			}
-		}
-		return top
-	}
-}
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-	if (edge0 === edge1) return x < edge0 ? 0 : 1
-	const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
-	return t * t * (3 - 2 * t)
-}
+import { MinHeap } from "../util/heap"
+import { smoothstep } from "../util/math"
 
 function polylineLengthKm(
 	line: [number, number, number, number][],
@@ -97,19 +37,17 @@ export function computeRivers(
 	rainfall: OrogenRainfall,
 	climate: OrogenClimate,
 	hydrology: OrogenHydrology,
-	isLand?: Uint8Array,
+	isLand: Uint8Array,
 	params?: Pick<OrogenParams, "planetRadiusKm" | "daysPerYear" | "hoursPerDay">,
 ): OrogenRivers {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
 	const DEG = 180 / Math.PI
-	const radiusKm = getPlanetRadiusKm(params?.planetRadiusKm)
+	const radiusKm = params?.planetRadiusKm ?? 6371
 	const radiusM = radiusKm * 1000
 	const cellAreaM2 = (4 * Math.PI * radiusM * radiusM) / Math.max(1, N)
 	const secondsPerYear =
-		getDaysPerYear(params?.daysPerYear) *
-		getHoursPerDay(params?.hoursPerDay) *
-		3600
+		(params?.daysPerYear ?? 365) * (params?.hoursPerDay ?? 24) * 3600
 
 	// ── 1. Priority-flood drainage ──────────────────────────────────
 	const drainTarget = new Int32Array(N).fill(-1)
@@ -125,16 +63,7 @@ export function computeRivers(
 	}
 	const heap = new MinHeap(key)
 
-	// Use provided land mask, or fall back to elevation-based classification
-	const land: Uint8Array =
-		isLand ??
-		(() => {
-			const mask = new Uint8Array(N)
-			for (let r = 0; r < N; r++) {
-				if (elevation[r] > 0) mask[r] = 1
-			}
-			return mask
-		})()
+	const land = isLand
 
 	// Track effective water surface for lake detection
 	const waterLevel = new Float32Array(N)
@@ -182,6 +111,7 @@ export function computeRivers(
 	const hydro = hydrology
 	const aetMonthly = hydro.aet_monthly
 	const aridityMonthly = hydro.aridity_monthly
+	const baseflowMonthly = hydro.baseflow_monthly
 	const runoffBoost = new Float32Array(N)
 	const passThroughElevBoost = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
@@ -207,8 +137,10 @@ export function computeRivers(
 			}
 			const runoffMm =
 				Math.max(0, rainfall.monthly[idx] - aetMonthly[idx]) * runoffBoost[r]
+			const baseflowMm = baseflowMonthly[idx]
+			const totalMm = runoffMm + baseflowMm
 			flowToTarget[r] =
-				runoffMm > 0 ? ((runoffMm / 1000) * cellAreaM2) / secondsPerMonth : 0
+				totalMm > 0 ? ((totalMm / 1000) * cellAreaM2) / secondsPerMonth : 0
 			const pet = climate.pet_monthly[idx]
 			const loss = 0.001 + smoothstep(0, monthlyPetHigh, pet) * 0.004
 			passThroughMonth[r] = Math.min(0.999, 1 - loss + passThroughElevBoost[r])

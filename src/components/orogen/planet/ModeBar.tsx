@@ -1,9 +1,5 @@
 import React from "react"
 import type { PopulationMapMode } from "@/components/world/types"
-import {
-	ENABLE_PASTA_CLASSIFICATION,
-	ENABLE_PROVINCES,
-} from "@/model/orogen/features"
 import type { ColorMode } from "../colors"
 
 export type NationMapMode = "borders" | "provinces"
@@ -25,6 +21,8 @@ interface ModeBarProps {
 	setWindAnnual: (v: boolean) => void
 	currentAnnual: boolean
 	setCurrentAnnual: (v: boolean) => void
+	dtrAnnual: boolean
+	setDtrAnnual: (v: boolean) => void
 }
 
 export const ModeBar: React.FC<ModeBarProps> = ({
@@ -44,6 +42,8 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	setWindAnnual,
 	currentAnnual,
 	setCurrentAnnual,
+	dtrAnnual,
+	setDtrAnnual,
 }) => {
 	const isTerrainMode =
 		colorMode === "terrain" ||
@@ -88,14 +88,15 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 			const climateButtons = (
 				[
 					["climate", "Basic"],
-					...(ENABLE_PASTA_CLASSIFICATION ? [["pastaClimate", "Pasta"]] : []),
+					["pastaClimate", "Pasta"],
 					["koppenClimate", "Koppen"],
 					["vegetation", "Veg"],
-					...(ENABLE_PASTA_CLASSIFICATION ? [["satellite", "Satellite"]] : []),
+					["satellite", "Satellite"],
 					["moisture", "Moisture"],
 					["oceanCurrents", "Currents"],
 					["temperature", "Temp"],
 					["precipitation", "Rain"],
+					["dtr", "DTR"],
 					// ["windSpeed", "Wind"],
 				] as [ColorMode, string][]
 			).map(([mode, label]) => {
@@ -143,20 +144,25 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 			if (
 				colorMode === "temperature" ||
 				colorMode === "precipitation" ||
-				colorMode === "windSpeed"
+				colorMode === "windSpeed" ||
+				colorMode === "dtr"
 			) {
 				const active =
 					colorMode === "temperature"
 						? tempAnnual
 						: colorMode === "precipitation"
 							? rainAnnual
-							: windAnnual
+							: colorMode === "windSpeed"
+								? windAnnual
+								: dtrAnnual
 				const setter =
 					colorMode === "temperature"
 						? setTempAnnual
 						: colorMode === "precipitation"
 							? setRainAnnual
-							: setWindAnnual
+							: colorMode === "windSpeed"
+								? setWindAnnual
+								: setDtrAnnual
 				return (
 					<div className="inline-flex items-center gap-0.5 rounded-xl border border-white/10 bg-slate-950/75 p-1 backdrop-blur-sm">
 						{climateButtons}
@@ -220,6 +226,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					{(
 						[
 							["density", "Density"],
+							["development", "Development"],
 							["gravity", "Gravity"],
 							["culture", "Culture"],
 							["heritage", "Heritage"],
@@ -270,23 +277,19 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	})()
 
 	return (
-		<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center pb-3 pointer-events-none gap-1.5">
+		<div className="flex flex-col items-center gap-1.5">
 			{subModeRow && (
-				<div className="pointer-events-auto inline-flex flex-col items-center rounded-xl border border-white/10 bg-slate-950/75 p-1 gap-1 backdrop-blur-sm">
+				<div className="inline-flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-slate-950/75 p-1 backdrop-blur-sm">
 					{subModeRow}
 				</div>
 			)}
-			<div className="pointer-events-auto inline-flex items-center rounded-xl border border-white/10 bg-slate-950/75 p-1 gap-0.5 backdrop-blur-sm">
+			<div className="inline-flex items-center gap-0.5 rounded-xl border border-white/10 bg-slate-950/75 p-1 backdrop-blur-sm">
 				{(
 					[
 						["terrain", "Terrain"],
 						["climate", "Climate"],
-						...(ENABLE_PROVINCES
-							? [
-									["population", "Population"],
-									["nations", "Nations"],
-								]
-							: []),
+						["population", "Population"],
+						["nations", "Nations"],
 					] as [string, string][]
 				).map(([mode, label]) => {
 					const isActive =

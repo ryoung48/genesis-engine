@@ -22,6 +22,7 @@ export type MapMode =
 
 export type PopulationMapMode =
 	| "density"
+	| "development"
 	| "culture"
 	| "heritage"
 	| "faith"

@@ -50,6 +50,7 @@ export type ColorMode =
 	| "debugEvr"
 	| "debugMinT"
 	| "debugMaxT"
+	| "dtr"
 
 /** Light blue used for ocean on thematic maps (non-terrain/satellite modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -558,6 +559,46 @@ export function gravityColor(t: number): [number, number, number] {
 		])(Math.pow(Math.max(0, Math.min(1, t)), 0.55)),
 	)
 	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
+export function developmentColor(t: number): [number, number, number] {
+	const color = d3.rgb(
+		d3.interpolateBuPu(Math.pow(Math.max(0, Math.min(1, t)), 0.9)),
+	)
+	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
+const dtrStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: 0, r: 0.0, g: 0.016, b: 0.812 }, // #0004cf
+	{ v: 5, r: 0.012, g: 0.373, b: 0.871 }, // #035fde
+	{ v: 10, r: 0.008, g: 0.906, b: 0.31 }, // #02e74f
+	{ v: 15, r: 0.596, g: 1.0, b: 0.067 }, // #98ff11
+	{ v: 20, r: 1.0, g: 1.0, b: 0.0 }, // #ffff00
+	{ v: 25, r: 1.0, g: 0.808, b: 0.0 }, // #ffce00
+	{ v: 30, r: 1.0, g: 0.455, b: 0.0 }, // #ff7400
+	{ v: 35, r: 1.0, g: 0.094, b: 0.0 }, // #ff1800
+	{ v: 40, r: 0.8, g: 0.0, b: 0.0 }, // #cc0000
+]
+
+export function dtrColor(celsius: number): [number, number, number] {
+	const clamped = Math.max(
+		dtrStops[0].v,
+		Math.min(dtrStops[dtrStops.length - 1].v, celsius),
+	)
+	for (let i = 0; i < dtrStops.length - 1; i++) {
+		const a = dtrStops[i]
+		const b = dtrStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = dtrStops[dtrStops.length - 1]
+	return [last.r, last.g, last.b]
 }
 
 export function slopeColor(normalizedSlope: number): [number, number, number] {

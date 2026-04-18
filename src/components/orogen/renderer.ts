@@ -4,6 +4,8 @@ import { TrackballControls } from "three/examples/jsm/controls/TrackballControls
 import { Line2 } from "three/examples/jsm/lines/Line2.js"
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
 import { type ColorMode, getColor } from "./colors"
 
@@ -17,9 +19,10 @@ export interface OrogenHoverInfo {
 export interface OrogenScene {
 	dispose(): void
 	resize(): void
-	updateWorld(world: SerializedOrogenWorld): void
+	updateWorld(world: SerializedOrogenWorld | null): void
 	setColorMode(mode: ColorMode): void
 	setRegionColors(colors: Float32Array | null): void
+	setOccupationOverlay(overlay: Float32Array | null): void
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void
 	setViewMode(mode: OrogenViewMode): void
@@ -63,6 +66,7 @@ export interface OrogenScene {
 	): void
 	setAtmospherePressure(pressureBar: number): void
 	setFullAmbient(enabled: boolean): void
+	focusOnNation(nationId: number, opts?: { durationMs?: number }): void
 }
 
 export function createOrogenScene(
@@ -209,6 +213,7 @@ export function createOrogenScene(
 	// Terrain mesh placeholder
 	let terrainMesh: THREE.Mesh | null = null
 	let mapMesh: THREE.Mesh | null = null
+	let mapOccupationOverlay: THREE.Mesh | null = null
 	let terrainWireframe: THREE.LineSegments | null = null
 	let mapWireframe: THREE.LineSegments | null = null
 	let globeGrid: THREE.LineSegments | null = null
@@ -216,11 +221,29 @@ export function createOrogenScene(
 	let currentWorld: SerializedOrogenWorld | null = null
 	let currentColorMode: ColorMode = "terrain"
 	let currentRegionColors: Float32Array | null = null
+	let currentOccupationOverlay: Float32Array | null = null
 	let currentViewMode: OrogenViewMode = "globe"
 	let wireframeVisible = false
 	let gridVisible = false
 	let gridSpacingDeg = 15
 	const currentMapCenterLongitudeDeg = 0
+	let focusTween: {
+		mode: OrogenViewMode
+		t0: number
+		duration: number
+		globeFrom: THREE.Vector3
+		globeTo: THREE.Vector3
+		mapFromX: number
+		mapFromY: number
+		mapToX: number
+		mapToY: number
+		mapFromZoom: number
+		mapToZoom: number
+	} | null = null
+	let pulseGlobe: LineSegments2 | null = null
+	let pulseMap: LineSegments2 | null = null
+	let pulseMaterials: LineMaterial[] = []
+	let pulse: { t0: number; duration: number } | null = null
 	let terrainFaceToRegion: Int32Array = new Int32Array(0)
 	let mapFaceToRegion: Int32Array = new Int32Array(0)
 	let globeThermalEquator: THREE.Line | null = null
@@ -439,6 +462,14 @@ export function createOrogenScene(
 		const geometry = new THREE.BufferGeometry()
 		geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 		geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
+		geometry.setAttribute(
+			"occColor",
+			new THREE.BufferAttribute(new Float32Array(validCount * 3 * 3), 3),
+		)
+		geometry.setAttribute(
+			"occMask",
+			new THREE.BufferAttribute(new Float32Array(validCount * 3), 1),
+		)
 		geometry.computeVertexNormals()
 
 		const material = new THREE.MeshLambertMaterial({
@@ -448,6 +479,37 @@ export function createOrogenScene(
 			shader.vertexShader = shader.vertexShader.replace(
 				"#include <beginnormal_vertex>",
 				"vec3 objectNormal = normalize(position);",
+			)
+			shader.vertexShader = shader.vertexShader.replace(
+				"void main() {",
+				`attribute vec3 occColor;
+				attribute float occMask;
+				varying vec3 vOccColor;
+				varying float vOccMask;
+				varying vec3 vWorldPos;
+				void main() {
+					vOccColor = occColor;
+					vOccMask = occMask;
+					vWorldPos = position;`,
+			)
+			shader.fragmentShader = shader.fragmentShader.replace(
+				"void main() {",
+				`varying vec3 vOccColor;
+				varying float vOccMask;
+				varying vec3 vWorldPos;
+				void main() {`,
+			)
+			shader.fragmentShader = shader.fragmentShader.replace(
+				"#include <color_fragment>",
+				`#include <color_fragment>
+				if (vOccMask > 0.5) {
+					float lon = atan(vWorldPos.y, vWorldPos.x);
+					float lat = asin(clamp(vWorldPos.z / length(vWorldPos), -1.0, 1.0));
+					float stripe = fract((lon + lat) * 100.0);
+					if (stripe > 0.25 && stripe < 0.75) {
+						diffuseColor.rgb = vOccColor;
+					}
+				}`,
 			)
 		}
 
@@ -643,9 +705,50 @@ export function createOrogenScene(
 		)
 		mapFaceToRegion = new Int32Array(faceToRegion.subarray(0, triCount))
 
-		const material = new THREE.MeshBasicMaterial({
-			vertexColors: true,
+		const vertexCount = triCount * 3
+		geometry.setAttribute(
+			"occColor",
+			new THREE.BufferAttribute(new Float32Array(vertexCount * 3), 3),
+		)
+		geometry.setAttribute(
+			"occMask",
+			new THREE.BufferAttribute(new Float32Array(vertexCount), 1),
+		)
+
+		const material = new THREE.ShaderMaterial({
 			side: THREE.DoubleSide,
+			vertexShader: `
+				attribute vec3 color;
+				attribute vec3 occColor;
+				attribute float occMask;
+				varying vec3 vColor;
+				varying vec3 vOccColor;
+				varying float vOccMask;
+				varying vec2 vWorldPos;
+				void main() {
+					vColor = color;
+					vOccColor = occColor;
+					vOccMask = occMask;
+					vWorldPos = position.xy;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+				}
+			`,
+			fragmentShader: `
+				varying vec3 vColor;
+				varying vec3 vOccColor;
+				varying float vOccMask;
+				varying vec2 vWorldPos;
+				void main() {
+					vec3 finalColor = vColor;
+					if (vOccMask > 0.5) {
+						float stripe = fract((vWorldPos.x + vWorldPos.y) * 150.0);
+						if (stripe > 0.25 && stripe < 0.75) {
+							finalColor = vOccColor;
+						}
+					}
+					gl_FragColor = vec4(finalColor, 1.0);
+				}
+			`,
 		})
 
 		const meshObj = new THREE.Mesh(geometry, material)
@@ -653,6 +756,92 @@ export function createOrogenScene(
 		const cloneR = new THREE.Mesh(geometry, material)
 		cloneL.position.x = -4
 		cloneR.position.x = 4
+		meshObj.add(cloneL, cloneR)
+		meshObj.userData.builtCenterLonDeg = currentMapCenterLongitudeDeg
+		return meshObj
+	}
+
+	function buildMapOccupationOverlay(): THREE.Mesh | null {
+		if (!mapMesh || !currentOccupationOverlay) return null
+		const geometry = mapMesh.geometry.clone()
+		const vertexCount = Math.floor(
+			(geometry.getAttribute("position") as THREE.BufferAttribute).count,
+		)
+		const overlayColors = new Float32Array(vertexCount * 3)
+		const overlayMask = new Float32Array(vertexCount)
+		const faceCount = Math.min(
+			mapFaceToRegion.length,
+			Math.floor(vertexCount / 3),
+		)
+		for (let face = 0; face < faceCount; face++) {
+			const region = mapFaceToRegion[face]
+			const regionBase = region * 4
+			const r = currentOccupationOverlay[regionBase]
+			const g = currentOccupationOverlay[regionBase + 1]
+			const b = currentOccupationOverlay[regionBase + 2]
+			const a = currentOccupationOverlay[regionBase + 3]
+			const vertexBase = face * 9
+			for (let offset = 0; offset < 9; offset += 3) {
+				overlayColors[vertexBase + offset] = r
+				overlayColors[vertexBase + offset + 1] = g
+				overlayColors[vertexBase + offset + 2] = b
+			}
+			const maskBase = face * 3
+			overlayMask[maskBase] = a
+			overlayMask[maskBase + 1] = a
+			overlayMask[maskBase + 2] = a
+		}
+		geometry.setAttribute(
+			"overlayColor",
+			new THREE.BufferAttribute(overlayColors, 3),
+		)
+		geometry.setAttribute(
+			"overlayMask",
+			new THREE.BufferAttribute(overlayMask, 1),
+		)
+
+		const material = new THREE.ShaderMaterial({
+			transparent: true,
+			depthTest: false,
+			depthWrite: false,
+			toneMapped: false,
+			side: THREE.DoubleSide,
+			polygonOffset: true,
+			polygonOffsetFactor: -1,
+			polygonOffsetUnits: -1,
+			vertexShader: `
+				attribute vec3 overlayColor;
+				attribute float overlayMask;
+				varying vec3 vOverlayColor;
+				varying float vOverlayMask;
+				varying vec2 vStripePos;
+				void main() {
+					vOverlayColor = overlayColor;
+					vOverlayMask = overlayMask;
+					vStripePos = position.xy;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+				}
+			`,
+			fragmentShader: `
+				varying vec3 vOverlayColor;
+				varying float vOverlayMask;
+				varying vec2 vStripePos;
+				void main() {
+					if (vOverlayMask < 0.5) discard;
+					gl_FragColor = vec4(0.0, 0.0, 0.0, 0.9);
+				}
+			`,
+		})
+
+		const meshObj = new THREE.Mesh(geometry, material)
+		meshObj.renderOrder = 1000
+		meshObj.position.z += 0.01
+		const cloneL = new THREE.Mesh(geometry, material)
+		const cloneR = new THREE.Mesh(geometry, material)
+		cloneL.renderOrder = 1000
+		cloneR.renderOrder = 1000
+		cloneL.position.set(-4, 0, 0.01)
+		cloneR.position.set(4, 0, 0.01)
 		meshObj.add(cloneL, cloneR)
 		meshObj.userData.builtCenterLonDeg = currentMapCenterLongitudeDeg
 		return meshObj
@@ -738,6 +927,7 @@ export function createOrogenScene(
 	function buildHoveredNationBorderGlobe(
 		world: SerializedOrogenWorld,
 		nation: number,
+		opts?: { color?: number; radiusBoost?: number; opacity?: number },
 	): THREE.LineSegments | null {
 		if (!world.nations || !world.provinces) return null
 		const { mesh, elevation } = world
@@ -762,7 +952,10 @@ export function createOrogenScene(
 			if (tInner < 0 || tOuter < 0) continue
 
 			const avgElev = (elevation[r0] + elevation[r1]) * 0.5
-			const radius = 1.006 + (avgElev > 0 ? avgElev * V : avgElev * V * 0.3)
+			const radius =
+				1.006 +
+				(opts?.radiusBoost ?? 0) +
+				(avgElev > 0 ? avgElev * V : avgElev * V * 0.3)
 			positions.push(
 				t_xyz[3 * tInner] * radius,
 				t_xyz[3 * tInner + 1] * radius,
@@ -780,9 +973,9 @@ export function createOrogenScene(
 			new THREE.Float32BufferAttribute(new Float32Array(positions), 3),
 		)
 		const material = new THREE.LineBasicMaterial({
-			color: 0x020617,
+			color: opts?.color ?? 0x020617,
 			transparent: true,
-			opacity: 0.95,
+			opacity: opts?.opacity ?? 0.95,
 			depthWrite: false,
 		})
 		const lines = new THREE.LineSegments(geometry, material)
@@ -793,6 +986,7 @@ export function createOrogenScene(
 	function buildHoveredNationBorderMap(
 		world: SerializedOrogenWorld,
 		nation: number,
+		opts?: { color?: number; opacity?: number; zBoost?: number },
 	): THREE.LineSegments | null {
 		if (!world.nations || !world.provinces) return null
 		const { mesh } = world
@@ -815,13 +1009,14 @@ export function createOrogenScene(
 			lat: Math.asin(Math.max(-1, Math.min(1, z))),
 		})
 
+		const z = 0.003 + (opts?.zBoost ?? 0)
 		const writeSegment = (
 			lon0: number,
 			lat0: number,
 			lon1: number,
 			lat1: number,
 		) => {
-			positions.push(lon0 * sx, lat0 * sx, 0.003, lon1 * sx, lat1 * sx, 0.003)
+			positions.push(lon0 * sx, lat0 * sx, z, lon1 * sx, lat1 * sx, z)
 		}
 
 		for (let s = 0; s < numSides; s++) {
@@ -869,9 +1064,9 @@ export function createOrogenScene(
 			new THREE.Float32BufferAttribute(new Float32Array(positions), 3),
 		)
 		const material = new THREE.LineBasicMaterial({
-			color: 0x020617,
+			color: opts?.color ?? 0x020617,
 			transparent: true,
-			opacity: 0.95,
+			opacity: opts?.opacity ?? 0.95,
 			depthWrite: false,
 		})
 		const lines = new THREE.LineSegments(geometry, material)
@@ -931,6 +1126,51 @@ export function createOrogenScene(
 			colorArray[faceBase + 8] = b
 		}
 		colorAttr.needsUpdate = true
+
+		// Update occupation attributes on map/terrain mesh
+		if (meshObj === mapMesh || meshObj === terrainMesh) {
+			const occColorAttr = geometry.getAttribute("occColor")
+			const occMaskAttr = geometry.getAttribute("occMask")
+			if (
+				occColorAttr instanceof THREE.BufferAttribute &&
+				occMaskAttr instanceof THREE.BufferAttribute
+			) {
+				const occColorArray = occColorAttr.array as Float32Array
+				const occMaskArray = occMaskAttr.array as Float32Array
+				for (let face = 0; face < faceCount; face++) {
+					const region = faceToRegion[face]
+					const faceBase = face * 9
+					const maskBase = face * 3
+					if (currentOccupationOverlay) {
+						const overlayBase = region * 4
+						const mask = currentOccupationOverlay[overlayBase + 3] > 0.5 ? 1 : 0
+						const or = currentOccupationOverlay[overlayBase]
+						const og = currentOccupationOverlay[overlayBase + 1]
+						const ob = currentOccupationOverlay[overlayBase + 2]
+						for (let v = 0; v < 9; v += 3) {
+							occColorArray[faceBase + v] = or
+							occColorArray[faceBase + v + 1] = og
+							occColorArray[faceBase + v + 2] = ob
+						}
+						occMaskArray[maskBase] = mask
+						occMaskArray[maskBase + 1] = mask
+						occMaskArray[maskBase + 2] = mask
+					} else {
+						for (let v = 0; v < 9; v += 3) {
+							occColorArray[faceBase + v] = 0
+							occColorArray[faceBase + v + 1] = 0
+							occColorArray[faceBase + v + 2] = 0
+						}
+						occMaskArray[maskBase] = 0
+						occMaskArray[maskBase + 1] = 0
+						occMaskArray[maskBase + 2] = 0
+					}
+				}
+				occColorAttr.needsUpdate = true
+				occMaskAttr.needsUpdate = true
+			}
+		}
+
 		return true
 	}
 
@@ -1544,6 +1784,8 @@ export function createOrogenScene(
 		disposeObject3D(mapThermalEquator)
 		disposeObject3D(globeHoverNationBorder)
 		disposeObject3D(mapHoverNationBorder)
+		disposeObject3D(pulseGlobe)
+		disposeObject3D(pulseMap)
 		disposeRiverGroup(globeRivers)
 		disposeRiverGroup(mapRivers)
 		disposeObject3D(globeWindArrows)
@@ -1556,6 +1798,9 @@ export function createOrogenScene(
 		mapThermalEquator = null
 		globeHoverNationBorder = null
 		mapHoverNationBorder = null
+		pulseGlobe = null
+		pulseMap = null
+		pulse = null
 		globeRivers = null
 		mapRivers = null
 		globeWindArrows = null
@@ -1605,6 +1850,11 @@ export function createOrogenScene(
 			mapWireframe.visible = wireframeVisible && currentViewMode === "map"
 			if (mapMesh) mapWireframe.position.copy(mapMesh.position)
 		}
+		if (mapOccupationOverlay) {
+			mapOccupationOverlay.visible =
+				currentViewMode === "map" && !!currentOccupationOverlay
+			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
+		}
 		if (globeHoverNationBorder)
 			globeHoverNationBorder.visible =
 				currentViewMode === "globe" && nationBordersVisible
@@ -1653,17 +1903,43 @@ export function createOrogenScene(
 		if (!currentWorld) return
 		disposeObject3D(terrainMesh)
 		disposeObject3D(mapMesh)
+		disposeObject3D(mapOccupationOverlay)
 		terrainMesh = null
 		mapMesh = null
+		mapOccupationOverlay = null
 		terrainMesh = buildTerrainMesh(currentWorld, currentColorMode)
 		mapMesh = buildMapMesh(currentWorld, currentColorMode)
 		scene.add(terrainMesh)
 		scene.add(mapMesh)
+		if (currentOccupationOverlay) {
+			mapOccupationOverlay = buildMapOccupationOverlay()
+			if (mapOccupationOverlay) scene.add(mapOccupationOverlay)
+		}
 		rebuildOverlays()
 		setViewMode(currentViewMode)
 	}
 
-	function updateWorld(world: SerializedOrogenWorld) {
+	function updateWorld(world: SerializedOrogenWorld | null) {
+		if (!world) {
+			currentWorld = null
+			hoveredRegion = -1
+			hoveredNation = -1
+			disposeObject3D(terrainMesh)
+			disposeObject3D(mapMesh)
+			disposeObject3D(mapOccupationOverlay)
+			terrainMesh = null
+			mapMesh = null
+			mapOccupationOverlay = null
+			rebuildOverlays()
+			emitHover(null)
+			return
+		}
+		const geometryUnchanged =
+			!!currentWorld &&
+			currentWorld.mesh === world.mesh &&
+			currentWorld.elevation === world.elevation &&
+			currentWorld.elevation_km === world.elevation_km &&
+			currentWorld.provinces?.regionProvince === world.provinces?.regionProvince
 		currentWorld = world
 		if (hoveredRegion >= 0) {
 			const hoveredProvince =
@@ -1674,6 +1950,10 @@ export function createOrogenScene(
 					: -1
 		} else {
 			hoveredNation = -1
+		}
+		if (geometryUnchanged) {
+			rebuildHoveredNationBorder()
+			return
 		}
 		rebuildTerrain()
 	}
@@ -1704,6 +1984,16 @@ export function createOrogenScene(
 		if (!recolorMeshesInPlace()) rebuildTerrain()
 	}
 
+	function setOccupationOverlay(overlay: Float32Array | null) {
+		if (currentOccupationOverlay === overlay) return
+		currentOccupationOverlay = overlay
+		if (!recolorMeshesInPlace()) {
+			rebuildTerrain()
+			return
+		}
+		updateOverlayVisibility()
+	}
+
 	function setHoveredRegion(region: number | null) {
 		hoveredRegion = region ?? -1
 		if (!currentWorld || hoveredRegion < 0 || !nationBordersVisible) {
@@ -1724,6 +2014,260 @@ export function createOrogenScene(
 		if (nationBordersVisible === visible) return
 		nationBordersVisible = visible
 		rebuildHoveredNationBorder()
+	}
+
+	function focusOnNation(nationId: number, opts?: { durationMs?: number }) {
+		if (!currentWorld?.nations || !currentWorld.provinces) return
+		if (nationId < 0) return
+		// `nationId` from the UI is actually a sovereign province index
+		// (see OrogenView click handler — assignment = sovereign).
+		const province = nationId
+		if (province >= currentWorld.provinces.count) return
+		const region = currentWorld.provinces.seeds[province]
+		if (region < 0) return
+		const rx = currentWorld.mesh.r_xyz[region * 3]
+		const ry = currentWorld.mesh.r_xyz[region * 3 + 1]
+		const rz = currentWorld.mesh.r_xyz[region * 3 + 2]
+		const center = new THREE.Vector3(rx, ry, rz).normalize()
+
+		const globeTargetDist = Math.max(controls.minDistance, 1.8)
+		const globeFrom = camera.position.clone()
+		const globeTo = center.clone().multiplyScalar(globeTargetDist)
+
+		const sx = 2 / Math.PI
+		const lat = Math.asin(Math.max(-1, Math.min(1, center.z)))
+		const centerLon = (currentMapCenterLongitudeDeg * Math.PI) / 180
+		let lon = Math.atan2(center.y, center.x) - centerLon
+		if (lon > Math.PI) lon -= 2 * Math.PI
+		else if (lon < -Math.PI) lon += 2 * Math.PI
+		const mapOffsetX = mapMesh?.position.x ?? 0
+		const mapOffsetY = mapMesh?.position.y ?? 0
+		const mapToX = lon * sx + mapOffsetX
+		const mapToY = lat * sx + mapOffsetY
+		const mapToZoom = 6
+
+		focusTween = {
+			mode: currentViewMode,
+			t0: performance.now(),
+			duration: opts?.durationMs ?? 700,
+			globeFrom,
+			globeTo,
+			mapFromX: mapCamera.position.x,
+			mapFromY: mapCamera.position.y,
+			mapToX,
+			mapToY,
+			mapFromZoom: mapCamera.zoom,
+			mapToZoom,
+		}
+		if (currentViewMode === "globe") controls.enabled = false
+		else mapControls.enabled = false
+
+		startBorderPulse(province)
+	}
+
+	function clearPulse() {
+		disposeObject3D(pulseGlobe)
+		disposeObject3D(pulseMap)
+		pulseGlobe = null
+		pulseMap = null
+		pulseMaterials = []
+		pulse = null
+	}
+
+	function collectNationBorderGlobePositions(
+		world: SerializedOrogenWorld,
+		nation: number,
+		radiusBoost: number,
+	): number[] {
+		if (!world.nations || !world.provinces) return []
+		const { mesh, elevation } = world
+		const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t, t_xyz } = mesh
+		const { regionProvince } = world.provinces
+		const positions: number[] = []
+		const V = 0.04
+		for (let s = 0; s < numSides; s++) {
+			const opp = halfedges[s]
+			if (opp < 0 || s > opp) continue
+			const r0 = s_begin_r[s]
+			const r1 = s_begin_r[opp]
+			const p0 = regionProvince[r0]
+			const p1 = regionProvince[r1]
+			const n0 = p0 >= 0 ? world.nations.assignment[p0] : -1
+			const n1 = p1 >= 0 ? world.nations.assignment[p1] : -1
+			if (n0 === n1 || (n0 !== nation && n1 !== nation)) continue
+			const tInner = s_inner_t[s]
+			const tOuter = s_outer_t[s]
+			if (tInner < 0 || tOuter < 0) continue
+			const avgElev = (elevation[r0] + elevation[r1]) * 0.5
+			const radius =
+				1.006 + radiusBoost + (avgElev > 0 ? avgElev * V : avgElev * V * 0.3)
+			positions.push(
+				t_xyz[3 * tInner] * radius,
+				t_xyz[3 * tInner + 1] * radius,
+				t_xyz[3 * tInner + 2] * radius,
+				t_xyz[3 * tOuter] * radius,
+				t_xyz[3 * tOuter + 1] * radius,
+				t_xyz[3 * tOuter + 2] * radius,
+			)
+		}
+		return positions
+	}
+
+	function collectNationBorderMapPositions(
+		world: SerializedOrogenWorld,
+		nation: number,
+		zBoost: number,
+	): number[] {
+		if (!world.nations || !world.provinces) return []
+		const { mesh } = world
+		const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t, t_xyz } = mesh
+		const { regionProvince } = world.provinces
+		const positions: number[] = []
+		const pi = Math.PI
+		const sx = 2 / pi
+		const centerLon = (currentMapCenterLongitudeDeg * pi) / 180
+		const z = 0.003 + zBoost
+		const wrapLon = (lon: number) => {
+			let l = lon - centerLon
+			if (l > pi) l -= 2 * pi
+			else if (l < -pi) l += 2 * pi
+			return l
+		}
+		const project = (x: number, y: number, zc: number) => ({
+			lon: wrapLon(Math.atan2(y, x)),
+			lat: Math.asin(Math.max(-1, Math.min(1, zc))),
+		})
+		const writeSegment = (
+			lon0: number,
+			lat0: number,
+			lon1: number,
+			lat1: number,
+		) => {
+			positions.push(lon0 * sx, lat0 * sx, z, lon1 * sx, lat1 * sx, z)
+		}
+		for (let s = 0; s < numSides; s++) {
+			const opp = halfedges[s]
+			if (opp < 0 || s > opp) continue
+			const r0 = s_begin_r[s]
+			const r1 = s_begin_r[opp]
+			const p0 = regionProvince[r0]
+			const p1 = regionProvince[r1]
+			const n0 = p0 >= 0 ? world.nations.assignment[p0] : -1
+			const n1 = p1 >= 0 ? world.nations.assignment[p1] : -1
+			if (n0 === n1 || (n0 !== nation && n1 !== nation)) continue
+			const tInner = s_inner_t[s]
+			const tOuter = s_outer_t[s]
+			if (tInner < 0 || tOuter < 0) continue
+			const a = project(
+				t_xyz[3 * tInner],
+				t_xyz[3 * tInner + 1],
+				t_xyz[3 * tInner + 2],
+			)
+			const b = project(
+				t_xyz[3 * tOuter],
+				t_xyz[3 * tOuter + 1],
+				t_xyz[3 * tOuter + 2],
+			)
+			let lon0 = a.lon
+			let lon1 = b.lon
+			if (Math.abs(lon1 - lon0) > pi) {
+				if (lon0 < lon1) lon0 += 2 * pi
+				else lon1 += 2 * pi
+				writeSegment(lon0, a.lat, lon1, b.lat)
+				writeSegment(lon0 - 2 * pi, a.lat, lon1 - 2 * pi, b.lat)
+			} else {
+				writeSegment(lon0, a.lat, lon1, b.lat)
+			}
+		}
+		return positions
+	}
+
+	function makeThickPulseLine(positions: number[]): LineSegments2 | null {
+		if (positions.length === 0) return null
+		const geom = new LineSegmentsGeometry()
+		geom.setPositions(positions)
+		const w = canvas.clientWidth || 1
+		const h = canvas.clientHeight || 1
+		const mat = new LineMaterial({
+			color: 0xffffff,
+			linewidth: 4,
+			resolution: new THREE.Vector2(w, h),
+			transparent: true,
+			opacity: 0,
+			depthWrite: false,
+			depthTest: false,
+		})
+		pulseMaterials.push(mat)
+		const line = new LineSegments2(geom, mat)
+		line.computeLineDistances()
+		line.renderOrder = 998
+		return line
+	}
+
+	function startBorderPulse(province: number) {
+		clearPulse()
+		if (!currentWorld?.nations) return
+		const nation = currentWorld.nations.assignment[province]
+		if (nation < 0) return
+		pulseGlobe = makeThickPulseLine(
+			collectNationBorderGlobePositions(currentWorld, nation, 0.003),
+		)
+		pulseMap = makeThickPulseLine(
+			collectNationBorderMapPositions(currentWorld, nation, 0.001),
+		)
+		if (pulseGlobe) {
+			pulseGlobe.visible = currentViewMode === "globe"
+			scene.add(pulseGlobe)
+		}
+		if (pulseMap) {
+			pulseMap.visible = currentViewMode === "map"
+			if (mapMesh) pulseMap.position.copy(mapMesh.position)
+			scene.add(pulseMap)
+		}
+		pulse = { t0: performance.now(), duration: 1200 }
+	}
+
+	function stepPulse() {
+		if (!pulse) return
+		const u = (performance.now() - pulse.t0) / pulse.duration
+		if (u >= 1) {
+			clearPulse()
+			return
+		}
+		const op = 0.9 * Math.abs(Math.sin(u * 2 * Math.PI))
+		for (const m of pulseMaterials) m.opacity = op
+	}
+
+	function stepFocusTween() {
+		if (!focusTween) return
+		const u = Math.min(
+			1,
+			(performance.now() - focusTween.t0) / focusTween.duration,
+		)
+		const eased = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2
+		if (focusTween.mode === "globe") {
+			camera.position.lerpVectors(
+				focusTween.globeFrom,
+				focusTween.globeTo,
+				eased,
+			)
+		} else {
+			mapCamera.position.x =
+				focusTween.mapFromX + (focusTween.mapToX - focusTween.mapFromX) * eased
+			mapCamera.position.y =
+				focusTween.mapFromY + (focusTween.mapToY - focusTween.mapFromY) * eased
+			mapCamera.zoom =
+				focusTween.mapFromZoom +
+				(focusTween.mapToZoom - focusTween.mapFromZoom) * eased
+			mapCamera.updateProjectionMatrix()
+			mapControls.target.set(mapCamera.position.x, mapCamera.position.y, 0)
+		}
+		if (u >= 1) {
+			const mode = focusTween.mode
+			focusTween = null
+			if (mode === "globe") controls.enabled = currentViewMode === "globe"
+			else mapControls.enabled = currentViewMode === "map"
+		}
 	}
 
 	function setViewMode(mode: OrogenViewMode) {
@@ -1841,6 +2385,8 @@ export function createOrogenScene(
 	let animId = 0
 	function animate() {
 		animId = requestAnimationFrame(animate)
+		stepFocusTween()
+		stepPulse()
 		if (currentViewMode === "map") {
 			mapControls.update()
 			renderer.render(scene, mapCamera)
@@ -1866,6 +2412,7 @@ export function createOrogenScene(
 		updateMapCameraFrustum()
 		renderer.setSize(w, h, false)
 		for (const mat of riverMaterials) mat.resolution.set(w, h)
+		for (const mat of pulseMaterials) mat.resolution.set(w, h)
 	}
 
 	updateMapCameraFrustum()
@@ -1923,6 +2470,7 @@ export function createOrogenScene(
 		renderer.dispose()
 		disposeObject3D(terrainMesh)
 		disposeObject3D(mapMesh)
+		disposeObject3D(mapOccupationOverlay)
 		disposeObject3D(terrainWireframe)
 		disposeObject3D(mapWireframe)
 		disposeObject3D(globeGrid)
@@ -1931,6 +2479,8 @@ export function createOrogenScene(
 		disposeObject3D(mapThermalEquator)
 		disposeObject3D(globeHoverNationBorder)
 		disposeObject3D(mapHoverNationBorder)
+		disposeObject3D(pulseGlobe)
+		disposeObject3D(pulseMap)
 		disposeRiverGroup(globeRivers)
 		disposeRiverGroup(mapRivers)
 		waterGeo.dispose()
@@ -2203,6 +2753,7 @@ export function createOrogenScene(
 		updateWorld,
 		setColorMode,
 		setRegionColors,
+		setOccupationOverlay,
 		setHoveredRegion,
 		setNationBordersVisible,
 		setViewMode,
@@ -2223,5 +2774,6 @@ export function createOrogenScene(
 		setSunPosition,
 		setAtmospherePressure,
 		setFullAmbient,
+		focusOnNation,
 	}
 }

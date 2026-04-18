@@ -1,54 +1,28 @@
 import type { SphereMesh } from "../types"
+import { MinHeap } from "../util/heap"
+import { smoothstep } from "../util/math"
 import { SimplexNoise } from "../util/simplex-noise"
 
-// ----------------------------------------------------------------
-//  Inline binary min-heap keyed on external Float32Array
-// ----------------------------------------------------------------
-class MinHeap {
-	private _key: Float32Array
-	private _data: number[] = []
-
-	constructor(keyArray: Float32Array) {
-		this._key = keyArray
-	}
-	get size() {
-		return this._data.length
-	}
-	push(cell: number) {
-		this._data.push(cell)
-		let i = this._data.length - 1
-		while (i > 0) {
-			const parent = (i - 1) >> 1
-			if (this._key[this._data[i]] >= this._key[this._data[parent]]) break
-			const tmp = this._data[i]
-			this._data[i] = this._data[parent]
-			this._data[parent] = tmp
-			i = parent
+/**
+ * Core iteration kernel shared by smoothElevation, sharpenRidges, and applySoilCreep.
+ * For each cell in `cells`, calls `compute(r)` and batch-writes the result back to `elev`.
+ */
+function diffuseIteration(
+	cells: ArrayLike<number>,
+	elev: Float32Array,
+	N: number,
+	iterations: number,
+	compute: (r: number) => number,
+): void {
+	const tmp = new Float32Array(N)
+	const n = cells.length
+	for (let iter = 0; iter < iterations; iter++) {
+		for (let i = 0; i < n; i++) {
+			tmp[cells[i]] = compute(cells[i])
 		}
-	}
-	pop(): number {
-		const top = this._data[0]
-		const last = this._data.pop()!
-		if (this._data.length > 0) {
-			this._data[0] = last
-			let i = 0
-			const n = this._data.length
-			for (;;) {
-				let smallest = i
-				const l = 2 * i + 1,
-					r = 2 * i + 2
-				if (l < n && this._key[this._data[l]] < this._key[this._data[smallest]])
-					smallest = l
-				if (r < n && this._key[this._data[r]] < this._key[this._data[smallest]])
-					smallest = r
-				if (smallest === i) break
-				const tmp = this._data[i]
-				this._data[i] = this._data[smallest]
-				this._data[smallest] = tmp
-				i = smallest
-			}
+		for (let i = 0; i < n; i++) {
+			elev[cells[i]] = tmp[cells[i]]
 		}
-		return top
 	}
 }
 
@@ -328,7 +302,6 @@ export function smoothElevation(
 	strength: number,
 ): void {
 	const N = mesh.numRegions
-	const tmp = new Float32Array(N)
 	const { adjOffset, adjList } = mesh
 
 	// Coastline lock: land cells adjacent to ocean
@@ -343,30 +316,61 @@ export function smoothElevation(
 		}
 	}
 
-	for (let iter = 0; iter < iterations; iter++) {
-		for (let r = 0; r < N; r++) {
-			if (locked[r]) {
-				tmp[r] = elev[r]
-				continue
-			}
-			const h = elev[r]
-			let wSum = 0,
-				hSum = 0
-			for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
-				const nh = elev[adjList[i]]
-				const diff = Math.abs(nh - h)
-				const w = 1 / (1 + diff * 8)
-				wSum += w
-				hSum += nh * w
-			}
-			if (wSum > 0) {
-				const avg = hSum / wSum
-				tmp[r] = h + (avg - h) * strength
-			} else {
-				tmp[r] = h
-			}
+	const allCells = new Uint32Array(N).map((_, i) => i)
+	diffuseIteration(allCells, elev, N, iterations, (r) => {
+		if (locked[r]) return elev[r]
+		const h = elev[r]
+		let wSum = 0,
+			hSum = 0
+		for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
+			const nh = elev[adjList[i]]
+			const diff = Math.abs(nh - h)
+			const w = 1 / (1 + diff * 8)
+			wSum += w
+			hSum += nh * w
 		}
-		for (let r = 0; r < N; r++) elev[r] = tmp[r]
+		if (wSum > 0) {
+			const avg = hSum / wSum
+			return h + (avg - h) * strength
+		}
+		return h
+	})
+}
+
+interface GlacialBuffers {
+	glacIdx: Float32Array
+	iceTarget: Int32Array
+	iceFlow: Float32Array
+	numIceUpstream: Uint8Array
+}
+
+function buildGlacialBuffers(
+	N: number,
+	r_xyz: Float32Array,
+	r_isOcean: Uint8Array,
+	elev: Float32Array,
+	glacialStrength: number,
+): GlacialBuffers {
+	const glacIdx = new Float32Array(N)
+	// At strength=1 glaciation starts at ~50° latitude; at 0.5 it starts at ~70°
+	const thresholdLat = Math.PI / 2 - (glacialStrength * Math.PI) / 4.5
+	for (let r = 0; r < N; r++) {
+		if (r_isOcean[r]) continue
+		const z = r_xyz[3 * r + 2]
+		const polarDist = Math.abs(Math.asin(Math.max(-1, Math.min(1, z))))
+		const latFactor = smoothstep(thresholdLat, Math.PI / 2, polarDist)
+		const elevFactor = smoothstep(0.5, 0.9, elev[r])
+		const latScale = smoothstep(Math.PI / 8, Math.PI / 3, polarDist)
+		glacIdx[r] =
+			Math.max(latFactor, elevFactor * 0.3 * (0.3 + 0.7 * latScale)) *
+			glacialStrength
+	}
+
+	return {
+		glacIdx,
+		iceTarget: new Int32Array(N),
+		iceFlow: new Float32Array(N),
+		numIceUpstream: new Uint8Array(N),
 	}
 }
 
@@ -411,39 +415,20 @@ export function erodeComposite(
 	}
 
 	// ---- Glacial precomputation (once — index is position-based) ----
-	let glacIdx: Float32Array | null = null
-	let iceTarget: Int32Array | null = null
-	let iceFlow: Float32Array | null = null
-	let numIceUpstream: Uint8Array | null = null
-
+	let glacialBuffers: GlacialBuffers | null = null
 	if (gIters > 0 && glacialStrength > 0) {
-		const { r_xyz } = mesh
-
-		function smoothstep(x: number, edge0: number, edge1: number): number {
-			const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
-			return t * t * (3 - 2 * t)
-		}
-
-		glacIdx = new Float32Array(N)
-		// At strength=1 glaciation starts at ~50° latitude; at 0.5 it starts at ~70°
-		const thresholdLat = Math.PI / 2 - (glacialStrength * Math.PI) / 4.5
-
-		for (let r = 0; r < N; r++) {
-			if (r_isOcean[r]) continue
-			const z = r_xyz[3 * r + 2]
-			const polarDist = Math.abs(Math.asin(Math.max(-1, Math.min(1, z))))
-			const latFactor = smoothstep(polarDist, thresholdLat, Math.PI / 2)
-			const elevFactor = smoothstep(elev[r], 0.5, 0.9)
-			const latScale = smoothstep(polarDist, Math.PI / 8, Math.PI / 3)
-			glacIdx[r] =
-				Math.max(latFactor, elevFactor * 0.3 * (0.3 + 0.7 * latScale)) *
-				glacialStrength
-		}
-
-		iceTarget = new Int32Array(N)
-		iceFlow = new Float32Array(N)
-		numIceUpstream = new Uint8Array(N)
+		glacialBuffers = buildGlacialBuffers(
+			N,
+			mesh.r_xyz,
+			r_isOcean,
+			elev,
+			glacialStrength,
+		)
 	}
+	const glacIdx = glacialBuffers?.glacIdx ?? null
+	const iceTarget = glacialBuffers?.iceTarget ?? null
+	const iceFlow = glacialBuffers?.iceFlow ?? null
+	const numIceUpstream = glacialBuffers?.numIceUpstream ?? null
 
 	// Per-iteration glacial rates (scaled so total effect ~ same regardless of iter count)
 	const gScale = gIters > 0 ? 1.0 / gIters : 0
@@ -467,6 +452,28 @@ export function erodeComposite(
 	const excNb = new Int32Array(maxDeg)
 	const excVal = new Float32Array(maxDeg)
 
+	// Pre-allocated bucket sort (512 buckets over [0,1] elevation range)
+	const SORT_BUCKETS = 512
+	const sortBuckets: number[][] = Array.from(
+		{ length: SORT_BUCKETS },
+		(): number[] => [],
+	)
+	function bucketSortLandDesc(): void {
+		for (let b = 0; b < SORT_BUCKETS; b++) sortBuckets[b].length = 0
+		for (let i = 0; i < landCount; i++) {
+			const r = landCells[i]
+			const b = Math.min(
+				SORT_BUCKETS - 1,
+				Math.max(0, Math.floor(elev[r] * SORT_BUCKETS)),
+			)
+			sortBuckets[b].push(r)
+		}
+		let idx = 0
+		for (let b = SORT_BUCKETS - 1; b >= 0; b--) {
+			for (const r of sortBuckets[b]) landCells[idx++] = r
+		}
+	}
+
 	for (let iter = 0; iter < totalIters; iter++) {
 		if (!midFloodDone && iter >= midFloodIter) {
 			midFloodDone = true
@@ -478,7 +485,7 @@ export function erodeComposite(
 
 		// Sort land cells by descending elevation — needed by glacial and hydraulic
 		if (glacialThisIter || hydraulicThisIter) {
-			landCells.sort((a, b) => elev[b] - elev[a])
+			bucketSortLandDesc()
 		}
 
 		// ---- Glacial step ----
@@ -577,7 +584,7 @@ export function erodeComposite(
 		if (hydraulicThisIter) {
 			// Re-sort if glacial step modified elevations this iteration
 			if (glacialThisIter) {
-				landCells.sort((a, b) => elev[b] - elev[a])
+				bucketSortLandDesc()
 			}
 
 			// Build drainage graph
@@ -735,37 +742,24 @@ export function sharpenRidges(
 	for (let r = 0; r < N; r++) {
 		if (!r_isOcean[r]) landCells.push(r)
 	}
-	const landCount = landCells.length
 
-	const tmp = new Float32Array(N)
 	const original = new Float32Array(elev)
-
-	for (let iter = 0; iter < iterations; iter++) {
-		for (let li = 0; li < landCount; li++) {
-			const r = landCells[li]
-			const h = elev[r]
-			let sum = 0
-			const count = adjOffset[r + 1] - adjOffset[r]
-			for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
-				sum += elev[adjList[i]]
-			}
-			if (count === 0) {
-				tmp[r] = h
-				continue
-			}
-			const avg = sum / count
-			if (h > avg) {
-				let h_new = h + (h - avg) * strength
-				const cap = original[r] * 1.5
-				if (h_new > cap) h_new = cap
-				tmp[r] = h_new
-			} else {
-				tmp[r] = h
-			}
+	diffuseIteration(landCells, elev, N, iterations, (r) => {
+		const h = elev[r]
+		const count = adjOffset[r + 1] - adjOffset[r]
+		if (count === 0) return h
+		let sum = 0
+		for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
+			sum += elev[adjList[i]]
 		}
-		for (let li = 0; li < landCount; li++)
-			elev[landCells[li]] = tmp[landCells[li]]
-	}
+		const avg = sum / count
+		if (h > avg) {
+			const h_new = h + (h - avg) * strength
+			const cap = original[r] * 1.5
+			return h_new > cap ? cap : h_new
+		}
+		return h
+	})
 }
 
 // ----------------------------------------------------------------
@@ -793,29 +787,19 @@ export function applySoilCreep(
 		}
 		if (!coastal) interiorLand.push(r)
 	}
-	const ilCount = interiorLand.length
 
-	const tmp = new Float32Array(N)
-	for (let iter = 0; iter < iterations; iter++) {
-		for (let li = 0; li < ilCount; li++) {
-			const r = interiorLand[li]
-			const h = elev[r]
-			let sum = 0,
-				count = 0
-			for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
-				if (!r_isOcean[adjList[i]]) {
-					sum += elev[adjList[i]]
-					count++
-				}
+	diffuseIteration(interiorLand, elev, N, iterations, (r) => {
+		const h = elev[r]
+		let sum = 0,
+			count = 0
+		for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
+			if (!r_isOcean[adjList[i]]) {
+				sum += elev[adjList[i]]
+				count++
 			}
-			if (count === 0) {
-				tmp[r] = h
-				continue
-			}
-			const avg = sum / count
-			tmp[r] = h + (avg - h) * strength
 		}
-		for (let li = 0; li < ilCount; li++)
-			elev[interiorLand[li]] = tmp[interiorLand[li]]
-	}
+		if (count === 0) return h
+		const avg = sum / count
+		return h + (avg - h) * strength
+	})
 }

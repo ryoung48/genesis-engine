@@ -4,7 +4,6 @@ import type {
 	OrogenParams,
 	OrogenRainfall,
 } from "../types"
-import { getDaysPerYear } from "../util/units"
 
 export function petMonthHargreaves(
 	tas: number,
@@ -13,7 +12,13 @@ export function petMonthHargreaves(
 	dpm: number,
 ): number {
 	const raMJ = raWm2 * 0.0864
-	const petDay = 0.0023 * (tas + 17.8) * Math.sqrt(Math.max(2, td)) * raMJ
+	// Thermal correction: latent heat of vaporization varies with temperature.
+	// From Hargreaves (1975) eq. 3: multiply by 238.8 / (595.5 - 0.55 * T).
+	// This factor ≈ 0.41 at typical temperatures and was omitted from the
+	// Hargreaves-Samani shorthand, causing ~2.4× overestimation without it.
+	const lambda = 595.5 - 0.55 * tas
+	const petDay =
+		0.0023 * (tas + 17.8) * Math.sqrt(Math.max(2, td)) * raMJ * (238.8 / lambda)
 	return Math.max(0, petDay) * dpm
 }
 
@@ -49,7 +54,7 @@ export function refreshClimatePetMonthly(
 		climate.temperature_monthly_range,
 		climate.insolation_monthly,
 		climate.pet_monthly,
-		getDaysPerYear(params?.daysPerYear) / 12,
+		params?.daysPerYear ?? 365 / 12,
 	)
 }
 
@@ -86,6 +91,12 @@ export function computeAetFromPet(
 	}
 }
 
+// Fraction of surface runoff that recharges the groundwater store each month.
+const F_PERC = 0.3
+// Monthly recession coefficient: fraction of groundwater store released as baseflow.
+// Half-life ≈ ln(2) / K_GW ≈ 14 months.
+const K_GW = 0.05
+
 export function computeHydrologyFields(
 	climate: Pick<OrogenClimate, "pet_monthly">,
 	rainfall: Pick<OrogenRainfall, "monthly">,
@@ -94,6 +105,7 @@ export function computeHydrologyFields(
 	const N = isLand.length
 	const aet_monthly = new Float32Array(12 * N)
 	const aridity_monthly = new Float32Array(12 * N)
+	const baseflow_monthly = new Float32Array(12 * N)
 	const rain = new Float64Array(12)
 	const petBuf = new Float64Array(12)
 	const aetBuf = new Float64Array(12)
@@ -113,7 +125,27 @@ export function computeHydrologyFields(
 			aet_monthly[idx] = aet
 			aridity_monthly[idx] = pet > 0 ? aet / pet : 1
 		}
+
+		// Spin up groundwater store to cyclostationary state.
+		// Recharge = F_PERC × surface runoff each month; release = K_GW × S_gw.
+		let gw = 0
+		for (let iter = 0; iter < 30; iter++) {
+			const startGw = gw
+			for (let m = 0; m < 12; m++) {
+				const runoff = Math.max(0, rain[m] - aetBuf[m])
+				gw += F_PERC * runoff
+				gw -= K_GW * gw
+			}
+			if (Math.abs(gw - startGw) < 0.01) break
+		}
+		for (let m = 0; m < 12; m++) {
+			const runoff = Math.max(0, rain[m] - aetBuf[m])
+			gw += F_PERC * runoff
+			const baseflow = K_GW * gw
+			gw -= baseflow
+			baseflow_monthly[m * N + r] = baseflow
+		}
 	}
 
-	return { aet_monthly, aridity_monthly }
+	return { aet_monthly, aridity_monthly, baseflow_monthly }
 }

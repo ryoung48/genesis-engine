@@ -1,321 +1,62 @@
-export interface SphereMesh {
-	numRegions: number
-	numTriangles: number
-	numSides: number
-	/** Flat xyz coords for each region center, length 3*numRegions */
-	r_xyz: Float32Array
-	/** Flat xyz coords for each triangle circumcenter, length 3*numTriangles */
-	t_xyz: Float32Array
-	/** Delaunay triangle indices, length 3*numTriangles */
-	triangles: Int32Array
-	/** Opposite halfedge for each side */
-	halfedges: Int32Array
-	/** CSR adjacency offset array, length numRegions+1 */
-	adjOffset: Int32Array
-	/** CSR adjacency list (neighbor region indices) */
-	adjList: Int32Array
-	/** Per-edge Euclidean distance between adjacent region centers */
-	neighborDist: Float32Array
-	/** For each side s, the region where the side begins */
-	s_begin_r: Int32Array
-	/** For each side s, the region where the side ends */
-	s_end_r: Int32Array
-	/** For each side s, the triangle on the inner (left) side */
-	s_inner_t: Int32Array
-	/** For each side s, the triangle on the outer (right) side */
-	s_outer_t: Int32Array
-}
+export type {
+	OrogenClimate,
+	OrogenHazards,
+	OrogenHydrology,
+	OrogenOceanCurrents,
+	OrogenRainfall,
+	OrogenVolcanism,
+	OrogenWind,
+} from "./types/climate"
+export type { SphereMesh } from "./types/mesh"
+export type {
+	OrogenNationHierarchy,
+	OrogenPartition,
+	OrogenProvinces,
+	OrogenRivers,
+} from "./types/partitions"
+export { OROGEN_TOPOGRAPHY_LABELS } from "./types/partitions"
+export type {
+	BoundaryInfo,
+	CollisionResult,
+	DistanceFields,
+	OrogenParams,
+	OrogenTerrainFeatureId,
+	OrogenTerrainFeatures,
+	PlateVec,
+	StageTiming,
+	SuperPlateData,
+	TectonicMode,
+	TectonicPlate,
+} from "./types/tectonics"
+export {
+	OROGEN_TERRAIN_FEATURE,
+	OROGEN_TERRAIN_FEATURE_LABELS,
+} from "./types/tectonics"
 
-export interface TectonicPlate {
-	id: number
-	isOcean: boolean
-	/** Euler pole axis [x, y, z] */
-	pole: [number, number, number]
-	/** Angular velocity */
-	omega: number
-	/** Set of region indices belonging to this plate */
-	regions: Set<number>
-	/** Growth rate for flood fill */
-	growthRate: number
-	/** Preferred growth direction [x, y, z] */
-	growthDir: [number, number, number]
-	/** Directional bias strength */
-	dirStrength: number
-}
-
-/** Plate vector: Euler pole + angular velocity (used for coarse plate representation) */
-export interface PlateVec {
-	pole: [number, number, number]
-	omega: number
-}
-
-export type TectonicMode = "active" | "stagnant"
-
-export interface OrogenParams {
-	tectonicMode?: TectonicMode | 0 | 1
-	seed: number
-	numPoints: number
-	numPlates: number
-	landDistribution: number
-	continentSizeVariety: number
-	landCoverage: number
-	jitter: number
-	roughness: number
-	terrainWarp: number
-	smoothing: number
-	hydraulicErosion: number
-	thermalErosion: number
-	ridgeSharpening: number
-	glacialErosion: number
-	volcanism?: number
-	craters?: number // 0 = none, 1 = heavily cratered
-	planetRadiusKm?: number
-	obliquity?: number // axial tilt in degrees, default 23.5
-	eccentricity?: number // orbital eccentricity, default 0.0167
-	sunTempFactor?: number // stellar temperature factor, 1.0 = Sol
-	daysPerYear?: number // orbital year length in local days, default 365
-	hoursPerDay?: number // rotation period expressed as local hours per day, default 24
-	tidallyLocked?: boolean // true = one hemisphere always faces the star
-	antistellarLon?: number // longitude of the antistellar point in degrees (0-360), default 180
-	perihelion?: number // argument of perihelion in degrees (0-360), default 90
-	pressure?: number // atmospheric pressure in bars, default 1.0
-}
-
-/** Result of findCollisions for one plate layer */
-export interface CollisionResult {
-	mountain_r: Set<number>
-	coastline_r: Set<number>
-	ocean_r: Set<number>
-	r_stress: Float32Array
-	r_subductFactor: Float32Array
-	r_boundaryType: Int8Array
-	r_bothOcean: Uint8Array
-	r_hasOcean: Uint8Array
-}
-
-export interface BoundaryInfo {
-	mountain_r: Set<number>
-	coastline_r: Set<number>
-	ocean_r: Set<number>
-	r_stress: Float32Array
-	r_subductFactor: Float32Array
-	r_boundaryType: Int8Array
-	r_bothOcean: Uint8Array
-	r_hasOcean: Uint8Array
-}
-
-export interface DistanceFields {
-	distMountain: Float32Array
-	distOcean: Float32Array
-	distCoastline: Float32Array
-	distCoast: Float32Array
-	distCoastLand: Float32Array
-}
-
-export const OROGEN_TERRAIN_FEATURE_LABELS = [
-	"none",
-	"rift valley",
-	"pull-apart basin",
-	"back-arc basin",
-	"fold ridges",
-	"plateau uplift",
-	"continental interior",
-	"mid-ocean ridge",
-	"fracture zone",
-	"trench",
-	"coastal roughening",
-	"island arc",
-] as const
-
-export type OrogenTerrainFeatureId =
-	(typeof OROGEN_TERRAIN_FEATURE_LABELS)[number]
-
-export const OROGEN_TERRAIN_FEATURE = {
-	RIFT_VALLEY: 1,
-	PULL_APART_BASIN: 2,
-	BACK_ARC_BASIN: 3,
-	FOLD_RIDGES: 4,
-	PLATEAU_UPLIFT: 5,
-	CONTINENTAL_INTERIOR: 6,
-	MID_OCEAN_RIDGE: 7,
-	FRACTURE_ZONE: 8,
-	TRENCH: 9,
-	COASTAL_ROUGHENING: 10,
-	ISLAND_ARC: 11,
-} as const
-
-export interface OrogenTerrainFeatures {
-	/** Per-cell bitmask of terrain features applied during blendElevation. */
-	featureMask: Uint32Array
-	/** Per-cell strongest contributing feature, index into OROGEN_TERRAIN_FEATURE_LABELS. */
-	dominantFeature: Uint8Array
-}
-
-export interface StageTiming {
-	Stage: string
-	ms: string
-}
-
-export interface SuperPlateData {
-	r_superPlate: Int32Array
-	superPlateVec: Map<number, PlateVec>
-	superPlateIsOcean: Set<number>
-	superPlateDensity: Map<number, number>
-	numSuperPlates: number
-}
-
-export interface OrogenClimate {
-	temperature_avg: Float32Array // per-cell annual mean °C
-	temperature_min: Float32Array // per-cell annual min °C
-	temperature_max: Float32Array // per-cell annual max °C
-	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
-	temperature_monthly_nolapse: Float32Array // flattened [month * numRegions + region] mean °C before terrain lapse correction
-	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temp range °C (for Hargreaves td)
-	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²
-	pet_monthly: Float32Array // flattened [month * numRegions + region] PET mm
-	daylight_hours_monthly: Float32Array // flattened [month * numRegions + region] daylight hours
-	landFraction: number[] // 36-band land fraction used by EBM
-}
-
-export interface OrogenOceanCurrents {
-	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */
-	oceanWarmth: Float32Array
-	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean/deep interior. */
-	coastalWarmth: Float32Array
-	/** Per-cell monthly ocean warmth, flattened [month * N + r]. Optional seasonal field. */
-	oceanWarmthMonthly?: Float32Array
-	/** Per-cell monthly coastal warmth, flattened [month * N + r]. Optional seasonal field. */
-	coastalWarmthMonthly?: Float32Array
-	/** Per-cell monthly temperature delta applied by ocean currents, flattened [month * N + r]. */
-	temperatureDeltaMonthly?: Float32Array
-	/** Per-cell temperature delta applied by ocean currents (°C). Zero where no effect. */
-	temperatureDelta: Float32Array
-}
-
-export interface OrogenWind {
-	/** Per-cell eastward wind component, [month * N + r] */
-	wind_east_monthly: Float32Array
-	/** Per-cell northward wind component, [month * N + r] */
-	wind_north_monthly: Float32Array
-	/** Per-cell wind speed (0–1 normalized), [month * N + r] */
-	wind_speed_monthly: Float32Array
-}
-
-export interface OrogenRainfall {
-	monthly: Float32Array // [month * N + r] mm
-	annual: Float32Array // per-cell annual mm
-	east: Float32Array // per-cell normalized east moisture (0–1)
-	west: Float32Array // per-cell normalized west moisture (0–1)
-}
-
-export interface OrogenHydrology {
-	aet_monthly: Float32Array // [month * N + r] mm
-	aridity_monthly: Float32Array // [month * N + r] AET / PET
-}
-
-export interface OrogenHazards {
-	earthquake: Float32Array
-	volcano: Float32Array
-	danger: Float32Array
-}
-
-export interface OrogenVolcanism {
-	hotspot: Float32Array
-}
-
-export interface OrogenProvinces {
-	/** Per-region province index (-1 = ocean/unassigned) */
-	regionProvince: Int32Array
-	/** Seed (capital) region for each province */
-	seeds: Int32Array
-	/** Number of provinces */
-	count: number
-	/** Per-province desolate flag (1 = uninhabitable) */
-	desolate: Uint8Array
-	/** Per-province landmass (connected component) index, -1 for desolate */
-	landmassId: Int32Array
-	/** Province adjacency — CSR offset, length count+1 */
-	adjOffset: Int32Array
-	/** Province adjacency — neighbor indices */
-	adjList: Int32Array
-	/** Per-province land region count */
-	size: Int32Array
-	/** Per-province RGB colors, length count*3 */
-	colors: Float32Array
-}
-
-export interface OrogenPartition {
-	/** Per-node partition index (-1 = inactive/unassigned) */
-	assignment: Int32Array
-	/** Seed node for each partition */
-	seeds: Int32Array
-	/** Number of partitions */
-	count: number
-	/** Partition adjacency — CSR offset, length count+1 */
-	adjOffset: Int32Array
-	/** Partition adjacency — neighbor indices */
-	adjList: Int32Array
-	/** Per-partition node count */
-	size: Int32Array
-	/** Per-partition RGB colors, length count*3 */
-	colors: Float32Array
-}
-
-export interface OrogenNationHierarchy extends OrogenPartition {
-	/** Per-province parent index (-1 = sovereign root) */
-	parent: Int32Array
-	/** Per-province hierarchy depth (0 = root) */
-	depth: Int32Array
-	/** Province children in CSR form, length count+1 */
-	childOffset: Int32Array
-	/** Flattened province children list */
-	childList: Int32Array
-	/** Per-province sovereign root */
-	sovereign: Int32Array
-	/** Per-province settlement gravity */
-	gravity: Float32Array
-}
-
-export interface OrogenRivers {
-	/** Each river is a polyline of [lonDeg, latDeg, flow, elevation] quads */
-	lines: [number, number, number, number][][]
-	/** Maximum flow value for normalization */
-	maxFlow: number
-	/** Flow threshold (minimum flow for a river cell), in m3/s */
-	minFlow: number
-	/** Per-cell mean discharge from upstream thawed-rain runoff, in m3/s */
-	flow: Float32Array
-	/** Per-cell monthly discharge, length 12*N, indexed [month*N + r], in m3/s */
-	flow_monthly: Float32Array
-	/** Per-cell flag for cells that belong to a rendered river polyline */
-	visible: Uint8Array
-	/** Per-cell river system ID (-1 = not a river cell). Tributaries share the main river's ID. */
-	riverId: Int32Array
-	/** Per-cell total length of the visible river system, in km. */
-	riverLengthKm: Float32Array
-	/** Per-cell terminal flag for the last visible river cell before its sink. */
-	terminal: Uint8Array
-	/** Terminal river cells that drain into ocean or other non-land water. */
-	terminalCoastal: Uint8Array
-	/** Terminal river cells that end in inland basins, lakes, or playas. */
-	terminalInterior: Uint8Array
-	/** Per-cell lake flag (1 = lake surface, 0 = not) */
-	lakes: Uint8Array
-	/** Per-cell enclosed basin ID (-1 = not assigned to a basin) */
-	basinId: Int32Array
-	/** Per-cell water surface elevation (only meaningful for lake cells) */
-	waterLevel: Float32Array
-}
-
-export const OROGEN_TOPOGRAPHY_LABELS = [
-	"flat",
-	"hill",
-	"plateau",
-	"mountains",
-	"marsh",
-	"ocean",
-	"lake",
-] as const
+import type {
+	OrogenClimate,
+	OrogenHazards,
+	OrogenHydrology,
+	OrogenOceanCurrents,
+	OrogenRainfall,
+	OrogenVolcanism,
+	OrogenWind,
+} from "./types/climate"
+import type { SphereMesh } from "./types/mesh"
+import type {
+	OrogenNationHierarchy,
+	OrogenPartition,
+	OrogenProvinces,
+	OrogenRivers,
+} from "./types/partitions"
+import type {
+	BoundaryInfo,
+	DistanceFields,
+	OrogenParams,
+	OrogenTerrainFeatures,
+	StageTiming,
+	TectonicPlate,
+} from "./types/tectonics"
 
 export interface OrogenWorld {
 	mesh: SphereMesh
@@ -329,41 +70,44 @@ export interface OrogenWorld {
 	elevation_km: Float32Array
 	params: OrogenParams
 	timings?: StageTiming[]
-	climate?: OrogenClimate
+	climate: OrogenClimate
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
-	oceanDist?: Float32Array
-	rainfall?: OrogenRainfall
-	hazards?: OrogenHazards
-	volcanism?: OrogenVolcanism
+	oceanDist: Float32Array
+	rainfall: OrogenRainfall
+	hazards: OrogenHazards
+	volcanism: OrogenVolcanism
 	/** Per-cell climate zone code (0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic) */
-	climateZones?: Uint8Array
+	climateZones: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
-	pastaClimate?: Uint8Array
+	pastaClimate: Uint8Array
 	/** Per-cell pasta classification debug metrics */
 	pastaDebug?: import("./climate/pasta").PastaDebug
 	/** Per-cell ice thickness in mm water equivalent (0 for ice-free) */
-	iceThickness?: Float32Array
+	iceThickness: Float32Array
 	/** Per-cell minimum ice across final-year months (mm w.e.) — for sea ice classification */
-	iceMinMonthly?: Float32Array
+	iceMinMonthly: Float32Array
 	/** Per-cell maximum ice across final-year months (mm w.e.) — for sea ice classification */
-	iceMaxMonthly?: Float32Array
+	iceMaxMonthly: Float32Array
 	/** Per-cell Koppen climate code (index into KOPPEN_CLASSES) */
-	koppenClimate?: Uint8Array
+	koppenClimate: Uint8Array
 	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
 	oceanCurrents?: OrogenOceanCurrents
 	/** Monthly wind fields */
 	wind?: OrogenWind
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
-	vegetation?: Uint8Array
+	vegetation: Uint8Array
 	/** Per-cell topography code, index into OROGEN_TOPOGRAPHY_LABELS */
-	topography?: Uint8Array
+	topography: Uint8Array
 	/** Per-cell coastal flag (1 = borders ocean or lake, 0 = otherwise). */
-	coastal?: Uint8Array
+	coastal: Uint8Array
 	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
-	slopeScore?: Float32Array
-	rivers?: OrogenRivers
-	isLand?: Uint8Array
-	riverLand?: Uint8Array
+	slopeScore: Float32Array
+	rivers: OrogenRivers
+	dtr_annual: Float32Array
+	dtr_monthly: Float32Array
+	hydrology: OrogenHydrology
+	isLand: Uint8Array
+	riverLand: Uint8Array
 	provinces?: OrogenProvinces
 	nations?: OrogenNationHierarchy
 	cultures?: OrogenPartition
@@ -372,7 +116,7 @@ export interface OrogenWorld {
 	religions?: OrogenPartition
 	landmarks?: import("./terrain/landmarks").OrogenLandmarks
 	population?: import("./partitions/population").ProvincePopulation
-	continentCount?: number
+	continentCount: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]
 }

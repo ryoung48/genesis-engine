@@ -10,6 +10,7 @@ import type {
 	SphereMesh,
 	SuperPlateData,
 } from "../types"
+import { eulerVelocityAt } from "../util/math"
 import { SimplexNoise } from "../util/simplex-noise"
 
 const COLLISION_THRESHOLD = 0.75
@@ -24,15 +25,7 @@ function plateVelocityAt(
 ): [number, number, number] {
 	const pv = plateVec.get(plateId)
 	if (!pv) return [0, 0, 0]
-	const px = pv.pole[0],
-		py = pv.pole[1],
-		pz = pv.pole[2]
-	const omega = pv.omega
-	return [
-		omega * (py * z - pz * y),
-		omega * (pz * x - px * z),
-		omega * (px * y - py * x),
-	]
+	return eulerVelocityAt(pv.pole, pv.omega, x, y, z)
 }
 
 export function findCollisions(

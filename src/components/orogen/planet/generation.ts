@@ -1,3 +1,5 @@
+import type { HistoryNote } from "@/model/orogen/history"
+import { YEAR_MS } from "@/model/orogen/history/state"
 import type { OrogenParams } from "@/model/orogen/types"
 import {
 	decodePlanetCode,
@@ -6,7 +8,9 @@ import {
 import type {
 	OrogenWorkerRequest,
 	OrogenWorkerResponse,
+	SerializedHistoryFrame,
 	SerializedOrogenWorld,
+	SerializedTimelines,
 } from "@/model/orogen/worker-types"
 
 export { decodePlanetCode }
@@ -78,6 +82,13 @@ export interface GenerationCallbacks {
 	setPlanetCodeInput: (v: string) => void
 	setWorld: (v: SerializedOrogenWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
+	onGenerationComplete?: () => void
+	onSimProgress?: (timeMs: number, frame: SerializedHistoryFrame) => void
+	onSimComplete?: (
+		timeMs: number,
+		timelines: SerializedTimelines,
+		events: HistoryNote[],
+	) => void
 }
 
 function createWorker(
@@ -108,12 +119,24 @@ function createWorker(
 			onDone(message, worker)
 			return
 		}
-		console.error("Orogen worker failed", message.message, message.stack)
-		callbacks.setGenerationLabel(failLabel)
-		callbacks.setGenerating(false)
-		worker.terminate()
-		if (callbacks.workerRef.current === worker)
-			callbacks.workerRef.current = null
+		if (message.type === "sim-progress") {
+			callbacks.onSimProgress?.(message.timeMs, message.frame)
+			return
+		}
+		if (message.type === "sim-done") {
+			callbacks.onSimComplete?.(
+				message.timeMs,
+				message.timelines,
+				message.events,
+			)
+			return
+		}
+		if (message.type === "error") {
+			console.error("Orogen worker failed", message.message, message.stack)
+			callbacks.setGenerationLabel(failLabel)
+			callbacks.setGenerating(false)
+			return
+		}
 	}
 
 	worker.onerror = (event) => {
@@ -190,7 +213,7 @@ export function generateWorld(
 	requestAnimationFrame(() => {
 		const worker = createWorker(
 			callbacks,
-			(message, w) => {
+			(message, _w) => {
 				const code = encodePlanetCode(overrideSeed, params)
 				callbacks.pushRecentCode(code)
 				callbacks.setPlanetCode(code)
@@ -199,14 +222,31 @@ export function generateWorld(
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
-				w.terminate()
-				if (callbacks.workerRef.current === w)
-					callbacks.workerRef.current = null
+				callbacks.onGenerationComplete?.()
+				// Keep worker alive for simulation
 			},
 			"Generation failed",
 		)
 		worker.postMessage(request)
 	})
+}
+
+export function startSimulation(
+	workerRef: React.MutableRefObject<Worker | null>,
+): void {
+	const worker = workerRef.current
+	if (!worker) return
+	const request: OrogenWorkerRequest = { type: "simulate", tickMs: YEAR_MS }
+	worker.postMessage(request)
+}
+
+export function pauseSimulation(
+	workerRef: React.MutableRefObject<Worker | null>,
+): void {
+	const worker = workerRef.current
+	if (!worker) return
+	const request: OrogenWorkerRequest = { type: "pause" }
+	worker.postMessage(request)
 }
 
 export function importHeightmap(
@@ -255,14 +295,13 @@ export function importHeightmap(
 	requestAnimationFrame(() => {
 		const worker = createWorker(
 			callbacks,
-			(message, w) => {
+			(message, _w) => {
 				callbacks.setWorld(message.world)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
-				w.terminate()
-				if (callbacks.workerRef.current === w)
-					callbacks.workerRef.current = null
+				callbacks.onGenerationComplete?.()
+				// Keep worker alive for simulation
 			},
 			"Import failed",
 		)

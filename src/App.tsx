@@ -170,10 +170,7 @@ function App() {
 						path="/language-lab"
 						element={<LanguageLab onBack={() => navigate("/")} />}
 					/>
-					<Route
-						path="/tectonic-lab"
-						element={<OrogenView onBack={() => navigate("/")} />}
-					/>
+					<Route path="/tectonic-lab" element={<OrogenView />} />
 					<Route path="*" element={<Navigate to="/" replace />} />
 				</Routes>
 			)}

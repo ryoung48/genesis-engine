@@ -3,18 +3,11 @@ import { EnergyBalanceModel } from "../../cells/ebm/index"
 import { WIND } from "../../cells/wind"
 import { TIME } from "../../utilities/time"
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../types"
-import {
-	getDaysPerYear,
-	getEccentricity,
-	getEffectiveObliquityDeg,
-	getHoursPerDay,
-	getPerihelion,
-	getPlanetRadiusKm,
-	getSunTempFactor,
-} from "../util/units"
+import { getRegionLatLonDegrees } from "../util/math"
+import { getEffectiveObliquityDeg } from "../util/units"
+import { interpolateLatBand } from "./climate"
 
 const NUM_MONTHS = 12
-const LAT_STEP_INV = (EMB_CONSTANTS.grid.NUM_LAT - 1) / 180
 
 export interface WindResult {
 	wind_east_monthly: Float32Array
@@ -22,63 +15,36 @@ export interface WindResult {
 	wind_speed_monthly: Float32Array
 }
 
-function clamp(value: number, lo: number, hi: number): number {
-	return Math.max(lo, Math.min(hi, value))
-}
-
-function interpolateLatBand(range: number[], latDeg: number): number {
-	const pos = clamp(
-		(latDeg + 90) * LAT_STEP_INV,
-		0,
-		EMB_CONSTANTS.grid.NUM_LAT - 1,
-	)
-	const i0 = Math.min(EMB_CONSTANTS.grid.NUM_LAT - 2, pos | 0)
-	const t = pos - i0
-	return range[i0] + t * (range[i0 + 1] - range[i0])
-}
-
-function buildLatitudeMetadata(mesh: SphereMesh): Float32Array {
-	const latDeg = new Float32Array(mesh.numRegions)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		const z = mesh.r_xyz[3 * r + 2]
-		latDeg[r] = Math.asin(clamp(z, -1, 1)) * (180 / Math.PI)
-	}
-	return latDeg
-}
-
 function buildPreviewEbm(
-	params:
-		| Pick<
-				OrogenParams,
-				| "hoursPerDay"
-				| "planetRadiusKm"
-				| "obliquity"
-				| "eccentricity"
-				| "sunTempFactor"
-				| "daysPerYear"
-				| "perihelion"
-				| "pressure"
-		  >
-		| undefined,
+	params: Pick<
+		OrogenParams,
+		| "hoursPerDay"
+		| "planetRadiusKm"
+		| "obliquity"
+		| "eccentricity"
+		| "sunTempFactor"
+		| "daysPerYear"
+		| "perihelion"
+		| "pressure"
+	>,
 	climate: OrogenClimate,
 ): EnergyBalanceModel {
 	const ebm = new EnergyBalanceModel({
 		orbital: {
 			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
-			ECCENTRICITY: getEccentricity(params.eccentricity),
-			PERIHELION: getPerihelion(params.perihelion),
+			ECCENTRICITY: params.eccentricity,
+			PERIHELION: params.perihelion,
 		},
 		stellar: {
 			...EMB_CONSTANTS.stellar,
-			T_SUN:
-				EMB_CONSTANTS.stellar.T_SUN * getSunTempFactor(params.sunTempFactor),
+			T_SUN: EMB_CONSTANTS.stellar.T_SUN * params.sunTempFactor,
 		},
 		time: {
-			YEAR_LENGTH_DAYS: getDaysPerYear(params.daysPerYear),
-			HOURS_PER_DAY: getHoursPerDay(params.hoursPerDay),
+			YEAR_LENGTH_DAYS: params.daysPerYear,
+			HOURS_PER_DAY: params.hoursPerDay,
 		},
 		pressure: params.pressure ?? 1.0,
-		radius: getPlanetRadiusKm(params.planetRadiusKm) * 1000,
+		radius: params.planetRadiusKm * 1000,
 		landFraction: climate.landFraction,
 	})
 	ebm.runModel(30, 0.5)
@@ -119,15 +85,10 @@ function buildMonthlyLatWind(wind: number[][]): number[][] {
 
 export function computeWind(
 	mesh: SphereMesh,
-	_elevation: Float32Array,
-	_isLand: Uint8Array,
-	_distCoast: Float32Array | undefined,
 	climate: OrogenClimate,
-	params?: Pick<
+	params: Pick<
 		OrogenParams,
-		| "seed"
 		| "hoursPerDay"
-		| "tidallyLocked"
 		| "planetRadiusKm"
 		| "obliquity"
 		| "eccentricity"
@@ -136,25 +97,17 @@ export function computeWind(
 		| "perihelion"
 		| "pressure"
 	>,
-	monthlyTEQ?: Float32Array[],
 ): WindResult {
 	const N = mesh.numRegions
 	const wind_east_monthly = new Float32Array(N * NUM_MONTHS)
 	const wind_north_monthly = new Float32Array(N * NUM_MONTHS)
 	const wind_speed_monthly = new Float32Array(N * NUM_MONTHS)
 
-	void _elevation
-	void _isLand
-	void _distCoast
-	void params?.seed
-	void params?.tidallyLocked
-	void monthlyTEQ
-
 	const ebm = buildPreviewEbm(params, climate)
 	const teqByDay = computeThermalEquatorByDay(ebm.temperature, ebm.lats_deg)
 	const dailyWind = WIND.calculateEbmWind(ebm.temperature, ebm.lats, teqByDay)
 	const monthlyLatWind = buildMonthlyLatWind(dailyWind)
-	const latDeg = buildLatitudeMetadata(mesh)
+	const { latDeg } = getRegionLatLonDegrees(mesh)
 
 	for (let month = 0; month < NUM_MONTHS; month++) {
 		const monthOffset = month * N

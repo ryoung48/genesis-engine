@@ -1,17 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+	DEV_BUCKETS,
+	DEV_COLORS,
+} from "@/components/world/charts/SimulationTab/ActiveTrendsChart"
 import type { PopulationMapMode } from "@/components/world/types"
 import { computeClouds } from "@/model/orogen/climate/clouds"
 import { computeThermalEquatorLine } from "@/model/orogen/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/climate/vegetation"
 import { computeWind } from "@/model/orogen/climate/wind"
-import {
-	ENABLE_PASTA_CLASSIFICATION,
-	ENABLE_PROVINCES,
-} from "@/model/orogen/features"
+import { REL } from "@/model/orogen/history/state"
+import { TOPO_LAKE, TOPO_OCEAN } from "@/model/orogen/terrain/classification"
 import type { StageTiming } from "@/model/orogen/types"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
 import { encodePlanetCode } from "@/model/orogen/util/planet-code"
-import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
+import type {
+	SerializedHistoryFrame,
+	SerializedOrogenWorld,
+} from "@/model/orogen/worker-types"
 import type { ColorMode } from "../colors"
 import { climateZoneColor, vegetationColor } from "../colors"
 import {
@@ -27,13 +32,23 @@ import {
 } from "./constants"
 import { DetailsDrawer } from "./DetailsDrawer"
 import {
+	buildDisplayNationModel,
+	buildDisplayWorld,
+	buildHistoryChildrenIndex,
+} from "./display-model"
+import { GenerationPanel } from "./GenerationPanel"
+import {
 	decodePlanetCode,
 	type GenerationCallbacks,
 	type GenerationParams,
 	generateWorld,
 	importHeightmap,
 	loadImageAsGrayscale,
+	pauseSimulation,
+	startSimulation,
 } from "./generation"
+import { createHistoryQuery, type TimelineBundle } from "./history-query"
+import { historyYearToTime } from "./history-time"
 import {
 	getCoastHopLengthKm,
 	getHoverBiome,
@@ -42,6 +57,7 @@ import {
 	getHoverCoordinates,
 	getHoverDistCoast,
 	getHoverDistCoastKm,
+	getHoverDtr,
 	getHoverElevationKm,
 	getHoverHazards,
 	getHoverHotspot,
@@ -60,8 +76,16 @@ import {
 	getHoverWind,
 	type HoverInfo,
 } from "./hover"
-import { GlobalInfoPanel, InfoPanel } from "./InfoPanel"
+import { InfoPanel } from "./InfoPanel"
 import { ModeBar, type NationMapMode } from "./ModeBar"
+import {
+	buildConflictDistribution,
+	buildNationHistory,
+	buildNationSizeDistribution,
+	buildRelationDistribution,
+	buildSelectedNationDetails,
+	buildWindowedNationEvents,
+} from "./nation-details-model"
 import { OverlayControls } from "./OverlayControls"
 import { computePlanetStats } from "./planet-stats"
 import {
@@ -69,40 +93,14 @@ import {
 	computeRegionColors,
 	getTopographyColor,
 } from "./region-colors"
-import { Sidebar } from "./Sidebar"
+import { SimControls } from "./SimControls"
 import {
 	buildPlanetSliders,
 	buildTerrainSliders,
 	resetWorldDefaults,
 } from "./sliders"
 import { TimeControls } from "./TimeControls"
-import { TOPO_LAKE, TOPO_OCEAN } from "@/model/orogen/terrain/classification"
-
-interface OrogenViewProps {
-	onBack: () => void
-}
-
-const NATION_BUCKETS: [number, number][] = [
-	[50, 100],
-	[25, 49],
-	[10, 24],
-	[5, 9],
-	[2, 4],
-	[1, 1],
-]
-
-const NATION_BUCKET_COLORS = [
-	"rgb(15, 23, 42)",
-	"rgb(30, 41, 59)",
-	"rgb(51, 65, 85)",
-	"rgb(71, 85, 105)",
-	"rgb(100, 116, 139)",
-	"rgb(148, 163, 184)",
-]
-
-function rgbToCss([r, g, b]: [number, number, number]): string {
-	return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
-}
+import { rgbToCss } from "./ui-format"
 
 function titleCase(value: string): string {
 	return value
@@ -135,7 +133,7 @@ function buildDistribution(
 		.filter((bucket) => bucket.count > 0)
 }
 
-export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
+export const OrogenView: React.FC = () => {
 	const makeRandomSeed = useCallback(
 		() => Math.floor(Math.random() * 16777216),
 		[],
@@ -170,8 +168,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [rainAnnual, setRainAnnual] = useState(true)
 	const [windAnnual, setWindAnnual] = useState(true)
 	const [currentAnnual, setCurrentAnnual] = useState(true)
+	const [dtrAnnual, setDtrAnnual] = useState(true)
 	const temperatureMonth = tempAnnual ? 0 : globalMonth
 	const rainfallMonth = rainAnnual ? 0 : globalMonth
+	const dtrMonth = dtrAnnual ? 0 : globalMonth
 	const windMonth = windAnnual ? 0 : globalMonth
 	const currentMonth = currentAnnual ? 0 : globalMonth
 	const [viewMode, setViewMode] = useState<OrogenViewMode>("globe")
@@ -189,9 +189,21 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
 	const [gridSpacing, setGridSpacing] = useState(15)
 	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
-	const [sidebarOpen, setSidebarOpen] = useState(true)
-	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(true)
+	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
+	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
+
+	// Simulation state
+	const [simPlaying, setSimPlaying] = useState(false)
+	const simStartTimeMs = historyYearToTime(800)
+	const [simTimeMs, setSimTimeMs] = useState(simStartTimeMs)
+	const [timelineBundle, setTimelineBundle] = useState<
+		TimelineBundle | undefined
+	>()
+	const [liveFrame, setLiveFrame] = useState<SerializedHistoryFrame | null>(
+		null,
+	)
+	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
@@ -376,16 +388,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		setGenerationTimings(world.timings ?? null)
 	}, [world])
 	useEffect(() => {
-		if (!world) {
-			setSelectedNationId(null)
-			return
-		}
-		if (!world.nations || selectedNationId === null) return
-		if (selectedNationId < 0 || selectedNationId >= world.nations.count) {
-			setSelectedNationId(null)
-		}
-	}, [selectedNationId, world])
-	useEffect(() => {
 		if (typeof window === "undefined") return
 		if (planetCode)
 			window.localStorage.setItem(PLANET_CODE_STORAGE_KEY, planetCode)
@@ -401,18 +403,6 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 	// --- Color mode guard ---
 	useEffect(() => {
-		if (
-			!ENABLE_PASTA_CLASSIFICATION &&
-			(colorMode === "pastaClimate" || colorMode === "satellite")
-		)
-			setColorMode("climate")
-		if (
-			!ENABLE_PROVINCES &&
-			(colorMode === "nations" ||
-				colorMode === "population" ||
-				colorMode === "gravity")
-		)
-			setColorMode("terrain")
 		if (world && !world.hazards && colorMode === "dangerZones")
 			setColorMode("terrain")
 		if (world && !world.volcanism && colorMode === "hotspots")
@@ -434,9 +424,10 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		colorMode === "precipitation" ||
 		colorMode === "windSpeed" ||
 		colorMode === "moisture" ||
-		(ENABLE_PASTA_CLASSIFICATION && colorMode === "pastaClimate") ||
+		colorMode === "pastaClimate" ||
 		colorMode === "koppenClimate" ||
-		colorMode === "oceanCurrents"
+		colorMode === "oceanCurrents" ||
+		colorMode === "dtr"
 	const isWindMode = colorMode === "windSpeed"
 	const isSatelliteMode =
 		colorMode === "satellite" || colorMode === "satelliteKoppen"
@@ -444,33 +435,90 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const cachedWind = world ? windCacheRef.current.get(world) : undefined
 
 	const lazyWind = useMemo(() => {
-		if (
-			cachedWind ||
-			!isWindMode ||
-			!world?.climate ||
-			!world?.isLand ||
-			!world?.distCoast ||
-			!world.monthlyTEQ
-		) {
+		if (cachedWind || !isWindMode || !world) {
 			return cachedWind
 		}
-		const computed = computeWind(
-			world.mesh,
-			world.elevation,
-			world.isLand,
-			world.distCoast,
-			world.climate,
-			world.params,
-			world.monthlyTEQ,
-		)
+		const computed = computeWind(world.mesh, world.climate, world.params)
 		windCacheRef.current.set(world, computed)
 		return computed
 	}, [cachedWind, isWindMode, world])
 
-	const worldForDisplay = useMemo(
-		() => (world && lazyWind ? { ...world, wind: lazyWind } : world),
-		[world, lazyWind],
+	const currentHistoryQuery = useMemo(
+		() =>
+			world && timelineBundle
+				? createHistoryQuery(timelineBundle, world)
+				: null,
+		[world, timelineBundle],
 	)
+
+	const selectedHistoryView = useMemo(
+		() =>
+			currentHistoryQuery
+				? currentHistoryQuery.getView(selectedTimeMs)
+				: selectedTimeMs === simTimeMs && liveFrame
+					? {
+							...liveFrame,
+							populationRural: Float32Array.from(
+								liveFrame.populationTotal,
+								(total, index) =>
+									Math.max(0, total - (liveFrame.populationUrban[index] ?? 0)),
+							),
+							relationAt: () => REL.NONE,
+						}
+					: null,
+		[currentHistoryQuery, selectedTimeMs, simTimeMs, liveFrame],
+	)
+	const selectedHistoryChildren = useMemo(
+		() => buildHistoryChildrenIndex(selectedHistoryView),
+		[selectedHistoryView],
+	)
+
+	const worldForDisplay = useMemo(
+		() =>
+			buildDisplayWorld({
+				world,
+				lazyWind,
+				selectedHistoryView,
+				selectedHistoryChildren,
+			}),
+		[world, lazyWind, selectedHistoryChildren, selectedHistoryView],
+	)
+	const nationModel = useMemo(
+		() => buildDisplayNationModel(worldForDisplay),
+		[worldForDisplay],
+	)
+	const nationProvinceCounts = useMemo(() => {
+		return nationModel?.counts ?? new Map<number, number>()
+	}, [nationModel])
+	const nationColorById = useMemo(() => {
+		return nationModel?.colorById ?? new Map<number, [number, number, number]>()
+	}, [nationModel])
+	const getNationColor = useCallback(
+		(nationId: number): string | null => {
+			if (nationId < 0) return null
+			const color = nationColorById.get(nationId)
+			return color ? rgbToCss(color) : null
+		},
+		[nationColorById],
+	)
+	const getNationColorRgb = useCallback(
+		(nationId: number): [number, number, number] | null => {
+			if (nationId < 0) return null
+			return nationColorById.get(nationId) ?? null
+		},
+		[nationColorById],
+	)
+
+	useEffect(() => {
+		if (!worldForDisplay) {
+			setSelectedNationId(null)
+			return
+		}
+		if (!worldForDisplay.nations || selectedNationId === null) return
+		if (selectedNationId < 0 || !nationProvinceCounts.has(selectedNationId)) {
+			setSelectedNationId(null)
+		}
+	}, [nationProvinceCounts, selectedNationId, worldForDisplay])
 
 	// --- Hover computations ---
 	const hoverElevationKm = getHoverElevationKm(hoverInfo, worldForDisplay)
@@ -488,6 +536,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		worldForDisplay,
 		rainfallMonth,
 	)
+	const hoverDtr = getHoverDtr(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverClimateZone = getHoverClimateZone(hoverInfo, worldForDisplay)
 	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
 	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
@@ -503,11 +552,31 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	const hoverRiver = getHoverRiver(hoverInfo, worldForDisplay)
 	const hoverTerrainFeature = getHoverTerrainFeature(hoverInfo, worldForDisplay)
 	const hoverOceanCurrents = getHoverOceanCurrents(hoverInfo, worldForDisplay)
+	const hoverNationId = useMemo(() => {
+		if (hoverProvince === null || hoverProvince < 0 || !nationModel?.assignment)
+			return null
+		return nationModel.assignment[hoverProvince] ?? null
+	}, [nationModel, hoverProvince])
 	const coastHopLengthKm = useMemo(
 		() => getCoastHopLengthKm(worldForDisplay),
 		[worldForDisplay],
 	)
 	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast, coastHopLengthKm)
+	const hoverOccupation = useMemo(() => {
+		if (hoverProvince === null || hoverProvince < 0 || !selectedHistoryView)
+			return null
+		for (const war of selectedHistoryView.activeWars) {
+			if (!war.occupied.includes(hoverProvince)) continue
+			return {
+				id: war.attacker,
+				color: war.rebel
+					? "rgb(0, 0, 0)"
+					: (getNationColor(war.attacker) ?? "rgb(0, 0, 0)"),
+				rebel: war.rebel,
+			}
+		}
+		return null
+	}, [selectedHistoryView, getNationColor, hoverProvince])
 	const hoverIceSummary = (() => {
 		if (!(hoverInfo && worldForDisplay)) return null
 		const r = hoverInfo.region
@@ -534,6 +603,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			populationMode,
 			temperatureMonth,
 			rainfallMonth,
+			dtrMonth,
 			windMonth,
 			currentMonth,
 			viewMode,
@@ -544,6 +614,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		populationMode,
 		temperatureMonth,
 		rainfallMonth,
+		dtrMonth,
 		viewMode,
 		windMonth,
 		currentMonth,
@@ -565,12 +636,43 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		if (!regionColors || !cloudData) return regionColors
 		return applyCloudOverlay(regionColors, cloudData)
 	}, [regionColors, cloudData])
+	const occupationOverlay = useMemo(() => {
+		if (!worldForDisplay?.provinces?.regionProvince || !selectedHistoryView)
+			return null
+		if (selectedHistoryView.activeWars.length === 0) return null
+		const regionProvince = worldForDisplay.provinces.regionProvince
+		const occupiedByProvince = new Map<number, [number, number, number]>()
+		for (const war of selectedHistoryView.activeWars) {
+			const stripeColor = war.rebel
+				? ([0, 0, 0] as [number, number, number])
+				: getNationColorRgb(war.attacker)
+			if (!stripeColor) continue
+			for (const province of war.occupied) {
+				occupiedByProvince.set(province, stripeColor)
+			}
+		}
+		if (occupiedByProvince.size === 0) return null
+		const overlay = new Float32Array(regionProvince.length * 4)
+		let hasOccupiedRegion = false
+		for (let region = 0; region < regionProvince.length; region++) {
+			const stripeColor = occupiedByProvince.get(regionProvince[region])
+			if (!stripeColor) continue
+			const base = region * 4
+			overlay[base] = stripeColor[0]
+			overlay[base + 1] = stripeColor[1]
+			overlay[base + 2] = stripeColor[2]
+			overlay[base + 3] = 1
+			hasOccupiedRegion = true
+		}
+		return hasOccupiedRegion ? overlay : null
+	}, [selectedHistoryView, getNationColorRgb, worldForDisplay])
 
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
 		if (!worldForDisplay) {
 			scene.updateWorld(null)
+			scene.setOccupationOverlay(null)
 			lastWorldRef.current = null
 			return
 		}
@@ -578,10 +680,21 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			scene.setRegionColors(regionColorsWithClouds)
 			scene.updateWorld(worldForDisplay)
 			lastWorldRef.current = worldForDisplay
-			return
+		} else {
+			scene.setRegionColors(regionColorsWithClouds)
 		}
-		scene.setRegionColors(regionColorsWithClouds)
-	}, [regionColorsWithClouds, worldForDisplay])
+		scene.setOccupationOverlay(
+			colorMode === "nations" && nationMode === "borders"
+				? occupationOverlay
+				: null,
+		)
+	}, [
+		colorMode,
+		nationMode,
+		occupationOverlay,
+		regionColorsWithClouds,
+		worldForDisplay,
+	])
 
 	const thermalEquator = useMemo(() => {
 		if (!world?.climate) return null
@@ -654,9 +767,11 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	useEffect(() => {
 		if (!sceneRef.current) return
 		sceneRef.current.setClickHandler((info) => {
-			if (!world?.provinces || !world?.nations) return
-			const province = world.provinces.regionProvince[info.region] ?? -1
-			const nation = province >= 0 ? world.nations.assignment[province] : -1
+			if (!worldForDisplay?.provinces || !nationModel) return
+			const province =
+				worldForDisplay.provinces.regionProvince[info.region] ?? -1
+			const nation =
+				province >= 0 ? (nationModel.assignment[province] ?? -1) : -1
 
 			if (!isMeasuring) {
 				setSelectedNationId(nation >= 0 ? nation : null)
@@ -690,42 +805,139 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 		}
 		window.addEventListener("keydown", handleKeyDown)
 		return () => window.removeEventListener("keydown", handleKeyDown)
-	}, [isMeasuring, world])
+	}, [nationModel, isMeasuring, worldForDisplay])
 
 	const selectedNation = useMemo(() => {
-		if (!world?.nations || !world.provinces || selectedNationId === null)
-			return null
-		if (selectedNationId < 0 || selectedNationId >= world.nations.count)
-			return null
+		return buildSelectedNationDetails({
+			selectedNationId,
+			world: worldForDisplay,
+			nationModel,
+			selectedHistoryView,
+			getNationColor,
+		})
+	}, [
+		selectedHistoryView,
+		nationModel,
+		getNationColor,
+		selectedNationId,
+		worldForDisplay,
+	])
 
-		let provinceCount = 0
-		let totalPopulation = 0
-		for (let province = 0; province < world.provinces.count; province++) {
-			if (world.nations.assignment[province] !== selectedNationId) continue
-			provinceCount++
-			totalPopulation += world.population?.population[province] ?? 0
-		}
+	const nationHistory = useMemo(() => {
+		return buildNationHistory({
+			selectedNationId,
+			historyQuery: currentHistoryQuery,
+			selectedTimeMs,
+			simStartTimeMs,
+			simTimeMs,
+			world: worldForDisplay,
+		})
+	}, [
+		selectedNationId,
+		currentHistoryQuery,
+		selectedTimeMs,
+		simStartTimeMs,
+		simTimeMs,
+		worldForDisplay,
+	])
 
-		return {
-			id: selectedNationId,
-			provinceCount,
-			totalPopulation,
-		}
-	}, [selectedNationId, world])
+	const windowedEvents = useMemo(() => {
+		return buildWindowedNationEvents({
+			selectedNationId,
+			historyQuery: currentHistoryQuery,
+			nationHistory,
+		})
+	}, [selectedNationId, currentHistoryQuery, nationHistory])
+
+	const allPastEvents = useMemo(() => {
+		if (!currentHistoryQuery) return undefined
+		return currentHistoryQuery.getEventsUntil(selectedTimeMs)
+	}, [currentHistoryQuery, selectedTimeMs])
 
 	const nationSizeDistribution = useMemo(
-		() =>
-			NATION_BUCKETS.map(([min, max], index) => ({
-				label: min === max ? `${min}` : `${min}-${max}`,
-				count: world?.nations?.size
-					? Array.from(world.nations.size).filter(
-							(size) => size >= min && size <= max,
-						).length
-					: 0,
-				color: NATION_BUCKET_COLORS[index] ?? "rgb(148, 163, 184)",
-			})),
-		[world],
+		() => buildNationSizeDistribution(nationProvinceCounts),
+		[nationProvinceCounts],
 	)
+
+	const conflictDistribution = useMemo(
+		() => buildConflictDistribution(selectedHistoryView),
+		[selectedHistoryView],
+	)
+
+	const relationDistribution = useMemo(
+		() => buildRelationDistribution(selectedHistoryView, nationProvinceCounts),
+		[selectedHistoryView, nationProvinceCounts],
+	)
+
+	const developmentDistribution = useMemo(() => {
+		const values = worldForDisplay?.development
+		const desolate = worldForDisplay?.provinces?.desolate
+		if (!values || !desolate) return []
+		const counts = new Array(DEV_BUCKETS.length).fill(0)
+		for (let province = 0; province < values.length; province++) {
+			if (desolate[province]) continue
+			const bucket = Math.min(
+				DEV_BUCKETS.length - 1,
+				Math.floor(values[province] * 10),
+			)
+			counts[bucket]++
+		}
+		return DEV_BUCKETS.map((label, index) => ({
+			label,
+			count: counts[index] ?? 0,
+			color: DEV_COLORS[index],
+		})).filter((bucket) => bucket.count > 0)
+	}, [worldForDisplay])
+
+	const nationDevelopmentDistribution = useMemo(() => {
+		const values = worldForDisplay?.development
+		const parent = worldForDisplay?.nations?.parent
+		const assignment = worldForDisplay?.nations?.assignment
+		if (!values || !parent || !assignment) return []
+		const counts = new Array(DEV_BUCKETS.length).fill(0)
+		for (let province = 0; province < values.length; province++) {
+			if (parent[province] >= 0 || assignment[province] < 0) continue
+			const bucket = Math.min(
+				DEV_BUCKETS.length - 1,
+				Math.floor(values[province] * 10),
+			)
+			counts[bucket]++
+		}
+		return DEV_BUCKETS.map((label, index) => ({
+			label,
+			count: counts[index] ?? 0,
+			color: DEV_COLORS[index],
+		})).filter((bucket) => bucket.count > 0)
+	}, [worldForDisplay])
+
+	const averageDevelopment = useMemo(() => {
+		const values = worldForDisplay?.development
+		const desolate = worldForDisplay?.provinces?.desolate
+		if (!values || !desolate) return null
+		let total = 0
+		let count = 0
+		for (let province = 0; province < values.length; province++) {
+			if (desolate[province]) continue
+			total += values[province]
+			count++
+		}
+		return count > 0 ? total / count : null
+	}, [worldForDisplay])
+
+	const nationAverageDevelopment = useMemo(() => {
+		const values = worldForDisplay?.development
+		const parent = worldForDisplay?.nations?.parent
+		const assignment = worldForDisplay?.nations?.assignment
+		if (!values || !parent || !assignment) return null
+		let total = 0
+		let count = 0
+		for (let province = 0; province < values.length; province++) {
+			if (parent[province] >= 0 || assignment[province] < 0) continue
+			total += values[province]
+			count++
+		}
+		return count > 0 ? total / count : null
+	}, [worldForDisplay])
 
 	const climateDistribution = useMemo(
 		() =>
@@ -927,6 +1139,22 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 			setPlanetCodeInput,
 			setWorld,
 			workerRef,
+			onGenerationComplete: () => {
+				setGenerationPanelOpen(false)
+				setDetailsDrawerOpen(true)
+			},
+			onSimProgress: (timeMs, frame) => {
+				setSimTimeMs(timeMs)
+				setSelectedTimeMs(timeMs)
+				setLiveFrame(frame)
+			},
+			onSimComplete: (timeMs, timelines, events) => {
+				setSimPlaying(false)
+				setSimTimeMs(timeMs)
+				setSelectedTimeMs(timeMs)
+				setTimelineBundle({ timelines, events })
+				setLiveFrame(null)
+			},
 		}),
 		[],
 	)
@@ -1006,9 +1234,15 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 
 	const handleGenerateWorld = useCallback(
 		(overrideSeed: number, overrides?: Partial<GenerationParams>) => {
+			// Reset simulation state
+			setSimPlaying(false)
+			setSimTimeMs(simStartTimeMs)
+			setSelectedTimeMs(simStartTimeMs)
+			setTimelineBundle(undefined)
+			setLiveFrame(null)
 			generateWorld(overrideSeed, overrides, currentParams, generationCallbacks)
 		},
-		[currentParams, generationCallbacks],
+		[currentParams, generationCallbacks, simStartTimeMs],
 	)
 
 	const resolveSeedInput = useCallback(() => {
@@ -1324,8 +1558,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 	// --- Render ---
 	return (
 		<div className="w-full h-full flex flex-col xl:flex-row bg-slate-100">
-			{sidebarOpen && (
-				<Sidebar
+			{generationPanelOpen && (
+				<GenerationPanel
 					worldTab={worldTab}
 					setWorldTab={setWorldTab}
 					resetWorldDefaults={handleResetDefaults}
@@ -1349,8 +1583,7 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					handleGenerate={handleGenerate}
 					handleFileImport={handleFileImport}
 					handleEarthImport={handleEarthImport}
-					onBack={onBack}
-					onClose={() => setSidebarOpen(false)}
+					onClose={() => setGenerationPanelOpen(false)}
 				/>
 			)}
 
@@ -1373,10 +1606,22 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						hoverIsLand={hoverIsLand}
 						hoverTemperatureDelta={hoverTemperatureDelta}
 						hoverRainfall={hoverRainfall}
+						hoverDtr={hoverDtr}
 						hoverClimateDisplay={hoverClimateDisplay}
 						hoverIceSummary={hoverIceSummary}
 						hoverBiome={hoverBiome}
 						hoverProvince={hoverProvince}
+						hoverNationId={hoverNationId}
+						hoverRegionColor={
+							hoverInfo && regionColorsWithClouds
+								? [
+										regionColorsWithClouds[hoverInfo.region * 3],
+										regionColorsWithClouds[hoverInfo.region * 3 + 1],
+										regionColorsWithClouds[hoverInfo.region * 3 + 2],
+									]
+								: null
+						}
+						hoverOccupation={hoverOccupation}
 						hoverOceanDist={hoverOceanDist}
 						hoverDistCoast={hoverDistCoast}
 						hoverDistCoastKm={hoverDistCoastKm}
@@ -1392,13 +1637,12 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 						tempAnnual={tempAnnual}
 						rainAnnual={rainAnnual}
 						windAnnual={windAnnual}
+						dtrAnnual={dtrAnnual}
 						globalMonth={globalMonth}
 						world={worldForDisplay}
 						hoverCardRef={hoverCardRef}
 					/>
-				) : (
-					<GlobalInfoPanel planetStats={planetStats} />
-				)}
+				) : null}
 
 				<OverlayControls
 					overlaysExpanded={overlaysExpanded}
@@ -1419,8 +1663,8 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					setShowNationBorders={setShowNationBorders}
 					gridSpacing={gridSpacing}
 					setGridSpacing={setGridSpacing}
-					sidebarOpen={sidebarOpen}
-					onToggleSidebar={() => setSidebarOpen(true)}
+					generationPanelOpen={generationPanelOpen}
+					onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
 				/>
 
 				<TimeControls
@@ -1527,35 +1771,85 @@ export const OrogenView: React.FC<OrogenViewProps> = ({ onBack }) => {
 					</div>
 				)}
 
-				<ModeBar
-					colorMode={colorMode}
-					setColorMode={setColorMode}
-					nationMode={nationMode}
-					setNationMode={setNationMode}
-					populationMode={populationMode}
-					setPopulationMode={setPopulationMode}
-					isClimateMode={isClimateMode}
-					isSatelliteMode={isSatelliteMode}
-					tempAnnual={tempAnnual}
-					setTempAnnual={setTempAnnual}
-					rainAnnual={rainAnnual}
-					setRainAnnual={setRainAnnual}
-					windAnnual={windAnnual}
-					setWindAnnual={setWindAnnual}
-					currentAnnual={currentAnnual}
-					setCurrentAnnual={setCurrentAnnual}
-				/>
+				<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
+					<div className="pointer-events-auto">
+						<SimControls
+							canSimulate={!!world && !!world.nations && !generating}
+							playing={simPlaying}
+							onPlay={() => {
+								setSimPlaying(true)
+								setTimelineBundle(null)
+								startSimulation(workerRef)
+							}}
+							onPause={() => {
+								setSimPlaying(false)
+								pauseSimulation(workerRef)
+							}}
+							selectedTimeMs={selectedTimeMs}
+							currentTimeMs={simTimeMs}
+							minTimeMs={simStartTimeMs}
+							maxTimeMs={simTimeMs}
+							onTimeChange={setSelectedTimeMs}
+							floating={false}
+						/>
+					</div>
+					<div className="pointer-events-auto">
+						<ModeBar
+							colorMode={colorMode}
+							setColorMode={setColorMode}
+							nationMode={nationMode}
+							setNationMode={setNationMode}
+							populationMode={populationMode}
+							setPopulationMode={setPopulationMode}
+							isClimateMode={isClimateMode}
+							isSatelliteMode={isSatelliteMode}
+							tempAnnual={tempAnnual}
+							setTempAnnual={setTempAnnual}
+							rainAnnual={rainAnnual}
+							setRainAnnual={setRainAnnual}
+							windAnnual={windAnnual}
+							setWindAnnual={setWindAnnual}
+							currentAnnual={currentAnnual}
+							setCurrentAnnual={setCurrentAnnual}
+							dtrAnnual={dtrAnnual}
+							setDtrAnnual={setDtrAnnual}
+						/>
+					</div>
+				</div>
 			</div>
 
 			<DetailsDrawer
 				open={detailsDrawerOpen}
 				onToggle={() => setDetailsDrawerOpen((value) => !value)}
 				nation={selectedNation}
-				nationCount={world?.nations?.count ?? null}
+				planetStats={planetStats}
+				worldPopulation={
+					selectedHistoryView?.totalPopulation ??
+					world?.population?.totalPopulation ??
+					null
+				}
+				activeWarCount={selectedHistoryView?.activeWars.length ?? null}
+				averageDevelopment={averageDevelopment}
+				nationAverageDevelopment={nationAverageDevelopment}
+				developmentDistribution={developmentDistribution}
+				nationDevelopmentDistribution={nationDevelopmentDistribution}
 				nationSizeDistribution={nationSizeDistribution}
+				conflictDistribution={conflictDistribution}
+				relationDistribution={relationDistribution}
 				climateDistribution={climateDistribution}
 				vegetationDistribution={vegetationDistribution}
 				topographyDistribution={topographyDistribution}
+				nationHistory={nationHistory}
+				windowedEvents={windowedEvents}
+				allPastEvents={allPastEvents}
+				selectedTimeMs={selectedTimeMs}
+				currentTimeMs={simTimeMs}
+				onTimeSelect={setSelectedTimeMs}
+				onNationClick={(nationId) => {
+					setSelectedNationId(nationId)
+					setDetailsDrawerOpen(true)
+					sceneRef.current?.focusOnNation(nationId)
+				}}
 			/>
 		</div>
 	)

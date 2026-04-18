@@ -5,9 +5,8 @@ import {
 	computeGravity,
 	rebalanceHierarchy,
 } from "./hierarchy"
-import { generatePartitionColorsWithSeed } from "./shared"
 
-const NATION_PERCENTAGES = normalize([0.025, 0.05, 0.1, 0.2, 0.3, 0.4])
+const NATION_PERCENTAGES = normalize([0.2, 0.21, 0.21, 0.18, 0.12, 0.09])
 const NATION_BUCKETS: [number, number][] = [
 	[50, 100],
 	[25, 49],
@@ -23,7 +22,7 @@ export function computeNations(params: {
 	r_xyz: Float32Array
 	seed: number
 }): OrogenNationHierarchy {
-	const { provinces, coastal, habitability, r_xyz, seed } = params
+	const { provinces, coastal, habitability, r_xyz } = params
 	const provinceCount = provinces.count
 	if (provinceCount === 0) return emptyPartition(provinceCount)
 
@@ -226,6 +225,7 @@ export function computeNations(params: {
 	const nationMembers = groupByNation(assignment, nationCount, provinceCount)
 	const parent = new Int32Array(provinceCount).fill(-1)
 	const depth = new Int32Array(provinceCount)
+	const urbanPop = new Float32Array(provinceCount)
 	for (let nation = 0; nation < nationCount; nation++) {
 		const members = nationMembers[nation]
 		const capital = seeds[nation]
@@ -238,6 +238,7 @@ export function computeNations(params: {
 			depth,
 			currentDepth: 0,
 			habitability,
+			urbanPop,
 			provinceSeeds: provinces.seeds,
 			r_xyz,
 			adjOffset: provinces.adjOffset,
@@ -263,7 +264,7 @@ export function computeNations(params: {
 		adjOffset,
 		adjList,
 		size,
-		colors: generatePartitionColorsWithSeed(nationCount, seed + 5201),
+		colors: nationColorsFromProvinces(nationCount, seeds, provinces.colors),
 		parent,
 		depth,
 		childOffset,
@@ -612,6 +613,21 @@ function groupByNation(
 		if (nation >= 0) members[nation].push(province)
 	}
 	return members
+}
+
+function nationColorsFromProvinces(
+	nationCount: number,
+	seeds: number[],
+	provinceColors: Float32Array,
+): Float32Array {
+	const colors = new Float32Array(nationCount * 3)
+	for (let n = 0; n < nationCount; n++) {
+		const p = seeds[n]
+		colors[3 * n] = provinceColors[3 * p]
+		colors[3 * n + 1] = provinceColors[3 * p + 1]
+		colors[3 * n + 2] = provinceColors[3 * p + 2]
+	}
+	return colors
 }
 
 function emptyPartition(nodeCount: number): OrogenNationHierarchy {

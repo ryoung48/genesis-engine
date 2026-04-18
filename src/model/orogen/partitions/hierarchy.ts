@@ -4,6 +4,7 @@ const DOMAIN_BREAKS = [3, 5, 8, 13, 21, 31, 51, 81]
 const DOMAIN_RANGE = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 const TRIBUTE = 0.25
 const OVEREXTENSION = 0.9
+const URBAN_POP_SCALE = 10_000
 
 export function domainLimitFn(count: number): number {
 	for (let i = 0; i < DOMAIN_BREAKS.length; i++) {
@@ -130,6 +131,7 @@ export function rebalanceHierarchy(params: {
 	depth: Int32Array<ArrayBufferLike>
 	currentDepth: number
 	habitability: Float32Array<ArrayBufferLike>
+	urbanPop: Float32Array<ArrayBufferLike>
 	provinceSeeds: Int32Array<ArrayBufferLike>
 	r_xyz: Float32Array<ArrayBufferLike>
 	adjOffset: Int32Array<ArrayBufferLike>
@@ -143,6 +145,7 @@ export function rebalanceHierarchy(params: {
 		depth,
 		currentDepth,
 		habitability,
+		urbanPop,
 		provinceSeeds,
 		r_xyz,
 		adjOffset,
@@ -177,7 +180,9 @@ export function rebalanceHierarchy(params: {
 	const baseScores = new Float32Array(members.length)
 	for (let i = 0; i < members.length; i++) {
 		const z = std === 0 ? 1 : Math.max(1, Math.abs((distances[i] - mean) / std))
-		baseScores[i] = habitability[members[i]] / Math.sqrt(z)
+		baseScores[i] =
+			(habitability[members[i]] + urbanPop[members[i]] / URBAN_POP_SCALE) /
+			Math.sqrt(z)
 	}
 
 	const seeds = new Int32Array(k)
@@ -242,6 +247,7 @@ export function rebalanceHierarchy(params: {
 				depth,
 				currentDepth: currentDepth + 1,
 				habitability,
+				urbanPop,
 				provinceSeeds,
 				r_xyz,
 				adjOffset,
