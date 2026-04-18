@@ -1,7 +1,7 @@
 import React from "react"
 import { YEAR_MS } from "@/model/orogen/history/state"
-import { monthLabels } from "./constants"
-import { historyTimeParts } from "./history-time"
+import { monthLabels } from "../model/constants"
+import { historyTimeParts } from "../model/history-time"
 
 export const TIMELINE_STEP_MS = YEAR_MS
 

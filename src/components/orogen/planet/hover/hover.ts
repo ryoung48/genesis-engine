@@ -8,7 +8,7 @@ import {
 } from "@/model/orogen/types"
 import { meanEdgeLengthKm } from "@/model/orogen/util/units"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
-import type { ColorMode } from "../colors"
+import type { ColorMode } from "../../colors"
 
 export interface HoverInfo {
 	region: number

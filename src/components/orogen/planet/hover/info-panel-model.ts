@@ -5,11 +5,18 @@ import {
 import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model/orogen/types"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
-import type { ColorMode } from "../colors"
-import { climateTempColor, climateZoneColor, vegetationColor } from "../colors"
+import type { ColorMode } from "../../colors"
+import {
+	climateTempColor,
+	climateZoneColor,
+	vegetationColor,
+} from "../../colors"
+import {
+	getTerrainFeatureColor,
+	getTopographyColor,
+} from "../model/region-colors"
+import { rgbToCss } from "../model/ui-format"
 import type { HoverInfo, HoverTerrainFeature, HoverWind } from "./hover"
-import { getTerrainFeatureColor, getTopographyColor } from "./region-colors"
-import { rgbToCss } from "./ui-format"
 
 export interface HoverChartData {
 	temps: number[]

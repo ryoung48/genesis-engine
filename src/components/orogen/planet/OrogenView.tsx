@@ -24,31 +24,12 @@ import {
 	type OrogenScene,
 	type OrogenViewMode,
 } from "../renderer"
-import {
-	DEFAULT_WORLD_PARAMS,
-	MAX_RECENT_CODES,
-	PLANET_CODE_STORAGE_KEY,
-	RECENT_CODES_STORAGE_KEY,
-} from "./constants"
-import { DetailsDrawer } from "./DetailsDrawer"
-import {
-	buildDisplayNationModel,
-	buildDisplayWorld,
-	buildHistoryChildrenIndex,
-} from "./display-model"
-import { GenerationPanel } from "./GenerationPanel"
-import {
-	decodePlanetCode,
-	type GenerationCallbacks,
-	type GenerationParams,
-	generateWorld,
-	importHeightmap,
-	loadImageAsGrayscale,
-	pauseSimulation,
-	startSimulation,
-} from "./generation"
-import { createHistoryQuery, type TimelineBundle } from "./history-query"
-import { historyYearToTime } from "./history-time"
+import { GenerationPanel } from "./controls/GenerationPanel"
+import { ModeBar, type NationMapMode } from "./controls/ModeBar"
+import { OverlayControls } from "./controls/OverlayControls"
+import { SimControls } from "./controls/SimControls"
+import { TimeControls } from "./controls/TimeControls"
+import { DetailsDrawer } from "./details/DetailsDrawer"
 import {
 	getCoastHopLengthKm,
 	getHoverBiome,
@@ -75,9 +56,31 @@ import {
 	getHoverTopography,
 	getHoverWind,
 	type HoverInfo,
-} from "./hover"
-import { InfoPanel } from "./InfoPanel"
-import { ModeBar, type NationMapMode } from "./ModeBar"
+} from "./hover/hover"
+import { InfoPanel } from "./hover/InfoPanel"
+import {
+	DEFAULT_WORLD_PARAMS,
+	MAX_RECENT_CODES,
+	PLANET_CODE_STORAGE_KEY,
+	RECENT_CODES_STORAGE_KEY,
+} from "./model/constants"
+import {
+	buildDisplayNationModel,
+	buildDisplayWorld,
+	buildHistoryChildrenIndex,
+} from "./model/display-model"
+import {
+	decodePlanetCode,
+	type GenerationCallbacks,
+	type GenerationParams,
+	generateWorld,
+	importHeightmap,
+	loadImageAsGrayscale,
+	pauseSimulation,
+	startSimulation,
+} from "./model/generation"
+import { createHistoryQuery, type TimelineBundle } from "./model/history-query"
+import { historyYearToTime } from "./model/history-time"
 import {
 	buildConflictDistribution,
 	buildNationHistory,
@@ -85,22 +88,19 @@ import {
 	buildRelationDistribution,
 	buildSelectedNationDetails,
 	buildWindowedNationEvents,
-} from "./nation-details-model"
-import { OverlayControls } from "./OverlayControls"
-import { computePlanetStats } from "./planet-stats"
+} from "./model/nation-details-model"
+import { computePlanetStats } from "./model/planet-stats"
 import {
 	applyCloudOverlay,
 	computeRegionColors,
 	getTopographyColor,
-} from "./region-colors"
-import { SimControls } from "./SimControls"
+} from "./model/region-colors"
 import {
 	buildPlanetSliders,
 	buildTerrainSliders,
 	resetWorldDefaults,
-} from "./sliders"
-import { TimeControls } from "./TimeControls"
-import { rgbToCss } from "./ui-format"
+} from "./model/sliders"
+import { rgbToCss } from "./model/ui-format"
 
 function titleCase(value: string): string {
 	return value

@@ -4,14 +4,11 @@ import {
 	type NationSection,
 	resolveDrawerStateOnOpen,
 	type WorldSection,
-} from "./details/drawer-state"
-import { NationDetails } from "./details/NationDetails"
-import type { NationHistoryPoint } from "./details/NationHistoryChart"
-import {
-	type DetailsDrawerBaseProps,
-	type NationDetailsData,
-} from "./details/shared"
-import { WorldDetails } from "./details/WorldDetails"
+} from "./drawer-state"
+import { NationDetails } from "./NationDetails"
+import type { NationHistoryPoint } from "./NationHistoryChart"
+import { type DetailsDrawerBaseProps, type NationDetailsData } from "./shared"
+import { WorldDetails } from "./WorldDetails"
 
 interface DetailsDrawerProps extends DetailsDrawerBaseProps {
 	open: boolean

@@ -1,5 +1,5 @@
 import React from "react"
-import type { PlanetStat } from "../planet-stats"
+import type { PlanetStat } from "../model/planet-stats"
 
 export interface NationDetailsData {
 	id: number

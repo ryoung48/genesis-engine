@@ -1,9 +1,9 @@
 import { REL, YEAR_MS } from "@/model/orogen/history/state"
 import { domainLimitFn } from "@/model/orogen/partitions/hierarchy"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
-import { eventInvolvesNation } from "./details/event-description"
-import type { NationHistoryPoint } from "./details/NationHistoryChart"
-import type { DistributionBucket, NationDetailsData } from "./details/shared"
+import { eventInvolvesNation } from "../details/event-description"
+import type { NationHistoryPoint } from "../details/NationHistoryChart"
+import type { DistributionBucket, NationDetailsData } from "../details/shared"
 import type { DisplayNationModel } from "./display-model"
 import type { HistoryQuery, HistoryView } from "./history-query"
 

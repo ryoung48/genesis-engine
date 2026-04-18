@@ -11,7 +11,7 @@ import {
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model/orogen/types"
-import type { SliderDef } from "./sliders"
+import type { SliderDef } from "../model/sliders"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 

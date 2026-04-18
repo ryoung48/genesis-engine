@@ -17,8 +17,8 @@ import {
 import React from "react"
 import { Line } from "react-chartjs-2"
 import type { HistoryNote } from "@/model/orogen/history"
-import { monthLabels } from "../constants"
-import { historyTimeParts, historyTimeToYear } from "../history-time"
+import { monthLabels } from "../model/constants"
+import { historyTimeParts, historyTimeToYear } from "../model/history-time"
 import {
 	type EventCtx,
 	eventDotColors,

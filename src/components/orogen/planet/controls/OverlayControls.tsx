@@ -1,5 +1,5 @@
 import React from "react"
-import { gridSpacingOptions } from "./constants"
+import { gridSpacingOptions } from "../model/constants"
 
 interface OverlayControlsProps {
 	overlaysExpanded: boolean

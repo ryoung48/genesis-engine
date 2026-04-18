@@ -7,7 +7,7 @@ import { pastaClimateColor, pastaTrueColor } from "@/model/orogen/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/orogen/climate/vegetation"
 import { OROGEN_TERRAIN_FEATURE } from "@/model/orogen/types"
 import type { SerializedOrogenWorld } from "@/model/orogen/worker-types"
-import type { ColorMode } from "../colors"
+import type { ColorMode } from "../../colors"
 import {
 	climateTempColor,
 	climateZoneColor,
@@ -27,12 +27,12 @@ import {
 	temperatureDeltaColor,
 	vegetationColor,
 	windSpeedColor,
-} from "../colors"
+} from "../../colors"
+import type { NationMapMode } from "../controls/ModeBar"
 import {
 	darkenClimateAtElevation,
 	darkenVegetationAtElevation,
 } from "./color-helpers"
-import type { NationMapMode } from "./ModeBar"
 
 function basinColor(id: number): [number, number, number] {
 	if (id < 0) return OCEAN_LIGHT_BLUE

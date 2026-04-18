@@ -1,5 +1,5 @@
 import React from "react"
-import { monthLabels } from "./constants"
+import { monthLabels } from "../model/constants"
 
 interface TimeControlsProps {
 	timeExpanded: boolean
