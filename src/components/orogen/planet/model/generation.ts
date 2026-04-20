@@ -101,7 +101,7 @@ function createWorker(
 ): Worker {
 	callbacks.workerRef.current?.terminate()
 	const worker = new Worker(
-		new URL("../../../model/orogen/orogen.worker.ts", import.meta.url),
+		new URL("../../../../model/orogen/orogen.worker.ts", import.meta.url),
 		{ type: "module" },
 	)
 	callbacks.workerRef.current = worker
