@@ -66,6 +66,7 @@ describe("importOrogenWorld", () => {
 			expect(world.koppenClimate.length).toBe(N)
 			expect(world.hazards.danger.length).toBe(N)
 			expect(world.volcanism.hotspot.length).toBe(N)
+			expect(world.volcanism.mantleUpwelling.length).toBe(N)
 			expect(world.iceThickness.length).toBe(N)
 			expect(world.dtr_annual.length).toBe(N)
 			expect(world.oceanDist.length).toBe(N)

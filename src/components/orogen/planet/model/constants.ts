@@ -49,7 +49,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	thermalErosion: 0.1,
 	ridgeSharpening: 0.5,
 	glacialErosion: 0.5,
-	volcanism: 0.5,
+	volcanism: 1,
 	craters: 0,
 	tectonicMode: 0,
 	pressure: 1.0,

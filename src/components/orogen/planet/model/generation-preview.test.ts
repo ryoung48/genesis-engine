@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest"
+import {
+	buildGenerationPreviewConfig,
+	getGenerationPreviewCanvasClassName,
+	getGenerationPreviewToggleLabel,
+} from "./generation-preview"
+
+describe("buildGenerationPreviewConfig", () => {
+	it("maps generation params to ebm preview inputs", () => {
+		expect(
+			buildGenerationPreviewConfig({
+				tidallyLocked: false,
+				obliquity: 23.5,
+				eccentricity: 0.1,
+				perihelion: 90,
+				sunTempFactor: 1.1,
+				hoursPerDay: 30,
+				daysPerYear: 480,
+				landCoverage: 0.42,
+				planetRadiusKm: 8000,
+				pressure: 1.6,
+			}),
+		).toEqual({
+			obliquity: 23.5,
+			eccentricity: 0.1,
+			perihelion: 90,
+			tSun: 6355.8,
+			hoursPerDay: 30,
+			daysPerYear: 480,
+			landFraction: 0.42,
+			radius: 8000,
+			pressure: 1.6,
+		})
+	})
+
+	it("zeros the preview obliquity for tidally locked planets", () => {
+		expect(
+			buildGenerationPreviewConfig({
+				tidallyLocked: true,
+				obliquity: 45,
+				eccentricity: 0.02,
+				perihelion: 180,
+				sunTempFactor: 1,
+				hoursPerDay: 24,
+				daysPerYear: 365,
+				landCoverage: 0.3,
+				planetRadiusKm: 6371,
+				pressure: 1,
+			}).obliquity,
+		).toBe(0)
+	})
+
+	it("switches the toggle label based on the active viewport", () => {
+		expect(getGenerationPreviewToggleLabel(false)).toBe("Preview")
+		expect(getGenerationPreviewToggleLabel(true)).toBe("Globe")
+	})
+
+	it("keeps the globe canvas mounted while preview is active", () => {
+		expect(getGenerationPreviewCanvasClassName(true, false)).toBe(
+			"h-full w-full block invisible",
+		)
+		expect(getGenerationPreviewCanvasClassName(false, true)).toBe(
+			"h-full w-full block cursor-crosshair",
+		)
+	})
+})

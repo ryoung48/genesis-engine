@@ -67,7 +67,7 @@ export interface SerializedOrogenWorld {
 		volcano: Float32Array
 		danger: Float32Array
 	}
-	volcanism: { hotspot: Float32Array }
+	volcanism: { hotspot: Float32Array; mantleUpwelling: Float32Array }
 	climateZones: Uint8Array
 	pastaClimate: Uint8Array
 	pastaDebug?: {

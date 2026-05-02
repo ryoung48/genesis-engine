@@ -11,7 +11,7 @@ import type { ColorMode } from "../../colors"
 import {
 	climateTempColor,
 	climateZoneColor,
-	dangerColor,
+	dangerMapColor,
 	developmentColor,
 	dtrColor,
 	getColor,
@@ -21,6 +21,7 @@ import {
 	OCEAN_LIGHT_BLUE,
 	oceanCurrentColor,
 	populationColor,
+	precipitationAnnualColor,
 	precipitationColor,
 	slopeColor,
 	temperatureColor,
@@ -202,9 +203,9 @@ export function computeRegionColors(
 			for (let r = 0; r < N; r++) {
 				const [cr, cg, cb] =
 					world.elevation[r] <= 0
-						? precipitationColor(world.rainfall.annual[r] / 12)
+						? precipitationAnnualColor(world.rainfall.annual[r])
 						: darkenClimateAtElevation(
-								precipitationColor(world.rainfall.annual[r] / 12),
+								precipitationAnnualColor(world.rainfall.annual[r]),
 								world.elevation_km[r],
 							)
 				rgb[3 * r] = cr
@@ -502,12 +503,12 @@ export function computeRegionColors(
 	if (colorMode === "dangerZones" && world.hazards) {
 		for (let r = 0; r < N; r++) {
 			const isLand = !!world.isLand?.[r]
+			const earthquake = world.hazards.earthquake[r] ?? 0
+			const volcano = world.hazards.volcano[r] ?? 0
+			const scaledColor = dangerMapColor(earthquake, volcano)
 			const [cr, cg, cb] = isLand
-				? darkenVegetationAtElevation(
-						dangerColor(world.hazards.danger[r]),
-						world.elevation_km[r],
-					)
-				: dangerColor(world.hazards.danger[r])
+				? darkenVegetationAtElevation(scaledColor, world.elevation_km[r])
+				: scaledColor
 			const factor = viewMode === "map" && !isLand ? 0.78 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor

@@ -97,6 +97,8 @@ export const OROGEN_TERRAIN_FEATURE_LABELS = [
 	"trench",
 	"coastal roughening",
 	"island arc",
+	"volcanic arc",
+	"large igneous province",
 ] as const
 
 export type OrogenTerrainFeatureId =
@@ -114,6 +116,8 @@ export const OROGEN_TERRAIN_FEATURE = {
 	TRENCH: 9,
 	COASTAL_ROUGHENING: 10,
 	ISLAND_ARC: 11,
+	VOLCANIC_ARC: 12,
+	LARGE_IGNEOUS_PROVINCE: 13,
 } as const
 
 export interface OrogenTerrainFeatures {
@@ -121,6 +125,8 @@ export interface OrogenTerrainFeatures {
 	featureMask: Uint32Array
 	/** Per-cell strongest contributing feature, index into OROGEN_TERRAIN_FEATURE_LABELS. */
 	dominantFeature: Uint8Array
+	/** Internal helper used while later pipeline stages keep feature dominance accurate. */
+	dominantMagnitude?: Float32Array
 }
 
 export interface StageTiming {

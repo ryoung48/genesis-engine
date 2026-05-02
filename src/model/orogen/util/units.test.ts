@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
+	getEarthYearFactor,
 	getEffectiveObliquityDeg,
 	getMaxElevationKm,
 	getMaxOceanDepthKm,
@@ -8,6 +9,16 @@ import {
 	isRetrogradeObliquity,
 	meanEdgeLengthKm,
 } from "./units"
+
+describe("getEarthYearFactor", () => {
+	it("returnsOneAtEarthYearLength", () => {
+		expect(getEarthYearFactor(365)).toBe(1)
+	})
+
+	it("scalesLinearlyFromEarthYearLength", () => {
+		expect(getEarthYearFactor(730)).toBe(2)
+	})
+})
 
 describe("getMaxElevationKm", () => {
 	it("returnsSixKmAtEarthRadius", () => {

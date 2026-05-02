@@ -13,6 +13,7 @@ import type {
 import { OROGEN_TERRAIN_FEATURE } from "../types"
 import { createRng } from "../util/rng"
 import { SimplexNoise } from "../util/simplex-noise"
+import { applyVolcanicArcs } from "./volcanism"
 
 type StageTiming = { Stage: string; ms: string }
 
@@ -186,6 +187,7 @@ export function blendElevation(
 	distFields: DistanceFields,
 	boundary: BoundaryInfo,
 	roughness: number,
+	volcanism: number,
 	seed: number,
 	timing?: StageTiming[],
 ): { elevation: Float32Array; terrainFeatures: OrogenTerrainFeatures } {
@@ -214,6 +216,8 @@ export function blendElevation(
 	const noise = new SimplexNoise(seed)
 	const foldNoise = new SimplexNoise(seed + 557)
 	const riftNoise = new SimplexNoise(seed + 419)
+	const MAX_OCEAN_ARC_ELEV = 0.2
+	const ISLAND_ARC_SURFACING_BOOST = 1.8
 
 	// Source uses default persistence (2/3) for most fbm calls.
 	// Only detail/fine noise uses explicit 0.5.
@@ -947,8 +951,17 @@ export function blendElevation(
 			const threshold = 0.3
 			if (n > threshold) {
 				const excess = (n - threshold) / (1 - threshold)
-				const arcEffect =
-					excess * excess * 0.55 * distWeight * (0.5 + arcStress[r])
+				let arcEffect =
+					excess *
+					excess *
+					0.55 *
+					ISLAND_ARC_SURFACING_BOOST *
+					distWeight *
+					(0.5 + arcStress[r])
+				if (r_isOcean[r]) {
+					const maxOceanUplift = Math.max(0, -elev[r] + MAX_OCEAN_ARC_ELEV)
+					arcEffect = Math.min(arcEffect, maxOceanUplift)
+				}
 				elev[r] += arcEffect
 				markFeature(r, OROGEN_TERRAIN_FEATURE.ISLAND_ARC, arcEffect)
 			}
@@ -959,11 +972,27 @@ export function blendElevation(
 		ms: (performance.now() - islandArcsStart).toFixed(1),
 	})
 
+	const volcanicArcsStart = performance.now()
+	applyVolcanicArcs({
+		mesh,
+		elevation: elev,
+		boundary,
+		maxStress,
+		seed,
+		volcanism,
+		markFeature,
+	})
+	timing?.push({
+		Stage: "Volcanic arcs",
+		ms: (performance.now() - volcanicArcsStart).toFixed(1),
+	})
+
 	return {
 		elevation: elev,
 		terrainFeatures: {
 			featureMask,
 			dominantFeature,
+			dominantMagnitude,
 		},
 	}
 }

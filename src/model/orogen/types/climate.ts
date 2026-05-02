@@ -56,4 +56,5 @@ export interface OrogenHazards {
 
 export interface OrogenVolcanism {
 	hotspot: Float32Array
+	mantleUpwelling: Float32Array
 }

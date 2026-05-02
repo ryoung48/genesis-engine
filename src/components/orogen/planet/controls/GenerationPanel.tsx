@@ -11,6 +11,7 @@ import {
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model/orogen/types"
+import { getGenerationPreviewToggleLabel } from "../model/generation-preview"
 import type { SliderDef } from "../model/sliders"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
@@ -36,6 +37,8 @@ interface GenerationPanelProps {
 	generationLabel: string
 	generationProgress: number
 	generationTimings?: StageTiming[] | null
+	showClimatePreview: boolean
+	onToggleClimatePreview: () => void
 	handleGenerate: () => void
 	handleFileImport: (file: File) => void
 	handleEarthImport: () => void
@@ -225,6 +228,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	generationLabel,
 	generationProgress,
 	generationTimings,
+	showClimatePreview,
+	onToggleClimatePreview,
 	handleGenerate,
 	handleFileImport,
 	handleEarthImport,
@@ -285,25 +290,39 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
 				<div className="flex items-center justify-between gap-2">
-					<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
-						{(
-							[
-								["planet", "Planet"],
-								["terrain", "Terrain"],
-							] as const
-						).map(([tab, label]) => (
-							<button
-								key={tab}
-								onClick={() => setWorldTab(tab)}
-								className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
-									worldTab === tab
-										? "bg-white text-slate-900 shadow-sm"
-										: "text-slate-500 hover:text-slate-700"
-								}`}
-							>
-								{label}
-							</button>
-						))}
+					<div className="flex items-center gap-2">
+						<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
+							{(
+								[
+									["planet", "Planet"],
+									["terrain", "Terrain"],
+								] as const
+							).map(([tab, label]) => (
+								<button
+									key={tab}
+									onClick={() => setWorldTab(tab)}
+									className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
+										worldTab === tab
+											? "bg-white text-slate-900 shadow-sm"
+											: "text-slate-500 hover:text-slate-700"
+									}`}
+								>
+									{label}
+								</button>
+							))}
+						</div>
+						<button
+							type="button"
+							onClick={onToggleClimatePreview}
+							className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
+								showClimatePreview
+									? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800 hover:border-slate-800"
+									: "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+							}`}
+							title="Toggle the climate preview in the main viewport"
+						>
+							{getGenerationPreviewToggleLabel(showClimatePreview)}
+						</button>
 					</div>
 					<button
 						type="button"

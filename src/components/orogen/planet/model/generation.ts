@@ -110,8 +110,10 @@ function createWorker(
 		const message = event.data
 		if (message.type === "progress") {
 			callbacks.setGenerationLabel(message.label)
-			callbacks.setGenerationProgress(
-				(current: number) => message.pct ?? current,
+			callbacks.setGenerationProgress((current: number) =>
+				message.pct == null
+					? current
+					: Math.max(current, Math.min(100, message.pct)),
 			)
 			return
 		}

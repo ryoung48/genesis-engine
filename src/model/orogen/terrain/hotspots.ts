@@ -1,46 +1,76 @@
 /**
- * Hotspot volcanism — mantle plumes with drift chains.
+ * Hotspot volcanism ΓÇö mantle plumes with drift chains.
  * Faithful port of orogen's dual-component model: broad thermal swell +
  * volcanic peak with domain-warped shape distortion, age-dependent texture,
  * drift elongation, summit calderas, and radial rift-zone ridges.
  */
 
-import type { SphereMesh, TectonicPlate } from "../types"
+import { normalizeMantleField } from "../tectonics/mantle"
+import type { OrogenTerrainFeatures, SphereMesh, TectonicPlate } from "../types"
 import { eulerVelocityAt } from "../util/math"
 import { createRng } from "../util/rng"
 import { SimplexNoise } from "../util/simplex-noise"
-
-function clampUnit(value: number): number {
-	return Math.max(0, Math.min(1, value))
-}
+import {
+	getLegacyVolcanismEquivalent,
+	getVolcanismOverdrive,
+} from "../util/volcanism"
+import {
+	appendLargeIgneousProvinceSites,
+	applyLargeIgneousProvinces,
+	buildTangentFrame,
+	type LipSite,
+} from "./volcanism"
 
 function lerp(min: number, max: number, t: number): number {
 	return min + (max - min) * t
 }
 
 function mapActiveHotspotCount(volcanism: number): number {
-	const v = clampUnit(volcanism)
-	return Math.round(
+	const v = getLegacyVolcanismEquivalent(volcanism)
+	const overdrive = getVolcanismOverdrive(volcanism)
+	const baseCount = Math.round(
 		v <= 0.5 ? lerp(2, 5, v / 0.5) : lerp(5, 10, (v - 0.5) / 0.5),
 	)
+	return Math.round(baseCount * lerp(1, 3.2, overdrive))
 }
 
 function mapActiveChainLength(volcanism: number): number {
-	const v = clampUnit(volcanism)
-	return Math.round(
+	const v = getLegacyVolcanismEquivalent(volcanism)
+	const overdrive = getVolcanismOverdrive(volcanism)
+	const baseLength = Math.round(
 		v <= 0.5 ? lerp(3, 6, v / 0.5) : lerp(6, 10, (v - 0.5) / 0.5),
 	)
+	return Math.round(baseLength * lerp(1, 1.75, overdrive))
 }
 
 function mapActiveDomeStrength(volcanism: number): number {
-	const v = clampUnit(volcanism)
-	return v <= 0.5 ? lerp(0, 0.6, v / 0.5) : lerp(0.6, 0.9, (v - 0.5) / 0.5)
+	const v = getLegacyVolcanismEquivalent(volcanism)
+	const baseStrength =
+		v <= 0.5 ? lerp(0, 0.6, v / 0.5) : lerp(0.6, 0.9, (v - 0.5) / 0.5)
+	return baseStrength
 }
 
-/**
- * Static hotspots for stagnant lid worlds — dome features without
- * plate-velocity-driven chain trails.
- */
+function findNearestR(
+	mesh: SphereMesh,
+	px: number,
+	py: number,
+	pz: number,
+): number {
+	let bestDot = -2,
+		bestR = 0
+	for (let r = 0; r < mesh.numRegions; r++) {
+		const dot =
+			px * mesh.r_xyz[3 * r] +
+			py * mesh.r_xyz[3 * r + 1] +
+			pz * mesh.r_xyz[3 * r + 2]
+		if (dot > bestDot) {
+			bestDot = dot
+			bestR = r
+		}
+	}
+	return bestR
+}
+
 export function applyStaticHotspots(
 	mesh: SphereMesh,
 	elevation: Float32Array,
@@ -49,7 +79,7 @@ export function applyStaticHotspots(
 ): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
-	const v = clampUnit(volcanism)
+	const v = getLegacyVolcanismEquivalent(volcanism)
 	const count = Math.round(lerp(3, 14, v))
 
 	const DOME_SIGMA = 0.04
@@ -79,7 +109,6 @@ export function applyStaticHotspots(
 		calderaDepth: number
 		invS2Caldera: number
 		riftAngles: number[]
-		// tangent frame for rift/caldera angular measurement
 		ux: number
 		uy: number
 		uz: number
@@ -89,7 +118,6 @@ export function applyStaticHotspots(
 	}
 
 	const domes: StaticDome[] = []
-
 	for (let h = 0; h < count; h++) {
 		const strength = DOME_STRENGTH * (0.4 + hsRng.random() * 1.2)
 		const sigma = DOME_SIGMA * (0.5 + hsRng.random() * 1.0)
@@ -104,28 +132,25 @@ export function applyStaticHotspots(
 		const isOcean = elevation[findNearestR(mesh, hx, hy, hz)] <= 0
 		const boost = isOcean ? 1.8 : 1.0
 
-		// Build tangent frame from an arbitrary reference direction
-		let refX = 0,
-			refY = 0,
-			refZ = 1
+		let refX = 0
+		const refY = 0
+		let refZ = 1
 		if (Math.abs(hz) > 0.9) {
 			refX = 1
 			refZ = 0
 		}
-		// Project ref onto tangent plane and normalize
 		const rd = refX * hx + refY * hy + refZ * hz
-		let ux = refX - rd * hx,
-			uy = refY - rd * hy,
-			uz = refZ - rd * hz
+		let ux = refX - rd * hx
+		let uy = refY - rd * hy
+		let uz = refZ - rd * hz
 		const uLen = Math.sqrt(ux * ux + uy * uy + uz * uz) || 1
 		ux /= uLen
 		uy /= uLen
 		uz /= uLen
-		const vx_ = hy * uz - hz * uy,
-			vy_ = hz * ux - hx * uz,
-			vz_ = hx * uy - hy * ux
+		const vx = hy * uz - hz * uy
+		const vy = hz * ux - hx * uz
+		const vz = hx * uy - hy * ux
 
-		// Radial rift arms: 3–5 arms in a star pattern
 		const numRifts = 3 + Math.floor(hsRng.random() * 3)
 		const baseRiftAngle = hsNoise3.noise3D(hx * 10, hy * 10, hz * 10) * Math.PI
 		const riftAngles: number[] = []
@@ -133,7 +158,6 @@ export function applyStaticHotspots(
 			riftAngles.push(baseRiftAngle + (2 * Math.PI * i) / numRifts)
 		}
 
-		// Caldera on strong domes (land: summit depression, ocean: central uplift in basin)
 		const hasCaldera = strength * boost > 0.15
 		const calderaSigma = sigma * 0.25
 		const calderaDepth = strength * boost * 0.2
@@ -158,19 +182,19 @@ export function applyStaticHotspots(
 			ux,
 			uy,
 			uz,
-			vx: vx_,
-			vy: vy_,
-			vz: vz_,
+			vx,
+			vy,
+			vz,
 		})
 	}
 
 	for (let r = 0; r < numRegions; r++) {
-		const rx = r_xyz[3 * r],
-			ry = r_xyz[3 * r + 1],
-			rz = r_xyz[3 * r + 2]
+		const rx = r_xyz[3 * r]
+		const ry = r_xyz[3 * r + 1]
+		const rz = r_xyz[3 * r + 2]
 
-		let nearSwell = false,
-			nearPeak = false
+		let nearSwell = false
+		let nearPeak = false
 		for (const dm of domes) {
 			const cdot = dm.x * rx + dm.y * ry + dm.z * rz
 			if (cdot > dm.cosThreshSwell) {
@@ -183,7 +207,7 @@ export function applyStaticHotspots(
 		}
 		if (!nearSwell) continue
 
-		let shapeWarpSq = 1.0
+		let shapeWarpSq = 1
 		if (nearPeak) {
 			const warpScale = 8
 			const wx =
@@ -208,7 +232,7 @@ export function applyStaticHotspots(
 					2,
 				) * 0.4
 			const shapeWarp =
-				1.0 +
+				1 +
 				0.4 *
 					hsNoise.fbm(
 						(rx + wx) * 20 + 3.2,
@@ -219,8 +243,8 @@ export function applyStaticHotspots(
 			shapeWarpSq = shapeWarp * shapeWarp
 		}
 
-		let totalUplift = 0,
-			totalSwellUplift = 0
+		let totalUplift = 0
+		let totalSwellUplift = 0
 		for (const dm of domes) {
 			const dot = dm.x * rx + dm.y * ry + dm.z * rz
 
@@ -232,16 +256,14 @@ export function applyStaticHotspots(
 
 			if (dot < dm.cosThreshPeak) continue
 
-			const offX = rx - dot * dm.x,
-				offY = ry - dot * dm.y,
-				offZ = rz - dot * dm.z
+			const offX = rx - dot * dm.x
+			const offY = ry - dot * dm.y
+			const offZ = rz - dot * dm.z
 			const parComp = offX * dm.ux + offY * dm.uy + offZ * dm.uz
 			const perpComp = offX * dm.vx + offY * dm.vy + offZ * dm.vz
 			const angleSq = parComp * parComp + perpComp * perpComp
 
 			let gauss = Math.exp(angleSq * shapeWarpSq * dm.invS2)
-
-			// Radial rift zones — star-pattern ridges radiating from center
 			if (dm.riftAngles.length > 0 && gauss > 0.01) {
 				const angle = Math.atan2(perpComp, parComp)
 				let maxRift = 0
@@ -252,12 +274,10 @@ export function applyStaticHotspots(
 					const riftFactor = c2 ** 4
 					if (riftFactor > maxRift) maxRift = riftFactor
 				}
-				gauss *= 1.0 + 0.5 * maxRift
+				gauss *= 1 + 0.5 * maxRift
 			}
 
 			totalUplift += dm.strength * gauss
-
-			// Caldera — summit depression on the largest domes
 			if (dm.hasCaldera) {
 				totalUplift -= dm.calderaDepth * Math.exp(angleSq * dm.invS2Caldera)
 			}
@@ -266,9 +286,9 @@ export function applyStaticHotspots(
 		const combinedUplift = totalSwellUplift + totalUplift
 		if (combinedUplift > 0.001) {
 			const texBase =
-				0.7 * hsNoise.ridgedFbm(rx * 12, ry * 12, rz * 12, 4, 2.0, 0.5, 1.0)
+				0.7 * hsNoise.ridgedFbm(rx * 12, ry * 12, rz * 12, 4, 2, 0.5, 1)
 			const texDetail =
-				0.3 * hsNoise.ridgedFbm(rx * 30, ry * 30, rz * 30, 3, 2.0, 0.5, 1.0)
+				0.3 * hsNoise.ridgedFbm(rx * 30, ry * 30, rz * 30, 3, 2, 0.5, 1)
 			const volc = 0.4 + 0.8 * (texBase + texDetail)
 			const uplift = totalSwellUplift + Math.max(0, totalUplift) * volc
 			elevation[r] += uplift
@@ -277,27 +297,6 @@ export function applyStaticHotspots(
 	}
 
 	return hotspotContrib
-}
-
-function findNearestR(
-	mesh: SphereMesh,
-	px: number,
-	py: number,
-	pz: number,
-): number {
-	let bestDot = -2,
-		bestR = 0
-	for (let r = 0; r < mesh.numRegions; r++) {
-		const dot =
-			px * mesh.r_xyz[3 * r] +
-			py * mesh.r_xyz[3 * r + 1] +
-			pz * mesh.r_xyz[3 * r + 2]
-		if (dot > bestDot) {
-			bestDot = dot
-			bestR = r
-		}
-	}
-	return bestR
 }
 
 interface Dome {
@@ -332,6 +331,7 @@ interface Dome {
 	calderaDepth: number
 	invS2Caldera: number
 	ageFactor: number
+	isContinental: boolean
 }
 
 export function applyHotspots(
@@ -339,28 +339,46 @@ export function applyHotspots(
 	plates: TectonicPlate[],
 	plateAssignment: Int32Array,
 	elevation: Float32Array,
+	mantleUpwelling: Float32Array,
+	terrainFeatures: OrogenTerrainFeatures | undefined,
 	seed: number,
 	volcanism: number,
 ): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
-	const v = clampUnit(volcanism)
+	const dominantMagnitude = terrainFeatures?.dominantMagnitude
+	const overdrive = getVolcanismOverdrive(volcanism)
 
-	const NUM_HOTSPOTS = mapActiveHotspotCount(v)
-	const CHAIN_LENGTH = mapActiveChainLength(v)
+	const NUM_HOTSPOTS = mapActiveHotspotCount(volcanism)
+	const CHAIN_LENGTH = mapActiveChainLength(volcanism)
 	const CHAIN_DECAY = 0.75
-	const CHAIN_SPACING = 0.06
+	const CHAIN_SPACING = 0.06 * lerp(1, 1.35, overdrive)
 	const DOME_SIGMA = 0.006
-	const DOME_STRENGTH = mapActiveDomeStrength(v)
+	const DOME_STRENGTH = mapActiveDomeStrength(volcanism)
 	const SWELL_SIGMA_MULT = 2
 	const SWELL_STR_MULT = 0.1
-
+	const CONT_HOTSPOT_SIGMA_MULT = 2.5
+	const CONT_HOTSPOT_STRENGTH_MULT = 0.4
+	const CONT_HOTSPOT_CALDERA_SIGMA_FRAC = 0.35
+	const CONT_HOTSPOT_CALDERA_DEPTH_FRAC = 0.3
+	const CONT_HOTSPOT_SWELL_MULT = 1.5
+	const DOME_OCEAN_BOOST = 1.8
+	const DOME_DRIFT_STRETCH = 1.05
+	const DOME_CALDERA_STRENGTH_MIN = 0.15
+	const DOME_SATELLITE_COUNT = 2
+	const DOME_SATELLITE_OFFSET = 0.8
+	const DOME_SATELLITE_SIGMA = 0.5
+	const DOME_SATELLITE_STRENGTH = 0.35
+	const HOTSPOT_UPWELLING_CANDIDATES = 8
+	const HOTSPOT_UPWELLING_JITTER = 0.3
+	const DOME_AGE_BROADENING = 0.03
 	// Deterministic RNGs matching source: makeRng(seed + 999), makeRng(seed + 1001)
 	const hsRng = createRng(seed + 999)
 	const hsPosRng = createRng(seed + 1001)
 	const hsNoise = new SimplexNoise(seed + 501)
 	const hsNoise2 = new SimplexNoise(seed + 502)
 	const hsNoise3 = new SimplexNoise(seed + 503)
+	const mantleNorm = normalizeMantleField(mantleUpwelling)
 
 	// FBM helpers
 	function fbm(
@@ -383,26 +401,14 @@ export function applyHotspots(
 		return noise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
 	}
 
-	const buildTangentFrame = (
-		px: number,
-		py: number,
-		pz: number,
-		dx: number,
-		dy: number,
-		dz: number,
-	) => {
-		const dd = dx * px + dy * py + dz * pz
-		let ux = dx - dd * px,
-			uy = dy - dd * py,
-			uz = dz - dd * pz
-		const uLen = Math.sqrt(ux * ux + uy * uy + uz * uz) || 1
-		ux /= uLen
-		uy /= uLen
-		uz /= uLen
-		const vx = py * uz - pz * uy,
-			vy = pz * ux - px * uz,
-			vz = px * uy - py * ux
-		return { ux, uy, uz, vx, vy, vz }
+	const markFeature = (r: number, feature: number, delta: number) => {
+		if (!terrainFeatures || !dominantMagnitude || Math.abs(delta) <= 1e-5)
+			return
+		terrainFeatures.featureMask[r] |= 1 << (feature - 1)
+		if (Math.abs(delta) > dominantMagnitude[r]) {
+			dominantMagnitude[r] = Math.abs(delta)
+			terrainFeatures.dominantFeature[r] = feature
+		}
 	}
 
 	const riftAnglesForDome = (
@@ -418,6 +424,51 @@ export function applyHotspots(
 	}
 
 	const domes: Dome[] = []
+	const lipSites: LipSite[] = []
+
+	const spawnSatellites = (parent: Dome) => {
+		for (let s = 0; s < DOME_SATELLITE_COUNT; s++) {
+			const angle = hsRng.random() * 2 * Math.PI
+			const offDist =
+				parent.sigma * DOME_SATELLITE_OFFSET * (0.5 + hsRng.random() * 0.5)
+			const offX = Math.cos(angle) * parent.ux + Math.sin(angle) * parent.vx
+			const offY = Math.cos(angle) * parent.uy + Math.sin(angle) * parent.vy
+			const offZ = Math.cos(angle) * parent.uz + Math.sin(angle) * parent.vz
+			const cosA = Math.cos(offDist)
+			const sinA = Math.sin(offDist)
+			let sx = parent.x * cosA + offX * sinA
+			let sy = parent.y * cosA + offY * sinA
+			let sz = parent.z * cosA + offZ * sinA
+			const sLen = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1
+			sx /= sLen
+			sy /= sLen
+			sz /= sLen
+			const satFrame = buildTangentFrame(
+				sx,
+				sy,
+				sz,
+				parent.dx,
+				parent.dy,
+				parent.dz,
+			)
+			domes.push({
+				x: sx,
+				y: sy,
+				z: sz,
+				strength: parent.strength * DOME_SATELLITE_STRENGTH,
+				baseStrength: parent.baseStrength * DOME_SATELLITE_STRENGTH,
+				sigma: parent.sigma * DOME_SATELLITE_SIGMA,
+				chainIndex: parent.chainIndex,
+				chainLength: parent.chainLength,
+				dx: parent.dx,
+				dy: parent.dy,
+				dz: parent.dz,
+				...satFrame,
+				riftAngles: [],
+				isContinental: parent.isContinental,
+			} as Dome)
+		}
+	}
 
 	for (let h = 0; h < NUM_HOTSPOTS; h++) {
 		const hStrength = DOME_STRENGTH * (0.4 + hsRng.random() * 1.2)
@@ -428,12 +479,37 @@ export function applyHotspots(
 			CHAIN_LENGTH + Math.round((hsRng.random() - 0.5) * 10),
 		)
 
-		const theta = 2 * Math.PI * hsPosRng.random()
-		const cosPhiVal = 2 * hsPosRng.random() - 1
-		const sinPhiVal = Math.sqrt(1 - cosPhiVal * cosPhiVal)
-		const hx = sinPhiVal * Math.cos(theta)
-		const hy = sinPhiVal * Math.sin(theta)
-		const hz = cosPhiVal
+		let hx = 0
+		let hy = 0
+		let hz = 1
+		if (mantleNorm) {
+			let bestScore = -Infinity
+			for (let c = 0; c < HOTSPOT_UPWELLING_CANDIDATES; c++) {
+				const theta = 2 * Math.PI * hsPosRng.random()
+				const cosPhiVal = 2 * hsPosRng.random() - 1
+				const sinPhiVal = Math.sqrt(1 - cosPhiVal * cosPhiVal)
+				const cx = sinPhiVal * Math.cos(theta)
+				const cy = sinPhiVal * Math.sin(theta)
+				const cz = cosPhiVal
+				const candidateRegion = findNearestR(mesh, cx, cy, cz)
+				const score =
+					mantleNorm[candidateRegion] +
+					(hsPosRng.random() - 0.5) * HOTSPOT_UPWELLING_JITTER
+				if (score > bestScore) {
+					bestScore = score
+					hx = cx
+					hy = cy
+					hz = cz
+				}
+			}
+		} else {
+			const theta = 2 * Math.PI * hsPosRng.random()
+			const cosPhiVal = 2 * hsPosRng.random() - 1
+			const sinPhiVal = Math.sqrt(1 - cosPhiVal * cosPhiVal)
+			hx = sinPhiVal * Math.cos(theta)
+			hy = sinPhiVal * Math.sin(theta)
+			hz = cosPhiVal
+		}
 
 		const centerR = findNearestR(mesh, hx, hy, hz)
 		const plate = plates[plateAssignment[centerR]]
@@ -447,7 +523,12 @@ export function applyHotspots(
 		drift[2] /= driftLen
 
 		const isOceanHotspot = plate.isOcean
-		const oceanBoost = isOceanHotspot ? 1.8 : 1.0
+		const isContinental = !isOceanHotspot
+		const sigmaScale = isContinental ? CONT_HOTSPOT_SIGMA_MULT : 1.0
+		const strengthScale = isContinental ? CONT_HOTSPOT_STRENGTH_MULT : 1.0
+		const oceanBoost = isOceanHotspot ? DOME_OCEAN_BOOST : 1.0
+		const effectiveSigma = hSigma * sigmaScale
+		const effectiveStrength = hStrength * strengthScale * oceanBoost
 
 		const baseRiftAngle = hsNoise3.noise3D(hx * 10, hy * 10, hz * 10) * Math.PI
 
@@ -456,9 +537,9 @@ export function applyHotspots(
 			x: hx,
 			y: hy,
 			z: hz,
-			strength: hStrength * oceanBoost,
-			baseStrength: hStrength,
-			sigma: hSigma,
+			strength: effectiveStrength,
+			baseStrength: hStrength * strengthScale,
+			sigma: effectiveSigma,
 			chainIndex: 0,
 			chainLength: hLength,
 			dx: drift[0],
@@ -466,7 +547,9 @@ export function applyHotspots(
 			dz: drift[2],
 			...frame0,
 			riftAngles: riftAnglesForDome(0, hLength, baseRiftAngle),
+			isContinental,
 		} as Dome)
+		spawnSatellites(domes[domes.length - 1])
 
 		// Chain trail
 		let perpX = drift[1] * hz - drift[2] * hy
@@ -481,16 +564,17 @@ export function applyHotspots(
 		let cx = hx,
 			cy = hy,
 			cz = hz
-		let str = hStrength * oceanBoost
-		let baseStr = hStrength
+		let str = effectiveStrength
+		let baseStr = hStrength * strengthScale
 		for (let c = 0; c < hLength; c++) {
 			const ci = c + 1
 			const decayJitter = hDecay * (0.7 + hsRng.random() * 0.6)
 			str *= decayJitter
 			baseStr *= decayJitter
 			const stepSpacing = CHAIN_SPACING * (0.3 + hsRng.random() * 1.4)
-			const ageBroadening = 1.0 + ci * 0.06
-			const stepSigma = hSigma * (0.5 + hsRng.random() * 1.0) * ageBroadening
+			const ageBroadening = 1.0 + ci * DOME_AGE_BROADENING
+			const stepSigma =
+				effectiveSigma * (0.5 + hsRng.random() * 1.0) * ageBroadening
 			const wobble = (hsRng.random() - 0.5) * 0.8
 			const ddx = -drift[0] + perpX * wobble
 			const ddy = -drift[1] + perpY * wobble
@@ -529,23 +613,46 @@ export function applyHotspots(
 				dz: drift[2],
 				...frameC,
 				riftAngles: riftAnglesForDome(ci, hLength, baseRiftAngle),
+				isContinental,
 			} as Dome)
+			if (ci <= Math.ceil(hLength * 0.4)) {
+				spawnSatellites(domes[domes.length - 1])
+			}
 		}
+
+		const lipRegion = findNearestR(mesh, cx, cy, cz)
+		const upwelling = mantleNorm ? Math.max(0, mantleNorm[lipRegion]) : 0.5
+		appendLargeIgneousProvinceSites(lipSites, {
+			x: cx,
+			y: cy,
+			z: cz,
+			drift: [drift[0], drift[1], drift[2]],
+			upwelling,
+			volcanism,
+			isOcean:
+				plates[plateAssignment[lipRegion]]?.isOcean ??
+				elevation[lipRegion] <= 0,
+			random: () => hsRng.random(),
+		})
 	}
 
 	// Pre-compute per-dome constants
 	for (const dm of domes) {
 		dm.cosThreshPeak = Math.cos(dm.sigma * 5.5)
 		dm.invS2 = -0.5 / (dm.sigma * dm.sigma)
-		const swSigma = dm.sigma * SWELL_SIGMA_MULT
+		const swellMultiplier = dm.isContinental ? CONT_HOTSPOT_SWELL_MULT : 1.0
+		const swSigma = dm.sigma * SWELL_SIGMA_MULT * swellMultiplier
 		dm.swellSigma = swSigma
 		dm.swellStrength = dm.baseStrength * SWELL_STR_MULT
 		dm.cosThreshSwell = Math.cos(swSigma * 3)
 		dm.invS2Swell = -0.5 / (swSigma * swSigma)
-		dm.driftStretch = 1.0 / 1.4
-		dm.hasCaldera = dm.chainIndex <= 1 && dm.strength > 0.15
-		dm.calderaSigma = dm.sigma * 0.25
-		dm.calderaDepth = dm.strength * 0.2
+		dm.driftStretch = 1.0 / DOME_DRIFT_STRETCH
+		dm.hasCaldera =
+			dm.chainIndex <= 1 && dm.strength > DOME_CALDERA_STRENGTH_MIN
+		dm.calderaSigma =
+			dm.sigma * (dm.isContinental ? CONT_HOTSPOT_CALDERA_SIGMA_FRAC : 0.25)
+		dm.calderaDepth =
+			dm.strength * (dm.isContinental ? CONT_HOTSPOT_CALDERA_DEPTH_FRAC : 0.2)
 		dm.invS2Caldera = -0.5 / (dm.calderaSigma * dm.calderaSigma)
 		dm.ageFactor = dm.chainLength > 0 ? dm.chainIndex / dm.chainLength : 0
 	}
@@ -673,6 +780,17 @@ export function applyHotspots(
 			elevation[r] += uplift
 			hotspotContrib[r] = uplift
 		}
+	}
+
+	const lipUplift = applyLargeIgneousProvinces({
+		mesh,
+		elevation,
+		lipSites,
+		seed,
+		markFeature,
+	})
+	for (let r = 0; r < numRegions; r++) {
+		if (lipUplift[r] > 0) hotspotContrib[r] += lipUplift[r]
 	}
 
 	return hotspotContrib

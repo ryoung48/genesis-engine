@@ -332,7 +332,10 @@ export function importOrogenWorld(
 		oceanDist,
 		rainfall: post.rainfall,
 		hazards: post.hazards,
-		volcanism: { hotspot: new Float32Array(mesh.numRegions) },
+		volcanism: {
+			hotspot: new Float32Array(mesh.numRegions),
+			mantleUpwelling: new Float32Array(mesh.numRegions),
+		},
 		climateZones: post.climateZones,
 		pastaClimate: post.pastaClimate,
 		pastaDebug: post.pastaDebug,

@@ -1,14 +1,16 @@
 /**
- * Planet code encode/decode — packs seed + all exposed world settings into a
- * fixed-width base36 string. No suffixes, no legacy decoding.
+ * Planet code encode/decode ΓÇö stores the seed separately from the packed params
+ * segment so the seed stays recoverable across param format changes.
  */
 
 import type { OrogenParams } from "../types"
 import { SLIDER_RANGES } from "./slider-ranges"
+import { clampVolcanism } from "./volcanism"
 
 const DEFAULT_PRESSURE = 1.0
+const PLANET_CODE_PART_SEPARATOR = "."
 
-const SEED_MAX = 16777216
+export const SEED_MAX = 2147483647
 type FieldSpec = {
 	name: string
 	min: number
@@ -190,7 +192,7 @@ const FIELD_SPECS: FieldSpec[] = [
 		min: SR.volcanism.min,
 		step: SR.volcanism.step,
 		count: rangeCount(SR.volcanism),
-		read: (p) => clampUnit(p.volcanism ?? 0.5),
+		read: (p) => clampVolcanism(p.volcanism, 1),
 	},
 	{
 		name: "craters",
@@ -211,8 +213,8 @@ const FIELD_SPECS: FieldSpec[] = [
 	},
 ]
 
-const BASE_LEN = (() => {
-	let packed = BigInt(SEED_MAX - 1)
+const PARAMS_BASE_LEN = (() => {
+	let packed = 0n
 	for (const field of FIELD_SPECS)
 		packed = packed * BigInt(field.count) + BigInt(field.count - 1)
 	return packed.toString(36).length
@@ -226,7 +228,7 @@ function clampUnit(value: number): number {
 function clampPressure(value?: number): number {
 	if (typeof value !== "number" || !Number.isFinite(value))
 		return DEFAULT_PRESSURE
-	return Math.max(0.1, Math.min(10, value))
+	return Math.max(0.1, Math.min(100, value))
 }
 
 function toIndex(
@@ -256,16 +258,58 @@ function parseBase36(str: string): bigint {
 	}, 0n)
 }
 
-export function encodePlanetCode(seed: number, params: OrogenParams): string {
-	let packed = BigInt(seed)
+function parsePlanetCodeParts(
+	code: string,
+): { seedPart: string; paramsPart: string } | null {
+	const normalized = code.trim().toLowerCase()
+	if (!normalized) return null
+
+	const parts = normalized.split(PLANET_CODE_PART_SEPARATOR)
+	if (parts.length !== 2) return null
+
+	const [seedPart, paramsPart] = parts
+	if (seedPart.length === 0 || paramsPart.length === 0) return null
+
+	return { seedPart, paramsPart }
+}
+
+function parseSeedPart(seedPart: string): number | null {
+	if (!/^[0-9a-z]+$/.test(seedPart)) return null
+
+	let packed: bigint
+	try {
+		packed = parseBase36(seedPart)
+	} catch {
+		return null
+	}
+
+	const seed = Number(packed)
+	if (!Number.isInteger(seed) || seed < 0 || seed >= SEED_MAX) return null
+	return seed
+}
+
+function encodePlanetParams(params: OrogenParams): string {
+	let packed = 0n
 	for (const field of FIELD_SPECS) {
 		packed =
 			packed * BigInt(field.count) + BigInt(toIndex(field.read(params), field))
 	}
-	return packed.toString(36).padStart(BASE_LEN, "0")
+	return packed.toString(36).padStart(PARAMS_BASE_LEN, "0")
 }
 
-export interface DecodedPlanetCode {
+export function decodePlanetSeed(code: string): number | null {
+	const parts = parsePlanetCodeParts(code)
+	if (!parts) return null
+	return parseSeedPart(parts.seedPart)
+}
+
+export function encodePlanetCode(seed: number, params: OrogenParams): string {
+	const seedPart = BigInt(seed).toString(36)
+	const paramsPart = encodePlanetParams(params)
+	return [seedPart, paramsPart].join(PLANET_CODE_PART_SEPARATOR)
+}
+
+interface DecodedPlanetCode {
 	seed: number
 	numPoints: number
 	jitter: number
@@ -296,13 +340,21 @@ export interface DecodedPlanetCode {
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
-	const normalized = code.trim().toLowerCase()
-	if (normalized.length !== BASE_LEN) return null
-	if (!/^[0-9a-z]+$/.test(normalized)) return null
+	const parts = parsePlanetCodeParts(code)
+	if (!parts) return null
+
+	const seed = parseSeedPart(parts.seedPart)
+	if (seed === null) return null
+	if (
+		parts.paramsPart.length === 0 ||
+		parts.paramsPart.length > PARAMS_BASE_LEN ||
+		!/^[0-9a-z]+$/.test(parts.paramsPart)
+	)
+		return null
 
 	let packed: bigint
 	try {
-		packed = parseBase36(normalized)
+		packed = parseBase36(parts.paramsPart)
 	} catch {
 		return null
 	}
@@ -314,9 +366,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		packed = packed / BigInt(field.count)
 		decodedFields[field.name] = fromIndex(index, field)
 	}
-
-	const seed = Number(packed)
-	if (!Number.isInteger(seed) || seed < 0 || seed >= SEED_MAX) return null
+	if (packed !== 0n) return null
 
 	const craters = decodedFields.craters
 

@@ -72,6 +72,7 @@ describe("generateOrogenWorld", () => {
 			expect(world.koppenClimate.length).toBe(N)
 			expect(world.hazards.danger.length).toBe(N)
 			expect(world.volcanism.hotspot.length).toBe(N)
+			expect(world.volcanism.mantleUpwelling.length).toBe(N)
 
 			expect(world.provinces).toBeDefined()
 			expect(world.nations).toBeDefined()
@@ -97,6 +98,7 @@ describe("generateOrogenWorld", () => {
 			for (let r = 0; r < world.volcanism!.hotspot.length; r++) {
 				expect(world.volcanism!.hotspot[r]).toBe(0)
 			}
+			expect(world.volcanism.mantleUpwelling.length).toBe(world.mesh.numRegions)
 		},
 		TEST_TIMEOUT,
 	)
@@ -133,6 +135,7 @@ describe("generateOrogenWorld", () => {
 			expect(a.elevation).toEqual(b.elevation)
 			expect(a.isLand).toEqual(b.isLand)
 			expect(a.plateAssignment).toEqual(b.plateAssignment)
+			expect(a.volcanism.mantleUpwelling).toEqual(b.volcanism.mantleUpwelling)
 		},
 		TEST_TIMEOUT,
 	)

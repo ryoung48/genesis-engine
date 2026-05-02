@@ -94,6 +94,18 @@ function lerp(a: number, b: number, t: number): number {
 	return a + (b - a) * t
 }
 
+function toCssColor([r, g, b]: [number, number, number]): string {
+	return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
+}
+
+function mixRgb(
+	a: [number, number, number],
+	b: [number, number, number],
+	t: number,
+): [number, number, number] {
+	return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
+}
+
 /**
  * Convert raw mesh elevation to physical height in km.
  * Hybrid S-curve: quartic start gives flatlands, steepest near 0.75, derivative -> 0 at top.
@@ -226,7 +238,7 @@ export function temperatureDeltaColor(
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
-const precipStops: { mm: number; r: number; g: number; b: number }[] = [
+const monthlyPrecipStops: { mm: number; r: number; g: number; b: number }[] = [
 	{ mm: 0, r: 0.76, g: 0.7, b: 0.5 },
 	{ mm: 10, r: 0.85, g: 0.78, b: 0.45 },
 	{ mm: 40, r: 0.7, g: 0.82, b: 0.42 },
@@ -237,13 +249,18 @@ const precipStops: { mm: number; r: number; g: number; b: number }[] = [
 	{ mm: 400, r: 0.3, g: 0.15, b: 0.7 },
 ]
 
-export function precipitationNormalizedColor(
-	normalized: number,
+const annualPrecipStops = monthlyPrecipStops.map((stop) => ({
+	...stop,
+	mm: stop.mm * 12,
+}))
+
+function interpolatePrecipitationStops(
+	mm: number,
+	stops: ReadonlyArray<{ mm: number; r: number; g: number; b: number }>,
 ): [number, number, number] {
-	const mm = Math.max(0, Math.min(1, normalized)) * 400
-	for (let i = 0; i < precipStops.length - 1; i++) {
-		const a = precipStops[i]
-		const b = precipStops[i + 1]
+	for (let i = 0; i < stops.length - 1; i++) {
+		const a = stops[i]
+		const b = stops[i + 1]
 		if (mm <= b.mm) {
 			const t = (mm - a.mm) / (b.mm - a.mm)
 			return [
@@ -253,12 +270,33 @@ export function precipitationNormalizedColor(
 			]
 		}
 	}
-	const last = precipStops[precipStops.length - 1]
+	const last = stops[stops.length - 1]
 	return [last.r, last.g, last.b]
 }
 
+export function precipitationNormalizedColor(
+	normalized: number,
+): [number, number, number] {
+	const mm = Math.max(0, Math.min(1, normalized)) * 400
+	return interpolatePrecipitationStops(mm, monthlyPrecipStops)
+}
+
+export function precipitationMonthlyColor(
+	mm: number,
+): [number, number, number] {
+	return interpolatePrecipitationStops(mm, monthlyPrecipStops)
+}
+
+export function precipitationAnnualColor(mm: number): [number, number, number] {
+	return interpolatePrecipitationStops(mm, annualPrecipStops)
+}
+
 export function precipitationColor(mm: number): [number, number, number] {
-	return precipitationNormalizedColor(mm / 400)
+	return precipitationMonthlyColor(mm)
+}
+
+export function precipitationCssColor(mm: number): string {
+	return toCssColor(precipitationColor(mm))
 }
 
 const moistureStops: { t: number; r: number; g: number; b: number }[] = [
@@ -522,6 +560,21 @@ export function dangerColor(score: number): [number, number, number] {
 	return [color.r / 255, color.g / 255, color.b / 255]
 }
 
+const DANGER_WHITE: [number, number, number] = [1, 1, 1]
+const DANGER_EARTHQUAKE_ORANGE = dangerColor(0.375)
+const DANGER_VOLCANO_RED = dangerColor(0.625)
+
+export function dangerMapColor(
+	earthquake: number,
+	volcano: number,
+): [number, number, number] {
+	const dominant =
+		volcano >= earthquake ? DANGER_VOLCANO_RED : DANGER_EARTHQUAKE_ORANGE
+	const score = Math.max(earthquake, volcano)
+	const t = Math.max(0, Math.min(1, (score - 0.25) / 0.75))
+	return mixRgb(DANGER_WHITE, dominant, t)
+}
+
 export function hotspotColor(score: number): [number, number, number] {
 	const color = d3.rgb(
 		d3.interpolateRgbBasis([
@@ -545,6 +598,37 @@ export function populationColor(
 		),
 	)
 	return [color.r / 255, color.g / 255, color.b / 255]
+}
+
+export function migrationColor(
+	normalizedArrival: number,
+): [number, number, number] {
+	const stops = [
+		{ value: 0, r: 0.091, g: 0.169, b: 0.478 },
+		{ value: 0.125, r: 0.122, g: 0.353, b: 0.678 },
+		{ value: 0.25, r: 0.106, g: 0.533, b: 0.745 },
+		{ value: 0.375, r: 0.216, g: 0.686, b: 0.624 },
+		{ value: 0.5, r: 0.486, g: 0.773, b: 0.447 },
+		{ value: 0.625, r: 0.769, g: 0.835, b: 0.318 },
+		{ value: 0.75, r: 0.941, g: 0.804, b: 0.255 },
+		{ value: 0.875, r: 0.973, g: 0.608, b: 0.224 },
+		{ value: 1, r: 0.882, g: 0.286, b: 0.224 },
+	]
+	const clamped = Math.max(0, Math.min(1, normalizedArrival))
+	for (let i = 0; i < stops.length - 1; i++) {
+		const a = stops[i]
+		const b = stops[i + 1]
+		if (clamped <= b.value) {
+			const t = (clamped - a.value) / (b.value - a.value)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = stops[stops.length - 1]
+	return [last.r, last.g, last.b]
 }
 
 export function gravityColor(t: number): [number, number, number] {

@@ -3,7 +3,9 @@ import {
 	DEV_BUCKETS,
 	DEV_COLORS,
 } from "@/components/world/charts/SimulationTab/ActiveTrendsChart"
+import SeasonalTempByLat from "@/components/world/charts/SimulationTab/SeasonalTempByLat"
 import type { PopulationMapMode } from "@/components/world/types"
+import { useEbmPreview } from "@/hooks/useEbmPreview"
 import { computeClouds } from "@/model/orogen/climate/clouds"
 import { computeThermalEquatorLine } from "@/model/orogen/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/orogen/climate/vegetation"
@@ -12,7 +14,11 @@ import { REL } from "@/model/orogen/history/state"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/orogen/terrain/classification"
 import type { StageTiming } from "@/model/orogen/types"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model/orogen/types"
-import { encodePlanetCode } from "@/model/orogen/util/planet-code"
+import { encodePlanetCode, SEED_MAX } from "@/model/orogen/util/planet-code"
+import {
+	getEffectiveObliquityDeg,
+	isRetrogradeObliquity,
+} from "@/model/orogen/util/units"
 import type {
 	SerializedHistoryFrame,
 	SerializedOrogenWorld,
@@ -79,6 +85,10 @@ import {
 	pauseSimulation,
 	startSimulation,
 } from "./model/generation"
+import {
+	buildGenerationPreviewConfig,
+	getGenerationPreviewCanvasClassName,
+} from "./model/generation-preview"
 import { createHistoryQuery, type TimelineBundle } from "./model/history-query"
 import { historyYearToTime } from "./model/history-time"
 import {
@@ -135,7 +145,7 @@ function buildDistribution(
 
 export const OrogenView: React.FC = () => {
 	const makeRandomSeed = useCallback(
-		() => Math.floor(Math.random() * 16777216),
+		() => Math.floor(Math.random() * SEED_MAX),
 		[],
 	)
 	// Refs
@@ -190,6 +200,7 @@ export const OrogenView: React.FC = () => {
 	const [gridSpacing, setGridSpacing] = useState(15)
 	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
+	const [showClimatePreview, setShowClimatePreview] = useState(false)
 	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
 
@@ -1435,8 +1446,8 @@ export const OrogenView: React.FC = () => {
 	}, [handleImportHeightmap])
 
 	const handleResetDefaults = useCallback(
-		() => resetWorldDefaults(tectonicMode, setters),
-		[tectonicMode, setters],
+		() => resetWorldDefaults(setters),
+		[setters],
 	)
 	const handleRandomizeCode = useCallback(() => {
 		const nextSeed = makeRandomSeed()
@@ -1467,9 +1478,23 @@ export const OrogenView: React.FC = () => {
 		}
 	}, [planetCode])
 
+	const setAxialTilt = useCallback(
+		(value: number) => {
+			setObliquity(isRetrogradeObliquity(obliquity) ? 180 - value : value)
+		},
+		[obliquity],
+	)
+	const setAxialTiltDirection = useCallback(
+		(value: number) => {
+			const retrograde = value === 1
+			const baseTilt = getEffectiveObliquityDeg(obliquity)
+			setObliquity(retrograde ? 180 - baseTilt : baseTilt)
+		},
+		[obliquity],
+	)
+
 	// --- Slider definitions ---
 	const planetSliders = buildPlanetSliders({
-		tectonicMode,
 		planetRadiusKm,
 		obliquity,
 		eccentricity,
@@ -1478,24 +1503,26 @@ export const OrogenView: React.FC = () => {
 		daysPerYear,
 		hoursPerDay,
 		pressure,
+		volcanism,
 		landDistribution,
 		landCoverage,
 		tidallyLocked,
 		antistellarLon,
 		setPlanetRadiusKm,
-		setObliquity,
+		setObliquity: setAxialTilt,
 		setEccentricity,
 		setPerihelion,
 		setSunTempFactor,
 		setDaysPerYear,
 		setHoursPerDay,
 		setPressure,
+		setVolcanism,
+		setAxialTiltDirection,
 		setLandDistribution,
 		setLandCoverage,
 		setAntistellarLon,
 	})
 	const terrainSliders = buildTerrainSliders({
-		tectonicMode,
 		numPoints,
 		jitter,
 		numPlates,
@@ -1507,9 +1534,7 @@ export const OrogenView: React.FC = () => {
 		thermalErosion,
 		ridgeSharpening,
 		glacialErosion,
-		volcanism,
 		craters,
-		setTectonicMode,
 		setNumPoints,
 		setJitter,
 		setNumPlates,
@@ -1521,7 +1546,6 @@ export const OrogenView: React.FC = () => {
 		setThermalErosion,
 		setRidgeSharpening,
 		setGlacialErosion,
-		setVolcanism,
 		setCraters,
 	})
 
@@ -1554,6 +1578,27 @@ export const OrogenView: React.FC = () => {
 			world,
 		],
 	)
+	const generationPreview = useEbmPreview(
+		buildGenerationPreviewConfig({
+			tidallyLocked,
+			obliquity,
+			eccentricity,
+			perihelion,
+			sunTempFactor,
+			hoursPerDay,
+			daysPerYear,
+			landCoverage,
+			planetRadiusKm,
+			pressure,
+		}),
+	)
+
+	useEffect(() => {
+		if (showClimatePreview) return
+		requestAnimationFrame(() => {
+			sceneRef.current?.resize()
+		})
+	}, [showClimatePreview])
 
 	// --- Render ---
 	return (
@@ -1580,6 +1625,10 @@ export const OrogenView: React.FC = () => {
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
 					generationTimings={generationTimings}
+					showClimatePreview={showClimatePreview}
+					onToggleClimatePreview={() =>
+						setShowClimatePreview((current) => !current)
+					}
 					handleGenerate={handleGenerate}
 					handleFileImport={handleFileImport}
 					handleEarthImport={handleEarthImport}
@@ -1593,229 +1642,269 @@ export const OrogenView: React.FC = () => {
 			>
 				<canvas
 					ref={canvasRef}
-					className={`w-full h-full block ${isMeasuring ? "cursor-crosshair" : ""}`}
-				/>
-
-				{hoverInfo && hoverElevationKm !== null ? (
-					<InfoPanel
-						hoverInfo={hoverInfo}
-						hoverElevationKm={hoverElevationKm}
-						hoverTopography={hoverTopography}
-						hoverCoordinates={hoverCoordinates}
-						hoverLandmark={hoverLandmark}
-						hoverIsLand={hoverIsLand}
-						hoverTemperatureDelta={hoverTemperatureDelta}
-						hoverRainfall={hoverRainfall}
-						hoverDtr={hoverDtr}
-						hoverClimateDisplay={hoverClimateDisplay}
-						hoverIceSummary={hoverIceSummary}
-						hoverBiome={hoverBiome}
-						hoverProvince={hoverProvince}
-						hoverNationId={hoverNationId}
-						hoverRegionColor={
-							hoverInfo && regionColorsWithClouds
-								? [
-										regionColorsWithClouds[hoverInfo.region * 3],
-										regionColorsWithClouds[hoverInfo.region * 3 + 1],
-										regionColorsWithClouds[hoverInfo.region * 3 + 2],
-									]
-								: null
-						}
-						hoverOccupation={hoverOccupation}
-						hoverOceanDist={hoverOceanDist}
-						hoverDistCoast={hoverDistCoast}
-						hoverDistCoastKm={hoverDistCoastKm}
-						hoverWind={hoverWind}
-						hoverHazards={hoverHazards}
-						hoverHotspot={hoverHotspot}
-						hoverRiver={hoverRiver}
-						hoverTerrainFeature={hoverTerrainFeature}
-						hoverOceanCurrents={hoverOceanCurrents}
-						colorMode={colorMode}
-						isClimateMode={isClimateMode}
-						isSatelliteMode={isSatelliteMode}
-						tempAnnual={tempAnnual}
-						rainAnnual={rainAnnual}
-						windAnnual={windAnnual}
-						dtrAnnual={dtrAnnual}
-						globalMonth={globalMonth}
-						world={worldForDisplay}
-						hoverCardRef={hoverCardRef}
-					/>
-				) : null}
-
-				<OverlayControls
-					overlaysExpanded={overlaysExpanded}
-					setOverlaysExpanded={setOverlaysExpanded}
-					isMeasuring={isMeasuring}
-					setIsMeasuring={setIsMeasuring}
-					showWireframe={showWireframe}
-					setShowWireframe={setShowWireframe}
-					showRivers={showRivers}
-					setShowRivers={setShowRivers}
-					showClouds={showClouds}
-					setShowClouds={setShowClouds}
-					showThermalEquator={showThermalEquator}
-					setShowThermalEquator={setShowThermalEquator}
-					showGrid={showGrid}
-					setShowGrid={setShowGrid}
-					showNationBorders={showNationBorders}
-					setShowNationBorders={setShowNationBorders}
-					gridSpacing={gridSpacing}
-					setGridSpacing={setGridSpacing}
-					generationPanelOpen={generationPanelOpen}
-					onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
-				/>
-
-				<TimeControls
-					timeExpanded={timeExpanded}
-					setTimeExpanded={setTimeExpanded}
-					globalMonth={globalMonth}
-					setGlobalMonth={setGlobalMonth}
-					timeOfDay={timeOfDay}
-					setTimeOfDay={setTimeOfDay}
-					tidallyLocked={tidallyLocked}
-					hoursPerDay={hoursPerDay}
-					detailsOpen={detailsDrawerOpen}
-					onToggleDetails={() => setDetailsDrawerOpen(true)}
-				/>
-
-				<div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-slate-950/75 p-1 backdrop-blur-sm">
-					{(
-						[
-							["globe", "Globe"],
-							["map", "Map"],
-						] as const
-					).map(([mode, label]) => (
-						<button
-							key={mode}
-							onClick={() => setViewMode(mode)}
-							className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
-								viewMode === mode
-									? "bg-white/15 text-white shadow-sm"
-									: "text-slate-400 hover:text-slate-200"
-							}`}
-						>
-							{label}
-						</button>
-					))}
-				</div>
-
-				<div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-					{planetCode && (
-						<button
-							onClick={handleCopyCode}
-							title={codeCopied ? "Copied" : "Copy code"}
-							className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
-								codeCopied
-									? "border-emerald-300/60 bg-emerald-400/20 text-emerald-100"
-									: "border-white/10 bg-slate-950/75 text-slate-400 hover:text-slate-200"
-							} backdrop-blur-sm`}
-						>
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-							>
-								<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-								<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-							</svg>
-						</button>
+					className={getGenerationPreviewCanvasClassName(
+						showClimatePreview,
+						isMeasuring,
 					)}
-					{viewMode === "globe" && (
-						<button
-							onClick={() => setFullAmbient((v) => !v)}
-							title={
-								fullAmbient ? "Switch to sunlit" : "Switch to full ambient"
-							}
-							className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
-								fullAmbient
-									? "border-white/20 bg-white/15 text-yellow-300"
-									: "border-white/10 bg-slate-950/75 text-slate-400 hover:text-slate-200"
-							} backdrop-blur-sm`}
-						>
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 16 16"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="1.5"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
-								<path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" />
-								<circle cx="8" cy="8" r="3" />
-							</svg>
-						</button>
-					)}
-				</div>
+				/>
 
-				{measureDistanceKm !== null && measureLabelPos && (
-					<div
-						className="pointer-events-none absolute z-20 rounded-lg border border-white/10 bg-slate-950/85 px-2.5 py-1 text-white shadow-2xl backdrop-blur-sm"
-						style={{
-							left: measureLabelPos[0],
-							top: measureLabelPos[1] - 32,
-							transform: "translateX(-50%)",
-						}}
-					>
-						<span className="font-mono text-xs font-semibold">
-							{measureDistanceKm < 100
-								? `${measureDistanceKm.toFixed(1)} km`
-								: `${Math.round(measureDistanceKm).toLocaleString()} km`}
-						</span>
+				{showClimatePreview && (
+					<div className="absolute inset-0 z-20 flex h-full flex-col bg-slate-50 text-slate-900">
+						<div className="flex items-start gap-4 border-b border-slate-200 px-5 py-4">
+							<div>
+								<h2 className="text-sm font-semibold tracking-tight text-slate-900">
+									Climate Preview
+								</h2>
+								<p className="mt-1 text-xs text-slate-500">
+									Seasonal temperature by latitude from the current generation
+									settings.
+								</p>
+							</div>
+							<div className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-right shadow-sm">
+								<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+									Avg Temp
+								</div>
+								<div className="font-mono text-sm text-slate-900">
+									{generationPreview.avgTemp.toFixed(1)}&deg;C
+								</div>
+							</div>
+						</div>
+						<div className="min-h-0 flex-1 px-5 py-5">
+							<SeasonalTempByLat
+								heat={generationPreview.heat}
+								latRange={generationPreview.lats}
+								sampledDays={generationPreview.sampledDays}
+								dayLabels={generationPreview.dayLabels}
+								fullHeight={true}
+							/>
+						</div>
 					</div>
 				)}
 
-				<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
-					<div className="pointer-events-auto">
-						<SimControls
-							canSimulate={!!world && !!world.nations && !generating}
-							playing={simPlaying}
-							onPlay={() => {
-								setSimPlaying(true)
-								setTimelineBundle(null)
-								startSimulation(workerRef)
-							}}
-							onPause={() => {
-								setSimPlaying(false)
-								pauseSimulation(workerRef)
-							}}
-							selectedTimeMs={selectedTimeMs}
-							currentTimeMs={simTimeMs}
-							minTimeMs={simStartTimeMs}
-							maxTimeMs={simTimeMs}
-							onTimeChange={setSelectedTimeMs}
-							floating={false}
+				{!showClimatePreview && (
+					<>
+						{hoverInfo && hoverElevationKm !== null ? (
+							<InfoPanel
+								hoverInfo={hoverInfo}
+								hoverElevationKm={hoverElevationKm}
+								hoverTopography={hoverTopography}
+								hoverCoordinates={hoverCoordinates}
+								hoverLandmark={hoverLandmark}
+								hoverIsLand={hoverIsLand}
+								hoverTemperatureDelta={hoverTemperatureDelta}
+								hoverRainfall={hoverRainfall}
+								hoverDtr={hoverDtr}
+								hoverClimateDisplay={hoverClimateDisplay}
+								hoverIceSummary={hoverIceSummary}
+								hoverBiome={hoverBiome}
+								hoverProvince={hoverProvince}
+								hoverNationId={hoverNationId}
+								hoverRegionColor={
+									hoverInfo && regionColorsWithClouds
+										? [
+												regionColorsWithClouds[hoverInfo.region * 3],
+												regionColorsWithClouds[hoverInfo.region * 3 + 1],
+												regionColorsWithClouds[hoverInfo.region * 3 + 2],
+											]
+										: null
+								}
+								hoverOccupation={hoverOccupation}
+								hoverOceanDist={hoverOceanDist}
+								hoverDistCoast={hoverDistCoast}
+								hoverDistCoastKm={hoverDistCoastKm}
+								hoverWind={hoverWind}
+								hoverHazards={hoverHazards}
+								hoverHotspot={hoverHotspot}
+								hoverRiver={hoverRiver}
+								hoverTerrainFeature={hoverTerrainFeature}
+								hoverOceanCurrents={hoverOceanCurrents}
+								colorMode={colorMode}
+								isClimateMode={isClimateMode}
+								isSatelliteMode={isSatelliteMode}
+								tempAnnual={tempAnnual}
+								rainAnnual={rainAnnual}
+								windAnnual={windAnnual}
+								dtrAnnual={dtrAnnual}
+								globalMonth={globalMonth}
+								world={worldForDisplay}
+								hoverCardRef={hoverCardRef}
+							/>
+						) : null}
+
+						<OverlayControls
+							overlaysExpanded={overlaysExpanded}
+							setOverlaysExpanded={setOverlaysExpanded}
+							isMeasuring={isMeasuring}
+							setIsMeasuring={setIsMeasuring}
+							showWireframe={showWireframe}
+							setShowWireframe={setShowWireframe}
+							showRivers={showRivers}
+							setShowRivers={setShowRivers}
+							showClouds={showClouds}
+							setShowClouds={setShowClouds}
+							showThermalEquator={showThermalEquator}
+							setShowThermalEquator={setShowThermalEquator}
+							showGrid={showGrid}
+							setShowGrid={setShowGrid}
+							showNationBorders={showNationBorders}
+							setShowNationBorders={setShowNationBorders}
+							gridSpacing={gridSpacing}
+							setGridSpacing={setGridSpacing}
+							generationPanelOpen={generationPanelOpen}
+							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
 						/>
-					</div>
-					<div className="pointer-events-auto">
-						<ModeBar
-							colorMode={colorMode}
-							setColorMode={setColorMode}
-							nationMode={nationMode}
-							setNationMode={setNationMode}
-							populationMode={populationMode}
-							setPopulationMode={setPopulationMode}
-							isClimateMode={isClimateMode}
-							isSatelliteMode={isSatelliteMode}
-							tempAnnual={tempAnnual}
-							setTempAnnual={setTempAnnual}
-							rainAnnual={rainAnnual}
-							setRainAnnual={setRainAnnual}
-							windAnnual={windAnnual}
-							setWindAnnual={setWindAnnual}
-							currentAnnual={currentAnnual}
-							setCurrentAnnual={setCurrentAnnual}
-							dtrAnnual={dtrAnnual}
-							setDtrAnnual={setDtrAnnual}
+
+						<TimeControls
+							timeExpanded={timeExpanded}
+							setTimeExpanded={setTimeExpanded}
+							globalMonth={globalMonth}
+							setGlobalMonth={setGlobalMonth}
+							timeOfDay={timeOfDay}
+							setTimeOfDay={setTimeOfDay}
+							tidallyLocked={tidallyLocked}
+							hoursPerDay={hoursPerDay}
+							detailsOpen={detailsDrawerOpen}
+							onToggleDetails={() => setDetailsDrawerOpen(true)}
 						/>
-					</div>
-				</div>
+
+						<div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-white/10 bg-slate-950/75 p-1 backdrop-blur-sm">
+							{(
+								[
+									["globe", "Globe"],
+									["map", "Map"],
+								] as const
+							).map(([mode, label]) => (
+								<button
+									key={mode}
+									onClick={() => setViewMode(mode)}
+									className={`rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-all ${
+										viewMode === mode
+											? "bg-white/15 text-white shadow-sm"
+											: "text-slate-400 hover:text-slate-200"
+									}`}
+								>
+									{label}
+								</button>
+							))}
+						</div>
+
+						<div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+							{planetCode && (
+								<button
+									onClick={handleCopyCode}
+									title={codeCopied ? "Copied" : "Copy code"}
+									className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
+										codeCopied
+											? "border-emerald-300/60 bg-emerald-400/20 text-emerald-100"
+											: "border-white/10 bg-slate-950/75 text-slate-400 hover:text-slate-200"
+									} backdrop-blur-sm`}
+								>
+									<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+									>
+										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+									</svg>
+								</button>
+							)}
+							{viewMode === "globe" && (
+								<button
+									onClick={() => setFullAmbient((v) => !v)}
+									title={
+										fullAmbient ? "Switch to sunlit" : "Switch to full ambient"
+									}
+									className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-all ${
+										fullAmbient
+											? "border-white/20 bg-white/15 text-yellow-300"
+											: "border-white/10 bg-slate-950/75 text-slate-400 hover:text-slate-200"
+									} backdrop-blur-sm`}
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 16 16"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="1.5"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" />
+										<circle cx="8" cy="8" r="3" />
+									</svg>
+								</button>
+							)}
+						</div>
+
+						{measureDistanceKm !== null && measureLabelPos && (
+							<div
+								className="pointer-events-none absolute z-20 rounded-lg border border-white/10 bg-slate-950/85 px-2.5 py-1 text-white shadow-2xl backdrop-blur-sm"
+								style={{
+									left: measureLabelPos[0],
+									top: measureLabelPos[1] - 32,
+									transform: "translateX(-50%)",
+								}}
+							>
+								<span className="font-mono text-xs font-semibold">
+									{measureDistanceKm < 100
+										? `${measureDistanceKm.toFixed(1)} km`
+										: `${Math.round(measureDistanceKm).toLocaleString()} km`}
+								</span>
+							</div>
+						)}
+
+						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
+							<div className="pointer-events-auto">
+								<SimControls
+									canSimulate={!!world && !!world.nations && !generating}
+									playing={simPlaying}
+									onPlay={() => {
+										setSimPlaying(true)
+										setTimelineBundle(null)
+										startSimulation(workerRef)
+									}}
+									onPause={() => {
+										setSimPlaying(false)
+										pauseSimulation(workerRef)
+									}}
+									selectedTimeMs={selectedTimeMs}
+									currentTimeMs={simTimeMs}
+									minTimeMs={simStartTimeMs}
+									maxTimeMs={simTimeMs}
+									onTimeChange={setSelectedTimeMs}
+									floating={false}
+								/>
+							</div>
+							<div className="pointer-events-auto">
+								<ModeBar
+									colorMode={colorMode}
+									setColorMode={setColorMode}
+									nationMode={nationMode}
+									setNationMode={setNationMode}
+									populationMode={populationMode}
+									setPopulationMode={setPopulationMode}
+									isClimateMode={isClimateMode}
+									isSatelliteMode={isSatelliteMode}
+									tempAnnual={tempAnnual}
+									setTempAnnual={setTempAnnual}
+									rainAnnual={rainAnnual}
+									setRainAnnual={setRainAnnual}
+									windAnnual={windAnnual}
+									setWindAnnual={setWindAnnual}
+									currentAnnual={currentAnnual}
+									setCurrentAnnual={setCurrentAnnual}
+									dtrAnnual={dtrAnnual}
+									setDtrAnnual={setDtrAnnual}
+								/>
+							</div>
+						</div>
+					</>
+				)}
 			</div>
 
 			<DetailsDrawer

@@ -9,6 +9,10 @@ export const DEFAULT_HOURS_PER_DAY = 24
 export const DEFAULT_ANTISTELLAR_LON = 180
 export const DEFAULT_PERIHELION = 102
 
+export function getEarthYearFactor(daysPerYear: number): number {
+	return daysPerYear / DEFAULT_DAYS_PER_YEAR
+}
+
 type MeshWithOptionalNeighborDist = Pick<SphereMesh, "numRegions"> & {
 	neighborDist?: Float32Array
 }
