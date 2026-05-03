@@ -6,7 +6,14 @@
 	"linter": {
 		"enabled": true,
 		"rules": { "recommended": false },
-		"includes": ["**", "!dist"]
+		"includes": [
+			"**",
+			"!dist",
+			"!coverage",
+			"!coverage/**",
+			"!.hotspot-baseline",
+			"!.hotspot-baseline/**"
+		]
 	},
 	"javascript": {
 		"formatter": { "quoteStyle": "double", "semicolons": "asNeeded" }

@@ -1,175 +1,207 @@
 /**
- * HEALTH CHECK EVENT HANDLER
- *
- * Records the current and optimal wealth of all nations once per year.
- * This provides a historical record for charting wealth over time.
+ * SUCCESSION EVENT — leader death, new ruler, dynasties, regency, vassal rebellions.
+ * Port of src/model/history/events/succession.ts
  */
 
-import { NATION } from "@/model/nations"
-import { RELATIONS } from "@/model/nations/relations"
-import { PROVINCE } from "@/model/provinces"
-import { LEADER } from "@/model/provinces/leader"
-import { Province } from "@/model/provinces/types"
-import { TIME } from "@/model/utilities/time"
-import { SuccessionEvent } from "../types"
+import { EVT } from "../event-heap"
+import { PROV } from "../fields"
+import type { HistoryRng } from "../history-rng"
+import {
+	deltaYear,
+	diffYears,
+	fixConnections,
+	getChildren,
+	getNationNeighbors,
+	getNationProvinces,
+	getRelation,
+	type HistoryState,
+	isSovereign,
+	REL,
+	releaseProvince,
+	setRelation,
+	spawnLeader,
+	wealthOptimal,
+} from "../state"
 
-export const SUCCESSION_EVENT = {
-	init: () => {
-		window.world.provinces
-			.filter((p) => !p.desolate)
-			.forEach((p) => {
-				SUCCESSION_EVENT.spawn(p)
-			})
-		LEADER.dynasty.init()
-	},
-	spawn: (province: Province) => {
-		const event = LEADER.add(province)
-		window.world.future.enqueue({
-			type: "succession",
-			time: event.end,
-			province: province.idx,
-			idx: event.idx,
-		})
-	},
-	claim: (province: Province) => {
-		const nation = PROVINCE.nation(province)
-		const provinces = NATION.provinces(nation)
-		const leader = LEADER.get(province)
-		const others = provinces
-			.filter((p) => p !== province)
-			.filter((p) => LEADER.dynasty.get(p) === leader.dynasty)
-		const claim = window.dice.weightedChoice([
-			{ v: "none", w: others.length > 0 ? 0 : 1 },
-			{ v: "weak", w: 1 },
-			{ v: "average", w: 1 },
-			{ v: "strong", w: 2 },
-		])
-		if (claim === "weak" || claim === "none") {
-			const soverign = NATION.sovereign(province)
-			const foreign = soverign
-				? NATION.neighbors({ nation }).filter((n) => {
-						const rel = RELATIONS.get({ nation, other: n })
-						return rel === "friendly" || rel === "ally" || rel === "overlord"
-					})
-				: []
-			const parent = PROVINCE.parent.get(province)
-			const siblings = parent
-				? PROVINCE.children.get(parent).filter((p) => p !== province)
-				: []
-			const children = PROVINCE.children.get(province)
-			const candidates = [
-				...foreign,
-				...(parent ? [parent] : []),
-				...siblings,
-				...children,
-			]
-			// No heir → new dynasty immediately (old bloodline ends)
-			if (candidates.length === 0) {
-				leader.dynasty = LEADER.dynasty.add(province.culture)
-				return
-			}
-			candidates.sort(
-				(a, b) => NATION.wealth.optimal(b) - NATION.wealth.optimal(a),
-			)
-			const senior = candidates[0]
-			const seniorDynasty = LEADER.dynasty.get(senior)
-			// form a personal union if the dynasty is the same
-			if (
-				seniorDynasty === leader.dynasty &&
-				PROVINCE.nation(senior) !== nation
-			) {
-				RELATIONS.set({
-					nation: province,
-					other: senior,
-					relation: "personal_union_junior",
+export function initSuccession(state: HistoryState, _rng: HistoryRng): void {
+	for (let p = 0; p < state.P; p++) {
+		if (state.desolate[p]) continue
+		// Schedule succession at leader's death
+		state.heap.enqueue(
+			state.leaderRuntime.end[p],
+			EVT.SUCCESSION,
+			p,
+			state.leaderRuntime.idx[p],
+		)
+	}
+}
+
+function claim(state: HistoryState, p: number, rng: HistoryRng): void {
+	const nation = getSovereign(state, p) ?? p
+	const dynasty = PROV.leader.dynasty.get(state, p)
+
+	// Count provinces in the same nation with matching dynasty
+	const provinces = getNationProvinces(state, nation)
+	const sameCount = provinces.filter(
+		(q) => q !== p && PROV.leader.dynasty.get(state, q) === dynasty,
+	).length
+
+	const claimRoll =
+		rng.weightedChoice([
+			{ v: 0 as const, w: sameCount > 0 ? 0 : 1 }, // none
+			{ v: 1 as const, w: 1 }, // weak
+			{ v: 2 as const, w: 1 }, // average
+			{ v: 3 as const, w: 2 }, // strong
+		]) ?? 2
+
+	PROV.leader.claim.set(state, p, state.time, claimRoll)
+
+	if (claimRoll <= 1) {
+		// Weak or no claim — look for senior candidates
+		const sov = isSovereign(state, p)
+
+		// Gather candidate sources
+		const foreign = sov
+			? getNationNeighbors(state, nation).filter((n) => {
+					const rel = getRelation(state, nation, n)
+					return (
+						rel === REL.FRIENDLY || rel === REL.ALLY || rel === REL.OVERLORD
+					)
 				})
-				return
-			}
-			// otherwise spread the dynasty with a small chance of random noble
-			leader.dynasty =
-				claim === "none" && !soverign && window.dice.random > 0.95
-					? LEADER.dynasty.add(province.culture)
-					: seniorDynasty
+			: []
+
+		const parentP = PROV.parent.get(state, p)
+		const siblings =
+			parentP >= 0 ? getChildren(state, parentP).filter((c) => c !== p) : []
+		const children = getChildren(state, p)
+		const candidates = [
+			...foreign,
+			...(parentP >= 0 ? [parentP] : []),
+			...siblings,
+			...children,
+		]
+
+		if (candidates.length === 0) {
+			// No heir → new dynasty
+			PROV.leader.dynasty.set(state, p, state.time, state.nextDynasty++)
+			return
 		}
-	},
-	regency: (province: Province) => {
-		const leader = LEADER.get(province)
-		const age = TIME.date.diffYears(window.world.time, leader.birthTime)
-		if (age < 16 && NATION.sovereign(province)) {
-			window.world.past.push({
-				tag: "regency started",
-				time: window.world.time,
-				agents: [province.idx],
-				nation: province.idx,
-				leader: leader.idx,
+
+		// Sort by wealth, take the senior
+		candidates.sort((a, b) => wealthOptimal(state, b) - wealthOptimal(state, a))
+		const senior = candidates[0]
+		const seniorDynasty = PROV.leader.dynasty.get(state, senior)
+
+		// Form personal union if same dynasty, different nation
+		if (seniorDynasty === dynasty && getSovereign(state, senior) !== nation) {
+			setRelation(state, p, senior, REL.PU_JUNIOR)
+			state.events.push({
+				tag: "personal union formed",
+				time: state.time,
+				data: { junior: p, senior },
+			})
+			return
+		}
+
+		// Spread dynasty with small chance of random new noble
+		PROV.leader.dynasty.set(
+			state,
+			p,
+			state.time,
+			claimRoll === 0 && !sov && rng.random() > 0.95
+				? state.nextDynasty++
+				: seniorDynasty,
+		)
+	}
+}
+
+function regency(state: HistoryState, p: number): void {
+	const age = diffYears(state.time, state.leaderRuntime.birth[p])
+	if (age < 16 && isSovereign(state, p)) {
+		state.events.push({
+			tag: "regency started",
+			time: state.time,
+			data: {
+				nation: p,
+				leader: state.leaderRuntime.idx[p],
 				age: Math.round(age),
-			})
-			const regencyEndTime = leader.birthTime + TIME.delta.year(16)
-			if (regencyEndTime < leader.end) {
-				window.world.future.enqueue({
-					type: "regency",
-					time: regencyEndTime,
-					province: province.idx,
-					leader: leader.idx,
-				})
-			}
+			},
+		})
+		const regencyEndTime = state.leaderRuntime.birth[p] + deltaYear(16)
+		if (regencyEndTime < state.leaderRuntime.end[p]) {
+			state.heap.enqueue(
+				regencyEndTime,
+				EVT.REGENCY,
+				p,
+				state.leaderRuntime.idx[p],
+			)
 		}
-	},
-	run: (event: SuccessionEvent) => {
-		// Record wealth snapshot for all nations
-		const province = window.world.provinces[event.province]
-		const leader = province._leader[event.idx]
-		const curr = LEADER.get(province)
-		if (curr?.idx !== leader.idx) return
-		SUCCESSION_EVENT.spawn(province)
-		const overlord = PROVINCE.parent.get(province)
+	}
+}
 
-		// Log the succession event with the deceased leader and new successor
-		const newLeader = LEADER.get(province)
-		window.world.past.push({
-			tag: "succession",
-			time: window.world.time,
-			agents: [province.idx],
-			nation: province.idx,
-			leader: event.idx,
-			successor: newLeader.idx,
+function getSovereign(state: HistoryState, p: number): number {
+	return getNationProvinces(state, p)[0] ?? p
+}
+
+export function runSuccession(
+	state: HistoryState,
+	province: number,
+	leaderIdx: number,
+	rng: HistoryRng,
+): void {
+	// Check if this is still the current leader
+	if (state.leaderRuntime.idx[province] !== leaderIdx) return
+
+	// Spawn new leader
+	spawnLeader(state, province, rng)
+
+	state.events.push({
+		tag: "succession",
+		time: state.time,
+		data: {
+			nation: province,
+			leader: leaderIdx,
+			successor: state.leaderRuntime.idx[province],
+		},
+	})
+
+	// Schedule next succession
+	state.heap.enqueue(
+		state.leaderRuntime.end[province],
+		EVT.SUCCESSION,
+		province,
+		state.leaderRuntime.idx[province],
+	)
+
+	// Regency check
+	regency(state, province)
+
+	// Compute claim and handle PU formation
+	claim(state, province, rng)
+
+	// Random subject rebellions during succession
+	const overlord = PROV.parent.get(state, province)
+	if (overlord < 0 && getChildren(state, province).length > 0) {
+		const subjects = rng.shuffle(getChildren(state, province)).filter((s) => {
+			const provinces = getNationProvinces(state, s)
+			return !provinces.some((q) => state.occupationCurrent[q] >= 0)
 		})
 
-		// Check for child ruler — emit regency events
-		SUCCESSION_EVENT.regency(province)
-
-		// Compute claim strength and handle PU formation for sovereign nations
-		SUCCESSION_EVENT.claim(province)
-
-		if (!overlord && PROVINCE.children.get(province).length > 0) {
-			// Random subject rebellions during succession
-			const subjects = window.dice
-				.shuffle(PROVINCE.children.get(province))
-				.filter((s) => {
-					return !NATION.provinces(s).some((p) => PROVINCE.occupations.get(p))
-				})
-			const total = subjects.length
-			let rebelCount = 0
-			const rebellionChance = 0.5 // Probability of each additional rebel
-			while (rebelCount < total && window.dice.random < rebellionChance) {
-				rebelCount++
-				const subject = subjects.pop()
-				if (!subject) break
-				if (PROVINCE.parent.get(subject) !== province) continue
-				NATION.domains.release(subject)
-				// Log individual rebellion events with fromSuccession flag
-				window.world.past.push({
-					tag: "rebellion",
-					time: window.world.time,
-					agents: [province.idx, subject.idx],
-					overlord: province.idx,
-					subject: subject.idx,
-					succession: true,
-				})
-			}
-
-			// Clean up disconnected vassals after rebellions
-			NATION.connections(province)
+		const rebellionChance = 0.5
+		let rebelCount = 0
+		while (rebelCount < subjects.length && rng.random() < rebellionChance) {
+			const subject = subjects[rebelCount]
+			rebelCount++
+			if (PROV.parent.get(state, subject) !== province) continue
+			releaseProvince(state, subject)
+			state.events.push({
+				tag: "rebellion",
+				time: state.time,
+				data: { overlord: province, subject, succession: true },
+			})
 		}
-	},
+
+		// Fix disconnected vassals
+		fixConnections(state, province)
+	}
 }

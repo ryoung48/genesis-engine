@@ -1,14 +1,12 @@
-import {
-	interpolatePlasma,
-	interpolatePurples,
-	interpolateRdBu,
-	mean,
-	scaleDiverging,
-	scaleLinear,
-} from "d3"
 import { useMemo } from "react"
-import { EBM, EnergyBalanceModel } from "../model/cells/ebm"
-import { WIND } from "../model/cells/wind"
+import { EnergyBalanceModel } from "@/model/climate/ebm"
+import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
+import {
+	mapLinear,
+	rgbToCss,
+	sampleColorStops,
+} from "@/model/shared/color-interpolation"
+import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
 
 interface EbmConfig {
 	obliquity: number
@@ -20,6 +18,13 @@ interface EbmConfig {
 	landFraction: number
 	radius: number
 	pressure: number
+}
+
+function meanOf(values: readonly number[]): number {
+	if (values.length === 0) return 0
+	let sum = 0
+	for (const value of values) sum += value
+	return sum / values.length
 }
 
 export function useEbmPreview(config: EbmConfig) {
@@ -42,21 +47,21 @@ export function useEbmPreview(config: EbmConfig) {
 				PERIHELION: perihelion,
 			},
 			stellar: {
-				...EBM.constants.stellar,
+				...EMB_CONSTANTS.stellar,
 				T_SUN: tSun,
 			},
 			time: {
 				HOURS_PER_DAY: hoursPerDay,
 				YEAR_LENGTH_DAYS: daysPerYear,
 			},
-			landFraction: new Array(EBM.constants.grid.NUM_LAT).fill(landFraction),
+			landFraction: new Array(EMB_CONSTANTS.grid.NUM_LAT).fill(landFraction),
 			radius: radius * 1000, // km to meters
 			pressure,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
 
-		const time = EBM.constants.time
+		const time = EMB_CONSTANTS.time
 		const sampledDays: number[] = []
 		const dayLabels: string[] = []
 		for (let i = 0; i < time.DAYS_PER_YEAR; i += 10) {
@@ -72,74 +77,26 @@ export function useEbmPreview(config: EbmConfig) {
 				if (val > insolMax) insolMax = val
 			}
 		}
-		const insolColorScale = scaleLinear()
-			.domain([insolMin, insolMax])
-			.range([0, 1])
-			.clamp(true)
 		const insolColorFn = (val: number) =>
-			interpolatePlasma(insolColorScale(val))
-
-		const daylightScale = scaleLinear([0, hoursPerDay], [1, 0])
+			rgbToCss(
+				sampleColorStops(
+					PLASMA_STOPS,
+					mapLinear(val, insolMin, insolMax, 0, 1, true),
+				),
+			)
 		const daylightColorFn = (hours: number) =>
-			interpolatePurples(daylightScale(hours))
-
-		const gradient = model.temperature.map((row, latIdx) => {
-			const prevIdx = Math.max(0, latIdx - 1)
-			const nextIdx = Math.min(model.temperature.length - 1, latIdx + 1)
-			const latSpan = model.lats_deg[nextIdx] - model.lats_deg[prevIdx] || 1
-
-			return row.map((_, dayIdx) => {
-				const dT =
-					model.temperature[nextIdx][dayIdx] -
-					model.temperature[prevIdx][dayIdx]
-				return dT / latSpan
-			})
-		})
-
-		let gradientAbsMax = 0
-		for (const row of gradient) {
-			for (const val of row) {
-				const abs = Math.abs(val)
-				if (abs > gradientAbsMax) gradientAbsMax = abs
-			}
-		}
-		const gradientScale = scaleDiverging((t) => t)
-			.domain([-(gradientAbsMax || 0.1), 0, gradientAbsMax || 0.1])
-			.clamp(true)
-		const gradientColorFn = (val: number) =>
-			interpolateRdBu(1 - gradientScale(val))
-
-		// Find thermal equator per day
-		const teqByDay: number[] = []
-		for (let day = 0; day < time.DAYS_PER_YEAR; day++) {
-			let maxTemp = -Infinity
-			let maxLat = 0
-			for (let i = 0; i < model.lats_deg.length; i++) {
-				if (model.temperature[i][day] > maxTemp) {
-					maxTemp = model.temperature[i][day]
-					maxLat = model.lats_deg[i]
-				}
-			}
-			teqByDay.push(maxLat)
-		}
-
-		// Calculate signed zonal wind field (neg=easterly, pos=westerly)
-		const wind = WIND.calculateEbmWind(model.temperature, model.lats, teqByDay)
-		let windMax = 0
-		for (const row of wind) {
-			for (const val of row) {
-				const abs = Math.abs(val)
-				if (abs > windMax) windMax = abs
-			}
-		}
-		const windAbsMax = Math.max(15, windMax)
-		const windColorFn = (val: number) => WIND.color(val, windAbsMax)
+			rgbToCss(
+				sampleColorStops(
+					PURPLES_STOPS,
+					mapLinear(hours, 0, hoursPerDay, 1, 0, true),
+				),
+			)
 
 		// Calculate global average temperature (area-weighted)
 		let totalWeightedTemp = 0
 		let totalArea = 0
 		for (let i = 0; i < model.lats_deg.length; i++) {
-			const latAvg = (mean(model.temperature[i]) as number) || 0
+			const latAvg = meanOf(model.temperature[i])
 			const areaWeight = model.dx[i]
 			totalWeightedTemp += latAvg * areaWeight
 			totalArea += areaWeight
@@ -153,11 +110,6 @@ export function useEbmPreview(config: EbmConfig) {
 			insolColorFn,
 			daylight: model.daylightHours,
 			daylightColorFn,
-			gradient,
-			gradientColorFn,
-			teqByDay,
-			wind,
-			windColorFn,
 			lats: model.lats_deg,
 			sampledDays,
 			dayLabels,

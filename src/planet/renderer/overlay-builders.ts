@@ -1,0 +1,582 @@
+import * as THREE from "three"
+import { Line2 } from "three/examples/jsm/lines/Line2.js"
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import { createMapProjection } from "./map-projection"
+import type { OrogenViewMode, RiverData } from "./types"
+
+const TERRAIN_ELEVATION_SCALE = 0.04
+
+interface NationBoundarySide {
+	r0: number
+	r1: number
+	tInner: number
+	tOuter: number
+}
+
+function forEachNationBoundarySide(
+	world: SerializedOrogenWorld,
+	nation: number,
+	visit: (side: NationBoundarySide) => void,
+) {
+	if (!world.nations || !world.provinces) return
+	const { mesh } = world
+	const { numSides, halfedges, s_begin_r, s_inner_t, s_outer_t } = mesh
+	const { regionProvince } = world.provinces
+
+	for (let side = 0; side < numSides; side++) {
+		const opposite = halfedges[side]
+		if (opposite < 0 || side > opposite) continue
+		const r0 = s_begin_r[side]
+		const r1 = s_begin_r[opposite]
+		const provinceA = regionProvince[r0]
+		const provinceB = regionProvince[r1]
+		const nationA = provinceA >= 0 ? world.nations.assignment[provinceA] : -1
+		const nationB = provinceB >= 0 ? world.nations.assignment[provinceB] : -1
+		if (nationA === nationB || (nationA !== nation && nationB !== nation))
+			continue
+
+		const tInner = s_inner_t[side]
+		const tOuter = s_outer_t[side]
+		if (tInner < 0 || tOuter < 0) continue
+
+		visit({ r0, r1, tInner, tOuter })
+	}
+}
+
+function createLineSegments(
+	positions: number[],
+	color: number,
+	opacity: number,
+	visible: boolean,
+) {
+	if (positions.length === 0) return null
+	const geometry = new THREE.BufferGeometry()
+	geometry.setAttribute(
+		"position",
+		new THREE.Float32BufferAttribute(new Float32Array(positions), 3),
+	)
+	const material = new THREE.LineBasicMaterial({
+		color,
+		transparent: true,
+		opacity,
+		depthWrite: false,
+	})
+	const lines = new THREE.LineSegments(geometry, material)
+	lines.visible = visible
+	return lines
+}
+
+function appendProjectedSegment(
+	positions: number[],
+	projection: ReturnType<typeof createMapProjection>,
+	start: { lon: number; lat: number },
+	end: { lon: number; lat: number },
+	z: number,
+) {
+	let lon0 = start.lon
+	let lon1 = end.lon
+	if (Math.abs(lon1 - lon0) > Math.PI) {
+		if (lon0 < lon1) lon0 += 2 * Math.PI
+		else lon1 += 2 * Math.PI
+		const a = projection.projectRadians(lon0, start.lat, z)
+		const b = projection.projectRadians(lon1, end.lat, z)
+		const c = projection.projectRadians(lon0 - 2 * Math.PI, start.lat, z)
+		const d = projection.projectRadians(lon1 - 2 * Math.PI, end.lat, z)
+		positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
+		positions.push(c[0], c[1], c[2], d[0], d[1], d[2])
+		return
+	}
+	const a = projection.projectRadians(lon0, start.lat, z)
+	const b = projection.projectRadians(lon1, end.lat, z)
+	positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
+}
+
+export function buildHoveredNationBorderGlobe(
+	world: SerializedOrogenWorld,
+	nation: number,
+	viewMode: OrogenViewMode,
+	nationBordersVisible: boolean,
+	opts?: { color?: number; radiusBoost?: number; opacity?: number },
+) {
+	const positions = collectNationBorderGlobePositions(
+		world,
+		nation,
+		opts?.radiusBoost ?? 0,
+	)
+	return createLineSegments(
+		positions,
+		opts?.color ?? 0x020617,
+		opts?.opacity ?? 0.95,
+		viewMode === "globe" && nationBordersVisible,
+	)
+}
+
+export function buildHoveredNationBorderMap(
+	world: SerializedOrogenWorld,
+	nation: number,
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	viewMode: OrogenViewMode,
+	nationBordersVisible: boolean,
+	opts?: { color?: number; opacity?: number; zBoost?: number },
+) {
+	const positions = collectNationBorderMapPositions(
+		world,
+		nation,
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+		opts?.zBoost ?? 0,
+	)
+	return createLineSegments(
+		positions,
+		opts?.color ?? 0x020617,
+		opts?.opacity ?? 0.95,
+		viewMode === "map" && nationBordersVisible,
+	)
+}
+
+export function collectNationBorderGlobePositions(
+	world: SerializedOrogenWorld,
+	nation: number,
+	radiusBoost: number,
+) {
+	if (!world.nations || !world.provinces) return []
+	const positions: number[] = []
+	const { elevation, mesh } = world
+	const { t_xyz } = mesh
+
+	forEachNationBoundarySide(world, nation, ({ r0, r1, tInner, tOuter }) => {
+		const averageElevation = (elevation[r0] + elevation[r1]) * 0.5
+		const radius =
+			1.006 +
+			radiusBoost +
+			(averageElevation > 0
+				? averageElevation * TERRAIN_ELEVATION_SCALE
+				: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3)
+		positions.push(
+			t_xyz[3 * tInner] * radius,
+			t_xyz[3 * tInner + 1] * radius,
+			t_xyz[3 * tInner + 2] * radius,
+			t_xyz[3 * tOuter] * radius,
+			t_xyz[3 * tOuter + 1] * radius,
+			t_xyz[3 * tOuter + 2] * radius,
+		)
+	})
+
+	return positions
+}
+
+export function collectNationBorderMapPositions(
+	world: SerializedOrogenWorld,
+	nation: number,
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	zBoost: number,
+) {
+	if (!world.nations || !world.provinces) return []
+	const positions: number[] = []
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
+	const { t_xyz } = world.mesh
+	const z = 0.003 + zBoost
+
+	const writeSegment = (
+		lon0: number,
+		lat0: number,
+		lon1: number,
+		lat1: number,
+	) => {
+		appendProjectedSegment(
+			positions,
+			projection,
+			{ lon: lon0, lat: lat0 },
+			{ lon: lon1, lat: lat1 },
+			z,
+		)
+	}
+
+	forEachNationBoundarySide(world, nation, ({ tInner, tOuter }) => {
+		const a = projection.projectCartesian(
+			t_xyz[3 * tInner],
+			t_xyz[3 * tInner + 1],
+			t_xyz[3 * tInner + 2],
+		)
+		const b = projection.projectCartesian(
+			t_xyz[3 * tOuter],
+			t_xyz[3 * tOuter + 1],
+			t_xyz[3 * tOuter + 2],
+		)
+		let lon0 = a.lon
+		let lon1 = b.lon
+		if (Math.abs(lon1 - lon0) > Math.PI) {
+			if (lon0 < lon1) lon0 += 2 * Math.PI
+			else lon1 += 2 * Math.PI
+			writeSegment(lon0, a.lat, lon1, b.lat)
+			writeSegment(lon0 - 2 * Math.PI, a.lat, lon1 - 2 * Math.PI, b.lat)
+		} else {
+			writeSegment(lon0, a.lat, lon1, b.lat)
+		}
+	})
+
+	return positions
+}
+
+export function buildGlobeGrid(
+	spacingDeg: number,
+	gridVisible: boolean,
+	viewMode: OrogenViewMode,
+): THREE.LineSegments {
+	const spacing = Math.max(2.5, spacingDeg)
+	const radius = 1.018
+	const latStep = THREE.MathUtils.degToRad(3)
+	const lonStep = THREE.MathUtils.degToRad(3)
+	const positions: number[] = []
+
+	for (let latDeg = -90 + spacing; latDeg < 90; latDeg += spacing) {
+		const lat = THREE.MathUtils.degToRad(latDeg)
+		let previous: [number, number, number] | null = null
+		for (let lon = -Math.PI; lon <= Math.PI + 0.0001; lon += lonStep) {
+			const cosLat = Math.cos(lat)
+			const point: [number, number, number] = [
+				radius * cosLat * Math.cos(lon),
+				radius * cosLat * Math.sin(lon),
+				radius * Math.sin(lat),
+			]
+			if (previous) positions.push(...previous, ...point)
+			previous = point
+		}
+	}
+
+	for (let lonDeg = -180; lonDeg < 180; lonDeg += spacing) {
+		const lon = THREE.MathUtils.degToRad(lonDeg)
+		let previous: [number, number, number] | null = null
+		for (let lat = -Math.PI / 2; lat <= Math.PI / 2 + 0.0001; lat += latStep) {
+			const cosLat = Math.cos(lat)
+			const point: [number, number, number] = [
+				radius * cosLat * Math.cos(lon),
+				radius * cosLat * Math.sin(lon),
+				radius * Math.sin(lat),
+			]
+			if (previous) positions.push(...previous, ...point)
+			previous = point
+		}
+	}
+
+	return createLineSegments(
+		positions,
+		0xe2e8f0,
+		0.28,
+		gridVisible && viewMode === "globe",
+	)!
+}
+
+export function buildMapGrid(
+	spacingDeg: number,
+	projectionLatitudeDeg: number,
+	gridVisible: boolean,
+	viewMode: OrogenViewMode,
+): THREE.LineSegments {
+	const spacing = Math.max(2.5, spacingDeg)
+	const lonStep = Math.max(2.5, spacing / 2)
+	const latStep = Math.max(2.5, spacing / 2)
+	const positions: number[] = []
+	const projection = createMapProjection(0, projectionLatitudeDeg)
+
+	for (let latDeg = -90 + spacing; latDeg < 90; latDeg += spacing) {
+		let previous: { lon: number; lat: number } | null = null
+		for (let lonDeg = -180; lonDeg <= 180 + 0.001; lonDeg += lonStep) {
+			const lon = THREE.MathUtils.degToRad(lonDeg)
+			const lat = THREE.MathUtils.degToRad(latDeg)
+			const cosLat = Math.cos(lat)
+			const current = projection.projectCartesian(
+				cosLat * Math.cos(lon),
+				cosLat * Math.sin(lon),
+				Math.sin(lat),
+			)
+			if (previous)
+				appendProjectedSegment(positions, projection, previous, current, 0.001)
+			previous = current
+		}
+	}
+
+	for (let lonDeg = -180; lonDeg < 180; lonDeg += spacing) {
+		let previous: { lon: number; lat: number } | null = null
+		for (let latDeg = -90; latDeg <= 90 + 0.001; latDeg += latStep) {
+			const lon = THREE.MathUtils.degToRad(lonDeg)
+			const lat = THREE.MathUtils.degToRad(latDeg)
+			const cosLat = Math.cos(lat)
+			const current = projection.projectCartesian(
+				cosLat * Math.cos(lon),
+				cosLat * Math.sin(lon),
+				Math.sin(lat),
+			)
+			if (previous)
+				appendProjectedSegment(positions, projection, previous, current, 0.001)
+			previous = current
+		}
+	}
+
+	return createLineSegments(
+		positions,
+		0xf8fafc,
+		0.22,
+		gridVisible && viewMode === "map",
+	)!
+}
+
+function buildThermalEquatorLine(
+	controlPoints: THREE.Vector3[],
+	pointsCount: number,
+	color: number,
+	visible: boolean,
+	adjustPoint?: (point: THREE.Vector3) => void,
+) {
+	const curve = new THREE.CatmullRomCurve3(
+		controlPoints,
+		false,
+		"catmullrom",
+		0.5,
+	)
+	const smoothPoints = curve.getPoints(pointsCount * 4)
+	for (const point of smoothPoints) adjustPoint?.(point)
+	const geometry = new THREE.BufferGeometry().setFromPoints(smoothPoints)
+	const material = new THREE.LineBasicMaterial({
+		color,
+		transparent: true,
+		opacity: 0.9,
+		depthWrite: false,
+	})
+	const line = new THREE.Line(geometry, material)
+	line.visible = visible
+	return line
+}
+
+export function buildGlobeThermalEquator(
+	points: [number, number][],
+	viewMode: OrogenViewMode,
+) {
+	const radius = 1.05
+	const controlPoints = points.map(([lonDeg, latDeg]) => {
+		const lon = THREE.MathUtils.degToRad(lonDeg)
+		const lat = THREE.MathUtils.degToRad(latDeg)
+		const cosLat = Math.cos(lat)
+		return new THREE.Vector3(
+			radius * cosLat * Math.cos(lon),
+			radius * cosLat * Math.sin(lon),
+			radius * Math.sin(lat),
+		)
+	})
+
+	return buildThermalEquatorLine(
+		controlPoints,
+		points.length,
+		0xff3333,
+		viewMode === "globe",
+		(point) => point.normalize().multiplyScalar(radius),
+	)
+}
+
+export function buildMapThermalEquator(
+	points: [number, number][],
+	projectionLatitudeDeg: number,
+	viewMode: OrogenViewMode,
+) {
+	const projection = createMapProjection(0, projectionLatitudeDeg)
+	const controlPoints = points.map(([lonDeg, latDeg]) => {
+		const [x, y] = projection.projectDegrees(lonDeg, latDeg, 0.002)
+		return new THREE.Vector3(x, y, 0.002)
+	})
+
+	return buildThermalEquatorLine(
+		controlPoints,
+		points.length,
+		0xff3333,
+		viewMode === "map",
+		(point) => {
+			point.z = 0.002
+		},
+	)
+}
+
+function buildRiverGroup(
+	rivers: RiverData,
+	canvas: HTMLCanvasElement,
+	riverMaterials: LineMaterial[],
+	toPosition: (
+		lonDeg: number,
+		latDeg: number,
+		elev: number,
+	) => [number, number, number],
+) {
+	const group = new THREE.Group()
+	const width = canvas.clientWidth || 1
+	const height = canvas.clientHeight || 1
+	const minWidth = 0.15
+	const maxWidth = 1.2
+	const binStep = 0.3
+	const logMin = Math.log(1 + rivers.minFlow)
+	const logMax = Math.log(1 + rivers.maxFlow)
+	const logRange = logMax - logMin || 1
+	const materialCache = new Map<number, LineMaterial>()
+
+	function getMaterial(lineWidth: number) {
+		const binned = Math.max(
+			minWidth,
+			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
+		)
+		let material = materialCache.get(binned)
+		if (!material) {
+			const t = (binned - minWidth) / (maxWidth - minWidth)
+			material = new LineMaterial({
+				color: 0x0978ab,
+				opacity: 0.55 + t * 0.4,
+				linewidth: binned,
+				transparent: true,
+				depthWrite: false,
+				worldUnits: false,
+			})
+			material.resolution.set(width, height)
+			materialCache.set(binned, material)
+			riverMaterials.push(material)
+		}
+		return material
+	}
+
+	function flowToWidth(flow: number) {
+		const t = Math.max(0, (Math.log(1 + flow) - logMin) / logRange)
+		return minWidth + (maxWidth - minWidth) * t
+	}
+
+	const toBin = (lineWidth: number) =>
+		Math.max(
+			minWidth,
+			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
+		)
+
+	for (const polyline of rivers.lines) {
+		if (polyline.length < 2) continue
+		const flowValues = polyline.map(([, , flow]) => flow)
+		let positions: [number, number, number][]
+		let smoothFlows: number[]
+
+		if (polyline.length >= 3) {
+			const controlPoints = polyline.map(([lon, lat, , elev]) => {
+				const [x, y, z] = toPosition(lon, lat, elev)
+				return new THREE.Vector3(x, y, z)
+			})
+			const curve = new THREE.CatmullRomCurve3(
+				controlPoints,
+				false,
+				"catmullrom",
+				0.5,
+			)
+			const smoothPointCount = polyline.length * 3
+			const smoothed = curve.getPoints(smoothPointCount)
+			positions = smoothed.map((point) => [point.x, point.y, point.z])
+			smoothFlows = smoothed.map((_, index) => {
+				const t = index / smoothPointCount
+				const step = t * (polyline.length - 1)
+				const lower = Math.floor(step)
+				const upper = Math.min(lower + 1, polyline.length - 1)
+				return (
+					flowValues[lower] +
+					(flowValues[upper] - flowValues[lower]) * (step - lower)
+				)
+			})
+		} else {
+			positions = polyline.map(([lon, lat, , elev]) =>
+				toPosition(lon, lat, elev),
+			)
+			smoothFlows = flowValues
+		}
+
+		const widths = smoothFlows.map((flow) => flowToWidth(flow))
+		let segmentStart = 0
+		let currentBin = toBin(widths[0])
+
+		const emitSegment = (start: number, end: number, binnedWidth: number) => {
+			if (end <= start) return
+			const segmentPositions: number[] = []
+			for (let index = start; index <= end; index++) {
+				segmentPositions.push(...positions[index])
+			}
+			if (segmentPositions.length < 6) return
+			const geometry = new LineGeometry()
+			geometry.setPositions(segmentPositions)
+			const line = new Line2(geometry, getMaterial(binnedWidth))
+			line.computeLineDistances()
+			group.add(line)
+		}
+
+		for (let index = 1; index < positions.length; index++) {
+			const nextBin = toBin(widths[index])
+			if (nextBin !== currentBin) {
+				emitSegment(segmentStart, index, currentBin)
+				segmentStart = index
+				currentBin = nextBin
+			}
+		}
+		emitSegment(segmentStart, positions.length - 1, currentBin)
+	}
+
+	return group
+}
+
+export function buildGlobeRivers(
+	rivers: RiverData,
+	canvas: HTMLCanvasElement,
+	riverMaterials: LineMaterial[],
+	riversVisible: boolean,
+	viewMode: OrogenViewMode,
+) {
+	const lift = 0.003
+	const group = buildRiverGroup(
+		rivers,
+		canvas,
+		riverMaterials,
+		(lonDeg, latDeg, elev) => {
+			const lon = THREE.MathUtils.degToRad(lonDeg)
+			const lat = THREE.MathUtils.degToRad(latDeg)
+			const cosLat = Math.cos(lat)
+			const radius =
+				1 +
+				(elev > 0
+					? elev * TERRAIN_ELEVATION_SCALE
+					: elev * TERRAIN_ELEVATION_SCALE * 0.3) +
+				lift
+			return [
+				radius * cosLat * Math.cos(lon),
+				radius * cosLat * Math.sin(lon),
+				radius * Math.sin(lat),
+			]
+		},
+	)
+	group.visible = riversVisible && viewMode === "globe"
+	return group
+}
+
+export function buildMapRivers(
+	rivers: RiverData,
+	canvas: HTMLCanvasElement,
+	riverMaterials: LineMaterial[],
+	projectionLatitudeDeg: number,
+	riversVisible: boolean,
+	viewMode: OrogenViewMode,
+) {
+	const projection = createMapProjection(0, projectionLatitudeDeg)
+	const group = buildRiverGroup(
+		rivers,
+		canvas,
+		riverMaterials,
+		(lonDeg, latDeg) => {
+			const [x, y, z] = projection.projectDegrees(lonDeg, latDeg, 0.003)
+			return [x, y, z]
+		},
+	)
+	group.visible = riversVisible && viewMode === "map"
+	return group
+}

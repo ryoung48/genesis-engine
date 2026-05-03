@@ -1,0 +1,8 @@
+{
+	"$schema": "https://unpkg.com/knip@6/schema.json",
+	"entry": ["src/model/orogen.worker.ts"],
+	"project": ["src/**/*.{ts,tsx,js,jsx}"],
+	"ignoreDependencies": ["tailwindcss", "babel-plugin-react-compiler"],
+	"ignore": ["src/types/delaunator.d.ts", "src/model/actors/language/**"],
+	"tags": ["-lintignore"]
+}

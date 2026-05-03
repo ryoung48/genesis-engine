@@ -1,6 +1,9 @@
-import { MATH } from "../../../../utilities/math"
 import { CLUSTER } from "../clusters"
-import { Language, PhonemeCatalog } from "../types"
+import {
+	type Language,
+	PhonemeCatalog,
+	type WeightedDistribution,
+} from "../types"
 
 interface CustomClusterParams {
 	len?: number
@@ -20,13 +23,24 @@ interface CustomClusterParams {
 export const validTerms = (prospects: string[], letters: string[]) =>
 	prospects.filter((c) => c.split("").every((l) => letters.includes(l)))
 
+function buildDistribution<T>(
+	map: WeightedDistribution<T>,
+	qty = 1,
+): WeightedDistribution<T> {
+	const total = map.reduce((sum, { w }) => sum + w, 0)
+	return map.map(({ v, w }) => ({
+		v,
+		w: total === 0 ? 0 : (w / total) * qty,
+	}))
+}
+
 export const randomizePhonemes = (src: Language) => {
 	Object.entries(src.basePhonemes).forEach(([k, v]) => {
 		const condensed = new Map<string, number>()
 		v.forEach((c) => {
 			condensed.set(c, (condensed.get(c) || 0) + src.dice.random)
 		})
-		src.phonemes[k as PhonemeCatalog] = MATH.buildDistribution(
+		src.phonemes[k as PhonemeCatalog] = buildDistribution(
 			Array.from(condensed, ([v, w]) => ({ v, w })),
 			1,
 		)
@@ -44,9 +58,28 @@ export const initClusters = (params: {
 
 	// Syllable weight drives base length and how often names get an extra syllable
 	const sw = src.syllableWeight
-	const baseLen = sw === "light" ? 1 : 2
+	const baseLen = sw === "light" ? (src.phonotacticStyle === "open" ? 2 : 1) : 2
 	const lnMult = sw === "light" ? 0.3 : sw === "heavy" ? 1.5 : 1.0
-	const regionLen = sw === "heavy" ? 3 : baseLen
+	const regionLen = 2
+	const cultureLen = 2
+	const regionLongNames =
+		sw === "light"
+			? 0.12
+			: sw === "heavy"
+				? src.phonotacticStyle === "closed"
+					? 0.4
+					: 0.32
+				: 0.22
+	const cultureLongNames =
+		sw === "light"
+			? src.phonotacticStyle === "open"
+				? 0.2
+				: 0.14
+			: sw === "heavy"
+				? src.phonotacticStyle === "closed"
+					? 0.46
+					: 0.38
+				: 0.28
 
 	src.clusters = {
 		settlement: CLUSTER.spawn({
@@ -74,7 +107,7 @@ export const initClusters = (params: {
 			stopChance: src.articleChance,
 			variation: 15,
 			len: regionLen,
-			longNames: 1 * lnMult,
+			longNames: regionLongNames,
 		}),
 		culture: CLUSTER.spawn({
 			src: src,
@@ -82,8 +115,8 @@ export const initClusters = (params: {
 			ending,
 			stopChance: 0,
 			variation: 15,
-			len: regionLen,
-			longNames: 1 * lnMult,
+			len: cultureLen,
+			longNames: cultureLongNames,
 		}),
 		male: CLUSTER.spawn({
 			src: src,

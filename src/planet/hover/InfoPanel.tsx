@@ -1,0 +1,682 @@
+import React from "react"
+import {
+	FloatingPanel,
+	LabeledValueRow,
+	SeriesBars,
+	Swatch,
+} from "@/components"
+import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import { type ColorMode, dangerColor, daylightColor } from "../colors"
+import { monthLabels } from "../screen/shared/constants"
+import {
+	formatDensity,
+	formatDistance,
+	formatElevation,
+	formatFlowRate,
+	formatPrecipitation,
+	formatTemperature,
+	formatTemperatureDelta,
+	rgbToCss,
+	type UnitSystem,
+} from "../screen/shared/ui-format"
+import type {
+	HoverDtr,
+	HoverHazards,
+	HoverHotspot,
+	HoverInfo,
+	HoverLandmark,
+	HoverOceanCurrents,
+	HoverRiver,
+	HoverTerrainFeature,
+} from "./hover"
+import {
+	aetColor,
+	currentImpactColor,
+	dtrChartColor,
+	flowColor,
+	formatCompactNumber,
+	gddColor,
+	gintColor,
+	petColor,
+	rainColor,
+	tempColor,
+} from "./info-panel-format"
+import {
+	buildClimateSwatchColor,
+	buildHoverChartData,
+	buildPastaMonthlyData,
+	buildProvinceDisplayData,
+	buildTerrainFeatureSwatches,
+	buildTopographySwatchColor,
+	buildVegetationSwatchColor,
+} from "./info-panel-model"
+
+const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+
+function buildSummary(
+	value: number | undefined,
+	options: {
+		prefix?: string
+		unit?: string
+		formatValue?: (value: number) => string
+	},
+): string | undefined {
+	if (value === undefined) return undefined
+
+	const prefix = options.prefix?.trim()
+	const formatted = options.formatValue
+		? options.formatValue(value)
+		: `${value}`
+	const unit = options.unit?.trim()
+
+	return [prefix, formatted, unit].filter(Boolean).join(" ")
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+	return <LabeledValueRow label={label} value={value} tone="overlay" />
+}
+
+function SwatchRow({
+	label,
+	value,
+	color,
+	striped = false,
+	stripeBackground = "rgba(15, 23, 42, 0.85)",
+}: {
+	label: string
+	value: string
+	color: string | null
+	striped?: boolean
+	stripeBackground?: string
+}) {
+	return (
+		<LabeledValueRow
+			label={label}
+			tone="overlay"
+			value={
+				<span className="flex items-center gap-1.5 font-mono text-[10px] text-slate-100">
+					<Swatch
+						color={color}
+						striped={striped}
+						stripeBackground={stripeBackground}
+						className="border-white/15"
+					/>
+					<span>{value}</span>
+				</span>
+			}
+		/>
+	)
+}
+
+function MultiSwatchRow({
+	label,
+	values,
+}: {
+	label: string
+	values: Array<{ label: string; color: string | null }>
+}) {
+	return (
+		<LabeledValueRow
+			label={label}
+			tone="overlay"
+			value={
+				<span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 font-mono text-[10px] text-slate-100">
+					{values.map((value, index) => (
+						<React.Fragment key={`${value.label}-${index}`}>
+							<span className="inline-flex items-center gap-1.5">
+								<Swatch color={value.color} className="border-white/15" />
+								<span>{value.label}</span>
+							</span>
+							{index < values.length - 1 && (
+								<span className="text-slate-500">,</span>
+							)}
+						</React.Fragment>
+					))}
+				</span>
+			}
+		/>
+	)
+}
+
+interface InfoPanelProps {
+	hoverInfo: HoverInfo | null
+	hoverElevationKm: number | null
+	hoverTopography: string | null
+	hoverCoordinates: string | null
+	hoverLandmark: HoverLandmark | null
+	hoverIsLand: boolean | null
+	hoverTemperatureDelta: number | null
+	hoverRainfall: number | null
+	hoverDtr: HoverDtr | null
+	hoverClimateDisplay: string | null
+	hoverIceSummary: string | null
+	hoverBiome: string | null
+	hoverProvince: number | null
+	hoverNationId: number | null
+	hoverRegionColor: [number, number, number] | null
+	hoverOccupation: {
+		id: number
+		name: string
+		color: string
+		rebel: boolean
+	} | null
+	hoverOceanDist: number | null
+	hoverDistCoast: number | null
+	hoverDistCoastKm: number | null
+	hoverHazards: HoverHazards | null
+	hoverHotspot: HoverHotspot | null
+	hoverRiver: HoverRiver | null
+	hoverTerrainFeature: HoverTerrainFeature | null
+	hoverOceanCurrents: HoverOceanCurrents | null
+	colorMode: ColorMode
+	isClimateMode: boolean
+	tempAnnual: boolean
+	rainAnnual: boolean
+	dtrAnnual: boolean
+	displayMonth: number
+	unitSystem: UnitSystem
+	world: SerializedOrogenWorld | null
+	hoverCardRef: React.RefObject<HTMLDivElement | null>
+	getNationName: (nationId: number) => string
+}
+
+export const InfoPanel: React.FC<InfoPanelProps> = ({
+	hoverInfo,
+	hoverElevationKm,
+	hoverTopography,
+	hoverCoordinates,
+	hoverLandmark,
+	hoverTemperatureDelta,
+	hoverDtr,
+	hoverClimateDisplay,
+	hoverIceSummary,
+	hoverBiome,
+	hoverProvince,
+	hoverNationId,
+	hoverRegionColor,
+	hoverOccupation,
+	hoverOceanDist,
+	hoverDistCoast,
+	hoverDistCoastKm,
+	hoverHazards,
+	hoverRiver,
+	hoverTerrainFeature,
+	hoverOceanCurrents,
+	colorMode,
+	dtrAnnual,
+	displayMonth,
+	unitSystem,
+	world,
+	hoverCardRef,
+	getNationName,
+}) => {
+	const chartData = buildHoverChartData(hoverInfo, hoverElevationKm, world)
+	const pastaMonthlyData = buildPastaMonthlyData(hoverInfo, world)
+
+	const hoverRegion = hoverInfo?.region ?? null
+	const landmarkShare =
+		hoverLandmark?.size != null && world?.mesh.numRegions
+			? (hoverLandmark.size / world.mesh.numRegions) * 100
+			: null
+	const annualTemp = world.climate.temperature_avg[hoverRegion]
+	const annualPrecip = chartData
+		? chartData.precip.reduce((sum, value) => sum + value, 0)
+		: null
+	const climateColor = buildClimateSwatchColor(hoverRegion, world, colorMode)
+	const vegetationSwatch = buildVegetationSwatchColor(hoverRegion, world)
+	const topographySwatch = buildTopographySwatchColor(hoverRegion, world)
+	const terrainFeatureSwatches =
+		buildTerrainFeatureSwatches(hoverTerrainFeature)
+	const slopeScoreByRegion = world?.slopeScore ?? null
+	const hoverSlopePercent =
+		hoverRegion !== null && slopeScoreByRegion
+			? slopeScoreByRegion[hoverRegion] * 100
+			: null
+	const hasCurrentImpact =
+		hoverOceanCurrents !== null &&
+		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
+	const { provinceColor, provinceNation } = buildProvinceDisplayData({
+		hoverProvince,
+		hoverNationId,
+		hoverRegionColor,
+		world,
+	})
+
+	return (
+		<FloatingPanel
+			className="absolute top-3 left-3 z-20 w-64 px-3 py-2"
+			padding="sm"
+		>
+			<div ref={hoverCardRef} className="space-y-0.5">
+				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
+				<Row
+					label="Elev"
+					value={`${formatElevation(hoverElevationKm, unitSystem)}${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
+				/>
+				{hoverLandmark && (
+					<Row
+						label="Landmark"
+						value={`${hoverLandmark.type ?? "unknown"} #${hoverLandmark.id}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
+					/>
+				)}
+				{colorMode === "temperatureDelta" && hoverTemperatureDelta !== null && (
+					<Row
+						label="Temp Δ"
+						value={formatTemperatureDelta(hoverTemperatureDelta, unitSystem)}
+					/>
+				)}
+				{colorMode === "dtr" && hoverDtr !== null && (
+					<Row
+						label={`DTR ${dtrAnnual ? "avg" : monthLabels[displayMonth]}`}
+						value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
+					/>
+				)}
+				{colorMode !== "nations" && hoverIceSummary && (
+					<Row label="Ice" value={hoverIceSummary} />
+				)}
+				{colorMode === "terrainFeatures" &&
+					terrainFeatureSwatches.length > 0 && (
+						<MultiSwatchRow label="Features" values={terrainFeatureSwatches} />
+					)}
+				{colorMode !== "nations" && hoverHazards && (
+					<>
+						<SwatchRow
+							label="Danger"
+							value={`${Math.round(hoverHazards.danger * 100)}%${
+								hoverHazards.danger >= 0.2
+									? hoverHazards.earthquake >= hoverHazards.volcano
+										? " (quakes)"
+										: " (volcanic)"
+									: ""
+							}`}
+							color={rgbToCss(dangerColor(hoverHazards.danger))}
+						/>
+					</>
+				)}
+				{hoverTopography && (
+					<SwatchRow
+						label="Topography"
+						value={hoverTopography}
+						color={topographySwatch}
+					/>
+				)}
+				{hoverClimateDisplay && (
+					<SwatchRow
+						label="Climate"
+						value={hoverClimateDisplay}
+						color={climateColor}
+					/>
+				)}
+				{hoverBiome && (
+					<SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />
+				)}
+				{hoverProvince !== null && hoverProvince >= 0 && (
+					<>
+						<SwatchRow
+							label="Province"
+							value={`#${hoverProvince}${world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}`}
+							color={provinceColor}
+						/>
+						{provinceNation && (
+							<SwatchRow
+								label="Nation"
+								value={getNationName(provinceNation.id)}
+								color={provinceNation.color}
+							/>
+						)}
+						{hoverOccupation && (
+							<SwatchRow
+								label="Occupier"
+								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
+								color={hoverOccupation.color}
+								striped
+								stripeBackground={"white"}
+							/>
+						)}
+						{world?.population &&
+							!world.provinces!.desolate[hoverProvince] &&
+							(() => {
+								const p = hoverProvince
+								const pop = world.population.population[p]
+								if (pop <= 0) return null
+								const popStr =
+									pop >= 1_000_000
+										? `${(pop / 1_000_000).toFixed(1)}M`
+										: pop >= 1_000
+											? `${(pop / 1_000).toFixed(0)}K`
+											: Math.round(pop).toLocaleString()
+								const radiusKm = world.params.planetRadiusKm ?? 6371
+								const cellAreaKm2 =
+									(4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
+								const areaKm2 = world.provinces.size[p] * cellAreaKm2
+								const density = pop / areaKm2
+								return (
+									<Row
+										label="Pop"
+										value={`${popStr} · ${formatDensity(density, unitSystem)}`}
+									/>
+								)
+							})()}
+						{world?.development &&
+							!world.provinces!.desolate[hoverProvince] && (
+								<Row
+									label="Development"
+									value={world.development[hoverProvince].toFixed(2)}
+								/>
+							)}
+						{world?.urbanPopulation &&
+							!world.provinces!.desolate[hoverProvince] && (
+								<Row
+									label="Urban Pop"
+									value={Math.round(
+										world.urbanPopulation[hoverProvince],
+									).toLocaleString()}
+								/>
+							)}
+					</>
+				)}
+				{hoverOceanDist !== null && hoverOceanDist > 0 && (
+					<Row
+						label="Ocean dist"
+						value={formatDistance(hoverOceanDist, unitSystem)}
+					/>
+				)}
+				{hoverDistCoast !== null && (
+					<Row
+						label="Coast dist"
+						value={
+							hoverDistCoastKm === Infinity
+								? "∞"
+								: hoverDistCoastKm !== null
+									? formatDistance(hoverDistCoastKm, unitSystem)
+									: "—"
+						}
+					/>
+				)}
+				{chartData && world?.climate && (
+					<div className="space-y-2 border-t border-white/5 pt-1">
+						<SeriesBars
+							values={chartData.daylight}
+							labels={MONTH_SHORT}
+							label="Daylight"
+							colorForValue={(value) => rgbToCss(daylightColor(value))}
+							activeIndex={displayMonth - 1}
+							summary={buildSummary(
+								chartData.daylight.reduce((sum, value) => sum + value, 0) /
+									chartData.daylight.length,
+								{
+									prefix: "AVG",
+									unit: "h",
+									formatValue: (value) => value.toFixed(1),
+								},
+							)}
+							formatValue={(value) => value.toFixed(0)}
+							tooltipLabel={({ index, value }) =>
+								`${monthLabels[index + 1]}: ${value.toFixed(0)} h`
+							}
+							showValues
+						/>
+						<SeriesBars
+							values={chartData.temps}
+							labels={MONTH_SHORT}
+							label="Temp"
+							colorForValue={(value) => tempColor(value)}
+							activeIndex={displayMonth - 1}
+							summary={buildSummary(annualTemp ?? undefined, {
+								prefix: "AVG",
+								formatValue: (value) => formatTemperature(value, unitSystem, 1),
+							})}
+							formatValue={(value) =>
+								formatTemperature(value, unitSystem, 1).replace(/ ?°[CF]$/, "")
+							}
+							tooltipLabel={({ index, value }) =>
+								`${monthLabels[index + 1]}: ${formatTemperature(value, unitSystem, 1)}`
+							}
+							showValues
+						/>
+						{colorMode === "pastaClimate" &&
+							hoverRegion !== null &&
+							world.pastaDebug?.minT &&
+							world.pastaDebug?.maxT && (
+								<div className="flex justify-between font-mono text-[9px] text-slate-400">
+									<span>
+										MIN{" "}
+										<span className="text-slate-200">
+											{formatTemperature(
+												world.pastaDebug.minT[hoverRegion],
+												unitSystem,
+											)}
+										</span>
+									</span>
+									<span>
+										MAX{" "}
+										<span className="text-slate-200">
+											{formatTemperature(
+												world.pastaDebug.maxT[hoverRegion],
+												unitSystem,
+											)}
+										</span>
+									</span>
+								</div>
+							)}
+						{!!chartData.isLand && (
+							<SeriesBars
+								values={chartData.precip}
+								labels={MONTH_SHORT}
+								label="Precip"
+								colorForValue={(value) => rainColor(value)}
+								activeIndex={displayMonth - 1}
+								summary={buildSummary(annualPrecip ?? undefined, {
+									prefix: "ANN",
+									formatValue: (value) =>
+										formatPrecipitation(value, unitSystem, 0),
+								})}
+								formatValue={(value) =>
+									formatPrecipitation(value, unitSystem, 0).replace(
+										/ (mm|in)$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+								}
+								showValues
+							/>
+						)}
+						{colorMode === "precipitation" && !!chartData?.isLand && (
+							<>
+								<SeriesBars
+									values={chartData.pet}
+									labels={MONTH_SHORT}
+									label="PET"
+									colorForValue={(value) => petColor(value)}
+									activeIndex={displayMonth - 1}
+									summary={buildSummary(
+										chartData.pet.reduce((sum, value) => sum + value, 0),
+										{
+											prefix: "ANN",
+											formatValue: (value) =>
+												formatPrecipitation(value, unitSystem, 0),
+										},
+									)}
+									formatValue={(value) =>
+										formatPrecipitation(value, unitSystem, 0).replace(
+											/ (mm|in)$/,
+											"",
+										)
+									}
+									tooltipLabel={({ index, value }) =>
+										`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+									}
+									showValues
+								/>
+								{chartData.aet.some((v) => v > 0) && (
+									<SeriesBars
+										values={chartData.aet}
+										labels={MONTH_SHORT}
+										label="AET"
+										colorForValue={(value) => aetColor(value)}
+										activeIndex={displayMonth - 1}
+										summary={buildSummary(
+											chartData.aet.reduce((sum, value) => sum + value, 0),
+											{
+												prefix: "ANN",
+												formatValue: (value) =>
+													formatPrecipitation(value, unitSystem, 0),
+											},
+										)}
+										formatValue={(value) =>
+											formatPrecipitation(value, unitSystem, 0).replace(
+												/ (mm|in)$/,
+												"",
+											)
+										}
+										tooltipLabel={({ index, value }) =>
+											`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+										}
+										showValues
+									/>
+								)}
+							</>
+						)}
+						{colorMode === "pastaClimate" &&
+							pastaMonthlyData &&
+							!!chartData?.isLand && (
+								<>
+									{(() => {
+										const rawGdd =
+											world.pastaDebug?.gdd[hoverRegion] ?? undefined
+										const isInfGdd = rawGdd !== undefined && rawGdd >= 99999
+										return (
+											<SeriesBars
+												values={pastaMonthlyData.gdd}
+												labels={MONTH_SHORT}
+												label="GDD"
+												colorForValue={(value) => gddColor(value)}
+												activeIndex={displayMonth - 1}
+												summary={buildSummary(rawGdd, {
+													prefix: isInfGdd ? "" : "ANN",
+													formatValue: (value) =>
+														value >= 99999 ? "∞" : value.toFixed(0),
+												})}
+												formatValue={(value) =>
+													value >= 99999 ? "∞" : value.toFixed(0)
+												}
+												tooltipLabel={({ index, value }) =>
+													`${monthLabels[index + 1]}: ${value >= 99999 ? "∞" : value.toFixed(0)}`
+												}
+												showValues
+											/>
+										)
+									})()}
+									<SeriesBars
+										values={pastaMonthlyData.gint}
+										labels={MONTH_SHORT}
+										label="GInt"
+										colorForValue={(value) => gintColor(value)}
+										activeIndex={displayMonth - 1}
+										summary={buildSummary(
+											world.pastaDebug?.gint[hoverRegion] !== undefined
+												? world.pastaDebug.gint[hoverRegion] >= 99999
+													? 12
+													: world.pastaDebug.gint[hoverRegion]
+												: undefined,
+											{
+												prefix: "ANN",
+												formatValue: (value) => value.toFixed(0),
+											},
+										)}
+										formatValue={(value) => value.toFixed(0)}
+										tooltipLabel={({ index, value }) =>
+											`${monthLabels[index + 1]}: ${value.toFixed(0)}`
+										}
+										showValues
+									/>
+								</>
+							)}
+						{colorMode === "dtr" &&
+							hoverDtr &&
+							hoverDtr.monthly.length === 12 && (
+								<SeriesBars
+									values={hoverDtr.monthly}
+									labels={MONTH_SHORT}
+									label="DTR"
+									colorForValue={(value) => dtrChartColor(value)}
+									activeIndex={displayMonth - 1}
+									summary={buildSummary(hoverDtr.annual, {
+										prefix: "AVG",
+										formatValue: (value) =>
+											formatTemperatureDelta(value, unitSystem, 1),
+									})}
+									formatValue={(value) =>
+										formatTemperatureDelta(value, unitSystem, 1).replace(
+											/ ?°[CF]$/,
+											"",
+										)
+									}
+									tooltipLabel={({ index, value }) =>
+										`${monthLabels[index + 1]}: ${formatTemperatureDelta(value, unitSystem, 1)}`
+									}
+									showValues
+								/>
+							)}
+						{colorMode === "oceanCurrents" &&
+							hasCurrentImpact &&
+							hoverOceanCurrents !== null && (
+								<div className="space-y-1 border-t border-white/5 pt-1">
+									<SeriesBars
+										values={hoverOceanCurrents.monthlyDelta}
+										labels={MONTH_SHORT}
+										label="Ocean Current"
+										colorForValue={(value) => currentImpactColor(value)}
+										activeIndex={displayMonth - 1}
+										formatValue={(value) =>
+											`${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1).replace(/ ?°[CF]$/, "")}`
+										}
+										summary={buildSummary(hoverOceanCurrents.averageDelta, {
+											prefix: `${hoverOceanCurrents.mode} · avg`,
+											formatValue: (value) =>
+												`${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1)}`,
+										})}
+										tooltipLabel={({ index, value }) =>
+											`${monthLabels[index + 1]}: ${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1)}`
+										}
+										showValues
+									/>
+								</div>
+							)}
+						{hoverRiver && hoverRiver.flow_monthly.length === 12 && (
+							<SeriesBars
+								values={hoverRiver.flow_monthly}
+								labels={MONTH_SHORT}
+								label={`River #${hoverRiver.riverId}`}
+								colorForValue={(value) => flowColor(value)}
+								activeIndex={displayMonth - 1}
+								summary={buildSummary(hoverRiver.flow, {
+									formatValue: (value) =>
+										formatFlowRate(value, unitSystem, formatCompactNumber),
+								})}
+								formatValue={(value) =>
+									formatFlowRate(
+										value,
+										unitSystem,
+										formatCompactNumber,
+									).replace(/ (m³\/s|ft³\/s)$/, "")
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatFlowRate(value, unitSystem, formatCompactNumber)}`
+								}
+								showValues
+							/>
+						)}
+						{hoverRiver && hoverRiver.lengthKm > 0 && (
+							<div className="-mt-1 font-mono text-[9px] text-slate-500">
+								Length {formatDistance(hoverRiver.lengthKm, unitSystem)}
+							</div>
+						)}
+					</div>
+				)}
+			</div>
+		</FloatingPanel>
+	)
+}

@@ -1,67 +1,61 @@
 /**
- * HEALTH CHECK EVENT HANDLER
- *
- * Records the current and optimal wealth of all nations once per year.
- * This provides a historical record for charting wealth over time.
+ * TAX EVENT — recovers wealth during peacetime.
+ * Port of src/model/history/events/tax.ts
  */
 
-import { NATION } from "@/model/nations"
-import { PROVINCE } from "@/model/provinces"
-import { Province } from "@/model/provinces/types"
-import { TIME } from "@/model/utilities/time"
-import { WAR } from "../../nations/wars"
-import { TaxEvent } from "../types"
+import { provinceWars } from "../derive"
+import { EVT } from "../event-heap"
+import { PROV } from "../fields"
+import type { HistoryRng } from "../history-rng"
+import { type HistoryState, wealthOptimal, YEAR_MS } from "../state"
 
-/**
- * Calculate the fraction of the past year that a nation spent at peace (not at war).
- * Returns a value between 0 (entire year at war) and 1 (entire year at peace).
- */
-const peaceFraction = (nation: Province, previous: number): number => {
+/** Calculate fraction of past year spent at peace (0 = all war, 1 = all peace) */
+function peaceFraction(
+	state: HistoryState,
+	nation: number,
+	previous: number,
+): number {
 	const start = previous
-	const end = window.world.time
+	const end = state.time
 	const duration = end - start
-	const wars = WAR.nation.get(nation)
+	if (duration <= 0) return 1
 
-	// Calculate total time spent at war during the past year
+	const wars = provinceWars(state, nation, end)
+		.map((idx: number) => state.wars[idx])
+		.filter((w) => w.startTime <= end)
+
 	let warTime = 0
 	for (const war of wars) {
 		const warStart = Math.max(war.startTime, start)
 		const warEnd = Math.min(war.endTime ?? end, end)
-		if (warStart < warEnd) {
-			warTime += warEnd - warStart
-		}
+		if (warStart < warEnd) warTime += warEnd - warStart
 	}
 
-	// Clamp to avoid floating point issues
-	const peaceTime = Math.max(0, duration - warTime)
-	return peaceTime / duration
+	return Math.max(0, duration - warTime) / duration
 }
 
-export const TAX_EVENT = {
-	init: () => {
-		window.world.provinces
-			.filter((p) => !p.desolate)
-			.forEach((p) => {
-				p._consumption.push({
-					time: window.world.time,
-					consumption: 0,
-				})
-				TAX_EVENT.spawn(p)
-			})
-	},
-	spawn: (province: Province) => {
-		window.world.future.enqueue({
-			type: "tax",
-			time: window.world.time + TIME.constants.yearMS,
-			nation: province.idx,
-			previous: window.world.time,
-		})
-	},
-	run: (event: TaxEvent) => {
-		const nation = window.world.provinces[event.nation]
-		const peace = peaceFraction(nation, event.previous)
-		const recovered = NATION.wealth.optimal(nation) * 0.1 * peace
-		PROVINCE.consumption.delta(nation, -recovered)
-		TAX_EVENT.spawn(nation)
-	},
+export function initTax(state: HistoryState, _rng: HistoryRng): void {
+	for (let p = 0; p < state.P; p++) {
+		if (state.desolate[p]) continue
+		state.heap.enqueue(state.time + YEAR_MS, EVT.TAX, p, 0, 0, 0, state.time)
+	}
+}
+
+export function runTax(
+	state: HistoryState,
+	nation: number,
+	previousTime: number,
+	_rng: HistoryRng,
+): void {
+	const peace = peaceFraction(state, nation, previousTime)
+	const recovered = wealthOptimal(state, nation) * 0.1 * peace
+	PROV.consumption.set(
+		state,
+		nation,
+		state.time,
+		Math.max(0, PROV.consumption.get(state, nation) - recovered),
+	)
+
+	// Schedule next tax event
+	state.heap.enqueue(state.time + YEAR_MS, EVT.TAX, nation, 0, 0, 0, state.time)
 }

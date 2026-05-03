@@ -1,115 +1,457 @@
-import { TEXT } from "@/model/utilities/text"
+import { titleCase } from "@/model/shared/text"
+import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { LANGUAGE } from "./languages"
-import { Language } from "./languages/types"
+import type { Language } from "./languages/types"
 
-/**
- * Lazily generate and cache names for provinces and nations
- * using their culture's language dialect. All generated names
- * are guaranteed unique via LANGUAGE.word.unique().
- */
+export interface LanguageNameLeaderEntry {
+	time: number
+	name?: string
+}
 
-const _provinceNames = new Map<number, string>()
-const _nationNames = new Map<number, string>()
-const _riverNames = new Map<number, string>()
-const _mountainNames = new Map<number, string>()
+export interface LanguageNameProvince {
+	culture: number
+	leaders?: LanguageNameLeaderEntry[]
+}
 
-const langFor = (provinceIdx: number): Language | null => {
-	const province = window.world.provinces[provinceIdx]
-	if (!province || province.culture === -1) return null
-	return window.world.cultures[province.culture]?.language ?? null
+export interface LanguageNameCulture {
+	language: Language | null
+	languageSeed?: number
+	nameSeed?: number
+	heritage?: number
+	faith?: number
+	traditions?: readonly string[]
+}
+
+export interface LanguageNameHeritage {
+	language: Language | null
+	languageSeed?: number
+	nameSeed?: number
+}
+
+export interface LanguageNameNation {
+	id: number
+	capital: number
+	culture: number
+	nameSeed?: number
+	name?: string
+}
+
+export interface LanguageNameFaith {
+	nameSeed?: number
+	seedCulture?: number
+	religion?: number
+	name?: string
+}
+
+export interface LanguageNameReligion {
+	nameSeed?: number
+	seedFaith?: number
+	name?: string
+}
+
+export interface LanguageNameDynasty {
+	name: string
+}
+
+export interface LanguageNameContext {
+	provinces: readonly LanguageNameProvince[]
+	cultures: readonly LanguageNameCulture[]
+	heritages?: readonly LanguageNameHeritage[]
+	faiths?: readonly LanguageNameFaith[]
+	religions?: readonly LanguageNameReligion[]
+	nations?: readonly LanguageNameNation[]
+	dynasties?: readonly LanguageNameDynasty[]
+}
+
+export interface LanguageNames {
+	province(provinceIdx: number): string
+	nation(capitalIdx: number): string
+	culture(cultureIdx: number): string
+	heritage(heritageIdx: number): string
+	faith(faithIdx: number): string
+	religion(religionIdx: number): string
+	river(provinceIdx: number): string
+	mountain(provinceIdx: number): string
+	leader(provinceIdx: number, time: number): string
+	dynasty(dynastyIdx: number): string
+	clear(): void
+}
+
+function getLanguage(
+	context: LanguageNameContext,
+	provinceIdx: number,
+): Language | null {
+	const province = context.provinces[provinceIdx]
+	if (!province || province.culture < 0) return null
+	return getCultureLanguage(context, province.culture)
+}
+
+function spawnSeededLanguage(seed: number, namespace: string): Language {
+	return LANGUAGE.spawn(`${namespace}:${seed}`)
+}
+
+function getHeritageLanguage(
+	context: LanguageNameContext,
+	heritageIdx: number,
+): Language | null {
+	const heritage = context.heritages?.[heritageIdx]
+	if (!heritage) return null
+	if (heritage.language) return heritage.language
+	if (heritage.languageSeed == null) return null
+	heritage.language = spawnSeededLanguage(heritage.languageSeed, "heritage")
+	return heritage.language
+}
+
+function getCultureLanguage(
+	context: LanguageNameContext,
+	cultureIdx: number,
+): Language | null {
+	const culture = context.cultures[cultureIdx]
+	if (!culture) return null
+	if (culture.language) return culture.language
+
+	const seed = culture.languageSeed
+	if (seed == null) return null
+
+	const heritageIdx = culture.heritage ?? -1
+	const heritageLanguage =
+		heritageIdx >= 0 ? getHeritageLanguage(context, heritageIdx) : null
+	culture.language = heritageLanguage
+		? LANGUAGE.dialect(heritageLanguage, seed)
+		: spawnSeededLanguage(seed, "culture")
+	return culture.language
+}
+
+function getLeaderEntry(
+	province: LanguageNameProvince | undefined,
+	time: number,
+): LanguageNameLeaderEntry | undefined {
+	if (!province?.leaders?.length) return undefined
+	for (let i = province.leaders.length - 1; i >= 0; i--) {
+		if (province.leaders[i].time <= time) return province.leaders[i]
+	}
+	return undefined
+}
+
+function buildNationSlot(
+	nation: LanguageNameNation | undefined,
+	capitalIdx: number,
+): string {
+	if (!nation) return `nation:${capitalIdx}`
+	return `nation:${nation.id}:${nation.nameSeed ?? nation.id}`
+}
+
+function buildNamedGroupSlot(
+	namespace: string,
+	index: number,
+	nameSeed: number | undefined,
+): string {
+	return `${namespace}:${index}:${nameSeed ?? index}`
+}
+
+export function createNames(context: LanguageNameContext): LanguageNames {
+	const provinceNames = new Map<number, string>()
+	const nationNames = new Map<number, string>()
+	const cultureNames = new Map<number, string>()
+	const heritageNames = new Map<number, string>()
+	const faithNames = new Map<number, string>()
+	const religionNames = new Map<number, string>()
+	const riverNames = new Map<number, string>()
+	const mountainNames = new Map<number, string>()
+	const nationById = new Map(
+		context.nations?.map((nation) => [nation.id, nation]) ?? [],
+	)
+
+	function cachedName(
+		cache: Map<number, string>,
+		index: number,
+		key: string,
+		namespace: string,
+		fallback: string,
+	): string {
+		const cached = cache.get(index)
+		if (cached) return cached
+
+		const lang = getLanguage(context, index)
+		if (!lang) return fallback
+
+		const name = titleCase(
+			LANGUAGE.word.simple({
+				lang,
+				key,
+				namespace,
+				slot: `${namespace}:${index}`,
+			}).word,
+		)
+		cache.set(index, name)
+		return name
+	}
+
+	function cachedScopedName(params: {
+		cache: Map<number, string>
+		index: number
+		key: string
+		namespace: string
+		slot: string
+		lang: Language | null
+		fallback: string
+		onNamed?: (name: string) => void
+	}): string {
+		const { cache, index, key, namespace, slot, lang, fallback, onNamed } =
+			params
+		const cached = cache.get(index)
+		if (cached) return cached
+		if (!lang) return fallback
+		const name = titleCase(
+			LANGUAGE.word.simple({
+				lang,
+				key,
+				namespace,
+				slot,
+			}).word,
+		)
+		cache.set(index, name)
+		onNamed?.(name)
+		return name
+	}
+
+	function cachedNationName(capitalIdx: number): string {
+		const nation = nationById.get(capitalIdx)
+		const lang =
+			nation && nation.culture >= 0
+				? getCultureLanguage(context, nation.culture)
+				: getLanguage(context, capitalIdx)
+		return cachedScopedName({
+			cache: nationNames,
+			index: capitalIdx,
+			key: "region",
+			namespace: "nation",
+			slot: buildNationSlot(nation, capitalIdx),
+			lang,
+			fallback: `#${capitalIdx}`,
+			onNamed: (name) => {
+				if (nation) nation.name = name
+			},
+		})
+	}
+
+	function cachedCultureName(cultureIdx: number): string {
+		const culture = context.cultures[cultureIdx]
+		return cachedScopedName({
+			cache: cultureNames,
+			index: cultureIdx,
+			key: "culture",
+			namespace: "culture",
+			slot: buildNamedGroupSlot("culture", cultureIdx, culture?.nameSeed),
+			lang: getCultureLanguage(context, cultureIdx),
+			fallback: `Culture #${cultureIdx}`,
+		})
+	}
+
+	function cachedHeritageName(heritageIdx: number): string {
+		const heritage = context.heritages?.[heritageIdx]
+		return cachedScopedName({
+			cache: heritageNames,
+			index: heritageIdx,
+			key: "culture",
+			namespace: "heritage",
+			slot: buildNamedGroupSlot("heritage", heritageIdx, heritage?.nameSeed),
+			lang: getHeritageLanguage(context, heritageIdx),
+			fallback: `Heritage #${heritageIdx}`,
+		})
+	}
+
+	function getFaithLanguage(faithIdx: number): Language | null {
+		const faith = context.faiths?.[faithIdx]
+		if (!faith) return null
+		const seedCulture = faith.seedCulture ?? -1
+		return seedCulture >= 0 ? getCultureLanguage(context, seedCulture) : null
+	}
+
+	function cachedFaithName(faithIdx: number): string {
+		const faith = context.faiths?.[faithIdx]
+		return cachedScopedName({
+			cache: faithNames,
+			index: faithIdx,
+			key: "culture",
+			namespace: "faith",
+			slot: buildNamedGroupSlot("faith", faithIdx, faith?.nameSeed),
+			lang: getFaithLanguage(faithIdx),
+			fallback: `Faith #${faithIdx}`,
+			onNamed: (name) => {
+				if (faith) faith.name = name
+			},
+		})
+	}
+
+	function getReligionLanguage(religionIdx: number): Language | null {
+		const religion = context.religions?.[religionIdx]
+		if (!religion) return null
+		const seedFaith = religion.seedFaith ?? -1
+		return seedFaith >= 0 ? getFaithLanguage(seedFaith) : null
+	}
+
+	function cachedReligionName(religionIdx: number): string {
+		const religion = context.religions?.[religionIdx]
+		return cachedScopedName({
+			cache: religionNames,
+			index: religionIdx,
+			key: "culture",
+			namespace: "religion",
+			slot: buildNamedGroupSlot("religion", religionIdx, religion?.nameSeed),
+			lang: getReligionLanguage(religionIdx),
+			fallback: `Religion #${religionIdx}`,
+			onNamed: (name) => {
+				if (religion) religion.name = name
+			},
+		})
+	}
+
+	return {
+		province: (provinceIdx: number) =>
+			cachedName(
+				provinceNames,
+				provinceIdx,
+				"settlement",
+				"province",
+				`#${provinceIdx}`,
+			),
+		nation: cachedNationName,
+		culture: cachedCultureName,
+		heritage: cachedHeritageName,
+		faith: cachedFaithName,
+		religion: cachedReligionName,
+		river: (provinceIdx: number) =>
+			cachedName(
+				riverNames,
+				provinceIdx,
+				"river",
+				"river",
+				`River #${provinceIdx}`,
+			),
+		mountain: (provinceIdx: number) =>
+			cachedName(
+				mountainNames,
+				provinceIdx,
+				"mountain",
+				"mountain",
+				`Mount #${provinceIdx}`,
+			),
+		leader: (provinceIdx: number, time: number) => {
+			const province = context.provinces[provinceIdx]
+			if (!province || province.culture < 0) return `Leader #${provinceIdx}`
+
+			const leaderEntry = getLeaderEntry(province, time)
+			if (!leaderEntry) return `Leader #${provinceIdx}`
+			if (leaderEntry.name) return leaderEntry.name
+
+			const culture = context.cultures[province.culture]
+			const lang = culture
+				? getCultureLanguage(context, province.culture)
+				: null
+			if (!lang) return `Leader #${provinceIdx}`
+
+			const isMatriarchal = culture.traditions?.includes("matriarchal_society")
+			const key = isMatriarchal ? "person_female" : "person_male"
+			const name = titleCase(
+				LANGUAGE.word.simple({
+					lang,
+					key,
+					namespace: "leader",
+					slot: `leader:${provinceIdx}:${time}`,
+				}).word,
+			)
+			leaderEntry.name = name
+			return name
+		},
+		dynasty: (dynastyIdx: number) => {
+			const dynasty = context.dynasties?.[dynastyIdx]
+			if (!dynasty) return `Dynasty #${dynastyIdx}`
+			return dynasty.name
+		},
+		clear: () => {
+			provinceNames.clear()
+			nationNames.clear()
+			cultureNames.clear()
+			heritageNames.clear()
+			faithNames.clear()
+			religionNames.clear()
+			riverNames.clear()
+			mountainNames.clear()
+		},
+	}
 }
 
 export const NAMES = {
-	province: (provinceIdx: number): string => {
-		const cached = _provinceNames.get(provinceIdx)
-		if (cached) return cached
-		const lang = langFor(provinceIdx)
-		if (!lang) return `#${provinceIdx}`
-		const name = TEXT.titleCase(
-			LANGUAGE.word.unique({ lang, key: "settlement" }).word,
-		)
-		_provinceNames.set(provinceIdx, name)
-		return name
-	},
-	nation: (capitalIdx: number): string => {
-		const cached = _nationNames.get(capitalIdx)
-		if (cached) return cached
-		const lang = langFor(capitalIdx)
-		if (!lang) return `#${capitalIdx}`
-		const name = TEXT.titleCase(
-			LANGUAGE.word.unique({ lang, key: "region" }).word,
-		)
-		_nationNames.set(capitalIdx, name)
-		return name
-	},
-	river: (provinceIdx: number): string => {
-		const cached = _riverNames.get(provinceIdx)
-		if (cached) return cached
-		const lang = langFor(provinceIdx)
-		if (!lang) return `River #${provinceIdx}`
-		const name = TEXT.titleCase(
-			LANGUAGE.word.unique({ lang, key: "river" }).word,
-		)
-		_riverNames.set(provinceIdx, name)
-		return name
-	},
-	mountain: (provinceIdx: number): string => {
-		const cached = _mountainNames.get(provinceIdx)
-		if (cached) return cached
-		const lang = langFor(provinceIdx)
-		if (!lang) return `Mount #${provinceIdx}`
-		const name = TEXT.titleCase(
-			LANGUAGE.word.unique({ lang, key: "mountain" }).word,
-		)
-		_mountainNames.set(provinceIdx, name)
-		return name
-	},
-	leader: (provinceIdx: number, time: number): string => {
-		// Get capital's leader at this specific time
-		const capital = window.world.provinces[provinceIdx]
-		if (!capital || capital.culture === -1) return `Leader #${provinceIdx}`
+	create: createNames,
+}
 
-		// Find relevant historical leader entry
-		let leaderEntry = null
-		if (capital._leader.length > 0) {
-			// Fast path for exact end match (often the case)
-			for (let i = capital._leader.length - 1; i >= 0; i--) {
-				if (capital._leader[i].time <= time) {
-					leaderEntry = capital._leader[i]
-					break
-				}
+export function createWorldNames(
+	world: Pick<
+		SerializedOrogenWorld,
+		"provinces" | "cultures" | "heritages" | "faiths" | "religions" | "nations"
+	>,
+): LanguageNames {
+	const provinceCount = world.provinces?.count ?? 0
+	const cultureCount = world.cultures?.count ?? 0
+	const heritageCount = world.heritages?.count ?? 0
+	const faithCount = world.faiths?.count ?? 0
+	const religionCount = world.religions?.count ?? 0
+	const cultures: LanguageNameCulture[] = Array.from(
+		{ length: cultureCount },
+		(_, cultureIdx): LanguageNameCulture => ({
+			language: null,
+			languageSeed: world.cultures?.languageSeeds?.[cultureIdx],
+			nameSeed: world.cultures?.nameSeeds?.[cultureIdx],
+			heritage: world.heritages?.assignment[cultureIdx] ?? -1,
+			faith: world.faiths?.assignment[cultureIdx] ?? -1,
+		}),
+	)
+	const heritages: LanguageNameHeritage[] = Array.from(
+		{ length: heritageCount },
+		(_, heritageIdx): LanguageNameHeritage => ({
+			language: null,
+			languageSeed: world.heritages?.languageSeeds?.[heritageIdx],
+			nameSeed: world.heritages?.nameSeeds?.[heritageIdx],
+		}),
+	)
+	const faiths: LanguageNameFaith[] = Array.from(
+		{ length: faithCount },
+		(_, faithIdx): LanguageNameFaith => ({
+			nameSeed: world.faiths?.nameSeeds?.[faithIdx],
+			seedCulture: world.faiths?.seeds?.[faithIdx] ?? -1,
+			religion: world.religions?.assignment?.[faithIdx] ?? -1,
+		}),
+	)
+	const religions: LanguageNameReligion[] = Array.from(
+		{ length: religionCount },
+		(_, religionIdx): LanguageNameReligion => ({
+			nameSeed: world.religions?.nameSeeds?.[religionIdx],
+			seedFaith: world.religions?.seeds?.[religionIdx] ?? -1,
+		}),
+	)
+	const provinces = Array.from({ length: provinceCount }, (_, provinceIdx) => ({
+		culture: world.cultures?.assignment[provinceIdx] ?? -1,
+	}))
+	const nations: LanguageNameNation[] = Array.from(
+		{ length: world.nations?.seeds.length ?? 0 },
+		(_, nationIdx): LanguageNameNation => {
+			const capital = world.nations?.seeds[nationIdx] ?? -1
+			return {
+				id: capital,
+				capital,
+				culture:
+					capital >= 0 ? (world.cultures?.assignment[capital] ?? -1) : -1,
+				nameSeed: world.nations?.nameSeeds?.[nationIdx],
 			}
-		}
-
-		if (!leaderEntry) return `Leader #${provinceIdx}`
-
-		// Use persistent name if it exists already
-		if (leaderEntry.name) return leaderEntry.name
-
-		const culture = window.world.cultures[capital.culture]
-		if (!culture) return `Leader #${provinceIdx}`
-
-		const lang = culture.language
-		const isMatriarchal = culture.traditions.includes("matriarchal_society")
-		const nameKey = isMatriarchal ? "person_female" : "person_male"
-
-		const name = LANGUAGE.word.unique({ lang, key: nameKey }).word
-		const finalName = TEXT.titleCase(name)
-
-		// Persist the generated name!
-		leaderEntry.name = finalName
-		return finalName
-	},
-	dynasty: (dynastyIdx: number): string => {
-		const dynasty = window.world.dynasties[dynastyIdx]
-		if (!dynasty) return `Dynasty #${dynastyIdx}`
-		return dynasty.name
-	},
-	/** Clear cached names (e.g. on world regeneration) */
-	clear: () => {
-		_provinceNames.clear()
-		_nationNames.clear()
-		_riverNames.clear()
-		_mountainNames.clear()
-	},
+		},
+	)
+	return createNames({
+		provinces,
+		cultures,
+		heritages,
+		faiths,
+		religions,
+		nations,
+	})
 }

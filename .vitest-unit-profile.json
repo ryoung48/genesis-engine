@@ -1,0 +1,2254 @@
+{
+	"numTotalTestSuites": 110,
+	"numPassedTestSuites": 110,
+	"numFailedTestSuites": 0,
+	"numPendingTestSuites": 0,
+	"numTotalTests": 211,
+	"numPassedTests": 211,
+	"numFailedTests": 0,
+	"numPendingTests": 0,
+	"numTodoTests": 0,
+	"snapshot": {
+		"added": 0,
+		"failure": false,
+		"filesAdded": 0,
+		"filesRemoved": 0,
+		"filesRemovedList": [],
+		"filesUnmatched": 0,
+		"filesUpdated": 0,
+		"matched": 0,
+		"total": 0,
+		"unchecked": 0,
+		"uncheckedKeysByFile": [],
+		"unmatched": 0,
+		"updated": 0,
+		"didUpdate": false
+	},
+	"startTime": 1777741856732,
+	"success": true,
+	"testResults": [
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["APP_PATHS"],
+					"fullName": "APP_PATHS keeps the tectonic lab at the root path",
+					"status": "passed",
+					"title": "keeps the tectonic lab at the root path",
+					"duration": 1.999300000000062,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["APP_PATHS"],
+					"fullName": "APP_PATHS does not expose removed legacy paths",
+					"status": "passed",
+					"title": "does not expose removed legacy paths",
+					"duration": 1.2064999999998918,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859794,
+			"endTime": 1777741859797.2065,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/app-routes.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["shared chart components"],
+					"fullName": "shared chart components renders a generic continuous legend",
+					"status": "passed",
+					"title": "renders a generic continuous legend",
+					"duration": 17.665100000000166,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["shared chart components"],
+					"fullName": "shared chart components renders reusable series bars with labels and summaries",
+					"status": "passed",
+					"title": "renders reusable series bars with labels and summaries",
+					"duration": 3.5206000000000586,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["shared chart components"],
+					"fullName": "shared chart components builds a generic heatmap chart dataset and legend",
+					"status": "passed",
+					"title": "builds a generic heatmap chart dataset and legend",
+					"duration": 7.733000000000175,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858575,
+			"endTime": 1777741858603.733,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/components/chart-components.test.tsx"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["planet ui primitives"],
+					"fullName": "planet ui primitives renders semantic overlay and panel surfaces",
+					"status": "passed",
+					"title": "renders semantic overlay and panel surfaces",
+					"duration": 17.3433,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet ui primitives"],
+					"fullName": "planet ui primitives renders segmented controls and buttons with selected states",
+					"status": "passed",
+					"title": "renders segmented controls and buttons with selected states",
+					"duration": 4.7883999999999105,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet ui primitives"],
+					"fullName": "planet ui primitives renders labeled values and swatches for panel rows",
+					"status": "passed",
+					"title": "renders labeled values and swatches for panel rows",
+					"duration": 2.9528000000000247,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858504,
+			"endTime": 1777741858529.953,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/components/component-primitives.test.tsx"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["ClimatePreviewOverlay"],
+					"fullName": "ClimatePreviewOverlay renders the broader climate preview tabs and a close action",
+					"status": "passed",
+					"title": "renders the broader climate preview tabs and a close action",
+					"duration": 25.042200000000093,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["ClimatePreviewOverlay"],
+					"fullName": "ClimatePreviewOverlay routes the insolation tab through the generalized heatmap chart",
+					"status": "passed",
+					"title": "routes the insolation tab through the generalized heatmap chart",
+					"duration": 6.068299999999908,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858665,
+			"endTime": 1777741858696.0684,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/ClimatePreviewOverlay.test.tsx"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["precipitation colors"],
+					"fullName": "precipitation colors matches the original monthly stop colors",
+					"status": "passed",
+					"title": "matches the original monthly stop colors",
+					"duration": 4.106099999999969,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["precipitation colors"],
+					"fullName": "precipitation colors uses fixed monthly thresholds without normalization",
+					"status": "passed",
+					"title": "uses fixed monthly thresholds without normalization",
+					"duration": 1.6523000000001957,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["precipitation colors"],
+					"fullName": "precipitation colors uses distinct annual thresholds from monthly precipitation",
+					"status": "passed",
+					"title": "uses distinct annual thresholds from monthly precipitation",
+					"duration": 0.8365999999998621,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["sampled palette colors"],
+					"fullName": "sampled palette colors matches the sampled temperature delta endpoints",
+					"status": "passed",
+					"title": "matches the sampled temperature delta endpoints",
+					"duration": 3.0978000000000065,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["sampled palette colors"],
+					"fullName": "sampled palette colors matches the shared daylight and temperature ramps",
+					"status": "passed",
+					"title": "matches the shared daylight and temperature ramps",
+					"duration": 2.672800000000052,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["sampled palette colors"],
+					"fullName": "sampled palette colors matches the shared ramps",
+					"status": "passed",
+					"title": "matches the shared ramps",
+					"duration": 3.81899999999996,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["sampled palette colors"],
+					"fullName": "sampled palette colors maps danger zones from white to orange for earthquakes and red for volcanoes",
+					"status": "passed",
+					"title": "maps danger zones from white to orange for earthquakes and red for volcanoes",
+					"duration": 1.7590000000000146,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858243,
+			"endTime": 1777741858261.759,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/colors.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["computeDiurnalRange"],
+					"fullName": "computeDiurnalRange producesMonthlyArrayOfTwelveTimesN",
+					"status": "passed",
+					"title": "producesMonthlyArrayOfTwelveTimesN",
+					"duration": 3.368400000000065,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeDiurnalRange"],
+					"fullName": "computeDiurnalRange producesAnnualArrayOfN",
+					"status": "passed",
+					"title": "producesAnnualArrayOfN",
+					"duration": 0.9804999999998927,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeDiurnalRange"],
+					"fullName": "computeDiurnalRange producesNonNegativeDtrForLandCells",
+					"status": "passed",
+					"title": "producesNonNegativeDtrForLandCells",
+					"duration": 3.683999999999969,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeDiurnalRange"],
+					"fullName": "computeDiurnalRange producesNonNegativeDtrForOceanCells",
+					"status": "passed",
+					"title": "producesNonNegativeDtrForOceanCells",
+					"duration": 2.837199999999939,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeDiurnalRange"],
+					"fullName": "computeDiurnalRange producesAnnualEqualToMeanOfMonthlyForEachCell",
+					"status": "passed",
+					"title": "producesAnnualEqualToMeanOfMonthlyForEachCell",
+					"duration": 1.2282999999999902,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeDiurnalRange"],
+					"fullName": "computeDiurnalRange producesLowerDtrForOceanCellsThanLandCellsWithSameRain",
+					"status": "passed",
+					"title": "producesLowerDtrForOceanCellsThanLandCellsWithSameRain",
+					"duration": 0.7909000000000788,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859112,
+			"endTime": 1777741859125.791,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/climate/dtr.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves returnsPositivePetForTypicalInputs",
+					"status": "passed",
+					"title": "returnsPositivePetForTypicalInputs",
+					"duration": 2.5731000000000677,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves returnsZeroPetWhenInsolationIsZero",
+					"status": "passed",
+					"title": "returnsZeroPetWhenInsolationIsZero",
+					"duration": 0.5422000000000935,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves returnsZeroPetWhenTemperatureIsBelowFreezingAndCold",
+					"status": "passed",
+					"title": "returnsZeroPetWhenTemperatureIsBelowFreezingAndCold",
+					"duration": 0.2939000000000078,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves producesHigherPetWithHigherTemperature",
+					"status": "passed",
+					"title": "producesHigherPetWithHigherTemperature",
+					"duration": 0.535199999999918,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves producesHigherPetWithMoreInsolation",
+					"status": "passed",
+					"title": "producesHigherPetWithMoreInsolation",
+					"duration": 0.7916000000000167,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves scalesPetWithDaysPerMonth",
+					"status": "passed",
+					"title": "scalesPetWithDaysPerMonth",
+					"duration": 0.6785999999999603,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petMonthHargreaves"],
+					"fullName": "petMonthHargreaves usesAtLeastDtrOfTwoToPreventZeroOutput",
+					"status": "passed",
+					"title": "usesAtLeastDtrOfTwoToPreventZeroOutput",
+					"duration": 0.3972999999999729,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["fillPetMonthlyHargreaves"],
+					"fullName": "fillPetMonthlyHargreaves fillsOutputArrayWithCorrectPetValues",
+					"status": "passed",
+					"title": "fillsOutputArrayWithCorrectPetValues",
+					"duration": 0.7923999999999296,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["fillPetMonthlyHargreaves"],
+					"fullName": "fillPetMonthlyHargreaves producesNonNegativeOutputForAllCells",
+					"status": "passed",
+					"title": "producesNonNegativeOutputForAllCells",
+					"duration": 0.7994000000001051,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859563,
+			"endTime": 1777741859571.7993,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/climate/hydrology.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh returnsNPlusOneRegionsToAccountForPoleClosure",
+					"status": "passed",
+					"title": "returnsNPlusOneRegionsToAccountForPoleClosure",
+					"duration": 21.682900000000018,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh placesEveryRegionOnUnitSphere",
+					"status": "passed",
+					"title": "placesEveryRegionOnUnitSphere",
+					"duration": 35.43730000000005,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh producesAdjacencyOffsetOfLengthNumRegionsPlusOne",
+					"status": "passed",
+					"title": "producesAdjacencyOffsetOfLengthNumRegionsPlusOne",
+					"duration": 5.781099999999924,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh producesSymmetricAdjacency",
+					"status": "passed",
+					"title": "producesSymmetricAdjacency",
+					"duration": 106.17079999999999,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh assignsAtLeastThreeNeighborsPerRegion",
+					"status": "passed",
+					"title": "assignsAtLeastThreeNeighborsPerRegion",
+					"duration": 10.84030000000007,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh producesPositiveNeighborDistances",
+					"status": "passed",
+					"title": "producesPositiveNeighborDistances",
+					"duration": 78.5510999999999,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh isDeterministicForSameSeed",
+					"status": "passed",
+					"title": "isDeterministicForSameSeed",
+					"duration": 46.742500000000064,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSphereMesh"],
+					"fullName": "buildSphereMesh producesDifferentGeometryForDifferentSeed",
+					"status": "passed",
+					"title": "producesDifferentGeometryForDifferentSeed",
+					"duration": 5.827800000000025,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741857759,
+			"endTime": 1777741858071.828,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/core/mesh.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["color interpolation"],
+					"fullName": "color interpolation parses css colors and formats rgb output",
+					"status": "passed",
+					"title": "parses css colors and formats rgb output",
+					"duration": 4.467800000000011,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["color interpolation"],
+					"fullName": "color interpolation samples discrete color stops linearly",
+					"status": "passed",
+					"title": "samples discrete color stops linearly",
+					"duration": 0.7303000000000566,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["color interpolation"],
+					"fullName": "color interpolation interpolates cubic basis endpoints",
+					"status": "passed",
+					"title": "interpolates cubic basis endpoints",
+					"duration": 1.0500999999999294,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["color interpolation"],
+					"fullName": "color interpolation maps linear ranges with optional clamping",
+					"status": "passed",
+					"title": "maps linear ranges with optional clamping",
+					"duration": 0.6955000000000382,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859514,
+			"endTime": 1777741859520.6956,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/color-interpolation.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["clamp"],
+					"fullName": "clamp returnsValueWhenWithinRange",
+					"status": "passed",
+					"title": "returnsValueWhenWithinRange",
+					"duration": 3.254199999999969,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["clamp"],
+					"fullName": "clamp clampsToLo",
+					"status": "passed",
+					"title": "clampsToLo",
+					"duration": 0.3997999999999138,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["clamp"],
+					"fullName": "clamp clampsToHi",
+					"status": "passed",
+					"title": "clampsToHi",
+					"duration": 0.32380000000000564,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["clamp01"],
+					"fullName": "clamp01 returnsValueWhenWithinRange",
+					"status": "passed",
+					"title": "returnsValueWhenWithinRange",
+					"duration": 0.6757000000000062,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["clamp01"],
+					"fullName": "clamp01 clampsNegativeToZero",
+					"status": "passed",
+					"title": "clampsNegativeToZero",
+					"duration": 0.4822000000000344,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["clamp01"],
+					"fullName": "clamp01 clampsAboveOneToOne",
+					"status": "passed",
+					"title": "clampsAboveOneToOne",
+					"duration": 0.22860000000002856,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["smoothstep"],
+					"fullName": "smoothstep returnsZeroAtEdge0",
+					"status": "passed",
+					"title": "returnsZeroAtEdge0",
+					"duration": 0.2903999999999769,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["smoothstep"],
+					"fullName": "smoothstep returnsOneAtEdge1",
+					"status": "passed",
+					"title": "returnsOneAtEdge1",
+					"duration": 0.21660000000008495,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["smoothstep"],
+					"fullName": "smoothstep returnsMidpointAtHalf",
+					"status": "passed",
+					"title": "returnsMidpointAtHalf",
+					"duration": 0.5320000000000391,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["smoothstep"],
+					"fullName": "smoothstep clampsOutsideRange",
+					"status": "passed",
+					"title": "clampsOutsideRange",
+					"duration": 0.5785999999999376,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["smoothstep"],
+					"fullName": "smoothstep handlesEqualEdges",
+					"status": "passed",
+					"title": "handlesEqualEdges",
+					"duration": 0.36549999999999727,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["eulerVelocityAt"],
+					"fullName": "eulerVelocityAt returnsZeroVelocityForZeroOmega",
+					"status": "passed",
+					"title": "returnsZeroVelocityForZeroOmega",
+					"duration": 1.6930999999999585,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["eulerVelocityAt"],
+					"fullName": "eulerVelocityAt computesCrossProduct",
+					"status": "passed",
+					"title": "computesCrossProduct",
+					"duration": 0.45889999999997144,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["eulerVelocityAt"],
+					"fullName": "eulerVelocityAt scalesWithOmega",
+					"status": "passed",
+					"title": "scalesWithOmega",
+					"duration": 0.411200000000008,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getRegionLatLonDegrees"],
+					"fullName": "getRegionLatLonDegrees returnsZeroLatLonForPosXPoint",
+					"status": "passed",
+					"title": "returnsZeroLatLonForPosXPoint",
+					"duration": 0.8099999999999454,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getRegionLatLonDegrees"],
+					"fullName": "getRegionLatLonDegrees returns90LatForNorthPole",
+					"status": "passed",
+					"title": "returns90LatForNorthPole",
+					"duration": 0.4194999999999709,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getRegionLatLonDegrees"],
+					"fullName": "getRegionLatLonDegrees returnsNeg90LatForSouthPole",
+					"status": "passed",
+					"title": "returnsNeg90LatForSouthPole",
+					"duration": 0.27129999999999654,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getRegionLatLonDegrees"],
+					"fullName": "getRegionLatLonDegrees returns90LonForPosYPoint",
+					"status": "passed",
+					"title": "returns90LonForPosYPoint",
+					"duration": 0.22469999999998436,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["piecewise"],
+					"fullName": "piecewise returnsFirstValueBelowDomain",
+					"status": "passed",
+					"title": "returnsFirstValueBelowDomain",
+					"duration": 0.31999999999993634,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["piecewise"],
+					"fullName": "piecewise returnsLastValueAboveDomain",
+					"status": "passed",
+					"title": "returnsLastValueAboveDomain",
+					"duration": 0.28890000000001237,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["piecewise"],
+					"fullName": "piecewise interpolatesLinearly",
+					"status": "passed",
+					"title": "interpolatesLinearly",
+					"duration": 0.14959999999996398,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741857979,
+			"endTime": 1777741857993.32,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/math.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["MinHeap"],
+					"fullName": "MinHeap startsEmpty",
+					"status": "passed",
+					"title": "startsEmpty",
+					"duration": 2.7676999999999907,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["MinHeap"],
+					"fullName": "MinHeap popsInAscendingKeyOrder",
+					"status": "passed",
+					"title": "popsInAscendingKeyOrder",
+					"duration": 1.9699000000000524,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["MinHeap"],
+					"fullName": "MinHeap sizeDecrementsOnPop",
+					"status": "passed",
+					"title": "sizeDecrementsOnPop",
+					"duration": 0.6438000000000557,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["MinHeap"],
+					"fullName": "MinHeap handlesEqualKeys",
+					"status": "passed",
+					"title": "handlesEqualKeys",
+					"duration": 0.45650000000000546,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["MinHeap"],
+					"fullName": "MinHeap handlesSingleElement",
+					"status": "passed",
+					"title": "handlesSingleElement",
+					"duration": 0.4943000000000666,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859506,
+			"endTime": 1777741859512.4944,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/min-heap.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["planet-code format"],
+					"fullName": "planet-code format encodes seed and params as separate parts",
+					"status": "passed",
+					"title": "encodes seed and params as separate parts",
+					"duration": 4.008699999999976,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet-code format"],
+					"fullName": "planet-code format recovers the seed even when the params blob is unreadable",
+					"status": "passed",
+					"title": "recovers the seed even when the params blob is unreadable",
+					"duration": 1.098600000000033,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet-code pressure"],
+					"fullName": "planet-code pressure round-trips high pressure values up to 100 bar",
+					"status": "passed",
+					"title": "round-trips high pressure values up to 100 bar",
+					"duration": 1.427599999999984,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet-code year length"],
+					"fullName": "planet-code year length round-trips year lengths up to 4 Earth years",
+					"status": "passed",
+					"title": "round-trips year lengths up to 4 Earth years",
+					"duration": 0.6938999999999851,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet-code volcanism"],
+					"fullName": "planet-code volcanism round-trips volcanism values up to the new 10.0 cap",
+					"status": "passed",
+					"title": "round-trips volcanism values up to the new 10.0 cap",
+					"duration": 0.41449999999997544,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet-code seed support"],
+					"fullName": "planet-code seed support round-trips large seeds up to the new cap",
+					"status": "passed",
+					"title": "round-trips large seeds up to the new cap",
+					"duration": 0.6535999999999831,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["planet-code seed support"],
+					"fullName": "planet-code seed support keeps the seed recoverable if the params segment becomes invalid",
+					"status": "passed",
+					"title": "keeps the seed recoverable if the params segment becomes invalid",
+					"duration": 0.32799999999997453,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859741,
+			"endTime": 1777741859751.328,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/planet-code.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["makeRng"],
+					"fullName": "makeRng producesSameSequenceForSameSeed",
+					"status": "passed",
+					"title": "producesSameSequenceForSameSeed",
+					"duration": 3.683499999999981,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["makeRng"],
+					"fullName": "makeRng producesDifferentSequencesForDifferentSeeds",
+					"status": "passed",
+					"title": "producesDifferentSequencesForDifferentSeeds",
+					"duration": 1.0749999999999318,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["makeRng"],
+					"fullName": "makeRng producesValuesWithinZeroToOne",
+					"status": "passed",
+					"title": "producesValuesWithinZeroToOne",
+					"duration": 97.99119999999994,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["createRng.randint"],
+					"fullName": "createRng.randint returnsValueInInclusiveRange",
+					"status": "passed",
+					"title": "returnsValueInInclusiveRange",
+					"duration": 68.65549999999996,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["createRng.randint"],
+					"fullName": "createRng.randint returnsFixedValueWhenBoundsAreEqual",
+					"status": "passed",
+					"title": "returnsFixedValueWhenBoundsAreEqual",
+					"duration": 2.320500000000038,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["makeRandInt"],
+					"fullName": "makeRandInt returnsValueLessThanN",
+					"status": "passed",
+					"title": "returnsValueLessThanN",
+					"duration": 18.99720000000002,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["makeRandInt"],
+					"fullName": "makeRandInt returnsNonNegativeValue",
+					"status": "passed",
+					"title": "returnsNonNegativeValue",
+					"duration": 14.192200000000184,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741857703,
+			"endTime": 1777741857912.1921,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/rng.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["computeOceanDistanceBFS"],
+					"fullName": "computeOceanDistanceBFS ocean cells stay at distance zero",
+					"status": "passed",
+					"title": "ocean cells stay at distance zero",
+					"duration": 3.573500000000081,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeOceanDistanceBFS"],
+					"fullName": "computeOceanDistanceBFS land cells get correct hop × avgEdgeKm distance",
+					"status": "passed",
+					"title": "land cells get correct hop × avgEdgeKm distance",
+					"duration": 0.8812000000000353,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeOceanDistanceBFS"],
+					"fullName": "computeOceanDistanceBFS all-ocean world returns all zeros",
+					"status": "passed",
+					"title": "all-ocean world returns all zeros",
+					"duration": 0.8374000000000024,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeOceanDistanceBFS"],
+					"fullName": "computeOceanDistanceBFS all-land world with no ocean leaves land cells at zero",
+					"status": "passed",
+					"title": "all-land world with no ocean leaves land cells at zero",
+					"duration": 0.6156999999999471,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeCoastDistances"],
+					"fullName": "computeCoastDistances coast cells get distCoast zero",
+					"status": "passed",
+					"title": "coast cells get distCoast zero",
+					"duration": 1.1374000000000706,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeCoastDistances"],
+					"fullName": "computeCoastDistances interior land cell gets distCoast 1 hop from coast",
+					"status": "passed",
+					"title": "interior land cell gets distCoast 1 hop from coast",
+					"duration": 0.42079999999998563,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeCoastDistances"],
+					"fullName": "computeCoastDistances distCoastLand is Infinity for ocean cells",
+					"status": "passed",
+					"title": "distCoastLand is Infinity for ocean cells",
+					"duration": 0.37620000000003984,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeCoastDistances"],
+					"fullName": "computeCoastDistances distCoastLand measures hops from coast along land only",
+					"status": "passed",
+					"title": "distCoastLand measures hops from coast along land only",
+					"duration": 0.6438000000000557,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["countContinents"],
+					"fullName": "countContinents returnsZeroWhenNoLand",
+					"status": "passed",
+					"title": "returnsZeroWhenNoLand",
+					"duration": 1.0622999999999365,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["countContinents"],
+					"fullName": "countContinents returnsOneForSingleConnectedLandmass",
+					"status": "passed",
+					"title": "returnsOneForSingleConnectedLandmass",
+					"duration": 0.9021000000000186,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["countContinents"],
+					"fullName": "countContinents countsTwoLandmassesWhenSeparatedByOcean",
+					"status": "passed",
+					"title": "countsTwoLandmassesWhenSeparatedByOcean",
+					"duration": 0.5657999999999674,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["countContinents"],
+					"fullName": "countContinents ignoresLandmassesSmallerThanSizeThreshold",
+					"status": "passed",
+					"title": "ignoresLandmassesSmallerThanSizeThreshold",
+					"duration": 0.6038999999999533,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859060,
+			"endTime": 1777741859072.604,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/stats.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["getEarthYearFactor"],
+					"fullName": "getEarthYearFactor returnsOneAtEarthYearLength",
+					"status": "passed",
+					"title": "returnsOneAtEarthYearLength",
+					"duration": 3.028099999999995,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getEarthYearFactor"],
+					"fullName": "getEarthYearFactor scalesLinearlyFromEarthYearLength",
+					"status": "passed",
+					"title": "scalesLinearlyFromEarthYearLength",
+					"duration": 0.3686999999999898,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getMaxElevationKm"],
+					"fullName": "getMaxElevationKm returnsSixKmAtEarthRadius",
+					"status": "passed",
+					"title": "returnsSixKmAtEarthRadius",
+					"duration": 0.577199999999948,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getMaxElevationKm"],
+					"fullName": "getMaxElevationKm clampsToFifteenKmForTinyPlanets",
+					"status": "passed",
+					"title": "clampsToFifteenKmForTinyPlanets",
+					"duration": 0.4858000000000402,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getMaxElevationKm"],
+					"fullName": "getMaxElevationKm clampsToThreeKmForHugePlanets",
+					"status": "passed",
+					"title": "clampsToThreeKmForHugePlanets",
+					"duration": 0.39790000000004966,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getMaxOceanDepthKm"],
+					"fullName": "getMaxOceanDepthKm returnsTenKmAtEarthRadius",
+					"status": "passed",
+					"title": "returnsTenKmAtEarthRadius",
+					"duration": 0.27749999999991815,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getMaxOceanDepthKm"],
+					"fullName": "getMaxOceanDepthKm producesGreaterDepthForLargerPlanets",
+					"status": "passed",
+					"title": "producesGreaterDepthForLargerPlanets",
+					"duration": 0.3344000000000733,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getEffectiveObliquityDeg"],
+					"fullName": "getEffectiveObliquityDeg returnsInputWhenBelowNinety",
+					"status": "passed",
+					"title": "returnsInputWhenBelowNinety",
+					"duration": 0.2644000000000233,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getEffectiveObliquityDeg"],
+					"fullName": "getEffectiveObliquityDeg foldsRetrogradeToPrograde",
+					"status": "passed",
+					"title": "foldsRetrogradeToPrograde",
+					"duration": 0.5566000000000031,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["isRetrogradeObliquity"],
+					"fullName": "isRetrogradeObliquity returnsFalseForPrograde",
+					"status": "passed",
+					"title": "returnsFalseForPrograde",
+					"duration": 1.1019999999999754,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["isRetrogradeObliquity"],
+					"fullName": "isRetrogradeObliquity returnsTrueForRetrograde",
+					"status": "passed",
+					"title": "returnsTrueForRetrograde",
+					"duration": 0.38009999999997035,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getSubstellarDir"],
+					"fullName": "getSubstellarDir returnsUnitLengthVector",
+					"status": "passed",
+					"title": "returnsUnitLengthVector",
+					"duration": 0.508199999999988,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getSubstellarDir"],
+					"fullName": "getSubstellarDir producesZeroZComponentAtEquatorialSubstellarPoint",
+					"status": "passed",
+					"title": "producesZeroZComponentAtEquatorialSubstellarPoint",
+					"duration": 0.3546999999999798,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["getSubstellarDir"],
+					"fullName": "getSubstellarDir pointsToLonZeroWhenAntistellarIsOneEighty",
+					"status": "passed",
+					"title": "pointsToLonZeroWhenAntistellarIsOneEighty",
+					"duration": 0.45269999999993615,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["meanEdgeLengthKm"],
+					"fullName": "meanEdgeLengthKm fallsBackToAnalyticalEstimateWhenNeighborDistMissing",
+					"status": "passed",
+					"title": "fallsBackToAnalyticalEstimateWhenNeighborDistMissing",
+					"duration": 0.5895000000000437,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["meanEdgeLengthKm"],
+					"fullName": "meanEdgeLengthKm usesNeighborDistWhenProvided",
+					"status": "passed",
+					"title": "usesNeighborDistWhenProvided",
+					"duration": 0.32179999999993925,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858651,
+			"endTime": 1777741858664.3218,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/units.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["volcanism scale helpers"],
+					"fullName": "volcanism scale helpers maps the new 0-10 scale onto the legacy 0-1 range through value 2",
+					"status": "passed",
+					"title": "maps the new 0-10 scale onto the legacy 0-1 range through value 2",
+					"duration": 2.7731999999999744,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["volcanism scale helpers"],
+					"fullName": "volcanism scale helpers only applies overdrive above the legacy-equivalent ceiling",
+					"status": "passed",
+					"title": "only applies overdrive above the legacy-equivalent ceiling",
+					"duration": 0.5996000000000095,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859745,
+			"endTime": 1777741859748.5996,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/shared/volcanism.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates returnsRequestedNumberOfPlateSeeds",
+					"status": "passed",
+					"title": "returnsRequestedNumberOfPlateSeeds",
+					"duration": 233.6155000000001,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates assignsEveryRegionToSomePlate",
+					"status": "passed",
+					"title": "assignsEveryRegionToSomePlate",
+					"duration": 302.2093,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates producesOneVectorPerPlate",
+					"status": "passed",
+					"title": "producesOneVectorPerPlate",
+					"duration": 1.0554000000001906,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates producesUnitLengthEulerPolePerPlate",
+					"status": "passed",
+					"title": "producesUnitLengthEulerPolePerPlate",
+					"duration": 3.9003999999999905,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates classifiesEveryPlateAsOceanWhenLandCoverageIsZero",
+					"status": "passed",
+					"title": "classifiesEveryPlateAsOceanWhenLandCoverageIsZero",
+					"duration": 89.03800000000001,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates classifiesZeroPlatesAsOceanWhenLandCoverageIsOne",
+					"status": "passed",
+					"title": "classifiesZeroPlatesAsOceanWhenLandCoverageIsOne",
+					"duration": 92.10649999999987,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates producesSamePlateAssignmentForSameSeed",
+					"status": "passed",
+					"title": "producesSamePlateAssignmentForSameSeed",
+					"duration": 138.3388,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateCoarsePlates"],
+					"fullName": "generateCoarsePlates producesDifferentPlateAssignmentForDifferentSeed",
+					"status": "passed",
+					"title": "producesDifferentPlateAssignmentForDifferentSeed",
+					"duration": 81.32810000000018,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858623,
+			"endTime": 1777741859566.3281,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/tectonics/coarse-plates.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["projectMantleFieldToRegions"],
+					"fullName": "projectMantleFieldToRegions preserves spatial mantle variation within a single plate",
+					"status": "passed",
+					"title": "preserves spatial mantle variation within a single plate",
+					"duration": 55.052799999999934,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeMantleField"],
+					"fullName": "computeMantleField produces a signed mantle field that can be normalized for hotspot biasing",
+					"status": "passed",
+					"title": "produces a signed mantle field that can be normalized for hotspot biasing",
+					"duration": 87.77629999999999,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858031,
+			"endTime": 1777741858174.7764,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/tectonics/mantle.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["generateStaticElevation"],
+					"fullName": "generateStaticElevation producesElevationArrayLengthOfNumRegions",
+					"status": "passed",
+					"title": "producesElevationArrayLengthOfNumRegions",
+					"duration": 43.82560000000012,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateStaticElevation"],
+					"fullName": "generateStaticElevation producesFiniteElevationForEveryRegion",
+					"status": "passed",
+					"title": "producesFiniteElevationForEveryRegion",
+					"duration": 126.92409999999995,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateStaticElevation"],
+					"fullName": "generateStaticElevation producesPositiveTendencyForLandCells",
+					"status": "passed",
+					"title": "producesPositiveTendencyForLandCells",
+					"duration": 45.2967000000001,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateStaticElevation"],
+					"fullName": "generateStaticElevation producesDeterministicOutputForSameSeed",
+					"status": "passed",
+					"title": "producesDeterministicOutputForSameSeed",
+					"duration": 18.194500000000062,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateStaticElevation"],
+					"fullName": "generateStaticElevation producesDifferentOutputForDifferentSeeds",
+					"status": "passed",
+					"title": "producesDifferentOutputForDifferentSeeds",
+					"duration": 57.562799999999925,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858519,
+			"endTime": 1777741858811.5627,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/tectonics/static-elevation.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buildSyntheticPlates"],
+					"fullName": "buildSyntheticPlates returnsArrayLengthMatchingPlateIdsInput",
+					"status": "passed",
+					"title": "returnsArrayLengthMatchingPlateIdsInput",
+					"duration": 5.961800000000039,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSyntheticPlates"],
+					"fullName": "buildSyntheticPlates marksOceanPlatesCorrectly",
+					"status": "passed",
+					"title": "marksOceanPlatesCorrectly",
+					"duration": 0.6666000000000167,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSyntheticPlates"],
+					"fullName": "buildSyntheticPlates assignsSequentialIdToEachPlate",
+					"status": "passed",
+					"title": "assignsSequentialIdToEachPlate",
+					"duration": 0.9932000000001153,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSyntheticPlates"],
+					"fullName": "buildSyntheticPlates assignsUnitLengthPoleToEachPlate",
+					"status": "passed",
+					"title": "assignsUnitLengthPoleToEachPlate",
+					"duration": 1.5748000000000957,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildSyntheticPlates"],
+					"fullName": "buildSyntheticPlates assignsNonNegativeGrowthRateToEachPlate",
+					"status": "passed",
+					"title": "assignsNonNegativeGrowthRateToEachPlate",
+					"duration": 1.5226999999999862,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["deriveSyntheticPlates"],
+					"fullName": "deriveSyntheticPlates assignsEveryRegionToAPlate",
+					"status": "passed",
+					"title": "assignsEveryRegionToAPlate",
+					"duration": 29.588799999999992,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["deriveSyntheticPlates"],
+					"fullName": "deriveSyntheticPlates classifiesOceanPlatesFromNegativeElevation",
+					"status": "passed",
+					"title": "classifiesOceanPlatesFromNegativeElevation",
+					"duration": 7.992099999999937,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["deriveSyntheticPlates"],
+					"fullName": "deriveSyntheticPlates classifiesLandPlatesFromPositiveElevation",
+					"status": "passed",
+					"title": "classifiesLandPlatesFromPositiveElevation",
+					"duration": 5.249399999999923,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["deriveSyntheticPlates"],
+					"fullName": "deriveSyntheticPlates returnsSamePlateAssignmentForIdenticalInput",
+					"status": "passed",
+					"title": "returnsSamePlateAssignmentForIdenticalInput",
+					"duration": 14.92639999999983,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858108,
+			"endTime": 1777741858177.9265,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/tectonics/synthetic-plates.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["applyHotspots"],
+					"fullName": "applyHotspots biases hotspot placement toward mantle upwelling candidates",
+					"status": "passed",
+					"title": "biases hotspot placement toward mantle upwelling candidates",
+					"duration": 248.7455,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyHotspots"],
+					"fullName": "applyHotspots retains hotspot bias from spatial mantle projection within one plate",
+					"status": "passed",
+					"title": "retains hotspot bias from spatial mantle projection within one plate",
+					"duration": 115.70139999999992,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyHotspots"],
+					"fullName": "applyHotspots spawns large igneous provinces for oceanic hotspot chains",
+					"status": "passed",
+					"title": "spawns large igneous provinces for oceanic hotspot chains",
+					"duration": 34.61249999999973,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyHotspots"],
+					"fullName": "applyHotspots gives continental hotspots a broader footprint than oceanic ones",
+					"status": "passed",
+					"title": "gives continental hotspots a broader footprint than oceanic ones",
+					"duration": 45.77679999999964,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyHotspots"],
+					"fullName": "applyHotspots keeps extreme active hotspots broader instead of much taller",
+					"status": "passed",
+					"title": "keeps extreme active hotspots broader instead of much taller",
+					"duration": 77.1531,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858588,
+			"endTime": 1777741859111.153,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/terrain/hotspots.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["selectConnectedLakeCells"],
+					"fullName": "selectConnectedLakeCells trims narrow lake corridors from basin selections",
+					"status": "passed",
+					"title": "trims narrow lake corridors from basin selections",
+					"duration": 4.941100000000006,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859833,
+			"endTime": 1777741859837.9412,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/terrain/rivers.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["volcanism helpers"],
+					"fullName": "volcanism helpers keeps legacy volcanic arc spacing and unconditional LIP spawning",
+					"status": "passed",
+					"title": "keeps legacy volcanic arc spacing and unconditional LIP spawning",
+					"duration": 3.73070000000007,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["volcanism helpers"],
+					"fullName": "volcanism helpers builds a tangent frame orthogonal to the surface normal",
+					"status": "passed",
+					"title": "builds a tangent frame orthogonal to the surface normal",
+					"duration": 0.5690999999999349,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyVolcanicArcs"],
+					"fullName": "applyVolcanicArcs adds uplift and marks volcanic arc terrain features",
+					"status": "passed",
+					"title": "adds uplift and marks volcanic arc terrain features",
+					"duration": 20.88869999999997,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyVolcanicArcs"],
+					"fullName": "applyVolcanicArcs keeps oceanic and continental volcanic cone heights identical",
+					"status": "passed",
+					"title": "keeps oceanic and continental volcanic cone heights identical",
+					"duration": 16.0608000000002,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyLargeIgneousProvinces"],
+					"fullName": "applyLargeIgneousProvinces spawns the legacy fixed seven-site LIP footprint regardless of volcanism",
+					"status": "passed",
+					"title": "spawns the legacy fixed seven-site LIP footprint regardless of volcanism",
+					"duration": 2.7081000000000586,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyLargeIgneousProvinces"],
+					"fullName": "applyLargeIgneousProvinces keeps oceanic LIPs but scales their uplift down",
+					"status": "passed",
+					"title": "keeps oceanic LIPs but scales their uplift down",
+					"duration": 1.2941000000000713,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyLargeIgneousProvinces"],
+					"fullName": "applyLargeIgneousProvinces makes large igneous provinces broader and taller at extreme volcanism",
+					"status": "passed",
+					"title": "makes large igneous provinces broader and taller at extreme volcanism",
+					"duration": 0.8505999999999858,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["applyLargeIgneousProvinces"],
+					"fullName": "applyLargeIgneousProvinces adds uplift and marks large igneous province terrain features",
+					"status": "passed",
+					"title": "adds uplift and marks large igneous province terrain features",
+					"duration": 32.762699999999995,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858583,
+			"endTime": 1777741858662.7627,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/terrain/volcanism.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["fixture world cache"],
+					"fullName": "fixture world cache uses a smaller shared fixture world size by default",
+					"status": "passed",
+					"title": "uses a smaller shared fixture world size by default",
+					"duration": 11.635599999999954,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["fixture world cache"],
+					"fullName": "fixture world cache reuses the cached world for identical params",
+					"status": "passed",
+					"title": "reuses the cached world for identical params",
+					"duration": 1.2916000000000167,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["fixture world cache"],
+					"fullName": "fixture world cache creates a separate cache entry when params change",
+					"status": "passed",
+					"title": "creates a separate cache entry when params change",
+					"duration": 0.5176999999999907,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859159,
+			"endTime": 1777741859172.5176,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/model/__fixtures__/world.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["GenerationPanel"],
+					"fullName": "GenerationPanel renders preview beside reset in the header actions",
+					"status": "passed",
+					"title": "renders preview beside reset in the header actions",
+					"duration": 26.730999999999995,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858189,
+			"endTime": 1777741858215.731,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/controls/GenerationPanel.test.tsx"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["resolveDrawerStateOnOpen"],
+					"fullName": "resolveDrawerStateOnOpen switches to the nation tab when a new nation is selected",
+					"status": "passed",
+					"title": "switches to the nation tab when a new nation is selected",
+					"duration": 3.2864999999999895,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["resolveDrawerStateOnOpen"],
+					"fullName": "resolveDrawerStateOnOpen falls back to the world tab when no nation remains selected",
+					"status": "passed",
+					"title": "falls back to the world tab when no nation remains selected",
+					"duration": 0.31150000000002365,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859825,
+			"endTime": 1777741859829.3115,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/details/drawer-state.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["formatCompactNumber"],
+					"fullName": "formatCompactNumber formats billions",
+					"status": "passed",
+					"title": "formats billions",
+					"duration": 2.858099999999922,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["formatCompactNumber"],
+					"fullName": "formatCompactNumber formats millions",
+					"status": "passed",
+					"title": "formats millions",
+					"duration": 0.5471999999999753,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["formatCompactNumber"],
+					"fullName": "formatCompactNumber formats thousands",
+					"status": "passed",
+					"title": "formats thousands",
+					"duration": 0.5435999999999694,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["formatCompactNumber"],
+					"fullName": "formatCompactNumber formats small values with appropriate decimals",
+					"status": "passed",
+					"title": "formats small values with appropriate decimals",
+					"duration": 0.7319999999999709,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["formatCompactNumber"],
+					"fullName": "formatCompactNumber returns 0 for non-finite values",
+					"status": "passed",
+					"title": "returns 0 for non-finite values",
+					"duration": 0.5352000000000317,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["tempColor"],
+					"fullName": "tempColor returns cold color for very low temperatures",
+					"status": "passed",
+					"title": "returns cold color for very low temperatures",
+					"duration": 0.3935000000000173,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["tempColor"],
+					"fullName": "tempColor returns warm color for hot temperatures",
+					"status": "passed",
+					"title": "returns warm color for hot temperatures",
+					"duration": 0.2438999999999396,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["tempColor"],
+					"fullName": "tempColor returns mid-range color for temperate values",
+					"status": "passed",
+					"title": "returns mid-range color for temperate values",
+					"duration": 0.26530000000002474,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["rainColor"],
+					"fullName": "rainColor returns desert color for very low precipitation",
+					"status": "passed",
+					"title": "returns desert color for very low precipitation",
+					"duration": 0.8587999999999738,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["rainColor"],
+					"fullName": "rainColor returns wet color for high precipitation",
+					"status": "passed",
+					"title": "returns wet color for high precipitation",
+					"duration": 0.44439999999997326,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["rainColor"],
+					"fullName": "rainColor returns boundary color correctly at threshold",
+					"status": "passed",
+					"title": "returns boundary color correctly at threshold",
+					"duration": 0.36340000000006967,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["flowColor"],
+					"fullName": "flowColor covers all buckets",
+					"status": "passed",
+					"title": "covers all buckets",
+					"duration": 0.7948999999999842,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["currentImpactColor"],
+					"fullName": "currentImpactColor returns warm color for positive impact",
+					"status": "passed",
+					"title": "returns warm color for positive impact",
+					"duration": 0.5090999999999894,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["currentImpactColor"],
+					"fullName": "currentImpactColor returns cool color for negative impact",
+					"status": "passed",
+					"title": "returns cool color for negative impact",
+					"duration": 0.49739999999997053,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["petColor"],
+					"fullName": "petColor covers cold to hot range",
+					"status": "passed",
+					"title": "covers cold to hot range",
+					"duration": 0.5387999999999238,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["aetColor"],
+					"fullName": "aetColor covers dry to wet range",
+					"status": "passed",
+					"title": "covers dry to wet range",
+					"duration": 0.36230000000000473,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["gddColor"],
+					"fullName": "gddColor covers low to high growing degree days",
+					"status": "passed",
+					"title": "covers low to high growing degree days",
+					"duration": 0.36230000000000473,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["gintColor"],
+					"fullName": "gintColor covers all buckets",
+					"status": "passed",
+					"title": "covers all buckets",
+					"duration": 0.43619999999998527,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["dtrChartColor"],
+					"fullName": "dtrChartColor covers all buckets",
+					"status": "passed",
+					"title": "covers all buckets",
+					"duration": 0.4900000000000091,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858764,
+			"endTime": 1777741858778.49,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/hover/info-panel-format.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buildClimateSwatchColor"],
+					"fullName": "buildClimateSwatchColor returns null when hoverRegion is null",
+					"status": "passed",
+					"title": "returns null when hoverRegion is null",
+					"duration": 1.615199999999959,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildClimateSwatchColor"],
+					"fullName": "buildClimateSwatchColor returns null when world is null",
+					"status": "passed",
+					"title": "returns null when world is null",
+					"duration": 0.18630000000007385,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildClimateSwatchColor"],
+					"fullName": "buildClimateSwatchColor returns null when no climate zones or matching mode data",
+					"status": "passed",
+					"title": "returns null when no climate zones or matching mode data",
+					"duration": 0.1996999999998934,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildClimateSwatchColor"],
+					"fullName": "buildClimateSwatchColor returns a css color string for pastaClimate mode",
+					"status": "passed",
+					"title": "returns a css color string for pastaClimate mode",
+					"duration": 0.4978000000000975,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildClimateSwatchColor"],
+					"fullName": "buildClimateSwatchColor returns a css color string for koppenClimate mode",
+					"status": "passed",
+					"title": "returns a css color string for koppenClimate mode",
+					"duration": 0.33110000000010587,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildClimateSwatchColor"],
+					"fullName": "buildClimateSwatchColor falls back to climateZone color when mode is terrain",
+					"status": "passed",
+					"title": "falls back to climateZone color when mode is terrain",
+					"duration": 0.21860000000015134,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildVegetationSwatchColor"],
+					"fullName": "buildVegetationSwatchColor returns null when hoverRegion is null",
+					"status": "passed",
+					"title": "returns null when hoverRegion is null",
+					"duration": 0.20800000000008367,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildVegetationSwatchColor"],
+					"fullName": "buildVegetationSwatchColor returns null when world has no vegetation",
+					"status": "passed",
+					"title": "returns null when world has no vegetation",
+					"duration": 0.14820000000008804,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildVegetationSwatchColor"],
+					"fullName": "buildVegetationSwatchColor returns a css color string for valid region",
+					"status": "passed",
+					"title": "returns a css color string for valid region",
+					"duration": 0.4334999999998672,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildTopographySwatchColor"],
+					"fullName": "buildTopographySwatchColor returns null when hoverRegion is null",
+					"status": "passed",
+					"title": "returns null when hoverRegion is null",
+					"duration": 0.32970000000000255,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildTopographySwatchColor"],
+					"fullName": "buildTopographySwatchColor returns null when world has no topography",
+					"status": "passed",
+					"title": "returns null when world has no topography",
+					"duration": 0.17880000000013752,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildTopographySwatchColor"],
+					"fullName": "buildTopographySwatchColor returns a css color string for a land topography index",
+					"status": "passed",
+					"title": "returns a css color string for a land topography index",
+					"duration": 0.2054000000000542,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859939,
+			"endTime": 1777741859944.3296,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/hover/info-panel-model.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["map projection helpers"],
+					"fullName": "map projection helpers wraps longitudes around the selected map center",
+					"status": "passed",
+					"title": "wraps longitudes around the selected map center",
+					"duration": 2.9040999999999713,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["map projection helpers"],
+					"fullName": "map projection helpers projects cartesian points into map lon lat coordinates",
+					"status": "passed",
+					"title": "projects cartesian points into map lon lat coordinates",
+					"duration": 2.407799999999952,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859663,
+			"endTime": 1777741859668.4077,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/renderer/map-projection.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["display-model"],
+					"fullName": "display-model builds a child index from parent links",
+					"status": "passed",
+					"title": "builds a child index from parent links",
+					"duration": 4.331000000000017,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["display-model"],
+					"fullName": "display-model summarizes display nation assignment and colors directly from world data",
+					"status": "passed",
+					"title": "summarizes display nation assignment and colors directly from world data",
+					"duration": 1.9536000000000513,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859613,
+			"endTime": 1777741859618.9536,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/display/display-model.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buildNationSizeDistribution"],
+					"fullName": "buildNationSizeDistribution counts nations into size buckets",
+					"status": "passed",
+					"title": "counts nations into size buckets",
+					"duration": 3.574200000000019,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildNationSizeDistribution"],
+					"fullName": "buildNationSizeDistribution returns 6 buckets matching NATION_BUCKETS length",
+					"status": "passed",
+					"title": "returns 6 buckets matching NATION_BUCKETS length",
+					"duration": 2.046699999999987,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildConflictDistribution"],
+					"fullName": "buildConflictDistribution returns zero counts when no history view",
+					"status": "passed",
+					"title": "returns zero counts when no history view",
+					"duration": 0.6804999999999382,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildConflictDistribution"],
+					"fullName": "buildConflictDistribution separates wars from rebellions",
+					"status": "passed",
+					"title": "separates wars from rebellions",
+					"duration": 0.6182000000000016,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildRelationDistribution"],
+					"fullName": "buildRelationDistribution returns empty array when no history view",
+					"status": "passed",
+					"title": "returns empty array when no history view",
+					"duration": 1.7977999999999383,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildRelationDistribution"],
+					"fullName": "buildRelationDistribution counts allied pairs",
+					"status": "passed",
+					"title": "counts allied pairs",
+					"duration": 0.7780999999999949,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859226,
+			"endTime": 1777741859236.7979,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/display/nation-details-model.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["computeRegionColors"],
+					"fullName": "computeRegionColors uses annual precipitation thresholds for annual rainfall mode",
+					"status": "passed",
+					"title": "uses annual precipitation thresholds for annual rainfall mode",
+					"duration": 5.612700000000018,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["computeRegionColors"],
+					"fullName": "computeRegionColors uses the mixed hazard tint for danger zones",
+					"status": "passed",
+					"title": "uses the mixed hazard tint for danger zones",
+					"duration": 0.8134999999999764,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859926,
+			"endTime": 1777741859932.8135,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/display/region-colors.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buildGenerationPreviewConfig"],
+					"fullName": "buildGenerationPreviewConfig maps generation params to ebm preview inputs",
+					"status": "passed",
+					"title": "maps generation params to ebm preview inputs",
+					"duration": 4.34559999999999,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildGenerationPreviewConfig"],
+					"fullName": "buildGenerationPreviewConfig zeros the preview obliquity for tidally locked planets",
+					"status": "passed",
+					"title": "zeros the preview obliquity for tidally locked planets",
+					"duration": 0.6759999999999309,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildGenerationPreviewConfig"],
+					"fullName": "buildGenerationPreviewConfig switches the toggle label based on the active viewport",
+					"status": "passed",
+					"title": "switches the toggle label based on the active viewport",
+					"duration": 0.6305999999999585,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildGenerationPreviewConfig"],
+					"fullName": "buildGenerationPreviewConfig keeps the globe canvas mounted while preview is active",
+					"status": "passed",
+					"title": "keeps the globe canvas mounted while preview is active",
+					"duration": 0.5130000000000337,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildGenerationPreviewConfig"],
+					"fullName": "buildGenerationPreviewConfig returns to the globe when generation exits the preview",
+					"status": "passed",
+					"title": "returns to the globe when generation exits the preview",
+					"duration": 0.5325000000000273,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859426,
+			"endTime": 1777741859433.5325,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/generation/generation-preview.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["generateWorld"],
+					"fullName": "generateWorld loads the worker module from the transport layer",
+					"status": "passed",
+					"title": "loads the worker module from the transport layer",
+					"duration": 11.811300000000074,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["generateWorld"],
+					"fullName": "generateWorld keeps generation progress monotonic when worker stages regress",
+					"status": "passed",
+					"title": "keeps generation progress monotonic when worker stages regress",
+					"duration": 3.851699999999937,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741858585,
+			"endTime": 1777741858600.8518,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/generation/generation.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["buildPlanetSliders"],
+					"fullName": "buildPlanetSliders expresses year length relative to Earth using year length only",
+					"status": "passed",
+					"title": "expresses year length relative to Earth using year length only",
+					"duration": 5.4355999999999085,
+					"failureMessages": [],
+					"meta": {}
+				},
+				{
+					"ancestorTitles": ["buildPlanetSliders"],
+					"fullName": "buildPlanetSliders shows base tilt on the planet tab and preserves retrograde mirroring",
+					"status": "passed",
+					"title": "shows base tilt on the planet tab and preserves retrograde mirroring",
+					"duration": 7.640899999999988,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859093,
+			"endTime": 1777741859106.6409,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/generation/sliders.test.ts"
+		},
+		{
+			"assertionResults": [
+				{
+					"ancestorTitles": ["createHistoryQuery"],
+					"fullName": "createHistoryQuery returns immutable snapshots across time queries",
+					"status": "passed",
+					"title": "returns immutable snapshots across time queries",
+					"duration": 6.572699999999941,
+					"failureMessages": [],
+					"meta": {}
+				}
+			],
+			"startTime": 1777741859597,
+			"endTime": 1777741859603.5728,
+			"status": "passed",
+			"message": "",
+			"name": "C:/Users/rayou/projects/nexus/chaos-machine/src/planet/map/history/history-query.test.ts"
+		}
+	]
+}

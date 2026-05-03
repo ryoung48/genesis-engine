@@ -1,5 +1,4 @@
-﻿import { range } from "d3"
-import { TEXT } from "../../../utilities/text"
+import { titleCase } from "@/model/shared/text"
 import {
 	Cluster,
 	Language,
@@ -8,6 +7,9 @@ import {
 	vowelRules,
 } from "./types"
 
+const range = (count: number): number[] =>
+	Array.from({ length: count }, (_, index) => index)
+
 const aVowels = ["a", "ä", "å", "á", "â", "ā"]
 const eVowels = ["e", "ë", "é", "ê", "ē"]
 const yiVowels = ["i", "y", "ï", "ÿ", "í", "ý", "î", "ī"]
@@ -15,6 +17,181 @@ const iVowels = ["i", "ï", "í", "î", "ī"]
 const oVowels = ["o", "u", "ø", "ö", "ü", "ó", "ú", "ô", "û", "ō", "ū"]
 const feminineConsonants = ["l", "ll", "n", "nn", "s", "ss", "th", "x", "xx"]
 const singleUseLetters = ["b", "f", "j", "p", "w", "v", "x"]
+const YI_VOWEL_SET = new Set(yiVowels)
+const FEMININE_CONSONANT_SET = new Set(feminineConsonants)
+const ALL_VOWELS = [...aVowels, ...eVowels, ...iVowels, ...oVowels, ...yiVowels]
+const ALL_VOWELS_SET = new Set(ALL_VOWELS)
+const languageCache = new WeakMap<
+	Language,
+	{
+		vowelSet: Set<string>
+		hasHPhoneme: boolean
+		backAVowels: string[]
+	}
+>()
+const clusterCache = new WeakMap<
+	Cluster,
+	{
+		masculineEndConsonants: Cluster["phonemes"][typeof PhonemeCatalog.END_CONSONANT]
+		masculineBackVowels: Cluster["phonemes"][typeof PhonemeCatalog.BACK_VOWEL]
+		masculineEndVowels: Cluster["phonemes"][typeof PhonemeCatalog.END_VOWEL]
+	}
+>()
+
+function getLanguageCache(src: Language): {
+	vowelSet: Set<string>
+	hasHPhoneme: boolean
+	backAVowels: string[]
+} {
+	const existing = languageCache.get(src)
+	if (existing) return existing
+
+	let hasHPhoneme = false
+	for (const phoneme of src.phonemes[PhonemeCatalog.START_CONSONANT]) {
+		if (phoneme.v === "h") {
+			hasHPhoneme = true
+			break
+		}
+	}
+	if (!hasHPhoneme) {
+		for (const phoneme of src.phonemes[PhonemeCatalog.MIDDLE_CONSONANT]) {
+			if (phoneme.v === "h") {
+				hasHPhoneme = true
+				break
+			}
+		}
+	}
+
+	const backAVowels: string[] = []
+	for (const vowel of aVowels) {
+		if (src.phonemes[PhonemeCatalog.BACK_VOWEL].some(({ v }) => v === vowel)) {
+			backAVowels.push(vowel)
+		}
+	}
+
+	const cache = {
+		vowelSet: new Set(src.vowels),
+		hasHPhoneme,
+		backAVowels,
+	}
+	languageCache.set(src, cache)
+	return cache
+}
+
+function getClusterCache(cluster: Cluster): {
+	masculineEndConsonants: Cluster["phonemes"][typeof PhonemeCatalog.END_CONSONANT]
+	masculineBackVowels: Cluster["phonemes"][typeof PhonemeCatalog.BACK_VOWEL]
+	masculineEndVowels: Cluster["phonemes"][typeof PhonemeCatalog.END_VOWEL]
+} {
+	const existing = clusterCache.get(cluster)
+	if (existing) return existing
+
+	const masculineEndConsonants = cluster.phonemes[
+		PhonemeCatalog.END_CONSONANT
+	].filter((phoneme) => !FEMININE_CONSONANT_SET.has(phoneme.v))
+	const masculineBackVowels =
+		masculineEndConsonants.length > 0
+			? cluster.phonemes[PhonemeCatalog.BACK_VOWEL].filter(
+					(phoneme) => !YI_VOWEL_SET.has(phoneme.v),
+				)
+			: cluster.phonemes[PhonemeCatalog.BACK_VOWEL]
+	const masculineEndVowels = cluster.phonemes[PhonemeCatalog.END_VOWEL].filter(
+		(phoneme) => oVowels.includes(phoneme.v.slice(-1)),
+	)
+
+	const cache = {
+		masculineEndConsonants,
+		masculineBackVowels,
+		masculineEndVowels,
+	}
+	clusterCache.set(cluster, cache)
+	return cache
+}
+
+function hasSegmentMatch(
+	prospect: string,
+	candidates: readonly string[],
+): boolean {
+	for (const candidate of candidates) {
+		if (prospect.includes(candidate)) return true
+	}
+	return false
+}
+
+function findLastNonVowelChar(
+	value: string,
+	vowelSet: ReadonlySet<string>,
+): string {
+	for (let i = value.length - 1; i >= 0; i--) {
+		const char = value[i]
+		if (!vowelSet.has(char)) return char
+	}
+	return ""
+}
+
+function hasSplitRestrictedRepeat(value: string): boolean {
+	const lowercaseWord = value.toLowerCase()
+	for (const letter of singleUseLetters) {
+		let first = -1
+		let last = -1
+		let count = 0
+		for (let i = 0; i < lowercaseWord.length; i++) {
+			if (lowercaseWord[i] !== letter) continue
+			if (first === -1) first = i
+			last = i
+			count++
+		}
+		if (count > 1 && last - first + 1 !== count) return true
+	}
+	return false
+}
+
+function maxConsonantRun(value: string): number {
+	let current = 0
+	let max = 0
+	for (const char of value.toLowerCase()) {
+		if (char === " " || char === "'" || char === "-") {
+			current = 0
+			continue
+		}
+		if (ALL_VOWELS_SET.has(char)) {
+			current = 0
+			continue
+		}
+		current++
+		if (current > max) max = current
+	}
+	return max
+}
+
+function clonePhonemes(phonemes: Cluster["phonemes"]): Cluster["phonemes"] {
+	return {
+		[PhonemeCatalog.START_CONSONANT]: phonemes[
+			PhonemeCatalog.START_CONSONANT
+		].map(({ v, w }) => ({ v, w })),
+		[PhonemeCatalog.MIDDLE_CONSONANT]: phonemes[
+			PhonemeCatalog.MIDDLE_CONSONANT
+		].map(({ v, w }) => ({ v, w })),
+		[PhonemeCatalog.END_CONSONANT]: phonemes[PhonemeCatalog.END_CONSONANT].map(
+			({ v, w }) => ({ v, w }),
+		),
+		[PhonemeCatalog.START_VOWEL]: phonemes[PhonemeCatalog.START_VOWEL].map(
+			({ v, w }) => ({ v, w }),
+		),
+		[PhonemeCatalog.FRONT_VOWEL]: phonemes[PhonemeCatalog.FRONT_VOWEL].map(
+			({ v, w }) => ({ v, w }),
+		),
+		[PhonemeCatalog.MIDDLE_VOWEL]: phonemes[PhonemeCatalog.MIDDLE_VOWEL].map(
+			({ v, w }) => ({ v, w }),
+		),
+		[PhonemeCatalog.BACK_VOWEL]: phonemes[PhonemeCatalog.BACK_VOWEL].map(
+			({ v, w }) => ({ v, w }),
+		),
+		[PhonemeCatalog.END_VOWEL]: phonemes[PhonemeCatalog.END_VOWEL].map(
+			({ v, w }) => ({ v, w }),
+		),
+	}
+}
 
 const wordLength = (cluster: Cluster, src: Language) => {
 	const mod = src.dice.random < cluster.longNames ? 1 : 0
@@ -135,31 +312,27 @@ const notHarsh = (
 	},
 ) => {
 	const { curr, prev, usedLongVowel, usedDigraph } = params
-	const longVowel = usedLongVowel && hasLongVowel(src, curr)
-	const digraph = usedDigraph && hasDigraph(src, curr)
-	const nonVowels = prev.split("").filter((c) => !src.vowels.includes(c))
-	const lowercaseWord = `${prev}${curr}`.toLowerCase()
-	const repeatedRestricted = singleUseLetters.some((letter) => {
-		const positions = [...lowercaseWord].flatMap((c, i) =>
-			c === letter ? [i] : [],
-		)
-		if (positions.length <= 1) {
-			return false
+	const { vowelSet } = getLanguageCache(src)
+	if (usedLongVowel && hasLongVowel(src, curr)) return false
+	if (usedDigraph && hasDigraph(src, curr)) return false
+	if (hasSplitRestrictedRepeat(`${prev}${curr}`)) return false
+	const maxRun =
+		src.phonotacticStyle === "open"
+			? 2
+			: src.phonotacticStyle === "balanced"
+				? 3
+				: 3
+	if (maxConsonantRun(`${prev}${curr}`) > maxRun) return false
+
+	const lastPrevNonVowel = findLastNonVowelChar(prev, vowelSet)
+	if (lastPrevNonVowel) {
+		for (let i = 0; i < curr.length; i++) {
+			const char = curr[i]
+			if (!vowelSet.has(char) && char === lastPrevNonVowel) return false
 		}
-		const first = positions[0]
-		const last = positions[positions.length - 1]
-		// Allow contiguous runs (gemination) like "bb", but reject split repeats like "b...b".
-		return last - first + 1 !== positions.length
-	})
-	return (
-		!longVowel &&
-		!digraph &&
-		!repeatedRestricted &&
-		!curr
-			.split("")
-			.filter((mc) => !src.vowels.includes(mc))
-			.some((mc) => nonVowels.slice(-1).includes(mc))
-	)
+	}
+
+	return true
 }
 const validLetter = (
 	src: Language,
@@ -189,10 +362,10 @@ const validLetter = (
 }
 
 const hasLongVowel = (src: Language, prospect: string) =>
-	src.diphthongs.some((v) => prospect.includes(v))
+	hasSegmentMatch(prospect, src.diphthongs)
 
 const hasDigraph = (src: Language, prospect: string) =>
-	src.digraphs.some((v) => prospect.includes(v))
+	hasSegmentMatch(prospect, src.digraphs)
 
 const baseEndVowels = (cluster: Cluster) =>
 	cluster.phonemes[PhonemeCatalog.END_VOWEL]
@@ -216,7 +389,7 @@ const feminineEndVowels = (cluster: Cluster, prev: string) => {
 	)
 }
 const masculineEndVowels = (cluster: Cluster) => {
-	return baseEndVowels(cluster).filter((v) => oVowels.includes(v.v.slice(-1)))
+	return getClusterCache(cluster).masculineEndVowels
 }
 const endVowels = (cluster: Cluster, prev: string) => {
 	if (cluster.key === "female") return feminineEndVowels(cluster, prev)
@@ -230,13 +403,13 @@ const masculineEndConsonants = (cluster: Cluster, prev: string) => {
 	const prevSub1 = prev.slice(-1)
 	const prevSub2 = prev.slice(-2)
 	const endings = cluster.phonemes[PhonemeCatalog.END_CONSONANT]
-	const valid = endings.filter((i) => !feminineConsonants.includes(i.v))
+	const valid = getClusterCache(cluster).masculineEndConsonants
 	if (
 		valid.length > 0 &&
-		yiVowels.includes(prevSub1) &&
+		YI_VOWEL_SET.has(prevSub1) &&
 		!vowelRules.back[prevSub2]
 	) {
-		return endings.filter((i) => !feminineConsonants.includes(i.v))
+		return valid
 	}
 	return endings
 }
@@ -248,14 +421,37 @@ const endConsonants = (cluster: Cluster, prev: string) => {
 const baseBackVowels = (cluster: Cluster) =>
 	cluster.phonemes[PhonemeCatalog.BACK_VOWEL]
 const masculineBackVowels = (cluster: Cluster) => {
-	const endings = cluster.phonemes[PhonemeCatalog.END_CONSONANT]
-	const valid = endings.filter((i) => !feminineConsonants.includes(i.v))
-	const back = cluster.phonemes[PhonemeCatalog.BACK_VOWEL]
-	return valid.length > 0 ? back.filter((v) => !yiVowels.includes(v.v)) : back
+	return getClusterCache(cluster).masculineBackVowels
 }
 const backVowels = (cluster: Cluster) => {
 	if (cluster.key === "male") return masculineBackVowels(cluster)
 	return baseBackVowels(cluster)
+}
+
+function weightedSignatureChoice(
+	src: Language,
+	phonemes: readonly { v: string; w: number }[],
+	preferred: readonly string[] | undefined,
+	boost: number,
+): string {
+	if (!preferred?.length || boost <= 1) {
+		return src.dice.weightedChoice<string>(phonemes)
+	}
+
+	let total = 0
+	for (const phoneme of phonemes) {
+		total += phoneme.w * (preferred.includes(phoneme.v) ? boost : 1)
+	}
+	if (total <= 0) {
+		return src.dice.weightedChoice<string>(phonemes)
+	}
+
+	let roll = src.dice.uniform(0, total)
+	for (const phoneme of phonemes) {
+		roll -= phoneme.w * (preferred.includes(phoneme.v) ? boost : 1)
+		if (roll <= 0) return phoneme.v
+	}
+	return phonemes[phonemes.length - 1]?.v ?? ""
 }
 
 const syllable = (
@@ -273,54 +469,64 @@ const syllable = (
 	let prev = currWord.join("")
 	let localLongVowel = usedLongVowel
 	let localUsedDigraph = usedDigraph
-	return template
-		.split("")
-		.map((c) => {
-			const letter = c as PhonemeCatalog | typeof STOP_CHAR
-			// no action for stop characters (they can only appear once)
-			if (letter === STOP_CHAR) {
-				return src.stop
-			}
-			const phonemes =
-				letter === PhonemeCatalog.END_VOWEL
-					? endVowels(cluster, prev)
-					: letter === PhonemeCatalog.END_CONSONANT
-						? endConsonants(cluster, prev)
-						: letter === PhonemeCatalog.BACK_VOWEL
-							? backVowels(cluster)
-							: cluster.phonemes[letter]
-			// get the valid character set (non-unique or non-used characters)
-			const valid = phonemes.filter((m) =>
+	let built = ""
+	for (const token of template) {
+		const letter = token as PhonemeCatalog | typeof STOP_CHAR
+		if (letter === STOP_CHAR) {
+			built += src.stop
+			continue
+		}
+		const phonemes =
+			letter === PhonemeCatalog.END_VOWEL
+				? endVowels(cluster, prev)
+				: letter === PhonemeCatalog.END_CONSONANT
+					? endConsonants(cluster, prev)
+					: letter === PhonemeCatalog.BACK_VOWEL
+						? backVowels(cluster)
+						: cluster.phonemes[letter]
+
+		let valid: typeof phonemes | undefined
+		for (const phoneme of phonemes) {
+			if (
 				validLetter(src, {
-					curr: m.v,
+					curr: phoneme.v,
 					prev,
 					type: letter,
 					usedLongVowel: localLongVowel,
 					usedDigraph: localUsedDigraph,
-				}),
-			)
-			// pick a random character from the valid set
-			// use all characters if there are none left
-			const chosen = src.dice.weightedChoice(
-				valid.length > 0 ? valid : cluster.phonemes[letter],
-			)
-			prev += chosen
-			// prevent additional long vowels
-			if (hasLongVowel(src, chosen)) {
-				localLongVowel = true
+				})
+			) {
+				if (!valid) valid = []
+				valid.push(phoneme)
 			}
-			if (hasDigraph(src, chosen)) {
-				localUsedDigraph = true
-			}
-			return chosen
-		})
-		.join("")
+		}
+
+		const selectedPhonemes =
+			valid && valid.length > 0
+				? valid
+				: phonemes.length > 0
+					? phonemes
+					: cluster.phonemes[letter]
+		const chosen = weightedSignatureChoice(
+			src,
+			selectedPhonemes,
+			cluster.signature.preferredPhonemes[letter],
+			cluster.signature.phonemeBoost,
+		)
+		prev += chosen
+		if (hasLongVowel(src, chosen)) localLongVowel = true
+		if (hasDigraph(src, chosen)) localUsedDigraph = true
+		built += chosen
+	}
+	return built
 }
 
-const hasMorph = (cluster: Cluster, template: string, morph: string) =>
-	cluster.morphemes[template]
-		.filter((m) => m !== cluster.newSyl)
-		.some((m) => m === morph)
+const hasMorph = (cluster: Cluster, template: string, morph: string) => {
+	for (const existing of cluster.morphemes[template]) {
+		if (existing !== cluster.newSyl && existing === morph) return true
+	}
+	return false
+}
 
 const newMorph = (
 	cluster: Cluster,
@@ -370,50 +576,74 @@ const morpheme = (
 			PhonemeCatalog.START_VOWEL,
 		]
 		if (start.includes(template[0])) {
-			cluster.morphemes[template] = range(cluster.variation).map(
-				() => cluster.newSyl,
+			cluster.morphemes[template] = Array(cluster.variation).fill(
+				cluster.newSyl,
 			)
 		} else {
-			range(cluster.variation).map(() =>
+			for (let i = 0; i < cluster.variation; i++) {
 				newMorph(cluster, src, {
 					template,
 					currWord: word,
 					usedLongVowel,
 					usedDigraph,
-				}),
-			)
-			const { phonemes } = src
+				})
+			}
 			// add non-standard ('ah') endings if applicable
-			const hasH = phonemes[PhonemeCatalog.START_CONSONANT]
-				.concat(phonemes[PhonemeCatalog.MIDDLE_CONSONANT])
-				.some(({ v }) => v === "h")
+			const { hasHPhoneme } = getLanguageCache(src)
 			if (
 				cluster.key === "female" &&
 				template.includes(PhonemeCatalog.END_CONSONANT) &&
-				hasH
+				hasHPhoneme
 			) {
 				const partial = template.replace(
 					`${PhonemeCatalog.BACK_VOWEL}${PhonemeCatalog.END_CONSONANT}`,
 					"",
 				)
 				const prefix = CLUSTER.simple(cluster, src, partial).toLowerCase()
-				aVowels
-					.filter((a) =>
-						phonemes[PhonemeCatalog.BACK_VOWEL].some(({ v }) => v === a),
-					)
-					.forEach((a) => cluster.morphemes[template].push(`${prefix}${a}h`))
+				for (const vowel of getLanguageCache(src).backAVowels) {
+					cluster.morphemes[template].push(`${prefix}${vowel}h`)
+				}
 			}
 		}
 	}
 	// valid morphemes haven't been already used and don't include used unique characters
 	const prev = word.join("")
-	const valid = cluster.morphemes[template].filter((curr) => {
-		return (
+	const usedWords = new Set(word)
+	const signatureStems = cluster.signature.templateStems[template] ?? []
+	const validSignatureStems = signatureStems.filter(
+		(curr) =>
+			!usedWords.has(curr) &&
+			notHarsh(src, { curr, prev, usedLongVowel, usedDigraph }),
+	)
+	const stemChance =
+		word.length === 0
+			? cluster.signature.leadStemChance
+			: cluster.signature.followStemChance
+	if (
+		validSignatureStems.length > 0 &&
+		src.dice.random < stemChance &&
+		(!repeat || word.length === 0)
+	) {
+		const prospect = src.dice.choice(validSignatureStems)
+		if (hasLongVowel(src, prospect)) {
+			usedLongVowel = true
+		}
+		if (hasDigraph(src, prospect)) {
+			usedDigraph = true
+		}
+		word.push(prospect)
+		return { usedLongVowel, usedDigraph }
+	}
+	const valid: string[] = []
+	for (const curr of cluster.morphemes[template]) {
+		if (
 			curr === cluster.newSyl ||
-			(!word.includes(curr) &&
+			(!usedWords.has(curr) &&
 				notHarsh(src, { curr, prev, usedLongVowel, usedDigraph }))
-		)
-	})
+		) {
+			valid.push(curr)
+		}
+	}
 	const idx = ~~(src.dice.random * valid.length)
 	let prospect = !valid[idx] || repeat ? cluster.newSyl : valid[idx]
 	// create a new morpheme if none valid or '*' is chosen
@@ -441,7 +671,7 @@ const morpheme = (
 export const CLUSTER = {
 	endVowels,
 	simple: (cluster: Cluster, src: Language, template: string) =>
-		TEXT.titleCase(
+		titleCase(
 			syllable(cluster, src, {
 				template,
 				currWord: [],
@@ -450,25 +680,53 @@ export const CLUSTER = {
 			}),
 		),
 	spawn: (args: Partial<Cluster> & { src: Language }) => {
-		const structures = {
-			[PhonemeCatalog.MIDDLE_VOWEL]: [
-				`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-				`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-			],
-			[PhonemeCatalog.MIDDLE_CONSONANT]: [
-				`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-				`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-			],
-		}
 		const { src } = args
-		src.dice.random > 0.5
-			? structures[PhonemeCatalog.MIDDLE_VOWEL].pop()
-			: structures[PhonemeCatalog.MIDDLE_CONSONANT].pop()
-		const vowelStruct = src.dice.choice(structures.V)
-		const conStruct = src.dice.choice(structures.C)
+		const phonotacticPatterns = {
+			open: {
+				vowel: [
+					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+				],
+				consonant: [
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_VOWEL}`,
+				],
+			},
+			balanced: {
+				vowel: [
+					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+				],
+				consonant: [
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+				],
+			},
+			closed: {
+				vowel: [
+					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+				],
+				consonant: [
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+				],
+			},
+		}[src.phonotacticStyle]
+		const vowelStruct = src.dice.choice(phonotacticPatterns.vowel)
+		const conStruct = src.dice.choice(phonotacticPatterns.consonant)
 		const cluster: Cluster = {
 			phonemes: src.phonemes,
 			morphemes: {},
+			signature: {
+				preferredPhonemes: {},
+				templateStems: {},
+				templateStemCount: 0,
+				leadStemChance: 0,
+				followStemChance: 0,
+				phonemeBoost: 1,
+			},
 			newSyl: "*",
 			key: args.key || "",
 			ending: args.ending,
@@ -486,22 +744,14 @@ export const CLUSTER = {
 			},
 		}
 		if (args.key === "female") {
-			const { phonemes } = args.src
-			cluster.phonemes = JSON.parse(JSON.stringify(phonemes))
-			cluster.phonemes[PhonemeCatalog.BACK_VOWEL].forEach((k) => {
-				if (!yiVowels.includes(k.v)) {
-					cluster.phonemes[PhonemeCatalog.BACK_VOWEL] = cluster.phonemes[
-						PhonemeCatalog.BACK_VOWEL
-					].filter(({ v }) => v !== k.v)
-				}
-			})
-			cluster.phonemes[PhonemeCatalog.END_CONSONANT].forEach((k) => {
-				if (!feminineConsonants.includes(k.v)) {
-					cluster.phonemes[PhonemeCatalog.END_CONSONANT] = cluster.phonemes[
-						PhonemeCatalog.END_CONSONANT
-					].filter(({ v }) => v !== k.v)
-				}
-			})
+			const phonemes = clonePhonemes(args.src.phonemes)
+			phonemes[PhonemeCatalog.BACK_VOWEL] = phonemes[
+				PhonemeCatalog.BACK_VOWEL
+			].filter(({ v }) => YI_VOWEL_SET.has(v))
+			phonemes[PhonemeCatalog.END_CONSONANT] = phonemes[
+				PhonemeCatalog.END_CONSONANT
+			].filter(({ v }) => FEMININE_CONSONANT_SET.has(v))
+			cluster.phonemes = phonemes
 		}
 		return cluster
 	},
@@ -544,17 +794,9 @@ export const CLUSTER = {
 			usedDigraph = updates.usedDigraph
 		})
 		// finalize word
-		return TEXT.titleCase(
-			CLUSTER.morphemes(cluster, src, repeat).flat().join(""),
-		)
+		return titleCase(CLUSTER.morphemes(cluster, src, repeat).join(""))
 	},
 	vowel: (vowel: string) => {
-		return [
-			...aVowels,
-			...eVowels,
-			...iVowels,
-			...oVowels,
-			...yiVowels,
-		].includes(vowel)
+		return ALL_VOWELS_SET.has(vowel)
 	},
 }

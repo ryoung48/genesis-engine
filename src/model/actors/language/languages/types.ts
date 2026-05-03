@@ -1,7 +1,5 @@
 ﻿/* eslint-disable no-unused-vars */
-import type { Dice } from "../../../utilities/dice"
-import { WeightedDistribution } from "../../../utilities/dice/types"
-import { Gender } from "../../types"
+import type { LanguageRng, WeightedValue } from "./rng"
 
 export const PhonemeCatalog = {
 	START_CONSONANT: "B",
@@ -28,9 +26,28 @@ export type PhonemeClass =
 	| "plosive"
 	| "airy"
 export type SyllableWeight = "light" | "medium" | "heavy"
-export type OrthoStyle = "standard" | "hacek" | "tilde" | "acute" | "circumflex"
+export type PhonotacticStyle = "open" | "balanced" | "closed"
+export type OrthoStyle =
+	| "standard"
+	| "hacek"
+	| "tilde"
+	| "acute"
+	| "circumflex"
+	| "germanic"
+export type Gender = "male" | "female"
+
+export type WeightedDistribution<T> = WeightedValue<T>[]
 
 type PhonemeLookup = Record<PhonemeCatalog, WeightedDistribution<string>>
+
+export interface ClusterSignature {
+	preferredPhonemes: Partial<Record<PhonemeCatalog, string[]>>
+	templateStems: Record<string, string[]>
+	templateStemCount: number
+	leadStemChance: number
+	followStemChance: number
+	phonemeBoost: number
+}
 
 export interface Cluster {
 	phonemes: PhonemeLookup
@@ -41,6 +58,7 @@ export interface Cluster {
 	len: number
 	variation: number
 	morphemes: Record<string, string[]>
+	signature: ClusterSignature
 	newSyl: string
 	longNames: number
 }
@@ -55,6 +73,7 @@ interface Surnames {
 }
 
 export interface Language {
+	seed: string
 	// chance to pick patterns with stop letters
 	stop: string
 	stopChance: number
@@ -66,6 +85,9 @@ export interface Language {
 	digraphs: string[]
 	// word clusters: each cluster has similar words
 	clusters: Record<string, Cluster>
+	clusterTemplates: Record<string, Cluster>
+	seenWords: Record<string, Set<string>>
+	slotWords: Map<string, { morphemes: string[]; word: string }>
 	// general ending pattern for words
 	ending: PhonemeCatalog
 	consonantChance: number // female names
@@ -77,10 +99,12 @@ export interface Language {
 	predefined: Record<string, string[]>
 	// sonic character
 	phonemeClass: PhonemeClass
+	secondaryPhonemeClass: PhonemeClass | null
 	syllableWeight: SyllableWeight
+	phonotacticStyle: PhonotacticStyle
 	orthoStyle: OrthoStyle
 	// per-language RNG â€” independent of the world dice
-	dice: Dice
+	dice: LanguageRng
 }
 
 interface VowelRules {
@@ -193,6 +217,8 @@ export const vowelRules: VowelRules = {
 export interface WordParams {
 	lang: Language
 	key: string
+	namespace?: string
+	slot?: string
 	len?: number
 	ending?: string
 	variation?: number
