@@ -8,7 +8,6 @@ import {
 	developmentColor,
 	dtrColor,
 	getColor,
-	gravityColor,
 	hotspotColor,
 	migrationColor,
 	moistureDirectionalColor,
@@ -77,7 +76,6 @@ describe("sampled palette colors", () => {
 		expectRgbCloseTo(hotspotColor(1), [1, 0.969, 0.929])
 		expectRgbCloseTo(populationColor(1), [0.498, 0.153, 0.016])
 		expectRgbCloseTo(migrationColor(1), [0.882, 0.286, 0.224])
-		expectRgbCloseTo(gravityColor(1), [0.725, 0.11, 0.11])
 		expectRgbCloseTo(developmentColor(1), [0.302, 0, 0.294])
 		expectRgbCloseTo(slopeColor(1), [0.498, 0.114, 0.114])
 	})
@@ -97,7 +95,6 @@ describe("sampled palette colors", () => {
 
 		expect(terrainOcean[2]).toBeGreaterThan(terrainOcean[0])
 		expectRgbCloseTo(getColor(6, "terrain"), [0.961, 0.957, 0.949])
-		expectRgbCloseTo(getColor(5, "heightmap"), [10 / 11, 10 / 11, 10 / 11])
 		expectRgbCloseTo(getColor(-1, "landHeightmap"), [0, 0, 0])
 		expectRgbCloseTo(getColor(3, "landHeightmap"), [0.5, 0.5, 0.5])
 		expectRgbCloseTo(getColor(0.25, "slope"), slopeColor(0.25))

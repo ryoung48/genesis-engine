@@ -13,6 +13,7 @@ export type {
 	OrogenRivers,
 } from "./types/society"
 export { OROGEN_TOPOGRAPHY_LABELS } from "./types/society"
+
 export type {
 	BoundaryInfo,
 	CollisionResult,

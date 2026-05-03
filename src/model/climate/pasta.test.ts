@@ -225,7 +225,6 @@ describe("assignPastaClimate", () => {
 		expect(pastaClimateName(result.zones[0])).toBe(
 			"Barren Seasonal Frozen Ocean",
 		)
-		expect(result.debug.gddz[0]).toBe(0)
 	})
 
 	it("classifies land ice sheets when thick ice survives year-round", () => {
@@ -254,7 +253,6 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(pastaClimateName(result.zones[0])).toBe("Cold Barren")
-		expect(result.debug.gddz[0]).toBe(0)
 	})
 
 	it("classifies warm deserts when moisture availability is extremely low", () => {
@@ -267,7 +265,6 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(pastaClimateName(result.zones[0])).toBe("Warm Desert")
-		expect(result.debug.ar[0]).toBe(0)
 	})
 
 	it("classifies oceanic boreal climates from cool wet growing seasons", () => {
@@ -281,7 +278,6 @@ describe("assignPastaClimate", () => {
 
 		expect(pastaClimateName(result.zones[0])).toBe("Oceanic Temperate")
 		expect(result.debug.gdd[0]).toBeGreaterThan(350)
-		expect(result.debug.ar[0]).toBeGreaterThan(0.75)
 	})
 
 	it("classifies subtropical forests when warm seasons are wet but interrupted", () => {
@@ -307,7 +303,6 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(result.debug.gdd[0]).toBeGreaterThan(0)
-		expect(result.debug.gddz[0]).toBeGreaterThan(0)
 		expect(result.debug.gint[0]).toBeGreaterThan(0)
 		expect(result.debug.gdd_monthly[5]).toBeGreaterThan(0)
 		expect(result.debug.gint_monthly[5]).toBeGreaterThanOrEqual(0)
@@ -337,7 +332,6 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(pastaClimateName(result.zones[0])).toBe("Supertropical Forest")
-		expect(result.debug.gar[0]).toBeGreaterThan(0.5)
 	})
 
 	it("distinguishes warm, hot, and extraseasonal oceans from temperature thresholds", () => {
@@ -370,7 +364,6 @@ describe("assignPastaClimate", () => {
 		)
 
 		expect(pastaClimateName(result.zones[0])).toBe("Seasonal Frozen Ocean")
-		expect(result.debug.gddz[0]).toBeGreaterThanOrEqual(50)
 	})
 
 	it("treats exact ocean ice cutoffs as unfrozen until they are exceeded", () => {
@@ -420,9 +413,7 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(pastaClimateName(dry.zones[0])).toContain("Dry Savanna")
-		expect(dry.debug.gar[0]).toBeLessThan(0.5)
 		expect(pastaClimateName(monsoonal.zones[0])).toContain("Monsoon")
-		expect(monsoonal.debug.gar[0]).toBeLessThan(0.5)
 	})
 
 	it("covers cool mediterranean and hot subparamediterranean branches", () => {
@@ -442,9 +433,7 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(pastaClimateName(mediterranean.zones[0])).toContain("mediterranean")
-		expect(mediterranean.debug.grs[0]).toBeLessThan(0.8)
 		expect(pastaClimateName(hotDry.zones[0])).toContain("Subparamediterranean")
-		expect(hotDry.debug.grs[0]).toBeLessThan(0.8)
 	})
 
 	it("covers barren ocean thresholds without ice and at torrid warmth", () => {
@@ -464,7 +453,6 @@ describe("assignPastaClimate", () => {
 		])
 
 		expect(pastaClimateName(barren.zones[0])).toBe("Barren Ocean")
-		expect(barren.debug.gddz[0]).toBe(0)
 		expect(pastaClimateName(torrid.zones[0])).toBe("Torrid Ocean")
 		expect(torrid.debug.maxT[0]).toBeGreaterThanOrEqual(60)
 	})
@@ -590,7 +578,6 @@ describe("assignPastaClimate", () => {
 		})
 
 		expect(pastaClimateName(tropicalDark.zones[0])).toBe("Tropical Dark")
-		expect(tropicalDark.debug.gddz[0]).toBe(0)
 		expect(pastaClimateName(hotBarren.zones[0])).toBe("Hot Barren")
 		expect(pastaClimateName(extraseasonalBarren.zones[0])).toBe(
 			"Extraseasonal Barren",
@@ -605,8 +592,6 @@ describe("assignPastaClimate", () => {
 		expect(pastaClimateName(hyperseasonalSemidesert.zones[0])).toBe(
 			"Hyperseasonal Semidesert",
 		)
-		expect(coldSemidesert.debug.ar[0]).toBeLessThan(0.2)
-		expect(hyperseasonalDesert.debug.ar[0]).toBe(0)
 	})
 
 	it("covers low-light twilight, parch, and pulse outcomes", () => {
@@ -815,9 +800,6 @@ describe("assignPastaClimate", () => {
 		expect(pastaClimateName(continentalTundra.zones[0])).toBe(
 			"Continental Tundra",
 		)
-		expect(continentalRainforest.debug.grs[0]).toBeGreaterThan(
-			continentalTemperate.debug.grs[0],
-		)
 		expect(continentalTundra.debug.gdd[0]).toBeLessThan(350)
 	})
 
@@ -886,7 +868,6 @@ describe("assignPastaClimate", () => {
 		expect(pastaClimateName(boilingPluvialSwelter.zones[0])).toBe(
 			"Boiling Pluvial Swelter",
 		)
-		expect(hotParamediterranean.debug.gar[0]).toBeLessThan(0.5)
 		expect(boilingPluvialSwelter.debug.maxT[0]).toBeGreaterThanOrEqual(90)
 	})
 
@@ -949,7 +930,6 @@ describe("assignPastaClimate", () => {
 			"Hot Dry Monsoon Savanna",
 		)
 		expect(pastaClimateName(boilingSwelter.zones[0])).toBe("Boiling Swelter")
-		expect(warmSemidesert.debug.ar[0]).toBeLessThan(0.2)
 		expect(boilingSwelter.debug.maxT[0]).toBeGreaterThanOrEqual(90)
 	})
 
@@ -1001,7 +981,6 @@ describe("assignPastaClimate", () => {
 		expect(pastaClimateName(extratropicalForest.zones[0])).toBe(
 			"Extratropical Forest",
 		)
-		expect(torridSubparamediterranean.debug.grs[0]).toBeLessThan(0.8)
 		expect(extratropicalForest.debug.gint[0]).toBeLessThan(1250)
 	})
 
@@ -1032,9 +1011,6 @@ describe("assignPastaClimate", () => {
 		]
 
 		expect(expected.filter((name) => !matches.has(name))).toEqual([])
-		expect(
-			matches.get("Hyperpluvial Tropical Rainforest")?.debug.evr[0],
-		).toBeLessThan(0.4)
 		expect(
 			matches.get("Quasitropical Forest")?.debug.gint[0],
 		).toBeGreaterThanOrEqual(1250)
@@ -1075,10 +1051,6 @@ describe("assignPastaClimate", () => {
 		]
 
 		expect(expected.filter((name) => !matches.has(name))).toEqual([])
-		expect(matches.get("Oceanic Mediterranean")?.debug.gar[0]).toBeLessThan(0.5)
-		expect(matches.get("Oceanic Submediterranean")?.debug.grs[0]).toBeLessThan(
-			0.8,
-		)
 		expect(matches.get("Percontinental Boreal")?.debug.gdd[0]).toBeLessThan(
 			1300,
 		)

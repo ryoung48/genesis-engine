@@ -13,155 +13,159 @@ function createProps(overrides: Partial<ComponentProps<typeof ModeBar>> = {}) {
 		setNationMode: vi.fn(),
 		populationMode: "density" as const,
 		setPopulationMode: vi.fn(),
-		isClimateMode: false,
-		tempAnnual: true,
-		setTempAnnual: vi.fn(),
-		rainAnnual: true,
-		setRainAnnual: vi.fn(),
-		currentAnnual: true,
-		setCurrentAnnual: vi.fn(),
-		dtrAnnual: true,
-		setDtrAnnual: vi.fn(),
+		debugMapModes: false,
 		...overrides,
 	}
 }
 
-function getFamilyControl(
+function getPrimaryControl(
 	props: ComponentProps<typeof ModeBar>,
 ): ReactElement<{ onChange: (value: string) => void }> {
 	const root = ModeBar(props) as ReactElement<{ children?: React.ReactNode }>
 	const children = React.Children.toArray(root.props.children) as ReactElement[]
-	const familyPill = children[1] as ReactElement<{ children?: React.ReactNode }>
+	const familyPill = children[children.length - 1] as ReactElement<{
+		children?: React.ReactNode
+	}>
 	return React.Children.only(familyPill.props.children) as ReactElement<{
 		onChange: (value: string) => void
 	}>
 }
 
 describe("ModeBar", () => {
-	it("renders the climate tray without satellite modes", () => {
-		const markup = renderToStaticMarkup(
-			<ModeBar
-				{...createProps({
-					colorMode: "koppenClimate",
-					isClimateMode: true,
-				})}
-			/>,
-		)
+	it("renders geography defaults without debug-only map modes", () => {
+		const markup = renderToStaticMarkup(<ModeBar {...createProps()} />)
 
+		expect(markup.indexOf(">Terrain<")).toBeLessThan(
+			markup.indexOf(">Geography<"),
+		)
+		expect(markup).toContain(">Geography<")
+		expect(markup).toContain(">Elevation<")
+		expect(markup).toContain(">Topography<")
+		expect(markup).toContain(">Vegetation<")
 		expect(markup).toContain(">Climate<")
 		expect(markup).toContain(">Pasta<")
-		expect(markup).toContain(">Koppen<")
-		expect(markup).not.toContain(">Sat<")
-		expect(markup).not.toContain(">Sat K<")
+		expect(markup).toContain(">Temperature<")
+		expect(markup).toContain(">Rain<")
+		expect(markup).not.toContain(">Slope<")
+		expect(markup).not.toContain(">Koppen<")
+		expect(markup).not.toContain(">Current<")
+		expect(markup).not.toContain(">Sim<")
+		expect(markup).not.toContain(">Annual<")
 	})
 
-	it("shows the simulation-time toggle for monthly climate metrics", () => {
-		const markup = renderToStaticMarkup(
+	it("renders political and demographic defaults with the requested labels", () => {
+		const politicalMarkup = renderToStaticMarkup(
 			<ModeBar
 				{...createProps({
-					colorMode: "temperature",
-					isClimateMode: true,
-					tempAnnual: false,
+					colorMode: "nations",
+					nationMode: "provinces",
+				})}
+			/>,
+		)
+		const demographicMarkup = renderToStaticMarkup(
+			<ModeBar
+				{...createProps({
+					colorMode: "population",
+					populationMode: "religion",
 				})}
 			/>,
 		)
 
-		expect(markup).toContain(">Annual<")
-		expect(markup).toContain(">Sim<")
+		expect(politicalMarkup).toContain(">Political<")
+		expect(politicalMarkup).toContain(">Nations<")
+		expect(politicalMarkup).toContain(">Provinces<")
+		expect(demographicMarkup).toContain(">Demographics<")
+		expect(demographicMarkup).toContain(">Population<")
+		expect(demographicMarkup).toContain(">Development<")
+		expect(demographicMarkup).toContain(">Religion<")
+		expect(demographicMarkup).not.toContain(">Gravity<")
 	})
 
-	it("renders population trays without nation controls", () => {
-		const markup = renderToStaticMarkup(
-			<ModeBar
-				{...createProps({ colorMode: "population", populationMode: "faith" })}
-			/>,
-		)
-
-		expect(markup).toContain(">Density<")
-		expect(markup).toContain(">Faith<")
-		expect(markup).not.toContain(">Borders<")
-	})
-
-	it("renders nation trays and exposes metric toggles for precipitation, dtr, and currents", () => {
-		const nationMarkup = renderToStaticMarkup(
-			<ModeBar
-				{...createProps({ colorMode: "nations", nationMode: "provinces" })}
-			/>,
-		)
-		const precipitationMarkup = renderToStaticMarkup(
-			<ModeBar
-				{...createProps({
-					colorMode: "precipitation",
-					isClimateMode: true,
-					rainAnnual: false,
-				})}
-			/>,
-		)
-		const dtrMarkup = renderToStaticMarkup(
+	it("shows hidden debug map modes in their categories when enabled", () => {
+		const geographyMarkup = renderToStaticMarkup(
 			<ModeBar
 				{...createProps({
 					colorMode: "dtr",
-					isClimateMode: true,
-					dtrAnnual: false,
-				})}
-			/>,
-		)
-		const currentMarkup = renderToStaticMarkup(
-			<ModeBar
-				{...createProps({
-					colorMode: "oceanCurrents",
-					isClimateMode: true,
-					currentAnnual: false,
+					debugMapModes: true,
 				})}
 			/>,
 		)
 
-		expect(nationMarkup).toContain(">Borders<")
-		expect(nationMarkup).toContain(">Provinces<")
-		expect(precipitationMarkup).toContain(">Rain<")
-		expect(precipitationMarkup).toContain(">Sim<")
-		expect(dtrMarkup).toContain(">DTR<")
-		expect(dtrMarkup).toContain(">Sim<")
-		expect(currentMarkup).toContain(">Current<")
-		expect(currentMarkup).toContain(">Sim<")
+		expect(geographyMarkup).toContain(">DTR<")
+		expect(geographyMarkup).toContain(">Current<")
+		expect(geographyMarkup).toContain(">Koppen<")
+		expect(geographyMarkup).toContain(">Grayscale<")
 	})
 
-	it("renders terrain controls and routes family switches to the expected modes", () => {
+	it("renders the primary selector without an extra bordered wrapper", () => {
+		const tree = ModeBar(createProps()) as ReactElement<{
+			children?: React.ReactNode
+			className?: string
+		}>
+		const children = React.Children.toArray(
+			tree.props.children,
+		) as ReactElement[]
+		const primaryWrapper = children[1] as ReactElement<{ className?: string }>
+
+		expect(primaryWrapper.props.className).toBe("inline-flex")
+	})
+
+	it("routes primary switches to the expected backing modes", () => {
 		const setColorMode = vi.fn()
-		const markup = renderToStaticMarkup(
-			<ModeBar {...createProps({ setColorMode })} />,
-		)
-		const climateControl = getFamilyControl(
-			createProps({
-				colorMode: "terrain",
-				setColorMode,
-			}),
-		)
-		const populationControl = getFamilyControl(
-			createProps({
-				colorMode: "nations",
-				setColorMode,
-			}),
-		)
-		const nationControl = getFamilyControl(
+		const geographyControl = getPrimaryControl(
 			createProps({
 				colorMode: "population",
 				setColorMode,
 			}),
 		)
+		const politicalControl = getPrimaryControl(
+			createProps({
+				colorMode: "terrain",
+				setColorMode,
+			}),
+		)
+		const demographicsControl = getPrimaryControl(
+			createProps({
+				colorMode: "nations",
+				setColorMode,
+			}),
+		)
 
-		expect(markup).toContain(">Elev<")
-		expect(markup).toContain(">Danger<")
-
-		climateControl.props.onChange("terrain")
-		climateControl.props.onChange("climate")
-		populationControl.props.onChange("population")
-		nationControl.props.onChange("nations")
+		geographyControl.props.onChange("geography")
+		politicalControl.props.onChange("political")
+		demographicsControl.props.onChange("demographics")
 
 		expect(setColorMode).toHaveBeenNthCalledWith(1, "terrain")
-		expect(setColorMode).toHaveBeenNthCalledWith(2, "climate")
+		expect(setColorMode).toHaveBeenNthCalledWith(2, "nations")
 		expect(setColorMode).toHaveBeenNthCalledWith(3, "population")
-		expect(setColorMode).toHaveBeenNthCalledWith(4, "nations")
+	})
+
+	it("ignores unexpected primary mode values", () => {
+		const setColorMode = vi.fn()
+		const primaryControl = getPrimaryControl(
+			createProps({
+				colorMode: "terrain",
+				setColorMode,
+			}),
+		)
+
+		primaryControl.props.onChange("unexpected")
+
+		expect(setColorMode).not.toHaveBeenCalled()
+	})
+
+	it("keeps the current geography submode when switching within geography", () => {
+		const setColorMode = vi.fn()
+		const geographyControl = getPrimaryControl(
+			createProps({
+				colorMode: "dtr",
+				setColorMode,
+			}),
+		)
+
+		geographyControl.props.onChange("geography")
+
+		expect(setColorMode).toHaveBeenCalledWith("dtr")
 	})
 
 	it("wires shared mode-control helpers through active-state callbacks", () => {

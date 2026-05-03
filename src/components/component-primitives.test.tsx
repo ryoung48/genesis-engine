@@ -85,6 +85,51 @@ describe("planet ui primitives", () => {
 		expect(markup).toContain('viewBox="0 0 24 24"')
 	})
 
+	it("honors segmented control active overrides and click handlers", () => {
+		const onChange = vi.fn()
+		const tree = SegmentedControl({
+			options: [
+				{
+					value: "globe",
+					label: "Globe",
+					title: "Focus globe",
+				},
+				{
+					value: "map",
+					label: "Map",
+					disabled: true,
+				},
+			],
+			value: "map",
+			onChange,
+			isActive: (value) => value === "globe",
+			buttonClassName: "extra-button",
+		}) as React.ReactElement<ChildrenProps>
+
+		const buttons = React.Children.toArray(
+			tree.props.children,
+		) as React.ReactElement<
+			ClickableProps & {
+				className?: string
+				disabled?: boolean
+				title?: string
+			}
+		>[]
+		const globeButton = buttons[0]
+		const mapButton = buttons[1]
+
+		expect(globeButton.props.className).toContain(
+			"bg-white text-slate-900 shadow-sm",
+		)
+		expect(globeButton.props.className).toContain("extra-button")
+		expect(globeButton.props.title).toBe("Focus globe")
+		expect(mapButton.props.disabled).toBe(true)
+
+		globeButton.props.onClick?.(undefined as never)
+
+		expect(onChange).toHaveBeenCalledWith("globe")
+	})
+
 	it("renders labeled values and swatches for panel rows", () => {
 		const markup = renderToStaticMarkup(
 			<LabeledValueRow

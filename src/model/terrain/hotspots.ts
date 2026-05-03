@@ -799,7 +799,7 @@ export function applyHotspots(
 		hotspotContrib[r] = uplift
 	}
 
-	const lipUplift = applyLargeIgneousProvinces({
+	const lipContrib = applyLargeIgneousProvinces({
 		mesh,
 		elevation,
 		lipSites,
@@ -807,7 +807,7 @@ export function applyHotspots(
 		markFeature,
 	})
 	for (let r = 0; r < numRegions; r++) {
-		if (lipUplift[r] > 0) hotspotContrib[r] += lipUplift[r]
+		if (lipContrib[r] > 0) hotspotContrib[r] += lipContrib[r]
 	}
 
 	return hotspotContrib

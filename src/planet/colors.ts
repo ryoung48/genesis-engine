@@ -21,14 +21,12 @@ import {
 	PURPLES_STOPS,
 	YL_OR_RD_STOPS,
 } from "@/model/shared/color-palettes"
-
 /**
  * Orogen elevation and temperature color mapping.
  */
 
 export type ColorMode =
 	| "terrain"
-	| "heightmap"
 	| "landHeightmap"
 	| "slope"
 	| "topography"
@@ -46,21 +44,8 @@ export type ColorMode =
 	| "nations"
 	| "population"
 	| "provinces"
-	| "gravity"
 	| "basins"
 	| "terrainFeatures"
-	| "terrainFeaturesLand"
-	| "terrainFeaturesOcean"
-	| "terrainFeaturesCoast"
-	| "debugGdd"
-	| "debugGddz"
-	| "debugGint"
-	| "debugAr"
-	| "debugGar"
-	| "debugGrs"
-	| "debugEvr"
-	| "debugMinT"
-	| "debugMaxT"
 	| "dtr"
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
@@ -117,27 +102,10 @@ function elevationToColor(km: number, maxElevKm = 6): [number, number, number] {
 }
 
 /**
- * Grayscale heightmap: maps km range to grayscale.
+ * Grayscale terrain: ocean = black, land on 0 -> maxElev km scale.
  * Accepts elevation in km.
  */
-function heightmapColor(
-	km: number,
-	maxElevKm = 6,
-	maxDepthKm = 10,
-): [number, number, number] {
-	const range = maxDepthKm / 2 + maxElevKm
-	const t = Math.max(0, Math.min(1, (km + maxDepthKm / 2) / range))
-	return [t, t, t]
-}
-
-/**
- * Land heightmap: ocean = black, land on 0 -> maxElev km scale.
- * Accepts elevation in km.
- */
-function landHeightmapColor(
-	km: number,
-	maxElevKm = 6,
-): [number, number, number] {
+function grayscaleColor(km: number, maxElevKm = 6): [number, number, number] {
 	if (km <= 0) return [0, 0, 0]
 	const t = Math.max(0, Math.min(1, km / maxElevKm))
 	return [t, t, t]
@@ -447,14 +415,6 @@ const HOTSPOT_BASIS_STOPS: RgbColor[] = [
 	"#fb7185",
 	"#fff7ed",
 ].map(cssColorToRgb)
-const GRAVITY_BASIS_STOPS: RgbColor[] = [
-	"#0b1f3a",
-	"#0f6ba8",
-	"#27c7d9",
-	"#f4d35e",
-	"#f97316",
-	"#b91c1c",
-].map(cssColorToRgb)
 const SLOPE_BASIS_STOPS: RgbColor[] = [
 	"#f8fafc",
 	"#d9f99d",
@@ -524,15 +484,6 @@ export function migrationColor(
 	return [last.r, last.g, last.b]
 }
 
-export function gravityColor(t: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(
-			GRAVITY_BASIS_STOPS,
-			Math.pow(Math.max(0, Math.min(1, t)), 0.55),
-		),
-	)
-}
-
 export function developmentColor(t: number): [number, number, number] {
 	return quantizeRgb(
 		sampleColorStops(BUPU_STOPS, Math.pow(Math.max(0, Math.min(1, t)), 0.9)),
@@ -585,13 +536,10 @@ export function getColor(
 	km: number,
 	mode: ColorMode,
 	maxElevKm = 6,
-	maxDepthKm = 10,
 ): [number, number, number] {
 	switch (mode) {
-		case "heightmap":
-			return heightmapColor(km, maxElevKm, maxDepthKm)
 		case "landHeightmap":
-			return landHeightmapColor(km, maxElevKm)
+			return grayscaleColor(km, maxElevKm)
 		case "slope":
 			return slopeColor(Math.max(0, Math.min(1, km)))
 		default:

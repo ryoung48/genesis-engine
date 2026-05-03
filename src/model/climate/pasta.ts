@@ -349,7 +349,7 @@ function classifyOcean(
 	dpm: number,
 	warmest: number,
 	coldest: number,
-): { zone: number; gddz: number } {
+): { zone: number } {
 	// Only need gddz for ocean classification
 	for (let m = 0; m < 12; m++) {
 		const g0 = gdm(temps[m], dpm, 0, 20, 40, 60)
@@ -373,7 +373,7 @@ function classifyOcean(
 	else if (warmest > OCEAN.hot) zone = Z.Oe
 	else zone = Z.Oc
 
-	return { zone, gddz }
+	return { zone }
 }
 
 // MinIce > 10cm (100mm w.e.) for CI, per Worldbuilding Pasta spec
@@ -397,12 +397,7 @@ function classifyLand(
 ): {
 	zone: number
 	gdd: number
-	gddz: number
 	gint: number
-	ar: number
-	gar: number
-	grs: number
-	evr: number
 } {
 	let annualPrecip = 0
 	for (let m = 0; m < 12; m++) annualPrecip += rain[m]
@@ -550,25 +545,15 @@ function classifyLand(
 	return {
 		zone,
 		gdd,
-		gddz,
 		gint,
-		ar,
-		gar,
-		grs,
-		evr,
 	}
 }
 
 export interface PastaDebug {
 	gdd: Float32Array
-	gddz: Float32Array
 	gint: Float32Array
 	gdd_monthly: Float32Array
 	gint_monthly: Float32Array
-	ar: Float32Array
-	gar: Float32Array
-	grs: Float32Array
-	evr: Float32Array
 	minT: Float32Array
 	maxT: Float32Array
 }
@@ -591,14 +576,9 @@ export function assignPastaClimate(
 
 	const debug: PastaDebug = {
 		gdd: new Float32Array(N),
-		gddz: new Float32Array(N),
 		gint: new Float32Array(N),
 		gdd_monthly: new Float32Array(12 * N),
 		gint_monthly: new Float32Array(12 * N),
-		ar: new Float32Array(N),
-		gar: new Float32Array(N),
-		grs: new Float32Array(N),
-		evr: new Float32Array(N),
 		minT: new Float32Array(N),
 		maxT: new Float32Array(N),
 	}
@@ -640,7 +620,6 @@ export function assignPastaClimate(
 				coldest,
 			)
 			output[r] = result.zone
-			debug.gddz[r] = result.gddz
 		} else {
 			for (let m = 0; m < 12; m++) {
 				const idx = m * N + r
@@ -666,16 +645,11 @@ export function assignPastaClimate(
 			)
 			output[r] = result.zone
 			debug.gdd[r] = result.gdd
-			debug.gddz[r] = result.gddz
 			debug.gint[r] = result.gint === Infinity ? 99999 : result.gint
 			for (let m = 0; m < 12; m++) {
 				debug.gdd_monthly[m * N + r] = mGDD[m]
 				debug.gint_monthly[m * N + r] = mGInt[m]
 			}
-			debug.ar[r] = result.ar
-			debug.gar[r] = result.gar
-			debug.grs[r] = result.grs
-			debug.evr[r] = result.evr
 		}
 	}
 

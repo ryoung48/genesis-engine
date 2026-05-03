@@ -50,6 +50,28 @@ describe("shared chart components", () => {
 		expect(markup).toContain("10.0")
 	})
 
+	it("renders positive-only series bars with custom tooltips", () => {
+		const tooltipLabel = vi.fn(
+			({ label, value }: { label: string; value: number; index: number }) =>
+				`${label} => ${value}`,
+		)
+
+		const markup = renderToStaticMarkup(
+			<SeriesBars
+				values={[2, 4]}
+				labels={["A", "B"]}
+				label="Rain"
+				colorForValue={() => "#123456"}
+				tooltipLabel={tooltipLabel}
+			/>,
+		)
+
+		expect(markup).toContain("Rain")
+		expect(markup).toContain('title="A =&gt; 2"')
+		expect(markup).not.toContain("border-slate-500/30")
+		expect(tooltipLabel).toHaveBeenCalledTimes(2)
+	})
+
 	it("builds a generic heatmap chart dataset and legend", () => {
 		capturedBarProps = null
 

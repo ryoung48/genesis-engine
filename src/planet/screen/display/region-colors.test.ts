@@ -11,7 +11,6 @@ import {
 	developmentColor,
 	dtrColor,
 	getColor,
-	gravityColor,
 	hotspotColor,
 	moistureDirectionalColor,
 	OCEAN_LIGHT_BLUE,
@@ -82,6 +81,23 @@ const DEFAULT_NATION_MODE: NationMapMode = "borders"
 const DEFAULT_POPULATION_MODE: PopulationMapMode = "density"
 
 describe("computeRegionColors", () => {
+	it("defers grayscale mode to mesh-based smoothing", () => {
+		const world = buildWorld({})
+
+		const rgb = computeRegionColors(
+			world,
+			"landHeightmap",
+			DEFAULT_NATION_MODE,
+			DEFAULT_POPULATION_MODE,
+			0,
+			0,
+			0,
+			0,
+		)
+
+		expect(rgb).toBeNull()
+	})
+
 	it("returns known terrain feature and topography colors", () => {
 		expect(getTerrainFeatureColor(OROGEN_TERRAIN_FEATURE.TRENCH)).toEqual([
 			0.07, 0.17, 0.46,
@@ -732,89 +748,6 @@ describe("computeRegionColors", () => {
 		expectRegionColor(koppenClimate!, 1, koppenClimateColor(2))
 	})
 
-	it("normalizes pasta debug metrics and keeps oceans dark", () => {
-		const world = buildWorld({
-			mesh: { numRegions: 3 } as never,
-			elevation: new Float32Array([1, 1, -1]),
-			elevation_km: new Float32Array([0, 0, -1]),
-			isLand: new Uint8Array([1, 1, 0]),
-			pastaDebug: {
-				gdd: new Float32Array([0, 10, 1]),
-				gddz: new Float32Array([0, 10, 1]),
-				gint: new Float32Array([99999, 10, 5]),
-				gdd_monthly: new Float32Array(36),
-				gint_monthly: new Float32Array(36),
-				ar: new Float32Array([0.1, 0.2, 0.3]),
-				gar: new Float32Array([0.1, 0.2, 0.3]),
-				grs: new Float32Array([0.1, 0.2, 0.3]),
-				evr: new Float32Array([0.1, 0.2, 0.3]),
-				minT: new Float32Array([0, 10, -5]),
-				maxT: new Float32Array([20, 30, 5]),
-			},
-		})
-
-		const rgb = computeRegionColors(
-			world,
-			"debugGint",
-			DEFAULT_NATION_MODE,
-			DEFAULT_POPULATION_MODE,
-			0,
-			0,
-			0,
-			0,
-		)
-
-		expect(rgb).not.toBeNull()
-		expectRegionColor(rgb!, 0, [1, 1, 0])
-		expectRegionColor(rgb!, 1, [0, 0.05, 0.5])
-		expectRegionColor(rgb!, 2, [0.05, 0.08, 0.18])
-	})
-
-	it("normalizes flat debug ranges for min-temperature views without ocean darkening", () => {
-		const world = buildWorld({
-			climate: {
-				temperature_avg: new Float32Array([0, 0]),
-				temperature_min: new Float32Array([0, 0]),
-				temperature_max: new Float32Array([0, 0]),
-				temperature_monthly: new Float32Array(24),
-				temperature_monthly_nolapse: new Float32Array(24),
-				temperature_monthly_range: new Float32Array(24),
-				insolation_monthly: new Float32Array(24),
-				pet_monthly: new Float32Array(24),
-				daylight_hours_monthly: new Float32Array(24),
-				landFraction: [],
-			},
-			pastaDebug: {
-				gdd: new Float32Array([0, 0]),
-				gddz: new Float32Array([0, 0]),
-				gint: new Float32Array([0, 0]),
-				gdd_monthly: new Float32Array(24),
-				gint_monthly: new Float32Array(24),
-				ar: new Float32Array([0, 0]),
-				gar: new Float32Array([0, 0]),
-				grs: new Float32Array([0, 0]),
-				evr: new Float32Array([0, 0]),
-				minT: new Float32Array([4, 4]),
-				maxT: new Float32Array([10, 10]),
-			},
-		})
-
-		const rgb = computeRegionColors(
-			world,
-			"debugMinT",
-			DEFAULT_NATION_MODE,
-			DEFAULT_POPULATION_MODE,
-			0,
-			0,
-			0,
-			0,
-		)
-
-		expect(rgb).not.toBeNull()
-		expectRegionColor(rgb!, 0, [0, 0.05, 0.5])
-		expectRegionColor(rgb!, 1, [0, 0.05, 0.5])
-	})
-
 	it("falls back to terrain colors when climate-specific data is missing", () => {
 		const world = buildWorld({
 			mesh: { numRegions: 3 } as never,
@@ -847,7 +780,6 @@ describe("computeRegionColors", () => {
 		expect(terrain).not.toBeNull()
 		for (const colorMode of [
 			"climate",
-			"debugGdd",
 			"dtr",
 			"oceanCurrents",
 			"terrainFeatures",
@@ -1031,7 +963,7 @@ describe("computeRegionColors", () => {
 		)
 		const features = computeRegionColors(
 			world,
-			"terrainFeaturesCoast",
+			"terrainFeatures",
 			DEFAULT_NATION_MODE,
 			DEFAULT_POPULATION_MODE,
 			0,
@@ -1060,9 +992,9 @@ describe("computeRegionColors", () => {
 			hotspotColor(0.2)[2] * 0.82,
 		])
 		expectRegionColor(features!, 0, [
-			coastalBase[0] * 0.32,
-			coastalBase[1] * 0.32,
-			coastalBase[2] * 0.32,
+			coastalBase[0] * 0.2 + 0.82 * 0.8,
+			coastalBase[1] * 0.2 + 0.29 * 0.8,
+			coastalBase[2] * 0.2 + 0.22 * 0.8,
 		])
 		expectRegionColor(features!, 1, [
 			coastalAccent[0] * 0.2 + 0.98 * 0.8,
@@ -1332,16 +1264,6 @@ describe("computeRegionColors", () => {
 			0,
 			0,
 		)
-		const gravity = computeRegionColors(
-			populationWorld,
-			"population",
-			DEFAULT_NATION_MODE,
-			"gravity",
-			0,
-			0,
-			0,
-			0,
-		)
 		const development = computeRegionColors(
 			populationWorld,
 			"population",
@@ -1395,8 +1317,6 @@ describe("computeRegionColors", () => {
 
 		expectRegionColor(density!, 0, populationColor(1))
 		expectRegionColor(density!, 1, populationColor(0.2))
-		expectRegionColor(gravity!, 0, gravityColor(0.5))
-		expectRegionColor(gravity!, 1, gravityColor(1))
 		expectRegionColor(development!, 0, developmentColor(0.5))
 		expectRegionColor(development!, 1, developmentColor(1))
 		expectRegionColor(culture!, 0, [0.35, 0.33, 0.32])
@@ -1512,7 +1432,7 @@ describe("computeRegionColors", () => {
 		).toBeNull()
 	})
 
-	it("falls back to the first filtered terrain feature when the dominant feature is excluded", () => {
+	it("falls back to the first terrain feature when the dominant feature is invalid", () => {
 		const landBase = getColor(0.5, "terrain")
 		const oceanBase = getColor(-0.5, "terrain")
 		const world = buildWorld({
@@ -1533,19 +1453,9 @@ describe("computeRegionColors", () => {
 			},
 		})
 
-		const landFeatures = computeRegionColors(
+		const features = computeRegionColors(
 			world,
-			"terrainFeaturesLand",
-			DEFAULT_NATION_MODE,
-			DEFAULT_POPULATION_MODE,
-			0,
-			0,
-			0,
-			0,
-		)
-		const oceanFeatures = computeRegionColors(
-			world,
-			"terrainFeaturesOcean",
+			"terrainFeatures",
 			DEFAULT_NATION_MODE,
 			DEFAULT_POPULATION_MODE,
 			0,
@@ -1554,15 +1464,15 @@ describe("computeRegionColors", () => {
 			0,
 		)
 
-		expectRegionColor(landFeatures!, 0, [
-			landBase[0] * 0.2 + 0.55 * 0.8,
-			landBase[1] * 0.2 + 0.24 * 0.8,
-			landBase[2] * 0.2 + 0.13 * 0.8,
+		expectRegionColor(features!, 0, [
+			landBase[0] * 0.2 + 0.98 * 0.8,
+			landBase[1] * 0.2 + 0.9 * 0.8,
+			landBase[2] * 0.2 + 0.5 * 0.8,
 		])
-		expectRegionColor(oceanFeatures!, 1, [
-			oceanBase[0] * 0.2 + 0.07 * 0.8,
-			oceanBase[1] * 0.2 + 0.17 * 0.8,
-			oceanBase[2] * 0.2 + 0.46 * 0.8,
+		expectRegionColor(features!, 1, [
+			oceanBase[0] * 0.2 + 0.82 * 0.8,
+			oceanBase[1] * 0.2 + 0.29 * 0.8,
+			oceanBase[2] * 0.2 + 0.22 * 0.8,
 		])
 	})
 
@@ -1676,7 +1586,7 @@ describe("computeRegionColors", () => {
 		)
 	})
 
-	it("filters terrain features and falls back to terrain colors for default rendering", () => {
+	it("renders terrain features and falls back to terrain colors for default rendering", () => {
 		const featureWorld = buildWorld({
 			mesh: { numRegions: 4 } as never,
 			elevation: new Float32Array([1, 0.4, -1, 0.2]),
@@ -1698,29 +1608,9 @@ describe("computeRegionColors", () => {
 				]),
 			},
 		})
-		const landFeatures = computeRegionColors(
+		const features = computeRegionColors(
 			featureWorld,
-			"terrainFeaturesLand",
-			DEFAULT_NATION_MODE,
-			DEFAULT_POPULATION_MODE,
-			0,
-			0,
-			0,
-			0,
-		)
-		const oceanFeatures = computeRegionColors(
-			featureWorld,
-			"terrainFeaturesOcean",
-			DEFAULT_NATION_MODE,
-			DEFAULT_POPULATION_MODE,
-			0,
-			0,
-			0,
-			0,
-		)
-		const coastFeatures = computeRegionColors(
-			featureWorld,
-			"terrainFeaturesCoast",
+			"terrainFeatures",
 			DEFAULT_NATION_MODE,
 			DEFAULT_POPULATION_MODE,
 			0,
@@ -1734,27 +1624,22 @@ describe("computeRegionColors", () => {
 		const region2Base = getColor(-1, "terrain")
 		const region3Base = getColor(0.2, "terrain")
 
-		expectRegionColor(landFeatures!, 0, [
+		expectRegionColor(features!, 0, [
 			region0Base[0] * 0.2 + 0.82 * 0.8,
 			region0Base[1] * 0.2 + 0.29 * 0.8,
 			region0Base[2] * 0.2 + 0.22 * 0.8,
 		])
-		expectRegionColor(landFeatures!, 1, [
-			region1Base[0] * 0.32,
-			region1Base[1] * 0.32,
-			region1Base[2] * 0.32,
-		])
-		expectRegionColor(oceanFeatures!, 1, [
+		expectRegionColor(features!, 1, [
 			region1Base[0] * 0.2 + 0.17 * 0.8,
 			region1Base[1] * 0.2 + 0.73 * 0.8,
 			region1Base[2] * 0.2 + 0.88 * 0.8,
 		])
-		expectRegionColor(coastFeatures!, 2, [
+		expectRegionColor(features!, 2, [
 			region2Base[0] * 0.2 + 0.98 * 0.8,
 			region2Base[1] * 0.2 + 0.9 * 0.8,
 			region2Base[2] * 0.2 + 0.5 * 0.8,
 		])
-		expectRegionColor(landFeatures!, 3, [
+		expectRegionColor(features!, 3, [
 			region3Base[0] * 0.2 + 0.82 * 0.8,
 			region3Base[1] * 0.2 + 0.29 * 0.8,
 			region3Base[2] * 0.2 + 0.22 * 0.8,
@@ -1924,14 +1809,9 @@ describe("computeRegionColors", () => {
 			koppenClimate: new Uint8Array([1, 2, 3, 4, 5, 6]),
 			pastaDebug: {
 				gdd: new Float32Array([10, 20, 30, 40, 50, 60]),
-				gddz: new Float32Array([5, 15, 25, 35, 45, 55]),
 				gint: new Float32Array([100, 500, 99999, 900, 1200, 1400]),
 				gdd_monthly: new Float32Array(72),
 				gint_monthly: new Float32Array(72),
-				ar: new Float32Array([0.2, 0.4, 0.6, 0.8, 1, 0.3]),
-				gar: new Float32Array([0.2, 0.4, 0.6, 0.8, 1, 0.3]),
-				grs: new Float32Array([0.5, 0.7, 0.9, 1.1, 1.3, 0.6]),
-				evr: new Float32Array([0.2, 0.4, 0.6, 0.8, 1, 0.3]),
 				minT: new Float32Array([-10, -5, 0, 5, 10, 15]),
 				maxT: new Float32Array([10, 20, 30, 40, 50, 60]),
 			},
@@ -2040,8 +1920,6 @@ describe("computeRegionColors", () => {
 			["vegetation", DEFAULT_POPULATION_MODE],
 			["pastaClimate", DEFAULT_POPULATION_MODE],
 			["koppenClimate", DEFAULT_POPULATION_MODE],
-			["debugAr", DEFAULT_POPULATION_MODE],
-			["debugMaxT", DEFAULT_POPULATION_MODE],
 			["climate", DEFAULT_POPULATION_MODE],
 			["dtr", DEFAULT_POPULATION_MODE],
 			["oceanCurrents", DEFAULT_POPULATION_MODE],
@@ -2050,7 +1928,6 @@ describe("computeRegionColors", () => {
 			["nations", DEFAULT_POPULATION_MODE],
 			["provinces", DEFAULT_POPULATION_MODE],
 			["population", "density"],
-			["population", "gravity"],
 			["population", "development"],
 			["population", "culture"],
 			["population", "heritage"],
@@ -2058,9 +1935,6 @@ describe("computeRegionColors", () => {
 			["population", "religion"],
 			["basins", DEFAULT_POPULATION_MODE],
 			["terrainFeatures", DEFAULT_POPULATION_MODE],
-			["terrainFeaturesLand", DEFAULT_POPULATION_MODE],
-			["terrainFeaturesOcean", DEFAULT_POPULATION_MODE],
-			["terrainFeaturesCoast", DEFAULT_POPULATION_MODE],
 			["terrain", DEFAULT_POPULATION_MODE],
 		]
 

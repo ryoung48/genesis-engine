@@ -226,19 +226,18 @@ function runActivePath(
 	const r_hotspot = withTiming("orogen:hotspots", pipelineTiming, () =>
 		params.landCoverage <= 0
 			? new Float32Array(mesh.numRegions)
-			: clampHotspots(
-					applyHotspots(
-						mesh,
-						plates,
-						plateAssignment,
-						elevation,
-						r_mantleUpwelling,
-						terrainFeatures,
-						params.seed,
-						volcanism,
-					),
+			: applyHotspots(
+					mesh,
+					plates,
+					plateAssignment,
+					elevation,
+					r_mantleUpwelling,
+					terrainFeatures,
+					params.seed,
+					volcanism,
 				),
 	)
+	clampHotspots(r_hotspot)
 
 	// 11. Peak compression (orogen: Math.pow(elev, 0.92) for positive elevations)
 	onProgress?.("Compressing peaks...", 75)
@@ -288,10 +287,9 @@ function runStagnantPath(
 	const r_hotspot = withTiming("orogen:static-hotspots", pipelineTiming, () =>
 		params.landCoverage <= 0
 			? new Float32Array(mesh.numRegions)
-			: clampHotspots(
-					applyStaticHotspots(mesh, elevation, params.seed, volcanism),
-				),
+			: applyStaticHotspots(mesh, elevation, params.seed, volcanism),
 	)
+	clampHotspots(r_hotspot)
 
 	// Peak compression
 	applyPeakCompression(elevation, mesh.numRegions)
@@ -614,7 +612,6 @@ export function generateOrogenWorld(
 			meanEdgeLengthKm(mesh, params.planetRadiusKm),
 		),
 	)
-
 	// 17. Small ocean detection — patches < 0.1% of land become lakes so rivers drain through them
 	const smallOcean = new Uint8Array(mesh.numRegions)
 	{
@@ -677,6 +674,8 @@ export function generateOrogenWorld(
 			boundary,
 			distFields,
 			r_hotspot,
+			r_mantleUpwelling,
+			terrainFeatures,
 			enableOceanCurrents: false,
 			onProgress,
 		}),

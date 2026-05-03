@@ -21,6 +21,7 @@ export interface OrogenScene {
 	updateWorld(world: SerializedOrogenWorld | null): void
 	setColorMode(mode: ColorMode): void
 	setRegionColors(colors: Float32Array | null): void
+	setDisplayColors(mode: ColorMode, colors: Float32Array | null): void
 	setOccupationOverlay(overlay: Float32Array | null): void
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void

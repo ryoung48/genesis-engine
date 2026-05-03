@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import {
 	buildClimateSwatchColor,
+	buildDemographicDisplayData,
 	buildHoverChartData,
 	buildPastaMonthlyData,
 	buildProvinceDisplayData,
@@ -281,6 +282,345 @@ describe("buildTopographySwatchColor", () => {
 				0,
 				makeWorld({ topography: new Uint8Array([99]) }),
 			),
+		).toBeNull()
+	})
+})
+
+describe("buildDemographicDisplayData", () => {
+	it("formats population density for density mode", () => {
+		const result = buildDemographicDisplayData({
+			populationMode: "density",
+			hoverProvince: 0,
+			world: makeWorld({
+				params: { planetRadiusKm: 1000 },
+				provinces: {
+					desolate: new Uint8Array([0]),
+					size: new Float32Array([2]),
+				},
+				population: {
+					population: new Float32Array([125000]),
+				},
+			}),
+			unitSystem: "metric",
+			getCultureName: (id) => `culture-${id}`,
+			getHeritageName: (id) => `heritage-${id}`,
+			getFaithName: (id) => `faith-${id}`,
+			getReligionName: (id) => `religion-${id}`,
+		})
+
+		expect(result?.label).toBe("Population")
+		expect(result?.value).toContain("125K")
+		expect(result?.value).toContain("km")
+	})
+
+	it("resolves cultural partitions and swatch colors for culture mode", () => {
+		const result = buildDemographicDisplayData({
+			populationMode: "culture",
+			hoverProvince: 0,
+			world: makeWorld({
+				provinces: {
+					desolate: new Uint8Array([0]),
+					size: new Float32Array([1]),
+				},
+				cultures: {
+					assignment: new Int32Array([1]),
+					colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+				},
+			}),
+			unitSystem: "metric",
+			getCultureName: (id) => `culture-${id}`,
+			getHeritageName: (id) => `heritage-${id}`,
+			getFaithName: (id) => `faith-${id}`,
+			getReligionName: (id) => `religion-${id}`,
+		})
+
+		expect(result).toEqual({
+			label: "Culture",
+			value: "culture-1",
+			color: expect.stringMatching(/^rgb/),
+		})
+	})
+
+	it("returns null when the hovered demographic province is missing or desolate", () => {
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "development",
+				hoverProvince: null,
+				world: makeWorld({}),
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toBeNull()
+	})
+
+	it("returns plain rows for development demographic mode", () => {
+		const world = makeWorld({
+			provinces: {
+				desolate: new Uint8Array([0]),
+				size: new Float32Array([1]),
+			},
+			development: new Float32Array([0.75]),
+		})
+
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "development",
+				hoverProvince: 0,
+				world,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toEqual({
+			label: "Development",
+			value: "0.75",
+			color: null,
+		})
+	})
+
+	it("resolves heritage, faith, and religion chains from the hovered culture", () => {
+		const world = makeWorld({
+			provinces: {
+				desolate: new Uint8Array([0]),
+				size: new Float32Array([1]),
+			},
+			cultures: {
+				assignment: new Int32Array([1]),
+				colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+			},
+			heritages: {
+				assignment: new Int32Array([0, 2]),
+				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
+			},
+			faiths: {
+				assignment: new Int32Array([0, 3]),
+				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]),
+			},
+			religions: {
+				assignment: new Int32Array([0, 0, 0, 4]),
+				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1]),
+			},
+		})
+
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "heritage",
+				hoverProvince: 0,
+				world,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toEqual({
+			label: "Heritage",
+			value: "heritage-2",
+			color: expect.stringMatching(/^rgb/),
+		})
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "faith",
+				hoverProvince: 0,
+				world,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toEqual({
+			label: "Faith",
+			value: "faith-3",
+			color: expect.stringMatching(/^rgb/),
+		})
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "religion",
+				hoverProvince: 0,
+				world,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toEqual({
+			label: "Religion",
+			value: "religion-4",
+			color: expect.stringMatching(/^rgb/),
+		})
+	})
+
+	it("handles density fallback and partition fallback branches", () => {
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "density",
+				hoverProvince: 0,
+				world: makeWorld({
+					params: { planetRadiusKm: 1000 },
+					provinces: {
+						desolate: new Uint8Array([0]),
+						size: new Float32Array([0]),
+					},
+					population: {
+						population: new Float32Array([0]),
+					},
+				}),
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toBeNull()
+
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "faith",
+				hoverProvince: 0,
+				world: makeWorld({
+					provinces: {
+						desolate: new Uint8Array([0]),
+						size: new Float32Array([1]),
+					},
+					cultures: {
+						assignment: new Int32Array([1]),
+						colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+					},
+				}),
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toBeNull()
+	})
+
+	it("keeps demographic labels even when partition colors are unavailable", () => {
+		const result = buildDemographicDisplayData({
+			populationMode: "culture",
+			hoverProvince: 0,
+			world: makeWorld({
+				provinces: {
+					desolate: new Uint8Array([0]),
+					size: new Float32Array([1]),
+				},
+				cultures: {
+					assignment: new Int32Array([1]),
+					colors: new Float32Array([1, 0, 0]),
+				},
+			}),
+			unitSystem: "metric",
+			getCultureName: (id) => `culture-${id}`,
+			getHeritageName: (id) => `heritage-${id}`,
+			getFaithName: (id) => `faith-${id}`,
+			getReligionName: (id) => `religion-${id}`,
+		})
+
+		expect(result).toEqual({
+			label: "Culture",
+			value: "culture-1",
+			color: null,
+		})
+	})
+
+	it("covers small and large population formatting branches", () => {
+		const small = buildDemographicDisplayData({
+			populationMode: "density",
+			hoverProvince: 0,
+			world: makeWorld({
+				provinces: {
+					desolate: new Uint8Array([0]),
+					size: new Float32Array([0]),
+				},
+				population: {
+					population: new Float32Array([500]),
+				},
+			}),
+			unitSystem: "metric",
+			getCultureName: (id) => `culture-${id}`,
+			getHeritageName: (id) => `heritage-${id}`,
+			getFaithName: (id) => `faith-${id}`,
+			getReligionName: (id) => `religion-${id}`,
+		})
+		const large = buildDemographicDisplayData({
+			populationMode: "density",
+			hoverProvince: 0,
+			world: makeWorld({
+				provinces: {
+					desolate: new Uint8Array([0]),
+					size: new Float32Array([1]),
+				},
+				population: {
+					population: new Float32Array([2_500_000]),
+				},
+			}),
+			unitSystem: "metric",
+			getCultureName: (id) => `culture-${id}`,
+			getHeritageName: (id) => `heritage-${id}`,
+			getFaithName: (id) => `faith-${id}`,
+			getReligionName: (id) => `religion-${id}`,
+		})
+
+		expect(small?.value).toContain("500")
+		expect(small?.value).toContain("km")
+		expect(large?.value).toContain("2.5M")
+	})
+
+	it("returns null when demographic assignment chains are missing", () => {
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "culture",
+				hoverProvince: 0,
+				world: makeWorld({
+					provinces: {
+						desolate: new Uint8Array([0]),
+						size: new Float32Array([1]),
+					},
+					cultures: {
+						assignment: new Int32Array([-1]),
+						colors: new Float32Array([1, 0, 0]),
+					},
+				}),
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toBeNull()
+
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "religion",
+				hoverProvince: 0,
+				world: makeWorld({
+					provinces: {
+						desolate: new Uint8Array([0]),
+						size: new Float32Array([1]),
+					},
+					cultures: {
+						assignment: new Int32Array([1]),
+						colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+					},
+					faiths: {
+						assignment: new Int32Array([0, -1]),
+						colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+					},
+				}),
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
 		).toBeNull()
 	})
 })

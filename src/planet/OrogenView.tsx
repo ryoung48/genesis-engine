@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { FloatingPanel } from "@/components"
+import { FloatingPanel, IconButton } from "@/components"
 import {
 	DEV_BUCKETS,
 	DEV_COLORS,
@@ -120,6 +120,11 @@ import type {
 	PopulationMapMode,
 } from "./screen/shared/map-modes"
 import {
+	DEFAULT_GEOGRAPHY_MODE,
+	isDebugGeographyMode,
+	normalizeGeographyColorMode,
+} from "./screen/shared/map-modes"
+import {
 	formatDistance,
 	rgbToCss,
 	type UnitSystem,
@@ -175,10 +180,6 @@ export const OrogenView: React.FC = () => {
 	const [nationMode, setNationMode] = useState<NationMapMode>("borders")
 	const [populationMode, setPopulationMode] =
 		useState<PopulationMapMode>("density")
-	const [tempAnnual, setTempAnnual] = useState(true)
-	const [rainAnnual, setRainAnnual] = useState(true)
-	const [currentAnnual, setCurrentAnnual] = useState(true)
-	const [dtrAnnual, setDtrAnnual] = useState(true)
 	const [viewMode, setViewMode] = useState<OrogenViewMode>("globe")
 	const [mapCenterLongitude] = useState(0)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(0)
@@ -193,6 +194,8 @@ export const OrogenView: React.FC = () => {
 	const [showThermalEquator, setShowThermalEquator] = useState(false)
 	const [showRivers, setShowRivers] = useState(false)
 	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
+	const [debugMapModes, setDebugMapModes] = useState(false)
+	const [simulationControlsOpen, setSimulationControlsOpen] = useState(false)
 	const [gridSpacing, setGridSpacing] = useState(15)
 	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
@@ -214,10 +217,11 @@ export const OrogenView: React.FC = () => {
 	)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	const displayMonth = historyTimeToMonth(selectedTimeMs)
-	const temperatureMonth = tempAnnual ? 0 : displayMonth
-	const rainfallMonth = rainAnnual ? 0 : displayMonth
-	const dtrMonth = dtrAnnual ? 0 : displayMonth
-	const currentMonth = currentAnnual ? 0 : displayMonth
+	const temperatureMonth = displayMonth
+	const rainfallMonth = displayMonth
+	const dtrMonth = displayMonth
+	const currentMonth = displayMonth
+	const canSimulate = !!world && !!world.nations && !generating
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
@@ -417,30 +421,26 @@ export const OrogenView: React.FC = () => {
 
 	// --- Color mode guard ---
 	useEffect(() => {
-		if (world && !world.hazards && colorMode === "dangerZones")
-			setColorMode("terrain")
-		if (world && !world.volcanism && colorMode === "hotspots")
-			setColorMode("terrain")
-		if (colorMode === "landHeightmap") setColorMode("terrain")
-		if (
-			colorMode === "terrainFeaturesLand" ||
-			colorMode === "terrainFeaturesOcean" ||
-			colorMode === "terrainFeaturesCoast"
-		) {
-			setColorMode("terrainFeatures")
-		}
+		const normalizedColorMode = normalizeGeographyColorMode({
+			colorMode,
+			hasHazards: !!world?.hazards,
+			hasVolcanism: !!world?.volcanism,
+		})
+		if (normalizedColorMode !== colorMode) setColorMode(normalizedColorMode)
 	}, [colorMode, world?.hazards, world?.volcanism, world])
 
-	const isClimateMode =
-		colorMode === "climate" ||
-		colorMode === "vegetation" ||
-		colorMode === "temperature" ||
-		colorMode === "precipitation" ||
-		colorMode === "moisture" ||
-		colorMode === "pastaClimate" ||
-		colorMode === "koppenClimate" ||
-		colorMode === "oceanCurrents" ||
-		colorMode === "dtr"
+	useEffect(() => {
+		if (debugMapModes) return
+		if (isDebugGeographyMode(colorMode)) {
+			setColorMode(DEFAULT_GEOGRAPHY_MODE)
+		}
+	}, [colorMode, debugMapModes])
+
+	useEffect(() => {
+		if (!canSimulate) {
+			setSimulationControlsOpen(false)
+		}
+	}, [canSimulate])
 
 	const currentHistoryQuery = useMemo(
 		() =>
@@ -684,12 +684,10 @@ export const OrogenView: React.FC = () => {
 			lastWorldRef.current = null
 			return
 		}
+		scene.setDisplayColors(colorMode, regionColors)
 		if (lastWorldRef.current !== worldForDisplay) {
-			scene.setRegionColors(regionColors)
 			scene.updateWorld(worldForDisplay)
 			lastWorldRef.current = worldForDisplay
-		} else {
-			scene.setRegionColors(regionColors)
 		}
 		scene.setOccupationOverlay(
 			colorMode === "nations" && nationMode === "borders"
@@ -1054,9 +1052,6 @@ export const OrogenView: React.FC = () => {
 		return () => cancelAnimationFrame(rafId)
 	}, [measureStart, measureEnd, world])
 
-	useEffect(() => {
-		sceneRef.current?.setColorMode(colorMode)
-	}, [colorMode])
 	useEffect(() => {
 		sceneRef.current?.setHoveredRegion(hoverInfo?.region ?? null)
 	}, [hoverInfo])
@@ -1457,6 +1452,35 @@ export const OrogenView: React.FC = () => {
 		}
 	}, [planetCode])
 
+	const handleStartSimulation = useCallback(() => {
+		setSimPlaying(true)
+		setTimelineBundle(null)
+		startSimulation(workerRef)
+	}, [])
+
+	const handlePauseSimulation = useCallback(() => {
+		setSimPlaying(false)
+		pauseSimulation(workerRef)
+	}, [])
+
+	const handleToggleSimulationPlayback = useCallback(() => {
+		setSimulationControlsOpen(true)
+		if (simPlaying) {
+			handlePauseSimulation()
+			return
+		}
+		if (selectedTimeMs !== simTimeMs) {
+			setSelectedTimeMs(simTimeMs)
+		}
+		handleStartSimulation()
+	}, [
+		handlePauseSimulation,
+		handleStartSimulation,
+		selectedTimeMs,
+		simPlaying,
+		simTimeMs,
+	])
+
 	const setAxialTilt = useCallback(
 		(value: number) => {
 			setObliquity(isRetrogradeObliquity(obliquity) ? 180 - value : value)
@@ -1677,15 +1701,16 @@ export const OrogenView: React.FC = () => {
 								hoverTerrainFeature={hoverTerrainFeature}
 								hoverOceanCurrents={hoverOceanCurrents}
 								colorMode={colorMode}
-								isClimateMode={isClimateMode}
-								tempAnnual={tempAnnual}
-								rainAnnual={rainAnnual}
-								dtrAnnual={dtrAnnual}
+								populationMode={populationMode}
 								displayMonth={displayMonth}
 								unitSystem={unitSystem}
 								world={worldForDisplay}
 								hoverCardRef={hoverCardRef}
 								getNationName={getNationName}
+								getCultureName={getCultureName}
+								getHeritageName={getHeritageName}
+								getFaithName={getFaithName}
+								getReligionName={getReligionName}
 							/>
 						) : null}
 
@@ -1714,6 +1739,8 @@ export const OrogenView: React.FC = () => {
 							draftMapProjectionLatitude={draftMapProjectionLatitude}
 							setDraftMapProjectionLatitude={setDraftMapProjectionLatitude}
 							setMapProjectionLatitude={setMapProjectionLatitude}
+							debugMapModes={debugMapModes}
+							setDebugMapModes={setDebugMapModes}
 							canCopyCode={!!planetCode}
 							codeCopied={codeCopied}
 							onCopyCode={() => {
@@ -1743,28 +1770,62 @@ export const OrogenView: React.FC = () => {
 							</FloatingPanel>
 						)}
 
-						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
-							<div className="pointer-events-auto">
-								<SimulationControls
-									canSimulate={!!world && !!world.nations && !generating}
-									playing={simPlaying}
-									onPlay={() => {
-										setSimPlaying(true)
-										setTimelineBundle(null)
-										startSimulation(workerRef)
-									}}
-									onPause={() => {
-										setSimPlaying(false)
-										pauseSimulation(workerRef)
-									}}
-									selectedTimeMs={selectedTimeMs}
-									currentTimeMs={simTimeMs}
-									minTimeMs={simStartTimeMs}
-									maxTimeMs={simTimeMs}
-									onTimeChange={setSelectedTimeMs}
-									floating={false}
-								/>
+						{simulationControlsOpen && (
+							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+								<div className="pointer-events-auto">
+									<SimulationControls
+										selectedTimeMs={selectedTimeMs}
+										minTimeMs={simStartTimeMs}
+										maxTimeMs={simTimeMs}
+										onTimeChange={setSelectedTimeMs}
+										floating={false}
+									/>
+								</div>
 							</div>
+						)}
+						{canSimulate && (
+							<div
+								className="pointer-events-none absolute bottom-3 z-20"
+								style={{ right: detailsDrawerOpen ? "0.75rem" : "3.5rem" }}
+							>
+								<IconButton
+									onClick={handleToggleSimulationPlayback}
+									title={simPlaying ? "Pause simulation" : "Start simulation"}
+									aria-label={
+										simPlaying ? "Pause simulation" : "Start simulation"
+									}
+									tone="overlay"
+									selected={simPlaying || simulationControlsOpen}
+									shape="rounded"
+									size="sm"
+									className="pointer-events-auto shadow-lg backdrop-blur-md"
+								>
+									{simPlaying ? (
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 12 12"
+											fill="currentColor"
+											aria-hidden="true"
+										>
+											<rect x="2" y="1" width="3" height="10" rx="0.5" />
+											<rect x="7" y="1" width="3" height="10" rx="0.5" />
+										</svg>
+									) : (
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 12 12"
+											fill="currentColor"
+											aria-hidden="true"
+										>
+											<path d="M2.5 1L10.5 6L2.5 11V1Z" />
+										</svg>
+									)}
+								</IconButton>
+							</div>
+						)}
+						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
 							<div className="pointer-events-auto">
 								<ModeBar
 									colorMode={colorMode}
@@ -1773,15 +1834,7 @@ export const OrogenView: React.FC = () => {
 									setNationMode={setNationMode}
 									populationMode={populationMode}
 									setPopulationMode={setPopulationMode}
-									isClimateMode={isClimateMode}
-									tempAnnual={tempAnnual}
-									setTempAnnual={setTempAnnual}
-									rainAnnual={rainAnnual}
-									setRainAnnual={setRainAnnual}
-									currentAnnual={currentAnnual}
-									setCurrentAnnual={setCurrentAnnual}
-									dtrAnnual={dtrAnnual}
-									setDtrAnnual={setDtrAnnual}
+									debugMapModes={debugMapModes}
 								/>
 							</div>
 						</div>

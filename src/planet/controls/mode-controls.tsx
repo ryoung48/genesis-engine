@@ -15,7 +15,7 @@ export function ModeButtonGroup<T extends string>({
 	onChange,
 	buttonClassName,
 }: {
-	options: ReadonlyArray<[T, string]>
+	options: ReadonlyArray<readonly [T, string]>
 	value: T
 	isActive?: (mode: T) => boolean
 	onChange: (mode: T) => void

@@ -15,6 +15,7 @@ import type {
 	OrogenProvinces,
 	OrogenRainfall,
 	OrogenRivers,
+	OrogenTerrainFeatures,
 	SphereMesh,
 	StageTiming,
 } from ".."
@@ -69,6 +70,8 @@ interface PostPipelineInput {
 	boundary: BoundaryInfo
 	distFields: DistanceFields
 	r_hotspot: Float32Array
+	r_mantleUpwelling?: Float32Array
+	terrainFeatures?: OrogenTerrainFeatures
 	enableOceanCurrents: boolean
 	onProgress?: (label: string, pct?: number) => void
 }
@@ -116,6 +119,8 @@ export function runPostElevationPipeline(
 		boundary,
 		distFields,
 		r_hotspot,
+		r_mantleUpwelling,
+		terrainFeatures,
 		enableOceanCurrents,
 		onProgress,
 	} = input
@@ -139,6 +144,9 @@ export function runPostElevationPipeline(
 		oceanDist,
 		isLand,
 		elevation_km,
+		r_hotspot,
+		r_mantleUpwelling,
+		terrainFeatures,
 	)
 	record("Post: climate", t0)
 

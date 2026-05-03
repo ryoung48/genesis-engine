@@ -190,7 +190,10 @@ export function blendElevation(
 	volcanism: number,
 	seed: number,
 	timing?: StageTiming[],
-): { elevation: Float32Array; terrainFeatures: OrogenTerrainFeatures } {
+): {
+	elevation: Float32Array
+	terrainFeatures: OrogenTerrainFeatures
+} {
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const { distMountain, distOcean, distCoastline, distCoast, distCoastLand } =
 		distFields
@@ -242,6 +245,11 @@ export function blendElevation(
 	for (let r = 0; r < numRegions; r++) {
 		if (plateIsOcean.has(r_plate[r])) r_isOcean[r] = 1
 	}
+	const coastal = new Float32Array(numRegions)
+	const margins = new Float32Array(numRegions)
+	const backArc = new Float32Array(numRegions)
+	const foldRidge = new Float32Array(numRegions)
+	const orogenicPowerField = new Float32Array(numRegions)
 
 	// 95th-percentile stress normalization
 	let maxStress = 0
@@ -481,6 +489,7 @@ export function blendElevation(
 		const rawOro = noise.noise3D(x * 1.5 + 33.7, y * 1.5 + 11.2, z * 1.5 + 22.9)
 		const shaped = rawOro >= 0 ? Math.sqrt(rawOro) : -Math.sqrt(-rawOro)
 		const orogenicPower = Math.max(0, Math.min(1, 0.5 + 0.5 * shaped))
+		orogenicPowerField[r] = orogenicPower - 0.5
 
 		if (!isOceanPlate) {
 			// Subduction suppression
@@ -570,6 +579,7 @@ export function blendElevation(
 						baEffect = -0.1 * backArcStress[r] * (1 - s) * orogenyFactor
 					}
 					elev[r] += baEffect
+					backArc[r] = baEffect
 					markFeature(r, OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
 				}
 			}
@@ -606,6 +616,7 @@ export function blendElevation(
 						elevBoost
 					const foldEffect = foldCentered * foldAmp * ampMod
 					elev[r] += foldEffect
+					foldRidge[r] = foldEffect
 					markFeature(r, OROGEN_TERRAIN_FEATURE.FOLD_RIDGES, foldEffect)
 				}
 			}
@@ -705,6 +716,7 @@ export function blendElevation(
 			// convergent margins are narrow & steep.
 			const dc = distCoast[r]
 			const isPassive = !coastConvergent[r]
+			margins[r] = isPassive ? 0.2 : 0.8
 			const shelfScale = isPassive ? 1.8 : 0.6
 			const shelfEnd = 5 * shelfScale
 			const slopeEnd = shelfEnd + 7 * shelfScale
@@ -727,6 +739,7 @@ export function blendElevation(
 			// Mid-ocean ridge
 			const rd = ridgeDist[r]
 			if (rd !== Infinity && rd <= ridgeHalfWidth) {
+				margins[r] = 1
 				const t = rd / ridgeHalfWidth
 				const ridgeFade = (1 - t) * (1 - t)
 				const ridgeN = ridgedFbm(x * 3, y * 3, z * 3, 4)
@@ -738,6 +751,7 @@ export function blendElevation(
 			// Fracture zones
 			const fd = fractureDist[r]
 			if (fd !== Infinity && fd <= fractureHalfWidth) {
+				margins[r] = -0.5
 				const ft = fd / fractureHalfWidth
 				const fractureEffect = -0.03 * (1 - ft)
 				elev[r] += fractureEffect
@@ -769,6 +783,7 @@ export function blendElevation(
 						baEffect = -0.1 * backArcStress[r] * (1 - s) * orogenyFactor
 					}
 					elev[r] += baEffect
+					backArc[r] = baEffect
 					markFeature(r, OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
 				}
 			}
@@ -835,6 +850,7 @@ export function blendElevation(
 			let coastNoise1 = n1 * coastAmp * falloff1 * stressAmp1
 			if (subSup > 0 && coastNoise1 > 0) coastNoise1 *= 1 - subSup
 			elev[r] += coastNoise1
+			coastal[r] += coastNoise1
 			markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, coastNoise1)
 
 			// Layer 3: Coastline-aware domain warping
@@ -856,6 +872,7 @@ export function blendElevation(
 				let warpDelta = (warpN - origN) * falloffW
 				if (subSup > 0 && warpDelta > 0) warpDelta *= 1 - subSup
 				elev[r] += warpDelta
+				coastal[r] += warpDelta
 				markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, warpDelta)
 			}
 
@@ -882,6 +899,7 @@ export function blendElevation(
 					let bump = excess * excess * 0.18 * (1 + sn * 2) * distFade
 					bump *= 1 - subSup / 0.3
 					elev[r] += bump
+					coastal[r] += bump
 					markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, bump)
 				}
 			}
@@ -986,6 +1004,12 @@ export function blendElevation(
 		Stage: "Volcanic arcs",
 		ms: (performance.now() - volcanicArcsStart).toFixed(1),
 	})
+
+	void coastal
+	void margins
+	void backArc
+	void foldRidge
+	void orogenicPowerField
 
 	return {
 		elevation: elev,

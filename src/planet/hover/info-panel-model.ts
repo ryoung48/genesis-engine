@@ -8,7 +8,12 @@ import {
 	getTerrainFeatureColor,
 	getTopographyColor,
 } from "../screen/display/region-colors"
-import { rgbToCss } from "../screen/shared/ui-format"
+import type { PopulationMapMode } from "../screen/shared/map-modes"
+import {
+	formatDensity,
+	rgbToCss,
+	type UnitSystem,
+} from "../screen/shared/ui-format"
 import type { HoverInfo, HoverTerrainFeature } from "./hover"
 
 interface HoverChartData {
@@ -35,6 +40,12 @@ interface HoverProvinceDisplayData {
 		color: string | null
 	} | null
 	regionDisplayColor: string | null
+}
+
+interface HoverDemographicDisplayData {
+	label: string
+	value: string
+	color: string | null
 }
 
 export function buildHoverChartData(
@@ -202,4 +213,117 @@ export function buildTopographySwatchColor(
 	if (hoverRegion === null || !world?.topography) return null
 	const color = getTopographyColor(world.topography[hoverRegion])
 	return color ? rgbToCss(color) : null
+}
+
+export function buildDemographicDisplayData(params: {
+	populationMode: PopulationMapMode
+	hoverProvince: number | null
+	world: SerializedOrogenWorld | null
+	unitSystem: UnitSystem
+	getCultureName: (cultureId: number) => string
+	getHeritageName: (heritageId: number) => string
+	getFaithName: (faithId: number) => string
+	getReligionName: (religionId: number) => string
+}): HoverDemographicDisplayData | null {
+	const {
+		populationMode,
+		hoverProvince,
+		world,
+		unitSystem,
+		getCultureName,
+		getHeritageName,
+		getFaithName,
+		getReligionName,
+	} = params
+	if (
+		hoverProvince === null ||
+		hoverProvince < 0 ||
+		!world?.provinces ||
+		hoverProvince >= world.provinces.desolate.length
+	) {
+		return null
+	}
+	const province = hoverProvince
+	const isDesolate = !!world.provinces.desolate[province]
+
+	if (populationMode === "density") {
+		const pop = world.population?.population?.[province] ?? 0
+		if (isDesolate || pop <= 0) return null
+		const popStr =
+			pop >= 1_000_000
+				? `${(pop / 1_000_000).toFixed(1)}M`
+				: pop >= 1_000
+					? `${(pop / 1_000).toFixed(0)}K`
+					: Math.round(pop).toLocaleString()
+		const radiusKm = world.params?.planetRadiusKm ?? 6371
+		const cellAreaKm2 =
+			(4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
+		const areaKm2 = world.provinces.size[province] * cellAreaKm2
+		const density = areaKm2 > 0 ? pop / areaKm2 : 0
+		return {
+			label: "Population",
+			value: `${popStr} · ${formatDensity(density, unitSystem)}`,
+			color: null,
+		}
+	}
+
+	if (populationMode === "development") {
+		if (isDesolate || !world.development) return null
+		return {
+			label: "Development",
+			value: world.development[province].toFixed(2),
+			color: null,
+		}
+	}
+
+	const cultureIdx = world.cultures?.assignment[province] ?? -1
+	const heritageIdx =
+		cultureIdx >= 0 ? (world.heritages?.assignment[cultureIdx] ?? -1) : -1
+	const faithIdx =
+		cultureIdx >= 0 ? (world.faiths?.assignment[cultureIdx] ?? -1) : -1
+	const religionIdx =
+		faithIdx >= 0 ? (world.religions?.assignment[faithIdx] ?? -1) : -1
+	const selected =
+		populationMode === "culture"
+			? {
+					idx: cultureIdx,
+					label: "Culture",
+					partition: world.cultures,
+					name: getCultureName,
+				}
+			: populationMode === "heritage"
+				? {
+						idx: heritageIdx,
+						label: "Heritage",
+						partition: world.heritages,
+						name: getHeritageName,
+					}
+				: populationMode === "faith"
+					? {
+							idx: faithIdx,
+							label: "Faith",
+							partition: world.faiths,
+							name: getFaithName,
+						}
+					: {
+							idx: religionIdx,
+							label: "Religion",
+							partition: world.religions,
+							name: getReligionName,
+						}
+
+	if (!selected.partition || selected.idx < 0) return null
+
+	return {
+		label: selected.label,
+		value: selected.name(selected.idx),
+		color:
+			selected.idx * 3 + 2 < selected.partition.colors.length
+				? rgbToCss([
+						selected.partition.colors[selected.idx * 3],
+						selected.partition.colors[selected.idx * 3 + 1],
+						selected.partition.colors[selected.idx * 3 + 2],
+					])
+				: null,
+	}
 }

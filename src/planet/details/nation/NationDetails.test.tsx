@@ -212,6 +212,22 @@ describe("NationDetails", () => {
 		expect(markup).not.toContain("Religions")
 	})
 
+	it("renders political fallbacks when no nation is selected", () => {
+		const markup = renderToStaticMarkup(
+			<NationDetails
+				nation={null}
+				section="political"
+				onSectionChange={vi.fn()}
+			/>,
+		)
+
+		expect(markup).toContain(">Nation<")
+		expect(markup).toContain(">Political<")
+		expect(markup).toContain(">Provinces<")
+		expect(markup).toContain(">N/A<")
+		expect(markup).toContain(">Active Wars<")
+	})
+
 	it("wires neighbor table actions through table cells and pagination", () => {
 		const onSort = vi.fn()
 		const onPageChange = vi.fn()

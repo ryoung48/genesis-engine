@@ -9,7 +9,10 @@ import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { type ColorMode, dangerColor, daylightColor } from "../colors"
 import { monthLabels } from "../screen/shared/constants"
 import {
-	formatDensity,
+	getMapModePrimary,
+	type PopulationMapMode,
+} from "../screen/shared/map-modes"
+import {
 	formatDistance,
 	formatElevation,
 	formatFlowRate,
@@ -43,6 +46,7 @@ import {
 } from "./info-panel-format"
 import {
 	buildClimateSwatchColor,
+	buildDemographicDisplayData,
 	buildHoverChartData,
 	buildPastaMonthlyData,
 	buildProvinceDisplayData,
@@ -138,6 +142,12 @@ function MultiSwatchRow({
 	)
 }
 
+interface DemographicEntry {
+	label: string
+	value: string
+	color: string | null
+}
+
 interface InfoPanelProps {
 	hoverInfo: HoverInfo | null
 	hoverElevationKm: number | null
@@ -169,15 +179,16 @@ interface InfoPanelProps {
 	hoverTerrainFeature: HoverTerrainFeature | null
 	hoverOceanCurrents: HoverOceanCurrents | null
 	colorMode: ColorMode
-	isClimateMode: boolean
-	tempAnnual: boolean
-	rainAnnual: boolean
-	dtrAnnual: boolean
+	populationMode: PopulationMapMode
 	displayMonth: number
 	unitSystem: UnitSystem
 	world: SerializedOrogenWorld | null
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
 	getNationName: (nationId: number) => string
+	getCultureName: (cultureId: number) => string
+	getHeritageName: (heritageId: number) => string
+	getFaithName: (faithId: number) => string
+	getReligionName: (religionId: number) => string
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -203,36 +214,58 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverTerrainFeature,
 	hoverOceanCurrents,
 	colorMode,
-	dtrAnnual,
+	populationMode,
 	displayMonth,
 	unitSystem,
 	world,
 	hoverCardRef,
 	getNationName,
+	getCultureName,
+	getHeritageName,
+	getFaithName,
+	getReligionName,
 }) => {
-	const chartData = buildHoverChartData(hoverInfo, hoverElevationKm, world)
-	const pastaMonthlyData = buildPastaMonthlyData(hoverInfo, world)
-
+	const activePrimary = getMapModePrimary(colorMode)
+	const showGeography = activePrimary === "geography"
+	const showPolitical = activePrimary === "political"
+	const showDemographics = activePrimary === "demographics"
 	const hoverRegion = hoverInfo?.region ?? null
+	const chartData =
+		showGeography && hoverInfo
+			? buildHoverChartData(hoverInfo, hoverElevationKm, world)
+			: null
+	const pastaMonthlyData =
+		showGeography && hoverInfo ? buildPastaMonthlyData(hoverInfo, world) : null
 	const landmarkShare =
 		hoverLandmark?.size != null && world?.mesh.numRegions
 			? (hoverLandmark.size / world.mesh.numRegions) * 100
 			: null
-	const annualTemp = world.climate.temperature_avg[hoverRegion]
+	const annualTemp =
+		hoverRegion !== null
+			? (world?.climate?.temperature_avg?.[hoverRegion] ?? null)
+			: null
 	const annualPrecip = chartData
 		? chartData.precip.reduce((sum, value) => sum + value, 0)
 		: null
-	const climateColor = buildClimateSwatchColor(hoverRegion, world, colorMode)
-	const vegetationSwatch = buildVegetationSwatchColor(hoverRegion, world)
-	const topographySwatch = buildTopographySwatchColor(hoverRegion, world)
-	const terrainFeatureSwatches =
-		buildTerrainFeatureSwatches(hoverTerrainFeature)
+	const climateColor = showGeography
+		? buildClimateSwatchColor(hoverRegion, world, colorMode)
+		: null
+	const vegetationSwatch = showGeography
+		? buildVegetationSwatchColor(hoverRegion, world)
+		: null
+	const topographySwatch = showGeography
+		? buildTopographySwatchColor(hoverRegion, world)
+		: null
+	const terrainFeatureSwatches = showGeography
+		? buildTerrainFeatureSwatches(hoverTerrainFeature)
+		: []
 	const slopeScoreByRegion = world?.slopeScore ?? null
 	const hoverSlopePercent =
-		hoverRegion !== null && slopeScoreByRegion
+		showGeography && hoverRegion !== null && slopeScoreByRegion
 			? slopeScoreByRegion[hoverRegion] * 100
 			: null
 	const hasCurrentImpact =
+		showGeography &&
 		hoverOceanCurrents !== null &&
 		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
 	const { provinceColor, provinceNation } = buildProvinceDisplayData({
@@ -241,6 +274,97 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		hoverRegionColor,
 		world,
 	})
+	const demographicModes: PopulationMapMode[] = [
+		populationMode,
+		...(
+			[
+				"density",
+				"development",
+				"culture",
+				"heritage",
+				"faith",
+				"religion",
+			] as const
+		).filter((mode) => mode !== populationMode),
+	]
+	const demographicDisplays = showDemographics
+		? demographicModes.flatMap((mode) => {
+				const display = buildDemographicDisplayData({
+					populationMode: mode,
+					hoverProvince,
+					world,
+					unitSystem,
+					getCultureName,
+					getHeritageName,
+					getFaithName,
+					getReligionName,
+				})
+				return display ? [display] : []
+			})
+		: []
+	const urbanPopulation =
+		showDemographics &&
+		hoverProvince !== null &&
+		hoverProvince >= 0 &&
+		world?.urbanPopulation &&
+		world?.provinces &&
+		hoverProvince < world.urbanPopulation.length &&
+		hoverProvince < world.provinces.desolate.length &&
+		!world.provinces.desolate[hoverProvince]
+			? Math.round(world.urbanPopulation[hoverProvince])
+			: null
+	const demographicEntries: DemographicEntry[] = [
+		...demographicDisplays,
+		...(urbanPopulation !== null && urbanPopulation > 0
+			? [
+					{
+						label: "Urban Pop",
+						value: urbanPopulation.toLocaleString(),
+						color: null,
+					},
+				]
+			: []),
+	]
+	const demographicGroups = showDemographics
+		? [
+				{
+					id: "population",
+					title: "Population",
+					labels: ["Population", "Urban Pop", "Development"],
+				},
+				{
+					id: "culture",
+					title: "Culture",
+					labels: ["Culture", "Heritage"],
+				},
+				{
+					id: "belief",
+					title: "Belief",
+					labels: ["Faith", "Religion"],
+				},
+			]
+				.map((group) => ({
+					...group,
+					items: demographicEntries.filter((entry) =>
+						group.labels.includes(entry.label),
+					),
+				}))
+				.filter((group) => group.items.length > 0)
+		: []
+	const selectedDemographicGroupId =
+		populationMode === "culture" || populationMode === "heritage"
+			? "culture"
+			: populationMode === "faith" || populationMode === "religion"
+				? "belief"
+				: "population"
+	const orderedDemographicGroups = [
+		...demographicGroups.filter(
+			(group) => group.id === selectedDemographicGroupId,
+		),
+		...demographicGroups.filter(
+			(group) => group.id !== selectedDemographicGroupId,
+		),
+	]
 
 	return (
 		<FloatingPanel
@@ -249,68 +373,97 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		>
 			<div ref={hoverCardRef} className="space-y-0.5">
 				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
-				<Row
-					label="Elev"
-					value={`${formatElevation(hoverElevationKm, unitSystem)}${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
-				/>
-				{hoverLandmark && (
-					<Row
-						label="Landmark"
-						value={`${hoverLandmark.type ?? "unknown"} #${hoverLandmark.id}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
-					/>
-				)}
-				{colorMode === "temperatureDelta" && hoverTemperatureDelta !== null && (
-					<Row
-						label="Temp Δ"
-						value={formatTemperatureDelta(hoverTemperatureDelta, unitSystem)}
-					/>
-				)}
-				{colorMode === "dtr" && hoverDtr !== null && (
-					<Row
-						label={`DTR ${dtrAnnual ? "avg" : monthLabels[displayMonth]}`}
-						value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
-					/>
-				)}
-				{colorMode !== "nations" && hoverIceSummary && (
-					<Row label="Ice" value={hoverIceSummary} />
-				)}
-				{colorMode === "terrainFeatures" &&
-					terrainFeatureSwatches.length > 0 && (
-						<MultiSwatchRow label="Features" values={terrainFeatureSwatches} />
-					)}
-				{colorMode !== "nations" && hoverHazards && (
+				{showGeography && (
 					<>
-						<SwatchRow
-							label="Danger"
-							value={`${Math.round(hoverHazards.danger * 100)}%${
-								hoverHazards.danger >= 0.2
-									? hoverHazards.earthquake >= hoverHazards.volcano
-										? " (quakes)"
-										: " (volcanic)"
-									: ""
-							}`}
-							color={rgbToCss(dangerColor(hoverHazards.danger))}
+						<Row
+							label="Elev"
+							value={`${formatElevation(hoverElevationKm, unitSystem)}${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
 						/>
+						{hoverLandmark && (
+							<Row
+								label="Landmark"
+								value={`${hoverLandmark.type ?? "unknown"} #${hoverLandmark.id}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
+							/>
+						)}
+						{colorMode === "temperatureDelta" &&
+							hoverTemperatureDelta !== null && (
+								<Row
+									label="Temp Δ"
+									value={formatTemperatureDelta(
+										hoverTemperatureDelta,
+										unitSystem,
+									)}
+								/>
+							)}
+						{colorMode === "dtr" && hoverDtr !== null && (
+							<Row
+								label={`DTR ${monthLabels[displayMonth] ?? `M${displayMonth}`}`}
+								value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
+							/>
+						)}
+						{hoverIceSummary && <Row label="Ice" value={hoverIceSummary} />}
+						{colorMode === "terrainFeatures" &&
+							terrainFeatureSwatches.length > 0 && (
+								<MultiSwatchRow
+									label="Features"
+									values={terrainFeatureSwatches}
+								/>
+							)}
+						{colorMode === "dangerZones" && hoverHazards && (
+							<SwatchRow
+								label="Danger"
+								value={`${Math.round(hoverHazards.danger * 100)}%${
+									hoverHazards.danger >= 0.2
+										? hoverHazards.earthquake >= hoverHazards.volcano
+											? " (quakes)"
+											: " (volcanic)"
+										: ""
+								}`}
+								color={rgbToCss(dangerColor(hoverHazards.danger))}
+							/>
+						)}
+						{hoverTopography && (
+							<SwatchRow
+								label="Topography"
+								value={hoverTopography}
+								color={topographySwatch}
+							/>
+						)}
+						{hoverClimateDisplay && (
+							<SwatchRow
+								label="Climate"
+								value={hoverClimateDisplay}
+								color={climateColor}
+							/>
+						)}
+						{hoverBiome && (
+							<SwatchRow
+								label="Veg"
+								value={hoverBiome}
+								color={vegetationSwatch}
+							/>
+						)}
+						{hoverOceanDist !== null && hoverOceanDist > 0 && (
+							<Row
+								label="Ocean dist"
+								value={formatDistance(hoverOceanDist, unitSystem)}
+							/>
+						)}
+						{hoverDistCoast !== null && (
+							<Row
+								label="Coast dist"
+								value={
+									hoverDistCoastKm === Infinity
+										? "∞"
+										: hoverDistCoastKm !== null
+											? formatDistance(hoverDistCoastKm, unitSystem)
+											: "—"
+								}
+							/>
+						)}
 					</>
 				)}
-				{hoverTopography && (
-					<SwatchRow
-						label="Topography"
-						value={hoverTopography}
-						color={topographySwatch}
-					/>
-				)}
-				{hoverClimateDisplay && (
-					<SwatchRow
-						label="Climate"
-						value={hoverClimateDisplay}
-						color={climateColor}
-					/>
-				)}
-				{hoverBiome && (
-					<SwatchRow label="Veg" value={hoverBiome} color={vegetationSwatch} />
-				)}
-				{hoverProvince !== null && hoverProvince >= 0 && (
+				{showPolitical && hoverProvince !== null && hoverProvince >= 0 && (
 					<>
 						<SwatchRow
 							label="Province"
@@ -333,67 +486,33 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								stripeBackground={"white"}
 							/>
 						)}
-						{world?.population &&
-							!world.provinces!.desolate[hoverProvince] &&
-							(() => {
-								const p = hoverProvince
-								const pop = world.population.population[p]
-								if (pop <= 0) return null
-								const popStr =
-									pop >= 1_000_000
-										? `${(pop / 1_000_000).toFixed(1)}M`
-										: pop >= 1_000
-											? `${(pop / 1_000).toFixed(0)}K`
-											: Math.round(pop).toLocaleString()
-								const radiusKm = world.params.planetRadiusKm ?? 6371
-								const cellAreaKm2 =
-									(4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
-								const areaKm2 = world.provinces.size[p] * cellAreaKm2
-								const density = pop / areaKm2
-								return (
-									<Row
-										label="Pop"
-										value={`${popStr} · ${formatDensity(density, unitSystem)}`}
-									/>
-								)
-							})()}
-						{world?.development &&
-							!world.provinces!.desolate[hoverProvince] && (
-								<Row
-									label="Development"
-									value={world.development[hoverProvince].toFixed(2)}
-								/>
-							)}
-						{world?.urbanPopulation &&
-							!world.provinces!.desolate[hoverProvince] && (
-								<Row
-									label="Urban Pop"
-									value={Math.round(
-										world.urbanPopulation[hoverProvince],
-									).toLocaleString()}
-								/>
-							)}
 					</>
 				)}
-				{hoverOceanDist !== null && hoverOceanDist > 0 && (
-					<Row
-						label="Ocean dist"
-						value={formatDistance(hoverOceanDist, unitSystem)}
-					/>
+				{showDemographics && (
+					<>
+						{orderedDemographicGroups.map((group) => (
+							<div key={group.id} className="space-y-0.5">
+								{group.items.map((item) =>
+									item.color ? (
+										<SwatchRow
+											key={item.label}
+											label={item.label}
+											value={item.value}
+											color={item.color}
+										/>
+									) : (
+										<Row
+											key={item.label}
+											label={item.label}
+											value={item.value}
+										/>
+									),
+								)}
+							</div>
+						))}
+					</>
 				)}
-				{hoverDistCoast !== null && (
-					<Row
-						label="Coast dist"
-						value={
-							hoverDistCoastKm === Infinity
-								? "∞"
-								: hoverDistCoastKm !== null
-									? formatDistance(hoverDistCoastKm, unitSystem)
-									: "—"
-						}
-					/>
-				)}
-				{chartData && world?.climate && (
+				{showGeography && chartData && world?.climate && (
 					<div className="space-y-2 border-t border-white/5 pt-1">
 						<SeriesBars
 							values={chartData.daylight}

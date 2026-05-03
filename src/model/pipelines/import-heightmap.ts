@@ -307,6 +307,8 @@ export function importOrogenWorld(
 		boundary,
 		distFields,
 		r_hotspot: new Float32Array(mesh.numRegions),
+		r_mantleUpwelling: new Float32Array(mesh.numRegions),
+		terrainFeatures: undefined,
 		enableOceanCurrents: true,
 		onProgress,
 	})

@@ -42,6 +42,8 @@ interface OverlayControlsProps {
 	draftMapProjectionLatitude: number
 	setDraftMapProjectionLatitude: (v: number) => void
 	setMapProjectionLatitude: (v: number) => void
+	debugMapModes: boolean
+	setDebugMapModes: (v: boolean) => void
 	canCopyCode?: boolean
 	codeCopied?: boolean
 	onCopyCode?: () => void
@@ -74,6 +76,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	draftMapProjectionLatitude,
 	setDraftMapProjectionLatitude,
 	setMapProjectionLatitude,
+	debugMapModes,
+	setDebugMapModes,
 	canCopyCode = false,
 	codeCopied = false,
 	onCopyCode,
@@ -239,6 +243,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										/>
 									</div>
 								)}
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Debug Map Modes</span>
+									<input
+										type="checkbox"
+										checked={debugMapModes}
+										onChange={(e) => setDebugMapModes(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
 								<div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
 									<SegmentedControl
 										options={[

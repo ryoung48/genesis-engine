@@ -11,6 +11,12 @@ interface MeshBuildResult {
 	faceToRegion: Int32Array
 }
 
+export function usesSmoothedHeightmapColors(
+	colorMode: Parameters<typeof getColor>[1],
+): boolean {
+	return colorMode === "landHeightmap"
+}
+
 export function buildTerrainMesh(
 	world: SerializedOrogenWorld,
 	colorMode: Parameters<typeof getColor>[1],
@@ -28,9 +34,7 @@ export function buildTerrainMesh(
 	} = mesh
 	const useRegionColors =
 		regionColors && regionColors.length >= mesh.numRegions * 3
-	const isHeightmap = colorMode === "heightmap"
-	const isLandHeightmap = colorMode === "landHeightmap"
-	const isSmoothHeightmap = isHeightmap || isLandHeightmap
+	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 
 	const tElevation = new Float32Array(numTriangles)
 	const tElevationKm = new Float32Array(numTriangles)
@@ -287,9 +291,7 @@ export function buildMapMesh(
 	)
 	const useRegionColors =
 		regionColors && regionColors.length >= mesh.numRegions * 3
-	const isHeightmap = colorMode === "heightmap"
-	const isLandHeightmap = colorMode === "landHeightmap"
-	const isSmoothHeightmap = isHeightmap || isLandHeightmap
+	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
 
 	const triangleElevationKm = new Float32Array(mesh.numTriangles)
 	for (let triangle = 0; triangle < mesh.numTriangles; triangle++) {
@@ -647,6 +649,211 @@ export function buildMapWireframe(
 	return lines
 }
 
+function applyOccupationOverlayColors(
+	geometry: THREE.BufferGeometry,
+	faceToRegion: Int32Array,
+	occupationOverlay: Float32Array | null,
+	faceCount: number,
+) {
+	const occColorAttribute = geometry.getAttribute("occColor")
+	const occMaskAttribute = geometry.getAttribute("occMask")
+	if (
+		!(occColorAttribute instanceof THREE.BufferAttribute) ||
+		!(occMaskAttribute instanceof THREE.BufferAttribute)
+	) {
+		return
+	}
+
+	const occColorArray = occColorAttribute.array as Float32Array
+	const occMaskArray = occMaskAttribute.array as Float32Array
+	for (let face = 0; face < faceCount; face++) {
+		const region = faceToRegion[face]
+		const faceBase = face * 9
+		const maskBase = face * 3
+		if (occupationOverlay) {
+			const overlayBase = region * 4
+			const mask = occupationOverlay[overlayBase + 3] > 0.5 ? 1 : 0
+			const or = occupationOverlay[overlayBase]
+			const og = occupationOverlay[overlayBase + 1]
+			const ob = occupationOverlay[overlayBase + 2]
+			for (let vertex = 0; vertex < 9; vertex += 3) {
+				occColorArray[faceBase + vertex] = or
+				occColorArray[faceBase + vertex + 1] = og
+				occColorArray[faceBase + vertex + 2] = ob
+			}
+			occMaskArray[maskBase] = mask
+			occMaskArray[maskBase + 1] = mask
+			occMaskArray[maskBase + 2] = mask
+		} else {
+			for (let vertex = 0; vertex < 9; vertex += 3) {
+				occColorArray[faceBase + vertex] = 0
+				occColorArray[faceBase + vertex + 1] = 0
+				occColorArray[faceBase + vertex + 2] = 0
+			}
+			occMaskArray[maskBase] = 0
+			occMaskArray[maskBase + 1] = 0
+			occMaskArray[maskBase + 2] = 0
+		}
+	}
+	occColorAttribute.needsUpdate = true
+	occMaskAttribute.needsUpdate = true
+}
+
+export function applyTerrainColorModeColors(
+	meshObject: THREE.Mesh | null,
+	world: SerializedOrogenWorld,
+	colorMode: Parameters<typeof getColor>[1],
+	faceToRegion: Int32Array,
+	occupationOverlay: Float32Array | null,
+): boolean {
+	if (!meshObject) return false
+	const geometry = meshObject.geometry
+	const colorAttribute = geometry.getAttribute("color")
+	if (!(colorAttribute instanceof THREE.BufferAttribute)) return false
+	const colorArray = colorAttribute.array
+	if (!(colorArray instanceof Float32Array)) return false
+
+	const { mesh, elevation_km } = world
+	const { numSides, numTriangles, s_begin_r, s_inner_t, s_outer_t } = mesh
+	const triangleElevationKm = new Float32Array(numTriangles)
+	for (let triangle = 0; triangle < numTriangles; triangle++) {
+		const sideOffset = 3 * triangle
+		const a = s_begin_r[sideOffset]
+		const b = s_begin_r[sideOffset + 1]
+		const c = s_begin_r[sideOffset + 2]
+		triangleElevationKm[triangle] =
+			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
+	}
+
+	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
+	let faceCount = 0
+	for (let side = 0; side < numSides; side++) {
+		const tOuter = s_outer_t[side]
+		if (tOuter < 0) continue
+		const region = s_begin_r[side]
+		const tInner = s_inner_t[side]
+		const vertexElevations = isSmoothHeightmap
+			? [
+					triangleElevationKm[tInner],
+					elevation_km[region],
+					triangleElevationKm[tOuter],
+				]
+			: [elevation_km[region], elevation_km[region], elevation_km[region]]
+		const faceBase = faceCount * 9
+		for (let vertex = 0; vertex < 3; vertex++) {
+			const [r, g, b] = getColor(vertexElevations[vertex], colorMode)
+			colorArray[faceBase + vertex * 3] = r
+			colorArray[faceBase + vertex * 3 + 1] = g
+			colorArray[faceBase + vertex * 3 + 2] = b
+		}
+		faceCount++
+	}
+	colorAttribute.needsUpdate = true
+	applyOccupationOverlayColors(
+		geometry,
+		faceToRegion,
+		occupationOverlay,
+		faceCount,
+	)
+	return true
+}
+
+export function applyMapColorModeColors(
+	meshObject: THREE.Mesh | null,
+	world: SerializedOrogenWorld,
+	colorMode: Parameters<typeof getColor>[1],
+	faceToRegion: Int32Array,
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	occupationOverlay: Float32Array | null,
+): boolean {
+	if (!meshObject) return false
+	const geometry = meshObject.geometry
+	const colorAttribute = geometry.getAttribute("color")
+	if (!(colorAttribute instanceof THREE.BufferAttribute)) return false
+	const colorArray = colorAttribute.array
+	if (!(colorArray instanceof Float32Array)) return false
+
+	const { mesh, elevation_km } = world
+	const {
+		numSides,
+		numTriangles,
+		s_begin_r,
+		s_inner_t,
+		s_outer_t,
+		r_xyz,
+		t_xyz,
+	} = mesh
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
+	const triangleElevationKm = new Float32Array(numTriangles)
+	for (let triangle = 0; triangle < numTriangles; triangle++) {
+		const sideOffset = 3 * triangle
+		const a = s_begin_r[sideOffset]
+		const b = s_begin_r[sideOffset + 1]
+		const c = s_begin_r[sideOffset + 2]
+		triangleElevationKm[triangle] =
+			(elevation_km[a] + elevation_km[b] + elevation_km[c]) / 3
+	}
+
+	const isSmoothHeightmap = usesSmoothedHeightmapColors(colorMode)
+	let faceCount = 0
+	for (let side = 0; side < numSides; side++) {
+		const tInner = s_inner_t[side]
+		const tOuter = s_outer_t[side]
+		if (tOuter < 0) continue
+		const region = s_begin_r[side]
+
+		const p0 = projection.projectCartesian(
+			t_xyz[3 * tInner],
+			t_xyz[3 * tInner + 1],
+			t_xyz[3 * tInner + 2],
+		)
+		const p1 = projection.projectCartesian(
+			t_xyz[3 * tOuter],
+			t_xyz[3 * tOuter + 1],
+			t_xyz[3 * tOuter + 2],
+		)
+		const p2 = projection.projectCartesian(
+			r_xyz[3 * region],
+			r_xyz[3 * region + 1],
+			r_xyz[3 * region + 2],
+		)
+		const maxLon = Math.max(p0.lon, p1.lon, p2.lon)
+		const minLon = Math.min(p0.lon, p1.lon, p2.lon)
+		const wraps = maxLon - minLon > Math.PI
+
+		const vertexElevations = isSmoothHeightmap
+			? [
+					triangleElevationKm[tInner],
+					triangleElevationKm[tOuter],
+					elevation_km[region],
+				]
+			: [elevation_km[region], elevation_km[region], elevation_km[region]]
+		const triangleInstances = wraps ? 2 : 1
+		for (let instance = 0; instance < triangleInstances; instance++) {
+			const faceBase = faceCount * 9
+			for (let vertex = 0; vertex < 3; vertex++) {
+				const [r, g, b] = getColor(vertexElevations[vertex], colorMode)
+				colorArray[faceBase + vertex * 3] = r
+				colorArray[faceBase + vertex * 3 + 1] = g
+				colorArray[faceBase + vertex * 3 + 2] = b
+			}
+			faceCount++
+		}
+	}
+	colorAttribute.needsUpdate = true
+	applyOccupationOverlayColors(
+		geometry,
+		faceToRegion,
+		occupationOverlay,
+		faceCount,
+	)
+	return true
+}
+
 export function applyFaceRegionColors(
 	meshObject: THREE.Mesh | null,
 	faceToRegion: Int32Array,
@@ -683,46 +890,11 @@ export function applyFaceRegionColors(
 	}
 	colorAttribute.needsUpdate = true
 
-	const occColorAttribute = geometry.getAttribute("occColor")
-	const occMaskAttribute = geometry.getAttribute("occMask")
-	if (
-		occColorAttribute instanceof THREE.BufferAttribute &&
-		occMaskAttribute instanceof THREE.BufferAttribute
-	) {
-		const occColorArray = occColorAttribute.array as Float32Array
-		const occMaskArray = occMaskAttribute.array as Float32Array
-		for (let face = 0; face < faceCount; face++) {
-			const region = faceToRegion[face]
-			const faceBase = face * 9
-			const maskBase = face * 3
-			if (occupationOverlay) {
-				const overlayBase = region * 4
-				const mask = occupationOverlay[overlayBase + 3] > 0.5 ? 1 : 0
-				const or = occupationOverlay[overlayBase]
-				const og = occupationOverlay[overlayBase + 1]
-				const ob = occupationOverlay[overlayBase + 2]
-				for (let vertex = 0; vertex < 9; vertex += 3) {
-					occColorArray[faceBase + vertex] = or
-					occColorArray[faceBase + vertex + 1] = og
-					occColorArray[faceBase + vertex + 2] = ob
-				}
-				occMaskArray[maskBase] = mask
-				occMaskArray[maskBase + 1] = mask
-				occMaskArray[maskBase + 2] = mask
-			} else {
-				for (let vertex = 0; vertex < 9; vertex += 3) {
-					occColorArray[faceBase + vertex] = 0
-					occColorArray[faceBase + vertex + 1] = 0
-					occColorArray[faceBase + vertex + 2] = 0
-				}
-				occMaskArray[maskBase] = 0
-				occMaskArray[maskBase + 1] = 0
-				occMaskArray[maskBase + 2] = 0
-			}
-		}
-		occColorAttribute.needsUpdate = true
-		occMaskAttribute.needsUpdate = true
-	}
-
+	applyOccupationOverlayColors(
+		geometry,
+		faceToRegion,
+		occupationOverlay,
+		faceCount,
+	)
 	return true
 }

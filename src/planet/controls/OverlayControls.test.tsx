@@ -46,6 +46,8 @@ function createTree(
 		draftMapProjectionLatitude: 0,
 		setDraftMapProjectionLatitude: vi.fn(),
 		setMapProjectionLatitude: vi.fn(),
+		debugMapModes: false,
+		setDebugMapModes: vi.fn(),
 		...overrides,
 	}) as ReactElement<ChildrenProps>
 }
@@ -78,6 +80,8 @@ describe("OverlayControls", () => {
 				draftMapProjectionLatitude={42}
 				setDraftMapProjectionLatitude={vi.fn()}
 				setMapProjectionLatitude={vi.fn()}
+				debugMapModes={false}
+				setDebugMapModes={vi.fn()}
 				canCopyCode
 				onCopyCode={vi.fn()}
 			/>,
@@ -91,6 +95,7 @@ describe("OverlayControls", () => {
 		expect(markup).toContain(">km<")
 		expect(markup).toContain(">mi<")
 		expect(markup).toContain("Projection Latitude")
+		expect(markup).toContain("Debug Map Modes")
 		expect(markup).not.toContain(">Close<")
 		expect(markup).not.toContain(">View<")
 	})
@@ -122,6 +127,8 @@ describe("OverlayControls", () => {
 				draftMapProjectionLatitude={0}
 				setDraftMapProjectionLatitude={vi.fn()}
 				setMapProjectionLatitude={vi.fn()}
+				debugMapModes={false}
+				setDebugMapModes={vi.fn()}
 			/>,
 		)
 
@@ -140,6 +147,7 @@ describe("OverlayControls", () => {
 		const setUnitSystem = vi.fn()
 		const setDraftMapProjectionLatitude = vi.fn()
 		const setMapProjectionLatitude = vi.fn()
+		const setDebugMapModes = vi.fn()
 		const onCopyCode = vi.fn()
 		const onToggleGenerationPanel = vi.fn()
 
@@ -155,6 +163,7 @@ describe("OverlayControls", () => {
 			setUnitSystem,
 			setDraftMapProjectionLatitude,
 			setMapProjectionLatitude,
+			setDebugMapModes,
 			canCopyCode: true,
 			onCopyCode,
 			viewMode: "map",
@@ -194,7 +203,8 @@ describe("OverlayControls", () => {
 		const gridLabel = optionGroupChildren[5]
 		const gridSection = optionGroupChildren[6]
 		const projectionSection = optionGroupChildren[7]
-		const footerRow = optionGroupChildren[8]
+		const debugLabel = optionGroupChildren[8]
+		const footerRow = optionGroupChildren[9]
 		const generationButton = React.Children.toArray(
 			actionRow.props.children,
 		)[0] as ReactElement<ClickableProps>
@@ -229,6 +239,9 @@ describe("OverlayControls", () => {
 		const projectionRange = React.Children.toArray(
 			projectionSection.props.children,
 		)[1] as ReactElement<InputProps>
+		const debugInput = React.Children.toArray(
+			debugLabel.props.children,
+		)[1] as ReactElement<InputProps>
 
 		viewControl.props.onChange?.("map")
 		unitControl.props.onChange?.("imperial")
@@ -254,6 +267,9 @@ describe("OverlayControls", () => {
 		projectionRange.props.onPointerUp?.({
 			currentTarget: { value: "-42" },
 		} as React.PointerEvent<HTMLInputElement>)
+		debugInput.props.onChange?.({
+			target: { checked: true },
+		} as React.ChangeEvent<HTMLInputElement>)
 		generationButton.props.onClick?.(undefined as never)
 		overlaysButton.props.onClick?.(undefined as never)
 
@@ -267,8 +283,60 @@ describe("OverlayControls", () => {
 		expect(setGridSpacing).toHaveBeenCalledWith(10)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setMapProjectionLatitude).toHaveBeenCalledWith(-42)
+		expect(setDebugMapModes).toHaveBeenCalledWith(true)
 		expect(onToggleGenerationPanel).toHaveBeenCalledTimes(1)
 		expect(setOverlaysExpanded).toHaveBeenCalledWith(expect.any(Function))
+	})
+
+	it("renders only generation and settings buttons in the action row", () => {
+		const markup = renderToStaticMarkup(
+			<OverlayControls
+				overlaysExpanded={false}
+				setOverlaysExpanded={vi.fn()}
+				isMeasuring={false}
+				setIsMeasuring={vi.fn()}
+				showWireframe={false}
+				setShowWireframe={vi.fn()}
+				showRivers={false}
+				setShowRivers={vi.fn()}
+				showThermalEquator={false}
+				setShowThermalEquator={vi.fn()}
+				showGrid={true}
+				setShowGrid={vi.fn()}
+				showNationBorders={false}
+				setShowNationBorders={vi.fn()}
+				gridSpacing={15}
+				setGridSpacing={vi.fn()}
+				viewMode="globe"
+				setViewMode={vi.fn()}
+				unitSystem="metric"
+				setUnitSystem={vi.fn()}
+				mapProjectionLatitude={0}
+				draftMapProjectionLatitude={0}
+				setDraftMapProjectionLatitude={vi.fn()}
+				setMapProjectionLatitude={vi.fn()}
+				debugMapModes={false}
+				setDebugMapModes={vi.fn()}
+				generationPanelOpen={false}
+				onToggleGenerationPanel={vi.fn()}
+			/>,
+		)
+		const tree = createTree({
+			generationPanelOpen: false,
+			onToggleGenerationPanel: vi.fn(),
+		})
+		const anchored = React.Children.only(
+			tree.props.children,
+		) as ReactElement<ChildrenProps>
+		const actionRow = React.Children.toArray(
+			anchored.props.children,
+		)[1] as ReactElement<ChildrenProps>
+		const actionButtons = React.Children.toArray(
+			actionRow.props.children,
+		).filter(Boolean)
+
+		expect(markup).not.toContain("Hide simulation controls")
+		expect(actionButtons).toHaveLength(2)
 	})
 
 	it("renders copied state and skips unchanged or invalid projection commits", () => {
@@ -301,6 +369,8 @@ describe("OverlayControls", () => {
 				draftMapProjectionLatitude={18}
 				setDraftMapProjectionLatitude={vi.fn()}
 				setMapProjectionLatitude={setMapProjectionLatitude}
+				debugMapModes={false}
+				setDebugMapModes={vi.fn()}
 				canCopyCode
 				codeCopied
 				onCopyCode={vi.fn()}

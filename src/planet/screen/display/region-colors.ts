@@ -11,7 +11,6 @@ import {
 	developmentColor,
 	dtrColor,
 	getColor,
-	gravityColor,
 	hotspotColor,
 	moistureDirectionalColor,
 	OCEAN_LIGHT_BLUE,
@@ -80,22 +79,6 @@ export function getTerrainFeatureColor(
 	return TERRAIN_FEATURE_COLORS[feature] ?? null
 }
 
-const LAND_FEATURE_MASK =
-	(1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.FOLD_RIDGES - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.PLATEAU_UPLIFT - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR - 1))
-
-const OCEAN_FEATURE_MASK =
-	(1 << (OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.TRENCH - 1)) |
-	(1 << (OROGEN_TERRAIN_FEATURE.ISLAND_ARC - 1))
-
-const COAST_FEATURE_MASK = 1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1)
-
 const TOPOGRAPHY_COLORS: Record<number, [number, number, number]> = {
 	0: [0x6c / 255, 0x9d / 255, 0x35 / 255], // flat
 	1: [0x72 / 255, 0x84 / 255, 0x76 / 255], // hill
@@ -124,6 +107,8 @@ export function computeRegionColors(
 	viewMode: "globe" | "map" = "globe",
 	_occupiedRegions?: Set<number>,
 ): Float32Array | null {
+	if (colorMode === "landHeightmap") return null
+
 	const N = world.mesh.numRegions
 	const rgb = new Float32Array(N * 3)
 	const darkenMapWaterTemperature =
@@ -313,63 +298,6 @@ export function computeRegionColors(
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
-		}
-		return rgb
-	}
-
-	if (colorMode.startsWith("debug") && world.pastaDebug) {
-		const debugModeToKey = {
-			debugGdd: "gdd",
-			debugGddz: "gddz",
-			debugGint: "gint",
-			debugAr: "ar",
-			debugGar: "gar",
-			debugGrs: "grs",
-			debugEvr: "evr",
-			debugMinT: "minT",
-			debugMaxT: "maxT",
-		} as const
-		const debugKey = debugModeToKey[colorMode as keyof typeof debugModeToKey]
-		const data = world.pastaDebug[debugKey]
-		// Find min/max for normalization (land only for most, all for minT/maxT)
-		let lo = Infinity,
-			hi = -Infinity
-		for (let r = 0; r < N; r++) {
-			if (
-				!world.isLand?.[r] &&
-				!colorMode.includes("MinT") &&
-				!colorMode.includes("MaxT")
-			)
-				continue
-			const v = data[r]
-			// gint stores 99999 for infinity — skip for range
-			if (v >= 99999) continue
-			if (v < lo) lo = v
-			if (v > hi) hi = v
-		}
-		if (lo === hi) {
-			hi = lo + 1
-		}
-		const range = hi - lo
-		for (let r = 0; r < N; r++) {
-			if (
-				!world.isLand?.[r] &&
-				!colorMode.includes("MinT") &&
-				!colorMode.includes("MaxT")
-			) {
-				rgb[3 * r] = 0.05
-				rgb[3 * r + 1] = 0.08
-				rgb[3 * r + 2] = 0.18
-				continue
-			}
-			let v = data[r]
-			if (v >= 99999) v = hi
-			const t = Math.max(0, Math.min(1, (v - lo) / range))
-			// Viridis-like: blue → cyan → green → yellow
-			rgb[3 * r] = t < 0.5 ? t * 1.4 : 0.7 + (t - 0.5) * 0.6
-			rgb[3 * r + 1] =
-				t < 0.25 ? 0.05 + t * 2 : t < 0.75 ? 0.55 + (t - 0.25) * 0.9 : 1.0
-			rgb[3 * r + 2] = t < 0.5 ? 0.5 - t * 0.8 : 0.1 - (t - 0.5) * 0.2
 		}
 		return rgb
 	}
@@ -581,13 +509,6 @@ export function computeRegionColors(
 				}
 			}
 		}
-		let maxGravity = 0
-		if (populationMode === "gravity" && world.nations?.gravity) {
-			for (let i = 0; i < world.provinces.count; i++) {
-				if (!desolate[i] && world.nations.gravity[i] > maxGravity)
-					maxGravity = world.nations.gravity[i]
-			}
-		}
 		let maxDevelopment = 0
 		if (populationMode === "development" && world.development) {
 			for (let i = 0; i < world.provinces.count; i++) {
@@ -596,7 +517,6 @@ export function computeRegionColors(
 			}
 		}
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
-		const invGravityMax = maxGravity > 0 ? 1 / maxGravity : 0
 		const invDevelopmentMax = maxDevelopment > 0 ? 1 / maxDevelopment : 0
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
@@ -612,13 +532,6 @@ export function computeRegionColors(
 				if (populationMode === "density" && pop) {
 					const [cr, cg, cb] = populationColor(
 						(pop[p] / Math.max(1, size[p])) * invMax,
-					)
-					rgb[3 * r] = cr
-					rgb[3 * r + 1] = cg
-					rgb[3 * r + 2] = cb
-				} else if (populationMode === "gravity" && world.nations?.gravity) {
-					const [cr, cg, cb] = gravityColor(
-						world.nations.gravity[p] * invGravityMax,
 					)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
@@ -681,25 +594,11 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (
-		(colorMode === "terrainFeatures" ||
-			colorMode === "terrainFeaturesLand" ||
-			colorMode === "terrainFeaturesOcean" ||
-			colorMode === "terrainFeaturesCoast") &&
-		world.terrainFeatures
-	) {
+	if (colorMode === "terrainFeatures" && world.terrainFeatures) {
 		const { featureMask, dominantFeature } = world.terrainFeatures
-		const filterMask =
-			colorMode === "terrainFeaturesLand"
-				? LAND_FEATURE_MASK
-				: colorMode === "terrainFeaturesOcean"
-					? OCEAN_FEATURE_MASK
-					: colorMode === "terrainFeaturesCoast"
-						? COAST_FEATURE_MASK
-						: 0xffffffff
 		for (let r = 0; r < N; r++) {
 			const base = getColor(world.elevation_km[r], "terrain")
-			const mask = featureMask[r] & filterMask
+			const mask = featureMask[r]
 			if (!mask) {
 				rgb[3 * r] = base[0] * 0.32
 				rgb[3 * r + 1] = base[1] * 0.32

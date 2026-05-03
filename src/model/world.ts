@@ -44,7 +44,7 @@ export interface OrogenWorld {
 	climateZones: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
 	pastaClimate: Uint8Array
-	/** Per-cell pasta classification debug metrics */
+	/** Per-cell pasta climate detail metrics used by hover charts */
 	pastaDebug?: import("./climate/pasta").PastaDebug
 	/** Per-cell ice thickness in mm water equivalent (0 for ice-free) */
 	iceThickness: Float32Array

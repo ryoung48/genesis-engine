@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { EnergyBalanceModel } from "@/model/climate/ebm"
 import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
+import { PASTA_LABELS } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { decodePlanetCode } from "@/model/shared/planet-code"
 import { DEFAULT_WORLD_PARAMS } from "@/planet/screen/generation/defaults"
@@ -283,6 +284,8 @@ describe("full world smoke generation", () => {
 		console.table(
 			summarizeDistribution(world.climateZones, CLIMATE_LABELS, [0]),
 		)
+		console.info("Pasta climate distribution")
+		console.table(summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]))
 		console.info("Topography distribution")
 		console.table(
 			summarizeDistribution(world.topography, OROGEN_TOPOGRAPHY_LABELS, [5, 6]),
@@ -298,5 +301,74 @@ describe("full world smoke generation", () => {
 		expect(Number.isFinite(summary.avgTempC)).toBe(true)
 		expect(fingerprint.length).toBe(64)
 		expect(world.volcanism.hotspotExposure).toBeDefined()
+	}, 300_000)
+
+	it("logs pasta distributions for frozen, refuge, and hothouse volcanic scenarios", () => {
+		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const scenarioParams: Array<{
+			name: string
+			params: OrogenParams
+		}> = [
+			{
+				name: "frozen-control",
+				params: {
+					...base,
+					numPoints: 60_000,
+					sunTempFactor: 0.89,
+					pressure: 1,
+					volcanism: 1,
+				},
+			},
+			{
+				name: "volcanic-refugia",
+				params: {
+					...base,
+					numPoints: 60_000,
+					sunTempFactor: 0.89,
+					pressure: 1,
+					volcanism: 10,
+				},
+			},
+			{
+				name: "high-pressure-hothouse",
+				params: {
+					...base,
+					numPoints: 60_000,
+					sunTempFactor: 0.89,
+					pressure: 100,
+					volcanism: 10,
+				},
+			},
+		]
+
+		const results = scenarioParams.map(({ name, params }) => {
+			const world = generateOrogenWorld(params)
+			const summary = summarizeWorld(world)
+			console.info("Volcanic climate scenario", {
+				name,
+				pressure: params.pressure,
+				volcanism: params.volcanism,
+				sunTempFactor: params.sunTempFactor,
+				avgTempC: Number(summary.avgTempC.toFixed(1)),
+				landAvgTempC: Number(summary.landAvgTempC.toFixed(1)),
+				minTempC: Number(summary.minTempC.toFixed(1)),
+				maxTempC: Number(summary.maxTempC.toFixed(1)),
+			})
+			console.table(
+				summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]),
+			)
+			return { name, summary }
+		})
+
+		expect(results[1].summary.avgTempC).toBeGreaterThan(
+			results[0].summary.avgTempC,
+		)
+		expect(results[1].summary.maxTempC).toBeGreaterThan(0)
+		expect(results[2].summary.avgTempC).toBeGreaterThan(
+			results[1].summary.avgTempC,
+		)
+		expect(results[2].summary.maxTempC).toBeGreaterThan(
+			results[1].summary.maxTempC,
+		)
 	}, 300_000)
 })

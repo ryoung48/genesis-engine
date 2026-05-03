@@ -1,0 +1,441 @@
+import React from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { describe, expect, it } from "vitest"
+import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import { InfoPanel } from "./InfoPanel"
+
+function makeWorld(): SerializedOrogenWorld {
+	return {
+		mesh: { numRegions: 1 },
+		params: { planetRadiusKm: 6371 },
+		climate: {
+			temperature_avg: new Float32Array([12]),
+			temperature_monthly: new Float32Array(
+				Array.from({ length: 12 }, () => 12),
+			),
+			daylight_hours_monthly: new Float32Array(
+				Array.from({ length: 12 }, () => 10),
+			),
+			pet_monthly: new Float32Array(Array.from({ length: 12 }, () => 5)),
+		},
+		rainfall: {
+			monthly: new Float32Array(Array.from({ length: 12 }, () => 20)),
+		},
+		hydrology: {
+			aet_monthly: new Float32Array(Array.from({ length: 12 }, () => 4)),
+		},
+		isLand: new Uint8Array([1]),
+		iceThickness: new Float32Array([0]),
+		iceMinMonthly: new Float32Array([0]),
+		iceMaxMonthly: new Float32Array([0]),
+		slopeScore: new Float32Array([0.2]),
+		climateZones: new Uint8Array([1]),
+		vegetation: new Uint8Array([1]),
+		topography: new Uint8Array([1]),
+		pastaClimate: new Uint8Array([1]),
+		pastaDebug: {
+			gdd_monthly: new Float32Array(Array.from({ length: 12 }, () => 100)),
+			gint_monthly: new Float32Array(Array.from({ length: 12 }, () => 2)),
+			gdd: new Float32Array([1200]),
+			gint: new Float32Array([8]),
+			minT: new Float32Array([2]),
+			maxT: new Float32Array([24]),
+		},
+		provinces: {
+			desolate: new Uint8Array([0]),
+			size: new Float32Array([1]),
+			colors: new Float32Array([1, 0, 0]),
+		},
+		nations: {
+			assignment: new Int32Array([2]),
+			gravity: new Float32Array([4]),
+		},
+		population: {
+			population: new Float32Array([120000]),
+		},
+		urbanPopulation: new Float32Array([42000]),
+		development: new Float32Array([0.75]),
+		cultures: {
+			assignment: new Int32Array([1]),
+			colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+		},
+		heritages: {
+			assignment: new Int32Array([0, 2]),
+			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
+		},
+		faiths: {
+			assignment: new Int32Array([0, 3]),
+			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]),
+		},
+		religions: {
+			assignment: new Int32Array([0, 0, 0, 4]),
+			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1]),
+		},
+	} as unknown as SerializedOrogenWorld
+}
+
+function renderPanel(
+	overrides: Partial<React.ComponentProps<typeof InfoPanel>> = {},
+) {
+	return renderToStaticMarkup(
+		<InfoPanel
+			hoverInfo={{ region: 0, x: 0, y: 0 }}
+			hoverElevationKm={1.5}
+			hoverTopography="Plateau"
+			hoverCoordinates="10.0N, 20.0E"
+			hoverLandmark={{ id: 3, type: "peak", size: 1 }}
+			hoverIsLand={true}
+			hoverTemperatureDelta={6}
+			hoverRainfall={20}
+			hoverDtr={{
+				value: 5,
+				annual: 5,
+				monthly: Array.from({ length: 12 }, () => 5),
+			}}
+			hoverClimateDisplay="Temperate"
+			hoverIceSummary={null}
+			hoverBiome="Forest"
+			hoverProvince={0}
+			hoverNationId={2}
+			hoverRegionColor={[1, 0, 0]}
+			hoverOccupation={{
+				id: 9,
+				name: "Invaders",
+				color: "rgb(1,2,3)",
+				rebel: false,
+			}}
+			hoverOceanDist={25}
+			hoverDistCoast={1}
+			hoverDistCoastKm={12}
+			hoverHazards={{ earthquake: 0.3, volcano: 0.1, danger: 0.3 }}
+			hoverHotspot={null}
+			hoverRiver={null}
+			hoverTerrainFeature={{ dominant: "ridge", all: ["ridge"] }}
+			hoverOceanCurrents={null}
+			colorMode="terrain"
+			populationMode="density"
+			displayMonth={1}
+			unitSystem="metric"
+			world={makeWorld()}
+			hoverCardRef={{ current: null }}
+			getNationName={(id) => `Nation ${id}`}
+			getCultureName={(id) => `Culture ${id}`}
+			getHeritageName={(id) => `Heritage ${id}`}
+			getFaithName={(id) => `Faith ${id}`}
+			getReligionName={(id) => `Religion ${id}`}
+			{...overrides}
+		/>,
+	)
+}
+
+describe("InfoPanel", () => {
+	it("shows only geography-focused hover data for geography modes", () => {
+		const markup = renderPanel()
+
+		expect(markup).toContain(">Elev<")
+		expect(markup).toContain(">Climate<")
+		expect(markup).toContain(">Veg<")
+		expect(markup).not.toContain(">Province<")
+		expect(markup).not.toContain(">Nation<")
+		expect(markup).not.toContain(">Population<")
+	})
+
+	it("renders geography-only feature and temperature detail branches", () => {
+		const markup = renderPanel({
+			colorMode: "terrainFeatures",
+			hoverIceSummary: "0.20 m",
+		})
+
+		expect(markup).toContain(">Features<")
+		expect(markup).toContain(">Ice<")
+		expect(markup).not.toContain(">Danger<")
+		expect(markup).toContain(">Ocean dist<")
+		expect(markup).toContain(">Coast dist<")
+	})
+
+	it("shows danger details only in danger mode", () => {
+		const markup = renderPanel({
+			colorMode: "dangerZones",
+			hoverHazards: { earthquake: 0.1, volcano: 0.3, danger: 0.25 },
+		})
+
+		expect(markup).toContain(">Danger<")
+		expect(markup).toContain("(volcanic)")
+	})
+
+	it("shows quake-tagged danger when earthquakes dominate", () => {
+		const markup = renderPanel({
+			colorMode: "dangerZones",
+			hoverHazards: { earthquake: 0.35, volcano: 0.1, danger: 0.25 },
+		})
+
+		expect(markup).toContain("(quakes)")
+		expect(markup).not.toContain("(volcanic)")
+	})
+
+	it("renders DTR, precipitation, river, pasta, and ocean-current charts for geography debug modes", () => {
+		const dtrMarkup = renderPanel({
+			colorMode: "dtr",
+		})
+		const precipitationMarkup = renderPanel({
+			colorMode: "precipitation",
+			hoverRiver: {
+				flow: 12,
+				flow_monthly: Array.from({ length: 12 }, () => 12),
+				riverId: 7,
+				lengthKm: 30,
+			},
+		})
+		const pastaMarkup = renderPanel({
+			colorMode: "pastaClimate",
+		})
+		const currentMarkup = renderPanel({
+			colorMode: "oceanCurrents",
+			hoverOceanCurrents: {
+				warmth: 0.8,
+				delta: 1.5,
+				averageDelta: 1.2,
+				mode: "warm",
+				monthlyDelta: Array.from({ length: 12 }, () => 1.2),
+			},
+		})
+
+		expect(dtrMarkup).toContain("DTR Jan")
+		expect(precipitationMarkup).toContain(">PET<")
+		expect(precipitationMarkup).toContain(">AET<")
+		expect(precipitationMarkup).toContain("River #7")
+		expect(precipitationMarkup).toContain("Length")
+		expect(pastaMarkup).toContain(">GDD<")
+		expect(pastaMarkup).toContain(">GInt<")
+		expect(pastaMarkup).toContain("MIN")
+		expect(pastaMarkup).toContain("MAX")
+		expect(currentMarkup).toContain("Ocean Current")
+		expect(currentMarkup).toContain("warm")
+	})
+
+	it("renders geography edge cases without leaking political or demographic rows", () => {
+		const markup = renderPanel({
+			colorMode: "temperatureDelta",
+			hoverLandmark: { id: 4, type: null, size: null },
+			hoverHazards: { earthquake: 0.1, volcano: 0.3, danger: 0.25 },
+			hoverOceanDist: 0,
+			hoverDistCoastKm: Infinity,
+			hoverTopography: null,
+			hoverClimateDisplay: null,
+			hoverBiome: null,
+		})
+
+		expect(markup).toContain(">Temp Δ<")
+		expect(markup).toContain("unknown #4")
+		expect(markup).not.toContain("(volcanic)")
+		expect(markup).toContain(">∞<")
+		expect(markup).not.toContain(">Province<")
+		expect(markup).not.toContain(">Development<")
+	})
+
+	it("renders geography fallback branches when optional data is missing or over water", () => {
+		const markup = renderPanel({
+			colorMode: "precipitation",
+			world: {
+				...makeWorld(),
+				isLand: new Uint8Array([0]),
+				slopeScore: undefined,
+			} as SerializedOrogenWorld,
+			hoverLandmark: { id: 5, type: null, size: null },
+			hoverHazards: { earthquake: 0.1, volcano: 0.05, danger: 0.1 },
+			hoverOceanDist: null,
+			hoverDistCoastKm: null,
+			hoverTopography: null,
+			hoverClimateDisplay: null,
+			hoverBiome: null,
+			hoverRiver: {
+				flow: 5,
+				flow_monthly: Array.from({ length: 12 }, () => 5),
+				riverId: 2,
+				lengthKm: 0,
+			},
+		})
+
+		expect(markup).toContain(">Elev<")
+		expect(markup).toContain("unknown #5")
+		expect(markup).not.toContain("(quakes)")
+		expect(markup).not.toContain("(volcanic)")
+		expect(markup).toContain(">—<")
+		expect(markup).not.toContain(">PET<")
+		expect(markup).not.toContain(">AET<")
+		expect(markup).not.toContain("Length")
+	})
+
+	it("renders infinite pasta summaries and cold current deltas", () => {
+		const pastaMarkup = renderPanel({
+			colorMode: "pastaClimate",
+			world: {
+				...makeWorld(),
+				pastaDebug: {
+					...makeWorld().pastaDebug,
+					gdd: new Float32Array([99999]),
+					gint: new Float32Array([99999]),
+				},
+			} as SerializedOrogenWorld,
+		})
+		const currentMarkup = renderPanel({
+			colorMode: "oceanCurrents",
+			hoverOceanCurrents: {
+				warmth: -0.8,
+				delta: -1.5,
+				averageDelta: -1.2,
+				mode: "cold",
+				monthlyDelta: Array.from({ length: 12 }, () => -1.2),
+			},
+		})
+
+		expect(pastaMarkup).toContain(">∞<")
+		expect(currentMarkup).toContain("cold")
+		expect(currentMarkup).toContain("avg")
+	})
+
+	it("shows only political hover data for political modes", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+		})
+
+		expect(markup).toContain(">Province<")
+		expect(markup).toContain(">Nation<")
+		expect(markup).toContain(">Occupier<")
+		expect(markup).not.toContain(">Elev<")
+		expect(markup).not.toContain(">Climate<")
+		expect(markup).not.toContain(">Population<")
+	})
+
+	it("renders rebel occupiers in political mode", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+			hoverOccupation: {
+				id: 9,
+				name: "Invaders",
+				color: "rgb(1,2,3)",
+				rebel: true,
+			},
+		})
+
+		expect(markup).toContain("Invaders (rebels)")
+	})
+
+	it("omits political detail rows when no valid province is hovered", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+			hoverProvince: -1,
+			hoverNationId: null,
+			hoverOccupation: null,
+		})
+
+		expect(markup).toContain(">Coords<")
+		expect(markup).not.toContain(">Province<")
+		expect(markup).not.toContain(">Nation<")
+		expect(markup).not.toContain(">Occupier<")
+	})
+
+	it("renders the full demographic summary without political rows", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			populationMode: "development",
+		})
+
+		expect(markup).toContain(">Population<")
+		expect(markup).toContain(">120K")
+		expect(markup).toContain(">Development<")
+		expect(markup).toContain(">0.75<")
+		expect(markup).toContain(">Urban Pop<")
+		expect(markup).toContain(">42,000<")
+		expect(markup).toContain(">Culture<")
+		expect(markup).toContain(">Heritage<")
+		expect(markup).toContain(">Faith<")
+		expect(markup).toContain(">Religion<")
+		expect(markup).not.toContain(">Province<")
+	})
+
+	it("omits demographic detail rows when no valid province is hovered", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			populationMode: "faith",
+			hoverProvince: -1,
+		})
+
+		expect(markup).toContain(">Coords<")
+		expect(markup).not.toContain(">Faith<")
+		expect(markup).not.toContain(">Province<")
+	})
+
+	it("keeps the selected demographic first while still showing the related rows", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			populationMode: "culture",
+		})
+
+		expect(markup.indexOf(">Culture<")).toBeLessThan(
+			markup.indexOf(">Population<"),
+		)
+		expect(markup).toContain(">Culture<")
+		expect(markup).toContain(">Culture 1<")
+		expect(markup).toContain(">Development<")
+		expect(markup).toContain(">Religion<")
+		expect(markup).not.toContain(">Province<")
+		expect(markup).not.toContain(">Nation<")
+		expect(markup).not.toContain(">Elev<")
+	})
+
+	it("prioritizes belief demographics when religion mode is selected", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			populationMode: "religion",
+		})
+
+		expect(markup.indexOf(">Faith<")).toBeLessThan(
+			markup.indexOf(">Population<"),
+		)
+		expect(markup.indexOf(">Religion<")).toBeLessThan(
+			markup.indexOf(">Population<"),
+		)
+	})
+
+	it("skips current and river charts when the inputs have no meaningful signal", () => {
+		const currentMarkup = renderPanel({
+			colorMode: "oceanCurrents",
+			hoverOceanCurrents: {
+				warmth: 0.2,
+				delta: 0,
+				averageDelta: 0,
+				mode: "warm",
+				monthlyDelta: Array.from({ length: 12 }, () => 0),
+			},
+		})
+		const riverMarkup = renderPanel({
+			colorMode: "precipitation",
+			hoverRiver: {
+				flow: 12,
+				flow_monthly: Array.from({ length: 11 }, () => 12),
+				riverId: 7,
+				lengthKm: 0,
+			},
+		})
+
+		expect(currentMarkup).not.toContain("Ocean Current")
+		expect(riverMarkup).not.toContain("River #7")
+		expect(riverMarkup).not.toContain("Length")
+	})
+
+	it("omits the AET chart when all aet values are zero", () => {
+		const markup = renderPanel({
+			colorMode: "precipitation",
+			world: {
+				...makeWorld(),
+				hydrology: {
+					aet_monthly: new Float32Array(12),
+				},
+			} as SerializedOrogenWorld,
+		})
+
+		expect(markup).toContain(">PET<")
+		expect(markup).not.toContain(">AET<")
+	})
+})

@@ -8,6 +8,11 @@ import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
 import { SimplexNoise } from "../shared/simplex-noise"
 import { TIME } from "../shared/time"
 import { getEffectiveObliquityDeg, getSubstellarDir } from "../shared/units"
+import { clampVolcanism, getVolcanismOverdrive } from "../shared/volcanism"
+import {
+	OROGEN_TERRAIN_FEATURE,
+	type OrogenTerrainFeatures,
+} from "../types/tectonics"
 import { EMB_CONSTANTS } from "./ebm/constants"
 import { EnergyBalanceModel } from "./ebm/index"
 import { INSOLATION } from "./ebm/insolation"
@@ -16,6 +21,9 @@ const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 const LAT_STEP_INV = (NUM_LAT - 1) / 180 // O(1) uniform-grid interpolation
 const RAD_TO_DEG = 180 / Math.PI
+const VOLCANIC_ARC_MASK = 1 << (OROGEN_TERRAIN_FEATURE.VOLCANIC_ARC - 1)
+const LARGE_IGNEOUS_PROVINCE_MASK =
+	1 << (OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1)
 
 interface MeshLatitudeGeometry {
 	latDegByRegion: Float64Array
@@ -51,6 +59,15 @@ function getMeshLatitudeGeometry(mesh: SphereMesh): MeshLatitudeGeometry {
 
 function clampAcosInput(value: number): number {
 	return Math.max(-1, Math.min(1, value))
+}
+
+function clamp01(value: number): number {
+	return Math.max(0, Math.min(1, value))
+}
+
+function smoothstep01(value: number): number {
+	const t = clamp01(value)
+	return t * t * (3 - 2 * t)
 }
 
 /** Fast piecewise-linear interpolation for uniformly-spaced latitude bands (-90..90). */
@@ -342,6 +359,163 @@ function applyTemperatureNoise(
 	}
 }
 
+function recomputeAnnualTemperatureStats(
+	temperature_monthly: Float32Array,
+	temperature_avg: Float32Array,
+	temperature_min: Float32Array,
+	temperature_max: Float32Array,
+	N: number,
+): void {
+	for (let r = 0; r < N; r++) {
+		let sum = 0
+		let min = Infinity
+		let max = -Infinity
+		for (let month = 0; month < 12; month++) {
+			const value = temperature_monthly[month * N + r]
+			sum += value
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+		temperature_avg[r] = sum / 12
+		temperature_min[r] = min
+		temperature_max[r] = max
+	}
+}
+
+function maxPositiveValue(field?: Float32Array): number {
+	if (!field) return 0
+	let result = 0
+	for (let i = 0; i < field.length; i++) {
+		if (field[i] > result) result = field[i]
+	}
+	return result
+}
+
+function buildVolcanicSourceField(
+	mesh: SphereMesh,
+	hotspot?: Float32Array,
+	mantleUpwelling?: Float32Array,
+	terrainFeatures?: OrogenTerrainFeatures,
+): Float32Array {
+	const source = new Float32Array(mesh.numRegions)
+	const hotspotMax = maxPositiveValue(hotspot)
+	const mantleMax = maxPositiveValue(mantleUpwelling)
+	const featureMask = terrainFeatures?.featureMask
+
+	for (let r = 0; r < mesh.numRegions; r++) {
+		let value = 0
+		if (hotspotMax > 1e-6 && hotspot) {
+			value += 0.7 * Math.sqrt(Math.max(0, hotspot[r]) / hotspotMax)
+		}
+		if (mantleMax > 1e-6 && mantleUpwelling) {
+			value += 0.35 * Math.sqrt(Math.max(0, mantleUpwelling[r]) / mantleMax)
+		}
+		const mask = featureMask?.[r] ?? 0
+		if ((mask & VOLCANIC_ARC_MASK) !== 0) value += 0.35
+		if ((mask & LARGE_IGNEOUS_PROVINCE_MASK) !== 0) value += 0.25
+		source[r] = Math.min(1.25, value)
+	}
+
+	return source
+}
+
+function diffuseVolcanicSource(
+	mesh: SphereMesh,
+	source: Float32Array,
+	pressure: number,
+): Float32Array {
+	if (mesh.adjList.length === 0) return source.slice()
+
+	const pressureLog = Math.log10(Math.max(pressure, 1e-3))
+	const passes = Math.max(
+		1,
+		Math.min(5, 1 + Math.round(Math.max(0, pressureLog + 1))),
+	)
+	const neighborShare = 0.18 + 0.08 * Math.max(0, Math.min(3, pressureLog + 1))
+	let current = source.slice()
+	let next = new Float32Array(source.length)
+
+	for (let pass = 0; pass < passes; pass++) {
+		for (let r = 0; r < mesh.numRegions; r++) {
+			const start = mesh.adjOffset[r]
+			const end = mesh.adjOffset[r + 1]
+			if (start === end) {
+				next[r] = current[r]
+				continue
+			}
+			let neighborSum = 0
+			for (let i = start; i < end; i++) neighborSum += current[mesh.adjList[i]]
+			const neighborAverage = neighborSum / (end - start)
+			next[r] =
+				current[r] * (1 - neighborShare) + neighborAverage * neighborShare
+			if (next[r] < source[r] * 0.55) next[r] = source[r] * 0.55
+		}
+		;[current, next] = [next, current]
+	}
+
+	return current
+}
+
+interface VolcanicTemperatureEffectParams {
+	mesh: SphereMesh
+	params: OrogenParams
+	temperature_monthly: Float32Array
+	temperature_monthly_nolapse: Float32Array
+	hotspot?: Float32Array
+	mantleUpwelling?: Float32Array
+	terrainFeatures?: OrogenTerrainFeatures
+}
+
+function applyVolcanicTemperatureEffects({
+	mesh,
+	params,
+	temperature_monthly,
+	temperature_monthly_nolapse,
+	hotspot,
+	mantleUpwelling,
+	terrainFeatures,
+}: VolcanicTemperatureEffectParams): void {
+	const volcanism = clampVolcanism(params.volcanism, 1)
+	if (volcanism <= 1) return
+
+	const pressure = Math.max(params.pressure ?? 1.0, 1e-3)
+	const activity = smoothstep01((volcanism - 1) / 9)
+	if (activity <= 0) return
+
+	const overdrive = getVolcanismOverdrive(volcanism)
+	const localSource = buildVolcanicSourceField(
+		mesh,
+		hotspot,
+		mantleUpwelling,
+		terrainFeatures,
+	)
+	const diffusedSource = diffuseVolcanicSource(mesh, localSource, pressure)
+	const pressureLog = Math.log10(pressure)
+	const retentionFactor = 0.35 + 0.65 * smoothstep01((pressureLog + 1) / 3)
+	const localCoupling = 0.95 + 0.45 * smoothstep01((pressureLog + 1) / 3)
+	const localPeakDelta = activity * localCoupling * (7.5 + 10 * overdrive)
+	const greenhousePressureBoost =
+		retentionFactor *
+		(1 +
+			0.35 * Math.max(0, pressureLog) +
+			0.12 * Math.max(0, pressureLog) * Math.max(0, pressureLog))
+	const globalGreenhouseDelta =
+		activity * greenhousePressureBoost * (1.8 + 18 * Math.pow(overdrive, 1.08))
+
+	for (let r = 0; r < mesh.numRegions; r++) {
+		const geothermalDelta =
+			localPeakDelta *
+			Math.min(1.5, 0.5 * localSource[r] + 0.75 * diffusedSource[r])
+		const totalDelta = globalGreenhouseDelta + geothermalDelta
+		if (Math.abs(totalDelta) <= 1e-6) continue
+		for (let month = 0; month < 12; month++) {
+			const idx = month * mesh.numRegions + r
+			temperature_monthly[idx] += totalDelta
+			temperature_monthly_nolapse[idx] += totalDelta
+		}
+	}
+}
+
 /**
  * Compute per-cell temperature for a tidally locked planet using a
  * Legendre polynomial expansion around the substellar point.
@@ -359,6 +533,9 @@ function computeTidalTemperature(
 	params: OrogenParams,
 	oceanDist?: Float32Array,
 	elevation_km?: Float32Array,
+	hotspot?: Float32Array,
+	mantleUpwelling?: Float32Array,
+	terrainFeatures?: OrogenTerrainFeatures,
 ): OrogenClimate {
 	const N = mesh.numRegions
 	const sub = getSubstellarDir(params.antistellarLon)
@@ -440,21 +617,22 @@ function computeTidalTemperature(
 		},
 		() => true,
 	)
-
-	for (let r = 0; r < N; r++) {
-		let sum = 0
-		let min = Infinity
-		let max = -Infinity
-		for (let month = 0; month < 12; month++) {
-			const value = temperature_monthly[month * N + r]
-			sum += value
-			if (value < min) min = value
-			if (value > max) max = value
-		}
-		temperature_avg[r] = sum / 12
-		temperature_min[r] = min
-		temperature_max[r] = max
-	}
+	applyVolcanicTemperatureEffects({
+		mesh,
+		params,
+		temperature_monthly,
+		temperature_monthly_nolapse,
+		hotspot,
+		mantleUpwelling,
+		terrainFeatures,
+	})
+	recomputeAnnualTemperatureStats(
+		temperature_monthly,
+		temperature_avg,
+		temperature_min,
+		temperature_max,
+		N,
+	)
 
 	return {
 		temperature_avg,
@@ -507,6 +685,9 @@ export function computeTemperature(
 	oceanDist?: Float32Array,
 	isLand?: Uint8Array,
 	elevation_km?: Float32Array,
+	hotspot?: Float32Array,
+	mantleUpwelling?: Float32Array,
+	terrainFeatures?: OrogenTerrainFeatures,
 ): OrogenClimate {
 	if (params.tidallyLocked) {
 		return computeTidalTemperature(
@@ -516,6 +697,9 @@ export function computeTemperature(
 			params,
 			oceanDist,
 			elevation_km,
+			hotspot,
+			mantleUpwelling,
+			terrainFeatures,
 		)
 	}
 
@@ -638,21 +822,22 @@ export function computeTemperature(
 			temperature_max,
 		)
 	}
-
-	for (let r = 0; r < N; r++) {
-		let sum = 0
-		let min = Infinity
-		let max = -Infinity
-		for (let month = 0; month < 12; month++) {
-			const value = temperature_monthly[month * N + r]
-			sum += value
-			if (value < min) min = value
-			if (value > max) max = value
-		}
-		temperature_avg[r] = sum / 12
-		temperature_min[r] = min
-		temperature_max[r] = max
-	}
+	applyVolcanicTemperatureEffects({
+		mesh,
+		params,
+		temperature_monthly,
+		temperature_monthly_nolapse,
+		hotspot,
+		mantleUpwelling,
+		terrainFeatures,
+	})
+	recomputeAnnualTemperatureStats(
+		temperature_monthly,
+		temperature_avg,
+		temperature_min,
+		temperature_max,
+		N,
+	)
 
 	return {
 		temperature_avg,

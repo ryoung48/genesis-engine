@@ -81,14 +81,9 @@ export interface SerializedOrogenWorld {
 	pastaClimate: Uint8Array
 	pastaDebug?: {
 		gdd: Float32Array
-		gddz: Float32Array
 		gint: Float32Array
 		gdd_monthly: Float32Array
 		gint_monthly: Float32Array
-		ar: Float32Array
-		gar: Float32Array
-		grs: Float32Array
-		evr: Float32Array
 		minT: Float32Array
 		maxT: Float32Array
 	}

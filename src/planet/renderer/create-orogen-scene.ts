@@ -12,6 +12,8 @@ import { disposeGroup, disposeObject3D } from "./disposal"
 import { createMapProjection } from "./map-projection"
 import {
 	applyFaceRegionColors,
+	applyMapColorModeColors,
+	applyTerrainColorModeColors,
 	buildMapMesh,
 	buildMapOccupationOverlay,
 	buildMapWireframe,
@@ -298,6 +300,52 @@ export function createOrogenScene(
 		return terrainUpdated || mapUpdated
 	}
 
+	function recolorModeColorsInPlace(): boolean {
+		if (!currentWorld || currentRegionColors) return false
+		const terrainUpdated = applyTerrainColorModeColors(
+			terrainMesh,
+			currentWorld,
+			currentColorMode,
+			terrainFaceToRegion,
+			currentOccupationOverlay,
+		)
+		const mapUpdated = applyMapColorModeColors(
+			mapMesh,
+			currentWorld,
+			currentColorMode,
+			mapFaceToRegion,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			currentOccupationOverlay,
+		)
+		return terrainUpdated || mapUpdated
+	}
+
+	function applyWaterMaterialForMode(mode: ColorMode) {
+		const useTerrainWaterMaterial = mode === "terrain"
+		if (useTerrainWaterMaterial) {
+			waterMat.color.set(0xffffff)
+			waterMat.opacity = 0.12
+			waterMat.specular.set(DEFAULT_WATER_SPECULAR)
+		} else {
+			waterMat.color.set(0x0c3a6e)
+			waterMat.opacity = 0.12
+			waterMat.specular.set(0x000000)
+		}
+		if (currentViewMode === "globe") {
+			waterMesh.visible = true
+			atmosMesh.visible = sun.intensity > 0
+		}
+	}
+
+	function refreshMeshColors() {
+		if (currentRegionColors) {
+			if (!recolorMeshesInPlace()) rebuildTerrain()
+			return
+		}
+		if (!recolorModeColorsInPlace()) rebuildTerrain()
+	}
+
 	function rebuildOverlays() {
 		disposeObject3D(scene, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
@@ -523,27 +571,22 @@ export function createOrogenScene(
 	function setColorMode(mode: ColorMode) {
 		if (mode === currentColorMode) return
 		currentColorMode = mode
-		const useTerrainWaterMaterial = mode === "terrain"
-		if (useTerrainWaterMaterial) {
-			waterMat.color.set(0xffffff)
-			waterMat.opacity = 0.12
-			waterMat.specular.set(DEFAULT_WATER_SPECULAR)
-		} else {
-			waterMat.color.set(0x0c3a6e)
-			waterMat.opacity = 0.12
-			waterMat.specular.set(0x000000)
-		}
-		if (currentViewMode === "globe") {
-			waterMesh.visible = true
-			atmosMesh.visible = sun.intensity > 0
-		}
-		if (!recolorMeshesInPlace()) rebuildTerrain()
+		applyWaterMaterialForMode(mode)
+		refreshMeshColors()
 	}
 
 	function setRegionColors(colors: Float32Array | null) {
 		if (currentRegionColors === colors) return
 		currentRegionColors = colors
-		if (!recolorMeshesInPlace()) rebuildTerrain()
+		refreshMeshColors()
+	}
+
+	function setDisplayColors(mode: ColorMode, colors: Float32Array | null) {
+		if (mode === currentColorMode && currentRegionColors === colors) return
+		currentColorMode = mode
+		currentRegionColors = colors
+		applyWaterMaterialForMode(mode)
+		refreshMeshColors()
 	}
 
 	function setOccupationOverlay(overlay: Float32Array | null) {
@@ -1219,6 +1262,7 @@ export function createOrogenScene(
 		updateWorld,
 		setColorMode,
 		setRegionColors,
+		setDisplayColors,
 		setOccupationOverlay,
 		setHoveredRegion,
 		setNationBordersVisible,
