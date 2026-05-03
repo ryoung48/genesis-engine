@@ -110,10 +110,10 @@ describe("WorldDetails", () => {
 
 		expect(markup).toContain("Population")
 		expect(markup).toContain("N/A")
-		expect(markup).toContain("Province Development")
-		expect(markup).toContain("Nation Development")
 		expect(markup).toContain("Nation Size")
 		expect(markup).toContain("Conflicts")
 		expect(markup).toContain("Relations")
+		expect(markup).not.toContain("Province Development")
+		expect(markup).not.toContain("Nation Development")
 	})
 })

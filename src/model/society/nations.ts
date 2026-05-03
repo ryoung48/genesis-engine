@@ -1,11 +1,11 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import { buildIdentitySeeds } from "../shared/identity-seeds"
 import {
 	buildChildrenCSR,
 	buildSovereign,
 	computeGravity,
 	rebalanceHierarchy,
 } from "./hierarchy"
-import { buildIdentitySeeds } from "./shared"
 
 const NATION_PERCENTAGES = normalize([0.2, 0.21, 0.21, 0.18, 0.12, 0.09])
 export const NATION_BUCKETS: [number, number][] = [

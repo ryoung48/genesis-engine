@@ -38,6 +38,8 @@ describe("details shared helpers", () => {
 		expect(markup).toContain("Visible body")
 		expect(markup).not.toContain("Hidden body")
 		expect(markup).toContain("rotate-180")
+		expect(markup).toContain("overflow-hidden")
+		expect(markup).toContain("rounded-none")
 		expect(markup).toContain("Biomes")
 		expect(markup).toContain("Forest (3, 75.0%)")
 		expect(markup).toContain("Tundra (1, 25.0%)")

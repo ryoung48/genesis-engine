@@ -298,7 +298,7 @@ describe("simulation controls", () => {
 
 		expect(workerRef.current?.postMessage).toHaveBeenNthCalledWith(1, {
 			type: "simulate",
-			tickMs: 31_536_000_000,
+			tickMs: 2_592_000_000,
 		})
 		expect(workerRef.current?.postMessage).toHaveBeenNthCalledWith(2, {
 			type: "pause",

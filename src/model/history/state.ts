@@ -47,7 +47,7 @@ const DAYS_PER_MONTH = 30
 const HOURS_PER_DAY = 24
 const DAY_MS = HOURS_PER_DAY * 60 * 60 * 1000
 export const YEAR_MS = DAYS_PER_YEAR * DAY_MS
-const MONTH_MS = DAYS_PER_MONTH * DAY_MS
+export const MONTH_MS = DAYS_PER_MONTH * DAY_MS
 
 export function deltaYear(years: number): number {
 	return years * YEAR_MS

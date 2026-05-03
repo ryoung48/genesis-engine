@@ -1,10 +1,10 @@
 import React from "react"
 import { FloatingPanel, IconButton } from "@/components"
-import { YEAR_MS } from "@/model/history/state"
+import { MONTH_MS } from "@/model/history/state"
 import { historyTimeParts } from "../screen/history/history-time"
 import { monthLabels } from "../screen/shared/constants"
 
-const TIMELINE_STEP_MS = YEAR_MS
+const TIMELINE_STEP_MS = MONTH_MS
 
 function clampTimelineTime(
 	timeMs: number,
@@ -66,8 +66,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						size="sm"
 						shape="rounded"
 						className="h-7 w-7 shrink-0 border-white/0 bg-white/5 text-slate-100 shadow-none hover:bg-white/10"
-						title="Previous year"
-						aria-label="Previous year"
+						title="Previous month"
+						aria-label="Previous month"
 					>
 						<svg
 							width="12"
@@ -93,7 +93,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						value={selectedTimeMs}
 						onChange={(e) => onTimeChange(Number(e.target.value))}
 						className="min-w-0 flex-1 accent-slate-100"
-						aria-label="Simulation year"
+						aria-label="Simulation month"
 					/>
 					<IconButton
 						onClick={handleStepForward}
@@ -101,8 +101,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						size="sm"
 						shape="rounded"
 						className="h-7 w-7 shrink-0 border-white/0 bg-white/5 text-slate-100 shadow-none hover:bg-white/10"
-						title="Next year"
-						aria-label="Next year"
+						title="Next month"
+						aria-label="Next month"
 					>
 						<svg
 							width="12"

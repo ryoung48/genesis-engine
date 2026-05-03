@@ -5,7 +5,7 @@ import React, {
 } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { YEAR_MS } from "@/model/history/state"
+import { MONTH_MS, YEAR_MS } from "@/model/history/state"
 import { SimulationControls } from "./SimulationControls"
 
 type SimulationControlsProps = ComponentProps<typeof SimulationControls>
@@ -71,12 +71,12 @@ describe("SimulationControls", () => {
 		)
 
 		expect(markup).toContain("Y2")
-		expect(markup).toContain("Simulation year")
+		expect(markup).toContain("Simulation month")
 		expect(markup).not.toContain("Latest Y5")
 		expect(markup).not.toContain("Start simulation")
 	})
 
-	it("updates the selected year directly from the single-row slider", () => {
+	it("updates the selected month directly from the single-row slider", () => {
 		const onTimeChange = vi.fn()
 		const { slider } = getActionButtons(
 			createProps({
@@ -85,13 +85,13 @@ describe("SimulationControls", () => {
 		)
 
 		slider.props.onChange?.({
-			target: { value: `${3 * YEAR_MS}` },
+			target: { value: `${YEAR_MS + 3 * MONTH_MS}` },
 		} as React.ChangeEvent<HTMLInputElement>)
 
-		expect(onTimeChange).toHaveBeenCalledWith(3 * YEAR_MS)
+		expect(onTimeChange).toHaveBeenCalledWith(YEAR_MS + 3 * MONTH_MS)
 	})
 
-	it("clamps step controls to the available timeline range", () => {
+	it("clamps monthly step controls to the available timeline range", () => {
 		const onTimeChange = vi.fn()
 		const { previousButton, nextButton } = getActionButtons(
 			createProps({
@@ -105,7 +105,7 @@ describe("SimulationControls", () => {
 
 		nextButton.props.onClick?.(undefined as never)
 
-		expect(onTimeChange).toHaveBeenCalledWith(2 * YEAR_MS)
+		expect(onTimeChange).toHaveBeenCalledWith(YEAR_MS + MONTH_MS)
 	})
 
 	it("keeps the compact single-row layout even without history", () => {
@@ -120,7 +120,7 @@ describe("SimulationControls", () => {
 			/>,
 		)
 
-		expect(markup).toContain("Simulation year")
+		expect(markup).toContain("Simulation month")
 		expect(markup).toContain("Y1")
 		expect(markup).not.toContain("Start simulation")
 		expect(markup).not.toContain("Latest Y1")

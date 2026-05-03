@@ -440,6 +440,8 @@ function serializeWorld(
 					regionLandmark: world.landmarks.regionLandmark,
 					type: world.landmarks.type,
 					size: world.landmarks.size,
+					dominantCulture: world.landmarks.dominantCulture,
+					nameSeeds: world.landmarks.nameSeeds,
 					count: world.landmarks.count,
 				}
 			: undefined,
@@ -663,6 +665,12 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.landmarks.type.buffer,
 			world.landmarks.size.buffer,
 		)
+		if (world.landmarks.dominantCulture) {
+			add(world.landmarks.dominantCulture.buffer)
+		}
+		if (world.landmarks.nameSeeds) {
+			add(world.landmarks.nameSeeds.buffer)
+		}
 	}
 	if (world.development) add(world.development.buffer)
 	if (world.urbanPopulation) add(world.urbanPopulation.buffer)

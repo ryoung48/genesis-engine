@@ -59,6 +59,7 @@ import {
 	warpTerrain,
 } from "../terrain/erosion"
 import { applyHotspots, applyStaticHotspots } from "../terrain/hotspots"
+import { assignLandmarkIdentity } from "../terrain/landmarks"
 import { runPostElevationPipeline } from "./post-elevation"
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -723,6 +724,14 @@ export function generateOrogenWorld(
 			})
 		})
 	}
+	post.landmarks = assignLandmarkIdentity({
+		mesh,
+		landmarks: post.landmarks,
+		provinces: post.provinces,
+		cultures,
+		isLand,
+		seed: params.seed,
+	})
 
 	const timings = [...pipelineTiming, ...post.timings]
 	console.timeEnd("orogen:total")

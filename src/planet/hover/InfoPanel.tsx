@@ -5,6 +5,7 @@ import {
 	SeriesBars,
 	Swatch,
 } from "@/components"
+import { titleCase } from "@/model/shared/text"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { type ColorMode, dangerColor, daylightColor } from "../colors"
 import { monthLabels } from "../screen/shared/constants"
@@ -189,6 +190,7 @@ interface InfoPanelProps {
 	getHeritageName: (heritageId: number) => string
 	getFaithName: (faithId: number) => string
 	getReligionName: (religionId: number) => string
+	getLandmarkName: (landmarkId: number) => string
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -224,6 +226,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getHeritageName,
 	getFaithName,
 	getReligionName,
+	getLandmarkName,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
@@ -381,8 +384,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						/>
 						{hoverLandmark && (
 							<Row
-								label="Landmark"
-								value={`${hoverLandmark.type ?? "unknown"} #${hoverLandmark.id}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
+								label={
+									hoverLandmark.type
+										? titleCase(hoverLandmark.type)
+										: "Landmark"
+								}
+								value={`${getLandmarkName(hoverLandmark.id)}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
 							/>
 						)}
 						{colorMode === "temperatureDelta" &&
@@ -401,7 +408,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
 							/>
 						)}
-						{hoverIceSummary && <Row label="Ice" value={hoverIceSummary} />}
+						{colorMode === "pastaClimate" && hoverIceSummary && (
+							<Row label="Ice" value={hoverIceSummary} />
+						)}
 						{colorMode === "terrainFeatures" &&
 							terrainFeatureSwatches.length > 0 && (
 								<MultiSwatchRow
@@ -482,8 +491,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								label="Occupier"
 								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
 								color={hoverOccupation.color}
-								striped
-								stripeBackground={"white"}
 							/>
 						)}
 					</>

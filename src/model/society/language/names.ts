@@ -49,6 +49,12 @@ export interface LanguageNameReligion {
 	name?: string
 }
 
+export interface LanguageNameLandmark {
+	culture: number
+	nameSeed?: number
+	name?: string
+}
+
 export interface LanguageNameDynasty {
 	name: string
 }
@@ -59,6 +65,7 @@ export interface LanguageNameContext {
 	heritages?: readonly LanguageNameHeritage[]
 	faiths?: readonly LanguageNameFaith[]
 	religions?: readonly LanguageNameReligion[]
+	landmarks?: readonly LanguageNameLandmark[]
 	nations?: readonly LanguageNameNation[]
 	dynasties?: readonly LanguageNameDynasty[]
 }
@@ -70,6 +77,7 @@ export interface LanguageNames {
 	heritage(heritageIdx: number): string
 	faith(faithIdx: number): string
 	religion(religionIdx: number): string
+	landmark(landmarkIdx: number): string
 	river(provinceIdx: number): string
 	mountain(provinceIdx: number): string
 	leader(provinceIdx: number, time: number): string
@@ -156,6 +164,7 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 	const heritageNames = new Map<number, string>()
 	const faithNames = new Map<number, string>()
 	const religionNames = new Map<number, string>()
+	const landmarkNames = new Map<number, string>()
 	const riverNames = new Map<number, string>()
 	const mountainNames = new Map<number, string>()
 	const nationById = new Map(
@@ -307,6 +316,23 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		})
 	}
 
+	function cachedLandmarkName(landmarkIdx: number): string {
+		const landmark = context.landmarks?.[landmarkIdx]
+		const cultureIdx = landmark?.culture ?? -1
+		return cachedScopedName({
+			cache: landmarkNames,
+			index: landmarkIdx,
+			key: "region",
+			namespace: "landmark",
+			slot: buildNamedGroupSlot("landmark", landmarkIdx, landmark?.nameSeed),
+			lang: cultureIdx >= 0 ? getCultureLanguage(context, cultureIdx) : null,
+			fallback: `#${landmarkIdx}`,
+			onNamed: (name) => {
+				if (landmark) landmark.name = name
+			},
+		})
+	}
+
 	return {
 		province: (provinceIdx: number) =>
 			cachedName(
@@ -321,6 +347,7 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		heritage: cachedHeritageName,
 		faith: cachedFaithName,
 		religion: cachedReligionName,
+		landmark: cachedLandmarkName,
 		river: (provinceIdx: number) =>
 			cachedName(
 				riverNames,
@@ -376,6 +403,7 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 			heritageNames.clear()
 			faithNames.clear()
 			religionNames.clear()
+			landmarkNames.clear()
 			riverNames.clear()
 			mountainNames.clear()
 		},
@@ -389,7 +417,13 @@ export const NAMES = {
 export function createWorldNames(
 	world: Pick<
 		SerializedOrogenWorld,
-		"provinces" | "cultures" | "heritages" | "faiths" | "religions" | "nations"
+		| "provinces"
+		| "cultures"
+		| "heritages"
+		| "faiths"
+		| "religions"
+		| "landmarks"
+		| "nations"
 	>,
 ): LanguageNames {
 	const provinceCount = world.provinces?.count ?? 0
@@ -430,6 +464,13 @@ export function createWorldNames(
 			seedFaith: world.religions?.seeds?.[religionIdx] ?? -1,
 		}),
 	)
+	const landmarks: LanguageNameLandmark[] = Array.from(
+		{ length: world.landmarks?.count ?? 0 },
+		(_, landmarkIdx): LanguageNameLandmark => ({
+			culture: world.landmarks?.dominantCulture?.[landmarkIdx] ?? -1,
+			nameSeed: world.landmarks?.nameSeeds?.[landmarkIdx],
+		}),
+	)
 	const provinces = Array.from({ length: provinceCount }, (_, provinceIdx) => ({
 		culture: world.cultures?.assignment[provinceIdx] ?? -1,
 	}))
@@ -452,6 +493,7 @@ export function createWorldNames(
 		heritages,
 		faiths,
 		religions,
+		landmarks,
 		nations,
 	})
 }

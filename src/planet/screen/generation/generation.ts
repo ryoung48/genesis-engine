@@ -1,6 +1,6 @@
 import type { OrogenParams } from "@/model"
 import type { HistoryNote } from "@/model/history"
-import { YEAR_MS } from "@/model/history/state"
+import { MONTH_MS } from "@/model/history/state"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import type {
 	OrogenWorkerRequest,
@@ -242,7 +242,7 @@ export function startSimulation(
 ): void {
 	const worker = workerRef.current
 	if (!worker) return
-	const request: OrogenWorkerRequest = { type: "simulate", tickMs: YEAR_MS }
+	const request: OrogenWorkerRequest = { type: "simulate", tickMs: MONTH_MS }
 	worker.postMessage(request)
 }
 

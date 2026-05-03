@@ -1,7 +1,7 @@
 /**
  * Province population initialization.
- * Computes per-province habitability and distributes population proportionally.
- * O(provinceCount) time, typed arrays.
+ * Computes per-province habitability by summing regional scores and distributes population proportionally.
+ * O(regionCount + provinceCount) time, typed arrays.
  */
 
 import type { OrogenProvinces } from ".."
@@ -48,7 +48,7 @@ export function computePopulation(
 	planetRadiusKm?: number,
 	numRegions?: number,
 ): ProvincePopulation {
-	const { count, seeds, desolate, size, regionProvince } = provinces
+	const { count, desolate, regionProvince } = provinces
 	const rng = createRng(seed + 77777)
 
 	const habitability = new Float32Array(count)
@@ -61,14 +61,14 @@ export function computePopulation(
 		if (coastal[r] || riverVisible[r]) waterAccess[province] = 1
 	}
 
-	for (let i = 0; i < count; i++) {
-		if (desolate[i]) continue
+	for (let r = 0; r < regionProvince.length; r++) {
+		const province = regionProvince[r]
+		if (province < 0 || desolate[province]) continue
 
-		const r = seeds[i]
 		const cz = climateZones[r]
 		const veg = vegetation[r]
 		const topo = topography[r]
-		const coastalFactor = waterAccess[i] ? HAB_COASTAL : 1
+		const coastalFactor = waterAccess[province] ? HAB_COASTAL : 1
 		const lm = landmarks.type[landmarks.regionLandmark[r]]
 
 		const score =
@@ -77,10 +77,9 @@ export function computePopulation(
 			(HAB_TOPOGRAPHY[topo] ?? 0) *
 			coastalFactor *
 			(HAB_LANDMARK[lm] ?? 0) *
-			size[i] *
 			(0.8 + rng.random() * 0.4) // uniform(0.8, 1.2)
 
-		habitability[i] = score
+		habitability[province] += score
 		totalHab += score
 	}
 
@@ -92,9 +91,9 @@ export function computePopulation(
 
 	let habitabilityScore = 0
 	for (let i = 0; i < count; i++) {
-		habitabilityScore += size[i] * cellAreaKm2 * habitability[i]
+		habitabilityScore += cellAreaKm2 * habitability[i]
 	}
-	habitabilityScore /= 1.698e9
+	habitabilityScore /= 83302728.146
 
 	const totalPop = 215e6 * habitabilityScore
 

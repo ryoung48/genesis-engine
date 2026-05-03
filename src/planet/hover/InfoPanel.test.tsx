@@ -123,6 +123,7 @@ function renderPanel(
 			getHeritageName={(id) => `Heritage ${id}`}
 			getFaithName={(id) => `Faith ${id}`}
 			getReligionName={(id) => `Religion ${id}`}
+			getLandmarkName={(id) => `Landform ${id}`}
 			{...overrides}
 		/>,
 	)
@@ -133,6 +134,8 @@ describe("InfoPanel", () => {
 		const markup = renderPanel()
 
 		expect(markup).toContain(">Elev<")
+		expect(markup).toContain(">Peak<")
+		expect(markup).toContain("Landform 3 (100.0%)")
 		expect(markup).toContain(">Climate<")
 		expect(markup).toContain(">Veg<")
 		expect(markup).not.toContain(">Province<")
@@ -147,7 +150,7 @@ describe("InfoPanel", () => {
 		})
 
 		expect(markup).toContain(">Features<")
-		expect(markup).toContain(">Ice<")
+		expect(markup).not.toContain(">Ice<")
 		expect(markup).not.toContain(">Danger<")
 		expect(markup).toContain(">Ocean dist<")
 		expect(markup).toContain(">Coast dist<")
@@ -213,6 +216,20 @@ describe("InfoPanel", () => {
 		expect(currentMarkup).toContain("warm")
 	})
 
+	it("shows ice only in pasta climate mode", () => {
+		const pastaMarkup = renderPanel({
+			colorMode: "pastaClimate",
+			hoverIceSummary: "0.20 m",
+		})
+		const terrainMarkup = renderPanel({
+			colorMode: "terrain",
+			hoverIceSummary: "0.20 m",
+		})
+
+		expect(pastaMarkup).toContain(">Ice<")
+		expect(terrainMarkup).not.toContain(">Ice<")
+	})
+
 	it("renders geography edge cases without leaking political or demographic rows", () => {
 		const markup = renderPanel({
 			colorMode: "temperatureDelta",
@@ -226,7 +243,8 @@ describe("InfoPanel", () => {
 		})
 
 		expect(markup).toContain(">Temp Δ<")
-		expect(markup).toContain("unknown #4")
+		expect(markup).toContain(">Landmark<")
+		expect(markup).toContain("Landform 4")
 		expect(markup).not.toContain("(volcanic)")
 		expect(markup).toContain(">∞<")
 		expect(markup).not.toContain(">Province<")
@@ -257,7 +275,8 @@ describe("InfoPanel", () => {
 		})
 
 		expect(markup).toContain(">Elev<")
-		expect(markup).toContain("unknown #5")
+		expect(markup).toContain(">Landmark<")
+		expect(markup).toContain("Landform 5")
 		expect(markup).not.toContain("(quakes)")
 		expect(markup).not.toContain("(volcanic)")
 		expect(markup).toContain(">—<")
@@ -319,6 +338,7 @@ describe("InfoPanel", () => {
 		})
 
 		expect(markup).toContain("Invaders (rebels)")
+		expect(markup).not.toContain("repeating-linear-gradient")
 	})
 
 	it("omits political detail rows when no valid province is hovered", () => {

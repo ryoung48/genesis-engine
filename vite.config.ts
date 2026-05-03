@@ -8,8 +8,10 @@ import { configDefaults } from "vitest/config"
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
 	const isTest = mode === "test" || process.env.VITEST === "true"
+	const base = process.env.VITE_BASE_PATH ?? "/"
 
 	return {
+		base,
 		plugins: [
 			react(
 				isTest

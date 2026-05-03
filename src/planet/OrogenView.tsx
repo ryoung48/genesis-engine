@@ -7,7 +7,6 @@ import {
 import { useEbmPreview } from "@/hooks/useEbmPreview"
 import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
-import { createWorldNames } from "@/model/actors/language/names"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { REL } from "@/model/history/state"
@@ -17,6 +16,7 @@ import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
 } from "@/model/shared/units"
+import { createWorldNames } from "@/model/society/language/names"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
 	SerializedHistoryFrame,
@@ -579,6 +579,11 @@ export const OrogenView: React.FC = () => {
 	const getReligionName = useCallback(
 		(religionId: number) =>
 			worldNames?.religion(religionId) ?? `Religion #${religionId}`,
+		[worldNames],
+	)
+	const getLandmarkName = useCallback(
+		(landmarkId: number) =>
+			worldNames?.landmark(landmarkId) ?? `#${landmarkId}`,
 		[worldNames],
 	)
 	const coastHopLengthKm = useMemo(
@@ -1711,6 +1716,7 @@ export const OrogenView: React.FC = () => {
 								getHeritageName={getHeritageName}
 								getFaithName={getFaithName}
 								getReligionName={getReligionName}
+								getLandmarkName={getLandmarkName}
 							/>
 						) : null}
 

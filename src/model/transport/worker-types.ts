@@ -133,6 +133,8 @@ export interface SerializedOrogenWorld {
 		regionLandmark: Int32Array
 		type: Uint8Array
 		size: Int32Array
+		dominantCulture?: Int32Array
+		nameSeeds?: Int32Array
 		count: number
 	}
 	development?: Float32Array

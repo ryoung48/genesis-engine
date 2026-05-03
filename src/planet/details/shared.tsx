@@ -83,13 +83,18 @@ export function AccordionSection({
 	children: React.ReactNode
 }) {
 	return (
-		<Surface tone="panelMuted" borderTone="default" radius="lg">
+		<Surface
+			tone="panelMuted"
+			borderTone="default"
+			radius="lg"
+			className="overflow-hidden"
+		>
 			<Button
 				onClick={onToggle}
 				tone="panel"
 				shape="rounded"
 				size="sm"
-				className="flex w-full items-center justify-between gap-3 border-0 bg-transparent px-3 py-2 text-left text-slate-600 shadow-none hover:bg-slate-100"
+				className="flex w-full items-center justify-between gap-3 rounded-none border-0 bg-transparent px-3 py-2 text-left text-slate-600 shadow-none hover:bg-slate-100"
 			>
 				<span
 					className={`${uiTokens.type.label} font-semibold tracking-[0.14em] text-slate-600`}

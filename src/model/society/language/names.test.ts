@@ -208,6 +208,73 @@ describe("createNames", () => {
 		expect(dialectSpy).toHaveBeenCalledWith(expect.any(Object), 202)
 	})
 
+	it("lazily names landmarks from seeded dominant cultures", () => {
+		const simpleSpy = vi
+			.spyOn(LANGUAGE.word, "simple")
+			.mockImplementation(({ slot }) => ({
+				morphemes: [slot],
+				word: `slot ${slot}`,
+			}))
+
+		const names = createWorldNames({
+			provinces: { count: 1 } as never,
+			cultures: {
+				count: 1,
+				assignment: new Int32Array([0]),
+				languageSeeds: new Int32Array([202]),
+				nameSeeds: new Int32Array([302]),
+			} as never,
+			landmarks: {
+				count: 1,
+				dominantCulture: new Int32Array([0]),
+				nameSeeds: new Int32Array([909]),
+			} as never,
+		})
+
+		expect(names.landmark(0)).toBe("Slot Landmark:0:909")
+		expect(names.landmark(0)).toBe("Slot Landmark:0:909")
+		expect(simpleSpy).toHaveBeenCalledTimes(1)
+	})
+
+	it("uses deterministic landmark slots when a name seed is missing", () => {
+		const simpleSpy = vi
+			.spyOn(LANGUAGE.word, "simple")
+			.mockImplementation(({ slot }) => ({
+				morphemes: [slot],
+				word: `slot ${slot}`,
+			}))
+
+		const context: LanguageNameContext = {
+			provinces: [{ culture: 0 }],
+			cultures: [{ language: LANGUAGE.spawn("landmark-name"), traditions: [] }],
+			landmarks: [{ culture: 0 }],
+		}
+		const names = createNames(context)
+
+		expect(names.landmark(0)).toBe("Slot Landmark:0:0")
+		expect(context.landmarks?.[0]?.name).toBe("Slot Landmark:0:0")
+		expect(simpleSpy).toHaveBeenCalledWith(
+			expect.objectContaining({ slot: "landmark:0:0" }),
+		)
+	})
+
+	it("falls back for landmarks without a resolvable culture language", () => {
+		const context: LanguageNameContext = {
+			provinces: [{ culture: 0 }],
+			cultures: [{ language: null, traditions: [] }],
+			landmarks: [
+				{ culture: 99, nameSeed: 12 },
+				{ culture: -1, nameSeed: 13 },
+			],
+		}
+		const names = createNames(context)
+
+		expect(names.landmark(0)).toBe("#0")
+		expect(names.landmark(1)).toBe("#1")
+		expect(context.landmarks?.[0]?.name).toBeUndefined()
+		expect(context.landmarks?.[1]?.name).toBeUndefined()
+	})
+
 	it("persists seeded faith and religion names while falling back for unresolvable groups", () => {
 		const simpleSpy = vi
 			.spyOn(LANGUAGE.word, "simple")
@@ -326,6 +393,7 @@ describe("createNames", () => {
 		expect(names.heritage(0)).toBe("Heritage #0")
 		expect(names.faith(0)).toBe("Faith #0")
 		expect(names.religion(0)).toBe("Religion #0")
+		expect(names.landmark(0)).toBe("#0")
 		expect(names.river(0)).toBe("River #0")
 		expect(names.mountain(0)).toBe("Mount #0")
 		expect(names.leader(0, 0)).toBe("Leader #0")
