@@ -64,6 +64,7 @@ interface LeaderRuntime {
 	birth: Float64Array
 	end: Float64Array
 	targetUrban: Float32Array
+	nameSeed: Int32Array
 }
 
 export interface HistoryNote {
@@ -83,7 +84,9 @@ export interface HistoryState {
 	_development: Timeline<number>[]
 	_consumption: Timeline<number>[]
 	_leader_dyn: Timeline<number>[]
+	_leader_name_seed: Timeline<number>[]
 	_leader_claim: Timeline<number>[]
+	_leader_birth_year: Timeline<number>[]
 	_occupation: Timeline<number>[]
 	_relations: Map<number, Timeline<Relation>>
 
@@ -107,7 +110,9 @@ export interface HistoryState {
 	developmentCurrent: Float32Array
 	consumptionCurrent: Float32Array
 	leaderDynCurrent: Int32Array
+	leaderNameSeedCurrent: Int32Array
 	leaderClaimCurrent: Uint8Array
+	leaderBirthYearCurrent: Float32Array
 	occupationCurrent: Int32Array
 
 	// Live per-province war-index lists (mirror of provinceWars derivation).
@@ -750,7 +755,9 @@ export function createHistoryState(
 		_development: makeTimelineArray<number>(P),
 		_consumption: makeTimelineArray<number>(P),
 		_leader_dyn: makeTimelineArray<number>(P),
+		_leader_name_seed: makeTimelineArray<number>(P),
 		_leader_claim: makeTimelineArray<number>(P),
+		_leader_birth_year: makeTimelineArray<number>(P),
 		_occupation: makeTimelineArray<number>(P),
 		_relations: new Map(),
 		parentCurrent: new Int32Array(P).fill(-1),
@@ -766,7 +773,9 @@ export function createHistoryState(
 		developmentCurrent: new Float32Array(P),
 		consumptionCurrent: new Float32Array(P),
 		leaderDynCurrent: new Int32Array(P).fill(-1),
+		leaderNameSeedCurrent: new Int32Array(P).fill(-1),
 		leaderClaimCurrent: new Uint8Array(P),
+		leaderBirthYearCurrent: new Float32Array(P).fill(-1),
 		occupationCurrent: new Int32Array(P).fill(-1),
 		provinceWars: Array.from({ length: P }, () => [] as number[]),
 		provinceSeeds: provinces.seeds,
@@ -790,6 +799,7 @@ export function createHistoryState(
 			birth: new Float64Array(P),
 			end: new Float64Array(P),
 			targetUrban: new Float32Array(P),
+			nameSeed: new Int32Array(P).fill(-1),
 		},
 	}
 
@@ -813,7 +823,9 @@ export function createHistoryState(
 		PROV.development.set(state, p, startTime, 0)
 		PROV.consumption.set(state, p, startTime, 0)
 		PROV.leader.dynasty.set(state, p, startTime, -1)
+		PROV.leader.nameSeed.set(state, p, startTime, -1)
 		PROV.leader.claim.set(state, p, startTime, 0)
+		PROV.leader.birthYear.set(state, p, startTime, -1)
 		PROV.occupation.set(state, p, startTime, -1)
 		if (nations.parent[p] < 0) ensureNationColor(state, p)
 	}
@@ -847,7 +859,14 @@ export function spawnLeader(
 	state.leaderRuntime.idx[p]++
 	state.leaderRuntime.birth[p] = state.time - deltaYear(ageAtAccession)
 	state.leaderRuntime.end[p] = death
+	PROV.leader.nameSeed.set(state, p, state.time, rng.randint(1, 0x7fffffff))
 	PROV.leader.claim.set(state, p, state.time, 3)
+	PROV.leader.birthYear.set(
+		state,
+		p,
+		state.time,
+		state.leaderRuntime.birth[p] / YEAR_MS,
+	)
 }
 
 function initDynasties(state: HistoryState, rng: HistoryRng): void {
@@ -858,20 +877,40 @@ function initDynasties(state: HistoryState, rng: HistoryRng): void {
 	)
 	for (const p of shuffled) {
 		if (PROV.leader.dynasty.get(state, p, state.time) >= 0) continue
-		const sameCulture: number[] = []
-		const other: number[] = []
+		const sameCulture: Array<{ dynasty: number; source: number }> = []
+		const other: Array<{ dynasty: number; source: number }> = []
+		const currentSovereign = (province: number): number => {
+			let current = province
+			while (state.parentCurrent[current] >= 0) {
+				current = state.parentCurrent[current]
+			}
+			return current
+		}
 		for (const nb of getProvinceNeighbors(state, p)) {
 			const dynasty = PROV.leader.dynasty.get(state, nb, state.time)
 			if (state.desolate[nb] || dynasty < 0) continue
-			if (state.culture[p] === state.culture[nb]) sameCulture.push(dynasty)
-			else other.push(dynasty)
+			const donor = { dynasty, source: currentSovereign(nb) }
+			if (state.culture[p] === state.culture[nb]) sameCulture.push(donor)
+			else other.push(donor)
 		}
 		let dynasty = -1
+		let source = -1
 		if (sameCulture.length > 0 && rng.random() < 0.4)
-			dynasty = rng.choice(sameCulture)
+			({ dynasty, source } = rng.choice(sameCulture))
 		else if (other.length > 0 && rng.random() < 0.05)
-			dynasty = rng.choice(other)
+			({ dynasty, source } = rng.choice(other))
 		if (dynasty < 0) dynasty = state.nextDynasty++
 		PROV.leader.dynasty.set(state, p, state.time, dynasty)
+		if (source >= 0 && source !== p && dynasty >= 0 && isSovereign(state, p)) {
+			state.events.push({
+				tag: "dynasty spread",
+				time: state.time,
+				data: {
+					nation: p,
+					source,
+					dynasty,
+				},
+			})
+		}
 	}
 }

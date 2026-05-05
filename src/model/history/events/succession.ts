@@ -36,6 +36,27 @@ export function initSuccession(state: HistoryState, _rng: HistoryRng): void {
 	}
 }
 
+function recordDynastySpread(params: {
+	state: HistoryState
+	nation: number
+	source: number
+	dynasty: number
+	previousDynasty?: number
+}): void {
+	const { state, nation, source, dynasty, previousDynasty } = params
+	if (!isSovereign(state, nation)) return
+	state.events.push({
+		tag: "dynasty spread",
+		time: state.time,
+		data: {
+			nation,
+			source,
+			dynasty,
+			previousDynasty,
+		},
+	})
+}
+
 function claim(state: HistoryState, p: number, rng: HistoryRng): void {
 	const nation = getSovereign(state, p) ?? p
 	const dynasty = PROV.leader.dynasty.get(state, p)
@@ -104,14 +125,20 @@ function claim(state: HistoryState, p: number, rng: HistoryRng): void {
 		}
 
 		// Spread dynasty with small chance of random new noble
-		PROV.leader.dynasty.set(
-			state,
-			p,
-			state.time,
+		const adoptedDynasty =
 			claimRoll === 0 && !sov && rng.random() > 0.95
 				? state.nextDynasty++
-				: seniorDynasty,
-		)
+				: seniorDynasty
+		PROV.leader.dynasty.set(state, p, state.time, adoptedDynasty)
+		if (adoptedDynasty === seniorDynasty && adoptedDynasty !== dynasty) {
+			recordDynastySpread({
+				state,
+				nation: p,
+				source: senior,
+				dynasty: adoptedDynasty,
+				previousDynasty: dynasty,
+			})
+		}
 	}
 }
 

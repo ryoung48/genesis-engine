@@ -5,6 +5,7 @@ import {
 	buildDisplayNationModel,
 	buildDisplayWorld,
 	buildHistoryChildrenIndex,
+	buildSovereignRulerFields,
 } from "./display-model"
 
 describe("display-model", () => {
@@ -22,6 +23,22 @@ describe("display-model", () => {
 		expect(result).not.toBeNull()
 		expect(Array.from(result!.childOffset)).toEqual([0, 2, 3, 3, 3])
 		expect(Array.from(result!.childList)).toEqual([1, 2, 3])
+	})
+
+	it("reuses a precomputed child index from the history view", () => {
+		const childOffset = new Int32Array([0, 2, 3, 3, 3])
+		const childList = new Int32Array([1, 2, 3])
+		const historyView = {
+			parent: new Int32Array([-1, 0, 0, 1]),
+			childOffset,
+			childList,
+		} as HistoryView
+
+		const result = buildHistoryChildrenIndex(historyView)
+
+		expect(result).not.toBeNull()
+		expect(result!.childOffset).toBe(childOffset)
+		expect(result!.childList).toBe(childList)
 	})
 
 	it("summarizes display nation assignment and colors directly from world data", () => {
@@ -69,14 +86,18 @@ describe("display-model", () => {
 				adjOffset: new Int32Array([0, 1, 3, 4]),
 				adjList: new Int32Array([1, 0, 2, 1]),
 			},
+			leaderDynasty: new Int32Array([4, 5, 6]),
+			leaderNameSeed: new Int32Array([40, 50, 60]),
+			leaderClaim: new Int32Array([3, 2, 1]),
+			leaderBirthYear: new Float32Array([10, 11, 12]),
 			nations: {
 				assignment: new Int32Array([9, 8, 7]),
 				seeds: new Int32Array([0, 2]),
 				sovereign: new Int32Array([0, 0, 2]),
 				colors: new Float32Array([1, 0, 0, 0, 1, 0]),
-				parent: new Int32Array([-1, -1, -1]),
-				childOffset: new Int32Array([0, 0, 0, 0]),
-				childList: new Int32Array(0),
+				parent: new Int32Array([-1, 0, -1]),
+				childOffset: new Int32Array([0, 1, 1, 1]),
+				childList: new Int32Array([1]),
 				size: new Int32Array([1, 1, 1]),
 				adjOffset: new Int32Array([0, 0, 0, 0]),
 				adjList: new Int32Array(0),
@@ -94,13 +115,54 @@ describe("display-model", () => {
 		expect(Array.from(result!.nations!.colors)).toEqual([
 			1, 0, 0, 1, 0, 0, 0, 1, 0,
 		])
+		expect(Array.from(result!.leaderDynasty ?? [])).toEqual([4, -1, 6])
+		expect(Array.from(result!.leaderNameSeed ?? [])).toEqual([40, -1, 60])
+		expect(Array.from(result!.leaderClaim ?? [])).toEqual([3, 0, 1])
+		expect(Array.from(result!.leaderBirthYear ?? [])).toEqual([10, -1, 12])
 		expect(Array.from(result!.nations!.adjOffset)).toEqual([0, 1, 1, 2])
 		expect(Array.from(result!.nations!.adjList)).toEqual([2, 0])
+	})
+
+	it("builds sovereign-only ruler fields from the current world", () => {
+		const result = buildSovereignRulerFields({
+			world: {
+				provinces: { count: 3 },
+				leaderDynasty: new Int32Array([7, 8, 9]),
+				leaderNameSeed: new Int32Array([70, 80, 90]),
+				leaderClaim: new Int32Array([3, 2, 1]),
+				leaderBirthYear: new Float32Array([20, 21, 22]),
+				nations: {
+					assignment: new Int32Array([0, 0, 2]),
+					sovereign: new Int32Array([0, 0, 2]),
+					parent: new Int32Array([-1, 0, -1]),
+				},
+			} as unknown as SerializedOrogenWorld,
+		})
+
+		expect(Array.from(result.leaderDynasty)).toEqual([7, -1, 9])
+		expect(Array.from(result.leaderNameSeed)).toEqual([70, -1, 90])
+		expect(Array.from(result.leaderClaim)).toEqual([3, 0, 1])
+		expect(Array.from(result.leaderBirthYear)).toEqual([20, -1, 22])
+	})
+
+	it("returns default ruler fields when no world is available", () => {
+		const result = buildSovereignRulerFields({
+			world: null,
+			fallbackLength: 2,
+		})
+
+		expect(Array.from(result.leaderDynasty)).toEqual([-1, -1])
+		expect(Array.from(result.leaderNameSeed)).toEqual([-1, -1])
+		expect(Array.from(result.leaderClaim)).toEqual([0, 0])
+		expect(Array.from(result.leaderBirthYear)).toEqual([-1, -1])
 	})
 
 	it("projects a selected history view over the base world", () => {
 		const world = {
 			provinces: { count: 2 },
+			leaderNameSeed: new Int32Array([10, 20]),
+			leaderClaim: new Int32Array([3, 2]),
+			leaderBirthYear: new Float32Array([0, 1]),
 			nations: {
 				assignment: new Int32Array([0, 1]),
 				seeds: new Int32Array([0, 1]),
@@ -124,6 +186,10 @@ describe("display-model", () => {
 			assignment: new Int32Array([1, 1]),
 			parent: new Int32Array([-1, 0]),
 			sovereign: new Int32Array([1, 1]),
+			leaderDynasty: new Int32Array([4, 4]),
+			leaderNameSeed: new Int32Array([30, 40]),
+			leaderClaim: new Int32Array([1, 2]),
+			leaderBirthYear: new Float32Array([5, 6]),
 			colors: new Float32Array([0.2, 0.3, 0.4, 0.5, 0.6, 0.7]),
 			adjOffset: new Int32Array([0, 1, 1]),
 			adjList: new Int32Array([1]),
@@ -143,6 +209,9 @@ describe("display-model", () => {
 
 		expect(result?.nations?.assignment).toBe(historyView.assignment)
 		expect(result?.nations?.childList).toEqual(new Int32Array([1]))
+		expect(result?.leaderNameSeed).toBe(historyView.leaderNameSeed)
+		expect(result?.leaderClaim).toBe(historyView.leaderClaim)
+		expect(result?.leaderBirthYear).toBe(historyView.leaderBirthYear)
 		expect(result?.population?.population).toBe(historyView.populationTotal)
 		expect(result?.urbanPopulation).toBe(historyView.populationUrban)
 		expect(result?.development).toBe(historyView.development)

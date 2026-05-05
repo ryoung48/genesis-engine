@@ -12,6 +12,8 @@ For model-generation changes, also run `pnpm gen:world` before handing the work 
 
 If `pnpm lint` changes files, rerun `pnpm lint` and then `pnpm typecheck` and `pnpm test` before handing the work back. If any verification command fails, fix the reported issues and rerun the verification steps in that order.
 
+**All changes must have an accompanying unit test.** Remember that these tests are to help you prevent regressions and verify expected behaviors, therefore it is in your best interest to make them meaningful. Another word of advice, sometimes you can avoid unit tests by reusing already made functions. Therefore it is in your best interest to centralize common utilities and avoid duplicated behavior.
+
 Coverage thresholds are a ratchet. Whenever new files or new testable lines are added, update the enforced thresholds to reflect the new covered baseline, and never lower any threshold under any circumstances.
 
 Unless the user explicitly asks for backwards compatibility, never preserve or optimize for backwards compatibility.
@@ -23,4 +25,4 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 ## References
 
 - For any UI or UX work, follow `src/components/UI.md`.
-- For testing requirements and test-writing guidance, follow `testing.md`. **All changes must have an accompanying unit test.**
+- For testing requirements and test-writing guidance, follow `testing.md`. 

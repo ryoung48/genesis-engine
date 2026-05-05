@@ -67,6 +67,15 @@ describe("NationDetails", () => {
 				nation={{
 					id: 3,
 					name: "River Crown",
+					ruler: {
+						name: "Queen Mira",
+						age: 42,
+						genderSymbol: "♀",
+						claimStrength: "Strong claim",
+						isRegency: false,
+						dynasty: "House Rowan",
+						dynastyColor: "#225588",
+					},
 					provinceCount: 5,
 					totalPopulation: 250_000,
 					color: "#fedcba",
@@ -91,6 +100,44 @@ describe("NationDetails", () => {
 
 		expect(markup).toContain("vs Vale · Attacker · Rebel")
 		expect(markup).toContain(">Active Wars<")
+		expect(markup).toContain(">Dynasty<")
+		expect(markup).toContain("House Rowan")
+		expect(markup).toContain(">Ruler<")
+		expect(markup).toContain("Queen Mira · ♀ · 42")
+		expect(markup).not.toContain("Strong claim")
+	})
+
+	it("omits claim and regency ruler tags", () => {
+		const markup = renderToStaticMarkup(
+			<NationDetails
+				nation={{
+					id: 4,
+					name: "Regal March",
+					ruler: {
+						name: "Prince Cael",
+						age: 12,
+						genderSymbol: "♂",
+						claimStrength: "Average claim",
+						isRegency: true,
+						dynasty: "House Ember",
+						dynastyColor: "#884422",
+					},
+					provinceCount: 2,
+					totalPopulation: 80_000,
+					color: "#fedcba",
+					neighbors: [],
+					activeWars: [],
+					...emptyDistributions,
+				}}
+				section="political"
+				onSectionChange={vi.fn()}
+				onNationClick={vi.fn()}
+			/>,
+		)
+
+		expect(markup).toContain("Prince Cael · ♂ · 12")
+		expect(markup).not.toContain("Average claim")
+		expect(markup).not.toContain("Regency")
 	})
 
 	it("renders history when historical inputs are present", () => {
@@ -124,6 +171,54 @@ describe("NationDetails", () => {
 		expect(markup).toContain(">History<")
 		expect(markup).toContain('role="img"')
 		expect(markup).toContain("Year 1")
+	})
+
+	it("threads province naming into history events", () => {
+		const markup = renderToStaticMarkup(
+			<NationDetails
+				nation={{
+					id: 3,
+					name: "River Crown",
+					provinceCount: 5,
+					totalPopulation: 250_000,
+					color: "#fedcba",
+					neighbors: [],
+					activeWars: [],
+					...emptyDistributions,
+				}}
+				section="history"
+				onSectionChange={vi.fn()}
+				nationHistory={[
+					{ timeMs: 0, size: 2, wealth: 4, optimalWealth: 5 },
+					{ timeMs: YEAR_MS, size: 3, wealth: 6, optimalWealth: 7 },
+				]}
+				windowedEvents={[
+					{
+						tag: "battle",
+						time: YEAR_MS,
+						data: {
+							attacker: 3,
+							defender: 7,
+							winner: 3,
+							war: 1,
+							province: 4,
+						},
+					},
+				]}
+				allPastEvents={[]}
+				selectedTimeMs={YEAR_MS}
+				currentTimeMs={YEAR_MS}
+				onTimeSelect={vi.fn()}
+				onNationClick={vi.fn()}
+				onProvinceClick={vi.fn()}
+				getNationName={(id) => `Nation ${id}`}
+				getNationColor={() => "#112233"}
+				getProvinceName={(id) => `Province ${id}`}
+				getProvinceColor={() => "#0ea5e9"}
+			/>,
+		)
+
+		expect(markup).toContain("Province 4")
 	})
 
 	it("defaults history event collections and non-rebel wars cleanly", () => {
@@ -168,6 +263,19 @@ describe("NationDetails", () => {
 
 		expect(warMarkup).toContain("vs Northmarch · Defender")
 		expect(warMarkup).not.toContain("Rebel")
+	})
+
+	it("renders neutral fallbacks when no nation is selected", () => {
+		const markup = renderToStaticMarkup(
+			<NationDetails
+				nation={null}
+				section="political"
+				onSectionChange={vi.fn()}
+			/>,
+		)
+
+		expect(markup).toContain(">Nation<")
+		expect(markup).toContain("N/A")
 	})
 
 	it("renders demographic distributions and omits history when inputs are incomplete", () => {

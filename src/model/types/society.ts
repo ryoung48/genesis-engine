@@ -28,6 +28,8 @@ export interface OrogenPartition {
 	languageSeeds?: Int32Array
 	/** Deterministic per-partition display/name seed */
 	nameSeeds?: Int32Array
+	/** Per-partition ruler gender system (0=patriarchal, 1=equal, 2=matriarchal) */
+	genderSystems?: Uint8Array
 	/** Number of partitions */
 	count: number
 	/** Partition adjacency — CSR offset, length count+1 */

@@ -1,4 +1,5 @@
 import type { OrogenPartition, OrogenProvinces } from ".."
+import { assignCultureGenderSystems } from "./gender-system"
 import { computeGraphPartition } from "./shared"
 
 export function computeCultures(
@@ -16,7 +17,7 @@ export function computeCultures(
 			activeCount++
 		}
 	}
-	return computeGraphPartition({
+	const partition = computeGraphPartition({
 		nodeCount: provinces.count,
 		adjOffset: provinces.adjOffset,
 		adjList: provinces.adjList,
@@ -24,4 +25,8 @@ export function computeCultures(
 		targetCount: Math.max(1, Math.floor(activeCount / 8)),
 		seed: seed + 4101,
 	})
+	return {
+		...partition,
+		genderSystems: assignCultureGenderSystems(partition.count, seed + 4102),
+	}
 }

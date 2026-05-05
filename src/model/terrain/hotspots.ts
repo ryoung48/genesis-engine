@@ -47,7 +47,7 @@ function mapActiveChainLength(volcanism: number): number {
 function mapActiveDomeStrength(volcanism: number): number {
 	const v = getLegacyVolcanismEquivalent(volcanism)
 	const baseStrength =
-		v <= 0.5 ? lerp(0, 0.6, v / 0.5) : lerp(0.6, 0.9, (v - 0.5) / 0.5)
+		v <= 0.5 ? lerp(0, 0.65, v / 0.5) : lerp(0.65, 1.0, (v - 0.5) / 0.5)
 	return baseStrength
 }
 
@@ -355,22 +355,22 @@ export function applyHotspots(
 	const CHAIN_LENGTH = mapActiveChainLength(volcanism)
 	const CHAIN_DECAY = 0.75
 	const CHAIN_SPACING = 0.06 * lerp(1, 1.35, overdrive)
-	const DOME_SIGMA = 0.006
+	const DOME_SIGMA = 0.0064
 	const DOME_STRENGTH = mapActiveDomeStrength(volcanism)
-	const SWELL_SIGMA_MULT = 2
-	const SWELL_STR_MULT = 0.1
-	const CONT_HOTSPOT_SIGMA_MULT = 2.5
+	const SWELL_SIGMA_MULT = 2.25
+	const SWELL_STR_MULT = 0.14
+	const CONT_HOTSPOT_SIGMA_MULT = 2.7
 	const CONT_HOTSPOT_STRENGTH_MULT = 0.4
 	const CONT_HOTSPOT_CALDERA_SIGMA_FRAC = 0.35
 	const CONT_HOTSPOT_CALDERA_DEPTH_FRAC = 0.3
-	const CONT_HOTSPOT_SWELL_MULT = 1.5
+	const CONT_HOTSPOT_SWELL_MULT = 1.75
 	const DOME_OCEAN_BOOST = 1.8
 	const DOME_DRIFT_STRETCH = 1.05
 	const DOME_CALDERA_STRENGTH_MIN = 0.15
 	const DOME_SATELLITE_COUNT = 2
 	const DOME_SATELLITE_OFFSET = 0.8
-	const DOME_SATELLITE_SIGMA = 0.5
-	const DOME_SATELLITE_STRENGTH = 0.35
+	const DOME_SATELLITE_SIGMA = 0.6
+	const DOME_SATELLITE_STRENGTH = 0.4
 	const HOTSPOT_UPWELLING_CANDIDATES = 8
 	const HOTSPOT_UPWELLING_JITTER = 0.3
 	const DOME_AGE_BROADENING = 0.03

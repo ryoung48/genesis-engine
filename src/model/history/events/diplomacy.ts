@@ -12,6 +12,7 @@ import {
 	getRulerRelation,
 	type HistoryState,
 	isSovereign,
+	provinceDistanceSq,
 	REL,
 	type Relation,
 	setRelation,
@@ -170,7 +171,71 @@ function nextEvent(
 	)
 }
 
+function seedSubjectRelations(state: HistoryState): void {
+	for (let nation = 0; nation < state.P; nation++) {
+		if (state.desolate[nation]) continue
+		const overlord = state.parentCurrent[nation]
+		if (overlord < 0) continue
+		setRelation(state, nation, overlord, REL.VASSAL)
+	}
+}
+
+function classifyInitialNeighborRelation(
+	state: HistoryState,
+	a: number,
+	b: number,
+): Relation {
+	const threat = warThreat(state, a, b)
+	const aWealth = wealthOptimal(state, a)
+	const bWealth = wealthOptimal(state, b)
+	const wealthRatio =
+		Math.min(aWealth, bWealth) / Math.max(1, Math.max(aWealth, bWealth))
+	const distanceSq = provinceDistanceSq(state, a, b)
+	const sameCulture = state.culture[a] === state.culture[b]
+	const bothWaterAccess =
+		state.waterAccess[a] === 1 && state.waterAccess[b] === 1
+
+	if (wealthRatio >= 0.78 && threat >= 0.68) return REL.RIVAL
+	if (
+		threat >= 0.54 ||
+		(!sameCulture && distanceSq <= 0.45 && wealthRatio >= 0.65)
+	) {
+		return REL.SUSPICIOUS
+	}
+	if (sameCulture && wealthRatio >= 0.8 && threat <= 0.3 && distanceSq <= 2) {
+		return REL.ALLY
+	}
+	if (
+		threat <= 0.42 &&
+		(sameCulture || bothWaterAccess || distanceSq <= 1.1 || wealthRatio <= 0.55)
+	) {
+		return REL.FRIENDLY
+	}
+	return REL.NEUTRAL
+}
+
+function seedNeighborRelations(state: HistoryState): void {
+	for (let nation = 0; nation < state.P; nation++) {
+		if (state.desolate[nation] || !isSovereign(state, nation)) continue
+		for (const neighbor of getNationNeighbors(state, nation)) {
+			if (
+				neighbor <= nation ||
+				state.desolate[neighbor] ||
+				!isSovereign(state, neighbor)
+			) {
+				continue
+			}
+			const relation = classifyInitialNeighborRelation(state, nation, neighbor)
+			if (relation !== REL.NEUTRAL) {
+				setRelation(state, nation, neighbor, relation)
+			}
+		}
+	}
+}
+
 export function initDiplomacy(state: HistoryState, rng: HistoryRng): void {
+	seedSubjectRelations(state)
+	seedNeighborRelations(state)
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		nextEvent(state, p, rng, rng.uniform(0, 8))

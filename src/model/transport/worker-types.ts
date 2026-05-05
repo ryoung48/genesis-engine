@@ -125,6 +125,10 @@ export interface SerializedOrogenWorld {
 	}
 	provinces?: SerializedProvinces
 	nations?: SerializedNationHierarchy
+	leaderDynasty?: Int32Array
+	leaderNameSeed?: Int32Array
+	leaderClaim?: Int32Array
+	leaderBirthYear?: Float32Array
 	cultures?: SerializedPartition
 	heritages?: SerializedPartition
 	faiths?: SerializedPartition
@@ -179,7 +183,9 @@ export interface SerializedTimelines {
 	development: SerializedProvinceTimelineFloat
 	consumption: SerializedProvinceTimelineFloat
 	leaderDynasty: SerializedProvinceTimelineInt
+	leaderNameSeed?: SerializedProvinceTimelineInt
 	leaderClaim: SerializedProvinceTimelineInt
+	leaderBirthYear?: SerializedProvinceTimelineFloat
 	occupation: SerializedProvinceTimelineInt
 	relations: SerializedRelationTimelines
 	nationColorKeys: Int32Array
@@ -199,6 +205,10 @@ export interface SerializedHistoryFrame {
 	assignment: Int32Array
 	parent: Int32Array
 	sovereign: Int32Array
+	leaderDynasty: Int32Array
+	leaderNameSeed: Int32Array
+	leaderClaim: Int32Array
+	leaderBirthYear: Float32Array
 	colors: Float32Array
 	adjOffset: Int32Array
 	adjList: Int32Array
@@ -208,6 +218,9 @@ export interface SerializedHistoryFrame {
 	consumption: Float32Array
 	nationWealth: Float32Array
 	nationOptimalWealth: Float32Array
+	relationA: Int32Array
+	relationB: Int32Array
+	relationValues: Uint8Array
 	activeWars: Array<{
 		idx: number
 		attacker: number
@@ -270,6 +283,7 @@ export type OrogenWorkerResponse =
 	| {
 			type: "done"
 			world: SerializedOrogenWorld
+			frame?: SerializedHistoryFrame
 	  }
 	| {
 			type: "error"

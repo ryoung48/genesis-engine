@@ -4,6 +4,7 @@ import {
 	getEarthYearFactor,
 	getEffectiveObliquityDeg,
 } from "@/model/shared/units"
+import { formatCompactNumber } from "../../hover/info-panel-format"
 import { DEFAULT_WORLD_PARAMS } from "./defaults"
 
 const SR = SLIDER_RANGES
@@ -53,7 +54,7 @@ export function buildPlanetSliders(state: {
 			label: "Radius",
 			help: "Sets the planet's physical size for climate and distance calculations.",
 			value: state.planetRadiusKm,
-			display: `${(state.planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x Earth`,
+			display: `${(state.planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x`,
 			...SR.planetRadiusKm,
 			set: state.setPlanetRadiusKm,
 		},
@@ -130,7 +131,7 @@ export function buildPlanetSliders(state: {
 			label: "Year Length",
 			help: "Sets the orbital year length in local days. Seasonal pacing changes without increasing sim resolution.",
 			value: state.daysPerYear,
-			display: `${getEarthYearFactor(state.daysPerYear).toFixed(2)}x Earth`,
+			display: `${getEarthYearFactor(state.daysPerYear).toFixed(2)}x`,
 			...SR.daysPerYear,
 			set: state.setDaysPerYear,
 		},
@@ -140,7 +141,7 @@ export function buildPlanetSliders(state: {
 						label: "Day Length",
 						help: "Sets the rotation period in local hours. Shorter days mix heat more strongly; longer days reduce that effect.",
 						value: state.hoursPerDay,
-						display: `${(state.hoursPerDay / 24).toFixed(2)}x Earth`,
+						display: `${(state.hoursPerDay / 24).toFixed(2)}x`,
 						...SR.hoursPerDay,
 						set: state.setHoursPerDay,
 					},
@@ -208,7 +209,7 @@ export function buildTerrainSliders(state: {
 			label: "Detail",
 			help: "Higher detail sharpens coastlines and terrain, but takes longer to build.",
 			value: state.numPoints,
-			display: state.numPoints.toLocaleString(),
+			display: formatCompactNumber(state.numPoints),
 			...SR.numPoints,
 			set: state.setNumPoints,
 		},

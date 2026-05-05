@@ -155,6 +155,12 @@ interface NationDetailsProps {
 	currentTimeMs?: number
 	onTimeSelect?: (timeMs: number) => void
 	onNationClick?: (nationId: number) => void
+	onProvinceClick?: (provinceId: number) => void
+	getNationName?: (nationId: number) => string
+	getNationColor?: (nationId: number) => string | null
+	getProvinceName?: (provinceId: number) => string
+	getProvinceColor?: (provinceId: number) => string | null
+	getDynastyName?: (dynastyId: number) => string
 }
 
 export const NationDetails: React.FC<NationDetailsProps> = ({
@@ -168,6 +174,12 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 	currentTimeMs,
 	onTimeSelect,
 	onNationClick,
+	onProvinceClick,
+	getNationName,
+	getNationColor,
+	getProvinceName,
+	getProvinceColor,
+	getDynastyName,
 }) => {
 	const [neighborSort, setNeighborSort] = useState<NeighborSortState>(
 		DEFAULT_NEIGHBOR_SORT,
@@ -216,6 +228,41 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 						"N/A"
 					)
 				}
+			/>
+			<LabeledValueRow
+				label="Dynasty"
+				value={
+					nation?.ruler?.dynasty ? (
+						<span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-950">
+							<Swatch color={nation.ruler.dynastyColor} />
+							<span>{nation.ruler.dynasty}</span>
+						</span>
+					) : (
+						"N/A"
+					)
+				}
+			/>
+			<LabeledValueRow
+				label="Ruler"
+				align="start"
+				value={
+					nation?.ruler ? (
+						<span className="inline-flex flex-col items-end gap-1 font-mono text-[11px] text-slate-950">
+							<span>
+								{[
+									nation.ruler.name,
+									nation.ruler.genderSymbol,
+									nation.ruler.age !== null ? `${nation.ruler.age}` : null,
+								]
+									.filter(Boolean)
+									.join(" · ")}
+							</span>
+						</span>
+					) : (
+						"N/A"
+					)
+				}
+				valueClassName="text-right"
 			/>
 			<AccordionSection
 				title="Political"
@@ -306,6 +353,12 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 						currentTimeMs={currentTimeMs}
 						onTimeSelect={onTimeSelect}
 						onNationClick={onNationClick}
+						onProvinceClick={onProvinceClick}
+						getNationName={getNationName}
+						getNationColor={getNationColor}
+						getProvinceName={getProvinceName}
+						getProvinceColor={getProvinceColor}
+						getDynastyName={getDynastyName}
 					/>
 				</AccordionSection>
 			) : null}

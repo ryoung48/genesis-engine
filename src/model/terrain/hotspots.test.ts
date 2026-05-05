@@ -211,7 +211,7 @@ describe("applyHotspots", () => {
 		expect(continentalFootprint).toBeGreaterThan(oceanicFootprint)
 	})
 
-	it("keeps extreme active hotspots broader instead of much taller", () => {
+	it("makes extreme active hotspots broader and moderately taller", () => {
 		const mesh = buildMesh()
 		const plateAssignment = new Int32Array(mesh.numRegions)
 		const mantle = new Float32Array(mesh.numRegions).fill(1)
@@ -242,8 +242,11 @@ describe("applyHotspots", () => {
 		expect(hotspotFootprint(overdriven)).toBeGreaterThan(
 			hotspotFootprint(baseline) * 1.5,
 		)
+		expect(maxHotspotUplift(overdriven)).toBeGreaterThan(
+			maxHotspotUplift(baseline) * 1.05,
+		)
 		expect(maxHotspotUplift(overdriven)).toBeLessThan(
-			maxHotspotUplift(baseline) * 1.5,
+			maxHotspotUplift(baseline) * 1.8,
 		)
 	})
 

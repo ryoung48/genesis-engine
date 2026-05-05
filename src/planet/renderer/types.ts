@@ -53,4 +53,5 @@ export interface OrogenScene {
 	setAtmospherePressure(pressureBar: number): void
 	setFullAmbient(enabled: boolean): void
 	focusOnNation(nationId: number, opts?: { durationMs?: number }): void
+	focusOnProvince(provinceId: number, opts?: { durationMs?: number }): void
 }

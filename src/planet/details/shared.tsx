@@ -13,6 +13,15 @@ export type { DistributionBucket }
 export interface NationDetailsData {
 	id: number
 	name: string
+	ruler?: {
+		name: string
+		age: number | null
+		genderSymbol: string | null
+		claimStrength: string | null
+		isRegency: boolean
+		dynasty: string | null
+		dynastyColor: string | null
+	} | null
 	provinceCount: number
 	totalPopulation: number
 	color: string | null

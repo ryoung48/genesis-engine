@@ -50,6 +50,7 @@ import {
 	buildDemographicDisplayData,
 	buildHoverChartData,
 	buildPastaMonthlyData,
+	buildPoliticalDisplayData,
 	buildProvinceDisplayData,
 	buildTerrainFeatureSwatches,
 	buildTopographySwatchColor,
@@ -181,16 +182,21 @@ interface InfoPanelProps {
 	hoverOceanCurrents: HoverOceanCurrents | null
 	colorMode: ColorMode
 	populationMode: PopulationMapMode
+	selectedTimeMs: number | null
 	displayMonth: number
 	unitSystem: UnitSystem
 	world: SerializedOrogenWorld | null
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
+	getProvinceName?: (provinceId: number) => string
 	getNationName: (nationId: number) => string
+	getLeaderName?: (nationId: number, timeMs: number) => string
+	getDynastyName?: (dynastyId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
 	getFaithName: (faithId: number) => string
 	getReligionName: (religionId: number) => string
 	getLandmarkName: (landmarkId: number) => string
+	getRiverName: (riverId: number) => string
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -217,16 +223,21 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverOceanCurrents,
 	colorMode,
 	populationMode,
+	selectedTimeMs,
 	displayMonth,
 	unitSystem,
 	world,
 	hoverCardRef,
+	getProvinceName,
 	getNationName,
+	getLeaderName,
+	getDynastyName,
 	getCultureName,
 	getHeritageName,
 	getFaithName,
 	getReligionName,
 	getLandmarkName,
+	getRiverName,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
@@ -277,6 +288,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		hoverRegionColor,
 		world,
 	})
+	const { dynasty: provinceDynasty, ruler: provinceRuler } =
+		buildPoliticalDisplayData({
+			hoverNationId,
+			selectedTimeMs,
+			world,
+			getLeaderName,
+			getDynastyName,
+		})
 	const demographicModes: PopulationMapMode[] = [
 		populationMode,
 		...(
@@ -476,7 +495,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					<>
 						<SwatchRow
 							label="Province"
-							value={`#${hoverProvince}${world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}`}
+							value={`${getProvinceName?.(hoverProvince) ?? `#${hoverProvince}`}${world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}`}
 							color={provinceColor}
 						/>
 						{provinceNation && (
@@ -484,6 +503,25 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								label="Nation"
 								value={getNationName(provinceNation.id)}
 								color={provinceNation.color}
+							/>
+						)}
+						{provinceDynasty && (
+							<SwatchRow
+								label="Dynasty"
+								value={provinceDynasty.name}
+								color={provinceDynasty.color}
+							/>
+						)}
+						{provinceRuler && (
+							<Row
+								label="Ruler"
+								value={[
+									provinceRuler.name,
+									provinceRuler.genderSymbol,
+									provinceRuler.age !== null ? `${provinceRuler.age}` : null,
+								]
+									.filter(Boolean)
+									.join(" · ")}
 							/>
 						)}
 						{hoverOccupation && (
@@ -775,7 +813,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							<SeriesBars
 								values={hoverRiver.flow_monthly}
 								labels={MONTH_SHORT}
-								label={`River #${hoverRiver.riverId}`}
+								label={
+									hoverRiver.riverId >= 0
+										? getRiverName(hoverRiver.riverId)
+										: `River #${hoverRiver.riverId}`
+								}
 								colorForValue={(value) => flowColor(value)}
 								activeIndex={displayMonth - 1}
 								summary={buildSummary(hoverRiver.flow, {

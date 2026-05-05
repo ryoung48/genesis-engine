@@ -9,6 +9,7 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import { disposeGroup, disposeObject3D } from "./disposal"
+import { getRegionFocusTargets } from "./focus"
 import { createMapProjection } from "./map-projection"
 import {
 	applyFaceRegionColors,
@@ -32,6 +33,12 @@ import {
 	collectNationBorderGlobePositions,
 	collectNationBorderMapPositions,
 } from "./overlay-builders"
+import {
+	buildSelectedProvinceBorderGlobe,
+	buildSelectedProvinceBorderMap,
+	collectProvinceBorderGlobePositions,
+	collectProvinceBorderMapPositions,
+} from "./province-overlay"
 import type {
 	OrogenHoverInfo,
 	OrogenScene,
@@ -214,7 +221,11 @@ export function createOrogenScene(
 	let pulseGlobe: LineSegments2 | null = null
 	let pulseMap: LineSegments2 | null = null
 	let pulseMaterials: LineMaterial[] = []
-	let pulse: { t0: number; duration: number } | null = null
+	let pulse: {
+		t0: number
+		duration: number
+		clearSelectedProvince: boolean
+	} | null = null
 	let terrainFaceToRegion: Int32Array = new Int32Array(0)
 	let mapFaceToRegion: Int32Array = new Int32Array(0)
 	let globeThermalEquator: THREE.Line | null = null
@@ -227,10 +238,13 @@ export function createOrogenScene(
 	let riverMaterials: LineMaterial[] = []
 	let globeHoverNationBorder: THREE.LineSegments | null = null
 	let mapHoverNationBorder: THREE.LineSegments | null = null
+	let globeSelectedProvinceBorder: THREE.Object3D | null = null
+	let mapSelectedProvinceBorder: THREE.Object3D | null = null
 	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
 	let clickHandler: ((info: OrogenHoverInfo) => void) | null = null
 	let hoveredRegion = -1
 	let hoveredNation = -1
+	let selectedProvince = -1
 	let nationBordersVisible = false
 	const raycaster = new THREE.Raycaster()
 	const pointer = new THREE.Vector2()
@@ -280,6 +294,41 @@ export function createOrogenScene(
 		)
 		if (globeHoverNationBorder) scene.add(globeHoverNationBorder)
 		if (mapHoverNationBorder) scene.add(mapHoverNationBorder)
+		updateOverlayVisibility()
+	}
+
+	function rebuildSelectedProvinceBorder() {
+		disposeObject3D(scene, globeSelectedProvinceBorder)
+		disposeObject3D(scene, mapSelectedProvinceBorder)
+		globeSelectedProvinceBorder = null
+		mapSelectedProvinceBorder = null
+		if (!currentWorld?.provinces || selectedProvince < 0) return
+		globeSelectedProvinceBorder = buildSelectedProvinceBorderGlobe(
+			currentWorld,
+			selectedProvince,
+			currentViewMode,
+			{
+				color: 0xfffbeb,
+				radiusBoost: 0.003,
+				lineWidth: 4,
+				resolution: [canvas.clientWidth || 1, canvas.clientHeight || 1],
+			},
+		)
+		mapSelectedProvinceBorder = buildSelectedProvinceBorderMap(
+			currentWorld,
+			selectedProvince,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			currentViewMode,
+			{
+				color: 0xfffbeb,
+				zBoost: 0.004,
+				lineWidth: 4,
+				resolution: [canvas.clientWidth || 1, canvas.clientHeight || 1],
+			},
+		)
+		if (globeSelectedProvinceBorder) scene.add(globeSelectedProvinceBorder)
+		if (mapSelectedProvinceBorder) scene.add(mapSelectedProvinceBorder)
 		updateOverlayVisibility()
 	}
 
@@ -355,6 +404,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, mapThermalEquator)
 		disposeObject3D(scene, globeHoverNationBorder)
 		disposeObject3D(scene, mapHoverNationBorder)
+		disposeObject3D(scene, globeSelectedProvinceBorder)
+		disposeObject3D(scene, mapSelectedProvinceBorder)
 		disposeObject3D(scene, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
 		disposeGroup(scene, globeRivers)
@@ -436,6 +487,7 @@ export function createOrogenScene(
 			scene.add(mapRivers)
 		}
 		rebuildHoveredNationBorder()
+		rebuildSelectedProvinceBorder()
 		updateOverlayVisibility()
 	}
 
@@ -458,6 +510,12 @@ export function createOrogenScene(
 			mapHoverNationBorder.visible =
 				currentViewMode === "map" && nationBordersVisible
 			if (mapMesh) mapHoverNationBorder.position.copy(mapMesh.position)
+		}
+		if (globeSelectedProvinceBorder)
+			globeSelectedProvinceBorder.visible = currentViewMode === "globe"
+		if (mapSelectedProvinceBorder) {
+			mapSelectedProvinceBorder.visible = currentViewMode === "map"
+			if (mapMesh) mapSelectedProvinceBorder.position.copy(mapMesh.position)
 		}
 		if (globeGrid)
 			globeGrid.visible = gridVisible && currentViewMode === "globe"
@@ -563,6 +621,7 @@ export function createOrogenScene(
 		}
 		if (geometryUnchanged) {
 			rebuildHoveredNationBorder()
+			rebuildSelectedProvinceBorder()
 			return
 		}
 		rebuildTerrain()
@@ -621,60 +680,70 @@ export function createOrogenScene(
 		rebuildHoveredNationBorder()
 	}
 
+	function setSelectedProvince(provinceId: number | null) {
+		selectedProvince = provinceId ?? -1
+		rebuildSelectedProvinceBorder()
+	}
+
+	function focusOnRegion(region: number, opts?: { durationMs?: number }) {
+		if (!currentWorld) return
+		const targets = getRegionFocusTargets({
+			meshXYZ: currentWorld.mesh.r_xyz,
+			numRegions: currentWorld.mesh.numRegions,
+			region,
+			centerLongitudeDeg: currentMapCenterLongitudeDeg,
+			projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+			mapOffsetX: mapMesh?.position.x ?? 0,
+			mapOffsetY: mapMesh?.position.y ?? 0,
+			minDistance: controls.minDistance,
+		})
+		if (!targets) return
+
+		focusTween = {
+			mode: currentViewMode,
+			t0: performance.now(),
+			duration: opts?.durationMs ?? 700,
+			globeFrom: camera.position.clone(),
+			globeTo: new THREE.Vector3(...targets.globeTarget),
+			mapFromX: mapCamera.position.x,
+			mapFromY: mapCamera.position.y,
+			mapToX: targets.mapToX,
+			mapToY: targets.mapToY,
+			mapFromZoom: mapCamera.zoom,
+			mapToZoom: targets.mapToZoom,
+		}
+		if (currentViewMode === "globe") controls.enabled = false
+		else mapControls.enabled = false
+	}
+
 	function focusOnNation(nationId: number, opts?: { durationMs?: number }) {
 		if (!currentWorld?.nations || !currentWorld.provinces) return
 		if (nationId < 0) return
+		setSelectedProvince(null)
 		// `nationId` from the UI is actually a sovereign province index
 		// (see OrogenView click handler — assignment = sovereign).
 		const province = nationId
 		if (province >= currentWorld.provinces.count) return
 		const region = currentWorld.provinces.seeds[province]
 		if (region < 0) return
-		const rx = currentWorld.mesh.r_xyz[region * 3]
-		const ry = currentWorld.mesh.r_xyz[region * 3 + 1]
-		const rz = currentWorld.mesh.r_xyz[region * 3 + 2]
-		const center = new THREE.Vector3(rx, ry, rz).normalize()
-
-		const globeTargetDist = Math.max(controls.minDistance, 1.8)
-		const globeFrom = camera.position.clone()
-		const globeTo = center.clone().multiplyScalar(globeTargetDist)
-
-		const mapProjection = createMapProjection(
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-		)
-		const projected = mapProjection.projectCartesian(
-			center.x,
-			center.y,
-			center.z,
-		)
-		const [mapX, mapY] = mapProjection.projectRadians(
-			projected.lon,
-			projected.lat,
-		)
-		const mapOffsetX = mapMesh?.position.x ?? 0
-		const mapOffsetY = mapMesh?.position.y ?? 0
-		const mapToX = mapX + mapOffsetX
-		const mapToY = mapY + mapOffsetY
-		const mapToZoom = 6
-
-		focusTween = {
-			mode: currentViewMode,
-			t0: performance.now(),
-			duration: opts?.durationMs ?? 700,
-			globeFrom,
-			globeTo,
-			mapFromX: mapCamera.position.x,
-			mapFromY: mapCamera.position.y,
-			mapToX,
-			mapToY,
-			mapFromZoom: mapCamera.zoom,
-			mapToZoom,
-		}
-		if (currentViewMode === "globe") controls.enabled = false
-		else mapControls.enabled = false
-
+		focusOnRegion(region, opts)
 		startBorderPulse(province)
+	}
+
+	function focusOnProvince(provinceId: number, opts?: { durationMs?: number }) {
+		if (!currentWorld?.provinces) return
+		if (provinceId < 0 || provinceId >= currentWorld.provinces.count) {
+			setSelectedProvince(null)
+			return
+		}
+		setSelectedProvince(provinceId)
+		const region = currentWorld.provinces.seeds[provinceId]
+		if (region < 0) {
+			setSelectedProvince(null)
+			return
+		}
+		focusOnRegion(region, opts)
+		startBorderPulse(provinceId, "province")
 	}
 
 	function clearPulse() {
@@ -686,7 +755,10 @@ export function createOrogenScene(
 		pulse = null
 	}
 
-	function makeThickPulseLine(positions: number[]): LineSegments2 | null {
+	function makeThickPulseLine(
+		positions: number[],
+		linewidth = 4,
+	): LineSegments2 | null {
 		if (positions.length === 0) return null
 		const geom = new LineSegmentsGeometry()
 		geom.setPositions(positions)
@@ -694,7 +766,7 @@ export function createOrogenScene(
 		const h = canvas.clientHeight || 1
 		const mat = new LineMaterial({
 			color: 0xffffff,
-			linewidth: 4,
+			linewidth,
 			resolution: new THREE.Vector2(w, h),
 			transparent: true,
 			opacity: 0,
@@ -708,23 +780,48 @@ export function createOrogenScene(
 		return line
 	}
 
-	function startBorderPulse(province: number) {
+	function startBorderPulse(
+		province: number,
+		target: "nation" | "province" = "nation",
+	) {
 		clearPulse()
-		if (!currentWorld?.nations) return
-		const nation = currentWorld.nations.assignment[province]
-		if (nation < 0) return
-		pulseGlobe = makeThickPulseLine(
-			collectNationBorderGlobePositions(currentWorld, nation, 0.003),
-		)
-		pulseMap = makeThickPulseLine(
-			collectNationBorderMapPositions(
-				currentWorld,
-				nation,
-				currentMapCenterLongitudeDeg,
-				currentMapProjectionLatitudeDeg,
-				0.001,
-			),
-		)
+		if (!currentWorld) return
+		const lineWidth = target === "province" ? 5 : 4
+		const globePositions =
+			target === "province"
+				? collectProvinceBorderGlobePositions(currentWorld, province, 0.003)
+				: (() => {
+						if (!currentWorld.nations) return []
+						const nation = currentWorld.nations.assignment[province]
+						return nation < 0
+							? []
+							: collectNationBorderGlobePositions(currentWorld, nation, 0.003)
+					})()
+		const mapPositions =
+			target === "province"
+				? collectProvinceBorderMapPositions(
+						currentWorld,
+						province,
+						currentMapCenterLongitudeDeg,
+						currentMapProjectionLatitudeDeg,
+						0.004,
+					)
+				: (() => {
+						if (!currentWorld.nations) return []
+						const nation = currentWorld.nations.assignment[province]
+						return nation < 0
+							? []
+							: collectNationBorderMapPositions(
+									currentWorld,
+									nation,
+									currentMapCenterLongitudeDeg,
+									currentMapProjectionLatitudeDeg,
+									0.001,
+								)
+					})()
+		pulseGlobe = makeThickPulseLine(globePositions, lineWidth)
+		pulseMap = makeThickPulseLine(mapPositions, lineWidth)
+		if (!pulseGlobe && !pulseMap) return
 		if (pulseGlobe) {
 			pulseGlobe.visible = currentViewMode === "globe"
 			scene.add(pulseGlobe)
@@ -734,14 +831,20 @@ export function createOrogenScene(
 			if (mapMesh) pulseMap.position.copy(mapMesh.position)
 			scene.add(pulseMap)
 		}
-		pulse = { t0: performance.now(), duration: 1200 }
+		pulse = {
+			t0: performance.now(),
+			duration: 1200,
+			clearSelectedProvince: target === "province",
+		}
 	}
 
 	function stepPulse() {
 		if (!pulse) return
 		const u = (performance.now() - pulse.t0) / pulse.duration
 		if (u >= 1) {
+			const clearSelectedProvince = pulse.clearSelectedProvince
 			clearPulse()
+			if (clearSelectedProvince) setSelectedProvince(null)
 			return
 		}
 		const op = 0.9 * Math.abs(Math.sin(u * 2 * Math.PI))
@@ -931,6 +1034,7 @@ export function createOrogenScene(
 		renderer.setSize(w, h, false)
 		for (const mat of riverMaterials) mat.resolution.set(w, h)
 		for (const mat of pulseMaterials) mat.resolution.set(w, h)
+		if (selectedProvince >= 0) rebuildSelectedProvinceBorder()
 	}
 
 	updateMapCameraFrustum()
@@ -965,6 +1069,7 @@ export function createOrogenScene(
 			currentViewMode === "map" ? mapFaceToRegion : terrainFaceToRegion
 		const region = faceToRegion[hit.faceIndex] ?? -1
 		if (region < 0) return
+		setSelectedProvince(null)
 		clickHandler({
 			region,
 			clientX: event.clientX - rect.left,
@@ -1284,5 +1389,6 @@ export function createOrogenScene(
 		setAtmospherePressure,
 		setFullAmbient,
 		focusOnNation,
+		focusOnProvince,
 	}
 }

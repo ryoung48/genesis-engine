@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import {
+	CULTURE_GENDER_SYSTEM,
+	resolveLeaderGender,
+} from "@/model/society/gender-system"
 import { LANGUAGE } from "./languages"
 import type { LanguageNameContext } from "./names"
 import { createNames, createWorldNames } from "./names"
@@ -65,6 +69,58 @@ describe("createNames", () => {
 		expect(simpleSpy).toHaveBeenCalledTimes(1)
 		expect(simpleSpy).toHaveBeenCalledWith(
 			expect.objectContaining({ key: "person_female" }),
+		)
+	})
+
+	it("uses leader name seeds when generating lazy leader names", () => {
+		const language = LANGUAGE.spawn("leader-name-seed")
+		const simpleSpy = vi
+			.spyOn(LANGUAGE.word, "simple")
+			.mockImplementation(({ slot }) => ({ morphemes: [slot], word: slot }))
+
+		const names = createNames({
+			provinces: [
+				{
+					culture: 0,
+					leaders: [{ time: 100, nameSeed: 77 }],
+				},
+			],
+			cultures: [{ language, traditions: [] }],
+			dynasties: [],
+		})
+
+		expect(names.leader(0, 100)).toBe("Leader:0:77")
+		expect(simpleSpy).toHaveBeenCalledWith(
+			expect.objectContaining({ slot: "leader:0:77" }),
+		)
+	})
+
+	it("uses culture gender systems when choosing leader name forms", () => {
+		const language = LANGUAGE.spawn("leader-gender-system")
+		const simpleSpy = vi
+			.spyOn(LANGUAGE.word, "simple")
+			.mockImplementation(({ key }) => ({ morphemes: [key], word: key }))
+
+		const names = createNames({
+			provinces: [{ culture: 0, leaders: [{ time: 100, nameSeed: 77 }] }],
+			cultures: [
+				{
+					language,
+					genderSystem: CULTURE_GENDER_SYSTEM.MATRIARCHAL,
+				},
+			],
+			dynasties: [],
+		})
+
+		const expectedKey =
+			resolveLeaderGender(CULTURE_GENDER_SYSTEM.MATRIARCHAL, 77) === "female"
+				? "person_female"
+				: "person_male"
+		expect(names.leader(0, 100)).toBe(
+			expectedKey === "person_female" ? "Person_female" : "Person_male",
+		)
+		expect(simpleSpy).toHaveBeenCalledWith(
+			expect.objectContaining({ key: expectedKey }),
 		)
 	})
 
@@ -234,6 +290,38 @@ describe("createNames", () => {
 		expect(names.landmark(0)).toBe("Slot Landmark:0:909")
 		expect(names.landmark(0)).toBe("Slot Landmark:0:909")
 		expect(simpleSpy).toHaveBeenCalledTimes(1)
+	})
+
+	it("uses stable river ids when world river cells span multiple provinces", () => {
+		const simpleSpy = vi
+			.spyOn(LANGUAGE.word, "simple")
+			.mockImplementation(({ slot }) => ({
+				morphemes: [slot],
+				word: `slot ${slot}`,
+			}))
+
+		const names = createWorldNames({
+			provinces: {
+				count: 3,
+				regionProvince: new Int32Array([0, 1, 2]),
+			} as never,
+			cultures: {
+				count: 3,
+				assignment: new Int32Array([0, 1, 2]),
+				languageSeeds: new Int32Array([201, 202, 203]),
+			} as never,
+			rivers: {
+				riverId: new Int32Array([7, 7, 9]),
+			} as never,
+		})
+
+		expect(names.river(7)).toBe("Slot River:7:7")
+		expect(names.river(7)).toBe("Slot River:7:7")
+		expect(names.river(9)).toBe("Slot River:9:9")
+		expect(simpleSpy).toHaveBeenCalledTimes(2)
+		expect(simpleSpy).toHaveBeenCalledWith(
+			expect.objectContaining({ slot: "river:7:7" }),
+		)
 	})
 
 	it("uses deterministic landmark slots when a name seed is missing", () => {

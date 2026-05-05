@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest"
+import {
+	CULTURE_GENDER_SYSTEM,
+	leaderGenderSymbol,
+	resolveLeaderGender,
+} from "@/model/society/gender-system"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
 	buildHoverChartData,
 	buildPastaMonthlyData,
+	buildPoliticalDisplayData,
 	buildProvinceDisplayData,
 	buildTerrainFeatureSwatches,
 	buildTopographySwatchColor,
@@ -186,6 +192,101 @@ describe("buildProvinceDisplayData", () => {
 			provinceColor: null,
 			provinceNation: null,
 			regionDisplayColor: null,
+		})
+	})
+})
+
+describe("buildPoliticalDisplayData", () => {
+	it("returns dynasty and ruler details for a valid hovered nation", () => {
+		const result = buildPoliticalDisplayData({
+			hoverNationId: 1,
+			selectedTimeMs: 123,
+			world: makeWorld({
+				leaderDynasty: new Int32Array([-1, 7]),
+				leaderNameSeed: new Int32Array([-1, 99]),
+				leaderBirthYear: new Float32Array([-1, 0]),
+				cultures: {
+					assignment: new Int32Array([0, 0]),
+					genderSystems: new Uint8Array([CULTURE_GENDER_SYSTEM.PATRIARCHAL]),
+				},
+			}),
+			getLeaderName: (nationId, timeMs) => `Leader ${nationId}@${timeMs}`,
+			getDynastyName: (dynastyId) => `Dynasty ${dynastyId}`,
+		})
+
+		expect(result.dynasty).toEqual({
+			id: 7,
+			name: "Dynasty 7",
+			color: expect.stringMatching(/^rgb/),
+		})
+		expect(result.ruler).toEqual({
+			name: "Leader 1@123",
+			age: 0,
+			genderSymbol: leaderGenderSymbol(
+				resolveLeaderGender(CULTURE_GENDER_SYSTEM.PATRIARCHAL, 99),
+			),
+		})
+	})
+
+	it("falls back cleanly when nation, dynasty, or time data is missing", () => {
+		expect(
+			buildPoliticalDisplayData({
+				hoverNationId: null,
+				selectedTimeMs: 123,
+				world: makeWorld({}),
+			}),
+		).toEqual({ dynasty: null, ruler: null })
+
+		expect(
+			buildPoliticalDisplayData({
+				hoverNationId: 0,
+				selectedTimeMs: null,
+				world: makeWorld({
+					leaderDynasty: new Int32Array([-1]),
+				}),
+				getLeaderName: () => "Leader 0",
+				getDynastyName: () => "Dynasty 0",
+			}),
+		).toEqual({ dynasty: null, ruler: null })
+	})
+
+	it("keeps dynasty details when ruler resolution is unavailable", () => {
+		const result = buildPoliticalDisplayData({
+			hoverNationId: 0,
+			selectedTimeMs: null,
+			world: makeWorld({
+				leaderDynasty: new Int32Array([3]),
+			}),
+			getDynastyName: (dynastyId) => `Dynasty ${dynastyId}`,
+		})
+
+		expect(result).toEqual({
+			dynasty: {
+				id: 3,
+				name: "Dynasty 3",
+				color: expect.stringMatching(/^rgb/),
+			},
+			ruler: null,
+		})
+	})
+
+	it("keeps ruler details when dynasty naming is unavailable", () => {
+		const result = buildPoliticalDisplayData({
+			hoverNationId: 0,
+			selectedTimeMs: 50,
+			world: makeWorld({
+				leaderDynasty: new Int32Array([8]),
+			}),
+			getLeaderName: (nationId, timeMs) => `Leader ${nationId}@${timeMs}`,
+		})
+
+		expect(result).toEqual({
+			dynasty: null,
+			ruler: {
+				name: "Leader 0@50",
+				age: null,
+				genderSymbol: null,
+			},
 		})
 	})
 })

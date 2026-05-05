@@ -1,4 +1,5 @@
 import type { HistoryState, Relation } from "./state"
+import { YEAR_MS } from "./state"
 import { read, type Timeline, write } from "./timeline"
 
 function getField<T>(
@@ -134,6 +135,19 @@ export const PROV = {
 				if (time >= state.time) state.leaderDynCurrent[p] = value
 			},
 		},
+		nameSeed: {
+			get: (state: HistoryState, p: number, time = state.time) =>
+				time === state.time
+					? state.leaderNameSeedCurrent[p]
+					: getField(state._leader_name_seed[p], -1, time),
+			set: (state: HistoryState, p: number, time: number, value: number) => {
+				setField(state._leader_name_seed[p], time, value)
+				if (time >= state.time) {
+					state.leaderNameSeedCurrent[p] = value
+					state.leaderRuntime.nameSeed[p] = value
+				}
+			},
+		},
 		claim: {
 			get: (state: HistoryState, p: number, time = state.time) =>
 				time === state.time
@@ -142,6 +156,19 @@ export const PROV = {
 			set: (state: HistoryState, p: number, time: number, value: number) => {
 				setField(state._leader_claim[p], time, value)
 				if (time >= state.time) state.leaderClaimCurrent[p] = value
+			},
+		},
+		birthYear: {
+			get: (state: HistoryState, p: number, time = state.time) =>
+				time === state.time
+					? state.leaderBirthYearCurrent[p]
+					: getField(state._leader_birth_year[p], -1, time),
+			set: (state: HistoryState, p: number, time: number, value: number) => {
+				setField(state._leader_birth_year[p], time, value)
+				if (time >= state.time) {
+					state.leaderBirthYearCurrent[p] = value
+					state.leaderRuntime.birth[p] = value >= 0 ? value * YEAR_MS : 0
+				}
 			},
 		},
 	},

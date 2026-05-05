@@ -1,10 +1,17 @@
 import { titleCase } from "@/model/shared/text"
+import {
+	CULTURE_GENDER_SYSTEM,
+	type CultureGenderSystem,
+	normalizeCultureGenderSystem,
+	resolveLeaderGender,
+} from "@/model/society/gender-system"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { LANGUAGE } from "./languages"
 import type { Language } from "./languages/types"
 
 export interface LanguageNameLeaderEntry {
 	time: number
+	nameSeed?: number
 	name?: string
 }
 
@@ -19,6 +26,7 @@ export interface LanguageNameCulture {
 	nameSeed?: number
 	heritage?: number
 	faith?: number
+	genderSystem?: CultureGenderSystem
 	traditions?: readonly string[]
 }
 
@@ -55,6 +63,12 @@ export interface LanguageNameLandmark {
 	name?: string
 }
 
+export interface LanguageNameRiver {
+	province: number
+	nameSeed?: number
+	name?: string
+}
+
 export interface LanguageNameDynasty {
 	name: string
 }
@@ -66,6 +80,7 @@ export interface LanguageNameContext {
 	faiths?: readonly LanguageNameFaith[]
 	religions?: readonly LanguageNameReligion[]
 	landmarks?: readonly LanguageNameLandmark[]
+	rivers?: readonly LanguageNameRiver[]
 	nations?: readonly LanguageNameNation[]
 	dynasties?: readonly LanguageNameDynasty[]
 }
@@ -155,6 +170,24 @@ function buildNamedGroupSlot(
 	nameSeed: number | undefined,
 ): string {
 	return `${namespace}:${index}:${nameSeed ?? index}`
+}
+
+function buildLeaderSlot(
+	provinceIdx: number,
+	entry: LanguageNameLeaderEntry,
+): string {
+	return entry.nameSeed == null
+		? `leader:${provinceIdx}:${entry.time}`
+		: buildNamedGroupSlot("leader", provinceIdx, entry.nameSeed)
+}
+
+function getCultureGenderSystem(
+	culture: LanguageNameCulture | undefined,
+): CultureGenderSystem {
+	if (culture?.genderSystem != null) return culture.genderSystem
+	return culture?.traditions?.includes("matriarchal_society")
+		? CULTURE_GENDER_SYSTEM.MATRIARCHAL
+		: CULTURE_GENDER_SYSTEM.PATRIARCHAL
 }
 
 export function createNames(context: LanguageNameContext): LanguageNames {
@@ -348,14 +381,31 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		faith: cachedFaithName,
 		religion: cachedReligionName,
 		landmark: cachedLandmarkName,
-		river: (provinceIdx: number) =>
-			cachedName(
-				riverNames,
-				provinceIdx,
-				"river",
-				"river",
-				`River #${provinceIdx}`,
-			),
+		river: (riverIdx: number) => {
+			const river = context.rivers?.[riverIdx]
+			if (!context.rivers) {
+				return cachedName(
+					riverNames,
+					riverIdx,
+					"river",
+					"river",
+					`River #${riverIdx}`,
+				)
+			}
+			const provinceIdx = river?.province ?? -1
+			return cachedScopedName({
+				cache: riverNames,
+				index: riverIdx,
+				key: "river",
+				namespace: "river",
+				slot: buildNamedGroupSlot("river", riverIdx, river?.nameSeed),
+				lang: provinceIdx >= 0 ? getLanguage(context, provinceIdx) : null,
+				fallback: `River #${riverIdx}`,
+				onNamed: (name) => {
+					if (river) river.name = name
+				},
+			})
+		},
 		mountain: (provinceIdx: number) =>
 			cachedName(
 				mountainNames,
@@ -378,14 +428,19 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 				: null
 			if (!lang) return `Leader #${provinceIdx}`
 
-			const isMatriarchal = culture.traditions?.includes("matriarchal_society")
-			const key = isMatriarchal ? "person_female" : "person_male"
+			const key =
+				resolveLeaderGender(
+					getCultureGenderSystem(culture),
+					leaderEntry.nameSeed ?? leaderEntry.time ?? provinceIdx,
+				) === "female"
+					? "person_female"
+					: "person_male"
 			const name = titleCase(
 				LANGUAGE.word.simple({
 					lang,
 					key,
 					namespace: "leader",
-					slot: `leader:${provinceIdx}:${time}`,
+					slot: buildLeaderSlot(provinceIdx, leaderEntry),
 				}).word,
 			)
 			leaderEntry.name = name
@@ -415,15 +470,18 @@ export const NAMES = {
 }
 
 export function createWorldNames(
-	world: Pick<
-		SerializedOrogenWorld,
-		| "provinces"
-		| "cultures"
-		| "heritages"
-		| "faiths"
-		| "religions"
-		| "landmarks"
-		| "nations"
+	world: Partial<
+		Pick<
+			SerializedOrogenWorld,
+			| "provinces"
+			| "cultures"
+			| "heritages"
+			| "faiths"
+			| "religions"
+			| "landmarks"
+			| "nations"
+			| "rivers"
+		>
 	>,
 ): LanguageNames {
 	const provinceCount = world.provinces?.count ?? 0
@@ -439,6 +497,13 @@ export function createWorldNames(
 			nameSeed: world.cultures?.nameSeeds?.[cultureIdx],
 			heritage: world.heritages?.assignment[cultureIdx] ?? -1,
 			faith: world.faiths?.assignment[cultureIdx] ?? -1,
+			genderSystem:
+				world.cultures?.genderSystems &&
+				cultureIdx < world.cultures.genderSystems.length
+					? normalizeCultureGenderSystem(
+							world.cultures.genderSystems[cultureIdx],
+						)
+					: undefined,
 		}),
 	)
 	const heritages: LanguageNameHeritage[] = Array.from(
@@ -471,6 +536,32 @@ export function createWorldNames(
 			nameSeed: world.landmarks?.nameSeeds?.[landmarkIdx],
 		}),
 	)
+	const riverProvinceById = new Map<number, number>()
+	if (world.rivers?.riverId && world.provinces?.regionProvince) {
+		for (
+			let regionIdx = 0;
+			regionIdx < world.rivers.riverId.length;
+			regionIdx++
+		) {
+			const riverId = world.rivers.riverId[regionIdx] ?? -1
+			if (riverId < 0 || riverProvinceById.has(riverId)) continue
+			const provinceIdx = world.provinces.regionProvince[regionIdx] ?? -1
+			if (provinceIdx >= 0) riverProvinceById.set(riverId, provinceIdx)
+		}
+	}
+	const riverCount =
+		world.rivers?.riverId && world.rivers.riverId.length > 0
+			? world.rivers.riverId.reduce(
+					(max, riverId) => (riverId > max ? riverId : max),
+					-1,
+				) + 1
+			: 0
+	const rivers: LanguageNameRiver[] = Array.from(
+		{ length: riverCount },
+		(_, riverIdx): LanguageNameRiver => ({
+			province: riverProvinceById.get(riverIdx) ?? -1,
+		}),
+	)
 	const provinces = Array.from({ length: provinceCount }, (_, provinceIdx) => ({
 		culture: world.cultures?.assignment[provinceIdx] ?? -1,
 	}))
@@ -494,6 +585,7 @@ export function createWorldNames(
 		faiths,
 		religions,
 		landmarks,
+		rivers,
 		nations,
 	})
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
+import { EVT } from "./event-heap"
+import { initDiplomacy } from "./events/diplomacy"
+import { initSuccession, runSuccession } from "./events/succession"
 import { PROV } from "./fields"
 import { createHistoryRng } from "./history-rng"
 import {
@@ -208,6 +211,23 @@ describe("history state helpers", () => {
 			ruler: 2,
 			relation: REL.PU_SENIOR,
 		})
+	})
+
+	it("returns no ruler relation when a nation has no overlord or union senior", () => {
+		const state = createTestState()
+
+		expect(getRulerRelation(state, 2)).toBeUndefined()
+	})
+
+	it("seeds startup subject and neighbor relations during diplomacy initialization", () => {
+		const state = createTestState()
+
+		initDiplomacy(state, createHistoryRng(23))
+
+		expect(getRelation(state, 1, 0)).toBe(REL.OVERLORD)
+		expect(getRelation(state, 0, 1)).toBe(REL.VASSAL)
+		expect(getRelation(state, 0, 2)).not.toBe(REL.NONE)
+		expect(getRelation(state, 0, 2)).not.toBe(REL.NEUTRAL)
 	})
 
 	it("can release provinces and break disconnected subject links into rebellions", () => {
@@ -607,6 +627,7 @@ describe("history state helpers", () => {
 
 	it("keeps connected subjects and reuses dynasties across duplicate shuffle entries", () => {
 		const connected = createIndirectConnectionState()
+		connected.events = []
 
 		fixConnections(connected, 0)
 
@@ -630,13 +651,13 @@ describe("history state helpers", () => {
 			count: 3,
 			adjOffset: new Int32Array([0, 0, 0, 0]),
 			adjList: new Int32Array(0),
-			size: new Int32Array([1, 1, 1]),
+			size: new Int32Array([2, 1, 1]),
 			colors: provinces.colors.slice(),
-			parent: new Int32Array([-1, -1, -1]),
-			depth: new Int32Array([0, 0, 0]),
-			childOffset: new Int32Array([0, 0, 0, 0]),
-			childList: new Int32Array(0),
-			sovereign: new Int32Array([0, 1, 2]),
+			parent: new Int32Array([-1, 0, -1]),
+			depth: new Int32Array([0, 1, 0]),
+			childOffset: new Int32Array([0, 1, 1, 1]),
+			childList: new Int32Array([1]),
+			sovereign: new Int32Array([0, 0, 2]),
 			gravity: new Float32Array([8, 7, 6]),
 		} as OrogenNationHierarchy
 		const population: ProvincePopulation = {
@@ -675,6 +696,313 @@ describe("history state helpers", () => {
 		expect(PROV.leader.dynasty.get(dynastyState, 2)).toBe(
 			PROV.leader.dynasty.get(dynastyState, 1),
 		)
+		const dynastySpreadEvents = dynastyState.events.filter(
+			(event) => event.tag === "dynasty spread",
+		)
+		expect(dynastySpreadEvents).toHaveLength(1)
+		expect(dynastySpreadEvents[0]).toMatchObject({
+			tag: "dynasty spread",
+			data: { nation: 2, source: 0 },
+		})
+	})
+
+	it("does not log dynasty spread for subject-level successions", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		PROV.leader.dynasty.set(state, 0, state.time, 7)
+		PROV.leader.dynasty.set(state, 1, state.time, 3)
+		PROV.leader.claim.set(state, 1, state.time, 0)
+		const leaderIdx = state.leaderRuntime.idx[1]
+		const rng = {
+			random: () => 0,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) =>
+				values[1]?.v ?? values[0]!.v,
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 1, leaderIdx, rng)
+
+		expect(PROV.leader.dynasty.get(state, 1)).toBe(7)
+		expect(state.events.some((event) => event.tag === "dynasty spread")).toBe(
+			false,
+		)
+	})
+
+	it("does not log dynasty spread when a sovereign inherits from its own realm", () => {
+		const provinces = {
+			regionProvince: new Int32Array([0, 1, 2]),
+			seeds: new Int32Array([0, 1, 2]),
+			count: 3,
+			desolate: new Uint8Array([0, 0, 0]),
+			landmassId: new Int32Array([0, 0, 0]),
+			adjOffset: new Int32Array([0, 1, 2, 3]),
+			adjList: new Int32Array([1, 2, 1]),
+			size: new Int32Array([1, 1, 1]),
+			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
+		} as OrogenProvinces
+		const nations = {
+			assignment: new Int32Array([0, 2, 2]),
+			seeds: new Int32Array([0, 1, 2]),
+			count: 3,
+			adjOffset: new Int32Array([0, 0, 0, 0]),
+			adjList: new Int32Array(0),
+			size: new Int32Array([1, 0, 2]),
+			colors: provinces.colors.slice(),
+			parent: new Int32Array([-1, 2, -1]),
+			depth: new Int32Array([0, 1, 0]),
+			childOffset: new Int32Array([0, 0, 0, 1]),
+			childList: new Int32Array([1]),
+			sovereign: new Int32Array([0, 2, 2]),
+			gravity: new Float32Array([9, 7, 8]),
+		} as OrogenNationHierarchy
+		const population: ProvincePopulation = {
+			habitability: new Float32Array([9, 8, 7]),
+			population: new Float32Array([90, 80, 70]),
+			habitabilityScore: 24,
+			totalPopulation: 240,
+		}
+		const randomValues = [0.3, 0.3]
+		const rng = {
+			random: () => randomValues.shift() ?? 0.99,
+			uniform: (min: number, max: number) => (min + max) / 2,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) =>
+				values[2]?.v ?? values[0]!.v,
+			shuffle: <T>(_values: readonly T[]) => [0, 1, 2] as T[],
+		}
+
+		const dynastyState = createHistoryState(
+			nations,
+			provinces,
+			population,
+			new Uint8Array([1, 1, 1, 0]),
+			new Uint8Array([1, 1, 1, 0]),
+			new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
+			{ assignment: new Int32Array([0, 0, 0]) },
+			150,
+			rng,
+		)
+
+		const dynastySpreadEvents = dynastyState.events.filter(
+			(event) => event.tag === "dynasty spread",
+		)
+		expect(PROV.leader.dynasty.get(dynastyState, 2)).toBe(
+			PROV.leader.dynasty.get(dynastyState, 1),
+		)
+		expect(dynastySpreadEvents).toHaveLength(0)
+	})
+
+	it("logs dynasty spread when a sovereign adopts a foreign dynasty on succession", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		setRelation(state, 2, 0, REL.FRIENDLY)
+		PROV.leader.dynasty.set(state, 0, state.time, 7)
+		PROV.leader.dynasty.set(state, 2, state.time, 3)
+		const leaderIdx = state.leaderRuntime.idx[2]
+		let weightedChoiceCalls = 0
+		const rng = {
+			random: () => 0,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) => {
+				weightedChoiceCalls++
+				return weightedChoiceCalls === 1
+					? (values[2]?.v ?? values[0]!.v)
+					: (values[1]?.v ?? values[0]!.v)
+			},
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 2, leaderIdx, rng)
+
+		expect(PROV.leader.dynasty.get(state, 2)).toBe(7)
+		expect(state.events).toContainEqual(
+			expect.objectContaining({
+				tag: "dynasty spread",
+				data: expect.objectContaining({
+					nation: 2,
+					source: 0,
+					dynasty: 7,
+					previousDynasty: 3,
+				}),
+			}),
+		)
+	})
+
+	it("forms personal unions for sovereign successions that keep a shared dynasty", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		setRelation(state, 2, 3, REL.FRIENDLY)
+		PROV.leader.dynasty.set(state, 2, state.time, 7)
+		PROV.leader.dynasty.set(state, 3, state.time, 7)
+		const leaderIdx = state.leaderRuntime.idx[2]
+		let weightedChoiceCalls = 0
+		const rng = {
+			random: () => 0,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) => {
+				weightedChoiceCalls++
+				return weightedChoiceCalls === 1
+					? (values[2]?.v ?? values[0]!.v)
+					: (values[1]?.v ?? values[0]!.v)
+			},
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 2, leaderIdx, rng)
+
+		expect(getRelation(state, 2, 3)).toBe(REL.PU_SENIOR)
+		expect(getRulerRelation(state, 2)).toEqual({
+			ruler: 3,
+			relation: REL.PU_SENIOR,
+		})
+		expect(state.events).toContainEqual(
+			expect.objectContaining({
+				tag: "personal union formed",
+				data: { junior: 2, senior: 3 },
+			}),
+		)
+	})
+
+	it("starts a regency when a sovereign successor is underage", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		const leaderIdx = state.leaderRuntime.idx[0]
+		let weightedChoiceCalls = 0
+		const rng = {
+			random: () => 1,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) => {
+				weightedChoiceCalls++
+				return weightedChoiceCalls === 1
+					? (values[0]?.v ?? values[0]!.v)
+					: (values[3]?.v ?? values[0]!.v)
+			},
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 0, leaderIdx, rng)
+
+		expect(state.events).toContainEqual(
+			expect.objectContaining({
+				tag: "regency started",
+				data: expect.objectContaining({ nation: 0 }),
+			}),
+		)
+	})
+
+	it("starts a new dynasty on succession when no heir candidates exist", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		PROV.leader.dynasty.set(state, 3, state.time, 4)
+		const leaderIdx = state.leaderRuntime.idx[3]
+		const nextDynasty = state.nextDynasty
+		let weightedChoiceCalls = 0
+		const rng = {
+			random: () => 0,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) => {
+				weightedChoiceCalls++
+				return weightedChoiceCalls === 1
+					? (values[2]?.v ?? values[0]!.v)
+					: (values[0]?.v ?? values[0]!.v)
+			},
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 3, leaderIdx, rng)
+
+		expect(PROV.leader.dynasty.get(state, 3)).toBe(nextDynasty)
+		expect(state.nextDynasty).toBe(nextDynasty + 1)
+	})
+
+	it("can trigger succession rebellions from sovereign subjects", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		const leaderIdx = state.leaderRuntime.idx[0]
+		const randomValues = [0, 1]
+		let weightedChoiceCalls = 0
+		const rng = {
+			random: () => randomValues.shift() ?? 1,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) => {
+				weightedChoiceCalls++
+				return weightedChoiceCalls === 1
+					? (values[2]?.v ?? values[0]!.v)
+					: (values[3]?.v ?? values[0]!.v)
+			},
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 0, leaderIdx, rng)
+
+		expect(getSovereign(state, 1)).toBe(1)
+		expect(state.events).toContainEqual(
+			expect.objectContaining({
+				tag: "rebellion",
+				data: { overlord: 0, subject: 1, succession: true },
+			}),
+		)
+	})
+
+	it("can assign a fresh dynasty to subject successions without senior inheritance", () => {
+		const state = createTestState()
+		state.events = []
+		state.time += deltaMonth(1)
+		PROV.leader.dynasty.set(state, 0, state.time, 7)
+		PROV.leader.dynasty.set(state, 1, state.time, 3)
+		const leaderIdx = state.leaderRuntime.idx[1]
+		const nextDynasty = state.nextDynasty
+		let weightedChoiceCalls = 0
+		const rng = {
+			random: () => 0.96,
+			uniform: (min: number, _max: number) => min,
+			randint: (min: number, _max: number) => min,
+			choice: <T>(values: readonly T[]) => values[0]!,
+			weightedChoice: <T>(values: readonly { v: T; w: number }[]) => {
+				weightedChoiceCalls++
+				return weightedChoiceCalls === 1
+					? (values[2]?.v ?? values[0]!.v)
+					: (values[0]?.v ?? values[0]!.v)
+			},
+			shuffle: <T>(values: readonly T[]) => [...values],
+		}
+
+		runSuccession(state, 1, leaderIdx, rng)
+
+		expect(PROV.leader.dynasty.get(state, 1)).toBe(nextDynasty)
+		expect(state.nextDynasty).toBe(nextDynasty + 1)
+		expect(state.events.some((event) => event.tag === "dynasty spread")).toBe(
+			false,
+		)
+	})
+
+	it("schedules succession events for living rulers", () => {
+		const state = createTestState()
+
+		initSuccession(state, createHistoryRng(23))
+
+		expect(state.heap.size).toBe(4)
+		expect(state.heap.peekType()).toBe(EVT.SUCCESSION)
 	})
 
 	it("initializes desolate history states and can respawn leaders with a fixed end date", () => {
@@ -691,6 +1019,9 @@ describe("history state helpers", () => {
 		expect(state.leaderDynCurrent[0]).toBeGreaterThanOrEqual(0)
 		expect(state.leaderDynCurrent[1]).toBeGreaterThanOrEqual(0)
 		expect(state.leaderDynCurrent[2]).toBe(-1)
+		expect(state.leaderNameSeedCurrent[0]).toBeGreaterThan(0)
+		expect(state.leaderNameSeedCurrent[1]).toBeGreaterThan(0)
+		expect(state.leaderNameSeedCurrent[2]).toBe(-1)
 
 		const fixedEnd = state.time + deltaYear(5)
 		const initialIndex = state.leaderRuntime.idx[0]
@@ -699,6 +1030,11 @@ describe("history state helpers", () => {
 		expect(state.leaderRuntime.idx[0]).toBe(initialIndex + 1)
 		expect(state.leaderRuntime.end[0]).toBe(fixedEnd)
 		expect(state.leaderRuntime.birth[0]).toBeLessThan(state.time)
+		expect(state.leaderRuntime.nameSeed[0]).toBeGreaterThan(0)
+		expect(PROV.leader.nameSeed.get(state, 0)).toBe(
+			state.leaderRuntime.nameSeed[0],
+		)
 		expect(PROV.leader.claim.get(state, 0)).toBe(3)
+		expect(PROV.leader.birthYear.get(state, 0)).toBeGreaterThan(0)
 	})
 })

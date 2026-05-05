@@ -8,7 +8,10 @@ import type {
 	NationDetailsData,
 } from "../../details/shared"
 import type { HistoryQuery, HistoryView } from "../history/history-query"
+import { rgbToCss } from "../shared/ui-format"
 import type { DisplayNationModel } from "./display-model"
+import { getDynastyColor } from "./region-colors"
+import { buildRulerDisplayMeta } from "./ruler-display"
 
 const RELATION_LABELS: Record<number, string> = {
 	[REL.NONE]: "None",
@@ -68,13 +71,62 @@ function buildPartitionDistribution(params: {
 		.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
 }
 
+function getNationNeighborIds(params: {
+	selectedNationId: number
+	world: SerializedOrogenWorld
+	nationModel: DisplayNationModel
+	useLazyAdjacency: boolean
+}): number[] {
+	const { selectedNationId, world, nationModel, useLazyAdjacency } = params
+	if (
+		useLazyAdjacency &&
+		world.provinces?.adjOffset &&
+		world.provinces.adjList
+	) {
+		const neighborIds = new Set<number>()
+		for (let province = 0; province < world.provinces.count; province++) {
+			if (nationModel.assignment[province] !== selectedNationId) continue
+			for (
+				let edge = world.provinces.adjOffset[province];
+				edge < world.provinces.adjOffset[province + 1];
+				edge++
+			) {
+				const neighborId = nationModel.assignment[world.provinces.adjList[edge]]
+				if (
+					neighborId < 0 ||
+					neighborId === selectedNationId ||
+					!nationModel.counts.has(neighborId)
+				) {
+					continue
+				}
+				neighborIds.add(neighborId)
+			}
+		}
+		return Array.from(neighborIds).sort((a, b) => a - b)
+	}
+	if (selectedNationId + 1 >= nationModel.adjOffset.length) return []
+	return Array.from(
+		new Set(
+			nationModel.adjList.slice(
+				nationModel.adjOffset[selectedNationId],
+				nationModel.adjOffset[selectedNationId + 1],
+			),
+		),
+	)
+		.filter((neighborId) => nationModel.counts.has(neighborId))
+		.sort((a, b) => a - b)
+}
+
 export function buildSelectedNationDetails(params: {
 	selectedNationId: number | null
+	selectedTimeMs?: number
 	world: SerializedOrogenWorld | null
 	nationModel: DisplayNationModel | null
 	selectedHistoryView: HistoryView | null
 	getNationColor: (nationId: number) => string | null
 	getNationName: (nationId: number) => string
+	getLeaderName?: (nationId: number, timeMs: number) => string
+	getDynastyName?: (dynastyId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
 	getFaithName: (faithId: number) => string
@@ -82,11 +134,14 @@ export function buildSelectedNationDetails(params: {
 }): NationDetailsData | null {
 	const {
 		selectedNationId,
+		selectedTimeMs,
 		world,
 		nationModel,
 		selectedHistoryView,
 		getNationColor,
 		getNationName,
+		getLeaderName,
+		getDynastyName,
 		getCultureName,
 		getHeritageName,
 		getFaithName,
@@ -209,28 +264,19 @@ export function buildSelectedNationDetails(params: {
 		return 1 - attackerWeighted / (attackerWeighted + defenderWeighted)
 	}
 
-	const neighbors =
-		selectedNationId + 1 < nationModel.adjOffset.length
-			? Array.from(
-					new Set(
-						nationModel.adjList.slice(
-							nationModel.adjOffset[selectedNationId],
-							nationModel.adjOffset[selectedNationId + 1],
-						),
-					),
-				)
-					.filter((neighborId) => nationModel.counts.has(neighborId))
-					.sort((a, b) => a - b)
-					.map((neighborId) => ({
-						id: neighborId,
-						name: getNationName(neighborId),
-						color: getNationColor(neighborId),
-						relation:
-							RELATION_LABELS[relationAt(selectedNationId, neighborId)] ??
-							"Unknown",
-						threat: warThreatAgainst(selectedNationId, neighborId),
-					}))
-			: []
+	const neighbors = getNationNeighborIds({
+		selectedNationId,
+		world,
+		nationModel,
+		useLazyAdjacency: selectedHistoryView !== null,
+	}).map((neighborId) => ({
+		id: neighborId,
+		name: getNationName(neighborId),
+		color: getNationColor(neighborId),
+		relation:
+			RELATION_LABELS[relationAt(selectedNationId, neighborId)] ?? "Unknown",
+		threat: warThreatAgainst(selectedNationId, neighborId),
+	}))
 
 	const nationWars = activeWars
 		.filter(
@@ -252,9 +298,38 @@ export function buildSelectedNationDetails(params: {
 		}))
 		.sort((a, b) => a.opponentId - b.opponentId)
 
+	const dynastyByNation =
+		selectedHistoryView?.leaderDynasty ?? world.leaderDynasty
+	const rulerDynastyId =
+		selectedNationId >= 0 ? (dynastyByNation?.[selectedNationId] ?? -1) : -1
+	const rulerMeta = buildRulerDisplayMeta({
+		world,
+		nationId: selectedNationId,
+		timeMs: selectedTimeMs,
+	})
+	const ruler =
+		selectedTimeMs != null && getLeaderName
+			? {
+					name: getLeaderName(selectedNationId, selectedTimeMs),
+					age: rulerMeta.age,
+					genderSymbol: rulerMeta.genderSymbol,
+					claimStrength: rulerMeta.claimStrength,
+					isRegency: rulerMeta.isRegency,
+					dynasty:
+						rulerDynastyId >= 0 && getDynastyName
+							? getDynastyName(rulerDynastyId)
+							: null,
+					dynastyColor:
+						rulerDynastyId >= 0
+							? rgbToCss(getDynastyColor(rulerDynastyId))
+							: null,
+				}
+			: null
+
 	return {
 		id: selectedNationId,
 		name: getNationName(selectedNationId),
+		ruler,
 		provinceCount,
 		totalPopulation,
 		color: getNationColor(selectedNationId),
@@ -334,8 +409,14 @@ export function buildNationHistory(params: {
 		points.push({
 			timeMs,
 			size,
-			wealth: view.nationWealth?.[selectedNationId] ?? 0,
-			optimalWealth: view.nationOptimalWealth?.[selectedNationId] ?? 0,
+			wealth:
+				view.getNationWealth?.(selectedNationId) ??
+				view.nationWealth?.[selectedNationId] ??
+				0,
+			optimalWealth:
+				view.getNationOptimalWealth?.(selectedNationId) ??
+				view.nationOptimalWealth?.[selectedNationId] ??
+				0,
 		})
 	}
 	return points

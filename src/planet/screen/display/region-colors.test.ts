@@ -273,6 +273,54 @@ describe("computeRegionColors", () => {
 		expectRegionColor(rgb!, 0, darkenPoliticalAtElevation([0.7, 0.5, 0.3], 2))
 	})
 
+	it("renders rebel nations with their loyalist base color in nation borders mode", () => {
+		const world = buildWorld({
+			elevation_km: new Float32Array([2, 1]),
+			provinces: {
+				regionProvince: new Int32Array([0, 1]),
+				seeds: new Int32Array([0, 1]),
+				count: 2,
+				desolate: new Uint8Array([0, 0]),
+				landmassId: new Int32Array([0, 0]),
+				adjOffset: new Int32Array([0, 1, 2]),
+				adjList: new Int32Array([1, 0]),
+				size: new Int32Array([1, 1]),
+				colors: new Float32Array([0.1, 0.2, 0.3, 0.7, 0.1, 0.1]),
+			},
+			nations: {
+				assignment: new Int32Array([0, 1]),
+				seeds: new Int32Array([0, 1]),
+				count: 2,
+				adjOffset: new Int32Array([0, 1, 2]),
+				adjList: new Int32Array([1, 0]),
+				size: new Int32Array([1, 1]),
+				colors: new Float32Array([0.2, 0.3, 0.4, 0.8, 0.1, 0.2]),
+				parent: new Int32Array([-1, -1]),
+				depth: new Int32Array([0, 0]),
+				childOffset: new Int32Array([0, 0, 0]),
+				childList: new Int32Array(0),
+				sovereign: new Int32Array([0, 1]),
+				gravity: new Float32Array([1, 1]),
+			},
+		})
+
+		const rgb = computeRegionColors(
+			world,
+			"nations",
+			DEFAULT_NATION_MODE,
+			DEFAULT_POPULATION_MODE,
+			0,
+			0,
+			0,
+			0,
+			"globe",
+			undefined,
+			[{ idx: 4, attacker: 0, defender: 1, rebel: true, occupied: [] }],
+		)
+
+		expectRegionColor(rgb!, 1, darkenPoliticalAtElevation([0.2, 0.3, 0.4], 1))
+	})
+
 	it("darkens map water in temperature and moisture views", () => {
 		const world = buildWorld({
 			climate: {
@@ -606,6 +654,44 @@ describe("computeRegionColors", () => {
 
 			expectRegionColor(rgb!, 0, [0.35, 0.33, 0.32])
 		}
+	})
+
+	it("colors shared dynasties consistently and grays missing dynasties", () => {
+		const world = buildWorld({
+			elevation: new Float32Array([1, 1]),
+			elevation_km: new Float32Array([0.4, 0.8]),
+			isLand: new Uint8Array([1, 1]),
+			provinces: {
+				regionProvince: new Int32Array([0, 1]),
+				seeds: new Int32Array([0, 1]),
+				count: 2,
+				desolate: new Uint8Array([0, 0]),
+				landmassId: new Int32Array([0, 0]),
+				adjOffset: new Int32Array([0, 0, 0]),
+				adjList: new Int32Array(0),
+				size: new Int32Array([1, 1]),
+				colors: new Float32Array([0.1, 0.2, 0.3, 0.3, 0.2, 0.1]),
+			},
+			nations: {
+				assignment: new Int32Array([1, 0]),
+			} as never,
+			leaderDynasty: new Int32Array([-1, 7]),
+		})
+
+		const rgb = computeRegionColors(
+			world,
+			"nations",
+			"dynasty",
+			DEFAULT_POPULATION_MODE,
+			0,
+			0,
+			0,
+			0,
+		)
+
+		expect(rgb).not.toBeNull()
+		expect(Array.from(rgb!.subarray(0, 3))).not.toEqual([0.35, 0.33, 0.32])
+		expect(Array.from(rgb!.subarray(3, 6))).not.toEqual([0.35, 0.33, 0.32])
 	})
 
 	it("falls back to defaults for missing danger and basin values", () => {

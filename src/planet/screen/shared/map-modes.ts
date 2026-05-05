@@ -8,7 +8,7 @@ export type PopulationMapMode =
 	| "faith"
 	| "religion"
 
-export type NationMapMode = "borders" | "provinces"
+export type NationMapMode = "borders" | "provinces" | "dynasty"
 
 export type MapModePrimary = "geography" | "political" | "demographics"
 
@@ -70,6 +70,7 @@ export const POLITICAL_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["borders", "Nations"],
 	["provinces", "Provinces"],
+	["dynasty", "Dynasty"],
 ]
 
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {

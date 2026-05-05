@@ -21,4 +21,8 @@ describe("getNearestHistoryPointIndex", () => {
 		expect(getNearestHistoryPointIndex(history, 50)).toBe(0)
 		expect(getNearestHistoryPointIndex(history, 999)).toBe(3)
 	})
+
+	it("returns -1 when no history points exist", () => {
+		expect(getNearestHistoryPointIndex([], 240)).toBe(-1)
+	})
 })

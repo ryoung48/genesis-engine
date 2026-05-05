@@ -79,6 +79,7 @@ export interface GenerationCallbacks {
 	setPlanetCodeInput: (v: string) => void
 	setWorld: (v: SerializedOrogenWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
+	onGenerationFrame?: (frame: SerializedHistoryFrame) => void
 	onGenerationComplete?: () => void
 	onSimProgress?: (timeMs: number, frame: SerializedHistoryFrame) => void
 	onSimComplete?: (
@@ -225,6 +226,7 @@ export function generateWorld(
 				callbacks.setPlanetCode(code)
 				callbacks.setPlanetCodeInput(code)
 				callbacks.setWorld(message.world)
+				if (message.frame) callbacks.onGenerationFrame?.(message.frame)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)

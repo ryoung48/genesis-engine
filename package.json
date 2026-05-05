@@ -9,6 +9,7 @@
 		"build": "tsc -b && vite build",
 		"lint": "knip --fix --allow-remove-files && biome check --write --unsafe",
 		"preview": "vite preview",
+		"bench:snapshot": "node scripts/run-snapshot-bench.mjs",
 		"test": "vitest run --project unit --coverage",
 		"test:unit": "vitest run --project unit",
 		"test:coverage": "pnpm test",

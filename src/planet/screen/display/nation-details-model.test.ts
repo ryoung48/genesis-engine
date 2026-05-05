@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import type { HistoryNote } from "@/model/history/state"
 import { REL, YEAR_MS } from "@/model/history/state"
+import {
+	CULTURE_GENDER_SYSTEM,
+	leaderGenderSymbol,
+	resolveLeaderGender,
+} from "@/model/society/gender-system"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { HistoryView } from "../history/history-query"
 import {
@@ -102,6 +107,10 @@ describe("buildSelectedNationDetails", () => {
 			cultures: {
 				assignment: new Int32Array([0, 1]),
 				colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+				genderSystems: new Uint8Array([
+					CULTURE_GENDER_SYSTEM.PATRIARCHAL,
+					CULTURE_GENDER_SYSTEM.PATRIARCHAL,
+				]),
 			},
 			heritages: {
 				assignment: new Int32Array([0, 1]),
@@ -126,6 +135,9 @@ describe("buildSelectedNationDetails", () => {
 				habitabilityScore: 0,
 				totalPopulation: 140,
 			},
+			leaderNameSeed: new Int32Array([99, 11]),
+			leaderClaim: new Int32Array([3, 2]),
+			leaderBirthYear: new Float32Array([0, 0]),
 		} as unknown as SerializedOrogenWorld
 		const nationModel = {
 			assignment: new Int32Array([0, 1]),
@@ -138,9 +150,11 @@ describe("buildSelectedNationDetails", () => {
 		}
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
+			selectedTimeMs: YEAR_MS,
 			world,
 			nationModel: nationModel as never,
 			selectedHistoryView: {
+				leaderDynasty: new Int32Array([4, 5]),
 				consumption: new Float32Array([2, 1]),
 				activeWars: [{ idx: 9, attacker: 0, defender: 1, rebel: false }],
 				relationAt: (a: number, b: number) =>
@@ -148,6 +162,8 @@ describe("buildSelectedNationDetails", () => {
 			} as unknown as HistoryView,
 			getNationColor: (nationId) => `color-${nationId}`,
 			getNationName: (nationId) => `nation-${nationId}`,
+			getLeaderName: (nationId, timeMs) => `leader-${nationId}-${timeMs}`,
+			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
 			getCultureName,
 			getHeritageName,
 			getFaithName,
@@ -157,6 +173,17 @@ describe("buildSelectedNationDetails", () => {
 		expect(details).toMatchObject({
 			id: 0,
 			name: "nation-0",
+			ruler: {
+				name: `leader-0-${YEAR_MS}`,
+				age: 1,
+				genderSymbol: leaderGenderSymbol(
+					resolveLeaderGender(CULTURE_GENDER_SYSTEM.PATRIARCHAL, 99),
+				),
+				claimStrength: "Strong claim",
+				isRegency: true,
+				dynasty: "dynasty-4",
+				dynastyColor: expect.stringMatching(/^rgb/),
+			},
 			provinceCount: 1,
 			totalPopulation: 100,
 			color: "color-0",
@@ -443,6 +470,125 @@ describe("buildSelectedNationDetails", () => {
 		expect(details?.neighbors[1]?.threat).toBeGreaterThan(0)
 	})
 
+	it("computes historical neighbors lazily from province adjacency", () => {
+		const world = {
+			provinces: {
+				count: 4,
+				adjOffset: new Int32Array([0, 2, 4, 6, 8]),
+				adjList: new Int32Array([1, 2, 0, 3, 0, 3, 1, 2]),
+			},
+			nations: {
+				parent: new Int32Array([-1, -1, -1, -1]),
+				childOffset: new Int32Array([0, 0, 0, 0, 0]),
+				childList: new Int32Array(0),
+			},
+			population: {
+				population: new Float32Array([10, 20, 30, 40]),
+				habitability: new Float32Array([5, 6, 7, 8]),
+				habitabilityScore: 0,
+				totalPopulation: 100,
+			},
+		} as unknown as SerializedOrogenWorld
+		const details = buildSelectedNationDetails({
+			selectedNationId: 0,
+			world,
+			nationModel: {
+				assignment: new Int32Array([0, 0, 1, 2]),
+				counts: new Map([
+					[0, 2],
+					[1, 1],
+					[2, 1],
+				]),
+				adjOffset: new Int32Array([0, 0, 0, 0]),
+				adjList: new Int32Array(0),
+			} as never,
+			selectedHistoryView: {
+				consumption: new Float32Array([1, 1, 1, 1]),
+				activeWars: [],
+				relationAt: (a: number, b: number) => {
+					if ((a === 0 && b === 1) || (a === 1 && b === 0)) return REL.ALLY
+					if ((a === 0 && b === 2) || (a === 2 && b === 0)) return REL.RIVAL
+					return REL.NONE
+				},
+			} as unknown as HistoryView,
+			getNationColor: (nationId) => `color-${nationId}`,
+			getNationName: (nationId) => `nation-${nationId}`,
+			getCultureName,
+			getHeritageName,
+			getFaithName,
+			getReligionName,
+		})
+
+		expect(details?.neighbors).toEqual([
+			expect.objectContaining({
+				id: 1,
+				name: "nation-1",
+				color: "color-1",
+				relation: "Ally",
+			}),
+			expect.objectContaining({
+				id: 2,
+				name: "nation-2",
+				color: "color-2",
+				relation: "Rival",
+			}),
+		])
+		expect(details?.neighbors[0]?.threat).toBeGreaterThan(0)
+		expect(details?.neighbors[1]?.threat).toBeGreaterThan(0)
+	})
+
+	it("prefers lazy historical adjacency over stale nation-model neighbors", () => {
+		const world = {
+			provinces: {
+				count: 4,
+				adjOffset: new Int32Array([0, 2, 4, 6, 8]),
+				adjList: new Int32Array([1, 2, 0, 3, 0, 3, 1, 2]),
+			},
+			nations: {
+				parent: new Int32Array([-1, -1, -1, -1]),
+				childOffset: new Int32Array([0, 0, 0, 0, 0]),
+				childList: new Int32Array(0),
+			},
+			population: {
+				population: new Float32Array([10, 20, 30, 40]),
+				habitability: new Float32Array([5, 6, 7, 8]),
+				habitabilityScore: 0,
+				totalPopulation: 100,
+			},
+		} as unknown as SerializedOrogenWorld
+		const details = buildSelectedNationDetails({
+			selectedNationId: 0,
+			world,
+			nationModel: {
+				assignment: new Int32Array([0, 0, 1, 2]),
+				counts: new Map([
+					[0, 2],
+					[1, 1],
+					[2, 1],
+				]),
+				adjOffset: new Int32Array([0, 1, 1, 1]),
+				adjList: new Int32Array([2]),
+			} as never,
+			selectedHistoryView: {
+				consumption: new Float32Array([1, 1, 1, 1]),
+				activeWars: [],
+				relationAt: (a: number, b: number) => {
+					if ((a === 0 && b === 1) || (a === 1 && b === 0)) return REL.ALLY
+					if ((a === 0 && b === 2) || (a === 2 && b === 0)) return REL.RIVAL
+					return REL.NONE
+				},
+			} as unknown as HistoryView,
+			getNationColor: () => null,
+			getNationName: (nationId) => `nation-${nationId}`,
+			getCultureName,
+			getHeritageName,
+			getFaithName,
+			getReligionName,
+		})
+
+		expect(details?.neighbors.map((neighbor) => neighbor.id)).toEqual([1, 2])
+	})
+
 	it("uses default relations, empty wars, and zeroed history wealth fallbacks", () => {
 		const world = {
 			provinces: { count: 2 },
@@ -477,6 +623,8 @@ describe("buildSelectedNationDetails", () => {
 			historyQuery: {
 				getView: () => ({
 					assignment: new Int32Array([1, 1]),
+					getNationWealth: () => 0,
+					getNationOptimalWealth: () => 0,
 				}),
 			} as never,
 			selectedTimeMs: 0,
@@ -503,6 +651,31 @@ describe("buildSelectedNationDetails", () => {
 		})
 		expect(history).toEqual([
 			{ timeMs: 0, size: 2, wealth: 0, optimalWealth: 0 },
+		])
+	})
+
+	it("prefers lazy history wealth accessors over eager snapshot arrays", () => {
+		const history = buildNationHistory({
+			selectedNationId: 1,
+			historyQuery: {
+				getView: () => ({
+					assignment: new Int32Array([1, 1]),
+					nationWealth: new Float32Array([10, 20]),
+					nationOptimalWealth: new Float32Array([30, 40]),
+					getNationWealth: (nationId: number) => nationId + 100,
+					getNationOptimalWealth: (nationId: number) => nationId + 200,
+				}),
+			} as never,
+			selectedTimeMs: 0,
+			simStartTimeMs: 0,
+			simTimeMs: 0,
+			world: {
+				provinces: { count: 2 },
+			} as unknown as SerializedOrogenWorld,
+		})
+
+		expect(history).toEqual([
+			{ timeMs: 0, size: 2, wealth: 101, optimalWealth: 201 },
 		])
 	})
 
@@ -536,6 +709,137 @@ describe("buildSelectedNationDetails", () => {
 			id: 1,
 			name: "nation-1",
 			neighbors: [],
+		})
+	})
+
+	it("uses world dynasty fallbacks and allows ruler entries without a named dynasty", () => {
+		const details = buildSelectedNationDetails({
+			selectedNationId: 0,
+			selectedTimeMs: 0,
+			world: {
+				provinces: { count: 1 },
+				leaderDynasty: new Int32Array([-1]),
+				nations: {
+					parent: new Int32Array([-1]),
+					childOffset: new Int32Array([0, 0]),
+					childList: new Int32Array(0),
+				},
+			} as unknown as SerializedOrogenWorld,
+			nationModel: {
+				assignment: new Int32Array([0]),
+				counts: new Map([[0, 1]]),
+				adjOffset: new Int32Array([0, 0]),
+				adjList: new Int32Array(0),
+			} as never,
+			selectedHistoryView: null,
+			getNationColor: () => null,
+			getNationName: (nationId) => `nation-${nationId}`,
+			getLeaderName: (nationId, timeMs) => `leader-${nationId}-${timeMs}`,
+			getCultureName,
+			getHeritageName,
+			getFaithName,
+			getReligionName,
+		})
+
+		expect(details?.ruler).toEqual({
+			name: "leader-0-0",
+			age: null,
+			genderSymbol: null,
+			claimStrength: null,
+			isRegency: false,
+			dynasty: null,
+			dynastyColor: null,
+		})
+	})
+
+	it("omits ruler info when the selected time or leader formatter is unavailable", () => {
+		const world = {
+			provinces: { count: 1 },
+			leaderDynasty: new Int32Array([3]),
+			nations: {
+				parent: new Int32Array([-1]),
+				childOffset: new Int32Array([0, 0]),
+				childList: new Int32Array(0),
+			},
+		} as unknown as SerializedOrogenWorld
+		const nationModel = {
+			assignment: new Int32Array([0]),
+			counts: new Map([[0, 1]]),
+			adjOffset: new Int32Array([0, 0]),
+			adjList: new Int32Array(0),
+		} as never
+
+		const missingTime = buildSelectedNationDetails({
+			selectedNationId: 0,
+			world,
+			nationModel,
+			selectedHistoryView: null,
+			getNationColor: () => null,
+			getNationName: (nationId) => `nation-${nationId}`,
+			getLeaderName: (nationId, timeMs) => `leader-${nationId}-${timeMs}`,
+			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
+			getCultureName,
+			getHeritageName,
+			getFaithName,
+			getReligionName,
+		})
+		const missingLeaderName = buildSelectedNationDetails({
+			selectedNationId: 0,
+			selectedTimeMs: 0,
+			world,
+			nationModel,
+			selectedHistoryView: null,
+			getNationColor: () => null,
+			getNationName: (nationId) => `nation-${nationId}`,
+			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
+			getCultureName,
+			getHeritageName,
+			getFaithName,
+			getReligionName,
+		})
+
+		expect(missingTime?.ruler).toBeNull()
+		expect(missingLeaderName?.ruler).toBeNull()
+	})
+
+	it("uses world dynasty data for named rulers when no history snapshot is present", () => {
+		const details = buildSelectedNationDetails({
+			selectedNationId: 0,
+			selectedTimeMs: 0,
+			world: {
+				provinces: { count: 1 },
+				leaderDynasty: new Int32Array([3]),
+				nations: {
+					parent: new Int32Array([-1]),
+					childOffset: new Int32Array([0, 0]),
+					childList: new Int32Array(0),
+				},
+			} as unknown as SerializedOrogenWorld,
+			nationModel: {
+				assignment: new Int32Array([0]),
+				counts: new Map([[0, 1]]),
+				adjOffset: new Int32Array([0, 0]),
+				adjList: new Int32Array(0),
+			} as never,
+			selectedHistoryView: null,
+			getNationColor: () => null,
+			getNationName: (nationId) => `nation-${nationId}`,
+			getLeaderName: (nationId, timeMs) => `leader-${nationId}-${timeMs}`,
+			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
+			getCultureName,
+			getHeritageName,
+			getFaithName,
+			getReligionName,
+		})
+
+		expect(details?.ruler).toEqual({
+			name: "leader-0-0",
+			age: null,
+			genderSymbol: null,
+			claimStrength: null,
+			isRegency: false,
+			dynasty: "dynasty-3",
+			dynastyColor: expect.stringMatching(/^rgb/),
 		})
 	})
 
@@ -611,24 +915,30 @@ describe("buildNationHistory", () => {
 				0,
 				{
 					assignment: new Int32Array([1, 0, 1]),
-					nationWealth: new Float32Array([4, 10]),
-					nationOptimalWealth: new Float32Array([6, 12]),
+					getNationWealth: (nationId: number) =>
+						new Float32Array([4, 10])[nationId] ?? 0,
+					getNationOptimalWealth: (nationId: number) =>
+						new Float32Array([6, 12])[nationId] ?? 0,
 				},
 			],
 			[
 				YEAR_MS,
 				{
 					assignment: new Int32Array([1, 1, 0]),
-					nationWealth: new Float32Array([5, 11]),
-					nationOptimalWealth: new Float32Array([7, 13]),
+					getNationWealth: (nationId: number) =>
+						new Float32Array([5, 11])[nationId] ?? 0,
+					getNationOptimalWealth: (nationId: number) =>
+						new Float32Array([7, 13])[nationId] ?? 0,
 				},
 			],
 			[
 				2 * YEAR_MS,
 				{
 					assignment: new Int32Array([0, 1, 0]),
-					nationWealth: new Float32Array([6, 12]),
-					nationOptimalWealth: new Float32Array([8, 14]),
+					getNationWealth: (nationId: number) =>
+						new Float32Array([6, 12])[nationId] ?? 0,
+					getNationOptimalWealth: (nationId: number) =>
+						new Float32Array([8, 14])[nationId] ?? 0,
 				},
 			],
 		])
@@ -653,6 +963,29 @@ describe("buildNationHistory", () => {
 		])
 	})
 
+	it("falls back to snapshot wealth arrays when lazy accessors are unavailable", () => {
+		const result = buildNationHistory({
+			selectedNationId: 1,
+			historyQuery: {
+				getView: () => ({
+					assignment: new Int32Array([1, 0, 1]),
+					nationWealth: new Float32Array([4, 10]),
+					nationOptimalWealth: new Float32Array([6, 12]),
+				}),
+			} as never,
+			selectedTimeMs: 0,
+			simStartTimeMs: 0,
+			simTimeMs: 0,
+			world: {
+				provinces: { count: 3 },
+			} as unknown as SerializedOrogenWorld,
+		})
+
+		expect(result).toEqual([
+			{ timeMs: 0, size: 2, wealth: 10, optimalWealth: 12 },
+		])
+	})
+
 	it("returns undefined without a selected nation, history query, or provinces", () => {
 		expect(
 			buildNationHistory({
@@ -673,6 +1006,8 @@ describe("buildNationHistory", () => {
 				historyQuery: {
 					getView: () => ({
 						assignment: new Int32Array([0]),
+						getNationWealth: () => 0,
+						getNationOptimalWealth: () => 0,
 					}),
 				} as never,
 				selectedTimeMs: 0,

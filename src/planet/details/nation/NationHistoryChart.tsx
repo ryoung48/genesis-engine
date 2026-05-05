@@ -18,11 +18,13 @@ import React from "react"
 import { Line } from "react-chartjs-2"
 import { Swatch } from "@/components"
 import type { HistoryNote } from "@/model/history"
+import { getDynastyColor } from "../../screen/display/region-colors"
 import {
 	historyTimeParts,
 	historyTimeToYear,
 } from "../../screen/history/history-time"
 import { monthLabels } from "../../screen/shared/constants"
+import { rgbToCss } from "../../screen/shared/ui-format"
 import {
 	type EventCtx,
 	eventDotColors,
@@ -60,6 +62,12 @@ interface NationHistoryChartProps {
 	currentTimeMs: number
 	onTimeSelect: (timeMs: number) => void
 	onNationClick?: (nationId: number) => void
+	onProvinceClick?: (provinceId: number) => void
+	getNationName?: (nationId: number) => string
+	getNationColor?: (nationId: number) => string | null
+	getProvinceName?: (provinceId: number) => string
+	getProvinceColor?: (provinceId: number) => string | null
+	getDynastyName?: (dynastyId: number) => string
 }
 
 export const NationHistoryChart: React.FC<NationHistoryChartProps> = ({
@@ -71,6 +79,12 @@ export const NationHistoryChart: React.FC<NationHistoryChartProps> = ({
 	currentTimeMs: _currentTimeMs,
 	onTimeSelect,
 	onNationClick,
+	onProvinceClick,
+	getNationName,
+	getNationColor,
+	getProvinceName,
+	getProvinceColor,
+	getDynastyName,
 }) => {
 	const selectedLineIdx = getNearestHistoryPointIndex(history, selectedTimeMs)
 	const selectedIdxRef = React.useRef(selectedLineIdx)
@@ -332,6 +346,12 @@ export const NationHistoryChart: React.FC<NationHistoryChartProps> = ({
 				ctx={ctx}
 				onTimeSelect={onTimeSelect}
 				onNationClick={onNationClick}
+				onProvinceClick={onProvinceClick}
+				getNationName={getNationName}
+				getNationColor={getNationColor}
+				getProvinceName={getProvinceName}
+				getProvinceColor={getProvinceColor}
+				getDynastyName={getDynastyName}
 			/>
 		</div>
 	)
@@ -339,30 +359,128 @@ export const NationHistoryChart: React.FC<NationHistoryChartProps> = ({
 
 export function renderDescription(
 	text: string,
-	onNationClick?: (nationId: number) => void,
+	options?: {
+		onNationClick?: (nationId: number) => void
+		onProvinceClick?: (provinceId: number) => void
+		getNationName?: (nationId: number) => string
+		getNationColor?: (nationId: number) => string | null
+		getProvinceName?: (provinceId: number) => string
+		getProvinceColor?: (provinceId: number) => string | null
+		getDynastyName?: (dynastyId: number) => string
+	},
 ) {
+	const getNationName = options?.getNationName
+	const getNationColor = options?.getNationColor
+	const getProvinceName = options?.getProvinceName
+	const getProvinceColor = options?.getProvinceColor
+	const getDynastyName = options?.getDynastyName
+	const onNationClick = options?.onNationClick
+	const onProvinceClick = options?.onProvinceClick
 	const parts: React.ReactNode[] = []
-	const re = /#(\d+)/g
+	const re = /Dynasty #(\d+)|leader #(\d+)|province #(\d+)|#(\d+)/g
 	let last = 0
 	let match: RegExpExecArray | null
 	let key = 0
 	match = re.exec(text)
 	while (match !== null) {
 		if (match.index > last) parts.push(text.slice(last, match.index))
-		const id = Number(match[1])
-		if (onNationClick) {
+		if (match[1] !== undefined) {
+			const dynastyId = Number(match[1])
 			parts.push(
-				<button
+				<span
 					key={key++}
-					type="button"
-					onClick={(e) => {
-						e.stopPropagation()
-						onNationClick(id)
-					}}
-					className="font-semibold text-indigo-600 hover:underline"
+					className="inline-flex items-center gap-1 font-semibold text-slate-700"
 				>
-					#{id}
-				</button>,
+					<Swatch
+						color={rgbToCss(getDynastyColor(dynastyId))}
+						className="shrink-0"
+					/>
+					<span>{getDynastyName?.(dynastyId) ?? `Dynasty #${dynastyId}`}</span>
+				</span>,
+			)
+			last = match.index + match[0].length
+			match = re.exec(text)
+			continue
+		}
+		if (match[2] !== undefined) {
+			parts.push(match[0])
+			last = match.index + match[0].length
+			match = re.exec(text)
+			continue
+		}
+		if (match[3] !== undefined) {
+			const provinceId = Number(match[3])
+			const provinceLabel = (
+				<>
+					<Swatch
+						color={getProvinceColor?.(provinceId) ?? null}
+						className="shrink-0"
+					/>
+					<span>
+						{getProvinceName?.(provinceId) ?? `Province #${provinceId}`}
+					</span>
+				</>
+			)
+			if (onProvinceClick || getProvinceName || getProvinceColor) {
+				parts.push(
+					onProvinceClick ? (
+						<button
+							key={key++}
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation()
+								onProvinceClick(provinceId)
+							}}
+							className="inline-flex items-center gap-1 font-semibold text-cyan-700 hover:underline"
+						>
+							{provinceLabel}
+						</button>
+					) : (
+						<span
+							key={key++}
+							className="inline-flex items-center gap-1 font-semibold text-slate-700"
+						>
+							{provinceLabel}
+						</span>
+					),
+				)
+			} else {
+				parts.push(match[0])
+			}
+			last = match.index + match[0].length
+			match = re.exec(text)
+			continue
+		}
+		const id = Number(match[4])
+		const nationName = getNationName?.(id) ?? match[0]
+		const nationLabel = (
+			<>
+				<Swatch color={getNationColor?.(id) ?? null} className="shrink-0" />
+				<span>{nationName}</span>
+			</>
+		)
+		if (onNationClick || getNationName || getNationColor) {
+			parts.push(
+				onNationClick ? (
+					<button
+						key={key++}
+						type="button"
+						onClick={(e) => {
+							e.stopPropagation()
+							onNationClick(id)
+						}}
+						className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:underline"
+					>
+						{nationLabel}
+					</button>
+				) : (
+					<span
+						key={key++}
+						className="inline-flex items-center gap-1 font-semibold text-slate-700"
+					>
+						{nationLabel}
+					</span>
+				),
 			)
 		} else {
 			parts.push(match[0])
@@ -380,12 +498,24 @@ export function EventCards({
 	ctx,
 	onTimeSelect,
 	onNationClick,
+	onProvinceClick,
+	getNationName,
+	getNationColor,
+	getProvinceName,
+	getProvinceColor,
+	getDynastyName,
 }: {
 	events: HistoryNote[]
 	year: number
 	ctx: EventCtx
 	onTimeSelect: (timeMs: number) => void
 	onNationClick?: (nationId: number) => void
+	onProvinceClick?: (provinceId: number) => void
+	getNationName?: (nationId: number) => string
+	getNationColor?: (nationId: number) => string | null
+	getProvinceName?: (provinceId: number) => string
+	getProvinceColor?: (provinceId: number) => string | null
+	getDynastyName?: (dynastyId: number) => string
 }) {
 	if (events.length === 0) {
 		return (
@@ -463,10 +593,15 @@ export function EventCards({
 								className="mt-1 text-[9px] leading-tight text-gray-600"
 								style={{ overflowWrap: "anywhere" }}
 							>
-								{renderDescription(
-									getEventDescription(event, ctx),
+								{renderDescription(getEventDescription(event, ctx), {
 									onNationClick,
-								)}
+									onProvinceClick,
+									getNationName,
+									getNationColor,
+									getProvinceName,
+									getProvinceColor,
+									getDynastyName,
+								})}
 							</div>
 						</div>
 					)

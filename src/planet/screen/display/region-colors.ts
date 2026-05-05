@@ -29,6 +29,10 @@ import {
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
 } from "./color-helpers"
+import {
+	getRebelDisplayColorNationId,
+	type PoliticalMapWar,
+} from "./political-conflict-display"
 
 function basinColor(id: number): [number, number, number] {
 	if (id < 0) return OCEAN_LIGHT_BLUE
@@ -37,6 +41,35 @@ function basinColor(id: number): [number, number, number] {
 	const hue = (h % 360) / 360
 	const sat = 0.45 + ((h >>> 9) % 40) / 100
 	const light = 0.42 + ((h >>> 17) % 18) / 100
+	let r = light
+	let g = light
+	let b = light
+	if (sat > 0) {
+		const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat
+		const p = 2 * light - q
+		const hueToRgb = (t: number) => {
+			let x = t
+			if (x < 0) x += 1
+			if (x > 1) x -= 1
+			if (x < 1 / 6) return p + (q - p) * 6 * x
+			if (x < 1 / 2) return q
+			if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6
+			return p
+		}
+		r = hueToRgb(hue + 1 / 3)
+		g = hueToRgb(hue)
+		b = hueToRgb(hue - 1 / 3)
+	}
+	return [r, g, b]
+}
+
+export function getDynastyColor(id: number): [number, number, number] {
+	if (id < 0) return [0.35, 0.33, 0.32]
+	let h = (id * 2246822519) >>> 0
+	h ^= h >>> 15
+	const hue = (h % 360) / 360
+	const sat = 0.52 + ((h >>> 9) % 24) / 100
+	const light = 0.44 + ((h >>> 17) % 16) / 100
 	let r = light
 	let g = light
 	let b = light
@@ -106,6 +139,7 @@ export function computeRegionColors(
 	currentMonth: number,
 	viewMode: "globe" | "map" = "globe",
 	_occupiedRegions?: Set<number>,
+	activeWars?: readonly PoliticalMapWar[] | null,
 ): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
 
@@ -417,6 +451,34 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "nations" && world.provinces) {
+		if (nationMode === "dynasty") {
+			const { regionProvince, desolate } = world.provinces
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				const rulerNationId =
+					p >= 0 ? (world.nations?.assignment?.[p] ?? -1) : -1
+				const dynastyId =
+					rulerNationId >= 0 ? (world.leaderDynasty?.[rulerNationId] ?? -1) : -1
+				if (p < 0) {
+					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
+					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
+					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+				} else if (desolate[p] || dynastyId < 0) {
+					rgb[3 * r] = 0.35
+					rgb[3 * r + 1] = 0.33
+					rgb[3 * r + 2] = 0.32
+				} else {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						getDynastyColor(dynastyId),
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
+			}
+			return rgb
+		}
 		if (nationMode === "provinces") {
 			const { regionProvince, colors: provColors, desolate } = world.provinces
 			for (let r = 0; r < N; r++) {
@@ -454,11 +516,16 @@ export function computeRegionColors(
 					rgb[3 * r + 1] = 0.33
 					rgb[3 * r + 2] = 0.32
 				} else {
+					const displayColorNationId =
+						getRebelDisplayColorNationId(
+							activeWars,
+							world.nations.assignment[p],
+						) ?? world.nations.assignment[p]
 					const [cr, cg, cb] = darkenPoliticalAtElevation(
 						[
-							world.nations.colors[3 * p],
-							world.nations.colors[3 * p + 1],
-							world.nations.colors[3 * p + 2],
+							world.nations.colors[3 * displayColorNationId],
+							world.nations.colors[3 * displayColorNationId + 1],
+							world.nations.colors[3 * displayColorNationId + 2],
 						],
 						world.elevation_km[r],
 					)

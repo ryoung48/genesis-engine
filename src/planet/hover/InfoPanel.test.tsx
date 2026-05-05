@@ -1,6 +1,11 @@
 import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
+import {
+	CULTURE_GENDER_SYSTEM,
+	leaderGenderSymbol,
+	resolveLeaderGender,
+} from "@/model/society/gender-system"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { InfoPanel } from "./InfoPanel"
 
@@ -46,6 +51,9 @@ function makeWorld(): SerializedOrogenWorld {
 			size: new Float32Array([1]),
 			colors: new Float32Array([1, 0, 0]),
 		},
+		leaderNameSeed: new Int32Array([-1, -1, 99]),
+		leaderBirthYear: new Float32Array([-1, -1, 0]),
+		leaderDynasty: new Int32Array([-1, -1, 6]),
 		nations: {
 			assignment: new Int32Array([2]),
 			gravity: new Float32Array([4]),
@@ -56,8 +64,12 @@ function makeWorld(): SerializedOrogenWorld {
 		urbanPopulation: new Float32Array([42000]),
 		development: new Float32Array([0.75]),
 		cultures: {
-			assignment: new Int32Array([1]),
+			assignment: new Int32Array([1, 1, 1]),
 			colors: new Float32Array([1, 0, 0, 0, 1, 0]),
+			genderSystems: new Uint8Array([
+				CULTURE_GENDER_SYSTEM.PATRIARCHAL,
+				CULTURE_GENDER_SYSTEM.PATRIARCHAL,
+			]),
 		},
 		heritages: {
 			assignment: new Int32Array([0, 2]),
@@ -114,20 +126,29 @@ function renderPanel(
 			hoverOceanCurrents={null}
 			colorMode="terrain"
 			populationMode="density"
+			selectedTimeMs={800}
 			displayMonth={1}
 			unitSystem="metric"
 			world={makeWorld()}
 			hoverCardRef={{ current: null }}
+			getProvinceName={(id) => `Province ${id}`}
 			getNationName={(id) => `Nation ${id}`}
+			getLeaderName={(id, timeMs) => `Leader ${id}@${timeMs}`}
+			getDynastyName={(id) => `Dynasty ${id}`}
 			getCultureName={(id) => `Culture ${id}`}
 			getHeritageName={(id) => `Heritage ${id}`}
 			getFaithName={(id) => `Faith ${id}`}
 			getReligionName={(id) => `Religion ${id}`}
 			getLandmarkName={(id) => `Landform ${id}`}
+			getRiverName={(id) => `River Name ${id}`}
 			{...overrides}
 		/>,
 	)
 }
+
+const expectedRulerSymbol = leaderGenderSymbol(
+	resolveLeaderGender(CULTURE_GENDER_SYSTEM.PATRIARCHAL, 99),
+)
 
 describe("InfoPanel", () => {
 	it("shows only geography-focused hover data for geography modes", () => {
@@ -206,7 +227,7 @@ describe("InfoPanel", () => {
 		expect(dtrMarkup).toContain("DTR Jan")
 		expect(precipitationMarkup).toContain(">PET<")
 		expect(precipitationMarkup).toContain(">AET<")
-		expect(precipitationMarkup).toContain("River #7")
+		expect(precipitationMarkup).toContain("River Name 7")
 		expect(precipitationMarkup).toContain("Length")
 		expect(pastaMarkup).toContain(">GDD<")
 		expect(pastaMarkup).toContain(">GInt<")
@@ -283,6 +304,7 @@ describe("InfoPanel", () => {
 		expect(markup).not.toContain(">PET<")
 		expect(markup).not.toContain(">AET<")
 		expect(markup).not.toContain("Length")
+		expect(markup).toContain("River Name 2")
 	})
 
 	it("renders infinite pasta summaries and cold current deltas", () => {
@@ -319,26 +341,81 @@ describe("InfoPanel", () => {
 		})
 
 		expect(markup).toContain(">Province<")
+		expect(markup).toContain("Province 0")
 		expect(markup).toContain(">Nation<")
+		expect(markup).toContain(">Dynasty<")
+		expect(markup).toContain("Dynasty 6")
+		expect(markup).toContain(">Ruler<")
+		expect(markup).toContain(`Leader 2@800 · ${expectedRulerSymbol} · 0`)
 		expect(markup).toContain(">Occupier<")
 		expect(markup).not.toContain(">Elev<")
 		expect(markup).not.toContain(">Climate<")
 		expect(markup).not.toContain(">Population<")
 	})
 
+	it("falls back to province ids when no province naming callback is provided", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+			getProvinceName: undefined,
+		})
+
+		expect(markup).toContain("#0")
+	})
+
 	it("renders rebel occupiers in political mode", () => {
 		const markup = renderPanel({
 			colorMode: "nations",
+			hoverNationId: 1,
 			hoverOccupation: {
 				id: 9,
 				name: "Invaders",
-				color: "rgb(1,2,3)",
+				color: "rgb(0, 0, 0)",
 				rebel: true,
 			},
 		})
 
+		expect(markup).toContain("Nation 1")
 		expect(markup).toContain("Invaders (rebels)")
+		expect(markup).toContain("background-color:rgb(0, 0, 0)")
 		expect(markup).not.toContain("repeating-linear-gradient")
+	})
+
+	it("shows dynasty without ruler details when no selected time is available", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+			selectedTimeMs: null,
+		})
+
+		expect(markup).toContain(">Dynasty<")
+		expect(markup).toContain("Dynasty 6")
+		expect(markup).not.toContain(">Ruler<")
+	})
+
+	it("shows a ruler without dynasty text when no dynasty can be resolved", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+			world: {
+				...makeWorld(),
+				leaderDynasty: new Int32Array([-1, -1, -1]),
+			} as SerializedOrogenWorld,
+			hoverOccupation: null,
+		})
+
+		expect(markup).toContain(">Ruler<")
+		expect(markup).toContain(`Leader 2@800 · ${expectedRulerSymbol} · 0`)
+		expect(markup).not.toContain(">Dynasty<")
+		expect(markup).not.toContain(">Occupier<")
+	})
+
+	it("omits dynasty and ruler rows when the naming resolvers are unavailable", () => {
+		const markup = renderPanel({
+			colorMode: "nations",
+			getLeaderName: undefined,
+			getDynastyName: undefined,
+		})
+
+		expect(markup).not.toContain(">Dynasty<")
+		expect(markup).not.toContain(">Ruler<")
 	})
 
 	it("omits political detail rows when no valid province is hovered", () => {

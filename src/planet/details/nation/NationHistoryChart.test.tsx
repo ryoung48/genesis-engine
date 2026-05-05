@@ -209,6 +209,7 @@ describe("NationHistoryChart", () => {
 
 	it("renders clickable descriptions and event-card interactions", () => {
 		const onNationClick = vi.fn()
+		const onProvinceClick = vi.fn()
 		const onTimeSelect = vi.fn()
 		const event = makeEvent("war started", YEAR_MS, {
 			attacker: 1,
@@ -216,7 +217,9 @@ describe("NationHistoryChart", () => {
 			war: 8,
 		})
 
-		const parts = renderDescription("#1 declared war on #7.", onNationClick)
+		const parts = renderDescription("#1 declared war on #7.", {
+			onNationClick,
+		})
 		expect(parts).toHaveLength(4)
 		const attackerButton = parts[0] as React.ReactElement<{
 			onClick?: (event: { stopPropagation: () => void }) => void
@@ -228,6 +231,21 @@ describe("NationHistoryChart", () => {
 		defenderButton.props.onClick?.({ stopPropagation: vi.fn() })
 		expect(onNationClick).toHaveBeenCalledWith(1)
 		expect(onNationClick).toHaveBeenCalledWith(7)
+
+		const provinceParts = renderDescription(
+			"#1 defeated #7 in a major battle (province #4).",
+			{
+				onNationClick,
+				onProvinceClick,
+				getProvinceName: (provinceId) => `Province ${provinceId}`,
+				getProvinceColor: () => "#0ea5e9",
+			},
+		)
+		const provinceButton = provinceParts[4] as React.ReactElement<{
+			onClick?: (event: { stopPropagation: () => void }) => void
+		}>
+		provinceButton.props.onClick?.({ stopPropagation: vi.fn() })
+		expect(onProvinceClick).toHaveBeenCalledWith(4)
 
 		const emptyMarkup = renderToStaticMarkup(
 			<EventCards
@@ -267,8 +285,30 @@ describe("NationHistoryChart", () => {
 		expect(onTimeSelect).toHaveBeenCalledTimes(3)
 	})
 
+	it("renders dynasty labels with swatches and no click handler", () => {
+		const onNationClick = vi.fn()
+		const parts = renderDescription("Dynasty #4 spread from #2 to #5.", {
+			onNationClick,
+			getDynastyName: (dynastyId) =>
+				dynastyId === 4 ? "House Aurelian" : `Dynasty #${dynastyId}`,
+		})
+
+		expect(parts).toHaveLength(6)
+		const dynastyChip = parts[0] as React.ReactElement
+		expect(dynastyChip.type).toBe("span")
+		const dynastyMarkup = renderToStaticMarkup(<>{dynastyChip}</>)
+		expect(dynastyMarkup).toContain("House Aurelian")
+		expect(dynastyMarkup).toContain("rgb(")
+
+		const sourceButton = parts[2] as React.ReactElement<{
+			onClick?: (event: { stopPropagation: () => void }) => void
+		}>
+		sourceButton.props.onClick?.({ stopPropagation: vi.fn() })
+		expect(onNationClick).toHaveBeenCalledWith(2)
+	})
+
 	it("covers non-clickable descriptions and remaining chart callback fallbacks", () => {
-		expect(renderDescription("#4 signed peace.", undefined)).toEqual([
+		expect(renderDescription("#4 signed peace.")).toEqual([
 			"#4",
 			" signed peace.",
 		])
@@ -293,6 +333,7 @@ describe("NationHistoryChart", () => {
 				selectedTimeMs={YEAR_MS}
 				currentTimeMs={YEAR_MS}
 				onTimeSelect={onTimeSelect}
+				getDynastyName={(dynastyId) => `House ${dynastyId}`}
 			/>,
 		)
 
@@ -340,6 +381,78 @@ describe("NationHistoryChart", () => {
 			data: { labels: [] },
 		})
 		expect(ctx.stroke).not.toHaveBeenCalled()
+	})
+
+	it("renders real nation names with swatches inside history descriptions", () => {
+		const markup = renderToStaticMarkup(
+			<>
+				{renderDescription("#1 declared war on #7.", {
+					getNationName: (nationId) =>
+						nationId === 1 ? "Aurelian March" : "Sable Coast",
+					getNationColor: (nationId) =>
+						nationId === 1 ? "#123456" : "#654321",
+				})}
+			</>,
+		)
+
+		expect(markup).toContain("Aurelian March")
+		expect(markup).toContain("Sable Coast")
+		expect(markup).toContain("#123456")
+		expect(markup).toContain("#654321")
+		expect(markup).not.toContain("&gt;#1&lt;")
+		expect(markup).not.toContain("&gt;#7&lt;")
+	})
+
+	it("renders dynasty names with swatches inside history descriptions", () => {
+		const markup = renderToStaticMarkup(
+			<>
+				{renderDescription("Dynasty #4 spread from #1 to #2.", {
+					onNationClick: vi.fn(),
+					getNationName: (nationId) => `Nation ${nationId}`,
+					getNationColor: () => "#123456",
+					getDynastyName: (dynastyId) => `House ${dynastyId}`,
+				})}
+			</>,
+		)
+
+		expect(markup).toContain("House 4")
+		expect(markup).toContain("Nation 1")
+		expect(markup).toContain("Nation 2")
+		expect(markup).not.toContain(">Dynasty #4<")
+	})
+
+	it("renders province names with swatches inside history descriptions", () => {
+		const markup = renderToStaticMarkup(
+			<>
+				{renderDescription("Battle in province #4.", {
+					onProvinceClick: vi.fn(),
+					getProvinceName: (provinceId) => `Province ${provinceId}`,
+					getProvinceColor: () => "#0ea5e9",
+				})}
+			</>,
+		)
+
+		expect(markup).toContain("Province 4")
+		expect(markup).toContain("#0ea5e9")
+		expect(markup).not.toContain(">province #4<")
+	})
+
+	it("renders province spans and raw province ids in fallback modes", () => {
+		const namedMarkup = renderToStaticMarkup(
+			<>
+				{renderDescription("Battle in province #4.", {
+					getProvinceName: (provinceId) => `Province ${provinceId}`,
+					getProvinceColor: () => "#0ea5e9",
+				})}
+			</>,
+		)
+
+		expect(namedMarkup).toContain("Province 4")
+		expect(renderDescription("Battle in province #4.")).toEqual([
+			"Battle in ",
+			"province #4",
+			".",
+		])
 	})
 
 	it("deduplicates per-point event types and skips events outside the visible history", () => {

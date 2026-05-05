@@ -37,4 +37,20 @@ describe("resolveDrawerStateOnOpen", () => {
 			nationSection: "political",
 		})
 	})
+
+	it("preserves the current drawer state when the selection context is unchanged", () => {
+		const current = {
+			tab: "world" as const,
+			worldSection: "planetary" as const,
+			nationSection: "demographics" as const,
+		}
+
+		expect(
+			resolveDrawerStateOnOpen({
+				current,
+				selectedNationId: null,
+				previousNationId: null,
+			}),
+		).toBe(current)
+	})
 })

@@ -74,6 +74,7 @@ describe("ModeBar", () => {
 		expect(politicalMarkup).toContain(">Political<")
 		expect(politicalMarkup).toContain(">Nations<")
 		expect(politicalMarkup).toContain(">Provinces<")
+		expect(politicalMarkup).toContain(">Dynasty<")
 		expect(demographicMarkup).toContain(">Demographics<")
 		expect(demographicMarkup).toContain(">Population<")
 		expect(demographicMarkup).toContain(">Development<")

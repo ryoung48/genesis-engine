@@ -5,6 +5,7 @@ import {
 	getVisibleGeographyModeOptions,
 	isDebugGeographyMode,
 	normalizeGeographyColorMode,
+	POLITICAL_MODE_OPTIONS,
 } from "./map-modes"
 
 describe("map-modes", () => {
@@ -30,6 +31,14 @@ describe("map-modes", () => {
 
 		expect(defaultOptions.map(([mode]) => mode)).toContain("density")
 		expect(debugOptions).toEqual(defaultOptions)
+	})
+
+	it("includes dynasty alongside the political submodes", () => {
+		expect(POLITICAL_MODE_OPTIONS).toEqual([
+			["borders", "Nations"],
+			["provinces", "Provinces"],
+			["dynasty", "Dynasty"],
+		])
 	})
 
 	it("identifies debug-only geography modes", () => {

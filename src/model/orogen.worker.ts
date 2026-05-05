@@ -11,6 +11,7 @@ import { PROV } from "./history/fields"
 import {
 	ensureHierarchyClean,
 	type HistoryState,
+	REL,
 	validateLiveHierarchy,
 } from "./history/state"
 import type { Timeline } from "./history/timeline"
@@ -42,7 +43,7 @@ interface HistorySeedWorld {
 	population: ProvincePopulation | null
 	coastal: Uint8Array | null
 	riverVisible: Uint8Array | null
-	cultures: { assignment: Int32Array } | null
+	cultures: { assignment: Int32Array; genderSystems?: Uint8Array } | null
 }
 
 let lastGeneratedWorld: HistorySeedWorld | null = null
@@ -100,7 +101,10 @@ function cloneHistorySeedWorld(
 		coastal: world.coastal ? world.coastal.slice() : null,
 		riverVisible: world.rivers?.visible ? world.rivers.visible.slice() : null,
 		cultures: world.cultures
-			? { assignment: world.cultures.assignment.slice() }
+			? {
+					assignment: world.cultures.assignment.slice(),
+					genderSystems: world.cultures.genderSystems?.slice(),
+				}
 			: null,
 	}
 }
@@ -197,7 +201,9 @@ function serializeTimelines(state: HistoryState): SerializedTimelines {
 		development: flattenFloatTimelineField(state._development),
 		consumption: flattenFloatTimelineField(state._consumption),
 		leaderDynasty: flattenIntTimelineField(state._leader_dyn),
+		leaderNameSeed: flattenIntTimelineField(state._leader_name_seed),
 		leaderClaim: flattenIntTimelineField(state._leader_claim),
+		leaderBirthYear: flattenFloatTimelineField(state._leader_birth_year),
 		occupation: flattenIntTimelineField(state._occupation),
 		relations: {
 			aIdx: relationA,
@@ -237,9 +243,23 @@ function buildTimelineTransferList(
 		timelines.leaderDynasty.times.buffer,
 		timelines.leaderDynasty.values.buffer,
 		timelines.leaderDynasty.offsets.buffer,
+		...(timelines.leaderNameSeed
+			? [
+					timelines.leaderNameSeed.times.buffer,
+					timelines.leaderNameSeed.values.buffer,
+					timelines.leaderNameSeed.offsets.buffer,
+				]
+			: []),
 		timelines.leaderClaim.times.buffer,
 		timelines.leaderClaim.values.buffer,
 		timelines.leaderClaim.offsets.buffer,
+		...(timelines.leaderBirthYear
+			? [
+					timelines.leaderBirthYear.times.buffer,
+					timelines.leaderBirthYear.values.buffer,
+					timelines.leaderBirthYear.offsets.buffer,
+				]
+			: []),
 		timelines.occupation.times.buffer,
 		timelines.occupation.values.buffer,
 		timelines.occupation.offsets.buffer,
@@ -258,6 +278,10 @@ function buildFrame(state: HistoryState): SerializedHistoryFrame {
 	const assignment = new Int32Array(P)
 	const parent = new Int32Array(P)
 	const sovereign = new Int32Array(P)
+	const leaderDynasty = new Int32Array(P).fill(-1)
+	const leaderNameSeed = new Int32Array(P).fill(-1)
+	const leaderClaim = new Int32Array(P)
+	const leaderBirthYear = new Float32Array(P).fill(-1)
 	const colors = new Float32Array(P * 3)
 	const adjOffset = new Int32Array(P + 1)
 	const populationTotal = new Float32Array(P)
@@ -266,6 +290,14 @@ function buildFrame(state: HistoryState): SerializedHistoryFrame {
 	const consumption = new Float32Array(P)
 	const nationWealth = new Float32Array(P)
 	const nationOptimalWealth = new Float32Array(P)
+	const relationEntries = Array.from(state._relations.entries()).filter(
+		([, timeline]) =>
+			timeline.length > 0 &&
+			timeline[timeline.length - 1].value !== REL.NEUTRAL,
+	)
+	const relationA = new Int32Array(relationEntries.length)
+	const relationB = new Int32Array(relationEntries.length)
+	const relationValues = new Uint8Array(relationEntries.length)
 
 	ensureHierarchyClean(state)
 	for (let p = 0; p < P; p++) {
@@ -338,10 +370,20 @@ function buildFrame(state: HistoryState): SerializedHistoryFrame {
 	for (let p = 0; p < P; p++) {
 		if (parent[p] < 0 && assignment[p] >= 0) {
 			sovereignCount++
+			leaderDynasty[p] = PROV.leader.dynasty.get(state, p)
+			leaderNameSeed[p] = PROV.leader.nameSeed.get(state, p)
+			leaderClaim[p] = PROV.leader.claim.get(state, p)
+			leaderBirthYear[p] = PROV.leader.birthYear.get(state, p)
 			nationWealth[p] = Math.max(0, state.habitability[p] - consumption[p])
 			nationOptimalWealth[p] = state.habitability[p]
 		}
 		totalPopulation += populationTotal[p]
+	}
+	for (let i = 0; i < relationEntries.length; i++) {
+		const [key, timeline] = relationEntries[i]
+		relationA[i] = Math.floor(key / P)
+		relationB[i] = key % P
+		relationValues[i] = timeline[timeline.length - 1].value
 	}
 
 	return {
@@ -349,6 +391,10 @@ function buildFrame(state: HistoryState): SerializedHistoryFrame {
 		assignment,
 		parent,
 		sovereign,
+		leaderDynasty,
+		leaderNameSeed,
+		leaderClaim,
+		leaderBirthYear,
 		colors,
 		adjOffset,
 		adjList,
@@ -358,6 +404,9 @@ function buildFrame(state: HistoryState): SerializedHistoryFrame {
 		consumption,
 		nationWealth,
 		nationOptimalWealth,
+		relationA,
+		relationB,
+		relationValues,
 		activeWars,
 		sovereignCount,
 		totalPopulation,
@@ -369,6 +418,10 @@ function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
 		frame.assignment.buffer,
 		frame.parent.buffer,
 		frame.sovereign.buffer,
+		frame.leaderDynasty.buffer,
+		frame.leaderNameSeed.buffer,
+		frame.leaderClaim.buffer,
+		frame.leaderBirthYear.buffer,
 		frame.colors.buffer,
 		frame.adjOffset.buffer,
 		frame.adjList.buffer,
@@ -378,6 +431,9 @@ function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
 		frame.consumption.buffer,
 		frame.nationWealth.buffer,
 		frame.nationOptimalWealth.buffer,
+		frame.relationA.buffer,
+		frame.relationB.buffer,
+		frame.relationValues.buffer,
 	]
 }
 
@@ -431,6 +487,12 @@ function serializeWorld(
 		oceanCurrents: world.oceanCurrents,
 		provinces: world.provinces,
 		nations: world.nations,
+		leaderDynasty: seedHistoryState?.leaderDynCurrent.slice(),
+		leaderNameSeed: seedHistoryState?.leaderNameSeedCurrent.slice(),
+		leaderClaim: seedHistoryState
+			? Int32Array.from(seedHistoryState.leaderClaimCurrent)
+			: undefined,
+		leaderBirthYear: seedHistoryState?.leaderBirthYearCurrent.slice(),
 		cultures: world.cultures,
 		heritages: world.heritages,
 		faiths: world.faiths,
@@ -474,6 +536,7 @@ function partitionBuffers(p: {
 	seeds: Int32Array
 	languageSeeds?: Int32Array
 	nameSeeds?: Int32Array
+	genderSystems?: Uint8Array
 	adjOffset: Int32Array
 	adjList: Int32Array
 	size: Int32Array
@@ -481,11 +544,13 @@ function partitionBuffers(p: {
 }): Transferable[] {
 	const languageSeeds = p.languageSeeds ?? new Int32Array(0)
 	const nameSeeds = p.nameSeeds ?? new Int32Array(0)
+	const genderSystems = p.genderSystems ?? new Uint8Array(0)
 	return [
 		p.assignment.buffer as ArrayBuffer,
 		p.seeds.buffer as ArrayBuffer,
 		languageSeeds.buffer as ArrayBuffer,
 		nameSeeds.buffer as ArrayBuffer,
+		genderSystems.buffer as ArrayBuffer,
 		p.adjOffset.buffer as ArrayBuffer,
 		p.adjList.buffer as ArrayBuffer,
 		p.size.buffer as ArrayBuffer,
@@ -655,6 +720,10 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		for (const teq of world.monthlyTEQ) add(teq.buffer)
 	}
 	if (world.nations) add(...nationBuffers(world.nations))
+	if (world.leaderDynasty) add(world.leaderDynasty.buffer)
+	if (world.leaderNameSeed) add(world.leaderNameSeed.buffer)
+	if (world.leaderClaim) add(world.leaderClaim.buffer)
+	if (world.leaderBirthYear) add(world.leaderBirthYear.buffer)
 	if (world.cultures) add(...partitionBuffers(world.cultures))
 	if (world.heritages) add(...partitionBuffers(world.heritages))
 	if (world.faiths) add(...partitionBuffers(world.faiths))
@@ -821,9 +890,12 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 				: null
 
 		const world = serializeWorld(generated, seedHistoryState)
+		const frame = seedHistoryState ? buildFrame(seedHistoryState) : undefined
 		self.postMessage(
-			{ type: "done", world } satisfies OrogenWorkerResponse,
-			buildTransferList(world),
+			{ type: "done", world, frame } satisfies OrogenWorkerResponse,
+			frame
+				? [...buildTransferList(world), ...buildFrameTransferList(frame)]
+				: buildTransferList(world),
 		)
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error))

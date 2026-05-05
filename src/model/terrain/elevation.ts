@@ -219,8 +219,9 @@ export function blendElevation(
 	const noise = new SimplexNoise(seed)
 	const foldNoise = new SimplexNoise(seed + 557)
 	const riftNoise = new SimplexNoise(seed + 419)
-	const MAX_OCEAN_ARC_ELEV = 0.2
+	const MAX_OCEAN_ARC_ELEV = 0.74
 	const ISLAND_ARC_SURFACING_BOOST = 1.8
+	const ISLAND_ARC_BELT_BASE = 0.03
 
 	// Source uses default persistence (2/3) for most fbm calls.
 	// Only detail/fine noise uses explicit 0.5.
@@ -962,24 +963,71 @@ export function blendElevation(
 			const x = r_xyz[3 * r],
 				y = r_xyz[3 * r + 1],
 				z = r_xyz[3 * r + 2]
-			const peakDist = Math.max(1.5, 1.5 * scaleFactor)
-			const sigma = Math.max(1.5, 1.5 * scaleFactor)
+			const stressWeight = 0.45 + arcStress[r]
+			const beltPeakDist = Math.max(2, 1.8 * scaleFactor)
+			const beltSigma = Math.max(2.2, 2.6 * scaleFactor)
+			const beltWeight = Math.exp(-0.5 * ((d - beltPeakDist) / beltSigma) ** 2)
+			const beltNoise =
+				0.55 +
+				0.45 * arcRidgedFbm(x * 2.5 + 4.1, y * 2.5 + 7.3, z * 2.5 + 1.9, 3)
+			let beltEffect =
+				ISLAND_ARC_BELT_BASE *
+				ISLAND_ARC_SURFACING_BOOST *
+				beltWeight *
+				stressWeight *
+				beltNoise
+			let peakEffect = 0
+			const peakDist = Math.max(1.15, 1.15 * scaleFactor)
+			const sigma = Math.max(0.8, 0.95 * scaleFactor)
 			const distWeight = Math.exp(-0.5 * ((d - peakDist) / sigma) ** 2)
 			const n = arcRidgedFbm(x * 4, y * 4, z * 4, 4)
-			const threshold = 0.3
+			const threshold = 0.18
 			if (n > threshold) {
 				const excess = (n - threshold) / (1 - threshold)
-				let arcEffect =
+				peakEffect +=
 					excess *
 					excess *
-					0.55 *
+					1.2 *
 					ISLAND_ARC_SURFACING_BOOST *
 					distWeight *
 					(0.5 + arcStress[r])
-				if (r_isOcean[r]) {
-					const maxOceanUplift = Math.max(0, -elev[r] + MAX_OCEAN_ARC_ELEV)
-					arcEffect = Math.min(arcEffect, maxOceanUplift)
-				}
+			}
+			const ridgePeakDist = Math.max(1.1, 1.1 * scaleFactor)
+			const ridgeSigma = Math.max(0.65, 0.75 * scaleFactor)
+			const ridgeWeight = Math.exp(
+				-0.5 * ((d - ridgePeakDist) / ridgeSigma) ** 2,
+			)
+			const ridgeNoise = arcRidgedFbm(x * 9 + 6.7, y * 9 + 2.1, z * 9 + 4.8, 3)
+			const ridgeThreshold = 0.34
+			let ridgeEffect = 0
+			if (ridgeNoise > ridgeThreshold) {
+				const ridgeExcess = (ridgeNoise - ridgeThreshold) / (1 - ridgeThreshold)
+				ridgeEffect +=
+					ridgeExcess *
+					ridgeExcess *
+					0.5 *
+					ISLAND_ARC_SURFACING_BOOST *
+					ridgeWeight *
+					(0.65 + arcStress[r])
+			}
+			let arcEffect = beltEffect + peakEffect + ridgeEffect
+			if (r_isOcean[r]) {
+				const maxBeltUplift = Math.max(0, -elev[r] - 0.03)
+				beltEffect = Math.min(beltEffect, maxBeltUplift)
+				const surfacingMask =
+					ridgeWeight *
+					Math.max(0, (ridgeNoise - 0.5) / (1 - 0.5)) *
+					(0.55 + 0.45 * arcStress[r])
+				const surfacedPeakEffect =
+					surfacingMask > 0
+						? Math.min(
+								peakEffect + ridgeEffect,
+								Math.max(0, -elev[r] + MAX_OCEAN_ARC_ELEV) * surfacingMask,
+							)
+						: 0
+				arcEffect = beltEffect + surfacedPeakEffect
+			}
+			if (arcEffect > 0.001) {
 				elev[r] += arcEffect
 				markFeature(r, OROGEN_TERRAIN_FEATURE.ISLAND_ARC, arcEffect)
 			}

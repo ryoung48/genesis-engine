@@ -183,9 +183,11 @@ describe("generateWorld", () => {
 		const callbacks = {
 			...makeCallbacks(),
 			onGenerationComplete: vi.fn(),
+			onGenerationFrame: vi.fn(),
 			workerRef: { current: previousWorker },
 		}
 		const world = { id: "generated-world" } as never
+		const frame = { timeMs: 123 } as never
 
 		generateWorld(
 			77,
@@ -220,7 +222,9 @@ describe("generateWorld", () => {
 			}),
 		})
 
-		workers[0].onmessage?.({ data: { type: "done", world } } as MessageEvent)
+		workers[0].onmessage?.({
+			data: { type: "done", world, frame },
+		} as MessageEvent)
 
 		const pushedCode = vi.mocked(callbacks.pushRecentCode).mock.calls[0]?.[0]
 		expect(typeof pushedCode).toBe("string")
@@ -228,6 +232,7 @@ describe("generateWorld", () => {
 		expect(callbacks.setPlanetCode).toHaveBeenCalledWith(pushedCode)
 		expect(callbacks.setPlanetCodeInput).toHaveBeenCalledWith(pushedCode)
 		expect(callbacks.setWorld).toHaveBeenLastCalledWith(world)
+		expect(callbacks.onGenerationFrame).toHaveBeenCalledWith(frame)
 		expect(callbacks.setGenerationLabel).toHaveBeenLastCalledWith("Done")
 		expect(callbacks.setGenerationProgress).toHaveBeenLastCalledWith(100)
 		expect(callbacks.setGenerating).toHaveBeenLastCalledWith(false)
@@ -322,6 +327,7 @@ describe("importHeightmap", () => {
 		const callbacks = {
 			...makeCallbacks(),
 			onGenerationComplete: vi.fn(),
+			onGenerationFrame: vi.fn(),
 		}
 		const grayscale = new Uint8Array([10, 20, 30, 40])
 		const world = { id: "imported-world" } as never
@@ -374,7 +380,9 @@ describe("importHeightmap", () => {
 			[grayscale.buffer],
 		)
 
-		workers[0].onmessage?.({ data: { type: "done", world } } as MessageEvent)
+		workers[0].onmessage?.({
+			data: { type: "done", world, frame: { timeMs: 0 } },
+		} as MessageEvent)
 
 		expect(callbacks.setWorld).toHaveBeenLastCalledWith(world)
 		expect(callbacks.setGenerationLabel).toHaveBeenLastCalledWith("Done")

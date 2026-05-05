@@ -22,6 +22,12 @@ interface DetailsDrawerProps extends DetailsDrawerBaseProps {
 	currentTimeMs?: number
 	onTimeSelect?: (timeMs: number) => void
 	onNationClick?: (nationId: number) => void
+	onProvinceClick?: (provinceId: number) => void
+	getNationName?: (nationId: number) => string
+	getNationColor?: (nationId: number) => string | null
+	getProvinceName?: (provinceId: number) => string
+	getProvinceColor?: (provinceId: number) => string | null
+	getDynastyName?: (dynastyId: number) => string
 }
 
 export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
@@ -48,6 +54,12 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	currentTimeMs,
 	onTimeSelect,
 	onNationClick,
+	onProvinceClick,
+	getNationName,
+	getNationColor,
+	getProvinceName,
+	getProvinceColor,
+	getDynastyName,
 }) => {
 	const [tab, setTab] = useState<"world" | "nation">("world")
 	const [worldSection, setWorldSection] = useState<WorldSection>("planetary")
@@ -152,6 +164,12 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 								currentTimeMs={currentTimeMs}
 								onTimeSelect={onTimeSelect}
 								onNationClick={onNationClick}
+								onProvinceClick={onProvinceClick}
+								getNationName={getNationName}
+								getNationColor={getNationColor}
+								getProvinceName={getProvinceName}
+								getProvinceColor={getProvinceColor}
+								getDynastyName={getDynastyName}
 							/>
 						)}
 					</div>

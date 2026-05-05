@@ -9,14 +9,12 @@ import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
-import { REL } from "@/model/history/state"
 import { encodePlanetCode, SEED_MAX } from "@/model/shared/planet-code"
 import { titleCase } from "@/model/shared/text"
 import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
 } from "@/model/shared/units"
-import { createWorldNames } from "@/model/society/language/names"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
 	SerializedHistoryFrame,
@@ -30,6 +28,7 @@ import { ModeBar } from "./controls/ModeBar"
 import { OverlayControls } from "./controls/OverlayControls"
 import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
+import { createDrawerNationClickHandler } from "./details/nation-clicks"
 import {
 	getCoastHopLengthKm,
 	getHoverBiome,
@@ -67,6 +66,7 @@ import {
 	buildDisplayWorld,
 	buildHistoryChildrenIndex,
 } from "./screen/display/display-model"
+import { createDisplayNames } from "./screen/display/display-names"
 import {
 	buildConflictDistribution,
 	buildNationHistory,
@@ -76,6 +76,12 @@ import {
 	buildWindowedNationEvents,
 } from "./screen/display/nation-details-model"
 import { computePlanetStats } from "./screen/display/planet-stats"
+import {
+	buildPoliticalOccupationOverlay,
+	getPoliticalHoverNationId,
+	getPoliticalHoverOccupation,
+	getRebelDisplayColorNationId,
+} from "./screen/display/political-conflict-display"
 import {
 	computeRegionColors,
 	getTopographyColor,
@@ -115,6 +121,7 @@ import {
 	historyTimeToMonth,
 	historyYearToTime,
 } from "./screen/history/history-time"
+import { buildLiveHistoryView } from "./screen/history/live-history-view"
 import type {
 	NationMapMode,
 	PopulationMapMode,
@@ -454,17 +461,11 @@ export const OrogenView: React.FC = () => {
 		() =>
 			currentHistoryQuery
 				? currentHistoryQuery.getView(selectedTimeMs)
-				: selectedTimeMs === simTimeMs && liveFrame
-					? {
-							...liveFrame,
-							populationRural: Float32Array.from(
-								liveFrame.populationTotal,
-								(total, index) =>
-									Math.max(0, total - (liveFrame.populationUrban[index] ?? 0)),
-							),
-							relationAt: () => REL.NONE,
-						}
-					: null,
+				: buildLiveHistoryView({
+						selectedTimeMs,
+						simTimeMs,
+						liveFrame,
+					}),
 		[currentHistoryQuery, selectedTimeMs, simTimeMs, liveFrame],
 	)
 	const selectedHistoryChildren = useMemo(
@@ -489,8 +490,21 @@ export const OrogenView: React.FC = () => {
 		return nationModel?.counts ?? new Map<number, number>()
 	}, [nationModel])
 	const nationColorById = useMemo(() => {
-		return nationModel?.colorById ?? new Map<number, [number, number, number]>()
-	}, [nationModel])
+		const baseColors =
+			nationModel?.colorById ?? new Map<number, [number, number, number]>()
+		if (!selectedHistoryView?.activeWars?.length) return baseColors
+		const displayColors = new Map(baseColors)
+		for (const nationId of displayColors.keys()) {
+			const displayColorNationId = getRebelDisplayColorNationId(
+				selectedHistoryView.activeWars,
+				nationId,
+			)
+			if (displayColorNationId === null) continue
+			const displayColor = baseColors.get(displayColorNationId)
+			if (displayColor) displayColors.set(nationId, displayColor)
+		}
+		return displayColors
+	}, [nationModel, selectedHistoryView])
 	const getNationColor = useCallback(
 		(nationId: number): string | null => {
 			if (nationId < 0) return null
@@ -550,16 +564,23 @@ export const OrogenView: React.FC = () => {
 	const hoverTerrainFeature = getHoverTerrainFeature(hoverInfo, worldForDisplay)
 	const hoverOceanCurrents = getHoverOceanCurrents(hoverInfo, worldForDisplay)
 	const hoverNationId = useMemo(() => {
-		if (hoverProvince === null || hoverProvince < 0 || !nationModel?.assignment)
-			return null
-		return nationModel.assignment[hoverProvince] ?? null
-	}, [nationModel, hoverProvince])
+		return getPoliticalHoverNationId({
+			hoverProvince,
+			assignment: nationModel?.assignment,
+			activeWars: selectedHistoryView?.activeWars,
+		})
+	}, [nationModel, hoverProvince, selectedHistoryView])
 	const worldNames = useMemo(
-		() => (worldForDisplay ? createWorldNames(worldForDisplay) : null),
-		[worldForDisplay],
+		() => (world ? createDisplayNames(world, timelineBundle) : null),
+		[timelineBundle, world],
 	)
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
+		[worldNames],
+	)
+	const getProvinceName = useCallback(
+		(provinceId: number) =>
+			worldNames?.province(provinceId) ?? `Province #${provinceId}`,
 		[worldNames],
 	)
 	const getCultureName = useCallback(
@@ -581,10 +602,41 @@ export const OrogenView: React.FC = () => {
 			worldNames?.religion(religionId) ?? `Religion #${religionId}`,
 		[worldNames],
 	)
+	const getLeaderName = useCallback(
+		(nationId: number, timeMs: number) =>
+			worldNames?.leader(nationId, timeMs) ?? `Leader #${nationId}`,
+		[worldNames],
+	)
+	const getDynastyName = useCallback(
+		(dynastyId: number) =>
+			worldNames?.dynasty(dynastyId) ?? `Dynasty #${dynastyId}`,
+		[worldNames],
+	)
 	const getLandmarkName = useCallback(
 		(landmarkId: number) =>
 			worldNames?.landmark(landmarkId) ?? `#${landmarkId}`,
 		[worldNames],
+	)
+	const getRiverName = useCallback(
+		(riverId: number) => worldNames?.river(riverId) ?? `River #${riverId}`,
+		[worldNames],
+	)
+	const getProvinceColor = useCallback(
+		(provinceId: number) => {
+			if (
+				!worldForDisplay?.provinces?.colors ||
+				provinceId < 0 ||
+				provinceId * 3 + 2 >= worldForDisplay.provinces.colors.length
+			) {
+				return null
+			}
+			return rgbToCss([
+				worldForDisplay.provinces.colors[provinceId * 3],
+				worldForDisplay.provinces.colors[provinceId * 3 + 1],
+				worldForDisplay.provinces.colors[provinceId * 3 + 2],
+			])
+		},
+		[worldForDisplay],
 	)
 	const coastHopLengthKm = useMemo(
 		() => getCoastHopLengthKm(worldForDisplay),
@@ -592,21 +644,27 @@ export const OrogenView: React.FC = () => {
 	)
 	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast, coastHopLengthKm)
 	const hoverOccupation = useMemo(() => {
-		if (hoverProvince === null || hoverProvince < 0 || !selectedHistoryView)
-			return null
-		for (const war of selectedHistoryView.activeWars) {
-			if (!war.occupied.includes(hoverProvince)) continue
-			return {
-				id: war.attacker,
-				name: getNationName(war.attacker),
-				color: war.rebel
-					? "rgb(0, 0, 0)"
-					: (getNationColor(war.attacker) ?? "rgb(0, 0, 0)"),
-				rebel: war.rebel,
-			}
+		const occupation = getPoliticalHoverOccupation({
+			hoverProvince,
+			assignment: worldForDisplay?.nations?.assignment,
+			activeWars: selectedHistoryView?.activeWars,
+		})
+		if (!occupation) return null
+		return {
+			id: occupation.id,
+			name: getNationName(occupation.id),
+			color: occupation.rebel
+				? "rgb(0, 0, 0)"
+				: (getNationColor(occupation.displayColorNationId) ?? "rgb(0, 0, 0)"),
+			rebel: occupation.rebel,
 		}
-		return null
-	}, [selectedHistoryView, getNationColor, getNationName, hoverProvince])
+	}, [
+		selectedHistoryView,
+		getNationColor,
+		getNationName,
+		hoverProvince,
+		worldForDisplay,
+	])
 	const hoverIceSummary = (() => {
 		if (!(hoverInfo && worldForDisplay)) return null
 		const r = hoverInfo.region
@@ -636,6 +694,8 @@ export const OrogenView: React.FC = () => {
 			dtrMonth,
 			currentMonth,
 			viewMode,
+			undefined,
+			selectedHistoryView?.activeWars,
 		)
 	}, [
 		colorMode,
@@ -646,38 +706,17 @@ export const OrogenView: React.FC = () => {
 		dtrMonth,
 		viewMode,
 		currentMonth,
+		selectedHistoryView,
 		worldForDisplay,
 	])
 
 	const occupationOverlay = useMemo(() => {
-		if (!worldForDisplay?.provinces?.regionProvince || !selectedHistoryView)
-			return null
-		if (selectedHistoryView.activeWars.length === 0) return null
-		const regionProvince = worldForDisplay.provinces.regionProvince
-		const occupiedByProvince = new Map<number, [number, number, number]>()
-		for (const war of selectedHistoryView.activeWars) {
-			const stripeColor = war.rebel
-				? ([0, 0, 0] as [number, number, number])
-				: getNationColorRgb(war.attacker)
-			if (!stripeColor) continue
-			for (const province of war.occupied) {
-				occupiedByProvince.set(province, stripeColor)
-			}
-		}
-		if (occupiedByProvince.size === 0) return null
-		const overlay = new Float32Array(regionProvince.length * 4)
-		let hasOccupiedRegion = false
-		for (let region = 0; region < regionProvince.length; region++) {
-			const stripeColor = occupiedByProvince.get(regionProvince[region])
-			if (!stripeColor) continue
-			const base = region * 4
-			overlay[base] = stripeColor[0]
-			overlay[base + 1] = stripeColor[1]
-			overlay[base + 2] = stripeColor[2]
-			overlay[base + 3] = 1
-			hasOccupiedRegion = true
-		}
-		return hasOccupiedRegion ? overlay : null
+		return buildPoliticalOccupationOverlay({
+			regionProvince: worldForDisplay?.provinces?.regionProvince,
+			assignment: worldForDisplay?.nations?.assignment,
+			activeWars: selectedHistoryView?.activeWars,
+			getNationColorRgb,
+		})
 	}, [selectedHistoryView, getNationColorRgb, worldForDisplay])
 
 	useEffect(() => {
@@ -807,11 +846,14 @@ export const OrogenView: React.FC = () => {
 	const selectedNation = useMemo(() => {
 		return buildSelectedNationDetails({
 			selectedNationId,
+			selectedTimeMs,
 			world: worldForDisplay,
 			nationModel,
 			selectedHistoryView,
 			getNationColor,
 			getNationName,
+			getLeaderName,
+			getDynastyName,
 			getCultureName,
 			getHeritageName,
 			getFaithName,
@@ -822,13 +864,27 @@ export const OrogenView: React.FC = () => {
 		nationModel,
 		getNationColor,
 		getNationName,
+		getLeaderName,
+		getDynastyName,
 		getCultureName,
 		getHeritageName,
 		getFaithName,
 		getReligionName,
 		selectedNationId,
+		selectedTimeMs,
 		worldForDisplay,
 	])
+	const handleDrawerNationClick = useMemo(
+		() =>
+			createDrawerNationClickHandler({
+				openDetailsDrawer: () => setDetailsDrawerOpen(true),
+				focusOnNation: (nationId) => sceneRef.current?.focusOnNation(nationId),
+			}),
+		[],
+	)
+	const handleProvinceClick = useCallback((provinceId: number) => {
+		sceneRef.current?.focusOnProvince(provinceId)
+	}, [])
 
 	const nationHistory = useMemo(() => {
 		return buildNationHistory({
@@ -1112,6 +1168,11 @@ export const OrogenView: React.FC = () => {
 			setPlanetCodeInput,
 			setWorld,
 			workerRef,
+			onGenerationFrame: (frame) => {
+				setSimTimeMs(frame.timeMs)
+				setSelectedTimeMs(frame.timeMs)
+				setLiveFrame(frame)
+			},
 			onGenerationComplete: () => {
 				setGenerationPanelOpen(false)
 				setDetailsDrawerOpen(true)
@@ -1707,16 +1768,21 @@ export const OrogenView: React.FC = () => {
 								hoverOceanCurrents={hoverOceanCurrents}
 								colorMode={colorMode}
 								populationMode={populationMode}
+								selectedTimeMs={selectedTimeMs}
 								displayMonth={displayMonth}
 								unitSystem={unitSystem}
 								world={worldForDisplay}
 								hoverCardRef={hoverCardRef}
+								getProvinceName={getProvinceName}
 								getNationName={getNationName}
+								getLeaderName={getLeaderName}
+								getDynastyName={getDynastyName}
 								getCultureName={getCultureName}
 								getHeritageName={getHeritageName}
 								getFaithName={getFaithName}
 								getReligionName={getReligionName}
 								getLandmarkName={getLandmarkName}
+								getRiverName={getRiverName}
 							/>
 						) : null}
 
@@ -1875,11 +1941,13 @@ export const OrogenView: React.FC = () => {
 				selectedTimeMs={selectedTimeMs}
 				currentTimeMs={simTimeMs}
 				onTimeSelect={setSelectedTimeMs}
-				onNationClick={(nationId) => {
-					setSelectedNationId(nationId)
-					setDetailsDrawerOpen(true)
-					sceneRef.current?.focusOnNation(nationId)
-				}}
+				onNationClick={handleDrawerNationClick}
+				onProvinceClick={handleProvinceClick}
+				getNationName={getNationName}
+				getNationColor={getNationColor}
+				getProvinceName={getProvinceName}
+				getProvinceColor={getProvinceColor}
+				getDynastyName={getDynastyName}
 			/>
 		</div>
 	)

@@ -6,7 +6,9 @@
 
 import type { OrogenProvinces, OrogenRainfall, SphereMesh } from ".."
 import { createRng } from "../shared/rng"
-import { meanEdgeLengthKm } from "../shared/units"
+import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "../shared/units"
+
+const PROVINCE_AREA_TARGET_KM2 = 10_000
 
 export function computeProvinces(
 	mesh: SphereMesh,
@@ -16,8 +18,6 @@ export function computeProvinces(
 	options?: {
 		climateZones?: Uint8Array
 		rainfall?: OrogenRainfall
-		targetCount?: number
-		targetAreaKm2?: number
 		planetRadiusKm?: number
 	},
 ): OrogenProvinces {
@@ -30,25 +30,25 @@ export function computeProvinces(
 	for (let r = 0; r < N; r++) if (isLand[r]) landCount++
 	if (landCount === 0) return emptyProvinces(N)
 
-	// Determine target province count
-	let targetCount: number
-	if (options?.targetCount) {
-		targetCount = options.targetCount
-	} else {
-		const areaTarget = options?.targetAreaKm2 ?? 45_000
-		const avgEdgeKm = meanEdgeLengthKm(mesh, options?.planetRadiusKm)
-		const regionAreaKm2 = avgEdgeKm * avgEdgeKm * Math.sqrt(3) * 0.5
-		targetCount = Math.max(
-			1,
-			Math.round((landCount * regionAreaKm2) / areaTarget),
-		)
-	}
+	// Target area only influences seed density approximately: the actual province
+	// count comes from greedy seed placement below, not this estimate directly.
+	const planetRadiusKm = options?.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
+	const avgEdgeKm = meanEdgeLengthKm(mesh, options?.planetRadiusKm)
+	const regionAreaKm2 = avgEdgeKm * avgEdgeKm * Math.sqrt(3) * 0.5
+	const targetCount = Math.max(
+		1,
+		Math.round((landCount * regionAreaKm2) / PROVINCE_AREA_TARGET_KM2),
+	)
 
-	// Compute seed spacing in hops from target density
+	// Compute a continuous seed-claim radius from target density instead of
+	// quantizing through integer graph hops.
 	const regionsPerProvince = Math.max(1, landCount / targetCount)
-	const spacing = Math.max(2, Math.round(Math.sqrt(regionsPerProvince) * 0.85))
+	const seedClaimRadiusKm = Math.max(
+		avgEdgeKm,
+		avgEdgeKm * Math.sqrt(regionsPerProvince) * 0.85,
+	)
 
-	// ── Phase 1: Seed placement via greedy BFS spacing ──────────────────
+	// ── Phase 1: Seed placement via greedy distance-aware BFS ────────────
 
 	// Collect and shuffle land regions (Fisher-Yates)
 	const landRegions = new Int32Array(landCount)
@@ -64,32 +64,35 @@ export function computeProvinces(
 	const seeds: number[] = []
 	const claimed = new Uint8Array(N)
 	const bfsQueue: number[] = []
-	const bfsDist = new Int32Array(N) // reused per-seed, reset after each
 
 	for (let li = 0; li < landCount; li++) {
 		const r = landRegions[li]
 		if (claimed[r]) continue
 		seeds.push(r)
+		const seedX = mesh.r_xyz[3 * r]
+		const seedY = mesh.r_xyz[3 * r + 1]
+		const seedZ = mesh.r_xyz[3 * r + 2]
 
-		// BFS from seed to mark nearby regions within spacing as claimed
+		// BFS from seed to mark nearby regions within the target claim radius.
 		bfsQueue.length = 0
 		bfsQueue.push(r)
 		claimed[r] = 1
-		bfsDist[r] = 0
 		let head = 0
 		while (head < bfsQueue.length) {
 			const curr = bfsQueue[head++]
-			if (bfsDist[curr] >= spacing) continue
 			for (let j = adjOffset[curr], jEnd = adjOffset[curr + 1]; j < jEnd; j++) {
 				const nb = adjList[j]
 				if (!isLand[nb] || claimed[nb]) continue
-				bfsDist[nb] = bfsDist[curr] + 1
+				const dx = seedX - mesh.r_xyz[3 * nb]
+				const dy = seedY - mesh.r_xyz[3 * nb + 1]
+				const dz = seedZ - mesh.r_xyz[3 * nb + 2]
+				const seedDistanceKm =
+					Math.sqrt(dx * dx + dy * dy + dz * dz) * planetRadiusKm
+				if (seedDistanceKm > seedClaimRadiusKm) continue
 				claimed[nb] = 1
 				bfsQueue.push(nb)
 			}
 		}
-		// Reset bfsDist for reuse
-		for (let i = 0; i < bfsQueue.length; i++) bfsDist[bfsQueue[i]] = 0
 	}
 
 	const provinceCount = seeds.length

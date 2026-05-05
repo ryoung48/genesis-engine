@@ -43,10 +43,10 @@ describe("buildPlanetSliders", () => {
 
 		expect(
 			sliders.find((slider) => slider.label === "Year Length")?.display,
-		).toBe("1.00x Earth")
+		).toBe("1.00x")
 		expect(
 			sliders.find((slider) => slider.label === "Day Length")?.display,
-		).toBe("2.00x Earth")
+		).toBe("2.00x")
 	})
 
 	it("shows base tilt on the planet tab and preserves retrograde mirroring", () => {
@@ -169,7 +169,7 @@ describe("buildTerrainSliders", () => {
 		const setNumPoints = vi.fn()
 		const setCraters = vi.fn()
 		const sliders = buildTerrainSliders({
-			numPoints: 120000,
+			numPoints: 204000,
 			jitter: 0.35,
 			numPlates: 12,
 			roughness: 0.45,
@@ -211,6 +211,9 @@ describe("buildTerrainSliders", () => {
 		])
 		expect(sliders.find((slider) => slider.label === "Plates")?.display).toBe(
 			"12",
+		)
+		expect(sliders.find((slider) => slider.label === "Detail")?.display).toBe(
+			"204k",
 		)
 		expect(sliders.find((slider) => slider.label === "Craters")?.display).toBe(
 			"0.25",

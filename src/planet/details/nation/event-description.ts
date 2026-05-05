@@ -21,6 +21,7 @@ type VictoryDegree =
 
 export const eventDotColors: Record<string, string> = {
 	succession: "#f43f5e",
+	"dynasty spread": "#14b8a6",
 	rebellion: "#f97316",
 	"war started": "#f59e0b",
 	battle: "#60a5fa",
@@ -441,6 +442,8 @@ export function getDisplayTags(
 			}
 		case "succession":
 			return { primary: "Succession" }
+		case "dynasty spread":
+			return { primary: "Dynasty", secondary: "Spread" }
 		case "rebellion":
 			return {
 				primary: "Rebellion",
@@ -609,7 +612,15 @@ export function getEventDescription(event: HistoryNote, ctx: EventCtx): string {
 		}
 		case "succession": {
 			const nation = event.data.nation as number
-			return `#${nation}: leader #${event.data.leader} was succeeded by #${event.data.successor}.`
+			return `#${nation}: leader #${event.data.leader} was succeeded by leader #${event.data.successor}.`
+		}
+		case "dynasty spread": {
+			const source = event.data.source as number | undefined
+			const nation = event.data.nation as number
+			const dynasty = event.data.dynasty as number | undefined
+			return source !== undefined
+				? `Dynasty #${dynasty ?? "?"} spread from #${source} to #${nation}.`
+				: `Dynasty #${dynasty ?? "?"} spread to #${nation}.`
 		}
 		case "rebellion": {
 			const overlord = event.data.overlord as number
@@ -665,7 +676,8 @@ export function eventInvolvesNation(
 		d.subject === nation ||
 		d.vassal === nation ||
 		d.junior === nation ||
-		d.senior === nation
+		d.senior === nation ||
+		d.source === nation
 	)
 }
 

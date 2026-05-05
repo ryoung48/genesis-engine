@@ -114,6 +114,19 @@ describe("getDisplayTags", () => {
 		).toEqual({ primary: "Succession" })
 		expect(
 			getDisplayTags(
+				makeEvent("dynasty spread", YEAR_MS, {
+					nation: 5,
+					source: 2,
+					dynasty: 4,
+				}),
+				5,
+			),
+		).toEqual({
+			primary: "Dynasty",
+			secondary: "Spread",
+		})
+		expect(
+			getDisplayTags(
 				makeEvent("vassalized", YEAR_MS, { overlord: 2, vassal: 5 }),
 				5,
 			),
@@ -1072,7 +1085,17 @@ describe("getEventDescription", () => {
 				}),
 				ctx,
 			),
-		).toBe("#5: leader #2 was succeeded by #9.")
+		).toBe("#5: leader #2 was succeeded by leader #9.")
+		expect(
+			getEventDescription(
+				makeEvent("dynasty spread", YEAR_MS, {
+					nation: 5,
+					source: 2,
+					dynasty: 4,
+				}),
+				ctx,
+			),
+		).toBe("Dynasty #4 spread from #2 to #5.")
 		expect(
 			getEventDescription(
 				makeEvent("rebellion", YEAR_MS, { overlord: 3, subject: 8 }),
@@ -1171,6 +1194,12 @@ describe("eventInvolvesNation", () => {
 		).toBe(true)
 		expect(
 			eventInvolvesNation(makeEvent("rebellion", YEAR_MS, { subject: 9 }), 9),
+		).toBe(true)
+		expect(
+			eventInvolvesNation(
+				makeEvent("dynasty spread", YEAR_MS, { nation: 4, source: 8 }),
+				8,
+			),
 		).toBe(true)
 		expect(
 			eventInvolvesNation(makeEvent("vassalized", YEAR_MS, { vassal: 10 }), 10),

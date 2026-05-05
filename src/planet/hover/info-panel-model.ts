@@ -5,9 +5,11 @@ import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import { climateTempColor, climateZoneColor, vegetationColor } from "../colors"
 import {
+	getDynastyColor,
 	getTerrainFeatureColor,
 	getTopographyColor,
 } from "../screen/display/region-colors"
+import { buildRulerDisplayMeta } from "../screen/display/ruler-display"
 import type { PopulationMapMode } from "../screen/shared/map-modes"
 import {
 	formatDensity,
@@ -46,6 +48,19 @@ interface HoverDemographicDisplayData {
 	label: string
 	value: string
 	color: string | null
+}
+
+interface HoverPoliticalDisplayData {
+	dynasty: {
+		id: number
+		name: string
+		color: string
+	} | null
+	ruler: {
+		name: string
+		age: number | null
+		genderSymbol: string | null
+	} | null
 }
 
 export function buildHoverChartData(
@@ -178,6 +193,49 @@ export function buildProvinceDisplayData(params: {
 				])
 			: null
 	return { provinceColor, provinceNation, regionDisplayColor }
+}
+
+export function buildPoliticalDisplayData(params: {
+	hoverNationId: number | null
+	selectedTimeMs: number | null
+	world: SerializedOrogenWorld | null
+	getLeaderName?: (nationId: number, timeMs: number) => string
+	getDynastyName?: (dynastyId: number) => string
+}): HoverPoliticalDisplayData {
+	const {
+		hoverNationId,
+		selectedTimeMs,
+		world,
+		getLeaderName,
+		getDynastyName,
+	} = params
+	if (hoverNationId === null || hoverNationId < 0) {
+		return { dynasty: null, ruler: null }
+	}
+
+	const dynastyId = world?.leaderDynasty?.[hoverNationId] ?? -1
+	const dynasty =
+		dynastyId >= 0 && getDynastyName
+			? {
+					id: dynastyId,
+					name: getDynastyName(dynastyId),
+					color: rgbToCss(getDynastyColor(dynastyId)),
+				}
+			: null
+	const rulerMeta = buildRulerDisplayMeta({
+		world,
+		nationId: hoverNationId,
+		timeMs: selectedTimeMs,
+	})
+	const ruler =
+		selectedTimeMs !== null && getLeaderName
+			? {
+					name: getLeaderName(hoverNationId, selectedTimeMs),
+					age: rulerMeta.age,
+					genderSymbol: rulerMeta.genderSymbol,
+				}
+			: null
+	return { dynasty, ruler }
 }
 
 export function buildClimateSwatchColor(
