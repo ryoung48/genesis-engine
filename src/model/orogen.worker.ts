@@ -9,12 +9,10 @@ import {
 } from "./history"
 import { PROV } from "./history/fields"
 import {
-	ensureHierarchyClean,
-	type HistoryState,
-	REL,
-	validateLiveHierarchy,
-} from "./history/state"
-import type { Timeline } from "./history/timeline"
+	buildHistoryFrame,
+	serializeHistoryTimelines,
+} from "./history/snapshot"
+import { type HistoryState, validateLiveHierarchy } from "./history/state"
 import { generateOrogenWorld } from "./pipelines/generate-world"
 import { importOrogenWorld } from "./pipelines/import-heightmap"
 import type { ProvincePopulation } from "./society/population"
@@ -23,8 +21,6 @@ import type {
 	OrogenWorkerResponse,
 	SerializedHistoryFrame,
 	SerializedOrogenWorld,
-	SerializedProvinceTimelineFloat,
-	SerializedProvinceTimelineInt,
 	SerializedTimelines,
 } from "./transport/worker-types"
 
@@ -109,115 +105,6 @@ function cloneHistorySeedWorld(
 	}
 }
 
-function flattenIntTimelineField(
-	field: Timeline<number>[],
-): SerializedProvinceTimelineInt {
-	const offsets = new Int32Array(field.length + 1)
-	let total = 0
-	for (let i = 0; i < field.length; i++) {
-		total += field[i].length
-		offsets[i + 1] = total
-	}
-	const times = new Float64Array(total)
-	const values = new Int32Array(total)
-	let cursor = 0
-	for (const timeline of field) {
-		for (const entry of timeline) {
-			times[cursor] = entry.time
-			values[cursor] = Math.round(entry.value)
-			cursor++
-		}
-	}
-	return { times, values, offsets }
-}
-
-function flattenFloatTimelineField(
-	field: Timeline<number>[],
-): SerializedProvinceTimelineFloat {
-	const offsets = new Int32Array(field.length + 1)
-	let total = 0
-	for (let i = 0; i < field.length; i++) {
-		total += field[i].length
-		offsets[i + 1] = total
-	}
-	const times = new Float64Array(total)
-	const values = new Float32Array(total)
-	let cursor = 0
-	for (const timeline of field) {
-		for (const entry of timeline) {
-			times[cursor] = entry.time
-			values[cursor] = entry.value
-			cursor++
-		}
-	}
-	return { times, values, offsets }
-}
-
-function serializeTimelines(state: HistoryState): SerializedTimelines {
-	const relationEntries = Array.from(state._relations.entries()).sort(
-		([a], [b]) => a - b,
-	)
-	const relationOffsets = new Int32Array(relationEntries.length + 1)
-	let relationCount = 0
-	for (let i = 0; i < relationEntries.length; i++) {
-		relationCount += relationEntries[i][1].length
-		relationOffsets[i + 1] = relationCount
-	}
-	const relationTimes = new Float64Array(relationCount)
-	const relationValues = new Int32Array(relationCount)
-	const relationA = new Int32Array(relationEntries.length)
-	const relationB = new Int32Array(relationEntries.length)
-	let cursor = 0
-	for (let i = 0; i < relationEntries.length; i++) {
-		const [key, timeline] = relationEntries[i]
-		relationA[i] = Math.floor(key / state.P)
-		relationB[i] = key % state.P
-		for (const entry of timeline) {
-			relationTimes[cursor] = entry.time
-			relationValues[cursor] = entry.value
-			cursor++
-		}
-	}
-
-	const nationColorKeys = new Int32Array(state.nationColors.size)
-	const nationColorValues = new Float32Array(state.nationColors.size * 3)
-	let colorIndex = 0
-	for (const [key, value] of state.nationColors.entries()) {
-		nationColorKeys[colorIndex] = key
-		nationColorValues[colorIndex * 3] = value[0]
-		nationColorValues[colorIndex * 3 + 1] = value[1]
-		nationColorValues[colorIndex * 3 + 2] = value[2]
-		colorIndex++
-	}
-
-	return {
-		P: state.P,
-		startTimeMs: 800 * YEAR_MS,
-		endTimeMs: historyTime,
-		parent: flattenIntTimelineField(state._parent),
-		assignment: flattenIntTimelineField(state._assignment),
-		populationRural: flattenFloatTimelineField(state._pop_rural),
-		populationUrban: flattenFloatTimelineField(state._pop_urban),
-		development: flattenFloatTimelineField(state._development),
-		consumption: flattenFloatTimelineField(state._consumption),
-		leaderDynasty: flattenIntTimelineField(state._leader_dyn),
-		leaderNameSeed: flattenIntTimelineField(state._leader_name_seed),
-		leaderClaim: flattenIntTimelineField(state._leader_claim),
-		leaderBirthYear: flattenFloatTimelineField(state._leader_birth_year),
-		occupation: flattenIntTimelineField(state._occupation),
-		relations: {
-			aIdx: relationA,
-			bIdx: relationB,
-			offsets: relationOffsets,
-			times: relationTimes,
-			values: relationValues,
-		},
-		nationColorKeys,
-		nationColorValues,
-		wars: state.wars.map((war) => ({ ...war })),
-	}
-}
-
 function buildTimelineTransferList(
 	timelines: SerializedTimelines,
 ): Transferable[] {
@@ -271,146 +158,6 @@ function buildTimelineTransferList(
 		timelines.nationColorKeys.buffer,
 		timelines.nationColorValues.buffer,
 	]
-}
-
-function buildFrame(state: HistoryState): SerializedHistoryFrame {
-	const P = state.P
-	const assignment = new Int32Array(P)
-	const parent = new Int32Array(P)
-	const sovereign = new Int32Array(P)
-	const leaderDynasty = new Int32Array(P).fill(-1)
-	const leaderNameSeed = new Int32Array(P).fill(-1)
-	const leaderClaim = new Int32Array(P)
-	const leaderBirthYear = new Float32Array(P).fill(-1)
-	const colors = new Float32Array(P * 3)
-	const adjOffset = new Int32Array(P + 1)
-	const populationTotal = new Float32Array(P)
-	const populationUrban = new Float32Array(P)
-	const development = new Float32Array(P)
-	const consumption = new Float32Array(P)
-	const nationWealth = new Float32Array(P)
-	const nationOptimalWealth = new Float32Array(P)
-	const relationEntries = Array.from(state._relations.entries()).filter(
-		([, timeline]) =>
-			timeline.length > 0 &&
-			timeline[timeline.length - 1].value !== REL.NEUTRAL,
-	)
-	const relationA = new Int32Array(relationEntries.length)
-	const relationB = new Int32Array(relationEntries.length)
-	const relationValues = new Uint8Array(relationEntries.length)
-
-	ensureHierarchyClean(state)
-	for (let p = 0; p < P; p++) {
-		parent[p] = PROV.parent.get(state, p)
-	}
-
-	for (let p = 0; p < P; p++) {
-		assignment[p] = PROV.assignment.get(state, p)
-		sovereign[p] = state.sovereignCurrent[p]
-		populationUrban[p] = PROV.population.urban.get(state, p)
-		populationTotal[p] =
-			PROV.population.rural.get(state, p) + populationUrban[p]
-		development[p] = PROV.development.get(state, p)
-		consumption[p] = PROV.consumption.get(state, p)
-		const color = state.nationColors.get(assignment[p])
-		if (color) {
-			const base = p * 3
-			colors[base] = color[0]
-			colors[base + 1] = color[1]
-			colors[base + 2] = color[2]
-		}
-	}
-
-	const neighborSets = new Map<number, Set<number>>()
-	for (let p = 0; p < P; p++) {
-		const nation = assignment[p]
-		if (nation < 0) continue
-		if (!neighborSets.has(nation)) neighborSets.set(nation, new Set())
-		for (
-			let i = state.provinceAdjOffset[p];
-			i < state.provinceAdjOffset[p + 1];
-			i++
-		) {
-			const nbNation = assignment[state.provinceAdjList[i]]
-			if (nbNation >= 0 && nbNation !== nation) {
-				neighborSets.get(nation)?.add(nbNation)
-			}
-		}
-	}
-
-	let totalAdj = 0
-	for (let p = 0; p < P; p++) {
-		totalAdj += neighborSets.get(p)?.size ?? 0
-		adjOffset[p + 1] = totalAdj
-	}
-	const adjList = new Int32Array(totalAdj)
-	for (let p = 0; p < P; p++) {
-		let idx = adjOffset[p]
-		for (const nb of neighborSets.get(p) ?? []) adjList[idx++] = nb
-	}
-
-	const activeWars = state.wars
-		.filter(
-			(war) =>
-				war.startTime <= state.time &&
-				(war.endTime ?? Number.POSITIVE_INFINITY) > state.time,
-		)
-		.map((war) => ({
-			idx: war.idx,
-			attacker: war.attacker,
-			defender: war.defender,
-			rebel: war.rebel,
-			occupied: Array.from({ length: P }, (_, p) => p).filter(
-				(p) => PROV.occupation.get(state, p) === war.idx,
-			),
-		}))
-
-	let sovereignCount = 0
-	let totalPopulation = 0
-	for (let p = 0; p < P; p++) {
-		if (parent[p] < 0 && assignment[p] >= 0) {
-			sovereignCount++
-			leaderDynasty[p] = PROV.leader.dynasty.get(state, p)
-			leaderNameSeed[p] = PROV.leader.nameSeed.get(state, p)
-			leaderClaim[p] = PROV.leader.claim.get(state, p)
-			leaderBirthYear[p] = PROV.leader.birthYear.get(state, p)
-			nationWealth[p] = Math.max(0, state.habitability[p] - consumption[p])
-			nationOptimalWealth[p] = state.habitability[p]
-		}
-		totalPopulation += populationTotal[p]
-	}
-	for (let i = 0; i < relationEntries.length; i++) {
-		const [key, timeline] = relationEntries[i]
-		relationA[i] = Math.floor(key / P)
-		relationB[i] = key % P
-		relationValues[i] = timeline[timeline.length - 1].value
-	}
-
-	return {
-		timeMs: state.time,
-		assignment,
-		parent,
-		sovereign,
-		leaderDynasty,
-		leaderNameSeed,
-		leaderClaim,
-		leaderBirthYear,
-		colors,
-		adjOffset,
-		adjList,
-		populationTotal,
-		populationUrban,
-		development,
-		consumption,
-		nationWealth,
-		nationOptimalWealth,
-		relationA,
-		relationB,
-		relationValues,
-		activeWars,
-		sovereignCount,
-		totalPopulation,
-	}
 }
 
 function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
@@ -754,7 +501,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 
 function emitSimulationDone(): void {
 	if (!historyState) return
-	const timelines = serializeTimelines(historyState)
+	const timelines = serializeHistoryTimelines(historyState, historyTime)
 	const done: OrogenWorkerResponse = {
 		type: "sim-done",
 		timeMs: historyTime,
@@ -773,7 +520,7 @@ async function runSimulation(tickMs = YEAR_MS): Promise<void> {
 			historyTime += tickMs
 			simulateUntil(historyState, historyTime, historyRng)
 			validateLiveHierarchy(historyState, `worker-post-simulate ${historyTime}`)
-			const frame = buildFrame(historyState)
+			const frame = buildHistoryFrame(historyState)
 			const progress: OrogenWorkerResponse = {
 				type: "sim-progress",
 				timeMs: historyTime,
@@ -890,7 +637,9 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 				: null
 
 		const world = serializeWorld(generated, seedHistoryState)
-		const frame = seedHistoryState ? buildFrame(seedHistoryState) : undefined
+		const frame = seedHistoryState
+			? buildHistoryFrame(seedHistoryState)
+			: undefined
 		self.postMessage(
 			{ type: "done", world, frame } satisfies OrogenWorkerResponse,
 			frame

@@ -1,19 +1,18 @@
 import type { BoundaryInfo, SphereMesh } from ".."
 import { SimplexNoise } from "../shared/simplex-noise"
-import { getVolcanismOverdrive } from "../shared/volcanism"
 import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
 
 const VOLC_MIN_SPACING = 0.015
 const VOLC_SIGMA_BASE = 0.003
-const VOLC_HEIGHT_BASE = 0.18
+const VOLC_HEIGHT_BASE = 0.15
 const VOLC_HEIGHT_VAR_BASE = 0.7
 const VOLC_HEIGHT_VAR_RANGE = 0.6
 const VOLC_SIGMA_VAR_BASE = 0.6
 const VOLC_SIGMA_VAR_RANGE = 0.8
 const VOLC_SUBDUCT_THRESH = 0.45
 
-const LIP_SIGMA = 0.08
-const LIP_HEIGHT = 0.03
+const LIP_SIGMA = 0.12
+const LIP_HEIGHT = 0.02
 const LIP_LOBE_COUNT = 6
 const LIP_LOBE_OFFSET = 0.6
 const LIP_LOBE_SIGMA = 0.6
@@ -28,13 +27,12 @@ interface TangentFrame {
 	vz: number
 }
 
-export interface LipSite extends TangentFrame {
+export interface LipSite {
 	x: number
 	y: number
 	z: number
 	height: number
 	sigma: number
-	aspect: number
 }
 
 export type TerrainFeatureMarker = (
@@ -43,12 +41,12 @@ export type TerrainFeatureMarker = (
 	delta: number,
 ) => void
 
-export function getVolcanicArcSpacing(volcanism: number): number {
-	return VOLC_MIN_SPACING * (1 - 0.65 * getVolcanismOverdrive(volcanism))
+export function getVolcanicArcSpacing(_volcanism: number): number {
+	return VOLC_MIN_SPACING
 }
 
-export function getLipUpwellingThreshold(volcanism: number): number {
-	return 0.02 * (1 - getVolcanismOverdrive(volcanism))
+export function getLipUpwellingThreshold(_volcanism: number): number {
+	return 0.2
 }
 
 export function getLipSpawnChance(_volcanism: number): number {
@@ -100,8 +98,7 @@ export function applyVolcanicArcs({
 	const uplift = new Float32Array(numRegions)
 	const arcVolcNoise = new SimplexNoise(seed + 713)
 	const minSpacingSq = getVolcanicArcSpacing(volcanism) ** 2
-	const overdrive = getVolcanismOverdrive(volcanism)
-	const coneHeightMultiplier = 1 + 0.35 * overdrive
+	void volcanism
 
 	const candidates: Array<{
 		x: number
@@ -177,11 +174,7 @@ export function applyVolcanicArcs({
 			x: candidate.x,
 			y: candidate.y,
 			z: candidate.z,
-			height:
-				VOLC_HEIGHT_BASE *
-				(0.5 + candidate.stressLocal) *
-				heightVar *
-				coneHeightMultiplier,
+			height: VOLC_HEIGHT_BASE * (0.5 + candidate.stressLocal) * heightVar,
 			invS2: -0.5 / (sigma * sigma),
 		})
 	}
@@ -285,27 +278,19 @@ export function appendLargeIgneousProvinceSites(
 		volcanism,
 	}: AppendLipSitesParams,
 ): void {
-	const overdrive = getVolcanismOverdrive(volcanism)
+	void volcanism
 	const landBoost = isOcean ? 0.6 : 1.0
-	const lipHeight =
-		LIP_HEIGHT *
-		(0.5 + random()) *
-		(0.5 + upwelling) *
-		landBoost *
-		(1 + 0.45 * overdrive)
-	const baseLipSigma =
-		LIP_SIGMA * (0.7 + 0.6 * random()) * (1 + 0.55 * overdrive)
+	const baseLipStr =
+		LIP_HEIGHT * (0.5 + random()) * (0.5 + upwelling) * landBoost
+	const baseLipSigma = LIP_SIGMA * (0.7 + 0.6 * random())
 	const lipFrame = buildTangentFrame(x, y, z, drift[0], drift[1], drift[2])
-	const lipAspect = 1.5 + random() * 1.5
 
 	lipSites.push({
 		x,
 		y,
 		z,
-		height: lipHeight,
+		height: baseLipStr,
 		sigma: baseLipSigma,
-		aspect: lipAspect,
-		...lipFrame,
 	})
 
 	for (let i = 0; i < LIP_LOBE_COUNT; i++) {
@@ -326,22 +311,12 @@ export function appendLargeIgneousProvinceSites(
 		ly /= ll
 		lz /= ll
 
-		const lobeAngle = random() * Math.PI
-		const lobeCa = Math.cos(lobeAngle)
-		const lobeSa = Math.sin(lobeAngle)
 		lipSites.push({
 			x: lx,
 			y: ly,
 			z: lz,
-			height: lipHeight * LIP_LOBE_STRENGTH * (0.5 + random() * 0.5),
+			height: baseLipStr * LIP_LOBE_STRENGTH * (0.5 + random() * 0.5),
 			sigma: baseLipSigma * LIP_LOBE_SIGMA * (0.6 + random() * 0.8),
-			ux: lobeCa * lipFrame.ux + lobeSa * lipFrame.vx,
-			uy: lobeCa * lipFrame.uy + lobeSa * lipFrame.vy,
-			uz: lobeCa * lipFrame.uz + lobeSa * lipFrame.vz,
-			vx: -lobeSa * lipFrame.ux + lobeCa * lipFrame.vx,
-			vy: -lobeSa * lipFrame.uy + lobeCa * lipFrame.vy,
-			vz: -lobeSa * lipFrame.uz + lobeCa * lipFrame.vz,
-			aspect: 1.2 + random() * 1.3,
 		})
 	}
 }
@@ -363,40 +338,19 @@ export function applyLargeIgneousProvinces({
 }: LargeIgneousProvinceParams): Float32Array {
 	const uplift = new Float32Array(mesh.numRegions)
 	if (lipSites.length === 0) return uplift
-
-	const lipWarpNoise = new SimplexNoise(seed + 7771)
-	const lipWarpAmp = 0.08
+	void seed
 
 	for (let r = 0; r < mesh.numRegions; r++) {
 		const rx = mesh.r_xyz[3 * r]
 		const ry = mesh.r_xyz[3 * r + 1]
 		const rz = mesh.r_xyz[3 * r + 2]
 
-		const wx = rx + lipWarpNoise.noise3D(rx * 6, ry * 6, rz * 6) * lipWarpAmp
-		const wy =
-			ry +
-			lipWarpNoise.noise3D(rx * 6 + 40, ry * 6 + 40, rz * 6 + 40) * lipWarpAmp
-		const wz =
-			rz +
-			lipWarpNoise.noise3D(rx * 6 + 80, ry * 6 + 80, rz * 6 + 80) * lipWarpAmp
-		const wl = Math.sqrt(wx * wx + wy * wy + wz * wz) || 1
-		const wrx = wx / wl
-		const wry = wy / wl
-		const wrz = wz / wl
-
 		let total = 0
 		for (const lip of lipSites) {
-			const dot = wrx * lip.x + wry * lip.y + wrz * lip.z
-			if (dot < 0.9) continue
-
-			const dx = wrx - lip.x * dot
-			const dy = wry - lip.y * dot
-			const dz = wrz - lip.z * dot
-			const du = dx * lip.ux + dy * lip.uy + dz * lip.uz
-			const dv = dx * lip.vx + dy * lip.vy + dz * lip.vz
-			const ellipDist = (du * du) / (lip.aspect * lip.aspect) + dv * dv
+			const dot = rx * lip.x + ry * lip.y + rz * lip.z
+			const angleSq = Math.max(0, 2 * (1 - dot))
 			const invS2 = -0.5 / (lip.sigma * lip.sigma)
-			const gauss = Math.exp(ellipDist * invS2)
+			const gauss = Math.exp(angleSq * invS2)
 			if (gauss > 0.01) total += lip.height * gauss
 		}
 

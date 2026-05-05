@@ -8,10 +8,7 @@
 import { eulerVelocityAt } from "../shared/math"
 import { createRng } from "../shared/rng"
 import { SimplexNoise } from "../shared/simplex-noise"
-import {
-	getLegacyVolcanismEquivalent,
-	getVolcanismOverdrive,
-} from "../shared/volcanism"
+import { getLegacyVolcanismEquivalent } from "../shared/volcanism"
 import { normalizeMantleField } from "../tectonics/mantle"
 import type { SphereMesh } from "../types/mesh"
 import type { OrogenTerrainFeatures, TectonicPlate } from "../types/tectonics"
@@ -24,31 +21,6 @@ import {
 
 function lerp(min: number, max: number, t: number): number {
 	return min + (max - min) * t
-}
-
-function mapActiveHotspotCount(volcanism: number): number {
-	const v = getLegacyVolcanismEquivalent(volcanism)
-	const overdrive = getVolcanismOverdrive(volcanism)
-	const baseCount = Math.round(
-		v <= 0.5 ? lerp(2, 5, v / 0.5) : lerp(5, 10, (v - 0.5) / 0.5),
-	)
-	return Math.round(baseCount * lerp(1, 3.2, overdrive))
-}
-
-function mapActiveChainLength(volcanism: number): number {
-	const v = getLegacyVolcanismEquivalent(volcanism)
-	const overdrive = getVolcanismOverdrive(volcanism)
-	const baseLength = Math.round(
-		v <= 0.5 ? lerp(3, 6, v / 0.5) : lerp(6, 10, (v - 0.5) / 0.5),
-	)
-	return Math.round(baseLength * lerp(1, 1.75, overdrive))
-}
-
-function mapActiveDomeStrength(volcanism: number): number {
-	const v = getLegacyVolcanismEquivalent(volcanism)
-	const baseStrength =
-		v <= 0.5 ? lerp(0, 0.65, v / 0.5) : lerp(0.65, 1.0, (v - 0.5) / 0.5)
-	return baseStrength
 }
 
 function findNearestR(
@@ -304,7 +276,6 @@ interface Dome {
 	x: number
 	y: number
 	z: number
-	centerRegion: number
 	strength: number
 	baseStrength: number
 	sigma: number
@@ -349,32 +320,30 @@ export function applyHotspots(
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
 	const dominantMagnitude = terrainFeatures?.dominantMagnitude
-	const overdrive = getVolcanismOverdrive(volcanism)
-
-	const NUM_HOTSPOTS = mapActiveHotspotCount(volcanism)
-	const CHAIN_LENGTH = mapActiveChainLength(volcanism)
-	const CHAIN_DECAY = 0.75
-	const CHAIN_SPACING = 0.06 * lerp(1, 1.35, overdrive)
-	const DOME_SIGMA = 0.0064
-	const DOME_STRENGTH = mapActiveDomeStrength(volcanism)
-	const SWELL_SIGMA_MULT = 2.25
-	const SWELL_STR_MULT = 0.14
-	const CONT_HOTSPOT_SIGMA_MULT = 2.7
+	const NUM_HOTSPOTS = 5
+	const CHAIN_LENGTH = 6
+	const CHAIN_DECAY = 0.65
+	const CHAIN_SPACING = 0.06
+	const DOME_SIGMA = 0.006
+	const DOME_STRENGTH = 0.6
+	const SWELL_SIGMA_MULT = 2
+	const SWELL_STR_MULT = 0.1
+	const CONT_HOTSPOT_SIGMA_MULT = 2.5
 	const CONT_HOTSPOT_STRENGTH_MULT = 0.4
 	const CONT_HOTSPOT_CALDERA_SIGMA_FRAC = 0.35
 	const CONT_HOTSPOT_CALDERA_DEPTH_FRAC = 0.3
-	const CONT_HOTSPOT_SWELL_MULT = 1.75
+	const CONT_HOTSPOT_SWELL_MULT = 1.5
 	const DOME_OCEAN_BOOST = 1.8
 	const DOME_DRIFT_STRETCH = 1.05
 	const DOME_CALDERA_STRENGTH_MIN = 0.15
 	const DOME_SATELLITE_COUNT = 2
 	const DOME_SATELLITE_OFFSET = 0.8
-	const DOME_SATELLITE_SIGMA = 0.6
-	const DOME_SATELLITE_STRENGTH = 0.4
+	const DOME_SATELLITE_SIGMA = 0.5
+	const DOME_SATELLITE_STRENGTH = 0.35
 	const HOTSPOT_UPWELLING_CANDIDATES = 8
 	const HOTSPOT_UPWELLING_JITTER = 0.3
 	const DOME_AGE_BROADENING = 0.03
-	// Deterministic RNGs matching source: makeRng(seed + 999), makeRng(seed + 1001)
+	void volcanism
 	const hsRng = createRng(seed + 999)
 	const hsPosRng = createRng(seed + 1001)
 	const hsNoise = new SimplexNoise(seed + 501)
@@ -457,7 +426,6 @@ export function applyHotspots(
 				x: sx,
 				y: sy,
 				z: sz,
-				centerRegion: findNearestR(mesh, sx, sy, sz),
 				strength: parent.strength * DOME_SATELLITE_STRENGTH,
 				baseStrength: parent.baseStrength * DOME_SATELLITE_STRENGTH,
 				sigma: parent.sigma * DOME_SATELLITE_SIGMA,
@@ -540,7 +508,6 @@ export function applyHotspots(
 			x: hx,
 			y: hy,
 			z: hz,
-			centerRegion: centerR,
 			strength: effectiveStrength,
 			baseStrength: hStrength * strengthScale,
 			sigma: effectiveSigma,
@@ -607,7 +574,6 @@ export function applyHotspots(
 				x: cx,
 				y: cy,
 				z: cz,
-				centerRegion: findNearestR(mesh, cx, cy, cz),
 				strength: str,
 				baseStrength: baseStr,
 				sigma: stepSigma,
@@ -662,141 +628,151 @@ export function applyHotspots(
 		dm.ageFactor = dm.chainLength > 0 ? dm.chainIndex / dm.chainLength : 0
 	}
 
-	const totalSwellUplift = new Float32Array(numRegions)
-	const totalPeakUplift = new Float32Array(numRegions)
-	const weightedAge = new Float32Array(numRegions)
-	const ageWeightSum = new Float32Array(numRegions)
-	const shapeWarpSq = new Float32Array(numRegions)
-	shapeWarpSq.fill(1)
-	const shapeWarpReady = new Uint8Array(numRegions)
-	const visited = new Int32Array(numRegions)
-	const queue = new Int32Array(numRegions)
-	const { adjOffset, adjList } = mesh
-	let visitStamp = 0
-
-	const getShapeWarpSq = (r: number, rx: number, ry: number, rz: number) => {
-		if (shapeWarpReady[r]) return shapeWarpSq[r]
-		const warpScale = 8
-		const wx =
-			fbm(
-				hsNoise2,
-				rx * warpScale + 5.1,
-				ry * warpScale + 3.7,
-				rz * warpScale + 9.2,
-				2,
-			) * 0.4
-		const wy =
-			fbm(
-				hsNoise2,
-				rx * warpScale + 11.3,
-				ry * warpScale + 7.1,
-				rz * warpScale + 2.9,
-				2,
-			) * 0.4
-		const wz =
-			fbm(
-				hsNoise2,
-				rx * warpScale + 1.7,
-				ry * warpScale + 13.5,
-				rz * warpScale + 6.4,
-				2,
-			) * 0.4
-		const shapeWarp =
-			1.0 +
-			0.4 *
-				fbm(
-					hsNoise,
-					(rx + wx) * 20 + 3.2,
-					(ry + wy) * 20 + 7.8,
-					(rz + wz) * 20 + 1.5,
-					4,
-				)
-		const value = shapeWarp * shapeWarp
-		shapeWarpSq[r] = value
-		shapeWarpReady[r] = 1
-		return value
-	}
-
-	// Apply dome uplift with per-dome neighborhood traversal instead of
-	// scanning every region against every dome.
-	for (const dm of domes) {
-		visitStamp++
-		let head = 0
-		let tail = 0
-		queue[tail++] = dm.centerRegion
-		visited[dm.centerRegion] = visitStamp
-
-		while (head < tail) {
-			const r = queue[head++]
-			const rx = r_xyz[3 * r]
-			const ry = r_xyz[3 * r + 1]
-			const rz = r_xyz[3 * r + 2]
-			const dot = dm.x * rx + dm.y * ry + dm.z * rz
-			if (dot <= dm.cosThreshSwell) continue
-
-			const swAngleSq = 2 * (1 - dot)
-			totalSwellUplift[r] +=
-				dm.swellStrength * Math.exp(swAngleSq * dm.invS2Swell)
-
-			if (dot > dm.cosThreshPeak) {
-				const offX = rx - dot * dm.x
-				const offY = ry - dot * dm.y
-				const offZ = rz - dot * dm.z
-				const parComp = offX * dm.ux + offY * dm.uy + offZ * dm.uz
-				const perpComp = offX * dm.vx + offY * dm.vy + offZ * dm.vz
-				const stretchedParSq = (parComp * dm.driftStretch) ** 2
-				const angleSq = stretchedParSq + perpComp * perpComp
-
-				let gauss = Math.exp(angleSq * getShapeWarpSq(r, rx, ry, rz) * dm.invS2)
-				if (dm.riftAngles.length > 0 && gauss > 0.01) {
-					const angle = Math.atan2(perpComp, parComp)
-					let maxRift = 0
-					for (const ra of dm.riftAngles) {
-						let da = angle - ra
-						da = da - Math.round(da / (2 * Math.PI)) * 2 * Math.PI
-						const riftFactor = Math.cos(da) ** 4
-						if (riftFactor > maxRift) maxRift = riftFactor
-					}
-					gauss *= 1.0 + 0.5 * maxRift
-				}
-
-				const peakUplift = dm.strength * gauss
-				totalPeakUplift[r] += peakUplift
-				weightedAge[r] += dm.ageFactor * peakUplift
-				ageWeightSum[r] += peakUplift
-				if (dm.hasCaldera) {
-					totalPeakUplift[r] -=
-						dm.calderaDepth * Math.exp(angleSq * dm.invS2Caldera)
-				}
-			}
-
-			for (let i = adjOffset[r], end = adjOffset[r + 1]; i < end; i++) {
-				const nb = adjList[i]
-				if (visited[nb] === visitStamp) continue
-				visited[nb] = visitStamp
-				queue[tail++] = nb
-			}
-		}
+	const domeGrid: number[][] = new Array(18 * 36)
+	for (let d = 0; d < domes.length; d++) {
+		const dm = domes[d]
+		const lat = Math.asin(Math.max(-1, Math.min(1, dm.y)))
+		const lon = Math.atan2(dm.x, dm.z)
+		const bi = Math.max(
+			0,
+			Math.min(17, Math.floor(((lat + Math.PI / 2) / Math.PI) * 18)),
+		)
+		const bj = Math.max(
+			0,
+			Math.min(35, Math.floor(((lon + Math.PI) / (2 * Math.PI)) * 36)),
+		)
+		const bin = bi * 36 + bj
+		domeGrid[bin] ??= []
+		domeGrid[bin].push(d)
 	}
 
 	for (let r = 0; r < numRegions; r++) {
-		const combinedUplift = totalSwellUplift[r] + totalPeakUplift[r]
-		if (combinedUplift <= 0.001) continue
-
 		const rx = r_xyz[3 * r]
 		const ry = r_xyz[3 * r + 1]
 		const rz = r_xyz[3 * r + 2]
-		const age = ageWeightSum[r] > 0 ? weightedAge[r] / ageWeightSum[r] : 0
-		const texBase = 0.7 * ridgedFbm(hsNoise, rx * 12, ry * 12, rz * 12, 4)
-		const texDetail = 0.3 * ridgedFbm(hsNoise, rx * 30, ry * 30, rz * 30, 3)
-		const texRaw = texBase + texDetail
-		const texMin = 0.4 + age * 0.3
-		const texMax = 1.2 - age * 0.2
-		const volc = texMin + (texMax - texMin) * texRaw
+		const rLat = Math.asin(Math.max(-1, Math.min(1, ry)))
+		const rLon = Math.atan2(rx, rz)
+		const rbi = Math.max(
+			0,
+			Math.min(17, Math.floor(((rLat + Math.PI / 2) / Math.PI) * 18)),
+		)
+		const rbj = Math.max(
+			0,
+			Math.min(35, Math.floor(((rLon + Math.PI) / (2 * Math.PI)) * 36)),
+		)
 
-		const uplift = totalSwellUplift[r] + Math.max(0, totalPeakUplift[r]) * volc
-		elevation[r] += uplift
-		hotspotContrib[r] = uplift
+		let totalUplift = 0
+		let totalSwellUplift = 0
+		let weightedAge = 0
+		let ageWeightSum = 0
+		let nearPeak = false
+		let shapeWarpSq = 1
+		let hasContrib = false
+
+		for (let di = -1; di <= 1; di++) {
+			const bi = rbi + di
+			if (bi < 0 || bi >= 18) continue
+			for (let dj = -1; dj <= 1; dj++) {
+				const bj = (((rbj + dj) % 36) + 36) % 36
+				const cell = domeGrid[bi * 36 + bj]
+				if (!cell) continue
+				for (const domeIndex of cell) {
+					const dm = domes[domeIndex]
+					const cdot = dm.x * rx + dm.y * ry + dm.z * rz
+					if (cdot > dm.cosThreshSwell) hasContrib = true
+					if (cdot > dm.cosThreshPeak && !nearPeak) nearPeak = true
+				}
+			}
+		}
+		if (!hasContrib) continue
+
+		if (nearPeak) {
+			const wx =
+				fbm(hsNoise2, rx * 8 + 5.1, ry * 8 + 3.7, rz * 8 + 9.2, 2) * 0.4
+			const wy =
+				fbm(hsNoise2, rx * 8 + 11.3, ry * 8 + 7.1, rz * 8 + 2.9, 2) * 0.4
+			const wz =
+				fbm(hsNoise2, rx * 8 + 1.7, ry * 8 + 13.5, rz * 8 + 6.4, 2) * 0.4
+			const shapeWarp =
+				1 +
+				0.4 *
+					fbm(
+						hsNoise,
+						(rx + wx) * 20 + 3.2,
+						(ry + wy) * 20 + 7.8,
+						(rz + wz) * 20 + 1.5,
+						4,
+					)
+			shapeWarpSq = shapeWarp * shapeWarp
+		}
+
+		for (let di = -1; di <= 1; di++) {
+			const bi = rbi + di
+			if (bi < 0 || bi >= 18) continue
+			for (let dj = -1; dj <= 1; dj++) {
+				const bj = (((rbj + dj) % 36) + 36) % 36
+				const cell = domeGrid[bi * 36 + bj]
+				if (!cell) continue
+				for (const domeIndex of cell) {
+					const dm = domes[domeIndex]
+					const dot = dm.x * rx + dm.y * ry + dm.z * rz
+
+					if (dot > dm.cosThreshSwell) {
+						const swAngleSq = 2 * (1 - dot)
+						totalSwellUplift +=
+							dm.swellStrength * Math.exp(swAngleSq * dm.invS2Swell)
+					}
+
+					if (dot < dm.cosThreshPeak) continue
+
+					const offX = rx - dot * dm.x
+					const offY = ry - dot * dm.y
+					const offZ = rz - dot * dm.z
+					const parComp = offX * dm.ux + offY * dm.uy + offZ * dm.uz
+					const perpComp = offX * dm.vx + offY * dm.vy + offZ * dm.vz
+					const stretchedParSq =
+						parComp * dm.driftStretch * (parComp * dm.driftStretch)
+					const angleSq = stretchedParSq + perpComp * perpComp
+
+					let gauss = Math.exp(angleSq * shapeWarpSq * dm.invS2)
+					if (dm.riftAngles.length > 0 && gauss > 0.01) {
+						const angle = Math.atan2(perpComp, parComp)
+						let maxRift = 0
+						for (const riftAngle of dm.riftAngles) {
+							let da = angle - riftAngle
+							da = da - Math.round(da / (2 * Math.PI)) * 2 * Math.PI
+							const c2 = Math.cos(da)
+							const riftFactor = c2 * c2 * c2 * c2
+							if (riftFactor > maxRift) maxRift = riftFactor
+						}
+						gauss *= 1 + 0.5 * maxRift
+					}
+
+					const peakUplift = dm.strength * gauss
+					totalUplift += peakUplift
+					weightedAge += dm.ageFactor * peakUplift
+					ageWeightSum += peakUplift
+
+					if (dm.hasCaldera) {
+						totalUplift -= dm.calderaDepth * Math.exp(angleSq * dm.invS2Caldera)
+					}
+				}
+			}
+		}
+
+		const combinedUplift = totalSwellUplift + totalUplift
+		if (combinedUplift > 0.001) {
+			const age = ageWeightSum > 0 ? weightedAge / ageWeightSum : 0
+			const texBase = 0.7 * ridgedFbm(hsNoise, rx * 12, ry * 12, rz * 12, 4)
+			const texDetail = 0.3 * ridgedFbm(hsNoise, rx * 30, ry * 30, rz * 30, 3)
+			const texRaw = texBase + texDetail
+			const texMin = 0.4 + age * 0.3
+			const texMax = 1.2 - age * 0.2
+			const volc = texMin + (texMax - texMin) * texRaw
+			const uplift = totalSwellUplift + Math.max(0, totalUplift) * volc
+			elevation[r] += uplift
+			hotspotContrib[r] = uplift
+		}
 	}
 
 	const lipContrib = applyLargeIgneousProvinces({

@@ -211,7 +211,7 @@ describe("applyHotspots", () => {
 		expect(continentalFootprint).toBeGreaterThan(oceanicFootprint)
 	})
 
-	it("makes extreme active hotspots broader and moderately taller", () => {
+	it("keeps active hotspot fields identical across volcanism levels", () => {
 		const mesh = buildMesh()
 		const plateAssignment = new Int32Array(mesh.numRegions)
 		const mantle = new Float32Array(mesh.numRegions).fill(1)
@@ -236,18 +236,12 @@ describe("applyHotspots", () => {
 			10,
 		)
 
-		expect(totalHotspotUplift(overdriven)).toBeGreaterThan(
-			totalHotspotUplift(baseline) * 2,
+		expect(overdriven).toEqual(baseline)
+		expect(totalHotspotUplift(overdriven)).toBeCloseTo(
+			totalHotspotUplift(baseline),
 		)
-		expect(hotspotFootprint(overdriven)).toBeGreaterThan(
-			hotspotFootprint(baseline) * 1.5,
-		)
-		expect(maxHotspotUplift(overdriven)).toBeGreaterThan(
-			maxHotspotUplift(baseline) * 1.05,
-		)
-		expect(maxHotspotUplift(overdriven)).toBeLessThan(
-			maxHotspotUplift(baseline) * 1.8,
-		)
+		expect(hotspotFootprint(overdriven)).toBe(hotspotFootprint(baseline))
+		expect(maxHotspotUplift(overdriven)).toBeCloseTo(maxHotspotUplift(baseline))
 	})
 
 	it("is deterministic for repeated active-hotspot runs with the same inputs", () => {

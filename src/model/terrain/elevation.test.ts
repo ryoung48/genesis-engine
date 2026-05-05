@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { BoundaryInfo, DistanceFields, PlateVec } from ".."
-import { elevToHeightKm } from "../climate/climate"
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
-import { classifyTopography } from "./classification"
 import { blendElevation } from "./elevation"
 
 function buildMesh() {
@@ -35,7 +33,7 @@ function buildDistanceFields(regionCount: number): DistanceFields {
 }
 
 describe("blendElevation", () => {
-	it("builds a surfaced island-arc belt from oceanic subduction seeds", () => {
+	it("keeps legacy oceanic island arcs mostly submerged under the old cap", () => {
 		const mesh = buildMesh()
 		const boundary = buildBoundaryInfo(mesh.numRegions)
 		boundary.r_boundaryType[0] = 1
@@ -75,39 +73,8 @@ describe("blendElevation", () => {
 		}
 
 		expect(arcRegions).toBeGreaterThan(10)
-		expect(surfacedArcRegions).toBeGreaterThan(1)
-		expect(surfacedArcRegions).toBeLessThan(arcRegions * 0.25)
-		expect(mountainousArcRegions).toBeGreaterThan(1)
-		expect(maxArcElevation).toBeGreaterThan(0.5)
-
-		const elevationKm = Float32Array.from(elevation, (value) =>
-			elevToHeightKm(value),
-		)
-		const isLand = Uint8Array.from(elevation, (value) => (value > 0 ? 1 : 0))
-		const { topography } = classifyTopography({
-			mesh,
-			elevationKm,
-			isLand,
-			rivers: {
-				lakes: new Uint8Array(mesh.numRegions),
-				visible: new Uint8Array(mesh.numRegions),
-				terminal: new Uint8Array(mesh.numRegions),
-				terminalCoastal: new Uint8Array(mesh.numRegions),
-				terminalInterior: new Uint8Array(mesh.numRegions),
-			},
-			seed: 17,
-		})
-
-		let mountainArcRegions = 0
-		for (let r = 0; r < mesh.numRegions; r++) {
-			if (
-				(terrainFeatures.featureMask[r] & islandArcBit) !== 0 &&
-				topography[r] === 3
-			) {
-				mountainArcRegions++
-			}
-		}
-
-		expect(mountainArcRegions).toBeGreaterThan(0)
+		expect(surfacedArcRegions).toBeLessThanOrEqual(1)
+		expect(mountainousArcRegions).toBe(0)
+		expect(maxArcElevation).toBeLessThanOrEqual(0.2)
 	})
 })

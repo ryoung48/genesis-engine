@@ -9,12 +9,12 @@
 		"build": "tsc -b && vite build",
 		"lint": "knip --fix --allow-remove-files && biome check --write --unsafe",
 		"preview": "vite preview",
-		"bench:snapshot": "node scripts/run-snapshot-bench.mjs",
 		"test": "vitest run --project unit --coverage",
 		"test:unit": "vitest run --project unit",
 		"test:coverage": "pnpm test",
 		"gen:lang": "vitest run --project smoke src\\model\\actors\\language\\language.smoke.test.ts",
 		"gen:history": "vitest run --project smoke src\\model\\history\\history.smoke.test.ts",
+		"gen:snapshot": "vitest run --project smoke src\\model\\history\\snapshot.smoke.test.ts",
 		"gen:world": "vitest run --project smoke src\\model\\pipelines\\generate-default-world.smoke.test.ts",
 		"knip": "knip"
 	},

@@ -34,14 +34,14 @@ function createFeatureTracker(regionCount: number) {
 }
 
 describe("volcanism helpers", () => {
-	it("keeps legacy volcanic arc spacing and unconditional LIP spawning", () => {
+	it("keeps legacy fixed volcanic arc spacing and LIP thresholds", () => {
 		expect(getVolcanicArcSpacing(0)).toBeCloseTo(0.015)
 		expect(getVolcanicArcSpacing(1)).toBeCloseTo(getVolcanicArcSpacing(0))
 		expect(getVolcanicArcSpacing(2)).toBeCloseTo(getVolcanicArcSpacing(0))
-		expect(getVolcanicArcSpacing(10)).toBeLessThan(getVolcanicArcSpacing(2))
-		expect(getLipUpwellingThreshold(0)).toBeCloseTo(0.02)
-		expect(getLipUpwellingThreshold(1)).toBeCloseTo(0.02)
-		expect(getLipUpwellingThreshold(10)).toBe(0)
+		expect(getVolcanicArcSpacing(10)).toBeCloseTo(getVolcanicArcSpacing(2))
+		expect(getLipUpwellingThreshold(0)).toBeCloseTo(0.2)
+		expect(getLipUpwellingThreshold(1)).toBeCloseTo(0.2)
+		expect(getLipUpwellingThreshold(10)).toBeCloseTo(0.2)
 		expect(getLipSpawnChance(0)).toBe(1)
 		expect(getLipSpawnChance(1)).toBe(1)
 	})
@@ -285,7 +285,7 @@ describe("applyLargeIgneousProvinces", () => {
 		)
 	})
 
-	it("makes large igneous provinces broader and taller at extreme volcanism", () => {
+	it("keeps large igneous province sites identical across volcanism levels", () => {
 		const makeRandom = () => {
 			const values = [0.2, 0.6, 0.5, 0.25, 0.4, 0.7, 0.3, 0.2, 0.8, 0.45]
 			let index = 0
@@ -320,12 +320,7 @@ describe("applyLargeIgneousProvinces", () => {
 		})
 
 		expect(extremeSites).toHaveLength(7)
-		expect(extremeSites[0]?.height ?? 0).toBeGreaterThan(
-			baselineSites[0]?.height ?? 0,
-		)
-		expect(extremeSites[0]?.sigma ?? 0).toBeGreaterThan(
-			baselineSites[0]?.sigma ?? 0,
-		)
+		expect(extremeSites).toEqual(baselineSites)
 	})
 
 	it("adds uplift and marks large igneous province terrain features", () => {
@@ -342,15 +337,6 @@ describe("applyLargeIgneousProvinces", () => {
 					z: mesh.r_xyz[2],
 					height: 0.05,
 					sigma: 0.08,
-					aspect: 2,
-					...buildTangentFrame(
-						mesh.r_xyz[0],
-						mesh.r_xyz[1],
-						mesh.r_xyz[2],
-						1,
-						0,
-						0,
-					),
 				},
 			],
 			seed: 11,
