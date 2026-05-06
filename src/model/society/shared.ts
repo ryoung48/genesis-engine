@@ -26,7 +26,12 @@ export function computeGraphPartition({
 	const rng = createRng(seed)
 	const desiredCount = Math.max(1, Math.min(activeCount, targetCount))
 	const nodesPerPartition = Math.max(1, activeCount / desiredCount)
-	const spacing = Math.max(1, Math.round(Math.sqrt(nodesPerPartition) * 0.85))
+	// Maximum spacing where the hex exclusion ball (1 + 3s(s+1) nodes) still
+	// fits within nodesPerPartition, so seed placement can always reach targetCount.
+	const spacing = Math.max(
+		0,
+		Math.floor((-3 + Math.sqrt(12 * nodesPerPartition - 3)) / 6),
+	)
 
 	const activeNodes = new Int32Array(activeCount)
 	let wi = 0

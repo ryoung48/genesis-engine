@@ -23,6 +23,7 @@ import {
 import {
 	DEFAULT_NEIGHBOR_SORT,
 	formatNeighborThreat,
+	getRelationColor,
 	type NationNeighbor,
 	type NeighborSortState,
 	nextNeighborSortState,
@@ -99,7 +100,12 @@ export function PoliticalNeighborsTable({
 			header: "Relation",
 			sortable: true,
 			sortLabel: "Sort neighbors by relation",
-			cell: (item) => item.relation,
+			cell: (item) => (
+				<span className="inline-flex items-center gap-1.5">
+					<Swatch color={getRelationColor(item.relation)} />
+					<span>{item.relation}</span>
+				</span>
+			),
 		},
 		{
 			id: "threat",

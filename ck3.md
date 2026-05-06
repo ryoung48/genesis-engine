@@ -96,12 +96,26 @@ Using that mapped-county set:
 | 867.1.1 | 3,431 | 201 | 55 | 98 | 46 | 17.07 | 62.38 | 35.01 | 74.59 |
 | 1066.1.1 | 3,431 | 201 | 53 | 96 | 46 | 17.07 | 64.74 | 35.74 | 74.59 |
 
+Standard deviation of county counts across groups (population σ, computed from current-install parse; known-county groups only):
+
+| Bookmark | STD/culture | STD/heritage | STD/faith | STD/religion |
+| --- | ---: | ---: | ---: | ---: |
+| 867.1.1 | 19.96 | 62.36 | 63.57 | 147.70 |
+| 1066.1.1 | 19.50 | 62.13 | 76.03 | 177.50 |
+
 `UNKNOWN` buckets remained for counties whose mapped baronies did not resolve cleanly through the available province-history files on this install (**132** counties in both bookmarks). Excluding that unknown bucket:
 
 | Bookmark | Known counties | Avg/culture | Avg/heritage | Avg/faith | Avg/religion |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 867.1.1 | 3,299 | 16.50 | 61.09 | 34.01 | 73.31 |
 | 1066.1.1 | 3,299 | 16.50 | 63.44 | 34.73 | 73.31 |
+
+Standard deviation of county counts across groups (known counties only, same values as above since unknowns are not attributed to any group):
+
+| Bookmark | STD/culture | STD/heritage | STD/faith | STD/religion |
+| --- | ---: | ---: | ---: | ---: |
+| 867.1.1 | 19.96 | 62.36 | 63.57 | 147.70 |
+| 1066.1.1 | 19.50 | 62.13 | 76.03 | 177.50 |
 
 This redo is lower than the wiki/original-study **3,476** mapped-county figure, so treat these averages as a current-install estimate rather than a strict recreation of the original version/method.
 

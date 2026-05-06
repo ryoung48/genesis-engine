@@ -233,12 +233,12 @@ describe("history state helpers", () => {
 	it("can release provinces and break disconnected subject links into rebellions", () => {
 		const state = createTestState()
 
-		releaseProvince(state, 1)
+		releaseProvince(state, 1, createHistoryRng(42))
 		expect(getSovereign(state, 1)).toBe(1)
 		expect(isSovereign(state, 1)).toBe(true)
 
 		const disconnected = createTestState()
-		fixConnections(disconnected, 0)
+		fixConnections(disconnected, 0, createHistoryRng(42))
 
 		expect(getSovereign(disconnected, 1)).toBe(1)
 		expect(disconnected.events).toContainEqual(
@@ -293,7 +293,7 @@ describe("history state helpers", () => {
 
 	it("adjusts war threat when offensive and defensive allies join a conflict", () => {
 		const state = createTestState()
-		releaseProvince(state, 1)
+		releaseProvince(state, 1, createHistoryRng(42))
 		const baseline = warThreat(state, 0, 2)
 
 		setRelation(state, 1, 0, REL.VASSAL)
@@ -385,7 +385,7 @@ describe("history state helpers", () => {
 	it("skips conflicted allies and lets defenders win empty wars", () => {
 		const state = createTestState()
 		const rng = createHistoryRng(37)
-		releaseProvince(state, 1)
+		releaseProvince(state, 1, rng)
 
 		setRelation(state, 1, 0, REL.VASSAL)
 		const threatWithEligibleAlly = warThreat(state, 0, 2)
@@ -461,7 +461,7 @@ describe("history state helpers", () => {
 		expect(state.hierarchyVersion).toBe(version)
 
 		PROV.occupation.set(state, 1, state.time, 7)
-		fixConnections(state, 1)
+		fixConnections(state, 1, createHistoryRng(42))
 
 		expect(PROV.occupation.get(state, 1)).toBe(-1)
 		expect(getSovereign(state, 1)).toBe(1)
@@ -484,7 +484,7 @@ describe("history state helpers", () => {
 		PROV.parent.set(state, 1, state.time, -1)
 		state.hierarchyDirty = false
 
-		fixConnections(state, 0)
+		fixConnections(state, 0, createHistoryRng(42))
 
 		expect(PROV.parent.get(state, 1)).toBe(-1)
 		expect(state.events).toEqual([])
@@ -629,7 +629,7 @@ describe("history state helpers", () => {
 		const connected = createIndirectConnectionState()
 		connected.events = []
 
-		fixConnections(connected, 0)
+		fixConnections(connected, 0, createHistoryRng(42))
 
 		expect(getSovereign(connected, 1)).toBe(0)
 		expect(connected.events).toEqual([])
@@ -726,7 +726,7 @@ describe("history state helpers", () => {
 
 		runSuccession(state, 1, leaderIdx, rng)
 
-		expect(PROV.leader.dynasty.get(state, 1)).toBe(7)
+		expect(PROV.leader.dynasty.get(state, 1)).toBe(3)
 		expect(state.events.some((event) => event.tag === "dynasty spread")).toBe(
 			false,
 		)
@@ -964,7 +964,7 @@ describe("history state helpers", () => {
 		)
 	})
 
-	it("can assign a fresh dynasty to subject successions without senior inheritance", () => {
+	it("silently skips succession for subject provinces (sovereign-only guard)", () => {
 		const state = createTestState()
 		state.events = []
 		state.time += deltaMonth(1)
@@ -989,8 +989,9 @@ describe("history state helpers", () => {
 
 		runSuccession(state, 1, leaderIdx, rng)
 
-		expect(PROV.leader.dynasty.get(state, 1)).toBe(nextDynasty)
-		expect(state.nextDynasty).toBe(nextDynasty + 1)
+		// Vassal succession is now a no-op: dynasty and nextDynasty stay unchanged
+		expect(PROV.leader.dynasty.get(state, 1)).toBe(3)
+		expect(state.nextDynasty).toBe(nextDynasty)
 		expect(state.events.some((event) => event.tag === "dynasty spread")).toBe(
 			false,
 		)
@@ -1001,7 +1002,7 @@ describe("history state helpers", () => {
 
 		initSuccession(state, createHistoryRng(23))
 
-		expect(state.heap.size).toBe(4)
+		expect(state.heap.size).toBe(3)
 		expect(state.heap.peekType()).toBe(EVT.SUCCESSION)
 	})
 

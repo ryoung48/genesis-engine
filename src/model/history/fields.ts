@@ -1,5 +1,4 @@
 import type { HistoryState, Relation } from "./state"
-import { YEAR_MS } from "./state"
 import { read, type Timeline, write } from "./timeline"
 
 function getField<T>(
@@ -165,10 +164,7 @@ export const PROV = {
 					: getField(state._leader_birth_year[p], -1, time),
 			set: (state: HistoryState, p: number, time: number, value: number) => {
 				setField(state._leader_birth_year[p], time, value)
-				if (time >= state.time) {
-					state.leaderBirthYearCurrent[p] = value
-					state.leaderRuntime.birth[p] = value >= 0 ? value * YEAR_MS : 0
-				}
+				if (time >= state.time) state.leaderBirthYearCurrent[p] = value
 			},
 		},
 	},

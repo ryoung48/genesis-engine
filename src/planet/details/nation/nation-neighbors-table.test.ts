@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
 	DEFAULT_NEIGHBOR_SORT,
 	formatNeighborThreat,
+	getRelationColor,
 	type NationNeighbor,
 	nextNeighborSortState,
 	sortNationNeighbors,
@@ -62,5 +63,17 @@ describe("nation-neighbors-table", () => {
 			key: "name",
 			direction: "desc",
 		})
+	})
+
+	it("returns the correct CSS color for known relation labels and null for unknown", () => {
+		expect(getRelationColor("Ally")).toBe("rgb(59, 130, 246)")
+		expect(getRelationColor("War")).toBe("rgb(249, 56, 22)")
+		expect(getRelationColor("Neutral")).toBe("rgb(201, 201, 201)")
+		expect(getRelationColor("PU Senior")).toBe("rgb(99, 102, 241)")
+		expect(getRelationColor("PU Junior")).toBe("rgb(99, 102, 241)")
+		expect(getRelationColor("Overlord")).toBe("rgb(168, 85, 247)")
+		expect(getRelationColor("Vassal")).toBe("rgb(168, 85, 247)")
+		expect(getRelationColor("None")).toBeNull()
+		expect(getRelationColor("Unknown")).toBeNull()
 	})
 })

@@ -18,7 +18,7 @@ export function computeHeritages(
 		adjOffset: cultures.adjOffset,
 		adjList: cultures.adjList,
 		active,
-		targetCount: Math.max(1, Math.floor(activeCount / 6)),
+		targetCount: Math.max(1, Math.floor(activeCount / 4)),
 		seed: seed + 4102,
 	})
 }

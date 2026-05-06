@@ -18,7 +18,7 @@ export function computeFaiths(
 		adjOffset: cultures.adjOffset,
 		adjList: cultures.adjList,
 		active,
-		targetCount: Math.max(1, Math.floor(activeCount / 3)),
+		targetCount: Math.max(1, Math.floor(activeCount / 2)),
 		seed: seed + 4103,
 	})
 }

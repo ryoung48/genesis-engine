@@ -37,10 +37,10 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	planetStats,
 	worldPopulation,
 	activeWarCount,
-	averageDevelopment,
-	nationAverageDevelopment,
-	developmentDistribution,
-	nationDevelopmentDistribution,
+	cultureCount,
+	heritageCount,
+	faithCount,
+	religionCount,
 	nationSizeDistribution,
 	conflictDistribution,
 	relationDistribution,
@@ -141,10 +141,10 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 								planetStats={planetStats}
 								worldPopulation={worldPopulation}
 								activeWarCount={activeWarCount}
-								averageDevelopment={averageDevelopment}
-								nationAverageDevelopment={nationAverageDevelopment}
-								developmentDistribution={developmentDistribution}
-								nationDevelopmentDistribution={nationDevelopmentDistribution}
+								cultureCount={cultureCount}
+								heritageCount={heritageCount}
+								faithCount={faithCount}
+								religionCount={religionCount}
 								nationSizeDistribution={nationSizeDistribution}
 								conflictDistribution={conflictDistribution}
 								relationDistribution={relationDistribution}

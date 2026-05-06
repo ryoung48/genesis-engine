@@ -470,7 +470,6 @@ describe("createHistoryQuery", () => {
 		expect(atTwenty.relationAt(0, 2)).toBe(9)
 		expect(atTen.relationAt(2, 0)).toBe(REL.NEUTRAL)
 		expect(Array.from(atTen.sovereign)).toEqual([0, 0, 2])
-		expect(Array.from(atTen.adjOffset)).toEqual([0, 0, 0, 0])
 		expect(query.getEventsInRange(10, 20).map((event) => event.time)).toEqual([
 			10, 20,
 		])
@@ -512,8 +511,6 @@ describe("createHistoryQuery", () => {
 		const view = query.getView(0)
 
 		expect(Array.from(view.colors)).toEqual([0, 0, 0, 0, 0, 0])
-		expect(Array.from(view.adjOffset)).toEqual([0, 0, 0])
-		expect(Array.from(view.adjList)).toEqual([])
 		expect(Array.from(view.leaderNameSeed)).toEqual([-1, -1])
 		expect(Array.from(view.leaderBirthYear)).toEqual([-1, -1])
 		expect(Array.from(view.nationWealth)).toEqual([0, 0])

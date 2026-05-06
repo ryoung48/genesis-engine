@@ -1,0 +1,238 @@
+import { describe, expect, it } from "vitest"
+import type { OrogenProvinces } from "../types/society"
+import { buildNationPlan, computeNations, NATION_BUCKETS } from "./nations"
+
+// CK3 1066.9.15 all-county-titles province share targets
+const CK3_1066_TARGETS = [0.4554, 0.072, 0.102, 0.0746, 0.0786, 0.2174]
+
+/**
+ * Build a ring of `n` provinces connected as a cycle.
+ * Each province `i` is its own region seed, positioned on the unit circle at
+ * angle `2πi/n` so that 3-D coordinates are available for noise sampling.
+ */
+function buildRingNationProvinces(n: number) {
+	const adjOffset = new Int32Array(n + 1)
+	const adjList = new Int32Array(n * 2)
+	for (let i = 0; i < n; i++) {
+		adjOffset[i] = i * 2
+		adjList[i * 2] = (i - 1 + n) % n
+		adjList[i * 2 + 1] = (i + 1) % n
+	}
+	adjOffset[n] = n * 2
+
+	// Region seed = province index (1-to-1 mapping)
+	const seeds = Int32Array.from({ length: n }, (_, i) => i)
+	// 3-D coordinates on the unit circle (z = 0)
+	const r_xyz = new Float32Array(n * 3)
+	for (let i = 0; i < n; i++) {
+		const angle = (2 * Math.PI * i) / n
+		r_xyz[3 * i] = Math.cos(angle)
+		r_xyz[3 * i + 1] = Math.sin(angle)
+		r_xyz[3 * i + 2] = 0
+	}
+
+	const provinces: OrogenProvinces = {
+		count: n,
+		seeds,
+		desolate: new Uint8Array(n),
+		landmassId: new Int32Array(n).fill(0),
+		regionProvince: Int32Array.from({ length: n }, (_, i) => i),
+		adjOffset,
+		adjList,
+		size: new Int32Array(n).fill(1),
+		colors: new Float32Array(n * 3),
+	}
+
+	const coastal = new Uint8Array(n)
+	const habitability = new Float32Array(n).fill(1)
+
+	return { provinces, coastal, habitability, r_xyz }
+}
+
+describe("NATION_BUCKETS", () => {
+	it("has six tiers in descending order", () => {
+		expect(NATION_BUCKETS).toHaveLength(6)
+		for (let i = 1; i < NATION_BUCKETS.length; i++) {
+			expect(NATION_BUCKETS[i][1]).toBeLessThan(NATION_BUCKETS[i - 1][0])
+		}
+	})
+
+	it("top bucket upper bound is at least 250 to accommodate 1066 mega-realms", () => {
+		expect(NATION_BUCKETS[0][1]).toBeGreaterThanOrEqual(250)
+	})
+})
+
+describe("buildNationPlan", () => {
+	it("total province mass equals input total", () => {
+		const total = 10_000
+		const plan = buildNationPlan(total)
+		const mass = plan.targetProvinceMass.reduce((s, v) => s + v, 0)
+		expect(mass).toBe(total)
+	})
+
+	it("allocates 50+ bucket ~45% of provinces (CK3 1066 target)", () => {
+		const total = 10_000
+		const plan = buildNationPlan(total)
+		const pct = plan.targetProvinceMass[0] / total
+		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[0] - 0.05)
+		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[0] + 0.05)
+	})
+
+	it("allocates size-1 bucket ~22% of provinces (CK3 1066 target)", () => {
+		const total = 10_000
+		const plan = buildNationPlan(total)
+		const pct = plan.targetProvinceMass[5] / total
+		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[5] - 0.05)
+		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[5] + 0.05)
+	})
+
+	it("each bucket mass matches CK3 1066 target within 5%", () => {
+		const total = 100_000
+		const plan = buildNationPlan(total)
+		for (let i = 0; i < NATION_BUCKETS.length; i++) {
+			const pct = plan.targetProvinceMass[i] / total
+			expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[i] - 0.05)
+			expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[i] + 0.05)
+		}
+	})
+
+	it("50+ bucket nations are sized within [50, 250]", () => {
+		const plan = buildNationPlan(10_000)
+		const [min, max] = NATION_BUCKETS[0]
+		const largeNationTargets = plan.targets.filter((t) => t >= min)
+		for (const t of largeNationTargets) {
+			expect(t).toBeGreaterThanOrEqual(min)
+			expect(t).toBeLessThanOrEqual(max)
+		}
+	})
+
+	it("produces at least one nation per non-empty bucket", () => {
+		const plan = buildNationPlan(10_000)
+		expect(plan.targetNationCount.some((c) => c > 0)).toBe(true)
+	})
+})
+
+describe("computeNations", () => {
+	it("returns an empty partition when all provinces are desolate", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(10)
+		provinces.desolate.fill(1)
+		const result = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 1,
+		})
+		expect(result.count).toBe(0)
+		expect(Array.from(result.assignment).every((a) => a === -1)).toBe(true)
+	})
+
+	it("assigns every active province to a nation", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(200)
+		const result = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 42,
+		})
+		for (let p = 0; p < provinces.count; p++) {
+			expect(result.assignment[p]).toBeGreaterThanOrEqual(0)
+		}
+	})
+
+	it("desolate provinces are not assigned", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(100)
+		provinces.desolate[5] = 1
+		const result = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 7,
+		})
+		expect(result.assignment[5]).toBe(-1)
+	})
+
+	it("is deterministic — same seed produces identical assignment", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(200)
+		const a = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 99,
+		})
+		const b = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 99,
+		})
+		expect(Array.from(a.assignment)).toEqual(Array.from(b.assignment))
+		expect(a.count).toBe(b.count)
+	})
+
+	it("different seeds produce different province assignments (noise is seed-dependent)", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(200)
+		const a = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 1,
+		})
+		const b = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 2,
+		})
+		const assignmentA = Array.from(a.assignment)
+		const assignmentB = Array.from(b.assignment)
+		// Remap nation IDs to canonical form (first-seen order) so we compare shapes not labels
+		function canonicalize(arr: number[]) {
+			const map = new Map<number, number>()
+			return arr.map((v) => {
+				if (!map.has(v)) map.set(v, map.size)
+				return map.get(v)!
+			})
+		}
+		expect(canonicalize(assignmentA)).not.toEqual(canonicalize(assignmentB))
+	})
+
+	it("all nation sizes are positive", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(150)
+		const result = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 13,
+		})
+		for (let n = 0; n < result.count; n++) {
+			expect(result.size[n]).toBeGreaterThan(0)
+		}
+	})
+
+	it("nation count equals seeds array length", () => {
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(150)
+		const result = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 55,
+		})
+		expect(result.count).toBe(result.seeds.length)
+	})
+})

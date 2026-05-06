@@ -49,8 +49,6 @@ describe("display-model", () => {
 			nations: {
 				assignment: new Int32Array([4, 4, 7]),
 				colors: new Float32Array([1, 0, 0, 0.5, 0, 0, 0, 1, 0]),
-				adjOffset: new Int32Array([0, 0, 0, 0]),
-				adjList: new Int32Array(),
 			},
 		} as unknown as SerializedOrogenWorld
 
@@ -119,8 +117,6 @@ describe("display-model", () => {
 		expect(Array.from(result!.leaderNameSeed ?? [])).toEqual([40, -1, 60])
 		expect(Array.from(result!.leaderClaim ?? [])).toEqual([3, 0, 1])
 		expect(Array.from(result!.leaderBirthYear ?? [])).toEqual([10, -1, 12])
-		expect(Array.from(result!.nations!.adjOffset)).toEqual([0, 1, 1, 2])
-		expect(Array.from(result!.nations!.adjList)).toEqual([2, 0])
 	})
 
 	it("builds sovereign-only ruler fields from the current world", () => {
@@ -328,8 +324,6 @@ describe("display-model", () => {
 
 		expect(result?.nations?.assignment).toEqual(new Int32Array([0, 0, -1, 3]))
 		expect(colors).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2, 0.4, 0.6])
-		expect(Array.from(result!.nations!.adjOffset)).toEqual([0, 0, 0, 0, 1])
-		expect(Array.from(result!.nations!.adjList)).toEqual([0])
 	})
 
 	it("counts display nations without fabricating colors for incomplete triples", () => {
@@ -340,8 +334,6 @@ describe("display-model", () => {
 			nations: {
 				assignment: new Int32Array([4, -1, 7]),
 				colors: new Float32Array([1, 0, 0, 0.5, 0, 0]),
-				adjOffset: new Int32Array([0, 0, 0, 0]),
-				adjList: new Int32Array(),
 			},
 		} as unknown as SerializedOrogenWorld
 

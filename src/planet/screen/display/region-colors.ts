@@ -2,6 +2,7 @@ import { OROGEN_TERRAIN_FEATURE } from "@/model"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/climate/vegetation"
+import { REL } from "@/model/history/state"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../../colors"
 import {
@@ -33,6 +34,21 @@ import {
 	getRebelDisplayColorNationId,
 	type PoliticalMapWar,
 } from "./political-conflict-display"
+
+// Relation value → RGB tuple (consistent with buildRelationDistribution palette)
+const DIPLOMACY_RGB_COLORS: Record<number, [number, number, number]> = {
+	[REL.NONE]: [0.58, 0.64, 0.69],
+	[REL.OVERLORD]: [0.659, 0.333, 0.969],
+	[REL.VASSAL]: [0.659, 0.333, 0.969],
+	[REL.PU_SENIOR]: [0.388, 0.4, 0.945],
+	[REL.PU_JUNIOR]: [0.388, 0.4, 0.945],
+	[REL.ALLY]: [0.231, 0.51, 0.965],
+	[REL.FRIENDLY]: [0.133, 0.773, 0.369],
+	[REL.NEUTRAL]: [0.788, 0.788, 0.788],
+	[REL.SUSPICIOUS]: [0.918, 0.702, 0.031],
+	[REL.RIVAL]: [0.976, 0.451, 0.086],
+	[REL.WAR]: [0.976, 0.22, 0.086],
+}
 
 function basinColor(id: number): [number, number, number] {
 	if (id < 0) return OCEAN_LIGHT_BLUE
@@ -140,6 +156,8 @@ export function computeRegionColors(
 	viewMode: "globe" | "map" = "globe",
 	_occupiedRegions?: Set<number>,
 	activeWars?: readonly PoliticalMapWar[] | null,
+	selectedNationId?: number | null,
+	relationAt?: ((a: number, b: number) => number) | null,
 ): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
 
@@ -496,6 +514,49 @@ export function computeRegionColors(
 						[provColors[3 * p], provColors[3 * p + 1], provColors[3 * p + 2]],
 						world.elevation_km[r],
 					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
+			}
+			return rgb
+		}
+		if (nationMode === "diplomacy" && world.nations) {
+			const { regionProvince, desolate } = world.provinces
+			const NEUTRAL_COLOR = DIPLOMACY_RGB_COLORS[REL.NEUTRAL]
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0) {
+					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
+					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
+					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+				} else if (desolate[p] || world.nations.assignment[p] < 0) {
+					rgb[3 * r] = 0.35
+					rgb[3 * r + 1] = 0.33
+					rgb[3 * r + 2] = 0.32
+				} else if (
+					selectedNationId === null ||
+					selectedNationId === undefined ||
+					!relationAt
+				) {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						NEUTRAL_COLOR,
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else {
+					const nationId = world.nations.assignment[p]
+					const [cr, cg, cb] =
+						nationId === selectedNationId
+							? darkenPoliticalAtElevation([1, 1, 1], world.elevation_km[r])
+							: darkenPoliticalAtElevation(
+									DIPLOMACY_RGB_COLORS[
+										relationAt(selectedNationId, nationId)
+									] ?? NEUTRAL_COLOR,
+									world.elevation_km[r],
+								)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb

@@ -22,7 +22,7 @@ export function computeCultures(
 		adjOffset: provinces.adjOffset,
 		adjList: provinces.adjList,
 		active,
-		targetCount: Math.max(1, Math.floor(activeCount / 8)),
+		targetCount: Math.max(1, Math.floor(activeCount / 17)),
 		seed: seed + 4101,
 	})
 	return {

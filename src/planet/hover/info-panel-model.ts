@@ -1,6 +1,7 @@
 import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
+import { REL } from "@/model/history/state"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import { climateTempColor, climateZoneColor, vegetationColor } from "../colors"
@@ -384,4 +385,111 @@ export function buildDemographicDisplayData(params: {
 					])
 				: null,
 	}
+}
+
+interface RelationBucket {
+	label: string
+	shortLabel: string
+	count: number
+	color: string
+}
+
+export function buildHoverNationRelationDistribution(params: {
+	hoverNationId: number | null
+	adjOffset: Int32Array | null
+	adjList: Int32Array | null
+	nationCounts: Map<number, number>
+	relationAt: ((a: number, b: number) => number) | null
+}): RelationBucket[] {
+	const { hoverNationId, adjOffset, adjList, nationCounts, relationAt } = params
+	if (
+		hoverNationId === null ||
+		hoverNationId < 0 ||
+		!adjOffset ||
+		!adjList ||
+		!relationAt
+	) {
+		return []
+	}
+	if (hoverNationId + 1 >= adjOffset.length) return []
+
+	const counts = {
+		PU: 0,
+		Vassal: 0,
+		Allied: 0,
+		Friendly: 0,
+		Neutral: 0,
+		Suspicious: 0,
+		Rival: 0,
+		War: 0,
+	}
+
+	for (
+		let e = adjOffset[hoverNationId];
+		e < adjOffset[hoverNationId + 1];
+		e++
+	) {
+		const neighborId = adjList[e]
+		if (!nationCounts.has(neighborId)) continue
+		const rel = relationAt(hoverNationId, neighborId)
+		if (rel === REL.OVERLORD || rel === REL.VASSAL) counts.Vassal++
+		else if (rel === REL.PU_SENIOR || rel === REL.PU_JUNIOR) counts.PU++
+		else if (rel === REL.ALLY) counts.Allied++
+		else if (rel === REL.FRIENDLY) counts.Friendly++
+		else if (rel === REL.SUSPICIOUS) counts.Suspicious++
+		else if (rel === REL.RIVAL) counts.Rival++
+		else if (rel === REL.WAR) counts.War++
+		else counts.Neutral++
+	}
+
+	return [
+		{
+			label: "Personal Union",
+			shortLabel: "PU",
+			count: counts.PU,
+			color: "rgb(99, 102, 241)",
+		},
+		{
+			label: "Vassal",
+			shortLabel: "Vas",
+			count: counts.Vassal,
+			color: "rgb(168, 85, 247)",
+		},
+		{
+			label: "Allied",
+			shortLabel: "Aly",
+			count: counts.Allied,
+			color: "rgb(59, 130, 246)",
+		},
+		{
+			label: "Friendly",
+			shortLabel: "Fri",
+			count: counts.Friendly,
+			color: "rgb(34, 197, 94)",
+		},
+		{
+			label: "Neutral",
+			shortLabel: "Neu",
+			count: counts.Neutral,
+			color: "rgb(201, 201, 201)",
+		},
+		{
+			label: "Suspicious",
+			shortLabel: "Sus",
+			count: counts.Suspicious,
+			color: "rgb(234, 179, 8)",
+		},
+		{
+			label: "Rival",
+			shortLabel: "Riv",
+			count: counts.Rival,
+			color: "rgb(249, 115, 22)",
+		},
+		{
+			label: "War",
+			shortLabel: "War",
+			count: counts.War,
+			color: "rgb(249, 56, 22)",
+		},
+	]
 }

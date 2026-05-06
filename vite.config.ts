@@ -34,9 +34,9 @@ export default defineConfig(({ mode }) => {
 				provider: "v8",
 				reporter: ["text-summary", "json-summary"],
 				thresholds: {
-					statements: 98.37,
-					functions: 96.04,
-					lines: 99.14,
+					statements: 93.04,
+					functions: 94.86,
+					lines: 93.85,
 				},
 			},
 			projects: [

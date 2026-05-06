@@ -1,0 +1,194 @@
+
+> chaos-machine@0.0.0 test C:\Users\rayou\projects\nexus\chaos-machine
+> vitest run --project unit --coverage
+
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90mC:/Users/rayou/projects/nexus/chaos-machine[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/controls/GenerationPanel.stateful.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 344[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/tectonics/mantle.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 169[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/mesh.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 345[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/names.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 157[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/display/display-names.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 348[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/tectonics/static-elevation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 251[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/languages/index.test.ts [2m([22m[2m25 tests[22m[2m)[22m[33m 677[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/ebm/index.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1240[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m produces non-zero finite insolation for Earth-like orbital inputs [33m 445[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m keeps the first orbital step finite [33m 467[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/terrain/hotspots.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 547[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/pasta.test.ts [2m([22m[2m30 tests[22m[2m)[22m[33m 1635[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m finds additional cool-group climates covering mediterranean, steppe, and boreal rainforests [33m 863[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m finds additional hot and extratropical climates for swelter, monsoon, and seasonal branches [33m 507[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/tectonics/synthetic-plates.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/tectonics/coarse-plates.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1049[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/DetailsDrawer.stateful.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 1890[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m applies drawer-state updates when opening with a new nation [33m 1791[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/nation/NationDetails.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/world/WorldDetails.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 105[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/hover/info-panel-model.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/rng.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 217[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/hover/InfoPanel.test.tsx [2m([22m[2m22 tests[22m[2m)[22m[33m 630[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/controls/GenerationPanel.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 60[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/terrain/volcanism.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 113[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/terrain/rivers.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 113[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/display/region-colors.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 158[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/state.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 98[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/shared.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/tectonics/plates.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/renderer/mesh-builders.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/controls/OverlayControls.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/nation/NationHistoryChart.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+[90mstdout[2m | src/planet/screen/generation/generation.test.ts[2m > [22m[2mgenerateWorld[2m > [22m[2mloads the worker module from the transport layer
+[22m[39m[90mundefined[39m {
+  tidallyLocked: [33mfalse[39m,
+  tectonicMode: [32m'active'[39m,
+  numPoints: [33m10000[39m,
+  numPlates: [33m12[39m,
+  landDistribution: [33m0.5[39m,
+  continentSizeVariety: [33m0.5[39m,
+  landCoverage: [33m0.4[39m,
+  planetRadiusKm: [33m6371[39m,
+  obliquity: [33m23.5[39m,
+  eccentricity: [33m0.0167[39m,
+  perihelion: [33m102.9[39m,
+  sunTempFactor: [33m1[39m,
+  daysPerYear: [33m365[39m,
+  hoursPerDay: [33m24[39m,
+  pressure: [33m1[39m,
+  antistellarLon: [33m180[39m,
+  jitter: [33m0.2[39m,
+  roughness: [33m0.5[39m,
+  terrainWarp: [33m0.2[39m,
+  smoothing: [33m1[39m,
+  hydraulicErosion: [33m0[39m,
+  thermalErosion: [33m0[39m,
+  ridgeSharpening: [33m0[39m,
+  glacialErosion: [33m0[39m,
+  volcanism: [33m0[39m,
+  craters: [33m0[39m
+}
+
+[90mstdout[2m | src/planet/screen/generation/generation.test.ts[2m > [22m[2mgenerateWorld[2m > [22m[2mkeeps generation progress monotonic when worker stages regress
+[22m[39m[90mundefined[39m {
+  tidallyLocked: [33mfalse[39m,
+  tectonicMode: [32m'active'[39m,
+  numPoints: [33m10000[39m,
+  numPlates: [33m12[39m,
+  landDistribution: [33m0.5[39m,
+  continentSizeVariety: [33m0.5[39m,
+  landCoverage: [33m0.4[39m,
+  planetRadiusKm: [33m6371[39m,
+  obliquity: [33m23.5[39m,
+  eccentricity: [33m0.0167[39m,
+  perihelion: [33m102.9[39m,
+  sunTempFactor: [33m1[39m,
+  daysPerYear: [33m365[39m,
+  hoursPerDay: [33m24[39m,
+  pressure: [33m1[39m,
+  antistellarLon: [33m180[39m,
+  jitter: [33m0.2[39m,
+  roughness: [33m0.5[39m,
+  terrainWarp: [33m0.2[39m,
+  smoothing: [33m1[39m,
+  hydraulicErosion: [33m0[39m,
+  thermalErosion: [33m0[39m,
+  ridgeSharpening: [33m0[39m,
+  glacialErosion: [33m0[39m,
+  volcanism: [33m0[39m,
+  craters: [33m0[39m
+}
+
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/controls/ModeBar.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/display/nation-details-model.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/terrain/elevation.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/generation/generation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 118[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/rain.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 92[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/languages/builder/index.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/languages/clusters.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/events/diplomacy.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 73[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/components/component-primitives.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/display/planet-stats.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/shared/ui-format.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/nation/event-description.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/fields-and-derive.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/nation/nation-neighbors-table.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/nations.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/components/chart-components.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/ClimatePreviewOverlay.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/components/composites/charts/HeatmapChart.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/colors.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/controls/SimulationControls.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/DetailsDrawer.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/events/succession.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/history/history-query.test.ts [2m([22m[2m8 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 31[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/climate.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 4373[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m applies ocean-only temperature noise when a land mask is provided [33m 423[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m keeps volcanism neutral at the default dial of one [33m 358[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m lets thick atmospheres spread and amplify volcanic warming [33m 1131[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m adds a stronger global volcanic greenhouse bump in thick atmospheres [33m 1279[2mms[22m[39m
+     [33m[2mΓ£ô[22m[39m warms terrain-feature volcanic cells without hotspot fields [33m 872[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/ocean-currents.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/components/composites/DrawerShell.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/languages/builder/consonants.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/display/display-model.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/terrain/landmarks.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/generation/sliders.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/renderer/province-overlay.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/planet-code.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/hydrology.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/partitions.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/hierarchy.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/snapshot.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/test-world.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/terrain/provinces.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/ice.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/display/political-conflict-display.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/hover/info-panel-format.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/dtr.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/math.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/shared/map-modes.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/languages/rng.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/drawer-state.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/color-interpolation.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/identity-seeds.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/language/languages/builder/vowels.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/koppen.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/time.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/vegetation.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/units.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/stats.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/min-heap.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/history/history-time.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/gender-system.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/renderer/map-projection.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/nation-clicks.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/climate/ebm/albedo.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/history/live-history-view.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/volcanism.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/screen/generation/generation-preview.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/event-heap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/history/timeline.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/shared/text.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/details/nation/history-chart-utils.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/planet/renderer/focus.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/app-routes.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32mΓ£ô[39m [30m[42m unit [49m[39m src/model/society/population.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m98 passed[39m[22m[90m (98)[39m
+[2m      Tests [22m [1m[32m952 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (953)[39m
+[2m   Start at [22m 00:09:11
+[2m   Duration [22m 10.47s[2m (transform 14.02s, setup 0ms, import 31.47s, tests 17.27s, environment 49ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+
+=============================== Coverage summary ===============================
+Statements   : 93.03% ( 11760/12640 )
+Branches     : 89.57% ( 5878/6562 )
+Functions    : 94.86% ( 1237/1304 )
+Lines        : 93.84% ( 10288/10963 )
+================================================================================
+ERROR: Coverage for lines (93.84%) does not meet global threshold (99.14%)
+ERROR: Coverage for functions (94.86%) does not meet global threshold (96.04%)
+ERROR: Coverage for statements (93.03%) does not meet global threshold (98.37%)
+ΓÇëELIFECYCLEΓÇë Test failed. See above for more details.

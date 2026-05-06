@@ -210,8 +210,6 @@ export interface SerializedHistoryFrame {
 	leaderClaim: Int32Array
 	leaderBirthYear: Float32Array
 	colors: Float32Array
-	adjOffset: Int32Array
-	adjList: Int32Array
 	populationTotal: Float32Array
 	populationUrban: Float32Array
 	development: Float32Array

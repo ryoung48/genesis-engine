@@ -20,7 +20,6 @@ export interface HistoryTimelineSerializationProfile {
 export interface HistoryFrameBuildProfile {
 	hierarchyMs: number
 	provinceFieldsMs: number
-	adjacencyMs: number
 	warsMs: number
 	summaryMs: number
 	relationsMs: number
@@ -186,7 +185,6 @@ export function buildHistoryFrame(
 	const leaderClaim = new Int32Array(P)
 	const leaderBirthYear = new Float32Array(P).fill(-1)
 	const colors = new Float32Array(P * 3)
-	const adjOffset = new Int32Array(P + 1)
 	const populationTotal = new Float32Array(P)
 	const populationUrban = new Float32Array(P)
 	const development = new Float32Array(P)
@@ -226,38 +224,6 @@ export function buildHistoryFrame(
 		colors[base + 2] = color[2]
 	}
 	const provinceFieldsMs = performance.now() - provinceFieldsStartedAt
-
-	const adjacencyStartedAt = performance.now()
-	const neighborSets = new Map<number, Set<number>>()
-	for (let province = 0; province < P; province++) {
-		const nation = assignment[province]
-		if (nation < 0) continue
-		if (!neighborSets.has(nation)) neighborSets.set(nation, new Set())
-		for (
-			let i = state.provinceAdjOffset[province];
-			i < state.provinceAdjOffset[province + 1];
-			i++
-		) {
-			const neighborNation = assignment[state.provinceAdjList[i]]
-			if (neighborNation >= 0 && neighborNation !== nation) {
-				neighborSets.get(nation)?.add(neighborNation)
-			}
-		}
-	}
-
-	let totalAdj = 0
-	for (let province = 0; province < P; province++) {
-		totalAdj += neighborSets.get(province)?.size ?? 0
-		adjOffset[province + 1] = totalAdj
-	}
-	const adjList = new Int32Array(totalAdj)
-	for (let province = 0; province < P; province++) {
-		let index = adjOffset[province]
-		for (const neighbor of neighborSets.get(province) ?? []) {
-			adjList[index++] = neighbor
-		}
-	}
-	const adjacencyMs = performance.now() - adjacencyStartedAt
 
 	const warsStartedAt = performance.now()
 	const activeWars = state.wars
@@ -310,7 +276,6 @@ export function buildHistoryFrame(
 	if (profile) {
 		profile.hierarchyMs = hierarchyMs
 		profile.provinceFieldsMs = provinceFieldsMs
-		profile.adjacencyMs = adjacencyMs
 		profile.warsMs = warsMs
 		profile.summaryMs = summaryMs
 		profile.relationsMs = relationsMs
@@ -327,8 +292,6 @@ export function buildHistoryFrame(
 		leaderClaim,
 		leaderBirthYear,
 		colors,
-		adjOffset,
-		adjList,
 		populationTotal,
 		populationUrban,
 		development,

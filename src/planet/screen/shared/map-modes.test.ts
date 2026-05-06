@@ -33,11 +33,12 @@ describe("map-modes", () => {
 		expect(debugOptions).toEqual(defaultOptions)
 	})
 
-	it("includes dynasty alongside the political submodes", () => {
+	it("includes dynasty and diplomacy alongside the political submodes", () => {
 		expect(POLITICAL_MODE_OPTIONS).toEqual([
 			["borders", "Nations"],
 			["provinces", "Provinces"],
 			["dynasty", "Dynasty"],
+			["diplomacy", "Diplomacy"],
 		])
 	})
 

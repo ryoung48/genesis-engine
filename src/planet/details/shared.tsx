@@ -50,10 +50,10 @@ export interface DetailsDrawerBaseProps {
 	planetStats: PlanetStat[]
 	worldPopulation: number | null
 	activeWarCount: number | null
-	averageDevelopment: number | null
-	nationAverageDevelopment: number | null
-	developmentDistribution: DistributionBucket[]
-	nationDevelopmentDistribution: DistributionBucket[]
+	cultureCount: number | null
+	heritageCount: number | null
+	faithCount: number | null
+	religionCount: number | null
 	nationSizeDistribution: DistributionBucket[]
 	conflictDistribution: DistributionBucket[]
 	relationDistribution: DistributionBucket[]

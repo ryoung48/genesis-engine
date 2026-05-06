@@ -75,46 +75,29 @@ function getNationNeighborIds(params: {
 	selectedNationId: number
 	world: SerializedOrogenWorld
 	nationModel: DisplayNationModel
-	useLazyAdjacency: boolean
 }): number[] {
-	const { selectedNationId, world, nationModel, useLazyAdjacency } = params
-	if (
-		useLazyAdjacency &&
-		world.provinces?.adjOffset &&
-		world.provinces.adjList
-	) {
-		const neighborIds = new Set<number>()
-		for (let province = 0; province < world.provinces.count; province++) {
-			if (nationModel.assignment[province] !== selectedNationId) continue
-			for (
-				let edge = world.provinces.adjOffset[province];
-				edge < world.provinces.adjOffset[province + 1];
-				edge++
+	const { selectedNationId, world, nationModel } = params
+	if (!world.provinces?.adjOffset || !world.provinces.adjList) return []
+	const neighborIds = new Set<number>()
+	for (let province = 0; province < world.provinces.count; province++) {
+		if (nationModel.assignment[province] !== selectedNationId) continue
+		for (
+			let edge = world.provinces.adjOffset[province];
+			edge < world.provinces.adjOffset[province + 1];
+			edge++
+		) {
+			const neighborId = nationModel.assignment[world.provinces.adjList[edge]]
+			if (
+				neighborId < 0 ||
+				neighborId === selectedNationId ||
+				!nationModel.counts.has(neighborId)
 			) {
-				const neighborId = nationModel.assignment[world.provinces.adjList[edge]]
-				if (
-					neighborId < 0 ||
-					neighborId === selectedNationId ||
-					!nationModel.counts.has(neighborId)
-				) {
-					continue
-				}
-				neighborIds.add(neighborId)
+				continue
 			}
+			neighborIds.add(neighborId)
 		}
-		return Array.from(neighborIds).sort((a, b) => a - b)
 	}
-	if (selectedNationId + 1 >= nationModel.adjOffset.length) return []
-	return Array.from(
-		new Set(
-			nationModel.adjList.slice(
-				nationModel.adjOffset[selectedNationId],
-				nationModel.adjOffset[selectedNationId + 1],
-			),
-		),
-	)
-		.filter((neighborId) => nationModel.counts.has(neighborId))
-		.sort((a, b) => a - b)
+	return Array.from(neighborIds).sort((a, b) => a - b)
 }
 
 export function buildSelectedNationDetails(params: {
@@ -268,7 +251,6 @@ export function buildSelectedNationDetails(params: {
 		selectedNationId,
 		world,
 		nationModel,
-		useLazyAdjacency: selectedHistoryView !== null,
 	}).map((neighborId) => ({
 		id: neighborId,
 		name: getNationName(neighborId),
@@ -495,10 +477,10 @@ export function buildConflictDistribution(
 
 export function buildRelationDistribution(
 	selectedHistoryView: HistoryView | null,
-	nationProvinceCounts: Map<number, number>,
+	nationModel: DisplayNationModel | null,
+	nationAdj: { adjOffset: Int32Array; adjList: Int32Array } | null,
 ): DistributionBucket[] {
-	if (!selectedHistoryView) return []
-	const nations = Array.from(nationProvinceCounts.keys())
+	if (!selectedHistoryView || !nationModel || !nationAdj) return []
 	const counts: Record<string, number> = {
 		Vassal: 0,
 		PU: 0,
@@ -509,9 +491,16 @@ export function buildRelationDistribution(
 		Rival: 0,
 		War: 0,
 	}
-	for (let i = 0; i < nations.length; i++) {
-		for (let j = i + 1; j < nations.length; j++) {
-			const rel = selectedHistoryView.relationAt(nations[i], nations[j])
+	const seen = new Set<string>()
+	for (let i = 0; i < nationAdj.adjOffset.length - 1; i++) {
+		if (!nationModel.counts.has(i)) continue
+		for (let e = nationAdj.adjOffset[i]; e < nationAdj.adjOffset[i + 1]; e++) {
+			const j = nationAdj.adjList[e]
+			if (!nationModel.counts.has(j)) continue
+			const key = `${Math.min(i, j)},${Math.max(i, j)}`
+			if (seen.has(key)) continue
+			seen.add(key)
+			const rel = selectedHistoryView.relationAt(i, j)
 			if (rel === REL.OVERLORD || rel === REL.VASSAL) counts.Vassal++
 			else if (rel === REL.PU_SENIOR || rel === REL.PU_JUNIOR) counts.PU++
 			else if (rel === REL.ALLY) counts.Allied++

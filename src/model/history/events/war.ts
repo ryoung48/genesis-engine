@@ -128,11 +128,11 @@ export function runWar(
 					time: state.time,
 					data: { overlord: sovereignNation, subject: nation },
 				})
-				releaseProvince(state, nation)
+				releaseProvince(state, nation, rng)
 				if (rng.random() > threat) {
 					startWar(state, sovereignNation, nation, rng, true)
 				}
-				fixConnections(state, nation)
+				fixConnections(state, nation, rng)
 			}
 		}
 	}

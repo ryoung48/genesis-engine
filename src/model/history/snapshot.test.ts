@@ -310,7 +310,6 @@ describe("history snapshot helpers", () => {
 		const profile = {
 			hierarchyMs: 0,
 			provinceFieldsMs: 0,
-			adjacencyMs: 0,
 			warsMs: 0,
 			summaryMs: 0,
 			relationsMs: 0,
@@ -331,8 +330,6 @@ describe("history snapshot helpers", () => {
 		expect(roundFloat32(frame.colors)).toEqual([
 			0.1, 0.2, 0.3, 0.1, 0.2, 0.3, 0, 0, 0, 0, 0, 0,
 		])
-		expect(Array.from(frame.adjOffset)).toEqual([0, 1, 1, 2, 2])
-		expect(Array.from(frame.adjList)).toEqual([2, 0])
 		expect(frame.activeWars).toEqual([
 			{
 				idx: 999,
@@ -353,7 +350,6 @@ describe("history snapshot helpers", () => {
 		expect(
 			profile.hierarchyMs +
 				profile.provinceFieldsMs +
-				profile.adjacencyMs +
 				profile.warsMs +
 				profile.summaryMs +
 				profile.relationsMs,

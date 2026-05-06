@@ -21,20 +21,18 @@ function renderWorldDetails(
 			]}
 			worldPopulation={1_250_000}
 			activeWarCount={12}
-			averageDevelopment={3.5}
-			nationAverageDevelopment={2.25}
-			developmentDistribution={[{ label: "I", count: 3, color: "#123456" }]}
-			nationDevelopmentDistribution={[
-				{ label: "II", count: 2, color: "#654321" },
-			]}
+			cultureCount={145}
+			heritageCount={28}
+			faithCount={52}
+			religionCount={11}
 			nationSizeDistribution={[{ label: "III", count: 1, color: "#abcdef" }]}
 			conflictDistribution={[{ label: "Peace", count: 4, color: "#111111" }]}
-			relationDistribution={[{ label: "Neutral", count: 5, color: "#222222" }]}
 			climateDistribution={[{ label: "Temperate", count: 6, color: "#333333" }]}
 			vegetationDistribution={[{ label: "Forest", count: 7, color: "#444444" }]}
 			topographyDistribution={[
 				{ label: "Highland", count: 8, color: "#555555" },
 			]}
+			relationDistribution={[{ label: "Allied", count: 2, color: "#0000ff" }]}
 			{...overrides}
 		/>,
 	)
@@ -64,20 +62,18 @@ describe("WorldDetails", () => {
 			planetStats: [],
 			worldPopulation: null,
 			activeWarCount: null,
-			averageDevelopment: null,
-			nationAverageDevelopment: null,
-			developmentDistribution: [{ label: "I", count: 3, color: "#123456" }],
-			nationDevelopmentDistribution: [
-				{ label: "II", count: 2, color: "#654321" },
-			],
+			cultureCount: null,
+			heritageCount: null,
+			faithCount: null,
+			religionCount: null,
 			nationSizeDistribution: [{ label: "III", count: 1, color: "#abcdef" }],
 			conflictDistribution: [{ label: "Peace", count: 4, color: "#111111" }],
-			relationDistribution: [{ label: "Neutral", count: 5, color: "#222222" }],
 			climateDistribution: [{ label: "Temperate", count: 6, color: "#333333" }],
 			vegetationDistribution: [{ label: "Forest", count: 7, color: "#444444" }],
 			topographyDistribution: [
 				{ label: "Highland", count: 8, color: "#555555" },
 			],
+			relationDistribution: [],
 		}) as React.ReactElement<{ children?: React.ReactNode }>
 
 		const sections = React.Children.toArray(element.props.children) as Array<
@@ -104,16 +100,22 @@ describe("WorldDetails", () => {
 			section: "social",
 			worldPopulation: null,
 			activeWarCount: null,
-			averageDevelopment: null,
-			nationAverageDevelopment: null,
+			cultureCount: null,
+			heritageCount: null,
+			faithCount: null,
+			religionCount: null,
 		})
 
 		expect(markup).toContain("Population")
 		expect(markup).toContain("N/A")
+		expect(markup).toContain("Culture Count")
+		expect(markup).toContain("Heritage Count")
+		expect(markup).toContain("Faith Count")
+		expect(markup).toContain("Religion Count")
 		expect(markup).toContain("Nation Size")
 		expect(markup).toContain("Conflicts")
+		expect(markup).not.toContain("Avg Development")
+		expect(markup).not.toContain("Nation Avg Dev")
 		expect(markup).toContain("Relations")
-		expect(markup).not.toContain("Province Development")
-		expect(markup).not.toContain("Nation Development")
 	})
 })

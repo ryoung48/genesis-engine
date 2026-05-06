@@ -10,8 +10,6 @@ export interface DisplayNationModel {
 	assignment: Int32Array
 	counts: Map<number, number>
 	colorById: Map<number, [number, number, number]>
-	adjOffset: Int32Array
-	adjList: Int32Array
 	toActualId: (displayNationId: number) => number | null
 	toDisplayId: (actualNationId: number) => number | null
 }
@@ -93,7 +91,7 @@ function buildBaseNationColors(world: SerializedOrogenWorld): Float32Array {
 	return colors
 }
 
-function buildNationAdjacency(
+export function buildNationAdjacency(
 	provinceAssignment: Int32Array,
 	world: SerializedOrogenWorld,
 ): { adjOffset: Int32Array; adjList: Int32Array } {
@@ -184,7 +182,6 @@ export function buildDisplayWorld(params: {
 			const sovereign = assignment[province]
 			if (sovereign >= 0) size[sovereign] += 1
 		}
-		const { adjOffset, adjList } = buildNationAdjacency(assignment, base)
 		return {
 			...base,
 			leaderDynasty: sovereignRulerFields.leaderDynasty,
@@ -196,19 +193,9 @@ export function buildDisplayWorld(params: {
 				assignment,
 				colors: buildBaseNationColors(base),
 				size,
-				adjOffset,
-				adjList,
 			},
 		}
 	}
-
-	const { adjOffset, adjList } =
-		base.provinces.adjOffset && base.provinces.adjList
-			? buildNationAdjacency(selectedHistoryView.assignment, base)
-			: {
-					adjOffset: base.nations.adjOffset,
-					adjList: base.nations.adjList,
-				}
 
 	return {
 		...base,
@@ -225,8 +212,6 @@ export function buildDisplayWorld(params: {
 			childList: selectedHistoryChildren?.childList ?? base.nations.childList,
 			sovereign: selectedHistoryView.sovereign,
 			colors: selectedHistoryView.colors,
-			adjOffset,
-			adjList,
 		},
 		population: base.population
 			? {
@@ -272,8 +257,6 @@ export function buildDisplayNationModel(
 		assignment: world.nations.assignment,
 		counts,
 		colorById,
-		adjOffset: world.nations.adjOffset,
-		adjList: world.nations.adjList,
 		toActualId: (displayNationId) =>
 			counts.has(displayNationId) ? displayNationId : null,
 		toDisplayId: (actualNationId) =>

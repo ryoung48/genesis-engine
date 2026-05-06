@@ -459,9 +459,20 @@ export function warThreat(
 	return 1 - atk / (atk + def)
 }
 
-export function releaseProvince(state: HistoryState, p: number): void {
+export function releaseProvince(
+	state: HistoryState,
+	p: number,
+	rng: HistoryRng,
+): void {
 	PROV.parent.set(state, p, state.time, -1)
 	rebuildAssignment(state)
+	spawnLeader(state, p, rng)
+	state.heap.enqueue(
+		state.leaderRuntime.end[p],
+		EVT.SUCCESSION,
+		p,
+		state.leaderRuntime.idx[p],
+	)
 }
 
 function isProvinceConnectedToParent(
@@ -500,11 +511,12 @@ function releaseDisconnectedProvince(
 	state: HistoryState,
 	province: number,
 	overlord: number,
+	rng: HistoryRng,
 ): void {
 	if (state.occupationCurrent[province] >= 0) {
 		PROV.occupation.set(state, province, state.time, -1)
 	}
-	releaseProvince(state, province)
+	releaseProvince(state, province, rng)
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
@@ -551,6 +563,17 @@ function addTerritory(
 		adjList: state.provinceAdjList,
 		provinceCount: state.P,
 	})
+	// Depose leaders of absorbed sovereigns before parents are rewritten
+	for (const p of subjects) {
+		if (!isSovereign(state, p)) continue
+		state.leaderRuntime.end[p] = state.time
+		state.leaderRuntime.idx[p]++
+		state.events.push({
+			tag: "ruler deposed",
+			time: state.time,
+			data: { nation: p, leader: state.leaderRuntime.idx[p] - 1 },
+		})
+	}
 	for (const member of members) {
 		PROV.parent.set(state, member, state.time, -1)
 	}
@@ -608,21 +631,25 @@ function releaseSubjectRelations(state: HistoryState, nation: number): void {
 	}
 }
 
-export function fixConnections(state: HistoryState, nation: number): void {
+export function fixConnections(
+	state: HistoryState,
+	nation: number,
+	rng: HistoryRng,
+): void {
 	let disconnected = true
 	while (disconnected) {
 		disconnected = false
 		for (const subject of getChildren(state, nation)) {
 			if (isProvinceConnectedToParent(state, subject)) continue
 			disconnected = true
-			releaseDisconnectedProvince(state, subject, nation)
+			releaseDisconnectedProvince(state, subject, nation, rng)
 		}
 	}
 
 	const overlord = PROV.parent.get(state, nation)
 	if (overlord >= 0 && !isProvinceConnectedToParent(state, nation)) {
-		releaseDisconnectedProvince(state, nation, overlord)
-		fixConnections(state, overlord)
+		releaseDisconnectedProvince(state, nation, overlord, rng)
+		fixConnections(state, overlord, rng)
 	}
 }
 
@@ -696,7 +723,7 @@ export function resolveWar(
 	if (transferred.length > 0) {
 		addTerritory(state, war.attacker, transferred, rng)
 	}
-	if (!victory) fixConnections(state, war.defender)
+	if (!victory) fixConnections(state, war.defender, rng)
 	setRelation(state, war.attacker, war.defender, REL.SUSPICIOUS)
 
 	state.events.push({
@@ -832,6 +859,7 @@ export function createHistoryState(
 
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
+		if (nations.parent[p] >= 0) continue
 		spawnLeader(state, p, rng)
 	}
 	initDynasties(state, rng)
@@ -872,7 +900,7 @@ export function spawnLeader(
 function initDynasties(state: HistoryState, rng: HistoryRng): void {
 	const shuffled = rng.shuffle(
 		Array.from({ length: state.P }, (_, i) => i).filter(
-			(p) => !state.desolate[p],
+			(p) => !state.desolate[p] && state.parentCurrent[p] < 0,
 		),
 	)
 	for (const p of shuffled) {

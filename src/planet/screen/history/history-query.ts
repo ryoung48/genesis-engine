@@ -25,8 +25,6 @@ export interface HistoryView {
 	leaderClaim: Int32Array
 	leaderBirthYear: Float32Array
 	colors: Float32Array
-	adjOffset: Int32Array
-	adjList: Int32Array
 	populationTotal: Float32Array
 	populationRural: Float32Array
 	populationUrban: Float32Array
@@ -605,8 +603,6 @@ export function createHistoryQuery(
 
 	const eventsByTime = events.slice().sort((a, b) => a.time - b.time)
 	const habitability = world.population?.habitability
-	const emptyAdjOffset = new Int32Array(provinceCount + 1)
-	const emptyAdjList = new Int32Array(0)
 
 	const parentChanges = flattenIntTimeline(timelines.parent, provinceCount)
 	const assignmentChanges = flattenIntTimeline(
@@ -989,8 +985,6 @@ export function createHistoryQuery(
 			...war,
 			occupied: war.occupied.slice(),
 		}))
-		const adjOffset = emptyAdjOffset.slice()
-		const adjList = emptyAdjList.slice()
 		const cloneMs = performance.now() - cloneStartedAt
 
 		lastComputedMs = timeMs
@@ -1004,8 +998,6 @@ export function createHistoryQuery(
 			leaderClaim,
 			leaderBirthYear,
 			colors,
-			adjOffset,
-			adjList,
 			populationTotal,
 			populationRural,
 			populationUrban,

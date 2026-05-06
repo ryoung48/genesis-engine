@@ -170,8 +170,6 @@ function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
 		frame.leaderClaim.buffer,
 		frame.leaderBirthYear.buffer,
 		frame.colors.buffer,
-		frame.adjOffset.buffer,
-		frame.adjList.buffer,
 		frame.populationTotal.buffer,
 		frame.populationUrban.buffer,
 		frame.development.buffer,

@@ -13,15 +13,19 @@ function getWorldSections({
 	planetStats,
 	worldPopulation,
 	activeWarCount,
-	averageDevelopment,
-	nationAverageDevelopment,
+	cultureCount,
+	heritageCount,
+	faithCount,
+	religionCount,
 }: Pick<
 	DetailsDrawerBaseProps,
 	| "planetStats"
 	| "worldPopulation"
 	| "activeWarCount"
-	| "averageDevelopment"
-	| "nationAverageDevelopment"
+	| "cultureCount"
+	| "heritageCount"
+	| "faithCount"
+	| "religionCount"
 >) {
 	const stats = new Map(
 		planetStats
@@ -67,16 +71,20 @@ function getWorldSections({
 				value: activeWarCount != null ? activeWarCount.toLocaleString() : "N/A",
 			},
 			{
-				label: "Avg Development",
-				value:
-					averageDevelopment != null ? averageDevelopment.toFixed(2) : "N/A",
+				label: "Culture Count",
+				value: cultureCount != null ? cultureCount.toLocaleString() : "N/A",
 			},
 			{
-				label: "Nation Avg Dev",
-				value:
-					nationAverageDevelopment != null
-						? nationAverageDevelopment.toFixed(2)
-						: "N/A",
+				label: "Heritage Count",
+				value: heritageCount != null ? heritageCount.toLocaleString() : "N/A",
+			},
+			{
+				label: "Faith Count",
+				value: faithCount != null ? faithCount.toLocaleString() : "N/A",
+			},
+			{
+				label: "Religion Count",
+				value: religionCount != null ? religionCount.toLocaleString() : "N/A",
 			},
 		],
 	}
@@ -93,8 +101,10 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	planetStats,
 	worldPopulation,
 	activeWarCount,
-	averageDevelopment,
-	nationAverageDevelopment,
+	cultureCount,
+	heritageCount,
+	faithCount,
+	religionCount,
 	nationSizeDistribution,
 	conflictDistribution,
 	relationDistribution,
@@ -106,8 +116,10 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		planetStats,
 		worldPopulation,
 		activeWarCount,
-		averageDevelopment,
-		nationAverageDevelopment,
+		cultureCount,
+		heritageCount,
+		faithCount,
+		religionCount,
 	})
 
 	return (

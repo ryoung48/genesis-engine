@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { REL } from "@/model/history/state"
 import {
 	CULTURE_GENDER_SYSTEM,
 	leaderGenderSymbol,
@@ -9,6 +10,7 @@ import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
 	buildHoverChartData,
+	buildHoverNationRelationDistribution,
 	buildPastaMonthlyData,
 	buildPoliticalDisplayData,
 	buildProvinceDisplayData,
@@ -117,6 +119,117 @@ describe("buildPastaMonthlyData", () => {
 				}),
 			),
 		).toBeNull()
+	})
+})
+
+describe("buildHoverNationRelationDistribution", () => {
+	it("returns empty array when hoverNationId is null or adjacency is missing", () => {
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: null,
+				adjOffset: new Int32Array([0, 1]),
+				adjList: new Int32Array([1]),
+				nationCounts: new Map([[1, 1]]),
+				relationAt: () => REL.ALLY,
+			}),
+		).toEqual([])
+
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: 0,
+				adjOffset: null,
+				adjList: new Int32Array([1]),
+				nationCounts: new Map([[1, 1]]),
+				relationAt: () => REL.ALLY,
+			}),
+		).toEqual([])
+
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: 0,
+				adjOffset: new Int32Array([0, 1]),
+				adjList: null,
+				nationCounts: new Map([[1, 1]]),
+				relationAt: () => REL.ALLY,
+			}),
+		).toEqual([])
+
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: 0,
+				adjOffset: new Int32Array([0, 1]),
+				adjList: new Int32Array([1]),
+				nationCounts: new Map([[1, 1]]),
+				relationAt: null,
+			}),
+		).toEqual([])
+	})
+
+	it("counts neighbors into the correct relation buckets", () => {
+		const adjOffset = new Int32Array([0, 8, 8, 8, 8, 8, 8, 8, 8, 8])
+		const adjList = new Int32Array([1, 2, 3, 4, 5, 6, 7, 8])
+		const nationCounts = new Map(
+			[0, 1, 2, 3, 4, 5, 6, 7, 8].map((id) => [id, 1]),
+		)
+		const relations: Record<number, number> = {
+			1: REL.PU_SENIOR,
+			2: REL.PU_JUNIOR,
+			3: REL.OVERLORD,
+			4: REL.VASSAL,
+			5: REL.ALLY,
+			6: REL.FRIENDLY,
+			7: REL.SUSPICIOUS,
+			8: REL.RIVAL,
+		}
+		const result = buildHoverNationRelationDistribution({
+			hoverNationId: 0,
+			adjOffset,
+			adjList,
+			nationCounts,
+			relationAt: (_, b) => relations[b] ?? REL.NEUTRAL,
+		})
+		expect(result).toHaveLength(8)
+		const byLabel = Object.fromEntries(result.map((b) => [b.label, b.count]))
+		expect(byLabel["Personal Union"]).toBe(2)
+		expect(byLabel["Vassal"]).toBe(2)
+		expect(byLabel["Allied"]).toBe(1)
+		expect(byLabel["Friendly"]).toBe(1)
+		expect(byLabel["Suspicious"]).toBe(1)
+		expect(byLabel["Rival"]).toBe(1)
+		expect(byLabel["Neutral"]).toBe(0)
+		expect(byLabel["War"]).toBe(0)
+		expect(result.every((b) => b.shortLabel.length > 0)).toBe(true)
+	})
+
+	it("counts war neighbors and skips nations not in nationCounts", () => {
+		const adjOffset = new Int32Array([0, 3, 3])
+		const adjList = new Int32Array([1, 2, 99])
+		const nationCounts = new Map([
+			[0, 1],
+			[1, 1],
+			[2, 1],
+		])
+		const result = buildHoverNationRelationDistribution({
+			hoverNationId: 0,
+			adjOffset,
+			adjList,
+			nationCounts,
+			relationAt: (_, b) => (b === 1 ? REL.WAR : REL.NEUTRAL),
+		})
+		const byLabel = Object.fromEntries(result.map((b) => [b.label, b.count]))
+		expect(byLabel["War"]).toBe(1)
+		expect(byLabel["Neutral"]).toBe(1)
+	})
+
+	it("returns empty when hoverNationId is out of adjOffset bounds", () => {
+		const result = buildHoverNationRelationDistribution({
+			hoverNationId: 5,
+			adjOffset: new Int32Array([0, 1]),
+			adjList: new Int32Array([1]),
+			nationCounts: new Map([[1, 1]]),
+			relationAt: () => REL.ALLY,
+		})
+		expect(result).toEqual([])
 	})
 })
 
@@ -723,5 +836,115 @@ describe("buildDemographicDisplayData", () => {
 				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
+	})
+})
+
+describe("buildHoverNationRelationDistribution", () => {
+	it("returns empty array when hoverNationId is null or adjacency is missing", () => {
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: null,
+				adjOffset: new Int32Array([0, 1]),
+				adjList: new Int32Array([1]),
+				nationCounts: new Map([[1, 1]]),
+				relationAt: () => REL.ALLY,
+			}),
+		).toEqual([])
+
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: 0,
+				adjOffset: null,
+				adjList: new Int32Array([1]),
+				nationCounts: new Map([[1, 1]]),
+				relationAt: () => REL.ALLY,
+			}),
+		).toEqual([])
+
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: 0,
+				adjOffset: new Int32Array([0, 1]),
+				adjList: null,
+				nationCounts: new Map([[1, 1]]),
+				relationAt: () => REL.ALLY,
+			}),
+		).toEqual([])
+
+		expect(
+			buildHoverNationRelationDistribution({
+				hoverNationId: 0,
+				adjOffset: new Int32Array([0, 1]),
+				adjList: new Int32Array([1]),
+				nationCounts: new Map([[1, 1]]),
+				relationAt: null,
+			}),
+		).toEqual([])
+	})
+
+	it("counts neighbors into the correct relation buckets", () => {
+		const adjOffset = new Int32Array([0, 8, 8, 8, 8, 8, 8, 8, 8, 8])
+		const adjList = new Int32Array([1, 2, 3, 4, 5, 6, 7, 8])
+		const nationCounts = new Map(
+			[0, 1, 2, 3, 4, 5, 6, 7, 8].map((id) => [id, 1]),
+		)
+		const relations: Record<number, number> = {
+			1: REL.PU_SENIOR,
+			2: REL.PU_JUNIOR,
+			3: REL.OVERLORD,
+			4: REL.VASSAL,
+			5: REL.ALLY,
+			6: REL.FRIENDLY,
+			7: REL.SUSPICIOUS,
+			8: REL.RIVAL,
+		}
+		const result = buildHoverNationRelationDistribution({
+			hoverNationId: 0,
+			adjOffset,
+			adjList,
+			nationCounts,
+			relationAt: (_, b) => relations[b] ?? REL.NEUTRAL,
+		})
+		expect(result).toHaveLength(8)
+		const byLabel = Object.fromEntries(result.map((b) => [b.label, b.count]))
+		expect(byLabel["Personal Union"]).toBe(2)
+		expect(byLabel["Vassal"]).toBe(2)
+		expect(byLabel["Allied"]).toBe(1)
+		expect(byLabel["Friendly"]).toBe(1)
+		expect(byLabel["Suspicious"]).toBe(1)
+		expect(byLabel["Rival"]).toBe(1)
+		expect(byLabel["Neutral"]).toBe(0)
+		expect(byLabel["War"]).toBe(0)
+	})
+
+	it("counts war neighbors and skips nations not in nationCounts", () => {
+		const adjOffset = new Int32Array([0, 3, 3])
+		const adjList = new Int32Array([1, 2, 99])
+		const nationCounts = new Map([
+			[0, 1],
+			[1, 1],
+			[2, 1],
+		])
+		const result = buildHoverNationRelationDistribution({
+			hoverNationId: 0,
+			adjOffset,
+			adjList,
+			nationCounts,
+			relationAt: (_, b) => (b === 1 ? REL.WAR : REL.NEUTRAL),
+		})
+		const byLabel = Object.fromEntries(result.map((b) => [b.label, b.count]))
+		expect(byLabel["War"]).toBe(1)
+		expect(byLabel["Neutral"]).toBe(1)
+	})
+
+	it("returns empty when hoverNationId is out of adjOffset bounds", () => {
+		const result = buildHoverNationRelationDistribution({
+			hoverNationId: 5,
+			adjOffset: new Int32Array([0, 1]),
+			adjList: new Int32Array([1]),
+			nationCounts: new Map([[1, 1]]),
+			relationAt: () => REL.ALLY,
+		})
+		expect(result).toEqual([])
 	})
 })

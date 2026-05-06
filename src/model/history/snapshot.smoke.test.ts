@@ -24,7 +24,6 @@ function createFrameProfile(): HistoryFrameBuildProfile {
 	return {
 		hierarchyMs: 0,
 		provinceFieldsMs: 0,
-		adjacencyMs: 0,
 		warsMs: 0,
 		summaryMs: 0,
 		relationsMs: 0,
@@ -115,7 +114,6 @@ describe("history simulation snapshot smoke", () => {
 				activeWars: frame.activeWars.length,
 				frameMs,
 				frameProvinceFieldsMs: frameProfile.provinceFieldsMs,
-				frameAdjacencyMs: frameProfile.adjacencyMs,
 				frameWarsMs: frameProfile.warsMs,
 				frameSummaryMs: frameProfile.summaryMs,
 				frameRelationsMs: frameProfile.relationsMs,

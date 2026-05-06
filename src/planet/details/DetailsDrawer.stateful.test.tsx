@@ -100,16 +100,16 @@ describe("DetailsDrawer stateful branches", () => {
 				planetStats={[]}
 				worldPopulation={null}
 				activeWarCount={null}
-				averageDevelopment={null}
-				nationAverageDevelopment={null}
-				developmentDistribution={[]}
-				nationDevelopmentDistribution={[]}
+				cultureCount={null}
+				heritageCount={null}
+				faithCount={null}
+				religionCount={null}
 				nationSizeDistribution={[]}
 				conflictDistribution={[]}
-				relationDistribution={[]}
 				climateDistribution={[]}
 				vegetationDistribution={[]}
 				topographyDistribution={[]}
+				relationDistribution={[]}
 			/>,
 		)
 
@@ -155,16 +155,16 @@ describe("DetailsDrawer stateful branches", () => {
 				planetStats={[]}
 				worldPopulation={null}
 				activeWarCount={null}
-				averageDevelopment={null}
-				nationAverageDevelopment={null}
-				developmentDistribution={[]}
-				nationDevelopmentDistribution={[]}
+				cultureCount={null}
+				heritageCount={null}
+				faithCount={null}
+				religionCount={null}
 				nationSizeDistribution={[]}
 				conflictDistribution={[]}
-				relationDistribution={[]}
 				climateDistribution={[]}
 				vegetationDistribution={[]}
 				topographyDistribution={[]}
+				relationDistribution={[]}
 				onNationClick={vi.fn()}
 			/>,
 		)

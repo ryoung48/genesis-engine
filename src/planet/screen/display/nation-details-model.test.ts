@@ -8,6 +8,7 @@ import {
 } from "@/model/society/gender-system"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { HistoryView } from "../history/history-query"
+import type { DisplayNationModel } from "./display-model"
 import {
 	buildConflictDistribution,
 	buildNationHistory,
@@ -76,12 +77,12 @@ describe("buildConflictDistribution", () => {
 
 describe("buildRelationDistribution", () => {
 	it("returns empty array when no history view", () => {
-		const result = buildRelationDistribution(null, new Map())
+		const result = buildRelationDistribution(null, null, null)
 		expect(result).toEqual([])
 	})
 
-	it("counts allied pairs", () => {
-		const nations = [0, 1, 2]
+	it("counts allied pairs among neighbors", () => {
+		// Complete graph: nations 0, 1, 2 all adjacent to each other
 		const relations = new Map<string, number>([
 			["0,1", REL.ALLY],
 			["0,2", REL.NEUTRAL],
@@ -91,9 +92,19 @@ describe("buildRelationDistribution", () => {
 			relationAt: (a: number, b: number) =>
 				relations.get(`${Math.min(a, b)},${Math.max(a, b)}`) ?? REL.NEUTRAL,
 		} as unknown as HistoryView
-		const counts = new Map(nations.map((id) => [id, 1]))
+		const nationModel = {
+			counts: new Map([
+				[0, 1],
+				[1, 1],
+				[2, 1],
+			]),
+		} as unknown as DisplayNationModel
+		const nationAdj = {
+			adjOffset: new Int32Array([0, 2, 4, 6]),
+			adjList: new Int32Array([1, 2, 0, 2, 0, 1]),
+		}
 
-		const result = buildRelationDistribution(view, counts)
+		const result = buildRelationDistribution(view, nationModel, nationAdj)
 
 		expect(result.find((b) => b.label === "Allied")?.count).toBe(1)
 		expect(result.find((b) => b.label === "Rival")?.count).toBe(1)
@@ -103,7 +114,11 @@ describe("buildRelationDistribution", () => {
 describe("buildSelectedNationDetails", () => {
 	it("aggregates population, deduplicates neighbors, and maps active wars", () => {
 		const world = {
-			provinces: { count: 2 },
+			provinces: {
+				count: 2,
+				adjOffset: new Int32Array([0, 1, 2]),
+				adjList: new Int32Array([1, 0]),
+			},
 			cultures: {
 				assignment: new Int32Array([0, 1]),
 				colors: new Float32Array([1, 0, 0, 0, 1, 0]),
@@ -145,8 +160,6 @@ describe("buildSelectedNationDetails", () => {
 				[0, 1],
 				[1, 1],
 			]),
-			adjOffset: new Int32Array([0, 2, 2]),
-			adjList: new Int32Array([1, 1]),
 		}
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
@@ -351,7 +364,11 @@ describe("buildSelectedNationDetails", () => {
 
 	it("drops threats when wealth inputs are unavailable and excludes allied targets", () => {
 		const world = {
-			provinces: { count: 3 },
+			provinces: {
+				count: 3,
+				adjOffset: new Int32Array([0, 2, 3, 4]),
+				adjList: new Int32Array([1, 2, 0, 0]),
+			},
 			nations: {
 				parent: new Int32Array([-1, -1, -1]),
 				childOffset: new Int32Array([0, 0, 0, 0]),
@@ -368,8 +385,6 @@ describe("buildSelectedNationDetails", () => {
 					[1, 1],
 					[2, 1],
 				]),
-				adjOffset: new Int32Array([0, 3, 3, 3]),
-				adjList: new Int32Array([1, 1, 2]),
 			} as never,
 			selectedHistoryView: {
 				activeWars: [],
@@ -395,7 +410,11 @@ describe("buildSelectedNationDetails", () => {
 
 	it("applies recursive wealth penalties, defender war roles, and unknown relation fallbacks", () => {
 		const world = {
-			provinces: { count: 6 },
+			provinces: {
+				count: 6,
+				adjOffset: new Int32Array([0, 2, 2, 2, 2, 3, 4]),
+				adjList: new Int32Array([4, 5, 0, 0]),
+			},
 			nations: {
 				parent: new Int32Array([-1, 0, 0, 0, 0, 0]),
 				childOffset: new Int32Array([0, 5, 5, 5, 5, 5, 5]),
@@ -421,8 +440,6 @@ describe("buildSelectedNationDetails", () => {
 					[4, 1],
 					[5, 1],
 				]),
-				adjOffset: new Int32Array([0, 3, 3, 3, 3, 3, 3]),
-				adjList: new Int32Array([5, 4, 5]),
 			} as never,
 			selectedHistoryView: {
 				consumption: new Float32Array([3, 2, 2, 2, 3, 3]),
@@ -499,8 +516,6 @@ describe("buildSelectedNationDetails", () => {
 					[1, 1],
 					[2, 1],
 				]),
-				adjOffset: new Int32Array([0, 0, 0, 0]),
-				adjList: new Int32Array(0),
 			} as never,
 			selectedHistoryView: {
 				consumption: new Float32Array([1, 1, 1, 1]),
@@ -537,7 +552,7 @@ describe("buildSelectedNationDetails", () => {
 		expect(details?.neighbors[1]?.threat).toBeGreaterThan(0)
 	})
 
-	it("prefers lazy historical adjacency over stale nation-model neighbors", () => {
+	it("always uses province adjacency for neighbor resolution", () => {
 		const world = {
 			provinces: {
 				count: 4,
@@ -566,8 +581,6 @@ describe("buildSelectedNationDetails", () => {
 					[1, 1],
 					[2, 1],
 				]),
-				adjOffset: new Int32Array([0, 1, 1, 1]),
-				adjList: new Int32Array([2]),
 			} as never,
 			selectedHistoryView: {
 				consumption: new Float32Array([1, 1, 1, 1]),
@@ -591,7 +604,11 @@ describe("buildSelectedNationDetails", () => {
 
 	it("uses default relations, empty wars, and zeroed history wealth fallbacks", () => {
 		const world = {
-			provinces: { count: 2 },
+			provinces: {
+				count: 2,
+				adjOffset: new Int32Array([0, 1, 2]),
+				adjList: new Int32Array([1, 0]),
+			},
 			nations: {
 				parent: new Int32Array([-1, -1]),
 				childOffset: new Int32Array([0, 0, 0]),
@@ -607,8 +624,6 @@ describe("buildSelectedNationDetails", () => {
 					[0, 1],
 					[1, 1],
 				]),
-				adjOffset: new Int32Array([0, 1, 1]),
-				adjList: new Int32Array([1]),
 			} as never,
 			selectedHistoryView: null,
 			getNationColor: () => null,
@@ -679,7 +694,7 @@ describe("buildSelectedNationDetails", () => {
 		])
 	})
 
-	it("returns no neighbors when adjacency offsets do not cover the selected nation", () => {
+	it("returns no neighbors when province adjacency is absent", () => {
 		const details = buildSelectedNationDetails({
 			selectedNationId: 1,
 			world: {
@@ -693,8 +708,6 @@ describe("buildSelectedNationDetails", () => {
 			nationModel: {
 				assignment: new Int32Array([0, 1]),
 				counts: new Map([[1, 1]]),
-				adjOffset: new Int32Array([0]),
-				adjList: new Int32Array(0),
 			} as never,
 			selectedHistoryView: null,
 			getNationColor: () => null,
@@ -1104,7 +1117,7 @@ describe("buildWindowedNationEvents", () => {
 })
 
 describe("buildRelationDistribution", () => {
-	it("counts every relation bucket including neutral pairs", () => {
+	it("counts every relation bucket including neutral neighbor pairs", () => {
 		const nations = new Map([
 			[0, 1],
 			[1, 1],
@@ -1121,13 +1134,24 @@ describe("buildRelationDistribution", () => {
 			["1,3", REL.RIVAL],
 			["1,4", REL.WAR],
 		])
+		// Complete graph: all 5 nations are neighbors with each other
+		const nationAdj = {
+			adjOffset: new Int32Array([0, 4, 8, 12, 16, 20]),
+			adjList: new Int32Array([
+				1, 2, 3, 4, 0, 2, 3, 4, 0, 1, 3, 4, 0, 1, 2, 4, 0, 1, 2, 3,
+			]),
+		}
+		const nationModel = {
+			counts: nations,
+		} as unknown as DisplayNationModel
 
 		const result = buildRelationDistribution(
 			{
 				relationAt: (a: number, b: number) =>
 					relations.get(`${Math.min(a, b)},${Math.max(a, b)}`) ?? REL.NEUTRAL,
 			} as unknown as HistoryView,
-			nations,
+			nationModel,
+			nationAdj,
 		)
 
 		expect(result.find((bucket) => bucket.label === "Vassal")?.count).toBe(1)

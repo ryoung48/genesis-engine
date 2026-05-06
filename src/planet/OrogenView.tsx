@@ -1,9 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FloatingPanel, IconButton } from "@/components"
-import {
-	DEV_BUCKETS,
-	DEV_COLORS,
-} from "@/components/composites/charts/active-trends-constants"
 import { useEbmPreview } from "@/hooks/useEbmPreview"
 import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
@@ -65,6 +61,7 @@ import {
 	buildDisplayNationModel,
 	buildDisplayWorld,
 	buildHistoryChildrenIndex,
+	buildNationAdjacency,
 } from "./screen/display/display-model"
 import { createDisplayNames } from "./screen/display/display-names"
 import {
@@ -696,6 +693,8 @@ export const OrogenView: React.FC = () => {
 			viewMode,
 			undefined,
 			selectedHistoryView?.activeWars,
+			selectedNationId,
+			selectedHistoryView?.relationAt ?? null,
 		)
 	}, [
 		colorMode,
@@ -708,6 +707,7 @@ export const OrogenView: React.FC = () => {
 		currentMonth,
 		selectedHistoryView,
 		worldForDisplay,
+		selectedNationId,
 	])
 
 	const occupationOverlay = useMemo(() => {
@@ -927,80 +927,23 @@ export const OrogenView: React.FC = () => {
 		[selectedHistoryView],
 	)
 
-	const relationDistribution = useMemo(
-		() => buildRelationDistribution(selectedHistoryView, nationProvinceCounts),
-		[selectedHistoryView, nationProvinceCounts],
+	const nationAdjacency = useMemo(
+		() =>
+			colorMode === "nations" && nationModel && worldForDisplay
+				? buildNationAdjacency(nationModel.assignment, worldForDisplay)
+				: null,
+		[colorMode, nationModel, worldForDisplay],
 	)
 
-	const developmentDistribution = useMemo(() => {
-		const values = worldForDisplay?.development
-		const desolate = worldForDisplay?.provinces?.desolate
-		if (!values || !desolate) return []
-		const counts = new Array(DEV_BUCKETS.length).fill(0)
-		for (let province = 0; province < values.length; province++) {
-			if (desolate[province]) continue
-			const bucket = Math.min(
-				DEV_BUCKETS.length - 1,
-				Math.floor(values[province] * 10),
-			)
-			counts[bucket]++
-		}
-		return DEV_BUCKETS.map((label, index) => ({
-			label,
-			count: counts[index] ?? 0,
-			color: DEV_COLORS[index],
-		})).filter((bucket) => bucket.count > 0)
-	}, [worldForDisplay])
-
-	const nationDevelopmentDistribution = useMemo(() => {
-		const values = worldForDisplay?.development
-		const parent = worldForDisplay?.nations?.parent
-		const assignment = worldForDisplay?.nations?.assignment
-		if (!values || !parent || !assignment) return []
-		const counts = new Array(DEV_BUCKETS.length).fill(0)
-		for (let province = 0; province < values.length; province++) {
-			if (parent[province] >= 0 || assignment[province] < 0) continue
-			const bucket = Math.min(
-				DEV_BUCKETS.length - 1,
-				Math.floor(values[province] * 10),
-			)
-			counts[bucket]++
-		}
-		return DEV_BUCKETS.map((label, index) => ({
-			label,
-			count: counts[index] ?? 0,
-			color: DEV_COLORS[index],
-		})).filter((bucket) => bucket.count > 0)
-	}, [worldForDisplay])
-
-	const averageDevelopment = useMemo(() => {
-		const values = worldForDisplay?.development
-		const desolate = worldForDisplay?.provinces?.desolate
-		if (!values || !desolate) return null
-		let total = 0
-		let count = 0
-		for (let province = 0; province < values.length; province++) {
-			if (desolate[province]) continue
-			total += values[province]
-			count++
-		}
-		return count > 0 ? total / count : null
-	}, [worldForDisplay])
-
-	const nationAverageDevelopment = useMemo(() => {
-		const values = worldForDisplay?.development
-		const parent = worldForDisplay?.nations?.parent
-		const assignment = worldForDisplay?.nations?.assignment
-		if (!values || !parent || !assignment) return null
-		let total = 0
-		let count = 0
-		for (let province = 0; province < values.length; province++) {
-			if (parent[province] >= 0 || assignment[province] < 0) continue
-			total += values[province]
-			count++
-		}
-		return count > 0 ? total / count : null
-	}, [worldForDisplay])
+	const relationDistribution = useMemo(
+		() =>
+			buildRelationDistribution(
+				selectedHistoryView,
+				nationModel,
+				nationAdjacency,
+			),
+		[selectedHistoryView, nationModel, nationAdjacency],
+	)
 
 	const climateDistribution = useMemo(
 		() =>
@@ -1783,6 +1726,24 @@ export const OrogenView: React.FC = () => {
 								getReligionName={getReligionName}
 								getLandmarkName={getLandmarkName}
 								getRiverName={getRiverName}
+								hoverNationAdjOffset={
+									colorMode === "nations"
+										? (nationAdjacency?.adjOffset ?? null)
+										: null
+								}
+								hoverNationAdjList={
+									colorMode === "nations"
+										? (nationAdjacency?.adjList ?? null)
+										: null
+								}
+								hoverNationCounts={
+									colorMode === "nations" ? nationProvinceCounts : null
+								}
+								relationAt={
+									colorMode === "nations"
+										? (selectedHistoryView?.relationAt ?? null)
+										: null
+								}
 							/>
 						) : null}
 
@@ -1925,10 +1886,10 @@ export const OrogenView: React.FC = () => {
 					null
 				}
 				activeWarCount={selectedHistoryView?.activeWars.length ?? null}
-				averageDevelopment={averageDevelopment}
-				nationAverageDevelopment={nationAverageDevelopment}
-				developmentDistribution={developmentDistribution}
-				nationDevelopmentDistribution={nationDevelopmentDistribution}
+				cultureCount={worldForDisplay?.cultures?.count ?? null}
+				heritageCount={worldForDisplay?.heritages?.count ?? null}
+				faithCount={worldForDisplay?.faiths?.count ?? null}
+				religionCount={worldForDisplay?.religions?.count ?? null}
 				nationSizeDistribution={nationSizeDistribution}
 				conflictDistribution={conflictDistribution}
 				relationDistribution={relationDistribution}

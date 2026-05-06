@@ -18,7 +18,7 @@ export function computeReligions(
 		adjOffset: faiths.adjOffset,
 		adjList: faiths.adjList,
 		active,
-		targetCount: Math.max(1, Math.floor(activeCount / 8)),
+		targetCount: Math.max(1, Math.floor(activeCount / 2)),
 		seed: seed + 4104,
 	})
 }

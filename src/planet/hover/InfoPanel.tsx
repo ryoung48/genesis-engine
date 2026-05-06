@@ -49,6 +49,7 @@ import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
 	buildHoverChartData,
+	buildHoverNationRelationDistribution,
 	buildPastaMonthlyData,
 	buildPoliticalDisplayData,
 	buildProvinceDisplayData,
@@ -197,6 +198,10 @@ interface InfoPanelProps {
 	getReligionName: (religionId: number) => string
 	getLandmarkName: (landmarkId: number) => string
 	getRiverName: (riverId: number) => string
+	hoverNationAdjOffset?: Int32Array | null
+	hoverNationAdjList?: Int32Array | null
+	hoverNationCounts?: Map<number, number> | null
+	relationAt?: ((a: number, b: number) => number) | null
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -238,12 +243,25 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getReligionName,
 	getLandmarkName,
 	getRiverName,
+	hoverNationAdjOffset,
+	hoverNationAdjList,
+	hoverNationCounts,
+	relationAt,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
 	const showPolitical = activePrimary === "political"
 	const showDemographics = activePrimary === "demographics"
 	const hoverRegion = hoverInfo?.region ?? null
+	const hoverNationRelationDistribution = showPolitical
+		? buildHoverNationRelationDistribution({
+				hoverNationId,
+				adjOffset: hoverNationAdjOffset ?? null,
+				adjList: hoverNationAdjList ?? null,
+				nationCounts: hoverNationCounts ?? new Map(),
+				relationAt: relationAt ?? null,
+			})
+		: []
 	const chartData =
 		showGeography && hoverInfo
 			? buildHoverChartData(hoverInfo, hoverElevationKm, world)
@@ -387,7 +405,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			(group) => group.id !== selectedDemographicGroupId,
 		),
 	]
-
 	return (
 		<FloatingPanel
 			className="absolute top-3 left-3 z-20 w-64 px-3 py-2"
@@ -530,6 +547,23 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
 								color={hoverOccupation.color}
 							/>
+						)}
+						{hoverNationRelationDistribution.length > 0 && (
+							<div className="border-t border-white/5 pt-1">
+								<SeriesBars
+									label="Relations"
+									values={hoverNationRelationDistribution.map((b) => b.count)}
+									labels={hoverNationRelationDistribution.map(
+										(b) => b.shortLabel,
+									)}
+									colorForValue={(_, i) =>
+										hoverNationRelationDistribution[i]?.color ?? "#aaa"
+									}
+									tooltipLabel={({ value, index }) =>
+										`${hoverNationRelationDistribution[index]?.label ?? ""}: ${value}`
+									}
+								/>
+							</div>
 						)}
 					</>
 				)}

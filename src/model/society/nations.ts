@@ -1,5 +1,6 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
+import { SimplexNoise } from "../shared/simplex-noise"
 import {
 	buildChildrenCSR,
 	buildSovereign,
@@ -7,9 +8,12 @@ import {
 	rebalanceHierarchy,
 } from "./hierarchy"
 
-const NATION_PERCENTAGES = normalize([0.2, 0.21, 0.21, 0.18, 0.12, 0.09])
+// Province-mass weights per bucket — calibrated to CK3 1066.9.15 all-county-titles distribution
+const NATION_PERCENTAGES = normalize([
+	0.4554, 0.072, 0.102, 0.0746, 0.0786, 0.2174,
+])
 export const NATION_BUCKETS: [number, number][] = [
-	[50, 100],
+	[50, 250],
 	[25, 49],
 	[10, 24],
 	[5, 9],
@@ -38,6 +42,7 @@ export function computeNations(params: {
 	}
 	if (activeCount === 0) return emptyPartition(provinceCount)
 
+	const noise = new SimplexNoise(params.seed ^ 0xdeadbeef)
 	const plan = buildNationPlan(activeCount)
 	const assignment = new Int32Array(provinceCount).fill(-1)
 	const blocked = new Uint8Array(provinceCount)
@@ -95,6 +100,7 @@ export function computeNations(params: {
 				provinces.seeds,
 				provinces.adjOffset,
 				provinces.adjList,
+				noise,
 			)
 			if (claim < 0) break
 			claimProvinceDynamic(
@@ -323,7 +329,7 @@ function integerMass(total: number, weights: number[]): number[] {
 	return base
 }
 
-function buildNationPlan(total: number): {
+export function buildNationPlan(total: number): {
 	targetProvinceMass: number[]
 	targetNationCount: number[]
 	targets: number[]
@@ -412,6 +418,12 @@ function spreadBucketSizes(
 	return sizes
 }
 
+// Noise frequency on the unit sphere: ~4 rad⁻¹ gives features ~45° wide,
+// broad enough to produce coherent irregular lobes rather than pixel noise.
+const NOISE_FREQ = 4.0
+// Fraction of the distance score that noise can shift up or down.
+const NOISE_STRENGTH = 0.4
+
 function bestClaim(
 	nation: number,
 	seedProvince: number,
@@ -423,6 +435,7 @@ function bestClaim(
 	provinceSeeds: Int32Array,
 	adjOffset: Int32Array,
 	adjList: Int32Array,
+	noise: SimplexNoise,
 ): number {
 	let best = -1
 	let bestScore = -Infinity
@@ -446,8 +459,15 @@ function bestClaim(
 			provinceSeeds,
 			r_xyz,
 		)
+		const s = provinceSeeds[candidate]
+		const nx = r_xyz[3 * s] * NOISE_FREQ
+		const ny = r_xyz[3 * s + 1] * NOISE_FREQ
+		const nz = r_xyz[3 * s + 2] * NOISE_FREQ
+		const noiseVal = noise.noise3D(nx, ny, nz)
 		const score =
-			(1 / (d + 0.1)) * coastalScore[candidate] +
+			(1 / (d + 0.1)) *
+				coastalScore[candidate] *
+				(1 + NOISE_STRENGTH * noiseVal) +
 			sharedBorder * 0.05 +
 			seedPenalty
 		if (score > bestScore) {

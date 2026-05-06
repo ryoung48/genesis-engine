@@ -2045,4 +2045,118 @@ describe("computeRegionColors", () => {
 			expect(Array.from(rgb!).every(Number.isFinite)).toBe(true)
 		}
 	})
+
+	it("colors provinces by diplomacy relation to the selected nation", () => {
+		// 3 regions: land province 0 (nation 0, the selected nation), land province 1 (nation 1), ocean
+		const world = {
+			...buildWorld({}),
+			mesh: { numRegions: 3 } as unknown as SerializedOrogenWorld["mesh"],
+			elevation_km: new Float32Array([1, 0.5, -1]),
+			provinces: {
+				regionProvince: new Int32Array([0, 1, -1]),
+				seeds: new Int32Array([0, 1]),
+				count: 2,
+				desolate: new Uint8Array([0, 0]),
+				landmassId: new Int32Array([0, 0]),
+				adjOffset: new Int32Array([0, 0, 0, 0]),
+				adjList: new Int32Array(0),
+				size: new Int32Array([1, 1]),
+				colors: new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+			},
+			nations: {
+				assignment: new Int32Array([0, 1]),
+				seeds: new Int32Array([0, 1]),
+				count: 2,
+				adjOffset: new Int32Array([0, 0, 0]),
+				adjList: new Int32Array(0),
+				size: new Int32Array([1, 1]),
+				colors: new Float32Array([0.7, 0.5, 0.3, 0.2, 0.8, 0.4]),
+				parent: new Int32Array([-1, -1]),
+				depth: new Int32Array([0, 0]),
+				childOffset: new Int32Array([0, 0, 0]),
+				childList: new Int32Array(0),
+				sovereign: new Int32Array([0, 1]),
+				gravity: new Float32Array([1, 1]),
+			},
+		} as unknown as SerializedOrogenWorld
+
+		const ALLY_REL = 5
+		const rgb = computeRegionColors(
+			world,
+			"nations",
+			"diplomacy",
+			"density",
+			0,
+			0,
+			0,
+			0,
+			undefined,
+			undefined,
+			undefined,
+			0,
+			(_, b) => (b === 1 ? ALLY_REL : 7),
+		)
+
+		expect(rgb).not.toBeNull()
+		// region 0 belongs to selected nation 0: uses white
+		expectRegionColor(rgb!, 0, darkenPoliticalAtElevation([1, 1, 1], 1))
+		// region 2 is ocean: uses OCEAN_LIGHT_BLUE
+		expectRegionColor(rgb!, 2, OCEAN_LIGHT_BLUE)
+	})
+
+	it("renders diplomacy mode as all neutral when no nation is selected", () => {
+		const world = buildWorld({
+			elevation_km: new Float32Array([0, -1]),
+			provinces: {
+				regionProvince: new Int32Array([0, -1]),
+				seeds: new Int32Array([0]),
+				count: 1,
+				desolate: new Uint8Array([0]),
+				landmassId: new Int32Array([0]),
+				adjOffset: new Int32Array([0, 0, 0]),
+				adjList: new Int32Array(0),
+				size: new Int32Array([1]),
+				colors: new Float32Array([0.1, 0.2, 0.3]),
+			},
+			nations: {
+				assignment: new Int32Array([0]),
+				seeds: new Int32Array([0]),
+				count: 1,
+				adjOffset: new Int32Array([0, 0]),
+				adjList: new Int32Array(0),
+				size: new Int32Array([1]),
+				colors: new Float32Array([0.7, 0.5, 0.3]),
+				parent: new Int32Array([-1]),
+				depth: new Int32Array([0]),
+				childOffset: new Int32Array([0, 0]),
+				childList: new Int32Array(0),
+				sovereign: new Int32Array([0]),
+				gravity: new Float32Array([1]),
+			},
+		})
+
+		const rgb = computeRegionColors(
+			world,
+			"nations",
+			"diplomacy",
+			"density",
+			0,
+			0,
+			0,
+			0,
+			undefined,
+			undefined,
+			undefined,
+			null,
+			null,
+		)
+
+		expect(rgb).not.toBeNull()
+		// no selection -> neutral gray [0.788, 0.788, 0.788] at flat elevation (no darkening)
+		expectRegionColor(
+			rgb!,
+			0,
+			darkenPoliticalAtElevation([0.788, 0.788, 0.788], 0),
+		)
+	})
 })
