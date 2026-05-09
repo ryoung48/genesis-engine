@@ -23,11 +23,13 @@ import {
 } from "./mesh-builders"
 import {
 	buildGlobeGrid,
+	buildGlobeHierarchyOverlay,
 	buildGlobeRivers,
 	buildGlobeThermalEquator,
 	buildHoveredNationBorderGlobe,
 	buildHoveredNationBorderMap,
 	buildMapGrid,
+	buildMapHierarchyOverlay,
 	buildMapRivers,
 	buildMapThermalEquator,
 	collectNationBorderGlobePositions,
@@ -252,6 +254,10 @@ export function createOrogenScene(
 	let mapMeasureLine: THREE.Line | null = null
 	let globeMeasureDots: THREE.Group | null = null
 	let mapMeasureDots: THREE.Group | null = null
+	let globeHierarchyOverlay: THREE.Group | null = null
+	let mapHierarchyOverlay: THREE.Group | null = null
+	let hierarchyOverlayNationId = -1
+	let hierarchyOverlayWorld: SerializedOrogenWorld | null = null
 
 	function updateMapCameraFrustum() {
 		const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight)
@@ -270,6 +276,29 @@ export function createOrogenScene(
 		mapCamera.top = halfH
 		mapCamera.bottom = -halfH
 		mapCamera.updateProjectionMatrix()
+	}
+
+	function rebuildHierarchyOverlay() {
+		disposeGroup(scene, globeHierarchyOverlay)
+		disposeGroup(scene, mapHierarchyOverlay)
+		globeHierarchyOverlay = null
+		mapHierarchyOverlay = null
+		if (!hierarchyOverlayWorld || hierarchyOverlayNationId < 0) return
+		globeHierarchyOverlay = buildGlobeHierarchyOverlay(
+			hierarchyOverlayWorld,
+			hierarchyOverlayNationId,
+			currentViewMode,
+		)
+		mapHierarchyOverlay = buildMapHierarchyOverlay(
+			hierarchyOverlayWorld,
+			hierarchyOverlayNationId,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			currentViewMode,
+		)
+		if (globeHierarchyOverlay) scene.add(globeHierarchyOverlay)
+		if (mapHierarchyOverlay) scene.add(mapHierarchyOverlay)
+		updateOverlayVisibility()
 	}
 
 	function rebuildHoveredNationBorder() {
@@ -410,6 +439,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, pulseMap)
 		disposeGroup(scene, globeRivers)
 		disposeGroup(scene, mapRivers)
+		disposeGroup(scene, globeHierarchyOverlay)
+		disposeGroup(scene, mapHierarchyOverlay)
 		terrainWireframe = null
 		mapWireframe = null
 		globeGrid = null
@@ -424,6 +455,8 @@ export function createOrogenScene(
 		globeRivers = null
 		mapRivers = null
 		riverMaterials = []
+		globeHierarchyOverlay = null
+		mapHierarchyOverlay = null
 
 		if (wireframeVisible && currentWorld) {
 			terrainWireframe = buildTerrainWireframe(
@@ -488,6 +521,7 @@ export function createOrogenScene(
 		}
 		rebuildHoveredNationBorder()
 		rebuildSelectedProvinceBorder()
+		rebuildHierarchyOverlay()
 		updateOverlayVisibility()
 	}
 
@@ -544,6 +578,12 @@ export function createOrogenScene(
 		if (mapMeasureDots) {
 			mapMeasureDots.visible = currentViewMode === "map"
 			if (mapMesh) mapMeasureDots.position.copy(mapMesh.position)
+		}
+		if (globeHierarchyOverlay)
+			globeHierarchyOverlay.visible = currentViewMode === "globe"
+		if (mapHierarchyOverlay) {
+			mapHierarchyOverlay.visible = currentViewMode === "map"
+			if (mapMesh) mapHierarchyOverlay.position.copy(mapMesh.position)
 		}
 	}
 
@@ -1106,6 +1146,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, pulseMap)
 		disposeGroup(scene, globeRivers)
 		disposeGroup(scene, mapRivers)
+		disposeGroup(scene, globeHierarchyOverlay)
+		disposeGroup(scene, mapHierarchyOverlay)
 		waterGeo.dispose()
 		waterMat.dispose()
 		atmosGeo.dispose()
@@ -1361,6 +1403,15 @@ export function createOrogenScene(
 		}
 	}
 
+	function setHierarchyOverlay(
+		world: SerializedOrogenWorld | null,
+		selectedNationId: number,
+	) {
+		hierarchyOverlayWorld = world
+		hierarchyOverlayNationId = selectedNationId
+		rebuildHierarchyOverlay()
+	}
+
 	return {
 		dispose,
 		resize,
@@ -1385,6 +1436,7 @@ export function createOrogenScene(
 		setThermalEquator,
 		setRivers,
 		setRiversVisible,
+		setHierarchyOverlay,
 		setSunPosition,
 		setAtmospherePressure,
 		setFullAmbient,

@@ -8,6 +8,62 @@ import type { OrogenViewMode, RiverData } from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 
+// Per-depth colors: depth 0 = gold, 1 = orange, 2 = teal, 3 = blue, 4+ = purple
+const HIERARCHY_DEPTH_COLORS: ReadonlyArray<[number, number, number]> = [
+	[1.0, 0.85, 0.2],
+	[0.93, 0.52, 0.14],
+	[0.2, 0.78, 0.55],
+	[0.25, 0.55, 0.9],
+	[0.68, 0.32, 0.88],
+]
+
+interface HierarchyNode {
+	provinceId: number
+	seedRegion: number
+	depth: number
+	parentProvinceId: number
+	xyz: [number, number, number]
+}
+
+export function collectHierarchyNodes(
+	world: SerializedOrogenWorld,
+	selectedNationId: number,
+): HierarchyNode[] | null {
+	if (!world.nations || !world.provinces) return null
+	const { assignment, depth, parent } = world.nations
+	const { seeds } = world.provinces
+	const { r_xyz } = world.mesh
+	const provinceCount = assignment.length
+	const nodes: HierarchyNode[] = []
+
+	for (let p = 0; p < provinceCount; p++) {
+		if (assignment[p] !== selectedNationId) continue
+		const seedRegion = seeds[p]
+		const len = Math.sqrt(
+			r_xyz[3 * seedRegion] ** 2 +
+				r_xyz[3 * seedRegion + 1] ** 2 +
+				r_xyz[3 * seedRegion + 2] ** 2,
+		)
+		const scale = len > 0 ? 1 / len : 1
+		nodes.push({
+			provinceId: p,
+			seedRegion,
+			depth: depth[p],
+			parentProvinceId: parent[p],
+			xyz: [
+				r_xyz[3 * seedRegion] * scale,
+				r_xyz[3 * seedRegion + 1] * scale,
+				r_xyz[3 * seedRegion + 2] * scale,
+			],
+		})
+	}
+	return nodes
+}
+
+function depthColor(d: number): [number, number, number] {
+	return HIERARCHY_DEPTH_COLORS[Math.min(d, HIERARCHY_DEPTH_COLORS.length - 1)]
+}
+
 interface NationBoundarySide {
 	r0: number
 	r1: number
@@ -578,5 +634,210 @@ export function buildMapRivers(
 		},
 	)
 	group.visible = riversVisible && viewMode === "map"
+	return group
+}
+
+export function buildGlobeHierarchyOverlay(
+	world: SerializedOrogenWorld,
+	selectedNationId: number,
+	viewMode: OrogenViewMode,
+): THREE.Group | null {
+	const nodes = collectHierarchyNodes(world, selectedNationId)
+	if (!nodes || nodes.length === 0) return null
+
+	const provinceIndex = new Map<number, HierarchyNode>()
+	for (const node of nodes) provinceIndex.set(node.provinceId, node)
+
+	const radius = 1.015
+	const dotPositions: number[] = []
+	const dotColors: number[] = []
+	const capitalPositions: number[] = []
+	const capitalColors: number[] = []
+	const linePositions: number[] = []
+	const lineColors: number[] = []
+
+	for (const node of nodes) {
+		const [r, g, b] = depthColor(node.depth)
+		const x = node.xyz[0] * radius
+		const y = node.xyz[1] * radius
+		const z = node.xyz[2] * radius
+
+		if (node.depth === 0) {
+			capitalPositions.push(x, y, z)
+			capitalColors.push(r, g, b)
+		} else {
+			dotPositions.push(x, y, z)
+			dotColors.push(r, g, b)
+		}
+
+		if (node.parentProvinceId >= 0) {
+			const parentNode = provinceIndex.get(node.parentProvinceId)
+			if (parentNode) {
+				linePositions.push(x, y, z)
+				lineColors.push(r, g, b)
+				linePositions.push(
+					parentNode.xyz[0] * radius,
+					parentNode.xyz[1] * radius,
+					parentNode.xyz[2] * radius,
+				)
+				const [pr, pg, pb] = depthColor(parentNode.depth)
+				lineColors.push(pr, pg, pb)
+			}
+		}
+	}
+
+	const group = new THREE.Group()
+
+	if (dotPositions.length > 0) {
+		const geo = new THREE.BufferGeometry()
+		geo.setAttribute(
+			"position",
+			new THREE.Float32BufferAttribute(new Float32Array(dotPositions), 3),
+		)
+		geo.setAttribute(
+			"color",
+			new THREE.Float32BufferAttribute(new Float32Array(dotColors), 3),
+		)
+		const mat = new THREE.PointsMaterial({
+			size: 0.018,
+			sizeAttenuation: true,
+			vertexColors: true,
+			depthWrite: false,
+			transparent: true,
+			opacity: 0.95,
+		})
+		group.add(new THREE.Points(geo, mat))
+	}
+
+	if (capitalPositions.length > 0) {
+		const geo = new THREE.BufferGeometry()
+		geo.setAttribute(
+			"position",
+			new THREE.Float32BufferAttribute(new Float32Array(capitalPositions), 3),
+		)
+		geo.setAttribute(
+			"color",
+			new THREE.Float32BufferAttribute(new Float32Array(capitalColors), 3),
+		)
+		const mat = new THREE.PointsMaterial({
+			size: 0.025,
+			sizeAttenuation: true,
+			vertexColors: true,
+			depthWrite: false,
+			transparent: true,
+			opacity: 0.95,
+		})
+		group.add(new THREE.Points(geo, mat))
+	}
+
+	if (linePositions.length > 0) {
+		const geo = new THREE.BufferGeometry()
+		geo.setAttribute(
+			"position",
+			new THREE.Float32BufferAttribute(new Float32Array(linePositions), 3),
+		)
+		geo.setAttribute(
+			"color",
+			new THREE.Float32BufferAttribute(new Float32Array(lineColors), 3),
+		)
+		const mat = new THREE.LineBasicMaterial({
+			vertexColors: true,
+			transparent: true,
+			opacity: 0.55,
+			depthWrite: false,
+		})
+		group.add(new THREE.LineSegments(geo, mat))
+	}
+
+	group.visible = viewMode === "globe"
+	return group
+}
+
+export function buildMapHierarchyOverlay(
+	world: SerializedOrogenWorld,
+	selectedNationId: number,
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	viewMode: OrogenViewMode,
+): THREE.Group | null {
+	const nodes = collectHierarchyNodes(world, selectedNationId)
+	if (!nodes || nodes.length === 0) return null
+
+	const provinceIndex = new Map<number, HierarchyNode>()
+	for (const node of nodes) provinceIndex.set(node.provinceId, node)
+
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
+	const z = 0.005
+	const linePositions: number[] = []
+	const lineColors: number[] = []
+
+	const group = new THREE.Group()
+
+	for (const node of nodes) {
+		const [r, g, b] = depthColor(node.depth)
+		const projected = projection.projectCartesian(
+			node.xyz[0],
+			node.xyz[1],
+			node.xyz[2],
+		)
+		const pos = projection.projectRadians(projected.lon, projected.lat, z)
+		const radius = node.depth === 0 ? 0.009 : 0.006
+		const circleGeo = new THREE.CircleGeometry(radius, 12)
+		const circleMat = new THREE.MeshBasicMaterial({
+			color: new THREE.Color(r, g, b),
+			depthWrite: false,
+		})
+		const circle = new THREE.Mesh(circleGeo, circleMat)
+		circle.position.set(pos[0], pos[1], pos[2])
+		group.add(circle)
+
+		if (node.parentProvinceId >= 0) {
+			const parentNode = provinceIndex.get(node.parentProvinceId)
+			if (parentNode) {
+				const parentProjected = projection.projectCartesian(
+					parentNode.xyz[0],
+					parentNode.xyz[1],
+					parentNode.xyz[2],
+				)
+				const lonDiff = Math.abs(parentProjected.lon - projected.lon)
+				appendProjectedSegment(
+					linePositions,
+					projection,
+					{ lon: projected.lon, lat: projected.lat },
+					{ lon: parentProjected.lon, lat: parentProjected.lat },
+					z,
+				)
+				const [pr, pg, pb] = depthColor(parentNode.depth)
+				lineColors.push(r, g, b, pr, pg, pb)
+				if (lonDiff > Math.PI) {
+					lineColors.push(r, g, b, pr, pg, pb)
+				}
+			}
+		}
+	}
+
+	if (linePositions.length > 0) {
+		const geo = new THREE.BufferGeometry()
+		geo.setAttribute(
+			"position",
+			new THREE.Float32BufferAttribute(new Float32Array(linePositions), 3),
+		)
+		geo.setAttribute(
+			"color",
+			new THREE.Float32BufferAttribute(new Float32Array(lineColors), 3),
+		)
+		const mat = new THREE.LineBasicMaterial({
+			vertexColors: true,
+			transparent: true,
+			opacity: 0.55,
+			depthWrite: false,
+		})
+		group.add(new THREE.LineSegments(geo, mat))
+	}
+
+	group.visible = viewMode === "map"
 	return group
 }

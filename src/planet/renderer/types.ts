@@ -44,6 +44,10 @@ export interface OrogenScene {
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: RiverData | null): void
 	setRiversVisible(visible: boolean): void
+	setHierarchyOverlay(
+		world: SerializedOrogenWorld | null,
+		selectedNationId: number,
+	): void
 	setSunPosition(
 		month: number,
 		obliquityDeg: number,
