@@ -175,6 +175,10 @@ export function computeProvinces(
 		}
 	}
 
+	// Snapshot land-only adjacency for landmass connected-component analysis
+	// (must be captured before sea-crossing edges are added below).
+	const landOnlyNeighbors: Set<number>[] = provNeighbors.map((s) => new Set(s))
+
 	// 5b. Sea-crossing adjacency: competitive BFS from coastal cells into ocean.
 	// When two province frontiers meet in the ocean, link them.
 	{
@@ -263,12 +267,7 @@ export function computeProvinces(
 		while (head < tail) {
 			const p = queue[head++]
 			area += size[p]
-			for (
-				let i = provAdjOffset[p], iEnd = provAdjOffset[p + 1];
-				i < iEnd;
-				i++
-			) {
-				const nb = provAdjList[i]
+			for (const nb of landOnlyNeighbors[p]) {
 				if (desolate[nb] || componentId[nb] >= 0) continue
 				componentId[nb] = componentCount
 				queue[tail++] = nb
@@ -278,18 +277,10 @@ export function computeProvinces(
 		componentCount++
 	}
 
-	let totalLandArea = 0
-	for (let p = 0; p < provinceCount; p++) totalLandArea += size[p]
-	const isolatedThreshold = totalLandArea * 0.01
-
 	for (let p = 0; p < provinceCount; p++) {
 		if (desolate[p]) continue
 		const component = componentId[p]
-		if (component >= 0 && componentArea[component] < isolatedThreshold) {
-			desolate[p] = 1
-			continue
-		}
-		landmassId[p] = component
+		if (component >= 0) landmassId[p] = component
 	}
 
 	const colors = generateProvinceColors(provinceCount, rng)

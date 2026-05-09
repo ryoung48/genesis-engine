@@ -3,7 +3,9 @@
  * Port of src/model/history/events/diplomacy.ts
  */
 
+import type { WeightedValue } from "../../shared/rng"
 import { EVT } from "../event-heap"
+import { PROV } from "../fields"
 import type { HistoryRng } from "../history-rng"
 import {
 	deltaYear,
@@ -12,7 +14,6 @@ import {
 	getRulerRelation,
 	type HistoryState,
 	isSovereign,
-	provinceDistanceSq,
 	REL,
 	type Relation,
 	setRelation,
@@ -29,6 +30,14 @@ const LADDER_STATES = [
 	REL.FRIENDLY,
 	REL.ALLY,
 ] as const
+
+const INITIAL_RELATION_POOL: ReadonlyArray<WeightedValue<Relation>> = [
+	{ v: REL.RIVAL, w: 8 },
+	{ v: REL.SUSPICIOUS, w: 20 },
+	{ v: REL.NEUTRAL, w: 42 },
+	{ v: REL.FRIENDLY, w: 22 },
+	{ v: REL.ALLY, w: 8 },
+]
 
 // Transition matrix: [from][to] probabilities
 const TRANSITION_MATRIX: Record<Relation, number[] | undefined> = {
@@ -138,7 +147,7 @@ function processPersonalUnionDiplomacy(
 	syncVassalRelations(state, junior, senior)
 
 	const threat = warThreat(state, senior, junior)
-	if (threat <= 0.4) return
+	if (threat <= 0.6) return
 
 	// Break union
 	setRelation(state, junior, senior, REL.SUSPICIOUS)
@@ -184,37 +193,16 @@ function classifyInitialNeighborRelation(
 	state: HistoryState,
 	a: number,
 	b: number,
+	rng: HistoryRng,
 ): Relation {
-	const threat = warThreat(state, a, b)
-	const aWealth = wealthOptimal(state, a)
-	const bWealth = wealthOptimal(state, b)
-	const wealthRatio =
-		Math.min(aWealth, bWealth) / Math.max(1, Math.max(aWealth, bWealth))
-	const distanceSq = provinceDistanceSq(state, a, b)
-	const sameCulture = state.culture[a] === state.culture[b]
-	const bothWaterAccess =
-		state.waterAccess[a] === 1 && state.waterAccess[b] === 1
-
-	if (wealthRatio >= 0.78 && threat >= 0.68) return REL.RIVAL
-	if (
-		threat >= 0.54 ||
-		(!sameCulture && distanceSq <= 0.45 && wealthRatio >= 0.65)
-	) {
-		return REL.SUSPICIOUS
+	let relation = rng.weightedChoice(INITIAL_RELATION_POOL) ?? REL.NEUTRAL
+	if (relation === REL.RIVAL && !canBeRivals(state, a, b)) {
+		relation = REL.SUSPICIOUS
 	}
-	if (sameCulture && wealthRatio >= 0.8 && threat <= 0.3 && distanceSq <= 2) {
-		return REL.ALLY
-	}
-	if (
-		threat <= 0.42 &&
-		(sameCulture || bothWaterAccess || distanceSq <= 1.1 || wealthRatio <= 0.55)
-	) {
-		return REL.FRIENDLY
-	}
-	return REL.NEUTRAL
+	return relation
 }
 
-function seedNeighborRelations(state: HistoryState): void {
+function seedNeighborRelations(state: HistoryState, rng: HistoryRng): void {
 	for (let nation = 0; nation < state.P; nation++) {
 		if (state.desolate[nation] || !isSovereign(state, nation)) continue
 		for (const neighbor of getNationNeighbors(state, nation)) {
@@ -225,7 +213,12 @@ function seedNeighborRelations(state: HistoryState): void {
 			) {
 				continue
 			}
-			const relation = classifyInitialNeighborRelation(state, nation, neighbor)
+			const relation = classifyInitialNeighborRelation(
+				state,
+				nation,
+				neighbor,
+				rng,
+			)
 			if (relation !== REL.NEUTRAL) {
 				setRelation(state, nation, neighbor, relation)
 			}
@@ -233,9 +226,91 @@ function seedNeighborRelations(state: HistoryState): void {
 	}
 }
 
+const VASSAL_SEED_CHANCE = 0.4
+const VASSAL_SEED_RATIO = 0.3
+
+function seedInitialVassals(state: HistoryState, rng: HistoryRng): void {
+	for (let nation = 0; nation < state.P; nation++) {
+		if (state.desolate[nation] || !isSovereign(state, nation)) continue
+		if (getRulerRelation(state, nation)) continue
+		for (const neighbor of getNationNeighbors(state, nation)) {
+			if (state.desolate[neighbor] || !isSovereign(state, neighbor)) continue
+			const aW = wealthOptimal(state, nation)
+			const bW = wealthOptimal(state, neighbor)
+			const ratio = aW / Math.max(1, bW)
+			if (ratio >= VASSAL_SEED_RATIO) continue
+			if (rng.random() >= VASSAL_SEED_CHANCE) continue
+			setRelation(state, nation, neighbor, REL.VASSAL)
+			break
+		}
+	}
+}
+
+const SHARED_DYNASTY_SEED_CHANCE = 0.25
+const PERSONAL_UNION_SEED_CHANCE = SHARED_DYNASTY_SEED_CHANCE / 5
+
+function seedSharedDynasties(state: HistoryState, rng: HistoryRng): void {
+	for (let nation = 0; nation < state.P; nation++) {
+		if (state.desolate[nation] || !isSovereign(state, nation)) continue
+		for (const nb of getNationNeighbors(state, nation)) {
+			if (nb <= nation) continue
+			const rel = getRelation(state, nation, nb)
+			if (rel !== REL.FRIENDLY && rel !== REL.ALLY) continue
+			if (rng.random() >= SHARED_DYNASTY_SEED_CHANCE) continue
+
+			const [senior, junior] =
+				wealthOptimal(state, nation) >= wealthOptimal(state, nb)
+					? [nation, nb]
+					: [nb, nation]
+			const seniorDynasty = PROV.leader.dynasty.get(state, senior)
+			if (seniorDynasty === PROV.leader.dynasty.get(state, junior)) continue
+
+			PROV.leader.dynasty.set(state, junior, state.time, seniorDynasty)
+			state.events.push({
+				tag: "dynasty spread",
+				time: state.time,
+				data: { nation: junior, source: senior, dynasty: seniorDynasty },
+			})
+		}
+	}
+}
+
+function seedInitialPersonalUnions(state: HistoryState, rng: HistoryRng): void {
+	for (let nation = 0; nation < state.P; nation++) {
+		if (state.desolate[nation] || !isSovereign(state, nation)) continue
+		if (getRulerRelation(state, nation)) continue
+		for (const nb of getNationNeighbors(state, nation)) {
+			if (nb <= nation) continue
+			if (getRulerRelation(state, nb)) continue
+			const rel = getRelation(state, nation, nb)
+			if (rel !== REL.FRIENDLY && rel !== REL.ALLY) continue
+			if (
+				PROV.leader.dynasty.get(state, nation) !==
+				PROV.leader.dynasty.get(state, nb)
+			)
+				continue
+			if (rng.random() >= PERSONAL_UNION_SEED_CHANCE) continue
+
+			const [senior, junior] =
+				wealthOptimal(state, nation) >= wealthOptimal(state, nb)
+					? [nation, nb]
+					: [nb, nation]
+			setRelation(state, junior, senior, REL.PU_JUNIOR)
+			state.events.push({
+				tag: "personal union formed",
+				time: state.time,
+				data: { junior, senior },
+			})
+		}
+	}
+}
+
 export function initDiplomacy(state: HistoryState, rng: HistoryRng): void {
 	seedSubjectRelations(state)
-	seedNeighborRelations(state)
+	seedNeighborRelations(state, rng)
+	seedInitialVassals(state, rng)
+	seedSharedDynasties(state, rng)
+	seedInitialPersonalUnions(state, rng)
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		nextEvent(state, p, rng, rng.uniform(0, 8))
@@ -291,12 +366,12 @@ export function runDiplomacy(
 		if (rel === REL.WAR) continue
 
 		if (rel === REL.VASSAL) {
-			processVassalDiplomacy(state, nation, nb, rng)
+			processVassalDiplomacy(state, nb, nation, rng)
 			continue
 		}
 
 		if (rel === REL.PU_JUNIOR) {
-			processPersonalUnionDiplomacy(state, nation, nb, rng)
+			processPersonalUnionDiplomacy(state, nb, nation, rng)
 			continue
 		}
 

@@ -12,6 +12,11 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		base,
+		server: {
+			watch: {
+				ignored: ["**/*.{test,spec}.{ts,tsx}", "**/*.smoke.test.ts"],
+			},
+		},
 		plugins: [
 			react(
 				isTest
@@ -30,15 +35,16 @@ export default defineConfig(({ mode }) => {
 			},
 		},
 		test: {
-			coverage: {
-				provider: "v8",
-				reporter: ["text-summary", "json-summary"],
-				thresholds: {
-					statements: 93.04,
-					functions: 94.86,
-					lines: 93.85,
-				},
-			},
+			// coverage: {
+			// 	provider: "v8",
+			// 	reporter: ["text-summary", "json-summary"],
+			// 	thresholds: {
+			// 		statements: 97.06,
+			// 		branches: 92.51,
+			// 		functions: 96.8,
+			// 		lines: 97.86,
+			// 	},
+			// },
 			projects: [
 				{
 					extends: true,

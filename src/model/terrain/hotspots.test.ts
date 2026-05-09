@@ -277,6 +277,23 @@ describe("applyHotspots", () => {
 		expect(featuresB.featureMask).toEqual(featuresA.featureMask)
 		expect(featuresB.dominantFeature).toEqual(featuresA.dominantFeature)
 	})
+	it("generates hotspot peaks above sea level from typical ocean depth", () => {
+		const mesh = buildMesh()
+		const elevation = buildElevation(mesh.numRegions, -0.3)
+		applyHotspots(
+			mesh,
+			buildPlate(true),
+			new Int32Array(mesh.numRegions),
+			elevation,
+			new Float32Array(mesh.numRegions).fill(1),
+			buildTerrainFeatures(mesh.numRegions),
+			7,
+			1,
+		)
+
+		const hasAboveWater = Array.from(elevation).some((e) => e > 0)
+		expect(hasAboveWater).toBe(true)
+	})
 })
 
 describe("applyStaticHotspots", () => {

@@ -114,13 +114,9 @@ export function runWar(
 				startWar(state, nation, closest.n, rng)
 			}
 		}
-	} else if (parent >= 0) {
-		// Subject province — consider rebellion
-		if (
-			sovereignNation >= 0 &&
-			sovereignNation !== nation &&
-			provinceWars(state, sovereignNation).length === 0
-		) {
+	} else if (parent === sovereignNation) {
+		// Direct subject of the sovereign — consider rebellion
+		if (provinceWars(state, sovereignNation).length === 0) {
 			const threat = warThreat(state, sovereignNation, nation, nation)
 			if (threat > 0.4 && rng.random() < threat) {
 				state.events.push({

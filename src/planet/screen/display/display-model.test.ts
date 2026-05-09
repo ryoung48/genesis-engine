@@ -5,6 +5,7 @@ import {
 	buildDisplayNationModel,
 	buildDisplayWorld,
 	buildHistoryChildrenIndex,
+	buildNationAdjacency,
 	buildSovereignRulerFields,
 } from "./display-model"
 
@@ -324,6 +325,47 @@ describe("display-model", () => {
 
 		expect(result?.nations?.assignment).toEqual(new Int32Array([0, 0, -1, 3]))
 		expect(colors).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0.2, 0.4, 0.6])
+	})
+
+	it("builds nation adjacency from province assignments", () => {
+		const provinceAssignment = new Int32Array([0, 0, 1])
+		const world = {
+			provinces: {
+				count: 3,
+				adjOffset: new Int32Array([0, 1, 3, 4]),
+				adjList: new Int32Array([1, 0, 2, 1]),
+			},
+		} as unknown as SerializedOrogenWorld
+
+		const { adjOffset, adjList } = buildNationAdjacency(
+			provinceAssignment,
+			world,
+		)
+
+		expect(adjOffset[1] - adjOffset[0]).toBe(1)
+		expect(adjList[adjOffset[0]]).toBe(1)
+		expect(adjOffset[2] - adjOffset[1]).toBe(1)
+		expect(adjList[adjOffset[1]]).toBe(0)
+	})
+
+	it("skips unassigned provinces when building nation adjacency", () => {
+		const provinceAssignment = new Int32Array([0, -1, 1])
+		const world = {
+			provinces: {
+				count: 3,
+				adjOffset: new Int32Array([0, 1, 3, 4]),
+				adjList: new Int32Array([1, 0, 2, 1]),
+			},
+		} as unknown as SerializedOrogenWorld
+
+		const { adjOffset, adjList } = buildNationAdjacency(
+			provinceAssignment,
+			world,
+		)
+
+		expect(adjOffset[1] - adjOffset[0]).toBe(0)
+		expect(adjOffset[2] - adjOffset[1]).toBe(0)
+		expect(adjList.length).toBe(0)
 	})
 
 	it("counts display nations without fabricating colors for incomplete triples", () => {

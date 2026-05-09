@@ -75,7 +75,12 @@ function claim(state: HistoryState, p: number, rng: HistoryRng): void {
 		// Look only at neighboring sovereign nations filtered by diplomatic relation
 		const candidates = getNationNeighbors(state, p).filter((n) => {
 			const rel = getRelation(state, p, n)
-			return rel === REL.FRIENDLY || rel === REL.ALLY || rel === REL.OVERLORD
+			return (
+				rel === REL.FRIENDLY ||
+				rel === REL.ALLY ||
+				rel === REL.OVERLORD ||
+				rel === REL.NEUTRAL
+			)
 		})
 
 		if (candidates.length === 0) {

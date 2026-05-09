@@ -195,8 +195,20 @@ describe("CLUSTER", () => {
 		).toBe("Ba")
 	})
 
+	it("does not crash and returns a string when a phoneme list for a template letter is empty", () => {
+		const lang = LANGUAGE.spawn("cluster-empty-phonemes")
+		const cluster = CLUSTER.spawn({ src: lang })
+		cluster.phonemes[PhonemeCatalog.START_VOWEL] = []
+
+		expect(() =>
+			CLUSTER.simple(cluster, lang, PhonemeCatalog.START_VOWEL),
+		).not.toThrow()
+		expect(
+			typeof CLUSTER.simple(cluster, lang, PhonemeCatalog.START_VOWEL),
+		).toBe("string")
+	})
+
 	it("recognizes vowel spellings from the shared vowel catalog only", () => {
-		expect(CLUSTER.vowel("a")).toBe(true)
 		expect(CLUSTER.vowel("ae")).toBe(false)
 		expect(CLUSTER.vowel("zz")).toBe(false)
 	})

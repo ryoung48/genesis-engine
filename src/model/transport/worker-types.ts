@@ -148,6 +148,8 @@ export interface SerializedOrogenWorld {
 		population: Float32Array
 		habitabilityScore: number
 		totalPopulation: number
+		migrationWave?: Float32Array
+		cradleProvinces?: Int32Array
 	}
 	monthlyTEQ?: Float32Array[]
 }

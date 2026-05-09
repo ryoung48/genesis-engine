@@ -45,7 +45,7 @@ import {
 } from "../climate/rain"
 import { assignClimateZones, assignVegetation } from "../climate/vegetation"
 import type { ProvincePopulation } from "../society/population"
-import { computePopulation } from "../society/population"
+import { computeMigration, computePopulation } from "../society/population"
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
 import type { OrogenLandmarks } from "../terrain/landmarks"
@@ -387,6 +387,19 @@ export function runPostElevationPipeline(
 		N,
 	)
 	record("Post: population", t0)
+
+	// ── Migration diffusion ─────────────────────────────────────────────
+	t0 = performance.now()
+	const migration = computeMigration(
+		provinces,
+		population.habitability,
+		mesh,
+		params.planetRadiusKm,
+		N,
+	)
+	population.migrationWave = migration.migrationWave
+	population.cradleProvinces = migration.cradleProvinces
+	record("Post: migration", t0)
 
 	return {
 		climate,

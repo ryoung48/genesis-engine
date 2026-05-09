@@ -219,7 +219,7 @@ export function blendElevation(
 	const noise = new SimplexNoise(seed)
 	const foldNoise = new SimplexNoise(seed + 557)
 	const riftNoise = new SimplexNoise(seed + 419)
-	const MAX_OCEAN_ARC_ELEV = 0.2
+	const MAX_OCEAN_ARC_ELEV = 0.6
 
 	// Source uses default persistence (2/3) for most fbm calls.
 	// Only detail/fine noise uses explicit 0.5.
@@ -956,10 +956,10 @@ export function blendElevation(
 			const sigma = Math.max(1.5, 1.5 * scaleFactor)
 			const distWeight = Math.exp(-0.5 * ((d - peakDist) / sigma) ** 2)
 			const n = arcNoise.ridgedFbm(x * 4, y * 4, z * 4, 4, 2.0, 0.5, 1.0)
-			const threshold = 0.3
+			const threshold = 0.2
 			if (n > threshold) {
 				const excess = (n - threshold) / (1 - threshold)
-				let uplift = excess * excess * 0.55 * distWeight * (0.5 + arcStress[r])
+				let uplift = excess * excess * 0.8 * distWeight * (0.5 + arcStress[r])
 				if (r_isOcean[r]) {
 					const maxOceanUplift = Math.max(0, -elev[r] + MAX_OCEAN_ARC_ELEV)
 					uplift = Math.min(uplift, maxOceanUplift)

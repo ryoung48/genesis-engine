@@ -166,7 +166,6 @@ interface InfoPanelProps {
 	hoverBiome: string | null
 	hoverProvince: number | null
 	hoverNationId: number | null
-	hoverRegionColor: [number, number, number] | null
 	hoverOccupation: {
 		id: number
 		name: string
@@ -217,7 +216,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverBiome,
 	hoverProvince,
 	hoverNationId,
-	hoverRegionColor,
 	hoverOccupation,
 	hoverOceanDist,
 	hoverDistCoast,
@@ -303,7 +301,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const { provinceColor, provinceNation } = buildProvinceDisplayData({
 		hoverProvince,
 		hoverNationId,
-		hoverRegionColor,
 		world,
 	})
 	const { dynasty: provinceDynasty, ruler: provinceRuler } =
@@ -320,6 +317,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			[
 				"density",
 				"development",
+				"migration",
 				"culture",
 				"heritage",
 				"faith",
@@ -370,7 +368,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				{
 					id: "population",
 					title: "Population",
-					labels: ["Population", "Urban Pop", "Development"],
+					labels: ["Population", "Urban Pop", "Development", "Migration"],
 				},
 				{
 					id: "culture",
@@ -522,6 +520,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								color={provinceNation.color}
 							/>
 						)}
+						{hoverOccupation && (
+							<SwatchRow
+								label="Occupier"
+								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
+								color={hoverOccupation.color}
+							/>
+						)}
 						{provinceDynasty && (
 							<SwatchRow
 								label="Dynasty"
@@ -539,13 +544,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								]
 									.filter(Boolean)
 									.join(" · ")}
-							/>
-						)}
-						{hoverOccupation && (
-							<SwatchRow
-								label="Occupier"
-								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
-								color={hoverOccupation.color}
 							/>
 						)}
 						{hoverNationRelationDistribution.length > 0 && (

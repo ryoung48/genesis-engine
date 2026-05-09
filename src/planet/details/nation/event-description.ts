@@ -462,7 +462,7 @@ export function getDisplayTags(
 			return {
 				primary: "Vassal",
 				secondary:
-					event.data.vassal === viewingNation ? "Ended" : "Lost Subject",
+					event.data.vassal === viewingNation ? "Independence" : "Lost Subject",
 			}
 		case "personal union formed":
 			return {

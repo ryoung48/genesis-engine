@@ -103,7 +103,7 @@ export function applyStaticHotspots(
 		const hz = cosPhiVal
 
 		const isOcean = elevation[findNearestR(mesh, hx, hy, hz)] <= 0
-		const boost = isOcean ? 1.8 : 1.0
+		const boost = isOcean ? 2.4 : 1.0
 
 		let refX = 0
 		const refY = 0
@@ -320,7 +320,7 @@ export function applyHotspots(
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
 	const dominantMagnitude = terrainFeatures?.dominantMagnitude
-	const NUM_HOTSPOTS = 5
+	const NUM_HOTSPOTS = 8
 	const CHAIN_LENGTH = 6
 	const CHAIN_DECAY = 0.65
 	const CHAIN_SPACING = 0.06
@@ -333,7 +333,7 @@ export function applyHotspots(
 	const CONT_HOTSPOT_CALDERA_SIGMA_FRAC = 0.35
 	const CONT_HOTSPOT_CALDERA_DEPTH_FRAC = 0.3
 	const CONT_HOTSPOT_SWELL_MULT = 1.5
-	const DOME_OCEAN_BOOST = 1.8
+	const DOME_OCEAN_BOOST = 2.4
 	const DOME_DRIFT_STRETCH = 1.05
 	const DOME_CALDERA_STRENGTH_MIN = 0.15
 	const DOME_SATELLITE_COUNT = 2

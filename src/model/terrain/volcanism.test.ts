@@ -218,6 +218,39 @@ describe("applyVolcanicArcs", () => {
 		expect(Array.from(elevation)).toEqual(new Array(mesh.numRegions).fill(0))
 		expect(featureCalls).toBe(0)
 	})
+
+	it("elevates arc volcano above sea level from typical ocean depth with full stress", () => {
+		const mesh = buildMesh()
+		const elevation = new Float32Array(mesh.numRegions).fill(-0.3)
+		const boundary = {
+			mountain_r: new Set<number>(),
+			coastline_r: new Set<number>(),
+			ocean_r: new Set<number>(),
+			r_stress: Float32Array.from({ length: mesh.numRegions }, (_, i) =>
+				i === 0 ? 1 : 0,
+			),
+			r_subductFactor: new Float32Array(mesh.numRegions),
+			r_boundaryType: Int8Array.from({ length: mesh.numRegions }, (_, i) =>
+				i === 0 ? 1 : 0,
+			),
+			r_bothOcean: new Uint8Array(mesh.numRegions),
+			r_hasOcean: Uint8Array.from({ length: mesh.numRegions }, (_, i) =>
+				i === 0 ? 1 : 0,
+			),
+		}
+
+		applyVolcanicArcs({
+			mesh,
+			elevation,
+			boundary,
+			maxStress: 1,
+			seed: 7,
+			volcanism: 1,
+			markFeature: () => undefined,
+		})
+
+		expect(elevation[0]).toBeGreaterThan(0)
+	})
 })
 
 describe("applyLargeIgneousProvinces", () => {

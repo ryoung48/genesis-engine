@@ -13,6 +13,7 @@ import {
 	dtrColor,
 	getColor,
 	hotspotColor,
+	migrationColor,
 	moistureDirectionalColor,
 	OCEAN_LIGHT_BLUE,
 	oceanCurrentColor,
@@ -671,6 +672,21 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
+				} else if (
+					populationMode === "migration" &&
+					world.population?.migrationWave
+				) {
+					const t = world.population.migrationWave[p]
+					if (t < 0) {
+						rgb[3 * r] = 0.35
+						rgb[3 * r + 1] = 0.33
+						rgb[3 * r + 2] = 0.32
+					} else {
+						const [cr, cg, cb] = migrationColor(t)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
 				} else {
 					const cultureIdx = world.cultures?.assignment[p] ?? -1
 					const heritageIdx =

@@ -3,8 +3,8 @@ import { SimplexNoise } from "../shared/simplex-noise"
 import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
 
 const VOLC_MIN_SPACING = 0.015
-const VOLC_SIGMA_BASE = 0.003
-const VOLC_HEIGHT_BASE = 0.15
+const VOLC_SIGMA_BASE = 0.005
+const VOLC_HEIGHT_BASE = 0.4
 const VOLC_HEIGHT_VAR_BASE = 0.7
 const VOLC_HEIGHT_VAR_RANGE = 0.6
 const VOLC_SIGMA_VAR_BASE = 0.6
@@ -138,6 +138,7 @@ export function applyVolcanicArcs({
 		z: number
 		height: number
 		invS2: number
+		cosThresh: number
 	}> = []
 
 	for (const candidate of candidates) {
@@ -176,6 +177,7 @@ export function applyVolcanicArcs({
 			z: candidate.z,
 			height: VOLC_HEIGHT_BASE * (0.5 + candidate.stressLocal) * heightVar,
 			invS2: -0.5 / (sigma * sigma),
+			cosThresh: Math.cos(sigma * 4),
 		})
 	}
 
@@ -237,7 +239,7 @@ export function applyVolcanicArcs({
 				for (const volcIndex of cell) {
 					const volc = volcPositions[volcIndex]
 					const dot = rx * volc.x + ry * volc.y + rz * volc.z
-					if (dot < 0.9999) continue
+					if (dot < volc.cosThresh) continue
 					const angleSq = Math.max(0, 2 * (1 - dot))
 					const gauss = Math.exp(angleSq * volc.invS2)
 					if (gauss > 0.01) volcUplift += volc.height * gauss

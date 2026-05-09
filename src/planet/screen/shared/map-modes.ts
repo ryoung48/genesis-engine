@@ -7,6 +7,7 @@ export type PopulationMapMode =
 	| "heritage"
 	| "faith"
 	| "religion"
+	| "migration"
 
 export type NationMapMode = "borders" | "provinces" | "dynasty" | "diplomacy"
 
@@ -55,6 +56,7 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["density", "Population"],
 	["development", "Development"],
+	["migration", "Migration"],
 	["culture", "Culture"],
 	["heritage", "Heritage"],
 	["faith", "Faith"],

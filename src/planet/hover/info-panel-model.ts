@@ -42,7 +42,6 @@ interface HoverProvinceDisplayData {
 		id: number
 		color: string | null
 	} | null
-	regionDisplayColor: string | null
 }
 
 interface HoverDemographicDisplayData {
@@ -163,13 +162,20 @@ export function buildTerrainFeatureSwatches(
 export function buildProvinceDisplayData(params: {
 	hoverProvince: number | null
 	hoverNationId: number | null
-	hoverRegionColor: [number, number, number] | null
 	world: SerializedOrogenWorld | null
 }): HoverProvinceDisplayData {
-	const { hoverProvince, hoverNationId, hoverRegionColor, world } = params
-	const regionDisplayColor = hoverRegionColor
-		? rgbToCss(hoverRegionColor)
-		: null
+	const { hoverProvince, hoverNationId, world } = params
+	const nationColor =
+		hoverNationId !== null &&
+		hoverNationId >= 0 &&
+		world?.nations?.colors &&
+		hoverNationId * 3 + 2 < world.nations.colors.length
+			? rgbToCss([
+					world.nations.colors[hoverNationId * 3],
+					world.nations.colors[hoverNationId * 3 + 1],
+					world.nations.colors[hoverNationId * 3 + 2],
+				])
+			: null
 	const provinceNation =
 		hoverProvince !== null &&
 		hoverProvince >= 0 &&
@@ -179,7 +185,7 @@ export function buildProvinceDisplayData(params: {
 		hoverProvince < world.nations.assignment.length
 			? {
 					id: hoverNationId,
-					color: regionDisplayColor,
+					color: nationColor,
 				}
 			: null
 	const provinceColor =
@@ -193,7 +199,7 @@ export function buildProvinceDisplayData(params: {
 					world.provinces.colors[hoverProvince * 3 + 2],
 				])
 			: null
-	return { provinceColor, provinceNation, regionDisplayColor }
+	return { provinceColor, provinceNation }
 }
 
 export function buildPoliticalDisplayData(params: {
@@ -331,6 +337,17 @@ export function buildDemographicDisplayData(params: {
 		return {
 			label: "Development",
 			value: world.development[province].toFixed(2),
+			color: null,
+		}
+	}
+
+	if (populationMode === "migration") {
+		const wave = world.population?.migrationWave?.[province] ?? -1
+		if (isDesolate || wave < 0) return null
+		const pct = Math.round(wave * 100)
+		return {
+			label: "Migration",
+			value: pct === 0 ? "Cradle" : `${pct}%`,
 			color: null,
 		}
 	}

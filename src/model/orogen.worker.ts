@@ -92,6 +92,12 @@ function cloneHistorySeedWorld(
 					population: world.population.population.slice(),
 					habitabilityScore: world.population.habitabilityScore,
 					totalPopulation: world.population.totalPopulation,
+					...(world.population.migrationWave && {
+						migrationWave: world.population.migrationWave.slice(),
+					}),
+					...(world.population.cradleProvinces && {
+						cradleProvinces: world.population.cradleProvinces.slice(),
+					}),
 				}
 			: null,
 		coastal: world.coastal ? world.coastal.slice() : null,
@@ -493,6 +499,10 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.population.habitability.buffer,
 			world.population.population.buffer,
 		)
+		if (world.population.migrationWave)
+			add(world.population.migrationWave.buffer)
+		if (world.population.cradleProvinces)
+			add(world.population.cradleProvinces.buffer)
 	}
 	return Array.from(transfer)
 }

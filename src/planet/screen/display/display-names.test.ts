@@ -395,7 +395,7 @@ describe("createDisplayNames", () => {
 			events: [],
 		})
 
-		expect(names.nation(0)).toBe("#0")
+		expect(names.nation(0)).toMatch(/^[A-Z]/)
 		expect(names.culture(0)).toBe("Culture #0")
 		expect(names.heritage(0)).toBe("Heritage #0")
 		expect(names.faith(0)).toBe("Faith #0")

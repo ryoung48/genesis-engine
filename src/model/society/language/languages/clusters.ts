@@ -435,7 +435,7 @@ function weightedSignatureChoice(
 	boost: number,
 ): string {
 	if (!preferred?.length || boost <= 1) {
-		return src.dice.weightedChoice<string>(phonemes)
+		return src.dice.weightedChoice<string>(phonemes) ?? ""
 	}
 
 	let total = 0
@@ -443,7 +443,7 @@ function weightedSignatureChoice(
 		total += phoneme.w * (preferred.includes(phoneme.v) ? boost : 1)
 	}
 	if (total <= 0) {
-		return src.dice.weightedChoice<string>(phonemes)
+		return src.dice.weightedChoice<string>(phonemes) ?? ""
 	}
 
 	let roll = src.dice.uniform(0, total)

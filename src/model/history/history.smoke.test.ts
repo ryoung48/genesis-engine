@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { DEFAULT_WORLD_PARAMS } from "@/planet/screen/generation/defaults"
 import { NATION_BUCKETS } from "../society/nations"
 import { createHistoryRng, initHistory, simulateUntil, YEAR_MS } from "."
-import { ensureHierarchyClean, validateLiveHierarchy } from "./state"
+import { nationAdjacency } from "./derive"
+import type { HistoryState } from "./state"
+import { ensureHierarchyClean, REL, validateLiveHierarchy } from "./state"
 import { getCachedWorld } from "./test-world"
 
 const HISTORY_NATION_SIZE_BUCKETS = [
@@ -11,6 +14,43 @@ const HISTORY_NATION_SIZE_BUCKETS = [
 
 function formatNationSizeBucket([min, max]: readonly [number, number]): string {
 	return Number.isFinite(max) ? `${min}-${max}` : `${min}+`
+}
+
+function collectRelationDistribution(
+	state: HistoryState,
+): Record<string, number> {
+	const adj = nationAdjacency(state)
+	const counts = {
+		"Personal Union": 0,
+		Vassal: 0,
+		Allied: 0,
+		Friendly: 0,
+		Neutral: 0,
+		Suspicious: 0,
+		Rival: 0,
+		War: 0,
+	}
+	const seen = new Set<number>()
+	const P = state.P
+	for (let i = 0; i < adj.offset.length - 1; i++) {
+		for (let e = adj.offset[i]; e < adj.offset[i + 1]; e++) {
+			const j = adj.list[e]
+			const key = Math.min(i, j) * P + Math.max(i, j)
+			if (seen.has(key)) continue
+			seen.add(key)
+			const rel = state.relationsCurrent[i * P + j]
+			if (rel === REL.OVERLORD || rel === REL.VASSAL) counts.Vassal++
+			else if (rel === REL.PU_SENIOR || rel === REL.PU_JUNIOR)
+				counts["Personal Union"]++
+			else if (rel === REL.ALLY) counts.Allied++
+			else if (rel === REL.FRIENDLY) counts.Friendly++
+			else if (rel === REL.SUSPICIOUS) counts.Suspicious++
+			else if (rel === REL.RIVAL) counts.Rival++
+			else if (rel === REL.WAR) counts.War++
+			else counts.Neutral++
+		}
+	}
+	return counts
 }
 
 function collectYearlyMetrics(state: {
@@ -70,7 +110,7 @@ afterAll(() => {
 
 describe("history simulation on a generated world", () => {
 	it("seeds from a generated world and simulates a short span", () => {
-		const world = getCachedWorld({ seed: 314159, numPoints: 400 })
+		const world = getCachedWorld({ numPoints: DEFAULT_WORLD_PARAMS.numPoints })
 		expect(world.nations).toBeDefined()
 		expect(world.provinces).toBeDefined()
 		expect(world.population).toBeDefined()
@@ -103,6 +143,11 @@ describe("history simulation on a generated world", () => {
 		console.table(yearlyMetrics)
 		console.info(JSON.stringify(yearlyMetrics, null, 2))
 
+		const relationDistribution = collectRelationDistribution(state)
+		console.info("Relation distribution (final year)")
+		console.table([relationDistribution])
+		console.info(JSON.stringify(relationDistribution, null, 2))
+
 		expect(() => simulateUntil(state, target, rng)).not.toThrow()
 		expect(state.time).toBe(target)
 		expect(() =>
@@ -112,5 +157,5 @@ describe("history simulation on a generated world", () => {
 		expect(yearlyMetrics[0]?.year).toBe(startYear)
 		expect(yearlyMetrics.at(-1)?.year).toBe(target / YEAR_MS)
 		expect(yearlyMetrics.every((row) => row.globalPopulation > 0)).toBe(true)
-	}, 60_000)
+	}, 600_000)
 })

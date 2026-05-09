@@ -270,7 +270,16 @@ describe("getDisplayTags", () => {
 			),
 		).toEqual({
 			primary: "Vassal",
-			secondary: "Ended",
+			secondary: "Independence",
+		})
+		expect(
+			getDisplayTags(
+				makeEvent("vassalage ended", YEAR_MS, { overlord: 2, vassal: 5 }),
+				2,
+			),
+		).toEqual({
+			primary: "Vassal",
+			secondary: "Lost Subject",
 		})
 		expect(
 			getDisplayTags(

@@ -138,7 +138,7 @@ describe("createNames", () => {
 		})
 
 		expect(names.province(0)).toBe("#0")
-		expect(names.nation(0)).toBe("#0")
+		expect(names.nation(0)).toMatch(/^[A-Z]/)
 		expect(names.river(0)).toBe("River #0")
 		expect(names.mountain(0)).toBe("Mount #0")
 		expect(names.leader(0, 500)).toBe("Leader #0")
@@ -451,7 +451,10 @@ describe("createNames", () => {
 		expect(names.province(3)).toBe("Slot Province:3")
 		const fallbackNationName = names.nation(1)
 		const seededNationName = names.nation(3)
-		expect(names.nation(99)).toBe("#99")
+		const unknownNationName = names.nation(99)
+		expect(unknownNationName).toMatch(/^[A-Z]/)
+		expect(names.nation(99)).toBe(unknownNationName)
+		expect(spawnSpy).toHaveBeenCalledWith("nation:99")
 		expect(simpleSpy).toHaveBeenCalledWith(
 			expect.objectContaining({ slot: "province:0" }),
 		)
@@ -476,7 +479,7 @@ describe("createNames", () => {
 		const names = createWorldNames({} as never)
 
 		expect(names.province(0)).toBe("#0")
-		expect(names.nation(0)).toBe("#0")
+		expect(names.nation(0)).toMatch(/^[A-Z]/)
 		expect(names.culture(0)).toBe("Culture #0")
 		expect(names.heritage(0)).toBe("Heritage #0")
 		expect(names.faith(0)).toBe("Faith #0")
@@ -519,7 +522,7 @@ describe("createNames", () => {
 		})
 
 		expect(names.province(0)).toBe("#0")
-		expect(names.nation(0)).toBe("#0")
+		expect(names.nation(0)).toMatch(/^[A-Z]/)
 		expect(
 			createNames({
 				provinces: [{ culture: 1, leaders: [{ time: 10 }] }],

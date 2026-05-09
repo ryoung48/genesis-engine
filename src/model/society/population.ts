@@ -1,12 +1,21 @@
 /**
- * Province population initialization.
- * Computes per-province habitability by summing regional scores and distributes population proportionally.
- * O(regionCount + provinceCount) time, typed arrays.
+ * Province population initialization and prehistoric migration diffusion.
+ *
+ * computePopulation: sums regional habitability scores into provinces and
+ * distributes initial population proportionally. O(R + P) time, typed arrays.
+ *
+ * computeMigration: runs multi-source Dijkstra on the region graph from
+ * cradle provinces seeded on the most habitable landmass. Travel cost is
+ * inversely proportional to regional habitability; ocean traversal is very
+ * expensive but possible. Returns a per-province normalized arrival time
+ * (0 = cradle origin, 1 = latest frontier) and the cradle province indices.
  */
 
 import type { OrogenProvinces } from ".."
 import { createRng } from "../shared/rng"
+import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
 import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { SphereMesh } from "../types/mesh"
 
 // Habitability factors indexed by orogen codes
 
@@ -34,6 +43,13 @@ export interface ProvincePopulation {
 	habitabilityScore: number
 	/** Total world population */
 	totalPopulation: number
+	/**
+	 * Per-province normalized migration arrival time (0 = cradle origin,
+	 * 1 = latest frontier reached). -1 for desolate/unreachable provinces.
+	 */
+	migrationWave?: Float32Array
+	/** Province indices where prehistoric cradles were seeded */
+	cradleProvinces?: Int32Array
 }
 
 export function computePopulation(
@@ -109,5 +125,323 @@ export function computePopulation(
 		population,
 		habitabilityScore,
 		totalPopulation: totalPop,
+	}
+}
+
+// ── Migration diffusion ─────────────────────────────────────────────────────
+
+// Travel cost for ocean regions (no province): very slow but passable.
+const OCEAN_TRAVEL_COST = 1.0
+// Minimum per-region normalized habitability used as denominator, prevents
+// cost from blowing up in arctic/desert provinces.
+const MIN_HAB_FOR_COST = 0.1
+// One cradle per this many km² of continent area (Eurasia ~54M → 3 cradles).
+const KM2_PER_CRADLE = 18e6
+
+/** Tiny binary min-heap for lazy Dijkstra. */
+class MinHeap {
+	private readonly keys: number[] = []
+	private readonly vals: number[] = []
+
+	get size(): number {
+		return this.keys.length
+	}
+
+	push(key: number, val: number): void {
+		const i = this.keys.length
+		this.keys.push(key)
+		this.vals.push(val)
+		this._up(i)
+	}
+
+	pop(): [number, number] | undefined {
+		const n = this.keys.length
+		if (n === 0) return undefined
+		const k = this.keys[0]
+		const v = this.vals[0]
+		const lastK = this.keys.pop()!
+		const lastV = this.vals.pop()!
+		if (this.keys.length > 0) {
+			this.keys[0] = lastK
+			this.vals[0] = lastV
+			this._down(0)
+		}
+		return [k, v]
+	}
+
+	private _up(i: number): void {
+		while (i > 0) {
+			const p = (i - 1) >> 1
+			if (this.keys[p] <= this.keys[i]) break
+			this._swap(p, i)
+			i = p
+		}
+	}
+
+	private _down(i: number): void {
+		const n = this.keys.length
+		while (true) {
+			let m = i
+			const l = 2 * i + 1
+			const r = l + 1
+			if (l < n && this.keys[l] < this.keys[m]) m = l
+			if (r < n && this.keys[r] < this.keys[m]) m = r
+			if (m === i) break
+			this._swap(m, i)
+			i = m
+		}
+	}
+
+	private _swap(a: number, b: number): void {
+		const tk = this.keys[a]
+		const tv = this.vals[a]
+		this.keys[a] = this.keys[b]
+		this.vals[a] = this.vals[b]
+		this.keys[b] = tk
+		this.vals[b] = tv
+	}
+}
+
+/**
+ * BFS from `start` through the province adjacency graph, setting
+ * `minHops[p]` to the minimum hop distance from `start` (capped at any
+ * pre-existing lower value so multi-source updates work correctly).
+ */
+function bfsUpdateMinHops(
+	start: number,
+	adjOffset: Int32Array,
+	adjList: Int32Array,
+	minHops: Int32Array,
+): void {
+	const queue: number[] = []
+	if (minHops[start] > 0) {
+		minHops[start] = 0
+		queue.push(start)
+	}
+	let head = 0
+	while (head < queue.length) {
+		const p = queue[head++]
+		const d = minHops[p]
+		for (let j = adjOffset[p], jEnd = adjOffset[p + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (minHops[nb] > d + 1) {
+				minHops[nb] = d + 1
+				queue.push(nb)
+			}
+		}
+	}
+}
+
+/**
+ * Farthest-point sampling on province adjacency.
+ * First cradle = most habitable province; subsequent cradles maximise
+ * `minHops * (0.2 + normHab)` to spread geographically while favouring
+ * habitable terrain.
+ */
+function placeCradles(
+	continentProvinces: number[],
+	normHab: Float32Array,
+	adjOffset: Int32Array,
+	adjList: Int32Array,
+	totalProvinces: number,
+	k: number,
+): number[] {
+	const capped = Math.min(k, continentProvinces.length)
+	if (capped === 0) return []
+
+	// First cradle: most habitable province in the continent.
+	let first = continentProvinces[0]
+	for (const p of continentProvinces) {
+		if (normHab[p] > normHab[first]) first = p
+	}
+
+	const cradles: number[] = [first]
+	if (capped === 1) return cradles
+
+	const INF = 2 ** 30
+	const minHops = new Int32Array(totalProvinces).fill(INF)
+	bfsUpdateMinHops(first, adjOffset, adjList, minHops)
+
+	for (let i = 1; i < capped; i++) {
+		let bestP = continentProvinces[0]
+		let bestScore = -1
+		for (const p of continentProvinces) {
+			if (minHops[p] >= INF) continue
+			const score = minHops[p] * (0.2 + normHab[p])
+			if (score > bestScore) {
+				bestScore = score
+				bestP = p
+			}
+		}
+		cradles.push(bestP)
+		bfsUpdateMinHops(bestP, adjOffset, adjList, minHops)
+	}
+
+	return cradles
+}
+
+/**
+ * Compute prehistoric migration diffusion from cradle provinces seeded on
+ * the most habitable landmass. Uses multi-source Dijkstra on the full
+ * region graph so ocean traversal (very expensive) is included.
+ *
+ * Returns:
+ * - `migrationWave`: per-province normalized arrival time, 0..1 for
+ *   reachable non-desolate provinces, -1 otherwise.
+ * - `cradleProvinces`: province indices of the seeded cradles.
+ */
+export function computeMigration(
+	provinces: OrogenProvinces,
+	habitability: Float32Array,
+	mesh: SphereMesh,
+	planetRadiusKm: number = DEFAULT_PLANET_RADIUS_KM,
+	numRegions?: number,
+): { migrationWave: Float32Array; cradleProvinces: Int32Array } {
+	const {
+		count,
+		desolate,
+		adjOffset: pAdjOffset,
+		adjList: pAdjList,
+		landmassId,
+		size,
+		seeds: provinceSeedRegions,
+		regionProvince,
+	} = provinces
+
+	if (count === 0) {
+		return {
+			migrationWave: new Float32Array(0),
+			cradleProvinces: new Int32Array(0),
+		}
+	}
+
+	const N = numRegions ?? mesh.numRegions
+
+	// Per-province normalized habitability (hab per region).
+	const normHab = new Float32Array(count)
+	for (let p = 0; p < count; p++) {
+		if (!desolate[p]) {
+			normHab[p] = habitability[p] / Math.max(1, size[p])
+		}
+	}
+
+	// Find the most habitable non-desolate landmass.
+	const landmassHab = new Map<number, number>()
+	const landmassSize = new Map<number, number>()
+	for (let p = 0; p < count; p++) {
+		if (desolate[p]) continue
+		const lm = landmassId[p]
+		if (lm < 0) continue
+		landmassHab.set(lm, (landmassHab.get(lm) ?? 0) + habitability[p])
+		landmassSize.set(lm, (landmassSize.get(lm) ?? 0) + size[p])
+	}
+
+	let bestLandmass = -1
+	let bestHab = -1
+	for (const [lm, hab] of landmassHab) {
+		if (hab > bestHab) {
+			bestHab = hab
+			bestLandmass = lm
+		}
+	}
+
+	const continentProvinces: number[] = []
+	for (let p = 0; p < count; p++) {
+		if (!desolate[p] && landmassId[p] === bestLandmass) {
+			continentProvinces.push(p)
+		}
+	}
+
+	if (continentProvinces.length === 0) {
+		return {
+			migrationWave: new Float32Array(count).fill(-1),
+			cradleProvinces: new Int32Array(0),
+		}
+	}
+
+	// Number of cradles scales with continent area; cap at 5.
+	const sphereAreaKm2 = 4 * Math.PI * planetRadiusKm ** 2
+	const cellAreaKm2 = sphereAreaKm2 / N
+	const continentAreaKm2 = (landmassSize.get(bestLandmass) ?? 1) * cellAreaKm2
+	const numCradles = Math.max(
+		1,
+		Math.min(5, Math.round(continentAreaKm2 / KM2_PER_CRADLE)),
+	)
+
+	const cradleList = placeCradles(
+		continentProvinces,
+		normHab,
+		pAdjOffset,
+		pAdjList,
+		count,
+		numCradles,
+	)
+
+	// Multi-source Dijkstra on the region graph. Edge cost is the average of
+	// the two endpoint travel costs; ocean regions use OCEAN_TRAVEL_COST.
+	const { adjOffset: rAdjOffset, adjList: rAdjList } = mesh
+	const INF = 1e15
+	const dist = new Float64Array(N).fill(INF)
+
+	function regionTravelCost(r: number): number {
+		const p = regionProvince[r]
+		if (p < 0 || desolate[p]) return OCEAN_TRAVEL_COST
+		return 1.0 / Math.max(normHab[p], MIN_HAB_FOR_COST)
+	}
+
+	const heap = new MinHeap()
+	for (const cradleP of cradleList) {
+		const seedR = provinceSeedRegions[cradleP]
+		if (seedR >= 0 && seedR < N && dist[seedR] > 0) {
+			dist[seedR] = 0
+			heap.push(0, seedR)
+		}
+	}
+
+	while (heap.size > 0) {
+		const [d, r] = heap.pop()!
+		if (d > dist[r]) continue // stale lazy entry
+		const costR = regionTravelCost(r)
+		for (let j = rAdjOffset[r], jEnd = rAdjOffset[r + 1]; j < jEnd; j++) {
+			const nb = rAdjList[j]
+			const edgeCost = (costR + regionTravelCost(nb)) * 0.5
+			const newDist = d + edgeCost
+			if (newDist < dist[nb]) {
+				dist[nb] = newDist
+				heap.push(newDist, nb)
+			}
+		}
+	}
+
+	// Normalize arrival times to 0..1 using the farthest reachable
+	// non-desolate province seed as the reference.
+	let maxDist = 0
+	for (let p = 0; p < count; p++) {
+		if (desolate[p]) continue
+		const seedR = provinceSeedRegions[p]
+		if (seedR >= 0 && seedR < N && dist[seedR] < INF && dist[seedR] > maxDist) {
+			maxDist = dist[seedR]
+		}
+	}
+
+	const migrationWave = new Float32Array(count).fill(-1)
+	if (maxDist > 0) {
+		for (let p = 0; p < count; p++) {
+			if (desolate[p]) continue
+			const seedR = provinceSeedRegions[p]
+			if (seedR >= 0 && seedR < N && dist[seedR] < INF) {
+				migrationWave[p] = dist[seedR] / maxDist
+			}
+		}
+	} else {
+		// All seeds at distance 0 (or unreachable) — just mark cradles.
+		for (const cradleP of cradleList) {
+			if (!desolate[cradleP]) migrationWave[cradleP] = 0
+		}
+	}
+
+	return {
+		migrationWave,
+		cradleProvinces: new Int32Array(cradleList),
 	}
 }

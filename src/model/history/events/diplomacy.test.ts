@@ -3,6 +3,7 @@ import type { OrogenNationHierarchy, OrogenProvinces } from "../.."
 import type { WeightedValue } from "../../shared/rng"
 import type { ProvincePopulation } from "../../society/population"
 import { EVT } from "../event-heap"
+import { PROV } from "../fields"
 import { createHistoryRng, type HistoryRng } from "../history-rng"
 import {
 	createHistoryState,
@@ -165,7 +166,16 @@ describe("diplomacy events", () => {
 
 		expect(getRelation(state, 1, 0)).toBe(REL.OVERLORD)
 		expect(getRelation(state, 0, 1)).toBe(REL.VASSAL)
-		expect([REL.FRIENDLY, REL.ALLY]).toContain(getRelation(state, 0, 2))
+		const rel02 = getRelation(state, 0, 2)
+		expect([
+			REL.RIVAL,
+			REL.SUSPICIOUS,
+			REL.NEUTRAL,
+			REL.FRIENDLY,
+			REL.ALLY,
+			REL.PU_SENIOR,
+			REL.PU_JUNIOR,
+		]).toContain(rel02)
 		expect(state.heap.size).toBe(3)
 		expect(state.heap.peekType()).toBe(EVT.DIPLOMACY)
 	})
@@ -240,7 +250,7 @@ describe("diplomacy events", () => {
 
 	it("syncs dependent hostility and can break unstable vassalage", () => {
 		const state = createDiplomacyState({
-			habitability: [20, 4, 10],
+			habitability: [4, 20, 10],
 			neighbors: [
 				[1, 2],
 				[0, 2],
@@ -252,19 +262,19 @@ describe("diplomacy events", () => {
 
 		runDiplomacy(state, 0, createStubRng([0.99, 0.3]))
 
-		expect(getRelation(state, 0, 2)).toBe(REL.SUSPICIOUS)
+		expect(getRelation(state, 1, 2)).toBe(REL.SUSPICIOUS)
 		expect(getRelation(state, 0, 1)).toBe(REL.SUSPICIOUS)
 		expect(state.events).toContainEqual(
 			expect.objectContaining({
 				tag: "vassalage ended",
-				data: { vassal: 0, overlord: 1 },
+				data: { vassal: 1, overlord: 0 },
 			}),
 		)
 	})
 
 	it("skips syncing hierarchy-marked neighbors for dependent realms", () => {
 		const state = createDiplomacyState({
-			habitability: [4, 20, 20],
+			habitability: [20, 4, 4],
 			neighbors: [
 				[1, 2],
 				[0, 2],
@@ -282,7 +292,7 @@ describe("diplomacy events", () => {
 
 	it("leaves low-threat dependent ties in place", () => {
 		const state = createDiplomacyState({
-			habitability: [4, 20, 8],
+			habitability: [20, 4, 8],
 			neighbors: [[1], [0], []],
 		})
 		setRelation(state, 1, 0, REL.VASSAL)
@@ -295,7 +305,7 @@ describe("diplomacy events", () => {
 
 	it("can break personal unions when the junior becomes threatening", () => {
 		const state = createDiplomacyState({
-			habitability: [20, 4],
+			habitability: [4, 20],
 			cultures: [0, 1],
 			neighbors: [[1], [0]],
 			r_xyz: [1, 0, 0, 0.9, 0.1, 0],
@@ -308,14 +318,14 @@ describe("diplomacy events", () => {
 		expect(state.events).toContainEqual(
 			expect.objectContaining({
 				tag: "personal union ended",
-				data: { junior: 0, senior: 1 },
+				data: { junior: 1, senior: 0 },
 			}),
 		)
 	})
 
 	it("can launch counter-wars after unstable dependent ties collapse", () => {
 		const vassalState = createDiplomacyState({
-			habitability: [20, 4],
+			habitability: [4, 20],
 			neighbors: [[1], [0]],
 		})
 		setRelation(vassalState, 1, 0, REL.VASSAL)
@@ -328,7 +338,7 @@ describe("diplomacy events", () => {
 		)
 
 		const unionState = createDiplomacyState({
-			habitability: [20, 4],
+			habitability: [4, 20],
 			neighbors: [[1], [0]],
 		})
 		setRelation(unionState, 1, 0, REL.PU_JUNIOR)
@@ -343,7 +353,7 @@ describe("diplomacy events", () => {
 
 	it("leaves stable personal unions untouched", () => {
 		const state = createDiplomacyState({
-			habitability: [4, 20],
+			habitability: [20, 4],
 			cultures: [0, 1],
 			neighbors: [[1], [0]],
 			r_xyz: [1, 0, 0, 0.9, 0.1, 0],
@@ -494,5 +504,339 @@ describe("diplomacy events", () => {
 		runDiplomacy(state, 0, createStubRng([0.01]))
 
 		expect(getRelation(state, 0, 1)).toBe(REL.SUSPICIOUS)
+	})
+
+	it("seeds a broad initial relation spectrum across many seeds", () => {
+		const seen = new Set<number>()
+		for (let seed = 0; seed < 50; seed++) {
+			const state = createDiplomacyState({
+				parent: [-1, -1],
+				habitability: [10, 10],
+				neighbors: [[1], [0]],
+			})
+			initDiplomacy(state, createHistoryRng(seed))
+			seen.add(getRelation(state, 0, 1))
+		}
+		expect(seen.size).toBeGreaterThanOrEqual(3)
+		expect(seen.has(REL.SUSPICIOUS)).toBe(true)
+		expect(seen.has(REL.NEUTRAL)).toBe(true)
+		expect(seen.has(REL.FRIENDLY)).toBe(true)
+	})
+
+	it("vassalizes small nations that neighbor dominant empires during init", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [40, 4],
+			neighbors: [[1], [0]],
+		})
+
+		// random() = 0.1 < VASSAL_SEED_CHANCE (0.4) so vassalisation is guaranteed
+		initDiplomacy(state, createStubRng([0.1]))
+
+		expect(getRelation(state, 1, 0)).toBe(REL.OVERLORD)
+		expect(getRelation(state, 0, 1)).toBe(REL.VASSAL)
+	})
+
+	it("does not vassalize nations that are too close in wealth", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 4],
+			neighbors: [[1], [0]],
+		})
+
+		// ratio = 4/10 = 0.4 >= VASSAL_SEED_RATIO (0.3), so no vassalisation
+		initDiplomacy(state, createStubRng([0.1]))
+
+		expect(getRelation(state, 1, 0)).not.toBe(REL.OVERLORD)
+	})
+
+	it("skips vassalization when the probability gate fails", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [40, 4],
+			neighbors: [[1], [0]],
+		})
+
+		// random() = 0.9 >= VASSAL_SEED_CHANCE (0.4), so vassalisation is skipped
+		initDiplomacy(state, createStubRng([0.9]))
+
+		expect(getRelation(state, 1, 0)).not.toBe(REL.OVERLORD)
+	})
+
+	it("does not re-vassalize already-subject nations during init", () => {
+		const state = createDiplomacyState({
+			parent: [-1, 0, -1],
+			habitability: [40, 4, 1],
+			neighbors: [[1, 2], [0], [0]],
+		})
+
+		// Even with the probability always passing, hierarchy subjects are skipped
+		initDiplomacy(state, createStubRng([0.1]))
+
+		expect(getRelation(state, 1, 0)).toBe(REL.OVERLORD)
+		expect(getRelation(state, 0, 1)).toBe(REL.VASSAL)
+	})
+
+	it("seeds shared dynasties for neighboring nations with friendly init relations", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const dynastyBefore0 = PROV.leader.dynasty.get(state, 0, state.time)
+		const dynastyBefore1 = PROV.leader.dynasty.get(state, 1, state.time)
+		expect(dynastyBefore0).not.toBe(dynastyBefore1)
+
+		// weightedChoice returns FRIENDLY; random() = 0.1 passes the 0.25 seed chance
+		initDiplomacy(state, {
+			random: () => 0.1,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		// Nation 0 is wealthier (habitability 10 > 6) → senior; nation 1 adopts its dynasty
+		expect(PROV.leader.dynasty.get(state, 1, state.time)).toBe(dynastyBefore0)
+		expect(state.events).toContainEqual(
+			expect.objectContaining({
+				tag: "dynasty spread",
+				data: expect.objectContaining({
+					nation: 1,
+					source: 0,
+					dynasty: dynastyBefore0,
+				}),
+			}),
+		)
+	})
+
+	it("seeds shared dynasties for neighboring nations with ally init relations", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const dynastyBefore0 = PROV.leader.dynasty.get(state, 0, state.time)
+		const dynastyBefore1 = PROV.leader.dynasty.get(state, 1, state.time)
+		expect(dynastyBefore0).not.toBe(dynastyBefore1)
+
+		// weightedChoice returns ALLY; random() = 0.1 passes the 0.25 seed chance
+		initDiplomacy(state, {
+			random: () => 0.1,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.ALLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(PROV.leader.dynasty.get(state, 1, state.time)).toBe(dynastyBefore0)
+	})
+
+	it("uses the wealthier nation as dynasty senior when the neighbor outranks the actor", () => {
+		// Nation 1 (habitability 14) wealthier than nation 0 (habitability 6) → nation 0 adopts nation 1's dynasty
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [6, 14],
+			neighbors: [[1], [0]],
+		})
+
+		const dynastyBefore0 = PROV.leader.dynasty.get(state, 0, state.time)
+		const dynastyBefore1 = PROV.leader.dynasty.get(state, 1, state.time)
+		expect(dynastyBefore0).not.toBe(dynastyBefore1)
+
+		initDiplomacy(state, {
+			random: () => 0.1,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(PROV.leader.dynasty.get(state, 0, state.time)).toBe(dynastyBefore1)
+	})
+
+	it("skips dynasty seeding when neighboring nations already share a dynasty", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const sharedDynasty = PROV.leader.dynasty.get(state, 0, state.time)
+		PROV.leader.dynasty.set(state, 1, state.time, sharedDynasty)
+
+		// weightedChoice returns FRIENDLY; random() = 0.1 would pass chance if eligible
+		initDiplomacy(state, {
+			random: () => 0.1,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(PROV.leader.dynasty.get(state, 1, state.time)).toBe(sharedDynasty)
+		expect(state.events).not.toContainEqual(
+			expect.objectContaining({ tag: "dynasty spread" }),
+		)
+	})
+
+	it("does not seed dynasties when the probability gate fails", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const dynastyBefore1 = PROV.leader.dynasty.get(state, 1, state.time)
+
+		// random() = 0.9 >= SHARED_DYNASTY_SEED_CHANCE (0.25) → skipped
+		initDiplomacy(state, {
+			random: () => 0.9,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(PROV.leader.dynasty.get(state, 1, state.time)).toBe(dynastyBefore1)
+	})
+
+	it("seeds an initial personal union for neighboring nations with a friendly relation and shared dynasty", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const sharedDynasty = PROV.leader.dynasty.get(state, 0, state.time)
+		PROV.leader.dynasty.set(state, 1, state.time, sharedDynasty)
+
+		// random() = 0.01 passes both SHARED_DYNASTY_SEED_CHANCE (0.25) and PERSONAL_UNION_SEED_CHANCE (0.05)
+		initDiplomacy(state, {
+			random: () => 0.01,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		// Nation 0 (habitability 10) is wealthier → senior; nation 1 → junior
+		expect(getRelation(state, 1, 0)).toBe(REL.PU_SENIOR)
+		expect(getRelation(state, 0, 1)).toBe(REL.PU_JUNIOR)
+		expect(state.events).toContainEqual(
+			expect.objectContaining({
+				tag: "personal union formed",
+				data: expect.objectContaining({ junior: 1, senior: 0 }),
+			}),
+		)
+	})
+
+	it("seeds an initial personal union for neighboring nations with an ally relation and shared dynasty", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const sharedDynasty = PROV.leader.dynasty.get(state, 0, state.time)
+		PROV.leader.dynasty.set(state, 1, state.time, sharedDynasty)
+
+		initDiplomacy(state, {
+			random: () => 0.01,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.ALLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(getRelation(state, 1, 0)).toBe(REL.PU_SENIOR)
+		expect(getRelation(state, 0, 1)).toBe(REL.PU_JUNIOR)
+	})
+
+	it("does not seed an initial personal union when neighboring nations have different dynasties", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+		// Dynasties are different by default
+
+		// First random() (dynasty seed gate): 0.9 → fails (keeps dynasties different)
+		// Second random() (PU gate): 0.01 → would pass, but dynasties differ → no PU
+		let call = 0
+		initDiplomacy(state, {
+			random: () => ([0.9, 0.01] as const)[call++] ?? 0.9,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(state.events).not.toContainEqual(
+			expect.objectContaining({ tag: "personal union formed" }),
+		)
+	})
+
+	it("does not seed an initial personal union when the probability gate fails", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1],
+			habitability: [10, 6],
+			neighbors: [[1], [0]],
+		})
+
+		const sharedDynasty = PROV.leader.dynasty.get(state, 0, state.time)
+		PROV.leader.dynasty.set(state, 1, state.time, sharedDynasty)
+
+		// 0.06 < SHARED_DYNASTY_SEED_CHANCE (0.25) → dynasty gate passes but same dynasty → skipped
+		// 0.06 >= PERSONAL_UNION_SEED_CHANCE (0.05) → PU gate fails
+		initDiplomacy(state, {
+			random: () => 0.06,
+			uniform: () => 1,
+			randint: () => 0,
+			choice: <T>(items: T[]) => items[0]!,
+			weightedChoice: <T>(items: readonly WeightedValue<T>[]) =>
+				((items as ReadonlyArray<WeightedValue<unknown>>).find(
+					(i) => i.v === REL.FRIENDLY,
+				)?.v ?? items[0]?.v) as T,
+			shuffle: <T>(items: T[]) => items,
+		})
+
+		expect(state.events).not.toContainEqual(
+			expect.objectContaining({ tag: "personal union formed" }),
+		)
 	})
 })

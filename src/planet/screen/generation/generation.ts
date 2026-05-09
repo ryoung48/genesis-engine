@@ -170,8 +170,6 @@ export function generateWorld(
 	callbacks.setSeed(overrideSeed)
 	callbacks.setWorld(null)
 
-	console.log(overrides, currentParams)
-
 	const tidallyLocked = overrides?.tidallyLocked
 		? true
 		: currentParams.tidallyLocked

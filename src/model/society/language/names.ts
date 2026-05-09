@@ -262,7 +262,8 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		const lang =
 			nation && nation.culture >= 0
 				? getCultureLanguage(context, nation.culture)
-				: getLanguage(context, capitalIdx)
+				: (getLanguage(context, capitalIdx) ??
+					(capitalIdx >= 0 ? spawnSeededLanguage(capitalIdx, "nation") : null))
 		return cachedScopedName({
 			cache: nationNames,
 			index: capitalIdx,

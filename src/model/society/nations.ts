@@ -423,6 +423,10 @@ function spreadBucketSizes(
 const NOISE_FREQ = 4.0
 // Fraction of the distance score that noise can shift up or down.
 const NOISE_STRENGTH = 0.4
+// Small additive bonus for claiming coastal provinces. Kept additive (not
+// multiplicative) so that the 1/(d+0.1) distance gradient always dominates —
+// preventing empires from snaking along coastlines across entire continents.
+const COASTAL_CLAIM_BONUS = 0.15
 
 function bestClaim(
 	nation: number,
@@ -465,9 +469,8 @@ function bestClaim(
 		const nz = r_xyz[3 * s + 2] * NOISE_FREQ
 		const noiseVal = noise.noise3D(nx, ny, nz)
 		const score =
-			(1 / (d + 0.1)) *
-				coastalScore[candidate] *
-				(1 + NOISE_STRENGTH * noiseVal) +
+			(1 / (d + 0.1)) * (1 + NOISE_STRENGTH * noiseVal) +
+			(coastalScore[candidate] - 1) * COASTAL_CLAIM_BONUS +
 			sharedBorder * 0.05 +
 			seedPenalty
 		if (score > bestScore) {

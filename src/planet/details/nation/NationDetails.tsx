@@ -235,6 +235,7 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 					)
 				}
 			/>
+			<LabeledValueRow label="ID" value={nation ? `#${nation.id}` : "N/A"} />
 			<LabeledValueRow
 				label="Dynasty"
 				value={

@@ -128,7 +128,8 @@ describe("computeProvinces", () => {
 		expect(Array.from(provinces.adjList)).toEqual([1, 0])
 	})
 
-	it("marks tiny isolated landmasses as desolate and still assigns colors", () => {
+	it("assigns distinct landmassIds to isolated islands without desolating them by size", () => {
+		// Region 219 is isolated (no edges connecting it to the main chain 0-218).
 		const mesh = makeGraphMesh(220, [...chainEdges(0, 217)])
 		const isLand = new Uint8Array(220)
 		isLand.fill(1, 0, 219)
@@ -139,8 +140,11 @@ describe("computeProvinces", () => {
 		})
 
 		expect(provinces.count).toBeGreaterThan(6)
-		expect(provinces.desolate.some((value) => value === 1)).toBe(true)
-		expect(provinces.landmassId.some((value) => value >= 0)).toBe(true)
+		// Without climate/rainfall options, nothing should be desolated by size.
+		expect(provinces.desolate.every((value) => value === 0)).toBe(true)
+		// Both the main landmass and the isolated island should have valid landmassIds.
+		const ids = new Set(Array.from(provinces.landmassId).filter((v) => v >= 0))
+		expect(ids.size).toBeGreaterThanOrEqual(2)
 		expect(Array.from(provinces.colors)).toSatisfy((colors) =>
 			colors.every((value: number) => Number.isFinite(value) && value >= 0),
 		)

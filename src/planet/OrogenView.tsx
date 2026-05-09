@@ -1691,15 +1691,6 @@ export const OrogenView: React.FC = () => {
 								hoverBiome={hoverBiome}
 								hoverProvince={hoverProvince}
 								hoverNationId={hoverNationId}
-								hoverRegionColor={
-									hoverInfo && regionColors
-										? [
-												regionColors[hoverInfo.region * 3],
-												regionColors[hoverInfo.region * 3 + 1],
-												regionColors[hoverInfo.region * 3 + 2],
-											]
-										: null
-								}
 								hoverOccupation={hoverOccupation}
 								hoverOceanDist={hoverOceanDist}
 								hoverDistCoast={hoverDistCoast}

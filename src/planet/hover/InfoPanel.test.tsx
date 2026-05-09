@@ -109,7 +109,6 @@ function renderPanel(
 			hoverBiome="Forest"
 			hoverProvince={0}
 			hoverNationId={2}
-			hoverRegionColor={[1, 0, 0]}
 			hoverOccupation={{
 				id: 9,
 				name: "Invaders",

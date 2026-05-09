@@ -31,6 +31,29 @@ describe("map projection helpers", () => {
 		expect(southPolar.projectCartesian(0, 0, -1).lat).toBeCloseTo(0)
 	})
 
+	it("projects degree coordinates to map space", () => {
+		const projection = createMapProjection(0)
+		const [x, y, z0] = projection.projectDegrees(0, 0)
+		expect(x).toBeCloseTo(0)
+		expect(y).toBeCloseTo(0)
+
+		const [x2] = projection.projectDegrees(90, 0)
+		expect(x2).toBeCloseTo(1)
+
+		const [, , z1] = projection.projectDegrees(0, 0, 5)
+		expect(z1).toBe(5)
+		expect(z0).toBe(0)
+	})
+
+	it("wraps longitude around the projection center longitude", () => {
+		const projection = createMapProjection(90)
+		const [x] = projection.projectDegrees(90, 0)
+		expect(x).toBeCloseTo(0)
+
+		const wrapped = projection.wrapLongitude(Math.PI / 2)
+		expect(wrapped).toBeCloseTo(0)
+	})
+
 	it("projects radians while preserving the optional z coordinate", () => {
 		const projection = createMapProjection(30, 60)
 		const projected = projection.projectRadians(Math.PI / 2, Math.PI / 4, 3)

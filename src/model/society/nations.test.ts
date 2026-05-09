@@ -49,6 +49,67 @@ function buildRingNationProvinces(n: number) {
 	return { provinces, coastal, habitability, r_xyz }
 }
 
+/**
+ * Build a double-ring topology: COLS coastal provinces on the equator and COLS
+ * inland provinces at latitude `latRad`, each coastal[i] connected to
+ * coastal[i±1] and inland[i]. The inland latitude is chosen so that
+ * coastal[i]→inland[i] distance equals coastal[i]→coastal[i+1] distance,
+ * making the coastal score the only variable that can bias expansion direction.
+ */
+function buildDoubleRingProvinces(cols: number) {
+	const latRad = (2 * Math.PI) / cols // equal-distance offset
+	const n = cols * 2
+	const edges: number[][] = Array.from({ length: n }, (): number[] => [])
+	for (let i = 0; i < cols; i++) {
+		edges[i].push((i - 1 + cols) % cols, (i + 1) % cols, i + cols)
+		edges[i + cols].push(
+			i,
+			((i - 1 + cols) % cols) + cols,
+			((i + 1) % cols) + cols,
+		)
+	}
+	let total = 0
+	for (let i = 0; i < n; i++) total += edges[i].length
+	const adjOffset = new Int32Array(n + 1)
+	const adjList = new Int32Array(total)
+	let wi = 0
+	for (let i = 0; i < n; i++) {
+		adjOffset[i] = wi
+		for (const nb of edges[i]) adjList[wi++] = nb
+	}
+	adjOffset[n] = wi
+
+	const r_xyz = new Float32Array(n * 3)
+	for (let i = 0; i < cols; i++) {
+		const angle = (2 * Math.PI * i) / cols
+		r_xyz[3 * i] = Math.cos(angle)
+		r_xyz[3 * i + 1] = Math.sin(angle)
+		r_xyz[3 * i + 2] = 0
+		r_xyz[3 * (i + cols)] = Math.cos(angle) * Math.cos(latRad)
+		r_xyz[3 * (i + cols) + 1] = Math.sin(angle) * Math.cos(latRad)
+		r_xyz[3 * (i + cols) + 2] = Math.sin(latRad)
+	}
+
+	const seeds = Int32Array.from({ length: n }, (_, i) => i)
+	const coastal = new Uint8Array(n)
+	for (let i = 0; i < cols; i++) coastal[i] = 1
+
+	const provinces: OrogenProvinces = {
+		count: n,
+		seeds,
+		desolate: new Uint8Array(n),
+		landmassId: new Int32Array(n).fill(0),
+		regionProvince: Int32Array.from({ length: n }, (_, i) => i),
+		adjOffset,
+		adjList,
+		size: new Int32Array(n).fill(1),
+		colors: new Float32Array(n * 3),
+	}
+
+	const habitability = new Float32Array(n).fill(1)
+	return { provinces, coastal, habitability, r_xyz }
+}
+
 describe("NATION_BUCKETS", () => {
 	it("has six tiers in descending order", () => {
 		expect(NATION_BUCKETS).toHaveLength(6)
@@ -234,5 +295,43 @@ describe("computeNations", () => {
 			seed: 55,
 		})
 		expect(result.count).toBe(result.seeds.length)
+	})
+
+	it("does not coast-snake — empire seeded on coast claims inland provinces rather than following the coastline", () => {
+		// Two parallel rings: COLS coastal provinces (equator) and COLS inland
+		// provinces (latitude offset). All neighbors are equidistant on the sphere
+		// so the only signal that can bias expansion is the coastal score.
+		// Without the fix the empire would follow the 1-D coastal chain (100%
+		// coastal); with the fix the distance gradient dominates and the empire
+		// grows into both rings (< 75% coastal).
+		const COLS = 20
+		const { provinces, coastal, habitability, r_xyz } =
+			buildDoubleRingProvinces(COLS)
+		const result = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 17,
+		})
+
+		// Find the largest nation whose seed is a coastal province.
+		let largestNation = -1
+		let largestSize = 0
+		for (let nat = 0; nat < result.count; nat++) {
+			if (coastal[result.seeds[nat]] && result.size[nat] > largestSize) {
+				largestNation = nat
+				largestSize = result.size[nat]
+			}
+		}
+		expect(largestNation).toBeGreaterThanOrEqual(0)
+
+		let coastalClaimed = 0
+		for (let p = 0; p < provinces.count; p++) {
+			if (result.assignment[p] === largestNation && coastal[p]) coastalClaimed++
+		}
+
+		// Should have claimed some inland provinces — not just snaked along coast.
+		expect(coastalClaimed / largestSize).toBeLessThan(0.75)
 	})
 })

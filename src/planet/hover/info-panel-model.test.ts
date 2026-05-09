@@ -263,14 +263,14 @@ describe("buildTerrainFeatureSwatches", () => {
 })
 
 describe("buildProvinceDisplayData", () => {
-	it("returns province and nation colors when the hovered province is valid", () => {
+	it("returns province and nation colors from world data when the hovered province is valid", () => {
 		const result = buildProvinceDisplayData({
 			hoverProvince: 1,
-			hoverNationId: 7,
-			hoverRegionColor: [0.1, 0.2, 0.3],
+			hoverNationId: 1,
 			world: makeWorld({
 				nations: {
-					assignment: new Int32Array([0, 7]),
+					assignment: new Int32Array([0, 1]),
+					colors: new Float32Array([0, 0, 0, 0.5, 0.6, 0.7]),
 				},
 				provinces: {
 					colors: new Float32Array([1, 0, 0, 0, 1, 0]),
@@ -278,22 +278,41 @@ describe("buildProvinceDisplayData", () => {
 			}),
 		})
 
-		expect(result.regionDisplayColor).toMatch(/^rgb/)
 		expect(result.provinceColor).toMatch(/^rgb/)
 		expect(result.provinceNation).toEqual({
-			id: 7,
-			color: result.regionDisplayColor,
+			id: 1,
+			color: "rgb(128, 153, 178)",
 		})
 	})
 
-	it("returns null province details for invalid province and color inputs", () => {
+	it("nation color is always from world.nations.colors regardless of hovered region color", () => {
+		const world = makeWorld({
+			nations: {
+				assignment: new Int32Array([0, 1]),
+				colors: new Float32Array([0, 0, 0, 1, 0, 0]),
+			},
+			provinces: {
+				colors: new Float32Array([0, 1, 0, 0, 0, 1]),
+			},
+		})
+
+		const result = buildProvinceDisplayData({
+			hoverProvince: 1,
+			hoverNationId: 1,
+			world,
+		})
+
+		expect(result.provinceNation?.color).toBe("rgb(255, 0, 0)")
+	})
+
+	it("returns null province details for invalid province inputs", () => {
 		const result = buildProvinceDisplayData({
 			hoverProvince: -1,
 			hoverNationId: null,
-			hoverRegionColor: null,
 			world: makeWorld({
 				nations: {
 					assignment: new Int32Array([0]),
+					colors: new Float32Array([1, 0, 0]),
 				},
 				provinces: {
 					colors: new Float32Array([1, 0, 0]),
@@ -304,8 +323,37 @@ describe("buildProvinceDisplayData", () => {
 		expect(result).toEqual({
 			provinceColor: null,
 			provinceNation: null,
-			regionDisplayColor: null,
 		})
+	})
+	it("returns null nation color when nations.colors is absent or nation id is out of bounds", () => {
+		const noColors = buildProvinceDisplayData({
+			hoverProvince: 0,
+			hoverNationId: 0,
+			world: makeWorld({
+				nations: {
+					assignment: new Int32Array([0]),
+				},
+				provinces: {
+					colors: new Float32Array([1, 0, 0]),
+				},
+			}),
+		})
+		expect(noColors.provinceNation?.color).toBeNull()
+
+		const outOfBounds = buildProvinceDisplayData({
+			hoverProvince: 0,
+			hoverNationId: 5,
+			world: makeWorld({
+				nations: {
+					assignment: new Int32Array([5]),
+					colors: new Float32Array([1, 0, 0]),
+				},
+				provinces: {
+					colors: new Float32Array([1, 0, 0]),
+				},
+			}),
+		})
+		expect(outOfBounds.provinceNation?.color).toBeNull()
 	})
 })
 
@@ -595,6 +643,80 @@ describe("buildDemographicDisplayData", () => {
 			value: "0.75",
 			color: null,
 		})
+	})
+
+	it("shows 'Cradle' label at wave=0 for migration mode", () => {
+		const world = makeWorld({
+			provinces: { desolate: new Uint8Array([0]), size: new Float32Array([1]) },
+			population: { migrationWave: new Float32Array([0]) },
+		})
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "migration",
+				hoverProvince: 0,
+				world,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toEqual({ label: "Migration", value: "Cradle", color: null })
+	})
+
+	it("shows percentage for mid-range migration wave", () => {
+		const world = makeWorld({
+			provinces: { desolate: new Uint8Array([0]), size: new Float32Array([1]) },
+			population: { migrationWave: new Float32Array([0.42]) },
+		})
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "migration",
+				hoverProvince: 0,
+				world,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toEqual({ label: "Migration", value: "42%", color: null })
+	})
+
+	it("returns null for migration mode when province is desolate or wave is -1", () => {
+		const desolateWorld = makeWorld({
+			provinces: { desolate: new Uint8Array([1]), size: new Float32Array([1]) },
+			population: { migrationWave: new Float32Array([0.5]) },
+		})
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "migration",
+				hoverProvince: 0,
+				world: desolateWorld,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toBeNull()
+
+		const unreachableWorld = makeWorld({
+			provinces: { desolate: new Uint8Array([0]), size: new Float32Array([1]) },
+			population: { migrationWave: new Float32Array([-1]) },
+		})
+		expect(
+			buildDemographicDisplayData({
+				populationMode: "migration",
+				hoverProvince: 0,
+				world: unreachableWorld,
+				unitSystem: "metric",
+				getCultureName: (id) => `culture-${id}`,
+				getHeritageName: (id) => `heritage-${id}`,
+				getFaithName: (id) => `faith-${id}`,
+				getReligionName: (id) => `religion-${id}`,
+			}),
+		).toBeNull()
 	})
 
 	it("resolves heritage, faith, and religion chains from the hovered culture", () => {

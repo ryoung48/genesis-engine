@@ -841,6 +841,7 @@ describe("history state helpers", () => {
 		state.events = []
 		state.time += deltaMonth(1)
 		setRelation(state, 2, 3, REL.FRIENDLY)
+		setRelation(state, 2, 0, REL.SUSPICIOUS)
 		PROV.leader.dynasty.set(state, 2, state.time, 7)
 		PROV.leader.dynasty.set(state, 3, state.time, 7)
 		const leaderIdx = state.leaderRuntime.idx[2]
@@ -909,6 +910,8 @@ describe("history state helpers", () => {
 		state.events = []
 		state.time += deltaMonth(1)
 		PROV.leader.dynasty.set(state, 3, state.time, 4)
+		// Set all neighbors to SUSPICIOUS so no qualifying candidates exist
+		setRelation(state, 3, 2, REL.SUSPICIOUS)
 		const leaderIdx = state.leaderRuntime.idx[3]
 		const nextDynasty = state.nextDynasty
 		let weightedChoiceCalls = 0
