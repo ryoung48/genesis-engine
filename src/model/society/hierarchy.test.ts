@@ -86,10 +86,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([12, 11, 9, 8, 7]),
 			urbanPop: new Float32Array([0, 20_000, 10_000, 0, 0]),
-			provinceSeeds: new Int32Array([0, 1, 2, 3, 4]),
-			r_xyz: new Float32Array([
-				1, 0, 0, 0.8, 0.2, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0,
-			]),
 			adjOffset: new Int32Array([0, 4, 6, 9, 12, 14]),
 			adjList: new Int32Array([1, 2, 3, 4, 0, 2, 0, 1, 3, 0, 2, 4, 0, 3]),
 			provinceCount: 5,
@@ -109,12 +105,6 @@ describe("rebalanceHierarchy", () => {
 		const members = Int32Array.from({ length: 15 }, (_, i) => i + 1)
 		const parent = new Int32Array(provinceCount).fill(-1)
 		const depth = new Int32Array(provinceCount)
-		const angle = (i: number) => (2 * Math.PI * i) / provinceCount
-		const r_xyz = new Float32Array(provinceCount * 3)
-		for (let i = 0; i < provinceCount; i++) {
-			r_xyz[3 * i] = Math.cos(angle(i))
-			r_xyz[3 * i + 1] = Math.sin(angle(i))
-		}
 		const adjOffset = new Int32Array(provinceCount + 1)
 		const adjList = new Int32Array(provinceCount * 2)
 		for (let i = 0; i < provinceCount; i++) {
@@ -133,8 +123,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: KINGDOM_FANOUT,
 			habitability: new Float32Array(provinceCount).fill(1),
 			urbanPop: new Float32Array(provinceCount),
-			provinceSeeds: Int32Array.from({ length: provinceCount }, (_, i) => i),
-			r_xyz,
 			adjOffset,
 			adjList,
 			provinceCount,
@@ -171,8 +159,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([3, 2]),
 			urbanPop: new Float32Array([0, 0]),
-			provinceSeeds: new Int32Array([0, 1]),
-			r_xyz: new Float32Array([1, 0, 0, -1, 0, 0]),
 			adjOffset: new Int32Array([0, 0, 0]),
 			adjList: new Int32Array(),
 			provinceCount: 2,
@@ -193,8 +179,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([10, 9, 8, 11]),
 			urbanPop: new Float32Array([0, 5000, 0, 0]),
-			provinceSeeds: new Int32Array([0, 1, 2, 3]),
-			r_xyz: new Float32Array([1, 0, 0, 0.8, 0.2, 0, -0.8, 0.2, 0, 0, -1, 0]),
 			adjOffset: new Int32Array([0, 1, 1, 1, 1]),
 			adjList: new Int32Array([1]),
 			provinceCount: 4,
@@ -221,11 +205,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([10, 20, 19, 1, 3, 18]),
 			urbanPop: new Float32Array([0, 0, 0, 0, 0, 0]),
-			provinceSeeds: new Int32Array([0, 1, 2, 3, 4, 5]),
-			r_xyz: new Float32Array([
-				1, 0, 0, 0.99, 0.1, 0, 0.98, 0.2, 0, 0.96, 0.28, 0, 0.95, 0.3, 0, 0.97,
-				0.25, 0,
-			]),
 			adjOffset: new Int32Array([0, 0, 1, 2, 3, 4, 4]),
 			adjList: new Int32Array([2, 1, 4, 3]),
 			provinceCount: 6,
@@ -253,11 +232,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: KINGDOM_FANOUT,
 			habitability: new Float32Array([10, 20, 18, 16, 14, 0.01, 0.02]),
 			urbanPop: new Float32Array([0, 0, 0, 0, 0, 0, 0]),
-			provinceSeeds: new Int32Array([0, 1, 2, 3, 4, 5, 6]),
-			r_xyz: new Float32Array([
-				1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0, 0, 0, 1, 0.1, 0.99, 0, 0.2, 0.98,
-				0,
-			]),
 			adjOffset: new Int32Array([0, 0, 0, 0, 0, 0, 1, 2]),
 			adjList: new Int32Array([6, 5]),
 			provinceCount: 7,
@@ -281,12 +255,6 @@ describe("rebalanceHierarchy", () => {
 		const members = Int32Array.from({ length: 50 }, (_, i) => i + 1)
 		const parent = new Int32Array(provinceCount).fill(-1)
 		const depth = new Int32Array(provinceCount)
-		const r_xyz = new Float32Array(provinceCount * 3)
-		for (let i = 0; i < provinceCount; i++) {
-			const angle = (2 * Math.PI * i) / provinceCount
-			r_xyz[3 * i] = Math.cos(angle)
-			r_xyz[3 * i + 1] = Math.sin(angle)
-		}
 		const adjOffset = new Int32Array(provinceCount + 1)
 		const adjList = new Int32Array(provinceCount * 2)
 		for (let i = 0; i < provinceCount; i++) {
@@ -305,8 +273,6 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: EMPIRE_FANOUT,
 			habitability: new Float32Array(provinceCount).fill(1),
 			urbanPop: new Float32Array(provinceCount),
-			provinceSeeds: Int32Array.from({ length: provinceCount }, (_, i) => i),
-			r_xyz,
 			adjOffset,
 			adjList,
 			provinceCount,

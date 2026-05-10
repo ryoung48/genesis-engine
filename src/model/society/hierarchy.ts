@@ -41,24 +41,6 @@ const TRIBUTE = 0.25
 const OVEREXTENSION = 0.9
 const URBAN_POP_SCALE = 10_000
 
-function provinceSeedDistance(
-	aProvince: number,
-	bProvince: number,
-	provinceSeeds: Int32Array<ArrayBufferLike>,
-	r_xyz: Float32Array<ArrayBufferLike>,
-): number {
-	const a = provinceSeeds[aProvince]
-	const b = provinceSeeds[bProvince]
-	const ax = r_xyz[3 * a]
-	const ay = r_xyz[3 * a + 1]
-	const az = r_xyz[3 * a + 2]
-	const bx = r_xyz[3 * b]
-	const by = r_xyz[3 * b + 1]
-	const bz = r_xyz[3 * b + 2]
-	const dot = Math.max(-1, Math.min(1, ax * bx + ay * by + az * bz))
-	return Math.acos(dot)
-}
-
 function partitionMembers(
 	seeds: Int32Array<ArrayBufferLike>,
 	members: Int32Array<ArrayBufferLike>,
@@ -161,8 +143,6 @@ export function rebalanceHierarchy(params: {
 	fanoutRanges: FanoutRanges
 	habitability: Float32Array<ArrayBufferLike>
 	urbanPop: Float32Array<ArrayBufferLike>
-	provinceSeeds: Int32Array<ArrayBufferLike>
-	r_xyz: Float32Array<ArrayBufferLike>
 	adjOffset: Int32Array<ArrayBufferLike>
 	adjList: Int32Array<ArrayBufferLike>
 	provinceCount: number
@@ -176,8 +156,6 @@ export function rebalanceHierarchy(params: {
 		fanoutRanges,
 		habitability,
 		urbanPop,
-		provinceSeeds,
-		r_xyz,
 		adjOffset,
 		adjList,
 		provinceCount,
@@ -196,42 +174,71 @@ export function rebalanceHierarchy(params: {
 	const rawK = Math.round(members.length / targetGroupSize)
 	const k = Math.min(members.length, Math.max(minK, Math.min(maxK, rawK)))
 
-	// k-means++ seed selection: each seed is chosen proportional to
-	// (habitability + 1) * minDistToExistingSeeds, spreading seeds across the
-	// full territory rather than clustering them in a distance ring.
-	const candidates = new Uint8Array(members.length).fill(1)
+	// Traversable set for BFS routing: capital + all members.
+	// This lets BFS paths cut through the parent capital so seeds are
+	// placed by actual graph-hop distance, not angular distance.
+	const traversable = new Uint8Array(provinceCount)
+	traversable[capital] = 1
+	for (let i = 0; i < members.length; i++) traversable[members[i]] = 1
+
+	// Farthest-first seed selection using multi-source BFS graph distance.
+	// First seed: most habitable member.
+	// Subsequent seeds: member with greatest min-hop distance to any existing
+	// seed, with habitability as a tiebreaker.
+	const isSeed = new Uint8Array(provinceCount)
 	const seeds = new Int32Array(k)
 	let seedCount = 0
+
 	for (; seedCount < k; seedCount++) {
-		let bestMember = -1
-		let bestScore = -Infinity
-		for (let i = 0; i < members.length; i++) {
-			if (!candidates[i]) continue
-			const province = members[i]
-			const hab =
-				habitability[province] + urbanPop[province] / URBAN_POP_SCALE + 1
-			let minDist = 1
-			if (seedCount > 0) {
-				minDist = Infinity
-				for (let s = 0; s < seedCount; s++) {
-					const dist = provinceSeedDistance(
-						province,
-						seeds[s],
-						provinceSeeds,
-						r_xyz,
-					)
-					if (dist < minDist) minDist = dist
+		let bestIdx = -1
+		let bestScore = -1
+
+		if (seedCount === 0) {
+			for (let i = 0; i < members.length; i++) {
+				const score =
+					habitability[members[i]] + urbanPop[members[i]] / URBAN_POP_SCALE
+				if (score > bestScore) {
+					bestScore = score
+					bestIdx = i
 				}
 			}
-			const score = hab * minDist
-			if (score > bestScore) {
-				bestScore = score
-				bestMember = i
+		} else {
+			// Multi-source BFS from all existing seeds.
+			const bfsDist = new Int32Array(provinceCount).fill(-1)
+			const queue: number[] = []
+			for (let s = 0; s < seedCount; s++) {
+				bfsDist[seeds[s]] = 0
+				queue.push(seeds[s])
+			}
+			for (let head = 0; head < queue.length; head++) {
+				const p = queue[head]
+				const d = bfsDist[p] + 1
+				for (let j = adjOffset[p]; j < adjOffset[p + 1]; j++) {
+					const nb = adjList[j]
+					if (traversable[nb] && bfsDist[nb] < 0) {
+						bfsDist[nb] = d
+						queue.push(nb)
+					}
+				}
+			}
+			// Pick the member farthest from all seeds; use habitability to
+			// break ties between equidistant provinces.
+			for (let i = 0; i < members.length; i++) {
+				const p = members[i]
+				if (isSeed[p]) continue
+				const d = bfsDist[p]
+				if (d < 0) continue
+				const score = d * 1000 + habitability[p] + urbanPop[p] / URBAN_POP_SCALE
+				if (score > bestScore) {
+					bestScore = score
+					bestIdx = i
+				}
 			}
 		}
-		if (bestMember < 0) break
-		seeds[seedCount] = members[bestMember]
-		candidates[bestMember] = 0
+
+		if (bestIdx < 0) break
+		seeds[seedCount] = members[bestIdx]
+		isSeed[members[bestIdx]] = 1
 	}
 	if (seedCount === 0) return
 
@@ -261,8 +268,6 @@ export function rebalanceHierarchy(params: {
 				fanoutRanges,
 				habitability,
 				urbanPop,
-				provinceSeeds,
-				r_xyz,
 				adjOffset,
 				adjList,
 				provinceCount,

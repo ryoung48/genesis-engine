@@ -565,8 +565,6 @@ function addTerritory(
 		fanoutRanges: fanoutRangesForSize(members.length),
 		habitability: state.habitability,
 		urbanPop: state.popUrbanCurrent,
-		provinceSeeds: state.provinceSeeds,
-		r_xyz: state.r_xyz,
 		adjOffset: state.provinceAdjOffset,
 		adjList: state.provinceAdjList,
 		provinceCount: state.P,

@@ -1415,6 +1415,100 @@ describe("computeRegionColors", () => {
 		expectRegionColor(religion!, 1, [0.7, 0.2, 0.5])
 	})
 
+	it("renders culture stripes when a province has an active blend", () => {
+		// Province 0 has 2 regions, province 1 has 2 regions.
+		// Culture 0 = [0.4, 0.5, 0.6], culture 1 = [0.8, 0.3, 0.1]
+		// Province 0 is bleeding toward culture 1 (blendSecondary=1, blendWeight=0.3).
+		//
+		// Hash: stripeVal = Math.abs(((rx*7 + ry*13 + rz*5)*25) % 1)
+		// Region 0 r_xyz=[1,0,0]: (7)*25=175, 175%1=0   → 0 < 0.3 → secondary color
+		// Region 1 r_xyz=[0,0,0.004]: (0.02)*25=0.5, 0.5%1=0.5 → 0.5 ≥ 0.3 → primary color
+		// Region 2 in province 1 (no blend): primary culture 1 color
+		const stripeWorld = buildWorld({
+			mesh: {
+				numRegions: 4,
+				r_xyz: new Float32Array([
+					1,
+					0,
+					0, // region 0: stripeVal ≈ 0
+					0,
+					0,
+					0.004, // region 1: stripeVal ≈ 0.5
+					0,
+					1,
+					0, // region 2: province 1, no blend
+					0,
+					0,
+					1, // region 3: province 1, no blend
+				]),
+			} as never,
+			elevation: new Float32Array([1, 1, 1, 1]),
+			elevation_km: new Float32Array([1, 1, 1, 1]),
+			isLand: new Uint8Array([1, 1, 1, 1]),
+			provinces: {
+				regionProvince: new Int32Array([0, 0, 1, 1]),
+				seeds: new Int32Array([0, 1]),
+				count: 2,
+				desolate: new Uint8Array([0, 0]),
+				landmassId: new Int32Array([0, 0]),
+				adjOffset: new Int32Array([0, 1, 2]),
+				adjList: new Int32Array([1, 0]),
+				size: new Int32Array([2, 2]),
+				colors: new Float32Array(6),
+			} as never,
+			cultures: {
+				assignment: new Int32Array([0, 1]),
+				count: 2,
+				colors: new Float32Array([0.4, 0.5, 0.6, 0.8, 0.3, 0.1]),
+			} as SerializedOrogenWorld["cultures"],
+		})
+
+		const blendView = {
+			cultureBlendSecondary: new Int32Array([-1, -1, -1, -1]).fill(1, 0, 1),
+			cultureBlendWeight: new Float32Array([0.3, 0, 0, 0]),
+		}
+
+		const colors = computeRegionColors(
+			stripeWorld,
+			"population",
+			DEFAULT_NATION_MODE,
+			"culture",
+			0,
+			0,
+			0,
+			0,
+			"map",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			blendView as never,
+		)!
+
+		// Region 0: stripeVal≈0 < blendWeight=0.3 → secondary culture 1 color
+		expectRegionColor(colors, 0, [0.8, 0.3, 0.1])
+		// Region 1: stripeVal≈0.5 ≥ blendWeight=0.3 → primary culture 0 color
+		expectRegionColor(colors, 1, [0.4, 0.5, 0.6])
+		// Regions 2 and 3: province 1, no blend → culture 1 color
+		expectRegionColor(colors, 2, [0.8, 0.3, 0.1])
+		expectRegionColor(colors, 3, [0.8, 0.3, 0.1])
+
+		// Without historyView, culture mode renders normally (no stripe logic)
+		const noView = computeRegionColors(
+			stripeWorld,
+			"population",
+			DEFAULT_NATION_MODE,
+			"culture",
+			0,
+			0,
+			0,
+			0,
+		)!
+		// Both provinces render their primary culture colors
+		expectRegionColor(noView, 0, [0.4, 0.5, 0.6])
+		expectRegionColor(noView, 2, [0.8, 0.3, 0.1])
+	})
+
 	it("covers province, population, basin, and null fallbacks", () => {
 		const provinceWorld = buildWorld({
 			mesh: { numRegions: 3 } as never,

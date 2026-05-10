@@ -190,6 +190,8 @@ function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
 		frame.relationA.buffer,
 		frame.relationB.buffer,
 		frame.relationValues.buffer,
+		frame.cultureBlendSecondary.buffer,
+		frame.cultureBlendWeight.buffer,
 	]
 }
 

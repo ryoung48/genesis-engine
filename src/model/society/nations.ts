@@ -251,8 +251,6 @@ export function computeNations(params: {
 			fanoutRanges: fanoutRangesForSize(sizes[nation]),
 			habitability,
 			urbanPop,
-			provinceSeeds: provinces.seeds,
-			r_xyz,
 			adjOffset: provinces.adjOffset,
 			adjList: provinces.adjList,
 			provinceCount,

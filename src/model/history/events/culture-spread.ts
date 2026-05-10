@@ -8,9 +8,9 @@ const SPREAD_INTERVAL_YEARS = 5
 /** Fraction of culture-border province pairs that are eligible for bleed. */
 const BLEED_INIT_PROBABILITY = 0.55
 /** Probability per tick that an eligible idle border starts a new bleed. */
-const NEW_BLEED_CHANCE = 0.08
-/** Initial blend weight when a new bleed starts. */
-const BLEED_START_WEIGHT = 0.05
+const NEW_BLEED_CHANCE = 0.2
+/** Initial blend weight when a new bleed starts — high enough to produce visible stripes immediately. */
+const BLEED_START_WEIGHT = 0.3
 /** Blend weight increase per tick via organic cultural diffusion. */
 const DIFFUSION_RATE = 0.01
 /** Blend weight increase per tick when the province is under a foreign ruler of the secondary culture. */
