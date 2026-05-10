@@ -1,5 +1,11 @@
-import React from "react"
-import { DistributionChart } from "@/components"
+import React, { useMemo, useState } from "react"
+import {
+	DataTable,
+	type DataTableColumn,
+	DistributionChart,
+	Pagination,
+	Swatch,
+} from "@/components"
 import type { WorldSection } from "../drawer-state"
 import type { DetailsDrawerBaseProps } from "../shared"
 import { AccordionSection, DetailRow, formatPopulation } from "../shared"
@@ -50,6 +56,8 @@ function getWorldSections({
 			{ label: "Continents", value: stats.get("Continents") },
 			{ label: "Provinces", value: stats.get("Provinces") },
 			{ label: "Avg Province Area", value: stats.get("Avg Province Area") },
+			{ label: "Locations", value: stats.get("Locations") },
+			{ label: "Avg Location Area", value: stats.get("Avg Location Area") },
 		].filter((stat): stat is { label: string; value: string } =>
 			Boolean(stat.value),
 		),
@@ -90,6 +98,8 @@ function getWorldSections({
 	}
 }
 
+const TRADE_GOODS_PAGE_SIZE = 5
+
 interface WorldDetailsProps extends DetailsDrawerBaseProps {
 	section: WorldSection
 	onSectionChange: (section: WorldSection) => void
@@ -111,6 +121,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	climateDistribution,
 	vegetationDistribution,
 	topographyDistribution,
+	tradeGoodsDistribution,
 }) => {
 	const worldSections = getWorldSections({
 		planetStats,
@@ -121,6 +132,45 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		faithCount,
 		religionCount,
 	})
+
+	const tradeGoodsTotal = tradeGoodsDistribution.reduce(
+		(sum, row) => sum + row.count,
+		0,
+	)
+
+	const [tradeGoodsPage, setTradeGoodsPage] = useState(0)
+	const pagedTradeGoods = useMemo(() => {
+		const start = tradeGoodsPage * TRADE_GOODS_PAGE_SIZE
+		return tradeGoodsDistribution.slice(start, start + TRADE_GOODS_PAGE_SIZE)
+	}, [tradeGoodsDistribution, tradeGoodsPage])
+	type TradeGoodRow = (typeof tradeGoodsDistribution)[number]
+	const tradeGoodsColumns: ReadonlyArray<DataTableColumn<TradeGoodRow>> = [
+		{
+			id: "name",
+			header: "Trade Good",
+			cell: (row) => (
+				<span className="inline-flex items-center gap-1.5">
+					<Swatch color={row.color} />
+					<span>{row.label}</span>
+				</span>
+			),
+		},
+		{
+			id: "count",
+			header: "Count",
+			align: "end",
+			cell: (row) => row.count.toLocaleString(),
+		},
+		{
+			id: "pct",
+			header: "Dist%",
+			align: "end",
+			cell: (row) =>
+				tradeGoodsTotal > 0
+					? `${((row.count / tradeGoodsTotal) * 100).toFixed(1)}%`
+					: "—",
+		},
+	]
 
 	return (
 		<div className="space-y-2">
@@ -183,6 +233,24 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 					<DistributionChart title="Conflicts" buckets={conflictDistribution} />
 					<DistributionChart title="Relations" buckets={relationDistribution} />
 				</div>
+			</AccordionSection>
+			<AccordionSection
+				title="Trade Goods"
+				open={section === "trade-goods"}
+				onToggle={() => onSectionChange("trade-goods")}
+			>
+				<DataTable
+					columns={tradeGoodsColumns}
+					rows={pagedTradeGoods}
+					rowKey={(row) => row.label}
+					empty="No trade goods assigned"
+				/>
+				<Pagination
+					pageIndex={tradeGoodsPage}
+					pageSize={TRADE_GOODS_PAGE_SIZE}
+					totalItems={tradeGoodsDistribution.length}
+					onPageChange={setTradeGoodsPage}
+				/>
 			</AccordionSection>
 		</div>
 	)

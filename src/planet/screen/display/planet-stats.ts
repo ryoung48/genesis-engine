@@ -62,6 +62,11 @@ export function computePlanetStats(
 		avgProvinceAreaKm2 = landAreaKm2 / world.provinces.count
 	}
 
+	let avgLocationAreaKm2: number | null = null
+	if (landAreaKm2 !== null && world?.locations?.count) {
+		avgLocationAreaKm2 = landAreaKm2 / world.locations.count
+	}
+
 	let avgAnnualTempC: number | null = null
 	if (world?.climate?.temperature_avg) {
 		let sum = 0
@@ -143,6 +148,21 @@ export function computePlanetStats(
 			value:
 				avgProvinceAreaKm2 !== null
 					? formatArea(avgProvinceAreaKm2, unitSystem, {
+							digits: 0,
+							compact: "k",
+						})
+					: "-",
+		},
+		{
+			label: "Locations",
+			value:
+				world?.locations?.count != null ? String(world.locations.count) : "-",
+		},
+		{
+			label: "Avg Location Area",
+			value:
+				avgLocationAreaKm2 !== null
+					? formatArea(avgLocationAreaKm2, unitSystem, {
 							digits: 0,
 							compact: "k",
 						})

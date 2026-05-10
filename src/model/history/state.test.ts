@@ -75,7 +75,7 @@ function createTestState(): HistoryState {
 		new Uint8Array([1, 1, 0, 0]),
 		new Uint8Array([0, 0, 1, 0]),
 		new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0]),
-		{ assignment: new Int32Array([0, 0, 1, 1]) },
+		{ assignment: new Int32Array([0, 0, 1, 1]), count: 2 },
 		10,
 		createHistoryRng(11),
 	)
@@ -122,7 +122,7 @@ function createDesolateState(): HistoryState {
 		new Uint8Array([1, 0, 0]),
 		new Uint8Array([0, 1, 0]),
 		new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0]),
-		{ assignment: new Int32Array([0, 1, 1]) },
+		{ assignment: new Int32Array([0, 1, 1]), count: 2 },
 		120,
 		createHistoryRng(17),
 	)
@@ -169,7 +169,7 @@ function createIndirectConnectionState(): HistoryState {
 		new Uint8Array([1, 0, 0]),
 		new Uint8Array([0, 0, 1]),
 		new Float32Array([1, 0, 0, -1, 0, 0, 0, 1, 0]),
-		{ assignment: new Int32Array([0, 0, 0]) },
+		{ assignment: new Int32Array([0, 0, 0]), count: 1 },
 		75,
 		createHistoryRng(53),
 	)
@@ -684,7 +684,7 @@ describe("history state helpers", () => {
 			new Uint8Array([1, 1, 0, 0]),
 			new Uint8Array([1, 0, 1, 0]),
 			new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0]),
-			{ assignment: new Int32Array([0, 0, 1]) },
+			{ assignment: new Int32Array([0, 0, 1]), count: 2 },
 			150,
 			rng,
 		)
@@ -783,7 +783,7 @@ describe("history state helpers", () => {
 			new Uint8Array([1, 1, 1, 0]),
 			new Uint8Array([1, 1, 1, 0]),
 			new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
-			{ assignment: new Int32Array([0, 0, 0]) },
+			{ assignment: new Int32Array([0, 0, 0]), count: 1 },
 			150,
 			rng,
 		)

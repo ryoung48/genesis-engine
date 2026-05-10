@@ -47,6 +47,7 @@ export type ColorMode =
 	| "basins"
 	| "terrainFeatures"
 	| "dtr"
+	| "trade_goods"
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]

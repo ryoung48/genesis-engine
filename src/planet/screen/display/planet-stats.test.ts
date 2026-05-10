@@ -28,6 +28,7 @@ function buildWorld(): SerializedOrogenWorld {
 		} as SerializedOrogenWorld["rainfall"],
 		dtr_annual: Float32Array.from([8, 10]),
 		provinces: { count: 2 } as SerializedOrogenWorld["provinces"],
+		locations: { count: 6 } as SerializedOrogenWorld["locations"],
 		population: {
 			habitabilityScore: 0.75,
 			totalPopulation: 2_500_000,
@@ -71,6 +72,10 @@ describe("computePlanetStats", () => {
 		expect(statValue(imperial, "Avg Rain")).toBe("43.3 in")
 		expect(statValue(metric, "Avg Province Area")).toMatch(/k km²$/)
 		expect(statValue(imperial, "Avg Province Area")).toMatch(/k mi²$/)
+		expect(statValue(metric, "Locations")).toBe("6")
+		expect(statValue(imperial, "Locations")).toBe("6")
+		expect(statValue(metric, "Avg Location Area")).toMatch(/k km²$/)
+		expect(statValue(imperial, "Avg Location Area")).toMatch(/k mi²$/)
 		expect(statValue(metric, "Land Area")).toMatch(/M km² \(50\.0%\)$/)
 		expect(statValue(imperial, "Land Area")).toMatch(/M mi² \(50\.0%\)$/)
 	})
@@ -99,6 +104,8 @@ describe("computePlanetStats", () => {
 		expect(statValue(stats, "Day")).toBe("30.0 h")
 		expect(statValue(stats, "Pressure")).toBe("1.5 bar")
 		expect(statValue(stats, "Avg Province Area")).toBe("-")
+		expect(statValue(stats, "Locations")).toBe("-")
+		expect(statValue(stats, "Avg Location Area")).toBe("-")
 		expect(statValue(stats, "Cell")).toBe("-")
 		expect(statValue(stats, "Land Area")).toBe("-")
 		expect(statValue(stats, "Avg Temp")).toBe("-")

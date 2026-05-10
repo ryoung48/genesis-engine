@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 import { DetailsDrawer } from "./DetailsDrawer"
 
-function renderDrawer(
+function _renderDrawer(
 	overrides: Partial<React.ComponentProps<typeof DetailsDrawer>> = {},
 ) {
 	return renderToStaticMarkup(
@@ -24,6 +24,7 @@ function renderDrawer(
 			vegetationDistribution={[]}
 			topographyDistribution={[]}
 			relationDistribution={[]}
+			tradeGoodsDistribution={[]}
 			{...overrides}
 		/>,
 	)
@@ -31,7 +32,7 @@ function renderDrawer(
 
 describe("DetailsDrawer", () => {
 	it("renders a reopen button when the drawer is closed", () => {
-		const markup = renderDrawer({ open: false })
+		const markup = _renderDrawer({ open: false })
 
 		expect(markup).toContain('title="Show details"')
 		expect(markup).toContain("absolute right-3 bottom-3")
@@ -40,7 +41,7 @@ describe("DetailsDrawer", () => {
 	})
 
 	it("renders the drawer shell when open", () => {
-		const markup = renderDrawer()
+		const markup = _renderDrawer()
 
 		expect(markup).toContain("DETAILS")
 		expect(markup).toContain('title="Hide details"')

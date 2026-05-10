@@ -266,6 +266,8 @@ function makeBenchmarkFixture(params: {
 				endTime: 130,
 			},
 		],
+		cultureBlendSecondary: makeProvinceTimelineInt([]),
+		cultureBlendWeight: makeProvinceTimelineFloat([]),
 	}
 
 	const adjOffset = new Int32Array(provinceCount + 1)
@@ -358,6 +360,8 @@ describe("createHistoryQuery", () => {
 			nationColorKeys: new Int32Array([0, 1]),
 			nationColorValues: new Float32Array([1, 0, 0, 0, 1, 0]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const bundle: TimelineBundle = { timelines, events: [] }
 		const world = {
@@ -431,6 +435,8 @@ describe("createHistoryQuery", () => {
 					endTime: 10,
 				},
 			],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const bundle: TimelineBundle = {
 			timelines,
@@ -502,6 +508,8 @@ describe("createHistoryQuery", () => {
 			nationColorKeys: new Int32Array(),
 			nationColorValues: new Float32Array(),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 
 		const query = createHistoryQuery({ timelines, events: [] }, {
@@ -561,6 +569,8 @@ describe("createHistoryQuery", () => {
 					startTime: 0,
 				},
 			],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const world = {
 			provinces: {
@@ -681,6 +691,8 @@ describe("createHistoryQuery", () => {
 					endTime: 40,
 				},
 			],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const world = {
 			provinces: {
@@ -785,6 +797,8 @@ describe("createHistoryQuery", () => {
 					endTime: 20,
 				},
 			],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const world = {
 			provinces: {
@@ -878,6 +892,8 @@ describe("createHistoryQuery", () => {
 				1, 0, 0, 0.8, 0, 0, 0.6, 0, 0, 0, 1, 0, 0, 0.8, 0, 0, 0.6, 0,
 			]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const world = {
 			provinces: {

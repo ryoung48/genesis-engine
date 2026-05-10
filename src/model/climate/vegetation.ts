@@ -108,14 +108,40 @@ const MOIST = 1500
 const WET = 2200
 
 /**
+ * Half-width (mm) of the probabilistic blend zone around each rainfall threshold.
+ * Within [threshold − HALF_WIDTH, threshold + HALF_WIDTH] the transition is
+ * linear-probabilistic; outside that window the result is deterministic.
+ */
+export const RAINFALL_BLEND_HALF_WIDTH = 50
+
+/**
+ * Returns true if `rain` is considered to exceed `threshold`, with a linear
+ * probabilistic blend in the ±RAINFALL_BLEND_HALF_WIDTH window around it.
+ */
+function probAbove(
+	rain: number,
+	threshold: number,
+	rng: () => number,
+): boolean {
+	if (rain >= threshold + RAINFALL_BLEND_HALF_WIDTH) return true
+	if (rain <= threshold - RAINFALL_BLEND_HALF_WIDTH) return false
+	const t =
+		(rain - (threshold - RAINFALL_BLEND_HALF_WIDTH)) /
+		(2 * RAINFALL_BLEND_HALF_WIDTH)
+	return rng() < t
+}
+
+/**
  * Assign a biome to each land cell based on temperature zone and annual rainfall.
- * Deterministic — no RNG needed.
+ * Pass a seeded `rng` to produce deterministic probabilistic transitions near
+ * rainfall boundaries.
  */
 export function assignVegetation(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
 	climate: OrogenClimate,
 	rainfall: OrogenRainfall,
+	rng: () => number,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const biome = new Uint8Array(N) // 0 = ocean by default
@@ -126,59 +152,59 @@ export function assignVegetation(
 		const temp = climate.temperature_avg[r]
 		const rain = rainfall.annual[r]
 
-		biome[r] = classifyBiome(temp, rain)
+		biome[r] = classifyBiome(temp, rain, rng)
 	}
 
 	return biome
 }
 
-function classifyBiome(temp: number, rain: number): BiomeCode {
+function classifyBiome(
+	temp: number,
+	rain: number,
+	rng: () => number,
+): BiomeCode {
 	// Arctic / ice cap
 	if (temp <= TEMPERATURE_BOUNDARY_SUBARCTIC) return 1 // desert (ice desert)
 
 	// Subarctic
 	if (temp <= TEMPERATURE_BOUNDARY_BOREAL) {
-		if (rain > LOW) return 2 // sparse tundra
-		if (rain > DRY) return 2 // sparse
+		if (probAbove(rain, DRY, rng)) return 2 // sparse
 		return 1 // desert
 	}
 
 	// Boreal
 	if (temp <= TEMPERATURE_BOUNDARY_TEMPERATE) {
-		if (rain > MOD) return 5 // forest (taiga)
-		if (rain > LOW) return 4 // woods
-		if (rain > DRY) return 3 // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+		if (probAbove(rain, MOD, rng)) return 5 // forest (taiga)
+		if (probAbove(rain, LOW, rng)) return 4 // woods
+		if (probAbove(rain, DRY, rng)) return 3 // grasslands
+		if (probAbove(rain, ARID_RAINFALL_THRESHOLD, rng)) return 2 // sparse
 		return 1 // desert
 	}
 
 	// Temperate
 	if (temp <= TEMPERATURE_BOUNDARY_SUBTROPICAL) {
-		if (rain > MOIST) return 5 // forest
-		if (rain > MOD) return 5 // forest
-		if (rain > LOW) return 4 // woods
-		if (rain > DRY) return 3 // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+		if (probAbove(rain, MOD, rng)) return 5 // forest
+		if (probAbove(rain, LOW, rng)) return 4 // woods
+		if (probAbove(rain, DRY, rng)) return 3 // grasslands
+		if (probAbove(rain, ARID_RAINFALL_THRESHOLD, rng)) return 2 // sparse
 		return 1 // desert
 	}
 
 	// Subtropical
 	if (temp <= TEMPERATURE_BOUNDARY_TROPICAL) {
-		if (rain > WET) return 6 // jungle
-		if (rain > MOIST) return 5 // forest
-		if (rain > MOD) return 5 // forest
-		if (rain > LOW) return 4 // woods
-		if (rain > DRY) return 3 // grasslands
-		if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+		if (probAbove(rain, WET, rng)) return 6 // jungle
+		if (probAbove(rain, MOD, rng)) return 5 // forest
+		if (probAbove(rain, LOW, rng)) return 4 // woods
+		if (probAbove(rain, DRY, rng)) return 3 // grasslands
+		if (probAbove(rain, ARID_RAINFALL_THRESHOLD, rng)) return 2 // sparse
 		return 1 // desert
 	}
 
 	// Tropical
-	if (rain > WET) return 6 // jungle
-	if (rain > MOIST) return 6 // jungle
-	if (rain > MOD) return 5 // forest
-	if (rain > LOW) return 4 // woods
-	if (rain > DRY) return 3 // grasslands
-	if (rain > ARID_RAINFALL_THRESHOLD) return 2 // sparse
+	if (probAbove(rain, MOIST, rng)) return 6 // jungle
+	if (probAbove(rain, MOD, rng)) return 5 // forest
+	if (probAbove(rain, LOW, rng)) return 4 // woods
+	if (probAbove(rain, DRY, rng)) return 3 // grasslands
+	if (probAbove(rain, ARID_RAINFALL_THRESHOLD, rng)) return 2 // sparse
 	return 1 // desert
 }

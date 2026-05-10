@@ -1,17 +1,45 @@
 import type { OrogenNationHierarchy } from ".."
 
-const DOMAIN_BREAKS = [3, 5, 8, 13, 21, 31, 51, 81]
-const DOMAIN_RANGE = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+type FanoutLevel = readonly [min: number, max: number, targetGroupSize: number]
+type FanoutRanges = readonly FanoutLevel[]
+
+// Flat: all subjects become direct children of the duchy capital (mirrors CK3
+// where counties are direct vassals of the duke with no intermediate tier).
+export const DUCHY_FANOUT: FanoutRanges = []
+
+// One duchy-level split at depth 0; counties are flat-assigned at depth 1.
+export const KINGDOM_FANOUT: FanoutRanges = [[2, 6, 4]]
+
+// Kingdom split at depth 0, duchy split at depth 1, then flat counties.
+export const EMPIRE_FANOUT: FanoutRanges = [
+	[3, 8, 15],
+	[2, 6, 4],
+]
+
+// Empire split at depth 0, kingdom split at depth 1, duchy split at depth 2,
+// then flat counties.
+export const HEGEMON_FANOUT: FanoutRanges = [
+	[3, 8, 80],
+	[3, 8, 15],
+	[2, 6, 4],
+]
+
+export function fanoutRangesForSize(size: number): FanoutRanges {
+	if (size >= 251) return HEGEMON_FANOUT
+	if (size >= 50) return EMPIRE_FANOUT
+	if (size >= 10) return KINGDOM_FANOUT
+	return DUCHY_FANOUT
+}
+
+/** Max direct children before a node is considered overextended, given nation size. */
+export function maxFanoutForNationSize(size: number): number {
+	const ranges = fanoutRangesForSize(size)
+	return ranges[0]?.[1] ?? Infinity
+}
+
 const TRIBUTE = 0.25
 const OVEREXTENSION = 0.9
 const URBAN_POP_SCALE = 10_000
-
-export function domainLimitFn(count: number): number {
-	for (let i = 0; i < DOMAIN_BREAKS.length; i++) {
-		if (count < DOMAIN_BREAKS[i]) return DOMAIN_RANGE[i]
-	}
-	return DOMAIN_RANGE[DOMAIN_RANGE.length - 1]
-}
 
 function provinceSeedDistance(
 	aProvince: number,
@@ -130,6 +158,7 @@ export function rebalanceHierarchy(params: {
 	parent: Int32Array<ArrayBufferLike>
 	depth: Int32Array<ArrayBufferLike>
 	currentDepth: number
+	fanoutRanges: FanoutRanges
 	habitability: Float32Array<ArrayBufferLike>
 	urbanPop: Float32Array<ArrayBufferLike>
 	provinceSeeds: Int32Array<ArrayBufferLike>
@@ -144,6 +173,7 @@ export function rebalanceHierarchy(params: {
 		parent,
 		depth,
 		currentDepth,
+		fanoutRanges,
 		habitability,
 		urbanPop,
 		provinceSeeds,
@@ -154,7 +184,17 @@ export function rebalanceHierarchy(params: {
 	} = params
 	if (members.length === 0) return
 
-	const k = Math.min(members.length, domainLimitFn(members.length))
+	if (currentDepth >= fanoutRanges.length) {
+		for (let i = 0; i < members.length; i++) {
+			parent[members[i]] = capital
+			depth[members[i]] = currentDepth + 1
+		}
+		return
+	}
+
+	const [minK, maxK, targetGroupSize] = fanoutRanges[currentDepth]
+	const rawK = Math.round(members.length / targetGroupSize)
+	const k = Math.min(members.length, Math.max(minK, Math.min(maxK, rawK)))
 	const distances = new Float32Array(members.length)
 	let mean = 0
 	for (let i = 0; i < members.length; i++) {
@@ -246,6 +286,7 @@ export function rebalanceHierarchy(params: {
 				parent,
 				depth,
 				currentDepth: currentDepth + 1,
+				fanoutRanges,
 				habitability,
 				urbanPop,
 				provinceSeeds,
@@ -306,14 +347,20 @@ export function computeGravity(params: {
 	childList: Int32Array<ArrayBufferLike>
 	depth: Int32Array<ArrayBufferLike>
 	provinceCount: number
+	fanoutRanges: FanoutRanges
 }): Float32Array {
-	const { habitability, childOffset, childList, depth, provinceCount } = params
+	const {
+		habitability,
+		childOffset,
+		childList,
+		depth,
+		provinceCount,
+		fanoutRanges,
+	} = params
 	const gravity = new Float32Array(provinceCount)
-	const subtreeSize = new Int32Array(provinceCount)
 
 	let maxDepth = 0
 	for (let p = 0; p < provinceCount; p++) {
-		subtreeSize[p] = 1
 		if (depth[p] > maxDepth) maxDepth = depth[p]
 	}
 
@@ -331,25 +378,14 @@ export function computeGravity(params: {
 
 	for (let i = provinceCount - 1; i >= 0; i--) {
 		const province = order[i]
-		const childStart = childOffset[province]
-		const childEnd = childOffset[province + 1]
-		for (let j = childStart; j < childEnd; j++) {
-			subtreeSize[province] += subtreeSize[childList[j]]
-		}
-	}
-
-	for (let i = provinceCount - 1; i >= 0; i--) {
-		const province = order[i]
 		let score = habitability[province]
 		const childStart = childOffset[province]
 		const childEnd = childOffset[province + 1]
 		for (let j = childStart; j < childEnd; j++) {
 			score += gravity[childList[j]] * TRIBUTE
 		}
-		const overextended =
-			childEnd - childStart > domainLimitFn(subtreeSize[province])
-				? OVEREXTENSION
-				: 1
+		const maxChildren = fanoutRanges[depth[province]]?.[1] ?? 100
+		const overextended = childEnd - childStart > maxChildren ? OVEREXTENSION : 1
 		gravity[province] = score * overextended
 	}
 

@@ -6,6 +6,7 @@ import {
 	resolveLeaderGender,
 } from "@/model/society/gender-system"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import { getHoverClimateDisplay, getHoverTradeGood } from "./hover"
 import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
@@ -504,6 +505,45 @@ describe("buildClimateSwatchColor", () => {
 				"koppenClimate",
 			),
 		).toMatch(/^rgb/)
+	})
+})
+
+describe("getHoverClimateDisplay", () => {
+	const pasta = { code: "Af", name: "Tropical Rainforest" }
+	const koppen = { code: "Cfb", name: "Oceanic" }
+
+	it("returns null when no data is present", () => {
+		expect(getHoverClimateDisplay("terrain", null, null, null)).toBeNull()
+	})
+
+	it("shows basic climate zone by default", () => {
+		expect(getHoverClimateDisplay("terrain", pasta, null, "temperate")).toBe(
+			"temperate",
+		)
+	})
+
+	it("shows pasta climate name in lowercase without code in pastaClimate mode", () => {
+		expect(
+			getHoverClimateDisplay("pastaClimate", pasta, null, "tropical"),
+		).toBe("tropical rainforest")
+	})
+
+	it("shows basic climate zone when pasta absent in pastaClimate mode", () => {
+		expect(getHoverClimateDisplay("pastaClimate", null, null, "tropical")).toBe(
+			"tropical",
+		)
+	})
+
+	it("shows koppen climate in koppenClimate mode", () => {
+		expect(
+			getHoverClimateDisplay("koppenClimate", null, koppen, "temperate"),
+		).toBe("Oceanic (Cfb)")
+	})
+
+	it("shows basic climate zone outside koppenClimate mode", () => {
+		expect(getHoverClimateDisplay("terrain", null, koppen, "temperate")).toBe(
+			"temperate",
+		)
 	})
 })
 
@@ -1068,5 +1108,31 @@ describe("buildHoverNationRelationDistribution", () => {
 			relationAt: () => REL.ALLY,
 		})
 		expect(result).toEqual([])
+	})
+})
+
+describe("getHoverTradeGood", () => {
+	it("returns null when world has no trade goods", () => {
+		const result = getHoverTradeGood({ region: 0 } as never, makeWorld({}))
+		expect(result).toBeNull()
+	})
+
+	it("returns null for an unassigned location", () => {
+		const world = makeWorld({
+			tradeGoods: new Uint8Array([0]),
+			locations: { regionLocation: new Int32Array([0]) },
+		})
+		expect(getHoverTradeGood({ region: 0 } as never, world)).toBeNull()
+	})
+
+	it("returns lowercase name without goods_ prefix", () => {
+		const world = makeWorld({
+			tradeGoods: new Uint8Array([1]),
+			locations: { regionLocation: new Int32Array([0]) },
+		})
+		const result = getHoverTradeGood({ region: 0 } as never, world)
+		expect(result).not.toBeNull()
+		expect(result?.name).toBe("alum")
+		expect(result?.materialIndex).toBe(1)
 	})
 })

@@ -88,6 +88,12 @@ vi.mock("./fields", () => ({
 			get: (state: FixtureState, province: number) =>
 				state.occupationCurrent[province],
 		},
+		cultureBlendSecondary: {
+			get: (_state: FixtureState, _province: number) => -1,
+		},
+		cultureBlendWeight: {
+			get: (_state: FixtureState, _province: number) => 0,
+		},
 	},
 }))
 
@@ -109,6 +115,8 @@ type FixtureState = Pick<
 	| "_leader_birth_year"
 	| "_occupation"
 	| "_relations"
+	| "_culture_blend_secondary"
+	| "_culture_blend_weight"
 	| "parentCurrent"
 	| "sovereignCurrent"
 	| "assignmentCurrent"
@@ -259,6 +267,8 @@ function createFixtureState(): FixtureState {
 			},
 		],
 		hierarchyDirty: true,
+		_culture_blend_secondary: [[], [], [], []],
+		_culture_blend_weight: [[], [], [], []],
 	}
 }
 

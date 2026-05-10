@@ -74,6 +74,8 @@ export function classifyTopography(params: {
 }): {
 	topography: Uint8Array
 	coastal: Uint8Array
+	oceanCoastal: Uint8Array
+	lakeCoastal: Uint8Array
 	slopeScore: Float32Array
 } {
 	const { mesh, elevationKm, isLand, rivers, vegetation, planetRadiusKm } =
@@ -199,5 +201,11 @@ export function classifyTopography(params: {
 		topography[r] = TOPO_FLAT
 	}
 
-	return { topography, coastal, slopeScore }
+	return {
+		topography,
+		coastal,
+		oceanCoastal: adjacentOcean,
+		lakeCoastal: adjacentLake,
+		slopeScore,
+	}
 }

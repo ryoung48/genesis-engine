@@ -84,6 +84,9 @@ export function serializeHistoryTimelines(
 	const leaderNameSeed = flattenIntTimelineField(state._leader_name_seed)
 	const leaderClaim = flattenIntTimelineField(state._leader_claim)
 	const occupation = flattenIntTimelineField(state._occupation)
+	const cultureBlendSecondary = flattenIntTimelineField(
+		state._culture_blend_secondary,
+	)
 	const intFieldsMs = performance.now() - intFieldsStartedAt
 
 	const floatFieldsStartedAt = performance.now()
@@ -92,6 +95,9 @@ export function serializeHistoryTimelines(
 	const development = flattenFloatTimelineField(state._development)
 	const consumption = flattenFloatTimelineField(state._consumption)
 	const leaderBirthYear = flattenFloatTimelineField(state._leader_birth_year)
+	const cultureBlendWeight = flattenFloatTimelineField(
+		state._culture_blend_weight,
+	)
 	const floatFieldsMs = performance.now() - floatFieldsStartedAt
 
 	const relationsStartedAt = performance.now()
@@ -158,6 +164,8 @@ export function serializeHistoryTimelines(
 		leaderClaim,
 		leaderBirthYear,
 		occupation,
+		cultureBlendSecondary,
+		cultureBlendWeight,
 		relations: {
 			aIdx: relationA,
 			bIdx: relationB,
@@ -191,6 +199,8 @@ export function buildHistoryFrame(
 	const consumption = new Float32Array(P)
 	const nationWealth = new Float32Array(P)
 	const nationOptimalWealth = new Float32Array(P)
+	const cultureBlendSecondary = new Int32Array(P).fill(-1)
+	const cultureBlendWeight = new Float32Array(P)
 	const relationEntries = Array.from(state._relations.entries()).filter(
 		([, timeline]) =>
 			timeline.length > 0 &&
@@ -216,6 +226,11 @@ export function buildHistoryFrame(
 			PROV.population.rural.get(state, province) + populationUrban[province]
 		development[province] = PROV.development.get(state, province)
 		consumption[province] = PROV.consumption.get(state, province)
+		cultureBlendSecondary[province] = PROV.cultureBlendSecondary.get(
+			state,
+			province,
+		)
+		cultureBlendWeight[province] = PROV.cultureBlendWeight.get(state, province)
 		const color = state.nationColors.get(assignment[province])
 		if (!color) continue
 		const base = province * 3
@@ -304,5 +319,7 @@ export function buildHistoryFrame(
 		activeWars,
 		sovereignCount,
 		totalPopulation,
+		cultureBlendSecondary,
+		cultureBlendWeight,
 	}
 }

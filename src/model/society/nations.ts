@@ -5,14 +5,18 @@ import {
 	buildChildrenCSR,
 	buildSovereign,
 	computeGravity,
+	fanoutRangesForSize,
+	HEGEMON_FANOUT,
 	rebalanceHierarchy,
 } from "./hierarchy"
 
-// Province-mass weights per bucket — calibrated to CK3 1066.9.15 all-county-titles distribution
+// Province-mass weights per bucket — calibrated to CK3 1066.9.15 all-county-titles
+// distribution, with ~4% carved from the empire bucket for hegemons.
 const NATION_PERCENTAGES = normalize([
-	0.4554, 0.072, 0.102, 0.0746, 0.0786, 0.2174,
+	0.04, 0.4154, 0.072, 0.102, 0.0746, 0.0786, 0.2174,
 ])
 export const NATION_BUCKETS: [number, number][] = [
+	[251, 600],
 	[50, 250],
 	[25, 49],
 	[10, 24],
@@ -244,6 +248,7 @@ export function computeNations(params: {
 			parent,
 			depth,
 			currentDepth: 0,
+			fanoutRanges: fanoutRangesForSize(sizes[nation]),
 			habitability,
 			urbanPop,
 			provinceSeeds: provinces.seeds,
@@ -265,6 +270,7 @@ export function computeNations(params: {
 		childList,
 		depth,
 		provinceCount,
+		fanoutRanges: HEGEMON_FANOUT,
 	})
 
 	return {

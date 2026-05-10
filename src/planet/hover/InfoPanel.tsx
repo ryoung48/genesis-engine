@@ -33,6 +33,7 @@ import type {
 	HoverRiver,
 	HoverTerrainFeature,
 } from "./hover"
+import { getHoverTradeGood } from "./hover"
 import {
 	aetColor,
 	currentImpactColor,
@@ -55,6 +56,7 @@ import {
 	buildProvinceDisplayData,
 	buildTerrainFeatureSwatches,
 	buildTopographySwatchColor,
+	buildTradeGoodSwatchColor,
 	buildVegetationSwatchColor,
 } from "./info-panel-model"
 
@@ -325,6 +327,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			] as const
 		).filter((mode) => mode !== populationMode),
 	]
+	const hoverTradeGood =
+		colorMode === "trade_goods" || showGeography
+			? getHoverTradeGood(hoverInfo, world)
+			: null
 	const demographicDisplays = showDemographics
 		? demographicModes.flatMap((mode) => {
 				const display = buildDemographicDisplayData({
@@ -484,6 +490,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								label="Veg"
 								value={hoverBiome}
 								color={vegetationSwatch}
+							/>
+						)}
+						{hoverTradeGood && (
+							<SwatchRow
+								label="Trade Good"
+								value={hoverTradeGood.name}
+								color={buildTradeGoodSwatchColor(hoverTradeGood.materialIndex)}
 							/>
 						)}
 						{hoverOceanDist !== null && hoverOceanDist > 0 && (

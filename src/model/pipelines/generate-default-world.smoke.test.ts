@@ -4,6 +4,7 @@ import { EnergyBalanceModel } from "@/model/climate/ebm"
 import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
 import { PASTA_LABELS } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
+import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { decodePlanetCode } from "@/model/shared/planet-code"
 import { DEFAULT_WORLD_PARAMS } from "@/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/planet/screen/generation/generation-preview"
@@ -290,6 +291,18 @@ describe("full world smoke generation", () => {
 		console.table(
 			summarizeDistribution(world.topography, OROGEN_TOPOGRAPHY_LABELS, [5, 6]),
 		)
+		if (world.tradeGoods) {
+			console.info(
+				`Trade good distribution (${world.locations?.count ?? 0} locations, ${world.tradeGoods.material.filter((v) => v > 0).length} assigned)`,
+			)
+			console.table(
+				summarizeDistribution(
+					world.tradeGoods.material,
+					TRADE_GOOD_LABELS,
+					[0],
+				),
+			)
+		}
 		if (world.timings?.length) console.table(world.timings)
 
 		expect(world.mesh.numRegions).toBeGreaterThan(0)

@@ -7,7 +7,6 @@ import type {
 	PopulationMapMode,
 } from "../screen/shared/map-modes"
 import {
-	DEFAULT_GEOGRAPHY_MODE,
 	getMapModePrimary,
 	getVisibleDemographicModeOptions,
 	getVisibleGeographyModeOptions,
@@ -19,6 +18,8 @@ import { ModeButtonGroup } from "./mode-controls"
 interface ModeBarProps {
 	colorMode: ColorMode
 	setColorMode: (v: ColorMode) => void
+	geographyMode: ColorMode
+	setGeographyMode: (v: ColorMode) => void
 	nationMode: NationMapMode
 	setNationMode: (v: NationMapMode) => void
 	populationMode: PopulationMapMode
@@ -32,6 +33,8 @@ const TRAY =
 export const ModeBar: React.FC<ModeBarProps> = ({
 	colorMode,
 	setColorMode,
+	geographyMode,
+	setGeographyMode,
 	nationMode,
 	setNationMode,
 	populationMode,
@@ -46,8 +49,11 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 		activePrimary === "geography" ? (
 			<ModeButtonGroup
 				options={geographyOptions}
-				value={colorMode}
-				onChange={setColorMode}
+				value={geographyMode}
+				onChange={(mode) => {
+					setColorMode(mode)
+					setGeographyMode(mode)
+				}}
 				buttonClassName="px-1.5"
 			/>
 		) : activePrimary === "political" ? (
@@ -78,11 +84,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					value={activePrimary}
 					onChange={(primary: MapModePrimary) => {
 						if (primary === "geography") {
-							setColorMode(
-								getMapModePrimary(colorMode) === "geography"
-									? colorMode
-									: DEFAULT_GEOGRAPHY_MODE,
-							)
+							setColorMode(geographyMode)
 							return
 						}
 						if (primary === "political") {

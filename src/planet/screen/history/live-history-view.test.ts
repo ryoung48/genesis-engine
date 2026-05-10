@@ -29,6 +29,8 @@ describe("buildLiveHistoryView", () => {
 				activeWars: [],
 				sovereignCount: 2,
 				totalPopulation: 25,
+				cultureBlendSecondary: new Int32Array([-1, -1, -1]),
+				cultureBlendWeight: new Float32Array([0, 0, 0]),
 			},
 		})
 
@@ -71,6 +73,8 @@ describe("buildLiveHistoryView", () => {
 					activeWars: [],
 					sovereignCount: 0,
 					totalPopulation: 0,
+					cultureBlendSecondary: new Int32Array(0),
+					cultureBlendWeight: new Float32Array(0),
 				},
 			}),
 		).toBeNull()

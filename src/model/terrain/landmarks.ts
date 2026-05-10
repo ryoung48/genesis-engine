@@ -32,12 +32,12 @@ export const LANDMARK_TYPES: LandmarkType[] = [
 	"lake", // 5
 ]
 
-const TYPE_CONTINENT = 0
-const TYPE_ISLAND = 1
-const TYPE_ISLE = 2
-const TYPE_OCEAN = 3
-const TYPE_SEA = 4
-const TYPE_LAKE = 5
+const LANDMARK_TYPE_CONTINENT = 0
+const LANDMARK_TYPE_ISLAND = 1
+const LANDMARK_TYPE_ISLE = 2
+export const LANDMARK_TYPE_OCEAN = 3
+const LANDMARK_TYPE_SEA = 4
+const LANDMARK_TYPE_LAKE = 5
 
 export function computeLandmarks(
 	mesh: SphereMesh,
@@ -87,13 +87,13 @@ export function computeLandmarks(
 	for (let i = 0; i < count; i++) {
 		const ratio = sizes[i] / N
 		if (isWater[i]) {
-			if (ratio >= 0.01) type[i] = TYPE_OCEAN
-			else if (ratio >= 0.001) type[i] = TYPE_SEA
-			else type[i] = TYPE_LAKE
+			if (ratio >= 0.01) type[i] = LANDMARK_TYPE_OCEAN
+			else if (ratio >= 0.001) type[i] = LANDMARK_TYPE_SEA
+			else type[i] = LANDMARK_TYPE_LAKE
 		} else {
-			if (ratio >= 0.01) type[i] = TYPE_CONTINENT
-			else if (ratio >= 0.001) type[i] = TYPE_ISLAND
-			else type[i] = TYPE_ISLE
+			if (ratio >= 0.01) type[i] = LANDMARK_TYPE_CONTINENT
+			else if (ratio >= 0.001) type[i] = LANDMARK_TYPE_ISLAND
+			else type[i] = LANDMARK_TYPE_ISLE
 		}
 	}
 

@@ -47,6 +47,7 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	climateDistribution,
 	vegetationDistribution,
 	topographyDistribution,
+	tradeGoodsDistribution,
 	nationHistory,
 	windowedEvents,
 	allPastEvents,
@@ -151,6 +152,7 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 								climateDistribution={climateDistribution}
 								vegetationDistribution={vegetationDistribution}
 								topographyDistribution={topographyDistribution}
+								tradeGoodsDistribution={tradeGoodsDistribution}
 							/>
 						) : (
 							<NationDetails

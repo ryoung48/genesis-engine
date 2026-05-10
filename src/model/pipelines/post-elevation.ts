@@ -10,6 +10,7 @@ import type {
 	OrogenClimate,
 	OrogenHazards,
 	OrogenHydrology,
+	OrogenLocations,
 	OrogenOceanCurrents,
 	OrogenParams,
 	OrogenProvinces,
@@ -44,12 +45,22 @@ import {
 	computeThermalEquator,
 } from "../climate/rain"
 import { assignClimateZones, assignVegetation } from "../climate/vegetation"
+import {
+	computeTradeGoods,
+	type LocationTradeGoods,
+} from "../economy/trade-goods"
+import { makeRng } from "../shared/rng"
 import type { ProvincePopulation } from "../society/population"
-import { computeMigration, computePopulation } from "../society/population"
+import {
+	computeMigration,
+	computePopulation,
+	computeProvinceHabitability,
+} from "../society/population"
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
 import type { OrogenLandmarks } from "../terrain/landmarks"
-import { computeLandmarks } from "../terrain/landmarks"
+import { computeLandmarks, LANDMARK_TYPE_OCEAN } from "../terrain/landmarks"
+import { computeLocations } from "../terrain/locations"
 import { computeProvinces } from "../terrain/provinces"
 import { computeRivers } from "../terrain/rivers"
 
@@ -96,7 +107,9 @@ interface PostPipelineOutput {
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
 	provinces: OrogenProvinces | undefined
+	locations: OrogenLocations | undefined
 	population: ProvincePopulation | undefined
+	tradeGoods: LocationTradeGoods | undefined
 	hazards: OrogenHazards
 	landmarks: OrogenLandmarks
 	oceanCurrents: OrogenOceanCurrents | undefined
@@ -255,7 +268,13 @@ export function runPostElevationPipeline(
 	// ── Vegetation ─────────────────────────────────────────────────────
 	onProgress?.("Assigning vegetation...", 88)
 	t0 = performance.now()
-	const vegetation = assignVegetation(mesh, isLand, climate, rainfall)
+	const vegetation = assignVegetation(
+		mesh,
+		isLand,
+		climate,
+		rainfall,
+		makeRng(params.seed),
+	)
 	record("Post: vegetation", t0)
 
 	// ── Rivers ─────────────────────────────────────────────────────────
@@ -301,16 +320,39 @@ export function runPostElevationPipeline(
 
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
-	const { topography, coastal, slopeScore } = classifyTopography({
-		mesh,
-		elevationKm: elevation_km,
-		isLand,
-		rivers,
-		vegetation,
-		planetRadiusKm: params.planetRadiusKm,
-		seed: params.seed,
-	})
+	const { topography, coastal, oceanCoastal, lakeCoastal, slopeScore } =
+		classifyTopography({
+			mesh,
+			elevationKm: elevation_km,
+			isLand,
+			rivers,
+			vegetation,
+			planetRadiusKm: params.planetRadiusKm,
+			seed: params.seed,
+		})
 	record("Post: topography", t0)
+
+	// Demote sea-adjacent regions from ocean to lake coastal tier.
+	// A region only touching seas (not true oceans) gets the lake hab bonus (1.5×)
+	// instead of the ocean bonus (2.0×).
+	for (let r = 0; r < mesh.numRegions; r++) {
+		if (!oceanCoastal[r]) continue
+		let touchesOcean = false
+		for (let j = mesh.adjOffset[r], end = mesh.adjOffset[r + 1]; j < end; j++) {
+			const nb = mesh.adjList[j]
+			if (isLand[nb]) continue
+			if (
+				landmarks.type[landmarks.regionLandmark[nb]] === LANDMARK_TYPE_OCEAN
+			) {
+				touchesOcean = true
+				break
+			}
+		}
+		if (!touchesOcean) {
+			oceanCoastal[r] = 0
+			lakeCoastal[r] = 1
+		}
+	}
 
 	// ── Climate zones ──────────────────────────────────────────────────
 	onProgress?.("Classifying climate zones...", 93)
@@ -371,6 +413,46 @@ export function runPostElevationPipeline(
 	)
 	record("Post: provinces", t0)
 
+	t0 = performance.now()
+	const locations: OrogenLocations = computeLocations(
+		provinces,
+		mesh,
+		params.seed,
+		{ planetRadiusKm: params.planetRadiusKm },
+	)
+	record("Post: locations", t0)
+
+	// ── Migration diffusion ─────────────────────────────────────────────
+	// Migration runs before full population so that provinces unreachable
+	// from any cradle can be marked desolate, which in turn zeroes their
+	// population and habitability in the population pass below.
+	onProgress?.("Computing migration...", 97)
+	t0 = performance.now()
+	const rawHabitability = computeProvinceHabitability(
+		provinces,
+		landmarks,
+		climateZones,
+		vegetation,
+		topography,
+		oceanCoastal,
+		lakeCoastal,
+		rivers.visible,
+		params.seed,
+	)
+	const migration = computeMigration(
+		provinces,
+		rawHabitability,
+		mesh,
+		params.planetRadiusKm,
+		N,
+	)
+	// Mark provinces unreachable from any cradle as desolate so they are
+	// excluded from the population pass.
+	for (let p = 0; p < provinces.count; p++) {
+		if (migration.migrationWave[p] < 0) provinces.desolate[p] = 1
+	}
+	record("Post: migration", t0)
+
 	// ── Population ─────────────────────────────────────────────────────
 	onProgress?.("Computing population...", 98)
 	t0 = performance.now()
@@ -380,26 +462,33 @@ export function runPostElevationPipeline(
 		climateZones,
 		vegetation,
 		topography,
-		coastal,
+		oceanCoastal,
+		lakeCoastal,
 		rivers.visible,
 		params.seed,
 		params.planetRadiusKm,
 		N,
 	)
-	record("Post: population", t0)
-
-	// ── Migration diffusion ─────────────────────────────────────────────
-	t0 = performance.now()
-	const migration = computeMigration(
-		provinces,
-		population.habitability,
-		mesh,
-		params.planetRadiusKm,
-		N,
-	)
 	population.migrationWave = migration.migrationWave
 	population.cradleProvinces = migration.cradleProvinces
-	record("Post: migration", t0)
+	record("Post: population", t0)
+
+	// ── Trade goods ─────────────────────────────────────────────────────
+	t0 = performance.now()
+	const tradeGoods = locations
+		? computeTradeGoods({
+				seed: params.seed,
+				locations,
+				provinces,
+				climateZones,
+				vegetation,
+				topography,
+				coastal,
+				numRegions: N,
+				pastaClimate,
+			})
+		: undefined
+	record("Post: trade goods", t0)
 
 	return {
 		climate,
@@ -421,7 +510,9 @@ export function runPostElevationPipeline(
 		dtr_annual,
 		dtr_monthly,
 		provinces,
+		locations,
 		population,
+		tradeGoods,
 		hazards,
 		landmarks,
 		oceanCurrents,

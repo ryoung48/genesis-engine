@@ -66,6 +66,8 @@ function createDiplomacyState(options?: {
 	const parent = options?.parent ?? [-1, -1, -1]
 	const habitability = options?.habitability ?? [12, 8, 6]
 	const cultures = options?.cultures ?? [0, 1, 2]
+	const cultureCount =
+		cultures.length > 0 ? Math.max(...cultures.filter((c) => c >= 0)) + 1 : 0
 	const coastal = options?.coastal ?? new Array(parent.length).fill(0)
 	const neighbors =
 		options?.neighbors ??
@@ -128,7 +130,7 @@ function createDiplomacyState(options?: {
 		Uint8Array.from(coastal),
 		new Uint8Array(parent.length),
 		Float32Array.from(provinceXyz),
-		{ assignment: Int32Array.from(cultures) },
+		{ assignment: Int32Array.from(cultures), count: cultureCount },
 		10,
 		createHistoryRng(11),
 	)

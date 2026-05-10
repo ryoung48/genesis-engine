@@ -8,7 +8,7 @@ import type { OrogenProvinces, OrogenRainfall, SphereMesh } from ".."
 import { createRng } from "../shared/rng"
 import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "../shared/units"
 
-const PROVINCE_AREA_TARGET_KM2 = 10_000
+export const PROVINCE_AREA_TARGET_KM2 = 10_000
 
 export function computeProvinces(
 	mesh: SphereMesh,

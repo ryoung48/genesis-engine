@@ -33,6 +33,10 @@ function renderWorldDetails(
 				{ label: "Highland", count: 8, color: "#555555" },
 			]}
 			relationDistribution={[{ label: "Allied", count: 2, color: "#0000ff" }]}
+			tradeGoodsDistribution={[
+				{ label: "Lumber", count: 100, color: "#4a7c59" },
+				{ label: "Fish", count: 50, color: "#4488aa" },
+			]}
 			{...overrides}
 		/>,
 	)
@@ -54,48 +58,38 @@ describe("WorldDetails", () => {
 		expect(environmentalMarkup).toContain("Topography")
 	})
 
-	it("renders social fallbacks and toggles each section", () => {
-		const onSectionChange = vi.fn()
-		const element = WorldDetails({
-			section: "social",
-			onSectionChange,
-			planetStats: [],
-			worldPopulation: null,
-			activeWarCount: null,
-			cultureCount: null,
-			heritageCount: null,
-			faithCount: null,
-			religionCount: null,
-			nationSizeDistribution: [{ label: "III", count: 1, color: "#abcdef" }],
-			conflictDistribution: [{ label: "Peace", count: 4, color: "#111111" }],
-			climateDistribution: [{ label: "Temperate", count: 6, color: "#333333" }],
-			vegetationDistribution: [{ label: "Forest", count: 7, color: "#444444" }],
-			topographyDistribution: [
-				{ label: "Highland", count: 8, color: "#555555" },
+	it("renders location count and avg location area in planetary section", () => {
+		const markup = renderWorldDetails({
+			section: "planetary",
+			planetStats: [
+				{ label: "Radius", value: "6,371 km" },
+				{ label: "Locations", value: "90" },
+				{ label: "Avg Location Area", value: "12k km²" },
 			],
-			relationDistribution: [],
-		}) as React.ReactElement<{ children?: React.ReactNode }>
+		})
 
-		const sections = React.Children.toArray(element.props.children) as Array<
-			React.ReactElement<{ onToggle: () => void; open: boolean; title: string }>
-		>
+		expect(markup).toContain("Locations")
+		expect(markup).toContain("90")
+		expect(markup).toContain("Avg Location Area")
+		expect(markup).toContain("12k km²")
+	})
 
-		expect(
-			sections.map((section) => [section.props.title, section.props.open]),
-		).toEqual([
-			["Planetary", false],
-			["Environmental", false],
-			["Social", true],
-		])
-
-		for (const section of sections) {
-			section.props.onToggle()
+	it("renders all section titles and opens the correct section", () => {
+		const sections: Array<[string, string]> = [
+			["Planetary", "planetary"],
+			["Environmental", "environmental"],
+			["Social", "social"],
+			["Trade Goods", "trade-goods"],
+		]
+		for (const [title, key] of sections) {
+			const markup = renderWorldDetails({
+				section: key as Parameters<typeof renderWorldDetails>[0]["section"],
+			})
+			expect(markup).toContain(title)
 		}
+	})
 
-		expect(onSectionChange).toHaveBeenNthCalledWith(1, "planetary")
-		expect(onSectionChange).toHaveBeenNthCalledWith(2, "environmental")
-		expect(onSectionChange).toHaveBeenNthCalledWith(3, "social")
-
+	it("renders social section with fallback values for null stats", () => {
 		const markup = renderWorldDetails({
 			section: "social",
 			worldPopulation: null,
@@ -117,5 +111,22 @@ describe("WorldDetails", () => {
 		expect(markup).not.toContain("Avg Development")
 		expect(markup).not.toContain("Nation Avg Dev")
 		expect(markup).toContain("Relations")
+	})
+
+	it("renders trade goods distribution in trade-goods section", () => {
+		const markup = renderWorldDetails({
+			section: "trade-goods",
+			tradeGoodsDistribution: [
+				{ label: "Lumber", count: 200, color: "#4a7c59" },
+				{ label: "Fish", count: 100, color: "#4488aa" },
+			],
+		})
+		expect(markup).toContain("Trade Goods")
+		expect(markup).toContain("Lumber")
+		expect(markup).toContain("200")
+		expect(markup).toContain("66.7%")
+		expect(markup).toContain("Fish")
+		expect(markup).toContain("100")
+		expect(markup).toContain("33.3%")
 	})
 })

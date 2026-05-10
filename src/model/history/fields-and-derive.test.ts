@@ -54,44 +54,55 @@ function createTestState(): HistoryState {
 		new Uint8Array([1, 1, 1, 1]),
 		new Uint8Array([0, 0, 0, 0]),
 		new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0, 0, -1, 0]),
-		{ assignment: new Int32Array([0, 0, 1, 1]) },
+		{ assignment: new Int32Array([0, 0, 1, 1]), count: 2 },
 		10,
 		createHistoryRng(7),
 	)
 }
 
 function createWideState(): HistoryState {
+	// 10-province star: province 0 is sovereign with 9 direct children.
+	// Nation size = 10 → kingdom tier → max fanout = 6 → 9 > 6 → overextended.
+	const P = 10
+	const childOffset = new Int32Array(P + 1)
+	childOffset[1] = 9
+	for (let i = 2; i <= P; i++) childOffset[i] = 9
+
 	const provinces = {
-		regionProvince: new Int32Array([0, 1, 2, 3, 4, 5]),
-		seeds: new Int32Array([0, 1, 2, 3, 4, 5]),
-		count: 6,
-		desolate: new Uint8Array([0, 0, 0, 0, 0, 0]),
-		landmassId: new Int32Array([0, 0, 0, 0, 0, 0]),
-		adjOffset: new Int32Array([0, 5, 6, 7, 8, 9, 10]),
-		adjList: new Int32Array([1, 2, 3, 4, 5, 0, 0, 0, 0, 0]),
-		size: new Int32Array([1, 1, 1, 1, 1, 1]),
-		colors: new Float32Array([
-			1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1,
+		regionProvince: Int32Array.from({ length: P }, (_, i) => i),
+		seeds: Int32Array.from({ length: P }, (_, i) => i),
+		count: P,
+		desolate: new Uint8Array(P),
+		landmassId: new Int32Array(P),
+		adjOffset: new Int32Array([0, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
+		adjList: new Int32Array([
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		]),
+		size: new Int32Array(P).fill(1),
+		colors: new Float32Array(P * 3),
 	} as OrogenProvinces
 	const nations = {
-		assignment: new Int32Array([0, 0, 0, 0, 0, 0]),
-		seeds: new Int32Array([0, 1, 2, 3, 4, 5]),
-		count: 6,
-		adjOffset: new Int32Array([0, 0, 0, 0, 0, 0, 0]),
+		assignment: new Int32Array(P).fill(0),
+		seeds: Int32Array.from({ length: P }, (_, i) => i),
+		count: P,
+		adjOffset: new Int32Array(P + 1),
 		adjList: new Int32Array(0),
-		size: new Int32Array([6, 0, 0, 0, 0, 0]),
-		colors: provinces.colors.slice(),
-		parent: new Int32Array([-1, 0, 0, 0, 0, 0]),
-		depth: new Int32Array([0, 1, 1, 1, 1, 1]),
-		childOffset: new Int32Array([0, 5, 5, 5, 5, 5, 5]),
-		childList: new Int32Array([1, 2, 3, 4, 5]),
-		sovereign: new Int32Array([0, 0, 0, 0, 0, 0]),
-		gravity: new Float32Array([13.5, 4, 4, 4, 4, 4]),
+		size: Int32Array.from({ length: P }, (_, i) => (i === 0 ? P : 0)),
+		colors: new Float32Array(P * 3),
+		parent: Int32Array.from({ length: P }, (_, i) => (i === 0 ? -1 : 0)),
+		depth: Int32Array.from({ length: P }, (_, i) => (i === 0 ? 0 : 1)),
+		childOffset,
+		childList: Int32Array.from({ length: P - 1 }, (_, i) => i + 1),
+		sovereign: new Int32Array(P).fill(0),
+		gravity: new Float32Array(P).fill(4),
 	} as OrogenNationHierarchy
 	const population: ProvincePopulation = {
-		habitability: new Float32Array([10, 4, 4, 4, 4, 4]),
-		population: new Float32Array([100, 40, 40, 40, 40, 40]),
+		habitability: Float32Array.from({ length: P }, (_, i) =>
+			i === 0 ? 10 : 4,
+		),
+		population: Float32Array.from({ length: P }, (_, i) =>
+			i === 0 ? 100 : 40,
+		),
 		habitabilityScore: 30,
 		totalPopulation: 300,
 	}
@@ -100,12 +111,10 @@ function createWideState(): HistoryState {
 		nations,
 		provinces,
 		population,
-		new Uint8Array([1, 1, 1, 1, 1, 1]),
-		new Uint8Array([0, 0, 0, 0, 0, 0]),
-		new Float32Array([
-			1, 0, 0, 0.8, 0.2, 0, 0, 1, 0, -0.8, 0.2, 0, 0, -1, 0, -0.8, -0.2, 0,
-		]),
-		{ assignment: new Int32Array([0, 0, 0, 0, 0, 0]) },
+		new Uint8Array(P).fill(1),
+		new Uint8Array(P),
+		new Float32Array(P * 3),
+		{ assignment: new Int32Array(P).fill(0), count: 1 },
 		10,
 		createHistoryRng(13),
 	)
@@ -365,10 +374,10 @@ describe("history derive helpers", () => {
 			provinceWars: new Map<string, number[]>(),
 		}
 
-		expect(wealthOptimal(state, 0)).toBeCloseTo(13.5, 6)
-		expect(wealthCurrent(state, 0)).toBeCloseTo(12.375, 6)
-		expect(wealthOptimal(state, 0, futureTime, cache)).toBeCloseTo(13.5, 6)
-		expect(wealthCurrent(state, 0, futureTime, cache)).toBeCloseTo(12.375, 6)
+		expect(wealthOptimal(state, 0)).toBeCloseTo(17.1, 6)
+		expect(wealthCurrent(state, 0)).toBeCloseTo(15.075, 6)
+		expect(wealthOptimal(state, 0, futureTime, cache)).toBeCloseTo(17.1, 6)
+		expect(wealthCurrent(state, 0, futureTime, cache)).toBeCloseTo(15.075, 6)
 	})
 
 	it("throws for corrupted historical sovereign cycles", () => {

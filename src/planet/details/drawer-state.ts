@@ -1,5 +1,9 @@
 type DrawerTab = "world" | "nation"
-export type WorldSection = "planetary" | "environmental" | "social"
+export type WorldSection =
+	| "planetary"
+	| "environmental"
+	| "social"
+	| "trade-goods"
 export type NationSection = "political" | "demographics" | "history"
 
 interface DrawerState {

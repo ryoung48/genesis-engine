@@ -5,6 +5,11 @@ import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
+import {
+	TRADE_GOOD_LABELS,
+	tradeGoodColor,
+	tradeGoodDisplayName,
+} from "@/model/economy/trade-goods"
 import { encodePlanetCode, SEED_MAX } from "@/model/shared/planet-code"
 import { titleCase } from "@/model/shared/text"
 import {
@@ -181,6 +186,9 @@ export const OrogenView: React.FC = () => {
 		StageTiming[] | null
 	>(null)
 	const [colorMode, setColorMode] = useState<ColorMode>("terrain")
+	const [geographyMode, setGeographyMode] = useState<ColorMode>(
+		DEFAULT_GEOGRAPHY_MODE,
+	)
 	const [nationMode, setNationMode] = useState<NationMapMode>("borders")
 	const [populationMode, setPopulationMode] =
 		useState<PopulationMapMode>("density")
@@ -195,6 +203,7 @@ export const OrogenView: React.FC = () => {
 	const [showWireframe, setShowWireframe] = useState(false)
 	const [showGrid, setShowGrid] = useState(true)
 	const [showNationBorders, setShowNationBorders] = useState(false)
+	const [showNationHierarchy, setShowNationHierarchy] = useState(false)
 	const [showThermalEquator, setShowThermalEquator] = useState(false)
 	const [showRivers, setShowRivers] = useState(false)
 	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
@@ -430,13 +439,17 @@ export const OrogenView: React.FC = () => {
 			hasHazards: !!world?.hazards,
 			hasVolcanism: !!world?.volcanism,
 		})
-		if (normalizedColorMode !== colorMode) setColorMode(normalizedColorMode)
+		if (normalizedColorMode !== colorMode) {
+			setColorMode(normalizedColorMode)
+			setGeographyMode(normalizedColorMode)
+		}
 	}, [colorMode, world?.hazards, world?.volcanism, world])
 
 	useEffect(() => {
 		if (debugMapModes) return
 		if (isDebugGeographyMode(colorMode)) {
 			setColorMode(DEFAULT_GEOGRAPHY_MODE)
+			setGeographyMode(DEFAULT_GEOGRAPHY_MODE)
 		}
 	}, [colorMode, debugMapModes])
 
@@ -695,6 +708,7 @@ export const OrogenView: React.FC = () => {
 			selectedHistoryView?.activeWars,
 			selectedNationId,
 			selectedHistoryView?.relationAt ?? null,
+			selectedHistoryView,
 		)
 	}, [
 		colorMode,
@@ -981,6 +995,27 @@ export const OrogenView: React.FC = () => {
 		[world?.topography],
 	)
 
+	const tradeGoodsDistribution = useMemo(() => {
+		const material = world?.tradeGoods
+		if (!material) return []
+		const counts = new Array<number>(TRADE_GOOD_LABELS.length).fill(0)
+		for (let i = 0; i < material.length; i++) {
+			const idx = material[i]!
+			if (idx > 0 && idx < counts.length) counts[idx]++
+		}
+		return TRADE_GOOD_LABELS.flatMap((label, index) => {
+			if (index === 0 || counts[index] === 0) return []
+			const [r, g, b] = tradeGoodColor(index)
+			return [
+				{
+					label: tradeGoodDisplayName(label),
+					count: counts[index]!,
+					color: rgbToCss([r!, g!, b!]),
+				},
+			]
+		}).sort((a, b) => b.count - a.count)
+	}, [world?.tradeGoods])
+
 	const measureDistanceKm = useMemo(() => {
 		if (measureStart === null || measureEnd === null || !world) return null
 		const r = world.mesh.r_xyz
@@ -1062,6 +1097,15 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setNationBordersVisible(showNationBorders)
 	}, [showNationBorders])
+	useEffect(() => {
+		const scene = sceneRef.current
+		if (!scene) return
+		if (showNationHierarchy && worldForDisplay && selectedNationId !== null) {
+			scene.setHierarchyOverlay(worldForDisplay, selectedNationId)
+		} else {
+			scene.setHierarchyOverlay(null, -1)
+		}
+	}, [showNationHierarchy, worldForDisplay, selectedNationId])
 	useEffect(() => {
 		sceneRef.current?.setViewMode(viewMode)
 	}, [viewMode])
@@ -1753,6 +1797,8 @@ export const OrogenView: React.FC = () => {
 							setShowGrid={setShowGrid}
 							showNationBorders={showNationBorders}
 							setShowNationBorders={setShowNationBorders}
+							showNationHierarchy={showNationHierarchy}
+							setShowNationHierarchy={setShowNationHierarchy}
 							gridSpacing={gridSpacing}
 							setGridSpacing={setGridSpacing}
 							viewMode={viewMode}
@@ -1854,6 +1900,8 @@ export const OrogenView: React.FC = () => {
 								<ModeBar
 									colorMode={colorMode}
 									setColorMode={setColorMode}
+									geographyMode={geographyMode}
+									setGeographyMode={setGeographyMode}
 									nationMode={nationMode}
 									setNationMode={setNationMode}
 									populationMode={populationMode}
@@ -1887,6 +1935,7 @@ export const OrogenView: React.FC = () => {
 				climateDistribution={climateDistribution}
 				vegetationDistribution={vegetationDistribution}
 				topographyDistribution={topographyDistribution}
+				tradeGoodsDistribution={tradeGoodsDistribution}
 				nationHistory={nationHistory}
 				windowedEvents={windowedEvents}
 				allPastEvents={allPastEvents}

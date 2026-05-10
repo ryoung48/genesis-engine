@@ -1,4 +1,4 @@
-import { domainLimitFn } from "../society/hierarchy"
+import { maxFanoutForNationSize } from "../society/hierarchy"
 import { PROV } from "./fields"
 import { ensureHierarchyClean, type HistoryState } from "./state"
 
@@ -93,7 +93,7 @@ function gravity(
 		value += gravity(state, child, t, cache) * TRIBUTE
 	}
 	const memberCount = nationMemberCount(state, p, t)
-	if (members.length > domainLimitFn(memberCount)) value *= 0.9
+	if (members.length > maxFanoutForNationSize(memberCount)) value *= 0.9
 	cache?.gravity?.set(key, value)
 	return value
 }
@@ -167,7 +167,10 @@ export function wealthCurrent(
 		if (child === exclude) continue
 		collected += wealthCurrent(state, child, t, cache, exclude) * TRIBUTE
 	}
-	if (directChildren.length > domainLimitFn(nationMemberCount(state, p, t)))
+	if (
+		directChildren.length >
+		maxFanoutForNationSize(nationMemberCount(state, p, t))
+	)
 		collected *= 0.9
 	if (!freedom && PROV.parent.get(state, p, t) >= 0) collected *= 1 - TRIBUTE
 

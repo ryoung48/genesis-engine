@@ -1,6 +1,7 @@
 import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
+import { tradeGoodColor } from "@/model/economy/trade-goods"
 import { REL } from "@/model/history/state"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
@@ -509,4 +510,15 @@ export function buildHoverNationRelationDistribution(params: {
 			color: "rgb(249, 56, 22)",
 		},
 	]
+}
+
+/**
+ * Returns the CSS color string for the given trade good material index,
+ * or null if the index is 0 (unassigned).
+ */
+export function buildTradeGoodSwatchColor(
+	materialIndex: number,
+): string | null {
+	if (materialIndex <= 0) return null
+	return rgbToCss(tradeGoodColor(materialIndex))
 }

@@ -13,6 +13,7 @@ export const EVT = {
 	CENSUS: 4,
 	DIPLOMACY: 5,
 	REGENCY: 6,
+	CULTURE_SPREAD: 7,
 } as const
 
 type EventType = (typeof EVT)[keyof typeof EVT]
@@ -20,13 +21,14 @@ type EventType = (typeof EVT)[keyof typeof EVT]
 /**
  * Data field layout per event type (indices into the 4-wide data slot):
  *
- * WAR:        [nation, previous, _, _]
- * BATTLE:     [war, attacker, defender, _]
- * SUCCESSION: [province, idx, _, _]
- * TAX:        [nation, previous, _, _]
- * CENSUS:     [previous, _, _, _]  (previous stored as float64 via time2)
- * DIPLOMACY:  [nation, previous, _, _]
- * REGENCY:    [province, leader, _, _]
+ * WAR:            [nation, previous, _, _]
+ * BATTLE:         [war, attacker, defender, _]
+ * SUCCESSION:     [province, idx, _, _]
+ * TAX:            [nation, previous, _, _]
+ * CENSUS:         [previous, _, _, _]  (previous stored as float64 via time2)
+ * DIPLOMACY:      [nation, previous, _, _]
+ * REGENCY:        [province, leader, _, _]
+ * CULTURE_SPREAD: [_, _, _, _]  (no data; processes all provinces)
  */
 
 const INITIAL_CAPACITY = 1024

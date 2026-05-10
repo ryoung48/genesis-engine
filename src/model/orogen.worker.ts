@@ -39,7 +39,11 @@ interface HistorySeedWorld {
 	population: ProvincePopulation | null
 	coastal: Uint8Array | null
 	riverVisible: Uint8Array | null
-	cultures: { assignment: Int32Array; genderSystems?: Uint8Array } | null
+	cultures: {
+		assignment: Int32Array
+		count: number
+		genderSystems?: Uint8Array
+	} | null
 }
 
 let lastGeneratedWorld: HistorySeedWorld | null = null
@@ -105,6 +109,7 @@ function cloneHistorySeedWorld(
 		cultures: world.cultures
 			? {
 					assignment: world.cultures.assignment.slice(),
+					count: world.cultures.count,
 					genderSystems: world.cultures.genderSystems?.slice(),
 				}
 			: null,
@@ -237,6 +242,7 @@ function serializeWorld(
 			: world.rivers,
 		oceanCurrents: world.oceanCurrents,
 		provinces: world.provinces,
+		locations: world.locations,
 		nations: world.nations,
 		leaderDynasty: seedHistoryState?.leaderDynCurrent.slice(),
 		leaderNameSeed: seedHistoryState?.leaderNameSeedCurrent.slice(),
@@ -279,6 +285,7 @@ function serializeWorld(
 		hydrology: world.hydrology
 			? { aet_monthly: world.hydrology.aet_monthly }
 			: undefined,
+		tradeGoods: world.tradeGoods?.material,
 	}
 }
 
@@ -335,6 +342,26 @@ function nationBuffers(n: {
 		n.childList.buffer as ArrayBuffer,
 		n.sovereign.buffer as ArrayBuffer,
 		n.gravity.buffer as ArrayBuffer,
+	]
+}
+
+function locationBuffers(l: {
+	regionLocation: Int32Array
+	locationProvince: Int32Array
+	seeds: Int32Array
+	adjOffset: Int32Array
+	adjList: Int32Array
+	size: Int32Array
+	colors: Float32Array
+}): Transferable[] {
+	return [
+		l.regionLocation.buffer as ArrayBuffer,
+		l.locationProvince.buffer as ArrayBuffer,
+		l.seeds.buffer as ArrayBuffer,
+		l.adjOffset.buffer as ArrayBuffer,
+		l.adjList.buffer as ArrayBuffer,
+		l.size.buffer as ArrayBuffer,
+		l.colors.buffer as ArrayBuffer,
 	]
 }
 
@@ -439,6 +466,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.isLand) add(world.isLand.buffer)
 	if (world.riverLand) add(world.riverLand.buffer)
 	if (world.provinces) add(...provinceBuffers(world.provinces))
+	if (world.locations) add(...locationBuffers(world.locations))
 	if (world.rivers) {
 		add(
 			world.rivers.flow.buffer,
@@ -504,6 +532,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 		if (world.population.cradleProvinces)
 			add(world.population.cradleProvinces.buffer)
 	}
+	if (world.tradeGoods) add(world.tradeGoods.buffer)
 	return Array.from(transfer)
 }
 

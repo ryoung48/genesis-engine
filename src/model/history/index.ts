@@ -2,6 +2,7 @@ import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
 import { EVT } from "./event-heap"
 import { runBattle } from "./events/battle"
+import { initCultureSpread, runCultureSpread } from "./events/culture-spread"
 import { initDiplomacy, runDiplomacy } from "./events/diplomacy"
 import { initPopulation, runPopulation } from "./events/population"
 import { initSuccession, runSuccession } from "./events/succession"
@@ -21,7 +22,7 @@ export function initHistory(params: {
 	coastal: Uint8Array
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
-	cultures: { assignment: Int32Array }
+	cultures: { assignment: Int32Array; count: number }
 	seed: number
 	startYear?: number
 }): HistoryState {
@@ -44,6 +45,7 @@ export function initHistory(params: {
 	initTax(state, rng)
 	initDiplomacy(state, rng)
 	initPopulation(state, rng)
+	initCultureSpread(state)
 	return state
 }
 
@@ -91,6 +93,9 @@ function processEventsUntil(
 				}
 				break
 			}
+			case EVT.CULTURE_SPREAD:
+				runCultureSpread(state, state.cultureCount, rng)
+				break
 		}
 		validateLiveHierarchy(
 			state,

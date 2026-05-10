@@ -32,6 +32,8 @@ interface OverlayControlsProps {
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
 	setShowNationBorders: (v: boolean) => void
+	showNationHierarchy: boolean
+	setShowNationHierarchy: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
 	viewMode: OrogenViewMode
@@ -66,6 +68,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowGrid,
 	showNationBorders,
 	setShowNationBorders,
+	showNationHierarchy,
+	setShowNationHierarchy,
 	gridSpacing,
 	setGridSpacing,
 	viewMode,
@@ -176,6 +180,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										type="checkbox"
 										checked={showNationBorders}
 										onChange={(e) => setShowNationBorders(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Hierarchy</span>
+									<input
+										type="checkbox"
+										checked={showNationHierarchy}
+										onChange={(e) => setShowNationHierarchy(e.target.checked)}
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>

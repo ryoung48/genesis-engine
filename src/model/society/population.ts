@@ -1,14 +1,22 @@
 /**
  * Province population initialization and prehistoric migration diffusion.
  *
- * computePopulation: sums regional habitability scores into provinces and
- * distributes initial population proportionally. O(R + P) time, typed arrays.
+ * computeProvinceHabitability: sums regional habitability scores into provinces.
+ * Used both by computePopulation and as a pre-pass for computeMigration.
+ *
+ * computePopulation: computes province habitability and distributes initial
+ * population proportionally. O(R + P) time, typed arrays.
  *
  * computeMigration: runs multi-source Dijkstra on the region graph from
- * cradle provinces seeded on the most habitable landmass. Travel cost is
- * inversely proportional to regional habitability; ocean traversal is very
- * expensive but possible. Returns a per-province normalized arrival time
- * (0 = cradle origin, 1 = latest frontier) and the cradle province indices.
+ * cradle provinces seeded on the most habitable landmass. Desolate provinces
+ * are impassable barriers. Travel cost is inversely proportional to regional
+ * habitability; ocean traversal is slow but passable. Returns a per-province
+ * normalized arrival time (0 = cradle origin, 1 = latest frontier) and the
+ * cradle province indices.
+ *
+ * Pipeline order: computeProvinceHabitability → computeMigration → mark
+ * unreachable provinces desolate → computePopulation. This ensures that
+ * migration-derived desolation affects population density.
  */
 
 import type { OrogenProvinces } from ".."
@@ -29,7 +37,16 @@ const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
 
 // topography: 0=flat, 1=hills, 2=plateaus, 3=mountains, 4=marsh, 5=ocean, 6=lake
 const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
-const HAB_COASTAL = 1.25
+// Water access levels: 0=none, 1=river, 2=lake, 3=ocean
+const HAB_COASTAL_OCEAN = 1.5
+const HAB_COASTAL_LAKE = 1.2
+const HAB_COASTAL_RIVER = 1.1
+const HAB_COASTAL_FACTORS = new Float32Array([
+	1.0,
+	HAB_COASTAL_RIVER,
+	HAB_COASTAL_LAKE,
+	HAB_COASTAL_OCEAN,
+])
 
 // landmark type: 0=continent, 1=island, 2=isle, 3=ocean, 4=sea, 5=lake
 const HAB_LANDMARK = new Float32Array([1.0, 0.8, 0.5, 0, 0, 0])
@@ -52,29 +69,37 @@ export interface ProvincePopulation {
 	cradleProvinces?: Int32Array
 }
 
-export function computePopulation(
+/**
+ * Computes per-province habitability scores by summing regional factors.
+ * Skips regions belonging to desolate provinces. The same seed produces the
+ * same jitter values, so calling this twice with identical inputs is stable.
+ */
+export function computeProvinceHabitability(
 	provinces: OrogenProvinces,
 	landmarks: OrogenLandmarks,
 	climateZones: Uint8Array,
 	vegetation: Uint8Array,
 	topography: Uint8Array,
-	coastal: Uint8Array,
+	oceanCoastal: Uint8Array,
+	lakeCoastal: Uint8Array,
 	riverVisible: Uint8Array,
 	seed: number,
-	planetRadiusKm?: number,
-	numRegions?: number,
-): ProvincePopulation {
+): Float32Array {
 	const { count, desolate, regionProvince } = provinces
 	const rng = createRng(seed + 77777)
 
 	const habitability = new Float32Array(count)
+	// Track best water access per province: 0=none, 1=river, 2=lake, 3=ocean
 	const waterAccess = new Uint8Array(count)
-	let totalHab = 0
 
 	for (let r = 0; r < regionProvince.length; r++) {
 		const province = regionProvince[r]
 		if (province < 0) continue
-		if (coastal[r] || riverVisible[r]) waterAccess[province] = 1
+		if (oceanCoastal[r] && waterAccess[province] < 3) waterAccess[province] = 3
+		else if (lakeCoastal[r] && waterAccess[province] < 2)
+			waterAccess[province] = 2
+		else if (riverVisible[r] && waterAccess[province] < 1)
+			waterAccess[province] = 1
 	}
 
 	for (let r = 0; r < regionProvince.length; r++) {
@@ -84,7 +109,7 @@ export function computePopulation(
 		const cz = climateZones[r]
 		const veg = vegetation[r]
 		const topo = topography[r]
-		const coastalFactor = waterAccess[province] ? HAB_COASTAL : 1
+		const coastalFactor = HAB_COASTAL_FACTORS[waterAccess[province]]
 		const lm = landmarks.type[landmarks.regionLandmark[r]]
 
 		const score =
@@ -96,8 +121,40 @@ export function computePopulation(
 			(0.8 + rng.random() * 0.4) // uniform(0.8, 1.2)
 
 		habitability[province] += score
-		totalHab += score
 	}
+
+	return habitability
+}
+
+export function computePopulation(
+	provinces: OrogenProvinces,
+	landmarks: OrogenLandmarks,
+	climateZones: Uint8Array,
+	vegetation: Uint8Array,
+	topography: Uint8Array,
+	oceanCoastal: Uint8Array,
+	lakeCoastal: Uint8Array,
+	riverVisible: Uint8Array,
+	seed: number,
+	planetRadiusKm?: number,
+	numRegions?: number,
+): ProvincePopulation {
+	const { count } = provinces
+
+	const habitability = computeProvinceHabitability(
+		provinces,
+		landmarks,
+		climateZones,
+		vegetation,
+		topography,
+		oceanCoastal,
+		lakeCoastal,
+		riverVisible,
+		seed,
+	)
+
+	let totalHab = 0
+	for (let i = 0; i < count; i++) totalHab += habitability[i]
 
 	// Compute global habitability score (mirrors WORLD.habitability)
 	// = sum(province.land * cellArea * habitability) / 1e8
@@ -385,7 +442,8 @@ export function computeMigration(
 
 	function regionTravelCost(r: number): number {
 		const p = regionProvince[r]
-		if (p < 0 || desolate[p]) return OCEAN_TRAVEL_COST
+		if (p < 0) return OCEAN_TRAVEL_COST // ocean: slow but passable
+		if (desolate[p]) return Infinity // desolate land: impassable barrier
 		return 1.0 / Math.max(normHab[p], MIN_HAB_FOR_COST)
 	}
 

@@ -1,4 +1,5 @@
 import type {
+	OrogenLocations,
 	OrogenNationHierarchy,
 	OrogenParams,
 	OrogenPartition,
@@ -39,6 +40,7 @@ interface SerializedOrogenClimate {
 
 type SerializedPartition = OrogenPartition
 type SerializedProvinces = OrogenProvinces
+type SerializedLocations = OrogenLocations
 type SerializedNationHierarchy = OrogenNationHierarchy
 
 export interface SerializedOrogenWorld {
@@ -124,6 +126,7 @@ export interface SerializedOrogenWorld {
 		temperatureDelta: Float32Array
 	}
 	provinces?: SerializedProvinces
+	locations?: SerializedLocations
 	nations?: SerializedNationHierarchy
 	leaderDynasty?: Int32Array
 	leaderNameSeed?: Int32Array
@@ -152,6 +155,8 @@ export interface SerializedOrogenWorld {
 		cradleProvinces?: Int32Array
 	}
 	monthlyTEQ?: Float32Array[]
+	/** Per-location trade good index (0=unassigned, 1-based into TRADE_GOOD_LABELS). */
+	tradeGoods?: Uint8Array
 }
 
 export interface SerializedProvinceTimelineInt {
@@ -189,6 +194,8 @@ export interface SerializedTimelines {
 	leaderClaim: SerializedProvinceTimelineInt
 	leaderBirthYear?: SerializedProvinceTimelineFloat
 	occupation: SerializedProvinceTimelineInt
+	cultureBlendSecondary: SerializedProvinceTimelineInt
+	cultureBlendWeight: SerializedProvinceTimelineFloat
 	relations: SerializedRelationTimelines
 	nationColorKeys: Int32Array
 	nationColorValues: Float32Array
@@ -230,6 +237,10 @@ export interface SerializedHistoryFrame {
 	}>
 	sovereignCount: number
 	totalPopulation: number
+	/** Per-province secondary (bleeding) culture index. -1 = no blend. */
+	cultureBlendSecondary: Int32Array
+	/** Per-province blend weight [0, 1]. 0 = pure primary culture. */
+	cultureBlendWeight: Float32Array
 }
 
 export type OrogenWorkerRequest =

@@ -33,6 +33,7 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["pastaClimate", "Pasta"],
 	["temperature", "Temperature"],
 	["precipitation", "Rain"],
+	["trade_goods", "Trade Goods"],
 ]
 
 const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<

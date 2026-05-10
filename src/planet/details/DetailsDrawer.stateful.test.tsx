@@ -110,6 +110,7 @@ describe("DetailsDrawer stateful branches", () => {
 				vegetationDistribution={[]}
 				topographyDistribution={[]}
 				relationDistribution={[]}
+				tradeGoodsDistribution={[]}
 			/>,
 		)
 
@@ -165,6 +166,7 @@ describe("DetailsDrawer stateful branches", () => {
 				vegetationDistribution={[]}
 				topographyDistribution={[]}
 				relationDistribution={[]}
+				tradeGoodsDistribution={[]}
 				onNationClick={vi.fn()}
 			/>,
 		)

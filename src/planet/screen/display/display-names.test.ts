@@ -123,6 +123,8 @@ describe("createDisplayNames", () => {
 			nationColorKeys: new Int32Array([0]),
 			nationColorValues: new Float32Array([0.4, 0.5, 0.6]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const bundle: TimelineBundle = {
 			timelines,
@@ -186,6 +188,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [],
 		})
@@ -284,6 +288,8 @@ describe("createDisplayNames", () => {
 				0.1, 0.2, 0.3, 0.3, 0.2, 0.1, 0.4, 0.5, 0.6,
 			]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const bundle: TimelineBundle = {
 			timelines,
@@ -353,6 +359,8 @@ describe("createDisplayNames", () => {
 			nationColorKeys: new Int32Array([0]),
 			nationColorValues: new Float32Array([0.1, 0.2, 0.3]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const bundle: TimelineBundle = { timelines, events: [] }
 
@@ -389,6 +397,8 @@ describe("createDisplayNames", () => {
 			nationColorKeys: new Int32Array(),
 			nationColorValues: new Float32Array(),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 		const names = createDisplayNames({} as SerializedOrogenWorld, {
 			timelines,
@@ -443,6 +453,8 @@ describe("createDisplayNames", () => {
 			nationColorKeys: new Int32Array([0]),
 			nationColorValues: new Float32Array([0.1, 0.2, 0.3]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 
 		const names = createDisplayNames(world, { timelines, events: [] })
@@ -486,6 +498,8 @@ describe("createDisplayNames", () => {
 			nationColorKeys: new Int32Array([0]),
 			nationColorValues: new Float32Array([0.1, 0.2, 0.3]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 
 		const names = createDisplayNames(world, { timelines, events: [] })
@@ -533,6 +547,8 @@ describe("createDisplayNames", () => {
 			nationColorKeys: new Int32Array([0]),
 			nationColorValues: new Float32Array([0.1, 0.2, 0.3]),
 			wars: [],
+			cultureBlendSecondary: makeProvinceTimelineInt([]),
+			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
 
 		const names = createDisplayNames(world, { timelines, events: [] })
@@ -640,6 +656,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [
 				{ tag: "war started", time: 1, data: {} } as never,
@@ -692,6 +710,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [],
 		}
@@ -733,6 +753,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [],
 		}
@@ -812,6 +834,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [
 				{ tag: "succession", time: 5, data: { nation: 1 } } as never,
@@ -950,6 +974,8 @@ describe("createDisplayNames", () => {
 					nationColorKeys: new Int32Array(),
 					nationColorValues: new Float32Array(),
 					wars: [],
+					cultureBlendSecondary: makeProvinceTimelineInt([]),
+					cultureBlendWeight: makeProvinceTimelineFloat([]),
 				},
 				events: [],
 			},
@@ -987,6 +1013,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [{ tag: "succession", time: 17, data: { nation: 1 } } as never],
 		}
@@ -1055,6 +1083,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [],
 		}
@@ -1147,6 +1177,8 @@ describe("createDisplayNames", () => {
 				nationColorKeys: new Int32Array(),
 				nationColorValues: new Float32Array(),
 				wars: [],
+				cultureBlendSecondary: makeProvinceTimelineInt([]),
+				cultureBlendWeight: makeProvinceTimelineFloat([]),
 			},
 			events: [],
 		}

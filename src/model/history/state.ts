@@ -1,5 +1,5 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
-import { rebalanceHierarchy } from "../society/hierarchy"
+import { fanoutRangesForSize, rebalanceHierarchy } from "../society/hierarchy"
 import type { ProvincePopulation } from "../society/population"
 import {
 	children,
@@ -89,6 +89,8 @@ export interface HistoryState {
 	_leader_birth_year: Timeline<number>[]
 	_occupation: Timeline<number>[]
 	_relations: Map<number, Timeline<Relation>>
+	_culture_blend_secondary: Timeline<number>[]
+	_culture_blend_weight: Timeline<number>[]
 
 	// Live current-time caches (mirror timeline state at state.time).
 	// Rebuilt from _parent when hierarchyDirty; written through on REL.set.
@@ -115,6 +117,10 @@ export interface HistoryState {
 	leaderBirthYearCurrent: Float32Array
 	occupationCurrent: Int32Array
 
+	// Live current-time mirrors for culture blend fields.
+	cultureBlendSecondaryCurrent: Int32Array
+	cultureBlendWeightCurrent: Float32Array
+
 	// Live per-province war-index lists (mirror of provinceWars derivation).
 	provinceWars: number[][]
 
@@ -129,6 +135,7 @@ export interface HistoryState {
 	province_xyz: Float32Array
 	habitability: Float32Array
 	culture: Int32Array
+	cultureCount: number
 
 	wars: War[]
 	events: HistoryNote[]
@@ -555,6 +562,7 @@ function addTerritory(
 		parent: nextParent,
 		depth: nextDepth,
 		currentDepth: 0,
+		fanoutRanges: fanoutRangesForSize(members.length),
 		habitability: state.habitability,
 		urbanPop: state.popUrbanCurrent,
 		provinceSeeds: state.provinceSeeds,
@@ -760,7 +768,7 @@ export function createHistoryState(
 	coastal: Uint8Array,
 	riverVisible: Uint8Array,
 	r_xyz: Float32Array,
-	cultures: { assignment: Int32Array },
+	cultures: { assignment: Int32Array; count: number },
 	startYear: number,
 	rng: HistoryRng,
 ): HistoryState {
@@ -787,6 +795,8 @@ export function createHistoryState(
 		_leader_birth_year: makeTimelineArray<number>(P),
 		_occupation: makeTimelineArray<number>(P),
 		_relations: new Map(),
+		_culture_blend_secondary: makeTimelineArray<number>(P),
+		_culture_blend_weight: makeTimelineArray<number>(P),
 		parentCurrent: new Int32Array(P).fill(-1),
 		childOffset: new Int32Array(P + 1),
 		childList: new Int32Array(0),
@@ -804,6 +814,8 @@ export function createHistoryState(
 		leaderClaimCurrent: new Uint8Array(P),
 		leaderBirthYearCurrent: new Float32Array(P).fill(-1),
 		occupationCurrent: new Int32Array(P).fill(-1),
+		cultureBlendSecondaryCurrent: new Int32Array(P).fill(-1),
+		cultureBlendWeightCurrent: new Float32Array(P),
 		provinceWars: Array.from({ length: P }, () => [] as number[]),
 		provinceSeeds: provinces.seeds,
 		provinceAdjOffset: provinces.adjOffset,
@@ -816,6 +828,7 @@ export function createHistoryState(
 		province_xyz: buildProvinceXyz(provinces.seeds, r_xyz),
 		habitability: population.habitability.slice(),
 		culture: cultures.assignment.slice(),
+		cultureCount: cultures.count,
 		wars: [],
 		events: [],
 		nextDynasty: 0,

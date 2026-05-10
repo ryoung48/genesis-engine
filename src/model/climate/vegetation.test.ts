@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
-import { assignClimateZones, assignVegetation } from "./vegetation"
+import {
+	assignClimateZones,
+	assignVegetation,
+	RAINFALL_BLEND_HALF_WIDTH,
+} from "./vegetation"
+
+const H = RAINFALL_BLEND_HALF_WIDTH
 
 function makeMesh(numRegions: number): SphereMesh {
 	return {
@@ -10,6 +16,9 @@ function makeMesh(numRegions: number): SphereMesh {
 		adjOffset: new Int32Array(numRegions + 1),
 	} as SphereMesh
 }
+
+/** RNG that always returns `v` — useful to force a deterministic side of a blend. */
+const fixedRng = (v: number) => () => v
 
 describe("assignClimateZones", () => {
 	it("classifies ocean, cold, temperate, tropical, infernal, and chaotic cells", () => {
@@ -61,11 +70,13 @@ describe("assignVegetation", () => {
 			annual: new Float32Array([0, 600, 1200, 400, 2500, 700, 150]),
 		} as OrogenRainfall
 
+		// All rain values are outside blend zones, so rng is never consulted.
 		const biome = assignVegetation(
 			makeMesh(7),
 			new Uint8Array([0, 1, 1, 1, 1, 1, 1]),
 			climate,
 			rainfall,
+			fixedRng(0),
 		)
 
 		expect(Array.from(biome)).toEqual([
@@ -79,77 +90,141 @@ describe("assignVegetation", () => {
 		])
 	})
 
-	it("uses strict rainfall thresholds across each biome band", () => {
+	it("biome is deterministic outside the rainfall blend zone", () => {
+		// Values are placed at least H+1 mm away from each threshold so rng is
+		// never consulted. Using fixedRng(0.5) to confirm it is not called in a
+		// way that could influence the result.
+		const rng = fixedRng(0.5)
+
+		// Layout: subarctic(×2) | boreal(×6) | temperate(×2) | subtropical(×2) | tropical(×2)
+		// For each zone a value strictly below the blend lower edge and one strictly
+		// above the blend upper edge are paired so both outcomes are verified.
 		const climate = {
 			temperature_avg: new Float32Array([
-				-20, -10, -10, 0, 0, 0, 0, 12, 12, 12, 20, 20, 20, 30, 30, 30,
+				-10,
+				-10, // subarctic
+				0,
+				0,
+				0,
+				0,
+				0,
+				0, // boreal
+				12,
+				12, // temperate
+				20,
+				20, // subtropical
+				30,
+				30, // tropical
 			]),
 		} as OrogenClimate
 		const rainfall = {
 			annual: new Float32Array([
-				0, 250, 251, 100, 101, 500, 901, 250, 251, 901, 2200, 2201, 501, 250,
-				251, 1501,
+				199,
+				301, // subarctic: below / above DRY blend [200,300]
+				49,
+				151, // boreal: below / above ARID blend [50,150]
+				449,
+				551, // boreal: below / above LOW blend [450,550]
+				849,
+				951, // boreal: below / above MOD blend [850,950]
+				49,
+				951, // temperate: below ARID blend / above MOD blend
+				2149,
+				2251, // subtropical: below / above WET blend [2150,2250]
+				1449,
+				1551, // tropical: below / above MOIST blend [1450,1550]
 			]),
 		} as OrogenRainfall
 
 		const biome = assignVegetation(
-			makeMesh(16),
-			new Uint8Array(16).fill(1),
+			makeMesh(14),
+			new Uint8Array(14).fill(1),
 			climate,
 			rainfall,
+			rng,
 		)
 
 		expect(Array.from(biome)).toEqual([
-			1, // arctic ice desert
-			1, // subarctic exact DRY stays desert
-			2, // subarctic above DRY becomes sparse
-			1, // boreal exact arid threshold stays desert
-			2, // boreal above arid threshold becomes sparse
-			3, // boreal exact LOW stays grasslands
-			5, // boreal above MOD becomes forest
-			2, // temperate exact DRY still exceeds the arid threshold
-			3, // temperate above DRY becomes grasslands
-			5, // temperate above MOD becomes forest
-			5, // subtropical exact WET stays forest
-			6, // subtropical above WET becomes jungle
-			4, // subtropical above LOW becomes woods
-			2, // tropical exact DRY still exceeds the arid threshold
-			3, // tropical above DRY becomes grasslands
-			6, // tropical above MOIST becomes jungle
+			1, // subarctic below DRY blend → desert
+			2, // subarctic above DRY blend → sparse
+			1, // boreal below ARID blend → desert
+			2, // boreal above ARID blend → sparse
+			3, // boreal below LOW blend (above DRY blend) → grasslands
+			4, // boreal above LOW blend → woods
+			4, // boreal below MOD blend (above LOW blend) → woods
+			5, // boreal above MOD blend → forest
+			1, // temperate below ARID blend → desert
+			5, // temperate above MOD blend → forest
+			5, // subtropical below WET blend (above MOD blend) → forest
+			6, // subtropical above WET blend → jungle
+			5, // tropical below MOIST blend (above MOD blend) → forest
+			6, // tropical above MOIST blend → jungle
 		])
 	})
 
-	it("covers remaining exact drought and woodland thresholds across warm bands", () => {
-		const climate = {
-			temperature_avg: new Float32Array([
-				0, 12, 12, 12, 20, 20, 20, 20, 30, 30,
-			]),
-		} as OrogenClimate
-		const rainfall = {
-			annual: new Float32Array([
-				501, 100, 501, 1501, 100, 101, 251, 1500, 100, 101,
-			]),
-		} as OrogenRainfall
+	it("biome transitions are probabilistic within the rainfall blend zone", () => {
+		// At rain == threshold the blend factor t == 0.5.
+		// rng() < 0.5  → probAbove returns true  (higher biome)
+		// rng() >= 0.5 → probAbove returns false (lower biome, falls to next check)
 
-		const biome = assignVegetation(
-			makeMesh(10),
-			new Uint8Array(10).fill(1),
-			climate,
-			rainfall,
+		// Boreal zone: rain at DRY threshold (250), t = 0.5
+		//   rng=0.3 → above DRY → grasslands (3)
+		//   rng=0.7 → below DRY, above ARID(250>=150) → sparse (2)
+		const boreals_high = assignVegetation(
+			makeMesh(1),
+			new Uint8Array([1]),
+			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
+			{ annual: new Float32Array([250]) } as OrogenRainfall,
+			fixedRng(0.3),
 		)
+		const boreals_low = assignVegetation(
+			makeMesh(1),
+			new Uint8Array([1]),
+			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
+			{ annual: new Float32Array([250]) } as OrogenRainfall,
+			fixedRng(0.7),
+		)
+		expect(boreals_high[0]).toBe(3) // grasslands
+		expect(boreals_low[0]).toBe(2) // sparse
 
-		expect(Array.from(biome)).toEqual([
-			4, // boreal above LOW becomes woods
-			1, // temperate exact arid threshold stays desert
-			4, // temperate above LOW becomes woods
-			5, // temperate above MOIST remains forest
-			1, // subtropical exact arid threshold stays desert
-			2, // subtropical above arid threshold becomes sparse
-			3, // subtropical above DRY becomes grasslands
-			5, // subtropical exact MOIST remains forest
-			1, // tropical exact arid threshold stays desert
-			2, // tropical above arid threshold becomes sparse
-		])
+		// Subtropical zone: rain at WET threshold (2200), t = 0.5
+		//   rng=0.3 → above WET → jungle (6)
+		//   rng=0.7 → below WET, above MOD (2200>=950) → forest (5)
+		const subtropical_high = assignVegetation(
+			makeMesh(1),
+			new Uint8Array([1]),
+			{ temperature_avg: new Float32Array([20]) } as OrogenClimate,
+			{ annual: new Float32Array([2200]) } as OrogenRainfall,
+			fixedRng(0.3),
+		)
+		const subtropical_low = assignVegetation(
+			makeMesh(1),
+			new Uint8Array([1]),
+			{ temperature_avg: new Float32Array([20]) } as OrogenClimate,
+			{ annual: new Float32Array([2200]) } as OrogenRainfall,
+			fixedRng(0.7),
+		)
+		expect(subtropical_high[0]).toBe(6) // jungle
+		expect(subtropical_low[0]).toBe(5) // forest
+
+		// Blend boundaries are inclusive: at threshold − H the lower biome is certain,
+		// at threshold + H the higher biome is certain regardless of rng.
+		const at_lower_edge = assignVegetation(
+			makeMesh(1),
+			new Uint8Array([1]),
+			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
+			{ annual: new Float32Array([250 - H]) } as OrogenRainfall,
+			fixedRng(0), // low rng would normally give higher biome
+		)
+		const at_upper_edge = assignVegetation(
+			makeMesh(1),
+			new Uint8Array([1]),
+			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
+			{ annual: new Float32Array([250 + H]) } as OrogenRainfall,
+			fixedRng(1), // high rng would normally give lower biome
+		)
+		expect(at_lower_edge[0]).toBe(2) // sparse: below DRY, above ARID(200>=150)
+		expect(at_upper_edge[0]).toBe(3) // grasslands: deterministically above DRY
 	})
 
 	it("treats exact chaos limits as non-chaotic and only marks infernal heat above the max", () => {

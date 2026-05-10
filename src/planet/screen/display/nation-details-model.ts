@@ -1,5 +1,5 @@
 import { REL, YEAR_MS } from "@/model/history/state"
-import { domainLimitFn } from "@/model/society/hierarchy"
+import { maxFanoutForNationSize } from "@/model/society/hierarchy"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { eventInvolvesNation } from "../../details/nation/event-description"
 import type { NationHistoryPoint } from "../../details/nation/NationHistoryChart"
@@ -204,7 +204,7 @@ export function buildSelectedNationDetails(params: {
 		}
 		const provinces = getNationProvinces(nationId)
 		const children = getNationChildren(childOffset, childList, nationId)
-		if (children.length > domainLimitFn(provinces.length)) {
+		if (children.length > maxFanoutForNationSize(provinces.length)) {
 			collected *= 0.9
 		}
 		if (!freedom && parent[nationId] >= 0) collected *= 0.75

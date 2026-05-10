@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import type { OrogenProvinces } from "../types/society"
 import { buildNationPlan, computeNations, NATION_BUCKETS } from "./nations"
 
-// CK3 1066.9.15 all-county-titles province share targets
-const CK3_1066_TARGETS = [0.4554, 0.072, 0.102, 0.0746, 0.0786, 0.2174]
+// CK3 1066.9.15 all-county-titles province share targets, with ~4% split for hegemons
+const CK3_1066_TARGETS = [0.04, 0.4154, 0.072, 0.102, 0.0746, 0.0786, 0.2174]
 
 /**
  * Build a ring of `n` provinces connected as a cycle.
@@ -111,15 +111,21 @@ function buildDoubleRingProvinces(cols: number) {
 }
 
 describe("NATION_BUCKETS", () => {
-	it("has six tiers in descending order", () => {
-		expect(NATION_BUCKETS).toHaveLength(6)
+	it("has seven tiers in descending order", () => {
+		expect(NATION_BUCKETS).toHaveLength(7)
 		for (let i = 1; i < NATION_BUCKETS.length; i++) {
 			expect(NATION_BUCKETS[i][1]).toBeLessThan(NATION_BUCKETS[i - 1][0])
 		}
 	})
 
-	it("top bucket upper bound is at least 250 to accommodate 1066 mega-realms", () => {
-		expect(NATION_BUCKETS[0][1]).toBeGreaterThanOrEqual(250)
+	it("top bucket covers hegemon-scale realms [251, 600]", () => {
+		expect(NATION_BUCKETS[0][0]).toBe(251)
+		expect(NATION_BUCKETS[0][1]).toBeGreaterThanOrEqual(600)
+	})
+
+	it("empire bucket covers [50, 250] to accommodate 1066 mega-realms", () => {
+		expect(NATION_BUCKETS[1][0]).toBe(50)
+		expect(NATION_BUCKETS[1][1]).toBeGreaterThanOrEqual(250)
 	})
 })
 
@@ -131,20 +137,20 @@ describe("buildNationPlan", () => {
 		expect(mass).toBe(total)
 	})
 
-	it("allocates 50+ bucket ~45% of provinces (CK3 1066 target)", () => {
+	it("allocates empire bucket ~41% of provinces (CK3 1066 target)", () => {
 		const total = 10_000
 		const plan = buildNationPlan(total)
-		const pct = plan.targetProvinceMass[0] / total
-		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[0] - 0.05)
-		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[0] + 0.05)
+		const pct = plan.targetProvinceMass[1] / total
+		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[1] - 0.05)
+		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[1] + 0.05)
 	})
 
 	it("allocates size-1 bucket ~22% of provinces (CK3 1066 target)", () => {
 		const total = 10_000
 		const plan = buildNationPlan(total)
-		const pct = plan.targetProvinceMass[5] / total
-		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[5] - 0.05)
-		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[5] + 0.05)
+		const pct = plan.targetProvinceMass[6] / total
+		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[6] - 0.05)
+		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[6] + 0.05)
 	})
 
 	it("each bucket mass matches CK3 1066 target within 5%", () => {
@@ -157,11 +163,22 @@ describe("buildNationPlan", () => {
 		}
 	})
 
-	it("50+ bucket nations are sized within [50, 250]", () => {
+	it("hegemon bucket nations are sized within [251, 600]", () => {
 		const plan = buildNationPlan(10_000)
 		const [min, max] = NATION_BUCKETS[0]
-		const largeNationTargets = plan.targets.filter((t) => t >= min)
-		for (const t of largeNationTargets) {
+		const hegeMonTargets = plan.targets.filter((t) => t >= min)
+		for (const t of hegeMonTargets) {
+			expect(t).toBeGreaterThanOrEqual(min)
+			expect(t).toBeLessThanOrEqual(max)
+		}
+	})
+
+	it("empire bucket nations are sized within [50, 250]", () => {
+		const plan = buildNationPlan(10_000)
+		const [min, max] = NATION_BUCKETS[1]
+		const empirerTargets = plan.targets.filter((t) => t >= min && t <= max)
+		expect(empirerTargets.length).toBeGreaterThan(0)
+		for (const t of empirerTargets) {
 			expect(t).toBeGreaterThanOrEqual(min)
 			expect(t).toBeLessThanOrEqual(max)
 		}

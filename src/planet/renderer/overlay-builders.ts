@@ -2,6 +2,8 @@ import * as THREE from "three"
 import { Line2 } from "three/examples/jsm/lines/Line2.js"
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
 import type { OrogenViewMode, RiverData } from "./types"
@@ -62,6 +64,25 @@ export function collectHierarchyNodes(
 
 function depthColor(d: number): [number, number, number] {
 	return HIERARCHY_DEPTH_COLORS[Math.min(d, HIERARCHY_DEPTH_COLORS.length - 1)]
+}
+
+/** Rank-based color: counties (deepest) = gold, capitals = color by tier */
+function rankColor(depth: number, maxDepth: number): [number, number, number] {
+	return depthColor(maxDepth - depth)
+}
+
+function createCircleTexture(): THREE.CanvasTexture | null {
+	if (typeof document === "undefined") return null
+	const size = 64
+	const cvs = document.createElement("canvas")
+	cvs.width = size
+	cvs.height = size
+	const ctx = cvs.getContext("2d")!
+	ctx.beginPath()
+	ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2)
+	ctx.fillStyle = "white"
+	ctx.fill()
+	return new THREE.CanvasTexture(cvs)
 }
 
 interface NationBoundarySide {
@@ -641,6 +662,7 @@ export function buildGlobeHierarchyOverlay(
 	world: SerializedOrogenWorld,
 	selectedNationId: number,
 	viewMode: OrogenViewMode,
+	canvas: HTMLCanvasElement,
 ): THREE.Group | null {
 	const nodes = collectHierarchyNodes(world, selectedNationId)
 	if (!nodes || nodes.length === 0) return null
@@ -648,45 +670,43 @@ export function buildGlobeHierarchyOverlay(
 	const provinceIndex = new Map<number, HierarchyNode>()
 	for (const node of nodes) provinceIndex.set(node.provinceId, node)
 
-	const radius = 1.015
+	const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0)
+	const uniformRadius = 1.025
+
 	const dotPositions: number[] = []
 	const dotColors: number[] = []
-	const capitalPositions: number[] = []
-	const capitalColors: number[] = []
 	const linePositions: number[] = []
 	const lineColors: number[] = []
 
 	for (const node of nodes) {
-		const [r, g, b] = depthColor(node.depth)
-		const x = node.xyz[0] * radius
-		const y = node.xyz[1] * radius
-		const z = node.xyz[2] * radius
+		const [r, g, b] = rankColor(node.depth, maxDepth)
+		const x = node.xyz[0] * uniformRadius
+		const y = node.xyz[1] * uniformRadius
+		const z = node.xyz[2] * uniformRadius
 
-		if (node.depth === 0) {
-			capitalPositions.push(x, y, z)
-			capitalColors.push(r, g, b)
-		} else {
-			dotPositions.push(x, y, z)
-			dotColors.push(r, g, b)
-		}
+		dotPositions.push(x, y, z)
+		dotColors.push(r, g, b)
 
 		if (node.parentProvinceId >= 0) {
 			const parentNode = provinceIndex.get(node.parentProvinceId)
 			if (parentNode) {
-				linePositions.push(x, y, z)
-				lineColors.push(r, g, b)
 				linePositions.push(
-					parentNode.xyz[0] * radius,
-					parentNode.xyz[1] * radius,
-					parentNode.xyz[2] * radius,
+					x,
+					y,
+					z,
+					parentNode.xyz[0] * uniformRadius,
+					parentNode.xyz[1] * uniformRadius,
+					parentNode.xyz[2] * uniformRadius,
 				)
-				const [pr, pg, pb] = depthColor(parentNode.depth)
-				lineColors.push(pr, pg, pb)
+				const [pr, pg, pb] = rankColor(parentNode.depth, maxDepth)
+				lineColors.push(r, g, b, pr, pg, pb)
 			}
 		}
 	}
 
 	const group = new THREE.Group()
+	const w = canvas.clientWidth || 1
+	const h = canvas.clientHeight || 1
 
 	if (dotPositions.length > 0) {
 		const geo = new THREE.BufferGeometry()
@@ -698,31 +718,12 @@ export function buildGlobeHierarchyOverlay(
 			"color",
 			new THREE.Float32BufferAttribute(new Float32Array(dotColors), 3),
 		)
+		const circleTex = createCircleTexture()
 		const mat = new THREE.PointsMaterial({
-			size: 0.018,
+			size: 0.012,
 			sizeAttenuation: true,
 			vertexColors: true,
-			depthWrite: false,
-			transparent: true,
-			opacity: 0.95,
-		})
-		group.add(new THREE.Points(geo, mat))
-	}
-
-	if (capitalPositions.length > 0) {
-		const geo = new THREE.BufferGeometry()
-		geo.setAttribute(
-			"position",
-			new THREE.Float32BufferAttribute(new Float32Array(capitalPositions), 3),
-		)
-		geo.setAttribute(
-			"color",
-			new THREE.Float32BufferAttribute(new Float32Array(capitalColors), 3),
-		)
-		const mat = new THREE.PointsMaterial({
-			size: 0.025,
-			sizeAttenuation: true,
-			vertexColors: true,
+			...(circleTex ? { map: circleTex, alphaTest: 0.5 } : {}),
 			depthWrite: false,
 			transparent: true,
 			opacity: 0.95,
@@ -731,22 +732,20 @@ export function buildGlobeHierarchyOverlay(
 	}
 
 	if (linePositions.length > 0) {
-		const geo = new THREE.BufferGeometry()
-		geo.setAttribute(
-			"position",
-			new THREE.Float32BufferAttribute(new Float32Array(linePositions), 3),
-		)
-		geo.setAttribute(
-			"color",
-			new THREE.Float32BufferAttribute(new Float32Array(lineColors), 3),
-		)
-		const mat = new THREE.LineBasicMaterial({
+		const geom = new LineSegmentsGeometry()
+		geom.setPositions(linePositions)
+		geom.setColors(lineColors)
+		const mat = new LineMaterial({
 			vertexColors: true,
+			linewidth: 1.8,
+			resolution: new THREE.Vector2(w, h),
 			transparent: true,
-			opacity: 0.55,
+			opacity: 0.7,
 			depthWrite: false,
 		})
-		group.add(new THREE.LineSegments(geo, mat))
+		const lines = new LineSegments2(geom, mat)
+		lines.computeLineDistances()
+		group.add(lines)
 	}
 
 	group.visible = viewMode === "globe"
@@ -759,6 +758,7 @@ export function buildMapHierarchyOverlay(
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	viewMode: OrogenViewMode,
+	canvas: HTMLCanvasElement,
 ): THREE.Group | null {
 	const nodes = collectHierarchyNodes(world, selectedNationId)
 	if (!nodes || nodes.length === 0) return null
@@ -766,26 +766,30 @@ export function buildMapHierarchyOverlay(
 	const provinceIndex = new Map<number, HierarchyNode>()
 	for (const node of nodes) provinceIndex.set(node.provinceId, node)
 
+	const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0)
+
 	const projection = createMapProjection(
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
 	)
-	const z = 0.005
+	const z = 0.02
+	const CIRCLE_RADIUS = 0.005
 	const linePositions: number[] = []
 	const lineColors: number[] = []
 
 	const group = new THREE.Group()
+	const w = canvas.clientWidth || 1
+	const h = canvas.clientHeight || 1
 
 	for (const node of nodes) {
-		const [r, g, b] = depthColor(node.depth)
+		const [r, g, b] = rankColor(node.depth, maxDepth)
 		const projected = projection.projectCartesian(
 			node.xyz[0],
 			node.xyz[1],
 			node.xyz[2],
 		)
 		const pos = projection.projectRadians(projected.lon, projected.lat, z)
-		const radius = node.depth === 0 ? 0.009 : 0.006
-		const circleGeo = new THREE.CircleGeometry(radius, 12)
+		const circleGeo = new THREE.CircleGeometry(CIRCLE_RADIUS, 16)
 		const circleMat = new THREE.MeshBasicMaterial({
 			color: new THREE.Color(r, g, b),
 			depthWrite: false,
@@ -810,7 +814,7 @@ export function buildMapHierarchyOverlay(
 					{ lon: parentProjected.lon, lat: parentProjected.lat },
 					z,
 				)
-				const [pr, pg, pb] = depthColor(parentNode.depth)
+				const [pr, pg, pb] = rankColor(parentNode.depth, maxDepth)
 				lineColors.push(r, g, b, pr, pg, pb)
 				if (lonDiff > Math.PI) {
 					lineColors.push(r, g, b, pr, pg, pb)
@@ -820,22 +824,20 @@ export function buildMapHierarchyOverlay(
 	}
 
 	if (linePositions.length > 0) {
-		const geo = new THREE.BufferGeometry()
-		geo.setAttribute(
-			"position",
-			new THREE.Float32BufferAttribute(new Float32Array(linePositions), 3),
-		)
-		geo.setAttribute(
-			"color",
-			new THREE.Float32BufferAttribute(new Float32Array(lineColors), 3),
-		)
-		const mat = new THREE.LineBasicMaterial({
+		const geom = new LineSegmentsGeometry()
+		geom.setPositions(linePositions)
+		geom.setColors(lineColors)
+		const mat = new LineMaterial({
 			vertexColors: true,
+			linewidth: 1.8,
+			resolution: new THREE.Vector2(w, h),
 			transparent: true,
-			opacity: 0.55,
+			opacity: 0.7,
 			depthWrite: false,
 		})
-		group.add(new THREE.LineSegments(geo, mat))
+		const lines = new LineSegments2(geom, mat)
+		lines.computeLineDistances()
+		group.add(lines)
 	}
 
 	group.visible = viewMode === "map"

@@ -36,6 +36,8 @@ function createTree(
 		setShowGrid: vi.fn(),
 		showNationBorders: false,
 		setShowNationBorders: vi.fn(),
+		showNationHierarchy: false,
+		setShowNationHierarchy: vi.fn(),
 		gridSpacing: 15,
 		setGridSpacing: vi.fn(),
 		viewMode: "globe",
@@ -70,6 +72,8 @@ describe("OverlayControls", () => {
 				setShowGrid={vi.fn()}
 				showNationBorders={false}
 				setShowNationBorders={vi.fn()}
+				showNationHierarchy={false}
+				setShowNationHierarchy={vi.fn()}
 				gridSpacing={15}
 				setGridSpacing={vi.fn()}
 				viewMode="map"
@@ -117,6 +121,8 @@ describe("OverlayControls", () => {
 				setShowGrid={vi.fn()}
 				showNationBorders={false}
 				setShowNationBorders={vi.fn()}
+				showNationHierarchy={false}
+				setShowNationHierarchy={vi.fn()}
 				gridSpacing={15}
 				setGridSpacing={vi.fn()}
 				viewMode="globe"
@@ -142,6 +148,7 @@ describe("OverlayControls", () => {
 		const setShowWireframe = vi.fn()
 		const setShowGrid = vi.fn()
 		const setShowNationBorders = vi.fn()
+		const setShowNationHierarchy = vi.fn()
 		const setGridSpacing = vi.fn()
 		const setViewMode = vi.fn()
 		const setUnitSystem = vi.fn()
@@ -158,6 +165,7 @@ describe("OverlayControls", () => {
 			setShowWireframe,
 			setShowGrid,
 			setShowNationBorders,
+			setShowNationHierarchy,
 			setGridSpacing,
 			setViewMode,
 			setUnitSystem,
@@ -200,11 +208,12 @@ describe("OverlayControls", () => {
 		const measureLabel = optionGroupChildren[0]
 		const wireframeLabel = optionGroupChildren[1]
 		const nationBordersLabel = optionGroupChildren[4]
-		const gridLabel = optionGroupChildren[5]
-		const gridSection = optionGroupChildren[6]
-		const projectionSection = optionGroupChildren[7]
-		const debugLabel = optionGroupChildren[8]
-		const footerRow = optionGroupChildren[9]
+		const hierarchyLabel = optionGroupChildren[5]
+		const gridLabel = optionGroupChildren[6]
+		const gridSection = optionGroupChildren[7]
+		const projectionSection = optionGroupChildren[8]
+		const debugLabel = optionGroupChildren[9]
+		const footerRow = optionGroupChildren[10]
 		const generationButton = React.Children.toArray(
 			actionRow.props.children,
 		)[0] as ReactElement<ClickableProps>
@@ -229,6 +238,9 @@ describe("OverlayControls", () => {
 		)[1] as ReactElement<InputProps>
 		const nationBordersInput = React.Children.toArray(
 			nationBordersLabel.props.children,
+		)[1] as ReactElement<InputProps>
+		const hierarchyInput = React.Children.toArray(
+			hierarchyLabel.props.children,
 		)[1] as ReactElement<InputProps>
 		const gridToggle = React.Children.toArray(
 			gridLabel.props.children,
@@ -255,6 +267,9 @@ describe("OverlayControls", () => {
 		nationBordersInput.props.onChange?.({
 			target: { checked: true },
 		} as React.ChangeEvent<HTMLInputElement>)
+		hierarchyInput.props.onChange?.({
+			target: { checked: true },
+		} as React.ChangeEvent<HTMLInputElement>)
 		gridToggle.props.onChange?.({
 			target: { checked: false },
 		} as React.ChangeEvent<HTMLInputElement>)
@@ -279,6 +294,7 @@ describe("OverlayControls", () => {
 		expect(setIsMeasuring).toHaveBeenCalledWith(true)
 		expect(setShowWireframe).toHaveBeenCalledWith(true)
 		expect(setShowNationBorders).toHaveBeenCalledWith(true)
+		expect(setShowNationHierarchy).toHaveBeenCalledWith(true)
 		expect(setShowGrid).toHaveBeenCalledWith(false)
 		expect(setGridSpacing).toHaveBeenCalledWith(10)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
@@ -305,6 +321,8 @@ describe("OverlayControls", () => {
 				setShowGrid={vi.fn()}
 				showNationBorders={false}
 				setShowNationBorders={vi.fn()}
+				showNationHierarchy={false}
+				setShowNationHierarchy={vi.fn()}
 				gridSpacing={15}
 				setGridSpacing={vi.fn()}
 				viewMode="globe"
@@ -359,6 +377,8 @@ describe("OverlayControls", () => {
 				setShowGrid={vi.fn()}
 				showNationBorders={false}
 				setShowNationBorders={vi.fn()}
+				showNationHierarchy={false}
+				setShowNationHierarchy={vi.fn()}
 				gridSpacing={7}
 				setGridSpacing={setGridSpacing}
 				viewMode="map"
@@ -412,8 +432,8 @@ describe("OverlayControls", () => {
 		const optionGroupChildren = React.Children.toArray(
 			optionGroups.props.children,
 		) as ReactElement<ChildrenProps>[]
-		const gridSection = optionGroupChildren[6]
-		const projectionSection = optionGroupChildren[7]
+		const gridSection = optionGroupChildren[7]
+		const projectionSection = optionGroupChildren[8]
 		const gridRange = React.Children.toArray(
 			gridSection.props.children,
 		)[1] as ReactElement<InputProps>

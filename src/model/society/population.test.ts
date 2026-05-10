@@ -3,14 +3,15 @@ import { describe, expect, it } from "vitest"
 import { createRng } from "../shared/rng"
 import type { OrogenLandmarks } from "../terrain/landmarks"
 import type { OrogenProvinces } from "../types/society"
-import { computePopulation } from "./population"
+import { computePopulation, computeProvinceHabitability } from "./population"
 
 const HAB_CLIMATE = new Float32Array([
 	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,
 ])
 const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
 const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
-const HAB_COASTAL = 1.25
+const HAB_COASTAL_OCEAN = 1.5
+const HAB_COASTAL_RIVER = 1.1
 const HAB_LANDMARK = new Float32Array([1.0, 0.8, 0.5, 0, 0, 0])
 
 describe("computePopulation", () => {
@@ -35,7 +36,8 @@ describe("computePopulation", () => {
 		const climateZones = new Uint8Array([4, 1, 4])
 		const vegetation = new Uint8Array([4, 4, 4])
 		const topography = new Uint8Array([0, 0, 0])
-		const coastal = new Uint8Array([0, 0, 0])
+		const oceanCoastal = new Uint8Array([0, 0, 0])
+		const lakeCoastal = new Uint8Array([0, 0, 0])
 		const riverVisible = new Uint8Array([0, 0, 0])
 		const seed = 123
 
@@ -45,7 +47,8 @@ describe("computePopulation", () => {
 			climateZones,
 			vegetation,
 			topography,
-			coastal,
+			oceanCoastal,
+			lakeCoastal,
 			riverVisible,
 			seed,
 			1,
@@ -99,7 +102,8 @@ describe("computePopulation", () => {
 		const climateZones = new Uint8Array([4, 4, 4, 4, 4])
 		const vegetation = new Uint8Array([4, 4, 4, 4, 4])
 		const topography = new Uint8Array([0, 0, 0, 0, 0])
-		const coastal = new Uint8Array([0, 1, 0, 0, 1])
+		const oceanCoastal = new Uint8Array([0, 1, 0, 0, 1])
+		const lakeCoastal = new Uint8Array([0, 0, 0, 0, 0])
 		const riverVisible = new Uint8Array([0, 0, 0, 1, 1])
 		const seed = 321
 
@@ -109,7 +113,8 @@ describe("computePopulation", () => {
 			climateZones,
 			vegetation,
 			topography,
-			coastal,
+			oceanCoastal,
+			lakeCoastal,
 			riverVisible,
 			seed,
 			1,
@@ -119,10 +124,12 @@ describe("computePopulation", () => {
 		const rng = createRng(seed + 77777)
 		const baseScore =
 			HAB_CLIMATE[4] * HAB_VEGETATION[4] * HAB_TOPOGRAPHY[0] * HAB_LANDMARK[0]
+		// Province 0 has ocean coastal (region 1) → HAB_COASTAL_OCEAN for all its regions
+		// Province 1 has river (region 3) → HAB_COASTAL_RIVER
 		const regionScores = [
-			baseScore * HAB_COASTAL * (0.8 + rng.random() * 0.4),
-			baseScore * HAB_COASTAL * (0.8 + rng.random() * 0.4),
-			baseScore * HAB_COASTAL * (0.8 + rng.random() * 0.4),
+			baseScore * HAB_COASTAL_OCEAN * (0.8 + rng.random() * 0.4), // r=1, prov 0
+			baseScore * HAB_COASTAL_OCEAN * (0.8 + rng.random() * 0.4), // r=2, prov 0
+			baseScore * HAB_COASTAL_RIVER * (0.8 + rng.random() * 0.4), // r=3, prov 1
 		]
 
 		expect(result.habitability[0]).toBeCloseTo(
@@ -160,6 +167,7 @@ describe("computePopulation", () => {
 			new Uint8Array([99]),
 			new Uint8Array([0]),
 			new Uint8Array([0]),
+			new Uint8Array([0]),
 			999,
 		)
 
@@ -167,6 +175,97 @@ describe("computePopulation", () => {
 		expect(result.population[0]).toBe(0)
 		expect(result.habitabilityScore).toBe(0)
 		expect(result.totalPopulation).toBe(0)
+	})
+})
+
+// ── computeProvinceHabitability ───────────────────────────────────────────────
+
+describe("computeProvinceHabitability", () => {
+	it("matches habitability produced by computePopulation for the same inputs", () => {
+		const provinces = {
+			regionProvince: new Int32Array([0, 0, 1]),
+			seeds: new Int32Array([0, 2]),
+			count: 2,
+			desolate: new Uint8Array([0, 0]),
+			landmassId: new Int32Array([0, 0]),
+			adjOffset: new Int32Array([0, 0, 0]),
+			adjList: new Int32Array(),
+			size: new Int32Array([2, 1]),
+			colors: new Float32Array(6),
+		} satisfies OrogenProvinces
+		const landmarks = {
+			regionLandmark: new Int32Array([0, 0, 0]),
+			type: new Uint8Array([0]),
+			size: new Int32Array([3]),
+			count: 1,
+		} satisfies OrogenLandmarks
+		const climateZones = new Uint8Array([4, 1, 4])
+		const vegetation = new Uint8Array([4, 4, 4])
+		const topography = new Uint8Array([0, 0, 0])
+		const coastal = new Uint8Array([0, 0, 0])
+		const riverVisible = new Uint8Array([0, 0, 0])
+		const seed = 42
+
+		const hab = computeProvinceHabitability(
+			provinces,
+			landmarks,
+			climateZones,
+			vegetation,
+			topography,
+			coastal,
+			coastal,
+			riverVisible,
+			seed,
+		)
+		const pop = computePopulation(
+			provinces,
+			landmarks,
+			climateZones,
+			vegetation,
+			topography,
+			coastal,
+			coastal,
+			riverVisible,
+			seed,
+		)
+
+		expect(hab[0]).toBeCloseTo(pop.habitability[0], 6)
+		expect(hab[1]).toBeCloseTo(pop.habitability[1], 6)
+	})
+
+	it("returns zero for desolate provinces and skips unassigned regions", () => {
+		const provinces = {
+			regionProvince: new Int32Array([-1, 0, 1]),
+			seeds: new Int32Array([1, 2]),
+			count: 2,
+			desolate: new Uint8Array([0, 1]),
+			landmassId: new Int32Array([0, 0]),
+			adjOffset: new Int32Array([0, 0, 0]),
+			adjList: new Int32Array(),
+			size: new Int32Array([1, 1]),
+			colors: new Float32Array(6),
+		} satisfies OrogenProvinces
+		const landmarks = {
+			regionLandmark: new Int32Array([0, 0, 0]),
+			type: new Uint8Array([0]),
+			size: new Int32Array([3]),
+			count: 1,
+		} satisfies OrogenLandmarks
+
+		const hab = computeProvinceHabitability(
+			provinces,
+			landmarks,
+			new Uint8Array([4, 4, 4]),
+			new Uint8Array([4, 4, 4]),
+			new Uint8Array([0, 0, 0]),
+			new Uint8Array([0, 0, 0]),
+			new Uint8Array([0, 0, 0]),
+			new Uint8Array([0, 0, 0]),
+			1,
+		)
+
+		expect(hab[0]).toBeGreaterThan(0) // province 0 is non-desolate
+		expect(hab[1]).toBe(0) // province 1 is desolate
 	})
 })
 
@@ -305,7 +404,8 @@ describe("computeMigration", () => {
 		}
 	})
 
-	it("returns wave=-1 for desolate provinces and still covers the rest", () => {
+	it("returns wave=-1 for desolate provinces and blocks passage through them", () => {
+		// Chain: p0 (habitable) — p1 (desolate barrier) — p2 (habitable but cut off)
 		const provinces = {
 			regionProvince: new Int32Array([0, 1, 2]),
 			seeds: new Int32Array([0, 1, 2]),
@@ -321,10 +421,31 @@ describe("computeMigration", () => {
 		const habitability = new Float32Array([2.0, 0.0, 1.0])
 		const result = computeMigration(provinces, habitability, mesh, 1, 3)
 
-		expect(result.migrationWave[1]).toBe(-1) // desolate
-		expect(result.migrationWave[0]).toBeGreaterThanOrEqual(0)
-		// p2 is on a different island from p0 via ocean crossing but still reachable
-		expect(result.migrationWave[2]).toBeGreaterThanOrEqual(0)
+		expect(result.migrationWave[1]).toBe(-1) // desolate barrier
+		expect(result.migrationWave[0]).toBeGreaterThanOrEqual(0) // cradle
+		// p2 is isolated behind the desolate barrier → unreachable
+		expect(result.migrationWave[2]).toBe(-1)
+	})
+
+	it("allows migration across true ocean gaps (unassigned regions)", () => {
+		// Chain: p0 [region 0] — ocean [region 1, province=-1] — p1 [region 2]
+		const provinces = {
+			regionProvince: new Int32Array([0, -1, 1]),
+			seeds: new Int32Array([0, 2]),
+			count: 2,
+			desolate: new Uint8Array([0, 0]),
+			landmassId: new Int32Array([0, 1]),
+			adjOffset: new Int32Array([0, 1, 3, 4]),
+			adjList: new Int32Array([1, 0, 2, 1]),
+			size: new Int32Array([1, 1]),
+			colors: new Float32Array(6),
+		} satisfies OrogenProvinces
+		const mesh = makeLinearMesh(3)
+		const habitability = new Float32Array([2.0, 1.0])
+		const result = computeMigration(provinces, habitability, mesh, 1, 3)
+
+		expect(result.migrationWave[0]).toBeGreaterThanOrEqual(0) // cradle
+		expect(result.migrationWave[1]).toBeGreaterThanOrEqual(0) // reachable via ocean
 	})
 
 	it("returns all -1 when all provinces are desolate (empty continent)", () => {

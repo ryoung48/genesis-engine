@@ -54,6 +54,8 @@ export function createHistoryTestState(options?: {
 	const parent = options?.parent ?? [-1, -1]
 	const habitability = options?.habitability ?? parent.map(() => 10)
 	const cultures = options?.cultures ?? parent.map((_, i) => i)
+	const cultureCount =
+		cultures.length > 0 ? Math.max(...cultures.filter((c) => c >= 0)) + 1 : 0
 	const neighbors =
 		options?.neighbors ??
 		parent.map((_, index) => {
@@ -114,7 +116,7 @@ export function createHistoryTestState(options?: {
 		new Uint8Array(parent.length),
 		Uint8Array.from(desolate),
 		Float32Array.from(parent.flatMap((_, i) => [1 - i * 0.3, i * 0.2, 0])),
-		{ assignment: Int32Array.from(cultures) },
+		{ assignment: Int32Array.from(cultures), count: cultureCount },
 		10,
 		createHistoryRng(11),
 	)

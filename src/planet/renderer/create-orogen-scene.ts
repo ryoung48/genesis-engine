@@ -288,6 +288,7 @@ export function createOrogenScene(
 			hierarchyOverlayWorld,
 			hierarchyOverlayNationId,
 			currentViewMode,
+			canvas,
 		)
 		mapHierarchyOverlay = buildMapHierarchyOverlay(
 			hierarchyOverlayWorld,
@@ -295,6 +296,7 @@ export function createOrogenScene(
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 			currentViewMode,
+			canvas,
 		)
 		if (globeHierarchyOverlay) scene.add(globeHierarchyOverlay)
 		if (mapHierarchyOverlay) scene.add(mapHierarchyOverlay)

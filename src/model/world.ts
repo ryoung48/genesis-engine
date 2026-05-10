@@ -1,3 +1,5 @@
+import type { LocationTradeGoods } from "./economy/trade-goods"
+import type { OrogenLandmarks } from "./terrain/landmarks"
 import type {
 	OrogenClimate,
 	OrogenHazards,
@@ -8,6 +10,7 @@ import type {
 } from "./types/climate"
 import type { SphereMesh } from "./types/mesh"
 import type {
+	OrogenLocations,
 	OrogenNationHierarchy,
 	OrogenPartition,
 	OrogenProvinces,
@@ -71,13 +74,15 @@ export interface OrogenWorld {
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	provinces?: OrogenProvinces
+	locations?: OrogenLocations
 	nations?: OrogenNationHierarchy
 	cultures?: OrogenPartition
 	heritages?: OrogenPartition
 	faiths?: OrogenPartition
 	religions?: OrogenPartition
-	landmarks?: import("./terrain/landmarks").OrogenLandmarks
+	landmarks?: OrogenLandmarks
 	population?: import("./society/population").ProvincePopulation
+	tradeGoods?: LocationTradeGoods
 	continentCount: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]

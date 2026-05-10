@@ -9,6 +9,8 @@ function createProps(overrides: Partial<ComponentProps<typeof ModeBar>> = {}) {
 	return {
 		colorMode: "terrain" as const,
 		setColorMode: vi.fn(),
+		geographyMode: "terrain" as const,
+		setGeographyMode: vi.fn(),
 		nationMode: "borders" as const,
 		setNationMode: vi.fn(),
 		populationMode: "density" as const,
@@ -116,6 +118,7 @@ describe("ModeBar", () => {
 		const geographyControl = getPrimaryControl(
 			createProps({
 				colorMode: "population",
+				geographyMode: "terrain",
 				setColorMode,
 			}),
 		)
@@ -160,6 +163,7 @@ describe("ModeBar", () => {
 		const geographyControl = getPrimaryControl(
 			createProps({
 				colorMode: "dtr",
+				geographyMode: "dtr",
 				setColorMode,
 			}),
 		)
@@ -167,6 +171,21 @@ describe("ModeBar", () => {
 		geographyControl.props.onChange("geography")
 
 		expect(setColorMode).toHaveBeenCalledWith("dtr")
+	})
+
+	it("restores the last geography submode when switching back from another primary", () => {
+		const setColorMode = vi.fn()
+		const geographyControl = getPrimaryControl(
+			createProps({
+				colorMode: "nations",
+				geographyMode: "topography",
+				setColorMode,
+			}),
+		)
+
+		geographyControl.props.onChange("geography")
+
+		expect(setColorMode).toHaveBeenCalledWith("topography")
 	})
 
 	it("wires shared mode-control helpers through active-state callbacks", () => {

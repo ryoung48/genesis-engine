@@ -7,6 +7,7 @@ export type {
 } from "./types/climate"
 export type { SphereMesh } from "./types/mesh"
 export type {
+	OrogenLocations,
 	OrogenNationHierarchy,
 	OrogenPartition,
 	OrogenProvinces,

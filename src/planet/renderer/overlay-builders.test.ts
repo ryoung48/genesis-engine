@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { describe, expect, it } from "vitest"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import {
@@ -6,6 +7,10 @@ import {
 	buildMapHierarchyOverlay,
 	collectHierarchyNodes,
 } from "./overlay-builders"
+
+function makeMockCanvas(): HTMLCanvasElement {
+	return { clientWidth: 800, clientHeight: 600 } as unknown as HTMLCanvasElement
+}
 
 function makeHierarchyWorld(): SerializedOrogenWorld {
 	// 3 provinces in nation 0 with depth 0, 1, 2
@@ -130,33 +135,50 @@ describe("buildGlobeHierarchyOverlay", () => {
 	it("returns null when world has no nations", () => {
 		const world = makeHierarchyWorld()
 		;(world as unknown as Record<string, unknown>).nations = undefined
-		expect(buildGlobeHierarchyOverlay(world, 0, "globe")).toBeNull()
+		expect(
+			buildGlobeHierarchyOverlay(world, 0, "globe", makeMockCanvas()),
+		).toBeNull()
 	})
 
 	it("returns a Group with children when valid data provided", () => {
 		const world = makeHierarchyWorld()
-		const group = buildGlobeHierarchyOverlay(world, 0, "globe")
+		const group = buildGlobeHierarchyOverlay(
+			world,
+			0,
+			"globe",
+			makeMockCanvas(),
+		)
 		expect(group).toBeInstanceOf(THREE.Group)
 		expect(group!.children.length).toBeGreaterThan(0)
 	})
 
 	it("sets group visible=true when viewMode is globe", () => {
 		const world = makeHierarchyWorld()
-		const group = buildGlobeHierarchyOverlay(world, 0, "globe")!
+		const group = buildGlobeHierarchyOverlay(
+			world,
+			0,
+			"globe",
+			makeMockCanvas(),
+		)!
 		expect(group.visible).toBe(true)
 	})
 
 	it("sets group visible=false when viewMode is map", () => {
 		const world = makeHierarchyWorld()
-		const group = buildGlobeHierarchyOverlay(world, 0, "map")!
+		const group = buildGlobeHierarchyOverlay(world, 0, "map", makeMockCanvas())!
 		expect(group.visible).toBe(false)
 	})
 
-	it("includes Points for dots and LineSegments for edges", () => {
+	it("includes Points for dots and LineSegments2 for edges", () => {
 		const world = makeHierarchyWorld()
-		const group = buildGlobeHierarchyOverlay(world, 0, "globe")!
+		const group = buildGlobeHierarchyOverlay(
+			world,
+			0,
+			"globe",
+			makeMockCanvas(),
+		)!
 		const hasPoints = group.children.some((c) => c instanceof THREE.Points)
-		const hasLines = group.children.some((c) => c instanceof THREE.LineSegments)
+		const hasLines = group.children.some((c) => c instanceof LineSegments2)
 		expect(hasPoints).toBe(true)
 		expect(hasLines).toBe(true)
 	})
@@ -166,31 +188,61 @@ describe("buildMapHierarchyOverlay", () => {
 	it("returns null when world has no nations", () => {
 		const world = makeHierarchyWorld()
 		;(world as unknown as Record<string, unknown>).nations = undefined
-		expect(buildMapHierarchyOverlay(world, 0, 0, 0, "map")).toBeNull()
+		expect(
+			buildMapHierarchyOverlay(world, 0, 0, 0, "map", makeMockCanvas()),
+		).toBeNull()
 	})
 
 	it("returns a Group with children when valid data provided", () => {
 		const world = makeHierarchyWorld()
-		const group = buildMapHierarchyOverlay(world, 0, 0, 0, "map")
+		const group = buildMapHierarchyOverlay(
+			world,
+			0,
+			0,
+			0,
+			"map",
+			makeMockCanvas(),
+		)
 		expect(group).toBeInstanceOf(THREE.Group)
 		expect(group!.children.length).toBeGreaterThan(0)
 	})
 
 	it("sets group visible=true when viewMode is map", () => {
 		const world = makeHierarchyWorld()
-		const group = buildMapHierarchyOverlay(world, 0, 0, 0, "map")!
+		const group = buildMapHierarchyOverlay(
+			world,
+			0,
+			0,
+			0,
+			"map",
+			makeMockCanvas(),
+		)!
 		expect(group.visible).toBe(true)
 	})
 
 	it("sets group visible=false when viewMode is globe", () => {
 		const world = makeHierarchyWorld()
-		const group = buildMapHierarchyOverlay(world, 0, 0, 0, "globe")!
+		const group = buildMapHierarchyOverlay(
+			world,
+			0,
+			0,
+			0,
+			"globe",
+			makeMockCanvas(),
+		)!
 		expect(group.visible).toBe(false)
 	})
 
 	it("includes circle meshes for provinces", () => {
 		const world = makeHierarchyWorld()
-		const group = buildMapHierarchyOverlay(world, 0, 0, 0, "map")!
+		const group = buildMapHierarchyOverlay(
+			world,
+			0,
+			0,
+			0,
+			"map",
+			makeMockCanvas(),
+		)!
 		const hasMeshes = group.children.some((c) => c instanceof THREE.Mesh)
 		expect(hasMeshes).toBe(true)
 	})

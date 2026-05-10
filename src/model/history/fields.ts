@@ -178,6 +178,26 @@ export const PROV = {
 			if (time >= state.time) state.occupationCurrent[p] = value
 		},
 	},
+	cultureBlendSecondary: {
+		get: (state: HistoryState, p: number, time = state.time) =>
+			time === state.time
+				? state.cultureBlendSecondaryCurrent[p]
+				: getField(state._culture_blend_secondary[p], -1, time),
+		set: (state: HistoryState, p: number, time: number, value: number) => {
+			setField(state._culture_blend_secondary[p], time, value)
+			if (time >= state.time) state.cultureBlendSecondaryCurrent[p] = value
+		},
+	},
+	cultureBlendWeight: {
+		get: (state: HistoryState, p: number, time = state.time) =>
+			time === state.time
+				? state.cultureBlendWeightCurrent[p]
+				: getField(state._culture_blend_weight[p], 0, time),
+		set: (state: HistoryState, p: number, time: number, value: number) => {
+			setField(state._culture_blend_weight[p], time, value)
+			if (time >= state.time) state.cultureBlendWeightCurrent[p] = value
+		},
+	},
 } as const
 
 function relationKey(state: HistoryState, a: number, b: number): number {

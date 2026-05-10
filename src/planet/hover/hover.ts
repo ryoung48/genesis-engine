@@ -5,6 +5,7 @@ import {
 import { KOPPEN_LABELS, koppenClimateName } from "@/model/climate/koppen"
 import { PASTA_LABELS, pastaClimateName } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
+import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { meanEdgeLengthKm } from "@/model/shared/units"
 import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
@@ -348,13 +349,28 @@ export function getHoverClimateDisplay(
 	hoverClimateZone: string | null,
 ): string | null {
 	if (colorMode === "pastaClimate" && hoverPastaClimate) {
-		return `${hoverPastaClimate.name}${hoverPastaClimate.code ? ` (${hoverPastaClimate.code})` : ""}`
+		return hoverPastaClimate.name.toLowerCase()
 	}
 	if (colorMode === "koppenClimate" && hoverKoppenClimate) {
 		return `${hoverKoppenClimate.name}${hoverKoppenClimate.code ? ` (${hoverKoppenClimate.code})` : ""}`
 	}
-	if (hoverClimateZone) {
-		return hoverClimateZone
-	}
-	return null
+	return hoverClimateZone
+}
+
+/**
+ * Returns the trade good name and its 1-based material index for the
+ * location that contains the hovered region, or null if unavailable.
+ */
+export function getHoverTradeGood(
+	hoverInfo: HoverInfo | null,
+	world: SerializedOrogenWorld | null,
+): { name: string; materialIndex: number } | null {
+	if (!(hoverInfo && world?.tradeGoods && world?.locations)) return null
+	const l = world.locations.regionLocation[hoverInfo.region]
+	if (l == null || l < 0 || l >= world.tradeGoods.length) return null
+	const idx = world.tradeGoods[l]
+	if (!idx) return null
+	const raw = TRADE_GOOD_LABELS[idx] ?? "unknown"
+	const name = raw.replace(/^goods_/, "").replace(/_/g, " ")
+	return { name, materialIndex: idx }
 }

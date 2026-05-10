@@ -60,6 +60,7 @@ export interface DetailsDrawerBaseProps {
 	climateDistribution: DistributionBucket[]
 	vegetationDistribution: DistributionBucket[]
 	topographyDistribution: DistributionBucket[]
+	tradeGoodsDistribution: DistributionBucket[]
 }
 
 export function formatPopulation(value: number): string {

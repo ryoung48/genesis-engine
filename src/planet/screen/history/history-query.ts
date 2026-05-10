@@ -1,6 +1,6 @@
 import type { HistoryNote } from "@/model/history"
 import { REL } from "@/model/history/state"
-import { domainLimitFn } from "@/model/society/hierarchy"
+import { maxFanoutForNationSize } from "@/model/society/hierarchy"
 import type {
 	SerializedOrogenWorld,
 	SerializedProvinceTimelineFloat,
@@ -41,6 +41,10 @@ export interface HistoryView {
 	totalPopulation: number
 	nationWealth: Float32Array
 	nationOptimalWealth: Float32Array
+	/** Per-province secondary (bleeding) culture index. -1 = no blend. */
+	cultureBlendSecondary: Int32Array
+	/** Per-province blend weight [0, 1]. */
+	cultureBlendWeight: Float32Array
 	relationAt: (a: number, b: number) => number
 	getNationWealth: (nationId: number) => number
 	getNationOptimalWealth: (nationId: number) => number
@@ -548,7 +552,7 @@ function buildLazyWealthAccess(params: {
 				optimal += nationOptimalWealth[child] * 0.25
 				current += nationWealth[child] * 0.25
 			}
-			if (childCount > domainLimitFn(memberCounts[nationId])) {
+			if (childCount > maxFanoutForNationSize(memberCounts[nationId])) {
 				optimal *= 0.9
 				current *= 0.9
 			}
@@ -987,6 +991,31 @@ export function createHistoryQuery(
 		}))
 		const cloneMs = performance.now() - cloneStartedAt
 
+		const cultureBlendSecondary = new Int32Array(provinceCount).fill(-1)
+		const cultureBlendWeight = new Float32Array(provinceCount)
+		const blendSecTimeline = timelines.cultureBlendSecondary
+		const blendWtTimeline = timelines.cultureBlendWeight
+		if (blendSecTimeline && blendWtTimeline) {
+			for (let p = 0; p < provinceCount; p++) {
+				cultureBlendSecondary[p] = readTimelineValue(
+					blendSecTimeline.times,
+					blendSecTimeline.values,
+					blendSecTimeline.offsets[p],
+					blendSecTimeline.offsets[p + 1],
+					-1,
+					timeMs,
+				)
+				cultureBlendWeight[p] = readTimelineValue(
+					blendWtTimeline.times,
+					blendWtTimeline.values,
+					blendWtTimeline.offsets[p],
+					blendWtTimeline.offsets[p + 1],
+					0,
+					timeMs,
+				)
+			}
+		}
+
 		lastComputedMs = timeMs
 		lastView = {
 			timeMs,
@@ -1008,6 +1037,8 @@ export function createHistoryQuery(
 			totalPopulation: workingState.totalPopulation,
 			nationWealth: wealthAccess.nationWealth,
 			nationOptimalWealth: wealthAccess.nationOptimalWealth,
+			cultureBlendSecondary,
+			cultureBlendWeight,
 			relationAt: (a, b) => readRelation(a, b, timeMs),
 			getNationWealth: wealthAccess.getNationWealth,
 			getNationOptimalWealth: wealthAccess.getNationOptimalWealth,
