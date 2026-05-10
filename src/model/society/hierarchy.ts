@@ -195,36 +195,11 @@ export function rebalanceHierarchy(params: {
 	const [minK, maxK, targetGroupSize] = fanoutRanges[currentDepth]
 	const rawK = Math.round(members.length / targetGroupSize)
 	const k = Math.min(members.length, Math.max(minK, Math.min(maxK, rawK)))
-	const distances = new Float32Array(members.length)
-	let mean = 0
-	for (let i = 0; i < members.length; i++) {
-		const distance = provinceSeedDistance(
-			capital,
-			members[i],
-			provinceSeeds,
-			r_xyz,
-		)
-		distances[i] = distance
-		mean += distance
-	}
-	mean /= Math.max(1, members.length)
 
-	let variance = 0
-	for (let i = 0; i < distances.length; i++) {
-		const delta = distances[i] - mean
-		variance += delta * delta
-	}
-	const std = Math.sqrt(variance / Math.max(1, distances.length - 1))
-
+	// k-means++ seed selection: each seed is chosen proportional to
+	// (habitability + 1) * minDistToExistingSeeds, spreading seeds across the
+	// full territory rather than clustering them in a distance ring.
 	const candidates = new Uint8Array(members.length).fill(1)
-	const baseScores = new Float32Array(members.length)
-	for (let i = 0; i < members.length; i++) {
-		const z = std === 0 ? 1 : Math.max(1, Math.abs((distances[i] - mean) / std))
-		baseScores[i] =
-			(habitability[members[i]] + urbanPop[members[i]] / URBAN_POP_SCALE) /
-			Math.sqrt(z)
-	}
-
 	const seeds = new Int32Array(k)
 	let seedCount = 0
 	for (; seedCount < k; seedCount++) {
@@ -233,11 +208,8 @@ export function rebalanceHierarchy(params: {
 		for (let i = 0; i < members.length; i++) {
 			if (!candidates[i]) continue
 			const province = members[i]
-			const centerDistance = distances[i]
-			const centerPenalty =
-				std === 0
-					? 1
-					: Math.max(1, Math.abs((centerDistance - mean) / std)) ** 2
+			const hab =
+				habitability[province] + urbanPop[province] / URBAN_POP_SCALE + 1
 			let minDist = 1
 			if (seedCount > 0) {
 				minDist = Infinity
@@ -251,9 +223,9 @@ export function rebalanceHierarchy(params: {
 					if (dist < minDist) minDist = dist
 				}
 			}
-			const adjusted = (baseScores[i] * minDist) / centerPenalty
-			if (adjusted > bestScore) {
-				bestScore = adjusted
+			const score = hab * minDist
+			if (score > bestScore) {
+				bestScore = score
 				bestMember = i
 			}
 		}
