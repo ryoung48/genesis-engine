@@ -20,6 +20,8 @@ interface SimulationControlsProps {
 	maxTimeMs: number
 	onTimeChange: (timeMs: number) => void
 	floating?: boolean
+	onPlayPause?: () => void
+	simPlaying?: boolean
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
@@ -28,6 +30,8 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	maxTimeMs,
 	onTimeChange,
 	floating = true,
+	onPlayPause,
+	simPlaying = false,
 }) => {
 	const wrapperClassName = floating
 		? "absolute bottom-3 left-1/2 z-20 -translate-x-1/2 pointer-events-none"
@@ -117,6 +121,45 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 							<path d="M4 2L8 6L4 10" />
 						</svg>
 					</IconButton>
+					{onPlayPause !== undefined && (
+						<>
+							<div className="h-4 w-px shrink-0 bg-white/15" />
+							<IconButton
+								onClick={onPlayPause}
+								size="sm"
+								shape="rounded"
+								className="h-7 w-7 shrink-0 border-white/0 bg-white/5 text-slate-100 shadow-none hover:bg-white/10"
+								title={simPlaying ? "Pause simulation" : "Start simulation"}
+								aria-label={
+									simPlaying ? "Pause simulation" : "Start simulation"
+								}
+								selected={simPlaying}
+							>
+								{simPlaying ? (
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 12 12"
+										fill="currentColor"
+										aria-hidden="true"
+									>
+										<rect x="2" y="1" width="3" height="10" rx="0.5" />
+										<rect x="7" y="1" width="3" height="10" rx="0.5" />
+									</svg>
+								) : (
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 12 12"
+										fill="currentColor"
+										aria-hidden="true"
+									>
+										<path d="M2.5 1L10.5 6L2.5 11V1Z" />
+									</svg>
+								)}
+							</IconButton>
+						</>
+					)}
 				</FloatingPanel>
 			</div>
 		</div>

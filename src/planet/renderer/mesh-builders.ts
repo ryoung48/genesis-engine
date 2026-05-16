@@ -432,6 +432,9 @@ export function buildMapMesh(
 
 	const material = new THREE.ShaderMaterial({
 		side: THREE.DoubleSide,
+		uniforms: {
+			uAmbient: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+		},
 		vertexShader: `
 			attribute vec3 color;
 			attribute vec3 occColor;
@@ -449,19 +452,20 @@ export function buildMapMesh(
 			}
 		`,
 		fragmentShader: `
+			uniform vec3 uAmbient;
 			varying vec3 vColor;
 			varying vec3 vOccColor;
 			varying float vOccMask;
 			varying vec2 vWorldPos;
 			void main() {
-				vec3 finalColor = vColor;
+				vec3 finalColor = vColor * uAmbient;
 				if (vOccMask > 0.5) {
 					float stripe = fract((vWorldPos.x + vWorldPos.y) * 150.0);
 					if (stripe > 0.25 && stripe < 0.75) {
-						finalColor = vOccColor;
+						finalColor = vOccColor * uAmbient;
 					}
 				}
-				gl_FragColor = vec4(finalColor, 1.0);
+				gl_FragColor = linearToOutputTexel(vec4(finalColor, 1.0));
 			}
 		`,
 	})

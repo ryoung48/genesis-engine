@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { FloatingPanel, IconButton } from "@/components"
+import { FloatingPanel } from "@/components"
 import { useEbmPreview } from "@/hooks/useEbmPreview"
 import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
@@ -79,6 +79,7 @@ import {
 } from "./screen/display/nation-details-model"
 import { computePlanetStats } from "./screen/display/planet-stats"
 import {
+	buildCultureBlendOverlay,
 	buildPoliticalOccupationOverlay,
 	getPoliticalHoverNationId,
 	getPoliticalHoverOccupation,
@@ -208,7 +209,6 @@ export const OrogenView: React.FC = () => {
 	const [showRivers, setShowRivers] = useState(false)
 	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
 	const [debugMapModes, setDebugMapModes] = useState(false)
-	const [simulationControlsOpen, setSimulationControlsOpen] = useState(false)
 	const [gridSpacing, setGridSpacing] = useState(15)
 	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
@@ -455,7 +455,7 @@ export const OrogenView: React.FC = () => {
 
 	useEffect(() => {
 		if (!canSimulate) {
-			setSimulationControlsOpen(false)
+			setSimPlaying(false)
 		}
 	}, [canSimulate])
 
@@ -708,7 +708,6 @@ export const OrogenView: React.FC = () => {
 			selectedHistoryView?.activeWars,
 			selectedNationId,
 			selectedHistoryView?.relationAt ?? null,
-			selectedHistoryView,
 		)
 	}, [
 		colorMode,
@@ -733,6 +732,79 @@ export const OrogenView: React.FC = () => {
 		})
 	}, [selectedHistoryView, getNationColorRgb, worldForDisplay])
 
+	const cultureBlendOverlay = useMemo(() => {
+		if (colorMode !== "population") return null
+		const world = worldForDisplay
+		if (!world?.cultures) return null
+
+		const blendSecondary = selectedHistoryView?.cultureBlendSecondary
+		const blendWeight = selectedHistoryView?.cultureBlendWeight
+		const cultureAssignment = world.cultures.assignment
+
+		let getOverlayColor:
+			| ((
+					sec: number,
+					prim: number,
+			  ) => readonly [number, number, number] | null)
+			| null = null
+
+		if (populationMode === "culture") {
+			const colors = world.cultures.colors
+			getOverlayColor = (sec) =>
+				[colors[3 * sec], colors[3 * sec + 1], colors[3 * sec + 2]] as const
+		} else if (populationMode === "heritage" && world.heritages) {
+			const { assignment: cultureToHeritage, colors } = world.heritages
+			getOverlayColor = (sec, prim) => {
+				const secH = cultureToHeritage[sec] ?? -1
+				if (secH < 0 || secH === (cultureToHeritage[prim] ?? -1)) return null
+				return [
+					colors[3 * secH],
+					colors[3 * secH + 1],
+					colors[3 * secH + 2],
+				] as const
+			}
+		} else if (populationMode === "faith" && world.faiths) {
+			const { assignment: cultureToFaith, colors } = world.faiths
+			getOverlayColor = (sec, prim) => {
+				const secF = cultureToFaith[sec] ?? -1
+				if (secF < 0 || secF === (cultureToFaith[prim] ?? -1)) return null
+				return [
+					colors[3 * secF],
+					colors[3 * secF + 1],
+					colors[3 * secF + 2],
+				] as const
+			}
+		} else if (
+			populationMode === "religion" &&
+			world.religions &&
+			world.faiths
+		) {
+			const { assignment: faithToReligion, colors } = world.religions
+			const { assignment: cultureToFaith } = world.faiths
+			getOverlayColor = (sec, prim) => {
+				const secF = cultureToFaith[sec] ?? -1
+				const primF = cultureToFaith[prim] ?? -1
+				const secR = secF >= 0 ? (faithToReligion[secF] ?? -1) : -1
+				const primR = primF >= 0 ? (faithToReligion[primF] ?? -1) : -1
+				if (secR < 0 || secR === primR) return null
+				return [
+					colors[3 * secR],
+					colors[3 * secR + 1],
+					colors[3 * secR + 2],
+				] as const
+			}
+		}
+
+		if (!getOverlayColor) return null
+		return buildCultureBlendOverlay({
+			regionProvince: world.provinces?.regionProvince,
+			cultureBlendSecondary: blendSecondary,
+			cultureBlendWeight: blendWeight,
+			cultureAssignment,
+			getOverlayColor,
+		})
+	}, [colorMode, populationMode, worldForDisplay, selectedHistoryView])
+
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
@@ -750,9 +822,22 @@ export const OrogenView: React.FC = () => {
 		scene.setOccupationOverlay(
 			colorMode === "nations" && nationMode === "borders"
 				? occupationOverlay
-				: null,
+				: colorMode === "population" &&
+						["culture", "heritage", "faith", "religion"].includes(
+							populationMode,
+						)
+					? cultureBlendOverlay
+					: null,
 		)
-	}, [colorMode, nationMode, occupationOverlay, regionColors, worldForDisplay])
+	}, [
+		colorMode,
+		nationMode,
+		populationMode,
+		occupationOverlay,
+		cultureBlendOverlay,
+		regionColors,
+		worldForDisplay,
+	])
 
 	const thermalEquator = useMemo(() => {
 		if (!world?.climate) return null
@@ -1517,7 +1602,6 @@ export const OrogenView: React.FC = () => {
 	}, [])
 
 	const handleToggleSimulationPlayback = useCallback(() => {
-		setSimulationControlsOpen(true)
 		if (simPlaying) {
 			handlePauseSimulation()
 			return
@@ -1840,7 +1924,7 @@ export const OrogenView: React.FC = () => {
 							</FloatingPanel>
 						)}
 
-						{simulationControlsOpen && (
+						{canSimulate && (
 							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
 								<div className="pointer-events-auto">
 									<SimulationControls
@@ -1849,50 +1933,10 @@ export const OrogenView: React.FC = () => {
 										maxTimeMs={simTimeMs}
 										onTimeChange={setSelectedTimeMs}
 										floating={false}
+										onPlayPause={handleToggleSimulationPlayback}
+										simPlaying={simPlaying}
 									/>
 								</div>
-							</div>
-						)}
-						{canSimulate && (
-							<div
-								className="pointer-events-none absolute bottom-3 z-20"
-								style={{ right: detailsDrawerOpen ? "0.75rem" : "3.5rem" }}
-							>
-								<IconButton
-									onClick={handleToggleSimulationPlayback}
-									title={simPlaying ? "Pause simulation" : "Start simulation"}
-									aria-label={
-										simPlaying ? "Pause simulation" : "Start simulation"
-									}
-									tone="overlay"
-									selected={simPlaying || simulationControlsOpen}
-									shape="rounded"
-									size="sm"
-									className="pointer-events-auto shadow-lg backdrop-blur-md"
-								>
-									{simPlaying ? (
-										<svg
-											width="12"
-											height="12"
-											viewBox="0 0 12 12"
-											fill="currentColor"
-											aria-hidden="true"
-										>
-											<rect x="2" y="1" width="3" height="10" rx="0.5" />
-											<rect x="7" y="1" width="3" height="10" rx="0.5" />
-										</svg>
-									) : (
-										<svg
-											width="12"
-											height="12"
-											viewBox="0 0 12 12"
-											fill="currentColor"
-											aria-hidden="true"
-										>
-											<path d="M2.5 1L10.5 6L2.5 11V1Z" />
-										</svg>
-									)}
-								</IconButton>
 							</div>
 						)}
 						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">

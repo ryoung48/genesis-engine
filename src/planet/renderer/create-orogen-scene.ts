@@ -615,6 +615,7 @@ export function createOrogenScene(
 		mapFaceToRegion = mapBuild.faceToRegion
 		scene.add(terrainMesh)
 		scene.add(mapMesh)
+		syncMapAmbient()
 		if (currentOccupationOverlay) {
 			mapOccupationOverlay = buildMapOccupationOverlay(
 				mapMesh,
@@ -1387,6 +1388,17 @@ export function createOrogenScene(
 		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
 	}
 
+	function syncMapAmbient() {
+		if (!mapMesh) return
+		const mat = mapMesh.material as THREE.ShaderMaterial
+		const invPi = 1 / Math.PI
+		mat.uniforms.uAmbient.value.set(
+			ambient.color.r * ambient.intensity * invPi,
+			ambient.color.g * ambient.intensity * invPi,
+			ambient.color.b * ambient.intensity * invPi,
+		)
+	}
+
 	function setFullAmbient(enabled: boolean) {
 		if (enabled) {
 			ambient.color.set(0xffffff)
@@ -1403,6 +1415,7 @@ export function createOrogenScene(
 				currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000,
 			)
 		}
+		syncMapAmbient()
 	}
 
 	function setHierarchyOverlay(

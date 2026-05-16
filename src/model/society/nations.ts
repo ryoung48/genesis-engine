@@ -1,6 +1,7 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
 import { SimplexNoise } from "../shared/simplex-noise"
+import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
 import {
 	buildChildrenCSR,
 	buildSovereign,
@@ -9,6 +10,9 @@ import {
 	HEGEMON_FANOUT,
 	rebalanceHierarchy,
 } from "./hierarchy"
+
+// Hard cap on how far a nation can spread from its capital, in km.
+export const MAX_NATION_SPREAD_KM = 2000
 
 // Province-mass weights per bucket — calibrated to CK3 1066.9.15 all-county-titles
 // distribution, with ~4% carved from the empire bucket for hegemons.
@@ -30,8 +34,11 @@ export function computeNations(params: {
 	habitability: Float32Array
 	r_xyz: Float32Array
 	seed: number
+	planetRadiusKm?: number
 }): OrogenNationHierarchy {
 	const { provinces, coastal, habitability, r_xyz } = params
+	const maxSpreadRad =
+		MAX_NATION_SPREAD_KM / (params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM)
 	const provinceCount = provinces.count
 	if (provinceCount === 0) return emptyPartition(provinceCount)
 
@@ -105,6 +112,7 @@ export function computeNations(params: {
 				provinces.adjOffset,
 				provinces.adjList,
 				noise,
+				maxSpreadRad,
 			)
 			if (claim < 0) break
 			claimProvinceDynamic(
@@ -444,6 +452,7 @@ function bestClaim(
 	adjOffset: Int32Array,
 	adjList: Int32Array,
 	noise: SimplexNoise,
+	maxSpreadRad: number,
 ): number {
 	let best = -1
 	let bestScore = -Infinity
@@ -467,6 +476,7 @@ function bestClaim(
 			provinceSeeds,
 			r_xyz,
 		)
+		if (d > maxSpreadRad) continue
 		const s = provinceSeeds[candidate]
 		const nx = r_xyz[3 * s] * NOISE_FREQ
 		const ny = r_xyz[3 * s + 1] * NOISE_FREQ

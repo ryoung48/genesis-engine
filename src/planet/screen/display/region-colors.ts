@@ -26,7 +26,6 @@ import {
 	temperatureDeltaColor,
 	vegetationColor,
 } from "../../colors"
-import type { HistoryView } from "../history/history-query"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import {
 	darkenClimateAtElevation,
@@ -161,7 +160,6 @@ export function computeRegionColors(
 	activeWars?: readonly PoliticalMapWar[] | null,
 	selectedNationId?: number | null,
 	relationAt?: ((a: number, b: number) => number) | null,
-	historyView?: HistoryView | null,
 ): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
 
@@ -720,29 +718,6 @@ export function computeRegionColors(
 						rgb[3 * r] = 0.35
 						rgb[3 * r + 1] = 0.33
 						rgb[3 * r + 2] = 0.32
-					} else if (
-						populationMode === "culture" &&
-						historyView !== null &&
-						historyView !== undefined
-					) {
-						const blendSecondary = historyView.cultureBlendSecondary[p] ?? -1
-						const blendWeight = historyView.cultureBlendWeight[p] ?? 0
-						if (blendSecondary >= 0 && blendWeight > 0 && world.cultures) {
-							// Per-region stripe value: stable hash based on 3D position
-							const rx = world.mesh.r_xyz[3 * r]
-							const ry = world.mesh.r_xyz[3 * r + 1]
-							const rz = world.mesh.r_xyz[3 * r + 2]
-							const stripeVal = Math.abs(((rx * 7 + ry * 13 + rz * 5) * 25) % 1)
-							const colorIdx =
-								stripeVal < blendWeight ? blendSecondary : cultureIdx
-							rgb[3 * r] = world.cultures.colors[3 * colorIdx]
-							rgb[3 * r + 1] = world.cultures.colors[3 * colorIdx + 1]
-							rgb[3 * r + 2] = world.cultures.colors[3 * colorIdx + 2]
-						} else {
-							rgb[3 * r] = partition.colors[3 * idx]
-							rgb[3 * r + 1] = partition.colors[3 * idx + 1]
-							rgb[3 * r + 2] = partition.colors[3 * idx + 2]
-						}
 					} else {
 						rgb[3 * r] = partition.colors[3 * idx]
 						rgb[3 * r + 1] = partition.colors[3 * idx + 1]

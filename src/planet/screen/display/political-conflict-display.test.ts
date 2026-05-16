@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import {
+	buildCultureBlendOverlay,
 	buildPoliticalOccupationOverlay,
 	getPoliticalHoverNationId,
 	getPoliticalHoverOccupation,
@@ -148,5 +149,75 @@ describe("political-conflict-display", () => {
 				],
 			}),
 		).toBe(7)
+	})
+})
+
+describe("buildCultureBlendOverlay", () => {
+	it("sets occColor and mask=1 for regions in provinces with an active blend", () => {
+		// 3 regions: province 0 (region 0,1) has blend to culture 1; province 1 (region 2) has no blend
+		const overlay = buildCultureBlendOverlay({
+			regionProvince: new Int32Array([0, 0, 1]),
+			cultureBlendSecondary: new Int32Array([1, -1]), // province 0 → secondary culture 1
+			cultureBlendWeight: new Float32Array([0.3, 0]),
+			cultureAssignment: new Int32Array([0, 1]), // province 0 = culture 0, province 1 = culture 1
+			getOverlayColor: (sec) => {
+				const colors = [0.4, 0.5, 0.6, 0.8, 0.3, 0.1]
+				return [
+					colors[3 * sec],
+					colors[3 * sec + 1],
+					colors[3 * sec + 2],
+				] as const
+			},
+		})
+
+		expect(overlay).not.toBeNull()
+		// Regions 0 and 1 (province 0): secondary culture 1 color, mask=1
+		const r0 = Array.from(overlay!.subarray(0, 4))
+		const r1 = Array.from(overlay!.subarray(4, 8))
+		expect(r0[0]).toBeCloseTo(0.8)
+		expect(r0[1]).toBeCloseTo(0.3)
+		expect(r0[2]).toBeCloseTo(0.1)
+		expect(r0[3]).toBe(1)
+		expect(r1[0]).toBeCloseTo(0.8)
+		expect(r1[1]).toBeCloseTo(0.3)
+		expect(r1[2]).toBeCloseTo(0.1)
+		expect(r1[3]).toBe(1)
+		// Region 2 (province 1, no blend): zeroed
+		expect(Array.from(overlay!.subarray(8, 12))).toEqual([0, 0, 0, 0])
+	})
+
+	it("suppresses the stripe when getOverlayColor returns null (e.g. same heritage)", () => {
+		const overlay = buildCultureBlendOverlay({
+			regionProvince: new Int32Array([0]),
+			cultureBlendSecondary: new Int32Array([1]),
+			cultureBlendWeight: new Float32Array([0.3]),
+			cultureAssignment: new Int32Array([0]),
+			getOverlayColor: () => null, // same heritage on both sides
+		})
+		expect(overlay).toBeNull()
+	})
+
+	it("returns null when no provinces have an active blend", () => {
+		expect(
+			buildCultureBlendOverlay({
+				regionProvince: new Int32Array([0, 1]),
+				cultureBlendSecondary: new Int32Array([-1, -1]),
+				cultureBlendWeight: new Float32Array([0, 0]),
+				cultureAssignment: new Int32Array([0, 1]),
+				getOverlayColor: () => [0.1, 0.2, 0.3] as const,
+			}),
+		).toBeNull()
+	})
+
+	it("returns null when required inputs are missing", () => {
+		expect(
+			buildCultureBlendOverlay({
+				regionProvince: null,
+				cultureBlendSecondary: new Int32Array([1]),
+				cultureBlendWeight: new Float32Array([0.3]),
+				cultureAssignment: new Int32Array([0]),
+				getOverlayColor: () => [0.1, 0.2, 0.3] as const,
+			}),
+		).toBeNull()
 	})
 })

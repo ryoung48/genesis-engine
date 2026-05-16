@@ -773,7 +773,7 @@ export function buildMapHierarchyOverlay(
 		projectionLatitudeDeg,
 	)
 	const z = 0.02
-	const CIRCLE_RADIUS = 0.005
+	const CIRCLE_RADIUS = 0.0025
 	const linePositions: number[] = []
 	const lineColors: number[] = []
 

@@ -702,6 +702,7 @@ export function generateOrogenWorld(
 					habitability: post.population!.habitability,
 					r_xyz: mesh.r_xyz,
 					seed: params.seed,
+					planetRadiusKm: params.planetRadiusKm,
 				}),
 			)
 		}

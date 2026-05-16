@@ -6,7 +6,7 @@ import { ensureHierarchyClean, YEAR_MS } from "../state"
 
 const SPREAD_INTERVAL_YEARS = 5
 /** Fraction of culture-border province pairs that are eligible for bleed. */
-const BLEED_INIT_PROBABILITY = 0.55
+const BLEED_INIT_PROBABILITY = 0.35
 /** Probability per tick that an eligible idle border starts a new bleed. */
 const NEW_BLEED_CHANCE = 0.2
 /** Initial blend weight when a new bleed starts — high enough to produce visible stripes immediately. */
@@ -55,6 +55,62 @@ function computeCulturePopulations(
 }
 
 export function initCultureSpread(state: HistoryState): void {
+	// Seed visible blends on ~55% of culture borders immediately so stripes
+	// appear before any simulation ticks have run. Uses the same strength/balance
+	// rules as runCultureSpread: only the weaker culture's province is seeded,
+	// and balanced borders are skipped.
+	const culturePop = computeCulturePopulations(state, state.cultureCount)
+	const visited = new ProvincePairSet(state.P)
+	for (let p = 0; p < state.P; p++) {
+		if (state.desolate[p]) continue
+		const cultureP = state.culture[p]
+		for (
+			let i = state.provinceAdjOffset[p];
+			i < state.provinceAdjOffset[p + 1];
+			i++
+		) {
+			const nb = state.provinceAdjList[i]
+			if (state.desolate[nb]) continue
+			const cultureNb = state.culture[nb]
+			if (cultureNb === cultureP) continue
+			const edgeKey = p < nb ? p * state.P + nb : nb * state.P + p
+			if (visited.has(edgeKey)) continue
+			visited.add(edgeKey)
+			if (
+				!isBleedEdge(
+					state.provinceSeeds[p],
+					state.provinceSeeds[nb],
+					BLEED_INIT_PROBABILITY,
+				)
+			) {
+				continue
+			}
+			const popP = culturePop[cultureP] ?? 0
+			const popNb = culturePop[cultureNb] ?? 0
+			const ratio =
+				Math.max(popP, popNb) === 0
+					? 1
+					: Math.abs(popP - popNb) / Math.max(popP, popNb)
+			if (ratio < BALANCE_THRESHOLD) continue
+			// Only the weaker side receives the blend.
+			const receiver = popP < popNb ? p : nb
+			const spreaderCulture = popP < popNb ? cultureNb : cultureP
+			if (PROV.cultureBlendSecondary.get(state, receiver) >= 0) continue
+			PROV.cultureBlendSecondary.set(
+				state,
+				receiver,
+				state.time,
+				spreaderCulture,
+			)
+			PROV.cultureBlendWeight.set(
+				state,
+				receiver,
+				state.time,
+				BLEED_START_WEIGHT,
+			)
+		}
+	}
+
 	state.heap.enqueue(
 		state.time + SPREAD_INTERVAL_YEARS * YEAR_MS,
 		EVT.CULTURE_SPREAD,

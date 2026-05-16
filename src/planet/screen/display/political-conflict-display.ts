@@ -110,6 +110,59 @@ export function getPoliticalHoverOccupation(params: {
 	return null
 }
 
+export function buildCultureBlendOverlay(params: {
+	regionProvince: Int32Array | null | undefined
+	cultureBlendSecondary: Int32Array | null | undefined
+	cultureBlendWeight: Float32Array | null | undefined
+	/** Province-indexed primary culture (world.cultures.assignment). */
+	cultureAssignment: Int32Array | null | undefined
+	/**
+	 * Resolves the overlay stripe color given the secondary (spreading) culture
+	 * index and the primary (current) culture index. Return null to suppress the
+	 * stripe (e.g. same heritage/faith/religion on both sides).
+	 */
+	getOverlayColor: (
+		secondaryCulture: number,
+		primaryCulture: number,
+	) => readonly [number, number, number] | null
+}): Float32Array | null {
+	const {
+		regionProvince,
+		cultureBlendSecondary,
+		cultureBlendWeight,
+		cultureAssignment,
+		getOverlayColor,
+	} = params
+	if (
+		!regionProvince ||
+		!cultureBlendSecondary ||
+		!cultureBlendWeight ||
+		!cultureAssignment
+	)
+		return null
+
+	const overlay = new Float32Array(regionProvince.length * 4)
+	let hasAny = false
+	for (let region = 0; region < regionProvince.length; region++) {
+		const p = regionProvince[region]
+		if (p < 0) continue
+		const secondary = cultureBlendSecondary[p] ?? -1
+		if (secondary < 0) continue
+		if ((cultureBlendWeight[p] ?? 0) <= 0) continue
+		const primary = cultureAssignment[p] ?? -1
+		if (primary < 0) continue
+		const color = getOverlayColor(secondary, primary)
+		if (!color) continue
+		const base = region * 4
+		overlay[base] = color[0]
+		overlay[base + 1] = color[1]
+		overlay[base + 2] = color[2]
+		overlay[base + 3] = 1
+		hasAny = true
+	}
+	return hasAny ? overlay : null
+}
+
 export function getPoliticalHoverNationId(params: {
 	hoverProvince: number | null
 	assignment: Int32Array | null | undefined

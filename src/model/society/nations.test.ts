@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import type { OrogenProvinces } from "../types/society"
-import { buildNationPlan, computeNations, NATION_BUCKETS } from "./nations"
+import {
+	buildNationPlan,
+	computeNations,
+	MAX_NATION_SPREAD_KM,
+	NATION_BUCKETS,
+} from "./nations"
 
 // CK3 1066.9.15 all-county-titles province share targets, with ~4% split for hegemons
 const CK3_1066_TARGETS = [0.04, 0.4154, 0.072, 0.102, 0.0746, 0.0786, 0.2174]
@@ -350,5 +355,45 @@ describe("computeNations", () => {
 
 		// Should have claimed some inland provinces — not just snaked along coast.
 		expect(coastalClaimed / largestSize).toBeLessThan(0.75)
+	})
+
+	it("tight spread cap (large planetRadiusKm) limits per-nation expansion in main pass", () => {
+		const N = 200
+		const { provinces, coastal, habitability, r_xyz } =
+			buildRingNationProvinces(N)
+
+		// planetRadiusKm=100: maxSpreadRad = MAX_NATION_SPREAD_KM/100 = 20 rad >> π, cap never reached
+		const loose = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 1,
+			planetRadiusKm: 100,
+		})
+
+		// planetRadiusKm=60000: maxSpreadRad ≈ 0.033 rad ≈ 1 hop on this ring — severely caps expansion
+		const tight = computeNations({
+			provinces,
+			coastal,
+			habitability,
+			r_xyz,
+			seed: 1,
+			planetRadiusKm: 60000,
+		})
+
+		// Tight cap: large-target nations can't grow far → smaller max nation size
+		expect(Math.max(...Array.from(tight.size))).toBeLessThan(
+			Math.max(...Array.from(loose.size)),
+		)
+
+		// All provinces still get assigned — leftover fills what the cap prevents
+		for (let p = 0; p < N; p++) {
+			expect(tight.assignment[p]).toBeGreaterThanOrEqual(0)
+		}
+	})
+
+	it("MAX_NATION_SPREAD_KM is exported and equals 2000", () => {
+		expect(MAX_NATION_SPREAD_KM).toBe(2000)
 	})
 })

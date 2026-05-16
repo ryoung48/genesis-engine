@@ -41,6 +41,7 @@ function getActionButtons(props: SimulationControlsProps): {
 	previousButton: ReactElement<ClickableProps>
 	nextButton: ReactElement<ClickableProps>
 	slider: ReactElement<InputProps>
+	playPauseButton?: ReactElement<ClickableProps>
 } {
 	const root = SimulationControls(props) as ReactElement<ChildrenProps>
 	const content = React.Children.only(
@@ -53,10 +54,20 @@ function getActionButtons(props: SimulationControlsProps): {
 		panel.props.children,
 	) as ReactElement<ClickableProps | InputProps>[]
 
+	const playPauseFragment = rowChildren[4] as
+		| ReactElement<ChildrenProps>
+		| undefined
+	const playPauseButton = playPauseFragment
+		? (React.Children.toArray(
+				playPauseFragment.props.children,
+			)[1] as ReactElement<ClickableProps>)
+		: undefined
+
 	return {
 		previousButton: rowChildren[0] as ReactElement<ClickableProps>,
 		nextButton: rowChildren[3] as ReactElement<ClickableProps>,
 		slider: rowChildren[2] as ReactElement<InputProps>,
+		playPauseButton,
 	}
 }
 
@@ -124,5 +135,45 @@ describe("SimulationControls", () => {
 		expect(markup).toContain("Y1")
 		expect(markup).not.toContain("Start simulation")
 		expect(markup).not.toContain("Latest Y1")
+	})
+
+	it("does not render play/pause button when onPlayPause is not provided", () => {
+		const markup = renderToStaticMarkup(
+			<SimulationControls {...createProps()} />,
+		)
+
+		expect(markup).not.toContain("Start simulation")
+		expect(markup).not.toContain("Pause simulation")
+	})
+
+	it("renders play button when onPlayPause is provided and not playing", () => {
+		const markup = renderToStaticMarkup(
+			<SimulationControls
+				{...createProps({ onPlayPause: vi.fn(), simPlaying: false })}
+			/>,
+		)
+
+		expect(markup).toContain("Start simulation")
+		expect(markup).not.toContain("Pause simulation")
+	})
+
+	it("renders pause button when simPlaying is true", () => {
+		const markup = renderToStaticMarkup(
+			<SimulationControls
+				{...createProps({ onPlayPause: vi.fn(), simPlaying: true })}
+			/>,
+		)
+
+		expect(markup).toContain("Pause simulation")
+		expect(markup).not.toContain("Start simulation")
+	})
+
+	it("calls onPlayPause when play/pause button is clicked", () => {
+		const onPlayPause = vi.fn()
+		const { playPauseButton } = getActionButtons(createProps({ onPlayPause }))
+
+		playPauseButton?.props.onClick?.(undefined as never)
+
+		expect(onPlayPause).toHaveBeenCalledOnce()
 	})
 })
