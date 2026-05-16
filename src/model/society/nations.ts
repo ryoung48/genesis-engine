@@ -10,6 +10,7 @@ import {
 	HEGEMON_FANOUT,
 	rebalanceHierarchy,
 } from "./hierarchy"
+import { computeProvinceWaterAccess, WATER_ACCESS_BONUS } from "./water-access"
 
 // Hard cap on how far a nation can spread from its capital, in km.
 export const MAX_NATION_SPREAD_KM = 2000
@@ -31,25 +32,40 @@ export const NATION_BUCKETS: [number, number][] = [
 export function computeNations(params: {
 	provinces: OrogenProvinces
 	coastal: Uint8Array
+	riverVisible: Uint8Array
+	waterAccess?: Uint8Array
 	habitability: Float32Array
 	r_xyz: Float32Array
 	seed: number
 	planetRadiusKm?: number
 }): OrogenNationHierarchy {
-	const { provinces, coastal, habitability, r_xyz } = params
+	const {
+		provinces,
+		coastal,
+		riverVisible,
+		waterAccess: providedWaterAccess,
+		habitability,
+		r_xyz,
+	} = params
 	const maxSpreadRad =
 		MAX_NATION_SPREAD_KM / (params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM)
 	const provinceCount = provinces.count
 	if (provinceCount === 0) return emptyPartition(provinceCount)
 
 	const active = new Uint8Array(provinceCount)
-	const coastalScore = new Float32Array(provinceCount)
+	const waterAccess =
+		providedWaterAccess ??
+		computeProvinceWaterAccess(
+			provinces,
+			coastal,
+			new Uint8Array(provinceCount),
+			riverVisible,
+		)
 	let activeCount = 0
 	for (let p = 0; p < provinceCount; p++) {
 		if (provinces.desolate[p]) continue
 		active[p] = 1
 		activeCount++
-		coastalScore[p] = coastal[provinces.seeds[p]] ? 2 : 1
 	}
 	if (activeCount === 0) return emptyPartition(provinceCount)
 
@@ -74,7 +90,8 @@ export function computeNations(params: {
 			active,
 			assignment,
 			blocked,
-			coastalScore,
+			habitability,
+			waterAccess,
 			components.componentId,
 			components.sizes,
 			provinces.adjOffset,
@@ -106,7 +123,8 @@ export function computeNations(params: {
 				frontier,
 				active,
 				assignment,
-				coastalScore,
+				habitability,
+				waterAccess,
 				r_xyz,
 				provinces.seeds,
 				provinces.adjOffset,
@@ -169,7 +187,9 @@ export function computeNations(params: {
 				) {
 					const nation = assignment[provinces.adjList[j]]
 					if (nation < 0) continue
-					const score = coastalScore[province] - sizes[nation] * 0.02
+					const score =
+						nationPlacementScore(province, habitability, waterAccess) -
+						sizes[nation] * 0.02
 					if (score > bestScore) {
 						bestScore = score
 						bestNation = nation
@@ -188,12 +208,17 @@ export function computeNations(params: {
 
 			const nation = seeds.length
 			let seedProvince = members[0]
-			let seedScore = coastalScore[seedProvince]
+			let seedScore = nationPlacementScore(
+				seedProvince,
+				habitability,
+				waterAccess,
+			)
 			for (let i = 1; i < members.length; i++) {
 				const province = members[i]
-				if (coastalScore[province] > seedScore) {
+				const score = nationPlacementScore(province, habitability, waterAccess)
+				if (score > seedScore) {
 					seedProvince = province
-					seedScore = coastalScore[province]
+					seedScore = score
 				}
 			}
 			seeds.push(seedProvince)
@@ -259,6 +284,7 @@ export function computeNations(params: {
 			fanoutRanges: fanoutRangesForSize(sizes[nation]),
 			habitability,
 			urbanPop,
+			waterAccess,
 			adjOffset: provinces.adjOffset,
 			adjList: provinces.adjList,
 			provinceCount,
@@ -435,10 +461,16 @@ function spreadBucketSizes(
 const NOISE_FREQ = 4.0
 // Fraction of the distance score that noise can shift up or down.
 const NOISE_STRENGTH = 0.4
-// Small additive bonus for claiming coastal provinces. Kept additive (not
-// multiplicative) so that the 1/(d+0.1) distance gradient always dominates —
-// preventing empires from snaking along coastlines across entire continents.
-const COASTAL_CLAIM_BONUS = 0.15
+const HABITABILITY_CLAIM_WEIGHT = 0.01
+const WATER_CLAIM_WEIGHT = 0.02
+
+function nationPlacementScore(
+	province: number,
+	habitability: Float32Array<ArrayBufferLike>,
+	waterAccess: Uint8Array<ArrayBufferLike>,
+): number {
+	return habitability[province] + waterAccess[province] * WATER_ACCESS_BONUS
+}
 
 function bestClaim(
 	nation: number,
@@ -446,7 +478,8 @@ function bestClaim(
 	frontier: Set<number>,
 	active: Uint8Array,
 	assignment: Int32Array,
-	coastalScore: Float32Array,
+	habitability: Float32Array,
+	waterAccess: Uint8Array,
 	r_xyz: Float32Array,
 	provinceSeeds: Int32Array,
 	adjOffset: Int32Array,
@@ -484,7 +517,8 @@ function bestClaim(
 		const noiseVal = noise.noise3D(nx, ny, nz)
 		const score =
 			(1 / (d + 0.1)) * (1 + NOISE_STRENGTH * noiseVal) +
-			(coastalScore[candidate] - 1) * COASTAL_CLAIM_BONUS +
+			habitability[candidate] * HABITABILITY_CLAIM_WEIGHT +
+			waterAccess[candidate] * WATER_ACCESS_BONUS * WATER_CLAIM_WEIGHT +
 			sharedBorder * 0.05 +
 			seedPenalty
 		if (score > bestScore) {
@@ -523,7 +557,8 @@ function selectSeed(
 	active: Uint8Array,
 	assignment: Int32Array,
 	blocked: Uint8Array,
-	coastalScore: Float32Array,
+	habitability: Float32Array,
+	waterAccess: Uint8Array,
 	componentId: Int32Array,
 	componentSizes: number[],
 	adjOffset: Int32Array,
@@ -548,7 +583,9 @@ function selectSeed(
 			1 + Math.min(openNeighbors, Math.max(1, Math.round(Math.sqrt(target))))
 		const sizeFactor = Math.min(componentSize, target) / Math.max(1, target)
 		const score =
-			coastalScore[p] * blockedPenalty * expansion * (1 + sizeFactor)
+			nationPlacementScore(p, habitability, waterAccess) * blockedPenalty +
+			expansion +
+			sizeFactor
 		if (componentSize >= target && score > bestScore) {
 			bestScore = score
 			best = p

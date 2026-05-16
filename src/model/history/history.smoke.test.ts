@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
-import { DEFAULT_WORLD_PARAMS } from "@/planet/screen/generation/defaults"
+import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { NATION_BUCKETS } from "../society/nations"
 import { createHistoryRng, initHistory, simulateUntil, YEAR_MS } from "."
 import { nationAdjacency } from "./derive"

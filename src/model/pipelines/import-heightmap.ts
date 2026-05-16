@@ -340,6 +340,7 @@ export function importOrogenWorld(
 		vegetation: post.vegetation,
 		topography: post.topography,
 		coastal: post.coastal,
+		waterAccess: post.waterAccess,
 		slopeScore: post.slopeScore,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,

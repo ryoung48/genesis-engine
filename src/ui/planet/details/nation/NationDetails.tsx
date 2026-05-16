@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react"
+import type { HistoryNote } from "@/model/history"
+import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import {
 	DataTable,
 	type DataTableColumn,
-	DistributionChart,
-	LabeledValueRow,
-	Pagination,
-	Swatch,
-	uiTokens,
-} from "@/components"
-import type { HistoryNote } from "@/model/history"
+} from "@/ui/components/primitives/DataTable"
+import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
+import { Pagination } from "@/ui/components/primitives/Pagination"
+import { Swatch } from "@/ui/components/primitives/Swatch"
+import { uiTokens } from "@/ui/components/tokens"
 import type { NationSection } from "../drawer-state"
 import {
 	AccordionSection,

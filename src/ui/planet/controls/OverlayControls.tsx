@@ -1,17 +1,15 @@
 import React from "react"
-import {
-	Button,
-	CheckIcon,
-	CopyIcon,
-	FloatingPanel,
-	fadeVisibilityClassName,
-	GearIcon,
-	GlobeIcon,
-	IconButton,
-	MapIcon,
-	PanelHeader,
-	SegmentedControl,
-} from "@/components"
+import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
+import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
+import { PanelHeader } from "@/ui/components/composites/PanelHeader"
+import { Button } from "@/ui/components/primitives/Button"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
+import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
+import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
+import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
+import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import type { OrogenViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"

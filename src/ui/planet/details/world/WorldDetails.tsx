@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react"
+import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import {
 	DataTable,
 	type DataTableColumn,
-	DistributionChart,
-	Pagination,
-	Swatch,
-} from "@/components"
+} from "@/ui/components/primitives/DataTable"
+import { Pagination } from "@/ui/components/primitives/Pagination"
+import { Swatch } from "@/ui/components/primitives/Swatch"
 import type { WorldSection } from "../drawer-state"
 import type { DetailsDrawerBaseProps } from "../shared"
 import { AccordionSection, DetailRow, formatPopulation } from "../shared"

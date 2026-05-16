@@ -1,5 +1,5 @@
 import React from "react"
-import { SegmentedControl } from "@/components"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import type { ColorMode } from "../colors"
 import type {
 	MapModePrimary,

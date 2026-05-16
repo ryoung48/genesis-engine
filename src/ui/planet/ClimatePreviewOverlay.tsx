@@ -1,13 +1,16 @@
 import React from "react"
-import { IconButton, SegmentedControl, Surface, uiTokens } from "@/components"
-import { HeatmapChart } from "@/components/composites/charts/HeatmapChart"
-import type { useEbmPreview } from "@/hooks/useEbmPreview"
-import { temperatureColor } from "@/planet/colors"
+import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { Surface } from "@/ui/components/primitives/Surface"
+import { uiTokens } from "@/ui/components/tokens"
+import type { useEbmPreview } from "@/ui/hooks/useEbmPreview"
+import { temperatureColor } from "@/ui/planet/colors"
 import {
 	formatTemperature,
 	rgbToCss,
 	type UnitSystem,
-} from "@/planet/screen/shared/ui-format"
+} from "@/ui/planet/screen/shared/ui-format"
 import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,

@@ -1,6 +1,7 @@
 import React from "react"
-import { FloatingPanel, IconButton } from "@/components"
 import { MONTH_MS } from "@/model/history/state"
+import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
+import { IconButton } from "@/ui/components/primitives/IconButton"
 import { historyTimeParts } from "../screen/history/history-time"
 import { monthLabels } from "../screen/shared/constants"
 

@@ -1,5 +1,5 @@
 import { vi } from "vitest"
-import { DEFAULT_WORLD_PARAMS } from "@/planet/screen/generation/defaults"
+import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import type { OrogenParams, OrogenWorld } from ".."
 import { generateOrogenWorld } from "../pipelines/generate-world"
 

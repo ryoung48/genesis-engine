@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom"
 import { APP_PATHS } from "./app-routes"
-import { OrogenView } from "./planet/OrogenView"
+import { OrogenView } from "./ui/planet/OrogenView"
 
 function App() {
 	return (

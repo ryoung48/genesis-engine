@@ -56,6 +56,7 @@ import {
 	computePopulation,
 	computeProvinceHabitability,
 } from "../society/population"
+import { computeProvinceWaterAccess } from "../society/water-access"
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
 import type { OrogenLandmarks } from "../terrain/landmarks"
@@ -106,6 +107,7 @@ interface PostPipelineOutput {
 	pastaDebug: PastaDebug | undefined
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
+	waterAccess: Uint8Array
 	provinces: OrogenProvinces | undefined
 	locations: OrogenLocations | undefined
 	population: ProvincePopulation | undefined
@@ -413,6 +415,13 @@ export function runPostElevationPipeline(
 	)
 	record("Post: provinces", t0)
 
+	const waterAccess = computeProvinceWaterAccess(
+		provinces,
+		oceanCoastal,
+		lakeCoastal,
+		rivers.visible,
+	)
+
 	t0 = performance.now()
 	const locations: OrogenLocations = computeLocations(
 		provinces,
@@ -509,6 +518,7 @@ export function runPostElevationPipeline(
 		pastaDebug,
 		dtr_annual,
 		dtr_monthly,
+		waterAccess,
 		provinces,
 		locations,
 		population,

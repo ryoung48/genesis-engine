@@ -1,6 +1,6 @@
 # UI.md
 
-Use this as the baseline guidance for any UX or UI work in `src\components`.
+Use this as the baseline guidance for any UX or UI work in `src\ui\components`.
 
 ## Core rules
 

@@ -49,9 +49,10 @@ function buildRingNationProvinces(n: number) {
 	}
 
 	const coastal = new Uint8Array(n)
+	const riverVisible = new Uint8Array(n)
 	const habitability = new Float32Array(n).fill(1)
 
-	return { provinces, coastal, habitability, r_xyz }
+	return { provinces, coastal, riverVisible, habitability, r_xyz }
 }
 
 /**
@@ -98,6 +99,7 @@ function buildDoubleRingProvinces(cols: number) {
 	const seeds = Int32Array.from({ length: n }, (_, i) => i)
 	const coastal = new Uint8Array(n)
 	for (let i = 0; i < cols; i++) coastal[i] = 1
+	const riverVisible = new Uint8Array(n)
 
 	const provinces: OrogenProvinces = {
 		count: n,
@@ -112,7 +114,7 @@ function buildDoubleRingProvinces(cols: number) {
 	}
 
 	const habitability = new Float32Array(n).fill(1)
-	return { provinces, coastal, habitability, r_xyz }
+	return { provinces, coastal, riverVisible, habitability, r_xyz }
 }
 
 describe("NATION_BUCKETS", () => {
@@ -197,12 +199,13 @@ describe("buildNationPlan", () => {
 
 describe("computeNations", () => {
 	it("returns an empty partition when all provinces are desolate", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(10)
 		provinces.desolate.fill(1)
 		const result = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 1,
@@ -212,11 +215,12 @@ describe("computeNations", () => {
 	})
 
 	it("assigns every active province to a nation", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(200)
 		const result = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 42,
@@ -227,12 +231,13 @@ describe("computeNations", () => {
 	})
 
 	it("desolate provinces are not assigned", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(100)
 		provinces.desolate[5] = 1
 		const result = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 7,
@@ -241,11 +246,12 @@ describe("computeNations", () => {
 	})
 
 	it("is deterministic — same seed produces identical assignment", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(200)
 		const a = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 99,
@@ -253,6 +259,7 @@ describe("computeNations", () => {
 		const b = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 99,
@@ -262,11 +269,12 @@ describe("computeNations", () => {
 	})
 
 	it("different seeds produce different province assignments (noise is seed-dependent)", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(200)
 		const a = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 1,
@@ -274,6 +282,7 @@ describe("computeNations", () => {
 		const b = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 2,
@@ -292,11 +301,12 @@ describe("computeNations", () => {
 	})
 
 	it("all nation sizes are positive", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(150)
 		const result = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 13,
@@ -307,11 +317,12 @@ describe("computeNations", () => {
 	})
 
 	it("nation count equals seeds array length", () => {
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(150)
 		const result = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 55,
@@ -327,11 +338,12 @@ describe("computeNations", () => {
 		// coastal); with the fix the distance gradient dominates and the empire
 		// grows into both rings (< 75% coastal).
 		const COLS = 20
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildDoubleRingProvinces(COLS)
 		const result = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 17,
@@ -359,13 +371,14 @@ describe("computeNations", () => {
 
 	it("tight spread cap (large planetRadiusKm) limits per-nation expansion in main pass", () => {
 		const N = 200
-		const { provinces, coastal, habitability, r_xyz } =
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
 			buildRingNationProvinces(N)
 
 		// planetRadiusKm=100: maxSpreadRad = MAX_NATION_SPREAD_KM/100 = 20 rad >> π, cap never reached
 		const loose = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 1,
@@ -376,6 +389,7 @@ describe("computeNations", () => {
 		const tight = computeNations({
 			provinces,
 			coastal,
+			riverVisible,
 			habitability,
 			r_xyz,
 			seed: 1,
@@ -395,5 +409,67 @@ describe("computeNations", () => {
 
 	it("MAX_NATION_SPREAD_KM is exported and equals 2000", () => {
 		expect(MAX_NATION_SPREAD_KM).toBe(2000)
+	})
+
+	it("prefers river access over slightly higher inland habitability when seeding nations", () => {
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
+			buildRingNationProvinces(12)
+		habitability[0] = 5
+		habitability[1] = 8
+		habitability[2] = 7
+		riverVisible[0] = 1
+
+		const result = computeNations({
+			provinces,
+			coastal,
+			riverVisible,
+			habitability,
+			r_xyz,
+			seed: 23,
+		})
+
+		expect(result.seeds[0]).toBe(0)
+	})
+
+	it("treats coastal and river access equally for nation seeding", () => {
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
+			buildRingNationProvinces(12)
+		habitability[0] = 6
+		habitability[1] = 6
+		coastal[0] = 1
+		riverVisible[1] = 1
+
+		const result = computeNations({
+			provinces,
+			coastal,
+			riverVisible,
+			habitability,
+			r_xyz,
+			seed: 29,
+		})
+
+		expect([0, 1]).toContain(result.seeds[0])
+	})
+
+	it("weights ocean access above river access when seeding nations", () => {
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
+			buildRingNationProvinces(12)
+		habitability[0] = 6
+		habitability[1] = 6
+		const waterAccess = new Uint8Array(12)
+		waterAccess[0] = 2
+		waterAccess[1] = 1
+
+		const result = computeNations({
+			provinces,
+			coastal,
+			riverVisible,
+			waterAccess,
+			habitability,
+			r_xyz,
+			seed: 31,
+		})
+
+		expect(result.seeds[0]).toBe(0)
 	})
 })

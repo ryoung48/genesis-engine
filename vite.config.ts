@@ -17,6 +17,18 @@ export default defineConfig(({ mode }) => {
 				ignored: ["**/*.{test,spec}.{ts,tsx}", "**/*.smoke.test.ts"],
 			},
 		},
+		optimizeDeps: isTest
+			? undefined
+			: {
+					include: [
+						"@datastructures-js/priority-queue",
+						"chart.js",
+						"delaunator",
+						"react-chartjs-2",
+						"react-router-dom",
+						"three",
+					],
+				},
 		plugins: [
 			react(
 				isTest

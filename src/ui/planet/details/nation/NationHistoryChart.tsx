@@ -16,8 +16,8 @@ import {
 } from "chart.js"
 import React from "react"
 import { Line } from "react-chartjs-2"
-import { Swatch } from "@/components"
 import type { HistoryNote } from "@/model/history"
+import { Swatch } from "@/ui/components/primitives/Swatch"
 import { getDynastyColor } from "../../screen/display/region-colors"
 import {
 	historyTimeParts,

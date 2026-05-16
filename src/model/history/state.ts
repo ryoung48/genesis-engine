@@ -565,6 +565,7 @@ function addTerritory(
 		fanoutRanges: fanoutRangesForSize(members.length),
 		habitability: state.habitability,
 		urbanPop: state.popUrbanCurrent,
+		waterAccess: state.waterAccess,
 		adjOffset: state.provinceAdjOffset,
 		adjList: state.provinceAdjList,
 		provinceCount: state.P,
@@ -769,14 +770,18 @@ export function createHistoryState(
 	cultures: { assignment: Int32Array; count: number },
 	startYear: number,
 	rng: HistoryRng,
+	waterAccess?: Uint8Array,
 ): HistoryState {
 	const P = provinces.count
 	const startTime = startYear * YEAR_MS
-	const waterAccess = new Uint8Array(P)
-	for (let region = 0; region < provinces.regionProvince.length; region++) {
-		const province = provinces.regionProvince[region]
-		if (province < 0) continue
-		if (coastal[region] || riverVisible[region]) waterAccess[province] = 1
+	const waterAccessLevels = waterAccess ?? new Uint8Array(P)
+	if (!waterAccess) {
+		for (let region = 0; region < provinces.regionProvince.length; region++) {
+			const province = provinces.regionProvince[region]
+			if (province < 0) continue
+			if (coastal[region] || riverVisible[region])
+				waterAccessLevels[province] = 1
+		}
 	}
 	const state: HistoryState = {
 		P,
@@ -821,7 +826,7 @@ export function createHistoryState(
 		provinceSize: provinces.size,
 		provinceColors: provinces.colors,
 		desolate: provinces.desolate,
-		waterAccess,
+		waterAccess: waterAccessLevels,
 		r_xyz,
 		province_xyz: buildProvinceXyz(provinces.seeds, r_xyz),
 		habitability: population.habitability.slice(),

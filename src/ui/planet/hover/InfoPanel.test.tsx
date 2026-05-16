@@ -59,6 +59,7 @@ function makeWorld(): SerializedOrogenWorld {
 			gravity: new Float32Array([4]),
 		},
 		population: {
+			habitability: new Float32Array([7.25]),
 			population: new Float32Array([120000]),
 		},
 		urbanPopulation: new Float32Array([42000]),
@@ -439,6 +440,8 @@ describe("InfoPanel", () => {
 
 		expect(markup).toContain(">Population<")
 		expect(markup).toContain(">120K")
+		expect(markup).toContain(">Habitability<")
+		expect(markup).toContain(">7.25<")
 		expect(markup).toContain(">Development<")
 		expect(markup).toContain(">0.75<")
 		expect(markup).toContain(">Urban Pop<")
@@ -448,6 +451,20 @@ describe("InfoPanel", () => {
 		expect(markup).toContain(">Faith<")
 		expect(markup).toContain(">Religion<")
 		expect(markup).not.toContain(">Province<")
+	})
+
+	it("keeps habitability directly below population in demographics mode", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			populationMode: "density",
+		})
+
+		expect(markup.indexOf(">Population<")).toBeLessThan(
+			markup.indexOf(">Habitability<"),
+		)
+		expect(markup.indexOf(">Habitability<")).toBeLessThan(
+			markup.indexOf(">Urban Pop<"),
+		)
 	})
 
 	it("omits demographic detail rows when no valid province is hovered", () => {

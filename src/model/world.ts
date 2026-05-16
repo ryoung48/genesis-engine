@@ -65,6 +65,8 @@ export interface OrogenWorld {
 	topography: Uint8Array
 	/** Per-cell coastal flag (1 = borders ocean or lake, 0 = otherwise). */
 	coastal: Uint8Array
+	/** Per-province water access level (0=none, 1=river/lake, 2=ocean). */
+	waterAccess?: Uint8Array
 	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
 	slopeScore: Float32Array
 	rivers: OrogenRivers

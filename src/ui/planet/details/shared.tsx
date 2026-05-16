@@ -1,11 +1,9 @@
 import React from "react"
-import {
-	Button,
-	type DistributionChartBucket as DistributionBucket,
-	LabeledValueRow,
-	Surface,
-	uiTokens,
-} from "@/components"
+import { type DistributionChartBucket as DistributionBucket } from "@/ui/components/composites/DistributionChart"
+import { Button } from "@/ui/components/primitives/Button"
+import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
+import { Surface } from "@/ui/components/primitives/Surface"
+import { uiTokens } from "@/ui/components/tokens"
 import type { PlanetStat } from "../screen/display/planet-stats"
 
 export type { DistributionBucket }

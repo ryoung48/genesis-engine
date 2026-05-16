@@ -86,6 +86,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([12, 11, 9, 8, 7]),
 			urbanPop: new Float32Array([0, 20_000, 10_000, 0, 0]),
+			waterAccess: new Uint8Array(5),
 			adjOffset: new Int32Array([0, 4, 6, 9, 12, 14]),
 			adjList: new Int32Array([1, 2, 3, 4, 0, 2, 0, 1, 3, 0, 2, 4, 0, 3]),
 			provinceCount: 5,
@@ -123,6 +124,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: KINGDOM_FANOUT,
 			habitability: new Float32Array(provinceCount).fill(1),
 			urbanPop: new Float32Array(provinceCount),
+			waterAccess: new Uint8Array(provinceCount),
 			adjOffset,
 			adjList,
 			provinceCount,
@@ -159,6 +161,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([3, 2]),
 			urbanPop: new Float32Array([0, 0]),
+			waterAccess: new Uint8Array(2),
 			adjOffset: new Int32Array([0, 0, 0]),
 			adjList: new Int32Array(),
 			provinceCount: 2,
@@ -179,6 +182,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([10, 9, 8, 11]),
 			urbanPop: new Float32Array([0, 5000, 0, 0]),
+			waterAccess: new Uint8Array(4),
 			adjOffset: new Int32Array([0, 1, 1, 1, 1]),
 			adjList: new Int32Array([1]),
 			provinceCount: 4,
@@ -205,6 +209,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: DUCHY_FANOUT,
 			habitability: new Float32Array([10, 20, 19, 1, 3, 18]),
 			urbanPop: new Float32Array([0, 0, 0, 0, 0, 0]),
+			waterAccess: new Uint8Array(6),
 			adjOffset: new Int32Array([0, 0, 1, 2, 3, 4, 4]),
 			adjList: new Int32Array([2, 1, 4, 3]),
 			provinceCount: 6,
@@ -232,6 +237,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: KINGDOM_FANOUT,
 			habitability: new Float32Array([10, 20, 18, 16, 14, 0.01, 0.02]),
 			urbanPop: new Float32Array([0, 0, 0, 0, 0, 0, 0]),
+			waterAccess: new Uint8Array(7),
 			adjOffset: new Int32Array([0, 0, 0, 0, 0, 0, 1, 2]),
 			adjList: new Int32Array([6, 5]),
 			provinceCount: 7,
@@ -273,6 +279,7 @@ describe("rebalanceHierarchy", () => {
 			fanoutRanges: EMPIRE_FANOUT,
 			habitability: new Float32Array(provinceCount).fill(1),
 			urbanPop: new Float32Array(provinceCount),
+			waterAccess: new Uint8Array(provinceCount),
 			adjOffset,
 			adjList,
 			provinceCount,
@@ -292,5 +299,74 @@ describe("rebalanceHierarchy", () => {
 		for (const p of members) {
 			expect(parent[p]).toBeGreaterThanOrEqual(0)
 		}
+	})
+
+	it("prefers water-access members over slightly better inland habitability", () => {
+		const parent = new Int32Array(4).fill(-1)
+		const depth = new Int32Array(4)
+
+		rebalanceHierarchy({
+			capital: 0,
+			members: new Int32Array([1, 2, 3]),
+			parent,
+			depth,
+			currentDepth: 0,
+			fanoutRanges: KINGDOM_FANOUT,
+			habitability: new Float32Array([0, 10, 12, 8]),
+			urbanPop: new Float32Array(4),
+			waterAccess: new Uint8Array([0, 1, 0, 0]),
+			adjOffset: new Int32Array([0, 1, 3, 5, 6]),
+			adjList: new Int32Array([1, 0, 2, 1, 3, 2]),
+			provinceCount: 4,
+		})
+
+		expect(parent[1]).toBe(0)
+		expect(depth[1]).toBe(1)
+	})
+
+	it("treats river and coastal access equally in hierarchy selection", () => {
+		const parent = new Int32Array(4).fill(-1)
+		const depth = new Int32Array(4)
+
+		rebalanceHierarchy({
+			capital: 0,
+			members: new Int32Array([1, 2, 3]),
+			parent,
+			depth,
+			currentDepth: 0,
+			fanoutRanges: KINGDOM_FANOUT,
+			habitability: new Float32Array([0, 11, 11, 8]),
+			urbanPop: new Float32Array(4),
+			waterAccess: new Uint8Array([0, 1, 1, 0]),
+			adjOffset: new Int32Array([0, 1, 3, 5, 6]),
+			adjList: new Int32Array([1, 0, 2, 1, 3, 2]),
+			provinceCount: 4,
+		})
+
+		expect(parent[1]).toBe(0)
+		expect(parent[2]).toBe(1)
+	})
+
+	it("weights ocean access above river access in hierarchy selection", () => {
+		const parent = new Int32Array(4).fill(-1)
+		const depth = new Int32Array(4)
+
+		rebalanceHierarchy({
+			capital: 0,
+			members: new Int32Array([1, 2, 3]),
+			parent,
+			depth,
+			currentDepth: 0,
+			fanoutRanges: KINGDOM_FANOUT,
+			habitability: new Float32Array([0, 6, 6, 8]),
+			urbanPop: new Float32Array(4),
+			waterAccess: new Uint8Array([0, 1, 2, 0]),
+			adjOffset: new Int32Array([0, 1, 3, 5, 6]),
+			adjList: new Int32Array([1, 0, 2, 1, 3, 2]),
+			provinceCount: 4,
+		})
+
+		expect(parent[2]).toBe(0)
+		expect(depth[2]).toBe(1)
 	})
 })

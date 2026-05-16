@@ -1,12 +1,10 @@
 import React from "react"
-import {
-	FloatingPanel,
-	LabeledValueRow,
-	SeriesBars,
-	Swatch,
-} from "@/components"
 import { titleCase } from "@/model/shared/text"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
+import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
+import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
+import { Swatch } from "@/ui/components/primitives/Swatch"
 import { type ColorMode, dangerColor, daylightColor } from "../colors"
 import { monthLabels } from "../screen/shared/constants"
 import {
@@ -346,6 +344,19 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				return display ? [display] : []
 			})
 		: []
+	const habitabilityEntry: DemographicEntry | null =
+		showDemographics &&
+		hoverProvince !== null &&
+		hoverProvince >= 0 &&
+		world?.population?.habitability &&
+		hoverProvince < world.population.habitability.length &&
+		!world.provinces?.desolate?.[hoverProvince]
+			? {
+					label: "Habitability",
+					value: world.population.habitability[hoverProvince].toFixed(2),
+					color: null,
+				}
+			: null
 	const urbanPopulation =
 		showDemographics &&
 		hoverProvince !== null &&
@@ -357,24 +368,32 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		!world.provinces.desolate[hoverProvince]
 			? Math.round(world.urbanPopulation[hoverProvince])
 			: null
-	const demographicEntries: DemographicEntry[] = [
-		...demographicDisplays,
-		...(urbanPopulation !== null && urbanPopulation > 0
-			? [
-					{
-						label: "Urban Pop",
-						value: urbanPopulation.toLocaleString(),
-						color: null,
-					},
-				]
-			: []),
-	]
+	const demographicEntries: DemographicEntry[] = []
+	for (const entry of demographicDisplays) {
+		demographicEntries.push(entry)
+		if (entry.label === "Population" && habitabilityEntry) {
+			demographicEntries.push(habitabilityEntry)
+		}
+	}
+	if (urbanPopulation !== null && urbanPopulation > 0) {
+		demographicEntries.push({
+			label: "Urban Pop",
+			value: urbanPopulation.toLocaleString(),
+			color: null,
+		})
+	}
 	const demographicGroups = showDemographics
 		? [
 				{
 					id: "population",
 					title: "Population",
-					labels: ["Population", "Urban Pop", "Development", "Migration"],
+					labels: [
+						"Population",
+						"Habitability",
+						"Urban Pop",
+						"Development",
+						"Migration",
+					],
 				},
 				{
 					id: "culture",

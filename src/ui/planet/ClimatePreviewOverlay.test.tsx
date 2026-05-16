@@ -2,14 +2,15 @@ import type { ComponentProps } from "react"
 import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { IconButton, SegmentedControl } from "@/components"
-import { temperatureColor } from "@/planet/colors"
-import { rgbToCss } from "@/planet/screen/shared/ui-format"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { temperatureColor } from "@/ui/planet/colors"
+import { rgbToCss } from "@/ui/planet/screen/shared/ui-format"
 import { ClimatePreviewOverlay } from "./ClimatePreviewOverlay"
 
 let capturedHeatmapProps: Record<string, unknown> | null = null
 
-vi.mock("@/components/composites/charts/HeatmapChart", () => ({
+vi.mock("@/ui/components/composites/charts/HeatmapChart", () => ({
 	HeatmapChart: (props: Record<string, unknown>) => {
 		capturedHeatmapProps = props
 		return React.createElement("div", {

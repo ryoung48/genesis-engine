@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { DistributionChart } from "@/components"
+import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import { AccordionSection, DetailRow, formatPopulation } from "./shared"
 
 describe("details shared helpers", () => {

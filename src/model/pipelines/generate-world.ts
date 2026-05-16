@@ -699,6 +699,8 @@ export function generateOrogenWorld(
 				computeNations({
 					provinces: post.provinces!,
 					coastal: post.coastal,
+					riverVisible: post.rivers.visible,
+					waterAccess: post.waterAccess,
 					habitability: post.population!.habitability,
 					r_xyz: mesh.r_xyz,
 					seed: params.seed,
@@ -771,6 +773,7 @@ export function generateOrogenWorld(
 		vegetation: post.vegetation,
 		topography: post.topography,
 		coastal: post.coastal,
+		waterAccess: post.waterAccess,
 		slopeScore: post.slopeScore,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,

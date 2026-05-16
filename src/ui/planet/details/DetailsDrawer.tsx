@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react"
-import { DrawerShell, IconButton, SegmentedControl } from "@/components"
 import type { HistoryNote } from "@/model/history"
+import { DrawerShell } from "@/ui/components/composites/DrawerShell"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import {
 	type NationSection,
 	resolveDrawerStateOnOpen,

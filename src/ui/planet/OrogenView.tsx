@@ -1,6 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { FloatingPanel } from "@/components"
-import { useEbmPreview } from "@/hooks/useEbmPreview"
 import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
@@ -21,6 +19,8 @@ import type {
 	SerializedHistoryFrame,
 	SerializedOrogenWorld,
 } from "@/model/transport/worker-types"
+import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
+import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { ClimatePreviewOverlay } from "./ClimatePreviewOverlay"
 import type { ColorMode } from "./colors"
 import { climateZoneColor, vegetationColor } from "./colors"

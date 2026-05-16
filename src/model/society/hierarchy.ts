@@ -1,4 +1,5 @@
 import type { OrogenNationHierarchy } from ".."
+import { WATER_ACCESS_BONUS } from "./water-access"
 
 type FanoutLevel = readonly [min: number, max: number, targetGroupSize: number]
 type FanoutRanges = readonly FanoutLevel[]
@@ -41,6 +42,19 @@ const TRIBUTE = 0.25
 const OVEREXTENSION = 0.9
 const URBAN_POP_SCALE = 10_000
 
+function hierarchyProvinceScore(
+	province: number,
+	habitability: Float32Array<ArrayBufferLike>,
+	urbanPop: Float32Array<ArrayBufferLike>,
+	waterAccess: Uint8Array<ArrayBufferLike>,
+): number {
+	return (
+		habitability[province] +
+		urbanPop[province] / URBAN_POP_SCALE +
+		waterAccess[province] * WATER_ACCESS_BONUS
+	)
+}
+
 function partitionMembers(
 	seeds: Int32Array<ArrayBufferLike>,
 	members: Int32Array<ArrayBufferLike>,
@@ -48,6 +62,8 @@ function partitionMembers(
 	adjList: Int32Array<ArrayBufferLike>,
 	provinceCount: number,
 	habitability?: Float32Array<ArrayBufferLike>,
+	urbanPop?: Float32Array<ArrayBufferLike>,
+	waterAccess?: Uint8Array<ArrayBufferLike>,
 ): Int32Array[] {
 	const inMembers = new Uint8Array(provinceCount)
 	const unassigned = new Uint8Array(provinceCount)
@@ -111,9 +127,19 @@ function partitionMembers(
 	}
 	if (leftovers.length > 0) {
 		let seed = leftovers[0]
-		if (habitability) {
+		if (habitability && urbanPop && waterAccess) {
 			for (let i = 1; i < leftovers.length; i++) {
-				if (habitability[leftovers[i]] > habitability[seed]) seed = leftovers[i]
+				const candidate = leftovers[i]
+				if (
+					hierarchyProvinceScore(
+						candidate,
+						habitability,
+						urbanPop,
+						waterAccess,
+					) > hierarchyProvinceScore(seed, habitability, urbanPop, waterAccess)
+				) {
+					seed = candidate
+				}
 			}
 		}
 		const rest = leftovers.filter((province) => province !== seed)
@@ -126,6 +152,8 @@ function partitionMembers(
 			adjList,
 			provinceCount,
 			habitability,
+			urbanPop,
+			waterAccess,
 		)
 		for (let i = 0; i < extraGroups.length; i++) {
 			result.push(Int32Array.from(extraGroups[i]))
@@ -143,6 +171,7 @@ export function rebalanceHierarchy(params: {
 	fanoutRanges: FanoutRanges
 	habitability: Float32Array<ArrayBufferLike>
 	urbanPop: Float32Array<ArrayBufferLike>
+	waterAccess: Uint8Array<ArrayBufferLike>
 	adjOffset: Int32Array<ArrayBufferLike>
 	adjList: Int32Array<ArrayBufferLike>
 	provinceCount: number
@@ -156,6 +185,7 @@ export function rebalanceHierarchy(params: {
 		fanoutRanges,
 		habitability,
 		urbanPop,
+		waterAccess,
 		adjOffset,
 		adjList,
 		provinceCount,
@@ -195,8 +225,12 @@ export function rebalanceHierarchy(params: {
 
 		if (seedCount === 0) {
 			for (let i = 0; i < members.length; i++) {
-				const score =
-					habitability[members[i]] + urbanPop[members[i]] / URBAN_POP_SCALE
+				const score = hierarchyProvinceScore(
+					members[i],
+					habitability,
+					urbanPop,
+					waterAccess,
+				)
 				if (score > bestScore) {
 					bestScore = score
 					bestIdx = i
@@ -228,7 +262,9 @@ export function rebalanceHierarchy(params: {
 				if (isSeed[p]) continue
 				const d = bfsDist[p]
 				if (d < 0) continue
-				const score = d * 1000 + habitability[p] + urbanPop[p] / URBAN_POP_SCALE
+				const score =
+					d * 1000 +
+					hierarchyProvinceScore(p, habitability, urbanPop, waterAccess)
 				if (score > bestScore) {
 					bestScore = score
 					bestIdx = i
@@ -250,6 +286,8 @@ export function rebalanceHierarchy(params: {
 		adjList,
 		provinceCount,
 		habitability,
+		urbanPop,
+		waterAccess,
 	)
 
 	for (let i = 0; i < regions.length; i++) {
@@ -268,6 +306,7 @@ export function rebalanceHierarchy(params: {
 				fanoutRanges,
 				habitability,
 				urbanPop,
+				waterAccess,
 				adjOffset,
 				adjList,
 				provinceCount,

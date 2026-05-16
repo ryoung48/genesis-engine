@@ -99,6 +99,7 @@ export interface SerializedOrogenWorld {
 	vegetation: Uint8Array
 	topography: Uint8Array
 	coastal: Uint8Array
+	waterAccess?: Uint8Array
 	slopeScore: Float32Array
 	isLand: Uint8Array
 	riverLand: Uint8Array

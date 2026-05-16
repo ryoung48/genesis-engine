@@ -38,6 +38,7 @@ interface HistorySeedWorld {
 	provinces: OrogenProvinces | null
 	population: ProvincePopulation | null
 	coastal: Uint8Array | null
+	waterAccess: Uint8Array | null
 	riverVisible: Uint8Array | null
 	cultures: {
 		assignment: Int32Array
@@ -105,6 +106,7 @@ function cloneHistorySeedWorld(
 				}
 			: null,
 		coastal: world.coastal ? world.coastal.slice() : null,
+		waterAccess: world.waterAccess ? world.waterAccess.slice() : null,
 		riverVisible: world.rivers?.visible ? world.rivers.visible.slice() : null,
 		cultures: world.cultures
 			? {
@@ -224,6 +226,7 @@ function serializeWorld(
 		vegetation: world.vegetation,
 		topography: world.topography,
 		coastal: world.coastal,
+		waterAccess: world.waterAccess,
 		slopeScore: world.slopeScore,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
@@ -461,6 +464,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.vegetation) add(world.vegetation.buffer)
 	if (world.topography) add(world.topography.buffer)
 	if (world.coastal) add(world.coastal.buffer)
+	if (world.waterAccess) add(world.waterAccess.buffer)
 	if (world.slopeScore) add(world.slopeScore.buffer)
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)
@@ -622,6 +626,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 				provinces: world.provinces,
 				population: world.population,
 				coastal: world.coastal,
+				waterAccess: world.waterAccess,
 				riverVisible: world.riverVisible,
 				r_xyz: world.mesh.r_xyz,
 				cultures: world.cultures,
@@ -661,6 +666,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			generated.provinces &&
 			generated.population &&
 			generated.coastal &&
+			generated.waterAccess &&
 			generated.rivers?.visible &&
 			generated.cultures
 				? initHistory({
@@ -668,6 +674,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 						provinces: generated.provinces,
 						population: generated.population,
 						coastal: generated.coastal,
+						waterAccess: generated.waterAccess,
 						riverVisible: generated.rivers.visible,
 						r_xyz: generated.mesh.r_xyz,
 						cultures: generated.cultures,

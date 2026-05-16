@@ -1,4 +1,5 @@
-import { cx, uiTokens } from "@/components"
+import { cx } from "@/ui/components/lib"
+import { uiTokens } from "@/ui/components/tokens"
 
 const BUTTON_CLASS = cx(
 	uiTokens.radius.md,

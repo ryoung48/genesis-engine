@@ -20,6 +20,7 @@ export function initHistory(params: {
 	provinces: OrogenProvinces
 	population: ProvincePopulation
 	coastal: Uint8Array
+	waterAccess?: Uint8Array
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
 	cultures: { assignment: Int32Array; count: number }
@@ -38,6 +39,7 @@ export function initHistory(params: {
 		params.cultures,
 		startYear,
 		rng,
+		params.waterAccess,
 	)
 
 	initWar(state, rng)
