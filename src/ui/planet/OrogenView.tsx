@@ -207,6 +207,7 @@ export const OrogenView: React.FC = () => {
 	const [showNationHierarchy, setShowNationHierarchy] = useState(false)
 	const [showThermalEquator, setShowThermalEquator] = useState(false)
 	const [showRivers, setShowRivers] = useState(false)
+	const [showInfrastructure, setShowInfrastructure] = useState(false)
 	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
 	const [debugMapModes, setDebugMapModes] = useState(false)
 	const [gridSpacing, setGridSpacing] = useState(15)
@@ -329,6 +330,10 @@ export const OrogenView: React.FC = () => {
 	)
 	const [sunTempFactor, setSunTempFactor] = useState(
 		initialDecodedCode?.sunTempFactor ?? DEFAULT_WORLD_PARAMS.sunTempFactor,
+	)
+	const [insolationFactor, setInsolationFactor] = useState(
+		initialDecodedCode?.insolationFactor ??
+			DEFAULT_WORLD_PARAMS.insolationFactor,
 	)
 	const [daysPerYear, setDaysPerYear] = useState(
 		initialDecodedCode?.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
@@ -1209,6 +1214,30 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setGridSpacing(gridSpacing)
 	}, [gridSpacing])
+	useEffect(() => {
+		sceneRef.current?.setSettlementsVisible(showInfrastructure)
+	}, [showInfrastructure])
+	useEffect(() => {
+		const scene = sceneRef.current
+		if (!scene) return
+		if (showInfrastructure && worldForDisplay?.urbanPopulation) {
+			scene.setSettlements(worldForDisplay.urbanPopulation)
+		} else {
+			scene.setSettlements(null)
+		}
+	}, [showInfrastructure, worldForDisplay])
+	useEffect(() => {
+		sceneRef.current?.setInfrastructureVisible(showInfrastructure)
+	}, [showInfrastructure])
+	useEffect(() => {
+		const scene = sceneRef.current
+		if (!scene) return
+		if (showInfrastructure && worldForDisplay?.network) {
+			scene.setInfrastructure(worldForDisplay.network)
+		} else {
+			scene.setInfrastructure(null)
+		}
+	}, [showInfrastructure, worldForDisplay])
 
 	// --- Map center longitude ---
 	const formatLongitude = useCallback((longitude: number) => {
@@ -1279,6 +1308,7 @@ export const OrogenView: React.FC = () => {
 			eccentricity,
 			perihelion,
 			sunTempFactor,
+			insolationFactor,
 			daysPerYear,
 			hoursPerDay,
 			tidallyLocked,
@@ -1308,6 +1338,7 @@ export const OrogenView: React.FC = () => {
 			eccentricity,
 			perihelion,
 			sunTempFactor,
+			insolationFactor,
 			daysPerYear,
 			hoursPerDay,
 			tidallyLocked,
@@ -1403,6 +1434,7 @@ export const OrogenView: React.FC = () => {
 			setEccentricity,
 			setPerihelion,
 			setSunTempFactor,
+			setInsolationFactor,
 			setDaysPerYear,
 			setHoursPerDay,
 			setTidallyLocked,
@@ -1434,6 +1466,7 @@ export const OrogenView: React.FC = () => {
 			setters.setEccentricity(decoded.eccentricity)
 			setters.setPerihelion(decoded.perihelion)
 			setters.setSunTempFactor(decoded.sunTempFactor)
+			setters.setInsolationFactor(decoded.insolationFactor)
 			setters.setDaysPerYear(decoded.daysPerYear)
 			setters.setHoursPerDay(decoded.hoursPerDay)
 			setters.setTidallyLocked(decoded.tidallyLocked)
@@ -1485,6 +1518,7 @@ export const OrogenView: React.FC = () => {
 				eccentricity,
 				perihelion,
 				sunTempFactor,
+				insolationFactor,
 				daysPerYear,
 				hoursPerDay,
 				pressure,
@@ -1530,6 +1564,7 @@ export const OrogenView: React.FC = () => {
 			craters,
 			pressure,
 			generationCallbacks,
+			insolationFactor,
 		],
 	)
 
@@ -1640,6 +1675,7 @@ export const OrogenView: React.FC = () => {
 		eccentricity,
 		perihelion,
 		sunTempFactor,
+		insolationFactor,
 		daysPerYear,
 		hoursPerDay,
 		pressure,
@@ -1653,6 +1689,7 @@ export const OrogenView: React.FC = () => {
 		setEccentricity,
 		setPerihelion,
 		setSunTempFactor,
+		setInsolationFactor,
 		setDaysPerYear,
 		setHoursPerDay,
 		setPressure,
@@ -1730,6 +1767,7 @@ export const OrogenView: React.FC = () => {
 			eccentricity,
 			perihelion,
 			sunTempFactor,
+			insolationFactor,
 			hoursPerDay,
 			daysPerYear,
 			landCoverage,
@@ -1834,6 +1872,7 @@ export const OrogenView: React.FC = () => {
 								displayMonth={displayMonth}
 								unitSystem={unitSystem}
 								world={worldForDisplay}
+								routes={worldForDisplay?.routes ?? null}
 								hoverCardRef={hoverCardRef}
 								getProvinceName={getProvinceName}
 								getNationName={getNationName}
@@ -1883,6 +1922,8 @@ export const OrogenView: React.FC = () => {
 							setShowNationBorders={setShowNationBorders}
 							showNationHierarchy={showNationHierarchy}
 							setShowNationHierarchy={setShowNationHierarchy}
+							showInfrastructure={showInfrastructure}
+							setShowInfrastructure={setShowInfrastructure}
 							gridSpacing={gridSpacing}
 							setGridSpacing={setGridSpacing}
 							viewMode={viewMode}

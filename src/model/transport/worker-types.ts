@@ -158,6 +158,11 @@ export interface SerializedOrogenWorld {
 	monthlyTEQ?: Float32Array[]
 	/** Per-location trade good index (0=unassigned, 1-based into TRADE_GOOD_LABELS). */
 	tradeGoods?: Uint8Array
+	settlementRegions?: Int32Array
+	settlementWaterLandmarks?: Int32Array
+	settlementPortRegions?: Int32Array
+	routes?: SerializedRoutes
+	network?: SerializedNetwork
 }
 
 export interface SerializedProvinceTimelineInt {
@@ -244,6 +249,159 @@ export interface SerializedHistoryFrame {
 	cultureBlendWeight: Float32Array
 }
 
+export const ROUTE_LAND_MAJOR = 0
+export const ROUTE_LAND_MINOR = 1
+export const ROUTE_SEA = 2
+
+export type SerializedRouteKind =
+	| typeof ROUTE_LAND_MAJOR
+	| typeof ROUTE_LAND_MINOR
+	| typeof ROUTE_SEA
+
+export interface Route {
+	fromProvince: number
+	toProvince: number
+	kind: SerializedRouteKind
+	pathRegions: number[]
+}
+
+export interface RouteEdge {
+	fromRegion: number
+	toRegion: number
+	kind: SerializedRouteKind
+	usage: number
+	weight: number
+}
+
+export interface SerializedRoutes {
+	fromProvince: Int32Array
+	toProvince: Int32Array
+	kind: Uint8Array
+	pathOffsets: Int32Array
+	pathRegions: Int32Array
+}
+
+export interface SerializedNetwork {
+	fromRegion: Int32Array
+	toRegion: Int32Array
+	kind: Uint8Array
+	usage: Int32Array
+	weight: Float32Array
+}
+
+export function packRoutes(
+	routes: readonly Route[] | null | undefined,
+): SerializedRoutes {
+	const routeList = routes ?? []
+	const fromProvince = new Int32Array(routeList.length)
+	const toProvince = new Int32Array(routeList.length)
+	const kind = new Uint8Array(routeList.length)
+	const pathOffsets = new Int32Array(routeList.length + 1)
+	let totalPathLength = 0
+	for (let i = 0; i < routeList.length; i++) {
+		const route = routeList[i]
+		fromProvince[i] = route.fromProvince
+		toProvince[i] = route.toProvince
+		kind[i] = route.kind
+		totalPathLength += route.pathRegions.length
+		pathOffsets[i + 1] = totalPathLength
+	}
+	const pathRegions = new Int32Array(totalPathLength)
+	let cursor = 0
+	for (const route of routeList) {
+		pathRegions.set(route.pathRegions, cursor)
+		cursor += route.pathRegions.length
+	}
+	return {
+		fromProvince,
+		toProvince,
+		kind,
+		pathOffsets,
+		pathRegions,
+	}
+}
+
+export function packNetwork(
+	edges: readonly RouteEdge[] | null | undefined,
+): SerializedNetwork {
+	const edgeList = edges ?? []
+	const fromRegion = new Int32Array(edgeList.length)
+	const toRegion = new Int32Array(edgeList.length)
+	const kind = new Uint8Array(edgeList.length)
+	const usage = new Int32Array(edgeList.length)
+	const weight = new Float32Array(edgeList.length)
+	for (let i = 0; i < edgeList.length; i++) {
+		const edge = edgeList[i]
+		fromRegion[i] = edge.fromRegion
+		toRegion[i] = edge.toRegion
+		kind[i] = edge.kind
+		usage[i] = edge.usage
+		weight[i] = edge.weight
+	}
+	return {
+		fromRegion,
+		toRegion,
+		kind,
+		usage,
+		weight,
+	}
+}
+
+export function networkCount(
+	network: SerializedNetwork | null | undefined,
+): number {
+	return network?.kind.length ?? 0
+}
+
+export function forEachRoute(
+	routes: SerializedRoutes | null | undefined,
+	callback: (route: {
+		fromProvince: number
+		toProvince: number
+		kind: SerializedRouteKind
+		pathRegions: Int32Array
+		index: number
+	}) => void,
+): void {
+	if (!routes) return
+	for (let i = 0; i < routes.kind.length; i++) {
+		callback({
+			fromProvince: routes.fromProvince[i],
+			toProvince: routes.toProvince[i],
+			kind: routes.kind[i] as SerializedRouteKind,
+			pathRegions: routes.pathRegions.subarray(
+				routes.pathOffsets[i],
+				routes.pathOffsets[i + 1],
+			),
+			index: i,
+		})
+	}
+}
+
+export function forEachEdge(
+	network: SerializedNetwork | null | undefined,
+	callback: (edge: {
+		fromRegion: number
+		toRegion: number
+		kind: SerializedRouteKind
+		usage: number
+		weight: number
+		index: number
+	}) => void,
+): void {
+	if (!network) return
+	for (let i = 0; i < network.kind.length; i++) {
+		callback({
+			fromRegion: network.fromRegion[i],
+			toRegion: network.toRegion[i],
+			kind: network.kind[i] as SerializedRouteKind,
+			usage: network.usage[i],
+			weight: network.weight[i],
+			index: i,
+		})
+	}
+}
+
 export type OrogenWorkerRequest =
 	| {
 			type: "generate"
@@ -277,6 +435,7 @@ export type OrogenWorkerRequest =
 				obliquity?: number
 				eccentricity?: number
 				sunTempFactor?: number
+				insolationFactor?: number
 				daysPerYear?: number
 				hoursPerDay?: number
 				tidallyLocked?: boolean

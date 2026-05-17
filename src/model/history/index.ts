@@ -1,5 +1,7 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
+import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { StageTiming } from "../types/tectonics"
 import { EVT } from "./event-heap"
 import { runBattle } from "./events/battle"
 import { initCultureSpread, runCultureSpread } from "./events/culture-spread"
@@ -7,6 +9,7 @@ import { initDiplomacy, runDiplomacy } from "./events/diplomacy"
 import { initPopulation, runPopulation } from "./events/population"
 import { initSuccession, runSuccession } from "./events/succession"
 import { initTax, runTax } from "./events/tax"
+import { computeRoutes } from "./events/trade-routes"
 import { initWar, runWar } from "./events/war"
 import { createHistoryRng, type HistoryRng } from "./history-rng"
 import {
@@ -14,6 +17,19 @@ import {
 	type HistoryState,
 	validateLiveHierarchy,
 } from "./state"
+
+function timed<T>(
+	label: string,
+	timings: StageTiming[] | undefined,
+	fn: () => T,
+): T {
+	const t0 = performance.now()
+	const result = fn()
+	if (timings) {
+		timings.push({ Stage: label, ms: (performance.now() - t0).toFixed(1) })
+	}
+	return result
+}
 
 export function initHistory(params: {
 	nations: OrogenNationHierarchy
@@ -26,28 +42,67 @@ export function initHistory(params: {
 	cultures: { assignment: Int32Array; count: number }
 	seed: number
 	startYear?: number
+	landmarks?: OrogenLandmarks
+	regionProvince?: Int32Array
+	regionAdjOffset?: Int32Array
+	regionAdjList?: Int32Array
+	regionIsLand?: Uint8Array
+	planetRadiusKm?: number
+	settlementRegions?: Int32Array
+	settlementWaterLandmarks?: Int32Array
+	settlementPortRegions?: Int32Array
+	timings?: StageTiming[]
 }): HistoryState {
 	const startYear = params.startYear ?? 800
 	const rng = createHistoryRng(params.seed + 99999)
-	const state = createHistoryState(
-		params.nations,
-		params.provinces,
-		params.population,
-		params.coastal,
-		params.riverVisible,
-		params.r_xyz,
-		params.cultures,
-		startYear,
-		rng,
-		params.waterAccess,
+	const state = timed("initHistory:createHistoryState", params.timings, () =>
+		createHistoryState(
+			params.nations,
+			params.provinces,
+			params.population,
+			params.coastal,
+			params.riverVisible,
+			params.r_xyz,
+			params.cultures,
+			startYear,
+			rng,
+			params.waterAccess,
+			params.landmarks,
+			params.regionProvince,
+			params.regionAdjOffset,
+			params.regionAdjList,
+			params.regionIsLand,
+		),
 	)
 
-	initWar(state, rng)
-	initSuccession(state, rng)
-	initTax(state, rng)
-	initDiplomacy(state, rng)
-	initPopulation(state, rng)
-	initCultureSpread(state)
+	timed("initHistory:initWar", params.timings, () => initWar(state, rng))
+	timed("initHistory:initSuccession", params.timings, () =>
+		initSuccession(state, rng),
+	)
+	timed("initHistory:initTax", params.timings, () => initTax(state, rng))
+	timed("initHistory:initDiplomacy", params.timings, () =>
+		initDiplomacy(state, rng),
+	)
+	timed("initHistory:initPopulation", params.timings, () =>
+		initPopulation(state, rng),
+	)
+	timed("initHistory:initCultureSpread", params.timings, () =>
+		initCultureSpread(state),
+	)
+	const infrastructure = timed(
+		"initHistory:computeRoutes",
+		params.timings,
+		() =>
+			computeRoutes(state, {
+				planetRadiusKm: params.planetRadiusKm,
+				settlementRegions: params.settlementRegions,
+				settlementWaterLandmarks: params.settlementWaterLandmarks,
+				settlementPortRegions: params.settlementPortRegions,
+				timings: params.timings,
+			}),
+	)
+	state.routes = infrastructure.routes
+	state.network = infrastructure.network
 	return state
 }
 

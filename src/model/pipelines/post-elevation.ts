@@ -148,7 +148,6 @@ export function runPostElevationPipeline(
 	}
 
 	// ── Climate ────────────────────────────────────────────────────────
-	onProgress?.("Computing climate...", 65)
 	let t0 = performance.now()
 	const landFraction = computeLandFraction(mesh, isLand)
 	const climate = computeTemperature(
@@ -164,6 +163,7 @@ export function runPostElevationPipeline(
 		terrainFeatures,
 	)
 	record("Post: climate", t0)
+	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
 	const currentLandmarks = enableOceanCurrents
@@ -181,9 +181,9 @@ export function runPostElevationPipeline(
 		)
 	}
 	record("Post: thermal equator", t0)
+	onProgress?.("Post: thermal equator", 44)
 
 	// ── Moisture advection ─────────────────────────────────────────────
-	onProgress?.("Computing moisture advection...", 80)
 	t0 = performance.now()
 	const { east: eastAdv, west: westAdv } = computeAdvection(
 		mesh,
@@ -195,9 +195,9 @@ export function runPostElevationPipeline(
 		elevation_km,
 	)
 	record("Post: moisture advection", t0)
+	onProgress?.("Post: moisture advection", 50)
 
 	// ── Ocean currents ─────────────────────────────────────────────────
-	onProgress?.("Computing ocean currents...", 82)
 	t0 = performance.now()
 	const oceanCurrents = enableOceanCurrents
 		? computeOceanCurrents(
@@ -224,7 +224,6 @@ export function runPostElevationPipeline(
 	}
 
 	// ── Rainfall ───────────────────────────────────────────────────────
-	onProgress?.("Computing rainfall...", 85)
 	t0 = performance.now()
 	const rain = computeMonthlyRain(
 		mesh,
@@ -236,6 +235,7 @@ export function runPostElevationPipeline(
 		monthlyTEQ,
 	)
 	record("Post: rainfall", t0)
+	onProgress?.("Post: rainfall", 54)
 	const rainfall: OrogenRainfall = {
 		monthly: rain.monthly,
 		annual: rain.annual,
@@ -262,13 +262,14 @@ export function runPostElevationPipeline(
 	)
 	applyDtrToClimateMinMax(climate, dtr_monthly, N)
 	record("Post: dtr + pet", t0)
+	onProgress?.("Post: dtr + pet", 56)
 
 	t0 = performance.now()
 	const hydrology = computeHydrologyFields(climate, rainfall, riverLand)
 	record("Post: hydrology", t0)
+	onProgress?.("Post: hydrology", 57)
 
 	// ── Vegetation ─────────────────────────────────────────────────────
-	onProgress?.("Assigning vegetation...", 88)
 	t0 = performance.now()
 	const vegetation = assignVegetation(
 		mesh,
@@ -278,9 +279,9 @@ export function runPostElevationPipeline(
 		makeRng(params.seed),
 	)
 	record("Post: vegetation", t0)
+	onProgress?.("Post: vegetation", 57)
 
 	// ── Rivers ─────────────────────────────────────────────────────────
-	onProgress?.("Computing rivers...", 90)
 	t0 = performance.now()
 	const rivers = computeRivers(
 		mesh,
@@ -292,6 +293,7 @@ export function runPostElevationPipeline(
 		params,
 	)
 	record("Post: rivers", t0)
+	onProgress?.("Post: rivers", 62)
 
 	// Clear vegetation for lake cells; mutate isLand so downstream treats them as water
 	t0 = performance.now()
@@ -307,9 +309,9 @@ export function runPostElevationPipeline(
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
 	record("Post: landmarks", t0)
+	onProgress?.("Post: landmarks", 64)
 
 	// ── Ice ────────────────────────────────────────────────────────────
-	onProgress?.("Computing ice...", 92)
 	t0 = performance.now()
 	const { iceThickness, iceMinMonthly, iceMaxMonthly } = computeIceAccumulation(
 		mesh,
@@ -319,6 +321,7 @@ export function runPostElevationPipeline(
 		distCoast,
 	)
 	record("Post: ice", t0)
+	onProgress?.("Post: ice", 64)
 
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -333,6 +336,7 @@ export function runPostElevationPipeline(
 			seed: params.seed,
 		})
 	record("Post: topography", t0)
+	onProgress?.("Post: topography", 65)
 
 	// Demote sea-adjacent regions from ocean to lake coastal tier.
 	// A region only touching seas (not true oceans) gets the lake hab bonus (1.5×)
@@ -357,13 +361,12 @@ export function runPostElevationPipeline(
 	}
 
 	// ── Climate zones ──────────────────────────────────────────────────
-	onProgress?.("Classifying climate zones...", 93)
 	t0 = performance.now()
 	const climateZones = assignClimateZones(mesh, isLand, climate)
 	record("Post: climate zones", t0)
+	onProgress?.("Post: climate zones", 65)
 
 	// ── Pasta climate ──────────────────────────────────────────────────
-	onProgress?.("Classifying pasta climate...", 95)
 	t0 = performance.now()
 	const pastaResult = assignPastaClimate(
 		mesh,
@@ -379,12 +382,13 @@ export function runPostElevationPipeline(
 	record("Post: pasta climate", t0)
 	const pastaClimate: Uint8Array = pastaResult.zones
 	const pastaDebug: PastaDebug = pastaResult.debug
+	onProgress?.("Post: pasta climate", 68)
 
 	// ── Koppen climate ─────────────────────────────────────────────────
-	onProgress?.("Classifying Koppen climate...", 96)
 	t0 = performance.now()
 	const koppenClimate = assignKoppenClimate(mesh, isLand, climate, rainfall)
 	record("Post: koppen climate", t0)
+	onProgress?.("Post: koppen climate", 69)
 
 	// ── Hazards ────────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -398,9 +402,9 @@ export function runPostElevationPipeline(
 		r_hotspot,
 	)
 	record("Post: hazards", t0)
+	onProgress?.("Post: hazards", 70)
 
 	// ── Provinces ──────────────────────────────────────────────────────
-	onProgress?.("Partitioning provinces...", 97)
 	t0 = performance.now()
 	const provinces: OrogenProvinces = computeProvinces(
 		mesh,
@@ -414,6 +418,7 @@ export function runPostElevationPipeline(
 		},
 	)
 	record("Post: provinces", t0)
+	onProgress?.("Post: provinces", 72)
 
 	const waterAccess = computeProvinceWaterAccess(
 		provinces,
@@ -430,12 +435,12 @@ export function runPostElevationPipeline(
 		{ planetRadiusKm: params.planetRadiusKm },
 	)
 	record("Post: locations", t0)
+	onProgress?.("Post: locations", 73)
 
 	// ── Migration diffusion ─────────────────────────────────────────────
 	// Migration runs before full population so that provinces unreachable
 	// from any cradle can be marked desolate, which in turn zeroes their
 	// population and habitability in the population pass below.
-	onProgress?.("Computing migration...", 97)
 	t0 = performance.now()
 	const rawHabitability = computeProvinceHabitability(
 		provinces,
@@ -461,9 +466,9 @@ export function runPostElevationPipeline(
 		if (migration.migrationWave[p] < 0) provinces.desolate[p] = 1
 	}
 	record("Post: migration", t0)
+	onProgress?.("Post: migration", 74)
 
 	// ── Population ─────────────────────────────────────────────────────
-	onProgress?.("Computing population...", 98)
 	t0 = performance.now()
 	const population: ProvincePopulation = computePopulation(
 		provinces,
@@ -481,6 +486,7 @@ export function runPostElevationPipeline(
 	population.migrationWave = migration.migrationWave
 	population.cradleProvinces = migration.cradleProvinces
 	record("Post: population", t0)
+	onProgress?.("Post: population", 74)
 
 	// ── Trade goods ─────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -498,6 +504,7 @@ export function runPostElevationPipeline(
 			})
 		: undefined
 	record("Post: trade goods", t0)
+	onProgress?.("Post: trade goods", 75)
 
 	return {
 		climate,

@@ -29,6 +29,7 @@ interface ImportHeightmapParams {
 	obliquity: number
 	eccentricity: number
 	sunTempFactor: number
+	insolationFactor: number
 	daysPerYear: number
 	hoursPerDay: number
 	tidallyLocked: boolean
@@ -195,6 +196,8 @@ export function generateWorld(
 		eccentricity: overrides?.eccentricity ?? currentParams.eccentricity,
 		perihelion: overrides?.perihelion ?? currentParams.perihelion,
 		sunTempFactor: overrides?.sunTempFactor ?? currentParams.sunTempFactor,
+		insolationFactor:
+			overrides?.insolationFactor ?? currentParams.insolationFactor,
 		daysPerYear: overrides?.daysPerYear ?? currentParams.daysPerYear,
 		hoursPerDay: overrides?.hoursPerDay ?? currentParams.hoursPerDay,
 		pressure: overrides?.pressure ?? currentParams.pressure,
@@ -283,6 +286,7 @@ export function importHeightmap(
 			eccentricity: importParams.eccentricity as number,
 			perihelion: importParams.perihelion as number,
 			sunTempFactor: importParams.sunTempFactor as number,
+			insolationFactor: 1,
 			daysPerYear: importParams.daysPerYear as number,
 			hoursPerDay: importParams.hoursPerDay as number,
 			pressure: importParams.pressure as number,

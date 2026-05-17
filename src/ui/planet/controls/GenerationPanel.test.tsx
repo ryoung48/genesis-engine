@@ -77,6 +77,7 @@ describe("GenerationPanel", () => {
 				{ label: "post-pipeline", ms: 980 },
 				{ label: "mesh", ms: 120 },
 			],
+			otherEntries: [],
 			totalMs: 1100,
 		})
 	})
@@ -93,8 +94,9 @@ describe("GenerationPanel", () => {
 			entries: [
 				{ label: "rainfall", ms: 310 },
 				{ label: "rivers", ms: 220 },
-				{ label: "topography", ms: 95 },
+				{ label: "Other", ms: 95 },
 			],
+			otherEntries: [{ label: "topography", ms: 95 }],
 			totalMs: 625,
 		})
 	})
@@ -110,6 +112,10 @@ describe("GenerationPanel", () => {
 			]),
 		).toEqual({
 			entries: [{ label: "Other", ms: 140 }],
+			otherEntries: [
+				{ label: "mesh", ms: 90 },
+				{ label: "detail", ms: 50 },
+			],
 			totalMs: 140,
 		})
 	})
@@ -125,8 +131,9 @@ describe("GenerationPanel", () => {
 		).toEqual({
 			entries: [
 				{ label: "rainfall", ms: 310 },
-				{ label: "topography", ms: 95 },
+				{ label: "Other", ms: 95 },
 			],
+			otherEntries: [{ label: "topography", ms: 95 }],
 			totalMs: 405,
 		})
 	})
@@ -142,6 +149,7 @@ describe("GenerationPanel", () => {
 				{ label: "Standalone", ms: 100 },
 				{ label: "Other", ms: 99.9 },
 			],
+			otherEntries: [{ label: "detail", ms: 99.9 }],
 			totalMs: 199.9,
 		})
 		expect(getPostTimingSummary([{ Stage: "mesh", ms: "120" }])).toBeNull()

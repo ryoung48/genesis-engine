@@ -8,6 +8,7 @@ import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
 import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
+import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import type { OrogenViewMode } from "../renderer"
@@ -32,6 +33,8 @@ interface OverlayControlsProps {
 	setShowNationBorders: (v: boolean) => void
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
+	showInfrastructure: boolean
+	setShowInfrastructure: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
 	viewMode: OrogenViewMode
@@ -68,6 +71,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowNationBorders,
 	showNationHierarchy,
 	setShowNationHierarchy,
+	showInfrastructure,
+	setShowInfrastructure,
 	gridSpacing,
 	setGridSpacing,
 	viewMode,
@@ -121,6 +126,18 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 
 	return (
 		<div className="absolute inset-0 z-20 pointer-events-none">
+			<div className="absolute top-3 left-3 pointer-events-auto">
+				{!generationPanelOpen && onToggleGenerationPanel && (
+					<IconButton
+						onClick={onToggleGenerationPanel}
+						title="Show generation panel"
+						tone="overlay"
+						size="sm"
+					>
+						<LightningIcon className="h-4 w-4 text-white" />
+					</IconButton>
+				)}
+			</div>
 			<div className="absolute bottom-3 left-3 flex flex-col items-start gap-2">
 				<div
 					className={fadeVisibilityClassName(
@@ -187,6 +204,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										type="checkbox"
 										checked={showNationHierarchy}
 										onChange={(e) => setShowNationHierarchy(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Infrastructure</span>
+									<input
+										type="checkbox"
+										checked={showInfrastructure}
+										onChange={(e) => setShowInfrastructure(e.target.checked)}
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
@@ -311,16 +337,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 						</FloatingPanel>
 					</div>
 				</div>
-				<div className="pointer-events-auto flex items-center gap-2">
-					{!generationPanelOpen && onToggleGenerationPanel && (
-						<IconButton
-							onClick={onToggleGenerationPanel}
-							title="Show generation panel"
-							tone="overlay"
-						>
-							<GlobeIcon className="h-3.5 w-3.5 text-white" />
-						</IconButton>
-					)}
+				<div className="pointer-events-auto">
 					<IconButton
 						onClick={() => setOverlaysExpanded((value) => !value)}
 						title={overlaysExpanded ? "Hide settings" : "Show settings"}

@@ -6,7 +6,13 @@ import {
 	leaderGenderSymbol,
 	resolveLeaderGender,
 } from "@/model/society/gender-system"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import {
+	packRoutes as packRouteData,
+	ROUTE_LAND_MAJOR,
+	ROUTE_LAND_MINOR,
+	ROUTE_SEA,
+	type SerializedOrogenWorld,
+} from "@/model/transport/worker-types"
 import { InfoPanel } from "./InfoPanel"
 
 function makeWorld(): SerializedOrogenWorld {
@@ -84,7 +90,27 @@ function makeWorld(): SerializedOrogenWorld {
 			assignment: new Int32Array([0, 0, 0, 4]),
 			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1]),
 		},
+		landmarks: {
+			regionLandmark: new Int32Array([3]),
+			type: new Uint8Array([0, 0, 0, 3, 4, 5]),
+			size: new Int32Array([1, 1, 1, 1, 1, 1]),
+			count: 6,
+		},
+		settlementWaterLandmarks: new Int32Array([4]),
+		settlementPortRegions: new Int32Array([0]),
 	} as unknown as SerializedOrogenWorld
+}
+
+function makeInlandWorld(): SerializedOrogenWorld {
+	return {
+		...makeWorld(),
+		settlementWaterLandmarks: new Int32Array([-1]),
+		settlementPortRegions: new Int32Array([-1]),
+	} as SerializedOrogenWorld
+}
+
+function packRoutes(routes: Parameters<typeof packRouteData>[0]) {
+	return packRouteData(routes)
 }
 
 function renderPanel(
@@ -130,6 +156,14 @@ function renderPanel(
 			displayMonth={1}
 			unitSystem="metric"
 			world={makeWorld()}
+			routes={packRoutes([
+				{
+					fromProvince: 0,
+					toProvince: 1,
+					kind: ROUTE_LAND_MAJOR,
+					pathRegions: [0, 1],
+				},
+			])}
 			hoverCardRef={{ current: null }}
 			getProvinceName={(id) => `Province ${id}`}
 			getNationName={(id) => `Nation ${id}`}
@@ -158,10 +192,63 @@ describe("InfoPanel", () => {
 		expect(markup).toContain(">Peak<")
 		expect(markup).toContain("Landform 3 (100.0%)")
 		expect(markup).toContain(">Climate<")
+		expect(markup).toContain(">Route<")
+		expect(markup).toContain(">Major<")
 		expect(markup).toContain(">Veg<")
 		expect(markup).not.toContain(">Province<")
 		expect(markup).not.toContain(">Nation<")
 		expect(markup).not.toContain(">Population<")
+	})
+
+	it("shows sea route presence in geography mode", () => {
+		const markup = renderPanel({
+			routes: packRoutes([
+				{
+					fromProvince: 0,
+					toProvince: 1,
+					kind: ROUTE_SEA,
+					pathRegions: [0, 1],
+				},
+			]),
+		})
+
+		expect(markup).toContain(">Route<")
+		expect(markup).toContain(">Sea<")
+	})
+
+	it("shows minor road presence in geography mode", () => {
+		const markup = renderPanel({
+			routes: packRoutes([
+				{
+					fromProvince: 0,
+					toProvince: 1,
+					kind: ROUTE_LAND_MINOR,
+					pathRegions: [0, 1],
+				},
+			]),
+		})
+
+		expect(markup).toContain(">Route<")
+		expect(markup).toContain(">Minor<")
+	})
+
+	it("shows port water body details in demographics mode", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			world: makeWorld(),
+		})
+
+		expect(markup).toContain(">Port<")
+		expect(markup).toContain("Landform 4 (Sea)")
+	})
+
+	it("omits port details in demographics mode when no port exists", () => {
+		const markup = renderPanel({
+			colorMode: "population",
+			world: makeInlandWorld(),
+		})
+
+		expect(markup).not.toContain(">Port<")
 	})
 
 	it("renders geography-only feature and temperature detail branches", () => {

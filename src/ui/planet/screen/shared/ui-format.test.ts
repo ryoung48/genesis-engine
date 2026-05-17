@@ -20,7 +20,14 @@ describe("ui-format", () => {
 		expect(formatTemperatureDelta(-3.2, "metric", 0)).toBe("-3 °C")
 		expect(formatTemperatureDelta(-3.2, "imperial", 1)).toBe("-5.8 °F")
 		expect(formatElevation(1.5, "metric")).toBe("1.50 km")
-		expect(formatElevation(1.5, "imperial")).toBe("4,921 ft")
+		expect(formatElevation(1.5, "imperial")).toBe("4.9k ft")
+		expect(formatElevation(0.01, "imperial")).toBe("33 ft")
+		expect(formatElevation(0.305, "imperial")).toBe("1k ft")
+		expect(formatElevation(3.05, "imperial")).toBe("10k ft")
+		expect(formatElevation(305, "imperial")).toBe("1M ft")
+		expect(formatElevation(3050, "imperial")).toBe("10M ft")
+		expect(formatElevation(-1.5, "imperial")).toBe("-4.9k ft")
+		expect(formatElevation(-0.01, "imperial")).toBe("-33 ft")
 		expect(formatDistance(42, "metric", { under100Digits: 1 })).toBe("42.0 km")
 		expect(formatDistance(42, "imperial", { under100Digits: 1 })).toBe(
 			"26.1 mi",

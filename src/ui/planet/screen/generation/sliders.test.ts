@@ -18,6 +18,7 @@ describe("buildPlanetSliders", () => {
 			eccentricity: 0.0167,
 			perihelion: 102,
 			sunTempFactor: 1,
+			insolationFactor: 1,
 			daysPerYear: 365,
 			hoursPerDay: 48,
 			pressure: 1,
@@ -31,6 +32,7 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setSunTempFactor: vi.fn(),
+			setInsolationFactor: vi.fn(),
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
@@ -61,6 +63,7 @@ describe("buildPlanetSliders", () => {
 			eccentricity: 0.0167,
 			perihelion: 102,
 			sunTempFactor: 1,
+			insolationFactor: 1,
 			daysPerYear: 365,
 			hoursPerDay: 48,
 			pressure: 1,
@@ -74,6 +77,7 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setSunTempFactor: vi.fn(),
+			setInsolationFactor: vi.fn(),
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
@@ -99,9 +103,10 @@ describe("buildPlanetSliders", () => {
 			max: 1,
 			step: 1,
 		})
-		expect(sliders.slice(0, 5).map((slider) => slider.label)).toEqual([
+		expect(sliders.slice(0, 6).map((slider) => slider.label)).toEqual([
 			"Radius",
 			"Sun Temp",
+			"Insolation",
 			"Pressure",
 			"Volcanism",
 			"Axial Tilt",
@@ -120,6 +125,7 @@ describe("buildPlanetSliders", () => {
 			eccentricity: 0.0167,
 			perihelion: 102,
 			sunTempFactor: 1,
+			insolationFactor: 1,
 			daysPerYear: 365,
 			hoursPerDay: 24,
 			pressure: 1,
@@ -133,6 +139,7 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setSunTempFactor: vi.fn(),
+			setInsolationFactor: vi.fn(),
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
@@ -242,6 +249,7 @@ describe("resetWorldDefaults", () => {
 			setObliquity: vi.fn(),
 			setEccentricity: vi.fn(),
 			setSunTempFactor: vi.fn(),
+			setInsolationFactor: vi.fn(),
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setTidallyLocked: vi.fn(),
@@ -293,6 +301,9 @@ describe("resetWorldDefaults", () => {
 		)
 		expect(setters.setSunTempFactor).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.sunTempFactor,
+		)
+		expect(setters.setInsolationFactor).toHaveBeenCalledWith(
+			DEFAULT_WORLD_PARAMS.insolationFactor,
 		)
 		expect(setters.setDaysPerYear).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.daysPerYear,

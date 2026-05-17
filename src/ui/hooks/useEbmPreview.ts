@@ -13,6 +13,7 @@ interface EbmConfig {
 	eccentricity: number
 	perihelion: number
 	tSun: number
+	insolationFactor: number
 	hoursPerDay: number
 	daysPerYear: number
 	landFraction: number
@@ -33,6 +34,7 @@ export function useEbmPreview(config: EbmConfig) {
 		eccentricity,
 		perihelion,
 		tSun,
+		insolationFactor,
 		hoursPerDay,
 		daysPerYear,
 		landFraction,
@@ -57,6 +59,7 @@ export function useEbmPreview(config: EbmConfig) {
 			landFraction: new Array(EMB_CONSTANTS.grid.NUM_LAT).fill(landFraction),
 			radius: radius * 1000, // km to meters
 			pressure,
+			insolationFactor,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
@@ -119,6 +122,7 @@ export function useEbmPreview(config: EbmConfig) {
 		eccentricity,
 		perihelion,
 		tSun,
+		insolationFactor,
 		hoursPerDay,
 		daysPerYear,
 		landFraction,

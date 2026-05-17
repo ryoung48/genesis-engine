@@ -12,6 +12,7 @@ interface GenerationPreviewParams {
 	eccentricity: number
 	perihelion: number
 	sunTempFactor: number
+	insolationFactor: number
 	hoursPerDay: number
 	daysPerYear: number
 	landCoverage: number
@@ -25,6 +26,7 @@ export function buildGenerationPreviewConfig(params: GenerationPreviewParams) {
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
 		tSun: params.sunTempFactor * 5778,
+		insolationFactor: params.insolationFactor,
 		hoursPerDay: params.hoursPerDay,
 		daysPerYear: params.daysPerYear,
 		landFraction: params.landCoverage,

@@ -626,6 +626,12 @@ function computeTidalTemperature(
 		mantleUpwelling,
 		terrainFeatures,
 	})
+
+	const insolationMul = params.insolationFactor ?? 1
+	for (let i = 0; i < insolation_monthly.length; i++) {
+		insolation_monthly[i] *= insolationMul
+	}
+
 	recomputeAnnualTemperatureStats(
 		temperature_monthly,
 		temperature_avg,
@@ -648,15 +654,6 @@ function computeTidalTemperature(
 	}
 }
 
-/**
- * Update climate.temperature_min and temperature_max to reflect daily extremes
- * rather than coldest/warmest monthly means.
- *
- *   temperature_max[r] = max over months of (monthly_mean + DTR/2)
- *   temperature_min[r] = min over months of (monthly_mean − DTR/2)
- *
- * Must be called after computeDiurnalRange, which requires rainfall.
- */
 export function applyDtrToClimateMinMax(
 	climate: OrogenClimate,
 	dtr_monthly: Float32Array,
@@ -720,6 +717,7 @@ export function computeTemperature(
 		pressure: params.pressure ?? 1.0,
 		radius: params.planetRadiusKm * 1000,
 		landFraction,
+		insolationFactor: params.insolationFactor,
 	})
 	ebm.runModel(30, 0.5)
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
@@ -831,6 +829,7 @@ export function computeTemperature(
 		mantleUpwelling,
 		terrainFeatures,
 	})
+
 	recomputeAnnualTemperatureStats(
 		temperature_monthly,
 		temperature_avg,

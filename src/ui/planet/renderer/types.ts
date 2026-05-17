@@ -1,4 +1,7 @@
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type {
+	SerializedNetwork,
+	SerializedOrogenWorld,
+} from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 
 export type OrogenViewMode = "globe" | "map"
@@ -58,4 +61,8 @@ export interface OrogenScene {
 	setFullAmbient(enabled: boolean): void
 	focusOnNation(nationId: number, opts?: { durationMs?: number }): void
 	focusOnProvince(provinceId: number, opts?: { durationMs?: number }): void
+	setSettlements(urbanPop: Float32Array | null): void
+	setSettlementsVisible(visible: boolean): void
+	setInfrastructure(edges: SerializedNetwork | null): void
+	setInfrastructureVisible(visible: boolean): void
 }

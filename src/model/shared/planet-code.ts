@@ -146,6 +146,13 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.sunTempFactor,
 	},
 	{
+		name: "insolationFactor",
+		min: SR.insolationFactor.min,
+		step: SR.insolationFactor.step,
+		count: rangeCount(SR.insolationFactor),
+		read: (p) => p.insolationFactor,
+	},
+	{
 		name: "daysPerYear",
 		min: SR.daysPerYear.min,
 		step: SR.daysPerYear.step,
@@ -328,6 +335,7 @@ interface DecodedPlanetCode {
 	obliquity: number
 	eccentricity: number
 	sunTempFactor: number
+	insolationFactor: number
 	daysPerYear: number
 	hoursPerDay: number
 	tidallyLocked: boolean
@@ -389,6 +397,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		obliquity: decodedFields.obliquity,
 		eccentricity: decodedFields.eccentricity,
 		sunTempFactor: decodedFields.sunTempFactor,
+		insolationFactor: decodedFields.insolationFactor,
 		daysPerYear: decodedFields.daysPerYear,
 		hoursPerDay: decodedFields.hoursPerDay,
 		tidallyLocked: decodedFields.tidallyLocked >= 0.5,

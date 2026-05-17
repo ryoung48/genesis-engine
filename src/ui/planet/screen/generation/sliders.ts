@@ -27,6 +27,7 @@ export function buildPlanetSliders(state: {
 	eccentricity: number
 	perihelion: number
 	sunTempFactor: number
+	insolationFactor: number
 	daysPerYear: number
 	hoursPerDay: number
 	pressure: number
@@ -40,6 +41,7 @@ export function buildPlanetSliders(state: {
 	setEccentricity: (v: number) => void
 	setPerihelion: (v: number) => void
 	setSunTempFactor: (v: number) => void
+	setInsolationFactor: (v: number) => void
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPressure: (v: number) => void
@@ -65,6 +67,14 @@ export function buildPlanetSliders(state: {
 			display: `${state.sunTempFactor.toFixed(2)}x`,
 			...SR.sunTempFactor,
 			set: state.setSunTempFactor,
+		},
+		{
+			label: "Insolation",
+			help: "Scales the stellar flux received by the planet. 1x matches baseline, lower values simulate reduced light while keeping stellar temperature unchanged.",
+			value: state.insolationFactor,
+			display: `${state.insolationFactor.toFixed(2)}x`,
+			...SR.insolationFactor,
+			set: state.setInsolationFactor,
 		},
 		{
 			label: "Pressure",
@@ -317,6 +327,7 @@ export function resetWorldDefaults(setters: {
 	setObliquity: (v: number) => void
 	setEccentricity: (v: number) => void
 	setSunTempFactor: (v: number) => void
+	setInsolationFactor: (v: number) => void
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setTidallyLocked: (v: boolean) => void
@@ -344,6 +355,7 @@ export function resetWorldDefaults(setters: {
 	setters.setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
 	setters.setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
 	setters.setSunTempFactor(DEFAULT_WORLD_PARAMS.sunTempFactor)
+	setters.setInsolationFactor(DEFAULT_WORLD_PARAMS.insolationFactor)
 	setters.setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
 	setters.setTidallyLocked(false)

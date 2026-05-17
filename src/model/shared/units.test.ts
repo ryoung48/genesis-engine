@@ -8,6 +8,7 @@ import {
 	getSubstellarDir,
 	isRetrogradeObliquity,
 	meanEdgeLengthKm,
+	regionPathLengthKm,
 } from "./units"
 
 describe("getEarthYearFactor", () => {
@@ -99,5 +100,14 @@ describe("meanEdgeLengthKm", () => {
 		}
 		const result = meanEdgeLengthKm(meshStub, 1000)
 		expect(result).toBeCloseTo(100, 5)
+	})
+})
+
+describe("regionPathLengthKm", () => {
+	it("sums great-circle arc lengths across the path", () => {
+		const r_xyz = new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0])
+		const lengthKm = regionPathLengthKm(r_xyz, [0, 1, 2], 1000)
+
+		expect(lengthKm).toBeCloseTo(Math.PI * 1000, 5)
 	})
 })

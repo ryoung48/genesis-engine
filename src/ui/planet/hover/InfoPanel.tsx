@@ -1,6 +1,14 @@
 import React from "react"
 import { titleCase } from "@/model/shared/text"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
+import {
+	forEachRoute,
+	ROUTE_LAND_MAJOR,
+	ROUTE_LAND_MINOR,
+	ROUTE_SEA,
+	type SerializedOrogenWorld,
+	type SerializedRoutes,
+} from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
@@ -81,6 +89,54 @@ function buildSummary(
 
 function Row({ label, value }: { label: string; value: string }) {
 	return <LabeledValueRow label={label} value={value} tone="overlay" />
+}
+
+function buildHoverRouteLabel(
+	hoverRegion: number | null,
+	routes: SerializedRoutes | null,
+): string | null {
+	if (hoverRegion === null || !routes) return null
+	let hasImperialRoute = false
+	let hasMinorRoute = false
+	let hasSeaRoute = false
+	forEachRoute(routes, (route) => {
+		if (!route.pathRegions.includes(hoverRegion)) return
+		if (route.kind === ROUTE_SEA) {
+			hasSeaRoute = true
+		} else if (route.kind === ROUTE_LAND_MAJOR) {
+			hasImperialRoute = true
+		} else if (route.kind === ROUTE_LAND_MINOR) {
+			hasMinorRoute = true
+		}
+	})
+	const labels: string[] = []
+	if (hasImperialRoute) labels.push("Major")
+	if (hasMinorRoute) labels.push("Minor")
+	if (hasSeaRoute) labels.push("Sea")
+	return labels.length > 0 ? labels.join(" / ") : null
+}
+
+function buildHoverPortLabel(
+	hoverProvince: number | null,
+	world: SerializedOrogenWorld | null,
+	getLandmarkName: (landmarkId: number) => string,
+): string | null {
+	if (
+		hoverProvince === null ||
+		hoverProvince < 0 ||
+		!world?.settlementWaterLandmarks ||
+		hoverProvince >= world.settlementWaterLandmarks.length
+	) {
+		return null
+	}
+	const landmarkId = world.settlementWaterLandmarks[hoverProvince]
+	if (landmarkId < 0) return null
+	const landmarkTypeCode = world.landmarks?.type?.[landmarkId]
+	const landmarkType =
+		typeof landmarkTypeCode === "number"
+			? titleCase(LANDMARK_TYPES[landmarkTypeCode] ?? "water body")
+			: "Water Body"
+	return `${getLandmarkName(landmarkId)} (${landmarkType})`
 }
 
 function SwatchRow({
@@ -186,6 +242,7 @@ interface InfoPanelProps {
 	displayMonth: number
 	unitSystem: UnitSystem
 	world: SerializedOrogenWorld | null
+	routes?: SerializedRoutes | null
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
 	getProvinceName?: (provinceId: number) => string
 	getNationName: (nationId: number) => string
@@ -230,6 +287,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	displayMonth,
 	unitSystem,
 	world,
+	routes,
 	hoverCardRef,
 	getProvinceName,
 	getNationName,
@@ -294,6 +352,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showGeography && hoverRegion !== null && slopeScoreByRegion
 			? slopeScoreByRegion[hoverRegion] * 100
 			: null
+	const hoverRouteLabel = showGeography
+		? buildHoverRouteLabel(hoverRegion, routes ?? null)
+		: null
 	const hasCurrentImpact =
 		showGeography &&
 		hoverOceanCurrents !== null &&
@@ -368,6 +429,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		!world.provinces.desolate[hoverProvince]
 			? Math.round(world.urbanPopulation[hoverProvince])
 			: null
+	const hoverPortLabel = showDemographics
+		? buildHoverPortLabel(hoverProvince, world, getLandmarkName)
+		: null
 	const demographicEntries: DemographicEntry[] = []
 	for (const entry of demographicDisplays) {
 		demographicEntries.push(entry)
@@ -382,6 +446,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			color: null,
 		})
 	}
+	if (hoverPortLabel) {
+		demographicEntries.push({
+			label: "Port",
+			value: hoverPortLabel,
+			color: null,
+		})
+	}
 	const demographicGroups = showDemographics
 		? [
 				{
@@ -391,6 +462,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						"Population",
 						"Habitability",
 						"Urban Pop",
+						"Port",
 						"Development",
 						"Migration",
 					],
@@ -430,17 +502,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	]
 	return (
 		<FloatingPanel
-			className="absolute top-3 left-3 z-20 w-64 px-3 py-2"
+			className="absolute top-3 right-3 z-20 w-64 px-3 py-2"
 			padding="sm"
 		>
 			<div ref={hoverCardRef} className="space-y-0.5">
 				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
 				{showGeography && (
 					<>
-						<Row
-							label="Elev"
-							value={`${formatElevation(hoverElevationKm, unitSystem)}${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
-						/>
 						{hoverLandmark && (
 							<Row
 								label={
@@ -451,6 +519,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={`${getLandmarkName(hoverLandmark.id)}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
 							/>
 						)}
+						<Row
+							label="Elev"
+							value={`${formatElevation(hoverElevationKm, unitSystem)}${hoverSlopePercent !== null ? ` (${hoverSlopePercent.toFixed(1)}%)` : ""}`}
+						/>
+						{hoverRouteLabel && <Row label="Route" value={hoverRouteLabel} />}
 						{colorMode === "temperatureDelta" &&
 							hoverTemperatureDelta !== null && (
 								<Row

@@ -102,15 +102,23 @@ interface TimingEntry {
 
 interface TimingSummary {
 	entries: TimingEntry[]
+	otherEntries: TimingEntry[]
 	totalMs: number
 }
 
 const POST_TIMING_PREFIX = "Post:"
+const HISTORY_TIMING_PREFIX = "initHistory:"
+
+const COMPUTE_ROUTES_PREFIX = "computeRoutes:"
 
 function stripTimingPrefix(stage: string): string {
 	if (stage.startsWith("orogen:")) return stage.slice("orogen:".length)
 	if (stage.startsWith(`${POST_TIMING_PREFIX} `))
 		return stage.slice(`${POST_TIMING_PREFIX} `.length)
+	if (stage.startsWith(HISTORY_TIMING_PREFIX))
+		return stage.slice(HISTORY_TIMING_PREFIX.length)
+	if (stage.startsWith(COMPUTE_ROUTES_PREFIX))
+		return stage.slice(COMPUTE_ROUTES_PREFIX.length)
 	return stage
 }
 
@@ -134,26 +142,27 @@ export function getGenerationTimingSummary(
 ): TimingSummary | null {
 	const orderedEntries = parseTimingEntries(
 		timings,
-		(stage) => !stage.startsWith(POST_TIMING_PREFIX),
+		(stage) =>
+			!stage.startsWith(POST_TIMING_PREFIX) &&
+			!stage.startsWith(HISTORY_TIMING_PREFIX) &&
+			!stage.startsWith(COMPUTE_ROUTES_PREFIX),
 	).sort((a, b) => b.ms - a.ms)
 
 	if (!orderedEntries.length) return null
 
 	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
-	const otherMs = orderedEntries
-		.filter((entry) => entry.ms < 100)
-		.reduce((sum, entry) => sum + entry.ms, 0)
+	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
+	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
 	const entries =
 		otherMs > 0
 			? [...largeEntries, { label: "Other", ms: otherMs }]
 			: largeEntries
 
-	if (!entries.length) return null
-
 	entries.sort((a, b) => b.ms - a.ms)
 
 	return {
 		entries,
+		otherEntries,
 		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
 	}
 }
@@ -161,21 +170,85 @@ export function getGenerationTimingSummary(
 export function getPostTimingSummary(
 	timings?: StageTiming[] | null,
 ): TimingSummary | null {
-	const entries = parseTimingEntries(timings, (stage) =>
+	const orderedEntries = parseTimingEntries(timings, (stage) =>
 		stage.startsWith(POST_TIMING_PREFIX),
 	).sort((a, b) => b.ms - a.ms)
 
-	if (!entries.length) return null
+	if (!orderedEntries.length) return null
+
+	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
+	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
+	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
+	const entries =
+		otherMs > 0
+			? [...largeEntries, { label: "Other", ms: otherMs }]
+			: largeEntries
+
+	entries.sort((a, b) => b.ms - a.ms)
 
 	return {
 		entries,
-		totalMs: entries.reduce((sum, entry) => sum + entry.ms, 0),
+		otherEntries,
+		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
+	}
+}
+
+function getHistoryTimingSummary(
+	timings?: StageTiming[] | null,
+): TimingSummary | null {
+	const orderedEntries = parseTimingEntries(timings, (stage) =>
+		stage.startsWith(HISTORY_TIMING_PREFIX),
+	).sort((a, b) => b.ms - a.ms)
+
+	if (!orderedEntries.length) return null
+
+	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
+	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
+	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
+	const entries =
+		otherMs > 0
+			? [...largeEntries, { label: "Other", ms: otherMs }]
+			: largeEntries
+
+	entries.sort((a, b) => b.ms - a.ms)
+
+	return {
+		entries,
+		otherEntries,
+		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
+	}
+}
+
+function getComputeRoutesTimingSummary(
+	timings?: StageTiming[] | null,
+): TimingSummary | null {
+	const orderedEntries = parseTimingEntries(timings, (stage) =>
+		stage.startsWith(COMPUTE_ROUTES_PREFIX),
+	).sort((a, b) => b.ms - a.ms)
+
+	if (!orderedEntries.length) return null
+
+	const largeEntries = orderedEntries.filter((entry) => entry.ms >= 100)
+	const otherEntries = orderedEntries.filter((entry) => entry.ms < 100)
+	const otherMs = otherEntries.reduce((sum, entry) => sum + entry.ms, 0)
+	const entries =
+		otherMs > 0
+			? [...largeEntries, { label: "Other", ms: otherMs }]
+			: largeEntries
+
+	entries.sort((a, b) => b.ms - a.ms)
+
+	return {
+		entries,
+		otherEntries,
+		totalMs: orderedEntries.reduce((sum, entry) => sum + entry.ms, 0),
 	}
 }
 
 const GenerationTimingChart: React.FC<{
 	entries: TimingEntry[]
-}> = ({ entries }) => {
+	onBarClick?: (label: string) => void
+}> = ({ entries, onBarClick }) => {
 	const chartState = useMemo(() => {
 		if (!entries.length) return null
 
@@ -231,6 +304,12 @@ const GenerationTimingChart: React.FC<{
 					},
 				},
 			},
+			onClick: (_event, elements) => {
+				if (elements.length > 0 && onBarClick) {
+					const idx = elements[0].index
+					onBarClick(entries[idx]?.label ?? "")
+				}
+			},
 		}
 
 		return {
@@ -238,7 +317,7 @@ const GenerationTimingChart: React.FC<{
 			options,
 			height: Math.max(180, Math.min(420, entries.length * 24 + 56)),
 		}
-	}, [entries])
+	}, [entries, onBarClick])
 
 	if (!chartState) {
 		return (
@@ -288,12 +367,30 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const [showRecentCodes, setShowRecentCodes] = useState(false)
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
+	type DrillDownState =
+		| null
+		| "post"
+		| "history"
+		| "computeRoutes"
+		| {
+				kind: "other"
+				parent: "pipeline" | "post" | "history" | "computeRoutes"
+		  }
+	const [timingDrillDown, setTimingDrillDown] = useState<DrillDownState>(null)
 	const generationTimingSummary = useMemo(
 		() => getGenerationTimingSummary(generationTimings),
 		[generationTimings],
 	)
 	const postTimingSummary = useMemo(
 		() => getPostTimingSummary(generationTimings),
+		[generationTimings],
+	)
+	const historyTimingSummary = useMemo(
+		() => getHistoryTimingSummary(generationTimings),
+		[generationTimings],
+	)
+	const computeRoutesTimingSummary = useMemo(
+		() => getComputeRoutesTimingSummary(generationTimings),
 		[generationTimings],
 	)
 
@@ -395,24 +492,142 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 
 				{worldTab === "planet" && (
 					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
-						<label className="flex items-center gap-2 mb-2 px-1 cursor-pointer select-none">
-							<input
-								type="checkbox"
-								checked={tidallyLocked}
-								onChange={(e) => {
-									setTidallyLocked(e.target.checked)
-									if (e.target.checked) setObliquity(0)
-								}}
-								className="accent-slate-900 h-3.5 w-3.5"
-							/>
-							<span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-								Tidally Locked
-							</span>
-							<span className="text-[9px] text-slate-400 ml-auto">
-								One side always faces the star
-							</span>
-						</label>
-						{renderSliderGroup(planetSliders)}
+						<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5 mb-1.5">
+							{planetSliders
+								.filter((p) => p.label === "Radius")
+								.map((p) => (
+									<div
+										key={p.label}
+										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
+									>
+										<div className="flex justify-between items-baseline gap-3">
+											<div className="group relative flex items-center min-w-0">
+												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+													{p.label}
+												</label>
+												<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+													{p.help}
+												</div>
+											</div>
+											<span className="font-mono text-[10px] text-slate-400">
+												{p.display}
+											</span>
+										</div>
+										<input
+											type="range"
+											min={p.min}
+											max={p.max}
+											step={p.step}
+											value={p.value}
+											onChange={(e) => p.set(parseFloat(e.target.value))}
+											disabled={!!p.disabled}
+											className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+										/>
+									</div>
+								))}
+							<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
+								<div className="flex justify-between items-baseline gap-3">
+									<div className="group relative flex items-center min-w-0">
+										<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+											Tidally Locked
+										</label>
+										<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+											One side always faces the star
+										</div>
+									</div>
+									<span className="font-mono text-[10px] text-slate-400">
+										{tidallyLocked ? "Yes" : "No"}
+									</span>
+								</div>
+								<input
+									type="range"
+									min={0}
+									max={1}
+									step={1}
+									value={tidallyLocked ? 1 : 0}
+									onChange={(e) => {
+										const v = e.target.value === "1"
+										setTidallyLocked(v)
+										if (v) setObliquity(0)
+									}}
+									className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+								/>
+							</div>
+						</div>
+						<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5 mb-1.5">
+							{planetSliders
+								.filter((p) => p.label === "Sun Temp")
+								.map((p) => (
+									<div
+										key={p.label}
+										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
+									>
+										<div className="flex justify-between items-baseline gap-3">
+											<div className="group relative flex items-center min-w-0">
+												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+													{p.label}
+												</label>
+												<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+													{p.help}
+												</div>
+											</div>
+											<span className="font-mono text-[10px] text-slate-400">
+												{p.display}
+											</span>
+										</div>
+										<input
+											type="range"
+											min={p.min}
+											max={p.max}
+											step={p.step}
+											value={p.value}
+											onChange={(e) => p.set(parseFloat(e.target.value))}
+											disabled={!!p.disabled}
+											className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+										/>
+									</div>
+								))}
+							{planetSliders
+								.filter((p) => p.label === "Insolation")
+								.map((p) => (
+									<div
+										key={p.label}
+										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
+									>
+										<div className="flex justify-between items-baseline gap-3">
+											<div className="group relative flex items-center min-w-0">
+												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+													{p.label}
+												</label>
+												<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+													{p.help}
+												</div>
+											</div>
+											<span className="font-mono text-[10px] text-slate-400">
+												{p.display}
+											</span>
+										</div>
+										<input
+											type="range"
+											min={p.min}
+											max={p.max}
+											step={p.step}
+											value={p.value}
+											onChange={(e) => p.set(parseFloat(e.target.value))}
+											disabled={!!p.disabled}
+											className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+										/>
+									</div>
+								))}
+						</div>
+						{renderSliderGroup(
+							planetSliders.filter(
+								(p) =>
+									p.label !== "Radius" &&
+									p.label !== "Sun Temp" &&
+									p.label !== "Insolation",
+							),
+						)}
 					</div>
 				)}
 
@@ -579,9 +794,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
 								<button
 									type="button"
-									onClick={() =>
+									onClick={() => {
 										setShowGenerationTimings((current) => !current)
-									}
+										if (showGenerationTimings) setTimingDrillDown(null)
+									}}
 									className="flex w-full items-center justify-between gap-3 text-left"
 								>
 									<div>
@@ -610,31 +826,231 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								</button>
 								{showGenerationTimings && (
 									<div className="mt-3 space-y-3">
-										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-											<div className="mb-2 flex items-center justify-between px-1">
-												<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-													Pipeline
-												</div>
-												<span className="font-mono text-[10px] text-slate-400">
-													{formatTimingSeconds(generationTimingSummary.totalMs)}
-												</span>
-											</div>
-											<GenerationTimingChart
-												entries={generationTimingSummary.entries}
-											/>
-										</div>
-										{postTimingSummary && (
-											<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-												<div className="mb-2 flex items-center justify-between px-1">
+										{timingDrillDown === "post" && postTimingSummary ? (
+											<div className="space-y-2">
+												<div className="flex items-center gap-2">
+													<button
+														type="button"
+														onClick={() => setTimingDrillDown(null)}
+														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+													>
+														<svg
+															width="10"
+															height="10"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															strokeWidth="2"
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<polyline points="15 18 9 12 15 6" />
+														</svg>
+														Back
+													</button>
 													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
 														Post breakdown
 													</div>
-													<span className="font-mono text-[10px] text-slate-400">
+													<span className="ml-auto font-mono text-[10px] text-slate-400">
 														{formatTimingSeconds(postTimingSummary.totalMs)}
 													</span>
 												</div>
+												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+													<GenerationTimingChart
+														entries={postTimingSummary.entries}
+														onBarClick={(label) => {
+															if (label === "Other")
+																setTimingDrillDown({
+																	kind: "other",
+																	parent: "post",
+																})
+														}}
+													/>
+												</div>
+											</div>
+										) : timingDrillDown === "history" &&
+											historyTimingSummary ? (
+											<div className="space-y-2">
+												<div className="flex items-center gap-2">
+													<button
+														type="button"
+														onClick={() => setTimingDrillDown(null)}
+														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+													>
+														<svg
+															width="10"
+															height="10"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															strokeWidth="2"
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<polyline points="15 18 9 12 15 6" />
+														</svg>
+														Back
+													</button>
+													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+														History breakdown
+													</div>
+													<span className="ml-auto font-mono text-[10px] text-slate-400">
+														{formatTimingSeconds(historyTimingSummary.totalMs)}
+													</span>
+												</div>
+												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+													<GenerationTimingChart
+														entries={historyTimingSummary.entries}
+														onBarClick={(label) => {
+															if (
+																label === "computeRoutes" &&
+																computeRoutesTimingSummary
+															)
+																setTimingDrillDown("computeRoutes")
+															else if (label === "Other")
+																setTimingDrillDown({
+																	kind: "other",
+																	parent: "history",
+																})
+														}}
+													/>
+												</div>
+											</div>
+										) : timingDrillDown === "computeRoutes" &&
+											computeRoutesTimingSummary ? (
+											<div className="space-y-2">
+												<div className="flex items-center gap-2">
+													<button
+														type="button"
+														onClick={() => setTimingDrillDown("history")}
+														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+													>
+														<svg
+															width="10"
+															height="10"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															strokeWidth="2"
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<polyline points="15 18 9 12 15 6" />
+														</svg>
+														Back
+													</button>
+													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+														Compute routes breakdown
+													</div>
+													<span className="ml-auto font-mono text-[10px] text-slate-400">
+														{formatTimingSeconds(
+															computeRoutesTimingSummary.totalMs,
+														)}
+													</span>
+												</div>
+												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+													<GenerationTimingChart
+														entries={computeRoutesTimingSummary.entries}
+														onBarClick={(label) => {
+															if (label === "Other")
+																setTimingDrillDown({
+																	kind: "other",
+																	parent: "computeRoutes",
+																})
+														}}
+													/>
+												</div>
+											</div>
+										) : typeof timingDrillDown === "object" &&
+											timingDrillDown?.kind === "other" ? (
+											<div className="space-y-2">
+												<div className="flex items-center gap-2">
+													<button
+														type="button"
+														onClick={() => {
+															const parent = timingDrillDown.parent
+															if (parent === "pipeline")
+																setTimingDrillDown(null)
+															else setTimingDrillDown(parent)
+														}}
+														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+													>
+														<svg
+															width="10"
+															height="10"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															strokeWidth="2"
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<polyline points="15 18 9 12 15 6" />
+														</svg>
+														Back
+													</button>
+													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+														Other items
+													</div>
+													<span className="ml-auto font-mono text-[10px] text-slate-400">
+														{formatTimingSeconds(
+															timingDrillDown.parent === "pipeline"
+																? (generationTimingSummary?.totalMs ?? 0)
+																: timingDrillDown.parent === "post"
+																	? (postTimingSummary?.totalMs ?? 0)
+																	: timingDrillDown.parent === "history"
+																		? (historyTimingSummary?.totalMs ?? 0)
+																		: (computeRoutesTimingSummary?.totalMs ??
+																			0),
+														)}
+													</span>
+												</div>
+												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+													<GenerationTimingChart
+														entries={
+															timingDrillDown.parent === "pipeline"
+																? (generationTimingSummary?.otherEntries ?? [])
+																: timingDrillDown.parent === "post"
+																	? (postTimingSummary?.otherEntries ?? [])
+																	: timingDrillDown.parent === "history"
+																		? (historyTimingSummary?.otherEntries ?? [])
+																		: (computeRoutesTimingSummary?.otherEntries ??
+																			[])
+														}
+													/>
+												</div>
+											</div>
+										) : (
+											<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+												<div className="mb-2 flex items-center justify-between px-1">
+													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+														Pipeline
+													</div>
+													<span className="font-mono text-[10px] text-slate-400">
+														{formatTimingSeconds(
+															generationTimingSummary.totalMs,
+														)}
+													</span>
+												</div>
 												<GenerationTimingChart
-													entries={postTimingSummary.entries}
+													entries={generationTimingSummary.entries}
+													onBarClick={(label) => {
+														if (label === "post-pipeline" && postTimingSummary)
+															setTimingDrillDown("post")
+														else if (
+															label === "initHistory" &&
+															historyTimingSummary
+														)
+															setTimingDrillDown("history")
+														else if (
+															label === "Other" &&
+															generationTimingSummary.otherEntries.length > 0
+														)
+															setTimingDrillDown({
+																kind: "other",
+																parent: "pipeline",
+															})
+													}}
 												/>
 											</div>
 										)}

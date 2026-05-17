@@ -3,14 +3,15 @@ import {
 	DEFAULT_DAYS_PER_YEAR,
 	DEFAULT_ECCENTRICITY,
 	DEFAULT_HOURS_PER_DAY,
+	DEFAULT_INSOLATION_FACTOR,
 	DEFAULT_OBLIQUITY_DEG,
 	DEFAULT_PERIHELION,
 	DEFAULT_PLANET_RADIUS_KM,
 	DEFAULT_SUN_TEMP_FACTOR,
 } from "@/model/shared/units"
 
-export const PLANET_CODE_STORAGE_KEY = "orogen:lastPlanetCode"
-export const RECENT_CODES_STORAGE_KEY = "orogen:recentCodes"
+export const PLANET_CODE_STORAGE_KEY = "genesis:lastPlanetCode"
+export const RECENT_CODES_STORAGE_KEY = "genesis:recentCodes"
 export const MAX_RECENT_CODES = 10
 
 export const DEFAULT_WORLD_PARAMS = {
@@ -25,6 +26,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	obliquity: DEFAULT_OBLIQUITY_DEG,
 	eccentricity: DEFAULT_ECCENTRICITY,
 	sunTempFactor: DEFAULT_SUN_TEMP_FACTOR,
+	insolationFactor: DEFAULT_INSOLATION_FACTOR,
 	daysPerYear: DEFAULT_DAYS_PER_YEAR,
 	hoursPerDay: DEFAULT_HOURS_PER_DAY,
 	terrainWarp: 0.75,

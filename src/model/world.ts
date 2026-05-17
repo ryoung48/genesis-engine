@@ -85,6 +85,9 @@ export interface OrogenWorld {
 	landmarks?: OrogenLandmarks
 	population?: import("./society/population").ProvincePopulation
 	tradeGoods?: LocationTradeGoods
+	settlementRegions?: Int32Array
+	settlementWaterLandmarks?: Int32Array
+	settlementPortRegions?: Int32Array
 	continentCount: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]

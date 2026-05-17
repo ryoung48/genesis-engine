@@ -1,8 +1,8 @@
-import type {
-	SerializedHistoryFrame,
-	SerializedProvinceTimelineFloat,
-	SerializedProvinceTimelineInt,
-	SerializedTimelines,
+import {
+	type SerializedHistoryFrame,
+	type SerializedProvinceTimelineFloat,
+	type SerializedProvinceTimelineInt,
+	type SerializedTimelines,
 } from "../transport/worker-types"
 import { YEAR_MS } from "."
 import { PROV } from "./fields"

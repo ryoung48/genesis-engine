@@ -156,7 +156,6 @@ describe("GenerationPanel stateful branches", () => {
 		expect(markup).toContain("Orogen")
 		expect(markup).toContain("42%")
 		expect(markup).toContain("Pipeline")
-		expect(markup).toContain("Post breakdown")
 	})
 
 	it("wires the interactive controls to their handlers", async () => {
@@ -235,10 +234,14 @@ describe("GenerationPanel stateful branches", () => {
 				element.type === "button" &&
 				textContent(element.props.children) === "Terrain",
 		)
-		const checkbox = findElement(
+		const tidallyLockedSlider = findElement(
 			tree,
 			(element) =>
-				element.type === "input" && element.props.type === "checkbox",
+				element.type === "input" &&
+				element.props.type === "range" &&
+				element.props.min === 0 &&
+				element.props.max === 1 &&
+				element.props.value === 0,
 		)
 		const slider = findElement(
 			tree,
@@ -290,10 +293,10 @@ describe("GenerationPanel stateful branches", () => {
 
 		;(terrainButton?.props.onClick as (() => void) | undefined)?.()
 		;(
-			checkbox?.props.onChange as
-				| ((event: { target: { checked: boolean } }) => void)
+			tidallyLockedSlider?.props.onChange as
+				| ((event: { target: { value: string } }) => void)
 				| undefined
-		)?.({ target: { checked: true } })
+		)?.({ target: { value: "1" } })
 		;(
 			slider?.props.onChange as
 				| ((event: { target: { value: string } }) => void)
@@ -400,10 +403,14 @@ describe("GenerationPanel stateful branches", () => {
 				element.type === "button" &&
 				textContent(element.props.children) === "Reset",
 		)
-		const checkbox = findElement(
+		const tidallyLockedSlider = findElement(
 			tree,
 			(element) =>
-				element.type === "input" && element.props.type === "checkbox",
+				element.type === "input" &&
+				element.props.type === "range" &&
+				element.props.min === 0 &&
+				element.props.max === 1 &&
+				element.props.value === 1,
 		)
 		const fileInput = findElement(
 			tree,
@@ -436,10 +443,10 @@ describe("GenerationPanel stateful branches", () => {
 		;(previewButton?.props.onClick as (() => void) | undefined)?.()
 		;(resetButton?.props.onClick as (() => void) | undefined)?.()
 		;(
-			checkbox?.props.onChange as
-				| ((event: { target: { checked: boolean } }) => void)
+			tidallyLockedSlider?.props.onChange as
+				| ((event: { target: { value: string } }) => void)
 				| undefined
-		)?.({ target: { checked: false } })
+		)?.({ target: { value: "0" } })
 		const emptyTarget: { files: File[]; value: string } = {
 			files: [],
 			value: "filled",

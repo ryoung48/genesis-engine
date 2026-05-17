@@ -38,6 +38,7 @@ const LANDMARK_TYPE_ISLE = 2
 export const LANDMARK_TYPE_OCEAN = 3
 const LANDMARK_TYPE_SEA = 4
 const LANDMARK_TYPE_LAKE = 5
+export { LANDMARK_TYPE_SEA, LANDMARK_TYPE_LAKE }
 
 export function computeLandmarks(
 	mesh: SphereMesh,

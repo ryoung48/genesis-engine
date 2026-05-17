@@ -55,6 +55,7 @@ export interface ImportParams {
 	obliquity?: number
 	eccentricity?: number
 	sunTempFactor?: number
+	insolationFactor?: number
 	daysPerYear?: number
 	hoursPerDay?: number
 	tidallyLocked?: boolean
@@ -148,12 +149,12 @@ export function importOrogenWorld(
 	const { timings, record } = createTimingRecorder()
 	const rng = createRng(params.seed)
 
-	onProgress?.("Building sphere mesh...", 5)
+	onProgress?.("import:mesh", 3)
 	let t0 = performance.now()
 	const mesh = buildSphereMesh(params.numPoints, params.jitter, rng)
 	record("Sphere mesh (Fibonacci + Delaunay + pole)", t0)
 
-	onProgress?.("Sampling heightmap...", 15)
+	onProgress?.("import:heightmap", 10)
 	t0 = performance.now()
 	const elevation = sampleHeightmap(
 		mesh,
@@ -164,8 +165,6 @@ export function importOrogenWorld(
 	record("Heightmap sampling", t0)
 
 	// Post-processing
-	onProgress?.("Post-processing terrain...", 25)
-
 	if (params.terrainWarp > 0) {
 		t0 = performance.now()
 		warpTerrain(
@@ -227,9 +226,9 @@ export function importOrogenWorld(
 	t0 = performance.now()
 	applySoilCreep(mesh, elevation, r_isOcean, 3, 0.1125)
 	record("Soil creep (3 iters)", t0)
+	onProgress?.("import:post", 20)
 
 	// Derive synthetic plates
-	onProgress?.("Deriving plates...", 45)
 	t0 = performance.now()
 	const { plateAssignment, plateIds, plateIsOcean } = deriveSyntheticPlates(
 		mesh,
@@ -239,9 +238,9 @@ export function importOrogenWorld(
 	const boundary = buildDummyBoundary(mesh, elevation)
 	const distFields = computeSimpleDistanceFields(mesh, elevation)
 	record("Synthetic plates + boundary", t0)
+	onProgress?.("import:plates", 25)
 
 	// Ocean distance
-	onProgress?.("Computing ocean distance...", 55)
 	t0 = performance.now()
 	const isLand = new Uint8Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -253,6 +252,7 @@ export function importOrogenWorld(
 		meanEdgeLengthKm(mesh, params.planetRadiusKm),
 	)
 	record("Ocean distance (BFS)", t0)
+	onProgress?.("import:oceanDist", 28)
 
 	// Build OrogenParams from ImportParams
 	const orogenParams: OrogenParams = {
@@ -275,6 +275,7 @@ export function importOrogenWorld(
 		obliquity: params.obliquity ?? DEFAULT_OBLIQUITY_DEG,
 		eccentricity: params.eccentricity ?? DEFAULT_ECCENTRICITY,
 		sunTempFactor: params.sunTempFactor ?? DEFAULT_SUN_TEMP_FACTOR,
+		insolationFactor: params.insolationFactor ?? 1,
 		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
 		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
 		tidallyLocked: params.tidallyLocked ?? false,
@@ -292,7 +293,6 @@ export function importOrogenWorld(
 	}
 
 	// Shared post-elevation pipeline (climate → population)
-	onProgress?.("Computing climate...", 65)
 	t0 = performance.now()
 	const post = runPostElevationPipeline({
 		mesh,
@@ -313,8 +313,7 @@ export function importOrogenWorld(
 		onProgress,
 	})
 	record("Post-elevation pipeline", t0)
-
-	onProgress?.("Done", 100)
+	onProgress?.("import:post-pipeline", 70)
 
 	return {
 		mesh,

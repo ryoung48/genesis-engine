@@ -4,6 +4,7 @@ export const DEFAULT_PLANET_RADIUS_KM = 6371
 export const DEFAULT_OBLIQUITY_DEG = 23.5
 export const DEFAULT_ECCENTRICITY = 0.0167
 export const DEFAULT_SUN_TEMP_FACTOR = 1
+export const DEFAULT_INSOLATION_FACTOR = 1
 export const DEFAULT_DAYS_PER_YEAR = 365
 export const DEFAULT_HOURS_PER_DAY = 24
 export const DEFAULT_ANTISTELLAR_LON = 180
@@ -65,4 +66,25 @@ export function meanEdgeLengthKm(
 	for (let i = 0; i < mesh.neighborDist.length; i++)
 		edgeSum += mesh.neighborDist[i]
 	return (edgeSum / Math.max(1, mesh.neighborDist.length)) * planetRadiusKm
+}
+
+export function regionPathLengthKm(
+	r_xyz: Float32Array,
+	pathRegions: ArrayLike<number>,
+	planetRadiusKm: number = DEFAULT_PLANET_RADIUS_KM,
+): number {
+	let totalKm = 0
+	for (let i = 1; i < pathRegions.length; i++) {
+		const fromRegion = pathRegions[i - 1]
+		const toRegion = pathRegions[i]
+		if (fromRegion < 0 || toRegion < 0 || fromRegion === toRegion) continue
+		const fromOffset = fromRegion * 3
+		const toOffset = toRegion * 3
+		const cosTheta =
+			r_xyz[fromOffset] * r_xyz[toOffset] +
+			r_xyz[fromOffset + 1] * r_xyz[toOffset + 1] +
+			r_xyz[fromOffset + 2] * r_xyz[toOffset + 2]
+		totalKm += Math.acos(Math.max(-1, Math.min(1, cosTheta))) * planetRadiusKm
+	}
+	return totalKm
 }

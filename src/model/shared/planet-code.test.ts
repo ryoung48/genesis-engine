@@ -20,6 +20,7 @@ function makeParams(overrides: Record<string, number | boolean> = {}) {
 		obliquity: 23.5,
 		eccentricity: 0.0167,
 		sunTempFactor: 1,
+		insolationFactor: 1,
 		daysPerYear: 365,
 		hoursPerDay: 24,
 		terrainWarp: 0.75,

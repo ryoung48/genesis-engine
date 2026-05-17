@@ -1,5 +1,5 @@
 /**
- * Orogen pipeline orchestrator: generates a complete tectonic world.
+ * Genesis pipeline orchestrator: generates a complete tectonic world.
  * Faithful port of orogen's planet-worker.js pipeline order.
  */
 
@@ -15,6 +15,7 @@ import type {
 } from ".."
 import { elevToHeightKm } from "../climate/climate"
 import { buildSphereMesh } from "../mesh"
+import { computeSettlementAnchors } from "../settlements/compute-settlement-regions"
 import { createRng } from "../shared/rng"
 import {
 	computeCoastDistances,
@@ -162,8 +163,7 @@ function runActivePath(
 	// 6. Build super plates (skip if < 8 plates)
 	let superPlateData = null
 	if (params.numPlates >= 8) {
-		onProgress?.("Building super plates...", 38)
-		superPlateData = withTiming("orogen:super-plates", pipelineTiming, () =>
+		superPlateData = withTiming("super-plates", pipelineTiming, () =>
 			buildSuperPlates(
 				mesh,
 				r_plate,
@@ -173,11 +173,11 @@ function runActivePath(
 				plateDensity,
 			),
 		)
+		onProgress?.("super-plates", 12)
 	}
 
 	// 7. Collision + stress (dual-layer with super plates)
-	onProgress?.("Computing tectonic stress...", 46)
-	const boundary = withTiming("orogen:collision", pipelineTiming, () =>
+	const boundary = withTiming("collision", pipelineTiming, () =>
 		classifyBoundaries(
 			mesh,
 			r_plate,
@@ -191,10 +191,10 @@ function runActivePath(
 			elevationTiming,
 		),
 	)
+	onProgress?.("collision", 14)
 
 	// 8. Distance fields
-	onProgress?.("Propagating distance fields...", 54)
-	const distFields = withTiming("orogen:distance-fields", pipelineTiming, () =>
+	const distFields = withTiming("distance-fields", pipelineTiming, () =>
 		computeDistanceFields(
 			mesh,
 			r_plate,
@@ -203,10 +203,10 @@ function runActivePath(
 			params.seed,
 		),
 	)
+	onProgress?.("distance-fields", 16)
 
 	// 9. Elevation assignment
-	onProgress?.("Assigning elevation...", 62)
-	const blendResult = withTiming("orogen:elevation", pipelineTiming, () =>
+	const blendResult = withTiming("elevation", pipelineTiming, () =>
 		blendElevation(
 			mesh,
 			r_plate,
@@ -221,10 +221,10 @@ function runActivePath(
 		),
 	)
 	const { elevation, terrainFeatures } = blendResult
+	onProgress?.("elevation", 26)
 
 	// 10. Hotspot volcanism
-	onProgress?.("Applying hotspots...", 70)
-	const r_hotspot = withTiming("orogen:hotspots", pipelineTiming, () =>
+	const r_hotspot = withTiming("hotspots", pipelineTiming, () =>
 		params.landCoverage <= 0
 			? new Float32Array(mesh.numRegions)
 			: applyHotspots(
@@ -239,12 +239,13 @@ function runActivePath(
 				),
 	)
 	clampHotspots(r_hotspot)
+	onProgress?.("hotspots", 29)
 
-	// 11. Peak compression (orogen: Math.pow(elev, 0.92) for positive elevations)
-	onProgress?.("Compressing peaks...", 75)
-	withTiming("orogen:peak-compression", pipelineTiming, () => {
+	// 11. Peak compression (Math.pow(elev, 0.92) for positive elevations)
+	withTiming("peak-compression", pipelineTiming, () => {
 		applyPeakCompression(elevation, mesh.numRegions)
 	})
+	onProgress?.("peak-compression", 29)
 
 	return {
 		elevation,
@@ -271,8 +272,7 @@ function runStagnantPath(
 		if (coarse.coarsePlateIsOcean.has(r_plate[r])) plateOceanMask[r] = 1
 	}
 
-	onProgress?.("Generating stagnant lid terrain...", 50)
-	const elevation = withTiming("orogen:static-elevation", pipelineTiming, () =>
+	const elevation = withTiming("static-elevation", pipelineTiming, () =>
 		generateStaticElevation(
 			mesh,
 			params.seed,
@@ -282,15 +282,16 @@ function runStagnantPath(
 			plateOceanMask,
 		),
 	)
+	onProgress?.("static-elevation", 20)
 
 	// Static hotspots (no plate velocity needed)
-	onProgress?.("Applying hotspots...", 60)
-	const r_hotspot = withTiming("orogen:static-hotspots", pipelineTiming, () =>
+	const r_hotspot = withTiming("static-hotspots", pipelineTiming, () =>
 		params.landCoverage <= 0
 			? new Float32Array(mesh.numRegions)
 			: applyStaticHotspots(mesh, elevation, params.seed, volcanism),
 	)
 	clampHotspots(r_hotspot)
+	onProgress?.("static-hotspots", 25)
 
 	// Peak compression
 	applyPeakCompression(elevation, mesh.numRegions)
@@ -318,13 +319,14 @@ export function generateOrogenWorld(
 	const pipelineTiming: StageTiming[] = []
 	const elevationTiming: StageTiming[] = []
 	const postTiming: StageTiming[] = []
-	console.time("orogen:total")
+	console.time("total")
 	onProgress?.("Building sphere mesh...", 5)
 
 	// 1. Build hi-res sphere mesh
-	const mesh = withTiming("orogen:mesh", pipelineTiming, () =>
+	const mesh = withTiming("mesh", pipelineTiming, () =>
 		buildSphereMesh(params.numPoints, params.jitter, rng),
 	)
+	onProgress?.("mesh", 3)
 
 	const tectonicMode = params.tectonicMode ?? "active"
 
@@ -341,8 +343,8 @@ export function generateOrogenWorld(
 	// ── Shared plate generation (both active and stagnant paths) ──────
 
 	// 2. Generate coarse plates on fixed 20K mesh
-	onProgress?.("Generating coarse plates...", 14)
-	const coarse = withTiming("orogen:coarse-plates", pipelineTiming, () =>
+	onProgress?.("coarse-plates", 5)
+	const coarse = withTiming("coarse-plates", pipelineTiming, () =>
 		generateCoarsePlates(
 			params.seed,
 			params.numPlates,
@@ -353,8 +355,8 @@ export function generateOrogenWorld(
 	)
 
 	// 3. Project coarse plates → hi-res mesh with FBM noise perturbation
-	onProgress?.("Projecting plates...", 24)
-	const r_plate = withTiming("orogen:project", pipelineTiming, () =>
+	onProgress?.("project", 11)
+	const r_plate = withTiming("project", pipelineTiming, () =>
 		projectCoarsePlates(
 			mesh,
 			coarse.coarseMesh,
@@ -366,8 +368,8 @@ export function generateOrogenWorld(
 
 	// 4. Smooth projected boundaries + reconnect fragments
 	const plateIds = Array.from(coarse.coarsePlateSeeds)
-	onProgress?.("Smoothing boundaries...", 30)
-	withTiming("orogen:smooth-plates", pipelineTiming, () => {
+	onProgress?.("smooth-plates", 12)
+	withTiming("smooth-plates", pipelineTiming, () => {
 		smoothAndReconnectPlates(mesh, r_plate, plateIds, 3)
 	})
 
@@ -440,8 +442,7 @@ export function generateOrogenWorld(
 	} // end tectonic mode branch
 
 	// 12. Terrain post-processing (orogen order)
-	onProgress?.("Post-processing terrain...", 82)
-	withTiming("orogen:post", pipelineTiming, () => {
+	withTiming("post", pipelineTiming, () => {
 		// Terrain warp — first, before ocean detection or smoothing
 		if (params.terrainWarp > 0) {
 			const postStageStart = performance.now()
@@ -543,8 +544,7 @@ export function generateOrogenWorld(
 
 	// Impact craters (applied after all erosion so they stay crisp)
 	if (params.craters && params.craters > 0) {
-		onProgress?.("Applying craters...", 83)
-		withTiming("orogen:craters", pipelineTiming, () => {
+		withTiming("craters", pipelineTiming, () => {
 			applyCraters(
 				mesh,
 				elevation,
@@ -553,6 +553,7 @@ export function generateOrogenWorld(
 				params.planetRadiusKm,
 			)
 		})
+		onProgress?.("craters", 39)
 	}
 
 	// Convert raw [0,1] elevation to physical km (radius-scaled)
@@ -599,20 +600,22 @@ export function generateOrogenWorld(
 		isLand,
 	)
 
-	const finalCoastDist = withTiming("orogen:coastDist", pipelineTiming, () =>
+	const finalCoastDist = withTiming("coastDist", pipelineTiming, () =>
 		computeCoastDistances(mesh, isLand),
 	)
 	distFields.distCoast = finalCoastDist.distCoast
 	distFields.distCoastLand = finalCoastDist.distCoastLand
+	onProgress?.("coastDist", 39)
 
 	// 13. Ocean distance (BFS hop count → km)
-	const oceanDist = withTiming("orogen:oceanDist", pipelineTiming, () =>
+	const oceanDist = withTiming("oceanDist", pipelineTiming, () =>
 		computeOceanDistanceBFS(
 			mesh,
 			isLand,
 			meanEdgeLengthKm(mesh, params.planetRadiusKm),
 		),
 	)
+	onProgress?.("oceanDist", 39)
 	// 17. Small ocean detection — patches < 0.1% of land become lakes so rivers drain through them
 	const smallOcean = new Uint8Array(mesh.numRegions)
 	{
@@ -661,7 +664,7 @@ export function generateOrogenWorld(
 	}
 
 	// 14–22. Shared post-elevation pipeline (climate → population)
-	const post = withTiming("orogen:post-pipeline", pipelineTiming, () =>
+	const post = withTiming("post-pipeline", pipelineTiming, () =>
 		runPostElevationPipeline({
 			mesh,
 			elevation,
@@ -681,6 +684,7 @@ export function generateOrogenWorld(
 			onProgress,
 		}),
 	)
+	onProgress?.("post-pipeline", 70)
 
 	// Mark small ocean cells as lakes in river output
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -695,7 +699,7 @@ export function generateOrogenWorld(
 	let nations
 	if (post.provinces) {
 		if (post.population) {
-			nations = withTiming("orogen:nations", pipelineTiming, () =>
+			nations = withTiming("nations", pipelineTiming, () =>
 				computeNations({
 					provinces: post.provinces!,
 					coastal: post.coastal,
@@ -708,7 +712,7 @@ export function generateOrogenWorld(
 				}),
 			)
 		}
-		withTiming("orogen:cultures", pipelineTiming, () => {
+		withTiming("cultures", pipelineTiming, () => {
 			cultures = computeCultures(post.provinces!, params.seed)
 			heritages = computeHeritages(cultures!, params.seed)
 			faiths = computeFaiths(cultures!, params.seed)
@@ -726,6 +730,7 @@ export function generateOrogenWorld(
 				seed: params.seed + 5102,
 			})
 		})
+		onProgress?.("cultures", 77)
 	}
 	post.landmarks = assignLandmarkIdentity({
 		mesh,
@@ -735,14 +740,22 @@ export function generateOrogenWorld(
 		isLand,
 		seed: params.seed,
 	})
+	const settlementAnchors = computeSettlementAnchors({
+		mesh,
+		provinces: post.provinces,
+		topography: post.topography,
+		coastal: post.coastal,
+		rivers: post.rivers ? { visible: post.rivers.visible } : undefined,
+		isLand,
+		landmarks: post.landmarks,
+	})
 
 	const timings = [...pipelineTiming, ...post.timings]
-	console.timeEnd("orogen:total")
+	console.timeEnd("total")
 	console.table(pipelineTiming)
 	if (elevationTiming.length > 0) console.table(elevationTiming)
 	if (postTiming.length > 0) console.table(postTiming)
 	if (post.timings.length > 0) console.table(post.timings)
-	onProgress?.("Done", 100)
 
 	return {
 		mesh,
@@ -791,6 +804,9 @@ export function generateOrogenWorld(
 		landmarks: post.landmarks,
 		population: post.population,
 		tradeGoods: post.tradeGoods,
+		settlementRegions: settlementAnchors.settlementRegions,
+		settlementWaterLandmarks: settlementAnchors.settlementWaterLandmarks,
+		settlementPortRegions: settlementAnchors.settlementPortRegions,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: countContinents(mesh, isLand),
 		monthlyTEQ: post.monthlyTEQ,

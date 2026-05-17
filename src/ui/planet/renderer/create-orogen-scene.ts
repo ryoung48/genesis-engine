@@ -6,7 +6,11 @@ import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import {
+	networkCount,
+	type SerializedNetwork,
+	type SerializedOrogenWorld,
+} from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import { disposeGroup, disposeObject3D } from "./disposal"
 import { getRegionFocusTargets } from "./focus"
@@ -41,6 +45,14 @@ import {
 	collectProvinceBorderGlobePositions,
 	collectProvinceBorderMapPositions,
 } from "./province-overlay"
+import {
+	buildGlobeSettlements,
+	buildMapSettlements,
+} from "./settlement-overlay"
+import {
+	buildGlobeTradeRoutes,
+	buildMapTradeRoutes,
+} from "./trade-route-overlay"
 import type {
 	OrogenHoverInfo,
 	OrogenScene,
@@ -258,6 +270,17 @@ export function createOrogenScene(
 	let mapHierarchyOverlay: THREE.Group | null = null
 	let hierarchyOverlayNationId = -1
 	let hierarchyOverlayWorld: SerializedOrogenWorld | null = null
+	let globeSettlements: THREE.Group | null = null
+	let mapSettlements: THREE.Group | null = null
+	let settlementLocations: Int32Array | null = null
+	let settlementUrbanPop: Float32Array | null = null
+	let settlementsVisible = false
+	let settlementsDirty = false
+	let globeInfrastructure: THREE.Group | null = null
+	let mapInfrastructure: THREE.Group | null = null
+	let infrastructureData: SerializedNetwork | null = null
+	let infrastructureMaterials: LineMaterial[] = []
+	let infrastructureVisible = false
 
 	function updateMapCameraFrustum() {
 		const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight)
@@ -300,6 +323,85 @@ export function createOrogenScene(
 		)
 		if (globeHierarchyOverlay) scene.add(globeHierarchyOverlay)
 		if (mapHierarchyOverlay) scene.add(mapHierarchyOverlay)
+		updateOverlayVisibility()
+	}
+
+	function rebuildSettlementOverlay() {
+		disposeGroup(scene, globeSettlements)
+		disposeGroup(scene, mapSettlements)
+		globeSettlements = null
+		mapSettlements = null
+		if (
+			!currentWorld?.provinces ||
+			!settlementLocations ||
+			!settlementUrbanPop ||
+			!settlementsVisible
+		) {
+			return
+		}
+		globeSettlements = buildGlobeSettlements(
+			currentWorld,
+			settlementLocations,
+			settlementUrbanPop,
+		)
+		mapSettlements = buildMapSettlements(
+			currentWorld,
+			settlementLocations,
+			settlementUrbanPop,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+		)
+		if (globeSettlements) scene.add(globeSettlements)
+		if (mapSettlements) {
+			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
+			scene.add(mapSettlements)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildTradeRouteOverlay() {
+		disposeGroup(scene, globeInfrastructure)
+		disposeGroup(scene, mapInfrastructure)
+		globeInfrastructure = null
+		mapInfrastructure = null
+		infrastructureMaterials = []
+		if (
+			!currentWorld?.provinces ||
+			!infrastructureData ||
+			networkCount(infrastructureData) === 0 ||
+			!infrastructureVisible
+		) {
+			return
+		}
+		const globeTradeRouteBuild = buildGlobeTradeRoutes(
+			currentWorld,
+			infrastructureData,
+			{
+				width: canvas.clientWidth || 1,
+				height: canvas.clientHeight || 1,
+			},
+		)
+		const mapTradeRouteBuild = buildMapTradeRoutes(
+			currentWorld,
+			infrastructureData,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			{
+				width: canvas.clientWidth || 1,
+				height: canvas.clientHeight || 1,
+			},
+		)
+		globeInfrastructure = globeTradeRouteBuild.group
+		mapInfrastructure = mapTradeRouteBuild.group
+		infrastructureMaterials = [
+			...globeTradeRouteBuild.materials,
+			...mapTradeRouteBuild.materials,
+		]
+		if (globeInfrastructure) scene.add(globeInfrastructure)
+		if (mapInfrastructure) {
+			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
+			scene.add(mapInfrastructure)
+		}
 		updateOverlayVisibility()
 	}
 
@@ -443,6 +545,10 @@ export function createOrogenScene(
 		disposeGroup(scene, mapRivers)
 		disposeGroup(scene, globeHierarchyOverlay)
 		disposeGroup(scene, mapHierarchyOverlay)
+		disposeGroup(scene, globeSettlements)
+		disposeGroup(scene, mapSettlements)
+		disposeGroup(scene, globeInfrastructure)
+		disposeGroup(scene, mapInfrastructure)
 		terrainWireframe = null
 		mapWireframe = null
 		globeGrid = null
@@ -459,6 +565,11 @@ export function createOrogenScene(
 		riverMaterials = []
 		globeHierarchyOverlay = null
 		mapHierarchyOverlay = null
+		globeSettlements = null
+		mapSettlements = null
+		settlementsDirty = true
+		globeInfrastructure = null
+		mapInfrastructure = null
 
 		if (wireframeVisible && currentWorld) {
 			terrainWireframe = buildTerrainWireframe(
@@ -524,6 +635,8 @@ export function createOrogenScene(
 		rebuildHoveredNationBorder()
 		rebuildSelectedProvinceBorder()
 		rebuildHierarchyOverlay()
+		rebuildSettlementOverlay()
+		rebuildTradeRouteOverlay()
 		updateOverlayVisibility()
 	}
 
@@ -586,6 +699,21 @@ export function createOrogenScene(
 		if (mapHierarchyOverlay) {
 			mapHierarchyOverlay.visible = currentViewMode === "map"
 			if (mapMesh) mapHierarchyOverlay.position.copy(mapMesh.position)
+		}
+		if (globeSettlements)
+			globeSettlements.visible =
+				settlementsVisible && currentViewMode === "globe"
+		if (mapSettlements) {
+			mapSettlements.visible = settlementsVisible && currentViewMode === "map"
+			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
+		}
+		if (globeInfrastructure)
+			globeInfrastructure.visible =
+				infrastructureVisible && currentViewMode === "globe"
+		if (mapInfrastructure) {
+			mapInfrastructure.visible =
+				infrastructureVisible && currentViewMode === "map"
+			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
 		}
 	}
 
@@ -1077,6 +1205,7 @@ export function createOrogenScene(
 		renderer.setSize(w, h, false)
 		for (const mat of riverMaterials) mat.resolution.set(w, h)
 		for (const mat of pulseMaterials) mat.resolution.set(w, h)
+		for (const mat of infrastructureMaterials) mat.resolution.set(w, h)
 		if (selectedProvince >= 0) rebuildSelectedProvinceBorder()
 	}
 
@@ -1151,6 +1280,10 @@ export function createOrogenScene(
 		disposeGroup(scene, mapRivers)
 		disposeGroup(scene, globeHierarchyOverlay)
 		disposeGroup(scene, mapHierarchyOverlay)
+		disposeGroup(scene, globeSettlements)
+		disposeGroup(scene, mapSettlements)
+		disposeGroup(scene, globeInfrastructure)
+		disposeGroup(scene, mapInfrastructure)
 		waterGeo.dispose()
 		waterMat.dispose()
 		atmosGeo.dispose()
@@ -1427,6 +1560,50 @@ export function createOrogenScene(
 		rebuildHierarchyOverlay()
 	}
 
+	function setSettlements(urbanPop: Float32Array | null) {
+		if (
+			!urbanPop ||
+			!currentWorld?.provinces ||
+			!currentWorld.settlementRegions
+		) {
+			settlementUrbanPop = null
+			settlementLocations = null
+			rebuildSettlementOverlay()
+			return
+		}
+		settlementLocations = currentWorld.settlementRegions
+		settlementUrbanPop = urbanPop
+		settlementsDirty = false
+		rebuildSettlementOverlay()
+	}
+
+	function setSettlementsVisible(visible: boolean) {
+		if (settlementsVisible === visible) return
+		settlementsVisible = visible
+		if (
+			visible &&
+			settlementsDirty &&
+			settlementUrbanPop &&
+			currentWorld?.provinces &&
+			currentWorld.settlementRegions
+		) {
+			settlementLocations = currentWorld.settlementRegions
+			settlementsDirty = false
+		}
+		rebuildSettlementOverlay()
+	}
+
+	function setInfrastructure(edges: SerializedNetwork | null) {
+		infrastructureData = edges
+		rebuildTradeRouteOverlay()
+	}
+
+	function setInfrastructureVisible(visible: boolean) {
+		if (infrastructureVisible === visible) return
+		infrastructureVisible = visible
+		rebuildTradeRouteOverlay()
+	}
+
 	return {
 		dispose,
 		resize,
@@ -1452,6 +1629,10 @@ export function createOrogenScene(
 		setRivers,
 		setRiversVisible,
 		setHierarchyOverlay,
+		setSettlements,
+		setSettlementsVisible,
+		setInfrastructure,
+		setInfrastructureVisible,
 		setSunPosition,
 		setAtmospherePressure,
 		setFullAmbient,

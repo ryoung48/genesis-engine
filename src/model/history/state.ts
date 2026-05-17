@@ -1,6 +1,8 @@
 import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import { fanoutRangesForSize, rebalanceHierarchy } from "../society/hierarchy"
 import type { ProvincePopulation } from "../society/population"
+import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { Route, RouteEdge } from "../transport/worker-types"
 import {
 	children,
 	type DerivedCache,
@@ -131,6 +133,10 @@ export interface HistoryState {
 	provinceColors: Float32Array
 	desolate: Uint8Array
 	waterAccess: Uint8Array
+	regionProvince: Int32Array
+	regionAdjOffset: Int32Array
+	regionAdjList: Int32Array
+	regionIsLand: Uint8Array
 	r_xyz: Float32Array
 	province_xyz: Float32Array
 	habitability: Float32Array
@@ -143,6 +149,9 @@ export interface HistoryState {
 	heap: EventHeap
 	nationColors: Map<number, [number, number, number]>
 	leaderRuntime: LeaderRuntime
+	routes: Route[]
+	network: RouteEdge[]
+	landmarks: OrogenLandmarks
 }
 
 function makeTimelineArray<T>(length: number): Timeline<T>[] {
@@ -771,6 +780,11 @@ export function createHistoryState(
 	startYear: number,
 	rng: HistoryRng,
 	waterAccess?: Uint8Array,
+	landmarks?: OrogenLandmarks,
+	regionProvince?: Int32Array,
+	regionAdjOffset?: Int32Array,
+	regionAdjList?: Int32Array,
+	regionIsLand?: Uint8Array,
 ): HistoryState {
 	const P = provinces.count
 	const startTime = startYear * YEAR_MS
@@ -827,6 +841,10 @@ export function createHistoryState(
 		provinceColors: provinces.colors,
 		desolate: provinces.desolate,
 		waterAccess: waterAccessLevels,
+		regionProvince: regionProvince ?? new Int32Array(0),
+		regionAdjOffset: regionAdjOffset ?? new Int32Array(0),
+		regionAdjList: regionAdjList ?? new Int32Array(0),
+		regionIsLand: regionIsLand ?? new Uint8Array(0),
 		r_xyz,
 		province_xyz: buildProvinceXyz(provinces.seeds, r_xyz),
 		habitability: population.habitability.slice(),
@@ -843,6 +861,14 @@ export function createHistoryState(
 			end: new Float64Array(P),
 			targetUrban: new Float32Array(P),
 			nameSeed: new Int32Array(P).fill(-1),
+		},
+		routes: [],
+		network: [],
+		landmarks: landmarks ?? {
+			regionLandmark: new Int32Array(0),
+			type: new Uint8Array(0),
+			size: new Int32Array(0),
+			count: 0,
 		},
 	}
 

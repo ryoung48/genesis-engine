@@ -10,6 +10,7 @@ interface EBMConfig {
 	landFraction?: number[]
 	radius?: number
 	pressure?: number
+	insolationFactor?: number
 	time?: {
 		YEAR_LENGTH_DAYS?: number
 		HOURS_PER_DAY?: number
@@ -245,5 +246,14 @@ export class EnergyBalanceModel {
 		this.temperature_avg = this.temperature.map((row) => meanOf(row))
 		this.temperature_min = this.temperature.map((row) => minOf(row))
 		this.temperature_max = this.temperature.map((row) => maxOf(row))
+
+		const insolMul = this.config.insolationFactor ?? 1
+		if (insolMul !== 1) {
+			for (let i = 0; i < this.insolation.length; i++) {
+				for (let j = 0; j < this.insolation[i].length; j++) {
+					this.insolation[i][j] *= insolMul
+				}
+			}
+		}
 	}
 }

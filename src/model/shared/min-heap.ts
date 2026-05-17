@@ -11,6 +11,10 @@ export class MinHeap {
 		return this._data.length
 	}
 
+	clear() {
+		this._data.length = 0
+	}
+
 	push(cell: number) {
 		this._data.push(cell)
 		let i = this._data.length - 1

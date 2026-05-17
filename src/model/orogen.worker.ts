@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import type { OrogenNationHierarchy, OrogenProvinces } from "."
+import type { OrogenNationHierarchy, OrogenProvinces, StageTiming } from "."
 import {
 	createHistoryRng,
 	initHistory,
@@ -16,6 +16,7 @@ import { type HistoryState, validateLiveHierarchy } from "./history/state"
 import { generateOrogenWorld } from "./pipelines/generate-world"
 import { importOrogenWorld } from "./pipelines/import-heightmap"
 import type { ProvincePopulation } from "./society/population"
+import type { OrogenLandmarks } from "./terrain/landmarks"
 import type {
 	OrogenWorkerRequest,
 	OrogenWorkerResponse,
@@ -23,6 +24,7 @@ import type {
 	SerializedOrogenWorld,
 	SerializedTimelines,
 } from "./transport/worker-types"
+import { packNetwork, packRoutes } from "./transport/worker-types"
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -32,19 +34,24 @@ let historyTime = 800 * YEAR_MS
 let simulationRunning = false
 
 interface HistorySeedWorld {
-	params: { seed: number }
-	mesh: { r_xyz: Float32Array }
+	params: { seed: number; planetRadiusKm?: number }
+	mesh: { r_xyz: Float32Array; adjOffset: Int32Array; adjList: Int32Array }
 	nations: OrogenNationHierarchy | null
 	provinces: OrogenProvinces | null
 	population: ProvincePopulation | null
 	coastal: Uint8Array | null
 	waterAccess: Uint8Array | null
 	riverVisible: Uint8Array | null
+	isLand: Uint8Array | null
 	cultures: {
 		assignment: Int32Array
 		count: number
 		genderSystems?: Uint8Array
 	} | null
+	landmarks: OrogenLandmarks | null
+	settlementRegions: Int32Array | null
+	settlementWaterLandmarks: Int32Array | null
+	settlementPortRegions: Int32Array | null
 }
 
 let lastGeneratedWorld: HistorySeedWorld | null = null
@@ -87,8 +94,15 @@ function cloneHistorySeedWorld(
 	world: ReturnType<typeof generateOrogenWorld>,
 ): HistorySeedWorld {
 	return {
-		params: { seed: world.params.seed },
-		mesh: { r_xyz: world.mesh.r_xyz.slice() },
+		params: {
+			seed: world.params.seed,
+			planetRadiusKm: world.params.planetRadiusKm,
+		},
+		mesh: {
+			r_xyz: world.mesh.r_xyz.slice(),
+			adjOffset: world.mesh.adjOffset.slice(),
+			adjList: world.mesh.adjList.slice(),
+		},
 		nations: world.nations ? cloneNations(world.nations) : null,
 		provinces: world.provinces ? cloneProvinces(world.provinces) : null,
 		population: world.population
@@ -108,6 +122,7 @@ function cloneHistorySeedWorld(
 		coastal: world.coastal ? world.coastal.slice() : null,
 		waterAccess: world.waterAccess ? world.waterAccess.slice() : null,
 		riverVisible: world.rivers?.visible ? world.rivers.visible.slice() : null,
+		isLand: world.isLand ? world.isLand.slice() : null,
 		cultures: world.cultures
 			? {
 					assignment: world.cultures.assignment.slice(),
@@ -115,6 +130,17 @@ function cloneHistorySeedWorld(
 					genderSystems: world.cultures.genderSystems?.slice(),
 				}
 			: null,
+		landmarks: world.landmarks
+			? {
+					regionLandmark: world.landmarks.regionLandmark.slice(),
+					type: world.landmarks.type.slice(),
+					size: world.landmarks.size.slice(),
+					count: world.landmarks.count,
+				}
+			: null,
+		settlementRegions: world.settlementRegions?.slice() ?? null,
+		settlementWaterLandmarks: world.settlementWaterLandmarks?.slice() ?? null,
+		settlementPortRegions: world.settlementPortRegions?.slice() ?? null,
 	}
 }
 
@@ -291,6 +317,13 @@ function serializeWorld(
 			? { aet_monthly: world.hydrology.aet_monthly }
 			: undefined,
 		tradeGoods: world.tradeGoods?.material,
+		settlementRegions: world.settlementRegions,
+		settlementWaterLandmarks: world.settlementWaterLandmarks,
+		settlementPortRegions: world.settlementPortRegions,
+		routes: seedHistoryState ? packRoutes(seedHistoryState.routes) : undefined,
+		network: seedHistoryState
+			? packNetwork(seedHistoryState.network)
+			: undefined,
 	}
 }
 
@@ -471,6 +504,27 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.hydrology) add(world.hydrology.aet_monthly.buffer)
 	if (world.isLand) add(world.isLand.buffer)
 	if (world.riverLand) add(world.riverLand.buffer)
+	if (world.settlementRegions) add(world.settlementRegions.buffer)
+	if (world.settlementWaterLandmarks) add(world.settlementWaterLandmarks.buffer)
+	if (world.settlementPortRegions) add(world.settlementPortRegions.buffer)
+	if (world.routes) {
+		add(
+			world.routes.fromProvince.buffer,
+			world.routes.toProvince.buffer,
+			world.routes.kind.buffer,
+			world.routes.pathOffsets.buffer,
+			world.routes.pathRegions.buffer,
+		)
+	}
+	if (world.network) {
+		add(
+			world.network.fromRegion.buffer,
+			world.network.toRegion.buffer,
+			world.network.kind.buffer,
+			world.network.usage.buffer,
+			world.network.weight.buffer,
+		)
+	}
 	if (world.provinces) add(...provinceBuffers(world.provinces))
 	if (world.locations) add(...locationBuffers(world.locations))
 	if (world.rivers) {
@@ -631,6 +685,15 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 				r_xyz: world.mesh.r_xyz,
 				cultures: world.cultures,
 				seed: world.params.seed,
+				landmarks: world.landmarks ?? undefined,
+				regionProvince: world.provinces?.regionProvince,
+				regionAdjOffset: world.mesh.adjOffset,
+				regionAdjList: world.mesh.adjList,
+				regionIsLand: world.isLand ?? undefined,
+				planetRadiusKm: world.params.planetRadiusKm,
+				settlementRegions: world.settlementRegions ?? undefined,
+				settlementWaterLandmarks: world.settlementWaterLandmarks ?? undefined,
+				settlementPortRegions: world.settlementPortRegions ?? undefined,
 			})
 			historyTime = historyState.time
 		}
@@ -661,31 +724,53 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 		historyTime = 800 * YEAR_MS
 		simulationRunning = false
 		lastGeneratedWorld = cloneHistorySeedWorld(generated)
-		const seedHistoryState =
-			generated.nations &&
-			generated.provinces &&
-			generated.population &&
-			generated.coastal &&
-			generated.waterAccess &&
-			generated.rivers?.visible &&
-			generated.cultures
-				? initHistory({
-						nations: generated.nations,
-						provinces: generated.provinces,
-						population: generated.population,
-						coastal: generated.coastal,
-						waterAccess: generated.waterAccess,
-						riverVisible: generated.rivers.visible,
-						r_xyz: generated.mesh.r_xyz,
-						cultures: generated.cultures,
-						seed: generated.params.seed,
-					})
-				: null
+		const seedWorld = lastGeneratedWorld
+		if (
+			seedWorld.nations &&
+			seedWorld.provinces &&
+			seedWorld.population &&
+			seedWorld.coastal &&
+			seedWorld.waterAccess &&
+			seedWorld.riverVisible &&
+			seedWorld.cultures
+		) {
+			const t0 = performance.now()
+			progressCb("initHistory", 80)
+			const historyTimings: StageTiming[] = []
+			historyRng = createHistoryRng(generated.params.seed + 99999)
+			historyState = initHistory({
+				nations: seedWorld.nations,
+				provinces: seedWorld.provinces,
+				population: seedWorld.population,
+				coastal: seedWorld.coastal,
+				waterAccess: seedWorld.waterAccess,
+				riverVisible: seedWorld.riverVisible,
+				r_xyz: seedWorld.mesh.r_xyz,
+				cultures: seedWorld.cultures,
+				seed: generated.params.seed,
+				landmarks: seedWorld.landmarks,
+				regionProvince: seedWorld.provinces.regionProvince,
+				regionAdjOffset: seedWorld.mesh.adjOffset,
+				regionAdjList: seedWorld.mesh.adjList,
+				regionIsLand: seedWorld.isLand,
+				planetRadiusKm: seedWorld.params.planetRadiusKm,
+				settlementRegions: seedWorld.settlementRegions,
+				settlementWaterLandmarks: seedWorld.settlementWaterLandmarks,
+				settlementPortRegions: seedWorld.settlementPortRegions,
+				timings: historyTimings,
+			})
+			historyTime = historyState.time
+			progressCb("initHistory:computeRoutes", 90)
+			generated.timings.push({
+				Stage: "initHistory",
+				ms: (performance.now() - t0).toFixed(1),
+			})
+			generated.timings.push(...historyTimings)
+		}
 
-		const world = serializeWorld(generated, seedHistoryState)
-		const frame = seedHistoryState
-			? buildHistoryFrame(seedHistoryState)
-			: undefined
+		const world = serializeWorld(generated, historyState)
+		progressCb("Done", 100)
+		const frame = historyState ? buildHistoryFrame(historyState) : undefined
 		self.postMessage(
 			{ type: "done", world, frame } satisfies OrogenWorkerResponse,
 			frame

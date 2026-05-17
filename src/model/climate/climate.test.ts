@@ -58,6 +58,7 @@ function buildParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
 		obliquity: 23.5,
 		eccentricity: 0.0167,
 		sunTempFactor: 1,
+		insolationFactor: 1,
 		daysPerYear: 365,
 		hoursPerDay: 24,
 		tidallyLocked: false,

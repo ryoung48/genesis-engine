@@ -50,13 +50,25 @@ export function formatTemperatureDelta(
 	)
 }
 
+function compactFeet(feet: number): string {
+	const abs = Math.abs(feet)
+	const sign = feet < 0 ? "-" : ""
+	if (abs >= 1_000_000)
+		return `${sign}${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`
+	if (abs >= 1_000)
+		return `${sign}${(abs / 1_000).toFixed(abs >= 10_000 ? 0 : 1).replace(/\.0$/, "")}k`
+	return `${sign}${Math.round(abs).toLocaleString()}`
+}
+
 export function formatElevation(
 	valueKm: number,
 	unitSystem: UnitSystem,
 	digits = 2,
 ): string {
-	if (unitSystem === "imperial")
-		return `${Math.round(valueKm * KM_TO_FT).toLocaleString()} ft`
+	if (unitSystem === "imperial") {
+		const feet = Math.round(valueKm * KM_TO_FT)
+		return `${compactFeet(feet)} ft`
+	}
 	return `${valueKm.toFixed(digits)} km`
 }
 

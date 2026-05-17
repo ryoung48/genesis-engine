@@ -5,11 +5,25 @@ import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
 import { PASTA_LABELS } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
+import { initHistory } from "@/model/history"
+import { SEA_ROUTE_PORT_MIN_POPULATION } from "@/model/history/events/trade-routes"
+import { PROV } from "@/model/history/fields"
 import { decodePlanetCode } from "@/model/shared/planet-code"
+import { regionPathLengthKm } from "@/model/shared/units"
+import {
+	ROUTE_LAND_MAJOR,
+	ROUTE_LAND_MINOR,
+	ROUTE_SEA,
+} from "@/model/transport/worker-types"
+import { buildTradeRouteCorridors } from "@/ui/planet/renderer/trade-route-overlay"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
 import type { OrogenParams } from ".."
 import type { OrogenWorld } from "../world"
+import {
+	collectSeaRoutePortDiagnostics,
+	selectTimingStages,
+} from "./generate-default-world-diagnostics"
 import { generateOrogenWorld } from "./generate-world"
 
 const SMOKE_PLANET_CODE = "8wqaf.080yudfjcze4m7yceeysl488rbtec5u"
@@ -51,6 +65,8 @@ function buildSmokeParams(code: string): OrogenParams {
 		obliquity: decoded.obliquity ?? DEFAULT_WORLD_PARAMS.obliquity,
 		eccentricity: decoded.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity,
 		sunTempFactor: decoded.sunTempFactor ?? DEFAULT_WORLD_PARAMS.sunTempFactor,
+		insolationFactor:
+			decoded.insolationFactor ?? DEFAULT_WORLD_PARAMS.insolationFactor,
 		daysPerYear: decoded.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
 		hoursPerDay: decoded.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
 		tidallyLocked: decoded.tidallyLocked ?? false,
@@ -68,6 +84,7 @@ function computePreviewAverageTempC(params: OrogenParams): number {
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
 		sunTempFactor: params.sunTempFactor,
+		insolationFactor: params.insolationFactor,
 		hoursPerDay: params.hoursPerDay,
 		daysPerYear: params.daysPerYear,
 		landCoverage: params.landCoverage,
@@ -303,7 +320,292 @@ describe("full world smoke generation", () => {
 				),
 			)
 		}
-		if (world.timings?.length) console.table(world.timings)
+		// Trade route diagnostics
+		if (
+			world.nations &&
+			world.provinces &&
+			world.population &&
+			world.coastal &&
+			world.rivers?.visible &&
+			world.cultures
+		) {
+			const THRESHOLD = 20_000
+			const historyTimings: Array<{ Stage: string; ms: string }> = []
+			const t0 = performance.now()
+			const state = initHistory({
+				nations: world.nations,
+				provinces: world.provinces,
+				population: world.population,
+				coastal: world.coastal,
+				waterAccess: world.waterAccess,
+				riverVisible: world.rivers.visible,
+				r_xyz: world.mesh.r_xyz,
+				cultures: world.cultures,
+				seed: world.params.seed,
+				landmarks: world.landmarks,
+				regionProvince: world.provinces.regionProvince,
+				regionAdjOffset: world.mesh.adjOffset,
+				regionAdjList: world.mesh.adjList,
+				regionIsLand: world.isLand,
+				planetRadiusKm: world.params.planetRadiusKm,
+				settlementRegions: world.settlementRegions,
+				settlementWaterLandmarks: world.settlementWaterLandmarks,
+				settlementPortRegions: world.settlementPortRegions,
+				timings: historyTimings,
+			})
+			world.timings ??= []
+			world.timings.push({
+				Stage: "initHistory",
+				ms: (performance.now() - t0).toFixed(1),
+			})
+			world.timings.push(...historyTimings)
+			if (world.timings.length > 0) console.table(world.timings)
+
+			const routeTimings = selectTimingStages(historyTimings, [
+				"initHistory:",
+				"computeRoutes:",
+			])
+			if (routeTimings.length > 0) {
+				console.info("Trade route timing diagnostics")
+				console.table(routeTimings)
+			}
+
+			// Collect landmark -> settlement count + route count
+			const landmarkCities = new Map<number, number>()
+			const landmarkSettlements = new Map<number, number>()
+			const landmarkMajorRoutes = new Map<number, number>()
+			const landmarkMinorRoutes = new Map<number, number>()
+			const landmarkSeaRoutes = new Map<number, number>()
+			const P = state.P
+			const seeds = state.provinceSeeds
+			const lmData = world.landmarks
+			const urbanPopulation = new Float32Array(P)
+			for (let p = 0; p < P; p++) {
+				const urban = PROV.population.urban.get(state, p)
+				urbanPopulation[p] = urban
+				const r = seeds[p]
+				if (r < 0 || !lmData) continue
+				const lmId = lmData.regionLandmark[r]
+				if (lmId < 0) continue
+				if (urban > 1_000) {
+					landmarkSettlements.set(
+						lmId,
+						(landmarkSettlements.get(lmId) ?? 0) + 1,
+					)
+				}
+				if (urban < THRESHOLD) continue
+				landmarkCities.set(lmId, (landmarkCities.get(lmId) ?? 0) + 1)
+			}
+			for (const route of state.routes) {
+				if (!lmData) continue
+				const lmId =
+					route.kind === ROUTE_SEA
+						? (world.settlementWaterLandmarks?.[route.fromProvince] ?? -1)
+						: (lmData.regionLandmark[route.pathRegions[0] ?? -1] ?? -1)
+				if (lmId < 0) continue
+				if (route.kind === ROUTE_LAND_MAJOR) {
+					landmarkMajorRoutes.set(
+						lmId,
+						(landmarkMajorRoutes.get(lmId) ?? 0) + 1,
+					)
+				} else if (route.kind === ROUTE_LAND_MINOR) {
+					landmarkMinorRoutes.set(
+						lmId,
+						(landmarkMinorRoutes.get(lmId) ?? 0) + 1,
+					)
+				} else if (route.kind === ROUTE_SEA) {
+					landmarkSeaRoutes.set(lmId, (landmarkSeaRoutes.get(lmId) ?? 0) + 1)
+				}
+			}
+			let longestMajorRoadKm = 0
+			let longestMajorRoad:
+				| {
+						fromProvince: number
+						toProvince: number
+						lengthKm: number
+				  }
+				| undefined
+			const seaRoutesCrossingLand: Array<{
+				fromProvince: number
+				toProvince: number
+				waterLandmark: number
+				interiorLandRegions: number[]
+				pathPreview: number[]
+			}> = []
+			for (const route of state.routes) {
+				if (route.kind === ROUTE_LAND_MAJOR) {
+					const lengthKm = regionPathLengthKm(
+						world.mesh.r_xyz,
+						route.pathRegions,
+						world.params.planetRadiusKm,
+					)
+					if (lengthKm <= longestMajorRoadKm) continue
+					longestMajorRoadKm = lengthKm
+					longestMajorRoad = {
+						fromProvince: route.fromProvince,
+						toProvince: route.toProvince,
+						lengthKm,
+					}
+				}
+				if (route.kind !== ROUTE_SEA) continue
+				const interiorLandRegions = route.pathRegions
+					.slice(1, -1)
+					.filter((region) => world.isLand[region] === 1)
+				if (interiorLandRegions.length === 0) continue
+				seaRoutesCrossingLand.push({
+					fromProvince: route.fromProvince,
+					toProvince: route.toProvince,
+					waterLandmark:
+						world.settlementWaterLandmarks?.[route.fromProvince] ?? -1,
+					interiorLandRegions,
+					pathPreview:
+						route.pathRegions.length > 12
+							? [
+									...route.pathRegions.slice(0, 6),
+									-1,
+									...route.pathRegions.slice(-5),
+								]
+							: [...route.pathRegions],
+				})
+				if (seaRoutesCrossingLand.length >= 5) {
+					// Limit console noise while still proving the failure mode.
+					break
+				}
+			}
+
+			const diagEntries: Array<{
+				lmId: number
+				type: string
+				size: number
+				settlementsOver1k: number
+				cities: number
+				majorRoads: number
+				minorRoads: number
+				seaRoutes: number
+			}> = []
+			const allLandmarks = new Set<number>([
+				...landmarkCities.keys(),
+				...landmarkSettlements.keys(),
+				...landmarkMajorRoutes.keys(),
+				...landmarkMinorRoutes.keys(),
+				...landmarkSeaRoutes.keys(),
+			])
+			for (const lmId of allLandmarks) {
+				diagEntries.push({
+					lmId,
+					type: lmData
+						? (
+								["continent", "island", "isle", "ocean", "sea", "lake"] as const
+							)[lmData.type[lmId]]
+						: "?",
+					size: lmData?.size[lmId] ?? 0,
+					settlementsOver1k: landmarkSettlements.get(lmId) ?? 0,
+					cities: landmarkCities.get(lmId) ?? 0,
+					majorRoads: landmarkMajorRoutes.get(lmId) ?? 0,
+					minorRoads: landmarkMinorRoutes.get(lmId) ?? 0,
+					seaRoutes: landmarkSeaRoutes.get(lmId) ?? 0,
+				})
+			}
+			diagEntries.sort(
+				(a, b) =>
+					b.majorRoads +
+						b.minorRoads +
+						b.seaRoutes -
+						(a.majorRoads + a.minorRoads + a.seaRoutes) || b.cities - a.cities,
+			)
+
+			// Deeper connectivity diagnostics
+			const CONN_THRESHOLD = 20_000
+			const diagProvLandmark = new Int32Array(state.P).fill(-1)
+			if (lmData) {
+				for (let p = 0; p < state.P; p++) {
+					const r = seeds[p]
+					if (r < 0) continue
+					const lmId = lmData.regionLandmark[r]
+					if (lmId < 0) continue
+					diagProvLandmark[p] = lmId
+				}
+			}
+			for (const entry of diagEntries) {
+				const lmId = entry.lmId
+				const cityProvs: number[] = []
+				for (let p = 0; p < state.P; p++) {
+					if (diagProvLandmark[p] !== lmId) continue
+					const urban = PROV.population.urban.get(state, p)
+					if (urban >= CONN_THRESHOLD) cityProvs.push(p)
+				}
+				// Log sample urban pops
+				const samplePops: number[] = []
+				for (let i = 0; i < Math.min(cityProvs.length, 5); i++) {
+					samplePops.push(PROV.population.urban.get(state, cityProvs[i]))
+				}
+				console.info(
+					`  lmId=${lmId} (${entry.type}): ${cityProvs.length} cities, sample urban pops: [${samplePops.join(", ")}]`,
+				)
+			}
+			console.info(
+				`Infrastructure diagnostics (threshold >= ${THRESHOLD.toLocaleString()})`,
+			)
+			console.table(diagEntries)
+			console.info(
+				`Total settlements >1k: ${diagEntries.reduce((s, e) => s + e.settlementsOver1k, 0)}, Total cities: ${diagEntries.reduce((s, e) => s + e.cities, 0)}, Major roads: ${state.routes.filter((route) => route.kind === ROUTE_LAND_MAJOR).length}, Minor roads: ${state.routes.filter((route) => route.kind === ROUTE_LAND_MINOR).length}, Sea routes: ${state.routes.filter((route) => route.kind === ROUTE_SEA).length}`,
+			)
+			const seaPortDiagnostics = collectSeaRoutePortDiagnostics({
+				urbanPopulation,
+				settlementRegions:
+					world.settlementRegions ?? new Int32Array(state.P).fill(-1),
+				settlementWaterLandmarks:
+					world.settlementWaterLandmarks ?? new Int32Array(state.P).fill(-1),
+				settlementPortRegions:
+					world.settlementPortRegions ?? new Int32Array(state.P).fill(-1),
+				routes: state.routes,
+				minPopulation: SEA_ROUTE_PORT_MIN_POPULATION,
+			})
+			console.info(
+				`Eligible sea ports (urban >= ${SEA_ROUTE_PORT_MIN_POPULATION.toLocaleString()}): ${seaPortDiagnostics.eligiblePorts}, with sea routes: ${seaPortDiagnostics.portsWithSeaRoutes}, without sea routes: ${seaPortDiagnostics.missingPorts.length}`,
+			)
+			if (seaPortDiagnostics.missingPorts.length > 0) {
+				console.info("Eligible urban ports without sea routes")
+				console.table(seaPortDiagnostics.missingPorts)
+			}
+			const corridorEntries = buildTradeRouteCorridors(state.network)
+			const edgeCounts = {
+				major: state.network.filter((edge) => edge.kind === ROUTE_LAND_MAJOR)
+					.length,
+				minor: state.network.filter((edge) => edge.kind === ROUTE_LAND_MINOR)
+					.length,
+				sea: state.network.filter((edge) => edge.kind === ROUTE_SEA).length,
+			}
+			const corridorCounts = {
+				major: corridorEntries.filter(
+					(corridor) => corridor.kind === ROUTE_LAND_MAJOR,
+				).length,
+				minor: corridorEntries.filter(
+					(corridor) => corridor.kind === ROUTE_LAND_MINOR,
+				).length,
+				sea: corridorEntries.filter((corridor) => corridor.kind === ROUTE_SEA)
+					.length,
+			}
+			console.info(
+				`Infrastructure edges -> corridors: major ${edgeCounts.major} -> ${corridorCounts.major}, minor ${edgeCounts.minor} -> ${corridorCounts.minor}, sea ${edgeCounts.sea} -> ${corridorCounts.sea}, total ${state.network.length} -> ${corridorEntries.length}`,
+			)
+			console.info(
+				`Corridor reduction: ${state.network.length === 0 ? "n/a" : `${(((state.network.length - corridorEntries.length) / state.network.length) * 100).toFixed(1)}% fewer draw units after corridor collapse`}`,
+			)
+			if (longestMajorRoad) {
+				console.info(
+					`Longest major road: ${longestMajorRoad.lengthKm.toFixed(1)} km (province ${longestMajorRoad.fromProvince} -> province ${longestMajorRoad.toProvince})`,
+				)
+			}
+			if (seaRoutesCrossingLand.length > 0) {
+				console.warn(
+					`Sea routes crossing land in interior: ${seaRoutesCrossingLand.length}`,
+				)
+				console.table(seaRoutesCrossingLand)
+			} else {
+				console.info("Sea routes crossing land in interior: 0")
+			}
+		}
 
 		expect(world.mesh.numRegions).toBeGreaterThan(0)
 		expect(world.params.seed).toBe(params.seed)

@@ -38,6 +38,8 @@ function createTree(
 		setShowNationBorders: vi.fn(),
 		showNationHierarchy: false,
 		setShowNationHierarchy: vi.fn(),
+		showInfrastructure: false,
+		setShowInfrastructure: vi.fn(),
 		gridSpacing: 15,
 		setGridSpacing: vi.fn(),
 		viewMode: "globe",
@@ -74,6 +76,8 @@ describe("OverlayControls", () => {
 				setShowNationBorders={vi.fn()}
 				showNationHierarchy={false}
 				setShowNationHierarchy={vi.fn()}
+				showInfrastructure={false}
+				setShowInfrastructure={vi.fn()}
 				gridSpacing={15}
 				setGridSpacing={vi.fn()}
 				viewMode="map"
@@ -123,6 +127,8 @@ describe("OverlayControls", () => {
 				setShowNationBorders={vi.fn()}
 				showNationHierarchy={false}
 				setShowNationHierarchy={vi.fn()}
+				showInfrastructure={false}
+				setShowInfrastructure={vi.fn()}
 				gridSpacing={15}
 				setGridSpacing={vi.fn()}
 				viewMode="globe"
@@ -180,14 +186,14 @@ describe("OverlayControls", () => {
 			generationPanelOpen: false,
 			onToggleGenerationPanel,
 		})
-		const anchored = React.Children.only(
-			tree.props.children,
-		) as ReactElement<ChildrenProps>
+		const rootChildren = React.Children.toArray(tree.props.children)
+		const topLeft = rootChildren[0] as ReactElement<ChildrenProps>
+		const bottomLeft = rootChildren[1] as ReactElement<ChildrenProps>
 		const panelWrapper = React.Children.toArray(
-			anchored.props.children,
+			bottomLeft.props.children,
 		)[0] as ReactElement<ChildrenProps>
 		const actionRow = React.Children.toArray(
-			anchored.props.children,
+			bottomLeft.props.children,
 		)[1] as ReactElement<ChildrenProps>
 		const panel = React.Children.only(
 			panelWrapper.props.children,
@@ -209,17 +215,17 @@ describe("OverlayControls", () => {
 		const wireframeLabel = optionGroupChildren[1]
 		const nationBordersLabel = optionGroupChildren[4]
 		const hierarchyLabel = optionGroupChildren[5]
-		const gridLabel = optionGroupChildren[6]
-		const gridSection = optionGroupChildren[7]
-		const projectionSection = optionGroupChildren[8]
-		const debugLabel = optionGroupChildren[9]
-		const footerRow = optionGroupChildren[10]
-		const generationButton = React.Children.toArray(
+		const gridLabel = optionGroupChildren[7]
+		const gridSection = optionGroupChildren[8]
+		const projectionSection = optionGroupChildren[9]
+		const debugLabel = optionGroupChildren[10]
+		const footerRow = optionGroupChildren[11]
+		const generationButton = React.Children.only(
+			topLeft.props.children,
+		) as ReactElement<ClickableProps>
+		const overlaysButton = React.Children.only(
 			actionRow.props.children,
-		)[0] as ReactElement<ClickableProps>
-		const overlaysButton = React.Children.toArray(
-			actionRow.props.children,
-		)[1] as ReactElement<ClickableProps>
+		) as ReactElement<ClickableProps>
 
 		const footerChildren = React.Children.toArray(
 			footerRow.props.children,
@@ -323,6 +329,8 @@ describe("OverlayControls", () => {
 				setShowNationBorders={vi.fn()}
 				showNationHierarchy={false}
 				setShowNationHierarchy={vi.fn()}
+				showInfrastructure={false}
+				setShowInfrastructure={vi.fn()}
 				gridSpacing={15}
 				setGridSpacing={vi.fn()}
 				viewMode="globe"
@@ -343,18 +351,19 @@ describe("OverlayControls", () => {
 			generationPanelOpen: false,
 			onToggleGenerationPanel: vi.fn(),
 		})
-		const anchored = React.Children.only(
-			tree.props.children,
-		) as ReactElement<ChildrenProps>
+		const rootChildren = React.Children.toArray(tree.props.children)
+		const topLeft = rootChildren[0] as ReactElement<ChildrenProps>
+		const bottomLeft = rootChildren[1] as ReactElement<ChildrenProps>
 		const actionRow = React.Children.toArray(
-			anchored.props.children,
+			bottomLeft.props.children,
 		)[1] as ReactElement<ChildrenProps>
 		const actionButtons = React.Children.toArray(
 			actionRow.props.children,
 		).filter(Boolean)
 
 		expect(markup).not.toContain("Hide simulation controls")
-		expect(actionButtons).toHaveLength(2)
+		expect(actionButtons).toHaveLength(1)
+		expect(React.Children.toArray(topLeft.props.children)).toHaveLength(1)
 	})
 
 	it("renders copied state and skips unchanged or invalid projection commits", () => {
@@ -379,6 +388,8 @@ describe("OverlayControls", () => {
 				setShowNationBorders={vi.fn()}
 				showNationHierarchy={false}
 				setShowNationHierarchy={vi.fn()}
+				showInfrastructure={false}
+				setShowInfrastructure={vi.fn()}
 				gridSpacing={7}
 				setGridSpacing={setGridSpacing}
 				viewMode="map"
@@ -414,11 +425,10 @@ describe("OverlayControls", () => {
 			codeCopied: true,
 			onCopyCode: vi.fn(),
 		})
-		const anchored = React.Children.only(
-			tree.props.children,
-		) as ReactElement<ChildrenProps>
+		const rootChildren = React.Children.toArray(tree.props.children)
+		const bottomLeft = rootChildren[1] as ReactElement<ChildrenProps>
 		const panelWrapper = React.Children.toArray(
-			anchored.props.children,
+			bottomLeft.props.children,
 		)[0] as ReactElement<ChildrenProps>
 		const panel = React.Children.only(
 			panelWrapper.props.children,
@@ -432,8 +442,8 @@ describe("OverlayControls", () => {
 		const optionGroupChildren = React.Children.toArray(
 			optionGroups.props.children,
 		) as ReactElement<ChildrenProps>[]
-		const gridSection = optionGroupChildren[7]
-		const projectionSection = optionGroupChildren[8]
+		const gridSection = optionGroupChildren[8]
+		const projectionSection = optionGroupChildren[9]
 		const gridRange = React.Children.toArray(
 			gridSection.props.children,
 		)[1] as ReactElement<InputProps>
