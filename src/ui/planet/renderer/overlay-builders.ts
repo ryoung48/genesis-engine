@@ -5,10 +5,11 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
-import { createMapProjection } from "./map-projection"
+import { createMapProjection, MAP_X_SCALE } from "./map-projection"
 import type { OrogenViewMode, RiverData } from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
+const MAP_RIVER_SEAM_THRESHOLD = 2
 
 // Per-depth colors: depth 0 = gold, 1 = orange, 2 = teal, 3 = blue, 4+ = purple
 const HIERARCHY_DEPTH_COLORS: ReadonlyArray<[number, number, number]> = [
@@ -640,20 +641,167 @@ export function buildMapRivers(
 	rivers: RiverData,
 	canvas: HTMLCanvasElement,
 	riverMaterials: LineMaterial[],
+	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	riversVisible: boolean,
 	viewMode: OrogenViewMode,
 ) {
-	const projection = createMapProjection(0, projectionLatitudeDeg)
-	const group = buildRiverGroup(
-		rivers,
-		canvas,
-		riverMaterials,
-		(lonDeg, latDeg) => {
-			const [x, y, z] = projection.projectDegrees(lonDeg, latDeg, 0.003)
-			return [x, y, z]
-		},
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
 	)
+	const group = new THREE.Group()
+	const width = canvas.clientWidth || 1
+	const height = canvas.clientHeight || 1
+	const minWidth = 0.15
+	const maxWidth = 1.2
+	const binStep = 0.3
+	const logMin = Math.log(1 + rivers.minFlow)
+	const logMax = Math.log(1 + rivers.maxFlow)
+	const logRange = logMax - logMin || 1
+	const materialCache = new Map<number, LineMaterial>()
+
+	function getMaterial(lineWidth: number) {
+		const binned = Math.max(
+			minWidth,
+			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
+		)
+		let material = materialCache.get(binned)
+		if (!material) {
+			const t = (binned - minWidth) / (maxWidth - minWidth)
+			material = new LineMaterial({
+				color: 0x0978ab,
+				opacity: 0.55 + t * 0.4,
+				linewidth: binned,
+				transparent: true,
+				depthWrite: false,
+				worldUnits: false,
+			})
+			material.resolution.set(width, height)
+			materialCache.set(binned, material)
+			riverMaterials.push(material)
+		}
+		return material
+	}
+
+	function flowToWidth(flow: number) {
+		const t = Math.max(0, (Math.log(1 + flow) - logMin) / logRange)
+		return minWidth + (maxWidth - minWidth) * t
+	}
+
+	const toBin = (lineWidth: number) =>
+		Math.max(
+			minWidth,
+			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
+		)
+
+	const MAP_LON_SEAM_RAD = MAP_RIVER_SEAM_THRESHOLD / MAP_X_SCALE
+
+	function splitLonLatPoints(
+		points: [number, number, number][],
+		flows: number[],
+	): { points: [number, number, number][]; flows: number[] }[] {
+		if (points.length < 2) return points.length === 0 ? [] : [{ points, flows }]
+		const segments: { points: [number, number, number][]; flows: number[] }[] =
+			[{ points: [points[0]], flows: [flows[0]] }]
+		for (let i = 1; i < points.length; i++) {
+			const current = points[i]
+			const previous = points[i - 1]
+			if (Math.abs(current[0] - previous[0]) > MAP_LON_SEAM_RAD) {
+				segments.push({ points: [current], flows: [flows[i]] })
+				continue
+			}
+			segments[segments.length - 1].points.push(current)
+			segments[segments.length - 1].flows.push(flows[i])
+		}
+		return segments.filter((s) => s.points.length >= 2)
+	}
+
+	function emitRiverSegment(
+		points: [number, number, number][],
+		flows: number[],
+	) {
+		const widths = flows.map((flow) => flowToWidth(flow))
+		let segmentStart = 0
+		let currentBin = toBin(widths[0])
+
+		const emitSegment = (start: number, end: number, binnedWidth: number) => {
+			if (end <= start) return
+			const segmentPositions: number[] = []
+			for (let index = start; index <= end; index++) {
+				segmentPositions.push(...points[index])
+			}
+			if (segmentPositions.length < 6) return
+			const geometry = new LineGeometry()
+			geometry.setPositions(segmentPositions)
+			const line = new Line2(geometry, getMaterial(binnedWidth))
+			line.computeLineDistances()
+			group.add(line)
+		}
+
+		for (let index = 1; index < points.length; index++) {
+			const nextBin = toBin(widths[index])
+			if (nextBin !== currentBin) {
+				emitSegment(segmentStart, index, currentBin)
+				segmentStart = index
+				currentBin = nextBin
+			}
+		}
+		emitSegment(segmentStart, points.length - 1, currentBin)
+	}
+
+	for (const polyline of rivers.lines) {
+		if (polyline.length < 2) continue
+		const flowValues = polyline.map(([, , flow]) => flow)
+
+		const lonLatPoints: [number, number, number][] = polyline.map(
+			([lon, lat]) => {
+				const lonRad = THREE.MathUtils.degToRad(lon)
+				const latRad = THREE.MathUtils.degToRad(lat)
+				return [lonRad, latRad, 0.003]
+			},
+		)
+
+		const segments = splitLonLatPoints(lonLatPoints, flowValues)
+
+		for (const segment of segments) {
+			const projectedPoints = segment.points.map(([lon, lat, z]) => {
+				const [x, y] = projection.projectRadians(lon, lat, z)
+				return [x, y, z] as [number, number, number]
+			})
+
+			if (segment.points.length >= 3) {
+				const controlPoints = projectedPoints.map(
+					([x, y, z]) => new THREE.Vector3(x, y, z),
+				)
+				const curve = new THREE.CatmullRomCurve3(
+					controlPoints,
+					false,
+					"catmullrom",
+					0.5,
+				)
+				const smoothPointCount = segment.points.length * 3
+				const smoothed = curve.getPoints(smoothPointCount)
+				const smoothPositions = smoothed.map(
+					(p) => [p.x, p.y, p.z] as [number, number, number],
+				)
+				const smoothFlows = smoothed.map((_, index) => {
+					const t = index / smoothPointCount
+					const step = t * (segment.points.length - 1)
+					const lower = Math.floor(step)
+					const upper = Math.min(lower + 1, segment.points.length - 1)
+					return (
+						segment.flows[lower] +
+						(segment.flows[upper] - segment.flows[lower]) * (step - lower)
+					)
+				})
+				emitRiverSegment(smoothPositions, smoothFlows)
+			} else {
+				emitRiverSegment(projectedPoints, segment.flows)
+			}
+		}
+	}
+
 	group.visible = riversVisible && viewMode === "map"
 	return group
 }

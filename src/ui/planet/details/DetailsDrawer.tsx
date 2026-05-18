@@ -126,16 +126,23 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 					icon={detailsIcon}
 				>
 					<div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
-						<SegmentedControl
-							options={[
-								{ value: "world", label: "World" },
-								{ value: "nation", label: "Nation" },
-							]}
-							value={tab}
-							onChange={setTab}
-							tone="panel"
-							size="sm"
-						/>
+						<div className="flex items-center justify-between">
+							<SegmentedControl
+								options={[
+									{ value: "world", label: "World" },
+									{ value: "nation", label: "Nation" },
+								]}
+								value={tab}
+								onChange={setTab}
+								tone="panel"
+								size="sm"
+							/>
+							{tab === "nation" && nation && (
+								<span className="font-mono text-[10px] text-slate-400">
+									#{nation.id}
+								</span>
+							)}
+						</div>
 
 						{tab === "world" ? (
 							<WorldDetails

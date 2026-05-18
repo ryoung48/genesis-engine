@@ -78,7 +78,7 @@ export function buildPlanetSliders(state: {
 		},
 		{
 			label: "Pressure",
-			help: "Atmospheric pressure in bars. Lower pressure increases evaporation and cloud formation; higher pressure suppresses it.",
+			help: "Atmospheric pressure in bars. Higher pressure increases water vapor capacity and cloud formation; lower pressure suppresses it.",
 			value: state.pressure,
 			display: `${state.pressure.toFixed(1)} bar`,
 			...SR.pressure,

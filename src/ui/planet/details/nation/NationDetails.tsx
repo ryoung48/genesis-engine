@@ -235,7 +235,6 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 					)
 				}
 			/>
-			<LabeledValueRow label="ID" value={nation ? `#${nation.id}` : "N/A"} />
 			<LabeledValueRow
 				label="Dynasty"
 				value={
@@ -321,6 +320,32 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 					<DetailRow
 						label="Population"
 						value={nation ? formatPopulation(nation.totalPopulation) : "N/A"}
+					/>
+					<LabeledValueRow
+						label="Ruling Culture"
+						value={
+							nation?.cultureDistribution?.[0] ? (
+								<span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-950">
+									<Swatch color={nation.cultureDistribution[0].color} />
+									<span>{nation.cultureDistribution[0].label}</span>
+								</span>
+							) : (
+								"N/A"
+							)
+						}
+					/>
+					<LabeledValueRow
+						label="Ruling Faith"
+						value={
+							nation?.faithDistribution?.[0] ? (
+								<span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-950">
+									<Swatch color={nation.faithDistribution[0].color} />
+									<span>{nation.faithDistribution[0].label}</span>
+								</span>
+							) : (
+								"N/A"
+							)
+						}
 					/>
 					<DistributionChart
 						title="Cultures"

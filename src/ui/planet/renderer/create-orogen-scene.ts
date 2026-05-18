@@ -60,6 +60,20 @@ import type {
 	RiverData,
 } from "./types"
 
+const MAP_REPEAT_WIDTH = 4
+
+function addMapSlideClones(object: THREE.Object3D) {
+	const clones: THREE.Object3D[] = []
+	const cloneL = object.clone()
+	const cloneR = object.clone()
+	cloneL.position.x -= MAP_REPEAT_WIDTH
+	cloneR.position.x += MAP_REPEAT_WIDTH
+	clones.push(cloneL, cloneR)
+	for (const clone of clones) {
+		object.add(clone)
+	}
+}
+
 export function createOrogenScene(
 	canvas: HTMLCanvasElement,
 	initialWorld?: SerializedOrogenWorld,
@@ -322,7 +336,10 @@ export function createOrogenScene(
 			canvas,
 		)
 		if (globeHierarchyOverlay) scene.add(globeHierarchyOverlay)
-		if (mapHierarchyOverlay) scene.add(mapHierarchyOverlay)
+		if (mapHierarchyOverlay) {
+			addMapSlideClones(mapHierarchyOverlay)
+			scene.add(mapHierarchyOverlay)
+		}
 		updateOverlayVisibility()
 	}
 
@@ -353,6 +370,7 @@ export function createOrogenScene(
 		)
 		if (globeSettlements) scene.add(globeSettlements)
 		if (mapSettlements) {
+			addMapSlideClones(mapSettlements)
 			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
 			scene.add(mapSettlements)
 		}
@@ -399,6 +417,7 @@ export function createOrogenScene(
 		]
 		if (globeInfrastructure) scene.add(globeInfrastructure)
 		if (mapInfrastructure) {
+			addMapSlideClones(mapInfrastructure)
 			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
 			scene.add(mapInfrastructure)
 		}
@@ -426,7 +445,10 @@ export function createOrogenScene(
 			nationBordersVisible,
 		)
 		if (globeHoverNationBorder) scene.add(globeHoverNationBorder)
-		if (mapHoverNationBorder) scene.add(mapHoverNationBorder)
+		if (mapHoverNationBorder) {
+			addMapSlideClones(mapHoverNationBorder)
+			scene.add(mapHoverNationBorder)
+		}
 		updateOverlayVisibility()
 	}
 
@@ -461,7 +483,10 @@ export function createOrogenScene(
 			},
 		)
 		if (globeSelectedProvinceBorder) scene.add(globeSelectedProvinceBorder)
-		if (mapSelectedProvinceBorder) scene.add(mapSelectedProvinceBorder)
+		if (mapSelectedProvinceBorder) {
+			addMapSlideClones(mapSelectedProvinceBorder)
+			scene.add(mapSelectedProvinceBorder)
+		}
 		updateOverlayVisibility()
 	}
 
@@ -587,6 +612,7 @@ export function createOrogenScene(
 				wireframeVisible,
 				currentViewMode,
 			)
+			addMapSlideClones(mapWireframe)
 			scene.add(mapWireframe)
 		}
 		if (gridVisible) {
@@ -598,6 +624,7 @@ export function createOrogenScene(
 				currentViewMode,
 			)
 			scene.add(globeGrid)
+			addMapSlideClones(mapGrid)
 			scene.add(mapGrid)
 		}
 		if (thermalEquatorPoints) {
@@ -611,6 +638,7 @@ export function createOrogenScene(
 				currentViewMode,
 			)
 			scene.add(globeThermalEquator)
+			addMapSlideClones(mapThermalEquator)
 			scene.add(mapThermalEquator)
 		}
 		if (riversVisible && riverData) {
@@ -625,11 +653,13 @@ export function createOrogenScene(
 				riverData,
 				canvas,
 				riverMaterials,
+				currentMapCenterLongitudeDeg,
 				currentMapProjectionLatitudeDeg,
 				riversVisible,
 				currentViewMode,
 			)
 			scene.add(globeRivers)
+			addMapSlideClones(mapRivers)
 			scene.add(mapRivers)
 		}
 		rebuildHoveredNationBorder()
@@ -752,7 +782,10 @@ export function createOrogenScene(
 				currentMapCenterLongitudeDeg,
 				currentMapProjectionLatitudeDeg,
 			)
-			if (mapOccupationOverlay) scene.add(mapOccupationOverlay)
+			if (mapOccupationOverlay) {
+				addMapSlideClones(mapOccupationOverlay)
+				scene.add(mapOccupationOverlay)
+			}
 		}
 		rebuildOverlays()
 		setViewMode(currentViewMode)
@@ -1400,6 +1433,7 @@ export function createOrogenScene(
 		mapLine2.visible = currentViewMode === "map"
 		if (mapMesh) mapLine2.position.copy(mapMesh.position)
 		mapMeasureLine = mapLine2 as unknown as THREE.Line
+		addMapSlideClones(mapMeasureLine)
 		scene.add(mapMeasureLine)
 
 		globeMeasureDots = new THREE.Group()
@@ -1440,6 +1474,7 @@ export function createOrogenScene(
 		}
 		mapMeasureDots.visible = currentViewMode === "map"
 		if (mapMesh) mapMeasureDots.position.copy(mapMesh.position)
+		addMapSlideClones(mapMeasureDots)
 		scene.add(mapMeasureDots)
 	}
 

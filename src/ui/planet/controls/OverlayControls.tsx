@@ -315,13 +315,13 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										options={[
 											{
 												value: "metric",
-												label: <span className="font-mono uppercase">km</span>,
+												label: <span className="font-mono uppercase">me</span>,
 												title: "Metric units",
 												ariaLabel: "Metric units",
 											},
 											{
 												value: "imperial",
-												label: <span className="font-mono uppercase">mi</span>,
+												label: <span className="font-mono uppercase">im</span>,
 												title: "Imperial units",
 												ariaLabel: "Imperial units",
 											},
