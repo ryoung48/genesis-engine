@@ -22,5 +22,5 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 
 ## References
 
-- For any UI or UX work, follow `src/components/UI.md`.
+- For any UI or UX work, follow `src/ui/components/UI.md`.
 - For testing requirements and test-writing guidance, follow `testing.md`. 

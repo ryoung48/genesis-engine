@@ -144,7 +144,7 @@ describe("OverlayControls", () => {
 			/>,
 		)
 
-		expect(markup).toContain('title="Show settings"')
+		expect(markup).toContain("Show settings")
 		expect(markup).not.toContain(">Overlays<")
 	})
 
@@ -207,7 +207,10 @@ describe("OverlayControls", () => {
 		const optionGroups = React.Children.toArray(
 			floatingPanel.props.children,
 		)[1] as ReactElement<ChildrenProps>
-		const copyButton = header.props.action as ReactElement<ClickableProps>
+		const copyTooltip = header.props.action as ReactElement<ChildrenProps>
+		const copyButton = React.Children.only(
+			copyTooltip.props.children,
+		) as ReactElement<ClickableProps>
 		const optionGroupChildren = React.Children.toArray(
 			optionGroups.props.children,
 		) as ReactElement<ChildrenProps>[]
@@ -220,11 +223,17 @@ describe("OverlayControls", () => {
 		const projectionSection = optionGroupChildren[9]
 		const debugLabel = optionGroupChildren[10]
 		const footerRow = optionGroupChildren[11]
-		const generationButton = React.Children.only(
+		const generationTooltip = React.Children.only(
 			topLeft.props.children,
+		) as ReactElement<ChildrenProps>
+		const generationButton = React.Children.only(
+			generationTooltip.props.children,
 		) as ReactElement<ClickableProps>
-		const overlaysButton = React.Children.only(
+		const overlaysTooltip = React.Children.only(
 			actionRow.props.children,
+		) as ReactElement<ChildrenProps>
+		const overlaysButton = React.Children.only(
+			overlaysTooltip.props.children,
 		) as ReactElement<ClickableProps>
 
 		const footerChildren = React.Children.toArray(

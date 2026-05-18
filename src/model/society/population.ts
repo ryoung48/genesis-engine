@@ -166,7 +166,7 @@ export function computePopulation(
 	for (let i = 0; i < count; i++) {
 		habitabilityScore += cellAreaKm2 * habitability[i]
 	}
-	habitabilityScore /= 83302728.146
+	habitabilityScore /= 81234131.618
 
 	const totalPop = 215e6 * habitabilityScore
 

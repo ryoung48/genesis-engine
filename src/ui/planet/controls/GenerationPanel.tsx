@@ -11,6 +11,7 @@ import {
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model"
+import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { getGenerationPreviewToggleLabel } from "../screen/generation/generation-preview"
 import type { SliderDef } from "../screen/generation/sliders"
 
@@ -63,14 +64,11 @@ function renderSliderGroup(
 					className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
 				>
 					<div className="flex justify-between items-baseline gap-3">
-						<div className="group relative flex items-center min-w-0">
+						<UITooltip content={p.help} position="top">
 							<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
 								{p.label}
 							</label>
-							<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-								{p.help}
-							</div>
-						</div>
+						</UITooltip>
 						<span className="font-mono text-[10px] text-slate-400">
 							{p.display}
 						</span>
@@ -501,14 +499,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
 									>
 										<div className="flex justify-between items-baseline gap-3">
-											<div className="group relative flex items-center min-w-0">
+											<UITooltip content={p.help} position="top">
 												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
 													{p.label}
 												</label>
-												<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-													{p.help}
-												</div>
-											</div>
+											</UITooltip>
 											<span className="font-mono text-[10px] text-slate-400">
 												{p.display}
 											</span>
@@ -527,14 +522,14 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								))}
 							<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
 								<div className="flex justify-between items-baseline gap-3">
-									<div className="group relative flex items-center min-w-0">
+									<UITooltip
+										content="One side always faces the star"
+										position="top"
+									>
 										<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
 											Tidally Locked
 										</label>
-										<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-											One side always faces the star
-										</div>
-									</div>
+									</UITooltip>
 									<span className="font-mono text-[10px] text-slate-400">
 										{tidallyLocked ? "Yes" : "No"}
 									</span>
@@ -563,14 +558,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
 									>
 										<div className="flex justify-between items-baseline gap-3">
-											<div className="group relative flex items-center min-w-0">
+											<UITooltip content={p.help} position="top">
 												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
 													{p.label}
 												</label>
-												<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-													{p.help}
-												</div>
-											</div>
+											</UITooltip>
 											<span className="font-mono text-[10px] text-slate-400">
 												{p.display}
 											</span>
@@ -595,14 +587,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
 									>
 										<div className="flex justify-between items-baseline gap-3">
-											<div className="group relative flex items-center min-w-0">
+											<UITooltip content={p.help} position="top">
 												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
 													{p.label}
 												</label>
-												<div className="pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-													{p.help}
-												</div>
-											</div>
+											</UITooltip>
 											<span className="font-mono text-[10px] text-slate-400">
 												{p.display}
 											</span>

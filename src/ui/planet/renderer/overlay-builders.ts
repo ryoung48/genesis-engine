@@ -1,6 +1,4 @@
 import * as THREE from "three"
-import { Line2 } from "three/examples/jsm/lines/Line2.js"
-import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
@@ -499,30 +497,6 @@ function buildRiverGroup(
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
 	const logRange = logMax - logMin || 1
-	const materialCache = new Map<number, LineMaterial>()
-
-	function getMaterial(lineWidth: number) {
-		const binned = Math.max(
-			minWidth,
-			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
-		)
-		let material = materialCache.get(binned)
-		if (!material) {
-			const t = (binned - minWidth) / (maxWidth - minWidth)
-			material = new LineMaterial({
-				color: 0x0978ab,
-				opacity: 0.55 + t * 0.4,
-				linewidth: binned,
-				transparent: true,
-				depthWrite: false,
-				worldUnits: false,
-			})
-			material.resolution.set(width, height)
-			materialCache.set(binned, material)
-			riverMaterials.push(material)
-		}
-		return material
-	}
 
 	function flowToWidth(flow: number) {
 		const t = Math.max(0, (Math.log(1 + flow) - logMin) / logRange)
@@ -534,6 +508,42 @@ function buildRiverGroup(
 			minWidth,
 			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
 		)
+
+	const batchedPositions = new Map<number, number[]>()
+
+	const appendSegments = (
+		positions: [number, number, number][],
+		flows: number[],
+	) => {
+		if (positions.length < 2) return
+		const widths = flows.map((flow) => flowToWidth(flow))
+		let segmentStart = 0
+		let currentBin = toBin(widths[0])
+
+		const flushSegment = (start: number, end: number, binnedWidth: number) => {
+			if (end <= start) return
+			let binPositions = batchedPositions.get(binnedWidth)
+			if (!binPositions) {
+				binPositions = []
+				batchedPositions.set(binnedWidth, binPositions)
+			}
+			for (let index = start; index < end; index++) {
+				const a = positions[index]
+				const b = positions[index + 1]
+				binPositions.push(a[0], a[1], a[2], b[0], b[1], b[2])
+			}
+		}
+
+		for (let index = 1; index < positions.length; index++) {
+			const nextBin = toBin(widths[index])
+			if (nextBin !== currentBin) {
+				flushSegment(segmentStart, index, currentBin)
+				segmentStart = index
+				currentBin = nextBin
+			}
+		}
+		flushSegment(segmentStart, positions.length - 1, currentBin)
+	}
 
 	for (const polyline of rivers.lines) {
 		if (polyline.length < 2) continue
@@ -572,33 +582,28 @@ function buildRiverGroup(
 			smoothFlows = flowValues
 		}
 
-		const widths = smoothFlows.map((flow) => flowToWidth(flow))
-		let segmentStart = 0
-		let currentBin = toBin(widths[0])
+		appendSegments(positions, smoothFlows)
+	}
 
-		const emitSegment = (start: number, end: number, binnedWidth: number) => {
-			if (end <= start) return
-			const segmentPositions: number[] = []
-			for (let index = start; index <= end; index++) {
-				segmentPositions.push(...positions[index])
-			}
-			if (segmentPositions.length < 6) return
-			const geometry = new LineGeometry()
-			geometry.setPositions(segmentPositions)
-			const line = new Line2(geometry, getMaterial(binnedWidth))
-			line.computeLineDistances()
-			group.add(line)
-		}
+	for (const [binnedWidth, positions] of batchedPositions) {
+		if (positions.length < 6) continue
+		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
+		const material = new LineMaterial({
+			color: 0x0978ab,
+			opacity: 0.55 + t * 0.4,
+			linewidth: binnedWidth,
+			transparent: true,
+			depthWrite: false,
+			worldUnits: false,
+		})
+		material.resolution.set(width, height)
+		riverMaterials.push(material)
 
-		for (let index = 1; index < positions.length; index++) {
-			const nextBin = toBin(widths[index])
-			if (nextBin !== currentBin) {
-				emitSegment(segmentStart, index, currentBin)
-				segmentStart = index
-				currentBin = nextBin
-			}
-		}
-		emitSegment(segmentStart, positions.length - 1, currentBin)
+		const geometry = new LineSegmentsGeometry()
+		geometry.setPositions(positions)
+		const line = new LineSegments2(geometry, material)
+		line.computeLineDistances()
+		group.add(line)
 	}
 
 	return group
@@ -659,30 +664,6 @@ export function buildMapRivers(
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
 	const logRange = logMax - logMin || 1
-	const materialCache = new Map<number, LineMaterial>()
-
-	function getMaterial(lineWidth: number) {
-		const binned = Math.max(
-			minWidth,
-			Math.min(maxWidth, Math.round(lineWidth / binStep) * binStep),
-		)
-		let material = materialCache.get(binned)
-		if (!material) {
-			const t = (binned - minWidth) / (maxWidth - minWidth)
-			material = new LineMaterial({
-				color: 0x0978ab,
-				opacity: 0.55 + t * 0.4,
-				linewidth: binned,
-				transparent: true,
-				depthWrite: false,
-				worldUnits: false,
-			})
-			material.resolution.set(width, height)
-			materialCache.set(binned, material)
-			riverMaterials.push(material)
-		}
-		return material
-	}
 
 	function flowToWidth(flow: number) {
 		const t = Math.max(0, (Math.log(1 + flow) - logMin) / logRange)
@@ -717,37 +698,40 @@ export function buildMapRivers(
 		return segments.filter((s) => s.points.length >= 2)
 	}
 
-	function emitRiverSegment(
+	const batchedPositions = new Map<number, number[]>()
+
+	const appendSegments = (
 		points: [number, number, number][],
 		flows: number[],
-	) {
+	) => {
+		if (points.length < 2) return
 		const widths = flows.map((flow) => flowToWidth(flow))
 		let segmentStart = 0
 		let currentBin = toBin(widths[0])
 
-		const emitSegment = (start: number, end: number, binnedWidth: number) => {
+		const flushSegment = (start: number, end: number, binnedWidth: number) => {
 			if (end <= start) return
-			const segmentPositions: number[] = []
-			for (let index = start; index <= end; index++) {
-				segmentPositions.push(...points[index])
+			let binPositions = batchedPositions.get(binnedWidth)
+			if (!binPositions) {
+				binPositions = []
+				batchedPositions.set(binnedWidth, binPositions)
 			}
-			if (segmentPositions.length < 6) return
-			const geometry = new LineGeometry()
-			geometry.setPositions(segmentPositions)
-			const line = new Line2(geometry, getMaterial(binnedWidth))
-			line.computeLineDistances()
-			group.add(line)
+			for (let index = start; index < end; index++) {
+				const a = points[index]
+				const b = points[index + 1]
+				binPositions.push(a[0], a[1], a[2], b[0], b[1], b[2])
+			}
 		}
 
 		for (let index = 1; index < points.length; index++) {
 			const nextBin = toBin(widths[index])
 			if (nextBin !== currentBin) {
-				emitSegment(segmentStart, index, currentBin)
+				flushSegment(segmentStart, index, currentBin)
 				segmentStart = index
 				currentBin = nextBin
 			}
 		}
-		emitSegment(segmentStart, points.length - 1, currentBin)
+		flushSegment(segmentStart, points.length - 1, currentBin)
 	}
 
 	for (const polyline of rivers.lines) {
@@ -795,11 +779,32 @@ export function buildMapRivers(
 						(segment.flows[upper] - segment.flows[lower]) * (step - lower)
 					)
 				})
-				emitRiverSegment(smoothPositions, smoothFlows)
+				appendSegments(smoothPositions, smoothFlows)
 			} else {
-				emitRiverSegment(projectedPoints, segment.flows)
+				appendSegments(projectedPoints, segment.flows)
 			}
 		}
+	}
+
+	for (const [binnedWidth, positions] of batchedPositions) {
+		if (positions.length < 6) continue
+		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
+		const material = new LineMaterial({
+			color: 0x0978ab,
+			opacity: 0.55 + t * 0.4,
+			linewidth: binnedWidth,
+			transparent: true,
+			depthWrite: false,
+			worldUnits: false,
+		})
+		material.resolution.set(width, height)
+		riverMaterials.push(material)
+
+		const geometry = new LineSegmentsGeometry()
+		geometry.setPositions(positions)
+		const line = new LineSegments2(geometry, material)
+		line.computeLineDistances()
+		group.add(line)
 	}
 
 	group.visible = riversVisible && viewMode === "map"

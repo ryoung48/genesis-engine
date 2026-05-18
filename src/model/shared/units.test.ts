@@ -8,6 +8,7 @@ import {
 	getSubstellarDir,
 	isRetrogradeObliquity,
 	meanEdgeLengthKm,
+	regionDistanceKm,
 	regionPathLengthKm,
 } from "./units"
 
@@ -104,6 +105,15 @@ describe("meanEdgeLengthKm", () => {
 })
 
 describe("regionPathLengthKm", () => {
+	it("returns direct great-circle arc length between two regions", () => {
+		const r_xyz = new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0])
+
+		expect(regionDistanceKm(r_xyz, 0, 1, 1000)).toBeCloseTo(
+			(Math.PI / 2) * 1000,
+			5,
+		)
+	})
+
 	it("sums great-circle arc lengths across the path", () => {
 		const r_xyz = new Float32Array([1, 0, 0, 0, 1, 0, -1, 0, 0])
 		const lengthKm = regionPathLengthKm(r_xyz, [0, 1, 2], 1000)

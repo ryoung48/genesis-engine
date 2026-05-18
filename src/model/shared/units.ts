@@ -75,16 +75,28 @@ export function regionPathLengthKm(
 ): number {
 	let totalKm = 0
 	for (let i = 1; i < pathRegions.length; i++) {
-		const fromRegion = pathRegions[i - 1]
-		const toRegion = pathRegions[i]
-		if (fromRegion < 0 || toRegion < 0 || fromRegion === toRegion) continue
-		const fromOffset = fromRegion * 3
-		const toOffset = toRegion * 3
-		const cosTheta =
-			r_xyz[fromOffset] * r_xyz[toOffset] +
-			r_xyz[fromOffset + 1] * r_xyz[toOffset + 1] +
-			r_xyz[fromOffset + 2] * r_xyz[toOffset + 2]
-		totalKm += Math.acos(Math.max(-1, Math.min(1, cosTheta))) * planetRadiusKm
+		totalKm += regionDistanceKm(
+			r_xyz,
+			pathRegions[i - 1],
+			pathRegions[i],
+			planetRadiusKm,
+		)
 	}
 	return totalKm
+}
+
+export function regionDistanceKm(
+	r_xyz: Float32Array,
+	fromRegion: number,
+	toRegion: number,
+	planetRadiusKm: number = DEFAULT_PLANET_RADIUS_KM,
+): number {
+	if (fromRegion < 0 || toRegion < 0 || fromRegion === toRegion) return 0
+	const fromOffset = fromRegion * 3
+	const toOffset = toRegion * 3
+	const cosTheta =
+		r_xyz[fromOffset] * r_xyz[toOffset] +
+		r_xyz[fromOffset + 1] * r_xyz[toOffset + 1] +
+		r_xyz[fromOffset + 2] * r_xyz[toOffset + 2]
+	return Math.acos(Math.max(-1, Math.min(1, cosTheta))) * planetRadiusKm
 }

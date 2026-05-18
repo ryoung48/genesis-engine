@@ -2,7 +2,6 @@ import React from "react"
 import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
-import { Button } from "@/ui/components/primitives/Button"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
 import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
@@ -11,6 +10,7 @@ import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
 import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { OrogenViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
@@ -104,38 +104,40 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	}
 	const headerAction =
 		canCopyCode && onCopyCode ? (
-			<Button
-				onClick={onCopyCode}
-				tone="overlay"
-				shape="pill"
-				size="sm"
-				className={
-					codeCopied
-						? "inline-flex shrink-0 items-center gap-1.5 border-emerald-300/60 bg-emerald-400/20 text-emerald-100 shadow-none"
-						: "inline-flex shrink-0 items-center gap-1.5 shadow-none"
-				}
-			>
-				{codeCopied ? (
-					<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
-				) : (
-					<CopyIcon className="h-3.5 w-3.5" />
-				)}
-				<span>{codeCopied ? "Copied" : "Copy seed"}</span>
-			</Button>
+			<Tooltip content={codeCopied ? "Copied" : "Copy seed"} position="top">
+				<IconButton
+					onClick={onCopyCode}
+					tone="overlay"
+					shape="pill"
+					size="sm"
+					className={
+						codeCopied
+							? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
+							: "shadow-none"
+					}
+				>
+					{codeCopied ? (
+						<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
+					) : (
+						<CopyIcon className="h-3.5 w-3.5" />
+					)}
+				</IconButton>
+			</Tooltip>
 		) : undefined
 
 	return (
 		<div className="absolute inset-0 z-20 pointer-events-none">
 			<div className="absolute top-3 left-3 pointer-events-auto">
 				{!generationPanelOpen && onToggleGenerationPanel && (
-					<IconButton
-						onClick={onToggleGenerationPanel}
-						title="Show generation panel"
-						tone="overlay"
-						size="sm"
-					>
-						<LightningIcon className="h-4 w-4 text-white" />
-					</IconButton>
+					<Tooltip content="Show generation panel" position="bottom">
+						<IconButton
+							onClick={onToggleGenerationPanel}
+							tone="overlay"
+							size="sm"
+						>
+							<LightningIcon className="h-4 w-4 text-white" />
+						</IconButton>
+					</Tooltip>
 				)}
 			</div>
 			<div className="absolute bottom-3 left-3 flex flex-col items-start gap-2">
@@ -338,17 +340,21 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 					</div>
 				</div>
 				<div className="pointer-events-auto">
-					<IconButton
-						onClick={() => setOverlaysExpanded((value) => !value)}
-						title={overlaysExpanded ? "Hide settings" : "Show settings"}
-						tone="overlay"
-						selected={overlaysExpanded}
-						shape="rounded"
-						size="sm"
-						className="shadow-lg backdrop-blur-md"
+					<Tooltip
+						content={overlaysExpanded ? "Hide settings" : "Show settings"}
+						position="top"
 					>
-						<GearIcon className="h-4 w-4" />
-					</IconButton>
+						<IconButton
+							onClick={() => setOverlaysExpanded((value) => !value)}
+							tone="overlay"
+							selected={overlaysExpanded}
+							shape="rounded"
+							size="sm"
+							className="shadow-lg backdrop-blur-md"
+						>
+							<GearIcon className="h-4 w-4" />
+						</IconButton>
+					</Tooltip>
 				</div>
 			</div>
 		</div>

@@ -34,8 +34,8 @@ describe("DetailsDrawer", () => {
 	it("renders a reopen button when the drawer is closed", () => {
 		const markup = _renderDrawer({ open: false })
 
-		expect(markup).toContain('title="Show details"')
-		expect(markup).toContain("absolute right-3 bottom-3")
+		expect(markup).toContain("Show details")
+		expect(markup).toContain("absolute right-3 top-3")
 		expect(markup).not.toContain("Hide details")
 		expect(markup).not.toContain("Start simulation")
 	})

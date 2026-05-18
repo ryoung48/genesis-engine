@@ -1,5 +1,5 @@
 import { MinHeap } from "../../shared/min-heap"
-import { regionPathLengthKm } from "../../shared/units"
+import { regionDistanceKm, regionPathLengthKm } from "../../shared/units"
 import { buildUrquhartEdgesFromFlat } from "../../shared/urquhart"
 import {
 	ROUTE_LAND_MAJOR,
@@ -513,7 +513,7 @@ function findSeaPathsToTargets(
 	state: HistoryState,
 	workspace: SearchWorkspace,
 	startRegion: number,
-	targetRegions: number[],
+	targetRegions: ArrayLike<number>,
 	waterLandmark: number,
 	waterEdgeUsed: Set<number>,
 	waterDepthPenalty: Float32Array,
@@ -531,7 +531,8 @@ function findSeaPathsToTargets(
 	const heap = workspace.heap
 	heap.clear()
 	let remainingTargets = 0
-	for (const region of targetRegions) {
+	for (let i = 0; i < targetRegions.length; i++) {
+		const region = targetRegions[i] ?? -1
 		if (region < 0) continue
 		if (workspace.targetStamp[region] !== stamp) {
 			workspace.targetStamp[region] = stamp
@@ -607,6 +608,16 @@ function reconstructPathFromTree(
 	path.push(startRegion)
 	path.reverse()
 	return path
+}
+
+function computeSeaRouteMaxLengthKm(
+	sourcePopulation: number,
+	targetPopulation: number,
+): number {
+	return sourcePopulation < ROUTE_TUNING.sea.shortRouteMaxPop &&
+		targetPopulation < ROUTE_TUNING.sea.shortRouteMaxPop
+		? ROUTE_TUNING.sea.shortRouteMaxLengthKm
+		: ROUTE_TUNING.sea.maxLengthKm
 }
 
 function collectSeaNeighborPairs(
@@ -736,6 +747,16 @@ function appendLandRoutes(
 				provincePairSpan,
 			)
 			if (blockedPairs.has(provincePairKey)) continue
+			if (
+				regionDistanceKm(
+					state.r_xyz,
+					source.region,
+					target.region,
+					planetRadiusKm,
+				) > maxLengthKm
+			) {
+				continue
+			}
 			const pathRegions = findLandPath(
 				state,
 				workspace,
@@ -784,6 +805,11 @@ function appendSeaRoutes(
 ): void {
 	for (const { waterLandmark, candidates } of candidateGroups) {
 		if (candidates.length < 2) continue
+		const candidatePopulation = new Float32Array(candidates.length)
+		for (let i = 0; i < candidates.length; i++) {
+			candidatePopulation[i] =
+				urbanPopulation[candidates[i]?.province ?? -1] ?? 0
+		}
 		const candidatePairs = collectSeaNeighborPairs(
 			state,
 			waterLandmark,
@@ -791,35 +817,68 @@ function appendSeaRoutes(
 			waterDepthPenalty,
 			neighborWorkspace,
 		)
-		const targetsBySource = Array.from(
-			{ length: candidates.length },
-			() => [] as number[],
-		)
-		for (const [sourceIndex, targetIndex] of candidatePairs) {
-			targetsBySource[sourceIndex]?.push(targetIndex)
-		}
-		for (
-			let sourceIndex = 0;
-			sourceIndex < targetsBySource.length;
-			sourceIndex++
-		) {
-			const targetIndexes = targetsBySource[sourceIndex]
-			if (!targetIndexes || targetIndexes.length === 0) continue
+		const targetIndexScratch = new Int32Array(candidatePairs.length)
+		const targetPortScratch = new Int32Array(candidatePairs.length)
+		const maxLengthScratch = new Float32Array(candidatePairs.length)
+		const singleTargetRegion = new Int32Array(1)
+		for (let pairIndex = 0; pairIndex < candidatePairs.length; ) {
+			const sourceIndex = candidatePairs[pairIndex]?.[0] ?? -1
+			if (sourceIndex < 0) {
+				pairIndex++
+				continue
+			}
 			const source = candidates[sourceIndex]
-			const searchStamp = findSeaPathsToTargets(
-				state,
-				workspace,
-				source.portRegion,
-				targetIndexes.map(
-					(targetIndex) => candidates[targetIndex]?.portRegion ?? -1,
-				),
-				waterLandmark,
-				seaUsage,
-				waterDepthPenalty,
-				regionPairSpan,
-			)
-			for (const targetIndex of targetIndexes) {
+			const sourcePop = candidatePopulation[sourceIndex] ?? 0
+			let routableTargetCount = 0
+			while (
+				pairIndex < candidatePairs.length &&
+				(candidatePairs[pairIndex]?.[0] ?? -1) === sourceIndex
+			) {
+				const targetIndex = candidatePairs[pairIndex]?.[1] ?? -1
+				pairIndex++
+				if (targetIndex < 0) continue
 				const target = candidates[targetIndex]
+				const targetPop = candidatePopulation[targetIndex] ?? 0
+				const maxLen = computeSeaRouteMaxLengthKm(sourcePop, targetPop)
+				if (
+					Math.max(
+						regionDistanceKm(
+							state.r_xyz,
+							source.anchorRegion,
+							target.anchorRegion,
+							planetRadiusKm,
+						),
+						regionDistanceKm(
+							state.r_xyz,
+							source.portRegion,
+							target.portRegion,
+							planetRadiusKm,
+						),
+					) > maxLen
+				) {
+					continue
+				}
+				targetIndexScratch[routableTargetCount] = targetIndex
+				targetPortScratch[routableTargetCount] = target.portRegion
+				maxLengthScratch[routableTargetCount] = maxLen
+				routableTargetCount++
+			}
+			if (routableTargetCount === 0) continue
+			for (let i = 0; i < routableTargetCount; i++) {
+				const targetIndex = targetIndexScratch[i] ?? -1
+				const target = candidates[targetIndex]
+				const maxLen = maxLengthScratch[i] ?? 0
+				singleTargetRegion[0] = targetPortScratch[i] ?? -1
+				const searchStamp = findSeaPathsToTargets(
+					state,
+					workspace,
+					source.portRegion,
+					singleTargetRegion,
+					waterLandmark,
+					seaUsage,
+					waterDepthPenalty,
+					regionPairSpan,
+				)
 				const waterPath = reconstructPathFromTree(
 					workspace,
 					source.portRegion,
@@ -837,13 +896,6 @@ function appendSeaRoutes(
 					pathRegions,
 					planetRadiusKm,
 				)
-				const sourcePop = urbanPopulation[source.province] ?? 0
-				const targetPop = urbanPopulation[target.province] ?? 0
-				const maxLen =
-					sourcePop < ROUTE_TUNING.sea.shortRouteMaxPop &&
-					targetPop < ROUTE_TUNING.sea.shortRouteMaxPop
-						? ROUTE_TUNING.sea.shortRouteMaxLengthKm
-						: ROUTE_TUNING.sea.maxLengthKm
 				if (lengthKm > maxLen) continue
 				routes.push({
 					fromProvince: source.province,

@@ -3,6 +3,7 @@ import type { HistoryNote } from "@/model/history"
 import { DrawerShell } from "@/ui/components/composites/DrawerShell"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import {
 	type NationSection,
 	resolveDrawerStateOnOpen,
@@ -104,18 +105,19 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 
 	return (
 		<>
-			<div className="pointer-events-none absolute right-3 bottom-3 z-20">
+			<div className="pointer-events-none absolute right-3 top-3 z-20">
 				{!open ? (
-					<IconButton
-						onClick={onToggle}
-						title="Show details"
-						tone="overlay"
-						shape="rounded"
-						size="sm"
-						className="pointer-events-auto shadow-lg backdrop-blur-md"
-					>
-						{detailsIcon}
-					</IconButton>
+					<Tooltip content="Show details" position="bottom" align="end">
+						<IconButton
+							onClick={onToggle}
+							tone="overlay"
+							shape="rounded"
+							size="sm"
+							className="pointer-events-auto shadow-lg backdrop-blur-md"
+						>
+							{detailsIcon}
+						</IconButton>
+					</Tooltip>
 				) : null}
 			</div>
 			{open ? (
