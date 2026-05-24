@@ -567,7 +567,9 @@ export function buildMapOccupationOverlay(
 			varying vec2 vStripePos;
 			void main() {
 				if (vOverlayMask < 0.5) discard;
-				gl_FragColor = vec4(0.0, 0.0, 0.0, 0.9);
+				float stripe = fract((vStripePos.x + vStripePos.y) * 150.0);
+				if (stripe <= 0.25 || stripe >= 0.75) discard;
+				gl_FragColor = vec4(vOverlayColor, 0.9);
 			}
 		`,
 	})

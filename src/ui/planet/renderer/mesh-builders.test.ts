@@ -264,6 +264,14 @@ describe("mesh-builders", () => {
 				(overlayMask as THREE.BufferAttribute).array as Float32Array,
 			).some((value) => value === 1),
 		).toBe(true)
+		const overlayMaterial = overlayMesh?.material
+		expect(overlayMaterial).toBeInstanceOf(THREE.ShaderMaterial)
+		expect((overlayMaterial as THREE.ShaderMaterial).fragmentShader).toContain(
+			"gl_FragColor = vec4(vOverlayColor, 0.9);",
+		)
+		expect((overlayMaterial as THREE.ShaderMaterial).fragmentShader).toContain(
+			"if (stripe <= 0.25 || stripe >= 0.75) discard;",
+		)
 	})
 
 	it("builds wrapped map wireframes in map view", () => {

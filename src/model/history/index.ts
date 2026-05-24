@@ -75,14 +75,14 @@ export function initHistory(params: {
 		),
 	)
 
+	timed("initHistory:initDiplomacy", params.timings, () =>
+		initDiplomacy(state, rng),
+	)
 	timed("initHistory:initWar", params.timings, () => initWar(state, rng))
 	timed("initHistory:initSuccession", params.timings, () =>
 		initSuccession(state, rng),
 	)
 	timed("initHistory:initTax", params.timings, () => initTax(state, rng))
-	timed("initHistory:initDiplomacy", params.timings, () =>
-		initDiplomacy(state, rng),
-	)
 	timed("initHistory:initPopulation", params.timings, () =>
 		initPopulation(state, rng),
 	)

@@ -26,7 +26,11 @@ import type { ColorMode } from "./colors"
 import { climateZoneColor, vegetationColor } from "./colors"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
-import { type MeasureMode, OverlayControls } from "./controls/OverlayControls"
+import {
+	type ExportWidthPreset,
+	type MeasureMode,
+	OverlayControls,
+} from "./controls/OverlayControls"
 import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
 import { createDrawerNationClickHandler } from "./details/nation-clicks"
@@ -170,6 +174,32 @@ function buildDistribution(
 		.filter((bucket) => bucket.count > 0)
 }
 
+function buildExportTimestamp(date: Date): string {
+	return date.toISOString().replace(/[:.]/g, "-")
+}
+
+function sanitizeExportIdentity(
+	value: string | null | undefined,
+): string | null {
+	if (!value) return null
+	const sanitized = value
+		.toLowerCase()
+		.replace(/[^a-z0-9-]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "")
+	return sanitized.length > 0 ? sanitized : null
+}
+
+export function buildMapExportFilename(
+	planetCode: string | null | undefined,
+	width: number,
+	date: Date = new Date(),
+): string {
+	const identity =
+		sanitizeExportIdentity(planetCode) ?? buildExportTimestamp(date)
+	return `genesis-map-${identity}-${width}w.png`
+}
+
 export const OrogenView: React.FC = () => {
 	const makeRandomSeed = useCallback(
 		() => Math.floor(Math.random() * SEED_MAX),
@@ -181,7 +211,6 @@ export const OrogenView: React.FC = () => {
 	const sceneRef = useRef<OrogenScene | null>(null)
 	const workerRef = useRef<Worker | null>(null)
 	const lastWorldRef = useRef<SerializedOrogenWorld | null>(null)
-	const mapCenterLongitudeValueRef = useRef<HTMLSpanElement>(null)
 	const hoverCardRef = useRef<HTMLDivElement>(null)
 	const initialViewPrefs =
 		typeof window === "undefined"
@@ -213,10 +242,10 @@ export const OrogenView: React.FC = () => {
 	const [viewMode, setViewMode] = useState<OrogenViewMode>(
 		initialViewPrefs.viewMode,
 	)
-	const [mapCenterLongitude] = useState(0)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
 	)
+	const [exportCenterLongitude, setExportCenterLongitude] = useState(0)
 	const [draftMapProjectionLatitude, setDraftMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
 	)
@@ -369,6 +398,13 @@ export const OrogenView: React.FC = () => {
 	const [codeInputDirty, setCodeInputDirty] = useState(false)
 	const [codeError, setCodeError] = useState(false)
 	const [codeCopied, setCodeCopied] = useState(false)
+	const [exportWidthPreset, setExportWidthPreset] =
+		useState<ExportWidthPreset>("8192")
+	const [exportProgress, setExportProgress] = useState<{
+		percent: number
+		label: string
+	} | null>(null)
+	const [exportError, setExportError] = useState<string | null>(null)
 
 	// Planet params
 	const [numPoints, setNumPoints] = useState(
@@ -1387,6 +1423,10 @@ export const OrogenView: React.FC = () => {
 		sceneRef.current?.setMapProjectionLatitude(mapProjectionLatitude)
 	}, [mapProjectionLatitude])
 	useEffect(() => {
+		sceneRef.current?.setMapCenterLongitude(exportCenterLongitude)
+		sceneRef.current?.commitMapCenterLongitude()
+	}, [exportCenterLongitude])
+	useEffect(() => {
 		setDraftMapProjectionLatitude(mapProjectionLatitude)
 	}, [mapProjectionLatitude])
 	useEffect(() => {
@@ -1435,17 +1475,6 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setElevationVisible(showElevation)
 	}, [showElevation])
-
-	// --- Map center longitude ---
-	const formatLongitude = useCallback((longitude: number) => {
-		const suffix = longitude > 0 ? "E" : longitude < 0 ? "W" : ""
-		return `${Math.abs(longitude).toFixed(0)}°${suffix}`
-	}, [])
-	useEffect(() => {
-		if (mapCenterLongitudeValueRef.current)
-			mapCenterLongitudeValueRef.current.textContent =
-				formatLongitude(mapCenterLongitude)
-	}, [mapCenterLongitude, formatLongitude])
 
 	// --- Generation callbacks ---
 	const generationCallbacks: GenerationCallbacks = useMemo(
@@ -1846,6 +1875,41 @@ export const OrogenView: React.FC = () => {
 		}
 	}, [planetCode])
 
+	const handleExportMap = useCallback(async () => {
+		if (!worldForDisplay || !sceneRef.current || exportProgress) return
+		const width = Number(exportWidthPreset)
+		setExportError(null)
+		setExportProgress({ percent: 0, label: "Preparing export" })
+		try {
+			const blob = await sceneRef.current.exportMapPng({
+				width,
+				centerLongitudeDeg: exportCenterLongitude,
+				onProgress: (percent, label) => {
+					setExportProgress({ percent, label })
+				},
+			})
+			const objectUrl = window.URL.createObjectURL(blob)
+			const link = document.createElement("a")
+			link.href = objectUrl
+			link.download = buildMapExportFilename(planetCode, width)
+			document.body.appendChild(link)
+			link.click()
+			link.remove()
+			window.URL.revokeObjectURL(objectUrl)
+			setExportProgress(null)
+		} catch (error) {
+			console.error("Failed to export map PNG:", error)
+			setExportError(error instanceof Error ? error.message : "Export failed")
+			setExportProgress(null)
+		}
+	}, [
+		exportCenterLongitude,
+		exportProgress,
+		exportWidthPreset,
+		planetCode,
+		worldForDisplay,
+	])
+
 	const handleStartSimulation = useCallback(() => {
 		setSimPlaying(true)
 		setTimelineBundle(null)
@@ -2004,6 +2068,9 @@ export const OrogenView: React.FC = () => {
 		})
 	}, [showClimatePreview])
 
+	const exportBusy = exportProgress !== null
+	const exportDisabled = !worldForDisplay || exportBusy
+
 	// --- Render ---
 	return (
 		<div className="w-full h-full flex flex-col xl:flex-row bg-slate-100">
@@ -2123,6 +2190,7 @@ export const OrogenView: React.FC = () => {
 										? (selectedHistoryView?.relationAt ?? null)
 										: null
 								}
+								detailsDrawerOpen={detailsDrawerOpen}
 							/>
 						) : null}
 
@@ -2166,6 +2234,17 @@ export const OrogenView: React.FC = () => {
 							setMapProjectionLatitude={setMapProjectionLatitude}
 							debugMapModes={debugMapModes}
 							setDebugMapModes={setDebugMapModes}
+							exportWidthPreset={exportWidthPreset}
+							setExportWidthPreset={setExportWidthPreset}
+							exportCenterLongitude={exportCenterLongitude}
+							setExportCenterLongitude={setExportCenterLongitude}
+							exportDisabled={exportDisabled}
+							exportBusy={exportBusy}
+							exportProgress={exportProgress}
+							exportError={exportError}
+							onExport={() => {
+								void handleExportMap()
+							}}
 							canCopyCode={!!planetCode}
 							codeCopied={codeCopied}
 							onCopyCode={() => {
@@ -2188,6 +2267,7 @@ export const OrogenView: React.FC = () => {
 								setPathfindingLand(true)
 								setPathfindingSea(true)
 								setDebugMapModes(false)
+								setExportCenterLongitude(0)
 								setMapProjectionLatitude(0)
 								setDraftMapProjectionLatitude(0)
 							}}

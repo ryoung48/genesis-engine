@@ -44,6 +44,17 @@ export interface War {
 	occupied: number[]
 }
 
+interface ActiveWarOptions {
+	rebel?: boolean
+	startTime?: number
+	nextBattleTime?: number
+	occupied?: number[]
+	rebellion?: {
+		overlord: number
+		subject: number
+	}
+}
+
 const DAYS_PER_YEAR = 365
 const DAYS_PER_MONTH = 30
 const HOURS_PER_DAY = 24
@@ -676,34 +687,83 @@ export function startWar(
 	rng: HistoryRng,
 	rebel = false,
 ): void {
+	createActiveWar(state, attacker, defender, rng, { rebel })
+}
+
+export function queueBattleEvent(
+	state: HistoryState,
+	warIdx: number,
+	attacker: number,
+	defender: number,
+	time: number,
+): void {
+	state.heap.enqueue(time, EVT.BATTLE, warIdx, attacker, defender)
+}
+
+export function createActiveWar(
+	state: HistoryState,
+	attacker: number,
+	defender: number,
+	rng: HistoryRng,
+	options: ActiveWarOptions = {},
+): War {
+	const startTime = options.startTime ?? state.time
 	const war: War = {
 		idx: state.wars.length,
 		attacker,
 		defender,
-		startTime: state.time,
-		rebel,
+		startTime,
+		rebel: options.rebel ?? false,
 		occupied: [],
 	}
 	state.wars.push(war)
 	state.provinceWars[attacker].push(war.idx)
 	state.provinceWars[defender].push(war.idx)
-	setRelation(state, attacker, defender, REL.WAR)
+	REL_FIELD.set(state, attacker, defender, REL.WAR, startTime)
+	if (startTime < state.time) {
+		REL_FIELD.set(state, attacker, defender, REL.WAR, state.time)
+	}
+	if (options.rebellion) {
+		state.events.push({
+			tag: "rebellion",
+			time: startTime,
+			data: options.rebellion,
+		})
+	}
 	state.events.push({
 		tag: "war started",
-		time: state.time,
+		time: startTime,
 		data: {
 			attacker,
 			defender,
 			war: war.idx,
 		},
 	})
-	state.heap.enqueue(
-		state.time + deltaMonth(rng.uniform(1, 6)),
-		EVT.BATTLE,
+	const occupied = Array.from(
+		new Set(
+			(options.occupied ?? []).filter(
+				(province) =>
+					province !== defender &&
+					getSovereign(state, province) === defender &&
+					state.occupationCurrent[province] < 0,
+			),
+		),
+	)
+	for (const province of occupied) {
+		PROV.occupation.set(state, province, startTime, war.idx)
+		if (startTime < state.time) {
+			PROV.occupation.set(state, province, state.time, war.idx)
+		}
+		war.occupied.push(province)
+	}
+	queueBattleEvent(
+		state,
 		war.idx,
 		attacker,
 		defender,
+		options.nextBattleTime ?? state.time + deltaMonth(rng.uniform(1, 6)),
 	)
+	return war
 }
 
 export function resolveWar(

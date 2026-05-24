@@ -258,6 +258,7 @@ interface InfoPanelProps {
 	hoverNationAdjList?: Int32Array | null
 	hoverNationCounts?: Map<number, number> | null
 	relationAt?: ((a: number, b: number) => number) | null
+	detailsDrawerOpen?: boolean
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -303,6 +304,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverNationAdjList,
 	hoverNationCounts,
 	relationAt,
+	detailsDrawerOpen,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
@@ -502,7 +504,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	]
 	return (
 		<FloatingPanel
-			className="absolute top-3 right-3 z-20 w-64 px-3 py-2"
+			className={`absolute top-3 z-20 w-64 px-3 py-2 ${detailsDrawerOpen ? "right-3" : "right-12"}`}
 			padding="sm"
 		>
 			<div ref={hoverCardRef} className="space-y-0.5">

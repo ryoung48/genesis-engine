@@ -23,6 +23,7 @@ import type { UnitSystem } from "../screen/shared/ui-format"
 import { formatDistance } from "../screen/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
+export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
 
 const LAND_TRAVEL_KM_PER_DAY = 30
 const SEA_TRAVEL_KM_PER_DAY = 100
@@ -95,6 +96,17 @@ interface OverlayControlsProps {
 	setMapProjectionLatitude: (v: number) => void
 	debugMapModes: boolean
 	setDebugMapModes: (v: boolean) => void
+	exportExpanded?: boolean
+	setExportExpanded?: (v: boolean | ((prev: boolean) => boolean)) => void
+	exportWidthPreset: ExportWidthPreset
+	setExportWidthPreset: (v: ExportWidthPreset) => void
+	exportCenterLongitude: number
+	setExportCenterLongitude: (v: number) => void
+	exportDisabled: boolean
+	exportBusy: boolean
+	exportProgress: { percent: number; label: string } | null
+	exportError?: string | null
+	onExport: () => void
 	canCopyCode?: boolean
 	codeCopied?: boolean
 	onCopyCode?: () => void
@@ -143,14 +155,32 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setMapProjectionLatitude,
 	debugMapModes,
 	setDebugMapModes,
+	exportWidthPreset,
+	setExportWidthPreset,
+	exportCenterLongitude,
+	setExportCenterLongitude,
+	exportDisabled,
+	exportBusy,
+	exportProgress,
+	exportError,
+	onExport,
 	canCopyCode = false,
 	codeCopied = false,
 	onCopyCode,
 	onReset,
 	generationPanelOpen,
 	onToggleGenerationPanel,
+	exportExpanded: controlledExportExpanded,
+	setExportExpanded: controlledSetExportExpanded,
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
+	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
+	const exportExpanded =
+		controlledExportExpanded !== undefined
+			? controlledExportExpanded
+			: localExportExpanded
+	const setExportExpanded =
+		controlledSetExportExpanded ?? setLocalExportExpanded
 	const commitMapProjectionLatitude = (
 		event:
 			| React.PointerEvent<HTMLInputElement>
@@ -533,6 +563,113 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										/>
 									</div>
 								)}
+								<div className="space-y-2 border-t border-white/10 pt-2">
+									<div className="flex items-center justify-between gap-3">
+										<label className="text-[11px] font-medium text-slate-300">
+											Export PNG
+										</label>
+										<button
+											type="button"
+											onClick={() => setExportExpanded((v) => !v)}
+											className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/10 transition-colors"
+										>
+											<ChevronIcon
+												direction={exportExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+									</div>
+									{exportExpanded && (
+										<div className="space-y-2">
+											<div className="flex items-center justify-between gap-3">
+												<label className="text-[11px] font-medium text-slate-300">
+													Resolution
+												</label>
+												<SegmentedControl
+													options={[
+														{
+															value: "4096",
+															label: "4k",
+															ariaLabel: "4096 wide",
+														},
+														{
+															value: "8192",
+															label: "8k",
+															ariaLabel: "8192 wide",
+														},
+														{
+															value: "16384",
+															label: "16k",
+															ariaLabel: "16384 wide",
+														},
+														{
+															value: "32768",
+															label: "32k",
+															ariaLabel: "32768 wide",
+														},
+													]}
+													value={exportWidthPreset}
+													onChange={setExportWidthPreset}
+													tone="overlay"
+													size="sm"
+													buttonClassName="px-1.5"
+												/>
+											</div>
+											<div className="space-y-1.5">
+												<div className="flex items-baseline justify-between gap-3">
+													<label className="text-[11px] font-medium text-slate-300">
+														Export Longitude
+													</label>
+													<span className="font-mono text-[11px] text-slate-400">
+														{exportCenterLongitude.toFixed(0)}°
+													</span>
+												</div>
+												<input
+													type="range"
+													min={-180}
+													max={180}
+													step={1}
+													value={exportCenterLongitude}
+													onChange={(e) =>
+														setExportCenterLongitude(Number(e.target.value))
+													}
+													className="w-full accent-slate-100"
+												/>
+											</div>
+											<button
+												type="button"
+												onClick={onExport}
+												disabled={exportDisabled}
+												className="w-full rounded-md border border-white/10 bg-white/8 px-2.5 py-1.5 text-[11px] font-medium text-slate-100 transition hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-50"
+											>
+												{exportBusy
+													? `Exporting ${exportWidthPreset}w`
+													: "Export PNG"}
+											</button>
+											{exportProgress && (
+												<div className="space-y-1">
+													<div className="flex items-center justify-between gap-2 text-[10px] text-slate-400">
+														<span>{exportProgress.label}</span>
+														<span className="font-mono">
+															{exportProgress.percent}%
+														</span>
+													</div>
+													<div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+														<div
+															className="h-full rounded-full bg-slate-100 transition-[width]"
+															style={{ width: `${exportProgress.percent}%` }}
+														/>
+													</div>
+												</div>
+											)}
+											{exportError && (
+												<div className="text-[10px] text-rose-300">
+													{exportError}
+												</div>
+											)}
+										</div>
+									)}
+								</div>
 							</div>
 						</FloatingPanel>
 					</div>

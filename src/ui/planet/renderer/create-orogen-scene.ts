@@ -49,6 +49,7 @@ import {
 	collectNationBorderGlobePositions,
 	collectNationBorderMapPositions,
 } from "./overlay-builders"
+import { PngStreamWriter } from "./PngStreamWriter"
 import {
 	buildGlobePathfindingOverlay,
 	buildMapPathfindingOverlay,
@@ -75,8 +76,294 @@ import type {
 	RiverData,
 } from "./types"
 
+export function reapplyMeshOverlayState(params: {
+	world: SerializedOrogenWorld
+	colorMode: ColorMode
+	regionColors: Float32Array | null
+	occupationOverlay: Float32Array | null
+	terrainMesh: THREE.Mesh | null
+	terrainFaceToRegion: Int32Array
+	mapMesh: THREE.Mesh | null
+	mapFaceToRegion: Int32Array
+	mapCenterLongitudeDeg: number
+	mapProjectionLatitudeDeg: number
+}): void {
+	const {
+		world,
+		colorMode,
+		regionColors,
+		occupationOverlay,
+		terrainMesh,
+		terrainFaceToRegion,
+		mapMesh,
+		mapFaceToRegion,
+		mapCenterLongitudeDeg,
+		mapProjectionLatitudeDeg,
+	} = params
+
+	if (regionColors) {
+		applyFaceRegionColors(
+			terrainMesh,
+			terrainFaceToRegion,
+			regionColors,
+			occupationOverlay,
+		)
+		applyFaceRegionColors(
+			mapMesh,
+			mapFaceToRegion,
+			regionColors,
+			occupationOverlay,
+		)
+		return
+	}
+
+	applyTerrainColorModeColors(
+		terrainMesh,
+		world,
+		colorMode,
+		terrainFaceToRegion,
+		occupationOverlay,
+	)
+	applyMapColorModeColors(
+		mapMesh,
+		world,
+		colorMode,
+		mapFaceToRegion,
+		mapCenterLongitudeDeg,
+		mapProjectionLatitudeDeg,
+		occupationOverlay,
+	)
+}
+
 const MAP_REPEAT_WIDTH = 4
 const CONTROL_SETTLE_FRAMES = 2
+const MAP_EXPORT_TILE_CAP = 2048
+
+interface MapExportOptions {
+	width: number
+	centerLongitudeDeg?: number
+	onProgress?: (percent: number, label: string) => void
+}
+
+interface MapExportTile {
+	x: number
+	y: number
+	width: number
+	height: number
+}
+
+interface ExportRenderTargetLike {
+	width?: number
+	height?: number
+	texture?:
+		| {
+				colorSpace?: string
+		  }
+		| Array<{
+				colorSpace?: string
+		  }>
+	dispose: () => void
+}
+
+interface ExportRendererLike {
+	capabilities: {
+		maxTextureSize: number
+	}
+	getRenderTarget: () => unknown
+	setRenderTarget: (target: unknown | null) => void
+	render: (sceneToRender: THREE.Scene, cameraToRender: THREE.Camera) => void
+	readRenderTargetPixels: (
+		target: unknown,
+		x: number,
+		y: number,
+		width: number,
+		height: number,
+		buffer: Uint8Array,
+	) => void
+}
+
+interface MapExportVisibilityTarget {
+	object: THREE.Object3D | null
+	visible: boolean
+}
+
+interface MapExportDependencies {
+	createRenderTarget?: (width: number, height: number) => ExportRenderTargetLike
+	yieldToMainThread?: () => Promise<void>
+}
+
+export function buildMapExportTiles(
+	width: number,
+	height: number,
+	maxTileSize: number,
+): MapExportTile[] {
+	const tileSize = Math.max(1, Math.min(maxTileSize, width, height))
+	const tiles: MapExportTile[] = []
+	for (let y = 0; y < height; y += tileSize) {
+		for (let x = 0; x < width; x += tileSize) {
+			tiles.push({
+				x,
+				y,
+				width: Math.min(tileSize, width - x),
+				height: Math.min(tileSize, height - y),
+			})
+		}
+	}
+	return tiles
+}
+
+export function normalizeMapCenterLongitudeDeg(longitudeDeg: number): number {
+	return ((((longitudeDeg + 180) % 360) + 360) % 360) - 180
+}
+
+function linearChannelToSrgb8(channel: number): number {
+	const normalized = THREE.MathUtils.clamp(channel / 255, 0, 1)
+	const srgb =
+		normalized <= 0.0031308
+			? normalized * 12.92
+			: 1.055 * Math.pow(normalized, 1 / 2.4) - 0.055
+	return Math.round(THREE.MathUtils.clamp(srgb, 0, 1) * 255)
+}
+
+const MAP_EXPORT_BAND_HEIGHT = 512
+
+export function renderMapExportPng(params: {
+	scene: THREE.Scene
+	renderer: ExportRendererLike
+	camera: THREE.OrthographicCamera
+	width: number
+	height: number
+	onProgress?: (percent: number, label: string) => void
+	createRenderTarget: (width: number, height: number) => ExportRenderTargetLike
+	yieldToMainThread?: () => Promise<void>
+}): Promise<Blob> {
+	const {
+		scene,
+		renderer,
+		camera,
+		width,
+		height,
+		onProgress,
+		createRenderTarget,
+		yieldToMainThread,
+	} = params
+	const maxTileWidth = Math.max(
+		1,
+		Math.min(MAP_EXPORT_TILE_CAP, renderer.capabilities.maxTextureSize),
+	)
+	const previousTarget = renderer.getRenderTarget()
+	const previousFrustum = {
+		left: camera.left,
+		right: camera.right,
+		top: camera.top,
+		bottom: camera.bottom,
+	}
+
+	const pngWriter = new PngStreamWriter(
+		width,
+		height,
+		(rowsCompleted, totalRows) => {
+			onProgress?.(
+				Math.round((rowsCompleted / totalRows) * 100),
+				`Encoding row ${rowsCompleted}/${totalRows}`,
+			)
+		},
+	)
+
+	const renderBands = async () => {
+		onProgress?.(0, "Preparing export")
+		let bandIndex = 0
+		const totalBands = Math.ceil(height / MAP_EXPORT_BAND_HEIGHT)
+
+		for (let y = 0; y < height; y += MAP_EXPORT_BAND_HEIGHT) {
+			const bandHeight = Math.min(MAP_EXPORT_BAND_HEIGHT, height - y)
+			const bytesPerRow = width * 4
+			const bandPixels = new Uint8Array(bandHeight * bytesPerRow)
+
+			for (let x = 0; x < width; x += maxTileWidth) {
+				const tileWidth = Math.min(maxTileWidth, width - x)
+				const target = createRenderTarget(tileWidth, bandHeight)
+				const targetTexture = Array.isArray(target.texture)
+					? target.texture[0]
+					: target.texture
+				if (targetTexture) targetTexture.colorSpace = THREE.LinearSRGBColorSpace
+				try {
+					camera.left = -2 + (4 * x) / width
+					camera.right = -2 + (4 * (x + tileWidth)) / width
+					camera.top = 1 - (2 * y) / height
+					camera.bottom = 1 - (2 * (y + bandHeight)) / height
+					camera.updateProjectionMatrix()
+					renderer.setRenderTarget(target)
+					renderer.render(scene, camera)
+					const pixels = new Uint8Array(tileWidth * bandHeight * 4)
+					renderer.readRenderTargetPixels(
+						target,
+						0,
+						0,
+						tileWidth,
+						bandHeight,
+						pixels,
+					)
+					for (let row = 0; row < bandHeight; row++) {
+						const srcRow = bandHeight - row - 1
+						for (let col = 0; col < tileWidth; col++) {
+							const srcOffset = (srcRow * tileWidth + col) * 4
+							const destOffset = (row * width + (x + col)) * 4
+							bandPixels[destOffset] = linearChannelToSrgb8(
+								pixels[srcOffset] ?? 0,
+							)
+							bandPixels[destOffset + 1] = linearChannelToSrgb8(
+								pixels[srcOffset + 1] ?? 0,
+							)
+							bandPixels[destOffset + 2] = linearChannelToSrgb8(
+								pixels[srcOffset + 2] ?? 0,
+							)
+							bandPixels[destOffset + 3] = pixels[srcOffset + 3] ?? 255
+						}
+					}
+				} finally {
+					renderer.setRenderTarget(previousTarget)
+					target.dispose()
+				}
+			}
+
+			await pngWriter.writeBand(bandPixels, bandHeight)
+			bandIndex++
+			onProgress?.(
+				Math.round((bandIndex / totalBands) * 100),
+				`Rendering band ${bandIndex}/${totalBands}`,
+			)
+			await yieldToMainThread?.()
+		}
+
+		return pngWriter.finalize()
+	}
+
+	return renderBands().finally(() => {
+		camera.left = previousFrustum.left
+		camera.right = previousFrustum.right
+		camera.top = previousFrustum.top
+		camera.bottom = previousFrustum.bottom
+		camera.updateProjectionMatrix()
+		renderer.setRenderTarget(previousTarget)
+	})
+}
+
+export function applyMapExportVisibility(
+	targets: ReadonlyArray<MapExportVisibilityTarget>,
+): () => void {
+	const snapshot = new Map<THREE.Object3D, boolean>()
+	for (const target of targets) {
+		if (!target.object) continue
+		snapshot.set(target.object, target.object.visible)
+		target.object.visible = target.visible
+	}
+	return () => {
+		for (const [object, visible] of snapshot) {
+			object.visible = visible
+		}
+	}
+}
 
 function addMapSlideClones(object: THREE.Object3D) {
 	const clones: THREE.Object3D[] = []
@@ -93,6 +380,7 @@ function addMapSlideClones(object: THREE.Object3D) {
 export function createOrogenScene(
 	canvas: HTMLCanvasElement,
 	initialWorld?: SerializedOrogenWorld,
+	dependencies: MapExportDependencies = {},
 ): OrogenScene {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -248,7 +536,7 @@ export function createOrogenScene(
 	let wireframeVisible = false
 	let gridVisible = false
 	let gridSpacingDeg = 15
-	const currentMapCenterLongitudeDeg = 0
+	let currentMapCenterLongitudeDeg = 0
 	let currentMapProjectionLatitudeDeg = 0
 	let focusTween: {
 		mode: OrogenViewMode
@@ -899,6 +1187,73 @@ export function createOrogenScene(
 		requestRender()
 	}
 
+	function syncMapExportObjectPositions() {
+		const mapObjects = [
+			mapWireframe,
+			mapOccupationOverlay,
+			mapNationBorders,
+			mapSelectedProvinceBorder,
+			mapGrid,
+			mapThermalEquator,
+			mapRivers,
+			mapMeasureLine,
+			mapMeasureDots,
+			mapHierarchyOverlay,
+			mapSettlements,
+			mapInfrastructure,
+			mapNationLabels,
+			mapPathfindingLine,
+			mapPathfindingDots,
+			pulseMap,
+		]
+		for (const object of mapObjects) {
+			if (object && mapMesh) object.position.copy(mapMesh.position)
+		}
+	}
+
+	function buildMapExportVisibilityTargets(): MapExportVisibilityTarget[] {
+		return [
+			{ object: terrainMesh, visible: false },
+			{ object: waterMesh, visible: false },
+			{ object: atmosMesh, visible: false },
+			{ object: terrainWireframe, visible: false },
+			{ object: globeGrid, visible: false },
+			{ object: globeThermalEquator, visible: false },
+			{ object: globeRivers, visible: false },
+			{ object: globeNationBorders, visible: false },
+			{ object: globeSelectedProvinceBorder, visible: false },
+			{ object: globeMeasureLine, visible: false },
+			{ object: globeMeasureDots, visible: false },
+			{ object: globePathfindingLine, visible: false },
+			{ object: globePathfindingDots, visible: false },
+			{ object: globeHierarchyOverlay, visible: false },
+			{ object: globeSettlements, visible: false },
+			{ object: globeInfrastructure, visible: false },
+			{ object: globeNationLabels, visible: false },
+			{ object: pulseGlobe, visible: false },
+			{ object: mapMesh, visible: true },
+			{
+				object: mapOccupationOverlay,
+				visible: !!currentOccupationOverlay,
+			},
+			{ object: mapWireframe, visible: wireframeVisible },
+			{ object: mapGrid, visible: gridVisible },
+			{ object: mapThermalEquator, visible: false },
+			{ object: mapRivers, visible: riversVisible },
+			{ object: mapNationBorders, visible: nationBordersVisible },
+			{ object: mapHierarchyOverlay, visible: hierarchyOverlayNationId >= 0 },
+			{ object: mapSettlements, visible: settlementsVisible },
+			{ object: mapInfrastructure, visible: infrastructureVisible },
+			{ object: mapNationLabels, visible: nationLabelsVisible },
+			{ object: mapSelectedProvinceBorder, visible: false },
+			{ object: mapMeasureLine, visible: false },
+			{ object: mapMeasureDots, visible: false },
+			{ object: mapPathfindingLine, visible: false },
+			{ object: mapPathfindingDots, visible: false },
+			{ object: pulseMap, visible: false },
+		]
+	}
+
 	function rebuildTerrain() {
 		if (!currentWorld) return
 		disposeObject3D(scene, terrainMesh)
@@ -926,6 +1281,18 @@ export function createOrogenScene(
 		mapFaceToRegion = mapBuild.faceToRegion
 		scene.add(terrainMesh)
 		scene.add(mapMesh)
+		reapplyMeshOverlayState({
+			world: currentWorld,
+			colorMode: currentColorMode,
+			regionColors: currentRegionColors,
+			occupationOverlay: currentOccupationOverlay,
+			terrainMesh,
+			terrainFaceToRegion,
+			mapMesh,
+			mapFaceToRegion,
+			mapCenterLongitudeDeg: currentMapCenterLongitudeDeg,
+			mapProjectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+		})
 		syncMapAmbient()
 		if (currentOccupationOverlay) {
 			mapOccupationOverlay = buildMapOccupationOverlay(
@@ -1274,8 +1641,12 @@ export function createOrogenScene(
 		rebuildOverlays()
 	}
 
-	function setMapCenterLongitude(_longitudeDeg: number) {
-		// No-op — free pan/zoom replaces center longitude control
+	function setMapCenterLongitude(longitudeDeg: number) {
+		const normalized = normalizeMapCenterLongitudeDeg(longitudeDeg)
+		if (currentMapCenterLongitudeDeg === normalized) return
+		currentMapCenterLongitudeDeg = normalized
+		if (currentWorld) rebuildTerrain()
+		else rebuildOverlays()
 	}
 
 	function setMapProjectionLatitude(latitudeDeg: number) {
@@ -1287,7 +1658,7 @@ export function createOrogenScene(
 	}
 
 	function commitMapCenterLongitude() {
-		// No-op — free pan/zoom replaces center longitude control
+		requestRender()
 	}
 
 	function emitHover(info: OrogenHoverInfo | null) {
@@ -1363,6 +1734,53 @@ export function createOrogenScene(
 		for (const mat of infrastructureMaterials) mat.resolution.set(w, h)
 		if (selectedProvince >= 0) rebuildSelectedProvinceBorder()
 		requestRender()
+	}
+
+	async function exportMapPng(options: MapExportOptions): Promise<Blob> {
+		if (!currentWorld || !mapMesh) {
+			throw new Error("Cannot export map before a world is loaded")
+		}
+		const width = Math.max(1, Math.floor(options.width))
+		const height = Math.max(1, Math.floor(width / 2))
+		const previousCenterLongitude = currentMapCenterLongitudeDeg
+		const requestedCenterLongitude = options.centerLongitudeDeg
+		const shouldRecenterForExport =
+			typeof requestedCenterLongitude === "number" &&
+			Number.isFinite(requestedCenterLongitude) &&
+			requestedCenterLongitude !== previousCenterLongitude
+		if (shouldRecenterForExport) {
+			setMapCenterLongitude(requestedCenterLongitude)
+		}
+		syncMapExportObjectPositions()
+		const restoreVisibility = applyMapExportVisibility(
+			buildMapExportVisibilityTargets(),
+		)
+		const exportCamera = new THREE.OrthographicCamera(-2, 2, 1, -1, 0.1, 100)
+		exportCamera.position.set(0, 0, 5)
+		exportCamera.lookAt(0, 0, 0)
+		try {
+			return await renderMapExportPng({
+				scene,
+				renderer: renderer as unknown as ExportRendererLike,
+				camera: exportCamera,
+				width,
+				height,
+				onProgress: options.onProgress,
+				createRenderTarget:
+					dependencies.createRenderTarget ??
+					((tileWidth, tileHeight) =>
+						new THREE.WebGLRenderTarget(tileWidth, tileHeight)),
+				yieldToMainThread:
+					dependencies.yieldToMainThread ??
+					(() => new Promise((resolve) => window.setTimeout(resolve, 0))),
+			})
+		} finally {
+			restoreVisibility()
+			if (shouldRecenterForExport) {
+				setMapCenterLongitude(previousCenterLongitude)
+			}
+			requestRender()
+		}
 	}
 
 	updateMapCameraFrustum()
@@ -1795,6 +2213,7 @@ export function createOrogenScene(
 		dispose,
 		resize,
 		updateWorld,
+		exportMapPng,
 		setColorMode,
 		setRegionColors,
 		setDisplayColors,

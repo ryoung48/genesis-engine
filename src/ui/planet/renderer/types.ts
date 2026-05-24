@@ -22,6 +22,11 @@ export interface OrogenScene {
 	dispose(): void
 	resize(): void
 	updateWorld(world: SerializedOrogenWorld | null): void
+	exportMapPng(options: {
+		width: number
+		centerLongitudeDeg?: number
+		onProgress?: (percent: number, label: string) => void
+	}): Promise<Blob>
 	setColorMode(mode: ColorMode): void
 	setRegionColors(colors: Float32Array | null): void
 	setDisplayColors(mode: ColorMode, colors: Float32Array | null): void

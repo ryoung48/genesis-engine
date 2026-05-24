@@ -46,6 +46,15 @@ function renderWithProps(
 		setMapProjectionLatitude: vi.fn(),
 		debugMapModes: false,
 		setDebugMapModes: vi.fn(),
+		exportWidthPreset: "8192",
+		setExportWidthPreset: vi.fn(),
+		exportCenterLongitude: 0,
+		setExportCenterLongitude: vi.fn(),
+		exportDisabled: false,
+		exportBusy: false,
+		exportProgress: null,
+		exportError: null,
+		onExport: vi.fn(),
 		...overrides,
 	}
 	const markup = renderToStaticMarkup(<OverlayControls {...props} />)
@@ -56,6 +65,7 @@ describe("OverlayControls", () => {
 	it("renders the view selector inside the expanded overlays panel", () => {
 		const { markup } = renderWithProps({
 			overlaysExpanded: true,
+			exportExpanded: true,
 			measureMode: "ruler",
 			viewMode: "map",
 			mapProjectionLatitude: 30,
@@ -73,6 +83,12 @@ describe("OverlayControls", () => {
 		expect(markup).toContain(">im<")
 		expect(markup).toContain("Projection Latitude")
 		expect(markup).toContain("Debug Map Modes")
+		expect(markup).toContain("Export PNG")
+		expect(markup).toContain("Export Longitude")
+		expect(markup).toContain('aria-label="4096 wide"')
+		expect(markup).toContain('aria-label="8192 wide"')
+		expect(markup).toContain('aria-label="16384 wide"')
+		expect(markup).toContain('aria-label="32768 wide"')
 		expect(markup).not.toContain(">Close<")
 		expect(markup).not.toContain(">View<")
 	})
@@ -99,6 +115,9 @@ describe("OverlayControls", () => {
 		const setDraftMapProjectionLatitude = vi.fn()
 		const setMapProjectionLatitude = vi.fn()
 		const setDebugMapModes = vi.fn()
+		const setExportWidthPreset = vi.fn()
+		const setExportCenterLongitude = vi.fn()
+		const onExport = vi.fn()
 		const onCopyCode = vi.fn()
 		const onReset = vi.fn()
 		const onToggleGenerationPanel = vi.fn()
@@ -116,6 +135,9 @@ describe("OverlayControls", () => {
 			setDraftMapProjectionLatitude,
 			setMapProjectionLatitude,
 			setDebugMapModes,
+			setExportWidthPreset,
+			setExportCenterLongitude,
+			onExport,
 			canCopyCode: true,
 			onCopyCode,
 			onReset,
@@ -134,6 +156,9 @@ describe("OverlayControls", () => {
 		props.setDraftMapProjectionLatitude?.(-42)
 		props.setMapProjectionLatitude?.(-42)
 		props.setDebugMapModes?.(true)
+		props.setExportWidthPreset?.("16384")
+		props.setExportCenterLongitude?.(120)
+		props.onExport?.()
 		props.onCopyCode?.()
 		props.onReset?.()
 		props.onToggleGenerationPanel?.()
@@ -157,6 +182,9 @@ describe("OverlayControls", () => {
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setDebugMapModes).toHaveBeenCalledWith(true)
+		expect(setExportWidthPreset).toHaveBeenCalledWith("16384")
+		expect(setExportCenterLongitude).toHaveBeenCalledWith(120)
+		expect(onExport).toHaveBeenCalledTimes(1)
 		expect(onToggleGenerationPanel).toHaveBeenCalledTimes(1)
 		expect(setOverlaysExpanded).toHaveBeenCalledWith(expect.any(Function))
 	})
@@ -191,6 +219,29 @@ describe("OverlayControls", () => {
 		expect(markup).toContain("bg-emerald-400/20")
 		expect(markup).toContain("Projection Latitude")
 		expect(markup).toContain('value="18"')
+	})
+
+	it("renders exporting and disabled export states", () => {
+		const { markup } = renderWithProps({
+			overlaysExpanded: true,
+			exportExpanded: true,
+			exportWidthPreset: "16384",
+			exportCenterLongitude: 45,
+			exportDisabled: true,
+			exportBusy: true,
+			exportProgress: {
+				percent: 64,
+				label: "Rendering tile 2/3",
+			},
+			exportError: "Export failed",
+		})
+
+		expect(markup).toContain("Exporting 16384w")
+		expect(markup).toContain('value="45"')
+		expect(markup).toContain("Rendering tile 2/3")
+		expect(markup).toContain("64%")
+		expect(markup).toContain("Export failed")
+		expect(markup).toContain("disabled")
 	})
 
 	it("renders pathfinding travel rates in the active unit system", () => {

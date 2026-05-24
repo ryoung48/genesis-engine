@@ -3,7 +3,6 @@
  * Port of src/model/history/events/battle.ts
  */
 
-import { EVT } from "../event-heap"
 import { PROV } from "../fields"
 import type { HistoryRng } from "../history-rng"
 import {
@@ -12,6 +11,7 @@ import {
 	getProvinceNeighbors,
 	type HistoryState,
 	isSovereign,
+	queueBattleEvent,
 	resolveWar,
 	type War,
 	warStrengthSolo,
@@ -76,22 +76,6 @@ function findInvasionTarget(
 
 function findReconquestTarget(_state: HistoryState, war: War): number | null {
 	return war.occupied.length > 0 ? war.occupied[war.occupied.length - 1] : null
-}
-
-function spawnBattle(
-	state: HistoryState,
-	warIdx: number,
-	attacker: number,
-	defender: number,
-	rng: HistoryRng,
-): void {
-	state.heap.enqueue(
-		state.time + deltaMonth(rng.uniform(4, 24)),
-		EVT.BATTLE,
-		warIdx,
-		attacker,
-		defender,
-	)
 }
 
 export function runBattle(
@@ -179,15 +163,21 @@ export function runBattle(
 		if (atkExhausted) {
 			resolveWar(state, war, rng)
 		} else {
-			spawnBattle(state, war.idx, war.attacker, war.defender, rng)
+			queueBattleEvent(
+				state,
+				war.idx,
+				war.attacker,
+				war.defender,
+				state.time + deltaMonth(rng.uniform(4, 24)),
+			)
 		}
 	} else {
-		spawnBattle(
+		queueBattleEvent(
 			state,
 			war.idx,
 			outcome ? eventAttacker : eventDefender,
 			outcome ? eventDefender : eventAttacker,
-			rng,
+			state.time + deltaMonth(rng.uniform(4, 24)),
 		)
 	}
 }
