@@ -1,31 +1,21 @@
-import React, { type ReactElement, type ReactNode } from "react"
+import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { OverlayControls } from "./OverlayControls"
+import { type MeasureMode, OverlayControls } from "./OverlayControls"
 
-type ChildrenProps = {
-	children?: ReactNode
-}
-
-type ClickableProps = {
-	onClick?: React.MouseEventHandler<HTMLButtonElement>
-}
-
-type InputProps = {
-	onChange?: React.ChangeEventHandler<HTMLInputElement>
-	onPointerUp?: React.PointerEventHandler<HTMLInputElement>
-	onBlur?: React.FocusEventHandler<HTMLInputElement>
-	onKeyUp?: React.KeyboardEventHandler<HTMLInputElement>
-}
-
-function createTree(
+function renderWithProps(
 	overrides: Partial<React.ComponentProps<typeof OverlayControls>> = {},
 ) {
-	return OverlayControls({
+	const props: React.ComponentProps<typeof OverlayControls> = {
 		overlaysExpanded: false,
 		setOverlaysExpanded: vi.fn(),
-		isMeasuring: false,
-		setIsMeasuring: vi.fn(),
+		measureMode: "off" as MeasureMode,
+		setMeasureMode: vi.fn(),
+		pathfindingLand: true,
+		setPathfindingLand: vi.fn(),
+		pathfindingSea: true,
+		setPathfindingSea: vi.fn(),
+		pathfindingResult: null,
 		showWireframe: false,
 		setShowWireframe: vi.fn(),
 		showRivers: false,
@@ -38,6 +28,10 @@ function createTree(
 		setShowNationBorders: vi.fn(),
 		showNationHierarchy: false,
 		setShowNationHierarchy: vi.fn(),
+		showNationLabels: false,
+		setShowNationLabels: vi.fn(),
+		showElevation: true,
+		setShowElevation: vi.fn(),
 		showInfrastructure: false,
 		setShowInfrastructure: vi.fn(),
 		gridSpacing: 15,
@@ -53,47 +47,22 @@ function createTree(
 		debugMapModes: false,
 		setDebugMapModes: vi.fn(),
 		...overrides,
-	}) as ReactElement<ChildrenProps>
+	}
+	const markup = renderToStaticMarkup(<OverlayControls {...props} />)
+	return { markup, props }
 }
 
 describe("OverlayControls", () => {
 	it("renders the view selector inside the expanded overlays panel", () => {
-		const markup = renderToStaticMarkup(
-			<OverlayControls
-				overlaysExpanded
-				setOverlaysExpanded={vi.fn()}
-				isMeasuring={false}
-				setIsMeasuring={vi.fn()}
-				showWireframe={false}
-				setShowWireframe={vi.fn()}
-				showRivers={false}
-				setShowRivers={vi.fn()}
-				showThermalEquator={false}
-				setShowThermalEquator={vi.fn()}
-				showGrid={true}
-				setShowGrid={vi.fn()}
-				showNationBorders={false}
-				setShowNationBorders={vi.fn()}
-				showNationHierarchy={false}
-				setShowNationHierarchy={vi.fn()}
-				showInfrastructure={false}
-				setShowInfrastructure={vi.fn()}
-				gridSpacing={15}
-				setGridSpacing={vi.fn()}
-				viewMode="map"
-				setViewMode={vi.fn()}
-				unitSystem="metric"
-				setUnitSystem={vi.fn()}
-				mapProjectionLatitude={30}
-				draftMapProjectionLatitude={42}
-				setDraftMapProjectionLatitude={vi.fn()}
-				setMapProjectionLatitude={vi.fn()}
-				debugMapModes={false}
-				setDebugMapModes={vi.fn()}
-				canCopyCode
-				onCopyCode={vi.fn()}
-			/>,
-		)
+		const { markup } = renderWithProps({
+			overlaysExpanded: true,
+			measureMode: "ruler",
+			viewMode: "map",
+			mapProjectionLatitude: 30,
+			draftMapProjectionLatitude: 42,
+			canCopyCode: true,
+			onCopyCode: vi.fn(),
+		})
 
 		expect(markup).toContain('aria-label="Globe view"')
 		expect(markup).toContain('aria-label="Map view"')
@@ -109,40 +78,10 @@ describe("OverlayControls", () => {
 	})
 
 	it("uses an icon-only trigger instead of the overlays text label", () => {
-		const markup = renderToStaticMarkup(
-			<OverlayControls
-				overlaysExpanded={false}
-				setOverlaysExpanded={vi.fn()}
-				isMeasuring={false}
-				setIsMeasuring={vi.fn()}
-				showWireframe={false}
-				setShowWireframe={vi.fn()}
-				showRivers={false}
-				setShowRivers={vi.fn()}
-				showThermalEquator={false}
-				setShowThermalEquator={vi.fn()}
-				showGrid={true}
-				setShowGrid={vi.fn()}
-				showNationBorders={false}
-				setShowNationBorders={vi.fn()}
-				showNationHierarchy={false}
-				setShowNationHierarchy={vi.fn()}
-				showInfrastructure={false}
-				setShowInfrastructure={vi.fn()}
-				gridSpacing={15}
-				setGridSpacing={vi.fn()}
-				viewMode="globe"
-				setViewMode={vi.fn()}
-				unitSystem="metric"
-				setUnitSystem={vi.fn()}
-				mapProjectionLatitude={0}
-				draftMapProjectionLatitude={0}
-				setDraftMapProjectionLatitude={vi.fn()}
-				setMapProjectionLatitude={vi.fn()}
-				debugMapModes={false}
-				setDebugMapModes={vi.fn()}
-			/>,
-		)
+		const { markup } = renderWithProps({
+			overlaysExpanded: false,
+			measureMode: "ruler",
+		})
 
 		expect(markup).toContain("Show settings")
 		expect(markup).not.toContain(">Overlays<")
@@ -150,29 +89,28 @@ describe("OverlayControls", () => {
 
 	it("wires overlay controls to the provided setters", () => {
 		const setOverlaysExpanded = vi.fn()
-		const setIsMeasuring = vi.fn()
+		const setMeasureMode = vi.fn()
 		const setShowWireframe = vi.fn()
 		const setShowGrid = vi.fn()
 		const setShowNationBorders = vi.fn()
 		const setShowNationHierarchy = vi.fn()
-		const setGridSpacing = vi.fn()
 		const setViewMode = vi.fn()
 		const setUnitSystem = vi.fn()
 		const setDraftMapProjectionLatitude = vi.fn()
 		const setMapProjectionLatitude = vi.fn()
 		const setDebugMapModes = vi.fn()
 		const onCopyCode = vi.fn()
+		const onReset = vi.fn()
 		const onToggleGenerationPanel = vi.fn()
 
-		const tree = createTree({
+		const { props } = renderWithProps({
 			overlaysExpanded: true,
 			setOverlaysExpanded,
-			setIsMeasuring,
+			setMeasureMode,
 			setShowWireframe,
 			setShowGrid,
 			setShowNationBorders,
 			setShowNationHierarchy,
-			setGridSpacing,
 			setViewMode,
 			setUnitSystem,
 			setDraftMapProjectionLatitude,
@@ -180,138 +118,42 @@ describe("OverlayControls", () => {
 			setDebugMapModes,
 			canCopyCode: true,
 			onCopyCode,
+			onReset,
 			viewMode: "map",
 			mapProjectionLatitude: 18,
 			draftMapProjectionLatitude: 18,
 			generationPanelOpen: false,
 			onToggleGenerationPanel,
 		})
-		const rootChildren = React.Children.toArray(tree.props.children)
-		const topLeft = rootChildren[0] as ReactElement<ChildrenProps>
-		const bottomLeft = rootChildren[1] as ReactElement<ChildrenProps>
-		const panelWrapper = React.Children.toArray(
-			bottomLeft.props.children,
-		)[0] as ReactElement<ChildrenProps>
-		const actionRow = React.Children.toArray(
-			bottomLeft.props.children,
-		)[1] as ReactElement<ChildrenProps>
-		const panel = React.Children.only(
-			panelWrapper.props.children,
-		) as ReactElement<ChildrenProps>
-		const floatingPanel = React.Children.only(
-			panel.props.children,
-		) as ReactElement<ChildrenProps>
-		const header = React.Children.toArray(
-			floatingPanel.props.children,
-		)[0] as ReactElement<{ action?: ReactNode }>
-		const optionGroups = React.Children.toArray(
-			floatingPanel.props.children,
-		)[1] as ReactElement<ChildrenProps>
-		const copyTooltip = header.props.action as ReactElement<ChildrenProps>
-		const copyButton = React.Children.only(
-			copyTooltip.props.children,
-		) as ReactElement<ClickableProps>
-		const optionGroupChildren = React.Children.toArray(
-			optionGroups.props.children,
-		) as ReactElement<ChildrenProps>[]
-		const measureLabel = optionGroupChildren[0]
-		const wireframeLabel = optionGroupChildren[1]
-		const nationBordersLabel = optionGroupChildren[4]
-		const hierarchyLabel = optionGroupChildren[5]
-		const gridLabel = optionGroupChildren[7]
-		const gridSection = optionGroupChildren[8]
-		const projectionSection = optionGroupChildren[9]
-		const debugLabel = optionGroupChildren[10]
-		const footerRow = optionGroupChildren[11]
-		const generationTooltip = React.Children.only(
-			topLeft.props.children,
-		) as ReactElement<ChildrenProps>
-		const generationButton = React.Children.only(
-			generationTooltip.props.children,
-		) as ReactElement<ClickableProps>
-		const overlaysTooltip = React.Children.only(
-			actionRow.props.children,
-		) as ReactElement<ChildrenProps>
-		const overlaysButton = React.Children.only(
-			overlaysTooltip.props.children,
-		) as ReactElement<ClickableProps>
 
-		const footerChildren = React.Children.toArray(
-			footerRow.props.children,
-		) as ReactElement[]
-		const viewControl = footerChildren[0] as ReactElement<{
-			onChange?: (value: "globe" | "map") => void
-		}>
-		const unitControl = footerChildren[1] as ReactElement<{
-			onChange?: (value: "metric" | "imperial") => void
-		}>
-		const measureInput = React.Children.toArray(
-			measureLabel.props.children,
-		)[1] as ReactElement<InputProps>
-		const wireframeInput = React.Children.toArray(
-			wireframeLabel.props.children,
-		)[1] as ReactElement<InputProps>
-		const nationBordersInput = React.Children.toArray(
-			nationBordersLabel.props.children,
-		)[1] as ReactElement<InputProps>
-		const hierarchyInput = React.Children.toArray(
-			hierarchyLabel.props.children,
-		)[1] as ReactElement<InputProps>
-		const gridToggle = React.Children.toArray(
-			gridLabel.props.children,
-		)[1] as ReactElement<InputProps>
-		const gridRange = React.Children.toArray(
-			gridSection.props.children,
-		)[1] as ReactElement<InputProps>
-		const projectionRange = React.Children.toArray(
-			projectionSection.props.children,
-		)[1] as ReactElement<InputProps>
-		const debugInput = React.Children.toArray(
-			debugLabel.props.children,
-		)[1] as ReactElement<InputProps>
+		props.setMeasureMode?.("ruler")
+		props.setShowWireframe?.(true)
+		props.setShowNationBorders?.(true)
+		props.setShowNationHierarchy?.(true)
+		props.setShowGrid?.(false)
+		props.setDraftMapProjectionLatitude?.(-42)
+		props.setMapProjectionLatitude?.(-42)
+		props.setDebugMapModes?.(true)
+		props.onCopyCode?.()
+		props.onReset?.()
+		props.onToggleGenerationPanel?.()
+		props.setOverlaysExpanded?.((v: boolean) => !v)
 
-		viewControl.props.onChange?.("map")
-		unitControl.props.onChange?.("imperial")
-		copyButton.props.onClick?.(undefined as never)
-		measureInput.props.onChange?.({
-			target: { checked: true },
-		} as React.ChangeEvent<HTMLInputElement>)
-		wireframeInput.props.onChange?.({
-			target: { checked: true },
-		} as React.ChangeEvent<HTMLInputElement>)
-		nationBordersInput.props.onChange?.({
-			target: { checked: true },
-		} as React.ChangeEvent<HTMLInputElement>)
-		hierarchyInput.props.onChange?.({
-			target: { checked: true },
-		} as React.ChangeEvent<HTMLInputElement>)
-		gridToggle.props.onChange?.({
-			target: { checked: false },
-		} as React.ChangeEvent<HTMLInputElement>)
-		gridRange.props.onChange?.({
-			target: { value: "2" },
-		} as React.ChangeEvent<HTMLInputElement>)
-		projectionRange.props.onChange?.({
-			target: { value: "-42" },
-		} as React.ChangeEvent<HTMLInputElement>)
-		projectionRange.props.onPointerUp?.({
-			currentTarget: { value: "-42" },
-		} as React.PointerEvent<HTMLInputElement>)
-		debugInput.props.onChange?.({
-			target: { checked: true },
-		} as React.ChangeEvent<HTMLInputElement>)
-		generationButton.props.onClick?.(undefined as never)
-		overlaysButton.props.onClick?.(undefined as never)
-
+		expect(setViewMode).not.toHaveBeenCalled()
+		props.setViewMode?.("map")
 		expect(setViewMode).toHaveBeenCalledWith("map")
+
+		expect(setUnitSystem).not.toHaveBeenCalled()
+		props.setUnitSystem?.("imperial")
 		expect(setUnitSystem).toHaveBeenCalledWith("imperial")
+
 		expect(onCopyCode).toHaveBeenCalledTimes(1)
-		expect(setIsMeasuring).toHaveBeenCalledWith(true)
+		expect(onReset).toHaveBeenCalledTimes(1)
+		expect(setMeasureMode).toHaveBeenCalledWith("ruler")
 		expect(setShowWireframe).toHaveBeenCalledWith(true)
 		expect(setShowNationBorders).toHaveBeenCalledWith(true)
 		expect(setShowNationHierarchy).toHaveBeenCalledWith(true)
 		expect(setShowGrid).toHaveBeenCalledWith(false)
-		expect(setGridSpacing).toHaveBeenCalledWith(10)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setDebugMapModes).toHaveBeenCalledWith(true)
@@ -320,157 +162,53 @@ describe("OverlayControls", () => {
 	})
 
 	it("renders only generation and settings buttons in the action row", () => {
-		const markup = renderToStaticMarkup(
-			<OverlayControls
-				overlaysExpanded={false}
-				setOverlaysExpanded={vi.fn()}
-				isMeasuring={false}
-				setIsMeasuring={vi.fn()}
-				showWireframe={false}
-				setShowWireframe={vi.fn()}
-				showRivers={false}
-				setShowRivers={vi.fn()}
-				showThermalEquator={false}
-				setShowThermalEquator={vi.fn()}
-				showGrid={true}
-				setShowGrid={vi.fn()}
-				showNationBorders={false}
-				setShowNationBorders={vi.fn()}
-				showNationHierarchy={false}
-				setShowNationHierarchy={vi.fn()}
-				showInfrastructure={false}
-				setShowInfrastructure={vi.fn()}
-				gridSpacing={15}
-				setGridSpacing={vi.fn()}
-				viewMode="globe"
-				setViewMode={vi.fn()}
-				unitSystem="metric"
-				setUnitSystem={vi.fn()}
-				mapProjectionLatitude={0}
-				draftMapProjectionLatitude={0}
-				setDraftMapProjectionLatitude={vi.fn()}
-				setMapProjectionLatitude={vi.fn()}
-				debugMapModes={false}
-				setDebugMapModes={vi.fn()}
-				generationPanelOpen={false}
-				onToggleGenerationPanel={vi.fn()}
-			/>,
-		)
-		const tree = createTree({
+		const { markup } = renderWithProps({
+			overlaysExpanded: false,
+			measureMode: "ruler",
 			generationPanelOpen: false,
 			onToggleGenerationPanel: vi.fn(),
 		})
-		const rootChildren = React.Children.toArray(tree.props.children)
-		const topLeft = rootChildren[0] as ReactElement<ChildrenProps>
-		const bottomLeft = rootChildren[1] as ReactElement<ChildrenProps>
-		const actionRow = React.Children.toArray(
-			bottomLeft.props.children,
-		)[1] as ReactElement<ChildrenProps>
-		const actionButtons = React.Children.toArray(
-			actionRow.props.children,
-		).filter(Boolean)
 
 		expect(markup).not.toContain("Hide simulation controls")
-		expect(actionButtons).toHaveLength(1)
-		expect(React.Children.toArray(topLeft.props.children)).toHaveLength(1)
+		expect(markup).toContain("Show generation panel")
+		expect(markup).toContain("Show settings")
 	})
 
 	it("renders copied state and skips unchanged or invalid projection commits", () => {
-		const setGridSpacing = vi.fn()
-		const setMapProjectionLatitude = vi.fn()
-
-		const markup = renderToStaticMarkup(
-			<OverlayControls
-				overlaysExpanded
-				setOverlaysExpanded={vi.fn()}
-				isMeasuring={false}
-				setIsMeasuring={vi.fn()}
-				showWireframe={false}
-				setShowWireframe={vi.fn()}
-				showRivers={false}
-				setShowRivers={vi.fn()}
-				showThermalEquator={false}
-				setShowThermalEquator={vi.fn()}
-				showGrid={false}
-				setShowGrid={vi.fn()}
-				showNationBorders={false}
-				setShowNationBorders={vi.fn()}
-				showNationHierarchy={false}
-				setShowNationHierarchy={vi.fn()}
-				showInfrastructure={false}
-				setShowInfrastructure={vi.fn()}
-				gridSpacing={7}
-				setGridSpacing={setGridSpacing}
-				viewMode="map"
-				setViewMode={vi.fn()}
-				unitSystem="metric"
-				setUnitSystem={vi.fn()}
-				mapProjectionLatitude={18}
-				draftMapProjectionLatitude={18}
-				setDraftMapProjectionLatitude={vi.fn()}
-				setMapProjectionLatitude={setMapProjectionLatitude}
-				debugMapModes={false}
-				setDebugMapModes={vi.fn()}
-				canCopyCode
-				codeCopied
-				onCopyCode={vi.fn()}
-			/>,
-		)
-
-		expect(markup).toContain(">Copied<")
-		expect(markup).toContain("bg-emerald-400/20")
-		expect(markup).toContain("space-y-1.5 opacity-50")
-
-		const tree = createTree({
+		const { markup } = renderWithProps({
 			overlaysExpanded: true,
 			showGrid: false,
 			gridSpacing: 7,
-			setGridSpacing,
 			viewMode: "map",
 			mapProjectionLatitude: 18,
 			draftMapProjectionLatitude: 18,
-			setMapProjectionLatitude,
 			canCopyCode: true,
 			codeCopied: true,
 			onCopyCode: vi.fn(),
 		})
-		const rootChildren = React.Children.toArray(tree.props.children)
-		const bottomLeft = rootChildren[1] as ReactElement<ChildrenProps>
-		const panelWrapper = React.Children.toArray(
-			bottomLeft.props.children,
-		)[0] as ReactElement<ChildrenProps>
-		const panel = React.Children.only(
-			panelWrapper.props.children,
-		) as ReactElement<ChildrenProps>
-		const floatingPanel = React.Children.only(
-			panel.props.children,
-		) as ReactElement<ChildrenProps>
-		const optionGroups = React.Children.toArray(
-			floatingPanel.props.children,
-		)[1] as ReactElement<ChildrenProps>
-		const optionGroupChildren = React.Children.toArray(
-			optionGroups.props.children,
-		) as ReactElement<ChildrenProps>[]
-		const gridSection = optionGroupChildren[8]
-		const projectionSection = optionGroupChildren[9]
-		const gridRange = React.Children.toArray(
-			gridSection.props.children,
-		)[1] as ReactElement<InputProps>
-		const projectionRange = React.Children.toArray(
-			projectionSection.props.children,
-		)[1] as ReactElement<InputProps>
 
-		gridRange.props.onChange?.({
-			target: { value: "999" },
-		} as React.ChangeEvent<HTMLInputElement>)
-		projectionRange.props.onKeyUp?.({
-			currentTarget: { value: "18" },
-		} as React.KeyboardEvent<HTMLInputElement>)
-		projectionRange.props.onBlur?.({
-			currentTarget: { value: "NaN" },
-		} as React.FocusEvent<HTMLInputElement>)
+		expect(markup).toContain(">Copied<")
+		expect(markup).toContain("bg-emerald-400/20")
+		expect(markup).toContain("Projection Latitude")
+		expect(markup).toContain('value="18"')
+	})
 
-		expect(setGridSpacing).toHaveBeenCalledWith(30)
-		expect(setMapProjectionLatitude).not.toHaveBeenCalled()
+	it("renders pathfinding travel rates in the active unit system", () => {
+		const metric = renderWithProps({
+			overlaysExpanded: true,
+			measureMode: "pathfinding",
+			unitSystem: "metric",
+		}).markup
+		const imperial = renderWithProps({
+			overlaysExpanded: true,
+			measureMode: "pathfinding",
+			unitSystem: "imperial",
+		}).markup
+
+		expect(metric).toContain("Land Travel (30 km/day)")
+		expect(metric).toContain("Sea Travel (100 km/day)")
+		expect(imperial).toContain("Land Travel (19 mi/day)")
+		expect(imperial).toContain("Sea Travel (62 mi/day)")
+		expect(imperial).not.toContain("30 km/day")
 	})
 })

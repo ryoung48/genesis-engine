@@ -472,4 +472,81 @@ describe("computeNations", () => {
 
 		expect(result.seeds[0]).toBe(0)
 	})
+
+	it("prefers continent provinces when placing large nations", () => {
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
+			buildRingNationProvinces(300)
+		const provinceContinent = new Uint8Array(provinces.count)
+		habitability.fill(1)
+		habitability[0] = 10
+		habitability[1] = 8
+		provinceContinent[1] = 1
+
+		const result = computeNations({
+			provinces,
+			coastal,
+			riverVisible,
+			provinceContinent,
+			habitability,
+			r_xyz,
+			seed: 37,
+		})
+
+		expect(result.seeds[0]).toBe(1)
+	})
+
+	it("assigns distinct colors to neighboring nations even when province seed colors are similar", () => {
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
+			buildRingNationProvinces(120)
+		for (let p = 0; p < provinces.count; p++) {
+			provinces.colors[3 * p] = 0.46 + (p % 3) * 0.005
+			provinces.colors[3 * p + 1] = 0.44 + (p % 3) * 0.005
+			provinces.colors[3 * p + 2] = 0.42 + (p % 3) * 0.005
+		}
+
+		const result = computeNations({
+			provinces,
+			coastal,
+			riverVisible,
+			habitability,
+			r_xyz,
+			seed: 73,
+		})
+
+		expect(result.count).toBeGreaterThan(1)
+
+		let sawAdjacentPair = false
+		for (let nation = 0; nation < result.count; nation++) {
+			const colorA: [number, number, number] = [
+				result.colors[3 * nation],
+				result.colors[3 * nation + 1],
+				result.colors[3 * nation + 2],
+			]
+			const seedProvince = result.seeds[nation]
+			expect(provinces.colors[3 * seedProvince]).toBeCloseTo(colorA[0], 6)
+			expect(provinces.colors[3 * seedProvince + 1]).toBeCloseTo(colorA[1], 6)
+			expect(provinces.colors[3 * seedProvince + 2]).toBeCloseTo(colorA[2], 6)
+			for (
+				let edge = result.adjOffset[nation];
+				edge < result.adjOffset[nation + 1];
+				edge++
+			) {
+				const neighbor = result.adjList[edge]
+				if (neighbor <= nation) continue
+				sawAdjacentPair = true
+				const colorB: [number, number, number] = [
+					result.colors[3 * neighbor],
+					result.colors[3 * neighbor + 1],
+					result.colors[3 * neighbor + 2],
+				]
+				const dr = colorA[0] - colorB[0]
+				const dg = colorA[1] - colorB[1]
+				const db = colorA[2] - colorB[2]
+				const distance = Math.sqrt(dr * dr + dg * dg + db * db)
+				expect(distance).toBeGreaterThan(0.15)
+			}
+		}
+
+		expect(sawAdjacentPair).toBe(true)
+	})
 })

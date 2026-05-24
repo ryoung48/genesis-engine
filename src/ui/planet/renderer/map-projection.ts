@@ -1,6 +1,6 @@
 import * as THREE from "three"
 
-export const MAP_X_SCALE = 2 / Math.PI
+const MAP_X_SCALE = 2 / Math.PI
 export const MAX_MAP_PROJECTION_LATITUDE_DEG = 90
 
 export function wrapLongitudeRadians(

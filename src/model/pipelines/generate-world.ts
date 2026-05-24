@@ -15,7 +15,6 @@ import type {
 } from ".."
 import { elevToHeightKm } from "../climate/climate"
 import { buildSphereMesh } from "../mesh"
-import { computeSettlementAnchors } from "../settlements/compute-settlement-regions"
 import { createRng } from "../shared/rng"
 import {
 	computeCoastDistances,
@@ -28,12 +27,6 @@ import {
 	meanEdgeLengthKm,
 } from "../shared/units"
 import { clampVolcanism } from "../shared/volcanism"
-import { computeCultures } from "../society/culture"
-import { computeFaiths } from "../society/faith"
-import { computeHeritages } from "../society/heritage"
-import { computeNations } from "../society/nations"
-import { computeReligions } from "../society/religion"
-import { deriveChildColors } from "../society/shared"
 import {
 	generateCoarsePlates,
 	projectCoarsePlates,
@@ -60,7 +53,7 @@ import {
 	warpTerrain,
 } from "../terrain/erosion"
 import { applyHotspots, applyStaticHotspots } from "../terrain/hotspots"
-import { assignLandmarkIdentity } from "../terrain/landmarks"
+import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -691,64 +684,14 @@ export function generateOrogenWorld(
 		if (smallOcean[r]) post.rivers.lakes[r] = 1
 	}
 
-	// 23. Nations / cultures (pipeline-only, not in import path)
-	let cultures
-	let heritages
-	let faiths
-	let religions
-	let nations
-	if (post.provinces) {
-		if (post.population) {
-			nations = withTiming("nations", pipelineTiming, () =>
-				computeNations({
-					provinces: post.provinces!,
-					coastal: post.coastal,
-					riverVisible: post.rivers.visible,
-					waterAccess: post.waterAccess,
-					habitability: post.population!.habitability,
-					r_xyz: mesh.r_xyz,
-					seed: params.seed,
-					planetRadiusKm: params.planetRadiusKm,
-				}),
-			)
-		}
-		withTiming("cultures", pipelineTiming, () => {
-			cultures = computeCultures(post.provinces!, params.seed)
-			heritages = computeHeritages(cultures!, params.seed)
-			faiths = computeFaiths(cultures!, params.seed)
-			religions = computeReligions(faiths!, params.seed)
-			cultures!.colors = deriveChildColors({
-				childCount: cultures!.count,
-				childToParent: heritages!.assignment,
-				parentColors: heritages!.colors,
-				seed: params.seed + 5101,
-			})
-			faiths!.colors = deriveChildColors({
-				childCount: faiths!.count,
-				childToParent: religions!.assignment,
-				parentColors: religions!.colors,
-				seed: params.seed + 5102,
-			})
-		})
-		onProgress?.("cultures", 77)
-	}
-	post.landmarks = assignLandmarkIdentity({
+	const provinceSociety = deriveProvinceSociety({
 		mesh,
-		landmarks: post.landmarks,
-		provinces: post.provinces,
-		cultures,
+		params,
+		post,
 		isLand,
-		seed: params.seed,
 	})
-	const settlementAnchors = computeSettlementAnchors({
-		mesh,
-		provinces: post.provinces,
-		topography: post.topography,
-		coastal: post.coastal,
-		rivers: post.rivers ? { visible: post.rivers.visible } : undefined,
-		isLand,
-		landmarks: post.landmarks,
-	})
+	pipelineTiming.push(...provinceSociety.timings)
+	onProgress?.("cultures", 77)
 
 	const timings = [...pipelineTiming, ...post.timings]
 	console.timeEnd("total")
@@ -796,17 +739,17 @@ export function generateOrogenWorld(
 		riverLand,
 		provinces: post.provinces,
 		locations: post.locations,
-		nations,
-		cultures,
-		heritages,
-		faiths,
-		religions,
-		landmarks: post.landmarks,
+		nations: provinceSociety.nations,
+		cultures: provinceSociety.cultures,
+		heritages: provinceSociety.heritages,
+		faiths: provinceSociety.faiths,
+		religions: provinceSociety.religions,
+		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		tradeGoods: post.tradeGoods,
-		settlementRegions: settlementAnchors.settlementRegions,
-		settlementWaterLandmarks: settlementAnchors.settlementWaterLandmarks,
-		settlementPortRegions: settlementAnchors.settlementPortRegions,
+		settlementRegions: provinceSociety.settlementRegions,
+		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
+		settlementPortRegions: provinceSociety.settlementPortRegions,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: countContinents(mesh, isLand),
 		monthlyTEQ: post.monthlyTEQ,

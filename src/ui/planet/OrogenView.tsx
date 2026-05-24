@@ -26,7 +26,7 @@ import type { ColorMode } from "./colors"
 import { climateZoneColor, vegetationColor } from "./colors"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
-import { OverlayControls } from "./controls/OverlayControls"
+import { type MeasureMode, OverlayControls } from "./controls/OverlayControls"
 import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
 import { createDrawerNationClickHandler } from "./details/nation-clicks"
@@ -57,6 +57,7 @@ import {
 	type HoverInfo,
 } from "./hover/hover"
 import { InfoPanel } from "./hover/InfoPanel"
+import { canHandlePlanetClick } from "./measurement-click"
 import {
 	createOrogenScene,
 	type OrogenScene,
@@ -94,6 +95,7 @@ import {
 	MAX_RECENT_CODES,
 	PLANET_CODE_STORAGE_KEY,
 	RECENT_CODES_STORAGE_KEY,
+	VIEW_PREFS_STORAGE_KEY,
 } from "./screen/generation/defaults"
 import {
 	decodePlanetCode,
@@ -109,13 +111,17 @@ import {
 	buildGenerationPreviewConfig,
 	type GenerationPreviewTab,
 	getGenerationPreviewCanvasClassName,
-	getGenerationPreviewExitState,
 } from "./screen/generation/generation-preview"
 import {
 	buildPlanetSliders,
 	buildTerrainSliders,
 	resetWorldDefaults,
 } from "./screen/generation/sliders"
+import {
+	DEFAULT_VIEW_PREFS,
+	parseStoredViewPrefs,
+	serializeStoredViewPrefs,
+} from "./screen/generation/view-prefs"
 import {
 	createHistoryQuery,
 	type TimelineBundle,
@@ -177,6 +183,12 @@ export const OrogenView: React.FC = () => {
 	const lastWorldRef = useRef<SerializedOrogenWorld | null>(null)
 	const mapCenterLongitudeValueRef = useRef<HTMLSpanElement>(null)
 	const hoverCardRef = useRef<HTMLDivElement>(null)
+	const initialViewPrefs =
+		typeof window === "undefined"
+			? DEFAULT_VIEW_PREFS
+			: (parseStoredViewPrefs(
+					window.localStorage.getItem(VIEW_PREFS_STORAGE_KEY),
+				) ?? DEFAULT_VIEW_PREFS)
 
 	// Core state
 	const [world, setWorld] = useState<SerializedOrogenWorld | null>(null)
@@ -186,31 +198,63 @@ export const OrogenView: React.FC = () => {
 	const [generationTimings, setGenerationTimings] = useState<
 		StageTiming[] | null
 	>(null)
-	const [colorMode, setColorMode] = useState<ColorMode>("terrain")
-	const [geographyMode, setGeographyMode] = useState<ColorMode>(
-		DEFAULT_GEOGRAPHY_MODE,
+	const [colorMode, setColorMode] = useState<ColorMode>(
+		initialViewPrefs.colorMode,
 	)
-	const [nationMode, setNationMode] = useState<NationMapMode>("borders")
-	const [populationMode, setPopulationMode] =
-		useState<PopulationMapMode>("density")
-	const [viewMode, setViewMode] = useState<OrogenViewMode>("globe")
+	const [geographyMode, setGeographyMode] = useState<ColorMode>(
+		initialViewPrefs.geographyMode,
+	)
+	const [nationMode, setNationMode] = useState<NationMapMode>(
+		initialViewPrefs.nationMode,
+	)
+	const [populationMode, setPopulationMode] = useState<PopulationMapMode>(
+		initialViewPrefs.populationMode,
+	)
+	const [viewMode, setViewMode] = useState<OrogenViewMode>(
+		initialViewPrefs.viewMode,
+	)
 	const [mapCenterLongitude] = useState(0)
-	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(0)
-	const [draftMapProjectionLatitude, setDraftMapProjectionLatitude] =
-		useState(0)
-	const [unitSystem, setUnitSystem] = useState<UnitSystem>("metric")
+	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
+		initialViewPrefs.mapProjectionLatitude,
+	)
+	const [draftMapProjectionLatitude, setDraftMapProjectionLatitude] = useState(
+		initialViewPrefs.mapProjectionLatitude,
+	)
+	const [unitSystem, setUnitSystem] = useState<UnitSystem>(
+		initialViewPrefs.unitSystem,
+	)
 
 	// Overlay state
-	const [showWireframe, setShowWireframe] = useState(false)
-	const [showGrid, setShowGrid] = useState(true)
-	const [showNationBorders, setShowNationBorders] = useState(false)
-	const [showNationHierarchy, setShowNationHierarchy] = useState(false)
-	const [showThermalEquator, setShowThermalEquator] = useState(false)
-	const [showRivers, setShowRivers] = useState(false)
-	const [showInfrastructure, setShowInfrastructure] = useState(false)
-	const [overlaysExpanded, setOverlaysExpanded] = useState(false)
-	const [debugMapModes, setDebugMapModes] = useState(false)
-	const [gridSpacing, setGridSpacing] = useState(15)
+	const [showWireframe, setShowWireframe] = useState(
+		initialViewPrefs.showWireframe,
+	)
+	const [showGrid, setShowGrid] = useState(initialViewPrefs.showGrid)
+	const [showNationBorders, setShowNationBorders] = useState(
+		initialViewPrefs.showNationBorders,
+	)
+	const [showNationHierarchy, setShowNationHierarchy] = useState(
+		initialViewPrefs.showNationHierarchy,
+	)
+	const [showThermalEquator, setShowThermalEquator] = useState(
+		initialViewPrefs.showThermalEquator,
+	)
+	const [showRivers, setShowRivers] = useState(initialViewPrefs.showRivers)
+	const [showInfrastructure, setShowInfrastructure] = useState(
+		initialViewPrefs.showInfrastructure,
+	)
+	const [showNationLabels, setShowNationLabels] = useState(
+		initialViewPrefs.showNationLabels,
+	)
+	const [showElevation, setShowElevation] = useState(
+		initialViewPrefs.showElevation,
+	)
+	const [overlaysExpanded, setOverlaysExpanded] = useState(
+		initialViewPrefs.overlaysExpanded,
+	)
+	const [debugMapModes, setDebugMapModes] = useState(
+		initialViewPrefs.debugMapModes,
+	)
+	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
 	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
 	const [showClimatePreview, setShowClimatePreview] = useState(false)
@@ -239,13 +283,44 @@ export const OrogenView: React.FC = () => {
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
-	const [isMeasuring, setIsMeasuring] = useState(false)
 	const [measureStart, setMeasureStart] = useState<number | null>(null)
 	const [measureEnd, setMeasureEnd] = useState<number | null>(null)
 	const [measureLabelPos, setMeasureLabelPos] = useState<
 		[number, number] | null
 	>(null)
 	const measureRef = useRef<{ start: number | null; end: number | null }>({
+		start: null,
+		end: null,
+	})
+
+	// Measure state
+	const [measureMode, setMeasureModeState] = useState<MeasureMode>(
+		initialViewPrefs.measureMode,
+	)
+	const setMeasureMode = useCallback((mode: MeasureMode) => {
+		measureRef.current = { start: null, end: null }
+		setMeasureStart(null)
+		setMeasureEnd(null)
+		setMeasureLabelPos(null)
+		sceneRef.current?.setMeasureLine(null, null)
+		pathfindingRef.current = { start: null, end: null }
+		setPathfindingResult(null)
+		sceneRef.current?.setPathfindingOverlay(null, null, null)
+		setMeasureModeState(mode)
+	}, [])
+	const [pathfindingLand, setPathfindingLand] = useState(
+		initialViewPrefs.pathfindingLand,
+	)
+	const [pathfindingSea, setPathfindingSea] = useState(
+		initialViewPrefs.pathfindingSea,
+	)
+	const [pathfindingResult, setPathfindingResult] = useState<{
+		distanceKm: number
+		landKm: number
+		seaKm: number
+		travelDays: number
+	} | null>(null)
+	const pathfindingRef = useRef<{ start: number | null; end: number | null }>({
 		start: null,
 		end: null,
 	})
@@ -436,6 +511,59 @@ export const OrogenView: React.FC = () => {
 			JSON.stringify(recentCodes),
 		)
 	}, [recentCodes])
+	useEffect(() => {
+		if (typeof window === "undefined") return
+		window.localStorage.setItem(
+			VIEW_PREFS_STORAGE_KEY,
+			serializeStoredViewPrefs({
+				colorMode,
+				geographyMode,
+				nationMode,
+				populationMode,
+				viewMode,
+				showWireframe,
+				showGrid,
+				showNationBorders,
+				showNationHierarchy,
+				showNationLabels,
+				showElevation,
+				showThermalEquator,
+				showRivers,
+				showInfrastructure,
+				overlaysExpanded,
+				gridSpacing,
+				unitSystem,
+				mapProjectionLatitude,
+				debugMapModes,
+				measureMode,
+				pathfindingLand,
+				pathfindingSea,
+			}),
+		)
+	}, [
+		colorMode,
+		debugMapModes,
+		geographyMode,
+		gridSpacing,
+		mapProjectionLatitude,
+		nationMode,
+		overlaysExpanded,
+		populationMode,
+		showGrid,
+		showInfrastructure,
+		showNationBorders,
+		showNationHierarchy,
+		showNationLabels,
+		showElevation,
+		showRivers,
+		showThermalEquator,
+		showWireframe,
+		unitSystem,
+		viewMode,
+		measureMode,
+		pathfindingLand,
+		pathfindingSea,
+	])
 
 	// --- Color mode guard ---
 	useEffect(() => {
@@ -589,6 +717,16 @@ export const OrogenView: React.FC = () => {
 		() => (world ? createDisplayNames(world, timelineBundle) : null),
 		[timelineBundle, world],
 	)
+	const nationLabelsArray = useMemo(() => {
+		if (!worldNames || !world?.nations) return null
+		const count = world.nations.seeds?.length ?? 0
+		const names: string[] = new Array(count)
+		for (let i = 0; i < count; i++) {
+			const capitalProvince = world.nations.seeds[i]
+			names[i] = capitalProvince >= 0 ? worldNames.nation(capitalProvince) : ""
+		}
+		return names
+	}, [worldNames, world])
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
 		[worldNames],
@@ -893,27 +1031,59 @@ export const OrogenView: React.FC = () => {
 		}
 	}, [displayMonth, obliquity, hoursPerDay, tidallyLocked, antistellarLon])
 
-	// --- Measurement ---
-	useEffect(() => {
-		if (!isMeasuring) {
-			measureRef.current = { start: null, end: null }
-			setMeasureStart(null)
-			setMeasureEnd(null)
-			setMeasureLabelPos(null)
-			sceneRef.current?.setMeasureLine(null, null)
-		}
-	}, [isMeasuring])
-
+	// --- Measure click handler ---
 	useEffect(() => {
 		if (!sceneRef.current) return
 		sceneRef.current.setClickHandler((info) => {
-			if (!worldForDisplay?.provinces || !nationModel) return
+			if (
+				!canHandlePlanetClick(measureMode, {
+					hasWorld: !!worldForDisplay,
+					hasProvinces: !!worldForDisplay?.provinces,
+					hasNationModel: !!nationModel,
+				})
+			) {
+				return
+			}
+
+			// Pathfinding mode
+			if (measureMode === "pathfinding") {
+				const p = pathfindingRef.current
+				if (p.start === null || p.end !== null) {
+					p.start = info.region
+					p.end = null
+					setPathfindingResult(null)
+					const r_xyz = worldForDisplay?.mesh?.r_xyz
+					const startXYZ: [number, number, number] | null = r_xyz
+						? [
+								r_xyz[info.region * 3],
+								r_xyz[info.region * 3 + 1],
+								r_xyz[info.region * 3 + 2],
+							]
+						: null
+					sceneRef.current?.setPathfindingOverlay(null, startXYZ, null)
+				} else {
+					p.end = info.region
+					// Send pathfinding request to worker
+					if (workerRef.current) {
+						workerRef.current.postMessage({
+							type: "pathfind",
+							startRegion: p.start,
+							endRegion: info.region,
+							allowLand: pathfindingLand,
+							allowSea: pathfindingSea,
+							network: worldForDisplay.network ?? null,
+						})
+					}
+				}
+				return
+			}
+
 			const province =
 				worldForDisplay.provinces.regionProvince[info.region] ?? -1
 			const nation =
 				province >= 0 ? (nationModel.assignment[province] ?? -1) : -1
 
-			if (!isMeasuring) {
+			if (measureMode === "off") {
 				setSelectedNationId(nation >= 0 ? nation : null)
 				if (nation >= 0) setDetailsDrawerOpen(true)
 				return
@@ -938,14 +1108,25 @@ export const OrogenView: React.FC = () => {
 					setMeasureEnd(null)
 					setMeasureLabelPos(null)
 					sceneRef.current?.setMeasureLine(null, null)
+				} else if (pathfindingRef.current.start !== null) {
+					pathfindingRef.current = { start: null, end: null }
+					setPathfindingResult(null)
+					sceneRef.current?.setPathfindingOverlay(null, null, null)
 				} else {
-					setIsMeasuring(false)
+					setMeasureMode("off")
 				}
 			}
 		}
 		window.addEventListener("keydown", handleKeyDown)
 		return () => window.removeEventListener("keydown", handleKeyDown)
-	}, [nationModel, isMeasuring, worldForDisplay])
+	}, [
+		nationModel,
+		measureMode,
+		pathfindingLand,
+		pathfindingSea,
+		worldForDisplay,
+		setMeasureMode,
+	])
 
 	const selectedNation = useMemo(() => {
 		return buildSelectedNationDetails({
@@ -1127,7 +1308,7 @@ export const OrogenView: React.FC = () => {
 
 	useEffect(() => {
 		if (!sceneRef.current || !world) return
-		if (measureStart === null || measureEnd === null) {
+		if (measureStart === null) {
 			sceneRef.current.setMeasureLine(null, null)
 			setMeasureLabelPos(null)
 			return
@@ -1138,11 +1319,14 @@ export const OrogenView: React.FC = () => {
 			r[measureStart * 3 + 1],
 			r[measureStart * 3 + 2],
 		] as [number, number, number]
-		const e = [
-			r[measureEnd * 3],
-			r[measureEnd * 3 + 1],
-			r[measureEnd * 3 + 2],
-		] as [number, number, number]
+		const e =
+			measureEnd === null
+				? null
+				: ([
+						r[measureEnd * 3],
+						r[measureEnd * 3 + 1],
+						r[measureEnd * 3 + 2],
+					] as [number, number, number])
 		sceneRef.current.setMeasureLine(s, e)
 	}, [measureStart, measureEnd, world])
 
@@ -1239,6 +1423,19 @@ export const OrogenView: React.FC = () => {
 		}
 	}, [showInfrastructure, worldForDisplay])
 
+	// --- Nation labels ---
+	useEffect(() => {
+		sceneRef.current?.setNationLabelsVisible(showNationLabels)
+	}, [showNationLabels])
+	useEffect(() => {
+		sceneRef.current?.setNationNames(nationLabelsArray)
+	}, [nationLabelsArray])
+
+	// --- Elevation ---
+	useEffect(() => {
+		sceneRef.current?.setElevationVisible(showElevation)
+	}, [showElevation])
+
 	// --- Map center longitude ---
 	const formatLongitude = useCallback((longitude: number) => {
 		const suffix = longitude > 0 ? "E" : longitude < 0 ? "W" : ""
@@ -1289,6 +1486,35 @@ export const OrogenView: React.FC = () => {
 				setSelectedTimeMs(timeMs)
 				setTimelineBundle({ timelines, events })
 				setLiveFrame(null)
+			},
+			onPathfindResult: (result) => {
+				if (result.reachable) {
+					const pathArray = Array.from(result.pathRegions)
+					setPathfindingResult({
+						distanceKm: result.distanceKm,
+						landKm: result.landKm,
+						seaKm: result.seaKm,
+						travelDays: result.travelDays,
+					})
+					// Render path overlay
+					if (pathArray.length >= 2 && lastWorldRef.current) {
+						const r = lastWorldRef.current.mesh.r_xyz
+						const startXYZ: [number, number, number] = [
+							r[pathArray[0] * 3],
+							r[pathArray[0] * 3 + 1],
+							r[pathArray[0] * 3 + 2],
+						]
+						const endXYZ: [number, number, number] = [
+							r[pathArray[pathArray.length - 1] * 3],
+							r[pathArray[pathArray.length - 1] * 3 + 1],
+							r[pathArray[pathArray.length - 1] * 3 + 2],
+						]
+						sceneRef.current?.setPathfindingOverlay(pathArray, startXYZ, endXYZ)
+					}
+				} else {
+					setPathfindingResult(null)
+					sceneRef.current?.setPathfindingOverlay(null, null, null)
+				}
 			},
 		}),
 		[],
@@ -1377,9 +1603,6 @@ export const OrogenView: React.FC = () => {
 			setSelectedTimeMs(simStartTimeMs)
 			setTimelineBundle(undefined)
 			setLiveFrame(null)
-			const previewExitState = getGenerationPreviewExitState()
-			setShowClimatePreview(previewExitState.showPreview)
-			setViewMode(previewExitState.viewMode)
 			generateWorld(overrideSeed, overrides, currentParams, generationCallbacks)
 		},
 		[currentParams, generationCallbacks, simStartTimeMs],
@@ -1406,9 +1629,7 @@ export const OrogenView: React.FC = () => {
 	}, [handleGenerateWorld, planetCodeInput, resolveSeedInput, seed])
 
 	const handleCloseClimatePreview = useCallback(() => {
-		const previewExitState = getGenerationPreviewExitState()
-		setShowClimatePreview(previewExitState.showPreview)
-		setViewMode(previewExitState.viewMode)
+		setShowClimatePreview(false)
 	}, [])
 
 	const handleToggleClimatePreview = useCallback(() => {
@@ -1823,10 +2044,10 @@ export const OrogenView: React.FC = () => {
 			>
 				<canvas
 					ref={canvasRef}
-					className={getGenerationPreviewCanvasClassName(
+					className={`${getGenerationPreviewCanvasClassName(
 						showClimatePreview,
-						isMeasuring,
-					)}
+						measureMode !== "off",
+					)} ${measureMode === "pathfinding" ? "cursor-crosshair" : ""}`}
 				/>
 
 				{showClimatePreview && (
@@ -1908,8 +2129,13 @@ export const OrogenView: React.FC = () => {
 						<OverlayControls
 							overlaysExpanded={overlaysExpanded}
 							setOverlaysExpanded={setOverlaysExpanded}
-							isMeasuring={isMeasuring}
-							setIsMeasuring={setIsMeasuring}
+							measureMode={measureMode}
+							setMeasureMode={setMeasureMode}
+							pathfindingLand={pathfindingLand}
+							setPathfindingLand={setPathfindingLand}
+							pathfindingSea={pathfindingSea}
+							setPathfindingSea={setPathfindingSea}
+							pathfindingResult={pathfindingResult}
 							showWireframe={showWireframe}
 							setShowWireframe={setShowWireframe}
 							showRivers={showRivers}
@@ -1922,6 +2148,10 @@ export const OrogenView: React.FC = () => {
 							setShowNationBorders={setShowNationBorders}
 							showNationHierarchy={showNationHierarchy}
 							setShowNationHierarchy={setShowNationHierarchy}
+							showNationLabels={showNationLabels}
+							setShowNationLabels={setShowNationLabels}
+							showElevation={showElevation}
+							setShowElevation={setShowElevation}
 							showInfrastructure={showInfrastructure}
 							setShowInfrastructure={setShowInfrastructure}
 							gridSpacing={gridSpacing}
@@ -1940,6 +2170,26 @@ export const OrogenView: React.FC = () => {
 							codeCopied={codeCopied}
 							onCopyCode={() => {
 								void handleCopyCode()
+							}}
+							onReset={() => {
+								setViewMode("globe")
+								setUnitSystem("metric")
+								setShowGrid(true)
+								setGridSpacing(15)
+								setShowWireframe(false)
+								setShowRivers(false)
+								setShowThermalEquator(false)
+								setShowNationBorders(false)
+								setShowNationHierarchy(false)
+								setShowNationLabels(false)
+								setShowElevation(false)
+								setShowInfrastructure(false)
+								setMeasureMode("off")
+								setPathfindingLand(true)
+								setPathfindingSea(true)
+								setDebugMapModes(false)
+								setMapProjectionLatitude(0)
+								setDraftMapProjectionLatitude(0)
 							}}
 							generationPanelOpen={generationPanelOpen}
 							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}

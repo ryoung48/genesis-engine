@@ -3,6 +3,6 @@
 	"entry": ["src/model/orogen.worker.ts"],
 	"project": ["src/**/*.{ts,tsx,js,jsx}"],
 	"ignoreDependencies": ["tailwindcss", "babel-plugin-react-compiler"],
-	"ignore": ["src/types/delaunator.d.ts", "src/model/society/language/**"],
+	"ignore": ["src/types/*.d.ts", "src/model/society/language/**"],
 	"tags": ["-lintignore"]
 }

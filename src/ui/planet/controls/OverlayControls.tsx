@@ -4,23 +4,67 @@ import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
+import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
+import { CompassRoseIcon } from "@/ui/components/primitives/icons/CompassRoseIcon"
 import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
+import { DiameterVariantIcon } from "@/ui/components/primitives/icons/DiameterVariantIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
 import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
+import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
+import { RulerIcon } from "@/ui/components/primitives/icons/RulerIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { OrogenViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
 import type { UnitSystem } from "../screen/shared/ui-format"
+import { formatDistance } from "../screen/shared/ui-format"
+
+export type MeasureMode = "off" | "ruler" | "pathfinding"
+
+const LAND_TRAVEL_KM_PER_DAY = 30
+const SEA_TRAVEL_KM_PER_DAY = 100
+
+function formatTravelTime(days: number): string {
+	if (days < 30) return `${days}d`
+	const months = Math.floor(days / 30)
+	const remainingDays = days % 30
+	if (months < 12) {
+		return remainingDays > 0 ? `${months}m ${remainingDays}d` : `${months}m`
+	}
+	const years = Math.floor(months / 12)
+	const remainingMonths = months % 12
+	const parts: string[] = []
+	if (years > 0) parts.push(`${years}y`)
+	if (remainingMonths > 0) parts.push(`${remainingMonths}m`)
+	if (remainingDays > 0) parts.push(`${remainingDays}d`)
+	return parts.join(" ")
+}
+
+function formatTravelRateLabel(
+	kmPerDay: number,
+	unitSystem: UnitSystem,
+): string {
+	return `(${formatDistance(kmPerDay, unitSystem)}/day)`
+}
 
 interface OverlayControlsProps {
 	overlaysExpanded: boolean
 	setOverlaysExpanded: (v: boolean | ((prev: boolean) => boolean)) => void
-	isMeasuring: boolean
-	setIsMeasuring: (v: boolean) => void
+	measureMode: MeasureMode
+	setMeasureMode: (v: MeasureMode) => void
+	pathfindingLand: boolean
+	setPathfindingLand: (v: boolean) => void
+	pathfindingSea: boolean
+	setPathfindingSea: (v: boolean) => void
+	pathfindingResult: {
+		distanceKm: number
+		landKm: number
+		seaKm: number
+		travelDays: number
+	} | null
 	showWireframe: boolean
 	setShowWireframe: (v: boolean) => void
 	showRivers: boolean
@@ -33,6 +77,10 @@ interface OverlayControlsProps {
 	setShowNationBorders: (v: boolean) => void
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
+	showNationLabels: boolean
+	setShowNationLabels: (v: boolean) => void
+	showElevation: boolean
+	setShowElevation: (v: boolean) => void
 	showInfrastructure: boolean
 	setShowInfrastructure: (v: boolean) => void
 	gridSpacing: number
@@ -50,6 +98,7 @@ interface OverlayControlsProps {
 	canCopyCode?: boolean
 	codeCopied?: boolean
 	onCopyCode?: () => void
+	onReset?: () => void
 	generationPanelOpen?: boolean
 	onToggleGenerationPanel?: () => void
 }
@@ -57,8 +106,13 @@ interface OverlayControlsProps {
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	overlaysExpanded,
 	setOverlaysExpanded,
-	isMeasuring,
-	setIsMeasuring,
+	measureMode,
+	setMeasureMode,
+	pathfindingLand,
+	setPathfindingLand,
+	pathfindingSea,
+	setPathfindingSea,
+	pathfindingResult,
 	showWireframe,
 	setShowWireframe,
 	showRivers,
@@ -71,6 +125,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowNationBorders,
 	showNationHierarchy,
 	setShowNationHierarchy,
+	showNationLabels,
+	setShowNationLabels,
+	showElevation,
+	setShowElevation,
 	showInfrastructure,
 	setShowInfrastructure,
 	gridSpacing,
@@ -88,9 +146,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	canCopyCode = false,
 	codeCopied = false,
 	onCopyCode,
+	onReset,
 	generationPanelOpen,
 	onToggleGenerationPanel,
 }) => {
+	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
 	const commitMapProjectionLatitude = (
 		event:
 			| React.PointerEvent<HTMLInputElement>
@@ -103,26 +163,43 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 		setMapProjectionLatitude(nextValue)
 	}
 	const headerAction =
-		canCopyCode && onCopyCode ? (
-			<Tooltip content={codeCopied ? "Copied" : "Copy seed"} position="top">
-				<IconButton
-					onClick={onCopyCode}
-					tone="overlay"
-					shape="pill"
-					size="sm"
-					className={
-						codeCopied
-							? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
-							: "shadow-none"
-					}
-				>
-					{codeCopied ? (
-						<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
-					) : (
-						<CopyIcon className="h-3.5 w-3.5" />
-					)}
-				</IconButton>
-			</Tooltip>
+		(canCopyCode && onCopyCode) || onReset ? (
+			<div className="flex items-center gap-1">
+				{onReset && (
+					<Tooltip content="Reset to defaults" position="top">
+						<IconButton
+							onClick={onReset}
+							tone="overlay"
+							shape="pill"
+							size="sm"
+							className="shadow-none"
+						>
+							<RefreshIcon className="h-3.5 w-3.5" />
+						</IconButton>
+					</Tooltip>
+				)}
+				{canCopyCode && onCopyCode && (
+					<Tooltip content={codeCopied ? "Copied" : "Copy seed"} position="top">
+						<IconButton
+							onClick={onCopyCode}
+							tone="overlay"
+							shape="pill"
+							size="sm"
+							className={
+								codeCopied
+									? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
+									: "shadow-none"
+							}
+						>
+							{codeCopied ? (
+								<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
+							) : (
+								<CopyIcon className="h-3.5 w-3.5" />
+							)}
+						</IconButton>
+					</Tooltip>
+				)}
+			</div>
 		) : undefined
 
 	return (
@@ -156,20 +233,57 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 							/>
 							<div className="space-y-3">
 								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Measure</span>
-									<input
-										type="checkbox"
-										checked={isMeasuring}
-										onChange={(e) => setIsMeasuring(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
 									<span>Wireframe</span>
 									<input
 										type="checkbox"
 										checked={showWireframe}
 										onChange={(e) => setShowWireframe(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Elevation</span>
+									<input
+										type="checkbox"
+										checked={showElevation}
+										onChange={(e) => setShowElevation(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Hierarchy</span>
+									<input
+										type="checkbox"
+										checked={showNationHierarchy}
+										onChange={(e) => setShowNationHierarchy(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Nation Borders</span>
+									<input
+										type="checkbox"
+										checked={showNationBorders}
+										onChange={(e) => setShowNationBorders(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Nation Labels</span>
+									<input
+										type="checkbox"
+										checked={showNationLabels}
+										onChange={(e) => setShowNationLabels(e.target.checked)}
+										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+									/>
+								</label>
+								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
+									<span>Infrastructure</span>
+									<input
+										type="checkbox"
+										checked={showInfrastructure}
+										onChange={(e) => setShowInfrastructure(e.target.checked)}
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
@@ -192,93 +306,57 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									/>
 								</label>
 								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Nation Borders</span>
-									<input
-										type="checkbox"
-										checked={showNationBorders}
-										onChange={(e) => setShowNationBorders(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Hierarchy</span>
-									<input
-										type="checkbox"
-										checked={showNationHierarchy}
-										onChange={(e) => setShowNationHierarchy(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Infrastructure</span>
-									<input
-										type="checkbox"
-										checked={showInfrastructure}
-										onChange={(e) => setShowInfrastructure(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
 									<span>Grid Lines</span>
-									<input
-										type="checkbox"
-										checked={showGrid}
-										onChange={(e) => setShowGrid(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<div
-									className={
-										showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"
-									}
-								>
-									<div className="flex justify-between items-baseline">
-										<label className="text-[11px] font-medium text-slate-300">
-											Grid Spacing
-										</label>
-										<span className="font-mono text-[11px] text-slate-400">
-											{gridSpacing}°
-										</span>
+									<div className="flex items-center gap-1">
+										<button
+											type="button"
+											onClick={() => setGridSpacingExpanded((v) => !v)}
+											className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/10 transition-colors"
+										>
+											<ChevronIcon
+												direction={gridSpacingExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										<input
+											type="checkbox"
+											checked={showGrid}
+											onChange={(e) => setShowGrid(e.target.checked)}
+											className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+										/>
 									</div>
-									<input
-										type="range"
-										min={0}
-										max={gridSpacingOptions.length - 1}
-										step={1}
-										value={Math.max(0, gridSpacingOptions.indexOf(gridSpacing))}
-										onChange={(e) =>
-											setGridSpacing(
-												gridSpacingOptions[Number(e.target.value)] ??
-													gridSpacingOptions[0],
-											)
+								</label>
+								{gridSpacingExpanded && (
+									<div
+										className={
+											showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"
 										}
-										disabled={!showGrid}
-										className="w-full accent-slate-100 disabled:cursor-not-allowed"
-									/>
-								</div>
-								{viewMode === "map" && (
-									<div className="space-y-1.5">
-										<div className="flex items-baseline justify-between gap-3">
+									>
+										<div className="flex justify-between items-baseline">
 											<label className="text-[11px] font-medium text-slate-300">
-												Projection Latitude
+												Grid Spacing
 											</label>
 											<span className="font-mono text-[11px] text-slate-400">
-												{draftMapProjectionLatitude.toFixed(0)}°
+												{gridSpacing}°
 											</span>
 										</div>
 										<input
 											type="range"
-											min={-MAX_MAP_PROJECTION_LATITUDE_DEG}
-											max={MAX_MAP_PROJECTION_LATITUDE_DEG}
+											min={0}
+											max={gridSpacingOptions.length - 1}
 											step={1}
-											value={draftMapProjectionLatitude}
+											value={Math.max(
+												0,
+												gridSpacingOptions.indexOf(gridSpacing),
+											)}
 											onChange={(e) =>
-												setDraftMapProjectionLatitude(Number(e.target.value))
+												setGridSpacing(
+													gridSpacingOptions[Number(e.target.value)] ??
+														gridSpacingOptions[0],
+												)
 											}
-											onPointerUp={commitMapProjectionLatitude}
-											onKeyUp={commitMapProjectionLatitude}
-											onBlur={commitMapProjectionLatitude}
-											className="w-full accent-slate-100"
+											disabled={!showGrid}
+											className="w-full accent-slate-100 disabled:cursor-not-allowed"
 										/>
 									</div>
 								)}
@@ -291,6 +369,100 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
+
+								<div className="border-t border-white/10 pt-2">
+									<div className="flex items-center justify-between gap-3">
+										<span className="text-[11px] font-medium text-slate-200">
+											Measure
+										</span>
+										<SegmentedControl
+											options={[
+												{
+													value: "off",
+													label: (
+														<DiameterVariantIcon className="h-3.5 w-3.5" />
+													),
+													ariaLabel: "Measure off",
+													title: "Measure off",
+												},
+												{
+													value: "ruler",
+													label: <RulerIcon className="h-3.5 w-3.5" />,
+													ariaLabel: "Ruler mode",
+													title: "Ruler mode",
+												},
+												{
+													value: "pathfinding",
+													label: <CompassRoseIcon className="h-3.5 w-3.5" />,
+													ariaLabel: "Pathfinding mode",
+													title: "Pathfinding mode",
+												},
+											]}
+											value={measureMode}
+											onChange={setMeasureMode}
+											tone="overlay"
+											size="sm"
+											buttonClassName="px-2"
+										/>
+									</div>
+								</div>
+								{measureMode === "pathfinding" && (
+									<div className="space-y-1.5">
+										<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+											<span>
+												Land Travel{" "}
+												{formatTravelRateLabel(
+													LAND_TRAVEL_KM_PER_DAY,
+													unitSystem,
+												)}
+											</span>
+											<input
+												type="checkbox"
+												checked={pathfindingLand}
+												onChange={(e) => setPathfindingLand(e.target.checked)}
+												className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+											/>
+										</label>
+										<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+											<span>
+												Sea Travel{" "}
+												{formatTravelRateLabel(
+													SEA_TRAVEL_KM_PER_DAY,
+													unitSystem,
+												)}
+											</span>
+											<input
+												type="checkbox"
+												checked={pathfindingSea}
+												onChange={(e) => setPathfindingSea(e.target.checked)}
+												className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+											/>
+										</label>
+										{pathfindingResult && (
+											<div className="rounded bg-white/5 px-2 py-1.5 font-mono text-[10px] text-slate-300">
+												<div>
+													Distance:{" "}
+													{formatDistance(
+														pathfindingResult.distanceKm,
+														unitSystem,
+													)}
+												</div>
+												<div>
+													Land:{" "}
+													{formatDistance(pathfindingResult.landKm, unitSystem)}
+												</div>
+												<div>
+													Sea:{" "}
+													{formatDistance(pathfindingResult.seaKm, unitSystem)}
+												</div>
+												<div>
+													Travel time: ~
+													{formatTravelTime(pathfindingResult.travelDays)}
+												</div>
+											</div>
+										)}
+									</div>
+								)}
 								<div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
 									<SegmentedControl
 										options={[
@@ -335,6 +507,32 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										buttonClassName="px-1.5"
 									/>
 								</div>
+								{viewMode === "map" && (
+									<div className="space-y-1.5">
+										<div className="flex items-baseline justify-between gap-3">
+											<label className="text-[11px] font-medium text-slate-300">
+												Projection Latitude
+											</label>
+											<span className="font-mono text-[11px] text-slate-400">
+												{draftMapProjectionLatitude.toFixed(0)}°
+											</span>
+										</div>
+										<input
+											type="range"
+											min={-MAX_MAP_PROJECTION_LATITUDE_DEG}
+											max={MAX_MAP_PROJECTION_LATITUDE_DEG}
+											step={1}
+											value={draftMapProjectionLatitude}
+											onChange={(e) =>
+												setDraftMapProjectionLatitude(Number(e.target.value))
+											}
+											onPointerUp={commitMapProjectionLatitude}
+											onKeyUp={commitMapProjectionLatitude}
+											onBlur={commitMapProjectionLatitude}
+											className="w-full accent-slate-100"
+										/>
+									</div>
+								)}
 							</div>
 						</FloatingPanel>
 					</div>

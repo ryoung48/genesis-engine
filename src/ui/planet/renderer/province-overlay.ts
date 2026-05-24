@@ -91,20 +91,22 @@ export function collectProvinceBorderGlobePositions(
 	world: SerializedOrogenWorld,
 	province: number,
 	radiusBoost: number,
+	elevationVisible: boolean,
 ) {
 	if (!world.provinces) return []
 	const positions: number[] = []
 	const { elevation, mesh } = world
 	const { t_xyz } = mesh
+	const baseRadius = elevationVisible ? 1.006 : 1.003
 
 	forEachProvinceBoundarySide(world, province, ({ r0, r1, tInner, tOuter }) => {
 		const averageElevation = (elevation[r0] + elevation[r1]) * 0.5
-		const radius =
-			1.006 +
-			radiusBoost +
-			(averageElevation > 0
+		const elevationFactor = elevationVisible
+			? averageElevation > 0
 				? averageElevation * TERRAIN_ELEVATION_SCALE
-				: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3)
+				: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3
+			: 0
+		const radius = baseRadius + radiusBoost + elevationFactor
 		positions.push(
 			t_xyz[3 * tInner] * radius,
 			t_xyz[3 * tInner + 1] * radius,
@@ -179,6 +181,7 @@ export function buildSelectedProvinceBorderGlobe(
 	world: SerializedOrogenWorld,
 	province: number,
 	viewMode: OrogenViewMode,
+	elevationVisible: boolean,
 	opts?: {
 		color?: number
 		radiusBoost?: number
@@ -191,6 +194,7 @@ export function buildSelectedProvinceBorderGlobe(
 		world,
 		province,
 		opts?.radiusBoost ?? 0,
+		elevationVisible,
 	)
 	return createLineSegments(
 		positions,

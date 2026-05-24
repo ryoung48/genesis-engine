@@ -131,6 +131,28 @@ describe("importOrogenWorld", () => {
 	)
 
 	it(
+		"builds province society data for imported land worlds",
+		() => {
+			const width = 64
+			const height = 32
+			const grayscale = new Uint8Array(width * height)
+			grayscale.fill(255, 0, (width * height) / 2)
+			const world = getCachedImportWorld({
+				grayscale,
+				imageWidth: width,
+				imageHeight: height,
+			})
+
+			expect(world.provinces).toBeDefined()
+			expect(world.nations).toBeDefined()
+			expect(world.cultures).toBeDefined()
+			expect(world.settlementRegions).toBeDefined()
+			expect(world.settlementRegions?.length).toBe(world.provinces?.count)
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
 		"produces an all-ocean world from a uniform black image",
 		() => {
 			const world = getCachedImportWorld({

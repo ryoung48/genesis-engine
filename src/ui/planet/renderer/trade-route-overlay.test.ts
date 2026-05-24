@@ -54,6 +54,7 @@ describe("trade-route-overlay", () => {
 				},
 			],
 			{ width: 800, height: 600 },
+			true,
 		)
 
 		expect(build.group.children).toHaveLength(1)
@@ -131,6 +132,7 @@ describe("trade-route-overlay", () => {
 				},
 			],
 			{ width: 800, height: 600 },
+			true,
 		)
 
 		expect(build.group.children).toHaveLength(3)
@@ -166,6 +168,7 @@ describe("trade-route-overlay", () => {
 				},
 			],
 			{ width: 800, height: 600 },
+			true,
 		)
 
 		expect(build.group.children).toHaveLength(1)
@@ -193,6 +196,7 @@ describe("trade-route-overlay", () => {
 				},
 			],
 			{ width: 800, height: 600 },
+			true,
 		)
 
 		const materialsByColor = new Map(

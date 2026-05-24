@@ -350,12 +350,12 @@ export function climateTempColor(celsius: number): [number, number, number] {
 
 const biomeColors: [number, number, number][] = [
 	OCEAN_LIGHT_BLUE,
-	[0xe8 / 255, 0xcc / 255, 0xa7 / 255],
-	[0xb9 / 255, 0xbc / 255, 0x91 / 255],
-	[0x9d / 255, 0xb4 / 255, 0x7b / 255],
-	[0x7d / 255, 0x8c / 255, 0x5c / 255],
-	[0x4d / 255, 0x61 / 255, 0x3c / 255],
-	[0x2d / 255, 0x4d / 255, 0x29 / 255],
+	[0xcc / 255, 0xc4 / 255, 0xbc / 255],
+	[0xa0 / 255, 0xa6 / 255, 0x96 / 255],
+	[0x8e / 255, 0x9a / 255, 0x82 / 255],
+	[0x78 / 255, 0x80 / 255, 0x6a / 255],
+	[0x52 / 255, 0x5c / 255, 0x4a / 255],
+	[0x34 / 255, 0x44 / 255, 0x32 / 255],
 ]
 
 export function vegetationColor(biomeCode: number): [number, number, number] {

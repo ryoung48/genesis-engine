@@ -27,7 +27,8 @@
 		"react-chartjs-2": "^5.3.1",
 		"react-dom": "^19.2.0",
 		"react-router-dom": "^7.9.5",
-		"three": "^0.183.2"
+		"three": "^0.183.2",
+		"troika-three-text": "^0.52.4"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.11",

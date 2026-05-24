@@ -1,0 +1,231 @@
+import type { ColorMode } from "../../colors"
+import type { MeasureMode } from "../../controls/OverlayControls"
+import type { OrogenViewMode } from "../../renderer"
+import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
+import { DEFAULT_GEOGRAPHY_MODE } from "../shared/map-modes"
+import type { UnitSystem } from "../shared/ui-format"
+
+interface StoredViewPrefs {
+	colorMode: ColorMode
+	geographyMode: ColorMode
+	nationMode: NationMapMode
+	populationMode: PopulationMapMode
+	viewMode: OrogenViewMode
+	showWireframe: boolean
+	showGrid: boolean
+	showNationBorders: boolean
+	showNationHierarchy: boolean
+	showNationLabels: boolean
+	showElevation: boolean
+	showThermalEquator: boolean
+	showRivers: boolean
+	showInfrastructure: boolean
+	overlaysExpanded: boolean
+	gridSpacing: number
+	unitSystem: UnitSystem
+	mapProjectionLatitude: number
+	debugMapModes: boolean
+	measureMode: MeasureMode
+	pathfindingLand: boolean
+	pathfindingSea: boolean
+}
+
+const COLOR_MODES = new Set<ColorMode>([
+	"terrain",
+	"landHeightmap",
+	"slope",
+	"topography",
+	"temperature",
+	"temperatureDelta",
+	"precipitation",
+	"moisture",
+	"vegetation",
+	"climate",
+	"pastaClimate",
+	"koppenClimate",
+	"oceanCurrents",
+	"dangerZones",
+	"hotspots",
+	"nations",
+	"population",
+	"provinces",
+	"basins",
+	"terrainFeatures",
+	"dtr",
+	"trade_goods",
+])
+
+const NATION_MAP_MODES = new Set<NationMapMode>([
+	"borders",
+	"provinces",
+	"dynasty",
+	"diplomacy",
+])
+
+const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
+	"density",
+	"development",
+	"culture",
+	"heritage",
+	"faith",
+	"religion",
+	"migration",
+])
+
+const VIEW_MODES = new Set<OrogenViewMode>(["globe", "map"])
+const UNIT_SYSTEMS = new Set<UnitSystem>(["metric", "imperial"])
+const MEASURE_MODES = new Set<MeasureMode>(["off", "ruler", "pathfinding"])
+
+export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
+	colorMode: DEFAULT_GEOGRAPHY_MODE,
+	geographyMode: DEFAULT_GEOGRAPHY_MODE,
+	nationMode: "borders",
+	populationMode: "density",
+	viewMode: "globe",
+	showWireframe: false,
+	showGrid: true,
+	showNationBorders: false,
+	showNationHierarchy: false,
+	showNationLabels: false,
+	showElevation: true,
+	showThermalEquator: false,
+	showRivers: false,
+	showInfrastructure: false,
+	overlaysExpanded: false,
+	gridSpacing: 15,
+	unitSystem: "metric",
+	mapProjectionLatitude: 0,
+	debugMapModes: false,
+	measureMode: "off",
+	pathfindingLand: true,
+	pathfindingSea: true,
+}
+
+function isColorMode(value: unknown): value is ColorMode {
+	return typeof value === "string" && COLOR_MODES.has(value as ColorMode)
+}
+
+function isNationMapMode(value: unknown): value is NationMapMode {
+	return (
+		typeof value === "string" && NATION_MAP_MODES.has(value as NationMapMode)
+	)
+}
+
+function isPopulationMapMode(value: unknown): value is PopulationMapMode {
+	return (
+		typeof value === "string" &&
+		POPULATION_MAP_MODES.has(value as PopulationMapMode)
+	)
+}
+
+function isViewMode(value: unknown): value is OrogenViewMode {
+	return typeof value === "string" && VIEW_MODES.has(value as OrogenViewMode)
+}
+
+function isUnitSystem(value: unknown): value is UnitSystem {
+	return typeof value === "string" && UNIT_SYSTEMS.has(value as UnitSystem)
+}
+
+function isMeasureMode(value: unknown): value is MeasureMode {
+	return typeof value === "string" && MEASURE_MODES.has(value as MeasureMode)
+}
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+	return typeof value === "boolean" ? value : fallback
+}
+
+function readNumber(value: unknown, fallback: number): number {
+	return typeof value === "number" && Number.isFinite(value) ? value : fallback
+}
+
+export function parseStoredViewPrefs(
+	stored: string | null,
+): StoredViewPrefs | null {
+	if (!stored) return null
+	try {
+		const parsed = JSON.parse(stored) as Record<string, unknown>
+		return {
+			colorMode: isColorMode(parsed.colorMode)
+				? parsed.colorMode
+				: DEFAULT_VIEW_PREFS.colorMode,
+			geographyMode: isColorMode(parsed.geographyMode)
+				? parsed.geographyMode
+				: DEFAULT_VIEW_PREFS.geographyMode,
+			nationMode: isNationMapMode(parsed.nationMode)
+				? parsed.nationMode
+				: DEFAULT_VIEW_PREFS.nationMode,
+			populationMode: isPopulationMapMode(parsed.populationMode)
+				? parsed.populationMode
+				: DEFAULT_VIEW_PREFS.populationMode,
+			viewMode: isViewMode(parsed.viewMode)
+				? parsed.viewMode
+				: DEFAULT_VIEW_PREFS.viewMode,
+			showWireframe: readBoolean(
+				parsed.showWireframe,
+				DEFAULT_VIEW_PREFS.showWireframe,
+			),
+			showGrid: readBoolean(parsed.showGrid, DEFAULT_VIEW_PREFS.showGrid),
+			showNationBorders: readBoolean(
+				parsed.showNationBorders,
+				DEFAULT_VIEW_PREFS.showNationBorders,
+			),
+			showNationHierarchy: readBoolean(
+				parsed.showNationHierarchy,
+				DEFAULT_VIEW_PREFS.showNationHierarchy,
+			),
+			showNationLabels: readBoolean(
+				parsed.showNationLabels,
+				DEFAULT_VIEW_PREFS.showNationLabels,
+			),
+			showElevation: readBoolean(
+				parsed.showElevation,
+				DEFAULT_VIEW_PREFS.showElevation,
+			),
+			showThermalEquator: readBoolean(
+				parsed.showThermalEquator,
+				DEFAULT_VIEW_PREFS.showThermalEquator,
+			),
+			showRivers: readBoolean(parsed.showRivers, DEFAULT_VIEW_PREFS.showRivers),
+			showInfrastructure: readBoolean(
+				parsed.showInfrastructure,
+				DEFAULT_VIEW_PREFS.showInfrastructure,
+			),
+			overlaysExpanded: readBoolean(
+				parsed.overlaysExpanded,
+				DEFAULT_VIEW_PREFS.overlaysExpanded,
+			),
+			gridSpacing: readNumber(
+				parsed.gridSpacing,
+				DEFAULT_VIEW_PREFS.gridSpacing,
+			),
+			unitSystem: isUnitSystem(parsed.unitSystem)
+				? parsed.unitSystem
+				: DEFAULT_VIEW_PREFS.unitSystem,
+			mapProjectionLatitude: readNumber(
+				parsed.mapProjectionLatitude,
+				DEFAULT_VIEW_PREFS.mapProjectionLatitude,
+			),
+			debugMapModes: readBoolean(
+				parsed.debugMapModes,
+				DEFAULT_VIEW_PREFS.debugMapModes,
+			),
+			measureMode: isMeasureMode(parsed.measureMode)
+				? parsed.measureMode
+				: DEFAULT_VIEW_PREFS.measureMode,
+			pathfindingLand: readBoolean(
+				parsed.pathfindingLand,
+				DEFAULT_VIEW_PREFS.pathfindingLand,
+			),
+			pathfindingSea: readBoolean(
+				parsed.pathfindingSea,
+				DEFAULT_VIEW_PREFS.pathfindingSea,
+			),
+		}
+	} catch {
+		return null
+	}
+}
+
+export function serializeStoredViewPrefs(prefs: StoredViewPrefs): string {
+	return JSON.stringify(prefs)
+}

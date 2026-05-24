@@ -43,6 +43,11 @@ export interface OrogenScene {
 		startXYZ: [number, number, number] | null,
 		endXYZ: [number, number, number] | null,
 	): void
+	setPathfindingOverlay(
+		pathRegions: number[] | null,
+		startXYZ: [number, number, number] | null,
+		endXYZ: [number, number, number] | null,
+	): void
 	projectToScreen(xyz: [number, number, number]): [number, number] | null
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: RiverData | null): void
@@ -65,4 +70,7 @@ export interface OrogenScene {
 	setSettlementsVisible(visible: boolean): void
 	setInfrastructure(edges: SerializedNetwork | null): void
 	setInfrastructureVisible(visible: boolean): void
+	setNationLabelsVisible(visible: boolean): void
+	setNationNames(names: string[] | null): void
+	setElevationVisible(visible: boolean): void
 }

@@ -282,7 +282,7 @@ describe("buildProvinceDisplayData", () => {
 		expect(result.provinceColor).toMatch(/^rgb/)
 		expect(result.provinceNation).toEqual({
 			id: 1,
-			color: "rgb(128, 153, 178)",
+			color: "rgb(194, 206, 218)",
 		})
 	})
 
@@ -303,7 +303,7 @@ describe("buildProvinceDisplayData", () => {
 			world,
 		})
 
-		expect(result.provinceNation?.color).toBe("rgb(255, 0, 0)")
+		expect(result.provinceNation?.color).toBe("rgb(255, 133, 133)")
 	})
 
 	it("returns null province details for invalid province inputs", () => {

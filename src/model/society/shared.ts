@@ -185,7 +185,11 @@ export function deriveChildColors(params: {
 	return colors
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+export function hslToRgb(
+	h: number,
+	s: number,
+	l: number,
+): [number, number, number] {
 	const c = (1 - Math.abs(2 * l - 1)) * s
 	const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
 	const m = l - c / 2
@@ -233,7 +237,11 @@ function generatePartitionColors(
 	return colors
 }
 
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+export function rgbToHsl(
+	r: number,
+	g: number,
+	b: number,
+): [number, number, number] {
 	const max = Math.max(r, g, b)
 	const min = Math.min(r, g, b)
 	const l = (max + min) / 2
@@ -256,7 +264,7 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
 	return [h / 6, s, l]
 }
 
-function clamp01(value: number) {
+export function clamp01(value: number) {
 	return Math.max(0, Math.min(1, value))
 }
 

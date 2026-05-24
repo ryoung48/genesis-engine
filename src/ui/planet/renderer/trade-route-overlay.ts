@@ -86,17 +86,20 @@ function regionPositionGlobe(
 	r_xyz: Float32Array,
 	elevation: Float32Array,
 	region: number,
+	elevationVisible: boolean,
 ): THREE.Vector3 {
 	const x = r_xyz[3 * region]
 	const y = r_xyz[3 * region + 1]
 	const z = r_xyz[3 * region + 2]
 	const len = Math.sqrt(x * x + y * y + z * z)
 	const elev = elevation[region]
-	const adj =
-		elev > 0
+	const adj = elevationVisible
+		? elev > 0
 			? elev * TERRAIN_ELEVATION_SCALE
 			: elev * TERRAIN_ELEVATION_SCALE * 0.3
-	const radius = 1 + adj + GLOBE_Z_LIFT
+		: 0
+	const lift = elevationVisible ? GLOBE_Z_LIFT : 0.004
+	const radius = 1 + adj + lift
 	return new THREE.Vector3(
 		(x / len) * radius,
 		(y / len) * radius,
@@ -344,6 +347,7 @@ export function buildGlobeTradeRoutes(
 	world: SerializedOrogenWorld,
 	edges: readonly RouteEdge[] | SerializedNetwork,
 	resolution: OverlayResolution,
+	elevationVisible: boolean,
 ): TradeRouteOverlayBuild {
 	const group = new THREE.Group()
 	const materials: LineMaterial[] = []
@@ -353,7 +357,12 @@ export function buildGlobeTradeRoutes(
 	const batchedPositions = createEmptyBatchedPositions()
 	for (const corridor of buildTradeRouteCorridors(edges)) {
 		const points = corridor.regions.map((region) =>
-			regionPositionGlobe(world.mesh.r_xyz, world.elevation, region),
+			regionPositionGlobe(
+				world.mesh.r_xyz,
+				world.elevation,
+				region,
+				elevationVisible,
+			),
 		)
 		appendPolylineSegments(batchedPositions[corridor.kind], points)
 	}

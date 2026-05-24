@@ -21,6 +21,7 @@ export function buildTerrainMesh(
 	world: SerializedOrogenWorld,
 	colorMode: Parameters<typeof getColor>[1],
 	regionColors: Float32Array | null,
+	elevationVisible: boolean,
 ): MeshBuildResult {
 	const { mesh, elevation, elevation_km } = world
 	const {
@@ -91,11 +92,12 @@ export function buildTerrainMesh(
 		]
 
 		for (const vertex of vertices) {
-			const radius =
-				1 +
-				(vertex.elev > 0
+			const elevationFactor = elevationVisible
+				? vertex.elev > 0
 					? vertex.elev * TERRAIN_ELEVATION_SCALE
-					: vertex.elev * TERRAIN_ELEVATION_SCALE * 0.3)
+					: vertex.elev * TERRAIN_ELEVATION_SCALE * 0.3
+				: 0
+			const radius = 1 + elevationFactor
 			const length = Math.sqrt(
 				vertex.x * vertex.x + vertex.y * vertex.y + vertex.z * vertex.z,
 			)
@@ -229,6 +231,7 @@ export function buildTerrainWireframe(
 	world: SerializedOrogenWorld,
 	wireframeVisible: boolean,
 	viewMode: OrogenViewMode,
+	elevationVisible: boolean,
 ): THREE.LineSegments {
 	const { mesh, elevation } = world
 	const { numSides, halfedges, s_inner_t, s_outer_t, t_xyz, s_begin_r } = mesh
@@ -244,11 +247,12 @@ export function buildTerrainWireframe(
 		const regionA = s_begin_r[side]
 		const regionB = opposite >= 0 ? s_begin_r[opposite] : regionA
 		const averageElevation = (elevation[regionA] + elevation[regionB]) * 0.5
-		const radius =
-			1.002 +
-			(averageElevation > 0
+		const elevationFactor = elevationVisible
+			? averageElevation > 0
 				? averageElevation * TERRAIN_ELEVATION_SCALE
-				: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3)
+				: averageElevation * TERRAIN_ELEVATION_SCALE * 0.3
+			: 0
+		const radius = 1.002 + elevationFactor
 
 		positions.push(
 			t_xyz[3 * tInner] * radius,

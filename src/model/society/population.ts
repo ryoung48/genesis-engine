@@ -48,9 +48,6 @@ const HAB_COASTAL_FACTORS = new Float32Array([
 	HAB_COASTAL_OCEAN,
 ])
 
-// landmark type: 0=continent, 1=island, 2=isle, 3=ocean, 4=sea, 5=lake
-const HAB_LANDMARK = new Float32Array([1.0, 0.8, 0.5, 0, 0, 0])
-
 export interface ProvincePopulation {
 	/** Per-province habitability score */
 	habitability: Float32Array
@@ -76,7 +73,7 @@ export interface ProvincePopulation {
  */
 export function computeProvinceHabitability(
 	provinces: OrogenProvinces,
-	landmarks: OrogenLandmarks,
+	_landmarks: OrogenLandmarks,
 	climateZones: Uint8Array,
 	vegetation: Uint8Array,
 	topography: Uint8Array,
@@ -110,14 +107,11 @@ export function computeProvinceHabitability(
 		const veg = vegetation[r]
 		const topo = topography[r]
 		const coastalFactor = HAB_COASTAL_FACTORS[waterAccess[province]]
-		const lm = landmarks.type[landmarks.regionLandmark[r]]
-
 		const score =
 			(HAB_CLIMATE[cz] ?? 0) *
 			(HAB_VEGETATION[veg] ?? 0) *
 			(HAB_TOPOGRAPHY[topo] ?? 0) *
 			coastalFactor *
-			(HAB_LANDMARK[lm] ?? 0) *
 			(0.8 + rng.random() * 0.4) // uniform(0.8, 1.2)
 
 		habitability[province] += score

@@ -10,6 +10,7 @@ import {
 	HEGEMON_FANOUT,
 	rebalanceHierarchy,
 } from "./hierarchy"
+import { clamp01, hslToRgb, rgbToHsl } from "./shared"
 import { computeProvinceWaterAccess, WATER_ACCESS_BONUS } from "./water-access"
 
 // Hard cap on how far a nation can spread from its capital, in km.
@@ -34,6 +35,7 @@ export function computeNations(params: {
 	coastal: Uint8Array
 	riverVisible: Uint8Array
 	waterAccess?: Uint8Array
+	provinceContinent?: Uint8Array
 	habitability: Float32Array
 	r_xyz: Float32Array
 	seed: number
@@ -44,6 +46,7 @@ export function computeNations(params: {
 		coastal,
 		riverVisible,
 		waterAccess: providedWaterAccess,
+		provinceContinent,
 		habitability,
 		r_xyz,
 	} = params
@@ -92,6 +95,7 @@ export function computeNations(params: {
 			blocked,
 			habitability,
 			waterAccess,
+			provinceContinent,
 			components.componentId,
 			components.sizes,
 			provinces.adjOffset,
@@ -188,7 +192,13 @@ export function computeNations(params: {
 					const nation = assignment[provinces.adjList[j]]
 					if (nation < 0) continue
 					const score =
-						nationPlacementScore(province, habitability, waterAccess) -
+						nationPlacementScore(
+							province,
+							habitability,
+							waterAccess,
+							provinceContinent,
+							members.length,
+						) -
 						sizes[nation] * 0.02
 					if (score > bestScore) {
 						bestScore = score
@@ -212,10 +222,18 @@ export function computeNations(params: {
 				seedProvince,
 				habitability,
 				waterAccess,
+				provinceContinent,
+				members.length,
 			)
 			for (let i = 1; i < members.length; i++) {
 				const province = members[i]
-				const score = nationPlacementScore(province, habitability, waterAccess)
+				const score = nationPlacementScore(
+					province,
+					habitability,
+					waterAccess,
+					provinceContinent,
+					members.length,
+				)
 				if (score > seedScore) {
 					seedProvince = province
 					seedScore = score
@@ -314,7 +332,13 @@ export function computeNations(params: {
 		adjOffset,
 		adjList,
 		size,
-		colors: nationColorsFromProvinces(nationCount, seeds, provinces.colors),
+		colors: nationColorsFromProvinces({
+			nationCount,
+			seeds,
+			provinceColors: provinces.colors,
+			adjOffset,
+			adjList,
+		}),
 		parent,
 		depth,
 		childOffset,
@@ -463,13 +487,35 @@ const NOISE_FREQ = 4.0
 const NOISE_STRENGTH = 0.4
 const HABITABILITY_CLAIM_WEIGHT = 0.01
 const WATER_CLAIM_WEIGHT = 0.02
+const LARGE_NATION_CONTINENT_BONUS = 3.5
+const LARGE_NATION_CONTINENT_MIN_TARGET = 10
+const LARGE_NATION_CONTINENT_FULL_TARGET = 50
 
 function nationPlacementScore(
 	province: number,
 	habitability: Float32Array<ArrayBufferLike>,
 	waterAccess: Uint8Array<ArrayBufferLike>,
+	provinceContinent: Uint8Array<ArrayBufferLike> | undefined,
+	target: number,
 ): number {
-	return habitability[province] + waterAccess[province] * WATER_ACCESS_BONUS
+	return (
+		habitability[province] +
+		waterAccess[province] * WATER_ACCESS_BONUS +
+		continentPlacementBonus(province, provinceContinent, target)
+	)
+}
+
+function continentPlacementBonus(
+	province: number,
+	provinceContinent: Uint8Array<ArrayBufferLike> | undefined,
+	target: number,
+): number {
+	if (!provinceContinent?.[province]) return 0
+	const sizeBias = clamp01(
+		(target - LARGE_NATION_CONTINENT_MIN_TARGET) /
+			(LARGE_NATION_CONTINENT_FULL_TARGET - LARGE_NATION_CONTINENT_MIN_TARGET),
+	)
+	return sizeBias * LARGE_NATION_CONTINENT_BONUS
 }
 
 function bestClaim(
@@ -559,6 +605,7 @@ function selectSeed(
 	blocked: Uint8Array,
 	habitability: Float32Array,
 	waterAccess: Uint8Array,
+	provinceContinent: Uint8Array | undefined,
 	componentId: Int32Array,
 	componentSizes: number[],
 	adjOffset: Int32Array,
@@ -583,7 +630,14 @@ function selectSeed(
 			1 + Math.min(openNeighbors, Math.max(1, Math.round(Math.sqrt(target))))
 		const sizeFactor = Math.min(componentSize, target) / Math.max(1, target)
 		const score =
-			nationPlacementScore(p, habitability, waterAccess) * blockedPenalty +
+			nationPlacementScore(
+				p,
+				habitability,
+				waterAccess,
+				provinceContinent,
+				target,
+			) *
+				blockedPenalty +
 			expansion +
 			sizeFactor
 		if (componentSize >= target && score > bestScore) {
@@ -695,19 +749,114 @@ function groupByNation(
 	return members
 }
 
-function nationColorsFromProvinces(
-	nationCount: number,
-	seeds: number[],
-	provinceColors: Float32Array,
-): Float32Array {
+function nationColorsFromProvinces(params: {
+	nationCount: number
+	seeds: number[]
+	provinceColors: Float32Array
+	adjOffset: Int32Array
+	adjList: Int32Array
+}): Float32Array {
+	const { nationCount, seeds, provinceColors, adjOffset, adjList } = params
 	const colors = new Float32Array(nationCount * 3)
-	for (let n = 0; n < nationCount; n++) {
-		const p = seeds[n]
-		colors[3 * n] = provinceColors[3 * p]
-		colors[3 * n + 1] = provinceColors[3 * p + 1]
-		colors[3 * n + 2] = provinceColors[3 * p + 2]
+	if (nationCount === 0) return colors
+
+	const baseColors = new Array<[number, number, number]>(nationCount)
+	for (let nation = 0; nation < nationCount; nation++) {
+		const province = seeds[nation]
+		baseColors[nation] = [
+			provinceColors[3 * province],
+			provinceColors[3 * province + 1],
+			provinceColors[3 * province + 2],
+		]
 	}
+
+	const order = Array.from({ length: nationCount }, (_, nation) => nation).sort(
+		(a, b) => {
+			const degreeDelta =
+				adjOffset[b + 1] - adjOffset[b] - (adjOffset[a + 1] - adjOffset[a])
+			if (degreeDelta !== 0) return degreeDelta
+			return a - b
+		},
+	)
+	const assigned = new Uint8Array(nationCount)
+
+	for (const nation of order) {
+		const candidates = buildNationColorCandidates(baseColors[nation])
+		let bestColor = baseColors[nation]
+		let bestScore = -Infinity
+		for (const candidate of candidates) {
+			let neighborPenalty = 0
+			let minNeighborDistance = Infinity
+			for (
+				let edge = adjOffset[nation], end = adjOffset[nation + 1];
+				edge < end;
+				edge++
+			) {
+				const neighbor = adjList[edge]
+				if (!assigned[neighbor]) continue
+				const nr = colors[3 * neighbor]
+				const ng = colors[3 * neighbor + 1]
+				const nb = colors[3 * neighbor + 2]
+				const distance = colorDistance(candidate, [nr, ng, nb])
+				minNeighborDistance = Math.min(minNeighborDistance, distance)
+				if (distance < 0.32) neighborPenalty += (0.32 - distance) * 4
+			}
+			const baseDistance = colorDistance(candidate, baseColors[nation])
+			const score =
+				(minNeighborDistance === Infinity ? 0.6 : minNeighborDistance * 3) -
+				baseDistance * 0.9 -
+				neighborPenalty
+			if (score > bestScore) {
+				bestScore = score
+				bestColor = candidate
+			}
+		}
+		colors[3 * nation] = bestColor[0]
+		colors[3 * nation + 1] = bestColor[1]
+		colors[3 * nation + 2] = bestColor[2]
+		const province = seeds[nation]
+		provinceColors[3 * province] = bestColor[0]
+		provinceColors[3 * province + 1] = bestColor[1]
+		provinceColors[3 * province + 2] = bestColor[2]
+		assigned[nation] = 1
+	}
+
 	return colors
+}
+
+function buildNationColorCandidates(
+	baseColor: [number, number, number],
+): [number, number, number][] {
+	const [baseHue, baseSat, baseLight] = rgbToHsl(
+		baseColor[0],
+		baseColor[1],
+		baseColor[2],
+	)
+	const hueOffsets = [0, -0.08, 0.08, -0.16, 0.16, 0.32, 0.5]
+	const satOffsets = [0, 0.08, -0.06]
+	const lightOffsets = [0, -0.08, 0.06]
+	const candidates: [number, number, number][] = []
+	for (const hueOffset of hueOffsets) {
+		for (const satOffset of satOffsets) {
+			for (const lightOffset of lightOffsets) {
+				const hue = (baseHue + hueOffset + 1) % 1
+				const sat = clamp01(baseSat + satOffset)
+				const light = clamp01(baseLight + lightOffset)
+				candidates.push(hslToRgb(hue * 360, sat, light))
+			}
+		}
+	}
+	return candidates
+}
+
+function colorDistance(
+	a: [number, number, number],
+	b: [number, number, number],
+): number {
+	const dr = a[0] - b[0]
+	const dg = a[1] - b[1]
+	const db = a[2] - b[2]
+	return Math.sqrt(dr * dr + dg * dg + db * db)
 }
 
 function emptyPartition(nodeCount: number): OrogenNationHierarchy {

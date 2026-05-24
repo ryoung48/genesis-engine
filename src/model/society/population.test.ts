@@ -12,7 +12,6 @@ const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
 const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
 const HAB_COASTAL_OCEAN = 1.5
 const HAB_COASTAL_RIVER = 1.1
-const HAB_LANDMARK = new Float32Array([1.0, 0.8, 0.5, 0, 0, 0])
 
 describe("computePopulation", () => {
 	it("sums per-region habitability into each province and applies world scoring once", () => {
@@ -62,7 +61,6 @@ describe("computePopulation", () => {
 				HAB_CLIMATE[climateZone] *
 				HAB_VEGETATION[vegetation[region]] *
 				HAB_TOPOGRAPHY[topography[region]] *
-				HAB_LANDMARK[landmarks.type[landmarks.regionLandmark[region]]] *
 				randomFactor
 			)
 		})
@@ -70,7 +68,7 @@ describe("computePopulation", () => {
 		const expectedProvince1 = regionScores[2]
 		const cellAreaKm2 = (4 * Math.PI) / 3
 		const expectedHabitabilityScore =
-			((expectedProvince0 + expectedProvince1) * cellAreaKm2) / 83302728.146
+			((expectedProvince0 + expectedProvince1) * cellAreaKm2) / 81234131.618
 
 		expect(result.habitability[0]).toBeCloseTo(expectedProvince0, 5)
 		expect(result.habitability[1]).toBeCloseTo(expectedProvince1, 5)
@@ -122,8 +120,7 @@ describe("computePopulation", () => {
 		)
 
 		const rng = createRng(seed + 77777)
-		const baseScore =
-			HAB_CLIMATE[4] * HAB_VEGETATION[4] * HAB_TOPOGRAPHY[0] * HAB_LANDMARK[0]
+		const baseScore = HAB_CLIMATE[4] * HAB_VEGETATION[4] * HAB_TOPOGRAPHY[0]
 		// Province 0 has ocean coastal (region 1) → HAB_COASTAL_OCEAN for all its regions
 		// Province 1 has river (region 3) → HAB_COASTAL_RIVER
 		const regionScores = [
@@ -266,6 +263,57 @@ describe("computeProvinceHabitability", () => {
 
 		expect(hab[0]).toBeGreaterThan(0) // province 0 is non-desolate
 		expect(hab[1]).toBe(0) // province 1 is desolate
+	})
+
+	it("does not reduce habitability for non-continent landmarks", () => {
+		const provinces = {
+			regionProvince: new Int32Array([0]),
+			seeds: new Int32Array([0]),
+			count: 1,
+			desolate: new Uint8Array([0]),
+			landmassId: new Int32Array([0]),
+			adjOffset: new Int32Array([0, 0]),
+			adjList: new Int32Array(),
+			size: new Int32Array([1]),
+			colors: new Float32Array(3),
+		} satisfies OrogenProvinces
+		const continentLandmarks = {
+			regionLandmark: new Int32Array([0]),
+			type: new Uint8Array([0]),
+			size: new Int32Array([1]),
+			count: 1,
+		} satisfies OrogenLandmarks
+		const isleLandmarks = {
+			regionLandmark: new Int32Array([0]),
+			type: new Uint8Array([2]),
+			size: new Int32Array([1]),
+			count: 1,
+		} satisfies OrogenLandmarks
+
+		const continentHabitability = computeProvinceHabitability(
+			provinces,
+			continentLandmarks,
+			new Uint8Array([4]),
+			new Uint8Array([4]),
+			new Uint8Array([0]),
+			new Uint8Array([0]),
+			new Uint8Array([0]),
+			new Uint8Array([0]),
+			17,
+		)
+		const isleHabitability = computeProvinceHabitability(
+			provinces,
+			isleLandmarks,
+			new Uint8Array([4]),
+			new Uint8Array([4]),
+			new Uint8Array([0]),
+			new Uint8Array([0]),
+			new Uint8Array([0]),
+			new Uint8Array([0]),
+			17,
+		)
+
+		expect(continentHabitability[0]).toBeCloseTo(isleHabitability[0], 6)
 	})
 })
 

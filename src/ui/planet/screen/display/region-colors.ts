@@ -110,6 +110,17 @@ export function getDynastyColor(id: number): [number, number, number] {
 	return [r, g, b]
 }
 
+export function toPastelNationColor(
+	color: readonly [number, number, number],
+): [number, number, number] {
+	const pastelMix = 0.52
+	return [
+		color[0] + (1 - color[0]) * pastelMix,
+		color[1] + (1 - color[1]) * pastelMix,
+		color[2] + (1 - color[2]) * pastelMix,
+	]
+}
+
 const TERRAIN_FEATURE_COLORS: Record<number, [number, number, number]> = {
 	[OROGEN_TERRAIN_FEATURE.RIFT_VALLEY]: [0.82, 0.29, 0.22],
 	[OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN]: [0.7, 0.22, 0.18],
@@ -165,14 +176,8 @@ export function computeRegionColors(
 
 	const N = world.mesh.numRegions
 	const rgb = new Float32Array(N * 3)
-	const darkenMapWaterTemperature =
-		viewMode === "map" && colorMode === "temperature"
-	const darkenMapWaterPastaClimate =
-		viewMode === "map" && colorMode === "pastaClimate"
-	const darkenMapWaterOceanCurrents =
-		viewMode === "map" && colorMode === "oceanCurrents"
-	const darkenMapWaterMoisture = viewMode === "map" && colorMode === "moisture"
-	const mapWaterDarkenFactor = 0.74
+	const oceanRgb = (r: number): [number, number, number] =>
+		darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, world.elevation_km[r])
 
 	if (colorMode === "slope") {
 		const slopeScoreByRegion = world.slopeScore
@@ -194,10 +199,19 @@ export function computeRegionColors(
 
 	if (colorMode === "topography" && world.topography) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = TOPOGRAPHY_COLORS[world.topography[r]] ?? [1, 1, 1]
-			rgb[3 * r] = cr
-			rgb[3 * r + 1] = cg
-			rgb[3 * r + 2] = cb
+			const topo = world.topography[r]
+			const isWater = topo === 5 || topo === 6
+			if (isWater) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else {
+				const [cr, cg, cb] = TOPOGRAPHY_COLORS[topo] ?? [1, 1, 1]
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
 		}
 		return rgb
 	}
@@ -206,6 +220,8 @@ export function computeRegionColors(
 		(colorMode === "temperature" || colorMode === "temperatureDelta") &&
 		world.climate
 	) {
+		const darkenMapWaterTemperature =
+			viewMode === "map" && colorMode === "temperature"
 		const temps =
 			temperatureMonth === 0
 				? world.climate.temperature_avg
@@ -222,8 +238,7 @@ export function computeRegionColors(
 						)
 					: temperatureColor(temps[r])
 			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
-			const factor =
-				darkenMapWaterTemperature && isWater ? mapWaterDarkenFactor : 1
+			const factor = darkenMapWaterTemperature && isWater ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
 			rgb[3 * r + 2] = cb * factor
@@ -236,7 +251,7 @@ export function computeRegionColors(
 			for (let r = 0; r < N; r++) {
 				const [cr, cg, cb] =
 					world.elevation[r] <= 0
-						? precipitationAnnualColor(world.rainfall.annual[r])
+						? oceanRgb(r)
 						: darkenClimateAtElevation(
 								precipitationAnnualColor(world.rainfall.annual[r]),
 								world.elevation_km[r],
@@ -250,7 +265,7 @@ export function computeRegionColors(
 			for (let r = 0; r < N; r++) {
 				const [cr, cg, cb] =
 					world.elevation[r] <= 0
-						? precipitationColor(world.rainfall.monthly[offset + r])
+						? oceanRgb(r)
 						: darkenClimateAtElevation(
 								precipitationColor(world.rainfall.monthly[offset + r]),
 								world.elevation_km[r],
@@ -260,50 +275,59 @@ export function computeRegionColors(
 				rgb[3 * r + 2] = cb
 			}
 		}
-		for (let r = 0; r < N; r++) {
-			if (world.elevation[r] <= 0) {
-				rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-				rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-				rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
-			}
-		}
 		return rgb
 	}
 
 	if (colorMode === "moisture" && world.rainfall) {
 		if (rainfallMonth === 0) {
 			for (let r = 0; r < N; r++) {
-				const east = world.rainfall.east[r]
-				const west = world.rainfall.west[r]
-				const moisture = Math.max(east, west)
-				const dominantIsEast =
-					Math.abs(east - west) < 0.02 ? moisture >= 0.35 : east > west
-				const [cr, cg, cb] = moistureDirectionalColor(moisture, dominantIsEast)
 				const isWater = world.isLand
 					? !world.isLand[r]
 					: world.elevation[r] <= 0
-				const factor =
-					darkenMapWaterMoisture && isWater ? mapWaterDarkenFactor : 1
-				rgb[3 * r] = cr * factor
-				rgb[3 * r + 1] = cg * factor
-				rgb[3 * r + 2] = cb * factor
+				if (isWater) {
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else {
+					const east = world.rainfall.east[r]
+					const west = world.rainfall.west[r]
+					const moisture = Math.max(east, west)
+					const dominantIsEast =
+						Math.abs(east - west) < 0.02 ? moisture >= 0.35 : east > west
+					const [cr, cg, cb] = moistureDirectionalColor(
+						moisture,
+						dominantIsEast,
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
 			}
 		} else {
 			for (let r = 0; r < N; r++) {
-				const east = world.rainfall.east[r]
-				const west = world.rainfall.west[r]
-				const moisture = Math.max(east, west)
-				const dominantIsEast =
-					Math.abs(east - west) < 0.02 ? moisture >= 0.35 : east > west
-				const [cr, cg, cb] = moistureDirectionalColor(moisture, dominantIsEast)
 				const isWater = world.isLand
 					? !world.isLand[r]
 					: world.elevation[r] <= 0
-				const factor =
-					darkenMapWaterMoisture && isWater ? mapWaterDarkenFactor : 1
-				rgb[3 * r] = cr * factor
-				rgb[3 * r + 1] = cg * factor
-				rgb[3 * r + 2] = cb * factor
+				if (isWater) {
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else {
+					const east = world.rainfall.east[r]
+					const west = world.rainfall.west[r]
+					const moisture = Math.max(east, west)
+					const dominantIsEast =
+						Math.abs(east - west) < 0.02 ? moisture >= 0.35 : east > west
+					const [cr, cg, cb] = moistureDirectionalColor(
+						moisture,
+						dominantIsEast,
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
 			}
 		}
 		return rgb
@@ -334,11 +358,12 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "pastaClimate" && world.pastaClimate) {
+		const darkenMapWaterPastaClimate =
+			viewMode === "map" && colorMode === "pastaClimate"
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
 			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
-			const factor =
-				darkenMapWaterPastaClimate && isWater ? mapWaterDarkenFactor : 1
+			const factor = darkenMapWaterPastaClimate && isWater ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
 			rgb[3 * r + 2] = cb * factor
@@ -361,9 +386,10 @@ export function computeRegionColors(
 		const chaoticRgb = climateZoneColor(8)
 		for (let r = 0; r < N; r++) {
 			if (world.elevation[r] <= 0) {
-				rgb[3 * r] = 0.05
-				rgb[3 * r + 1] = 0.08
-				rgb[3 * r + 2] = 0.18
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
 				continue
 			}
 			let [cr, cg, cb] = climateTempColor(world.climate.temperature_avg[r])
@@ -398,7 +424,7 @@ export function computeRegionColors(
 							? (monthly[offset + r] ?? world.dtr_annual[r])
 							: world.dtr_annual[r],
 					)
-				: OCEAN_LIGHT_BLUE
+				: oceanRgb(r)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -412,16 +438,21 @@ export function computeRegionColors(
 		const offset = monthly ? (currentMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
 			const isLand = !!world.isLand?.[r]
-			const delta = monthly
-				? (monthly[offset + r] ?? temperatureDelta?.[r] ?? 0)
-				: (temperatureDelta?.[r] ?? 0)
-			const colorValue = Math.max(-1, Math.min(1, delta / 15))
-			const [cr, cg, cb] = oceanCurrentColor(colorValue)
-			const factor =
-				darkenMapWaterOceanCurrents && !isLand ? mapWaterDarkenFactor : 1
-			rgb[3 * r] = cr * factor
-			rgb[3 * r + 1] = cg * factor
-			rgb[3 * r + 2] = cb * factor
+			if (!isLand) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else {
+				const delta = monthly
+					? (monthly[offset + r] ?? temperatureDelta?.[r] ?? 0)
+					: (temperatureDelta?.[r] ?? 0)
+				const colorValue = Math.max(-1, Math.min(1, delta / 15))
+				const [cr, cg, cb] = oceanCurrentColor(colorValue)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
 		}
 		return rgb
 	}
@@ -429,16 +460,23 @@ export function computeRegionColors(
 	if (colorMode === "dangerZones" && world.hazards) {
 		for (let r = 0; r < N; r++) {
 			const isLand = !!world.isLand?.[r]
-			const earthquake = world.hazards.earthquake[r] ?? 0
-			const volcano = world.hazards.volcano[r] ?? 0
-			const scaledColor = dangerMapColor(earthquake, volcano)
-			const [cr, cg, cb] = isLand
-				? darkenVegetationAtElevation(scaledColor, world.elevation_km[r])
-				: scaledColor
-			const factor = viewMode === "map" && !isLand ? 0.78 : 1
-			rgb[3 * r] = cr * factor
-			rgb[3 * r + 1] = cg * factor
-			rgb[3 * r + 2] = cb * factor
+			if (!isLand) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else {
+				const earthquake = world.hazards.earthquake[r] ?? 0
+				const volcano = world.hazards.volcano[r] ?? 0
+				const scaledColor = dangerMapColor(earthquake, volcano)
+				const [cr, cg, cb] = darkenVegetationAtElevation(
+					scaledColor,
+					world.elevation_km[r],
+				)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
 		}
 		return rgb
 	}
@@ -452,20 +490,24 @@ export function computeRegionColors(
 		const invMax = maxHotspot > 1e-6 ? 1 / maxHotspot : 0
 		for (let r = 0; r < N; r++) {
 			const isLand = !!world.isLand?.[r]
-			const score = Math.max(
-				0,
-				Math.min(1, world.volcanism.hotspot[r] * invMax),
-			)
-			const [cr, cg, cb] = isLand
-				? darkenVegetationAtElevation(
-						hotspotColor(score),
-						world.elevation_km[r],
-					)
-				: hotspotColor(score)
-			const factor = viewMode === "map" && !isLand ? 0.82 : 1
-			rgb[3 * r] = cr * factor
-			rgb[3 * r + 1] = cg * factor
-			rgb[3 * r + 2] = cb * factor
+			if (!isLand) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else {
+				const score = Math.max(
+					0,
+					Math.min(1, world.volcanism.hotspot[r] * invMax),
+				)
+				const [cr, cg, cb] = darkenVegetationAtElevation(
+					hotspotColor(score),
+					world.elevation_km[r],
+				)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
 		}
 		return rgb
 	}
@@ -480,16 +522,17 @@ export function computeRegionColors(
 				const dynastyId =
 					rulerNationId >= 0 ? (world.leaderDynasty?.[rulerNationId] ?? -1) : -1
 				if (p < 0) {
-					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
 				} else if (desolate[p] || dynastyId < 0) {
 					rgb[3 * r] = 0.35
 					rgb[3 * r + 1] = 0.33
 					rgb[3 * r + 2] = 0.32
 				} else {
 					const [cr, cg, cb] = darkenPoliticalAtElevation(
-						getDynastyColor(dynastyId),
+						toPastelNationColor(getDynastyColor(dynastyId)),
 						world.elevation_km[r],
 					)
 					rgb[3 * r] = cr
@@ -504,9 +547,10 @@ export function computeRegionColors(
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
 				if (p < 0) {
-					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
 				} else if (desolate[p]) {
 					rgb[3 * r] = 0.35
 					rgb[3 * r + 1] = 0.33
@@ -529,9 +573,10 @@ export function computeRegionColors(
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
 				if (p < 0) {
-					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
 				} else if (desolate[p] || world.nations.assignment[p] < 0) {
 					rgb[3 * r] = 0.35
 					rgb[3 * r + 1] = 0.33
@@ -571,9 +616,10 @@ export function computeRegionColors(
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
 				if (p < 0) {
-					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
 				} else if (desolate[p] || world.nations.assignment[p] < 0) {
 					rgb[3 * r] = 0.35
 					rgb[3 * r + 1] = 0.33
@@ -585,11 +631,11 @@ export function computeRegionColors(
 							world.nations.assignment[p],
 						) ?? world.nations.assignment[p]
 					const [cr, cg, cb] = darkenPoliticalAtElevation(
-						[
+						toPastelNationColor([
 							world.nations.colors[3 * displayColorNationId],
 							world.nations.colors[3 * displayColorNationId + 1],
 							world.nations.colors[3 * displayColorNationId + 2],
-						],
+						]),
 						world.elevation_km[r],
 					)
 					rgb[3 * r] = cr
@@ -606,9 +652,10 @@ export function computeRegionColors(
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
 			if (p < 0) {
-				rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-				rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-				rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
 			} else if (desolate[p]) {
 				rgb[3 * r] = 0.35
 				rgb[3 * r + 1] = 0.33
@@ -651,9 +698,10 @@ export function computeRegionColors(
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
 			if (p < 0) {
-				rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-				rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-				rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
 			} else if (desolate[p]) {
 				rgb[3 * r] = 0.35
 				rgb[3 * r + 1] = 0.33
@@ -731,10 +779,18 @@ export function computeRegionColors(
 
 	if (colorMode === "basins" && world.rivers?.basinId) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = basinColor(world.rivers.basinId[r] ?? -1)
-			rgb[3 * r] = cr
-			rgb[3 * r + 1] = cg
-			rgb[3 * r + 2] = cb
+			const basinId = world.rivers.basinId[r] ?? -1
+			if (basinId < 0) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else {
+				const [cr, cg, cb] = basinColor(basinId)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
 		}
 		return rgb
 	}
@@ -781,6 +837,11 @@ export function computeRegionColors(
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
+			} else if (world.elevation[r] <= 0) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
 			} else {
 				const l = regionLocation[r]
 				const tgIdx = l != null && l >= 0 ? (world.tradeGoods[l] ?? 0) : 0
@@ -788,13 +849,6 @@ export function computeRegionColors(
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
-			}
-		}
-		for (let r = 0; r < N; r++) {
-			if (world.elevation[r] <= 0) {
-				rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
-				rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
-				rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
 			}
 		}
 		return rgb

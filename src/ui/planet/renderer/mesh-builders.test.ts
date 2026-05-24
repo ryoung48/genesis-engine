@@ -29,6 +29,7 @@ describe("mesh-builders", () => {
 			world,
 			"terrain",
 			regionColors,
+			true,
 		)
 
 		expect(faceToRegion).toEqual(new Int32Array([0, 1, 2, 0, 2, 3]))
@@ -45,6 +46,7 @@ describe("mesh-builders", () => {
 			buildSparseWorld(),
 			"terrain",
 			null,
+			true,
 		)
 
 		expect(faceToRegion).toEqual(new Int32Array([0]))
@@ -57,6 +59,7 @@ describe("mesh-builders", () => {
 			world,
 			"terrain",
 			regionColors,
+			true,
 		)
 
 		const updated = applyTerrainColorModeColors(
@@ -74,7 +77,7 @@ describe("mesh-builders", () => {
 	})
 
 	it("builds terrain meshes directly from smoothed grayscale colors", () => {
-		const { mesh } = buildTerrainMesh(buildWorld(), "landHeightmap", null)
+		const { mesh } = buildTerrainMesh(buildWorld(), "landHeightmap", null, true)
 
 		const colorArray = getColorArray(mesh)
 		expect(colorArray[0]).not.toBeCloseTo(colorArray[3], 6)
@@ -82,7 +85,7 @@ describe("mesh-builders", () => {
 	})
 
 	it("configures terrain shader overlays during material compilation", () => {
-		const { mesh } = buildTerrainMesh(buildWorld(), "terrain", null)
+		const { mesh } = buildTerrainMesh(buildWorld(), "terrain", null, true)
 		const material = mesh.material as THREE.MeshLambertMaterial
 		const shader = {
 			vertexShader: "#include <beginnormal_vertex>\nvoid main() {",
@@ -100,7 +103,7 @@ describe("mesh-builders", () => {
 	it("builds a terrain wireframe for unique edges in globe view", () => {
 		const world = buildWorld()
 
-		const wireframe = buildTerrainWireframe(world, true, "globe")
+		const wireframe = buildTerrainWireframe(world, true, "globe", true)
 
 		expect(wireframe.visible).toBe(true)
 		const position = wireframe.geometry.getAttribute("position")
@@ -109,7 +112,7 @@ describe("mesh-builders", () => {
 	})
 
 	it("hides terrain wireframes outside globe view", () => {
-		const wireframe = buildTerrainWireframe(buildWorld(), true, "map")
+		const wireframe = buildTerrainWireframe(buildWorld(), true, "map", true)
 
 		expect(wireframe.visible).toBe(false)
 	})
@@ -119,6 +122,7 @@ describe("mesh-builders", () => {
 			buildInvalidWireframeWorld(),
 			true,
 			"globe",
+			true,
 		)
 		const position = wireframe.geometry.getAttribute(
 			"position",
@@ -302,7 +306,12 @@ describe("mesh-builders", () => {
 
 	it("applies face region colors and occupation overlays in place", () => {
 		const world = buildWorld()
-		const { mesh, faceToRegion } = buildTerrainMesh(world, "terrain", null)
+		const { mesh, faceToRegion } = buildTerrainMesh(
+			world,
+			"terrain",
+			null,
+			true,
+		)
 		const regionColors = new Float32Array([
 			0.1, 0.2, 0.3, 0.7, 0.6, 0.5, 0.2, 0.4, 0.6, 0.9, 0.8, 0.7,
 		])
@@ -454,7 +463,12 @@ describe("mesh-builders", () => {
 
 	it("skips occupation overlay writes when overlay attributes are missing", () => {
 		const world = buildWorld()
-		const { mesh, faceToRegion } = buildTerrainMesh(world, "terrain", null)
+		const { mesh, faceToRegion } = buildTerrainMesh(
+			world,
+			"terrain",
+			null,
+			true,
+		)
 		mesh.geometry.deleteAttribute("occColor")
 		mesh.geometry.deleteAttribute("occMask")
 
@@ -472,7 +486,7 @@ describe("mesh-builders", () => {
 
 	it("skips missing outer triangles during in-place recolors", () => {
 		const sparseWorld = buildSparseWorld()
-		const terrainBuild = buildTerrainMesh(sparseWorld, "terrain", null)
+		const terrainBuild = buildTerrainMesh(sparseWorld, "terrain", null, true)
 		const mapBuild = buildMapMesh(sparseWorld, "terrain", null, 0, 0)
 
 		expect(

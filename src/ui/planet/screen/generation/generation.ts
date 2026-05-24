@@ -88,6 +88,14 @@ export interface GenerationCallbacks {
 		timelines: SerializedTimelines,
 		events: HistoryNote[],
 	) => void
+	onPathfindResult?: (result: {
+		pathRegions: Int32Array
+		distanceKm: number
+		landKm: number
+		seaKm: number
+		travelDays: number
+		reachable: boolean
+	}) => void
 }
 
 function createWorker(
@@ -136,6 +144,17 @@ function createWorker(
 			console.error("Orogen worker failed", message.message, message.stack)
 			callbacks.setGenerationLabel(failLabel)
 			callbacks.setGenerating(false)
+			return
+		}
+		if (message.type === "pathfind-result") {
+			callbacks.onPathfindResult?.({
+				pathRegions: message.pathRegions,
+				distanceKm: message.distanceKm,
+				landKm: message.landKm,
+				seaKm: message.seaKm,
+				travelDays: message.travelDays,
+				reachable: message.reachable,
+			})
 			return
 		}
 	}

@@ -10,6 +10,7 @@ import {
 	getDynastyColor,
 	getTerrainFeatureColor,
 	getTopographyColor,
+	toPastelNationColor,
 } from "../screen/display/region-colors"
 import { buildRulerDisplayMeta } from "../screen/display/ruler-display"
 import type { PopulationMapMode } from "../screen/shared/map-modes"
@@ -172,9 +173,11 @@ export function buildProvinceDisplayData(params: {
 		world?.nations?.colors &&
 		hoverNationId * 3 + 2 < world.nations.colors.length
 			? rgbToCss([
-					world.nations.colors[hoverNationId * 3],
-					world.nations.colors[hoverNationId * 3 + 1],
-					world.nations.colors[hoverNationId * 3 + 2],
+					...toPastelNationColor([
+						world.nations.colors[hoverNationId * 3],
+						world.nations.colors[hoverNationId * 3 + 1],
+						world.nations.colors[hoverNationId * 3 + 2],
+					]),
 				])
 			: null
 	const provinceNation =

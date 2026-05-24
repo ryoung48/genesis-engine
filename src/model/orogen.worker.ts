@@ -13,6 +13,7 @@ import {
 	serializeHistoryTimelines,
 } from "./history/snapshot"
 import { type HistoryState, validateLiveHierarchy } from "./history/state"
+import { pathfind } from "./pathfinding/pathfind"
 import { generateOrogenWorld } from "./pipelines/generate-world"
 import { importOrogenWorld } from "./pipelines/import-heightmap"
 import type { ProvincePopulation } from "./society/population"
@@ -43,6 +44,8 @@ interface HistorySeedWorld {
 	waterAccess: Uint8Array | null
 	riverVisible: Uint8Array | null
 	isLand: Uint8Array | null
+	vegetation: Uint8Array | null
+	topography: Uint8Array | null
 	cultures: {
 		assignment: Int32Array
 		count: number
@@ -123,6 +126,8 @@ function cloneHistorySeedWorld(
 		waterAccess: world.waterAccess ? world.waterAccess.slice() : null,
 		riverVisible: world.rivers?.visible ? world.rivers.visible.slice() : null,
 		isLand: world.isLand ? world.isLand.slice() : null,
+		vegetation: world.vegetation ? world.vegetation.slice() : null,
+		topography: world.topography ? world.topography.slice() : null,
 		cultures: world.cultures
 			? {
 					assignment: world.cultures.assignment.slice(),
@@ -698,6 +703,65 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			historyTime = historyState.time
 		}
 		void runSimulation(message.tickMs ?? YEAR_MS)
+		return
+	}
+
+	if (message.type === "pathfind") {
+		if (!lastGeneratedWorld) {
+			self.postMessage({
+				type: "error",
+				message: "No world generated yet",
+			} satisfies OrogenWorkerResponse)
+			return
+		}
+
+		const world = lastGeneratedWorld
+		const numRegions = world.mesh.r_xyz.length / 3
+
+		// Build route edge set from network
+		const routeEdges = new Set<number>()
+		if (message.network) {
+			const span = numRegions
+			for (let i = 0; i < message.network.kind.length; i++) {
+				const from = message.network.fromRegion[i]
+				const to = message.network.toRegion[i]
+				const key = Math.min(from, to) * span + Math.max(from, to)
+				routeEdges.add(key)
+			}
+		}
+
+		const result = pathfind(
+			{
+				numRegions,
+				adjOffset: world.mesh.adjOffset,
+				adjList: world.mesh.adjList,
+				r_xyz: world.mesh.r_xyz,
+				regionIsLand: world.isLand ?? null,
+				vegetation: world.vegetation ?? null,
+				topography: world.topography ?? null,
+				waterDepth: null,
+				routeEdges,
+				planetRadiusKm: world.params.planetRadiusKm ?? 6371,
+				regionProvince: world.provinces.regionProvince ?? null,
+				desolate: world.provinces.desolate ?? null,
+			},
+			{
+				startRegion: message.startRegion,
+				endRegion: message.endRegion,
+				allowLand: message.allowLand,
+				allowSea: message.allowSea,
+			},
+		)
+
+		self.postMessage({
+			type: "pathfind-result",
+			pathRegions: Int32Array.from(result.pathRegions),
+			distanceKm: result.distanceKm,
+			landKm: result.landKm,
+			seaKm: result.seaKm,
+			travelDays: result.travelDays,
+			reachable: result.reachable,
+		} satisfies OrogenWorkerResponse)
 		return
 	}
 

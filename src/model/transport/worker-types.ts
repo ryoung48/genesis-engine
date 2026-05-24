@@ -444,6 +444,14 @@ export type OrogenWorkerRequest =
 				pressure?: number
 			}
 	  }
+	| {
+			type: "pathfind"
+			startRegion: number
+			endRegion: number
+			allowLand: boolean
+			allowSea: boolean
+			network?: SerializedNetwork | null
+	  }
 
 export type OrogenWorkerResponse =
 	| {
@@ -471,4 +479,13 @@ export type OrogenWorkerResponse =
 			timeMs: number
 			timelines: SerializedTimelines
 			events: HistoryNote[]
+	  }
+	| {
+			type: "pathfind-result"
+			pathRegions: Int32Array
+			distanceKm: number
+			landKm: number
+			seaKm: number
+			travelDays: number
+			reachable: boolean
 	  }

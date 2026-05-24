@@ -14,7 +14,7 @@ interface SettlementTier {
 	maxPop: number
 	label: string
 	/** Canvas texture factory */
-	buildTexture: () => THREE.CanvasTexture
+	buildTexture: (isCapital: boolean) => THREE.CanvasTexture
 	/** Min/max sprite scale for globe mode (interpolated by urbanPop) */
 	minGlobeScale: number
 	maxGlobeScale: number
@@ -47,6 +47,33 @@ const CROSS_WIDTH_RATIO = 0.045
 const FILL_COLOR = "#ffffff"
 const SOLID_BLACK = "#0f172a"
 const FILLED_CENTER_COLOR = "#334155" // for 200K-1M "filled center"
+const CAPITAL_FILL_COLOR = "#dc2626"
+const CAPITAL_SOLID_COLOR = "#b91c1c"
+const CAPITAL_FILLED_CENTER_COLOR = "#991b1b"
+
+interface SettlementVisualStyle {
+	fillColor: string
+	solidColor: string
+	filledCenterColor: string
+	crossColor: string
+}
+
+function getSettlementVisualStyle(isCapital: boolean): SettlementVisualStyle {
+	if (!isCapital) {
+		return {
+			fillColor: FILL_COLOR,
+			solidColor: SOLID_BLACK,
+			filledCenterColor: FILLED_CENTER_COLOR,
+			crossColor: CROSS_COLOR,
+		}
+	}
+	return {
+		fillColor: CAPITAL_FILL_COLOR,
+		solidColor: CAPITAL_SOLID_COLOR,
+		filledCenterColor: CAPITAL_FILLED_CENTER_COLOR,
+		crossColor: CROSS_COLOR,
+	}
+}
 
 function drawRing(
 	ctx: CanvasRenderingContext2D,
@@ -105,12 +132,13 @@ const TIERS: SettlementTier[] = [
 		maxGlobeScale: 0.005,
 		minMapRadius: 0.0008,
 		maxMapRadius: 0.0017,
-		buildTexture: () =>
+		buildTexture: (isCapital) =>
 			makeCanvasTexture(128, (ctx, w) => {
+				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
 				const r = w * 0.4
-				drawFilledCircle(ctx, cx, cy, r, FILL_COLOR)
+				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
 				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
 			}),
 	},
@@ -123,12 +151,13 @@ const TIERS: SettlementTier[] = [
 		maxGlobeScale: 0.0065,
 		minMapRadius: 0.0017,
 		maxMapRadius: 0.0022,
-		buildTexture: () =>
+		buildTexture: (isCapital) =>
 			makeCanvasTexture(128, (ctx, w) => {
+				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
 				const r = w * 0.42
-				drawFilledCircle(ctx, cx, cy, r, FILL_COLOR)
+				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
 				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
 			}),
 	},
@@ -141,14 +170,22 @@ const TIERS: SettlementTier[] = [
 		maxGlobeScale: 0.0075,
 		minMapRadius: 0.0018,
 		maxMapRadius: 0.0027,
-		buildTexture: () =>
+		buildTexture: (isCapital) =>
 			makeCanvasTexture(128, (ctx, w) => {
+				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
 				const r = w * 0.38
-				drawFilledCircle(ctx, cx, cy, r, FILL_COLOR)
+				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
 				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
-				drawCross(ctx, cx, cy, r * 0.55, w * CROSS_WIDTH_RATIO, CROSS_COLOR)
+				drawCross(
+					ctx,
+					cx,
+					cy,
+					r * 0.55,
+					w * CROSS_WIDTH_RATIO,
+					style.crossColor,
+				)
 			}),
 	},
 	{
@@ -160,17 +197,25 @@ const TIERS: SettlementTier[] = [
 		maxGlobeScale: 0.01,
 		minMapRadius: 0.0024,
 		maxMapRadius: 0.0033,
-		buildTexture: () =>
+		buildTexture: (isCapital) =>
 			makeCanvasTexture(128, (ctx, w) => {
+				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
 				const outerR = w * 0.42
 				const innerR = w * 0.32
 				const lw = w * RING_WIDTH_RATIO
-				drawFilledCircle(ctx, cx, cy, outerR, FILL_COLOR)
+				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
 				drawRing(ctx, cx, cy, outerR, lw, RING_COLOR)
 				drawRing(ctx, cx, cy, innerR, lw, RING_COLOR)
-				drawCross(ctx, cx, cy, innerR * 0.6, w * CROSS_WIDTH_RATIO, CROSS_COLOR)
+				drawCross(
+					ctx,
+					cx,
+					cy,
+					innerR * 0.6,
+					w * CROSS_WIDTH_RATIO,
+					style.crossColor,
+				)
 			}),
 	},
 	{
@@ -182,26 +227,33 @@ const TIERS: SettlementTier[] = [
 		maxGlobeScale: 0.012,
 		minMapRadius: 0.003,
 		maxMapRadius: 0.004,
-		buildTexture: () =>
+		buildTexture: (isCapital) =>
 			makeCanvasTexture(128, (ctx, w) => {
+				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
 				const outerR = w * 0.42
 				const innerR = w * 0.32
 				const lw = w * RING_WIDTH_RATIO
 				// White base behind rings
-				drawFilledCircle(ctx, cx, cy, outerR, FILL_COLOR)
+				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
 				drawRing(ctx, cx, cy, outerR, lw, RING_COLOR)
 				drawRing(ctx, cx, cy, innerR, lw, RING_COLOR)
 				// Darker filled center disc inside inner ring
-				drawFilledCircle(ctx, cx, cy, innerR - lw * 1.5, FILLED_CENTER_COLOR)
+				drawFilledCircle(
+					ctx,
+					cx,
+					cy,
+					innerR - lw * 1.5,
+					style.filledCenterColor,
+				)
 				drawCross(
 					ctx,
 					cx,
 					cy,
 					innerR * 0.6,
 					w * CROSS_WIDTH_RATIO * 1.2,
-					FILL_COLOR,
+					style.crossColor,
 				)
 			}),
 	},
@@ -214,15 +266,30 @@ const TIERS: SettlementTier[] = [
 		maxGlobeScale: 0.018,
 		minMapRadius: 0.004,
 		maxMapRadius: 0.0065,
-		buildTexture: () =>
+		buildTexture: (isCapital) =>
 			makeCanvasTexture(128, (ctx, w) => {
+				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
 				const r = w * 0.42
-				drawFilledCircle(ctx, cx, cy, r, SOLID_BLACK)
+				drawFilledCircle(ctx, cx, cy, r, style.solidColor)
 			}),
 	},
 ]
+
+function collectCapitalProvinces(
+	world: SerializedOrogenWorld,
+	locationsLength: number,
+): Set<number> {
+	const capitals = new Set<number>()
+	const seeds = world.nations?.seeds
+	if (!seeds) return capitals
+	for (let i = 0; i < seeds.length; i++) {
+		const province = seeds[i]
+		if (province >= 0 && province < locationsLength) capitals.add(province)
+	}
+	return capitals
+}
 
 function getTierIndex(urbanPop: number): number {
 	for (let t = 0; t < TIERS.length; t++) {
@@ -244,7 +311,7 @@ function tierFraction(pop: number, tier: SettlementTier): number {
 	return Math.max(0, Math.min(1, (v - lo) / range))
 }
 
-function globeScaleForPop(pop: number): number {
+export function globeScaleForPop(pop: number): number {
 	const t = getTierIndex(pop)
 	if (t < 0) return 0
 	const tier = TIERS[t]
@@ -252,7 +319,7 @@ function globeScaleForPop(pop: number): number {
 	return tier.minGlobeScale + (tier.maxGlobeScale - tier.minGlobeScale) * f
 }
 
-function mapRadiusForPop(pop: number): number {
+export function mapRadiusForPop(pop: number): number {
 	const t = getTierIndex(pop)
 	if (t < 0) return 0
 	const tier = TIERS[t]
@@ -266,6 +333,7 @@ function settlementPositionGlobe(
 	r_xyz: Float32Array,
 	elevation: Float32Array,
 	region: number,
+	elevationVisible: boolean,
 ): [number, number, number] {
 	const x = r_xyz[3 * region]
 	const y = r_xyz[3 * region + 1]
@@ -275,11 +343,13 @@ function settlementPositionGlobe(
 	const ny = y / len
 	const nz = z / len
 	const elev = elevation[region]
-	const adj =
-		elev > 0
+	const adj = elevationVisible
+		? elev > 0
 			? elev * TERRAIN_ELEVATION_SCALE
 			: elev * TERRAIN_ELEVATION_SCALE * 0.3
-	const radius = 1 + adj + SETTLEMENT_LIFT
+		: 0
+	const lift = elevationVisible ? SETTLEMENT_LIFT : 0.002
+	const radius = 1 + adj + lift
 	return [nx * radius, ny * radius, nz * radius]
 }
 
@@ -287,6 +357,7 @@ export function buildGlobeSettlements(
 	world: SerializedOrogenWorld,
 	locations: Int32Array,
 	urbanPop: Float32Array,
+	elevationVisible: boolean,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces) return group
@@ -295,7 +366,11 @@ export function buildGlobeSettlements(
 	const elevation = world.elevation
 
 	// Pre-build textures per tier
-	const tierTextures = TIERS.map((t) => t.buildTexture())
+	const tierTextures = TIERS.map((tier) => ({
+		normal: tier.buildTexture(false),
+		capital: tier.buildTexture(true),
+	}))
+	const capitalProvinces = collectCapitalProvinces(world, locations.length)
 
 	for (let p = 0; p < locations.length; p++) {
 		const r = locations[p]
@@ -304,18 +379,29 @@ export function buildGlobeSettlements(
 		const t = getTierIndex(pop)
 		if (t < 0) continue
 
-		const [px, py, pz] = settlementPositionGlobe(r_xyz, elevation, r)
+		const [px, py, pz] = settlementPositionGlobe(
+			r_xyz,
+			elevation,
+			r,
+			elevationVisible,
+		)
 		const scale = globeScaleForPop(pop)
+		const isCapital = capitalProvinces.has(p)
 
 		const spriteMat = new THREE.SpriteMaterial({
-			map: tierTextures[t],
+			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
 			depthWrite: false,
 			transparent: true,
 		})
+		spriteMat.userData = {
+			fillColor: isCapital ? CAPITAL_FILL_COLOR : FILL_COLOR,
+			isCapital,
+		}
 		const sprite = new THREE.Sprite(spriteMat)
 		sprite.position.set(px, py, pz)
 		sprite.scale.setScalar(scale)
 		sprite.renderOrder = 998
+		sprite.userData = { isCapital, province: p }
 		group.add(sprite)
 	}
 
@@ -363,7 +449,11 @@ export function buildMapSettlements(
 	const elevation = world.elevation
 
 	// Pre-build textures per tier
-	const tierTextures = TIERS.map((t) => t.buildTexture())
+	const tierTextures = TIERS.map((tier) => ({
+		normal: tier.buildTexture(false),
+		capital: tier.buildTexture(true),
+	}))
+	const capitalProvinces = collectCapitalProvinces(world, locations.length)
 
 	for (let p = 0; p < locations.length; p++) {
 		const r = locations[p]
@@ -374,17 +464,23 @@ export function buildMapSettlements(
 
 		const [px, py, pz] = settlementPositionMap(projection, r_xyz, elevation, r)
 		const radius = mapRadiusForPop(pop)
+		const isCapital = capitalProvinces.has(p)
 
 		const circleGeo = new THREE.CircleGeometry(radius, 16)
 		const mat = new THREE.MeshBasicMaterial({
-			map: tierTextures[t],
+			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
 			depthWrite: false,
 			transparent: true,
 			side: THREE.DoubleSide,
 		})
+		mat.userData = {
+			fillColor: isCapital ? CAPITAL_FILL_COLOR : FILL_COLOR,
+			isCapital,
+		}
 		const circle = new THREE.Mesh(circleGeo, mat)
 		circle.position.set(px, py, pz)
 		circle.renderOrder = 998
+		circle.userData = { isCapital, province: p }
 		group.add(circle)
 	}
 

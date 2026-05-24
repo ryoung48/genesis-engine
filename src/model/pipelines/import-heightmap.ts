@@ -35,6 +35,7 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "../terrain/erosion"
+import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
 export interface ImportParams {
@@ -315,6 +316,16 @@ export function importOrogenWorld(
 	record("Post-elevation pipeline", t0)
 	onProgress?.("import:post-pipeline", 70)
 
+	t0 = performance.now()
+	const provinceSociety = deriveProvinceSociety({
+		mesh,
+		params: orogenParams,
+		post,
+		isLand,
+	})
+	record("Imported province society", t0)
+	onProgress?.("import:society", 77)
+
 	return {
 		mesh,
 		plates,
@@ -352,10 +363,19 @@ export function importOrogenWorld(
 		riverLand: isLand,
 		provinces: post.provinces,
 		locations: post.locations,
+		nations: provinceSociety.nations,
+		cultures: provinceSociety.cultures,
+		heritages: provinceSociety.heritages,
+		faiths: provinceSociety.faiths,
+		religions: provinceSociety.religions,
+		landmarks: provinceSociety.landmarks,
 		population: post.population,
 		tradeGoods: post.tradeGoods,
+		settlementRegions: provinceSociety.settlementRegions,
+		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
+		settlementPortRegions: provinceSociety.settlementPortRegions,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: countContinents(mesh, isLand),
-		timings: [...timings, ...post.timings],
+		timings: [...timings, ...post.timings, ...provinceSociety.timings],
 	}
 }

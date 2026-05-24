@@ -55,7 +55,9 @@ describe("province-overlay", () => {
 	it("collects province border positions on globe and map projections", () => {
 		const world = makeWorld()
 
-		expect(collectProvinceBorderGlobePositions(world, 0, 0.003)).toHaveLength(6)
+		expect(
+			collectProvinceBorderGlobePositions(world, 0, 0.003, true),
+		).toHaveLength(6)
 		expect(
 			collectProvinceBorderMapPositions(world, 0, 0, 0, 0.004),
 		).toHaveLength(6)
@@ -65,7 +67,12 @@ describe("province-overlay", () => {
 		const world = makeWorld()
 		const mergedWorld = makeWorld(new Int32Array([0, 0]))
 
-		const globeBorder = buildSelectedProvinceBorderGlobe(world, 0, "globe")
+		const globeBorder = buildSelectedProvinceBorderGlobe(
+			world,
+			0,
+			"globe",
+			true,
+		)
 		const mapBorder = buildSelectedProvinceBorderMap(world, 0, 0, 0, "map")
 
 		expect(globeBorder).not.toBeNull()
@@ -74,7 +81,9 @@ describe("province-overlay", () => {
 		expect(mapBorder).not.toBeNull()
 		expect(mapBorder?.visible).toBe(true)
 		expect((mapBorder?.material as LineMaterial).linewidth).toBe(4)
-		expect(buildSelectedProvinceBorderGlobe(mergedWorld, 0, "globe")).toBeNull()
+		expect(
+			buildSelectedProvinceBorderGlobe(mergedWorld, 0, "globe", true),
+		).toBeNull()
 		expect(
 			buildSelectedProvinceBorderMap(mergedWorld, 0, 0, 0, "map"),
 		).toBeNull()
@@ -101,6 +110,7 @@ describe("province-overlay", () => {
 				{ mesh: invalidWorld.mesh } as SerializedOrogenWorld,
 				0,
 				0,
+				true,
 			),
 		).toEqual([])
 		expect(
@@ -111,6 +121,7 @@ describe("province-overlay", () => {
 				} as SerializedOrogenWorld,
 				0,
 				"globe",
+				true,
 			),
 		).toBeNull()
 		expect(
@@ -125,7 +136,9 @@ describe("province-overlay", () => {
 				"map",
 			),
 		).toBeNull()
-		expect(collectProvinceBorderGlobePositions(invalidWorld, 0, 0)).toEqual([])
+		expect(
+			collectProvinceBorderGlobePositions(invalidWorld, 0, 0, true),
+		).toEqual([])
 		expect(collectProvinceBorderMapPositions(invalidWorld, 0, 0, 0, 0)).toEqual(
 			[],
 		)
@@ -142,7 +155,7 @@ describe("province-overlay", () => {
 			collectProvinceBorderMapPositions(reversedWrappedWorld, 0, 0, 0, 0),
 		).toHaveLength(12)
 		expect(
-			buildSelectedProvinceBorderGlobe(wrappedWorld, 0, "map", {
+			buildSelectedProvinceBorderGlobe(wrappedWorld, 0, "map", true, {
 				color: 0xabcdef,
 				opacity: 0.5,
 				radiusBoost: 0.01,
@@ -157,14 +170,14 @@ describe("province-overlay", () => {
 		).toBe(false)
 		expect(
 			(
-				buildSelectedProvinceBorderGlobe(wrappedWorld, 0, "globe", {
+				buildSelectedProvinceBorderGlobe(wrappedWorld, 0, "globe", true, {
 					lineWidth: 6,
 					resolution: [1920, 1080],
 				})?.material as LineMaterial
 			).linewidth,
 		).toBe(6)
 		expect(
-			buildSelectedProvinceBorderGlobe(wrappedWorld, 2, "globe"),
+			buildSelectedProvinceBorderGlobe(wrappedWorld, 2, "globe", true),
 		).toBeNull()
 		expect(
 			buildSelectedProvinceBorderMap(wrappedWorld, 2, 0, 0, "map"),
@@ -201,15 +214,17 @@ describe("province-overlay", () => {
 			},
 		} as SerializedOrogenWorld
 
-		expect(collectProvinceBorderGlobePositions(makeWorld(), 2, 0)).toEqual([])
+		expect(
+			collectProvinceBorderGlobePositions(makeWorld(), 2, 0, true),
+		).toEqual([])
 		expect(collectProvinceBorderMapPositions(makeWorld(), 2, 0, 0, 0)).toEqual(
 			[],
 		)
 		expect(
-			collectProvinceBorderGlobePositions(negativeWorld, 0, 0)[0],
+			collectProvinceBorderGlobePositions(negativeWorld, 0, 0, true)[0],
 		).toBeCloseTo(0.994)
 		expect(
-			collectProvinceBorderGlobePositions(invalidHalfedgeWorld, 2, 0),
+			collectProvinceBorderGlobePositions(invalidHalfedgeWorld, 2, 0, true),
 		).toEqual([])
 	})
 })

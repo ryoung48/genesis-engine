@@ -72,9 +72,9 @@ export const POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
 > = [
 	["borders", "Nations"],
-	["provinces", "Provinces"],
 	["dynasty", "Dynasty"],
 	["diplomacy", "Diplomacy"],
+	["provinces", "Provinces"],
 ]
 
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {

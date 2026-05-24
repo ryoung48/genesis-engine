@@ -1,8 +1,6 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js"
-import { Line2 } from "three/examples/jsm/lines/Line2.js"
-import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
@@ -16,6 +14,10 @@ import { disposeGroup, disposeObject3D } from "./disposal"
 import { getRegionFocusTargets } from "./focus"
 import { createMapProjection } from "./map-projection"
 import {
+	buildGlobeMeasurementOverlay,
+	buildMapMeasurementOverlay,
+} from "./measurement-overlay"
+import {
 	applyFaceRegionColors,
 	applyMapColorModeColors,
 	applyTerrainColorModeColors,
@@ -25,26 +27,39 @@ import {
 	buildTerrainMesh,
 	buildTerrainWireframe,
 } from "./mesh-builders"
+import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
+import {
+	buildGlobeNationLabels,
+	buildMapNationLabels,
+	createNationLabelPools,
+	disposePool,
+	updateGlobeLabelOrientations,
+} from "./nation-label-overlay"
 import {
 	buildGlobeGrid,
 	buildGlobeHierarchyOverlay,
 	buildGlobeRivers,
 	buildGlobeThermalEquator,
-	buildHoveredNationBorderGlobe,
-	buildHoveredNationBorderMap,
 	buildMapGrid,
 	buildMapHierarchyOverlay,
 	buildMapRivers,
 	buildMapThermalEquator,
+	buildNationBordersGlobe,
+	buildNationBordersMap,
 	collectNationBorderGlobePositions,
 	collectNationBorderMapPositions,
 } from "./overlay-builders"
+import {
+	buildGlobePathfindingOverlay,
+	buildMapPathfindingOverlay,
+} from "./pathfinding-overlay"
 import {
 	buildSelectedProvinceBorderGlobe,
 	buildSelectedProvinceBorderMap,
 	collectProvinceBorderGlobePositions,
 	collectProvinceBorderMapPositions,
 } from "./province-overlay"
+import { createRenderScheduler } from "./render-scheduler"
 import {
 	buildGlobeSettlements,
 	buildMapSettlements,
@@ -61,6 +76,7 @@ import type {
 } from "./types"
 
 const MAP_REPEAT_WIDTH = 4
+const CONTROL_SETTLE_FRAMES = 2
 
 function addMapSlideClones(object: THREE.Object3D) {
 	const clones: THREE.Object3D[] = []
@@ -193,6 +209,7 @@ export function createOrogenScene(
 		atmosMat.uniforms.atmosphereStrength.value = 0.7 + pressureFactor * 0.45
 		const shellScale = 1.105 + pressureFactor * 0.02
 		atmosMesh.scale.setScalar(shellScale / 1.12)
+		requestRender()
 	}
 
 	// Starfield
@@ -264,14 +281,13 @@ export function createOrogenScene(
 	let riverData: RiverData | null = null
 	let riversVisible = false
 	let riverMaterials: LineMaterial[] = []
-	let globeHoverNationBorder: THREE.LineSegments | null = null
-	let mapHoverNationBorder: THREE.LineSegments | null = null
+	let globeNationBorders: THREE.LineSegments | null = null
+	let mapNationBorders: THREE.LineSegments | null = null
 	let globeSelectedProvinceBorder: THREE.Object3D | null = null
 	let mapSelectedProvinceBorder: THREE.Object3D | null = null
 	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
 	let clickHandler: ((info: OrogenHoverInfo) => void) | null = null
 	let hoveredRegion = -1
-	let hoveredNation = -1
 	let selectedProvince = -1
 	let nationBordersVisible = false
 	const raycaster = new THREE.Raycaster()
@@ -280,6 +296,10 @@ export function createOrogenScene(
 	let mapMeasureLine: THREE.Line | null = null
 	let globeMeasureDots: THREE.Group | null = null
 	let mapMeasureDots: THREE.Group | null = null
+	let globePathfindingLine: LineSegments2 | null = null
+	let mapPathfindingLine: LineSegments2 | null = null
+	let globePathfindingDots: THREE.Group | null = null
+	let mapPathfindingDots: THREE.Group | null = null
 	let globeHierarchyOverlay: THREE.Group | null = null
 	let mapHierarchyOverlay: THREE.Group | null = null
 	let hierarchyOverlayNationId = -1
@@ -295,6 +315,84 @@ export function createOrogenScene(
 	let infrastructureData: SerializedNetwork | null = null
 	let infrastructureMaterials: LineMaterial[] = []
 	let infrastructureVisible = false
+	let globeNationLabels: THREE.Group | null = null
+	let mapNationLabels: THREE.Group | null = null
+	let nationLabelsVisible = false
+	let elevationVisible = true
+	const nationLabelPools = createNationLabelPools()
+	let nationNames: string[] | null = null
+	let globeControlsInteracting = false
+	let mapControlsInteracting = false
+	let globeControlActivityFrames = 0
+	let mapControlActivityFrames = 0
+
+	const renderScheduler = createRenderScheduler({
+		requestFrame: (callback) => window.requestAnimationFrame(callback),
+		cancelFrame: (handle) => window.cancelAnimationFrame(handle),
+		onFrame: () => {
+			let keepAnimating = false
+
+			if (focusTween) {
+				stepFocusTween()
+				keepAnimating = keepAnimating || focusTween !== null
+			}
+			if (pulse) {
+				stepPulse()
+				keepAnimating = keepAnimating || pulse !== null
+			}
+
+			if (currentViewMode === "map") {
+				if (mapControlsInteracting || mapControlActivityFrames > 0) {
+					mapControls.update()
+					if (!mapControlsInteracting && mapControlActivityFrames > 0) {
+						mapControlActivityFrames--
+					}
+					keepAnimating =
+						keepAnimating ||
+						mapControlsInteracting ||
+						mapControlActivityFrames > 0
+				}
+				renderer.render(scene, mapCamera)
+				return keepAnimating
+			}
+
+			if (globeMeasureDots && globeMeasureDots.visible) {
+				const dist = camera.position.length()
+				const scale = dist * 0.001
+				for (const child of globeMeasureDots.children) {
+					child.scale.setScalar(scale)
+				}
+			}
+			if (globeControlsInteracting || globeControlActivityFrames > 0) {
+				controls.update()
+				if (!globeControlsInteracting && globeControlActivityFrames > 0) {
+					globeControlActivityFrames--
+				}
+				keepAnimating =
+					keepAnimating ||
+					globeControlsInteracting ||
+					globeControlActivityFrames > 0
+			}
+			updateGlobeLabelOrientations(globeNationLabels, camera)
+			renderer.render(scene, camera)
+			return keepAnimating
+		},
+	})
+
+	function requestRender() {
+		renderScheduler.requestRender()
+	}
+
+	function syncAnimationState() {
+		renderScheduler.setAnimationActive(
+			!!focusTween ||
+				!!pulse ||
+				globeControlsInteracting ||
+				mapControlsInteracting ||
+				globeControlActivityFrames > 0 ||
+				mapControlActivityFrames > 0,
+		)
+	}
 
 	function updateMapCameraFrustum() {
 		const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight)
@@ -326,6 +424,7 @@ export function createOrogenScene(
 			hierarchyOverlayNationId,
 			currentViewMode,
 			canvas,
+			elevationVisible,
 		)
 		mapHierarchyOverlay = buildMapHierarchyOverlay(
 			hierarchyOverlayWorld,
@@ -360,6 +459,7 @@ export function createOrogenScene(
 			currentWorld,
 			settlementLocations,
 			settlementUrbanPop,
+			elevationVisible,
 		)
 		mapSettlements = buildMapSettlements(
 			currentWorld,
@@ -373,6 +473,36 @@ export function createOrogenScene(
 			addMapSlideClones(mapSettlements)
 			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
 			scene.add(mapSettlements)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildNationLabels() {
+		disposeGroup(scene, globeNationLabels)
+		disposeGroup(scene, mapNationLabels)
+		globeNationLabels = null
+		mapNationLabels = null
+		if (!currentWorld?.nations || !nationNames || !nationLabelsVisible) {
+			return
+		}
+		globeNationLabels = buildGlobeNationLabels(
+			currentWorld,
+			nationNames,
+			camera,
+			nationLabelPools.globe,
+		)
+		mapNationLabels = buildMapNationLabels(
+			currentWorld,
+			nationNames,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			nationLabelPools.map,
+		)
+		if (globeNationLabels) scene.add(globeNationLabels)
+		if (mapNationLabels) {
+			addMapSlideClones(mapNationLabels)
+			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
+			scene.add(mapNationLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -398,6 +528,7 @@ export function createOrogenScene(
 				width: canvas.clientWidth || 1,
 				height: canvas.clientHeight || 1,
 			},
+			elevationVisible,
 		)
 		const mapTradeRouteBuild = buildMapTradeRoutes(
 			currentWorld,
@@ -424,31 +555,27 @@ export function createOrogenScene(
 		updateOverlayVisibility()
 	}
 
-	function rebuildHoveredNationBorder() {
-		disposeObject3D(scene, globeHoverNationBorder)
-		disposeObject3D(scene, mapHoverNationBorder)
-		globeHoverNationBorder = null
-		mapHoverNationBorder = null
-		if (!currentWorld || hoveredNation < 0 || !nationBordersVisible) return
-		globeHoverNationBorder = buildHoveredNationBorderGlobe(
+	function rebuildNationBorders() {
+		disposeObject3D(scene, globeNationBorders)
+		disposeObject3D(scene, mapNationBorders)
+		globeNationBorders = null
+		mapNationBorders = null
+		if (!currentWorld || !nationBordersVisible) return
+		globeNationBorders = buildNationBordersGlobe(
 			currentWorld,
-			hoveredNation,
 			currentViewMode,
 			nationBordersVisible,
+			elevationVisible,
 		)
-		mapHoverNationBorder = buildHoveredNationBorderMap(
+		mapNationBorders = buildNationBordersMap(
 			currentWorld,
-			hoveredNation,
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 			currentViewMode,
 			nationBordersVisible,
 		)
-		if (globeHoverNationBorder) scene.add(globeHoverNationBorder)
-		if (mapHoverNationBorder) {
-			addMapSlideClones(mapHoverNationBorder)
-			scene.add(mapHoverNationBorder)
-		}
+		if (globeNationBorders) scene.add(globeNationBorders)
+		if (mapNationBorders) scene.add(mapNationBorders)
 		updateOverlayVisibility()
 	}
 
@@ -462,6 +589,7 @@ export function createOrogenScene(
 			currentWorld,
 			selectedProvince,
 			currentViewMode,
+			elevationVisible,
 			{
 				color: 0xfffbeb,
 				radiusBoost: 0.003,
@@ -548,9 +676,11 @@ export function createOrogenScene(
 	function refreshMeshColors() {
 		if (currentRegionColors) {
 			if (!recolorMeshesInPlace()) rebuildTerrain()
+			else requestRender()
 			return
 		}
 		if (!recolorModeColorsInPlace()) rebuildTerrain()
+		else requestRender()
 	}
 
 	function rebuildOverlays() {
@@ -560,8 +690,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, mapGrid)
 		disposeObject3D(scene, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
-		disposeObject3D(scene, globeHoverNationBorder)
-		disposeObject3D(scene, mapHoverNationBorder)
+		disposeObject3D(scene, globeNationBorders)
+		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(scene, globeSelectedProvinceBorder)
 		disposeObject3D(scene, mapSelectedProvinceBorder)
 		disposeObject3D(scene, pulseGlobe)
@@ -574,14 +704,16 @@ export function createOrogenScene(
 		disposeGroup(scene, mapSettlements)
 		disposeGroup(scene, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
+		disposeGroup(scene, globeNationLabels)
+		disposeGroup(scene, mapNationLabels)
 		terrainWireframe = null
 		mapWireframe = null
 		globeGrid = null
 		mapGrid = null
 		globeThermalEquator = null
 		mapThermalEquator = null
-		globeHoverNationBorder = null
-		mapHoverNationBorder = null
+		globeNationBorders = null
+		mapNationBorders = null
 		pulseGlobe = null
 		pulseMap = null
 		pulse = null
@@ -595,12 +727,16 @@ export function createOrogenScene(
 		settlementsDirty = true
 		globeInfrastructure = null
 		mapInfrastructure = null
+		globeNationLabels = null
+		mapNationLabels = null
+		syncAnimationState()
 
 		if (wireframeVisible && currentWorld) {
 			terrainWireframe = buildTerrainWireframe(
 				currentWorld,
 				wireframeVisible,
 				currentViewMode,
+				elevationVisible,
 			)
 			scene.add(terrainWireframe)
 		}
@@ -616,7 +752,12 @@ export function createOrogenScene(
 			scene.add(mapWireframe)
 		}
 		if (gridVisible) {
-			globeGrid = buildGlobeGrid(gridSpacingDeg, gridVisible, currentViewMode)
+			globeGrid = buildGlobeGrid(
+				gridSpacingDeg,
+				gridVisible,
+				currentViewMode,
+				elevationVisible,
+			)
 			mapGrid = buildMapGrid(
 				gridSpacingDeg,
 				currentMapProjectionLatitudeDeg,
@@ -631,6 +772,7 @@ export function createOrogenScene(
 			globeThermalEquator = buildGlobeThermalEquator(
 				thermalEquatorPoints,
 				currentViewMode,
+				elevationVisible,
 			)
 			mapThermalEquator = buildMapThermalEquator(
 				thermalEquatorPoints,
@@ -648,6 +790,7 @@ export function createOrogenScene(
 				riverMaterials,
 				riversVisible,
 				currentViewMode,
+				elevationVisible,
 			)
 			mapRivers = buildMapRivers(
 				riverData,
@@ -662,11 +805,12 @@ export function createOrogenScene(
 			addMapSlideClones(mapRivers)
 			scene.add(mapRivers)
 		}
-		rebuildHoveredNationBorder()
+		rebuildNationBorders()
 		rebuildSelectedProvinceBorder()
 		rebuildHierarchyOverlay()
 		rebuildSettlementOverlay()
 		rebuildTradeRouteOverlay()
+		rebuildNationLabels()
 		updateOverlayVisibility()
 	}
 
@@ -682,13 +826,13 @@ export function createOrogenScene(
 				currentViewMode === "map" && !!currentOccupationOverlay
 			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
 		}
-		if (globeHoverNationBorder)
-			globeHoverNationBorder.visible =
+		if (globeNationBorders)
+			globeNationBorders.visible =
 				currentViewMode === "globe" && nationBordersVisible
-		if (mapHoverNationBorder) {
-			mapHoverNationBorder.visible =
+		if (mapNationBorders) {
+			mapNationBorders.visible =
 				currentViewMode === "map" && nationBordersVisible
-			if (mapMesh) mapHoverNationBorder.position.copy(mapMesh.position)
+			if (mapMesh) mapNationBorders.position.copy(mapMesh.position)
 		}
 		if (globeSelectedProvinceBorder)
 			globeSelectedProvinceBorder.visible = currentViewMode === "globe"
@@ -745,6 +889,14 @@ export function createOrogenScene(
 				infrastructureVisible && currentViewMode === "map"
 			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
 		}
+		if (globeNationLabels)
+			globeNationLabels.visible =
+				nationLabelsVisible && currentViewMode === "globe"
+		if (mapNationLabels) {
+			mapNationLabels.visible = nationLabelsVisible && currentViewMode === "map"
+			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
+		}
+		requestRender()
 	}
 
 	function rebuildTerrain() {
@@ -759,6 +911,7 @@ export function createOrogenScene(
 			currentWorld,
 			currentColorMode,
 			currentRegionColors,
+			elevationVisible,
 		)
 		terrainMesh = terrainBuild.mesh
 		terrainFaceToRegion = terrainBuild.faceToRegion
@@ -795,7 +948,6 @@ export function createOrogenScene(
 		if (!world) {
 			currentWorld = null
 			hoveredRegion = -1
-			hoveredNation = -1
 			disposeObject3D(scene, terrainMesh)
 			disposeObject3D(scene, mapMesh)
 			disposeObject3D(scene, mapOccupationOverlay)
@@ -813,18 +965,8 @@ export function createOrogenScene(
 			currentWorld.elevation_km === world.elevation_km &&
 			currentWorld.provinces?.regionProvince === world.provinces?.regionProvince
 		currentWorld = world
-		if (hoveredRegion >= 0) {
-			const hoveredProvince =
-				world.provinces?.regionProvince?.[hoveredRegion] ?? -1
-			hoveredNation =
-				hoveredProvince >= 0 && world.nations
-					? world.nations.assignment[hoveredProvince]
-					: -1
-		} else {
-			hoveredNation = -1
-		}
 		if (geometryUnchanged) {
-			rebuildHoveredNationBorder()
+			rebuildNationBorders()
 			rebuildSelectedProvinceBorder()
 			return
 		}
@@ -864,24 +1006,22 @@ export function createOrogenScene(
 
 	function setHoveredRegion(region: number | null) {
 		hoveredRegion = region ?? -1
-		if (!currentWorld || hoveredRegion < 0 || !nationBordersVisible) {
-			hoveredNation = -1
-			rebuildHoveredNationBorder()
-			return
-		}
-		const hoveredProvince =
-			currentWorld.provinces?.regionProvince?.[hoveredRegion] ?? -1
-		hoveredNation =
-			hoveredProvince >= 0 && currentWorld.nations
-				? currentWorld.nations.assignment[hoveredProvince]
-				: -1
-		rebuildHoveredNationBorder()
 	}
 
 	function setNationBordersVisible(visible: boolean) {
 		if (nationBordersVisible === visible) return
 		nationBordersVisible = visible
-		rebuildHoveredNationBorder()
+		if (
+			shouldRebuildNationBordersForVisibilityChange({
+				nextVisible: visible,
+				hasGlobeOverlay: globeNationBorders !== null,
+				hasMapOverlay: mapNationBorders !== null,
+			})
+		) {
+			rebuildNationBorders()
+			return
+		}
+		updateOverlayVisibility()
 	}
 
 	function setSelectedProvince(provinceId: number | null) {
@@ -918,6 +1058,8 @@ export function createOrogenScene(
 		}
 		if (currentViewMode === "globe") controls.enabled = false
 		else mapControls.enabled = false
+		syncAnimationState()
+		requestRender()
 	}
 
 	function focusOnNation(nationId: number, opts?: { durationMs?: number }) {
@@ -993,13 +1135,23 @@ export function createOrogenScene(
 		const lineWidth = target === "province" ? 5 : 4
 		const globePositions =
 			target === "province"
-				? collectProvinceBorderGlobePositions(currentWorld, province, 0.003)
+				? collectProvinceBorderGlobePositions(
+						currentWorld,
+						province,
+						0.003,
+						elevationVisible,
+					)
 				: (() => {
 						if (!currentWorld.nations) return []
 						const nation = currentWorld.nations.assignment[province]
 						return nation < 0
 							? []
-							: collectNationBorderGlobePositions(currentWorld, nation, 0.003)
+							: collectNationBorderGlobePositions(
+									currentWorld,
+									nation,
+									0.003,
+									elevationVisible,
+								)
 					})()
 		const mapPositions =
 			target === "province"
@@ -1040,6 +1192,8 @@ export function createOrogenScene(
 			duration: 1200,
 			clearSelectedProvince: target === "province",
 		}
+		syncAnimationState()
+		requestRender()
 	}
 
 	function stepPulse() {
@@ -1049,6 +1203,7 @@ export function createOrogenScene(
 			const clearSelectedProvince = pulse.clearSelectedProvince
 			clearPulse()
 			if (clearSelectedProvince) setSelectedProvince(null)
+			syncAnimationState()
 			return
 		}
 		const op = 0.9 * Math.abs(Math.sin(u * 2 * Math.PI))
@@ -1084,6 +1239,7 @@ export function createOrogenScene(
 			focusTween = null
 			if (mode === "globe") controls.enabled = currentViewMode === "globe"
 			else mapControls.enabled = currentViewMode === "map"
+			syncAnimationState()
 		}
 	}
 
@@ -1097,6 +1253,7 @@ export function createOrogenScene(
 		waterMesh.visible = !isMap
 		atmosMesh.visible = !isMap && sun.intensity > 0
 		updateOverlayVisibility()
+		syncAnimationState()
 	}
 
 	function setWireframeVisible(visible: boolean) {
@@ -1140,8 +1297,6 @@ export function createOrogenScene(
 	function clearHover() {
 		if (hoveredRegion === -1) return
 		hoveredRegion = -1
-		hoveredNation = -1
-		rebuildHoveredNationBorder()
 		emitHover(null)
 	}
 
@@ -1183,18 +1338,6 @@ export function createOrogenScene(
 		}
 
 		hoveredRegion = region
-		if (currentWorld && nationBordersVisible) {
-			const hoveredProvince =
-				currentWorld.provinces?.regionProvince?.[region] ?? -1
-			const nextHoveredNation =
-				hoveredProvince >= 0 && currentWorld.nations
-					? currentWorld.nations.assignment[hoveredProvince]
-					: -1
-			if (nextHoveredNation !== hoveredNation) {
-				hoveredNation = nextHoveredNation
-				rebuildHoveredNationBorder()
-			}
-		}
 		emitHover({
 			region,
 			clientX: event.clientX - rect.left,
@@ -1204,30 +1347,9 @@ export function createOrogenScene(
 
 	if (initialWorld) {
 		updateWorld(initialWorld)
+	} else {
+		requestRender()
 	}
-
-	// Animation loop
-	let animId = 0
-	function animate() {
-		animId = requestAnimationFrame(animate)
-		stepFocusTween()
-		stepPulse()
-		if (currentViewMode === "map") {
-			mapControls.update()
-			renderer.render(scene, mapCamera)
-		} else {
-			if (globeMeasureDots && globeMeasureDots.visible) {
-				const dist = camera.position.length()
-				const scale = dist * 0.001
-				for (const child of globeMeasureDots.children) {
-					child.scale.setScalar(scale)
-				}
-			}
-			controls.update()
-			renderer.render(scene, camera)
-		}
-	}
-	animate()
 
 	function resize() {
 		const w = canvas.clientWidth
@@ -1240,6 +1362,7 @@ export function createOrogenScene(
 		for (const mat of pulseMaterials) mat.resolution.set(w, h)
 		for (const mat of infrastructureMaterials) mat.resolution.set(w, h)
 		if (selectedProvince >= 0) rebuildSelectedProvinceBorder()
+		requestRender()
 	}
 
 	updateMapCameraFrustum()
@@ -1286,9 +1409,43 @@ export function createOrogenScene(
 	canvas.addEventListener("pointerleave", clearHover)
 	canvas.addEventListener("pointerdown", handlePointerDown)
 	canvas.addEventListener("pointerup", handleClick)
+	controls.addEventListener("start", () => {
+		globeControlsInteracting = true
+		globeControlActivityFrames = CONTROL_SETTLE_FRAMES
+		syncAnimationState()
+		requestRender()
+	})
+	controls.addEventListener("change", () => {
+		globeControlActivityFrames = CONTROL_SETTLE_FRAMES
+		syncAnimationState()
+		requestRender()
+	})
+	controls.addEventListener("end", () => {
+		globeControlsInteracting = false
+		globeControlActivityFrames = CONTROL_SETTLE_FRAMES
+		syncAnimationState()
+		requestRender()
+	})
+	mapControls.addEventListener("start", () => {
+		mapControlsInteracting = true
+		mapControlActivityFrames = CONTROL_SETTLE_FRAMES
+		syncAnimationState()
+		requestRender()
+	})
+	mapControls.addEventListener("change", () => {
+		mapControlActivityFrames = CONTROL_SETTLE_FRAMES
+		syncAnimationState()
+		requestRender()
+	})
+	mapControls.addEventListener("end", () => {
+		mapControlsInteracting = false
+		mapControlActivityFrames = CONTROL_SETTLE_FRAMES
+		syncAnimationState()
+		requestRender()
+	})
 
 	function dispose() {
-		cancelAnimationFrame(animId)
+		renderScheduler.dispose()
 		canvas.removeEventListener("pointermove", updateHover)
 		canvas.removeEventListener("pointerleave", clearHover)
 		canvas.removeEventListener("pointerdown", handlePointerDown)
@@ -1305,8 +1462,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, mapGrid)
 		disposeObject3D(scene, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
-		disposeObject3D(scene, globeHoverNationBorder)
-		disposeObject3D(scene, mapHoverNationBorder)
+		disposeObject3D(scene, globeNationBorders)
+		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(scene, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
 		disposeGroup(scene, globeRivers)
@@ -1317,6 +1474,10 @@ export function createOrogenScene(
 		disposeGroup(scene, mapSettlements)
 		disposeGroup(scene, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
+		disposeGroup(scene, globeNationLabels)
+		disposeGroup(scene, mapNationLabels)
+		disposePool(nationLabelPools.globe)
+		disposePool(nationLabelPools.map)
 		waterGeo.dispose()
 		waterMat.dispose()
 		atmosGeo.dispose()
@@ -1349,133 +1510,105 @@ export function createOrogenScene(
 		globeMeasureDots = null
 		mapMeasureDots = null
 
-		if (!startXYZ || !endXYZ) return
+		if (!startXYZ) {
+			requestRender()
+			return
+		}
 
-		const arcRadius = 1.02
-		const mapProjection = createMapProjection(
+		const w = canvas.clientWidth || 1
+		const h = canvas.clientHeight || 1
+		const globeOverlay = buildGlobeMeasurementOverlay(
+			startXYZ,
+			endXYZ,
+			currentViewMode,
+			[w, h],
+		)
+		globeMeasureLine = globeOverlay.line
+		globeMeasureDots = globeOverlay.dots
+		if (globeMeasureLine) scene.add(globeMeasureLine)
+		scene.add(globeMeasureDots)
+
+		const mapOverlay = buildMapMeasurementOverlay(
+			startXYZ,
+			endXYZ,
+			currentViewMode,
+			[w, h],
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 		)
-		const w = canvas.clientWidth || 1
-		const h = canvas.clientHeight || 1
-
-		const s = new THREE.Vector3(...startXYZ).normalize()
-		const e = new THREE.Vector3(...endXYZ).normalize()
-		const angle = s.angleTo(e)
-		const numSegments = Math.max(2, Math.ceil(angle / 0.02))
-		const globePositions: number[] = []
-		const mapPositions: number[] = []
-
-		for (let i = 0; i <= numSegments; i++) {
-			const t = i / numSegments
-			let pt: THREE.Vector3
-			if (angle < 0.001) {
-				pt = s.clone()
-			} else {
-				const sinA = Math.sin(angle)
-				const a = Math.sin((1 - t) * angle) / sinA
-				const b = Math.sin(t * angle) / sinA
-				pt = new THREE.Vector3(
-					s.x * a + e.x * b,
-					s.y * a + e.y * b,
-					s.z * a + e.z * b,
-				)
-			}
-			pt.normalize().multiplyScalar(arcRadius)
-			globePositions.push(pt.x, pt.y, pt.z)
-			const projected = mapProjection.projectCartesian(
-				pt.x / arcRadius,
-				pt.y / arcRadius,
-				pt.z / arcRadius,
-			)
-			const mapPoint = mapProjection.projectRadians(
-				projected.lon,
-				projected.lat,
-				0.003,
-			)
-			mapPositions.push(mapPoint[0], mapPoint[1], mapPoint[2])
+		mapMeasureLine = mapOverlay.line
+		mapMeasureDots = mapOverlay.dots
+		if (mapMeasureLine) {
+			if (mapMesh) mapMeasureLine.position.copy(mapMesh.position)
+			addMapSlideClones(mapMeasureLine)
+			scene.add(mapMeasureLine)
 		}
-
-		const globeLineGeo = new LineGeometry()
-		globeLineGeo.setPositions(globePositions)
-		const globeLineMat = new LineMaterial({
-			color: 0x000000,
-			linewidth: 2,
-			resolution: new THREE.Vector2(w, h),
-			depthWrite: false,
-			depthTest: false,
-			dashed: true,
-			dashSize: 0.008,
-			gapSize: 0.006,
-		})
-		const globeLine2 = new Line2(globeLineGeo, globeLineMat)
-		globeLine2.computeLineDistances()
-		globeLine2.renderOrder = 999
-		globeLine2.visible = currentViewMode === "globe"
-		globeMeasureLine = globeLine2 as unknown as THREE.Line
-		scene.add(globeMeasureLine)
-
-		const mapLineGeo = new LineGeometry()
-		mapLineGeo.setPositions(mapPositions)
-		const mapLineMat = new LineMaterial({
-			color: 0x000000,
-			linewidth: 2,
-			resolution: new THREE.Vector2(w, h),
-			depthWrite: false,
-			depthTest: false,
-			dashed: true,
-			dashSize: 0.008,
-			gapSize: 0.006,
-		})
-		const mapLine2 = new Line2(mapLineGeo, mapLineMat)
-		mapLine2.computeLineDistances()
-		mapLine2.renderOrder = 999
-		mapLine2.visible = currentViewMode === "map"
-		if (mapMesh) mapLine2.position.copy(mapMesh.position)
-		mapMeasureLine = mapLine2 as unknown as THREE.Line
-		addMapSlideClones(mapMeasureLine)
-		scene.add(mapMeasureLine)
-
-		globeMeasureDots = new THREE.Group()
-		const dotGeo = new THREE.SphereGeometry(1, 8, 8)
-		const dotMat = new THREE.MeshBasicMaterial({
-			color: 0x000000,
-			depthTest: false,
-		})
-		for (const xyz of [
-			s.clone().multiplyScalar(arcRadius),
-			e.clone().multiplyScalar(arcRadius),
-		]) {
-			const dot = new THREE.Mesh(dotGeo, dotMat)
-			dot.position.copy(xyz)
-			dot.renderOrder = 999
-			globeMeasureDots.add(dot)
-		}
-		globeMeasureDots.visible = currentViewMode === "globe"
-		scene.add(globeMeasureDots)
-
-		mapMeasureDots = new THREE.Group()
-		const mapDotGeo = new THREE.CircleGeometry(0.008, 12)
-		const startMapPt = new THREE.Vector3(
-			mapPositions[0],
-			mapPositions[1],
-			mapPositions[2],
-		)
-		const endMapPt = new THREE.Vector3(
-			mapPositions[mapPositions.length - 3],
-			mapPositions[mapPositions.length - 2],
-			mapPositions[mapPositions.length - 1],
-		)
-		for (const pt of [startMapPt, endMapPt]) {
-			const dot = new THREE.Mesh(mapDotGeo, dotMat.clone())
-			dot.position.copy(pt)
-			dot.renderOrder = 999
-			mapMeasureDots.add(dot)
-		}
-		mapMeasureDots.visible = currentViewMode === "map"
 		if (mapMesh) mapMeasureDots.position.copy(mapMesh.position)
 		addMapSlideClones(mapMeasureDots)
 		scene.add(mapMeasureDots)
+		requestRender()
+	}
+
+	function setPathfindingOverlay(
+		pathRegions: number[] | null,
+		startXYZ: [number, number, number] | null,
+		endXYZ: [number, number, number] | null,
+	) {
+		disposeObject3D(scene, globePathfindingLine)
+		disposeObject3D(scene, mapPathfindingLine)
+		disposeObject3D(scene, globePathfindingDots)
+		disposeObject3D(scene, mapPathfindingDots)
+		globePathfindingLine = null
+		mapPathfindingLine = null
+		globePathfindingDots = null
+		mapPathfindingDots = null
+
+		if (!startXYZ || !currentWorld) {
+			requestRender()
+			return
+		}
+
+		const r_xyz = currentWorld.mesh.r_xyz
+		const elevation = currentWorld.elevation
+		const w = canvas.clientWidth || 1
+		const h = canvas.clientHeight || 1
+
+		const globeOverlay = buildGlobePathfindingOverlay(
+			pathRegions,
+			startXYZ,
+			endXYZ,
+			r_xyz,
+			elevation,
+			currentViewMode,
+			[w, h],
+		)
+		globePathfindingLine = globeOverlay.line as LineSegments2 | null
+		globePathfindingDots = globeOverlay.dots
+		if (globePathfindingLine) scene.add(globePathfindingLine)
+		scene.add(globePathfindingDots)
+
+		const mapOverlay = buildMapPathfindingOverlay(
+			pathRegions,
+			startXYZ,
+			endXYZ,
+			r_xyz,
+			elevation,
+			currentViewMode,
+			[w, h],
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+		)
+		mapPathfindingLine = mapOverlay.line as LineSegments2 | null
+		mapPathfindingDots = mapOverlay.dots
+		if (mapPathfindingLine) {
+			if (mapMesh) mapPathfindingLine.position.copy(mapMesh.position)
+			addMapSlideClones(mapPathfindingLine)
+			scene.add(mapPathfindingLine)
+		}
+		if (mapMesh) mapPathfindingDots.position.copy(mapMesh.position)
+		addMapSlideClones(mapPathfindingDots)
+		scene.add(mapPathfindingDots)
+		requestRender()
 	}
 
 	function projectToScreen(
@@ -1554,6 +1687,7 @@ export function createOrogenScene(
 			dist * sinLat,
 		)
 		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
+		requestRender()
 	}
 
 	function syncMapAmbient() {
@@ -1584,6 +1718,7 @@ export function createOrogenScene(
 			)
 		}
 		syncMapAmbient()
+		requestRender()
 	}
 
 	function setHierarchyOverlay(
@@ -1639,6 +1774,23 @@ export function createOrogenScene(
 		rebuildTradeRouteOverlay()
 	}
 
+	function setNationLabelsVisible(visible: boolean) {
+		if (nationLabelsVisible === visible) return
+		nationLabelsVisible = visible
+		rebuildNationLabels()
+	}
+
+	function setNationNames(names: string[] | null) {
+		nationNames = names
+		rebuildNationLabels()
+	}
+
+	function setElevationVisible(visible: boolean) {
+		if (elevationVisible === visible) return
+		elevationVisible = visible
+		if (currentWorld) rebuildTerrain()
+	}
+
 	return {
 		dispose,
 		resize,
@@ -1659,6 +1811,7 @@ export function createOrogenScene(
 		setHoverHandler,
 		setClickHandler,
 		setMeasureLine,
+		setPathfindingOverlay,
 		projectToScreen,
 		setThermalEquator,
 		setRivers,
@@ -1668,6 +1821,9 @@ export function createOrogenScene(
 		setSettlementsVisible,
 		setInfrastructure,
 		setInfrastructureVisible,
+		setNationLabelsVisible,
+		setNationNames,
+		setElevationVisible,
 		setSunPosition,
 		setAtmospherePressure,
 		setFullAmbient,

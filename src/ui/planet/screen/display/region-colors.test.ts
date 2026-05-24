@@ -33,6 +33,7 @@ import {
 	computeRegionColors,
 	getTerrainFeatureColor,
 	getTopographyColor,
+	toPastelNationColor,
 } from "./region-colors"
 
 function expectRgbCloseTo(
@@ -130,7 +131,11 @@ describe("computeRegionColors", () => {
 
 		expect(rgb).not.toBeNull()
 		expectRegionColor(rgb!, 0, precipitationAnnualColor(120))
-		expectRegionColor(rgb!, 1, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			rgb!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("uses monthly moisture colors and darkens water cells in map view", () => {
@@ -157,11 +162,11 @@ describe("computeRegionColors", () => {
 
 		expect(rgb).not.toBeNull()
 		expectRegionColor(rgb!, 0, moistureDirectionalColor(0.36, true))
-		expectRegionColor(rgb!, 1, [
-			moistureDirectionalColor(0.8, true)[0] * 0.74,
-			moistureDirectionalColor(0.8, true)[1] * 0.74,
-			moistureDirectionalColor(0.8, true)[2] * 0.74,
-		])
+		expectRegionColor(
+			rgb!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("uses the mixed hazard tint for danger zones", () => {
@@ -186,12 +191,16 @@ describe("computeRegionColors", () => {
 		)
 
 		expect(rgb).not.toBeNull()
-		expectRegionColor(rgb!, 0, dangerMapColor(0.1, 1))
-		expectRegionColor(rgb!, 1, [
-			dangerMapColor(0.3, 0.6)[0] * 0.78,
-			dangerMapColor(0.3, 0.6)[1] * 0.78,
-			dangerMapColor(0.3, 0.6)[2] * 0.78,
-		])
+		expectRegionColor(
+			rgb!,
+			0,
+			darkenVegetationAtElevation(dangerMapColor(0.1, 1), 0),
+		)
+		expectRegionColor(
+			rgb!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("applies elevation shading to nation province fills", () => {
@@ -270,7 +279,35 @@ describe("computeRegionColors", () => {
 		)
 
 		expect(rgb).not.toBeNull()
-		expectRegionColor(rgb!, 0, darkenPoliticalAtElevation([0.7, 0.5, 0.3], 2))
+		expectRegionColor(
+			rgb!,
+			0,
+			darkenPoliticalAtElevation(toPastelNationColor([0.7, 0.5, 0.3]), 2),
+		)
+	})
+
+	it("increases nation saturation while still darkening higher elevation", () => {
+		const baseColor: [number, number, number] = [0.6, 0.45, 0.35]
+		const saturated = darkenPoliticalAtElevation(baseColor, 4)
+		const baseRange = Math.max(...baseColor) - Math.min(...baseColor)
+		const saturatedRange = Math.max(...saturated) - Math.min(...saturated)
+		const baseAverage =
+			(baseColor[0] + baseColor[1] + baseColor[2]) / baseColor.length
+		const saturatedAverage =
+			(saturated[0] + saturated[1] + saturated[2]) / saturated.length
+
+		expect(Math.max(...saturated)).toBeLessThan(Math.max(...baseColor))
+		expect(saturatedRange).toBeGreaterThan(baseRange)
+		expect(saturatedAverage).toBeLessThan(baseAverage)
+	})
+
+	it("lightens nation base colors before elevation shading", () => {
+		const baseColor: [number, number, number] = [0.35, 0.4, 0.45]
+		const pastel = toPastelNationColor(baseColor)
+
+		expect(pastel[0]).toBeGreaterThan(baseColor[0])
+		expect(pastel[1]).toBeGreaterThan(baseColor[1])
+		expect(pastel[2]).toBeGreaterThan(baseColor[2])
 	})
 
 	it("renders rebel nations with their loyalist base color in nation borders mode", () => {
@@ -318,7 +355,11 @@ describe("computeRegionColors", () => {
 			[{ idx: 4, attacker: 0, defender: 1, rebel: true, occupied: [] }],
 		)
 
-		expectRegionColor(rgb!, 1, darkenPoliticalAtElevation([0.2, 0.3, 0.4], 1))
+		expectRegionColor(
+			rgb!,
+			1,
+			darkenPoliticalAtElevation(toPastelNationColor([0.2, 0.3, 0.4]), 1),
+		)
 	})
 
 	it("darkens map water in temperature and moisture views", () => {
@@ -376,11 +417,11 @@ describe("computeRegionColors", () => {
 
 		expect(moisture).not.toBeNull()
 		expectRegionColor(moisture!, 0, moistureDirectionalColor(0.4, true))
-		expectRegionColor(moisture!, 1, [
-			moistureDirectionalColor(0.5, false)[0] * 0.74,
-			moistureDirectionalColor(0.5, false)[1] * 0.74,
-			moistureDirectionalColor(0.5, false)[2] * 0.74,
-		])
+		expectRegionColor(
+			moisture!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("falls back to elevation-based water detection when isLand is absent", () => {
@@ -450,11 +491,11 @@ describe("computeRegionColors", () => {
 			temperatureColor(6)[1] * 0.74,
 			temperatureColor(6)[2] * 0.74,
 		])
-		expectRegionColor(moisture!, 1, [
-			moistureDirectionalColor(0.5, false)[0] * 0.74,
-			moistureDirectionalColor(0.5, false)[1] * 0.74,
-			moistureDirectionalColor(0.5, false)[2] * 0.74,
-		])
+		expectRegionColor(
+			moisture!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(pasta!, 1, [
 			pastaClimateColor(2)[0] * 0.74,
 			pastaClimateColor(2)[1] * 0.74,
@@ -506,11 +547,11 @@ describe("computeRegionColors", () => {
 			slopeColor(0)[1] * 0.55,
 			Math.min(1, slopeColor(0)[2] * 0.8 + 0.18),
 		])
-		expectRegionColor(moisture!, 1, [
-			moistureDirectionalColor(0.4, true)[0] * 0.74,
-			moistureDirectionalColor(0.4, true)[1] * 0.74,
-			moistureDirectionalColor(0.4, true)[2] * 0.74,
-		])
+		expectRegionColor(
+			moisture!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("uses dtr monthly and ocean-current fallbacks when monthly values are missing", () => {
@@ -548,13 +589,17 @@ describe("computeRegionColors", () => {
 		)
 
 		expectRegionColor(dtr!, 0, dtrColor(6))
-		expectRegionColor(dtr!, 1, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			dtr!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(currents!, 0, oceanCurrentColor(0))
-		expectRegionColor(currents!, 1, [
-			oceanCurrentColor(-12 / 15)[0] * 0.74,
-			oceanCurrentColor(-12 / 15)[1] * 0.74,
-			oceanCurrentColor(-12 / 15)[2] * 0.74,
-		])
+		expectRegionColor(
+			currents!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("uses annual dtr and annual ocean-current data when no monthly view is selected", () => {
@@ -592,18 +637,22 @@ describe("computeRegionColors", () => {
 			"map",
 		)
 
-		expectRegionColor(dtr!, 0, OCEAN_LIGHT_BLUE)
-		expectRegionColor(dtr!, 1, OCEAN_LIGHT_BLUE)
-		expectRegionColor(currents!, 0, [
-			oceanCurrentColor(0)[0] * 0.74,
-			oceanCurrentColor(0)[1] * 0.74,
-			oceanCurrentColor(0)[2] * 0.74,
-		])
-		expectRegionColor(currents!, 1, [
-			oceanCurrentColor(-9 / 15)[0] * 0.74,
-			oceanCurrentColor(-9 / 15)[1] * 0.74,
-			oceanCurrentColor(-9 / 15)[2] * 0.74,
-		])
+		expectRegionColor(dtr!, 0, darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0))
+		expectRegionColor(
+			dtr!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
+		expectRegionColor(
+			currents!,
+			0,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0),
+		)
+		expectRegionColor(
+			currents!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("falls back to neutral population colors when lineage partitions are missing", () => {
@@ -764,8 +813,16 @@ describe("computeRegionColors", () => {
 			0,
 		)
 
-		expectRegionColor(danger!, 0, dangerMapColor(0, 0))
-		expectRegionColor(basins!, 0, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			danger!,
+			0,
+			darkenVegetationAtElevation(dangerMapColor(0, 0), 0),
+		)
+		expectRegionColor(
+			basins!,
+			0,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0),
+		)
 		expectRegionColor(religion!, 0, [0.35, 0.33, 0.32])
 	})
 
@@ -791,11 +848,11 @@ describe("computeRegionColors", () => {
 
 		expect(rgb).not.toBeNull()
 		expectRegionColor(rgb!, 0, getColor(0, "terrain"))
-		expectRegionColor(rgb!, 1, [
-			vegetationColor(5)[0] * 0.85,
-			vegetationColor(5)[1] * 0.85,
-			vegetationColor(5)[2] * 0.85,
-		])
+		expectRegionColor(
+			rgb!,
+			1,
+			darkenVegetationAtElevation(vegetationColor(5), 2),
+		)
 	})
 
 	it("renders pasta and koppen climate palettes", () => {
@@ -940,7 +997,11 @@ describe("computeRegionColors", () => {
 			blendRgb(climateTempColor(20), climateZoneColor(8), (5 + 5) / 2 / 15),
 		)
 		expectRegionColor(rgb!, 1, climateTempColor(10))
-		expectRegionColor(rgb!, 2, [0.05, 0.08, 0.18])
+		expectRegionColor(
+			rgb!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("blends chaotic climate cells and supports dtr, current, hotspot, and terrain feature modes", () => {
@@ -1059,24 +1120,32 @@ describe("computeRegionColors", () => {
 		)
 
 		expectRegionColor(climate!, 0, climateZoneColor(8))
-		expectRegionColor(climate!, 2, [0.05, 0.08, 0.18])
+		expectRegionColor(
+			climate!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(dtr!, 0, dtrColor(14))
-		expectRegionColor(dtr!, 2, OCEAN_LIGHT_BLUE)
-		expectRegionColor(currents!, 2, [
-			oceanCurrentColor(-1)[0] * 0.74,
-			oceanCurrentColor(-1)[1] * 0.74,
-			oceanCurrentColor(-1)[2] * 0.74,
-		])
-		expectRegionColor(hotspots!, 1, [
-			hotspotColor(1)[0] * 0.85,
-			hotspotColor(1)[1] * 0.85,
-			hotspotColor(1)[2] * 0.85,
-		])
-		expectRegionColor(hotspots!, 2, [
-			hotspotColor(0.2)[0] * 0.82,
-			hotspotColor(0.2)[1] * 0.82,
-			hotspotColor(0.2)[2] * 0.82,
-		])
+		expectRegionColor(
+			dtr!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
+		expectRegionColor(
+			currents!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
+		expectRegionColor(
+			hotspots!,
+			1,
+			darkenVegetationAtElevation(hotspotColor(1), 2),
+		)
+		expectRegionColor(
+			hotspots!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(features!, 0, [
 			coastalBase[0] * 0.2 + 0.82 * 0.8,
 			coastalBase[1] * 0.2 + 0.29 * 0.8,
@@ -1172,7 +1241,11 @@ describe("computeRegionColors", () => {
 			0,
 			darkenClimateAtElevation(precipitationColor(300), 2),
 		)
-		expectRegionColor(precipitation!, 1, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			precipitation!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 
 		expectRegionColor(temperatureDelta!, 0, temperatureDeltaColor(20))
 		expectRegionColor(temperatureDelta!, 1, temperatureDeltaColor(16))
@@ -1206,7 +1279,11 @@ describe("computeRegionColors", () => {
 			0,
 			0,
 		)
-		expectRegionColor(provinces!, 0, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			provinces!,
+			0,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(provinces!, 1, [0.35, 0.33, 0.32])
 		expectRegionColor(
 			provinces!,
@@ -1256,11 +1333,15 @@ describe("computeRegionColors", () => {
 			0,
 			0,
 		)
-		expectRegionColor(borders!, 0, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			borders!,
+			0,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(
 			borders!,
 			1,
-			darkenPoliticalAtElevation([0.6, 0.4, 0.2], 0.8),
+			darkenPoliticalAtElevation(toPastelNationColor([0.6, 0.4, 0.2]), 0.8),
 		)
 		expectRegionColor(borders!, 2, [0.35, 0.33, 0.32])
 
@@ -1538,11 +1619,23 @@ describe("computeRegionColors", () => {
 			),
 		)
 		expectRegionColor(provinces!, 1, [0.35, 0.33, 0.32])
-		expectRegionColor(provinces!, 2, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			provinces!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(population!, 0, [0.35, 0.33, 0.32])
 		expectRegionColor(population!, 1, [0.35, 0.33, 0.32])
-		expectRegionColor(population!, 2, OCEAN_LIGHT_BLUE)
-		expectRegionColor(basins!, 1, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			population!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
+		expectRegionColor(
+			basins!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0.4),
+		)
 		expect(basins!.subarray(0, 3)).not.toEqual(basins!.subarray(6, 9))
 		expect(empty).toBeNull()
 		expect(
@@ -1713,7 +1806,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			nations!,
 			1,
-			darkenPoliticalAtElevation([0.9, 0.7, 0.5], 2),
+			darkenPoliticalAtElevation(toPastelNationColor([0.9, 0.7, 0.5]), 2),
 		)
 	})
 
@@ -1873,21 +1966,21 @@ describe("computeRegionColors", () => {
 		)
 
 		expectRegionColor(currents!, 0, oceanCurrentColor(6 / 15))
-		expectRegionColor(currents!, 1, [
-			oceanCurrentColor(-12 / 15)[0] * 0.74,
-			oceanCurrentColor(-12 / 15)[1] * 0.74,
-			oceanCurrentColor(-12 / 15)[2] * 0.74,
-		])
+		expectRegionColor(
+			currents!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(
 			hotspots!,
 			0,
 			darkenVegetationAtElevation(hotspotColor(0), 1),
 		)
-		expectRegionColor(hotspots!, 1, [
-			hotspotColor(0)[0] * 0.82,
-			hotspotColor(0)[1] * 0.82,
-			hotspotColor(0)[2] * 0.82,
-		])
+		expectRegionColor(
+			hotspots!,
+			1,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 		expectRegionColor(features!, 0, [
 			region0Base[0] * 0.2 + 0.55 * 0.8,
 			region0Base[1] * 0.2 + 0.24 * 0.8,
@@ -2146,7 +2239,11 @@ describe("computeRegionColors", () => {
 		// region 0 belongs to selected nation 0: uses white
 		expectRegionColor(rgb!, 0, darkenPoliticalAtElevation([1, 1, 1], 1))
 		// region 2 is ocean: uses OCEAN_LIGHT_BLUE
-		expectRegionColor(rgb!, 2, OCEAN_LIGHT_BLUE)
+		expectRegionColor(
+			rgb!,
+			2,
+			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+		)
 	})
 
 	it("renders diplomacy mode as all neutral when no nation is selected", () => {
