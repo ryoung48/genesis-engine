@@ -1,5 +1,5 @@
 import type { ColorMode } from "../../colors"
-import type { MeasureMode } from "../../controls/OverlayControls"
+import type { LabelMode, MeasureMode } from "../../controls/OverlayControls"
 import type { OrogenViewMode } from "../../renderer"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import { DEFAULT_GEOGRAPHY_MODE } from "../shared/map-modes"
@@ -15,7 +15,7 @@ interface StoredViewPrefs {
 	showGrid: boolean
 	showNationBorders: boolean
 	showNationHierarchy: boolean
-	showNationLabels: boolean
+	labelMode: LabelMode
 	showElevation: boolean
 	showThermalEquator: boolean
 	showRivers: boolean
@@ -75,6 +75,7 @@ const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
 const VIEW_MODES = new Set<OrogenViewMode>(["globe", "map"])
 const UNIT_SYSTEMS = new Set<UnitSystem>(["metric", "imperial"])
 const MEASURE_MODES = new Set<MeasureMode>(["off", "ruler", "pathfinding"])
+const LABEL_MODES = new Set<LabelMode>(["off", "nations", "dynasty"])
 
 export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	colorMode: DEFAULT_GEOGRAPHY_MODE,
@@ -86,7 +87,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showGrid: true,
 	showNationBorders: false,
 	showNationHierarchy: false,
-	showNationLabels: false,
+	labelMode: "off",
 	showElevation: true,
 	showThermalEquator: false,
 	showRivers: false,
@@ -128,6 +129,10 @@ function isUnitSystem(value: unknown): value is UnitSystem {
 
 function isMeasureMode(value: unknown): value is MeasureMode {
 	return typeof value === "string" && MEASURE_MODES.has(value as MeasureMode)
+}
+
+function isLabelMode(value: unknown): value is LabelMode {
+	return typeof value === "string" && LABEL_MODES.has(value as LabelMode)
 }
 
 function readBoolean(value: unknown, fallback: boolean): boolean {
@@ -173,10 +178,9 @@ export function parseStoredViewPrefs(
 				parsed.showNationHierarchy,
 				DEFAULT_VIEW_PREFS.showNationHierarchy,
 			),
-			showNationLabels: readBoolean(
-				parsed.showNationLabels,
-				DEFAULT_VIEW_PREFS.showNationLabels,
-			),
+			labelMode: isLabelMode(parsed.labelMode)
+				? parsed.labelMode
+				: DEFAULT_VIEW_PREFS.labelMode,
 			showElevation: readBoolean(
 				parsed.showElevation,
 				DEFAULT_VIEW_PREFS.showElevation,

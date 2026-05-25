@@ -3,6 +3,7 @@ import type {
 	SerializedOrogenWorld,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
+import type { LabelMode } from "../controls/OverlayControls"
 
 export type OrogenViewMode = "globe" | "map"
 
@@ -75,7 +76,8 @@ export interface OrogenScene {
 	setSettlementsVisible(visible: boolean): void
 	setInfrastructure(edges: SerializedNetwork | null): void
 	setInfrastructureVisible(visible: boolean): void
-	setNationLabelsVisible(visible: boolean): void
+	setLabelMode(mode: LabelMode): void
 	setNationNames(names: string[] | null): void
+	setDynastyNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 }

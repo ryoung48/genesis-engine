@@ -10,6 +10,7 @@ import {
 	type SerializedOrogenWorld,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
+import type { LabelMode } from "../controls/OverlayControls"
 import { disposeGroup, disposeObject3D } from "./disposal"
 import { getRegionFocusTargets } from "./focus"
 import { createMapProjection } from "./map-projection"
@@ -605,10 +606,12 @@ export function createOrogenScene(
 	let infrastructureVisible = false
 	let globeNationLabels: THREE.Group | null = null
 	let mapNationLabels: THREE.Group | null = null
-	let nationLabelsVisible = false
+	let labelMode: LabelMode = "off"
+	const labelCullingEnabled = true
 	let elevationVisible = true
 	const nationLabelPools = createNationLabelPools()
 	let nationNames: string[] | null = null
+	let dynastyNames: string[] | null = null
 	let globeControlsInteracting = false
 	let mapControlsInteracting = false
 	let globeControlActivityFrames = 0
@@ -661,7 +664,11 @@ export function createOrogenScene(
 					globeControlsInteracting ||
 					globeControlActivityFrames > 0
 			}
-			updateGlobeLabelOrientations(globeNationLabels, camera)
+			updateGlobeLabelOrientations(
+				globeNationLabels,
+				camera,
+				labelCullingEnabled,
+			)
 			renderer.render(scene, camera)
 			return keepAnimating
 		},
@@ -770,25 +777,29 @@ export function createOrogenScene(
 		disposeGroup(scene, mapNationLabels)
 		globeNationLabels = null
 		mapNationLabels = null
-		if (!currentWorld?.nations || !nationNames || !nationLabelsVisible) {
+		if (!currentWorld?.nations || labelMode === "off") {
 			return
 		}
+		const labelNames = labelMode === "dynasty" ? dynastyNames : nationNames
+		if (!labelNames) return
 		globeNationLabels = buildGlobeNationLabels(
 			currentWorld,
-			nationNames,
+			labelNames,
 			camera,
 			nationLabelPools.globe,
+			labelCullingEnabled,
 		)
 		mapNationLabels = buildMapNationLabels(
 			currentWorld,
-			nationNames,
+			labelNames,
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 			nationLabelPools.map,
+			labelCullingEnabled,
 		)
 		if (globeNationLabels) scene.add(globeNationLabels)
 		if (mapNationLabels) {
-			addMapSlideClones(mapNationLabels)
+			if (!labelCullingEnabled) addMapSlideClones(mapNationLabels)
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
 			scene.add(mapNationLabels)
 		}
@@ -1179,9 +1190,9 @@ export function createOrogenScene(
 		}
 		if (globeNationLabels)
 			globeNationLabels.visible =
-				nationLabelsVisible && currentViewMode === "globe"
+				labelMode !== "off" && currentViewMode === "globe"
 		if (mapNationLabels) {
-			mapNationLabels.visible = nationLabelsVisible && currentViewMode === "map"
+			mapNationLabels.visible = labelMode !== "off" && currentViewMode === "map"
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
 		}
 		requestRender()
@@ -1244,7 +1255,7 @@ export function createOrogenScene(
 			{ object: mapHierarchyOverlay, visible: hierarchyOverlayNationId >= 0 },
 			{ object: mapSettlements, visible: settlementsVisible },
 			{ object: mapInfrastructure, visible: infrastructureVisible },
-			{ object: mapNationLabels, visible: nationLabelsVisible },
+			{ object: mapNationLabels, visible: labelMode !== "off" },
 			{ object: mapSelectedProvinceBorder, visible: false },
 			{ object: mapMeasureLine, visible: false },
 			{ object: mapMeasureDots, visible: false },
@@ -2192,14 +2203,19 @@ export function createOrogenScene(
 		rebuildTradeRouteOverlay()
 	}
 
-	function setNationLabelsVisible(visible: boolean) {
-		if (nationLabelsVisible === visible) return
-		nationLabelsVisible = visible
+	function setLabelMode(mode: LabelMode) {
+		if (labelMode === mode) return
+		labelMode = mode
 		rebuildNationLabels()
 	}
 
 	function setNationNames(names: string[] | null) {
 		nationNames = names
+		rebuildNationLabels()
+	}
+
+	function setDynastyNames(names: string[] | null) {
+		dynastyNames = names
 		rebuildNationLabels()
 	}
 
@@ -2240,8 +2256,9 @@ export function createOrogenScene(
 		setSettlementsVisible,
 		setInfrastructure,
 		setInfrastructureVisible,
-		setNationLabelsVisible,
+		setLabelMode,
 		setNationNames,
+		setDynastyNames,
 		setElevationVisible,
 		setSunPosition,
 		setAtmospherePressure,

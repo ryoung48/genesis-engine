@@ -7,6 +7,7 @@ import {
 	sampleColorStops,
 } from "@/model/shared/color-interpolation"
 import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
+import type { RegularClimatePreviewData } from "@/ui/preview/types"
 
 interface EbmConfig {
 	obliquity: number
@@ -41,7 +42,7 @@ export function useEbmPreview(config: EbmConfig) {
 		radius,
 		pressure,
 	} = config
-	return useMemo(() => {
+	return useMemo<RegularClimatePreviewData>(() => {
 		const modelConfig = {
 			orbital: {
 				OBLIQUITY: obliquity,
@@ -114,8 +115,8 @@ export function useEbmPreview(config: EbmConfig) {
 			daylight: model.daylightHours,
 			daylightColorFn,
 			lats: model.lats_deg,
-			sampledDays,
-			dayLabels,
+			columnValues: sampledDays,
+			columnLabels: dayLabels,
 		}
 	}, [
 		obliquity,

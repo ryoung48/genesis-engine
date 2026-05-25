@@ -244,7 +244,7 @@ describe("assignVegetation", () => {
 			6, // exact chaos bounds stay tropical
 			7, // avg above the max becomes infernal
 			6, // min must be below zero to become chaotic
-			6, // max must be above forty to become chaotic
+			8, // max above forty becomes chaotic
 		])
 	})
 })

@@ -21,13 +21,15 @@ import type {
 } from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
-import { ClimatePreviewOverlay } from "./ClimatePreviewOverlay"
+import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
+import { ClimatePreviewOverlay } from "@/ui/preview/ClimatePreviewOverlay"
 import type { ColorMode } from "./colors"
 import { climateZoneColor, vegetationColor } from "./colors"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import {
 	type ExportWidthPreset,
+	type LabelMode,
 	type MeasureMode,
 	OverlayControls,
 } from "./controls/OverlayControls"
@@ -74,6 +76,10 @@ import {
 	buildNationAdjacency,
 } from "./screen/display/display-model"
 import { createDisplayNames } from "./screen/display/display-names"
+import {
+	buildNationDynastyLabelNames,
+	buildNationLabelNames,
+} from "./screen/display/label-names"
 import {
 	buildConflictDistribution,
 	buildNationHistory,
@@ -271,8 +277,8 @@ export const OrogenView: React.FC = () => {
 	const [showInfrastructure, setShowInfrastructure] = useState(
 		initialViewPrefs.showInfrastructure,
 	)
-	const [showNationLabels, setShowNationLabels] = useState(
-		initialViewPrefs.showNationLabels,
+	const [labelMode, setLabelMode] = useState<LabelMode>(
+		initialViewPrefs.labelMode,
 	)
 	const [showElevation, setShowElevation] = useState(
 		initialViewPrefs.showElevation,
@@ -561,7 +567,7 @@ export const OrogenView: React.FC = () => {
 				showGrid,
 				showNationBorders,
 				showNationHierarchy,
-				showNationLabels,
+				labelMode,
 				showElevation,
 				showThermalEquator,
 				showRivers,
@@ -589,7 +595,7 @@ export const OrogenView: React.FC = () => {
 		showInfrastructure,
 		showNationBorders,
 		showNationHierarchy,
-		showNationLabels,
+		labelMode,
 		showElevation,
 		showRivers,
 		showThermalEquator,
@@ -754,15 +760,11 @@ export const OrogenView: React.FC = () => {
 		[timelineBundle, world],
 	)
 	const nationLabelsArray = useMemo(() => {
-		if (!worldNames || !world?.nations) return null
-		const count = world.nations.seeds?.length ?? 0
-		const names: string[] = new Array(count)
-		for (let i = 0; i < count; i++) {
-			const capitalProvince = world.nations.seeds[i]
-			names[i] = capitalProvince >= 0 ? worldNames.nation(capitalProvince) : ""
-		}
-		return names
-	}, [worldNames, world])
+		return buildNationLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
+	const dynastyLabelsArray = useMemo(() => {
+		return buildNationDynastyLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
 		[worldNames],
@@ -1463,13 +1465,16 @@ export const OrogenView: React.FC = () => {
 		}
 	}, [showInfrastructure, worldForDisplay])
 
-	// --- Nation labels ---
+	// --- Labels ---
 	useEffect(() => {
-		sceneRef.current?.setNationLabelsVisible(showNationLabels)
-	}, [showNationLabels])
+		sceneRef.current?.setLabelMode(labelMode)
+	}, [labelMode])
 	useEffect(() => {
 		sceneRef.current?.setNationNames(nationLabelsArray)
 	}, [nationLabelsArray])
+	useEffect(() => {
+		sceneRef.current?.setDynastyNames(dynastyLabelsArray)
+	}, [dynastyLabelsArray])
 
 	// --- Elevation ---
 	useEffect(() => {
@@ -2051,6 +2056,23 @@ export const OrogenView: React.FC = () => {
 			obliquity,
 			eccentricity,
 			perihelion,
+			antistellarLon,
+			sunTempFactor,
+			insolationFactor,
+			hoursPerDay,
+			daysPerYear,
+			landCoverage,
+			planetRadiusKm,
+			pressure,
+		}),
+	)
+	const lockedGenerationPreview = useLockedClimatePreview(
+		buildGenerationPreviewConfig({
+			tidallyLocked,
+			obliquity,
+			eccentricity,
+			perihelion,
+			antistellarLon,
 			sunTempFactor,
 			insolationFactor,
 			hoursPerDay,
@@ -2119,7 +2141,10 @@ export const OrogenView: React.FC = () => {
 
 				{showClimatePreview && (
 					<ClimatePreviewOverlay
-						preview={generationPreview}
+						preview={
+							tidallyLocked ? lockedGenerationPreview : generationPreview
+						}
+						tidallyLocked={tidallyLocked}
 						activeTab={generationPreviewTab}
 						unitSystem={unitSystem}
 						onSelectTab={setGenerationPreviewTab}
@@ -2216,8 +2241,8 @@ export const OrogenView: React.FC = () => {
 							setShowNationBorders={setShowNationBorders}
 							showNationHierarchy={showNationHierarchy}
 							setShowNationHierarchy={setShowNationHierarchy}
-							showNationLabels={showNationLabels}
-							setShowNationLabels={setShowNationLabels}
+							labelMode={labelMode}
+							setLabelMode={setLabelMode}
 							showElevation={showElevation}
 							setShowElevation={setShowElevation}
 							showInfrastructure={showInfrastructure}
@@ -2260,7 +2285,7 @@ export const OrogenView: React.FC = () => {
 								setShowThermalEquator(false)
 								setShowNationBorders(false)
 								setShowNationHierarchy(false)
-								setShowNationLabels(false)
+								setLabelMode("off")
 								setShowElevation(false)
 								setShowInfrastructure(false)
 								setMeasureMode("off")

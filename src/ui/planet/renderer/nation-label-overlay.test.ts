@@ -23,6 +23,10 @@ vi.mock("troika-three-text", () => {
 		textRenderingMode = "distanceField"
 		renderOrder = 0
 
+		sync(): void {
+			return
+		}
+
 		dispose(): void {
 			return
 		}
@@ -83,6 +87,7 @@ describe("nation-label-overlay", () => {
 			["A", "Large Dominion"],
 			camera,
 			pools.globe,
+			false,
 		)
 		const mapGroup = buildMapNationLabels(
 			world,
@@ -90,6 +95,7 @@ describe("nation-label-overlay", () => {
 			0,
 			0,
 			pools.map,
+			false,
 		)
 
 		expect(globeGroup.children).toHaveLength(2)
@@ -121,6 +127,7 @@ describe("nation-label-overlay", () => {
 			["A", "Large Dominion"],
 			camera,
 			pools.globe,
+			false,
 		)
 		const label = globeGroup.children[0] as THREE.Object3D
 		const capital = new THREE.Vector3(
@@ -141,6 +148,7 @@ describe("nation-label-overlay", () => {
 			0,
 			0,
 			pools.map,
+			false,
 		)
 		const label = mapGroup.children[0] as THREE.Object3D
 		const projection = createMapProjection(0, 0)
@@ -174,6 +182,7 @@ describe("nation-label-overlay", () => {
 			["A", "Large Dominion"],
 			camera,
 			pools.globe,
+			false,
 		)
 		const smallNation = globeGroup.children[0] as unknown as {
 			fontSize: number
@@ -196,6 +205,7 @@ describe("nation-label-overlay", () => {
 			["A", "Large Dominion"],
 			camera,
 			pools.globe,
+			false,
 		)
 		const label = globeGroup.children[0] as THREE.Object3D & {
 			userData: {
@@ -214,10 +224,13 @@ describe("nation-label-overlay", () => {
 		expect(globeGroup.userData.globeCameraQuaternion).toBeInstanceOf(
 			THREE.Quaternion,
 		)
+		expect(globeGroup.userData.globeCameraPosition).toBeInstanceOf(
+			THREE.Vector3,
+		)
 
 		const before = basePosition?.clone()
 		camera.quaternion.setFromEuler(new THREE.Euler(Math.PI / 6, Math.PI / 8, 0))
-		updateGlobeLabelOrientations(globeGroup, camera)
+		updateGlobeLabelOrientations(globeGroup, camera, false)
 
 		expect(label.userData.globeBasePosition?.distanceTo(before!)).toBeLessThan(
 			1e-6,
@@ -238,15 +251,111 @@ describe("nation-label-overlay", () => {
 			["A", "Large Dominion"],
 			camera,
 			pools.globe,
+			false,
 		)
 		const label = globeGroup.children[0] as THREE.Object3D
 		const initialQuaternion = label.quaternion.clone()
 		const initialPosition = label.position.clone()
 
 		camera.quaternion.setFromEuler(new THREE.Euler(Math.PI / 5, Math.PI / 4, 0))
-		updateGlobeLabelOrientations(globeGroup, camera)
+		updateGlobeLabelOrientations(globeGroup, camera, false)
 
 		expect(label.quaternion.angleTo(initialQuaternion)).toBeGreaterThan(0.1)
 		expect(label.position.distanceTo(initialPosition)).toBeGreaterThan(0.001)
+	})
+
+	it("hides far-side globe labels when culling is enabled", () => {
+		const pools = createNationLabelPools()
+		const world = buildWorld()
+		const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100)
+		camera.position.set(0, 3, 0)
+		camera.lookAt(0, 0, 0)
+
+		const globeGroup = buildGlobeNationLabels(
+			world,
+			["A", "Large Dominion"],
+			camera,
+			pools.globe,
+			true,
+		)
+		const hiddenLabel = globeGroup.children[0] as THREE.Object3D
+		const visibleLabel = globeGroup.children[1] as THREE.Object3D
+
+		expect(hiddenLabel.visible).toBe(false)
+		expect(visibleLabel.visible).toBe(true)
+	})
+
+	it("keeps far-side globe labels visible when culling is disabled", () => {
+		const pools = createNationLabelPools()
+		const world = buildWorld()
+		const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100)
+		camera.position.set(0, 3, 0)
+		camera.lookAt(0, 0, 0)
+
+		const globeGroup = buildGlobeNationLabels(
+			world,
+			["A", "Large Dominion"],
+			camera,
+			pools.globe,
+			false,
+		)
+		const hiddenLabel = globeGroup.children[0] as THREE.Object3D
+
+		expect(hiddenLabel.visible).toBe(true)
+	})
+
+	it("only enables map frustum culling when label culling is enabled", () => {
+		const world = buildWorld()
+		const culledPools = createNationLabelPools()
+		const alwaysVisiblePools = createNationLabelPools()
+
+		const culledGroup = buildMapNationLabels(
+			world,
+			["A", "Large Dominion"],
+			0,
+			0,
+			culledPools.map,
+			true,
+		)
+		const culledLabel = culledGroup.children[0] as THREE.Object3D & {
+			frustumCulled: boolean
+		}
+
+		const alwaysVisibleGroup = buildMapNationLabels(
+			world,
+			["A", "Large Dominion"],
+			0,
+			0,
+			alwaysVisiblePools.map,
+			false,
+		)
+		const alwaysVisibleLabel = alwaysVisibleGroup
+			.children[0] as THREE.Object3D & {
+			frustumCulled: boolean
+		}
+
+		expect(culledLabel.frustumCulled).toBe(true)
+		expect(alwaysVisibleLabel.frustumCulled).toBe(false)
+	})
+
+	it("builds wrapped map label copies directly when culling is enabled", () => {
+		const pools = createNationLabelPools()
+		const world = buildWorld()
+
+		const mapGroup = buildMapNationLabels(
+			world,
+			["A", "Large Dominion"],
+			0,
+			0,
+			pools.map,
+			true,
+		)
+		const xPositions = mapGroup.children
+			.map((child) => child.position.x)
+			.sort((a, b) => a - b)
+
+		expect(mapGroup.children).toHaveLength(6)
+		expect(xPositions[2]! - xPositions[0]!).toBeCloseTo(4, 4)
+		expect(xPositions[5]! - xPositions[3]!).toBeCloseTo(4, 4)
 	})
 })

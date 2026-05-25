@@ -21,7 +21,7 @@ vi.mock("@/ui/components/composites/charts/HeatmapChart", () => ({
 
 type ClimatePreviewOverlayProps = ComponentProps<typeof ClimatePreviewOverlay>
 
-function createProps(
+function createRegularProps(
 	overrides: Partial<ClimatePreviewOverlayProps> = {},
 ): ClimatePreviewOverlayProps {
 	return {
@@ -33,9 +33,34 @@ function createProps(
 			daylight: [[5, 6]],
 			daylightColorFn: vi.fn(),
 			lats: [0],
-			sampledDays: [0, 10],
-			dayLabels: ["0", "10"],
+			columnValues: [0, 10],
+			columnLabels: ["0", "10"],
 		},
+		tidallyLocked: false,
+		activeTab: "temperature",
+		unitSystem: "metric",
+		onSelectTab: vi.fn(),
+		onClose: vi.fn(),
+		...overrides,
+	}
+}
+
+function createLockedProps(
+	overrides: Partial<ClimatePreviewOverlayProps> = {},
+): ClimatePreviewOverlayProps {
+	return {
+		preview: {
+			heat: [[1, 2]],
+			avgTemp: 7.5,
+			insolation: [[3, 4]],
+			insolColorFn: vi.fn(),
+			daylight: [[5, 6]],
+			daylightColorFn: vi.fn(),
+			longitudes: [30],
+			columnValues: [0, 10],
+			columnLabels: ["0", "10"],
+		},
+		tidallyLocked: true,
 		activeTab: "temperature",
 		unitSystem: "metric",
 		onSelectTab: vi.fn(),
@@ -49,7 +74,7 @@ describe("ClimatePreviewOverlay", () => {
 		capturedHeatmapProps = null
 
 		const markup = renderToStaticMarkup(
-			<ClimatePreviewOverlay {...createProps()} />,
+			<ClimatePreviewOverlay {...createRegularProps()} />,
 		)
 
 		expect(markup).toContain("TEMP")
@@ -61,9 +86,9 @@ describe("ClimatePreviewOverlay", () => {
 		expect(markup).not.toContain("Climate Preview")
 	})
 
-	it("routes the insolation tab through the generalized heatmap chart", () => {
+	it("routes the regular insolation tab through the latitude preview chart", () => {
 		capturedHeatmapProps = null
-		const props = createProps({ activeTab: "insolation" })
+		const props = createRegularProps({ activeTab: "insolation" })
 
 		renderToStaticMarkup(<ClimatePreviewOverlay {...props} />)
 
@@ -71,6 +96,7 @@ describe("ClimatePreviewOverlay", () => {
 			matrix: props.preview.insolation,
 			colorForValue: props.preview.insolColorFn,
 			legendTitle: "Insolation",
+			yAxisTitle: "Latitude",
 			fullHeight: true,
 		})
 		expect(
@@ -97,18 +123,26 @@ describe("ClimatePreviewOverlay", () => {
 		).toBe("Lat 10.0°, Day 3: 123.4 W/m²")
 	})
 
-	it("routes daylight and temperature tabs through the expected chart formatting", () => {
+	it("renders the locked preview with longitude labels and axis titles", () => {
 		capturedHeatmapProps = null
-		const daylightProps = createProps({ activeTab: "daylight" })
-		renderToStaticMarkup(<ClimatePreviewOverlay {...daylightProps} />)
+		const props = createLockedProps({ activeTab: "daylight" })
+
+		renderToStaticMarkup(<ClimatePreviewOverlay {...props} />)
 
 		expect(capturedHeatmapProps).toMatchObject({
-			matrix: daylightProps.preview.daylight,
-			colorForValue: daylightProps.preview.daylightColorFn,
+			matrix: props.preview.daylight,
+			colorForValue: props.preview.daylightColorFn,
 			legendTitle: "Daylight",
 			xAxisTitle: "Day of Year",
-			yAxisTitle: "Latitude",
+			yAxisTitle: "Longitude",
 		})
+		expect(
+			(
+				capturedHeatmapProps?.datasetLabel as
+					| ((value: number) => string)
+					| undefined
+			)?.(30),
+		).toBe("Lon 30.0°")
 		expect(
 			(
 				capturedHeatmapProps?.tooltipLabel as
@@ -123,24 +157,20 @@ describe("ClimatePreviewOverlay", () => {
 				columnValue: 4,
 				value: 9.5,
 			}),
-		).toBe("Lat 15.0°, Day 5: 9.5 hrs")
-		expect(
-			(
-				capturedHeatmapProps?.formatLegendValue as
-					| ((value: number) => string)
-					| undefined
-			)?.(9.5),
-		).toBe("9.5 hrs")
+		).toBe("Lon 15.0°, Day 5: 9.5 hrs")
+	})
 
+	it("formats the temperature tab using the shared temperature color and unit helpers", () => {
 		capturedHeatmapProps = null
-		const temperatureProps = createProps({
+		const props = createRegularProps({
 			activeTab: "temperature",
 			unitSystem: "imperial",
 		})
-		renderToStaticMarkup(<ClimatePreviewOverlay {...temperatureProps} />)
+
+		renderToStaticMarkup(<ClimatePreviewOverlay {...props} />)
 
 		expect(capturedHeatmapProps).toMatchObject({
-			matrix: temperatureProps.preview.heat,
+			matrix: props.preview.heat,
 			legendTitle: "Temperature",
 		})
 		expect(
@@ -157,27 +187,13 @@ describe("ClimatePreviewOverlay", () => {
 					| undefined
 			)?.(11.25),
 		).toBe("52.3°F")
-		expect(
-			(
-				capturedHeatmapProps?.datasetLabel as
-					| ((value: number) => string)
-					| undefined
-			)?.(-42.4),
-		).toBe("Lat -42.4°")
-		expect(
-			(
-				capturedHeatmapProps?.rowTickLabel as
-					| ((value: number) => string)
-					| undefined
-			)?.(-42.4),
-		).toBe("-42°")
 	})
 
 	it("wires the tab selector and close button callbacks", () => {
 		const onSelectTab = vi.fn()
 		const onClose = vi.fn()
 		const tree = ClimatePreviewOverlay(
-			createProps({ onSelectTab, onClose }),
+			createRegularProps({ onSelectTab, onClose }),
 		) as React.ReactElement<{ children?: React.ReactNode }>
 		const rootChildren = React.Children.toArray(
 			tree.props.children,

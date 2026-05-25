@@ -233,6 +233,7 @@ export function runPostElevationPipeline(
 		isLand,
 		params,
 		monthlyTEQ,
+		distCoast,
 	)
 	record("Post: rainfall", t0)
 	onProgress?.("Post: rainfall", 54)
@@ -269,17 +270,66 @@ export function runPostElevationPipeline(
 	record("Post: hydrology", t0)
 	onProgress?.("Post: hydrology", 57)
 
+	// ── Ice (needed for pasta climate) ─────────────────────────────────
+	t0 = performance.now()
+	const { iceThickness, iceMinMonthly, iceMaxMonthly } = computeIceAccumulation(
+		mesh,
+		climate,
+		rainfall,
+		isLand,
+		distCoast,
+	)
+	record("Post: ice", t0)
+	onProgress?.("Post: ice", 58)
+
+	// ── Pasta climate (needed before vegetation) ───────────────────────
+	t0 = performance.now()
+	const pastaResult = assignPastaClimate(
+		mesh,
+		isLand,
+		climate,
+		rainfall,
+		hydrology,
+		params,
+		iceThickness,
+		iceMinMonthly,
+		iceMaxMonthly,
+	)
+	record("Post: pasta climate", t0)
+	const pastaClimate: Uint8Array = pastaResult.zones
+	const pastaDebug: PastaDebug = pastaResult.debug
+	onProgress?.("Post: pasta climate", 59)
+
 	// ── Vegetation ─────────────────────────────────────────────────────
 	t0 = performance.now()
+	// Compute GAr (growing-season aridity ratio) per cell for cold/extraseasonal forest transition
+	const garField = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		let petGdd = 0
+		let aetGdd = 0
+		for (let m = 0; m < 12; m++) {
+			const idx = m * N + r
+			const temp = climate.temperature_monthly[idx]
+			const g5 =
+				temp > 5 ? Math.min(temp - 5, 20) * (params.daysPerYear / 12) : 0
+			petGdd += climate.pet_monthly[idx] * g5
+			aetGdd += hydrology.aet_monthly[idx] * g5
+		}
+		garField[r] = petGdd > 0 ? aetGdd / petGdd : 1
+	}
 	const vegetation = assignVegetation(
 		mesh,
 		isLand,
 		climate,
 		rainfall,
 		makeRng(params.seed),
+		pastaClimate,
+		pastaDebug.gdd,
+		garField,
 	)
 	record("Post: vegetation", t0)
-	onProgress?.("Post: vegetation", 57)
+	onProgress?.("Post: vegetation", 60)
 
 	// ── Rivers ─────────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -309,19 +359,7 @@ export function runPostElevationPipeline(
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
 	record("Post: landmarks", t0)
-	onProgress?.("Post: landmarks", 64)
-
-	// ── Ice ────────────────────────────────────────────────────────────
-	t0 = performance.now()
-	const { iceThickness, iceMinMonthly, iceMaxMonthly } = computeIceAccumulation(
-		mesh,
-		climate,
-		rainfall,
-		isLand,
-		distCoast,
-	)
-	record("Post: ice", t0)
-	onProgress?.("Post: ice", 64)
+	onProgress?.("Post: landmarks", 62)
 
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -364,25 +402,7 @@ export function runPostElevationPipeline(
 	t0 = performance.now()
 	const climateZones = assignClimateZones(mesh, isLand, climate)
 	record("Post: climate zones", t0)
-	onProgress?.("Post: climate zones", 65)
-
-	// ── Pasta climate ──────────────────────────────────────────────────
-	t0 = performance.now()
-	const pastaResult = assignPastaClimate(
-		mesh,
-		isLand,
-		climate,
-		rainfall,
-		hydrology,
-		params,
-		iceThickness,
-		iceMinMonthly,
-		iceMaxMonthly,
-	)
-	record("Post: pasta climate", t0)
-	const pastaClimate: Uint8Array = pastaResult.zones
-	const pastaDebug: PastaDebug = pastaResult.debug
-	onProgress?.("Post: pasta climate", 68)
+	onProgress?.("Post: climate zones", 64)
 
 	// ── Koppen climate ─────────────────────────────────────────────────
 	t0 = performance.now()

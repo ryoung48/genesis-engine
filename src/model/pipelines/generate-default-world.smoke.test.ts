@@ -83,6 +83,7 @@ function computePreviewAverageTempC(params: OrogenParams): number {
 		obliquity: params.obliquity,
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
+		antistellarLon: params.antistellarLon,
 		sunTempFactor: params.sunTempFactor,
 		insolationFactor: params.insolationFactor,
 		hoursPerDay: params.hoursPerDay,

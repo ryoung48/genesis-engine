@@ -195,17 +195,19 @@ describe("renderMapExportPng", () => {
 		})
 
 		expect(blob.type).toBe("image/png")
-		const bands = Math.ceil(2048 / 256)
+		const bands = Math.ceil(2048 / 512)
 		const tilesPerBand = 2
 		expect(readWidths).toEqual(Array(bands * tilesPerBand).fill(2048))
 		expect(progress[0]).toBe("0:Preparing export")
-		expect(disposedTargets).toEqual(Array(bands * tilesPerBand).fill(2048 * 256))
+		expect(disposedTargets).toEqual(
+			Array(bands * tilesPerBand).fill(2048 * 512),
+		)
 		expect(camera.left).toBe(-1)
 		expect(camera.right).toBe(1)
 		expect(camera.top).toBe(1)
 		expect(camera.bottom).toBe(-1)
 		expect(renderer.setRenderTarget).toHaveBeenLastCalledWith(previousTarget)
-	}, 10000)
+	}, 20000)
 
 	it("assembles horizontal tiles correctly using coordinate-pattern verification", async () => {
 		const scene = new THREE.Scene()

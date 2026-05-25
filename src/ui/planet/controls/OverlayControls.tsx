@@ -3,10 +3,12 @@ import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
+import { BankIcon } from "@/ui/components/primitives/icons/BankIcon"
 import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
 import { CompassRoseIcon } from "@/ui/components/primitives/icons/CompassRoseIcon"
 import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
+import { CrownIcon } from "@/ui/components/primitives/icons/CrownIcon"
 import { DiameterVariantIcon } from "@/ui/components/primitives/icons/DiameterVariantIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
@@ -24,6 +26,7 @@ import { formatDistance } from "../screen/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
+export type LabelMode = "off" | "nations" | "dynasty"
 
 const LAND_TRAVEL_KM_PER_DAY = 30
 const SEA_TRAVEL_KM_PER_DAY = 100
@@ -78,8 +81,8 @@ interface OverlayControlsProps {
 	setShowNationBorders: (v: boolean) => void
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
-	showNationLabels: boolean
-	setShowNationLabels: (v: boolean) => void
+	labelMode: LabelMode
+	setLabelMode: (v: LabelMode) => void
 	showElevation: boolean
 	setShowElevation: (v: boolean) => void
 	showInfrastructure: boolean
@@ -137,8 +140,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowNationBorders,
 	showNationHierarchy,
 	setShowNationHierarchy,
-	showNationLabels,
-	setShowNationLabels,
+	labelMode,
+	setLabelMode,
 	showElevation,
 	setShowElevation,
 	showInfrastructure,
@@ -289,22 +292,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
-
 								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
 									<span>Nation Borders</span>
 									<input
 										type="checkbox"
 										checked={showNationBorders}
 										onChange={(e) => setShowNationBorders(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Nation Labels</span>
-									<input
-										type="checkbox"
-										checked={showNationLabels}
-										onChange={(e) => setShowNationLabels(e.target.checked)}
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
@@ -400,6 +393,38 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									/>
 								</label>
 
+								<div className="flex items-center justify-between gap-3">
+									<span className="text-[11px] font-medium text-slate-200">
+										Labels
+									</span>
+									<SegmentedControl
+										options={[
+											{
+												value: "off",
+												label: <DiameterVariantIcon className="h-3.5 w-3.5" />,
+												ariaLabel: "Labels off",
+												title: "Labels off",
+											},
+											{
+												value: "nations",
+												label: <BankIcon className="h-3.5 w-3.5" />,
+												ariaLabel: "Nation labels",
+												title: "Nation labels",
+											},
+											{
+												value: "dynasty",
+												label: <CrownIcon className="h-3.5 w-3.5" />,
+												ariaLabel: "Dynasty labels",
+												title: "Dynasty labels",
+											},
+										]}
+										value={labelMode}
+										onChange={setLabelMode}
+										tone="overlay"
+										size="sm"
+										buttonClassName="px-2"
+									/>
+								</div>
 								<div className="border-t border-white/10 pt-2">
 									<div className="flex items-center justify-between gap-3">
 										<span className="text-[11px] font-medium text-slate-200">

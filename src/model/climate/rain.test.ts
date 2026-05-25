@@ -485,6 +485,86 @@ describe("computeMonthlyRain", () => {
 		expect(denseAir.annual[2]).toBe(0)
 	})
 
+	it("suppresses tidally locked rainfall as atmospheric pressure rises", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 0, lonDeg: 0 },
+				{ latDeg: 0, lonDeg: 180 },
+				{ latDeg: 0, lonDeg: 90 },
+			],
+			[[2], [2], [0, 1]],
+		)
+		const climate = buildClimate([35, -10, 10])
+		const isLand = new Uint8Array([1, 1, 0])
+
+		const thinAir = computeMonthlyRain(
+			mesh,
+			climate,
+			new Float32Array(3),
+			new Float32Array(3),
+			isLand,
+			buildParams({ tidallyLocked: true, pressure: 0.5, seed: 0 }),
+		)
+		const denseAir = computeMonthlyRain(
+			mesh,
+			climate,
+			new Float32Array(3),
+			new Float32Array(3),
+			isLand,
+			buildParams({ tidallyLocked: true, pressure: 4, seed: 0 }),
+		)
+
+		const thinLandTotal = thinAir.annual[0] + thinAir.annual[1]
+		const denseLandTotal = denseAir.annual[0] + denseAir.annual[1]
+
+		expect(thinAir.annual[0]).toBeGreaterThan(denseAir.annual[0])
+		expect(thinLandTotal).toBeGreaterThan(denseLandTotal)
+		expect(thinAir.annual[2]).toBe(0)
+		expect(denseAir.annual[2]).toBe(0)
+	})
+
+	it("scales tidally locked coastal moisture by physical coast distance", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 0, lonDeg: 0 },
+				{ latDeg: 0, lonDeg: 180 },
+				{ latDeg: 0, lonDeg: 90 },
+			],
+			[[2], [2], [0, 1]],
+		)
+		;(mesh as SphereMesh & { neighborDist: Float32Array }).neighborDist =
+			new Float32Array([0.01, 0.01, 0.01, 0.01])
+		const climate = buildClimate([35, -10, 10])
+		const isLand = new Uint8Array([1, 1, 0])
+		const distCoast = new Float32Array([1, 1, 0])
+
+		const smallPlanet = computeMonthlyRain(
+			mesh,
+			climate,
+			new Float32Array(3),
+			new Float32Array(3),
+			isLand,
+			buildParams({ tidallyLocked: true, planetRadiusKm: 1000, seed: 0 }),
+			undefined,
+			distCoast,
+		)
+		const largePlanet = computeMonthlyRain(
+			mesh,
+			climate,
+			new Float32Array(3),
+			new Float32Array(3),
+			isLand,
+			buildParams({ tidallyLocked: true, planetRadiusKm: 10000, seed: 0 }),
+			undefined,
+			distCoast,
+		)
+
+		expect(smallPlanet.annual[0]).toBeGreaterThan(largePlanet.annual[0])
+		expect(smallPlanet.annual[1]).toBeGreaterThan(largePlanet.annual[1])
+		expect(smallPlanet.annual[2]).toBe(0)
+		expect(largePlanet.annual[2]).toBe(0)
+	})
+
 	it("smooths tidally locked rain across adjacent land neighbors", () => {
 		const connectedMesh = buildMesh(
 			[

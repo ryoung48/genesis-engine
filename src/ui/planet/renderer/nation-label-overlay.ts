@@ -27,6 +27,8 @@ const MAX_LABEL_SCALE = 4.5
 const GLOBE_CAMERA_UP = new THREE.Vector3()
 const GLOBE_PROJECTED_UP = new THREE.Vector3()
 const GLOBE_BASE_POSITION = new THREE.Vector3()
+const GLOBE_CAMERA_LOCAL_POSITION = new THREE.Vector3()
+const GLOBE_TO_CAMERA = new THREE.Vector3()
 
 interface LabelPool {
 	items: Text[]
@@ -60,7 +62,7 @@ function ensurePoolSize(pool: LabelPool, count: number) {
 		text.anchorY = "middle"
 		text.textRenderingMode = "distanceField"
 		text.renderOrder = 999
-		text.frustumCulled = false
+		text.frustumCulled = true
 		text.visible = false
 		pool.items.push(text)
 	}
@@ -229,24 +231,65 @@ function updateGlobeLabelPosition(text: Text, cameraUp: THREE.Vector3): void {
 	text.position.copy(basePosition).addScaledVector(GLOBE_PROJECTED_UP, offset)
 }
 
+function isGlobeLabelVisible(
+	text: Text,
+	cameraPosition: THREE.Vector3,
+): boolean {
+	const normal = text.userData.globeNormal as THREE.Vector3 | undefined
+	const basePosition = text.userData.globeBasePosition as
+		| THREE.Vector3
+		| undefined
+	if (!normal || !basePosition) return false
+
+	return GLOBE_TO_CAMERA.copy(cameraPosition).sub(basePosition).dot(normal) > 0
+}
+
 function updateGlobeLabelOrientations(
 	group: THREE.Group | null,
 	camera: THREE.PerspectiveCamera,
+	cullingEnabled = false,
 ) {
 	if (!group) return
+	camera.getWorldPosition(GLOBE_CAMERA_LOCAL_POSITION)
+	group.worldToLocal(GLOBE_CAMERA_LOCAL_POSITION)
+
 	const lastCameraQuaternion = group.userData.globeCameraQuaternion as
 		| THREE.Quaternion
 		| undefined
-	if (lastCameraQuaternion?.angleTo(camera.quaternion) === 0) return
+	const lastCameraPosition = group.userData.globeCameraPosition as
+		| THREE.Vector3
+		| undefined
+	const rotationChanged =
+		!lastCameraQuaternion ||
+		lastCameraQuaternion.angleTo(camera.quaternion) > 1e-8
+	const positionChanged =
+		!lastCameraPosition ||
+		lastCameraPosition.distanceToSquared(GLOBE_CAMERA_LOCAL_POSITION) > 1e-12
+
+	if (!rotationChanged && !positionChanged) return
+
 	if (lastCameraQuaternion) {
 		lastCameraQuaternion.copy(camera.quaternion)
 	} else {
 		group.userData.globeCameraQuaternion = camera.quaternion.clone()
 	}
+	if (lastCameraPosition) {
+		lastCameraPosition.copy(GLOBE_CAMERA_LOCAL_POSITION)
+	} else {
+		group.userData.globeCameraPosition = GLOBE_CAMERA_LOCAL_POSITION.clone()
+	}
 	GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
 	for (const child of group.children) {
-		updateGlobeLabelPosition(child as Text, GLOBE_CAMERA_UP)
-		orientGlobeLabel(child as Text, camera.quaternion)
+		const text = child as Text
+		const visible = cullingEnabled
+			? isGlobeLabelVisible(text, GLOBE_CAMERA_LOCAL_POSITION)
+			: true
+
+		text.visible = visible
+		if (!visible) continue
+
+		updateGlobeLabelPosition(text, GLOBE_CAMERA_UP)
+		orientGlobeLabel(text, camera.quaternion)
 	}
 }
 
@@ -255,6 +298,7 @@ export function buildGlobeNationLabels(
 	nationNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
+	cullingEnabled = false,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces || !world.nations) return group
@@ -286,6 +330,7 @@ export function buildGlobeNationLabels(
 				: 0
 		const text = pool.items[activeCount]
 		applyGlobeLabelStyle(text)
+		text.frustumCulled = cullingEnabled
 		text.text = name
 		text.fontSize = LABEL_FONT_SIZE_GLOBE * scale
 		text.userData.globeNormal = globePlacement.normal
@@ -298,6 +343,7 @@ export function buildGlobeNationLabels(
 			markerScale,
 			text.fontSize,
 		)
+		text.sync()
 		updateGlobeLabelPosition(text, cameraUp)
 		orientGlobeLabel(text, camera.quaternion)
 		text.visible = true
@@ -306,7 +352,7 @@ export function buildGlobeNationLabels(
 	}
 
 	hideUnusedPool(pool, activeCount)
-	group.userData.globeCameraQuaternion = camera.quaternion.clone()
+	updateGlobeLabelOrientations(group, camera, cullingEnabled)
 	return group
 }
 
@@ -316,6 +362,7 @@ export function buildMapNationLabels(
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	pool: LabelPool,
+	cullingEnabled = false,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces || !world.nations) return group
@@ -327,8 +374,11 @@ export function buildMapNationLabels(
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
 	const nationCount = world.nations.seeds?.length ?? 0
+	const wrapOffsets = cullingEnabled
+		? [-projection.repeatWidth, 0, projection.repeatWidth]
+		: [0]
 
-	ensurePoolSize(pool, nationCount)
+	ensurePoolSize(pool, nationCount * wrapOffsets.length)
 
 	let activeCount = 0
 	for (let n = 0; n < nationCount; n++) {
@@ -355,15 +405,19 @@ export function buildMapNationLabels(
 			markerRadius,
 			fontSize,
 		)
-		const text = pool.items[activeCount]
-		applyMapLabelStyle(text)
-		text.text = name
-		text.position.set(px, py, pz)
-		text.rotation.set(0, 0, 0)
-		text.fontSize = fontSize
-		text.visible = true
-		group.add(text)
-		activeCount++
+		for (const wrapOffset of wrapOffsets) {
+			const text = pool.items[activeCount]
+			applyMapLabelStyle(text)
+			text.frustumCulled = cullingEnabled
+			text.text = name
+			text.position.set(px + wrapOffset, py, pz)
+			text.rotation.set(0, 0, 0)
+			text.fontSize = fontSize
+			text.sync()
+			text.visible = true
+			group.add(text)
+			activeCount++
+		}
 	}
 
 	hideUnusedPool(pool, activeCount)

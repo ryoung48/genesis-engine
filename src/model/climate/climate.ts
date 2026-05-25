@@ -7,7 +7,7 @@
 import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
 import { SimplexNoise } from "../shared/simplex-noise"
 import { TIME } from "../shared/time"
-import { getEffectiveObliquityDeg, getSubstellarDir } from "../shared/units"
+import { getEffectiveObliquityDeg } from "../shared/units"
 import { clampVolcanism, getVolcanismOverdrive } from "../shared/volcanism"
 import {
 	OROGEN_TERRAIN_FEATURE,
@@ -16,6 +16,10 @@ import {
 import { EMB_CONSTANTS } from "./ebm/constants"
 import { EnergyBalanceModel } from "./ebm/index"
 import { INSOLATION } from "./ebm/insolation"
+import {
+	computeLockedMonthlyDaylightHours,
+	computeTidalTemperature,
+} from "./locked/heat"
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -55,10 +59,6 @@ function getMeshLatitudeGeometry(mesh: SphereMesh): MeshLatitudeGeometry {
 	const geometry = { latDegByRegion, latBandByRegion }
 	meshLatitudeGeometryCache.set(mesh, geometry)
 	return geometry
-}
-
-function clampAcosInput(value: number): number {
-	return Math.max(-1, Math.min(1, value))
 }
 
 function clamp01(value: number): number {
@@ -115,76 +115,6 @@ export function computeLandFraction(
 	return landFraction
 }
 
-// ---------------------------------------------------------------------------
-// Tidally locked analytic temperature model
-// ---------------------------------------------------------------------------
-
-function computeMonthlyOrbitalFlux(params: OrogenParams): number[] {
-	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
-	const effectiveTSun = T_SUN * params.sunTempFactor
-	const s0 =
-		(SIGMA * Math.pow(effectiveTSun, 4) * Math.pow(R_SUN, 2)) / Math.pow(AU, 2)
-	const ecc = params.eccentricity
-	const PI = Math.PI
-	const perihelionRad = (params.perihelion * Math.PI) / 180
-	const longP = perihelionRad + PI
-	const equinoxOffsetRad = (40 * 2 * Math.PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
-
-	const calcEccFromTrue = (
-		trueAnomaly: number,
-		eccentricity: number,
-	): number => {
-		const acosInput = clampAcosInput(
-			(eccentricity + Math.cos(trueAnomaly)) /
-				(1 + eccentricity * Math.cos(trueAnomaly)),
-		)
-		if (trueAnomaly > PI) {
-			return 2 * PI - Math.acos(acosInput)
-		}
-		return Math.acos(acosInput)
-	}
-
-	let trueL = -equinoxOffsetRad
-	let trueA = trueL - longP
-	while (trueA < 0) trueA += 2 * PI
-	let eccA = calcEccFromTrue(trueA, ecc)
-	let meanL = eccA - ecc * Math.sin(eccA) + longP
-
-	const dailyFlux = new Array<number>(EMB_CONSTANTS.time.DAYS_PER_YEAR).fill(0)
-	for (let day = 0; day < EMB_CONSTANTS.time.DAYS_PER_YEAR; day++) {
-		if (day !== 0) {
-			meanL += (2 * PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
-			const meanA = meanL - longP
-			eccA = meanA
-			for (let iter = 0; iter < 10; iter++) eccA = meanA + ecc * Math.sin(eccA)
-			while (eccA >= 2 * PI) eccA -= 2 * PI
-			while (eccA < 0) eccA += 2 * PI
-			const trueAnomalyInput = clampAcosInput(
-				(Math.cos(eccA) - ecc) / (1 - ecc * Math.cos(eccA)),
-			)
-			trueA =
-				eccA > PI
-					? 2 * PI - Math.acos(trueAnomalyInput)
-					: Math.acos(trueAnomalyInput)
-			trueL = trueA + longP
-		}
-
-		while (trueL > 2 * PI) trueL -= 2 * PI
-		while (trueL < 0) trueL += 2 * PI
-
-		const astroDist = (1 - ecc * ecc) / (1 + ecc * Math.cos(trueA))
-		dailyFlux[day] = s0 / (astroDist * astroDist)
-	}
-
-	return Array.from({ length: 12 }, (_, month) => {
-		const days = TIME.month.days(month)
-		return (
-			days.reduce((sum, day) => sum + dailyFlux[day], 0) /
-			Math.max(1, days.length)
-		)
-	})
-}
-
 function computeMonthlyDaylightHours(
 	mesh: SphereMesh,
 	params: OrogenParams,
@@ -195,19 +125,7 @@ function computeMonthlyDaylightHours(
 	const hoursPerDay = params.hoursPerDay
 
 	if (params.tidallyLocked) {
-		const sub = getSubstellarDir(params.antistellarLon)
-		for (let r = 0; r < N; r++) {
-			const x = mesh.r_xyz[3 * r]
-			const y = mesh.r_xyz[3 * r + 1]
-			const z = mesh.r_xyz[3 * r + 2]
-			const cosTheta = x * sub[0] + y * sub[1] + z * sub[2]
-			const daylight =
-				cosTheta > 1e-6 ? hoursPerDay : cosTheta < -1e-6 ? 0 : hoursPerDay / 2
-			for (let month = 0; month < 12; month++) {
-				monthly[month * N + r] = daylight
-			}
-		}
-		return monthly
+		return computeLockedMonthlyDaylightHours(mesh, params)
 	}
 
 	const lats = Array.from(
@@ -250,75 +168,13 @@ function computeMonthlyDaylightHours(
 	return monthly
 }
 
-interface TidalTransportParams {
-	T_mean_C: number
-	A1: number
-	A_night: number
-	eccAmplitude: number
-	LAPSE_RATE: number
-	tidalTd: number
-	redistribution: number
-	contrast: number
-}
-
-function computeTidalTransportParams(
-	params: OrogenParams,
-): TidalTransportParams {
-	const radiusM = params.planetRadiusKm * 1000
-	const pressure = params.pressure ?? 1.0
-	const ecc = params.eccentricity
-	const sunFactor = params.sunTempFactor
-
-	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
-	const effectiveTSun = T_SUN * sunFactor
-	const S0 =
-		(SIGMA * Math.pow(effectiveTSun, 4) * Math.pow(R_SUN, 2)) / Math.pow(AU, 2)
-	const albedo = 0.3
-	const T_eq = Math.pow((S0 * (1 - albedo)) / (4 * SIGMA), 0.25)
-	const GREENHOUSE_OFFSET = 33
-	const T_mean_C = T_eq - 273.15 + GREENHOUSE_OFFSET
-
-	const radiusRatio = EMB_CONSTANTS.planet.EARTH_RADIUS / radiusM
-	const radiusFactor = radiusRatio * radiusRatio
-	const pressureFactor = Math.pow(pressure, 0.5)
-	const yearFactor = Math.pow(
-		params.daysPerYear / EMB_CONSTANTS.time.DAYS_PER_YEAR,
-		0.25,
-	)
-	const transportFactor = radiusFactor * pressureFactor * yearFactor
-
-	const redistribution = Math.max(
-		0.2,
-		Math.min(0.85, 0.5 + 0.18 * Math.tanh((transportFactor - 1) * 1.5)),
-	)
-	const contrast = 1 - redistribution
-
-	const A1 = 60 * contrast
-	const A_night = -80 * contrast
-	const eccAmplitude = ecc * 8
-	const gravityRatio = params.planetRadiusKm / 6371
-	const LAPSE_RATE = 6.5 * gravityRatio
-	const tidalTd = Math.max(5, 2 * eccAmplitude)
-
-	return {
-		T_mean_C,
-		A1,
-		A_night,
-		eccAmplitude,
-		LAPSE_RATE,
-		tidalTd,
-		redistribution,
-		contrast,
-	}
-}
-
 /**
  * Applies simplex noise to break up smooth temperature isotherms.
  * `computeTaper(r, x, y, z)` returns a per-cell blend weight [0, 1].
  * `includeCell(r)` gates which cells are processed.
  * When avg/min/max arrays are provided they also receive the offset.
  */
-function applyTemperatureNoise(
+export function applyTemperatureNoise(
 	mesh: SphereMesh,
 	N: number,
 	seed: number,
@@ -359,7 +215,7 @@ function applyTemperatureNoise(
 	}
 }
 
-function recomputeAnnualTemperatureStats(
+export function recomputeAnnualTemperatureStats(
 	temperature_monthly: Float32Array,
 	temperature_avg: Float32Array,
 	temperature_min: Float32Array,
@@ -466,7 +322,7 @@ interface VolcanicTemperatureEffectParams {
 	terrainFeatures?: OrogenTerrainFeatures
 }
 
-function applyVolcanicTemperatureEffects({
+export function applyVolcanicTemperatureEffects({
 	mesh,
 	params,
 	temperature_monthly,
@@ -513,144 +369,6 @@ function applyVolcanicTemperatureEffects({
 			temperature_monthly[idx] += totalDelta
 			temperature_monthly_nolapse[idx] += totalDelta
 		}
-	}
-}
-
-/**
- * Compute per-cell temperature for a tidally locked planet using a
- * Legendre polynomial expansion around the substellar point.
- *
- * T(θ) = T_mean + A₁·P₁(cosθ) + A₂·P₂(cosθ)
- *
- * where θ is angular distance from the substellar point. Redistribution
- * factor controls how uniform temperatures are (1 = perfectly uniform,
- * 0 = no heat redistribution).
- */
-function computeTidalTemperature(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-	landFraction: number[],
-	params: OrogenParams,
-	oceanDist?: Float32Array,
-	elevation_km?: Float32Array,
-	hotspot?: Float32Array,
-	mantleUpwelling?: Float32Array,
-	terrainFeatures?: OrogenTerrainFeatures,
-): OrogenClimate {
-	const N = mesh.numRegions
-	const sub = getSubstellarDir(params.antistellarLon)
-	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)
-
-	const { T_mean_C, A1, A_night, eccAmplitude, LAPSE_RATE, tidalTd, contrast } =
-		computeTidalTransportParams(params)
-	const KM_TO_MI = 0.621371
-
-	const temperature_avg = new Float32Array(N)
-	const temperature_min = new Float32Array(N)
-	const temperature_max = new Float32Array(N)
-	const temperature_monthly = new Float32Array(N * 12)
-	const temperature_monthly_nolapse = new Float32Array(N * 12)
-	const temperature_monthly_range = new Float32Array(N * 12)
-	const insolation_monthly = new Float32Array(N * 12)
-	const pet_monthly = new Float32Array(N * 12)
-
-	const monthlyFlux = computeMonthlyOrbitalFlux(params)
-
-	for (let r = 0; r < N; r++) {
-		const x = mesh.r_xyz[3 * r]
-		const y = mesh.r_xyz[3 * r + 1]
-		const z = mesh.r_xyz[3 * r + 2]
-
-		// Angular distance from substellar point
-		const cosTheta = Math.max(
-			-1,
-			Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]),
-		)
-
-		const P1 = cosTheta
-		const nightFrac = (1 - cosTheta) / 2 // 0 at substellar, 1 at antistellar
-
-		let T = T_mean_C + A1 * P1 + A_night * nightFrac
-
-		// Lapse rate correction for elevated terrain
-		const hKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
-		const lapseCorrection = hKm > 0 ? hKm * LAPSE_RATE : 0
-		T -= lapseCorrection
-
-		// Continentality moderation — inland areas have slightly more extreme temps
-		// For tidal lock the effect is small since there are no seasons, but
-		// ocean proximity still moderates the base temperature slightly
-		if (oceanDist) {
-			const distMiles = oceanDist[r] * KM_TO_MI
-			// Inland areas are slightly warmer on dayside, slightly colder on nightside
-			const inlandShift = Math.tanh((distMiles - 300) / 1000) * 2 * contrast
-			T += cosTheta > 0 ? inlandShift : -inlandShift
-		}
-
-		// All 12 monthly slots get the same value (tiny eccentricity wobble spread as sine)
-		for (let month = 0; month < 12; month++) {
-			const phase = Math.sin((month / 12) * 2 * Math.PI)
-			const monthValue = T + eccAmplitude * phase
-			temperature_monthly[month * N + r] = monthValue
-			temperature_monthly_nolapse[month * N + r] = monthValue + lapseCorrection
-			temperature_monthly_range[month * N + r] = tidalTd
-			insolation_monthly[month * N + r] =
-				monthlyFlux[month] * Math.max(0, cosTheta)
-		}
-	}
-
-	// Temperature noise: break up perfectly smooth concentric isotherms.
-	// Amplitude tapers near the substellar point and deep nightside.
-	applyTemperatureNoise(
-		mesh,
-		N,
-		params.seed ?? 0,
-		temperature_monthly,
-		temperature_monthly_nolapse,
-		(_r, x, y, z) => {
-			const ct = Math.max(-1, Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]))
-			// fade near substellar (ct > 0.5) and deep nightside (ct < -0.5)
-			return Math.min(
-				1 - Math.max(0, ct - 0.5) * 2,
-				1 + Math.min(0, ct + 0.5) * 2,
-			)
-		},
-		() => true,
-	)
-	applyVolcanicTemperatureEffects({
-		mesh,
-		params,
-		temperature_monthly,
-		temperature_monthly_nolapse,
-		hotspot,
-		mantleUpwelling,
-		terrainFeatures,
-	})
-
-	const insolationMul = params.insolationFactor ?? 1
-	for (let i = 0; i < insolation_monthly.length; i++) {
-		insolation_monthly[i] *= insolationMul
-	}
-
-	recomputeAnnualTemperatureStats(
-		temperature_monthly,
-		temperature_avg,
-		temperature_min,
-		temperature_max,
-		N,
-	)
-
-	return {
-		temperature_avg,
-		temperature_min,
-		temperature_max,
-		temperature_monthly,
-		temperature_monthly_nolapse,
-		temperature_monthly_range,
-		insolation_monthly,
-		pet_monthly,
-		daylight_hours_monthly,
-		landFraction,
 	}
 }
 

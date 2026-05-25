@@ -12,23 +12,24 @@ import {
 	smoothstep,
 } from "../shared/math"
 import { SimplexNoise } from "../shared/simplex-noise"
-import {
-	DEFAULT_ANTISTELLAR_LON,
-	getSubstellarDir,
-	isRetrogradeObliquity,
-	meanEdgeLengthKm,
-} from "../shared/units"
+import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
 import { elevToHeightKm } from "./climate"
+import { computeTidalRain } from "./locked/rain"
 
 const DEG2RAD = Math.PI / 180
-const RAD2DEG = 180 / Math.PI
 
-const ceilingScale = (x: number) =>
+export const ceilingScale = (x: number) =>
 	piecewise(
 		[-14, -8, 2, 12, 18, 40, 60, 90],
 		[40, 62, 83, 125, 165, 300, 150, 0],
 		x,
 	)
+
+export function getPressureRainFactor(pressure: number | undefined): number {
+	// Lower pressure -> easier evaporation -> more rain; higher -> suppressed.
+	// ~1/p^0.4: 0.1bar->2.5x, 0.25->1.6x, 0.5->1.3x, 1->1x, 2->0.76x, 4->0.57x, 10->0.40x
+	return Math.pow(1 / (pressure ?? 1.0), 0.4)
+}
 
 const itczScale = (x: number) =>
 	piecewise([0, 0.26, 0.6, 0.93], [1, 0.7, 0.2, 0], x)
@@ -121,7 +122,7 @@ export function getClimateGeometry(mesh: SphereMesh): ClimateGeometry {
 	return geometry
 }
 
-function buildLandGraph(mesh: SphereMesh, isLand: Uint8Array) {
+export function buildLandGraph(mesh: SphereMesh, isLand: Uint8Array) {
 	const { adjOffset, adjList } = mesh
 	const landRegions: number[] = []
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -468,7 +469,7 @@ function computeWeight(
 	return clamp(Math.max(itcz * suppression, eastStorms, westerlies), 0, 1)
 }
 
-function computeRainBandWarpField(
+export function computeRainBandWarpField(
 	mesh: SphereMesh,
 	seed: number,
 	amplitudeDeg: number,
@@ -528,143 +529,6 @@ function computeRainBandWarpField(
 	return warp
 }
 
-// ---------------------------------------------------------------------------
-// Tidally locked rainfall: convection-driven from substellar point
-// ---------------------------------------------------------------------------
-
-/**
- * Rainfall for a tidally locked planet. Convective uplift concentrates
- * near the substellar point; rain tapers smoothly toward the terminator
- * and is near-zero on the nightside. Uses temperature and moisture
- * availability (ocean proximity) rather than latitude-band circulation.
- */
-function computeTidalRain(
-	mesh: SphereMesh,
-	climate: OrogenClimate,
-	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "seed" | "antistellarLon" | "pressure">,
-): { monthly: Float32Array; annual: Float32Array } {
-	const N = mesh.numRegions
-	const sub = getSubstellarDir(
-		params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON,
-	)
-	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
-	const { landRegions, landNeighborOffset, landNeighborList } = buildLandGraph(
-		mesh,
-		isLand,
-	)
-
-	// Higher pressure → more heat redistribution → more moisture transport
-	// past the terminator. logP: -3.3 at 0.1, 0 at 1, 3.3 at 10
-	const logP = Math.log2(Math.max(0.1, pressure))
-	// Terminator convergence strength:
-	//   0.1bar → ~0.02, 1bar → 0.1, 3bar → 0.25, 10bar → 0.5
-	const terminatorStrength = clamp(0.1 + logP * 0.12, 0.02, 0.55)
-	// Nightside drizzle: zero at ≤1bar, ramps up only at high pressure
-	//   1bar → 0, 3bar → ~0.05, 10bar → ~0.13
-	const nightsideDrizzle = clamp((logP - 0.5) * 0.05, 0, 0.15)
-
-	// Compute angular distance from substellar point for each cell
-	const cosTheta = new Float32Array(N)
-	for (let r = 0; r < N; r++) {
-		cosTheta[r] = Math.max(
-			-1,
-			Math.min(
-				1,
-				mesh.r_xyz[3 * r] * sub[0] +
-					mesh.r_xyz[3 * r + 1] * sub[1] +
-					mesh.r_xyz[3 * r + 2] * sub[2],
-			),
-		)
-	}
-
-	// Noise to break up perfectly smooth concentric rainfall rings.
-	const seed = params?.seed ?? 0
-	const sn1 = new SimplexNoise(seed + 4001)
-	const sn2 = new SimplexNoise(seed + 4002)
-	const FREQ1 = 3.0
-	const FREQ2 = 7.0
-	const AMP1 = 0.35
-	const AMP2 = 0.15
-	const boundaryWarpDeg = computeRainBandWarpField(mesh, seed, 8, landRegions)
-
-	// Three rainfall sources:
-	// 1) Substellar convection: cos⁴ falloff, peaks at substellar
-	// 2) Terminator convergence: ring where warm dayside air meets cold nightside
-	// 3) Nightside drizzle: advected moisture condensing in cold sinking air
-	const monthly = new Float32Array(N * 12)
-	for (const r of landRegions) {
-		const ct = cosTheta[r]
-		const thetaDeg = Math.acos(clamp(ct, -1, 1)) * RAD2DEG + boundaryWarpDeg[r]
-
-		const temp = climate.temperature_avg[r]
-		const ceiling = ceilingScale(temp)
-
-		// 1) Substellar convection: cos⁴, dayside only
-		const convection = ct > 0 ? ct * ct * ct * ct : 0
-
-		// 2) Terminator convergence ring: bell curve peaking ~85° from substellar
-		//    Warm moist air collides with cold nightside air → forced uplift
-		const termDist = Math.abs(thetaDeg - 85)
-		const terminator =
-			Math.exp((-termDist * termDist) / (2 * 18 * 18)) * terminatorStrength
-
-		// 3) Nightside drizzle: gentle falloff past the terminator
-		//    Advected moisture condenses as it cools; fades toward antistellar
-		const nightside =
-			ct < 0.1 ? nightsideDrizzle * clamp(1 - (thetaDeg - 95) / 70, 0, 1) : 0
-
-		const weight = convection + terminator + nightside
-
-		// Multiplicative noise: breaks up uniform concentric bands
-		const x = mesh.r_xyz[3 * r]
-		const y = mesh.r_xyz[3 * r + 1]
-		const z = mesh.r_xyz[3 * r + 2]
-		const n =
-			sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1 +
-			sn2.noise3D(x * FREQ2, y * FREQ2, z * FREQ2) * AMP2
-		const noiseMul = Math.max(0, 1 + n)
-
-		const rain = weight * ceiling * noiseMul
-		for (let month = 0; month < 12; month++) {
-			monthly[month * N + r] = rain
-		}
-	}
-
-	// Smooth 3 passes (same as regular model)
-	const smoothBuf = new Float32Array(N)
-	for (let pass = 0; pass < 3; pass++) {
-		for (let month = 0; month < 12; month++) {
-			const offset = month * N
-			for (let i = 0; i < landRegions.length; i++) {
-				const r = landRegions[i]
-				let sum = 0
-				const start = landNeighborOffset[i]
-				const end = landNeighborOffset[i + 1]
-				for (let j = start; j < end; j++) {
-					sum += monthly[offset + landNeighborList[j]]
-				}
-				sum += monthly[offset + r]
-				smoothBuf[r] = sum / (end - start + 1)
-			}
-			for (const r of landRegions) {
-				monthly[offset + r] = smoothBuf[r]
-			}
-		}
-	}
-
-	const annual = new Float32Array(N)
-	for (const r of landRegions) {
-		let sum = 0
-		for (let month = 0; month < 12; month++) {
-			sum += monthly[month * N + r]
-		}
-		annual[r] = sum
-	}
-
-	return { monthly, annual }
-}
-
 /**
  * Compute monthly and annual rainfall for all regions.
  */
@@ -676,16 +540,15 @@ export function computeMonthlyRain(
 	isLand: Uint8Array,
 	params?: OrogenParams,
 	monthlyTEQ?: Float32Array[],
+	distCoast?: Float32Array,
 ): { monthly: Float32Array; annual: Float32Array } {
 	if (params?.tidallyLocked) {
-		return computeTidalRain(mesh, climate, isLand, params)
+		return computeTidalRain(mesh, climate, isLand, params, distCoast)
 	}
 
 	const N = mesh.numRegions
 	const reverseCirculation = isRetrogradeObliquity(params?.obliquity ?? 0)
-	// Lower pressure → easier evaporation → more rain; higher → suppressed
-	// ~1/p^0.4: 0.1bar→2.5x, 0.25→1.6x, 0.5→1.3x, 1→1x, 2→0.76x, 4→0.57x, 10→0.40x
-	const pressureRainFactor = Math.pow(1 / (params?.pressure ?? 1.0), 0.4)
+	const pressureRainFactor = getPressureRainFactor(params?.pressure)
 
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
 	const { landRegions, landNeighborOffset, landNeighborList } = buildLandGraph(

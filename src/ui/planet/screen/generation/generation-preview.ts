@@ -11,6 +11,7 @@ interface GenerationPreviewParams {
 	obliquity: number
 	eccentricity: number
 	perihelion: number
+	antistellarLon: number
 	sunTempFactor: number
 	insolationFactor: number
 	hoursPerDay: number
@@ -25,12 +26,15 @@ export function buildGenerationPreviewConfig(params: GenerationPreviewParams) {
 		obliquity: params.tidallyLocked ? 0 : params.obliquity,
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
+		antistellarLon: params.antistellarLon,
 		tSun: params.sunTempFactor * 5778,
+		sunTempFactor: params.sunTempFactor,
 		insolationFactor: params.insolationFactor,
 		hoursPerDay: params.hoursPerDay,
 		daysPerYear: params.daysPerYear,
 		landFraction: params.landCoverage,
 		radius: params.planetRadiusKm,
+		planetRadiusKm: params.planetRadiusKm,
 		pressure: params.pressure,
 	}
 }

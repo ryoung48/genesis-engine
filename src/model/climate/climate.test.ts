@@ -7,6 +7,7 @@ import {
 	computeTemperature,
 	elevToHeightKm,
 } from "./climate"
+import { computeTidalTransportParams } from "./locked/heat"
 
 function buildMesh(
 	zValues: number[],
@@ -132,6 +133,20 @@ describe("applyDtrToClimateMinMax", () => {
 })
 
 describe("computeTemperature", () => {
+	it("keeps strengthening tidal redistribution above ten bar", () => {
+		const thinAir = computeTidalTransportParams(buildParams({ pressure: 1 }))
+		const denseAir = computeTidalTransportParams(buildParams({ pressure: 10 }))
+		const superDenseAir = computeTidalTransportParams(
+			buildParams({ pressure: 100 }),
+		)
+
+		expect(denseAir.redistribution).toBeGreaterThan(thinAir.redistribution)
+		expect(superDenseAir.redistribution).toBeGreaterThan(
+			denseAir.redistribution,
+		)
+		expect(superDenseAir.contrast).toBeLessThan(denseAir.contrast)
+	})
+
 	it("uses tidal-lock daylight geometry and ocean distance to shape temperatures", () => {
 		const mesh = buildMesh([0, 0, 0, 0, 0], [1, -1, 0, 1, -1], [0, 0, 1, 0, 0])
 
@@ -139,7 +154,12 @@ describe("computeTemperature", () => {
 			mesh,
 			new Float32Array(5),
 			new Array(36).fill(0),
-			buildParams({ tidallyLocked: true, antistellarLon: 180, seed: 0 }),
+			buildParams({
+				tidallyLocked: true,
+				antistellarLon: 180,
+				seed: 0,
+				eccentricity: 0,
+			}),
 			new Float32Array([0, 0, 0, 2000, 2000]),
 		)
 
@@ -155,6 +175,34 @@ describe("computeTemperature", () => {
 		expect(climate.temperature_avg[4]).toBeLessThan(climate.temperature_avg[1])
 		expect(climate.temperature_monthly_range[0]).toBeGreaterThan(0)
 		expect(climate.insolation_monthly[1]).toBe(0)
+	})
+
+	it("keeps an Earth-like locked planet milder than the previous extreme baseline", () => {
+		const mesh = buildMesh([0, 0, 0], [1, -1, 0], [0, 0, 1])
+
+		const climate = computeTemperature(
+			mesh,
+			new Float32Array(3),
+			new Array(36).fill(0),
+			buildParams({
+				tidallyLocked: true,
+				antistellarLon: 180,
+				seed: 0,
+				eccentricity: 0,
+				pressure: 1,
+				planetRadiusKm: 6371,
+				daysPerYear: 365,
+				sunTempFactor: 1,
+			}),
+			new Float32Array([0, 0, 0]),
+		)
+
+		expect(climate.temperature_avg[0]).toBeLessThan(35)
+		expect(climate.temperature_avg[1]).toBeLessThan(-30)
+		expect(climate.temperature_avg[1]).toBeGreaterThan(-42)
+		expect(
+			climate.temperature_avg[0] - climate.temperature_avg[1],
+		).toBeLessThan(70)
 	})
 
 	it("supports perihelion inputs that start beyond pi in the tidal orbital flux", () => {

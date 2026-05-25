@@ -1,7 +1,11 @@
 import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import { type MeasureMode, OverlayControls } from "./OverlayControls"
+import {
+	type LabelMode,
+	type MeasureMode,
+	OverlayControls,
+} from "./OverlayControls"
 
 function renderWithProps(
 	overrides: Partial<React.ComponentProps<typeof OverlayControls>> = {},
@@ -28,8 +32,8 @@ function renderWithProps(
 		setShowNationBorders: vi.fn(),
 		showNationHierarchy: false,
 		setShowNationHierarchy: vi.fn(),
-		showNationLabels: false,
-		setShowNationLabels: vi.fn(),
+		labelMode: "off" as LabelMode,
+		setLabelMode: vi.fn(),
 		showElevation: true,
 		setShowElevation: vi.fn(),
 		showInfrastructure: false,
@@ -79,6 +83,9 @@ describe("OverlayControls", () => {
 		expect(markup).toContain(">Copy seed<")
 		expect(markup).toContain('aria-label="Metric units"')
 		expect(markup).toContain('aria-label="Imperial units"')
+		expect(markup).toContain('aria-label="Labels off"')
+		expect(markup).toContain('aria-label="Nation labels"')
+		expect(markup).toContain('aria-label="Dynasty labels"')
 		expect(markup).toContain(">me<")
 		expect(markup).toContain(">im<")
 		expect(markup).toContain("Projection Latitude")
@@ -110,6 +117,7 @@ describe("OverlayControls", () => {
 		const setShowGrid = vi.fn()
 		const setShowNationBorders = vi.fn()
 		const setShowNationHierarchy = vi.fn()
+		const setLabelMode = vi.fn()
 		const setViewMode = vi.fn()
 		const setUnitSystem = vi.fn()
 		const setDraftMapProjectionLatitude = vi.fn()
@@ -130,6 +138,7 @@ describe("OverlayControls", () => {
 			setShowGrid,
 			setShowNationBorders,
 			setShowNationHierarchy,
+			setLabelMode,
 			setViewMode,
 			setUnitSystem,
 			setDraftMapProjectionLatitude,
@@ -152,6 +161,7 @@ describe("OverlayControls", () => {
 		props.setShowWireframe?.(true)
 		props.setShowNationBorders?.(true)
 		props.setShowNationHierarchy?.(true)
+		props.setLabelMode?.("dynasty")
 		props.setShowGrid?.(false)
 		props.setDraftMapProjectionLatitude?.(-42)
 		props.setMapProjectionLatitude?.(-42)
@@ -178,6 +188,7 @@ describe("OverlayControls", () => {
 		expect(setShowWireframe).toHaveBeenCalledWith(true)
 		expect(setShowNationBorders).toHaveBeenCalledWith(true)
 		expect(setShowNationHierarchy).toHaveBeenCalledWith(true)
+		expect(setLabelMode).toHaveBeenCalledWith("dynasty")
 		expect(setShowGrid).toHaveBeenCalledWith(false)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setMapProjectionLatitude).toHaveBeenCalledWith(-42)

@@ -1,9 +1,10 @@
 /**
  * Vegetation and climate zone assignment for the orogen pipeline.
  * Classifies each land cell into a biome and climate zone based on temperature
- * and rainfall, mirroring the logic from src/model/shapers/climate.ts.
+ * and rainfall, mirroring the logic from src/model/shaders/climate.ts.
  */
 import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import { PASTA_LABELS } from "./pasta"
 
 /**
  * Climate zone codes stored in a Uint8Array:
@@ -36,7 +37,7 @@ export const TEMPERATURE_BOUNDARY_SUBTROPICAL = 16
 export const TEMPERATURE_BOUNDARY_TROPICAL = 24
 
 // Chaotic thresholds (from EBM constants)
-export const CHAOTIC_MIN = 0
+export const CHAOTIC_MIN = 15
 export const CHAOTIC_MAX = 40
 
 /**
@@ -131,10 +132,133 @@ function probAbove(
 	return rng() < t
 }
 
+/** Mapping from Pasta zone label to base biome code. */
+const PASTA_BIOME_MAP: Record<string, BiomeCode> = {
+	// Arid
+	Aha: 1,
+	Ahc: 1,
+	Ahh: 1,
+	Ahe: 1,
+	Ada: 2,
+	Adc: 2,
+	Adh: 2,
+	Ade: 2,
+
+	// Tropical
+	TUr: 6,
+	TUrp: 6,
+	TUf: 5,
+	TUfp: 6,
+	TUs: 4,
+	TUsp: 5,
+	TUA: 3,
+	TUAp: 4,
+
+	TQf: 5,
+	TQfp: 6,
+	TQs: 4,
+	TQsp: 5,
+	TQA: 3,
+	TQAp: 4,
+
+	TF: 2,
+	TG: 1,
+
+	// Cold
+	CTf: 5,
+	CTfp: 6,
+	CTs: 4,
+	CTsp: 5,
+
+	CDa: 5,
+	CDap: 5,
+	CDb: 5,
+	CDbp: 5,
+
+	CEa: 5,
+	CEap: 5,
+	CEb: 5,
+	CEbp: 5,
+	CEc: 5,
+	CEcp: 5,
+
+	CMa: 4,
+	CMb: 4,
+
+	CAMa: 4,
+	CAMb: 4,
+	CAa: 3,
+	CAap: 4,
+	CAb: 3,
+	CAbp: 3,
+
+	CFa: 2,
+	CFb: 2,
+	CG: 1,
+	CI: 1,
+
+	// Hot
+	HTf: 5,
+	HTfp: 5,
+	HTs: 4,
+	HTsp: 5,
+
+	HDa: 4,
+	HDap: 5,
+	HDb: 3,
+	HDbp: 4,
+	HDc: 2,
+	HDcp: 3,
+
+	HMa: 4,
+	HMb: 3,
+	HMc: 2,
+
+	HAMa: 3,
+	HAMb: 2,
+	HAMc: 1,
+	HAa: 3,
+	HAap: 4,
+	HAb: 2,
+	HAbp: 3,
+	HAc: 1,
+	HAcp: 2,
+
+	HFa: 2,
+	HFb: 2,
+	HFc: 1,
+	HG: 1,
+
+	// Extraseasonal
+	ETf: 5,
+	ETfp: 6,
+	ETs: 4,
+	ETsp: 5,
+
+	EDa: 5,
+	EDap: 5,
+	EDb: 4,
+	EDbp: 5,
+
+	EMa: 4,
+	EMb: 3,
+
+	EAMa: 4,
+	EAMb: 3,
+	EAa: 3,
+	EAap: 4,
+	EAb: 2,
+	EAbp: 3,
+
+	EFa: 2,
+	EFb: 2,
+	EG: 1,
+}
+
 /**
- * Assign a biome to each land cell based on temperature zone and annual rainfall.
- * Pass a seeded `rng` to produce deterministic probabilistic transitions near
- * rainfall boundaries.
+ * Assign a biome to each land cell based on the Pasta climate zone.
+ * Uses the Pasta zone as the primary classifier, with probabilistic noise
+ * at biome boundaries to preserve organic transitions.
  */
 export function assignVegetation(
 	mesh: SphereMesh,
@@ -142,17 +266,63 @@ export function assignVegetation(
 	climate: OrogenClimate,
 	rainfall: OrogenRainfall,
 	rng: () => number,
+	pastaZones?: Uint8Array,
+	gdd?: Float32Array,
+	gar?: Float32Array,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const biome = new Uint8Array(N) // 0 = ocean by default
 
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue // ocean
+	// Cold/extraseasonal forest zones that transition to woods at low GAr or low GDD
+	const COLD_EXTRA_FORESTS = new Set([
+		"CTf",
+		"CTfp",
+		"CDa",
+		"CDap",
+		"CDb",
+		"CDbp",
+		"CEa",
+		"CEap",
+		"CEb",
+		"CEbp",
+		"CEc",
+		"CEcp",
+		"ETf",
+		"ETfp",
+		"EDa",
+		"EDap",
+		"EDb",
+		"EDbp",
+	])
+	const WOODS_CODE = 4 as BiomeCode
 
-		const temp = climate.temperature_avg[r]
-		const rain = rainfall.annual[r]
+	if (pastaZones) {
+		const baseBiome = new Uint8Array(N)
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r]) continue
+			const zoneLabel = PASTA_LABELS[pastaZones[r]]
+			let biomeCode = PASTA_BIOME_MAP[zoneLabel] ?? 1
+			// Cold/extraseasonal forest → woods transition at GAr < 0.6 or GDD < 600
+			if (biomeCode === 5 && COLD_EXTRA_FORESTS.has(zoneLabel)) {
+				const lowGar = gar !== undefined && gar[r] < 0.75
+				const lowGDD = gdd !== undefined && gdd[r] < 700
+				if (lowGar || lowGDD) biomeCode = WOODS_CODE
+			}
+			baseBiome[r] = biomeCode
+		}
 
-		biome[r] = classifyBiome(temp, rain, rng)
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r]) continue
+			biome[r] = baseBiome[r] as BiomeCode
+		}
+	} else {
+		// Fallback: temperature + rainfall only (legacy behavior)
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r]) continue
+			const temp = climate.temperature_avg[r]
+			const rain = rainfall.annual[r]
+			biome[r] = classifyBiome(temp, rain, rng)
+		}
 	}
 
 	return biome
