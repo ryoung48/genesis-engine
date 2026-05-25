@@ -3,7 +3,6 @@ import type {
 	DistanceFields,
 	OrogenHazards,
 	SphereMesh,
-	TectonicMode,
 } from ".."
 import { clamp01, smoothstep } from "../shared/math"
 
@@ -81,7 +80,6 @@ export function computeHazards(
 	distFields: DistanceFields,
 	elevationKm: Float32Array,
 	isLand: Uint8Array,
-	tectonicMode: TectonicMode | 0 | 1,
 	hotspot?: Float32Array,
 ): OrogenHazards {
 	const N = elevationKm.length
@@ -218,11 +216,6 @@ export function computeHazards(
 		}
 		volc = Math.max(volc, volcanicProximity * relief * 0.18)
 		if (hotspotScore < 0.07 && volcanicProximity < 0.1) volc *= 0.3
-
-		if (tectonicMode === "stagnant") {
-			quake *= 0.45
-			volc = Math.max(volc, hotspotScore, relief * (land ? 0.16 : 0.05))
-		}
 		if (!(mountainousVolcanicZone || hotspotVolcanicZone)) {
 			volc = 0
 		}

@@ -24,7 +24,6 @@ export type {
 	PlateVec,
 	StageTiming,
 	SuperPlateData,
-	TectonicMode,
 	TectonicPlate,
 } from "./types/tectonics"
 export {

@@ -799,7 +799,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			seedWorld.cultures
 		) {
 			const t0 = performance.now()
-			progressCb("initHistory", 80)
+			progressCb("Initializing history", 80)
 			const historyTimings: StageTiming[] = []
 			historyRng = createHistoryRng(generated.params.seed + 99999)
 			historyState = initHistory({
@@ -824,7 +824,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 				timings: historyTimings,
 			})
 			historyTime = historyState.time
-			progressCb("initHistory:computeRoutes", 90)
+			progressCb("Computing trade routes", 90)
 			generated.timings.push({
 				Stage: "initHistory",
 				ms: (performance.now() - t0).toFixed(1),

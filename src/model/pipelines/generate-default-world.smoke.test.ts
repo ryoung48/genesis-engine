@@ -28,17 +28,12 @@ import { generateOrogenWorld } from "./generate-world"
 
 const SMOKE_PLANET_CODE = "8wqaf.080yudfjcze4m7yceeysl488rbtec5u"
 
-function defaultTectonicMode(): OrogenParams["tectonicMode"] {
-	return "active"
-}
-
 function buildSmokeParams(code: string): OrogenParams {
 	const decoded = decodePlanetCode(code)
 	if (!decoded) throw new Error(`Invalid smoke planet code: ${code}`)
 
 	return {
 		seed: decoded.seed,
-		tectonicMode: decoded.tectonicMode ?? defaultTectonicMode(),
 		numPoints: decoded.numPoints ?? DEFAULT_WORLD_PARAMS.numPoints,
 		numPlates: decoded.numPlates ?? DEFAULT_WORLD_PARAMS.numPlates,
 		landDistribution:
@@ -268,7 +263,6 @@ describe("full world smoke generation", () => {
 		console.info("Smoke planet code", SMOKE_PLANET_CODE)
 		console.info("Decoded smoke params", {
 			seed: params.seed,
-			tectonicMode: params.tectonicMode,
 			numPoints: params.numPoints,
 			numPlates: params.numPlates,
 			landDistribution: params.landDistribution,

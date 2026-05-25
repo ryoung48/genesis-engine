@@ -26,7 +26,6 @@ import {
 	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
 } from "../shared/units"
-import { clampVolcanism } from "../shared/volcanism"
 import {
 	generateCoarsePlates,
 	projectCoarsePlates,
@@ -37,12 +36,7 @@ import {
 	projectMantleFieldToRegions,
 } from "../tectonics/mantle"
 import { smoothAndReconnectPlates } from "../tectonics/plates"
-import { generateStaticElevation } from "../tectonics/static-elevation"
 import { buildSuperPlates } from "../tectonics/super-plates"
-import {
-	buildDummyBoundary,
-	computeSimpleDistanceFields,
-} from "../tectonics/synthetic-plates"
 import { applyCraters } from "../terrain/craters"
 import { blendElevation, computeDistanceFields } from "../terrain/elevation"
 import {
@@ -52,7 +46,7 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "../terrain/erosion"
-import { applyHotspots, applyStaticHotspots } from "../terrain/hotspots"
+import { applyHotspots } from "../terrain/hotspots"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
@@ -218,7 +212,7 @@ function runActivePath(
 
 	// 10. Hotspot volcanism
 	const r_hotspot = withTiming("hotspots", pipelineTiming, () =>
-		params.landCoverage <= 0
+		volcanism <= 0
 			? new Float32Array(mesh.numRegions)
 			: applyHotspots(
 					mesh,
@@ -250,65 +244,12 @@ function runActivePath(
 	}
 }
 
-function runStagnantPath(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	coarse: ReturnType<typeof generateCoarsePlates>,
-	params: OrogenParams,
-	volcanism: number,
-	pipelineTiming: StageTiming[],
-	onProgress?: ProgressFn,
-): TectonicPathResult {
-	// Build per-region ocean mask from plate classification
-	const plateOceanMask = new Uint8Array(mesh.numRegions)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (coarse.coarsePlateIsOcean.has(r_plate[r])) plateOceanMask[r] = 1
-	}
-
-	const elevation = withTiming("static-elevation", pipelineTiming, () =>
-		generateStaticElevation(
-			mesh,
-			params.seed,
-			params.roughness,
-			params.landCoverage,
-			volcanism,
-			plateOceanMask,
-		),
-	)
-	onProgress?.("static-elevation", 20)
-
-	// Static hotspots (no plate velocity needed)
-	const r_hotspot = withTiming("static-hotspots", pipelineTiming, () =>
-		params.landCoverage <= 0
-			? new Float32Array(mesh.numRegions)
-			: applyStaticHotspots(mesh, elevation, params.seed, volcanism),
-	)
-	clampHotspots(r_hotspot)
-	onProgress?.("static-hotspots", 25)
-
-	// Peak compression
-	applyPeakCompression(elevation, mesh.numRegions)
-
-	// Dummy boundary/distance data for downstream climate + rivers
-	const boundary = buildDummyBoundary(mesh, elevation)
-	const distFields = computeSimpleDistanceFields(mesh, elevation)
-
-	return {
-		elevation,
-		terrainFeatures: undefined,
-		boundary,
-		distFields,
-		r_hotspot,
-		r_mantleUpwelling: new Float32Array(mesh.numRegions),
-	}
-}
-
 export function generateOrogenWorld(
 	params: OrogenParams,
 	onProgress?: ProgressFn,
 ): OrogenWorld {
 	const rng = createRng(params.seed)
-	const volcanism = clampVolcanism(params.volcanism, 1)
+	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []
 	const elevationTiming: StageTiming[] = []
 	const postTiming: StageTiming[] = []
@@ -321,19 +262,14 @@ export function generateOrogenWorld(
 	)
 	onProgress?.("mesh", 3)
 
-	const tectonicMode = params.tectonicMode ?? "active"
-
-	// Shared mutable state populated by either the active or stagnant path
+	// Mutable state for the active plate tectonics pipeline
 	let elevation: Float32Array
-	let plates: TectonicPlate[]
 	let plateAssignment: Int32Array
 	let boundary: BoundaryInfo
 	let distFields: DistanceFields
 	let r_hotspot: Float32Array
 	let r_mantleUpwelling: Float32Array
 	let terrainFeatures: OrogenTerrainFeatures | undefined
-
-	// ── Shared plate generation (both active and stagnant paths) ──────
 
 	// 2. Generate coarse plates on fixed 20K mesh
 	onProgress?.("coarse-plates", 5)
@@ -366,14 +302,14 @@ export function generateOrogenWorld(
 		smoothAndReconnectPlates(mesh, r_plate, plateIds, 3)
 	})
 
-	// Build TectonicPlate[] and plateAssignment (shared by both paths)
+	// Build TectonicPlate[] and plateAssignment
 	const maxSeedId = plateIds.reduce((m, p) => Math.max(m, p), 0)
 	const seedToIdx = new Int32Array(maxSeedId + 1).fill(-1)
 	plateIds.forEach((pid, idx) => {
 		seedToIdx[pid] = idx
 	})
 
-	plates = plateIds.map((pid, idx) => {
+	const plates = plateIds.map((pid, idx) => {
 		const pv = coarse.coarsePlateVec.get(pid)!
 		return {
 			id: idx,
@@ -391,48 +327,27 @@ export function generateOrogenWorld(
 		const idx = seedToIdx[r_plate[r]]
 		plateAssignment[r] = idx !== -1 ? idx : 0
 	}
-
-	if (tectonicMode === "active") {
-		// ── Active plate tectonics path (stages 5–11) ─────────────────────
-		;({
-			elevation,
-			terrainFeatures,
-			boundary,
-			distFields,
-			r_hotspot,
-			r_mantleUpwelling,
-		} = runActivePath(
-			mesh,
-			r_plate,
-			plates,
-			plateIds,
-			coarse,
-			params,
-			volcanism,
-			plateAssignment,
-			pipelineTiming,
-			elevationTiming,
-			onProgress,
-		))
-	} else {
-		// ── Stagnant lid path (plates determine land/ocean, noise drives terrain) ──
-		;({
-			elevation,
-			terrainFeatures,
-			boundary,
-			distFields,
-			r_hotspot,
-			r_mantleUpwelling,
-		} = runStagnantPath(
-			mesh,
-			r_plate,
-			coarse,
-			params,
-			volcanism,
-			pipelineTiming,
-			onProgress,
-		))
-	} // end tectonic mode branch
+	// 5–11. Active plate tectonics pipeline
+	;({
+		elevation,
+		terrainFeatures,
+		boundary,
+		distFields,
+		r_hotspot,
+		r_mantleUpwelling,
+	} = runActivePath(
+		mesh,
+		r_plate,
+		plates,
+		plateIds,
+		coarse,
+		params,
+		volcanism,
+		plateAssignment,
+		pipelineTiming,
+		elevationTiming,
+		onProgress,
+	))
 
 	// 12. Terrain post-processing (orogen order)
 	withTiming("post", pipelineTiming, () => {
@@ -518,7 +433,7 @@ export function generateOrogenWorld(
 		})
 
 		// Honor exact coverage extremes after all terrain shaping.
-		if (params.landCoverage <= 0) {
+		if (params.landCoverage <= 0 && volcanism <= 0) {
 			for (let r = 0; r < mesh.numRegions; r++) {
 				elevation[r] = Math.min(elevation[r], -0.02)
 			}
@@ -667,7 +582,7 @@ export function generateOrogenWorld(
 			distCoast: distFields.distCoast,
 			oceanDist,
 			params,
-			tectonicMode: tectonicMode === "active" ? "active" : "stagnant",
+			tectonicMode: "active" as const,
 			boundary,
 			distFields,
 			r_hotspot,

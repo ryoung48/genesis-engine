@@ -38,19 +38,12 @@ export function getSubstellarDir(
  * Max mountain height scales ~1/g, and g ∝ R for rocky bodies of similar density.
  * Earth (6371 km) → 6 km practical tectonic max.
  */
-export function getMaxElevationKm(planetRadiusKm: number): number {
-	return Math.max(
-		3,
-		Math.min(15, 6 * (DEFAULT_PLANET_RADIUS_KM / planetRadiusKm)),
-	)
+export function getMaxElevationKm(_planetRadiusKm: number): number {
+	return 6
 }
 
-/**
- * Ocean depth scales weakly with gravity — isostasy is a density ratio.
- * Earth → 10 km max depth. Mild power-law scaling with radius.
- */
-export function getMaxOceanDepthKm(planetRadiusKm: number): number {
-	return 10 * Math.pow(planetRadiusKm / DEFAULT_PLANET_RADIUS_KM, 0.3)
+export function getMaxOceanDepthKm(_planetRadiusKm: number): number {
+	return 10
 }
 
 export function meanEdgeLengthKm(

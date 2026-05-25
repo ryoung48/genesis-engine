@@ -1,10 +1,8 @@
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../.."
 import { TIME } from "../../shared/time"
 import { getSubstellarDir } from "../../shared/units"
-import type { OrogenTerrainFeatures } from "../../types/tectonics"
 import {
 	applyTemperatureNoise,
-	applyVolcanicTemperatureEffects,
 	elevToHeightKm,
 	recomputeAnnualTemperatureStats,
 } from "../climate"
@@ -257,9 +255,6 @@ export function computeTidalTemperature(
 	params: OrogenParams,
 	oceanDist?: Float32Array,
 	elevation_km?: Float32Array,
-	hotspot?: Float32Array,
-	mantleUpwelling?: Float32Array,
-	terrainFeatures?: OrogenTerrainFeatures,
 ): OrogenClimate {
 	const N = mesh.numRegions
 	const monthlyLibration = computeMonthlyLibration(
@@ -341,15 +336,6 @@ export function computeTidalTemperature(
 		},
 		() => true,
 	)
-	applyVolcanicTemperatureEffects({
-		mesh,
-		params,
-		temperature_monthly,
-		temperature_monthly_nolapse,
-		hotspot,
-		mantleUpwelling,
-		terrainFeatures,
-	})
 
 	const insolationMul = params.insolationFactor ?? 1
 	for (let i = 0; i < insolation_monthly.length; i++) {

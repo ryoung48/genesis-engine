@@ -8,7 +8,6 @@ const worldCache = new Map<string, ReturnType<typeof generateOrogenWorld>>()
 function makeParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
 	return {
 		seed: 12345,
-		tectonicMode: "active",
 		numPoints: TEST_NUM_POINTS,
 		numPlates: 12,
 		landDistribution: 0.25,

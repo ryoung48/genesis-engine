@@ -315,7 +315,6 @@ export function buildTerrainSliders(state: {
 }
 
 export function resetWorldDefaults(setters: {
-	setTectonicMode: (v: 0 | 1) => void
 	setNumPoints: (v: number) => void
 	setJitter: (v: number) => void
 	setNumPlates: (v: number) => void
@@ -343,7 +342,6 @@ export function resetWorldDefaults(setters: {
 	setVolcanism: (v: number) => void
 	setCraters: (v: number) => void
 }): void {
-	setters.setTectonicMode(DEFAULT_WORLD_PARAMS.tectonicMode)
 	setters.setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
 	setters.setJitter(DEFAULT_WORLD_PARAMS.jitter)
 	setters.setNumPlates(DEFAULT_WORLD_PARAMS.numPlates)

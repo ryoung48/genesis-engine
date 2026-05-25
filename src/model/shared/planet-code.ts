@@ -5,7 +5,6 @@
 
 import type { OrogenParams } from ".."
 import { SLIDER_RANGES } from "./slider-ranges"
-import { clampVolcanism } from "./volcanism"
 
 const DEFAULT_PRESSURE = 1.0
 const PLANET_CODE_PART_SEPARATOR = "."
@@ -199,7 +198,7 @@ const FIELD_SPECS: FieldSpec[] = [
 		min: SR.volcanism.min,
 		step: SR.volcanism.step,
 		count: rangeCount(SR.volcanism),
-		read: (p) => clampVolcanism(p.volcanism, 1),
+		read: (p) => p.volcanism ?? 1,
 	},
 	{
 		name: "craters",
@@ -207,16 +206,6 @@ const FIELD_SPECS: FieldSpec[] = [
 		step: SR.craters.step,
 		count: rangeCount(SR.craters),
 		read: (p) => clampUnit(p.craters ?? 0),
-	},
-	{
-		name: "tectonicMode",
-		min: SR.tectonicMode.min,
-		step: SR.tectonicMode.step,
-		count: rangeCount(SR.tectonicMode),
-		read: (p) =>
-			p.tectonicMode === "stagnant" || (p.tectonicMode as unknown) === 1
-				? 1
-				: 0,
 	},
 ]
 
@@ -344,7 +333,6 @@ interface DecodedPlanetCode {
 	pressure: number
 	volcanism: number
 	craters?: number
-	tectonicMode?: "active" | "stagnant"
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
@@ -406,6 +394,5 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		pressure: decodedFields.pressure,
 		volcanism: decodedFields.volcanism,
 		craters: craters > 0 ? craters : undefined,
-		tectonicMode: decodedFields.tectonicMode >= 0.5 ? "stagnant" : "active",
 	}
 }

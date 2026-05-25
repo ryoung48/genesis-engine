@@ -8,7 +8,6 @@ export const TEST_WORLD_NUM_POINTS = 600
 function makeTestParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
 	return {
 		...DEFAULT_WORLD_PARAMS,
-		tectonicMode: "active",
 		seed: 12345,
 		numPoints: TEST_WORLD_NUM_POINTS,
 		tidallyLocked: false,

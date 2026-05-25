@@ -194,7 +194,6 @@ describe("generateWorld", () => {
 			77,
 			{
 				tidallyLocked: true,
-				tectonicMode: 1,
 				obliquity: 33,
 				numPlates: 24,
 			},
@@ -218,7 +217,6 @@ describe("generateWorld", () => {
 				seed: 77,
 				tidallyLocked: true,
 				obliquity: 0,
-				tectonicMode: "stagnant",
 				numPlates: 24,
 			}),
 		})

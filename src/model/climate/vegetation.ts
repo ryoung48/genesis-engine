@@ -237,18 +237,18 @@ const PASTA_BIOME_MAP: Record<string, BiomeCode> = {
 
 	EDa: 5,
 	EDap: 5,
-	EDb: 4,
+	EDb: 5,
 	EDbp: 5,
 
 	EMa: 4,
-	EMb: 3,
+	EMb: 4,
 
 	EAMa: 4,
-	EAMb: 3,
+	EAMb: 4,
 	EAa: 3,
 	EAap: 4,
-	EAb: 2,
-	EAbp: 3,
+	EAb: 3,
+	EAbp: 4,
 
 	EFa: 2,
 	EFb: 2,
@@ -295,6 +295,17 @@ export function assignVegetation(
 		"EDbp",
 	])
 	const WOODS_CODE = 4 as BiomeCode
+	const GRASS_CODE = 3 as BiomeCode
+
+	const DRY_MEDITERRANEAN = new Set([
+		"CAMa",
+		"CAMb",
+		"HAMa",
+		"HAMb",
+		"HAMc",
+		"EAMa",
+		"EAMb"
+	])
 
 	if (pastaZones) {
 		const baseBiome = new Uint8Array(N)
@@ -305,8 +316,11 @@ export function assignVegetation(
 			// Cold/extraseasonal forest → woods transition at GAr < 0.6 or GDD < 600
 			if (biomeCode === 5 && COLD_EXTRA_FORESTS.has(zoneLabel)) {
 				const lowGar = gar !== undefined && gar[r] < 0.75
-				const lowGDD = gdd !== undefined && gdd[r] < 700
-				if (lowGar || lowGDD) biomeCode = WOODS_CODE
+				const lowGDD = gdd !== undefined && gdd[r] < 750
+				if (gdd !== undefined && gdd[r] < 500) biomeCode = GRASS_CODE
+				else if (lowGar || lowGDD) biomeCode = WOODS_CODE
+			} else if (biomeCode === 4 && DRY_MEDITERRANEAN.has(zoneLabel)) {
+				if (gar !== undefined && gar[r] < 0.1) biomeCode = GRASS_CODE
 			}
 			baseBiome[r] = biomeCode
 		}

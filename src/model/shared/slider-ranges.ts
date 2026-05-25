@@ -7,7 +7,6 @@ const RADIUS_MAX = Math.round((DEFAULT_PLANET_RADIUS_KM * 4) / 100) * 100
 
 export const SLIDER_RANGES = {
 	// terrain
-	tectonicMode: { min: 0, max: 1, step: 1 },
 	numPoints: { min: 5000, max: 2560000, step: 1000 },
 	jitter: { min: 0, max: 1, step: 0.05 },
 	numPlates: { min: 4, max: 120, step: 1 },

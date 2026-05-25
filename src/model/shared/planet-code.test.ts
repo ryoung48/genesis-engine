@@ -143,7 +143,6 @@ describe("planet-code validation", () => {
 				pressure: -2,
 				volcanism: 99,
 				craters: 2,
-				tectonicMode: 1 as unknown as boolean,
 			}),
 		)
 
@@ -151,7 +150,6 @@ describe("planet-code validation", () => {
 			pressure: 0.1,
 			volcanism: 10,
 			craters: 1,
-			tectonicMode: "stagnant",
 		})
 	})
 
@@ -167,7 +165,6 @@ describe("planet-code validation", () => {
 		expect(decodePlanetCode(code)).toMatchObject({
 			pressure: 1,
 			craters: undefined,
-			tectonicMode: "active",
 		})
 	})
 

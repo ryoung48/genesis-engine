@@ -497,11 +497,6 @@ export const OrogenView: React.FC = () => {
 	const [craters, setCraters] = useState(
 		initialDecodedCode?.craters ?? DEFAULT_WORLD_PARAMS.craters,
 	)
-	const [tectonicMode, setTectonicMode] = useState<0 | 1>(
-		initialDecodedCode?.tectonicMode === "stagnant"
-			? 1
-			: DEFAULT_WORLD_PARAMS.tectonicMode,
-	)
 
 	// --- Three.js scene lifecycle ---
 	useEffect(() => {
@@ -1557,7 +1552,6 @@ export const OrogenView: React.FC = () => {
 	const currentParams = useMemo<GenerationParams>(
 		() => ({
 			seed,
-			tectonicMode,
 			numPoints,
 			numPlates,
 			landDistribution,
@@ -1587,7 +1581,6 @@ export const OrogenView: React.FC = () => {
 		}),
 		[
 			seed,
-			tectonicMode,
 			numPoints,
 			numPlates,
 			landDistribution,
@@ -1676,7 +1669,6 @@ export const OrogenView: React.FC = () => {
 
 	const setters = useMemo(
 		() => ({
-			setTectonicMode,
 			setNumPoints,
 			setJitter,
 			setNumPlates,
@@ -1735,7 +1727,6 @@ export const OrogenView: React.FC = () => {
 			setters.setGlacialErosion(decoded.glacialErosion)
 			setters.setVolcanism(decoded.volcanism)
 			setters.setCraters(decoded.craters ?? 0)
-			setters.setTectonicMode(decoded.tectonicMode === "stagnant" ? 1 : 0)
 		},
 		[setters],
 	)

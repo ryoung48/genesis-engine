@@ -237,7 +237,6 @@ describe("buildTerrainSliders", () => {
 describe("resetWorldDefaults", () => {
 	it("forwards every generation setter to the default world parameters", () => {
 		const setters = {
-			setTectonicMode: vi.fn(),
 			setNumPoints: vi.fn(),
 			setJitter: vi.fn(),
 			setNumPlates: vi.fn(),
@@ -268,9 +267,6 @@ describe("resetWorldDefaults", () => {
 
 		resetWorldDefaults(setters)
 
-		expect(setters.setTectonicMode).toHaveBeenCalledWith(
-			DEFAULT_WORLD_PARAMS.tectonicMode,
-		)
 		expect(setters.setNumPoints).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.numPoints,
 		)

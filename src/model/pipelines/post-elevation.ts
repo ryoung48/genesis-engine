@@ -78,7 +78,7 @@ interface PostPipelineInput {
 	distCoast: Float32Array
 	oceanDist: Float32Array
 	params: OrogenParams
-	tectonicMode: "active" | "stagnant"
+	tectonicMode: "active"
 	boundary: BoundaryInfo
 	distFields: DistanceFields
 	r_hotspot: Float32Array
@@ -130,12 +130,9 @@ export function runPostElevationPipeline(
 		distCoast,
 		oceanDist,
 		params,
-		tectonicMode,
 		boundary,
 		distFields,
 		r_hotspot,
-		r_mantleUpwelling,
-		terrainFeatures,
 		enableOceanCurrents,
 		onProgress,
 	} = input
@@ -158,9 +155,6 @@ export function runPostElevationPipeline(
 		oceanDist,
 		isLand,
 		elevation_km,
-		r_hotspot,
-		r_mantleUpwelling,
-		terrainFeatures,
 	)
 	record("Post: climate", t0)
 	onProgress?.("Post: climate", 42)
@@ -418,7 +412,6 @@ export function runPostElevationPipeline(
 		distFields,
 		elevation_km,
 		isLand,
-		tectonicMode,
 		r_hotspot,
 	)
 	record("Post: hazards", t0)

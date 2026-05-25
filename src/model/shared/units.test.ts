@@ -23,28 +23,17 @@ describe("getEarthYearFactor", () => {
 })
 
 describe("getMaxElevationKm", () => {
-	it("returnsSixKmAtEarthRadius", () => {
-		expect(getMaxElevationKm(DEFAULT_PLANET_RADIUS_KM)).toBeCloseTo(6, 5)
-	})
-
-	it("clampsToFifteenKmForTinyPlanets", () => {
-		expect(getMaxElevationKm(500)).toBe(15)
-	})
-
-	it("clampsToThreeKmForHugePlanets", () => {
-		expect(getMaxElevationKm(100_000)).toBe(3)
+	it("returnsSixKmAlways", () => {
+		expect(getMaxElevationKm(DEFAULT_PLANET_RADIUS_KM)).toBe(6)
+		expect(getMaxElevationKm(500)).toBe(6)
+		expect(getMaxElevationKm(100_000)).toBe(6)
 	})
 })
 
 describe("getMaxOceanDepthKm", () => {
-	it("returnsTenKmAtEarthRadius", () => {
-		expect(getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM)).toBeCloseTo(10, 5)
-	})
-
-	it("producesGreaterDepthForLargerPlanets", () => {
-		const earth = getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM)
-		const larger = getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM * 2)
-		expect(larger).toBeGreaterThan(earth)
+	it("returnsTenKmAlways", () => {
+		expect(getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM)).toBe(10)
+		expect(getMaxOceanDepthKm(12742)).toBe(10)
 	})
 })
 

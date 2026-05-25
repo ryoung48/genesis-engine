@@ -4,7 +4,7 @@ import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { projectMantleFieldToRegions } from "../tectonics/mantle"
 import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
-import { applyHotspots, applyStaticHotspots } from "./hotspots"
+import { applyHotspots } from "./hotspots"
 
 function buildMesh() {
 	return buildSphereMesh(1500, 0.5, createRng(1))
@@ -293,57 +293,5 @@ describe("applyHotspots", () => {
 
 		const hasAboveWater = Array.from(elevation).some((e) => e > 0)
 		expect(hasAboveWater).toBe(true)
-	})
-})
-
-describe("applyStaticHotspots", () => {
-	it("is deterministic and boosts total uplift over oceanic crust", () => {
-		const mesh = buildMesh()
-		const oceanic = applyStaticHotspots(
-			mesh,
-			buildElevation(mesh.numRegions, -0.2),
-			19,
-			4,
-		)
-		const oceanicRepeat = applyStaticHotspots(
-			mesh,
-			buildElevation(mesh.numRegions, -0.2),
-			19,
-			4,
-		)
-		const continental = applyStaticHotspots(
-			mesh,
-			buildElevation(mesh.numRegions, 0.2),
-			19,
-			4,
-		)
-
-		expect(oceanicRepeat).toEqual(oceanic)
-		expect(totalHotspotUplift(oceanic)).toBeGreaterThan(
-			totalHotspotUplift(continental),
-		)
-	})
-
-	it("widens the static hotspot footprint as volcanism increases", () => {
-		const mesh = buildMesh()
-		const lowVolcanism = applyStaticHotspots(
-			mesh,
-			buildElevation(mesh.numRegions, 0.2),
-			29,
-			1,
-		)
-		const highVolcanism = applyStaticHotspots(
-			mesh,
-			buildElevation(mesh.numRegions, 0.2),
-			29,
-			10,
-		)
-
-		expect(totalHotspotUplift(highVolcanism)).toBeGreaterThan(
-			totalHotspotUplift(lowVolcanism),
-		)
-		expect(hotspotFootprint(highVolcanism)).toBeGreaterThan(
-			hotspotFootprint(lowVolcanism),
-		)
 	})
 })
