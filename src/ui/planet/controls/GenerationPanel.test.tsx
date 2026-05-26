@@ -192,6 +192,43 @@ describe("GenerationPanel", () => {
 		expect(markup).toContain("0.34 s")
 	})
 
+	it("disables the axial tilt spin-direction toggle when tidal lock is active", () => {
+		const markup = renderToStaticMarkup(
+			<GenerationPanel
+				{...createProps({
+					tidallyLocked: true,
+					planetSliders: [
+						{
+							label: "Axial Tilt",
+							help: "Tilt",
+							display: "0.0°",
+							min: 0,
+							max: 90,
+							step: 0.5,
+							value: 0,
+							set: vi.fn(),
+						},
+						{
+							label: "Spin",
+							help: "Spin",
+							display: "Prograde",
+							min: 0,
+							max: 1,
+							step: 1,
+							value: 0,
+							set: vi.fn(),
+							disabled: true,
+						},
+					],
+				})}
+			/>,
+		)
+
+		expect(markup).toContain("spin locked by tidal lock")
+		expect(markup).toContain("disabled")
+		expect(markup).toContain("disabled:cursor-not-allowed")
+	})
+
 	it("renders rounded whole-second timing labels for long runs", () => {
 		const markup = renderToStaticMarkup(
 			<GenerationPanel

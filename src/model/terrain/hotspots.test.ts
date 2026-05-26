@@ -211,7 +211,7 @@ describe("applyHotspots", () => {
 		expect(continentalFootprint).toBeGreaterThan(oceanicFootprint)
 	})
 
-	it("keeps active hotspot fields identical across volcanism levels", () => {
+	it("scales hotspot footprint up with higher volcanism", () => {
 		const mesh = buildMesh()
 		const plateAssignment = new Int32Array(mesh.numRegions)
 		const mantle = new Float32Array(mesh.numRegions).fill(1)
@@ -223,7 +223,7 @@ describe("applyHotspots", () => {
 			mantle,
 			buildTerrainFeatures(mesh.numRegions),
 			41,
-			2,
+			1,
 		)
 		const overdriven = applyHotspots(
 			mesh,
@@ -236,12 +236,34 @@ describe("applyHotspots", () => {
 			10,
 		)
 
-		expect(overdriven).toEqual(baseline)
-		expect(totalHotspotUplift(overdriven)).toBeCloseTo(
+		expect(totalHotspotUplift(overdriven)).toBeGreaterThan(
 			totalHotspotUplift(baseline),
 		)
-		expect(hotspotFootprint(overdriven)).toBe(hotspotFootprint(baseline))
-		expect(maxHotspotUplift(overdriven)).toBeCloseTo(maxHotspotUplift(baseline))
+		expect(hotspotFootprint(overdriven)).toBeGreaterThan(
+			hotspotFootprint(baseline),
+		)
+		expect(maxHotspotUplift(overdriven)).toBeGreaterThan(0)
+	})
+
+	it("turns hotspots and hotspot-driven LIPs off when volcanism is zero", () => {
+		const mesh = buildMesh()
+		const terrainFeatures = buildTerrainFeatures(mesh.numRegions)
+		const hotspot = applyHotspots(
+			mesh,
+			buildPlate(true),
+			new Int32Array(mesh.numRegions),
+			buildElevation(mesh.numRegions, -0.2),
+			new Float32Array(mesh.numRegions).fill(1),
+			terrainFeatures,
+			23,
+			0,
+		)
+
+		const lipBit = 1 << (OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1)
+		expect(Array.from(hotspot)).toEqual(new Array(mesh.numRegions).fill(0))
+		expect(
+			Array.from(terrainFeatures.featureMask).some((mask) => mask & lipBit),
+		).toBe(false)
 	})
 
 	it("is deterministic for repeated active-hotspot runs with the same inputs", () => {

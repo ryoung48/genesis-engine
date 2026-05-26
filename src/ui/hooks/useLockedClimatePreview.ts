@@ -1,8 +1,9 @@
 import { useMemo } from "react"
 import {
 	computeDailyLockedOrbit,
+	computeLockedSubstellarDeclinationRad,
 	computeTidalTransportParams,
-	getSubstellarDirWithOffset,
+	getSubstellarDirWithOffsetAndDeclination,
 } from "@/model/climate/locked/heat"
 import {
 	mapLinear,
@@ -13,6 +14,7 @@ import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
 
 interface LockedClimatePreviewConfig {
+	obliquity: number
 	eccentricity: number
 	perihelion: number
 	tSun: number
@@ -39,8 +41,9 @@ export function buildLockedClimatePreview(
 		daysPerYear: config.daysPerYear,
 		perihelion: config.perihelion,
 		antistellarLon: config.antistellarLon,
+		obliquity: config.obliquity,
 	} as const
-	const { flux, libration } = computeDailyLockedOrbit({
+	const { flux, libration, solarLongitude } = computeDailyLockedOrbit({
 		eccentricity: config.eccentricity,
 		perihelion: config.perihelion,
 		sunTempFactor: config.sunTempFactor,
@@ -73,9 +76,13 @@ export function buildLockedClimatePreview(
 		const y = Math.sin(lonRad)
 
 		for (let day = 0; day < dayCount; day++) {
-			const substellar = getSubstellarDirWithOffset(
+			const substellar = getSubstellarDirWithOffsetAndDeclination(
 				config.antistellarLon,
 				libration[day],
+				computeLockedSubstellarDeclinationRad(
+					config.obliquity,
+					solarLongitude[day],
+				),
 			)
 			const cosTheta = Math.max(
 				-1,
@@ -144,6 +151,7 @@ export function useLockedClimatePreview(config: LockedClimatePreviewConfig) {
 			config.eccentricity,
 			config.hoursPerDay,
 			config.insolationFactor,
+			config.obliquity,
 			config.perihelion,
 			config.planetRadiusKm,
 			config.pressure,

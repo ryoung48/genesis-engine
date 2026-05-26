@@ -497,6 +497,9 @@ export const OrogenView: React.FC = () => {
 	const [craters, setCraters] = useState(
 		initialDecodedCode?.craters ?? DEFAULT_WORLD_PARAMS.craters,
 	)
+	const [maxElevation, setMaxElevation] = useState(
+		initialDecodedCode?.maxElevation ?? DEFAULT_WORLD_PARAMS.maxElevation,
+	)
 
 	// --- Three.js scene lifecycle ---
 	useEffect(() => {
@@ -1577,6 +1580,7 @@ export const OrogenView: React.FC = () => {
 			glacialErosion,
 			volcanism,
 			craters,
+			maxElevation,
 			pressure,
 		}),
 		[
@@ -1606,6 +1610,7 @@ export const OrogenView: React.FC = () => {
 			glacialErosion,
 			volcanism,
 			craters,
+			maxElevation,
 			pressure,
 		],
 	)
@@ -1695,6 +1700,7 @@ export const OrogenView: React.FC = () => {
 			setGlacialErosion,
 			setVolcanism,
 			setCraters,
+			setMaxElevation,
 		}),
 		[],
 	)
@@ -1727,6 +1733,7 @@ export const OrogenView: React.FC = () => {
 			setters.setGlacialErosion(decoded.glacialErosion)
 			setters.setVolcanism(decoded.volcanism)
 			setters.setCraters(decoded.craters ?? 0)
+			setters.setMaxElevation(decoded.maxElevation)
 		},
 		[setters],
 	)
@@ -1777,6 +1784,7 @@ export const OrogenView: React.FC = () => {
 				ridgeSharpening,
 				glacialErosion,
 				volcanism,
+				maxElevation,
 				craters,
 			}
 			importHeightmap(
@@ -1811,6 +1819,7 @@ export const OrogenView: React.FC = () => {
 			pressure,
 			generationCallbacks,
 			insolationFactor,
+			maxElevation,
 		],
 	)
 
@@ -1960,7 +1969,6 @@ export const OrogenView: React.FC = () => {
 		daysPerYear,
 		hoursPerDay,
 		pressure,
-		volcanism,
 		landDistribution,
 		landCoverage,
 		tidallyLocked,
@@ -1974,7 +1982,6 @@ export const OrogenView: React.FC = () => {
 		setDaysPerYear,
 		setHoursPerDay,
 		setPressure,
-		setVolcanism,
 		setAxialTiltDirection,
 		setLandDistribution,
 		setLandCoverage,
@@ -1993,6 +2000,8 @@ export const OrogenView: React.FC = () => {
 		ridgeSharpening,
 		glacialErosion,
 		craters,
+		volcanism,
+		maxElevation,
 		setNumPoints,
 		setJitter,
 		setNumPlates,
@@ -2005,6 +2014,8 @@ export const OrogenView: React.FC = () => {
 		setRidgeSharpening,
 		setGlacialErosion,
 		setCraters,
+		setVolcanism,
+		setMaxElevation,
 	})
 
 	// --- Planet stats ---

@@ -23,7 +23,7 @@ interface GenerationPreviewParams {
 
 export function buildGenerationPreviewConfig(params: GenerationPreviewParams) {
 	return {
-		obliquity: params.tidallyLocked ? 0 : params.obliquity,
+		obliquity: params.obliquity,
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
 		antistellarLon: params.antistellarLon,

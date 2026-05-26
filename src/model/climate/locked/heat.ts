@@ -1,6 +1,9 @@
 import type { OrogenClimate, OrogenParams, SphereMesh } from "../.."
 import { TIME } from "../../shared/time"
-import { getSubstellarDir } from "../../shared/units"
+import {
+	getEffectiveObliquityDeg,
+	isRetrogradeObliquity,
+} from "../../shared/units"
 import {
 	applyTemperatureNoise,
 	elevToHeightKm,
@@ -23,7 +26,7 @@ function clampAcosInput(value: number): number {
 
 export function computeDailyLockedOrbit(
 	params: Pick<OrogenParams, "eccentricity" | "perihelion" | "sunTempFactor">,
-): { flux: number[]; libration: number[] } {
+): { flux: number[]; libration: number[]; solarLongitude: number[] } {
 	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
 	const effectiveTSun = T_SUN * params.sunTempFactor
 	const s0 =
@@ -55,6 +58,9 @@ export function computeDailyLockedOrbit(
 
 	const flux = new Array<number>(EMB_CONSTANTS.time.DAYS_PER_YEAR).fill(0)
 	const libration = new Array<number>(EMB_CONSTANTS.time.DAYS_PER_YEAR).fill(0)
+	const solarLongitude = new Array<number>(
+		EMB_CONSTANTS.time.DAYS_PER_YEAR,
+	).fill(0)
 	for (let day = 0; day < EMB_CONSTANTS.time.DAYS_PER_YEAR; day++) {
 		if (day !== 0) {
 			meanL += (2 * PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
@@ -78,6 +84,7 @@ export function computeDailyLockedOrbit(
 
 		const astroDist = (1 - ecc * ecc) / (1 + ecc * Math.cos(trueA))
 		flux[day] = s0 / (astroDist * astroDist)
+		solarLongitude[day] = trueL
 
 		const meanA = meanL - longP
 		let lib = trueA - meanA
@@ -86,7 +93,7 @@ export function computeDailyLockedOrbit(
 		libration[day] = lib
 	}
 
-	return { flux, libration }
+	return { flux, libration, solarLongitude }
 }
 
 /**
@@ -114,13 +121,56 @@ export function computeMonthlyLibration(
 	})
 }
 
-/** Unit vector for substellar point with a longitude offset (radians). */
-export function getSubstellarDirWithOffset(
+function getSignedEffectiveObliquityRad(obliquity: number): number {
+	const magnitude = (getEffectiveObliquityDeg(obliquity) * Math.PI) / 180
+	return isRetrogradeObliquity(obliquity) ? -magnitude : magnitude
+}
+
+export function computeLockedSubstellarDeclinationRad(
+	obliquity: number,
+	solarLongitudeRad: number,
+): number {
+	const signedObliquityRad = getSignedEffectiveObliquityRad(obliquity)
+	return Math.asin(Math.sin(signedObliquityRad) * Math.sin(solarLongitudeRad))
+}
+
+export function computeMonthlyLockedDeclination(
+	obliquity: number,
+	eccentricity: number,
+	perihelion: number,
+): number[] {
+	if (Math.abs(obliquity) < 1e-6) return new Array(12).fill(0)
+
+	const { solarLongitude } = computeDailyLockedOrbit({
+		eccentricity,
+		perihelion,
+		sunTempFactor: 1,
+	})
+	return Array.from({ length: 12 }, (_, month) => {
+		const days = TIME.month.days(month)
+		return (
+			days.reduce(
+				(sum, day) =>
+					sum +
+					computeLockedSubstellarDeclinationRad(obliquity, solarLongitude[day]),
+				0,
+			) / Math.max(1, days.length)
+		)
+	})
+}
+
+export function getSubstellarDirWithOffsetAndDeclination(
 	antistellarLon: number,
 	lonOffsetRad: number,
+	declinationRad: number,
 ): [number, number, number] {
 	const subRad = ((antistellarLon + 180) % 360) * (Math.PI / 180) + lonOffsetRad
-	return [Math.cos(subRad), Math.sin(subRad), 0]
+	const cosDeclination = Math.cos(declinationRad)
+	return [
+		cosDeclination * Math.cos(subRad),
+		cosDeclination * Math.sin(subRad),
+		Math.sin(declinationRad),
+	]
 }
 
 function computeMonthlyOrbitalFlux(params: OrogenParams): number[] {
@@ -137,7 +187,11 @@ export function computeLockedMonthlyDaylightHours(
 	mesh: SphereMesh,
 	params: Pick<
 		OrogenParams,
-		"antistellarLon" | "eccentricity" | "hoursPerDay" | "perihelion"
+		| "antistellarLon"
+		| "eccentricity"
+		| "hoursPerDay"
+		| "obliquity"
+		| "perihelion"
 	>,
 ): Float32Array {
 	const N = mesh.numRegions
@@ -146,10 +200,16 @@ export function computeLockedMonthlyDaylightHours(
 		params.eccentricity,
 		params.perihelion,
 	)
+	const monthlyDeclination = computeMonthlyLockedDeclination(
+		params.obliquity,
+		params.eccentricity,
+		params.perihelion,
+	)
 	for (let month = 0; month < 12; month++) {
-		const sub = getSubstellarDirWithOffset(
+		const sub = getSubstellarDirWithOffsetAndDeclination(
 			params.antistellarLon,
 			monthlyLibration[month],
+			monthlyDeclination[month],
 		)
 		for (let r = 0; r < N; r++) {
 			const x = mesh.r_xyz[3 * r]
@@ -261,6 +321,11 @@ export function computeTidalTemperature(
 		params.eccentricity,
 		params.perihelion,
 	)
+	const monthlyDeclination = computeMonthlyLockedDeclination(
+		params.obliquity,
+		params.eccentricity,
+		params.perihelion,
+	)
 	const daylight_hours_monthly = computeLockedMonthlyDaylightHours(mesh, params)
 
 	const { T_mean_C, A1, A_night, eccAmplitude, LAPSE_RATE, tidalTd, contrast } =
@@ -284,9 +349,10 @@ export function computeTidalTemperature(
 		const z = mesh.r_xyz[3 * r + 2]
 
 		for (let month = 0; month < 12; month++) {
-			const sub = getSubstellarDirWithOffset(
+			const sub = getSubstellarDirWithOffsetAndDeclination(
 				params.antistellarLon,
 				monthlyLibration[month],
+				monthlyDeclination[month],
 			)
 			const cosTheta = Math.max(
 				-1,
@@ -324,11 +390,19 @@ export function computeTidalTemperature(
 		temperature_monthly,
 		temperature_monthly_nolapse,
 		(_r, x, y, z) => {
-			const baseSub = getSubstellarDir(params.antistellarLon)
-			const ct = Math.max(
-				-1,
-				Math.min(1, x * baseSub[0] + y * baseSub[1] + z * baseSub[2]),
-			)
+			let ct = -1
+			for (let month = 0; month < 12; month++) {
+				const baseSub = getSubstellarDirWithOffsetAndDeclination(
+					params.antistellarLon,
+					monthlyLibration[month],
+					monthlyDeclination[month],
+				)
+				const monthCt = Math.max(
+					-1,
+					Math.min(1, x * baseSub[0] + y * baseSub[1] + z * baseSub[2]),
+				)
+				if (monthCt > ct) ct = monthCt
+			}
 			return Math.min(
 				1 - Math.max(0, ct - 0.5) * 2,
 				1 + Math.min(0, ct + 0.5) * 2,

@@ -22,7 +22,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 48,
 			pressure: 1,
-			volcanism: 1,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: false,
@@ -36,7 +35,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setVolcanism: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -67,7 +65,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 48,
 			pressure: 1,
-			volcanism: 1,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: false,
@@ -81,7 +78,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setVolcanism: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -92,9 +88,6 @@ describe("buildPlanetSliders", () => {
 		expect(
 			sliders.find((slider) => slider.label === "Pressure")?.set,
 		).toBeDefined()
-		expect(
-			sliders.find((slider) => slider.label === "Volcanism")?.display,
-		).toBe("1.00")
 		expect(sliders.find((slider) => slider.label === "Spin")?.display).toBe(
 			"Retrograde",
 		)
@@ -103,13 +96,12 @@ describe("buildPlanetSliders", () => {
 			max: 1,
 			step: 1,
 		})
-		expect(sliders.slice(0, 6).map((slider) => slider.label)).toEqual([
+		expect(sliders.slice(0, 5).map((slider) => slider.label)).toEqual([
 			"Radius",
 			"Sun Temp",
-			"Insolation",
 			"Pressure",
-			"Volcanism",
 			"Axial Tilt",
+			"Spin",
 		])
 
 		sliders.find((slider) => slider.label === "Axial Tilt")?.set(30)
@@ -129,7 +121,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 24,
 			pressure: 1,
-			volcanism: 1,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: true,
@@ -143,7 +134,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setVolcanism: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -161,8 +151,7 @@ describe("buildPlanetSliders", () => {
 		expect(
 			sliders.find((slider) => slider.label === "Axial Tilt"),
 		).toMatchObject({
-			display: "0.0°",
-			disabled: true,
+			display: "23.5°",
 		})
 		expect(sliders.find((slider) => slider.label === "Spin")).toMatchObject({
 			display: "Prograde",
@@ -188,6 +177,8 @@ describe("buildTerrainSliders", () => {
 			ridgeSharpening: 0.5,
 			glacialErosion: 0.6,
 			craters: 0.25,
+			volcanism: 1,
+			maxElevation: 6000,
 			setNumPoints,
 			setJitter: vi.fn(),
 			setNumPlates: vi.fn(),
@@ -200,6 +191,8 @@ describe("buildTerrainSliders", () => {
 			setRidgeSharpening: vi.fn(),
 			setGlacialErosion: vi.fn(),
 			setCraters,
+			setVolcanism: vi.fn(),
+			setMaxElevation: vi.fn(),
 		})
 
 		expect(sliders.map((slider) => slider.label)).toEqual([
@@ -214,7 +207,9 @@ describe("buildTerrainSliders", () => {
 			"Thermal Erosion",
 			"Ridge Sharpening",
 			"Glacial Erosion",
+			"Max Elevation",
 			"Craters",
+			"Volcanism",
 		])
 		expect(sliders.find((slider) => slider.label === "Plates")?.display).toBe(
 			"12",
@@ -263,6 +258,7 @@ describe("resetWorldDefaults", () => {
 			setGlacialErosion: vi.fn(),
 			setVolcanism: vi.fn(),
 			setCraters: vi.fn(),
+			setMaxElevation: vi.fn(),
 		}
 
 		resetWorldDefaults(setters)
@@ -340,6 +336,9 @@ describe("resetWorldDefaults", () => {
 		)
 		expect(setters.setCraters).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.craters,
+		)
+		expect(setters.setMaxElevation).toHaveBeenCalledWith(
+			DEFAULT_WORLD_PARAMS.maxElevation,
 		)
 	})
 })

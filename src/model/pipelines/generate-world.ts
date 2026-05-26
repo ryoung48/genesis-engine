@@ -21,11 +21,7 @@ import {
 	computeOceanDistanceBFS,
 	countContinents,
 } from "../shared/stats"
-import {
-	getMaxElevationKm,
-	getMaxOceanDepthKm,
-	meanEdgeLengthKm,
-} from "../shared/units"
+import { getMaxOceanDepthKm, meanEdgeLengthKm } from "../shared/units"
 import {
 	generateCoarsePlates,
 	projectCoarsePlates,
@@ -465,7 +461,7 @@ export function generateOrogenWorld(
 	}
 
 	// Convert raw [0,1] elevation to physical km (radius-scaled)
-	const maxElevKm = getMaxElevationKm(params.planetRadiusKm)
+	const maxElevKm = (params.maxElevation ?? 6000) / 1000
 	const maxDepthKm = getMaxOceanDepthKm(params.planetRadiusKm)
 	const elevation_km = new Float32Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {

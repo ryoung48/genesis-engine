@@ -654,6 +654,7 @@ describe("full world smoke generation", () => {
 		const results = scenarioParams.map(({ name, params }) => {
 			const world = generateOrogenWorld(params)
 			const summary = summarizeWorld(world)
+			const exposure = world.volcanism.hotspotExposure
 			console.info("Volcanic climate scenario", {
 				name,
 				pressure: params.pressure,
@@ -667,18 +668,21 @@ describe("full world smoke generation", () => {
 			console.table(
 				summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]),
 			)
-			return { name, summary }
+			return { name, summary, exposure }
 		})
 
-		expect(results[1].summary.avgTempC).toBeGreaterThan(
-			results[0].summary.avgTempC,
+		expect(results[1].exposure?.activeCells ?? 0).toBeGreaterThan(
+			results[0].exposure?.activeCells ?? 0,
 		)
+		expect(
+			results[1].exposure?.aboveWaterAfterFlood ?? 0,
+		).toBeGreaterThanOrEqual(results[0].exposure?.aboveWaterAfterFlood ?? 0)
 		expect(results[1].summary.maxTempC).toBeGreaterThan(0)
 		expect(results[2].summary.avgTempC).toBeGreaterThan(
 			results[1].summary.avgTempC,
 		)
-		expect(results[2].summary.maxTempC).toBeGreaterThan(
-			results[1].summary.maxTempC,
+		expect(results[2].summary.minTempC).toBeGreaterThan(
+			results[1].summary.minTempC,
 		)
 	}, 300_000)
 })

@@ -36,7 +36,7 @@ function buildPreviewChartProps(
 					columnValue: number
 					value: number
 				}) =>
-					`Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} W/m²`,
+					`Eq Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} W/m²`,
 			}
 		case "daylight":
 			return {
@@ -53,7 +53,7 @@ function buildPreviewChartProps(
 					columnValue: number
 					value: number
 				}) =>
-					`Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} hrs`,
+					`Eq Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${value.toFixed(1)} hrs`,
 			}
 		default:
 			return {
@@ -71,7 +71,7 @@ function buildPreviewChartProps(
 					columnValue: number
 					value: number
 				}) =>
-					`Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${formatTemperature(value, unitSystem, 1, { compact: true })}`,
+					`Eq Lon ${rowValue.toFixed(1)}°, Day ${columnValue + 1}: ${formatTemperature(value, unitSystem, 1, { compact: true })}`,
 			}
 	}
 }
@@ -90,13 +90,13 @@ export const LockedClimatePreview: React.FC<LockedClimatePreviewProps> = ({
 			columnValues={preview.columnValues}
 			columnLabels={preview.columnLabels}
 			colorForValue={chartProps.colorForValue}
-			datasetLabel={(lon: number) => `Lon ${lon.toFixed(1)}°`}
+			datasetLabel={(lon: number) => `Eq Lon ${lon.toFixed(1)}°`}
 			rowTickLabel={(lon: number) => `${lon.toFixed(0)}°`}
 			tooltipLabel={chartProps.tooltipLabel}
 			legendTitle={chartProps.legendTitle}
 			formatLegendValue={chartProps.formatLegendValue}
 			xAxisTitle="Day of Year"
-			yAxisTitle="Longitude"
+			yAxisTitle="Equatorial Longitude"
 			fullHeight={true}
 		/>
 	)

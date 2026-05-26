@@ -25,6 +25,7 @@ interface ImportHeightmapParams {
 	ridgeSharpening: number
 	glacialErosion: number
 	volcanism: number
+	maxElevation: number
 	planetRadiusKm: number
 	obliquity: number
 	eccentricity: number
@@ -203,9 +204,7 @@ export function generateWorld(
 			overrides?.continentSizeVariety ?? currentParams.continentSizeVariety,
 		landCoverage: overrides?.landCoverage ?? currentParams.landCoverage,
 		planetRadiusKm: overrides?.planetRadiusKm ?? currentParams.planetRadiusKm,
-		obliquity: tidallyLocked
-			? 0
-			: (overrides?.obliquity ?? currentParams.obliquity),
+		obliquity: overrides?.obliquity ?? currentParams.obliquity,
 		eccentricity: overrides?.eccentricity ?? currentParams.eccentricity,
 		perihelion: overrides?.perihelion ?? currentParams.perihelion,
 		sunTempFactor: overrides?.sunTempFactor ?? currentParams.sunTempFactor,
@@ -227,6 +226,7 @@ export function generateWorld(
 			overrides?.ridgeSharpening ?? currentParams.ridgeSharpening,
 		glacialErosion: overrides?.glacialErosion ?? currentParams.glacialErosion,
 		volcanism: overrides?.volcanism ?? currentParams.volcanism,
+		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
 	} as OrogenParams
 
@@ -312,6 +312,7 @@ export function importHeightmap(
 			ridgeSharpening: importParams.ridgeSharpening as number,
 			glacialErosion: importParams.glacialErosion as number,
 			volcanism: importParams.volcanism as number,
+			maxElevation: importParams.maxElevation as number,
 			craters: importParams.craters as number,
 		},
 	}

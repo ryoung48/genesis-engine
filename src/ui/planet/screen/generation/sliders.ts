@@ -31,7 +31,6 @@ export function buildPlanetSliders(state: {
 	daysPerYear: number
 	hoursPerDay: number
 	pressure: number
-	volcanism: number
 	landDistribution: number
 	landCoverage: number
 	tidallyLocked: boolean
@@ -45,7 +44,6 @@ export function buildPlanetSliders(state: {
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPressure: (v: number) => void
-	setVolcanism: (v: number) => void
 	setAxialTiltDirection: (v: number) => void
 	setLandDistribution: (v: number) => void
 	setLandCoverage: (v: number) => void
@@ -69,14 +67,6 @@ export function buildPlanetSliders(state: {
 			set: state.setSunTempFactor,
 		},
 		{
-			label: "Insolation",
-			help: "Scales the stellar flux received by the planet. 1x matches baseline, lower values simulate reduced light while keeping stellar temperature unchanged.",
-			value: state.insolationFactor,
-			display: `${state.insolationFactor.toFixed(2)}x`,
-			...SR.insolationFactor,
-			set: state.setInsolationFactor,
-		},
-		{
 			label: "Pressure",
 			help: "Atmospheric pressure in bars. Higher pressure increases water vapor capacity and cloud formation; lower pressure suppresses it.",
 			value: state.pressure,
@@ -85,36 +75,20 @@ export function buildPlanetSliders(state: {
 			set: state.setPressure,
 		},
 		{
-			label: "Volcanism",
-			help: "Controls hotspot and volcanic activity on a 0-10 scale. 1 matches the old mid setting, 2 matches the old maximum, and values above 2 progressively push volcanic climate and terrain effects into much more extreme territory without relying on runaway peak heights.",
-			value: state.volcanism,
-			display: state.volcanism.toFixed(2),
-			...SR.volcanism,
-			set: state.setVolcanism,
-		},
-		{
 			label: "Axial Tilt",
-			help: "Sets the base seasonal tilt from 0 to 90 degrees. Use the direction control to switch between prograde and retrograde, which mirrors the stored obliquity as 180 - x.",
-			value: state.tidallyLocked
-				? 0
-				: getEffectiveObliquityDeg(state.obliquity),
-			display: state.tidallyLocked
-				? "0.0°"
-				: `${getEffectiveObliquityDeg(state.obliquity).toFixed(1)}°`,
+			help: "Sets the base seasonal tilt from 0 to 90 degrees. Use the direction control to switch between prograde and retrograde, which mirrors the stored obliquity as 180 - x. On tidally locked worlds this approximates a Cassini-state obliquity.",
+			value: getEffectiveObliquityDeg(state.obliquity),
+			display: `${getEffectiveObliquityDeg(state.obliquity).toFixed(1)}°`,
 			min: 0,
 			max: 90,
 			step: 0.5,
 			set: state.setObliquity,
-			disabled: state.tidallyLocked,
 		},
 		{
 			label: "Spin",
 			help: "Prograde spin matches the usual rotation direction; retrograde spin reverses it.",
-			value: state.tidallyLocked || state.obliquity <= 90 ? 0 : 1,
-			display:
-				state.tidallyLocked || state.obliquity <= 90
-					? "Prograde"
-					: "Retrograde",
+			value: state.obliquity <= 90 ? 0 : 1,
+			display: state.obliquity <= 90 ? "Prograde" : "Retrograde",
 			min: 0,
 			max: 1,
 			step: 1,
@@ -185,6 +159,14 @@ export function buildPlanetSliders(state: {
 			...SR.landCoverage,
 			set: state.setLandCoverage,
 		},
+		{
+			label: "Insolation",
+			help: "Scales the stellar flux received by the planet. 1x matches baseline, lower values simulate reduced light while keeping stellar temperature unchanged.",
+			value: state.insolationFactor,
+			display: `${state.insolationFactor.toFixed(2)}x`,
+			...SR.insolationFactor,
+			set: state.setInsolationFactor,
+		},
 	]
 }
 
@@ -201,6 +183,8 @@ export function buildTerrainSliders(state: {
 	ridgeSharpening: number
 	glacialErosion: number
 	craters: number
+	volcanism: number
+	maxElevation: number
 	setNumPoints: (v: number) => void
 	setJitter: (v: number) => void
 	setNumPlates: (v: number) => void
@@ -213,6 +197,8 @@ export function buildTerrainSliders(state: {
 	setRidgeSharpening: (v: number) => void
 	setGlacialErosion: (v: number) => void
 	setCraters: (v: number) => void
+	setVolcanism: (v: number) => void
+	setMaxElevation: (v: number) => void
 }): SliderDef[] {
 	return [
 		{
@@ -304,12 +290,28 @@ export function buildTerrainSliders(state: {
 			set: state.setGlacialErosion,
 		},
 		{
+			label: "Max Elevation",
+			help: "Sets the maximum mountain height in meters. Higher values allow taller mountain ranges to form during tectonic uplift.",
+			value: state.maxElevation,
+			display: `${state.maxElevation.toFixed(0)} m`,
+			...SR.maxElevation,
+			set: state.setMaxElevation,
+		},
+		{
 			label: "Craters",
 			help: "Stamps impact craters onto the surface. Higher values produce more and larger craters.",
 			value: state.craters,
 			display: state.craters.toFixed(2),
 			...SR.craters,
 			set: state.setCraters,
+		},
+		{
+			label: "Volcanism",
+			help: "Controls hotspot and volcanic feature frequency on a 0-10 scale. 0 disables hotspots, island arcs, volcanic arcs, and LIPs. 1 matches the old baseline setting, and values above 1 progressively make volcanic features more common without relying on runaway peak heights.",
+			value: state.volcanism,
+			display: state.volcanism.toFixed(2),
+			...SR.volcanism,
+			set: state.setVolcanism,
 		},
 	]
 }
@@ -339,8 +341,9 @@ export function resetWorldDefaults(setters: {
 	setThermalErosion: (v: number) => void
 	setRidgeSharpening: (v: number) => void
 	setGlacialErosion: (v: number) => void
-	setVolcanism: (v: number) => void
 	setCraters: (v: number) => void
+	setVolcanism: (v: number) => void
+	setMaxElevation: (v: number) => void
 }): void {
 	setters.setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
 	setters.setJitter(DEFAULT_WORLD_PARAMS.jitter)
@@ -366,6 +369,7 @@ export function resetWorldDefaults(setters: {
 	setters.setThermalErosion(DEFAULT_WORLD_PARAMS.thermalErosion)
 	setters.setRidgeSharpening(DEFAULT_WORLD_PARAMS.ridgeSharpening)
 	setters.setGlacialErosion(DEFAULT_WORLD_PARAMS.glacialErosion)
-	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
 	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
+	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
+	setters.setMaxElevation(DEFAULT_WORLD_PARAMS.maxElevation)
 }

@@ -102,7 +102,7 @@ describe("blendElevation", () => {
 			buildDistanceFields(mesh.numRegions),
 			boundary,
 			0,
-			0,
+			1,
 			17,
 		)
 
@@ -123,6 +123,41 @@ describe("blendElevation", () => {
 		expect(surfacedArcRegions).toBeGreaterThan(0)
 		expect(maxArcElevation).toBeGreaterThan(0)
 		expect(maxArcElevation).toBeLessThanOrEqual(0.6)
+	})
+
+	it("turns island arcs off when volcanism is zero", () => {
+		const mesh = buildMesh()
+		const boundary = buildBoundaryInfo(mesh.numRegions)
+		boundary.r_boundaryType[0] = 1
+		boundary.r_bothOcean[0] = 1
+		boundary.r_subductFactor[0] = 0.2
+		boundary.r_stress[0] = 1
+
+		const rPlate = new Int32Array(mesh.numRegions)
+		const plateVec = new Map<number, PlateVec>([
+			[0, { pole: [0, 0, 1], omega: 1 }],
+		])
+		const plateIsOcean = new Set([0])
+
+		const { terrainFeatures } = blendElevation(
+			mesh,
+			rPlate,
+			plateVec,
+			plateIsOcean,
+			buildDistanceFields(mesh.numRegions),
+			boundary,
+			0,
+			0,
+			17,
+		)
+
+		const islandArcBit = 1 << (OROGEN_TERRAIN_FEATURE.ISLAND_ARC - 1)
+		let arcRegions = 0
+		for (let r = 0; r < mesh.numRegions; r++) {
+			if ((terrainFeatures.featureMask[r] & islandArcBit) !== 0) arcRegions++
+		}
+
+		expect(arcRegions).toBe(0)
 	})
 
 	it("executes land elevation paths including mountain dissection, plateau, and interior uplift", () => {

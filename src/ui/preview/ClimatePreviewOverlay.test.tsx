@@ -134,7 +134,7 @@ describe("ClimatePreviewOverlay", () => {
 			colorForValue: props.preview.daylightColorFn,
 			legendTitle: "Daylight",
 			xAxisTitle: "Day of Year",
-			yAxisTitle: "Longitude",
+			yAxisTitle: "Equatorial Longitude",
 		})
 		expect(
 			(
@@ -142,7 +142,7 @@ describe("ClimatePreviewOverlay", () => {
 					| ((value: number) => string)
 					| undefined
 			)?.(30),
-		).toBe("Lon 30.0°")
+		).toBe("Eq Lon 30.0°")
 		expect(
 			(
 				capturedHeatmapProps?.tooltipLabel as
@@ -157,7 +157,7 @@ describe("ClimatePreviewOverlay", () => {
 				columnValue: 4,
 				value: 9.5,
 			}),
-		).toBe("Lon 15.0°, Day 5: 9.5 hrs")
+		).toBe("Eq Lon 15.0°, Day 5: 9.5 hrs")
 	})
 
 	it("formats the temperature tab using the shared temperature color and unit helpers", () => {

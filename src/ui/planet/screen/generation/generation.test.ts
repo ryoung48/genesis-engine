@@ -216,7 +216,7 @@ describe("generateWorld", () => {
 			params: expect.objectContaining({
 				seed: 77,
 				tidallyLocked: true,
-				obliquity: 0,
+				obliquity: 33,
 				numPlates: 24,
 			}),
 		})
@@ -346,6 +346,7 @@ describe("importHeightmap", () => {
 				ridgeSharpening: 0.6,
 				glacialErosion: 0.7,
 				volcanism: 0.8,
+				maxElevation: 6000,
 				planetRadiusKm: 7_000,
 				obliquity: 22,
 				eccentricity: 0.03,

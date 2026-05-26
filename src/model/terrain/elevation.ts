@@ -13,7 +13,7 @@ import type {
 import { createRng } from "../shared/rng"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
-import { applyVolcanicArcs } from "./volcanism"
+import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
 
 type StageTiming = { Stage: string; ms: string }
 
@@ -911,9 +911,10 @@ export function blendElevation(
 
 	// ---- Island arcs ----
 	const islandArcsStart = performance.now()
-	{
+	if (volcanism > 0) {
 		const arcNoise = new SimplexNoise(seed + 307)
 		const maxArcDist = Math.max(5, Math.round(5 * scaleFactor))
+		const threshold = getVolcanicActivityThreshold(0.2, volcanism)
 		const arcDist = new Float32Array(numRegions).fill(maxArcDist + 1)
 		const arcStress = new Float32Array(numRegions)
 		const arcSeedsList: number[] = []
@@ -956,7 +957,6 @@ export function blendElevation(
 			const sigma = Math.max(1.5, 1.5 * scaleFactor)
 			const distWeight = Math.exp(-0.5 * ((d - peakDist) / sigma) ** 2)
 			const n = arcNoise.ridgedFbm(x * 4, y * 4, z * 4, 4, 2.0, 0.5, 1.0)
-			const threshold = 0.2
 			if (n > threshold) {
 				const excess = (n - threshold) / (1 - threshold)
 				let uplift = excess * excess * 0.8 * distWeight * (0.5 + arcStress[r])

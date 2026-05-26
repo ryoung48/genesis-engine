@@ -304,7 +304,7 @@ export function assignVegetation(
 		"HAMb",
 		"HAMc",
 		"EAMa",
-		"EAMb"
+		"EAMb",
 	])
 
 	if (pastaZones) {

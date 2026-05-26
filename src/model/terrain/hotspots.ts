@@ -15,6 +15,8 @@ import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,
 	buildTangentFrame,
+	getLipSpawnChance,
+	getScaledFeatureCount,
 	type LipSite,
 } from "./volcanism"
 
@@ -86,8 +88,9 @@ export function applyHotspots(
 ): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
+	if (volcanism <= 0) return hotspotContrib
 	const dominantMagnitude = terrainFeatures?.dominantMagnitude
-	const NUM_HOTSPOTS = 8
+	const NUM_HOTSPOTS = getScaledFeatureCount(8, volcanism)
 	const CHAIN_LENGTH = 6
 	const CHAIN_DECAY = 0.65
 	const CHAIN_SPACING = 0.06
@@ -110,7 +113,6 @@ export function applyHotspots(
 	const HOTSPOT_UPWELLING_CANDIDATES = 8
 	const HOTSPOT_UPWELLING_JITTER = 0.3
 	const DOME_AGE_BROADENING = 0.03
-	void volcanism
 	const hsRng = createRng(seed + 999)
 	const hsPosRng = createRng(seed + 1001)
 	const hsNoise = new SimplexNoise(seed + 501)
@@ -360,18 +362,21 @@ export function applyHotspots(
 
 		const lipRegion = findNearestR(mesh, cx, cy, cz)
 		const upwelling = mantleNorm ? Math.max(0, mantleNorm[lipRegion]) : 0.5
-		appendLargeIgneousProvinceSites(lipSites, {
-			x: cx,
-			y: cy,
-			z: cz,
-			drift: [drift[0], drift[1], drift[2]],
-			upwelling,
-			volcanism,
-			isOcean:
-				plates[plateAssignment[lipRegion]]?.isOcean ??
-				elevation[lipRegion] <= 0,
-			random: () => hsRng.random(),
-		})
+		const lipSpawnChance = getLipSpawnChance(volcanism)
+		if (lipSpawnChance >= 1 || hsRng.random() <= lipSpawnChance) {
+			appendLargeIgneousProvinceSites(lipSites, {
+				x: cx,
+				y: cy,
+				z: cz,
+				drift: [drift[0], drift[1], drift[2]],
+				upwelling,
+				volcanism,
+				isOcean:
+					plates[plateAssignment[lipRegion]]?.isOcean ??
+					elevation[lipRegion] <= 0,
+				random: () => hsRng.random(),
+			})
+		}
 	}
 
 	// Pre-compute per-dome constants

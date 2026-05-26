@@ -38,6 +38,7 @@ export interface OrogenParams {
 	glacialErosion: number
 	volcanism?: number
 	craters?: number // 0 = none, 1 = heavily cratered
+	maxElevation?: number // max elevation in meters, default 6000
 	planetRadiusKm: number
 	obliquity: number // axial tilt in degrees, default 23.5
 	eccentricity: number // orbital eccentricity, default 0.0167

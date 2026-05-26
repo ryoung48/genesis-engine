@@ -41,16 +41,45 @@ export type TerrainFeatureMarker = (
 	delta: number,
 ) => void
 
-export function getVolcanicArcSpacing(_volcanism: number): number {
-	return VOLC_MIN_SPACING
+function getVolcanismFrequency(volcanism: number): number {
+	return Math.max(0, volcanism)
 }
 
-export function getLipUpwellingThreshold(_volcanism: number): number {
-	return 0.2
+export function getScaledFeatureCount(
+	baseCount: number,
+	volcanism: number,
+): number {
+	const frequency = getVolcanismFrequency(volcanism)
+	if (frequency <= 0) return 0
+	return Math.max(1, Math.round(baseCount * Math.sqrt(frequency)))
 }
 
-export function getLipSpawnChance(_volcanism: number): number {
-	return 1
+export function getVolcanicActivityThreshold(
+	baseThreshold: number,
+	volcanism: number,
+	minThreshold = 0.05,
+): number {
+	const frequency = getVolcanismFrequency(volcanism)
+	if (frequency <= 0) return 1.1
+	if (frequency < 1)
+		return baseThreshold + (1 - baseThreshold) * (1 - frequency)
+	return Math.max(minThreshold, baseThreshold / Math.sqrt(frequency))
+}
+
+export function getVolcanicArcSpacing(volcanism: number): number {
+	const frequency = getVolcanismFrequency(volcanism)
+	if (frequency <= 0) return Number.POSITIVE_INFINITY
+	return VOLC_MIN_SPACING / Math.sqrt(frequency)
+}
+
+export function getLipUpwellingThreshold(volcanism: number): number {
+	return getVolcanicActivityThreshold(0.2, volcanism, 0.05)
+}
+
+export function getLipSpawnChance(volcanism: number): number {
+	const frequency = getVolcanismFrequency(volcanism)
+	if (frequency <= 0) return 0
+	return Math.min(1, frequency)
 }
 
 export function buildTangentFrame(
@@ -96,9 +125,9 @@ export function applyVolcanicArcs({
 }: VolcanicArcParams): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const uplift = new Float32Array(numRegions)
+	if (volcanism <= 0) return uplift
 	const arcVolcNoise = new SimplexNoise(seed + 713)
 	const minSpacingSq = getVolcanicArcSpacing(volcanism) ** 2
-	void volcanism
 
 	const candidates: Array<{
 		x: number

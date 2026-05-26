@@ -20,6 +20,7 @@ export const SLIDER_RANGES = {
 	glacialErosion: { min: 0, max: 1, step: 0.05 },
 	volcanism: { min: 0, max: 10, step: 0.05 },
 	craters: { min: 0, max: 1, step: 0.05 },
+	maxElevation: { min: 0, max: 30000, step: 100 },
 	// planet
 	planetRadiusKm: { min: RADIUS_MIN, max: RADIUS_MAX, step: 100 },
 	sunTempFactor: { min: 0.6, max: 1.2, step: 0.01 },

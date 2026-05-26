@@ -18,7 +18,6 @@ import {
 	DEFAULT_PERIHELION,
 	DEFAULT_PLANET_RADIUS_KM,
 	DEFAULT_SUN_TEMP_FACTOR,
-	getMaxElevationKm,
 	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
 } from "../shared/units"
@@ -286,7 +285,7 @@ export function importOrogenWorld(
 	}
 
 	// Convert raw elevation to km (radius-scaled)
-	const maxElevKm = getMaxElevationKm(orogenParams.planetRadiusKm)
+	const maxElevKm = (orogenParams.maxElevation ?? 6000) / 1000
 	const maxDepthKm = getMaxOceanDepthKm(orogenParams.planetRadiusKm)
 	const elevation_km = new Float32Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {

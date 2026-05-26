@@ -40,7 +40,7 @@ describe("buildGenerationPreviewConfig", () => {
 		})
 	})
 
-	it("zeros the preview obliquity for tidally locked planets", () => {
+	it("preserves the preview obliquity for tidally locked planets", () => {
 		expect(
 			buildGenerationPreviewConfig({
 				tidallyLocked: true,
@@ -56,7 +56,7 @@ describe("buildGenerationPreviewConfig", () => {
 				planetRadiusKm: 6371,
 				pressure: 1,
 			}).obliquity,
-		).toBe(0)
+		).toBe(45)
 	})
 
 	it("switches the toggle label based on the active viewport", () => {

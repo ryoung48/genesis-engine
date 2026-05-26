@@ -207,6 +207,13 @@ const FIELD_SPECS: FieldSpec[] = [
 		count: rangeCount(SR.craters),
 		read: (p) => clampUnit(p.craters ?? 0),
 	},
+	{
+		name: "maxElevation",
+		min: SR.maxElevation.min,
+		step: SR.maxElevation.step,
+		count: rangeCount(SR.maxElevation),
+		read: (p) => p.maxElevation ?? 6000,
+	},
 ]
 
 const PARAMS_BASE_LEN = (() => {
@@ -333,6 +340,7 @@ interface DecodedPlanetCode {
 	pressure: number
 	volcanism: number
 	craters?: number
+	maxElevation: number
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
@@ -394,5 +402,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		pressure: decodedFields.pressure,
 		volcanism: decodedFields.volcanism,
 		craters: craters > 0 ? craters : undefined,
+		maxElevation: decodedFields.maxElevation,
 	}
 }

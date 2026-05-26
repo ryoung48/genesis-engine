@@ -9,6 +9,8 @@ import {
 	buildTangentFrame,
 	getLipSpawnChance,
 	getLipUpwellingThreshold,
+	getScaledFeatureCount,
+	getVolcanicActivityThreshold,
 	getVolcanicArcSpacing,
 	type TerrainFeatureMarker,
 } from "./volcanism"
@@ -34,15 +36,19 @@ function createFeatureTracker(regionCount: number) {
 }
 
 describe("volcanism helpers", () => {
-	it("keeps legacy fixed volcanic arc spacing and LIP thresholds", () => {
-		expect(getVolcanicArcSpacing(0)).toBeCloseTo(0.015)
-		expect(getVolcanicArcSpacing(1)).toBeCloseTo(getVolcanicArcSpacing(0))
-		expect(getVolcanicArcSpacing(2)).toBeCloseTo(getVolcanicArcSpacing(0))
-		expect(getVolcanicArcSpacing(10)).toBeCloseTo(getVolcanicArcSpacing(2))
-		expect(getLipUpwellingThreshold(0)).toBeCloseTo(0.2)
+	it("scales volcanic feature frequency around the legacy baseline at volcanism 1", () => {
+		expect(getScaledFeatureCount(8, 0)).toBe(0)
+		expect(getScaledFeatureCount(8, 1)).toBe(8)
+		expect(getScaledFeatureCount(8, 4)).toBe(16)
+		expect(getVolcanicArcSpacing(0)).toBe(Number.POSITIVE_INFINITY)
+		expect(getVolcanicArcSpacing(1)).toBeCloseTo(0.015)
+		expect(getVolcanicArcSpacing(4)).toBeLessThan(getVolcanicArcSpacing(1))
+		expect(getVolcanicActivityThreshold(0.2, 0)).toBeGreaterThan(1)
 		expect(getLipUpwellingThreshold(1)).toBeCloseTo(0.2)
-		expect(getLipUpwellingThreshold(10)).toBeCloseTo(0.2)
-		expect(getLipSpawnChance(0)).toBe(1)
+		expect(getLipUpwellingThreshold(10)).toBeLessThan(
+			getLipUpwellingThreshold(1),
+		)
+		expect(getLipSpawnChance(0)).toBe(0)
 		expect(getLipSpawnChance(1)).toBe(1)
 	})
 
@@ -181,6 +187,40 @@ describe("applyVolcanicArcs", () => {
 		expect(elevation[0]).toBeCloseTo(uplift[0])
 	})
 
+	it("turns volcanic arcs off when volcanism is zero", () => {
+		const mesh = buildMesh()
+		const elevation = new Float32Array(mesh.numRegions)
+		const boundary = {
+			mountain_r: new Set<number>(),
+			coastline_r: new Set<number>(),
+			ocean_r: new Set<number>(),
+			r_stress: Float32Array.from({ length: mesh.numRegions }, (_, i) =>
+				i === 0 ? 1 : 0,
+			),
+			r_subductFactor: new Float32Array(mesh.numRegions),
+			r_boundaryType: Int8Array.from({ length: mesh.numRegions }, (_, i) =>
+				i === 0 ? 1 : 0,
+			),
+			r_bothOcean: new Uint8Array(mesh.numRegions),
+			r_hasOcean: Uint8Array.from({ length: mesh.numRegions }, (_, i) =>
+				i === 0 ? 1 : 0,
+			),
+		}
+
+		const uplift = applyVolcanicArcs({
+			mesh,
+			elevation,
+			boundary,
+			maxStress: 1,
+			seed: 7,
+			volcanism: 0,
+			markFeature: () => undefined,
+		})
+
+		expect(Array.from(uplift)).toEqual(new Array(mesh.numRegions).fill(0))
+		expect(Array.from(elevation)).toEqual(new Array(mesh.numRegions).fill(0))
+	})
+
 	it("skips uplift when candidate boundaries are not subducting enough", () => {
 		const mesh = buildMesh()
 		const elevation = new Float32Array(mesh.numRegions)
@@ -254,7 +294,7 @@ describe("applyVolcanicArcs", () => {
 })
 
 describe("applyLargeIgneousProvinces", () => {
-	it("spawns the legacy fixed seven-site LIP footprint regardless of volcanism", () => {
+	it("spawns the legacy fixed seven-site LIP footprint at the baseline volcanism", () => {
 		const lipSites = [] as Parameters<
 			typeof applyLargeIgneousProvinces
 		>[0]["lipSites"]
@@ -264,7 +304,7 @@ describe("applyLargeIgneousProvinces", () => {
 			z: 1,
 			drift: [1, 0, 0],
 			upwelling: 0.05,
-			volcanism: 0,
+			volcanism: 1,
 			isOcean: false,
 			random: (() => {
 				const values = [0.2, 0.6, 0.5, 0.25, 0.4, 0.7, 0.3, 0.2, 0.8, 0.45]
@@ -318,7 +358,7 @@ describe("applyLargeIgneousProvinces", () => {
 		)
 	})
 
-	it("keeps large igneous province sites identical across volcanism levels", () => {
+	it("keeps large igneous province site shapes identical across positive volcanism levels", () => {
 		const makeRandom = () => {
 			const values = [0.2, 0.6, 0.5, 0.25, 0.4, 0.7, 0.3, 0.2, 0.8, 0.45]
 			let index = 0

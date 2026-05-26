@@ -2,7 +2,7 @@ import React from "react"
 import { cx } from "../lib"
 
 type TooltipPosition = "top" | "bottom"
-type TooltipAlign = "start" | "end"
+type TooltipAlign = "start" | "center" | "end"
 
 const positionClassName: Record<
 	TooltipPosition,
@@ -10,10 +10,12 @@ const positionClassName: Record<
 > = {
 	top: {
 		start: "bottom-full left-0 mb-1.5",
+		center: "bottom-full left-1/2 -translate-x-1/2 mb-1.5",
 		end: "bottom-full right-0 mb-1.5",
 	},
 	bottom: {
 		start: "top-full left-0 mt-1.5",
+		center: "top-full left-1/2 -translate-x-1/2 mt-1.5",
 		end: "top-full right-0 mt-1.5",
 	},
 }

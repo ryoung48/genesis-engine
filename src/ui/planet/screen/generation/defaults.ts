@@ -38,6 +38,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	glacialErosion: 0.5,
 	volcanism: 1,
 	craters: 0,
+	maxElevation: 6000,
 	pressure: 1.0,
 	antistellarLon: DEFAULT_ANTISTELLAR_LON,
 	perihelion: DEFAULT_PERIHELION,

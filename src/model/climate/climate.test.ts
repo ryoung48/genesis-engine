@@ -6,7 +6,10 @@ import {
 	computeTemperature,
 	elevToHeightKm,
 } from "./climate"
-import { computeTidalTransportParams } from "./locked/heat"
+import {
+	computeLockedMonthlyDaylightHours,
+	computeTidalTransportParams,
+} from "./locked/heat"
 
 function buildMesh(
 	zValues: number[],
@@ -174,6 +177,78 @@ describe("computeTemperature", () => {
 		expect(climate.temperature_avg[4]).toBeLessThan(climate.temperature_avg[1])
 		expect(climate.temperature_monthly_range[0]).toBeGreaterThan(0)
 		expect(climate.insolation_monthly[1]).toBe(0)
+	})
+
+	it("lets tidally locked obliquity shift polar daylight through the year", () => {
+		const mesh = buildMesh([1, -1, 0], [0, 0, 1], [0, 0, 0])
+
+		const flat = computeLockedMonthlyDaylightHours(
+			mesh,
+			buildParams({
+				tidallyLocked: true,
+				obliquity: 0,
+				antistellarLon: 180,
+				eccentricity: 0,
+				seed: 0,
+			}),
+		)
+		const tilted = computeLockedMonthlyDaylightHours(
+			mesh,
+			buildParams({
+				tidallyLocked: true,
+				obliquity: 60,
+				antistellarLon: 180,
+				eccentricity: 0,
+				seed: 0,
+			}),
+		)
+
+		expect(flat[0]).toBe(12)
+		expect(flat[1]).toBe(12)
+		expect(
+			Array.from({ length: 12 }, (_, month) => tilted[month * 3]),
+		).toContain(24)
+		expect(
+			Array.from({ length: 12 }, (_, month) => tilted[month * 3]),
+		).toContain(0)
+		expect(
+			Array.from({ length: 12 }, (_, month) => tilted[month * 3 + 1]),
+		).toContain(24)
+		expect(
+			Array.from({ length: 12 }, (_, month) => tilted[month * 3 + 1]),
+		).toContain(0)
+	})
+
+	it("mirrors locked polar seasons when the obliquity is retrograde", () => {
+		const mesh = buildMesh([1, -1], [0, 0], [0, 0])
+
+		const prograde = computeLockedMonthlyDaylightHours(
+			mesh,
+			buildParams({
+				tidallyLocked: true,
+				obliquity: 60,
+				antistellarLon: 180,
+				eccentricity: 0,
+				seed: 0,
+			}),
+		)
+		const retrograde = computeLockedMonthlyDaylightHours(
+			mesh,
+			buildParams({
+				tidallyLocked: true,
+				obliquity: 120,
+				antistellarLon: 180,
+				eccentricity: 0,
+				seed: 0,
+			}),
+		)
+
+		expect(
+			Array.from({ length: 12 }, (_, month) => retrograde[month * 2]),
+		).toEqual(Array.from({ length: 12 }, (_, month) => prograde[month * 2 + 1]))
+		expect(
+			Array.from({ length: 12 }, (_, month) => retrograde[month * 2 + 1]),
+		).toEqual(Array.from({ length: 12 }, (_, month) => prograde[month * 2]))
 	})
 
 	it("keeps an Earth-like locked planet milder than the previous extreme baseline", () => {

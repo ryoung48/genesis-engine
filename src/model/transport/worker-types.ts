@@ -431,6 +431,7 @@ export type OrogenWorkerRequest =
 				glacialErosion: number
 				volcanism?: number
 				craters?: number
+				maxElevation?: number
 				planetRadiusKm?: number
 				obliquity?: number
 				eccentricity?: number

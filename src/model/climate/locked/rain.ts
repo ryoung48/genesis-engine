@@ -8,7 +8,11 @@ import {
 	computeRainBandWarpField,
 	getPressureRainFactor,
 } from "../rain"
-import { computeMonthlyLibration, getSubstellarDirWithOffset } from "./heat"
+import {
+	computeMonthlyLibration,
+	computeMonthlyLockedDeclination,
+	getSubstellarDirWithOffsetAndDeclination,
+} from "./heat"
 
 const RAD2DEG = 180 / Math.PI
 
@@ -26,6 +30,7 @@ export function computeTidalRain(
 		OrogenParams,
 		| "seed"
 		| "antistellarLon"
+		| "obliquity"
 		| "pressure"
 		| "eccentricity"
 		| "perihelion"
@@ -44,6 +49,11 @@ export function computeTidalRain(
 
 	const ecc = params?.eccentricity ?? 0
 	const monthlyLibration = computeMonthlyLibration(
+		ecc,
+		params?.perihelion ?? 102,
+	)
+	const monthlyDeclination = computeMonthlyLockedDeclination(
+		params?.obliquity ?? 0,
 		ecc,
 		params?.perihelion ?? 102,
 	)
@@ -79,9 +89,10 @@ export function computeTidalRain(
 		const noiseMul = Math.max(0, 1 + n)
 
 		for (let month = 0; month < 12; month++) {
-			const sub = getSubstellarDirWithOffset(
+			const sub = getSubstellarDirWithOffsetAndDeclination(
 				params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON,
 				monthlyLibration[month],
+				monthlyDeclination[month],
 			)
 			const ct = Math.max(-1, Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]))
 			const thetaDeg =

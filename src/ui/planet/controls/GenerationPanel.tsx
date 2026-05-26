@@ -11,6 +11,10 @@ import {
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model"
+import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
+import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
+import { LockIcon } from "@/ui/components/primitives/icons/LockIcon"
+import { LockOpenIcon } from "@/ui/components/primitives/icons/LockOpenIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { getGenerationPreviewToggleLabel } from "../screen/generation/generation-preview"
 import type { SliderDef } from "../screen/generation/sliders"
@@ -49,6 +53,7 @@ interface GenerationPanelProps {
 function renderSliderGroup(
 	items: SliderDef[],
 	columns: "single" | "double" = "double",
+	renderSuffix?: (item: SliderDef) => React.ReactNode,
 ) {
 	return (
 		<div
@@ -69,8 +74,11 @@ function renderSliderGroup(
 								{p.label}
 							</label>
 						</UITooltip>
-						<span className="font-mono text-[10px] text-slate-400">
-							{p.display}
+						<span className="flex items-center gap-1.5">
+							{renderSuffix?.(p)}
+							<span className="font-mono text-[10px] text-slate-400">
+								{p.display}
+							</span>
 						</span>
 					</div>
 					<input
@@ -81,7 +89,7 @@ function renderSliderGroup(
 						value={p.value}
 						onChange={(e) => p.set(parseFloat(e.target.value))}
 						disabled={!!p.disabled}
-						className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
+						className="mt-1.5 w-full accent-slate-900 h-1 rounded-lg cursor-pointer"
 					/>
 				</div>
 			))}
@@ -490,132 +498,73 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 
 				{worldTab === "planet" && (
 					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
-						<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5 mb-1.5">
-							{planetSliders
-								.filter((p) => p.label === "Radius")
-								.map((p) => (
-									<div
-										key={p.label}
-										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
-									>
-										<div className="flex justify-between items-baseline gap-3">
-											<UITooltip content={p.help} position="top">
-												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-													{p.label}
-												</label>
-											</UITooltip>
-											<span className="font-mono text-[10px] text-slate-400">
-												{p.display}
-											</span>
-										</div>
-										<input
-											type="range"
-											min={p.min}
-											max={p.max}
-											step={p.step}
-											value={p.value}
-											onChange={(e) => p.set(parseFloat(e.target.value))}
-											disabled={!!p.disabled}
-											className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-										/>
-									</div>
-								))}
-							<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
-								<div className="flex justify-between items-baseline gap-3">
-									<UITooltip
-										content="One side always faces the star"
-										position="top"
-									>
-										<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-											Tidally Locked
-										</label>
-									</UITooltip>
-									<span className="font-mono text-[10px] text-slate-400">
-										{tidallyLocked ? "Yes" : "No"}
-									</span>
-								</div>
-								<input
-									type="range"
-									min={0}
-									max={1}
-									step={1}
-									value={tidallyLocked ? 1 : 0}
-									onChange={(e) => {
-										const v = e.target.value === "1"
-										setTidallyLocked(v)
-										if (v) setObliquity(0)
-									}}
-									className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-								/>
-							</div>
-						</div>
-						<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5 mb-1.5">
-							{planetSliders
-								.filter((p) => p.label === "Sun Temp")
-								.map((p) => (
-									<div
-										key={p.label}
-										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
-									>
-										<div className="flex justify-between items-baseline gap-3">
-											<UITooltip content={p.help} position="top">
-												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-													{p.label}
-												</label>
-											</UITooltip>
-											<span className="font-mono text-[10px] text-slate-400">
-												{p.display}
-											</span>
-										</div>
-										<input
-											type="range"
-											min={p.min}
-											max={p.max}
-											step={p.step}
-											value={p.value}
-											onChange={(e) => p.set(parseFloat(e.target.value))}
-											disabled={!!p.disabled}
-											className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-										/>
-									</div>
-								))}
-							{planetSliders
-								.filter((p) => p.label === "Insolation")
-								.map((p) => (
-									<div
-										key={p.label}
-										className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
-									>
-										<div className="flex justify-between items-baseline gap-3">
-											<UITooltip content={p.help} position="top">
-												<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-													{p.label}
-												</label>
-											</UITooltip>
-											<span className="font-mono text-[10px] text-slate-400">
-												{p.display}
-											</span>
-										</div>
-										<input
-											type="range"
-											min={p.min}
-											max={p.max}
-											step={p.step}
-											value={p.value}
-											onChange={(e) => p.set(parseFloat(e.target.value))}
-											disabled={!!p.disabled}
-											className="mt-1.5 w-full accent-slate-900 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer"
-										/>
-									</div>
-								))}
-						</div>
 						{renderSliderGroup(
-							planetSliders.filter(
-								(p) =>
-									p.label !== "Radius" &&
-									p.label !== "Sun Temp" &&
-									p.label !== "Insolation",
-							),
+							planetSliders.filter((p) => p.label !== "Spin"),
+							"double",
+							(item) => {
+								if (
+									item.label === "Day Length" ||
+									item.label === "Antistellar Lon"
+								)
+									return (
+										<UITooltip
+											content={
+												tidallyLocked
+													? "remove 1:1 tidal lock"
+													: "add 1:1 tidal lock"
+											}
+											position="top"
+											align="center"
+										>
+											<button
+												type="button"
+												onClick={() => {
+													setTidallyLocked(!tidallyLocked)
+													if (!tidallyLocked) setObliquity(0)
+												}}
+												className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+											>
+												{tidallyLocked ? (
+													<LockIcon className="h-3 w-3" />
+												) : (
+													<LockOpenIcon className="h-3 w-3" />
+												)}
+											</button>
+										</UITooltip>
+									)
+								if (item.label === "Axial Tilt") {
+									const spin = planetSliders.find((p) => p.label === "Spin")
+									const retrograde = spin && spin.value === 1
+									const spinDisabled = !!spin?.disabled
+									return (
+										<UITooltip
+											content={
+												spinDisabled
+													? "spin locked by tidal lock"
+													: retrograde
+													? "switch to prograde"
+													: "switch to retrograde"
+											}
+											position="top"
+											align="center"
+										>
+											<button
+												type="button"
+												onClick={() => spin?.set(retrograde ? 0 : 1)}
+												disabled={spinDisabled}
+												className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+											>
+												{retrograde ? (
+													<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
+												) : (
+													<AxisRotateClockwiseIcon className="h-3 w-3" />
+												)}
+											</button>
+										</UITooltip>
+									)
+								}
+								return null
+							},
 						)}
 					</div>
 				)}
