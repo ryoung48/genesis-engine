@@ -5,11 +5,11 @@ import { createMapProjection } from "./map-projection"
 import { globeScaleForPop, mapRadiusForPop } from "./settlement-overlay"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
-const LABEL_LIFT_GLOBE = 0.01
+const LABEL_LIFT_GLOBE = 0.005
 const LABEL_LIFT_MAP = 0.008
 const MAP_Z_ELEVATION_FACTOR = 0.5
 
-const LABEL_OFFSET_GLOBE_Y = 0.008
+const LABEL_OFFSET_GLOBE_Y = 0.003
 const LABEL_OFFSET_MAP_X = 0
 const LABEL_OFFSET_MAP_Y = 0.001
 const LABEL_MAP_FONT_GAP_FACTOR = 0.08
@@ -150,6 +150,7 @@ function labelPositionGlobe(
 	r_xyz: Float32Array,
 	elevation: Float32Array,
 	region: number,
+	elevationVisible = true,
 ) {
 	const x = r_xyz[3 * region]
 	const y = r_xyz[3 * region + 1]
@@ -159,10 +160,11 @@ function labelPositionGlobe(
 	const ny = y / len
 	const nz = z / len
 	const elev = elevation[region]
-	const adj =
-		elev > 0
+	const adj = elevationVisible
+		? elev > 0
 			? elev * TERRAIN_ELEVATION_SCALE
 			: elev * TERRAIN_ELEVATION_SCALE * 0.3
+		: 0
 	return {
 		normal: new THREE.Vector3(nx, ny, nz),
 		radius: 1 + adj + LABEL_LIFT_GLOBE,
@@ -299,6 +301,7 @@ export function buildGlobeNationLabels(
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
 	cullingEnabled = false,
+	elevationVisible = true,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces || !world.nations) return group
@@ -323,7 +326,7 @@ export function buildGlobeNationLabels(
 		const anchorRegion =
 			settlementRegion >= 0 ? settlementRegion : capitalRegion
 		const scale = computeLabelScale(nationProvinceCount(world, n), name)
-		const globePlacement = labelPositionGlobe(r_xyz, elevation, anchorRegion)
+		const globePlacement = labelPositionGlobe(r_xyz, elevation, anchorRegion, elevationVisible)
 		const markerScale =
 			capitalProvince >= 0
 				? globeScaleForPop(world.urbanPopulation?.[capitalProvince] ?? 0)
@@ -424,8 +427,175 @@ export function buildMapNationLabels(
 	return group
 }
 
+// ── Settlement labels ─────────────────────────────────────────────────────────
+
+const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.0016
+const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.002
+const SETTLEMENT_LOG_MIN = Math.log10(1_000)
+const SETTLEMENT_LOG_MAX = Math.log10(1_000_000)
+const SETTLEMENT_LABEL_OFFSET_GLOBE_Y = 0.001
+const SETTLEMENT_LABEL_LIFT_GLOBE = 0.002
+const SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION = 0.003
+
+function settlementFontScale(pop: number): number {
+	const v = Math.log10(Math.max(1_000, pop))
+	const t = Math.max(0, Math.min(1, (v - SETTLEMENT_LOG_MIN) / (SETTLEMENT_LOG_MAX - SETTLEMENT_LOG_MIN)))
+	return 0.7 + t * 1.3
+}
+
+function settlementLabelPositionGlobe(
+	r_xyz: Float32Array,
+	elevation: Float32Array,
+	region: number,
+	elevationVisible: boolean,
+) {
+	const x = r_xyz[3 * region]
+	const y = r_xyz[3 * region + 1]
+	const z = r_xyz[3 * region + 2]
+	const len = Math.sqrt(x * x + y * y + z * z) || 1
+	const nx = x / len
+	const ny = y / len
+	const nz = z / len
+	const elev = elevation[region]
+	const adj = elevationVisible
+		? elev > 0
+			? elev * TERRAIN_ELEVATION_SCALE
+			: elev * TERRAIN_ELEVATION_SCALE * 0.3
+		: 0
+	const lift = elevationVisible ? SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION : SETTLEMENT_LABEL_LIFT_GLOBE
+	return {
+		normal: new THREE.Vector3(nx, ny, nz),
+		radius: 1 + adj + lift,
+	}
+}
+
+function settlementGlobeLabelOffset(markerScale: number, fontSize: number): number {
+	return (
+		markerScale * 0.5 +
+		fontSize * LABEL_GLOBE_FONT_GAP_FACTOR +
+		SETTLEMENT_LABEL_OFFSET_GLOBE_Y
+	)
+}
+
+function createSettlementLabelPools(): NationLabelPools {
+	return { globe: createLabelPool(), map: createLabelPool() }
+}
+
+export function buildGlobeSettlementLabels(
+	world: SerializedOrogenWorld,
+	settlementNames: string[],
+	camera: THREE.PerspectiveCamera,
+	pool: LabelPool,
+	cullingEnabled = false,
+	elevationVisible = true,
+): THREE.Group {
+	const group = new THREE.Group()
+	if (!world.provinces || !world.settlementRegions) return group
+
+	const { r_xyz } = world.mesh
+	const elevation = world.elevation
+	const provinceCount = world.provinces.count ?? settlementNames.length
+
+	ensurePoolSize(pool, provinceCount)
+	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
+
+	let activeCount = 0
+	for (let p = 0; p < provinceCount; p++) {
+		const name = settlementNames[p]
+		if (!name) continue
+		const region = world.settlementRegions[p] ?? -1
+		if (region < 0) continue
+		const pop = world.urbanPopulation?.[p] ?? 0
+		const scale = settlementFontScale(pop)
+		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_GLOBE * scale
+		const markerScale = globeScaleForPop(pop)
+		const globePlacement = settlementLabelPositionGlobe(r_xyz, elevation, region, elevationVisible)
+
+		const text = pool.items[activeCount]
+		applyGlobeLabelStyle(text)
+		text.frustumCulled = cullingEnabled
+		text.text = name
+		text.fontSize = fontSize
+		text.userData.globeNormal = globePlacement.normal
+		text.userData.globeBasePosition = GLOBE_BASE_POSITION.copy(globePlacement.normal)
+			.multiplyScalar(globePlacement.radius)
+			.clone()
+		text.userData.globeLabelOffset = settlementGlobeLabelOffset(markerScale, fontSize)
+		text.sync()
+		updateGlobeLabelPosition(text, cameraUp)
+		orientGlobeLabel(text, camera.quaternion)
+		text.visible = true
+		group.add(text)
+		activeCount++
+	}
+
+	hideUnusedPool(pool, activeCount)
+	updateGlobeLabelOrientations(group, camera, cullingEnabled)
+	return group
+}
+
+export function buildMapSettlementLabels(
+	world: SerializedOrogenWorld,
+	settlementNames: string[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	pool: LabelPool,
+	cullingEnabled = false,
+): THREE.Group {
+	const group = new THREE.Group()
+	if (!world.provinces || !world.settlementRegions) return group
+
+	const projection = createMapProjection(centerLongitudeDeg, projectionLatitudeDeg)
+	const { r_xyz } = world.mesh
+	const elevation = world.elevation
+	const provinceCount = world.provinces.count ?? settlementNames.length
+	const wrapOffsets = cullingEnabled
+		? [-projection.repeatWidth, 0, projection.repeatWidth]
+		: [0]
+
+	ensurePoolSize(pool, provinceCount * wrapOffsets.length)
+
+	let activeCount = 0
+	for (let p = 0; p < provinceCount; p++) {
+		const name = settlementNames[p]
+		if (!name) continue
+		const region = world.settlementRegions[p] ?? -1
+		if (region < 0) continue
+		const pop = world.urbanPopulation?.[p] ?? 0
+		const scale = settlementFontScale(pop)
+		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_MAP * scale
+		const markerRadius = mapRadiusForPop(pop)
+		const [px, py, pz] = labelPositionMap(
+			projection,
+			r_xyz,
+			elevation,
+			region,
+			markerRadius,
+			fontSize,
+		)
+
+		for (const wrapOffset of wrapOffsets) {
+			const text = pool.items[activeCount]
+			applyMapLabelStyle(text)
+			text.frustumCulled = cullingEnabled
+			text.text = name
+			text.position.set(px + wrapOffset, py, pz)
+			text.rotation.set(0, 0, 0)
+			text.fontSize = fontSize
+			text.sync()
+			text.visible = true
+			group.add(text)
+			activeCount++
+		}
+	}
+
+	hideUnusedPool(pool, activeCount)
+	return group
+}
+
 export {
 	createNationLabelPools,
+	createSettlementLabelPools,
 	disposePool,
 	orientGlobeLabel,
 	updateGlobeLabelOrientations,

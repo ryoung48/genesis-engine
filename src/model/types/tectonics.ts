@@ -36,6 +36,7 @@ export interface OrogenParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	seaLevel: number
 	volcanism?: number
 	craters?: number // 0 = none, 1 = heavily cratered
 	maxElevation?: number // max elevation in meters, default 6000

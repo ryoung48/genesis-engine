@@ -1,7 +1,9 @@
 import {
 	DEFAULT_PLANET_RADIUS_KM,
+	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
 } from "@/model/shared/units"
+import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import {
 	formatArea,
@@ -30,6 +32,8 @@ export function computePlanetStats(
 		planetRadiusKm: number
 		pressure: number
 		tidallyLocked: boolean
+		seaLevel?: number
+		maxElevation?: number
 	},
 	unitSystem: UnitSystem,
 ): PlanetStat[] {
@@ -114,9 +118,40 @@ export function computePlanetStats(
 		avgDtrC = sum / Math.max(1, world.dtr_annual.length)
 	}
 
+	let riverCount: number | null = null
+	let longestRiverKm: number | null = null
+	if (world?.rivers?.riverId && world.rivers.visible && world.rivers.riverLengthKm) {
+		const { riverId, visible, riverLengthKm } = world.rivers
+		const seenIds = new Set<number>()
+		for (let r = 0; r < visible.length; r++) {
+			if (!visible[r]) continue
+			const id = riverId[r]
+			if (id >= 0) seenIds.add(id)
+			const len = riverLengthKm[r]
+			if (len > (longestRiverKm ?? 0)) longestRiverKm = len
+		}
+		riverCount = seenIds.size
+	}
+
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = activeParams?.tidallyLocked ?? params.tidallyLocked
 	const habitabilityScore = world?.population?.habitabilityScore ?? 0
+
+	const seaLevelValue = activeParams?.seaLevel ?? params.seaLevel
+	const maxElevationValue = activeParams?.maxElevation ?? params.maxElevation
+	let seaLevelShiftStat: PlanetStat | null = null
+	if (seaLevelValue != null && seaLevelValue !== 1) {
+		const maxElevKm = (maxElevationValue ?? 6000) / 1000
+		const maxDepthKm = getMaxOceanDepthKm(radiusKm)
+		const offsetKm = computeSeaLevelOffsetKm(seaLevelValue, maxElevKm, maxDepthKm)
+		const sign = offsetKm >= 0 ? "+" : "−"
+		const absValue =
+			unitSystem === "imperial"
+				? `${Math.round(Math.abs(offsetKm) * 3280.84).toLocaleString()} ft`
+				: `${Math.round(Math.abs(offsetKm) * 1000).toLocaleString()} m`
+		seaLevelShiftStat = { label: "Sea Level", value: `${sign}${absValue}` }
+	}
+
 	return [
 		{
 			label: "Habitability",
@@ -188,6 +223,16 @@ export function computePlanetStats(
 				landAreaKm2 !== null && landPercent !== null
 					? `${formatArea(landAreaKm2, unitSystem, { digits: 1, compact: "M" })} (${landPercent.toFixed(1)}%)`
 					: "-",
+		},
+		...(seaLevelShiftStat ? [seaLevelShiftStat] : []),
+		{
+			label: "Major Rivers",
+			value: riverCount !== null ? riverCount.toLocaleString() : "-",
+		},
+		{
+			label: "Longest River",
+			value:
+				longestRiverKm !== null ? formatDistance(longestRiverKm, unitSystem) : "-",
 		},
 		{
 			label: "Avg Temp",

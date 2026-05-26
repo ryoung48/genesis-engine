@@ -429,6 +429,7 @@ export type OrogenWorkerRequest =
 				thermalErosion: number
 				ridgeSharpening: number
 				glacialErosion: number
+				seaLevel: number
 				volcanism?: number
 				craters?: number
 				maxElevation?: number

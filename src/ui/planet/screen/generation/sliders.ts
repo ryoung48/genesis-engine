@@ -3,8 +3,11 @@ import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getEarthYearFactor,
 	getEffectiveObliquityDeg,
+	getMaxOceanDepthKm,
 } from "@/model/shared/units"
+import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
 import { formatCompactNumber } from "../../hover/info-panel-format"
+import type { UnitSystem } from "../shared/ui-format"
 import { DEFAULT_WORLD_PARAMS } from "./defaults"
 
 const SR = SLIDER_RANGES
@@ -182,8 +185,10 @@ export function buildTerrainSliders(state: {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	seaLevel: number
 	craters: number
 	volcanism: number
+	unitSystem: UnitSystem
 	maxElevation: number
 	setNumPoints: (v: number) => void
 	setJitter: (v: number) => void
@@ -196,6 +201,7 @@ export function buildTerrainSliders(state: {
 	setThermalErosion: (v: number) => void
 	setRidgeSharpening: (v: number) => void
 	setGlacialErosion: (v: number) => void
+	setSeaLevel: (v: number) => void
 	setCraters: (v: number) => void
 	setVolcanism: (v: number) => void
 	setMaxElevation: (v: number) => void
@@ -290,10 +296,35 @@ export function buildTerrainSliders(state: {
 			set: state.setGlacialErosion,
 		},
 		{
+			label: "Sea Level",
+			help: "Shifts the final shoreline after volcanism and craters are applied. 1.00x keeps the baseline sea level unchanged.",
+			value: state.seaLevel,
+			display: (() => {
+				const offsetKm = computeSeaLevelOffsetKm(
+					state.seaLevel,
+					6,
+					getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM),
+				)
+				const sign = offsetKm > 0 ? "+" : offsetKm < 0 ? "−" : ""
+				if (state.unitSystem === "imperial") {
+					return `${sign}${Math.round(Math.abs(offsetKm) * 3280.84).toLocaleString()} ft`
+				}
+				return `${sign}${Math.round(Math.abs(offsetKm) * 1000).toLocaleString()} m`
+			})(),
+			...SR.seaLevel,
+			set: state.setSeaLevel,
+		},
+		{
 			label: "Max Elevation",
 			help: "Sets the maximum mountain height in meters. Higher values allow taller mountain ranges to form during tectonic uplift.",
 			value: state.maxElevation,
-			display: `${state.maxElevation.toFixed(0)} m`,
+			display: (() => {
+				const km = state.maxElevation / 1000
+				if (state.unitSystem === "imperial") {
+					return `${(km * 0.621371).toFixed(1)} mi`
+				}
+				return `${km.toFixed(1)} km`
+			})(),
 			...SR.maxElevation,
 			set: state.setMaxElevation,
 		},
@@ -341,6 +372,7 @@ export function resetWorldDefaults(setters: {
 	setThermalErosion: (v: number) => void
 	setRidgeSharpening: (v: number) => void
 	setGlacialErosion: (v: number) => void
+	setSeaLevel: (v: number) => void
 	setCraters: (v: number) => void
 	setVolcanism: (v: number) => void
 	setMaxElevation: (v: number) => void
@@ -369,6 +401,7 @@ export function resetWorldDefaults(setters: {
 	setters.setThermalErosion(DEFAULT_WORLD_PARAMS.thermalErosion)
 	setters.setRidgeSharpening(DEFAULT_WORLD_PARAMS.ridgeSharpening)
 	setters.setGlacialErosion(DEFAULT_WORLD_PARAMS.glacialErosion)
+	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
 	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
 	setters.setMaxElevation(DEFAULT_WORLD_PARAMS.maxElevation)

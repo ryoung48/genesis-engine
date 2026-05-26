@@ -79,6 +79,7 @@ import { createDisplayNames } from "./screen/display/display-names"
 import {
 	buildNationDynastyLabelNames,
 	buildNationLabelNames,
+	buildSettlementLabelNames,
 } from "./screen/display/label-names"
 import {
 	buildConflictDistribution,
@@ -491,6 +492,9 @@ export const OrogenView: React.FC = () => {
 	const [glacialErosion, setGlacialErosion] = useState(
 		initialDecodedCode?.glacialErosion ?? DEFAULT_WORLD_PARAMS.glacialErosion,
 	)
+	const [seaLevel, setSeaLevel] = useState(
+		initialDecodedCode?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
+	)
 	const [volcanism, setVolcanism] = useState(
 		initialDecodedCode?.volcanism ?? DEFAULT_WORLD_PARAMS.volcanism,
 	)
@@ -762,6 +766,9 @@ export const OrogenView: React.FC = () => {
 	}, [worldForDisplay, worldNames])
 	const dynastyLabelsArray = useMemo(() => {
 		return buildNationDynastyLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
+	const settlementLabelsArray = useMemo(() => {
+		return buildSettlementLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
@@ -1473,6 +1480,9 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setDynastyNames(dynastyLabelsArray)
 	}, [dynastyLabelsArray])
+	useEffect(() => {
+		sceneRef.current?.setSettlementNames(settlementLabelsArray)
+	}, [settlementLabelsArray])
 
 	// --- Elevation ---
 	useEffect(() => {
@@ -1578,6 +1588,7 @@ export const OrogenView: React.FC = () => {
 			thermalErosion,
 			ridgeSharpening,
 			glacialErosion,
+			seaLevel,
 			volcanism,
 			craters,
 			maxElevation,
@@ -1608,6 +1619,7 @@ export const OrogenView: React.FC = () => {
 			thermalErosion,
 			ridgeSharpening,
 			glacialErosion,
+			seaLevel,
 			volcanism,
 			craters,
 			maxElevation,
@@ -1698,6 +1710,7 @@ export const OrogenView: React.FC = () => {
 			setThermalErosion,
 			setRidgeSharpening,
 			setGlacialErosion,
+			setSeaLevel,
 			setVolcanism,
 			setCraters,
 			setMaxElevation,
@@ -1731,6 +1744,7 @@ export const OrogenView: React.FC = () => {
 			setters.setThermalErosion(decoded.thermalErosion)
 			setters.setRidgeSharpening(decoded.ridgeSharpening)
 			setters.setGlacialErosion(decoded.glacialErosion)
+			setters.setSeaLevel(decoded.seaLevel)
 			setters.setVolcanism(decoded.volcanism)
 			setters.setCraters(decoded.craters ?? 0)
 			setters.setMaxElevation(decoded.maxElevation)
@@ -1783,6 +1797,7 @@ export const OrogenView: React.FC = () => {
 				thermalErosion,
 				ridgeSharpening,
 				glacialErosion,
+				seaLevel,
 				volcanism,
 				maxElevation,
 				craters,
@@ -1814,6 +1829,7 @@ export const OrogenView: React.FC = () => {
 			thermalErosion,
 			ridgeSharpening,
 			glacialErosion,
+			seaLevel,
 			volcanism,
 			craters,
 			pressure,
@@ -1999,6 +2015,7 @@ export const OrogenView: React.FC = () => {
 		thermalErosion,
 		ridgeSharpening,
 		glacialErosion,
+		seaLevel,
 		craters,
 		volcanism,
 		maxElevation,
@@ -2013,9 +2030,11 @@ export const OrogenView: React.FC = () => {
 		setThermalErosion,
 		setRidgeSharpening,
 		setGlacialErosion,
+		setSeaLevel,
 		setCraters,
 		setVolcanism,
 		setMaxElevation,
+		unitSystem,
 	})
 
 	// --- Planet stats ---
@@ -2034,6 +2053,8 @@ export const OrogenView: React.FC = () => {
 					planetRadiusKm,
 					pressure,
 					tidallyLocked,
+					seaLevel,
+					maxElevation,
 				},
 				unitSystem,
 			),
@@ -2048,6 +2069,8 @@ export const OrogenView: React.FC = () => {
 			pressure,
 			sunTempFactor,
 			tidallyLocked,
+			seaLevel,
+			maxElevation,
 			unitSystem,
 			world,
 		],

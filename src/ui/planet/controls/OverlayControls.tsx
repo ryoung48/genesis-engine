@@ -4,6 +4,7 @@ import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { BankIcon } from "@/ui/components/primitives/icons/BankIcon"
+import { CityIcon } from "@/ui/components/primitives/icons/CityIcon"
 import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
 import { CompassRoseIcon } from "@/ui/components/primitives/icons/CompassRoseIcon"
@@ -26,7 +27,7 @@ import { formatDistance } from "../screen/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
-export type LabelMode = "off" | "nations" | "dynasty"
+export type LabelMode = "off" | "nations" | "dynasty" | "settlements"
 
 const LAND_TRAVEL_KM_PER_DAY = 30
 const SEA_TRAVEL_KM_PER_DAY = 100
@@ -416,6 +417,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												label: <CrownIcon className="h-3.5 w-3.5" />,
 												ariaLabel: "Dynasty labels",
 												title: "Dynasty labels",
+											},
+											{
+												value: "settlements",
+												label: <CityIcon className="h-3.5 w-3.5" />,
+												ariaLabel: "Settlement labels",
+												title: "Settlement labels",
 											},
 										]}
 										value={labelMode}

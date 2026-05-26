@@ -517,8 +517,13 @@ export function computeRegionColors(
 			const { regionProvince, desolate } = world.provinces
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
-				const rulerNationId =
+				const assignedNationId =
 					p >= 0 ? (world.nations?.assignment?.[p] ?? -1) : -1
+				const rulerNationId =
+					assignedNationId >= 0
+						? (getRebelDisplayColorNationId(activeWars, assignedNationId) ??
+							assignedNationId)
+						: -1
 				const dynastyId =
 					rulerNationId >= 0 ? (world.leaderDynasty?.[rulerNationId] ?? -1) : -1
 				if (p < 0) {
@@ -876,7 +881,7 @@ export function computeRegionColors(
 				rgb[3 * r] = seaR + (depR - seaR) * t
 				rgb[3 * r + 1] = seaG + (depG - seaG) * t
 				rgb[3 * r + 2] = seaB + (depB - seaB) * t
-			} else if (!world.isLand[r]) {
+			} else if (!world.isLand[r] && km <= 0) {
 				const [cr, cg, cb] = getColor(Math.min(0, km), "terrain")
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg

@@ -13,7 +13,6 @@ import type {
 	StageTiming,
 	TectonicPlate,
 } from ".."
-import { elevToHeightKm } from "../climate/climate"
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import {
@@ -43,6 +42,7 @@ import {
 	warpTerrain,
 } from "../terrain/erosion"
 import { applyHotspots } from "../terrain/hotspots"
+import { applySeaLevelToElevation } from "../terrain/sea-level"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
@@ -460,12 +460,19 @@ export function generateOrogenWorld(
 		onProgress?.("craters", 39)
 	}
 
-	// Convert raw [0,1] elevation to physical km (radius-scaled)
 	const maxElevKm = (params.maxElevation ?? 6000) / 1000
 	const maxDepthKm = getMaxOceanDepthKm(params.planetRadiusKm)
-	const elevation_km = new Float32Array(mesh.numRegions)
+	const baseElevation = elevation.slice()
+	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
+		baseElevation,
+		maxElevKm,
+		maxDepthKm,
+		seaLevel: params.seaLevel,
+	})
+	elevation.set(finalElevation)
+	const emergedLand = new Uint8Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {
-		elevation_km[r] = elevToHeightKm(elevation[r], maxElevKm, maxDepthKm)
+		if (baseElevation[r] <= 0 && elevation_km[r] > 0) emergedLand[r] = 1
 	}
 
 	// Final land mask — ocean flood-fill determines which below-sea-level cells
@@ -477,7 +484,11 @@ export function generateOrogenWorld(
 		const flooded = new Uint8Array(mesh.numRegions)
 		const queue: number[] = []
 		for (let r = 0; r < mesh.numRegions; r++) {
-			if (!preCraterLand[r]) {
+			// Seed only from cells that are ocean *after* sea-level adjustment.
+			// preCraterLand captures the pre-adjustment boundary; if sea level
+			// dropped, some former ocean cells are now above sea level and must
+			// not be seeded as flooded (they should become land).
+			if (!preCraterLand[r] && elevation[r] <= 0) {
 				flooded[r] = 1
 				queue.push(r)
 			}
@@ -578,6 +589,7 @@ export function generateOrogenWorld(
 			distCoast: distFields.distCoast,
 			oceanDist,
 			params,
+			emergedLand,
 			tectonicMode: "active" as const,
 			boundary,
 			distFields,

@@ -1739,6 +1739,31 @@ describe("computeRegionColors", () => {
 		expectRegionColor(terrain!, 3, getColor(2, "terrain"))
 	})
 
+	it("renders positive non-lake cells as land even when the land mask says water", () => {
+		const world = buildWorld({
+			mesh: { numRegions: 1 } as never,
+			elevation: new Float32Array([0.4]),
+			elevation_km: new Float32Array([0.4]),
+			isLand: new Uint8Array([0]),
+			rivers: {
+				lakes: new Uint8Array([0]),
+			} as never,
+		})
+
+		const terrain = computeRegionColors(
+			world,
+			"terrain",
+			DEFAULT_NATION_MODE,
+			DEFAULT_POPULATION_MODE,
+			0,
+			0,
+			0,
+			0,
+		)
+
+		expectRegionColor(terrain!, 0, getColor(0.4, "terrain"))
+	})
+
 	it("uses neutral fills for desolate provinces in both province and nation overlays", () => {
 		const world = buildWorld({
 			mesh: { numRegions: 2 } as never,

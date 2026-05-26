@@ -8,7 +8,7 @@ import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { initHistory } from "@/model/history"
 import { SEA_ROUTE_PORT_MIN_POPULATION } from "@/model/history/events/trade-routes"
 import { PROV } from "@/model/history/fields"
-import { decodePlanetCode } from "@/model/shared/planet-code"
+import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import { regionPathLengthKm } from "@/model/shared/units"
 import {
 	ROUTE_LAND_MAJOR,
@@ -26,7 +26,37 @@ import {
 } from "./generate-default-world-diagnostics"
 import { generateOrogenWorld } from "./generate-world"
 
-const SMOKE_PLANET_CODE = "8wqaf.080yudfjcze4m7yceeysl488rbtec5u"
+const SMOKE_PLANET_CODE = encodePlanetCode(411999, {
+	...DEFAULT_WORLD_PARAMS,
+	seed: 411999,
+	numPoints: 9000,
+	numPlates: 36,
+	landDistribution: 0.35,
+	continentSizeVariety: 0.45,
+	landCoverage: 0.38,
+	jitter: 0.6,
+	roughness: 0.33,
+	terrainWarp: 0.55,
+	smoothing: 0.2,
+	hydraulicErosion: 0.25,
+	thermalErosion: 0.2,
+	ridgeSharpening: 0.25,
+	glacialErosion: 0.15,
+	seaLevel: 1,
+	volcanism: 1.2,
+	craters: 0.05,
+	planetRadiusKm: 6371,
+	obliquity: 28.5,
+	eccentricity: 0.032,
+	sunTempFactor: 1.01,
+	insolationFactor: 1.04,
+	daysPerYear: 390,
+	hoursPerDay: 27,
+	tidallyLocked: false,
+	antistellarLon: DEFAULT_WORLD_PARAMS.antistellarLon,
+	perihelion: 128,
+	pressure: 1.1,
+})
 
 function buildSmokeParams(code: string): OrogenParams {
 	const decoded = decodePlanetCode(code)
@@ -53,6 +83,7 @@ function buildSmokeParams(code: string): OrogenParams {
 			decoded.ridgeSharpening ?? DEFAULT_WORLD_PARAMS.ridgeSharpening,
 		glacialErosion:
 			decoded.glacialErosion ?? DEFAULT_WORLD_PARAMS.glacialErosion,
+		seaLevel: decoded.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 		volcanism: decoded.volcanism ?? DEFAULT_WORLD_PARAMS.volcanism,
 		craters: decoded.craters ?? DEFAULT_WORLD_PARAMS.craters,
 		planetRadiusKm:

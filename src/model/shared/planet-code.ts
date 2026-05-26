@@ -75,6 +75,13 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.glacialErosion,
 	},
 	{
+		name: "seaLevel",
+		min: SR.seaLevel.min,
+		step: SR.seaLevel.step,
+		count: rangeCount(SR.seaLevel),
+		read: (p) => p.seaLevel,
+	},
+	{
 		name: "hydraulicErosion",
 		min: SR.hydraulicErosion.min,
 		step: SR.hydraulicErosion.step,
@@ -321,6 +328,7 @@ interface DecodedPlanetCode {
 	roughness: number
 	smoothing: number
 	glacialErosion: number
+	seaLevel: number
 	hydraulicErosion: number
 	thermalErosion: number
 	ridgeSharpening: number
@@ -383,6 +391,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		roughness: decodedFields.roughness,
 		smoothing: decodedFields.smoothing,
 		glacialErosion: decodedFields.glacialErosion,
+		seaLevel: decodedFields.seaLevel,
 		hydraulicErosion: decodedFields.hydraulicErosion,
 		thermalErosion: decodedFields.thermalErosion,
 		ridgeSharpening: decodedFields.ridgeSharpening,

@@ -542,8 +542,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 												spinDisabled
 													? "spin locked by tidal lock"
 													: retrograde
-													? "switch to prograde"
-													: "switch to retrograde"
+														? "switch to prograde"
+														: "switch to retrograde"
 											}
 											position="top"
 											align="center"

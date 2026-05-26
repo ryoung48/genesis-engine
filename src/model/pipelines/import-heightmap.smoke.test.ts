@@ -20,6 +20,7 @@ function makeParams(overrides: Partial<ImportParams> = {}): ImportParams {
 		thermalErosion: 0,
 		ridgeSharpening: 0,
 		glacialErosion: 0,
+		seaLevel: 1,
 		...overrides,
 	}
 }

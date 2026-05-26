@@ -31,8 +31,11 @@ import {
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
 	buildGlobeNationLabels,
+	buildGlobeSettlementLabels,
 	buildMapNationLabels,
+	buildMapSettlementLabels,
 	createNationLabelPools,
+	createSettlementLabelPools,
 	disposePool,
 	updateGlobeLabelOrientations,
 } from "./nation-label-overlay"
@@ -407,7 +410,7 @@ export function createOrogenScene(
 	controls.zoomSpeed = 1.2
 	controls.noPan = true
 	controls.dynamicDampingFactor = 0.15
-	controls.minDistance = 1.4
+	controls.minDistance = 1.2
 	controls.maxDistance = 8
 
 	const mapControls = new OrbitControls(mapCamera, canvas)
@@ -606,12 +609,16 @@ export function createOrogenScene(
 	let infrastructureVisible = false
 	let globeNationLabels: THREE.Group | null = null
 	let mapNationLabels: THREE.Group | null = null
+	let globeSettlementLabels: THREE.Group | null = null
+	let mapSettlementLabels: THREE.Group | null = null
 	let labelMode: LabelMode = "off"
 	const labelCullingEnabled = true
 	let elevationVisible = true
 	const nationLabelPools = createNationLabelPools()
+	const settlementLabelPools = createSettlementLabelPools()
 	let nationNames: string[] | null = null
 	let dynastyNames: string[] | null = null
+	let settlementLabelNames: string[] | null = null
 	let globeControlsInteracting = false
 	let mapControlsInteracting = false
 	let globeControlActivityFrames = 0
@@ -666,6 +673,11 @@ export function createOrogenScene(
 			}
 			updateGlobeLabelOrientations(
 				globeNationLabels,
+				camera,
+				labelCullingEnabled,
+			)
+			updateGlobeLabelOrientations(
+				globeSettlementLabels,
 				camera,
 				labelCullingEnabled,
 			)
@@ -777,7 +789,7 @@ export function createOrogenScene(
 		disposeGroup(scene, mapNationLabels)
 		globeNationLabels = null
 		mapNationLabels = null
-		if (!currentWorld?.nations || labelMode === "off") {
+		if (!currentWorld?.nations || labelMode === "off" || labelMode === "settlements") {
 			return
 		}
 		const labelNames = labelMode === "dynasty" ? dynastyNames : nationNames
@@ -788,6 +800,7 @@ export function createOrogenScene(
 			camera,
 			nationLabelPools.globe,
 			labelCullingEnabled,
+			elevationVisible,
 		)
 		mapNationLabels = buildMapNationLabels(
 			currentWorld,
@@ -802,6 +815,39 @@ export function createOrogenScene(
 			if (!labelCullingEnabled) addMapSlideClones(mapNationLabels)
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
 			scene.add(mapNationLabels)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildSettlementLabels() {
+		disposeGroup(scene, globeSettlementLabels)
+		disposeGroup(scene, mapSettlementLabels)
+		globeSettlementLabels = null
+		mapSettlementLabels = null
+		if (!currentWorld?.settlementRegions || labelMode !== "settlements" || !settlementLabelNames) {
+			return
+		}
+		globeSettlementLabels = buildGlobeSettlementLabels(
+			currentWorld,
+			settlementLabelNames,
+			camera,
+			settlementLabelPools.globe,
+			labelCullingEnabled,
+			elevationVisible,
+		)
+		mapSettlementLabels = buildMapSettlementLabels(
+			currentWorld,
+			settlementLabelNames,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			settlementLabelPools.map,
+			labelCullingEnabled,
+		)
+		if (globeSettlementLabels) scene.add(globeSettlementLabels)
+		if (mapSettlementLabels) {
+			if (!labelCullingEnabled) addMapSlideClones(mapSettlementLabels)
+			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
+			scene.add(mapSettlementLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -1005,6 +1051,8 @@ export function createOrogenScene(
 		disposeGroup(scene, mapInfrastructure)
 		disposeGroup(scene, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
+		disposeGroup(scene, globeSettlementLabels)
+		disposeGroup(scene, mapSettlementLabels)
 		terrainWireframe = null
 		mapWireframe = null
 		globeGrid = null
@@ -1028,6 +1076,8 @@ export function createOrogenScene(
 		mapInfrastructure = null
 		globeNationLabels = null
 		mapNationLabels = null
+		globeSettlementLabels = null
+		mapSettlementLabels = null
 		syncAnimationState()
 
 		if (wireframeVisible && currentWorld) {
@@ -1190,10 +1240,19 @@ export function createOrogenScene(
 		}
 		if (globeNationLabels)
 			globeNationLabels.visible =
-				labelMode !== "off" && currentViewMode === "globe"
+				labelMode !== "off" && labelMode !== "settlements" && currentViewMode === "globe"
 		if (mapNationLabels) {
-			mapNationLabels.visible = labelMode !== "off" && currentViewMode === "map"
+			mapNationLabels.visible =
+				labelMode !== "off" && labelMode !== "settlements" && currentViewMode === "map"
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
+		}
+		if (globeSettlementLabels)
+			globeSettlementLabels.visible =
+				labelMode === "settlements" && currentViewMode === "globe"
+		if (mapSettlementLabels) {
+			mapSettlementLabels.visible =
+				labelMode === "settlements" && currentViewMode === "map"
+			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
 		}
 		requestRender()
 	}
@@ -1213,6 +1272,7 @@ export function createOrogenScene(
 			mapSettlements,
 			mapInfrastructure,
 			mapNationLabels,
+			mapSettlementLabels,
 			mapPathfindingLine,
 			mapPathfindingDots,
 			pulseMap,
@@ -1241,6 +1301,7 @@ export function createOrogenScene(
 			{ object: globeSettlements, visible: false },
 			{ object: globeInfrastructure, visible: false },
 			{ object: globeNationLabels, visible: false },
+			{ object: globeSettlementLabels, visible: false },
 			{ object: pulseGlobe, visible: false },
 			{ object: mapMesh, visible: true },
 			{
@@ -1255,7 +1316,8 @@ export function createOrogenScene(
 			{ object: mapHierarchyOverlay, visible: hierarchyOverlayNationId >= 0 },
 			{ object: mapSettlements, visible: settlementsVisible },
 			{ object: mapInfrastructure, visible: infrastructureVisible },
-			{ object: mapNationLabels, visible: labelMode !== "off" },
+			{ object: mapNationLabels, visible: labelMode !== "off" && labelMode !== "settlements" },
+			{ object: mapSettlementLabels, visible: labelMode === "settlements" },
 			{ object: mapSelectedProvinceBorder, visible: false },
 			{ object: mapMeasureLine, visible: false },
 			{ object: mapMeasureDots, visible: false },
@@ -1907,6 +1969,10 @@ export function createOrogenScene(
 		disposeGroup(scene, mapNationLabels)
 		disposePool(nationLabelPools.globe)
 		disposePool(nationLabelPools.map)
+		disposeGroup(scene, globeSettlementLabels)
+		disposeGroup(scene, mapSettlementLabels)
+		disposePool(settlementLabelPools.globe)
+		disposePool(settlementLabelPools.map)
 		waterGeo.dispose()
 		waterMat.dispose()
 		atmosGeo.dispose()
@@ -2207,6 +2273,7 @@ export function createOrogenScene(
 		if (labelMode === mode) return
 		labelMode = mode
 		rebuildNationLabels()
+		rebuildSettlementLabels()
 	}
 
 	function setNationNames(names: string[] | null) {
@@ -2219,10 +2286,17 @@ export function createOrogenScene(
 		rebuildNationLabels()
 	}
 
+	function setSettlementNames(names: string[] | null) {
+		settlementLabelNames = names
+		rebuildSettlementLabels()
+	}
+
 	function setElevationVisible(visible: boolean) {
 		if (elevationVisible === visible) return
 		elevationVisible = visible
 		if (currentWorld) rebuildTerrain()
+		rebuildNationLabels()
+		rebuildSettlementLabels()
 	}
 
 	return {
@@ -2259,6 +2333,7 @@ export function createOrogenScene(
 		setLabelMode,
 		setNationNames,
 		setDynastyNames,
+		setSettlementNames,
 		setElevationVisible,
 		setSunPosition,
 		setAtmospherePressure,

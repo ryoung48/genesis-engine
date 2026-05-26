@@ -146,6 +146,24 @@ function hasSplitRestrictedRepeat(value: string): boolean {
 	return false
 }
 
+function trailingVowelCount(value: string, vowelSet: ReadonlySet<string>): number {
+	let count = 0
+	for (let i = value.length - 1; i >= 0; i--) {
+		if (vowelSet.has(value[i])) count++
+		else break
+	}
+	return count
+}
+
+function leadingVowelCount(value: string, vowelSet: ReadonlySet<string>): number {
+	let count = 0
+	for (let i = 0; i < value.length; i++) {
+		if (vowelSet.has(value[i])) count++
+		else break
+	}
+	return count
+}
+
 function maxConsonantRun(value: string): number {
 	let current = 0
 	let max = 0
@@ -315,6 +333,7 @@ const notHarsh = (
 	const { vowelSet } = getLanguageCache(src)
 	if (usedLongVowel && hasLongVowel(src, curr)) return false
 	if (usedDigraph && hasDigraph(src, curr)) return false
+	if (trailingVowelCount(prev, vowelSet) + leadingVowelCount(curr, vowelSet) >= 3) return false
 	if (hasSplitRestrictedRepeat(`${prev}${curr}`)) return false
 	const maxRun =
 		src.phonotacticStyle === "open"
@@ -501,12 +520,16 @@ const syllable = (
 			}
 		}
 
+		// Fallback when all candidates fail validation: still enforce the
+		// long-vowel constraint so a second diphthong can never slip through.
+		const fallbackPhonemes = (() => {
+			const pool = phonemes.length > 0 ? phonemes : cluster.phonemes[letter]
+			if (!localLongVowel) return pool
+			const noLong = pool.filter((p) => !hasLongVowel(src, p.v))
+			return noLong.length > 0 ? noLong : pool
+		})()
 		const selectedPhonemes =
-			valid && valid.length > 0
-				? valid
-				: phonemes.length > 0
-					? phonemes
-					: cluster.phonemes[letter]
+			valid && valid.length > 0 ? valid : fallbackPhonemes
 		const chosen = weightedSignatureChoice(
 			src,
 			selectedPhonemes,
@@ -689,8 +712,7 @@ export const CLUSTER = {
 				],
 				consonant: [
 					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_VOWEL}`,
+					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
 				],
 			},
 			balanced: {

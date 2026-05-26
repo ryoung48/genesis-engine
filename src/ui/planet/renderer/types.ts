@@ -79,5 +79,6 @@ export interface OrogenScene {
 	setLabelMode(mode: LabelMode): void
 	setNationNames(names: string[] | null): void
 	setDynastyNames(names: string[] | null): void
+	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 }

@@ -176,6 +176,7 @@ describe("buildTerrainSliders", () => {
 			thermalErosion: 0.4,
 			ridgeSharpening: 0.5,
 			glacialErosion: 0.6,
+			seaLevel: 1.1,
 			craters: 0.25,
 			volcanism: 1,
 			maxElevation: 6000,
@@ -190,6 +191,7 @@ describe("buildTerrainSliders", () => {
 			setThermalErosion: vi.fn(),
 			setRidgeSharpening: vi.fn(),
 			setGlacialErosion: vi.fn(),
+			setSeaLevel: vi.fn(),
 			setCraters,
 			setVolcanism: vi.fn(),
 			setMaxElevation: vi.fn(),
@@ -207,6 +209,7 @@ describe("buildTerrainSliders", () => {
 			"Thermal Erosion",
 			"Ridge Sharpening",
 			"Glacial Erosion",
+			"Sea Level",
 			"Max Elevation",
 			"Craters",
 			"Volcanism",
@@ -256,6 +259,7 @@ describe("resetWorldDefaults", () => {
 			setThermalErosion: vi.fn(),
 			setRidgeSharpening: vi.fn(),
 			setGlacialErosion: vi.fn(),
+			setSeaLevel: vi.fn(),
 			setVolcanism: vi.fn(),
 			setCraters: vi.fn(),
 			setMaxElevation: vi.fn(),
@@ -330,6 +334,9 @@ describe("resetWorldDefaults", () => {
 		)
 		expect(setters.setGlacialErosion).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.glacialErosion,
+		)
+		expect(setters.setSeaLevel).toHaveBeenCalledWith(
+			DEFAULT_WORLD_PARAMS.seaLevel,
 		)
 		expect(setters.setVolcanism).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.volcanism,

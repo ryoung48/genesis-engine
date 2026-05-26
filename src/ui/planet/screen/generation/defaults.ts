@@ -36,6 +36,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	thermalErosion: 0.1,
 	ridgeSharpening: 0.5,
 	glacialErosion: 0.5,
+	seaLevel: 1,
 	volcanism: 1,
 	craters: 0,
 	maxElevation: 6000,

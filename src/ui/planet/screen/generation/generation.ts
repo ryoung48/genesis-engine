@@ -24,6 +24,7 @@ interface ImportHeightmapParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	seaLevel: number
 	volcanism: number
 	maxElevation: number
 	planetRadiusKm: number
@@ -225,6 +226,7 @@ export function generateWorld(
 		ridgeSharpening:
 			overrides?.ridgeSharpening ?? currentParams.ridgeSharpening,
 		glacialErosion: overrides?.glacialErosion ?? currentParams.glacialErosion,
+		seaLevel: overrides?.seaLevel ?? currentParams.seaLevel,
 		volcanism: overrides?.volcanism ?? currentParams.volcanism,
 		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
@@ -311,6 +313,7 @@ export function importHeightmap(
 			thermalErosion: importParams.thermalErosion as number,
 			ridgeSharpening: importParams.ridgeSharpening as number,
 			glacialErosion: importParams.glacialErosion as number,
+			seaLevel: importParams.seaLevel as number,
 			volcanism: importParams.volcanism as number,
 			maxElevation: importParams.maxElevation as number,
 			craters: importParams.craters as number,

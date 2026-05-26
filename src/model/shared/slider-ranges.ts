@@ -18,6 +18,7 @@ export const SLIDER_RANGES = {
 	thermalErosion: { min: 0, max: 1, step: 0.05 },
 	ridgeSharpening: { min: 0, max: 1, step: 0.05 },
 	glacialErosion: { min: 0, max: 1, step: 0.05 },
+	seaLevel: { min: 0.9, max: 1.1, step: 0.001 },
 	volcanism: { min: 0, max: 10, step: 0.05 },
 	craters: { min: 0, max: 1, step: 0.05 },
 	maxElevation: { min: 0, max: 30000, step: 100 },

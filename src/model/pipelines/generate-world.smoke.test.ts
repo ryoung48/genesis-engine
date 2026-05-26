@@ -21,6 +21,7 @@ function makeParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
 		thermalErosion: 0,
 		ridgeSharpening: 0,
 		glacialErosion: 0,
+		seaLevel: 1,
 		volcanism: 0,
 		craters: 0,
 		planetRadiusKm: 6371,
@@ -150,6 +151,50 @@ describe("generateOrogenWorld", () => {
 			let oceanCells = 0
 			for (let r = 0; r < isLand.length; r++) if (!isLand[r]) oceanCells++
 			expect(oceanCells).toBeLessThan(isLand.length * 0.02)
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
+		"applies sea level after terrain shaping and changes final land coverage",
+		() => {
+			const baseline = getCachedWorld({
+				seed: 2120,
+				numPoints: 700,
+				seaLevel: 1,
+			})
+			const flooded = getCachedWorld({
+				seed: 2120,
+				numPoints: 700,
+				seaLevel: 1.35,
+			})
+
+			let baselineLand = 0
+			let floodedLand = 0
+			for (let r = 0; r < baseline.isLand.length; r++) {
+				if (baseline.isLand[r]) baselineLand++
+				if (flooded.isLand[r]) floodedLand++
+			}
+
+			expect(floodedLand).toBeLessThan(baselineLand)
+			expect(flooded.elevation).not.toEqual(baseline.elevation)
+		},
+		TEST_TIMEOUT,
+	)
+
+	it(
+		"keeps positive km-space cells classified as land after sea-level remapping",
+		() => {
+			const lowered = getCachedWorld({
+				seed: 2121,
+				numPoints: 700,
+				seaLevel: 0.65,
+			})
+			for (let r = 0; r < lowered.mesh.numRegions; r++) {
+				if (lowered.elevation_km[r] <= 0) continue
+				if (lowered.rivers.lakes[r]) continue
+				expect(lowered.isLand[r]).toBe(1)
+			}
 		},
 		TEST_TIMEOUT,
 	)

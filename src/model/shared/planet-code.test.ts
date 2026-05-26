@@ -29,6 +29,7 @@ function makeParams(overrides: Record<string, number | boolean> = {}) {
 		thermalErosion: 0.1,
 		ridgeSharpening: 0.5,
 		glacialErosion: 0.5,
+		seaLevel: 1,
 		volcanism: 0.5,
 		craters: 0,
 		pressure: 1,
@@ -81,6 +82,14 @@ describe("planet-code volcanism", () => {
 		const code = encodePlanetCode(12345, makeParams({ volcanism: 10 }))
 
 		expect(decodePlanetCode(code)?.volcanism).toBe(10)
+	})
+})
+
+describe("planet-code sea level", () => {
+	it("round-trips sea level modifiers across the full slider range", () => {
+		const code = encodePlanetCode(12345, makeParams({ seaLevel: 1.73 }))
+
+		expect(decodePlanetCode(code)?.seaLevel).toBe(1.73)
 	})
 })
 

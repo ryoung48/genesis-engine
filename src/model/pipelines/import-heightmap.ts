@@ -5,7 +5,6 @@
  */
 
 import type { OrogenParams, OrogenWorld, SphereMesh, StageTiming } from ".."
-import { elevToHeightKm } from "../climate/climate"
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
@@ -34,6 +33,7 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "../terrain/erosion"
+import { applySeaLevelToElevation } from "../terrain/sea-level"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
@@ -50,7 +50,10 @@ export interface ImportParams {
 	thermalErosion: number
 	ridgeSharpening: number
 	glacialErosion: number
+	seaLevel: number
 	volcanism?: number
+	craters?: number
+	maxElevation?: number
 	planetRadiusKm?: number
 	obliquity?: number
 	eccentricity?: number
@@ -270,6 +273,7 @@ export function importOrogenWorld(
 		thermalErosion: params.thermalErosion,
 		ridgeSharpening: params.ridgeSharpening,
 		glacialErosion: params.glacialErosion,
+		seaLevel: params.seaLevel,
 		volcanism: params.volcanism ?? 0.5,
 		planetRadiusKm: params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM,
 		obliquity: params.obliquity ?? DEFAULT_OBLIQUITY_DEG,
@@ -284,13 +288,16 @@ export function importOrogenWorld(
 		pressure: params.pressure ?? 1.0,
 	}
 
-	// Convert raw elevation to km (radius-scaled)
 	const maxElevKm = (orogenParams.maxElevation ?? 6000) / 1000
 	const maxDepthKm = getMaxOceanDepthKm(orogenParams.planetRadiusKm)
-	const elevation_km = new Float32Array(mesh.numRegions)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		elevation_km[r] = elevToHeightKm(elevation[r], maxElevKm, maxDepthKm)
-	}
+	const baseElevation = elevation.slice()
+	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
+		baseElevation,
+		maxElevKm,
+		maxDepthKm,
+		seaLevel: orogenParams.seaLevel,
+	})
+	elevation.set(finalElevation)
 
 	// Shared post-elevation pipeline (climate → population)
 	t0 = performance.now()

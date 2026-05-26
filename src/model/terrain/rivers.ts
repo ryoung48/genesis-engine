@@ -606,6 +606,8 @@ export function computeRivers(
 	const thresholdIdx = Math.floor(landCount * (1 - majorRiverFraction))
 	const threshold = landFlows[thresholdIdx] || 1
 
+	const MIN_VISIBLE_RIVER_LENGTH_KM = 500
+
 	// ── 4. Extract river polylines with per-vertex flow + elevation ──
 	const riverCells: number[] = []
 	for (let i = 0; i < landCount; i++) {
@@ -617,6 +619,7 @@ export function computeRivers(
 	const traced = new Uint8Array(N)
 	const visible = new Uint8Array(N)
 	const lines: [number, number, number, number][][] = []
+	const lineRiverIds: number[] = []
 	const riverId = new Int32Array(N).fill(-1)
 	const riverLengthKm = new Float32Array(N)
 	const terminal = new Uint8Array(N)
@@ -692,6 +695,7 @@ export function computeRivers(
 			const id = riverId[lastCell] >= 0 ? riverId[lastCell] : nextRiverId++
 			const lineLengthKm = polylineLengthKm(line, radiusKm)
 			lines.push(line)
+			lineRiverIds.push(id)
 			riverSystemLengths[id] = (riverSystemLengths[id] ?? 0) + lineLengthKm
 			for (const cell of lineCells) {
 				if (land[cell]) visible[cell] = 1
@@ -704,6 +708,16 @@ export function computeRivers(
 		const id = riverId[r]
 		if (id >= 0) riverLengthKm[r] = riverSystemLengths[id] ?? 0
 	}
+
+	// Filter: only show river systems >= MIN_VISIBLE_RIVER_LENGTH_KM
+	for (let r = 0; r < N; r++) {
+		if (visible[r] && riverLengthKm[r] < MIN_VISIBLE_RIVER_LENGTH_KM) {
+			visible[r] = 0
+		}
+	}
+	const visibleLines = lines.filter(
+		(_, i) => (riverSystemLengths[lineRiverIds[i]] ?? 0) >= MIN_VISIBLE_RIVER_LENGTH_KM,
+	)
 
 	for (let r = 0; r < N; r++) {
 		if (!visible[r]) continue
@@ -734,7 +748,7 @@ export function computeRivers(
 	}
 
 	return {
-		lines,
+		lines: visibleLines,
 		maxFlow,
 		minFlow: threshold,
 		flow,

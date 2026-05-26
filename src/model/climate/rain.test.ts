@@ -73,6 +73,7 @@ function buildParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
 		thermalErosion: 0,
 		ridgeSharpening: 0,
 		glacialErosion: 0,
+		seaLevel: 1,
 		planetRadiusKm: 6371,
 		obliquity: 23.5,
 		eccentricity: 0.0167,

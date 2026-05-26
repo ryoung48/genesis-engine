@@ -34,6 +34,7 @@ const baseParams = {
 	thermalErosion: 0,
 	ridgeSharpening: 0,
 	glacialErosion: 0,
+	seaLevel: 1,
 	volcanism: 0,
 	craters: 0,
 } as const
@@ -345,6 +346,7 @@ describe("importHeightmap", () => {
 				thermalErosion: 0.5,
 				ridgeSharpening: 0.6,
 				glacialErosion: 0.7,
+				seaLevel: 1.15,
 				volcanism: 0.8,
 				maxElevation: 6000,
 				planetRadiusKm: 7_000,

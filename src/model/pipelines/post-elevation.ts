@@ -78,6 +78,8 @@ interface PostPipelineInput {
 	distCoast: Float32Array
 	oceanDist: Float32Array
 	params: OrogenParams
+	/** Cells that emerged above the baseline shoreline after sea-level lowering. */
+	emergedLand?: Uint8Array
 	tectonicMode: "active"
 	boundary: BoundaryInfo
 	distFields: DistanceFields
@@ -130,6 +132,7 @@ export function runPostElevationPipeline(
 		distCoast,
 		oceanDist,
 		params,
+		emergedLand,
 		boundary,
 		distFields,
 		r_hotspot,
@@ -342,6 +345,10 @@ export function runPostElevationPipeline(
 	// Clear vegetation for lake cells; mutate isLand so downstream treats them as water
 	t0 = performance.now()
 	for (let r = 0; r < N; r++) {
+		if (rivers.lakes[r] && emergedLand?.[r] && elevation_km[r] > 0) {
+			rivers.lakes[r] = 0
+			continue
+		}
 		if (rivers.lakes[r]) {
 			vegetation[r] = 0
 			isLand[r] = 0

@@ -75,7 +75,7 @@ const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
 const VIEW_MODES = new Set<OrogenViewMode>(["globe", "map"])
 const UNIT_SYSTEMS = new Set<UnitSystem>(["metric", "imperial"])
 const MEASURE_MODES = new Set<MeasureMode>(["off", "ruler", "pathfinding"])
-const LABEL_MODES = new Set<LabelMode>(["off", "nations", "dynasty"])
+const LABEL_MODES = new Set<LabelMode>(["off", "nations", "dynasty", "settlements"])
 
 export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	colorMode: DEFAULT_GEOGRAPHY_MODE,
