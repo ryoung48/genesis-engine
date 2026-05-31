@@ -76,6 +76,8 @@ interface OverlayControlsProps {
 	setShowRivers: (v: boolean) => void
 	showThermalEquator: boolean
 	setShowThermalEquator: (v: boolean) => void
+	showWindArrows: boolean
+	setShowWindArrows: (v: boolean) => void
 	showGrid: boolean
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
@@ -149,6 +151,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowRivers,
 	showThermalEquator,
 	setShowThermalEquator,
+	showWindArrows,
+	setShowWindArrows,
 	showGrid,
 	setShowGrid,
 	showNationBorders,
@@ -547,6 +551,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Wind</span>
+												<input
+													type="checkbox"
+													checked={showWindArrows}
+													onChange={(e) => setShowWindArrows(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
 										</div>
 									)}
 								</div>
@@ -670,7 +683,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								</div>
 
 								{(colorMode === "temperature" ||
-									colorMode === "precipitation") && (
+									colorMode === "precipitation" ||
+									colorMode === "wind") && (
 									<div>
 										<button
 											type="button"
@@ -680,7 +694,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 											<span>
 												{colorMode === "temperature"
 													? "Temperature"
-													: "Rainfall"}
+													: colorMode === "wind"
+														? "Wind"
+														: "Rainfall"}
 											</span>
 											<ChevronIcon
 												direction={climateExpanded ? "up" : "down"}

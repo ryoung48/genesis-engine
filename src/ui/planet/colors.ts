@@ -50,6 +50,7 @@ export type ColorMode =
 	| "humidity"
 	| "trade_goods"
 	| "timezone"
+	| "wind"
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -565,6 +566,20 @@ export function slopeColor(normalizedSlope: number): [number, number, number] {
 			Math.pow(Math.max(0, Math.min(1, normalizedSlope)), 0.7),
 		),
 	)
+}
+
+const windSpeedStops: RgbColor[] = [
+	[0.72, 0.87, 0.96], // 0 m/s  — calm, pale blue
+	[0.56, 0.84, 0.64], // 4 m/s  — light breeze, green
+	[0.94, 0.91, 0.35], // 8 m/s  — moderate, yellow
+	[0.97, 0.6, 0.14], // 14 m/s — fresh/strong, orange
+	[0.85, 0.13, 0.13], // 20 m/s — storm, red
+	[0.45, 0.04, 0.45], // 30+ m/s — violent, deep purple-red
+]
+
+export function windSpeedColor(speedMs: number): [number, number, number] {
+	const t = Math.max(0, Math.min(1, speedMs / 30))
+	return sampleColorStops(windSpeedStops, t)
 }
 
 export function getColor(

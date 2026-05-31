@@ -1,0 +1,504 @@
+/**
+ * Simplified surface wind model derived from a pressure field.
+ *
+ * Pressure = background Hadley/Ferrel pattern (relative to thermal equator)
+ *          + thermal anomaly (hot land → low, cold → high)
+ *          + topographic perturbation (mountains → high)
+ *
+ * Wind = geostrophic balance (perpendicular to ∇P, Coriolis-deflected)
+ *      + boundary-layer friction (~30% cross-isobar toward low)
+ *
+ * Rotation rate: the latitude at which geostrophic balance takes over scales
+ * linearly with hoursPerDay (∝ 1/Ω), so fast rotators get narrow trade-wind
+ * belts and slow rotators get broad ageostrophic circulation.
+ *
+ * Retrograde obliquity: the Coriolis sign is flipped so trades blow eastward
+ * and westerlies blow westward, matching the reversed advection model.
+ *
+ * This is standalone — it does NOT feed the moisture advection system.
+ */
+import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import { clamp, smoothstep } from "../shared/math"
+import { isRetrogradeObliquity } from "../shared/units"
+import {
+	TOPO_FLAT,
+	TOPO_HILL,
+	TOPO_LAKE,
+	TOPO_MARSH,
+	TOPO_MOUNTAIN,
+	TOPO_OCEAN,
+	TOPO_PLATEAU,
+} from "../terrain/classification"
+import { computeLockedWindVectors } from "./locked/wind"
+import { computeThermalEquator, getClimateGeometry, hadleyWidth } from "./rain"
+
+export interface WindSurface {
+	vegetation?: Uint8Array | null
+	topography?: Uint8Array | null
+	slopeScore?: Float32Array | null
+	/** Per-region BFS distance to nearest ocean, in km. */
+	oceanDist?: Float32Array | null
+}
+
+/** Roughness drag factor by biome code (0=ocean … 6=jungle). */
+function vegetationDragFactor(biomeCode: number | undefined): number {
+	switch (biomeCode) {
+		case 1:
+			return 1.03 // desert — bare sand/rock, low roughness
+		case 2:
+			return 1.0 // sparse
+		case 3:
+			return 0.93 // grasslands
+		case 4:
+			return 0.84 // woods
+		case 5:
+			return 0.75 // forest
+		case 6:
+			return 0.66 // jungle — dense multi-layer canopy
+		default:
+			return 1.0
+	}
+}
+
+/**
+ * Terrain blocking / channeling factor by topographic class.
+ * `slope` is the normalized slopeScore [0, 1] used to add continuous
+ * variation within each class without double-counting the class itself.
+ */
+function topographyWindFactor(
+	topoCode: number | undefined,
+	slope: number,
+): number {
+	let base: number
+	switch (topoCode) {
+		case TOPO_FLAT:
+			base = 1.0
+			break
+		case TOPO_MARSH:
+			base = 0.93
+			break
+		case TOPO_HILL:
+			base = 0.88
+			break
+		case TOPO_PLATEAU:
+			base = 0.93
+			break
+		case TOPO_MOUNTAIN:
+			base = 0.58
+			break
+		case TOPO_OCEAN:
+			base = 1.1
+			break
+		case TOPO_LAKE:
+			base = 1.08
+			break
+		default:
+			base = 1.0
+			break
+	}
+	return base * (1.0 - 0.12 * slope)
+}
+
+/**
+ * Combined surface modifier for one region — product of vegetation drag,
+ * topographic blocking, and coastal fetch bonus.
+ */
+function surfaceWindFactor(r: number, surface: WindSurface): number {
+	const topoCode = surface.topography?.[r]
+	const isWater = topoCode === TOPO_OCEAN || topoCode === TOPO_LAKE
+	const slope = surface.slopeScore?.[r] ?? 0
+
+	const vegFactor = isWater
+		? 1.0
+		: vegetationDragFactor(surface.vegetation?.[r])
+	const topoFactor = topographyWindFactor(topoCode, slope)
+	// Sea-breeze / fetch bonus: up to +12 % at coast, decaying over ~800 km inland.
+	const coastalFactor = isWater
+		? 1.0
+		: 1.0 + 0.12 * Math.exp(-(surface.oceanDist?.[r] ?? 0) / 800.0)
+
+	return vegFactor * topoFactor * coastalFactor
+}
+
+/** 1°-resolution wind lookup grid for particle animation. */
+export interface WindGrid {
+	/** Eastward component per cell, row-major lat×lon. */
+	u: Float32Array
+	/** Northward component per cell. */
+	v: Float32Array
+	/** Approximate wind speed (m/s) per cell. */
+	speed: Float32Array
+	/** Grid width (360 = 1° per column, lon -180…179). */
+	width: 360
+	/** Grid height (181 = 1° per row, lat -90…90). */
+	height: 181
+}
+
+/**
+ * Build a 360×181 lat/lon lookup grid from sparse mesh wind data.
+ * Empty cells (no mesh region) are filled by 3 passes of neighbour diffusion
+ * so particle lookups never stall at holes.
+ */
+export function computeWindGrid(
+	mesh: SphereMesh,
+	windU: Float32Array,
+	windV: Float32Array,
+	windSpeed: Float32Array,
+): WindGrid {
+	const W = 360
+	const H = 181
+	const u = new Float32Array(W * H)
+	const v = new Float32Array(W * H)
+	const speed = new Float32Array(W * H)
+	const cnt = new Int32Array(W * H)
+
+	const { latDeg, lonDeg } = getClimateGeometry(mesh)
+	const N = mesh.numRegions
+	for (let r = 0; r < N; r++) {
+		const li = Math.max(0, Math.min(H - 1, Math.round(latDeg[r] + 90)))
+		const ci = Math.max(0, Math.min(W - 1, Math.round(lonDeg[r] + 180)))
+		const idx = li * W + ci
+		u[idx] += windU[r]
+		v[idx] += windV[r]
+		speed[idx] += windSpeed[r]
+		cnt[idx]++
+	}
+	for (let i = 0; i < W * H; i++) {
+		if (cnt[i] > 1) {
+			u[i] /= cnt[i]
+			v[i] /= cnt[i]
+			speed[i] /= cnt[i]
+		}
+	}
+
+	// 3 passes of neighbour diffusion to fill sparse polar/edge gaps
+	const tmpU = u.slice()
+	const tmpV = v.slice()
+	const tmpS = speed.slice()
+	for (let pass = 0; pass < 3; pass++) {
+		for (let li = 0; li < H; li++) {
+			for (let ci = 0; ci < W; ci++) {
+				const idx = li * W + ci
+				if (cnt[idx] > 0) continue
+				let su = 0,
+					sv = 0,
+					ss = 0,
+					n = 0
+				const neighbours = [
+					[li - 1, ci],
+					[li + 1, ci],
+					[li, (ci - 1 + W) % W],
+					[li, (ci + 1) % W],
+				] as const
+				for (const [nl, nc] of neighbours) {
+					if (nl < 0 || nl >= H) continue
+					const ni = nl * W + nc
+					if (cnt[ni] > 0) {
+						su += tmpU[ni]
+						sv += tmpV[ni]
+						ss += tmpS[ni]
+						n++
+					}
+				}
+				if (n > 0) {
+					u[idx] = su / n
+					v[idx] = sv / n
+					speed[idx] = ss / n
+					cnt[idx] = 1
+				}
+			}
+		}
+		tmpU.set(u)
+		tmpV.set(v)
+		tmpS.set(speed)
+	}
+
+	return { u, v, speed, width: W as 360, height: H as 181 }
+}
+
+export interface WindArrowData {
+	lat: Float32Array
+	lon: Float32Array
+	u: Float32Array
+	v: Float32Array
+	/** Approximate surface wind speed in m/s. */
+	speed: Float32Array
+}
+
+// Pressure values at successive cell boundaries starting from the ITCZ.
+// Amplitude decreases with each cell away from the equator, matching the
+// observed weakening of the Ferrel and polar cells relative to the Hadley cell.
+// Six values supports up to 5 cells per hemisphere (~6 h day → hw≈18°, 90/18=5).
+const CELL_BOUNDARY_PRESSURES = [-1.0, 1.0, -0.45, 0.25, -0.15, 0.10]
+
+/**
+ * Background pressure at `distFromTeq` degrees for a planet with the given
+ * day length. Cell width = `hadleyWidth(hoursPerDay)` so fast rotators get
+ * many narrow cells and slow rotators a single broad Hadley cell.
+ */
+function bgPressureForRotation(distFromTeq: number, hoursPerDay: number): number {
+	const hw = hadleyWidth(hoursPerDay)
+	const d = Math.min(distFromTeq, 90)
+	const cellIndex = Math.min(
+		Math.floor(d / hw),
+		CELL_BOUNDARY_PRESSURES.length - 2,
+	)
+	const d0 = cellIndex * hw
+	const d1 = (cellIndex + 1) * hw
+	const p0 = CELL_BOUNDARY_PRESSURES[cellIndex]
+	const p1 = CELL_BOUNDARY_PRESSURES[cellIndex + 1]
+	return p0 + (p1 - p0) * smoothstep(d0, d1, d)
+}
+
+/**
+ * Compute a surface pressure proxy from temperature and elevation.
+ * Returns an arbitrary-unit pressure field (not in Pa) suitable for
+ * deriving wind direction only.
+ */
+function computePressureField(
+	mesh: SphereMesh,
+	temps: Float32Array,
+	elevation_km: Float32Array,
+	teqByLon: Float32Array,
+	hoursPerDay: number,
+): Float32Array {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const { latDeg, regionBin } = getClimateGeometry(mesh)
+
+	// Zonal-mean temperature from low-elevation cells only (<0.5 km) so that
+	// cold mountain tops don't skew the reference and create gradient spikes.
+	const LAT_BINS = 60
+	const latBinSum = new Float64Array(LAT_BINS)
+	const latBinCount = new Int32Array(LAT_BINS)
+	for (let r = 0; r < N; r++) {
+		if (elevation_km[r] > 0.5) continue
+		const bin = Math.max(
+			0,
+			Math.min(LAT_BINS - 1, Math.floor(((latDeg[r] + 90) / 180) * LAT_BINS)),
+		)
+		latBinSum[bin] += temps[r]
+		latBinCount[bin]++
+	}
+	const latBinMean = new Float32Array(LAT_BINS)
+	for (let i = 0; i < LAT_BINS; i++) {
+		latBinMean[i] = latBinCount[i] > 0 ? latBinSum[i] / latBinCount[i] : 15
+	}
+
+	const pressure = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const lat = latDeg[r]
+		const teq = teqByLon[regionBin[r]]
+		const distFromTeq = Math.abs(lat - teq)
+
+		// Background cell pattern: width and count scale with rotation so fast
+		// rotators produce many narrow cells and slow rotators a single broad
+		// Hadley cell. Smoothstep between each boundary avoids hard speed jumps.
+		const bgPressure = bgPressureForRotation(distFromTeq, hoursPerDay)
+
+		// Thermal anomaly from low-elevation cells only — high terrain is excluded
+		// so cold mountain peaks don't create artificial pressure spikes.
+		if (elevation_km[r] > 0.5) {
+			pressure[r] = bgPressure
+			continue
+		}
+		const latBin = Math.max(
+			0,
+			Math.min(LAT_BINS - 1, Math.floor(((lat + 90) / 180) * LAT_BINS)),
+		)
+		const thermalAnomaly = (-0.3 * (temps[r] - latBinMean[latBin])) / 15
+
+		pressure[r] = bgPressure + thermalAnomaly
+	}
+
+	// Smooth the pressure field to ensure clean gradients (4 passes)
+	const buf = new Float32Array(N)
+	for (let pass = 0; pass < 4; pass++) {
+		for (let r = 0; r < N; r++) {
+			let sum = pressure[r]
+			let count = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				sum += pressure[adjList[j]]
+				count++
+			}
+			buf[r] = sum / count
+		}
+		for (let r = 0; r < N; r++) pressure[r] = buf[r]
+	}
+
+	return pressure
+}
+
+/**
+ * Derive surface wind (u=east, v=north) from geostrophic balance + friction.
+ *
+ * Returns normalized wind vectors plus the raw pressure field (for optional
+ * visualization). Does not modify any existing climate data.
+ */
+export function computeWindVectors(
+	mesh: SphereMesh,
+	climate: OrogenClimate,
+	elevation_km: Float32Array,
+	params?: Pick<
+		OrogenParams,
+		| "obliquity"
+		| "hoursPerDay"
+		| "tidallyLocked"
+		| "antistellarLon"
+		| "eccentricity"
+		| "perihelion"
+		| "pressure"
+	>,
+	month?: number,
+	surface?: WindSurface,
+): {
+	windU: Float32Array
+	windV: Float32Array
+	pressure: Float32Array
+	windSpeed: Float32Array
+} {
+	if (params?.tidallyLocked) {
+		return computeLockedWindVectors(
+			mesh,
+			climate,
+			elevation_km,
+			params,
+			month,
+			surface,
+		)
+	}
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const {
+		absLatDeg,
+		sinLat: sinLatArr,
+		edgeEastward,
+		edgeNorthward,
+	} = getClimateGeometry(mesh)
+
+	// Geostrophic onset latitude scales with rotation period:
+	// faster rotation (short day) → narrower ageostrophic belt near equator.
+	// Clamped so very slow rotators stay ageostrophic almost everywhere.
+	const hoursPerDay = params?.hoursPerDay ?? 24
+	const geoTransitionLat = clamp((15 * hoursPerDay) / 24, 2, 75)
+
+	// Retrograde planets rotate opposite direction → Coriolis deflects the
+	// other way, so trades blow eastward and westerlies blow westward.
+	const coriolisSign = isRetrogradeObliquity(params?.obliquity ?? 0) ? -1 : 1
+
+	const temps =
+		month !== undefined && month >= 0 && month < 12
+			? climate.temperature_monthly.subarray(month * N, (month + 1) * N)
+			: climate.temperature_avg
+
+	const teqByLon = computeThermalEquator(mesh, temps)
+	const pressure = computePressureField(mesh, temps, elevation_km, teqByLon, hoursPerDay)
+
+	const windU = new Float32Array(N)
+	const windV = new Float32Array(N)
+	const rawSpeed = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		const absLat = absLatDeg[r]
+		// Effective Coriolis: sign flipped for retrograde rotation
+		const effSinLat = coriolisSign * sinLatArr[r]
+
+		// Pressure gradient in (east, north) from neighbor differences
+		let gradPEast = 0
+		let gradPNorth = 0
+		let count = 0
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const dP = pressure[adjList[j]] - pressure[r]
+			gradPEast += dP * edgeEastward[j]
+			gradPNorth += dP * edgeNorthward[j]
+			count++
+		}
+		if (count > 0) {
+			gradPEast /= count
+			gradPNorth /= count
+		}
+
+		// Geostrophic: perpendicular to ∇P, Coriolis-deflected
+		const windGeoEast = -effSinLat * gradPNorth
+		const windGeoNorth = effSinLat * gradPEast
+
+		// Ageostrophic (boundary-layer friction): direct flow toward low pressure
+		const windFricEast = -gradPEast
+		const windFricNorth = -gradPNorth
+
+		// Blend: geostrophic dominates above geoTransitionLat, friction always 30%
+		const geoWeight = smoothstep(0, geoTransitionLat, absLat)
+		const u = geoWeight * windGeoEast + 0.3 * windFricEast
+		const v = geoWeight * windGeoNorth + 0.3 * windFricNorth
+
+		// Raw speed proxy = pressure gradient magnitude (same for both geo+friction)
+		rawSpeed[r] = Math.hypot(gradPEast, gradPNorth)
+
+		const mag = Math.hypot(u, v)
+		if (mag > 1e-9) {
+			windU[r] = u / mag
+			windV[r] = v / mag
+		}
+	}
+
+	// Calibrate to approximate m/s:
+	// - 90th percentile of |∇P| → reference speed (10 m/s, typical trades/westerlies)
+	// - Rotation factor: slower rotation → weaker Coriolis → faster geostrophic winds
+	//   for the same thermal contrast. Clamped to a sensible range.
+	// - Pressure factor: thinner atmosphere → less air mass resisting the same thermal
+	//   gradient → faster surface winds. 1 bar = neutral; scales as 1/√pressure.
+	const sorted = rawSpeed.slice().sort()
+	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
+	const ref = Math.max(pct90, 1e-6)
+	const rotationFactor = Math.sqrt(clamp(hoursPerDay, 6, 192) / 24)
+	const pressureFactor =
+		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
+	const windSpeed = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		const base = (rawSpeed[r] / ref) * 10 * rotationFactor * pressureFactor
+		windSpeed[r] = surface ? base * surfaceWindFactor(r, surface) : base
+	}
+
+	return { windU, windV, pressure, windSpeed }
+}
+
+/**
+ * Sample a sparse subset of regions for rendering as arrow glyphs.
+ * Samples every ceil(N/maxArrows) regions by index; skips calm cells.
+ */
+export function sampleWindArrows(
+	mesh: SphereMesh,
+	windU: Float32Array,
+	windV: Float32Array,
+	windSpeed: Float32Array,
+	maxArrows = 500,
+): WindArrowData {
+	const N = mesh.numRegions
+	const step = Math.max(1, Math.floor(N / maxArrows))
+	const { latDeg, lonDeg } = getClimateGeometry(mesh)
+
+	const lats: number[] = []
+	const lons: number[] = []
+	const us: number[] = []
+	const vs: number[] = []
+	const speeds: number[] = []
+
+	for (let r = 0; r < N; r += step) {
+		const u = windU[r]
+		const v = windV[r]
+		if (Math.hypot(u, v) < 1e-6) continue
+		lats.push(latDeg[r])
+		lons.push(lonDeg[r])
+		us.push(u)
+		vs.push(v)
+		speeds.push(windSpeed[r])
+	}
+
+	return {
+		lat: new Float32Array(lats),
+		lon: new Float32Array(lons),
+		u: new Float32Array(us),
+		v: new Float32Array(vs),
+		speed: new Float32Array(speeds),
+	}
+}

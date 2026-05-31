@@ -2,11 +2,11 @@ import type { OrogenRivers, SphereMesh } from ".."
 import { BIOME_LABELS } from "../climate/vegetation"
 import { SimplexNoise } from "../shared/simplex-noise"
 
-const TOPO_FLAT = 0
-const TOPO_HILL = 1
-const TOPO_PLATEAU = 2
-const TOPO_MOUNTAIN = 3
-const TOPO_MARSH = 4
+export const TOPO_FLAT = 0
+export const TOPO_HILL = 1
+export const TOPO_PLATEAU = 2
+export const TOPO_MOUNTAIN = 3
+export const TOPO_MARSH = 4
 export const TOPO_OCEAN = 5
 export const TOPO_LAKE = 6
 

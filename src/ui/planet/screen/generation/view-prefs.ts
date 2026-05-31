@@ -18,6 +18,7 @@ interface StoredViewPrefs {
 	labelMode: LabelMode
 	showElevation: boolean
 	showThermalEquator: boolean
+	showWindArrows: boolean
 	showRivers: boolean
 	showSettlements: boolean
 	showRoads: boolean
@@ -61,6 +62,7 @@ const COLOR_MODES = new Set<ColorMode>([
 	"humidity",
 	"trade_goods",
 	"timezone",
+	"wind",
 ])
 
 const NATION_MAP_MODES = new Set<NationMapMode>([
@@ -97,6 +99,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	labelMode: { nations: false, dynasty: false, settlements: false },
 	showElevation: true,
 	showThermalEquator: false,
+	showWindArrows: false,
 	showRivers: false,
 	showSettlements: false,
 	showRoads: false,
@@ -210,6 +213,10 @@ export function parseStoredViewPrefs(
 			showThermalEquator: readBoolean(
 				parsed.showThermalEquator,
 				DEFAULT_VIEW_PREFS.showThermalEquator,
+			),
+			showWindArrows: readBoolean(
+				parsed.showWindArrows,
+				DEFAULT_VIEW_PREFS.showWindArrows,
 			),
 			showRivers: readBoolean(parsed.showRivers, DEFAULT_VIEW_PREFS.showRivers),
 			showSettlements: readBoolean(

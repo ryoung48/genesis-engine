@@ -65,6 +65,8 @@ function getWorldSections({
 			{ label: "Avg Temp", value: stats.get("Avg Temp") },
 			{ label: "Avg Rain", value: stats.get("Avg Rain") },
 			{ label: "Avg DTR", value: stats.get("Avg DTR") },
+			{ label: "Avg Wind", value: stats.get("Avg Wind") },
+			{ label: "Max Wind", value: stats.get("Max Wind") },
 			{ label: "Major Rivers", value: stats.get("Major Rivers") },
 			{ label: "Longest River", value: stats.get("Longest River") },
 		].filter((stat): stat is { label: string; value: string } =>

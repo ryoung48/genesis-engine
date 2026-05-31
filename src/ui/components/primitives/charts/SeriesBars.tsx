@@ -3,6 +3,7 @@ import React from "react"
 interface SeriesBarsProps {
 	values: readonly number[]
 	labels: readonly string[]
+	subLabels?: readonly string[]
 	label: string
 	colorForValue: (value: number, index: number) => string
 	activeIndex?: number
@@ -23,6 +24,7 @@ function defaultFormatValue(value: number): string {
 export const SeriesBars: React.FC<SeriesBarsProps> = ({
 	values,
 	labels,
+	subLabels,
 	label,
 	colorForValue,
 	activeIndex = -1,
@@ -113,6 +115,18 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 					</span>
 				))}
 			</div>
+			{subLabels && (
+				<div className="mt-px flex gap-px">
+					{subLabels.map((subLabel, index) => (
+						<span
+							key={`sub-${subLabel}-${index}`}
+							className={`flex-1 text-center text-[7px] leading-none ${index === activeIndex ? "font-bold text-slate-200" : "text-slate-500"}`}
+						>
+							{subLabel}
+						</span>
+					))}
+				</div>
+			)}
 		</div>
 	)
 }

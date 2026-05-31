@@ -4,6 +4,11 @@ import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import {
+	computeWindGrid,
+	computeWindVectors,
+	sampleWindArrows,
+} from "@/model/climate/wind"
+import {
 	TRADE_GOOD_LABELS,
 	tradeGoodColor,
 	tradeGoodDisplayName,
@@ -29,7 +34,7 @@ import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { ClimatePreviewOverlay } from "@/ui/preview/ClimatePreviewOverlay"
 import type { ColorMode } from "./colors"
-import { climateZoneColor, vegetationColor } from "./colors"
+import { climateZoneColor, vegetationColor, windSpeedColor } from "./colors"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import {
@@ -163,6 +168,14 @@ import {
 	rgbToCss,
 	type UnitSystem,
 } from "./screen/shared/ui-format"
+import { WindParticleCanvas } from "./WindParticleCanvas"
+
+const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+// "coming from" convention: negate u/v to get the source direction
+function windDirectionLabel(u: number, v: number): string {
+	const deg = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360
+	return WIND_DIR_LABELS[Math.round(deg / 45) % 8] ?? "N"
+}
 
 function buildDistribution(
 	labels: ReadonlyArray<string>,
@@ -280,6 +293,9 @@ export const OrogenView: React.FC = () => {
 	)
 	const [showThermalEquator, setShowThermalEquator] = useState(
 		initialViewPrefs.showThermalEquator,
+	)
+	const [showWindArrows, setShowWindArrows] = useState(
+		initialViewPrefs.showWindArrows,
 	)
 	const [showRivers, setShowRivers] = useState(initialViewPrefs.showRivers)
 	const [showSettlements, setShowSettlements] = useState(
@@ -606,6 +622,7 @@ export const OrogenView: React.FC = () => {
 				labelMode,
 				showElevation,
 				showThermalEquator,
+				showWindArrows,
 				showRivers,
 				showSettlements,
 				showRoads,
@@ -647,6 +664,7 @@ export const OrogenView: React.FC = () => {
 		showElevation,
 		showRivers,
 		showThermalEquator,
+		showWindArrows,
 		showWireframe,
 		unitSystem,
 		viewMode,
@@ -928,9 +946,142 @@ export const OrogenView: React.FC = () => {
 		hoverClimateZone,
 	)
 
+	// Shared wind computation — runs when wind arrows or wind color mode is active
+	const windVectors = useMemo(() => {
+		if (!world?.climate || (!showWindArrows && colorMode !== "wind"))
+			return null
+		const month =
+			resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
+		return computeWindVectors(
+			world.mesh,
+			world.climate,
+			world.elevation_km,
+			world.params,
+			month,
+			{
+				vegetation: world.vegetation,
+				topography: world.topography,
+				slopeScore: world.slopeScore,
+				oceanDist: world.oceanDist,
+			},
+		)
+	}, [world, showWindArrows, colorMode, resolvedClimateMonth])
+
+	// Monthly wind: computed lazily across setTimeout ticks when wind is active
+	const monthlyWindRef = useRef<
+		Array<{ windU: Float32Array; windV: Float32Array; windSpeed: Float32Array }>
+	>([])
+	const [monthlyWindReady, setMonthlyWindReady] = useState(false)
+	const windActive = showWindArrows || colorMode === "wind"
+	useEffect(() => {
+		if (!world?.climate || !windActive) {
+			monthlyWindRef.current = []
+			setMonthlyWindReady(false)
+			return
+		}
+		const results: typeof monthlyWindRef.current = []
+		setMonthlyWindReady(false)
+		let m = 0
+		const tick = () => {
+			if (m >= 12) {
+				monthlyWindRef.current = results
+				setMonthlyWindReady(true)
+				return
+			}
+			results.push(
+				computeWindVectors(
+					world.mesh,
+					world.climate,
+					world.elevation_km,
+					world.params,
+					m++,
+					{
+						vegetation: world.vegetation,
+						topography: world.topography,
+						slopeScore: world.slopeScore,
+						oceanDist: world.oceanDist,
+					},
+				),
+			)
+			setTimeout(tick, 0)
+		}
+		setTimeout(tick, 0)
+		return () => {
+			setMonthlyWindReady(false)
+		}
+	}, [world, windActive])
+
+	const projectToScreen = useCallback(
+		(xyz: [number, number, number]) =>
+			sceneRef.current?.projectToScreen(xyz) ?? null,
+		[],
+	)
+	const getGlobeCameraDir = useCallback(
+		() => sceneRef.current?.getGlobeCameraDir() ?? null,
+		[],
+	)
+
+	const hoverWindSpeed =
+		hoverInfo && windVectors ? windVectors.windSpeed[hoverInfo.region] : null
+	const hoverWindDir =
+		hoverInfo && windVectors
+			? windDirectionLabel(
+					windVectors.windU[hoverInfo.region],
+					windVectors.windV[hoverInfo.region],
+				)
+			: null
+	const hoverWindMonthly = useMemo(() => {
+		if (!hoverInfo || !monthlyWindReady || monthlyWindRef.current.length < 12)
+			return null
+		const r = hoverInfo.region
+		return monthlyWindRef.current.map((wv) => ({
+			speedMs: wv.windSpeed[r],
+			dir: windDirectionLabel(wv.windU[r], wv.windV[r]),
+		}))
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [hoverInfo?.region, monthlyWindReady, hoverInfo])
+
+	const windStats = useMemo(() => {
+		if (!world?.climate) return null
+		const vectors = computeWindVectors(
+			world.mesh,
+			world.climate,
+			world.elevation_km,
+			world.params,
+			undefined,
+			{
+				vegetation: world.vegetation,
+				topography: world.topography,
+				slopeScore: world.slopeScore,
+				oceanDist: world.oceanDist,
+			},
+		)
+		const speeds = vectors.windSpeed
+		let sum = 0
+		let max = 0
+		for (let i = 0; i < speeds.length; i++) {
+			const s = speeds[i]
+			sum += s
+			if (s > max) max = s
+		}
+		return { avg: speeds.length > 0 ? sum / speeds.length : 0, max }
+	}, [world])
+
 	// --- Region colors ---
 	const regionColors = useMemo(() => {
 		if (!worldForDisplay) return null
+		if (colorMode === "wind" && windVectors) {
+			const N = worldForDisplay.mesh.numRegions
+			const rgb = new Float32Array(N * 3)
+			const { windSpeed } = windVectors
+			for (let r = 0; r < N; r++) {
+				const [cr, cg, cb] = windSpeedColor(windSpeed[r])
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
 		return computeRegionColors(
 			worldForDisplay,
 			colorMode,
@@ -960,6 +1111,7 @@ export const OrogenView: React.FC = () => {
 		selectedHistoryView,
 		worldForDisplay,
 		selectedNationId,
+		windVectors,
 	])
 
 	const occupationOverlay = useMemo(() => {
@@ -1081,18 +1233,36 @@ export const OrogenView: React.FC = () => {
 	const thermalEquator = useMemo(() => {
 		if (!world?.climate) return null
 		const N = world.mesh.numRegions
-		const temps = world.climate.temperature_monthly.subarray(
-			(displayMonth - 1) * N,
-			displayMonth * N,
-		)
+		const temps =
+			resolvedClimateMonth === 0
+				? world.climate.temperature_avg
+				: world.climate.temperature_monthly.subarray(
+						(resolvedClimateMonth - 1) * N,
+						resolvedClimateMonth * N,
+					)
 		return computeThermalEquatorLine(world.mesh, temps)
-	}, [displayMonth, world])
+	}, [resolvedClimateMonth, world])
 
 	useEffect(() => {
 		sceneRef.current?.setThermalEquator(
 			showThermalEquator ? thermalEquator : null,
 		)
 	}, [thermalEquator, showThermalEquator])
+
+	const windGrid = useMemo(() => {
+		if (!windVectors || !world) return null
+		return computeWindGrid(
+			world.mesh,
+			windVectors.windU,
+			windVectors.windV,
+			windVectors.windSpeed,
+		)
+	}, [windVectors, world])
+
+	// Particles replace the static arrow overlay — keep arrows cleared
+	useEffect(() => {
+		sceneRef.current?.setWindArrows(null)
+	}, [])
 	useEffect(() => {
 		sceneRef.current?.setRivers(
 			showRivers && world?.rivers ? world.rivers : null,
@@ -2152,6 +2322,8 @@ export const OrogenView: React.FC = () => {
 					tidallyLocked,
 					seaLevel,
 					maxElevation,
+					avgWindSpeedMs: windStats?.avg ?? null,
+					maxWindSpeedMs: windStats?.max ?? null,
 				},
 				unitSystem,
 			),
@@ -2170,6 +2342,7 @@ export const OrogenView: React.FC = () => {
 			maxElevation,
 			unitSystem,
 			world,
+			windStats,
 		],
 	)
 	const generationPreview = useEbmPreview(
@@ -2262,6 +2435,12 @@ export const OrogenView: React.FC = () => {
 						measureMode !== "off",
 					)} ${measureMode === "pathfinding" ? "cursor-crosshair" : ""}`}
 				/>
+				<WindParticleCanvas
+					windGrid={windGrid}
+					projectToScreen={projectToScreen}
+					getGlobeCameraDir={getGlobeCameraDir}
+					visible={showWindArrows}
+				/>
 
 				{showClimatePreview && (
 					<ClimatePreviewOverlay
@@ -2305,10 +2484,15 @@ export const OrogenView: React.FC = () => {
 								hoverRiver={hoverRiver}
 								hoverTerrainFeature={hoverTerrainFeature}
 								hoverOceanCurrents={hoverOceanCurrents}
+								hoverWindSpeed={hoverWindSpeed}
+								hoverWindDir={hoverWindDir}
+								hoverWindMonthly={hoverWindMonthly}
 								colorMode={colorMode}
 								populationMode={populationMode}
 								selectedTimeMs={selectedTimeMs}
 								displayMonth={displayMonth}
+								climateTimeMode={climateTimeMode}
+								climateMonth={climateMonth}
 								unitSystem={unitSystem}
 								world={worldForDisplay}
 								routes={worldForDisplay?.routes ?? null}
@@ -2361,6 +2545,8 @@ export const OrogenView: React.FC = () => {
 							setShowRivers={setShowRivers}
 							showThermalEquator={showThermalEquator}
 							setShowThermalEquator={setShowThermalEquator}
+							showWindArrows={showWindArrows}
+							setShowWindArrows={setShowWindArrows}
 							showGrid={showGrid}
 							setShowGrid={setShowGrid}
 							showNationBorders={showNationBorders}

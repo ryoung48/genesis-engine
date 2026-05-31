@@ -13,7 +13,12 @@ import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { type ColorMode, dangerColor, daylightColor } from "../colors"
+import {
+	type ColorMode,
+	dangerColor,
+	daylightColor,
+	windSpeedColor,
+} from "../colors"
 import { monthLabels } from "../screen/shared/constants"
 import {
 	getMapModePrimary,
@@ -210,6 +215,11 @@ interface DemographicEntry {
 	color: string | null
 }
 
+function windSpeedColorCss(speed: number): string {
+	const [r, g, b] = windSpeedColor(speed)
+	return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`
+}
+
 interface InfoPanelProps {
 	hoverInfo: HoverInfo | null
 	hoverElevationKm: number | null
@@ -241,10 +251,15 @@ interface InfoPanelProps {
 	hoverRiver: HoverRiver | null
 	hoverTerrainFeature: HoverTerrainFeature | null
 	hoverOceanCurrents: HoverOceanCurrents | null
+	hoverWindSpeed: number | null
+	hoverWindDir: string | null
+	hoverWindMonthly: Array<{ speedMs: number; dir: string }> | null
 	colorMode: ColorMode
 	populationMode: PopulationMapMode
 	selectedTimeMs: number | null
 	displayMonth: number
+	climateTimeMode: "current" | "annual" | "monthly"
+	climateMonth: number
 	unitSystem: UnitSystem
 	world: SerializedOrogenWorld | null
 	routes?: SerializedRoutes | null
@@ -289,10 +304,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverRiver,
 	hoverTerrainFeature,
 	hoverOceanCurrents,
+	hoverWindSpeed,
+	hoverWindDir,
+	hoverWindMonthly,
 	colorMode,
 	populationMode,
 	selectedTimeMs,
 	displayMonth,
+	climateTimeMode,
+	climateMonth,
 	unitSystem,
 	world,
 	routes,
@@ -313,6 +333,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	relationAt,
 	detailsDrawerOpen,
 }) => {
+	const activeBarIndex =
+		climateTimeMode === "monthly" ? climateMonth : displayMonth - 1
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
 	const showPolitical = activePrimary === "political"
@@ -546,6 +568,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									)}
 								/>
 							)}
+						{!hoverWindMonthly &&
+							hoverWindSpeed !== null &&
+							hoverWindDir !== null && (
+								<Row
+									label="Wind"
+									value={`${hoverWindDir} ${unitSystem === "imperial" ? `${(hoverWindSpeed * 2.237).toFixed(1)} mph` : `${hoverWindSpeed.toFixed(1)} m/s`}`}
+								/>
+							)}
 						{colorMode === "dtr" && hoverDtr !== null && (
 							<Row
 								label={`DTR ${monthLabels[displayMonth] ?? `M${displayMonth}`}`}
@@ -741,7 +771,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							labels={MONTH_SHORT}
 							label="Daylight"
 							colorForValue={(value) => rgbToCss(daylightColor(value))}
-							activeIndex={displayMonth - 1}
+							activeIndex={activeBarIndex}
 							summary={buildSummary(
 								chartData.daylight.reduce((sum, value) => sum + value, 0) /
 									chartData.daylight.length,
@@ -762,7 +792,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							labels={MONTH_SHORT}
 							label="Temp"
 							colorForValue={(value) => tempColor(value)}
-							activeIndex={displayMonth - 1}
+							activeIndex={activeBarIndex}
 							summary={buildSummary(annualTemp ?? undefined, {
 								prefix: "AVG",
 								formatValue: (value) => formatTemperature(value, unitSystem, 1),
@@ -806,7 +836,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								labels={MONTH_SHORT}
 								label="Precip"
 								colorForValue={(value) => rainColor(value)}
-								activeIndex={displayMonth - 1}
+								activeIndex={activeBarIndex}
 								summary={buildSummary(annualPrecip ?? undefined, {
 									prefix: "ANN",
 									formatValue: (value) =>
@@ -831,7 +861,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									labels={MONTH_SHORT}
 									label="PET"
 									colorForValue={(value) => petColor(value)}
-									activeIndex={displayMonth - 1}
+									activeIndex={activeBarIndex}
 									summary={buildSummary(
 										chartData.pet.reduce((sum, value) => sum + value, 0),
 										{
@@ -857,7 +887,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										labels={MONTH_SHORT}
 										label="AET"
 										colorForValue={(value) => aetColor(value)}
-										activeIndex={displayMonth - 1}
+										activeIndex={activeBarIndex}
 										summary={buildSummary(
 											chartData.aet.reduce((sum, value) => sum + value, 0),
 											{
@@ -894,7 +924,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 												labels={MONTH_SHORT}
 												label="GDD"
 												colorForValue={(value) => gddColor(value)}
-												activeIndex={displayMonth - 1}
+												activeIndex={activeBarIndex}
 												summary={buildSummary(rawGdd, {
 													prefix: isInfGdd ? "" : "ANN",
 													formatValue: (value) =>
@@ -915,7 +945,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										labels={MONTH_SHORT}
 										label="GInt"
 										colorForValue={(value) => gintColor(value)}
-										activeIndex={displayMonth - 1}
+										activeIndex={activeBarIndex}
 										summary={buildSummary(
 											world.pastaDebug?.gint[hoverRegion] !== undefined
 												? world.pastaDebug.gint[hoverRegion] >= 99999
@@ -943,7 +973,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									labels={MONTH_SHORT}
 									label="DTR"
 									colorForValue={(value) => dtrChartColor(value)}
-									activeIndex={displayMonth - 1}
+									activeIndex={activeBarIndex}
 									summary={buildSummary(hoverDtr.annual, {
 										prefix: "AVG",
 										formatValue: (value) =>
@@ -969,7 +999,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									labels={MONTH_SHORT}
 									label="Humidity"
 									colorForValue={(value) => humidityChartColor(value)}
-									activeIndex={displayMonth - 1}
+									activeIndex={activeBarIndex}
 									summary={buildSummary(hoverHumidity.annual, {
 										prefix: "AVG",
 										formatValue: (value) => `${value.toFixed(0)}%`,
@@ -990,7 +1020,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										labels={MONTH_SHORT}
 										label="Ocean Current"
 										colorForValue={(value) => currentImpactColor(value)}
-										activeIndex={displayMonth - 1}
+										activeIndex={activeBarIndex}
 										formatValue={(value) =>
 											`${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1).replace(/ ?°[CF]$/, "")}`
 										}
@@ -1016,7 +1046,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										: `River #${hoverRiver.riverId}`
 								}
 								colorForValue={(value) => flowColor(value)}
-								activeIndex={displayMonth - 1}
+								activeIndex={activeBarIndex}
 								summary={buildSummary(hoverRiver.flow, {
 									formatValue: (value) =>
 										formatFlowRate(value, unitSystem, formatCompactNumber),
@@ -1039,6 +1069,35 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								Length {formatDistance(hoverRiver.lengthKm, unitSystem)}
 							</div>
 						)}
+						{hoverWindMonthly &&
+							(() => {
+								const activeIdx = Math.max(0, displayMonth - 1)
+								const active = hoverWindMonthly[activeIdx]
+								const speedFmt = (v: number) =>
+									unitSystem === "imperial"
+										? `${(v * 2.237).toFixed(0)}`
+										: `${v.toFixed(0)}`
+								return (
+									<SeriesBars
+										values={hoverWindMonthly.map((m) => m.speedMs)}
+										labels={hoverWindMonthly.map((m) => m.dir)}
+										subLabels={MONTH_SHORT}
+										label="Wind"
+										colorForValue={(value) => windSpeedColorCss(value)}
+										activeIndex={activeBarIndex}
+										summary={
+											active
+												? `${active.dir} ${speedFmt(active.speedMs)} ${unitSystem === "imperial" ? "mph" : "m/s"}`
+												: undefined
+										}
+										formatValue={speedFmt}
+										tooltipLabel={({ label, value, index }) =>
+											`${monthLabels[index + 1]}: ${value.toFixed(1)} m/s from ${label}`
+										}
+										showValues
+									/>
+								)
+							})()}
 					</div>
 				)}
 			</div>

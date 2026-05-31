@@ -34,6 +34,8 @@ export function computePlanetStats(
 		tidallyLocked: boolean
 		seaLevel?: number
 		maxElevation?: number
+		avgWindSpeedMs?: number | null
+		maxWindSpeedMs?: number | null
 	},
 	unitSystem: UnitSystem,
 ): PlanetStat[] {
@@ -140,6 +142,16 @@ export function computePlanetStats(
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = activeParams?.tidallyLocked ?? params.tidallyLocked
 	const habitabilityScore = world?.population?.habitabilityScore ?? 0
+
+	const avgWindSpeedMs = params.avgWindSpeedMs ?? null
+	const maxWindSpeedMs = params.maxWindSpeedMs ?? null
+
+	function formatWindSpeed(ms: number): string {
+		if (unitSystem === "imperial") {
+			return `${(ms * 2.237).toFixed(1)} mph`
+		}
+		return `${ms.toFixed(1)} m/s`
+	}
 
 	const seaLevelValue = activeParams?.seaLevel ?? params.seaLevel
 	let seaLevelShiftStat: PlanetStat | null = null
@@ -267,6 +279,14 @@ export function computePlanetStats(
 			label: "Avg DTR",
 			value:
 				avgDtrC !== null ? formatTemperatureDelta(avgDtrC, unitSystem, 1) : "-",
+		},
+		{
+			label: "Avg Wind",
+			value: avgWindSpeedMs !== null ? formatWindSpeed(avgWindSpeedMs) : "-",
+		},
+		{
+			label: "Max Wind",
+			value: maxWindSpeedMs !== null ? formatWindSpeed(maxWindSpeedMs) : "-",
 		},
 	]
 }

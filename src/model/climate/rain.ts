@@ -39,7 +39,7 @@ const eastStormScale = (x: number) => piecewise([0.33, 1.16, 3], [0, 0.8, 1], x)
 const westerliesScale = (x: number) =>
 	piecewise([1.33, 1.66, 3], [0, 1, 0.8], x)
 
-const hadleyWidth = (x: number) =>
+export const hadleyWidth = (x: number) =>
 	piecewise([6, 12, 24, 48, 96, 192, 384], [18, 25, 30, 40, 55, 65, 70], x)
 
 interface ClimateGeometry {

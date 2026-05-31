@@ -44,10 +44,12 @@ import {
 	buildGlobeHierarchyOverlay,
 	buildGlobeRivers,
 	buildGlobeThermalEquator,
+	buildGlobeWindArrows,
 	buildMapGrid,
 	buildMapHierarchyOverlay,
 	buildMapRivers,
 	buildMapThermalEquator,
+	buildMapWindArrows,
 	buildNationBordersGlobe,
 	buildNationBordersMap,
 	collectNationBorderGlobePositions,
@@ -78,6 +80,7 @@ import type {
 	OrogenScene,
 	OrogenViewMode,
 	RiverData,
+	WindArrowData,
 } from "./types"
 
 export function reapplyMeshOverlayState(params: {
@@ -568,6 +571,9 @@ export function createOrogenScene(
 	let globeThermalEquator: THREE.Line | null = null
 	let mapThermalEquator: THREE.Line | null = null
 	let thermalEquatorPoints: [number, number][] | null = null
+	let globeWindArrows: THREE.LineSegments | null = null
+	let mapWindArrows: THREE.LineSegments | null = null
+	let windArrowData: WindArrowData | null = null
 	let globeRivers: THREE.Group | null = null
 	let mapRivers: THREE.Group | null = null
 	let riverData: RiverData | null = null
@@ -1079,6 +1085,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, mapGrid)
 		disposeObject3D(scene, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
+		disposeObject3D(scene, globeWindArrows)
+		disposeObject3D(scene, mapWindArrows)
 		disposeObject3D(scene, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(scene, globeSelectedProvinceBorder)
@@ -1103,6 +1111,8 @@ export function createOrogenScene(
 		mapGrid = null
 		globeThermalEquator = null
 		mapThermalEquator = null
+		globeWindArrows = null
+		mapWindArrows = null
 		globeNationBorders = null
 		mapNationBorders = null
 		pulseGlobe = null
@@ -1178,6 +1188,19 @@ export function createOrogenScene(
 			addMapSlideClones(mapThermalEquator)
 			scene.add(mapThermalEquator)
 		}
+		if (windArrowData) {
+			globeWindArrows = buildGlobeWindArrows(
+				windArrowData,
+				currentViewMode,
+				elevationVisible,
+			)
+			mapWindArrows = buildMapWindArrows(windArrowData, currentViewMode)
+			if (globeWindArrows) scene.add(globeWindArrows)
+			if (mapWindArrows) {
+				addMapSlideClones(mapWindArrows)
+				scene.add(mapWindArrows)
+			}
+		}
 		if (riversVisible && riverData) {
 			globeRivers = buildGlobeRivers(
 				riverData,
@@ -1248,6 +1271,11 @@ export function createOrogenScene(
 		if (mapThermalEquator) {
 			mapThermalEquator.visible = currentViewMode === "map"
 			if (mapMesh) mapThermalEquator.position.copy(mapMesh.position)
+		}
+		if (globeWindArrows) globeWindArrows.visible = currentViewMode === "globe"
+		if (mapWindArrows) {
+			mapWindArrows.visible = currentViewMode === "map"
+			if (mapMesh) mapWindArrows.position.copy(mapMesh.position)
 		}
 		if (globeRivers)
 			globeRivers.visible = riversVisible && currentViewMode === "globe"
@@ -2195,6 +2223,11 @@ export function createOrogenScene(
 		rebuildOverlays()
 	}
 
+	function setWindArrows(data: WindArrowData | null) {
+		windArrowData = data
+		rebuildOverlays()
+	}
+
 	function setRivers(data: RiverData | null) {
 		riverData = data
 		rebuildOverlays()
@@ -2373,7 +2406,16 @@ export function createOrogenScene(
 		setMeasureLine,
 		setPathfindingOverlay,
 		projectToScreen,
+		getGlobeCameraDir(): [number, number, number] | null {
+			if (currentViewMode !== "globe") return null
+			const p = camera.position
+			if (p.x === 0 && p.y === 0 && p.z === 0) return null
+			// Return unnormalized position — the caller uses dot(P, camPos) < 1
+			// as the exact sphere-silhouette test (accounts for zoom distance).
+			return [p.x, p.y, p.z]
+		},
 		setThermalEquator,
+		setWindArrows,
 		setRivers,
 		setRiversVisible,
 		setHierarchyOverlay,

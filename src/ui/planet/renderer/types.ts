@@ -1,9 +1,12 @@
+import type { WindArrowData } from "@/model/climate/wind"
 import type {
 	SerializedNetwork,
 	SerializedOrogenWorld,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
+
+export type { WindArrowData }
 
 export type OrogenViewMode = "globe" | "map"
 
@@ -81,4 +84,7 @@ export interface OrogenScene {
 	setDynastyNames(names: string[] | null): void
 	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
+	setWindArrows(data: WindArrowData | null): void
+	/** Unit vector pointing from origin toward the camera (globe mode only, null in map mode). */
+	getGlobeCameraDir(): [number, number, number] | null
 }
