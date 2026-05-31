@@ -3,11 +3,7 @@ import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
-import {
-	computeWindGrid,
-	computeWindVectors,
-	sampleWindArrows,
-} from "@/model/climate/wind"
+import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
 	TRADE_GOOD_LABELS,
 	tradeGoodColor,
@@ -160,6 +156,7 @@ import type {
 } from "./screen/shared/map-modes"
 import {
 	DEFAULT_GEOGRAPHY_MODE,
+	getMapModePrimary,
 	isDebugGeographyMode,
 	normalizeGeographyColorMode,
 } from "./screen/shared/map-modes"
@@ -972,7 +969,10 @@ export const OrogenView: React.FC = () => {
 		Array<{ windU: Float32Array; windV: Float32Array; windSpeed: Float32Array }>
 	>([])
 	const [monthlyWindReady, setMonthlyWindReady] = useState(false)
-	const windActive = showWindArrows || colorMode === "wind"
+	const windActive =
+		showWindArrows ||
+		colorMode === "wind" ||
+		getMapModePrimary(colorMode) === "geography"
 	useEffect(() => {
 		if (!world?.climate || !windActive) {
 			monthlyWindRef.current = []
@@ -1012,8 +1012,8 @@ export const OrogenView: React.FC = () => {
 	}, [world, windActive])
 
 	const projectToScreen = useCallback(
-		(xyz: [number, number, number]) =>
-			sceneRef.current?.projectToScreen(xyz) ?? null,
+		(xyz: [number, number, number], lonOffsetRad?: number) =>
+			sceneRef.current?.projectToScreen(xyz, lonOffsetRad) ?? null,
 		[],
 	)
 	const getGlobeCameraDir = useCallback(
@@ -2440,6 +2440,7 @@ export const OrogenView: React.FC = () => {
 					projectToScreen={projectToScreen}
 					getGlobeCameraDir={getGlobeCameraDir}
 					visible={showWindArrows}
+					viewMode={viewMode}
 				/>
 
 				{showClimatePreview && (

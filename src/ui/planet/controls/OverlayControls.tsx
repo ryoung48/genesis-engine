@@ -541,6 +541,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												/>
 											</label>
 											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Wind</span>
+												<input
+													type="checkbox"
+													checked={showWindArrows}
+													onChange={(e) => setShowWindArrows(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 												<span>Thermal Equator</span>
 												<input
 													type="checkbox"
@@ -548,15 +557,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													onChange={(e) =>
 														setShowThermalEquator(e.target.checked)
 													}
-													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-												/>
-											</label>
-											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-												<span>Wind</span>
-												<input
-													type="checkbox"
-													checked={showWindArrows}
-													onChange={(e) => setShowWindArrows(e.target.checked)}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>

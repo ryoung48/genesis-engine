@@ -13,8 +13,7 @@ import type { OrogenClimate, OrogenParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
 import { DEFAULT_ANTISTELLAR_LON } from "../../shared/units"
 import { getClimateGeometry } from "../rain"
-import type { WindArrowData, WindSurface } from "../wind"
-import { sampleWindArrows } from "../wind"
+import type { WindSurface } from "../wind"
 import {
 	computeMonthlyLibration,
 	computeMonthlyLockedDeclination,
@@ -243,7 +242,16 @@ export function computeLockedWindVectors(
 			gradPNorth /= count
 		}
 
-		rawSpeed[r] = Math.hypot(gradPEast, gradPNorth)
+		const gradMag = Math.hypot(gradPEast, gradPNorth)
+
+		// Terminator jet: convergence of night→day surface flow amplifies winds
+		// near the terminator (ct≈0). Factor = 1 + k·sin⁴(θ) = 1 + k·(1−ct²)².
+		// Applied before normalisation so the 90th-percentile calibration absorbs it,
+		// keeping the absolute reference speed intact while sharpening the contrast.
+		const ct = cellCt[r]
+		const sin2 = 1.0 - ct * ct // sin²(θ): 1 at terminator, 0 at poles
+		const terminatorFactor = 1.0 + 2.0 * sin2 * sin2 // peaks at 3× at terminator
+		rawSpeed[r] = gradMag * terminatorFactor
 
 		const u = -gradPEast
 		const v = -gradPNorth

@@ -156,10 +156,15 @@ function renderPanel(
 			hoverRiver={null}
 			hoverTerrainFeature={{ dominant: "ridge", all: ["ridge"] }}
 			hoverOceanCurrents={null}
+			hoverWindSpeed={null}
+			hoverWindDir={null}
+			hoverWindMonthly={null}
 			colorMode="terrain"
 			populationMode="density"
 			selectedTimeMs={800}
 			displayMonth={1}
+			climateTimeMode="current"
+			climateMonth={0}
 			unitSystem="metric"
 			world={makeWorld()}
 			routes={packRoutes([

@@ -2187,6 +2187,7 @@ export function createOrogenScene(
 
 	function projectToScreen(
 		xyz: [number, number, number],
+		lonOffsetRad = 0,
 	): [number, number] | null {
 		const cam = currentViewMode === "map" ? mapCamera : camera
 		const v = new THREE.Vector3(...xyz)
@@ -2202,7 +2203,7 @@ export function createOrogenScene(
 				v.z / len,
 			)
 			const mapPoint = projection.projectRadians(
-				projected.lon,
+				projected.lon + lonOffsetRad,
 				projected.lat,
 				0.003,
 			)

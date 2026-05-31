@@ -71,9 +71,13 @@ function randomLon() {
 
 interface WindParticleCanvasProps {
 	windGrid: WindGrid | null
-	projectToScreen: (xyz: [number, number, number]) => [number, number] | null
+	projectToScreen: (
+		xyz: [number, number, number],
+		lonOffsetRad?: number,
+	) => [number, number] | null
 	getGlobeCameraDir: () => [number, number, number] | null
 	visible: boolean
+	viewMode: "globe" | "map"
 }
 
 export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
@@ -81,6 +85,7 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 	projectToScreen,
 	getGlobeCameraDir,
 	visible,
+	viewMode,
 }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -95,6 +100,7 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 	const visibleRef = useRef(visible)
 	const projectRef = useRef(projectToScreen)
 	const cameraDirRef = useRef(getGlobeCameraDir)
+	const viewModeRef = useRef(viewMode)
 
 	useEffect(() => {
 		gridRef.current = windGrid
@@ -108,6 +114,9 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 	useEffect(() => {
 		cameraDirRef.current = getGlobeCameraDir
 	}, [getGlobeCameraDir])
+	useEffect(() => {
+		viewModeRef.current = viewMode
+	}, [viewMode])
 
 	// Initialise particles staggered so trails don't all appear at once
 	useEffect(() => {
@@ -234,37 +243,48 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 				const px = cl * Math.cos(lonR)
 				const py = cl * Math.sin(lonR)
 				const pz = Math.sin(latR)
+				const xyz: [number, number, number] = [px, py, pz]
 
-				// Exact sphere-silhouette cull: dot(P, camPos) < 1 means the point is
-				// behind the limb for a camera at that position (unit sphere geometry).
-				// A small buffer (1.05) kills particles just before the horizon so
-				// their fading trails don't bleed past the edge of the globe.
-				const camPos = cameraDirRef.current()
-				if (camPos) {
-					if (px * camPos[0] + py * camPos[1] + pz * camPos[2] < 1.05) {
-						ageArr[i] = maxAgeArr[i] // kill immediately — no lingering trail
-						continue
+				const isMap = viewModeRef.current === "map"
+
+				// Globe mode: cull particles behind the visible hemisphere.
+				if (!isMap) {
+					const camPos = cameraDirRef.current()
+					if (camPos) {
+						if (px * camPos[0] + py * camPos[1] + pz * camPos[2] < 1.05) {
+							ageArr[i] = maxAgeArr[i] // kill immediately — no lingering trail
+							continue
+						}
 					}
 				}
-
-				const pos = project([px, py, pz])
-				if (!pos) continue
-				const sx = pos[0]
-				const sy = pos[1]
-				if (sx < -50 || sx > w + 50 || sy < -50 || sy > h + 50) continue
 
 				// Opacity: ease in during first 8% of life, ease out during last 8%
 				const t = ageArr[i] / maxAgeArr[i]
 				const alpha = Math.min(1, Math.min(t / 0.08, (1 - t) / 0.08))
-
 				ctx.globalAlpha = alpha * 0.85
 				ctx.fillStyle = getColor(speed)
-				ctx.fillRect(
-					Math.round(sx) - PARTICLE_HALF,
-					Math.round(sy) - PARTICLE_HALF,
-					PARTICLE_HALF * 2,
-					PARTICLE_HALF * 2,
-				)
+
+				// In map mode draw at the base position and at ±2π lon copies so
+				// particles are continuous across the antimeridian seam.
+				const offsets = isMap ? [0, -2 * Math.PI, 2 * Math.PI] : [0]
+				let drawn = false
+				for (const offset of offsets) {
+					const pos = project(xyz, offset || undefined)
+					if (!pos) continue
+					const sx = pos[0]
+					const sy = pos[1]
+					if (sx < -50 || sx > w + 50 || sy < -50 || sy > h + 50) continue
+					ctx.fillRect(
+						Math.round(sx) - PARTICLE_HALF,
+						Math.round(sy) - PARTICLE_HALF,
+						PARTICLE_HALF * 2,
+						PARTICLE_HALF * 2,
+					)
+					drawn = true
+				}
+				if (!drawn && !isMap) {
+					// Globe: particle projected off-screen — nothing to do
+				}
 			}
 
 			ctx.globalAlpha = 1

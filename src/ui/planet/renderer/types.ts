@@ -57,7 +57,10 @@ export interface OrogenScene {
 		startXYZ: [number, number, number] | null,
 		endXYZ: [number, number, number] | null,
 	): void
-	projectToScreen(xyz: [number, number, number]): [number, number] | null
+	projectToScreen(
+		xyz: [number, number, number],
+		lonOffsetRad?: number,
+	): [number, number] | null
 	setThermalEquator(points: [number, number][] | null): void
 	setRivers(data: RiverData | null): void
 	setRiversVisible(visible: boolean): void

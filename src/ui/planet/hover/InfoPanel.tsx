@@ -1071,8 +1071,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						)}
 						{hoverWindMonthly &&
 							(() => {
-								const activeIdx = Math.max(0, displayMonth - 1)
-								const active = hoverWindMonthly[activeIdx]
 								const speedFmt = (v: number) =>
 									unitSystem === "imperial"
 										? `${(v * 2.237).toFixed(0)}`
@@ -1085,11 +1083,18 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										label="Wind"
 										colorForValue={(value) => windSpeedColorCss(value)}
 										activeIndex={activeBarIndex}
-										summary={
-											active
-												? `${active.dir} ${speedFmt(active.speedMs)} ${unitSystem === "imperial" ? "mph" : "m/s"}`
-												: undefined
-										}
+										summary={buildSummary(
+											hoverWindMonthly.reduce((sum, m) => sum + m.speedMs, 0) /
+												hoverWindMonthly.length,
+											{
+												prefix: "AVG",
+												unit: unitSystem === "imperial" ? "mph" : "m/s",
+												formatValue: (value) =>
+													unitSystem === "imperial"
+														? (value * 2.237).toFixed(1)
+														: value.toFixed(1),
+											},
+										)}
 										formatValue={speedFmt}
 										tooltipLabel={({ label, value, index }) =>
 											`${monthLabels[index + 1]}: ${value.toFixed(1)} m/s from ${label}`

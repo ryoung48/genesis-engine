@@ -229,14 +229,17 @@ export interface WindArrowData {
 // Amplitude decreases with each cell away from the equator, matching the
 // observed weakening of the Ferrel and polar cells relative to the Hadley cell.
 // Six values supports up to 5 cells per hemisphere (~6 h day → hw≈18°, 90/18=5).
-const CELL_BOUNDARY_PRESSURES = [-1.0, 1.0, -0.45, 0.25, -0.15, 0.10]
+const CELL_BOUNDARY_PRESSURES = [-1.0, 1.0, -0.45, 0.25, -0.15, 0.1]
 
 /**
  * Background pressure at `distFromTeq` degrees for a planet with the given
  * day length. Cell width = `hadleyWidth(hoursPerDay)` so fast rotators get
  * many narrow cells and slow rotators a single broad Hadley cell.
  */
-function bgPressureForRotation(distFromTeq: number, hoursPerDay: number): number {
+function bgPressureForRotation(
+	distFromTeq: number,
+	hoursPerDay: number,
+): number {
 	const hw = hadleyWidth(hoursPerDay)
 	const d = Math.min(distFromTeq, 90)
 	const cellIndex = Math.min(
@@ -392,7 +395,13 @@ export function computeWindVectors(
 			: climate.temperature_avg
 
 	const teqByLon = computeThermalEquator(mesh, temps)
-	const pressure = computePressureField(mesh, temps, elevation_km, teqByLon, hoursPerDay)
+	const pressure = computePressureField(
+		mesh,
+		temps,
+		elevation_km,
+		teqByLon,
+		hoursPerDay,
+	)
 
 	const windU = new Float32Array(N)
 	const windV = new Float32Array(N)
@@ -460,45 +469,4 @@ export function computeWindVectors(
 	}
 
 	return { windU, windV, pressure, windSpeed }
-}
-
-/**
- * Sample a sparse subset of regions for rendering as arrow glyphs.
- * Samples every ceil(N/maxArrows) regions by index; skips calm cells.
- */
-export function sampleWindArrows(
-	mesh: SphereMesh,
-	windU: Float32Array,
-	windV: Float32Array,
-	windSpeed: Float32Array,
-	maxArrows = 500,
-): WindArrowData {
-	const N = mesh.numRegions
-	const step = Math.max(1, Math.floor(N / maxArrows))
-	const { latDeg, lonDeg } = getClimateGeometry(mesh)
-
-	const lats: number[] = []
-	const lons: number[] = []
-	const us: number[] = []
-	const vs: number[] = []
-	const speeds: number[] = []
-
-	for (let r = 0; r < N; r += step) {
-		const u = windU[r]
-		const v = windV[r]
-		if (Math.hypot(u, v) < 1e-6) continue
-		lats.push(latDeg[r])
-		lons.push(lonDeg[r])
-		us.push(u)
-		vs.push(v)
-		speeds.push(windSpeed[r])
-	}
-
-	return {
-		lat: new Float32Array(lats),
-		lon: new Float32Array(lons),
-		u: new Float32Array(us),
-		v: new Float32Array(vs),
-		speed: new Float32Array(speeds),
-	}
 }

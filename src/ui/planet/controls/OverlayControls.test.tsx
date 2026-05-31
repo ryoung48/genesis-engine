@@ -26,6 +26,8 @@ function renderWithProps(
 		setShowRivers: vi.fn(),
 		showThermalEquator: false,
 		setShowThermalEquator: vi.fn(),
+		showWindArrows: false,
+		setShowWindArrows: vi.fn(),
 		showGrid: true,
 		setShowGrid: vi.fn(),
 		showNationBorders: false,
