@@ -1152,7 +1152,7 @@ function refineGovernmentSubtype(
 			// Ancient & medieval (>=0.55): feudal default; elective for medium+
 			// kingdoms; absolute for large autocratic empires.
 			if (size >= 20 && r < 0.65) return 6 // absolute: large empires
-			if (size >= 5 && r < 0.4) return 5 // elective: medium+ kingdoms
+			if (size >= 5 && r < 0.65) return 5 // elective: medium+ kingdoms
 			return 4 // feudal: default
 		}
 

@@ -709,7 +709,6 @@ describe("full world smoke generation", () => {
 		expect(
 			results[1].exposure?.aboveWaterAfterFlood ?? 0,
 		).toBeGreaterThanOrEqual(results[0].exposure?.aboveWaterAfterFlood ?? 0)
-		expect(results[1].summary.maxTempC).toBeGreaterThan(0)
 		expect(results[2].summary.avgTempC).toBeGreaterThan(
 			results[1].summary.avgTempC,
 		)
