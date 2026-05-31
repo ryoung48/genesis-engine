@@ -20,6 +20,7 @@ const LABEL_FONT_SIZE_MAP = 0.005
 const LABEL_OUTLINE_WIDTH = 0.2
 const LABEL_OUTLINE_COLOR = 0x0f172a
 const LABEL_TEXT_COLOR = "#f1f5f9"
+const LABEL_RENDER_ORDER = 1001
 
 const MIN_LABEL_SCALE = 0.5
 const MAX_LABEL_SCALE = 4.5
@@ -61,7 +62,7 @@ function ensurePoolSize(pool: LabelPool, count: number) {
 		text.anchorX = "center"
 		text.anchorY = "middle"
 		text.textRenderingMode = "distanceField"
-		text.renderOrder = 999
+		text.renderOrder = LABEL_RENDER_ORDER
 		text.frustumCulled = true
 		text.visible = false
 		pool.items.push(text)
@@ -326,7 +327,12 @@ export function buildGlobeNationLabels(
 		const anchorRegion =
 			settlementRegion >= 0 ? settlementRegion : capitalRegion
 		const scale = computeLabelScale(nationProvinceCount(world, n), name)
-		const globePlacement = labelPositionGlobe(r_xyz, elevation, anchorRegion, elevationVisible)
+		const globePlacement = labelPositionGlobe(
+			r_xyz,
+			elevation,
+			anchorRegion,
+			elevationVisible,
+		)
 		const markerScale =
 			capitalProvince >= 0
 				? globeScaleForPop(world.urbanPopulation?.[capitalProvince] ?? 0)
@@ -439,7 +445,13 @@ const SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION = 0.003
 
 function settlementFontScale(pop: number): number {
 	const v = Math.log10(Math.max(1_000, pop))
-	const t = Math.max(0, Math.min(1, (v - SETTLEMENT_LOG_MIN) / (SETTLEMENT_LOG_MAX - SETTLEMENT_LOG_MIN)))
+	const t = Math.max(
+		0,
+		Math.min(
+			1,
+			(v - SETTLEMENT_LOG_MIN) / (SETTLEMENT_LOG_MAX - SETTLEMENT_LOG_MIN),
+		),
+	)
 	return 0.7 + t * 1.3
 }
 
@@ -462,14 +474,19 @@ function settlementLabelPositionGlobe(
 			? elev * TERRAIN_ELEVATION_SCALE
 			: elev * TERRAIN_ELEVATION_SCALE * 0.3
 		: 0
-	const lift = elevationVisible ? SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION : SETTLEMENT_LABEL_LIFT_GLOBE
+	const lift = elevationVisible
+		? SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION
+		: SETTLEMENT_LABEL_LIFT_GLOBE
 	return {
 		normal: new THREE.Vector3(nx, ny, nz),
 		radius: 1 + adj + lift,
 	}
 }
 
-function settlementGlobeLabelOffset(markerScale: number, fontSize: number): number {
+function settlementGlobeLabelOffset(
+	markerScale: number,
+	fontSize: number,
+): number {
 	return (
 		markerScale * 0.5 +
 		fontSize * LABEL_GLOBE_FONT_GAP_FACTOR +
@@ -497,7 +514,9 @@ export function buildGlobeSettlementLabels(
 	const provinceCount = world.provinces.count ?? settlementNames.length
 
 	ensurePoolSize(pool, provinceCount)
-	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
+	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
+		camera.quaternion,
+	)
 
 	let activeCount = 0
 	for (let p = 0; p < provinceCount; p++) {
@@ -509,7 +528,12 @@ export function buildGlobeSettlementLabels(
 		const scale = settlementFontScale(pop)
 		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_GLOBE * scale
 		const markerScale = globeScaleForPop(pop)
-		const globePlacement = settlementLabelPositionGlobe(r_xyz, elevation, region, elevationVisible)
+		const globePlacement = settlementLabelPositionGlobe(
+			r_xyz,
+			elevation,
+			region,
+			elevationVisible,
+		)
 
 		const text = pool.items[activeCount]
 		applyGlobeLabelStyle(text)
@@ -517,10 +541,15 @@ export function buildGlobeSettlementLabels(
 		text.text = name
 		text.fontSize = fontSize
 		text.userData.globeNormal = globePlacement.normal
-		text.userData.globeBasePosition = GLOBE_BASE_POSITION.copy(globePlacement.normal)
+		text.userData.globeBasePosition = GLOBE_BASE_POSITION.copy(
+			globePlacement.normal,
+		)
 			.multiplyScalar(globePlacement.radius)
 			.clone()
-		text.userData.globeLabelOffset = settlementGlobeLabelOffset(markerScale, fontSize)
+		text.userData.globeLabelOffset = settlementGlobeLabelOffset(
+			markerScale,
+			fontSize,
+		)
 		text.sync()
 		updateGlobeLabelPosition(text, cameraUp)
 		orientGlobeLabel(text, camera.quaternion)
@@ -545,7 +574,10 @@ export function buildMapSettlementLabels(
 	const group = new THREE.Group()
 	if (!world.provinces || !world.settlementRegions) return group
 
-	const projection = createMapProjection(centerLongitudeDeg, projectionLatitudeDeg)
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
 	const provinceCount = world.provinces.count ?? settlementNames.length

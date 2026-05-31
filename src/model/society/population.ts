@@ -5,7 +5,12 @@
  * Used both by computePopulation and as a pre-pass for computeMigration.
  *
  * computePopulation: computes province habitability and distributes initial
- * population proportionally. O(R + P) time, typed arrays.
+ * population proportionally. The distribution is additionally shaped by the
+ * migration wave: each province's share is weighted by (1 - migrationWave)^
+ * migrationFalloff, concentrating people near the cradles (strongly for early
+ * eras, not at all for the information age). This only redistributes the era's
+ * fixed total population — habitability itself is never modified. O(R + P)
+ * time, typed arrays.
  *
  * computeMigration: runs multi-source Dijkstra on the region graph from
  * cradle provinces seeded on the most habitable landmass. Desolate provinces
@@ -64,6 +69,13 @@ export interface ProvincePopulation {
 	migrationWave?: Float32Array
 	/** Province indices where prehistoric cradles were seeded */
 	cradleProvinces?: Int32Array
+	/**
+	 * Era settlementWave threshold used during generation. Provinces with
+	 * migrationWave > settlementWave are unsettled (pop=0). Stored here so
+	 * the renderer can distinguish unsettled from settled-stateless provinces
+	 * without re-importing era configs.
+	 */
+	settlementWave?: number
 }
 
 /**
@@ -132,9 +144,14 @@ export function computePopulation(
 	seed: number,
 	planetRadiusKm?: number,
 	numRegions?: number,
+	eraTargetPopulation?: number,
+	migrationWave?: Float32Array,
+	settlementWave?: number,
+	migrationFalloff?: number,
 ): ProvincePopulation {
 	const { count } = provinces
 
+	// Habitability is computed purely from terrain — migration never alters it.
 	const habitability = computeProvinceHabitability(
 		provinces,
 		landmarks,
@@ -147,8 +164,7 @@ export function computePopulation(
 		seed,
 	)
 
-	let totalHab = 0
-	for (let i = 0; i < count; i++) totalHab += habitability[i]
+	const effectiveSettlementWave = settlementWave ?? 1.0
 
 	// Compute global habitability score (mirrors WORLD.habitability)
 	// = sum(province.land * cellArea * habitability) / 1e8
@@ -162,12 +178,35 @@ export function computePopulation(
 	}
 	habitabilityScore /= 81234131.618
 
-	const totalPop = 215e6 * habitabilityScore
+	const targetPop = eraTargetPopulation ?? 215e6
+	const totalPop = targetPop * habitabilityScore
+
+	// Distribution weight = habitability shaped by distance from the cradles.
+	// Province share ∝ habitability * (1 - migrationWave)^falloff, so people
+	// concentrate near the cradles (strongly in early eras) while the frontier
+	// trends toward zero. falloff = 0 leaves the distribution at pure
+	// habitability. Renormalizing preserves the era's total population.
+	const falloff = migrationFalloff ?? 0
+	const weight = new Float32Array(count)
+	let totalWeight = 0
+	for (let i = 0; i < count; i++) {
+		let w = habitability[i]
+		if (w > 0 && migrationWave) {
+			const wave = migrationWave[i]
+			// wave < 0 marks desolate/unreachable provinces (habitability already 0).
+			// Provinces beyond the era's settlement frontier are unsettled: no
+			// population (their habitability is left intact for other consumers).
+			if (wave < 0 || wave > effectiveSettlementWave) w = 0
+			else if (falloff > 0) w *= (1 - Math.min(wave, 1)) ** falloff
+		}
+		weight[i] = w
+		totalWeight += w
+	}
 
 	const population = new Float32Array(count)
-	if (totalHab > 0) {
+	if (totalWeight > 0) {
 		for (let i = 0; i < count; i++) {
-			population[i] = (habitability[i] / totalHab) * totalPop
+			population[i] = (weight[i] / totalWeight) * totalPop
 		}
 	}
 
@@ -176,6 +215,7 @@ export function computePopulation(
 		population,
 		habitabilityScore,
 		totalPopulation: totalPop,
+		settlementWave: effectiveSettlementWave,
 	}
 }
 

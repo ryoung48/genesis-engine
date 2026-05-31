@@ -5,6 +5,7 @@ import {
 	getEffectiveObliquityDeg,
 	getMaxOceanDepthKm,
 } from "@/model/shared/units"
+import type { SocietyEra } from "@/model/society/eras"
 import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
 import { formatCompactNumber } from "../../hover/info-panel-format"
 import type { UnitSystem } from "../shared/ui-format"
@@ -302,7 +303,6 @@ export function buildTerrainSliders(state: {
 			display: (() => {
 				const offsetKm = computeSeaLevelOffsetKm(
 					state.seaLevel,
-					6,
 					getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM),
 				)
 				const sign = offsetKm > 0 ? "+" : offsetKm < 0 ? "−" : ""
@@ -376,6 +376,7 @@ export function resetWorldDefaults(setters: {
 	setCraters: (v: number) => void
 	setVolcanism: (v: number) => void
 	setMaxElevation: (v: number) => void
+	setEra: (v: SocietyEra) => void
 }): void {
 	setters.setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
 	setters.setJitter(DEFAULT_WORLD_PARAMS.jitter)
@@ -405,4 +406,5 @@ export function resetWorldDefaults(setters: {
 	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
 	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
 	setters.setMaxElevation(DEFAULT_WORLD_PARAMS.maxElevation)
+	setters.setEra(DEFAULT_WORLD_PARAMS.era)
 }

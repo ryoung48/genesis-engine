@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import type { OrogenParams } from "@/model/types/tectonics"
 import {
 	decodePlanetCode,
 	decodePlanetSeed,
@@ -6,7 +7,7 @@ import {
 	SEED_MAX,
 } from "./planet-code"
 
-function makeParams(overrides: Record<string, number | boolean> = {}) {
+function makeParams(overrides: Record<string, number | boolean | string> = {}) {
 	return {
 		seed: 12345,
 		numPoints: 204000,
@@ -36,8 +37,9 @@ function makeParams(overrides: Record<string, number | boolean> = {}) {
 		antistellarLon: 180,
 		perihelion: 90,
 		tidallyLocked: false,
+		era: "lateMedieval" as const,
 		...overrides,
-	}
+	} as OrogenParams
 }
 
 describe("planet-code format", () => {
@@ -58,6 +60,30 @@ describe("planet-code format", () => {
 
 		expect(decodePlanetSeed(code)).toBe(seed)
 		expect(decodePlanetCode(code)).toBeNull()
+	})
+})
+
+describe("planet-code era", () => {
+	it("round-trips the society era through the codec", () => {
+		for (const era of [
+			"paleolithic",
+			"neolithic",
+			"bronze",
+			"iron",
+			"lateMedieval",
+			"earlyModern",
+			"industrial",
+			"information",
+		] as const) {
+			const code = encodePlanetCode(12345, makeParams({ era }))
+			expect(decodePlanetCode(code)?.era).toBe(era)
+		}
+	})
+
+	it("defaults to lateMedieval when era is missing", () => {
+		const { era: _era, ...paramsWithoutEra } = makeParams()
+		const code = encodePlanetCode(12345, paramsWithoutEra as OrogenParams)
+		expect(decodePlanetCode(code)?.era).toBe("lateMedieval")
 	})
 })
 
@@ -87,9 +113,9 @@ describe("planet-code volcanism", () => {
 
 describe("planet-code sea level", () => {
 	it("round-trips sea level modifiers across the full slider range", () => {
-		const code = encodePlanetCode(12345, makeParams({ seaLevel: 1.73 }))
+		const code = encodePlanetCode(12345, makeParams({ seaLevel: 1.05 }))
 
-		expect(decodePlanetCode(code)?.seaLevel).toBe(1.73)
+		expect(decodePlanetCode(code)?.seaLevel).toBe(1.05)
 	})
 })
 

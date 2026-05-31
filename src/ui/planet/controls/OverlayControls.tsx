@@ -3,22 +3,18 @@ import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
-import { BankIcon } from "@/ui/components/primitives/icons/BankIcon"
-import { CityIcon } from "@/ui/components/primitives/icons/CityIcon"
+import { BugIcon } from "@/ui/components/primitives/icons/BugIcon"
 import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
-import { CompassRoseIcon } from "@/ui/components/primitives/icons/CompassRoseIcon"
 import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
-import { CrownIcon } from "@/ui/components/primitives/icons/CrownIcon"
-import { DiameterVariantIcon } from "@/ui/components/primitives/icons/DiameterVariantIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
 import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
-import { RulerIcon } from "@/ui/components/primitives/icons/RulerIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
+import type { ColorMode } from "../colors"
 import type { OrogenViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
@@ -27,7 +23,11 @@ import { formatDistance } from "../screen/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
-export type LabelMode = "off" | "nations" | "dynasty" | "settlements"
+export interface LabelMode {
+	nations: boolean
+	dynasty: boolean
+	settlements: boolean
+}
 
 const LAND_TRAVEL_KM_PER_DAY = 30
 const SEA_TRAVEL_KM_PER_DAY = 100
@@ -86,8 +86,10 @@ interface OverlayControlsProps {
 	setLabelMode: (v: LabelMode) => void
 	showElevation: boolean
 	setShowElevation: (v: boolean) => void
-	showInfrastructure: boolean
-	setShowInfrastructure: (v: boolean) => void
+	showSettlements: boolean
+	setShowSettlements: (v: boolean) => void
+	showRoads: boolean
+	setShowRoads: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
 	viewMode: OrogenViewMode
@@ -100,6 +102,18 @@ interface OverlayControlsProps {
 	setMapProjectionLatitude: (v: number) => void
 	debugMapModes: boolean
 	setDebugMapModes: (v: boolean) => void
+	colorMode: ColorMode
+	setColorMode: (v: ColorMode) => void
+	climateTimeMode: "current" | "annual" | "monthly"
+	setClimateTimeMode: (v: "current" | "annual" | "monthly") => void
+	climateMonth: number
+	setClimateMonth: (v: number) => void
+	climateSubMode: "basic" | "pasta" | "koppen"
+	setClimateSubMode: (v: "basic" | "pasta" | "koppen") => void
+	elevationSubMode: "colored" | "grayscale"
+	setElevationSubMode: (v: "colored" | "grayscale") => void
+	topographySubMode: "classification" | "slope"
+	setTopographySubMode: (v: "classification" | "slope") => void
 	exportExpanded?: boolean
 	setExportExpanded?: (v: boolean | ((prev: boolean) => boolean)) => void
 	exportWidthPreset: ExportWidthPreset
@@ -145,8 +159,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setLabelMode,
 	showElevation,
 	setShowElevation,
-	showInfrastructure,
-	setShowInfrastructure,
+	showSettlements,
+	setShowSettlements,
+	showRoads,
+	setShowRoads,
 	gridSpacing,
 	setGridSpacing,
 	viewMode,
@@ -159,6 +175,18 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setMapProjectionLatitude,
 	debugMapModes,
 	setDebugMapModes,
+	colorMode,
+	setColorMode,
+	climateTimeMode,
+	setClimateTimeMode,
+	climateMonth,
+	setClimateMonth,
+	climateSubMode,
+	setClimateSubMode,
+	elevationSubMode,
+	setElevationSubMode,
+	topographySubMode,
+	setTopographySubMode,
 	exportWidthPreset,
 	setExportWidthPreset,
 	exportCenterLongitude,
@@ -178,6 +206,14 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setExportExpanded: controlledSetExportExpanded,
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
+	const [politicalExpanded, setPoliticalExpanded] = React.useState(false)
+	const [infrastructureExpanded, setInfrastructureExpanded] =
+		React.useState(false)
+	const [geographyExpanded, setGeographyExpanded] = React.useState(false)
+	const [climateExpanded, setClimateExpanded] = React.useState(false)
+	const [measureExpanded, setMeasureExpanded] = React.useState(false)
+	const [elevationExpanded, setElevationExpanded] = React.useState(false)
+	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
 	const exportExpanded =
 		controlledExportExpanded !== undefined
@@ -196,45 +232,62 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 			return
 		setMapProjectionLatitude(nextValue)
 	}
-	const headerAction =
-		(canCopyCode && onCopyCode) || onReset ? (
-			<div className="flex items-center gap-1">
-				{onReset && (
-					<Tooltip content="Reset to defaults" position="top">
-						<IconButton
-							onClick={onReset}
-							tone="overlay"
-							shape="pill"
-							size="sm"
-							className="shadow-none"
-						>
-							<RefreshIcon className="h-3.5 w-3.5" />
-						</IconButton>
-					</Tooltip>
-				)}
-				{canCopyCode && onCopyCode && (
-					<Tooltip content={codeCopied ? "Copied" : "Copy seed"} position="top">
-						<IconButton
-							onClick={onCopyCode}
-							tone="overlay"
-							shape="pill"
-							size="sm"
-							className={
-								codeCopied
-									? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
-									: "shadow-none"
-							}
-						>
-							{codeCopied ? (
-								<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
-							) : (
-								<CopyIcon className="h-3.5 w-3.5" />
-							)}
-						</IconButton>
-					</Tooltip>
-				)}
-			</div>
-		) : undefined
+	const headerAction = (
+		<div className="flex items-center gap-1">
+			<Tooltip
+				content={debugMapModes ? "Disable debug modes" : "Enable debug modes"}
+				position="top"
+			>
+				<IconButton
+					onClick={() => setDebugMapModes(!debugMapModes)}
+					tone="overlay"
+					shape="pill"
+					size="sm"
+					className={
+						debugMapModes
+							? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
+							: "shadow-none"
+					}
+				>
+					<BugIcon className="h-3.5 w-3.5" filled={debugMapModes} />
+				</IconButton>
+			</Tooltip>
+			{onReset && (
+				<Tooltip content="Reset to defaults" position="top">
+					<IconButton
+						onClick={onReset}
+						tone="overlay"
+						shape="pill"
+						size="sm"
+						className="shadow-none"
+					>
+						<RefreshIcon className="h-3.5 w-3.5" />
+					</IconButton>
+				</Tooltip>
+			)}
+			{canCopyCode && onCopyCode && (
+				<Tooltip content={codeCopied ? "Copied" : "Copy seed"} position="top">
+					<IconButton
+						onClick={onCopyCode}
+						tone="overlay"
+						shape="pill"
+						size="sm"
+						className={
+							codeCopied
+								? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
+								: "shadow-none"
+						}
+					>
+						{codeCopied ? (
+							<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
+						) : (
+							<CopyIcon className="h-3.5 w-3.5" />
+						)}
+					</IconButton>
+				</Tooltip>
+			)}
+		</div>
+	)
 
 	return (
 		<div className="absolute inset-0 z-20 pointer-events-none">
@@ -275,60 +328,126 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
+
 								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Elevation</span>
-									<input
-										type="checkbox"
-										checked={showElevation}
-										onChange={(e) => setShowElevation(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
+									<span>Measure</span>
+									<div className="flex items-center gap-1">
+										<button
+											type="button"
+											onClick={() => setMeasureExpanded((v) => !v)}
+											className="flex items-center justify-center w-4 h-4 rounded hover:bg-white/10 transition-colors"
+										>
+											<ChevronIcon
+												direction={measureExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										<input
+											type="checkbox"
+											checked={measureMode !== "off"}
+											onChange={(e) => {
+												if (!e.target.checked) {
+													setMeasureMode("off")
+												} else if (measureMode === "off") {
+													setMeasureMode("ruler")
+												}
+											}}
+											className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+										/>
+									</div>
 								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Hierarchy</span>
-									<input
-										type="checkbox"
-										checked={showNationHierarchy}
-										onChange={(e) => setShowNationHierarchy(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Nation Borders</span>
-									<input
-										type="checkbox"
-										checked={showNationBorders}
-										onChange={(e) => setShowNationBorders(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Infrastructure</span>
-									<input
-										type="checkbox"
-										checked={showInfrastructure}
-										onChange={(e) => setShowInfrastructure(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Rivers</span>
-									<input
-										type="checkbox"
-										checked={showRivers}
-										onChange={(e) => setShowRivers(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Thermal Equator</span>
-									<input
-										type="checkbox"
-										checked={showThermalEquator}
-										onChange={(e) => setShowThermalEquator(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
+								{measureExpanded && (
+									<div className="space-y-1.5">
+										<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+											<span>Ruler</span>
+											<input
+												type="radio"
+												name="measure-mode"
+												checked={measureMode === "ruler"}
+												onChange={() => setMeasureMode("ruler")}
+												className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+											/>
+										</label>
+										<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+											<span>Pathfinding</span>
+											<input
+												type="radio"
+												name="measure-mode"
+												checked={measureMode === "pathfinding"}
+												onChange={() => setMeasureMode("pathfinding")}
+												className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+											/>
+										</label>
+										{measureMode === "pathfinding" && (
+											<div className="space-y-1.5">
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>
+														Land Travel{" "}
+														{formatTravelRateLabel(
+															LAND_TRAVEL_KM_PER_DAY,
+															unitSystem,
+														)}
+													</span>
+													<input
+														type="checkbox"
+														checked={pathfindingLand}
+														onChange={(e) =>
+															setPathfindingLand(e.target.checked)
+														}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>
+														Sea Travel{" "}
+														{formatTravelRateLabel(
+															SEA_TRAVEL_KM_PER_DAY,
+															unitSystem,
+														)}
+													</span>
+													<input
+														type="checkbox"
+														checked={pathfindingSea}
+														onChange={(e) =>
+															setPathfindingSea(e.target.checked)
+														}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												{pathfindingResult && (
+													<div className="rounded bg-white/5 px-2 py-1.5 font-mono text-[10px] text-slate-300">
+														<div>
+															Distance:{" "}
+															{formatDistance(
+																pathfindingResult.distanceKm,
+																unitSystem,
+															)}
+														</div>
+														<div>
+															Land:{" "}
+															{formatDistance(
+																pathfindingResult.landKm,
+																unitSystem,
+															)}
+														</div>
+														<div>
+															Sea:{" "}
+															{formatDistance(
+																pathfindingResult.seaKm,
+																unitSystem,
+															)}
+														</div>
+														<div>
+															Travel time: ~
+															{formatTravelTime(pathfindingResult.travelDays)}
+														</div>
+													</div>
+												)}
+											</div>
+										)}
+									</div>
+								)}
+
 								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
 									<span>Grid Lines</span>
 									<div className="flex items-center gap-1">
@@ -384,147 +503,411 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										/>
 									</div>
 								)}
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Debug Map Modes</span>
-									<input
-										type="checkbox"
-										checked={debugMapModes}
-										onChange={(e) => setDebugMapModes(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
 
-								<div className="flex items-center justify-between gap-3">
-									<span className="text-[11px] font-medium text-slate-200">
-										Labels
-									</span>
-									<SegmentedControl
-										options={[
-											{
-												value: "off",
-												label: <DiameterVariantIcon className="h-3.5 w-3.5" />,
-												ariaLabel: "Labels off",
-												title: "Labels off",
-											},
-											{
-												value: "nations",
-												label: <BankIcon className="h-3.5 w-3.5" />,
-												ariaLabel: "Nation labels",
-												title: "Nation labels",
-											},
-											{
-												value: "dynasty",
-												label: <CrownIcon className="h-3.5 w-3.5" />,
-												ariaLabel: "Dynasty labels",
-												title: "Dynasty labels",
-											},
-											{
-												value: "settlements",
-												label: <CityIcon className="h-3.5 w-3.5" />,
-												ariaLabel: "Settlement labels",
-												title: "Settlement labels",
-											},
-										]}
-										value={labelMode}
-										onChange={setLabelMode}
-										tone="overlay"
-										size="sm"
-										buttonClassName="px-2"
-									/>
-								</div>
-								<div className="border-t border-white/10 pt-2">
-									<div className="flex items-center justify-between gap-3">
-										<span className="text-[11px] font-medium text-slate-200">
-											Measure
-										</span>
-										<SegmentedControl
-											options={[
-												{
-													value: "off",
-													label: (
-														<DiameterVariantIcon className="h-3.5 w-3.5" />
-													),
-													ariaLabel: "Measure off",
-													title: "Measure off",
-												},
-												{
-													value: "ruler",
-													label: <RulerIcon className="h-3.5 w-3.5" />,
-													ariaLabel: "Ruler mode",
-													title: "Ruler mode",
-												},
-												{
-													value: "pathfinding",
-													label: <CompassRoseIcon className="h-3.5 w-3.5" />,
-													ariaLabel: "Pathfinding mode",
-													title: "Pathfinding mode",
-												},
-											]}
-											value={measureMode}
-											onChange={setMeasureMode}
-											tone="overlay"
-											size="sm"
-											buttonClassName="px-2"
+								<div>
+									<button
+										type="button"
+										onClick={() => setGeographyExpanded((v) => !v)}
+										className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+									>
+										<span>Geography</span>
+										<ChevronIcon
+											direction={geographyExpanded ? "up" : "down"}
+											className="h-3 w-3 text-slate-400"
 										/>
-									</div>
+									</button>
+									{geographyExpanded && (
+										<div className="mt-1.5 space-y-1.5">
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Elevation</span>
+												<input
+													type="checkbox"
+													checked={showElevation}
+													onChange={(e) => setShowElevation(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Rivers</span>
+												<input
+													type="checkbox"
+													checked={showRivers}
+													onChange={(e) => setShowRivers(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Thermal Equator</span>
+												<input
+													type="checkbox"
+													checked={showThermalEquator}
+													onChange={(e) =>
+														setShowThermalEquator(e.target.checked)
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+										</div>
+									)}
 								</div>
-								{measureMode === "pathfinding" && (
-									<div className="space-y-1.5">
-										<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+
+								<div>
+									<button
+										type="button"
+										onClick={() => setPoliticalExpanded((v) => !v)}
+										className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+									>
+										<span>Political</span>
+										<ChevronIcon
+											direction={politicalExpanded ? "up" : "down"}
+											className="h-3 w-3 text-slate-400"
+										/>
+									</button>
+									{politicalExpanded && (
+										<div className="mt-1.5 space-y-1.5">
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Hierarchy</span>
+												<input
+													type="checkbox"
+													checked={showNationHierarchy}
+													onChange={(e) =>
+														setShowNationHierarchy(e.target.checked)
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Borders</span>
+												<input
+													type="checkbox"
+													checked={showNationBorders}
+													onChange={(e) =>
+														setShowNationBorders(e.target.checked)
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Labels</span>
+												<input
+													type="checkbox"
+													checked={labelMode.nations}
+													onChange={(e) =>
+														setLabelMode({
+															...labelMode,
+															nations: e.target.checked,
+														})
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Dynasties</span>
+												<input
+													type="checkbox"
+													checked={labelMode.dynasty}
+													onChange={(e) =>
+														setLabelMode({
+															...labelMode,
+															dynasty: e.target.checked,
+														})
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+										</div>
+									)}
+								</div>
+
+								<div>
+									<button
+										type="button"
+										onClick={() => setInfrastructureExpanded((v) => !v)}
+										className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+									>
+										<span>Infrastructure</span>
+										<ChevronIcon
+											direction={infrastructureExpanded ? "up" : "down"}
+											className="h-3 w-3 text-slate-400"
+										/>
+									</button>
+									{infrastructureExpanded && (
+										<div className="mt-1.5 space-y-1.5">
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Settlements</span>
+												<input
+													type="checkbox"
+													checked={showSettlements}
+													onChange={(e) => setShowSettlements(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Roads</span>
+												<input
+													type="checkbox"
+													checked={showRoads}
+													onChange={(e) => setShowRoads(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Labels</span>
+												<input
+													type="checkbox"
+													checked={labelMode.settlements}
+													onChange={(e) =>
+														setLabelMode({
+															...labelMode,
+															settlements: e.target.checked,
+														})
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+										</div>
+									)}
+								</div>
+
+								{(colorMode === "temperature" ||
+									colorMode === "precipitation") && (
+									<div>
+										<button
+											type="button"
+											onClick={() => setClimateExpanded((v) => !v)}
+											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+										>
 											<span>
-												Land Travel{" "}
-												{formatTravelRateLabel(
-													LAND_TRAVEL_KM_PER_DAY,
-													unitSystem,
-												)}
+												{colorMode === "temperature"
+													? "Temperature"
+													: "Rainfall"}
 											</span>
-											<input
-												type="checkbox"
-												checked={pathfindingLand}
-												onChange={(e) => setPathfindingLand(e.target.checked)}
-												className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+											<ChevronIcon
+												direction={climateExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
 											/>
-										</label>
-										<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-											<span>
-												Sea Travel{" "}
-												{formatTravelRateLabel(
-													SEA_TRAVEL_KM_PER_DAY,
-													unitSystem,
+										</button>
+										{climateExpanded && (
+											<div className="mt-1.5 space-y-1.5">
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Current</span>
+													<input
+														type="radio"
+														name="climate-time"
+														checked={climateTimeMode === "current"}
+														onChange={() => setClimateTimeMode("current")}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Annual</span>
+													<input
+														type="radio"
+														name="climate-time"
+														checked={climateTimeMode === "annual"}
+														onChange={() => setClimateTimeMode("annual")}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Monthly</span>
+													<input
+														type="radio"
+														name="climate-time"
+														checked={climateTimeMode === "monthly"}
+														onChange={() => setClimateTimeMode("monthly")}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												{climateTimeMode === "monthly" && (
+													<div className="flex items-center gap-3">
+														<input
+															type="range"
+															min={0}
+															max={11}
+															step={1}
+															value={climateMonth}
+															onChange={(e) =>
+																setClimateMonth(Number(e.target.value))
+															}
+															className="flex-1 accent-slate-100"
+														/>
+														<span className="font-mono text-[11px] text-slate-400 w-8 text-right">
+															{[
+																"Jan",
+																"Feb",
+																"Mar",
+																"Apr",
+																"May",
+																"Jun",
+																"Jul",
+																"Aug",
+																"Sep",
+																"Oct",
+																"Nov",
+																"Dec",
+															][climateMonth] ?? climateMonth}
+														</span>
+													</div>
 												)}
-											</span>
-											<input
-												type="checkbox"
-												checked={pathfindingSea}
-												onChange={(e) => setPathfindingSea(e.target.checked)}
-												className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-											/>
-										</label>
-										{pathfindingResult && (
-											<div className="rounded bg-white/5 px-2 py-1.5 font-mono text-[10px] text-slate-300">
-												<div>
-													Distance:{" "}
-													{formatDistance(
-														pathfindingResult.distanceKm,
-														unitSystem,
-													)}
-												</div>
-												<div>
-													Land:{" "}
-													{formatDistance(pathfindingResult.landKm, unitSystem)}
-												</div>
-												<div>
-													Sea:{" "}
-													{formatDistance(pathfindingResult.seaKm, unitSystem)}
-												</div>
-												<div>
-													Travel time: ~
-													{formatTravelTime(pathfindingResult.travelDays)}
-												</div>
 											</div>
 										)}
 									</div>
 								)}
+
+								{(colorMode === "terrain" || colorMode === "landHeightmap") && (
+									<div>
+										<button
+											type="button"
+											onClick={() => setElevationExpanded((v) => !v)}
+											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+										>
+											<span>Elevation</span>
+											<ChevronIcon
+												direction={elevationExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										{elevationExpanded && (
+											<div className="mt-1.5 space-y-1.5">
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Colored</span>
+													<input
+														type="radio"
+														name="elevation-sub"
+														checked={elevationSubMode === "colored"}
+														onChange={() => {
+															setElevationSubMode("colored")
+															setColorMode("terrain")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Grayscale</span>
+													<input
+														type="radio"
+														name="elevation-sub"
+														checked={elevationSubMode === "grayscale"}
+														onChange={() => {
+															setElevationSubMode("grayscale")
+															setColorMode("landHeightmap")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+											</div>
+										)}
+									</div>
+								)}
+
+								{(colorMode === "topography" || colorMode === "slope") && (
+									<div>
+										<button
+											type="button"
+											onClick={() => setTopographyExpanded((v) => !v)}
+											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+										>
+											<span>Topography</span>
+											<ChevronIcon
+												direction={topographyExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										{topographyExpanded && (
+											<div className="mt-1.5 space-y-1.5">
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Classification</span>
+													<input
+														type="radio"
+														name="topography-sub"
+														checked={topographySubMode === "classification"}
+														onChange={() => {
+															setTopographySubMode("classification")
+															setColorMode("topography")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Slope</span>
+													<input
+														type="radio"
+														name="topography-sub"
+														checked={topographySubMode === "slope"}
+														onChange={() => {
+															setTopographySubMode("slope")
+															setColorMode("slope")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+											</div>
+										)}
+									</div>
+								)}
+
+								{(colorMode === "climate" ||
+									colorMode === "pastaClimate" ||
+									colorMode === "koppenClimate") && (
+									<div>
+										<button
+											type="button"
+											onClick={() => setClimateExpanded((v) => !v)}
+											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+										>
+											<span>Climate</span>
+											<ChevronIcon
+												direction={climateExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										{climateExpanded && (
+											<div className="mt-1.5 space-y-1.5">
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Basic</span>
+													<input
+														type="radio"
+														name="climate-sub"
+														checked={climateSubMode === "basic"}
+														onChange={() => {
+															setClimateSubMode("basic")
+															setColorMode("climate")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Pasta</span>
+													<input
+														type="radio"
+														name="climate-sub"
+														checked={climateSubMode === "pasta"}
+														onChange={() => {
+															setClimateSubMode("pasta")
+															setColorMode("pastaClimate")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Koppen</span>
+													<input
+														type="radio"
+														name="climate-sub"
+														checked={climateSubMode === "koppen"}
+														onChange={() => {
+															setClimateSubMode("koppen")
+															setColorMode("koppenClimate")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+											</div>
+										)}
+									</div>
+								)}
+
 								<div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
 									<SegmentedControl
 										options={[
@@ -595,6 +978,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										/>
 									</div>
 								)}
+
 								<div className="space-y-2 border-t border-white/10 pt-2">
 									<div className="flex items-center justify-between gap-3">
 										<label className="text-[11px] font-medium text-slate-300">

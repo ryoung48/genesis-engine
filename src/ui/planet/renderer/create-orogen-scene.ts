@@ -572,6 +572,8 @@ export function createOrogenScene(
 	let mapRivers: THREE.Group | null = null
 	let riverData: RiverData | null = null
 	let riversVisible = false
+	let globeRiverMaterials: LineMaterial[] = []
+	let mapRiverMaterials: LineMaterial[] = []
 	let riverMaterials: LineMaterial[] = []
 	let globeNationBorders: THREE.LineSegments | null = null
 	let mapNationBorders: THREE.LineSegments | null = null
@@ -605,13 +607,19 @@ export function createOrogenScene(
 	let globeInfrastructure: THREE.Group | null = null
 	let mapInfrastructure: THREE.Group | null = null
 	let infrastructureData: SerializedNetwork | null = null
+	let globeInfrastructureMaterials: LineMaterial[] = []
+	let mapInfrastructureMaterials: LineMaterial[] = []
 	let infrastructureMaterials: LineMaterial[] = []
 	let infrastructureVisible = false
 	let globeNationLabels: THREE.Group | null = null
 	let mapNationLabels: THREE.Group | null = null
 	let globeSettlementLabels: THREE.Group | null = null
 	let mapSettlementLabels: THREE.Group | null = null
-	let labelMode: LabelMode = "off"
+	let labelMode: LabelMode = {
+		nations: false,
+		dynasty: false,
+		settlements: false,
+	}
 	const labelCullingEnabled = true
 	let elevationVisible = true
 	const nationLabelPools = createNationLabelPools()
@@ -650,15 +658,41 @@ export function createOrogenScene(
 						mapControlsInteracting ||
 						mapControlActivityFrames > 0
 				}
+				if (mapInfrastructureMaterials.length > 0) {
+					const zoomScale = Math.sqrt(mapCamera.zoom)
+					for (const mat of mapInfrastructureMaterials) {
+						mat.linewidth = mat.userData.baseWidth * zoomScale
+					}
+				}
+				if (mapRiverMaterials.length > 0) {
+					const zoomScale = Math.sqrt(mapCamera.zoom)
+					for (const mat of mapRiverMaterials) {
+						mat.linewidth = mat.userData.baseWidth * zoomScale
+					}
+				}
 				renderer.render(scene, mapCamera)
 				return keepAnimating
 			}
 
+			if (globeRiverMaterials.length > 0) {
+				const dist = camera.position.length()
+				const zoomScale = 3 / dist
+				for (const mat of globeRiverMaterials) {
+					mat.linewidth = mat.userData.baseWidth * zoomScale
+				}
+			}
 			if (globeMeasureDots && globeMeasureDots.visible) {
 				const dist = camera.position.length()
 				const scale = dist * 0.001
 				for (const child of globeMeasureDots.children) {
 					child.scale.setScalar(scale)
+				}
+			}
+			if (globeInfrastructureMaterials.length > 0) {
+				const dist = camera.position.length()
+				const zoomScale = 3 / dist
+				for (const mat of globeInfrastructureMaterials) {
+					mat.linewidth = mat.userData.baseWidth * zoomScale
 				}
 			}
 			if (globeControlsInteracting || globeControlActivityFrames > 0) {
@@ -789,10 +823,12 @@ export function createOrogenScene(
 		disposeGroup(scene, mapNationLabels)
 		globeNationLabels = null
 		mapNationLabels = null
-		if (!currentWorld?.nations || labelMode === "off" || labelMode === "settlements") {
+		if (!currentWorld?.nations) {
 			return
 		}
-		const labelNames = labelMode === "dynasty" ? dynastyNames : nationNames
+		const showNationLabels = labelMode.nations || labelMode.dynasty
+		if (!showNationLabels) return
+		const labelNames = labelMode.dynasty ? dynastyNames : nationNames
 		if (!labelNames) return
 		globeNationLabels = buildGlobeNationLabels(
 			currentWorld,
@@ -824,7 +860,11 @@ export function createOrogenScene(
 		disposeGroup(scene, mapSettlementLabels)
 		globeSettlementLabels = null
 		mapSettlementLabels = null
-		if (!currentWorld?.settlementRegions || labelMode !== "settlements" || !settlementLabelNames) {
+		if (
+			!currentWorld?.settlementRegions ||
+			!labelMode.settlements ||
+			!settlementLabelNames
+		) {
 			return
 		}
 		globeSettlementLabels = buildGlobeSettlementLabels(
@@ -857,6 +897,8 @@ export function createOrogenScene(
 		disposeGroup(scene, mapInfrastructure)
 		globeInfrastructure = null
 		mapInfrastructure = null
+		globeInfrastructureMaterials = []
+		mapInfrastructureMaterials = []
 		infrastructureMaterials = []
 		if (
 			!currentWorld?.provinces ||
@@ -887,6 +929,8 @@ export function createOrogenScene(
 		)
 		globeInfrastructure = globeTradeRouteBuild.group
 		mapInfrastructure = mapTradeRouteBuild.group
+		globeInfrastructureMaterials = globeTradeRouteBuild.materials
+		mapInfrastructureMaterials = mapTradeRouteBuild.materials
 		infrastructureMaterials = [
 			...globeTradeRouteBuild.materials,
 			...mapTradeRouteBuild.materials,
@@ -1066,6 +1110,8 @@ export function createOrogenScene(
 		pulse = null
 		globeRivers = null
 		mapRivers = null
+		globeRiverMaterials = []
+		mapRiverMaterials = []
 		riverMaterials = []
 		globeHierarchyOverlay = null
 		mapHierarchyOverlay = null
@@ -1137,6 +1183,7 @@ export function createOrogenScene(
 				riverData,
 				canvas,
 				riverMaterials,
+				globeRiverMaterials,
 				riversVisible,
 				currentViewMode,
 				elevationVisible,
@@ -1145,6 +1192,7 @@ export function createOrogenScene(
 				riverData,
 				canvas,
 				riverMaterials,
+				mapRiverMaterials,
 				currentMapCenterLongitudeDeg,
 				currentMapProjectionLatitudeDeg,
 				riversVisible,
@@ -1240,18 +1288,18 @@ export function createOrogenScene(
 		}
 		if (globeNationLabels)
 			globeNationLabels.visible =
-				labelMode !== "off" && labelMode !== "settlements" && currentViewMode === "globe"
+				(labelMode.nations || labelMode.dynasty) && currentViewMode === "globe"
 		if (mapNationLabels) {
 			mapNationLabels.visible =
-				labelMode !== "off" && labelMode !== "settlements" && currentViewMode === "map"
+				(labelMode.nations || labelMode.dynasty) && currentViewMode === "map"
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
 		}
 		if (globeSettlementLabels)
 			globeSettlementLabels.visible =
-				labelMode === "settlements" && currentViewMode === "globe"
+				labelMode.settlements && currentViewMode === "globe"
 		if (mapSettlementLabels) {
 			mapSettlementLabels.visible =
-				labelMode === "settlements" && currentViewMode === "map"
+				labelMode.settlements && currentViewMode === "map"
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
 		}
 		requestRender()
@@ -1316,8 +1364,11 @@ export function createOrogenScene(
 			{ object: mapHierarchyOverlay, visible: hierarchyOverlayNationId >= 0 },
 			{ object: mapSettlements, visible: settlementsVisible },
 			{ object: mapInfrastructure, visible: infrastructureVisible },
-			{ object: mapNationLabels, visible: labelMode !== "off" && labelMode !== "settlements" },
-			{ object: mapSettlementLabels, visible: labelMode === "settlements" },
+			{
+				object: mapNationLabels,
+				visible: labelMode.nations || labelMode.dynasty,
+			},
+			{ object: mapSettlementLabels, visible: labelMode.settlements },
 			{ object: mapSelectedProvinceBorder, visible: false },
 			{ object: mapMeasureLine, visible: false },
 			{ object: mapMeasureDots, visible: false },

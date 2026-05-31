@@ -2,7 +2,6 @@ import { elevToHeightKm } from "../climate/climate"
 
 export function computeSeaLevelOffsetKm(
 	seaLevel: number,
-	maxElevKm: number,
 	maxDepthKm: number,
 ): number {
 	if (seaLevel === 1) return 0
@@ -41,11 +40,7 @@ export function applySeaLevelToElevation(params: {
 	seaLevelOffsetKm: number
 } {
 	const { baseElevation, maxElevKm, maxDepthKm, seaLevel } = params
-	const seaLevelOffsetKm = computeSeaLevelOffsetKm(
-		seaLevel,
-		maxElevKm,
-		maxDepthKm,
-	)
+	const seaLevelOffsetKm = computeSeaLevelOffsetKm(seaLevel, maxDepthKm)
 	if (seaLevelOffsetKm === 0) {
 		const elevation_km = new Float32Array(baseElevation.length)
 		for (let r = 0; r < baseElevation.length; r++) {

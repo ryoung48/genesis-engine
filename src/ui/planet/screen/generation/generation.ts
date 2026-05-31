@@ -230,6 +230,7 @@ export function generateWorld(
 		volcanism: overrides?.volcanism ?? currentParams.volcanism,
 		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
+		era: overrides?.era ?? currentParams.era,
 	} as OrogenParams
 
 	const request: OrogenWorkerRequest = { type: "generate", params }

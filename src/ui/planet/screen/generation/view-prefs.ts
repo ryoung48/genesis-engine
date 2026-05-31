@@ -19,7 +19,8 @@ interface StoredViewPrefs {
 	showElevation: boolean
 	showThermalEquator: boolean
 	showRivers: boolean
-	showInfrastructure: boolean
+	showSettlements: boolean
+	showRoads: boolean
 	overlaysExpanded: boolean
 	gridSpacing: number
 	unitSystem: UnitSystem
@@ -28,6 +29,11 @@ interface StoredViewPrefs {
 	measureMode: MeasureMode
 	pathfindingLand: boolean
 	pathfindingSea: boolean
+	climateTimeMode: "current" | "annual" | "monthly"
+	climateMonth: number
+	climateSubMode: "basic" | "pasta" | "koppen"
+	elevationSubMode: "colored" | "grayscale"
+	topographySubMode: "classification" | "slope"
 }
 
 const COLOR_MODES = new Set<ColorMode>([
@@ -52,7 +58,9 @@ const COLOR_MODES = new Set<ColorMode>([
 	"basins",
 	"terrainFeatures",
 	"dtr",
+	"humidity",
 	"trade_goods",
+	"timezone",
 ])
 
 const NATION_MAP_MODES = new Set<NationMapMode>([
@@ -60,6 +68,7 @@ const NATION_MAP_MODES = new Set<NationMapMode>([
 	"provinces",
 	"dynasty",
 	"diplomacy",
+	"government",
 ])
 
 const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
@@ -75,8 +84,6 @@ const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
 const VIEW_MODES = new Set<OrogenViewMode>(["globe", "map"])
 const UNIT_SYSTEMS = new Set<UnitSystem>(["metric", "imperial"])
 const MEASURE_MODES = new Set<MeasureMode>(["off", "ruler", "pathfinding"])
-const LABEL_MODES = new Set<LabelMode>(["off", "nations", "dynasty", "settlements"])
-
 export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	colorMode: DEFAULT_GEOGRAPHY_MODE,
 	geographyMode: DEFAULT_GEOGRAPHY_MODE,
@@ -87,11 +94,12 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showGrid: true,
 	showNationBorders: false,
 	showNationHierarchy: false,
-	labelMode: "off",
+	labelMode: { nations: false, dynasty: false, settlements: false },
 	showElevation: true,
 	showThermalEquator: false,
 	showRivers: false,
-	showInfrastructure: false,
+	showSettlements: false,
+	showRoads: false,
 	overlaysExpanded: false,
 	gridSpacing: 15,
 	unitSystem: "metric",
@@ -100,6 +108,11 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	measureMode: "off",
 	pathfindingLand: true,
 	pathfindingSea: true,
+	climateTimeMode: "current",
+	climateMonth: 0,
+	climateSubMode: "basic",
+	elevationSubMode: "colored",
+	topographySubMode: "classification",
 }
 
 function isColorMode(value: unknown): value is ColorMode {
@@ -132,7 +145,16 @@ function isMeasureMode(value: unknown): value is MeasureMode {
 }
 
 function isLabelMode(value: unknown): value is LabelMode {
-	return typeof value === "string" && LABEL_MODES.has(value as LabelMode)
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"nations" in value &&
+		"dynasty" in value &&
+		"settlements" in value &&
+		typeof (value as LabelMode).nations === "boolean" &&
+		typeof (value as LabelMode).dynasty === "boolean" &&
+		typeof (value as LabelMode).settlements === "boolean"
+	)
 }
 
 function readBoolean(value: unknown, fallback: boolean): boolean {
@@ -190,10 +212,11 @@ export function parseStoredViewPrefs(
 				DEFAULT_VIEW_PREFS.showThermalEquator,
 			),
 			showRivers: readBoolean(parsed.showRivers, DEFAULT_VIEW_PREFS.showRivers),
-			showInfrastructure: readBoolean(
-				parsed.showInfrastructure,
-				DEFAULT_VIEW_PREFS.showInfrastructure,
+			showSettlements: readBoolean(
+				parsed.showSettlements,
+				DEFAULT_VIEW_PREFS.showSettlements,
 			),
+			showRoads: readBoolean(parsed.showRoads, DEFAULT_VIEW_PREFS.showRoads),
 			overlaysExpanded: readBoolean(
 				parsed.overlaysExpanded,
 				DEFAULT_VIEW_PREFS.overlaysExpanded,
@@ -224,6 +247,32 @@ export function parseStoredViewPrefs(
 				parsed.pathfindingSea,
 				DEFAULT_VIEW_PREFS.pathfindingSea,
 			),
+			climateTimeMode:
+				parsed.climateTimeMode === "current" ||
+				parsed.climateTimeMode === "annual" ||
+				parsed.climateTimeMode === "monthly"
+					? parsed.climateTimeMode
+					: DEFAULT_VIEW_PREFS.climateTimeMode,
+			climateMonth: readNumber(
+				parsed.climateMonth,
+				DEFAULT_VIEW_PREFS.climateMonth,
+			),
+			climateSubMode:
+				parsed.climateSubMode === "basic" ||
+				parsed.climateSubMode === "pasta" ||
+				parsed.climateSubMode === "koppen"
+					? parsed.climateSubMode
+					: DEFAULT_VIEW_PREFS.climateSubMode,
+			elevationSubMode:
+				parsed.elevationSubMode === "colored" ||
+				parsed.elevationSubMode === "grayscale"
+					? parsed.elevationSubMode
+					: DEFAULT_VIEW_PREFS.elevationSubMode,
+			topographySubMode:
+				parsed.topographySubMode === "classification" ||
+				parsed.topographySubMode === "slope"
+					? parsed.topographySubMode
+					: DEFAULT_VIEW_PREFS.topographySubMode,
 		}
 	} catch {
 		return null

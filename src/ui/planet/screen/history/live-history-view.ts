@@ -30,6 +30,13 @@ export function buildLiveHistoryView(params: {
 		),
 		relationAt: (a: number, b: number) =>
 			relationIndex.get(a * liveFrame.assignment.length + b) ?? REL.NEUTRAL,
+		forEachRelationPair: (cb: (a: number, b: number) => void) => {
+			for (let i = 0; i < liveFrame.relationValues.length; i++) {
+				const a = liveFrame.relationA[i]
+				const b = liveFrame.relationB[i]
+				if (a < b) cb(a, b)
+			}
+		},
 		getNationWealth: (nationId: number) =>
 			liveFrame.nationWealth?.[nationId] ?? 0,
 		getNationOptimalWealth: (nationId: number) =>

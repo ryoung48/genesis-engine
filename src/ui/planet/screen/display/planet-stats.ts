@@ -120,7 +120,11 @@ export function computePlanetStats(
 
 	let riverCount: number | null = null
 	let longestRiverKm: number | null = null
-	if (world?.rivers?.riverId && world.rivers.visible && world.rivers.riverLengthKm) {
+	if (
+		world?.rivers?.riverId &&
+		world.rivers.visible &&
+		world.rivers.riverLengthKm
+	) {
 		const { riverId, visible, riverLengthKm } = world.rivers
 		const seenIds = new Set<number>()
 		for (let r = 0; r < visible.length; r++) {
@@ -138,12 +142,10 @@ export function computePlanetStats(
 	const habitabilityScore = world?.population?.habitabilityScore ?? 0
 
 	const seaLevelValue = activeParams?.seaLevel ?? params.seaLevel
-	const maxElevationValue = activeParams?.maxElevation ?? params.maxElevation
 	let seaLevelShiftStat: PlanetStat | null = null
 	if (seaLevelValue != null && seaLevelValue !== 1) {
-		const maxElevKm = (maxElevationValue ?? 6000) / 1000
 		const maxDepthKm = getMaxOceanDepthKm(radiusKm)
-		const offsetKm = computeSeaLevelOffsetKm(seaLevelValue, maxElevKm, maxDepthKm)
+		const offsetKm = computeSeaLevelOffsetKm(seaLevelValue, maxDepthKm)
 		const sign = offsetKm >= 0 ? "+" : "−"
 		const absValue =
 			unitSystem === "imperial"
@@ -232,7 +234,9 @@ export function computePlanetStats(
 		{
 			label: "Longest River",
 			value:
-				longestRiverKm !== null ? formatDistance(longestRiverKm, unitSystem) : "-",
+				longestRiverKm !== null
+					? formatDistance(longestRiverKm, unitSystem)
+					: "-",
 		},
 		{
 			label: "Avg Temp",

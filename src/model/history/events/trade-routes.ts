@@ -174,6 +174,7 @@ function computeLandPassableMask(state: HistoryState): Uint8Array {
 		if (
 			province >= 0 &&
 			!state.desolate[province] &&
+			!state.stateless[province] &&
 			(state.regionIsLand.length === 0 || state.regionIsLand[region])
 		) {
 			mask[region] = 1

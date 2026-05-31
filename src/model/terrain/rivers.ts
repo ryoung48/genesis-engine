@@ -716,7 +716,8 @@ export function computeRivers(
 		}
 	}
 	const visibleLines = lines.filter(
-		(_, i) => (riverSystemLengths[lineRiverIds[i]] ?? 0) >= MIN_VISIBLE_RIVER_LENGTH_KM,
+		(_, i) =>
+			(riverSystemLengths[lineRiverIds[i]] ?? 0) >= MIN_VISIBLE_RIVER_LENGTH_KM,
 	)
 
 	for (let r = 0; r < N; r++) {

@@ -10,6 +10,7 @@ import { SEA_ROUTE_PORT_MIN_POPULATION } from "@/model/history/events/trade-rout
 import { PROV } from "@/model/history/fields"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import { regionPathLengthKm } from "@/model/shared/units"
+import { ERA_ORDER } from "@/model/society/eras"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -716,4 +717,142 @@ describe("full world smoke generation", () => {
 			results[1].summary.minTempC,
 		)
 	}, 300_000)
+
+	it("neolithic era leaves most land stateless and the history model keeps it that way", () => {
+		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const world = generateOrogenWorld({ ...base, era: "neolithic" })
+		const provinceCount = world.provinces?.count ?? 0
+		const nationCount = world.nations?.count ?? 0
+
+		// Provinces left stateless (no nation) in the generated world.
+		let statelessProvinces = 0
+		const sovereign = world.nations?.sovereign
+		if (sovereign && world.provinces) {
+			for (let p = 0; p < world.provinces.count; p++) {
+				if (!world.provinces.desolate[p] && sovereign[p] < 0)
+					statelessProvinces++
+			}
+		}
+
+		// The political map renders PROV.assignment from the history model. Build
+		// it (as the worker does) and count distinct nation assignments — this must
+		// match the generated nation count, NOT explode into one state per province.
+		let historyNations = -1
+		if (
+			world.nations &&
+			world.provinces &&
+			world.population &&
+			world.cultures
+		) {
+			const state = initHistory({
+				nations: world.nations,
+				provinces: world.provinces,
+				population: world.population,
+				coastal: world.coastal,
+				riverVisible: world.rivers.visible,
+				r_xyz: world.mesh.r_xyz,
+				cultures: world.cultures,
+				seed: base.seed,
+				waterAccess: world.waterAccess,
+			})
+			const distinct = new Set<number>()
+			for (let p = 0; p < world.provinces.count; p++) {
+				const assign = PROV.assignment.get(state, p, state.time)
+				if (assign >= 0) distinct.add(assign)
+			}
+			historyNations = distinct.size
+		}
+
+		expect(provinceCount).toBeGreaterThan(0)
+		expect(nationCount).toBeGreaterThan(0)
+		// Nations cover only a small fraction of provinces at neolithic.
+		expect(nationCount).toBeLessThan(provinceCount * 0.25)
+		// Most land is settled-but-stateless.
+		expect(statelessProvinces).toBeGreaterThan(provinceCount * 0.3)
+		// The history model must not turn stateless land into single-province states.
+		expect(historyNations).toBe(nationCount)
+	}, 120_000)
+
+	it("late medieval era leaves no stateless non-desolate provinces", () => {
+		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const world = generateOrogenWorld({ ...base, era: "lateMedieval" })
+
+		let statelessProvinces = 0
+		const sovereign = world.nations?.sovereign
+		if (sovereign && world.provinces) {
+			for (let p = 0; p < world.provinces.count; p++) {
+				if (!world.provinces.desolate[p] && sovereign[p] < 0)
+					statelessProvinces++
+			}
+		}
+
+		expect(world.provinces?.count ?? 0).toBeGreaterThan(0)
+		expect(world.nations?.count ?? 0).toBeGreaterThan(0)
+		expect(statelessProvinces).toBe(0)
+	}, 120_000)
+
+	it("logs development stats for all era presets", () => {
+		const DEV_BUCKETS = [
+			{ label: "0–0.05", lo: 0, hi: 0.05 },
+			{ label: "0.05–0.1", lo: 0.05, hi: 0.1 },
+			{ label: "0.1–0.25", lo: 0.1, hi: 0.25 },
+			{ label: "0.25–0.5", lo: 0.25, hi: 0.5 },
+			{ label: "0.5–0.75", lo: 0.5, hi: 0.75 },
+			{ label: "0.75+", lo: 0.75, hi: Infinity },
+		]
+
+		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		for (const era of ERA_ORDER) {
+			const world = generateOrogenWorld({ ...base, era })
+			if (
+				!world.nations ||
+				!world.provinces ||
+				!world.population ||
+				!world.cultures
+			) {
+				console.info(`Era ${era}: no society data`)
+				continue
+			}
+			const state = initHistory({
+				nations: world.nations,
+				provinces: world.provinces,
+				population: world.population,
+				coastal: world.coastal,
+				riverVisible: world.rivers.visible,
+				r_xyz: world.mesh.r_xyz,
+				cultures: world.cultures,
+				seed: base.seed,
+				waterAccess: world.waterAccess,
+			})
+			const P = state.P
+			let devSum = 0
+			let nonDesolateCount = 0
+			const bucketCounts = new Int32Array(DEV_BUCKETS.length)
+			for (let p = 0; p < P; p++) {
+				if (state.desolate[p]) continue
+				const dev = PROV.development.get(state, p)
+				devSum += dev
+				nonDesolateCount++
+				for (let b = 0; b < DEV_BUCKETS.length; b++) {
+					if (dev >= DEV_BUCKETS[b].lo && dev < DEV_BUCKETS[b].hi) {
+						bucketCounts[b]++
+						break
+					}
+				}
+			}
+			const avgDev = nonDesolateCount > 0 ? devSum / nonDesolateCount : 0
+			console.info(
+				`\nEra: ${era} | provinces: ${P} | non-desolate: ${nonDesolateCount} | avg dev: ${avgDev.toFixed(3)}`,
+			)
+			console.table(
+				DEV_BUCKETS.map((b, i) => ({
+					bucket: b.label,
+					count: bucketCounts[i],
+					pct: `${((bucketCounts[i] / Math.max(1, nonDesolateCount)) * 100).toFixed(1)}%`,
+				})),
+			)
+		}
+
+		expect(true).toBe(true)
+	}, 600_000)
 })

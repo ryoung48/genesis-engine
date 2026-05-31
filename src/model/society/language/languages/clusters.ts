@@ -146,7 +146,10 @@ function hasSplitRestrictedRepeat(value: string): boolean {
 	return false
 }
 
-function trailingVowelCount(value: string, vowelSet: ReadonlySet<string>): number {
+function trailingVowelCount(
+	value: string,
+	vowelSet: ReadonlySet<string>,
+): number {
 	let count = 0
 	for (let i = value.length - 1; i >= 0; i--) {
 		if (vowelSet.has(value[i])) count++
@@ -155,7 +158,10 @@ function trailingVowelCount(value: string, vowelSet: ReadonlySet<string>): numbe
 	return count
 }
 
-function leadingVowelCount(value: string, vowelSet: ReadonlySet<string>): number {
+function leadingVowelCount(
+	value: string,
+	vowelSet: ReadonlySet<string>,
+): number {
 	let count = 0
 	for (let i = 0; i < value.length; i++) {
 		if (vowelSet.has(value[i])) count++
@@ -333,7 +339,11 @@ const notHarsh = (
 	const { vowelSet } = getLanguageCache(src)
 	if (usedLongVowel && hasLongVowel(src, curr)) return false
 	if (usedDigraph && hasDigraph(src, curr)) return false
-	if (trailingVowelCount(prev, vowelSet) + leadingVowelCount(curr, vowelSet) >= 3) return false
+	if (
+		trailingVowelCount(prev, vowelSet) + leadingVowelCount(curr, vowelSet) >=
+		3
+	)
+		return false
 	if (hasSplitRestrictedRepeat(`${prev}${curr}`)) return false
 	const maxRun =
 		src.phonotacticStyle === "open"

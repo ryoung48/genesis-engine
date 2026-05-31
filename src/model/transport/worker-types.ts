@@ -154,6 +154,7 @@ export interface SerializedOrogenWorld {
 		totalPopulation: number
 		migrationWave?: Float32Array
 		cradleProvinces?: Int32Array
+		settlementWave?: number
 	}
 	monthlyTEQ?: Float32Array[]
 	/** Per-location trade good index (0=unassigned, 1-based into TRADE_GOOD_LABELS). */

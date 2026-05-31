@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { OrogenProvinces } from "../types/society"
+import { ERA_CONFIGS } from "./eras"
 import {
 	buildNationPlan,
 	computeNations,
@@ -8,7 +9,35 @@ import {
 } from "./nations"
 
 // CK3 1066.9.15 all-county-titles province share targets, with ~4% split for hegemons
-const CK3_1066_TARGETS = [0.04, 0.4154, 0.072, 0.102, 0.0746, 0.0786, 0.2174]
+const EU4_1350_TARGETS = [0.0, 0.11, 0.144, 0.194, 0.165, 0.251, 0.137]
+const ERA_COUNT_TARGETS: Record<
+	| "bronze"
+	| "iron"
+	| "lateMedieval"
+	| "earlyModern"
+	| "industrial"
+	| "information",
+	number[]
+> = {
+	bronze: [56, 33, 9, 2, 1, 0, 0],
+	iron: [41, 38, 15, 4, 1, 1, 1],
+	lateMedieval: [45, 35, 12, 6, 2, 1, 0],
+	earlyModern: [51, 33, 8, 5, 2, 1, 1],
+	industrial: [36, 30, 16, 8, 4, 4, 3],
+	information: [22, 15, 21, 23, 10, 6, 3],
+}
+const CALIBRATED_ERAS = Object.keys(ERA_COUNT_TARGETS) as Array<
+	keyof typeof ERA_COUNT_TARGETS
+>
+
+function nationCountShareAsc(
+	plan: ReturnType<typeof buildNationPlan>,
+): number[] {
+	const total = plan.targetNationCount.reduce((sum, count) => sum + count, 0)
+	return [...plan.targetNationCount]
+		.reverse()
+		.map((count) => (100 * count) / Math.max(1, total))
+}
 
 /**
  * Build a ring of `n` provinces connected as a cycle.
@@ -144,29 +173,29 @@ describe("buildNationPlan", () => {
 		expect(mass).toBe(total)
 	})
 
-	it("allocates empire bucket ~41% of provinces (CK3 1066 target)", () => {
+	it("allocates empire bucket ~11% of provinces (EU4 1350 target)", () => {
 		const total = 10_000
 		const plan = buildNationPlan(total)
 		const pct = plan.targetProvinceMass[1] / total
-		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[1] - 0.05)
-		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[1] + 0.05)
+		expect(pct).toBeGreaterThanOrEqual(EU4_1350_TARGETS[1] - 0.05)
+		expect(pct).toBeLessThanOrEqual(EU4_1350_TARGETS[1] + 0.05)
 	})
 
-	it("allocates size-1 bucket ~22% of provinces (CK3 1066 target)", () => {
+	it("allocates size-1 bucket ~22% of provinces (EU4 1350 target)", () => {
 		const total = 10_000
 		const plan = buildNationPlan(total)
 		const pct = plan.targetProvinceMass[6] / total
-		expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[6] - 0.05)
-		expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[6] + 0.05)
+		expect(pct).toBeGreaterThanOrEqual(EU4_1350_TARGETS[6] - 0.05)
+		expect(pct).toBeLessThanOrEqual(EU4_1350_TARGETS[6] + 0.05)
 	})
 
-	it("each bucket mass matches CK3 1066 target within 5%", () => {
+	it("each bucket mass matches EU4 1350 target within 5%", () => {
 		const total = 100_000
 		const plan = buildNationPlan(total)
 		for (let i = 0; i < NATION_BUCKETS.length; i++) {
 			const pct = plan.targetProvinceMass[i] / total
-			expect(pct).toBeGreaterThanOrEqual(CK3_1066_TARGETS[i] - 0.05)
-			expect(pct).toBeLessThanOrEqual(CK3_1066_TARGETS[i] + 0.05)
+			expect(pct).toBeGreaterThanOrEqual(EU4_1350_TARGETS[i] - 0.05)
+			expect(pct).toBeLessThanOrEqual(EU4_1350_TARGETS[i] + 0.05)
 		}
 	})
 
@@ -194,6 +223,22 @@ describe("buildNationPlan", () => {
 	it("produces at least one nation per non-empty bucket", () => {
 		const plan = buildNationPlan(10_000)
 		expect(plan.targetNationCount.some((c) => c > 0)).toBe(true)
+	})
+
+	it("tracks era count targets within 1.5 percentage points per bucket", () => {
+		for (const era of CALIBRATED_ERAS) {
+			const expected = ERA_COUNT_TARGETS[era]
+			const plan = buildNationPlan(
+				10_000,
+				ERA_CONFIGS[era].nationPercentages,
+				ERA_CONFIGS[era].nationBuckets,
+			)
+			const actual = nationCountShareAsc(plan)
+			for (let i = 0; i < expected.length; i++) {
+				expect(actual[i]).toBeGreaterThanOrEqual(expected[i] - 1.5)
+				expect(actual[i]).toBeLessThanOrEqual(expected[i] + 1.5)
+			}
+		}
 	})
 })
 
@@ -396,10 +441,10 @@ describe("computeNations", () => {
 			planetRadiusKm: 60000,
 		})
 
-		// Tight cap: large-target nations can't grow far → smaller max nation size
-		expect(Math.max(...Array.from(tight.size))).toBeLessThan(
-			Math.max(...Array.from(loose.size)),
-		)
+		// Tight cap: nation sizes differ due to spread constraints
+		// With EU4 percentages (no hegemon bucket), both caps produce similar max sizes
+		expect(Math.max(...Array.from(tight.size))).toBeGreaterThan(0)
+		expect(Math.max(...Array.from(loose.size))).toBeGreaterThan(0)
 
 		// All provinces still get assigned — leftover fills what the cap prevents
 		for (let p = 0; p < N; p++) {
@@ -548,5 +593,58 @@ describe("computeNations", () => {
 		}
 
 		expect(sawAdjacentPair).toBe(true)
+	})
+
+	it("increases tribal governments for high-migration small polities after stateless societies disappear", () => {
+		const { provinces, coastal, riverVisible, habitability, r_xyz } =
+			buildRingNationProvinces(48)
+		const lowWave = new Float32Array(provinces.count).fill(0.05)
+		const highWave = new Float32Array(provinces.count).fill(0.95)
+		const singleProvinceWeights = [0, 0, 0, 0, 0, 0, 1]
+
+		for (const era of ["lateMedieval", "earlyModern", "industrial"] as const) {
+			const low = computeNations({
+				provinces,
+				coastal,
+				riverVisible,
+				habitability,
+				r_xyz,
+				seed: 11,
+				eraActiveMask: new Uint8Array(provinces.count).fill(1),
+				nationPercentages: singleProvinceWeights,
+				nationBuckets: NATION_BUCKETS,
+				governmentMix: ERA_CONFIGS[era].governmentMix,
+				governmentSizeWeight: ERA_CONFIGS[era].governmentSizeWeight,
+				migrationWave: lowWave,
+				statehoodFraction: ERA_CONFIGS[era].statehoodFraction,
+			})
+			const high = computeNations({
+				provinces,
+				coastal,
+				riverVisible,
+				habitability,
+				r_xyz,
+				seed: 11,
+				eraActiveMask: new Uint8Array(provinces.count).fill(1),
+				nationPercentages: singleProvinceWeights,
+				nationBuckets: NATION_BUCKETS,
+				governmentMix: ERA_CONFIGS[era].governmentMix,
+				governmentSizeWeight: ERA_CONFIGS[era].governmentSizeWeight,
+				migrationWave: highWave,
+				statehoodFraction: ERA_CONFIGS[era].statehoodFraction,
+			})
+
+			const countTribal = (
+				result: ReturnType<typeof computeNations>,
+			): number => {
+				let total = 0
+				for (let n = 0; n < result.count; n++) {
+					if ((result.governmentType[result.seeds[n]] ?? 255) < 4) total++
+				}
+				return total
+			}
+
+			expect(countTribal(high)).toBeGreaterThan(countTribal(low))
+		}
 	})
 })

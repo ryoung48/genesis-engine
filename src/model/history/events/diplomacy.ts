@@ -52,6 +52,7 @@ const TRANSITION_MATRIX: Record<Relation, number[] | undefined> = {
 	[REL.FRIENDLY]: [0.02, 0.1, 0.2, 0.45, 0.23],
 	[REL.ALLY]: [0.01, 0.04, 0.1, 0.2, 0.65],
 	[REL.WAR]: undefined,
+	[REL.COLONY]: undefined,
 }
 
 function rollTransition(current: Relation, rng: HistoryRng): Relation {
@@ -97,7 +98,8 @@ function syncVassalRelations(
 			vassalRel === REL.VASSAL ||
 			vassalRel === REL.OVERLORD ||
 			vassalRel === REL.PU_SENIOR ||
-			vassalRel === REL.PU_JUNIOR
+			vassalRel === REL.PU_JUNIOR ||
+			vassalRel === REL.COLONY
 		)
 			continue
 
@@ -213,6 +215,9 @@ function seedNeighborRelations(state: HistoryState, rng: HistoryRng): void {
 			) {
 				continue
 			}
+			// Don't overwrite colony-colonizer relations seeded by createHistoryState.
+			const existing = getRelation(state, nation, neighbor)
+			if (existing === REL.COLONY || existing === REL.OVERLORD) continue
 			const relation = classifyInitialNeighborRelation(
 				state,
 				nation,
@@ -235,6 +240,9 @@ function seedInitialVassals(state: HistoryState, rng: HistoryRng): void {
 		if (getRulerRelation(state, nation)) continue
 		for (const neighbor of getNationNeighbors(state, nation)) {
 			if (state.desolate[neighbor] || !isSovereign(state, neighbor)) continue
+			if (getRelation(state, nation, neighbor) === REL.COLONY) continue
+			if (getRelation(state, nation, neighbor) === REL.OVERLORD) continue
+			if (getRulerRelation(state, neighbor)) continue
 			const aW = wealthOptimal(state, nation)
 			const bW = wealthOptimal(state, neighbor)
 			const ratio = aW / Math.max(1, bW)
@@ -339,7 +347,8 @@ export function runDiplomacy(
 			rel === REL.VASSAL ||
 			rel === REL.OVERLORD ||
 			rel === REL.PU_SENIOR ||
-			rel === REL.PU_JUNIOR
+			rel === REL.PU_JUNIOR ||
+			rel === REL.COLONY
 		)
 			continue
 
@@ -364,6 +373,7 @@ export function runDiplomacy(
 
 		if (rel === REL.OVERLORD || rel === REL.PU_SENIOR) continue
 		if (rel === REL.WAR) continue
+		if (rel === REL.COLONY) continue // colonizer's view of a distant colony
 
 		if (rel === REL.VASSAL) {
 			processVassalDiplomacy(state, nb, nation, rng)
@@ -383,8 +393,10 @@ export function runDiplomacy(
 			const pair = canVassalize(state, nation, nb)
 			if (pair) {
 				// Subject relations are relation-only; do not infer them from territory.
-				const existingOverlord = getRulerRelation(state, pair.vassal)
-				if (!existingOverlord) {
+				if (
+					!getRulerRelation(state, pair.vassal) &&
+					!getRulerRelation(state, pair.overlord)
+				) {
 					setRelation(state, pair.vassal, pair.overlord, REL.VASSAL)
 					state.events.push({
 						tag: "vassalized",

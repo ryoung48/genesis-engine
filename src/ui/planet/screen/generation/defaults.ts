@@ -9,6 +9,7 @@ import {
 	DEFAULT_PLANET_RADIUS_KM,
 	DEFAULT_SUN_TEMP_FACTOR,
 } from "@/model/shared/units"
+import { DEFAULT_ERA } from "@/model/society/eras"
 
 export const PLANET_CODE_STORAGE_KEY = "genesis:lastPlanetCode"
 export const RECENT_CODES_STORAGE_KEY = "genesis:recentCodes"
@@ -43,4 +44,5 @@ export const DEFAULT_WORLD_PARAMS = {
 	pressure: 1.0,
 	antistellarLon: DEFAULT_ANTISTELLAR_LON,
 	perihelion: DEFAULT_PERIHELION,
+	era: DEFAULT_ERA,
 } as const

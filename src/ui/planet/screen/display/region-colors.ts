@@ -1,9 +1,15 @@
 import { OROGEN_TERRAIN_FEATURE } from "@/model"
+import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/climate/vegetation"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
 import { REL } from "@/model/history/state"
+import {
+	regionTimezoneOffset,
+	timezoneLandColor,
+	timezoneWaterColor,
+} from "@/model/society/timezone"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../../colors"
 import {
@@ -14,6 +20,7 @@ import {
 	dtrColor,
 	getColor,
 	hotspotColor,
+	humidityColor,
 	migrationColor,
 	moistureDirectionalColor,
 	OCEAN_LIGHT_BLUE,
@@ -50,6 +57,37 @@ const DIPLOMACY_RGB_COLORS: Record<number, [number, number, number]> = {
 	[REL.SUSPICIOUS]: [0.918, 0.702, 0.031],
 	[REL.RIVAL]: [0.976, 0.451, 0.086],
 	[REL.WAR]: [0.976, 0.22, 0.086],
+	[REL.COLONY]: [0.961, 0.549, 0.502],
+}
+
+const GOVERNMENT_COLORS: Record<number, [number, number, number]> = {
+	// tribal — orange / brown family
+	0: [0.8, 0.56, 0.28], // chiefdom               — ochre
+	1: [0.55, 0.35, 0.14], // tribal monarchy        — dark brown
+	2: [0.93, 0.76, 0.5], // tribal federation      — light sand
+	3: [0.44, 0.24, 0.11], // native council         — deep red-brown
+	// monarchy — blue family
+	4: [0.42, 0.54, 0.72], // feudal monarchy        — desaturated steel blue
+	5: [0.55, 0.78, 0.95], // elective monarchy      — light sky blue
+	6: [0.06, 0.16, 0.44], // absolute monarchy      — dark navy
+	7: [0.13, 0.4, 0.85], // constitutional monarchy — vivid royal blue
+	// republic — green family
+	8: [0.1, 0.56, 0.46], // merchant republic      — teal-green
+	9: [0.11, 0.36, 0.18], // noble republic         — dark forest
+	10: [0.64, 0.8, 0.24], // city-state confederation — lime
+	11: [0.24, 0.64, 0.34], // presidential republic  — emerald
+	12: [0.48, 0.84, 0.46], // parliamentary republic — bright spring green
+	// theocracy — purple / magenta family
+	13: [0.52, 0.24, 0.7], // theocracy              — medium purple
+	14: [0.28, 0.11, 0.46], // monastic state         — dark indigo
+	15: [0.76, 0.56, 0.9], // prince-bishopric       — light lavender
+	16: [0.82, 0.18, 0.58], // imperial cult          — magenta
+	// republic extensions
+	17: [0.74, 0.14, 0.14], // socialist state        — deep red (republic)
+	18: [0.44, 0.46, 0.24], // military junta         — olive drab (republic)
+	// colonial — red family
+	19: [0.902, 0.329, 0.239], // trading company     — vermilion red
+	20: [0.961, 0.549, 0.502], // settler colony      — light salmon red
 }
 
 function basinColor(id: number): [number, number, number] {
@@ -167,6 +205,7 @@ export function computeRegionColors(
 	dtrMonth: number,
 	currentMonth: number,
 	viewMode: "globe" | "map" = "globe",
+	showElevation = true,
 	_occupiedRegions?: Set<number>,
 	activeWars?: readonly PoliticalMapWar[] | null,
 	selectedNationId?: number | null,
@@ -178,6 +217,38 @@ export function computeRegionColors(
 	const rgb = new Float32Array(N * 3)
 	const oceanRgb = (r: number): [number, number, number] =>
 		darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, world.elevation_km[r])
+
+	if (colorMode === "timezone") {
+		const provinces = world.provinces
+
+		for (let r = 0; r < N; r++) {
+			const p = provinces ? provinces.regionProvince[r] : -1
+			if (p < 0) {
+				// Water: the timezone stripe under the region itself.
+				const [cr, cg, cb] = timezoneWaterColor(regionTimezoneOffset(world, r))
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+				continue
+			}
+			if (provinces?.desolate[p]) {
+				rgb[3 * r] = 0.35
+				rgb[3 * r + 1] = 0.33
+				rgb[3 * r + 2] = 0.32
+				continue
+			}
+			// Land: the province's single zone (its nation's capital zone if any).
+			const base = timezoneLandColor(regionTimezoneOffset(world, r))
+			const [cr, cg, cb] = darkenPoliticalAtElevation(
+				base,
+				world.elevation_km[r],
+			)
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
 
 	if (colorMode === "slope") {
 		const slopeScoreByRegion = world.slopeScore
@@ -221,7 +292,7 @@ export function computeRegionColors(
 		world.climate
 	) {
 		const darkenMapWaterTemperature =
-			viewMode === "map" && colorMode === "temperature"
+			colorMode === "temperature" && (viewMode === "map" || !showElevation)
 		const temps =
 			temperatureMonth === 0
 				? world.climate.temperature_avg
@@ -432,6 +503,49 @@ export function computeRegionColors(
 		return rgb
 	}
 
+	if (colorMode === "humidity" && world.climate && world.dtr_annual) {
+		// RH estimated from mean temp + diurnal range (Tdew ≈ Tmin). Follows the
+		// same month index as DTR, since DTR is the dominant input.
+		const monthlyTemp =
+			dtrMonth === 0 ? null : world.climate.temperature_monthly
+		const monthlyDtr = dtrMonth === 0 ? null : world.dtr_monthly
+		const offset = dtrMonth === 0 ? 0 : (dtrMonth - 1) * N
+		const aet = world.hydrology?.aet_monthly
+		const pet = world.climate.pet_monthly
+		for (let r = 0; r < N; r++) {
+			if (!world.isLand?.[r]) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+				continue
+			}
+			const meanT = monthlyTemp
+				? monthlyTemp[offset + r]
+				: world.climate.temperature_avg[r]
+			const dtr = monthlyDtr
+				? (monthlyDtr[offset + r] ?? world.dtr_annual[r])
+				: world.dtr_annual[r]
+			let annualAridity: number | undefined
+			if (aet && pet) {
+				let aetSum = 0
+				let petSum = 0
+				for (let m = 0; m < 12; m++) {
+					aetSum += aet[m * N + r]
+					petSum += pet[m * N + r]
+				}
+				annualAridity = petSum > 0 ? aetSum / petSum : 1
+			}
+			const [cr, cg, cb] = humidityColor(
+				relativeHumidityFromTempRange(meanT, dtr, annualAridity),
+			)
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
 	if (colorMode === "oceanCurrents" && world.oceanCurrents) {
 		const { temperatureDelta, temperatureDeltaMonthly } = world.oceanCurrents
 		const monthly = currentMonth === 0 ? null : temperatureDeltaMonthly
@@ -513,8 +627,63 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "nations" && world.provinces) {
+		if (nationMode === "government" && world.nations?.governmentType) {
+			const { regionProvince, desolate } = world.provinces
+			const migrationWaveGov = world.population?.migrationWave
+			const settlementWaveGov = world.population?.settlementWave ?? 1.0
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0) {
+					const [cr, cg, cb] = oceanRgb(r)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (desolate[p]) {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						[0.35, 0.33, 0.32],
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (world.nations.assignment[p] < 0) {
+					const wave = migrationWaveGov?.[p] ?? 0
+					if (wave <= settlementWaveGov) {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.96, 0.94, 0.9],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					} else {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.72, 0.7, 0.68],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
+				} else {
+					const nationId = world.nations.assignment[p]
+					const govType = world.nations.governmentType[nationId] ?? 1
+					const baseColor = GOVERNMENT_COLORS[govType] ?? GOVERNMENT_COLORS[1]
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						baseColor,
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				}
+			}
+			return rgb
+		}
 		if (nationMode === "dynasty") {
 			const { regionProvince, desolate } = world.provinces
+			const migrationWaveDyn = world.population?.migrationWave
+			const settlementWaveDyn = world.population?.settlementWave ?? 1.0
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
 				const assignedNationId =
@@ -531,10 +700,33 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
-				} else if (desolate[p] || dynastyId < 0) {
-					rgb[3 * r] = 0.35
-					rgb[3 * r + 1] = 0.33
-					rgb[3 * r + 2] = 0.32
+				} else if (desolate[p]) {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						[0.35, 0.33, 0.32],
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (dynastyId < 0) {
+					const wave = migrationWaveDyn?.[p] ?? 0
+					if (wave <= settlementWaveDyn) {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.96, 0.94, 0.9],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					} else {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.72, 0.7, 0.68],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
 				} else {
 					const [cr, cg, cb] = darkenPoliticalAtElevation(
 						toPastelNationColor(getDynastyColor(dynastyId)),
@@ -575,6 +767,8 @@ export function computeRegionColors(
 		if (nationMode === "diplomacy" && world.nations) {
 			const { regionProvince, desolate } = world.provinces
 			const NEUTRAL_COLOR = DIPLOMACY_RGB_COLORS[REL.NEUTRAL]
+			const migrationWaveDip = world.population?.migrationWave
+			const settlementWaveDip = world.population?.settlementWave ?? 1.0
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
 				if (p < 0) {
@@ -582,10 +776,33 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
-				} else if (desolate[p] || world.nations.assignment[p] < 0) {
-					rgb[3 * r] = 0.35
-					rgb[3 * r + 1] = 0.33
-					rgb[3 * r + 2] = 0.32
+				} else if (desolate[p]) {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						[0.35, 0.33, 0.32],
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (world.nations.assignment[p] < 0) {
+					const wave = migrationWaveDip?.[p] ?? 0
+					if (wave <= settlementWaveDip) {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.96, 0.94, 0.9],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					} else {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.72, 0.7, 0.68],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
 				} else if (
 					selectedNationId === null ||
 					selectedNationId === undefined ||
@@ -616,8 +833,10 @@ export function computeRegionColors(
 			}
 			return rgb
 		}
-		if (world.nations) {
+		{
 			const { regionProvince, desolate } = world.provinces
+			const migrationWave = world.population?.migrationWave
+			const settlementWave = world.population?.settlementWave ?? 1.0
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
 				if (p < 0) {
@@ -625,11 +844,15 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
-				} else if (desolate[p] || world.nations.assignment[p] < 0) {
-					rgb[3 * r] = 0.35
-					rgb[3 * r + 1] = 0.33
-					rgb[3 * r + 2] = 0.32
-				} else {
+				} else if (desolate[p]) {
+					const [cr, cg, cb] = darkenPoliticalAtElevation(
+						[0.35, 0.33, 0.32],
+						world.elevation_km[r],
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (world.nations && world.nations.assignment[p] >= 0) {
 					const displayColorNationId =
 						getRebelDisplayColorNationId(
 							activeWars,
@@ -646,6 +869,26 @@ export function computeRegionColors(
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
+				} else {
+					// no nation: settled-stateless → cream-white, unsettled → medium gray
+					const wave = migrationWave?.[p] ?? 0
+					if (wave <= settlementWave) {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.96, 0.94, 0.9],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					} else {
+						const [cr, cg, cb] = darkenPoliticalAtElevation(
+							[0.72, 0.7, 0.68],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
 				}
 			}
 			return rgb

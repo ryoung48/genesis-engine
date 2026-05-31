@@ -46,6 +46,12 @@ export interface HistoryView {
 	/** Per-province blend weight [0, 1]. */
 	cultureBlendWeight: Float32Array
 	relationAt: (a: number, b: number) => number
+	/**
+	 * Visits every unordered nation pair that holds a relation, once. Unlike the
+	 * adjacency graph this includes non-bordering pairs (e.g. overseas colonies),
+	 * so callers can find relations that don't follow territory.
+	 */
+	forEachRelationPair: (cb: (a: number, b: number) => void) => void
 	getNationWealth: (nationId: number) => number
 	getNationOptimalWealth: (nationId: number) => number
 }
@@ -1040,6 +1046,12 @@ export function createHistoryQuery(
 			cultureBlendSecondary,
 			cultureBlendWeight,
 			relationAt: (a, b) => readRelation(a, b, timeMs),
+			forEachRelationPair: (cb) => {
+				const { aIdx, bIdx } = timelines.relations
+				for (let i = 0; i < aIdx.length; i++) {
+					if (aIdx[i] < bIdx[i]) cb(aIdx[i], bIdx[i])
+				}
+			},
 			getNationWealth: wealthAccess.getNationWealth,
 			getNationOptimalWealth: wealthAccess.getNationOptimalWealth,
 		}

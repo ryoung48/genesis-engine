@@ -37,6 +37,9 @@ function renderWorldDetails(
 				{ label: "Lumber", count: 100, color: "#4a7c59" },
 				{ label: "Fish", count: 50, color: "#4488aa" },
 			]}
+			governmentDistribution={[
+				{ label: "Chiefdom", count: 3, color: "#cc8844" },
+			]}
 			{...overrides}
 		/>,
 	)

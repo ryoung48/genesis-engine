@@ -118,6 +118,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	faithCount,
 	religionCount,
 	nationSizeDistribution,
+	governmentDistribution,
 	conflictDistribution,
 	relationDistribution,
 	climateDistribution,
@@ -231,6 +232,10 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 					<DistributionChart
 						title="Nation Size"
 						buckets={nationSizeDistribution}
+					/>
+					<DistributionChart
+						title="Government"
+						buckets={governmentDistribution}
 					/>
 					<DistributionChart title="Conflicts" buckets={conflictDistribution} />
 					<DistributionChart title="Relations" buckets={relationDistribution} />

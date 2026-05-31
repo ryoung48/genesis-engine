@@ -206,14 +206,16 @@ function relationKey(state: HistoryState, a: number, b: number): number {
 
 function flipRelation(rel: Relation): Relation {
 	switch (rel) {
-		case 1:
+		case 1: // OVERLORD → VASSAL
 			return 2
-		case 2:
+		case 2: // VASSAL → OVERLORD
 			return 1
-		case 3:
+		case 3: // PU_SENIOR → PU_JUNIOR
 			return 4
-		case 4:
+		case 4: // PU_JUNIOR → PU_SENIOR
 			return 3
+		case 11: // COLONY → OVERLORD (colonies share the OVERLORD senior side)
+			return 1
 		default:
 			return rel
 	}

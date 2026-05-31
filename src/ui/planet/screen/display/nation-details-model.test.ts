@@ -91,6 +91,9 @@ describe("buildRelationDistribution", () => {
 		const view = {
 			relationAt: (a: number, b: number) =>
 				relations.get(`${Math.min(a, b)},${Math.max(a, b)}`) ?? REL.NEUTRAL,
+			forEachRelationPair: () => {
+				/* noop */
+			},
 		} as unknown as HistoryView
 		const nationModel = {
 			counts: new Map([
@@ -108,6 +111,35 @@ describe("buildRelationDistribution", () => {
 
 		expect(result.find((b) => b.label === "Allied")?.count).toBe(1)
 		expect(result.find((b) => b.label === "Rival")?.count).toBe(1)
+	})
+
+	it("counts colonies from relation pairs even when non-adjacent", () => {
+		// Nations 0 (colonizer) and 5 (colony) are NOT adjacent. The relation reads
+		// COLONY from the colonizer's side and OVERLORD from the colony's side.
+		const directed = new Map<string, number>([
+			["0->5", REL.COLONY],
+			["5->0", REL.OVERLORD],
+		])
+		const view = {
+			relationAt: (a: number, b: number) =>
+				directed.get(`${a}->${b}`) ?? REL.NEUTRAL,
+			forEachRelationPair: (cb: (a: number, b: number) => void) => cb(0, 5),
+		} as unknown as HistoryView
+		const nationModel = {
+			counts: new Map([
+				[0, 10],
+				[5, 4],
+			]),
+		} as unknown as DisplayNationModel
+		// No adjacency between 0 and 5.
+		const nationAdj = {
+			adjOffset: new Int32Array([0, 0, 0, 0, 0, 0, 0]),
+			adjList: new Int32Array([]),
+		}
+
+		const result = buildRelationDistribution(view, nationModel, nationAdj)
+
+		expect(result.find((b) => b.label === "Colony")?.count).toBe(1)
 	})
 })
 
@@ -1149,6 +1181,9 @@ describe("buildRelationDistribution", () => {
 			{
 				relationAt: (a: number, b: number) =>
 					relations.get(`${Math.min(a, b)},${Math.max(a, b)}`) ?? REL.NEUTRAL,
+				forEachRelationPair: () => {
+					/* noop */
+				},
 			} as unknown as HistoryView,
 			nationModel,
 			nationAdj,

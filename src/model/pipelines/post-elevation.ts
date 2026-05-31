@@ -50,6 +50,7 @@ import {
 	type LocationTradeGoods,
 } from "../economy/trade-goods"
 import { makeRng } from "../shared/rng"
+import { getEraConfig, wavePercentileThreshold } from "../society/eras"
 import type { ProvincePopulation } from "../society/population"
 import {
 	computeMigration,
@@ -118,6 +119,8 @@ interface PostPipelineOutput {
 	landmarks: OrogenLandmarks
 	oceanCurrents: OrogenOceanCurrents | undefined
 	timings: StageTiming[]
+	eraSettledMask: Uint8Array | undefined
+	eraStatehoodMask: Uint8Array | undefined
 }
 
 export function runPostElevationPipeline(
@@ -490,6 +493,51 @@ export function runPostElevationPipeline(
 
 	// ── Population ─────────────────────────────────────────────────────
 	t0 = performance.now()
+	const eraConfig = getEraConfig(params.era)
+
+	// Percentile-based wave thresholds computed here where migrationWave is
+	// guaranteed. Both are passed through to derive-province-society.
+	const actualSettlementWave = wavePercentileThreshold(
+		migration.migrationWave,
+		provinces.desolate,
+		eraConfig.settlementFraction,
+	)
+	const statehoodOverallFraction =
+		eraConfig.settlementFraction * eraConfig.statehoodFraction
+	const actualStatehoodWave = wavePercentileThreshold(
+		migration.migrationWave,
+		provinces.desolate,
+		statehoodOverallFraction,
+	)
+
+	// Build per-province era masks using migration.migrationWave directly.
+	// settledMask: provinces within the settlement percentile (get cultures/pop)
+	// statehoodMask: provinces within the statehood percentile (get nations)
+	let eraSettledMask: Uint8Array | undefined
+	let eraStatehoodMask: Uint8Array | undefined
+	if (provinces.count > 0 && eraConfig.settlementFraction < 1.0) {
+		eraSettledMask = new Uint8Array(provinces.count)
+		for (let p = 0; p < provinces.count; p++) {
+			const w = migration.migrationWave[p]
+			if (!provinces.desolate[p] && w >= 0 && w <= actualSettlementWave) {
+				eraSettledMask[p] = 1
+			}
+		}
+	}
+	if (
+		provinces.count > 0 &&
+		eraConfig.hasNations &&
+		statehoodOverallFraction < 1.0
+	) {
+		eraStatehoodMask = new Uint8Array(provinces.count)
+		for (let p = 0; p < provinces.count; p++) {
+			const w = migration.migrationWave[p]
+			if (!provinces.desolate[p] && w >= 0 && w <= actualStatehoodWave) {
+				eraStatehoodMask[p] = 1
+			}
+		}
+	}
+
 	const population: ProvincePopulation = computePopulation(
 		provinces,
 		landmarks,
@@ -502,6 +550,10 @@ export function runPostElevationPipeline(
 		params.seed,
 		params.planetRadiusKm,
 		N,
+		eraConfig.targetPopulation,
+		migration.migrationWave,
+		actualSettlementWave,
+		eraConfig.migrationFalloff,
 	)
 	population.migrationWave = migration.migrationWave
 	population.cradleProvinces = migration.cradleProvinces
@@ -554,5 +606,7 @@ export function runPostElevationPipeline(
 		landmarks,
 		oceanCurrents,
 		timings,
+		eraSettledMask,
+		eraStatehoodMask,
 	}
 }

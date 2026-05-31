@@ -307,6 +307,7 @@ function createBatchedLine(
 		dashSize: style.dashed ? SEA_ROUTE_DASH_STYLE.dashSize : undefined,
 		gapSize: style.dashed ? SEA_ROUTE_DASH_STYLE.gapSize : undefined,
 	})
+	material.userData.baseWidth = style.baseWidth
 	material.resolution.set(resolution.width, resolution.height)
 	const line = new LineSegments2(geometry, material)
 	line.computeLineDistances()

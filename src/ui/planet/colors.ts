@@ -47,7 +47,9 @@ export type ColorMode =
 	| "basins"
 	| "terrainFeatures"
 	| "dtr"
+	| "humidity"
 	| "trade_goods"
+	| "timezone"
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -521,6 +523,38 @@ export function dtrColor(celsius: number): [number, number, number] {
 		}
 	}
 	const last = dtrStops[dtrStops.length - 1]
+	return [last.r, last.g, last.b]
+}
+
+// Relative-humidity ramp (0–100%): arid brown → tan → green → teal → deep blue.
+const humidityStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: 0, r: 0.55, g: 0.27, b: 0.08 }, // arid brown
+	{ v: 20, r: 0.8, g: 0.52, b: 0.22 }, // tan
+	{ v: 40, r: 0.9, g: 0.82, b: 0.45 }, // pale yellow
+	{ v: 55, r: 0.55, g: 0.78, b: 0.42 }, // green
+	{ v: 70, r: 0.24, g: 0.66, b: 0.66 }, // teal
+	{ v: 85, r: 0.13, g: 0.45, b: 0.74 }, // blue
+	{ v: 100, r: 0.06, g: 0.27, b: 0.62 }, // deep blue
+]
+
+export function humidityColor(rhPercent: number): [number, number, number] {
+	const clamped = Math.max(
+		humidityStops[0].v,
+		Math.min(humidityStops[humidityStops.length - 1].v, rhPercent),
+	)
+	for (let i = 0; i < humidityStops.length - 1; i++) {
+		const a = humidityStops[i]
+		const b = humidityStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = humidityStops[humidityStops.length - 1]
 	return [last.r, last.g, last.b]
 }
 

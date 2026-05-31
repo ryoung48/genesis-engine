@@ -179,6 +179,7 @@ describe("buildTerrainSliders", () => {
 			seaLevel: 1.1,
 			craters: 0.25,
 			volcanism: 1,
+			unitSystem: "metric",
 			maxElevation: 6000,
 			setNumPoints,
 			setJitter: vi.fn(),
@@ -263,6 +264,7 @@ describe("resetWorldDefaults", () => {
 			setVolcanism: vi.fn(),
 			setCraters: vi.fn(),
 			setMaxElevation: vi.fn(),
+			setEra: vi.fn(),
 		}
 
 		resetWorldDefaults(setters)

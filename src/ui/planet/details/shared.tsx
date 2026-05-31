@@ -53,6 +53,7 @@ export interface DetailsDrawerBaseProps {
 	faithCount: number | null
 	religionCount: number | null
 	nationSizeDistribution: DistributionBucket[]
+	governmentDistribution: DistributionBucket[]
 	conflictDistribution: DistributionBucket[]
 	relationDistribution: DistributionBucket[]
 	climateDistribution: DistributionBucket[]

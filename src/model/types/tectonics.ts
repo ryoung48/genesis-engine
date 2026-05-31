@@ -51,6 +51,8 @@ export interface OrogenParams {
 	antistellarLon: number // longitude of the antistellar point in degrees (0-360), default 180
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
+	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */
+	era?: import("../society/eras").SocietyEra
 }
 
 /** Result of findCollisions for one plate layer */

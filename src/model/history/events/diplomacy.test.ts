@@ -202,6 +202,21 @@ describe("diplomacy events", () => {
 		expect(state.heap.peekType()).toBe(EVT.DIPLOMACY)
 	})
 
+	it("allows colonies to keep ordinary diplomacy with non-overlords", () => {
+		const state = createDiplomacyState({
+			habitability: [20, 16, 4],
+			neighbors: [[1, 2], [0], [0]],
+		})
+		setRelation(state, 0, 1, REL.COLONY)
+		setRelation(state, 0, 2, REL.FRIENDLY)
+
+		runDiplomacy(state, 0, createStubRng([0.99]))
+
+		expect(getRelation(state, 0, 1)).toBe(REL.OVERLORD)
+		expect(getRelation(state, 1, 0)).toBe(REL.COLONY)
+		expect(getRelation(state, 0, 2)).toBe(REL.ALLY)
+	})
+
 	it("drops stale non-neighbor relations back to neutral", () => {
 		const state = createDiplomacyState({
 			neighbors: [[1], [0, 2], [1]],
@@ -424,6 +439,28 @@ describe("diplomacy events", () => {
 
 		expect(getRulerRelation(state, 1)).toEqual({
 			relation: REL.PU_SENIOR,
+			ruler: 2,
+		})
+		expect(getRelation(state, 0, 1)).toBe(REL.ALLY)
+		expect(state.events).not.toContainEqual(
+			expect.objectContaining({ tag: "vassalized" }),
+		)
+	})
+
+	it("keeps alliance upgrades diplomatic when the proposed overlord has a ruler", () => {
+		const state = createDiplomacyState({
+			parent: [-1, -1, -1],
+			habitability: [4, 20, 12],
+			cultures: [0, 0, 1],
+			neighbors: [[1], [0, 2], [1]],
+		})
+		setRelation(state, 0, 1, REL.FRIENDLY)
+		setRelation(state, 1, 2, REL.COLONY)
+
+		runDiplomacy(state, 0, createStubRng([0.99]))
+
+		expect(getRulerRelation(state, 1)).toEqual({
+			relation: REL.OVERLORD,
 			ruler: 2,
 		})
 		expect(getRelation(state, 0, 1)).toBe(REL.ALLY)

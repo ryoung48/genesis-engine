@@ -16,6 +16,9 @@ function createProps(overrides: Partial<ComponentProps<typeof ModeBar>> = {}) {
 		populationMode: "density" as const,
 		setPopulationMode: vi.fn(),
 		debugMapModes: false,
+		climateSubMode: "basic" as const,
+		elevationSubMode: "colored" as const,
+		topographySubMode: "classification" as const,
 		...overrides,
 	}
 }
@@ -45,10 +48,10 @@ describe("ModeBar", () => {
 		expect(markup).toContain(">Topography<")
 		expect(markup).toContain(">Vegetation<")
 		expect(markup).toContain(">Climate<")
-		expect(markup).toContain(">Pasta<")
 		expect(markup).toContain(">Temperature<")
 		expect(markup).toContain(">Rain<")
 		expect(markup).not.toContain(">Slope<")
+		expect(markup).not.toContain(">Pasta<")
 		expect(markup).not.toContain(">Koppen<")
 		expect(markup).not.toContain(">Current<")
 		expect(markup).not.toContain(">Sim<")
@@ -60,7 +63,7 @@ describe("ModeBar", () => {
 			<ModeBar
 				{...createProps({
 					colorMode: "nations",
-					nationMode: "provinces",
+					nationMode: "borders",
 				})}
 			/>,
 		)
@@ -75,12 +78,13 @@ describe("ModeBar", () => {
 
 		expect(politicalMarkup).toContain(">Political<")
 		expect(politicalMarkup).toContain(">Nations<")
-		expect(politicalMarkup).toContain(">Provinces<")
 		expect(politicalMarkup).toContain(">Dynasty<")
+		expect(politicalMarkup).not.toContain(">Provinces<")
 		expect(demographicMarkup).toContain(">Demographics<")
 		expect(demographicMarkup).toContain(">Population<")
 		expect(demographicMarkup).toContain(">Development<")
 		expect(demographicMarkup).toContain(">Religion<")
+		expect(demographicMarkup).not.toContain(">Migration<")
 		expect(demographicMarkup).not.toContain(">Gravity<")
 	})
 
@@ -93,11 +97,31 @@ describe("ModeBar", () => {
 				})}
 			/>,
 		)
+		const politicalMarkup = renderToStaticMarkup(
+			<ModeBar
+				{...createProps({
+					colorMode: "nations",
+					debugMapModes: true,
+				})}
+			/>,
+		)
+		const demographicMarkup = renderToStaticMarkup(
+			<ModeBar
+				{...createProps({
+					colorMode: "population",
+					debugMapModes: true,
+				})}
+			/>,
+		)
 
 		expect(geographyMarkup).toContain(">DTR<")
 		expect(geographyMarkup).toContain(">Current<")
-		expect(geographyMarkup).toContain(">Koppen<")
-		expect(geographyMarkup).toContain(">Grayscale<")
+		expect(geographyMarkup).not.toContain(">Pasta<")
+		expect(geographyMarkup).not.toContain(">Koppen<")
+		expect(geographyMarkup).not.toContain(">Grayscale<")
+		expect(geographyMarkup).not.toContain(">Slope<")
+		expect(politicalMarkup).toContain(">Provinces<")
+		expect(demographicMarkup).toContain(">Migration<")
 	})
 
 	it("renders the primary selector without an extra bordered wrapper", () => {

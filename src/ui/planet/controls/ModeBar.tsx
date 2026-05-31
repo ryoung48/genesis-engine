@@ -10,7 +10,7 @@ import {
 	getMapModePrimary,
 	getVisibleDemographicModeOptions,
 	getVisibleGeographyModeOptions,
-	POLITICAL_MODE_OPTIONS,
+	getVisiblePoliticalModeOptions,
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "../screen/shared/map-modes"
 import { ModeButtonGroup } from "./mode-controls"
@@ -25,6 +25,29 @@ interface ModeBarProps {
 	populationMode: PopulationMapMode
 	setPopulationMode: (v: PopulationMapMode) => void
 	debugMapModes: boolean
+	climateSubMode: "basic" | "pasta" | "koppen"
+	elevationSubMode: "colored" | "grayscale"
+	topographySubMode: "classification" | "slope"
+}
+
+function resolveSubMode(
+	baseMode: ColorMode,
+	climateSubMode: "basic" | "pasta" | "koppen",
+	elevationSubMode: "colored" | "grayscale",
+	topographySubMode: "classification" | "slope",
+): ColorMode {
+	if (baseMode === "climate") {
+		if (climateSubMode === "pasta") return "pastaClimate"
+		if (climateSubMode === "koppen") return "koppenClimate"
+		return "climate"
+	}
+	if (baseMode === "terrain") {
+		return elevationSubMode === "grayscale" ? "landHeightmap" : "terrain"
+	}
+	if (baseMode === "topography") {
+		return topographySubMode === "slope" ? "slope" : "topography"
+	}
+	return baseMode
 }
 
 const TRAY =
@@ -40,10 +63,14 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	populationMode,
 	setPopulationMode,
 	debugMapModes,
+	climateSubMode,
+	elevationSubMode,
+	topographySubMode,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes)
 	const demographicOptions = getVisibleDemographicModeOptions(debugMapModes)
+	const politicalOptions = getVisiblePoliticalModeOptions(debugMapModes)
 
 	const submodeControl =
 		activePrimary === "geography" ? (
@@ -51,16 +78,30 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				options={geographyOptions}
 				value={geographyMode}
 				onChange={(mode) => {
-					setColorMode(mode)
+					setColorMode(
+						resolveSubMode(
+							mode,
+							climateSubMode,
+							elevationSubMode,
+							topographySubMode,
+						),
+					)
 					setGeographyMode(mode)
 				}}
 				buttonClassName="px-1.5"
 			/>
 		) : activePrimary === "political" ? (
-			<ModeButtonGroup
-				options={POLITICAL_MODE_OPTIONS}
-				value={nationMode}
-				onChange={setNationMode}
+			<ModeButtonGroup<NationMapMode | "timezone">
+				options={[...politicalOptions, ["timezone", "Timezones"]]}
+				value={colorMode === "timezone" ? "timezone" : nationMode}
+				onChange={(mode) => {
+					if (mode === "timezone") {
+						setColorMode("timezone")
+						return
+					}
+					setColorMode("nations")
+					setNationMode(mode)
+				}}
 				buttonClassName="px-1.5"
 			/>
 		) : (
@@ -84,7 +125,14 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					value={activePrimary}
 					onChange={(primary: MapModePrimary) => {
 						if (primary === "geography") {
-							setColorMode(geographyMode)
+							setColorMode(
+								resolveSubMode(
+									geographyMode,
+									climateSubMode,
+									elevationSubMode,
+									topographySubMode,
+								),
+							)
 							return
 						}
 						if (primary === "political") {

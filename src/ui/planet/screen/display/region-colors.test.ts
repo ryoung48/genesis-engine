@@ -275,7 +275,7 @@ describe("computeRegionColors", () => {
 			0,
 			0,
 			"globe",
-			new Set([0]),
+			true,
 		)
 
 		expect(rgb).not.toBeNull()
@@ -351,6 +351,7 @@ describe("computeRegionColors", () => {
 			0,
 			0,
 			"globe",
+			true,
 			undefined,
 			[{ idx: 4, attacker: 0, defender: 1, rebel: true, occupied: [] }],
 		)
@@ -952,7 +953,13 @@ describe("computeRegionColors", () => {
 				0,
 				0,
 			),
-		).toEqual(terrain)
+		).toEqual(
+			new Float32Array([
+				...darkenPoliticalAtElevation([0.96, 0.94, 0.9], 2),
+				...darkenPoliticalAtElevation([0.96, 0.94, 0.9], -0.5),
+				...darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+			]),
+		)
 	})
 
 	it("blends chaotic climate tint only when both extremes exceed the thresholds", () => {
@@ -1343,7 +1350,11 @@ describe("computeRegionColors", () => {
 			1,
 			darkenPoliticalAtElevation(toPastelNationColor([0.6, 0.4, 0.2]), 0.8),
 		)
-		expectRegionColor(borders!, 2, [0.35, 0.33, 0.32])
+		expectRegionColor(
+			borders!,
+			2,
+			darkenPoliticalAtElevation([0.96, 0.94, 0.9], 1.5),
+		)
 
 		const populationWorld = buildWorld({
 			mesh: { numRegions: 2 } as never,
@@ -1827,7 +1838,11 @@ describe("computeRegionColors", () => {
 			1,
 			darkenPoliticalAtElevation([0.7, 0.5, 0.3], 2),
 		)
-		expectRegionColor(nations!, 0, [0.35, 0.33, 0.32])
+		expectRegionColor(
+			nations!,
+			0,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1),
+		)
 		expectRegionColor(
 			nations!,
 			1,
@@ -2256,8 +2271,9 @@ describe("computeRegionColors", () => {
 			undefined,
 			undefined,
 			undefined,
+			undefined,
 			0,
-			(_, b) => (b === 1 ? ALLY_REL : 7),
+			(_a: number, b: number) => (b === 1 ? ALLY_REL : 7),
 		)
 
 		expect(rgb).not.toBeNull()

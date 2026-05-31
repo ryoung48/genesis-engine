@@ -11,10 +11,12 @@ import { initSuccession, runSuccession } from "./events/succession"
 import { initTax, runTax } from "./events/tax"
 import { computeRoutes } from "./events/trade-routes"
 import { initWar, runWar } from "./events/war"
+import { REL as REL_FIELD } from "./fields"
 import { createHistoryRng, type HistoryRng } from "./history-rng"
 import {
 	createHistoryState,
 	type HistoryState,
+	REL,
 	validateLiveHierarchy,
 } from "./state"
 
@@ -29,6 +31,28 @@ function timed<T>(
 		timings.push({ Stage: label, ms: (performance.now() - t0).toFixed(1) })
 	}
 	return result
+}
+
+function seedColonyRelations(
+	state: HistoryState,
+	nations: OrogenNationHierarchy | undefined,
+): void {
+	if (!nations?.nationColonizer) return
+	const { seeds, nationColonizer } = nations
+	for (let col = 0; col < nationColonizer.length; col++) {
+		const colonizerId = nationColonizer[col]
+		if (colonizerId < 0) continue
+		const colonyCapital = seeds[col]
+		const colonizerCapital = seeds[colonizerId]
+		if (colonyCapital < 0 || colonizerCapital < 0) continue
+		REL_FIELD.set(
+			state,
+			colonyCapital,
+			colonizerCapital,
+			REL.COLONY,
+			state.time,
+		)
+	}
 }
 
 export function initHistory(params: {
@@ -75,6 +99,10 @@ export function initHistory(params: {
 		),
 	)
 
+	// Seed colony dependencies before init passes so subordinate colonies are
+	// excluded from independent diplomacy and subject formation.
+	seedColonyRelations(state, params.nations)
+
 	timed("initHistory:initDiplomacy", params.timings, () =>
 		initDiplomacy(state, rng),
 	)
@@ -103,6 +131,10 @@ export function initHistory(params: {
 	)
 	state.routes = infrastructure.routes
 	state.network = infrastructure.network
+
+	// Re-seed COLONY relations so init passes cannot leave them downgraded.
+	seedColonyRelations(state, params.nations)
+
 	return state
 }
 

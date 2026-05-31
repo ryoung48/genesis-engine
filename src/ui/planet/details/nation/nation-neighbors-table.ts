@@ -15,6 +15,7 @@ const RELATION_LABEL_COLORS: Record<string, string> = {
 	Vassal: "rgb(168, 85, 247)",
 	"PU Senior": "rgb(99, 102, 241)",
 	"PU Junior": "rgb(99, 102, 241)",
+	Colony: "rgb(230, 84, 61)",
 	Ally: "rgb(59, 130, 246)",
 	Friendly: "rgb(34, 197, 94)",
 	Neutral: "rgb(201, 201, 201)",

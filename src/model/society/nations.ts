@@ -2,6 +2,7 @@ import type { OrogenNationHierarchy, OrogenProvinces } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
+import type { GovernmentMix } from "./eras"
 import {
 	buildChildrenCSR,
 	buildSovereign,
@@ -16,10 +17,10 @@ import { computeProvinceWaterAccess, WATER_ACCESS_BONUS } from "./water-access"
 // Hard cap on how far a nation can spread from its capital, in km.
 export const MAX_NATION_SPREAD_KM = 2000
 
-// Province-mass weights per bucket — calibrated to CK3 1066.9.15 all-county-titles
-// distribution, with ~4% carved from the empire bucket for hegemons.
+// Province-mass weights per bucket — calibrated to EU4 extended-timeline 1350 AD data.
+// Each era overrides this via EraConfig.nationPercentages.
 const NATION_PERCENTAGES = normalize([
-	0.04, 0.4154, 0.072, 0.102, 0.0746, 0.0786, 0.2174,
+	0.0, 0.11, 0.144, 0.194, 0.165, 0.251, 0.137,
 ])
 export const NATION_BUCKETS: [number, number][] = [
 	[251, 600],
@@ -40,6 +41,31 @@ export function computeNations(params: {
 	r_xyz: Float32Array
 	seed: number
 	planetRadiusKm?: number
+	/** When provided, only provinces where eraActiveMask[p] === 1 are eligible for nations */
+	eraActiveMask?: Uint8Array
+	/** Era-specific nation budget percentages (must align with nationBuckets) */
+	nationPercentages?: number[]
+	/** Era-specific province-size ranges for nation buckets */
+	nationBuckets?: [number, number][]
+	/** Government type mix for this era */
+	governmentMix?: GovernmentMix
+	/**
+	 * 0–1: how much nation size drives government type vs. era ideology.
+	 * 1.0 = size prior dominates (ancient). 0.0 = era mix dominates (modern).
+	 * Also scales spatial modifier strength.
+	 */
+	governmentSizeWeight?: number
+	/**
+	 * Per-province migration wave (0 = settlement cradle, 1 = frontier).
+	 * Frontier nations skew tribal; core nations skew toward established states.
+	 */
+	migrationWave?: Float32Array
+	/**
+	 * Era statehood fraction (0–1). The frontier→tribal skew represents proximity
+	 * to stateless societies; as statehood approaches 1.0 (no stateless land left,
+	 * e.g. information age) the skew fades to zero.
+	 */
+	statehoodFraction?: number
 }): OrogenNationHierarchy {
 	const {
 		provinces,
@@ -67,13 +93,18 @@ export function computeNations(params: {
 	let activeCount = 0
 	for (let p = 0; p < provinceCount; p++) {
 		if (provinces.desolate[p]) continue
+		if (params.eraActiveMask && !params.eraActiveMask[p]) continue
 		active[p] = 1
 		activeCount++
 	}
 	if (activeCount === 0) return emptyPartition(provinceCount)
 
 	const noise = new SimplexNoise(params.seed ^ 0xdeadbeef)
-	const plan = buildNationPlan(activeCount)
+	const plan = buildNationPlan(
+		activeCount,
+		params.nationPercentages,
+		params.nationBuckets,
+	)
 	const assignment = new Int32Array(provinceCount).fill(-1)
 	const blocked = new Uint8Array(provinceCount)
 	const seeds: number[] = []
@@ -282,6 +313,7 @@ export function computeNations(params: {
 		actualSizes: size,
 		targetProvinceMass: plan.targetProvinceMass,
 		targetNationCount: plan.targetNationCount,
+		buckets: params.nationBuckets,
 	})
 
 	const nationMembers = groupByNation(assignment, nationCount, provinceCount)
@@ -323,6 +355,51 @@ export function computeNations(params: {
 		fanoutRanges: HEGEMON_FANOUT,
 	})
 
+	// Per-province government type — indexed by province like leaderDynasty.
+	// Assign one government per nation using size + spatial biases, then expand.
+	const governmentType = new Uint8Array(provinceCount)
+	const nationColonizer = new Int32Array(nationCount).fill(-1)
+	if (params.governmentMix && nationCount > 0) {
+		const sizeWeight = params.governmentSizeWeight ?? 0.55
+		const statehoodFraction = params.statehoodFraction ?? 0.75
+		const nationGovType = new Uint8Array(nationCount)
+		for (let i = 0; i < nationCount; i++) {
+			nationGovType[i] = assignGovernmentType(
+				i,
+				seeds[i],
+				sizes[i],
+				params.governmentMix,
+				sizeWeight,
+				habitability,
+				waterAccess,
+				params.migrationWave,
+				statehoodFraction,
+				params.seed,
+			)
+		}
+		if ((params.governmentMix.colonial ?? 0) > 0) {
+			assignColonialRelations({
+				nationCount,
+				nationGovType,
+				nationColonizer,
+				assignment,
+				seeds,
+				size,
+				colonialFraction: params.governmentMix.colonial!,
+				waterAccess,
+				habitability,
+				provinceSeeds: provinces.seeds,
+				r_xyz,
+				sizeWeight,
+				maxSpreadRad,
+			})
+		}
+		for (let p = 0; p < provinceCount; p++) {
+			const n = assignment[p]
+			if (n >= 0) governmentType[p] = nationGovType[n]
+		}
+	}
+
 	return {
 		assignment,
 		seeds: new Int32Array(seeds),
@@ -345,6 +422,8 @@ export function computeNations(params: {
 		childList,
 		sovereign,
 		gravity,
+		governmentType,
+		nationColonizer,
 	}
 }
 
@@ -352,10 +431,12 @@ function printNationDistribution(params: {
 	actualSizes: Int32Array
 	targetProvinceMass: number[]
 	targetNationCount: number[]
+	buckets?: [number, number][]
 }) {
 	const { actualSizes, targetProvinceMass, targetNationCount } = params
+	const buckets = params.buckets ?? NATION_BUCKETS
 	const totalProvinceMass = actualSizes.reduce((sum, value) => sum + value, 0)
-	const rows = NATION_BUCKETS.map(([min, max], idx) => {
+	const rows = buckets.map(([min, max], idx) => {
 		let nationCount = 0
 		let provinceMass = 0
 		for (let i = 0; i < actualSizes.length; i++) {
@@ -391,18 +472,24 @@ function integerMass(total: number, weights: number[]): number[] {
 	return base
 }
 
-export function buildNationPlan(total: number): {
+export function buildNationPlan(
+	total: number,
+	nationPercentages?: number[],
+	nationBuckets?: [number, number][],
+): {
 	targetProvinceMass: number[]
 	targetNationCount: number[]
 	targets: number[]
 } {
-	const budgets = integerMass(total, NATION_PERCENTAGES)
-	const targetNationCount = new Array<number>(NATION_BUCKETS.length).fill(0)
+	const percentages = nationPercentages ?? NATION_PERCENTAGES
+	const buckets = nationBuckets ?? NATION_BUCKETS
+	const budgets = integerMass(total, percentages)
+	const targetNationCount = new Array<number>(buckets.length).fill(0)
 	const targets: number[] = []
 	for (let i = 0; i < budgets.length; i++) {
 		const budget = budgets[i]
 		if (budget <= 0) continue
-		const [minSize, maxSize] = NATION_BUCKETS[i]
+		const [minSize, maxSize] = buckets[i]
 		if (budget <= minSize) {
 			targets.push(budget)
 			targetNationCount[i] = 1
@@ -730,6 +817,378 @@ function markBlocked(
 	}
 }
 
+function assignColonialRelations(params: {
+	nationCount: number
+	nationGovType: Uint8Array
+	nationColonizer: Int32Array
+	assignment: Int32Array
+	seeds: number[]
+	size: Int32Array
+	colonialFraction: number
+	waterAccess: Uint8Array
+	habitability: Float32Array
+	provinceSeeds: Int32Array
+	r_xyz: Float32Array
+	sizeWeight: number
+	/** Already-scaled nation spread limit (rad) — used as minimum colonial distance */
+	maxSpreadRad: number
+}): void {
+	const {
+		nationCount,
+		nationGovType,
+		nationColonizer,
+		assignment,
+		seeds,
+		size,
+		colonialFraction,
+		waterAccess,
+		habitability,
+		provinceSeeds,
+		r_xyz,
+		sizeWeight,
+		maxSpreadRad,
+	} = params
+
+	const totalMass = size.reduce((s, v) => s + v, 0)
+	let budgetRemaining = Math.round(totalMass * colonialFraction)
+	if (budgetRemaining <= 0) return
+
+	// Precompute which nations own at least one ocean-coastal province.
+	const nationHasOceanCoastal = new Array(nationCount).fill(false)
+	for (let p = 0; p < provinceSeeds.length; p++) {
+		const n = assignment[p]
+		if (n >= 0 && waterAccess[p] >= 2) nationHasOceanCoastal[n] = true
+	}
+
+	// Score colonizer candidates: non-tribal, coastal, large enough.
+	const colonizers: Array<{ nation: number }> = []
+	for (let n = 0; n < nationCount; n++) {
+		if (nationGovType[n] < 4) continue // tribal cannot colonize
+		if (nationColonizer[n] >= 0) continue
+		if (waterAccess[seeds[n]] < 2) continue // must be ocean-coastal
+		if (size[n] < 8) continue
+		colonizers.push({ nation: n })
+	}
+	if (colonizers.length === 0) return
+
+	// Collect targets: any non-republic nation that owns an ocean-coastal province.
+	// Nations that already qualify as colonizers (non-tribal, size≥8, coastal capital)
+	// are excluded — they're the colonizing powers, not targets.
+	const targets: Array<{
+		nation: number
+		capital: number
+		hab: number
+	}> = []
+	for (let n = 0; n < nationCount; n++) {
+		if (nationColonizer[n] >= 0) continue
+		if (
+			(nationGovType[n] >= 8 && nationGovType[n] <= 12) ||
+			nationGovType[n] >= 17
+		)
+			continue // skip republic types & colonial
+		if (nationGovType[n] >= 4 && size[n] >= 8 && waterAccess[seeds[n]] >= 2)
+			continue // matches colonizer criteria — skip
+		if (!nationHasOceanCoastal[n]) continue
+		targets.push({ nation: n, capital: seeds[n], hab: habitability[seeds[n]] })
+	}
+	if (targets.length === 0) return
+
+	// Deterministic shuffle so colony type/size isn't ordered by habitability.
+	for (let i = targets.length - 1; i > 0; i--) {
+		const h = ((i * 2654435761) ^ (targets[i].capital * 31337)) >>> 0
+		const j = (h >>> 0) % (i + 1)
+		;[targets[i], targets[j]] = [targets[j], targets[i]]
+	}
+
+	// Minimum colonial distance: beyond the colonizer's natural spread radius so that
+	// truly adjacent tribal nations get absorbed rather than colonised. Scales with
+	// planet size since maxSpreadRad is already planet-relative. The 1.5x multiplier
+	// provides extra buffer against accidental adjacency.
+	const minColonialDistRad = maxSpreadRad * 1.5
+
+	for (const target of targets) {
+		if (budgetRemaining <= 0) break
+
+		let bestColonizer = -1
+		let bestDist = Infinity
+		for (const col of colonizers) {
+			if (nationColonizer[col.nation] >= 0) continue
+			const d = provinceSeedDistance(
+				seeds[col.nation],
+				target.capital,
+				provinceSeeds,
+				r_xyz,
+			)
+			if (d < minColonialDistRad) continue
+			if (d < bestDist) {
+				bestDist = d
+				bestColonizer = col.nation
+			}
+		}
+		if (bestColonizer < 0) continue
+
+		nationColonizer[target.nation] = bestColonizer
+		budgetRemaining -= size[target.nation]
+
+		const h = ((target.capital * 2654435761) ^ (target.nation * 31337)) >>> 0
+		const r = (h >>> 0) / 0xffffffff
+		const settlerChance =
+			sizeWeight < 0.4 ? 0.15 + 0.6 * Math.min(1, size[target.nation] / 30) : 0
+		const isSettler = target.hab >= 0.5 && r < settlerChance
+		nationGovType[target.nation] = isSettler ? 20 : 19
+	}
+}
+
+// Size-based government prior: larger nations tend toward monarchy/theocracy,
+// tiny nations toward tribal. Republics peak at city-state sizes (1-4).
+// These are universal priors blended with the era mix.
+const SIZE_GOV_PRIORS: Array<{
+	maxSize: number
+	tribal: number
+	monarchy: number
+	republic: number
+	theocracy: number
+}> = [
+	{ maxSize: 1, tribal: 0.72, monarchy: 0.12, republic: 0.12, theocracy: 0.04 },
+	{ maxSize: 4, tribal: 0.55, monarchy: 0.26, republic: 0.12, theocracy: 0.07 },
+	{ maxSize: 9, tribal: 0.28, monarchy: 0.52, republic: 0.1, theocracy: 0.1 },
+	{ maxSize: 24, tribal: 0.1, monarchy: 0.64, republic: 0.1, theocracy: 0.16 },
+	{
+		maxSize: 49,
+		tribal: 0.03,
+		monarchy: 0.72,
+		republic: 0.08,
+		theocracy: 0.17,
+	},
+	{
+		maxSize: 99,
+		tribal: 0.01,
+		monarchy: 0.77,
+		republic: 0.07,
+		theocracy: 0.15,
+	},
+	{
+		maxSize: Infinity,
+		tribal: 0.0,
+		monarchy: 0.82,
+		republic: 0.08,
+		theocracy: 0.1,
+	},
+]
+
+function assignGovernmentType(
+	nationIndex: number,
+	capitalProvince: number,
+	nationSize: number,
+	eraMix: import("./eras").GovernmentMix,
+	sizeWeight: number,
+	habitability: Float32Array,
+	waterAccess: Uint8Array,
+	migrationWave: Float32Array | undefined,
+	statehoodFraction: number,
+	seed: number,
+): number {
+	// Look up size prior
+	const prior =
+		SIZE_GOV_PRIORS.find((p) => nationSize <= p.maxSize) ??
+		SIZE_GOV_PRIORS[SIZE_GOV_PRIORS.length - 1]
+
+	// Tribal governments require stateless social organization to draw from.
+	// As statehood becomes universal (statehoodFraction → 1, e.g. information age)
+	// there is no stateless land left, so the tendency toward tribal — both from
+	// era ideology and from small size — fades to zero. Ramps over the final 30%.
+	const statelessScale = Math.max(0, Math.min(1, (1 - statehoodFraction) / 0.3))
+	// Premodern eras can still sustain frontier/tribal polities even at nominal
+	// full state coverage. This decays with political modernity and reaches zero
+	// in the information age.
+	const residualFrontierScale = Math.max(
+		0,
+		Math.min(1, (sizeWeight - 0.15) / (0.55 - 0.15)),
+	)
+	const frontierCompensationScale = Math.sqrt(residualFrontierScale)
+	const tribalSizeScale = Math.max(
+		statelessScale,
+		frontierCompensationScale * 0.6,
+	)
+	const frontierTribalScale = Math.max(
+		statelessScale,
+		frontierCompensationScale,
+	)
+
+	// Blend era mix with size prior using era-dependent weight.
+	// sizeWeight=1: size alone drives gov (ancient). sizeWeight=0: era ideology alone.
+	// The size prior's tribal share is reduced in late eras, but premodern worlds
+	// still retain some small-polity tribal bias even after stateless land vanishes.
+	const eraWeight = 1 - sizeWeight
+	let tribal =
+		eraMix.tribal * eraWeight + prior.tribal * sizeWeight * tribalSizeScale
+	let monarchy = eraMix.monarchy * eraWeight + prior.monarchy * sizeWeight
+	let republic = eraMix.republic * eraWeight + prior.republic * sizeWeight
+	let theocracy = eraMix.theocracy * eraWeight + prior.theocracy * sizeWeight
+
+	// High water access (coastal + river trade nodes) → boost republic.
+	// Scaled by sizeWeight: matters less in modern eras where ideology drives gov.
+	const water = waterAccess[capitalProvince] ?? 0
+	if (water > 0) {
+		const boost = Math.min(water, 2) * 0.08 * sizeWeight
+		republic += boost
+		tribal -= boost * 0.6
+		monarchy -= boost * 0.4
+	}
+
+	// Low habitability → boost tribal.
+	// Scaled by sizeWeight: geography matters less in modern eras.
+	const hab = habitability[capitalProvince] ?? 0.5
+	if (hab < 0.35) {
+		const boost = (0.35 - hab) * 0.6 * sizeWeight
+		tribal += boost
+		monarchy -= boost * 0.55
+		republic -= boost * 0.25
+		theocracy -= boost * 0.2
+	}
+
+	// Migration wave: the closer a nation is to the settlement frontier, the more
+	// tribal it should be. Premodern eras preserve this skew even after every
+	// settled province belongs to a state; modern eras largely suppress it.
+	const wave = migrationWave?.[capitalProvince] ?? -1
+	if (wave >= 0) {
+		const frontierBoost = wave * wave * 2.0 * frontierTribalScale
+		tribal += frontierBoost
+		monarchy -= frontierBoost * 0.5
+		republic -= frontierBoost * 0.35
+		theocracy -= frontierBoost * 0.15
+
+		// Core pull: ancient settlement entrenches state institutions
+		const coreBoost = (1 - wave) * (1 - wave) * 0.35
+		monarchy += coreBoost * 0.55
+		republic += coreBoost * 0.3
+		theocracy += coreBoost * 0.15
+		tribal -= coreBoost
+	}
+
+	// Clamp negatives and renormalize
+	tribal = Math.max(0, tribal)
+	monarchy = Math.max(0, monarchy)
+	republic = Math.max(0, republic)
+	theocracy = Math.max(0, theocracy)
+	const total = tribal + monarchy + republic + theocracy || 1
+	tribal /= total
+	monarchy /= total
+	republic /= total
+	theocracy /= total
+
+	// Deterministic draw from the blended distribution
+	let h = ((seed + 7919) ^ (nationIndex * 2654435761)) >>> 0
+	h ^= h >>> 16
+	h = Math.imul(h, 0x45d9f3b)
+	h ^= h >>> 16
+	const r = (h >>> 0) / 0xffffffff
+
+	let mainType: number
+	if (r < tribal) mainType = 0
+	else if (r < tribal + monarchy) mainType = 1
+	else if (r < tribal + monarchy + republic) mainType = 2
+	else mainType = 3
+
+	// Second hash — independent seed for subtype draw
+	let h2 = ((seed + 31337) ^ (nationIndex * 1234577)) >>> 0
+	h2 ^= h2 >>> 16
+	h2 = Math.imul(h2, 0x45d9f3b)
+	h2 ^= h2 >>> 16
+	const r2 = (h2 >>> 0) / 0xffffffff
+
+	return refineGovernmentSubtype(
+		mainType,
+		nationSize,
+		wave,
+		hab,
+		water,
+		sizeWeight,
+		r2,
+	)
+}
+
+function refineGovernmentSubtype(
+	mainType: number,
+	size: number,
+	wave: number,
+	hab: number,
+	water: number,
+	sizeWeight: number,
+	r: number,
+): number {
+	switch (mainType) {
+		case 0: {
+			// tribal → 0=chiefdom, 1=tribal monarchy, 2=tribal federation, 3=native council
+			if (size >= 10) return r < 0.55 ? 2 : 1 // federation or tribal monarchy
+			if (size >= 5) return 1 // tribal monarchy
+			// frontier/harsh → mostly native council; core → mostly chiefdom
+			return r < (wave > 0.35 || hab < 0.35 ? 0.35 : 0.7) ? 0 : 3
+		}
+
+		case 1: {
+			// monarchy → 4=feudal, 5=elective, 6=absolute, 7=constitutional
+			// Information era (sizeWeight ~0.15): constitutional dominant, a few
+			// absolute holdouts (Gulf-style states).
+			if (sizeWeight < 0.22) {
+				if (size >= 12 && r < 0.3) return 6 // absolute holdout
+				return 7 // constitutional
+			}
+			// Industrial era (~0.30): constitutional rises, absolute for medium+,
+			// no surviving feudalism.
+			if (sizeWeight < 0.4) {
+				if (r < 0.55) return 7 // constitutional
+				if (size >= 6) return 6 // absolute: medium+
+				return 7
+			}
+			// Early modern (~0.45): age of absolutism; elective and feudal persist;
+			// constitutional begins to emerge.
+			if (sizeWeight < 0.55) {
+				if (size >= 8 && r < 0.45) return 6 // absolute: medium+
+				if (size >= 8 && r < 0.65) return 5 // elective: medium+ (Poland, HRE)
+				if (r < 0.88) return 4 // feudal still widespread
+				return 7 // early constitutional
+			}
+			// Ancient & medieval (>=0.55): feudal default; elective for medium+
+			// kingdoms; absolute for large autocratic empires.
+			if (size >= 20 && r < 0.65) return 6 // absolute: large empires
+			if (size >= 5 && r < 0.4) return 5 // elective: medium+ kingdoms
+			return 4 // feudal: default
+		}
+
+		case 2: {
+			// republic → 8=merchant, 9=noble, 10=confederation, 11=presidential, 12=parliamentary, 17=socialist, 18=junta
+			// Modern republics (industrial & information): four-way mix of
+			// parliamentary, presidential, one-party socialist, and military junta.
+			if (sizeWeight < 0.4) {
+				if (size >= 20 && r < 0.35) return 17 // socialist: favoured for large one-party states
+				if (r < 0.18) return 17 // socialist: minority elsewhere
+				if (r < 0.36) return 18 // military junta
+				if (r < 0.68) return 12 // parliamentary
+				return 11 // presidential
+			}
+			// Pre-modern republics
+			if (water >= 2 && size <= 10 && wave >= 0 && wave < 0.35) return 8 // merchant: coastal core
+			if (water >= 1 && size <= 6 && wave >= 0 && wave < 0.3 && r < 0.55)
+				return 8
+			if (size >= 8 && wave >= 0 && wave < 0.28) return r < 0.55 ? 9 : 10 // noble or confederation
+			if (size >= 6 && r < 0.4) return 10 // confederation: medium chance
+			return 8 // merchant: default
+		}
+
+		case 3: {
+			// theocracy → 13=theocracy, 14=monastic state, 15=prince-bishopric, 16=imperial cult
+			// Imperial cult: large, early modern and earlier only (no industrial/information)
+			if (size >= 20 && sizeWeight >= 0.4) return r < 0.45 ? 16 : 13
+			if (size >= 10) return 13 // theocracy: medium+
+			if (water >= 1 && r < 0.55) return 14 // monastic: coastal small
+			if (sizeWeight > 0.4 && r < 0.55) return 15 // prince-bishopric: medieval small
+			return 13 // default theocracy
+		}
+	}
+	return 0
+}
+
 function normalize(values: number[]): number[] {
 	const sum = values.reduce((acc, value) => acc + value, 0) || 1
 	return values.map((value) => value / sum)
@@ -876,5 +1335,7 @@ function emptyPartition(nodeCount: number): OrogenNationHierarchy {
 		childList: new Int32Array(0),
 		sovereign: new Int32Array(nodeCount).fill(-1),
 		gravity: new Float32Array(nodeCount),
+		governmentType: new Uint8Array(nodeCount),
+		nationColonizer: new Int32Array(0),
 	}
 }

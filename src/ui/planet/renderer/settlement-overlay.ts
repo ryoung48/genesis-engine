@@ -46,33 +46,14 @@ const CROSS_COLOR = "#1e293b"
 const CROSS_WIDTH_RATIO = 0.045
 const FILL_COLOR = "#ffffff"
 const SOLID_BLACK = "#0f172a"
-const FILLED_CENTER_COLOR = "#334155" // for 200K-1M "filled center"
 const CAPITAL_FILL_COLOR = "#dc2626"
-const CAPITAL_SOLID_COLOR = "#b91c1c"
-const CAPITAL_FILLED_CENTER_COLOR = "#991b1b"
 
 interface SettlementVisualStyle {
 	fillColor: string
-	solidColor: string
-	filledCenterColor: string
-	crossColor: string
 }
 
 function getSettlementVisualStyle(isCapital: boolean): SettlementVisualStyle {
-	if (!isCapital) {
-		return {
-			fillColor: FILL_COLOR,
-			solidColor: SOLID_BLACK,
-			filledCenterColor: FILLED_CENTER_COLOR,
-			crossColor: CROSS_COLOR,
-		}
-	}
-	return {
-		fillColor: CAPITAL_FILL_COLOR,
-		solidColor: CAPITAL_SOLID_COLOR,
-		filledCenterColor: CAPITAL_FILLED_CENTER_COLOR,
-		crossColor: CROSS_COLOR,
-	}
+	return { fillColor: isCapital ? CAPITAL_FILL_COLOR : FILL_COLOR }
 }
 
 function drawRing(
@@ -178,18 +159,11 @@ const TIERS: SettlementTier[] = [
 				const r = w * 0.38
 				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
 				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
-				drawCross(
-					ctx,
-					cx,
-					cy,
-					r * 0.55,
-					w * CROSS_WIDTH_RATIO,
-					style.crossColor,
-				)
+				drawCross(ctx, cx, cy, r * 0.55, w * CROSS_WIDTH_RATIO, CROSS_COLOR)
 			}),
 	},
 	{
-		// 50K-200K: Double-ring circle with cross/plus inside (white fill)
+		// 50K-200K: White disc with outer border ring defined by inner dark ring (no cross)
 		minPop: 50_000,
 		maxPop: 200_000,
 		label: "50K-200K",
@@ -203,23 +177,15 @@ const TIERS: SettlementTier[] = [
 				const cx = w / 2
 				const cy = w / 2
 				const outerR = w * 0.42
-				const innerR = w * 0.32
+				const innerR = w * 0.35
 				const lw = w * RING_WIDTH_RATIO
 				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
-				drawRing(ctx, cx, cy, outerR, lw, RING_COLOR)
-				drawRing(ctx, cx, cy, innerR, lw, RING_COLOR)
-				drawCross(
-					ctx,
-					cx,
-					cy,
-					innerR * 0.6,
-					w * CROSS_WIDTH_RATIO,
-					style.crossColor,
-				)
+				drawRing(ctx, cx, cy, outerR, lw * 0.5, RING_COLOR)
+				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
 			}),
 	},
 	{
-		// 200K-1M: Double-ring circle with cross/plus and filled center (darker center)
+		// 200K-1M: White disc with border ring and cross inside inner ring
 		minPop: 200_000,
 		maxPop: 1_000_000,
 		label: "200K-1M",
@@ -233,32 +199,16 @@ const TIERS: SettlementTier[] = [
 				const cx = w / 2
 				const cy = w / 2
 				const outerR = w * 0.42
-				const innerR = w * 0.32
+				const innerR = w * 0.35
 				const lw = w * RING_WIDTH_RATIO
-				// White base behind rings
 				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
-				drawRing(ctx, cx, cy, outerR, lw, RING_COLOR)
-				drawRing(ctx, cx, cy, innerR, lw, RING_COLOR)
-				// Darker filled center disc inside inner ring
-				drawFilledCircle(
-					ctx,
-					cx,
-					cy,
-					innerR - lw * 1.5,
-					style.filledCenterColor,
-				)
-				drawCross(
-					ctx,
-					cx,
-					cy,
-					innerR * 0.6,
-					w * CROSS_WIDTH_RATIO * 1.2,
-					style.crossColor,
-				)
+				drawRing(ctx, cx, cy, outerR, lw * 0.5, RING_COLOR)
+				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
+				drawCross(ctx, cx, cy, innerR * 0.6, w * CROSS_WIDTH_RATIO, CROSS_COLOR)
 			}),
 	},
 	{
-		// >1M: Solid black circle
+		// >1M: White border ring with black inner circle
 		minPop: 1_000_000,
 		maxPop: Infinity,
 		label: ">1M",
@@ -271,8 +221,13 @@ const TIERS: SettlementTier[] = [
 				const style = getSettlementVisualStyle(isCapital)
 				const cx = w / 2
 				const cy = w / 2
-				const r = w * 0.42
-				drawFilledCircle(ctx, cx, cy, r, style.solidColor)
+				const outerR = w * 0.42
+				const innerR = w * 0.35
+				const lw = w * RING_WIDTH_RATIO
+				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
+				drawRing(ctx, cx, cy, outerR, lw * 0.5, RING_COLOR)
+				drawFilledCircle(ctx, cx, cy, innerR, SOLID_BLACK)
+				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
 			}),
 	},
 ]

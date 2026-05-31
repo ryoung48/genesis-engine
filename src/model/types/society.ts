@@ -76,6 +76,10 @@ export interface OrogenNationHierarchy extends OrogenPartition {
 	sovereign: Int32Array
 	/** Per-province settlement gravity */
 	gravity: Float32Array
+	/** Per-nation government type: 0=tribal, 1=monarchy, 2=republic, 3=theocracy */
+	governmentType?: Uint8Array
+	/** Per-nation colonizer index (-1 = sovereign, ≥0 = index of colonizing nation) */
+	nationColonizer?: Int32Array
 }
 
 export interface OrogenRivers {

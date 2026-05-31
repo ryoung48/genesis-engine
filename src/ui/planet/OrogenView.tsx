@@ -14,6 +14,11 @@ import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
 } from "@/model/shared/units"
+import {
+	GOVERNMENT_TYPE_LABELS,
+	GOVERNMENT_TYPES,
+	type SocietyEra,
+} from "@/model/society/eras"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
 	SerializedHistoryFrame,
@@ -48,6 +53,7 @@ import {
 	getHoverElevationKm,
 	getHoverHazards,
 	getHoverHotspot,
+	getHoverHumidity,
 	getHoverIsLand,
 	getHoverKoppenClimate,
 	getHoverLandmark,
@@ -59,6 +65,7 @@ import {
 	getHoverRiver,
 	getHoverTemperatureDelta,
 	getHoverTerrainFeature,
+	getHoverTimezone,
 	getHoverTopography,
 	type HoverInfo,
 } from "./hover/hover"
@@ -275,9 +282,10 @@ export const OrogenView: React.FC = () => {
 		initialViewPrefs.showThermalEquator,
 	)
 	const [showRivers, setShowRivers] = useState(initialViewPrefs.showRivers)
-	const [showInfrastructure, setShowInfrastructure] = useState(
-		initialViewPrefs.showInfrastructure,
+	const [showSettlements, setShowSettlements] = useState(
+		initialViewPrefs.showSettlements,
 	)
+	const [showRoads, setShowRoads] = useState(initialViewPrefs.showRoads)
 	const [labelMode, setLabelMode] = useState<LabelMode>(
 		initialViewPrefs.labelMode,
 	)
@@ -287,11 +295,28 @@ export const OrogenView: React.FC = () => {
 	const [overlaysExpanded, setOverlaysExpanded] = useState(
 		initialViewPrefs.overlaysExpanded,
 	)
+	const [climateTimeMode, setClimateTimeMode] = useState<
+		"current" | "annual" | "monthly"
+	>(initialViewPrefs.climateTimeMode)
+	const [climateMonth, setClimateMonth] = useState(
+		initialViewPrefs.climateMonth,
+	)
+	const [climateSubMode, setClimateSubMode] = useState<
+		"basic" | "pasta" | "koppen"
+	>(initialViewPrefs.climateSubMode)
+	const [elevationSubMode, setElevationSubMode] = useState<
+		"colored" | "grayscale"
+	>(initialViewPrefs.elevationSubMode)
+	const [topographySubMode, setTopographySubMode] = useState<
+		"classification" | "slope"
+	>(initialViewPrefs.topographySubMode)
 	const [debugMapModes, setDebugMapModes] = useState(
 		initialViewPrefs.debugMapModes,
 	)
 	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
-	const [worldTab, setWorldTab] = useState<"planet" | "terrain">("planet")
+	const [worldTab, setWorldTab] = useState<"planet" | "terrain" | "society">(
+		"planet",
+	)
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
 	const [showClimatePreview, setShowClimatePreview] = useState(false)
 	const [generationPreviewTab, setGenerationPreviewTab] =
@@ -311,8 +336,14 @@ export const OrogenView: React.FC = () => {
 	)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	const displayMonth = historyTimeToMonth(selectedTimeMs)
-	const temperatureMonth = displayMonth
-	const rainfallMonth = displayMonth
+	const resolvedClimateMonth =
+		climateTimeMode === "current"
+			? displayMonth
+			: climateTimeMode === "annual"
+				? 0
+				: climateMonth + 1
+	const temperatureMonth = resolvedClimateMonth
+	const rainfallMonth = resolvedClimateMonth
 	const dtrMonth = displayMonth
 	const currentMonth = displayMonth
 	const canSimulate = !!world && !!world.nations && !generating
@@ -504,6 +535,9 @@ export const OrogenView: React.FC = () => {
 	const [maxElevation, setMaxElevation] = useState(
 		initialDecodedCode?.maxElevation ?? DEFAULT_WORLD_PARAMS.maxElevation,
 	)
+	const [era, setEra] = useState<SocietyEra>(
+		initialDecodedCode?.era ?? DEFAULT_WORLD_PARAMS.era,
+	)
 
 	// --- Three.js scene lifecycle ---
 	useEffect(() => {
@@ -573,7 +607,8 @@ export const OrogenView: React.FC = () => {
 				showElevation,
 				showThermalEquator,
 				showRivers,
-				showInfrastructure,
+				showSettlements,
+				showRoads,
 				overlaysExpanded,
 				gridSpacing,
 				unitSystem,
@@ -582,10 +617,20 @@ export const OrogenView: React.FC = () => {
 				measureMode,
 				pathfindingLand,
 				pathfindingSea,
+				climateTimeMode,
+				climateMonth,
+				climateSubMode,
+				elevationSubMode,
+				topographySubMode,
 			}),
 		)
 	}, [
 		colorMode,
+		climateTimeMode,
+		climateMonth,
+		climateSubMode,
+		elevationSubMode,
+		topographySubMode,
 		debugMapModes,
 		geographyMode,
 		gridSpacing,
@@ -594,7 +639,8 @@ export const OrogenView: React.FC = () => {
 		overlaysExpanded,
 		populationMode,
 		showGrid,
-		showInfrastructure,
+		showSettlements,
+		showRoads,
 		showNationBorders,
 		showNationHierarchy,
 		labelMode,
@@ -726,6 +772,10 @@ export const OrogenView: React.FC = () => {
 		() => getHoverCoordinates(hoverInfo, worldForDisplay),
 		[hoverInfo, worldForDisplay],
 	)
+	const hoverTimezone = useMemo(
+		() => getHoverTimezone(hoverInfo, worldForDisplay),
+		[hoverInfo, worldForDisplay],
+	)
 	const hoverTemperatureDelta = getHoverTemperatureDelta(
 		hoverInfo,
 		worldForDisplay,
@@ -736,6 +786,7 @@ export const OrogenView: React.FC = () => {
 		rainfallMonth,
 	)
 	const hoverDtr = getHoverDtr(hoverInfo, worldForDisplay, dtrMonth)
+	const hoverHumidity = getHoverHumidity(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverClimateZone = getHoverClimateZone(hoverInfo, worldForDisplay)
 	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
 	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
@@ -890,6 +941,7 @@ export const OrogenView: React.FC = () => {
 			dtrMonth,
 			currentMonth,
 			viewMode,
+			showElevation,
 			undefined,
 			selectedHistoryView?.activeWars,
 			selectedNationId,
@@ -903,6 +955,7 @@ export const OrogenView: React.FC = () => {
 		rainfallMonth,
 		dtrMonth,
 		viewMode,
+		showElevation,
 		currentMonth,
 		selectedHistoryView,
 		worldForDisplay,
@@ -1250,6 +1303,46 @@ export const OrogenView: React.FC = () => {
 		[nationProvinceCounts],
 	)
 
+	const governmentDistribution = useMemo(() => {
+		// Indexed by government type (aligns with GOVERNMENT_TYPES / region-colors).
+		const GOV_COLORS = [
+			"rgb(204, 143, 71)", // 0 chiefdom
+			"rgb(140, 89, 36)", // 1 tribal monarchy
+			"rgb(237, 194, 128)", // 2 tribal federation
+			"rgb(112, 61, 28)", // 3 native council
+			"rgb(107, 138, 184)", // 4 feudal monarchy
+			"rgb(140, 199, 242)", // 5 elective monarchy
+			"rgb(15, 41, 112)", // 6 absolute monarchy
+			"rgb(33, 102, 217)", // 7 constitutional monarchy
+			"rgb(26, 143, 117)", // 8 merchant republic
+			"rgb(28, 92, 46)", // 9 noble republic
+			"rgb(163, 204, 61)", // 10 city-state confederation
+			"rgb(61, 163, 87)", // 11 presidential republic
+			"rgb(122, 214, 117)", // 12 parliamentary republic
+			"rgb(133, 61, 179)", // 13 theocracy
+			"rgb(71, 28, 117)", // 14 monastic state
+			"rgb(194, 143, 230)", // 15 prince-bishopric
+			"rgb(209, 46, 148)", // 16 imperial cult
+			"rgb(189, 36, 36)", // 17 socialist state
+			"rgb(112, 117, 61)", // 18 military junta
+			"rgb(230, 84, 61)", // 19 trading company
+			"rgb(245, 140, 128)", // 20 settler colony
+		]
+		const counts = new Array(GOVERNMENT_TYPES.length).fill(0)
+		const govType = worldForDisplay?.nations?.governmentType
+		if (govType && nationModel) {
+			for (const nationId of nationModel.counts.keys()) {
+				const t = govType[nationId] ?? 0
+				if (t >= 0 && t < counts.length) counts[t]++
+			}
+		}
+		return GOVERNMENT_TYPES.map((key, i) => ({
+			label: GOVERNMENT_TYPE_LABELS[key],
+			count: counts[i] ?? 0,
+			color: GOV_COLORS[i] ?? "rgb(148, 163, 184)",
+		}))
+	}, [worldForDisplay?.nations?.governmentType, nationModel])
+
 	const conflictDistribution = useMemo(
 		() => buildConflictDistribution(selectedHistoryView),
 		[selectedHistoryView],
@@ -1446,29 +1539,29 @@ export const OrogenView: React.FC = () => {
 		sceneRef.current?.setGridSpacing(gridSpacing)
 	}, [gridSpacing])
 	useEffect(() => {
-		sceneRef.current?.setSettlementsVisible(showInfrastructure)
-	}, [showInfrastructure])
+		sceneRef.current?.setSettlementsVisible(showSettlements)
+	}, [showSettlements])
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showInfrastructure && worldForDisplay?.urbanPopulation) {
+		if (showSettlements && worldForDisplay?.urbanPopulation) {
 			scene.setSettlements(worldForDisplay.urbanPopulation)
 		} else {
 			scene.setSettlements(null)
 		}
-	}, [showInfrastructure, worldForDisplay])
+	}, [showSettlements, worldForDisplay])
 	useEffect(() => {
-		sceneRef.current?.setInfrastructureVisible(showInfrastructure)
-	}, [showInfrastructure])
+		sceneRef.current?.setInfrastructureVisible(showRoads)
+	}, [showRoads])
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showInfrastructure && worldForDisplay?.network) {
+		if (showRoads && worldForDisplay?.network) {
 			scene.setInfrastructure(worldForDisplay.network)
 		} else {
 			scene.setInfrastructure(null)
 		}
-	}, [showInfrastructure, worldForDisplay])
+	}, [showRoads, worldForDisplay])
 
 	// --- Labels ---
 	useEffect(() => {
@@ -1515,7 +1608,7 @@ export const OrogenView: React.FC = () => {
 			},
 			onGenerationComplete: () => {
 				setGenerationPanelOpen(false)
-				setDetailsDrawerOpen(true)
+				setTimeout(() => setDetailsDrawerOpen(true), 400)
 			},
 			onSimProgress: (timeMs, frame) => {
 				setSimTimeMs(timeMs)
@@ -1569,6 +1662,7 @@ export const OrogenView: React.FC = () => {
 			numPlates,
 			landDistribution,
 			continentSizeVariety,
+			era,
 			landCoverage,
 			planetRadiusKm,
 			obliquity,
@@ -1600,6 +1694,7 @@ export const OrogenView: React.FC = () => {
 			numPlates,
 			landDistribution,
 			continentSizeVariety,
+			era,
 			landCoverage,
 			planetRadiusKm,
 			obliquity,
@@ -1714,6 +1809,7 @@ export const OrogenView: React.FC = () => {
 			setVolcanism,
 			setCraters,
 			setMaxElevation,
+			setEra,
 		}),
 		[],
 	)
@@ -1748,6 +1844,7 @@ export const OrogenView: React.FC = () => {
 			setters.setVolcanism(decoded.volcanism)
 			setters.setCraters(decoded.craters ?? 0)
 			setters.setMaxElevation(decoded.maxElevation)
+			setters.setEra(decoded.era)
 		},
 		[setters],
 	)
@@ -2131,6 +2228,8 @@ export const OrogenView: React.FC = () => {
 					setObliquity={setObliquity}
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
+					era={era}
+					setEra={setEra}
 					planetCode={planetCode}
 					codeInput={planetCodeInput}
 					setCodeInput={handleCodeInputChange}
@@ -2185,11 +2284,13 @@ export const OrogenView: React.FC = () => {
 								hoverElevationKm={hoverElevationKm}
 								hoverTopography={hoverTopography}
 								hoverCoordinates={hoverCoordinates}
+								hoverTimezone={hoverTimezone}
 								hoverLandmark={hoverLandmark}
 								hoverIsLand={hoverIsLand}
 								hoverTemperatureDelta={hoverTemperatureDelta}
 								hoverRainfall={hoverRainfall}
 								hoverDtr={hoverDtr}
+								hoverHumidity={hoverHumidity}
 								hoverClimateDisplay={hoverClimateDisplay}
 								hoverIceSummary={hoverIceSummary}
 								hoverBiome={hoverBiome}
@@ -2270,8 +2371,10 @@ export const OrogenView: React.FC = () => {
 							setLabelMode={setLabelMode}
 							showElevation={showElevation}
 							setShowElevation={setShowElevation}
-							showInfrastructure={showInfrastructure}
-							setShowInfrastructure={setShowInfrastructure}
+							showSettlements={showSettlements}
+							setShowSettlements={setShowSettlements}
+							showRoads={showRoads}
+							setShowRoads={setShowRoads}
 							gridSpacing={gridSpacing}
 							setGridSpacing={setGridSpacing}
 							viewMode={viewMode}
@@ -2284,6 +2387,18 @@ export const OrogenView: React.FC = () => {
 							setMapProjectionLatitude={setMapProjectionLatitude}
 							debugMapModes={debugMapModes}
 							setDebugMapModes={setDebugMapModes}
+							colorMode={colorMode}
+							setColorMode={setColorMode}
+							climateTimeMode={climateTimeMode}
+							setClimateTimeMode={setClimateTimeMode}
+							climateMonth={climateMonth}
+							setClimateMonth={setClimateMonth}
+							climateSubMode={climateSubMode}
+							setClimateSubMode={setClimateSubMode}
+							elevationSubMode={elevationSubMode}
+							setElevationSubMode={setElevationSubMode}
+							topographySubMode={topographySubMode}
+							setTopographySubMode={setTopographySubMode}
 							exportWidthPreset={exportWidthPreset}
 							setExportWidthPreset={setExportWidthPreset}
 							exportCenterLongitude={exportCenterLongitude}
@@ -2310,9 +2425,14 @@ export const OrogenView: React.FC = () => {
 								setShowThermalEquator(false)
 								setShowNationBorders(false)
 								setShowNationHierarchy(false)
-								setLabelMode("off")
+								setLabelMode({
+									nations: false,
+									dynasty: false,
+									settlements: false,
+								})
 								setShowElevation(false)
-								setShowInfrastructure(false)
+								setShowSettlements(false)
+								setShowRoads(false)
 								setMeasureMode("off")
 								setPathfindingLand(true)
 								setPathfindingSea(true)
@@ -2372,6 +2492,9 @@ export const OrogenView: React.FC = () => {
 									populationMode={populationMode}
 									setPopulationMode={setPopulationMode}
 									debugMapModes={debugMapModes}
+									climateSubMode={climateSubMode}
+									elevationSubMode={elevationSubMode}
+									topographySubMode={topographySubMode}
 								/>
 							</div>
 						</div>
@@ -2395,6 +2518,7 @@ export const OrogenView: React.FC = () => {
 				faithCount={worldForDisplay?.faiths?.count ?? null}
 				religionCount={worldForDisplay?.religions?.count ?? null}
 				nationSizeDistribution={nationSizeDistribution}
+				governmentDistribution={governmentDistribution}
 				conflictDistribution={conflictDistribution}
 				relationDistribution={relationDistribution}
 				climateDistribution={climateDistribution}

@@ -32,12 +32,18 @@ function renderWithProps(
 		setShowNationBorders: vi.fn(),
 		showNationHierarchy: false,
 		setShowNationHierarchy: vi.fn(),
-		labelMode: "off" as LabelMode,
+		labelMode: {
+			nations: false,
+			dynasty: false,
+			settlements: false,
+		} as LabelMode,
 		setLabelMode: vi.fn(),
 		showElevation: true,
 		setShowElevation: vi.fn(),
-		showInfrastructure: false,
-		setShowInfrastructure: vi.fn(),
+		showSettlements: false,
+		setShowSettlements: vi.fn(),
+		showRoads: false,
+		setShowRoads: vi.fn(),
 		gridSpacing: 15,
 		setGridSpacing: vi.fn(),
 		viewMode: "globe",
@@ -50,6 +56,18 @@ function renderWithProps(
 		setMapProjectionLatitude: vi.fn(),
 		debugMapModes: false,
 		setDebugMapModes: vi.fn(),
+		colorMode: "terrain",
+		setColorMode: vi.fn(),
+		climateTimeMode: "current",
+		setClimateTimeMode: vi.fn(),
+		climateMonth: 0,
+		setClimateMonth: vi.fn(),
+		climateSubMode: "basic",
+		setClimateSubMode: vi.fn(),
+		elevationSubMode: "colored",
+		setElevationSubMode: vi.fn(),
+		topographySubMode: "classification",
+		setTopographySubMode: vi.fn(),
 		exportWidthPreset: "8192",
 		setExportWidthPreset: vi.fn(),
 		exportCenterLongitude: 0,
@@ -83,13 +101,11 @@ describe("OverlayControls", () => {
 		expect(markup).toContain(">Copy seed<")
 		expect(markup).toContain('aria-label="Metric units"')
 		expect(markup).toContain('aria-label="Imperial units"')
-		expect(markup).toContain('aria-label="Labels off"')
-		expect(markup).toContain('aria-label="Nation labels"')
-		expect(markup).toContain('aria-label="Dynasty labels"')
+		expect(markup).toContain(">Political<")
+		expect(markup).toContain(">Infrastructure<")
 		expect(markup).toContain(">me<")
 		expect(markup).toContain(">im<")
 		expect(markup).toContain("Projection Latitude")
-		expect(markup).toContain("Debug Map Modes")
 		expect(markup).toContain("Export PNG")
 		expect(markup).toContain("Export Longitude")
 		expect(markup).toContain('aria-label="4096 wide"')
@@ -161,7 +177,7 @@ describe("OverlayControls", () => {
 		props.setShowWireframe?.(true)
 		props.setShowNationBorders?.(true)
 		props.setShowNationHierarchy?.(true)
-		props.setLabelMode?.("dynasty")
+		props.setLabelMode?.({ nations: false, dynasty: true, settlements: false })
 		props.setShowGrid?.(false)
 		props.setDraftMapProjectionLatitude?.(-42)
 		props.setMapProjectionLatitude?.(-42)
@@ -188,7 +204,11 @@ describe("OverlayControls", () => {
 		expect(setShowWireframe).toHaveBeenCalledWith(true)
 		expect(setShowNationBorders).toHaveBeenCalledWith(true)
 		expect(setShowNationHierarchy).toHaveBeenCalledWith(true)
-		expect(setLabelMode).toHaveBeenCalledWith("dynasty")
+		expect(setLabelMode).toHaveBeenCalledWith({
+			nations: false,
+			dynasty: true,
+			settlements: false,
+		})
 		expect(setShowGrid).toHaveBeenCalledWith(false)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
 		expect(setMapProjectionLatitude).toHaveBeenCalledWith(-42)
@@ -255,22 +275,12 @@ describe("OverlayControls", () => {
 		expect(markup).toContain("disabled")
 	})
 
-	it("renders pathfinding travel rates in the active unit system", () => {
-		const metric = renderWithProps({
+	it("renders the measure checkbox row above grid lines", () => {
+		const { markup } = renderWithProps({
 			overlaysExpanded: true,
-			measureMode: "pathfinding",
-			unitSystem: "metric",
-		}).markup
-		const imperial = renderWithProps({
-			overlaysExpanded: true,
-			measureMode: "pathfinding",
-			unitSystem: "imperial",
-		}).markup
+			measureMode: "off",
+		})
 
-		expect(metric).toContain("Land Travel (30 km/day)")
-		expect(metric).toContain("Sea Travel (100 km/day)")
-		expect(imperial).toContain("Land Travel (19 mi/day)")
-		expect(imperial).toContain("Sea Travel (62 mi/day)")
-		expect(imperial).not.toContain("30 km/day")
+		expect(markup).toContain(">Measure<")
 	})
 })

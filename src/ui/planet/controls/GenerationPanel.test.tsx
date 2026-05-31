@@ -51,6 +51,8 @@ function createProps(
 		handleGenerate: vi.fn(),
 		handleFileImport: vi.fn(),
 		handleEarthImport: vi.fn(),
+		era: "lateMedieval",
+		setEra: vi.fn(),
 		...overrides,
 	}
 }
@@ -59,9 +61,7 @@ describe("GenerationPanel", () => {
 	it("renders preview beside reset in the header actions", () => {
 		const markup = renderToStaticMarkup(<GenerationPanel {...createProps()} />)
 
-		expect(markup).toMatch(
-			/Terrain<\/button><\/div><\/div><div class="flex items-center gap-2"><button[^>]*>Preview<\/button><button[^>]*>Reset<\/button>/,
-		)
+		expect(markup).toMatch(/>Preview<\/button><button[^>]*>Reset<\/button>/)
 	})
 
 	it("keeps post breakdown out of the top-level timing total", () => {

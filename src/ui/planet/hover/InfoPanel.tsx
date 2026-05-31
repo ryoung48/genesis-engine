@@ -33,6 +33,7 @@ import type {
 	HoverDtr,
 	HoverHazards,
 	HoverHotspot,
+	HoverHumidity,
 	HoverInfo,
 	HoverLandmark,
 	HoverOceanCurrents,
@@ -48,6 +49,7 @@ import {
 	formatCompactNumber,
 	gddColor,
 	gintColor,
+	humidityChartColor,
 	petColor,
 	rainColor,
 	tempColor,
@@ -55,6 +57,7 @@ import {
 import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
+	buildGovernmentDisplayData,
 	buildHoverChartData,
 	buildHoverNationRelationDistribution,
 	buildPastaMonthlyData,
@@ -212,11 +215,13 @@ interface InfoPanelProps {
 	hoverElevationKm: number | null
 	hoverTopography: string | null
 	hoverCoordinates: string | null
+	hoverTimezone: string | null
 	hoverLandmark: HoverLandmark | null
 	hoverIsLand: boolean | null
 	hoverTemperatureDelta: number | null
 	hoverRainfall: number | null
 	hoverDtr: HoverDtr | null
+	hoverHumidity: HoverHumidity | null
 	hoverClimateDisplay: string | null
 	hoverIceSummary: string | null
 	hoverBiome: string | null
@@ -266,9 +271,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverElevationKm,
 	hoverTopography,
 	hoverCoordinates,
+	hoverTimezone,
 	hoverLandmark,
 	hoverTemperatureDelta,
 	hoverDtr,
+	hoverHumidity,
 	hoverClimateDisplay,
 	hoverIceSummary,
 	hoverBiome,
@@ -374,6 +381,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			getLeaderName,
 			getDynastyName,
 		})
+	const governmentDisplay = showPolitical
+		? buildGovernmentDisplayData({ hoverNationId, world })
+		: null
 	const demographicModes: PopulationMapMode[] = [
 		populationMode,
 		...(
@@ -542,6 +552,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
 							/>
 						)}
+						{colorMode === "humidity" && hoverHumidity !== null && (
+							<Row
+								label={`Humidity ${monthLabels[displayMonth] ?? `M${displayMonth}`}`}
+								value={`${hoverHumidity.value.toFixed(0)}%`}
+							/>
+						)}
 						{colorMode === "pastaClimate" && hoverIceSummary && (
 							<Row label="Ice" value={hoverIceSummary} />
 						)}
@@ -613,6 +629,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						)}
 					</>
 				)}
+				{showPolitical && hoverTimezone && (
+					<Row label="Timezone" value={hoverTimezone} />
+				)}
 				{showPolitical && hoverProvince !== null && hoverProvince >= 0 && (
 					<>
 						<SwatchRow
@@ -627,11 +646,30 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								color={provinceNation.color}
 							/>
 						)}
+						{provinceNation && governmentDisplay && (
+							<SwatchRow
+								label="Government"
+								value={governmentDisplay.label}
+								color={governmentDisplay.color}
+							/>
+						)}
 						{hoverOccupation && (
 							<SwatchRow
 								label="Occupier"
 								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
 								color={hoverOccupation.color}
+							/>
+						)}
+						{world?.waterAccess && hoverProvince < world.waterAccess.length && (
+							<Row
+								label="Water Access"
+								value={
+									world.waterAccess[hoverProvince] >= 2
+										? "Ocean"
+										: world.waterAccess[hoverProvince] >= 1
+											? "River/Lake"
+											: "None"
+								}
 							/>
 						)}
 						{provinceDynasty && (
@@ -919,6 +957,26 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									}
 									tooltipLabel={({ index, value }) =>
 										`${monthLabels[index + 1]}: ${formatTemperatureDelta(value, unitSystem, 1)}`
+									}
+									showValues
+								/>
+							)}
+						{colorMode === "humidity" &&
+							hoverHumidity &&
+							hoverHumidity.monthly.length === 12 && (
+								<SeriesBars
+									values={hoverHumidity.monthly}
+									labels={MONTH_SHORT}
+									label="Humidity"
+									colorForValue={(value) => humidityChartColor(value)}
+									activeIndex={displayMonth - 1}
+									summary={buildSummary(hoverHumidity.annual, {
+										prefix: "AVG",
+										formatValue: (value) => `${value.toFixed(0)}%`,
+									})}
+									formatValue={(value) => value.toFixed(0)}
+									tooltipLabel={({ index, value }) =>
+										`${monthLabels[index + 1]}: ${value.toFixed(0)}%`
 									}
 									showValues
 								/>

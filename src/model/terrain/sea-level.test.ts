@@ -8,14 +8,14 @@ import {
 
 describe("computeSeaLevelOffsetKm", () => {
 	it("keeps modifier 1 as an exact no-op", () => {
-		expect(computeSeaLevelOffsetKm(1, 6, 10)).toBe(0)
+		expect(computeSeaLevelOffsetKm(1, 10)).toBe(0)
 	})
 
 	it("maps lower and higher sea levels against ocean and mountain ranges", () => {
-		expect(computeSeaLevelOffsetKm(0, 6, 10)).toBe(-10)
-		expect(computeSeaLevelOffsetKm(2, 6, 10)).toBe(6)
-		expect(computeSeaLevelOffsetKm(0.5, 6, 10)).toBe(-5)
-		expect(computeSeaLevelOffsetKm(1.5, 6, 10)).toBe(3)
+		expect(computeSeaLevelOffsetKm(0, 10)).toBe(-10)
+		expect(computeSeaLevelOffsetKm(2, 10)).toBe(10)
+		expect(computeSeaLevelOffsetKm(0.5, 10)).toBe(-5)
+		expect(computeSeaLevelOffsetKm(1.5, 10)).toBe(5)
 	})
 })
 
@@ -64,12 +64,12 @@ describe("applySeaLevelToElevation", () => {
 		})
 
 		expect(raised.elevation_km[0]).toBeCloseTo(
-			elevToHeightKm(baseElevation[0], 6, 10) - 3,
+			elevToHeightKm(baseElevation[0], 6, 10) - 5,
 			5,
 		)
-		expect(raised.elevation_km[1]).toBeCloseTo(-3, 5)
+		expect(raised.elevation_km[1]).toBeCloseTo(-5, 5)
 		expect(raised.elevation_km[2]).toBeCloseTo(
-			elevToHeightKm(baseElevation[2], 6, 10) - 3,
+			elevToHeightKm(baseElevation[2], 6, 10) - 5,
 			5,
 		)
 		expect(raised.elevation[2]).toBeLessThanOrEqual(0)

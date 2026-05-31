@@ -26,7 +26,8 @@ export function buildSettlementLabelNames(
 	world: SerializedOrogenWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
-	if (!world?.settlementRegions || !world.urbanPopulation || !resolvers) return null
+	if (!world?.settlementRegions || !world.urbanPopulation || !resolvers)
+		return null
 	const provinceCount = world.provinces?.count ?? world.settlementRegions.length
 	const names: string[] = new Array(provinceCount)
 	for (let p = 0; p < provinceCount; p++) {

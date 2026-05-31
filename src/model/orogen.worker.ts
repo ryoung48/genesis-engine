@@ -76,6 +76,8 @@ function cloneNations(n: OrogenNationHierarchy): OrogenNationHierarchy {
 		childList: n.childList.slice(),
 		sovereign: n.sovereign.slice(),
 		gravity: n.gravity.slice(),
+		governmentType: n.governmentType?.slice(),
+		nationColonizer: n.nationColonizer?.slice(),
 	}
 }
 
@@ -119,6 +121,9 @@ function cloneHistorySeedWorld(
 					}),
 					...(world.population.cradleProvinces && {
 						cradleProvinces: world.population.cradleProvinces.slice(),
+					}),
+					...(world.population.settlementWave !== undefined && {
+						settlementWave: world.population.settlementWave,
 					}),
 				}
 			: null,
@@ -374,6 +379,7 @@ function nationBuffers(n: {
 	childList: Int32Array
 	sovereign: Int32Array
 	gravity: Float32Array
+	governmentType?: Uint8Array
 }): Transferable[] {
 	const nameSeeds = n.nameSeeds ?? new Int32Array(0)
 	return [
@@ -385,6 +391,7 @@ function nationBuffers(n: {
 		n.childList.buffer as ArrayBuffer,
 		n.sovereign.buffer as ArrayBuffer,
 		n.gravity.buffer as ArrayBuffer,
+		...(n.governmentType ? [n.governmentType.buffer as ArrayBuffer] : []),
 	]
 }
 

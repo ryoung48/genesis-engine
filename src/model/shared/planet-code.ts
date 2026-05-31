@@ -3,6 +3,7 @@
  * segment so the seed stays recoverable across param format changes.
  */
 
+import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import type { OrogenParams } from ".."
 import { SLIDER_RANGES } from "./slider-ranges"
 
@@ -221,6 +222,17 @@ const FIELD_SPECS: FieldSpec[] = [
 		count: rangeCount(SR.maxElevation),
 		read: (p) => p.maxElevation ?? 6000,
 	},
+	{
+		name: "era",
+		min: 0,
+		step: 1,
+		count: ERA_ORDER.length,
+		read: (p) => {
+			const era = p.era ?? DEFAULT_ERA
+			const idx = ERA_ORDER.indexOf(era)
+			return idx >= 0 ? idx : 0
+		},
+	},
 ]
 
 const PARAMS_BASE_LEN = (() => {
@@ -349,6 +361,7 @@ interface DecodedPlanetCode {
 	volcanism: number
 	craters?: number
 	maxElevation: number
+	era: SocietyEra
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
@@ -381,6 +394,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 	if (packed !== 0n) return null
 
 	const craters = decodedFields.craters
+	const eraIdx = decodedFields.era
 
 	return {
 		seed,
@@ -412,5 +426,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		volcanism: decodedFields.volcanism,
 		craters: craters > 0 ? craters : undefined,
 		maxElevation: decodedFields.maxElevation,
+		era: ERA_ORDER[eraIdx] ?? DEFAULT_ERA,
 	}
 }

@@ -3,9 +3,9 @@ import {
 	getMapModePrimary,
 	getVisibleDemographicModeOptions,
 	getVisibleGeographyModeOptions,
+	getVisiblePoliticalModeOptions,
 	isDebugGeographyMode,
 	normalizeGeographyColorMode,
-	POLITICAL_MODE_OPTIONS,
 } from "./map-modes"
 
 describe("map-modes", () => {
@@ -21,8 +21,10 @@ describe("map-modes", () => {
 
 		expect(defaultOptions.map(([mode]) => mode)).toContain("terrain")
 		expect(defaultOptions.map(([mode]) => mode)).not.toContain("dtr")
+		expect(defaultOptions.map(([mode]) => mode)).not.toContain("pastaClimate")
 		expect(debugOptions.map(([mode]) => mode)).toContain("dtr")
-		expect(debugOptions.map(([mode]) => mode)).toContain("koppenClimate")
+		expect(debugOptions.map(([mode]) => mode)).not.toContain("pastaClimate")
+		expect(debugOptions.map(([mode]) => mode)).not.toContain("koppenClimate")
 	})
 
 	it("filters demographic options by debug visibility", () => {
@@ -30,16 +32,17 @@ describe("map-modes", () => {
 		const debugOptions = getVisibleDemographicModeOptions(true)
 
 		expect(defaultOptions.map(([mode]) => mode)).toContain("density")
-		expect(debugOptions).toEqual(defaultOptions)
+		expect(defaultOptions.map(([mode]) => mode)).not.toContain("migration")
+		expect(debugOptions.map(([mode]) => mode)).toContain("migration")
 	})
 
-	it("includes dynasty and diplomacy alongside the political submodes", () => {
-		expect(POLITICAL_MODE_OPTIONS).toEqual([
-			["borders", "Nations"],
-			["dynasty", "Dynasty"],
-			["diplomacy", "Diplomacy"],
-			["provinces", "Provinces"],
-		])
+	it("filters political options by debug visibility", () => {
+		const defaultOptions = getVisiblePoliticalModeOptions(false)
+		const debugOptions = getVisiblePoliticalModeOptions(true)
+
+		expect(defaultOptions.map(([mode]) => mode)).toContain("borders")
+		expect(defaultOptions.map(([mode]) => mode)).not.toContain("provinces")
+		expect(debugOptions.map(([mode]) => mode)).toContain("provinces")
 	})
 
 	it("identifies debug-only geography modes", () => {

@@ -25,6 +25,7 @@ const RELATION_LABELS: Record<number, string> = {
 	[REL.SUSPICIOUS]: "Suspicious",
 	[REL.RIVAL]: "Rival",
 	[REL.WAR]: "War",
+	[REL.COLONY]: "Colony",
 }
 
 const HISTORY_WINDOW_YEARS = 10
@@ -221,8 +222,15 @@ export function buildSelectedNationDetails(params: {
 	): number[] => {
 		const validRelations: number[] =
 			type === "offensive"
-				? [REL.OVERLORD, REL.VASSAL, REL.PU_SENIOR, REL.PU_JUNIOR]
-				: [REL.ALLY, REL.OVERLORD, REL.VASSAL, REL.PU_SENIOR, REL.PU_JUNIOR]
+				? [REL.OVERLORD, REL.VASSAL, REL.PU_SENIOR, REL.PU_JUNIOR, REL.COLONY]
+				: [
+						REL.ALLY,
+						REL.OVERLORD,
+						REL.VASSAL,
+						REL.PU_SENIOR,
+						REL.PU_JUNIOR,
+						REL.COLONY,
+					]
 		return sovereignIds.filter((id) => {
 			if (id === nationId || id === target) return false
 			if (!validRelations.includes(relationAt(nationId, id))) return false
@@ -259,6 +267,32 @@ export function buildSelectedNationDetails(params: {
 			RELATION_LABELS[relationAt(selectedNationId, neighborId)] ?? "Unknown",
 		threat: warThreatAgainst(selectedNationId, neighborId),
 	}))
+
+	// Supplement neighbors with non-adjacent colony/colonizer pairs
+	if (selectedHistoryView?.forEachRelationPair) {
+		const neighborIds = new Set(neighbors.map((n) => n.id))
+		selectedHistoryView.forEachRelationPair((a, b) => {
+			let otherId = -1
+			let rel = -1
+			if (a === selectedNationId) {
+				otherId = b
+				rel = relationAt(selectedNationId, b)
+			} else if (b === selectedNationId) {
+				otherId = a
+				rel = relationAt(selectedNationId, a)
+			}
+			if (otherId < 0 || neighborIds.has(otherId)) return
+			if (rel !== REL.COLONY && rel !== REL.OVERLORD) return
+			neighborIds.add(otherId)
+			neighbors.push({
+				id: otherId,
+				name: getNationName(otherId),
+				color: getNationColor(otherId),
+				relation: RELATION_LABELS[rel] ?? "Unknown",
+				threat: warThreatAgainst(selectedNationId, otherId),
+			})
+		})
+	}
 
 	const nationWars = activeWars
 		.filter(
@@ -482,6 +516,7 @@ export function buildRelationDistribution(
 ): DistributionBucket[] {
 	if (!selectedHistoryView || !nationModel || !nationAdj) return []
 	const counts: Record<string, number> = {
+		Colony: 0,
 		Vassal: 0,
 		PU: 0,
 		Allied: 0,
@@ -501,7 +536,9 @@ export function buildRelationDistribution(
 			if (seen.has(key)) continue
 			seen.add(key)
 			const rel = selectedHistoryView.relationAt(i, j)
-			if (rel === REL.OVERLORD || rel === REL.VASSAL) counts.Vassal++
+			const rev = selectedHistoryView.relationAt(j, i)
+			if (rel === REL.COLONY || rev === REL.COLONY) counts.Colony++
+			else if (rel === REL.OVERLORD || rel === REL.VASSAL) counts.Vassal++
 			else if (rel === REL.PU_SENIOR || rel === REL.PU_JUNIOR) counts.PU++
 			else if (rel === REL.ALLY) counts.Allied++
 			else if (rel === REL.FRIENDLY) counts.Friendly++
@@ -511,9 +548,27 @@ export function buildRelationDistribution(
 			else counts.Neutral++
 		}
 	}
+
+	// Colonies are overseas and almost never adjacent, so the adjacency scan above
+	// misses them. Colonial relations live in the relation data like any other, so
+	// scan the relation pairs directly (a colony reads as COLONY one way, OVERLORD
+	// the other) and count the ones the adjacency pass didn't already see.
+	selectedHistoryView.forEachRelationPair((a, b) => {
+		if (!nationModel.counts.has(a) || !nationModel.counts.has(b)) return
+		const key = `${a},${b}` // forEachRelationPair yields a < b
+		if (seen.has(key)) return
+		if (
+			selectedHistoryView.relationAt(a, b) === REL.COLONY ||
+			selectedHistoryView.relationAt(b, a) === REL.COLONY
+		) {
+			seen.add(key)
+			counts.Colony++
+		}
+	})
 	return [
 		{ label: "Personal Union", count: counts.PU, color: "rgb(99, 102, 241)" },
 		{ label: "Vassal", count: counts.Vassal, color: "rgb(168, 85, 247)" },
+		{ label: "Colony", count: counts.Colony, color: "rgb(230, 84, 61)" },
 		{ label: "Allied", count: counts.Allied, color: "rgb(59, 130, 246)" },
 		{ label: "Friendly", count: counts.Friendly, color: "rgb(34, 197, 94)" },
 		{ label: "Neutral", count: counts.Neutral, color: "rgb(201, 201, 201)" },

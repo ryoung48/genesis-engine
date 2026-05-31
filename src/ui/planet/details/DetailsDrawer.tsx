@@ -45,6 +45,7 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	faithCount,
 	religionCount,
 	nationSizeDistribution,
+	governmentDistribution,
 	conflictDistribution,
 	relationDistribution,
 	climateDistribution,
@@ -158,6 +159,7 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 								faithCount={faithCount}
 								religionCount={religionCount}
 								nationSizeDistribution={nationSizeDistribution}
+								governmentDistribution={governmentDistribution}
 								conflictDistribution={conflictDistribution}
 								relationDistribution={relationDistribution}
 								climateDistribution={climateDistribution}

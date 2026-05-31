@@ -189,9 +189,10 @@ describe("buildHoverNationRelationDistribution", () => {
 			nationCounts,
 			relationAt: (_, b) => relations[b] ?? REL.NEUTRAL,
 		})
-		expect(result).toHaveLength(8)
+		expect(result).toHaveLength(9)
 		const byLabel = Object.fromEntries(result.map((b) => [b.label, b.count]))
 		expect(byLabel["Personal Union"]).toBe(2)
+		expect(byLabel["Colony"]).toBe(0)
 		expect(byLabel["Vassal"]).toBe(2)
 		expect(byLabel["Allied"]).toBe(1)
 		expect(byLabel["Friendly"]).toBe(1)
@@ -1067,9 +1068,10 @@ describe("buildHoverNationRelationDistribution", () => {
 			nationCounts,
 			relationAt: (_, b) => relations[b] ?? REL.NEUTRAL,
 		})
-		expect(result).toHaveLength(8)
+		expect(result).toHaveLength(9)
 		const byLabel = Object.fromEntries(result.map((b) => [b.label, b.count]))
 		expect(byLabel["Personal Union"]).toBe(2)
+		expect(byLabel["Colony"]).toBe(0)
 		expect(byLabel["Vassal"]).toBe(2)
 		expect(byLabel["Allied"]).toBe(1)
 		expect(byLabel["Friendly"]).toBe(1)

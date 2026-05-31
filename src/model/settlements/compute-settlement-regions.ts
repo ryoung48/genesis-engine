@@ -106,6 +106,7 @@ function inlandPriority(
 
 export function computeSettlementAnchors(
 	world: SettlementRegionWorld,
+	activeProvinceMask?: Uint8Array,
 ): SettlementAnchors {
 	const provinces = world.provinces
 	if (!provinces) {
@@ -142,6 +143,7 @@ export function computeSettlementAnchors(
 		if (province < 0 || provinces.desolate[province] || !world.isLand[region]) {
 			continue
 		}
+		if (activeProvinceMask && !activeProvinceMask[province]) continue
 		if (world.coastal[region]) provinceHasCoast[province] = 1
 	}
 
@@ -150,6 +152,7 @@ export function computeSettlementAnchors(
 		if (province < 0 || provinces.desolate[province] || !world.isLand[region]) {
 			continue
 		}
+		if (activeProvinceMask && !activeProvinceMask[province]) continue
 
 		const adjacentWater = world.coastal[region]
 			? getLargestAdjacentWaterRegion(world, region)

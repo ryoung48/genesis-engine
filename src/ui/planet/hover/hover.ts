@@ -2,11 +2,13 @@ import {
 	OROGEN_TERRAIN_FEATURE_LABELS,
 	OROGEN_TOPOGRAPHY_LABELS,
 } from "@/model"
+import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { KOPPEN_LABELS, koppenClimateName } from "@/model/climate/koppen"
 import { PASTA_LABELS, pastaClimateName } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { meanEdgeLengthKm } from "@/model/shared/units"
+import { regionTimezoneLabel } from "@/model/society/timezone"
 import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
@@ -59,6 +61,12 @@ export interface HoverDtr {
 	monthly: number[]
 }
 
+export interface HoverHumidity {
+	value: number
+	annual: number
+	monthly: number[]
+}
+
 export function getHoverElevationKm(
 	hoverInfo: HoverInfo | null,
 	world: SerializedOrogenWorld | null,
@@ -89,6 +97,17 @@ export function getHoverCoordinates(
 	const latLabel = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? "N" : "S"}`
 	const lonLabel = `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? "E" : "W"}`
 	return `${latLabel}, ${lonLabel}`
+}
+
+export function getHoverTimezone(
+	hoverInfo: HoverInfo | null,
+	world: SerializedOrogenWorld | null,
+): string | null {
+	if (!hoverInfo || !world) return null
+	// Reuse the colorer's band resolution so the hovered offset always matches
+	// the stripe under the cursor: land follows its province/nation, water
+	// follows the region's own longitude.
+	return regionTimezoneLabel(world, hoverInfo.region)
 }
 
 export function getHoverTemperatureDelta(
@@ -128,6 +147,54 @@ export function getHoverDtr(
 		const N = world.mesh.numRegions
 		for (let m = 0; m < 12; m++) {
 			monthly.push(world.dtr_monthly[m * N + r] ?? annual)
+		}
+	}
+	return {
+		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
+		annual,
+		monthly,
+	}
+}
+
+export function getHoverHumidity(
+	hoverInfo: HoverInfo | null,
+	world: SerializedOrogenWorld | null,
+	dtrMonth: number,
+): HoverHumidity | null {
+	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
+	const r = hoverInfo.region
+	if (world.isLand && !world.isLand[r]) return null
+	const N = world.mesh.numRegions
+
+	// Annual aridity ratio for the FAO-56 dewpoint correction.
+	let annualAridity: number | undefined
+	const aet = world.hydrology?.aet_monthly
+	const pet = world.climate.pet_monthly
+	if (aet && pet) {
+		let aetSum = 0
+		let petSum = 0
+		for (let m = 0; m < 12; m++) {
+			aetSum += aet[m * N + r]
+			petSum += pet[m * N + r]
+		}
+		annualAridity = petSum > 0 ? aetSum / petSum : 1
+	}
+
+	const annual = relativeHumidityFromTempRange(
+		world.climate.temperature_avg[r],
+		world.dtr_annual[r],
+		annualAridity,
+	)
+	const monthly: number[] = []
+	if (world.dtr_monthly && world.climate.temperature_monthly) {
+		for (let m = 0; m < 12; m++) {
+			monthly.push(
+				relativeHumidityFromTempRange(
+					world.climate.temperature_monthly[m * N + r],
+					world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
+					annualAridity,
+				),
+			)
 		}
 	}
 	return {

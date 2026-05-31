@@ -17,6 +17,7 @@ describe("label-names", () => {
 			buildNationLabelNames(world, {
 				nation: (capitalProvince) => `Nation at ${capitalProvince}`,
 				dynasty: (dynastyId) => `Dynasty ${dynastyId}`,
+				province: (provinceIdx) => `Province ${provinceIdx}`,
 			}),
 		).toEqual(["Nation at 4", "Nation at 1"])
 	})
@@ -33,6 +34,7 @@ describe("label-names", () => {
 			buildNationDynastyLabelNames(world, {
 				nation: (capitalProvince) => `Nation at ${capitalProvince}`,
 				dynasty: (dynastyId) => `Dynasty ${dynastyId}`,
+				province: (provinceIdx) => `Province ${provinceIdx}`,
 			}),
 		).toEqual(["Dynasty 7", "Dynasty 4", ""])
 	})

@@ -8,14 +8,16 @@ export function computeCultures(
 		"count" | "desolate" | "adjOffset" | "adjList"
 	>,
 	seed: number,
+	/** When provided, only settled[p]===1 provinces receive cultures */
+	settledMask?: Uint8Array,
 ): OrogenPartition {
 	const active = new Uint8Array(provinces.count)
 	let activeCount = 0
 	for (let i = 0; i < provinces.count; i++) {
-		if (!provinces.desolate[i]) {
-			active[i] = 1
-			activeCount++
-		}
+		if (provinces.desolate[i]) continue
+		if (settledMask && !settledMask[i]) continue
+		active[i] = 1
+		activeCount++
 	}
 	const partition = computeGraphPartition({
 		nodeCount: provinces.count,

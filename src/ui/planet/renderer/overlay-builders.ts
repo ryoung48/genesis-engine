@@ -778,6 +778,7 @@ function buildRiverGroup(
 			depthWrite: false,
 			worldUnits: false,
 		})
+		material.userData.baseWidth = binnedWidth
 		material.resolution.set(width, height)
 		riverMaterials.push(material)
 
@@ -795,6 +796,7 @@ export function buildGlobeRivers(
 	rivers: RiverData,
 	canvas: HTMLCanvasElement,
 	riverMaterials: LineMaterial[],
+	globeRiverMaterials: LineMaterial[],
 	riversVisible: boolean,
 	viewMode: OrogenViewMode,
 	elevationVisible: boolean,
@@ -803,7 +805,7 @@ export function buildGlobeRivers(
 	const group = buildRiverGroup(
 		rivers,
 		canvas,
-		riverMaterials,
+		globeRiverMaterials,
 		(lonDeg, latDeg, elev) => {
 			const lon = THREE.MathUtils.degToRad(lonDeg)
 			const lat = THREE.MathUtils.degToRad(latDeg)
@@ -822,6 +824,7 @@ export function buildGlobeRivers(
 		},
 	)
 	group.visible = riversVisible && viewMode === "globe"
+	for (const mat of globeRiverMaterials) riverMaterials.push(mat)
 	return group
 }
 
@@ -829,6 +832,7 @@ export function buildMapRivers(
 	rivers: RiverData,
 	canvas: HTMLCanvasElement,
 	riverMaterials: LineMaterial[],
+	mapRiverMaterials: LineMaterial[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	riversVisible: boolean,
@@ -974,8 +978,9 @@ export function buildMapRivers(
 			depthWrite: false,
 			worldUnits: false,
 		})
+		material.userData.baseWidth = binnedWidth
 		material.resolution.set(width, height)
-		riverMaterials.push(material)
+		mapRiverMaterials.push(material)
 
 		const geometry = new LineSegmentsGeometry()
 		geometry.setPositions(positions)
@@ -985,6 +990,7 @@ export function buildMapRivers(
 	}
 
 	group.visible = riversVisible && viewMode === "map"
+	for (const mat of mapRiverMaterials) riverMaterials.push(mat)
 	return group
 }
 

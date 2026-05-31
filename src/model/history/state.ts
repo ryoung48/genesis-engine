@@ -29,6 +29,7 @@ export const REL = {
 	SUSPICIOUS: 8,
 	RIVAL: 9,
 	WAR: 10,
+	COLONY: 11,
 } as const
 
 export type Relation = (typeof REL)[keyof typeof REL]
@@ -143,6 +144,7 @@ export interface HistoryState {
 	provinceSize: Int32Array
 	provinceColors: Float32Array
 	desolate: Uint8Array
+	stateless: Uint8Array
 	waterAccess: Uint8Array
 	regionProvince: Int32Array
 	regionAdjOffset: Int32Array
@@ -258,6 +260,7 @@ export function ensureHierarchyClean(state: HistoryState): void {
 	const sov = state.sovereignCurrent
 	for (let p = 0; p < P; p++) sov[p] = -1
 	for (let p = 0; p < P; p++) {
+		if (state.stateless[p]) continue
 		if (sov[p] !== -1) continue
 		let cur = p
 		let steps = 0
@@ -849,6 +852,10 @@ export function createHistoryState(
 	const P = provinces.count
 	const startTime = startYear * YEAR_MS
 	const waterAccessLevels = waterAccess ?? new Uint8Array(P)
+	const stateless = new Uint8Array(P)
+	for (let p = 0; p < P; p++) {
+		if (!provinces.desolate[p] && nations.sovereign[p] < 0) stateless[p] = 1
+	}
 	if (!waterAccess) {
 		for (let region = 0; region < provinces.regionProvince.length; region++) {
 			const province = provinces.regionProvince[region]
@@ -900,6 +907,7 @@ export function createHistoryState(
 		provinceSize: provinces.size,
 		provinceColors: provinces.colors,
 		desolate: provinces.desolate,
+		stateless,
 		waterAccess: waterAccessLevels,
 		regionProvince: regionProvince ?? new Int32Array(0),
 		regionAdjOffset: regionAdjOffset ?? new Int32Array(0),
@@ -961,6 +969,7 @@ export function createHistoryState(
 
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
+		if (state.stateless[p]) continue
 		if (nations.parent[p] >= 0) continue
 		spawnLeader(state, p, rng)
 	}
@@ -1002,7 +1011,8 @@ export function spawnLeader(
 function initDynasties(state: HistoryState, rng: HistoryRng): void {
 	const shuffled = rng.shuffle(
 		Array.from({ length: state.P }, (_, i) => i).filter(
-			(p) => !state.desolate[p] && state.parentCurrent[p] < 0,
+			(p) =>
+				!state.desolate[p] && !state.stateless[p] && state.parentCurrent[p] < 0,
 		),
 	)
 	for (const p of shuffled) {

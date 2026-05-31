@@ -25,6 +25,7 @@ function _renderDrawer(
 			topographyDistribution={[]}
 			relationDistribution={[]}
 			tradeGoodsDistribution={[]}
+			governmentDistribution={[]}
 			{...overrides}
 		/>,
 	)

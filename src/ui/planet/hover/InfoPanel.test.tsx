@@ -122,6 +122,7 @@ function renderPanel(
 			hoverElevationKm={1.5}
 			hoverTopography="Plateau"
 			hoverCoordinates="10.0N, 20.0E"
+			hoverTimezone="UTC+1"
 			hoverLandmark={{ id: 3, type: "peak", size: 1 }}
 			hoverIsLand={true}
 			hoverTemperatureDelta={6}
@@ -130,6 +131,11 @@ function renderPanel(
 				value: 5,
 				annual: 5,
 				monthly: Array.from({ length: 12 }, () => 5),
+			}}
+			hoverHumidity={{
+				value: 60,
+				annual: 60,
+				monthly: Array.from({ length: 12 }, () => 60),
 			}}
 			hoverClimateDisplay="Temperate"
 			hoverIceSummary={null}

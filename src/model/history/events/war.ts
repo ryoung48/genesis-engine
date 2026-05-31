@@ -45,6 +45,7 @@ const ATTACK_THRESHOLD: Record<number, number> = {
 	[REL.PU_SENIOR]: 0,
 	[REL.PU_JUNIOR]: 0,
 	[REL.NONE]: 0,
+	[REL.COLONY]: 0,
 }
 
 function nextEvent(
@@ -221,7 +222,8 @@ function seedInterstateWars(state: HistoryState, rng: HistoryRng): void {
 					relation !== REL.VASSAL &&
 					relation !== REL.OVERLORD &&
 					relation !== REL.PU_SENIOR &&
-					relation !== REL.PU_JUNIOR
+					relation !== REL.PU_JUNIOR &&
+					relation !== REL.COLONY
 				)
 			})
 			.map((target) => ({
