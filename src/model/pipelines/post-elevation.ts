@@ -44,6 +44,9 @@ import {
 	computeMonthlyRain,
 	computeThermalEquator,
 } from "../climate/rain"
+import { computeCycloneRisk } from "../climate/cyclones"
+import { computeTornadoRisk } from "../climate/tornadoes"
+import { computeCoastalMask, computeTidalRange } from "../climate/tides"
 import { assignClimateZones, assignVegetation } from "../climate/vegetation"
 import {
 	computeTradeGoods,
@@ -116,6 +119,9 @@ interface PostPipelineOutput {
 	population: ProvincePopulation | undefined
 	tradeGoods: LocationTradeGoods | undefined
 	hazards: OrogenHazards
+	cycloneRisk: Float32Array
+	tornadoRisk: Float32Array
+	tidalRange: Float32Array
 	landmarks: OrogenLandmarks
 	oceanCurrents: OrogenOceanCurrents | undefined
 	timings: StageTiming[]
@@ -365,6 +371,15 @@ export function runPostElevationPipeline(
 	record("Post: landmarks", t0)
 	onProgress?.("Post: landmarks", 62)
 
+	// ── Tidal range ────────────────────────────────────────────────────
+	// Computed before topography so the tidal bonus can nudge coastal marsh
+	// formation in classifyTopography.
+	t0 = performance.now()
+	const coastalMask = computeCoastalMask(mesh, isLand)
+	// params includes planetRadiusKm — Dijkstra uses it for km-distance edge weights
+	const tidalRange = computeTidalRange(mesh, isLand, coastalMask, elevation_km, params, rivers.lakes)
+	record("Post: tidal range", t0)
+
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
 	const { topography, coastal, oceanCoastal, lakeCoastal, slopeScore } =
@@ -376,6 +391,7 @@ export function runPostElevationPipeline(
 			vegetation,
 			planetRadiusKm: params.planetRadiusKm,
 			seed: params.seed,
+			tidalRange,
 		})
 	record("Post: topography", t0)
 	onProgress?.("Post: topography", 65)
@@ -426,6 +442,31 @@ export function runPostElevationPipeline(
 	)
 	record("Post: hazards", t0)
 	onProgress?.("Post: hazards", 70)
+
+	t0 = performance.now()
+	const cycloneRisk = computeCycloneRisk(
+		mesh,
+		climate,
+		isLand,
+		topography,
+		params,
+		oceanCurrents,
+	)
+	record("Post: cyclones", t0)
+
+	t0 = performance.now()
+	const tornadoRisk = computeTornadoRisk(
+		mesh,
+		climate.temperature_avg,
+		climate.temperature_max,
+		climate.temperature_min,
+		isLand,
+		topography,
+		vegetation,
+		oceanDist,
+		params,
+	)
+	record("Post: tornadoes", t0)
 
 	// ── Provinces ──────────────────────────────────────────────────────
 	t0 = performance.now()
@@ -603,6 +644,9 @@ export function runPostElevationPipeline(
 		population,
 		tradeGoods,
 		hazards,
+		cycloneRisk,
+		tornadoRisk,
+		tidalRange,
 		landmarks,
 		oceanCurrents,
 		timings,

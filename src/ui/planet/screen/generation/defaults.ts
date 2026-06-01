@@ -45,4 +45,5 @@ export const DEFAULT_WORLD_PARAMS = {
 	antistellarLon: DEFAULT_ANTISTELLAR_LON,
 	perihelion: DEFAULT_PERIHELION,
 	era: DEFAULT_ERA,
+	tidalStrength: 1.0,
 } as const

@@ -35,6 +35,7 @@ export function buildPlanetSliders(state: {
 	daysPerYear: number
 	hoursPerDay: number
 	pressure: number
+	tidalStrength: number
 	landDistribution: number
 	landCoverage: number
 	tidallyLocked: boolean
@@ -48,6 +49,7 @@ export function buildPlanetSliders(state: {
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPressure: (v: number) => void
+	setTidalStrength: (v: number) => void
 	setAxialTiltDirection: (v: number) => void
 	setLandDistribution: (v: number) => void
 	setLandCoverage: (v: number) => void
@@ -170,6 +172,15 @@ export function buildPlanetSliders(state: {
 			display: `${state.insolationFactor.toFixed(2)}x`,
 			...SR.insolationFactor,
 			set: state.setInsolationFactor,
+		},
+		{
+			label: "Tides",
+			help: "Tidal force multiplier. 1.0x = Earth's lunar+solar regime. 0 = no moon, negligible tides. Higher values create stronger tidal ranges and more coastal wetlands. Disabled on tidally locked worlds.",
+			value: state.tidalStrength,
+			display: `${state.tidalStrength.toFixed(1)}x`,
+			...SR.tidalStrength,
+			set: state.setTidalStrength,
+			disabled: state.tidallyLocked,
 		},
 	]
 }
@@ -366,6 +377,7 @@ export function resetWorldDefaults(setters: {
 	setAntistellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
+	setTidalStrength: (v: number) => void
 	setTerrainWarp: (v: number) => void
 	setSmoothing: (v: number) => void
 	setHydraulicErosion: (v: number) => void
@@ -407,4 +419,5 @@ export function resetWorldDefaults(setters: {
 	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
 	setters.setMaxElevation(DEFAULT_WORLD_PARAMS.maxElevation)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)
+	setters.setTidalStrength(DEFAULT_WORLD_PARAMS.tidalStrength)
 }

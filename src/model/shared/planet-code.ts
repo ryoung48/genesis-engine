@@ -233,6 +233,13 @@ const FIELD_SPECS: FieldSpec[] = [
 			return idx >= 0 ? idx : 0
 		},
 	},
+	{
+		name: "tidalStrength",
+		min: SR.tidalStrength.min,
+		step: SR.tidalStrength.step,
+		count: rangeCount(SR.tidalStrength),
+		read: (p) => p.tidalStrength ?? 1.0,
+	},
 ]
 
 const PARAMS_BASE_LEN = (() => {
@@ -362,6 +369,7 @@ interface DecodedPlanetCode {
 	craters?: number
 	maxElevation: number
 	era: SocietyEra
+	tidalStrength: number
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
@@ -427,5 +435,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		craters: craters > 0 ? craters : undefined,
 		maxElevation: decodedFields.maxElevation,
 		era: ERA_ORDER[eraIdx] ?? DEFAULT_ERA,
+		tidalStrength: decodedFields.tidalStrength ?? 1.0,
 	}
 }

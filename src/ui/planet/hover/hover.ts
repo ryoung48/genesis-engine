@@ -29,6 +29,10 @@ export interface HoverHazards {
 	earthquake: number
 	volcano: number
 	danger: number
+	cyclone: number
+	tornado: number
+	/** Raw tidal range in metres for the hovered cell. */
+	tidal: number
 }
 
 export interface HoverHotspot {
@@ -303,6 +307,10 @@ export function getHoverHazards(
 				earthquake: world.hazards.earthquake[hoverInfo.region],
 				volcano: world.hazards.volcano[hoverInfo.region],
 				danger: world.hazards.danger[hoverInfo.region],
+				cyclone: world.cycloneRisk?.[hoverInfo.region] ?? 0,
+				tornado: world.tornadoRisk?.[hoverInfo.region] ?? 0,
+				// Raw metres from the model; InfoPanel formats to m/ft
+				tidal: world.tidalRange?.[hoverInfo.region] ?? 0,
 			}
 		: null
 }

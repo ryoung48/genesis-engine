@@ -15,8 +15,12 @@ import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import {
 	type ColorMode,
+	cycloneLandColor,
 	dangerColor,
 	daylightColor,
+	tidalLandColor,
+	tornadoLandColor,
+	volcanicLandColor,
 	windSpeedColor,
 } from "../colors"
 import { monthLabels } from "../screen/shared/constants"
@@ -255,6 +259,7 @@ interface InfoPanelProps {
 	hoverWindDir: string | null
 	hoverWindMonthly: Array<{ speedMs: number; dir: string }> | null
 	colorMode: ColorMode
+	dangerSubMode: "earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
 	populationMode: PopulationMapMode
 	selectedTimeMs: number | null
 	displayMonth: number
@@ -308,6 +313,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverWindDir,
 	hoverWindMonthly,
 	colorMode,
+	dangerSubMode,
 	populationMode,
 	selectedTimeMs,
 	displayMonth,
@@ -598,19 +604,73 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									values={terrainFeatureSwatches}
 								/>
 							)}
-						{colorMode === "dangerZones" && hoverHazards && (
-							<SwatchRow
-								label="Danger"
-								value={`${Math.round(hoverHazards.danger * 100)}%${
-									hoverHazards.danger >= 0.2
-										? hoverHazards.earthquake >= hoverHazards.volcano
-											? " (quakes)"
-											: " (volcanic)"
-										: ""
-								}`}
-								color={rgbToCss(dangerColor(hoverHazards.danger))}
-							/>
-						)}
+						{colorMode === "dangerZones" && hoverHazards && (() => {
+							if (dangerSubMode === "cyclone") {
+								return (
+									<SwatchRow
+										label="Cyclone"
+										value={`${Math.round(hoverHazards.cyclone * 100)}%`}
+										color={rgbToCss(cycloneLandColor(hoverHazards.cyclone))}
+									/>
+								)
+							}
+							if (dangerSubMode === "tornado") {
+								return (
+									<SwatchRow
+										label="Tornado"
+										value={`${Math.round(hoverHazards.tornado * 100)}%`}
+										color={rgbToCss(tornadoLandColor(hoverHazards.tornado))}
+									/>
+								)
+							}
+							if (dangerSubMode === "tidal") {
+								const tidalM = hoverHazards.tidal
+								const tidalDisplay =
+									unitSystem === "imperial"
+										? `${(tidalM * 3.28084).toFixed(1)} ft`
+										: `${tidalM.toFixed(1)} m`
+								// Normalise for color against a ~16 m macro-tidal ceiling
+								// Same dark-navy gradient as the ocean renderer
+								const tidalNorm = Math.min(1, tidalM / 16)
+								const oceanLight = [0.75, 0.88, 0.96]
+								const tidalDark = [0.04, 0.11, 0.28]
+								const swatchRgb: [number, number, number] = [
+									oceanLight[0] + (tidalDark[0] - oceanLight[0]) * tidalNorm,
+									oceanLight[1] + (tidalDark[1] - oceanLight[1]) * tidalNorm,
+									oceanLight[2] + (tidalDark[2] - oceanLight[2]) * tidalNorm,
+								]
+								return (
+									<SwatchRow
+										label="Tidal"
+										value={tidalDisplay}
+										color={rgbToCss(swatchRgb)}
+									/>
+								)
+							}
+							if (dangerSubMode === "volcanic") {
+								return (
+									<SwatchRow
+										label="Volcanic"
+										value={`${Math.round(hoverHazards.volcano * 100)}%`}
+										color={rgbToCss(volcanicLandColor(hoverHazards.volcano))}
+									/>
+								)
+							}
+							// earthquake / default: show the combined danger score
+							return (
+								<SwatchRow
+									label="Danger"
+									value={`${Math.round(hoverHazards.danger * 100)}%${
+										hoverHazards.danger >= 0.2
+											? hoverHazards.earthquake >= hoverHazards.volcano
+												? " (quakes)"
+												: " (volcanic)"
+											: ""
+									}`}
+									color={rgbToCss(dangerColor(hoverHazards.danger))}
+								/>
+							)
+						})()}
 						{hoverTopography && (
 							<SwatchRow
 								label="Topography"

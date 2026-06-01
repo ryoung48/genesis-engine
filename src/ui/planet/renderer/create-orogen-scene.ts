@@ -2229,6 +2229,7 @@ export function createOrogenScene(
 		rebuildOverlays()
 	}
 
+
 	function setRivers(data: RiverData | null) {
 		riverData = data
 		rebuildOverlays()

@@ -440,6 +440,86 @@ export function dangerMapColor(
 	return mixRgb(DANGER_WHITE, dominant, t)
 }
 
+const TORNADO_LAND_STOPS: RgbColor[] = [
+	"#ffffff", // no risk — pure white
+	"#d9f99d", // lime-200
+	"#84cc16", // lime-500
+	"#3f6212", // lime-900 — ominous dark green
+].map(cssColorToRgb)
+
+/** Land color for tornado sub-mode: white → lime → dark forest green. */
+export function tornadoLandColor(risk: number): [number, number, number] {
+	return quantizeRgb(
+		sampleBasisColorStops(TORNADO_LAND_STOPS, Math.max(0, Math.min(1, risk))),
+	)
+}
+
+// Tidal range gradient: dark navy (no tides / deep ocean) → white (maximum range).
+// Applies to both land coastal cells and ocean cells so the map reads as a
+// continuous radial gradient from high-range coasts outward into the ocean.
+const TIDAL_RANGE_STOPS: RgbColor[] = [
+	"#030d24", // very dark navy — zero / deep open ocean
+	"#0a2255", // dark navy blue
+	"#1a4d9a", // medium blue
+	"#3b82d4", // lighter blue
+	"#90c8f0", // pale sky blue
+	"#d8eefa", // near-white light blue
+	"#ffffff", // white — maximum tidal range
+].map(cssColorToRgb)
+
+/**
+ * Tidal range color: dark navy (0 = inland / deep ocean) → white (max range).
+ * `normalized` is [0, 1] where 1 = the world's highest observed tidal range.
+ */
+export function tidalRangeColor(normalized: number): [number, number, number] {
+	return quantizeRgb(
+		sampleBasisColorStops(TIDAL_RANGE_STOPS, Math.max(0, Math.min(1, normalized))),
+	)
+}
+
+// Tidal land ramp: white (no tides / inland) → cyan → dark teal (extreme range).
+// Matches the white-to-colored convention of every other danger sub-mode.
+const TIDAL_LAND_STOPS: RgbColor[] = [
+	"#ffffff", // 0 — no tides, inland
+	"#a5f3fc", // light cyan
+	"#22d3ee", // cyan
+	"#0891b2", // dark cyan
+	"#164e63", // very dark teal
+].map(cssColorToRgb)
+
+/** Land color for tidal sub-mode: white (no tides) → cyan → dark teal (max range). */
+export function tidalLandColor(normalized: number): [number, number, number] {
+	return quantizeRgb(
+		sampleBasisColorStops(TIDAL_LAND_STOPS, Math.max(0, Math.min(1, normalized))),
+	)
+}
+
+/** Land color for cyclone sub-mode: white (no risk) → deep navy (high risk). */
+export function cycloneLandColor(risk: number): [number, number, number] {
+	const t = Math.max(0, Math.min(1, risk))
+	return [1 - 0.9 * t, 1 - 0.8 * t, 1 - 0.35 * t]
+}
+
+const EARTHQUAKE_LAND_STOPS: RgbColor[] = [
+	"#ffffff", // no risk — pure white
+	"#ffedd5", // very light orange
+	"#fdba74", // light orange
+	"#f97316", // orange
+].map(cssColorToRgb)
+
+/** Land color for earthquake sub-mode: white → light yellow → amber → orange. */
+export function earthquakeLandColor(score: number): [number, number, number] {
+	return quantizeRgb(
+		sampleBasisColorStops(EARTHQUAKE_LAND_STOPS, Math.max(0, Math.min(1, score))),
+	)
+}
+
+/** Land color for volcanic sub-mode: white → orange → deep red. */
+export function volcanicLandColor(score: number): [number, number, number] {
+	const t = Math.max(0, Math.min(1, score))
+	return [1 - 0.3 * t, 1 - 0.9 * t, 1 - t]
+}
+
 export function hotspotColor(score: number): [number, number, number] {
 	return quantizeRgb(
 		sampleBasisColorStops(HOTSPOT_BASIS_STOPS, Math.max(0, Math.min(1, score))),

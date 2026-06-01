@@ -509,12 +509,6 @@ export function generateOrogenWorld(
 			if (!flooded[r]) isLand[r] = 1
 		}
 	}
-	const hotspotExposure = summarizeHotspotExposure(
-		r_hotspot,
-		preCraterLand,
-		isLand,
-	)
-
 	const finalCoastDist = withTiming("coastDist", pipelineTiming, () =>
 		computeCoastDistances(mesh, isLand),
 	)
@@ -607,6 +601,14 @@ export function generateOrogenWorld(
 		if (smallOcean[r]) post.rivers.lakes[r] = 1
 	}
 
+	// Summarise hotspot exposure using the final isLand (after post-elevation
+	// lake clearing) so the stored count stays consistent with world.isLand.
+	const hotspotExposure = summarizeHotspotExposure(
+		r_hotspot,
+		preCraterLand,
+		isLand,
+	)
+
 	const provinceSociety = deriveProvinceSociety({
 		mesh,
 		params,
@@ -637,6 +639,9 @@ export function generateOrogenWorld(
 		oceanDist,
 		rainfall: post.rainfall,
 		hazards: post.hazards,
+		cycloneRisk: post.cycloneRisk,
+		tornadoRisk: post.tornadoRisk,
+		tidalRange: post.tidalRange,
 		volcanism: {
 			hotspot: r_hotspot,
 			mantleUpwelling: r_mantleUpwelling,

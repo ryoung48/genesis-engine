@@ -251,6 +251,9 @@ function serializeWorld(
 		distCoast: world.distFields?.distCoast,
 		rainfall: world.rainfall,
 		hazards: world.hazards,
+		cycloneRisk: world.cycloneRisk,
+		tornadoRisk: world.tornadoRisk,
+		tidalRange: world.tidalRange,
 		volcanism: world.volcanism,
 		climateZones: world.climateZones,
 		pastaClimate: world.pastaClimate,
@@ -486,6 +489,9 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.rainfall.west.buffer,
 		)
 	}
+	if (world.cycloneRisk) add(world.cycloneRisk.buffer)
+	if (world.tornadoRisk) add(world.tornadoRisk.buffer)
+	if (world.tidalRange) add(world.tidalRange.buffer)
 	if (world.hazards) {
 		add(
 			world.hazards.earthquake.buffer,

@@ -335,6 +335,53 @@ describe("full world smoke generation", () => {
 		console.table(
 			summarizeDistribution(world.topography, OROGEN_TOPOGRAPHY_LABELS, [5, 6]),
 		)
+		if (world.tidalRange) {
+			// Coastal-ocean cells: ocean cells adjacent to land.
+			// For each, use its own tidal value (propagated from land by Dijkstra).
+			// Bucket into micro/meso/macro by actual metre values.
+			const { adjOffset, adjList } = world.mesh
+			const isLand = world.isLand
+			const lakes = world.rivers?.lakes
+			const tidalRange = world.tidalRange
+			const N = world.mesh.numRegions
+
+			let micro = 0, meso = 0, macro = 0, totalCoastalOcean = 0
+			let maxTidal = 0, sumTidal = 0
+
+			for (let r = 0; r < N; r++) {
+				// Skip land and lake cells
+				if (isLand?.[r] || lakes?.[r]) continue
+				// Only consider ocean cells that border at least one land cell
+				let bordersLand = false
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					if (isLand?.[adjList[j]]) { bordersLand = true; break }
+				}
+				if (!bordersLand) continue
+
+				const val = tidalRange[r] ?? 0
+				totalCoastalOcean++
+				sumTidal += val
+				if (val > maxTidal) maxTidal = val
+				if (val < 1) micro++
+				else if (val < 3) meso++
+				else macro++
+			}
+
+			const pct = (n: number) =>
+				totalCoastalOcean > 0 ? `${((n / totalCoastalOcean) * 100).toFixed(1)}%` : "–"
+
+			console.info("Tidal range distribution (coastal-ocean cells)")
+			console.table({
+				micro_lt1m:  { count: micro,  pct: pct(micro),  label: "< 1 m" },
+				meso_1_3m:   { count: meso,   pct: pct(meso),   label: "1–3 m" },
+				macro_gt3m:  { count: macro,   pct: pct(macro),  label: "> 3 m" },
+				total:       { count: totalCoastalOcean, pct: "100%", label: "all" },
+			})
+			console.info("Tidal range stats", {
+				maxTidalM: maxTidal.toFixed(2),
+				avgCoastalM: totalCoastalOcean > 0 ? (sumTidal / totalCoastalOcean).toFixed(2) : "–",
+			})
+		}
 		if (world.tradeGoods) {
 			console.info(
 				`Trade good distribution (${world.locations?.count ?? 0} locations, ${world.tradeGoods.material.filter((v) => v > 0).length} assigned)`,

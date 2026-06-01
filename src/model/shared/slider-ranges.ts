@@ -35,4 +35,5 @@ export const SLIDER_RANGES = {
 	landDistribution: { min: 0, max: 1, step: 0.05 },
 	landCoverage: { min: 0, max: 1, step: 0.01 },
 	antistellarLon: { min: 0, max: 360, step: 1 },
+	tidalStrength: { min: 0, max: 5, step: 0.1 },
 } satisfies Record<string, SliderRange>

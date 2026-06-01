@@ -1,5 +1,5 @@
 import type { ColorMode } from "../../colors"
-import type { LabelMode, MeasureMode } from "../../controls/OverlayControls"
+import type { DangerSubMode, LabelMode, MeasureMode } from "../../controls/OverlayControls"
 import type { OrogenViewMode } from "../../renderer"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import { DEFAULT_GEOGRAPHY_MODE } from "../shared/map-modes"
@@ -35,6 +35,7 @@ interface StoredViewPrefs {
 	climateSubMode: "basic" | "pasta" | "koppen"
 	elevationSubMode: "colored" | "grayscale"
 	topographySubMode: "classification" | "slope"
+	dangerSubMode: DangerSubMode
 }
 
 const COLOR_MODES = new Set<ColorMode>([
@@ -116,6 +117,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	climateSubMode: "basic",
 	elevationSubMode: "colored",
 	topographySubMode: "classification",
+	dangerSubMode: "earthquake",
 }
 
 function isColorMode(value: unknown): value is ColorMode {
@@ -280,6 +282,14 @@ export function parseStoredViewPrefs(
 				parsed.topographySubMode === "slope"
 					? parsed.topographySubMode
 					: DEFAULT_VIEW_PREFS.topographySubMode,
+			dangerSubMode:
+				parsed.dangerSubMode === "earthquake" ||
+				parsed.dangerSubMode === "volcanic" ||
+				parsed.dangerSubMode === "cyclone" ||
+				parsed.dangerSubMode === "tornado" ||
+				parsed.dangerSubMode === "tidal"
+					? parsed.dangerSubMode
+					: DEFAULT_VIEW_PREFS.dangerSubMode,
 		}
 	} catch {
 		return null

@@ -15,6 +15,12 @@ import type { ColorMode } from "../../colors"
 import {
 	climateTempColor,
 	climateZoneColor,
+	cycloneLandColor,
+	earthquakeLandColor,
+	tidalLandColor,
+	tidalRangeColor,
+	tornadoLandColor,
+	volcanicLandColor,
 	dangerMapColor,
 	developmentColor,
 	dtrColor,
@@ -33,6 +39,7 @@ import {
 	temperatureDeltaColor,
 	vegetationColor,
 } from "../../colors"
+import type { DangerSubMode } from "../../controls/OverlayControls"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import {
 	darkenClimateAtElevation,
@@ -210,6 +217,7 @@ export function computeRegionColors(
 	activeWars?: readonly PoliticalMapWar[] | null,
 	selectedNationId?: number | null,
 	relationAt?: ((a: number, b: number) => number) | null,
+	dangerSubMode: DangerSubMode = "earthquake",
 ): Float32Array | null {
 	if (colorMode === "landHeightmap") return null
 
@@ -571,26 +579,77 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "dangerZones" && world.hazards) {
+	if (colorMode === "dangerZones" && dangerSubMode === "tidal" && world.tidalRange) {
+		// Land + lakes: white, same as other danger sub-modes (no tidal color on land).
+		// Ocean: OCEAN_LIGHT_BLUE (no tides) → dark navy (high tidal range).
+		// Use p99 so extreme depth-amplified outliers don't wash out the scale
+		const nonZero: number[] = []
 		for (let r = 0; r < N; r++) {
-			const isLand = !!world.isLand?.[r]
-			if (!isLand) {
-				const [cr, cg, cb] = oceanRgb(r)
+			if (world.tidalRange[r] > 1e-5) nonZero.push(world.tidalRange[r])
+		}
+		nonZero.sort((a, b) => a - b)
+		const p99 = nonZero.length > 0
+			? nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]!
+			: 0
+		const invMax = p99 > 1e-5 ? 1 / p99 : 0
+		const lakes = world.rivers?.lakes
+		// Dark navy used for maximum tidal range
+		const TIDAL_DARK: readonly [number, number, number] = [0.04, 0.11, 0.28]
+		for (let r = 0; r < N; r++) {
+			if (lakes?.[r]) {
+				const [cr, cg, cb] = OCEAN_LIGHT_BLUE
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
-			} else {
-				const earthquake = world.hazards.earthquake[r] ?? 0
-				const volcano = world.hazards.volcano[r] ?? 0
-				const scaledColor = dangerMapColor(earthquake, volcano)
+			} else if (world.isLand?.[r]) {
 				const [cr, cg, cb] = darkenVegetationAtElevation(
-					scaledColor,
+					[1, 1, 1],
 					world.elevation_km[r],
 				)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
+			} else {
+				const t = (world.tidalRange[r] ?? 0) * invMax
+				rgb[3 * r] = OCEAN_LIGHT_BLUE[0] + (TIDAL_DARK[0] - OCEAN_LIGHT_BLUE[0]) * t
+				rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1] + (TIDAL_DARK[1] - OCEAN_LIGHT_BLUE[1]) * t
+				rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2] + (TIDAL_DARK[2] - OCEAN_LIGHT_BLUE[2]) * t
 			}
+		}
+		return rgb
+	}
+
+	if (colorMode === "dangerZones" && world.hazards) {
+		const isOcean = (r: number) => !world.isLand?.[r]
+		for (let r = 0; r < N; r++) {
+			if (isOcean(r)) {
+				const [cr, cg, cb] = OCEAN_LIGHT_BLUE
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+				continue
+			}
+			let landColor: [number, number, number]
+			if (dangerSubMode === "cyclone") {
+				const risk = world.cycloneRisk?.[r] ?? 0
+				landColor = cycloneLandColor(risk)
+			} else if (dangerSubMode === "tornado") {
+				const risk = world.tornadoRisk?.[r] ?? 0
+				landColor = tornadoLandColor(risk)
+			} else if (dangerSubMode === "volcanic") {
+				const score = world.hazards.volcano[r] ?? 0
+				landColor = volcanicLandColor(score)
+			} else {
+				const score = world.hazards.earthquake[r] ?? 0
+				landColor = earthquakeLandColor(score)
+			}
+			const [cr, cg, cb] = darkenVegetationAtElevation(
+				landColor,
+				world.elevation_km[r],
+			)
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
 		}
 		return rgb
 	}

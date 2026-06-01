@@ -323,6 +323,9 @@ export const OrogenView: React.FC = () => {
 	const [topographySubMode, setTopographySubMode] = useState<
 		"classification" | "slope"
 	>(initialViewPrefs.topographySubMode)
+	const [dangerSubMode, setDangerSubMode] = useState<
+		"earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
+	>(initialViewPrefs.dangerSubMode)
 	const [debugMapModes, setDebugMapModes] = useState(
 		initialViewPrefs.debugMapModes,
 	)
@@ -515,6 +518,9 @@ export const OrogenView: React.FC = () => {
 	const [pressure, setPressure] = useState(
 		initialDecodedCode?.pressure ?? DEFAULT_WORLD_PARAMS.pressure,
 	)
+	const [tidalStrength, setTidalStrength] = useState(
+		initialDecodedCode?.tidalStrength ?? DEFAULT_WORLD_PARAMS.tidalStrength,
+	)
 
 	// Terrain params
 	const [terrainWarp, setTerrainWarp] = useState(
@@ -636,6 +642,7 @@ export const OrogenView: React.FC = () => {
 				climateSubMode,
 				elevationSubMode,
 				topographySubMode,
+				dangerSubMode,
 			}),
 		)
 	}, [
@@ -645,6 +652,7 @@ export const OrogenView: React.FC = () => {
 		climateSubMode,
 		elevationSubMode,
 		topographySubMode,
+		dangerSubMode,
 		debugMapModes,
 		geographyMode,
 		gridSpacing,
@@ -1097,6 +1105,7 @@ export const OrogenView: React.FC = () => {
 			selectedHistoryView?.activeWars,
 			selectedNationId,
 			selectedHistoryView?.relationAt ?? null,
+			dangerSubMode,
 		)
 	}, [
 		colorMode,
@@ -1112,6 +1121,7 @@ export const OrogenView: React.FC = () => {
 		worldForDisplay,
 		selectedNationId,
 		windVectors,
+		dangerSubMode,
 	])
 
 	const occupationOverlay = useMemo(() => {
@@ -1263,6 +1273,7 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setWindArrows(null)
 	}, [])
+
 	useEffect(() => {
 		sceneRef.current?.setRivers(
 			showRivers && world?.rivers ? world.rivers : null,
@@ -1857,6 +1868,7 @@ export const OrogenView: React.FC = () => {
 			craters,
 			maxElevation,
 			pressure,
+			tidalStrength,
 		}),
 		[
 			seed,
@@ -1889,6 +1901,7 @@ export const OrogenView: React.FC = () => {
 			craters,
 			maxElevation,
 			pressure,
+			tidalStrength,
 		],
 	)
 	const derivedPlanetCode = useMemo(
@@ -1969,6 +1982,7 @@ export const OrogenView: React.FC = () => {
 			setTidallyLocked,
 			setAntistellarLon,
 			setPressure,
+			setTidalStrength,
 			setTerrainWarp,
 			setSmoothing,
 			setHydraulicErosion,
@@ -2004,6 +2018,7 @@ export const OrogenView: React.FC = () => {
 			setters.setTidallyLocked(decoded.tidallyLocked)
 			setters.setAntistellarLon(decoded.antistellarLon)
 			setters.setPressure(decoded.pressure)
+			setters.setTidalStrength(decoded.tidalStrength)
 			setters.setTerrainWarp(decoded.terrainWarp)
 			setters.setSmoothing(decoded.smoothing)
 			setters.setHydraulicErosion(decoded.hydraulicErosion)
@@ -2252,6 +2267,7 @@ export const OrogenView: React.FC = () => {
 		daysPerYear,
 		hoursPerDay,
 		pressure,
+		tidalStrength,
 		landDistribution,
 		landCoverage,
 		tidallyLocked,
@@ -2265,6 +2281,7 @@ export const OrogenView: React.FC = () => {
 		setDaysPerYear,
 		setHoursPerDay,
 		setPressure,
+		setTidalStrength,
 		setAxialTiltDirection,
 		setLandDistribution,
 		setLandCoverage,
@@ -2489,6 +2506,7 @@ export const OrogenView: React.FC = () => {
 								hoverWindDir={hoverWindDir}
 								hoverWindMonthly={hoverWindMonthly}
 								colorMode={colorMode}
+								dangerSubMode={dangerSubMode}
 								populationMode={populationMode}
 								selectedTimeMs={selectedTimeMs}
 								displayMonth={displayMonth}
@@ -2586,6 +2604,11 @@ export const OrogenView: React.FC = () => {
 							setElevationSubMode={setElevationSubMode}
 							topographySubMode={topographySubMode}
 							setTopographySubMode={setTopographySubMode}
+							dangerSubMode={dangerSubMode}
+							setDangerSubMode={setDangerSubMode}
+							hasCycloneRisk={!!world?.cycloneRisk}
+							hasTornadoRisk={!!world?.tornadoRisk}
+							hasTidalRisk={!!world?.tidalRange}
 							exportWidthPreset={exportWidthPreset}
 							setExportWidthPreset={setExportWidthPreset}
 							exportCenterLongitude={exportCenterLongitude}

@@ -8,6 +8,7 @@ import {
 	climateTempColor,
 	climateZoneColor,
 	dangerMapColor,
+	earthquakeLandColor,
 	developmentColor,
 	dtrColor,
 	getColor,
@@ -169,7 +170,7 @@ describe("computeRegionColors", () => {
 		)
 	})
 
-	it("uses the mixed hazard tint for danger zones", () => {
+	it("uses per-submode hazard tint for danger zones", () => {
 		const world = buildWorld({
 			hazards: {
 				danger: new Float32Array([0.4, 0.2]),
@@ -183,23 +184,21 @@ describe("computeRegionColors", () => {
 			"dangerZones",
 			DEFAULT_NATION_MODE,
 			DEFAULT_POPULATION_MODE,
-			0,
-			0,
-			0,
-			0,
-			"map",
+			0, 0, 0, 0, "map",
+			true, undefined, null, null, null,
+			"earthquake",
 		)
 
 		expect(rgb).not.toBeNull()
 		expectRegionColor(
 			rgb!,
 			0,
-			darkenVegetationAtElevation(dangerMapColor(0.1, 1), 0),
+			darkenVegetationAtElevation(earthquakeLandColor(0.1), 0),
 		)
 		expectRegionColor(
 			rgb!,
 			1,
-			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
+			OCEAN_LIGHT_BLUE,
 		)
 	})
 
@@ -817,7 +816,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			danger!,
 			0,
-			darkenVegetationAtElevation(dangerMapColor(0, 0), 0),
+			darkenVegetationAtElevation(earthquakeLandColor(0), 0),
 		)
 		expectRegionColor(
 			basins!,

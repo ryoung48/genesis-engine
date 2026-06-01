@@ -37,6 +37,7 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["climate", "Climate"],
 	["temperature", "Temperature"],
 	["precipitation", "Rain"],
+	["dangerZones", "Danger"],
 	["trade_goods", "Trade Goods"],
 ]
 
@@ -45,7 +46,6 @@ const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["terrainFeatures", "Features"],
 	["basins", "Basins"],
-	["dangerZones", "Danger"],
 	["hotspots", "Hotspots"],
 	["moisture", "Moist"],
 	["temperatureDelta", "Temp Δ"],

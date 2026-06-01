@@ -64,6 +64,9 @@ export interface SerializedOrogenWorld {
 		east: Float32Array
 		west: Float32Array
 	}
+	cycloneRisk?: Float32Array
+	tornadoRisk?: Float32Array
+	tidalRange?: Float32Array
 	hazards: {
 		earthquake: Float32Array
 		volcano: Float32Array
