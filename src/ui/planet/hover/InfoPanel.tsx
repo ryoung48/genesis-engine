@@ -45,6 +45,7 @@ import type {
 	HoverHumidity,
 	HoverInfo,
 	HoverLandmark,
+	HoverMisery,
 	HoverOceanCurrents,
 	HoverRiver,
 	HoverTerrainFeature,
@@ -59,6 +60,7 @@ import {
 	gddColor,
 	gintColor,
 	humidityChartColor,
+	miseryChartColor,
 	petColor,
 	rainColor,
 	tempColor,
@@ -236,6 +238,7 @@ interface InfoPanelProps {
 	hoverRainfall: number | null
 	hoverDtr: HoverDtr | null
 	hoverHumidity: HoverHumidity | null
+	hoverMisery: HoverMisery | null
 	hoverClimateDisplay: string | null
 	hoverIceSummary: string | null
 	hoverBiome: string | null
@@ -296,6 +299,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverTemperatureDelta,
 	hoverDtr,
 	hoverHumidity,
+	hoverMisery,
 	hoverClimateDisplay,
 	hoverIceSummary,
 	hoverBiome,
@@ -582,18 +586,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									value={`${hoverWindDir} ${unitSystem === "imperial" ? `${(hoverWindSpeed * 2.237).toFixed(1)} mph` : `${hoverWindSpeed.toFixed(1)} m/s`}`}
 								/>
 							)}
-						{colorMode === "dtr" && hoverDtr !== null && (
-							<Row
-								label={`DTR ${climateTimeMode === "annual" ? monthLabels[0] : (monthLabels[climateTimeMode === "monthly" ? climateMonth + 1 : displayMonth] ?? `M${displayMonth}`)}`}
-								value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
-							/>
-						)}
-						{colorMode === "humidity" && hoverHumidity !== null && (
-							<Row
-								label={`Humidity ${climateTimeMode === "annual" ? monthLabels[0] : (monthLabels[climateTimeMode === "monthly" ? climateMonth + 1 : displayMonth] ?? `M${displayMonth}`)}`}
-								value={`${hoverHumidity.value.toFixed(0)}%`}
-							/>
-						)}
 						{colorMode === "pastaClimate" && hoverIceSummary && (
 							<Row label="Ice" value={hoverIceSummary} />
 						)}
@@ -849,24 +841,80 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							}
 							showValues
 						/>
-						<SeriesBars
-							values={chartData.temps}
-							labels={MONTH_SHORT}
-							label="Temp"
-							colorForValue={(value) => tempColor(value)}
-							activeIndex={activeBarIndex}
-							summary={buildSummary(annualTemp ?? undefined, {
-								prefix: "AVG",
-								formatValue: (value) => formatTemperature(value, unitSystem, 1),
-							})}
-							formatValue={(value) =>
-								formatTemperature(value, unitSystem, 1).replace(/ ?°[CF]$/, "")
-							}
-							tooltipLabel={({ index, value }) =>
-								`${monthLabels[index + 1]}: ${formatTemperature(value, unitSystem, 1)}`
-							}
-							showValues
-						/>
+						{colorMode === "dtr" &&
+						hoverDtr &&
+						hoverDtr.monthly.length === 12 ? (
+							<SeriesBars
+								values={hoverDtr.monthly}
+								labels={MONTH_SHORT}
+								label="DTR"
+								colorForValue={(value) => dtrChartColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(hoverDtr.annual, {
+									prefix: "AVG",
+									formatValue: (value) =>
+										formatTemperatureDelta(value, unitSystem, 1),
+								})}
+								formatValue={(value) =>
+									formatTemperatureDelta(value, unitSystem, 1).replace(
+										/ ?°[CF]$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatTemperatureDelta(value, unitSystem, 1)}`
+								}
+								showValues
+							/>
+						) : colorMode === "misery" &&
+						  hoverMisery &&
+						  hoverMisery.monthly.length === 12 ? (
+							<SeriesBars
+								values={hoverMisery.monthly}
+								labels={MONTH_SHORT}
+								label="MI"
+								colorForValue={(value) => miseryChartColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(hoverMisery.annual, {
+									prefix: "AVG",
+									formatValue: (value) =>
+										formatTemperature(value, unitSystem, 1),
+								})}
+								formatValue={(value) =>
+									formatTemperature(value, unitSystem, 1).replace(
+										/ ?°[CF]$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatTemperature(value, unitSystem, 1)}`
+								}
+								showValues
+							/>
+						) : (
+							<SeriesBars
+								values={chartData.temps}
+								labels={MONTH_SHORT}
+								label="Temp"
+								colorForValue={(value) => tempColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(annualTemp ?? undefined, {
+									prefix: "AVG",
+									formatValue: (value) =>
+										formatTemperature(value, unitSystem, 1),
+								})}
+								formatValue={(value) =>
+									formatTemperature(value, unitSystem, 1).replace(
+										/ ?°[CF]$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatTemperature(value, unitSystem, 1)}`
+								}
+								showValues
+							/>
+						)}
 						{colorMode === "pastaClimate" &&
 							hoverRegion !== null &&
 							world.pastaDebug?.minT &&
@@ -892,29 +940,50 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									</span>
 								</div>
 							)}
-						{!!chartData.isLand && (
+						{colorMode === "humidity" &&
+						hoverHumidity &&
+						hoverHumidity.monthly.length === 12 ? (
 							<SeriesBars
-								values={chartData.precip}
+								values={hoverHumidity.monthly}
 								labels={MONTH_SHORT}
-								label="Precip"
-								colorForValue={(value) => rainColor(value)}
+								label="Humidity"
+								colorForValue={(value) => humidityChartColor(value)}
 								activeIndex={activeBarIndex}
-								summary={buildSummary(annualPrecip ?? undefined, {
-									prefix: "ANN",
-									formatValue: (value) =>
-										formatPrecipitation(value, unitSystem, 0),
+								summary={buildSummary(hoverHumidity.annual, {
+									prefix: "AVG",
+									formatValue: (value) => `${value.toFixed(0)}%`,
 								})}
-								formatValue={(value) =>
-									formatPrecipitation(value, unitSystem, 0).replace(
-										/ (mm|in)$/,
-										"",
-									)
-								}
+								formatValue={(value) => value.toFixed(0)}
 								tooltipLabel={({ index, value }) =>
-									`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+									`${monthLabels[index + 1]}: ${value.toFixed(0)}%`
 								}
 								showValues
 							/>
+						) : (
+							!!chartData.isLand && (
+								<SeriesBars
+									values={chartData.precip}
+									labels={MONTH_SHORT}
+									label="Precip"
+									colorForValue={(value) => rainColor(value)}
+									activeIndex={activeBarIndex}
+									summary={buildSummary(annualPrecip ?? undefined, {
+										prefix: "ANN",
+										formatValue: (value) =>
+											formatPrecipitation(value, unitSystem, 0),
+									})}
+									formatValue={(value) =>
+										formatPrecipitation(value, unitSystem, 0).replace(
+											/ (mm|in)$/,
+											"",
+										)
+									}
+									tooltipLabel={({ index, value }) =>
+										`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+									}
+									showValues
+								/>
+							)
 						)}
 						{colorMode === "precipitation" && !!chartData?.isLand && (
 							<>
@@ -1026,52 +1095,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										showValues
 									/>
 								</>
-							)}
-						{colorMode === "dtr" &&
-							hoverDtr &&
-							hoverDtr.monthly.length === 12 && (
-								<SeriesBars
-									values={hoverDtr.monthly}
-									labels={MONTH_SHORT}
-									label="DTR"
-									colorForValue={(value) => dtrChartColor(value)}
-									activeIndex={activeBarIndex}
-									summary={buildSummary(hoverDtr.annual, {
-										prefix: "AVG",
-										formatValue: (value) =>
-											formatTemperatureDelta(value, unitSystem, 1),
-									})}
-									formatValue={(value) =>
-										formatTemperatureDelta(value, unitSystem, 1).replace(
-											/ ?°[CF]$/,
-											"",
-										)
-									}
-									tooltipLabel={({ index, value }) =>
-										`${monthLabels[index + 1]}: ${formatTemperatureDelta(value, unitSystem, 1)}`
-									}
-									showValues
-								/>
-							)}
-						{colorMode === "humidity" &&
-							hoverHumidity &&
-							hoverHumidity.monthly.length === 12 && (
-								<SeriesBars
-									values={hoverHumidity.monthly}
-									labels={MONTH_SHORT}
-									label="Humidity"
-									colorForValue={(value) => humidityChartColor(value)}
-									activeIndex={activeBarIndex}
-									summary={buildSummary(hoverHumidity.annual, {
-										prefix: "AVG",
-										formatValue: (value) => `${value.toFixed(0)}%`,
-									})}
-									formatValue={(value) => value.toFixed(0)}
-									tooltipLabel={({ index, value }) =>
-										`${monthLabels[index + 1]}: ${value.toFixed(0)}%`
-									}
-									showValues
-								/>
 							)}
 						{colorMode === "oceanCurrents" &&
 							hasCurrentImpact &&

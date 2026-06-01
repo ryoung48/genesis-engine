@@ -545,7 +545,12 @@ export function computeRegionColors(
 				annualAridity = petSum > 0 ? aetSum / petSum : 1
 			}
 			const [cr, cg, cb] = humidityColor(
-				relativeHumidityFromTempRange(meanT, dtr, annualAridity),
+				relativeHumidityFromTempRange(
+					meanT,
+					dtr,
+					annualAridity,
+					world.rainfall?.annual[r],
+				),
 			)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg

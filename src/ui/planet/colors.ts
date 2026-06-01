@@ -51,6 +51,7 @@ export type ColorMode =
 	| "trade_goods"
 	| "timezone"
 	| "wind"
+	| "misery"
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
@@ -644,6 +645,52 @@ export function humidityColor(rhPercent: number): [number, number, number] {
 		}
 	}
 	const last = humidityStops[humidityStops.length - 1]
+	return [last.r, last.g, last.b]
+}
+
+// Misery Index (apparent temperature) ramp. Black zone (6–26 °C) = comfortable.
+// Cold end → blues/whites; hot end → dark red → yellow → white.
+const miseryStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: -40, r: 1.0, g: 1.0, b: 1.0 },
+	{ v: -35, r: 241 / 255, g: 245 / 255, b: 1.0 },
+	{ v: -32, r: 137 / 255, g: 173 / 255, b: 1.0 },
+	{ v: -30, r: 27 / 255, g: 96 / 255, b: 1.0 },
+	{ v: -23, r: 18 / 255, g: 96 / 255, b: 1.0 },
+	{ v: -18, r: 41 / 255, g: 125 / 255, b: 1.0 },
+	{ v: -11, r: 46 / 255, g: 131 / 255, b: 1.0 },
+	{ v: -4, r: 31 / 255, g: 89 / 255, b: 173 / 255 },
+	{ v: 3, r: 9 / 255, g: 26 / 255, b: 50 / 255 },
+	{ v: 6, r: 0, g: 0, b: 0 },
+	{ v: 26, r: 0, g: 0, b: 0 },
+	{ v: 30, r: 155 / 255, g: 13 / 255, b: 22 / 255 },
+	{ v: 32, r: 247 / 255, g: 20 / 255, b: 35 / 255 },
+	{ v: 37, r: 247 / 255, g: 39 / 255, b: 32 / 255 },
+	{ v: 40, r: 246 / 255, g: 157 / 255, b: 13 / 255 },
+	{ v: 43, r: 245 / 255, g: 210 / 255, b: 5 / 255 },
+	{ v: 47, r: 245 / 255, g: 210 / 255, b: 5 / 255 },
+	{ v: 51, r: 250 / 255, g: 230 / 255, b: 117 / 255 },
+	{ v: 55, r: 1.0, g: 1.0, b: 1.0 },
+	{ v: 60, r: 1.0, g: 1.0, b: 1.0 },
+]
+
+export function miseryColor(apparentTempC: number): [number, number, number] {
+	const clamped = Math.max(
+		miseryStops[0].v,
+		Math.min(miseryStops[miseryStops.length - 1].v, apparentTempC),
+	)
+	for (let i = 0; i < miseryStops.length - 1; i++) {
+		const a = miseryStops[i]
+		const b = miseryStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = miseryStops[miseryStops.length - 1]
 	return [last.r, last.g, last.b]
 }
 

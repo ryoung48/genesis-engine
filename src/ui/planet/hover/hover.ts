@@ -2,6 +2,7 @@ import {
 	OROGEN_TERRAIN_FEATURE_LABELS,
 	OROGEN_TOPOGRAPHY_LABELS,
 } from "@/model"
+import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { KOPPEN_LABELS, koppenClimateName } from "@/model/climate/koppen"
 import { PASTA_LABELS, pastaClimateName } from "@/model/climate/pasta"
@@ -66,6 +67,12 @@ export interface HoverDtr {
 }
 
 export interface HoverHumidity {
+	value: number
+	annual: number
+	monthly: number[]
+}
+
+export interface HoverMisery {
 	value: number
 	annual: number
 	monthly: number[]
@@ -184,10 +191,12 @@ export function getHoverHumidity(
 		annualAridity = petSum > 0 ? aetSum / petSum : 1
 	}
 
+	const annualRainfall = world.rainfall?.annual[r]
 	const annual = relativeHumidityFromTempRange(
 		world.climate.temperature_avg[r],
 		world.dtr_annual[r],
 		annualAridity,
+		annualRainfall,
 	)
 	const monthly: number[] = []
 	if (world.dtr_monthly && world.climate.temperature_monthly) {
@@ -197,10 +206,68 @@ export function getHoverHumidity(
 					world.climate.temperature_monthly[m * N + r],
 					world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
 					annualAridity,
+					annualRainfall,
 				),
 			)
 		}
 	}
+	return {
+		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
+		annual,
+		monthly,
+	}
+}
+
+export function getHoverMisery(
+	hoverInfo: HoverInfo | null,
+	world: SerializedOrogenWorld | null,
+	dtrMonth: number,
+	windSpeedMs: number | null,
+	monthlyWindSpeedMs: number[] | null,
+): HoverMisery | null {
+	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
+	const r = hoverInfo.region
+	if (world.isLand && !world.isLand[r]) return null
+	const N = world.mesh.numRegions
+
+	let annualAridity: number | undefined
+	const aet = world.hydrology?.aet_monthly
+	const pet = world.climate.pet_monthly
+	if (aet && pet) {
+		let aetSum = 0
+		let petSum = 0
+		for (let m = 0; m < 12; m++) {
+			aetSum += aet[m * N + r]
+			petSum += pet[m * N + r]
+		}
+		annualAridity = petSum > 0 ? aetSum / petSum : 1
+	}
+
+	const annualRainfall = world.rainfall?.annual[r]
+	const annualWind = windSpeedMs ?? 0
+	const annualRh = relativeHumidityFromTempRange(
+		world.climate.temperature_avg[r],
+		world.dtr_annual[r],
+		annualAridity,
+		annualRainfall,
+	)
+	const annual = apparentTemperatureC(
+		world.climate.temperature_avg[r],
+		annualRh,
+		annualWind,
+	)
+
+	const monthly: number[] = []
+	if (world.dtr_monthly && world.climate.temperature_monthly) {
+		for (let m = 0; m < 12; m++) {
+			const T = world.climate.temperature_monthly[m * N + r]
+			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
+			const rh = relativeHumidityFromTempRange(T, dtr, annualAridity, annualRainfall)
+			const wind = monthlyWindSpeedMs?.[m] ?? annualWind
+			monthly.push(apparentTemperatureC(T, rh, wind))
+		}
+	}
+
 	return {
 		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
 		annual,

@@ -1,3 +1,6 @@
+import { dtrColor, humidityColor, miseryColor } from "@/ui/planet/colors"
+import { rgbToCss } from "@/ui/planet/screen/shared/ui-format"
+
 export function formatCompactNumber(value: number): string {
 	if (!Number.isFinite(value)) return "0"
 	if (value >= 1_000_000_000)
@@ -74,17 +77,13 @@ export function gintColor(v: number): string {
 }
 
 export function dtrChartColor(v: number): string {
-	if (v < 4) return "#38bdf8"
-	if (v < 8) return "#67e8f9"
-	if (v < 12) return "#facc15"
-	if (v < 16) return "#fb923c"
-	return "#ef4444"
+	return rgbToCss(dtrColor(v))
 }
 
 export function humidityChartColor(v: number): string {
-	if (v < 25) return "#a16207"
-	if (v < 45) return "#ca8a04"
-	if (v < 60) return "#65a30d"
-	if (v < 75) return "#0891b2"
-	return "#2563eb"
+	return rgbToCss(humidityColor(v))
+}
+
+export function miseryChartColor(v: number): string {
+	return rgbToCss(miseryColor(v))
 }

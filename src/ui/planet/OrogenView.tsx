@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
+import { apparentTemperatureC } from "@/model/climate/apparent-temp"
+import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
@@ -30,7 +32,13 @@ import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { ClimatePreviewOverlay } from "@/ui/preview/ClimatePreviewOverlay"
 import type { ColorMode } from "./colors"
-import { climateZoneColor, vegetationColor, windSpeedColor } from "./colors"
+import {
+	climateZoneColor,
+	miseryColor,
+	OCEAN_LIGHT_BLUE,
+	vegetationColor,
+	windSpeedColor,
+} from "./colors"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import {
@@ -55,6 +63,7 @@ import {
 	getHoverHazards,
 	getHoverHotspot,
 	getHoverHumidity,
+	getHoverMisery,
 	getHoverIsLand,
 	getHoverKoppenClimate,
 	getHoverLandmark,
@@ -69,6 +78,7 @@ import {
 	getHoverTimezone,
 	getHoverTopography,
 	type HoverInfo,
+	type HoverMisery,
 } from "./hover/hover"
 import { InfoPanel } from "./hover/InfoPanel"
 import { canHandlePlanetClick } from "./measurement-click"
@@ -954,7 +964,10 @@ export const OrogenView: React.FC = () => {
 
 	// Shared wind computation — runs when wind arrows or wind color mode is active
 	const windVectors = useMemo(() => {
-		if (!world?.climate || (!showWindArrows && colorMode !== "wind"))
+		if (
+			!world?.climate ||
+			(!showWindArrows && colorMode !== "wind" && colorMode !== "misery")
+		)
 			return null
 		const month =
 			resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
@@ -1050,6 +1063,14 @@ export const OrogenView: React.FC = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hoverInfo?.region, monthlyWindReady, hoverInfo])
 
+	const hoverMisery: HoverMisery | null = getHoverMisery(
+		hoverInfo,
+		worldForDisplay,
+		dtrMonth,
+		hoverWindSpeed,
+		hoverWindMonthly?.map((w) => w.speedMs) ?? null,
+	)
+
 	const windStats = useMemo(() => {
 		if (!world?.climate) return null
 		const vectors = computeWindVectors(
@@ -1085,6 +1106,59 @@ export const OrogenView: React.FC = () => {
 			const { windSpeed } = windVectors
 			for (let r = 0; r < N; r++) {
 				const [cr, cg, cb] = windSpeedColor(windSpeed[r])
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			}
+			return rgb
+		}
+		if (
+			colorMode === "misery" &&
+			windVectors &&
+			worldForDisplay.climate &&
+			worldForDisplay.dtr_annual
+		) {
+			const N = worldForDisplay.mesh.numRegions
+			const rgb = new Float32Array(N * 3)
+			const isMonthly = dtrMonth > 0
+			const offset = isMonthly ? (dtrMonth - 1) * N : 0
+			const monthlyTemp = isMonthly ? worldForDisplay.climate.temperature_monthly : null
+			const monthlyDtr = isMonthly ? worldForDisplay.dtr_monthly : null
+			const aet = worldForDisplay.hydrology?.aet_monthly
+			const pet = worldForDisplay.climate.pet_monthly
+			const { windSpeed } = windVectors
+			for (let r = 0; r < N; r++) {
+				if (!worldForDisplay.isLand?.[r]) {
+					rgb[3 * r] = OCEAN_LIGHT_BLUE[0]
+					rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1]
+					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
+					continue
+				}
+				const meanT = monthlyTemp
+					? monthlyTemp[offset + r]
+					: worldForDisplay.climate.temperature_avg[r]
+				const dtr = monthlyDtr
+					? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
+					: worldForDisplay.dtr_annual[r]
+				let annualAridity: number | undefined
+				if (aet && pet) {
+					let aetSum = 0
+					let petSum = 0
+					for (let m = 0; m < 12; m++) {
+						aetSum += aet[m * N + r]
+						petSum += pet[m * N + r]
+					}
+					annualAridity = petSum > 0 ? aetSum / petSum : 1
+				}
+				const rh = relativeHumidityFromTempRange(
+					meanT,
+					dtr,
+					annualAridity,
+					worldForDisplay.rainfall?.annual[r],
+				)
+				const [cr, cg, cb] = miseryColor(
+					apparentTemperatureC(meanT, rh, windSpeed[r]),
+				)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -2489,6 +2563,7 @@ export const OrogenView: React.FC = () => {
 								hoverRainfall={hoverRainfall}
 								hoverDtr={hoverDtr}
 								hoverHumidity={hoverHumidity}
+								hoverMisery={hoverMisery}
 								hoverClimateDisplay={hoverClimateDisplay}
 								hoverIceSummary={hoverIceSummary}
 								hoverBiome={hoverBiome}

@@ -11,6 +11,31 @@ function aridDewpointBiasC(aridity: number): number {
 	return -2 * (1 - aridity / 0.5)
 }
 
+// Moisture-source correction: in high-rainfall regions, evapotranspiration
+// keeps the air loaded with vapor beyond what the DTR proxy captures. Ramps
+// from 0 below 500 mm/yr to +3 °C at ~5000 mm/yr (coastal tropical rainforest
+// can reach near-saturation; Amazon-typical ~3000 mm lands around +2.4 °C).
+function precipMoistureBoostC(annualRainfallMm: number): number {
+	const excess = annualRainfallMm - 500
+	if (excess <= 0) return 0
+	return 3 * (1 - Math.exp(-excess / 1500))
+}
+
+// Dry air-mass correction: in hot hyperarid regions the ambient dewpoint is
+// driven by air-mass origin, not local temperature swings. Gates to zero at
+// Tmean ≤ 0 °C (cold polar dryness is already handled by DTR) and reaches
+// full strength at Tmean ≥ 30 °C. Ramps from 0 at 300 mm/yr to −9 °C at 0
+// mm/yr, pushing hot desert RH below 30 %.
+function dryAirDepressionC(
+	annualRainfallMm: number,
+	meanTempC: number,
+): number {
+	const deficit = 300 - annualRainfallMm
+	if (deficit <= 0) return 0
+	const tempGate = Math.max(0, Math.min(1, meanTempC / 30))
+	return -10.5 * (1 - Math.exp(-deficit / 100)) * tempGate
+}
+
 /**
  * Estimate mean relative humidity (%) from monthly mean temperature and the
  * diurnal temperature range, with an optional annual aridity ratio (AET/PET).
@@ -27,16 +52,28 @@ function aridDewpointBiasC(aridity: number): number {
  * the dewpoint down by up to 2 °C in arid zones where the night never actually
  * reaches saturation.
  *
+ * When `annualRainfallMm` is provided, two rainfall-driven corrections apply:
+ * a moisture-source boost of up to +3 °C for high-rainfall zones, and a dry
+ * air-mass depression of up to −9 °C for hot hyperarid zones (temperature-
+ * gated so cold polar dryness is unaffected).
+ *
  * Result is clamped to 0–100.
  */
 export function relativeHumidityFromTempRange(
 	meanTempC: number,
 	dtrC: number,
 	annualAridity?: number,
+	annualRainfallMm?: number,
 ): number {
 	const bias =
 		annualAridity !== undefined ? aridDewpointBiasC(annualAridity) : 0
-	const dewC = meanTempC - dtrC / 2 + bias
+	const moistureBoost =
+		annualRainfallMm !== undefined ? precipMoistureBoostC(annualRainfallMm) : 0
+	const dryDepression =
+		annualRainfallMm !== undefined
+			? dryAirDepressionC(annualRainfallMm, meanTempC)
+			: 0
+	const dewC = meanTempC - dtrC / 2 + bias + moistureBoost + dryDepression
 	const rh =
 		100 *
 		(saturationVaporPressureKpa(dewC) / saturationVaporPressureKpa(meanTempC))
