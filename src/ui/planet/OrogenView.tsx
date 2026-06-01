@@ -360,7 +360,7 @@ export const OrogenView: React.FC = () => {
 				: climateMonth + 1
 	const temperatureMonth = resolvedClimateMonth
 	const rainfallMonth = resolvedClimateMonth
-	const dtrMonth = displayMonth
+	const dtrMonth = resolvedClimateMonth
 	const currentMonth = displayMonth
 	const canSimulate = !!world && !!world.nations && !generating
 
@@ -680,6 +680,7 @@ export const OrogenView: React.FC = () => {
 
 	// --- Color mode guard ---
 	useEffect(() => {
+		if (!world) return
 		const normalizedColorMode = normalizeGeographyColorMode({
 			colorMode,
 			hasHazards: !!world?.hazards,

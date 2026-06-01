@@ -50,8 +50,6 @@ const DEBUG_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["moisture", "Moist"],
 	["temperatureDelta", "Temp Δ"],
 	["oceanCurrents", "Current"],
-	["dtr", "DTR"],
-	["humidity", "Humidity"],
 ]
 
 const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<

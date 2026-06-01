@@ -80,8 +80,15 @@ export function classifyTopography(params: {
 	lakeCoastal: Uint8Array
 	slopeScore: Float32Array
 } {
-	const { mesh, elevationKm, isLand, rivers, vegetation, planetRadiusKm, tidalRange } =
-		params
+	const {
+		mesh,
+		elevationKm,
+		isLand,
+		rivers,
+		vegetation,
+		planetRadiusKm,
+		tidalRange,
+	} = params
 	const slopeScore =
 		params.slopeScore ?? computeSlopeScore(mesh, elevationKm, planetRadiusKm)
 	const topography = new Uint8Array(mesh.numRegions)
@@ -158,7 +165,7 @@ export function classifyTopography(params: {
 		const riverBonus = adjacentRiver[r] ? 0.08 : 0
 		const terminalBonus = adjacentTerminal[r] ? 0.14 : 0
 		const coastalBonus = adjacentOcean[r] ? 0.1 : 0
-		const tidalBonus = (tidalRange?.[r] ?? 0) * 0.20
+		const tidalBonus = (tidalRange?.[r] ?? 0) * 0.2
 		const marshScore =
 			noiseBias * 0.58 +
 			elevationFactor * 0.17 +

@@ -22,7 +22,12 @@ import type { UnitSystem } from "../screen/shared/ui-format"
 import { formatDistance } from "../screen/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
-export type DangerSubMode = "earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
+export type DangerSubMode =
+	| "earthquake"
+	| "volcanic"
+	| "cyclone"
+	| "tornado"
+	| "tidal"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
 export interface LabelMode {
 	nations: boolean
@@ -696,7 +701,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 
 								{(colorMode === "temperature" ||
 									colorMode === "precipitation" ||
-									colorMode === "wind") && (
+									colorMode === "humidity" ||
+									colorMode === "wind" ||
+									colorMode === "dtr") && (
 									<div>
 										<button
 											type="button"
@@ -704,7 +711,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
 										>
 											<span>
-												{colorMode === "temperature"
+												{colorMode === "temperature" || colorMode === "dtr"
 													? "Temperature"
 													: colorMode === "wind"
 														? "Wind"
@@ -717,6 +724,62 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										</button>
 										{climateExpanded && (
 											<div className="mt-1.5 space-y-1.5">
+												{(colorMode === "precipitation" ||
+													colorMode === "humidity") && (
+													<>
+														<div className="flex items-center gap-4 text-[11px] font-medium">
+															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																<input
+																	type="radio"
+																	name="rain-sub"
+																	checked={colorMode === "precipitation"}
+																	onChange={() => setColorMode("precipitation")}
+																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																/>
+																Precipitation
+															</label>
+															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																<input
+																	type="radio"
+																	name="rain-sub"
+																	checked={colorMode === "humidity"}
+																	onChange={() => setColorMode("humidity")}
+																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																/>
+																Humidity
+															</label>
+														</div>
+														<div className="border-t border-white/10" />
+													</>
+												)}
+												{(colorMode === "temperature" ||
+													colorMode === "dtr") && (
+													<>
+														<div className="flex items-center gap-4 text-[11px] font-medium">
+															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																<input
+																	type="radio"
+																	name="temp-sub"
+																	checked={colorMode === "temperature"}
+																	onChange={() => setColorMode("temperature")}
+																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																/>
+																Temp
+															</label>
+															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																<input
+																	type="radio"
+																	name="temp-sub"
+																	checked={colorMode === "dtr"}
+																	onChange={() => setColorMode("dtr")}
+																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																/>
+																DTR
+															</label>
+														</div>
+														<div className="border-t border-white/10" />
+													</>
+												)}
 												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 													<span>Current</span>
 													<input
@@ -818,7 +881,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
-												<label className={`flex items-center justify-between gap-3 text-[11px] font-medium ${hasCycloneRisk ? "text-slate-300" : "text-slate-600"}`}>
+												<label
+													className={`flex items-center justify-between gap-3 text-[11px] font-medium ${hasCycloneRisk ? "text-slate-300" : "text-slate-600"}`}
+												>
 													<span>Cyclones</span>
 													<input
 														type="radio"
@@ -829,7 +894,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20 disabled:cursor-not-allowed"
 													/>
 												</label>
-												<label className={`flex items-center justify-between gap-3 text-[11px] font-medium ${hasTornadoRisk ? "text-slate-300" : "text-slate-600"}`}>
+												<label
+													className={`flex items-center justify-between gap-3 text-[11px] font-medium ${hasTornadoRisk ? "text-slate-300" : "text-slate-600"}`}
+												>
 													<span>Tornadoes</span>
 													<input
 														type="radio"
@@ -840,8 +907,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20 disabled:cursor-not-allowed"
 													/>
 												</label>
-												<label className={`flex items-center justify-between gap-3 text-[11px] font-medium ${hasTidalRisk ? "text-slate-300" : "text-slate-600"}`}>
-													<span>Tidal</span>
+												<label
+													className={`flex items-center justify-between gap-3 text-[11px] font-medium ${hasTidalRisk ? "text-slate-300" : "text-slate-600"}`}
+												>
+													<span>Tidal Range</span>
 													<input
 														type="radio"
 														name="danger-sub"

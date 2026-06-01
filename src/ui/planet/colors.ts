@@ -473,7 +473,10 @@ const TIDAL_RANGE_STOPS: RgbColor[] = [
  */
 export function tidalRangeColor(normalized: number): [number, number, number] {
 	return quantizeRgb(
-		sampleBasisColorStops(TIDAL_RANGE_STOPS, Math.max(0, Math.min(1, normalized))),
+		sampleBasisColorStops(
+			TIDAL_RANGE_STOPS,
+			Math.max(0, Math.min(1, normalized)),
+		),
 	)
 }
 
@@ -490,7 +493,10 @@ const TIDAL_LAND_STOPS: RgbColor[] = [
 /** Land color for tidal sub-mode: white (no tides) → cyan → dark teal (max range). */
 export function tidalLandColor(normalized: number): [number, number, number] {
 	return quantizeRgb(
-		sampleBasisColorStops(TIDAL_LAND_STOPS, Math.max(0, Math.min(1, normalized))),
+		sampleBasisColorStops(
+			TIDAL_LAND_STOPS,
+			Math.max(0, Math.min(1, normalized)),
+		),
 	)
 }
 
@@ -510,7 +516,10 @@ const EARTHQUAKE_LAND_STOPS: RgbColor[] = [
 /** Land color for earthquake sub-mode: white → light yellow → amber → orange. */
 export function earthquakeLandColor(score: number): [number, number, number] {
 	return quantizeRgb(
-		sampleBasisColorStops(EARTHQUAKE_LAND_STOPS, Math.max(0, Math.min(1, score))),
+		sampleBasisColorStops(
+			EARTHQUAKE_LAND_STOPS,
+			Math.max(0, Math.min(1, score)),
+		),
 	)
 }
 
@@ -607,15 +616,14 @@ export function dtrColor(celsius: number): [number, number, number] {
 	return [last.r, last.g, last.b]
 }
 
-// Relative-humidity ramp (0–100%): arid brown → tan → green → teal → deep blue.
+// Relative-humidity ramp (0–100%): ochre → muted brown-gray-purple → dark blue-purple → saturated blue → violet-blue → cyan.
 const humidityStops: { v: number; r: number; g: number; b: number }[] = [
-	{ v: 0, r: 0.55, g: 0.27, b: 0.08 }, // arid brown
-	{ v: 20, r: 0.8, g: 0.52, b: 0.22 }, // tan
-	{ v: 40, r: 0.9, g: 0.82, b: 0.45 }, // pale yellow
-	{ v: 55, r: 0.55, g: 0.78, b: 0.42 }, // green
-	{ v: 70, r: 0.24, g: 0.66, b: 0.66 }, // teal
-	{ v: 85, r: 0.13, g: 0.45, b: 0.74 }, // blue
-	{ v: 100, r: 0.06, g: 0.27, b: 0.62 }, // deep blue
+	{ v: 0, r: 0.902, g: 0.647, b: 0.118 }, // #E6A51E ochre
+	{ v: 35, r: 0.384, g: 0.337, b: 0.373 }, // #62565F muted brown-gray-purple
+	{ v: 60, r: 0.157, g: 0.173, b: 0.361 }, // #282C5C dark blue-purple
+	{ v: 80, r: 0.153, g: 0.118, b: 0.812 }, // #271ECF saturated blue
+	{ v: 93, r: 0.294, g: 0.251, b: 0.922 }, // #4B40EB violet-blue
+	{ v: 100, r: 0.098, g: 1.0, b: 1.0 }, // #19FFFF cyan
 ]
 
 export function humidityColor(rhPercent: number): [number, number, number] {

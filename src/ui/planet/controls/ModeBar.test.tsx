@@ -114,7 +114,7 @@ describe("ModeBar", () => {
 			/>,
 		)
 
-		expect(geographyMarkup).toContain(">DTR<")
+		expect(geographyMarkup).toContain(">Basins<")
 		expect(geographyMarkup).toContain(">Current<")
 		expect(geographyMarkup).not.toContain(">Pasta<")
 		expect(geographyMarkup).not.toContain(">Koppen<")

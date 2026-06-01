@@ -26,11 +26,19 @@ export function computeCoastalMask(
 
 // Calibrated so tidalStrength=1.0 (Earth) yields ~86% micro (<1 m),
 // 13% meso (1–3 m), 1% macro (up to 16 m) of coastal cells.
-const BASE_TIDAL_RANGE_M = 0.5
+const BASE_TIDAL_RANGE_M = 0.25
 
-// Enclosure → bay amplification (open headland → Bay-of-Fundy scale).
-const ENC_BREAKS = [0, 0.3, 0.6, 0.8, 1.0]
-const AMP_VALUES = [1, 2, 6, 16, 32]
+// Enclosure → bay amplification.  The reachable range for a coastal cell in a
+// 6-neighbour hex mesh is [0, 0.833] (minimum 1 ocean neighbour out of 6).
+// 7-neighbour and 8-neighbour irregular cells can reach 0.857–0.875.
+//
+//  enc=0    — open headland / island tip   → 1×   ~0.25 m  (micro)
+//  enc=0.5  — straight coast (3/6 ocean)   → 2×   ~0.50 m  (micro)
+//  enc=0.67 — slightly recessed (2/6)       → 3×   ~0.75 m  (micro)
+//  enc=0.833— tightest hex cell (1/6)       → 6×   ~1.50 m  (meso, typical small bay)
+//  enc=0.875— tight 8-neighbour cell        → 20×  ~5.00 m  (macro, rare deep inlet)
+const ENC_BREAKS = [0, 0.5, 0.67, 0.833, 0.92]
+const AMP_VALUES = [1, 2, 3, 6, 96]
 
 function piecewiseAmp(enclosure: number): number {
 	for (let i = 0; i < ENC_BREAKS.length - 1; i++) {
@@ -44,14 +52,8 @@ function piecewiseAmp(enclosure: number): number {
 	return AMP_VALUES[AMP_VALUES.length - 1]!
 }
 
-// Green's law: tidal amplitude ∝ h^(-1/4).  Applied once at the end so it
-// never feeds back into the Dijkstra propagation and cannot compound.
-function depthFactor(depthKm: number): number {
-	return Math.pow(0.1 / Math.max(0.001, depthKm), 0.25)
-}
-
 // e-folding distance for tidal energy propagation through ocean (km).
-const DECAY_KM = 1500
+const DECAY_KM = 400
 
 /**
  * Computes a per-cell tidal range in **metres** (raw, not normalised).
@@ -69,7 +71,10 @@ export function computeTidalRange(
 	isLand: Uint8Array,
 	isCoastal: Uint8Array,
 	elevationKm: Float32Array,
-	params: Pick<OrogenParams, "tidalStrength" | "tidallyLocked" | "planetRadiusKm">,
+	params: Pick<
+		OrogenParams,
+		"tidalStrength" | "tidallyLocked" | "planetRadiusKm"
+	>,
 	lakes?: Uint8Array,
 ): Float32Array {
 	const N = mesh.numRegions
@@ -171,11 +176,10 @@ export function computeTidalRange(
 		}
 	}
 
-	// ── Step 3: Apply depth factor to ocean cells ──────────────────────
+	// ── Step 3: Copy propagated values into ocean cells ───────────────
 	for (let r = 0; r < N; r++) {
 		if (!isOcean(r)) continue
-		if (f[r] <= 0) continue
-		result[r] = f[r] * depthFactor(Math.max(0.001, -elevationKm[r]))
+		result[r] = f[r]
 	}
 
 	return result

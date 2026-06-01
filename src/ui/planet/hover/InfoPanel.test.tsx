@@ -151,7 +151,14 @@ function renderPanel(
 			hoverOceanDist={25}
 			hoverDistCoast={1}
 			hoverDistCoastKm={12}
-			hoverHazards={{ earthquake: 0.3, volcano: 0.1, danger: 0.3, cyclone: 0, tornado: 0, tidal: 0 }}
+			hoverHazards={{
+				earthquake: 0.3,
+				volcano: 0.1,
+				danger: 0.3,
+				cyclone: 0,
+				tornado: 0,
+				tidal: 0,
+			}}
 			hoverHotspot={null}
 			hoverRiver={null}
 			hoverTerrainFeature={{ dominant: "ridge", all: ["ridge"] }}
@@ -278,7 +285,14 @@ describe("InfoPanel", () => {
 	it("shows danger details only in danger mode", () => {
 		const markup = renderPanel({
 			colorMode: "dangerZones",
-			hoverHazards: { earthquake: 0.1, volcano: 0.3, danger: 0.25, cyclone: 0, tornado: 0, tidal: 0 },
+			hoverHazards: {
+				earthquake: 0.1,
+				volcano: 0.3,
+				danger: 0.25,
+				cyclone: 0,
+				tornado: 0,
+				tidal: 0,
+			},
 		})
 
 		expect(markup).toContain(">Danger<")
@@ -288,7 +302,14 @@ describe("InfoPanel", () => {
 	it("shows quake-tagged danger when earthquakes dominate", () => {
 		const markup = renderPanel({
 			colorMode: "dangerZones",
-			hoverHazards: { earthquake: 0.35, volcano: 0.1, danger: 0.25, cyclone: 0, tornado: 0, tidal: 0 },
+			hoverHazards: {
+				earthquake: 0.35,
+				volcano: 0.1,
+				danger: 0.25,
+				cyclone: 0,
+				tornado: 0,
+				tidal: 0,
+			},
 		})
 
 		expect(markup).toContain("(quakes)")
@@ -353,7 +374,14 @@ describe("InfoPanel", () => {
 		const markup = renderPanel({
 			colorMode: "temperatureDelta",
 			hoverLandmark: { id: 4, type: null, size: null },
-			hoverHazards: { earthquake: 0.1, volcano: 0.3, danger: 0.25, cyclone: 0, tornado: 0, tidal: 0 },
+			hoverHazards: {
+				earthquake: 0.1,
+				volcano: 0.3,
+				danger: 0.25,
+				cyclone: 0,
+				tornado: 0,
+				tidal: 0,
+			},
 			hoverOceanDist: 0,
 			hoverDistCoastKm: Infinity,
 			hoverTopography: null,
@@ -379,7 +407,14 @@ describe("InfoPanel", () => {
 				slopeScore: undefined,
 			} as SerializedOrogenWorld,
 			hoverLandmark: { id: 5, type: null, size: null },
-			hoverHazards: { earthquake: 0.1, volcano: 0.05, danger: 0.1, cyclone: 0, tornado: 0, tidal: 0 },
+			hoverHazards: {
+				earthquake: 0.1,
+				volcano: 0.05,
+				danger: 0.1,
+				cyclone: 0,
+				tornado: 0,
+				tidal: 0,
+			},
 			hoverOceanDist: null,
 			hoverDistCoastKm: null,
 			hoverTopography: null,

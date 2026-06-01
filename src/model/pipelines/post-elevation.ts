@@ -25,6 +25,7 @@ import {
 	computeLandFraction,
 	computeTemperature,
 } from "../climate/climate"
+import { computeCycloneRisk } from "../climate/cyclones"
 import { computeDiurnalRange } from "../climate/dtr"
 import {
 	computeHydrologyFields,
@@ -44,9 +45,8 @@ import {
 	computeMonthlyRain,
 	computeThermalEquator,
 } from "../climate/rain"
-import { computeCycloneRisk } from "../climate/cyclones"
-import { computeTornadoRisk } from "../climate/tornadoes"
 import { computeCoastalMask, computeTidalRange } from "../climate/tides"
+import { computeTornadoRisk } from "../climate/tornadoes"
 import { assignClimateZones, assignVegetation } from "../climate/vegetation"
 import {
 	computeTradeGoods,
@@ -377,7 +377,14 @@ export function runPostElevationPipeline(
 	t0 = performance.now()
 	const coastalMask = computeCoastalMask(mesh, isLand)
 	// params includes planetRadiusKm — Dijkstra uses it for km-distance edge weights
-	const tidalRange = computeTidalRange(mesh, isLand, coastalMask, elevation_km, params, rivers.lakes)
+	const tidalRange = computeTidalRange(
+		mesh,
+		isLand,
+		coastalMask,
+		elevation_km,
+		params,
+		rivers.lakes,
+	)
 	record("Post: tidal range", t0)
 
 	// ── Topography ─────────────────────────────────────────────────────

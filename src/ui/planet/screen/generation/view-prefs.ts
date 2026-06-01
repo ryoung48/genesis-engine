@@ -1,5 +1,9 @@
 import type { ColorMode } from "../../colors"
-import type { DangerSubMode, LabelMode, MeasureMode } from "../../controls/OverlayControls"
+import type {
+	DangerSubMode,
+	LabelMode,
+	MeasureMode,
+} from "../../controls/OverlayControls"
 import type { OrogenViewMode } from "../../renderer"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import { DEFAULT_GEOGRAPHY_MODE } from "../shared/map-modes"

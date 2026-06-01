@@ -21,7 +21,7 @@ import type {
 } from ".."
 import { clamp, smoothstep } from "../shared/math"
 import { TOPO_OCEAN } from "../terrain/classification"
-import { getClimateGeometry, computeThermalEquator } from "./rain"
+import { computeThermalEquator, getClimateGeometry } from "./rain"
 
 export function computeCycloneRisk(
 	mesh: SphereMesh,
@@ -41,7 +41,7 @@ export function computeCycloneRisk(
 	// Slow rotators: the Coriolis no-go zone (radius = geoTransitionLat degrees
 	// from the thermal equator) engulfs the entire valid formation band (≤38°).
 	const hoursPerDay = params.hoursPerDay ?? 24
-	const noGoRadius = (15 * hoursPerDay) / 24  // same formula as wind model
+	const noGoRadius = (15 * hoursPerDay) / 24 // same formula as wind model
 	if (noGoRadius >= 38) return new Float32Array(N)
 
 	// --- SST threshold: global mean + 11°C (≈26°C on Earth) ---
@@ -49,7 +49,7 @@ export function computeCycloneRisk(
 	for (let r = 0; r < N; r++) globalTempSum += climate.temperature_avg[r]
 	const globalMeanTemp = globalTempSum / N
 	const SST_THRESHOLD = globalMeanTemp + 11
-	const SST_RANGE = 12  // full score at threshold + 12°C
+	const SST_RANGE = 12 // full score at threshold + 12°C
 
 	const annualTEQ = computeThermalEquator(mesh, climate.temperature_avg)
 
@@ -121,7 +121,7 @@ export function computeCycloneRisk(
 
 	// --- Step 3: Coastal land risk ---
 	// Seed from land cells adjacent to storm-track ocean; propagate 3 hops inland.
-	const COASTAL_DECAY = 0.40
+	const COASTAL_DECAY = 0.4
 	const COASTAL_HOPS = 3
 
 	const coastalRisk = new Float32Array(N)
@@ -161,7 +161,8 @@ export function computeCycloneRisk(
 	if (nonZero.length === 0) return combined
 
 	nonZero.sort((a, b) => a - b)
-	const p99 = nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]
+	const p99 =
+		nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]
 	if (p99 <= 0) return combined
 
 	const invP99 = 1 / p99
@@ -170,4 +171,3 @@ export function computeCycloneRisk(
 	}
 	return combined
 }
-

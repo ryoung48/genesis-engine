@@ -8,9 +8,9 @@ import {
 	climateTempColor,
 	climateZoneColor,
 	dangerMapColor,
-	earthquakeLandColor,
 	developmentColor,
 	dtrColor,
+	earthquakeLandColor,
 	getColor,
 	hotspotColor,
 	moistureDirectionalColor,
@@ -184,8 +184,16 @@ describe("computeRegionColors", () => {
 			"dangerZones",
 			DEFAULT_NATION_MODE,
 			DEFAULT_POPULATION_MODE,
-			0, 0, 0, 0, "map",
-			true, undefined, null, null, null,
+			0,
+			0,
+			0,
+			0,
+			"map",
+			true,
+			undefined,
+			null,
+			null,
+			null,
 			"earthquake",
 		)
 
@@ -195,11 +203,7 @@ describe("computeRegionColors", () => {
 			0,
 			darkenVegetationAtElevation(earthquakeLandColor(0.1), 0),
 		)
-		expectRegionColor(
-			rgb!,
-			1,
-			OCEAN_LIGHT_BLUE,
-		)
+		expectRegionColor(rgb!, 1, OCEAN_LIGHT_BLUE)
 	})
 
 	it("applies elevation shading to nation province fills", () => {

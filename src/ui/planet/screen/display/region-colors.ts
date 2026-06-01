@@ -16,14 +16,10 @@ import {
 	climateTempColor,
 	climateZoneColor,
 	cycloneLandColor,
-	earthquakeLandColor,
-	tidalLandColor,
-	tidalRangeColor,
-	tornadoLandColor,
-	volcanicLandColor,
 	dangerMapColor,
 	developmentColor,
 	dtrColor,
+	earthquakeLandColor,
 	getColor,
 	hotspotColor,
 	humidityColor,
@@ -37,7 +33,11 @@ import {
 	slopeColor,
 	temperatureColor,
 	temperatureDeltaColor,
+	tidalLandColor,
+	tidalRangeColor,
+	tornadoLandColor,
 	vegetationColor,
+	volcanicLandColor,
 } from "../../colors"
 import type { DangerSubMode } from "../../controls/OverlayControls"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
@@ -579,7 +579,11 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "dangerZones" && dangerSubMode === "tidal" && world.tidalRange) {
+	if (
+		colorMode === "dangerZones" &&
+		dangerSubMode === "tidal" &&
+		world.tidalRange
+	) {
 		// Land + lakes: white, same as other danger sub-modes (no tidal color on land).
 		// Ocean: OCEAN_LIGHT_BLUE (no tides) → dark navy (high tidal range).
 		// Use p99 so extreme depth-amplified outliers don't wash out the scale
@@ -588,9 +592,12 @@ export function computeRegionColors(
 			if (world.tidalRange[r] > 1e-5) nonZero.push(world.tidalRange[r])
 		}
 		nonZero.sort((a, b) => a - b)
-		const p99 = nonZero.length > 0
-			? nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]!
-			: 0
+		const p99 =
+			nonZero.length > 0
+				? nonZero[
+						Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))
+					]!
+				: 0
 		const invMax = p99 > 1e-5 ? 1 / p99 : 0
 		const lakes = world.rivers?.lakes
 		// Dark navy used for maximum tidal range
@@ -611,9 +618,12 @@ export function computeRegionColors(
 				rgb[3 * r + 2] = cb
 			} else {
 				const t = (world.tidalRange[r] ?? 0) * invMax
-				rgb[3 * r] = OCEAN_LIGHT_BLUE[0] + (TIDAL_DARK[0] - OCEAN_LIGHT_BLUE[0]) * t
-				rgb[3 * r + 1] = OCEAN_LIGHT_BLUE[1] + (TIDAL_DARK[1] - OCEAN_LIGHT_BLUE[1]) * t
-				rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2] + (TIDAL_DARK[2] - OCEAN_LIGHT_BLUE[2]) * t
+				rgb[3 * r] =
+					OCEAN_LIGHT_BLUE[0] + (TIDAL_DARK[0] - OCEAN_LIGHT_BLUE[0]) * t
+				rgb[3 * r + 1] =
+					OCEAN_LIGHT_BLUE[1] + (TIDAL_DARK[1] - OCEAN_LIGHT_BLUE[1]) * t
+				rgb[3 * r + 2] =
+					OCEAN_LIGHT_BLUE[2] + (TIDAL_DARK[2] - OCEAN_LIGHT_BLUE[2]) * t
 			}
 		}
 		return rgb

@@ -20,9 +20,9 @@ describe("map-modes", () => {
 		const debugOptions = getVisibleGeographyModeOptions(true)
 
 		expect(defaultOptions.map(([mode]) => mode)).toContain("terrain")
-		expect(defaultOptions.map(([mode]) => mode)).not.toContain("dtr")
+		expect(defaultOptions.map(([mode]) => mode)).not.toContain("basins")
 		expect(defaultOptions.map(([mode]) => mode)).not.toContain("pastaClimate")
-		expect(debugOptions.map(([mode]) => mode)).toContain("dtr")
+		expect(debugOptions.map(([mode]) => mode)).toContain("basins")
 		expect(debugOptions.map(([mode]) => mode)).not.toContain("pastaClimate")
 		expect(debugOptions.map(([mode]) => mode)).not.toContain("koppenClimate")
 	})
@@ -46,7 +46,7 @@ describe("map-modes", () => {
 	})
 
 	it("identifies debug-only geography modes", () => {
-		expect(isDebugGeographyMode("dtr")).toBe(true)
+		expect(isDebugGeographyMode("basins")).toBe(true)
 		expect(isDebugGeographyMode("terrain")).toBe(false)
 	})
 

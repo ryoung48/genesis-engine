@@ -27,37 +27,7 @@ import {
 } from "./generate-default-world-diagnostics"
 import { generateOrogenWorld } from "./generate-world"
 
-const SMOKE_PLANET_CODE = encodePlanetCode(411999, {
-	...DEFAULT_WORLD_PARAMS,
-	seed: 411999,
-	numPoints: 9000,
-	numPlates: 36,
-	landDistribution: 0.35,
-	continentSizeVariety: 0.45,
-	landCoverage: 0.38,
-	jitter: 0.6,
-	roughness: 0.33,
-	terrainWarp: 0.55,
-	smoothing: 0.2,
-	hydraulicErosion: 0.25,
-	thermalErosion: 0.2,
-	ridgeSharpening: 0.25,
-	glacialErosion: 0.15,
-	seaLevel: 1,
-	volcanism: 1.2,
-	craters: 0.05,
-	planetRadiusKm: 6371,
-	obliquity: 28.5,
-	eccentricity: 0.032,
-	sunTempFactor: 1.01,
-	insolationFactor: 1.04,
-	daysPerYear: 390,
-	hoursPerDay: 27,
-	tidallyLocked: false,
-	antistellarLon: DEFAULT_WORLD_PARAMS.antistellarLon,
-	perihelion: 128,
-	pressure: 1.1,
-})
+const SMOKE_PLANET_CODE = "8wqaf.095bnv9q91thqhw9t7gi7wytd2kaqfgnfhcry"
 
 function buildSmokeParams(code: string): OrogenParams {
 	const decoded = decodePlanetCode(code)
@@ -336,51 +306,89 @@ describe("full world smoke generation", () => {
 			summarizeDistribution(world.topography, OROGEN_TOPOGRAPHY_LABELS, [5, 6]),
 		)
 		if (world.tidalRange) {
-			// Coastal-ocean cells: ocean cells adjacent to land.
-			// For each, use its own tidal value (propagated from land by Dijkstra).
-			// Bucket into micro/meso/macro by actual metre values.
 			const { adjOffset, adjList } = world.mesh
 			const isLand = world.isLand
 			const lakes = world.rivers?.lakes
 			const tidalRange = world.tidalRange
 			const N = world.mesh.numRegions
 
-			let micro = 0, meso = 0, macro = 0, totalCoastalOcean = 0
-			let maxTidal = 0, sumTidal = 0
+			// ── Land coastal cells (enclosure-based source values) ────────────
+			let lMicro = 0,
+				lMeso = 0,
+				lMacro = 0,
+				lTotal = 0
+			let lMax = 0
 
 			for (let r = 0; r < N; r++) {
-				// Skip land and lake cells
-				if (isLand?.[r] || lakes?.[r]) continue
-				// Only consider ocean cells that border at least one land cell
-				let bordersLand = false
+				if (!isLand?.[r]) continue
+				let bordersOcean = false
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-					if (isLand?.[adjList[j]]) { bordersLand = true; break }
+					const nb = adjList[j]
+					if (!isLand[nb] && !lakes?.[nb]) {
+						bordersOcean = true
+						break
+					}
 				}
-				if (!bordersLand) continue
-
+				if (!bordersOcean) continue
 				const val = tidalRange[r] ?? 0
-				totalCoastalOcean++
-				sumTidal += val
-				if (val > maxTidal) maxTidal = val
-				if (val < 1) micro++
-				else if (val < 3) meso++
-				else macro++
+				lTotal++
+				if (val > lMax) lMax = val
+				if (val < 1) lMicro++
+				else if (val < 3) lMeso++
+				else lMacro++
 			}
 
-			const pct = (n: number) =>
-				totalCoastalOcean > 0 ? `${((n / totalCoastalOcean) * 100).toFixed(1)}%` : "–"
+			// ── Coastal-ocean cells (first Dijkstra hop from land) ────────────
+			let oMicro = 0,
+				oMeso = 0,
+				oMacro = 0,
+				oTotal = 0
+			let oMax = 0,
+				oSum = 0
 
-			console.info("Tidal range distribution (coastal-ocean cells)")
+			for (let r = 0; r < N; r++) {
+				if (isLand?.[r] || lakes?.[r]) continue
+				let bordersLand = false
+				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+					if (isLand?.[adjList[j]]) {
+						bordersLand = true
+						break
+					}
+				}
+				if (!bordersLand) continue
+				const val = tidalRange[r] ?? 0
+				oTotal++
+				oSum += val
+				if (val > oMax) oMax = val
+				if (val < 1) oMicro++
+				else if (val < 3) oMeso++
+				else oMacro++
+			}
+
+			const lpct = (n: number) =>
+				lTotal > 0 ? `${((n / lTotal) * 100).toFixed(1)}%` : "–"
+			const opct = (n: number) =>
+				oTotal > 0 ? `${((n / oTotal) * 100).toFixed(1)}%` : "–"
+
+			console.info("Tidal range — land coastal cells (source values)")
 			console.table({
-				micro_lt1m:  { count: micro,  pct: pct(micro),  label: "< 1 m" },
-				meso_1_3m:   { count: meso,   pct: pct(meso),   label: "1–3 m" },
-				macro_gt3m:  { count: macro,   pct: pct(macro),  label: "> 3 m" },
-				total:       { count: totalCoastalOcean, pct: "100%", label: "all" },
+				micro_lt1m: { count: lMicro, pct: lpct(lMicro), label: "< 1 m" },
+				meso_1_3m: { count: lMeso, pct: lpct(lMeso), label: "1–3 m" },
+				macro_gt3m: { count: lMacro, pct: lpct(lMacro), label: "> 3 m" },
+				total: { count: lTotal, pct: "100%", label: "all" },
 			})
-			console.info("Tidal range stats", {
-				maxTidalM: maxTidal.toFixed(2),
-				avgCoastalM: totalCoastalOcean > 0 ? (sumTidal / totalCoastalOcean).toFixed(2) : "–",
+			console.info(`  max land tidal: ${lMax.toFixed(2)} m`)
+
+			console.info("Tidal range — coastal-ocean cells (Dijkstra propagated)")
+			console.table({
+				micro_lt1m: { count: oMicro, pct: opct(oMicro), label: "< 1 m" },
+				meso_1_3m: { count: oMeso, pct: opct(oMeso), label: "1–3 m" },
+				macro_gt3m: { count: oMacro, pct: opct(oMacro), label: "> 3 m" },
+				total: { count: oTotal, pct: "100%", label: "all" },
 			})
+			console.info(
+				`  max ocean tidal: ${oMax.toFixed(2)} m  avg: ${oTotal > 0 ? (oSum / oTotal).toFixed(2) : "–"} m`,
+			)
 		}
 		if (world.tradeGoods) {
 			console.info(

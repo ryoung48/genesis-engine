@@ -1346,4 +1346,3 @@ export function buildMapWindArrows(
 
 	return createLineSegments(positions, 0xffffff, 0.75, viewMode === "map")
 }
-

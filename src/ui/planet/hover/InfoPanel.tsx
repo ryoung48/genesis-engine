@@ -584,13 +584,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							)}
 						{colorMode === "dtr" && hoverDtr !== null && (
 							<Row
-								label={`DTR ${monthLabels[displayMonth] ?? `M${displayMonth}`}`}
+								label={`DTR ${climateTimeMode === "annual" ? monthLabels[0] : (monthLabels[climateTimeMode === "monthly" ? climateMonth + 1 : displayMonth] ?? `M${displayMonth}`)}`}
 								value={formatTemperatureDelta(hoverDtr.value, unitSystem)}
 							/>
 						)}
 						{colorMode === "humidity" && hoverHumidity !== null && (
 							<Row
-								label={`Humidity ${monthLabels[displayMonth] ?? `M${displayMonth}`}`}
+								label={`Humidity ${climateTimeMode === "annual" ? monthLabels[0] : (monthLabels[climateTimeMode === "monthly" ? climateMonth + 1 : displayMonth] ?? `M${displayMonth}`)}`}
 								value={`${hoverHumidity.value.toFixed(0)}%`}
 							/>
 						)}
@@ -604,73 +604,75 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									values={terrainFeatureSwatches}
 								/>
 							)}
-						{colorMode === "dangerZones" && hoverHazards && (() => {
-							if (dangerSubMode === "cyclone") {
+						{colorMode === "dangerZones" &&
+							hoverHazards &&
+							(() => {
+								if (dangerSubMode === "cyclone") {
+									return (
+										<SwatchRow
+											label="Cyclone"
+											value={`${Math.round(hoverHazards.cyclone * 100)}%`}
+											color={rgbToCss(cycloneLandColor(hoverHazards.cyclone))}
+										/>
+									)
+								}
+								if (dangerSubMode === "tornado") {
+									return (
+										<SwatchRow
+											label="Tornado"
+											value={`${Math.round(hoverHazards.tornado * 100)}%`}
+											color={rgbToCss(tornadoLandColor(hoverHazards.tornado))}
+										/>
+									)
+								}
+								if (dangerSubMode === "tidal") {
+									const tidalM = hoverHazards.tidal
+									const tidalDisplay =
+										unitSystem === "imperial"
+											? `${(tidalM * 3.28084).toFixed(1)} ft`
+											: `${tidalM.toFixed(1)} m`
+									// Normalise for color against a ~16 m macro-tidal ceiling
+									// Same dark-navy gradient as the ocean renderer
+									const tidalNorm = Math.min(1, tidalM / 16)
+									const oceanLight = [0.75, 0.88, 0.96]
+									const tidalDark = [0.04, 0.11, 0.28]
+									const swatchRgb: [number, number, number] = [
+										oceanLight[0] + (tidalDark[0] - oceanLight[0]) * tidalNorm,
+										oceanLight[1] + (tidalDark[1] - oceanLight[1]) * tidalNorm,
+										oceanLight[2] + (tidalDark[2] - oceanLight[2]) * tidalNorm,
+									]
+									return (
+										<SwatchRow
+											label="Tidal Range"
+											value={tidalDisplay}
+											color={rgbToCss(swatchRgb)}
+										/>
+									)
+								}
+								if (dangerSubMode === "volcanic") {
+									return (
+										<SwatchRow
+											label="Volcanic"
+											value={`${Math.round(hoverHazards.volcano * 100)}%`}
+											color={rgbToCss(volcanicLandColor(hoverHazards.volcano))}
+										/>
+									)
+								}
+								// earthquake / default: show the combined danger score
 								return (
 									<SwatchRow
-										label="Cyclone"
-										value={`${Math.round(hoverHazards.cyclone * 100)}%`}
-										color={rgbToCss(cycloneLandColor(hoverHazards.cyclone))}
+										label="Danger"
+										value={`${Math.round(hoverHazards.danger * 100)}%${
+											hoverHazards.danger >= 0.2
+												? hoverHazards.earthquake >= hoverHazards.volcano
+													? " (quakes)"
+													: " (volcanic)"
+												: ""
+										}`}
+										color={rgbToCss(dangerColor(hoverHazards.danger))}
 									/>
 								)
-							}
-							if (dangerSubMode === "tornado") {
-								return (
-									<SwatchRow
-										label="Tornado"
-										value={`${Math.round(hoverHazards.tornado * 100)}%`}
-										color={rgbToCss(tornadoLandColor(hoverHazards.tornado))}
-									/>
-								)
-							}
-							if (dangerSubMode === "tidal") {
-								const tidalM = hoverHazards.tidal
-								const tidalDisplay =
-									unitSystem === "imperial"
-										? `${(tidalM * 3.28084).toFixed(1)} ft`
-										: `${tidalM.toFixed(1)} m`
-								// Normalise for color against a ~16 m macro-tidal ceiling
-								// Same dark-navy gradient as the ocean renderer
-								const tidalNorm = Math.min(1, tidalM / 16)
-								const oceanLight = [0.75, 0.88, 0.96]
-								const tidalDark = [0.04, 0.11, 0.28]
-								const swatchRgb: [number, number, number] = [
-									oceanLight[0] + (tidalDark[0] - oceanLight[0]) * tidalNorm,
-									oceanLight[1] + (tidalDark[1] - oceanLight[1]) * tidalNorm,
-									oceanLight[2] + (tidalDark[2] - oceanLight[2]) * tidalNorm,
-								]
-								return (
-									<SwatchRow
-										label="Tidal"
-										value={tidalDisplay}
-										color={rgbToCss(swatchRgb)}
-									/>
-								)
-							}
-							if (dangerSubMode === "volcanic") {
-								return (
-									<SwatchRow
-										label="Volcanic"
-										value={`${Math.round(hoverHazards.volcano * 100)}%`}
-										color={rgbToCss(volcanicLandColor(hoverHazards.volcano))}
-									/>
-								)
-							}
-							// earthquake / default: show the combined danger score
-							return (
-								<SwatchRow
-									label="Danger"
-									value={`${Math.round(hoverHazards.danger * 100)}%${
-										hoverHazards.danger >= 0.2
-											? hoverHazards.earthquake >= hoverHazards.volcano
-												? " (quakes)"
-												: " (volcanic)"
-											: ""
-									}`}
-									color={rgbToCss(dangerColor(hoverHazards.danger))}
-								/>
-							)
-						})()}
+							})()}
 						{hoverTopography && (
 							<SwatchRow
 								label="Topography"
