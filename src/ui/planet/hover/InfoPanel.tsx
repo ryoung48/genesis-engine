@@ -650,17 +650,20 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										/>
 									)
 								}
-								// earthquake / default: show the combined danger score
+								if (dangerSubMode === "earthquake") {
+									return (
+										<SwatchRow
+											label="Earthquake"
+											value={`${Math.round(hoverHazards.earthquake * 100)}%`}
+											color={rgbToCss(dangerColor(hoverHazards.danger))}
+										/>
+									)
+								}
+								// Show the combined danger score for the default case
 								return (
 									<SwatchRow
 										label="Danger"
-										value={`${Math.round(hoverHazards.danger * 100)}%${
-											hoverHazards.danger >= 0.2
-												? hoverHazards.earthquake >= hoverHazards.volcano
-													? " (quakes)"
-													: " (volcanic)"
-												: ""
-										}`}
+										value={`${Math.round(hoverHazards.danger * 100)}%`}
 										color={rgbToCss(dangerColor(hoverHazards.danger))}
 									/>
 								)

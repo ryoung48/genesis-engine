@@ -101,6 +101,49 @@ export function computeTidalRange(
 		result[r] = tidalStrength * BASE_TIDAL_RANGE_M * piecewiseAmp(enclosure)
 	}
 
+	// ── Step 1b: Clamp macro fraction to target ───────────────────────────
+	// This world has more enclosed bays than Earth, which pushes the raw
+	// macro fraction to ~7%.  Keep only the most enclosed inlets as macro;
+	// cap the rest to just below 3 m so propagation inherits lower values.
+	const MACRO_THRESHOLD_M = 3.0
+	const TARGET_MACRO_FRACTION = 0.01
+
+	const coastalIndices: number[] = []
+	for (let r = 0; r < N; r++) {
+		if (isCoastal[r]) coastalIndices.push(r)
+	}
+	if (coastalIndices.length > 0) {
+		const macroCells = coastalIndices.filter(r => result[r]! > MACRO_THRESHOLD_M)
+		const targetMacroCount = Math.ceil(coastalIndices.length * TARGET_MACRO_FRACTION)
+		if (macroCells.length > targetMacroCount) {
+			macroCells.sort((a, b) => result[b]! - result[a]!)
+			const cap = MACRO_THRESHOLD_M * 0.999
+			for (let i = targetMacroCount; i < macroCells.length; i++) {
+				result[macroCells[i]!] = cap
+			}
+		}
+	}
+
+	// ── Step 1c: Clamp meso fraction to target ────────────────────────────
+	// Same logic as 1b: keep the most enclosed meso cells, cap the rest to
+	// just below 1 m (micro ceiling).
+	const MESO_THRESHOLD_M = 1.0
+	const TARGET_MESO_FRACTION = 0.13
+
+	if (coastalIndices.length > 0) {
+		const mesoCells = coastalIndices.filter(
+			r => result[r]! >= MESO_THRESHOLD_M && result[r]! <= MACRO_THRESHOLD_M,
+		)
+		const targetMesoCount = Math.ceil(coastalIndices.length * TARGET_MESO_FRACTION)
+		if (mesoCells.length > targetMesoCount) {
+			mesoCells.sort((a, b) => result[b]! - result[a]!)
+			const cap = MESO_THRESHOLD_M * 0.999
+			for (let i = targetMesoCount; i < mesoCells.length; i++) {
+				result[mesoCells[i]!] = cap
+			}
+		}
+	}
+
 	// ── Step 2: Dijkstra propagation from coastal land → ocean ─────────
 	// f[r] = max_c( result[c] × exp(−km_dist(r,c) / DECAY_KM) )
 	// Processed highest-value-first; since exp(−d/D) < 1 for all d > 0,

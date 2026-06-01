@@ -13,12 +13,12 @@ function aridDewpointBiasC(aridity: number): number {
 
 // Moisture-source correction: in high-rainfall regions, evapotranspiration
 // keeps the air loaded with vapor beyond what the DTR proxy captures. Ramps
-// from 0 below 500 mm/yr to +3 °C at ~5000 mm/yr (coastal tropical rainforest
-// can reach near-saturation; Amazon-typical ~3000 mm lands around +2.4 °C).
+// from 0 below 500 mm/yr to +2 °C at ~5000 mm/yr (coastal tropical rainforest
+// can reach near-saturation; Amazon-typical ~3000 mm lands around +1.6 °C).
 function precipMoistureBoostC(annualRainfallMm: number): number {
 	const excess = annualRainfallMm - 500
 	if (excess <= 0) return 0
-	return 3 * (1 - Math.exp(-excess / 1500))
+	return 2 * (1 - Math.exp(-excess / 1500))
 }
 
 // Dry air-mass correction: in hot hyperarid regions the ambient dewpoint is
@@ -77,5 +77,10 @@ export function relativeHumidityFromTempRange(
 	const rh =
 		100 *
 		(saturationVaporPressureKpa(dewC) / saturationVaporPressureKpa(meanTempC))
-	return rh < 0 ? 0 : rh > 100 ? 100 : rh
+	if (rh <= 0) return 0
+	// Soft compression above 80 %: each additional raw point yields diminishing
+	// returns, asymptoting near 92. Makes 90+ achievable only in the most
+	// persistently humid conditions rather than any high-rainfall tropical cell.
+	if (rh >= 80) return 80 + 12 * (1 - Math.exp(-(rh - 80) / 4))
+	return rh
 }
