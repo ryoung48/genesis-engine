@@ -1,5 +1,4 @@
 import type { OrogenParams, SphereMesh } from ".."
-import { makeRng } from "../shared/rng"
 
 /**
  * Returns a Uint8Array where 1 = land cell that borders at least one non-land
@@ -84,7 +83,6 @@ export function computeTidalRange(
 	const planetRadiusKm = params.planetRadiusKm ?? 6371
 
 	if (params.tidallyLocked || tidalStrength <= 0) return new Float32Array(N)
-	const rng = makeRng(params.seed ^ 0x7a3f)
 
 	const isOcean = (r: number) => !isLand[r] && !lakes?.[r]
 
@@ -96,43 +94,52 @@ export function computeTidalRange(
 		let totalCount = 0
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			totalCount++
-			if (isOcean(adjList[j])) oceanCount++
+			if (!isLand[adjList[j]]) oceanCount++
 		}
-		// Skip cells with no true ocean exposure (e.g. land only adjacent to lakes).
-		if (totalCount === 0 || oceanCount === 0) continue
+		if (totalCount === 0) continue
 		const enclosure = 1 - oceanCount / totalCount
 		result[r] = tidalStrength * BASE_TIDAL_RANGE_M * piecewiseAmp(enclosure)
 	}
 
-	// ── Step 1b: Assign tiers by fraction, randomise within each range ───
-	// Sort coastal cells by raw enclosure value (highest first) to rank them,
-	// then overwrite every cell with a random value inside its assigned tier so
-	// the distribution is smooth and piecewise-amp breakpoints don't cluster.
-	// Tier bounds scale with tidalStrength so a low-tidal world gets
-	// proportionally smaller ranges, not just fewer cells per tier.
-	const MACRO_THRESHOLD_M = 3.0 * tidalStrength
-	const MESO_THRESHOLD_M = 1.0 * tidalStrength
-	const MACRO_MAX_M = 16 * tidalStrength
+	// ── Step 1b: Clamp macro fraction to target ───────────────────────────
+	// This world has more enclosed bays than Earth, which pushes the raw
+	// macro fraction to ~7%.  Keep only the most enclosed inlets as macro;
+	// cap the rest to just below 3 m so propagation inherits lower values.
+	const MACRO_THRESHOLD_M = 3.0
 	const TARGET_MACRO_FRACTION = 0.01
-	const TARGET_MESO_FRACTION = 0.13
 
 	const coastalIndices: number[] = []
 	for (let r = 0; r < N; r++) {
-		if (result[r] > 0) coastalIndices.push(r)
+		if (isCoastal[r]) coastalIndices.push(r)
 	}
 	if (coastalIndices.length > 0) {
-		coastalIndices.sort((a, b) => result[b]! - result[a]!)
-		const macroCount = Math.ceil(coastalIndices.length * TARGET_MACRO_FRACTION)
-		const mesoCount = Math.ceil(coastalIndices.length * TARGET_MESO_FRACTION)
-		for (let i = 0; i < coastalIndices.length; i++) {
-			const r = coastalIndices[i]!
-			if (i < macroCount) {
-				// Squared bias so extreme values (Bay of Fundy scale) are rare.
-				result[r] = MACRO_THRESHOLD_M + rng() ** 2 * (MACRO_MAX_M - MACRO_THRESHOLD_M)
-			} else if (i < macroCount + mesoCount) {
-				result[r] = MESO_THRESHOLD_M + rng() * (MACRO_THRESHOLD_M - MESO_THRESHOLD_M)
-			} else {
-				result[r] = rng() * MESO_THRESHOLD_M
+		const macroCells = coastalIndices.filter(r => result[r]! > MACRO_THRESHOLD_M)
+		const targetMacroCount = Math.ceil(coastalIndices.length * TARGET_MACRO_FRACTION)
+		if (macroCells.length > targetMacroCount) {
+			macroCells.sort((a, b) => result[b]! - result[a]!)
+			const cap = MACRO_THRESHOLD_M * 0.999
+			for (let i = targetMacroCount; i < macroCells.length; i++) {
+				result[macroCells[i]!] = cap
+			}
+		}
+	}
+
+	// ── Step 1c: Clamp meso fraction to target ────────────────────────────
+	// Same logic as 1b: keep the most enclosed meso cells, cap the rest to
+	// just below 1 m (micro ceiling).
+	const MESO_THRESHOLD_M = 1.0
+	const TARGET_MESO_FRACTION = 0.13
+
+	if (coastalIndices.length > 0) {
+		const mesoCells = coastalIndices.filter(
+			r => result[r]! >= MESO_THRESHOLD_M && result[r]! <= MACRO_THRESHOLD_M,
+		)
+		const targetMesoCount = Math.ceil(coastalIndices.length * TARGET_MESO_FRACTION)
+		if (mesoCells.length > targetMesoCount) {
+			mesoCells.sort((a, b) => result[b]! - result[a]!)
+			const cap = MESO_THRESHOLD_M * 0.999
+			for (let i = targetMesoCount; i < mesoCells.length; i++) {
+				result[mesoCells[i]!] = cap
 			}
 		}
 	}

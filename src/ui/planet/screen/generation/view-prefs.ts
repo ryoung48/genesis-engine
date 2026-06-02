@@ -23,7 +23,6 @@ interface StoredViewPrefs {
 	showElevation: boolean
 	showThermalEquator: boolean
 	showWindArrows: boolean
-	showOceanCurrents: boolean
 	showRivers: boolean
 	showSettlements: boolean
 	showRoads: boolean
@@ -106,7 +105,6 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showElevation: true,
 	showThermalEquator: false,
 	showWindArrows: false,
-	showOceanCurrents: false,
 	showRivers: false,
 	showSettlements: false,
 	showRoads: false,
@@ -225,10 +223,6 @@ export function parseStoredViewPrefs(
 			showWindArrows: readBoolean(
 				parsed.showWindArrows,
 				DEFAULT_VIEW_PREFS.showWindArrows,
-			),
-			showOceanCurrents: readBoolean(
-				parsed.showOceanCurrents,
-				DEFAULT_VIEW_PREFS.showOceanCurrents,
 			),
 			showRivers: readBoolean(parsed.showRivers, DEFAULT_VIEW_PREFS.showRivers),
 			showSettlements: readBoolean(

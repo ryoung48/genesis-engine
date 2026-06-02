@@ -153,7 +153,7 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 		for (let i = 0; i < NUM_PARTICLES; i++) {
 			ages.current[i] = maxAges.current[i] // force respawn next frame
 		}
-	}, [windGrid])
+	}, [])
 
 	// Main animation loop — mounts once, reads everything from refs
 	useEffect(() => {

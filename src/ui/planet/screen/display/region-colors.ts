@@ -33,7 +33,8 @@ import {
 	slopeColor,
 	temperatureColor,
 	temperatureDeltaColor,
-	tidalTierColor,
+	tidalLandColor,
+	tidalRangeColor,
 	tornadoLandColor,
 	vegetationColor,
 	volcanicLandColor,
@@ -588,25 +589,47 @@ export function computeRegionColors(
 		dangerSubMode === "tidal" &&
 		world.tidalRange
 	) {
-		const lakes = world.rivers?.lakes
+		// Land + lakes: white, same as other danger sub-modes (no tidal color on land).
+		// Ocean: OCEAN_LIGHT_BLUE (no tides) → dark navy (high tidal range).
+		// Use p99 so extreme depth-amplified outliers don't wash out the scale
+		const nonZero: number[] = []
 		for (let r = 0; r < N; r++) {
-			const tidalVal = world.tidalRange[r] ?? 0
-			const isLand = !!world.isLand?.[r]
-			const isLake = !!lakes?.[r]
-			let cr: number, cg: number, cb: number
-			if (isLand && !isLake && tidalVal > 1e-5) {
-				;[cr, cg, cb] = darkenVegetationAtElevation(
-					tidalTierColor(tidalVal),
+			if (world.tidalRange[r] > 1e-5) nonZero.push(world.tidalRange[r])
+		}
+		nonZero.sort((a, b) => a - b)
+		const p99 =
+			nonZero.length > 0
+				? nonZero[
+						Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))
+					]!
+				: 0
+		const invMax = p99 > 1e-5 ? 1 / p99 : 0
+		const lakes = world.rivers?.lakes
+		// Dark navy used for maximum tidal range
+		const TIDAL_DARK: readonly [number, number, number] = [0.04, 0.11, 0.28]
+		for (let r = 0; r < N; r++) {
+			if (lakes?.[r]) {
+				const [cr, cg, cb] = OCEAN_LIGHT_BLUE
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+			} else if (world.isLand?.[r]) {
+				const [cr, cg, cb] = darkenVegetationAtElevation(
+					[1, 1, 1],
 					world.elevation_km[r],
 				)
-			} else if (!isLand || isLake) {
-				;[cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
 			} else {
-				;[cr, cg, cb] = darkenVegetationAtElevation([1, 1, 1], world.elevation_km[r])
+				const t = (world.tidalRange[r] ?? 0) * invMax
+				rgb[3 * r] =
+					OCEAN_LIGHT_BLUE[0] + (TIDAL_DARK[0] - OCEAN_LIGHT_BLUE[0]) * t
+				rgb[3 * r + 1] =
+					OCEAN_LIGHT_BLUE[1] + (TIDAL_DARK[1] - OCEAN_LIGHT_BLUE[1]) * t
+				rgb[3 * r + 2] =
+					OCEAN_LIGHT_BLUE[2] + (TIDAL_DARK[2] - OCEAN_LIGHT_BLUE[2]) * t
 			}
-			rgb[3 * r] = cr
-			rgb[3 * r + 1] = cg
-			rgb[3 * r + 2] = cb
 		}
 		return rgb
 	}
