@@ -5,6 +5,7 @@ import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { computeThermalEquatorLine } from "@/model/climate/rain"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
+import { computeOceanCurrentGrid } from "@/model/climate/ocean-currents"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
 	TRADE_GOOD_LABELS,
@@ -175,6 +176,7 @@ import {
 	rgbToCss,
 	type UnitSystem,
 } from "./screen/shared/ui-format"
+import { OceanCurrentParticleCanvas } from "./OceanCurrentParticleCanvas"
 import { WindParticleCanvas } from "./WindParticleCanvas"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
@@ -303,6 +305,9 @@ export const OrogenView: React.FC = () => {
 	)
 	const [showWindArrows, setShowWindArrows] = useState(
 		initialViewPrefs.showWindArrows,
+	)
+	const [showOceanCurrents, setShowOceanCurrents] = useState(
+		initialViewPrefs.showOceanCurrents,
 	)
 	const [showRivers, setShowRivers] = useState(initialViewPrefs.showRivers)
 	const [showSettlements, setShowSettlements] = useState(
@@ -636,6 +641,7 @@ export const OrogenView: React.FC = () => {
 				showElevation,
 				showThermalEquator,
 				showWindArrows,
+				showOceanCurrents,
 				showRivers,
 				showSettlements,
 				showRoads,
@@ -677,6 +683,7 @@ export const OrogenView: React.FC = () => {
 		showNationHierarchy,
 		labelMode,
 		showElevation,
+		showOceanCurrents,
 		showRivers,
 		showThermalEquator,
 		showWindArrows,
@@ -966,7 +973,10 @@ export const OrogenView: React.FC = () => {
 	const windVectors = useMemo(() => {
 		if (
 			!world?.climate ||
-			(!showWindArrows && colorMode !== "wind" && colorMode !== "misery")
+			(!showWindArrows &&
+				!showOceanCurrents &&
+				colorMode !== "wind" &&
+				colorMode !== "misery")
 		)
 			return null
 		const month =
@@ -984,7 +994,7 @@ export const OrogenView: React.FC = () => {
 				oceanDist: world.oceanDist,
 			},
 		)
-	}, [world, showWindArrows, colorMode, resolvedClimateMonth])
+	}, [world, showWindArrows, showOceanCurrents, colorMode, resolvedClimateMonth])
 
 	// Monthly wind: computed lazily across setTimeout ticks when wind is active
 	const monthlyWindRef = useRef<
@@ -993,6 +1003,7 @@ export const OrogenView: React.FC = () => {
 	const [monthlyWindReady, setMonthlyWindReady] = useState(false)
 	const windActive =
 		showWindArrows ||
+		showOceanCurrents ||
 		colorMode === "wind" ||
 		getMapModePrimary(colorMode) === "geography"
 	useEffect(() => {
@@ -1343,6 +1354,26 @@ export const OrogenView: React.FC = () => {
 			windVectors.windSpeed,
 		)
 	}, [windVectors, world])
+
+	const oceanCurrentGrid = useMemo(() => {
+		if (!world?.oceanCurrents || !showOceanCurrents) return null
+		const N = world.mesh.numRegions
+		const month = resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
+		const warmth =
+			month !== undefined && world.oceanCurrents.oceanWarmthMonthly
+				? world.oceanCurrents.oceanWarmthMonthly.subarray(
+						month * N,
+						(month + 1) * N,
+					)
+				: world.oceanCurrents.oceanWarmth
+		return computeOceanCurrentGrid(
+			world.mesh,
+			world.isLand,
+			warmth,
+			windVectors?.windU,
+			windVectors?.windV,
+		)
+	}, [world, showOceanCurrents, windVectors, resolvedClimateMonth])
 
 	// Particles replace the static arrow overlay — keep arrows cleared
 	useEffect(() => {
@@ -2534,6 +2565,13 @@ export const OrogenView: React.FC = () => {
 					visible={showWindArrows}
 					viewMode={viewMode}
 				/>
+				<OceanCurrentParticleCanvas
+					grid={oceanCurrentGrid}
+					projectToScreen={projectToScreen}
+					getGlobeCameraDir={getGlobeCameraDir}
+					visible={showOceanCurrents}
+					viewMode={viewMode}
+				/>
 
 				{showClimatePreview && (
 					<ClimatePreviewOverlay
@@ -2642,6 +2680,8 @@ export const OrogenView: React.FC = () => {
 							setShowThermalEquator={setShowThermalEquator}
 							showWindArrows={showWindArrows}
 							setShowWindArrows={setShowWindArrows}
+							showOceanCurrents={showOceanCurrents}
+							setShowOceanCurrents={setShowOceanCurrents}
 							showGrid={showGrid}
 							setShowGrid={setShowGrid}
 							showNationBorders={showNationBorders}

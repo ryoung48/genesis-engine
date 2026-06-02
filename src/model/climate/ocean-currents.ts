@@ -7,12 +7,11 @@
  */
 
 import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
-import { meanEdgeLengthKm } from "../shared/units"
+import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
 import type { OrogenLandmarks } from "../terrain/landmarks"
 import { computeThermalEquator, getClimateGeometry } from "./rain"
 
 const DEG2RAD = Math.PI / 180
-const TYPE_CONTINENT = 0
 const TYPE_LAKE = 5
 const CURRENT_EFFECT_MONTHS = 12
 const TEQ_BINS = 120
@@ -46,175 +45,6 @@ function piecewise(xs: number[], ys: number[], x: number): number {
 	return ys[ys.length - 1]
 }
 
-function wrapLonDeltaDeg(delta: number): number {
-	if (delta > 180) return delta - 360
-	if (delta < -180) return delta + 360
-	return delta
-}
-
-interface CoastSite {
-	region: number
-	oceanNeighbors: number[]
-	eastFacing: boolean
-	lonBin: number
-}
-
-function classifyCurrentWarmth(
-	distFromReference: number,
-	eastFacing: boolean,
-): number {
-	let warmth = 0
-
-	const tStr = distFromReference >= 5 && distFromReference <= 30 ? 1 : 0
-	if (tStr > 0) warmth += eastFacing ? 1 : -1
-
-	const wStr = distFromReference >= 30 && distFromReference <= 70 ? 1 : 0
-	if (wStr > 0) warmth += eastFacing ? -1 : 1
-
-	const pStr = distFromReference >= 70 && distFromReference <= 90 ? 1 : 0
-	if (pStr > 0) warmth += -1
-
-	if (Math.abs(warmth) <= 0.01) return 0
-	return warmth > 0 ? 1 : -1
-}
-
-function fillOceanBeltSeeds(
-	warmSeed: Float32Array,
-	coldSeed: Float32Array,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	latDeg: Float32Array,
-	lonBinByRegion: Int32Array,
-	teqByLon?: Float32Array,
-): void {
-	const N = latDeg.length
-	for (let r = 0; r < N; r++) {
-		if (isLand[r] || isLake[r]) continue
-		const distFromReference = teqByLon
-			? Math.abs(latDeg[r] - teqByLon[lonBinByRegion[r]])
-			: Math.abs(latDeg[r])
-		if (distFromReference <= 10) warmSeed[r] = 1
-		if (distFromReference >= 68) {
-			const polarSeed = Math.min(1, (distFromReference - 68) / 10)
-			coldSeed[r] = Math.max(coldSeed[r], 0.35 + polarSeed * 0.55)
-		}
-	}
-}
-
-function buildCoastSites(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isContinent: Uint8Array,
-	isLake: Uint8Array,
-	latDeg: Float32Array,
-	lonDeg: Float32Array,
-	regionBin: Int32Array,
-	distCoast: Float32Array,
-	avgEdgeKm: number,
-): CoastSite[] {
-	const { adjOffset, adjList } = mesh
-	const openScanSteps = Math.max(1, Math.round(4000 / avgEdgeKm))
-	const openOceanCoastKm = 300
-	const sites: CoastSite[] = []
-
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (!isContinent[r]) continue
-
-		const oceanNeighbors: number[] = []
-		let zonal = 0
-		let meridional = 0
-		let oceanCount = 0
-
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] || isLake[nb]) continue
-			oceanNeighbors.push(nb)
-			oceanCount++
-			const dLonDeg = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r])
-			const meanLatRad = (latDeg[r] + latDeg[nb]) * 0.5 * DEG2RAD
-			zonal += dLonDeg * Math.cos(meanLatRad)
-			meridional += latDeg[nb] - latDeg[r]
-		}
-
-		if (oceanCount === 0) continue
-		if (oceanCount >= 3 && oceanNeighbors.length <= 3) continue
-		const absZonal = Math.abs(zonal)
-		const absMeridional = Math.abs(meridional)
-		if (absZonal < 0.2 || absZonal < absMeridional * 1) continue
-
-		const eastFacing = zonal > 0
-		let hasOpenOcean = false
-		for (const nb of oceanNeighbors) {
-			const dLon = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r])
-			if ((eastFacing && dLon <= 0) || (!eastFacing && dLon >= 0)) continue
-			const scanEnd = directionalOceanOpen(
-				nb,
-				eastFacing ? 1 : -1,
-				mesh,
-				isLand,
-				isContinent,
-				isLake,
-				latDeg,
-				lonDeg,
-				openScanSteps,
-			)
-			if (scanEnd >= 0 && distCoast[scanEnd] * avgEdgeKm >= openOceanCoastKm) {
-				hasOpenOcean = true
-				break
-			}
-		}
-		if (!hasOpenOcean) continue
-
-		sites.push({
-			region: r,
-			oceanNeighbors,
-			eastFacing,
-			lonBin: regionBin[r],
-		})
-	}
-
-	return sites
-}
-
-function computeOceanWarmthFromSeeds(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	warmSeed: Float32Array,
-	coldSeed: Float32Array,
-): Float32Array {
-	const warmDist = computeOceanSeedDistance(mesh, isLand, isLake, warmSeed)
-	const coldDist = computeOceanSeedDistance(mesh, isLand, isLake, coldSeed)
-	const oceanWarmth = new Float32Array(mesh.numRegions)
-
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (isLand[r] || isLake[r]) continue
-		const warm = warmDist[r]
-		const cold = coldDist[r]
-		if (warm < 0 && cold < 0) continue
-		if (warm >= 0 && cold < 0) {
-			oceanWarmth[r] = 1
-			continue
-		}
-		if (cold >= 0 && warm < 0) {
-			oceanWarmth[r] = -1
-			continue
-		}
-
-		const wDist = Math.max(0, warm)
-		const cDist = Math.max(0, cold)
-		const wScore = 1 / (1 + wDist)
-		const cScore = 1 / (1 + cDist)
-		oceanWarmth[r] = (wScore - cScore) / (wScore + cScore)
-	}
-
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (isLand[r]) oceanWarmth[r] = 0
-		else oceanWarmth[r] = Math.max(-1, Math.min(1, oceanWarmth[r]))
-	}
-
-	return oceanWarmth
-}
 
 function computeCoastalWarmthFromOceanWarmth(
 	mesh: SphereMesh,
@@ -267,87 +97,387 @@ function computeCoastalWarmthFromOceanWarmth(
 	return coastalWarmth
 }
 
-function directionalOceanOpen(
-	start: number,
-	dir: 1 | -1,
+
+/**
+ * Sverdrup streamfunction on a 360×181 lat-lon grid.
+ *
+ * Integrates ψ east→west within each ocean basin (ψ = 0 at each eastern
+ * boundary). Returns per-mesh-region ψ normalised to [-1, +1].
+ *
+ * Purely physical — no TEQ thresholds. TEQ-aware blending is the caller's job.
+ */
+function computeSverdrupPsi(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	isContinent: Uint8Array,
 	isLake: Uint8Array,
+	windU: Float32Array,
+	windV: Float32Array,
+	windSpeed: Float32Array,
 	latDeg: Float32Array,
-	lonDeg: Float32Array,
-	maxSteps: number,
-): number {
-	const { adjOffset, adjList } = mesh
-	const visited = new Uint8Array(mesh.numRegions)
-	let current = start
-	visited[current] = 1
+	coriolisSign: number,
+): Float32Array {
+	const W = 360
+	const H = 181
+	const N = mesh.numRegions
+	const { lonDeg } = getClimateGeometry(mesh)
 
-	for (let step = 0; step < maxSteps; step++) {
-		let bestOcean = -1
-		let bestScore = -Infinity
+	// Rasterise wind stress and ocean mask onto lat-lon grid
+	const tauX = new Float32Array(W * H)
+	const tauY = new Float32Array(W * H)
+	const ocean = new Uint8Array(W * H)
+	const cnt = new Int32Array(W * H)
+	for (let r = 0; r < N; r++) {
+		const li = Math.max(0, Math.min(H - 1, Math.round(latDeg[r] + 90)))
+		const ci = Math.max(0, Math.min(W - 1, Math.round(lonDeg[r] + 180)))
+		const idx = li * W + ci
+		if (!isLand[r] && !isLake[r]) {
+			tauX[idx] += windSpeed[r] * windU[r]
+			tauY[idx] += windSpeed[r] * windV[r]
+			ocean[idx] = 1
+			cnt[idx]++
+		}
+	}
+	for (let i = 0; i < W * H; i++) {
+		if (cnt[i] > 1) { tauX[i] /= cnt[i]; tauY[i] /= cnt[i] }
+	}
 
-		for (
-			let j = adjOffset[current], jEnd = adjOffset[current + 1];
-			j < jEnd;
-			j++
-		) {
-			const nb = adjList[j]
-			if (visited[nb] || isLake[nb]) continue
-
-			const dLon = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[current]) * dir
-			const dLat = Math.abs(latDeg[nb] - latDeg[current])
-
-			if (isContinent[nb] && dLon > 0.02 && dLat < 8) return -1
-			if (isLand[nb]) continue
-			if (dLon <= 0) continue
-
-			const score = dLon - dLat * 0.2
-			if (score > bestScore) {
-				bestScore = score
-				bestOcean = nb
+	// Fill grid gaps (3 diffusion passes)
+	const tmpX = tauX.slice()
+	const tmpY = tauY.slice()
+	for (let pass = 0; pass < 3; pass++) {
+		for (let j = 0; j < H; j++) {
+			for (let i = 0; i < W; i++) {
+				const idx = j * W + i
+				if (cnt[idx] > 0) continue
+				let sx = 0, sy = 0, n = 0
+				if (j > 0 && cnt[(j - 1) * W + i] > 0) { sx += tmpX[(j - 1) * W + i]; sy += tmpY[(j - 1) * W + i]; n++ }
+				if (j < H - 1 && cnt[(j + 1) * W + i] > 0) { sx += tmpX[(j + 1) * W + i]; sy += tmpY[(j + 1) * W + i]; n++ }
+				const il = (i - 1 + W) % W, ir = (i + 1) % W
+				if (cnt[j * W + il] > 0) { sx += tmpX[j * W + il]; sy += tmpY[j * W + il]; n++ }
+				if (cnt[j * W + ir] > 0) { sx += tmpX[j * W + ir]; sy += tmpY[j * W + ir]; n++ }
+				if (n > 0) { tauX[idx] = sx / n; tauY[idx] = sy / n; cnt[idx] = 1 }
 			}
 		}
-
-		if (bestOcean < 0) return current
-		current = bestOcean
-		visited[current] = 1
+		tmpX.set(tauX); tmpY.set(tauY)
 	}
 
-	return current
-}
-
-function computeOceanSeedDistance(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	seeds: Float32Array,
-): Int32Array {
-	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const dist = new Int32Array(N).fill(-1)
-	const queue = new Int32Array(N)
-	let head = 0
-	let tail = 0
-
-	for (let r = 0; r < N; r++) {
-		if (isLand[r] || isLake[r] || seeds[r] <= 0) continue
-		dist[r] = 0
-		queue[tail++] = r
+	// Smooth wind stress (4 passes)
+	for (let pass = 0; pass < 4; pass++) {
+		for (let j = 0; j < H; j++) {
+			for (let i = 0; i < W; i++) {
+				const idx = j * W + i
+				let sx = tauX[idx], sy = tauY[idx], n = 1
+				if (j > 0) { sx += tauX[(j - 1) * W + i]; sy += tauY[(j - 1) * W + i]; n++ }
+				if (j < H - 1) { sx += tauX[(j + 1) * W + i]; sy += tauY[(j + 1) * W + i]; n++ }
+				sx += tauX[j * W + (i - 1 + W) % W]; sy += tauY[j * W + (i - 1 + W) % W]; n++
+				sx += tauX[j * W + (i + 1) % W]; sy += tauY[j * W + (i + 1) % W]; n++
+				tmpX[idx] = sx / n; tmpY[idx] = sy / n
+			}
+		}
+		tauX.set(tmpX); tauY.set(tmpY)
 	}
 
-	while (head < tail) {
-		const r = queue[head++]
-		const nextDist = dist[r] + 1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] || isLake[nb] || dist[nb] >= 0) continue
-			dist[nb] = nextDist
-			queue[tail++] = nb
+	// Wind stress curl: ∂τy/∂x − ∂τx/∂y
+	const curlTau = new Float32Array(W * H)
+	for (let j = 1; j < H - 1; j++) {
+		for (let i = 0; i < W; i++) {
+			const ip = (i + 1) % W, im = (i - 1 + W) % W
+			curlTau[j * W + i] =
+				(tauY[j * W + ip] - tauY[j * W + im]) / 2 -
+				(tauX[(j + 1) * W + i] - tauX[(j - 1) * W + i]) / 2
 		}
 	}
 
-	return dist
+	// Sverdrup integration east → west on each latitude row.
+	// β_proxy = coriolisSign * cos(lat); ψ[i] = ψ[i+1] − curl[i] / β.
+	// ψ resets to 0 at each basin's eastern boundary (first ocean cell after land).
+	const psiGrid = new Float32Array(W * H)
+	for (let j = 0; j < H; j++) {
+		const lat = j - 90
+		const beta = coriolisSign * Math.cos(lat * DEG2RAD)
+		if (Math.abs(beta) < 0.01) continue
+
+		let psi = 0
+		let prevLand = true
+		for (let i = W - 1; i >= 0; i--) {
+			const idx = j * W + i
+			if (!ocean[idx]) {
+				psi = 0; prevLand = true
+			} else {
+				if (prevLand) { psi = 0; prevLand = false }
+				else { psi -= curlTau[idx] / beta }
+				psiGrid[idx] = psi
+			}
+		}
+	}
+
+	// Smooth ψ over ocean (4 passes)
+	const psiTmp = psiGrid.slice()
+	for (let pass = 0; pass < 4; pass++) {
+		for (let j = 0; j < H; j++) {
+			for (let i = 0; i < W; i++) {
+				const idx = j * W + i
+				if (!ocean[idx]) continue
+				let sum = psiGrid[idx], n = 1
+				if (j > 0 && ocean[(j - 1) * W + i]) { sum += psiGrid[(j - 1) * W + i]; n++ }
+				if (j < H - 1 && ocean[(j + 1) * W + i]) { sum += psiGrid[(j + 1) * W + i]; n++ }
+				const il = (i - 1 + W) % W, ir = (i + 1) % W
+				if (ocean[j * W + il]) { sum += psiGrid[j * W + il]; n++ }
+				if (ocean[j * W + ir]) { sum += psiGrid[j * W + ir]; n++ }
+				psiTmp[idx] = sum / n
+			}
+		}
+		psiGrid.set(psiTmp)
+	}
+
+	// Normalise ψ by 90th-percentile |ψ| over ocean
+	let nOcean = 0
+	for (let i = 0; i < W * H; i++) if (ocean[i] && psiGrid[i] !== 0) nOcean++
+	const absArr = new Float32Array(nOcean)
+	let ai = 0
+	for (let i = 0; i < W * H; i++) if (ocean[i] && psiGrid[i] !== 0) absArr[ai++] = Math.abs(psiGrid[i])
+	absArr.sort()
+	const p90 = absArr[Math.floor(0.9 * absArr.length)] ?? 1
+	const psiScale = 1 / Math.max(p90, 1e-9)
+	for (let i = 0; i < W * H; i++) psiGrid[i] = Math.max(-1, Math.min(1, psiGrid[i] * psiScale))
+
+	// Meridional velocity v = ∂ψ/∂x (eastward derivative of streamfunction).
+	// Large and poleward at western boundaries (Gulf Stream, Kuroshio, etc.);
+	// small and equatorward in the interior (Sverdrup return flow).
+	const vGrid = new Float32Array(W * H)
+	for (let j = 0; j < H; j++) {
+		for (let i = 0; i < W; i++) {
+			const idx = j * W + i
+			if (!ocean[idx]) continue
+			const ip = (i + 1) % W, im = (i - 1 + W) % W
+			if (ocean[j * W + ip] && ocean[j * W + im]) {
+				vGrid[idx] = (psiGrid[j * W + ip] - psiGrid[j * W + im]) / 2
+			} else if (ocean[j * W + ip]) {
+				// Land to west: ψ = 0 at the boundary — central difference with ψ_west = 0
+				vGrid[idx] = (psiGrid[j * W + ip] - 0) / 2
+			} else if (ocean[j * W + im]) {
+				// Land to east: ψ = 0 at the boundary — central difference with ψ_east = 0
+				vGrid[idx] = (0 - psiGrid[j * W + im]) / 2
+			}
+		}
+	}
+	// Normalise v by its own 90th percentile
+	let nv = 0
+	for (let i = 0; i < W * H; i++) if (ocean[i] && vGrid[i] !== 0) nv++
+	const vArr = new Float32Array(nv)
+	let vi = 0
+	for (let i = 0; i < W * H; i++) if (ocean[i] && vGrid[i] !== 0) vArr[vi++] = Math.abs(vGrid[i])
+	vArr.sort()
+	const vp90 = vArr[Math.floor(0.9 * vArr.length)] ?? 1
+	const vScale = 1 / Math.max(vp90, 1e-9)
+	for (let i = 0; i < W * H; i++) vGrid[i] = Math.max(-1, Math.min(1, vGrid[i] * vScale))
+
+	// Map ψ and v back to mesh cells (nearest grid cell)
+	const psiMesh = new Float32Array(N)
+	const vMesh = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) continue
+		const li = Math.max(0, Math.min(H - 1, Math.round(latDeg[r] + 90)))
+		const ci = Math.max(0, Math.min(W - 1, Math.round(lonDeg[r] + 180)))
+		psiMesh[r] = psiGrid[li * W + ci]
+		vMesh[r] = vGrid[li * W + ci]
+	}
+	return { psiMesh, vMesh }
+}
+
+/**
+ * Derive ocean warmth from Ekman pumping: curl(τ)/f.
+ *
+ * Downwelling (w_E < 0) → warm surface; upwelling (w_E > 0) → cold surface.
+ * Replaces the coast-orientation heuristic with physics that works for any
+ * continent configuration, rotation rate, or obliquity.
+ */
+function computeEkmanOceanWarmth(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	isLake: Uint8Array,
+	windU: Float32Array,
+	windV: Float32Array,
+	windSpeed: Float32Array,
+	latDeg: Float32Array,
+	sinLat: Float32Array,
+	edgeEastward: Float32Array,
+	edgeNorthward: Float32Array,
+	regionBin: Int32Array,
+	teqByLon: Float32Array | undefined,
+	coriolisSign: number,
+): Float32Array {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+
+	// Wind stress — linear in speed (pattern matters, not exact magnitude)
+	const tauX = new Float32Array(N)
+	const tauY = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		tauX[r] = windSpeed[r] * windU[r]
+		tauY[r] = windSpeed[r] * windV[r]
+	}
+
+	// Smooth wind stress to reduce noise on irregular mesh (4 passes)
+	const bufX = new Float32Array(N)
+	const bufY = new Float32Array(N)
+	for (let pass = 0; pass < 4; pass++) {
+		for (let r = 0; r < N; r++) {
+			let sx = tauX[r],
+				sy = tauY[r],
+				cnt = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				sx += tauX[adjList[j]]
+				sy += tauY[adjList[j]]
+				cnt++
+			}
+			bufX[r] = sx / cnt
+			bufY[r] = sy / cnt
+		}
+		tauX.set(bufX)
+		tauY.set(bufY)
+	}
+
+	// Ekman pumping proxy: curl(τ) / (coriolisSign * sinLat)
+	// curl(τ) = ∂τy/∂east − ∂τx/∂north  (mesh gradient, same method as wind.ts)
+	// Skip cells within ~5° of equator where sinLat ≈ 0
+	const F_MIN = Math.abs(Math.sin(5 * DEG2RAD))
+	const ekman = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) continue
+		const fProxy = coriolisSign * sinLat[r]
+		if (Math.abs(fProxy) < F_MIN) continue
+
+		let dtauY_deast = 0,
+			dtauX_dnorth = 0,
+			cnt = 0
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			dtauY_deast += (tauY[nb] - tauY[r]) * edgeEastward[j]
+			dtauX_dnorth += (tauX[nb] - tauX[r]) * edgeNorthward[j]
+			cnt++
+		}
+		if (cnt > 0) ekman[r] = (dtauY_deast - dtauX_dnorth) / (cnt * fProxy)
+	}
+
+	// Smooth Ekman over ocean only (4 passes; keeps land boundary clean)
+	const buf = new Float32Array(N)
+	for (let pass = 0; pass < 4; pass++) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r] || isLake[r]) continue
+			let sum = ekman[r],
+				cnt = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (!isLand[nb] && !isLake[nb]) {
+					sum += ekman[nb]
+					cnt++
+				}
+			}
+			buf[r] = sum / cnt
+		}
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r] && !isLake[r]) ekman[r] = buf[r]
+		}
+	}
+
+	// Normalise by the 90th-percentile absolute value (robust to outliers)
+	let absCount = 0
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r] && !isLake[r] && ekman[r] !== 0) absCount++
+	}
+	const absVals = new Float32Array(absCount)
+	let ai = 0
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r] && !isLake[r] && ekman[r] !== 0)
+			absVals[ai++] = Math.abs(ekman[r])
+	}
+	absVals.sort()
+	const pct90 = absVals[Math.floor(0.9 * absVals.length)] ?? 1
+	const scale = 1 / Math.max(pct90, 1e-9)
+
+	// Build warmth field
+	const warmth = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) continue
+
+		const lat = latDeg[r]
+		const teqRef = teqByLon ? teqByLon[regionBin[r]] : 0
+		const distFromTeq = Math.abs(lat - teqRef)
+
+		// Blend Ekman in smoothly — fade to zero within 15° of TEQ
+		const eqWeight = distFromTeq < 5 ? 0 : distFromTeq < 15 ? (distFromTeq - 5) / 10 : 1
+		// Downwelling (ekman < 0) → warm; upwelling (ekman > 0) → cold
+		let w = Math.max(-1, Math.min(1, -ekman[r] * scale * eqWeight))
+
+		// Tropical background warmth near TEQ
+		if (distFromTeq < 10) {
+			const t = 1 - distFromTeq / 10
+			w = w + (0.5 - w) * (t * 0.5)
+		}
+
+		// Polar cold override
+		if (distFromTeq > 65) {
+			const t = Math.min(1, (distFromTeq - 65) / 15)
+			const polarVal = -(0.35 + t * 0.55)
+			w = w + (polarVal - w) * (t * 0.8)
+		}
+
+		warmth[r] = Math.max(-1, Math.min(1, w))
+	}
+
+	// Sverdrup gyre-transport correction.
+	//
+	// v * |ψ| is the key signal: v = ∂ψ/∂x is large and poleward at each basin's
+	// western boundary (Gulf Stream, Kuroshio, Brazil, East Australian) and small
+	// elsewhere; |ψ| gates the contribution so the eastern boundary (ψ = 0) is
+	// unaffected. The additive formula preserves the Ekman base in the interior
+	// while creating sharp warm/cold anomalies at the right coasts.
+	//
+	// coriolisSign * sign(lat) converts poleward/equatorward to warm/cold for all
+	// hemisphere and rotation-direction combinations.
+	const { psiMesh, vMesh } = computeSverdrupPsi(
+		mesh, isLand, isLake, windU, windV, windSpeed, latDeg, coriolisSign,
+	)
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) continue
+		const lat = latDeg[r]
+		const teqRef = teqByLon ? teqByLon[regionBin[r]] : 0
+		const dist = Math.abs(lat - teqRef)
+		const distWeight =
+			dist < 15 ? 0
+			: dist < 25 ? (dist - 15) / 10
+			: dist < 60 ? 1
+			: dist < 70 ? (70 - dist) / 10
+			: 0
+		if (distWeight <= 0) continue
+		const contrib =
+			0.7 * distWeight * coriolisSign * Math.sign(lat) * vMesh[r] * Math.abs(psiMesh[r])
+		warmth[r] = Math.max(-1, Math.min(1, warmth[r] + contrib))
+	}
+
+	// Final smoothing pass to remove remaining noise
+	for (let pass = 0; pass < 4; pass++) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r] || isLake[r]) continue
+			let sum = warmth[r],
+				cnt = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (!isLand[nb] && !isLake[nb]) {
+					sum += warmth[nb]
+					cnt++
+				}
+			}
+			buf[r] = sum / cnt
+		}
+		for (let r = 0; r < N; r++) {
+			if (!isLand[r] && !isLake[r])
+				warmth[r] = Math.max(-1, Math.min(1, buf[r]))
+		}
+	}
+
+	return warmth
 }
 
 /**
@@ -359,64 +489,51 @@ function computeOceanSeedDistance(
 export function computeOceanCurrents(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	distCoast: Float32Array,
 	landmarks: OrogenLandmarks,
-	params?: Pick<OrogenParams, "planetRadiusKm">,
-	monthlyTEQ?: Float32Array[],
+	params: Pick<OrogenParams, "planetRadiusKm" | "hoursPerDay" | "obliquity"> | undefined,
+	monthlyTEQ: Float32Array[] | undefined,
+	windU: Float32Array,
+	windV: Float32Array,
+	windSpeed: Float32Array,
+	monthlyWind?: Array<{
+		windU: Float32Array
+		windV: Float32Array
+		windSpeed: Float32Array
+	}>,
 ): OceanCurrentResult {
 	const N = mesh.numRegions
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
-	const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
+	const { latDeg, regionBin, sinLat, edgeEastward, edgeNorthward } =
+		getClimateGeometry(mesh)
 
-	const isContinent = new Uint8Array(N)
 	const isLake = new Uint8Array(N)
 	for (let r = 0; r < N; r++) {
 		const landmark = landmarks.regionLandmark[r]
-		if (landmark < 0) continue
-		const type = landmarks.type[landmark]
-		if (isLand[r] && type === TYPE_CONTINENT) isContinent[r] = 1
-		if (!isLand[r] && type === TYPE_LAKE) isLake[r] = 1
+		if (landmark >= 0 && !isLand[r] && landmarks.type[landmark] === TYPE_LAKE)
+			isLake[r] = 1
 	}
 
-	const coastSites = buildCoastSites(
-		mesh,
-		isLand,
-		isContinent,
-		isLake,
-		latDeg,
-		lonDeg,
-		regionBin,
-		distCoast,
-		avgEdgeKm,
-	)
+	const coriolisSign = isRetrogradeObliquity(params?.obliquity ?? 0) ? -1 : 1
 
-	const warmSeed = new Float32Array(N)
-	const coldSeed = new Float32Array(N)
-
-	fillOceanBeltSeeds(warmSeed, coldSeed, isLand, isLake, latDeg, regionBin)
-	for (const site of coastSites) {
-		const distFromEquator = Math.abs(latDeg[site.region])
-		const warmth = classifyCurrentWarmth(distFromEquator, site.eastFacing)
-		if (warmth > 0) {
-			for (const nb of site.oceanNeighbors) warmSeed[nb] = 1
-		} else if (warmth < 0) {
-			for (const nb of site.oceanNeighbors) coldSeed[nb] = 1
+	// Annual mean TEQ for tropical/polar belt corrections
+	let annualTeq: Float32Array | undefined
+	if (monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS) {
+		const bins = monthlyTEQ[0]!.length
+		annualTeq = new Float32Array(bins)
+		for (const teq of monthlyTEQ) {
+			for (let i = 0; i < bins; i++) annualTeq[i] += teq[i]!
 		}
+		for (let i = 0; i < bins; i++) annualTeq[i] /= CURRENT_EFFECT_MONTHS
 	}
 
-	const oceanWarmth = computeOceanWarmthFromSeeds(
-		mesh,
-		isLand,
-		isLake,
-		warmSeed,
-		coldSeed,
+	const oceanWarmth = computeEkmanOceanWarmth(
+		mesh, isLand, isLake, windU, windV, windSpeed,
+		latDeg, sinLat, edgeEastward, edgeNorthward,
+		regionBin, annualTeq, coriolisSign,
 	)
+
 	const coastalWarmth = computeCoastalWarmthFromOceanWarmth(
-		mesh,
-		isLand,
-		isLake,
-		oceanWarmth,
-		avgEdgeKm,
+		mesh, isLand, isLake, oceanWarmth, avgEdgeKm,
 	)
 
 	let oceanWarmthMonthly: Float32Array | undefined
@@ -426,48 +543,19 @@ export function computeOceanCurrents(
 		oceanWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
 		coastalWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
 		temperatureDeltaMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
-		const monthWarmSeed = new Float32Array(N)
-		const monthColdSeed = new Float32Array(N)
 		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			monthWarmSeed.fill(0)
-			monthColdSeed.fill(0)
-			const teqByLon = monthlyTEQ[month]
-			fillOceanBeltSeeds(
-				monthWarmSeed,
-				monthColdSeed,
-				isLand,
-				isLake,
-				latDeg,
-				regionBin,
-				teqByLon,
-			)
-			for (const site of coastSites) {
-				const distFromTeq = Math.abs(
-					latDeg[site.region] - teqByLon[site.lonBin],
-				)
-				const warmth = classifyCurrentWarmth(distFromTeq, site.eastFacing)
-				if (warmth > 0) {
-					for (const nb of site.oceanNeighbors) monthWarmSeed[nb] = 1
-				} else if (warmth < 0) {
-					for (const nb of site.oceanNeighbors) monthColdSeed[nb] = 1
-				}
-			}
-			const monthOceanWarmth = computeOceanWarmthFromSeeds(
-				mesh,
-				isLand,
-				isLake,
-				monthWarmSeed,
-				monthColdSeed,
+			const mw = monthlyWind?.[month]
+			const monthOceanWarmth = computeEkmanOceanWarmth(
+				mesh, isLand, isLake,
+				mw?.windU ?? windU, mw?.windV ?? windV, mw?.windSpeed ?? windSpeed,
+				latDeg, sinLat, edgeEastward, edgeNorthward,
+				regionBin, monthlyTEQ[month], coriolisSign,
 			)
 			oceanWarmthMonthly.set(monthOceanWarmth, month * N)
-			const monthCoastalWarmth = computeCoastalWarmthFromOceanWarmth(
-				mesh,
-				isLand,
-				isLake,
-				monthOceanWarmth,
-				avgEdgeKm,
+			coastalWarmthMonthly.set(
+				computeCoastalWarmthFromOceanWarmth(mesh, isLand, isLake, monthOceanWarmth, avgEdgeKm),
+				month * N,
 			)
-			coastalWarmthMonthly.set(monthCoastalWarmth, month * N)
 		}
 	}
 
@@ -478,6 +566,147 @@ export function computeOceanCurrents(
 		coastalWarmthMonthly,
 		temperatureDeltaMonthly,
 		temperatureDelta: new Float32Array(N),
+	}
+}
+
+/** 360×181 lat-lon raster consumed by the ocean current particle overlay. */
+export interface OceanCurrentGrid {
+	/** Eastward direction component (normalized) */
+	u: Float32Array
+	/** Northward direction component (normalized) */
+	v: Float32Array
+	/** SSTA warmth -1..+1 for particle coloring */
+	warmth: Float32Array
+	/** 1 = ocean, 0 = land/lake */
+	isOcean: Uint8Array
+	width: 360
+	height: 181
+}
+
+/**
+ * Build a 360×181 lat-lon grid for ocean current particle animation.
+ *
+ * Current direction is derived from Ekman transport: wind stress rotated 90°
+ * in the direction of the Coriolis force (rightward in NH, leftward in SH).
+ * When wind data is absent, direction vectors are zero and particles won't move.
+ */
+export function computeOceanCurrentGrid(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	oceanWarmth: Float32Array,
+	windU?: Float32Array,
+	windV?: Float32Array,
+): OceanCurrentGrid {
+	const W = 360
+	const H = 181
+	const warmthGrid = new Float32Array(W * H)
+	const uGrid = new Float32Array(W * H)
+	const vGrid = new Float32Array(W * H)
+	const isOcean = new Uint8Array(W * H)
+	const cnt = new Int32Array(W * H)
+	const windUGrid = windU ? new Float32Array(W * H) : null
+	const windVGrid = windV ? new Float32Array(W * H) : null
+	const windCnt = windU ? new Int32Array(W * H) : null
+
+	const { latDeg, lonDeg } = getClimateGeometry(mesh)
+	const N = mesh.numRegions
+
+	for (let r = 0; r < N; r++) {
+		const li = Math.max(0, Math.min(H - 1, Math.round(latDeg[r] + 90)))
+		const ci = Math.max(0, Math.min(W - 1, Math.round(lonDeg[r] + 180)))
+		const idx = li * W + ci
+		if (!isLand[r]) {
+			warmthGrid[idx] += oceanWarmth[r]
+			isOcean[idx] = 1
+			cnt[idx]++
+		}
+		if (windU && windV && windUGrid && windVGrid && windCnt) {
+			windUGrid[idx] += windU[r]
+			windVGrid[idx] += windV[r]
+			windCnt[idx]++
+		}
+	}
+
+	for (let i = 0; i < W * H; i++) {
+		if (cnt[i] > 1) warmthGrid[i] /= cnt[i]
+		if (windCnt && windCnt[i] > 1) {
+			windUGrid![i] /= windCnt[i]
+			windVGrid![i] /= windCnt[i]
+		}
+	}
+
+	// Fill sparse polar/edge gaps with neighbour diffusion (3 passes)
+	const tmpW = warmthGrid.slice()
+	const tmpWU = windUGrid ? windUGrid.slice() : null
+	const tmpWV = windVGrid ? windVGrid.slice() : null
+	for (let pass = 0; pass < 3; pass++) {
+		for (let li = 0; li < H; li++) {
+			for (let ci = 0; ci < W; ci++) {
+				const idx = li * W + ci
+				if (cnt[idx] > 0) continue
+				let sw = 0,
+					swu = 0,
+					swv = 0,
+					n = 0
+				const neighbors = [
+					[li - 1, ci],
+					[li + 1, ci],
+					[li, (ci - 1 + W) % W],
+					[li, (ci + 1) % W],
+				] as const
+				for (const [nl, nc] of neighbors) {
+					if (nl < 0 || nl >= H) continue
+					const ni = nl * W + nc
+					if (cnt[ni] > 0) {
+						sw += tmpW[ni]
+						if (tmpWU) swu += tmpWU[ni]
+						if (tmpWV) swv += tmpWV[ni]
+						n++
+					}
+				}
+				if (n > 0) {
+					warmthGrid[idx] = sw / n
+					if (windUGrid) windUGrid[idx] = swu / n
+					if (windVGrid) windVGrid[idx] = swv / n
+					cnt[idx] = 1
+				}
+			}
+		}
+		tmpW.set(warmthGrid)
+		if (tmpWU && tmpWV) {
+			tmpWU.set(windUGrid!)
+			tmpWV.set(windVGrid!)
+		}
+	}
+
+	// Ekman transport direction: wind rotated 90° by Coriolis sign
+	// In NH (lat > 0): rightward of wind. In SH (lat < 0): leftward.
+	// tanh smooths across the equator to avoid a hard discontinuity.
+	for (let li = 0; li < H; li++) {
+		const lat = li - 90
+		const hemi = Math.tanh(lat / 5)
+		for (let ci = 0; ci < W; ci++) {
+			const idx = li * W + ci
+			if (!isOcean[idx] || !windUGrid || !windVGrid) continue
+			const wu = windUGrid[idx]
+			const wv = windVGrid[idx]
+			const cu = hemi * wv
+			const cv = hemi * -wu
+			const mag = Math.hypot(cu, cv)
+			if (mag > 1e-9) {
+				uGrid[idx] = cu / mag
+				vGrid[idx] = cv / mag
+			}
+		}
+	}
+
+	return {
+		u: uGrid,
+		v: vGrid,
+		warmth: warmthGrid,
+		isOcean,
+		width: W as 360,
+		height: H as 181,
 	}
 }
 

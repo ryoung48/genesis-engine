@@ -18,7 +18,7 @@ import {
 	cycloneLandColor,
 	dangerColor,
 	daylightColor,
-	tidalLandColor,
+	tidalTierColor,
 	tornadoLandColor,
 	volcanicLandColor,
 	windSpeedColor,
@@ -623,16 +623,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										unitSystem === "imperial"
 											? `${(tidalM * 3.28084).toFixed(1)} ft`
 											: `${tidalM.toFixed(1)} m`
-									// Normalise for color against a ~16 m macro-tidal ceiling
-									// Same dark-navy gradient as the ocean renderer
-									const tidalNorm = Math.min(1, tidalM / 16)
-									const oceanLight = [0.75, 0.88, 0.96]
-									const tidalDark = [0.04, 0.11, 0.28]
-									const swatchRgb: [number, number, number] = [
-										oceanLight[0] + (tidalDark[0] - oceanLight[0]) * tidalNorm,
-										oceanLight[1] + (tidalDark[1] - oceanLight[1]) * tidalNorm,
-										oceanLight[2] + (tidalDark[2] - oceanLight[2]) * tidalNorm,
-									]
+									const swatchRgb = tidalTierColor(tidalM)
 									return (
 										<SwatchRow
 											label="Tidal Range"

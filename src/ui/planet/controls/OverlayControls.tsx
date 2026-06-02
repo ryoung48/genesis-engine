@@ -84,6 +84,8 @@ interface OverlayControlsProps {
 	setShowThermalEquator: (v: boolean) => void
 	showWindArrows: boolean
 	setShowWindArrows: (v: boolean) => void
+	showOceanCurrents: boolean
+	setShowOceanCurrents: (v: boolean) => void
 	showGrid: boolean
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
@@ -164,6 +166,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowThermalEquator,
 	showWindArrows,
 	setShowWindArrows,
+	showOceanCurrents,
+	setShowOceanCurrents,
 	showGrid,
 	setShowGrid,
 	showNationBorders,
@@ -580,6 +584,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													type="checkbox"
 													checked={showWindArrows}
 													onChange={(e) => setShowWindArrows(e.target.checked)}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Ocean Currents</span>
+												<input
+													type="checkbox"
+													checked={showOceanCurrents}
+													onChange={(e) => setShowOceanCurrents(e.target.checked)}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>

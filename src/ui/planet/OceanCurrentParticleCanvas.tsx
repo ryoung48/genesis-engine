@@ -1,29 +1,22 @@
 import React, { useCallback, useEffect, useRef } from "react"
-import type { WindGrid } from "@/model/climate/wind"
-import { windSpeedColor } from "./colors"
+import type { OceanCurrentGrid } from "@/model/climate/ocean-currents"
+import { oceanCurrentColor } from "./colors"
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const NUM_PARTICLES = 3000
-const MIN_LIFETIME = 80 // frames
-const MAX_LIFETIME = 220
-const SPEED_SCALE = 0.04 // degrees per frame per m/s
-const TRAIL_ALPHA = 0.05 // fraction of trail erased per frame
-const PARTICLE_HALF = 1 // half-size of particle square in CSS pixels
+const NUM_PARTICLES = 2500
+const MIN_LIFETIME = 100
+const MAX_LIFETIME = 260
+const SPEED_SCALE = 0.025
+const TRAIL_ALPHA = 0.035
+const PARTICLE_HALF = 1
 const DEG2RAD = Math.PI / 180
-
-// ---------------------------------------------------------------------------
-// Grid sampling (bilinear interpolation)
-// ---------------------------------------------------------------------------
+const MAX_SPAWN_RETRIES = 12
 
 function sampleGrid(
-	grid: WindGrid,
+	grid: OceanCurrentGrid,
 	lat: number,
 	lon: number,
-): { u: number; v: number; speed: number } {
-	const { width: W, height: H, u, v, speed } = grid
+): { u: number; v: number; warmth: number; isOcean: boolean } {
+	const { width: W, height: H, u, v, warmth, isOcean } = grid
 	const latIdx = Math.max(0, Math.min(H - 1, lat + 90))
 	const lonNorm = (((lon + 180) % 360) + 360) % 360
 
@@ -44,20 +37,25 @@ function sampleGrid(
 	const i10 = l1 * W + c0
 	const i11 = l1 * W + c1
 
+	const ocean =
+		isOcean[i00] > 0 ||
+		isOcean[i01] > 0 ||
+		isOcean[i10] > 0 ||
+		isOcean[i11] > 0
+
 	return {
 		u: u[i00] * w00 + u[i01] * w01 + u[i10] * w10 + u[i11] * w11,
 		v: v[i00] * w00 + v[i01] * w01 + v[i10] * w10 + v[i11] * w11,
-		speed:
-			speed[i00] * w00 + speed[i01] * w01 + speed[i10] * w10 + speed[i11] * w11,
+		warmth:
+			warmth[i00] * w00 +
+			warmth[i01] * w01 +
+			warmth[i10] * w10 +
+			warmth[i11] * w11,
+		isOcean: ocean,
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Particle initialisation helpers
-// ---------------------------------------------------------------------------
-
 function randomLat() {
-	// Weight toward lower latitudes (more area near equator on sphere)
 	return (Math.asin(Math.random() * 2 - 1) / (Math.PI / 2)) * 85
 }
 
@@ -65,12 +63,29 @@ function randomLon() {
 	return Math.random() * 360 - 180
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function spawnOcean(
+	grid: OceanCurrentGrid,
+	lats: Float32Array,
+	lons: Float32Array,
+	i: number,
+) {
+	for (let attempt = 0; attempt < MAX_SPAWN_RETRIES; attempt++) {
+		const lat = randomLat()
+		const lon = randomLon()
+		const { isOcean } = sampleGrid(grid, lat, lon)
+		if (isOcean) {
+			lats[i] = lat
+			lons[i] = lon
+			return
+		}
+	}
+	// Fallback: random position (will be culled next frame if on land)
+	lats[i] = randomLat()
+	lons[i] = randomLon()
+}
 
-interface WindParticleCanvasProps {
-	windGrid: WindGrid | null
+interface OceanCurrentParticleCanvasProps {
+	grid: OceanCurrentGrid | null
 	projectToScreen: (
 		xyz: [number, number, number],
 		lonOffsetRad?: number,
@@ -80,45 +95,39 @@ interface WindParticleCanvasProps {
 	viewMode: "globe" | "map"
 }
 
-export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
-	windGrid,
-	projectToScreen,
-	getGlobeCameraDir,
-	visible,
-	viewMode,
-}) => {
+export const OceanCurrentParticleCanvas: React.FC<
+	OceanCurrentParticleCanvasProps
+> = ({ grid, projectToScreen, getGlobeCameraDir, visible, viewMode }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 
-	// Particle state — flat arrays, never triggers re-renders
 	const lats = useRef(new Float32Array(NUM_PARTICLES))
 	const lons = useRef(new Float32Array(NUM_PARTICLES))
 	const ages = useRef(new Float32Array(NUM_PARTICLES))
 	const maxAges = useRef(new Float32Array(NUM_PARTICLES))
 
-	// Prop mirrors as refs so animation loop doesn't need restarts
-	const gridRef = useRef(windGrid)
+	const gridRef = useRef(grid)
 	const visibleRef = useRef(visible)
 	const projectRef = useRef(projectToScreen)
 	const cameraDirRef = useRef(getGlobeCameraDir)
 	const viewModeRef = useRef(viewMode)
 
-	useEffect(() => {
-		gridRef.current = windGrid
-	}, [windGrid])
-	useEffect(() => {
-		visibleRef.current = visible
-	}, [visible])
-	useEffect(() => {
-		projectRef.current = projectToScreen
-	}, [projectToScreen])
-	useEffect(() => {
-		cameraDirRef.current = getGlobeCameraDir
-	}, [getGlobeCameraDir])
-	useEffect(() => {
-		viewModeRef.current = viewMode
-	}, [viewMode])
+	useEffect(() => { gridRef.current = grid }, [grid])
+	useEffect(() => { visibleRef.current = visible }, [visible])
+	useEffect(() => { projectRef.current = projectToScreen }, [projectToScreen])
+	useEffect(() => { cameraDirRef.current = getGlobeCameraDir }, [getGlobeCameraDir])
+	useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
 
-	// Initialise particles staggered so trails don't all appear at once
+	const clearCanvas = () => {
+		const canvas = canvasRef.current
+		canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height)
+		for (let i = 0; i < NUM_PARTICLES; i++) ages.current[i] = maxAges.current[i]
+	}
+
+	// Flush stale trails whenever the grid swaps (month/world change), the
+	// overlay is hidden, or the projection mode switches (screen-space mismatch).
+	useEffect(() => { if (!visible) clearCanvas() }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+	useEffect(clearCanvas, [grid, viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
 	useEffect(() => {
 		for (let i = 0; i < NUM_PARTICLES; i++) {
 			lats.current[i] = randomLat()
@@ -129,40 +138,28 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 		}
 	}, [])
 
-	// Precomputed colour LUT: speed 0–30 m/s in 0.5 m/s steps → CSS colour string
 	const colorLUT = useRef<string[]>([])
-	const getColor = useCallback((spd: number): string => {
+	const getColor = useCallback((warmth: number): string => {
 		if (colorLUT.current.length === 0) {
-			for (let i = 0; i <= 60; i++) {
-				const [r, g, b] = windSpeedColor(i * 0.5)
+			for (let i = 0; i <= 200; i++) {
+				const w = i / 100 - 1 // -1..+1
+				const [r, g, b] = oceanCurrentColor(w)
 				colorLUT.current.push(
 					`rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`,
 				)
 			}
 		}
-		const idx = Math.max(0, Math.min(60, Math.round(spd * 2)))
+		const idx = Math.max(0, Math.min(200, Math.round((warmth + 1) * 100)))
 		return colorLUT.current[idx]!
 	}, [])
 
-	// Clear canvas when the wind grid is replaced (new world / month)
-	useEffect(() => {
-		const canvas = canvasRef.current
-		if (!canvas) return
-		canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height)
-		// Re-stagger particles so they don't all burst from the same positions
-		for (let i = 0; i < NUM_PARTICLES; i++) {
-			ages.current[i] = maxAges.current[i] // force respawn next frame
-		}
-	}, [windGrid])
 
-	// Main animation loop — mounts once, reads everything from refs
 	useEffect(() => {
 		const canvas = canvasRef.current
 		if (!canvas) return
 		const ctx = canvas.getContext("2d", { alpha: true })
 		if (!ctx) return
 
-		// Keep canvas CSS-pixel-sized to match projectToScreen coordinates
 		const syncSize = () => {
 			const p = canvas.parentElement
 			if (!p) return
@@ -192,7 +189,6 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 			const h = canvas.height
 			if (w === 0 || h === 0) return
 
-			// Fade existing trails toward transparent
 			ctx.globalCompositeOperation = "destination-out"
 			ctx.fillStyle = `rgba(0,0,0,${TRAIL_ALPHA})`
 			ctx.fillRect(0, 0, w, h)
@@ -200,43 +196,33 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 
 			if (!visibleRef.current || !gridRef.current) return
 
-			const grid = gridRef.current
+			const g = gridRef.current
 			const project = projectRef.current
 
 			for (let i = 0; i < NUM_PARTICLES; i++) {
 				ageArr[i]++
 				if (ageArr[i] >= maxAgeArr[i]) {
-					latArr[i] = randomLat()
-					lonArr[i] = randomLon()
+					spawnOcean(g, latArr, lonArr, i)
 					ageArr[i] = 0
 					maxAgeArr[i] =
 						MIN_LIFETIME + Math.random() * (MAX_LIFETIME - MIN_LIFETIME)
 					continue
 				}
 
-				const { u, v, speed } = sampleGrid(grid, latArr[i], lonArr[i])
+				const { u, v, warmth, isOcean } = sampleGrid(g, latArr[i], lonArr[i])
 
-				// Age fast in calm zones (doldrums) so particles respawn to windier areas
-				if (speed < 0.5) {
-					ageArr[i] += 3
+				if (!isOcean) {
+					ageArr[i] = maxAgeArr[i]
 					continue
 				}
 
-				// Move particle
 				const cosLat = Math.cos(latArr[i] * DEG2RAD)
 				latArr[i] += v * SPEED_SCALE
 				lonArr[i] += (u * SPEED_SCALE) / Math.max(0.06, Math.abs(cosLat))
 				lonArr[i] = ((lonArr[i] + 540) % 360) - 180
-				if (latArr[i] > 87) {
-					latArr[i] = 87
-					ageArr[i] = maxAgeArr[i]
-				}
-				if (latArr[i] < -87) {
-					latArr[i] = -87
-					ageArr[i] = maxAgeArr[i]
-				}
+				if (latArr[i] > 87) { latArr[i] = 87; ageArr[i] = maxAgeArr[i] }
+				if (latArr[i] < -87) { latArr[i] = -87; ageArr[i] = maxAgeArr[i] }
 
-				// Project to screen via scene — handles globe camera, map pan/tilt/zoom
 				const latR = latArr[i] * DEG2RAD
 				const lonR = lonArr[i] * DEG2RAD
 				const cl = Math.cos(latR)
@@ -247,27 +233,22 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 
 				const isMap = viewModeRef.current === "map"
 
-				// Globe mode: cull particles behind the visible hemisphere.
 				if (!isMap) {
 					const camPos = cameraDirRef.current()
 					if (camPos) {
 						if (px * camPos[0] + py * camPos[1] + pz * camPos[2] < 1.05) {
-							ageArr[i] = maxAgeArr[i] // kill immediately — no lingering trail
+							ageArr[i] = maxAgeArr[i]
 							continue
 						}
 					}
 				}
 
-				// Opacity: ease in during first 8% of life, ease out during last 8%
 				const t = ageArr[i] / maxAgeArr[i]
 				const alpha = Math.min(1, Math.min(t / 0.08, (1 - t) / 0.08))
-				ctx.globalAlpha = alpha * 0.85
-				ctx.fillStyle = getColor(speed)
+				ctx.globalAlpha = alpha * 0.9
+				ctx.fillStyle = getColor(warmth)
 
-				// In map mode draw at the base position and at ±2π lon copies so
-				// particles are continuous across the antimeridian seam.
 				const offsets = isMap ? [0, -2 * Math.PI, 2 * Math.PI] : [0]
-				let drawn = false
 				for (const offset of offsets) {
 					const pos = project(xyz, offset || undefined)
 					if (!pos) continue
@@ -280,10 +261,6 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 						PARTICLE_HALF * 2,
 						PARTICLE_HALF * 2,
 					)
-					drawn = true
-				}
-				if (!drawn && !isMap) {
-					// Globe: particle projected off-screen — nothing to do
 				}
 			}
 
@@ -296,7 +273,7 @@ export const WindParticleCanvas: React.FC<WindParticleCanvasProps> = ({
 			ro.disconnect()
 			ctx.clearRect(0, 0, canvas.width, canvas.height)
 		}
-	}, [getColor]) // loop mounts once; everything else read from refs
+	}, [getColor])
 
 	return (
 		<canvas ref={canvasRef} className="pointer-events-none absolute inset-0" />

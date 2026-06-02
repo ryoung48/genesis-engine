@@ -83,13 +83,13 @@ export function computeLandmarks(
 
 	const count = landmarkId
 
-	// Classify by size relative to total
+	// Classify by size relative to total.
+	// Water bodies < 1 % of the sphere are lakes — too small to generate tides.
 	const type = new Uint8Array(count)
 	for (let i = 0; i < count; i++) {
 		const ratio = sizes[i] / N
 		if (isWater[i]) {
 			if (ratio >= 0.01) type[i] = LANDMARK_TYPE_OCEAN
-			else if (ratio >= 0.001) type[i] = LANDMARK_TYPE_SEA
 			else type[i] = LANDMARK_TYPE_LAKE
 		} else {
 			if (ratio >= 0.01) type[i] = LANDMARK_TYPE_CONTINENT
