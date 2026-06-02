@@ -1,0 +1,413 @@
+import type { OrogenClimate, OrogenOceanCurrents, OrogenParams, SphereMesh } from "../.."
+import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
+import type { OrogenLandmarks } from "../../terrain/landmarks"
+import { computeCoastalWarmthFromOceanWarmth } from "../ocean-currents-shared"
+import { getClimateGeometry } from "../rain"
+import type { FlowGrid } from "../wind"
+import { rasterizeVectorGrid } from "../wind"
+import {
+	computeMonthlyLibration,
+	computeMonthlyLockedDeclination,
+	getSubstellarDirWithOffsetAndDeclination,
+} from "./heat"
+
+const CURRENT_EFFECT_MONTHS = 12
+const LOCKED_WARMTH_SMOOTHING_PASSES = 6
+const LOCKED_VECTOR_SMOOTHING_PASSES = 2
+const TYPE_LAKE = 5
+
+type LockedCurrentParams = Pick<
+	OrogenParams,
+	| "antistellarLon"
+	| "eccentricity"
+	| "obliquity"
+	| "perihelion"
+	| "planetRadiusKm"
+>
+
+function clamp(value: number, min: number, max: number): number {
+	return Math.max(min, Math.min(max, value))
+}
+
+function normalizeField(field: Float32Array, isBlocked: Uint8Array): void {
+	let maxAbs = 0
+	for (let i = 0; i < field.length; i++) {
+		if (isBlocked[i]) continue
+		maxAbs = Math.max(maxAbs, Math.abs(field[i]))
+	}
+	if (maxAbs <= 1e-6) return
+	for (let i = 0; i < field.length; i++) {
+		if (isBlocked[i]) {
+			field[i] = 0
+			continue
+		}
+		field[i] = clamp(field[i] / maxAbs, -1, 1)
+	}
+}
+
+function buildLakeMask(
+	numRegions: number,
+	isLand: Uint8Array,
+	landmarks: OrogenLandmarks,
+): Uint8Array {
+	const isLake = new Uint8Array(numRegions)
+	for (let r = 0; r < numRegions; r++) {
+		const landmark = landmarks.regionLandmark[r]
+		if (landmark < 0 || isLand[r]) continue
+		if (landmarks.type[landmark] === TYPE_LAKE) isLake[r] = 1
+	}
+	return isLake
+}
+
+function computeMonthlySubstellarDirections(
+	params?: LockedCurrentParams,
+): Array<[number, number, number]> {
+	const antistellarLon = params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON
+	const obliquity = params?.obliquity ?? 0
+	const eccentricity = params?.eccentricity ?? 0
+	const perihelion = params?.perihelion ?? 102
+	const monthlyLibration = computeMonthlyLibration(eccentricity, perihelion)
+	const monthlyDeclination = computeMonthlyLockedDeclination(
+		obliquity,
+		eccentricity,
+		perihelion,
+	)
+	return Array.from({ length: CURRENT_EFFECT_MONTHS }, (_, month) =>
+		getSubstellarDirWithOffsetAndDeclination(
+			antistellarLon,
+			monthlyLibration[month],
+			monthlyDeclination[month],
+		),
+	)
+}
+
+function getAnnualMeanSubstellarDirection(
+	monthlyDirs: Array<[number, number, number]>,
+): [number, number, number] {
+	let x = 0
+	let y = 0
+	let z = 0
+	for (const dir of monthlyDirs) {
+		x += dir[0]
+		y += dir[1]
+		z += dir[2]
+	}
+	const mag = Math.hypot(x, y, z)
+	if (mag <= 1e-6) return [1, 0, 0]
+	return [x / mag, y / mag, z / mag]
+}
+
+function computeCellCosines(
+	mesh: SphereMesh,
+	substellarDir: [number, number, number],
+): Float32Array {
+	const result = new Float32Array(mesh.numRegions)
+	for (let r = 0; r < mesh.numRegions; r++) {
+		const offset = r * 3
+		result[r] =
+			mesh.r_xyz[offset] * substellarDir[0] +
+			mesh.r_xyz[offset + 1] * substellarDir[1] +
+			mesh.r_xyz[offset + 2] * substellarDir[2]
+	}
+	return result
+}
+
+function computeLockedOceanWarmthField(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	isLake: Uint8Array,
+	substellarDir: [number, number, number],
+): Float32Array {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const source = computeCellCosines(mesh, substellarDir)
+	const state = new Float32Array(N)
+	const next = new Float32Array(N)
+	const blocked = new Uint8Array(N)
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || isLake[r]) {
+			blocked[r] = 1
+			continue
+		}
+		state[r] = source[r]
+	}
+
+	for (let pass = 0; pass < LOCKED_WARMTH_SMOOTHING_PASSES; pass++) {
+		for (let r = 0; r < N; r++) {
+			if (blocked[r]) {
+				next[r] = 0
+				continue
+			}
+			let sum = source[r] * 2
+			let weight = 2
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (blocked[nb]) continue
+				sum += state[nb]
+				weight++
+			}
+			next[r] = sum / weight
+		}
+		state.set(next)
+	}
+
+	normalizeField(state, blocked)
+	return state
+}
+
+function computeLockedEffectLimit(cellCosTheta: number, isLandCell: boolean): number {
+	const exchangeFactor = 0.65 + 0.35 * (1 - Math.abs(cellCosTheta))
+	return (isLandCell ? 4 : 6) * exchangeFactor
+}
+
+export function computeLockedOceanCurrents(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	_landDistCoast: Float32Array,
+	landmarks: OrogenLandmarks,
+	params?: LockedCurrentParams,
+): OrogenOceanCurrents {
+	const N = mesh.numRegions
+	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
+	const isLake = buildLakeMask(N, isLand, landmarks)
+	const monthlyDirs = computeMonthlySubstellarDirections(params)
+
+	const oceanWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
+	const coastalWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
+	const oceanWarmth = new Float32Array(N)
+	const coastalWarmth = new Float32Array(N)
+
+	for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+		const monthWarmth = computeLockedOceanWarmthField(
+			mesh,
+			isLand,
+			isLake,
+			monthlyDirs[month],
+		)
+		oceanWarmthMonthly.set(monthWarmth, month * N)
+		const monthCoastalWarmth = computeCoastalWarmthFromOceanWarmth(
+			mesh,
+			isLand,
+			isLake,
+			monthWarmth,
+			avgEdgeKm,
+		)
+		coastalWarmthMonthly.set(monthCoastalWarmth, month * N)
+		for (let r = 0; r < N; r++) {
+			oceanWarmth[r] += monthWarmth[r] / CURRENT_EFFECT_MONTHS
+			coastalWarmth[r] += monthCoastalWarmth[r] / CURRENT_EFFECT_MONTHS
+		}
+	}
+
+	return {
+		oceanWarmth,
+		coastalWarmth,
+		oceanWarmthMonthly,
+		coastalWarmthMonthly,
+		temperatureDeltaMonthly: new Float32Array(N * CURRENT_EFFECT_MONTHS),
+		temperatureDelta: new Float32Array(N),
+	}
+}
+
+export function applyLockedCurrentTemperatureEffect(
+	mesh: SphereMesh,
+	climate: OrogenClimate,
+	isLand: Uint8Array,
+	currents: OrogenOceanCurrents,
+	params?: LockedCurrentParams,
+): void {
+	const N = mesh.numRegions
+	const monthlyDirs = computeMonthlySubstellarDirections(params)
+	const annualDir = getAnnualMeanSubstellarDirection(monthlyDirs)
+	const annualCt = computeCellCosines(mesh, annualDir)
+	const temperatureDeltaMonthly =
+		currents.temperatureDeltaMonthly ??
+		(currents.temperatureDeltaMonthly = new Float32Array(
+			N * CURRENT_EFFECT_MONTHS,
+		))
+
+	if (currents.oceanWarmthMonthly && currents.coastalWarmthMonthly) {
+		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+			const cellCt = computeCellCosines(mesh, monthlyDirs[month])
+			for (let r = 0; r < N; r++) {
+				const warmth = isLand[r]
+					? currents.coastalWarmthMonthly[month * N + r]
+					: currents.oceanWarmthMonthly[month * N + r]
+				if (Math.abs(warmth) <= 1e-4) continue
+				const delta = warmth * computeLockedEffectLimit(cellCt[r], !!isLand[r])
+				temperatureDeltaMonthly[month * N + r] = delta
+				climate.temperature_monthly[month * N + r] += delta
+				currents.temperatureDelta[r] += delta / CURRENT_EFFECT_MONTHS
+			}
+		}
+	} else {
+		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
+			for (let r = 0; r < N; r++) {
+				const warmth = isLand[r] ? currents.coastalWarmth[r] : currents.oceanWarmth[r]
+				if (Math.abs(warmth) <= 1e-4) continue
+				const delta =
+					warmth *
+					computeLockedEffectLimit(annualCt[r], !!isLand[r])
+				temperatureDeltaMonthly[month * N + r] = delta
+				climate.temperature_monthly[month * N + r] += delta
+				currents.temperatureDelta[r] = delta
+			}
+		}
+	}
+
+	for (let r = 0; r < N; r++) {
+		const annualDelta =
+			currents.oceanWarmthMonthly || currents.coastalWarmthMonthly
+				? currents.temperatureDelta[r]
+				: currents.temperatureDelta[r]
+		climate.temperature_avg[r] += annualDelta
+		climate.temperature_min[r] += annualDelta
+		climate.temperature_max[r] += annualDelta
+	}
+}
+
+function smoothVectorField(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	srcX: Float32Array,
+	srcY: Float32Array,
+	passes: number,
+): { x: Float32Array; y: Float32Array } {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const tmpX = new Float32Array(N)
+	const tmpY = new Float32Array(N)
+	let currentX = srcX
+	let currentY = srcY
+	let nextX = tmpX
+	let nextY = tmpY
+
+	for (let pass = 0; pass < passes; pass++) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r]) {
+				nextX[r] = 0
+				nextY[r] = 0
+				continue
+			}
+			let sumX = currentX[r]
+			let sumY = currentY[r]
+			let count = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (isLand[nb]) continue
+				sumX += currentX[nb]
+				sumY += currentY[nb]
+				count++
+			}
+			nextX[r] = sumX / count
+			nextY[r] = sumY / count
+		}
+		;[currentX, nextX] = [nextX, currentX]
+		;[currentY, nextY] = [nextY, currentY]
+	}
+
+	return { x: currentX, y: currentY }
+}
+
+export function buildLockedOceanCurrentGrid(
+	mesh: SphereMesh,
+	oceanWarmth: Float32Array,
+	isLand: Uint8Array,
+	latDeg: Float32Array,
+	lonDeg: Float32Array,
+	params?: Pick<
+		OrogenParams,
+		| "antistellarLon"
+		| "eccentricity"
+		| "obliquity"
+		| "perihelion"
+	>,
+	currentMonth?: number,
+): FlowGrid {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const monthlyDirs = computeMonthlySubstellarDirections(params)
+	const substellarDir =
+		currentMonth && currentMonth > 0 && currentMonth <= CURRENT_EFFECT_MONTHS
+			? monthlyDirs[currentMonth - 1]
+			: getAnnualMeanSubstellarDirection(monthlyDirs)
+	const cellCt = computeCellCosines(mesh, substellarDir)
+	const gradX = new Float32Array(N)
+	const gradY = new Float32Array(N)
+	const coastX = new Float32Array(N)
+	const coastY = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		let gx = 0
+		let gy = 0
+		let weightSum = 0
+		let shoreX = 0
+		let shoreY = 0
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			const dx =
+				(lonDeg[nb] - lonDeg[r] > 180
+					? lonDeg[nb] - lonDeg[r] - 360
+					: lonDeg[nb] - lonDeg[r] < -180
+						? lonDeg[nb] - lonDeg[r] + 360
+						: lonDeg[nb] - lonDeg[r]) *
+				Math.cos((((latDeg[r] + latDeg[nb]) * 0.5) / 180) * Math.PI)
+			const dy = latDeg[nb] - latDeg[r]
+			const distSq = dx * dx + dy * dy
+			if (distSq <= 1e-6) continue
+			gx += ((cellCt[nb] - cellCt[r]) * dx) / distSq
+			gy += ((cellCt[nb] - cellCt[r]) * dy) / distSq
+			weightSum += 1
+			if (isLand[nb]) {
+				shoreX += dx / distSq
+				shoreY += dy / distSq
+			}
+		}
+		if (weightSum > 0) {
+			gradX[r] = gx / weightSum
+			gradY[r] = gy / weightSum
+		}
+		coastX[r] = shoreX
+		coastY[r] = shoreY
+	}
+
+	const smoothed = smoothVectorField(
+		mesh,
+		isLand,
+		gradX,
+		gradY,
+		LOCKED_VECTOR_SMOOTHING_PASSES,
+	)
+	const currentU = new Float32Array(N)
+	const currentV = new Float32Array(N)
+	const currentSpeed = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		let flowEast = -smoothed.x[r]
+		let flowNorth = -smoothed.y[r]
+		const coastMag = Math.hypot(coastX[r], coastY[r])
+		if (coastMag > 1e-6) {
+			let tangentEast = -coastY[r] / coastMag
+			let tangentNorth = coastX[r] / coastMag
+			if (flowEast * tangentEast + flowNorth * tangentNorth < 0) {
+				tangentEast = -tangentEast
+				tangentNorth = -tangentNorth
+			}
+			flowEast = flowEast * 0.6 + tangentEast * 0.4
+			flowNorth = flowNorth * 0.6 + tangentNorth * 0.4
+		}
+		const speedScale = 0.4 + 0.6 * Math.abs(oceanWarmth[r])
+		currentU[r] = flowEast
+		currentV[r] = flowNorth
+		currentSpeed[r] = Math.hypot(flowEast, flowNorth) * speedScale
+	}
+
+	return rasterizeVectorGrid(mesh, currentU, currentV, currentSpeed, {
+		scalar: oceanWarmth,
+		allowCell: (region) => !isLand[region],
+		isBlockedRegion: (region) => !!isLand[region],
+	})
+}

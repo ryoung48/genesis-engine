@@ -228,6 +228,7 @@ export function runPostElevationPipeline(
 			isLand,
 			oceanCurrents,
 			monthlyTEQ,
+			params,
 		)
 		refreshClimatePetMonthly(climate, params)
 		record("Post: current temperature effect", t0)

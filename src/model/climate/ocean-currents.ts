@@ -7,9 +7,14 @@
  */
 
 import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
-import { meanEdgeLengthKm } from "../shared/units"
+import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
 import type { OrogenLandmarks } from "../terrain/landmarks"
-import { computeThermalEquator, getClimateGeometry } from "./rain"
+import {
+	applyLockedCurrentTemperatureEffect,
+	computeLockedOceanCurrents,
+} from "./locked/ocean-currents"
+import { computeCoastalWarmthFromOceanWarmth } from "./ocean-currents-shared"
+import { computeThermalEquator, getClimateGeometry, hadleyWidth } from "./rain"
 import type { FlowGrid } from "./wind"
 import { rasterizeVectorGrid } from "./wind"
 
@@ -66,20 +71,24 @@ interface CoastSite {
 function classifyCurrentWarmth(
 	distFromReference: number,
 	eastFacing: boolean,
+	reverseCirculation: boolean,
+	hoursPerDay = 24,
 ): number {
-	let warmth = 0
-
-	const tStr = distFromReference >= 5 && distFromReference <= 30 ? 1 : 0
-	if (tStr > 0) warmth += eastFacing ? 1 : -1
-
-	const wStr = distFromReference >= 30 && distFromReference <= 70 ? 1 : 0
-	if (wStr > 0) warmth += eastFacing ? -1 : 1
-
-	const pStr = distFromReference >= 70 && distFromReference <= 90 ? 1 : 0
-	if (pStr > 0) warmth += -1
-
-	if (Math.abs(warmth) <= 0.01) return 0
-	return warmth > 0 ? 1 : -1
+	if (distFromReference < 5) return 0
+	if (distFromReference >= 70) return -1
+	const hw = hadleyWidth(hoursPerDay)
+	const effectiveEastFacing = reverseCirculation ? !eastFacing : eastFacing
+	// East-facing coasts: shift boundary by hw/3 so the warm western boundary
+	// current (Gulf Stream, Kuroshio) extends to ~hw*4/3 (~40° for Earth) before
+	// the subtropical flip. West-facing coasts keep the unshifted hw boundary.
+	const effectiveDist = effectiveEastFacing
+		? Math.max(0, distFromReference - hw / 3)
+		: distFromReference
+	const cellIndex = Math.floor(effectiveDist / hw)
+	// Even-indexed cells: east-facing coast = warm (western boundary current).
+	// Odd-indexed cells: east-facing coast = cold (eastern boundary upwelling).
+	const sign = cellIndex % 2 === 0 ? 1 : -1
+	return sign * (effectiveEastFacing ? 1 : -1)
 }
 
 function fillOceanBeltSeeds(
@@ -90,14 +99,18 @@ function fillOceanBeltSeeds(
 	latDeg: Float32Array,
 	lonBinByRegion: Int32Array,
 	teqByLon?: Float32Array,
+	hoursPerDay = 24,
 ): void {
 	const N = latDeg.length
+	// Warm equatorial belt narrows on fast rotators and widens on slow ones,
+	// tracking the Hadley cell half-width (30° at Earth, 18° at 6h day).
+	const warmBeltDeg = hadleyWidth(hoursPerDay) / 3
 	for (let r = 0; r < N; r++) {
 		if (isLand[r] || isLake[r]) continue
 		const distFromReference = teqByLon
 			? Math.abs(latDeg[r] - teqByLon[lonBinByRegion[r]])
 			: Math.abs(latDeg[r])
-		if (distFromReference <= 10) warmSeed[r] = 1
+		if (distFromReference <= warmBeltDeg) warmSeed[r] = 1
 		if (distFromReference >= 68) {
 			const polarSeed = Math.min(1, (distFromReference - 68) / 10)
 			coldSeed[r] = Math.max(coldSeed[r], 0.35 + polarSeed * 0.55)
@@ -220,57 +233,6 @@ function computeOceanWarmthFromSeeds(
 	return oceanWarmth
 }
 
-function computeCoastalWarmthFromOceanWarmth(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	oceanWarmth: Float32Array,
-	avgEdgeKm: number,
-): Float32Array {
-	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const coastalWarmth = new Float32Array(N)
-	const landFadeHops = Math.max(4, Math.round(600 / avgEdgeKm))
-	const landDist = new Int32Array(N).fill(-1)
-	const landQueue = new Int32Array(N)
-	let lqLen = 0
-	let landHead = 0
-
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue
-		let warmSum = 0
-		let oceanCount = 0
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (!isLand[nb] && !isLake[nb]) {
-				warmSum += oceanWarmth[nb]
-				oceanCount++
-			}
-		}
-		if (oceanCount === 0) continue
-		coastalWarmth[r] = warmSum / oceanCount
-		landDist[r] = 0
-		landQueue[lqLen++] = r
-	}
-
-	while (landHead < lqLen) {
-		const r = landQueue[landHead++]
-		const d = landDist[r] + 1
-		if (d >= landFadeHops) continue
-		const fade = 1 - d / landFadeHops
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (isLand[nb] && landDist[nb] === -1) {
-				landDist[nb] = d
-				coastalWarmth[nb] = coastalWarmth[r] * fade
-				landQueue[lqLen++] = nb
-			}
-		}
-	}
-
-	return coastalWarmth
-}
-
 function directionalOceanOpen(
 	start: number,
 	dir: 1 | -1,
@@ -365,12 +327,29 @@ export function computeOceanCurrents(
 	isLand: Uint8Array,
 	distCoast: Float32Array,
 	landmarks: OrogenLandmarks,
-	params?: Pick<OrogenParams, "planetRadiusKm">,
+	params?: Pick<
+		OrogenParams,
+		| "antistellarLon"
+		| "eccentricity"
+		| "obliquity"
+		| "perihelion"
+		| "planetRadiusKm"
+		| "tidallyLocked"
+		| "hoursPerDay"
+	>,
 	monthlyTEQ?: Float32Array[],
 ): OceanCurrentResult {
+	if (params?.tidallyLocked) {
+		return computeLockedOceanCurrents(mesh, isLand, distCoast, landmarks, params)
+	}
 	const N = mesh.numRegions
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 	const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
+	const reverseCirculation = isRetrogradeObliquity(params?.obliquity ?? 0)
+	const hoursPerDay = params?.hoursPerDay ?? 24
+	// Coriolis scales with rotation rate; below ~96h days the gyre-based east/west
+	// coast seeding fades out and belt seeds (warm tropics, cold poles) dominate.
+	const coriolisWeight = Math.min(1, Math.sqrt(24 / hoursPerDay))
 
 	let annualTeq: Float32Array | undefined
 	if (monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS) {
@@ -415,15 +394,21 @@ export function computeOceanCurrents(
 		latDeg,
 		regionBin,
 		annualTeq,
+		hoursPerDay,
 	)
 	for (const site of coastSites) {
 		const distFromReference = annualTeq
 			? Math.abs(latDeg[site.region] - annualTeq[site.lonBin])
 			: Math.abs(latDeg[site.region])
-		const warmth = classifyCurrentWarmth(distFromReference, site.eastFacing)
-		if (warmth > 0) {
+		const warmth = classifyCurrentWarmth(
+			distFromReference,
+			site.eastFacing,
+			reverseCirculation,
+			hoursPerDay,
+		)
+		if (warmth * coriolisWeight > 0.5) {
 			for (const nb of site.oceanNeighbors) warmSeed[nb] = 1
-		} else if (warmth < 0) {
+		} else if (warmth * coriolisWeight < -0.5) {
 			for (const nb of site.oceanNeighbors) coldSeed[nb] = 1
 		}
 	}
@@ -464,15 +449,21 @@ export function computeOceanCurrents(
 				latDeg,
 				regionBin,
 				teqByLon,
+				hoursPerDay,
 			)
 			for (const site of coastSites) {
 				const distFromTeq = Math.abs(
 					latDeg[site.region] - teqByLon[site.lonBin],
 				)
-				const warmth = classifyCurrentWarmth(distFromTeq, site.eastFacing)
-				if (warmth > 0) {
+				const warmth = classifyCurrentWarmth(
+					distFromTeq,
+					site.eastFacing,
+					reverseCirculation,
+					hoursPerDay,
+				)
+				if (warmth * coriolisWeight > 0.5) {
 					for (const nb of site.oceanNeighbors) monthWarmSeed[nb] = 1
-				} else if (warmth < 0) {
+				} else if (warmth * coriolisWeight < -0.5) {
 					for (const nb of site.oceanNeighbors) monthColdSeed[nb] = 1
 				}
 			}
@@ -520,7 +511,19 @@ export function applyCurrentTemperatureEffect(
 	isLand: Uint8Array,
 	currents: OceanCurrentResult,
 	monthlyTEQ?: Float32Array[],
+	params?: Pick<
+		OrogenParams,
+		| "antistellarLon"
+		| "eccentricity"
+		| "obliquity"
+		| "perihelion"
+		| "tidallyLocked"
+	>,
 ): void {
+	if (params?.tidallyLocked) {
+		applyLockedCurrentTemperatureEffect(mesh, climate, isLand, currents, params)
+		return
+	}
 	const N = mesh.numRegions
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
 	const teqByBin =
@@ -610,8 +613,11 @@ export function buildOceanCurrentGrid(
 	isLand: Uint8Array,
 	latDeg: Float32Array,
 	lonDeg: Float32Array,
+	reverseCirculation = false,
 	_teqByLon?: Float32Array,
 	_regionBin?: Int32Array,
+	hoursPerDay = 24,
+	planetRadiusKm?: number,
 ): FlowGrid {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
@@ -678,7 +684,8 @@ export function buildOceanCurrentGrid(
 
 	for (let r = 0; r < N; r++) {
 		if (isLand[r]) continue
-		const hemisphereTurn = latDeg[r] >= 0 ? 1 : -1
+		const hemisphereTurn =
+			(latDeg[r] >= 0 ? 1 : -1) * (reverseCirculation ? -1 : 1)
 		const u = srcY[r] * hemisphereTurn
 		const v = -srcX[r] * hemisphereTurn
 		const speed = Math.hypot(u, v)
@@ -687,9 +694,40 @@ export function buildOceanCurrentGrid(
 		currentSpeed[r] = speed
 	}
 
+	// BFS from land to find ocean cells within the coastal display band.
+	const maxCoastHops = Math.round(600 / meanEdgeLengthKm(mesh, planetRadiusKm))
+	const coastalOcean = new Uint8Array(N)
+	const bfsQueue = new Int32Array(N)
+	const bfsDist = new Int32Array(N).fill(-1)
+	let head = 0
+	let tail = 0
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (!isLand[nb] && bfsDist[nb] < 0) {
+				bfsDist[nb] = 0
+				coastalOcean[nb] = 1
+				bfsQueue[tail++] = nb
+			}
+		}
+	}
+	while (head < tail) {
+		const r = bfsQueue[head++]
+		if (bfsDist[r] >= maxCoastHops) continue
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			if (!isLand[nb] && bfsDist[nb] < 0) {
+				bfsDist[nb] = bfsDist[r] + 1
+				coastalOcean[nb] = 1
+				bfsQueue[tail++] = nb
+			}
+		}
+	}
+
 	return rasterizeVectorGrid(mesh, currentU, currentV, currentSpeed, {
 		scalar: oceanWarmth,
-		allowCell: (region) => !isLand[region],
+		allowCell: (region) => !isLand[region] && coastalOcean[region] === 1,
 		isBlockedRegion: (region) => !!isLand[region],
 	})
 }

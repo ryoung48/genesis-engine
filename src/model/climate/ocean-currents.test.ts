@@ -232,6 +232,38 @@ describe("computeOceanCurrents", () => {
 		expect(currents.coastalWarmthMonthly).toBeUndefined()
 	})
 
+	it("reverses coastal current classification on retrograde planets", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 20, lonDeg: 0 },
+				{ latDeg: 20, lonDeg: 20 },
+				{ latDeg: 20, lonDeg: 40 },
+			],
+			[
+				[1],
+				[0, 2],
+				[1],
+			],
+		)
+		const isLand = new Uint8Array([1, 0, 0])
+		const distCoast = new Float32Array([0, 1, 2])
+		const landmarks = buildLandmarks(mesh.numRegions, [{ region: 0, type: 0 }])
+
+		const prograde = computeOceanCurrents(mesh, isLand, distCoast, landmarks, {
+			planetRadiusKm: 100,
+			obliquity: 23.5,
+		})
+		const retrograde = computeOceanCurrents(mesh, isLand, distCoast, landmarks, {
+			planetRadiusKm: 100,
+			obliquity: 156.5,
+		})
+
+		expect(prograde.oceanWarmth[1]).toBeGreaterThan(0)
+		expect(prograde.oceanWarmth[2]).toBeGreaterThan(0)
+		expect(retrograde.oceanWarmth[1]).toBeLessThan(0)
+		expect(retrograde.oceanWarmth[2]).toBeLessThan(0)
+	})
+
 	it("covers wrapped coasts, blocked coastlines, seasonal reversals, and inland fade limits", () => {
 		const mesh = buildMesh(
 			[
@@ -401,6 +433,50 @@ describe("buildOceanCurrentGrid", () => {
 		expect(grid.speed[landIdx]).toBe(0)
 		expect(grid.scalar?.[landIdx]).toBe(0)
 		expect(grid.mask?.[landIdx]).toBe(0)
+	})
+
+	it("reverses displayed current direction for retrograde circulation", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 20, lonDeg: 0 },
+				{ latDeg: 10, lonDeg: 0 },
+				{ latDeg: 10, lonDeg: 10 },
+			],
+			[
+				[1, 2],
+				[0, 2],
+				[0, 1],
+			],
+		)
+		const isLand = new Uint8Array([0, 0, 1])
+		const oceanWarmth = new Float32Array([1, 0.25, 0])
+		const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
+
+		const prograde = buildOceanCurrentGrid(
+			mesh,
+			oceanWarmth,
+			isLand,
+			latDeg,
+			lonDeg,
+			false,
+			undefined,
+			regionBin,
+		)
+		const retrograde = buildOceanCurrentGrid(
+			mesh,
+			oceanWarmth,
+			isLand,
+			latDeg,
+			lonDeg,
+			true,
+			undefined,
+			regionBin,
+		)
+
+		const idx =
+			Math.round(latDeg[0] + 90) * prograde.width + Math.round(lonDeg[0] + 180)
+		expect(prograde.u[idx]).toBeCloseTo(-retrograde.u[idx], 6)
+		expect(prograde.v[idx]).toBeCloseTo(-retrograde.v[idx], 6)
 	})
 })
 

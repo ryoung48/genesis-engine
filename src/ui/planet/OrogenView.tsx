@@ -3,6 +3,7 @@ import type { StageTiming } from "@/model"
 import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
+import { buildLockedOceanCurrentGrid } from "@/model/climate/locked/ocean-currents"
 import { buildOceanCurrentGrid } from "@/model/climate/ocean-currents"
 import {
 	computeThermalEquatorLine,
@@ -1365,14 +1366,28 @@ export const OrogenView: React.FC = () => {
 				? monthlyWarmth.subarray((currentMonth - 1) * N, currentMonth * N)
 				: world.oceanCurrents.oceanWarmth
 		const { latDeg, lonDeg, regionBin } = getClimateGeometry(world.mesh)
+		if (world.params.tidallyLocked) {
+			return buildLockedOceanCurrentGrid(
+				world.mesh,
+				warmth,
+				world.isLand,
+				latDeg,
+				lonDeg,
+				world.params,
+				currentMonth,
+			)
+		}
 		return buildOceanCurrentGrid(
 			world.mesh,
 			warmth,
 			world.isLand,
 			latDeg,
 			lonDeg,
+			isRetrogradeObliquity(world.params.obliquity),
 			undefined,
 			regionBin,
+			world.params.hoursPerDay,
+			world.params.planetRadiusKm,
 		)
 	}, [world, showOceanCurrents, currentMonth])
 
