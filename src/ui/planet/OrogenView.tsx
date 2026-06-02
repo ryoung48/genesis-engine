@@ -63,10 +63,10 @@ import {
 	getHoverHazards,
 	getHoverHotspot,
 	getHoverHumidity,
-	getHoverMisery,
 	getHoverIsLand,
 	getHoverKoppenClimate,
 	getHoverLandmark,
+	getHoverMisery,
 	getHoverOceanCurrents,
 	getHoverOceanDist,
 	getHoverPastaClimate,
@@ -1122,7 +1122,9 @@ export const OrogenView: React.FC = () => {
 			const rgb = new Float32Array(N * 3)
 			const isMonthly = dtrMonth > 0
 			const offset = isMonthly ? (dtrMonth - 1) * N : 0
-			const monthlyTemp = isMonthly ? worldForDisplay.climate.temperature_monthly : null
+			const monthlyTemp = isMonthly
+				? worldForDisplay.climate.temperature_monthly
+				: null
 			const monthlyDtr = isMonthly ? worldForDisplay.dtr_monthly : null
 			const aet = worldForDisplay.hydrology?.aet_monthly
 			const pet = worldForDisplay.climate.pet_monthly

@@ -64,7 +64,11 @@ import { computeProvinceWaterAccess } from "../society/water-access"
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
 import type { OrogenLandmarks } from "../terrain/landmarks"
-import { computeLandmarks, LANDMARK_TYPE_OCEAN } from "../terrain/landmarks"
+import {
+	computeLandmarks,
+	LANDMARK_TYPE_LAKE,
+	LANDMARK_TYPE_OCEAN,
+} from "../terrain/landmarks"
 import { computeLocations } from "../terrain/locations"
 import { computeProvinces } from "../terrain/provinces"
 import { computeRivers } from "../terrain/rivers"
@@ -370,6 +374,18 @@ export function runPostElevationPipeline(
 	const landmarks = computeLandmarks(mesh, isLand)
 	record("Post: landmarks", t0)
 	onProgress?.("Post: landmarks", 62)
+
+	// ── Promote small enclosed water bodies to lakes ──────────────────
+	// Any water body that landmarks classifies as LAKE (< 1 % of sphere) is too
+	// small to participate in tidal dynamics.  Back-fill rivers.lakes so the
+	// tidal computation and all downstream display code treat them as lakes.
+	for (let r = 0; r < N; r++) {
+		if (isLand[r] || rivers.lakes[r]) continue
+		const lmId = landmarks.regionLandmark[r]
+		if (lmId >= 0 && landmarks.type[lmId] === LANDMARK_TYPE_LAKE) {
+			rivers.lakes[r] = 1
+		}
+	}
 
 	// ── Tidal range ────────────────────────────────────────────────────
 	// Computed before topography so the tidal bonus can nudge coastal marsh

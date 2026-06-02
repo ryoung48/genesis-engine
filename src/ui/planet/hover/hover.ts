@@ -262,7 +262,12 @@ export function getHoverMisery(
 		for (let m = 0; m < 12; m++) {
 			const T = world.climate.temperature_monthly[m * N + r]
 			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
-			const rh = relativeHumidityFromTempRange(T, dtr, annualAridity, annualRainfall)
+			const rh = relativeHumidityFromTempRange(
+				T,
+				dtr,
+				annualAridity,
+				annualRainfall,
+			)
 			const wind = monthlyWindSpeedMs?.[m] ?? annualWind
 			monthly.push(apparentTemperatureC(T, rh, wind))
 		}
