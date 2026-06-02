@@ -261,6 +261,7 @@ interface InfoPanelProps {
 	hoverWindSpeed: number | null
 	hoverWindDir: string | null
 	hoverWindMonthly: Array<{ speedMs: number; dir: string }> | null
+	showOceanCurrentOverlay?: boolean
 	colorMode: ColorMode
 	dangerSubMode: "earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
 	populationMode: PopulationMapMode
@@ -316,6 +317,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverWindSpeed,
 	hoverWindDir,
 	hoverWindMonthly,
+	showOceanCurrentOverlay = false,
 	colorMode,
 	dangerSubMode,
 	populationMode,
@@ -1090,7 +1092,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									/>
 								</>
 							)}
-						{colorMode === "oceanCurrents" &&
+						{(colorMode === "oceanCurrents" || showOceanCurrentOverlay) &&
 							hasCurrentImpact &&
 							hoverOceanCurrents !== null && (
 								<div className="space-y-1 border-t border-white/5 pt-1">

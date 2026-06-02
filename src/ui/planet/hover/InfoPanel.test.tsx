@@ -166,6 +166,7 @@ function renderPanel(
 			hoverWindSpeed={null}
 			hoverWindDir={null}
 			hoverWindMonthly={null}
+			showOceanCurrentOverlay={false}
 			colorMode="terrain"
 			populationMode="density"
 			selectedTimeMs={800}
@@ -352,6 +353,23 @@ describe("InfoPanel", () => {
 		expect(pastaMarkup).toContain(">GInt<")
 		expect(pastaMarkup).toContain("MIN")
 		expect(pastaMarkup).toContain("MAX")
+		expect(currentMarkup).toContain("Ocean Current")
+		expect(currentMarkup).toContain("warm")
+	})
+
+	it("shows ocean current details when the current overlay is enabled", () => {
+		const currentMarkup = renderPanel({
+			colorMode: "terrain",
+			showOceanCurrentOverlay: true,
+			hoverOceanCurrents: {
+				warmth: 0.4,
+				delta: 1.5,
+				averageDelta: 1.5,
+				mode: "warm",
+				monthlyDelta: Array.from({ length: 12 }, () => 1.5),
+			},
+		})
+
 		expect(currentMarkup).toContain("Ocean Current")
 		expect(currentMarkup).toContain("warm")
 	})

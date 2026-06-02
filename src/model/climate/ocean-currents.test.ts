@@ -3,8 +3,10 @@ import type { OrogenClimate, SphereMesh } from ".."
 import type { OrogenLandmarks } from "../terrain/landmarks"
 import {
 	applyCurrentTemperatureEffect,
+	buildOceanCurrentGrid,
 	computeOceanCurrents,
 } from "./ocean-currents"
+import { getClimateGeometry } from "./rain"
 
 const TEQ_BINS = 120
 
@@ -354,6 +356,51 @@ describe("computeOceanCurrents", () => {
 		expect(currents.coastalWarmth[28]).toBe(0)
 		expect(currents.oceanWarmthMonthly![1]).toBeGreaterThan(0)
 		expect(currents.oceanWarmthMonthly![mesh.numRegions + 1]).toBeLessThan(0)
+	})
+})
+
+describe("buildOceanCurrentGrid", () => {
+	it("derives along-coast flow from warmth gradients and keeps land cells empty", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 20, lonDeg: 0 },
+				{ latDeg: 10, lonDeg: 0 },
+				{ latDeg: 10, lonDeg: 10 },
+			],
+			[
+				[1, 2],
+				[0, 2],
+				[0, 1],
+			],
+		)
+		const isLand = new Uint8Array([0, 0, 1])
+		const oceanWarmth = new Float32Array([1, 0.25, 0])
+		const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
+
+		const grid = buildOceanCurrentGrid(
+			mesh,
+			oceanWarmth,
+			isLand,
+			latDeg,
+			lonDeg,
+			undefined,
+			regionBin,
+		)
+
+		const warmIdx =
+			Math.round(latDeg[0] + 90) * grid.width + Math.round(lonDeg[0] + 180)
+		const landIdx =
+			Math.round(latDeg[2] + 90) * grid.width + Math.round(lonDeg[2] + 180)
+
+		expect(Math.abs(grid.u[warmIdx])).toBeGreaterThan(Math.abs(grid.v[warmIdx]))
+		expect(grid.speed[warmIdx]).toBeGreaterThan(0)
+		expect(grid.scalar?.[warmIdx]).toBeGreaterThan(0)
+		expect(grid.mask?.[warmIdx]).toBe(1)
+		expect(grid.u[landIdx]).toBe(0)
+		expect(grid.v[landIdx]).toBe(0)
+		expect(grid.speed[landIdx]).toBe(0)
+		expect(grid.scalar?.[landIdx]).toBe(0)
+		expect(grid.mask?.[landIdx]).toBe(0)
 	})
 })
 

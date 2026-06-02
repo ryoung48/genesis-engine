@@ -10,6 +10,8 @@ import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
 import { meanEdgeLengthKm } from "../shared/units"
 import type { OrogenLandmarks } from "../terrain/landmarks"
 import { computeThermalEquator, getClimateGeometry } from "./rain"
+import type { FlowGrid } from "./wind"
+import { rasterizeVectorGrid } from "./wind"
 
 const DEG2RAD = Math.PI / 180
 const TYPE_CONTINENT = 0
@@ -34,6 +36,8 @@ interface OceanCurrentResult {
 	/** Per-cell temperature delta applied by ocean currents (°C). Zero where no effect. */
 	temperatureDelta: Float32Array
 }
+
+const OCEAN_CURRENT_SMOOTHING_PASSES = 2
 
 function piecewise(xs: number[], ys: number[], x: number): number {
 	if (x <= xs[0]) return ys[0]
@@ -368,6 +372,16 @@ export function computeOceanCurrents(
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 	const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
 
+	let annualTeq: Float32Array | undefined
+	if (monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS) {
+		annualTeq = new Float32Array(TEQ_BINS)
+		for (let bin = 0; bin < TEQ_BINS; bin++) {
+			let sum = 0
+			for (const teq of monthlyTEQ) sum += teq[bin]
+			annualTeq[bin] = sum / CURRENT_EFFECT_MONTHS
+		}
+	}
+
 	const isContinent = new Uint8Array(N)
 	const isLake = new Uint8Array(N)
 	for (let r = 0; r < N; r++) {
@@ -393,10 +407,20 @@ export function computeOceanCurrents(
 	const warmSeed = new Float32Array(N)
 	const coldSeed = new Float32Array(N)
 
-	fillOceanBeltSeeds(warmSeed, coldSeed, isLand, isLake, latDeg, regionBin)
+	fillOceanBeltSeeds(
+		warmSeed,
+		coldSeed,
+		isLand,
+		isLake,
+		latDeg,
+		regionBin,
+		annualTeq,
+	)
 	for (const site of coastSites) {
-		const distFromEquator = Math.abs(latDeg[site.region])
-		const warmth = classifyCurrentWarmth(distFromEquator, site.eastFacing)
+		const distFromReference = annualTeq
+			? Math.abs(latDeg[site.region] - annualTeq[site.lonBin])
+			: Math.abs(latDeg[site.region])
+		const warmth = classifyCurrentWarmth(distFromReference, site.eastFacing)
 		if (warmth > 0) {
 			for (const nb of site.oceanNeighbors) warmSeed[nb] = 1
 		} else if (warmth < 0) {
@@ -578,4 +602,94 @@ export function applyCurrentTemperatureEffect(
 			climate.temperature_monthly[m * N + r] += delta
 		}
 	}
+}
+
+export function buildOceanCurrentGrid(
+	mesh: SphereMesh,
+	oceanWarmth: Float32Array,
+	isLand: Uint8Array,
+	latDeg: Float32Array,
+	lonDeg: Float32Array,
+	_teqByLon?: Float32Array,
+	_regionBin?: Int32Array,
+): FlowGrid {
+	const N = mesh.numRegions
+	const { adjOffset, adjList } = mesh
+	const gradX = new Float32Array(N)
+	const gradY = new Float32Array(N)
+	const smoothedX = new Float32Array(N)
+	const smoothedY = new Float32Array(N)
+	const currentU = new Float32Array(N)
+	const currentV = new Float32Array(N)
+	const currentSpeed = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		let gx = 0
+		let gy = 0
+		let weightSum = 0
+		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+			const nb = adjList[j]
+			const dx =
+				wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r]) *
+				Math.cos((((latDeg[r] + latDeg[nb]) * 0.5) / 180) * Math.PI)
+			const dy = latDeg[nb] - latDeg[r]
+			const distSq = dx * dx + dy * dy
+			if (distSq <= 1e-6) continue
+			const neighbourWarmth = isLand[nb] ? 0 : oceanWarmth[nb]
+			const dw = neighbourWarmth - oceanWarmth[r]
+			gx += (dw * dx) / distSq
+			gy += (dw * dy) / distSq
+			weightSum += 1
+		}
+		if (weightSum > 0) {
+			gradX[r] = gx / weightSum
+			gradY[r] = gy / weightSum
+		}
+	}
+
+	let srcX = gradX
+	let srcY = gradY
+	let dstX = smoothedX
+	let dstY = smoothedY
+	for (let pass = 0; pass < OCEAN_CURRENT_SMOOTHING_PASSES; pass++) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r]) {
+				dstX[r] = 0
+				dstY[r] = 0
+				continue
+			}
+			let sumX = srcX[r]
+			let sumY = srcY[r]
+			let count = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (isLand[nb]) continue
+				sumX += srcX[nb]
+				sumY += srcY[nb]
+				count++
+			}
+			dstX[r] = sumX / count
+			dstY[r] = sumY / count
+		}
+		;[srcX, dstX] = [dstX, srcX]
+		;[srcY, dstY] = [dstY, srcY]
+	}
+
+	for (let r = 0; r < N; r++) {
+		if (isLand[r]) continue
+		const hemisphereTurn = latDeg[r] >= 0 ? 1 : -1
+		const u = srcY[r] * hemisphereTurn
+		const v = -srcX[r] * hemisphereTurn
+		const speed = Math.hypot(u, v)
+		currentU[r] = u
+		currentV[r] = v
+		currentSpeed[r] = speed
+	}
+
+	return rasterizeVectorGrid(mesh, currentU, currentV, currentSpeed, {
+		scalar: oceanWarmth,
+		allowCell: (region) => !isLand[region],
+		isBlockedRegion: (region) => !!isLand[region],
+	})
 }

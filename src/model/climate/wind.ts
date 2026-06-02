@@ -120,37 +120,55 @@ function surfaceWindFactor(r: number, surface: WindSurface): number {
 	return vegFactor * topoFactor * coastalFactor
 }
 
-/** 1°-resolution wind lookup grid for particle animation. */
-export interface WindGrid {
+/** 1°-resolution vector lookup grid for particle animation. */
+export interface FlowGrid {
 	/** Eastward component per cell, row-major lat×lon. */
 	u: Float32Array
 	/** Northward component per cell. */
 	v: Float32Array
 	/** Approximate wind speed (m/s) per cell. */
 	speed: Float32Array
+	/** Optional scalar field used for particle coloring or spawn masking. */
+	scalar?: Float32Array
+	/** Optional active-cell mask (1 = active, 0 = inactive). */
+	mask?: Uint8Array
 	/** Grid width (360 = 1° per column, lon -180…179). */
 	width: 360
 	/** Grid height (181 = 1° per row, lat -90…90). */
 	height: 181
 }
 
+export type WindGrid = FlowGrid
+
+interface RasterizeVectorGridOptions {
+	scalar?: Float32Array
+	allowCell?: (region: number) => boolean
+	isBlockedRegion?: (region: number) => boolean
+}
+
 /**
- * Build a 360×181 lat/lon lookup grid from sparse mesh wind data.
+ * Build a 360×181 lat/lon lookup grid from sparse mesh vector data.
  * Empty cells (no mesh region) are filled by 3 passes of neighbour diffusion
  * so particle lookups never stall at holes.
  */
-export function computeWindGrid(
+export function rasterizeVectorGrid(
 	mesh: SphereMesh,
-	windU: Float32Array,
-	windV: Float32Array,
-	windSpeed: Float32Array,
-): WindGrid {
+	vectorU: Float32Array,
+	vectorV: Float32Array,
+	vectorSpeed: Float32Array,
+	options: RasterizeVectorGridOptions = {},
+): FlowGrid {
 	const W = 360
 	const H = 181
 	const u = new Float32Array(W * H)
 	const v = new Float32Array(W * H)
 	const speed = new Float32Array(W * H)
 	const cnt = new Int32Array(W * H)
+	const scalar = options.scalar ? new Float32Array(W * H) : undefined
+	const activeMask = options.allowCell ? new Uint8Array(W * H) : undefined
+	const blockedVotes = options.isBlockedRegion
+		? new Int16Array(W * H)
+		: undefined
 
 	const { latDeg, lonDeg } = getClimateGeometry(mesh)
 	const N = mesh.numRegions
@@ -158,16 +176,21 @@ export function computeWindGrid(
 		const li = Math.max(0, Math.min(H - 1, Math.round(latDeg[r] + 90)))
 		const ci = Math.max(0, Math.min(W - 1, Math.round(lonDeg[r] + 180)))
 		const idx = li * W + ci
-		u[idx] += windU[r]
-		v[idx] += windV[r]
-		speed[idx] += windSpeed[r]
+		if (blockedVotes) blockedVotes[idx] += options.isBlockedRegion?.(r) ? 1 : -1
+		if (options.allowCell && !options.allowCell(r)) continue
+		u[idx] += vectorU[r]
+		v[idx] += vectorV[r]
+		speed[idx] += vectorSpeed[r]
+		if (scalar) scalar[idx] += options.scalar?.[r] ?? 0
 		cnt[idx]++
+		if (activeMask) activeMask[idx] = 1
 	}
 	for (let i = 0; i < W * H; i++) {
 		if (cnt[i] > 1) {
 			u[i] /= cnt[i]
 			v[i] /= cnt[i]
 			speed[i] /= cnt[i]
+			if (scalar) scalar[i] /= cnt[i]
 		}
 	}
 
@@ -175,14 +198,17 @@ export function computeWindGrid(
 	const tmpU = u.slice()
 	const tmpV = v.slice()
 	const tmpS = speed.slice()
+	const tmpScalar = scalar?.slice()
 	for (let pass = 0; pass < 3; pass++) {
 		for (let li = 0; li < H; li++) {
 			for (let ci = 0; ci < W; ci++) {
 				const idx = li * W + ci
 				if (cnt[idx] > 0) continue
+				if (blockedVotes && blockedVotes[idx] > 0) continue
 				let su = 0,
 					sv = 0,
 					ss = 0,
+					sc = 0,
 					n = 0
 				const neighbours = [
 					[li - 1, ci],
@@ -197,6 +223,7 @@ export function computeWindGrid(
 						su += tmpU[ni]
 						sv += tmpV[ni]
 						ss += tmpS[ni]
+						if (tmpScalar) sc += tmpScalar[ni] ?? 0
 						n++
 					}
 				}
@@ -204,6 +231,7 @@ export function computeWindGrid(
 					u[idx] = su / n
 					v[idx] = sv / n
 					speed[idx] = ss / n
+					if (scalar) scalar[idx] = sc / n
 					cnt[idx] = 1
 				}
 			}
@@ -211,9 +239,37 @@ export function computeWindGrid(
 		tmpU.set(u)
 		tmpV.set(v)
 		tmpS.set(speed)
+		tmpScalar?.set(scalar ?? new Float32Array())
 	}
 
-	return { u, v, speed, width: W as 360, height: H as 181 }
+	if (blockedVotes) {
+		for (let i = 0; i < W * H; i++) {
+			if (blockedVotes[i] <= 0) continue
+			u[i] = 0
+			v[i] = 0
+			speed[i] = 0
+			if (scalar) scalar[i] = 0
+		}
+	}
+
+	return {
+		u,
+		v,
+		speed,
+		scalar,
+		mask: activeMask,
+		width: W as 360,
+		height: H as 181,
+	}
+}
+
+export function computeWindGrid(
+	mesh: SphereMesh,
+	windU: Float32Array,
+	windV: Float32Array,
+	windSpeed: Float32Array,
+): WindGrid {
+	return rasterizeVectorGrid(mesh, windU, windV, windSpeed)
 }
 
 export interface WindArrowData {

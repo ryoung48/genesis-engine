@@ -590,7 +590,7 @@ export function generateOrogenWorld(
 			r_hotspot,
 			r_mantleUpwelling,
 			terrainFeatures,
-			enableOceanCurrents: false,
+			enableOceanCurrents: true,
 			onProgress,
 		}),
 	)
