@@ -52,8 +52,7 @@ function getWorldSections({
 			{ label: "Lock", value: stats.get("Lock") },
 			{ label: "Habitability", value: stats.get("Habitability") },
 			{ label: "Cell", value: stats.get("Cell") },
-			{ label: "Land Area", value: stats.get("Land Area") },
-			{ label: "Continents", value: stats.get("Continents") },
+			{ label: "Land Coverage", value: stats.get("Land Coverage") },
 			{ label: "Provinces", value: stats.get("Provinces") },
 			{ label: "Avg Province Area", value: stats.get("Avg Province Area") },
 			{ label: "Locations", value: stats.get("Locations") },
@@ -62,6 +61,8 @@ function getWorldSections({
 			Boolean(stat.value),
 		),
 		environmental: [
+			{ label: "Continents", value: stats.get("Continents") },
+			{ label: "Land Area", value: stats.get("Land Area") },
 			{ label: "Avg Temp", value: stats.get("Avg Temp") },
 			{ label: "Avg Rain", value: stats.get("Avg Rain") },
 			{ label: "Avg DTR", value: stats.get("Avg DTR") },

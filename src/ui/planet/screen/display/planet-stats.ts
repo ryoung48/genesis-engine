@@ -234,9 +234,13 @@ export function computePlanetStats(
 		{
 			label: "Land Area",
 			value:
-				landAreaKm2 !== null && landPercent !== null
-					? `${formatArea(landAreaKm2, unitSystem, { digits: 1, compact: "M" })} (${landPercent.toFixed(1)}%)`
+				landAreaKm2 !== null
+					? formatArea(landAreaKm2, unitSystem, { digits: 1, compact: "M" })
 					: "-",
+		},
+		{
+			label: "Land Coverage",
+			value: landPercent !== null ? `${landPercent.toFixed(1)}%` : "-",
 		},
 		...(seaLevelShiftStat ? [seaLevelShiftStat] : []),
 		{

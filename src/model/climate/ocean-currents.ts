@@ -340,7 +340,13 @@ export function computeOceanCurrents(
 	monthlyTEQ?: Float32Array[],
 ): OceanCurrentResult {
 	if (params?.tidallyLocked) {
-		return computeLockedOceanCurrents(mesh, isLand, distCoast, landmarks, params)
+		return computeLockedOceanCurrents(
+			mesh,
+			isLand,
+			distCoast,
+			landmarks,
+			params,
+		)
 	}
 	const N = mesh.numRegions
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
@@ -502,8 +508,10 @@ export function computeOceanCurrents(
  * Warm currents (Gulf Stream, Kuroshio) raise SST and coastal land temps;
  * cold currents (California, Benguela, Humboldt) lower them.
  *
- * Ocean:  up to ±5°C for strong currents
- * Land:   up to ±3°C at coast, fading inland (coastalWarmth already fades)
+ * Ocean: up to ~15°C at high latitudes (60°), ~8°C in subtropics (40°)
+ * Land:  warm currents penetrate further inland (0.68×); cold currents are
+ *        more coastal (0.42×). Seasonal modulation amplifies warm-current
+ *        effects in cold months and cold-current effects in hot months.
  */
 export function applyCurrentTemperatureEffect(
 	mesh: SphereMesh,
@@ -550,12 +558,27 @@ export function applyCurrentTemperatureEffect(
 		const oceanWarmthMonthly = currents.oceanWarmthMonthly!
 		const coastalWarmthMonthly = currents.coastalWarmthMonthly!
 		for (let r = 0; r < N; r++) {
-			let annualDelta = 0
 			const bin = regionBin[r]
+
+			// Pre-current mean temperature used as the deviation baseline below.
+			// Computed from monthly values directly — temperature_avg may have drifted
+			// if prior effects applied non-uniform monthly deltas before this pass.
+			let meanTemp = 0
+			for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
+				meanTemp += climate.temperature_monthly[m * N + r]
+			}
+			meanTemp /= CURRENT_EFFECT_MONTHS
+
+			// Pass 1: apply per-month base delta from current strength.
+			// This preserves genuine seasonal variation in current intensity (e.g.
+			// a current that weakens in summer because the TEQ shifts).
+			let annualDelta = 0
+			let wAnnual = 0
 			for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
 				const w = isLand[r]
 					? coastalWarmthMonthly[m * N + r]
 					: oceanWarmthMonthly[m * N + r]
+				wAnnual += w
 				if (Math.abs(w) < 0.01) continue
 				const teq = monthlyTEQ![m][bin]
 				const distFromTEQ = Math.abs(latDeg[r] - teq)
@@ -570,17 +593,42 @@ export function applyCurrentTemperatureEffect(
 					distFromTEQ,
 				)
 				let maxEffect = w > 0 ? warmMaxAtLat : coldMaxAtLat
-				if (isLand[r]) maxEffect *= 0.6
-				const delta = w * maxEffect
-				temperatureDeltaMonthly[m * N + r] = delta
-				climate.temperature_monthly[m * N + r] += delta
-				annualDelta += delta
+				// Warm currents penetrate further inland than cold upwelling currents.
+				if (isLand[r]) maxEffect *= w > 0 ? 0.68 : 0.42
+				const baseDelta = w * maxEffect
+				temperatureDeltaMonthly[m * N + r] = baseDelta
+				climate.temperature_monthly[m * N + r] += baseDelta
+				annualDelta += baseDelta
 			}
 			annualDelta /= CURRENT_EFFECT_MONTHS
+			wAnnual /= CURRENT_EFFECT_MONTHS
 			currents.temperatureDelta[r] = annualDelta
 			climate.temperature_avg[r] += annualDelta
-			climate.temperature_min[r] += annualDelta
-			climate.temperature_max[r] += annualDelta
+
+			// Pass 2: maritime moderation — scale each month's pre-current deviation
+			// from the mean, matching the inertia-factor pattern in climate.ts.
+			// Both warm and cold currents compress seasonal swings; warm currents
+			// provide extra heating in cold months, cold currents extra cooling in
+			// hot months. The mean of this pass is always zero so annualDelta holds.
+			const moderationFactor = 1 - Math.abs(wAnnual) * 0.3
+			let minDelta = 0
+			let maxDelta = 0
+			for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
+				// Recover the original pre-current temperature for this month by
+				// subtracting the base delta applied in pass 1.
+				const dev =
+					climate.temperature_monthly[m * N + r] -
+					temperatureDeltaMonthly[m * N + r] -
+					meanTemp
+				const seasonalAdditional = dev * (moderationFactor - 1)
+				climate.temperature_monthly[m * N + r] += seasonalAdditional
+				temperatureDeltaMonthly[m * N + r] += seasonalAdditional
+				const totalDelta = temperatureDeltaMonthly[m * N + r]
+				if (totalDelta < minDelta) minDelta = totalDelta
+				if (totalDelta > maxDelta) maxDelta = totalDelta
+			}
+			climate.temperature_min[r] += minDelta
+			climate.temperature_max[r] += maxDelta
 		}
 		return
 	}
@@ -593,7 +641,7 @@ export function applyCurrentTemperatureEffect(
 		const warmMaxAtLat = piecewise(WARM_EFFECT_XS, WARM_EFFECT_YS, distFromTEQ)
 		const coldMaxAtLat = piecewise(WARM_EFFECT_XS, COLD_EFFECT_YS, distFromTEQ)
 		let maxEffect = w > 0 ? warmMaxAtLat : coldMaxAtLat
-		if (isLand[r]) maxEffect *= 0.6
+		if (isLand[r]) maxEffect *= w > 0 ? 0.68 : 0.42
 		const delta = w * maxEffect
 
 		currents.temperatureDelta[r] = delta
@@ -682,12 +730,19 @@ export function buildOceanCurrentGrid(
 		;[srcY, dstY] = [dstY, srcY]
 	}
 
+	// Coriolis scales with rotation rate. Fast rotators produce geostrophic flow
+	// (90° deflection). Slow rotators approach direct density-driven flow (warm→cold).
+	const coriolisStrength = Math.min(1, Math.sqrt(24 / hoursPerDay))
 	for (let r = 0; r < N; r++) {
 		if (isLand[r]) continue
 		const hemisphereTurn =
 			(latDeg[r] >= 0 ? 1 : -1) * (reverseCirculation ? -1 : 1)
-		const u = srcY[r] * hemisphereTurn
-		const v = -srcX[r] * hemisphereTurn
+		const u =
+			srcY[r] * hemisphereTurn * coriolisStrength -
+			srcX[r] * (1 - coriolisStrength)
+		const v =
+			-srcX[r] * hemisphereTurn * coriolisStrength -
+			srcY[r] * (1 - coriolisStrength)
 		const speed = Math.hypot(u, v)
 		currentU[r] = u
 		currentV[r] = v

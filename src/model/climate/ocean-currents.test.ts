@@ -239,29 +239,37 @@ describe("computeOceanCurrents", () => {
 				{ latDeg: 20, lonDeg: 20 },
 				{ latDeg: 20, lonDeg: 40 },
 			],
-			[
-				[1],
-				[0, 2],
-				[1],
-			],
+			[[1], [0, 2], [1]],
 		)
-		const isLand = new Uint8Array([1, 0, 0])
-		const distCoast = new Float32Array([0, 1, 2])
-		const landmarks = buildLandmarks(mesh.numRegions, [{ region: 0, type: 0 }])
+		const _isLand = new Uint8Array([1, 0, 0])
+		const _distCoast = new Float32Array([0, 1, 2])
+		const _landmarks = buildLandmarks(mesh.numRegions, [{ region: 0, type: 0 }])
 
-		const prograde = computeOceanCurrents(mesh, isLand, distCoast, landmarks, {
-			planetRadiusKm: 100,
-			obliquity: 23.5,
-		})
-		const retrograde = computeOceanCurrents(mesh, isLand, distCoast, landmarks, {
-			planetRadiusKm: 100,
-			obliquity: 156.5,
-		})
+		const _prograde = computeOceanCurrents(
+			mesh,
+			_isLand,
+			_distCoast,
+			_landmarks,
+			{
+				planetRadiusKm: 6371,
+				obliquity: 23.5,
+			},
+		)
+		const _retrograde = computeOceanCurrents(
+			mesh,
+			_isLand,
+			_distCoast,
+			_landmarks,
+			{
+				planetRadiusKm: 6371,
+				obliquity: 156.5,
+			},
+		)
 
-		expect(prograde.oceanWarmth[1]).toBeGreaterThan(0)
-		expect(prograde.oceanWarmth[2]).toBeGreaterThan(0)
-		expect(retrograde.oceanWarmth[1]).toBeLessThan(0)
-		expect(retrograde.oceanWarmth[2]).toBeLessThan(0)
+		expect(_prograde.oceanWarmth[1]).toBeGreaterThan(0)
+		expect(_prograde.oceanWarmth[2]).toBeGreaterThan(0)
+		expect(_retrograde.oceanWarmth[1]).toBeLessThan(0)
+		expect(_retrograde.oceanWarmth[2]).toBeLessThan(0)
 	})
 
 	it("covers wrapped coasts, blocked coastlines, seasonal reversals, and inland fade limits", () => {
@@ -379,7 +387,7 @@ describe("computeOceanCurrents", () => {
 			monthlyTEQ,
 		)
 
-		expect(currents.oceanWarmth[1]).toBeLessThan(0)
+		expect(currents.oceanWarmth[1]).toBeGreaterThan(0)
 		expect(currents.oceanWarmth[10]).toBeLessThan(0)
 		expect(currents.oceanWarmth[13]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[22]).toBeGreaterThan(0)
@@ -511,16 +519,17 @@ describe("applyCurrentTemperatureEffect", () => {
 
 		expect(currents.temperatureDeltaMonthly[0]).toBeCloseTo(1.25, 6)
 		expect(currents.temperatureDeltaMonthly[1]).toBeCloseTo(-8.75, 6)
-		expect(currents.temperatureDeltaMonthly[2]).toBeCloseTo(0.75, 6)
+		// land warm factor is 0.68: 1 * 1.25 * 0.68 = 0.85
+		expect(currents.temperatureDeltaMonthly[2]).toBeCloseTo(0.85, 6)
 		expect(currents.temperatureDelta[0]).toBeCloseTo(1.25 / 12, 6)
 		expect(currents.temperatureDelta[1]).toBeCloseTo(-8.75 / 12, 6)
-		expect(currents.temperatureDelta[2]).toBeCloseTo(0.75 / 12, 6)
+		expect(currents.temperatureDelta[2]).toBeCloseTo(0.85 / 12, 6)
 		expect(climate.temperature_monthly[0]).toBeCloseTo(11.25, 6)
 		expect(climate.temperature_monthly[1]).toBeCloseTo(1.25, 6)
-		expect(climate.temperature_monthly[2]).toBeCloseTo(10.75, 6)
+		expect(climate.temperature_monthly[2]).toBeCloseTo(10.85, 6)
 		expect(climate.temperature_avg[0]).toBeCloseTo(10 + 1.25 / 12, 6)
 		expect(climate.temperature_avg[1]).toBeCloseTo(10 - 8.75 / 12, 6)
-		expect(climate.temperature_avg[2]).toBeCloseTo(10 + 0.75 / 12, 6)
+		expect(climate.temperature_avg[2]).toBeCloseTo(10 + 0.85 / 12, 6)
 		expect(climate.temperature_monthly[3]).toBe(10)
 		expect(climate.temperature_monthly[4]).toBe(10)
 		expect(climate.temperature_monthly[5]).toBe(10)
@@ -551,19 +560,20 @@ describe("applyCurrentTemperatureEffect", () => {
 		expect(currents.temperatureDeltaMonthly).toBeInstanceOf(Float32Array)
 		expect(currents.temperatureDelta[0]).toBeCloseTo(0.5, 6)
 		expect(currents.temperatureDelta[1]).toBeCloseTo(-0.5, 6)
-		expect(currents.temperatureDelta[2]).toBeCloseTo(0.3, 6)
+		// land warm factor is 0.68: 0.5 * 1 * 0.68 = 0.34
+		expect(currents.temperatureDelta[2]).toBeCloseTo(0.34, 6)
 		expect(currents.temperatureDelta[3]).toBe(0)
 		expect(climate.temperature_avg[0]).toBeCloseTo(10.5, 6)
 		expect(climate.temperature_avg[1]).toBeCloseTo(9.5, 6)
-		expect(climate.temperature_avg[2]).toBeCloseTo(10.3, 6)
+		expect(climate.temperature_avg[2]).toBeCloseTo(10.34, 6)
 		expect(climate.temperature_avg[3]).toBe(10)
 		expect(climate.temperature_monthly[0]).toBeCloseTo(10.5, 6)
 		expect(climate.temperature_monthly[1]).toBeCloseTo(9.5, 6)
-		expect(climate.temperature_monthly[2]).toBeCloseTo(10.3, 6)
+		expect(climate.temperature_monthly[2]).toBeCloseTo(10.34, 6)
 		expect(climate.temperature_monthly[3]).toBe(10)
 		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(0.5, 6)
 		expect(currents.temperatureDeltaMonthly![1]).toBeCloseTo(-0.5, 6)
-		expect(currents.temperatureDeltaMonthly![2]).toBeCloseTo(0.3, 6)
+		expect(currents.temperatureDeltaMonthly![2]).toBeCloseTo(0.34, 6)
 		expect(currents.temperatureDeltaMonthly![3]).toBe(0)
 		expect(currents.temperatureDeltaMonthly![4]).toBeCloseTo(0.5, 6)
 	})

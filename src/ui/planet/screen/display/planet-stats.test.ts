@@ -76,8 +76,10 @@ describe("computePlanetStats", () => {
 		expect(statValue(imperial, "Locations")).toBe("6")
 		expect(statValue(metric, "Avg Location Area")).toMatch(/k km²$/)
 		expect(statValue(imperial, "Avg Location Area")).toMatch(/k mi²$/)
-		expect(statValue(metric, "Land Area")).toMatch(/M km² \(50\.0%\)$/)
-		expect(statValue(imperial, "Land Area")).toMatch(/M mi² \(50\.0%\)$/)
+		expect(statValue(metric, "Land Area")).toMatch(/M km²$/)
+		expect(statValue(imperial, "Land Area")).toMatch(/M mi²$/)
+		expect(statValue(metric, "Land Coverage")).toBe("50.0%")
+		expect(statValue(imperial, "Land Coverage")).toBe("50.0%")
 	})
 
 	it("falls back to params and placeholders when world data is missing", () => {

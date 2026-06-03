@@ -96,6 +96,8 @@ export const FlowParticleCanvas: React.FC<FlowParticleCanvasProps> = ({
 	const viewModeRef = useRef(viewMode)
 	const getColorRef = useRef(getColor)
 	const randomPositionRef = useRef(randomPosition)
+	const needsClearRef = useRef(false)
+	const sentinelAtLastClearRef = useRef<[number, number] | null>(null)
 
 	useEffect(() => {
 		gridRef.current = grid
@@ -105,6 +107,7 @@ export const FlowParticleCanvas: React.FC<FlowParticleCanvasProps> = ({
 	}, [visible])
 	useEffect(() => {
 		projectRef.current = projectToScreen
+		needsClearRef.current = true
 	}, [projectToScreen])
 	useEffect(() => {
 		cameraDirRef.current = getGlobeCameraDir
@@ -181,12 +184,39 @@ export const FlowParticleCanvas: React.FC<FlowParticleCanvasProps> = ({
 			const h = canvas.height
 			if (w === 0 || h === 0) return
 
-			ctx.globalCompositeOperation = "destination-out"
-			ctx.fillStyle = `rgba(0,0,0,${trailAlpha})`
-			ctx.fillRect(0, 0, w, h)
-			ctx.globalCompositeOperation = "source-over"
+			// Detect pan/zoom by projecting a fixed sentinel point and checking
+			// whether its screen position has drifted from when we last cleared.
+			const sentinelPos =
+				projectRef.current([1, 0, 0]) ??
+				projectRef.current([0, 1, 0]) ??
+				projectRef.current([0, 0, 1])
+			const lastSentinel = sentinelAtLastClearRef.current
+			const viewDrifted =
+				sentinelPos !== null &&
+				lastSentinel !== null &&
+				(Math.abs(sentinelPos[0] - lastSentinel[0]) > 2 ||
+					Math.abs(sentinelPos[1] - lastSentinel[1]) > 2)
 
-			if (!visibleRef.current || !gridRef.current) return
+			if (needsClearRef.current || viewDrifted) {
+				needsClearRef.current = false
+				sentinelAtLastClearRef.current = sentinelPos
+				ctx.clearRect(0, 0, w, h)
+			} else {
+				if (sentinelAtLastClearRef.current === null && sentinelPos !== null) {
+					sentinelAtLastClearRef.current = sentinelPos
+				}
+				ctx.globalCompositeOperation = "destination-out"
+				ctx.fillStyle = `rgba(0,0,0,${trailAlpha})`
+				ctx.fillRect(0, 0, w, h)
+				ctx.globalCompositeOperation = "source-over"
+			}
+
+			if (!visibleRef.current || !gridRef.current) {
+				if (!gridRef.current) {
+					ctx.clearRect(0, 0, w, h)
+				}
+				return
+			}
 
 			const activeGrid = gridRef.current
 			const latArr = lats.current

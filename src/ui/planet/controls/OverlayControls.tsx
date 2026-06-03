@@ -84,6 +84,14 @@ interface OverlayControlsProps {
 	setShowThermalEquator: (v: boolean) => void
 	showWindArrows: boolean
 	setShowWindArrows: (v: boolean) => void
+	showGdd: boolean
+	setShowGdd: (v: boolean) => void
+	showGint: boolean
+	setShowGint: (v: boolean) => void
+	showPet: boolean
+	setShowPet: (v: boolean) => void
+	showAet: boolean
+	setShowAet: (v: boolean) => void
 	showOceanCurrents: boolean
 	setShowOceanCurrents: (v: boolean) => void
 	showGrid: boolean
@@ -166,6 +174,14 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowThermalEquator,
 	showWindArrows,
 	setShowWindArrows,
+	showGdd,
+	setShowGdd,
+	showGint,
+	setShowGint,
+	showPet,
+	setShowPet,
+	showAet,
+	setShowAet,
 	showOceanCurrents,
 	setShowOceanCurrents,
 	showGrid,
@@ -1132,6 +1148,43 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															setColorMode("koppenClimate")
 														}}
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<div className="border-t border-white/10" />
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>GDD</span>
+													<input
+														type="checkbox"
+														checked={showGdd}
+														onChange={(e) => setShowGdd(e.target.checked)}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>GInt</span>
+													<input
+														type="checkbox"
+														checked={showGint}
+														onChange={(e) => setShowGint(e.target.checked)}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>PET</span>
+													<input
+														type="checkbox"
+														checked={showPet}
+														onChange={(e) => setShowPet(e.target.checked)}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>AET</span>
+													<input
+														type="checkbox"
+														checked={showAet}
+														onChange={(e) => setShowAet(e.target.checked)}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
 											</div>

@@ -192,11 +192,13 @@ export function getHoverHumidity(
 	}
 
 	const annualRainfall = world.rainfall?.annual[r]
+	const distFromOceanKm = world.oceanDist[r]
 	const annual = relativeHumidityFromTempRange(
 		world.climate.temperature_avg[r],
 		world.dtr_annual[r],
 		annualAridity,
 		annualRainfall,
+		distFromOceanKm,
 	)
 	const monthly: number[] = []
 	if (world.dtr_monthly && world.climate.temperature_monthly) {
@@ -207,6 +209,7 @@ export function getHoverHumidity(
 					world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
 					annualAridity,
 					annualRainfall,
+					distFromOceanKm,
 				),
 			)
 		}

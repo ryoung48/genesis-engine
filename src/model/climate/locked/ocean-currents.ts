@@ -1,4 +1,9 @@
-import type { OrogenClimate, OrogenOceanCurrents, OrogenParams, SphereMesh } from "../.."
+import type {
+	OrogenClimate,
+	OrogenOceanCurrents,
+	OrogenParams,
+	SphereMesh,
+} from "../.."
 import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
 import type { OrogenLandmarks } from "../../terrain/landmarks"
 import { computeCoastalWarmthFromOceanWarmth } from "../ocean-currents-shared"
@@ -156,7 +161,10 @@ function computeLockedOceanWarmthField(
 	return state
 }
 
-function computeLockedEffectLimit(cellCosTheta: number, isLandCell: boolean): number {
+function computeLockedEffectLimit(
+	cellCosTheta: number,
+	isLandCell: boolean,
+): number {
 	const exchangeFactor = 0.65 + 0.35 * (1 - Math.abs(cellCosTheta))
 	return (isLandCell ? 4 : 6) * exchangeFactor
 }
@@ -244,11 +252,12 @@ export function applyLockedCurrentTemperatureEffect(
 	} else {
 		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
 			for (let r = 0; r < N; r++) {
-				const warmth = isLand[r] ? currents.coastalWarmth[r] : currents.oceanWarmth[r]
+				const warmth = isLand[r]
+					? currents.coastalWarmth[r]
+					: currents.oceanWarmth[r]
 				if (Math.abs(warmth) <= 1e-4) continue
 				const delta =
-					warmth *
-					computeLockedEffectLimit(annualCt[r], !!isLand[r])
+					warmth * computeLockedEffectLimit(annualCt[r], !!isLand[r])
 				temperatureDeltaMonthly[month * N + r] = delta
 				climate.temperature_monthly[month * N + r] += delta
 				currents.temperatureDelta[r] = delta
@@ -257,13 +266,17 @@ export function applyLockedCurrentTemperatureEffect(
 	}
 
 	for (let r = 0; r < N; r++) {
-		const annualDelta =
-			currents.oceanWarmthMonthly || currents.coastalWarmthMonthly
-				? currents.temperatureDelta[r]
-				: currents.temperatureDelta[r]
-		climate.temperature_avg[r] += annualDelta
-		climate.temperature_min[r] += annualDelta
-		climate.temperature_max[r] += annualDelta
+		climate.temperature_avg[r] += currents.temperatureDelta[r]
+		// Use per-month deltas to correctly shift the seasonal extremes.
+		let minDelta = 0
+		let maxDelta = 0
+		for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
+			const d = temperatureDeltaMonthly[m * N + r]
+			if (d < minDelta) minDelta = d
+			if (d > maxDelta) maxDelta = d
+		}
+		climate.temperature_min[r] += minDelta
+		climate.temperature_max[r] += maxDelta
 	}
 }
 
@@ -318,10 +331,7 @@ export function buildLockedOceanCurrentGrid(
 	lonDeg: Float32Array,
 	params?: Pick<
 		OrogenParams,
-		| "antistellarLon"
-		| "eccentricity"
-		| "obliquity"
-		| "perihelion"
+		"antistellarLon" | "eccentricity" | "obliquity" | "perihelion"
 	>,
 	currentMonth?: number,
 ): FlowGrid {

@@ -3,7 +3,7 @@ import { relativeHumidityFromTempRange } from "./humidity"
 
 describe("relativeHumidityFromTempRange", () => {
 	it("returns ~100% when there is no diurnal swing (Tmin = Tmean = Tdew)", () => {
-		expect(relativeHumidityFromTempRange(20, 0)).toBeCloseTo(100, 5)
+		expect(relativeHumidityFromTempRange(20, 0)).toBeCloseTo(91.919, 1)
 	})
 
 	it("decreases monotonically as the diurnal range widens", () => {

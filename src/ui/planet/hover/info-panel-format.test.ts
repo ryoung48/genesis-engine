@@ -146,10 +146,10 @@ describe("gintColor", () => {
 
 describe("dtrChartColor", () => {
 	it("covers all buckets", () => {
-		expect(dtrChartColor(0)).toBe("#38bdf8")
-		expect(dtrChartColor(6)).toBe("#67e8f9")
-		expect(dtrChartColor(10)).toBe("#facc15")
-		expect(dtrChartColor(14)).toBe("#fb923c")
-		expect(dtrChartColor(20)).toBe("#ef4444")
+		expect(dtrChartColor(0)).toBe("rgb(0, 4, 207)")
+		expect(dtrChartColor(6)).toBe("rgb(3, 122, 193)")
+		expect(dtrChartColor(10)).toBe("rgb(2, 231, 79)")
+		expect(dtrChartColor(14)).toBe("rgb(122, 250, 29)")
+		expect(dtrChartColor(20)).toBe("rgb(255, 255, 0)")
 	})
 })

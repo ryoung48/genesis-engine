@@ -24,7 +24,7 @@ function precipMoistureBoostC(annualRainfallMm: number): number {
 // Dry air-mass correction: in hot hyperarid regions the ambient dewpoint is
 // driven by air-mass origin, not local temperature swings. Gates to zero at
 // Tmean ≤ 0 °C (cold polar dryness is already handled by DTR) and reaches
-// full strength at Tmean ≥ 30 °C. Ramps from 0 at 300 mm/yr to −9 °C at 0
+// full strength at Tmean ≥ 30 °C. Ramps from 0 at 300 mm/yr to −13 °C at 0
 // mm/yr, pushing hot desert RH below 30 %.
 function dryAirDepressionC(
 	annualRainfallMm: number,
@@ -33,7 +33,15 @@ function dryAirDepressionC(
 	const deficit = 300 - annualRainfallMm
 	if (deficit <= 0) return 0
 	const tempGate = Math.max(0, Math.min(1, meanTempC / 30))
-	return -10.5 * (1 - Math.exp(-deficit / 100)) * tempGate
+	return -13 * (1 - Math.exp(-deficit / 100)) * tempGate
+}
+
+// Continentality correction: maritime air carries more moisture than
+// continental air regardless of local rainfall. Linear so extreme continental
+// interiors accumulate enough dewpoint depression to push RH toward zero
+// (~−3 °C at 1500 km, ~−6 °C at 3000 km, ~−20 °C at 10 000 km).
+function continentalityDewpointC(distFromOceanKm: number): number {
+	return -distFromOceanKm / 500
 }
 
 /**
@@ -53,9 +61,13 @@ function dryAirDepressionC(
  * reaches saturation.
  *
  * When `annualRainfallMm` is provided, two rainfall-driven corrections apply:
- * a moisture-source boost of up to +3 °C for high-rainfall zones, and a dry
- * air-mass depression of up to −9 °C for hot hyperarid zones (temperature-
+ * a moisture-source boost of up to +2 °C for high-rainfall zones, and a dry
+ * air-mass depression of up to −13 °C for hot hyperarid zones (temperature-
  * gated so cold polar dryness is unaffected).
+ *
+ * When `distFromOceanKm` is provided, a continentality correction depresses the
+ * dewpoint by up to −4 °C for deep continental interiors, capturing the drier
+ * air-mass character of regions far from maritime moisture sources.
  *
  * Result is clamped to 0–100.
  */
@@ -64,6 +76,7 @@ export function relativeHumidityFromTempRange(
 	dtrC: number,
 	annualAridity?: number,
 	annualRainfallMm?: number,
+	distFromOceanKm?: number,
 ): number {
 	const bias =
 		annualAridity !== undefined ? aridDewpointBiasC(annualAridity) : 0
@@ -73,7 +86,10 @@ export function relativeHumidityFromTempRange(
 		annualRainfallMm !== undefined
 			? dryAirDepressionC(annualRainfallMm, meanTempC)
 			: 0
-	const dewC = meanTempC - dtrC / 2 + bias + moistureBoost + dryDepression
+	const continentality =
+		distFromOceanKm !== undefined ? continentalityDewpointC(distFromOceanKm) : 0
+	const dewC =
+		meanTempC - dtrC / 2 + bias + moistureBoost + dryDepression + continentality
 	const rh =
 		100 *
 		(saturationVaporPressureKpa(dewC) / saturationVaporPressureKpa(meanTempC))

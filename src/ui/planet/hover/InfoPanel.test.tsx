@@ -294,10 +294,11 @@ describe("InfoPanel", () => {
 				tornado: 0,
 				tidal: 0,
 			},
+			dangerSubMode: "volcanic",
 		})
 
-		expect(markup).toContain(">Danger<")
-		expect(markup).toContain("(volcanic)")
+		expect(markup).toContain(">Volcanic<")
+		expect(markup).toContain(">30%<")
 	})
 
 	it("shows quake-tagged danger when earthquakes dominate", () => {
@@ -311,9 +312,11 @@ describe("InfoPanel", () => {
 				tornado: 0,
 				tidal: 0,
 			},
+			dangerSubMode: "earthquake",
 		})
 
-		expect(markup).toContain("(quakes)")
+		expect(markup).toContain(">Earthquake<")
+		expect(markup).toContain(">35%<")
 		expect(markup).not.toContain("(volcanic)")
 	})
 
@@ -323,6 +326,9 @@ describe("InfoPanel", () => {
 		})
 		const precipitationMarkup = renderPanel({
 			colorMode: "precipitation",
+			showPet: true,
+			showAet: true,
+			showRivers: true,
 			hoverRiver: {
 				flow: 12,
 				flow_monthly: Array.from({ length: 12 }, () => 12),
@@ -332,6 +338,8 @@ describe("InfoPanel", () => {
 		})
 		const pastaMarkup = renderPanel({
 			colorMode: "pastaClimate",
+			showGdd: true,
+			showGint: true,
 		})
 		const currentMarkup = renderPanel({
 			colorMode: "oceanCurrents",
@@ -344,7 +352,7 @@ describe("InfoPanel", () => {
 			},
 		})
 
-		expect(dtrMarkup).toContain("DTR Jan")
+		expect(dtrMarkup).toContain(">DTR<")
 		expect(precipitationMarkup).toContain(">PET<")
 		expect(precipitationMarkup).toContain(">AET<")
 		expect(precipitationMarkup).toContain("River Name 7")
@@ -433,6 +441,7 @@ describe("InfoPanel", () => {
 				tornado: 0,
 				tidal: 0,
 			},
+			showRivers: true,
 			hoverOceanDist: null,
 			hoverDistCoastKm: null,
 			hoverTopography: null,
@@ -461,6 +470,7 @@ describe("InfoPanel", () => {
 	it("renders infinite pasta summaries and cold current deltas", () => {
 		const pastaMarkup = renderPanel({
 			colorMode: "pastaClimate",
+			showGdd: true,
 			world: {
 				...makeWorld(),
 				pastaDebug: {
@@ -675,6 +685,7 @@ describe("InfoPanel", () => {
 		})
 		const riverMarkup = renderPanel({
 			colorMode: "precipitation",
+			showRivers: true,
 			hoverRiver: {
 				flow: 12,
 				flow_monthly: Array.from({ length: 11 }, () => 12),
@@ -691,6 +702,8 @@ describe("InfoPanel", () => {
 	it("omits the AET chart when all aet values are zero", () => {
 		const markup = renderPanel({
 			colorMode: "precipitation",
+			showPet: true,
+			showAet: true,
 			world: {
 				...makeWorld(),
 				hydrology: {

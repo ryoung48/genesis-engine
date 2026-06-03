@@ -261,6 +261,12 @@ interface InfoPanelProps {
 	hoverWindSpeed: number | null
 	hoverWindDir: string | null
 	hoverWindMonthly: Array<{ speedMs: number; dir: string }> | null
+	showWindArrows?: boolean
+	showRivers?: boolean
+	showGdd?: boolean
+	showGint?: boolean
+	showPet?: boolean
+	showAet?: boolean
 	showOceanCurrentOverlay?: boolean
 	colorMode: ColorMode
 	dangerSubMode: "earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
@@ -317,6 +323,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverWindSpeed,
 	hoverWindDir,
 	hoverWindMonthly,
+	showWindArrows = false,
+	showRivers = false,
+	showGdd = false,
+	showGint = false,
+	showPet = false,
+	showAet = false,
 	showOceanCurrentOverlay = false,
 	colorMode,
 	dangerSubMode,
@@ -911,8 +923,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								showValues
 							/>
 						)}
-						{colorMode === "pastaClimate" &&
-							hoverRegion !== null &&
+						{hoverRegion !== null &&
 							world.pastaDebug?.minT &&
 							world.pastaDebug?.maxT && (
 								<div className="flex justify-between font-mono text-[9px] text-slate-400">
@@ -981,16 +992,44 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								/>
 							)
 						)}
-						{colorMode === "precipitation" && !!chartData?.isLand && (
-							<>
+						{showPet && !!chartData?.isLand && (
+							<SeriesBars
+								values={chartData.pet}
+								labels={MONTH_SHORT}
+								label="PET"
+								colorForValue={(value) => petColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(
+									chartData.pet.reduce((sum, value) => sum + value, 0),
+									{
+										prefix: "ANN",
+										formatValue: (value) =>
+											formatPrecipitation(value, unitSystem, 0),
+									},
+								)}
+								formatValue={(value) =>
+									formatPrecipitation(value, unitSystem, 0).replace(
+										/ (mm|in)$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+								}
+								showValues
+							/>
+						)}
+						{showAet &&
+							!!chartData?.isLand &&
+							chartData.aet.some((v) => v > 0) && (
 								<SeriesBars
-									values={chartData.pet}
+									values={chartData.aet}
 									labels={MONTH_SHORT}
-									label="PET"
-									colorForValue={(value) => petColor(value)}
+									label="AET"
+									colorForValue={(value) => aetColor(value)}
 									activeIndex={activeBarIndex}
 									summary={buildSummary(
-										chartData.pet.reduce((sum, value) => sum + value, 0),
+										chartData.aet.reduce((sum, value) => sum + value, 0),
 										{
 											prefix: "ANN",
 											formatValue: (value) =>
@@ -1008,90 +1047,60 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									}
 									showValues
 								/>
-								{chartData.aet.some((v) => v > 0) && (
-									<SeriesBars
-										values={chartData.aet}
-										labels={MONTH_SHORT}
-										label="AET"
-										colorForValue={(value) => aetColor(value)}
-										activeIndex={activeBarIndex}
-										summary={buildSummary(
-											chartData.aet.reduce((sum, value) => sum + value, 0),
-											{
-												prefix: "ANN",
-												formatValue: (value) =>
-													formatPrecipitation(value, unitSystem, 0),
-											},
-										)}
-										formatValue={(value) =>
-											formatPrecipitation(value, unitSystem, 0).replace(
-												/ (mm|in)$/,
-												"",
-											)
-										}
-										tooltipLabel={({ index, value }) =>
-											`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
-										}
-										showValues
-									/>
-								)}
-							</>
-						)}
-						{colorMode === "pastaClimate" &&
-							pastaMonthlyData &&
-							!!chartData?.isLand && (
-								<>
-									{(() => {
-										const rawGdd =
-											world.pastaDebug?.gdd[hoverRegion] ?? undefined
-										const isInfGdd = rawGdd !== undefined && rawGdd >= 99999
-										return (
-											<SeriesBars
-												values={pastaMonthlyData.gdd}
-												labels={MONTH_SHORT}
-												label="GDD"
-												colorForValue={(value) => gddColor(value)}
-												activeIndex={activeBarIndex}
-												summary={buildSummary(rawGdd, {
-													prefix: isInfGdd ? "" : "ANN",
-													formatValue: (value) =>
-														value >= 99999 ? "∞" : value.toFixed(0),
-												})}
-												formatValue={(value) =>
-													value >= 99999 ? "∞" : value.toFixed(0)
-												}
-												tooltipLabel={({ index, value }) =>
-													`${monthLabels[index + 1]}: ${value >= 99999 ? "∞" : value.toFixed(0)}`
-												}
-												showValues
-											/>
-										)
-									})()}
-									<SeriesBars
-										values={pastaMonthlyData.gint}
-										labels={MONTH_SHORT}
-										label="GInt"
-										colorForValue={(value) => gintColor(value)}
-										activeIndex={activeBarIndex}
-										summary={buildSummary(
-											world.pastaDebug?.gint[hoverRegion] !== undefined
-												? world.pastaDebug.gint[hoverRegion] >= 99999
-													? 12
-													: world.pastaDebug.gint[hoverRegion]
-												: undefined,
-											{
-												prefix: "ANN",
-												formatValue: (value) => value.toFixed(0),
-											},
-										)}
-										formatValue={(value) => value.toFixed(0)}
-										tooltipLabel={({ index, value }) =>
-											`${monthLabels[index + 1]}: ${value.toFixed(0)}`
-										}
-										showValues
-									/>
-								</>
 							)}
+						{showGdd &&
+							pastaMonthlyData &&
+							!!chartData?.isLand &&
+							(() => {
+								const rawGdd = world.pastaDebug?.gdd[hoverRegion] ?? undefined
+								const isInfGdd = rawGdd !== undefined && rawGdd >= 99999
+								return (
+									<SeriesBars
+										values={pastaMonthlyData.gdd}
+										labels={MONTH_SHORT}
+										label="GDD"
+										colorForValue={(value) => gddColor(value)}
+										activeIndex={activeBarIndex}
+										summary={buildSummary(rawGdd, {
+											prefix: isInfGdd ? "" : "ANN",
+											formatValue: (value) =>
+												value >= 99999 ? "∞" : value.toFixed(0),
+										})}
+										formatValue={(value) =>
+											value >= 99999 ? "∞" : value.toFixed(0)
+										}
+										tooltipLabel={({ index, value }) =>
+											`${monthLabels[index + 1]}: ${value >= 99999 ? "∞" : value.toFixed(0)}`
+										}
+										showValues
+									/>
+								)
+							})()}
+						{showGint && pastaMonthlyData && !!chartData?.isLand && (
+							<SeriesBars
+								values={pastaMonthlyData.gint}
+								labels={MONTH_SHORT}
+								label="GInt"
+								colorForValue={(value) => gintColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(
+									world.pastaDebug?.gint[hoverRegion] !== undefined
+										? world.pastaDebug.gint[hoverRegion] >= 99999
+											? 12
+											: world.pastaDebug.gint[hoverRegion]
+										: undefined,
+									{
+										prefix: "ANN",
+										formatValue: (value) => value.toFixed(0),
+									},
+								)}
+								formatValue={(value) => value.toFixed(0)}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${value.toFixed(0)}`
+								}
+								showValues
+							/>
+						)}
 						{(colorMode === "oceanCurrents" || showOceanCurrentOverlay) &&
 							hasCurrentImpact &&
 							hoverOceanCurrents !== null && (
@@ -1117,40 +1126,43 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									/>
 								</div>
 							)}
-						{hoverRiver && hoverRiver.flow_monthly.length === 12 && (
-							<SeriesBars
-								values={hoverRiver.flow_monthly}
-								labels={MONTH_SHORT}
-								label={
-									hoverRiver.riverId >= 0
-										? getRiverName(hoverRiver.riverId)
-										: `River #${hoverRiver.riverId}`
-								}
-								colorForValue={(value) => flowColor(value)}
-								activeIndex={activeBarIndex}
-								summary={buildSummary(hoverRiver.flow, {
-									formatValue: (value) =>
-										formatFlowRate(value, unitSystem, formatCompactNumber),
-								})}
-								formatValue={(value) =>
-									formatFlowRate(
-										value,
-										unitSystem,
-										formatCompactNumber,
-									).replace(/ (m³\/s|ft³\/s)$/, "")
-								}
-								tooltipLabel={({ index, value }) =>
-									`${monthLabels[index + 1]}: ${formatFlowRate(value, unitSystem, formatCompactNumber)}`
-								}
-								showValues
-							/>
-						)}
-						{hoverRiver && hoverRiver.lengthKm > 0 && (
+						{showRivers &&
+							hoverRiver &&
+							hoverRiver.flow_monthly.length === 12 && (
+								<SeriesBars
+									values={hoverRiver.flow_monthly}
+									labels={MONTH_SHORT}
+									label={
+										hoverRiver.riverId >= 0
+											? getRiverName(hoverRiver.riverId)
+											: `River #${hoverRiver.riverId}`
+									}
+									colorForValue={(value) => flowColor(value)}
+									activeIndex={activeBarIndex}
+									summary={buildSummary(hoverRiver.flow, {
+										formatValue: (value) =>
+											formatFlowRate(value, unitSystem, formatCompactNumber),
+									})}
+									formatValue={(value) =>
+										formatFlowRate(
+											value,
+											unitSystem,
+											formatCompactNumber,
+										).replace(/ (m³\/s|ft³\/s)$/, "")
+									}
+									tooltipLabel={({ index, value }) =>
+										`${monthLabels[index + 1]}: ${formatFlowRate(value, unitSystem, formatCompactNumber)}`
+									}
+									showValues
+								/>
+							)}
+						{showRivers && hoverRiver && hoverRiver.lengthKm > 0 && (
 							<div className="-mt-1 font-mono text-[9px] text-slate-500">
 								Length {formatDistance(hoverRiver.lengthKm, unitSystem)}
 							</div>
 						)}
-						{hoverWindMonthly &&
+						{showWindArrows &&
+							hoverWindMonthly &&
 							(() => {
 								const speedFmt = (v: number) =>
 									unitSystem === "imperial"

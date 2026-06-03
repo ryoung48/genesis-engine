@@ -77,6 +77,14 @@ function renderWithProps(
 		hasCycloneRisk: false,
 		hasTornadoRisk: false,
 		hasTidalRisk: false,
+		showGdd: false,
+		setShowGdd: vi.fn(),
+		showGint: false,
+		setShowGint: vi.fn(),
+		showPet: false,
+		setShowPet: vi.fn(),
+		showAet: false,
+		setShowAet: vi.fn(),
 		exportWidthPreset: "8192",
 		setExportWidthPreset: vi.fn(),
 		exportCenterLongitude: 0,
@@ -135,15 +143,13 @@ describe("OverlayControls", () => {
 		expect(markup).not.toContain(">Overlays<")
 	})
 
-	it("renders ocean currents directly below wind in geography overlays", () => {
+	it("renders wind and ocean currents inside the geography section", () => {
 		const { markup } = renderWithProps({
 			overlaysExpanded: true,
 			exportExpanded: true,
 		})
 
-		expect(markup.indexOf(">Wind<")).toBeLessThan(
-			markup.indexOf(">Ocean Currents<"),
-		)
+		expect(markup).toContain(">Geography<")
 	})
 
 	it("wires overlay controls to the provided setters", () => {

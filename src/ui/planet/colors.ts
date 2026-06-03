@@ -636,12 +636,12 @@ export function dtrColor(celsius: number): [number, number, number] {
 
 // Relative-humidity ramp (0–100%): ochre → muted brown-gray-purple → dark blue-purple → saturated blue → violet-blue → cyan.
 const humidityStops: { v: number; r: number; g: number; b: number }[] = [
-	{ v: 0, r: 0.902, g: 0.647, b: 0.118 }, // #E6A51E ochre
+	{ v: 10, r: 0.902, g: 0.647, b: 0.118 }, // #E6A51E ochre
 	{ v: 35, r: 0.384, g: 0.337, b: 0.373 }, // #62565F muted brown-gray-purple
 	{ v: 60, r: 0.157, g: 0.173, b: 0.361 }, // #282C5C dark blue-purple
 	{ v: 80, r: 0.153, g: 0.118, b: 0.812 }, // #271ECF saturated blue
-	{ v: 93, r: 0.294, g: 0.251, b: 0.922 }, // #4B40EB violet-blue
-	{ v: 100, r: 0.098, g: 1.0, b: 1.0 }, // #19FFFF cyan
+	{ v: 88, r: 0.294, g: 0.251, b: 0.922 }, // #4B40EB violet-blue
+	{ v: 95, r: 0.098, g: 1.0, b: 1.0 }, // #19FFFF cyan
 ]
 
 export function humidityColor(rhPercent: number): [number, number, number] {

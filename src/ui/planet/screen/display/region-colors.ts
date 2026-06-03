@@ -549,6 +549,7 @@ export function computeRegionColors(
 					dtr,
 					annualAridity,
 					world.rainfall?.annual[r],
+					world.oceanDist[r],
 				),
 			)
 			rgb[3 * r] = cr

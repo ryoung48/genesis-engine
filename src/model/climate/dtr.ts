@@ -61,7 +61,7 @@ export function computeDiurnalRange(
 			const daylightWet = 1 - Math.E ** (-rain / 100)
 			const daylightAmp = 0.6 * (1 - 0.5 * daylightWet)
 			const daylightFactor = 1 - daylightAmp * (2 * dayFrac - 1) ** 2
-			const rainFactor = 4 + 11 * Math.E ** (-rain / 85)
+			const rainFactor = 4 + 12 * Math.E ** (-rain / 85)
 			const dayAlpha = 0.2 + 0.23 * Math.E ** (-rain / 90)
 			const dayFactor = relHours ** dayAlpha
 

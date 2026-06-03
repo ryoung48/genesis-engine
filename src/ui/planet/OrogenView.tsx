@@ -314,6 +314,10 @@ export const OrogenView: React.FC = () => {
 		initialViewPrefs.showOceanCurrents,
 	)
 	const [showRivers, setShowRivers] = useState(initialViewPrefs.showRivers)
+	const [showGdd, setShowGdd] = useState(false)
+	const [showGint, setShowGint] = useState(false)
+	const [showPet, setShowPet] = useState(false)
+	const [showAet, setShowAet] = useState(false)
 	const [showSettlements, setShowSettlements] = useState(
 		initialViewPrefs.showSettlements,
 	)
@@ -2635,6 +2639,12 @@ export const OrogenView: React.FC = () => {
 								hoverWindSpeed={hoverWindSpeed}
 								hoverWindDir={hoverWindDir}
 								hoverWindMonthly={hoverWindMonthly}
+								showWindArrows={showWindArrows}
+								showRivers={showRivers}
+								showGdd={showGdd}
+								showGint={showGint}
+								showPet={showPet}
+								showAet={showAet}
 								showOceanCurrentOverlay={showOceanCurrents}
 								colorMode={colorMode}
 								dangerSubMode={dangerSubMode}
@@ -2697,6 +2707,14 @@ export const OrogenView: React.FC = () => {
 							setShowThermalEquator={setShowThermalEquator}
 							showWindArrows={showWindArrows}
 							setShowWindArrows={setShowWindArrows}
+							showGdd={showGdd}
+							setShowGdd={setShowGdd}
+							showGint={showGint}
+							setShowGint={setShowGint}
+							showPet={showPet}
+							setShowPet={setShowPet}
+							showAet={showAet}
+							setShowAet={setShowAet}
 							showOceanCurrents={showOceanCurrents}
 							setShowOceanCurrents={setShowOceanCurrents}
 							showGrid={showGrid}
