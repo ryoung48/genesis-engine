@@ -1,6 +1,7 @@
 import * as THREE from "three"
 import { Text } from "troika-three-text"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 import { createMapProjection } from "./map-projection"
 import { globeScaleForPop, mapRadiusForPop } from "./settlement-overlay"
 
@@ -15,8 +16,8 @@ const LABEL_OFFSET_MAP_Y = 0.001
 const LABEL_MAP_FONT_GAP_FACTOR = 0.08
 const LABEL_GLOBE_FONT_GAP_FACTOR = 0.04
 
-const LABEL_FONT_SIZE_GLOBE = 0.004
-const LABEL_FONT_SIZE_MAP = 0.005
+const LABEL_FONT_SIZE_GLOBE = 0.0035
+const LABEL_FONT_SIZE_MAP = 0.0044
 const LABEL_OUTLINE_WIDTH = 0.2
 const LABEL_OUTLINE_COLOR = 0x0f172a
 const LABEL_TEXT_COLOR = "#f1f5f9"
@@ -54,6 +55,7 @@ function createNationLabelPools(): NationLabelPools {
 function ensurePoolSize(pool: LabelPool, count: number) {
 	while (pool.items.length < count) {
 		const text = new Text()
+		text.font = jedarFontUrl
 		text.fontSize = LABEL_FONT_SIZE_GLOBE
 		text.fontWeight = 500
 		text.color = LABEL_TEXT_COLOR
@@ -435,8 +437,8 @@ export function buildMapNationLabels(
 
 // ── Settlement labels ─────────────────────────────────────────────────────────
 
-const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.0016
-const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.002
+const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
+const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.0018
 const SETTLEMENT_LOG_MIN = Math.log10(1_000)
 const SETTLEMENT_LOG_MAX = Math.log10(1_000_000)
 const SETTLEMENT_LABEL_OFFSET_GLOBE_Y = 0.001

@@ -4,14 +4,18 @@ import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
 import {
 	buildGlobeNationLabels,
+	buildGlobeSettlementLabels,
 	buildMapNationLabels,
+	buildMapSettlementLabels,
 	createNationLabelPools,
+	createSettlementLabelPools,
 	orientGlobeLabel,
 	updateGlobeLabelOrientations,
 } from "./nation-label-overlay"
 
 vi.mock("troika-three-text", () => {
 	class MockText extends THREE.Object3D {
+		font = ""
 		text = ""
 		fontSize = 0
 		fontWeight = 0
@@ -103,6 +107,55 @@ describe("nation-label-overlay", () => {
 		expect(globeGroup.children[0]?.parent).toBe(globeGroup)
 		expect(mapGroup.children[0]?.parent).toBe(mapGroup)
 		expect(globeGroup.children[0]).not.toBe(mapGroup.children[0])
+	})
+
+	it("assigns the Jedar font to nation labels", () => {
+		const pools = createNationLabelPools()
+		const world = buildWorld()
+		const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100)
+		camera.position.set(0, 0, 3)
+
+		const globeGroup = buildGlobeNationLabels(
+			world,
+			["A", "Large Dominion"],
+			camera,
+			pools.globe,
+			false,
+		)
+		const label = globeGroup.children[0] as THREE.Object3D & { font?: string }
+
+		expect(label.font).toContain("Jedar.otf")
+	})
+
+	it("assigns the Jedar font to settlement labels on globe and map", () => {
+		const world = buildWorld()
+		const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100)
+		camera.position.set(0, 0, 3)
+		const pools = createSettlementLabelPools()
+		const settlementNames = ["Port A", "Port B"]
+
+		const globeGroup = buildGlobeSettlementLabels(
+			world,
+			settlementNames,
+			camera,
+			pools.globe,
+			false,
+		)
+		const mapGroup = buildMapSettlementLabels(
+			world,
+			settlementNames,
+			0,
+			0,
+			pools.map,
+			false,
+		)
+		const globeLabel = globeGroup.children[0] as THREE.Object3D & {
+			font?: string
+		}
+		const mapLabel = mapGroup.children[0] as THREE.Object3D & { font?: string }
+
+		expect(globeLabel.font).toContain("Jedar.otf")
+		expect(mapLabel.font).toContain("Jedar.otf")
 	})
 
 	it("faces globe labels toward the camera", () => {

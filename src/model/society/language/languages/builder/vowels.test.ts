@@ -60,11 +60,9 @@ describe("vowel builders", () => {
 	it("keeps required vowels and adds an extra back vowel for vowel endings", () => {
 		const vowels = buildBasicVowels({
 			ending: PhonemeCatalog.MIDDLE_VOWEL,
-			phonotacticStyle: "balanced",
 			dice: createDice({
 				choices: ["u"],
 				weightedChoices: ["y"],
-				randint: 3,
 				samples: [["e"]],
 			}),
 		})
@@ -77,8 +75,6 @@ describe("vowel builders", () => {
 			consonants: ["r", "f", "h"],
 			vowels: ["a", "e", "i"],
 			stops: 0,
-			ending: PhonemeCatalog.MIDDLE_CONSONANT,
-			phonotacticStyle: "balanced",
 			dice: createDice({
 				weightedChoices: [2],
 				choices: [2],
@@ -98,9 +94,7 @@ describe("vowel builders", () => {
 		expect(result.vowelPhonemes[PhonemeCatalog.END_VOWEL]).toEqual(
 			expect.arrayContaining(["a", "e", "i"]),
 		)
-		expect(result.uniqueVowels).not.toEqual(
-			expect.arrayContaining(["aä", "aë", "éo", "oö", "uü"]),
-		)
+		expect(result.uniqueVowels).toEqual(expect.arrayContaining(["ä", "ë", "ï"]))
 	})
 
 	it("falls back to the base vowels when stops block exotic spellings", () => {
@@ -108,9 +102,6 @@ describe("vowel builders", () => {
 			consonants: ["n"],
 			vowels: ["a", "o", "u"],
 			stops: 1,
-			ending: PhonemeCatalog.END_CONSONANT,
-			phonotacticStyle: "balanced",
-			diacriticConsonants: true,
 			dice: createDice({
 				random: 0.95,
 				weightedChoices: [2],
@@ -136,14 +127,12 @@ describe("vowel builders", () => {
 			consonants: [],
 			vowels: ["i", "u"],
 			stops: 0,
-			ending: PhonemeCatalog.MIDDLE_CONSONANT,
-			phonotacticStyle: "balanced",
 			dice: createDice({
 				weightedChoices: [1],
 				samples: [["I"]],
 			}),
 		})
 
-		expect(result.uniqueVowels).toEqual(["iu", "i", "u"])
+		expect(result.uniqueVowels).toEqual(["i", "u"])
 	})
 })

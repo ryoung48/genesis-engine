@@ -18,22 +18,6 @@ export type PhonemeCatalog =
 
 export const STOP_CHAR = "ʔ"
 
-export type PhonemeClass =
-	| "nasal"
-	| "liquid"
-	| "sibilant"
-	| "guttural"
-	| "plosive"
-	| "airy"
-export type SyllableWeight = "light" | "medium" | "heavy"
-export type PhonotacticStyle = "open" | "balanced" | "closed"
-export type OrthoStyle =
-	| "standard"
-	| "hacek"
-	| "tilde"
-	| "acute"
-	| "circumflex"
-	| "germanic"
 export type Gender = "male" | "female"
 
 export type WeightedDistribution<T> = WeightedValue<T>[]
@@ -97,12 +81,6 @@ export interface Language {
 	articleChance: number
 	// predefined words
 	predefined: Record<string, string[]>
-	// sonic character
-	phonemeClass: PhonemeClass
-	secondaryPhonemeClass: PhonemeClass | null
-	syllableWeight: SyllableWeight
-	phonotacticStyle: PhonotacticStyle
-	orthoStyle: OrthoStyle
 	// per-language RNG â€” independent of the world dice
 	dice: LanguageRng
 }

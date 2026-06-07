@@ -139,60 +139,17 @@ describe("CLUSTER", () => {
 		)
 	})
 
-	it("falls back to the base weighted choice when signature phoneme weights are zero", () => {
-		const lang = LANGUAGE.spawn("cluster-zero-signature")
-		const cluster = CLUSTER.spawn({ src: lang })
-		cluster.signature.preferredPhonemes[PhonemeCatalog.START_VOWEL] = ["a"]
-		cluster.signature.phonemeBoost = 2
-		cluster.phonemes[PhonemeCatalog.START_VOWEL] = [
-			{ v: "a", w: 0 },
-			{ v: "e", w: 0 },
-		]
+	it("uses the original fixed pattern families", () => {
+		const lang = LANGUAGE.spawn("cluster-fixed-patterns")
+		lang.dice = createDice(0.5)
 
-		expect(CLUSTER.simple(cluster, lang, PhonemeCatalog.START_VOWEL)).toBe("A")
-		expect(cluster.key).toBe("")
-	})
-
-	it("uses lighter open templates and denser closed templates", () => {
-		const open = LANGUAGE.spawn("cluster-open-patterns")
-		open.phonotacticStyle = "open"
-		open.dice = createDice(0.5)
-
-		const openCluster = CLUSTER.spawn({ src: open, key: "settlement" })
-		expect(openCluster.patterns[PhonemeCatalog.MIDDLE_CONSONANT]).toBe(
+		const cluster = CLUSTER.spawn({ src: lang, key: "settlement" })
+		expect(cluster.patterns[PhonemeCatalog.MIDDLE_CONSONANT]).toBe(
 			`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
 		)
-		expect(openCluster.patterns[PhonemeCatalog.MIDDLE_VOWEL]).toBe(
+		expect(cluster.patterns[PhonemeCatalog.MIDDLE_VOWEL]).toBe(
 			`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
 		)
-
-		const closed = LANGUAGE.spawn("cluster-closed-patterns")
-		closed.phonotacticStyle = "closed"
-		closed.dice = createDice(0.5)
-
-		const closedCluster = CLUSTER.spawn({ src: closed, key: "settlement" })
-		expect(closedCluster.patterns[PhonemeCatalog.MIDDLE_CONSONANT]).toBe(
-			`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-		)
-		expect(closedCluster.patterns[PhonemeCatalog.MIDDLE_VOWEL]).toBe(
-			`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-		)
-	})
-
-	it("filters dense consonant runs out of open-style syllables", () => {
-		const lang = LANGUAGE.spawn("cluster-open-pronounceable")
-		lang.phonotacticStyle = "open"
-		const cluster = CLUSTER.spawn({ src: lang, key: "settlement" })
-		cluster.phonemes[PhonemeCatalog.START_CONSONANT] = weighted(["str", "b"])
-		cluster.phonemes[PhonemeCatalog.FRONT_VOWEL] = weighted(["a"])
-
-		expect(
-			CLUSTER.simple(
-				cluster,
-				lang,
-				`${PhonemeCatalog.START_CONSONANT}${PhonemeCatalog.FRONT_VOWEL}`,
-			),
-		).toBe("Ba")
 	})
 
 	it("does not crash and returns a string when a phoneme list for a template letter is empty", () => {

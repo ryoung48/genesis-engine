@@ -345,13 +345,7 @@ const notHarsh = (
 	)
 		return false
 	if (hasSplitRestrictedRepeat(`${prev}${curr}`)) return false
-	const maxRun =
-		src.phonotacticStyle === "open"
-			? 2
-			: src.phonotacticStyle === "balanced"
-				? 3
-				: 3
-	if (maxConsonantRun(`${prev}${curr}`) > maxRun) return false
+	if (maxConsonantRun(`${prev}${curr}`) > 3) return false
 
 	const lastPrevNonVowel = findLastNonVowelChar(prev, vowelSet)
 	if (lastPrevNonVowel) {
@@ -457,32 +451,6 @@ const backVowels = (cluster: Cluster) => {
 	return baseBackVowels(cluster)
 }
 
-function weightedSignatureChoice(
-	src: Language,
-	phonemes: readonly { v: string; w: number }[],
-	preferred: readonly string[] | undefined,
-	boost: number,
-): string {
-	if (!preferred?.length || boost <= 1) {
-		return src.dice.weightedChoice<string>(phonemes) ?? ""
-	}
-
-	let total = 0
-	for (const phoneme of phonemes) {
-		total += phoneme.w * (preferred.includes(phoneme.v) ? boost : 1)
-	}
-	if (total <= 0) {
-		return src.dice.weightedChoice<string>(phonemes) ?? ""
-	}
-
-	let roll = src.dice.uniform(0, total)
-	for (const phoneme of phonemes) {
-		roll -= phoneme.w * (preferred.includes(phoneme.v) ? boost : 1)
-		if (roll <= 0) return phoneme.v
-	}
-	return phonemes[phonemes.length - 1]?.v ?? ""
-}
-
 const syllable = (
 	cluster: Cluster,
 	src: Language,
@@ -540,12 +508,7 @@ const syllable = (
 		})()
 		const selectedPhonemes =
 			valid && valid.length > 0 ? valid : fallbackPhonemes
-		const chosen = weightedSignatureChoice(
-			src,
-			selectedPhonemes,
-			cluster.signature.preferredPhonemes[letter],
-			cluster.signature.phonemeBoost,
-		)
+		const chosen = src.dice.weightedChoice<string>(selectedPhonemes) ?? ""
 		prev += chosen
 		if (hasLongVowel(src, chosen)) localLongVowel = true
 		if (hasDigraph(src, chosen)) localUsedDigraph = true
@@ -642,31 +605,6 @@ const morpheme = (
 	// valid morphemes haven't been already used and don't include used unique characters
 	const prev = word.join("")
 	const usedWords = new Set(word)
-	const signatureStems = cluster.signature.templateStems[template] ?? []
-	const validSignatureStems = signatureStems.filter(
-		(curr) =>
-			!usedWords.has(curr) &&
-			notHarsh(src, { curr, prev, usedLongVowel, usedDigraph }),
-	)
-	const stemChance =
-		word.length === 0
-			? cluster.signature.leadStemChance
-			: cluster.signature.followStemChance
-	if (
-		validSignatureStems.length > 0 &&
-		src.dice.random < stemChance &&
-		(!repeat || word.length === 0)
-	) {
-		const prospect = src.dice.choice(validSignatureStems)
-		if (hasLongVowel(src, prospect)) {
-			usedLongVowel = true
-		}
-		if (hasDigraph(src, prospect)) {
-			usedDigraph = true
-		}
-		word.push(prospect)
-		return { usedLongVowel, usedDigraph }
-	}
 	const valid: string[] = []
 	for (const curr of cluster.morphemes[template]) {
 		if (
@@ -714,40 +652,14 @@ export const CLUSTER = {
 		),
 	spawn: (args: Partial<Cluster> & { src: Language }) => {
 		const { src } = args
-		const phonotacticPatterns = {
-			open: {
-				vowel: [
-					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-				],
-				consonant: [
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-				],
-			},
-			balanced: {
-				vowel: [
-					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-				],
-				consonant: [
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-				],
-			},
-			closed: {
-				vowel: [
-					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-					`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-				],
-				consonant: [
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
-					`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
-				],
-			},
-		}[src.phonotacticStyle]
-		const vowelStruct = src.dice.choice(phonotacticPatterns.vowel)
-		const conStruct = src.dice.choice(phonotacticPatterns.consonant)
+		const vowelStruct = src.dice.choice([
+			`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+			`${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+		])
+		const conStruct = src.dice.choice([
+			`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}`,
+			`${PhonemeCatalog.MIDDLE_CONSONANT}${PhonemeCatalog.MIDDLE_VOWEL}${PhonemeCatalog.MIDDLE_CONSONANT}`,
+		])
 		const cluster: Cluster = {
 			phonemes: src.phonemes,
 			morphemes: {},

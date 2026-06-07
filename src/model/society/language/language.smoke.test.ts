@@ -37,13 +37,8 @@ type BatchResult = {
 type LanguageProfileRow = {
 	languageSeed: string
 	fingerprint: string
-	phonemeClass: string
-	secondaryPhonemeClass: string
-	syllableWeight: string
-	phonotacticStyle: string
 	stop: string
 	ending: string
-	orthoStyle: string
 	extType: string
 	hasGemination: boolean
 	settlement: string
@@ -94,13 +89,8 @@ type LanguageSeedProfile = {
 	languageSeed: string
 	selectionKey: string
 	fingerprint: string
-	phonemeClass: string
-	secondaryPhonemeClass: string
-	syllableWeight: string
-	phonotacticStyle: string
 	stop: string
 	ending: string
-	orthoStyle: string
 	extType: string
 	hasGemination: boolean
 }
@@ -217,19 +207,13 @@ function buildLanguageSeedProfile(languageSeed: string): LanguageSeedProfile {
 	const lang = LANGUAGE.spawn(languageSeed)
 	const classification = LANGUAGE.classify(lang)
 	const extType = classification.extType ?? "none"
-	const orthoStyle = classification.orthoStyle ?? "standard"
 	const ending = lang.ending === "C" ? "consonant" : "vowel"
 	const settlement = LANGUAGE.word.simple({ lang, key: "settlement" }).word
 	const personMale = LANGUAGE.word.simple({ lang, key: "male" }).word
 	const personFemale = LANGUAGE.word.simple({ lang, key: "female" }).word
 	const fingerprint = [
-		lang.phonemeClass,
-		lang.secondaryPhonemeClass ?? "none",
-		lang.syllableWeight,
-		lang.phonotacticStyle,
 		lang.stop,
 		ending,
-		orthoStyle,
 		extType,
 		classification.hasGemination ? "geminate" : "plain",
 	].join("|")
@@ -238,13 +222,8 @@ function buildLanguageSeedProfile(languageSeed: string): LanguageSeedProfile {
 		languageSeed,
 		selectionKey: [fingerprint, settlement, personMale, personFemale].join("|"),
 		fingerprint,
-		phonemeClass: lang.phonemeClass,
-		secondaryPhonemeClass: lang.secondaryPhonemeClass ?? "none",
-		syllableWeight: lang.syllableWeight,
-		phonotacticStyle: lang.phonotacticStyle,
 		stop: lang.stop,
 		ending,
-		orthoStyle,
 		extType,
 		hasGemination: classification.hasGemination,
 	}
@@ -289,13 +268,8 @@ function buildLanguageProfileRows(
 		return {
 			languageSeed: profile.languageSeed,
 			fingerprint: profile.fingerprint,
-			phonemeClass: profile.phonemeClass,
-			secondaryPhonemeClass: profile.secondaryPhonemeClass,
-			syllableWeight: profile.syllableWeight,
-			phonotacticStyle: profile.phonotacticStyle,
 			stop: profile.stop,
 			ending: profile.ending,
-			orthoStyle: profile.orthoStyle,
 			extType: profile.extType,
 			hasGemination: profile.hasGemination,
 			settlement: LANGUAGE.word.simple({ lang, key: "settlement" }).word,
@@ -482,7 +456,7 @@ function buildPerformanceResults(): Array<BatchResult & { values: string[] }> {
 		runBatch("spawn-250", "language spawn only", 250, () =>
 			Array.from({ length: 250 }, (_, index) => {
 				const lang = LANGUAGE.spawn(makeSeed("perfspawn", index))
-				return `${lang.phonemeClass}|${lang.stop}|${lang.ending}`
+				return `${lang.stop}|${lang.ending}`
 			}),
 		),
 		runBatch(

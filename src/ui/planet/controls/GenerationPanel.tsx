@@ -14,6 +14,8 @@ import type { StageTiming } from "@/model"
 import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
+import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
+import { HistoryIcon } from "@/ui/components/primitives/icons/HistoryIcon"
 import { LockIcon } from "@/ui/components/primitives/icons/LockIcon"
 import { LockOpenIcon } from "@/ui/components/primitives/icons/LockOpenIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
@@ -115,10 +117,23 @@ interface TimingSummary {
 	totalMs: number
 }
 
+interface RecentCodeSelectionHandlers {
+	onSelectRecentCode: (code: string) => void
+	setShowRecentCodes: (show: boolean) => void
+}
+
 const POST_TIMING_PREFIX = "Post:"
 const HISTORY_TIMING_PREFIX = "initHistory:"
 
 const COMPUTE_ROUTES_PREFIX = "computeRoutes:"
+
+export function handleRecentCodeSelection(
+	recentCode: string,
+	handlers: RecentCodeSelectionHandlers,
+): void {
+	handlers.setShowRecentCodes(false)
+	handlers.onSelectRecentCode(recentCode)
+}
 
 function stripTimingPrefix(stage: string): string {
 	if (stage.startsWith("orogen:")) return stage.slice("orogen:".length)
@@ -404,6 +419,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		() => getComputeRoutesTimingSummary(generationTimings),
 		[generationTimings],
 	)
+	const selectRecentCode = (recentCode: string) =>
+		handleRecentCodeSelection(recentCode, {
+			onSelectRecentCode,
+			setShowRecentCodes,
+		})
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col px-4 py-4 lg:px-5 lg:py-5 border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -695,28 +715,25 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 											type="button"
 											onClick={() => setShowRecentCodes((current) => !current)}
 											disabled={generating}
-											className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+											aria-label={
+												showRecentCodes
+													? "Hide recent codes"
+													: "Show recent codes"
+											}
+											className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
 										>
-											{showRecentCodes ? "Hide Recent" : "Recent"}
+											<HistoryIcon className="h-4 w-4" />
 										</button>
 									)}
 									<button
+										type="button"
 										onClick={onRandomizeCode}
 										disabled={generating}
-										className="p-1 text-slate-300 hover:text-slate-900 transition-colors disabled:opacity-50"
+										aria-label="Generate new code"
+										className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
 										title="New code"
 									>
-										<svg
-											width="14"
-											height="14"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-										>
-											<path d="M1 4v6h6M23 20v-6h-6" />
-											<path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15" />
-										</svg>
+										<DiceMultipleOutlineIcon className="h-4 w-4" />
 									</button>
 								</div>
 							</div>
@@ -732,7 +749,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 									<button
 										key={recentCode}
 										type="button"
-										onClick={() => onSelectRecentCode(recentCode)}
+										onClick={() => selectRecentCode(recentCode)}
 										disabled={generating}
 										className={`rounded-md border px-2 py-1 font-mono text-[11px] transition-colors ${
 											recentCode === codeInput || recentCode === planetCode

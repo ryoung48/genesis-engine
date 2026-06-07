@@ -75,16 +75,14 @@ describe("language builder helpers", () => {
 		])
 	})
 
-	it("builds short clusters for light languages and short surname settings", () => {
+	it("builds short clusters for short first names and short surname settings", () => {
 		const lang = LANGUAGE.spawn("init-light")
-		lang.syllableWeight = "light"
-		lang.phonotacticStyle = "balanced"
 		lang.surnames.epithets = []
 
 		initClusters({ src: lang, shortFirst: true, shortSurnames: true })
 
-		expect(lang.clusters.settlement.len).toBe(1)
-		expect(lang.clusters.wilderness.len).toBe(1)
+		expect(lang.clusters.settlement.len).toBe(2)
+		expect(lang.clusters.wilderness.len).toBe(2)
 		expect(lang.clusters.region.len).toBe(2)
 		expect(lang.clusters.male.len).toBe(1)
 		expect(lang.clusters.female.len).toBe(1)
@@ -92,10 +90,8 @@ describe("language builder helpers", () => {
 		expect(lang.clusters.female.patterns).toBe(lang.clusters.male.patterns)
 	})
 
-	it("keeps open light place-name clusters from collapsing into clipped stubs", () => {
-		const lang = LANGUAGE.spawn("init-open-light")
-		lang.syllableWeight = "light"
-		lang.phonotacticStyle = "open"
+	it("keeps place-name clusters at the default length", () => {
+		const lang = LANGUAGE.spawn("init-default-light")
 		lang.surnames.epithets = []
 
 		initClusters({ src: lang, shortFirst: true, shortSurnames: true })
@@ -104,27 +100,25 @@ describe("language builder helpers", () => {
 		expect(lang.clusters.wilderness.len).toBe(2)
 		expect(lang.clusters.region.len).toBe(2)
 		expect(lang.clusters.culture.len).toBe(2)
-		expect(lang.clusters.culture.longNames).toBeCloseTo(0.2)
+		expect(lang.clusters.culture.longNames).toBeCloseTo(0)
 		expect(lang.clusters.male.len).toBe(1)
 		expect(lang.clusters.female.len).toBe(1)
 	})
 
-	it("uses heavy defaults, epithet surname lengths, and explicit cluster overrides", () => {
+	it("uses default lengths, epithet surname lengths, and explicit cluster overrides", () => {
 		const epithetLang = LANGUAGE.spawn("init-epithet")
-		epithetLang.syllableWeight = "heavy"
 		epithetLang.surnames.epithets = ["the-wise"]
 
 		initClusters({ src: epithetLang })
 
 		expect(epithetLang.clusters.settlement.len).toBe(2)
 		expect(epithetLang.clusters.region.len).toBe(2)
-		expect(epithetLang.clusters.region.longNames).toBeCloseTo(0.32)
+		expect(epithetLang.clusters.region.longNames).toBeCloseTo(1)
 		expect(epithetLang.clusters.culture.len).toBe(2)
-		expect(epithetLang.clusters.culture.longNames).toBeCloseTo(0.38)
+		expect(epithetLang.clusters.culture.longNames).toBeCloseTo(0)
 		expect(epithetLang.clusters.last.len).toBe(2)
 
 		const overridden = LANGUAGE.spawn("init-overridden")
-		overridden.syllableWeight = "heavy"
 		overridden.surnames.epithets = []
 
 		initClusters({
@@ -137,9 +131,9 @@ describe("language builder helpers", () => {
 		})
 
 		expect(overridden.clusters.male.len).toBe(4)
-		expect(overridden.clusters.male.longNames).toBeCloseTo(1.2)
+		expect(overridden.clusters.male.longNames).toBeCloseTo(0.8)
 		expect(overridden.clusters.female.len).toBe(5)
-		expect(overridden.clusters.female.longNames).toBeCloseTo(0.9)
+		expect(overridden.clusters.female.longNames).toBeCloseTo(0.6)
 		expect(overridden.clusters.last.len).toBe(6)
 		expect(overridden.clusters.last.longNames).toBe(0.7)
 	})

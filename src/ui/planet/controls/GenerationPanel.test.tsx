@@ -5,6 +5,7 @@ import {
 	GenerationPanel,
 	getGenerationTimingSummary,
 	getPostTimingSummary,
+	handleRecentCodeSelection,
 } from "./GenerationPanel"
 
 vi.mock("chart.js", () => ({
@@ -62,6 +63,20 @@ describe("GenerationPanel", () => {
 		const markup = renderToStaticMarkup(<GenerationPanel {...createProps()} />)
 
 		expect(markup).toMatch(/>Preview<\/button><button[^>]*>Reset<\/button>/)
+	})
+
+	it("renders the recent-codes toggle and randomize control with icons", () => {
+		const markup = renderToStaticMarkup(
+			<GenerationPanel {...createProps({ recentCodes: ["ABCD"] })} />,
+		)
+
+		expect(markup).toContain('aria-label="Show recent codes"')
+		expect(markup).toContain('aria-label="Generate new code"')
+		expect(
+			markup.match(/rounded-md border border-slate-200 bg-white p-1\.5/g),
+		).toHaveLength(2)
+		expect(markup).toContain("M13.5,8H12V13L16.28,15.54")
+		expect(markup).toContain("M19 5V19H5V5H19M19 3H5C3.9 3 3 3.9 3 5V19")
 	})
 
 	it("keeps post breakdown out of the top-level timing total", () => {
@@ -239,5 +254,19 @@ describe("GenerationPanel", () => {
 		)
 
 		expect(markup).toContain("13 s")
+	})
+
+	it("closes the recent-code dropdown after selecting a code", () => {
+		const onSelectRecentCode = vi.fn()
+		const setShowRecentCodes = vi.fn()
+
+		handleRecentCodeSelection("WXYZ", {
+			onSelectRecentCode,
+			setShowRecentCodes,
+		})
+
+		expect(setShowRecentCodes).toHaveBeenCalledWith(false)
+		expect(onSelectRecentCode).toHaveBeenCalledWith("WXYZ")
+		expect(setShowRecentCodes).toHaveBeenCalledBefore(onSelectRecentCode)
 	})
 })

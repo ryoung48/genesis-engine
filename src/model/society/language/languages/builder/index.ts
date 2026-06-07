@@ -56,49 +56,22 @@ export const initClusters = (params: {
 	const { src, shortSurnames, shortFirst, clusters } = params
 	const { ending, surnames } = src
 
-	// Syllable weight drives base length and how often names get an extra syllable
-	const sw = src.syllableWeight
-	const baseLen = sw === "light" ? (src.phonotacticStyle === "open" ? 2 : 1) : 2
-	const lnMult = sw === "light" ? 0.3 : sw === "heavy" ? 1.5 : 1.0
-	const regionLen = 2
-	const cultureLen = 2
-	const regionLongNames =
-		sw === "light"
-			? 0.12
-			: sw === "heavy"
-				? src.phonotacticStyle === "closed"
-					? 0.4
-					: 0.32
-				: 0.22
-	const cultureLongNames =
-		sw === "light"
-			? src.phonotacticStyle === "open"
-				? 0.2
-				: 0.14
-			: sw === "heavy"
-				? src.phonotacticStyle === "closed"
-					? 0.46
-					: 0.38
-				: 0.28
-
 	src.clusters = {
 		settlement: CLUSTER.spawn({
 			src: src,
 			key: "settlement",
 			ending,
 			stopChance: src.articleChance,
-			variation: 15,
-			len: baseLen,
-			longNames: 0.5 * lnMult,
+			variation: 5,
+			longNames: 0.5,
 		}),
 		wilderness: CLUSTER.spawn({
 			src: src,
 			key: "wilderness",
 			ending,
 			stopChance: src.articleChance,
-			variation: 15,
-			len: baseLen,
-			longNames: 0.5 * lnMult,
+			variation: 5,
+			longNames: 0.5,
 		}),
 		region: CLUSTER.spawn({
 			src: src,
@@ -106,8 +79,7 @@ export const initClusters = (params: {
 			ending,
 			stopChance: src.articleChance,
 			variation: 15,
-			len: regionLen,
-			longNames: regionLongNames,
+			longNames: 1,
 		}),
 		culture: CLUSTER.spawn({
 			src: src,
@@ -115,8 +87,7 @@ export const initClusters = (params: {
 			ending,
 			stopChance: 0,
 			variation: 15,
-			len: cultureLen,
-			longNames: cultureLongNames,
+			longNames: 0,
 		}),
 		male: CLUSTER.spawn({
 			src: src,
@@ -124,7 +95,7 @@ export const initClusters = (params: {
 			ending,
 			stopChance: src.stopChance,
 			len: shortFirst ? 1 : clusters?.male?.len,
-			longNames: (clusters?.male?.long_names ?? 0.3) * lnMult,
+			longNames: clusters?.male?.long_names || 0.3,
 			variation: 15,
 		}),
 		female: CLUSTER.spawn({
@@ -134,7 +105,7 @@ export const initClusters = (params: {
 			stopChance: src.stopChance,
 			variation: 15,
 			len: shortFirst ? 1 : clusters?.female?.len,
-			longNames: (clusters?.female?.long_names ?? 0) * lnMult,
+			longNames: clusters?.female?.long_names || 0,
 		}),
 		last: CLUSTER.spawn({
 			src: src,
