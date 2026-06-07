@@ -98,6 +98,8 @@ interface OverlayControlsProps {
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
 	setShowNationBorders: (v: boolean) => void
+	showLandBorders: boolean
+	setShowLandBorders: (v: boolean) => void
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
 	labelMode: LabelMode
@@ -188,6 +190,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowGrid,
 	showNationBorders,
 	setShowNationBorders,
+	showLandBorders,
+	setShowLandBorders,
 	showNationHierarchy,
 	setShowNationHierarchy,
 	labelMode,
@@ -651,6 +655,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													onChange={(e) =>
 														setShowNationHierarchy(e.target.checked)
 													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Land Borders</span>
+												<input
+													type="checkbox"
+													checked={showLandBorders}
+													onChange={(e) => setShowLandBorders(e.target.checked)}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>

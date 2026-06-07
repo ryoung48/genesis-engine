@@ -368,16 +368,16 @@ export function vegetationColor(biomeCode: number): [number, number, number] {
 
 /**
  * Diverging warm/cold ocean current color ramp.
- * -1 (cold, deep blue) → 0 (neutral gray) → +1 (warm, deep red/orange).
+ * -1 (cold, deep blue) → 0 (white, weak/neutral) → +1 (warm, deep red).
  */
 const oceanCurrentStops: { v: number; r: number; g: number; b: number }[] = [
-	{ v: -1.0, r: 0.12, g: 0.15, b: 0.6 },
-	{ v: -0.5, r: 0.2, g: 0.45, b: 0.8 },
-	{ v: -0.15, r: 0.55, g: 0.75, b: 0.9 },
-	{ v: 0.0, r: 0.8, g: 0.8, b: 0.8 },
-	{ v: 0.15, r: 0.95, g: 0.7, b: 0.5 },
-	{ v: 0.5, r: 0.9, g: 0.4, b: 0.2 },
-	{ v: 1.0, r: 0.65, g: 0.12, b: 0.08 },
+	{ v: -1.0, r: 0.1, g: 0.2, b: 0.7 },
+	{ v: -0.5, r: 0.3, g: 0.55, b: 0.9 },
+	{ v: -0.1, r: 0.8, g: 0.9, b: 1.0 },
+	{ v: 0.0, r: 1.0, g: 1.0, b: 1.0 },
+	{ v: 0.1, r: 1.0, g: 0.85, b: 0.75 },
+	{ v: 0.5, r: 0.95, g: 0.35, b: 0.2 },
+	{ v: 1.0, r: 0.6, g: 0.08, b: 0.05 },
 ]
 
 export function oceanCurrentColor(warmth: number): [number, number, number] {

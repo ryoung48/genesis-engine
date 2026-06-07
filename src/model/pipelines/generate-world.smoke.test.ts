@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { OrogenParams } from ".."
 import { generateOrogenWorld } from "./generate-world"
 
@@ -192,7 +193,9 @@ describe("generateOrogenWorld", () => {
 			})
 			for (let r = 0; r < lowered.mesh.numRegions; r++) {
 				if (lowered.elevation_km[r] <= 0) continue
-				if (lowered.rivers.lakes[r]) continue
+				const lid = lowered.landmarks?.regionLandmark[r] ?? -1
+				if (lid >= 0 && lowered.landmarks?.type[lid] === LANDMARK_TYPE_LAKE)
+					continue
 				expect(lowered.isLand[r]).toBe(1)
 			}
 		},

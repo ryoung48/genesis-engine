@@ -1,5 +1,7 @@
 import type { OrogenParams, SphereMesh } from ".."
 import { makeRng } from "../shared/rng"
+import type { OrogenLandmarks } from "../terrain/landmarks"
+import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
 
 /**
  * Returns a Uint8Array where 1 = land cell that borders at least one non-land
@@ -76,7 +78,7 @@ export function computeTidalRange(
 		OrogenParams,
 		"tidalStrength" | "tidallyLocked" | "planetRadiusKm"
 	>,
-	lakes?: Uint8Array,
+	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
 ): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
@@ -86,7 +88,12 @@ export function computeTidalRange(
 	if (params.tidallyLocked || tidalStrength <= 0) return new Float32Array(N)
 	const rng = makeRng(params.seed ^ 0x7a3f)
 
-	const isOcean = (r: number) => !isLand[r] && !lakes?.[r]
+	function isLandmarkLake(r: number): boolean {
+		if (!landmarks) return false
+		const lid = landmarks.regionLandmark[r]
+		return lid >= 0 && landmarks.type[lid] === LANDMARK_TYPE_LAKE
+	}
+	const isOcean = (r: number) => !isLand[r] && !isLandmarkLake(r)
 
 	// ── Step 1: Coastal land cell values ──────────────────────────────
 	const result = new Float32Array(N)

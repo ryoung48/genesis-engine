@@ -64,6 +64,7 @@ function getWorldSections({
 			{ label: "Continents", value: stats.get("Continents") },
 			{ label: "Land Area", value: stats.get("Land Area") },
 			{ label: "Avg Temp", value: stats.get("Avg Temp") },
+			{ label: "Pole-Eq Gradient", value: stats.get("Pole-Eq Gradient") },
 			{ label: "Avg Rain", value: stats.get("Avg Rain") },
 			{ label: "Avg DTR", value: stats.get("Avg DTR") },
 			{ label: "Avg Wind", value: stats.get("Avg Wind") },

@@ -10,7 +10,7 @@ import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { meanEdgeLengthKm } from "@/model/shared/units"
 import { regionTimezoneLabel } from "@/model/society/timezone"
-import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
+import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 
@@ -136,11 +136,19 @@ export function getHoverRainfall(
 	world: SerializedOrogenWorld | null,
 	rainfallMonth: number,
 ): number | null {
-	return hoverInfo && world?.rainfall && world.elevation[hoverInfo.region] > 0
+	const region = hoverInfo?.region
+	const canShowRainfall =
+		region !== undefined &&
+		(!!world?.isLand?.[region] ||
+			(world?.landmarks != null &&
+				world.landmarks.regionLandmark[region] >= 0 &&
+				world.landmarks.type[world.landmarks.regionLandmark[region]] ===
+					LANDMARK_TYPE_LAKE))
+	return hoverInfo && world?.rainfall && canShowRainfall
 		? rainfallMonth === 0
-			? world.rainfall.annual[hoverInfo.region]
+			? world.rainfall.annual[region]
 			: world.rainfall.monthly[
-					(rainfallMonth - 1) * world.mesh.numRegions + hoverInfo.region
+					(rainfallMonth - 1) * world.mesh.numRegions + region
 				]
 		: null
 }

@@ -16,7 +16,6 @@ import {
 	climateTempColor,
 	climateZoneColor,
 	cycloneLandColor,
-	dangerMapColor,
 	developmentColor,
 	dtrColor,
 	earthquakeLandColor,
@@ -315,8 +314,7 @@ export function computeRegionColors(
 								world.climate.temperature_min[r],
 						)
 					: temperatureColor(temps[r])
-			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
-			const factor = darkenMapWaterTemperature && isWater ? 0.74 : 1
+			const factor = darkenMapWaterTemperature && !world.isLand?.[r] ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
 			rgb[3 * r + 2] = cb * factor
@@ -327,13 +325,12 @@ export function computeRegionColors(
 	if (colorMode === "precipitation" && world.rainfall) {
 		if (rainfallMonth === 0) {
 			for (let r = 0; r < N; r++) {
-				const [cr, cg, cb] =
-					world.elevation[r] <= 0
-						? oceanRgb(r)
-						: darkenClimateAtElevation(
-								precipitationAnnualColor(world.rainfall.annual[r]),
-								world.elevation_km[r],
-							)
+				const [cr, cg, cb] = !world.isLand?.[r]
+					? oceanRgb(r)
+					: darkenClimateAtElevation(
+							precipitationAnnualColor(world.rainfall.annual[r]),
+							world.elevation_km[r],
+						)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -341,13 +338,12 @@ export function computeRegionColors(
 		} else {
 			const offset = (rainfallMonth - 1) * N
 			for (let r = 0; r < N; r++) {
-				const [cr, cg, cb] =
-					world.elevation[r] <= 0
-						? oceanRgb(r)
-						: darkenClimateAtElevation(
-								precipitationColor(world.rainfall.monthly[offset + r]),
-								world.elevation_km[r],
-							)
+				const [cr, cg, cb] = !world.isLand?.[r]
+					? oceanRgb(r)
+					: darkenClimateAtElevation(
+							precipitationColor(world.rainfall.monthly[offset + r]),
+							world.elevation_km[r],
+						)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -359,10 +355,7 @@ export function computeRegionColors(
 	if (colorMode === "moisture" && world.rainfall) {
 		if (rainfallMonth === 0) {
 			for (let r = 0; r < N; r++) {
-				const isWater = world.isLand
-					? !world.isLand[r]
-					: world.elevation[r] <= 0
-				if (isWater) {
+				if (!world.isLand?.[r]) {
 					const [cr, cg, cb] = oceanRgb(r)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
@@ -384,10 +377,7 @@ export function computeRegionColors(
 			}
 		} else {
 			for (let r = 0; r < N; r++) {
-				const isWater = world.isLand
-					? !world.isLand[r]
-					: world.elevation[r] <= 0
-				if (isWater) {
+				if (!world.isLand?.[r]) {
 					const [cr, cg, cb] = oceanRgb(r)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
@@ -412,9 +402,8 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "vegetation" && world.vegetation) {
-		const lakes = world.rivers?.lakes
 		for (let r = 0; r < N; r++) {
-			if (lakes?.[r]) {
+			if (!world.isLand[r]) {
 				const [cr, cg, cb] = getColor(
 					Math.min(0, world.elevation_km[r]),
 					"terrain",
@@ -440,8 +429,7 @@ export function computeRegionColors(
 			viewMode === "map" && colorMode === "pastaClimate"
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
-			const isWater = world.isLand ? !world.isLand[r] : world.elevation[r] <= 0
-			const factor = darkenMapWaterPastaClimate && isWater ? 0.74 : 1
+			const factor = darkenMapWaterPastaClimate && !world.isLand?.[r] ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
 			rgb[3 * r + 2] = cb * factor
@@ -463,7 +451,7 @@ export function computeRegionColors(
 		const BLEND_THRESHOLD = 15
 		const chaoticRgb = climateZoneColor(8)
 		for (let r = 0; r < N; r++) {
-			if (world.elevation[r] <= 0) {
+			if (!world.isLand?.[r]) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -560,26 +548,27 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "oceanCurrents" && world.oceanCurrents) {
-		const { temperatureDelta, temperatureDeltaMonthly } = world.oceanCurrents
+		const { oceanWarmth, temperatureDelta, temperatureDeltaMonthly } =
+			world.oceanCurrents
 		const monthly = currentMonth === 0 ? null : temperatureDeltaMonthly
 		const offset = monthly ? (currentMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
 			const isLand = !!world.isLand?.[r]
-			if (!isLand) {
-				const [cr, cg, cb] = oceanRgb(r)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-			} else {
-				const delta = monthly
-					? (monthly[offset + r] ?? temperatureDelta?.[r] ?? 0)
-					: (temperatureDelta?.[r] ?? 0)
-				const colorValue = Math.max(-1, Math.min(1, delta / 15))
-				const [cr, cg, cb] = oceanCurrentColor(colorValue)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-			}
+			const colorValue = isLand
+				? Math.max(
+						-1,
+						Math.min(
+							1,
+							(monthly
+								? (monthly[offset + r] ?? temperatureDelta?.[r] ?? 0)
+								: (temperatureDelta?.[r] ?? 0)) / 15,
+						),
+					)
+				: (oceanWarmth?.[r] ?? 0)
+			const [cr, cg, cb] = oceanCurrentColor(colorValue)
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
 		}
 		return rgb
 	}
@@ -589,18 +578,16 @@ export function computeRegionColors(
 		dangerSubMode === "tidal" &&
 		world.tidalRange
 	) {
-		const lakes = world.rivers?.lakes
 		for (let r = 0; r < N; r++) {
 			const tidalVal = world.tidalRange[r] ?? 0
 			const isLand = !!world.isLand?.[r]
-			const isLake = !!lakes?.[r]
 			let cr: number, cg: number, cb: number
-			if (isLand && !isLake && tidalVal > 1e-5) {
+			if (isLand && tidalVal > 1e-5) {
 				;[cr, cg, cb] = darkenVegetationAtElevation(
 					tidalTierColor(tidalVal),
 					world.elevation_km[r],
 				)
-			} else if (!isLand || isLake) {
+			} else if (!isLand) {
 				;[cr, cg, cb] = oceanRgb(r)
 			} else {
 				;[cr, cg, cb] = darkenVegetationAtElevation(
@@ -1130,17 +1117,8 @@ export function computeRegionColors(
 	// Terrain / heightmap modes
 	if (colorMode === "trade_goods" && world.tradeGoods && world.locations) {
 		const { regionLocation } = world.locations
-		const lakes = world.rivers?.lakes
 		for (let r = 0; r < N; r++) {
-			if (lakes?.[r]) {
-				const [cr, cg, cb] = getColor(
-					Math.min(0, world.elevation_km[r]),
-					"terrain",
-				)
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
-			} else if (world.elevation[r] <= 0) {
+			if (!world.isLand?.[r]) {
 				const [cr, cg, cb] = oceanRgb(r)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -1159,31 +1137,25 @@ export function computeRegionColors(
 
 	// Terrain / heightmap modes
 	if (world.isLand) {
-		const seaR = 0xac / 255,
-			seaG = 0xd0 / 255,
-			seaB = 0xa5 / 255
-		const depR = 0xa7 / 255,
-			depG = 0xdf / 255,
-			depB = 0xd2 / 255
-		const lakes = world.rivers?.lakes
+		const shelfLandR = 0xac / 255,
+			shelfLandG = 0xd0 / 255,
+			shelfLandB = 0xa5 / 255
+		const basinLandR = 0xa7 / 255,
+			basinLandG = 0xdf / 255,
+			basinLandB = 0xd2 / 255
 		for (let r = 0; r < N; r++) {
 			const km = world.elevation_km[r]
-			if (lakes?.[r]) {
+			if (!world.isLand[r]) {
 				const [cr, cg, cb] = getColor(Math.min(0, km), "terrain")
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else if (world.isLand[r] && km <= 0) {
 				const depthKm = -km
-				const t = Math.min(1, Math.sqrt(depthKm / 1))
-				rgb[3 * r] = seaR + (depR - seaR) * t
-				rgb[3 * r + 1] = seaG + (depG - seaG) * t
-				rgb[3 * r + 2] = seaB + (depB - seaB) * t
-			} else if (!world.isLand[r] && km <= 0) {
-				const [cr, cg, cb] = getColor(Math.min(0, km), "terrain")
-				rgb[3 * r] = cr
-				rgb[3 * r + 1] = cg
-				rgb[3 * r + 2] = cb
+				const t = Math.min(1, Math.sqrt(depthKm))
+				rgb[3 * r] = shelfLandR + (basinLandR - shelfLandR) * t
+				rgb[3 * r + 1] = shelfLandG + (basinLandG - shelfLandG) * t
+				rgb[3 * r + 2] = shelfLandB + (basinLandB - shelfLandB) * t
 			} else {
 				const [cr, cg, cb] = getColor(km, colorMode)
 				rgb[3 * r] = cr

@@ -301,6 +301,9 @@ export const OrogenView: React.FC = () => {
 	const [showNationBorders, setShowNationBorders] = useState(
 		initialViewPrefs.showNationBorders,
 	)
+	const [showLandBorders, setShowLandBorders] = useState(
+		initialViewPrefs.showLandBorders,
+	)
 	const [showNationHierarchy, setShowNationHierarchy] = useState(
 		initialViewPrefs.showNationHierarchy,
 	)
@@ -644,6 +647,7 @@ export const OrogenView: React.FC = () => {
 				showWireframe,
 				showGrid,
 				showNationBorders,
+				showLandBorders,
 				showNationHierarchy,
 				labelMode,
 				showElevation,
@@ -688,6 +692,7 @@ export const OrogenView: React.FC = () => {
 		showSettlements,
 		showRoads,
 		showNationBorders,
+		showLandBorders,
 		showNationHierarchy,
 		labelMode,
 		showElevation,
@@ -1815,6 +1820,9 @@ export const OrogenView: React.FC = () => {
 		sceneRef.current?.setNationBordersVisible(showNationBorders)
 	}, [showNationBorders])
 	useEffect(() => {
+		sceneRef.current?.setLandNationBordersVisible(showLandBorders)
+	}, [showLandBorders])
+	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
 		if (showNationHierarchy && worldForDisplay && selectedNationId !== null) {
@@ -2721,6 +2729,8 @@ export const OrogenView: React.FC = () => {
 							setShowGrid={setShowGrid}
 							showNationBorders={showNationBorders}
 							setShowNationBorders={setShowNationBorders}
+							showLandBorders={showLandBorders}
+							setShowLandBorders={setShowLandBorders}
 							showNationHierarchy={showNationHierarchy}
 							setShowNationHierarchy={setShowNationHierarchy}
 							labelMode={labelMode}

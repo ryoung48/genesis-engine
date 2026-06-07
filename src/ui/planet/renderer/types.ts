@@ -37,6 +37,7 @@ export interface OrogenScene {
 	setOccupationOverlay(overlay: Float32Array | null): void
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void
+	setLandNationBordersVisible(visible: boolean): void
 	setViewMode(mode: OrogenViewMode): void
 	setWireframeVisible(visible: boolean): void
 	setGridVisible(visible: boolean): void

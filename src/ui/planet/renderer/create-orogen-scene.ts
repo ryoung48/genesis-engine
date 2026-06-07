@@ -45,15 +45,18 @@ import {
 	buildGlobeRivers,
 	buildGlobeThermalEquator,
 	buildGlobeWindArrows,
+	buildLandNationBordersGlobe,
+	buildLandNationBordersMap,
 	buildMapGrid,
 	buildMapHierarchyOverlay,
 	buildMapRivers,
 	buildMapThermalEquator,
 	buildMapWindArrows,
-	buildNationBordersGlobe,
-	buildNationBordersMap,
+	collectAllNationBorderGlobePositions,
+	collectAllNationBorderMapPositions,
 	collectNationBorderGlobePositions,
 	collectNationBorderMapPositions,
+	repeatMapPositions,
 } from "./overlay-builders"
 import { PngStreamWriter } from "./PngStreamWriter"
 import {
@@ -581,8 +584,9 @@ export function createOrogenScene(
 	let globeRiverMaterials: LineMaterial[] = []
 	let mapRiverMaterials: LineMaterial[] = []
 	let riverMaterials: LineMaterial[] = []
-	let globeNationBorders: THREE.LineSegments | null = null
-	let mapNationBorders: THREE.LineSegments | null = null
+	let globeNationBorders: LineSegments2 | null = null
+	let mapNationBorders: LineSegments2 | null = null
+	let nationBorderMaterials: LineMaterial[] = []
 	let globeSelectedProvinceBorder: THREE.Object3D | null = null
 	let mapSelectedProvinceBorder: THREE.Object3D | null = null
 	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
@@ -590,6 +594,10 @@ export function createOrogenScene(
 	let hoveredRegion = -1
 	let selectedProvince = -1
 	let nationBordersVisible = false
+	let globeLandNationBorders: LineSegments2 | null = null
+	let mapLandNationBorders: LineSegments2 | null = null
+	let landNationBordersVisible = false
+	let landNationBorderMaterials: LineMaterial[] = []
 	const raycaster = new THREE.Raycaster()
 	const pointer = new THREE.Vector2()
 	let globeMeasureLine: THREE.Line | null = null
@@ -676,6 +684,18 @@ export function createOrogenScene(
 						mat.linewidth = mat.userData.baseWidth * zoomScale
 					}
 				}
+				if (nationBorderMaterials.length > 0) {
+					const zoomScale = Math.pow(mapCamera.zoom, 0.3)
+					for (const mat of nationBorderMaterials) {
+						mat.linewidth = mat.userData.baseWidth * zoomScale
+					}
+				}
+				if (landNationBorderMaterials.length > 0) {
+					const zoomScale = Math.sqrt(mapCamera.zoom)
+					for (const mat of landNationBorderMaterials) {
+						mat.linewidth = mat.userData.baseWidth * zoomScale
+					}
+				}
 				renderer.render(scene, mapCamera)
 				return keepAnimating
 			}
@@ -684,6 +704,20 @@ export function createOrogenScene(
 				const dist = camera.position.length()
 				const zoomScale = 3 / dist
 				for (const mat of globeRiverMaterials) {
+					mat.linewidth = mat.userData.baseWidth * zoomScale
+				}
+			}
+			if (nationBorderMaterials.length > 0) {
+				const dist = camera.position.length()
+				const zoomScale = Math.pow(3 / dist, 0.3)
+				for (const mat of nationBorderMaterials) {
+					mat.linewidth = mat.userData.baseWidth * zoomScale
+				}
+			}
+			if (landNationBorderMaterials.length > 0) {
+				const dist = camera.position.length()
+				const zoomScale = 3 / dist
+				for (const mat of landNationBorderMaterials) {
 					mat.linewidth = mat.userData.baseWidth * zoomScale
 				}
 			}
@@ -953,24 +987,106 @@ export function createOrogenScene(
 	function rebuildNationBorders() {
 		disposeObject3D(scene, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
+		disposeObject3D(scene, globeLandNationBorders)
+		disposeObject3D(scene, mapLandNationBorders)
 		globeNationBorders = null
 		mapNationBorders = null
-		if (!currentWorld || !nationBordersVisible) return
-		globeNationBorders = buildNationBordersGlobe(
-			currentWorld,
-			currentViewMode,
-			nationBordersVisible,
-			elevationVisible,
-		)
-		mapNationBorders = buildNationBordersMap(
-			currentWorld,
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-			currentViewMode,
-			nationBordersVisible,
-		)
-		if (globeNationBorders) scene.add(globeNationBorders)
-		if (mapNationBorders) scene.add(mapNationBorders)
+		globeLandNationBorders = null
+		mapLandNationBorders = null
+		nationBorderMaterials = []
+		landNationBorderMaterials = []
+
+		const w = canvas.clientWidth || 1
+		const h = canvas.clientHeight || 1
+
+		if (currentWorld && landNationBordersVisible) {
+			const globeLand = buildLandNationBordersGlobe(
+				currentWorld,
+				currentViewMode,
+				landNationBordersVisible,
+				elevationVisible,
+				[w, h],
+			)
+			const mapLand = buildLandNationBordersMap(
+				currentWorld,
+				currentMapCenterLongitudeDeg,
+				currentMapProjectionLatitudeDeg,
+				currentViewMode,
+				landNationBordersVisible,
+				[w, h],
+			)
+			if (globeLand) {
+				globeLandNationBorders = globeLand.lines
+				landNationBorderMaterials.push(globeLand.material)
+				scene.add(globeLandNationBorders)
+			}
+			if (mapLand) {
+				mapLandNationBorders = mapLand.lines
+				landNationBorderMaterials.push(mapLand.material)
+				scene.add(mapLandNationBorders)
+			}
+		}
+
+		if (currentWorld && nationBordersVisible) {
+			const BORDER_BASE_WIDTH = 1.2
+			const globePos = collectAllNationBorderGlobePositions(
+				currentWorld,
+				0,
+				elevationVisible,
+			)
+			if (globePos.length > 0) {
+				const geom = new LineSegmentsGeometry()
+				geom.setPositions(globePos)
+				const mat = new LineMaterial({
+					color: 0x020617,
+					linewidth: BORDER_BASE_WIDTH,
+					resolution: new THREE.Vector2(w, h),
+					transparent: true,
+					opacity: 0.95,
+					depthWrite: false,
+				})
+				mat.userData.baseWidth = BORDER_BASE_WIDTH
+				globeNationBorders = new LineSegments2(geom, mat)
+				globeNationBorders.computeLineDistances()
+				globeNationBorders.visible = currentViewMode === "globe"
+				globeNationBorders.renderOrder = 1
+				nationBorderMaterials.push(mat)
+				scene.add(globeNationBorders)
+			}
+			const mapRaw = collectAllNationBorderMapPositions(
+				currentWorld,
+				currentMapCenterLongitudeDeg,
+				currentMapProjectionLatitudeDeg,
+				0,
+			)
+			const mapPos = repeatMapPositions(
+				mapRaw,
+				createMapProjection(
+					currentMapCenterLongitudeDeg,
+					currentMapProjectionLatitudeDeg,
+				).repeatWidth,
+			)
+			if (mapPos.length > 0) {
+				const geom = new LineSegmentsGeometry()
+				geom.setPositions(mapPos)
+				const mat = new LineMaterial({
+					color: 0x020617,
+					linewidth: BORDER_BASE_WIDTH,
+					resolution: new THREE.Vector2(w, h),
+					transparent: true,
+					opacity: 0.95,
+					depthWrite: false,
+				})
+				mat.userData.baseWidth = BORDER_BASE_WIDTH
+				mapNationBorders = new LineSegments2(geom, mat)
+				mapNationBorders.computeLineDistances()
+				mapNationBorders.visible = currentViewMode === "map"
+				mapNationBorders.renderOrder = 1
+				nationBorderMaterials.push(mat)
+				scene.add(mapNationBorders)
+			}
+		}
+
 		updateOverlayVisibility()
 	}
 
@@ -1089,6 +1205,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, mapWindArrows)
 		disposeObject3D(scene, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
+		disposeObject3D(scene, globeLandNationBorders)
+		disposeObject3D(scene, mapLandNationBorders)
 		disposeObject3D(scene, globeSelectedProvinceBorder)
 		disposeObject3D(scene, mapSelectedProvinceBorder)
 		disposeObject3D(scene, pulseGlobe)
@@ -1115,6 +1233,10 @@ export function createOrogenScene(
 		mapWindArrows = null
 		globeNationBorders = null
 		mapNationBorders = null
+		globeLandNationBorders = null
+		mapLandNationBorders = null
+		nationBorderMaterials = []
+		landNationBorderMaterials = []
 		pulseGlobe = null
 		pulseMap = null
 		pulse = null
@@ -1246,6 +1368,14 @@ export function createOrogenScene(
 				currentViewMode === "map" && !!currentOccupationOverlay
 			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
 		}
+		if (globeLandNationBorders)
+			globeLandNationBorders.visible =
+				currentViewMode === "globe" && landNationBordersVisible
+		if (mapLandNationBorders) {
+			mapLandNationBorders.visible =
+				currentViewMode === "map" && landNationBordersVisible
+			if (mapMesh) mapLandNationBorders.position.copy(mapMesh.position)
+		}
 		if (globeNationBorders)
 			globeNationBorders.visible =
 				currentViewMode === "globe" && nationBordersVisible
@@ -1337,6 +1467,7 @@ export function createOrogenScene(
 		const mapObjects = [
 			mapWireframe,
 			mapOccupationOverlay,
+			mapLandNationBorders,
 			mapNationBorders,
 			mapSelectedProvinceBorder,
 			mapGrid,
@@ -1367,6 +1498,7 @@ export function createOrogenScene(
 			{ object: globeGrid, visible: false },
 			{ object: globeThermalEquator, visible: false },
 			{ object: globeRivers, visible: false },
+			{ object: globeLandNationBorders, visible: false },
 			{ object: globeNationBorders, visible: false },
 			{ object: globeSelectedProvinceBorder, visible: false },
 			{ object: globeMeasureLine, visible: false },
@@ -1388,6 +1520,7 @@ export function createOrogenScene(
 			{ object: mapGrid, visible: gridVisible },
 			{ object: mapThermalEquator, visible: false },
 			{ object: mapRivers, visible: riversVisible },
+			{ object: mapLandNationBorders, visible: landNationBordersVisible },
 			{ object: mapNationBorders, visible: nationBordersVisible },
 			{ object: mapHierarchyOverlay, visible: hierarchyOverlayNationId >= 0 },
 			{ object: mapSettlements, visible: settlementsVisible },
@@ -1535,6 +1668,22 @@ export function createOrogenScene(
 				nextVisible: visible,
 				hasGlobeOverlay: globeNationBorders !== null,
 				hasMapOverlay: mapNationBorders !== null,
+			})
+		) {
+			rebuildNationBorders()
+			return
+		}
+		updateOverlayVisibility()
+	}
+
+	function setLandNationBordersVisible(visible: boolean) {
+		if (landNationBordersVisible === visible) return
+		landNationBordersVisible = visible
+		if (
+			shouldRebuildNationBordersForVisibilityChange({
+				nextVisible: visible,
+				hasGlobeOverlay: globeLandNationBorders !== null,
+				hasMapOverlay: mapLandNationBorders !== null,
 			})
 		) {
 			rebuildNationBorders()
@@ -1884,6 +2033,8 @@ export function createOrogenScene(
 		for (const mat of riverMaterials) mat.resolution.set(w, h)
 		for (const mat of pulseMaterials) mat.resolution.set(w, h)
 		for (const mat of infrastructureMaterials) mat.resolution.set(w, h)
+		for (const mat of nationBorderMaterials) mat.resolution.set(w, h)
+		for (const mat of landNationBorderMaterials) mat.resolution.set(w, h)
 		if (selectedProvince >= 0) rebuildSelectedProvinceBorder()
 		requestRender()
 	}
@@ -2034,6 +2185,8 @@ export function createOrogenScene(
 		disposeObject3D(scene, mapThermalEquator)
 		disposeObject3D(scene, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
+		disposeObject3D(scene, globeLandNationBorders)
+		disposeObject3D(scene, mapLandNationBorders)
 		disposeObject3D(scene, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
 		disposeGroup(scene, globeRivers)
@@ -2395,6 +2548,7 @@ export function createOrogenScene(
 		setOccupationOverlay,
 		setHoveredRegion,
 		setNationBordersVisible,
+		setLandNationBordersVisible,
 		setViewMode,
 		setWireframeVisible,
 		setGridVisible,

@@ -1152,7 +1152,7 @@ function refineGovernmentSubtype(
 			// Ancient & medieval (>=0.55): feudal default; elective for medium+
 			// kingdoms; absolute for large autocratic empires.
 			if (size >= 20 && r < 0.65) return 6 // absolute: large empires
-			if (size >= 5 && r < 0.65) return 5 // elective: medium+ kingdoms
+			if (size >= 5 && r < 0.75) return 5 // elective: medium+ kingdoms
 			return 4 // feudal: default
 		}
 
@@ -1171,8 +1171,8 @@ function refineGovernmentSubtype(
 			if (water >= 2 && size <= 10 && wave >= 0 && wave < 0.35) return 8 // merchant: coastal core
 			if (water >= 1 && size <= 6 && wave >= 0 && wave < 0.3 && r < 0.55)
 				return 8
-			if (size >= 8 && wave >= 0 && wave < 0.28) return r < 0.55 ? 9 : 10 // noble or confederation
-			if (size >= 6 && r < 0.4) return 10 // confederation: medium chance
+			if (size >= 10 && r < 0.4) return 10 // confederation: medium chance
+			if (size >= 8 && wave >= 0 && wave < 0.28) return 9 // noble or confederation
 			return 8 // merchant: default
 		}
 

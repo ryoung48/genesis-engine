@@ -11,6 +11,7 @@ import { PROV } from "@/model/history/fields"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import { regionPathLengthKm } from "@/model/shared/units"
 import { ERA_ORDER } from "@/model/society/eras"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -308,9 +309,13 @@ describe("full world smoke generation", () => {
 		if (world.tidalRange) {
 			const { adjOffset, adjList } = world.mesh
 			const isLand = world.isLand
-			const lakes = world.rivers?.lakes
 			const tidalRange = world.tidalRange
 			const N = world.mesh.numRegions
+			function isLakeLandmark(r: number): boolean {
+				if (!world.landmarks) return false
+				const lid = world.landmarks.regionLandmark[r]
+				return lid >= 0 && world.landmarks.type[lid] === LANDMARK_TYPE_LAKE
+			}
 
 			// ── Land coastal cells (enclosure-based source values) ────────────
 			let lMicro = 0,
@@ -324,7 +329,7 @@ describe("full world smoke generation", () => {
 				let bordersOcean = false
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
-					if (!isLand[nb] && !lakes?.[nb]) {
+					if (!isLand[nb] && !isLakeLandmark(nb)) {
 						bordersOcean = true
 						break
 					}

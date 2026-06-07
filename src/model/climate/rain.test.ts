@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import { LANDMARK_TYPE_LAKE, LANDMARK_TYPE_OCEAN } from "../terrain/landmarks"
 import { elevToHeightKm } from "./climate"
 import {
 	computeAdvection,
@@ -646,5 +647,37 @@ describe("computeMonthlyRain", () => {
 			3,
 		)
 		expect(rain.annual[1]).toBeGreaterThan(0)
+	})
+
+	it("rains on non-ocean water landmarks while keeping ocean landmarks dry", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 10, lonDeg: -30 },
+				{ latDeg: 12, lonDeg: 0 },
+				{ latDeg: 8, lonDeg: 30 },
+			],
+			[[1], [0, 2], [1]],
+		)
+		const climate = buildClimate([24, 22, 20])
+		const rain = computeMonthlyRain(
+			mesh,
+			climate,
+			new Float32Array([0.7, 0.6, 0.2]),
+			new Float32Array([0.1, 0.15, 0]),
+			new Uint8Array([1, 0, 0]),
+			buildParams({ seed: 3 }),
+			Array.from({ length: 12 }, () => new Float32Array(120).fill(10)),
+			undefined,
+			{
+				regionLandmark: new Int32Array([0, 1, 2]),
+				type: new Uint8Array([0, LANDMARK_TYPE_LAKE, LANDMARK_TYPE_OCEAN]),
+			},
+		)
+
+		expect(rain.annual[0]).toBeGreaterThan(0)
+		expect(rain.annual[1]).toBeGreaterThan(0)
+		expect(rain.monthly[1]).toBeGreaterThan(0)
+		expect(rain.annual[2]).toBe(0)
+		expect(rain.monthly[2]).toBe(0)
 	})
 })

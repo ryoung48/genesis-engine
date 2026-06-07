@@ -80,6 +80,8 @@ export interface OrogenNationHierarchy extends OrogenPartition {
 	governmentType?: Uint8Array
 	/** Per-nation colonizer index (-1 = sovereign, ≥0 = index of colonizing nation) */
 	nationColonizer?: Int32Array
+	/** Active rebel wars — attacker is the overlord, defender is the rebel nation */
+	activeRebelWars?: ReadonlyArray<{ attacker: number; defender: number }>
 }
 
 export interface OrogenRivers {
@@ -105,8 +107,6 @@ export interface OrogenRivers {
 	terminalCoastal: Uint8Array
 	/** Terminal river cells that end in inland basins, lakes, or playas. */
 	terminalInterior: Uint8Array
-	/** Per-cell lake flag (1 = lake surface, 0 = not) */
-	lakes: Uint8Array
 	/** Per-cell enclosed basin ID (-1 = not assigned to a basin) */
 	basinId: Int32Array
 	/** Per-cell water surface elevation (only meaningful for lake cells) */

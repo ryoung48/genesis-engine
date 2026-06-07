@@ -63,6 +63,7 @@ import {
 import { computeProvinceWaterAccess } from "../society/water-access"
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
+import { computeLakes } from "../terrain/lakes"
 import type { OrogenLandmarks } from "../terrain/landmarks"
 import {
 	computeLandmarks,
@@ -133,6 +134,48 @@ interface PostPipelineOutput {
 	eraStatehoodMask: Uint8Array | undefined
 }
 
+const LAKE_RETENTION_THRESHOLD = 100 // mm/yr
+
+export function reconcileClosedWaterBodies(params: {
+	isLand: Uint8Array
+	riverLand: Uint8Array
+	landmarks: Pick<OrogenLandmarks, "regionLandmark" | "type" | "count">
+	rainfall: Pick<OrogenRainfall, "annual">
+}): boolean {
+	const { isLand, riverLand, landmarks, rainfall } = params
+	const rainfallSum = new Float32Array(landmarks.count)
+	const rainfallCount = new Int32Array(landmarks.count)
+
+	for (let r = 0; r < isLand.length; r++) {
+		if (isLand[r]) continue
+		const landmarkId = landmarks.regionLandmark[r]
+		if (landmarkId < 0 || landmarks.type[landmarkId] !== LANDMARK_TYPE_LAKE)
+			continue
+		rainfallSum[landmarkId] += rainfall.annual[r]
+		rainfallCount[landmarkId]++
+	}
+
+	let changed = false
+	for (let r = 0; r < isLand.length; r++) {
+		if (isLand[r]) continue
+		const landmarkId = landmarks.regionLandmark[r]
+		if (landmarkId < 0 || landmarks.type[landmarkId] !== LANDMARK_TYPE_LAKE)
+			continue
+
+		const avgRain =
+			rainfallCount[landmarkId] > 0
+				? rainfallSum[landmarkId] / rainfallCount[landmarkId]
+				: 0
+		if (avgRain < LAKE_RETENTION_THRESHOLD) {
+			isLand[r] = 1
+			riverLand[r] = 1
+			changed = true
+		}
+	}
+
+	return changed
+}
+
 export function runPostElevationPipeline(
 	input: PostPipelineInput,
 ): PostPipelineOutput {
@@ -163,7 +206,7 @@ export function runPostElevationPipeline(
 	// ── Climate ────────────────────────────────────────────────────────
 	let t0 = performance.now()
 	const landFraction = computeLandFraction(mesh, isLand)
-	const climate = computeTemperature(
+	let climate = computeTemperature(
 		mesh,
 		elevation,
 		landFraction,
@@ -176,10 +219,8 @@ export function runPostElevationPipeline(
 	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
-	const currentLandmarks = enableOceanCurrents
-		? computeLandmarks(mesh, isLand)
-		: undefined
-	if (enableOceanCurrents) record("Post: current landmarks", t0)
+	const currentLandmarks = computeLandmarks(mesh, isLand)
+	record("Post: current landmarks", t0)
 
 	const N = mesh.numRegions
 	t0 = performance.now()
@@ -245,6 +286,7 @@ export function runPostElevationPipeline(
 		params,
 		monthlyTEQ,
 		distCoast,
+		currentLandmarks,
 	)
 	record("Post: rainfall", t0)
 	onProgress?.("Post: rainfall", 54)
@@ -253,6 +295,44 @@ export function runPostElevationPipeline(
 		annual: rain.annual,
 		east: eastAdv,
 		west: westAdv,
+	}
+
+	const drainedClosedWater = reconcileClosedWaterBodies({
+		isLand,
+		riverLand,
+		landmarks: currentLandmarks,
+		rainfall,
+	})
+	if (drainedClosedWater) {
+		t0 = performance.now()
+		const updatedLandFraction = computeLandFraction(mesh, isLand)
+		climate = computeTemperature(
+			mesh,
+			elevation,
+			updatedLandFraction,
+			params,
+			oceanDist,
+			isLand,
+			elevation_km,
+		)
+		for (let month = 0; month < 12; month++) {
+			monthlyTEQ[month] = computeThermalEquator(
+				mesh,
+				climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+			)
+		}
+		if (oceanCurrents) {
+			applyCurrentTemperatureEffect(
+				mesh,
+				climate,
+				isLand,
+				oceanCurrents,
+				monthlyTEQ,
+				params,
+			)
+			refreshClimatePetMonthly(climate, params)
+		}
+		record("Post: drain arid closed water", t0)
 	}
 
 	// ── Diurnal temperature range + PET ───────────────────────────────
@@ -280,6 +360,33 @@ export function runPostElevationPipeline(
 	const hydrology = computeHydrologyFields(climate, rainfall, riverLand)
 	record("Post: hydrology", t0)
 	onProgress?.("Post: hydrology", 57)
+
+	// ── Rivers ─────────────────────────────────────────────────────────
+	t0 = performance.now()
+	const rivers = computeRivers(
+		mesh,
+		elevation,
+		rainfall,
+		climate,
+		hydrology,
+		riverLand,
+		params,
+	)
+	record("Post: rivers", t0)
+
+	t0 = performance.now()
+	computeLakes(
+		mesh,
+		elevation,
+		rainfall,
+		rivers.waterLevel,
+		rivers.basinId,
+		isLand,
+		emergedLand,
+		elevation_km,
+	)
+	record("Post: lakes", t0)
+	onProgress?.("Post: rivers", 62)
 
 	// ── Ice (needed for pasta climate) ─────────────────────────────────
 	t0 = performance.now()
@@ -342,52 +449,11 @@ export function runPostElevationPipeline(
 	record("Post: vegetation", t0)
 	onProgress?.("Post: vegetation", 60)
 
-	// ── Rivers ─────────────────────────────────────────────────────────
-	t0 = performance.now()
-	const rivers = computeRivers(
-		mesh,
-		elevation,
-		rainfall,
-		climate,
-		hydrology,
-		riverLand,
-		params,
-	)
-	record("Post: rivers", t0)
-	onProgress?.("Post: rivers", 62)
-
-	// Clear vegetation for lake cells; mutate isLand so downstream treats them as water
-	t0 = performance.now()
-	for (let r = 0; r < N; r++) {
-		if (rivers.lakes[r] && emergedLand?.[r] && elevation_km[r] > 0) {
-			rivers.lakes[r] = 0
-			continue
-		}
-		if (rivers.lakes[r]) {
-			vegetation[r] = 0
-			isLand[r] = 0
-		}
-	}
-	record("Post: apply lakes", t0)
-
 	// Recompute landmarks with updated isLand (lakes now treated as water)
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
 	record("Post: landmarks", t0)
 	onProgress?.("Post: landmarks", 62)
-
-	// ── Promote small enclosed water bodies to lakes ──────────────────
-	// Any water body that landmarks classifies as LAKE (< 1 % of sphere) is too
-	// small to participate in tidal dynamics.  Back-fill rivers.lakes so the
-	// tidal computation and all downstream display code treat them as lakes.
-	for (let r = 0; r < N; r++) {
-		if (isLand[r] || rivers.lakes[r]) continue
-		const lmId = landmarks.regionLandmark[r]
-		if (lmId >= 0 && landmarks.type[lmId] === LANDMARK_TYPE_LAKE) {
-			rivers.lakes[r] = 1
-		}
-	}
-
 	// ── Tidal range ────────────────────────────────────────────────────
 	// Computed before topography so the tidal bonus can nudge coastal marsh
 	// formation in classifyTopography.
@@ -400,7 +466,7 @@ export function runPostElevationPipeline(
 		coastalMask,
 		elevation_km,
 		params,
-		rivers.lakes,
+		landmarks,
 	)
 	record("Post: tidal range", t0)
 
@@ -412,6 +478,7 @@ export function runPostElevationPipeline(
 			elevationKm: elevation_km,
 			isLand,
 			rivers,
+			landmarks,
 			vegetation,
 			planetRadiusKm: params.planetRadiusKm,
 			seed: params.seed,

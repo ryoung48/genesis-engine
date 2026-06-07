@@ -1,6 +1,8 @@
 import type { OrogenRivers, SphereMesh } from ".."
 import { BIOME_LABELS } from "../climate/vegetation"
 import { SimplexNoise } from "../shared/simplex-noise"
+import type { OrogenLandmarks } from "../terrain/landmarks"
+import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
 
 export const TOPO_FLAT = 0
 export const TOPO_HILL = 1
@@ -63,10 +65,8 @@ export function classifyTopography(params: {
 	mesh: SphereMesh
 	elevationKm: Float32Array
 	isLand: Uint8Array
-	rivers: Pick<
-		OrogenRivers,
-		"lakes" | "visible" | "terminal" | "terminalCoastal" | "terminalInterior"
-	>
+	rivers: Pick<OrogenRivers, "visible" | "terminal">
+	landmarks: Pick<OrogenLandmarks, "regionLandmark" | "type">
 	vegetation?: Uint8Array
 	slopeScore?: Float32Array
 	planetRadiusKm?: number
@@ -94,7 +94,12 @@ export function classifyTopography(params: {
 	const topography = new Uint8Array(mesh.numRegions)
 	const coastal = new Uint8Array(mesh.numRegions)
 	const { adjOffset, adjList, r_xyz } = mesh
-	const { lakes } = rivers
+	const { regionLandmark, type: landmarkType } = params.landmarks
+	function isLake(r: number): boolean {
+		if (isLand[r]) return false
+		const lid = regionLandmark[r]
+		return lid >= 0 && landmarkType[lid] === LANDMARK_TYPE_LAKE
+	}
 	const adjacentLake = new Uint8Array(mesh.numRegions)
 	const adjacentOcean = new Uint8Array(mesh.numRegions)
 	const adjacentTerminal = new Uint8Array(mesh.numRegions)
@@ -110,7 +115,7 @@ export function classifyTopography(params: {
 
 	function isMarshCandidate(r: number): boolean {
 		const isDesert = vegetation?.[r] === desertBiome
-		return isLand[r] === 1 && lakes[r] === 0 && !isDesert
+		return isLand[r] === 1 && !isDesert
 	}
 
 	function marshEdgeBias(r: number): number {
@@ -118,7 +123,7 @@ export function classifyTopography(params: {
 	}
 
 	for (let r = 0; r < mesh.numRegions; r++) {
-		if (lakes[r]) {
+		if (isLake(r)) {
 			topography[r] = TOPO_LAKE
 			continue
 		}
@@ -138,8 +143,8 @@ export function classifyTopography(params: {
 
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			if (lakes[nb]) adjacentLake[r] = 1
-			if (!isLand[nb] && !lakes[nb]) adjacentOcean[r] = 1
+			if (isLake(nb)) adjacentLake[r] = 1
+			if (!isLand[nb] && !isLake(nb)) adjacentOcean[r] = 1
 			if (rivers.visible[nb] || rivers.terminal[nb]) adjacentRiver[r] = 1
 			if (rivers.terminal[nb]) adjacentTerminal[r] = 1
 		}
@@ -180,7 +185,7 @@ export function classifyTopography(params: {
 	}
 
 	for (let r = 0; r < mesh.numRegions; r++) {
-		if (lakes[r] || !isLand[r]) continue
+		if (!isLand[r]) continue
 
 		const elevation = elevationKm[r]
 		const slope = slopeScore[r]

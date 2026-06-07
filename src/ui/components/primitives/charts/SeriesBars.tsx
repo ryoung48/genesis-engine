@@ -33,11 +33,11 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 	tooltipLabel,
 	showValues = false,
 }) => {
-	const max = Math.max(...values.map(Math.abs), 0.001)
-	const min = Math.min(...values, 0)
-	const hasNegativeValues = min < 0
-	const range = hasNegativeValues ? max - min : max
-	const zeroY = hasNegativeValues ? max / range : 1
+	const maxPositive = Math.max(...values, 0.001)
+	const maxNegative = Math.max(...values.map((v) => -v), 0)
+	const hasNegativeValues = maxNegative > 0
+	const range = maxPositive + maxNegative
+	const zeroY = hasNegativeValues ? maxPositive / range : 1
 
 	return (
 		<div>
@@ -60,7 +60,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 					const valueLabel = formatValue(value)
 					const labelBottom =
 						value >= 0
-							? `calc(${(1 - zeroY) * 100 + barHeight * zeroY * 100}% + 2px)`
+							? `calc(${(1 - zeroY) * 100 + barHeight * 100}% + 2px)`
 							: `calc(${(1 - zeroY) * 100}% + 2px)`
 					const itemLabel = labels[index] ?? `${index + 1}`
 
@@ -86,7 +86,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 								<div
 									className={`absolute right-0 left-0 rounded-t-[1px] transition-all ${isActive ? "opacity-100" : "opacity-70"}`}
 									style={{
-										height: `${barHeight * zeroY * 100}%`,
+										height: `${barHeight * 100}%`,
 										bottom: `${(1 - zeroY) * 100}%`,
 										backgroundColor: colorForValue(value, index),
 									}}
@@ -95,7 +95,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 								<div
 									className={`absolute right-0 left-0 rounded-b-[1px] transition-all ${isActive ? "opacity-100" : "opacity-70"}`}
 									style={{
-										height: `${barHeight * (1 - zeroY) * 100}%`,
+										height: `${barHeight * 100}%`,
 										top: `${zeroY * 100}%`,
 										backgroundColor: colorForValue(value, index),
 									}}

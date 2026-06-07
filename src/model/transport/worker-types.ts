@@ -117,7 +117,6 @@ export interface SerializedOrogenWorld {
 		riverId: Int32Array
 		riverLengthKm: Float32Array
 		visible: Uint8Array
-		lakes: Uint8Array
 		basinId: Int32Array
 		waterLevel: Float32Array
 	}

@@ -23,9 +23,16 @@ const TYPE_CONTINENT = 0
 const TYPE_LAKE = 5
 const CURRENT_EFFECT_MONTHS = 12
 const TEQ_BINS = 120
-const WARM_EFFECT_XS = [0, 20, 40, 60, 80]
-const WARM_EFFECT_YS = [1, 2, 8, 15, 10]
-const COLD_EFFECT_YS = [1, 2, 5, 10, 7]
+const WARM_EFFECT_XS = [0, 20, 40, 50, 60, 80, 90]
+const WARM_EFFECT_YS = [1, 2, 8, 12, 15, 10, 0]
+const COLD_EFFECT_YS = [1, 2, 6, 8, 10, 5, 0]
+const EAST_COAST_WARM_EXTENSION_DEG = 5
+const WEST_COAST_COLD_EXTENSION_DEG = 5
+const WARM_COASTAL_SEED_DEPTH = 1
+const COLD_COASTAL_SEED_DEPTH = 4
+const LAND_CURRENT_EFFECT_SCALE = 0.68
+const WARM_CURRENT_SEASONALITY = 0.7
+const COLD_CURRENT_SEASONALITY = 0.6
 
 interface OceanCurrentResult {
 	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */
@@ -61,6 +68,33 @@ function wrapLonDeltaDeg(delta: number): number {
 	return delta
 }
 
+function computeAnnualTeq(
+	monthlyTEQ?: Float32Array[],
+): Float32Array | undefined {
+	if (!monthlyTEQ || monthlyTEQ.length !== CURRENT_EFFECT_MONTHS)
+		return undefined
+	const annualTeq = new Float32Array(TEQ_BINS)
+	for (let bin = 0; bin < TEQ_BINS; bin++) {
+		let sum = 0
+		for (const teq of monthlyTEQ) sum += teq[bin]
+		annualTeq[bin] = sum / CURRENT_EFFECT_MONTHS
+	}
+	return annualTeq
+}
+
+function computeSeasonalCurrentFactor(
+	monthlyTemp: number,
+	minMonthlyTemp: number,
+	maxMonthlyTemp: number,
+	isWarmCurrent: boolean,
+): number {
+	const range = maxMonthlyTemp - minMonthlyTemp
+	const hotPhase = range <= 1e-6 ? 0.5 : (monthlyTemp - minMonthlyTemp) / range
+	return isWarmCurrent
+		? 1 - WARM_CURRENT_SEASONALITY * hotPhase
+		: 1 - COLD_CURRENT_SEASONALITY * (1 - hotPhase)
+}
+
 interface CoastSite {
 	region: number
 	oceanNeighbors: number[]
@@ -78,17 +112,59 @@ function classifyCurrentWarmth(
 	if (distFromReference >= 70) return -1
 	const hw = hadleyWidth(hoursPerDay)
 	const effectiveEastFacing = reverseCirculation ? !eastFacing : eastFacing
-	// East-facing coasts: shift boundary by hw/3 so the warm western boundary
-	// current (Gulf Stream, Kuroshio) extends to ~hw*4/3 (~40° for Earth) before
-	// the subtropical flip. West-facing coasts keep the unshifted hw boundary.
 	const effectiveDist = effectiveEastFacing
-		? Math.max(0, distFromReference - hw / 3)
-		: distFromReference
+		? Math.max(0, distFromReference - EAST_COAST_WARM_EXTENSION_DEG)
+		: Math.max(0, distFromReference - WEST_COAST_COLD_EXTENSION_DEG)
 	const cellIndex = Math.floor(effectiveDist / hw)
 	// Even-indexed cells: east-facing coast = warm (western boundary current).
 	// Odd-indexed cells: east-facing coast = cold (eastern boundary upwelling).
 	const sign = cellIndex % 2 === 0 ? 1 : -1
 	return sign * (effectiveEastFacing ? 1 : -1)
+}
+
+function seedCoastalNeighbors(
+	seeds: Float32Array,
+	oceanNeighbors: number[],
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	isLake: Uint8Array,
+	extraDepth: number,
+): void {
+	const { adjOffset, adjList } = mesh
+	const visited = new Uint8Array(mesh.numRegions)
+	const queue = new Int32Array(mesh.numRegions)
+	const depth = new Int32Array(mesh.numRegions)
+	let head = 0
+	let tail = 0
+
+	for (const nb of oceanNeighbors) {
+		if (isLand[nb] || isLake[nb] || visited[nb]) continue
+		visited[nb] = 1
+		seeds[nb] = 1
+		queue[tail] = nb
+		depth[tail] = 0
+		tail++
+	}
+
+	while (head < tail) {
+		const current = queue[head]
+		const currentDepth = depth[head]
+		head++
+		if (currentDepth >= extraDepth) continue
+		for (
+			let j = adjOffset[current], jEnd = adjOffset[current + 1];
+			j < jEnd;
+			j++
+		) {
+			const nb = adjList[j]
+			if (isLand[nb] || isLake[nb] || visited[nb]) continue
+			visited[nb] = 1
+			seeds[nb] = 1
+			queue[tail] = nb
+			depth[tail] = currentDepth + 1
+			tail++
+		}
+	}
 }
 
 function fillOceanBeltSeeds(
@@ -206,6 +282,14 @@ function computeOceanWarmthFromSeeds(
 
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (isLand[r] || isLake[r]) continue
+		if (warmSeed[r] > coldSeed[r]) {
+			oceanWarmth[r] = 1
+			continue
+		}
+		if (coldSeed[r] > warmSeed[r]) {
+			oceanWarmth[r] = -1
+			continue
+		}
 		const warm = warmDist[r]
 		const cold = coldDist[r]
 		if (warm < 0 && cold < 0) continue
@@ -357,15 +441,7 @@ export function computeOceanCurrents(
 	// coast seeding fades out and belt seeds (warm tropics, cold poles) dominate.
 	const coriolisWeight = Math.min(1, Math.sqrt(24 / hoursPerDay))
 
-	let annualTeq: Float32Array | undefined
-	if (monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS) {
-		annualTeq = new Float32Array(TEQ_BINS)
-		for (let bin = 0; bin < TEQ_BINS; bin++) {
-			let sum = 0
-			for (const teq of monthlyTEQ) sum += teq[bin]
-			annualTeq[bin] = sum / CURRENT_EFFECT_MONTHS
-		}
-	}
+	const annualTeq = computeAnnualTeq(monthlyTEQ)
 
 	const isContinent = new Uint8Array(N)
 	const isLake = new Uint8Array(N)
@@ -413,9 +489,23 @@ export function computeOceanCurrents(
 			hoursPerDay,
 		)
 		if (warmth * coriolisWeight > 0.5) {
-			for (const nb of site.oceanNeighbors) warmSeed[nb] = 1
+			seedCoastalNeighbors(
+				warmSeed,
+				site.oceanNeighbors,
+				mesh,
+				isLand,
+				isLake,
+				WARM_COASTAL_SEED_DEPTH,
+			)
 		} else if (warmth * coriolisWeight < -0.5) {
-			for (const nb of site.oceanNeighbors) coldSeed[nb] = 1
+			seedCoastalNeighbors(
+				coldSeed,
+				site.oceanNeighbors,
+				mesh,
+				isLand,
+				isLake,
+				COLD_COASTAL_SEED_DEPTH,
+			)
 		}
 	}
 
@@ -434,70 +524,9 @@ export function computeOceanCurrents(
 		avgEdgeKm,
 	)
 
-	let oceanWarmthMonthly: Float32Array | undefined
-	let coastalWarmthMonthly: Float32Array | undefined
-	let temperatureDeltaMonthly: Float32Array | undefined
-	if (monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS) {
-		oceanWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
-		coastalWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
-		temperatureDeltaMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
-		const monthWarmSeed = new Float32Array(N)
-		const monthColdSeed = new Float32Array(N)
-		for (let month = 0; month < CURRENT_EFFECT_MONTHS; month++) {
-			monthWarmSeed.fill(0)
-			monthColdSeed.fill(0)
-			const teqByLon = monthlyTEQ[month]
-			fillOceanBeltSeeds(
-				monthWarmSeed,
-				monthColdSeed,
-				isLand,
-				isLake,
-				latDeg,
-				regionBin,
-				teqByLon,
-				hoursPerDay,
-			)
-			for (const site of coastSites) {
-				const distFromTeq = Math.abs(
-					latDeg[site.region] - teqByLon[site.lonBin],
-				)
-				const warmth = classifyCurrentWarmth(
-					distFromTeq,
-					site.eastFacing,
-					reverseCirculation,
-					hoursPerDay,
-				)
-				if (warmth * coriolisWeight > 0.5) {
-					for (const nb of site.oceanNeighbors) monthWarmSeed[nb] = 1
-				} else if (warmth * coriolisWeight < -0.5) {
-					for (const nb of site.oceanNeighbors) monthColdSeed[nb] = 1
-				}
-			}
-			const monthOceanWarmth = computeOceanWarmthFromSeeds(
-				mesh,
-				isLand,
-				isLake,
-				monthWarmSeed,
-				monthColdSeed,
-			)
-			oceanWarmthMonthly.set(monthOceanWarmth, month * N)
-			const monthCoastalWarmth = computeCoastalWarmthFromOceanWarmth(
-				mesh,
-				isLand,
-				isLake,
-				monthOceanWarmth,
-				avgEdgeKm,
-			)
-			coastalWarmthMonthly.set(monthCoastalWarmth, month * N)
-		}
-	}
-
 	return {
 		oceanWarmth,
 		coastalWarmth,
-		oceanWarmthMonthly,
-		coastalWarmthMonthly,
-		temperatureDeltaMonthly,
 		temperatureDelta: new Float32Array(N),
 	}
 }
@@ -508,10 +537,8 @@ export function computeOceanCurrents(
  * Warm currents (Gulf Stream, Kuroshio) raise SST and coastal land temps;
  * cold currents (California, Benguela, Humboldt) lower them.
  *
- * Ocean: up to ~15°C at high latitudes (60°), ~8°C in subtropics (40°)
- * Land:  warm currents penetrate further inland (0.68×); cold currents are
- *        more coastal (0.42×). Seasonal modulation amplifies warm-current
- *        effects in cold months and cold-current effects in hot months.
+ * Ocean:  up to ±5°C for strong currents
+ * Land:   up to ±3°C at coast, fading inland (coastalWarmth already fades)
  */
 export function applyCurrentTemperatureEffect(
 	mesh: SphereMesh,
@@ -535,14 +562,8 @@ export function applyCurrentTemperatureEffect(
 	const N = mesh.numRegions
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
 	const teqByBin =
-		monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS
-			? undefined
-			: computeThermalEquator(mesh, climate.temperature_avg, TEQ_BINS)
-	const hasMonthlyCurrents =
-		!!currents.oceanWarmthMonthly &&
-		!!currents.coastalWarmthMonthly &&
-		!!monthlyTEQ &&
-		monthlyTEQ.length === CURRENT_EFFECT_MONTHS
+		computeAnnualTeq(monthlyTEQ) ??
+		computeThermalEquator(mesh, climate.temperature_avg, TEQ_BINS)
 	const temperatureDeltaMonthly =
 		currents.temperatureDeltaMonthly ??
 		(currents.temperatureDeltaMonthly = new Float32Array(
@@ -551,86 +572,7 @@ export function applyCurrentTemperatureEffect(
 
 	function teqAt(r: number): number {
 		const bin = regionBin[r]
-		return teqByBin ? teqByBin[bin] : 0
-	}
-
-	if (hasMonthlyCurrents) {
-		const oceanWarmthMonthly = currents.oceanWarmthMonthly!
-		const coastalWarmthMonthly = currents.coastalWarmthMonthly!
-		for (let r = 0; r < N; r++) {
-			const bin = regionBin[r]
-
-			// Pre-current mean temperature used as the deviation baseline below.
-			// Computed from monthly values directly — temperature_avg may have drifted
-			// if prior effects applied non-uniform monthly deltas before this pass.
-			let meanTemp = 0
-			for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
-				meanTemp += climate.temperature_monthly[m * N + r]
-			}
-			meanTemp /= CURRENT_EFFECT_MONTHS
-
-			// Pass 1: apply per-month base delta from current strength.
-			// This preserves genuine seasonal variation in current intensity (e.g.
-			// a current that weakens in summer because the TEQ shifts).
-			let annualDelta = 0
-			let wAnnual = 0
-			for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
-				const w = isLand[r]
-					? coastalWarmthMonthly[m * N + r]
-					: oceanWarmthMonthly[m * N + r]
-				wAnnual += w
-				if (Math.abs(w) < 0.01) continue
-				const teq = monthlyTEQ![m][bin]
-				const distFromTEQ = Math.abs(latDeg[r] - teq)
-				const warmMaxAtLat = piecewise(
-					WARM_EFFECT_XS,
-					WARM_EFFECT_YS,
-					distFromTEQ,
-				)
-				const coldMaxAtLat = piecewise(
-					WARM_EFFECT_XS,
-					COLD_EFFECT_YS,
-					distFromTEQ,
-				)
-				let maxEffect = w > 0 ? warmMaxAtLat : coldMaxAtLat
-				// Warm currents penetrate further inland than cold upwelling currents.
-				if (isLand[r]) maxEffect *= w > 0 ? 0.68 : 0.42
-				const baseDelta = w * maxEffect
-				temperatureDeltaMonthly[m * N + r] = baseDelta
-				climate.temperature_monthly[m * N + r] += baseDelta
-				annualDelta += baseDelta
-			}
-			annualDelta /= CURRENT_EFFECT_MONTHS
-			wAnnual /= CURRENT_EFFECT_MONTHS
-			currents.temperatureDelta[r] = annualDelta
-			climate.temperature_avg[r] += annualDelta
-
-			// Pass 2: maritime moderation — scale each month's pre-current deviation
-			// from the mean, matching the inertia-factor pattern in climate.ts.
-			// Both warm and cold currents compress seasonal swings; warm currents
-			// provide extra heating in cold months, cold currents extra cooling in
-			// hot months. The mean of this pass is always zero so annualDelta holds.
-			const moderationFactor = 1 - Math.abs(wAnnual) * 0.3
-			let minDelta = 0
-			let maxDelta = 0
-			for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
-				// Recover the original pre-current temperature for this month by
-				// subtracting the base delta applied in pass 1.
-				const dev =
-					climate.temperature_monthly[m * N + r] -
-					temperatureDeltaMonthly[m * N + r] -
-					meanTemp
-				const seasonalAdditional = dev * (moderationFactor - 1)
-				climate.temperature_monthly[m * N + r] += seasonalAdditional
-				temperatureDeltaMonthly[m * N + r] += seasonalAdditional
-				const totalDelta = temperatureDeltaMonthly[m * N + r]
-				if (totalDelta < minDelta) minDelta = totalDelta
-				if (totalDelta > maxDelta) maxDelta = totalDelta
-			}
-			climate.temperature_min[r] += minDelta
-			climate.temperature_max[r] += maxDelta
-		}
-		return
+		return teqByBin[bin]
 	}
 
 	for (let r = 0; r < N; r++) {
@@ -641,17 +583,36 @@ export function applyCurrentTemperatureEffect(
 		const warmMaxAtLat = piecewise(WARM_EFFECT_XS, WARM_EFFECT_YS, distFromTEQ)
 		const coldMaxAtLat = piecewise(WARM_EFFECT_XS, COLD_EFFECT_YS, distFromTEQ)
 		let maxEffect = w > 0 ? warmMaxAtLat : coldMaxAtLat
-		if (isLand[r]) maxEffect *= w > 0 ? 0.68 : 0.42
-		const delta = w * maxEffect
-
-		currents.temperatureDelta[r] = delta
-		climate.temperature_avg[r] += delta
-		climate.temperature_min[r] += delta
-		climate.temperature_max[r] += delta
+		if (isLand[r]) maxEffect *= LAND_CURRENT_EFFECT_SCALE
+		let minMonthlyTemp = climate.temperature_monthly[r]
+		let maxMonthlyTemp = climate.temperature_monthly[r]
+		for (let m = 1; m < CURRENT_EFFECT_MONTHS; m++) {
+			const monthlyTemp = climate.temperature_monthly[m * N + r]
+			if (monthlyTemp < minMonthlyTemp) minMonthlyTemp = monthlyTemp
+			if (monthlyTemp > maxMonthlyTemp) maxMonthlyTemp = monthlyTemp
+		}
+		let annualDelta = 0
+		let minDelta = 0
+		let maxDelta = 0
 		for (let m = 0; m < CURRENT_EFFECT_MONTHS; m++) {
+			const seasonalFactor = computeSeasonalCurrentFactor(
+				climate.temperature_monthly[m * N + r],
+				minMonthlyTemp,
+				maxMonthlyTemp,
+				w > 0,
+			)
+			const delta = w * maxEffect * seasonalFactor
 			temperatureDeltaMonthly[m * N + r] = delta
 			climate.temperature_monthly[m * N + r] += delta
+			annualDelta += delta
+			if (delta < minDelta) minDelta = delta
+			if (delta > maxDelta) maxDelta = delta
 		}
+		annualDelta /= CURRENT_EFFECT_MONTHS
+		currents.temperatureDelta[r] = annualDelta
+		climate.temperature_avg[r] += annualDelta
+		climate.temperature_min[r] += minDelta
+		climate.temperature_max[r] += maxDelta
 	}
 }
 
@@ -730,19 +691,12 @@ export function buildOceanCurrentGrid(
 		;[srcY, dstY] = [dstY, srcY]
 	}
 
-	// Coriolis scales with rotation rate. Fast rotators produce geostrophic flow
-	// (90° deflection). Slow rotators approach direct density-driven flow (warm→cold).
-	const coriolisStrength = Math.min(1, Math.sqrt(24 / hoursPerDay))
 	for (let r = 0; r < N; r++) {
 		if (isLand[r]) continue
 		const hemisphereTurn =
 			(latDeg[r] >= 0 ? 1 : -1) * (reverseCirculation ? -1 : 1)
-		const u =
-			srcY[r] * hemisphereTurn * coriolisStrength -
-			srcX[r] * (1 - coriolisStrength)
-		const v =
-			-srcX[r] * hemisphereTurn * coriolisStrength -
-			srcY[r] * (1 - coriolisStrength)
+		const u = srcY[r] * hemisphereTurn
+		const v = -srcX[r] * hemisphereTurn
 		const speed = Math.hypot(u, v)
 		currentU[r] = u
 		currentV[r] = v

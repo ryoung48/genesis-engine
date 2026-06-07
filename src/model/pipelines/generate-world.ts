@@ -596,11 +596,6 @@ export function generateOrogenWorld(
 	)
 	onProgress?.("post-pipeline", 70)
 
-	// Mark small ocean cells as lakes in river output
-	for (let r = 0; r < mesh.numRegions; r++) {
-		if (smallOcean[r]) post.rivers.lakes[r] = 1
-	}
-
 	// Summarise hotspot exposure using the final isLand (after post-elevation
 	// lake clearing) so the stored count stays consistent with world.isLand.
 	const hotspotExposure = summarizeHotspotExposure(

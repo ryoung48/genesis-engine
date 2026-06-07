@@ -1,3 +1,4 @@
+import { getClimateGeometry } from "@/model/climate/rain"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getMaxOceanDepthKm,
@@ -111,6 +112,28 @@ export function computePlanetStats(
 		for (let i = 0; i < world.rainfall.annual.length; i++)
 			sum += world.rainfall.annual[i]
 		avgAnnualPrecipMm = sum / Math.max(1, world.rainfall.annual.length)
+	}
+
+	let poleEqGradientC: number | null = null
+	if (world?.climate?.temperature_avg && world?.mesh) {
+		const { latDeg } = getClimateGeometry(world.mesh)
+		const temp = world.climate.temperature_avg
+		let eqSum = 0,
+			eqCount = 0,
+			polSum = 0,
+			polCount = 0
+		for (let r = 0; r < temp.length; r++) {
+			const lat = Math.abs(latDeg[r])
+			if (lat < 15) {
+				eqSum += temp[r]
+				eqCount++
+			} else if (lat > 60) {
+				polSum += temp[r]
+				polCount++
+			}
+		}
+		if (eqCount > 0 && polCount > 0)
+			poleEqGradientC = eqSum / eqCount - polSum / polCount
 	}
 
 	let avgDtrC: number | null = null
@@ -259,6 +282,13 @@ export function computePlanetStats(
 			value:
 				avgAnnualTempC !== null
 					? formatTemperature(avgAnnualTempC, unitSystem, 1)
+					: "-",
+		},
+		{
+			label: "Pole-Eq Gradient",
+			value:
+				poleEqGradientC !== null
+					? formatTemperatureDelta(poleEqGradientC, unitSystem, 1)
 					: "-",
 		},
 		{

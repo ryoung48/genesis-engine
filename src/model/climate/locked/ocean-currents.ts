@@ -22,7 +22,7 @@ const LOCKED_VECTOR_SMOOTHING_PASSES = 2
 const TYPE_LAKE = 5
 
 type LockedCurrentParams = Pick<
-	OrogenParams,
+	Partial<OrogenParams>,
 	| "antistellarLon"
 	| "eccentricity"
 	| "obliquity"

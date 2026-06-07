@@ -1715,12 +1715,12 @@ describe("computeRegionColors", () => {
 	})
 
 	it("covers terrain mode for lakes, submerged land shelves, open ocean, and dry land", () => {
-		const seaR = 0xac / 255
-		const seaG = 0xd0 / 255
-		const seaB = 0xa5 / 255
-		const depR = 0xa7 / 255
-		const depG = 0xdf / 255
-		const depB = 0xd2 / 255
+		const shelfLandR = 0xac / 255
+		const shelfLandG = 0xd0 / 255
+		const shelfLandB = 0xa5 / 255
+		const basinLandR = 0xa7 / 255
+		const basinLandG = 0xdf / 255
+		const basinLandB = 0xd2 / 255
 		const shelfT = Math.sqrt(0.25)
 		const world = buildWorld({
 			mesh: { numRegions: 4 } as never,
@@ -1744,9 +1744,9 @@ describe("computeRegionColors", () => {
 		)
 
 		expectRegionColor(terrain!, 0, [
-			seaR + (depR - seaR) * shelfT,
-			seaG + (depG - seaG) * shelfT,
-			seaB + (depB - seaB) * shelfT,
+			shelfLandR + (basinLandR - shelfLandR) * shelfT,
+			shelfLandG + (basinLandG - shelfLandG) * shelfT,
+			shelfLandB + (basinLandB - shelfLandB) * shelfT,
 		])
 		expectRegionColor(terrain!, 1, getColor(-1, "terrain"))
 		expectRegionColor(terrain!, 2, getColor(-2, "terrain"))

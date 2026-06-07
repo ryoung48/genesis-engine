@@ -101,6 +101,29 @@ function buildSummary(
 	return [prefix, formatted, unit].filter(Boolean).join(" ")
 }
 
+function computeLakeAverageAnnualPrecipitation(
+	hoverLandmark: HoverLandmark | null,
+	world: SerializedOrogenWorld | null,
+): number | null {
+	if (
+		hoverLandmark?.type !== "lake" ||
+		!world?.rainfall?.annual ||
+		!world.landmarks?.regionLandmark
+	) {
+		return null
+	}
+
+	let sum = 0
+	let count = 0
+	for (let region = 0; region < world.mesh.numRegions; region++) {
+		if (world.landmarks.regionLandmark[region] !== hoverLandmark.id) continue
+		sum += world.rainfall.annual[region] ?? 0
+		count++
+	}
+
+	return count > 0 ? sum / count : null
+}
+
 function Row({ label, value }: { label: string; value: string }) {
 	return <LabeledValueRow label={label} value={value} tone="overlay" />
 }
@@ -390,6 +413,11 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const annualPrecip = chartData
 		? chartData.precip.reduce((sum, value) => sum + value, 0)
 		: null
+	const lakeAverageAnnualPrecip = showGeography
+		? computeLakeAverageAnnualPrecipitation(hoverLandmark, world)
+		: null
+	const showPrecipChart =
+		!!chartData && (!!chartData.isLand || !!chartData.isLake)
 	const climateColor = showGeography
 		? buildClimateSwatchColor(hoverRegion, world, colorMode)
 		: null
@@ -694,6 +722,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								color={vegetationSwatch}
 							/>
 						)}
+						{lakeAverageAnnualPrecip !== null && (
+							<Row
+								label="Lake Avg Rain"
+								value={formatPrecipitation(
+									lakeAverageAnnualPrecip,
+									unitSystem,
+									0,
+								)}
+							/>
+						)}
 						{hoverTradeGood && (
 							<SwatchRow
 								label="Trade Good"
@@ -967,7 +1005,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								showValues
 							/>
 						) : (
-							!!chartData.isLand && (
+							showPrecipChart && (
 								<SeriesBars
 									values={chartData.precip}
 									labels={MONTH_SHORT}
@@ -1112,15 +1150,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 										colorForValue={(value) => currentImpactColor(value)}
 										activeIndex={activeBarIndex}
 										formatValue={(value) =>
-											`${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1).replace(/ ?°[CF]$/, "")}`
+											`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1).replace(/ ?°[CF]$/, "")}`
 										}
 										summary={buildSummary(hoverOceanCurrents.averageDelta, {
 											prefix: `${hoverOceanCurrents.mode} · avg`,
 											formatValue: (value) =>
-												`${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1)}`,
+												`${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`,
 										})}
 										tooltipLabel={({ index, value }) =>
-											`${monthLabels[index + 1]}: ${value >= 0 ? "+" : ""}${formatTemperatureDelta(Math.abs(value), unitSystem, 1)}`
+											`${monthLabels[index + 1]}: ${value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`
 										}
 										showValues
 									/>

@@ -276,7 +276,6 @@ function serializeWorld(
 					riverId: world.rivers.riverId,
 					riverLengthKm: world.rivers.riverLengthKm,
 					visible: world.rivers.visible,
-					lakes: world.rivers.lakes,
 					basinId: world.rivers.basinId,
 					waterLevel: world.rivers.waterLevel,
 					lines: world.rivers.lines,
@@ -552,7 +551,6 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 			world.rivers.riverId.buffer,
 			world.rivers.riverLengthKm.buffer,
 			world.rivers.visible.buffer,
-			world.rivers.lakes.buffer,
 			world.rivers.basinId.buffer,
 			world.rivers.waterLevel.buffer,
 		)

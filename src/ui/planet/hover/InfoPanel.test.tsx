@@ -30,6 +30,7 @@ function makeWorld(): SerializedOrogenWorld {
 			pet_monthly: new Float32Array(Array.from({ length: 12 }, () => 5)),
 		},
 		rainfall: {
+			annual: new Float32Array([240]),
 			monthly: new Float32Array(Array.from({ length: 12 }, () => 20)),
 		},
 		hydrology: {
@@ -465,6 +466,58 @@ describe("InfoPanel", () => {
 		expect(markup).not.toContain(">AET<")
 		expect(markup).not.toContain("Length")
 		expect(markup).toContain("River Name 2")
+	})
+
+	it("shows precipitation for lake regions while keeping land-only hydrology rows hidden", () => {
+		const markup = renderPanel({
+			colorMode: "precipitation",
+			world: {
+				...makeWorld(),
+				isLand: new Uint8Array([0]),
+				rivers: {
+					lakes: new Uint8Array([1]),
+				},
+			} as SerializedOrogenWorld,
+		})
+
+		expect(markup).toContain(">Precip<")
+		expect(markup).not.toContain(">PET<")
+		expect(markup).not.toContain(">AET<")
+	})
+
+	it("shows the average annual precipitation across all regions in a hovered lake", () => {
+		const markup = renderPanel({
+			world: {
+				...makeWorld(),
+				mesh: { numRegions: 3 },
+				climate: {
+					...makeWorld().climate,
+					temperature_avg: new Float32Array([12, 12, 12]),
+					temperature_monthly: new Float32Array(
+						Array.from({ length: 36 }, () => 12),
+					),
+					daylight_hours_monthly: new Float32Array(
+						Array.from({ length: 36 }, () => 10),
+					),
+					pet_monthly: new Float32Array(Array.from({ length: 36 }, () => 5)),
+				},
+				rainfall: {
+					annual: new Float32Array([150, 300, 900]),
+					monthly: new Float32Array(Array.from({ length: 36 }, () => 20)),
+				},
+				landmarks: {
+					regionLandmark: new Int32Array([5, 5, 3]),
+					type: new Uint8Array([0, 0, 0, 3, 4, 5]),
+					size: new Int32Array([1, 1, 1, 1, 1, 2]),
+					count: 6,
+				},
+			} as SerializedOrogenWorld,
+			hoverInfo: { region: 0, x: 0, y: 0 },
+			hoverLandmark: { id: 5, type: "lake", size: 2 },
+		})
+
+		expect(markup).toContain(">Lake Avg Rain<")
+		expect(markup).toContain(">225 mm<")
 	})
 
 	it("renders infinite pasta summaries and cold current deltas", () => {

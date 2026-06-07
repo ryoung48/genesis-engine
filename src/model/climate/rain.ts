@@ -13,6 +13,7 @@ import {
 } from "../shared/math"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
+import { LANDMARK_TYPE_OCEAN, type OrogenLandmarks } from "../terrain/landmarks"
 import { elevToHeightKm } from "./climate"
 import { computeTidalRain } from "./locked/rain"
 
@@ -122,11 +123,11 @@ export function getClimateGeometry(mesh: SphereMesh): ClimateGeometry {
 	return geometry
 }
 
-export function buildLandGraph(mesh: SphereMesh, isLand: Uint8Array) {
+export function buildRegionGraph(mesh: SphereMesh, mask: Uint8Array) {
 	const { adjOffset, adjList } = mesh
 	const landRegions: number[] = []
 	for (let r = 0; r < mesh.numRegions; r++) {
-		if (isLand[r]) landRegions.push(r)
+		if (mask[r]) landRegions.push(r)
 	}
 
 	const landNeighborOffset = new Int32Array(landRegions.length + 1)
@@ -135,7 +136,7 @@ export function buildLandGraph(mesh: SphereMesh, isLand: Uint8Array) {
 		const r = landRegions[i]
 		landNeighborOffset[i] = landNeighborCount
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			if (isLand[adjList[j]]) landNeighborCount++
+			if (mask[adjList[j]]) landNeighborCount++
 		}
 	}
 	landNeighborOffset[landRegions.length] = landNeighborCount
@@ -146,11 +147,29 @@ export function buildLandGraph(mesh: SphereMesh, isLand: Uint8Array) {
 		const r = landRegions[i]
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			if (isLand[nb]) landNeighborList[landNeighborIndex++] = nb
+			if (mask[nb]) landNeighborList[landNeighborIndex++] = nb
 		}
 	}
 
 	return { landRegions, landNeighborOffset, landNeighborList }
+}
+
+function buildRainRegionMask(
+	isLand: Uint8Array,
+	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
+): Uint8Array {
+	const rainMask = new Uint8Array(isLand)
+	if (!landmarks) return rainMask
+
+	for (let r = 0; r < isLand.length; r++) {
+		if (rainMask[r]) continue
+		const landmarkId = landmarks.regionLandmark[r]
+		if (landmarkId >= 0 && landmarks.type[landmarkId] !== LANDMARK_TYPE_OCEAN) {
+			rainMask[r] = 1
+		}
+	}
+
+	return rainMask
 }
 
 // ---------------------------------------------------------------------------
@@ -541,9 +560,11 @@ export function computeMonthlyRain(
 	params?: OrogenParams,
 	monthlyTEQ?: Float32Array[],
 	distCoast?: Float32Array,
+	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
 ): { monthly: Float32Array; annual: Float32Array } {
+	const rainRegionMask = buildRainRegionMask(isLand, landmarks)
 	if (params?.tidallyLocked) {
-		return computeTidalRain(mesh, climate, isLand, params, distCoast)
+		return computeTidalRain(mesh, climate, rainRegionMask, params, distCoast)
 	}
 
 	const N = mesh.numRegions
@@ -551,10 +572,8 @@ export function computeMonthlyRain(
 	const pressureRainFactor = getPressureRainFactor(params?.pressure)
 
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
-	const { landRegions, landNeighborOffset, landNeighborList } = buildLandGraph(
-		mesh,
-		isLand,
-	)
+	const { landRegions, landNeighborOffset, landNeighborList } =
+		buildRegionGraph(mesh, rainRegionMask)
 
 	const teqPerMonth: Float32Array[] =
 		monthlyTEQ ??

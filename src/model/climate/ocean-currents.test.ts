@@ -108,7 +108,7 @@ function buildMonthlyTEQ(
 }
 
 describe("computeOceanCurrents", () => {
-	it("reuses longitude bins for monthly ocean belt seeding", () => {
+	it("locks currents to the annual mean and emits no monthly warmth arrays", () => {
 		const mesh = buildMesh([
 			{ latDeg: 15, lonDeg: -90 },
 			{ latDeg: 15, lonDeg: 90 },
@@ -128,14 +128,13 @@ describe("computeOceanCurrents", () => {
 			monthlyTEQ,
 		)
 
-		expect(Array.from(currents.oceanWarmth)).toEqual([0, 0, -1])
+		expect(currents.oceanWarmth[0]).toBe(0)
+		expect(currents.oceanWarmth[1]).toBe(0)
+		expect(currents.oceanWarmth[2]).toBeLessThan(-0.7)
 		expect(Array.from(currents.coastalWarmth)).toEqual([0, 0, 0])
-		expect(Array.from(currents.oceanWarmthMonthly!.subarray(0, 3))).toEqual([
-			1, 0, -1,
-		])
-		expect(Array.from(currents.oceanWarmthMonthly!.subarray(3, 6))).toEqual([
-			0, 1, -1,
-		])
+		// Currents no longer migrate month to month — no per-month warmth fields.
+		expect(currents.oceanWarmthMonthly).toBeUndefined()
+		expect(currents.coastalWarmthMonthly).toBeUndefined()
 	})
 
 	it("classifies warm and cold coastal currents, diffuses inland, and skips blocked coasts", () => {
@@ -187,17 +186,11 @@ describe("computeOceanCurrents", () => {
 		])
 
 		const currents = computeOceanCurrents(mesh, isLand, distCoast, landmarks)
-
 		expect(currents.oceanWarmth[1]).toBeGreaterThan(0)
 		expect(currents.oceanWarmth[2]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[0]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[12]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[12]).toBeLessThan(currents.coastalWarmth[0])
-
-		expect(currents.oceanWarmth[4]).toBeLessThan(0)
-		expect(currents.oceanWarmth[5]).toBeLessThan(0)
-		expect(currents.oceanWarmth[7]).toBeGreaterThan(0)
-		expect(currents.oceanWarmth[8]).toBeGreaterThan(0)
 
 		expect(currents.oceanWarmth[10]).toBe(0)
 		expect(currents.coastalWarmth[9]).toBe(0)
@@ -222,14 +215,37 @@ describe("computeOceanCurrents", () => {
 			undefined,
 			buildMonthlyTEQ([{ 0: 0 }]).slice(0, 2),
 		)
-
-		expect(currents.oceanWarmth[0]).toBe(1)
+		expect(currents.oceanWarmth[0]).toBeGreaterThan(0.7)
 		expect(currents.oceanWarmth[1]).toBe(0)
-		expect(currents.oceanWarmth[2]).toBeLessThan(0)
+		expect(currents.oceanWarmth[2]).toBeLessThan(-0.7)
 		expect(currents.oceanWarmth[3]).toBe(0)
 		expect(Array.from(currents.coastalWarmth)).toEqual([0, 0, 0, 0])
 		expect(currents.oceanWarmthMonthly).toBeUndefined()
 		expect(currents.coastalWarmthMonthly).toBeUndefined()
+	})
+
+	it("fades offshore from a direct coastal assignment instead of staying binary", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 20, lonDeg: 0 },
+				{ latDeg: 20, lonDeg: 20 },
+				{ latDeg: 20, lonDeg: 40 },
+				{ latDeg: 20, lonDeg: 60 },
+				{ latDeg: 20, lonDeg: 80 },
+			],
+			[[1], [0, 2], [1, 3], [2, 4], [3]],
+		)
+		const currents = computeOceanCurrents(
+			mesh,
+			new Uint8Array([1, 0, 0, 0, 0]),
+			new Float32Array([0, 1, 2, 3, 4]),
+			buildLandmarks(mesh.numRegions, [{ region: 0, type: 0 }]),
+		)
+
+		expect(currents.oceanWarmth[1]).toBeGreaterThan(currents.oceanWarmth[2])
+		expect(currents.oceanWarmth[2]).toBeGreaterThan(currents.oceanWarmth[3])
+		expect(currents.oceanWarmth[3]).toBeGreaterThan(currents.oceanWarmth[4])
+		expect(currents.oceanWarmth[4]).toBeGreaterThan(0)
 	})
 
 	it("reverses coastal current classification on retrograde planets", () => {
@@ -272,7 +288,7 @@ describe("computeOceanCurrents", () => {
 		expect(_retrograde.oceanWarmth[2]).toBeLessThan(0)
 	})
 
-	it("covers wrapped coasts, blocked coastlines, seasonal reversals, and inland fade limits", () => {
+	it("covers wrapped coasts, blocked coastlines, and inland fade limits", () => {
 		const mesh = buildMesh(
 			[
 				{ latDeg: 40, lonDeg: 0 },
@@ -386,16 +402,21 @@ describe("computeOceanCurrents", () => {
 			{ planetRadiusKm: 100 },
 			monthlyTEQ,
 		)
-
 		expect(currents.oceanWarmth[1]).toBeGreaterThan(0)
 		expect(currents.oceanWarmth[10]).toBeLessThan(0)
 		expect(currents.oceanWarmth[13]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[22]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[23]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[27]).toBeGreaterThan(0)
+		expect(currents.coastalWarmth[22]).toBeGreaterThan(
+			currents.coastalWarmth[23],
+		)
+		expect(currents.coastalWarmth[23]).toBeGreaterThan(
+			currents.coastalWarmth[24],
+		)
 		expect(currents.coastalWarmth[28]).toBe(0)
-		expect(currents.oceanWarmthMonthly![1]).toBeGreaterThan(0)
-		expect(currents.oceanWarmthMonthly![mesh.numRegions + 1]).toBeLessThan(0)
+		expect(currents.oceanWarmthMonthly).toBeUndefined()
+		expect(currents.coastalWarmthMonthly).toBeUndefined()
 	})
 })
 
@@ -423,6 +444,7 @@ describe("buildOceanCurrentGrid", () => {
 			isLand,
 			latDeg,
 			lonDeg,
+			false,
 			undefined,
 			regionBin,
 		)
@@ -489,25 +511,24 @@ describe("buildOceanCurrentGrid", () => {
 })
 
 describe("applyCurrentTemperatureEffect", () => {
-	it("applies monthly deltas from shared TEQ bins without changing annual math", () => {
+	it("applies locked-sign deltas scaled by the seasonal-mean factor", () => {
 		const mesh = buildMesh([
 			{ latDeg: 15, lonDeg: -90 },
 			{ latDeg: 15, lonDeg: 90 },
 			{ latDeg: 15, lonDeg: 0 },
 		])
+		// Flat climate → seasonal phase is zero, so every month gets the mean delta:
+		// warm peak * (1 - WARM_SEASONALITY/2) = peak * 0.65,
+		// cold peak * (1 - COLD_SEASONALITY/2) = peak * 0.70.
 		const climate = buildClimate([10, 10, 10])
-		const monthlyTEQ = buildMonthlyTEQ([{ 30: 20, 90: -40, 60: 20 }])
-		const currents = {
-			oceanWarmth: new Float32Array(3),
-			coastalWarmth: new Float32Array(3),
-			oceanWarmthMonthly: new Float32Array(36),
-			coastalWarmthMonthly: new Float32Array(36),
-			temperatureDeltaMonthly: new Float32Array(36),
+		// Annual-mean TEQ is zero → distFromTEQ = 15.
+		// warm curve(15) = 1.75, cold curve(15) = 7.5.
+		const monthlyTEQ = buildMonthlyTEQ()
+		const currents: Parameters<typeof applyCurrentTemperatureEffect>[3] = {
+			oceanWarmth: new Float32Array([1, -1, 0]),
+			coastalWarmth: new Float32Array([0, 0, 1]),
 			temperatureDelta: new Float32Array(3),
 		}
-		currents.oceanWarmthMonthly[0] = 1
-		currents.oceanWarmthMonthly[1] = -1
-		currents.coastalWarmthMonthly[2] = 1
 
 		applyCurrentTemperatureEffect(
 			mesh,
@@ -517,25 +538,90 @@ describe("applyCurrentTemperatureEffect", () => {
 			monthlyTEQ,
 		)
 
-		expect(currents.temperatureDeltaMonthly[0]).toBeCloseTo(1.25, 6)
-		expect(currents.temperatureDeltaMonthly[1]).toBeCloseTo(-8.75, 6)
-		// land warm factor is 0.68: 1 * 1.25 * 0.68 = 0.85
-		expect(currents.temperatureDeltaMonthly[2]).toBeCloseTo(0.85, 6)
-		expect(currents.temperatureDelta[0]).toBeCloseTo(1.25 / 12, 6)
-		expect(currents.temperatureDelta[1]).toBeCloseTo(-8.75 / 12, 6)
-		expect(currents.temperatureDelta[2]).toBeCloseTo(0.85 / 12, 6)
-		expect(climate.temperature_monthly[0]).toBeCloseTo(11.25, 6)
-		expect(climate.temperature_monthly[1]).toBeCloseTo(1.25, 6)
-		expect(climate.temperature_monthly[2]).toBeCloseTo(10.85, 6)
-		expect(climate.temperature_avg[0]).toBeCloseTo(10 + 1.25 / 12, 6)
-		expect(climate.temperature_avg[1]).toBeCloseTo(10 - 8.75 / 12, 6)
-		expect(climate.temperature_avg[2]).toBeCloseTo(10 + 0.85 / 12, 6)
-		expect(climate.temperature_monthly[3]).toBe(10)
-		expect(climate.temperature_monthly[4]).toBe(10)
-		expect(climate.temperature_monthly[5]).toBe(10)
+		// r0 ocean warm: 1.75 * 0.65 = 1.1375
+		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(1.1375, 4)
+		// r1 ocean cold: -7.5 * 0.70 = -5.25
+		expect(currents.temperatureDeltaMonthly![1]).toBeCloseTo(-5.25, 4)
+		// r2 land warm: 1.75 * 0.68 * 0.65 = 0.7735
+		expect(currents.temperatureDeltaMonthly![2]).toBeCloseTo(0.7735, 4)
+		// Flat climate → annual mean equals the per-month delta.
+		expect(currents.temperatureDelta[0]).toBeCloseTo(1.1375, 4)
+		expect(currents.temperatureDelta[1]).toBeCloseTo(-5.25, 4)
+		expect(currents.temperatureDelta[2]).toBeCloseTo(0.7735, 4)
+		expect(climate.temperature_avg[0]).toBeCloseTo(11.1375, 4)
+		expect(climate.temperature_avg[1]).toBeCloseTo(4.75, 4)
+		expect(climate.temperature_avg[2]).toBeCloseTo(10.7735, 4)
+		// Every month identical under a flat climate.
+		expect(currents.temperatureDeltaMonthly![3]).toBeCloseTo(1.1375, 4)
 	})
 
-	it("falls back to annual TEQ bins, creates monthly deltas, and skips tiny warmth values", () => {
+	it("modulates magnitude by season while keeping the current's sign fixed", () => {
+		const mesh = buildMesh([{ latDeg: 30, lonDeg: 0 }])
+		const climate = buildClimate([10])
+		// Cold first half of the year, hot second half. mean = 10, amplitude = 10.
+		climate.temperature_monthly = new Float32Array([
+			0, 0, 0, 0, 0, 0, 20, 20, 20, 20, 20, 20,
+		])
+		// Annual-mean TEQ zero → distFromTEQ = 30 → warm curve(30) = 5.
+		const monthlyTEQ = buildMonthlyTEQ()
+		const currents: Parameters<typeof applyCurrentTemperatureEffect>[3] = {
+			oceanWarmth: new Float32Array([1]),
+			coastalWarmth: new Float32Array([0]),
+			temperatureDelta: new Float32Array(1),
+		}
+
+		applyCurrentTemperatureEffect(
+			mesh,
+			climate,
+			new Uint8Array([0]),
+			currents,
+			monthlyTEQ,
+		)
+
+		// Warm current: full strength in the coldest month, weakest in the hottest.
+		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(5, 4) // winter peak
+		expect(currents.temperatureDeltaMonthly![6]).toBeCloseTo(1.5, 4) // summer trough
+		// Sign is locked positive all year.
+		for (let m = 0; m < 12; m++) {
+			expect(currents.temperatureDeltaMonthly![m]).toBeGreaterThan(0)
+		}
+		// Annual mean = (6*5 + 6*1.5) / 12 = 3.25.
+		expect(currents.temperatureDelta[0]).toBeCloseTo(3.25, 4)
+		expect(climate.temperature_avg[0]).toBeCloseTo(13.25, 4)
+		// Extremes shift by their own month's delta: min += 5, max += 1.5.
+		expect(climate.temperature_min[0]).toBeCloseTo(10, 4)
+		expect(climate.temperature_max[0]).toBeCloseTo(16.5, 4)
+	})
+
+	it("positions the locked current with the annual mean of the monthly TEQ", () => {
+		const mesh = buildMesh([{ latDeg: 20, lonDeg: 0 }])
+		const climate = buildClimate([10])
+		// Every month's TEQ = 50 → annual-mean TEQ = 50 → distFromTEQ = 30.
+		// warm curve(30) = 5, flat climate → delta = 5 * 0.65 = 3.25.
+		const monthlyTEQ = Array.from({ length: 12 }, () =>
+			new Float32Array(TEQ_BINS).fill(50),
+		)
+		const currents: Parameters<typeof applyCurrentTemperatureEffect>[3] = {
+			oceanWarmth: new Float32Array([1]),
+			coastalWarmth: new Float32Array([0]),
+			temperatureDelta: new Float32Array(1),
+		}
+
+		applyCurrentTemperatureEffect(
+			mesh,
+			climate,
+			new Uint8Array([0]),
+			currents,
+			monthlyTEQ,
+		)
+
+		expect(currents.temperatureDelta[0]).toBeCloseTo(3.25, 4)
+		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(3.25, 4)
+		expect(currents.temperatureDeltaMonthly![11]).toBeCloseTo(3.25, 4)
+		expect(climate.temperature_avg[0]).toBeCloseTo(13.25, 4)
+	})
+
+	it("falls back to the computed thermal equator and skips tiny warmth values", () => {
 		const mesh = buildMesh([
 			{ latDeg: 0, lonDeg: -120 },
 			{ latDeg: 0, lonDeg: 0 },
@@ -549,6 +635,9 @@ describe("applyCurrentTemperatureEffect", () => {
 			temperatureDelta: new Float32Array(4),
 		}
 
+		// Incomplete monthly TEQ (length 11) → fall back to computeThermalEquator,
+		// which yields TEQ ≈ 0 for a uniform climate. distFromTEQ = 0 →
+		// warm curve(0) = 1, cold curve(0) = 3. Flat climate → × 0.65 / 0.70.
 		applyCurrentTemperatureEffect(
 			mesh,
 			climate,
@@ -558,50 +647,20 @@ describe("applyCurrentTemperatureEffect", () => {
 		)
 
 		expect(currents.temperatureDeltaMonthly).toBeInstanceOf(Float32Array)
-		expect(currents.temperatureDelta[0]).toBeCloseTo(0.5, 6)
-		expect(currents.temperatureDelta[1]).toBeCloseTo(-0.5, 6)
-		// land warm factor is 0.68: 0.5 * 1 * 0.68 = 0.34
-		expect(currents.temperatureDelta[2]).toBeCloseTo(0.34, 6)
+		// r0 ocean warm: 0.5 * 1 * 0.65 = 0.325
+		expect(currents.temperatureDelta[0]).toBeCloseTo(0.325, 4)
+		// r1 ocean cold: -(0.5 * 3) * 0.70 = -1.05
+		expect(currents.temperatureDelta[1]).toBeCloseTo(-1.05, 4)
+		// r2 land warm: 0.5 * 1 * 0.68 * 0.65 = 0.221
+		expect(currents.temperatureDelta[2]).toBeCloseTo(0.221, 4)
+		// r3 warmth 0.005 < 0.01 → skipped.
 		expect(currents.temperatureDelta[3]).toBe(0)
-		expect(climate.temperature_avg[0]).toBeCloseTo(10.5, 6)
-		expect(climate.temperature_avg[1]).toBeCloseTo(9.5, 6)
-		expect(climate.temperature_avg[2]).toBeCloseTo(10.34, 6)
+		expect(climate.temperature_avg[0]).toBeCloseTo(10.325, 4)
+		expect(climate.temperature_avg[1]).toBeCloseTo(8.95, 4)
+		expect(climate.temperature_avg[2]).toBeCloseTo(10.221, 4)
 		expect(climate.temperature_avg[3]).toBe(10)
-		expect(climate.temperature_monthly[0]).toBeCloseTo(10.5, 6)
-		expect(climate.temperature_monthly[1]).toBeCloseTo(9.5, 6)
-		expect(climate.temperature_monthly[2]).toBeCloseTo(10.34, 6)
-		expect(climate.temperature_monthly[3]).toBe(10)
-		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(0.5, 6)
-		expect(currents.temperatureDeltaMonthly![1]).toBeCloseTo(-0.5, 6)
-		expect(currents.temperatureDeltaMonthly![2]).toBeCloseTo(0.34, 6)
 		expect(currents.temperatureDeltaMonthly![3]).toBe(0)
-		expect(currents.temperatureDeltaMonthly![4]).toBeCloseTo(0.5, 6)
-	})
-
-	it("ignores full monthly TEQ input when monthly current fields are absent", () => {
-		const mesh = buildMesh([{ latDeg: 20, lonDeg: 0 }])
-		const climate = buildClimate([10])
-		const currents: Parameters<typeof applyCurrentTemperatureEffect>[3] = {
-			oceanWarmth: new Float32Array([1]),
-			coastalWarmth: new Float32Array([0]),
-			temperatureDelta: new Float32Array(1),
-		}
-		const monthlyTEQ = Array.from({ length: 12 }, () =>
-			new Float32Array(TEQ_BINS).fill(50),
-		)
-
-		applyCurrentTemperatureEffect(
-			mesh,
-			climate,
-			new Uint8Array([0]),
-			currents,
-			monthlyTEQ,
-		)
-
-		expect(currents.temperatureDelta[0]).toBeCloseTo(2, 6)
-		expect(currents.temperatureDeltaMonthly).toBeInstanceOf(Float32Array)
-		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(2, 6)
-		expect(currents.temperatureDeltaMonthly![11]).toBeCloseTo(2, 6)
-		expect(climate.temperature_avg[0]).toBeCloseTo(12, 6)
+		// Month 1, region 0 mirrors month 0 under a flat climate.
+		expect(currents.temperatureDeltaMonthly![4]).toBeCloseTo(0.325, 4)
 	})
 })

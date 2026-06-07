@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { ImportParams } from "./import-heightmap"
 import { importOrogenWorld } from "./import-heightmap"
 
@@ -117,12 +118,14 @@ describe("importOrogenWorld", () => {
 			})
 			const N = world.mesh.numRegions
 			const isLand = world.isLand!
-			const lakes = world.rivers!.lakes
 			const regionProvince = world.provinces!.regionProvince
 
 			for (let r = 0; r < N; r++) {
 				if (isLand[r]) {
-					expect(world.elevation[r] > 0 || lakes[r] === 1).toBe(true)
+					const lid = world.landmarks?.regionLandmark[r] ?? -1
+					const isLake =
+						lid >= 0 && world.landmarks!.type[lid] === LANDMARK_TYPE_LAKE
+					expect(world.elevation[r] > 0 || isLake).toBe(true)
 				}
 				const assigned = regionProvince[r] !== -1
 				expect(assigned).toBe(isLand[r] === 1)

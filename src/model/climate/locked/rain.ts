@@ -3,7 +3,7 @@ import { clamp } from "../../shared/math"
 import { SimplexNoise } from "../../shared/simplex-noise"
 import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
 import {
-	buildLandGraph,
+	buildRegionGraph,
 	ceilingScale,
 	computeRainBandWarpField,
 	getPressureRainFactor,
@@ -42,10 +42,8 @@ export function computeTidalRain(
 	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
 	const pressureRainFactor = getPressureRainFactor(params?.pressure)
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
-	const { landRegions, landNeighborOffset, landNeighborList } = buildLandGraph(
-		mesh,
-		isLand,
-	)
+	const { landRegions, landNeighborOffset, landNeighborList } =
+		buildRegionGraph(mesh, isLand)
 
 	const ecc = params?.eccentricity ?? 0
 	const monthlyLibration = computeMonthlyLibration(

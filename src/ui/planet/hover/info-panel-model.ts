@@ -4,6 +4,7 @@ import { pastaClimateColor } from "@/model/climate/pasta"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
 import { REL } from "@/model/history/state"
 import { GOVERNMENT_TYPE_LABELS, GOVERNMENT_TYPES } from "@/model/society/eras"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import { climateTempColor, climateZoneColor, vegetationColor } from "../colors"
@@ -29,6 +30,7 @@ interface HoverChartData {
 	pet: number[]
 	aet: number[]
 	isLand: number | undefined
+	isLake: number | undefined
 	iceThickness: number
 	iceMin: number
 	iceMax: number
@@ -111,6 +113,13 @@ export function buildHoverChartData(
 		pet,
 		aet,
 		isLand: world.isLand?.[region],
+		isLake:
+			world.landmarks != null &&
+			world.landmarks.regionLandmark[region] >= 0 &&
+			world.landmarks.type[world.landmarks.regionLandmark[region]] ===
+				LANDMARK_TYPE_LAKE
+				? 1
+				: 0,
 		iceThickness: world.iceThickness?.[region] ?? 0,
 		iceMin: world.iceMinMonthly?.[region] ?? 0,
 		iceMax: world.iceMaxMonthly?.[region] ?? 0,

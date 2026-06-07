@@ -67,9 +67,27 @@ describe("buildHoverChartData", () => {
 		expect(result?.aet[11]).toBe(423)
 		expect(result).toMatchObject({
 			isLand: 0,
+			isLake: undefined,
 			iceThickness: 3,
 			iceMin: 5,
 			iceMax: 7,
+		})
+	})
+
+	it("marks lake regions separately from land regions for chart gating", () => {
+		const world = makeWorld({
+			mesh: { numRegions: 1 },
+			isLand: new Uint8Array([0]),
+			rivers: {
+				lakes: new Uint8Array([1]),
+			},
+		})
+
+		const result = buildHoverChartData({ region: 0 } as never, 0.2, world)
+
+		expect(result).toMatchObject({
+			isLand: 0,
+			isLake: 1,
 		})
 	})
 
