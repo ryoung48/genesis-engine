@@ -1,9 +1,11 @@
-import type { SphereMesh } from ".."
+import type { OrogenLandmarks, SphereMesh } from ".."
+import { LANDMARK_TYPE_OCEAN } from "../terrain/landmarks"
 
 export function computeOceanDistanceBFS(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
 	avgEdgeKm: number,
+	landmarks?: OrogenLandmarks,
 ): Float32Array {
 	const { numRegions, adjOffset, adjList } = mesh
 	const oceanDist = new Float32Array(numRegions)
@@ -12,10 +14,13 @@ export function computeOceanDistanceBFS(
 	const hops = new Int32Array(numRegions)
 
 	for (let r = 0; r < numRegions; r++) {
-		if (!isLand[r]) {
-			visited[r] = 1
-			queue.push(r)
+		if (isLand[r]) continue
+		if (landmarks) {
+			const lm = landmarks.regionLandmark[r]
+			if (lm < 0 || landmarks.type[lm] !== LANDMARK_TYPE_OCEAN) continue
 		}
+		visited[r] = 1
+		queue.push(r)
 	}
 
 	let head = 0

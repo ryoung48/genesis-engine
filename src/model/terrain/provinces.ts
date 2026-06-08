@@ -18,6 +18,9 @@ export function computeProvinces(
 	options?: {
 		climateZones?: Uint8Array
 		rainfall?: OrogenRainfall
+		oceanCoastal?: Uint8Array
+		lakeCoastal?: Uint8Array
+		riverVisible?: Uint8Array
 		planetRadiusKm?: number
 	},
 ): OrogenProvinces {
@@ -140,11 +143,27 @@ export function computeProvinces(
 		if (p >= 0) size[p]++
 	}
 
+	// ── Phase 3b: Water access ──────────────────────────────────────────
+	const { climateZones, rainfall, oceanCoastal, lakeCoastal, riverVisible } =
+		options ?? {}
+	const waterAccess = new Uint8Array(provinceCount)
+	const riverAccess = new Uint8Array(provinceCount)
+	const lakeAccess = new Uint8Array(provinceCount)
+	for (let r = 0; r < N; r++) {
+		const p = regionProvince[r]
+		if (p < 0) continue
+		if (oceanCoastal?.[r]) waterAccess[p] = 2
+		else if ((lakeCoastal?.[r] || riverVisible?.[r]) && waterAccess[p] < 1)
+			waterAccess[p] = 1
+		if (riverVisible?.[r]) riverAccess[p] = 1
+		if (lakeCoastal?.[r]) lakeAccess[p] = 1
+	}
+
 	// ── Phase 4: Desolate classification ────────────────────────────────
-	// Check seed region climate: arctic/subarctic/infernal/chaotic or arid
+	// Climate-zone desolate: arctic/subarctic/infernal/chaotic regardless of rivers.
+	// Rainfall desolate: < 5mm annual precipitation, exempted if province has river access.
 
 	const desolate = new Uint8Array(provinceCount)
-	const { climateZones, rainfall } = options ?? {}
 	for (let i = 0; i < provinceCount; i++) {
 		const r = seeds[i]
 		if (climateZones) {
@@ -155,9 +174,7 @@ export function computeProvinces(
 				continue
 			}
 		}
-		if (rainfall && rainfall.annual[r] < 5) {
-			desolate[i] = 1
-		}
+		if (rainfall && rainfall.annual[r] < 5 && !riverAccess[i]) desolate[i] = 1
 	}
 
 	// ── Phase 5: Province adjacency (CSR) ───────────────────────────────
@@ -290,6 +307,9 @@ export function computeProvinces(
 		seeds: seedsArr,
 		count: provinceCount,
 		desolate,
+		waterAccess,
+		riverAccess,
+		lakeAccess,
 		landmassId,
 		adjOffset: provAdjOffset,
 		adjList: provAdjList,
@@ -352,6 +372,9 @@ function emptyProvinces(N: number): OrogenProvinces {
 		seeds: new Int32Array(0),
 		count: 0,
 		desolate: new Uint8Array(0),
+		waterAccess: new Uint8Array(0),
+		riverAccess: new Uint8Array(0),
+		lakeAccess: new Uint8Array(0),
 		landmassId: new Int32Array(0),
 		adjOffset: new Int32Array(1),
 		adjList: new Int32Array(0),

@@ -103,6 +103,8 @@ export interface SerializedOrogenWorld {
 	topography: Uint8Array
 	coastal: Uint8Array
 	waterAccess?: Uint8Array
+	riverAccess?: Uint8Array
+	lakeAccess?: Uint8Array
 	slopeScore: Float32Array
 	isLand: Uint8Array
 	riverLand: Uint8Array

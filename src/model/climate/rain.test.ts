@@ -297,6 +297,30 @@ describe("computeAdvection", () => {
 		expect(advection.east[1]).toBeGreaterThan(0)
 		expect(advection.west[2]).toBeGreaterThan(0)
 	})
+
+	it("lets easterly moisture win symmetric coastal ties", () => {
+		const mesh = buildMesh(
+			[
+				{ latDeg: 0, lonDeg: 0 },
+				{ latDeg: 0, lonDeg: -30 },
+				{ latDeg: 0, lonDeg: 30 },
+			],
+			[[1, 2], [0], [0]],
+		)
+
+		const advection = computeAdvection(
+			mesh,
+			new Float32Array([0.2, -1, -1]),
+			new Float32Array([20, 20, 20]),
+			undefined,
+			buildParams(),
+			new Uint8Array([1, 0, 0]),
+			new Float32Array([0.2, -1, -1]),
+		)
+
+		expect(advection.east[0]).toBeGreaterThan(0)
+		expect(advection.west[0]).toBe(0)
+	})
 })
 
 describe("computeMonthlyRain", () => {

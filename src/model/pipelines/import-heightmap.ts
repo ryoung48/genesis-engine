@@ -357,6 +357,8 @@ export function importOrogenWorld(
 		topography: post.topography,
 		coastal: post.coastal,
 		waterAccess: post.waterAccess,
+		riverAccess: post.riverAccess,
+		lakeAccess: post.lakeAccess,
 		slopeScore: post.slopeScore,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,

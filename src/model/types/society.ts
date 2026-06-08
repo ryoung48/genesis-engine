@@ -17,6 +17,12 @@ export interface OrogenProvinces {
 	size: Int32Array
 	/** Per-province RGB colors, length count*3 */
 	colors: Float32Array
+	/** Per-province water access level: 0=none, 1=river/lake, 2=ocean */
+	waterAccess: Uint8Array
+	/** Per-province flag: has at least one visible river cell */
+	riverAccess: Uint8Array
+	/** Per-province flag: adjacent to a lake */
+	lakeAccess: Uint8Array
 }
 
 export interface OrogenPartition {

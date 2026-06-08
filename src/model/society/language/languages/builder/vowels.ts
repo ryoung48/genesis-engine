@@ -60,6 +60,7 @@ const diphthongRules = {
 	back: [
 		"aa",
 		"aä",
+		"äe",
 		"ae",
 		"aë",
 		"ea",
@@ -74,8 +75,12 @@ const diphthongRules = {
 		"ii",
 		"io",
 		"yo",
+		"ÿo",
+		"ýo",
 		"iu",
 		"yu",
+		"ÿu",
+		"ýu",
 		"oo",
 		"oö",
 		"ua",
@@ -87,6 +92,7 @@ const diphthongRules = {
 	end: [
 		"aa",
 		"ae",
+		"äe",
 		"ai",
 		"ao",
 		"āo",
@@ -107,9 +113,17 @@ const diphthongRules = {
 		"ūi",
 		"uo",
 		"ya",
+		"ÿa",
+		"ýa",
 		"ye",
+		"ÿe",
+		"ýe",
 		"yo",
+		"ÿo",
+		"ýo",
 		"yu",
+		"ÿu",
+		"ýu",
 	],
 }
 
@@ -162,9 +176,10 @@ export const buildComplexVowels = (params: {
 	consonants: string[]
 	vowels: string[]
 	stops: number
+	exoticCons: boolean
 	dice: LanguageRng
 }) => {
-	const { vowels, consonants, stops, dice } = params
+	const { vowels, consonants, exoticCons, stops, dice } = params
 	const doubles = {
 		A: "aa",
 		E: "ee",
@@ -176,7 +191,7 @@ export const buildComplexVowels = (params: {
 	const vowelOrthography: Record<string, string> = dice.weightedChoice([
 		{ v: doubles, w: 0.1 },
 		{ v: diphthongs(vowels, consonants, dice), w: 0.5 },
-		{ v: stops > 0 ? basicVowels : exoticVowels(dice), w: 0.4 },
+		{ v: stops > 0 || exoticCons ? basicVowels : exoticVowels(dice), w: 0.4 },
 	])
 	const specialVowels = dice
 		.sample(

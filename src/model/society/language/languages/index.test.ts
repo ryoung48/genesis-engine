@@ -114,6 +114,30 @@ describe("LANGUAGE", () => {
 		expect(secondA.word).toBe(secondB.word)
 	})
 
+	it("reuses initialized cluster settings for slot-based names", () => {
+		const lang = LANGUAGE.spawn("slot-cluster-defaults")
+		const spawnSpy = vi.spyOn(CLUSTER, "spawn")
+
+		LANGUAGE.word.simple({
+			lang,
+			key: "region",
+			slot: "nation:12",
+			namespace: "nation",
+		})
+
+		expect(spawnSpy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				src: expect.objectContaining({ seed: lang.seed }),
+				key: "region",
+				stopChance: lang.clusters.region.stopChance,
+				ending: lang.clusters.region.ending,
+				len: lang.clusters.region.len,
+				variation: lang.clusters.region.variation,
+				longNames: lang.clusters.region.longNames,
+			}),
+		)
+	})
+
 	it("treats unique generation as a direct simple-word call", () => {
 		const lang = LANGUAGE.spawn("unique-pass-through")
 		const simpleSpy = vi.spyOn(LANGUAGE.word, "simple")

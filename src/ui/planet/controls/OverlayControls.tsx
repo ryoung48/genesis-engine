@@ -16,9 +16,12 @@ import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { ColorMode } from "../colors"
 import type { OrogenViewMode } from "../renderer"
-import type { NationMapMode, PopulationMapMode } from "../screen/shared/map-modes"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
+import type {
+	NationMapMode,
+	PopulationMapMode,
+} from "../screen/shared/map-modes"
 import type { UnitSystem } from "../screen/shared/ui-format"
 import { formatDistance } from "../screen/shared/ui-format"
 
@@ -724,13 +727,13 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													populationMode === "culture"
 														? "Culture"
 														: colorMode === "population" &&
-															  populationMode === "heritage"
+																populationMode === "heritage"
 															? "Heritage"
 															: colorMode === "population" &&
-																  populationMode === "faith"
+																	populationMode === "faith"
 																? "Faith"
 																: colorMode === "population" &&
-																	  populationMode === "religion"
+																		populationMode === "religion"
 																	? "Religion"
 																	: nationMode === "dynasty"
 																		? "Dynasty"
@@ -747,19 +750,14 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														labelMode.religion
 													}
 													onChange={(e) => {
-														const isPopMode =
-															colorMode === "population"
+														const isPopMode = colorMode === "population"
 														const isDynasty = nationMode === "dynasty"
 														setLabelMode({
 															...labelMode,
 															nations:
-																e.target.checked &&
-																!isPopMode &&
-																!isDynasty,
+																e.target.checked && !isPopMode && !isDynasty,
 															dynasty:
-																e.target.checked &&
-																!isPopMode &&
-																isDynasty,
+																e.target.checked && !isPopMode && isDynasty,
 															culture:
 																e.target.checked &&
 																isPopMode &&

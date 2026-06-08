@@ -434,8 +434,8 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 					getCultureGenderSystem(culture),
 					leaderEntry.nameSeed ?? leaderEntry.time ?? provinceIdx,
 				) === "female"
-					? "person_female"
-					: "person_male"
+					? "female"
+					: "male"
 			const name = titleCase(
 				LANGUAGE.word.simple({
 					lang,

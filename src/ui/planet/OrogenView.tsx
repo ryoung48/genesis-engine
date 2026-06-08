@@ -244,6 +244,82 @@ export function buildMapExportFilename(
 	return `genesis-map-${identity}-${width}w.png`
 }
 
+export function syncLabelModeToMapMode(params: {
+	labelMode: LabelMode
+	colorMode: ColorMode
+	nationMode: NationMapMode
+	populationMode: PopulationMapMode
+}): LabelMode {
+	const { labelMode, colorMode, nationMode, populationMode } = params
+	const anyActive =
+		labelMode.nations ||
+		labelMode.dynasty ||
+		labelMode.culture ||
+		labelMode.heritage ||
+		labelMode.faith ||
+		labelMode.religion
+	if (!anyActive) return labelMode
+
+	const politicalFallback = {
+		...labelMode,
+		nations: nationMode !== "dynasty",
+		dynasty: nationMode === "dynasty",
+		culture: false,
+		heritage: false,
+		faith: false,
+		religion: false,
+	}
+
+	if (colorMode === "population") {
+		if (populationMode === "culture") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: true,
+				heritage: false,
+				faith: false,
+				religion: false,
+			}
+		}
+		if (populationMode === "heritage") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: false,
+				heritage: true,
+				faith: false,
+				religion: false,
+			}
+		}
+		if (populationMode === "faith") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: false,
+				heritage: false,
+				faith: true,
+				religion: false,
+			}
+		}
+		if (populationMode === "religion") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: false,
+				heritage: false,
+				faith: false,
+				religion: true,
+			}
+		}
+		return politicalFallback
+	}
+	return politicalFallback
+}
+
 export const OrogenView: React.FC = () => {
 	const makeRandomSeed = useCallback(
 		() => Math.floor(Math.random() * SEED_MAX),
@@ -333,27 +409,14 @@ export const OrogenView: React.FC = () => {
 		initialViewPrefs.labelMode,
 	)
 	useEffect(() => {
-		setLabelMode((prev) => {
-			const anyActive =
-				prev.nations ||
-				prev.dynasty ||
-				prev.culture ||
-				prev.heritage ||
-				prev.faith ||
-				prev.religion
-			if (!anyActive) return prev
-			const isPopMode = colorMode === "population"
-			const isDynasty = nationMode === "dynasty"
-			return {
-				...prev,
-				nations: !isPopMode && !isDynasty,
-				dynasty: !isPopMode && isDynasty,
-				culture: isPopMode && populationMode === "culture",
-				heritage: isPopMode && populationMode === "heritage",
-				faith: isPopMode && populationMode === "faith",
-				religion: isPopMode && populationMode === "religion",
-			}
-		})
+		setLabelMode((prev) =>
+			syncLabelModeToMapMode({
+				labelMode: prev,
+				colorMode,
+				nationMode,
+				populationMode,
+			}),
+		)
 	}, [nationMode, colorMode, populationMode])
 	const [showElevation, setShowElevation] = useState(
 		initialViewPrefs.showElevation,
@@ -2853,6 +2916,10 @@ export const OrogenView: React.FC = () => {
 									nations: false,
 									dynasty: false,
 									settlements: false,
+									culture: false,
+									heritage: false,
+									faith: false,
+									religion: false,
 								})
 								setShowElevation(false)
 								setShowSettlements(false)

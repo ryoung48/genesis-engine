@@ -53,6 +53,8 @@ import {
 	type LocationTradeGoods,
 } from "../economy/trade-goods"
 import { makeRng } from "../shared/rng"
+import { computeCoastDistances, computeOceanDistanceBFS } from "../shared/stats"
+import { meanEdgeLengthKm } from "../shared/units"
 import { getEraConfig, wavePercentileThreshold } from "../society/eras"
 import type { ProvincePopulation } from "../society/population"
 import {
@@ -60,7 +62,6 @@ import {
 	computePopulation,
 	computeProvinceHabitability,
 } from "../society/population"
-import { computeProvinceWaterAccess } from "../society/water-access"
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
 import { computeLakes } from "../terrain/lakes"
@@ -119,6 +120,8 @@ interface PostPipelineOutput {
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
 	waterAccess: Uint8Array
+	riverAccess: Uint8Array
+	lakeAccess: Uint8Array
 	provinces: OrogenProvinces | undefined
 	locations: OrogenLocations | undefined
 	population: ProvincePopulation | undefined
@@ -337,7 +340,7 @@ export function runPostElevationPipeline(
 
 	// ── Diurnal temperature range + PET ───────────────────────────────
 	t0 = performance.now()
-	const { monthly: dtr_monthly, annual: dtr_annual } = computeDiurnalRange(
+	let { monthly: dtr_monthly, annual: dtr_annual } = computeDiurnalRange(
 		rainfall,
 		elevation_km,
 		oceanDist,
@@ -387,6 +390,67 @@ export function runPostElevationPipeline(
 	)
 	record("Post: lakes", t0)
 	onProgress?.("Post: rivers", 62)
+
+	// ── Landmarks + distances + temperature (post-lake) ────────────────
+	// Lakes are now final — recompute landmarks so ocean vs lake cells are
+	// correctly classified, then update coast/ocean distances and re-run
+	// temperature so continentality reflects the finalized water geometry.
+	// Ice, pasta climate, and vegetation run below on the corrected climate.
+	t0 = performance.now()
+	const landmarks = computeLandmarks(mesh, isLand)
+	distCoast.set(computeCoastDistances(mesh, isLand).distCoast)
+	oceanDist.set(
+		computeOceanDistanceBFS(
+			mesh,
+			isLand,
+			meanEdgeLengthKm(mesh, params.planetRadiusKm),
+			landmarks,
+		),
+	)
+	climate = computeTemperature(
+		mesh,
+		elevation,
+		landFraction,
+		params,
+		oceanDist,
+		isLand,
+		elevation_km,
+	)
+	for (let month = 0; month < 12; month++) {
+		monthlyTEQ[month] = computeThermalEquator(
+			mesh,
+			climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+		)
+	}
+	if (oceanCurrents) {
+		applyCurrentTemperatureEffect(
+			mesh,
+			climate,
+			isLand,
+			oceanCurrents,
+			monthlyTEQ,
+			params,
+		)
+		refreshClimatePetMonthly(climate, params)
+	}
+	;({ monthly: dtr_monthly, annual: dtr_annual } = computeDiurnalRange(
+		rainfall,
+		elevation_km,
+		oceanDist,
+		isLand,
+		params,
+		climate.daylight_hours_monthly,
+	))
+	fillPetMonthlyHargreaves(
+		climate.temperature_monthly,
+		dtr_monthly,
+		climate.insolation_monthly,
+		climate.pet_monthly,
+		params.daysPerYear / 12,
+	)
+	applyDtrToClimateMinMax(climate, dtr_monthly, N)
+	record("Post: landmarks + distances + temperature (post-lake)", t0)
+	onProgress?.("Post: landmarks", 62)
 
 	// ── Ice (needed for pasta climate) ─────────────────────────────────
 	t0 = performance.now()
@@ -449,11 +513,6 @@ export function runPostElevationPipeline(
 	record("Post: vegetation", t0)
 	onProgress?.("Post: vegetation", 60)
 
-	// Recompute landmarks with updated isLand (lakes now treated as water)
-	t0 = performance.now()
-	const landmarks = computeLandmarks(mesh, isLand)
-	record("Post: landmarks", t0)
-	onProgress?.("Post: landmarks", 62)
 	// ── Tidal range ────────────────────────────────────────────────────
 	// Computed before topography so the tidal bonus can nudge coastal marsh
 	// formation in classifyTopography.
@@ -569,18 +628,16 @@ export function runPostElevationPipeline(
 		{
 			climateZones,
 			rainfall,
+			oceanCoastal,
+			lakeCoastal,
+			riverVisible: rivers.visible,
 			planetRadiusKm: params.planetRadiusKm,
 		},
 	)
 	record("Post: provinces", t0)
 	onProgress?.("Post: provinces", 72)
 
-	const waterAccess = computeProvinceWaterAccess(
-		provinces,
-		oceanCoastal,
-		lakeCoastal,
-		rivers.visible,
-	)
+	const { waterAccess, riverAccess, lakeAccess } = provinces
 
 	t0 = performance.now()
 	const locations: OrogenLocations = computeLocations(
@@ -730,6 +787,8 @@ export function runPostElevationPipeline(
 		dtr_annual,
 		dtr_monthly,
 		waterAccess,
+		riverAccess,
+		lakeAccess,
 		provinces,
 		locations,
 		population,

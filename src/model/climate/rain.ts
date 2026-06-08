@@ -18,6 +18,7 @@ import { elevToHeightKm } from "./climate"
 import { computeTidalRain } from "./locked/rain"
 
 const DEG2RAD = Math.PI / 180
+const EAST_MOISTURE_WIN_BIAS = 1.03
 
 export const ceilingScale = (x: number) =>
 	piecewise(
@@ -448,7 +449,7 @@ export function computeAdvection(
 		for (let r = 0; r < N; r++) {
 			east[r] /= wet
 			west[r] /= wet
-			if (east[r] > west[r]) west[r] = 0
+			if (east[r] * EAST_MOISTURE_WIN_BIAS > west[r]) west[r] = 0
 			else east[r] = 0
 		}
 

@@ -42,6 +42,8 @@ interface HistorySeedWorld {
 	population: ProvincePopulation | null
 	coastal: Uint8Array | null
 	waterAccess: Uint8Array | null
+	riverAccess: Uint8Array | null
+	lakeAccess: Uint8Array | null
 	riverVisible: Uint8Array | null
 	isLand: Uint8Array | null
 	vegetation: Uint8Array | null
@@ -129,6 +131,8 @@ function cloneHistorySeedWorld(
 			: null,
 		coastal: world.coastal ? world.coastal.slice() : null,
 		waterAccess: world.waterAccess ? world.waterAccess.slice() : null,
+		riverAccess: world.riverAccess ? world.riverAccess.slice() : null,
+		lakeAccess: world.lakeAccess ? world.lakeAccess.slice() : null,
 		riverVisible: world.rivers?.visible ? world.rivers.visible.slice() : null,
 		isLand: world.isLand ? world.isLand.slice() : null,
 		vegetation: world.vegetation ? world.vegetation.slice() : null,
@@ -266,6 +270,8 @@ function serializeWorld(
 		topography: world.topography,
 		coastal: world.coastal,
 		waterAccess: world.waterAccess,
+		riverAccess: world.riverAccess,
+		lakeAccess: world.lakeAccess,
 		slopeScore: world.slopeScore,
 		isLand: world.isLand,
 		riverLand: world.riverLand,
@@ -515,6 +521,8 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 	if (world.topography) add(world.topography.buffer)
 	if (world.coastal) add(world.coastal.buffer)
 	if (world.waterAccess) add(world.waterAccess.buffer)
+	if (world.riverAccess) add(world.riverAccess.buffer)
+	if (world.lakeAccess) add(world.lakeAccess.buffer)
 	if (world.slopeScore) add(world.slopeScore.buffer)
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)

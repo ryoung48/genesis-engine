@@ -1,7 +1,10 @@
 import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
-import type { NationMapMode, PopulationMapMode } from "../screen/shared/map-modes"
+import type {
+	NationMapMode,
+	PopulationMapMode,
+} from "../screen/shared/map-modes"
 import {
 	type LabelMode,
 	type MeasureMode,
@@ -397,14 +400,14 @@ describe("OverlayControls", () => {
 			{
 				nationMode: "borders",
 				labelMode: {
-				nations: true,
-				dynasty: false,
-				settlements: true,
-				culture: false,
-				heritage: false,
-				faith: false,
-				religion: false,
-			},
+					nations: true,
+					dynasty: false,
+					settlements: true,
+					culture: false,
+					heritage: false,
+					faith: false,
+					religion: false,
+				},
 			},
 		)
 		const { markup: dynastyMarkup } = renderWithExpandedSections(
@@ -412,14 +415,14 @@ describe("OverlayControls", () => {
 			{
 				nationMode: "dynasty",
 				labelMode: {
-				nations: false,
-				dynasty: true,
-				settlements: false,
-				culture: false,
-				heritage: false,
-				faith: false,
-				religion: false,
-			},
+					nations: false,
+					dynasty: true,
+					settlements: false,
+					culture: false,
+					heritage: false,
+					faith: false,
+					religion: false,
+				},
 			},
 		)
 

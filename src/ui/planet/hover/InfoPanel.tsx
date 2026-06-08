@@ -796,9 +796,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								value={
 									world.waterAccess[hoverProvince] >= 2
 										? "Ocean"
-										: world.waterAccess[hoverProvince] >= 1
-											? "River/Lake"
-											: "None"
+										: world.riverAccess?.[hoverProvince]
+											? "River"
+											: world.lakeAccess?.[hoverProvince]
+												? "Lake"
+												: world.waterAccess[hoverProvince] >= 1
+													? "River/Lake"
+													: "None"
 								}
 							/>
 						)}

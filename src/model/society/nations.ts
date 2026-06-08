@@ -89,7 +89,7 @@ export function computeNations(params: {
 			coastal,
 			new Uint8Array(provinceCount),
 			riverVisible,
-		)
+		).waterAccess
 	let activeCount = 0
 	for (let p = 0; p < provinceCount; p++) {
 		if (provinces.desolate[p]) continue

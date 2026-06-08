@@ -31,16 +31,16 @@ import {
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
 	buildGlobeCultureLabels,
-	buildMapCultureLabels,
-	buildGlobeHeritageLabels,
-	buildMapHeritageLabels,
 	buildGlobeFaithLabels,
-	buildMapFaithLabels,
-	buildGlobeReligionLabels,
-	buildMapReligionLabels,
+	buildGlobeHeritageLabels,
 	buildGlobeNationLabels,
+	buildGlobeReligionLabels,
 	buildGlobeSettlementLabels,
+	buildMapCultureLabels,
+	buildMapFaithLabels,
+	buildMapHeritageLabels,
 	buildMapNationLabels,
+	buildMapReligionLabels,
 	buildMapSettlementLabels,
 	createNationLabelPools,
 	createSettlementLabelPools,
@@ -1620,8 +1620,7 @@ export function createOrogenScene(
 			globeCultureLabels.visible =
 				labelMode.culture && currentViewMode === "globe"
 		if (mapCultureLabels) {
-			mapCultureLabels.visible =
-				labelMode.culture && currentViewMode === "map"
+			mapCultureLabels.visible = labelMode.culture && currentViewMode === "map"
 			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
 		}
 		if (globeHeritageLabels)
@@ -1633,11 +1632,9 @@ export function createOrogenScene(
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 		}
 		if (globeFaithLabels)
-			globeFaithLabels.visible =
-				labelMode.faith && currentViewMode === "globe"
+			globeFaithLabels.visible = labelMode.faith && currentViewMode === "globe"
 		if (mapFaithLabels) {
-			mapFaithLabels.visible =
-				labelMode.faith && currentViewMode === "map"
+			mapFaithLabels.visible = labelMode.faith && currentViewMode === "map"
 			if (mapMesh) mapFaithLabels.position.copy(mapMesh.position)
 		}
 		if (globeReligionLabels)

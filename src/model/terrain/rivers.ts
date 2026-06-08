@@ -125,6 +125,9 @@ export function computeRivers(
 	const monthlyPetHigh = 2000 / 12
 	const passThroughMonth = new Float32Array(N)
 	const flowToTarget = new Float32Array(N)
+	// Reference discharge (m³/s) at which hydraulic-geometry scaling halves the loss.
+	// Loss fraction ∝ Q^-0.4, motivated by: wetted perimeter ~ Q^0.5, volume ~ Q^0.9.
+	const Q_REF = 500
 
 	for (let month = 0; month < 12; month++) {
 		const mOff = month * N
@@ -156,6 +159,9 @@ export function computeRivers(
 				pt *= 0.9 + 0.1 * smoothstep(0.2, 0.9, aridityMonthly[mOff + target])
 				if (temp <= 0) pt *= smoothstep(-20, 0, temp)
 				else if (temp >= 90) pt *= smoothstep(150, 90, temp)
+				// Larger rivers lose proportionally less: scale loss by Q^-0.4
+				const inFlow = flowToTarget[r]
+				if (inFlow > 0) pt = 1 - (1 - pt) / Math.pow(1 + inFlow / Q_REF, 0.4)
 				flowToTarget[target] += flowToTarget[r] * pt
 			}
 		}

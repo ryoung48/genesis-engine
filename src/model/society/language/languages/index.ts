@@ -106,6 +106,7 @@ function spawnCluster(
 		WordParams,
 		"key" | "len" | "ending" | "stopChance" | "variation"
 	>,
+	longNames?: number,
 ): Cluster {
 	return CLUSTER.spawn({
 		src: lang,
@@ -114,6 +115,7 @@ function spawnCluster(
 		ending: params.ending,
 		stopChance: params.stopChance,
 		variation: params.variation,
+		longNames,
 	})
 }
 
@@ -132,6 +134,12 @@ function buildSlotWord({
 	slot: string
 }): { morphemes: string[]; word: string } {
 	const normalizedKey = normalizeWordKey(key)
+	const baseCluster = lang.clusters[normalizedKey]
+	const resolvedLen = len ?? baseCluster?.len
+	const resolvedEnding = ending ?? baseCluster?.ending ?? lang.ending
+	const resolvedStopChance = stopChance ?? baseCluster?.stopChance ?? 0
+	const resolvedVariation = variation ?? baseCluster?.variation ?? 10
+	const resolvedLongNames = baseCluster?.longNames
 	const slotLang: Language = {
 		...lang,
 		dice: createLanguageRng(
@@ -142,13 +150,17 @@ function buildSlotWord({
 		seenWords: {},
 		slotWords: new Map(),
 	}
-	const cluster = spawnCluster(slotLang, {
-		key: normalizedKey,
-		len,
-		ending,
-		stopChance,
-		variation,
-	})
+	const cluster = spawnCluster(
+		slotLang,
+		{
+			key: normalizedKey,
+			len: resolvedLen,
+			ending: resolvedEnding,
+			stopChance: resolvedStopChance,
+			variation: resolvedVariation,
+		},
+		resolvedLongNames,
+	)
 	const morphemes = CLUSTER.morphemes(cluster, slotLang, repeat)
 	return { morphemes, word: titleCase(morphemes.join("")) }
 }
@@ -222,9 +234,9 @@ export const LANGUAGE = {
 			slot,
 			repeat = false,
 			len,
-			ending = lang.ending,
+			ending,
 			stopChance,
-			variation = 10,
+			variation,
 		}: WordParams) => {
 			const normalizedKey = normalizeWordKey(key)
 			if (slot) {
@@ -244,9 +256,9 @@ export const LANGUAGE = {
 				lang.clusters[normalizedKey] = spawnCluster(lang, {
 					key: normalizedKey,
 					len,
-					ending,
+					ending: ending ?? lang.ending,
 					stopChance,
-					variation,
+					variation: variation ?? 10,
 				})
 			}
 			const morphemes = CLUSTER.morphemes(
@@ -282,10 +294,15 @@ export const LANGUAGE = {
 			ending: lang.ending,
 			vowels,
 			dice,
+			stops: stop !== " ",
 		})
+		const exoticCons = ["ñ", "ñg"].some((c) =>
+			consonantPhonemes[PhonemeCatalog.MIDDLE_CONSONANT].includes(c),
+		)
 		const { uniqueVowels, vowelPhonemes } = buildComplexVowels({
 			vowels,
 			consonants: consonantPhonemes[PhonemeCatalog.END_CONSONANT],
+			exoticCons,
 			stops: stopChance,
 			dice,
 		})

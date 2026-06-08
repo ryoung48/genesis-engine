@@ -54,7 +54,7 @@ export const initClusters = (params: {
 	clusters?: Record<string, CustomClusterParams>
 }) => {
 	const { src, shortSurnames, shortFirst, clusters } = params
-	const { ending, surnames } = src
+	const { ending } = src
 
 	src.clusters = {
 		settlement: CLUSTER.spawn({
@@ -79,7 +79,7 @@ export const initClusters = (params: {
 			ending,
 			stopChance: src.articleChance,
 			variation: 15,
-			longNames: 1,
+			longNames: 0,
 		}),
 		culture: CLUSTER.spawn({
 			src: src,
@@ -113,10 +113,8 @@ export const initClusters = (params: {
 			variation: 15,
 			ending,
 			stopChance: 0,
-			longNames: clusters?.last?.long_names || 0,
-			len:
-				clusters?.last?.len ||
-				(shortSurnames ? 1 : surnames.epithets.length > 0 ? 2 : 3),
+			longNames: 0,
+			len: shortSurnames ? 1 : 2,
 		}),
 	}
 	// similar first names

@@ -30,6 +30,7 @@ export const buildConsonants = (params: {
 	ending: PhonemeCatalog
 	vowels: string[]
 	dice: LanguageRng
+	stops: boolean
 }) => {
 	const ortho = orthography(params.dice)
 	const k = params.dice.weightedChoice([
@@ -495,6 +496,8 @@ export const buildConsonants = (params: {
 		],
 		strict,
 	)
+	if (!params.stops && strict.includes("n")) mMid.push("ñ")
+	if (!params.stops && strict.includes("ŋ")) mMid.push("ñg")
 	const dMid = validTerms(
 		[
 			"cc",

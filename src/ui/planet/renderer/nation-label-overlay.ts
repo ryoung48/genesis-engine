@@ -506,7 +506,9 @@ function buildGlobePartitionLabels(
 	const elevation = world.elevation
 
 	ensurePoolSize(pool, partitionCount)
-	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
+	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
+		camera.quaternion,
+	)
 
 	let activeCount = 0
 	for (let c = 0; c < partitionCount; c++) {
@@ -564,7 +566,10 @@ function buildMapPartitionLabels(
 		partitionCount,
 		getProvincePartition,
 	)
-	const projection = createMapProjection(centerLongitudeDeg, projectionLatitudeDeg)
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
 	const wrapOffsets = cullingEnabled
@@ -668,7 +673,10 @@ export function buildGlobeHeritageLabels(
 		world,
 		heritageNames,
 		world.heritages.count,
-		(p) => { const c = ca[p] ?? -1; return c >= 0 ? ha[c] ?? -1 : -1 },
+		(p) => {
+			const c = ca[p] ?? -1
+			return c >= 0 ? (ha[c] ?? -1) : -1
+		},
 		camera,
 		pool,
 		cullingEnabled,
@@ -692,7 +700,10 @@ export function buildMapHeritageLabels(
 		world,
 		heritageNames,
 		world.heritages.count,
-		(p) => { const c = ca[p] ?? -1; return c >= 0 ? ha[c] ?? -1 : -1 },
+		(p) => {
+			const c = ca[p] ?? -1
+			return c >= 0 ? (ha[c] ?? -1) : -1
+		},
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
 		pool,
@@ -716,7 +727,10 @@ export function buildGlobeFaithLabels(
 		world,
 		faithNames,
 		world.faiths.count,
-		(p) => { const c = ca[p] ?? -1; return c >= 0 ? fa[c] ?? -1 : -1 },
+		(p) => {
+			const c = ca[p] ?? -1
+			return c >= 0 ? (fa[c] ?? -1) : -1
+		},
 		camera,
 		pool,
 		cullingEnabled,
@@ -740,7 +754,10 @@ export function buildMapFaithLabels(
 		world,
 		faithNames,
 		world.faiths.count,
-		(p) => { const c = ca[p] ?? -1; return c >= 0 ? fa[c] ?? -1 : -1 },
+		(p) => {
+			const c = ca[p] ?? -1
+			return c >= 0 ? (fa[c] ?? -1) : -1
+		},
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
 		pool,
@@ -767,8 +784,8 @@ export function buildGlobeReligionLabels(
 		world.religions.count,
 		(p) => {
 			const c = ca[p] ?? -1
-			const f = c >= 0 ? fa[c] ?? -1 : -1
-			return f >= 0 ? ra[f] ?? -1 : -1
+			const f = c >= 0 ? (fa[c] ?? -1) : -1
+			return f >= 0 ? (ra[f] ?? -1) : -1
 		},
 		camera,
 		pool,
@@ -796,8 +813,8 @@ export function buildMapReligionLabels(
 		world.religions.count,
 		(p) => {
 			const c = ca[p] ?? -1
-			const f = c >= 0 ? fa[c] ?? -1 : -1
-			return f >= 0 ? ra[f] ?? -1 : -1
+			const f = c >= 0 ? (fa[c] ?? -1) : -1
+			return f >= 0 ? (ra[f] ?? -1) : -1
 		},
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
@@ -1004,5 +1021,4 @@ export {
 	disposePool,
 	orientGlobeLabel,
 	updateGlobeLabelOrientations,
-	type LabelPool,
 }
