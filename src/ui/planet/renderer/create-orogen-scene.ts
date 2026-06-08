@@ -30,6 +30,14 @@ import {
 } from "./mesh-builders"
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
+	buildGlobeCultureLabels,
+	buildMapCultureLabels,
+	buildGlobeHeritageLabels,
+	buildMapHeritageLabels,
+	buildGlobeFaithLabels,
+	buildMapFaithLabels,
+	buildGlobeReligionLabels,
+	buildMapReligionLabels,
 	buildGlobeNationLabels,
 	buildGlobeSettlementLabels,
 	buildMapNationLabels,
@@ -629,18 +637,38 @@ export function createOrogenScene(
 	let mapNationLabels: THREE.Group | null = null
 	let globeSettlementLabels: THREE.Group | null = null
 	let mapSettlementLabels: THREE.Group | null = null
+	let globeCultureLabels: THREE.Group | null = null
+	let mapCultureLabels: THREE.Group | null = null
+	let globeHeritageLabels: THREE.Group | null = null
+	let mapHeritageLabels: THREE.Group | null = null
+	let globeFaithLabels: THREE.Group | null = null
+	let mapFaithLabels: THREE.Group | null = null
+	let globeReligionLabels: THREE.Group | null = null
+	let mapReligionLabels: THREE.Group | null = null
 	let labelMode: LabelMode = {
 		nations: false,
 		dynasty: false,
 		settlements: false,
+		culture: false,
+		heritage: false,
+		faith: false,
+		religion: false,
 	}
 	const labelCullingEnabled = true
 	let elevationVisible = true
 	const nationLabelPools = createNationLabelPools()
 	const settlementLabelPools = createSettlementLabelPools()
+	const cultureLabelPools = createNationLabelPools()
+	const heritageLabelPools = createNationLabelPools()
+	const faithLabelPools = createNationLabelPools()
+	const religionLabelPools = createNationLabelPools()
 	let nationNames: string[] | null = null
 	let dynastyNames: string[] | null = null
 	let settlementLabelNames: string[] | null = null
+	let cultureNames: string[] | null = null
+	let heritageNames: string[] | null = null
+	let faithNames: string[] | null = null
+	let religionNames: string[] | null = null
 	let globeControlsInteracting = false
 	let mapControlsInteracting = false
 	let globeControlActivityFrames = 0
@@ -928,6 +956,134 @@ export function createOrogenScene(
 			if (!labelCullingEnabled) addMapSlideClones(mapSettlementLabels)
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
 			scene.add(mapSettlementLabels)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildCultureLabels() {
+		disposeGroup(scene, globeCultureLabels)
+		disposeGroup(scene, mapCultureLabels)
+		globeCultureLabels = null
+		mapCultureLabels = null
+		if (!currentWorld?.cultures || !labelMode.culture || !cultureNames) {
+			return
+		}
+		globeCultureLabels = buildGlobeCultureLabels(
+			currentWorld,
+			cultureNames,
+			camera,
+			cultureLabelPools.globe,
+			labelCullingEnabled,
+			elevationVisible,
+		)
+		mapCultureLabels = buildMapCultureLabels(
+			currentWorld,
+			cultureNames,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			cultureLabelPools.map,
+			labelCullingEnabled,
+		)
+		if (globeCultureLabels) scene.add(globeCultureLabels)
+		if (mapCultureLabels) {
+			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
+			scene.add(mapCultureLabels)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildHeritageLabels() {
+		disposeGroup(scene, globeHeritageLabels)
+		disposeGroup(scene, mapHeritageLabels)
+		globeHeritageLabels = null
+		mapHeritageLabels = null
+		if (!currentWorld?.heritages || !labelMode.heritage || !heritageNames) {
+			return
+		}
+		globeHeritageLabels = buildGlobeHeritageLabels(
+			currentWorld,
+			heritageNames,
+			camera,
+			heritageLabelPools.globe,
+			labelCullingEnabled,
+			elevationVisible,
+		)
+		mapHeritageLabels = buildMapHeritageLabels(
+			currentWorld,
+			heritageNames,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			heritageLabelPools.map,
+			labelCullingEnabled,
+		)
+		if (globeHeritageLabels) scene.add(globeHeritageLabels)
+		if (mapHeritageLabels) {
+			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
+			scene.add(mapHeritageLabels)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildFaithLabels() {
+		disposeGroup(scene, globeFaithLabels)
+		disposeGroup(scene, mapFaithLabels)
+		globeFaithLabels = null
+		mapFaithLabels = null
+		if (!currentWorld?.faiths || !labelMode.faith || !faithNames) {
+			return
+		}
+		globeFaithLabels = buildGlobeFaithLabels(
+			currentWorld,
+			faithNames,
+			camera,
+			faithLabelPools.globe,
+			labelCullingEnabled,
+			elevationVisible,
+		)
+		mapFaithLabels = buildMapFaithLabels(
+			currentWorld,
+			faithNames,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			faithLabelPools.map,
+			labelCullingEnabled,
+		)
+		if (globeFaithLabels) scene.add(globeFaithLabels)
+		if (mapFaithLabels) {
+			if (mapMesh) mapFaithLabels.position.copy(mapMesh.position)
+			scene.add(mapFaithLabels)
+		}
+		updateOverlayVisibility()
+	}
+
+	function rebuildReligionLabels() {
+		disposeGroup(scene, globeReligionLabels)
+		disposeGroup(scene, mapReligionLabels)
+		globeReligionLabels = null
+		mapReligionLabels = null
+		if (!currentWorld?.religions || !labelMode.religion || !religionNames) {
+			return
+		}
+		globeReligionLabels = buildGlobeReligionLabels(
+			currentWorld,
+			religionNames,
+			camera,
+			religionLabelPools.globe,
+			labelCullingEnabled,
+			elevationVisible,
+		)
+		mapReligionLabels = buildMapReligionLabels(
+			currentWorld,
+			religionNames,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			religionLabelPools.map,
+			labelCullingEnabled,
+		)
+		if (globeReligionLabels) scene.add(globeReligionLabels)
+		if (mapReligionLabels) {
+			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
+			scene.add(mapReligionLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -1460,6 +1616,38 @@ export function createOrogenScene(
 				labelMode.settlements && currentViewMode === "map"
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
 		}
+		if (globeCultureLabels)
+			globeCultureLabels.visible =
+				labelMode.culture && currentViewMode === "globe"
+		if (mapCultureLabels) {
+			mapCultureLabels.visible =
+				labelMode.culture && currentViewMode === "map"
+			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
+		}
+		if (globeHeritageLabels)
+			globeHeritageLabels.visible =
+				labelMode.heritage && currentViewMode === "globe"
+		if (mapHeritageLabels) {
+			mapHeritageLabels.visible =
+				labelMode.heritage && currentViewMode === "map"
+			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
+		}
+		if (globeFaithLabels)
+			globeFaithLabels.visible =
+				labelMode.faith && currentViewMode === "globe"
+		if (mapFaithLabels) {
+			mapFaithLabels.visible =
+				labelMode.faith && currentViewMode === "map"
+			if (mapMesh) mapFaithLabels.position.copy(mapMesh.position)
+		}
+		if (globeReligionLabels)
+			globeReligionLabels.visible =
+				labelMode.religion && currentViewMode === "globe"
+		if (mapReligionLabels) {
+			mapReligionLabels.visible =
+				labelMode.religion && currentViewMode === "map"
+			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
+		}
 		requestRender()
 	}
 
@@ -1480,6 +1668,10 @@ export function createOrogenScene(
 			mapInfrastructure,
 			mapNationLabels,
 			mapSettlementLabels,
+			mapCultureLabels,
+			mapHeritageLabels,
+			mapFaithLabels,
+			mapReligionLabels,
 			mapPathfindingLine,
 			mapPathfindingDots,
 			pulseMap,
@@ -1510,6 +1702,10 @@ export function createOrogenScene(
 			{ object: globeInfrastructure, visible: false },
 			{ object: globeNationLabels, visible: false },
 			{ object: globeSettlementLabels, visible: false },
+			{ object: globeCultureLabels, visible: false },
+			{ object: globeHeritageLabels, visible: false },
+			{ object: globeFaithLabels, visible: false },
+			{ object: globeReligionLabels, visible: false },
 			{ object: pulseGlobe, visible: false },
 			{ object: mapMesh, visible: true },
 			{
@@ -1530,6 +1726,10 @@ export function createOrogenScene(
 				visible: labelMode.nations || labelMode.dynasty,
 			},
 			{ object: mapSettlementLabels, visible: labelMode.settlements },
+			{ object: mapCultureLabels, visible: labelMode.culture },
+			{ object: mapHeritageLabels, visible: labelMode.heritage },
+			{ object: mapFaithLabels, visible: labelMode.faith },
+			{ object: mapReligionLabels, visible: labelMode.religion },
 			{ object: mapSelectedProvinceBorder, visible: false },
 			{ object: mapMeasureLine, visible: false },
 			{ object: mapMeasureDots, visible: false },
@@ -2512,6 +2712,10 @@ export function createOrogenScene(
 		labelMode = mode
 		rebuildNationLabels()
 		rebuildSettlementLabels()
+		rebuildCultureLabels()
+		rebuildHeritageLabels()
+		rebuildFaithLabels()
+		rebuildReligionLabels()
 	}
 
 	function setNationNames(names: string[] | null) {
@@ -2522,6 +2726,26 @@ export function createOrogenScene(
 	function setDynastyNames(names: string[] | null) {
 		dynastyNames = names
 		rebuildNationLabels()
+	}
+
+	function setCultureNames(names: string[] | null) {
+		cultureNames = names
+		rebuildCultureLabels()
+	}
+
+	function setHeritageNames(names: string[] | null) {
+		heritageNames = names
+		rebuildHeritageLabels()
+	}
+
+	function setFaithNames(names: string[] | null) {
+		faithNames = names
+		rebuildFaithLabels()
+	}
+
+	function setReligionNames(names: string[] | null) {
+		religionNames = names
+		rebuildReligionLabels()
 	}
 
 	function setSettlementNames(names: string[] | null) {
@@ -2535,6 +2759,10 @@ export function createOrogenScene(
 		if (currentWorld) rebuildTerrain()
 		rebuildNationLabels()
 		rebuildSettlementLabels()
+		rebuildCultureLabels()
+		rebuildHeritageLabels()
+		rebuildFaithLabels()
+		rebuildReligionLabels()
 	}
 
 	return {
@@ -2581,6 +2809,10 @@ export function createOrogenScene(
 		setLabelMode,
 		setNationNames,
 		setDynastyNames,
+		setCultureNames,
+		setHeritageNames,
+		setFaithNames,
+		setReligionNames,
 		setSettlementNames,
 		setElevationVisible,
 		setSunPosition,

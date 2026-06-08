@@ -104,7 +104,15 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showNationBorders: false,
 	showLandBorders: false,
 	showNationHierarchy: false,
-	labelMode: { nations: false, dynasty: false, settlements: false },
+	labelMode: {
+		nations: false,
+		dynasty: false,
+		settlements: false,
+		culture: false,
+		heritage: false,
+		faith: false,
+		religion: false,
+	},
 	showElevation: true,
 	showThermalEquator: false,
 	showWindArrows: false,
@@ -170,6 +178,18 @@ function isLabelMode(value: unknown): value is LabelMode {
 	)
 }
 
+function parseLabelMode(value: unknown): LabelMode {
+	const base = isLabelMode(value) ? value : DEFAULT_VIEW_PREFS.labelMode
+	const v = value as Record<string, unknown> | null | undefined
+	return {
+		...base,
+		culture: typeof v?.culture === "boolean" ? v.culture : false,
+		heritage: typeof v?.heritage === "boolean" ? v.heritage : false,
+		faith: typeof v?.faith === "boolean" ? v.faith : false,
+		religion: typeof v?.religion === "boolean" ? v.religion : false,
+	}
+}
+
 function readBoolean(value: unknown, fallback: boolean): boolean {
 	return typeof value === "boolean" ? value : fallback
 }
@@ -217,9 +237,7 @@ export function parseStoredViewPrefs(
 				parsed.showNationHierarchy,
 				DEFAULT_VIEW_PREFS.showNationHierarchy,
 			),
-			labelMode: isLabelMode(parsed.labelMode)
-				? parsed.labelMode
-				: DEFAULT_VIEW_PREFS.labelMode,
+			labelMode: parseLabelMode(parsed.labelMode),
 			showElevation: readBoolean(
 				parsed.showElevation,
 				DEFAULT_VIEW_PREFS.showElevation,

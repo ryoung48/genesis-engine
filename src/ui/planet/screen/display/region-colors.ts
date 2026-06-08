@@ -129,8 +129,8 @@ export function getDynastyColor(id: number): [number, number, number] {
 	let h = (id * 2246822519) >>> 0
 	h ^= h >>> 15
 	const hue = (h % 360) / 360
-	const sat = 0.52 + ((h >>> 9) % 24) / 100
-	const light = 0.44 + ((h >>> 17) % 16) / 100
+	const sat = 0.52 + ((h >>> 9) % 48) / 100
+	const light = 0.18 + ((h >>> 17) % 62) / 100
 	let r = light
 	let g = light
 	let b = light

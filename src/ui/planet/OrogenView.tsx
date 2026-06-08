@@ -101,8 +101,12 @@ import {
 } from "./screen/display/display-model"
 import { createDisplayNames } from "./screen/display/display-names"
 import {
+	buildCultureLabelNames,
+	buildFaithLabelNames,
+	buildHeritageLabelNames,
 	buildNationDynastyLabelNames,
 	buildNationLabelNames,
+	buildReligionLabelNames,
 	buildSettlementLabelNames,
 } from "./screen/display/label-names"
 import {
@@ -328,6 +332,29 @@ export const OrogenView: React.FC = () => {
 	const [labelMode, setLabelMode] = useState<LabelMode>(
 		initialViewPrefs.labelMode,
 	)
+	useEffect(() => {
+		setLabelMode((prev) => {
+			const anyActive =
+				prev.nations ||
+				prev.dynasty ||
+				prev.culture ||
+				prev.heritage ||
+				prev.faith ||
+				prev.religion
+			if (!anyActive) return prev
+			const isPopMode = colorMode === "population"
+			const isDynasty = nationMode === "dynasty"
+			return {
+				...prev,
+				nations: !isPopMode && !isDynasty,
+				dynasty: !isPopMode && isDynasty,
+				culture: isPopMode && populationMode === "culture",
+				heritage: isPopMode && populationMode === "heritage",
+				faith: isPopMode && populationMode === "faith",
+				religion: isPopMode && populationMode === "religion",
+			}
+		})
+	}, [nationMode, colorMode, populationMode])
 	const [showElevation, setShowElevation] = useState(
 		initialViewPrefs.showElevation,
 	)
@@ -874,6 +901,18 @@ export const OrogenView: React.FC = () => {
 	}, [worldForDisplay, worldNames])
 	const settlementLabelsArray = useMemo(() => {
 		return buildSettlementLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
+	const cultureLabelsArray = useMemo(() => {
+		return buildCultureLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
+	const heritageLabelsArray = useMemo(() => {
+		return buildHeritageLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
+	const faithLabelsArray = useMemo(() => {
+		return buildFaithLabelNames(worldForDisplay, worldNames)
+	}, [worldForDisplay, worldNames])
+	const religionLabelsArray = useMemo(() => {
+		return buildReligionLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
@@ -1891,6 +1930,18 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setSettlementNames(settlementLabelsArray)
 	}, [settlementLabelsArray])
+	useEffect(() => {
+		sceneRef.current?.setCultureNames(cultureLabelsArray)
+	}, [cultureLabelsArray])
+	useEffect(() => {
+		sceneRef.current?.setHeritageNames(heritageLabelsArray)
+	}, [heritageLabelsArray])
+	useEffect(() => {
+		sceneRef.current?.setFaithNames(faithLabelsArray)
+	}, [faithLabelsArray])
+	useEffect(() => {
+		sceneRef.current?.setReligionNames(religionLabelsArray)
+	}, [religionLabelsArray])
 
 	// --- Elevation ---
 	useEffect(() => {
@@ -2733,6 +2784,8 @@ export const OrogenView: React.FC = () => {
 							setShowLandBorders={setShowLandBorders}
 							showNationHierarchy={showNationHierarchy}
 							setShowNationHierarchy={setShowNationHierarchy}
+							nationMode={nationMode}
+							populationMode={populationMode}
 							labelMode={labelMode}
 							setLabelMode={setLabelMode}
 							showElevation={showElevation}

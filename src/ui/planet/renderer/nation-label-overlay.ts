@@ -435,6 +435,377 @@ export function buildMapNationLabels(
 	return group
 }
 
+// ── Partition-based labels (culture, heritage, faith, religion) ───────────────
+
+function computePartitionCentralData(
+	world: SerializedOrogenWorld,
+	partitionCount: number,
+	getProvincePartition: (province: number) => number,
+): { centralRegions: Int32Array; provinceCounts: Int32Array } {
+	const { seeds, count: provinceCount } = world.provinces!
+	const { r_xyz } = world.mesh
+
+	const cx = new Float64Array(partitionCount)
+	const cy = new Float64Array(partitionCount)
+	const cz = new Float64Array(partitionCount)
+	const counts = new Int32Array(partitionCount)
+	const centralRegions = new Int32Array(partitionCount).fill(-1)
+	const bestDistsSq = new Float64Array(partitionCount).fill(Infinity)
+
+	for (let p = 0; p < provinceCount; p++) {
+		const idx = getProvincePartition(p)
+		if (idx < 0 || idx >= partitionCount) continue
+		const seedRegion = seeds[p] ?? -1
+		if (seedRegion < 0) continue
+		cx[idx] += r_xyz[3 * seedRegion]
+		cy[idx] += r_xyz[3 * seedRegion + 1]
+		cz[idx] += r_xyz[3 * seedRegion + 2]
+		counts[idx]++
+	}
+
+	for (let p = 0; p < provinceCount; p++) {
+		const idx = getProvincePartition(p)
+		if (idx < 0 || idx >= partitionCount) continue
+		const n = counts[idx]
+		if (n === 0) continue
+		const seedRegion = seeds[p] ?? -1
+		if (seedRegion < 0) continue
+		const invN = 1 / n
+		const dx = r_xyz[3 * seedRegion] - cx[idx] * invN
+		const dy = r_xyz[3 * seedRegion + 1] - cy[idx] * invN
+		const dz = r_xyz[3 * seedRegion + 2] - cz[idx] * invN
+		const distSq = dx * dx + dy * dy + dz * dz
+		if (distSq < bestDistsSq[idx]) {
+			bestDistsSq[idx] = distSq
+			centralRegions[idx] = seedRegion
+		}
+	}
+
+	return { centralRegions, provinceCounts: counts }
+}
+
+function buildGlobePartitionLabels(
+	world: SerializedOrogenWorld,
+	names: string[],
+	partitionCount: number,
+	getProvincePartition: (province: number) => number,
+	camera: THREE.PerspectiveCamera,
+	pool: LabelPool,
+	cullingEnabled: boolean,
+	elevationVisible: boolean,
+): THREE.Group {
+	const group = new THREE.Group()
+	if (!world.provinces) return group
+
+	const { centralRegions, provinceCounts } = computePartitionCentralData(
+		world,
+		partitionCount,
+		getProvincePartition,
+	)
+	const { r_xyz } = world.mesh
+	const elevation = world.elevation
+
+	ensurePoolSize(pool, partitionCount)
+	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
+
+	let activeCount = 0
+	for (let c = 0; c < partitionCount; c++) {
+		const name = names[c]
+		if (!name) continue
+		const centralRegion = centralRegions[c]
+		if (centralRegion < 0) continue
+		const scale = computeLabelScale(provinceCounts[c] ?? 0, name)
+		const globePlacement = labelPositionGlobe(
+			r_xyz,
+			elevation,
+			centralRegion,
+			elevationVisible,
+		)
+		const text = pool.items[activeCount]
+		applyGlobeLabelStyle(text)
+		text.frustumCulled = cullingEnabled
+		text.text = name
+		text.fontSize = LABEL_FONT_SIZE_GLOBE * scale
+		text.userData.globeNormal = globePlacement.normal
+		text.userData.globeBasePosition = GLOBE_BASE_POSITION.copy(
+			globePlacement.normal,
+		)
+			.multiplyScalar(globePlacement.radius)
+			.clone()
+		text.userData.globeLabelOffset = globeLabelOffset(0, text.fontSize)
+		text.sync()
+		updateGlobeLabelPosition(text, cameraUp)
+		orientGlobeLabel(text, camera.quaternion)
+		text.visible = true
+		group.add(text)
+		activeCount++
+	}
+
+	hideUnusedPool(pool, activeCount)
+	updateGlobeLabelOrientations(group, camera, cullingEnabled)
+	return group
+}
+
+function buildMapPartitionLabels(
+	world: SerializedOrogenWorld,
+	names: string[],
+	partitionCount: number,
+	getProvincePartition: (province: number) => number,
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	pool: LabelPool,
+	cullingEnabled: boolean,
+): THREE.Group {
+	const group = new THREE.Group()
+	if (!world.provinces) return group
+
+	const { centralRegions, provinceCounts } = computePartitionCentralData(
+		world,
+		partitionCount,
+		getProvincePartition,
+	)
+	const projection = createMapProjection(centerLongitudeDeg, projectionLatitudeDeg)
+	const { r_xyz } = world.mesh
+	const elevation = world.elevation
+	const wrapOffsets = cullingEnabled
+		? [-projection.repeatWidth, 0, projection.repeatWidth]
+		: [0]
+
+	ensurePoolSize(pool, partitionCount * wrapOffsets.length)
+
+	let activeCount = 0
+	for (let c = 0; c < partitionCount; c++) {
+		const name = names[c]
+		if (!name) continue
+		const centralRegion = centralRegions[c]
+		if (centralRegion < 0) continue
+		const scale = computeLabelScale(provinceCounts[c] ?? 0, name)
+		const fontSize = LABEL_FONT_SIZE_MAP * scale
+		const [px, py, pz] = labelPositionMap(
+			projection,
+			r_xyz,
+			elevation,
+			centralRegion,
+			0,
+			fontSize,
+		)
+		for (const wrapOffset of wrapOffsets) {
+			const text = pool.items[activeCount]
+			applyMapLabelStyle(text)
+			text.frustumCulled = cullingEnabled
+			text.text = name
+			text.position.set(px + wrapOffset, py, pz)
+			text.rotation.set(0, 0, 0)
+			text.fontSize = fontSize
+			text.sync()
+			text.visible = true
+			group.add(text)
+			activeCount++
+		}
+	}
+
+	hideUnusedPool(pool, activeCount)
+	return group
+}
+
+export function buildGlobeCultureLabels(
+	world: SerializedOrogenWorld,
+	cultureNames: string[],
+	camera: THREE.PerspectiveCamera,
+	pool: LabelPool,
+	cullingEnabled = false,
+	elevationVisible = true,
+): THREE.Group {
+	if (!world.cultures || !world.provinces) return new THREE.Group()
+	const ca = world.cultures.assignment
+	return buildGlobePartitionLabels(
+		world,
+		cultureNames,
+		world.cultures.count,
+		(p) => ca[p] ?? -1,
+		camera,
+		pool,
+		cullingEnabled,
+		elevationVisible,
+	)
+}
+
+export function buildMapCultureLabels(
+	world: SerializedOrogenWorld,
+	cultureNames: string[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	pool: LabelPool,
+	cullingEnabled = false,
+): THREE.Group {
+	if (!world.cultures || !world.provinces) return new THREE.Group()
+	const ca = world.cultures.assignment
+	return buildMapPartitionLabels(
+		world,
+		cultureNames,
+		world.cultures.count,
+		(p) => ca[p] ?? -1,
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+		pool,
+		cullingEnabled,
+	)
+}
+
+export function buildGlobeHeritageLabels(
+	world: SerializedOrogenWorld,
+	heritageNames: string[],
+	camera: THREE.PerspectiveCamera,
+	pool: LabelPool,
+	cullingEnabled = false,
+	elevationVisible = true,
+): THREE.Group {
+	if (!world.heritages || !world.cultures || !world.provinces)
+		return new THREE.Group()
+	const ca = world.cultures.assignment
+	const ha = world.heritages.assignment
+	return buildGlobePartitionLabels(
+		world,
+		heritageNames,
+		world.heritages.count,
+		(p) => { const c = ca[p] ?? -1; return c >= 0 ? ha[c] ?? -1 : -1 },
+		camera,
+		pool,
+		cullingEnabled,
+		elevationVisible,
+	)
+}
+
+export function buildMapHeritageLabels(
+	world: SerializedOrogenWorld,
+	heritageNames: string[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	pool: LabelPool,
+	cullingEnabled = false,
+): THREE.Group {
+	if (!world.heritages || !world.cultures || !world.provinces)
+		return new THREE.Group()
+	const ca = world.cultures.assignment
+	const ha = world.heritages.assignment
+	return buildMapPartitionLabels(
+		world,
+		heritageNames,
+		world.heritages.count,
+		(p) => { const c = ca[p] ?? -1; return c >= 0 ? ha[c] ?? -1 : -1 },
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+		pool,
+		cullingEnabled,
+	)
+}
+
+export function buildGlobeFaithLabels(
+	world: SerializedOrogenWorld,
+	faithNames: string[],
+	camera: THREE.PerspectiveCamera,
+	pool: LabelPool,
+	cullingEnabled = false,
+	elevationVisible = true,
+): THREE.Group {
+	if (!world.faiths || !world.cultures || !world.provinces)
+		return new THREE.Group()
+	const ca = world.cultures.assignment
+	const fa = world.faiths.assignment
+	return buildGlobePartitionLabels(
+		world,
+		faithNames,
+		world.faiths.count,
+		(p) => { const c = ca[p] ?? -1; return c >= 0 ? fa[c] ?? -1 : -1 },
+		camera,
+		pool,
+		cullingEnabled,
+		elevationVisible,
+	)
+}
+
+export function buildMapFaithLabels(
+	world: SerializedOrogenWorld,
+	faithNames: string[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	pool: LabelPool,
+	cullingEnabled = false,
+): THREE.Group {
+	if (!world.faiths || !world.cultures || !world.provinces)
+		return new THREE.Group()
+	const ca = world.cultures.assignment
+	const fa = world.faiths.assignment
+	return buildMapPartitionLabels(
+		world,
+		faithNames,
+		world.faiths.count,
+		(p) => { const c = ca[p] ?? -1; return c >= 0 ? fa[c] ?? -1 : -1 },
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+		pool,
+		cullingEnabled,
+	)
+}
+
+export function buildGlobeReligionLabels(
+	world: SerializedOrogenWorld,
+	religionNames: string[],
+	camera: THREE.PerspectiveCamera,
+	pool: LabelPool,
+	cullingEnabled = false,
+	elevationVisible = true,
+): THREE.Group {
+	if (!world.religions || !world.faiths || !world.cultures || !world.provinces)
+		return new THREE.Group()
+	const ca = world.cultures.assignment
+	const fa = world.faiths.assignment
+	const ra = world.religions.assignment
+	return buildGlobePartitionLabels(
+		world,
+		religionNames,
+		world.religions.count,
+		(p) => {
+			const c = ca[p] ?? -1
+			const f = c >= 0 ? fa[c] ?? -1 : -1
+			return f >= 0 ? ra[f] ?? -1 : -1
+		},
+		camera,
+		pool,
+		cullingEnabled,
+		elevationVisible,
+	)
+}
+
+export function buildMapReligionLabels(
+	world: SerializedOrogenWorld,
+	religionNames: string[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	pool: LabelPool,
+	cullingEnabled = false,
+): THREE.Group {
+	if (!world.religions || !world.faiths || !world.cultures || !world.provinces)
+		return new THREE.Group()
+	const ca = world.cultures.assignment
+	const fa = world.faiths.assignment
+	const ra = world.religions.assignment
+	return buildMapPartitionLabels(
+		world,
+		religionNames,
+		world.religions.count,
+		(p) => {
+			const c = ca[p] ?? -1
+			const f = c >= 0 ? fa[c] ?? -1 : -1
+			return f >= 0 ? ra[f] ?? -1 : -1
+		},
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+		pool,
+		cullingEnabled,
+	)
+}
+
 // ── Settlement labels ─────────────────────────────────────────────────────────
 
 const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
@@ -633,4 +1004,5 @@ export {
 	disposePool,
 	orientGlobeLabel,
 	updateGlobeLabelOrientations,
+	type LabelPool,
 }

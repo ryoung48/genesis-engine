@@ -16,6 +16,7 @@ import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { ColorMode } from "../colors"
 import type { OrogenViewMode } from "../renderer"
+import type { NationMapMode, PopulationMapMode } from "../screen/shared/map-modes"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
 import type { UnitSystem } from "../screen/shared/ui-format"
@@ -33,6 +34,10 @@ export interface LabelMode {
 	nations: boolean
 	dynasty: boolean
 	settlements: boolean
+	culture: boolean
+	heritage: boolean
+	faith: boolean
+	religion: boolean
 }
 
 const LAND_TRAVEL_KM_PER_DAY = 30
@@ -102,6 +107,8 @@ interface OverlayControlsProps {
 	setShowLandBorders: (v: boolean) => void
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
+	nationMode: NationMapMode
+	populationMode: PopulationMapMode
 	labelMode: LabelMode
 	setLabelMode: (v: LabelMode) => void
 	showElevation: boolean
@@ -194,6 +201,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowLandBorders,
 	showNationHierarchy,
 	setShowNationHierarchy,
+	nationMode,
+	populationMode,
 	labelMode,
 	setLabelMode,
 	showElevation,
@@ -251,9 +260,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
 	const [politicalExpanded, setPoliticalExpanded] = React.useState(false)
-	const [infrastructureExpanded, setInfrastructureExpanded] =
-		React.useState(false)
 	const [geographyExpanded, setGeographyExpanded] = React.useState(false)
+	const [labelsExpanded, setLabelsExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
 	const [dangerExpanded, setDangerExpanded] = React.useState(false)
 	const [measureExpanded, setMeasureExpanded] = React.useState(false)
@@ -283,6 +291,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 			: localExportExpanded
 	const setExportExpanded =
 		controlledSetExportExpanded ?? setLocalExportExpanded
+	const infrastructureVisible = showSettlements || showRoads
 	const commitMapProjectionLatitude = (
 		event:
 			| React.PointerEvent<HTMLInputElement>
@@ -599,6 +608,19 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												/>
 											</label>
 											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Infrastructure</span>
+												<input
+													type="checkbox"
+													checked={infrastructureVisible}
+													onChange={(e) => {
+														const checked = e.target.checked
+														setShowSettlements(checked)
+														setShowRoads(checked)
+													}}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 												<span>Wind</span>
 												<input
 													type="checkbox"
@@ -678,34 +700,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>
-											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-												<span>Labels</span>
-												<input
-													type="checkbox"
-													checked={labelMode.nations}
-													onChange={(e) =>
-														setLabelMode({
-															...labelMode,
-															nations: e.target.checked,
-														})
-													}
-													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-												/>
-											</label>
-											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-												<span>Dynasties</span>
-												<input
-													type="checkbox"
-													checked={labelMode.dynasty}
-													onChange={(e) =>
-														setLabelMode({
-															...labelMode,
-															dynasty: e.target.checked,
-														})
-													}
-													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-												/>
-											</label>
 										</div>
 									)}
 								</div>
@@ -713,37 +707,82 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								<div>
 									<button
 										type="button"
-										onClick={() => setInfrastructureExpanded((v) => !v)}
+										onClick={() => setLabelsExpanded((v) => !v)}
 										className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
 									>
-										<span>Infrastructure</span>
+										<span>Labels</span>
 										<ChevronIcon
-											direction={infrastructureExpanded ? "up" : "down"}
+											direction={labelsExpanded ? "up" : "down"}
 											className="h-3 w-3 text-slate-400"
 										/>
 									</button>
-									{infrastructureExpanded && (
+									{labelsExpanded && (
 										<div className="mt-1.5 space-y-1.5">
 											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>
+													{colorMode === "population" &&
+													populationMode === "culture"
+														? "Culture"
+														: colorMode === "population" &&
+															  populationMode === "heritage"
+															? "Heritage"
+															: colorMode === "population" &&
+																  populationMode === "faith"
+																? "Faith"
+																: colorMode === "population" &&
+																	  populationMode === "religion"
+																	? "Religion"
+																	: nationMode === "dynasty"
+																		? "Dynasty"
+																		: "Nations"}
+												</span>
+												<input
+													type="checkbox"
+													checked={
+														labelMode.nations ||
+														labelMode.dynasty ||
+														labelMode.culture ||
+														labelMode.heritage ||
+														labelMode.faith ||
+														labelMode.religion
+													}
+													onChange={(e) => {
+														const isPopMode =
+															colorMode === "population"
+														const isDynasty = nationMode === "dynasty"
+														setLabelMode({
+															...labelMode,
+															nations:
+																e.target.checked &&
+																!isPopMode &&
+																!isDynasty,
+															dynasty:
+																e.target.checked &&
+																!isPopMode &&
+																isDynasty,
+															culture:
+																e.target.checked &&
+																isPopMode &&
+																populationMode === "culture",
+															heritage:
+																e.target.checked &&
+																isPopMode &&
+																populationMode === "heritage",
+															faith:
+																e.target.checked &&
+																isPopMode &&
+																populationMode === "faith",
+															religion:
+																e.target.checked &&
+																isPopMode &&
+																populationMode === "religion",
+														})
+													}}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 												<span>Settlements</span>
-												<input
-													type="checkbox"
-													checked={showSettlements}
-													onChange={(e) => setShowSettlements(e.target.checked)}
-													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-												/>
-											</label>
-											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-												<span>Roads</span>
-												<input
-													type="checkbox"
-													checked={showRoads}
-													onChange={(e) => setShowRoads(e.target.checked)}
-													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-												/>
-											</label>
-											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-												<span>Labels</span>
 												<input
 													type="checkbox"
 													checked={labelMode.settlements}

@@ -86,6 +86,10 @@ export interface OrogenScene {
 	setLabelMode(mode: LabelMode): void
 	setNationNames(names: string[] | null): void
 	setDynastyNames(names: string[] | null): void
+	setCultureNames(names: string[] | null): void
+	setHeritageNames(names: string[] | null): void
+	setFaithNames(names: string[] | null): void
+	setReligionNames(names: string[] | null): void
 	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void

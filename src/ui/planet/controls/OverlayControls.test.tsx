@@ -1,6 +1,7 @@
 import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
+import type { NationMapMode, PopulationMapMode } from "../screen/shared/map-modes"
 import {
 	type LabelMode,
 	type MeasureMode,
@@ -34,12 +35,20 @@ function renderWithProps(
 		setShowGrid: vi.fn(),
 		showNationBorders: false,
 		setShowNationBorders: vi.fn(),
+		showLandBorders: false,
+		setShowLandBorders: vi.fn(),
 		showNationHierarchy: false,
 		setShowNationHierarchy: vi.fn(),
+		nationMode: "borders" as NationMapMode,
+		populationMode: "density" as PopulationMapMode,
 		labelMode: {
 			nations: false,
 			dynasty: false,
 			settlements: false,
+			culture: false,
+			heritage: false,
+			faith: false,
+			religion: false,
 		} as LabelMode,
 		setLabelMode: vi.fn(),
 		showElevation: true,
@@ -100,6 +109,51 @@ function renderWithProps(
 	return { markup, props }
 }
 
+function renderWithExpandedSections(
+	expandedStates: Partial<{
+		gridSpacingExpanded: boolean
+		politicalExpanded: boolean
+		geographyExpanded: boolean
+		labelsExpanded: boolean
+		climateExpanded: boolean
+		dangerExpanded: boolean
+		measureExpanded: boolean
+		elevationExpanded: boolean
+		topographyExpanded: boolean
+		localExportExpanded: boolean
+	}>,
+	overrides: Partial<React.ComponentProps<typeof OverlayControls>> = {},
+) {
+	const useStateSpy = vi.spyOn(React, "useState")
+	const stateValues = [
+		expandedStates.gridSpacingExpanded ?? false,
+		expandedStates.politicalExpanded ?? false,
+		expandedStates.geographyExpanded ?? false,
+		expandedStates.labelsExpanded ?? false,
+		expandedStates.climateExpanded ?? false,
+		expandedStates.dangerExpanded ?? false,
+		expandedStates.measureExpanded ?? false,
+		expandedStates.elevationExpanded ?? false,
+		expandedStates.topographyExpanded ?? false,
+		expandedStates.localExportExpanded ?? false,
+		"temperature" as const,
+		"precipitation" as const,
+	]
+
+	for (const value of stateValues) {
+		useStateSpy.mockImplementationOnce(() => [value, vi.fn()])
+	}
+
+	try {
+		return renderWithProps({
+			overlaysExpanded: true,
+			...overrides,
+		})
+	} finally {
+		useStateSpy.mockRestore()
+	}
+}
+
 describe("OverlayControls", () => {
 	it("renders the view selector inside the expanded overlays panel", () => {
 		const { markup } = renderWithProps({
@@ -119,7 +173,7 @@ describe("OverlayControls", () => {
 		expect(markup).toContain('aria-label="Metric units"')
 		expect(markup).toContain('aria-label="Imperial units"')
 		expect(markup).toContain(">Political<")
-		expect(markup).toContain(">Infrastructure<")
+		expect(markup).toContain(">Labels<")
 		expect(markup).toContain(">me<")
 		expect(markup).toContain(">im<")
 		expect(markup).toContain("Projection Latitude")
@@ -143,13 +197,24 @@ describe("OverlayControls", () => {
 		expect(markup).not.toContain(">Overlays<")
 	})
 
-	it("renders wind and ocean currents inside the geography section", () => {
-		const { markup } = renderWithProps({
-			overlaysExpanded: true,
-			exportExpanded: true,
-		})
+	it("renders infrastructure directly beneath rivers in the geography section", () => {
+		const { markup } = renderWithExpandedSections(
+			{ geographyExpanded: true },
+			{
+				showSettlements: true,
+				showRoads: true,
+			},
+		)
 
-		expect(markup).toContain(">Geography<")
+		const riversIndex = markup.indexOf(">Rivers<")
+		const infrastructureIndex = markup.indexOf(">Infrastructure<")
+		const windIndex = markup.indexOf(">Wind<")
+
+		expect(riversIndex).toBeGreaterThan(-1)
+		expect(infrastructureIndex).toBeGreaterThan(riversIndex)
+		expect(infrastructureIndex).toBeLessThan(windIndex)
+		expect(markup).not.toContain(">Roads<")
+		expect(markup).not.toContain(">Settlements<")
 	})
 
 	it("wires overlay controls to the provided setters", () => {
@@ -158,6 +223,7 @@ describe("OverlayControls", () => {
 		const setShowWireframe = vi.fn()
 		const setShowGrid = vi.fn()
 		const setShowNationBorders = vi.fn()
+		const setShowLandBorders = vi.fn()
 		const setShowNationHierarchy = vi.fn()
 		const setLabelMode = vi.fn()
 		const setViewMode = vi.fn()
@@ -179,6 +245,7 @@ describe("OverlayControls", () => {
 			setShowWireframe,
 			setShowGrid,
 			setShowNationBorders,
+			setShowLandBorders,
 			setShowNationHierarchy,
 			setLabelMode,
 			setViewMode,
@@ -202,8 +269,17 @@ describe("OverlayControls", () => {
 		props.setMeasureMode?.("ruler")
 		props.setShowWireframe?.(true)
 		props.setShowNationBorders?.(true)
+		props.setShowLandBorders?.(true)
 		props.setShowNationHierarchy?.(true)
-		props.setLabelMode?.({ nations: false, dynasty: true, settlements: false })
+		props.setLabelMode?.({
+			nations: false,
+			dynasty: true,
+			settlements: false,
+			culture: false,
+			heritage: false,
+			faith: false,
+			religion: false,
+		})
 		props.setShowGrid?.(false)
 		props.setDraftMapProjectionLatitude?.(-42)
 		props.setMapProjectionLatitude?.(-42)
@@ -229,11 +305,16 @@ describe("OverlayControls", () => {
 		expect(setMeasureMode).toHaveBeenCalledWith("ruler")
 		expect(setShowWireframe).toHaveBeenCalledWith(true)
 		expect(setShowNationBorders).toHaveBeenCalledWith(true)
+		expect(setShowLandBorders).toHaveBeenCalledWith(true)
 		expect(setShowNationHierarchy).toHaveBeenCalledWith(true)
 		expect(setLabelMode).toHaveBeenCalledWith({
 			nations: false,
 			dynasty: true,
 			settlements: false,
+			culture: false,
+			heritage: false,
+			faith: false,
+			religion: false,
 		})
 		expect(setShowGrid).toHaveBeenCalledWith(false)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
@@ -308,5 +389,56 @@ describe("OverlayControls", () => {
 		})
 
 		expect(markup).toContain(">Measure<")
+	})
+
+	it("moves nation and dynasty labels into a dedicated labels section", () => {
+		const { markup: nationsMarkup } = renderWithExpandedSections(
+			{ politicalExpanded: true, labelsExpanded: true },
+			{
+				nationMode: "borders",
+				labelMode: {
+				nations: true,
+				dynasty: false,
+				settlements: true,
+				culture: false,
+				heritage: false,
+				faith: false,
+				religion: false,
+			},
+			},
+		)
+		const { markup: dynastyMarkup } = renderWithExpandedSections(
+			{ politicalExpanded: true, labelsExpanded: true },
+			{
+				nationMode: "dynasty",
+				labelMode: {
+				nations: false,
+				dynasty: true,
+				settlements: false,
+				culture: false,
+				heritage: false,
+				faith: false,
+				religion: false,
+			},
+			},
+		)
+
+		const politicalIndex = nationsMarkup.indexOf(">Political<")
+		const labelsIndex = nationsMarkup.indexOf(">Labels<")
+		const politicalSection = nationsMarkup.slice(politicalIndex, labelsIndex)
+		const labelsSection = nationsMarkup.slice(labelsIndex)
+
+		expect(politicalSection).toContain(">Hierarchy<")
+		expect(politicalSection).toContain(">Land Borders<")
+		expect(politicalSection).toContain(">Borders<")
+		expect(politicalSection).not.toContain(">Nations<")
+		expect(politicalSection).not.toContain(">Settlements<")
+		expect(labelsSection).toContain(">Nations<")
+		expect(labelsSection).not.toContain(">Dynasty<")
+		expect(labelsSection).toContain(">Settlements<")
+		expect(labelsSection).not.toContain('name="label-mode"')
+
+		expect(dynastyMarkup).toContain(">Dynasty<")
+		expect(dynastyMarkup).not.toContain(">Nations<")
 	})
 })

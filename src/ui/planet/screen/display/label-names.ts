@@ -4,6 +4,10 @@ interface LabelNameResolvers {
 	nation: (capitalProvince: number) => string
 	dynasty: (dynastyId: number) => string
 	province: (provinceIdx: number) => string
+	culture: (cultureId: number) => string
+	heritage: (heritageId: number) => string
+	faith: (faithId: number) => string
+	religion: (religionId: number) => string
 }
 
 export function buildNationLabelNames(
@@ -37,6 +41,58 @@ export function buildSettlementLabelNames(
 			settlementRegion >= 0 && pop >= SETTLEMENT_MIN_LABEL_POP
 				? resolvers.province(p)
 				: ""
+	}
+	return names
+}
+
+export function buildCultureLabelNames(
+	world: SerializedOrogenWorld | null,
+	resolvers: LabelNameResolvers | null,
+): string[] | null {
+	if (!world?.cultures || !resolvers) return null
+	const count = world.cultures.count
+	const names: string[] = new Array(count)
+	for (let c = 0; c < count; c++) {
+		names[c] = resolvers.culture(c)
+	}
+	return names
+}
+
+export function buildHeritageLabelNames(
+	world: SerializedOrogenWorld | null,
+	resolvers: LabelNameResolvers | null,
+): string[] | null {
+	if (!world?.heritages || !resolvers) return null
+	const count = world.heritages.count
+	const names: string[] = new Array(count)
+	for (let h = 0; h < count; h++) {
+		names[h] = resolvers.heritage(h)
+	}
+	return names
+}
+
+export function buildFaithLabelNames(
+	world: SerializedOrogenWorld | null,
+	resolvers: LabelNameResolvers | null,
+): string[] | null {
+	if (!world?.faiths || !resolvers) return null
+	const count = world.faiths.count
+	const names: string[] = new Array(count)
+	for (let f = 0; f < count; f++) {
+		names[f] = resolvers.faith(f)
+	}
+	return names
+}
+
+export function buildReligionLabelNames(
+	world: SerializedOrogenWorld | null,
+	resolvers: LabelNameResolvers | null,
+): string[] | null {
+	if (!world?.religions || !resolvers) return null
+	const count = world.religions.count
+	const names: string[] = new Array(count)
+	for (let r = 0; r < count; r++) {
+		names[r] = resolvers.religion(r)
 	}
 	return names
 }
