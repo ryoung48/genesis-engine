@@ -53,6 +53,12 @@ describe("buildHoverChartData", () => {
 				),
 			},
 			isLand: new Uint8Array([1, 0]),
+			landmarks: {
+				regionLandmark: new Int32Array([-1, -1]),
+				type: new Uint8Array([5]),
+				size: new Int32Array([1]),
+				count: 1,
+			},
 			iceThickness: new Float32Array([2, 3]),
 			iceMinMonthly: new Float32Array([4, 5]),
 			iceMaxMonthly: new Float32Array([6, 7]),
@@ -78,8 +84,11 @@ describe("buildHoverChartData", () => {
 		const world = makeWorld({
 			mesh: { numRegions: 1 },
 			isLand: new Uint8Array([0]),
-			rivers: {
-				lakes: new Uint8Array([1]),
+			landmarks: {
+				regionLandmark: new Int32Array([0]),
+				type: new Uint8Array([5]),
+				size: new Int32Array([1]),
+				count: 1,
 			},
 		})
 

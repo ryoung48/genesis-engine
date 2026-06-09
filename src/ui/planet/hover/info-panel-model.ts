@@ -119,7 +119,7 @@ export function buildHoverChartData(
 			world.landmarks.type[world.landmarks.regionLandmark[region]] ===
 				LANDMARK_TYPE_LAKE
 				? 1
-				: 0,
+				: undefined,
 		iceThickness: world.iceThickness?.[region] ?? 0,
 		iceMin: world.iceMinMonthly?.[region] ?? 0,
 		iceMax: world.iceMaxMonthly?.[region] ?? 0,

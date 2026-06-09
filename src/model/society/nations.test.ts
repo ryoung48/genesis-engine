@@ -75,6 +75,9 @@ function buildRingNationProvinces(n: number) {
 		adjList,
 		size: new Int32Array(n).fill(1),
 		colors: new Float32Array(n * 3),
+		waterAccess: new Uint8Array(n),
+		riverAccess: new Uint8Array(n),
+		lakeAccess: new Uint8Array(n),
 	}
 
 	const coastal = new Uint8Array(n)
@@ -140,6 +143,9 @@ function buildDoubleRingProvinces(cols: number) {
 		adjList,
 		size: new Int32Array(n).fill(1),
 		colors: new Float32Array(n * 3),
+		waterAccess: new Uint8Array(n),
+		riverAccess: new Uint8Array(n),
+		lakeAccess: new Uint8Array(n),
 	}
 
 	const habitability = new Float32Array(n).fill(1)

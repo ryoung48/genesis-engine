@@ -12,8 +12,11 @@ function makeWorld(
 			monthly: new Float32Array(Array.from({ length: 12 }, () => 100)),
 		},
 		isLand: new Uint8Array([1]),
-		rivers: {
-			lakes: new Uint8Array([0]),
+		landmarks: {
+			regionLandmark: new Int32Array([-1]),
+			type: new Uint8Array([5]),
+			size: new Int32Array([1]),
+			count: 1,
 		},
 		...overrides,
 	} as unknown as SerializedOrogenWorld
@@ -23,8 +26,11 @@ describe("getHoverRainfall", () => {
 	it("returns rainfall for lake regions", () => {
 		const world = makeWorld({
 			isLand: new Uint8Array([0]),
-			rivers: {
-				lakes: new Uint8Array([1]),
+			landmarks: {
+				regionLandmark: new Int32Array([0]),
+				type: new Uint8Array([5]),
+				size: new Int32Array([1]),
+				count: 1,
 			},
 		})
 
@@ -35,8 +41,11 @@ describe("getHoverRainfall", () => {
 	it("keeps rainfall hidden for non-lake water regions", () => {
 		const world = makeWorld({
 			isLand: new Uint8Array([0]),
-			rivers: {
-				lakes: new Uint8Array([0]),
+			landmarks: {
+				regionLandmark: new Int32Array([-1]),
+				type: new Uint8Array([5]),
+				size: new Int32Array([1]),
+				count: 1,
 			},
 		})
 

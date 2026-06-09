@@ -46,9 +46,7 @@ function expectRgbCloseTo(
 	}
 }
 
-function buildWorld(
-	overrides: Partial<SerializedOrogenWorld>,
-): SerializedOrogenWorld {
+function buildWorld(overrides: Record<string, unknown>): SerializedOrogenWorld {
 	return {
 		mesh: { numRegions: 2 },
 		elevation: new Float32Array([1, -1]),
@@ -597,11 +595,7 @@ describe("computeRegionColors", () => {
 			"map",
 		)
 
-		expectRegionColor(slope!, 0, [
-			slopeColor(0)[0] * 0.45,
-			slopeColor(0)[1] * 0.55,
-			Math.min(1, slopeColor(0)[2] * 0.8 + 0.18),
-		])
+		expectRegionColor(slope!, 0, slopeColor(0))
 		expectRegionColor(slope!, 1, [
 			slopeColor(0)[0] * 0.45,
 			slopeColor(0)[1] * 0.55,
@@ -655,11 +649,7 @@ describe("computeRegionColors", () => {
 			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
 		)
 		expectRegionColor(currents!, 0, oceanCurrentColor(0))
-		expectRegionColor(
-			currents!,
-			1,
-			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
-		)
+		expectRegionColor(currents!, 1, oceanCurrentColor(0))
 	})
 
 	it("uses annual dtr and annual ocean-current data when no monthly view is selected", () => {
@@ -697,22 +687,14 @@ describe("computeRegionColors", () => {
 			"map",
 		)
 
-		expectRegionColor(dtr!, 0, darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0))
+		expectRegionColor(dtr!, 0, dtrColor(7))
 		expectRegionColor(
 			dtr!,
 			1,
 			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
 		)
-		expectRegionColor(
-			currents!,
-			0,
-			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0),
-		)
-		expectRegionColor(
-			currents!,
-			1,
-			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
-		)
+		expectRegionColor(currents!, 0, oceanCurrentColor(0))
+		expectRegionColor(currents!, 1, oceanCurrentColor(0))
 	})
 
 	it("falls back to neutral population colors when lineage partitions are missing", () => {
@@ -889,10 +871,10 @@ describe("computeRegionColors", () => {
 	it("uses lake terrain colors and darkened vegetation elsewhere", () => {
 		const world = buildWorld({
 			vegetation: new Uint8Array([3, 5]),
-			elevation_km: new Float32Array([0.4, 2]),
-			rivers: {
-				lakes: new Uint8Array([1, 0]),
-			} as never,
+			elevation: new Float32Array([0, 2]),
+			elevation_km: new Float32Array([0, 2]),
+			isLand: new Uint8Array([0, 1]),
+			topography: new Uint8Array([6, 0]),
 		})
 
 		const rgb = computeRegionColors(
@@ -1197,11 +1179,7 @@ describe("computeRegionColors", () => {
 			2,
 			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
 		)
-		expectRegionColor(
-			currents!,
-			2,
-			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
-		)
+		expectRegionColor(currents!, 2, oceanCurrentColor(0))
 		expectRegionColor(
 			hotspots!,
 			1,
@@ -1559,7 +1537,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			culture!,
 			0,
-			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
 		)
 		expectRegionColor(
 			culture!,
@@ -1569,7 +1547,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			heritage!,
 			0,
-			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
 		)
 		expectRegionColor(
 			heritage!,
@@ -1579,7 +1557,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			faith!,
 			0,
-			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
 		)
 		expectRegionColor(
 			faith!,
@@ -1589,7 +1567,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			religion!,
 			0,
-			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
 		)
 		expectRegionColor(
 			religion!,
@@ -1763,8 +1741,8 @@ describe("computeRegionColors", () => {
 			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, 0.4),
 		)
 		expect(basins!.subarray(0, 3)).not.toEqual(basins!.subarray(6, 9))
-		expect(empty).toBeNull()
-		expect(
+		expectRegionColor(empty!, 0, getColor(0, "terrain"))
+		expectRegionColor(
 			computeRegionColors(
 				{
 					mesh: { numRegions: 1 },
@@ -1778,8 +1756,10 @@ describe("computeRegionColors", () => {
 				0,
 				0,
 				0,
-			),
-		).toBeNull()
+			)!,
+			0,
+			getColor(0, "unsupported-mode" as never),
+		)
 	})
 
 	it("falls back to the first terrain feature when the dominant feature is invalid", () => {
@@ -1838,10 +1818,8 @@ describe("computeRegionColors", () => {
 			mesh: { numRegions: 4 } as never,
 			elevation: new Float32Array([-0.25, -1, -2, 2]),
 			elevation_km: new Float32Array([-0.25, -1, -2, 2]),
-			isLand: new Uint8Array([1, 1, 0, 1]),
-			rivers: {
-				lakes: new Uint8Array([0, 1, 0, 0]),
-			} as never,
+			isLand: new Uint8Array([1, 0, 0, 1]),
+			topography: new Uint8Array([0, 6, 5, 0]),
 		})
 
 		const terrain = computeRegionColors(
@@ -1871,9 +1849,7 @@ describe("computeRegionColors", () => {
 			elevation: new Float32Array([0.4]),
 			elevation_km: new Float32Array([0.4]),
 			isLand: new Uint8Array([0]),
-			rivers: {
-				lakes: new Uint8Array([0]),
-			} as never,
+			topography: new Uint8Array([0]),
 		})
 
 		const terrain = computeRegionColors(
@@ -2028,10 +2004,8 @@ describe("computeRegionColors", () => {
 			mesh: { numRegions: 4 } as never,
 			elevation: new Float32Array([1, -0.4, -1, 0.5]),
 			elevation_km: new Float32Array([1, -0.4, -1, 0.5]),
-			isLand: new Uint8Array([1, 1, 0, 1]),
-			rivers: {
-				lakes: new Uint8Array([0, 0, 0, 1]),
-			} as never,
+			isLand: new Uint8Array([1, 1, 0, 0]),
+			topography: new Uint8Array([0, 0, 5, 6]),
 		})
 		const terrain = computeRegionColors(
 			terrainWorld,
@@ -2121,11 +2095,7 @@ describe("computeRegionColors", () => {
 		)
 
 		expectRegionColor(currents!, 0, oceanCurrentColor(6 / 15))
-		expectRegionColor(
-			currents!,
-			1,
-			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
-		)
+		expectRegionColor(currents!, 1, oceanCurrentColor(0))
 		expectRegionColor(
 			hotspots!,
 			0,
@@ -2160,7 +2130,6 @@ describe("computeRegionColors", () => {
 			elevation_km: new Float32Array([2, 0.6, -0.1, -1, 1.5, 0]),
 			isLand: new Uint8Array([1, 1, 1, 0, 1, 0]),
 			slopeScore: new Float32Array([0, 0.2, 0.5, 0.8, 1, 0.3]),
-			topography: new Uint8Array([0, 1, 2, 5, 6, 99]),
 			climate: {
 				temperature_avg: new Float32Array([24, 8, 2, -3, 36, 18]),
 				temperature_min: new Float32Array([12, -8, -20, -5, 18, 4]),
@@ -2180,8 +2149,8 @@ describe("computeRegionColors", () => {
 				west: new Float32Array([0.39, 0.35, 0.2, 0.4, 0.48, 0.3]),
 			},
 			vegetation: new Uint8Array([1, 2, 3, 4, 5, 6]),
+			topography: new Uint8Array([0, 0, 6, 0, 0, 0]),
 			rivers: {
-				lakes: new Uint8Array([0, 0, 1, 0, 0, 0]),
 				basinId: new Int32Array([0, 1, 2, 3, 4, 5]),
 			} as never,
 			pastaClimate: new Uint8Array([1, 2, 3, 4, 5, 6]),

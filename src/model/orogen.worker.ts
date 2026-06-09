@@ -94,6 +94,9 @@ function cloneProvinces(p: OrogenProvinces): OrogenProvinces {
 		adjList: p.adjList.slice(),
 		size: p.size.slice(),
 		colors: p.colors.slice(),
+		waterAccess: p.waterAccess.slice(),
+		riverAccess: p.riverAccess.slice(),
+		lakeAccess: p.lakeAccess.slice(),
 	}
 }
 

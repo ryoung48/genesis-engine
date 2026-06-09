@@ -318,7 +318,7 @@ describe("computeTemperature", () => {
 			new Array(36).fill(0.4),
 			buildParams({ seed: 0 }),
 			new Float32Array([0, 2000, 0]),
-			undefined,
+			new Uint8Array([0, 1, 1]),
 			new Float32Array([0, 0, 2]),
 		)
 

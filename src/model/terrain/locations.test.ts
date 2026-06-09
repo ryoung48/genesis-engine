@@ -66,6 +66,9 @@ function buildLinearProvinces(n: number, provCount: number): OrogenProvinces {
 		adjList,
 		size,
 		colors: new Float32Array(provCount * 3),
+		waterAccess: new Uint8Array(provCount),
+		riverAccess: new Uint8Array(provCount),
+		lakeAccess: new Uint8Array(provCount),
 	}
 }
 
@@ -186,6 +189,9 @@ describe("computeLocations", () => {
 			adjList: provAdjList,
 			size,
 			colors: new Float32Array(6),
+			waterAccess: new Uint8Array(2),
+			riverAccess: new Uint8Array(2),
+			lakeAccess: new Uint8Array(2),
 		}
 
 		const locs = computeLocations(provinces, mesh, SEED, OPTS)

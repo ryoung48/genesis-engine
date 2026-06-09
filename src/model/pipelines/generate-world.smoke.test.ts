@@ -256,12 +256,17 @@ describe("generateOrogenWorld", () => {
 			const N = world.mesh.numRegions
 			const isLand = world.isLand!
 			const elevation = world.elevation
-			const lakes = world.rivers!.lakes
+			const landmarks = world.landmarks
+			const isLakeLandmark = (region: number) => {
+				if (!landmarks) return false
+				const landmark = landmarks.regionLandmark[region]
+				return landmark >= 0 && landmarks.type[landmark] === LANDMARK_TYPE_LAKE
+			}
 			const regionProvince = world.provinces!.regionProvince
 
 			for (let r = 0; r < N; r++) {
 				if (isLand[r]) {
-					expect(elevation[r] > 0 || lakes[r] === 1).toBe(true)
+					expect(elevation[r] > 0 || isLakeLandmark(r)).toBe(true)
 				}
 				const assigned = regionProvince[r] !== -1
 				expect(assigned).toBe(isLand[r] === 1)

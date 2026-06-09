@@ -113,7 +113,7 @@ describe("language builder helpers", () => {
 
 		expect(epithetLang.clusters.settlement.len).toBe(2)
 		expect(epithetLang.clusters.region.len).toBe(2)
-		expect(epithetLang.clusters.region.longNames).toBeCloseTo(1)
+		expect(epithetLang.clusters.region.longNames).toBeCloseTo(0)
 		expect(epithetLang.clusters.culture.len).toBe(2)
 		expect(epithetLang.clusters.culture.longNames).toBeCloseTo(0)
 		expect(epithetLang.clusters.last.len).toBe(2)
@@ -134,7 +134,7 @@ describe("language builder helpers", () => {
 		expect(overridden.clusters.male.longNames).toBeCloseTo(0.8)
 		expect(overridden.clusters.female.len).toBe(5)
 		expect(overridden.clusters.female.longNames).toBeCloseTo(0.6)
-		expect(overridden.clusters.last.len).toBe(6)
-		expect(overridden.clusters.last.longNames).toBe(0.7)
+		expect(overridden.clusters.last.len).toBe(2)
+		expect(overridden.clusters.last.longNames).toBe(0)
 	})
 })

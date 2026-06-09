@@ -226,6 +226,8 @@ function makeGeneratedWorld(seed: number) {
 		topography: new Uint8Array([0]),
 		coastal: new Uint8Array([1]),
 		waterAccess: new Uint8Array([1]),
+		riverAccess: new Uint8Array([0]),
+		lakeAccess: new Uint8Array([0]),
 		slopeScore: new Float32Array([0]),
 		isLand: new Uint8Array([1]),
 		riverLand: new Uint8Array([0]),
@@ -254,6 +256,9 @@ function makeGeneratedWorld(seed: number) {
 			adjList: new Int32Array(0),
 			size: new Int32Array([1]),
 			colors: new Float32Array([0.2, 0.3, 0.4]),
+			waterAccess: new Uint8Array([1]),
+			riverAccess: new Uint8Array([0]),
+			lakeAccess: new Uint8Array([0]),
 		},
 		nations: {
 			assignment: new Int32Array([0]),

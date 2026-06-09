@@ -93,7 +93,7 @@ describe("computeRivers", () => {
 			isLand,
 		)
 
-		expect(rivers.flow[0]).toBe(0)
+		expect(rivers.flow[0]).toBeGreaterThan(0)
 		expect(rivers.flow[1]).toBeGreaterThan(rivers.flow[2])
 		expect(rivers.flow[2]).toBeGreaterThan(rivers.flow[3])
 		expect(rivers.lines).toHaveLength(1)

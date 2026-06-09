@@ -455,32 +455,6 @@ export function tornadoLandColor(risk: number): [number, number, number] {
 	)
 }
 
-// Tidal range gradient: dark navy (no tides / deep ocean) → white (maximum range).
-// Applies to both land coastal cells and ocean cells so the map reads as a
-// continuous radial gradient from high-range coasts outward into the ocean.
-const TIDAL_RANGE_STOPS: RgbColor[] = [
-	"#030d24", // very dark navy — zero / deep open ocean
-	"#0a2255", // dark navy blue
-	"#1a4d9a", // medium blue
-	"#3b82d4", // lighter blue
-	"#90c8f0", // pale sky blue
-	"#d8eefa", // near-white light blue
-	"#ffffff", // white — maximum tidal range
-].map(cssColorToRgb)
-
-/**
- * Tidal range color: dark navy (0 = inland / deep ocean) → white (max range).
- * `normalized` is [0, 1] where 1 = the world's highest observed tidal range.
- */
-function _tidalRangeColor(normalized: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(
-			TIDAL_RANGE_STOPS,
-			Math.max(0, Math.min(1, normalized)),
-		),
-	)
-}
-
 // Five stops for the continuous tidal range gradient (raw metres).
 const TIDAL_ZERO: [number, number, number] = [1.0, 1.0, 1.0] // white  —  0 m (matches continent)
 const TIDAL_MICRO: [number, number, number] = [0.525, 0.91, 0.867] // seafoam —  1 m

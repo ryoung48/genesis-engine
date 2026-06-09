@@ -25,6 +25,9 @@ describe("computePopulation", () => {
 			adjList: new Int32Array(),
 			size: new Int32Array([2, 1]),
 			colors: new Float32Array(6),
+			waterAccess: new Uint8Array(2),
+			riverAccess: new Uint8Array(2),
+			lakeAccess: new Uint8Array(2),
 		} satisfies OrogenProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0]),
@@ -90,6 +93,9 @@ describe("computePopulation", () => {
 			adjList: new Int32Array(),
 			size: new Int32Array([2, 1, 1]),
 			colors: new Float32Array(9),
+			waterAccess: new Uint8Array(3),
+			riverAccess: new Uint8Array(3),
+			lakeAccess: new Uint8Array(3),
 		} satisfies OrogenProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0, 0, 0]),
@@ -148,6 +154,9 @@ describe("computePopulation", () => {
 			adjList: new Int32Array(),
 			size: new Int32Array([1]),
 			colors: new Float32Array(3),
+			waterAccess: new Uint8Array(1),
+			riverAccess: new Uint8Array(1),
+			lakeAccess: new Uint8Array(1),
 		} satisfies OrogenProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0]),
@@ -189,6 +198,9 @@ describe("computeProvinceHabitability", () => {
 			adjList: new Int32Array(),
 			size: new Int32Array([2, 1]),
 			colors: new Float32Array(6),
+			waterAccess: new Uint8Array(2),
+			riverAccess: new Uint8Array(2),
+			lakeAccess: new Uint8Array(2),
 		} satisfies OrogenProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0]),
@@ -241,6 +253,9 @@ describe("computeProvinceHabitability", () => {
 			adjList: new Int32Array(),
 			size: new Int32Array([1, 1]),
 			colors: new Float32Array(6),
+			waterAccess: new Uint8Array(2),
+			riverAccess: new Uint8Array(2),
+			lakeAccess: new Uint8Array(2),
 		} satisfies OrogenProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0]),
@@ -276,6 +291,9 @@ describe("computeProvinceHabitability", () => {
 			adjList: new Int32Array(),
 			size: new Int32Array([1]),
 			colors: new Float32Array(3),
+			waterAccess: new Uint8Array(1),
+			riverAccess: new Uint8Array(1),
+			lakeAccess: new Uint8Array(1),
 		} satisfies OrogenProvinces
 		const continentLandmarks = {
 			regionLandmark: new Int32Array([0]),
@@ -362,6 +380,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array(0),
 			size: new Int32Array(0),
 			colors: new Float32Array(0),
+			waterAccess: new Uint8Array(0),
+			riverAccess: new Uint8Array(0),
+			lakeAccess: new Uint8Array(0),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(0)
 		const result = computeMigration(emptyProvinces, new Float32Array(0), mesh)
@@ -381,6 +402,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array([1, 0, 2, 1]),
 			size: new Int32Array([1, 1, 1]),
 			colors: new Float32Array(9),
+			waterAccess: new Uint8Array(3),
+			riverAccess: new Uint8Array(3),
+			lakeAccess: new Uint8Array(3),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(3)
 		// p0 has highest habitability
@@ -406,6 +430,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array([1, 0, 2, 1]),
 			size: new Int32Array([1, 1, 1]),
 			colors: new Float32Array(9),
+			waterAccess: new Uint8Array(3),
+			riverAccess: new Uint8Array(3),
+			lakeAccess: new Uint8Array(3),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(3)
 		const habitability = new Float32Array([3.0, 1.5, 0.5])
@@ -438,6 +465,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array(adjL),
 			size: new Int32Array(N).fill(1),
 			colors: new Float32Array(N * 3),
+			waterAccess: new Uint8Array(N),
+			riverAccess: new Uint8Array(N),
+			lakeAccess: new Uint8Array(N),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(N)
 		// Uniform habitability so only distance matters
@@ -464,6 +494,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array([1, 0, 2, 1]),
 			size: new Int32Array([1, 1, 1]),
 			colors: new Float32Array(9),
+			waterAccess: new Uint8Array(3),
+			riverAccess: new Uint8Array(3),
+			lakeAccess: new Uint8Array(3),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(3)
 		const habitability = new Float32Array([2.0, 0.0, 1.0])
@@ -487,6 +520,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array([1, 0, 2, 1]),
 			size: new Int32Array([1, 1]),
 			colors: new Float32Array(6),
+			waterAccess: new Uint8Array(2),
+			riverAccess: new Uint8Array(2),
+			lakeAccess: new Uint8Array(2),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(3)
 		const habitability = new Float32Array([2.0, 1.0])
@@ -507,6 +543,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array([1, 0]),
 			size: new Int32Array([1, 1]),
 			colors: new Float32Array(6),
+			waterAccess: new Uint8Array(2),
+			riverAccess: new Uint8Array(2),
+			lakeAccess: new Uint8Array(2),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(2)
 		const result = computeMigration(
@@ -533,6 +572,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array(0),
 			size: new Int32Array([1]),
 			colors: new Float32Array(3),
+			waterAccess: new Uint8Array(1),
+			riverAccess: new Uint8Array(1),
+			lakeAccess: new Uint8Array(1),
 		} satisfies OrogenProvinces
 		// Isolated mesh (no neighbours)
 		const mesh: SphereMesh = {
@@ -583,6 +625,9 @@ describe("computeMigration", () => {
 			adjList: new Int32Array(adjL),
 			size: new Int32Array(N).fill(1),
 			colors: new Float32Array(N * 3),
+			waterAccess: new Uint8Array(N),
+			riverAccess: new Uint8Array(N),
+			lakeAccess: new Uint8Array(N),
 		} satisfies OrogenProvinces
 		const mesh = makeLinearMesh(N)
 		const habitability = new Float32Array(N).fill(1.0)

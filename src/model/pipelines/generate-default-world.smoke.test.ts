@@ -8,7 +8,7 @@ import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { initHistory } from "@/model/history"
 import { SEA_ROUTE_PORT_MIN_POPULATION } from "@/model/history/events/trade-routes"
 import { PROV } from "@/model/history/fields"
-import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
+import { decodePlanetCode } from "@/model/shared/planet-code"
 import { regionPathLengthKm } from "@/model/shared/units"
 import { ERA_ORDER } from "@/model/society/eras"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
@@ -352,7 +352,7 @@ describe("full world smoke generation", () => {
 				oSum = 0
 
 			for (let r = 0; r < N; r++) {
-				if (isLand?.[r] || lakes?.[r]) continue
+				if (isLand?.[r] || isLakeLandmark(r)) continue
 				let bordersLand = false
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					if (isLand?.[adjList[j]]) {

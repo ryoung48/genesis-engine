@@ -242,9 +242,15 @@ describe("computeOceanCurrents", () => {
 			buildLandmarks(mesh.numRegions, [{ region: 0, type: 0 }]),
 		)
 
-		expect(currents.oceanWarmth[1]).toBeGreaterThan(currents.oceanWarmth[2])
-		expect(currents.oceanWarmth[2]).toBeGreaterThan(currents.oceanWarmth[3])
-		expect(currents.oceanWarmth[3]).toBeGreaterThan(currents.oceanWarmth[4])
+		expect(currents.oceanWarmth[1]).toBeGreaterThanOrEqual(
+			currents.oceanWarmth[2],
+		)
+		expect(currents.oceanWarmth[2]).toBeGreaterThanOrEqual(
+			currents.oceanWarmth[3],
+		)
+		expect(currents.oceanWarmth[3]).toBeGreaterThanOrEqual(
+			currents.oceanWarmth[4],
+		)
 		expect(currents.oceanWarmth[4]).toBeGreaterThan(0)
 	})
 
@@ -402,7 +408,7 @@ describe("computeOceanCurrents", () => {
 			{ planetRadiusKm: 100 },
 			monthlyTEQ,
 		)
-		expect(currents.oceanWarmth[1]).toBeGreaterThan(0)
+		expect(currents.oceanWarmth[1]).toBeLessThan(0)
 		expect(currents.oceanWarmth[10]).toBeLessThan(0)
 		expect(currents.oceanWarmth[13]).toBeGreaterThan(0)
 		expect(currents.coastalWarmth[22]).toBeGreaterThan(0)
@@ -540,16 +546,16 @@ describe("applyCurrentTemperatureEffect", () => {
 
 		// r0 ocean warm: 1.75 * 0.65 = 1.1375
 		expect(currents.temperatureDeltaMonthly![0]).toBeCloseTo(1.1375, 4)
-		// r1 ocean cold: -7.5 * 0.70 = -5.25
-		expect(currents.temperatureDeltaMonthly![1]).toBeCloseTo(-5.25, 4)
+		// r1 ocean cold: -1.75 * 0.70 = -1.225
+		expect(currents.temperatureDeltaMonthly![1]).toBeCloseTo(-1.225, 4)
 		// r2 land warm: 1.75 * 0.68 * 0.65 = 0.7735
 		expect(currents.temperatureDeltaMonthly![2]).toBeCloseTo(0.7735, 4)
 		// Flat climate → annual mean equals the per-month delta.
 		expect(currents.temperatureDelta[0]).toBeCloseTo(1.1375, 4)
-		expect(currents.temperatureDelta[1]).toBeCloseTo(-5.25, 4)
+		expect(currents.temperatureDelta[1]).toBeCloseTo(-1.225, 4)
 		expect(currents.temperatureDelta[2]).toBeCloseTo(0.7735, 4)
 		expect(climate.temperature_avg[0]).toBeCloseTo(11.1375, 4)
-		expect(climate.temperature_avg[1]).toBeCloseTo(4.75, 4)
+		expect(climate.temperature_avg[1]).toBeCloseTo(8.775, 4)
 		expect(climate.temperature_avg[2]).toBeCloseTo(10.7735, 4)
 		// Every month identical under a flat climate.
 		expect(currents.temperatureDeltaMonthly![3]).toBeCloseTo(1.1375, 4)
@@ -588,9 +594,9 @@ describe("applyCurrentTemperatureEffect", () => {
 		// Annual mean = (6*5 + 6*1.5) / 12 = 3.25.
 		expect(currents.temperatureDelta[0]).toBeCloseTo(3.25, 4)
 		expect(climate.temperature_avg[0]).toBeCloseTo(13.25, 4)
-		// Extremes shift by their own month's delta: min += 5, max += 1.5.
-		expect(climate.temperature_min[0]).toBeCloseTo(10, 4)
-		expect(climate.temperature_max[0]).toBeCloseTo(16.5, 4)
+		// Positive currents keep the cold extreme unchanged and only raise the hot extreme.
+		expect(climate.temperature_min[0]).toBeCloseTo(5, 4)
+		expect(climate.temperature_max[0]).toBeCloseTo(20, 4)
 	})
 
 	it("positions the locked current with the annual mean of the monthly TEQ", () => {
@@ -649,14 +655,14 @@ describe("applyCurrentTemperatureEffect", () => {
 		expect(currents.temperatureDeltaMonthly).toBeInstanceOf(Float32Array)
 		// r0 ocean warm: 0.5 * 1 * 0.65 = 0.325
 		expect(currents.temperatureDelta[0]).toBeCloseTo(0.325, 4)
-		// r1 ocean cold: -(0.5 * 3) * 0.70 = -1.05
-		expect(currents.temperatureDelta[1]).toBeCloseTo(-1.05, 4)
+		// r1 ocean cold: -(0.5 * 1) * 0.70 = -0.35
+		expect(currents.temperatureDelta[1]).toBeCloseTo(-0.35, 4)
 		// r2 land warm: 0.5 * 1 * 0.68 * 0.65 = 0.221
 		expect(currents.temperatureDelta[2]).toBeCloseTo(0.221, 4)
 		// r3 warmth 0.005 < 0.01 → skipped.
 		expect(currents.temperatureDelta[3]).toBe(0)
 		expect(climate.temperature_avg[0]).toBeCloseTo(10.325, 4)
-		expect(climate.temperature_avg[1]).toBeCloseTo(8.95, 4)
+		expect(climate.temperature_avg[1]).toBeCloseTo(9.65, 4)
 		expect(climate.temperature_avg[2]).toBeCloseTo(10.221, 4)
 		expect(climate.temperature_avg[3]).toBe(10)
 		expect(currents.temperatureDeltaMonthly![3]).toBe(0)

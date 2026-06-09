@@ -356,6 +356,7 @@ describe("importHeightmap", () => {
 				insolationFactor: 1,
 				daysPerYear: 400,
 				hoursPerDay: 26,
+				tidalStrength: 1.2,
 				tidallyLocked: false,
 				antistellarLon: 170,
 				perihelion: 30,

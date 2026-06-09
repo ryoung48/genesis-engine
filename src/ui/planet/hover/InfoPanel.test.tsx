@@ -138,6 +138,7 @@ function renderPanel(
 				annual: 60,
 				monthly: Array.from({ length: 12 }, () => 60),
 			}}
+			hoverMisery={null}
 			hoverClimateDisplay="Temperate"
 			hoverIceSummary={null}
 			hoverBiome="Forest"
@@ -168,6 +169,7 @@ function renderPanel(
 			hoverWindDir={null}
 			hoverWindMonthly={null}
 			showOceanCurrentOverlay={false}
+			dangerSubMode="earthquake"
 			colorMode="terrain"
 			populationMode="density"
 			selectedTimeMs={800}
@@ -474,10 +476,14 @@ describe("InfoPanel", () => {
 			world: {
 				...makeWorld(),
 				isLand: new Uint8Array([0]),
-				rivers: {
-					lakes: new Uint8Array([1]),
+				landmarks: {
+					regionLandmark: new Int32Array([5]),
+					type: new Uint8Array([0, 0, 0, 3, 4, 5]),
+					size: new Int32Array([1, 1, 1, 1, 1, 1]),
+					count: 6,
 				},
 			} as SerializedOrogenWorld,
+			hoverLandmark: { id: 5, type: "lake", size: 1 },
 		})
 
 		expect(markup).toContain(">Precip<")

@@ -18,6 +18,10 @@ describe("label-names", () => {
 				nation: (capitalProvince) => `Nation at ${capitalProvince}`,
 				dynasty: (dynastyId) => `Dynasty ${dynastyId}`,
 				province: (provinceIdx) => `Province ${provinceIdx}`,
+				culture: (cultureIdx) => `Culture ${cultureIdx}`,
+				heritage: (heritageIdx) => `Heritage ${heritageIdx}`,
+				faith: (faithIdx) => `Faith ${faithIdx}`,
+				religion: (religionIdx) => `Religion ${religionIdx}`,
 			}),
 		).toEqual(["Nation at 4", "Nation at 1"])
 	})
@@ -35,6 +39,10 @@ describe("label-names", () => {
 				nation: (capitalProvince) => `Nation at ${capitalProvince}`,
 				dynasty: (dynastyId) => `Dynasty ${dynastyId}`,
 				province: (provinceIdx) => `Province ${provinceIdx}`,
+				culture: (cultureIdx) => `Culture ${cultureIdx}`,
+				heritage: (heritageIdx) => `Heritage ${heritageIdx}`,
+				faith: (faithIdx) => `Faith ${faithIdx}`,
+				religion: (religionIdx) => `Religion ${religionIdx}`,
 			}),
 		).toEqual(["Dynasty 7", "Dynasty 4", ""])
 	})

@@ -333,7 +333,7 @@ export function computeTemperature(
 		const z = mesh.r_xyz[3 * r + 2]
 		const latDeg = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
 		const hKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
-		const lapseCorrection = isLand[r] ? hKm * LAPSE_RATE : 0
+		const lapseCorrection = isLand?.[r] ? hKm * LAPSE_RATE : 0
 
 		const annualAvg =
 			interpolateLatBand(ebm.temperature_avg, latDeg) - lapseCorrection

@@ -64,11 +64,11 @@ describe("createNames", () => {
 			dynasties: [],
 		})
 
-		expect(names.leader(0, 800)).toBe("Person_female")
-		expect(names.leader(0, 801)).toBe("Person_female")
+		expect(names.leader(0, 800)).toBe("Female")
+		expect(names.leader(0, 801)).toBe("Female")
 		expect(simpleSpy).toHaveBeenCalledTimes(1)
 		expect(simpleSpy).toHaveBeenCalledWith(
-			expect.objectContaining({ key: "person_female" }),
+			expect.objectContaining({ key: "female" }),
 		)
 	})
 
@@ -114,10 +114,10 @@ describe("createNames", () => {
 
 		const expectedKey =
 			resolveLeaderGender(CULTURE_GENDER_SYSTEM.MATRIARCHAL, 77) === "female"
-				? "person_female"
-				: "person_male"
+				? "female"
+				: "male"
 		expect(names.leader(0, 100)).toBe(
-			expectedKey === "person_female" ? "Person_female" : "Person_male",
+			expectedKey === "female" ? "Female" : "Male",
 		)
 		expect(simpleSpy).toHaveBeenCalledWith(
 			expect.objectContaining({ key: expectedKey }),
@@ -165,11 +165,11 @@ describe("createNames", () => {
 		})
 
 		expect(names.leader(0, 150)).toBe("Elder Rowan")
-		expect(names.leader(0, 250)).toBe("Person_male")
-		expect(names.leader(0, 300)).toBe("Person_male")
+		expect(names.leader(0, 250)).toBe("Male")
+		expect(names.leader(0, 300)).toBe("Male")
 		expect(simpleSpy).toHaveBeenCalledTimes(1)
 		expect(simpleSpy).toHaveBeenCalledWith(
-			expect.objectContaining({ key: "person_male" }),
+			expect.objectContaining({ key: "male" }),
 		)
 	})
 

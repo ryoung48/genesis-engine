@@ -115,7 +115,7 @@ export function computePlanetStats(
 	}
 
 	let poleEqGradientC: number | null = null
-	if (world?.climate?.temperature_avg && world?.mesh) {
+	if (world?.climate?.temperature_avg && world?.mesh?.r_xyz) {
 		const { latDeg } = getClimateGeometry(world.mesh)
 		const temp = world.climate.temperature_avg
 		let eqSum = 0,

@@ -105,7 +105,7 @@ describe("sampled palette colors", () => {
 	it("interpolates intermediate climate, moisture, current, and dtr values", () => {
 		expectRgbCloseTo(moistureDirectionalColor(0.5, false), [0.54, 0.86, 0.6])
 		expectRgbCloseTo(climateTempColor(20), [1, 0.655, 0.357])
-		expectRgbCloseTo(oceanCurrentColor(0.25), [0.936, 0.614, 0.414])
+		expectRgbCloseTo(oceanCurrentColor(0.25), [0.98125, 0.6625, 0.54375])
 		expectRgbCloseTo(dtrColor(22.5), [1, 0.904, 0])
 		expectRgbCloseTo(temperatureColor(Number.NaN), temperatureColor(80))
 		expectRgbCloseTo(climateTempColor(Number.NaN), climateTempColor(40))

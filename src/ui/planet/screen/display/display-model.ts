@@ -212,7 +212,8 @@ export function buildDisplayWorld(params: {
 			childList: selectedHistoryChildren?.childList ?? base.nations.childList,
 			sovereign: selectedHistoryView.sovereign,
 			colors: selectedHistoryView.colors,
-			activeRebelWars: selectedHistoryView.activeWars.filter((w) => w.rebel),
+			activeRebelWars:
+				selectedHistoryView.activeWars?.filter((w) => w.rebel) ?? [],
 		},
 		population: base.population
 			? {
