@@ -75,6 +75,7 @@ describe("vowel builders", () => {
 			consonants: ["r", "f", "h"],
 			vowels: ["a", "e", "i"],
 			stops: 0,
+			exoticCons: false,
 			dice: createDice({
 				weightedChoices: [2],
 				choices: [2],
@@ -102,6 +103,7 @@ describe("vowel builders", () => {
 			consonants: ["n"],
 			vowels: ["a", "o", "u"],
 			stops: 1,
+			exoticCons: false,
 			dice: createDice({
 				random: 0.95,
 				weightedChoices: [2],
@@ -127,6 +129,7 @@ describe("vowel builders", () => {
 			consonants: [],
 			vowels: ["i", "u"],
 			stops: 0,
+			exoticCons: false,
 			dice: createDice({
 				weightedChoices: [1],
 				samples: [["I"]],

@@ -73,10 +73,10 @@ export function computeTidalRange(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
 	isCoastal: Uint8Array,
-	elevationKm: Float32Array,
+	_elevationKm: Float32Array,
 	params: Pick<
 		OrogenParams,
-		"tidalStrength" | "tidallyLocked" | "planetRadiusKm"
+		"seed" | "tidalStrength" | "tidallyLocked" | "planetRadiusKm"
 	>,
 	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
 ): Float32Array {

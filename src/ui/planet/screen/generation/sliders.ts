@@ -150,12 +150,18 @@ export function buildPlanetSliders(state: {
 				]
 			: []),
 		{
-			label: "Land Distribution",
-			help: "Controls how concentrated the minority phase is: land below 50%, water above 50%.",
-			value: state.landDistribution,
-			display: state.landDistribution.toFixed(2),
+			label:
+				state.landCoverage >= 0.5
+					? "Ocean Concentration"
+					: "Land Concentration",
+			help:
+				state.landCoverage >= 0.5
+					? "Controls how concentrated the oceans are. Higher values cluster water into a superocean, while lower values scatter it across the world."
+					: "Controls how concentrated the land is. Higher values cluster terrain into a supercontinent, while lower values scatter it across the world.",
+			value: 1 - state.landDistribution,
+			display: (1 - state.landDistribution).toFixed(2),
 			...SR.landDistribution,
-			set: state.setLandDistribution,
+			set: (value) => state.setLandDistribution(1 - value),
 		},
 		{
 			label: "Land Coverage",

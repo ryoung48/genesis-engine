@@ -115,7 +115,7 @@ export function classifyTopography(params: {
 
 	function isMarshCandidate(r: number): boolean {
 		const isDesert = vegetation?.[r] === desertBiome
-		return isLand[r] === 1 && (!isDesert || rivers.terminal[r])
+		return isLand[r] === 1 && (!isDesert || rivers.terminal[r] === 1)
 	}
 
 	function marshEdgeBias(r: number): number {

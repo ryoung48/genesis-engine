@@ -200,6 +200,27 @@ export function getTopographyColor(
 	return TOPOGRAPHY_COLORS[topography] ?? null
 }
 
+const CULTURE_ELEVATION_BUMP_SCALE = 1.6
+
+function hasPartitionElevationBump(populationMode: PopulationMapMode): boolean {
+	return (
+		populationMode === "culture" ||
+		populationMode === "heritage" ||
+		populationMode === "faith" ||
+		populationMode === "religion"
+	)
+}
+
+function darkenPartitionAtElevation(
+	color: [number, number, number],
+	heightKm: number,
+): [number, number, number] {
+	return darkenPoliticalAtElevation(
+		color,
+		heightKm * CULTURE_ELEVATION_BUMP_SCALE,
+	)
+}
+
 export function computeRegionColors(
 	world: SerializedOrogenWorld,
 	colorMode: ColorMode,
@@ -993,9 +1014,15 @@ export function computeRegionColors(
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else if (desolate[p]) {
-				rgb[3 * r] = 0.35
-				rgb[3 * r + 1] = 0.33
-				rgb[3 * r + 2] = 0.32
+				const [cr, cg, cb] = hasPartitionElevationBump(populationMode)
+					? darkenPartitionAtElevation(
+							[0.35, 0.33, 0.32],
+							world.elevation_km[r],
+						)
+					: [0.35, 0.33, 0.32]
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
 			} else {
 				if (populationMode === "density" && pop) {
 					const [cr, cg, cb] = populationColor(
@@ -1053,13 +1080,27 @@ export function computeRegionColors(
 									? world.faiths
 									: world.religions
 					if (!partition || idx < 0) {
-						rgb[3 * r] = 0.35
-						rgb[3 * r + 1] = 0.33
-						rgb[3 * r + 2] = 0.32
+						const [cr, cg, cb] = hasPartitionElevationBump(populationMode)
+							? darkenPartitionAtElevation(
+									[0.35, 0.33, 0.32],
+									world.elevation_km[r],
+								)
+							: [0.35, 0.33, 0.32]
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
 					} else {
-						rgb[3 * r] = partition.colors[3 * idx]
-						rgb[3 * r + 1] = partition.colors[3 * idx + 1]
-						rgb[3 * r + 2] = partition.colors[3 * idx + 2]
+						const baseColor: [number, number, number] = [
+							partition.colors[3 * idx],
+							partition.colors[3 * idx + 1],
+							partition.colors[3 * idx + 2],
+						]
+						const [cr, cg, cb] = hasPartitionElevationBump(populationMode)
+							? darkenPartitionAtElevation(baseColor, world.elevation_km[r])
+							: baseColor
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
 					}
 				}
 			}

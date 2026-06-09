@@ -51,6 +51,95 @@ describe("buildPlanetSliders", () => {
 		).toBe("2.00x")
 	})
 
+	it("presents land concentration as the inverse of land distribution", () => {
+		const setLandDistribution = vi.fn()
+		const sliders = buildPlanetSliders({
+			planetRadiusKm: 6371,
+			obliquity: 23.5,
+			eccentricity: 0.0167,
+			perihelion: 102,
+			sunTempFactor: 1,
+			insolationFactor: 1,
+			daysPerYear: 365,
+			hoursPerDay: 24,
+			pressure: 1,
+			tidalStrength: 1.0,
+			landDistribution: 0.25,
+			landCoverage: 0.3,
+			tidallyLocked: false,
+			antistellarLon: 180,
+			setPlanetRadiusKm: vi.fn(),
+			setObliquity: vi.fn(),
+			setEccentricity: vi.fn(),
+			setPerihelion: vi.fn(),
+			setSunTempFactor: vi.fn(),
+			setInsolationFactor: vi.fn(),
+			setDaysPerYear: vi.fn(),
+			setHoursPerDay: vi.fn(),
+			setPressure: vi.fn(),
+			setTidalStrength: vi.fn(),
+			setAxialTiltDirection: vi.fn(),
+			setLandDistribution,
+			setLandCoverage: vi.fn(),
+			setAntistellarLon: vi.fn(),
+		})
+
+		const slider = sliders.find(
+			(candidate) => candidate.label === "Land Concentration",
+		)
+
+		expect(slider).toMatchObject({
+			label: "Land Concentration",
+			value: 0.75,
+			display: "0.75",
+			help: "Controls how concentrated the land is. Higher values cluster terrain into a supercontinent, while lower values scatter it across the world.",
+		})
+
+		slider?.set(0.9)
+
+		expect(setLandDistribution).toHaveBeenCalledTimes(1)
+		expect(setLandDistribution.mock.calls[0]?.[0]).toBeCloseTo(0.1)
+	})
+
+	it("renames the concentration slider for ocean-heavy worlds", () => {
+		const sliders = buildPlanetSliders({
+			planetRadiusKm: 6371,
+			obliquity: 23.5,
+			eccentricity: 0.0167,
+			perihelion: 102,
+			sunTempFactor: 1,
+			insolationFactor: 1,
+			daysPerYear: 365,
+			hoursPerDay: 24,
+			pressure: 1,
+			tidalStrength: 1.0,
+			landDistribution: 0.25,
+			landCoverage: 0.6,
+			tidallyLocked: false,
+			antistellarLon: 180,
+			setPlanetRadiusKm: vi.fn(),
+			setObliquity: vi.fn(),
+			setEccentricity: vi.fn(),
+			setPerihelion: vi.fn(),
+			setSunTempFactor: vi.fn(),
+			setInsolationFactor: vi.fn(),
+			setDaysPerYear: vi.fn(),
+			setHoursPerDay: vi.fn(),
+			setPressure: vi.fn(),
+			setTidalStrength: vi.fn(),
+			setAxialTiltDirection: vi.fn(),
+			setLandDistribution: vi.fn(),
+			setLandCoverage: vi.fn(),
+			setAntistellarLon: vi.fn(),
+		})
+
+		expect(
+			sliders.find((slider) => slider.label === "Ocean Concentration"),
+		).toMatchObject({
+			help: "Controls how concentrated the oceans are. Higher values cluster water into a superocean, while lower values scatter it across the world.",
+		})
+	})
+
 	it("shows base tilt on the planet tab and preserves retrograde mirroring", () => {
 		let obliquity = 148.5
 		const setObliquity = vi.fn((value: number) => {

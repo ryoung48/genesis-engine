@@ -412,7 +412,7 @@ export function computeOceanCurrents(
 	distCoast: Float32Array,
 	landmarks: OrogenLandmarks,
 	params?: Pick<
-		OrogenParams,
+		Partial<OrogenParams>,
 		| "antistellarLon"
 		| "eccentricity"
 		| "obliquity"
@@ -625,7 +625,7 @@ export function buildOceanCurrentGrid(
 	reverseCirculation = false,
 	_teqByLon?: Float32Array,
 	_regionBin?: Int32Array,
-	hoursPerDay = 24,
+	_hoursPerDay = 24,
 	planetRadiusKm?: number,
 ): FlowGrid {
 	const N = mesh.numRegions

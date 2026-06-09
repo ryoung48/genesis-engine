@@ -7,7 +7,6 @@ import type {
 import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
 import type { OrogenLandmarks } from "../../terrain/landmarks"
 import { computeCoastalWarmthFromOceanWarmth } from "../ocean-currents-shared"
-import { getClimateGeometry } from "../rain"
 import type { FlowGrid } from "../wind"
 import { rasterizeVectorGrid } from "../wind"
 import {
@@ -293,8 +292,8 @@ function smoothVectorField(
 	const tmpY = new Float32Array(N)
 	let currentX = srcX
 	let currentY = srcY
-	let nextX = tmpX
-	let nextY = tmpY
+	let nextX: Float32Array = tmpX
+	let nextY: Float32Array = tmpY
 
 	for (let pass = 0; pass < passes; pass++) {
 		for (let r = 0; r < N; r++) {

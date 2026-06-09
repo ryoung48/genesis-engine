@@ -201,6 +201,8 @@ describe("GenerationPanel", () => {
 
 		expect(markup).toContain(">Globe<")
 		expect(markup).toContain("Roughness")
+		expect(markup).toContain("flex items-center justify-between gap-3")
+		expect(markup).toContain("flex min-h-4 items-center gap-1.5")
 		expect(markup).toContain("opacity-40 pointer-events-none")
 		expect(markup).toContain("Invalid code")
 		expect(markup).toContain(">Timing<")

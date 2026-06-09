@@ -7,7 +7,6 @@ import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
 import {
 	climateTempColor,
 	climateZoneColor,
-	dangerMapColor,
 	developmentColor,
 	dtrColor,
 	earthquakeLandColor,
@@ -235,6 +234,63 @@ describe("computeRegionColors", () => {
 
 		expect(rgb).not.toBeNull()
 		expectRegionColor(rgb!, 0, darkenPoliticalAtElevation([0.8, 0.4, 0.2], 3))
+	})
+
+	it("applies elevation shading to partition population fills and grey fallbacks", () => {
+		const world = buildWorld({
+			mesh: { numRegions: 4 } as never,
+			elevation: new Float32Array([1, 1.5, 2, -1]),
+			elevation_km: new Float32Array([2.5, 1.5, 2, -1]),
+			isLand: new Uint8Array([1, 1, 1, 0]),
+			provinces: {
+				regionProvince: new Int32Array([0, 1, 2, -1]),
+				seeds: new Int32Array([0, 1, 2]),
+				count: 3,
+				desolate: new Uint8Array([0, 0, 1]),
+				landmassId: new Int32Array([0, 0, 0]),
+				adjOffset: new Int32Array([0, 0, 0, 0, 0]),
+				adjList: new Int32Array(0),
+				size: new Int32Array([1, 1, 1]),
+				colors: new Float32Array([0.8, 0.4, 0.2, 0.6, 0.6, 0.6, 0.4, 0.4, 0.4]),
+			} as never,
+			cultures: {
+				assignment: new Int32Array([0, -1, 0]),
+				count: 1,
+				colors: new Float32Array([0.2, 0.6, 0.8]),
+			} as never,
+			population: {
+				habitability: new Float32Array([1, 1, 0]),
+				population: new Float32Array([10, 8, 0]),
+				habitabilityScore: 2,
+				totalPopulation: 18,
+				migrationWave: new Float32Array([0, 0, 0]),
+				settlementWave: 1,
+			} as never,
+		})
+
+		const rgb = computeRegionColors(
+			world,
+			"population",
+			DEFAULT_NATION_MODE,
+			"culture",
+			0,
+			0,
+			0,
+			0,
+		)
+
+		expect(rgb).not.toBeNull()
+		expectRegionColor(rgb!, 0, darkenPoliticalAtElevation([0.2, 0.6, 0.8], 4))
+		expectRegionColor(
+			rgb!,
+			1,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 2.4),
+		)
+		expectRegionColor(
+			rgb!,
+			2,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 3.2),
+		)
 	})
 
 	it("does not apply special occupied shading to nation borders", () => {
@@ -1500,14 +1556,46 @@ describe("computeRegionColors", () => {
 		expectRegionColor(density!, 1, populationColor(0.2))
 		expectRegionColor(development!, 0, developmentColor(0.5))
 		expectRegionColor(development!, 1, developmentColor(1))
-		expectRegionColor(culture!, 0, [0.35, 0.33, 0.32])
-		expectRegionColor(culture!, 1, [0.4, 0.5, 0.6])
-		expectRegionColor(heritage!, 0, [0.35, 0.33, 0.32])
-		expectRegionColor(heritage!, 1, [0.6, 0.3, 0.2])
-		expectRegionColor(faith!, 0, [0.35, 0.33, 0.32])
-		expectRegionColor(faith!, 1, [0.2, 0.6, 0.3])
-		expectRegionColor(religion!, 0, [0.35, 0.33, 0.32])
-		expectRegionColor(religion!, 1, [0.7, 0.2, 0.5])
+		expectRegionColor(
+			culture!,
+			0,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+		)
+		expectRegionColor(
+			culture!,
+			1,
+			darkenPoliticalAtElevation([0.4, 0.5, 0.6], 0.8),
+		)
+		expectRegionColor(
+			heritage!,
+			0,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+		)
+		expectRegionColor(
+			heritage!,
+			1,
+			darkenPoliticalAtElevation([0.6, 0.3, 0.2], 0.8),
+		)
+		expectRegionColor(
+			faith!,
+			0,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+		)
+		expectRegionColor(
+			faith!,
+			1,
+			darkenPoliticalAtElevation([0.2, 0.6, 0.3], 0.8),
+		)
+		expectRegionColor(
+			religion!,
+			0,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.8),
+		)
+		expectRegionColor(
+			religion!,
+			1,
+			darkenPoliticalAtElevation([0.7, 0.2, 0.5], 0.8),
+		)
 	})
 
 	it("renders culture mode with primary culture color (blend overlay handled separately)", () => {
@@ -1548,11 +1636,27 @@ describe("computeRegionColors", () => {
 			0,
 		)!
 		// All regions in province 0 → culture 0 color
-		expectRegionColor(colors, 0, [0.4, 0.5, 0.6])
-		expectRegionColor(colors, 1, [0.4, 0.5, 0.6])
+		expectRegionColor(
+			colors,
+			0,
+			darkenPoliticalAtElevation([0.4, 0.5, 0.6], 1.6),
+		)
+		expectRegionColor(
+			colors,
+			1,
+			darkenPoliticalAtElevation([0.4, 0.5, 0.6], 1.6),
+		)
 		// All regions in province 1 → culture 1 color
-		expectRegionColor(colors, 2, [0.8, 0.3, 0.1])
-		expectRegionColor(colors, 3, [0.8, 0.3, 0.1])
+		expectRegionColor(
+			colors,
+			2,
+			darkenPoliticalAtElevation([0.8, 0.3, 0.1], 1.6),
+		)
+		expectRegionColor(
+			colors,
+			3,
+			darkenPoliticalAtElevation([0.8, 0.3, 0.1], 1.6),
+		)
 	})
 
 	it("covers province, population, basin, and null fallbacks", () => {
@@ -1638,8 +1742,16 @@ describe("computeRegionColors", () => {
 			2,
 			darkenVegetationAtElevation(OCEAN_LIGHT_BLUE, -1),
 		)
-		expectRegionColor(population!, 0, [0.35, 0.33, 0.32])
-		expectRegionColor(population!, 1, [0.35, 0.33, 0.32])
+		expectRegionColor(
+			population!,
+			0,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
+		)
+		expectRegionColor(
+			population!,
+			1,
+			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 0.64),
+		)
 		expectRegionColor(
 			population!,
 			2,

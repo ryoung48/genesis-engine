@@ -59,6 +59,12 @@ export interface OrogenWorld {
 	koppenClimate: Uint8Array
 	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
 	oceanCurrents?: OrogenOceanCurrents
+	/** Per-cell cyclone risk score in [0, 1]. */
+	cycloneRisk?: Float32Array
+	/** Per-cell tornado risk score in [0, 1]. */
+	tornadoRisk?: Float32Array
+	/** Per-cell modeled tidal range in meters. */
+	tidalRange?: Float32Array
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation: Uint8Array
 	/** Per-cell topography code, index into OROGEN_TOPOGRAPHY_LABELS */
@@ -67,6 +73,10 @@ export interface OrogenWorld {
 	coastal: Uint8Array
 	/** Per-province water access level (0=none, 1=river/lake, 2=ocean). */
 	waterAccess?: Uint8Array
+	/** Per-province flag: has at least one visible river cell. */
+	riverAccess?: Uint8Array
+	/** Per-province flag: adjacent to a lake. */
+	lakeAccess?: Uint8Array
 	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
 	slopeScore: Float32Array
 	rivers: OrogenRivers

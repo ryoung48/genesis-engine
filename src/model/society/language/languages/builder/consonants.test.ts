@@ -65,6 +65,7 @@ describe("buildConsonants", () => {
 			ending: PhonemeCatalog.MIDDLE_CONSONANT,
 			vowels: ["a", "e"],
 			dice: createDice(["q", "j", "x", "q"]),
+			stops: false,
 		})
 		const flattened = Object.values(result.consonantPhonemes).flat()
 
@@ -78,6 +79,7 @@ describe("buildConsonants", () => {
 			ending: PhonemeCatalog.MIDDLE_CONSONANT,
 			vowels: ["a", "y"],
 			dice: createDice(["q", "j", "x", "q"]),
+			stops: false,
 		})
 		const flattened = Object.values(result.consonantPhonemes).flat()
 
@@ -89,6 +91,7 @@ describe("buildConsonants", () => {
 			ending: PhonemeCatalog.MIDDLE_VOWEL,
 			vowels: ["a", "e", "i"],
 			dice: createDice(["q", "j", "x", "q"], 3),
+			stops: false,
 		})
 
 		expect(Object.keys(result)).toEqual(["consonantPhonemes"])

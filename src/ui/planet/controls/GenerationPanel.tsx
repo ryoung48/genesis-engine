@@ -73,13 +73,13 @@ function renderSliderGroup(
 					key={p.label}
 					className={`rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20${p.disabled ? " opacity-40 pointer-events-none" : ""}`}
 				>
-					<div className="flex justify-between items-baseline gap-3">
+					<div className="flex items-center justify-between gap-3">
 						<UITooltip content={p.help} position="top">
-							<label className="cursor-help border-b border-dotted border-slate-300 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+							<label className="cursor-help whitespace-nowrap border-b border-dotted border-slate-300 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-slate-500 xl:text-[10px]">
 								{p.label}
 							</label>
 						</UITooltip>
-						<span className="flex items-center gap-1.5">
+						<span className="flex min-h-4 items-center gap-1.5">
 							{renderSuffix?.(p)}
 							<span className="font-mono text-[10px] text-slate-400">
 								{p.display}

@@ -1,3 +1,4 @@
+export type { OrogenLandmarks } from "./terrain/landmarks"
 export type {
 	OrogenClimate,
 	OrogenHazards,
