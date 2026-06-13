@@ -15,7 +15,7 @@ export interface SharedRng {
 	): T[]
 }
 
-export type OrogenRng = Pick<SharedRng, "random" | "randint">
+export type GenesisRng = Pick<SharedRng, "random" | "randint">
 
 interface CreateRngOptions {
 	nonPositiveWeightBehavior?: "first" | "undefined"

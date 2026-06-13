@@ -1,6 +1,6 @@
 /**
  * Collision detection, stress propagation, and dual-layer super plate blending.
- * Faithful port of orogen's elevation.js collision/stress logic.
+ * Faithful port of genesis's elevation.js collision/stress logic.
  */
 
 import type {
@@ -219,7 +219,7 @@ function propagateStress(
 }
 
 /**
- * Classify boundaries with dual-layer super plate blending (orogen port).
+ * Classify boundaries with dual-layer super plate blending (genesis port).
  * Runs findCollisions on both small plates and super plates, then blends.
  */
 export function classifyBoundaries(

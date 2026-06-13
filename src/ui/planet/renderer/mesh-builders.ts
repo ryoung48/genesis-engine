@@ -1,8 +1,8 @@
 import * as THREE from "three"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { getColor } from "../colors"
 import { createMapProjection } from "./map-projection"
-import type { OrogenViewMode } from "./types"
+import type { GenesisViewMode } from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 
@@ -18,7 +18,7 @@ export function usesSmoothedHeightmapColors(
 }
 
 export function buildTerrainMesh(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	colorMode: Parameters<typeof getColor>[1],
 	regionColors: Float32Array | null,
 	elevationVisible: boolean,
@@ -228,9 +228,9 @@ export function buildTerrainMesh(
 }
 
 export function buildTerrainWireframe(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	wireframeVisible: boolean,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	elevationVisible: boolean,
 ): THREE.LineSegments {
 	const { mesh, elevation } = world
@@ -281,7 +281,7 @@ export function buildTerrainWireframe(
 }
 
 export function buildMapMesh(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	colorMode: Parameters<typeof getColor>[1],
 	regionColors: Float32Array | null,
 	centerLongitudeDeg: number,
@@ -589,11 +589,11 @@ export function buildMapOccupationOverlay(
 }
 
 export function buildMapWireframe(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	wireframeVisible: boolean,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 ): THREE.LineSegments {
 	const { mesh } = world
 	const { numSides, halfedges, s_inner_t, s_outer_t, t_xyz } = mesh
@@ -711,7 +711,7 @@ function applyOccupationOverlayColors(
 
 export function applyTerrainColorModeColors(
 	meshObject: THREE.Mesh | null,
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	colorMode: Parameters<typeof getColor>[1],
 	faceToRegion: Int32Array,
 	occupationOverlay: Float32Array | null,
@@ -770,7 +770,7 @@ export function applyTerrainColorModeColors(
 
 export function applyMapColorModeColors(
 	meshObject: THREE.Mesh | null,
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	colorMode: Parameters<typeof getColor>[1],
 	faceToRegion: Int32Array,
 	centerLongitudeDeg: number,

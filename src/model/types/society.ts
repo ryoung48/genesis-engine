@@ -1,4 +1,4 @@
-export interface OrogenProvinces {
+export interface GenesisProvinces {
 	/** Per-region province index (-1 = ocean/unassigned) */
 	regionProvince: Int32Array
 	/** Seed (capital) region for each province */
@@ -25,7 +25,7 @@ export interface OrogenProvinces {
 	lakeAccess: Uint8Array
 }
 
-export interface OrogenPartition {
+export interface GenesisPartition {
 	/** Per-node partition index (-1 = inactive/unassigned) */
 	assignment: Int32Array
 	/** Seed node for each partition */
@@ -48,7 +48,7 @@ export interface OrogenPartition {
 	colors: Float32Array
 }
 
-export interface OrogenLocations {
+export interface GenesisLocations {
 	/** Per-mesh-region location index (-1 = ocean/unassigned) */
 	regionLocation: Int32Array
 	/** Per-location parent province index */
@@ -67,7 +67,7 @@ export interface OrogenLocations {
 	colors: Float32Array
 }
 
-export interface OrogenNationHierarchy extends OrogenPartition {
+export interface GenesisNationHierarchy extends GenesisPartition {
 	/** Deterministic per-nation name seed aligned to `seeds` order */
 	nameSeeds?: Int32Array
 	/** Per-province parent index (-1 = sovereign root) */
@@ -90,7 +90,7 @@ export interface OrogenNationHierarchy extends OrogenPartition {
 	activeRebelWars?: ReadonlyArray<{ attacker: number; defender: number }>
 }
 
-export interface OrogenRivers {
+export interface GenesisRivers {
 	/** Each river is a polyline of [lonDeg, latDeg, flow, elevation] quads */
 	lines: [number, number, number, number][][]
 	/** Maximum flow value for normalization */
@@ -119,7 +119,7 @@ export interface OrogenRivers {
 	waterLevel: Float32Array
 }
 
-export const OROGEN_TOPOGRAPHY_LABELS = [
+export const GENESIS_TOPOGRAPHY_LABELS = [
 	"flat",
 	"hill",
 	"plateau",

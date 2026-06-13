@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { BoundaryInfo, DistanceFields, PlateVec } from ".."
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
-import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
+import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
 import { blendElevation, computeDistanceFields } from "./elevation"
 
 function buildMesh() {
@@ -106,7 +106,7 @@ describe("blendElevation", () => {
 			17,
 		)
 
-		const islandArcBit = 1 << (OROGEN_TERRAIN_FEATURE.ISLAND_ARC - 1)
+		const islandArcBit = 1 << (GENESIS_TERRAIN_FEATURE.ISLAND_ARC - 1)
 		let arcRegions = 0
 		let surfacedArcRegions = 0
 		let _mountainousArcRegions = 0
@@ -151,7 +151,7 @@ describe("blendElevation", () => {
 			17,
 		)
 
-		const islandArcBit = 1 << (OROGEN_TERRAIN_FEATURE.ISLAND_ARC - 1)
+		const islandArcBit = 1 << (GENESIS_TERRAIN_FEATURE.ISLAND_ARC - 1)
 		let arcRegions = 0
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if ((terrainFeatures.featureMask[r] & islandArcBit) !== 0) arcRegions++
@@ -187,7 +187,7 @@ describe("blendElevation", () => {
 			17,
 		)
 
-		const interiorBit = 1 << (OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR - 1)
+		const interiorBit = 1 << (GENESIS_TERRAIN_FEATURE.CONTINENTAL_INTERIOR - 1)
 		expect(terrainFeatures.featureMask[0] & interiorBit).toBeGreaterThan(0)
 		for (let r = 0; r < mesh.numRegions; r++) {
 			expect(Number.isFinite(elevation[r])).toBe(true)
@@ -223,9 +223,9 @@ describe("blendElevation", () => {
 			17,
 		)
 
-		const ridgeBit = 1 << (OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1)
-		const fractureBit = 1 << (OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE - 1)
-		const trenchBit = 1 << (OROGEN_TERRAIN_FEATURE.TRENCH - 1)
+		const ridgeBit = 1 << (GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1)
+		const fractureBit = 1 << (GENESIS_TERRAIN_FEATURE.FRACTURE_ZONE - 1)
+		const trenchBit = 1 << (GENESIS_TERRAIN_FEATURE.TRENCH - 1)
 		expect(terrainFeatures.featureMask[0] & ridgeBit).toBeGreaterThan(0)
 		expect(terrainFeatures.featureMask[1] & fractureBit).toBeGreaterThan(0)
 		expect(terrainFeatures.featureMask[2] & trenchBit).toBeGreaterThan(0)
@@ -255,7 +255,7 @@ describe("blendElevation", () => {
 			17,
 		)
 
-		const coastBit = 1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1)
+		const coastBit = 1 << (GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1)
 		let coastalCount = 0
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if (terrainFeatures.featureMask[r] & coastBit) coastalCount++

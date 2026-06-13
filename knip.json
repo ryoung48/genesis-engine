@@ -1,6 +1,6 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
-	"entry": ["src/model/orogen.worker.ts"],
+	"entry": ["src/model/genesis.worker.ts"],
 	"project": ["src/**/*.{ts,tsx,js,jsx}"],
 	"ignoreDependencies": ["tailwindcss", "babel-plugin-react-compiler"],
 	"ignore": ["src/types/*.d.ts", "src/model/society/language/**"],

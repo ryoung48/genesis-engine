@@ -2,7 +2,7 @@
  * Coarse reference grid for resolution-independent plate boundaries.
  * Generates plates on a fixed ~20K-region mesh, then projects onto any
  * high-res mesh with FBM noise perturbation for fractal boundaries.
- * Faithful port of orogen's coarse-plates.js.
+ * Faithful port of genesis's coarse-plates.js.
  */
 
 import type { PlateVec, SphereMesh } from ".."

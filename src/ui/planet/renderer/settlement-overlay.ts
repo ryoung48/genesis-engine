@@ -1,5 +1,5 @@
 import * as THREE from "three"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
@@ -233,7 +233,7 @@ const TIERS: SettlementTier[] = [
 ]
 
 function collectCapitalProvinces(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	locationsLength: number,
 ): Set<number> {
 	const capitals = new Set<number>()
@@ -309,7 +309,7 @@ function settlementPositionGlobe(
 }
 
 export function buildGlobeSettlements(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	locations: Int32Array,
 	urbanPop: Float32Array,
 	elevationVisible: boolean,
@@ -387,7 +387,7 @@ function settlementPositionMap(
 }
 
 export function buildMapSettlements(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	locations: Int32Array,
 	urbanPop: Float32Array,
 	centerLongitudeDeg: number,

@@ -7,16 +7,16 @@
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	OrogenClimate,
-	OrogenHazards,
-	OrogenHydrology,
-	OrogenLocations,
-	OrogenOceanCurrents,
-	OrogenParams,
-	OrogenProvinces,
-	OrogenRainfall,
-	OrogenRivers,
-	OrogenTerrainFeatures,
+	GenesisClimate,
+	GenesisHazards,
+	GenesisHydrology,
+	GenesisLocations,
+	GenesisOceanCurrents,
+	GenesisParams,
+	GenesisProvinces,
+	GenesisRainfall,
+	GenesisRivers,
+	GenesisTerrainFeatures,
 	SphereMesh,
 	StageTiming,
 } from ".."
@@ -65,7 +65,7 @@ import {
 import { classifyTopography } from "../terrain/classification"
 import { computeHazards } from "../terrain/hazards"
 import { computeLakes } from "../terrain/lakes"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import {
 	computeLandmarks,
 	LANDMARK_TYPE_LAKE,
@@ -87,7 +87,7 @@ interface PostPipelineInput {
 	riverLand: Uint8Array
 	distCoast: Float32Array
 	oceanDist: Float32Array
-	params: OrogenParams
+	params: GenesisParams
 	/** Cells that emerged above the baseline shoreline after sea-level lowering. */
 	emergedLand?: Uint8Array
 	tectonicMode: "active"
@@ -95,18 +95,18 @@ interface PostPipelineInput {
 	distFields: DistanceFields
 	r_hotspot: Float32Array
 	r_mantleUpwelling?: Float32Array
-	terrainFeatures?: OrogenTerrainFeatures
+	terrainFeatures?: GenesisTerrainFeatures
 	enableOceanCurrents: boolean
 	onProgress?: (label: string, pct?: number) => void
 }
 
 interface PostPipelineOutput {
-	climate: OrogenClimate
-	rainfall: OrogenRainfall
+	climate: GenesisClimate
+	rainfall: GenesisRainfall
 	monthlyTEQ: Float32Array[]
-	hydrology: OrogenHydrology
+	hydrology: GenesisHydrology
 	vegetation: Uint8Array
-	rivers: OrogenRivers
+	rivers: GenesisRivers
 	iceThickness: Float32Array
 	iceMinMonthly: Float32Array
 	iceMaxMonthly: Float32Array
@@ -122,16 +122,16 @@ interface PostPipelineOutput {
 	waterAccess: Uint8Array
 	riverAccess: Uint8Array
 	lakeAccess: Uint8Array
-	provinces: OrogenProvinces | undefined
-	locations: OrogenLocations | undefined
+	provinces: GenesisProvinces | undefined
+	locations: GenesisLocations | undefined
 	population: ProvincePopulation | undefined
 	tradeGoods: LocationTradeGoods | undefined
-	hazards: OrogenHazards
+	hazards: GenesisHazards
 	cycloneRisk: Float32Array
 	tornadoRisk: Float32Array
 	tidalRange: Float32Array
-	landmarks: OrogenLandmarks
-	oceanCurrents: OrogenOceanCurrents | undefined
+	landmarks: GenesisLandmarks
+	oceanCurrents: GenesisOceanCurrents | undefined
 	timings: StageTiming[]
 	eraSettledMask: Uint8Array | undefined
 	eraStatehoodMask: Uint8Array | undefined
@@ -142,8 +142,8 @@ const LAKE_RETENTION_THRESHOLD = 100 // mm/yr
 export function reconcileClosedWaterBodies(params: {
 	isLand: Uint8Array
 	riverLand: Uint8Array
-	landmarks: Pick<OrogenLandmarks, "regionLandmark" | "type" | "count">
-	rainfall: Pick<OrogenRainfall, "annual">
+	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type" | "count">
+	rainfall: Pick<GenesisRainfall, "annual">
 }): boolean {
 	const { isLand, riverLand, landmarks, rainfall } = params
 	const rainfallSum = new Float32Array(landmarks.count)
@@ -293,7 +293,7 @@ export function runPostElevationPipeline(
 	)
 	record("Post: rainfall", t0)
 	onProgress?.("Post: rainfall", 54)
-	const rainfall: OrogenRainfall = {
+	const rainfall: GenesisRainfall = {
 		monthly: rain.monthly,
 		annual: rain.annual,
 		east: eastAdv,
@@ -620,7 +620,7 @@ export function runPostElevationPipeline(
 
 	// ── Provinces ──────────────────────────────────────────────────────
 	t0 = performance.now()
-	const provinces: OrogenProvinces = computeProvinces(
+	const provinces: GenesisProvinces = computeProvinces(
 		mesh,
 		isLand,
 		topography,
@@ -640,7 +640,7 @@ export function runPostElevationPipeline(
 	const { waterAccess, riverAccess, lakeAccess } = provinces
 
 	t0 = performance.now()
-	const locations: OrogenLocations = computeLocations(
+	const locations: GenesisLocations = computeLocations(
 		provinces,
 		mesh,
 		params.seed,

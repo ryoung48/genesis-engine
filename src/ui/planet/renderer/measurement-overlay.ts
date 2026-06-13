@@ -3,7 +3,7 @@ import { Line2 } from "three/examples/jsm/lines/Line2.js"
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { createMapProjection } from "./map-projection"
-import type { OrogenViewMode } from "./types"
+import type { GenesisViewMode } from "./types"
 
 const MEASURE_ARC_RADIUS = 1.02
 const MEASURE_LINE_COLOR = 0x000000
@@ -69,8 +69,8 @@ function unwrapLongitudeSequence(points: LonLatPoint[]): LonLatPoint[] {
 function buildLine(
 	positions: number[],
 	canvasSize: [number, number],
-	viewMode: OrogenViewMode,
-	targetViewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
+	targetViewMode: GenesisViewMode,
 ) {
 	const geometry = new LineGeometry()
 	geometry.setPositions(positions)
@@ -95,8 +95,8 @@ function buildDotGroup(
 	points: THREE.Vector3[],
 	geometry: THREE.BufferGeometry,
 	materialFactory: () => THREE.Material,
-	viewMode: OrogenViewMode,
-	targetViewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
+	targetViewMode: GenesisViewMode,
 ) {
 	const group = new THREE.Group()
 	for (const point of points) {
@@ -112,7 +112,7 @@ function buildDotGroup(
 export function buildGlobeMeasurementOverlay(
 	startXYZ: XYZ,
 	endXYZ: XYZ | null,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	canvasSize: [number, number],
 ) {
 	const start = new THREE.Vector3(...startXYZ).normalize()
@@ -146,7 +146,7 @@ export function buildGlobeMeasurementOverlay(
 export function buildMapMeasurementOverlay(
 	startXYZ: XYZ,
 	endXYZ: XYZ | null,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	canvasSize: [number, number],
 	mapCenterLongitudeDeg: number,
 	mapProjectionLatitudeDeg: number,

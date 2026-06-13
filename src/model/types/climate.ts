@@ -1,4 +1,4 @@
-export interface OrogenClimate {
+export interface GenesisClimate {
 	temperature_avg: Float32Array // per-cell annual mean °C
 	temperature_min: Float32Array // per-cell annual min °C
 	temperature_max: Float32Array // per-cell annual max °C
@@ -11,7 +11,7 @@ export interface OrogenClimate {
 	landFraction: number[] // 36-band land fraction used by EBM
 }
 
-export interface OrogenOceanCurrents {
+export interface GenesisOceanCurrents {
 	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */
 	oceanWarmth: Float32Array
 	/** Per-cell diffused coastal warmth on land: -1..+1. Zero for ocean/deep interior. */
@@ -26,34 +26,34 @@ export interface OrogenOceanCurrents {
 	temperatureDelta: Float32Array
 }
 
-export interface OrogenRainfall {
+export interface GenesisRainfall {
 	monthly: Float32Array // [month * N + r] mm
 	annual: Float32Array // per-cell annual mm
 	east: Float32Array // per-cell normalized east moisture (0–1)
 	west: Float32Array // per-cell normalized west moisture (0–1)
 }
 
-export interface OrogenHydrology {
+export interface GenesisHydrology {
 	aet_monthly: Float32Array // [month * N + r] mm
 	aridity_monthly: Float32Array // [month * N + r] AET / PET
 	baseflow_monthly: Float32Array // [month * N + r] mm — slow groundwater discharge
 }
 
-export interface OrogenHazards {
+export interface GenesisHazards {
 	earthquake: Float32Array
 	volcano: Float32Array
 	danger: Float32Array
 }
 
-interface OrogenHotspotExposureSummary {
+interface GenesisHotspotExposureSummary {
 	threshold: number
 	activeCells: number
 	aboveWaterBeforeFlood: number
 	aboveWaterAfterFlood: number
 }
 
-export interface OrogenVolcanism {
+export interface GenesisVolcanism {
 	hotspot: Float32Array
 	mantleUpwelling: Float32Array
-	hotspotExposure?: OrogenHotspotExposureSummary
+	hotspotExposure?: GenesisHotspotExposureSummary
 }

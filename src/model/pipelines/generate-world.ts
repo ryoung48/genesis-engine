@@ -1,14 +1,14 @@
 /**
  * Genesis pipeline orchestrator: generates a complete tectonic world.
- * Faithful port of orogen's planet-worker.js pipeline order.
+ * Faithful port of genesis's planet-worker.js pipeline order.
  */
 
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	OrogenParams,
-	OrogenTerrainFeatures,
-	OrogenWorld,
+	GenesisParams,
+	GenesisTerrainFeatures,
+	GenesisWorld,
 	SphereMesh,
 	StageTiming,
 	TectonicPlate,
@@ -97,7 +97,7 @@ function summarizeHotspotExposure(
 
 interface TectonicPathResult {
 	elevation: Float32Array
-	terrainFeatures: OrogenTerrainFeatures | undefined
+	terrainFeatures: GenesisTerrainFeatures | undefined
 	boundary: BoundaryInfo
 	distFields: DistanceFields
 	r_hotspot: Float32Array
@@ -110,7 +110,7 @@ function runActivePath(
 	plates: TectonicPlate[],
 	plateIds: number[],
 	coarse: ReturnType<typeof generateCoarsePlates>,
-	params: OrogenParams,
+	params: GenesisParams,
 	volcanism: number,
 	plateAssignment: Int32Array,
 	pipelineTiming: StageTiming[],
@@ -240,10 +240,10 @@ function runActivePath(
 	}
 }
 
-export function generateOrogenWorld(
-	params: OrogenParams,
+export function generateGenesisWorld(
+	params: GenesisParams,
 	onProgress?: ProgressFn,
-): OrogenWorld {
+): GenesisWorld {
 	const rng = createRng(params.seed)
 	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []
@@ -265,7 +265,7 @@ export function generateOrogenWorld(
 	let distFields: DistanceFields
 	let r_hotspot: Float32Array
 	let r_mantleUpwelling: Float32Array
-	let terrainFeatures: OrogenTerrainFeatures | undefined
+	let terrainFeatures: GenesisTerrainFeatures | undefined
 
 	// 2. Generate coarse plates on fixed 20K mesh
 	onProgress?.("coarse-plates", 5)
@@ -345,7 +345,7 @@ export function generateOrogenWorld(
 		onProgress,
 	))
 
-	// 12. Terrain post-processing (orogen order)
+	// 12. Terrain post-processing (genesis order)
 	withTiming("post", pipelineTiming, () => {
 		// Terrain warp — first, before ocean detection or smoothing
 		if (params.terrainWarp > 0) {

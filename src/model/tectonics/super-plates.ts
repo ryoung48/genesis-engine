@@ -1,8 +1,8 @@
 /**
  * Super plates: groups connected same-type plates into ~20 larger tectonic
- * units that move cohesively, producing broad orogenic belts while preserving
+ * units that move cohesively, producing broad genesisic belts while preserving
  * fine-grained detail from individual plate interactions.
- * Faithful port of orogen's super-plates.js.
+ * Faithful port of genesis's super-plates.js.
  */
 import type { PlateVec, SphereMesh, SuperPlateData } from ".."
 

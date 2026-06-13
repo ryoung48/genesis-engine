@@ -1,4 +1,4 @@
-import { OROGEN_TERRAIN_FEATURE } from "@/model"
+import { GENESIS_TERRAIN_FEATURE } from "@/model"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
@@ -11,7 +11,7 @@ import {
 	timezoneWaterColor,
 } from "@/model/society/timezone"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../../colors"
 import {
 	climateTempColor,
@@ -166,17 +166,17 @@ export function toPastelNationColor(
 }
 
 const TERRAIN_FEATURE_COLORS: Record<number, [number, number, number]> = {
-	[OROGEN_TERRAIN_FEATURE.RIFT_VALLEY]: [0.82, 0.29, 0.22],
-	[OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN]: [0.7, 0.22, 0.18],
-	[OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN]: [0.95, 0.55, 0.22],
-	[OROGEN_TERRAIN_FEATURE.FOLD_RIDGES]: [0.55, 0.24, 0.13],
-	[OROGEN_TERRAIN_FEATURE.PLATEAU_UPLIFT]: [0.8, 0.65, 0.28],
-	[OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR]: [0.45, 0.63, 0.21],
-	[OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE]: [0.17, 0.73, 0.88],
-	[OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE]: [0.18, 0.47, 0.92],
-	[OROGEN_TERRAIN_FEATURE.TRENCH]: [0.07, 0.17, 0.46],
-	[OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING]: [0.98, 0.9, 0.5],
-	[OROGEN_TERRAIN_FEATURE.ISLAND_ARC]: [0.9, 0.4, 0.72],
+	[GENESIS_TERRAIN_FEATURE.RIFT_VALLEY]: [0.82, 0.29, 0.22],
+	[GENESIS_TERRAIN_FEATURE.PULL_APART_BASIN]: [0.7, 0.22, 0.18],
+	[GENESIS_TERRAIN_FEATURE.BACK_ARC_BASIN]: [0.95, 0.55, 0.22],
+	[GENESIS_TERRAIN_FEATURE.FOLD_RIDGES]: [0.55, 0.24, 0.13],
+	[GENESIS_TERRAIN_FEATURE.PLATEAU_UPLIFT]: [0.8, 0.65, 0.28],
+	[GENESIS_TERRAIN_FEATURE.CONTINENTAL_INTERIOR]: [0.45, 0.63, 0.21],
+	[GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE]: [0.17, 0.73, 0.88],
+	[GENESIS_TERRAIN_FEATURE.FRACTURE_ZONE]: [0.18, 0.47, 0.92],
+	[GENESIS_TERRAIN_FEATURE.TRENCH]: [0.07, 0.17, 0.46],
+	[GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING]: [0.98, 0.9, 0.5],
+	[GENESIS_TERRAIN_FEATURE.ISLAND_ARC]: [0.9, 0.4, 0.72],
 }
 
 export function getTerrainFeatureColor(
@@ -223,7 +223,7 @@ function darkenPartitionAtElevation(
 }
 
 export function computeRegionColors(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	colorMode: ColorMode,
 	nationMode: NationMapMode,
 	populationMode: PopulationMapMode,

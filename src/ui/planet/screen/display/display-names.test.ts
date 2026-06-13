@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { LanguageNameContext } from "@/model/society/language/names"
 import type {
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	SerializedTimelines,
 } from "@/model/transport/worker-types"
 import type { TimelineBundle } from "../history/history-query"
@@ -98,7 +98,7 @@ describe("createDisplayNames", () => {
 			rivers: {
 				riverId: new Int32Array([0]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const timelines: SerializedTimelines = {
 			P: 1,
 			startTimeMs: 0,
@@ -162,7 +162,7 @@ describe("createDisplayNames", () => {
 				count: 0,
 				assignment: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const names = createDisplayNames(world, {
 			timelines: {
 				P: 1,
@@ -210,7 +210,7 @@ describe("createDisplayNames", () => {
 				},
 				leaderNameSeed: new Int32Array([303]),
 				leaderDynasty: new Int32Array([4]),
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 			null,
 		)
 
@@ -262,7 +262,7 @@ describe("createDisplayNames", () => {
 			rivers: {
 				riverId: new Int32Array([-1, 4, 4, 5]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const timelines: SerializedTimelines = {
 			P: 3,
 			startTimeMs: 0,
@@ -335,7 +335,7 @@ describe("createDisplayNames", () => {
 			nations: {
 				seeds: new Int32Array([0]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const timelines: SerializedTimelines = {
 			P: 1,
 			startTimeMs: 0,
@@ -400,7 +400,7 @@ describe("createDisplayNames", () => {
 			cultureBlendSecondary: makeProvinceTimelineInt([]),
 			cultureBlendWeight: makeProvinceTimelineFloat([]),
 		}
-		const names = createDisplayNames({} as SerializedOrogenWorld, {
+		const names = createDisplayNames({} as SerializedGenesisWorld, {
 			timelines,
 			events: [],
 		})
@@ -429,7 +429,7 @@ describe("createDisplayNames", () => {
 				languageSeeds: new Int32Array([41]),
 				nameSeeds: new Int32Array([43]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const timelines: SerializedTimelines = {
 			P: 1,
 			startTimeMs: 0,
@@ -474,7 +474,7 @@ describe("createDisplayNames", () => {
 				assignment: new Int32Array([5]),
 				seeds: new Int32Array(),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const timelines: SerializedTimelines = {
 			P: 1,
 			startTimeMs: 0,
@@ -523,7 +523,7 @@ describe("createDisplayNames", () => {
 				assignment: new Int32Array([4]),
 				seeds: new Int32Array(),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const timelines: SerializedTimelines = {
 			P: 1,
 			startTimeMs: 0,
@@ -766,7 +766,7 @@ describe("createDisplayNames", () => {
 
 	it("builds empty and sparse name contexts directly", () => {
 		expect(
-			displayNamesInternals.buildNameContext({} as SerializedOrogenWorld, []),
+			displayNamesInternals.buildNameContext({} as SerializedGenesisWorld, []),
 		).toEqual({
 			provinces: [],
 			cultures: [],
@@ -789,7 +789,7 @@ describe("createDisplayNames", () => {
 						languageSeeds: new Int32Array([21]),
 						nameSeeds: new Int32Array([22]),
 					},
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				[[{ time: 1 }], []],
 			),
 		).toEqual({
@@ -895,7 +895,7 @@ describe("createDisplayNames", () => {
 					cultures: [],
 					heritages: [],
 				},
-				{} as SerializedOrogenWorld,
+				{} as SerializedGenesisWorld,
 			),
 		).toEqual([])
 
@@ -909,11 +909,11 @@ describe("createDisplayNames", () => {
 				provinces: { count: 2 },
 				cultures: { assignment: new Int32Array([-1, 0]) },
 				leaderDynasty: new Int32Array([0, 1]),
-			} as unknown as SerializedOrogenWorld),
+			} as unknown as SerializedGenesisWorld),
 		).toEqual([{ name: "Dynasty #0" }, { name: "Dynasty #1" }])
 
 		const names = displayNamesInternals.createCurrentWorldPoliticalNames(
-			{} as SerializedOrogenWorld,
+			{} as SerializedGenesisWorld,
 		)
 		expect(names.leader(0, 0)).toBe("Leader #0")
 		expect(names.dynasty(0)).toBe("Dynasty #0")
@@ -929,7 +929,7 @@ describe("createDisplayNames", () => {
 			},
 			leaderNameSeed: new Int32Array([41, -1]),
 			leaderDynasty: new Int32Array([2, 3]),
-		} as unknown as SerializedOrogenWorld)
+		} as unknown as SerializedGenesisWorld)
 
 		expect(names.leader(0, 0)).not.toBe("Leader #0")
 		expect(names.leader(1, 0)).toBe("Leader #1")
@@ -948,7 +948,7 @@ describe("createDisplayNames", () => {
 					assignment: new Int32Array([0]),
 					languageSeeds: new Int32Array([71]),
 				},
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 			{
 				timelines: {
 					P: 1,
@@ -1041,7 +1041,7 @@ describe("createDisplayNames", () => {
 				{
 					provinces: { count: 2 },
 					leaderNameSeed: new Int32Array([91, 92]),
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				bundle,
 				0,
 				15,
@@ -1094,7 +1094,7 @@ describe("createDisplayNames", () => {
 				{
 					provinces: { count: 1 },
 					leaderNameSeed: new Int32Array([77]),
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				bundle,
 				0,
 				30,
@@ -1105,7 +1105,7 @@ describe("createDisplayNames", () => {
 				{
 					provinces: { count: 1 },
 					leaderNameSeed: new Int32Array([77]),
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				null,
 				0,
 				30,
@@ -1113,7 +1113,7 @@ describe("createDisplayNames", () => {
 		).toEqual({ time: 0, nameSeed: 77 })
 		expect(
 			displayNamesInternals.resolveLeaderEntry(
-				{} as SerializedOrogenWorld,
+				{} as SerializedGenesisWorld,
 				null,
 				4,
 				30,
@@ -1125,7 +1125,7 @@ describe("createDisplayNames", () => {
 					provinces: { count: 2 },
 					cultures: { assignment: new Int32Array([-1, 3]) },
 					leaderDynasty: new Int32Array([5, 9]),
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				null,
 				9,
 			),
@@ -1135,7 +1135,7 @@ describe("createDisplayNames", () => {
 				{
 					provinces: { count: 1 },
 					cultures: { assignment: new Int32Array([-1]) },
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				null,
 				4,
 			),
@@ -1151,7 +1151,7 @@ describe("createDisplayNames", () => {
 				languageSeeds: new Int32Array([83]),
 			},
 			leaderNameSeed: new Int32Array([91]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const bundle: TimelineBundle = {
 			timelines: {
 				P: 1,

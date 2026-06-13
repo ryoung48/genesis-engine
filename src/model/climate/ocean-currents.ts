@@ -6,9 +6,9 @@
  * nearby continental land.
  */
 
-import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import {
 	applyLockedCurrentTemperatureEffect,
 	computeLockedOceanCurrents,
@@ -410,9 +410,9 @@ export function computeOceanCurrents(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
 	distCoast: Float32Array,
-	landmarks: OrogenLandmarks,
+	landmarks: GenesisLandmarks,
 	params?: Pick<
-		Partial<OrogenParams>,
+		Partial<GenesisParams>,
 		| "antistellarLon"
 		| "eccentricity"
 		| "obliquity"
@@ -542,12 +542,12 @@ export function computeOceanCurrents(
  */
 export function applyCurrentTemperatureEffect(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	isLand: Uint8Array,
 	currents: OceanCurrentResult,
 	monthlyTEQ?: Float32Array[],
 	params?: Pick<
-		OrogenParams,
+		GenesisParams,
 		| "antistellarLon"
 		| "eccentricity"
 		| "obliquity"

@@ -3,12 +3,12 @@
  * Each region gets a landmark ID; each landmark has a type and size.
  * O(N) time, typed arrays only.
  */
-import type { OrogenPartition, OrogenProvinces, SphereMesh } from ".."
+import type { GenesisPartition, GenesisProvinces, SphereMesh } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
 
 type LandmarkType = "continent" | "island" | "isle" | "ocean" | "sea" | "lake"
 
-export interface OrogenLandmarks {
+export interface GenesisLandmarks {
 	/** Per-region landmark index */
 	regionLandmark: Int32Array
 	/** Per-landmark type code (index into LANDMARK_TYPES) */
@@ -43,7 +43,7 @@ export { LANDMARK_TYPE_SEA, LANDMARK_TYPE_LAKE }
 export function computeLandmarks(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-): OrogenLandmarks {
+): GenesisLandmarks {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 
@@ -127,12 +127,12 @@ function pickDominantCulture(counts: Map<number, number>): number {
 
 export function assignLandmarkIdentity(params: {
 	mesh: SphereMesh
-	landmarks: OrogenLandmarks
-	provinces?: Pick<OrogenProvinces, "regionProvince">
-	cultures?: Pick<OrogenPartition, "assignment">
+	landmarks: GenesisLandmarks
+	provinces?: Pick<GenesisProvinces, "regionProvince">
+	cultures?: Pick<GenesisPartition, "assignment">
 	isLand: Uint8Array
 	seed: number
-}): OrogenLandmarks {
+}): GenesisLandmarks {
 	const { mesh, landmarks, provinces, cultures, isLand, seed } = params
 	const dominantCulture = new Int32Array(landmarks.count).fill(-1)
 	const assignment = cultures?.assignment

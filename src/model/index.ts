@@ -1,34 +1,34 @@
-export type { OrogenLandmarks } from "./terrain/landmarks"
+export type { GenesisLandmarks } from "./terrain/landmarks"
 export type {
-	OrogenClimate,
-	OrogenHazards,
-	OrogenHydrology,
-	OrogenOceanCurrents,
-	OrogenRainfall,
+	GenesisClimate,
+	GenesisHazards,
+	GenesisHydrology,
+	GenesisOceanCurrents,
+	GenesisRainfall,
 } from "./types/climate"
 export type { SphereMesh } from "./types/mesh"
 export type {
-	OrogenLocations,
-	OrogenNationHierarchy,
-	OrogenPartition,
-	OrogenProvinces,
-	OrogenRivers,
+	GenesisLocations,
+	GenesisNationHierarchy,
+	GenesisPartition,
+	GenesisProvinces,
+	GenesisRivers,
 } from "./types/society"
-export { OROGEN_TOPOGRAPHY_LABELS } from "./types/society"
+export { GENESIS_TOPOGRAPHY_LABELS } from "./types/society"
 
 export type {
 	BoundaryInfo,
 	CollisionResult,
 	DistanceFields,
-	OrogenParams,
-	OrogenTerrainFeatures,
+	GenesisParams,
+	GenesisTerrainFeatures,
 	PlateVec,
 	StageTiming,
 	SuperPlateData,
 	TectonicPlate,
 } from "./types/tectonics"
 export {
-	OROGEN_TERRAIN_FEATURE,
-	OROGEN_TERRAIN_FEATURE_LABELS,
+	GENESIS_TERRAIN_FEATURE,
+	GENESIS_TERRAIN_FEATURE_LABELS,
 } from "./types/tectonics"
-export type { OrogenWorld } from "./world"
+export type { GenesisWorld } from "./world"

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { getHoverRainfall } from "./hover"
 
 function makeWorld(
 	overrides: Record<string, unknown> = {},
-): SerializedOrogenWorld {
+): SerializedGenesisWorld {
 	return {
 		mesh: { numRegions: 1 },
 		rainfall: {
@@ -19,7 +19,7 @@ function makeWorld(
 			count: 1,
 		},
 		...overrides,
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 describe("getHoverRainfall", () => {

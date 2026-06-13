@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { OROGEN_TERRAIN_FEATURE } from "@/model"
+import { GENESIS_TERRAIN_FEATURE } from "@/model"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/climate/vegetation"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	climateTempColor,
 	climateZoneColor,
@@ -46,14 +46,14 @@ function expectRgbCloseTo(
 	}
 }
 
-function buildWorld(overrides: Record<string, unknown>): SerializedOrogenWorld {
+function buildWorld(overrides: Record<string, unknown>): SerializedGenesisWorld {
 	return {
 		mesh: { numRegions: 2 },
 		elevation: new Float32Array([1, -1]),
 		elevation_km: new Float32Array([0, -1]),
 		isLand: new Uint8Array([1, 0]),
 		...overrides,
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 function expectRegionColor(
@@ -98,7 +98,7 @@ describe("computeRegionColors", () => {
 	})
 
 	it("returns known terrain feature and topography colors", () => {
-		expect(getTerrainFeatureColor(OROGEN_TERRAIN_FEATURE.TRENCH)).toEqual([
+		expect(getTerrainFeatureColor(GENESIS_TERRAIN_FEATURE.TRENCH)).toEqual([
 			0.07, 0.17, 0.46,
 		])
 		expect(getTerrainFeatureColor(999)).toBeNull()
@@ -712,23 +712,23 @@ describe("computeRegionColors", () => {
 			},
 			population: {
 				provincePopulation: new Float32Array([1, 1]),
-			} as unknown as SerializedOrogenWorld["population"],
+			} as unknown as SerializedGenesisWorld["population"],
 			cultures: {
 				assignment: new Int32Array([0, 0]),
 				colors: new Float32Array([0.2, 0.4, 0.6]),
-			} as SerializedOrogenWorld["cultures"],
+			} as SerializedGenesisWorld["cultures"],
 			heritages: {
 				assignment: [undefined] as unknown as Int32Array,
 				colors: new Float32Array([0.4, 0.5, 0.6]),
-			} as SerializedOrogenWorld["heritages"],
+			} as SerializedGenesisWorld["heritages"],
 			faiths: {
 				assignment: [undefined] as unknown as Int32Array,
 				colors: new Float32Array([0.6, 0.5, 0.4]),
-			} as SerializedOrogenWorld["faiths"],
+			} as SerializedGenesisWorld["faiths"],
 			religions: {
 				assignment: [undefined] as unknown as Int32Array,
 				colors: new Float32Array([0.7, 0.4, 0.2]),
-			} as SerializedOrogenWorld["religions"],
+			} as SerializedGenesisWorld["religions"],
 		})
 
 		for (const mode of ["heritage", "faith", "religion"] as const) {
@@ -794,19 +794,19 @@ describe("computeRegionColors", () => {
 			},
 			rivers: {
 				basinId: [undefined, 2] as unknown as Int32Array,
-			} as SerializedOrogenWorld["rivers"],
+			} as SerializedGenesisWorld["rivers"],
 			cultures: {
 				assignment: new Int32Array([0, 0]),
 				colors: new Float32Array([0.2, 0.4, 0.6]),
-			} as SerializedOrogenWorld["cultures"],
+			} as SerializedGenesisWorld["cultures"],
 			faiths: {
 				assignment: new Int32Array([0]),
 				colors: new Float32Array([0.6, 0.5, 0.4]),
-			} as SerializedOrogenWorld["faiths"],
+			} as SerializedGenesisWorld["faiths"],
 			religions: {
 				assignment: [undefined] as unknown as Int32Array,
 				colors: new Float32Array([0.7, 0.4, 0.2]),
-			} as SerializedOrogenWorld["religions"],
+			} as SerializedGenesisWorld["religions"],
 			provinces: {
 				regionProvince: new Int32Array([0, 0]),
 				seeds: new Int32Array([0]),
@@ -820,7 +820,7 @@ describe("computeRegionColors", () => {
 			},
 			population: {
 				provincePopulation: new Float32Array([1, 1]),
-			} as unknown as SerializedOrogenWorld["population"],
+			} as unknown as SerializedGenesisWorld["population"],
 		})
 
 		const danger = computeRegionColors(
@@ -1102,13 +1102,13 @@ describe("computeRegionColors", () => {
 			},
 			terrainFeatures: {
 				featureMask: new Uint32Array([
-					1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.RIFT_VALLEY - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1),
 					0,
 				]),
 				dominantFeature: new Uint8Array([
-					OROGEN_TERRAIN_FEATURE.RIFT_VALLEY,
-					OROGEN_TERRAIN_FEATURE.RIFT_VALLEY,
+					GENESIS_TERRAIN_FEATURE.RIFT_VALLEY,
+					GENESIS_TERRAIN_FEATURE.RIFT_VALLEY,
 					0,
 				]),
 			},
@@ -1600,7 +1600,7 @@ describe("computeRegionColors", () => {
 				assignment: new Int32Array([0, 1]),
 				count: 2,
 				colors: new Float32Array([0.4, 0.5, 0.6, 0.8, 0.3, 0.1]),
-			} as SerializedOrogenWorld["cultures"],
+			} as SerializedGenesisWorld["cultures"],
 		})
 
 		const colors = computeRegionColors(
@@ -1771,14 +1771,14 @@ describe("computeRegionColors", () => {
 			isLand: new Uint8Array([1, 0]),
 			terrainFeatures: {
 				featureMask: new Uint32Array([
-					(1 << (OROGEN_TERRAIN_FEATURE.FOLD_RIDGES - 1)) |
-						(1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1)),
-					(1 << (OROGEN_TERRAIN_FEATURE.TRENCH - 1)) |
-						(1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1)),
+					(1 << (GENESIS_TERRAIN_FEATURE.FOLD_RIDGES - 1)) |
+						(1 << (GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1)),
+					(1 << (GENESIS_TERRAIN_FEATURE.TRENCH - 1)) |
+						(1 << (GENESIS_TERRAIN_FEATURE.RIFT_VALLEY - 1)),
 				]),
 				dominantFeature: new Uint8Array([
-					OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING,
-					OROGEN_TERRAIN_FEATURE.RIFT_VALLEY,
+					GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING,
+					GENESIS_TERRAIN_FEATURE.RIFT_VALLEY,
 				]),
 			},
 		})
@@ -1949,17 +1949,17 @@ describe("computeRegionColors", () => {
 			isLand: new Uint8Array([1, 1, 0, 1]),
 			terrainFeatures: {
 				featureMask: new Uint32Array([
-					1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1),
-					(1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1)) |
-						(1 << (OROGEN_TERRAIN_FEATURE.FOLD_RIDGES - 1)),
+					1 << (GENESIS_TERRAIN_FEATURE.RIFT_VALLEY - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1),
+					(1 << (GENESIS_TERRAIN_FEATURE.RIFT_VALLEY - 1)) |
+						(1 << (GENESIS_TERRAIN_FEATURE.FOLD_RIDGES - 1)),
 				]),
 				dominantFeature: new Uint8Array([
-					OROGEN_TERRAIN_FEATURE.RIFT_VALLEY,
-					OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE,
-					OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING,
-					OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING,
+					GENESIS_TERRAIN_FEATURE.RIFT_VALLEY,
+					GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE,
+					GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING,
+					GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING,
 				]),
 			},
 		})
@@ -2049,12 +2049,12 @@ describe("computeRegionColors", () => {
 			},
 			terrainFeatures: {
 				featureMask: new Uint32Array([
-					1 << (OROGEN_TERRAIN_FEATURE.FOLD_RIDGES - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.FOLD_RIDGES - 1),
 					1 << 11,
 					0,
 				]),
 				dominantFeature: new Uint8Array([
-					OROGEN_TERRAIN_FEATURE.FOLD_RIDGES,
+					GENESIS_TERRAIN_FEATURE.FOLD_RIDGES,
 					12,
 					0,
 				]),
@@ -2239,19 +2239,19 @@ describe("computeRegionColors", () => {
 			} as never,
 			terrainFeatures: {
 				featureMask: new Uint32Array([
-					1 << (OROGEN_TERRAIN_FEATURE.RIFT_VALLEY - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.TRENCH - 1),
-					1 << (OROGEN_TERRAIN_FEATURE.FOLD_RIDGES - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.RIFT_VALLEY - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.TRENCH - 1),
+					1 << (GENESIS_TERRAIN_FEATURE.FOLD_RIDGES - 1),
 					1 << 11,
 				]),
 				dominantFeature: new Uint8Array([
-					OROGEN_TERRAIN_FEATURE.RIFT_VALLEY,
-					OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING,
-					OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE,
-					OROGEN_TERRAIN_FEATURE.TRENCH,
-					OROGEN_TERRAIN_FEATURE.FOLD_RIDGES,
+					GENESIS_TERRAIN_FEATURE.RIFT_VALLEY,
+					GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING,
+					GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE,
+					GENESIS_TERRAIN_FEATURE.TRENCH,
+					GENESIS_TERRAIN_FEATURE.FOLD_RIDGES,
 					12,
 				]),
 			},
@@ -2312,7 +2312,7 @@ describe("computeRegionColors", () => {
 		// 3 regions: land province 0 (nation 0, the selected nation), land province 1 (nation 1), ocean
 		const world = {
 			...buildWorld({}),
-			mesh: { numRegions: 3 } as unknown as SerializedOrogenWorld["mesh"],
+			mesh: { numRegions: 3 } as unknown as SerializedGenesisWorld["mesh"],
 			elevation_km: new Float32Array([1, 0.5, -1]),
 			provinces: {
 				regionProvince: new Int32Array([0, 1, -1]),
@@ -2340,7 +2340,7 @@ describe("computeRegionColors", () => {
 				sovereign: new Int32Array([0, 1]),
 				gravity: new Float32Array([1, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const ALLY_REL = 5
 		const rgb = computeRegionColors(

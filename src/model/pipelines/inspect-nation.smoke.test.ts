@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { decodePlanetCode } from "@/model/shared/planet-code"
-import { generateOrogenWorld } from "./generate-world"
+import { generateGenesisWorld } from "./generate-world"
 
 const PLANET_CODE = "8wqaf.0t235xojuv6uxcdkkrxdek0h1a9f1d46nrl"
 
@@ -14,7 +14,7 @@ describe("inspect nation", () => {
 			era: "industrial" as const,
 		}
 
-		const world = generateOrogenWorld(params)
+		const world = generateGenesisWorld(params)
 
 		expect(world.nations).toBeDefined()
 		expect(world.provinces).toBeDefined()

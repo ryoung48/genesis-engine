@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	buildGlobeSettlements,
 	buildMapSettlements,
@@ -47,7 +47,7 @@ afterAll(() => {
 	Reflect.deleteProperty(globalThis, "document")
 })
 
-function buildSettlementWorld(): SerializedOrogenWorld {
+function buildSettlementWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			r_xyz: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
@@ -59,7 +59,7 @@ function buildSettlementWorld(): SerializedOrogenWorld {
 		nations: {
 			seeds: new Int32Array([1]),
 		},
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 describe("settlement-overlay", () => {

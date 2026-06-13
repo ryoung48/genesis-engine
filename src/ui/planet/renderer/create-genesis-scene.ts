@@ -7,7 +7,7 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import {
 	networkCount,
 	type SerializedNetwork,
-	type SerializedOrogenWorld,
+	type SerializedGenesisWorld,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
@@ -87,15 +87,15 @@ import {
 	buildMapTradeRoutes,
 } from "./trade-route-overlay"
 import type {
-	OrogenHoverInfo,
-	OrogenScene,
-	OrogenViewMode,
+	GenesisHoverInfo,
+	GenesisScene,
+	GenesisViewMode,
 	RiverData,
 	WindArrowData,
 } from "./types"
 
 export function reapplyMeshOverlayState(params: {
-	world: SerializedOrogenWorld
+	world: SerializedGenesisWorld
 	colorMode: ColorMode
 	regionColors: Float32Array | null
 	occupationOverlay: Float32Array | null
@@ -395,11 +395,11 @@ function addMapSlideClones(object: THREE.Object3D) {
 	}
 }
 
-export function createOrogenScene(
+export function createGenesisScene(
 	canvas: HTMLCanvasElement,
-	initialWorld?: SerializedOrogenWorld,
+	initialWorld?: SerializedGenesisWorld,
 	dependencies: MapExportDependencies = {},
-): OrogenScene {
+): GenesisScene {
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 	renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
@@ -546,18 +546,18 @@ export function createOrogenScene(
 	let mapWireframe: THREE.LineSegments | null = null
 	let globeGrid: THREE.LineSegments | null = null
 	let mapGrid: THREE.LineSegments | null = null
-	let currentWorld: SerializedOrogenWorld | null = null
+	let currentWorld: SerializedGenesisWorld | null = null
 	let currentColorMode: ColorMode = "terrain"
 	let currentRegionColors: Float32Array | null = null
 	let currentOccupationOverlay: Float32Array | null = null
-	let currentViewMode: OrogenViewMode = "globe"
+	let currentViewMode: GenesisViewMode = "globe"
 	let wireframeVisible = false
 	let gridVisible = false
 	let gridSpacingDeg = 15
 	let currentMapCenterLongitudeDeg = 0
 	let currentMapProjectionLatitudeDeg = 0
 	let focusTween: {
-		mode: OrogenViewMode
+		mode: GenesisViewMode
 		t0: number
 		duration: number
 		globeFrom: THREE.Vector3
@@ -597,8 +597,8 @@ export function createOrogenScene(
 	let nationBorderMaterials: LineMaterial[] = []
 	let globeSelectedProvinceBorder: THREE.Object3D | null = null
 	let mapSelectedProvinceBorder: THREE.Object3D | null = null
-	let hoverHandler: ((info: OrogenHoverInfo | null) => void) | null = null
-	let clickHandler: ((info: OrogenHoverInfo) => void) | null = null
+	let hoverHandler: ((info: GenesisHoverInfo | null) => void) | null = null
+	let clickHandler: ((info: GenesisHoverInfo) => void) | null = null
 	let hoveredRegion = -1
 	let selectedProvince = -1
 	let nationBordersVisible = false
@@ -619,7 +619,7 @@ export function createOrogenScene(
 	let globeHierarchyOverlay: THREE.Group | null = null
 	let mapHierarchyOverlay: THREE.Group | null = null
 	let hierarchyOverlayNationId = -1
-	let hierarchyOverlayWorld: SerializedOrogenWorld | null = null
+	let hierarchyOverlayWorld: SerializedGenesisWorld | null = null
 	let globeSettlements: THREE.Group | null = null
 	let mapSettlements: THREE.Group | null = null
 	let settlementLocations: Int32Array | null = null
@@ -1793,7 +1793,7 @@ export function createOrogenScene(
 		setViewMode(currentViewMode)
 	}
 
-	function updateWorld(world: SerializedOrogenWorld | null) {
+	function updateWorld(world: SerializedGenesisWorld | null) {
 		if (!world) {
 			currentWorld = null
 			hoveredRegion = -1
@@ -1932,7 +1932,7 @@ export function createOrogenScene(
 		if (nationId < 0) return
 		setSelectedProvince(null)
 		// `nationId` from the UI is actually a sovereign province index
-		// (see OrogenView click handler — assignment = sovereign).
+		// (see GenesisView click handler — assignment = sovereign).
 		const province = nationId
 		if (province >= currentWorld.provinces.count) return
 		const region = currentWorld.provinces.seeds[province]
@@ -2108,7 +2108,7 @@ export function createOrogenScene(
 		}
 	}
 
-	function setViewMode(mode: OrogenViewMode) {
+	function setViewMode(mode: GenesisViewMode) {
 		currentViewMode = mode
 		const isMap = mode === "map"
 		controls.enabled = !isMap
@@ -2159,7 +2159,7 @@ export function createOrogenScene(
 		requestRender()
 	}
 
-	function emitHover(info: OrogenHoverInfo | null) {
+	function emitHover(info: GenesisHoverInfo | null) {
 		hoverHandler?.(info)
 	}
 
@@ -2411,13 +2411,13 @@ export function createOrogenScene(
 	}
 
 	function setHoverHandler(
-		handler: ((info: OrogenHoverInfo | null) => void) | null,
+		handler: ((info: GenesisHoverInfo | null) => void) | null,
 	) {
 		hoverHandler = handler
 		if (!handler) clearHover()
 	}
 
-	function setClickHandler(handler: ((info: OrogenHoverInfo) => void) | null) {
+	function setClickHandler(handler: ((info: GenesisHoverInfo) => void) | null) {
 		clickHandler = handler
 	}
 
@@ -2652,7 +2652,7 @@ export function createOrogenScene(
 	}
 
 	function setHierarchyOverlay(
-		world: SerializedOrogenWorld | null,
+		world: SerializedGenesisWorld | null,
 		selectedNationId: number,
 	) {
 		hierarchyOverlayWorld = world

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenRainfall } from ".."
+import type { GenesisRainfall } from ".."
 import {
 	LANDMARK_TYPE_LAKE,
 	LANDMARK_TYPE_OCEAN,
-	type OrogenLandmarks,
+	type GenesisLandmarks,
 } from "../terrain/landmarks"
 import { reconcileClosedWaterBodies } from "./post-elevation"
 
@@ -15,10 +15,10 @@ describe("reconcileClosedWaterBodies", () => {
 			regionLandmark: new Int32Array([0, 1, 1, 2]),
 			type: new Uint8Array([0, LANDMARK_TYPE_LAKE, LANDMARK_TYPE_OCEAN]),
 			count: 3,
-		} as Pick<OrogenLandmarks, "regionLandmark" | "type" | "count">
+		} as Pick<GenesisLandmarks, "regionLandmark" | "type" | "count">
 		const rainfall = {
 			annual: new Float32Array([0, 40, 60, 500]),
-		} as Pick<OrogenRainfall, "annual">
+		} as Pick<GenesisRainfall, "annual">
 
 		const changed = reconcileClosedWaterBodies({
 			isLand,
@@ -39,10 +39,10 @@ describe("reconcileClosedWaterBodies", () => {
 			regionLandmark: new Int32Array([0, 1, 1, 2]),
 			type: new Uint8Array([0, LANDMARK_TYPE_LAKE, LANDMARK_TYPE_OCEAN]),
 			count: 3,
-		} as Pick<OrogenLandmarks, "regionLandmark" | "type" | "count">
+		} as Pick<GenesisLandmarks, "regionLandmark" | "type" | "count">
 		const rainfall = {
 			annual: new Float32Array([0, 120, 180, 500]),
-		} as Pick<OrogenRainfall, "annual">
+		} as Pick<GenesisRainfall, "annual">
 
 		const changed = reconcileClosedWaterBodies({
 			isLand,

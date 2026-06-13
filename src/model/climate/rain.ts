@@ -1,10 +1,10 @@
 /**
- * Rainfall model for the orogen pipeline.
+ * Rainfall model for the genesis pipeline.
  * Computes moisture advection and monthly rainfall using typed-array-based
- * SphereMesh and OrogenClimate data (no Cell/window.world dependencies).
+ * SphereMesh and GenesisClimate data (no Cell/window.world dependencies).
  */
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import {
 	clamp,
 	getRegionLatLonDegrees,
@@ -13,7 +13,7 @@ import {
 } from "../shared/math"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
-import { LANDMARK_TYPE_OCEAN, type OrogenLandmarks } from "../terrain/landmarks"
+import { LANDMARK_TYPE_OCEAN, type GenesisLandmarks } from "../terrain/landmarks"
 import { elevToHeightKm } from "./climate"
 import { computeTidalRain } from "./locked/rain"
 
@@ -157,7 +157,7 @@ export function buildRegionGraph(mesh: SphereMesh, mask: Uint8Array) {
 
 function buildRainRegionMask(
 	isLand: Uint8Array,
-	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
+	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
 ): Uint8Array {
 	const rainMask = new Uint8Array(isLand)
 	if (!landmarks) return rainMask
@@ -174,7 +174,7 @@ function buildRainRegionMask(
 }
 
 // ---------------------------------------------------------------------------
-// Thermal equator computation (extracted from OrogenView.tsx)
+// Thermal equator computation (extracted from GenesisView.tsx)
 // ---------------------------------------------------------------------------
 
 const TEQ_NUM_BINS = 120 // 3 deg per bin
@@ -268,8 +268,8 @@ export function computeAdvection(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	distCoast: Float32Array,
-	climate: OrogenClimate | undefined,
-	params: number | Pick<OrogenParams, "planetRadiusKm"> | undefined,
+	climate: GenesisClimate | undefined,
+	params: number | Pick<GenesisParams, "planetRadiusKm"> | undefined,
 	isLand: Uint8Array,
 	elevation_km?: Float32Array,
 ): {
@@ -554,14 +554,14 @@ export function computeRainBandWarpField(
  */
 export function computeMonthlyRain(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	eastAdv: Float32Array,
 	westAdv: Float32Array,
 	isLand: Uint8Array,
-	params?: OrogenParams,
+	params?: GenesisParams,
 	monthlyTEQ?: Float32Array[],
 	distCoast?: Float32Array,
-	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
+	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
 ): { monthly: Float32Array; annual: Float32Array } {
 	const rainRegionMask = buildRainRegionMask(isLand, landmarks)
 	if (params?.tidallyLocked) {

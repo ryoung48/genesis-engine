@@ -1,48 +1,48 @@
 import type { LocationTradeGoods } from "./economy/trade-goods"
-import type { OrogenLandmarks } from "./terrain/landmarks"
+import type { GenesisLandmarks } from "./terrain/landmarks"
 import type {
-	OrogenClimate,
-	OrogenHazards,
-	OrogenHydrology,
-	OrogenOceanCurrents,
-	OrogenRainfall,
-	OrogenVolcanism,
+	GenesisClimate,
+	GenesisHazards,
+	GenesisHydrology,
+	GenesisOceanCurrents,
+	GenesisRainfall,
+	GenesisVolcanism,
 } from "./types/climate"
 import type { SphereMesh } from "./types/mesh"
 import type {
-	OrogenLocations,
-	OrogenNationHierarchy,
-	OrogenPartition,
-	OrogenProvinces,
-	OrogenRivers,
+	GenesisLocations,
+	GenesisNationHierarchy,
+	GenesisPartition,
+	GenesisProvinces,
+	GenesisRivers,
 } from "./types/society"
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	OrogenParams,
-	OrogenTerrainFeatures,
+	GenesisParams,
+	GenesisTerrainFeatures,
 	StageTiming,
 	TectonicPlate,
 } from "./types/tectonics"
 
-export interface OrogenWorld {
+export interface GenesisWorld {
 	mesh: SphereMesh
 	plates: TectonicPlate[]
 	plateAssignment: Int32Array
 	boundary: BoundaryInfo
 	distFields: DistanceFields
 	elevation: Float32Array
-	terrainFeatures?: OrogenTerrainFeatures
+	terrainFeatures?: GenesisTerrainFeatures
 	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
 	elevation_km: Float32Array
-	params: OrogenParams
+	params: GenesisParams
 	timings?: StageTiming[]
-	climate: OrogenClimate
+	climate: GenesisClimate
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
 	oceanDist: Float32Array
-	rainfall: OrogenRainfall
-	hazards: OrogenHazards
-	volcanism: OrogenVolcanism
+	rainfall: GenesisRainfall
+	hazards: GenesisHazards
+	volcanism: GenesisVolcanism
 	/** Per-cell climate zone code (0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic) */
 	climateZones: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
@@ -58,7 +58,7 @@ export interface OrogenWorld {
 	/** Per-cell Koppen climate code (index into KOPPEN_CLASSES) */
 	koppenClimate: Uint8Array
 	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
-	oceanCurrents?: OrogenOceanCurrents
+	oceanCurrents?: GenesisOceanCurrents
 	/** Per-cell cyclone risk score in [0, 1]. */
 	cycloneRisk?: Float32Array
 	/** Per-cell tornado risk score in [0, 1]. */
@@ -67,7 +67,7 @@ export interface OrogenWorld {
 	tidalRange?: Float32Array
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation: Uint8Array
-	/** Per-cell topography code, index into OROGEN_TOPOGRAPHY_LABELS */
+	/** Per-cell topography code, index into GENESIS_TOPOGRAPHY_LABELS */
 	topography: Uint8Array
 	/** Per-cell coastal flag (1 = borders ocean or lake, 0 = otherwise). */
 	coastal: Uint8Array
@@ -79,20 +79,20 @@ export interface OrogenWorld {
 	lakeAccess?: Uint8Array
 	/** Per-cell normalized local slope/ruggedness score (0..1, p95-normalized). */
 	slopeScore: Float32Array
-	rivers: OrogenRivers
+	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
-	hydrology: OrogenHydrology
+	hydrology: GenesisHydrology
 	isLand: Uint8Array
 	riverLand: Uint8Array
-	provinces?: OrogenProvinces
-	locations?: OrogenLocations
-	nations?: OrogenNationHierarchy
-	cultures?: OrogenPartition
-	heritages?: OrogenPartition
-	faiths?: OrogenPartition
-	religions?: OrogenPartition
-	landmarks?: OrogenLandmarks
+	provinces?: GenesisProvinces
+	locations?: GenesisLocations
+	nations?: GenesisNationHierarchy
+	cultures?: GenesisPartition
+	heritages?: GenesisPartition
+	faiths?: GenesisPartition
+	religions?: GenesisPartition
+	landmarks?: GenesisLandmarks
 	population?: import("./society/population").ProvincePopulation
 	tradeGoods?: LocationTradeGoods
 	settlementRegions?: Int32Array

@@ -1,4 +1,4 @@
-import type { OrogenParams, SphereMesh, StageTiming } from ".."
+import type { GenesisParams, SphereMesh, StageTiming } from ".."
 import { computeSettlementAnchors } from "../settlements/compute-settlement-regions"
 import { computeCultures } from "../society/culture"
 import { getEraConfig } from "../society/eras"
@@ -9,13 +9,13 @@ import { computeReligions } from "../society/religion"
 import { deriveChildColors } from "../society/shared"
 import {
 	assignLandmarkIdentity,
-	type OrogenLandmarks,
+	type GenesisLandmarks,
 } from "../terrain/landmarks"
 import { runPostElevationPipeline } from "./post-elevation"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
-	params: Pick<OrogenParams, "seed" | "planetRadiusKm" | "era">
+	params: Pick<GenesisParams, "seed" | "planetRadiusKm" | "era">
 	post: Pick<
 		ReturnType<typeof runPostElevationPipeline>,
 		| "coastal"
@@ -37,7 +37,7 @@ interface DerivedProvinceSociety {
 	heritages: ReturnType<typeof computeHeritages> | undefined
 	faiths: ReturnType<typeof computeFaiths> | undefined
 	religions: ReturnType<typeof computeReligions> | undefined
-	landmarks: OrogenLandmarks
+	landmarks: GenesisLandmarks
 	settlementRegions: Int32Array
 	settlementWaterLandmarks: Int32Array
 	settlementPortRegions: Int32Array

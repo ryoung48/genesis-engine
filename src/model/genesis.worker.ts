@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import type { OrogenNationHierarchy, OrogenProvinces, StageTiming } from "."
+import type { GenesisNationHierarchy, GenesisProvinces, StageTiming } from "."
 import {
 	createHistoryRng,
 	initHistory,
@@ -14,15 +14,15 @@ import {
 } from "./history/snapshot"
 import { type HistoryState, validateLiveHierarchy } from "./history/state"
 import { pathfind } from "./pathfinding/pathfind"
-import { generateOrogenWorld } from "./pipelines/generate-world"
-import { importOrogenWorld } from "./pipelines/import-heightmap"
+import { generateGenesisWorld } from "./pipelines/generate-world"
+import { importGenesisWorld } from "./pipelines/import-heightmap"
 import type { ProvincePopulation } from "./society/population"
-import type { OrogenLandmarks } from "./terrain/landmarks"
+import type { GenesisLandmarks } from "./terrain/landmarks"
 import type {
-	OrogenWorkerRequest,
-	OrogenWorkerResponse,
+	GenesisWorkerRequest,
+	GenesisWorkerResponse,
 	SerializedHistoryFrame,
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	SerializedTimelines,
 } from "./transport/worker-types"
 import { packNetwork, packRoutes } from "./transport/worker-types"
@@ -37,8 +37,8 @@ let simulationRunning = false
 interface HistorySeedWorld {
 	params: { seed: number; planetRadiusKm?: number }
 	mesh: { r_xyz: Float32Array; adjOffset: Int32Array; adjList: Int32Array }
-	nations: OrogenNationHierarchy | null
-	provinces: OrogenProvinces | null
+	nations: GenesisNationHierarchy | null
+	provinces: GenesisProvinces | null
 	population: ProvincePopulation | null
 	coastal: Uint8Array | null
 	waterAccess: Uint8Array | null
@@ -53,7 +53,7 @@ interface HistorySeedWorld {
 		count: number
 		genderSystems?: Uint8Array
 	} | null
-	landmarks: OrogenLandmarks | null
+	landmarks: GenesisLandmarks | null
 	settlementRegions: Int32Array | null
 	settlementWaterLandmarks: Int32Array | null
 	settlementPortRegions: Int32Array | null
@@ -61,7 +61,7 @@ interface HistorySeedWorld {
 
 let lastGeneratedWorld: HistorySeedWorld | null = null
 
-function cloneNations(n: OrogenNationHierarchy): OrogenNationHierarchy {
+function cloneNations(n: GenesisNationHierarchy): GenesisNationHierarchy {
 	return {
 		assignment: n.assignment.slice(),
 		seeds: n.seeds.slice(),
@@ -83,7 +83,7 @@ function cloneNations(n: OrogenNationHierarchy): OrogenNationHierarchy {
 	}
 }
 
-function cloneProvinces(p: OrogenProvinces): OrogenProvinces {
+function cloneProvinces(p: GenesisProvinces): GenesisProvinces {
 	return {
 		regionProvince: p.regionProvince.slice(),
 		seeds: p.seeds.slice(),
@@ -101,7 +101,7 @@ function cloneProvinces(p: OrogenProvinces): OrogenProvinces {
 }
 
 function cloneHistorySeedWorld(
-	world: ReturnType<typeof generateOrogenWorld>,
+	world: ReturnType<typeof generateGenesisWorld>,
 ): HistorySeedWorld {
 	return {
 		params: {
@@ -241,9 +241,9 @@ function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
 }
 
 function serializeWorld(
-	world: ReturnType<typeof generateOrogenWorld>,
+	world: ReturnType<typeof generateGenesisWorld>,
 	seedHistoryState: HistoryState | null,
-): SerializedOrogenWorld {
+): SerializedGenesisWorld {
 	return {
 		mesh: world.mesh,
 		plateAssignment: world.plateAssignment,
@@ -448,7 +448,7 @@ function provinceBuffers(p: {
 	]
 }
 
-function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
+function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	const transfer = new Set<Transferable>([
 		world.mesh.r_xyz.buffer,
 		world.mesh.t_xyz.buffer,
@@ -626,7 +626,7 @@ function buildTransferList(world: SerializedOrogenWorld): Transferable[] {
 function emitSimulationDone(): void {
 	if (!historyState) return
 	const timelines = serializeHistoryTimelines(historyState, historyTime)
-	const done: OrogenWorkerResponse = {
+	const done: GenesisWorkerResponse = {
 		type: "sim-done",
 		timeMs: historyTime,
 		timelines,
@@ -645,7 +645,7 @@ async function runSimulation(tickMs = YEAR_MS): Promise<void> {
 			simulateUntil(historyState, historyTime, historyRng)
 			validateLiveHierarchy(historyState, `worker-post-simulate ${historyTime}`)
 			const frame = buildHistoryFrame(historyState)
-			const progress: OrogenWorkerResponse = {
+			const progress: GenesisWorkerResponse = {
 				type: "sim-progress",
 				timeMs: historyTime,
 				frame,
@@ -653,7 +653,7 @@ async function runSimulation(tickMs = YEAR_MS): Promise<void> {
 			self.postMessage(progress, buildFrameTransferList(frame))
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error))
-			const failure: OrogenWorkerResponse = {
+			const failure: GenesisWorkerResponse = {
 				type: "error",
 				message: `Simulation error at ${historyTime}: ${err.message}`,
 				stack: err.stack,
@@ -668,7 +668,7 @@ async function runSimulation(tickMs = YEAR_MS): Promise<void> {
 	emitSimulationDone()
 }
 
-self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
+self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 	const message = event.data
 
 	if (message.type === "pause") {
@@ -681,7 +681,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			self.postMessage({
 				type: "error",
 				message: "No world generated yet - generate a world first",
-			} satisfies OrogenWorkerResponse)
+			} satisfies GenesisWorkerResponse)
 			return
 		}
 		if (!historyState) {
@@ -698,7 +698,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 					type: "error",
 					message:
 						"World is missing nations/provinces/population - cannot simulate",
-				} satisfies OrogenWorkerResponse)
+				} satisfies GenesisWorkerResponse)
 				return
 			}
 			historyRng = createHistoryRng(world.params.seed + 99999)
@@ -733,7 +733,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			self.postMessage({
 				type: "error",
 				message: "No world generated yet",
-			} satisfies OrogenWorkerResponse)
+			} satisfies GenesisWorkerResponse)
 			return
 		}
 
@@ -783,7 +783,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			seaKm: result.seaKm,
 			travelDays: result.travelDays,
 			reachable: result.reachable,
-		} satisfies OrogenWorkerResponse)
+		} satisfies GenesisWorkerResponse)
 		return
 	}
 
@@ -792,15 +792,15 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			type: "progress",
 			label,
 			pct,
-		} satisfies OrogenWorkerResponse)
+		} satisfies GenesisWorkerResponse)
 	}
 
 	try {
-		let generated: ReturnType<typeof generateOrogenWorld>
+		let generated: ReturnType<typeof generateGenesisWorld>
 		if (message.type === "generate") {
-			generated = generateOrogenWorld(message.params, progressCb)
+			generated = generateGenesisWorld(message.params, progressCb)
 		} else if (message.type === "import") {
-			generated = importOrogenWorld(message.params, progressCb)
+			generated = importGenesisWorld(message.params, progressCb)
 		} else {
 			return
 		}
@@ -858,7 +858,7 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 		progressCb("Done", 100)
 		const frame = historyState ? buildHistoryFrame(historyState) : undefined
 		self.postMessage(
-			{ type: "done", world, frame } satisfies OrogenWorkerResponse,
+			{ type: "done", world, frame } satisfies GenesisWorkerResponse,
 			frame
 				? [...buildTransferList(world), ...buildFrameTransferList(frame)]
 				: buildTransferList(world),
@@ -869,6 +869,6 @@ self.onmessage = (event: MessageEvent<OrogenWorkerRequest>) => {
 			type: "error",
 			message: err.message,
 			stack: err.stack,
-		} satisfies OrogenWorkerResponse)
+		} satisfies GenesisWorkerResponse)
 	}
 }

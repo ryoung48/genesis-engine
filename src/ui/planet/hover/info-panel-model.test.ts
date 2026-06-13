@@ -5,7 +5,7 @@ import {
 	leaderGenderSymbol,
 	resolveLeaderGender,
 } from "@/model/society/gender-system"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { getHoverClimateDisplay, getHoverTradeGood } from "./hover"
 import {
 	buildClimateSwatchColor,
@@ -20,11 +20,11 @@ import {
 	buildVegetationSwatchColor,
 } from "./info-panel-model"
 
-function makeWorld(overrides: Record<string, unknown>): SerializedOrogenWorld {
+function makeWorld(overrides: Record<string, unknown>): SerializedGenesisWorld {
 	return {
 		mesh: { numRegions: 1 },
 		...overrides,
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 describe("buildHoverChartData", () => {

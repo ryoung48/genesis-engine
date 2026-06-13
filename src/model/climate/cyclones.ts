@@ -14,9 +14,9 @@
  * valid formation band (roughly hoursPerDay > 61 h).
  */
 import type {
-	OrogenClimate,
-	OrogenOceanCurrents,
-	OrogenParams,
+	GenesisClimate,
+	GenesisOceanCurrents,
+	GenesisParams,
 	SphereMesh,
 } from ".."
 import { clamp, smoothstep } from "../shared/math"
@@ -25,11 +25,11 @@ import { computeThermalEquator, getClimateGeometry } from "./rain"
 
 export function computeCycloneRisk(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	isLand: Uint8Array,
 	topography: Uint8Array,
-	params: Pick<OrogenParams, "hoursPerDay" | "tidallyLocked">,
-	oceanCurrents?: OrogenOceanCurrents | null,
+	params: Pick<GenesisParams, "hoursPerDay" | "tidallyLocked">,
+	oceanCurrents?: GenesisOceanCurrents | null,
 ): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh

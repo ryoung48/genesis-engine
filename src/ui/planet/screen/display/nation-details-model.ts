@@ -1,6 +1,6 @@
 import { REL, YEAR_MS } from "@/model/history/state"
 import { maxFanoutForNationSize } from "@/model/society/hierarchy"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { eventInvolvesNation } from "../../details/nation/event-description"
 import type { NationHistoryPoint } from "../../details/nation/NationHistoryChart"
 import type {
@@ -74,7 +74,7 @@ function buildPartitionDistribution(params: {
 
 function getNationNeighborIds(params: {
 	selectedNationId: number
-	world: SerializedOrogenWorld
+	world: SerializedGenesisWorld
 	nationModel: DisplayNationModel
 }): number[] {
 	const { selectedNationId, world, nationModel } = params
@@ -104,7 +104,7 @@ function getNationNeighborIds(params: {
 export function buildSelectedNationDetails(params: {
 	selectedNationId: number | null
 	selectedTimeMs?: number
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 	nationModel: DisplayNationModel | null
 	selectedHistoryView: HistoryView | null
 	getNationColor: (nationId: number) => string | null
@@ -397,7 +397,7 @@ export function buildNationHistory(params: {
 	selectedTimeMs: number
 	simStartTimeMs: number
 	simTimeMs: number
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 }): NationHistoryPoint[] | undefined {
 	const {
 		selectedNationId,

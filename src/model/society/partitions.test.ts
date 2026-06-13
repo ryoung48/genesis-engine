@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenPartition } from ".."
+import type { GenesisPartition } from ".."
 import { computeCultures } from "./culture"
 import { computeFaiths } from "./faith"
 import { computeHeritages } from "./heritage"
@@ -23,8 +23,8 @@ function buildRingProvinces(n: number) {
 	}
 }
 
-/** Wrap a flat ring of `n` nodes as an OrogenPartition (one node per partition). */
-function buildRingPartition(n: number, sizeFill = 1): OrogenPartition {
+/** Wrap a flat ring of `n` nodes as an GenesisPartition (one node per partition). */
+function buildRingPartition(n: number, sizeFill = 1): GenesisPartition {
 	const adjOffset = new Int32Array(n + 1)
 	const adjList = new Int32Array(n * 2)
 	for (let i = 0; i < n; i++) {

@@ -1,4 +1,4 @@
-import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
@@ -32,7 +32,7 @@ export const NATION_BUCKETS: [number, number][] = [
 	[1, 1],
 ]
 export function computeNations(params: {
-	provinces: OrogenProvinces
+	provinces: GenesisProvinces
 	coastal: Uint8Array
 	riverVisible: Uint8Array
 	waterAccess?: Uint8Array
@@ -66,7 +66,7 @@ export function computeNations(params: {
 	 * e.g. information age) the skew fades to zero.
 	 */
 	statehoodFraction?: number
-}): OrogenNationHierarchy {
+}): GenesisNationHierarchy {
 	const {
 		provinces,
 		coastal,
@@ -1318,7 +1318,7 @@ function colorDistance(
 	return Math.sqrt(dr * dr + dg * dg + db * db)
 }
 
-function emptyPartition(nodeCount: number): OrogenNationHierarchy {
+function emptyPartition(nodeCount: number): GenesisNationHierarchy {
 	return {
 		assignment: new Int32Array(nodeCount).fill(-1),
 		seeds: new Int32Array(0),

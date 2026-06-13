@@ -11,11 +11,11 @@ import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
 	ROUTE_SEA,
-	type SerializedOrogenWorld,
+	type SerializedGenesisWorld,
 } from "@/model/transport/worker-types"
 import { InfoPanel } from "./InfoPanel"
 
-function makeWorld(): SerializedOrogenWorld {
+function makeWorld(): SerializedGenesisWorld {
 	return {
 		mesh: { numRegions: 1 },
 		params: { planetRadiusKm: 6371 },
@@ -99,15 +99,15 @@ function makeWorld(): SerializedOrogenWorld {
 		},
 		settlementWaterLandmarks: new Int32Array([4]),
 		settlementPortRegions: new Int32Array([0]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
-function makeInlandWorld(): SerializedOrogenWorld {
+function makeInlandWorld(): SerializedGenesisWorld {
 	return {
 		...makeWorld(),
 		settlementWaterLandmarks: new Int32Array([-1]),
 		settlementPortRegions: new Int32Array([-1]),
-	} as SerializedOrogenWorld
+	} as SerializedGenesisWorld
 }
 
 function packRoutes(routes: Parameters<typeof packRouteData>[0]) {
@@ -434,7 +434,7 @@ describe("InfoPanel", () => {
 				...makeWorld(),
 				isLand: new Uint8Array([0]),
 				slopeScore: undefined,
-			} as SerializedOrogenWorld,
+			} as SerializedGenesisWorld,
 			hoverLandmark: { id: 5, type: null, size: null },
 			hoverHazards: {
 				earthquake: 0.1,
@@ -482,7 +482,7 @@ describe("InfoPanel", () => {
 					size: new Int32Array([1, 1, 1, 1, 1, 1]),
 					count: 6,
 				},
-			} as SerializedOrogenWorld,
+			} as SerializedGenesisWorld,
 			hoverLandmark: { id: 5, type: "lake", size: 1 },
 		})
 
@@ -517,7 +517,7 @@ describe("InfoPanel", () => {
 					size: new Int32Array([1, 1, 1, 1, 1, 2]),
 					count: 6,
 				},
-			} as SerializedOrogenWorld,
+			} as SerializedGenesisWorld,
 			hoverInfo: { region: 0, x: 0, y: 0 },
 			hoverLandmark: { id: 5, type: "lake", size: 2 },
 		})
@@ -537,7 +537,7 @@ describe("InfoPanel", () => {
 					gdd: new Float32Array([99999]),
 					gint: new Float32Array([99999]),
 				},
-			} as SerializedOrogenWorld,
+			} as SerializedGenesisWorld,
 		})
 		const currentMarkup = renderPanel({
 			colorMode: "oceanCurrents",
@@ -617,7 +617,7 @@ describe("InfoPanel", () => {
 			world: {
 				...makeWorld(),
 				leaderDynasty: new Int32Array([-1, -1, -1]),
-			} as SerializedOrogenWorld,
+			} as SerializedGenesisWorld,
 			hoverOccupation: null,
 		})
 
@@ -768,7 +768,7 @@ describe("InfoPanel", () => {
 				hydrology: {
 					aet_monthly: new Float32Array(12),
 				},
-			} as SerializedOrogenWorld,
+			} as SerializedGenesisWorld,
 		})
 
 		expect(markup).toContain(">PET<")

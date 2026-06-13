@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenParams } from "@/model/types/tectonics"
+import type { GenesisParams } from "@/model/types/tectonics"
 import {
 	decodePlanetCode,
 	decodePlanetSeed,
@@ -39,7 +39,7 @@ function makeParams(overrides: Record<string, number | boolean | string> = {}) {
 		tidallyLocked: false,
 		era: "lateMedieval" as const,
 		...overrides,
-	} as OrogenParams
+	} as GenesisParams
 }
 
 describe("planet-code format", () => {
@@ -82,7 +82,7 @@ describe("planet-code era", () => {
 
 	it("defaults to lateMedieval when era is missing", () => {
 		const { era: _era, ...paramsWithoutEra } = makeParams()
-		const code = encodePlanetCode(12345, paramsWithoutEra as OrogenParams)
+		const code = encodePlanetCode(12345, paramsWithoutEra as GenesisParams)
 		expect(decodePlanetCode(code)?.era).toBe("lateMedieval")
 	})
 })

@@ -1,16 +1,16 @@
-import type { OrogenPartition, OrogenProvinces } from ".."
+import type { GenesisPartition, GenesisProvinces } from ".."
 import { assignCultureGenderSystems } from "./gender-system"
 import { computeGraphPartition } from "./shared"
 
 export function computeCultures(
 	provinces: Pick<
-		OrogenProvinces,
+		GenesisProvinces,
 		"count" | "desolate" | "adjOffset" | "adjList"
 	>,
 	seed: number,
 	/** When provided, only settled[p]===1 provinces receive cultures */
 	settledMask?: Uint8Array,
-): OrogenPartition {
+): GenesisPartition {
 	const active = new Uint8Array(provinces.count)
 	let activeCount = 0
 	for (let i = 0; i < provinces.count; i++) {

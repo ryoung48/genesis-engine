@@ -3,7 +3,7 @@ import {
 	leaderGenderSymbol,
 	resolveLeaderGender,
 } from "@/model/society/gender-system"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 
 interface RulerDisplayMeta {
 	age: number | null
@@ -22,7 +22,7 @@ function formatClaimStrength(claim: number | null | undefined): string | null {
 }
 
 export function buildRulerDisplayMeta(params: {
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 	nationId: number
 	timeMs: number | null | undefined
 }): RulerDisplayMeta {

@@ -1,4 +1,4 @@
-import type { OrogenClimate, OrogenParams, SphereMesh } from "../.."
+import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
 import { SimplexNoise } from "../../shared/simplex-noise"
 import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
@@ -24,10 +24,10 @@ const RAD2DEG = 180 / Math.PI
  */
 export function computeTidalRain(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	isLand: Uint8Array,
 	params?: Pick<
-		OrogenParams,
+		GenesisParams,
 		| "seed"
 		| "antistellarLon"
 		| "obliquity"

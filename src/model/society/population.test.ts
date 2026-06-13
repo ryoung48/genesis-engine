@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { createRng } from "../shared/rng"
-import type { OrogenLandmarks } from "../terrain/landmarks"
-import type { OrogenProvinces } from "../types/society"
+import type { GenesisLandmarks } from "../terrain/landmarks"
+import type { GenesisProvinces } from "../types/society"
 import { computePopulation, computeProvinceHabitability } from "./population"
 
 const HAB_CLIMATE = new Float32Array([
@@ -28,13 +28,13 @@ describe("computePopulation", () => {
 			waterAccess: new Uint8Array(2),
 			riverAccess: new Uint8Array(2),
 			lakeAccess: new Uint8Array(2),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0]),
 			type: new Uint8Array([0]),
 			size: new Int32Array([3]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 		const climateZones = new Uint8Array([4, 1, 4])
 		const vegetation = new Uint8Array([4, 4, 4])
 		const topography = new Uint8Array([0, 0, 0])
@@ -96,13 +96,13 @@ describe("computePopulation", () => {
 			waterAccess: new Uint8Array(3),
 			riverAccess: new Uint8Array(3),
 			lakeAccess: new Uint8Array(3),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0, 0, 0]),
 			type: new Uint8Array([0]),
 			size: new Int32Array([5]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 		const climateZones = new Uint8Array([4, 4, 4, 4, 4])
 		const vegetation = new Uint8Array([4, 4, 4, 4, 4])
 		const topography = new Uint8Array([0, 0, 0, 0, 0])
@@ -157,13 +157,13 @@ describe("computePopulation", () => {
 			waterAccess: new Uint8Array(1),
 			riverAccess: new Uint8Array(1),
 			lakeAccess: new Uint8Array(1),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0]),
 			type: new Uint8Array([99]),
 			size: new Int32Array([1]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 
 		const result = computePopulation(
 			provinces,
@@ -201,13 +201,13 @@ describe("computeProvinceHabitability", () => {
 			waterAccess: new Uint8Array(2),
 			riverAccess: new Uint8Array(2),
 			lakeAccess: new Uint8Array(2),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0]),
 			type: new Uint8Array([0]),
 			size: new Int32Array([3]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 		const climateZones = new Uint8Array([4, 1, 4])
 		const vegetation = new Uint8Array([4, 4, 4])
 		const topography = new Uint8Array([0, 0, 0])
@@ -256,13 +256,13 @@ describe("computeProvinceHabitability", () => {
 			waterAccess: new Uint8Array(2),
 			riverAccess: new Uint8Array(2),
 			lakeAccess: new Uint8Array(2),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const landmarks = {
 			regionLandmark: new Int32Array([0, 0, 0]),
 			type: new Uint8Array([0]),
 			size: new Int32Array([3]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 
 		const hab = computeProvinceHabitability(
 			provinces,
@@ -294,19 +294,19 @@ describe("computeProvinceHabitability", () => {
 			waterAccess: new Uint8Array(1),
 			riverAccess: new Uint8Array(1),
 			lakeAccess: new Uint8Array(1),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const continentLandmarks = {
 			regionLandmark: new Int32Array([0]),
 			type: new Uint8Array([0]),
 			size: new Int32Array([1]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 		const isleLandmarks = {
 			regionLandmark: new Int32Array([0]),
 			type: new Uint8Array([2]),
 			size: new Int32Array([1]),
 			count: 1,
-		} satisfies OrogenLandmarks
+		} satisfies GenesisLandmarks
 
 		const continentHabitability = computeProvinceHabitability(
 			provinces,
@@ -383,7 +383,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(0),
 			riverAccess: new Uint8Array(0),
 			lakeAccess: new Uint8Array(0),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(0)
 		const result = computeMigration(emptyProvinces, new Float32Array(0), mesh)
 		expect(result.migrationWave.length).toBe(0)
@@ -405,7 +405,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(3),
 			riverAccess: new Uint8Array(3),
 			lakeAccess: new Uint8Array(3),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(3)
 		// p0 has highest habitability
 		const habitability = new Float32Array([3.0, 1.5, 0.5])
@@ -433,7 +433,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(3),
 			riverAccess: new Uint8Array(3),
 			lakeAccess: new Uint8Array(3),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(3)
 		const habitability = new Float32Array([3.0, 1.5, 0.5])
 		const result = computeMigration(provinces, habitability, mesh, 1, 3)
@@ -468,7 +468,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(N),
 			riverAccess: new Uint8Array(N),
 			lakeAccess: new Uint8Array(N),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(N)
 		// Uniform habitability so only distance matters
 		const habitability = new Float32Array(N).fill(1.0)
@@ -497,7 +497,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(3),
 			riverAccess: new Uint8Array(3),
 			lakeAccess: new Uint8Array(3),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(3)
 		const habitability = new Float32Array([2.0, 0.0, 1.0])
 		const result = computeMigration(provinces, habitability, mesh, 1, 3)
@@ -523,7 +523,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(2),
 			riverAccess: new Uint8Array(2),
 			lakeAccess: new Uint8Array(2),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(3)
 		const habitability = new Float32Array([2.0, 1.0])
 		const result = computeMigration(provinces, habitability, mesh, 1, 3)
@@ -546,7 +546,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(2),
 			riverAccess: new Uint8Array(2),
 			lakeAccess: new Uint8Array(2),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(2)
 		const result = computeMigration(
 			provinces,
@@ -575,7 +575,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(1),
 			riverAccess: new Uint8Array(1),
 			lakeAccess: new Uint8Array(1),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		// Isolated mesh (no neighbours)
 		const mesh: SphereMesh = {
 			numRegions: 1,
@@ -628,7 +628,7 @@ describe("computeMigration", () => {
 			waterAccess: new Uint8Array(N),
 			riverAccess: new Uint8Array(N),
 			lakeAccess: new Uint8Array(N),
-		} satisfies OrogenProvinces
+		} satisfies GenesisProvinces
 		const mesh = makeLinearMesh(N)
 		const habitability = new Float32Array(N).fill(1.0)
 		// Earth-like radius forces many cradles → exercises multi-cradle path + bfsUpdateMinHops

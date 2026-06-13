@@ -1,13 +1,13 @@
 import * as THREE from "three"
 import { describe, expect, it, vi } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	applyMapExportVisibility,
 	buildMapExportTiles,
 	normalizeMapCenterLongitudeDeg,
 	reapplyMeshOverlayState,
 	renderMapExportPng,
-} from "./create-orogen-scene"
+} from "./create-genesis-scene"
 import { buildMapMesh, buildTerrainMesh } from "./mesh-builders"
 
 function getMaskArray(
@@ -20,7 +20,7 @@ function getMaskArray(
 	return Array.from(attribute.array)
 }
 
-function buildWorld(): SerializedOrogenWorld {
+function buildWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			numRegions: 4,
@@ -36,7 +36,7 @@ function buildWorld(): SerializedOrogenWorld {
 		elevation: new Float32Array([1, 3, 5, 9]),
 		elevation_km: new Float32Array([1, 3, 5, 9]),
 		isLand: new Uint8Array([1, 1, 1, 1]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 describe("reapplyMeshOverlayState", () => {

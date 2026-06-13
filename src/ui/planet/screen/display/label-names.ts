@@ -1,4 +1,4 @@
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 
 interface LabelNameResolvers {
 	nation: (capitalProvince: number) => string
@@ -11,7 +11,7 @@ interface LabelNameResolvers {
 }
 
 export function buildNationLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.nations?.seeds || !resolvers) return null
@@ -27,7 +27,7 @@ export function buildNationLabelNames(
 const SETTLEMENT_MIN_LABEL_POP = 1_000
 
 export function buildSettlementLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.settlementRegions || !world.urbanPopulation || !resolvers)
@@ -46,7 +46,7 @@ export function buildSettlementLabelNames(
 }
 
 export function buildCultureLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.cultures || !resolvers) return null
@@ -59,7 +59,7 @@ export function buildCultureLabelNames(
 }
 
 export function buildHeritageLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.heritages || !resolvers) return null
@@ -72,7 +72,7 @@ export function buildHeritageLabelNames(
 }
 
 export function buildFaithLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.faiths || !resolvers) return null
@@ -85,7 +85,7 @@ export function buildFaithLabelNames(
 }
 
 export function buildReligionLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.religions || !resolvers) return null
@@ -98,7 +98,7 @@ export function buildReligionLabelNames(
 }
 
 export function buildNationDynastyLabelNames(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
 	if (!world?.nations?.seeds || !world.leaderDynasty || !resolvers) return null

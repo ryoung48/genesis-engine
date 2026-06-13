@@ -1,10 +1,10 @@
 /**
- * EBM temperature layer for the orogen pipeline.
+ * EBM temperature layer for the genesis pipeline.
  * Computes land fraction from mesh elevation, runs the energy balance model,
  * and maps zonal temperatures to per-cell with elevation lapse rate correction.
  */
 
-import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import { SimplexNoise } from "../shared/simplex-noise"
 import { TIME } from "../shared/time"
 import { getEffectiveObliquityDeg } from "../shared/units"
@@ -101,7 +101,7 @@ export function computeLandFraction(
 
 function computeMonthlyDaylightHours(
 	mesh: SphereMesh,
-	params: OrogenParams,
+	params: GenesisParams,
 ): Float32Array {
 	const N = mesh.numRegions
 	const { latDegByRegion } = getMeshLatitudeGeometry(mesh)
@@ -223,7 +223,7 @@ export function recomputeAnnualTemperatureStats(
 }
 
 export function applyDtrToClimateMinMax(
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	dtr_monthly: Float32Array,
 	N: number,
 ): void {
@@ -246,11 +246,11 @@ export function computeTemperature(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	landFraction: number[],
-	params: OrogenParams,
+	params: GenesisParams,
 	oceanDist?: Float32Array,
 	isLand?: Uint8Array,
 	elevation_km?: Float32Array,
-): OrogenClimate {
+): GenesisClimate {
 	if (params.tidallyLocked) {
 		return computeTidalTemperature(
 			mesh,

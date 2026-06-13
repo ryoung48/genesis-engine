@@ -6,7 +6,7 @@ import {
 	leaderGenderSymbol,
 	resolveLeaderGender,
 } from "@/model/society/gender-system"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { HistoryView } from "../history/history-query"
 import type { DisplayNationModel } from "./display-model"
 import {
@@ -185,7 +185,7 @@ describe("buildSelectedNationDetails", () => {
 			leaderNameSeed: new Int32Array([99, 11]),
 			leaderClaim: new Int32Array([3, 2]),
 			leaderBirthYear: new Float32Array([0, 0]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const nationModel = {
 			assignment: new Int32Array([0, 1]),
 			counts: new Map([
@@ -288,7 +288,7 @@ describe("buildSelectedNationDetails", () => {
 						childOffset: new Int32Array([0, 0]),
 						childList: new Int32Array(0),
 					},
-				} as unknown as SerializedOrogenWorld,
+				} as unknown as SerializedGenesisWorld,
 				nationModel: {
 					assignment: new Int32Array([0]),
 					counts: new Map([[0, 1]]),
@@ -314,7 +314,7 @@ describe("buildSelectedNationDetails", () => {
 				childOffset: new Int32Array([0, 0]),
 				childList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const baseNationModel = {
 			assignment: new Int32Array([0]),
 			counts: new Map([[0, 1]]),
@@ -406,7 +406,7 @@ describe("buildSelectedNationDetails", () => {
 				childOffset: new Int32Array([0, 0, 0, 0]),
 				childList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
 			world,
@@ -458,7 +458,7 @@ describe("buildSelectedNationDetails", () => {
 				habitabilityScore: 0,
 				totalPopulation: 155,
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
 			world,
@@ -537,7 +537,7 @@ describe("buildSelectedNationDetails", () => {
 				habitabilityScore: 0,
 				totalPopulation: 100,
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
 			world,
@@ -602,7 +602,7 @@ describe("buildSelectedNationDetails", () => {
 				habitabilityScore: 0,
 				totalPopulation: 100,
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
 			world,
@@ -646,7 +646,7 @@ describe("buildSelectedNationDetails", () => {
 				childOffset: new Int32Array([0, 0, 0]),
 				childList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const details = buildSelectedNationDetails({
 			selectedNationId: 0,
 			world,
@@ -679,7 +679,7 @@ describe("buildSelectedNationDetails", () => {
 			simTimeMs: 0,
 			world: {
 				provinces: { count: 2 },
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 		})
 
 		expect(details).toMatchObject({
@@ -718,7 +718,7 @@ describe("buildSelectedNationDetails", () => {
 			simTimeMs: 0,
 			world: {
 				provinces: { count: 2 },
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 		})
 
 		expect(history).toEqual([
@@ -736,7 +736,7 @@ describe("buildSelectedNationDetails", () => {
 					childOffset: new Int32Array([0, 0, 0]),
 					childList: new Int32Array(0),
 				},
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 			nationModel: {
 				assignment: new Int32Array([0, 1]),
 				counts: new Map([[1, 1]]),
@@ -769,7 +769,7 @@ describe("buildSelectedNationDetails", () => {
 					childOffset: new Int32Array([0, 0]),
 					childList: new Int32Array(0),
 				},
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 			nationModel: {
 				assignment: new Int32Array([0]),
 				counts: new Map([[0, 1]]),
@@ -806,7 +806,7 @@ describe("buildSelectedNationDetails", () => {
 				childOffset: new Int32Array([0, 0]),
 				childList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const nationModel = {
 			assignment: new Int32Array([0]),
 			counts: new Map([[0, 1]]),
@@ -859,7 +859,7 @@ describe("buildSelectedNationDetails", () => {
 					childOffset: new Int32Array([0, 0]),
 					childList: new Int32Array(0),
 				},
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 			nationModel: {
 				assignment: new Int32Array([0]),
 				counts: new Map([[0, 1]]),
@@ -920,7 +920,7 @@ describe("buildSelectedNationDetails", () => {
 					habitabilityScore: 0,
 					totalPopulation: 100,
 				},
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 			nationModel: {
 				assignment: new Int32Array([0, 0, 0, 0]),
 				counts: new Map([[0, 4]]),
@@ -998,7 +998,7 @@ describe("buildNationHistory", () => {
 			simTimeMs: 2 * YEAR_MS,
 			world: {
 				provinces: { count: 3 },
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 		})
 
 		expect(result).toEqual([
@@ -1023,7 +1023,7 @@ describe("buildNationHistory", () => {
 			simTimeMs: 0,
 			world: {
 				provinces: { count: 3 },
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 		})
 
 		expect(result).toEqual([

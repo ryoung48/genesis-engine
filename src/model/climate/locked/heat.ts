@@ -1,4 +1,4 @@
-import type { OrogenClimate, OrogenParams, SphereMesh } from "../.."
+import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { TIME } from "../../shared/time"
 import {
 	getEffectiveObliquityDeg,
@@ -25,7 +25,7 @@ function clampAcosInput(value: number): number {
 }
 
 export function computeDailyLockedOrbit(
-	params: Pick<OrogenParams, "eccentricity" | "perihelion" | "sunTempFactor">,
+	params: Pick<GenesisParams, "eccentricity" | "perihelion" | "sunTempFactor">,
 ): { flux: number[]; libration: number[]; solarLongitude: number[] } {
 	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
 	const effectiveTSun = T_SUN * params.sunTempFactor
@@ -173,7 +173,7 @@ export function getSubstellarDirWithOffsetAndDeclination(
 	]
 }
 
-function computeMonthlyOrbitalFlux(params: OrogenParams): number[] {
+function computeMonthlyOrbitalFlux(params: GenesisParams): number[] {
 	const { flux } = computeDailyLockedOrbit(params)
 	return Array.from({ length: 12 }, (_, month) => {
 		const days = TIME.month.days(month)
@@ -186,7 +186,7 @@ function computeMonthlyOrbitalFlux(params: OrogenParams): number[] {
 export function computeLockedMonthlyDaylightHours(
 	mesh: SphereMesh,
 	params: Pick<
-		OrogenParams,
+		GenesisParams,
 		| "antistellarLon"
 		| "eccentricity"
 		| "hoursPerDay"
@@ -240,7 +240,7 @@ interface TidalTransportParams {
 
 export function computeTidalTransportParams(
 	params: Pick<
-		OrogenParams,
+		GenesisParams,
 		| "daysPerYear"
 		| "eccentricity"
 		| "planetRadiusKm"
@@ -312,10 +312,10 @@ export function computeTidalTemperature(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	landFraction: number[],
-	params: OrogenParams,
+	params: GenesisParams,
 	oceanDist?: Float32Array,
 	elevation_km?: Float32Array,
-): OrogenClimate {
+): GenesisClimate {
 	const N = mesh.numRegions
 	const monthlyLibration = computeMonthlyLibration(
 		params.eccentricity,

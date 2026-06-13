@@ -12,7 +12,7 @@
  *   Ofi: minIce > 80mm (8cm) in all months → >80% minimum cover
  *   Of:  maxIce > 20mm (2cm) in at least 1 month → >20% maximum cover
  */
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import { TIME } from "../shared/time"
 
 // Positive degree-day melt factor: 4 mm w.e. per degree-day
@@ -33,8 +33,8 @@ interface IceResult {
 
 export function computeIceAccumulation(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
-	rainfall: OrogenRainfall,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
 	isLand: Uint8Array,
 	distCoast: Float32Array,
 	cycles = 15,

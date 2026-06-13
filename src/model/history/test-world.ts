@@ -1,11 +1,11 @@
 import { vi } from "vitest"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
-import type { OrogenParams, OrogenWorld } from ".."
-import { generateOrogenWorld } from "../pipelines/generate-world"
+import type { GenesisParams, GenesisWorld } from ".."
+import { generateGenesisWorld } from "../pipelines/generate-world"
 
 export const TEST_WORLD_NUM_POINTS = 600
 
-function makeTestParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
+function makeTestParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 	return {
 		...DEFAULT_WORLD_PARAMS,
 		seed: 12345,
@@ -25,21 +25,21 @@ function silenceConsoleTimings(): void {
 	consoleTimingsSilenced = true
 }
 
-const worldCache = new Map<string, OrogenWorld>()
+const worldCache = new Map<string, GenesisWorld>()
 
 export function clearWorldCacheForTests(): void {
 	worldCache.clear()
 }
 
 export function getCachedWorld(
-	overrides: Partial<OrogenParams> = {},
-): OrogenWorld {
+	overrides: Partial<GenesisParams> = {},
+): GenesisWorld {
 	const params = makeTestParams(overrides)
 	const key = JSON.stringify(params)
 	const existing = worldCache.get(key)
 	if (existing) return existing
 	silenceConsoleTimings()
-	const world = generateOrogenWorld(params)
+	const world = generateGenesisWorld(params)
 	worldCache.set(key, world)
 	return world
 }

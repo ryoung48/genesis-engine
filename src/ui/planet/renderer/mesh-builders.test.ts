@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	applyFaceRegionColors,
 	applyMapColorModeColors,
@@ -545,7 +545,7 @@ function expectArrayClose(actual: number[], expected: number[]) {
 	}
 }
 
-function buildWorld(): SerializedOrogenWorld {
+function buildWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			numRegions: 4,
@@ -561,10 +561,10 @@ function buildWorld(): SerializedOrogenWorld {
 		elevation: new Float32Array([1, 3, 5, 9]),
 		elevation_km: new Float32Array([1, 3, 5, 9]),
 		isLand: new Uint8Array([1, 1, 1, 1]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
-function buildWrappedWorld(): SerializedOrogenWorld {
+function buildWrappedWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			numRegions: 1,
@@ -583,10 +583,10 @@ function buildWrappedWorld(): SerializedOrogenWorld {
 		elevation: new Float32Array([1]),
 		elevation_km: new Float32Array([1]),
 		isLand: new Uint8Array([1]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
-function buildWrappedWorldNegativeStart(): SerializedOrogenWorld {
+function buildWrappedWorldNegativeStart(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			numRegions: 1,
@@ -605,10 +605,10 @@ function buildWrappedWorldNegativeStart(): SerializedOrogenWorld {
 		elevation: new Float32Array([1]),
 		elevation_km: new Float32Array([1]),
 		isLand: new Uint8Array([1]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
-function buildSparseWorld(): SerializedOrogenWorld {
+function buildSparseWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			numRegions: 3,
@@ -624,10 +624,10 @@ function buildSparseWorld(): SerializedOrogenWorld {
 		elevation: new Float32Array([1, 2, 3]),
 		elevation_km: new Float32Array([1, 2, 3]),
 		isLand: new Uint8Array([1, 1, 1]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
-function buildInvalidWireframeWorld(): SerializedOrogenWorld {
+function buildInvalidWireframeWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			numRegions: 2,
@@ -643,7 +643,7 @@ function buildInvalidWireframeWorld(): SerializedOrogenWorld {
 		elevation: new Float32Array([1, -1]),
 		elevation_km: new Float32Array([1, -1]),
 		isLand: new Uint8Array([1, 0]),
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 function buildOccupationOverlay(

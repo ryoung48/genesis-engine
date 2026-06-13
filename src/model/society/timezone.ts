@@ -1,4 +1,4 @@
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 
 const TIMEZONE_BAND_WATER: readonly [number, number, number][] = [
 	[0.635, 0.718, 0.725],
@@ -30,7 +30,7 @@ function timezoneOffset(lonDeg: number): number {
 }
 
 export function regionTimezoneOffset(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	region: number,
 ): number {
 	const r_xyz = world.mesh.r_xyz
@@ -47,7 +47,7 @@ export function regionTimezoneOffset(
 }
 
 export function regionTimezoneLabel(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	region: number,
 ): string {
 	const offset = regionTimezoneOffset(world, region)

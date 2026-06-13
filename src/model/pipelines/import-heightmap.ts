@@ -4,7 +4,7 @@
  * and climate simulation.
  */
 
-import type { OrogenParams, OrogenWorld, SphereMesh, StageTiming } from ".."
+import type { GenesisParams, GenesisWorld, SphereMesh, StageTiming } from ".."
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
@@ -145,10 +145,10 @@ function sampleHeightmap(
 
 // ── Main import pipeline ───────────────────────────────────────────
 
-export function importOrogenWorld(
+export function importGenesisWorld(
 	params: ImportParams,
 	onProgress?: ProgressFn,
-): OrogenWorld {
+): GenesisWorld {
 	const { timings, record } = createTimingRecorder()
 	const rng = createRng(params.seed)
 
@@ -257,8 +257,8 @@ export function importOrogenWorld(
 	record("Ocean distance (BFS)", t0)
 	onProgress?.("import:oceanDist", 28)
 
-	// Build OrogenParams from ImportParams
-	const orogenParams: OrogenParams = {
+	// Build GenesisParams from ImportParams
+	const genesisParams: GenesisParams = {
 		seed: params.seed,
 		numPoints: params.numPoints,
 		numPlates: plateIds.length,
@@ -288,14 +288,14 @@ export function importOrogenWorld(
 		pressure: params.pressure ?? 1.0,
 	}
 
-	const maxElevKm = (orogenParams.maxElevation ?? 6000) / 1000
-	const maxDepthKm = getMaxOceanDepthKm(orogenParams.planetRadiusKm)
+	const maxElevKm = (genesisParams.maxElevation ?? 6000) / 1000
+	const maxDepthKm = getMaxOceanDepthKm(genesisParams.planetRadiusKm)
 	const baseElevation = elevation.slice()
 	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
 		baseElevation,
 		maxElevKm,
 		maxDepthKm,
-		seaLevel: orogenParams.seaLevel,
+		seaLevel: genesisParams.seaLevel,
 	})
 	elevation.set(finalElevation)
 
@@ -309,7 +309,7 @@ export function importOrogenWorld(
 		riverLand: isLand,
 		distCoast: distFields.distCoast,
 		oceanDist,
-		params: orogenParams,
+		params: genesisParams,
 		tectonicMode: "active",
 		boundary,
 		distFields,
@@ -325,7 +325,7 @@ export function importOrogenWorld(
 	t0 = performance.now()
 	const provinceSociety = deriveProvinceSociety({
 		mesh,
-		params: orogenParams,
+		params: genesisParams,
 		post,
 		isLand,
 	})
@@ -340,7 +340,7 @@ export function importOrogenWorld(
 		distFields,
 		elevation,
 		elevation_km,
-		params: orogenParams,
+		params: genesisParams,
 		climate: post.climate,
 		oceanDist,
 		rainfall: post.rainfall,

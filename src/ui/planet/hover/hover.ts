@@ -1,6 +1,6 @@
 import {
-	OROGEN_TERRAIN_FEATURE_LABELS,
-	OROGEN_TOPOGRAPHY_LABELS,
+	GENESIS_TERRAIN_FEATURE_LABELS,
+	GENESIS_TOPOGRAPHY_LABELS,
 } from "@/model"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
@@ -11,7 +11,7 @@ import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { meanEdgeLengthKm } from "@/model/shared/units"
 import { regionTimezoneLabel } from "@/model/society/timezone"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain/landmarks"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 
 export interface HoverInfo {
@@ -80,23 +80,23 @@ export interface HoverMisery {
 
 export function getHoverElevationKm(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	return hoverInfo && world ? (world.elevation_km[hoverInfo.region] ?? 0) : null
 }
 
 export function getHoverTopography(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	return hoverInfo && world?.topography
-		? (OROGEN_TOPOGRAPHY_LABELS[world.topography[hoverInfo.region]] ?? null)
+		? (GENESIS_TOPOGRAPHY_LABELS[world.topography[hoverInfo.region]] ?? null)
 		: null
 }
 
 export function getHoverCoordinates(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	if (!hoverInfo || !world) return null
 	const base = hoverInfo.region * 3
@@ -112,7 +112,7 @@ export function getHoverCoordinates(
 
 export function getHoverTimezone(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	if (!hoverInfo || !world) return null
 	// Reuse the colorer's band resolution so the hovered offset always matches
@@ -123,7 +123,7 @@ export function getHoverTimezone(
 
 export function getHoverTemperatureDelta(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	return hoverInfo && world?.climate
 		? world.climate.temperature_max[hoverInfo.region] -
@@ -133,7 +133,7 @@ export function getHoverTemperatureDelta(
 
 export function getHoverRainfall(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	rainfallMonth: number,
 ): number | null {
 	const region = hoverInfo?.region
@@ -155,7 +155,7 @@ export function getHoverRainfall(
 
 export function getHoverDtr(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 ): HoverDtr | null {
 	if (!(hoverInfo && world?.dtr_annual)) return null
@@ -177,7 +177,7 @@ export function getHoverDtr(
 
 export function getHoverHumidity(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 ): HoverHumidity | null {
 	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
@@ -231,7 +231,7 @@ export function getHoverHumidity(
 
 export function getHoverMisery(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 	windSpeedMs: number | null,
 	monthlyWindSpeedMs: number[] | null,
@@ -293,7 +293,7 @@ export function getHoverMisery(
 
 export function getHoverClimateZone(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	return hoverInfo && world?.climateZones && world?.isLand?.[hoverInfo.region]
 		? (CLIMATE_LABELS[world.climateZones[hoverInfo.region]] ?? null)
@@ -302,7 +302,7 @@ export function getHoverClimateZone(
 
 export function getHoverPastaClimate(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): { code: string | null; name: string } | null {
 	return hoverInfo && world?.pastaClimate
 		? {
@@ -314,7 +314,7 @@ export function getHoverPastaClimate(
 
 export function getHoverKoppenClimate(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): { code: string | null; name: string } | null {
 	return hoverInfo && world?.koppenClimate && world?.isLand?.[hoverInfo.region]
 		? {
@@ -326,7 +326,7 @@ export function getHoverKoppenClimate(
 
 export function getHoverBiome(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	return hoverInfo && world?.vegetation && world?.isLand?.[hoverInfo.region]
 		? (BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null)
@@ -335,7 +335,7 @@ export function getHoverBiome(
 
 export function getHoverProvince(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	return hoverInfo && world?.provinces
 		? world.provinces.regionProvince[hoverInfo.region]
@@ -344,7 +344,7 @@ export function getHoverProvince(
 
 export function getHoverLandmark(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverLandmark | null {
 	if (!(hoverInfo && world?.landmarks)) return null
 	const landmarkId = world.landmarks.regionLandmark[hoverInfo.region]
@@ -358,14 +358,14 @@ export function getHoverLandmark(
 
 export function getHoverIsLand(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): boolean | null {
 	return hoverInfo && world?.isLand ? !!world.isLand[hoverInfo.region] : null
 }
 
 export function getHoverOceanDist(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	return hoverInfo && world?.oceanDist
 		? world.oceanDist[hoverInfo.region]
@@ -374,7 +374,7 @@ export function getHoverOceanDist(
 
 export function getHoverDistCoast(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	return hoverInfo && world?.distCoast && world.elevation[hoverInfo.region] <= 0
 		? world.distCoast[hoverInfo.region]
@@ -383,7 +383,7 @@ export function getHoverDistCoast(
 
 export function getHoverHazards(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverHazards | null {
 	return hoverInfo && world?.hazards
 		? {
@@ -400,7 +400,7 @@ export function getHoverHazards(
 
 export function getHoverHotspot(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverHotspot | null {
 	return hoverInfo && world?.volcanism
 		? {
@@ -411,7 +411,7 @@ export function getHoverHotspot(
 
 export function getHoverRiver(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverRiver | null {
 	if (!(hoverInfo && world?.rivers?.visible && world.rivers.flow)) return null
 	const r = hoverInfo.region
@@ -432,7 +432,7 @@ export function getHoverRiver(
 
 export function getHoverOceanCurrents(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverOceanCurrents | null {
 	if (!(hoverInfo && world?.oceanCurrents)) return null
 	const r = hoverInfo.region
@@ -464,26 +464,26 @@ export function getHoverOceanCurrents(
 
 export function getHoverTerrainFeature(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverTerrainFeature | null {
 	if (!(hoverInfo && world?.terrainFeatures)) return null
 	const r = hoverInfo.region
 	const mask = world.terrainFeatures.featureMask[r]
 	if (!mask) return null
 	const all: string[] = []
-	for (let bit = 1; bit < OROGEN_TERRAIN_FEATURE_LABELS.length; bit++) {
-		if (mask & (1 << (bit - 1))) all.push(OROGEN_TERRAIN_FEATURE_LABELS[bit])
+	for (let bit = 1; bit < GENESIS_TERRAIN_FEATURE_LABELS.length; bit++) {
+		if (mask & (1 << (bit - 1))) all.push(GENESIS_TERRAIN_FEATURE_LABELS[bit])
 	}
 	return {
 		dominant:
-			OROGEN_TERRAIN_FEATURE_LABELS[world.terrainFeatures.dominantFeature[r]] ??
+			GENESIS_TERRAIN_FEATURE_LABELS[world.terrainFeatures.dominantFeature[r]] ??
 			null,
 		all,
 	}
 }
 
 export function getCoastHopLengthKm(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	if (!world) return null
 	return meanEdgeLengthKm(world.mesh, world.params.planetRadiusKm)
@@ -521,7 +521,7 @@ export function getHoverClimateDisplay(
  */
 export function getHoverTradeGood(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): { name: string; materialIndex: number } | null {
 	if (!(hoverInfo && world?.tradeGoods && world?.locations)) return null
 	const l = world.locations.regionLocation[hoverInfo.region]

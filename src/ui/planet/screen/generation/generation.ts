@@ -1,18 +1,18 @@
-import type { OrogenParams } from "@/model"
+import type { GenesisParams } from "@/model"
 import type { HistoryNote } from "@/model/history"
 import { MONTH_MS } from "@/model/history/state"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import type {
-	OrogenWorkerRequest,
-	OrogenWorkerResponse,
+	GenesisWorkerRequest,
+	GenesisWorkerResponse,
 	SerializedHistoryFrame,
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	SerializedTimelines,
 } from "@/model/transport/worker-types"
 
 export { decodePlanetCode }
 
-export type GenerationParams = OrogenParams
+export type GenerationParams = GenesisParams
 
 interface ImportHeightmapParams {
 	seed: number
@@ -81,7 +81,7 @@ export interface GenerationCallbacks {
 	pushRecentCode: (code: string) => void
 	setPlanetCode: (v: string) => void
 	setPlanetCodeInput: (v: string) => void
-	setWorld: (v: SerializedOrogenWorld | null) => void
+	setWorld: (v: SerializedGenesisWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
 	onGenerationFrame?: (frame: SerializedHistoryFrame) => void
 	onGenerationComplete?: () => void
@@ -104,19 +104,19 @@ export interface GenerationCallbacks {
 function createWorker(
 	callbacks: GenerationCallbacks,
 	onDone: (
-		message: OrogenWorkerResponse & { type: "done" },
+		message: GenesisWorkerResponse & { type: "done" },
 		worker: Worker,
 	) => void,
 	failLabel: string,
 ): Worker {
 	callbacks.workerRef.current?.terminate()
 	const worker = new Worker(
-		new URL("../../../../model/orogen.worker.ts", import.meta.url),
+		new URL("../../../../model/genesis.worker.ts", import.meta.url),
 		{ type: "module" },
 	)
 	callbacks.workerRef.current = worker
 
-	worker.onmessage = (event: MessageEvent<OrogenWorkerResponse>) => {
+	worker.onmessage = (event: MessageEvent<GenesisWorkerResponse>) => {
 		const message = event.data
 		if (message.type === "progress") {
 			callbacks.setGenerationLabel(message.label)
@@ -144,7 +144,7 @@ function createWorker(
 			return
 		}
 		if (message.type === "error") {
-			console.error("Orogen worker failed", message.message, message.stack)
+			console.error("Genesis worker failed", message.message, message.stack)
 			callbacks.setGenerationLabel(failLabel)
 			callbacks.setGenerating(false)
 			return
@@ -170,7 +170,7 @@ function createWorker(
 				.filter((value) => value !== undefined && value !== 0 && value !== "")
 				.join(":") ||
 			"Unknown worker error"
-		console.error("Orogen worker crashed", detail, event.error)
+		console.error("Genesis worker crashed", detail, event.error)
 		callbacks.setGenerationLabel(failLabel)
 		callbacks.setGenerating(false)
 		worker.terminate()
@@ -233,9 +233,9 @@ export function generateWorld(
 		maxElevation: overrides?.maxElevation ?? currentParams.maxElevation,
 		craters: overrides?.craters ?? currentParams.craters,
 		era: overrides?.era ?? currentParams.era,
-	} as OrogenParams
+	} as GenesisParams
 
-	const request: OrogenWorkerRequest = { type: "generate", params }
+	const request: GenesisWorkerRequest = { type: "generate", params }
 	requestAnimationFrame(() => {
 		const worker = createWorker(
 			callbacks,
@@ -263,7 +263,7 @@ export function startSimulation(
 ): void {
 	const worker = workerRef.current
 	if (!worker) return
-	const request: OrogenWorkerRequest = { type: "simulate", tickMs: MONTH_MS }
+	const request: GenesisWorkerRequest = { type: "simulate", tickMs: MONTH_MS }
 	worker.postMessage(request)
 }
 
@@ -272,7 +272,7 @@ export function pauseSimulation(
 ): void {
 	const worker = workerRef.current
 	if (!worker) return
-	const request: OrogenWorkerRequest = { type: "pause" }
+	const request: GenesisWorkerRequest = { type: "pause" }
 	worker.postMessage(request)
 }
 
@@ -290,7 +290,7 @@ export function importHeightmap(
 	callbacks.setPlanetCodeInput("")
 	callbacks.setWorld(null)
 
-	const request: OrogenWorkerRequest = {
+	const request: GenesisWorkerRequest = {
 		type: "import",
 		params: {
 			seed: importParams.seed as number,

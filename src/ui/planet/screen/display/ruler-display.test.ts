@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { YEAR_MS } from "@/model/history/state"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { buildRulerDisplayMeta } from "./ruler-display"
 
 describe("buildRulerDisplayMeta", () => {
@@ -22,7 +22,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([3]),
 			leaderBirthYear: new Float32Array([-1]),
 			leaderNameSeed: new Int32Array([-1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({ world, nationId: 0, timeMs: null })
 		expect(result.claimStrength).toBe("Strong claim")
 	})
@@ -32,7 +32,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([2]),
 			leaderBirthYear: new Float32Array([-1]),
 			leaderNameSeed: new Int32Array([-1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({ world, nationId: 0, timeMs: null })
 		expect(result.claimStrength).toBe("Average claim")
 	})
@@ -42,7 +42,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([1]),
 			leaderBirthYear: new Float32Array([-1]),
 			leaderNameSeed: new Int32Array([-1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({ world, nationId: 0, timeMs: null })
 		expect(result.claimStrength).toBe("Weak claim")
 	})
@@ -52,7 +52,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([0]),
 			leaderBirthYear: new Float32Array([-1]),
 			leaderNameSeed: new Int32Array([-1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({ world, nationId: 0, timeMs: null })
 		expect(result.claimStrength).toBe("No claim")
 	})
@@ -62,7 +62,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([2]),
 			leaderBirthYear: new Float32Array([10]),
 			leaderNameSeed: new Int32Array([-1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({
 			world,
 			nationId: 0,
@@ -77,7 +77,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([3]),
 			leaderBirthYear: new Float32Array([0]),
 			leaderNameSeed: new Int32Array([-1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({
 			world,
 			nationId: 0,
@@ -92,7 +92,7 @@ describe("buildRulerDisplayMeta", () => {
 			leaderClaim: new Int32Array([2]),
 			leaderBirthYear: new Float32Array([-1]),
 			leaderNameSeed: new Int32Array([42]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const result = buildRulerDisplayMeta({ world, nationId: 0, timeMs: null })
 		expect(result.gender).not.toBeNull()
 		expect(["male", "female"]).toContain(result.gender)

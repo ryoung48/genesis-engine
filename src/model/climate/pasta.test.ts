@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type {
-	OrogenClimate,
-	OrogenHydrology,
-	OrogenParams,
-	OrogenRainfall,
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisParams,
+	GenesisRainfall,
 	SphereMesh,
 } from ".."
 import {
@@ -21,7 +21,7 @@ function buildMesh(): SphereMesh {
 	} as SphereMesh
 }
 
-function buildParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
+function buildParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 	return {
 		seed: 1,
 		numPoints: 1,
@@ -64,7 +64,7 @@ function toMonthly(values: number[]): Float32Array {
 	return new Float32Array(values)
 }
 
-function buildClimate(input: PastaCaseInput): OrogenClimate {
+function buildClimate(input: PastaCaseInput): GenesisClimate {
 	const temperatures = input.temperatures
 	return {
 		temperature_avg: new Float32Array([
@@ -84,7 +84,7 @@ function buildClimate(input: PastaCaseInput): OrogenClimate {
 
 function buildRainfall(
 	monthly: number[] = new Array(12).fill(0),
-): OrogenRainfall {
+): GenesisRainfall {
 	return {
 		monthly: toMonthly(monthly),
 		annual: new Float32Array([monthly.reduce((sum, value) => sum + value, 0)]),
@@ -95,7 +95,7 @@ function buildRainfall(
 
 function buildHydrology(
 	aet: number[] = new Array(12).fill(0),
-): OrogenHydrology {
+): GenesisHydrology {
 	return {
 		aet_monthly: toMonthly(aet),
 		aridity_monthly: new Float32Array(12),

@@ -1,10 +1,10 @@
 /**
  * Sphere mesh construction: Fibonacci spiral → stereographic projection →
  * Delaunator → pole closure → SphereMesh.
- * Faithful port of orogen's sphere-mesh.js.
+ * Faithful port of genesis's sphere-mesh.js.
  */
 import Delaunator from "delaunator"
-import type { OrogenRng } from "./shared/rng"
+import type { GenesisRng } from "./shared/rng"
 import type { SphereMesh } from "./types/mesh"
 
 /**
@@ -13,7 +13,7 @@ import type { SphereMesh } from "./types/mesh"
 function generateFibonacciSphere(
 	N: number,
 	jitter: number,
-	rng: OrogenRng,
+	rng: GenesisRng,
 ): Float32Array {
 	const r_xyz = new Float32Array(3 * N)
 	const s = 3.6 / Math.sqrt(N)
@@ -113,7 +113,7 @@ function addPoleToMesh(
 export function buildSphereMesh(
 	n: number,
 	jitter: number,
-	rng: OrogenRng,
+	rng: GenesisRng,
 ): SphereMesh {
 	const baseXyz = generateFibonacciSphere(n, jitter, rng)
 	const flat = stereographicProjection(baseXyz, n)

@@ -9,7 +9,7 @@
  * The substellar position shifts monthly via libration (eccentricity) and
  * declination (obliquity), so seasonal wind variation is captured.
  */
-import type { OrogenClimate, OrogenParams, SphereMesh } from "../.."
+import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
 import { DEFAULT_ANTISTELLAR_LON } from "../../shared/units"
 import { getClimateGeometry } from "../rain"
@@ -95,10 +95,10 @@ function surfaceWindFactor(r: number, surface: WindSurface): number {
  */
 export function computeLockedWindVectors(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	elevation_km: Float32Array,
 	params?: Pick<
-		OrogenParams,
+		GenesisParams,
 		"antistellarLon" | "obliquity" | "eccentricity" | "perihelion" | "pressure"
 	>,
 	month?: number,
@@ -262,8 +262,9 @@ export function computeLockedWindVectors(
 		}
 	}
 
-	// No rotation factor for locked planets — circulation is ageostrophic.
-	// 90th percentile → 10 m/s reference (day-night gradient drives ~terminator jets).
+	// No Coriolis rotation factor — circulation is purely ageostrophic.
+	// 90th percentile → 10 m/s reference, matching the thermally-direct cap used
+	// for slow rotators (same regime). Terminator jet factor handles spatial contrast.
 	// Pressure factor: thin atmosphere → faster winds for same thermal gradient.
 	const sorted = rawSpeed.slice().sort()
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6

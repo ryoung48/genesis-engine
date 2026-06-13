@@ -1,11 +1,11 @@
 import type {
-	OrogenClimate,
-	OrogenOceanCurrents,
-	OrogenParams,
+	GenesisClimate,
+	GenesisOceanCurrents,
+	GenesisParams,
 	SphereMesh,
 } from "../.."
 import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
-import type { OrogenLandmarks } from "../../terrain/landmarks"
+import type { GenesisLandmarks } from "../../terrain/landmarks"
 import { computeCoastalWarmthFromOceanWarmth } from "../ocean-currents-shared"
 import type { FlowGrid } from "../wind"
 import { rasterizeVectorGrid } from "../wind"
@@ -21,7 +21,7 @@ const LOCKED_VECTOR_SMOOTHING_PASSES = 2
 const TYPE_LAKE = 5
 
 type LockedCurrentParams = Pick<
-	Partial<OrogenParams>,
+	Partial<GenesisParams>,
 	| "antistellarLon"
 	| "eccentricity"
 	| "obliquity"
@@ -52,7 +52,7 @@ function normalizeField(field: Float32Array, isBlocked: Uint8Array): void {
 function buildLakeMask(
 	numRegions: number,
 	isLand: Uint8Array,
-	landmarks: OrogenLandmarks,
+	landmarks: GenesisLandmarks,
 ): Uint8Array {
 	const isLake = new Uint8Array(numRegions)
 	for (let r = 0; r < numRegions; r++) {
@@ -172,9 +172,9 @@ export function computeLockedOceanCurrents(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
 	_landDistCoast: Float32Array,
-	landmarks: OrogenLandmarks,
+	landmarks: GenesisLandmarks,
 	params?: LockedCurrentParams,
-): OrogenOceanCurrents {
+): GenesisOceanCurrents {
 	const N = mesh.numRegions
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 	const isLake = buildLakeMask(N, isLand, landmarks)
@@ -219,9 +219,9 @@ export function computeLockedOceanCurrents(
 
 export function applyLockedCurrentTemperatureEffect(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	isLand: Uint8Array,
-	currents: OrogenOceanCurrents,
+	currents: GenesisOceanCurrents,
 	params?: LockedCurrentParams,
 ): void {
 	const N = mesh.numRegions
@@ -329,7 +329,7 @@ export function buildLockedOceanCurrentGrid(
 	latDeg: Float32Array,
 	lonDeg: Float32Array,
 	params?: Pick<
-		OrogenParams,
+		GenesisParams,
 		"antistellarLon" | "eccentricity" | "obliquity" | "perihelion"
 	>,
 	currentMonth?: number,

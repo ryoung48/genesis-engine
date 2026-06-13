@@ -3,7 +3,7 @@ import type { TectonicPlate } from ".."
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { projectMantleFieldToRegions } from "../tectonics/mantle"
-import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
+import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
 import { applyHotspots } from "./hotspots"
 
 function buildMesh() {
@@ -164,7 +164,7 @@ describe("applyHotspots", () => {
 			1,
 		)
 
-		const lipBit = 1 << (OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1)
+		const lipBit = 1 << (GENESIS_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1)
 		let markedLip = 0
 		let activeHotspot = 0
 		for (let r = 0; r < mesh.numRegions; r++) {
@@ -259,7 +259,7 @@ describe("applyHotspots", () => {
 			0,
 		)
 
-		const lipBit = 1 << (OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1)
+		const lipBit = 1 << (GENESIS_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1)
 		expect(Array.from(hotspot)).toEqual(new Array(mesh.numRegions).fill(0))
 		expect(
 			Array.from(terrainFeatures.featureMask).some((mask) => mask & lipBit),

@@ -1,9 +1,9 @@
 import type {
-	OrogenClimate,
-	OrogenHydrology,
-	OrogenParams,
-	OrogenRainfall,
-	OrogenRivers,
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisParams,
+	GenesisRainfall,
+	GenesisRivers,
 	SphereMesh,
 } from ".."
 import { smoothstep } from "../shared/math"
@@ -34,12 +34,12 @@ function polylineLengthKm(
 export function computeRivers(
 	mesh: SphereMesh,
 	elevation: Float32Array,
-	rainfall: OrogenRainfall,
-	climate: OrogenClimate,
-	hydrology: OrogenHydrology,
+	rainfall: GenesisRainfall,
+	climate: GenesisClimate,
+	hydrology: GenesisHydrology,
 	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "planetRadiusKm" | "daysPerYear" | "hoursPerDay">,
-): OrogenRivers {
+	params?: Pick<GenesisParams, "planetRadiusKm" | "daysPerYear" | "hoursPerDay">,
+): GenesisRivers {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
 	const DEG = 180 / Math.PI

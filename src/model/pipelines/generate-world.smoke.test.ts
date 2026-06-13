@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
-import type { OrogenParams } from ".."
-import { generateOrogenWorld } from "./generate-world"
+import type { GenesisParams } from ".."
+import { generateGenesisWorld } from "./generate-world"
 
 const TEST_NUM_POINTS = 700
-const worldCache = new Map<string, ReturnType<typeof generateOrogenWorld>>()
+const worldCache = new Map<string, ReturnType<typeof generateGenesisWorld>>()
 
-function makeParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
+function makeParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 	return {
 		seed: 12345,
 		numPoints: TEST_NUM_POINTS,
@@ -40,12 +40,12 @@ function makeParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
 	}
 }
 
-function getCachedWorld(overrides: Partial<OrogenParams> = {}) {
+function getCachedWorld(overrides: Partial<GenesisParams> = {}) {
 	const params = makeParams(overrides)
 	const key = JSON.stringify(params)
 	const cached = worldCache.get(key)
 	if (cached) return cached
-	const world = generateOrogenWorld(params)
+	const world = generateGenesisWorld(params)
 	worldCache.set(key, world)
 	return world
 }
@@ -74,7 +74,7 @@ afterAll(() => {
 
 const TEST_TIMEOUT = 60_000
 
-describe("generateOrogenWorld", () => {
+describe("generateGenesisWorld", () => {
 	it(
 		"produces a fully-populated world in active mode",
 		() => {
@@ -216,8 +216,8 @@ describe("generateOrogenWorld", () => {
 		"is deterministic for a given seed",
 		() => {
 			const params = makeParams({ seed: 777, numPoints: 400 })
-			const a = generateOrogenWorld(params)
-			const b = generateOrogenWorld(params)
+			const a = generateGenesisWorld(params)
+			const b = generateGenesisWorld(params)
 			expect(a.mesh.numRegions).toBe(b.mesh.numRegions)
 			expect(a.elevation).toEqual(b.elevation)
 			expect(a.isLand).toEqual(b.isLand)

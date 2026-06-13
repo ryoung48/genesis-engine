@@ -1,4 +1,4 @@
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { HistoryView } from "../history/history-query"
 
 interface HistoryChildrenIndex {
@@ -15,7 +15,7 @@ export interface DisplayNationModel {
 }
 
 export function buildSovereignRulerFields(params: {
-	world: SerializedOrogenWorld | null | undefined
+	world: SerializedGenesisWorld | null | undefined
 	fallbackLength?: number
 }): {
 	leaderDynasty: Int32Array
@@ -60,7 +60,7 @@ export function buildSovereignRulerFields(params: {
 	}
 }
 
-function buildBaseNationColors(world: SerializedOrogenWorld): Float32Array {
+function buildBaseNationColors(world: SerializedGenesisWorld): Float32Array {
 	const provinceCount =
 		world.provinces?.count ?? world.nations?.assignment.length ?? 0
 	const colors = new Float32Array(provinceCount * 3)
@@ -93,7 +93,7 @@ function buildBaseNationColors(world: SerializedOrogenWorld): Float32Array {
 
 export function buildNationAdjacency(
 	provinceAssignment: Int32Array,
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 ): { adjOffset: Int32Array; adjList: Int32Array } {
 	const provinceCount = world.provinces?.count ?? provinceAssignment.length
 	const neighborSets = new Map<number, Set<number>>()
@@ -164,10 +164,10 @@ export function buildHistoryChildrenIndex(
 }
 
 export function buildDisplayWorld(params: {
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 	selectedHistoryView: HistoryView | null
 	selectedHistoryChildren: HistoryChildrenIndex | null
-}): SerializedOrogenWorld | null {
+}): SerializedGenesisWorld | null {
 	const { world, selectedHistoryView, selectedHistoryChildren } = params
 	if (!world) return null
 	const base = world
@@ -227,7 +227,7 @@ export function buildDisplayWorld(params: {
 }
 
 export function buildDisplayNationModel(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): DisplayNationModel | null {
 	if (
 		!world?.provinces ||

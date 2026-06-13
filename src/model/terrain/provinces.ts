@@ -1,10 +1,10 @@
 /**
- * Province partitioning for the orogen pipeline.
+ * Province partitioning for the genesis pipeline.
  * Competitive multi-source BFS on SphereMesh CSR adjacency.
  * O(N) time, all typed arrays, no object allocation in hot path.
  */
 
-import type { OrogenProvinces, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisProvinces, GenesisRainfall, SphereMesh } from ".."
 import { createRng } from "../shared/rng"
 import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "../shared/units"
 
@@ -17,13 +17,13 @@ export function computeProvinces(
 	seed: number,
 	options?: {
 		climateZones?: Uint8Array
-		rainfall?: OrogenRainfall
+		rainfall?: GenesisRainfall
 		oceanCoastal?: Uint8Array
 		lakeCoastal?: Uint8Array
 		riverVisible?: Uint8Array
 		planetRadiusKm?: number
 	},
-): OrogenProvinces {
+): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const rng = createRng(seed + 31337)
@@ -366,7 +366,7 @@ function generateProvinceColors(
 	return colors
 }
 
-function emptyProvinces(N: number): OrogenProvinces {
+function emptyProvinces(N: number): GenesisProvinces {
 	return {
 		regionProvince: new Int32Array(N).fill(-1),
 		seeds: new Int32Array(0),

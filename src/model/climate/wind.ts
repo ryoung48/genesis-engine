@@ -17,7 +17,7 @@
  *
  * This is standalone — it does NOT feed the moisture advection system.
  */
-import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import { clamp, smoothstep } from "../shared/math"
 import { isRetrogradeObliquity } from "../shared/units"
 import {
@@ -396,10 +396,10 @@ function computePressureField(
  */
 export function computeWindVectors(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 	elevation_km: Float32Array,
 	params?: Pick<
-		OrogenParams,
+		GenesisParams,
 		| "obliquity"
 		| "hoursPerDay"
 		| "tidallyLocked"
@@ -508,14 +508,14 @@ export function computeWindVectors(
 
 	// Calibrate to approximate m/s:
 	// - 90th percentile of |∇P| → reference speed (10 m/s, typical trades/westerlies)
-	// - Rotation factor: slower rotation → weaker Coriolis → faster geostrophic winds
-	//   for the same thermal contrast. Clamped to a sensible range.
+	// - Rotation factor: slower rotation → faster surface winds, but boundary layer
+	//   friction decouples from geostrophic scaling, so ∝ log(hoursPerDay).
 	// - Pressure factor: thinner atmosphere → less air mass resisting the same thermal
 	//   gradient → faster surface winds. 1 bar = neutral; scales as 1/√pressure.
 	const sorted = rawSpeed.slice().sort()
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
 	const ref = Math.max(pct90, 1e-6)
-	const rotationFactor = Math.sqrt(clamp(hoursPerDay, 6, 192) / 24)
+	const rotationFactor = Math.min(Math.log(clamp(hoursPerDay, 6, 192)) / Math.log(24), 1.8)
 	const pressureFactor =
 		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
 	const windSpeed = new Float32Array(N)

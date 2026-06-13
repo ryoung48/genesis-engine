@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenProvinces, SphereMesh } from ".."
+import type { GenesisProvinces, SphereMesh } from ".."
 import { computeLocations } from "./locations"
 
 function buildRingMesh(n: number): SphereMesh {
@@ -34,7 +34,7 @@ function buildRingMesh(n: number): SphereMesh {
 	} as unknown as SphereMesh
 }
 
-function buildLinearProvinces(n: number, provCount: number): OrogenProvinces {
+function buildLinearProvinces(n: number, provCount: number): GenesisProvinces {
 	const regionProvince = new Int32Array(n)
 	const regionsPerProv = Math.ceil(n / provCount)
 	for (let r = 0; r < n; r++) {
@@ -179,7 +179,7 @@ describe("computeLocations", () => {
 		provAdjOffset[2] = 2
 		provAdjList[0] = 1
 		provAdjList[1] = 0
-		const provinces: OrogenProvinces = {
+		const provinces: GenesisProvinces = {
 			regionProvince,
 			seeds: new Int32Array([0, 60]),
 			count: 2,

@@ -1,2 +1,2 @@
-export { createOrogenScene } from "./create-orogen-scene"
-export type { OrogenScene, OrogenViewMode } from "./types"
+export { createGenesisScene } from "./create-genesis-scene"
+export type { GenesisScene, GenesisViewMode } from "./types"

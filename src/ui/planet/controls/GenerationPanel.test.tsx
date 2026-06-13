@@ -83,8 +83,8 @@ describe("GenerationPanel", () => {
 
 	it("keeps post breakdown out of the top-level timing total", () => {
 		const summary = getGenerationTimingSummary([
-			{ Stage: "orogen:mesh", ms: "120.0" },
-			{ Stage: "orogen:post-pipeline", ms: "980.0" },
+			{ Stage: "genesis:mesh", ms: "120.0" },
+			{ Stage: "genesis:post-pipeline", ms: "980.0" },
 			{ Stage: "Post: rainfall", ms: "310.0" },
 			{ Stage: "Post: rivers", ms: "220.0" },
 		])
@@ -101,7 +101,7 @@ describe("GenerationPanel", () => {
 
 	it("extracts post breakdown entries for the dedicated timing view", () => {
 		const summary = getPostTimingSummary([
-			{ Stage: "orogen:mesh", ms: "120.0" },
+			{ Stage: "genesis:mesh", ms: "120.0" },
 			{ Stage: "Post: rainfall", ms: "310.0" },
 			{ Stage: "Post: rivers", ms: "220.0" },
 			{ Stage: "Post: topography", ms: "95.0" },
@@ -123,7 +123,7 @@ describe("GenerationPanel", () => {
 		expect(
 			getGenerationTimingSummary([
 				{ Stage: "mesh", ms: "90" },
-				{ Stage: "orogen:detail", ms: "50" },
+				{ Stage: "genesis:detail", ms: "50" },
 				{ Stage: "Post: rainfall", ms: "300" },
 				{ Stage: "ignored", ms: "NaN" },
 			]),
@@ -159,7 +159,7 @@ describe("GenerationPanel", () => {
 		expect(
 			getGenerationTimingSummary([
 				{ Stage: "Standalone", ms: "100" },
-				{ Stage: "orogen:detail", ms: "99.9" },
+				{ Stage: "genesis:detail", ms: "99.9" },
 			]),
 		).toEqual({
 			entries: [
@@ -193,8 +193,8 @@ describe("GenerationPanel", () => {
 						},
 					],
 					generationTimings: [
-						{ Stage: "orogen:mesh", ms: "250" },
-						{ Stage: "orogen:detail", ms: "90" },
+						{ Stage: "genesis:mesh", ms: "250" },
+						{ Stage: "genesis:detail", ms: "90" },
 						{ Stage: "Post: rainfall", ms: "180" },
 					],
 				})}
@@ -252,7 +252,7 @@ describe("GenerationPanel", () => {
 		const markup = renderToStaticMarkup(
 			<GenerationPanel
 				{...createProps({
-					generationTimings: [{ Stage: "orogen:mesh", ms: "12500" }],
+					generationTimings: [{ Stage: "genesis:mesh", ms: "12500" }],
 				})}
 			/>,
 		)

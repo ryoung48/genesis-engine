@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import {
 	applyDtrToClimateMinMax,
 	computeLandFraction,
@@ -41,7 +41,7 @@ function buildMesh(
 	} as SphereMesh
 }
 
-function buildParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
+function buildParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 	return {
 		seed: 7,
 		numPoints: 3,
@@ -125,7 +125,7 @@ describe("applyDtrToClimateMinMax", () => {
 			pet_monthly: new Float32Array(24),
 			daylight_hours_monthly: new Float32Array(24),
 			landFraction: [] as number[],
-		} satisfies OrogenClimate
+		} satisfies GenesisClimate
 		const dtrMonthly = new Float32Array([6, 2, 4, 8, ...new Array(20).fill(0)])
 
 		applyDtrToClimateMinMax(climate, dtrMonthly, 2)

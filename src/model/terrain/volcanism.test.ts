@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
-import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
+import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
 import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,
@@ -100,9 +100,9 @@ describe("applyVolcanicArcs", () => {
 		expect(uplift[0]).toBeGreaterThan(0)
 		expect(elevation[0]).toBeCloseTo(uplift[0])
 		expect(tracker.featureMask[0]).toBe(
-			1 << (OROGEN_TERRAIN_FEATURE.VOLCANIC_ARC - 1),
+			1 << (GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC - 1),
 		)
-		expect(tracker.dominantFeature[0]).toBe(OROGEN_TERRAIN_FEATURE.VOLCANIC_ARC)
+		expect(tracker.dominantFeature[0]).toBe(GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC)
 	})
 
 	it("keeps oceanic and continental volcanic cone heights identical", () => {
@@ -419,10 +419,10 @@ describe("applyLargeIgneousProvinces", () => {
 		expect(uplift[0]).toBeGreaterThan(0)
 		expect(elevation[0]).toBeCloseTo(uplift[0])
 		expect(tracker.featureMask[0]).toBe(
-			1 << (OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1),
+			1 << (GENESIS_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE - 1),
 		)
 		expect(tracker.dominantFeature[0]).toBe(
-			OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE,
+			GENESIS_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE,
 		)
 	})
 

@@ -133,8 +133,8 @@ describe("generateWorld", () => {
 
 		generateWorld(42, undefined, baseParams as never, makeCallbacks())
 
-		expect(String(capturedUrl)).toContain("/src/model/orogen.worker.ts")
-		expect(String(capturedUrl)).not.toContain("/src/components/model/orogen")
+		expect(String(capturedUrl)).toContain("/src/model/genesis.worker.ts")
+		expect(String(capturedUrl)).not.toContain("/src/components/model/genesis")
 	})
 
 	it("keeps generation progress monotonic when worker stages regress", () => {

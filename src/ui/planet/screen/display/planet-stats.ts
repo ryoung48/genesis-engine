@@ -5,7 +5,7 @@ import {
 	meanEdgeLengthKm,
 } from "@/model/shared/units"
 import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	formatArea,
 	formatDistance,
@@ -21,7 +21,7 @@ export interface PlanetStat {
 }
 
 export function computePlanetStats(
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	params: {
 		obliquity: number
 		eccentricity: number

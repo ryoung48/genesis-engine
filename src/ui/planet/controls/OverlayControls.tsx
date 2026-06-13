@@ -15,7 +15,7 @@ import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import type { ColorMode } from "../colors"
-import type { OrogenViewMode } from "../renderer"
+import type { GenesisViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
 import type {
@@ -122,8 +122,8 @@ interface OverlayControlsProps {
 	setShowRoads: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
-	viewMode: OrogenViewMode
-	setViewMode: (v: OrogenViewMode) => void
+	viewMode: GenesisViewMode
+	setViewMode: (v: GenesisViewMode) => void
 	unitSystem: UnitSystem
 	setUnitSystem: (v: UnitSystem) => void
 	mapProjectionLatitude: number

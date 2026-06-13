@@ -1,6 +1,6 @@
 /**
  * Hotspot volcanism ΓÇö mantle plumes with drift chains.
- * Faithful port of orogen's dual-component model: broad thermal swell +
+ * Faithful port of genesis's dual-component model: broad thermal swell +
  * volcanic peak with domain-warped shape distortion, age-dependent texture,
  * drift elongation, summit calderas, and radial rift-zone ridges.
  */
@@ -10,7 +10,7 @@ import { createRng } from "../shared/rng"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { normalizeMantleField } from "../tectonics/mantle"
 import type { SphereMesh } from "../types/mesh"
-import type { OrogenTerrainFeatures, TectonicPlate } from "../types/tectonics"
+import type { GenesisTerrainFeatures, TectonicPlate } from "../types/tectonics"
 import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,
@@ -82,7 +82,7 @@ export function applyHotspots(
 	plateAssignment: Int32Array,
 	elevation: Float32Array,
 	mantleUpwelling: Float32Array,
-	terrainFeatures: OrogenTerrainFeatures | undefined,
+	terrainFeatures: GenesisTerrainFeatures | undefined,
 	seed: number,
 	volcanism: number,
 ): Float32Array {

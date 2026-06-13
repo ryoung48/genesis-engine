@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { Text } from "troika-three-text"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 import { createMapProjection } from "./map-projection"
 import { globeScaleForPop, mapRadiusForPop } from "./settlement-overlay"
@@ -96,7 +96,7 @@ function disposePool(pool: LabelPool) {
 }
 
 function nationCapitalRegion(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nationIdx: number,
 ): number {
 	const nationSeeds = world.nations?.seeds
@@ -111,7 +111,7 @@ function nationCapitalRegion(
 }
 
 function nationCapitalProvince(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nationIdx: number,
 ): number {
 	const nationSeeds = world.nations?.seeds
@@ -122,7 +122,7 @@ function nationCapitalProvince(
 }
 
 function nationProvinceCount(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nationIdx: number,
 ): number {
 	const directCount = world.nations?.size?.[nationIdx]
@@ -299,7 +299,7 @@ function updateGlobeLabelOrientations(
 }
 
 export function buildGlobeNationLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nationNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
@@ -368,7 +368,7 @@ export function buildGlobeNationLabels(
 }
 
 export function buildMapNationLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nationNames: string[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -438,7 +438,7 @@ export function buildMapNationLabels(
 // ── Partition-based labels (culture, heritage, faith, religion) ───────────────
 
 function computePartitionCentralData(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	partitionCount: number,
 	getProvincePartition: (province: number) => number,
 ): { centralRegions: Int32Array; provinceCounts: Int32Array } {
@@ -485,7 +485,7 @@ function computePartitionCentralData(
 }
 
 function buildGlobePartitionLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	names: string[],
 	partitionCount: number,
 	getProvincePartition: (province: number) => number,
@@ -549,7 +549,7 @@ function buildGlobePartitionLabels(
 }
 
 function buildMapPartitionLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	names: string[],
 	partitionCount: number,
 	getProvincePartition: (province: number) => number,
@@ -614,7 +614,7 @@ function buildMapPartitionLabels(
 }
 
 export function buildGlobeCultureLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	cultureNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
@@ -636,7 +636,7 @@ export function buildGlobeCultureLabels(
 }
 
 export function buildMapCultureLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	cultureNames: string[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -658,7 +658,7 @@ export function buildMapCultureLabels(
 }
 
 export function buildGlobeHeritageLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	heritageNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
@@ -685,7 +685,7 @@ export function buildGlobeHeritageLabels(
 }
 
 export function buildMapHeritageLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	heritageNames: string[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -712,7 +712,7 @@ export function buildMapHeritageLabels(
 }
 
 export function buildGlobeFaithLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	faithNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
@@ -739,7 +739,7 @@ export function buildGlobeFaithLabels(
 }
 
 export function buildMapFaithLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	faithNames: string[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -766,7 +766,7 @@ export function buildMapFaithLabels(
 }
 
 export function buildGlobeReligionLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	religionNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
@@ -795,7 +795,7 @@ export function buildGlobeReligionLabels(
 }
 
 export function buildMapReligionLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	religionNames: string[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -889,7 +889,7 @@ function createSettlementLabelPools(): NationLabelPools {
 }
 
 export function buildGlobeSettlementLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	settlementNames: string[],
 	camera: THREE.PerspectiveCamera,
 	pool: LabelPool,
@@ -954,7 +954,7 @@ export function buildGlobeSettlementLabels(
 }
 
 export function buildMapSettlementLabels(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	settlementNames: string[],
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,

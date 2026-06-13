@@ -1,4 +1,4 @@
-import type { OrogenRainfall, SphereMesh } from ".."
+import type { GenesisRainfall, SphereMesh } from ".."
 import { MinHeap } from "../shared/min-heap"
 
 function computeSubgraphNeighborCount(
@@ -326,7 +326,7 @@ export function selectConnectedLakeCells(
 export function computeLakes(
 	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList">,
 	elevation: Float32Array,
-	rainfall: Pick<OrogenRainfall, "annual">,
+	rainfall: Pick<GenesisRainfall, "annual">,
 	waterLevel: Float32Array,
 	basinId: Int32Array,
 	isLand: Uint8Array,

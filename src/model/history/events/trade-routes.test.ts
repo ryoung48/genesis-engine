@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenNationHierarchy, OrogenProvinces } from "../.."
+import type { GenesisNationHierarchy, GenesisProvinces } from "../.."
 import type { ProvincePopulation } from "../../society/population"
 import {
 	ROUTE_LAND_MAJOR,
@@ -58,7 +58,7 @@ function createInfrastructureState(options: {
 		adjList: provinceAdjList,
 		size: new Int32Array(provinceCount).fill(1),
 		colors,
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: Int32Array.from({ length: provinceCount }, (_, index) => index),
 		seeds: Int32Array.from({ length: provinceCount }, (_, index) => index),
@@ -73,7 +73,7 @@ function createInfrastructureState(options: {
 		childList: new Int32Array(0),
 		sovereign: Int32Array.from({ length: provinceCount }, (_, index) => index),
 		gravity: new Float32Array(provinceCount).fill(1),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const populationValues =
 		options.population ?? new Array(provinceCount).fill(300_000)
 	const population: ProvincePopulation = {

@@ -4,7 +4,7 @@ import type {
 	LabelMode,
 	MeasureMode,
 } from "../../controls/OverlayControls"
-import type { OrogenViewMode } from "../../renderer"
+import type { GenesisViewMode } from "../../renderer"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import { DEFAULT_GEOGRAPHY_MODE } from "../shared/map-modes"
 import type { UnitSystem } from "../shared/ui-format"
@@ -14,7 +14,7 @@ interface StoredViewPrefs {
 	geographyMode: ColorMode
 	nationMode: NationMapMode
 	populationMode: PopulationMapMode
-	viewMode: OrogenViewMode
+	viewMode: GenesisViewMode
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
@@ -90,7 +90,7 @@ const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
 	"migration",
 ])
 
-const VIEW_MODES = new Set<OrogenViewMode>(["globe", "map"])
+const VIEW_MODES = new Set<GenesisViewMode>(["globe", "map"])
 const UNIT_SYSTEMS = new Set<UnitSystem>(["metric", "imperial"])
 const MEASURE_MODES = new Set<MeasureMode>(["off", "ruler", "pathfinding"])
 export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
@@ -153,8 +153,8 @@ function isPopulationMapMode(value: unknown): value is PopulationMapMode {
 	)
 }
 
-function isViewMode(value: unknown): value is OrogenViewMode {
-	return typeof value === "string" && VIEW_MODES.has(value as OrogenViewMode)
+function isViewMode(value: unknown): value is GenesisViewMode {
+	return typeof value === "string" && VIEW_MODES.has(value as GenesisViewMode)
 }
 
 function isUnitSystem(value: unknown): value is UnitSystem {

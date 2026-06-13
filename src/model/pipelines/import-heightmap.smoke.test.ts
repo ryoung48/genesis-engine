@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { ImportParams } from "./import-heightmap"
-import { importOrogenWorld } from "./import-heightmap"
+import { importGenesisWorld } from "./import-heightmap"
 
 const TEST_NUM_POINTS = 200
-const worldCache = new Map<string, ReturnType<typeof importOrogenWorld>>()
+const worldCache = new Map<string, ReturnType<typeof importGenesisWorld>>()
 
 function makeParams(overrides: Partial<ImportParams> = {}): ImportParams {
 	const grayscale = new Uint8Array(64 * 32)
@@ -42,7 +42,7 @@ function getCachedImportWorld(overrides: Partial<ImportParams> = {}) {
 	})
 	const cached = worldCache.get(key)
 	if (cached) return cached
-	const world = importOrogenWorld(params)
+	const world = importGenesisWorld(params)
 	worldCache.set(key, world)
 	return world
 }
@@ -59,7 +59,7 @@ afterAll(() => {
 
 const TEST_TIMEOUT = 60_000
 
-describe("importOrogenWorld", () => {
+describe("importGenesisWorld", () => {
 	it(
 		"produces correct array sizes for all output fields",
 		() => {
@@ -94,8 +94,8 @@ describe("importOrogenWorld", () => {
 		"is deterministic for a given seed",
 		() => {
 			const p = makeParams({ seed: 99 })
-			const a = importOrogenWorld(p)
-			const b = importOrogenWorld(p)
+			const a = importGenesisWorld(p)
+			const b = importGenesisWorld(p)
 			expect(a.mesh.numRegions).toBe(b.mesh.numRegions)
 			expect(a.elevation).toEqual(b.elevation)
 			expect(a.isLand).toEqual(b.isLand)

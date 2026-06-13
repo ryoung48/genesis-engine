@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenRainfall } from ".."
+import type { GenesisRainfall } from ".."
 import { computeDiurnalRange } from "./dtr"
 
 const PARAMS = { hoursPerDay: 24, pressure: 1.0, tidallyLocked: false as const }
@@ -8,7 +8,7 @@ function makeDaylightHours(N: number, hoursPerDay = 24): Float32Array {
 	return new Float32Array(12 * N).fill(hoursPerDay / 2)
 }
 
-function makeRainfall(N: number, mmPerMonth = 50): OrogenRainfall {
+function makeRainfall(N: number, mmPerMonth = 50): GenesisRainfall {
 	return {
 		monthly: new Float32Array(12 * N).fill(mmPerMonth),
 		annual: new Float32Array(N).fill(mmPerMonth * 12),

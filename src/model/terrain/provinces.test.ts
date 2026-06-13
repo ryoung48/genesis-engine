@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenRainfall, SphereMesh } from ".."
+import type { GenesisRainfall, SphereMesh } from ".."
 import { computeProvinces } from "./provinces"
 
 function makeMesh(adjOffset: number[], adjList: number[]): SphereMesh {
@@ -97,7 +97,7 @@ describe("computeProvinces", () => {
 		const mesh = makeGraphMesh(4, chainEdges(0, 2))
 		const rainfall = {
 			annual: new Float32Array([4, 10, 10, 10]),
-		} as OrogenRainfall
+		} as GenesisRainfall
 		const provinces = computeProvinces(
 			mesh,
 			new Uint8Array(4).fill(1),

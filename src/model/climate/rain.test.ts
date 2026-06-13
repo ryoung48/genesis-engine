@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenParams, SphereMesh } from ".."
+import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPE_OCEAN } from "../terrain/landmarks"
 import { elevToHeightKm } from "./climate"
 import {
@@ -40,7 +40,7 @@ function buildMesh(
 function buildClimate(
 	temperatureAvg: number[],
 	temperatureMonthly?: number[],
-): OrogenClimate {
+): GenesisClimate {
 	const monthly =
 		temperatureMonthly ??
 		Array.from({ length: 12 }, () => temperatureAvg).flat()
@@ -58,7 +58,7 @@ function buildClimate(
 	}
 }
 
-function buildParams(overrides: Partial<OrogenParams> = {}): OrogenParams {
+function buildParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 	return {
 		seed: 11,
 		numPoints: 3,
@@ -374,7 +374,7 @@ describe("computeMonthlyRain", () => {
 			new Float32Array([0.7, 0.6, 0]),
 			new Float32Array([0.1, 0.2, 0]),
 			new Uint8Array([1, 1, 0]),
-			{ hoursPerDay: 24 } as OrogenParams,
+			{ hoursPerDay: 24 } as GenesisParams,
 		)
 
 		expect(rain.annual[0]).toBeGreaterThan(0)
@@ -399,7 +399,7 @@ describe("computeMonthlyRain", () => {
 			new Float32Array(3),
 			new Float32Array(3),
 			new Uint8Array([1, 1, 0]),
-			{ tidallyLocked: true } as OrogenParams,
+			{ tidallyLocked: true } as GenesisParams,
 		)
 
 		expect(rain.annual[0]).toBeGreaterThan(rain.annual[1])

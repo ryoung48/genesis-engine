@@ -1,16 +1,16 @@
 import type { WindArrowData } from "@/model/climate/wind"
 import type {
 	SerializedNetwork,
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
 
 export type { WindArrowData }
 
-export type OrogenViewMode = "globe" | "map"
+export type GenesisViewMode = "globe" | "map"
 
-export interface OrogenHoverInfo {
+export interface GenesisHoverInfo {
 	region: number
 	clientX: number
 	clientY: number
@@ -22,10 +22,10 @@ export interface RiverData {
 	minFlow: number
 }
 
-export interface OrogenScene {
+export interface GenesisScene {
 	dispose(): void
 	resize(): void
-	updateWorld(world: SerializedOrogenWorld | null): void
+	updateWorld(world: SerializedGenesisWorld | null): void
 	exportMapPng(options: {
 		width: number
 		centerLongitudeDeg?: number
@@ -38,7 +38,7 @@ export interface OrogenScene {
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void
 	setLandNationBordersVisible(visible: boolean): void
-	setViewMode(mode: OrogenViewMode): void
+	setViewMode(mode: GenesisViewMode): void
 	setWireframeVisible(visible: boolean): void
 	setGridVisible(visible: boolean): void
 	setGridSpacing(spacingDeg: number): void
@@ -46,9 +46,9 @@ export interface OrogenScene {
 	setMapProjectionLatitude(latitudeDeg: number): void
 	commitMapCenterLongitude(): void
 	setHoverHandler(
-		handler: ((info: OrogenHoverInfo | null) => void) | null,
+		handler: ((info: GenesisHoverInfo | null) => void) | null,
 	): void
-	setClickHandler(handler: ((info: OrogenHoverInfo) => void) | null): void
+	setClickHandler(handler: ((info: GenesisHoverInfo) => void) | null): void
 	setMeasureLine(
 		startXYZ: [number, number, number] | null,
 		endXYZ: [number, number, number] | null,
@@ -66,7 +66,7 @@ export interface OrogenScene {
 	setRivers(data: RiverData | null): void
 	setRiversVisible(visible: boolean): void
 	setHierarchyOverlay(
-		world: SerializedOrogenWorld | null,
+		world: SerializedGenesisWorld | null,
 		selectedNationId: number,
 	): void
 	setSunPosition(

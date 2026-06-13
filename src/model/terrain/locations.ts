@@ -5,7 +5,7 @@
  * province scales with its area relative to LOCATION_AREA_TARGET_KM2.
  */
 
-import type { OrogenLocations, OrogenProvinces, SphereMesh } from ".."
+import type { GenesisLocations, GenesisProvinces, SphereMesh } from ".."
 import { createRng } from "../shared/rng"
 import { meanEdgeLengthKm } from "../shared/units"
 import { PROVINCE_AREA_TARGET_KM2 } from "./provinces"
@@ -14,11 +14,11 @@ import { PROVINCE_AREA_TARGET_KM2 } from "./provinces"
 const LOCATION_AREA_TARGET_KM2 = PROVINCE_AREA_TARGET_KM2 / 2
 
 export function computeLocations(
-	provinces: OrogenProvinces,
+	provinces: GenesisProvinces,
 	mesh: SphereMesh,
 	seed: number,
 	options?: { planetRadiusKm?: number },
-): OrogenLocations {
+): GenesisLocations {
 	const { adjOffset, adjList } = mesh
 	const N = mesh.numRegions
 	const P = provinces.count

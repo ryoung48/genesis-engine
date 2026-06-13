@@ -2,7 +2,7 @@ import type { HistoryNote } from "@/model/history"
 import { REL } from "@/model/history/state"
 import { maxFanoutForNationSize } from "@/model/society/hierarchy"
 import type {
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	SerializedProvinceTimelineFloat,
 	SerializedProvinceTimelineInt,
 	SerializedTimelines,
@@ -590,7 +590,7 @@ function buildLazyWealthAccess(params: {
 
 export function createHistoryQuery(
 	bundle: TimelineBundle,
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 ): HistoryQuery {
 	const { timelines, events } = bundle
 	const provinceCount = timelines.P

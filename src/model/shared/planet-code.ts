@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
-import type { OrogenParams } from ".."
+import type { GenesisParams } from ".."
 import { SLIDER_RANGES } from "./slider-ranges"
 
 const DEFAULT_PRESSURE = 1.0
@@ -16,7 +16,7 @@ type FieldSpec = {
 	min: number
 	step: number
 	count: number
-	read: (params: OrogenParams) => number
+	read: (params: GenesisParams) => number
 }
 
 function rangeCount(r: { min: number; max: number; step: number }): number {
@@ -317,7 +317,7 @@ function parseSeedPart(seedPart: string): number | null {
 	return seed
 }
 
-function encodePlanetParams(params: OrogenParams): string {
+function encodePlanetParams(params: GenesisParams): string {
 	let packed = 0n
 	for (const field of FIELD_SPECS) {
 		packed =
@@ -332,7 +332,7 @@ export function decodePlanetSeed(code: string): number | null {
 	return parseSeedPart(parts.seedPart)
 }
 
-export function encodePlanetCode(seed: number, params: OrogenParams): string {
+export function encodePlanetCode(seed: number, params: GenesisParams): string {
 	const seedPart = BigInt(seed).toString(36)
 	const paramsPart = encodePlanetParams(params)
 	return [seedPart, paramsPart].join(PLANET_CODE_PART_SEPARATOR)

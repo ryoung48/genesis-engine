@@ -17,7 +17,7 @@
  * Returns a normalised [0, 1] Float32Array. Land cells encode tornado risk;
  * ocean/lake cells are zero.
  */
-import type { OrogenParams, SphereMesh } from ".."
+import type { GenesisParams, SphereMesh } from ".."
 import { clamp, piecewise, smoothstep } from "../shared/math"
 import {
 	TOPO_FLAT,
@@ -77,7 +77,7 @@ export function computeTornadoRisk(
 	topography: Uint8Array,
 	vegetation: Uint8Array,
 	oceanDist: Float32Array,
-	params: Pick<OrogenParams, "hoursPerDay" | "tidallyLocked">,
+	params: Pick<GenesisParams, "hoursPerDay" | "tidallyLocked">,
 ): Float32Array {
 	const N = mesh.numRegions
 

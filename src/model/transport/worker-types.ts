@@ -1,9 +1,9 @@
 import type {
-	OrogenLocations,
-	OrogenNationHierarchy,
-	OrogenParams,
-	OrogenPartition,
-	OrogenProvinces,
+	GenesisLocations,
+	GenesisNationHierarchy,
+	GenesisParams,
+	GenesisPartition,
+	GenesisProvinces,
 	StageTiming,
 } from ".."
 import type { HistoryNote } from "../history"
@@ -25,7 +25,7 @@ interface SerializedSphereMesh {
 	s_outer_t: Int32Array
 }
 
-interface SerializedOrogenClimate {
+interface SerializedGenesisClimate {
 	temperature_avg: Float32Array
 	temperature_min: Float32Array
 	temperature_max: Float32Array
@@ -38,12 +38,12 @@ interface SerializedOrogenClimate {
 	landFraction: number[]
 }
 
-type SerializedPartition = OrogenPartition
-type SerializedProvinces = OrogenProvinces
-type SerializedLocations = OrogenLocations
-type SerializedNationHierarchy = OrogenNationHierarchy
+type SerializedPartition = GenesisPartition
+type SerializedProvinces = GenesisProvinces
+type SerializedLocations = GenesisLocations
+type SerializedNationHierarchy = GenesisNationHierarchy
 
-export interface SerializedOrogenWorld {
+export interface SerializedGenesisWorld {
 	mesh: SerializedSphereMesh
 	plateAssignment: Int32Array
 	elevation: Float32Array
@@ -52,10 +52,10 @@ export interface SerializedOrogenWorld {
 		dominantFeature: Uint8Array
 	}
 	elevation_km: Float32Array
-	params: OrogenParams
+	params: GenesisParams
 	timings?: StageTiming[]
 	continentCount: number
-	climate: SerializedOrogenClimate
+	climate: SerializedGenesisClimate
 	oceanDist: Float32Array
 	distCoast?: Float32Array
 	rainfall: {
@@ -407,10 +407,10 @@ export function forEachEdge(
 	}
 }
 
-export type OrogenWorkerRequest =
+export type GenesisWorkerRequest =
 	| {
 			type: "generate"
-			params: OrogenParams
+			params: GenesisParams
 	  }
 	| {
 			type: "simulate"
@@ -460,7 +460,7 @@ export type OrogenWorkerRequest =
 			network?: SerializedNetwork | null
 	  }
 
-export type OrogenWorkerResponse =
+export type GenesisWorkerResponse =
 	| {
 			type: "progress"
 			label: string
@@ -468,7 +468,7 @@ export type OrogenWorkerResponse =
 	  }
 	| {
 			type: "done"
-			world: SerializedOrogenWorld
+			world: SerializedGenesisWorld
 			frame?: SerializedHistoryFrame
 	  }
 	| {

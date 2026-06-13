@@ -1,4 +1,4 @@
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 
 const KOPPEN_CLASSES = [
 	{
@@ -169,8 +169,8 @@ const CLASS_ID: Record<string, number> = Object.fromEntries(
 export function assignKoppenClimate(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: OrogenClimate,
-	rainfall: OrogenRainfall,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const classes = new Uint8Array(N)

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
-import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
+import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { buildLockedOceanCurrentGrid } from "@/model/climate/locked/ocean-currents"
@@ -30,7 +30,7 @@ import {
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
 	SerializedHistoryFrame,
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 } from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
@@ -89,9 +89,9 @@ import { InfoPanel } from "./hover/InfoPanel"
 import { canHandlePlanetClick } from "./measurement-click"
 import { OceanCurrentParticleCanvas } from "./OceanCurrentParticleCanvas"
 import {
-	createOrogenScene,
-	type OrogenScene,
-	type OrogenViewMode,
+	createGenesisScene,
+	type GenesisScene,
+	type GenesisViewMode,
 } from "./renderer"
 import {
 	buildDisplayNationModel,
@@ -326,7 +326,7 @@ export function syncLabelModeToMapMode(params: {
 	return politicalFallback
 }
 
-export const OrogenView: React.FC = () => {
+export const GenesisView: React.FC = () => {
 	const makeRandomSeed = useCallback(
 		() => Math.floor(Math.random() * SEED_MAX),
 		[],
@@ -334,9 +334,9 @@ export const OrogenView: React.FC = () => {
 	// Refs
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const viewportRef = useRef<HTMLDivElement>(null)
-	const sceneRef = useRef<OrogenScene | null>(null)
+	const sceneRef = useRef<GenesisScene | null>(null)
 	const workerRef = useRef<Worker | null>(null)
-	const lastWorldRef = useRef<SerializedOrogenWorld | null>(null)
+	const lastWorldRef = useRef<SerializedGenesisWorld | null>(null)
 	const hoverCardRef = useRef<HTMLDivElement>(null)
 	const initialViewPrefs =
 		typeof window === "undefined"
@@ -346,7 +346,7 @@ export const OrogenView: React.FC = () => {
 				) ?? DEFAULT_VIEW_PREFS)
 
 	// Core state
-	const [world, setWorld] = useState<SerializedOrogenWorld | null>(null)
+	const [world, setWorld] = useState<SerializedGenesisWorld | null>(null)
 	const [generating, setGenerating] = useState(false)
 	const [generationProgress, setGenerationProgress] = useState(0)
 	const [generationLabel, setGenerationLabel] = useState("Idle")
@@ -365,7 +365,7 @@ export const OrogenView: React.FC = () => {
 	const [populationMode, setPopulationMode] = useState<PopulationMapMode>(
 		initialViewPrefs.populationMode,
 	)
-	const [viewMode, setViewMode] = useState<OrogenViewMode>(
+	const [viewMode, setViewMode] = useState<GenesisViewMode>(
 		initialViewPrefs.viewMode,
 	)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
@@ -684,24 +684,24 @@ export const OrogenView: React.FC = () => {
 	useEffect(() => {
 		const canvas = canvasRef.current
 		if (!canvas) return
-		const orogenScene = createOrogenScene(canvas)
-		sceneRef.current = orogenScene
-		orogenScene.setHoverHandler((info) => {
+		const genesisScene = createGenesisScene(canvas)
+		sceneRef.current = genesisScene
+		genesisScene.setHoverHandler((info) => {
 			setHoverInfo(
 				info ? { region: info.region, x: info.clientX, y: info.clientY } : null,
 			)
 		})
-		const onResize = () => orogenScene.resize()
+		const onResize = () => genesisScene.resize()
 		window.addEventListener("resize", onResize)
-		const ro = new ResizeObserver(() => orogenScene.resize())
+		const ro = new ResizeObserver(() => genesisScene.resize())
 		ro.observe(canvas)
 		return () => {
 			window.removeEventListener("resize", onResize)
 			ro.disconnect()
 			workerRef.current?.terminate()
 			workerRef.current = null
-			orogenScene.setHoverHandler(null)
-			orogenScene.dispose()
+			genesisScene.setHoverHandler(null)
+			genesisScene.dispose()
 			sceneRef.current = null
 		}
 	}, [])
@@ -1818,7 +1818,7 @@ export const OrogenView: React.FC = () => {
 	const topographyDistribution = useMemo(
 		() =>
 			buildDistribution(
-				OROGEN_TOPOGRAPHY_LABELS,
+				GENESIS_TOPOGRAPHY_LABELS,
 				world?.topography,
 				(index) => {
 					const color = getTopographyColor(index)

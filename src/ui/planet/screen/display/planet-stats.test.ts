@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { computePlanetStats } from "./planet-stats"
 
-function buildWorld(): SerializedOrogenWorld {
+function buildWorld(): SerializedGenesisWorld {
 	const world = {
-		mesh: { numRegions: 4 } as SerializedOrogenWorld["mesh"],
+		mesh: { numRegions: 4 } as SerializedGenesisWorld["mesh"],
 		elevation: Float32Array.from([1, 1, -1, -1]),
 		params: {
 			obliquity: 23.5,
@@ -16,26 +16,26 @@ function buildWorld(): SerializedOrogenWorld {
 			planetRadiusKm: 6371,
 			pressure: 1,
 			tidallyLocked: false,
-		} as SerializedOrogenWorld["params"],
+		} as SerializedGenesisWorld["params"],
 		continentCount: 2,
 		climate: {
 			temperature_avg: Float32Array.from([10, 14]),
 			temperature_min: Float32Array.from([0, 2]),
 			temperature_max: Float32Array.from([20, 26]),
-		} as SerializedOrogenWorld["climate"],
+		} as SerializedGenesisWorld["climate"],
 		rainfall: {
 			annual: Float32Array.from([1000, 1200]),
-		} as SerializedOrogenWorld["rainfall"],
+		} as SerializedGenesisWorld["rainfall"],
 		dtr_annual: Float32Array.from([8, 10]),
-		provinces: { count: 2 } as SerializedOrogenWorld["provinces"],
-		locations: { count: 6 } as SerializedOrogenWorld["locations"],
+		provinces: { count: 2 } as SerializedGenesisWorld["provinces"],
+		locations: { count: 6 } as SerializedGenesisWorld["locations"],
 		population: {
 			habitabilityScore: 0.75,
 			totalPopulation: 2_500_000,
-		} as SerializedOrogenWorld["population"],
-	} satisfies Partial<SerializedOrogenWorld>
+		} as SerializedGenesisWorld["population"],
+	} satisfies Partial<SerializedGenesisWorld>
 
-	return world as SerializedOrogenWorld
+	return world as SerializedGenesisWorld
 }
 
 function statValue(

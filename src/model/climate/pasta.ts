@@ -1,8 +1,8 @@
 import type {
-	OrogenClimate,
-	OrogenHydrology,
-	OrogenParams,
-	OrogenRainfall,
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisParams,
+	GenesisRainfall,
 	SphereMesh,
 } from ".."
 
@@ -561,10 +561,10 @@ export interface PastaDebug {
 export function assignPastaClimate(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: OrogenClimate,
-	rainfall: OrogenRainfall,
-	hydrology: OrogenHydrology,
-	params: OrogenParams,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
+	hydrology: GenesisHydrology,
+	params: GenesisParams,
 	iceThickness?: Float32Array,
 	iceMinMonthly?: Float32Array,
 	iceMaxMonthly?: Float32Array,

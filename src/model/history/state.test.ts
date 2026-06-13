@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
 import { EVT } from "./event-heap"
 import { initDiplomacy } from "./events/diplomacy"
@@ -45,7 +45,7 @@ function createTestState(): HistoryState {
 		adjList: new Int32Array([2, 2, 0, 1, 3, 2]),
 		size: new Int32Array([1, 1, 1, 1]),
 		colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]),
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: new Int32Array([0, 0, 2, 3]),
 		seeds: new Int32Array([0, 1, 2, 3]),
@@ -60,7 +60,7 @@ function createTestState(): HistoryState {
 		childList: new Int32Array([1]),
 		sovereign: new Int32Array([0, 0, 2, 3]),
 		gravity: new Float32Array([10, 6, 8, 4]),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const population: ProvincePopulation = {
 		habitability: new Float32Array([10, 6, 8, 4]),
 		population: new Float32Array([100, 50, 80, 40]),
@@ -92,7 +92,7 @@ function createDesolateState(): HistoryState {
 		adjList: new Int32Array([1, 0, 2, 1]),
 		size: new Int32Array([1, 1, 1]),
 		colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: new Int32Array([0, 1, -1]),
 		seeds: new Int32Array([0, 1, 2]),
@@ -107,7 +107,7 @@ function createDesolateState(): HistoryState {
 		childList: new Int32Array(0),
 		sovereign: new Int32Array([0, 1, -1]),
 		gravity: new Float32Array([5, 3, 0]),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const population: ProvincePopulation = {
 		habitability: new Float32Array([10, 8, 0]),
 		population: new Float32Array([120, 80, 0]),
@@ -139,7 +139,7 @@ function createIndirectConnectionState(): HistoryState {
 		adjList: new Int32Array([2, 2, 0, 1]),
 		size: new Int32Array([1, 1, 1]),
 		colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: new Int32Array([0, 0, 0]),
 		seeds: new Int32Array([0, 1, 2]),
@@ -154,7 +154,7 @@ function createIndirectConnectionState(): HistoryState {
 		childList: new Int32Array([1, 2]),
 		sovereign: new Int32Array([0, 0, 0]),
 		gravity: new Float32Array([12, 7, 9]),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const population: ProvincePopulation = {
 		habitability: new Float32Array([10, 8, 9]),
 		population: new Float32Array([120, 70, 90]),
@@ -644,7 +644,7 @@ describe("history state helpers", () => {
 			adjList: new Int32Array([1, 0, 2, 1]),
 			size: new Int32Array([1, 1, 1]),
 			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
-		} as OrogenProvinces
+		} as GenesisProvinces
 		const nations = {
 			assignment: new Int32Array([0, 1, 2]),
 			seeds: new Int32Array([0, 1, 2]),
@@ -659,7 +659,7 @@ describe("history state helpers", () => {
 			childList: new Int32Array([1]),
 			sovereign: new Int32Array([0, 0, 2]),
 			gravity: new Float32Array([8, 7, 6]),
-		} as OrogenNationHierarchy
+		} as GenesisNationHierarchy
 		const population: ProvincePopulation = {
 			habitability: new Float32Array([9, 8, 7]),
 			population: new Float32Array([90, 80, 70]),
@@ -743,7 +743,7 @@ describe("history state helpers", () => {
 			adjList: new Int32Array([1, 2, 1]),
 			size: new Int32Array([1, 1, 1]),
 			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
-		} as OrogenProvinces
+		} as GenesisProvinces
 		const nations = {
 			assignment: new Int32Array([0, 2, 2]),
 			seeds: new Int32Array([0, 1, 2]),
@@ -758,7 +758,7 @@ describe("history state helpers", () => {
 			childList: new Int32Array([1]),
 			sovereign: new Int32Array([0, 2, 2]),
 			gravity: new Float32Array([9, 7, 8]),
-		} as OrogenNationHierarchy
+		} as GenesisNationHierarchy
 		const population: ProvincePopulation = {
 			habitability: new Float32Array([9, 8, 7]),
 			population: new Float32Array([90, 80, 70]),

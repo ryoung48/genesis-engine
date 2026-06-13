@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { OROGEN_TOPOGRAPHY_LABELS } from "@/model"
+import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { EnergyBalanceModel } from "@/model/climate/ebm"
 import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
 import { PASTA_LABELS } from "@/model/climate/pasta"
@@ -20,17 +20,17 @@ import {
 import { buildTradeRouteCorridors } from "@/ui/planet/renderer/trade-route-overlay"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
-import type { OrogenParams } from ".."
-import type { OrogenWorld } from "../world"
+import type { GenesisParams } from ".."
+import type { GenesisWorld } from "../world"
 import {
 	collectSeaRoutePortDiagnostics,
 	selectTimingStages,
 } from "./generate-default-world-diagnostics"
-import { generateOrogenWorld } from "./generate-world"
+import { generateGenesisWorld } from "./generate-world"
 
 const SMOKE_PLANET_CODE = "8wqaf.095bnv9q91thqhw9t7gi7wytd2kaqfgnfhcry"
 
-function buildSmokeParams(code: string): OrogenParams {
+function buildSmokeParams(code: string): GenesisParams {
 	const decoded = decodePlanetCode(code)
 	if (!decoded) throw new Error(`Invalid smoke planet code: ${code}`)
 
@@ -75,7 +75,7 @@ function buildSmokeParams(code: string): OrogenParams {
 	}
 }
 
-function computePreviewAverageTempC(params: OrogenParams): number {
+function computePreviewAverageTempC(params: GenesisParams): number {
 	const previewConfig = buildGenerationPreviewConfig({
 		tidallyLocked: params.tidallyLocked,
 		obliquity: params.obliquity,
@@ -142,7 +142,7 @@ function max(values: ArrayLike<number>): number {
 	return Number.isFinite(result) ? result : 0
 }
 
-function summarizeWorld(world: OrogenWorld) {
+function summarizeWorld(world: GenesisWorld) {
 	const landCount = world.isLand.reduce((sum, value) => sum + value, 0)
 	let landTempSum = 0
 	let landTempCount = 0
@@ -204,7 +204,7 @@ function createDeterministicFingerprint() {
 	}
 }
 
-function computeWorldFingerprint(world: OrogenWorld): string {
+function computeWorldFingerprint(world: GenesisWorld): string {
 	const hash = createDeterministicFingerprint()
 	hash.updateString(
 		JSON.stringify({
@@ -259,7 +259,7 @@ describe("full world smoke generation", () => {
 	it("generates a world using the configured smoke planet code", () => {
 		const params = buildSmokeParams(SMOKE_PLANET_CODE)
 		const previewAvgTempC = computePreviewAverageTempC(params)
-		const world = generateOrogenWorld(params)
+		const world = generateGenesisWorld(params)
 		const summary = summarizeWorld(world)
 		const fingerprint = computeWorldFingerprint(world)
 
@@ -304,7 +304,7 @@ describe("full world smoke generation", () => {
 		console.table(summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]))
 		console.info("Topography distribution")
 		console.table(
-			summarizeDistribution(world.topography, OROGEN_TOPOGRAPHY_LABELS, [5, 6]),
+			summarizeDistribution(world.topography, GENESIS_TOPOGRAPHY_LABELS, [5, 6]),
 		)
 		if (world.tidalRange) {
 			const { adjOffset, adjList } = world.mesh
@@ -709,7 +709,7 @@ describe("full world smoke generation", () => {
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
 		const scenarioParams: Array<{
 			name: string
-			params: OrogenParams
+			params: GenesisParams
 		}> = [
 			{
 				name: "frozen-control",
@@ -744,7 +744,7 @@ describe("full world smoke generation", () => {
 		]
 
 		const results = scenarioParams.map(({ name, params }) => {
-			const world = generateOrogenWorld(params)
+			const world = generateGenesisWorld(params)
 			const summary = summarizeWorld(world)
 			const exposure = world.volcanism.hotspotExposure
 			console.info("Volcanic climate scenario", {
@@ -779,7 +779,7 @@ describe("full world smoke generation", () => {
 
 	it("neolithic era leaves most land stateless and the history model keeps it that way", () => {
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
-		const world = generateOrogenWorld({ ...base, era: "neolithic" })
+		const world = generateGenesisWorld({ ...base, era: "neolithic" })
 		const provinceCount = world.provinces?.count ?? 0
 		const nationCount = world.nations?.count ?? 0
 
@@ -834,7 +834,7 @@ describe("full world smoke generation", () => {
 
 	it("late medieval era leaves no stateless non-desolate provinces", () => {
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
-		const world = generateOrogenWorld({ ...base, era: "lateMedieval" })
+		const world = generateGenesisWorld({ ...base, era: "lateMedieval" })
 
 		let statelessProvinces = 0
 		const sovereign = world.nations?.sovereign
@@ -862,7 +862,7 @@ describe("full world smoke generation", () => {
 
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
 		for (const era of ERA_ORDER) {
-			const world = generateOrogenWorld({ ...base, era })
+			const world = generateGenesisWorld({ ...base, era })
 			if (
 				!world.nations ||
 				!world.provinces ||

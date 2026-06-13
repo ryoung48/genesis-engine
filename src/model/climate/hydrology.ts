@@ -1,8 +1,8 @@
 import type {
-	OrogenClimate,
-	OrogenHydrology,
-	OrogenParams,
-	OrogenRainfall,
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisParams,
+	GenesisRainfall,
 } from ".."
 
 export function petMonthHargreaves(
@@ -41,13 +41,13 @@ export function fillPetMonthlyHargreaves(
 
 export function refreshClimatePetMonthly(
 	climate: Pick<
-		OrogenClimate,
+		GenesisClimate,
 		| "temperature_monthly"
 		| "temperature_monthly_range"
 		| "insolation_monthly"
 		| "pet_monthly"
 	>,
-	params?: Pick<OrogenParams, "daysPerYear">,
+	params?: Pick<GenesisParams, "daysPerYear">,
 ): void {
 	fillPetMonthlyHargreaves(
 		climate.temperature_monthly,
@@ -98,10 +98,10 @@ const F_PERC = 0.3
 const K_GW = 0.05
 
 export function computeHydrologyFields(
-	climate: Pick<OrogenClimate, "pet_monthly">,
-	rainfall: Pick<OrogenRainfall, "monthly">,
+	climate: Pick<GenesisClimate, "pet_monthly">,
+	rainfall: Pick<GenesisRainfall, "monthly">,
 	isLand: Uint8Array,
-): OrogenHydrology {
+): GenesisHydrology {
 	const N = isLand.length
 	const aet_monthly = new Float32Array(12 * N)
 	const aridity_monthly = new Float32Array(12 * N)

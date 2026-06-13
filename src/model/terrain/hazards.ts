@@ -1,7 +1,7 @@
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	OrogenHazards,
+	GenesisHazards,
 	SphereMesh,
 } from ".."
 import { clamp01, smoothstep } from "../shared/math"
@@ -81,7 +81,7 @@ export function computeHazards(
 	elevationKm: Float32Array,
 	isLand: Uint8Array,
 	hotspot?: Float32Array,
-): OrogenHazards {
+): GenesisHazards {
 	const N = elevationKm.length
 	const earthquake = new Float32Array(N)
 	const volcano = new Float32Array(N)

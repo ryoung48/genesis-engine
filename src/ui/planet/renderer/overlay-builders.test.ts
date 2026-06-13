@@ -1,7 +1,7 @@
 import * as THREE from "three"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	buildGlobeHierarchyOverlay,
 	buildMapHierarchyOverlay,
@@ -19,7 +19,7 @@ function makeMockCanvas(): HTMLCanvasElement {
 	return { clientWidth: 800, clientHeight: 600 } as unknown as HTMLCanvasElement
 }
 
-function makeHierarchyWorld(): SerializedOrogenWorld {
+function makeHierarchyWorld(): SerializedGenesisWorld {
 	// 3 provinces in nation 0 with depth 0, 1, 2
 	// province 0: depth 0, root (parent=-1), seed=region 0
 	// province 1: depth 1, parent=province 0, seed=region 1
@@ -77,7 +77,7 @@ function makeHierarchyWorld(): SerializedOrogenWorld {
 			sovereign: new Int32Array([0, 0, 0, 1]),
 			gravity: new Float32Array([1, 1, 1, 1]),
 		},
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 describe("collectHierarchyNodes", () => {
@@ -139,7 +139,7 @@ describe("collectHierarchyNodes", () => {
 })
 
 describe("nation border batching", () => {
-	function makeNationBorderWorld(): SerializedOrogenWorld {
+	function makeNationBorderWorld(): SerializedGenesisWorld {
 		return {
 			mesh: {
 				numRegions: 3,
@@ -179,10 +179,10 @@ describe("nation border batching", () => {
 				sovereign: new Int32Array([0, 1, 0]),
 				gravity: new Float32Array([1, 1, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 	}
 
-	function makeWrappedNationBorderWorld(): SerializedOrogenWorld {
+	function makeWrappedNationBorderWorld(): SerializedGenesisWorld {
 		const lonA = (179 * Math.PI) / 180
 		const lonB = (-179 * Math.PI) / 180
 		return {
@@ -231,7 +231,7 @@ describe("nation border batching", () => {
 				sovereign: new Int32Array([0, 1]),
 				gravity: new Float32Array([1, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 	}
 
 	it("collects each nation boundary once for the batched globe overlay", () => {

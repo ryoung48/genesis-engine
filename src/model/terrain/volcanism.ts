@@ -1,6 +1,6 @@
 import type { BoundaryInfo, SphereMesh } from ".."
 import { SimplexNoise } from "../shared/simplex-noise"
-import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
+import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
 
 const VOLC_MIN_SPACING = 0.015
 const VOLC_SIGMA_BASE = 0.005
@@ -278,7 +278,7 @@ export function applyVolcanicArcs({
 		if (volcUplift > 0.001) {
 			elevation[r] += volcUplift
 			uplift[r] = volcUplift
-			markFeature(r, OROGEN_TERRAIN_FEATURE.VOLCANIC_ARC, volcUplift)
+			markFeature(r, GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC, volcUplift)
 		}
 	}
 
@@ -388,7 +388,7 @@ export function applyLargeIgneousProvinces({
 		if (total > 0.001) {
 			elevation[r] += total
 			uplift[r] = total
-			markFeature(r, OROGEN_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE, total)
+			markFeature(r, GENESIS_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE, total)
 		}
 	}
 

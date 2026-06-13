@@ -1,5 +1,5 @@
 /**
- * Plate generation and ocean/land assignment — faithful port of orogen's
+ * Plate generation and ocean/land assignment — faithful port of genesis's
  * plates.js + ocean-land.js.
  *
  * Key source-matching details:
@@ -622,7 +622,7 @@ export function assignOceanLand(
 
 /**
  * Smooth plate boundaries via majority-vote and reconnect disconnected fragments.
- * Faithful port of orogen's smoothAndReconnectPlates.
+ * Faithful port of genesis's smoothAndReconnectPlates.
  */
 export function smoothAndReconnectPlates(
 	mesh: SphereMesh,

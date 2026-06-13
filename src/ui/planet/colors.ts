@@ -22,7 +22,7 @@ import {
 	YL_OR_RD_STOPS,
 } from "@/model/shared/color-palettes"
 /**
- * Orogen elevation and temperature color mapping.
+ * Genesis elevation and temperature color mapping.
  */
 
 export type ColorMode =

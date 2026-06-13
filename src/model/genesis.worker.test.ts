@@ -156,10 +156,10 @@ vi.mock("./history/state", () => ({
 }))
 vi.mock("./transport/worker-types", () => mockWorkerTypesApi)
 vi.mock("./pipelines/import-heightmap", () => ({
-	importOrogenWorld: vi.fn(),
+	importGenesisWorld: vi.fn(),
 }))
 vi.mock("./pipelines/generate-world", () => ({
-	generateOrogenWorld: vi.fn((params: { seed: number }) =>
+	generateGenesisWorld: vi.fn((params: { seed: number }) =>
 		makeGeneratedWorld(params.seed),
 	),
 }))
@@ -296,7 +296,7 @@ function makeGeneratedWorld(seed: number) {
 	}
 }
 
-describe("orogen worker", () => {
+describe("genesis worker", () => {
 	beforeEach(() => {
 		vi.resetModules()
 		vi.clearAllMocks()
@@ -314,7 +314,7 @@ describe("orogen worker", () => {
 	})
 
 	it("reuses generated history state on the first simulate request", async () => {
-		await import("./orogen.worker")
+		await import("./genesis.worker")
 
 		const worker = globalThis.self as unknown as {
 			postMessage: ReturnType<typeof vi.fn>
@@ -336,7 +336,7 @@ describe("orogen worker", () => {
 		expect(initParams).toBeDefined()
 		const generateWorldModule = await import("./pipelines/generate-world")
 		const generatedWorld = vi
-			.mocked(generateWorldModule.generateOrogenWorld)
+			.mocked(generateWorldModule.generateGenesisWorld)
 			.mock.results.at(0)?.value as
 			| ReturnType<typeof makeGeneratedWorld>
 			| undefined

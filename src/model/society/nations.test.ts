@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenProvinces } from "../types/society"
+import type { GenesisProvinces } from "../types/society"
 import { ERA_CONFIGS } from "./eras"
 import {
 	buildNationPlan,
@@ -65,7 +65,7 @@ function buildRingNationProvinces(n: number) {
 		r_xyz[3 * i + 2] = 0
 	}
 
-	const provinces: OrogenProvinces = {
+	const provinces: GenesisProvinces = {
 		count: n,
 		seeds,
 		desolate: new Uint8Array(n),
@@ -133,7 +133,7 @@ function buildDoubleRingProvinces(cols: number) {
 	for (let i = 0; i < cols; i++) coastal[i] = 1
 	const riverVisible = new Uint8Array(n)
 
-	const provinces: OrogenProvinces = {
+	const provinces: GenesisProvinces = {
 		count: n,
 		seeds,
 		desolate: new Uint8Array(n),

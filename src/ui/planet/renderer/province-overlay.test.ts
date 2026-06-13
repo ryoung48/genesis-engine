@@ -1,6 +1,6 @@
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	buildSelectedProvinceBorderGlobe,
 	buildSelectedProvinceBorderMap,
@@ -22,7 +22,7 @@ function makeWorld(regionProvince: Int32Array = new Int32Array([0, 1])) {
 		provinces: {
 			regionProvince,
 		},
-	} as SerializedOrogenWorld
+	} as SerializedGenesisWorld
 }
 
 function makeWrappedWorld(reverse = false) {
@@ -48,7 +48,7 @@ function makeWrappedWorld(reverse = false) {
 		provinces: {
 			regionProvince: new Int32Array([0, 1]),
 		},
-	} as SerializedOrogenWorld
+	} as SerializedGenesisWorld
 }
 
 describe("province-overlay", () => {
@@ -103,11 +103,11 @@ describe("province-overlay", () => {
 			provinces: {
 				regionProvince: new Int32Array([0, 1]),
 			},
-		} as SerializedOrogenWorld
+		} as SerializedGenesisWorld
 
 		expect(
 			collectProvinceBorderGlobePositions(
-				{ mesh: invalidWorld.mesh } as SerializedOrogenWorld,
+				{ mesh: invalidWorld.mesh } as SerializedGenesisWorld,
 				0,
 				0,
 				true,
@@ -118,7 +118,7 @@ describe("province-overlay", () => {
 				{
 					mesh: invalidWorld.mesh,
 					elevation: invalidWorld.elevation,
-				} as SerializedOrogenWorld,
+				} as SerializedGenesisWorld,
 				0,
 				"globe",
 				true,
@@ -129,7 +129,7 @@ describe("province-overlay", () => {
 				{
 					mesh: invalidWorld.mesh,
 					elevation: invalidWorld.elevation,
-				} as SerializedOrogenWorld,
+				} as SerializedGenesisWorld,
 				0,
 				0,
 				0,
@@ -198,7 +198,7 @@ describe("province-overlay", () => {
 			provinces: {
 				regionProvince: new Int32Array([0, 1]),
 			},
-		} as SerializedOrogenWorld
+		} as SerializedGenesisWorld
 		const invalidHalfedgeWorld = {
 			elevation: new Float32Array([0, 0, 0]),
 			mesh: {
@@ -212,7 +212,7 @@ describe("province-overlay", () => {
 			provinces: {
 				regionProvince: new Int32Array([0, 1, 2]),
 			},
-		} as SerializedOrogenWorld
+		} as SerializedGenesisWorld
 
 		expect(
 			collectProvinceBorderGlobePositions(makeWorld(), 2, 0, true),

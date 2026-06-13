@@ -6,7 +6,7 @@ import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
 	ROUTE_SEA,
-	type SerializedOrogenWorld,
+	type SerializedGenesisWorld,
 	type SerializedRoutes,
 } from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
@@ -103,7 +103,7 @@ function buildSummary(
 
 function computeLakeAverageAnnualPrecipitation(
 	hoverLandmark: HoverLandmark | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): number | null {
 	if (
 		hoverLandmark?.type !== "lake" ||
@@ -155,7 +155,7 @@ function buildHoverRouteLabel(
 
 function buildHoverPortLabel(
 	hoverProvince: number | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	getLandmarkName: (landmarkId: number) => string,
 ): string | null {
 	if (
@@ -299,7 +299,7 @@ interface InfoPanelProps {
 	climateTimeMode: "current" | "annual" | "monthly"
 	climateMonth: number
 	unitSystem: UnitSystem
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 	routes?: SerializedRoutes | null
 	hoverCardRef: React.RefObject<HTMLDivElement | null>
 	getProvinceName?: (provinceId: number) => string

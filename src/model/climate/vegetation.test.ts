@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import {
 	assignClimateZones,
 	assignVegetation,
@@ -26,7 +26,7 @@ describe("assignClimateZones", () => {
 			temperature_avg: new Float32Array([-20, -10, 10, 26, 45, 20]),
 			temperature_min: new Float32Array([-25, -12, 2, 24, 41, -5]),
 			temperature_max: new Float32Array([-15, -8, 16, 29, 49, 45]),
-		} as OrogenClimate
+		} as GenesisClimate
 
 		const zones = assignClimateZones(
 			makeMesh(6),
@@ -42,7 +42,7 @@ describe("assignClimateZones", () => {
 			temperature_avg: new Float32Array([-14, -6, 6, 16, 24, 45]),
 			temperature_min: new Float32Array([-20, -10, 0, 8, 18, -5]),
 			temperature_max: new Float32Array([-14, -6, 6, 16, 24, 45]),
-		} as OrogenClimate
+		} as GenesisClimate
 
 		const zones = assignClimateZones(
 			makeMesh(6),
@@ -65,10 +65,10 @@ describe("assignVegetation", () => {
 	it("maps rainfall and temperature bands to the expected biome classes", () => {
 		const climate = {
 			temperature_avg: new Float32Array([-20, -10, 0, 12, 20, 28, 30]),
-		} as OrogenClimate
+		} as GenesisClimate
 		const rainfall = {
 			annual: new Float32Array([0, 600, 1200, 400, 2500, 700, 150]),
-		} as OrogenRainfall
+		} as GenesisRainfall
 
 		// All rain values are outside blend zones, so rng is never consulted.
 		const biome = assignVegetation(
@@ -116,7 +116,7 @@ describe("assignVegetation", () => {
 				30,
 				30, // tropical
 			]),
-		} as OrogenClimate
+		} as GenesisClimate
 		const rainfall = {
 			annual: new Float32Array([
 				199,
@@ -134,7 +134,7 @@ describe("assignVegetation", () => {
 				1449,
 				1551, // tropical: below / above MOIST blend [1450,1550]
 			]),
-		} as OrogenRainfall
+		} as GenesisRainfall
 
 		const biome = assignVegetation(
 			makeMesh(14),
@@ -173,15 +173,15 @@ describe("assignVegetation", () => {
 		const boreals_high = assignVegetation(
 			makeMesh(1),
 			new Uint8Array([1]),
-			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
-			{ annual: new Float32Array([250]) } as OrogenRainfall,
+			{ temperature_avg: new Float32Array([0]) } as GenesisClimate,
+			{ annual: new Float32Array([250]) } as GenesisRainfall,
 			fixedRng(0.3),
 		)
 		const boreals_low = assignVegetation(
 			makeMesh(1),
 			new Uint8Array([1]),
-			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
-			{ annual: new Float32Array([250]) } as OrogenRainfall,
+			{ temperature_avg: new Float32Array([0]) } as GenesisClimate,
+			{ annual: new Float32Array([250]) } as GenesisRainfall,
 			fixedRng(0.7),
 		)
 		expect(boreals_high[0]).toBe(3) // grasslands
@@ -193,15 +193,15 @@ describe("assignVegetation", () => {
 		const subtropical_high = assignVegetation(
 			makeMesh(1),
 			new Uint8Array([1]),
-			{ temperature_avg: new Float32Array([20]) } as OrogenClimate,
-			{ annual: new Float32Array([2200]) } as OrogenRainfall,
+			{ temperature_avg: new Float32Array([20]) } as GenesisClimate,
+			{ annual: new Float32Array([2200]) } as GenesisRainfall,
 			fixedRng(0.3),
 		)
 		const subtropical_low = assignVegetation(
 			makeMesh(1),
 			new Uint8Array([1]),
-			{ temperature_avg: new Float32Array([20]) } as OrogenClimate,
-			{ annual: new Float32Array([2200]) } as OrogenRainfall,
+			{ temperature_avg: new Float32Array([20]) } as GenesisClimate,
+			{ annual: new Float32Array([2200]) } as GenesisRainfall,
 			fixedRng(0.7),
 		)
 		expect(subtropical_high[0]).toBe(6) // jungle
@@ -212,15 +212,15 @@ describe("assignVegetation", () => {
 		const at_lower_edge = assignVegetation(
 			makeMesh(1),
 			new Uint8Array([1]),
-			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
-			{ annual: new Float32Array([250 - H]) } as OrogenRainfall,
+			{ temperature_avg: new Float32Array([0]) } as GenesisClimate,
+			{ annual: new Float32Array([250 - H]) } as GenesisRainfall,
 			fixedRng(0), // low rng would normally give higher biome
 		)
 		const at_upper_edge = assignVegetation(
 			makeMesh(1),
 			new Uint8Array([1]),
-			{ temperature_avg: new Float32Array([0]) } as OrogenClimate,
-			{ annual: new Float32Array([250 + H]) } as OrogenRainfall,
+			{ temperature_avg: new Float32Array([0]) } as GenesisClimate,
+			{ annual: new Float32Array([250 + H]) } as GenesisRainfall,
 			fixedRng(1), // high rng would normally give lower biome
 		)
 		expect(at_lower_edge[0]).toBe(2) // sparse: below DRY, above ARID(200>=150)
@@ -232,7 +232,7 @@ describe("assignVegetation", () => {
 			temperature_avg: new Float32Array([40, 41, 30, 30]),
 			temperature_min: new Float32Array([0, 0, -1, 0]),
 			temperature_max: new Float32Array([40, 40, 40, 41]),
-		} as OrogenClimate
+		} as GenesisClimate
 
 		const zones = assignClimateZones(
 			makeMesh(4),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenHydrology, OrogenRainfall } from ".."
+import type { GenesisClimate, GenesisHydrology, GenesisRainfall } from ".."
 import { computeRivers } from "./rivers"
 import {
 	buildDrainageMesh,
@@ -12,7 +12,7 @@ import {
 describe("computeRivers", () => {
 	it("returns an empty river network when the world is entirely ocean", () => {
 		const mesh = buildLineMesh(3)
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly: new Float32Array(36),
 			annual: new Float32Array(3),
 			east: new Float32Array(3),
@@ -21,12 +21,12 @@ describe("computeRivers", () => {
 		const climate = {
 			temperature_monthly: new Float32Array(36),
 			pet_monthly: new Float32Array(36),
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly: new Float32Array(36),
 			aridity_monthly: new Float32Array(36),
 			baseflow_monthly: new Float32Array(36),
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,
@@ -68,7 +68,7 @@ describe("computeRivers", () => {
 			}
 		}
 
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly,
 			annual,
 			east: new Float32Array(4),
@@ -77,12 +77,12 @@ describe("computeRivers", () => {
 		const climate = {
 			temperature_monthly,
 			pet_monthly,
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly,
 			aridity_monthly,
 			baseflow_monthly,
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,
@@ -124,7 +124,7 @@ describe("computeRivers", () => {
 			}
 		}
 
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly,
 			annual,
 			east: new Float32Array(4),
@@ -134,13 +134,13 @@ describe("computeRivers", () => {
 			aet_monthly,
 			aridity_monthly,
 			baseflow_monthly,
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const buildClimate = (temperature: number) =>
 			({
 				temperature_monthly: new Float32Array(48).fill(temperature),
 				pet_monthly,
-			}) as OrogenClimate
+			}) as GenesisClimate
 
 		const temperate = computeRivers(
 			mesh,

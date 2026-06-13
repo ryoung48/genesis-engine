@@ -1,6 +1,6 @@
-import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import type { StageTiming } from "../types/tectonics"
 import { EVT } from "./event-heap"
 import { runBattle } from "./events/battle"
@@ -35,7 +35,7 @@ function timed<T>(
 
 function seedColonyRelations(
 	state: HistoryState,
-	nations: OrogenNationHierarchy | undefined,
+	nations: GenesisNationHierarchy | undefined,
 ): void {
 	if (!nations?.nationColonizer) return
 	const { seeds, nationColonizer } = nations
@@ -56,8 +56,8 @@ function seedColonyRelations(
 }
 
 export function initHistory(params: {
-	nations: OrogenNationHierarchy
-	provinces: OrogenProvinces
+	nations: GenesisNationHierarchy
+	provinces: GenesisProvinces
 	population: ProvincePopulation
 	coastal: Uint8Array
 	waterAccess?: Uint8Array
@@ -66,7 +66,7 @@ export function initHistory(params: {
 	cultures: { assignment: Int32Array; count: number }
 	seed: number
 	startYear?: number
-	landmarks?: OrogenLandmarks
+	landmarks?: GenesisLandmarks
 	regionProvince?: Int32Array
 	regionAdjOffset?: Int32Array
 	regionAdjList?: Int32Array

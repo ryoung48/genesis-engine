@@ -1,9 +1,9 @@
-import type { OrogenProvinces } from "../types/society"
+import type { GenesisProvinces } from "../types/society"
 
 export const WATER_ACCESS_BONUS = 100
 
 export function computeProvinceWaterAccess(
-	provinces: Pick<OrogenProvinces, "count" | "regionProvince">,
+	provinces: Pick<GenesisProvinces, "count" | "regionProvince">,
 	oceanCoastal: Uint8Array<ArrayBufferLike>,
 	lakeCoastal: Uint8Array<ArrayBufferLike>,
 	riverVisible: Uint8Array<ArrayBufferLike>,

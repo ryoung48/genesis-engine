@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenNationHierarchy, OrogenProvinces } from "../.."
+import type { GenesisNationHierarchy, GenesisProvinces } from "../.."
 import type { WeightedValue } from "../../shared/rng"
 import type { ProvincePopulation } from "../../society/population"
 import { EVT } from "../event-heap"
@@ -96,7 +96,7 @@ function createDiplomacyState(options?: {
 		adjList,
 		size: new Int32Array(parent.length).fill(1),
 		colors,
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: sovereign.slice(),
 		seeds: Int32Array.from(parent.map((_, index) => index)),
@@ -115,7 +115,7 @@ function createDiplomacyState(options?: {
 		childList: new Int32Array(0),
 		sovereign,
 		gravity: Float32Array.from(habitability),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const population: ProvincePopulation = {
 		habitability: Float32Array.from(habitability),
 		population: Float32Array.from(habitability.map((value) => value * 10)),

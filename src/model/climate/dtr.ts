@@ -1,4 +1,4 @@
-import type { OrogenParams, OrogenRainfall } from ".."
+import type { GenesisParams, GenesisRainfall } from ".."
 
 /**
  * Compute per-cell per-month diurnal temperature range (deg C) for use as the
@@ -22,11 +22,11 @@ import type { OrogenParams, OrogenRainfall } from ".."
  *   Float32Array of shape [N], both in deg C
  */
 export function computeDiurnalRange(
-	rainfall: OrogenRainfall,
+	rainfall: GenesisRainfall,
 	_elevationKm: Float32Array,
 	oceanDist: Float32Array | undefined,
 	isLand: Uint8Array,
-	params?: Pick<OrogenParams, "hoursPerDay" | "pressure" | "tidallyLocked">,
+	params?: Pick<GenesisParams, "hoursPerDay" | "pressure" | "tidallyLocked">,
 	daylight_hours_monthly?: Float32Array,
 ): { monthly: Float32Array; annual: Float32Array } {
 	const N = isLand.length

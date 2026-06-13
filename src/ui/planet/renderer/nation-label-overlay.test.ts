@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { describe, expect, it, vi } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
 import {
 	buildGlobeNationLabels,
@@ -49,7 +49,7 @@ function cartesianFromLonLat(
 	return [cosLat * Math.cos(lon), cosLat * Math.sin(lon), Math.sin(lat)]
 }
 
-function buildWorld(): SerializedOrogenWorld {
+function buildWorld(): SerializedGenesisWorld {
 	return {
 		mesh: {
 			r_xyz: new Float32Array([
@@ -76,7 +76,7 @@ function buildWorld(): SerializedOrogenWorld {
 			assignment: new Int32Array([0, 1]),
 			size: new Int32Array([1, 5]),
 		},
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 }
 
 describe("nation-label-overlay", () => {

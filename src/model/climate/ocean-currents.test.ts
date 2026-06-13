@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, SphereMesh } from ".."
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisClimate, SphereMesh } from ".."
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import {
 	applyCurrentTemperatureEffect,
 	buildOceanCurrentGrid,
@@ -48,7 +48,7 @@ function buildMesh(
 	} as SphereMesh
 }
 
-function buildClimate(temperatureAvg: number[]): OrogenClimate {
+function buildClimate(temperatureAvg: number[]): GenesisClimate {
 	const monthly = Array.from({ length: 12 }, () => temperatureAvg).flat()
 	return {
 		temperature_avg: new Float32Array(temperatureAvg),
@@ -64,7 +64,7 @@ function buildClimate(temperatureAvg: number[]): OrogenClimate {
 	}
 }
 
-function buildEmptyLandmarks(numRegions: number): OrogenLandmarks {
+function buildEmptyLandmarks(numRegions: number): GenesisLandmarks {
 	return {
 		regionLandmark: new Int32Array(numRegions).fill(-1),
 		type: new Uint8Array(),
@@ -76,7 +76,7 @@ function buildEmptyLandmarks(numRegions: number): OrogenLandmarks {
 function buildLandmarks(
 	numRegions: number,
 	regions: Array<{ region: number; type: number }>,
-): OrogenLandmarks {
+): GenesisLandmarks {
 	const regionLandmark = new Int32Array(numRegions).fill(-1)
 	const type = new Uint8Array(regions.length)
 	const size = new Int32Array(regions.length).fill(1)

@@ -27,7 +27,7 @@ function diffuseIteration(
 }
 
 // ----------------------------------------------------------------
-//  Priority-flood pit resolution with canyon carving (orogen port)
+//  Priority-flood pit resolution with canyon carving (genesis port)
 // ----------------------------------------------------------------
 function priorityFloodCarve(
 	mesh: SphereMesh,
@@ -182,7 +182,7 @@ function priorityFloodCarve(
 }
 
 // ----------------------------------------------------------------
-//  Domain warping via FBM simplex noise with greedy mesh walk (orogen port)
+//  Domain warping via FBM simplex noise with greedy mesh walk (genesis port)
 // ----------------------------------------------------------------
 export function warpTerrain(
 	mesh: SphereMesh,
@@ -292,7 +292,7 @@ export function warpTerrain(
 }
 
 // ----------------------------------------------------------------
-//  Bilateral smoothing with coastline locking (orogen port)
+//  Bilateral smoothing with coastline locking (genesis port)
 // ----------------------------------------------------------------
 export function smoothElevation(
 	mesh: SphereMesh,
@@ -375,7 +375,7 @@ function buildGlacialBuffers(
 }
 
 // ----------------------------------------------------------------
-//  Composite erosion: hydraulic (stream power) + thermal (orogen port)
+//  Composite erosion: hydraulic (stream power) + thermal (genesis port)
 // ----------------------------------------------------------------
 export function erodeComposite(
 	mesh: SphereMesh,
@@ -726,7 +726,7 @@ export function erodeComposite(
 }
 
 // ----------------------------------------------------------------
-//  Ridge sharpening (orogen port)
+//  Ridge sharpening (genesis port)
 // ----------------------------------------------------------------
 export function sharpenRidges(
 	mesh: SphereMesh,
@@ -763,7 +763,7 @@ export function sharpenRidges(
 }
 
 // ----------------------------------------------------------------
-//  Soil creep — Laplacian diffusion (orogen port)
+//  Soil creep — Laplacian diffusion (genesis port)
 // ----------------------------------------------------------------
 export function applySoilCreep(
 	mesh: SphereMesh,

@@ -141,7 +141,7 @@ export function handleRecentCodeSelection(
 }
 
 function stripTimingPrefix(stage: string): string {
-	if (stage.startsWith("orogen:")) return stage.slice("orogen:".length)
+	if (stage.startsWith("genesis:")) return stage.slice("genesis:".length)
 	if (stage.startsWith(`${POST_TIMING_PREFIX} `))
 		return stage.slice(`${POST_TIMING_PREFIX} `.length)
 	if (stage.startsWith(HISTORY_TIMING_PREFIX))

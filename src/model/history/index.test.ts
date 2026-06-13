@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
 import { initHistory } from "."
 import { getRelation, REL } from "./state"
@@ -45,8 +45,8 @@ function buildSovereign(parent: readonly number[]): Int32Array {
 }
 
 function createInitHistoryFixture(): {
-	nations: OrogenNationHierarchy
-	provinces: OrogenProvinces
+	nations: GenesisNationHierarchy
+	provinces: GenesisProvinces
 	population: ProvincePopulation
 } {
 	const parent = [-1, -1, -1]
@@ -65,7 +65,7 @@ function createInitHistoryFixture(): {
 		adjList,
 		size: new Int32Array(parent.length).fill(1),
 		colors,
-	} as OrogenProvinces
+	} as GenesisProvinces
 
 	const nations = {
 		assignment: sovereign.slice(),
@@ -82,7 +82,7 @@ function createInitHistoryFixture(): {
 		sovereign,
 		gravity: Float32Array.from([20, 16, 4]),
 		nationColonizer: Int32Array.from([1, -1, -1]),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 
 	const population: ProvincePopulation = {
 		habitability: Float32Array.from([20, 16, 4]),

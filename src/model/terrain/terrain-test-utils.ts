@@ -1,7 +1,7 @@
 import type {
-	OrogenClimate,
-	OrogenHydrology,
-	OrogenRainfall,
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisRainfall,
 	SphereMesh,
 } from ".."
 
@@ -92,9 +92,9 @@ export function buildUniformRiverInputs(
 		baseflow?: number
 	} = {},
 ): {
-	rainfall: OrogenRainfall
-	climate: OrogenClimate
-	hydrology: OrogenHydrology
+	rainfall: GenesisRainfall
+	climate: GenesisClimate
+	hydrology: GenesisHydrology
 } {
 	const monthly = new Float32Array(12 * numRegions)
 	const annual = new Float32Array(numRegions)
@@ -125,11 +125,11 @@ export function buildUniformRiverInputs(
 		climate: {
 			temperature_monthly,
 			pet_monthly,
-		} as OrogenClimate,
+		} as GenesisClimate,
 		hydrology: {
 			aet_monthly,
 			aridity_monthly,
 			baseflow_monthly,
-		} as OrogenHydrology,
+		} as GenesisHydrology,
 	}
 }

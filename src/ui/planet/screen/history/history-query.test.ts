@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { REL } from "@/model/history/state"
 import type {
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	SerializedProvinceTimelineFloat,
 	SerializedProvinceTimelineInt,
 	SerializedTimelines,
@@ -122,7 +122,7 @@ function makeBenchmarkFixture(params: {
 	sampleCount: number
 }): {
 	bundle: TimelineBundle
-	world: SerializedOrogenWorld
+	world: SerializedGenesisWorld
 	sampleTimes: number[]
 	trackedNationIds: number[]
 } {
@@ -317,7 +317,7 @@ function makeBenchmarkFixture(params: {
 			adjOffset: new Int32Array(provinceCount + 1),
 			adjList: new Int32Array(0),
 		},
-	} as unknown as SerializedOrogenWorld
+	} as unknown as SerializedGenesisWorld
 
 	return {
 		bundle: { timelines, events: [] },
@@ -373,7 +373,7 @@ describe("createHistoryQuery", () => {
 			population: {
 				habitability: new Float32Array([0.5, 0.6]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const query = createHistoryQuery(bundle, world)
 		const before = query.getView(0)
@@ -455,7 +455,7 @@ describe("createHistoryQuery", () => {
 			population: {
 				habitability: new Float32Array([1, 0.8, 1.2]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const query = createHistoryQuery(bundle, world)
 		const atTen = query.getView(10)
@@ -515,7 +515,7 @@ describe("createHistoryQuery", () => {
 		const query = createHistoryQuery({ timelines, events: [] }, {
 			provinces: undefined,
 			population: undefined,
-		} as unknown as SerializedOrogenWorld)
+		} as unknown as SerializedGenesisWorld)
 		const view = query.getView(0)
 
 		expect(Array.from(view.colors)).toEqual([0, 0, 0, 0, 0, 0])
@@ -581,7 +581,7 @@ describe("createHistoryQuery", () => {
 			population: {
 				habitability: new Float32Array([10, 4, 4, 4, 4]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const view = createHistoryQuery({ timelines, events: [] }, world).getView(0)
 
@@ -703,7 +703,7 @@ describe("createHistoryQuery", () => {
 			population: {
 				habitability: new Float32Array([5, 1, 4, 2]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const query = createHistoryQuery({ timelines, events: [] }, world)
 		const atTen = query.getView(10)
@@ -809,7 +809,7 @@ describe("createHistoryQuery", () => {
 			population: {
 				habitability: new Float32Array([2, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const query = createHistoryQuery({ timelines, events: [] }, world)
 		const atTwenty = query.getView(20)
@@ -904,7 +904,7 @@ describe("createHistoryQuery", () => {
 			population: {
 				habitability: new Float32Array([10, 4, 1, 8, 2, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const view = createHistoryQuery({ timelines, events: [] }, world).getView(0)
 		const historyChildren = buildHistoryChildrenIndex(view)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import type { ProvincePopulation } from "../society/population"
 import {
 	children,
@@ -24,7 +24,7 @@ function createTestState(): HistoryState {
 		adjList: new Int32Array([2, 2, 0, 1, 3, 2]),
 		size: new Int32Array([1, 1, 1, 1]),
 		colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]),
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: new Int32Array([0, 0, 2, 3]),
 		seeds: new Int32Array([0, 1, 2, 3]),
@@ -39,7 +39,7 @@ function createTestState(): HistoryState {
 		childList: new Int32Array([1]),
 		sovereign: new Int32Array([0, 0, 2, 3]),
 		gravity: new Float32Array([10, 6, 8, 4]),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const population: ProvincePopulation = {
 		habitability: new Float32Array([10, 6, 8, 4]),
 		population: new Float32Array([100, 50, 80, 40]),
@@ -80,7 +80,7 @@ function createWideState(): HistoryState {
 		]),
 		size: new Int32Array(P).fill(1),
 		colors: new Float32Array(P * 3),
-	} as OrogenProvinces
+	} as GenesisProvinces
 	const nations = {
 		assignment: new Int32Array(P).fill(0),
 		seeds: Int32Array.from({ length: P }, (_, i) => i),
@@ -95,7 +95,7 @@ function createWideState(): HistoryState {
 		childList: Int32Array.from({ length: P - 1 }, (_, i) => i + 1),
 		sovereign: new Int32Array(P).fill(0),
 		gravity: new Float32Array(P).fill(4),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 	const population: ProvincePopulation = {
 		habitability: Float32Array.from({ length: P }, (_, i) =>
 			i === 0 ? 10 : 4,

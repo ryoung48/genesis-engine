@@ -24,13 +24,13 @@
  * migration-derived desolation affects population density.
  */
 
-import type { OrogenProvinces } from ".."
+import type { GenesisProvinces } from ".."
 import { createRng } from "../shared/rng"
 import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import type { SphereMesh } from "../types/mesh"
 
-// Habitability factors indexed by orogen codes
+// Habitability factors indexed by genesis codes
 
 // climateZones: 0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic
 const HAB_CLIMATE = new Float32Array([
@@ -84,8 +84,8 @@ export interface ProvincePopulation {
  * same jitter values, so calling this twice with identical inputs is stable.
  */
 export function computeProvinceHabitability(
-	provinces: OrogenProvinces,
-	_landmarks: OrogenLandmarks,
+	provinces: GenesisProvinces,
+	_landmarks: GenesisLandmarks,
 	climateZones: Uint8Array,
 	vegetation: Uint8Array,
 	topography: Uint8Array,
@@ -133,8 +133,8 @@ export function computeProvinceHabitability(
 }
 
 export function computePopulation(
-	provinces: OrogenProvinces,
-	landmarks: OrogenLandmarks,
+	provinces: GenesisProvinces,
+	landmarks: GenesisLandmarks,
 	climateZones: Uint8Array,
 	vegetation: Uint8Array,
 	topography: Uint8Array,
@@ -382,7 +382,7 @@ function placeCradles(
  * - `cradleProvinces`: province indices of the seeded cradles.
  */
 export function computeMigration(
-	provinces: OrogenProvinces,
+	provinces: GenesisProvinces,
 	habitability: Float32Array,
 	mesh: SphereMesh,
 	planetRadiusKm: number = DEFAULT_PLANET_RADIUS_KM,

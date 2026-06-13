@@ -1,4 +1,4 @@
-import type { OrogenNationHierarchy } from ".."
+import type { GenesisNationHierarchy } from ".."
 import { WATER_ACCESS_BONUS } from "./water-access"
 
 type FanoutLevel = readonly [min: number, max: number, targetGroupSize: number]
@@ -318,7 +318,7 @@ export function rebalanceHierarchy(params: {
 export function buildChildrenCSR(
 	parent: Int32Array<ArrayBufferLike>,
 	provinceCount: number,
-): Pick<OrogenNationHierarchy, "childOffset" | "childList"> {
+): Pick<GenesisNationHierarchy, "childOffset" | "childList"> {
 	const childOffset = new Int32Array(provinceCount + 1)
 	for (let p = 0; p < provinceCount; p++) {
 		const par = parent[p]

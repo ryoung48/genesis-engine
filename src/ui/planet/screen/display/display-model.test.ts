@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { HistoryView } from "../history/history-query"
 import {
 	buildDisplayNationModel,
@@ -51,7 +51,7 @@ describe("display-model", () => {
 				assignment: new Int32Array([4, 4, 7]),
 				colors: new Float32Array([1, 0, 0, 0.5, 0, 0, 0, 1, 0]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const result = buildDisplayNationModel(world)
 
@@ -74,7 +74,7 @@ describe("display-model", () => {
 				nations: {
 					assignment: new Int32Array([0]),
 				},
-			} as unknown as SerializedOrogenWorld),
+			} as unknown as SerializedGenesisWorld),
 		).toBeNull()
 	})
 
@@ -101,7 +101,7 @@ describe("display-model", () => {
 				adjOffset: new Int32Array([0, 0, 0, 0]),
 				adjList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const result = buildDisplayWorld({
 			world,
@@ -133,7 +133,7 @@ describe("display-model", () => {
 					sovereign: new Int32Array([0, 0, 2]),
 					parent: new Int32Array([-1, 0, -1]),
 				},
-			} as unknown as SerializedOrogenWorld,
+			} as unknown as SerializedGenesisWorld,
 		})
 
 		expect(Array.from(result.leaderDynasty)).toEqual([7, -1, 9])
@@ -178,7 +178,7 @@ describe("display-model", () => {
 				habitabilityScore: 0,
 				totalPopulation: 30,
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const historyView = {
 			assignment: new Int32Array([1, 1]),
 			parent: new Int32Array([-1, 0]),
@@ -217,7 +217,7 @@ describe("display-model", () => {
 	it("returns the base world when nation display data is unavailable", () => {
 		const world = {
 			mesh: { numRegions: 1 },
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		expect(
 			buildDisplayWorld({
@@ -243,7 +243,7 @@ describe("display-model", () => {
 			nations: {
 				assignment: new Int32Array([0]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		expect(
 			buildDisplayWorld({
@@ -269,7 +269,7 @@ describe("display-model", () => {
 				adjOffset: new Int32Array([0, 0, 0]),
 				adjList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 		const historyView = {
 			assignment: new Int32Array([1, 1]),
 			parent: new Int32Array([-1, 0]),
@@ -312,7 +312,7 @@ describe("display-model", () => {
 				adjOffset: new Int32Array([0, 0, 0, 0, 0]),
 				adjList: new Int32Array(0),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const result = buildDisplayWorld({
 			world,
@@ -335,7 +335,7 @@ describe("display-model", () => {
 				adjOffset: new Int32Array([0, 1, 3, 4]),
 				adjList: new Int32Array([1, 0, 2, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const { adjOffset, adjList } = buildNationAdjacency(
 			provinceAssignment,
@@ -356,7 +356,7 @@ describe("display-model", () => {
 				adjOffset: new Int32Array([0, 1, 3, 4]),
 				adjList: new Int32Array([1, 0, 2, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const { adjOffset, adjList } = buildNationAdjacency(
 			provinceAssignment,
@@ -377,7 +377,7 @@ describe("display-model", () => {
 				assignment: new Int32Array([4, -1, 7]),
 				colors: new Float32Array([1, 0, 0, 0.5, 0, 0]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		const result = buildDisplayNationModel(world)
 

@@ -2,9 +2,9 @@ import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
-import type { OrogenViewMode } from "./types"
+import type { GenesisViewMode } from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 
@@ -16,7 +16,7 @@ interface ProvinceBoundarySide {
 }
 
 function forEachProvinceBoundarySide(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	province: number,
 	visit: (side: ProvinceBoundarySide) => void,
 ) {
@@ -88,7 +88,7 @@ function appendProjectedSegment(
 }
 
 export function collectProvinceBorderGlobePositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	province: number,
 	radiusBoost: number,
 	elevationVisible: boolean,
@@ -121,7 +121,7 @@ export function collectProvinceBorderGlobePositions(
 }
 
 export function collectProvinceBorderMapPositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	province: number,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -178,9 +178,9 @@ export function collectProvinceBorderMapPositions(
 }
 
 export function buildSelectedProvinceBorderGlobe(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	province: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	elevationVisible: boolean,
 	opts?: {
 		color?: number
@@ -206,11 +206,11 @@ export function buildSelectedProvinceBorderGlobe(
 }
 
 export function buildSelectedProvinceBorderMap(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	province: number,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	opts?: {
 		color?: number
 		opacity?: number

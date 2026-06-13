@@ -3,9 +3,9 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { WindArrowData } from "@/model/climate/wind"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
-import type { OrogenViewMode, RiverData } from "./types"
+import type { GenesisViewMode, RiverData } from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 
@@ -27,7 +27,7 @@ interface HierarchyNode {
 }
 
 export function collectHierarchyNodes(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	selectedNationId: number,
 ): HierarchyNode[] | null {
 	if (!world.nations || !world.provinces) return null
@@ -94,7 +94,7 @@ interface NationBoundarySide {
 }
 
 function forEachNationBoundarySide(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nation: number,
 	visit: (side: NationBoundarySide) => void,
 ) {
@@ -124,7 +124,7 @@ function forEachNationBoundarySide(
 }
 
 function forEachNationBorderSide(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	visit: (side: NationBoundarySide) => void,
 ) {
 	if (!world.nations || !world.provinces) return
@@ -265,8 +265,8 @@ function unwrapLongitudeSequence(
 }
 
 export function buildNationBordersGlobe(
-	world: SerializedOrogenWorld,
-	viewMode: OrogenViewMode,
+	world: SerializedGenesisWorld,
+	viewMode: GenesisViewMode,
 	nationBordersVisible: boolean,
 	elevationVisible: boolean,
 	opts?: { color?: number; radiusBoost?: number; opacity?: number },
@@ -285,10 +285,10 @@ export function buildNationBordersGlobe(
 }
 
 export function buildNationBordersMap(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	nationBordersVisible: boolean,
 	opts?: { color?: number; opacity?: number; zBoost?: number },
 ) {
@@ -310,7 +310,7 @@ export function buildNationBordersMap(
 }
 
 export function collectNationBorderGlobePositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nation: number,
 	radiusBoost: number,
 	elevationVisible: boolean,
@@ -343,7 +343,7 @@ export function collectNationBorderGlobePositions(
 }
 
 export function collectAllNationBorderGlobePositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	radiusBoost: number,
 	elevationVisible: boolean,
 ) {
@@ -375,7 +375,7 @@ export function collectAllNationBorderGlobePositions(
 }
 
 export function collectNationBorderMapPositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	nation: number,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
@@ -432,7 +432,7 @@ export function collectNationBorderMapPositions(
 }
 
 export function collectAllNationBorderMapPositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	zBoost: number,
@@ -490,7 +490,7 @@ export function collectAllNationBorderMapPositions(
 export function buildGlobeGrid(
 	spacingDeg: number,
 	gridVisible: boolean,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	elevationVisible: boolean,
 ): THREE.LineSegments {
 	const spacing = Math.max(2.5, spacingDeg)
@@ -541,7 +541,7 @@ export function buildMapGrid(
 	spacingDeg: number,
 	projectionLatitudeDeg: number,
 	gridVisible: boolean,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 ): THREE.LineSegments {
 	const spacing = Math.max(2.5, spacingDeg)
 	const lonStep = Math.max(2.5, spacing / 2)
@@ -620,7 +620,7 @@ function buildThermalEquatorLine(
 
 export function buildGlobeThermalEquator(
 	points: [number, number][],
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	elevationVisible: boolean,
 ) {
 	const radius = elevationVisible ? 1.05 : 1.02
@@ -647,7 +647,7 @@ export function buildGlobeThermalEquator(
 export function buildMapThermalEquator(
 	points: [number, number][],
 	projectionLatitudeDeg: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 ) {
 	const projection = createMapProjection(0, projectionLatitudeDeg)
 	const unwrappedPoints = unwrapLongitudeSequence(
@@ -825,7 +825,7 @@ export function buildGlobeRivers(
 	riverMaterials: LineMaterial[],
 	globeRiverMaterials: LineMaterial[],
 	riversVisible: boolean,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	elevationVisible: boolean,
 ) {
 	const lift = elevationVisible ? 0.003 : 0.0015
@@ -863,7 +863,7 @@ export function buildMapRivers(
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 	riversVisible: boolean,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 ) {
 	const projection = createMapProjection(
 		centerLongitudeDeg,
@@ -1022,9 +1022,9 @@ export function buildMapRivers(
 }
 
 export function buildGlobeHierarchyOverlay(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	selectedNationId: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	canvas: HTMLCanvasElement,
 	elevationVisible: boolean,
 ): THREE.Group | null {
@@ -1117,11 +1117,11 @@ export function buildGlobeHierarchyOverlay(
 }
 
 export function buildMapHierarchyOverlay(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	selectedNationId: number,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	canvas: HTMLCanvasElement,
 ): THREE.Group | null {
 	const nodes = collectHierarchyNodes(world, selectedNationId)
@@ -1222,7 +1222,7 @@ const ARROW_HEAD_SPREAD = 0.5 // sine of the arrowhead half-angle (~30°)
 /** Build wind arrows on the globe surface. Each arrow is shaft + V-head as line segments. */
 export function buildGlobeWindArrows(
 	data: WindArrowData,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	elevationVisible: boolean,
 ): THREE.LineSegments | null {
 	const radius = elevationVisible ? 1.06 : 1.02
@@ -1321,7 +1321,7 @@ export function buildGlobeWindArrows(
 /** Build wind arrows on the flat map. Uses equirectangular lat/lon coordinates. */
 export function buildMapWindArrows(
 	data: WindArrowData,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 ): THREE.LineSegments | null {
 	const shaftRad = ARROW_SHAFT_DEG * DEG2RAD
 	const headRad = ARROW_HEAD_DEG * DEG2RAD
@@ -1374,7 +1374,7 @@ export function buildMapWindArrows(
 }
 
 function collectAllLandNationBorderGlobePositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	elevationVisible: boolean,
 ) {
 	if (!world.nations || !world.provinces) return []
@@ -1408,7 +1408,7 @@ function collectAllLandNationBorderGlobePositions(
 }
 
 function collectAllLandNationBorderMapPositions(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
 ) {
@@ -1495,8 +1495,8 @@ function buildThickLineSegments2(
 }
 
 export function buildLandNationBordersGlobe(
-	world: SerializedOrogenWorld,
-	viewMode: OrogenViewMode,
+	world: SerializedGenesisWorld,
+	viewMode: GenesisViewMode,
 	visible: boolean,
 	elevationVisible: boolean,
 	resolution: [number, number],
@@ -1517,10 +1517,10 @@ export function buildLandNationBordersGlobe(
 }
 
 export function buildLandNationBordersMap(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	visible: boolean,
 	resolution: [number, number],
 	opts?: { color?: number; lineWidth?: number; opacity?: number },

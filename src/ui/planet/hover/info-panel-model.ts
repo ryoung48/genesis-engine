@@ -1,11 +1,11 @@
-import { OROGEN_TERRAIN_FEATURE_LABELS } from "@/model"
+import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
 import { REL } from "@/model/history/state"
 import { GOVERNMENT_TYPE_LABELS, GOVERNMENT_TYPES } from "@/model/society/eras"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import { climateTempColor, climateZoneColor, vegetationColor } from "../colors"
 import {
@@ -71,7 +71,7 @@ interface HoverPoliticalDisplayData {
 export function buildHoverChartData(
 	hoverInfo: HoverInfo | null,
 	hoverElevationKm: number | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverChartData | null {
 	if (!hoverInfo || hoverElevationKm === null || !world) return null
 	const region = hoverInfo.region
@@ -128,7 +128,7 @@ export function buildHoverChartData(
 
 export function buildPastaMonthlyData(
 	hoverInfo: HoverInfo | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): HoverPastaMonthlyData | null {
 	if (
 		!hoverInfo ||
@@ -159,8 +159,8 @@ export function buildTerrainFeatureSwatches(
 			),
 		),
 	).map((feature) => {
-		const featureIndex = OROGEN_TERRAIN_FEATURE_LABELS.indexOf(
-			feature as (typeof OROGEN_TERRAIN_FEATURE_LABELS)[number],
+		const featureIndex = GENESIS_TERRAIN_FEATURE_LABELS.indexOf(
+			feature as (typeof GENESIS_TERRAIN_FEATURE_LABELS)[number],
 		)
 		const featureColor =
 			featureIndex >= 0 ? getTerrainFeatureColor(featureIndex) : null
@@ -174,7 +174,7 @@ export function buildTerrainFeatureSwatches(
 export function buildProvinceDisplayData(params: {
 	hoverProvince: number | null
 	hoverNationId: number | null
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 }): HoverProvinceDisplayData {
 	const { hoverProvince, hoverNationId, world } = params
 	const nationColor =
@@ -219,7 +219,7 @@ export function buildProvinceDisplayData(params: {
 export function buildPoliticalDisplayData(params: {
 	hoverNationId: number | null
 	selectedTimeMs: number | null
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 	getLeaderName?: (nationId: number, timeMs: number) => string
 	getDynastyName?: (dynastyId: number) => string
 }): HoverPoliticalDisplayData {
@@ -261,7 +261,7 @@ export function buildPoliticalDisplayData(params: {
 
 export function buildClimateSwatchColor(
 	hoverRegion: number | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 	colorMode: ColorMode,
 ): string | null {
 	if (hoverRegion === null || !world) return null
@@ -279,7 +279,7 @@ export function buildClimateSwatchColor(
 
 export function buildVegetationSwatchColor(
 	hoverRegion: number | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	if (hoverRegion === null || !world?.vegetation) return null
 	return rgbToCss(vegetationColor(world.vegetation[hoverRegion]))
@@ -287,7 +287,7 @@ export function buildVegetationSwatchColor(
 
 export function buildTopographySwatchColor(
 	hoverRegion: number | null,
-	world: SerializedOrogenWorld | null,
+	world: SerializedGenesisWorld | null,
 ): string | null {
 	if (hoverRegion === null || !world?.topography) return null
 	const color = getTopographyColor(world.topography[hoverRegion])
@@ -297,7 +297,7 @@ export function buildTopographySwatchColor(
 export function buildDemographicDisplayData(params: {
 	populationMode: PopulationMapMode
 	hoverProvince: number | null
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 	unitSystem: UnitSystem
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
@@ -450,7 +450,7 @@ const GOVERNMENT_COLORS_CSS: Record<number, string> = {
 
 export function buildGovernmentDisplayData(params: {
 	hoverNationId: number | null
-	world: SerializedOrogenWorld | null
+	world: SerializedGenesisWorld | null
 }): { label: string; color: string } | null {
 	const { hoverNationId, world } = params
 	if (

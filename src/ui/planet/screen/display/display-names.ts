@@ -16,7 +16,7 @@ import {
 	type LanguageNames,
 } from "@/model/society/language/names"
 import type {
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	SerializedProvinceTimelineFloat,
 	SerializedProvinceTimelineInt,
 } from "@/model/transport/worker-types"
@@ -100,7 +100,7 @@ function buildLeaderEntries(
 
 function buildDynasties(
 	context: LanguageNameContext,
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	field: SerializedProvinceTimelineInt,
 ): LanguageNameDynasty[] {
 	let maxDynastyId = -1
@@ -140,7 +140,7 @@ function buildDynasties(
 }
 
 function buildNameContext(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	leaderEntries: LanguageNameLeaderEntry[][],
 ): LanguageNameContext {
 	const provinceCount = world.provinces?.count ?? 0
@@ -184,7 +184,7 @@ function buildNameContext(
 
 function buildDynastiesFromCurrentWorld(
 	context: LanguageNameContext,
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 ): LanguageNameDynasty[] {
 	const provinceCount = world.provinces?.count ?? 0
 	let maxDynastyId = -1
@@ -317,7 +317,7 @@ function findLatestSuccessionTime(
 }
 
 function resolveLeaderEntry(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	bundle: TimelineBundle | null,
 	provinceIdx: number,
 	time: number,
@@ -347,7 +347,7 @@ function resolveLeaderEntry(
 }
 
 function findDynastyCultureId(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	bundle: TimelineBundle | null,
 	dynastyIdx: number,
 ): number {
@@ -374,7 +374,7 @@ function findDynastyCultureId(
 }
 
 function createTimelineNames(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	bundle: TimelineBundle,
 ): LanguageNames {
 	const provinceCount = world.provinces?.count ?? 0
@@ -389,7 +389,7 @@ function createTimelineNames(
 }
 
 function createCurrentWorldPoliticalNames(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 ): LanguageNames {
 	const provinceCount = world.provinces?.count ?? 0
 	const leaderEntries = Array.from(
@@ -405,7 +405,7 @@ function createCurrentWorldPoliticalNames(
 }
 
 export function createDisplayNames(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	bundle: TimelineBundle | null,
 ): LanguageNames {
 	const baseNames = createWorldNames(world)

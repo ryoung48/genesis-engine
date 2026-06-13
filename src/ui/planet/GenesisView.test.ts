@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildMapExportFilename, syncLabelModeToMapMode } from "./OrogenView"
+import { buildMapExportFilename, syncLabelModeToMapMode } from "./GenesisView"
 
 describe("buildMapExportFilename", () => {
 	it("uses the current planet code when present", () => {

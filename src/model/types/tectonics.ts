@@ -21,7 +21,7 @@ export interface PlateVec {
 	omega: number
 }
 
-export interface OrogenParams {
+export interface GenesisParams {
 	seed: number
 	numPoints: number
 	numPlates: number
@@ -87,7 +87,7 @@ export interface DistanceFields {
 	distCoastLand: Float32Array
 }
 
-export const OROGEN_TERRAIN_FEATURE_LABELS = [
+export const GENESIS_TERRAIN_FEATURE_LABELS = [
 	"none",
 	"rift valley",
 	"pull-apart basin",
@@ -104,7 +104,7 @@ export const OROGEN_TERRAIN_FEATURE_LABELS = [
 	"large igneous province",
 ] as const
 
-export const OROGEN_TERRAIN_FEATURE = {
+export const GENESIS_TERRAIN_FEATURE = {
 	RIFT_VALLEY: 1,
 	PULL_APART_BASIN: 2,
 	BACK_ARC_BASIN: 3,
@@ -120,10 +120,10 @@ export const OROGEN_TERRAIN_FEATURE = {
 	LARGE_IGNEOUS_PROVINCE: 13,
 } as const
 
-export interface OrogenTerrainFeatures {
+export interface GenesisTerrainFeatures {
 	/** Per-cell bitmask of terrain features applied during blendElevation. */
 	featureMask: Uint32Array
-	/** Per-cell strongest contributing feature, index into OROGEN_TERRAIN_FEATURE_LABELS. */
+	/** Per-cell strongest contributing feature, index into GENESIS_TERRAIN_FEATURE_LABELS. */
 	dominantFeature: Uint8Array
 	/** Internal helper used while later pipeline stages keep feature dominance accurate. */
 	dominantMagnitude?: Float32Array

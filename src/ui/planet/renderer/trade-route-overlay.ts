@@ -10,7 +10,7 @@ import {
 	ROUTE_SEA,
 	type RouteEdge,
 	type SerializedNetwork,
-	SerializedOrogenWorld,
+	SerializedGenesisWorld,
 	type SerializedRouteKind,
 } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
@@ -345,7 +345,7 @@ function splitMapPoints(points: THREE.Vector3[]): THREE.Vector3[][] {
 }
 
 export function buildGlobeTradeRoutes(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	edges: readonly RouteEdge[] | SerializedNetwork,
 	resolution: OverlayResolution,
 	elevationVisible: boolean,
@@ -372,7 +372,7 @@ export function buildGlobeTradeRoutes(
 }
 
 export function buildMapTradeRoutes(
-	world: SerializedOrogenWorld,
+	world: SerializedGenesisWorld,
 	edges: readonly RouteEdge[] | SerializedNetwork,
 	centerLongitudeDeg: number,
 	projectionLatitudeDeg: number,

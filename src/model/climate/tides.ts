@@ -1,6 +1,6 @@
-import type { OrogenParams, SphereMesh } from ".."
+import type { GenesisParams, SphereMesh } from ".."
 import { makeRng } from "../shared/rng"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
 
 /**
@@ -75,10 +75,10 @@ export function computeTidalRange(
 	isCoastal: Uint8Array,
 	_elevationKm: Float32Array,
 	params: Pick<
-		OrogenParams,
+		GenesisParams,
 		"seed" | "tidalStrength" | "tidallyLocked" | "planetRadiusKm"
 	>,
-	landmarks?: Pick<OrogenLandmarks, "regionLandmark" | "type">,
+	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
 ): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh

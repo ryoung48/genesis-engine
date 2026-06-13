@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { OrogenWorld } from ".."
-import { generateOrogenWorld } from "../pipelines/generate-world"
+import type { GenesisWorld } from ".."
+import { generateGenesisWorld } from "../pipelines/generate-world"
 import {
 	clearWorldCacheForTests,
 	getCachedWorld,
@@ -8,27 +8,27 @@ import {
 } from "./test-world"
 
 vi.mock("../pipelines/generate-world", () => ({
-	generateOrogenWorld: vi.fn(),
+	generateGenesisWorld: vi.fn(),
 }))
 
-const generateOrogenWorldMock = vi.mocked(generateOrogenWorld)
+const generateGenesisWorldMock = vi.mocked(generateGenesisWorld)
 
 describe("test world cache", () => {
 	beforeEach(() => {
 		clearWorldCacheForTests()
-		generateOrogenWorldMock.mockReset()
-		generateOrogenWorldMock.mockImplementation(
+		generateGenesisWorldMock.mockReset()
+		generateGenesisWorldMock.mockImplementation(
 			(params) =>
 				({
 					mesh: { numRegions: params.numPoints },
-				}) as unknown as OrogenWorld,
+				}) as unknown as GenesisWorld,
 		)
 	})
 
 	it("uses a smaller shared test world size by default", () => {
 		getCachedWorld()
 
-		expect(generateOrogenWorldMock).toHaveBeenCalledWith(
+		expect(generateGenesisWorldMock).toHaveBeenCalledWith(
 			expect.objectContaining({ numPoints: TEST_WORLD_NUM_POINTS }),
 		)
 	})
@@ -38,13 +38,13 @@ describe("test world cache", () => {
 		const second = getCachedWorld()
 
 		expect(first).toBe(second)
-		expect(generateOrogenWorldMock).toHaveBeenCalledTimes(1)
+		expect(generateGenesisWorldMock).toHaveBeenCalledTimes(1)
 	})
 
 	it("creates a separate cache entry when params change", () => {
 		getCachedWorld()
 		getCachedWorld({ seed: 99999 })
 
-		expect(generateOrogenWorldMock).toHaveBeenCalledTimes(2)
+		expect(generateGenesisWorldMock).toHaveBeenCalledTimes(2)
 	})
 })

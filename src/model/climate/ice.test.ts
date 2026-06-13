@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import { TIME } from "../shared/time"
 import { computeIceAccumulation } from "./ice"
 
@@ -9,7 +9,7 @@ for (let m = 0; m < 12; m++) DAYS_PER_MONTH[m] = TIME.month.days(m).length
 function buildClimate(
 	temperatureMonthly: number[],
 	numRegions: number,
-): OrogenClimate {
+): GenesisClimate {
 	return {
 		temperature_avg: new Float32Array(numRegions),
 		temperature_min: new Float32Array(numRegions),
@@ -24,7 +24,7 @@ function buildClimate(
 	}
 }
 
-function buildRainfall(monthly: number[], numRegions: number): OrogenRainfall {
+function buildRainfall(monthly: number[], numRegions: number): GenesisRainfall {
 	return {
 		monthly: new Float32Array(monthly),
 		annual: new Float32Array(numRegions),
@@ -35,8 +35,8 @@ function buildRainfall(monthly: number[], numRegions: number): OrogenRainfall {
 
 function computeIceAccumulationReference(
 	mesh: SphereMesh,
-	climate: OrogenClimate,
-	rainfall: OrogenRainfall,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
 	isLand: Uint8Array,
 	distCoast: Float32Array,
 	cycles = 15,

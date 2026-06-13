@@ -1,24 +1,24 @@
 /**
  * Distance fields and elevation assignment.
- * Faithful port of orogen's elevation.js distance-field + elevation logic.
+ * Faithful port of genesis's elevation.js distance-field + elevation logic.
  */
 
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	OrogenTerrainFeatures,
+	GenesisTerrainFeatures,
 	PlateVec,
 	SphereMesh,
 } from ".."
 import { createRng } from "../shared/rng"
 import { SimplexNoise } from "../shared/simplex-noise"
-import { OROGEN_TERRAIN_FEATURE } from "../types/tectonics"
+import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
 import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
 
 type StageTiming = { Stage: string; ms: string }
 
 // ----------------------------------------------------------------
-//  Randomized BFS distance field (orogen port)
+//  Randomized BFS distance field (genesis port)
 // ----------------------------------------------------------------
 function assignDistanceField(
 	mesh: SphereMesh,
@@ -177,7 +177,7 @@ function boundedBfs(
 
 /**
  * Assign elevation from distance fields, stress, noise, and tectonic features.
- * Faithful port of orogen's main elevation loop.
+ * Faithful port of genesis's main elevation loop.
  */
 export function blendElevation(
 	mesh: SphereMesh,
@@ -192,7 +192,7 @@ export function blendElevation(
 	timing?: StageTiming[],
 ): {
 	elevation: Float32Array
-	terrainFeatures: OrogenTerrainFeatures
+	terrainFeatures: GenesisTerrainFeatures
 } {
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const { distMountain, distOcean, distCoastline, distCoast, distCoastLand } =
@@ -248,7 +248,7 @@ export function blendElevation(
 	const margins = new Float32Array(numRegions)
 	const backArc = new Float32Array(numRegions)
 	const foldRidge = new Float32Array(numRegions)
-	const orogenicPowerField = new Float32Array(numRegions)
+	const genesisicPowerField = new Float32Array(numRegions)
 
 	// 95th-percentile stress normalization
 	let maxStress = 0
@@ -484,11 +484,11 @@ export function blendElevation(
 		const wy = y + warpScale * fbm(x + 8.1, y + 2.9, z + 7.3, warpOctaves)
 		const wz = z + warpScale * fbm(x + 1.4, y + 6.2, z + 4.8, warpOctaves)
 
-		// Orogenic power noise
+		// Genesisic power noise
 		const rawOro = noise.noise3D(x * 1.5 + 33.7, y * 1.5 + 11.2, z * 1.5 + 22.9)
 		const shaped = rawOro >= 0 ? Math.sqrt(rawOro) : -Math.sqrt(-rawOro)
-		const orogenicPower = Math.max(0, Math.min(1, 0.5 + 0.5 * shaped))
-		orogenicPowerField[r] = orogenicPower - 0.5
+		const genesisicPower = Math.max(0, Math.min(1, 0.5 + 0.5 * shaped))
+		genesisicPowerField[r] = genesisicPower - 0.5
 
 		if (!isOceanPlate) {
 			// Subduction suppression
@@ -499,7 +499,7 @@ export function blendElevation(
 
 			// Tectonic uplift/depression
 			if (stressNorm > 0.01) {
-				const stressMag = stressNorm * stressNorm * 0.55 * orogenicPower
+				const stressMag = stressNorm * stressNorm * 0.55 * genesisicPower
 				const uplift = stressMag * (1 - sf)
 				const depress = stressMag * 0.4 * sf
 				const heightVar =
@@ -537,7 +537,7 @@ export function blendElevation(
 						riftEffect = 0.04 * (1 - fade) * 0.2
 					}
 					elev[r] += riftEffect
-					markFeature(r, OROGEN_TERRAIN_FEATURE.RIFT_VALLEY, riftEffect)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.RIFT_VALLEY, riftEffect)
 				}
 			}
 
@@ -556,7 +556,7 @@ export function blendElevation(
 						paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
 					}
 					elev[r] += paEffect
-					markFeature(r, OROGEN_TERRAIN_FEATURE.PULL_APART_BASIN, paEffect)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.PULL_APART_BASIN, paEffect)
 				}
 			}
 
@@ -565,21 +565,21 @@ export function blendElevation(
 				const bad = backArcDist[r]
 				if (bad !== Infinity && bad >= baStart) {
 					const dMtn = distMountain[r]
-					const orogenyFactor =
+					const genesisyFactor =
 						dMtn !== Infinity && dMtn < bad ? Math.max(0, dMtn / bad) : 1.0
 					let baEffect = 0
 					if (bad <= baPeak) {
 						const t = (bad - baStart) / Math.max(1, baPeak - baStart)
 						const s = t * t * (3 - 2 * t)
-						baEffect = -0.1 * backArcStress[r] * s * orogenyFactor
+						baEffect = -0.1 * backArcStress[r] * s * genesisyFactor
 					} else if (bad <= baEnd) {
 						const t = (bad - baPeak) / Math.max(1, baEnd - baPeak)
 						const s = t * t * (3 - 2 * t)
-						baEffect = -0.1 * backArcStress[r] * (1 - s) * orogenyFactor
+						baEffect = -0.1 * backArcStress[r] * (1 - s) * genesisyFactor
 					}
 					elev[r] += baEffect
 					backArc[r] = baEffect
-					markFeature(r, OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
 				}
 			}
 
@@ -616,7 +616,7 @@ export function blendElevation(
 					const foldEffect = foldCentered * foldAmp * ampMod
 					elev[r] += foldEffect
 					foldRidge[r] = foldEffect
-					markFeature(r, OROGEN_TERRAIN_FEATURE.FOLD_RIDGES, foldEffect)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.FOLD_RIDGES, foldEffect)
 				}
 			}
 
@@ -698,7 +698,7 @@ export function blendElevation(
 				elev[r] += interiorEffect
 				markFeature(
 					r,
-					OROGEN_TERRAIN_FEATURE.CONTINENTAL_INTERIOR,
+					GENESIS_TERRAIN_FEATURE.CONTINENTAL_INTERIOR,
 					interiorEffect,
 				)
 			}
@@ -707,7 +707,7 @@ export function blendElevation(
 			if (isPlateauZone && tectonicActivity > 0.1) {
 				const plateauEffect = 0.025 * tectonicActivity * (1 - sf)
 				elev[r] += plateauEffect
-				markFeature(r, OROGEN_TERRAIN_FEATURE.PLATEAU_UPLIFT, plateauEffect)
+				markFeature(r, GENESIS_TERRAIN_FEATURE.PLATEAU_UPLIFT, plateauEffect)
 			}
 		} else {
 			// ---- Ocean floor ----
@@ -744,7 +744,7 @@ export function blendElevation(
 				const ridgeN = ridgedFbm(x * 3, y * 3, z * 3, 4)
 				const ridgeEffect = (0.12 * ridgeN + 0.06) * ridgeFade
 				elev[r] += ridgeEffect
-				markFeature(r, OROGEN_TERRAIN_FEATURE.MID_OCEAN_RIDGE, ridgeEffect)
+				markFeature(r, GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE, ridgeEffect)
 			}
 
 			// Fracture zones
@@ -754,14 +754,14 @@ export function blendElevation(
 				const ft = fd / fractureHalfWidth
 				const fractureEffect = -0.03 * (1 - ft)
 				elev[r] += fractureEffect
-				markFeature(r, OROGEN_TERRAIN_FEATURE.FRACTURE_ZONE, fractureEffect)
+				markFeature(r, GENESIS_TERRAIN_FEATURE.FRACTURE_ZONE, fractureEffect)
 			}
 
 			// Trenches
 			if (btype === 1) {
 				const trenchEffect = -(0.15 + 0.15 * stressNorm)
 				elev[r] += trenchEffect
-				markFeature(r, OROGEN_TERRAIN_FEATURE.TRENCH, trenchEffect)
+				markFeature(r, GENESIS_TERRAIN_FEATURE.TRENCH, trenchEffect)
 			}
 
 			// Back-arc basin (ocean)
@@ -769,21 +769,21 @@ export function blendElevation(
 				const bad = backArcDist[r]
 				if (bad !== Infinity && bad >= baStart) {
 					const dMtn2 = distMountain[r]
-					const orogenyFactor =
+					const genesisyFactor =
 						dMtn2 !== Infinity && dMtn2 < bad ? Math.max(0, dMtn2 / bad) : 1.0
 					let baEffect = 0
 					if (bad <= baPeak) {
 						const t = (bad - baStart) / Math.max(1, baPeak - baStart)
 						const s = t * t * (3 - 2 * t)
-						baEffect = -0.1 * backArcStress[r] * s * orogenyFactor
+						baEffect = -0.1 * backArcStress[r] * s * genesisyFactor
 					} else if (bad <= baEnd) {
 						const t = (bad - baPeak) / Math.max(1, baEnd - baPeak)
 						const s = t * t * (3 - 2 * t)
-						baEffect = -0.1 * backArcStress[r] * (1 - s) * orogenyFactor
+						baEffect = -0.1 * backArcStress[r] * (1 - s) * genesisyFactor
 					}
 					elev[r] += baEffect
 					backArc[r] = baEffect
-					markFeature(r, OROGEN_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
 				}
 			}
 
@@ -850,7 +850,7 @@ export function blendElevation(
 			if (subSup > 0 && coastNoise1 > 0) coastNoise1 *= 1 - subSup
 			elev[r] += coastNoise1
 			coastal[r] += coastNoise1
-			markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, coastNoise1)
+			markFeature(r, GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING, coastNoise1)
 
 			// Layer 3: Coastline-aware domain warping
 			const warpReach = isPassiveCoast ? 1.2 : 1.5
@@ -872,7 +872,7 @@ export function blendElevation(
 				if (subSup > 0 && warpDelta > 0) warpDelta *= 1 - subSup
 				elev[r] += warpDelta
 				coastal[r] += warpDelta
-				markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, warpDelta)
+				markFeature(r, GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING, warpDelta)
 			}
 
 			// Layer 2: Island scattering
@@ -899,7 +899,7 @@ export function blendElevation(
 					bump *= 1 - subSup / 0.3
 					elev[r] += bump
 					coastal[r] += bump
-					markFeature(r, OROGEN_TERRAIN_FEATURE.COASTAL_ROUGHENING, bump)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING, bump)
 				}
 			}
 		}
@@ -966,7 +966,7 @@ export function blendElevation(
 				}
 				elev[r] += uplift
 				if (uplift > 0.001) {
-					markFeature(r, OROGEN_TERRAIN_FEATURE.ISLAND_ARC, uplift)
+					markFeature(r, GENESIS_TERRAIN_FEATURE.ISLAND_ARC, uplift)
 				}
 			}
 		}
@@ -995,7 +995,7 @@ export function blendElevation(
 	void margins
 	void backArc
 	void foldRidge
-	void orogenicPowerField
+	void genesisicPowerField
 
 	return {
 		elevation: elev,

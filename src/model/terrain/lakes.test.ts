@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenHydrology, OrogenRainfall } from ".."
+import type { GenesisClimate, GenesisHydrology, GenesisRainfall } from ".."
 import { computeLakes, selectConnectedLakeCells } from "./lakes"
 import { computeRivers } from "./rivers"
 import { buildLineMesh, buildMesh } from "./terrain-test-utils"
@@ -228,7 +228,7 @@ describe("computeLakes", () => {
 		const mesh = buildLineMesh(4)
 		const elevation = new Float32Array([-0.2, 0.4, 0.1, 0.8])
 		const isLand = new Uint8Array([0, 1, 1, 1])
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly: new Float32Array(12 * 4),
 			annual: new Float32Array([0, 0, 200, 0]),
 			east: new Float32Array(4),
@@ -237,12 +237,12 @@ describe("computeLakes", () => {
 		const climate = {
 			temperature_monthly: new Float32Array(12 * 4),
 			pet_monthly: new Float32Array(12 * 4),
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly: new Float32Array(12 * 4),
 			aridity_monthly: new Float32Array(12 * 4),
 			baseflow_monthly: new Float32Array(12 * 4),
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,
@@ -293,7 +293,7 @@ describe("computeLakes", () => {
 			}
 		}
 
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly,
 			annual,
 			east: new Float32Array(4),
@@ -302,12 +302,12 @@ describe("computeLakes", () => {
 		const climate = {
 			temperature_monthly,
 			pet_monthly,
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly,
 			aridity_monthly,
 			baseflow_monthly,
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,
@@ -335,7 +335,7 @@ describe("computeLakes", () => {
 		const mesh = buildLineMesh(4)
 		const elevation = new Float32Array([-0.2, 0.6, 0.05, 0.8])
 		const isLand = new Uint8Array([0, 1, 1, 1])
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly: new Float32Array(12 * 4),
 			annual: new Float32Array([0, 0, 0, 300]),
 			east: new Float32Array(4),
@@ -344,12 +344,12 @@ describe("computeLakes", () => {
 		const climate = {
 			temperature_monthly: new Float32Array(12 * 4),
 			pet_monthly: new Float32Array(12 * 4),
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly: new Float32Array(12 * 4),
 			aridity_monthly: new Float32Array(12 * 4),
 			baseflow_monthly: new Float32Array(12 * 4),
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,
@@ -378,7 +378,7 @@ describe("computeLakes", () => {
 		const mesh = buildLineMesh(5)
 		const elevation = new Float32Array([-0.2, 0.6, 0.1, 0.2, 0.9])
 		const isLand = new Uint8Array([0, 1, 1, 1, 1])
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly: new Float32Array(12 * 5),
 			annual: new Float32Array([0, 0, 300, -400, 0]),
 			east: new Float32Array(5),
@@ -387,12 +387,12 @@ describe("computeLakes", () => {
 		const climate = {
 			temperature_monthly: new Float32Array(12 * 5),
 			pet_monthly: new Float32Array(12 * 5),
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly: new Float32Array(12 * 5),
 			aridity_monthly: new Float32Array(12 * 5),
 			baseflow_monthly: new Float32Array(12 * 5),
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,
@@ -422,7 +422,7 @@ describe("computeLakes", () => {
 		const mesh = buildLineMesh(5)
 		const elevation = new Float32Array([-0.2, 0.6, 0.1, 0.2, 0.9])
 		const isLand = new Uint8Array([0, 1, 1, 1, 1])
-		const rainfall: OrogenRainfall = {
+		const rainfall: GenesisRainfall = {
 			monthly: new Float32Array(12 * 5),
 			annual: new Float32Array([0, 0, 300, -100, 0]),
 			east: new Float32Array(5),
@@ -431,12 +431,12 @@ describe("computeLakes", () => {
 		const climate = {
 			temperature_monthly: new Float32Array(12 * 5),
 			pet_monthly: new Float32Array(12 * 5),
-		} as OrogenClimate
+		} as GenesisClimate
 		const hydrology = {
 			aet_monthly: new Float32Array(12 * 5),
 			aridity_monthly: new Float32Array(12 * 5),
 			baseflow_monthly: new Float32Array(12 * 5),
-		} as OrogenHydrology
+		} as GenesisHydrology
 
 		const rivers = computeRivers(
 			mesh,

@@ -1,11 +1,11 @@
 /**
- * Event flavor-text generation for orogen history events.
+ * Event flavor-text generation for genesis history events.
  * Ported (and slimmed) from src/components/world/charts/NationTab/EventDetails.tsx.
- * Operates on orogen's HistoryNote shape: { tag, time, data }.
+ * Operates on genesis's HistoryNote shape: { tag, time, data }.
  *
  * Helpers that required legacy world data (terrain, rank titles, landmarks,
  * alliance membership) are stubbed to return null — they can be filled in
- * later once orogen exposes equivalents.
+ * later once genesis exposes equivalents.
  */
 
 import type { HistoryNote } from "@/model/history"

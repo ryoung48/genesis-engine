@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest"
 import { initHistory } from "@/model/history"
 import { REL } from "@/model/history/state"
-import { generateOrogenWorld } from "@/model/pipelines/generate-world"
+import { generateGenesisWorld } from "@/model/pipelines/generate-world"
 import { decodePlanetCode } from "@/model/shared/planet-code"
-import type { OrogenParams } from "@/model/types/tectonics"
+import type { GenesisParams } from "@/model/types/tectonics"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 
 beforeAll(() => {
@@ -17,7 +17,7 @@ it("no colony has illegitimate vassal relations", () => {
 	const code = "8wqaf.06ggpbhgeuxiver0km7ez8g3saa3cawxha4u"
 	const decoded = decodePlanetCode(code)!
 
-	const params: OrogenParams = {
+	const params: GenesisParams = {
 		seed: decoded.seed,
 		numPoints: decoded.numPoints,
 		jitter: decoded.jitter,
@@ -50,7 +50,7 @@ it("no colony has illegitimate vassal relations", () => {
 		era: decoded.era,
 	}
 
-	const world = generateOrogenWorld(params)
+	const world = generateGenesisWorld(params)
 	const state = initHistory({
 		nations: world.nations!,
 		provinces: world.provinces!,
@@ -83,12 +83,12 @@ it("no colony has illegitimate vassal relations", () => {
 }, 120000)
 
 it("seed 42 also has none", () => {
-	const world = generateOrogenWorld({
+	const world = generateGenesisWorld({
 		...DEFAULT_WORLD_PARAMS,
 		seed: 42,
 		numPoints: 200000,
 		tidallyLocked: false,
-	} as OrogenParams)
+	} as GenesisParams)
 	const state = initHistory({
 		nations: world.nations!,
 		provinces: world.provinces!,

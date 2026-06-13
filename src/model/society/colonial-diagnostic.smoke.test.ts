@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { initHistory } from "../history"
 import { REL } from "../history/state"
-import { generateOrogenWorld } from "../pipelines/generate-world"
+import { generateGenesisWorld } from "../pipelines/generate-world"
 import { ERA_CONFIGS } from "./eras"
 
 const SEED = 42
@@ -20,7 +20,7 @@ describe("colonial diagnostic", () => {
 		const industrialMix = ERA_CONFIGS.industrial.governmentMix
 		console.log("Era config colonial fraction:", industrialMix.colonial)
 
-		const world = generateOrogenWorld({
+		const world = generateGenesisWorld({
 			...DEFAULT_WORLD_PARAMS,
 			seed: SEED,
 			numPoints: NUM_POINTS,
@@ -113,7 +113,7 @@ describe("colonial diagnostic", () => {
 
 it("verifies colony capitals are in nationModel-equivalent set", () => {
 	vi.spyOn(console, "table").mockImplementation(() => undefined)
-	const world = generateOrogenWorld({
+	const world = generateGenesisWorld({
 		...DEFAULT_WORLD_PARAMS,
 		seed: SEED,
 		numPoints: NUM_POINTS,

@@ -1,9 +1,9 @@
 /**
- * Vegetation and climate zone assignment for the orogen pipeline.
+ * Vegetation and climate zone assignment for the genesis pipeline.
  * Classifies each land cell into a biome and climate zone based on temperature
  * and rainfall, mirroring the logic from src/model/shaders/climate.ts.
  */
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import { PASTA_LABELS } from "./pasta"
 
 /**
@@ -46,7 +46,7 @@ export const CHAOTIC_MAX = 40
 export function assignClimateZones(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: OrogenClimate,
+	climate: GenesisClimate,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const zones = new Uint8Array(N) // 0 = ocean by default
@@ -263,8 +263,8 @@ const PASTA_BIOME_MAP: Record<string, BiomeCode> = {
 export function assignVegetation(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: OrogenClimate,
-	rainfall: OrogenRainfall,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
 	rng: () => number,
 	pastaZones?: Uint8Array,
 	gdd?: Float32Array,

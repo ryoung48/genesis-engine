@@ -1,4 +1,4 @@
-import type { OrogenPartition } from ".."
+import type { GenesisPartition } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
 import { createRng } from "../shared/rng"
 
@@ -18,7 +18,7 @@ export function computeGraphPartition({
 	active,
 	targetCount,
 	seed,
-}: GraphPartitionParams): OrogenPartition {
+}: GraphPartitionParams): GenesisPartition {
 	let activeCount = 0
 	for (let i = 0; i < nodeCount; i++) if (active[i]) activeCount++
 	if (activeCount === 0) return emptyPartition(nodeCount)
@@ -268,7 +268,7 @@ export function clamp01(value: number) {
 	return Math.max(0, Math.min(1, value))
 }
 
-function emptyPartition(nodeCount: number): OrogenPartition {
+function emptyPartition(nodeCount: number): GenesisPartition {
 	return {
 		assignment: new Int32Array(nodeCount).fill(-1),
 		seeds: new Int32Array(0),

@@ -1,7 +1,7 @@
-import type { OrogenRivers, SphereMesh } from ".."
+import type { GenesisRivers, SphereMesh } from ".."
 import { BIOME_LABELS } from "../climate/vegetation"
 import { SimplexNoise } from "../shared/simplex-noise"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
 
 export const TOPO_FLAT = 0
@@ -65,8 +65,8 @@ export function classifyTopography(params: {
 	mesh: SphereMesh
 	elevationKm: Float32Array
 	isLand: Uint8Array
-	rivers: Pick<OrogenRivers, "visible" | "terminal">
-	landmarks: Pick<OrogenLandmarks, "regionLandmark" | "type">
+	rivers: Pick<GenesisRivers, "visible" | "terminal">
+	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
 	vegetation?: Uint8Array
 	slopeScore?: Float32Array
 	planetRadiusKm?: number

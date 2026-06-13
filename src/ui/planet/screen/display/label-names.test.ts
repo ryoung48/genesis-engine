@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import {
 	buildNationDynastyLabelNames,
 	buildNationLabelNames,
@@ -11,7 +11,7 @@ describe("label-names", () => {
 			nations: {
 				seeds: new Int32Array([4, 1]),
 			},
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		expect(
 			buildNationLabelNames(world, {
@@ -32,7 +32,7 @@ describe("label-names", () => {
 				seeds: new Int32Array([0, 2, 3]),
 			},
 			leaderDynasty: new Int32Array([7, -1, 4, -1]),
-		} as unknown as SerializedOrogenWorld
+		} as unknown as SerializedGenesisWorld
 
 		expect(
 			buildNationDynastyLabelNames(world, {

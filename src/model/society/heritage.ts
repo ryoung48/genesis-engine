@@ -1,10 +1,10 @@
-import type { OrogenPartition } from ".."
+import type { GenesisPartition } from ".."
 import { computeGraphPartition } from "./shared"
 
 export function computeHeritages(
-	cultures: OrogenPartition,
+	cultures: GenesisPartition,
 	seed: number,
-): OrogenPartition {
+): GenesisPartition {
 	const active = new Uint8Array(cultures.count)
 	let activeCount = 0
 	for (let i = 0; i < cultures.count; i++) {

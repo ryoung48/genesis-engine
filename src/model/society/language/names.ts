@@ -5,7 +5,7 @@ import {
 	normalizeCultureGenderSystem,
 	resolveLeaderGender,
 } from "@/model/society/gender-system"
-import type { SerializedOrogenWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { LANGUAGE } from "./languages"
 import type { Language } from "./languages/types"
 
@@ -473,7 +473,7 @@ export const NAMES = {
 export function createWorldNames(
 	world: Partial<
 		Pick<
-			SerializedOrogenWorld,
+			SerializedGenesisWorld,
 			| "provinces"
 			| "cultures"
 			| "heritages"

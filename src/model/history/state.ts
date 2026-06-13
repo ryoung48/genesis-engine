@@ -1,7 +1,7 @@
-import type { OrogenNationHierarchy, OrogenProvinces } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import { fanoutRangesForSize, rebalanceHierarchy } from "../society/hierarchy"
 import type { ProvincePopulation } from "../society/population"
-import type { OrogenLandmarks } from "../terrain/landmarks"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import type { Route, RouteEdge } from "../transport/worker-types"
 import {
 	children,
@@ -164,7 +164,7 @@ export interface HistoryState {
 	leaderRuntime: LeaderRuntime
 	routes: Route[]
 	network: RouteEdge[]
-	landmarks: OrogenLandmarks
+	landmarks: GenesisLandmarks
 }
 
 function makeTimelineArray<T>(length: number): Timeline<T>[] {
@@ -833,8 +833,8 @@ export function provinceDistanceSq(
 }
 
 export function createHistoryState(
-	nations: OrogenNationHierarchy,
-	provinces: OrogenProvinces,
+	nations: GenesisNationHierarchy,
+	provinces: GenesisProvinces,
 	population: ProvincePopulation,
 	coastal: Uint8Array,
 	riverVisible: Uint8Array,
@@ -843,7 +843,7 @@ export function createHistoryState(
 	startYear: number,
 	rng: HistoryRng,
 	waterAccess?: Uint8Array,
-	landmarks?: OrogenLandmarks,
+	landmarks?: GenesisLandmarks,
 	regionProvince?: Int32Array,
 	regionAdjOffset?: Int32Array,
 	regionAdjList?: Int32Array,

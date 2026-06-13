@@ -1,4 +1,4 @@
-import type { OrogenNationHierarchy, OrogenProvinces } from "../.."
+import type { GenesisNationHierarchy, GenesisProvinces } from "../.."
 import type { WeightedValue } from "../../shared/rng"
 import type { ProvincePopulation } from "../../society/population"
 import { createHistoryRng, type HistoryRng } from "../history-rng"
@@ -80,7 +80,7 @@ export function createHistoryTestState(options?: {
 		adjList,
 		size: new Int32Array(parent.length).fill(1),
 		colors,
-	} as OrogenProvinces
+	} as GenesisProvinces
 
 	const nations = {
 		assignment: sovereign.slice(),
@@ -100,7 +100,7 @@ export function createHistoryTestState(options?: {
 		childList: new Int32Array(0),
 		sovereign,
 		gravity: Float32Array.from(habitability),
-	} as OrogenNationHierarchy
+	} as GenesisNationHierarchy
 
 	const population: ProvincePopulation = {
 		habitability: Float32Array.from(habitability),

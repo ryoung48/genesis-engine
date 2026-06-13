@@ -3,7 +3,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import { createMapProjection } from "./map-projection"
-import type { OrogenViewMode } from "./types"
+import type { GenesisViewMode } from "./types"
 
 const PATHFIND_ARC_RADIUS = 1.02
 const PATHFIND_LINE_COLOR = 0x000000
@@ -38,8 +38,8 @@ function appendSegmentPairs(positions: number[], points: THREE.Vector3[]) {
 function buildLine(
 	positions: number[],
 	canvasSize: [number, number],
-	viewMode: OrogenViewMode,
-	targetViewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
+	targetViewMode: GenesisViewMode,
 ) {
 	const geometry = new LineSegmentsGeometry()
 	geometry.setPositions(positions)
@@ -64,8 +64,8 @@ function buildDotGroup(
 	points: THREE.Vector3[],
 	geometry: THREE.BufferGeometry,
 	materialFactory: () => THREE.Material,
-	viewMode: OrogenViewMode,
-	targetViewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
+	targetViewMode: GenesisViewMode,
 ) {
 	const group = new THREE.Group()
 	for (const point of points) {
@@ -89,7 +89,7 @@ export function buildGlobePathfindingOverlay(
 	endXYZ: XYZ | null,
 	r_xyz: Float32Array,
 	elevation: Float32Array | null,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	canvasSize: [number, number],
 ): PathfindingOverlayResult {
 	const dotGeo = new THREE.SphereGeometry(0.002, 8, 8)
@@ -162,7 +162,7 @@ export function buildMapPathfindingOverlay(
 	endXYZ: XYZ | null,
 	r_xyz: Float32Array,
 	elevation: Float32Array | null,
-	viewMode: OrogenViewMode,
+	viewMode: GenesisViewMode,
 	canvasSize: [number, number],
 	mapCenterLongitudeDeg: number,
 	mapProjectionLatitudeDeg: number,

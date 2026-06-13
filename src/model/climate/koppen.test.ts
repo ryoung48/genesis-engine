@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { OrogenClimate, OrogenRainfall, SphereMesh } from ".."
+import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import {
 	assignKoppenClimate,
 	KOPPEN_LABELS,
@@ -27,8 +27,8 @@ function buildClimate(
 ): {
 	mesh: SphereMesh
 	isLand: Uint8Array
-	climate: OrogenClimate
-	rainfall: OrogenRainfall
+	climate: GenesisClimate
+	rainfall: GenesisRainfall
 } {
 	const monthly = Float32Array.from(monthlyTemps)
 	const min = Math.min(...monthlyTemps)
