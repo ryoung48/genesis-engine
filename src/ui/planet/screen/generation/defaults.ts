@@ -13,6 +13,7 @@ import { DEFAULT_ERA } from "@/model/society/eras"
 
 export const PLANET_CODE_STORAGE_KEY = "genesis:lastPlanetCode"
 export const RECENT_CODES_STORAGE_KEY = "genesis:recentCodes"
+export const STARRED_RECENT_CODES_STORAGE_KEY = "genesis:starredRecentCodes"
 export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"
 export const MAX_RECENT_CODES = 10
 

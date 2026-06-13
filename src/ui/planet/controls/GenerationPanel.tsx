@@ -18,8 +18,11 @@ import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMu
 import { HistoryIcon } from "@/ui/components/primitives/icons/HistoryIcon"
 import { LockIcon } from "@/ui/components/primitives/icons/LockIcon"
 import { LockOpenIcon } from "@/ui/components/primitives/icons/LockOpenIcon"
+import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
+import { StarOutlineIcon } from "@/ui/components/primitives/icons/StarOutlineIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { getGenerationPreviewToggleLabel } from "../screen/generation/generation-preview"
+import { getOrderedRecentCodes } from "../screen/generation/recent-codes"
 import type { SliderDef } from "../screen/generation/sliders"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
@@ -41,7 +44,9 @@ interface GenerationPanelProps {
 	onApplyCode: () => void
 	codeError: boolean
 	recentCodes: string[]
+	starredRecentCodes: string[]
 	onSelectRecentCode: (code: string) => void
+	onToggleRecentCodeStar: (code: string) => void
 	onRandomizeCode: () => void
 	generating: boolean
 	generationLabel: string
@@ -377,7 +382,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	onApplyCode,
 	codeError,
 	recentCodes,
+	starredRecentCodes,
 	onSelectRecentCode,
+	onToggleRecentCodeStar,
 	onRandomizeCode,
 	generating,
 	generationLabel,
@@ -418,6 +425,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	const computeRoutesTimingSummary = useMemo(
 		() => getComputeRoutesTimingSummary(generationTimings),
 		[generationTimings],
+	)
+	const orderedRecentCodes = useMemo(
+		() => getOrderedRecentCodes(recentCodes, starredRecentCodes),
+		[recentCodes, starredRecentCodes],
 	)
 	const selectRecentCode = (recentCode: string) =>
 		handleRecentCodeSelection(recentCode, {
@@ -710,7 +721,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 											codeError ? "text-red-500" : "text-slate-700"
 										}`}
 									/>
-									{recentCodes.length > 0 && (
+									{orderedRecentCodes.length > 0 && (
 										<button
 											type="button"
 											onClick={() => setShowRecentCodes((current) => !current)}
@@ -743,24 +754,57 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								Invalid code
 							</p>
 						)}
-						{showRecentCodes && recentCodes.length > 0 && (
-							<div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-200 pt-2">
-								{recentCodes.map((recentCode) => (
-									<button
-										key={recentCode}
-										type="button"
-										onClick={() => selectRecentCode(recentCode)}
-										disabled={generating}
-										className={`rounded-md border px-2 py-1 font-mono text-[11px] transition-colors ${
-											recentCode === codeInput || recentCode === planetCode
-												? "border-slate-900 bg-slate-900 text-white"
-												: "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
-										} disabled:opacity-50 disabled:cursor-not-allowed`}
-										title="Use recent code"
-									>
-										{recentCode}
-									</button>
-								))}
+						{showRecentCodes && orderedRecentCodes.length > 0 && (
+							<div className="mt-2 flex flex-col gap-1.5 border-t border-slate-200 pt-2">
+								{orderedRecentCodes.map((recentCode) => {
+									const starred = starredRecentCodes.includes(recentCode)
+									return (
+										<div
+											key={recentCode}
+											className="flex w-full items-stretch overflow-hidden rounded-md border border-slate-200 bg-white"
+										>
+											<button
+												type="button"
+												onClick={() => selectRecentCode(recentCode)}
+												disabled={generating}
+												className={`min-w-0 flex-1 px-2 py-1 text-left font-mono text-[11px] transition-colors ${
+													recentCode === codeInput || recentCode === planetCode
+														? "bg-slate-900 text-white"
+														: "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+												} disabled:opacity-50 disabled:cursor-not-allowed`}
+												title="Use recent code"
+											>
+												{recentCode}
+											</button>
+											<button
+												type="button"
+												onClick={() => onToggleRecentCodeStar(recentCode)}
+												disabled={generating}
+												aria-label={
+													starred
+														? `Unstar recent code ${recentCode}`
+														: `Star recent code ${recentCode}`
+												}
+												className={`border-l border-slate-200 p-1.5 transition-colors ${
+													starred
+														? "bg-amber-50 text-amber-500 hover:bg-amber-100 hover:text-amber-600"
+														: "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+												} disabled:cursor-not-allowed disabled:opacity-50`}
+												title={
+													starred
+														? "Remove pinned recent code"
+														: "Pin recent code"
+												}
+											>
+												{starred ? (
+													<StarIcon className="h-4 w-4" />
+												) : (
+													<StarOutlineIcon className="h-4 w-4" />
+												)}
+											</button>
+										</div>
+									)
+								})}
 							</div>
 						)}
 					</div>

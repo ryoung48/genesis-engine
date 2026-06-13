@@ -1176,7 +1176,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									labels={MONTH_SHORT}
 									label={
 										hoverRiver.riverId >= 0
-											? getRiverName(hoverRiver.riverId)
+											? `${getRiverName(hoverRiver.riverId)} River`
 											: `River #${hoverRiver.riverId}`
 									}
 									colorForValue={(value) => flowColor(value)}

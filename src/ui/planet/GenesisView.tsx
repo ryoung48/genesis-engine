@@ -134,6 +134,7 @@ import {
 	MAX_RECENT_CODES,
 	PLANET_CODE_STORAGE_KEY,
 	RECENT_CODES_STORAGE_KEY,
+	STARRED_RECENT_CODES_STORAGE_KEY,
 	VIEW_PREFS_STORAGE_KEY,
 } from "./screen/generation/defaults"
 import {
@@ -151,6 +152,11 @@ import {
 	type GenerationPreviewTab,
 	getGenerationPreviewCanvasClassName,
 } from "./screen/generation/generation-preview"
+import {
+	parseStoredCodeList,
+	pushRecentCode,
+	toggleStarredRecentCode,
+} from "./screen/generation/recent-codes"
 import {
 	buildPlanetSliders,
 	buildTerrainSliders,
@@ -527,21 +533,20 @@ export const OrogenView: React.FC = () => {
 	// Generation params
 	const [recentCodes, setRecentCodes] = useState<string[]>(() => {
 		if (typeof window === "undefined") return []
-		try {
-			const stored = window.localStorage.getItem(RECENT_CODES_STORAGE_KEY)
-			if (!stored) return []
-			const parsed = JSON.parse(stored)
-			return Array.isArray(parsed)
-				? parsed
-						.filter(
-							(value): value is string =>
-								typeof value === "string" && value.length > 0,
-						)
-						.slice(0, MAX_RECENT_CODES)
-				: []
-		} catch {
-			return []
-		}
+		const starredCodes = parseStoredCodeList(
+			window.localStorage.getItem(STARRED_RECENT_CODES_STORAGE_KEY),
+		)
+		return parseStoredCodeList(
+			window.localStorage.getItem(RECENT_CODES_STORAGE_KEY),
+		)
+			.filter((code) => !starredCodes.includes(code))
+			.slice(0, MAX_RECENT_CODES)
+	})
+	const [starredRecentCodes, setStarredRecentCodes] = useState<string[]>(() => {
+		if (typeof window === "undefined") return []
+		return parseStoredCodeList(
+			window.localStorage.getItem(STARRED_RECENT_CODES_STORAGE_KEY),
+		)
 	})
 	const initialCode = (() => {
 		if (typeof window !== "undefined") {
@@ -549,6 +554,7 @@ export const OrogenView: React.FC = () => {
 			if (stored) return stored
 		}
 		if (recentCodes[0]) return recentCodes[0]
+		if (starredRecentCodes[0]) return starredRecentCodes[0]
 		const fallbackSeed = makeRandomSeed()
 		return encodePlanetCode(fallbackSeed, {
 			seed: fallbackSeed,
@@ -724,6 +730,13 @@ export const OrogenView: React.FC = () => {
 			JSON.stringify(recentCodes),
 		)
 	}, [recentCodes])
+	useEffect(() => {
+		if (typeof window === "undefined") return
+		window.localStorage.setItem(
+			STARRED_RECENT_CODES_STORAGE_KEY,
+			JSON.stringify(starredRecentCodes),
+		)
+	}, [starredRecentCodes])
 	useEffect(() => {
 		if (typeof window === "undefined") return
 		window.localStorage.setItem(
@@ -1021,7 +1034,7 @@ export const OrogenView: React.FC = () => {
 		[worldNames],
 	)
 	const getRiverName = useCallback(
-		(riverId: number) => worldNames?.river(riverId) ?? `River #${riverId}`,
+		(riverId: number) => worldNames?.river(riverId) ?? `#${riverId}`,
 		[worldNames],
 	)
 	const getProvinceColor = useCallback(
@@ -2020,10 +2033,12 @@ export const OrogenView: React.FC = () => {
 			setSeed,
 			pushRecentCode: (nextCode: string) => {
 				setRecentCodes((current) =>
-					[
+					pushRecentCode(
+						current,
+						starredRecentCodes,
 						nextCode,
-						...current.filter((codeValue) => codeValue !== nextCode),
-					].slice(0, MAX_RECENT_CODES),
+						MAX_RECENT_CODES,
+					),
 				)
 			},
 			setPlanetCode,
@@ -2081,7 +2096,7 @@ export const OrogenView: React.FC = () => {
 				}
 			},
 		}),
-		[],
+		[starredRecentCodes],
 	)
 
 	const currentParams = useMemo<GenerationParams>(
@@ -2416,6 +2431,21 @@ export const OrogenView: React.FC = () => {
 		},
 		[applyDecodedCode],
 	)
+	const handleToggleRecentCodeStar = useCallback(
+		(code: string) => {
+			setRecentCodes((currentRecentCodes) => {
+				const nextState = toggleStarredRecentCode(
+					currentRecentCodes,
+					starredRecentCodes,
+					code,
+					MAX_RECENT_CODES,
+				)
+				setStarredRecentCodes(nextState.starredRecentCodes)
+				return nextState.recentCodes
+			})
+		},
+		[starredRecentCodes],
+	)
 
 	const handleCopyCode = useCallback(async () => {
 		if (!planetCode) return
@@ -2676,7 +2706,9 @@ export const OrogenView: React.FC = () => {
 					onApplyCode={handleApplyCode}
 					codeError={codeError}
 					recentCodes={recentCodes}
+					starredRecentCodes={starredRecentCodes}
 					onSelectRecentCode={handleSelectRecentCode}
+					onToggleRecentCodeStar={handleToggleRecentCodeStar}
 					onRandomizeCode={handleRandomizeCode}
 					generating={generating}
 					generationLabel={generationLabel}

@@ -401,7 +401,7 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 				namespace: "river",
 				slot: buildNamedGroupSlot("river", riverIdx, river?.nameSeed),
 				lang: provinceIdx >= 0 ? getLanguage(context, provinceIdx) : null,
-				fallback: `River #${riverIdx}`,
+				fallback: "Unknown",
 				onNamed: (name) => {
 					if (river) river.name = name
 				},
@@ -539,14 +539,18 @@ export function createWorldNames(
 	)
 	const riverProvinceById = new Map<number, number>()
 	if (world.rivers?.riverId && world.provinces?.regionProvince) {
-		for (
-			let regionIdx = 0;
-			regionIdx < world.rivers.riverId.length;
-			regionIdx++
-		) {
-			const riverId = world.rivers.riverId[regionIdx] ?? -1
-			if (riverId < 0 || riverProvinceById.has(riverId)) continue
-			const provinceIdx = world.provinces.regionProvince[regionIdx] ?? -1
+		const riverIdArr = world.rivers.riverId
+		const regionProvince = world.provinces.regionProvince
+		for (let regionIdx = 0; regionIdx < riverIdArr.length; regionIdx++) {
+			const riverId = riverIdArr[regionIdx] ?? -1
+			if (riverId < 0) continue
+			// Stop only once we've found a province with a usable culture
+			const existing = riverProvinceById.get(riverId)
+			if (existing !== undefined) {
+				const existingCulture = world.cultures?.assignment?.[existing] ?? -1
+				if (existingCulture >= 0) continue
+			}
+			const provinceIdx = regionProvince[regionIdx] ?? -1
 			if (provinceIdx >= 0) riverProvinceById.set(riverId, provinceIdx)
 		}
 	}
