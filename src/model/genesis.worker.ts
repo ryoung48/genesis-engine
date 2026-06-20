@@ -16,13 +16,14 @@ import { type HistoryState, validateLiveHierarchy } from "./history/state"
 import { pathfind } from "./pathfinding/pathfind"
 import { generateGenesisWorld } from "./pipelines/generate-world"
 import { importGenesisWorld } from "./pipelines/import-heightmap"
+import type { SocietyEra } from "./society/eras"
 import type { ProvincePopulation } from "./society/population"
 import type { GenesisLandmarks } from "./terrain/landmarks"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
-	SerializedHistoryFrame,
 	SerializedGenesisWorld,
+	SerializedHistoryFrame,
 	SerializedTimelines,
 } from "./transport/worker-types"
 import { packNetwork, packRoutes } from "./transport/worker-types"
@@ -35,7 +36,7 @@ let historyTime = 800 * YEAR_MS
 let simulationRunning = false
 
 interface HistorySeedWorld {
-	params: { seed: number; planetRadiusKm?: number }
+	params: { seed: number; planetRadiusKm?: number; era?: SocietyEra }
 	mesh: { r_xyz: Float32Array; adjOffset: Int32Array; adjList: Int32Array }
 	nations: GenesisNationHierarchy | null
 	provinces: GenesisProvinces | null
@@ -107,6 +108,7 @@ function cloneHistorySeedWorld(
 		params: {
 			seed: world.params.seed,
 			planetRadiusKm: world.params.planetRadiusKm,
+			era: world.params.era,
 		},
 		mesh: {
 			r_xyz: world.mesh.r_xyz.slice(),
@@ -304,8 +306,8 @@ function serializeWorld(
 		leaderBirthYear: seedHistoryState?.leaderBirthYearCurrent.slice(),
 		cultures: world.cultures,
 		heritages: world.heritages,
-		faiths: world.faiths,
 		religions: world.religions,
+		religionTypes: world.religionTypes,
 		landmarks: world.landmarks
 			? {
 					regionLandmark: world.landmarks.regionLandmark,
@@ -592,8 +594,8 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.leaderBirthYear) add(world.leaderBirthYear.buffer)
 	if (world.cultures) add(...partitionBuffers(world.cultures))
 	if (world.heritages) add(...partitionBuffers(world.heritages))
-	if (world.faiths) add(...partitionBuffers(world.faiths))
 	if (world.religions) add(...partitionBuffers(world.religions))
+	if (world.religionTypes) add(world.religionTypes.buffer)
 	if (world.landmarks) {
 		add(
 			world.landmarks.regionLandmark.buffer,
@@ -711,6 +713,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				riverVisible: world.riverVisible,
 				r_xyz: world.mesh.r_xyz,
 				cultures: world.cultures,
+				era: world.params.era,
 				seed: world.params.seed,
 				landmarks: world.landmarks ?? undefined,
 				regionProvince: world.provinces?.regionProvince,
@@ -833,6 +836,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				riverVisible: seedWorld.riverVisible,
 				r_xyz: seedWorld.mesh.r_xyz,
 				cultures: seedWorld.cultures,
+				era: seedWorld.params.era,
 				seed: generated.params.seed,
 				landmarks: seedWorld.landmarks,
 				regionProvince: seedWorld.provinces.regionProvince,

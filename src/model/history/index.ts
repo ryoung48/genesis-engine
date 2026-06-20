@@ -1,4 +1,5 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from ".."
+import type { SocietyEra } from "../society/eras"
 import type { ProvincePopulation } from "../society/population"
 import type { GenesisLandmarks } from "../terrain/landmarks"
 import type { StageTiming } from "../types/tectonics"
@@ -64,6 +65,7 @@ export function initHistory(params: {
 	riverVisible: Uint8Array
 	r_xyz: Float32Array
 	cultures: { assignment: Int32Array; count: number }
+	era?: SocietyEra
 	seed: number
 	startYear?: number
 	landmarks?: GenesisLandmarks
@@ -96,6 +98,7 @@ export function initHistory(params: {
 			params.regionAdjOffset,
 			params.regionAdjList,
 			params.regionIsLand,
+			params.era,
 		),
 	)
 

@@ -1,5 +1,6 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from "../.."
 import type { WeightedValue } from "../../shared/rng"
+import type { SocietyEra } from "../../society/eras"
 import type { ProvincePopulation } from "../../society/population"
 import { createHistoryRng, type HistoryRng } from "../history-rng"
 import { createHistoryState } from "../state"
@@ -50,6 +51,7 @@ export function createHistoryTestState(options?: {
 	cultures?: number[]
 	neighbors?: number[][]
 	desolate?: number[]
+	era?: SocietyEra
 }): ReturnType<typeof createHistoryState> {
 	const parent = options?.parent ?? [-1, -1]
 	const habitability = options?.habitability ?? parent.map(() => 10)
@@ -119,6 +121,12 @@ export function createHistoryTestState(options?: {
 		{ assignment: Int32Array.from(cultures), count: cultureCount },
 		10,
 		createHistoryRng(11),
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		options?.era ?? "lateMedieval",
 	)
 }
 

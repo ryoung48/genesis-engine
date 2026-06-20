@@ -25,7 +25,6 @@ export interface LanguageNameCulture {
 	languageSeed?: number
 	nameSeed?: number
 	heritage?: number
-	faith?: number
 	genderSystem?: CultureGenderSystem
 	traditions?: readonly string[]
 }
@@ -41,19 +40,6 @@ export interface LanguageNameNation {
 	capital: number
 	culture: number
 	nameSeed?: number
-	name?: string
-}
-
-export interface LanguageNameFaith {
-	nameSeed?: number
-	seedCulture?: number
-	religion?: number
-	name?: string
-}
-
-export interface LanguageNameReligion {
-	nameSeed?: number
-	seedFaith?: number
 	name?: string
 }
 
@@ -77,8 +63,6 @@ export interface LanguageNameContext {
 	provinces: readonly LanguageNameProvince[]
 	cultures: readonly LanguageNameCulture[]
 	heritages?: readonly LanguageNameHeritage[]
-	faiths?: readonly LanguageNameFaith[]
-	religions?: readonly LanguageNameReligion[]
 	landmarks?: readonly LanguageNameLandmark[]
 	rivers?: readonly LanguageNameRiver[]
 	nations?: readonly LanguageNameNation[]
@@ -90,8 +74,6 @@ export interface LanguageNames {
 	nation(capitalIdx: number): string
 	culture(cultureIdx: number): string
 	heritage(heritageIdx: number): string
-	faith(faithIdx: number): string
-	religion(religionIdx: number): string
 	landmark(landmarkIdx: number): string
 	river(provinceIdx: number): string
 	mountain(provinceIdx: number): string
@@ -195,8 +177,6 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 	const nationNames = new Map<number, string>()
 	const cultureNames = new Map<number, string>()
 	const heritageNames = new Map<number, string>()
-	const faithNames = new Map<number, string>()
-	const religionNames = new Map<number, string>()
 	const landmarkNames = new Map<number, string>()
 	const riverNames = new Map<number, string>()
 	const mountainNames = new Map<number, string>()
@@ -304,52 +284,6 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		})
 	}
 
-	function getFaithLanguage(faithIdx: number): Language | null {
-		const faith = context.faiths?.[faithIdx]
-		if (!faith) return null
-		const seedCulture = faith.seedCulture ?? -1
-		return seedCulture >= 0 ? getCultureLanguage(context, seedCulture) : null
-	}
-
-	function cachedFaithName(faithIdx: number): string {
-		const faith = context.faiths?.[faithIdx]
-		return cachedScopedName({
-			cache: faithNames,
-			index: faithIdx,
-			key: "culture",
-			namespace: "faith",
-			slot: buildNamedGroupSlot("faith", faithIdx, faith?.nameSeed),
-			lang: getFaithLanguage(faithIdx),
-			fallback: `Faith #${faithIdx}`,
-			onNamed: (name) => {
-				if (faith) faith.name = name
-			},
-		})
-	}
-
-	function getReligionLanguage(religionIdx: number): Language | null {
-		const religion = context.religions?.[religionIdx]
-		if (!religion) return null
-		const seedFaith = religion.seedFaith ?? -1
-		return seedFaith >= 0 ? getFaithLanguage(seedFaith) : null
-	}
-
-	function cachedReligionName(religionIdx: number): string {
-		const religion = context.religions?.[religionIdx]
-		return cachedScopedName({
-			cache: religionNames,
-			index: religionIdx,
-			key: "culture",
-			namespace: "religion",
-			slot: buildNamedGroupSlot("religion", religionIdx, religion?.nameSeed),
-			lang: getReligionLanguage(religionIdx),
-			fallback: `Religion #${religionIdx}`,
-			onNamed: (name) => {
-				if (religion) religion.name = name
-			},
-		})
-	}
-
 	function cachedLandmarkName(landmarkIdx: number): string {
 		const landmark = context.landmarks?.[landmarkIdx]
 		const cultureIdx = landmark?.culture ?? -1
@@ -379,8 +313,6 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		nation: cachedNationName,
 		culture: cachedCultureName,
 		heritage: cachedHeritageName,
-		faith: cachedFaithName,
-		religion: cachedReligionName,
 		landmark: cachedLandmarkName,
 		river: (riverIdx: number) => {
 			const river = context.rivers?.[riverIdx]
@@ -457,8 +389,6 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 			nationNames.clear()
 			cultureNames.clear()
 			heritageNames.clear()
-			faithNames.clear()
-			religionNames.clear()
 			landmarkNames.clear()
 			riverNames.clear()
 			mountainNames.clear()
@@ -477,8 +407,6 @@ export function createWorldNames(
 			| "provinces"
 			| "cultures"
 			| "heritages"
-			| "faiths"
-			| "religions"
 			| "landmarks"
 			| "nations"
 			| "rivers"
@@ -488,8 +416,6 @@ export function createWorldNames(
 	const provinceCount = world.provinces?.count ?? 0
 	const cultureCount = world.cultures?.count ?? 0
 	const heritageCount = world.heritages?.count ?? 0
-	const faithCount = world.faiths?.count ?? 0
-	const religionCount = world.religions?.count ?? 0
 	const cultures: LanguageNameCulture[] = Array.from(
 		{ length: cultureCount },
 		(_, cultureIdx): LanguageNameCulture => ({
@@ -497,7 +423,6 @@ export function createWorldNames(
 			languageSeed: world.cultures?.languageSeeds?.[cultureIdx],
 			nameSeed: world.cultures?.nameSeeds?.[cultureIdx],
 			heritage: world.heritages?.assignment[cultureIdx] ?? -1,
-			faith: world.faiths?.assignment[cultureIdx] ?? -1,
 			genderSystem:
 				world.cultures?.genderSystems &&
 				cultureIdx < world.cultures.genderSystems.length
@@ -513,21 +438,6 @@ export function createWorldNames(
 			language: null,
 			languageSeed: world.heritages?.languageSeeds?.[heritageIdx],
 			nameSeed: world.heritages?.nameSeeds?.[heritageIdx],
-		}),
-	)
-	const faiths: LanguageNameFaith[] = Array.from(
-		{ length: faithCount },
-		(_, faithIdx): LanguageNameFaith => ({
-			nameSeed: world.faiths?.nameSeeds?.[faithIdx],
-			seedCulture: world.faiths?.seeds?.[faithIdx] ?? -1,
-			religion: world.religions?.assignment?.[faithIdx] ?? -1,
-		}),
-	)
-	const religions: LanguageNameReligion[] = Array.from(
-		{ length: religionCount },
-		(_, religionIdx): LanguageNameReligion => ({
-			nameSeed: world.religions?.nameSeeds?.[religionIdx],
-			seedFaith: world.religions?.seeds?.[religionIdx] ?? -1,
 		}),
 	)
 	const landmarks: LanguageNameLandmark[] = Array.from(
@@ -587,8 +497,6 @@ export function createWorldNames(
 		provinces,
 		cultures,
 		heritages,
-		faiths,
-		religions,
 		landmarks,
 		rivers,
 		nations,

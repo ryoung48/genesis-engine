@@ -108,7 +108,7 @@ function buildMonthlyTEQ(
 }
 
 describe("computeOceanCurrents", () => {
-	it("locks currents to the annual mean and emits no monthly warmth arrays", () => {
+	it("derives annual warmth from monthly current fields", () => {
 		const mesh = buildMesh([
 			{ latDeg: 15, lonDeg: -90 },
 			{ latDeg: 15, lonDeg: 90 },
@@ -128,13 +128,16 @@ describe("computeOceanCurrents", () => {
 			monthlyTEQ,
 		)
 
-		expect(currents.oceanWarmth[0]).toBe(0)
-		expect(currents.oceanWarmth[1]).toBe(0)
+		expect(currents.oceanWarmth[0]).toBeGreaterThan(0)
+		expect(currents.oceanWarmth[0]).toBeLessThan(0.2)
+		expect(currents.oceanWarmth[1]).toBeGreaterThan(0)
+		expect(currents.oceanWarmth[1]).toBeLessThan(0.2)
 		expect(currents.oceanWarmth[2]).toBeLessThan(-0.7)
 		expect(Array.from(currents.coastalWarmth)).toEqual([0, 0, 0])
-		// Currents no longer migrate month to month — no per-month warmth fields.
-		expect(currents.oceanWarmthMonthly).toBeUndefined()
-		expect(currents.coastalWarmthMonthly).toBeUndefined()
+		expect(currents.oceanWarmthMonthly).toBeInstanceOf(Float32Array)
+		expect(currents.coastalWarmthMonthly).toBeInstanceOf(Float32Array)
+		expect(currents.oceanWarmthMonthly).toHaveLength(36)
+		expect(currents.coastalWarmthMonthly).toHaveLength(36)
 	})
 
 	it("classifies warm and cold coastal currents, diffuses inland, and skips blocked coasts", () => {
@@ -196,8 +199,8 @@ describe("computeOceanCurrents", () => {
 		expect(currents.coastalWarmth[9]).toBe(0)
 		expect(currents.oceanWarmth[13]).toBe(0)
 		expect(currents.coastalWarmth[13]).toBe(0)
-		expect(currents.oceanWarmthMonthly).toBeUndefined()
-		expect(currents.coastalWarmthMonthly).toBeUndefined()
+		expect(currents.oceanWarmthMonthly).toBeInstanceOf(Float32Array)
+		expect(currents.coastalWarmthMonthly).toBeInstanceOf(Float32Array)
 	})
 
 	it("seeds warm equatorial water and cold polar water while ignoring lakes", () => {
@@ -220,8 +223,8 @@ describe("computeOceanCurrents", () => {
 		expect(currents.oceanWarmth[2]).toBeLessThan(-0.7)
 		expect(currents.oceanWarmth[3]).toBe(0)
 		expect(Array.from(currents.coastalWarmth)).toEqual([0, 0, 0, 0])
-		expect(currents.oceanWarmthMonthly).toBeUndefined()
-		expect(currents.coastalWarmthMonthly).toBeUndefined()
+		expect(currents.oceanWarmthMonthly).toBeInstanceOf(Float32Array)
+		expect(currents.coastalWarmthMonthly).toBeInstanceOf(Float32Array)
 	})
 
 	it("fades offshore from a direct coastal assignment instead of staying binary", () => {
@@ -252,6 +255,41 @@ describe("computeOceanCurrents", () => {
 			currents.oceanWarmth[4],
 		)
 		expect(currents.oceanWarmth[4]).toBeGreaterThan(0)
+	})
+
+	it("moves unlocked current warmth month to month when the thermal equator shifts", () => {
+		const mesh = buildMesh([
+			{ latDeg: 20, lonDeg: -90 },
+			{ latDeg: 15, lonDeg: 90 },
+			{ latDeg: 80, lonDeg: 0 },
+		])
+		const monthlyTEQ = buildMonthlyTEQ([
+			{ 30: 20, 90: -40 },
+			{},
+			{},
+			{},
+			{},
+			{},
+			{ 30: -40, 90: 20 },
+		])
+
+		const currents = computeOceanCurrents(
+			mesh,
+			new Uint8Array([0, 0, 0]),
+			new Float32Array(3),
+			buildEmptyLandmarks(3),
+			undefined,
+			monthlyTEQ,
+		)
+
+		expect(currents.oceanWarmthMonthly![0]).toBeGreaterThan(0.7)
+		expect(currents.oceanWarmthMonthly![1]).toBe(0)
+		expect(currents.oceanWarmthMonthly![6 * 3]).toBe(0)
+		expect(currents.oceanWarmthMonthly![6 * 3 + 1]).toBeGreaterThan(0.7)
+		expect(currents.oceanWarmth[0]).toBeLessThan(
+			currents.oceanWarmthMonthly![0],
+		)
+		expect(currents.oceanWarmth[1]).toBeGreaterThan(0)
 	})
 
 	it("reverses coastal current classification on retrograde planets", () => {
@@ -421,8 +459,8 @@ describe("computeOceanCurrents", () => {
 			currents.coastalWarmth[24],
 		)
 		expect(currents.coastalWarmth[28]).toBe(0)
-		expect(currents.oceanWarmthMonthly).toBeUndefined()
-		expect(currents.coastalWarmthMonthly).toBeUndefined()
+		expect(currents.oceanWarmthMonthly).toBeInstanceOf(Float32Array)
+		expect(currents.coastalWarmthMonthly).toBeInstanceOf(Float32Array)
 	})
 })
 

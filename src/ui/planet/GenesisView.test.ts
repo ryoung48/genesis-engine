@@ -29,8 +29,6 @@ describe("syncLabelModeToMapMode", () => {
 					settlements: true,
 					culture: true,
 					heritage: false,
-					faith: false,
-					religion: false,
 				},
 				colorMode: "population",
 				nationMode: "borders",
@@ -42,12 +40,10 @@ describe("syncLabelModeToMapMode", () => {
 			settlements: true,
 			culture: false,
 			heritage: false,
-			faith: false,
-			religion: false,
 		})
 	})
 
-	it("remaps active labels to the supported demographic label for the current mode", () => {
+	it("remaps active labels to heritage when in religion mode", () => {
 		expect(
 			syncLabelModeToMapMode({
 				labelMode: {
@@ -56,21 +52,17 @@ describe("syncLabelModeToMapMode", () => {
 					settlements: false,
 					culture: false,
 					heritage: false,
-					faith: false,
-					religion: false,
 				},
 				colorMode: "population",
 				nationMode: "borders",
-				populationMode: "faith",
+				populationMode: "religion",
 			}),
 		).toEqual({
 			nations: false,
 			dynasty: false,
 			settlements: false,
 			culture: false,
-			heritage: false,
-			faith: true,
-			religion: false,
+			heritage: true,
 		})
 	})
 })

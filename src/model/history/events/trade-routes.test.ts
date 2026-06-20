@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { GenesisNationHierarchy, GenesisProvinces } from "../.."
+import type { SocietyEra } from "../../society/eras"
 import type { ProvincePopulation } from "../../society/population"
 import {
 	ROUTE_LAND_MAJOR,
@@ -38,6 +39,7 @@ function createInfrastructureState(options: {
 	landmarkSizes?: number[]
 	population?: number[]
 	desolate?: number[]
+	era?: SocietyEra
 }) {
 	const provinceCount = options.provinceNeighbors.length
 	const { adjOffset: provinceAdjOffset, adjList: provinceAdjList } =
@@ -109,6 +111,7 @@ function createInfrastructureState(options: {
 		regionAdjOffset,
 		regionAdjList,
 		Uint8Array.from(options.regionIsLand),
+		options.era ?? "lateMedieval",
 	)
 }
 
@@ -243,7 +246,7 @@ describe("computeRoutes", () => {
 		).toHaveLength(2)
 	})
 
-	it("keeps towns at the major threshold on minor routes only", () => {
+	it("keeps towns below the city threshold on minor routes only", () => {
 		const state = createInfrastructureState({
 			provinceNeighbors: [[1], [0, 2], [1]],
 			regionNeighbors: [[1], [0, 2], [1]],
@@ -253,7 +256,7 @@ describe("computeRoutes", () => {
 			regionIsLand: [1, 1, 1],
 		})
 		PROV.population.urban.set(state, 0, state.time, 50_000)
-		PROV.population.urban.set(state, 1, state.time, 10_000)
+		PROV.population.urban.set(state, 1, state.time, 7_999)
 		PROV.population.urban.set(state, 2, state.time, 60_000)
 
 		const result = computeRoutes(state, {
@@ -283,6 +286,29 @@ describe("computeRoutes", () => {
 				pathRegions: [1, 2],
 			}),
 		])
+	})
+
+	it("uses information-era town thresholds for minor land routes", () => {
+		const state = createInfrastructureState({
+			provinceNeighbors: [[1], [0, 2], [1]],
+			regionNeighbors: [[1], [0, 2], [1]],
+			regionProvince: [0, 1, 2],
+			provinceSeeds: [0, 1, 2],
+			r_xyz: [0, 0, 1, 0.4, 0.2, 1, 0.8, 0, 1],
+			regionIsLand: [1, 1, 1],
+			era: "information",
+		})
+		PROV.population.urban.set(state, 0, state.time, 80_000)
+		PROV.population.urban.set(state, 1, state.time, 9_999)
+		PROV.population.urban.set(state, 2, state.time, 90_000)
+
+		const result = computeRoutes(state, {
+			settlementRegions: new Int32Array([0, 1, 2]),
+		})
+
+		expect(
+			result.routes.filter((route) => route.kind === ROUTE_LAND_MINOR),
+		).toHaveLength(0)
 	})
 
 	it("dedupes shared land edges into a single major network corridor", () => {

@@ -1,6 +1,7 @@
 import { MinHeap } from "../../shared/min-heap"
 import { regionDistanceKm, regionPathLengthKm } from "../../shared/units"
 import { buildUrquhartEdgesFromFlat } from "../../shared/urquhart"
+import { getSettlementEraTuning } from "../../society/settlement-tuning"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -15,18 +16,14 @@ import type { HistoryState } from "../state"
 const ROUTE_TUNING = {
 	land: {
 		minBodyShare: 0.001,
-		majorSettlementMin: 10_000,
-		minorSettlementMin: 1_000,
 		majorMaxLengthKm: 3_000,
 		minorMaxLengthKm: 1_000,
 		newEdgeCost: 1,
 		existingEdgeCost: 0.25,
 	},
 	sea: {
-		portSettlementMin: 1_000,
 		maxLengthKm: 5_000,
 		shortRouteMaxLengthKm: 2_500,
-		shortRouteMaxPop: 5_000,
 		minBodyShare: 0.001,
 		coastalPenalty: 10,
 		nearCoastPenalty: 1,
@@ -35,7 +32,19 @@ const ROUTE_TUNING = {
 	},
 } as const
 
-export const SEA_ROUTE_PORT_MIN_POPULATION = ROUTE_TUNING.sea.portSettlementMin
+function routePopulationThresholds(era: HistoryState["era"]) {
+	const tuning = getSettlementEraTuning(era)
+	return {
+		majorSettlementMin: tuning.cityMin,
+		minorSettlementMin: tuning.townMin,
+		portSettlementMin: tuning.townMin,
+		shortRouteMaxPop: tuning.cityMin,
+	}
+}
+
+export function seaRoutePortMinPopulation(era: HistoryState["era"]): number {
+	return routePopulationThresholds(era).portSettlementMin
+}
 
 interface RouteInputs {
 	planetRadiusKm?: number
@@ -340,6 +349,7 @@ function collectLandCandidatesByKind(
 	provinceClusters: Int32Array,
 	urbanPopulation: Float32Array,
 ): LandCandidateGroupsByKind {
+	const thresholds = routePopulationThresholds(state.era)
 	const majorGroups = new Map<number, LandCandidateGroup>()
 	const minorGroups = new Map<number, LandCandidateGroup>()
 	const minLandBodySize =
@@ -355,7 +365,7 @@ function collectLandCandidatesByKind(
 			landmark < 0 ||
 			(state.landmarks.size[landmark] ?? 0) < minLandBodySize ||
 			state.desolate[province] ||
-			population <= ROUTE_TUNING.land.minorSettlementMin
+			population <= thresholds.minorSettlementMin
 		) {
 			continue
 		}
@@ -365,7 +375,7 @@ function collectLandCandidatesByKind(
 			region,
 		}
 		pushLandCandidate(minorGroups, groupKey, cluster, landmark, candidate)
-		if (population > ROUTE_TUNING.land.majorSettlementMin) {
+		if (population > thresholds.majorSettlementMin) {
 			pushLandCandidate(majorGroups, groupKey, cluster, landmark, candidate)
 		}
 	}
@@ -401,6 +411,7 @@ function collectSeaCandidates(
 	settlementPortRegions: Int32Array,
 	urbanPopulation: Float32Array,
 ): SeaCandidateGroup[] {
+	const thresholds = routePopulationThresholds(state.era)
 	const groups = new Map<number, SeaCandidateGroup>()
 	const minWaterBodySize =
 		state.regionProvince.length * ROUTE_TUNING.sea.minBodyShare
@@ -415,7 +426,7 @@ function collectSeaCandidates(
 			portRegion < 0 ||
 			(state.landmarks.size[waterLandmark] ?? 0) < minWaterBodySize ||
 			state.desolate[province] ||
-			population < ROUTE_TUNING.sea.portSettlementMin
+			population < thresholds.portSettlementMin
 		) {
 			continue
 		}
@@ -612,11 +623,13 @@ function reconstructPathFromTree(
 }
 
 function computeSeaRouteMaxLengthKm(
+	state: HistoryState,
 	sourcePopulation: number,
 	targetPopulation: number,
 ): number {
-	return sourcePopulation < ROUTE_TUNING.sea.shortRouteMaxPop &&
-		targetPopulation < ROUTE_TUNING.sea.shortRouteMaxPop
+	const thresholds = routePopulationThresholds(state.era)
+	return sourcePopulation < thresholds.shortRouteMaxPop &&
+		targetPopulation < thresholds.shortRouteMaxPop
 		? ROUTE_TUNING.sea.shortRouteMaxLengthKm
 		: ROUTE_TUNING.sea.maxLengthKm
 }
@@ -840,7 +853,7 @@ function appendSeaRoutes(
 				if (targetIndex < 0) continue
 				const target = candidates[targetIndex]
 				const targetPop = candidatePopulation[targetIndex] ?? 0
-				const maxLen = computeSeaRouteMaxLengthKm(sourcePop, targetPop)
+				const maxLen = computeSeaRouteMaxLengthKm(state, sourcePop, targetPop)
 				if (
 					Math.max(
 						regionDistanceKm(

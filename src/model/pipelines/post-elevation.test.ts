@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type { GenesisRainfall } from ".."
 import {
+	type GenesisLandmarks,
 	LANDMARK_TYPE_LAKE,
 	LANDMARK_TYPE_OCEAN,
-	type GenesisLandmarks,
 } from "../terrain/landmarks"
 import { reconcileClosedWaterBodies } from "./post-elevation"
 

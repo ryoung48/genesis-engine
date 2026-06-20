@@ -270,7 +270,7 @@ export const ERA_CONFIGS: Record<SocietyEra, EraConfig> = {
 		label: "Early Modern",
 		targetPopulation: 600e6,
 		settlementFraction: 1.0,
-		migrationFalloff: 0.6,
+		migrationFalloff: 1.5,
 		statehoodFraction: 1.0,
 		hasNations: true,
 		// Count-calibrated against Renaissance / Early Modern size-tier targets:
@@ -294,7 +294,7 @@ export const ERA_CONFIGS: Record<SocietyEra, EraConfig> = {
 		label: "Industrial",
 		targetPopulation: 1.2e9,
 		settlementFraction: 1.0,
-		migrationFalloff: 0.1,
+		migrationFalloff: 1.5,
 		statehoodFraction: 1.0,
 		hasNations: true,
 		// Count-calibrated against Industrial size-tier targets:
@@ -318,7 +318,7 @@ export const ERA_CONFIGS: Record<SocietyEra, EraConfig> = {
 		label: "Information Age",
 		targetPopulation: 8e9,
 		settlementFraction: 1.0,
-		migrationFalloff: 0,
+		migrationFalloff: 1.5,
 		statehoodFraction: 1.0,
 		hasNations: true,
 		// Count-calibrated against modern nation-state size-tier targets:

@@ -308,8 +308,6 @@ interface InfoPanelProps {
 	getDynastyName?: (dynastyId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
-	getFaithName: (faithId: number) => string
-	getReligionName: (religionId: number) => string
 	getLandmarkName: (landmarkId: number) => string
 	getRiverName: (riverId: number) => string
 	hoverNationAdjOffset?: Int32Array | null
@@ -370,8 +368,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getDynastyName,
 	getCultureName,
 	getHeritageName,
-	getFaithName,
-	getReligionName,
 	getLandmarkName,
 	getRiverName,
 	hoverNationAdjOffset,
@@ -384,8 +380,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		climateTimeMode === "monthly" ? climateMonth : displayMonth - 1
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
-	const showPolitical = activePrimary === "political"
-	const showDemographics = activePrimary === "demographics"
+	const showPolitical = colorMode === "nations" || colorMode === "timezone"
+	const showDemographics = colorMode === "population"
 	const hoverRegion = hoverInfo?.region ?? null
 	const hoverNationRelationDistribution = showPolitical
 		? buildHoverNationRelationDistribution({
@@ -467,7 +463,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				"migration",
 				"culture",
 				"heritage",
-				"faith",
 				"religion",
 			] as const
 		).filter((mode) => mode !== populationMode),
@@ -485,8 +480,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					unitSystem,
 					getCultureName,
 					getHeritageName,
-					getFaithName,
-					getReligionName,
 				})
 				return display ? [display] : []
 			})
@@ -575,7 +568,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const selectedDemographicGroupId =
 		populationMode === "culture" || populationMode === "heritage"
 			? "culture"
-			: populationMode === "faith" || populationMode === "religion"
+			: populationMode === "religion"
 				? "belief"
 				: "population"
 	const orderedDemographicGroups = [

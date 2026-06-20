@@ -5,8 +5,8 @@ import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
-	SerializedHistoryFrame,
 	SerializedGenesisWorld,
+	SerializedHistoryFrame,
 	SerializedTimelines,
 } from "@/model/transport/worker-types"
 

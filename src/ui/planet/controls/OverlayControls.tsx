@@ -39,8 +39,6 @@ export interface LabelMode {
 	settlements: boolean
 	culture: boolean
 	heritage: boolean
-	faith: boolean
-	religion: boolean
 }
 
 const LAND_TRAVEL_KM_PER_DAY = 30
@@ -727,17 +725,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													populationMode === "culture"
 														? "Culture"
 														: colorMode === "population" &&
-																populationMode === "heritage"
+																(populationMode === "heritage" ||
+																	populationMode === "religion")
 															? "Heritage"
-															: colorMode === "population" &&
-																	populationMode === "faith"
-																? "Faith"
-																: colorMode === "population" &&
-																		populationMode === "religion"
-																	? "Religion"
-																	: nationMode === "dynasty"
-																		? "Dynasty"
-																		: "Nations"}
+															: nationMode === "dynasty"
+																? "Dynasty"
+																: "Nations"}
 												</span>
 												<input
 													type="checkbox"
@@ -745,9 +738,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														labelMode.nations ||
 														labelMode.dynasty ||
 														labelMode.culture ||
-														labelMode.heritage ||
-														labelMode.faith ||
-														labelMode.religion
+														labelMode.heritage
 													}
 													onChange={(e) => {
 														const isPopMode = colorMode === "population"
@@ -765,15 +756,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															heritage:
 																e.target.checked &&
 																isPopMode &&
-																populationMode === "heritage",
-															faith:
-																e.target.checked &&
-																isPopMode &&
-																populationMode === "faith",
-															religion:
-																e.target.checked &&
-																isPopMode &&
-																populationMode === "religion",
+																(populationMode === "heritage" ||
+																	populationMode === "religion"),
 														})
 													}}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"

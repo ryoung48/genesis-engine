@@ -515,7 +515,10 @@ export function computeWindVectors(
 	const sorted = rawSpeed.slice().sort()
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
 	const ref = Math.max(pct90, 1e-6)
-	const rotationFactor = Math.min(Math.log(clamp(hoursPerDay, 6, 192)) / Math.log(24), 1.8)
+	const rotationFactor = Math.min(
+		Math.log(clamp(hoursPerDay, 6, 192)) / Math.log(24),
+		1.8,
+	)
 	const pressureFactor =
 		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
 	const windSpeed = new Float32Array(N)

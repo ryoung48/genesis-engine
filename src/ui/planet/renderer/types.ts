@@ -1,7 +1,7 @@
 import type { WindArrowData } from "@/model/climate/wind"
 import type {
-	SerializedNetwork,
 	SerializedGenesisWorld,
+	SerializedNetwork,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
@@ -88,8 +88,6 @@ export interface GenesisScene {
 	setDynastyNames(names: string[] | null): void
 	setCultureNames(names: string[] | null): void
 	setHeritageNames(names: string[] | null): void
-	setFaithNames(names: string[] | null): void
-	setReligionNames(names: string[] | null): void
 	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void

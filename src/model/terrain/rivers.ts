@@ -38,7 +38,10 @@ export function computeRivers(
 	climate: GenesisClimate,
 	hydrology: GenesisHydrology,
 	isLand: Uint8Array,
-	params?: Pick<GenesisParams, "planetRadiusKm" | "daysPerYear" | "hoursPerDay">,
+	params?: Pick<
+		GenesisParams,
+		"planetRadiusKm" | "daysPerYear" | "hoursPerDay"
+	>,
 ): GenesisRivers {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh

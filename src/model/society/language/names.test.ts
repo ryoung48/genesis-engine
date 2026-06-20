@@ -218,7 +218,7 @@ describe("createNames", () => {
 		expect(dialectSpy).toHaveBeenCalledWith(expect.any(Object), 202)
 	})
 
-	it("lazily names cultures, heritages, faiths, and religions from world seeds", () => {
+	it("lazily names cultures and heritages from world seeds", () => {
 		const spawnSpy = vi.spyOn(LANGUAGE, "spawn")
 		const dialectSpy = vi.spyOn(LANGUAGE, "dialect")
 
@@ -238,18 +238,6 @@ describe("createNames", () => {
 				nameSeeds: new Int32Array([301]),
 				seeds: new Int32Array([0]),
 			} as never,
-			faiths: {
-				count: 1,
-				assignment: new Int32Array([0]),
-				nameSeeds: new Int32Array([303]),
-				seeds: new Int32Array([0]),
-			} as never,
-			religions: {
-				count: 1,
-				assignment: new Int32Array([0]),
-				nameSeeds: new Int32Array([304]),
-				seeds: new Int32Array([0]),
-			} as never,
 			nations: {
 				seeds: new Int32Array([1]),
 				nameSeeds: new Int32Array([305]),
@@ -258,8 +246,6 @@ describe("createNames", () => {
 
 		expect(names.heritage(0)).toMatch(/^[A-Z]/)
 		expect(names.culture(0)).toMatch(/^[A-Z]/)
-		expect(names.faith(0)).toMatch(/^[A-Z]/)
-		expect(names.religion(0)).toMatch(/^[A-Z]/)
 		expect(spawnSpy).toHaveBeenCalledWith("heritage:101")
 		expect(dialectSpy).toHaveBeenCalledWith(expect.any(Object), 202)
 	})
@@ -363,54 +349,6 @@ describe("createNames", () => {
 		expect(context.landmarks?.[1]?.name).toBeUndefined()
 	})
 
-	it("persists seeded faith and religion names while falling back for unresolvable groups", () => {
-		const simpleSpy = vi
-			.spyOn(LANGUAGE.word, "simple")
-			.mockImplementation(({ slot }) => ({
-				morphemes: [slot],
-				word: `slot ${slot}`,
-			}))
-
-		const context: LanguageNameContext = {
-			provinces: [{ culture: 0 }],
-			cultures: [
-				{ language: null, languageSeed: 55, nameSeed: 77, traditions: [] },
-			],
-			faiths: [{ nameSeed: 88, seedCulture: 0 }, { nameSeed: 99 }],
-			religions: [{ nameSeed: 111, seedFaith: 0 }, { nameSeed: 222 }],
-		}
-		const names = createNames(context)
-
-		expect(names.faith(0)).toBe("Slot Faith:0:88")
-		expect(names.religion(0)).toBe("Slot Religion:0:111")
-		expect(names.faith(0)).toBe("Slot Faith:0:88")
-		expect(names.religion(0)).toBe("Slot Religion:0:111")
-		expect(context.faiths?.[0]?.name).toBe("Slot Faith:0:88")
-		expect(context.religions?.[0]?.name).toBe("Slot Religion:0:111")
-		expect(names.faith(1)).toBe("Faith #1")
-		expect(names.religion(1)).toBe("Religion #1")
-		expect(simpleSpy).toHaveBeenCalledTimes(2)
-	})
-
-	it("defaults missing world faith and religion seed arrays to deterministic fallbacks", () => {
-		const names = createWorldNames({
-			provinces: { count: 0 } as never,
-			cultures: { count: 0, assignment: new Int32Array(0) } as never,
-			faiths: {
-				count: 1,
-			} as never,
-			religions: {
-				count: 1,
-			} as never,
-			nations: {
-				seeds: new Int32Array(0),
-			} as never,
-		})
-
-		expect(names.faith(0)).toBe("Faith #0")
-		expect(names.religion(0)).toBe("Religion #0")
-	})
-
 	it("covers seeded and fallback language resolution branches for provinces and nations", () => {
 		const heritageLanguage = LANGUAGE.spawn("heritage-existing")
 		const spawnSpy = vi.spyOn(LANGUAGE, "spawn")
@@ -482,8 +420,6 @@ describe("createNames", () => {
 		expect(names.nation(0)).toMatch(/^[A-Z]/)
 		expect(names.culture(0)).toBe("Culture #0")
 		expect(names.heritage(0)).toBe("Heritage #0")
-		expect(names.faith(0)).toBe("Faith #0")
-		expect(names.religion(0)).toBe("Religion #0")
 		expect(names.landmark(0)).toBe("#0")
 		expect(names.river(0)).toBe("River #0")
 		expect(names.mountain(0)).toBe("Mount #0")

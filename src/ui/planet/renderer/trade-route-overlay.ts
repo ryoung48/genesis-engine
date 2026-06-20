@@ -9,8 +9,8 @@ import {
 	ROUTE_LAND_MINOR,
 	ROUTE_SEA,
 	type RouteEdge,
-	type SerializedNetwork,
 	SerializedGenesisWorld,
+	type SerializedNetwork,
 	type SerializedRouteKind,
 } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"

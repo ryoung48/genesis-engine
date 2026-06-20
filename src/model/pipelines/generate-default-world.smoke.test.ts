@@ -6,7 +6,7 @@ import { PASTA_LABELS } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { initHistory } from "@/model/history"
-import { SEA_ROUTE_PORT_MIN_POPULATION } from "@/model/history/events/trade-routes"
+import { seaRoutePortMinPopulation } from "@/model/history/events/trade-routes"
 import { PROV } from "@/model/history/fields"
 import { decodePlanetCode } from "@/model/shared/planet-code"
 import { regionPathLengthKm } from "@/model/shared/units"
@@ -304,7 +304,11 @@ describe("full world smoke generation", () => {
 		console.table(summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]))
 		console.info("Topography distribution")
 		console.table(
-			summarizeDistribution(world.topography, GENESIS_TOPOGRAPHY_LABELS, [5, 6]),
+			summarizeDistribution(
+				world.topography,
+				GENESIS_TOPOGRAPHY_LABELS,
+				[5, 6],
+			),
 		)
 		if (world.tidalRange) {
 			const { adjOffset, adjList } = world.mesh
@@ -637,6 +641,7 @@ describe("full world smoke generation", () => {
 			console.info(
 				`Total settlements >1k: ${diagEntries.reduce((s, e) => s + e.settlementsOver1k, 0)}, Total cities: ${diagEntries.reduce((s, e) => s + e.cities, 0)}, Major roads: ${state.routes.filter((route) => route.kind === ROUTE_LAND_MAJOR).length}, Minor roads: ${state.routes.filter((route) => route.kind === ROUTE_LAND_MINOR).length}, Sea routes: ${state.routes.filter((route) => route.kind === ROUTE_SEA).length}`,
 			)
+			const portMinPopulation = seaRoutePortMinPopulation(world.params.era)
 			const seaPortDiagnostics = collectSeaRoutePortDiagnostics({
 				urbanPopulation,
 				settlementRegions:
@@ -646,10 +651,10 @@ describe("full world smoke generation", () => {
 				settlementPortRegions:
 					world.settlementPortRegions ?? new Int32Array(state.P).fill(-1),
 				routes: state.routes,
-				minPopulation: SEA_ROUTE_PORT_MIN_POPULATION,
+				minPopulation: portMinPopulation,
 			})
 			console.info(
-				`Eligible sea ports (urban >= ${SEA_ROUTE_PORT_MIN_POPULATION.toLocaleString()}): ${seaPortDiagnostics.eligiblePorts}, with sea routes: ${seaPortDiagnostics.portsWithSeaRoutes}, without sea routes: ${seaPortDiagnostics.missingPorts.length}`,
+				`Eligible sea ports (urban >= ${portMinPopulation.toLocaleString()}): ${seaPortDiagnostics.eligiblePorts}, with sea routes: ${seaPortDiagnostics.portsWithSeaRoutes}, without sea routes: ${seaPortDiagnostics.missingPorts.length}`,
 			)
 			if (seaPortDiagnostics.missingPorts.length > 0) {
 				console.info("Eligible urban ports without sea routes")

@@ -337,7 +337,10 @@ export function buildGlobeNationLabels(
 		)
 		const markerScale =
 			capitalProvince >= 0
-				? globeScaleForPop(world.urbanPopulation?.[capitalProvince] ?? 0)
+				? globeScaleForPop(
+						world.urbanPopulation?.[capitalProvince] ?? 0,
+						world.params?.era,
+					)
 				: 0
 		const text = pool.items[activeCount]
 		applyGlobeLabelStyle(text)
@@ -406,7 +409,10 @@ export function buildMapNationLabels(
 			settlementRegion >= 0 ? settlementRegion : capitalRegion
 		const markerRadius =
 			capitalProvince >= 0
-				? mapRadiusForPop(world.urbanPopulation?.[capitalProvince] ?? 0)
+				? mapRadiusForPop(
+						world.urbanPopulation?.[capitalProvince] ?? 0,
+						world.params?.era,
+					)
 				: 0
 		const [px, py, pz] = labelPositionMap(
 			projection,
@@ -435,7 +441,7 @@ export function buildMapNationLabels(
 	return group
 }
 
-// ── Partition-based labels (culture, heritage, faith, religion) ───────────────
+// ── Partition-based labels (culture, heritage) ────────────────────────────────
 
 function computePartitionCentralData(
 	world: SerializedGenesisWorld,
@@ -711,118 +717,6 @@ export function buildMapHeritageLabels(
 	)
 }
 
-export function buildGlobeFaithLabels(
-	world: SerializedGenesisWorld,
-	faithNames: string[],
-	camera: THREE.PerspectiveCamera,
-	pool: LabelPool,
-	cullingEnabled = false,
-	elevationVisible = true,
-): THREE.Group {
-	if (!world.faiths || !world.cultures || !world.provinces)
-		return new THREE.Group()
-	const ca = world.cultures.assignment
-	const fa = world.faiths.assignment
-	return buildGlobePartitionLabels(
-		world,
-		faithNames,
-		world.faiths.count,
-		(p) => {
-			const c = ca[p] ?? -1
-			return c >= 0 ? (fa[c] ?? -1) : -1
-		},
-		camera,
-		pool,
-		cullingEnabled,
-		elevationVisible,
-	)
-}
-
-export function buildMapFaithLabels(
-	world: SerializedGenesisWorld,
-	faithNames: string[],
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	pool: LabelPool,
-	cullingEnabled = false,
-): THREE.Group {
-	if (!world.faiths || !world.cultures || !world.provinces)
-		return new THREE.Group()
-	const ca = world.cultures.assignment
-	const fa = world.faiths.assignment
-	return buildMapPartitionLabels(
-		world,
-		faithNames,
-		world.faiths.count,
-		(p) => {
-			const c = ca[p] ?? -1
-			return c >= 0 ? (fa[c] ?? -1) : -1
-		},
-		centerLongitudeDeg,
-		projectionLatitudeDeg,
-		pool,
-		cullingEnabled,
-	)
-}
-
-export function buildGlobeReligionLabels(
-	world: SerializedGenesisWorld,
-	religionNames: string[],
-	camera: THREE.PerspectiveCamera,
-	pool: LabelPool,
-	cullingEnabled = false,
-	elevationVisible = true,
-): THREE.Group {
-	if (!world.religions || !world.faiths || !world.cultures || !world.provinces)
-		return new THREE.Group()
-	const ca = world.cultures.assignment
-	const fa = world.faiths.assignment
-	const ra = world.religions.assignment
-	return buildGlobePartitionLabels(
-		world,
-		religionNames,
-		world.religions.count,
-		(p) => {
-			const c = ca[p] ?? -1
-			const f = c >= 0 ? (fa[c] ?? -1) : -1
-			return f >= 0 ? (ra[f] ?? -1) : -1
-		},
-		camera,
-		pool,
-		cullingEnabled,
-		elevationVisible,
-	)
-}
-
-export function buildMapReligionLabels(
-	world: SerializedGenesisWorld,
-	religionNames: string[],
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	pool: LabelPool,
-	cullingEnabled = false,
-): THREE.Group {
-	if (!world.religions || !world.faiths || !world.cultures || !world.provinces)
-		return new THREE.Group()
-	const ca = world.cultures.assignment
-	const fa = world.faiths.assignment
-	const ra = world.religions.assignment
-	return buildMapPartitionLabels(
-		world,
-		religionNames,
-		world.religions.count,
-		(p) => {
-			const c = ca[p] ?? -1
-			const f = c >= 0 ? (fa[c] ?? -1) : -1
-			return f >= 0 ? (ra[f] ?? -1) : -1
-		},
-		centerLongitudeDeg,
-		projectionLatitudeDeg,
-		pool,
-		cullingEnabled,
-	)
-}
-
 // ── Settlement labels ─────────────────────────────────────────────────────────
 
 const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
@@ -917,7 +811,7 @@ export function buildGlobeSettlementLabels(
 		const pop = world.urbanPopulation?.[p] ?? 0
 		const scale = settlementFontScale(pop)
 		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_GLOBE * scale
-		const markerScale = globeScaleForPop(pop)
+		const markerScale = globeScaleForPop(pop, world.params?.era)
 		const globePlacement = settlementLabelPositionGlobe(
 			r_xyz,
 			elevation,
@@ -986,7 +880,7 @@ export function buildMapSettlementLabels(
 		const pop = world.urbanPopulation?.[p] ?? 0
 		const scale = settlementFontScale(pop)
 		const fontSize = SETTLEMENT_LABEL_FONT_SIZE_MAP * scale
-		const markerRadius = mapRadiusForPop(pop)
+		const markerRadius = mapRadiusForPop(pop, world.params?.era)
 		const [px, py, pz] = labelPositionMap(
 			projection,
 			r_xyz,

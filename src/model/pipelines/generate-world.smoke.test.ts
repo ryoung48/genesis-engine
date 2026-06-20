@@ -106,8 +106,8 @@ describe("generateGenesisWorld", () => {
 			expect(world.nations).toBeDefined()
 			expect(world.cultures).toBeDefined()
 			expect(world.heritages).toBeDefined()
-			expect(world.faiths).toBeDefined()
 			expect(world.religions).toBeDefined()
+			expect(world.religionTypes).toBeDefined()
 			expect(world.population).toBeDefined()
 			expect(world.landmarks).toBeDefined()
 		},

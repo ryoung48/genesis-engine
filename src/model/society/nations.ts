@@ -1158,13 +1158,20 @@ function refineGovernmentSubtype(
 
 		case 2: {
 			// republic → 8=merchant, 9=noble, 10=confederation, 11=presidential, 12=parliamentary, 17=socialist, 18=junta
-			// Modern republics (industrial & information): four-way mix of
-			// parliamentary, presidential, one-party socialist, and military junta.
-			if (sizeWeight < 0.4) {
-				if (size >= 20 && r < 0.35) return 17 // socialist: favoured for large one-party states
+			// Information era: socialist states emerge alongside parliamentary, presidential, and juntas.
+			if (sizeWeight < 0.22) {
+				if (size >= 20 && r < 0.35) return 17 // socialist: large one-party states
 				if (r < 0.18) return 17 // socialist: minority elsewhere
 				if (r < 0.36) return 18 // military junta
 				if (r < 0.68) return 12 // parliamentary
+				return 11 // presidential
+			}
+			// Industrial era: no socialist states (predates 1917); juntas dominate
+			// unstable republics (Latin America), parliamentary in France/Europe,
+			// presidential in the USA.
+			if (sizeWeight < 0.4) {
+				if (r < 0.3) return 18 // military junta
+				if (r < 0.7) return 12 // parliamentary
 				return 11 // presidential
 			}
 			// Pre-modern republics

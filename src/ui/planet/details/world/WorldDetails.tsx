@@ -21,7 +21,6 @@ function getWorldSections({
 	activeWarCount,
 	cultureCount,
 	heritageCount,
-	faithCount,
 	religionCount,
 }: Pick<
 	DetailsDrawerBaseProps,
@@ -30,7 +29,6 @@ function getWorldSections({
 	| "activeWarCount"
 	| "cultureCount"
 	| "heritageCount"
-	| "faithCount"
 	| "religionCount"
 >) {
 	const stats = new Map(
@@ -93,10 +91,6 @@ function getWorldSections({
 				value: heritageCount != null ? heritageCount.toLocaleString() : "N/A",
 			},
 			{
-				label: "Faith Count",
-				value: faithCount != null ? faithCount.toLocaleString() : "N/A",
-			},
-			{
 				label: "Religion Count",
 				value: religionCount != null ? religionCount.toLocaleString() : "N/A",
 			},
@@ -119,10 +113,10 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	activeWarCount,
 	cultureCount,
 	heritageCount,
-	faithCount,
 	religionCount,
 	nationSizeDistribution,
 	governmentDistribution,
+	religionDistribution,
 	conflictDistribution,
 	relationDistribution,
 	climateDistribution,
@@ -136,7 +130,6 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		activeWarCount,
 		cultureCount,
 		heritageCount,
-		faithCount,
 		religionCount,
 	})
 
@@ -240,6 +233,10 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 					<DistributionChart
 						title="Government"
 						buckets={governmentDistribution}
+					/>
+					<DistributionChart
+						title="Religion"
+						buckets={religionDistribution}
 					/>
 					<DistributionChart title="Conflicts" buckets={conflictDistribution} />
 					<DistributionChart title="Relations" buckets={relationDistribution} />

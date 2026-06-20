@@ -42,16 +42,10 @@ const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
 
 // topography: 0=flat, 1=hills, 2=plateaus, 3=mountains, 4=marsh, 5=ocean, 6=lake
 const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
-// Water access levels: 0=none, 1=river, 2=lake, 3=ocean
-const HAB_COASTAL_OCEAN = 1.5
-const HAB_COASTAL_LAKE = 1.2
-const HAB_COASTAL_RIVER = 1.1
-const HAB_COASTAL_FACTORS = new Float32Array([
-	1.0,
-	HAB_COASTAL_RIVER,
-	HAB_COASTAL_LAKE,
-	HAB_COASTAL_OCEAN,
-])
+// Additive habitability bonus by water access: 0=none, 1=river, 2=lake, 3=ocean.
+// Additive so that water remains meaningful even when climate/vegetation are near-zero
+// (e.g. desert rivers, arctic coasts).
+const HAB_WATER_BONUS = new Float32Array([0, 0.1, 0.1, 0.1])
 
 export interface ProvincePopulation {
 	/** Per-province habitability score */
@@ -118,12 +112,11 @@ export function computeProvinceHabitability(
 		const cz = climateZones[r]
 		const veg = vegetation[r]
 		const topo = topography[r]
-		const coastalFactor = HAB_COASTAL_FACTORS[waterAccess[province]]
 		const score =
-			(HAB_CLIMATE[cz] ?? 0) *
-			(HAB_VEGETATION[veg] ?? 0) *
-			(HAB_TOPOGRAPHY[topo] ?? 0) *
-			coastalFactor *
+			((HAB_CLIMATE[cz] ?? 0) *
+				(HAB_VEGETATION[veg] ?? 0) *
+				(HAB_TOPOGRAPHY[topo] ?? 0) +
+				HAB_WATER_BONUS[waterAccess[province]]) *
 			(0.8 + rng.random() * 0.4) // uniform(0.8, 1.2)
 
 		habitability[province] += score

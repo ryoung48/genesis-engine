@@ -85,7 +85,6 @@ const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
 	"development",
 	"culture",
 	"heritage",
-	"faith",
 	"religion",
 	"migration",
 ])
@@ -110,8 +109,6 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 		settlements: false,
 		culture: false,
 		heritage: false,
-		faith: false,
-		religion: false,
 	},
 	showElevation: true,
 	showThermalEquator: false,
@@ -185,8 +182,6 @@ function parseLabelMode(value: unknown): LabelMode {
 		...base,
 		culture: typeof v?.culture === "boolean" ? v.culture : false,
 		heritage: typeof v?.heritage === "boolean" ? v.heritage : false,
-		faith: typeof v?.faith === "boolean" ? v.faith : false,
-		religion: typeof v?.religion === "boolean" ? v.religion : false,
 	}
 }
 

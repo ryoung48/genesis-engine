@@ -5,12 +5,12 @@ import type {
 	MapModePrimary,
 	NationMapMode,
 	PopulationMapMode,
+	SocietyMapMode,
 } from "../screen/shared/map-modes"
 import {
 	getMapModePrimary,
-	getVisibleDemographicModeOptions,
 	getVisibleGeographyModeOptions,
-	getVisiblePoliticalModeOptions,
+	getVisibleSocietyModeOptions,
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "../screen/shared/map-modes"
 import { ModeButtonGroup } from "./mode-controls"
@@ -69,8 +69,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes)
-	const demographicOptions = getVisibleDemographicModeOptions(debugMapModes)
-	const politicalOptions = getVisiblePoliticalModeOptions(debugMapModes)
+	const societyOptions = getVisibleSocietyModeOptions(debugMapModes)
 
 	const submodeControl =
 		activePrimary === "geography" ? (
@@ -90,25 +89,36 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				}}
 				buttonClassName="px-1.5"
 			/>
-		) : activePrimary === "political" ? (
-			<ModeButtonGroup<NationMapMode | "timezone">
-				options={[...politicalOptions, ["timezone", "Timezones"]]}
-				value={colorMode === "timezone" ? "timezone" : nationMode}
+		) : (
+			<ModeButtonGroup<SocietyMapMode>
+				options={societyOptions}
+				value={
+					colorMode === "population"
+						? populationMode
+						: colorMode === "timezone"
+							? "timezone"
+							: nationMode
+				}
 				onChange={(mode) => {
 					if (mode === "timezone") {
 						setColorMode("timezone")
 						return
 					}
+					if (
+						mode === "density" ||
+						mode === "development" ||
+						mode === "culture" ||
+						mode === "heritage" ||
+						mode === "religion" ||
+						mode === "migration"
+					) {
+						setColorMode("population")
+						setPopulationMode(mode)
+						return
+					}
 					setColorMode("nations")
 					setNationMode(mode)
 				}}
-				buttonClassName="px-1.5"
-			/>
-		) : (
-			<ModeButtonGroup
-				options={demographicOptions}
-				value={populationMode}
-				onChange={setPopulationMode}
 				buttonClassName="px-1.5"
 			/>
 		)
@@ -135,12 +145,8 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 							)
 							return
 						}
-						if (primary === "political") {
+						if (primary === "society") {
 							setColorMode("nations")
-							return
-						}
-						if (primary === "demographics") {
-							setColorMode("population")
 						}
 					}}
 					tone="overlay"

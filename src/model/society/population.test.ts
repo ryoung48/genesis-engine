@@ -10,8 +10,7 @@ const HAB_CLIMATE = new Float32Array([
 ])
 const HAB_VEGETATION = new Float32Array([0, 0.1, 0.3, 0.8, 1.0, 0.8, 0.6])
 const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
-const HAB_COASTAL_OCEAN = 1.5
-const HAB_COASTAL_RIVER = 1.1
+const HAB_WATER_BONUS = new Float32Array([0, 0.08, 0.2, 0.35])
 
 describe("computePopulation", () => {
 	it("sums per-region habitability into each province and applies world scoring once", () => {
@@ -127,12 +126,12 @@ describe("computePopulation", () => {
 
 		const rng = createRng(seed + 77777)
 		const baseScore = HAB_CLIMATE[4] * HAB_VEGETATION[4] * HAB_TOPOGRAPHY[0]
-		// Province 0 has ocean coastal (region 1) → HAB_COASTAL_OCEAN for all its regions
-		// Province 1 has river (region 3) → HAB_COASTAL_RIVER
+		// Province 0 has ocean coastal (region 1) → HAB_WATER_BONUS[3] for all its regions
+		// Province 1 has river (region 3) → HAB_WATER_BONUS[1]
 		const regionScores = [
-			baseScore * HAB_COASTAL_OCEAN * (0.8 + rng.random() * 0.4), // r=1, prov 0
-			baseScore * HAB_COASTAL_OCEAN * (0.8 + rng.random() * 0.4), // r=2, prov 0
-			baseScore * HAB_COASTAL_RIVER * (0.8 + rng.random() * 0.4), // r=3, prov 1
+			(baseScore + HAB_WATER_BONUS[3]) * (0.8 + rng.random() * 0.4), // r=1, prov 0
+			(baseScore + HAB_WATER_BONUS[3]) * (0.8 + rng.random() * 0.4), // r=2, prov 0
+			(baseScore + HAB_WATER_BONUS[1]) * (0.8 + rng.random() * 0.4), // r=3, prov 1
 		]
 
 		expect(result.habitability[0]).toBeCloseTo(

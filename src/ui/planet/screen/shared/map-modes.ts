@@ -5,7 +5,6 @@ export type PopulationMapMode =
 	| "development"
 	| "culture"
 	| "heritage"
-	| "faith"
 	| "religion"
 	| "migration"
 
@@ -16,7 +15,9 @@ export type NationMapMode =
 	| "diplomacy"
 	| "government"
 
-export type MapModePrimary = "geography" | "political" | "demographics"
+export type SocietyMapMode = NationMapMode | PopulationMapMode | "timezone"
+
+export type MapModePrimary = "geography" | "society"
 
 export const DEFAULT_GEOGRAPHY_MODE: ColorMode = "terrain"
 
@@ -24,8 +25,7 @@ export const PRIMARY_MAP_MODE_OPTIONS: ReadonlyArray<
 	readonly [MapModePrimary, string]
 > = [
 	["geography", "Geography"],
-	["political", "Political"],
-	["demographics", "Demographics"],
+	["society", "Society"],
 ]
 
 const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
@@ -58,34 +58,37 @@ const DEFAULT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	["density", "Population"],
 	["development", "Development"],
 	["culture", "Culture"],
-	["heritage", "Heritage"],
-	["faith", "Faith"],
 	["religion", "Religion"],
 ]
 
 const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	readonly [PopulationMapMode, string]
-> = [["migration", "Migration"]]
+> = [
+	["heritage", "Heritage"],
+	["migration", "Migration"],
+]
 
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
 > = [
 	["borders", "Nations"],
-	["dynasty", "Dynasty"],
-	["diplomacy", "Diplomacy"],
 	["government", "Government"],
 ]
 
 const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
-> = [["provinces", "Provinces"]]
+> = [
+	["dynasty", "Dynasty"],
+	["diplomacy", "Diplomacy"],
+	["provinces", "Provinces"],
+]
 
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
-	return colorMode === "nations" || colorMode === "timezone"
-		? "political"
-		: colorMode === "population"
-			? "demographics"
-			: "geography"
+	return colorMode === "nations" ||
+		colorMode === "timezone" ||
+		colorMode === "population"
+		? "society"
+		: "geography"
 }
 
 export function isDebugGeographyMode(colorMode: ColorMode): boolean {
@@ -114,18 +117,29 @@ export function getVisibleGeographyModeOptions(
 		: [...DEFAULT_GEOGRAPHY_MODE_OPTIONS]
 }
 
-export function getVisibleDemographicModeOptions(
+export function getVisibleSocietyModeOptions(
 	debugEnabled: boolean,
-): ReadonlyArray<readonly [PopulationMapMode, string]> {
-	return debugEnabled
-		? [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS, ...DEBUG_DEMOGRAPHIC_MODE_OPTIONS]
-		: [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS]
-}
-
-export function getVisiblePoliticalModeOptions(
-	debugEnabled: boolean,
-): ReadonlyArray<readonly [NationMapMode, string]> {
-	return debugEnabled
+): ReadonlyArray<readonly [SocietyMapMode, string]> {
+	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
+	const demographicOptions = debugEnabled
+		? [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS, ...DEBUG_DEMOGRAPHIC_MODE_OPTIONS]
+		: [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS]
+	const trailingSocietyModes = new Set<PopulationMapMode>([
+		"density",
+		"development",
+	])
+	const leadingDemographicOptions = demographicOptions.filter(
+		([mode]) => !trailingSocietyModes.has(mode),
+	)
+	const trailingDemographicOptions = demographicOptions.filter(([mode]) =>
+		trailingSocietyModes.has(mode),
+	)
+	return [
+		...politicalOptions,
+		...leadingDemographicOptions,
+		...trailingDemographicOptions,
+		["timezone", "Timezones"],
+	]
 }

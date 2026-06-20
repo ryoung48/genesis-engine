@@ -5,6 +5,7 @@ import { pastaClimateColor } from "@/model/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/climate/vegetation"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
 import { REL } from "@/model/history/state"
+import { RELIGION_TYPE_COLORS } from "@/model/society/religion"
 import {
 	regionTimezoneOffset,
 	timezoneLandColor,
@@ -49,6 +50,10 @@ import {
 	getRebelDisplayColorNationId,
 	type PoliticalMapWar,
 } from "./political-conflict-display"
+import {
+	getReligionColorForProvince,
+	getReligionTypeIndexForProvince,
+} from "./religion-type"
 
 // Relation value → RGB tuple (consistent with buildRelationDistribution palette)
 const DIPLOMACY_RGB_COLORS: Record<number, [number, number, number]> = {
@@ -207,7 +212,6 @@ function hasPartitionElevationBump(populationMode: PopulationMapMode): boolean {
 	return (
 		populationMode === "culture" ||
 		populationMode === "heritage" ||
-		populationMode === "faith" ||
 		populationMode === "religion"
 	)
 }
@@ -584,9 +588,14 @@ export function computeRegionColors(
 	}
 
 	if (colorMode === "oceanCurrents" && world.oceanCurrents) {
-		const { oceanWarmth, temperatureDelta, temperatureDeltaMonthly } =
-			world.oceanCurrents
+		const {
+			oceanWarmth,
+			oceanWarmthMonthly,
+			temperatureDelta,
+			temperatureDeltaMonthly,
+		} = world.oceanCurrents
 		const monthly = currentMonth === 0 ? null : temperatureDeltaMonthly
+		const monthlyOceanWarmth = currentMonth === 0 ? null : oceanWarmthMonthly
 		const offset = monthly ? (currentMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
 			const isLand = isLandRegion(r)
@@ -600,7 +609,9 @@ export function computeRegionColors(
 								: (temperatureDelta?.[r] ?? 0)) / 15,
 						),
 					)
-				: (oceanWarmth?.[r] ?? 0)
+				: monthlyOceanWarmth
+					? (monthlyOceanWarmth[offset + r] ?? oceanWarmth?.[r] ?? 0)
+					: (oceanWarmth?.[r] ?? 0)
 			const [cr, cg, cb] = oceanCurrentColor(colorValue)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
@@ -1068,55 +1079,83 @@ export function computeRegionColors(
 						rgb[3 * r + 1] = cg
 						rgb[3 * r + 2] = cb
 					}
-				} else {
+				} else if (populationMode === "culture") {
+					const cultureIdx = world.cultures?.assignment[p] ?? -1
+					if (cultureIdx < 0 || !world.cultures) {
+						const [cr, cg, cb] = darkenPartitionAtElevation(
+							[0.35, 0.33, 0.32],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					} else {
+						const [cr, cg, cb] = darkenPartitionAtElevation(
+							[
+								world.cultures.colors[3 * cultureIdx],
+								world.cultures.colors[3 * cultureIdx + 1],
+								world.cultures.colors[3 * cultureIdx + 2],
+							],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
+				} else if (populationMode === "heritage") {
 					const cultureIdx = world.cultures?.assignment[p] ?? -1
 					const heritageIdx =
 						cultureIdx >= 0
 							? (world.heritages?.assignment[cultureIdx] ?? -1)
 							: -1
-					const faithIdx =
-						cultureIdx >= 0 ? (world.faiths?.assignment[cultureIdx] ?? -1) : -1
-					const religionIdx =
-						faithIdx >= 0 ? (world.religions?.assignment[faithIdx] ?? -1) : -1
-					const idx =
-						populationMode === "culture"
-							? cultureIdx
-							: populationMode === "heritage"
-								? heritageIdx
-								: populationMode === "faith"
-									? faithIdx
-									: religionIdx
-					const partition =
-						populationMode === "culture"
-							? world.cultures
-							: populationMode === "heritage"
-								? world.heritages
-								: populationMode === "faith"
-									? world.faiths
-									: world.religions
-					if (!partition || idx < 0) {
-						const [cr, cg, cb] = hasPartitionElevationBump(populationMode)
-							? darkenPartitionAtElevation(
-									[0.35, 0.33, 0.32],
-									world.elevation_km[r],
-								)
-							: [0.35, 0.33, 0.32]
+					if (heritageIdx < 0 || !world.heritages) {
+						const [cr, cg, cb] = darkenPartitionAtElevation(
+							[0.35, 0.33, 0.32],
+							world.elevation_km[r],
+						)
 						rgb[3 * r] = cr
 						rgb[3 * r + 1] = cg
 						rgb[3 * r + 2] = cb
 					} else {
-						const baseColor: [number, number, number] = [
-							partition.colors[3 * idx],
-							partition.colors[3 * idx + 1],
-							partition.colors[3 * idx + 2],
-						]
-						const [cr, cg, cb] = hasPartitionElevationBump(populationMode)
-							? darkenPartitionAtElevation(baseColor, world.elevation_km[r])
-							: baseColor
+						const [cr, cg, cb] = darkenPartitionAtElevation(
+							[
+								world.heritages.colors[3 * heritageIdx],
+								world.heritages.colors[3 * heritageIdx + 1],
+								world.heritages.colors[3 * heritageIdx + 2],
+							],
+							world.elevation_km[r],
+						)
 						rgb[3 * r] = cr
 						rgb[3 * r + 1] = cg
 						rgb[3 * r + 2] = cb
 					}
+				} else if (populationMode === "religion") {
+					const typeIdx = getReligionTypeIndexForProvince(world, p)
+					if (typeIdx < 0) {
+						const [cr, cg, cb] = darkenPartitionAtElevation(
+							[0.35, 0.33, 0.32],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					} else {
+						const typeColor =
+							getReligionColorForProvince(world, p) ??
+							(RELIGION_TYPE_COLORS[typeIdx] ?? RELIGION_TYPE_COLORS[0])
+						const [cr, cg, cb] = darkenPartitionAtElevation(
+							[typeColor[0], typeColor[1], typeColor[2]],
+							world.elevation_km[r],
+						)
+						rgb[3 * r] = cr
+						rgb[3 * r + 1] = cg
+						rgb[3 * r + 2] = cb
+					}
+				} else {
+					// density/development/migration handled above; fallback neutral
+					rgb[3 * r] = 0.35
+					rgb[3 * r + 1] = 0.33
+					rgb[3 * r + 2] = 0.32
 				}
 			}
 		}

@@ -634,8 +634,6 @@ describe("buildDemographicDisplayData", () => {
 			unitSystem: "metric",
 			getCultureName: (id) => `culture-${id}`,
 			getHeritageName: (id) => `heritage-${id}`,
-			getFaithName: (id) => `faith-${id}`,
-			getReligionName: (id) => `religion-${id}`,
 		})
 
 		expect(result?.label).toBe("Population")
@@ -660,8 +658,6 @@ describe("buildDemographicDisplayData", () => {
 			unitSystem: "metric",
 			getCultureName: (id) => `culture-${id}`,
 			getHeritageName: (id) => `heritage-${id}`,
-			getFaithName: (id) => `faith-${id}`,
-			getReligionName: (id) => `religion-${id}`,
 		})
 
 		expect(result).toEqual({
@@ -680,8 +676,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 	})
@@ -703,8 +697,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toEqual({
 			label: "Development",
@@ -726,8 +718,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toEqual({ label: "Migration", value: "Cradle", color: null })
 	})
@@ -745,8 +735,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toEqual({ label: "Migration", value: "42%", color: null })
 	})
@@ -764,8 +752,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 
@@ -781,13 +767,11 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 	})
 
-	it("resolves heritage, faith, and religion chains from the hovered culture", () => {
+	it("resolves heritage and religion chains from the hovered culture", () => {
 		const world = makeWorld({
 			provinces: {
 				desolate: new Uint8Array([0]),
@@ -801,14 +785,11 @@ describe("buildDemographicDisplayData", () => {
 				assignment: new Int32Array([0, 2]),
 				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
 			},
-			faiths: {
-				assignment: new Int32Array([0, 3]),
-				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]),
-			},
 			religions: {
-				assignment: new Int32Array([0, 0, 0, 4]),
-				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1]),
+				assignment: new Int32Array([0, 2]),
+				colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
 			},
+			religionTypes: new Uint8Array([0, 0, 3]),
 		})
 
 		expect(
@@ -819,28 +800,10 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toEqual({
 			label: "Heritage",
 			value: "heritage-2",
-			color: expect.stringMatching(/^rgb/),
-		})
-		expect(
-			buildDemographicDisplayData({
-				populationMode: "faith",
-				hoverProvince: 0,
-				world,
-				unitSystem: "metric",
-				getCultureName: (id) => `culture-${id}`,
-				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
-			}),
-		).toEqual({
-			label: "Faith",
-			value: "faith-3",
 			color: expect.stringMatching(/^rgb/),
 		})
 		expect(
@@ -851,17 +814,15 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toEqual({
 			label: "Religion",
-			value: "religion-4",
+			value: "Monotheistic",
 			color: expect.stringMatching(/^rgb/),
 		})
 	})
 
-	it("handles density fallback and partition fallback branches", () => {
+	it("handles density fallback and missing religion branches", () => {
 		expect(
 			buildDemographicDisplayData({
 				populationMode: "density",
@@ -879,14 +840,12 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 
 		expect(
 			buildDemographicDisplayData({
-				populationMode: "faith",
+				populationMode: "religion",
 				hoverProvince: 0,
 				world: makeWorld({
 					provinces: {
@@ -901,8 +860,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 	})
@@ -924,8 +881,6 @@ describe("buildDemographicDisplayData", () => {
 			unitSystem: "metric",
 			getCultureName: (id) => `culture-${id}`,
 			getHeritageName: (id) => `heritage-${id}`,
-			getFaithName: (id) => `faith-${id}`,
-			getReligionName: (id) => `religion-${id}`,
 		})
 
 		expect(result).toEqual({
@@ -951,8 +906,6 @@ describe("buildDemographicDisplayData", () => {
 			unitSystem: "metric",
 			getCultureName: (id) => `culture-${id}`,
 			getHeritageName: (id) => `heritage-${id}`,
-			getFaithName: (id) => `faith-${id}`,
-			getReligionName: (id) => `religion-${id}`,
 		})
 		const large = buildDemographicDisplayData({
 			populationMode: "density",
@@ -969,8 +922,6 @@ describe("buildDemographicDisplayData", () => {
 			unitSystem: "metric",
 			getCultureName: (id) => `culture-${id}`,
 			getHeritageName: (id) => `heritage-${id}`,
-			getFaithName: (id) => `faith-${id}`,
-			getReligionName: (id) => `religion-${id}`,
 		})
 
 		expect(small?.value).toContain("500")
@@ -996,8 +947,6 @@ describe("buildDemographicDisplayData", () => {
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 
@@ -1014,16 +963,10 @@ describe("buildDemographicDisplayData", () => {
 						assignment: new Int32Array([1]),
 						colors: new Float32Array([1, 0, 0, 0, 1, 0]),
 					},
-					faiths: {
-						assignment: new Int32Array([0, -1]),
-						colors: new Float32Array([1, 0, 0, 0, 1, 0]),
-					},
 				}),
 				unitSystem: "metric",
 				getCultureName: (id) => `culture-${id}`,
 				getHeritageName: (id) => `heritage-${id}`,
-				getFaithName: (id) => `faith-${id}`,
-				getReligionName: (id) => `religion-${id}`,
 			}),
 		).toBeNull()
 	})

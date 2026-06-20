@@ -102,7 +102,9 @@ describe("applyVolcanicArcs", () => {
 		expect(tracker.featureMask[0]).toBe(
 			1 << (GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC - 1),
 		)
-		expect(tracker.dominantFeature[0]).toBe(GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC)
+		expect(tracker.dominantFeature[0]).toBe(
+			GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC,
+		)
 	})
 
 	it("keeps oceanic and continental volcanic cone heights identical", () => {

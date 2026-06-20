@@ -40,7 +40,6 @@ export interface NationDetailsData {
 	}>
 	cultureDistribution: DistributionBucket[]
 	heritageDistribution: DistributionBucket[]
-	faithDistribution: DistributionBucket[]
 	religionDistribution: DistributionBucket[]
 }
 
@@ -50,10 +49,10 @@ export interface DetailsDrawerBaseProps {
 	activeWarCount: number | null
 	cultureCount: number | null
 	heritageCount: number | null
-	faithCount: number | null
 	religionCount: number | null
 	nationSizeDistribution: DistributionBucket[]
 	governmentDistribution: DistributionBucket[]
+	religionDistribution: DistributionBucket[]
 	conflictDistribution: DistributionBucket[]
 	relationDistribution: DistributionBucket[]
 	climateDistribution: DistributionBucket[]

@@ -3,6 +3,7 @@
  * Port of src/model/history/events/population.ts
  */
 
+import { getSettlementEraTuning } from "../../society/settlement-tuning"
 import { EVT } from "../event-heap"
 import { PROV } from "../fields"
 import type { HistoryRng } from "../history-rng"
@@ -12,15 +13,12 @@ import {
 	getSovereign,
 	type HistoryState,
 	isSovereign,
-	wealthOptimal,
 	YEAR_MS,
 } from "../state"
 
 // Medieval Demographics Made Easy constants
 const MAX_ADJUSTMENT_RATE = 0.005
 const URBAN_GROWTH = 0.1
-const CITY_MIN = 8000
-const TOWN_MIN = 1000
 const SECOND_CITY_RATIO = 0.5
 const CITY_DECAY = 0.75
 
@@ -52,15 +50,31 @@ function devToGrowthRate(dev: number): number {
 	)
 }
 
-function devToUrbanRate(dev: number): number {
+function devToUrbanRate(
+	dev: number,
+	tuning: ReturnType<typeof getSettlementEraTuning>,
+): number {
 	return lerpScale(
 		[0.0, 0.15, 0.35, 0.55, 0.75, 0.95],
-		[0.04, 0.05, 0.06, 0.07, 0.08, 0.09],
+		[...tuning.urbanRateRange],
 		dev,
 	)
 }
 
+function hierarchyDepth(state: HistoryState, province: number): number {
+	let depth = 0
+	let current = province
+	while (state.parentCurrent[current] >= 0) {
+		current = state.parentCurrent[current]
+		depth++
+	}
+	return depth
+}
+
 function urbanization(state: HistoryState, init: boolean): void {
+	const tuning = getSettlementEraTuning(state.era)
+	const { cityMin, townMin } = tuning
+
 	// Process each sovereign nation
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p] || !isSovereign(state, p)) continue
@@ -71,13 +85,17 @@ function urbanization(state: HistoryState, init: boolean): void {
 			totalBase += PROV.population.rural.get(state, prov)
 		}
 
-		const urbanRate = devToUrbanRate(PROV.development.get(state, p))
+		const urbanRate = devToUrbanRate(PROV.development.get(state, p), tuning)
 		const totalUrban = (urbanRate * totalBase) / (1 - urbanRate)
 
-		// Sort provinces by optimal wealth descending
-		const sorted = provinces
-			.slice()
-			.sort((a, b) => wealthOptimal(state, b) - wealthOptimal(state, a))
+		// Sort provinces by hierarchy depth ascending (sovereign = 0 gets the capital city),
+		// breaking ties by habitability so deeper-ranked provinces still differ meaningfully.
+		const sorted = provinces.slice().sort((a, b) => {
+			const da = hierarchyDepth(state, a)
+			const db = hierarchyDepth(state, b)
+			if (da !== db) return da - db
+			return state.habitability[b] - state.habitability[a]
+		})
 
 		const largestCity = totalUrban * 0.2
 		const urbanPops: number[] = []
@@ -95,7 +113,7 @@ function urbanization(state: HistoryState, init: boolean): void {
 			} else {
 				cityPop = prevCity * CITY_DECAY
 			}
-			if (cityPop < CITY_MIN) break
+			if (cityPop < cityMin) break
 			urbanPops.push(cityPop)
 			usedUrban += cityPop
 			prevCity = cityPop
@@ -110,14 +128,14 @@ function urbanization(state: HistoryState, init: boolean): void {
 			while (
 				i < sorted.length &&
 				usedUrban < totalUrban &&
-				townPop >= TOWN_MIN
+				townPop >= townMin
 			) {
 				const cappedTown = Math.min(
 					townPop,
-					CITY_MIN - 1,
+					cityMin - 1,
 					totalUrban - usedUrban,
 				)
-				if (cappedTown >= TOWN_MIN) {
+				if (cappedTown >= townMin) {
 					urbanPops.push(cappedTown)
 					usedUrban += cappedTown
 					townsCreated++
@@ -132,10 +150,10 @@ function urbanization(state: HistoryState, init: boolean): void {
 			}
 		} else {
 			const maxTownCount = numCities * 6
-			const townStart = Math.min(CITY_MIN - 1, prevCity * 0.8)
+			const townStart = Math.min(cityMin - 1, prevCity * 0.8)
 			const decay =
 				maxTownCount > 1
-					? Math.pow(TOWN_MIN / townStart, 1 / (maxTownCount - 1))
+					? Math.pow(townMin / townStart, 1 / (maxTownCount - 1))
 					: 1
 			let townsCreated = 0
 			let townTarget = townStart
@@ -145,8 +163,8 @@ function urbanization(state: HistoryState, init: boolean): void {
 				townsCreated < maxTownCount
 			) {
 				const remainingUrban = totalUrban - usedUrban
-				const actualPop = Math.min(townTarget, remainingUrban, CITY_MIN - 1)
-				if (actualPop >= TOWN_MIN) {
+				const actualPop = Math.min(townTarget, remainingUrban, cityMin - 1)
+				if (actualPop >= townMin) {
 					urbanPops.push(actualPop)
 					usedUrban += actualPop
 					townsCreated++
@@ -177,6 +195,7 @@ function urbanization(state: HistoryState, init: boolean): void {
 const MAX_SPREAD_HOPS = 20
 
 function development(state: HistoryState, init: boolean): void {
+	const { cityMin } = getSettlementEraTuning(state.era)
 	const BASE_DECAY = 0.75
 	const FOREIGN_DECAY = 0.65
 	const WATER_ACCESS_BONUS = 1.1
@@ -185,7 +204,7 @@ function development(state: HistoryState, init: boolean): void {
 	const cities: { province: number; dev: number; sourceNation: number }[] = []
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		if (PROV.population.urban.get(state, p) >= CITY_MIN) {
+		if (PROV.population.urban.get(state, p) >= cityMin) {
 			cities.push({
 				province: p,
 				dev: urbanPopToDev(PROV.population.urban.get(state, p)),

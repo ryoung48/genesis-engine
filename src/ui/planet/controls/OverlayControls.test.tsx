@@ -50,8 +50,6 @@ function renderWithProps(
 			settlements: false,
 			culture: false,
 			heritage: false,
-			faith: false,
-			religion: false,
 		} as LabelMode,
 		setLabelMode: vi.fn(),
 		showElevation: true,
@@ -280,8 +278,6 @@ describe("OverlayControls", () => {
 			settlements: false,
 			culture: false,
 			heritage: false,
-			faith: false,
-			religion: false,
 		})
 		props.setShowGrid?.(false)
 		props.setDraftMapProjectionLatitude?.(-42)
@@ -316,8 +312,6 @@ describe("OverlayControls", () => {
 			settlements: false,
 			culture: false,
 			heritage: false,
-			faith: false,
-			religion: false,
 		})
 		expect(setShowGrid).toHaveBeenCalledWith(false)
 		expect(setDraftMapProjectionLatitude).toHaveBeenCalledWith(-42)
@@ -405,8 +399,6 @@ describe("OverlayControls", () => {
 					settlements: true,
 					culture: false,
 					heritage: false,
-					faith: false,
-					religion: false,
 				},
 			},
 		)
@@ -420,8 +412,6 @@ describe("OverlayControls", () => {
 					settlements: false,
 					culture: false,
 					heritage: false,
-					faith: false,
-					religion: false,
 				},
 			},
 		)

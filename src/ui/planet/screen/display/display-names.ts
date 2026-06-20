@@ -424,8 +424,6 @@ export function createDisplayNames(
 		nation: baseNames.nation,
 		culture: baseNames.culture,
 		heritage: baseNames.heritage,
-		faith: baseNames.faith,
-		religion: baseNames.religion,
 		landmark: baseNames.landmark,
 		river: baseNames.river,
 		mountain: baseNames.mountain,

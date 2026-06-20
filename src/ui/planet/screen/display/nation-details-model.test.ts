@@ -28,8 +28,6 @@ function makeEvent(
 
 const getCultureName = (id: number) => `culture-${id}`
 const getHeritageName = (id: number) => `heritage-${id}`
-const getFaithName = (id: number) => `faith-${id}`
-const getReligionName = (id: number) => `religion-${id}`
 
 describe("buildNationSizeDistribution", () => {
 	it("counts nations into size buckets", () => {
@@ -163,14 +161,6 @@ describe("buildSelectedNationDetails", () => {
 				assignment: new Int32Array([0, 1]),
 				colors: new Float32Array([0, 0, 1, 1, 1, 0]),
 			},
-			faiths: {
-				assignment: new Int32Array([0, 1]),
-				colors: new Float32Array([1, 0, 1, 0, 1, 1]),
-			},
-			religions: {
-				assignment: new Int32Array([0, 1]),
-				colors: new Float32Array([0.5, 0.5, 0.5, 0.25, 0.25, 0.25]),
-			},
 			nations: {
 				parent: new Int32Array([-1, -1]),
 				childOffset: new Int32Array([0, 0, 0]),
@@ -211,8 +201,6 @@ describe("buildSelectedNationDetails", () => {
 			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details).toMatchObject({
@@ -254,12 +242,6 @@ describe("buildSelectedNationDetails", () => {
 		expect(details?.heritageDistribution).toEqual([
 			{ label: "heritage-0", count: 1, color: "rgb(0, 0, 255)" },
 		])
-		expect(details?.faithDistribution).toEqual([
-			{ label: "faith-0", count: 1, color: "rgb(255, 0, 255)" },
-		])
-		expect(details?.religionDistribution).toEqual([
-			{ label: "religion-0", count: 1, color: "rgb(128, 128, 128)" },
-		])
 	})
 
 	it("returns null for missing worlds or nations outside the display model", () => {
@@ -273,8 +255,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 
@@ -300,8 +280,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 	})
@@ -332,8 +310,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 		expect(
@@ -346,8 +322,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 		expect(
@@ -360,8 +334,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 		expect(
@@ -374,8 +346,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 		expect(
@@ -388,8 +358,6 @@ describe("buildSelectedNationDetails", () => {
 				getNationName: () => "nation",
 				getCultureName,
 				getHeritageName,
-				getFaithName,
-				getReligionName,
 			}),
 		).toBeNull()
 	})
@@ -430,8 +398,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details?.neighbors).toEqual([
@@ -492,8 +458,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details).toMatchObject({
@@ -562,8 +526,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details?.neighbors).toEqual([
@@ -627,8 +589,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details?.neighbors.map((neighbor) => neighbor.id)).toEqual([1, 2])
@@ -662,8 +622,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 		const history = buildNationHistory({
 			selectedNationId: 1,
@@ -746,8 +704,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details).toMatchObject({
@@ -782,8 +738,6 @@ describe("buildSelectedNationDetails", () => {
 			getLeaderName: (nationId, timeMs) => `leader-${nationId}-${timeMs}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details?.ruler).toEqual({
@@ -825,8 +779,6 @@ describe("buildSelectedNationDetails", () => {
 			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 		const missingLeaderName = buildSelectedNationDetails({
 			selectedNationId: 0,
@@ -839,8 +791,6 @@ describe("buildSelectedNationDetails", () => {
 			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(missingTime?.ruler).toBeNull()
@@ -873,8 +823,6 @@ describe("buildSelectedNationDetails", () => {
 			getDynastyName: (dynastyId) => `dynasty-${dynastyId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details?.ruler).toEqual({
@@ -901,14 +849,6 @@ describe("buildSelectedNationDetails", () => {
 					assignment: new Int32Array([2, 1]),
 					colors: new Float32Array([0, 1, 0]),
 				},
-				faiths: {
-					assignment: new Int32Array([-1, 0]),
-					colors: new Float32Array(0),
-				},
-				religions: {
-					assignment: new Int32Array([0]),
-					colors: new Float32Array(0),
-				},
 				nations: {
 					parent: new Int32Array([-1]),
 					childOffset: new Int32Array([0, 0]),
@@ -932,8 +872,6 @@ describe("buildSelectedNationDetails", () => {
 			getNationName: (nationId) => `nation-${nationId}`,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 
 		expect(details?.cultureDistribution).toEqual([
@@ -943,12 +881,6 @@ describe("buildSelectedNationDetails", () => {
 		expect(details?.heritageDistribution).toEqual([
 			{ label: "heritage-1", count: 2, color: "rgb(148, 163, 184)" },
 			{ label: "heritage-2", count: 1, color: "rgb(148, 163, 184)" },
-		])
-		expect(details?.faithDistribution).toEqual([
-			{ label: "faith-0", count: 2, color: "rgb(148, 163, 184)" },
-		])
-		expect(details?.religionDistribution).toEqual([
-			{ label: "religion-0", count: 2, color: "rgb(148, 163, 184)" },
 		])
 	})
 })

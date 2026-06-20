@@ -1,4 +1,5 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from ".."
+import type { SocietyEra } from "../society/eras"
 import { fanoutRangesForSize, rebalanceHierarchy } from "../society/hierarchy"
 import type { ProvincePopulation } from "../society/population"
 import type { GenesisLandmarks } from "../terrain/landmarks"
@@ -90,6 +91,7 @@ export interface HistoryNote {
 export interface HistoryState {
 	P: number
 	time: number
+	era: SocietyEra
 
 	_parent: Timeline<number>[]
 	_assignment: Timeline<number>[]
@@ -848,6 +850,7 @@ export function createHistoryState(
 	regionAdjOffset?: Int32Array,
 	regionAdjList?: Int32Array,
 	regionIsLand?: Uint8Array,
+	era: SocietyEra = "lateMedieval",
 ): HistoryState {
 	const P = provinces.count
 	const startTime = startYear * YEAR_MS
@@ -867,6 +870,7 @@ export function createHistoryState(
 	const state: HistoryState = {
 		P,
 		time: startTime,
+		era,
 		_parent: makeTimelineArray<number>(P),
 		_assignment: makeTimelineArray<number>(P),
 		_pop_rural: makeTimelineArray<number>(P),

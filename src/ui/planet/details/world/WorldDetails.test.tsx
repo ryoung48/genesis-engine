@@ -23,7 +23,6 @@ function renderWorldDetails(
 			activeWarCount={12}
 			cultureCount={145}
 			heritageCount={28}
-			faithCount={52}
 			religionCount={11}
 			nationSizeDistribution={[{ label: "III", count: 1, color: "#abcdef" }]}
 			conflictDistribution={[{ label: "Peace", count: 4, color: "#111111" }]}
@@ -39,6 +38,10 @@ function renderWorldDetails(
 			]}
 			governmentDistribution={[
 				{ label: "Chiefdom", count: 3, color: "#cc8844" },
+			]}
+			religionDistribution={[
+				{ label: "Animistic", count: 5, color: "#66cc66" },
+				{ label: "Monotheistic", count: 3, color: "#7a9cc8" },
 			]}
 			{...overrides}
 		/>,
@@ -99,7 +102,6 @@ describe("WorldDetails", () => {
 			activeWarCount: null,
 			cultureCount: null,
 			heritageCount: null,
-			faithCount: null,
 			religionCount: null,
 		})
 
@@ -107,9 +109,9 @@ describe("WorldDetails", () => {
 		expect(markup).toContain("N/A")
 		expect(markup).toContain("Culture Count")
 		expect(markup).toContain("Heritage Count")
-		expect(markup).toContain("Faith Count")
 		expect(markup).toContain("Religion Count")
 		expect(markup).toContain("Nation Size")
+		expect(markup).toContain("Religion")
 		expect(markup).toContain("Conflicts")
 		expect(markup).not.toContain("Avg Development")
 		expect(markup).not.toContain("Nation Avg Dev")

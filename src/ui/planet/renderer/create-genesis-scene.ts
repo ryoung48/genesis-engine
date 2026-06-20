@@ -6,8 +6,8 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import {
 	networkCount,
-	type SerializedNetwork,
 	type SerializedGenesisWorld,
+	type SerializedNetwork,
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
@@ -31,16 +31,12 @@ import {
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
 	buildGlobeCultureLabels,
-	buildGlobeFaithLabels,
 	buildGlobeHeritageLabels,
 	buildGlobeNationLabels,
-	buildGlobeReligionLabels,
 	buildGlobeSettlementLabels,
 	buildMapCultureLabels,
-	buildMapFaithLabels,
 	buildMapHeritageLabels,
 	buildMapNationLabels,
-	buildMapReligionLabels,
 	buildMapSettlementLabels,
 	createNationLabelPools,
 	createSettlementLabelPools,
@@ -641,18 +637,12 @@ export function createGenesisScene(
 	let mapCultureLabels: THREE.Group | null = null
 	let globeHeritageLabels: THREE.Group | null = null
 	let mapHeritageLabels: THREE.Group | null = null
-	let globeFaithLabels: THREE.Group | null = null
-	let mapFaithLabels: THREE.Group | null = null
-	let globeReligionLabels: THREE.Group | null = null
-	let mapReligionLabels: THREE.Group | null = null
 	let labelMode: LabelMode = {
 		nations: false,
 		dynasty: false,
 		settlements: false,
 		culture: false,
 		heritage: false,
-		faith: false,
-		religion: false,
 	}
 	const labelCullingEnabled = true
 	let elevationVisible = true
@@ -660,15 +650,11 @@ export function createGenesisScene(
 	const settlementLabelPools = createSettlementLabelPools()
 	const cultureLabelPools = createNationLabelPools()
 	const heritageLabelPools = createNationLabelPools()
-	const faithLabelPools = createNationLabelPools()
-	const religionLabelPools = createNationLabelPools()
 	let nationNames: string[] | null = null
 	let dynastyNames: string[] | null = null
 	let settlementLabelNames: string[] | null = null
 	let cultureNames: string[] | null = null
 	let heritageNames: string[] | null = null
-	let faithNames: string[] | null = null
-	let religionNames: string[] | null = null
 	let globeControlsInteracting = false
 	let mapControlsInteracting = false
 	let globeControlActivityFrames = 0
@@ -1020,70 +1006,6 @@ export function createGenesisScene(
 		if (mapHeritageLabels) {
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 			scene.add(mapHeritageLabels)
-		}
-		updateOverlayVisibility()
-	}
-
-	function rebuildFaithLabels() {
-		disposeGroup(scene, globeFaithLabels)
-		disposeGroup(scene, mapFaithLabels)
-		globeFaithLabels = null
-		mapFaithLabels = null
-		if (!currentWorld?.faiths || !labelMode.faith || !faithNames) {
-			return
-		}
-		globeFaithLabels = buildGlobeFaithLabels(
-			currentWorld,
-			faithNames,
-			camera,
-			faithLabelPools.globe,
-			labelCullingEnabled,
-			elevationVisible,
-		)
-		mapFaithLabels = buildMapFaithLabels(
-			currentWorld,
-			faithNames,
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-			faithLabelPools.map,
-			labelCullingEnabled,
-		)
-		if (globeFaithLabels) scene.add(globeFaithLabels)
-		if (mapFaithLabels) {
-			if (mapMesh) mapFaithLabels.position.copy(mapMesh.position)
-			scene.add(mapFaithLabels)
-		}
-		updateOverlayVisibility()
-	}
-
-	function rebuildReligionLabels() {
-		disposeGroup(scene, globeReligionLabels)
-		disposeGroup(scene, mapReligionLabels)
-		globeReligionLabels = null
-		mapReligionLabels = null
-		if (!currentWorld?.religions || !labelMode.religion || !religionNames) {
-			return
-		}
-		globeReligionLabels = buildGlobeReligionLabels(
-			currentWorld,
-			religionNames,
-			camera,
-			religionLabelPools.globe,
-			labelCullingEnabled,
-			elevationVisible,
-		)
-		mapReligionLabels = buildMapReligionLabels(
-			currentWorld,
-			religionNames,
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-			religionLabelPools.map,
-			labelCullingEnabled,
-		)
-		if (globeReligionLabels) scene.add(globeReligionLabels)
-		if (mapReligionLabels) {
-			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
-			scene.add(mapReligionLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -1631,20 +1553,6 @@ export function createGenesisScene(
 				labelMode.heritage && currentViewMode === "map"
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 		}
-		if (globeFaithLabels)
-			globeFaithLabels.visible = labelMode.faith && currentViewMode === "globe"
-		if (mapFaithLabels) {
-			mapFaithLabels.visible = labelMode.faith && currentViewMode === "map"
-			if (mapMesh) mapFaithLabels.position.copy(mapMesh.position)
-		}
-		if (globeReligionLabels)
-			globeReligionLabels.visible =
-				labelMode.religion && currentViewMode === "globe"
-		if (mapReligionLabels) {
-			mapReligionLabels.visible =
-				labelMode.religion && currentViewMode === "map"
-			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
-		}
 		requestRender()
 	}
 
@@ -1667,8 +1575,6 @@ export function createGenesisScene(
 			mapSettlementLabels,
 			mapCultureLabels,
 			mapHeritageLabels,
-			mapFaithLabels,
-			mapReligionLabels,
 			mapPathfindingLine,
 			mapPathfindingDots,
 			pulseMap,
@@ -1701,8 +1607,6 @@ export function createGenesisScene(
 			{ object: globeSettlementLabels, visible: false },
 			{ object: globeCultureLabels, visible: false },
 			{ object: globeHeritageLabels, visible: false },
-			{ object: globeFaithLabels, visible: false },
-			{ object: globeReligionLabels, visible: false },
 			{ object: pulseGlobe, visible: false },
 			{ object: mapMesh, visible: true },
 			{
@@ -1725,8 +1629,6 @@ export function createGenesisScene(
 			{ object: mapSettlementLabels, visible: labelMode.settlements },
 			{ object: mapCultureLabels, visible: labelMode.culture },
 			{ object: mapHeritageLabels, visible: labelMode.heritage },
-			{ object: mapFaithLabels, visible: labelMode.faith },
-			{ object: mapReligionLabels, visible: labelMode.religion },
 			{ object: mapSelectedProvinceBorder, visible: false },
 			{ object: mapMeasureLine, visible: false },
 			{ object: mapMeasureDots, visible: false },
@@ -2711,8 +2613,6 @@ export function createGenesisScene(
 		rebuildSettlementLabels()
 		rebuildCultureLabels()
 		rebuildHeritageLabels()
-		rebuildFaithLabels()
-		rebuildReligionLabels()
 	}
 
 	function setNationNames(names: string[] | null) {
@@ -2735,16 +2635,6 @@ export function createGenesisScene(
 		rebuildHeritageLabels()
 	}
 
-	function setFaithNames(names: string[] | null) {
-		faithNames = names
-		rebuildFaithLabels()
-	}
-
-	function setReligionNames(names: string[] | null) {
-		religionNames = names
-		rebuildReligionLabels()
-	}
-
 	function setSettlementNames(names: string[] | null) {
 		settlementLabelNames = names
 		rebuildSettlementLabels()
@@ -2758,8 +2648,6 @@ export function createGenesisScene(
 		rebuildSettlementLabels()
 		rebuildCultureLabels()
 		rebuildHeritageLabels()
-		rebuildFaithLabels()
-		rebuildReligionLabels()
 	}
 
 	return {
@@ -2808,8 +2696,6 @@ export function createGenesisScene(
 		setDynastyNames,
 		setCultureNames,
 		setHeritageNames,
-		setFaithNames,
-		setReligionNames,
 		setSettlementNames,
 		setElevationVisible,
 		setSunPosition,

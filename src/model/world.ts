@@ -90,8 +90,8 @@ export interface GenesisWorld {
 	nations?: GenesisNationHierarchy
 	cultures?: GenesisPartition
 	heritages?: GenesisPartition
-	faiths?: GenesisPartition
 	religions?: GenesisPartition
+	religionTypes?: Uint8Array
 	landmarks?: GenesisLandmarks
 	population?: import("./society/population").ProvincePopulation
 	tradeGoods?: LocationTradeGoods

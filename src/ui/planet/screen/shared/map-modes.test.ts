@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
 	getMapModePrimary,
-	getVisibleDemographicModeOptions,
 	getVisibleGeographyModeOptions,
-	getVisiblePoliticalModeOptions,
+	getVisibleSocietyModeOptions,
 	isDebugGeographyMode,
 	normalizeGeographyColorMode,
 } from "./map-modes"
@@ -11,8 +10,9 @@ import {
 describe("map-modes", () => {
 	it("maps color modes to their primary categories", () => {
 		expect(getMapModePrimary("terrain")).toBe("geography")
-		expect(getMapModePrimary("nations")).toBe("political")
-		expect(getMapModePrimary("population")).toBe("demographics")
+		expect(getMapModePrimary("nations")).toBe("society")
+		expect(getMapModePrimary("population")).toBe("society")
+		expect(getMapModePrimary("timezone")).toBe("society")
 	})
 
 	it("filters geography options by debug visibility", () => {
@@ -27,21 +27,16 @@ describe("map-modes", () => {
 		expect(debugOptions.map(([mode]) => mode)).not.toContain("koppenClimate")
 	})
 
-	it("filters demographic options by debug visibility", () => {
-		const defaultOptions = getVisibleDemographicModeOptions(false)
-		const debugOptions = getVisibleDemographicModeOptions(true)
-
-		expect(defaultOptions.map(([mode]) => mode)).toContain("density")
-		expect(defaultOptions.map(([mode]) => mode)).not.toContain("migration")
-		expect(debugOptions.map(([mode]) => mode)).toContain("migration")
-	})
-
-	it("filters political options by debug visibility", () => {
-		const defaultOptions = getVisiblePoliticalModeOptions(false)
-		const debugOptions = getVisiblePoliticalModeOptions(true)
+	it("filters society options by debug visibility", () => {
+		const defaultOptions = getVisibleSocietyModeOptions(false)
+		const debugOptions = getVisibleSocietyModeOptions(true)
 
 		expect(defaultOptions.map(([mode]) => mode)).toContain("borders")
+		expect(defaultOptions.map(([mode]) => mode)).toContain("density")
+		expect(defaultOptions.map(([mode]) => mode)).toContain("timezone")
+		expect(defaultOptions.map(([mode]) => mode)).not.toContain("migration")
 		expect(defaultOptions.map(([mode]) => mode)).not.toContain("provinces")
+		expect(debugOptions.map(([mode]) => mode)).toContain("migration")
 		expect(debugOptions.map(([mode]) => mode)).toContain("provinces")
 	})
 

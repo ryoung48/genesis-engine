@@ -4,6 +4,10 @@ import { pastaClimateColor } from "@/model/climate/pasta"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
 import { REL } from "@/model/history/state"
 import { GOVERNMENT_TYPE_LABELS, GOVERNMENT_TYPES } from "@/model/society/eras"
+import {
+	RELIGION_TYPE_COLORS,
+	RELIGION_TYPE_NAMES,
+} from "@/model/society/religion"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
@@ -14,6 +18,10 @@ import {
 	getTopographyColor,
 	toPastelNationColor,
 } from "../screen/display/region-colors"
+import {
+	getReligionColorForProvince,
+	getReligionTypeIndexForProvince,
+} from "../screen/display/religion-type"
 import { buildRulerDisplayMeta } from "../screen/display/ruler-display"
 import type { PopulationMapMode } from "../screen/shared/map-modes"
 import {
@@ -301,8 +309,6 @@ export function buildDemographicDisplayData(params: {
 	unitSystem: UnitSystem
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
-	getFaithName: (faithId: number) => string
-	getReligionName: (religionId: number) => string
 }): HoverDemographicDisplayData | null {
 	const {
 		populationMode,
@@ -311,8 +317,6 @@ export function buildDemographicDisplayData(params: {
 		unitSystem,
 		getCultureName,
 		getHeritageName,
-		getFaithName,
-		getReligionName,
 	} = params
 	if (
 		hoverProvince === null ||
@@ -369,53 +373,53 @@ export function buildDemographicDisplayData(params: {
 	const cultureIdx = world.cultures?.assignment[province] ?? -1
 	const heritageIdx =
 		cultureIdx >= 0 ? (world.heritages?.assignment[cultureIdx] ?? -1) : -1
-	const faithIdx =
-		cultureIdx >= 0 ? (world.faiths?.assignment[cultureIdx] ?? -1) : -1
-	const religionIdx =
-		faithIdx >= 0 ? (world.religions?.assignment[faithIdx] ?? -1) : -1
-	const selected =
-		populationMode === "culture"
-			? {
-					idx: cultureIdx,
-					label: "Culture",
-					partition: world.cultures,
-					name: getCultureName,
-				}
-			: populationMode === "heritage"
-				? {
-						idx: heritageIdx,
-						label: "Heritage",
-						partition: world.heritages,
-						name: getHeritageName,
-					}
-				: populationMode === "faith"
-					? {
-							idx: faithIdx,
-							label: "Faith",
-							partition: world.faiths,
-							name: getFaithName,
-						}
-					: {
-							idx: religionIdx,
-							label: "Religion",
-							partition: world.religions,
-							name: getReligionName,
-						}
 
-	if (!selected.partition || selected.idx < 0) return null
-
-	return {
-		label: selected.label,
-		value: selected.name(selected.idx),
-		color:
-			selected.idx * 3 + 2 < selected.partition.colors.length
-				? rgbToCss([
-						selected.partition.colors[selected.idx * 3],
-						selected.partition.colors[selected.idx * 3 + 1],
-						selected.partition.colors[selected.idx * 3 + 2],
-					])
-				: null,
+	if (populationMode === "culture") {
+		if (!world.cultures || cultureIdx < 0) return null
+		return {
+			label: "Culture",
+			value: getCultureName(cultureIdx),
+			color:
+				cultureIdx * 3 + 2 < world.cultures.colors.length
+					? rgbToCss([
+							world.cultures.colors[cultureIdx * 3],
+							world.cultures.colors[cultureIdx * 3 + 1],
+							world.cultures.colors[cultureIdx * 3 + 2],
+						])
+					: null,
+		}
 	}
+
+	if (populationMode === "heritage") {
+		if (!world.heritages || heritageIdx < 0) return null
+		return {
+			label: "Heritage",
+			value: getHeritageName(heritageIdx),
+			color:
+				heritageIdx * 3 + 2 < world.heritages.colors.length
+					? rgbToCss([
+							world.heritages.colors[heritageIdx * 3],
+							world.heritages.colors[heritageIdx * 3 + 1],
+							world.heritages.colors[heritageIdx * 3 + 2],
+						])
+					: null,
+		}
+	}
+
+	if (populationMode === "religion") {
+		const typeIdx = getReligionTypeIndexForProvince(world, hoverProvince)
+		if (typeIdx < 0) return null
+		const typeColor =
+			getReligionColorForProvince(world, hoverProvince) ??
+			(RELIGION_TYPE_COLORS[typeIdx] ?? RELIGION_TYPE_COLORS[0])
+		return {
+			label: "Religion",
+			value: RELIGION_TYPE_NAMES[typeIdx] ?? "Unknown",
+			color: rgbToCss([typeColor[0], typeColor[1], typeColor[2]]),
+		}
+	}
+
+	return null
 }
 
 const GOVERNMENT_COLORS_CSS: Record<number, string> = {

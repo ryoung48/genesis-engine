@@ -1,5 +1,9 @@
 import { REL, YEAR_MS } from "@/model/history/state"
 import { maxFanoutForNationSize } from "@/model/society/hierarchy"
+import {
+	RELIGION_TYPE_COLORS,
+	RELIGION_TYPE_NAMES,
+} from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { eventInvolvesNation } from "../../details/nation/event-description"
 import type { NationHistoryPoint } from "../../details/nation/NationHistoryChart"
@@ -113,8 +117,6 @@ export function buildSelectedNationDetails(params: {
 	getDynastyName?: (dynastyId: number) => string
 	getCultureName: (cultureId: number) => string
 	getHeritageName: (heritageId: number) => string
-	getFaithName: (faithId: number) => string
-	getReligionName: (religionId: number) => string
 }): NationDetailsData | null {
 	const {
 		selectedNationId,
@@ -128,8 +130,6 @@ export function buildSelectedNationDetails(params: {
 		getDynastyName,
 		getCultureName,
 		getHeritageName,
-		getFaithName,
-		getReligionName,
 	} = params
 	if (
 		!world?.nations ||
@@ -368,25 +368,26 @@ export function buildSelectedNationDetails(params: {
 			getLabel: getHeritageName,
 			getColor: (id) => colorFromPartition(world.heritages, id),
 		}),
-		faithDistribution: buildPartitionDistribution({
-			provinces: memberProvinces,
-			getPartitionId: (province) => {
-				const cultureId = world.cultures?.assignment[province] ?? -1
-				return cultureId >= 0 ? (world.faiths?.assignment[cultureId] ?? -1) : -1
-			},
-			getLabel: getFaithName,
-			getColor: (id) => colorFromPartition(world.faiths, id),
-		}),
 		religionDistribution: buildPartitionDistribution({
 			provinces: memberProvinces,
 			getPartitionId: (province) => {
 				const cultureId = world.cultures?.assignment[province] ?? -1
-				const faithId =
-					cultureId >= 0 ? (world.faiths?.assignment[cultureId] ?? -1) : -1
-				return faithId >= 0 ? (world.religions?.assignment[faithId] ?? -1) : -1
+				if (cultureId < 0) return -1
+				return world.religions?.assignment[cultureId] ?? -1
 			},
-			getLabel: getReligionName,
-			getColor: (id) => colorFromPartition(world.religions, id),
+			getLabel: (id) => {
+				const typeId = world.religionTypes?.[id] ?? -1
+				return typeId >= 0
+					? (RELIGION_TYPE_NAMES[typeId] ?? `Religion #${id}`)
+					: `Religion #${id}`
+			},
+			getColor: (id) => {
+				const typeId = world.religionTypes?.[id] ?? -1
+				if (typeId < 0) return colorFromPartition(world.religions, id)
+				const [r, g, b] =
+					RELIGION_TYPE_COLORS[typeId] ?? RELIGION_TYPE_COLORS[0]
+				return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
+			},
 		}),
 	}
 }

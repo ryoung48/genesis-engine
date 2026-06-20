@@ -263,6 +263,9 @@ export const TRADE_GOODS_TABLE: Readonly<
 	"arctic|grasslands|wetlands|inland": [
 		[50, 3],
 		[17, 1],
+		[15, 1],
+		[3, 1],
+		[52, 1],
 	],
 	"arctic|sparse|flatland|coastal": [
 		[15, 53],
@@ -745,7 +748,13 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[45, 1],
 		[49, 1],
 	],
-	"arid|grasslands|mountains|coastal": [[15, 6]],
+	"arid|grasslands|mountains|coastal": [
+		[15, 6],
+		[39, 2],
+		[44, 2],
+		[10, 1],
+		[26, 1],
+	],
 	"arid|grasslands|mountains|inland": [
 		[16, 6],
 		[26, 2],
@@ -1187,6 +1196,9 @@ export const TRADE_GOODS_TABLE: Readonly<
 	"cold_arid|forest|flatland|coastal": [
 		[15, 1],
 		[16, 1],
+		[52, 1],
+		[26, 1],
+		[39, 1],
 	],
 	"cold_arid|forest|flatland|inland": [
 		[19, 2],
@@ -1202,7 +1214,13 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[43, 1],
 		[52, 1],
 	],
-	"cold_arid|forest|mountains|coastal": [[30, 1]],
+	"cold_arid|forest|mountains|coastal": [
+		[30, 1],
+		[15, 1],
+		[17, 1],
+		[44, 1],
+		[10, 1],
+	],
 	"cold_arid|forest|mountains|inland": [
 		[27, 3],
 		[3, 1],
@@ -1214,6 +1232,10 @@ export const TRADE_GOODS_TABLE: Readonly<
 	"cold_arid|forest|plateau|inland": [
 		[27, 1],
 		[50, 1],
+		[52, 1],
+		[20, 1],
+		[10, 1],
+		[44, 1],
 	],
 	"cold_arid|grasslands|flatland|coastal": [
 		[15, 16],
@@ -2894,8 +2916,20 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[44, 1],
 		[50, 1],
 	],
-	"oceanic|forest|wetlands|coastal": [[15, 1]],
-	"oceanic|forest|wetlands|inland": [[14, 1]],
+	"oceanic|forest|wetlands|coastal": [
+		[15, 1],
+		[27, 1],
+		[3, 1],
+		[5, 1],
+		[30, 1],
+	],
+	"oceanic|forest|wetlands|inland": [
+		[14, 1],
+		[27, 1],
+		[3, 1],
+		[17, 1],
+		[5, 1],
+	],
 	"oceanic|grasslands|flatland|coastal": [
 		[15, 27],
 		[26, 16],
@@ -3758,7 +3792,13 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[43, 1],
 		[45, 1],
 	],
-	"subtropical|jungle|mountains|coastal": [[15, 1]],
+	"subtropical|jungle|mountains|coastal": [
+		[15, 1],
+		[27, 1],
+		[12, 1],
+		[30, 1],
+		[34, 1],
+	],
 	"subtropical|jungle|mountains|inland": [
 		[27, 18],
 		[50, 6],
@@ -3777,7 +3817,13 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[32, 1],
 		[44, 1],
 	],
-	"subtropical|jungle|plateau|coastal": [[16, 1]],
+	"subtropical|jungle|plateau|coastal": [
+		[16, 1],
+		[45, 1],
+		[46, 1],
+		[12, 1],
+		[27, 1],
+	],
 	"subtropical|jungle|plateau|inland": [
 		[27, 9],
 		[13, 2],
@@ -3790,7 +3836,13 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[47, 1],
 		[50, 1],
 	],
-	"subtropical|jungle|wetlands|coastal": [[14, 1]],
+	"subtropical|jungle|wetlands|coastal": [
+		[14, 1],
+		[15, 1],
+		[37, 1],
+		[30, 1],
+		[34, 1],
+	],
 	"subtropical|jungle|wetlands|inland": [
 		[23, 1],
 		[27, 1],
@@ -3800,11 +3852,27 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[50, 2],
 		[12, 1],
 	],
-	"subtropical|sparse|hills|coastal": [[52, 1]],
-	"subtropical|sparse|hills|inland": [[7, 1]],
+	"subtropical|sparse|hills|coastal": [
+		[52, 1],
+		[39, 1],
+		[26, 1],
+		[44, 1],
+		[15, 1],
+	],
+	"subtropical|sparse|hills|inland": [
+		[7, 1],
+		[39, 1],
+		[26, 1],
+		[44, 1],
+		[10, 1],
+	],
 	"subtropical|sparse|mountains|inland": [
 		[37, 3],
 		[26, 1],
+		[52, 1],
+		[44, 1],
+		[10, 1],
+		[50, 1],
 	],
 	"subtropical|woods|flatland|coastal": [
 		[15, 16],
@@ -4631,10 +4699,15 @@ export const TRADE_GOODS_TABLE: Readonly<
 	"tropical|sparse|hills|inland": [
 		[26, 2],
 		[50, 1],
+		[39, 1],
+		[11, 1],
+		[52, 1],
 	],
 	"tropical|sparse|mountains|coastal": [
-		[39, 1],
-		[44, 1],
+		[39, 2],
+		[44, 2],
+		[15, 2],
+		[10, 1],
 	],
 	"tropical|sparse|mountains|inland": [
 		[44, 3],
@@ -4656,6 +4729,10 @@ export const TRADE_GOODS_TABLE: Readonly<
 	"tropical|sparse|wetlands|coastal": [
 		[32, 1],
 		[34, 1],
+		[15, 1],
+		[37, 1],
+		[14, 1],
+		[39, 1],
 	],
 	"tropical|sparse|wetlands|inland": [
 		[23, 3],

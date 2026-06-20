@@ -476,8 +476,9 @@ export function getHoverTerrainFeature(
 	}
 	return {
 		dominant:
-			GENESIS_TERRAIN_FEATURE_LABELS[world.terrainFeatures.dominantFeature[r]] ??
-			null,
+			GENESIS_TERRAIN_FEATURE_LABELS[
+				world.terrainFeatures.dominantFeature[r]
+			] ?? null,
 		all,
 	}
 }

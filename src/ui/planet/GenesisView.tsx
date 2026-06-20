@@ -27,10 +27,14 @@ import {
 	GOVERNMENT_TYPES,
 	type SocietyEra,
 } from "@/model/society/eras"
+import {
+	RELIGION_TYPE_COLORS,
+	RELIGION_TYPE_NAMES,
+} from "@/model/society/religion"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
-	SerializedHistoryFrame,
 	SerializedGenesisWorld,
+	SerializedHistoryFrame,
 } from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
@@ -102,11 +106,9 @@ import {
 import { createDisplayNames } from "./screen/display/display-names"
 import {
 	buildCultureLabelNames,
-	buildFaithLabelNames,
 	buildHeritageLabelNames,
 	buildNationDynastyLabelNames,
 	buildNationLabelNames,
-	buildReligionLabelNames,
 	buildSettlementLabelNames,
 } from "./screen/display/label-names"
 import {
@@ -129,6 +131,10 @@ import {
 	computeRegionColors,
 	getTopographyColor,
 } from "./screen/display/region-colors"
+import {
+	getReligionColorForCulture,
+	getReligionIndexForCulture,
+} from "./screen/display/religion-type"
 import {
 	DEFAULT_WORLD_PARAMS,
 	MAX_RECENT_CODES,
@@ -261,9 +267,7 @@ export function syncLabelModeToMapMode(params: {
 		labelMode.nations ||
 		labelMode.dynasty ||
 		labelMode.culture ||
-		labelMode.heritage ||
-		labelMode.faith ||
-		labelMode.religion
+		labelMode.heritage
 	if (!anyActive) return labelMode
 
 	const politicalFallback = {
@@ -272,8 +276,6 @@ export function syncLabelModeToMapMode(params: {
 		dynasty: nationMode === "dynasty",
 		culture: false,
 		heritage: false,
-		faith: false,
-		religion: false,
 	}
 
 	if (colorMode === "population") {
@@ -284,41 +286,15 @@ export function syncLabelModeToMapMode(params: {
 				dynasty: false,
 				culture: true,
 				heritage: false,
-				faith: false,
-				religion: false,
 			}
 		}
-		if (populationMode === "heritage") {
+		if (populationMode === "heritage" || populationMode === "religion") {
 			return {
 				...labelMode,
 				nations: false,
 				dynasty: false,
 				culture: false,
 				heritage: true,
-				faith: false,
-				religion: false,
-			}
-		}
-		if (populationMode === "faith") {
-			return {
-				...labelMode,
-				nations: false,
-				dynasty: false,
-				culture: false,
-				heritage: false,
-				faith: true,
-				religion: false,
-			}
-		}
-		if (populationMode === "religion") {
-			return {
-				...labelMode,
-				nations: false,
-				dynasty: false,
-				culture: false,
-				heritage: false,
-				faith: false,
-				religion: true,
 			}
 		}
 		return politicalFallback
@@ -984,12 +960,6 @@ export const GenesisView: React.FC = () => {
 	const heritageLabelsArray = useMemo(() => {
 		return buildHeritageLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
-	const faithLabelsArray = useMemo(() => {
-		return buildFaithLabelNames(worldForDisplay, worldNames)
-	}, [worldForDisplay, worldNames])
-	const religionLabelsArray = useMemo(() => {
-		return buildReligionLabelNames(worldForDisplay, worldNames)
-	}, [worldForDisplay, worldNames])
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
 		[worldNames],
@@ -1007,15 +977,6 @@ export const GenesisView: React.FC = () => {
 	const getHeritageName = useCallback(
 		(heritageId: number) =>
 			worldNames?.heritage(heritageId) ?? `Heritage #${heritageId}`,
-		[worldNames],
-	)
-	const getFaithName = useCallback(
-		(faithId: number) => worldNames?.faith(faithId) ?? `Faith #${faithId}`,
-		[worldNames],
-	)
-	const getReligionName = useCallback(
-		(religionId: number) =>
-			worldNames?.religion(religionId) ?? `Religion #${religionId}`,
 		[worldNames],
 	)
 	const getLeaderName = useCallback(
@@ -1376,35 +1337,17 @@ export const GenesisView: React.FC = () => {
 					colors[3 * secH + 2],
 				] as const
 			}
-		} else if (populationMode === "faith" && world.faiths) {
-			const { assignment: cultureToFaith, colors } = world.faiths
-			getOverlayColor = (sec, prim) => {
-				const secF = cultureToFaith[sec] ?? -1
-				if (secF < 0 || secF === (cultureToFaith[prim] ?? -1)) return null
-				return [
-					colors[3 * secF],
-					colors[3 * secF + 1],
-					colors[3 * secF + 2],
-				] as const
-			}
 		} else if (
 			populationMode === "religion" &&
 			world.religions &&
-			world.faiths
+			world.religionTypes
 		) {
-			const { assignment: faithToReligion, colors } = world.religions
-			const { assignment: cultureToFaith } = world.faiths
 			getOverlayColor = (sec, prim) => {
-				const secF = cultureToFaith[sec] ?? -1
-				const primF = cultureToFaith[prim] ?? -1
-				const secR = secF >= 0 ? (faithToReligion[secF] ?? -1) : -1
-				const primR = primF >= 0 ? (faithToReligion[primF] ?? -1) : -1
-				if (secR < 0 || secR === primR) return null
-				return [
-					colors[3 * secR],
-					colors[3 * secR + 1],
-					colors[3 * secR + 2],
-				] as const
+				const secReligion = getReligionIndexForCulture(world, sec)
+				const primReligion =
+					prim >= 0 ? getReligionIndexForCulture(world, prim) : -1
+				if (secReligion < 0 || secReligion === primReligion) return null
+				return getReligionColorForCulture(world, sec)
 			}
 		}
 
@@ -1436,9 +1379,7 @@ export const GenesisView: React.FC = () => {
 			colorMode === "nations" && nationMode === "borders"
 				? occupationOverlay
 				: colorMode === "population" &&
-						["culture", "heritage", "faith", "religion"].includes(
-							populationMode,
-						)
+						["culture", "heritage", "religion"].includes(populationMode)
 					? cultureBlendOverlay
 					: null,
 		)
@@ -1664,8 +1605,6 @@ export const GenesisView: React.FC = () => {
 			getDynastyName,
 			getCultureName,
 			getHeritageName,
-			getFaithName,
-			getReligionName,
 		})
 	}, [
 		selectedHistoryView,
@@ -1676,8 +1615,6 @@ export const GenesisView: React.FC = () => {
 		getDynastyName,
 		getCultureName,
 		getHeritageName,
-		getFaithName,
-		getReligionName,
 		selectedNationId,
 		selectedTimeMs,
 		worldForDisplay,
@@ -1769,6 +1706,74 @@ export const GenesisView: React.FC = () => {
 			color: GOV_COLORS[i] ?? "rgb(148, 163, 184)",
 		}))
 	}, [worldForDisplay?.nations?.governmentType, nationModel])
+
+	const religionTypeDistribution = useMemo(() => {
+		const world = worldForDisplay
+		const nationAssign = world?.nations?.assignment
+		const cultureAssign = world?.cultures?.assignment
+		const religionAssign = world?.religions?.assignment
+		const relTypes = world?.religionTypes
+		if (
+			!nationAssign ||
+			!cultureAssign ||
+			!religionAssign ||
+			!relTypes ||
+			!nationModel
+		)
+			return []
+
+		// Per-nation accumulator: religion type → province count
+		const nationBuckets = new Map<number, number[]>()
+		for (const nationId of nationModel.counts.keys()) {
+			nationBuckets.set(
+				nationId,
+				new Array<number>(RELIGION_TYPE_NAMES.length).fill(0),
+			)
+		}
+
+		for (let p = 0; p < nationAssign.length; p++) {
+			const nationId = nationAssign[p]
+			if (nationId < 0) continue
+			const buckets = nationBuckets.get(nationId)
+			if (!buckets) continue
+
+			const cultureId = cultureAssign[p] ?? -1
+			if (cultureId < 0) continue
+			const religionId = religionAssign[cultureId] ?? -1
+			if (religionId < 0) continue
+			const type = relTypes[religionId] ?? 0
+			if (type >= 0 && type < buckets.length) buckets[type]++
+		}
+
+		// Pick the dominant religion type per nation, then count nations by type
+		const typeCounts = new Array<number>(RELIGION_TYPE_NAMES.length).fill(0)
+		for (const buckets of nationBuckets.values()) {
+			let best = -1
+			let bestCount = 0
+			for (let t = 0; t < buckets.length; t++) {
+				if (buckets[t] > bestCount) {
+					bestCount = buckets[t]
+					best = t
+				}
+			}
+			if (best >= 0) typeCounts[best]++
+		}
+
+		return RELIGION_TYPE_NAMES.map((label, i) => {
+			const [r, g, b] = RELIGION_TYPE_COLORS[i]!
+			return {
+				label,
+				count: typeCounts[i] ?? 0,
+				color: rgbToCss([r, g, b]),
+			}
+		}).filter((bucket) => bucket.count > 0)
+	}, [
+		worldForDisplay?.nations?.assignment,
+		worldForDisplay?.cultures?.assignment,
+		worldForDisplay?.religions?.assignment,
+		worldForDisplay?.religionTypes,
+		nationModel,
+	])
 
 	const conflictDistribution = useMemo(
 		() => buildConflictDistribution(selectedHistoryView),
@@ -2012,13 +2017,6 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setHeritageNames(heritageLabelsArray)
 	}, [heritageLabelsArray])
-	useEffect(() => {
-		sceneRef.current?.setFaithNames(faithLabelsArray)
-	}, [faithLabelsArray])
-	useEffect(() => {
-		sceneRef.current?.setReligionNames(religionLabelsArray)
-	}, [religionLabelsArray])
-
 	// --- Elevation ---
 	useEffect(() => {
 		sceneRef.current?.setElevationVisible(showElevation)
@@ -2819,8 +2817,6 @@ export const GenesisView: React.FC = () => {
 								getDynastyName={getDynastyName}
 								getCultureName={getCultureName}
 								getHeritageName={getHeritageName}
-								getFaithName={getFaithName}
-								getReligionName={getReligionName}
 								getLandmarkName={getLandmarkName}
 								getRiverName={getRiverName}
 								hoverNationAdjOffset={
@@ -2952,8 +2948,6 @@ export const GenesisView: React.FC = () => {
 									settlements: false,
 									culture: false,
 									heritage: false,
-									faith: false,
-									religion: false,
 								})
 								setShowElevation(false)
 								setShowSettlements(false)
@@ -3040,10 +3034,10 @@ export const GenesisView: React.FC = () => {
 				activeWarCount={selectedHistoryView?.activeWars.length ?? null}
 				cultureCount={worldForDisplay?.cultures?.count ?? null}
 				heritageCount={worldForDisplay?.heritages?.count ?? null}
-				faithCount={worldForDisplay?.faiths?.count ?? null}
 				religionCount={worldForDisplay?.religions?.count ?? null}
 				nationSizeDistribution={nationSizeDistribution}
 				governmentDistribution={governmentDistribution}
+				religionDistribution={religionTypeDistribution}
 				conflictDistribution={conflictDistribution}
 				relationDistribution={relationDistribution}
 				climateDistribution={climateDistribution}

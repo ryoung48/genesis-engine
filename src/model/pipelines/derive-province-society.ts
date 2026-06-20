@@ -2,10 +2,13 @@ import type { GenesisParams, SphereMesh, StageTiming } from ".."
 import { computeSettlementAnchors } from "../settlements/compute-settlement-regions"
 import { computeCultures } from "../society/culture"
 import { getEraConfig } from "../society/eras"
-import { computeFaiths } from "../society/faith"
 import { computeHeritages } from "../society/heritage"
 import { computeNations } from "../society/nations"
-import { computeReligions } from "../society/religion"
+import {
+	assignReligionTypes,
+	buildReligionColors,
+	computeReligions,
+} from "../society/religion"
 import { deriveChildColors } from "../society/shared"
 import {
 	assignLandmarkIdentity,
@@ -35,8 +38,8 @@ interface DerivedProvinceSociety {
 	nations: ReturnType<typeof computeNations> | undefined
 	cultures: ReturnType<typeof computeCultures> | undefined
 	heritages: ReturnType<typeof computeHeritages> | undefined
-	faiths: ReturnType<typeof computeFaiths> | undefined
 	religions: ReturnType<typeof computeReligions> | undefined
+	religionTypes: Uint8Array | undefined
 	landmarks: GenesisLandmarks
 	settlementRegions: Int32Array
 	settlementWaterLandmarks: Int32Array
@@ -60,8 +63,8 @@ export function deriveProvinceSociety({
 
 	let cultures: ReturnType<typeof computeCultures> | undefined
 	let heritages: ReturnType<typeof computeHeritages> | undefined
-	let faiths: ReturnType<typeof computeFaiths> | undefined
 	let religions: ReturnType<typeof computeReligions> | undefined
+	let religionTypes: Uint8Array | undefined
 	let nations: ReturnType<typeof computeNations> | undefined
 
 	const eraConfig = getEraConfig(params.era)
@@ -126,19 +129,27 @@ export function deriveProvinceSociety({
 				})()
 			cultures = computeCultures(post.provinces!, params.seed, settledMask)
 			heritages = computeHeritages(cultures!, params.seed)
-			faiths = computeFaiths(cultures!, params.seed)
-			religions = computeReligions(faiths!, params.seed)
+			religions = computeReligions(cultures!, params.seed)
+			religionTypes = assignReligionTypes({
+				religionCount: religions!.count,
+				cultureToReligion: religions!.assignment,
+				cultureCount: cultures!.count,
+				provinceCount,
+				cultureAssignment: cultures!.assignment,
+				governmentType: nations?.governmentType,
+				migrationWave: post.population?.migrationWave,
+				sizeWeight: eraConfig.governmentSizeWeight ?? 0.55,
+				seed: params.seed,
+			})
+			religions!.colors = buildReligionColors({
+				religionCount: religions!.count,
+				religionTypes,
+			})
 			cultures!.colors = deriveChildColors({
 				childCount: cultures!.count,
 				childToParent: heritages!.assignment,
 				parentColors: heritages!.colors,
 				seed: params.seed + 5101,
-			})
-			faiths!.colors = deriveChildColors({
-				childCount: faiths!.count,
-				childToParent: religions!.assignment,
-				parentColors: religions!.colors,
-				seed: params.seed + 5102,
 			})
 		})
 	}
@@ -172,8 +183,8 @@ export function deriveProvinceSociety({
 		nations,
 		cultures,
 		heritages,
-		faiths,
 		religions,
+		religionTypes,
 		landmarks,
 		settlementRegions: settlementAnchors.settlementRegions,
 		settlementWaterLandmarks: settlementAnchors.settlementWaterLandmarks,

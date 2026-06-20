@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { GenesisPartition } from ".."
 import { computeCultures } from "./culture"
-import { computeFaiths } from "./faith"
 import { computeHeritages } from "./heritage"
-import { computeReligions } from "./religion"
 
 /** Build a ring graph of `n` nodes for use as provinces or partitions. */
 function buildRingProvinces(n: number) {
@@ -107,77 +105,11 @@ describe("computeHeritages", () => {
 	})
 })
 
-describe("computeFaiths", () => {
-	it("produces approximately 1/2 as many faiths as active cultures", () => {
-		const cultures = buildRingPartition(40)
-		const faiths = computeFaiths(cultures, SEED)
-		const target = Math.floor(40 / 2)
-		expect(faiths.count).toBeGreaterThanOrEqual(Math.floor(target * 0.7))
-		expect(faiths.count).toBeLessThanOrEqual(Math.ceil(target * 1.3))
-	})
-
-	it("assigns every active culture to a faith", () => {
-		const cultures = buildRingPartition(20)
-		const faiths = computeFaiths(cultures, SEED)
-		const assigned = Array.from(faiths.assignment).filter((a) => a >= 0).length
-		expect(assigned).toBe(20)
-	})
-
-	it("is deterministic", () => {
-		const cultures = buildRingPartition(40)
-		const a = computeFaiths(cultures, SEED)
-		const b = computeFaiths(cultures, SEED)
-		expect(Array.from(a.assignment)).toEqual(Array.from(b.assignment))
-		expect(a.count).toBe(b.count)
-	})
-})
-
-describe("computeReligions", () => {
-	it("produces approximately 1/2 as many religions as active faiths", () => {
-		const faiths = buildRingPartition(40)
-		const religions = computeReligions(faiths, SEED)
-		const target = Math.floor(40 / 2)
-		expect(religions.count).toBeGreaterThanOrEqual(Math.floor(target * 0.7))
-		expect(religions.count).toBeLessThanOrEqual(Math.ceil(target * 1.3))
-	})
-
-	it("assigns every active faith to a religion", () => {
-		const faiths = buildRingPartition(20)
-		const religions = computeReligions(faiths, SEED)
-		const assigned = Array.from(religions.assignment).filter(
-			(a) => a >= 0,
-		).length
-		expect(assigned).toBe(20)
-	})
-
-	it("is deterministic", () => {
-		const faiths = buildRingPartition(40)
-		const a = computeReligions(faiths, SEED)
-		const b = computeReligions(faiths, SEED)
-		expect(Array.from(a.assignment)).toEqual(Array.from(b.assignment))
-		expect(a.count).toBe(b.count)
-	})
-})
-
-describe("partition ratios (cultures → heritages and faiths → religions)", () => {
+describe("partition ratios (cultures → heritages)", () => {
 	it("heritages are ~4x coarser than cultures (matching CK3 avg ~62 counties/heritage)", () => {
 		const cultures = buildRingPartition(100)
 		const heritages = computeHeritages(cultures, SEED)
 		expect(cultures.count / heritages.count).toBeGreaterThanOrEqual(3)
 		expect(cultures.count / heritages.count).toBeLessThanOrEqual(6)
-	})
-
-	it("faiths are ~2x coarser than cultures (matching CK3 avg ~35 counties/faith)", () => {
-		const cultures = buildRingPartition(100)
-		const faiths = computeFaiths(cultures, SEED)
-		expect(cultures.count / faiths.count).toBeGreaterThanOrEqual(1.5)
-		expect(cultures.count / faiths.count).toBeLessThanOrEqual(3)
-	})
-
-	it("religions are ~2x coarser than faiths (matching CK3 avg ~75 counties/religion)", () => {
-		const faiths = buildRingPartition(100)
-		const religions = computeReligions(faiths, SEED)
-		expect(faiths.count / religions.count).toBeGreaterThanOrEqual(1.5)
-		expect(faiths.count / religions.count).toBeLessThanOrEqual(3)
 	})
 })

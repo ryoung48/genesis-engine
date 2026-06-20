@@ -83,14 +83,11 @@ function makeWorld(): SerializedGenesisWorld {
 			assignment: new Int32Array([0, 2]),
 			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
 		},
-		faiths: {
-			assignment: new Int32Array([0, 3]),
-			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]),
-		},
 		religions: {
-			assignment: new Int32Array([0, 0, 0, 4]),
-			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1]),
+			assignment: new Int32Array([0, 2]),
+			colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
 		},
+		religionTypes: new Uint8Array([0, 0, 3]),
 		landmarks: {
 			regionLandmark: new Int32Array([3]),
 			type: new Uint8Array([0, 0, 0, 3, 4, 5]),
@@ -193,8 +190,6 @@ function renderPanel(
 			getDynastyName={(id) => `Dynasty ${id}`}
 			getCultureName={(id) => `Culture ${id}`}
 			getHeritageName={(id) => `Heritage ${id}`}
-			getFaithName={(id) => `Faith ${id}`}
-			getReligionName={(id) => `Religion ${id}`}
 			getLandmarkName={(id) => `Landform ${id}`}
 			getRiverName={(id) => `River Name ${id}`}
 			{...overrides}
@@ -668,7 +663,6 @@ describe("InfoPanel", () => {
 		expect(markup).toContain(">42,000<")
 		expect(markup).toContain(">Culture<")
 		expect(markup).toContain(">Heritage<")
-		expect(markup).toContain(">Faith<")
 		expect(markup).toContain(">Religion<")
 		expect(markup).not.toContain(">Province<")
 	})
@@ -690,12 +684,12 @@ describe("InfoPanel", () => {
 	it("omits demographic detail rows when no valid province is hovered", () => {
 		const markup = renderPanel({
 			colorMode: "population",
-			populationMode: "faith",
+			populationMode: "religion",
 			hoverProvince: -1,
 		})
 
 		expect(markup).toContain(">Coords<")
-		expect(markup).not.toContain(">Faith<")
+		expect(markup).not.toContain(">Religion<")
 		expect(markup).not.toContain(">Province<")
 	})
 
@@ -717,15 +711,12 @@ describe("InfoPanel", () => {
 		expect(markup).not.toContain(">Elev<")
 	})
 
-	it("prioritizes belief demographics when religion mode is selected", () => {
+	it("prioritizes religion demographic when religion mode is selected", () => {
 		const markup = renderPanel({
 			colorMode: "population",
 			populationMode: "religion",
 		})
 
-		expect(markup.indexOf(">Faith<")).toBeLessThan(
-			markup.indexOf(">Population<"),
-		)
 		expect(markup.indexOf(">Religion<")).toBeLessThan(
 			markup.indexOf(">Population<"),
 		)

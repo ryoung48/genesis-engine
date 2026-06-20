@@ -74,18 +74,6 @@ describe("createDisplayNames", () => {
 				languageSeeds: new Int32Array([5]),
 				nameSeeds: new Int32Array([7]),
 			},
-			faiths: {
-				count: 1,
-				assignment: new Int32Array([0]),
-				seeds: new Int32Array([0]),
-				nameSeeds: new Int32Array([11]),
-			},
-			religions: {
-				count: 1,
-				assignment: new Int32Array([0]),
-				seeds: new Int32Array([0]),
-				nameSeeds: new Int32Array([13]),
-			},
 			nations: {
 				seeds: new Int32Array([0]),
 				nameSeeds: new Int32Array([29]),
@@ -144,8 +132,6 @@ describe("createDisplayNames", () => {
 		expect(names.nation(0)).not.toBe("#0")
 		expect(names.culture(0)).not.toBe("Culture #0")
 		expect(names.heritage(0)).not.toBe("Heritage #0")
-		expect(names.faith(0)).not.toBe("Faith #0")
-		expect(names.religion(0)).not.toBe("Religion #0")
 		expect(names.landmark(0)).not.toBe("#0")
 		expect(names.river(0)).not.toBe("River #0")
 	})
@@ -216,8 +202,6 @@ describe("createDisplayNames", () => {
 
 		expect(names.culture(0)).not.toBe("Culture #0")
 		expect(names.heritage(0)).toBe("Heritage #0")
-		expect(names.faith(0)).toBe("Faith #0")
-		expect(names.religion(0)).toBe("Religion #0")
 		expect(names.landmark(0)).toBe("#0")
 		expect(names.river(0)).toBe("River #0")
 		expect(names.leader(0, 0)).not.toBe("Leader #0")
@@ -239,16 +223,6 @@ describe("createDisplayNames", () => {
 				count: 1,
 				assignment: new Int32Array([0, 0]),
 				seeds: new Int32Array([0]),
-			},
-			faiths: {
-				count: 1,
-				assignment: new Int32Array([0, 0]),
-				seeds: new Int32Array([-1]),
-			},
-			religions: {
-				count: 1,
-				assignment: new Int32Array([0]),
-				seeds: new Int32Array([-1]),
 			},
 			nations: {
 				seeds: new Int32Array([-1, 2]),
@@ -303,8 +277,6 @@ describe("createDisplayNames", () => {
 
 		expect(names.nation(-1)).toBe("#-1")
 		expect(names.nation(2)).toBe("#2")
-		expect(names.faith(0)).toBe("Faith #0")
-		expect(names.religion(0)).toBe("Religion #0")
 		expect(names.landmark(0)).toBe("#0")
 		expect(names.river(4)).toBe("River #4")
 		expect(names.river(5)).toBe("River #5")
@@ -408,8 +380,6 @@ describe("createDisplayNames", () => {
 		expect(names.nation(0)).toMatch(/^[A-Z]/)
 		expect(names.culture(0)).toBe("Culture #0")
 		expect(names.heritage(0)).toBe("Heritage #0")
-		expect(names.faith(0)).toBe("Faith #0")
-		expect(names.religion(0)).toBe("Religion #0")
 		expect(names.landmark(0)).toBe("#0")
 		expect(names.river(0)).toBe("River #0")
 		expect(names.leader(0, 0)).toBe("Leader #0")

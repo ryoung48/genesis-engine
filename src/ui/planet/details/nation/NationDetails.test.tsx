@@ -13,7 +13,6 @@ const emptyBuckets: DistributionBucket[] = []
 const emptyDistributions = {
 	cultureDistribution: emptyBuckets,
 	heritageDistribution: emptyBuckets,
-	faithDistribution: emptyBuckets,
 	religionDistribution: emptyBuckets,
 }
 
@@ -296,9 +295,6 @@ describe("NationDetails", () => {
 					heritageDistribution: [
 						{ label: "Coastal", count: 4, color: "#778899" },
 					],
-					faithDistribution: [
-						{ label: "Sun Faith", count: 2, color: "#ffaa00" },
-					],
 					religionDistribution: [],
 				}}
 				section="demographics"
@@ -315,7 +311,6 @@ describe("NationDetails", () => {
 		expect(markup).toContain("Cultures")
 		expect(markup).toContain("Lowland (3, 75.0%)")
 		expect(markup).toContain("Heritages")
-		expect(markup).toContain("Faiths")
 		expect(markup).not.toContain(">History<")
 		expect(markup).not.toContain("Religions")
 	})

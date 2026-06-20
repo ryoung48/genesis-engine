@@ -16,7 +16,6 @@ function _renderDrawer(
 			activeWarCount={null}
 			cultureCount={null}
 			heritageCount={null}
-			faithCount={null}
 			religionCount={null}
 			nationSizeDistribution={[]}
 			conflictDistribution={[]}
@@ -26,6 +25,7 @@ function _renderDrawer(
 			relationDistribution={[]}
 			tradeGoodsDistribution={[]}
 			governmentDistribution={[]}
+			religionDistribution={[]}
 			{...overrides}
 		/>,
 	)

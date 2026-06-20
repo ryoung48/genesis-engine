@@ -5,7 +5,7 @@ import {
 	tradeGoodColor,
 	tradeGoodDisplayName,
 } from "./trade-goods"
-import { TRADE_GOOD_LABELS } from "./trade-goods-table"
+import { TRADE_GOOD_LABELS, TRADE_GOODS_TABLE } from "./trade-goods-table"
 
 // Minimal location builder for tests.
 // regionLocation[r] = location index for region r
@@ -79,6 +79,29 @@ describe("tradeGoodColor", () => {
 })
 
 describe("computeTradeGoods", () => {
+	it("keeps curated low-diversity table rows diversified", () => {
+		expect(TRADE_GOODS_TABLE["arid|grasslands|mountains|coastal"]).toHaveLength(
+			5,
+		)
+		expect(
+			TRADE_GOODS_TABLE["subtropical|jungle|mountains|coastal"],
+		).toHaveLength(5)
+		expect(TRADE_GOODS_TABLE["oceanic|forest|wetlands|coastal"]).toHaveLength(5)
+		expect(TRADE_GOODS_TABLE["subtropical|sparse|hills|inland"]).toHaveLength(5)
+		expect(TRADE_GOODS_TABLE["tropical|sparse|wetlands|coastal"]).toHaveLength(
+			6,
+		)
+		expect(TRADE_GOODS_TABLE["cold_arid|forest|mountains|coastal"]).toEqual(
+			expect.arrayContaining([
+				[30, 1],
+				[15, 1],
+				[17, 1],
+				[44, 1],
+				[10, 1],
+			]),
+		)
+	})
+
 	it("returns a Uint8Array with length equal to location count", () => {
 		// 3 regions, 2 locations: regions 0,2 → location 0; region 1 → location 1
 		const { locations, provinces } = makeLocations([0, 1, 0], [0, 1], [0, 0])

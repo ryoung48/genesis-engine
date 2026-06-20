@@ -139,8 +139,8 @@ export interface SerializedGenesisWorld {
 	leaderBirthYear?: Float32Array
 	cultures?: SerializedPartition
 	heritages?: SerializedPartition
-	faiths?: SerializedPartition
 	religions?: SerializedPartition
+	religionTypes?: Uint8Array
 	landmarks?: {
 		regionLandmark: Int32Array
 		type: Uint8Array

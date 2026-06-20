@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import { getSettlementRenderThresholds } from "@/model/society/settlement-tuning"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
 
@@ -103,12 +104,8 @@ function drawFilledCircle(
 	ctx.fill()
 }
 
-const TIERS: SettlementTier[] = [
+const TIER_VISUALS = [
 	{
-		// 1K-10K: Small filled white circle with ring
-		minPop: 1_000,
-		maxPop: 10_000,
-		label: "1K-10K",
 		minGlobeScale: 0.0025,
 		maxGlobeScale: 0.005,
 		minMapRadius: 0.0008,
@@ -124,10 +121,6 @@ const TIERS: SettlementTier[] = [
 			}),
 	},
 	{
-		// 10K-20K: Larger filled white circle with ring
-		minPop: 10_000,
-		maxPop: 20_000,
-		label: "10K-20K",
 		minGlobeScale: 0.005,
 		maxGlobeScale: 0.0065,
 		minMapRadius: 0.0017,
@@ -143,10 +136,6 @@ const TIERS: SettlementTier[] = [
 			}),
 	},
 	{
-		// 20K-50K: Filled white circle with cross/plus inside
-		minPop: 20_000,
-		maxPop: 50_000,
-		label: "20K-50K",
 		minGlobeScale: 0.0055,
 		maxGlobeScale: 0.0075,
 		minMapRadius: 0.0018,
@@ -163,10 +152,6 @@ const TIERS: SettlementTier[] = [
 			}),
 	},
 	{
-		// 50K-200K: White disc with outer border ring defined by inner dark ring (no cross)
-		minPop: 50_000,
-		maxPop: 200_000,
-		label: "50K-200K",
 		minGlobeScale: 0.007,
 		maxGlobeScale: 0.01,
 		minMapRadius: 0.0024,
@@ -185,10 +170,6 @@ const TIERS: SettlementTier[] = [
 			}),
 	},
 	{
-		// 200K-1M: White disc with border ring and cross inside inner ring
-		minPop: 200_000,
-		maxPop: 1_000_000,
-		label: "200K-1M",
 		minGlobeScale: 0.009,
 		maxGlobeScale: 0.012,
 		minMapRadius: 0.003,
@@ -208,10 +189,6 @@ const TIERS: SettlementTier[] = [
 			}),
 	},
 	{
-		// >1M: White border ring with black inner circle
-		minPop: 1_000_000,
-		maxPop: Infinity,
-		label: ">1M",
 		minGlobeScale: 0.011,
 		maxGlobeScale: 0.018,
 		minMapRadius: 0.004,
@@ -230,7 +207,22 @@ const TIERS: SettlementTier[] = [
 				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
 			}),
 	},
-]
+] as const satisfies ReadonlyArray<
+	Omit<SettlementTier, "minPop" | "maxPop" | "label">
+>
+
+function settlementTiers(world: SerializedGenesisWorld): SettlementTier[] {
+	const thresholds = getSettlementRenderThresholds(world.params?.era)
+	return TIER_VISUALS.map((visual, index) => ({
+		...visual,
+		minPop: thresholds[index],
+		maxPop: thresholds[index + 1] ?? Infinity,
+		label:
+			thresholds[index + 1] === undefined
+				? `>${thresholds[index].toLocaleString()}`
+				: `${thresholds[index].toLocaleString()}-${thresholds[index + 1].toLocaleString()}`,
+	}))
+}
 
 function collectCapitalProvinces(
 	world: SerializedGenesisWorld,
@@ -246,12 +238,11 @@ function collectCapitalProvinces(
 	return capitals
 }
 
-function getTierIndex(urbanPop: number): number {
-	for (let t = 0; t < TIERS.length; t++) {
-		if (urbanPop >= TIERS[t].minPop && urbanPop < TIERS[t].maxPop) return t
+function getTierIndex(urbanPop: number, tiers: SettlementTier[]): number {
+	for (let t = 0; t < tiers.length; t++) {
+		if (urbanPop >= tiers[t].minPop && urbanPop < tiers[t].maxPop) return t
 	}
-	// >= 1M
-	if (urbanPop >= 1_000_000) return TIERS.length - 1
+	if (urbanPop >= tiers[tiers.length - 1]!.minPop) return tiers.length - 1
 	return -1
 }
 
@@ -266,18 +257,30 @@ function tierFraction(pop: number, tier: SettlementTier): number {
 	return Math.max(0, Math.min(1, (v - lo) / range))
 }
 
-export function globeScaleForPop(pop: number): number {
-	const t = getTierIndex(pop)
+export function globeScaleForPop(
+	pop: number,
+	era: SerializedGenesisWorld["params"]["era"] | undefined = "lateMedieval",
+): number {
+	const tiers = settlementTiers({
+		params: { era },
+	} as SerializedGenesisWorld)
+	const t = getTierIndex(pop, tiers)
 	if (t < 0) return 0
-	const tier = TIERS[t]
+	const tier = tiers[t]
 	const f = tierFraction(pop, tier)
 	return tier.minGlobeScale + (tier.maxGlobeScale - tier.minGlobeScale) * f
 }
 
-export function mapRadiusForPop(pop: number): number {
-	const t = getTierIndex(pop)
+export function mapRadiusForPop(
+	pop: number,
+	era: SerializedGenesisWorld["params"]["era"] | undefined = "lateMedieval",
+): number {
+	const tiers = settlementTiers({
+		params: { era },
+	} as SerializedGenesisWorld)
+	const t = getTierIndex(pop, tiers)
 	if (t < 0) return 0
-	const tier = TIERS[t]
+	const tier = tiers[t]
 	const f = tierFraction(pop, tier)
 	return tier.minMapRadius + (tier.maxMapRadius - tier.minMapRadius) * f
 }
@@ -319,9 +322,10 @@ export function buildGlobeSettlements(
 
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
+	const tiers = settlementTiers(world)
 
 	// Pre-build textures per tier
-	const tierTextures = TIERS.map((tier) => ({
+	const tierTextures = tiers.map((tier) => ({
 		normal: tier.buildTexture(false),
 		capital: tier.buildTexture(true),
 	}))
@@ -331,7 +335,7 @@ export function buildGlobeSettlements(
 		const r = locations[p]
 		if (r < 0) continue
 		const pop = urbanPop[p] ?? 0
-		const t = getTierIndex(pop)
+		const t = getTierIndex(pop, tiers)
 		if (t < 0) continue
 
 		const [px, py, pz] = settlementPositionGlobe(
@@ -340,7 +344,7 @@ export function buildGlobeSettlements(
 			r,
 			elevationVisible,
 		)
-		const scale = globeScaleForPop(pop)
+		const scale = globeScaleForPop(pop, world.params?.era)
 		const isCapital = capitalProvinces.has(p)
 
 		const spriteMat = new THREE.SpriteMaterial({
@@ -402,9 +406,10 @@ export function buildMapSettlements(
 	)
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
+	const tiers = settlementTiers(world)
 
 	// Pre-build textures per tier
-	const tierTextures = TIERS.map((tier) => ({
+	const tierTextures = tiers.map((tier) => ({
 		normal: tier.buildTexture(false),
 		capital: tier.buildTexture(true),
 	}))
@@ -414,11 +419,11 @@ export function buildMapSettlements(
 		const r = locations[p]
 		if (r < 0) continue
 		const pop = urbanPop[p] ?? 0
-		const t = getTierIndex(pop)
+		const t = getTierIndex(pop, tiers)
 		if (t < 0) continue
 
 		const [px, py, pz] = settlementPositionMap(projection, r_xyz, elevation, r)
-		const radius = mapRadiusForPop(pop)
+		const radius = mapRadiusForPop(pop, world.params?.era)
 		const isCapital = capitalProvinces.has(p)
 
 		const circleGeo = new THREE.CircleGeometry(radius, 16)

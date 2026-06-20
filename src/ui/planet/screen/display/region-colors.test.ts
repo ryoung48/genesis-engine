@@ -46,7 +46,9 @@ function expectRgbCloseTo(
 	}
 }
 
-function buildWorld(overrides: Record<string, unknown>): SerializedGenesisWorld {
+function buildWorld(
+	overrides: Record<string, unknown>,
+): SerializedGenesisWorld {
 	return {
 		mesh: { numRegions: 2 },
 		elevation: new Float32Array([1, -1]),
@@ -721,17 +723,9 @@ describe("computeRegionColors", () => {
 				assignment: [undefined] as unknown as Int32Array,
 				colors: new Float32Array([0.4, 0.5, 0.6]),
 			} as SerializedGenesisWorld["heritages"],
-			faiths: {
-				assignment: [undefined] as unknown as Int32Array,
-				colors: new Float32Array([0.6, 0.5, 0.4]),
-			} as SerializedGenesisWorld["faiths"],
-			religions: {
-				assignment: [undefined] as unknown as Int32Array,
-				colors: new Float32Array([0.7, 0.4, 0.2]),
-			} as SerializedGenesisWorld["religions"],
 		})
 
-		for (const mode of ["heritage", "faith", "religion"] as const) {
+		for (const mode of ["heritage", "religion"] as const) {
 			const rgb = computeRegionColors(
 				world,
 				"population",
@@ -799,14 +793,6 @@ describe("computeRegionColors", () => {
 				assignment: new Int32Array([0, 0]),
 				colors: new Float32Array([0.2, 0.4, 0.6]),
 			} as SerializedGenesisWorld["cultures"],
-			faiths: {
-				assignment: new Int32Array([0]),
-				colors: new Float32Array([0.6, 0.5, 0.4]),
-			} as SerializedGenesisWorld["faiths"],
-			religions: {
-				assignment: [undefined] as unknown as Int32Array,
-				colors: new Float32Array([0.7, 0.4, 0.2]),
-			} as SerializedGenesisWorld["religions"],
 			provinces: {
 				regionProvince: new Int32Array([0, 0]),
 				seeds: new Int32Array([0]),
@@ -1449,24 +1435,16 @@ describe("computeRegionColors", () => {
 				size: new Int32Array([2]),
 				colors: new Float32Array([0.6, 0.3, 0.2]),
 			},
-			faiths: {
+			religions: {
 				assignment: new Int32Array([0, 0]),
 				seeds: new Int32Array([0]),
 				count: 1,
 				adjOffset: new Int32Array([0, 0]),
 				adjList: new Int32Array(0),
-				size: new Int32Array([2]),
-				colors: new Float32Array([0.2, 0.6, 0.3]),
-			},
-			religions: {
-				assignment: new Int32Array([0]),
-				seeds: new Int32Array([0]),
-				count: 1,
-				adjOffset: new Int32Array([0, 0]),
-				adjList: new Int32Array(0),
 				size: new Int32Array([1]),
-				colors: new Float32Array([0.7, 0.2, 0.5]),
+				colors: new Float32Array([0.8, 0.2, 0.2]),
 			},
+			religionTypes: new Uint8Array([1]),
 		})
 
 		const density = computeRegionColors(
@@ -1509,16 +1487,6 @@ describe("computeRegionColors", () => {
 			0,
 			0,
 		)
-		const faith = computeRegionColors(
-			populationWorld,
-			"population",
-			DEFAULT_NATION_MODE,
-			"faith",
-			0,
-			0,
-			0,
-			0,
-		)
 		const religion = computeRegionColors(
 			populationWorld,
 			"population",
@@ -1555,16 +1523,6 @@ describe("computeRegionColors", () => {
 			darkenPoliticalAtElevation([0.6, 0.3, 0.2], 0.8),
 		)
 		expectRegionColor(
-			faith!,
-			0,
-			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
-		)
-		expectRegionColor(
-			faith!,
-			1,
-			darkenPoliticalAtElevation([0.2, 0.6, 0.3], 0.8),
-		)
-		expectRegionColor(
 			religion!,
 			0,
 			darkenPoliticalAtElevation([0.35, 0.33, 0.32], 1.6),
@@ -1572,7 +1530,7 @@ describe("computeRegionColors", () => {
 		expectRegionColor(
 			religion!,
 			1,
-			darkenPoliticalAtElevation([0.7, 0.2, 0.5], 0.8),
+			darkenPoliticalAtElevation([1.0, 0.691, 0.42], 0.8),
 		)
 	})
 
@@ -2123,6 +2081,54 @@ describe("computeRegionColors", () => {
 		])
 	})
 
+	it("uses monthly ocean warmth for ocean current maps when a month is selected", () => {
+		const world = buildWorld({
+			mesh: { numRegions: 2 } as never,
+			elevation: new Float32Array([-1, -1]),
+			elevation_km: new Float32Array([-1, -1]),
+			isLand: new Uint8Array([0, 0]),
+			oceanCurrents: {
+				oceanWarmth: new Float32Array([0.1, -0.1]),
+				oceanWarmthMonthly: new Float32Array([
+					0.8,
+					-0.8,
+					...new Array(22).fill(0),
+				]),
+				coastalWarmth: new Float32Array(2),
+				temperatureDelta: new Float32Array(2),
+				temperatureDeltaMonthly: new Float32Array(24),
+			},
+		})
+
+		const currents = computeRegionColors(
+			world,
+			"oceanCurrents",
+			DEFAULT_NATION_MODE,
+			DEFAULT_POPULATION_MODE,
+			0,
+			0,
+			0,
+			1,
+			"map",
+		)
+		const annualCurrents = computeRegionColors(
+			world,
+			"oceanCurrents",
+			DEFAULT_NATION_MODE,
+			DEFAULT_POPULATION_MODE,
+			0,
+			0,
+			0,
+			0,
+			"map",
+		)
+
+		expectRegionColor(currents!, 0, oceanCurrentColor(0.8))
+		expectRegionColor(currents!, 1, oceanCurrentColor(-0.8))
+		expectRegionColor(annualCurrents!, 0, oceanCurrentColor(0.1))
+		expectRegionColor(annualCurrents!, 1, oceanCurrentColor(-0.1))
+	})
+
 	it("keeps broad mode sweeps finite across mixed region data", () => {
 		const world = buildWorld({
 			mesh: { numRegions: 6 } as never,
@@ -2229,14 +2235,11 @@ describe("computeRegionColors", () => {
 				assignment: new Int32Array([0, 1, 1, 0]),
 				colors: new Float32Array([0.7, 0.2, 0.3, 0.1, 0.6, 0.4]),
 			} as never,
-			faiths: {
-				assignment: new Int32Array([0, 1, 2, 1]),
-				colors: new Float32Array([0.3, 0.6, 0.2, 0.5, 0.4, 0.1, 0.7, 0.2, 0.5]),
-			} as never,
 			religions: {
-				assignment: new Int32Array([0, 1, 2]),
-				colors: new Float32Array([0.9, 0.2, 0.5, 0.2, 0.7, 0.5, 0.4, 0.4, 0.8]),
+				assignment: new Int32Array([0, 1, 1, 0]),
+				colors: new Float32Array([0.7, 0.2, 0.3, 0.1, 0.6, 0.4]),
 			} as never,
+			religionTypes: new Uint8Array([0, 3]),
 			terrainFeatures: {
 				featureMask: new Uint32Array([
 					1 << (GENESIS_TERRAIN_FEATURE.RIFT_VALLEY - 1),
@@ -2279,7 +2282,6 @@ describe("computeRegionColors", () => {
 			["population", "development"],
 			["population", "culture"],
 			["population", "heritage"],
-			["population", "faith"],
 			["population", "religion"],
 			["basins", DEFAULT_POPULATION_MODE],
 			["terrainFeatures", DEFAULT_POPULATION_MODE],

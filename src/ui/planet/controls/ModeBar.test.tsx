@@ -58,7 +58,7 @@ describe("ModeBar", () => {
 		expect(markup).not.toContain(">Annual<")
 	})
 
-	it("renders political and demographic defaults with the requested labels", () => {
+	it("renders society defaults with the requested labels", () => {
 		const politicalMarkup = renderToStaticMarkup(
 			<ModeBar
 				{...createProps({
@@ -76,14 +76,29 @@ describe("ModeBar", () => {
 			/>,
 		)
 
-		expect(politicalMarkup).toContain(">Political<")
+		expect(politicalMarkup).toContain(">Society<")
 		expect(politicalMarkup).toContain(">Nations<")
-		expect(politicalMarkup).toContain(">Dynasty<")
+		expect(politicalMarkup).toContain(">Government<")
+		expect(politicalMarkup).toContain(">Timezones<")
+		expect(politicalMarkup).not.toContain(">Dynasty<")
 		expect(politicalMarkup).not.toContain(">Provinces<")
-		expect(demographicMarkup).toContain(">Demographics<")
+		expect(politicalMarkup.indexOf(">Government<")).toBeLessThan(
+			politicalMarkup.indexOf(">Timezones<"),
+		)
+		expect(demographicMarkup).toContain(">Society<")
 		expect(demographicMarkup).toContain(">Population<")
 		expect(demographicMarkup).toContain(">Development<")
 		expect(demographicMarkup).toContain(">Religion<")
+		expect(demographicMarkup).toContain(">Timezones<")
+		expect(demographicMarkup.indexOf(">Religion<")).toBeLessThan(
+			demographicMarkup.indexOf(">Population<"),
+		)
+		expect(demographicMarkup.indexOf(">Population<")).toBeLessThan(
+			demographicMarkup.indexOf(">Development<"),
+		)
+		expect(demographicMarkup.indexOf(">Development<")).toBeLessThan(
+			demographicMarkup.indexOf(">Timezones<"),
+		)
 		expect(demographicMarkup).not.toContain(">Migration<")
 		expect(demographicMarkup).not.toContain(">Gravity<")
 	})
@@ -97,7 +112,7 @@ describe("ModeBar", () => {
 				})}
 			/>,
 		)
-		const politicalMarkup = renderToStaticMarkup(
+		const societyMarkup = renderToStaticMarkup(
 			<ModeBar
 				{...createProps({
 					colorMode: "nations",
@@ -120,7 +135,8 @@ describe("ModeBar", () => {
 		expect(geographyMarkup).not.toContain(">Koppen<")
 		expect(geographyMarkup).not.toContain(">Grayscale<")
 		expect(geographyMarkup).not.toContain(">Slope<")
-		expect(politicalMarkup).toContain(">Provinces<")
+		expect(societyMarkup).toContain(">Provinces<")
+		expect(societyMarkup).toContain(">Migration<")
 		expect(demographicMarkup).toContain(">Migration<")
 	})
 
@@ -146,7 +162,7 @@ describe("ModeBar", () => {
 				setColorMode,
 			}),
 		)
-		const politicalControl = getPrimaryControl(
+		const societyControl = getPrimaryControl(
 			createProps({
 				colorMode: "terrain",
 				setColorMode,
@@ -160,12 +176,12 @@ describe("ModeBar", () => {
 		)
 
 		geographyControl.props.onChange("geography")
-		politicalControl.props.onChange("political")
-		demographicsControl.props.onChange("demographics")
+		societyControl.props.onChange("society")
+		demographicsControl.props.onChange("society")
 
 		expect(setColorMode).toHaveBeenNthCalledWith(1, "terrain")
 		expect(setColorMode).toHaveBeenNthCalledWith(2, "nations")
-		expect(setColorMode).toHaveBeenNthCalledWith(3, "population")
+		expect(setColorMode).toHaveBeenNthCalledWith(3, "nations")
 	})
 
 	it("ignores unexpected primary mode values", () => {

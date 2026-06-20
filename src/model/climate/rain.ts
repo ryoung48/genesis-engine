@@ -13,7 +13,10 @@ import {
 } from "../shared/math"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
-import { LANDMARK_TYPE_OCEAN, type GenesisLandmarks } from "../terrain/landmarks"
+import {
+	type GenesisLandmarks,
+	LANDMARK_TYPE_OCEAN,
+} from "../terrain/landmarks"
 import { elevToHeightKm } from "./climate"
 import { computeTidalRain } from "./locked/rain"
 

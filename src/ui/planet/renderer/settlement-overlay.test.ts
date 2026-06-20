@@ -49,6 +49,9 @@ afterAll(() => {
 
 function buildSettlementWorld(): SerializedGenesisWorld {
 	return {
+		params: {
+			era: "lateMedieval",
+		},
 		mesh: {
 			r_xyz: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
 		},
@@ -114,5 +117,24 @@ describe("settlement-overlay", () => {
 		expect(
 			(nonCapital.material as THREE.MeshBasicMaterial).userData.fillColor,
 		).toBe("#ffffff")
+	})
+
+	it("uses era-specific town minimums before rendering settlements", () => {
+		const world = {
+			...buildSettlementWorld(),
+			params: { era: "information" },
+		} as SerializedGenesisWorld
+
+		const group = buildGlobeSettlements(
+			world,
+			new Int32Array([0, 1, 2]),
+			new Float32Array([9_999, 10_000, 50_000]),
+			true,
+		)
+
+		expect(group.children).toHaveLength(2)
+		expect(group.children.map((child) => child.userData.province)).toEqual([
+			1, 2,
+		])
 	})
 })
