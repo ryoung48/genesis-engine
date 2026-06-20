@@ -7,14 +7,21 @@ import {
 	sampleColorStops,
 } from "@/model/shared/color-interpolation"
 import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
+import {
+	getStarDiameterSol,
+	getStarTemperatureK,
+	isValidSpectralClass,
+	type MainSequenceClass,
+} from "@/model/shared/star-types"
 import type { RegularClimatePreviewData } from "@/ui/preview/types"
 
 interface EbmConfig {
 	obliquity: number
 	eccentricity: number
 	perihelion: number
-	tSun: number
-	insolationFactor: number
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
 	hoursPerDay: number
 	daysPerYear: number
 	landFraction: number
@@ -34,8 +41,9 @@ export function useEbmPreview(config: EbmConfig) {
 		obliquity,
 		eccentricity,
 		perihelion,
-		tSun,
-		insolationFactor,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
 		hoursPerDay,
 		daysPerYear,
 		landFraction,
@@ -43,6 +51,13 @@ export function useEbmPreview(config: EbmConfig) {
 		pressure,
 	} = config
 	return useMemo<RegularClimatePreviewData>(() => {
+		const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
+			? spectralClass
+			: "G"
+		const T_star = getStarTemperatureK(cls, starSubtype)
+		const R_star_m =
+			getStarDiameterSol(cls, starSubtype) * EMB_CONSTANTS.stellar.R_SUN
+		const d_m = orbitalDistanceAU * EMB_CONSTANTS.stellar.AU
 		const modelConfig = {
 			orbital: {
 				OBLIQUITY: obliquity,
@@ -51,7 +66,9 @@ export function useEbmPreview(config: EbmConfig) {
 			},
 			stellar: {
 				...EMB_CONSTANTS.stellar,
-				T_SUN: tSun,
+				T_SUN: T_star,
+				R_SUN: R_star_m,
+				AU: d_m,
 			},
 			time: {
 				HOURS_PER_DAY: hoursPerDay,
@@ -60,7 +77,6 @@ export function useEbmPreview(config: EbmConfig) {
 			landFraction: new Array(EMB_CONSTANTS.grid.NUM_LAT).fill(landFraction),
 			radius: radius * 1000, // km to meters
 			pressure,
-			insolationFactor,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
@@ -122,8 +138,9 @@ export function useEbmPreview(config: EbmConfig) {
 		obliquity,
 		eccentricity,
 		perihelion,
-		tSun,
-		insolationFactor,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
 		hoursPerDay,
 		daysPerYear,
 		landFraction,

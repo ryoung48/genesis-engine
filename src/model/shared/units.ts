@@ -3,8 +3,9 @@ import type { SphereMesh } from ".."
 export const DEFAULT_PLANET_RADIUS_KM = 6371
 export const DEFAULT_OBLIQUITY_DEG = 23.5
 export const DEFAULT_ECCENTRICITY = 0.0167
-export const DEFAULT_SUN_TEMP_FACTOR = 1
-export const DEFAULT_INSOLATION_FACTOR = 1
+const _DEFAULT_SPECTRAL_CLASS = "G" as const
+const _DEFAULT_STAR_SUBTYPE = 2.0
+const _DEFAULT_ORBITAL_DISTANCE_AU = 1.0
 export const DEFAULT_DAYS_PER_YEAR = 365
 export const DEFAULT_HOURS_PER_DAY = 24
 export const DEFAULT_ANTISTELLAR_LON = 180

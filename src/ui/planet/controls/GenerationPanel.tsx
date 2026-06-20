@@ -11,6 +11,21 @@ import {
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import {
+	getHabitableZoneAU,
+	getKeplerYearYears,
+	getStarDiameterSol,
+	getStarLabel,
+	getStarLuminositySol,
+	getStarMAO,
+	getStarMassSol,
+	getStarPARFactor,
+	getStarTemperatureK,
+	isValidSpectralClass,
+	MAIN_SEQUENCE_CLASSES,
+	type MainSequenceClass,
+} from "@/model/shared/star-types"
 import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
@@ -24,18 +39,24 @@ import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { getGenerationPreviewToggleLabel } from "../screen/generation/generation-preview"
 import { getOrderedRecentCodes } from "../screen/generation/recent-codes"
 import type { SliderDef } from "../screen/generation/sliders"
+import { SPECTRAL_CLASS_COLORS } from "../screen/generation/star-utils"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 
 interface GenerationPanelProps {
-	worldTab: "planet" | "terrain" | "society"
-	setWorldTab: (tab: "planet" | "terrain" | "society") => void
+	worldTab: "planet" | "terrain" | "society" | "star"
+	setWorldTab: (tab: "planet" | "terrain" | "society" | "star") => void
 	resetWorldDefaults: () => void
 	tidallyLocked: boolean
 	setTidallyLocked: (v: boolean) => void
 	setObliquity: (v: number) => void
 	planetSliders: SliderDef[]
 	terrainSliders: SliderDef[]
+	spectralClass: string
+	setSpectralClass: (v: string) => void
+	starSubtype: number
+	setStarSubtype: (v: number) => void
+	orbitalDistanceAU: number
 	era: SocietyEra
 	setEra: (v: SocietyEra) => void
 	planetCode: string
@@ -374,6 +395,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	setObliquity,
 	planetSliders,
 	terrainSliders,
+	spectralClass,
+	setSpectralClass,
+	starSubtype,
+	setStarSubtype,
+	orbitalDistanceAU,
 	era,
 	setEra,
 	planetCode,
@@ -491,6 +517,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						<div className="inline-flex w-fit rounded-xl border border-slate-200 bg-slate-100 p-1 gap-1">
 							{(
 								[
+									["star", "Star"],
 									["planet", "Planet"],
 									["terrain", "Terrain"],
 									["society", "Society"],
@@ -534,7 +561,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 				</div>
 
 				{worldTab === "planet" && (
-					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
+					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
 						{renderSliderGroup(
 							planetSliders.filter((p) => p.label !== "Spin"),
 							"double",
@@ -603,6 +630,22 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								return null
 							},
 						)}
+						{(() => {
+							const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
+								? spectralClass
+								: "G"
+							const mass = getStarMassSol(cls, starSubtype)
+							const years = getKeplerYearYears(orbitalDistanceAU, mass)
+							return (
+								<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] text-slate-400 leading-relaxed">
+									Year length is derived
+									from stellar and orbital properties · currently{" "}
+									<span className="font-mono text-slate-900">
+										{years.toFixed(2)}×
+									</span>
+								</div>
+							)
+						})()}
 					</div>
 				)}
 
@@ -611,6 +654,109 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						{renderSliderGroup(terrainSliders)}
 					</div>
 				)}
+
+				{worldTab === "star" &&
+					(() => {
+						const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
+							? spectralClass
+							: "G"
+						const tempK = Math.round(getStarTemperatureK(cls, starSubtype))
+						const diamSol = getStarDiameterSol(cls, starSubtype).toFixed(3)
+						const lum = getStarLuminositySol(cls, starSubtype)
+						const lumSol = lum.toFixed(3)
+						const hzAU = getHabitableZoneAU(lum).toFixed(3)
+						const massSol = getStarMassSol(cls, starSubtype).toFixed(3)
+						const maoAU = getStarMAO(cls, starSubtype).toFixed(3)
+						const parFactor = getStarPARFactor(cls, starSubtype).toFixed(3)
+						return (
+							<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
+								<p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 px-0.5">
+									Spectral Class
+								</p>
+								<div className="flex gap-1.5 flex-wrap">
+									{MAIN_SEQUENCE_CLASSES.map((c) => {
+										const color = SPECTRAL_CLASS_COLORS[c]
+										const active = c === cls
+										return (
+											<button
+												key={c}
+												type="button"
+												onClick={() => setSpectralClass(c)}
+												style={{
+													backgroundColor: active ? color : undefined,
+													borderColor: active ? "#0f172a" : undefined,
+													color: active ? "#0f172a" : undefined,
+												}}
+												className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold transition-all ${
+													active
+														? ""
+														: "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+												}`}
+											>
+												{c}
+											</button>
+										)
+									})}
+								</div>
+								<div className="space-y-1">
+									<div className="flex items-center justify-between px-0.5">
+										<span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+											Subtype
+										</span>
+										<span className="font-mono text-[11px] font-semibold text-slate-900">
+											{getStarLabel(cls, starSubtype)}
+										</span>
+									</div>
+									<input
+										type="range"
+										min={SLIDER_RANGES.starSubtype.min}
+										max={SLIDER_RANGES.starSubtype.max}
+										step={SLIDER_RANGES.starSubtype.step}
+										value={starSubtype}
+										onChange={(e) => setStarSubtype(parseFloat(e.target.value))}
+										className="w-full"
+									/>
+								</div>
+								<div className="grid grid-cols-2 gap-2 pt-1">
+									{[
+										["Temperature", `${tempK.toLocaleString()} K`],
+										["Luminosity", `${lumSol} L☉`],
+										["Diameter", `${diamSol} R☉`],
+										["Mass", `${massSol} M☉`],
+										["HZ Center", `${hzAU} AU`],
+										["MAO", `${maoAU} AU`],
+									].map(([label, value]) => (
+										<div
+											key={label}
+											className="rounded-lg border border-slate-200 bg-white px-2.5 py-2"
+										>
+											<div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+												{label}
+											</div>
+											<div className="font-mono text-[11px] font-semibold text-slate-700 mt-0.5">
+												{value}
+											</div>
+										</div>
+									))}
+								</div>
+								<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+									<div className="flex items-baseline justify-between gap-2">
+										<div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+											PAR Factor
+										</div>
+										<div className="font-mono text-[11px] font-semibold text-slate-700">
+											{parFactor}×
+										</div>
+									</div>
+									<div className="mt-1 text-[10px] text-slate-400 leading-relaxed">
+										400–700 nm band relative to Sol. M stars emit mostly
+										infrared — little usable light for photosynthesis even at
+										the same total flux.
+									</div>
+								</div>
+							</div>
+						)
+					})()}
 
 				{worldTab === "society" && (
 					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">

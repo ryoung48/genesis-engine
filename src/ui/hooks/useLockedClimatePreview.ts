@@ -17,14 +17,14 @@ interface LockedClimatePreviewConfig {
 	obliquity: number
 	eccentricity: number
 	perihelion: number
-	tSun: number
-	insolationFactor: number
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
 	hoursPerDay: number
 	daysPerYear: number
 	radius: number
 	pressure: number
 	planetRadiusKm: number
-	sunTempFactor: number
 	antistellarLon: number
 }
 
@@ -37,7 +37,9 @@ export function buildLockedClimatePreview(
 		planetRadiusKm: config.planetRadiusKm,
 		pressure: config.pressure,
 		eccentricity: config.eccentricity,
-		sunTempFactor: config.sunTempFactor,
+		spectralClass: config.spectralClass,
+		starSubtype: config.starSubtype,
+		orbitalDistanceAU: config.orbitalDistanceAU,
 		daysPerYear: config.daysPerYear,
 		perihelion: config.perihelion,
 		antistellarLon: config.antistellarLon,
@@ -46,7 +48,9 @@ export function buildLockedClimatePreview(
 	const { flux, libration, solarLongitude } = computeDailyLockedOrbit({
 		eccentricity: config.eccentricity,
 		perihelion: config.perihelion,
-		sunTempFactor: config.sunTempFactor,
+		spectralClass: config.spectralClass,
+		starSubtype: config.starSubtype,
+		orbitalDistanceAU: config.orbitalDistanceAU,
 	})
 	const dayCount = flux.length
 	const longitudes = Array.from(
@@ -94,8 +98,7 @@ export function buildLockedClimatePreview(
 				A1 * cosTheta +
 				A_night * nightFrac +
 				eccAmplitude * Math.sin((day / config.daysPerYear) * 2 * Math.PI)
-			const dayInsolation =
-				flux[day] * config.insolationFactor * Math.max(0, cosTheta)
+			const dayInsolation = flux[day] * Math.max(0, cosTheta)
 			const dayLength =
 				cosTheta > 1e-6
 					? config.hoursPerDay
@@ -150,14 +153,14 @@ export function useLockedClimatePreview(config: LockedClimatePreviewConfig) {
 			config.daysPerYear,
 			config.eccentricity,
 			config.hoursPerDay,
-			config.insolationFactor,
+			config.orbitalDistanceAU,
 			config.obliquity,
 			config.perihelion,
 			config.planetRadiusKm,
 			config.pressure,
 			config.radius,
-			config.sunTempFactor,
-			config.tSun,
+			config.spectralClass,
+			config.starSubtype,
 			config,
 		],
 	)

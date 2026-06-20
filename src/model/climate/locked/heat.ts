@@ -1,4 +1,10 @@
 import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
+import {
+	getStarDiameterSol,
+	getStarTemperatureK,
+	isValidSpectralClass,
+	type MainSequenceClass,
+} from "../../shared/star-types"
 import { TIME } from "../../shared/time"
 import {
 	getEffectiveObliquityDeg,
@@ -25,12 +31,24 @@ function clampAcosInput(value: number): number {
 }
 
 export function computeDailyLockedOrbit(
-	params: Pick<GenesisParams, "eccentricity" | "perihelion" | "sunTempFactor">,
+	params: Pick<
+		GenesisParams,
+		| "eccentricity"
+		| "perihelion"
+		| "spectralClass"
+		| "starSubtype"
+		| "orbitalDistanceAU"
+	>,
 ): { flux: number[]; libration: number[]; solarLongitude: number[] } {
-	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
-	const effectiveTSun = T_SUN * params.sunTempFactor
+	const { SIGMA, R_SUN, AU } = EMB_CONSTANTS.stellar
+	const cls: MainSequenceClass = isValidSpectralClass(params.spectralClass)
+		? params.spectralClass
+		: "G"
+	const T_star = getStarTemperatureK(cls, params.starSubtype)
+	const R_star = getStarDiameterSol(cls, params.starSubtype) * R_SUN
+	const d = params.orbitalDistanceAU * AU
 	const s0 =
-		(SIGMA * Math.pow(effectiveTSun, 4) * Math.pow(R_SUN, 2)) / Math.pow(AU, 2)
+		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
 	const ecc = params.eccentricity
 	const PI = Math.PI
 	const perihelionRad = (params.perihelion * Math.PI) / 180
@@ -110,7 +128,9 @@ export function computeMonthlyLibration(
 	const { libration } = computeDailyLockedOrbit({
 		eccentricity,
 		perihelion,
-		sunTempFactor: 1,
+		spectralClass: "G",
+		starSubtype: 2,
+		orbitalDistanceAU: 1,
 	})
 	return Array.from({ length: 12 }, (_, month) => {
 		const days = TIME.month.days(month)
@@ -144,7 +164,9 @@ export function computeMonthlyLockedDeclination(
 	const { solarLongitude } = computeDailyLockedOrbit({
 		eccentricity,
 		perihelion,
-		sunTempFactor: 1,
+		spectralClass: "G",
+		starSubtype: 2,
+		orbitalDistanceAU: 1,
 	})
 	return Array.from({ length: 12 }, (_, month) => {
 		const days = TIME.month.days(month)
@@ -245,18 +267,24 @@ export function computeTidalTransportParams(
 		| "eccentricity"
 		| "planetRadiusKm"
 		| "pressure"
-		| "sunTempFactor"
+		| "spectralClass"
+		| "starSubtype"
+		| "orbitalDistanceAU"
 	>,
 ): TidalTransportParams {
 	const radiusM = params.planetRadiusKm * 1000
 	const pressure = params.pressure ?? 1.0
 	const ecc = params.eccentricity
-	const sunFactor = params.sunTempFactor
 
-	const { SIGMA, T_SUN, R_SUN, AU } = EMB_CONSTANTS.stellar
-	const effectiveTSun = T_SUN * sunFactor
+	const { SIGMA, R_SUN, AU } = EMB_CONSTANTS.stellar
+	const cls: MainSequenceClass = isValidSpectralClass(params.spectralClass)
+		? params.spectralClass
+		: "G"
+	const T_star = getStarTemperatureK(cls, params.starSubtype)
+	const R_star = getStarDiameterSol(cls, params.starSubtype) * R_SUN
+	const d = params.orbitalDistanceAU * AU
 	const S0 =
-		(SIGMA * Math.pow(effectiveTSun, 4) * Math.pow(R_SUN, 2)) / Math.pow(AU, 2)
+		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
 	const albedo = 0.3
 	const T_eq = Math.pow((S0 * (1 - albedo)) / (4 * SIGMA), 0.25)
 	const GREENHOUSE_OFFSET = 33
@@ -410,11 +438,6 @@ export function computeTidalTemperature(
 		},
 		() => true,
 	)
-
-	const insolationMul = params.insolationFactor ?? 1
-	for (let i = 0; i < insolation_monthly.length; i++) {
-		insolation_monthly[i] *= insolationMul
-	}
 
 	recomputeAnnualTemperatureStats(
 		temperature_monthly,

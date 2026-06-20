@@ -428,9 +428,9 @@ export const GenesisView: React.FC = () => {
 		initialViewPrefs.debugMapModes,
 	)
 	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
-	const [worldTab, setWorldTab] = useState<"planet" | "terrain" | "society">(
-		"planet",
-	)
+	const [worldTab, setWorldTab] = useState<
+		"planet" | "terrain" | "society" | "star"
+	>("planet")
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
 	const [showClimatePreview, setShowClimatePreview] = useState(false)
 	const [generationPreviewTab, setGenerationPreviewTab] =
@@ -591,12 +591,15 @@ export const GenesisView: React.FC = () => {
 	const [eccentricity, setEccentricity] = useState(
 		initialDecodedCode?.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity,
 	)
-	const [sunTempFactor, setSunTempFactor] = useState(
-		initialDecodedCode?.sunTempFactor ?? DEFAULT_WORLD_PARAMS.sunTempFactor,
+	const [spectralClass, setSpectralClass] = useState(
+		initialDecodedCode?.spectralClass ?? DEFAULT_WORLD_PARAMS.spectralClass,
 	)
-	const [insolationFactor, setInsolationFactor] = useState(
-		initialDecodedCode?.insolationFactor ??
-			DEFAULT_WORLD_PARAMS.insolationFactor,
+	const [starSubtype, setStarSubtype] = useState(
+		initialDecodedCode?.starSubtype ?? DEFAULT_WORLD_PARAMS.starSubtype,
+	)
+	const [orbitalDistanceAU, setOrbitalDistanceAU] = useState(
+		initialDecodedCode?.orbitalDistanceAU ??
+			DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
 	)
 	const [daysPerYear, setDaysPerYear] = useState(
 		initialDecodedCode?.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
@@ -1773,6 +1776,7 @@ export const GenesisView: React.FC = () => {
 		worldForDisplay?.religions?.assignment,
 		worldForDisplay?.religionTypes,
 		nationModel,
+		worldForDisplay,
 	])
 
 	const conflictDistribution = useMemo(
@@ -2110,8 +2114,9 @@ export const GenesisView: React.FC = () => {
 			obliquity,
 			eccentricity,
 			perihelion,
-			sunTempFactor,
-			insolationFactor,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
 			tidallyLocked,
@@ -2143,8 +2148,9 @@ export const GenesisView: React.FC = () => {
 			obliquity,
 			eccentricity,
 			perihelion,
-			sunTempFactor,
-			insolationFactor,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
 			tidallyLocked,
@@ -2236,8 +2242,9 @@ export const GenesisView: React.FC = () => {
 			setObliquity,
 			setEccentricity,
 			setPerihelion,
-			setSunTempFactor,
-			setInsolationFactor,
+			setSpectralClass,
+			setStarSubtype,
+			setOrbitalDistanceAU,
 			setDaysPerYear,
 			setHoursPerDay,
 			setTidallyLocked,
@@ -2272,8 +2279,9 @@ export const GenesisView: React.FC = () => {
 			setters.setObliquity(decoded.obliquity)
 			setters.setEccentricity(decoded.eccentricity)
 			setters.setPerihelion(decoded.perihelion)
-			setters.setSunTempFactor(decoded.sunTempFactor)
-			setters.setInsolationFactor(decoded.insolationFactor)
+			setters.setSpectralClass(decoded.spectralClass)
+			setters.setStarSubtype(decoded.starSubtype)
+			setters.setOrbitalDistanceAU(decoded.orbitalDistanceAU)
 			setters.setDaysPerYear(decoded.daysPerYear)
 			setters.setHoursPerDay(decoded.hoursPerDay)
 			setters.setTidallyLocked(decoded.tidallyLocked)
@@ -2327,8 +2335,9 @@ export const GenesisView: React.FC = () => {
 				obliquity,
 				eccentricity,
 				perihelion,
-				sunTempFactor,
-				insolationFactor,
+				spectralClass,
+				starSubtype,
+				orbitalDistanceAU,
 				daysPerYear,
 				hoursPerDay,
 				pressure,
@@ -2362,7 +2371,9 @@ export const GenesisView: React.FC = () => {
 			obliquity,
 			eccentricity,
 			perihelion,
-			sunTempFactor,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
 			tidallyLocked,
@@ -2379,7 +2390,6 @@ export const GenesisView: React.FC = () => {
 			pressure,
 			tidalStrength,
 			generationCallbacks,
-			insolationFactor,
 			maxElevation,
 		],
 	)
@@ -2540,8 +2550,9 @@ export const GenesisView: React.FC = () => {
 		obliquity,
 		eccentricity,
 		perihelion,
-		sunTempFactor,
-		insolationFactor,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
 		daysPerYear,
 		hoursPerDay,
 		pressure,
@@ -2554,8 +2565,7 @@ export const GenesisView: React.FC = () => {
 		setObliquity: setAxialTilt,
 		setEccentricity,
 		setPerihelion,
-		setSunTempFactor,
-		setInsolationFactor,
+		setOrbitalDistanceAU,
 		setDaysPerYear,
 		setHoursPerDay,
 		setPressure,
@@ -2609,7 +2619,8 @@ export const GenesisView: React.FC = () => {
 					eccentricity,
 					perihelion,
 					antistellarLon,
-					sunTempFactor,
+					spectralClass,
+					starSubtype,
 					daysPerYear,
 					hoursPerDay,
 					planetRadiusKm,
@@ -2631,7 +2642,8 @@ export const GenesisView: React.FC = () => {
 			obliquity,
 			planetRadiusKm,
 			pressure,
-			sunTempFactor,
+			spectralClass,
+			starSubtype,
 			tidallyLocked,
 			seaLevel,
 			maxElevation,
@@ -2647,8 +2659,9 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			perihelion,
 			antistellarLon,
-			sunTempFactor,
-			insolationFactor,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
 			landCoverage,
@@ -2663,8 +2676,9 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			perihelion,
 			antistellarLon,
-			sunTempFactor,
-			insolationFactor,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
 			hoursPerDay,
 			daysPerYear,
 			landCoverage,
@@ -2696,6 +2710,11 @@ export const GenesisView: React.FC = () => {
 					setObliquity={setObliquity}
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
+					spectralClass={spectralClass}
+					setSpectralClass={setSpectralClass}
+					starSubtype={starSubtype}
+					setStarSubtype={setStarSubtype}
+					orbitalDistanceAU={orbitalDistanceAU}
 					era={era}
 					setEra={setEra}
 					planetCode={planetCode}

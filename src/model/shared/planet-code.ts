@@ -3,6 +3,10 @@
  * segment so the seed stays recoverable across param format changes.
  */
 
+import {
+	MAIN_SEQUENCE_CLASSES,
+	type MainSequenceClass,
+} from "@/model/shared/star-types"
 import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import type { GenesisParams } from ".."
 import { SLIDER_RANGES } from "./slider-ranges"
@@ -146,18 +150,23 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.eccentricity,
 	},
 	{
-		name: "sunTempFactor",
-		min: SR.sunTempFactor.min,
-		step: SR.sunTempFactor.step,
-		count: rangeCount(SR.sunTempFactor),
-		read: (p) => p.sunTempFactor,
+		name: "spectralClass",
+		min: 0,
+		step: 1,
+		count: MAIN_SEQUENCE_CLASSES.length,
+		read: (p) => {
+			const idx = MAIN_SEQUENCE_CLASSES.indexOf(
+				p.spectralClass as MainSequenceClass,
+			)
+			return idx >= 0 ? idx : 4 // default G
+		},
 	},
 	{
-		name: "insolationFactor",
-		min: SR.insolationFactor.min,
-		step: SR.insolationFactor.step,
-		count: rangeCount(SR.insolationFactor),
-		read: (p) => p.insolationFactor,
+		name: "starSubtype",
+		min: SR.starSubtype.min,
+		step: SR.starSubtype.step,
+		count: rangeCount(SR.starSubtype),
+		read: (p) => p.starSubtype,
 	},
 	{
 		name: "daysPerYear",
@@ -239,6 +248,13 @@ const FIELD_SPECS: FieldSpec[] = [
 		step: SR.tidalStrength.step,
 		count: rangeCount(SR.tidalStrength),
 		read: (p) => p.tidalStrength ?? 1.0,
+	},
+	{
+		name: "orbitalDistanceAU",
+		min: SR.orbitalDistanceAU.min,
+		step: SR.orbitalDistanceAU.step,
+		count: rangeCount(SR.orbitalDistanceAU),
+		read: (p) => p.orbitalDistanceAU,
 	},
 ]
 
@@ -357,8 +373,9 @@ interface DecodedPlanetCode {
 	planetRadiusKm: number
 	obliquity: number
 	eccentricity: number
-	sunTempFactor: number
-	insolationFactor: number
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
 	tidallyLocked: boolean
@@ -423,8 +440,9 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		planetRadiusKm: decodedFields.planetRadiusKm,
 		obliquity: decodedFields.obliquity,
 		eccentricity: decodedFields.eccentricity,
-		sunTempFactor: decodedFields.sunTempFactor,
-		insolationFactor: decodedFields.insolationFactor,
+		spectralClass: MAIN_SEQUENCE_CLASSES[decodedFields.spectralClass] ?? "G",
+		starSubtype: decodedFields.starSubtype,
+		orbitalDistanceAU: decodedFields.orbitalDistanceAU,
 		daysPerYear: decodedFields.daysPerYear,
 		hoursPerDay: decodedFields.hoursPerDay,
 		tidallyLocked: decodedFields.tidallyLocked >= 0.5,

@@ -30,8 +30,9 @@ interface ImportHeightmapParams {
 	planetRadiusKm: number
 	obliquity: number
 	eccentricity: number
-	sunTempFactor: number
-	insolationFactor: number
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
 	tidallyLocked: boolean
@@ -209,9 +210,10 @@ export function generateWorld(
 		obliquity: overrides?.obliquity ?? currentParams.obliquity,
 		eccentricity: overrides?.eccentricity ?? currentParams.eccentricity,
 		perihelion: overrides?.perihelion ?? currentParams.perihelion,
-		sunTempFactor: overrides?.sunTempFactor ?? currentParams.sunTempFactor,
-		insolationFactor:
-			overrides?.insolationFactor ?? currentParams.insolationFactor,
+		spectralClass: overrides?.spectralClass ?? currentParams.spectralClass,
+		starSubtype: overrides?.starSubtype ?? currentParams.starSubtype,
+		orbitalDistanceAU:
+			overrides?.orbitalDistanceAU ?? currentParams.orbitalDistanceAU,
 		daysPerYear: overrides?.daysPerYear ?? currentParams.daysPerYear,
 		hoursPerDay: overrides?.hoursPerDay ?? currentParams.hoursPerDay,
 		pressure: overrides?.pressure ?? currentParams.pressure,
@@ -303,8 +305,9 @@ export function importHeightmap(
 			obliquity: importParams.obliquity as number,
 			eccentricity: importParams.eccentricity as number,
 			perihelion: importParams.perihelion as number,
-			sunTempFactor: importParams.sunTempFactor as number,
-			insolationFactor: 1,
+			spectralClass: importParams.spectralClass,
+			starSubtype: importParams.starSubtype,
+			orbitalDistanceAU: importParams.orbitalDistanceAU,
 			daysPerYear: importParams.daysPerYear as number,
 			hoursPerDay: importParams.hoursPerDay as number,
 			pressure: importParams.pressure as number,

@@ -234,10 +234,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 						title="Government"
 						buckets={governmentDistribution}
 					/>
-					<DistributionChart
-						title="Religion"
-						buckets={religionDistribution}
-					/>
+					<DistributionChart title="Religion" buckets={religionDistribution} />
 					<DistributionChart title="Conflicts" buckets={conflictDistribution} />
 					<DistributionChart title="Relations" buckets={relationDistribution} />
 				</div>

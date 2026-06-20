@@ -43,8 +43,9 @@ export interface GenesisParams {
 	planetRadiusKm: number
 	obliquity: number // axial tilt in degrees, default 23.5
 	eccentricity: number // orbital eccentricity, default 0.0167
-	sunTempFactor: number // stellar temperature factor, 1.0 = Sol
-	insolationFactor?: number // received stellar flux multiplier, 1.0 = baseline
+	spectralClass: string // stellar spectral class, default "G"
+	starSubtype: number // spectral subtype 0–9, default 2.0 (G2 ≈ Sol)
+	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
 	tidallyLocked: boolean // true = one hemisphere always faces the star

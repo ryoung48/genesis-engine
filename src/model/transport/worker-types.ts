@@ -441,8 +441,9 @@ export type GenesisWorkerRequest =
 				planetRadiusKm?: number
 				obliquity?: number
 				eccentricity?: number
-				sunTempFactor?: number
-				insolationFactor?: number
+				spectralClass?: string
+				starSubtype?: number
+				orbitalDistanceAU?: number
 				daysPerYear?: number
 				hoursPerDay?: number
 				tidallyLocked?: boolean

@@ -24,8 +24,8 @@ export const SLIDER_RANGES = {
 	maxElevation: { min: 0, max: 30000, step: 100 },
 	// planet
 	planetRadiusKm: { min: RADIUS_MIN, max: RADIUS_MAX, step: 100 },
-	sunTempFactor: { min: 0.6, max: 1.2, step: 0.01 },
-	insolationFactor: { min: 0, max: 2, step: 0.01 },
+	orbitalDistanceAU: { min: 0.05, max: 20, step: 0.05 },
+	starSubtype: { min: 0, max: 9, step: 0.1 },
 	pressure: { min: 0.1, max: 100, step: 0.1 },
 	obliquity: { min: 0, max: 180, step: 0.5 },
 	eccentricity: { min: 0, max: 0.6, step: 0.001 },

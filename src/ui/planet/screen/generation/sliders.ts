@@ -1,7 +1,12 @@
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import {
+	getHabitableZoneAU,
+	getStarLuminositySol,
+	isValidSpectralClass,
+	type MainSequenceClass,
+} from "@/model/shared/star-types"
+import {
 	DEFAULT_PLANET_RADIUS_KM,
-	getEarthYearFactor,
 	getEffectiveObliquityDeg,
 	getMaxOceanDepthKm,
 } from "@/model/shared/units"
@@ -30,8 +35,9 @@ export function buildPlanetSliders(state: {
 	obliquity: number
 	eccentricity: number
 	perihelion: number
-	sunTempFactor: number
-	insolationFactor: number
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
 	pressure: number
@@ -44,8 +50,7 @@ export function buildPlanetSliders(state: {
 	setObliquity: (v: number) => void
 	setEccentricity: (v: number) => void
 	setPerihelion: (v: number) => void
-	setSunTempFactor: (v: number) => void
-	setInsolationFactor: (v: number) => void
+	setOrbitalDistanceAU: (v: number) => void
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPressure: (v: number) => void
@@ -64,14 +69,24 @@ export function buildPlanetSliders(state: {
 			...SR.planetRadiusKm,
 			set: state.setPlanetRadiusKm,
 		},
-		{
-			label: "Sun Temp",
-			help: "Scales stellar temperature relative to Sol. 1.0x matches the Sun, 0.5x is half as hot.",
-			value: state.sunTempFactor,
-			display: `${state.sunTempFactor.toFixed(2)}x`,
-			...SR.sunTempFactor,
-			set: state.setSunTempFactor,
-		},
+		(() => {
+			const cls: MainSequenceClass = isValidSpectralClass(state.spectralClass)
+				? state.spectralClass
+				: "G"
+			const lum = getStarLuminositySol(cls, state.starSubtype)
+			const hz = getHabitableZoneAU(lum)
+			const hzFactor = hz > 0 ? state.orbitalDistanceAU / hz : 1
+			return {
+				label: "Orbital Distance",
+				help: "Distance from the star relative to the habitable zone centre. 1.00× HZ = ideal insolation for liquid water.",
+				value: hzFactor,
+				display: `${hzFactor.toFixed(2)}× HZ`,
+				min: 0.5,
+				max: 1.5,
+				step: 0.01,
+				set: (v: number) => state.setOrbitalDistanceAU(v * hz),
+			}
+		})(),
 		{
 			label: "Pressure",
 			help: "Atmospheric pressure in bars. Higher pressure increases water vapor capacity and cloud formation; lower pressure suppresses it.",
@@ -116,14 +131,6 @@ export function buildPlanetSliders(state: {
 			display: `${state.perihelion.toFixed(0)}\u00B0`,
 			...SR.perihelion,
 			set: state.setPerihelion,
-		},
-		{
-			label: "Year Length",
-			help: "Sets the orbital year length in local days. Seasonal pacing changes without increasing sim resolution.",
-			value: state.daysPerYear,
-			display: `${getEarthYearFactor(state.daysPerYear).toFixed(2)}x`,
-			...SR.daysPerYear,
-			set: state.setDaysPerYear,
 		},
 		...(!state.tidallyLocked
 			? [
@@ -170,14 +177,6 @@ export function buildPlanetSliders(state: {
 			display: `${(state.landCoverage * 100).toFixed(0)}%`,
 			...SR.landCoverage,
 			set: state.setLandCoverage,
-		},
-		{
-			label: "Insolation",
-			help: "Scales the stellar flux received by the planet. 1x matches baseline, lower values simulate reduced light while keeping stellar temperature unchanged.",
-			value: state.insolationFactor,
-			display: `${state.insolationFactor.toFixed(2)}x`,
-			...SR.insolationFactor,
-			set: state.setInsolationFactor,
 		},
 		{
 			label: "Tides",
@@ -375,8 +374,9 @@ export function resetWorldDefaults(setters: {
 	setPlanetRadiusKm: (v: number) => void
 	setObliquity: (v: number) => void
 	setEccentricity: (v: number) => void
-	setSunTempFactor: (v: number) => void
-	setInsolationFactor: (v: number) => void
+	setSpectralClass: (v: string) => void
+	setStarSubtype: (v: number) => void
+	setOrbitalDistanceAU: (v: number) => void
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setTidallyLocked: (v: boolean) => void
@@ -406,8 +406,9 @@ export function resetWorldDefaults(setters: {
 	setters.setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
 	setters.setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
 	setters.setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
-	setters.setSunTempFactor(DEFAULT_WORLD_PARAMS.sunTempFactor)
-	setters.setInsolationFactor(DEFAULT_WORLD_PARAMS.insolationFactor)
+	setters.setSpectralClass(DEFAULT_WORLD_PARAMS.spectralClass)
+	setters.setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
+	setters.setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
 	setters.setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
 	setters.setTidallyLocked(false)

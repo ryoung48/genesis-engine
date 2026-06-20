@@ -8,7 +8,7 @@ export function getReligionIndexForCulture(
 	return world.religions.assignment[cultureIdx] ?? -1
 }
 
-export function getReligionTypeIndexForCulture(
+function getReligionTypeIndexForCulture(
 	world: Pick<SerializedGenesisWorld, "religions" | "religionTypes">,
 	cultureIdx: number,
 ): number {

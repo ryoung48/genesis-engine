@@ -1142,7 +1142,8 @@ export function computeRegionColors(
 					} else {
 						const typeColor =
 							getReligionColorForProvince(world, p) ??
-							(RELIGION_TYPE_COLORS[typeIdx] ?? RELIGION_TYPE_COLORS[0])
+							RELIGION_TYPE_COLORS[typeIdx] ??
+							RELIGION_TYPE_COLORS[0]
 						const [cr, cg, cb] = darkenPartitionAtElevation(
 							[typeColor[0], typeColor[1], typeColor[2]],
 							world.elevation_km[r],

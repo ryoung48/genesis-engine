@@ -62,9 +62,10 @@ function buildSmokeParams(code: string): GenesisParams {
 			decoded.planetRadiusKm ?? DEFAULT_WORLD_PARAMS.planetRadiusKm,
 		obliquity: decoded.obliquity ?? DEFAULT_WORLD_PARAMS.obliquity,
 		eccentricity: decoded.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity,
-		sunTempFactor: decoded.sunTempFactor ?? DEFAULT_WORLD_PARAMS.sunTempFactor,
-		insolationFactor:
-			decoded.insolationFactor ?? DEFAULT_WORLD_PARAMS.insolationFactor,
+		spectralClass: decoded.spectralClass ?? DEFAULT_WORLD_PARAMS.spectralClass,
+		starSubtype: decoded.starSubtype ?? DEFAULT_WORLD_PARAMS.starSubtype,
+		orbitalDistanceAU:
+			decoded.orbitalDistanceAU ?? DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
 		daysPerYear: decoded.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
 		hoursPerDay: decoded.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
 		tidallyLocked: decoded.tidallyLocked ?? false,
@@ -82,8 +83,9 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
 		antistellarLon: params.antistellarLon,
-		sunTempFactor: params.sunTempFactor,
-		insolationFactor: params.insolationFactor,
+		spectralClass: params.spectralClass,
+		starSubtype: params.starSubtype,
+		orbitalDistanceAU: params.orbitalDistanceAU,
 		hoursPerDay: params.hoursPerDay,
 		daysPerYear: params.daysPerYear,
 		landCoverage: params.landCoverage,
@@ -273,7 +275,9 @@ describe("full world smoke generation", () => {
 			planetRadiusKm: params.planetRadiusKm,
 			obliquity: params.obliquity,
 			eccentricity: params.eccentricity,
-			sunTempFactor: params.sunTempFactor,
+			spectralClass: params.spectralClass,
+			starSubtype: params.starSubtype,
+			orbitalDistanceAU: params.orbitalDistanceAU,
 			daysPerYear: params.daysPerYear,
 			hoursPerDay: params.hoursPerDay,
 			pressure: params.pressure,
@@ -701,7 +705,7 @@ describe("full world smoke generation", () => {
 
 		expect(world.mesh.numRegions).toBeGreaterThan(0)
 		expect(world.params.seed).toBe(params.seed)
-		expect(world.params.sunTempFactor).toBe(params.sunTempFactor)
+		expect(world.params.spectralClass).toBe(params.spectralClass)
 		expect(world.params.pressure).toBe(params.pressure)
 		expect(world.plates.length).toBe(params.numPlates)
 		expect(world.climate.temperature_avg.length).toBe(world.mesh.numRegions)
@@ -721,7 +725,9 @@ describe("full world smoke generation", () => {
 				params: {
 					...base,
 					numPoints: 60_000,
-					sunTempFactor: 0.89,
+					spectralClass: "K",
+					starSubtype: 0.5,
+					orbitalDistanceAU: 1.0,
 					pressure: 1,
 					volcanism: 1,
 				},
@@ -731,7 +737,9 @@ describe("full world smoke generation", () => {
 				params: {
 					...base,
 					numPoints: 60_000,
-					sunTempFactor: 0.89,
+					spectralClass: "K",
+					starSubtype: 0.5,
+					orbitalDistanceAU: 1.0,
 					pressure: 1,
 					volcanism: 10,
 				},
@@ -741,7 +749,9 @@ describe("full world smoke generation", () => {
 				params: {
 					...base,
 					numPoints: 60_000,
-					sunTempFactor: 0.89,
+					spectralClass: "K",
+					starSubtype: 0.5,
+					orbitalDistanceAU: 1.0,
 					pressure: 100,
 					volcanism: 10,
 				},
@@ -756,7 +766,7 @@ describe("full world smoke generation", () => {
 				name,
 				pressure: params.pressure,
 				volcanism: params.volcanism,
-				sunTempFactor: params.sunTempFactor,
+				spectralClass: params.spectralClass,
 				avgTempC: Number(summary.avgTempC.toFixed(1)),
 				landAvgTempC: Number(summary.landAvgTempC.toFixed(1)),
 				minTempC: Number(summary.minTempC.toFixed(1)),

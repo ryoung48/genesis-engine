@@ -27,7 +27,8 @@ export function computePlanetStats(
 		eccentricity: number
 		perihelion: number
 		antistellarLon: number
-		sunTempFactor: number
+		spectralClass: string
+		starSubtype: number
 		daysPerYear: number
 		hoursPerDay: number
 		planetRadiusKm: number
@@ -44,7 +45,8 @@ export function computePlanetStats(
 	const obliquityValue = activeParams?.obliquity ?? params.obliquity
 	const eccentricityValue = activeParams?.eccentricity ?? params.eccentricity
 	const perihelionValue = activeParams?.perihelion ?? params.perihelion
-	const sunTempFactorValue = activeParams?.sunTempFactor ?? params.sunTempFactor
+	const spectralClassValue = activeParams?.spectralClass ?? params.spectralClass
+	const starSubtypeValue = activeParams?.starSubtype ?? params.starSubtype
 	const daysPerYearValue = activeParams?.daysPerYear ?? params.daysPerYear
 	const hoursPerDayValue = activeParams?.hoursPerDay ?? params.hoursPerDay
 	const radiusKm = activeParams?.planetRadiusKm ?? params.planetRadiusKm
@@ -198,7 +200,10 @@ export function computePlanetStats(
 		{ label: "Tilt", value: `${obliquityValue.toFixed(1)} deg` },
 		{ label: "Ecc", value: eccentricityValue.toFixed(3) },
 		{ label: "Perihelion", value: `${perihelionValue.toFixed(0)} deg` },
-		{ label: "Sun", value: `${sunTempFactorValue.toFixed(2)}x` },
+		{
+			label: "Star",
+			value: `${spectralClassValue}${Math.round(starSubtypeValue)}`,
+		},
 		{ label: "Year", value: `${daysPerYearValue.toFixed(0)} d` },
 		{ label: "Day", value: `${hoursPerDayValue.toFixed(1)} h` },
 		{ label: "Pressure", value: `${pressureValue.toFixed(1)} bar` },

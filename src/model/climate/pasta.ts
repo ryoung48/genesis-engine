@@ -1,3 +1,7 @@
+import {
+	getStarPARFactor,
+	isValidSpectralClass,
+} from "@/model/shared/star-types"
 import type {
 	GenesisClimate,
 	GenesisHydrology,
@@ -573,6 +577,10 @@ export function assignPastaClimate(
 	const dpm = params.daysPerYear / 12
 	const output = new Uint8Array(N)
 	const insolation = climate.insolation_monthly
+	const cls = isValidSpectralClass(params.spectralClass)
+		? params.spectralClass
+		: "G"
+	const parFactor = getStarPARFactor(cls, params.starSubtype)
 
 	const debug: PastaDebug = {
 		gdd: new Float32Array(N),
@@ -598,7 +606,7 @@ export function assignPastaClimate(
 	for (let r = 0; r < N; r++) {
 		for (let m = 0; m < 12; m++) {
 			temps[m] = climate.temperature_monthly[m * N + r]
-			insol[m] = insolation[m * N + r]
+			insol[m] = insolation[m * N + r] * parFactor
 		}
 		const warmest = climate.temperature_max[r]
 		const coldest = climate.temperature_min[r]

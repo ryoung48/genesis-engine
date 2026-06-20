@@ -6,6 +6,12 @@
 
 import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
 import { SimplexNoise } from "../shared/simplex-noise"
+import {
+	getStarDiameterSol,
+	getStarTemperatureK,
+	isValidSpectralClass,
+	type MainSequenceClass,
+} from "../shared/star-types"
 import { TIME } from "../shared/time"
 import { getEffectiveObliquityDeg } from "../shared/units"
 
@@ -16,6 +22,10 @@ import {
 	computeLockedMonthlyDaylightHours,
 	computeTidalTemperature,
 } from "./locked/heat"
+
+function getStellarCls(params: GenesisParams): MainSequenceClass {
+	return isValidSpectralClass(params.spectralClass) ? params.spectralClass : "G"
+}
 
 const NUM_LAT = EMB_CONSTANTS.grid.NUM_LAT // 36
 const MONTH_DAY_COUNTS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -116,19 +126,12 @@ function computeMonthlyDaylightHours(
 		{ length: EMB_CONSTANTS.grid.NUM_LAT },
 		(_, i) => -Math.PI / 2 + (Math.PI * i) / (EMB_CONSTANTS.grid.NUM_LAT - 1),
 	)
-	const { _daylight_hours } = INSOLATION.compute(
-		lats,
-		{
-			...EMB_CONSTANTS.orbital,
-			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
-			ECCENTRICITY: params.eccentricity,
-			PERIHELION: params.perihelion,
-		},
-		{
-			...EMB_CONSTANTS.stellar,
-			T_SUN: EMB_CONSTANTS.stellar.T_SUN * params.sunTempFactor,
-		},
-	)
+	const { _daylight_hours } = INSOLATION.compute(lats, {
+		...EMB_CONSTANTS.orbital,
+		OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
+		ECCENTRICITY: params.eccentricity,
+		PERIHELION: params.perihelion,
+	})
 	const monthlyRanges: number[][] = new Array(12)
 	for (let month = 0; month < 12; month++) {
 		const days = TIME.month.days(month)
@@ -262,6 +265,11 @@ export function computeTemperature(
 		)
 	}
 
+	const cls = getStellarCls(params)
+	const T_star = getStarTemperatureK(cls, params.starSubtype)
+	const R_star_m =
+		getStarDiameterSol(cls, params.starSubtype) * EMB_CONSTANTS.stellar.R_SUN
+	const d_m = params.orbitalDistanceAU * EMB_CONSTANTS.stellar.AU
 	const ebm = new EnergyBalanceModel({
 		orbital: {
 			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
@@ -270,7 +278,9 @@ export function computeTemperature(
 		},
 		stellar: {
 			...EMB_CONSTANTS.stellar,
-			T_SUN: EMB_CONSTANTS.stellar.T_SUN * params.sunTempFactor,
+			T_SUN: T_star,
+			R_SUN: R_star_m,
+			AU: d_m,
 		},
 		time: {
 			YEAR_LENGTH_DAYS: params.daysPerYear,
@@ -279,7 +289,6 @@ export function computeTemperature(
 		pressure: params.pressure ?? 1.0,
 		radius: params.planetRadiusKm * 1000,
 		landFraction,
-		insolationFactor: params.insolationFactor,
 	})
 	ebm.runModel(30, 0.5)
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)

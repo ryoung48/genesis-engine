@@ -411,7 +411,8 @@ export function buildDemographicDisplayData(params: {
 		if (typeIdx < 0) return null
 		const typeColor =
 			getReligionColorForProvince(world, hoverProvince) ??
-			(RELIGION_TYPE_COLORS[typeIdx] ?? RELIGION_TYPE_COLORS[0])
+			RELIGION_TYPE_COLORS[typeIdx] ??
+			RELIGION_TYPE_COLORS[0]
 		return {
 			label: "Religion",
 			value: RELIGION_TYPE_NAMES[typeIdx] ?? "Unknown",
