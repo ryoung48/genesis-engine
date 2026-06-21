@@ -44,7 +44,7 @@ export function buildPlanetSliders(state: {
 	pressure: number
 	landDistribution: number
 	landCoverage: number
-	tidallyLocked: boolean
+	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	antistellarLon: number
 	setPlanetRadiusKm: (v: number) => void
 	setObliquity: (v: number) => void
@@ -113,7 +113,7 @@ export function buildPlanetSliders(state: {
 			max: 1,
 			step: 1,
 			set: state.setAxialTiltDirection,
-			disabled: state.tidallyLocked,
+			disabled: state.tideLock?.type === "solar",
 		},
 		{
 			label: "Eccentricity",
@@ -131,7 +131,7 @@ export function buildPlanetSliders(state: {
 			...SR.perihelion,
 			set: state.setPerihelion,
 		},
-		...(!state.tidallyLocked
+		...(state.tideLock?.type !== "solar"
 			? [
 					{
 						label: "Day Length",
@@ -143,7 +143,7 @@ export function buildPlanetSliders(state: {
 					},
 				]
 			: []),
-		...(state.tidallyLocked
+		...(state.tideLock?.type === "solar"
 			? [
 					{
 						label: "Antistellar Lon",
@@ -369,7 +369,7 @@ export function resetWorldDefaults(setters: {
 	setOrbitalDistanceAU: (v: number) => void
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
-	setTidallyLocked: (v: boolean) => void
+	setTideLock: (v: import("@/model/celestial/moons/moon-types").TideLock | null) => void
 	setAntistellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
@@ -402,7 +402,7 @@ export function resetWorldDefaults(setters: {
 	setters.setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
 	setters.setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
-	setters.setTidallyLocked(false)
+	setters.setTideLock(null)
 	setters.setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)

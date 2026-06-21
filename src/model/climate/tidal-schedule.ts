@@ -180,7 +180,7 @@ export function computeTidalSchedule(
 		| "daysPerYear"
 		| "hoursPerDay"
 		| "planetRadiusKm"
-		| "tidallyLocked"
+		| "tideLock"
 		| "spectralClass"
 		| "starSubtype"
 		| "orbitalDistanceAU"
@@ -192,7 +192,7 @@ export function computeTidalSchedule(
 		daysPerYear,
 		hoursPerDay,
 		planetRadiusKm,
-		tidallyLocked,
+		tideLock,
 		spectralClass,
 		starSubtype,
 		orbitalDistanceAU,
@@ -249,7 +249,7 @@ export function computeTidalSchedule(
 		)
 
 		// Star tide (zero if tidally locked — bulge is static, not oscillating)
-		const starTide = tidallyLocked
+		const starTide = tideLock?.type === "solar"
 			? 0
 			: starTideContribution(
 					starPos.latRad,

@@ -118,7 +118,7 @@ function computeMonthlyDaylightHours(
 	const monthly = new Float32Array(N * 12)
 	const hoursPerDay = params.hoursPerDay
 
-	if (params.tidallyLocked) {
+	if (params.tideLock?.type === "solar") {
 		return computeLockedMonthlyDaylightHours(mesh, params)
 	}
 
@@ -254,7 +254,7 @@ export function computeTemperature(
 	isLand?: Uint8Array,
 	elevation_km?: Float32Array,
 ): GenesisClimate {
-	if (params.tidallyLocked) {
+	if (params.tideLock?.type === "solar") {
 		return computeTidalTemperature(
 			mesh,
 			elevation,

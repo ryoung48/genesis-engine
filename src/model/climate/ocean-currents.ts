@@ -424,12 +424,12 @@ export function computeOceanCurrents(
 		| "obliquity"
 		| "perihelion"
 		| "planetRadiusKm"
-		| "tidallyLocked"
+		| "tideLock"
 		| "hoursPerDay"
 	>,
 	monthlyTEQ?: Float32Array[],
 ): OceanCurrentResult {
-	if (params?.tidallyLocked) {
+	if (params?.tideLock?.type === "solar") {
 		return computeLockedOceanCurrents(
 			mesh,
 			isLand,
@@ -576,10 +576,10 @@ export function applyCurrentTemperatureEffect(
 		| "eccentricity"
 		| "obliquity"
 		| "perihelion"
-		| "tidallyLocked"
+		| "tideLock"
 	>,
 ): void {
-	if (params?.tidallyLocked) {
+	if (params?.tideLock?.type === "solar") {
 		applyLockedCurrentTemperatureEffect(mesh, climate, isLand, currents, params)
 		return
 	}

@@ -26,7 +26,7 @@ export function computeDiurnalRange(
 	_elevationKm: Float32Array,
 	oceanDist: Float32Array | undefined,
 	isLand: Uint8Array,
-	params?: Pick<GenesisParams, "hoursPerDay" | "pressure" | "tidallyLocked">,
+	params?: Pick<GenesisParams, "hoursPerDay" | "pressure" | "tideLock">,
 	daylight_hours_monthly?: Float32Array,
 ): { monthly: Float32Array; annual: Float32Array } {
 	const N = isLand.length

@@ -54,6 +54,7 @@ const MOON_ORBIT_RANGE_ORDER: MoonOrbitRange[] = [
 ]
 
 const LUNA_OUTER_COMPANION: MoonParams = {
+	id: 2,
 	massKg: MOON_DEFAULTS.massKg * 0.34,
 	diameterKm: MOON_DEFAULTS.diameterKm * 0.72,
 	orbitalPeriodDays: MOON_DEFAULTS.orbitalPeriodDays * 1.82,
@@ -68,6 +69,7 @@ const LUNA_OUTER_COMPANION: MoonParams = {
 }
 
 const LUNA_INNER_COMPANION: MoonParams = {
+	id: 1,
 	massKg: MOON_DEFAULTS.massKg * 0.18,
 	diameterKm: MOON_DEFAULTS.diameterKm * 0.57,
 	orbitalPeriodDays: MOON_DEFAULTS.orbitalPeriodDays * 0.56,
@@ -97,23 +99,77 @@ function withRandomizedAngles(baseMoon: MoonParams, seed: number): MoonParams {
 
 function generateLunaMoonSystem(count: number): MoonParams[] {
 	if (count <= 0) return []
-	if (count === 1) return [{ ...MOON_DEFAULTS }]
+	if (count === 1) return [{ ...MOON_DEFAULTS, id: 1 }]
 	if (count === 2) {
 		return [
-			{ ...MOON_DEFAULTS },
-			withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1),
+			{ ...MOON_DEFAULTS, id: 1 },
+			{ ...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1), id: 2 },
 		]
 	}
 
 	return [
-		withRandomizedAngles(LUNA_INNER_COMPANION, LUNA_MOON_SEED + 2),
-		{ ...MOON_DEFAULTS },
-		withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1),
+		{ ...withRandomizedAngles(LUNA_INNER_COMPANION, LUNA_MOON_SEED + 2), id: 1 },
+		{ ...MOON_DEFAULTS, id: 2 },
+		{ ...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1), id: 3 },
 	]
 }
 
 function rollDie(rng: ReturnType<typeof createRng>, sides: number): number {
 	return rng.randint(1, sides)
+}
+
+function rollMoonInclination(
+	rng: ReturnType<typeof createRng>,
+	orbitRange: MoonOrbitRange,
+): number {
+	// Retrograde probability and inclination ranges by orbit class.
+	// Inner/middle moons formed in-situ: nearly coplanar, rarely retrograde.
+	// Outer/extreme moons are often captured bodies: high inclination, frequently retrograde.
+	const retrogradeChance =
+		orbitRange === "extreme" ? 0.65
+		: orbitRange === "outer" ? 0.35
+		: orbitRange === "middle" ? 0.05
+		: 0.02 // inner
+
+	const isRetrograde = rng.uniform(0, 1) < retrogradeChance
+
+	if (isRetrograde) {
+		// Retrograde: 90°–175° (peaked toward 120°–160° for captured objects)
+		const base = orbitRange === "inner" || orbitRange === "middle"
+			? rng.uniform(95, 175)
+			: rng.uniform(100, 175)
+		return base
+	}
+
+	// Prograde: low inclination for inner/middle, higher for outer/extreme
+	const maxInc =
+		orbitRange === "extreme" ? 45
+		: orbitRange === "outer" ? 30
+		: orbitRange === "middle" ? 15
+		: 5 // inner
+	return rng.uniform(0, maxInc)
+}
+
+function rollMoonAxialTilt(rng: ReturnType<typeof createRng>): {
+	axialTiltDeg: number
+	retrogradeRotation: boolean
+} {
+	const raw = (() => {
+		const standard = rollDie(rng, 6) + rollDie(rng, 6)
+		if (standard <= 4) return rng.uniform(0.01, 0.1)
+		if (standard <= 5) return rng.uniform(0.2, 1.2)
+		if (standard <= 6) return rng.uniform(1, 6)
+		if (standard <= 7) return rng.uniform(7, 12)
+		if (standard <= 9) return rng.uniform(10, 35)
+		const extreme = rollDie(rng, 6)
+		if (extreme <= 2) return rng.uniform(20, 70)
+		if (extreme <= 4) return rng.uniform(40, 90)
+		if (extreme <= 5) return rng.uniform(91, 126)
+		return rng.uniform(144, 180)
+	})()
+	// Values >90 indicate retrograde rotation; fold back into 0–90 range.
+	if (raw > 90) return { axialTiltDeg: 180 - raw, retrogradeRotation: true }
+	return { axialTiltDeg: raw, retrogradeRotation: false }
 }
 
 function inferPlanetSizeClass(planetDiameterKm: number): number {
@@ -500,12 +556,14 @@ export function generateMoons(
 		const semiMajorM = pd * planetDiameterM
 		const orbitalPeriodDays = periodFromDist(semiMajorM)
 		const eccentricity = rollMoonEccentricity(rng, orbitRange, sizeClass)
-		const inclinationDeg = rng.uniform(0, 25)
+		const inclinationDeg = rollMoonInclination(rng, orbitRange)
 		const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
 		const argumentOfPeriapsisDeg = rng.uniform(0, 360)
 		const meanAnomalyAtEpochDeg = rng.uniform(0, 360)
+		const { axialTiltDeg, retrogradeRotation } = rollMoonAxialTilt(rng)
 
 		moons.push({
+			id: moons.length + 1,
 			massKg,
 			diameterKm,
 			orbitalPeriodDays,
@@ -514,6 +572,8 @@ export function generateMoons(
 			longitudeOfAscendingNodeDeg,
 			argumentOfPeriapsisDeg,
 			meanAnomalyAtEpochDeg,
+			axialTiltDeg,
+			retrogradeRotation,
 			orbitRange,
 			semiMajorAxisPlanetDiameters: pd,
 			sizeClass,

@@ -35,7 +35,7 @@ interface ImportHeightmapParams {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	tidallyLocked: boolean
+	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	antistellarLon: number
 	perihelion: number
 	pressure: number
@@ -195,9 +195,9 @@ export function generateWorld(
 	callbacks.setSeed(overrideSeed)
 	callbacks.setWorld(null)
 
-	const tidallyLocked = overrides?.tidallyLocked
-		? true
-		: currentParams.tidallyLocked
+	const tideLock = overrides?.tideLock !== undefined
+		? overrides.tideLock
+		: currentParams.tideLock
 	const params = {
 		seed: overrideSeed,
 		numPoints: overrides?.numPoints ?? currentParams.numPoints,
@@ -220,7 +220,7 @@ export function generateWorld(
 		pressure: overrides?.pressure ?? currentParams.pressure,
 		moonCount: overrides?.moonCount ?? currentParams.moonCount,
 		moonSeed: overrides?.moonSeed ?? currentParams.moonSeed,
-		tidallyLocked,
+		tideLock,
 		antistellarLon: overrides?.antistellarLon ?? currentParams.antistellarLon,
 		jitter: overrides?.jitter ?? currentParams.jitter,
 		roughness: overrides?.roughness ?? currentParams.roughness,

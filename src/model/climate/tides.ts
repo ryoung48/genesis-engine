@@ -76,7 +76,7 @@ function _computeTidalRange(
 	_elevationKm: Float32Array,
 	params: Pick<
 		GenesisParams,
-		"seed" | "tidalStrength" | "tidallyLocked" | "planetRadiusKm"
+		"seed" | "tidalStrength" | "tideLock" | "planetRadiusKm"
 	>,
 	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
 ): Float32Array {
@@ -85,7 +85,7 @@ function _computeTidalRange(
 	const tidalStrength = params.tidalStrength ?? 1.0
 	const planetRadiusKm = params.planetRadiusKm ?? 6371
 
-	if (params.tidallyLocked || tidalStrength <= 0) return new Float32Array(N)
+	if (params.tideLock?.type === "solar" || tidalStrength <= 0) return new Float32Array(N)
 	const rng = makeRng(params.seed ^ 0x7a3f)
 
 	function isLandmarkLake(r: number): boolean {

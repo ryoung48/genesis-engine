@@ -204,6 +204,13 @@ export function buildMoonOrbitOverlay(
 			metalness: 0,
 		})
 		const moonMesh = new THREE.Mesh(moonGeo, moonMat)
+		// Tilt the moon's rotation axis relative to its orbital plane.
+		// Q is 90° ahead in the orbit, so tilting around Q tips the pole
+		// toward/away from the planet — a reasonable reference orientation.
+		const tiltRad =
+			(moon.axialTiltDeg * Math.PI) / 180 *
+			(moon.retrogradeRotation ? -1 : 1)
+		moonMesh.setRotationFromAxisAngle(Q, tiltRad)
 		group.add(moonMesh)
 
 		// Lat/lon grid lines on moon surface matching the planet grid spacing

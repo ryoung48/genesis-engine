@@ -567,7 +567,7 @@ export function computeMonthlyRain(
 	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
 ): { monthly: Float32Array; annual: Float32Array } {
 	const rainRegionMask = buildRainRegionMask(isLand, landmarks)
-	if (params?.tidallyLocked) {
+	if (params?.tideLock?.type === "solar") {
 		return computeTidalRain(mesh, climate, rainRegionMask, params, distCoast)
 	}
 

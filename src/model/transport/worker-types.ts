@@ -447,7 +447,7 @@ export type GenesisWorkerRequest =
 				orbitalDistanceAU?: number
 				daysPerYear?: number
 				hoursPerDay?: number
-				tidallyLocked?: boolean
+				tideLock?: import("../celestial/moons/moon-types").TideLock | null
 				antistellarLon?: number
 				perihelion?: number
 				pressure?: number

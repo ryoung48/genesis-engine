@@ -48,7 +48,7 @@ export interface GenesisParams {
 	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
-	tidallyLocked: boolean // true = one hemisphere always faces the star
+	tideLock: import("../celestial/moons/moon-types").TideLock | null // null = not locked
 	antistellarLon: number // longitude of the antistellar point in degrees (0-360), default 180
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0

@@ -7,7 +7,7 @@ export const GENERATION_PREVIEW_TABS = [
 export type GenerationPreviewTab = (typeof GENERATION_PREVIEW_TABS)[number][0]
 
 interface GenerationPreviewParams {
-	tidallyLocked: boolean
+	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	obliquity: number
 	eccentricity: number
 	perihelion: number

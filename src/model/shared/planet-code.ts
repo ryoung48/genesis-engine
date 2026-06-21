@@ -183,11 +183,16 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.hoursPerDay,
 	},
 	{
+		// 0 = none, 1 = solar, 2 = lunar moon 0, 3 = lunar moon 1, 4 = lunar moon 2
 		name: "tidallyLocked",
 		min: 0,
 		step: 1,
-		count: 2,
-		read: (p) => (p.tidallyLocked ? 1 : 0),
+		count: 5,
+		read: (p) => {
+			if (!p.tideLock) return 0
+			if (p.tideLock.type === "solar") return 1
+			return 2 + p.tideLock.target
+		},
 	},
 	{
 		name: "antistellarLon",
@@ -386,7 +391,7 @@ interface DecodedPlanetCode {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	tidallyLocked: boolean
+	tideLock: import("../celestial/moons/moon-types").TideLock | null
 	antistellarLon: number
 	perihelion: number
 	pressure: number
@@ -454,7 +459,12 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		orbitalDistanceAU: decodedFields.orbitalDistanceAU,
 		daysPerYear: decodedFields.daysPerYear,
 		hoursPerDay: decodedFields.hoursPerDay,
-		tidallyLocked: decodedFields.tidallyLocked >= 0.5,
+		tideLock: (() => {
+			const v = decodedFields.tidallyLocked
+			if (v === 1) return { type: "solar" as const, target: 0 }
+			if (v >= 2) return { type: "lunar" as const, target: v - 2 }
+			return null
+		})(),
 		antistellarLon: decodedFields.antistellarLon,
 		perihelion: decodedFields.perihelion,
 		pressure: decodedFields.pressure,

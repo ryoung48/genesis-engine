@@ -56,8 +56,8 @@ interface GenerationPanelProps {
 	worldTab: "planet" | "terrain" | "society" | "star"
 	setWorldTab: (tab: "planet" | "terrain" | "society" | "star") => void
 	resetWorldDefaults: () => void
-	tidallyLocked: boolean
-	setTidallyLocked: (v: boolean) => void
+	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
+	setTideLock: (v: import("@/model/celestial/moons/moon-types").TideLock | null) => void
 	setObliquity: (v: number) => void
 	moonCount: number
 	setMoonCount: (v: number) => void
@@ -409,8 +409,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	worldTab,
 	setWorldTab,
 	resetWorldDefaults,
-	tidallyLocked,
-	setTidallyLocked,
+	tideLock,
+	setTideLock,
 	setObliquity,
 	moonCount,
 	setMoonCount,
@@ -521,31 +521,39 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	const landSliders = planetSliders.filter((slider) =>
 		landSliderLabels.has(slider.label),
 	)
+	const isSolarLocked = tideLock?.type === "solar"
+	const isLunarLocked = tideLock?.type === "lunar"
 	const renderPlanetSliderSuffix = (item: SliderDef) => {
-		if (item.label === "Day Length" || item.label === "Antistellar Lon")
+		if (item.label === "Day Length" || item.label === "Antistellar Lon") {
+			const otherLockActive = isLunarLocked
 			return (
 				<UITooltip
 					content={
-						tidallyLocked ? "remove 1:1 tidal lock" : "add 1:1 tidal lock"
+						otherLockActive
+							? "lunar lock active — release it first"
+							: isSolarLocked
+								? "remove solar tidal lock"
+								: "add solar tidal lock (1:1 with star)"
 					}
 					position="top"
 					align="center"
 				>
 					<button
 						type="button"
+						disabled={otherLockActive}
 						onClick={() => {
-							const locking = !tidallyLocked
-							setTidallyLocked(locking)
-							if (locking) {
+							if (isSolarLocked) {
+								setTideLock(null)
+								setHoursPerDay(24)
+							} else {
+								setTideLock({ type: "solar", target: 0 })
 								setObliquity(0)
 								setHoursPerDay(daysPerYear * hoursPerDay)
-							} else {
-								setHoursPerDay(24)
 							}
 						}}
-						className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+						className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						{tidallyLocked ? (
+						{isSolarLocked ? (
 							<LockIcon className="h-3 w-3" />
 						) : (
 							<LockOpenIcon className="h-3 w-3" />
@@ -553,6 +561,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 					</button>
 				</UITooltip>
 			)
+		}
 		if (item.label === "Axial Tilt") {
 			const spin = planetSliders.find((slider) => slider.label === "Spin")
 			const retrograde = spin && spin.value === 1
@@ -757,7 +766,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 flex flex-col">
 								<UITooltip
 									content={
-										tidallyLocked
+										isSolarLocked
 											? "Tidally locked — year equals day."
 											: "Derived from stellar mass and orbital distance using Kepler's third law."
 									}
@@ -877,7 +886,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 													</button>
 												</div>
 											</div>
-											{tidallyLocked && moonCount > 0 && (
+											{isSolarLocked && moonCount > 0 && (
 												<p className="mt-1.5 text-[9px] text-slate-400 leading-tight">
 													Solar tides suppressed · lunar tides active
 												</p>
@@ -911,6 +920,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																		Math.max(max, ev.moonForces[i] ?? 0),
 																	0,
 																) ?? 0
+															const isThisMoonLocked =
+																tideLock?.type === "lunar" &&
+																tideLock.target === i
+															const otherLockActive =
+																tideLock !== null && !isThisMoonLocked
 															return (
 																<details
 																	key={i}
@@ -923,19 +937,47 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																			Moon {i + 1} · {orbitLabel} ·{" "}
 																			{diamRel.toFixed(2)}× Luna
 																		</span>
-																		<svg
-																			width="12"
-																			height="12"
-																			viewBox="0 0 24 24"
-																			fill="none"
-																			stroke="currentColor"
-																			strokeWidth="2"
-																			strokeLinecap="round"
-																			strokeLinejoin="round"
-																			className="text-slate-400 transition-transform group-open:rotate-180"
-																		>
-																			<polyline points="6 9 12 15 18 9" />
-																		</svg>
+																		<div className="flex items-center gap-1">
+																			<button
+																				type="button"
+																				disabled={otherLockActive}
+																				onClick={(e) => {
+																					e.preventDefault()
+																					if (isThisMoonLocked) {
+																						setTideLock(null)
+																						setHoursPerDay(24)
+																					} else {
+																						setTideLock({
+																							type: "lunar",
+																							target: i,
+																						})
+																						setHoursPerDay(
+																							moon.orbitalPeriodDays * 24,
+																						)
+																					}
+																				}}
+																				className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+																			>
+																				{isThisMoonLocked ? (
+																					<LockIcon className="h-3 w-3" />
+																				) : (
+																					<LockOpenIcon className="h-3 w-3" />
+																				)}
+																			</button>
+																			<svg
+																				width="12"
+																				height="12"
+																				viewBox="0 0 24 24"
+																				fill="none"
+																				stroke="currentColor"
+																				strokeWidth="2"
+																				strokeLinecap="round"
+																				strokeLinejoin="round"
+																				className="text-slate-400 transition-transform group-open:rotate-180"
+																			>
+																				<polyline points="6 9 12 15 18 9" />
+																			</svg>
+																		</div>
 																	</summary>
 																	<div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5">
 																		{[

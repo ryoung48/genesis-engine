@@ -28,7 +28,7 @@ export function computeCycloneRisk(
 	climate: GenesisClimate,
 	isLand: Uint8Array,
 	topography: Uint8Array,
-	params: Pick<GenesisParams, "hoursPerDay" | "tidallyLocked">,
+	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">,
 	oceanCurrents?: GenesisOceanCurrents | null,
 ): Float32Array {
 	const N = mesh.numRegions
@@ -36,7 +36,7 @@ export function computeCycloneRisk(
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
 
 	// Tidally locked: no meaningful Coriolis → no cyclones
-	if (params.tidallyLocked) return new Float32Array(N)
+	if (params.tideLock?.type === "solar") return new Float32Array(N)
 
 	// Slow rotators: the Coriolis no-go zone (radius = geoTransitionLat degrees
 	// from the thermal equator) engulfs the entire valid formation band (≤38°).

@@ -77,12 +77,12 @@ export function computeTornadoRisk(
 	topography: Uint8Array,
 	vegetation: Uint8Array,
 	oceanDist: Float32Array,
-	params: Pick<GenesisParams, "hoursPerDay" | "tidallyLocked">,
+	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">,
 ): Float32Array {
 	const N = mesh.numRegions
 
 	// No Coriolis on locked planets → no organized rotation → no tornadoes
-	if (params.tidallyLocked) return new Float32Array(N)
+	if (params.tideLock?.type === "solar") return new Float32Array(N)
 
 	const hoursPerDay = params.hoursPerDay ?? 24
 	const hw = hadleyWidth(hoursPerDay)

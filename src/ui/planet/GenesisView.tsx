@@ -582,7 +582,7 @@ export const GenesisView: React.FC = () => {
 		return encodePlanetCode(fallbackSeed, {
 			seed: fallbackSeed,
 			...DEFAULT_WORLD_PARAMS,
-			tidallyLocked: false,
+			tideLock: null,
 		})
 	})()
 	const initialDecodedCode = decodePlanetCode(initialCode)
@@ -661,9 +661,10 @@ export const GenesisView: React.FC = () => {
 		? spectralClass
 		: DEFAULT_SPECTRAL_CLASS
 	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
-	const [tidallyLocked, setTidallyLocked] = useState(
-		initialDecodedCode?.tidallyLocked ?? false,
+	const [tideLock, setTideLock] = useState<import("@/model/celestial/moons/moon-types").TideLock | null>(
+		initialDecodedCode?.tideLock ?? null,
 	)
+	const tidallyLocked = tideLock?.type === "solar"
 	const effectiveDaysPerYear = tidallyLocked
 		? 1
 		: Math.max(
@@ -1516,7 +1517,7 @@ export const GenesisView: React.FC = () => {
 				? monthlyWarmth.subarray((currentMonth - 1) * N, currentMonth * N)
 				: world.oceanCurrents.oceanWarmth
 		const { latDeg, lonDeg, regionBin } = getClimateGeometry(world.mesh)
-		if (world.params.tidallyLocked) {
+		if (world.params.tideLock?.type === "solar") {
 			return buildLockedOceanCurrentGrid(
 				world.mesh,
 				warmth,
@@ -2227,7 +2228,7 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
-			tidallyLocked,
+			tideLock,
 			antistellarLon,
 			jitter,
 			roughness,
@@ -2262,7 +2263,7 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
-			tidallyLocked,
+			tideLock,
 			antistellarLon,
 			jitter,
 			roughness,
@@ -2357,7 +2358,7 @@ export const GenesisView: React.FC = () => {
 			setOrbitalDistanceAU,
 			setDaysPerYear,
 			setHoursPerDay,
-			setTidallyLocked,
+			setTideLock,
 			setAntistellarLon,
 			setPressure,
 			setMoonCount,
@@ -2395,7 +2396,7 @@ export const GenesisView: React.FC = () => {
 			setters.setOrbitalDistanceAU(decoded.orbitalDistanceAU)
 			setters.setDaysPerYear(decoded.daysPerYear)
 			setters.setHoursPerDay(decoded.hoursPerDay)
-			setters.setTidallyLocked(decoded.tidallyLocked)
+			setters.setTideLock(decoded.tideLock)
 			setters.setAntistellarLon(decoded.antistellarLon)
 			setters.setPressure(decoded.pressure)
 			setters.setMoonCount(decoded.moonCount ?? 1)
@@ -2457,7 +2458,7 @@ export const GenesisView: React.FC = () => {
 				pressure,
 				moonCount,
 				moonSeed,
-				tidallyLocked,
+				tideLock,
 				antistellarLon,
 				terrainWarp,
 				smoothing,
@@ -2491,7 +2492,7 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
-			tidallyLocked,
+			tideLock,
 			antistellarLon,
 			terrainWarp,
 			smoothing,
@@ -2674,7 +2675,7 @@ export const GenesisView: React.FC = () => {
 		pressure,
 		landDistribution,
 		landCoverage,
-		tidallyLocked,
+		tideLock,
 		antistellarLon,
 		setPlanetRadiusKm,
 		setObliquity: setAxialTilt,
@@ -2739,7 +2740,7 @@ export const GenesisView: React.FC = () => {
 					hoursPerDay,
 					planetRadiusKm,
 					pressure,
-					tidallyLocked,
+					tideLock,
 					moonCount,
 					moonSeed,
 					seaLevel,
@@ -2760,7 +2761,7 @@ export const GenesisView: React.FC = () => {
 			pressure,
 			spectralClass,
 			starSubtype,
-			tidallyLocked,
+			tideLock,
 			moonCount,
 			moonSeed,
 			seaLevel,
@@ -2772,7 +2773,7 @@ export const GenesisView: React.FC = () => {
 	)
 	const generationPreview = useEbmPreview(
 		buildGenerationPreviewConfig({
-			tidallyLocked,
+			tideLock,
 			obliquity,
 			eccentricity,
 			perihelion,
@@ -2789,7 +2790,7 @@ export const GenesisView: React.FC = () => {
 	)
 	const lockedGenerationPreview = useLockedClimatePreview(
 		buildGenerationPreviewConfig({
-			tidallyLocked,
+			tideLock,
 			obliquity,
 			eccentricity,
 			perihelion,
@@ -2864,7 +2865,7 @@ export const GenesisView: React.FC = () => {
 			daysPerYear,
 			hoursPerDay,
 			planetRadiusKm,
-			tidallyLocked,
+			tideLock,
 			spectralClass,
 			starSubtype,
 			orbitalDistanceAU,
@@ -2877,7 +2878,7 @@ export const GenesisView: React.FC = () => {
 		daysPerYear,
 		hoursPerDay,
 		planetRadiusKm,
-		tidallyLocked,
+		tideLock,
 		spectralClass,
 		starSubtype,
 		orbitalDistanceAU,
@@ -2912,11 +2913,20 @@ export const GenesisView: React.FC = () => {
 					worldTab={worldTab}
 					setWorldTab={setWorldTab}
 					resetWorldDefaults={handleResetDefaults}
-					tidallyLocked={tidallyLocked}
-					setTidallyLocked={setTidallyLocked}
+					tideLock={tideLock}
+					setTideLock={setTideLock}
 					setObliquity={setObliquity}
 					moonCount={moonCount}
-					setMoonCount={setMoonCount}
+					setMoonCount={(n) => {
+						setMoonCount(n)
+						if (
+							tideLock?.type === "lunar" &&
+							tideLock.target >= n
+						) {
+							setTideLock(null)
+							setHoursPerDay(24)
+						}
+					}}
 					moonSeed={moonSeed}
 					setMoonSeed={setMoonSeed}
 					tidalSchedulePreview={tidalSchedulePreview}

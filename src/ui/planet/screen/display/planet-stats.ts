@@ -33,7 +33,7 @@ export function computePlanetStats(
 		hoursPerDay: number
 		planetRadiusKm: number
 		pressure: number
-		tidallyLocked: boolean
+		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 		moonCount?: number
 		seaLevel?: number
 		maxElevation?: number
@@ -166,7 +166,7 @@ export function computePlanetStats(
 	}
 
 	const pressureValue = activeParams?.pressure ?? params.pressure
-	const isTidal = activeParams?.tidallyLocked ?? params.tidallyLocked
+	const isTidal = (activeParams?.tideLock ?? params.tideLock)?.type === "solar"
 	const habitabilityScore = world?.population?.habitabilityScore ?? 0
 
 	const avgWindSpeedMs = params.avgWindSpeedMs ?? null

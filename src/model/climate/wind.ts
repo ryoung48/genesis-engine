@@ -402,7 +402,7 @@ export function computeWindVectors(
 		GenesisParams,
 		| "obliquity"
 		| "hoursPerDay"
-		| "tidallyLocked"
+		| "tideLock"
 		| "antistellarLon"
 		| "eccentricity"
 		| "perihelion"
@@ -416,7 +416,7 @@ export function computeWindVectors(
 	pressure: Float32Array
 	windSpeed: Float32Array
 } {
-	if (params?.tidallyLocked) {
+	if (params?.tideLock?.type === "solar") {
 		return computeLockedWindVectors(
 			mesh,
 			climate,
