@@ -296,8 +296,8 @@ interface InfoPanelProps {
 	populationMode: PopulationMapMode
 	selectedTimeMs: number | null
 	displayMonth: number
-	climateTimeMode: "annual" | "monthly"
-	climateMonth: number
+	clockMonthMode: "annual" | "monthly"
+	clockMonth: number
 	unitSystem: UnitSystem
 	world: SerializedGenesisWorld | null
 	routes?: SerializedRoutes | null
@@ -356,8 +356,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	populationMode,
 	selectedTimeMs,
 	displayMonth,
-	climateTimeMode,
-	climateMonth,
+	clockMonthMode,
+	clockMonth,
 	unitSystem,
 	world,
 	routes,
@@ -377,7 +377,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	detailsDrawerOpen,
 }) => {
 	const activeBarIndex =
-		climateTimeMode === "monthly" ? climateMonth : displayMonth - 1
+		clockMonthMode === "monthly" ? clockMonth : displayMonth - 1
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
 	const showPolitical = colorMode === "nations" || colorMode === "timezone"

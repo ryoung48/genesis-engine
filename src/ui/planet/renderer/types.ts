@@ -76,6 +76,7 @@ export interface GenesisScene {
 		timeOfDay: number,
 		hoursPerDay: number,
 	): void
+	setSolarTerminatorVisible(visible: boolean): void
 	setAtmospherePressure(pressureBar: number): void
 	setFullAmbient(enabled: boolean): void
 	focusOnNation(nationId: number, opts?: { durationMs?: number }): void

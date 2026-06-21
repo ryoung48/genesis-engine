@@ -39,11 +39,12 @@ interface StoredViewPrefs {
 	showMoonOrbits: boolean
 	showApparentDiameter: boolean
 	showDaylight: boolean
+	showSolarTerminator: boolean
 	clockCurrent: boolean
 	clockDay: number
 	clockHour: number
-	climateTimeMode: "annual" | "monthly"
-	climateMonth: number
+	clockMonthMode: "annual" | "monthly"
+	clockMonth: number
 	climateSubMode: "basic" | "pasta" | "koppen"
 	elevationSubMode: "colored" | "grayscale"
 	topographySubMode: "classification" | "slope"
@@ -134,11 +135,12 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showMoonOrbits: false,
 	showApparentDiameter: false,
 	showDaylight: false,
+	showSolarTerminator: false,
 	clockCurrent: true,
 	clockDay: 0,
 	clockHour: 12,
-	climateTimeMode: "monthly",
-	climateMonth: 0,
+	clockMonthMode: "monthly",
+	clockMonth: 0,
 	climateSubMode: "basic",
 	elevationSubMode: "colored",
 	topographySubMode: "classification",
@@ -309,21 +311,22 @@ export function parseStoredViewPrefs(
 				parsed.showDaylight,
 				DEFAULT_VIEW_PREFS.showDaylight,
 			),
+			showSolarTerminator: readBoolean(
+				parsed.showSolarTerminator,
+				DEFAULT_VIEW_PREFS.showSolarTerminator,
+			),
 			clockCurrent: readBoolean(
 				parsed.clockCurrent,
 				DEFAULT_VIEW_PREFS.clockCurrent,
 			),
 			clockDay: readNumber(parsed.clockDay, DEFAULT_VIEW_PREFS.clockDay),
 			clockHour: readNumber(parsed.clockHour, DEFAULT_VIEW_PREFS.clockHour),
-			climateTimeMode:
-				parsed.climateTimeMode === "annual" ||
-				parsed.climateTimeMode === "monthly"
-					? parsed.climateTimeMode
-					: DEFAULT_VIEW_PREFS.climateTimeMode,
-			climateMonth: readNumber(
-				parsed.climateMonth,
-				DEFAULT_VIEW_PREFS.climateMonth,
-			),
+			clockMonthMode:
+				parsed.clockMonthMode === "annual" ||
+				parsed.clockMonthMode === "monthly"
+					? parsed.clockMonthMode
+					: DEFAULT_VIEW_PREFS.clockMonthMode,
+			clockMonth: readNumber(parsed.clockMonth, DEFAULT_VIEW_PREFS.clockMonth),
 			climateSubMode:
 				parsed.climateSubMode === "basic" ||
 				parsed.climateSubMode === "pasta" ||

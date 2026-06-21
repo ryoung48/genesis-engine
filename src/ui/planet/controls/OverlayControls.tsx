@@ -134,10 +134,10 @@ interface OverlayControlsProps {
 	setColorMode: (v: ColorMode) => void
 	clockCurrent: boolean
 	setClockCurrent: (v: boolean) => void
-	climateTimeMode: "annual" | "monthly"
-	setClimateTimeMode: (v: "annual" | "monthly") => void
-	climateMonth: number
-	setClimateMonth: (v: number) => void
+	clockMonthMode: "annual" | "monthly"
+	setClockMonthMode: (v: "annual" | "monthly") => void
+	clockMonth: number
+	setClockMonth: (v: number) => void
 	clockDay: number
 	setClockDay: (v: number) => void
 	clockHour?: number
@@ -243,10 +243,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setColorMode,
 	clockCurrent,
 	setClockCurrent,
-	climateTimeMode,
-	setClimateTimeMode,
-	climateMonth,
-	setClimateMonth,
+	clockMonthMode,
+	setClockMonthMode,
+	clockMonth,
+	setClockMonth,
 	clockDay,
 	setClockDay,
 	clockHour = 12,
@@ -638,11 +638,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														type="radio"
 														name="clock-mode"
 														checked={
-															!clockCurrent && climateTimeMode === "annual"
+															!clockCurrent && clockMonthMode === "annual"
 														}
 														onChange={() => {
 															setClockCurrent(false)
-															setClimateTimeMode("annual")
+															setClockMonthMode("annual")
 														}}
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
@@ -653,11 +653,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														type="radio"
 														name="clock-mode"
 														checked={
-															!clockCurrent && climateTimeMode === "monthly"
+															!clockCurrent && clockMonthMode === "monthly"
 														}
 														onChange={() => {
 															setClockCurrent(false)
-															setClimateTimeMode("monthly")
+															setClockMonthMode("monthly")
 														}}
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
@@ -667,7 +667,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 											<div className="border-t border-white/10" />
 											<div
 												className={
-													clockCurrent || climateTimeMode === "annual"
+													clockCurrent || clockMonthMode === "annual"
 														? "space-y-1.5 opacity-50 pointer-events-none"
 														: "space-y-1.5"
 												}
@@ -690,7 +690,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															"Oct",
 															"Nov",
 															"Dec",
-														][climateMonth] ?? climateMonth + 1}
+														][clockMonth] ?? clockMonth + 1}
 													</span>
 												</div>
 												<input
@@ -698,13 +698,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													min={0}
 													max={11}
 													step={1}
-													value={climateMonth}
+													value={clockMonth}
 													onChange={(e) =>
-														setClimateMonth(Number(e.target.value))
+														setClockMonth(Number(e.target.value))
 													}
-													disabled={
-														clockCurrent || climateTimeMode === "annual"
-													}
+													disabled={clockCurrent || clockMonthMode === "annual"}
 													className="w-full accent-slate-100 disabled:cursor-not-allowed"
 												/>
 												<div className="flex items-center justify-between">
@@ -722,9 +720,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													step={1}
 													value={clockDay}
 													onChange={(e) => setClockDay(Number(e.target.value))}
-													disabled={
-														clockCurrent || climateTimeMode === "annual"
-													}
+													disabled={clockCurrent || clockMonthMode === "annual"}
 													className="w-full accent-slate-100 disabled:cursor-not-allowed"
 												/>
 											</div>
