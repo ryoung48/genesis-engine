@@ -54,10 +54,8 @@ function renderWithProps(
 		setLabelMode: vi.fn(),
 		showElevation: true,
 		setShowElevation: vi.fn(),
-		showSettlements: false,
-		setShowSettlements: vi.fn(),
-		showRoads: false,
-		setShowRoads: vi.fn(),
+		showInfrastructure: false,
+		setShowInfrastructure: vi.fn(),
 		gridSpacing: 15,
 		setGridSpacing: vi.fn(),
 		viewMode: "globe",
@@ -207,8 +205,7 @@ describe("OverlayControls", () => {
 		const { markup } = renderWithExpandedSections(
 			{ geographyExpanded: true },
 			{
-				showSettlements: true,
-				showRoads: true,
+				showInfrastructure: true,
 			},
 		)
 

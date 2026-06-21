@@ -67,6 +67,7 @@ interface GenerationPanelProps {
 	generatedMoons?: import("@/model/celestial/moons/moon-types").MoonParams[]
 	daysPerYear: number
 	hoursPerDay: number
+	setHoursPerDay: (v: number) => void
 	planetRadiusKm: number
 	planetSliders: SliderDef[]
 	terrainSliders: SliderDef[]
@@ -419,6 +420,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	generatedMoons,
 	daysPerYear,
 	hoursPerDay,
+	setHoursPerDay,
 	planetRadiusKm,
 	planetSliders,
 	terrainSliders,
@@ -501,6 +503,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	const dayLengthSlider = planetSliders.find(
 		(slider) => slider.label === "Day Length",
 	)
+	const antistellarLonSlider = planetSliders.find(
+		(slider) => slider.label === "Antistellar Lon",
+	)
 	const landSliderLabels = new Set([
 		"Land Coverage",
 		"Land Concentration",
@@ -510,6 +515,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		(slider) =>
 			slider.label !== "Spin" &&
 			slider.label !== "Day Length" &&
+			slider.label !== "Antistellar Lon" &&
 			!landSliderLabels.has(slider.label),
 	)
 	const landSliders = planetSliders.filter((slider) =>
@@ -528,8 +534,14 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 					<button
 						type="button"
 						onClick={() => {
-							setTidallyLocked(!tidallyLocked)
-							if (!tidallyLocked) setObliquity(0)
+							const locking = !tidallyLocked
+							setTidallyLocked(locking)
+							if (locking) {
+								setObliquity(0)
+								setHoursPerDay(daysPerYear * hoursPerDay)
+							} else {
+								setHoursPerDay(24)
+							}
 						}}
 						className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
 					>
@@ -680,8 +692,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							"double",
 							renderPlanetSliderSuffix,
 						)}
-						{dayLengthSlider && (
-							<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5">
+						<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5">
+							{dayLengthSlider && (
 								<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
 									<div className="flex items-center justify-between gap-3">
 										<UITooltip content={dayLengthSlider.help} position="top">
@@ -709,26 +721,59 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										className="mt-1.5 w-full accent-slate-900 h-1 rounded-lg cursor-pointer"
 									/>
 								</div>
+							)}
+							{antistellarLonSlider && (
 								<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
 									<div className="flex items-center justify-between gap-3">
 										<UITooltip
-											content="Derived from stellar mass and orbital distance using Kepler's third law."
+											content={antistellarLonSlider.help}
 											position="top"
 										>
 											<label className="cursor-help whitespace-nowrap border-b border-dotted border-slate-300 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-slate-500 xl:text-[10px]">
-												Year Length
+												{antistellarLonSlider.label}
 											</label>
 										</UITooltip>
-										<span className="font-mono text-[10px] text-slate-400">
-											{yearLengthYears.toFixed(2)}×
+										<span className="flex min-h-4 items-center gap-1.5">
+											{renderPlanetSliderSuffix(antistellarLonSlider)}
+											<span className="font-mono text-[10px] text-slate-400">
+												{antistellarLonSlider.display}
+											</span>
 										</span>
 									</div>
-									<div className="mt-1.5 rounded-md bg-slate-50 px-2 py-1.5 text-[10px] leading-relaxed text-slate-400">
-										Derived from star + orbit
+									<input
+										type="range"
+										min={antistellarLonSlider.min}
+										max={antistellarLonSlider.max}
+										step={antistellarLonSlider.step}
+										value={antistellarLonSlider.value}
+										onChange={(e) =>
+											antistellarLonSlider.set(parseFloat(e.target.value))
+										}
+										disabled={!!antistellarLonSlider.disabled}
+										className="mt-1.5 w-full accent-slate-900 h-1 rounded-lg cursor-pointer"
+									/>
+								</div>
+							)}
+							<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 flex flex-col">
+								<UITooltip
+									content={
+										tidallyLocked
+											? "Tidally locked — year equals day."
+											: "Derived from stellar mass and orbital distance using Kepler's third law."
+									}
+									position="top"
+								>
+									<div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+										Year Length
+									</div>
+								</UITooltip>
+								<div className="flex-1 flex items-center">
+									<div className="font-mono text-[11px] font-semibold text-slate-700">
+										{`${yearLengthYears.toFixed(3)}x Earth yr`}
 									</div>
 								</div>
 							</div>
-						)}
+						</div>
 						{landSliders.length > 0 &&
 							renderSliderGroup(
 								landSliders,

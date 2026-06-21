@@ -4,6 +4,7 @@ import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
 } from "@/model/celestial/moons/orbital-mechanics"
+import { scaleClockDialHourToDayLength } from "../clock"
 
 const MOON_COLORS = ["#0ea5e9", "#8b5cf6", "#10b981"]
 const TWO_PI = 2 * Math.PI
@@ -44,6 +45,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 	const MARGIN = 18
 	const cx = SIZE / 2
 	const cy = SIZE / 2
+	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
 
 	const orbits = useMemo(() => {
 		if (moons.length === 0) return []
@@ -86,7 +88,8 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 			const globalPosX = posX * cosOmega - posY * sinOmega
 			const globalPosY = posX * sinOmega + posY * cosOmega
 			const moonDistance = Math.hypot(globalPosX, globalPosY)
-			const sunAngle = Math.PI + TWO_PI * (clockHour / (hoursPerDay || 24))
+			const sunAngle =
+				Math.PI + TWO_PI * (scaledClockHour / (hoursPerDay || 24))
 			const sunDirX = Math.cos(sunAngle)
 			const sunDirY = Math.sin(sunAngle)
 			const moonDirX = moonDistance > 0 ? globalPosX / moonDistance : 0
@@ -112,7 +115,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				label: `M${i + 1}`,
 			}
 		})
-	}, [moons, hoursPerDay, day, planetRadiusKm, clockHour])
+	}, [moons, hoursPerDay, day, planetRadiusKm, scaledClockHour])
 
 	return (
 		<div

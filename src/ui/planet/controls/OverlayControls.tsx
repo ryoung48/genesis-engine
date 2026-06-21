@@ -14,6 +14,12 @@ import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
+import {
+	CLOCK_DIAL_HOURS,
+	clampClockDialHour,
+	formatClockTimeDisplay,
+	scaleClockDialHourToDayLength,
+} from "../clock"
 import type { ColorMode } from "../colors"
 import type { GenesisViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
@@ -114,10 +120,8 @@ interface OverlayControlsProps {
 	setLabelMode: (v: LabelMode) => void
 	showElevation: boolean
 	setShowElevation: (v: boolean) => void
-	showSettlements: boolean
-	setShowSettlements: (v: boolean) => void
-	showRoads: boolean
-	setShowRoads: (v: boolean) => void
+	showInfrastructure: boolean
+	setShowInfrastructure: (v: boolean) => void
 	gridSpacing: number
 	setGridSpacing: (v: number) => void
 	viewMode: GenesisViewMode
@@ -142,7 +146,10 @@ interface OverlayControlsProps {
 	setClockDay: (v: number) => void
 	clockHour?: number
 	setClockHour?: (v: number) => void
+	clockUseMeridiem?: boolean
+	setClockUseMeridiem?: (v: boolean) => void
 	hoursPerDay?: number
+	tidallyLocked?: boolean
 	daysPerYear: number
 	climateSubMode: "basic" | "pasta" | "koppen"
 	setClimateSubMode: (v: "basic" | "pasta" | "koppen") => void
@@ -178,6 +185,8 @@ interface OverlayControlsProps {
 	setShowApparentDiameter?: (v: boolean) => void
 	showDaylight?: boolean
 	setShowDaylight?: (v: boolean) => void
+	showSolarTerminator?: boolean
+	setShowSolarTerminator?: (v: boolean) => void
 	moonCount?: number
 }
 
@@ -223,10 +232,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setLabelMode,
 	showElevation,
 	setShowElevation,
-	showSettlements,
-	setShowSettlements,
-	showRoads,
-	setShowRoads,
+	showInfrastructure,
+	setShowInfrastructure,
 	gridSpacing,
 	setGridSpacing,
 	viewMode,
@@ -251,7 +258,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setClockDay,
 	clockHour = 12,
 	setClockHour = () => undefined,
+	clockUseMeridiem = false,
+	setClockUseMeridiem = () => undefined,
 	hoursPerDay = 24,
+	tidallyLocked = false,
 	daysPerYear,
 	climateSubMode,
 	setClimateSubMode,
@@ -285,6 +295,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowApparentDiameter,
 	showDaylight = false,
 	setShowDaylight,
+	setShowSolarTerminator,
 	moonCount = 0,
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
@@ -301,6 +312,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [elevationExpanded, setElevationExpanded] = React.useState(false)
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
+	const hasCelestialControls = Boolean(
+		(moonCount > 0 && setShowMoonOrbits) ||
+			setShowApparentDiameter ||
+			(setShowDaylight && setShowSolarTerminator),
+	)
 	const [lastTempSubMode, setLastTempSubMode] = React.useState<
 		"temperature" | "dtr" | "misery"
 	>("temperature")
@@ -324,7 +340,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 			: localExportExpanded
 	const setExportExpanded =
 		controlledSetExportExpanded ?? setLocalExportExpanded
-	const infrastructureVisible = showSettlements || showRoads
+	const clampedClockHour = clampClockDialHour(clockHour)
+	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
+	const daysPerMonth = Math.max(1, Math.round(daysPerYear / 12))
+	const clampedClockDay = Math.max(0, Math.min(clockDay, daysPerMonth - 1))
 	const commitMapProjectionLatitude = (
 		event:
 			| React.PointerEvent<HTMLInputElement>
@@ -710,45 +729,61 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														Day
 													</label>
 													<span className="font-mono text-[11px] text-slate-400">
-														{clockDay + 1}
+														#{clampedClockDay + 1}
 													</span>
 												</div>
 												<input
 													type="range"
 													min={0}
-													max={Math.round(daysPerYear / 12) - 1}
+													max={daysPerMonth - 1}
 													step={1}
-													value={clockDay}
+													value={clampedClockDay}
 													onChange={(e) => setClockDay(Number(e.target.value))}
 													disabled={clockCurrent || clockMonthMode === "annual"}
 													className="w-full accent-slate-100 disabled:cursor-not-allowed"
 												/>
 											</div>
-											<div className="border-t border-white/10" />
-											<div className="space-y-1.5">
-												<div className="flex items-center justify-between">
-													<label className="text-[11px] font-medium text-slate-300">
-														Hour
+											{!tidallyLocked && (
+												<div className="space-y-1">
+													<div className="flex items-center justify-between">
+														<label className="text-[11px] font-medium text-slate-300">
+															Hour
+														</label>
+														<span className="font-mono text-[11px] text-slate-400">
+															{formatClockTimeDisplay(
+																scaledClockHour,
+																hoursPerDay,
+																clockUseMeridiem,
+															)}
+														</span>
+													</div>
+													<input
+														type="range"
+														min={0}
+														max={CLOCK_DIAL_HOURS}
+														step={0.5}
+														value={clampedClockHour}
+														onChange={(e) => setClockHour(Number(e.target.value))}
+														className="m-0 block w-full accent-slate-100"
+													/>
+													<label className="mt-1.5 flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+														<span>AM / PM</span>
+														<input
+															type="checkbox"
+															checked={clockUseMeridiem}
+															onChange={(e) =>
+																setClockUseMeridiem(e.target.checked)
+															}
+															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+														/>
 													</label>
-													<span className="font-mono text-[11px] text-slate-400">
-														{clockHour.toFixed(1)} / {hoursPerDay.toFixed(1)}
-													</span>
 												</div>
-												<input
-													type="range"
-													min={0}
-													max={hoursPerDay}
-													step={0.5}
-													value={Math.max(0, Math.min(clockHour, hoursPerDay))}
-													onChange={(e) => setClockHour(Number(e.target.value))}
-													className="w-full accent-slate-100"
-												/>
-											</div>
+											)}
 										</div>
 									)}
 								</div>
 
-								{moonCount > 0 && (
+								{hasCelestialControls && (
 									<div>
 										<button
 											type="button"
@@ -763,7 +798,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										</button>
 										{celestialExpanded && (
 											<div className="mt-1.5 space-y-1.5 pl-2">
-												{setShowMoonOrbits && (
+												{moonCount > 0 && setShowMoonOrbits && (
 													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
 														<span>Moon Orbits</span>
 														<input
@@ -789,15 +824,16 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														/>
 													</label>
 												)}
-												{setShowDaylight && (
+												{setShowDaylight && setShowSolarTerminator && (
 													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
 														<span>Daylight</span>
 														<input
 															type="checkbox"
 															checked={showDaylight}
-															onChange={(e) =>
+															onChange={(e) => {
 																setShowDaylight(e.target.checked)
-															}
+																setShowSolarTerminator(e.target.checked)
+															}}
 															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 														/>
 													</label>
@@ -843,12 +879,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												<span>Infrastructure</span>
 												<input
 													type="checkbox"
-													checked={infrastructureVisible}
-													onChange={(e) => {
-														const checked = e.target.checked
-														setShowSettlements(checked)
-														setShowRoads(checked)
-													}}
+													checked={showInfrastructure}
+													onChange={(e) =>
+														setShowInfrastructure(e.target.checked)
+													}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>

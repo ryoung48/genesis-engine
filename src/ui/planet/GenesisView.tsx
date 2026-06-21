@@ -8,11 +8,17 @@ import {
 import type { MainSequenceClass } from "@/model/celestial/star/star-types"
 import {
 	DEFAULT_SPECTRAL_CLASS,
+	getKeplerYearYears,
 	getStarMassSol,
 	isValidSpectralClass,
 } from "@/model/celestial/star/star-types"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
+import {
+	computeMonthlyLibration,
+	computeMonthlyLockedDeclination,
+	getSubstellarDirWithOffsetAndDeclination,
+} from "@/model/climate/locked/heat"
 import { buildLockedOceanCurrentGrid } from "@/model/climate/locked/ocean-currents"
 import { buildOceanCurrentGrid } from "@/model/climate/ocean-currents"
 import {
@@ -51,6 +57,10 @@ import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { ClimatePreviewOverlay } from "@/ui/preview/ClimatePreviewOverlay"
+import { scaleClockDialHourToDayLength } from "./clock"
+
+const EARTH_DAYS_PER_YEAR = 365
+
 import type { ColorMode } from "./colors"
 import {
 	climateZoneColor,
@@ -396,10 +406,9 @@ export const GenesisView: React.FC = () => {
 	const [showGint, setShowGint] = useState(false)
 	const [showPet, setShowPet] = useState(false)
 	const [showAet, setShowAet] = useState(false)
-	const [showSettlements, setShowSettlements] = useState(
-		initialViewPrefs.showSettlements,
+	const [showInfrastructure, setShowInfrastructure] = useState(
+		initialViewPrefs.showInfrastructure,
 	)
-	const [showRoads, setShowRoads] = useState(initialViewPrefs.showRoads)
 	const [labelMode, setLabelMode] = useState<LabelMode>(
 		initialViewPrefs.labelMode,
 	)
@@ -440,6 +449,9 @@ export const GenesisView: React.FC = () => {
 	)
 	const [clockMonth, setClockMonth] = useState(initialViewPrefs.clockMonth)
 	const [clockHour, setClockHour] = useState(initialViewPrefs.clockHour)
+	const [clockUseMeridiem, setClockUseMeridiem] = useState(
+		initialViewPrefs.clockUseMeridiem,
+	)
 	const [climateSubMode, setClimateSubMode] = useState<
 		"basic" | "pasta" | "koppen"
 	>(initialViewPrefs.climateSubMode)
@@ -642,9 +654,27 @@ export const GenesisView: React.FC = () => {
 	const [hoursPerDay, setHoursPerDay] = useState(
 		initialDecodedCode?.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
 	)
+	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
+	const effectiveStarClass: MainSequenceClass = isValidSpectralClass(
+		spectralClass,
+	)
+		? spectralClass
+		: DEFAULT_SPECTRAL_CLASS
+	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
 	const [tidallyLocked, setTidallyLocked] = useState(
 		initialDecodedCode?.tidallyLocked ?? false,
 	)
+	const effectiveDaysPerYear = tidallyLocked
+		? 1
+		: Math.max(
+				1,
+				Math.round(
+					(getKeplerYearYears(orbitalDistanceAU, effectiveStarMassSol) *
+						EARTH_DAYS_PER_YEAR *
+						24) /
+						Math.max(hoursPerDay, 0.001),
+				),
+			)
 	const [antistellarLon, setAntistellarLon] = useState(
 		initialDecodedCode?.antistellarLon ?? DEFAULT_WORLD_PARAMS.antistellarLon,
 	)
@@ -775,8 +805,7 @@ export const GenesisView: React.FC = () => {
 				showWindArrows,
 				showOceanCurrents,
 				showRivers,
-				showSettlements,
-				showRoads,
+				showInfrastructure,
 				overlaysExpanded,
 				gridSpacing,
 				unitSystem,
@@ -792,6 +821,7 @@ export const GenesisView: React.FC = () => {
 				clockCurrent,
 				clockDay,
 				clockHour,
+				clockUseMeridiem,
 				clockMonthMode,
 				clockMonth,
 				climateSubMode,
@@ -809,6 +839,7 @@ export const GenesisView: React.FC = () => {
 		clockCurrent,
 		clockDay,
 		clockHour,
+		clockUseMeridiem,
 		clockMonthMode,
 		clockMonth,
 		climateSubMode,
@@ -823,8 +854,7 @@ export const GenesisView: React.FC = () => {
 		overlaysExpanded,
 		populationMode,
 		showGrid,
-		showSettlements,
-		showRoads,
+		showInfrastructure,
 		showNationBorders,
 		showLandBorders,
 		showNationHierarchy,
@@ -1530,33 +1560,47 @@ export const GenesisView: React.FC = () => {
 		const scene = sceneRef.current
 		if (!scene) return
 		scene.setFullAmbient(!showDaylight)
+		scene.setSolarTerminatorUseMeridiem(clockUseMeridiem)
 		scene.setSolarTerminatorVisible(showSolarTerminator)
 		if (tidallyLocked) {
-			// Sun at substellar point = antistellar + 180°
-			const subLonDeg = (antistellarLon + 180) % 360
-			const effectiveTime = (0.5 + subLonDeg / 360) * hoursPerDay
-			scene.setSunPosition(
-				0,
-				0,
-				((effectiveTime % hoursPerDay) + hoursPerDay) % hoursPerDay,
-				hoursPerDay,
+			const selectedMonth =
+				clockMonthMode === "annual" ? 5 : clockMonth
+			const monthlyLibration = computeMonthlyLibration(eccentricity, perihelion)
+			const monthlyDeclination = computeMonthlyLockedDeclination(
+				obliquity,
+				eccentricity,
+				perihelion,
 			)
+			const [sx, sy, sz] = getSubstellarDirWithOffsetAndDeclination(
+				antistellarLon,
+				monthlyLibration[selectedMonth] ?? 0,
+				monthlyDeclination[selectedMonth] ?? 0,
+			)
+			scene.setSunDirection(sx, sy, sz, hoursPerDay)
 		} else {
 			const lightingMonth =
 				clockMonthMode === "annual"
 					? 0
-					: clockMonth + 1 + clockDay / (daysPerYear / 12)
-			scene.setSunPosition(lightingMonth, obliquity, clockHour, hoursPerDay)
+					: clockMonth + 1 + clockDay / (effectiveDaysPerYear / 12)
+			scene.setSunPosition(
+				lightingMonth,
+				obliquity,
+				scaledClockHour,
+				hoursPerDay,
+			)
 		}
 	}, [
 		showDaylight,
 		showSolarTerminator,
+		clockUseMeridiem,
 		clockMonthMode,
 		clockMonth,
 		clockDay,
-		daysPerYear,
-		clockHour,
+		effectiveDaysPerYear,
+		scaledClockHour,
 		obliquity,
+		eccentricity,
+		perihelion,
 		hoursPerDay,
 		tidallyLocked,
 		antistellarLon,
@@ -2042,29 +2086,29 @@ export const GenesisView: React.FC = () => {
 		sceneRef.current?.setGridSpacing(gridSpacing)
 	}, [gridSpacing])
 	useEffect(() => {
-		sceneRef.current?.setSettlementsVisible(showSettlements)
-	}, [showSettlements])
+		sceneRef.current?.setSettlementsVisible(showInfrastructure)
+	}, [showInfrastructure])
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showSettlements && worldForDisplay?.urbanPopulation) {
+		if (showInfrastructure && worldForDisplay?.urbanPopulation) {
 			scene.setSettlements(worldForDisplay.urbanPopulation)
 		} else {
 			scene.setSettlements(null)
 		}
-	}, [showSettlements, worldForDisplay])
+	}, [showInfrastructure, worldForDisplay])
 	useEffect(() => {
-		sceneRef.current?.setInfrastructureVisible(showRoads)
-	}, [showRoads])
+		sceneRef.current?.setInfrastructureVisible(showInfrastructure)
+	}, [showInfrastructure])
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showRoads && worldForDisplay?.network) {
+		if (showInfrastructure && worldForDisplay?.network) {
 			scene.setInfrastructure(worldForDisplay.network)
 		} else {
 			scene.setInfrastructure(null)
 		}
-	}, [showRoads, worldForDisplay])
+	}, [showInfrastructure, worldForDisplay])
 
 	// --- Labels ---
 	useEffect(() => {
@@ -2786,7 +2830,7 @@ export const GenesisView: React.FC = () => {
 
 	// --- Moon orbits (3D scene, globe mode only) ---
 	const moonOrbitDayOfYear =
-		clockDay + clockMonth * Math.round(daysPerYear / 12)
+		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)
 	useEffect(() => {
 		sceneRef.current?.setMoonOrbitOverlay(
 			showMoonOrbits && viewMode === "globe" && generatedMoonsPreview.length > 0
@@ -2879,6 +2923,7 @@ export const GenesisView: React.FC = () => {
 					generatedMoons={generatedMoonsPreview}
 					daysPerYear={daysPerYear}
 					hoursPerDay={hoursPerDay}
+					setHoursPerDay={setHoursPerDay}
 					planetRadiusKm={planetRadiusKm}
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
@@ -3073,10 +3118,8 @@ export const GenesisView: React.FC = () => {
 							setLabelMode={setLabelMode}
 							showElevation={showElevation}
 							setShowElevation={setShowElevation}
-							showSettlements={showSettlements}
-							setShowSettlements={setShowSettlements}
-							showRoads={showRoads}
-							setShowRoads={setShowRoads}
+							showInfrastructure={showInfrastructure}
+							setShowInfrastructure={setShowInfrastructure}
 							gridSpacing={gridSpacing}
 							setGridSpacing={setGridSpacing}
 							viewMode={viewMode}
@@ -3101,8 +3144,11 @@ export const GenesisView: React.FC = () => {
 							setClockDay={setClockDay}
 							clockHour={clockHour}
 							setClockHour={setClockHour}
+							clockUseMeridiem={clockUseMeridiem}
+							setClockUseMeridiem={setClockUseMeridiem}
 							hoursPerDay={hoursPerDay}
-							daysPerYear={daysPerYear}
+							tidallyLocked={tidallyLocked}
+							daysPerYear={effectiveDaysPerYear}
 							climateSubMode={climateSubMode}
 							setClimateSubMode={setClimateSubMode}
 							elevationSubMode={elevationSubMode}
@@ -3148,8 +3194,7 @@ export const GenesisView: React.FC = () => {
 									heritage: false,
 								})
 								setShowElevation(false)
-								setShowSettlements(false)
-								setShowRoads(false)
+								setShowInfrastructure(false)
 								setMeasureMode("off")
 								setPathfindingLand(true)
 								setPathfindingSea(true)
@@ -3169,6 +3214,8 @@ export const GenesisView: React.FC = () => {
 							setShowApparentDiameter={setShowApparentDiameter}
 							showDaylight={showDaylight}
 							setShowDaylight={setShowDaylight}
+							showSolarTerminator={showSolarTerminator}
+							setShowSolarTerminator={setShowSolarTerminator}
 							moonCount={moonCount}
 						/>
 

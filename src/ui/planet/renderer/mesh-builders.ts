@@ -309,6 +309,7 @@ export function buildMapMesh(
 
 	const positions = new Float32Array(numSides * 18)
 	const colors = new Float32Array(numSides * 18)
+	const lonLat = new Float32Array(numSides * 12)
 	const faceToRegion = new Int32Array(numSides * 2)
 	let triangleCount = 0
 
@@ -382,6 +383,13 @@ export function buildMapMesh(
 			positions[offset + 6] = projection.clampX(c[0])
 			positions[offset + 7] = projection.clampY(c[1])
 			positions[offset + 8] = 0
+			const lonLatOffset = triangleCount * 6
+			lonLat[lonLatOffset] = aLon
+			lonLat[lonLatOffset + 1] = aLat
+			lonLat[lonLatOffset + 2] = bLon
+			lonLat[lonLatOffset + 3] = bLat
+			lonLat[lonLatOffset + 4] = cLon
+			lonLat[lonLatOffset + 5] = cLat
 			for (let vertex = 0; vertex < 3; vertex++) {
 				colors[offset + vertex * 3] = vertexColors[vertex][0]
 				colors[offset + vertex * 3 + 1] = vertexColors[vertex][1]
@@ -423,6 +431,13 @@ export function buildMapMesh(
 			3,
 		),
 	)
+	geometry.setAttribute(
+		"lonLat",
+		new THREE.BufferAttribute(
+			new Float32Array(lonLat.subarray(0, triangleCount * 6)),
+			2,
+		),
+	)
 
 	const vertexCount = triangleCount * 3
 	geometry.setAttribute(
@@ -438,35 +453,51 @@ export function buildMapMesh(
 		side: THREE.DoubleSide,
 		uniforms: {
 			uAmbient: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+			uSunDirection: { value: new THREE.Vector3(1.0, 0.0, 0.0) },
+			uSunLight: { value: new THREE.Vector3(0.0, 0.0, 0.0) },
 		},
 		vertexShader: `
 			attribute vec3 color;
 			attribute vec3 occColor;
 			attribute float occMask;
+			attribute vec2 lonLat;
 			varying vec3 vColor;
 			varying vec3 vOccColor;
 			varying float vOccMask;
 			varying vec2 vWorldPos;
+			varying vec2 vLonLat;
 			void main() {
 				vColor = color;
 				vOccColor = occColor;
 				vOccMask = occMask;
 				vWorldPos = position.xy;
+				vLonLat = lonLat;
 				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 			}
 		`,
 		fragmentShader: `
 			uniform vec3 uAmbient;
+			uniform vec3 uSunDirection;
+			uniform vec3 uSunLight;
 			varying vec3 vColor;
 			varying vec3 vOccColor;
 			varying float vOccMask;
 			varying vec2 vWorldPos;
+			varying vec2 vLonLat;
 			void main() {
-				vec3 finalColor = vColor * uAmbient;
+				float cosLat = cos(vLonLat.y);
+				vec3 surfaceNormal = vec3(
+					cosLat * cos(vLonLat.x),
+					cosLat * sin(vLonLat.x),
+					sin(vLonLat.y)
+				);
+				float daylight = max(dot(normalize(surfaceNormal), normalize(uSunDirection)), 0.0);
+				vec3 light = uAmbient + (uSunLight * daylight);
+				vec3 finalColor = vColor * light;
 				if (vOccMask > 0.5) {
 					float stripe = fract((vWorldPos.x + vWorldPos.y) * 150.0);
 					if (stripe > 0.25 && stripe < 0.75) {
-						finalColor = vOccColor * uAmbient;
+						finalColor = vOccColor * light;
 					}
 				}
 				gl_FragColor = linearToOutputTexel(vec4(finalColor, 1.0));

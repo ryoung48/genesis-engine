@@ -76,6 +76,8 @@ export interface GenesisScene {
 		timeOfDay: number,
 		hoursPerDay: number,
 	): void
+	setSunDirection(x: number, y: number, z: number, hoursPerDay: number): void
+	setSolarTerminatorUseMeridiem(enabled: boolean): void
 	setSolarTerminatorVisible(visible: boolean): void
 	setAtmospherePressure(pressureBar: number): void
 	setFullAmbient(enabled: boolean): void

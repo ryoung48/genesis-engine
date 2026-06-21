@@ -9,6 +9,7 @@ import {
 	type SerializedGenesisWorld,
 	type SerializedNetwork,
 } from "@/model/transport/worker-types"
+import { formatClockTimeDisplay } from "../clock"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
 import { disposeGroup, disposeObject3D } from "./disposal"
@@ -95,27 +96,19 @@ import type {
 } from "./types"
 
 const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
-const SOLAR_TERMINATOR_LINE_COLOR = 0xfacc15
-const SOLAR_TERMINATOR_GLOW_COLOR = 0xf59e0b
+const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc
+const SOLAR_TERMINATOR_HAIRLINE_COLOR = 0x0f172a
+const SOLAR_TERMINATOR_BAND_COLOR = 0xe2e8f0
 const SOLAR_TERMINATOR_RADIUS = 1.02
 const SOLAR_TERMINATOR_ELEVATED_RADIUS = 1.05
-const SOLAR_TERMINATOR_LABEL_COUNT = 10
+const SOLAR_TERMINATOR_BAND_HALF_WIDTH = 0.008
+const SOLAR_TERMINATOR_LABEL_COUNT = 24
 const SOLAR_TERMINATOR_LABEL_RENDER_ORDER = 1002
-const SOLAR_TERMINATOR_LABEL_TEXT_COLOR = "#fff7d6"
-const SOLAR_TERMINATOR_LABEL_BG_FILL = "rgba(120, 53, 15, 0.92)"
-const SOLAR_TERMINATOR_LABEL_BG_STROKE = "rgba(245, 158, 11, 0.95)"
-const SOLAR_TERMINATOR_LABEL_BASE_FONT_PX = 17
-
-function formatSolarTerminatorTime(
-	localHours: number,
-	hoursPerDay: number,
-): string {
-	const wrapped =
-		((localHours % hoursPerDay) + hoursPerDay) % Math.max(hoursPerDay, 0.001)
-	const hours = Math.floor(wrapped)
-	const minutes = Math.floor((wrapped - hours) * 60)
-	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
-}
+const SOLAR_TERMINATOR_LABEL_TEXT_COLOR = "#0f172a"
+const SOLAR_TERMINATOR_LABEL_BG_FILL = "rgba(248, 250, 252, 0.94)"
+const SOLAR_TERMINATOR_LABEL_BG_STROKE = "rgba(148, 163, 184, 0.55)"
+const SOLAR_TERMINATOR_LABEL_BASE_FONT_PX = 12
+const SOLAR_TERMINATOR_LABEL_TEXTURE_SCALE = 2
 
 function drawRoundedRect(
 	ctx: CanvasRenderingContext2D,
@@ -138,6 +131,38 @@ function drawRoundedRect(
 	ctx.closePath()
 }
 
+function createSolarTerminatorBand(
+	points: THREE.Vector3[],
+	radius: number,
+	halfWidth: number,
+): THREE.BufferGeometry {
+	const positions = new Float32Array(points.length * 2 * 3)
+	const indices: number[] = []
+
+	for (let index = 0; index < points.length; index++) {
+		const direction = points[index]!.clone().normalize()
+		const inner = direction.clone().multiplyScalar(radius - halfWidth)
+		const outer = direction.clone().multiplyScalar(radius + halfWidth)
+		const offset = index * 6
+		positions[offset] = inner.x
+		positions[offset + 1] = inner.y
+		positions[offset + 2] = inner.z
+		positions[offset + 3] = outer.x
+		positions[offset + 4] = outer.y
+		positions[offset + 5] = outer.z
+	}
+
+	for (let index = 0; index < points.length - 1; index++) {
+		const base = index * 2
+		indices.push(base, base + 1, base + 3, base, base + 3, base + 2)
+	}
+
+	const geometry = new THREE.BufferGeometry()
+	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+	geometry.setIndex(indices)
+	return geometry
+}
+
 function createSolarTerminatorLabelSprite(label: string): {
 	sprite: THREE.Sprite
 	aspect: number
@@ -146,23 +171,26 @@ function createSolarTerminatorLabelSprite(label: string): {
 	const canvas = document.createElement("canvas")
 	const ctx = canvas.getContext("2d")
 	if (!ctx) return null
-	ctx.font = `600 ${SOLAR_TERMINATOR_LABEL_BASE_FONT_PX}px ui-monospace, SFMono-Regular, Menlo, monospace`
+	const textureScale = SOLAR_TERMINATOR_LABEL_TEXTURE_SCALE
+	const scaledFontPx = SOLAR_TERMINATOR_LABEL_BASE_FONT_PX * textureScale
+	ctx.font = `500 ${scaledFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`
 	const textMetrics = ctx.measureText(label)
-	const width = Math.ceil(textMetrics.width + 22)
-	const height = 32
-	canvas.width = width
-	canvas.height = height
-	ctx.font = `600 ${SOLAR_TERMINATOR_LABEL_BASE_FONT_PX}px ui-monospace, SFMono-Regular, Menlo, monospace`
+	const width = Math.ceil(textMetrics.width / textureScale + 14)
+	const height = 22
+	canvas.width = width * textureScale
+	canvas.height = height * textureScale
+	ctx.setTransform(textureScale, 0, 0, textureScale, 0, 0)
+	ctx.font = `500 ${SOLAR_TERMINATOR_LABEL_BASE_FONT_PX}px ui-monospace, SFMono-Regular, Menlo, monospace`
 	ctx.textAlign = "center"
 	ctx.textBaseline = "middle"
 	ctx.fillStyle = SOLAR_TERMINATOR_LABEL_BG_FILL
-	ctx.strokeStyle = SOLAR_TERMINATOR_LABEL_BG_STROKE
-	ctx.lineWidth = 2
-	drawRoundedRect(ctx, 1, 1, width - 2, height - 2, 9)
+	drawRoundedRect(ctx, 0.5, 0.5, width - 1, height - 1, 6)
 	ctx.fill()
+	ctx.strokeStyle = SOLAR_TERMINATOR_LABEL_BG_STROKE
+	ctx.lineWidth = 1
 	ctx.stroke()
 	ctx.fillStyle = SOLAR_TERMINATOR_LABEL_TEXT_COLOR
-	ctx.fillText(label, width / 2, height / 2 + 1)
+	ctx.fillText(label, width / 2, height / 2 + 0.5)
 	const texture = new THREE.CanvasTexture(canvas)
 	texture.needsUpdate = true
 	texture.colorSpace = THREE.SRGBColorSpace
@@ -175,6 +203,121 @@ function createSolarTerminatorLabelSprite(label: string): {
 	const sprite = new THREE.Sprite(material)
 	sprite.renderOrder = SOLAR_TERMINATOR_LABEL_RENDER_ORDER
 	return { sprite, aspect: width / height }
+}
+
+function getSolarTerminatorLabelText(params: {
+	anchor: THREE.Vector3
+	sunDirection: THREE.Vector3
+	hoursPerDay: number
+	useMeridiem: boolean
+}) {
+	const { anchor, sunDirection, hoursPerDay, useMeridiem } = params
+	const latitude = Math.asin(anchor.z)
+	const declination = Math.asin(sunDirection.z)
+	const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
+	const sinH0 = Math.sin(h0)
+	const denom = Math.max(
+		1e-6,
+		Math.abs(Math.cos(latitude) * Math.cos(declination)),
+	)
+	const cosHourAngle = THREE.MathUtils.clamp(
+		(sinH0 - Math.sin(latitude) * Math.sin(declination)) / denom,
+		-1,
+		1,
+	)
+	const hourAngleMagnitude = Math.acos(cosHourAngle)
+	const east = new THREE.Vector3(-anchor.y, anchor.x, 0)
+	if (east.lengthSq() < 1e-6) east.set(0, 1, 0)
+	east.normalize()
+	const isSunrise = east.dot(sunDirection) > 0
+	const localHours =
+		12 +
+		((isSunrise ? -hourAngleMagnitude : hourAngleMagnitude) * hoursPerDay) /
+			(2 * Math.PI)
+	return `${isSunrise ? "↑" : "↓"} ${formatClockTimeDisplay(
+		localHours,
+		hoursPerDay,
+		useMeridiem,
+	)}`
+}
+
+function buildSolarTerminatorRingPoints(
+	sunDirection: THREE.Vector3,
+	radius: number,
+): THREE.Vector3[] | null {
+	const sunDir = sunDirection.clone().normalize()
+	if (sunDir.lengthSq() === 0) return null
+	const reference =
+		Math.abs(sunDir.z) > 0.9
+			? new THREE.Vector3(1, 0, 0)
+			: new THREE.Vector3(0, 0, 1)
+	const uAxis = new THREE.Vector3().crossVectors(reference, sunDir).normalize()
+	const vAxis = new THREE.Vector3().crossVectors(sunDir, uAxis).normalize()
+	const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
+	const sinH0 = Math.sin(h0)
+	const cosH0 = Math.cos(h0)
+	const sampleCount = 192
+	const points: THREE.Vector3[] = []
+	for (let index = 0; index <= sampleCount; index++) {
+		const t = (index / sampleCount) * Math.PI * 2
+		const ring = uAxis
+			.clone()
+			.multiplyScalar(Math.cos(t))
+			.addScaledVector(vAxis, Math.sin(t))
+		points.push(
+			sunDir
+				.clone()
+				.multiplyScalar(sinH0)
+				.addScaledVector(ring, cosH0)
+				.normalize()
+				.multiplyScalar(radius),
+		)
+	}
+	return points
+}
+
+function projectSolarTerminatorPointsToMap(
+	points: THREE.Vector3[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+	zOffset: number,
+): THREE.Vector3[][] {
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
+	const segments: THREE.Vector3[][] = []
+	let currentSegment: THREE.Vector3[] = []
+	const seamThreshold = projection.repeatWidth * 0.5
+
+	for (let index = 0; index < points.length; index++) {
+		const point = points[index]!
+		const lon = Math.atan2(point.y, point.x)
+		const lat = Math.asin(
+			THREE.MathUtils.clamp(point.z / Math.max(point.length(), 1e-6), -1, 1),
+		)
+		const projected = projection.projectRadians(lon, lat, zOffset)
+		const nextPoint = new THREE.Vector3(
+			projection.clampX(projected[0]),
+			projection.clampY(projected[1]),
+			projected[2],
+		)
+		const previousPoint = currentSegment[currentSegment.length - 1]
+
+		if (
+			previousPoint &&
+			Math.abs(nextPoint.x - previousPoint.x) > seamThreshold
+		) {
+			if (currentSegment.length > 1) segments.push(currentSegment)
+			currentSegment = [nextPoint]
+			continue
+		}
+
+		currentSegment.push(nextPoint)
+	}
+
+	if (currentSegment.length > 1) segments.push(currentSegment)
+	return segments
 }
 
 export function reapplyMeshOverlayState(params: {
@@ -470,6 +613,8 @@ function addMapSlideClones(object: THREE.Object3D) {
 	const clones: THREE.Object3D[] = []
 	const cloneL = object.clone()
 	const cloneR = object.clone()
+	cloneL.visible = true
+	cloneR.visible = true
 	cloneL.position.x -= MAP_REPEAT_WIDTH
 	cloneR.position.x += MAP_REPEAT_WIDTH
 	clones.push(cloneL, cloneR)
@@ -666,7 +811,9 @@ export function createGenesisScene(
 	let mapThermalEquator: THREE.Line | null = null
 	let thermalEquatorPoints: [number, number][] | null = null
 	let globeSolarTerminator: THREE.Group | null = null
+	let mapSolarTerminator: THREE.Group | null = null
 	let solarTerminatorVisible = false
+	let solarTerminatorUseMeridiem = false
 	const currentSunDirection = new THREE.Vector3(1, 0, 0)
 	let currentSunHoursPerDay = 24
 	let globeWindArrows: THREE.LineSegments | null = null
@@ -756,42 +903,42 @@ export function createGenesisScene(
 			? SOLAR_TERMINATOR_ELEVATED_RADIUS
 			: SOLAR_TERMINATOR_RADIUS
 		const sunDir = currentSunDirection.clone().normalize()
-		if (sunDir.lengthSq() === 0) return null
-
+		const points = buildSolarTerminatorRingPoints(currentSunDirection, radius)
+		if (!points) return null
+		const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
+		const sinH0 = Math.sin(h0)
+		const cosH0 = Math.cos(h0)
 		const reference =
 			Math.abs(sunDir.z) > 0.9
 				? new THREE.Vector3(1, 0, 0)
 				: new THREE.Vector3(0, 0, 1)
 		const U = new THREE.Vector3().crossVectors(reference, sunDir).normalize()
 		const V = new THREE.Vector3().crossVectors(sunDir, U).normalize()
-		const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
-		const sinH0 = Math.sin(h0)
-		const cosH0 = Math.cos(h0)
-		const sampleCount = 192
-		const points: THREE.Vector3[] = []
-		for (let index = 0; index <= sampleCount; index++) {
-			const t = (index / sampleCount) * Math.PI * 2
-			const ring = U.clone()
-				.multiplyScalar(Math.cos(t))
-				.addScaledVector(V, Math.sin(t))
-			points.push(
-				sunDir
-					.clone()
-					.multiplyScalar(sinH0)
-					.addScaledVector(ring, cosH0)
-					.normalize()
-					.multiplyScalar(radius),
-			)
-		}
 
 		const group = new THREE.Group()
+		group.add(
+			new THREE.Mesh(
+				createSolarTerminatorBand(
+					points,
+					radius,
+					SOLAR_TERMINATOR_BAND_HALF_WIDTH,
+				),
+				new THREE.MeshBasicMaterial({
+					color: SOLAR_TERMINATOR_BAND_COLOR,
+					transparent: true,
+					opacity: 0.16,
+					side: THREE.DoubleSide,
+					depthWrite: false,
+				}),
+			),
+		)
 		group.add(
 			new THREE.Line(
 				new THREE.BufferGeometry().setFromPoints(points),
 				new THREE.LineBasicMaterial({
-					color: SOLAR_TERMINATOR_GLOW_COLOR,
+					color: SOLAR_TERMINATOR_HAIRLINE_COLOR,
 					transparent: true,
-					opacity: 0.18,
+					opacity: 0.42,
 					depthWrite: false,
 				}),
 			),
@@ -802,7 +949,7 @@ export function createGenesisScene(
 				new THREE.LineBasicMaterial({
 					color: SOLAR_TERMINATOR_LINE_COLOR,
 					transparent: true,
-					opacity: 0.95,
+					opacity: 0.82,
 					depthWrite: false,
 				}),
 			),
@@ -820,30 +967,13 @@ export function createGenesisScene(
 				.multiplyScalar(sinH0)
 				.addScaledVector(ring, cosH0)
 				.normalize()
-
-			const latitude = Math.asin(anchor.z)
-			const declination = Math.asin(sunDir.z)
-			const denom = Math.max(
-				1e-6,
-				Math.abs(Math.cos(latitude) * Math.cos(declination)),
-			)
-			const cosHourAngle = THREE.MathUtils.clamp(
-				(sinH0 - Math.sin(latitude) * Math.sin(declination)) / denom,
-				-1,
-				1,
-			)
-			const hourAngleMagnitude = Math.acos(cosHourAngle)
-			const east = new THREE.Vector3(-anchor.y, anchor.x, 0)
-			if (east.lengthSq() < 1e-6) east.set(0, 1, 0)
-			east.normalize()
-			const isSunrise = east.dot(sunDir) > 0
-			const localHours =
-				12 +
-				((isSunrise ? -hourAngleMagnitude : hourAngleMagnitude) *
-					currentSunHoursPerDay) /
-					(2 * Math.PI)
 			const spriteData = createSolarTerminatorLabelSprite(
-				`${isSunrise ? "↑" : "↓"} ${formatSolarTerminatorTime(localHours, currentSunHoursPerDay)}`,
+				getSolarTerminatorLabelText({
+					anchor,
+					sunDirection: sunDir,
+					hoursPerDay: currentSunHoursPerDay,
+					useMeridiem: solarTerminatorUseMeridiem,
+				}),
 			)
 			if (!spriteData) continue
 			const leader = new THREE.Line(
@@ -873,14 +1003,115 @@ export function createGenesisScene(
 		return group
 	}
 
+	function buildMapSolarTerminatorGroup(): THREE.Group | null {
+		if (!solarTerminatorVisible || !mapMesh) return null
+		const projection = createMapProjection(
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+		)
+		const sunDir = currentSunDirection.clone().normalize()
+		const points = buildSolarTerminatorRingPoints(currentSunDirection, 1)
+		if (!points) return null
+		const segments = projectSolarTerminatorPointsToMap(
+			points,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			0.012,
+		)
+		if (segments.length === 0) return null
+
+		const content = new THREE.Group()
+		for (const segment of segments) {
+			const geometry = new THREE.BufferGeometry().setFromPoints(segment)
+			const hairline = new THREE.Line(
+				geometry.clone(),
+				new THREE.LineBasicMaterial({
+					color: SOLAR_TERMINATOR_HAIRLINE_COLOR,
+					transparent: true,
+					opacity: 0.55,
+					depthWrite: false,
+				}),
+			)
+			hairline.renderOrder = 1001
+			const line = new THREE.Line(
+				geometry,
+				new THREE.LineBasicMaterial({
+					color: SOLAR_TERMINATOR_LINE_COLOR,
+					transparent: true,
+					opacity: 0.9,
+					depthWrite: false,
+				}),
+			)
+			line.renderOrder = 1002
+			content.add(hairline, line)
+		}
+
+		for (let index = 0; index < SOLAR_TERMINATOR_LABEL_COUNT; index++) {
+			const pointIndex = Math.floor(
+				((index + 0.5) / SOLAR_TERMINATOR_LABEL_COUNT) * (points.length - 1),
+			)
+			const anchorPoint = points[pointIndex]
+			if (!anchorPoint) continue
+			const anchor = anchorPoint.clone().normalize()
+			const label = getSolarTerminatorLabelText({
+				anchor,
+				sunDirection: sunDir,
+				hoursPerDay: currentSunHoursPerDay,
+				useMeridiem: solarTerminatorUseMeridiem,
+			})
+			const spriteData = createSolarTerminatorLabelSprite(label)
+			if (!spriteData) continue
+			const projected = projection.projectRadians(
+				Math.atan2(anchor.y, anchor.x),
+				Math.asin(THREE.MathUtils.clamp(anchor.z, -1, 1)),
+				0.014,
+			)
+			const posX = projection.clampX(projected[0])
+			const posY = projection.clampY(projected[1])
+			const leader = new THREE.Line(
+				new THREE.BufferGeometry().setFromPoints([
+					new THREE.Vector3(posX, posY, 0.0125),
+					new THREE.Vector3(posX, posY + 0.008, 0.0125),
+				]),
+				new THREE.LineBasicMaterial({
+					color: SOLAR_TERMINATOR_LINE_COLOR,
+					transparent: true,
+					opacity: 0.72,
+					depthWrite: false,
+				}),
+			)
+			leader.renderOrder = SOLAR_TERMINATOR_LABEL_RENDER_ORDER
+			spriteData.sprite.position.set(posX, posY + 0.012, 0.014)
+			spriteData.sprite.scale.set(spriteData.aspect * 0.028, 0.028, 1)
+			content.add(leader, spriteData.sprite)
+		}
+
+		const root = new THREE.Group()
+		for (const offset of [-projection.repeatWidth, 0, projection.repeatWidth]) {
+			const copy = offset === 0 ? content : content.clone(true)
+			copy.position.x = offset
+			root.add(copy)
+		}
+
+		root.visible = currentViewMode === "map"
+		root.position.copy(mapMesh.position)
+		return root
+	}
+
 	function rebuildSolarTerminator() {
 		if (globeSolarTerminator) {
 			disposeGroup(scene, globeSolarTerminator)
 			globeSolarTerminator = null
 		}
+		if (mapSolarTerminator) {
+			disposeGroup(scene, mapSolarTerminator)
+			mapSolarTerminator = null
+		}
 		if (!solarTerminatorVisible) return
 		globeSolarTerminator = buildSolarTerminatorGroup()
 		if (globeSolarTerminator) scene.add(globeSolarTerminator)
+		mapSolarTerminator = buildMapSolarTerminatorGroup()
+		if (mapSolarTerminator) scene.add(mapSolarTerminator)
 	}
 
 	function updateSolarTerminatorLabels(radius: number) {
@@ -890,11 +1121,16 @@ export function createGenesisScene(
 		solarTerminatorCameraRight
 			.crossVectors(solarTerminatorCameraDir, solarTerminatorCameraUp)
 			.normalize()
-		const baseHeight = camera.position.length() * 0.014
+		const camDist = camera.position.length()
+		const depth = Math.max(camDist - 1.0, 0.3)
+		const baseHeight = Math.pow(depth, 0.65) * 0.022
+		const stride = camDist < 2.0 ? 1 : camDist < 3.2 ? 2 : 3
 
 		for (let index = 0; index < solarTerminatorLabels.length; index++) {
 			const label = solarTerminatorLabels[index]!
-			const frontFacing = label.anchor.dot(solarTerminatorCameraDir) > 0.06
+			const frontFacing =
+				index % stride === 0 &&
+				label.anchor.dot(solarTerminatorCameraDir) > 0.06
 			label.sprite.visible = frontFacing
 			label.leader.visible = frontFacing
 			if (!frontFacing) continue
@@ -1559,6 +1795,7 @@ export function createGenesisScene(
 		disposeObject3D(scene, mapThermalEquator)
 		disposeObject3D(scene, globeWindArrows)
 		disposeObject3D(scene, mapWindArrows)
+		disposeGroup(scene, mapSolarTerminator)
 		disposeObject3D(scene, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(scene, globeLandNationBorders)
@@ -1587,6 +1824,7 @@ export function createGenesisScene(
 		mapThermalEquator = null
 		globeWindArrows = null
 		mapWindArrows = null
+		mapSolarTerminator = null
 		globeNationBorders = null
 		mapNationBorders = null
 		globeLandNationBorders = null
@@ -1759,6 +1997,11 @@ export function createGenesisScene(
 			mapThermalEquator.visible = currentViewMode === "map"
 			if (mapMesh) mapThermalEquator.position.copy(mapMesh.position)
 		}
+		if (mapSolarTerminator) {
+			mapSolarTerminator.visible =
+				solarTerminatorVisible && currentViewMode === "map"
+			if (mapMesh) mapSolarTerminator.position.copy(mapMesh.position)
+		}
 		if (globeWindArrows) globeWindArrows.visible = currentViewMode === "globe"
 		if (mapWindArrows) {
 			mapWindArrows.visible = currentViewMode === "map"
@@ -1844,6 +2087,7 @@ export function createGenesisScene(
 			mapSelectedProvinceBorder,
 			mapGrid,
 			mapThermalEquator,
+			mapSolarTerminator,
 			mapRivers,
 			mapMeasureLine,
 			mapMeasureDots,
@@ -1895,6 +2139,7 @@ export function createGenesisScene(
 			{ object: mapWireframe, visible: wireframeVisible },
 			{ object: mapGrid, visible: gridVisible },
 			{ object: mapThermalEquator, visible: false },
+			{ object: mapSolarTerminator, visible: solarTerminatorVisible },
 			{ object: mapRivers, visible: riversVisible },
 			{ object: mapLandNationBorders, visible: landNationBordersVisible },
 			{ object: mapNationBorders, visible: nationBordersVisible },
@@ -1922,9 +2167,11 @@ export function createGenesisScene(
 		disposeObject3D(scene, terrainMesh)
 		disposeObject3D(scene, mapMesh)
 		disposeObject3D(scene, mapOccupationOverlay)
+		disposeGroup(scene, mapSolarTerminator)
 		terrainMesh = null
 		mapMesh = null
 		mapOccupationOverlay = null
+		mapSolarTerminator = null
 		const terrainBuild = buildTerrainMesh(
 			currentWorld,
 			currentColorMode,
@@ -1956,7 +2203,7 @@ export function createGenesisScene(
 			mapCenterLongitudeDeg: currentMapCenterLongitudeDeg,
 			mapProjectionLatitudeDeg: currentMapProjectionLatitudeDeg,
 		})
-		syncMapAmbient()
+		syncMapLighting()
 		if (currentOccupationOverlay) {
 			mapOccupationOverlay = buildMapOccupationOverlay(
 				mapMesh,
@@ -2299,6 +2546,7 @@ export function createGenesisScene(
 		waterMesh.visible = !isMap
 		atmosMesh.visible = !isMap && sun.intensity > 0
 		if (globeSolarTerminator) globeSolarTerminator.visible = !isMap
+		if (mapSolarTerminator) mapSolarTerminator.visible = isMap
 		updateOverlayVisibility()
 		syncAnimationState()
 	}
@@ -2563,6 +2811,7 @@ export function createGenesisScene(
 		disposeObject3D(scene, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
 		disposeGroup(scene, globeSolarTerminator)
+		disposeGroup(scene, mapSolarTerminator)
 		disposeObject3D(scene, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(scene, globeLandNationBorders)
@@ -2802,7 +3051,25 @@ export function createGenesisScene(
 		currentSunDirection.copy(sun.position).normalize()
 		currentSunHoursPerDay = hoursPerDay || 24
 		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
+		syncMapLighting()
 		if (solarTerminatorVisible) rebuildSolarTerminator()
+		moonOrbitState?.setTilt(
+			currentSunDirection.x,
+			currentSunDirection.y,
+			currentSunDirection.z,
+		)
+		requestRender()
+	}
+
+	function setSunDirection(x: number, y: number, z: number, hoursPerDay: number) {
+		const dist = 10
+		sun.position.set(dist * x, dist * y, dist * z)
+		currentSunDirection.copy(sun.position).normalize()
+		currentSunHoursPerDay = hoursPerDay || 24
+		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
+		syncMapLighting()
+		if (solarTerminatorVisible) rebuildSolarTerminator()
+		moonOrbitState?.setTilt(x, y, z)
 		requestRender()
 	}
 
@@ -2813,7 +3080,14 @@ export function createGenesisScene(
 		requestRender()
 	}
 
-	function syncMapAmbient() {
+	function setSolarTerminatorUseMeridiem(enabled: boolean) {
+		if (solarTerminatorUseMeridiem === enabled) return
+		solarTerminatorUseMeridiem = enabled
+		if (solarTerminatorVisible) rebuildSolarTerminator()
+		requestRender()
+	}
+
+	function syncMapLighting() {
 		if (!mapMesh) return
 		const mat = mapMesh.material as THREE.ShaderMaterial
 		const invPi = 1 / Math.PI
@@ -2821,6 +3095,12 @@ export function createGenesisScene(
 			ambient.color.r * ambient.intensity * invPi,
 			ambient.color.g * ambient.intensity * invPi,
 			ambient.color.b * ambient.intensity * invPi,
+		)
+		mat.uniforms.uSunDirection.value.copy(currentSunDirection).normalize()
+		mat.uniforms.uSunLight.value.set(
+			sun.color.r * sun.intensity * invPi,
+			sun.color.g * sun.intensity * invPi,
+			sun.color.b * sun.intensity * invPi,
 		)
 	}
 
@@ -2840,7 +3120,7 @@ export function createGenesisScene(
 				currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000,
 			)
 		}
-		syncMapAmbient()
+		syncMapLighting()
 		requestRender()
 	}
 
@@ -2967,6 +3247,11 @@ export function createGenesisScene(
 				showGrid,
 				gridSpacing,
 			)
+			moonOrbitState.setTilt(
+				currentSunDirection.x,
+				currentSunDirection.y,
+				currentSunDirection.z,
+			)
 			scene.add(moonOrbitState.group)
 		}
 		requestRender()
@@ -3026,6 +3311,8 @@ export function createGenesisScene(
 		setSettlementNames,
 		setElevationVisible,
 		setSunPosition,
+		setSunDirection,
+		setSolarTerminatorUseMeridiem,
 		setSolarTerminatorVisible,
 		setAtmospherePressure,
 		setFullAmbient,

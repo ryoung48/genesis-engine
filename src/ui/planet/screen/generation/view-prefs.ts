@@ -26,8 +26,7 @@ interface StoredViewPrefs {
 	showWindArrows: boolean
 	showOceanCurrents: boolean
 	showRivers: boolean
-	showSettlements: boolean
-	showRoads: boolean
+	showInfrastructure: boolean
 	overlaysExpanded: boolean
 	gridSpacing: number
 	unitSystem: UnitSystem
@@ -43,6 +42,7 @@ interface StoredViewPrefs {
 	clockCurrent: boolean
 	clockDay: number
 	clockHour: number
+	clockUseMeridiem: boolean
 	clockMonthMode: "annual" | "monthly"
 	clockMonth: number
 	climateSubMode: "basic" | "pasta" | "koppen"
@@ -122,8 +122,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showWindArrows: false,
 	showOceanCurrents: false,
 	showRivers: false,
-	showSettlements: false,
-	showRoads: false,
+	showInfrastructure: false,
 	overlaysExpanded: false,
 	gridSpacing: 15,
 	unitSystem: "metric",
@@ -139,6 +138,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	clockCurrent: true,
 	clockDay: 0,
 	clockHour: 12,
+	clockUseMeridiem: false,
 	clockMonthMode: "monthly",
 	clockMonth: 0,
 	climateSubMode: "basic",
@@ -264,11 +264,10 @@ export function parseStoredViewPrefs(
 				DEFAULT_VIEW_PREFS.showOceanCurrents,
 			),
 			showRivers: readBoolean(parsed.showRivers, DEFAULT_VIEW_PREFS.showRivers),
-			showSettlements: readBoolean(
-				parsed.showSettlements,
-				DEFAULT_VIEW_PREFS.showSettlements,
+			showInfrastructure: readBoolean(
+				parsed.showInfrastructure,
+				DEFAULT_VIEW_PREFS.showInfrastructure,
 			),
-			showRoads: readBoolean(parsed.showRoads, DEFAULT_VIEW_PREFS.showRoads),
 			overlaysExpanded: readBoolean(
 				parsed.overlaysExpanded,
 				DEFAULT_VIEW_PREFS.overlaysExpanded,
@@ -321,6 +320,10 @@ export function parseStoredViewPrefs(
 			),
 			clockDay: readNumber(parsed.clockDay, DEFAULT_VIEW_PREFS.clockDay),
 			clockHour: readNumber(parsed.clockHour, DEFAULT_VIEW_PREFS.clockHour),
+			clockUseMeridiem: readBoolean(
+				parsed.clockUseMeridiem,
+				DEFAULT_VIEW_PREFS.clockUseMeridiem,
+			),
 			clockMonthMode:
 				parsed.clockMonthMode === "annual" ||
 				parsed.clockMonthMode === "monthly"
