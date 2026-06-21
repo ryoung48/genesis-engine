@@ -140,6 +140,9 @@ interface OverlayControlsProps {
 	setClimateMonth: (v: number) => void
 	clockDay: number
 	setClockDay: (v: number) => void
+	clockHour?: number
+	setClockHour?: (v: number) => void
+	hoursPerDay?: number
 	daysPerYear: number
 	climateSubMode: "basic" | "pasta" | "koppen"
 	setClimateSubMode: (v: "basic" | "pasta" | "koppen") => void
@@ -173,6 +176,8 @@ interface OverlayControlsProps {
 	setShowMoonOrbits?: (v: boolean) => void
 	showApparentDiameter?: boolean
 	setShowApparentDiameter?: (v: boolean) => void
+	showDaylight?: boolean
+	setShowDaylight?: (v: boolean) => void
 	moonCount?: number
 }
 
@@ -244,6 +249,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setClimateMonth,
 	clockDay,
 	setClockDay,
+	clockHour = 12,
+	setClockHour = () => undefined,
+	hoursPerDay = 24,
 	daysPerYear,
 	climateSubMode,
 	setClimateSubMode,
@@ -275,6 +283,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowMoonOrbits,
 	showApparentDiameter = false,
 	setShowApparentDiameter,
+	showDaylight = false,
+	setShowDaylight,
 	moonCount = 0,
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
@@ -718,6 +728,26 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													className="w-full accent-slate-100 disabled:cursor-not-allowed"
 												/>
 											</div>
+											<div className="border-t border-white/10" />
+											<div className="space-y-1.5">
+												<div className="flex items-center justify-between">
+													<label className="text-[11px] font-medium text-slate-300">
+														Hour
+													</label>
+													<span className="font-mono text-[11px] text-slate-400">
+														{clockHour.toFixed(1)} / {hoursPerDay.toFixed(1)}
+													</span>
+												</div>
+												<input
+													type="range"
+													min={0}
+													max={hoursPerDay}
+													step={0.5}
+													value={Math.max(0, Math.min(clockHour, hoursPerDay))}
+													onChange={(e) => setClockHour(Number(e.target.value))}
+													className="w-full accent-slate-100"
+												/>
+											</div>
 										</div>
 									)}
 								</div>
@@ -758,6 +788,19 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															checked={showApparentDiameter}
 															onChange={(e) =>
 																setShowApparentDiameter(e.target.checked)
+															}
+															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+														/>
+													</label>
+												)}
+												{setShowDaylight && (
+													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
+														<span>Daylight</span>
+														<input
+															type="checkbox"
+															checked={showDaylight}
+															onChange={(e) =>
+																setShowDaylight(e.target.checked)
 															}
 															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 														/>

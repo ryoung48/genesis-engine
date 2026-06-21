@@ -38,8 +38,10 @@ interface StoredViewPrefs {
 	pathfindingSea: boolean
 	showMoonOrbits: boolean
 	showApparentDiameter: boolean
+	showDaylight: boolean
 	clockCurrent: boolean
 	clockDay: number
+	clockHour: number
 	climateTimeMode: "annual" | "monthly"
 	climateMonth: number
 	climateSubMode: "basic" | "pasta" | "koppen"
@@ -131,8 +133,10 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	pathfindingSea: true,
 	showMoonOrbits: false,
 	showApparentDiameter: false,
+	showDaylight: false,
 	clockCurrent: true,
 	clockDay: 0,
+	clockHour: 12,
 	climateTimeMode: "monthly",
 	climateMonth: 0,
 	climateSubMode: "basic",
@@ -301,11 +305,16 @@ export function parseStoredViewPrefs(
 				parsed.showApparentDiameter,
 				DEFAULT_VIEW_PREFS.showApparentDiameter,
 			),
+			showDaylight: readBoolean(
+				parsed.showDaylight,
+				DEFAULT_VIEW_PREFS.showDaylight,
+			),
 			clockCurrent: readBoolean(
 				parsed.clockCurrent,
 				DEFAULT_VIEW_PREFS.clockCurrent,
 			),
 			clockDay: readNumber(parsed.clockDay, DEFAULT_VIEW_PREFS.clockDay),
+			clockHour: readNumber(parsed.clockHour, DEFAULT_VIEW_PREFS.clockHour),
 			climateTimeMode:
 				parsed.climateTimeMode === "annual" ||
 				parsed.climateTimeMode === "monthly"

@@ -192,31 +192,35 @@ export function buildMoonOrbitOverlay(
 			),
 		)
 
-		// --- Moon body (always gray) ---
+		// --- Moon body (lit by the scene sun/ambient lights) ---
 		const moonR = Math.max(
 			0.008,
 			(0.035 * (moon.diameterKm / planetRadiusKm)) / (3474 / 6371),
 		)
 		const moonGeo = new THREE.SphereGeometry(moonR, 8, 6)
-		const moonMat = new THREE.MeshBasicMaterial({ color: 0x9ca3af })
+		const moonMat = new THREE.MeshStandardMaterial({
+			color: 0xcbd5e1,
+			roughness: 1,
+			metalness: 0,
+		})
 		const moonMesh = new THREE.Mesh(moonGeo, moonMat)
 		group.add(moonMesh)
 
 		// Lat/lon grid lines on moon surface matching the planet grid spacing
 		if (showGrid) {
 			const R = moonR
+			const gridRadius = R * 1.01
 			const STEPS = 64
 			const gridMat = new THREE.LineBasicMaterial({
 				color: moonColor,
 				transparent: true,
-				opacity: 0.7,
-				depthTest: false,
+				opacity: 0.45,
+				linewidth: 0.5,
+				depthTest: true,
 			})
 			const addLine = (pts: THREE.Vector3[]) => {
 				const g = new THREE.BufferGeometry().setFromPoints(pts)
-				const l = new THREE.Line(g, gridMat.clone())
-				l.renderOrder = 1
-				moonMesh.add(l)
+				moonMesh.add(new THREE.Line(g, gridMat.clone()))
 			}
 			// Latitude lines at every gridSpacing degrees
 			for (let latDeg = -90 + gridSpacing; latDeg < 90; latDeg += gridSpacing) {
@@ -226,9 +230,9 @@ export function buildMoonOrbitOverlay(
 					const lon = (s / STEPS) * TWO_PI
 					pts.push(
 						new THREE.Vector3(
-							R * Math.cos(lat) * Math.cos(lon),
-							R * Math.cos(lat) * Math.sin(lon),
-							R * Math.sin(lat),
+							gridRadius * Math.cos(lat) * Math.cos(lon),
+							gridRadius * Math.cos(lat) * Math.sin(lon),
+							gridRadius * Math.sin(lat),
 						),
 					)
 				}
@@ -242,9 +246,9 @@ export function buildMoonOrbitOverlay(
 					const lat = (s / STEPS - 0.5) * Math.PI
 					pts.push(
 						new THREE.Vector3(
-							R * Math.cos(lat) * Math.cos(lon),
-							R * Math.cos(lat) * Math.sin(lon),
-							R * Math.sin(lat),
+							gridRadius * Math.cos(lat) * Math.cos(lon),
+							gridRadius * Math.cos(lat) * Math.sin(lon),
+							gridRadius * Math.sin(lat),
 						),
 					)
 				}

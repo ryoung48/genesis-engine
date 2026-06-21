@@ -27,6 +27,8 @@ interface MoonOrbitsOverlayProps {
 	planetRadiusKm: number
 	hoursPerDay: number
 	day: number
+	showDaylight?: boolean
+	clockHour?: number
 }
 
 export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
@@ -34,6 +36,8 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 	planetRadiusKm,
 	hoursPerDay,
 	day,
+	showDaylight = false,
+	clockHour = 12,
 }) => {
 	const SIZE = 230
 	const PLANET_R = 10
@@ -76,6 +80,21 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				)
 			const posX = r * Math.cos(nu)
 			const posY = r * Math.sin(nu)
+			const omegaRad = (omegaDeg * Math.PI) / 180
+			const cosOmega = Math.cos(omegaRad)
+			const sinOmega = Math.sin(omegaRad)
+			const globalPosX = posX * cosOmega - posY * sinOmega
+			const globalPosY = posX * sinOmega + posY * cosOmega
+			const moonDistance = Math.hypot(globalPosX, globalPosY)
+			const sunAngle = Math.PI + TWO_PI * (clockHour / (hoursPerDay || 24))
+			const sunDirX = Math.cos(sunAngle)
+			const sunDirY = Math.sin(sunAngle)
+			const moonDirX = moonDistance > 0 ? globalPosX / moonDistance : 0
+			const moonDirY = moonDistance > 0 ? globalPosY / moonDistance : 0
+			const illumination = Math.max(
+				0,
+				Math.min(1, (1 - (moonDirX * sunDirX + moonDirY * sunDirY)) / 2),
+			)
 
 			return {
 				a,
@@ -86,11 +105,14 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				posY,
 				diameterKm: moon.diameterKm,
 				color: MOON_COLORS[i % MOON_COLORS.length],
+				illumination,
+				sunDirX,
+				sunDirY,
 				period: moon.orbitalPeriodDays,
 				label: `M${i + 1}`,
 			}
 		})
-	}, [moons, hoursPerDay, day, planetRadiusKm])
+	}, [moons, hoursPerDay, day, planetRadiusKm, clockHour])
 
 	return (
 		<div
@@ -169,7 +191,30 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 							{/* Moon body — size derived from live planetRadiusKm prop */}
 							{((_r) => (
 								<>
-									<circle cx={o.posX} cy={o.posY} r={_r} fill={o.color} />
+									<circle
+										cx={o.posX}
+										cy={o.posY}
+										r={_r}
+										fill={showDaylight ? "#334155" : o.color}
+									/>
+									{showDaylight ? (
+										<circle
+											cx={o.posX - o.sunDirX * _r * (1 - o.illumination)}
+											cy={o.posY - o.sunDirY * _r * (1 - o.illumination)}
+											r={Math.max(_r * (0.3 + o.illumination * 0.7), _r * 0.45)}
+											fill={o.color}
+											fillOpacity={0.9}
+										/>
+									) : null}
+									{showDaylight ? (
+										<circle
+											cx={o.posX - o.sunDirX * _r * 0.45}
+											cy={o.posY - o.sunDirY * _r * 0.45}
+											r={Math.max(_r * 0.28, 0.75)}
+											fill="#ffffff"
+											fillOpacity={0.12 + o.illumination * 0.18}
+										/>
+									) : null}
 									<circle
 										cx={o.posX}
 										cy={o.posY}

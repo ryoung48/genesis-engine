@@ -68,7 +68,7 @@ export function computeSpringTideMap(
 	}
 
 	// ── Step 1b: Tier randomisation ───────────────────────────────────────
-	const MACRO_MAX_M = Math.min(11 * tidalStrength, 80)
+	const MACRO_MAX_M = Math.min(11 * tidalStrength, 60)
 	const MACRO_THRESHOLD_M = MACRO_MAX_M * (3 / 11)
 	const MESO_THRESHOLD_M = MACRO_MAX_M * (1 / 11)
 	const TARGET_MACRO_FRACTION = 0.01

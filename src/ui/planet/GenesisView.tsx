@@ -429,12 +429,16 @@ export const GenesisView: React.FC = () => {
 	const [showApparentDiameter, setShowApparentDiameter] = useState(
 		initialViewPrefs.showApparentDiameter,
 	)
+	const [showDaylight, setShowDaylight] = useState(
+		initialViewPrefs.showDaylight,
+	)
 	const [climateTimeMode, setClimateTimeMode] = useState<"annual" | "monthly">(
 		initialViewPrefs.climateTimeMode === "annual" ? "annual" : "monthly",
 	)
 	const [climateMonth, setClimateMonth] = useState(
 		initialViewPrefs.climateMonth,
 	)
+	const [clockHour, setClockHour] = useState(initialViewPrefs.clockHour)
 	const [climateSubMode, setClimateSubMode] = useState<
 		"basic" | "pasta" | "koppen"
 	>(initialViewPrefs.climateSubMode)
@@ -486,6 +490,11 @@ export const GenesisView: React.FC = () => {
 			: clockCurrent
 				? displayMonth
 				: climateMonth + 1
+	const resolvedLightingMonth = clockCurrent
+		? displayMonth
+		: climateTimeMode === "annual"
+			? 0
+			: climateMonth + 1
 	const temperatureMonth = resolvedClimateMonth
 	const rainfallMonth = resolvedClimateMonth
 	const dtrMonth = resolvedClimateMonth
@@ -782,8 +791,10 @@ export const GenesisView: React.FC = () => {
 				pathfindingSea,
 				showMoonOrbits,
 				showApparentDiameter,
+				showDaylight,
 				clockCurrent,
 				clockDay,
+				clockHour,
 				climateTimeMode,
 				climateMonth,
 				climateSubMode,
@@ -796,8 +807,10 @@ export const GenesisView: React.FC = () => {
 		colorMode,
 		showMoonOrbits,
 		showApparentDiameter,
+		showDaylight,
 		clockCurrent,
 		clockDay,
+		clockHour,
 		climateTimeMode,
 		climateMonth,
 		climateSubMode,
@@ -1518,7 +1531,7 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		scene.setFullAmbient(true)
+		scene.setFullAmbient(!showDaylight)
 		if (tidallyLocked) {
 			// Sun at substellar point = antistellar + 180°
 			const subLonDeg = (antistellarLon + 180) % 360
@@ -1531,13 +1544,21 @@ export const GenesisView: React.FC = () => {
 			)
 		} else {
 			scene.setSunPosition(
-				displayMonth,
+				resolvedLightingMonth,
 				obliquity,
-				hoursPerDay / 2,
+				clockHour,
 				hoursPerDay,
 			)
 		}
-	}, [displayMonth, obliquity, hoursPerDay, tidallyLocked, antistellarLon])
+	}, [
+		showDaylight,
+		resolvedLightingMonth,
+		clockHour,
+		obliquity,
+		hoursPerDay,
+		tidallyLocked,
+		antistellarLon,
+	])
 
 	// --- Measure click handler ---
 	useEffect(() => {
@@ -3076,6 +3097,9 @@ export const GenesisView: React.FC = () => {
 							setClimateMonth={setClimateMonth}
 							clockDay={clockDay}
 							setClockDay={setClockDay}
+							clockHour={clockHour}
+							setClockHour={setClockHour}
+							hoursPerDay={hoursPerDay}
 							daysPerYear={daysPerYear}
 							climateSubMode={climateSubMode}
 							setClimateSubMode={setClimateSubMode}
@@ -3128,19 +3152,20 @@ export const GenesisView: React.FC = () => {
 								setPathfindingLand(true)
 								setPathfindingSea(true)
 								setDebugMapModes(false)
+								setShowDaylight(false)
+								setClockHour(12)
 								setExportCenterLongitude(0)
 								setMapProjectionLatitude(0)
 								setDraftMapProjectionLatitude(0)
 							}}
 							generationPanelOpen={generationPanelOpen}
 							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
-							clockDay={clockDay}
-							setClockDay={setClockDay}
-							daysPerYear={daysPerYear}
 							showMoonOrbits={showMoonOrbits}
 							setShowMoonOrbits={setShowMoonOrbits}
 							showApparentDiameter={showApparentDiameter}
 							setShowApparentDiameter={setShowApparentDiameter}
+							showDaylight={showDaylight}
+							setShowDaylight={setShowDaylight}
 							moonCount={moonCount}
 						/>
 
@@ -3153,6 +3178,8 @@ export const GenesisView: React.FC = () => {
 										planetRadiusKm={planetRadiusKm}
 										hoursPerDay={hoursPerDay}
 										day={moonOrbitDayOfYear}
+										showDaylight={showDaylight}
+										clockHour={clockHour}
 									/>
 								</div>
 							)}
