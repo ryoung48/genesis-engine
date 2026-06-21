@@ -4,7 +4,7 @@ import {
 	getStarTemperatureK,
 	isValidSpectralClass,
 	type MainSequenceClass,
-} from "../../shared/star-types"
+} from "../../celestial/star/star-types"
 import { TIME } from "../../shared/time"
 import {
 	getEffectiveObliquityDeg,

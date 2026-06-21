@@ -263,6 +263,7 @@ function serializeWorld(
 		cycloneRisk: world.cycloneRisk,
 		tornadoRisk: world.tornadoRisk,
 		tidalRange: world.tidalRange,
+		tidalSchedule: world.tidalSchedule,
 		volcanism: world.volcanism,
 		climateZones: world.climateZones,
 		pastaClimate: world.pastaClimate,

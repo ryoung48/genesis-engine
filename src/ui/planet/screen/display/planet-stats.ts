@@ -34,6 +34,7 @@ export function computePlanetStats(
 		planetRadiusKm: number
 		pressure: number
 		tidallyLocked: boolean
+		moonCount?: number
 		seaLevel?: number
 		maxElevation?: number
 		avgWindSpeedMs?: number | null
@@ -197,6 +198,40 @@ export function computePlanetStats(
 			value: habitabilityScore != null ? habitabilityScore.toFixed(3) : "0.000",
 		},
 		...(isTidal ? [{ label: "Lock", value: "Tidal" }] : []),
+		{ label: "Moons", value: String(params.moonCount ?? 0) },
+		...(world?.tidalSchedule
+			? [
+					{
+						label: "Spring Tide",
+						value: `${world.tidalSchedule.maxForce.toFixed(2)}× Earth`,
+					},
+					...(() => {
+						const { events } = world.tidalSchedule
+						const peaks = events.filter(
+							(e) => e.tidalForce >= world.tidalSchedule!.maxForce * 0.8,
+						)
+						if (peaks.length < 2) return []
+						const gaps: number[] = []
+						for (let i = 1; i < peaks.length; i++)
+							gaps.push(peaks[i]!.dayOfYear - peaks[i - 1]!.dayOfYear)
+						const avg = gaps.reduce((s, g) => s + g, 0) / gaps.length
+						return [{ label: "Spring Interval", value: `~${avg.toFixed(0)} d` }]
+					})(),
+					...(() => {
+						const nextEclipse = world.tidalSchedule.events.find(
+							(e) => e.eclipseType !== "none",
+						)
+						return nextEclipse
+							? [
+									{
+										label: "Next Eclipse",
+										value: `Day ${nextEclipse.dayOfYear}`,
+									},
+								]
+							: []
+					})(),
+				]
+			: []),
 		{ label: "Tilt", value: `${obliquityValue.toFixed(1)} deg` },
 		{ label: "Ecc", value: eccentricityValue.toFixed(3) },
 		{ label: "Perihelion", value: `${perihelionValue.toFixed(0)} deg` },

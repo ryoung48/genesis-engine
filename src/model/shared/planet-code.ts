@@ -6,7 +6,7 @@
 import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
-} from "@/model/shared/star-types"
+} from "@/model/celestial/star/star-types"
 import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import type { GenesisParams } from ".."
 import { SLIDER_RANGES } from "./slider-ranges"
@@ -243,11 +243,19 @@ const FIELD_SPECS: FieldSpec[] = [
 		},
 	},
 	{
-		name: "tidalStrength",
-		min: SR.tidalStrength.min,
-		step: SR.tidalStrength.step,
-		count: rangeCount(SR.tidalStrength),
-		read: (p) => p.tidalStrength ?? 1.0,
+		name: "moonCount",
+		min: 0,
+		step: 1,
+		count: 4, // 0, 1, 2, 3
+		read: (p) => p.moonCount ?? 0,
+	},
+	{
+		name: "moonSeed",
+		min: 0,
+		step: 1,
+		count: SEED_MAX,
+		read: (p) =>
+			Math.max(0, Math.min(SEED_MAX - 1, Math.floor(p.moonSeed ?? 0))),
 	},
 	{
 		name: "orbitalDistanceAU",
@@ -386,7 +394,8 @@ interface DecodedPlanetCode {
 	craters?: number
 	maxElevation: number
 	era: SocietyEra
-	tidalStrength: number
+	moonCount: number
+	moonSeed: number
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
@@ -453,6 +462,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		craters: craters > 0 ? craters : undefined,
 		maxElevation: decodedFields.maxElevation,
 		era: ERA_ORDER[eraIdx] ?? DEFAULT_ERA,
-		tidalStrength: decodedFields.tidalStrength ?? 1.0,
+		moonCount: decodedFields.moonCount ?? 1,
+		moonSeed: decodedFields.moonSeed ?? 0,
 	}
 }

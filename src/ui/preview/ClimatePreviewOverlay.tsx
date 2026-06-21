@@ -22,6 +22,7 @@ interface ClimatePreviewOverlayProps {
 	tidallyLocked: boolean
 	activeTab: GenerationPreviewTab
 	unitSystem: UnitSystem
+	daysPerYear: number
 	onSelectTab: (tab: GenerationPreviewTab) => void
 	onClose: () => void
 }
@@ -31,6 +32,7 @@ export const ClimatePreviewOverlay: React.FC<ClimatePreviewOverlayProps> = ({
 	tidallyLocked,
 	activeTab,
 	unitSystem,
+	daysPerYear,
 	onSelectTab,
 	onClose,
 }) => {
@@ -95,12 +97,14 @@ export const ClimatePreviewOverlay: React.FC<ClimatePreviewOverlayProps> = ({
 						preview={preview as LockedClimatePreviewData}
 						activeTab={activeTab}
 						unitSystem={unitSystem}
+						daysPerYear={daysPerYear}
 					/>
 				) : (
 					<RegularClimatePreview
 						preview={preview as RegularClimatePreviewData}
 						activeTab={activeTab}
 						unitSystem={unitSystem}
+						daysPerYear={daysPerYear}
 					/>
 				)}
 			</div>

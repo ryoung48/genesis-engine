@@ -1,6 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
+import {
+	generateMoons,
+	M_SOL_KG,
+} from "@/model/celestial/moons/orbital-mechanics"
+import type { MainSequenceClass } from "@/model/celestial/star/star-types"
+import {
+	DEFAULT_SPECTRAL_CLASS,
+	getStarMassSol,
+	isValidSpectralClass,
+} from "@/model/celestial/star/star-types"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import { buildLockedOceanCurrentGrid } from "@/model/climate/locked/ocean-currents"
@@ -9,6 +19,7 @@ import {
 	computeThermalEquatorLine,
 	getClimateGeometry,
 } from "@/model/climate/rain"
+import { computeTidalSchedule } from "@/model/climate/tidal-schedule"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
@@ -48,8 +59,10 @@ import {
 	vegetationColor,
 	windSpeedColor,
 } from "./colors"
+import { ApparentDiameterOverlay } from "./controls/ApparentDiameterOverlay"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
+import { MoonOrbitsOverlay } from "./controls/MoonOrbitsOverlay"
 import {
 	type ExportWidthPreset,
 	type LabelMode,
@@ -406,9 +419,19 @@ export const GenesisView: React.FC = () => {
 	const [overlaysExpanded, setOverlaysExpanded] = useState(
 		initialViewPrefs.overlaysExpanded,
 	)
-	const [climateTimeMode, setClimateTimeMode] = useState<
-		"current" | "annual" | "monthly"
-	>(initialViewPrefs.climateTimeMode)
+	const [clockDay, setClockDay] = useState(initialViewPrefs.clockDay)
+	const [clockCurrent, setClockCurrent] = useState(
+		initialViewPrefs.clockCurrent,
+	)
+	const [showMoonOrbits, setShowMoonOrbits] = useState(
+		initialViewPrefs.showMoonOrbits,
+	)
+	const [showApparentDiameter, setShowApparentDiameter] = useState(
+		initialViewPrefs.showApparentDiameter,
+	)
+	const [climateTimeMode, setClimateTimeMode] = useState<"annual" | "monthly">(
+		initialViewPrefs.climateTimeMode === "annual" ? "annual" : "monthly",
+	)
 	const [climateMonth, setClimateMonth] = useState(
 		initialViewPrefs.climateMonth,
 	)
@@ -450,11 +473,18 @@ export const GenesisView: React.FC = () => {
 	)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	const displayMonth = historyTimeToMonth(selectedTimeMs)
+	// When clock is locked to current sim time, sync month control (day resets to 0)
+	useEffect(() => {
+		if (clockCurrent) {
+			setClimateMonth(displayMonth - 1)
+			setClockDay(0)
+		}
+	}, [clockCurrent, displayMonth])
 	const resolvedClimateMonth =
-		climateTimeMode === "current"
-			? displayMonth
-			: climateTimeMode === "annual"
-				? 0
+		climateTimeMode === "annual"
+			? 0
+			: clockCurrent
+				? displayMonth
 				: climateMonth + 1
 	const temperatureMonth = resolvedClimateMonth
 	const rainfallMonth = resolvedClimateMonth
@@ -619,8 +649,11 @@ export const GenesisView: React.FC = () => {
 	const [pressure, setPressure] = useState(
 		initialDecodedCode?.pressure ?? DEFAULT_WORLD_PARAMS.pressure,
 	)
-	const [tidalStrength, setTidalStrength] = useState(
-		initialDecodedCode?.tidalStrength ?? DEFAULT_WORLD_PARAMS.tidalStrength,
+	const [moonCount, setMoonCount] = useState(
+		initialDecodedCode?.moonCount ?? DEFAULT_WORLD_PARAMS.moonCount,
+	)
+	const [moonSeed, setMoonSeed] = useState(
+		initialDecodedCode?.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
 	)
 
 	// Terrain params
@@ -747,6 +780,10 @@ export const GenesisView: React.FC = () => {
 				measureMode,
 				pathfindingLand,
 				pathfindingSea,
+				showMoonOrbits,
+				showApparentDiameter,
+				clockCurrent,
+				clockDay,
 				climateTimeMode,
 				climateMonth,
 				climateSubMode,
@@ -757,6 +794,10 @@ export const GenesisView: React.FC = () => {
 		)
 	}, [
 		colorMode,
+		showMoonOrbits,
+		showApparentDiameter,
+		clockCurrent,
+		clockDay,
 		climateTimeMode,
 		climateMonth,
 		climateSubMode,
@@ -2134,7 +2175,8 @@ export const GenesisView: React.FC = () => {
 			craters,
 			maxElevation,
 			pressure,
-			tidalStrength,
+			moonCount,
+			moonSeed,
 		}),
 		[
 			seed,
@@ -2168,7 +2210,8 @@ export const GenesisView: React.FC = () => {
 			craters,
 			maxElevation,
 			pressure,
-			tidalStrength,
+			moonCount,
+			moonSeed,
 		],
 	)
 	const derivedPlanetCode = useMemo(
@@ -2250,7 +2293,8 @@ export const GenesisView: React.FC = () => {
 			setTidallyLocked,
 			setAntistellarLon,
 			setPressure,
-			setTidalStrength,
+			setMoonCount,
+			setMoonSeed,
 			setTerrainWarp,
 			setSmoothing,
 			setHydraulicErosion,
@@ -2287,7 +2331,10 @@ export const GenesisView: React.FC = () => {
 			setters.setTidallyLocked(decoded.tidallyLocked)
 			setters.setAntistellarLon(decoded.antistellarLon)
 			setters.setPressure(decoded.pressure)
-			setters.setTidalStrength(decoded.tidalStrength)
+			setters.setMoonCount(decoded.moonCount ?? 1)
+			setters.setMoonSeed(
+				decoded.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
+			)
 			setters.setTerrainWarp(decoded.terrainWarp)
 			setters.setSmoothing(decoded.smoothing)
 			setters.setHydraulicErosion(decoded.hydraulicErosion)
@@ -2341,7 +2388,8 @@ export const GenesisView: React.FC = () => {
 				daysPerYear,
 				hoursPerDay,
 				pressure,
-				tidalStrength,
+				moonCount,
+				moonSeed,
 				tidallyLocked,
 				antistellarLon,
 				terrainWarp,
@@ -2388,7 +2436,8 @@ export const GenesisView: React.FC = () => {
 			volcanism,
 			craters,
 			pressure,
-			tidalStrength,
+			moonCount,
+			moonSeed,
 			generationCallbacks,
 			maxElevation,
 		],
@@ -2556,7 +2605,6 @@ export const GenesisView: React.FC = () => {
 		daysPerYear,
 		hoursPerDay,
 		pressure,
-		tidalStrength,
 		landDistribution,
 		landCoverage,
 		tidallyLocked,
@@ -2569,7 +2617,6 @@ export const GenesisView: React.FC = () => {
 		setDaysPerYear,
 		setHoursPerDay,
 		setPressure,
-		setTidalStrength,
 		setAxialTiltDirection,
 		setLandDistribution,
 		setLandCoverage,
@@ -2626,6 +2673,8 @@ export const GenesisView: React.FC = () => {
 					planetRadiusKm,
 					pressure,
 					tidallyLocked,
+					moonCount,
+					moonSeed,
 					seaLevel,
 					maxElevation,
 					avgWindSpeedMs: windStats?.avg ?? null,
@@ -2645,6 +2694,8 @@ export const GenesisView: React.FC = () => {
 			spectralClass,
 			starSubtype,
 			tidallyLocked,
+			moonCount,
+			moonSeed,
 			seaLevel,
 			maxElevation,
 			unitSystem,
@@ -2687,6 +2738,95 @@ export const GenesisView: React.FC = () => {
 		}),
 	)
 
+	const generatedMoonsPreview = useMemo(() => {
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+		return generateMoons(
+			moonCount,
+			moonSeed,
+			planetRadiusKm,
+			orbitalDistanceAU,
+			hoursPerDay,
+			starMassKg,
+		)
+	}, [
+		moonCount,
+		moonSeed,
+		planetRadiusKm,
+		orbitalDistanceAU,
+		hoursPerDay,
+		spectralClass,
+		starSubtype,
+	])
+
+	// --- Moon orbits (3D scene, globe mode only) ---
+	const moonOrbitDayOfYear =
+		clockDay + climateMonth * Math.round(daysPerYear / 12)
+	useEffect(() => {
+		sceneRef.current?.setMoonOrbitOverlay(
+			showMoonOrbits && viewMode === "globe" && generatedMoonsPreview.length > 0
+				? generatedMoonsPreview
+				: null,
+			planetRadiusKm,
+			hoursPerDay,
+			moonOrbitDayOfYear,
+			showGrid,
+			gridSpacing,
+		)
+	}, [
+		showMoonOrbits,
+		viewMode,
+		generatedMoonsPreview,
+		planetRadiusKm,
+		hoursPerDay,
+		moonOrbitDayOfYear,
+		showGrid,
+		gridSpacing,
+	])
+
+	useEffect(() => {
+		if (showMoonOrbits && viewMode === "globe")
+			sceneRef.current?.updateMoonOrbitDay(moonOrbitDayOfYear)
+	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
+
+	const tidalSchedulePreview = useMemo(() => {
+		return computeTidalSchedule(generatedMoonsPreview, {
+			seed,
+			daysPerYear,
+			hoursPerDay,
+			planetRadiusKm,
+			tidallyLocked,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
+			eccentricity,
+			perihelion,
+		})
+	}, [
+		generatedMoonsPreview,
+		seed,
+		daysPerYear,
+		hoursPerDay,
+		planetRadiusKm,
+		tidallyLocked,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
+		eccentricity,
+		perihelion,
+	])
+
+	const previewWithTides = useMemo(
+		() => ({ ...generationPreview, tidalSchedule: tidalSchedulePreview }),
+		[generationPreview, tidalSchedulePreview],
+	)
+	const lockedPreviewWithTides = useMemo(
+		() => ({ ...lockedGenerationPreview, tidalSchedule: tidalSchedulePreview }),
+		[lockedGenerationPreview, tidalSchedulePreview],
+	)
+
 	useEffect(() => {
 		if (showClimatePreview) return
 		requestAnimationFrame(() => {
@@ -2708,6 +2848,15 @@ export const GenesisView: React.FC = () => {
 					tidallyLocked={tidallyLocked}
 					setTidallyLocked={setTidallyLocked}
 					setObliquity={setObliquity}
+					moonCount={moonCount}
+					setMoonCount={setMoonCount}
+					moonSeed={moonSeed}
+					setMoonSeed={setMoonSeed}
+					tidalSchedulePreview={tidalSchedulePreview}
+					generatedMoons={generatedMoonsPreview}
+					daysPerYear={daysPerYear}
+					hoursPerDay={hoursPerDay}
+					planetRadiusKm={planetRadiusKm}
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
 					spectralClass={spectralClass}
@@ -2768,12 +2917,11 @@ export const GenesisView: React.FC = () => {
 
 				{showClimatePreview && (
 					<ClimatePreviewOverlay
-						preview={
-							tidallyLocked ? lockedGenerationPreview : generationPreview
-						}
+						preview={tidallyLocked ? lockedPreviewWithTides : previewWithTides}
 						tidallyLocked={tidallyLocked}
 						activeTab={generationPreviewTab}
 						unitSystem={unitSystem}
+						daysPerYear={daysPerYear}
 						onSelectTab={setGenerationPreviewTab}
 						onClose={handleCloseClimatePreview}
 					/>
@@ -2920,10 +3068,15 @@ export const GenesisView: React.FC = () => {
 							setDebugMapModes={setDebugMapModes}
 							colorMode={colorMode}
 							setColorMode={setColorMode}
+							clockCurrent={clockCurrent}
+							setClockCurrent={setClockCurrent}
 							climateTimeMode={climateTimeMode}
 							setClimateTimeMode={setClimateTimeMode}
 							climateMonth={climateMonth}
 							setClimateMonth={setClimateMonth}
+							clockDay={clockDay}
+							setClockDay={setClockDay}
+							daysPerYear={daysPerYear}
 							climateSubMode={climateSubMode}
 							setClimateSubMode={setClimateSubMode}
 							elevationSubMode={elevationSubMode}
@@ -2981,7 +3134,43 @@ export const GenesisView: React.FC = () => {
 							}}
 							generationPanelOpen={generationPanelOpen}
 							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
+							clockDay={clockDay}
+							setClockDay={setClockDay}
+							daysPerYear={daysPerYear}
+							showMoonOrbits={showMoonOrbits}
+							setShowMoonOrbits={setShowMoonOrbits}
+							showApparentDiameter={showApparentDiameter}
+							setShowApparentDiameter={setShowApparentDiameter}
+							moonCount={moonCount}
 						/>
+
+						{showMoonOrbits &&
+							viewMode === "map" &&
+							generatedMoonsPreview.length > 0 && (
+								<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
+									<MoonOrbitsOverlay
+										moons={generatedMoonsPreview}
+										planetRadiusKm={planetRadiusKm}
+										hoursPerDay={hoursPerDay}
+										day={moonOrbitDayOfYear}
+									/>
+								</div>
+							)}
+
+						{showApparentDiameter && moonCount > 0 && (
+							<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
+								<ApparentDiameterOverlay
+									moons={generatedMoonsPreview}
+									planetRadiusKm={planetRadiusKm}
+									hoursPerDay={hoursPerDay}
+									day={moonOrbitDayOfYear}
+									orbitalDistanceAU={orbitalDistanceAU}
+									spectralClass={spectralClass}
+									starSubtype={starSubtype}
+									useAverageDistance={climateTimeMode === "annual"}
+								/>
+							</div>
+						)}
 
 						{measureDistanceKm !== null && measureLabelPos && (
 							<FloatingPanel

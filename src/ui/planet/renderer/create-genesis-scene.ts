@@ -28,6 +28,10 @@ import {
 	buildTerrainMesh,
 	buildTerrainWireframe,
 } from "./mesh-builders"
+import {
+	buildMoonOrbitOverlay,
+	type MoonOrbitState,
+} from "./moon-orbit-overlay"
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
 	buildGlobeCultureLabels,
@@ -2650,6 +2654,41 @@ export function createGenesisScene(
 		rebuildHeritageLabels()
 	}
 
+	// Moon orbit overlay
+	let moonOrbitState: MoonOrbitState | null = null
+
+	function setMoonOrbitOverlay(
+		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
+		planetRadiusKm: number,
+		hoursPerDay: number,
+		day: number,
+		showGrid: boolean,
+		gridSpacing: number,
+	) {
+		if (moonOrbitState) {
+			scene.remove(moonOrbitState.group)
+			moonOrbitState.dispose()
+			moonOrbitState = null
+		}
+		if (moons && moons.length > 0) {
+			moonOrbitState = buildMoonOrbitOverlay(
+				moons,
+				planetRadiusKm,
+				hoursPerDay,
+				day,
+				showGrid,
+				gridSpacing,
+			)
+			scene.add(moonOrbitState.group)
+		}
+		requestRender()
+	}
+
+	function updateMoonOrbitDay(day: number) {
+		moonOrbitState?.setDay(day)
+		requestRender()
+	}
+
 	return {
 		dispose,
 		resize,
@@ -2703,5 +2742,7 @@ export function createGenesisScene(
 		setFullAmbient,
 		focusOnNation,
 		focusOnProvince,
+		setMoonOrbitOverlay,
+		updateMoonOrbitDay,
 	}
 }

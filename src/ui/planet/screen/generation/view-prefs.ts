@@ -36,7 +36,11 @@ interface StoredViewPrefs {
 	measureMode: MeasureMode
 	pathfindingLand: boolean
 	pathfindingSea: boolean
-	climateTimeMode: "current" | "annual" | "monthly"
+	showMoonOrbits: boolean
+	showApparentDiameter: boolean
+	clockCurrent: boolean
+	clockDay: number
+	climateTimeMode: "annual" | "monthly"
 	climateMonth: number
 	climateSubMode: "basic" | "pasta" | "koppen"
 	elevationSubMode: "colored" | "grayscale"
@@ -125,7 +129,11 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	measureMode: "off",
 	pathfindingLand: true,
 	pathfindingSea: true,
-	climateTimeMode: "current",
+	showMoonOrbits: false,
+	showApparentDiameter: false,
+	clockCurrent: true,
+	clockDay: 0,
+	climateTimeMode: "monthly",
 	climateMonth: 0,
 	climateSubMode: "basic",
 	elevationSubMode: "colored",
@@ -285,8 +293,20 @@ export function parseStoredViewPrefs(
 				parsed.pathfindingSea,
 				DEFAULT_VIEW_PREFS.pathfindingSea,
 			),
+			showMoonOrbits: readBoolean(
+				parsed.showMoonOrbits,
+				DEFAULT_VIEW_PREFS.showMoonOrbits,
+			),
+			showApparentDiameter: readBoolean(
+				parsed.showApparentDiameter,
+				DEFAULT_VIEW_PREFS.showApparentDiameter,
+			),
+			clockCurrent: readBoolean(
+				parsed.clockCurrent,
+				DEFAULT_VIEW_PREFS.clockCurrent,
+			),
+			clockDay: readNumber(parsed.clockDay, DEFAULT_VIEW_PREFS.clockDay),
 			climateTimeMode:
-				parsed.climateTimeMode === "current" ||
 				parsed.climateTimeMode === "annual" ||
 				parsed.climateTimeMode === "monthly"
 					? parsed.climateTimeMode

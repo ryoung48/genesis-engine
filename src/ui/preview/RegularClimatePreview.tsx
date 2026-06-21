@@ -13,6 +13,7 @@ interface RegularClimatePreviewProps {
 	preview: RegularClimatePreviewData
 	activeTab: GenerationPreviewTab
 	unitSystem: UnitSystem
+	daysPerYear?: number
 }
 
 function buildPreviewChartProps(

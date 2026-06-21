@@ -1,10 +1,11 @@
-import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import { LUNA_MOON_SEED } from "@/model/celestial/moons/orbital-mechanics"
 import {
 	getHabitableZoneAU,
 	getStarLuminositySol,
 	isValidSpectralClass,
 	type MainSequenceClass,
-} from "@/model/shared/star-types"
+} from "@/model/celestial/star/star-types"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getEffectiveObliquityDeg,
@@ -41,7 +42,6 @@ export function buildPlanetSliders(state: {
 	daysPerYear: number
 	hoursPerDay: number
 	pressure: number
-	tidalStrength: number
 	landDistribution: number
 	landCoverage: number
 	tidallyLocked: boolean
@@ -54,7 +54,6 @@ export function buildPlanetSliders(state: {
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPressure: (v: number) => void
-	setTidalStrength: (v: number) => void
 	setAxialTiltDirection: (v: number) => void
 	setLandDistribution: (v: number) => void
 	setLandCoverage: (v: number) => void
@@ -177,15 +176,6 @@ export function buildPlanetSliders(state: {
 			display: `${(state.landCoverage * 100).toFixed(0)}%`,
 			...SR.landCoverage,
 			set: state.setLandCoverage,
-		},
-		{
-			label: "Tides",
-			help: "Tidal force multiplier. 1.0x = Earth's lunar+solar regime. 0 = no moon, negligible tides. Higher values create stronger tidal ranges and more coastal wetlands. Disabled on tidally locked worlds.",
-			value: state.tidalStrength,
-			display: `${state.tidalStrength.toFixed(1)}x`,
-			...SR.tidalStrength,
-			set: state.setTidalStrength,
-			disabled: state.tidallyLocked,
 		},
 	]
 }
@@ -383,7 +373,8 @@ export function resetWorldDefaults(setters: {
 	setAntistellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
-	setTidalStrength: (v: number) => void
+	setMoonCount: (v: number) => void
+	setMoonSeed: (v: number) => void
 	setTerrainWarp: (v: number) => void
 	setSmoothing: (v: number) => void
 	setHydraulicErosion: (v: number) => void
@@ -415,6 +406,8 @@ export function resetWorldDefaults(setters: {
 	setters.setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
+	setters.setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)
+	setters.setMoonSeed(LUNA_MOON_SEED)
 	setters.setTerrainWarp(DEFAULT_WORLD_PARAMS.terrainWarp)
 	setters.setSmoothing(DEFAULT_WORLD_PARAMS.smoothing)
 	setters.setHydraulicErosion(DEFAULT_WORLD_PARAMS.hydraulicErosion)
@@ -426,5 +419,4 @@ export function resetWorldDefaults(setters: {
 	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
 	setters.setMaxElevation(DEFAULT_WORLD_PARAMS.maxElevation)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)
-	setters.setTidalStrength(DEFAULT_WORLD_PARAMS.tidalStrength)
 }

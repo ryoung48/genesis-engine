@@ -13,6 +13,7 @@ interface LockedClimatePreviewProps {
 	preview: LockedClimatePreviewData
 	activeTab: GenerationPreviewTab
 	unitSystem: UnitSystem
+	daysPerYear?: number
 }
 
 function buildPreviewChartProps(

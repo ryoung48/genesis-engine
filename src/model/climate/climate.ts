@@ -5,13 +5,13 @@
  */
 
 import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
-import { SimplexNoise } from "../shared/simplex-noise"
 import {
 	getStarDiameterSol,
 	getStarTemperatureK,
 	isValidSpectralClass,
 	type MainSequenceClass,
-} from "../shared/star-types"
+} from "../celestial/star/star-types"
+import { SimplexNoise } from "../shared/simplex-noise"
 import { TIME } from "../shared/time"
 import { getEffectiveObliquityDeg } from "../shared/units"
 

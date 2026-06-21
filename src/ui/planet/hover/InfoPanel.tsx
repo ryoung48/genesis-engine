@@ -296,7 +296,7 @@ interface InfoPanelProps {
 	populationMode: PopulationMapMode
 	selectedTimeMs: number | null
 	displayMonth: number
-	climateTimeMode: "current" | "annual" | "monthly"
+	climateTimeMode: "annual" | "monthly"
 	climateMonth: number
 	unitSystem: UnitSystem
 	world: SerializedGenesisWorld | null

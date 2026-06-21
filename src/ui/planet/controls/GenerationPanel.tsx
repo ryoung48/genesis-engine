@@ -11,7 +11,12 @@ import {
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model"
-import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import { MAX_MOONS } from "@/model/celestial/moons/moon-types"
+import {
+	derivePlanetMassKg,
+	isLunaMoonSeed,
+	moonSemiMajorAxisM,
+} from "@/model/celestial/moons/orbital-mechanics"
 import {
 	getHabitableZoneAU,
 	getKeplerYearYears,
@@ -25,7 +30,10 @@ import {
 	isValidSpectralClass,
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
-} from "@/model/shared/star-types"
+} from "@/model/celestial/star/star-types"
+import { EARTH_MOON_TIDE_REFERENCE } from "@/model/climate/tidal-force"
+import { SEED_MAX } from "@/model/shared/planet-code"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
@@ -36,6 +44,7 @@ import { LockOpenIcon } from "@/ui/components/primitives/icons/LockOpenIcon"
 import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
 import { StarOutlineIcon } from "@/ui/components/primitives/icons/StarOutlineIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
+import { TidalCalendarChart } from "@/ui/preview/TidalCalendarChart"
 import { getGenerationPreviewToggleLabel } from "../screen/generation/generation-preview"
 import { getOrderedRecentCodes } from "../screen/generation/recent-codes"
 import type { SliderDef } from "../screen/generation/sliders"
@@ -50,6 +59,15 @@ interface GenerationPanelProps {
 	tidallyLocked: boolean
 	setTidallyLocked: (v: boolean) => void
 	setObliquity: (v: number) => void
+	moonCount: number
+	setMoonCount: (v: number) => void
+	moonSeed: number
+	setMoonSeed: (v: number) => void
+	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
+	generatedMoons?: import("@/model/celestial/moons/moon-types").MoonParams[]
+	daysPerYear: number
+	hoursPerDay: number
+	planetRadiusKm: number
 	planetSliders: SliderDef[]
 	terrainSliders: SliderDef[]
 	spectralClass: string
@@ -393,6 +411,15 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	tidallyLocked,
 	setTidallyLocked,
 	setObliquity,
+	moonCount,
+	setMoonCount,
+	moonSeed,
+	setMoonSeed,
+	tidalSchedulePreview,
+	generatedMoons,
+	daysPerYear,
+	hoursPerDay,
+	planetRadiusKm,
 	planetSliders,
 	terrainSliders,
 	spectralClass,
@@ -424,6 +451,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	onClose,
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null)
+	const [moonBoxTab, setMoonBoxTab] = useState<"count" | "tides">("count")
 	const [showRecentCodes, setShowRecentCodes] = useState(false)
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
 	type DrillDownState =
@@ -461,6 +489,91 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 			onSelectRecentCode,
 			setShowRecentCodes,
 		})
+	const moonSeedLabel = isLunaMoonSeed(moonSeed)
+		? `${moonCount}-luna`
+		: `${moonCount}-${moonSeed.toString(36).padStart(6, "0")}`
+	const rerollMoonSeed = () => setMoonSeed(Math.floor(Math.random() * SEED_MAX))
+	const starClass: MainSequenceClass = isValidSpectralClass(spectralClass)
+		? spectralClass
+		: "G"
+	const starMassSol = getStarMassSol(starClass, starSubtype)
+	const yearLengthYears = getKeplerYearYears(orbitalDistanceAU, starMassSol)
+	const dayLengthSlider = planetSliders.find(
+		(slider) => slider.label === "Day Length",
+	)
+	const landSliderLabels = new Set([
+		"Land Coverage",
+		"Land Concentration",
+		"Ocean Concentration",
+	])
+	const planetSlidersWithoutSpinDayOrLand = planetSliders.filter(
+		(slider) =>
+			slider.label !== "Spin" &&
+			slider.label !== "Day Length" &&
+			!landSliderLabels.has(slider.label),
+	)
+	const landSliders = planetSliders.filter((slider) =>
+		landSliderLabels.has(slider.label),
+	)
+	const renderPlanetSliderSuffix = (item: SliderDef) => {
+		if (item.label === "Day Length" || item.label === "Antistellar Lon")
+			return (
+				<UITooltip
+					content={
+						tidallyLocked ? "remove 1:1 tidal lock" : "add 1:1 tidal lock"
+					}
+					position="top"
+					align="center"
+				>
+					<button
+						type="button"
+						onClick={() => {
+							setTidallyLocked(!tidallyLocked)
+							if (!tidallyLocked) setObliquity(0)
+						}}
+						className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+					>
+						{tidallyLocked ? (
+							<LockIcon className="h-3 w-3" />
+						) : (
+							<LockOpenIcon className="h-3 w-3" />
+						)}
+					</button>
+				</UITooltip>
+			)
+		if (item.label === "Axial Tilt") {
+			const spin = planetSliders.find((slider) => slider.label === "Spin")
+			const retrograde = spin && spin.value === 1
+			const spinDisabled = !!spin?.disabled
+			return (
+				<UITooltip
+					content={
+						spinDisabled
+							? "spin locked by tidal lock"
+							: retrograde
+								? "switch to prograde"
+								: "switch to retrograde"
+					}
+					position="top"
+					align="center"
+				>
+					<button
+						type="button"
+						onClick={() => spin?.set(retrograde ? 0 : 1)}
+						disabled={spinDisabled}
+						className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						{retrograde ? (
+							<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
+						) : (
+							<AxisRotateClockwiseIcon className="h-3 w-3" />
+						)}
+					</button>
+				</UITooltip>
+			)
+		}
+		return null
+	}
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col px-4 py-4 lg:px-5 lg:py-5 border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -563,86 +676,301 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 				{worldTab === "planet" && (
 					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 space-y-3">
 						{renderSliderGroup(
-							planetSliders.filter((p) => p.label !== "Spin"),
+							planetSlidersWithoutSpinDayOrLand,
 							"double",
-							(item) => {
-								if (
-									item.label === "Day Length" ||
-									item.label === "Antistellar Lon"
-								)
-									return (
-										<UITooltip
-											content={
-												tidallyLocked
-													? "remove 1:1 tidal lock"
-													: "add 1:1 tidal lock"
-											}
-											position="top"
-											align="center"
-										>
-											<button
-												type="button"
-												onClick={() => {
-													setTidallyLocked(!tidallyLocked)
-													if (!tidallyLocked) setObliquity(0)
-												}}
-												className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-											>
-												{tidallyLocked ? (
-													<LockIcon className="h-3 w-3" />
-												) : (
-													<LockOpenIcon className="h-3 w-3" />
-												)}
-											</button>
-										</UITooltip>
-									)
-								if (item.label === "Axial Tilt") {
-									const spin = planetSliders.find((p) => p.label === "Spin")
-									const retrograde = spin && spin.value === 1
-									const spinDisabled = !!spin?.disabled
-									return (
-										<UITooltip
-											content={
-												spinDisabled
-													? "spin locked by tidal lock"
-													: retrograde
-														? "switch to prograde"
-														: "switch to retrograde"
-											}
-											position="top"
-											align="center"
-										>
-											<button
-												type="button"
-												onClick={() => spin?.set(retrograde ? 0 : 1)}
-												disabled={spinDisabled}
-												className="flex h-4 w-4 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-											>
-												{retrograde ? (
-													<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
-												) : (
-													<AxisRotateClockwiseIcon className="h-3 w-3" />
-												)}
-											</button>
-										</UITooltip>
-									)
-								}
-								return null
-							},
+							renderPlanetSliderSuffix,
 						)}
+						{dayLengthSlider && (
+							<div className="grid grid-cols-1 xl:grid-cols-2 gap-1.5">
+								<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
+									<div className="flex items-center justify-between gap-3">
+										<UITooltip content={dayLengthSlider.help} position="top">
+											<label className="cursor-help whitespace-nowrap border-b border-dotted border-slate-300 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-slate-500 xl:text-[10px]">
+												{dayLengthSlider.label}
+											</label>
+										</UITooltip>
+										<span className="flex min-h-4 items-center gap-1.5">
+											{renderPlanetSliderSuffix(dayLengthSlider)}
+											<span className="font-mono text-[10px] text-slate-400">
+												{dayLengthSlider.display}
+											</span>
+										</span>
+									</div>
+									<input
+										type="range"
+										min={dayLengthSlider.min}
+										max={dayLengthSlider.max}
+										step={dayLengthSlider.step}
+										value={dayLengthSlider.value}
+										onChange={(e) =>
+											dayLengthSlider.set(parseFloat(e.target.value))
+										}
+										disabled={!!dayLengthSlider.disabled}
+										className="mt-1.5 w-full accent-slate-900 h-1 rounded-lg cursor-pointer"
+									/>
+								</div>
+								<div className="rounded-lg border border-slate-200/80 bg-white/85 px-2.5 py-2 shadow-sm shadow-slate-200/20">
+									<div className="flex items-center justify-between gap-3">
+										<UITooltip
+											content="Derived from stellar mass and orbital distance using Kepler's third law."
+											position="top"
+										>
+											<label className="cursor-help whitespace-nowrap border-b border-dotted border-slate-300 text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-slate-500 xl:text-[10px]">
+												Year Length
+											</label>
+										</UITooltip>
+										<span className="font-mono text-[10px] text-slate-400">
+											{yearLengthYears.toFixed(2)}×
+										</span>
+									</div>
+									<div className="mt-1.5 rounded-md bg-slate-50 px-2 py-1.5 text-[10px] leading-relaxed text-slate-400">
+										Derived from star + orbit
+									</div>
+								</div>
+							</div>
+						)}
+						{landSliders.length > 0 &&
+							renderSliderGroup(
+								landSliders,
+								"double",
+								renderPlanetSliderSuffix,
+							)}
+						{/* Moon box */}
 						{(() => {
-							const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
-								? spectralClass
-								: "G"
-							const mass = getStarMassSol(cls, starSubtype)
-							const years = getKeplerYearYears(orbitalDistanceAU, mass)
+							const MOON_COLORS_CSS = [
+								"text-sky-500",
+								"text-violet-500",
+								"text-emerald-500",
+							]
+							const planetMassKg = derivePlanetMassKg(planetRadiusKm)
 							return (
-								<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] text-slate-400 leading-relaxed">
-									Year length is derived
-									from stellar and orbital properties · currently{" "}
-									<span className="font-mono text-slate-900">
-										{years.toFixed(2)}×
-									</span>
+								<div className="rounded-lg border border-slate-200/80 bg-white/85 shadow-sm shadow-slate-200/20 overflow-hidden">
+									{/* Tab header */}
+									<div className="flex items-center border-b border-slate-100 px-2.5 pt-2 gap-2">
+										<UITooltip
+											content="Number of natural satellites. Each moon's mass and orbital period drive tidal forces, spring/neap beating cycles, moon phases, and eclipses. Solar tides are suppressed on tidally locked worlds; lunar tides still apply."
+											position="top"
+											align="start"
+										>
+											<span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-500 cursor-default">
+												Moons
+											</span>
+										</UITooltip>
+										<div className="flex gap-0 ml-auto">
+											{(["count", "tides"] as const).map((tab) => (
+												<button
+													key={tab}
+													type="button"
+													onClick={() => setMoonBoxTab(tab)}
+													className={`px-2 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-2 ${
+														moonBoxTab === tab
+															? "border-slate-700 text-slate-900"
+															: "border-transparent text-slate-400 hover:text-slate-600"
+													}`}
+												>
+													{tab}
+												</button>
+											))}
+										</div>
+									</div>
+
+									{/* MOONS tab */}
+									{moonBoxTab === "count" && (
+										<div className="px-2.5 py-2">
+											<div className="flex items-center justify-between gap-2">
+												<div className="flex items-center gap-1.5 min-w-0">
+													<UITooltip
+														content="Reroll moon parameters"
+														position="top"
+														align="start"
+													>
+														<button
+															type="button"
+															onClick={rerollMoonSeed}
+															className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700"
+														>
+															<DiceMultipleOutlineIcon className="h-3 w-3" />
+														</button>
+													</UITooltip>
+													<span
+														className="font-mono text-[9px] text-slate-400 truncate"
+														title={String(moonSeed)}
+													>
+														{moonSeedLabel}
+													</span>
+													<div className="flex gap-0.5 ml-1 self-center">
+														{Array.from({ length: moonCount }, (_, i) => (
+															<span
+																key={i}
+																className={`${MOON_COLORS_CSS[i % MOON_COLORS_CSS.length]} inline-block text-[9px]`}
+															>
+																●
+															</span>
+														))}
+													</div>
+												</div>
+												{/* Right: −/count/+ stepper */}
+												<div className="flex items-center gap-1.5 shrink-0">
+													<button
+														type="button"
+														disabled={moonCount === 0}
+														onClick={() => setMoonCount(moonCount - 1)}
+														className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+													>
+														<span className="leading-none text-[11px]">−</span>
+													</button>
+													<span className="w-3 text-center text-[11px] font-mono text-slate-800">
+														{moonCount}
+													</span>
+													<button
+														type="button"
+														disabled={moonCount >= MAX_MOONS}
+														onClick={() => setMoonCount(moonCount + 1)}
+														className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+													>
+														<span className="leading-none text-[11px]">+</span>
+													</button>
+												</div>
+											</div>
+											{tidallyLocked && moonCount > 0 && (
+												<p className="mt-1.5 text-[9px] text-slate-400 leading-tight">
+													Solar tides suppressed · lunar tides active
+												</p>
+											)}
+											<div className="mt-2">
+												{!generatedMoons || generatedMoons.length === 0 ? (
+													<div className="text-[10px] text-slate-400 py-2">
+														{moonCount === 0
+															? "No moons configured."
+															: "Computing moon parameters…"}
+													</div>
+												) : (
+													<div className="flex flex-col gap-2">
+														{generatedMoons.map((moon, i) => {
+															const sma = moonSemiMajorAxisM(
+																moon,
+																planetMassKg,
+																hoursPerDay,
+															)
+															const earthMoonMass = 7.342e22
+															const earthMoonDiam = 3474
+															const massRel = moon.massKg / earthMoonMass
+															const diamRel = moon.diameterKm / earthMoonDiam
+															const orbitLabel = moon.orbitRange ?? "middle"
+															const pd =
+																moon.semiMajorAxisPlanetDiameters ??
+																sma / (planetRadiusKm * 2000)
+															const peakForce =
+																tidalSchedulePreview?.events.reduce(
+																	(max, ev) =>
+																		Math.max(max, ev.moonForces[i] ?? 0),
+																	0,
+																) ?? 0
+															return (
+																<details
+																	key={i}
+																	className="group rounded border border-slate-100 px-2 py-1.5"
+																>
+																	<summary
+																		className={`flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] ${MOON_COLORS_CSS[i % MOON_COLORS_CSS.length]}`}
+																	>
+																		<span>
+																			Moon {i + 1} · {orbitLabel} ·{" "}
+																			{diamRel.toFixed(2)}× Luna
+																		</span>
+																		<svg
+																			width="12"
+																			height="12"
+																			viewBox="0 0 24 24"
+																			fill="none"
+																			stroke="currentColor"
+																			strokeWidth="2"
+																			strokeLinecap="round"
+																			strokeLinejoin="round"
+																			className="text-slate-400 transition-transform group-open:rotate-180"
+																		>
+																			<polyline points="6 9 12 15 18 9" />
+																		</svg>
+																	</summary>
+																	<div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5">
+																		{[
+																			[
+																				"Mass",
+																				`${massRel.toFixed(3)}× Luna (${(moon.massKg / 1e21).toFixed(2)} ×10²¹ kg)`,
+																			],
+																			[
+																				"Diameter",
+																				`${moon.diameterKm.toFixed(0)} km (${diamRel.toFixed(2)}× Luna)`,
+																			],
+																			[
+																				"Period",
+																				`${moon.orbitalPeriodDays.toFixed(2)} d`,
+																			],
+																			[
+																				"Semi-major axis",
+																				`${(sma / 1e6).toFixed(0)} Mm (${pd.toFixed(1)} PD)`,
+																			],
+																			[
+																				"Eccentricity",
+																				moon.eccentricity.toFixed(4),
+																			],
+																			[
+																				"Inclination",
+																				`${moon.inclinationDeg.toFixed(1)}°`,
+																			],
+																			[
+																				"Ω (asc. node)",
+																				`${moon.longitudeOfAscendingNodeDeg.toFixed(1)}°`,
+																			],
+																			[
+																				"ω (periapsis)",
+																				`${moon.argumentOfPeriapsisDeg.toFixed(1)}°`,
+																			],
+																			[
+																				"M₀ (epoch)",
+																				`${moon.meanAnomalyAtEpochDeg.toFixed(1)}°`,
+																			],
+																			[
+																				"Peak tide",
+																				`${(peakForce * EARTH_MOON_TIDE_REFERENCE).toFixed(3)} m`,
+																			],
+																		].map(([label, value]) => (
+																			<React.Fragment key={label}>
+																				<span className="text-[9px] text-slate-400">
+																					{label}
+																				</span>
+																				<span className="text-[9px] font-mono text-slate-700">
+																					{value}
+																				</span>
+																			</React.Fragment>
+																		))}
+																	</div>
+																</details>
+															)
+														})}
+													</div>
+												)}
+											</div>
+										</div>
+									)}
+
+									{/* TIDES tab */}
+									{moonBoxTab === "tides" && (
+										<div className="px-1 py-1" style={{ minHeight: 140 }}>
+											{tidalSchedulePreview &&
+											tidalSchedulePreview.events.length > 0 ? (
+												<TidalCalendarChart
+													schedule={tidalSchedulePreview}
+													daysPerYear={daysPerYear}
+													compact={true}
+												/>
+											) : (
+												<div className="flex items-center justify-center h-32 text-[10px] text-slate-400">
+													{moonCount === 0 ? "No moons" : "Computing…"}
+												</div>
+											)}
+										</div>
+									)}
 								</div>
 							)
 						})()}

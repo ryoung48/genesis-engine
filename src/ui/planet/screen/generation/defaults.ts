@@ -2,7 +2,7 @@ import {
 	DEFAULT_ORBITAL_DISTANCE_AU,
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
-} from "@/model/shared/star-types"
+} from "@/model/celestial/star/star-types"
 import {
 	DEFAULT_ANTISTELLAR_LON,
 	DEFAULT_DAYS_PER_YEAR,
@@ -50,5 +50,5 @@ export const DEFAULT_WORLD_PARAMS = {
 	antistellarLon: DEFAULT_ANTISTELLAR_LON,
 	perihelion: DEFAULT_PERIHELION,
 	era: DEFAULT_ERA,
-	tidalStrength: 1.0,
+	moonCount: 1,
 } as const

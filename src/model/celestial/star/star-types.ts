@@ -43,7 +43,7 @@ const STAR_MASS_SOL = [
 	0.05, 0.04, 0.025, 0.013,
 ]
 
-// Maximum aphelion orbit (AU) for main-sequence V class, first 15 entries
+// Minimum allowable orbit (AU) for main-sequence V class, first 15 entries
 const STAR_MAO_AU = [
 	0.5, 0.3, 0.18, 0.09, 0.06, 0.05, 0.04, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02,
 	0.01, 0.01,

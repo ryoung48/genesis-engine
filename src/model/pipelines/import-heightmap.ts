@@ -5,13 +5,13 @@
  */
 
 import type { GenesisParams, GenesisWorld, SphereMesh, StageTiming } from ".."
-import { buildSphereMesh } from "../mesh"
-import { createRng } from "../shared/rng"
 import {
 	DEFAULT_ORBITAL_DISTANCE_AU,
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
-} from "../shared/star-types"
+} from "../celestial/star/star-types"
+import { buildSphereMesh } from "../mesh"
+import { createRng } from "../shared/rng"
 import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
 import {
 	DEFAULT_ANTISTELLAR_LON,

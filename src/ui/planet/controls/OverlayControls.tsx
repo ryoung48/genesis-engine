@@ -132,10 +132,15 @@ interface OverlayControlsProps {
 	setDebugMapModes: (v: boolean) => void
 	colorMode: ColorMode
 	setColorMode: (v: ColorMode) => void
-	climateTimeMode: "current" | "annual" | "monthly"
-	setClimateTimeMode: (v: "current" | "annual" | "monthly") => void
+	clockCurrent: boolean
+	setClockCurrent: (v: boolean) => void
+	climateTimeMode: "annual" | "monthly"
+	setClimateTimeMode: (v: "annual" | "monthly") => void
 	climateMonth: number
 	setClimateMonth: (v: number) => void
+	clockDay: number
+	setClockDay: (v: number) => void
+	daysPerYear: number
 	climateSubMode: "basic" | "pasta" | "koppen"
 	setClimateSubMode: (v: "basic" | "pasta" | "koppen") => void
 	elevationSubMode: "colored" | "grayscale"
@@ -164,6 +169,11 @@ interface OverlayControlsProps {
 	onReset?: () => void
 	generationPanelOpen?: boolean
 	onToggleGenerationPanel?: () => void
+	showMoonOrbits?: boolean
+	setShowMoonOrbits?: (v: boolean) => void
+	showApparentDiameter?: boolean
+	setShowApparentDiameter?: (v: boolean) => void
+	moonCount?: number
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
@@ -226,10 +236,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setDebugMapModes,
 	colorMode,
 	setColorMode,
+	clockCurrent,
+	setClockCurrent,
 	climateTimeMode,
 	setClimateTimeMode,
 	climateMonth,
 	setClimateMonth,
+	clockDay,
+	setClockDay,
+	daysPerYear,
 	climateSubMode,
 	setClimateSubMode,
 	elevationSubMode,
@@ -256,6 +271,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	onReset,
 	generationPanelOpen,
 	onToggleGenerationPanel,
+	showMoonOrbits = false,
+	setShowMoonOrbits,
+	showApparentDiameter = false,
+	setShowApparentDiameter,
+	moonCount = 0,
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
 }) => {
@@ -263,6 +283,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [politicalExpanded, setPoliticalExpanded] = React.useState(false)
 	const [geographyExpanded, setGeographyExpanded] = React.useState(false)
 	const [labelsExpanded, setLabelsExpanded] = React.useState(false)
+	const [clockExpanded, setClockExpanded] = React.useState(false)
+	const [celestialExpanded, setCelestialExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
 	const [dangerExpanded, setDangerExpanded] = React.useState(false)
 	const [measureExpanded, setMeasureExpanded] = React.useState(false)
@@ -579,6 +601,176 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								<div>
 									<button
 										type="button"
+										onClick={() => setClockExpanded((v) => !v)}
+										className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+									>
+										<span>Clock</span>
+										<ChevronIcon
+											direction={clockExpanded ? "up" : "down"}
+											className="h-3 w-3 text-slate-400"
+										/>
+									</button>
+									{clockExpanded && (
+										<div className="mt-1.5 space-y-1.5">
+											<div className="flex items-center gap-4 text-[11px] font-medium">
+												<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+													<input
+														type="radio"
+														name="clock-mode"
+														checked={clockCurrent}
+														onChange={() => setClockCurrent(true)}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+													Current
+												</label>
+												<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+													<input
+														type="radio"
+														name="clock-mode"
+														checked={
+															!clockCurrent && climateTimeMode === "annual"
+														}
+														onChange={() => {
+															setClockCurrent(false)
+															setClimateTimeMode("annual")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+													Annual
+												</label>
+												<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+													<input
+														type="radio"
+														name="clock-mode"
+														checked={
+															!clockCurrent && climateTimeMode === "monthly"
+														}
+														onChange={() => {
+															setClockCurrent(false)
+															setClimateTimeMode("monthly")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+													Monthly
+												</label>
+											</div>
+											<div className="border-t border-white/10" />
+											<div
+												className={
+													clockCurrent || climateTimeMode === "annual"
+														? "space-y-1.5 opacity-50 pointer-events-none"
+														: "space-y-1.5"
+												}
+											>
+												<div className="flex items-center justify-between">
+													<label className="text-[11px] font-medium text-slate-300">
+														Month
+													</label>
+													<span className="font-mono text-[11px] text-slate-400">
+														{[
+															"Jan",
+															"Feb",
+															"Mar",
+															"Apr",
+															"May",
+															"Jun",
+															"Jul",
+															"Aug",
+															"Sep",
+															"Oct",
+															"Nov",
+															"Dec",
+														][climateMonth] ?? climateMonth + 1}
+													</span>
+												</div>
+												<input
+													type="range"
+													min={0}
+													max={11}
+													step={1}
+													value={climateMonth}
+													onChange={(e) =>
+														setClimateMonth(Number(e.target.value))
+													}
+													disabled={
+														clockCurrent || climateTimeMode === "annual"
+													}
+													className="w-full accent-slate-100 disabled:cursor-not-allowed"
+												/>
+												<div className="flex items-center justify-between">
+													<label className="text-[11px] font-medium text-slate-300">
+														Day
+													</label>
+													<span className="font-mono text-[11px] text-slate-400">
+														{clockDay + 1}
+													</span>
+												</div>
+												<input
+													type="range"
+													min={0}
+													max={Math.round(daysPerYear / 12) - 1}
+													step={1}
+													value={clockDay}
+													onChange={(e) => setClockDay(Number(e.target.value))}
+													disabled={
+														clockCurrent || climateTimeMode === "annual"
+													}
+													className="w-full accent-slate-100 disabled:cursor-not-allowed"
+												/>
+											</div>
+										</div>
+									)}
+								</div>
+
+								{moonCount > 0 && (
+									<div>
+										<button
+											type="button"
+											onClick={() => setCelestialExpanded((v) => !v)}
+											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+										>
+											<span>Celestial</span>
+											<ChevronIcon
+												direction={celestialExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										{celestialExpanded && (
+											<div className="mt-1.5 space-y-1.5 pl-2">
+												{setShowMoonOrbits && (
+													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
+														<span>Moon Orbits</span>
+														<input
+															type="checkbox"
+															checked={showMoonOrbits}
+															onChange={(e) =>
+																setShowMoonOrbits(e.target.checked)
+															}
+															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+														/>
+													</label>
+												)}
+												{setShowApparentDiameter && (
+													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
+														<span>Apparent Diameter</span>
+														<input
+															type="checkbox"
+															checked={showApparentDiameter}
+															onChange={(e) =>
+																setShowApparentDiameter(e.target.checked)
+															}
+															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+														/>
+													</label>
+												)}
+											</div>
+										)}
+									</div>
+								)}
+
+								<div>
+									<button
+										type="button"
 										onClick={() => setGeographyExpanded((v) => !v)}
 										className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
 									>
@@ -840,7 +1032,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 																Humidity
 															</label>
 														</div>
-														<div className="border-t border-white/10" />
 													</>
 												)}
 												{(colorMode === "temperature" ||
@@ -890,67 +1081,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														</div>
 														<div className="border-t border-white/10" />
 													</>
-												)}
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>Current</span>
-													<input
-														type="radio"
-														name="climate-time"
-														checked={climateTimeMode === "current"}
-														onChange={() => setClimateTimeMode("current")}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>Annual</span>
-													<input
-														type="radio"
-														name="climate-time"
-														checked={climateTimeMode === "annual"}
-														onChange={() => setClimateTimeMode("annual")}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>Monthly</span>
-													<input
-														type="radio"
-														name="climate-time"
-														checked={climateTimeMode === "monthly"}
-														onChange={() => setClimateTimeMode("monthly")}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												{climateTimeMode === "monthly" && (
-													<div className="flex items-center gap-3">
-														<input
-															type="range"
-															min={0}
-															max={11}
-															step={1}
-															value={climateMonth}
-															onChange={(e) =>
-																setClimateMonth(Number(e.target.value))
-															}
-															className="flex-1 accent-slate-100"
-														/>
-														<span className="font-mono text-[11px] text-slate-400 w-8 text-right">
-															{[
-																"Jan",
-																"Feb",
-																"Mar",
-																"Apr",
-																"May",
-																"Jun",
-																"Jul",
-																"Aug",
-																"Sep",
-																"Oct",
-																"Nov",
-																"Dec",
-															][climateMonth] ?? climateMonth}
-														</span>
-													</div>
 												)}
 											</div>
 										)}
@@ -1408,7 +1538,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 						</FloatingPanel>
 					</div>
 				</div>
-				<div className="pointer-events-auto">
+				<div className="flex items-center gap-2 pointer-events-auto">
 					<Tooltip
 						content={overlaysExpanded ? "Hide settings" : "Show settings"}
 						position="top"

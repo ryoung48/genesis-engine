@@ -171,7 +171,7 @@ function renderPanel(
 			populationMode="density"
 			selectedTimeMs={800}
 			displayMonth={1}
-			climateTimeMode="current"
+			climateTimeMode="monthly"
 			climateMonth={0}
 			unitSystem="metric"
 			world={makeWorld()}

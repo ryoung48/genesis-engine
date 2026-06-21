@@ -1,3 +1,5 @@
+import type { TidalSchedule } from "@/model/climate/tidal-schedule"
+
 interface ClimatePreviewCommon {
 	avgTemp: number
 	insolation: number[][]
@@ -6,6 +8,7 @@ interface ClimatePreviewCommon {
 	daylightColorFn: (value: number) => string
 	columnValues: number[]
 	columnLabels: string[]
+	tidalSchedule?: TidalSchedule
 }
 
 export interface RegularClimatePreviewData extends ClimatePreviewCommon {

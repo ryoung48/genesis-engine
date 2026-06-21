@@ -39,7 +39,8 @@ interface ImportHeightmapParams {
 	antistellarLon: number
 	perihelion: number
 	pressure: number
-	tidalStrength: number
+	moonCount: number
+	moonSeed: number
 	craters: number
 }
 
@@ -217,7 +218,8 @@ export function generateWorld(
 		daysPerYear: overrides?.daysPerYear ?? currentParams.daysPerYear,
 		hoursPerDay: overrides?.hoursPerDay ?? currentParams.hoursPerDay,
 		pressure: overrides?.pressure ?? currentParams.pressure,
-		tidalStrength: overrides?.tidalStrength ?? currentParams.tidalStrength,
+		moonCount: overrides?.moonCount ?? currentParams.moonCount,
+		moonSeed: overrides?.moonSeed ?? currentParams.moonSeed,
 		tidallyLocked,
 		antistellarLon: overrides?.antistellarLon ?? currentParams.antistellarLon,
 		jitter: overrides?.jitter ?? currentParams.jitter,

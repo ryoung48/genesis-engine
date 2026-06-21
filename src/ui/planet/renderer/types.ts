@@ -1,3 +1,4 @@
+import type { MoonParams } from "@/model/celestial/moons/moon-types"
 import type { WindArrowData } from "@/model/climate/wind"
 import type {
 	SerializedGenesisWorld,
@@ -91,6 +92,15 @@ export interface GenesisScene {
 	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void
+	setMoonOrbitOverlay(
+		moons: MoonParams[] | null,
+		planetRadiusKm: number,
+		hoursPerDay: number,
+		day: number,
+		showGrid: boolean,
+		gridSpacing: number,
+	): void
+	updateMoonOrbitDay(day: number): void
 	/** Unit vector pointing from origin toward the camera (globe mode only, null in map mode). */
 	getGlobeCameraDir(): [number, number, number] | null
 }

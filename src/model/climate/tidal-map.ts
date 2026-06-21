@@ -2,44 +2,12 @@ import type { GenesisParams, SphereMesh } from ".."
 import { makeRng } from "../shared/rng"
 import type { GenesisLandmarks } from "../terrain/landmarks"
 import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
+import type { TidalSchedule } from "./tidal-schedule"
 
-/**
- * Returns a Uint8Array where 1 = land cell that borders at least one non-land
- * (ocean or lake) neighbour.  Shared by the tidal model and classifyTopography
- * so the O(N×6) adjacency scan is not duplicated.
- */
-export function computeCoastalMask(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-): Uint8Array {
-	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const coastal = new Uint8Array(N)
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			if (!isLand[adjList[j]]) {
-				coastal[r] = 1
-				break
-			}
-		}
-	}
-	return coastal
-}
+export { computeCoastalMask } from "./tides"
 
-// Calibrated so tidalStrength=1.0 (Earth) yields ~86% micro (<1 m),
-// 13% meso (1–3 m), 1% macro (up to 16 m) of coastal cells.
 const BASE_TIDAL_RANGE_M = 0.25
 
-// Enclosure → bay amplification.  The reachable range for a coastal cell in a
-// 6-neighbour hex mesh is [0, 0.833] (minimum 1 ocean neighbour out of 6).
-// 7-neighbour and 8-neighbour irregular cells can reach 0.857–0.875.
-//
-//  enc=0    — open headland / island tip   → 1×   ~0.25 m  (micro)
-//  enc=0.5  — straight coast (3/6 ocean)   → 2×   ~0.50 m  (micro)
-//  enc=0.67 — slightly recessed (2/6)       → 3×   ~0.75 m  (micro)
-//  enc=0.833— tightest hex cell (1/6)       → 6×   ~1.50 m  (meso, typical small bay)
-//  enc=0.875— tight 8-neighbour cell        → 20×  ~5.00 m  (macro, rare deep inlet)
 const ENC_BREAKS = [0, 0.5, 0.67, 0.833, 0.92]
 const AMP_VALUES = [1, 2, 3, 6, 96]
 
@@ -55,38 +23,24 @@ function piecewiseAmp(enclosure: number): number {
 	return AMP_VALUES[AMP_VALUES.length - 1]!
 }
 
-// e-folding distance for tidal energy propagation through ocean (km).
 const DECAY_KM = 400
 
-/**
- * Computes a per-cell tidal range in **metres** (raw, not normalised).
- *
- * Coastal land cells: enclosure-based amplification (bay geometry proxy).
- *
- * Ocean cells: Dijkstra propagation from coastal-land sources using actual km
- * distances so decay is exp(−km/DECAY_KM) — always < 1, never amplifies.
- * Green's-law depth factor is applied once to the final ocean values only.
- *
- * Lakes and inland land: 0.
- */
-function _computeTidalRange(
+export function computeSpringTideMap(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
 	isCoastal: Uint8Array,
-	_elevationKm: Float32Array,
-	params: Pick<
-		GenesisParams,
-		"seed" | "tidalStrength" | "tidallyLocked" | "planetRadiusKm"
-	>,
+	schedule: TidalSchedule,
+	params: Pick<GenesisParams, "seed" | "planetRadiusKm">,
 	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
 ): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
-	const tidalStrength = params.tidalStrength ?? 1.0
-	const planetRadiusKm = params.planetRadiusKm ?? 6371
+	const { maxForce } = schedule
 
-	if (params.tidallyLocked || tidalStrength <= 0) return new Float32Array(N)
+	if (maxForce <= 0) return new Float32Array(N)
+
 	const rng = makeRng(params.seed ^ 0x7a3f)
+	const planetRadiusKm = params.planetRadiusKm
 
 	function isLandmarkLake(r: number): boolean {
 		if (!landmarks) return false
@@ -95,7 +49,10 @@ function _computeTidalRange(
 	}
 	const isOcean = (r: number) => !isLand[r] && !isLandmarkLake(r)
 
-	// ── Step 1: Coastal land cell values ──────────────────────────────
+	// Scale tidal range by spring tide force relative to Earth
+	const tidalStrength = maxForce
+
+	// ── Step 1: Coastal land cell values (enclosure amplification) ────────
 	const result = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		if (!isCoastal[r]) continue
@@ -105,21 +62,15 @@ function _computeTidalRange(
 			totalCount++
 			if (isOcean(adjList[j])) oceanCount++
 		}
-		// Skip cells with no true ocean exposure (e.g. land only adjacent to lakes).
 		if (totalCount === 0 || oceanCount === 0) continue
 		const enclosure = 1 - oceanCount / totalCount
 		result[r] = tidalStrength * BASE_TIDAL_RANGE_M * piecewiseAmp(enclosure)
 	}
 
-	// ── Step 1b: Assign tiers by fraction, randomise within each range ───
-	// Sort coastal cells by raw enclosure value (highest first) to rank them,
-	// then overwrite every cell with a random value inside its assigned tier so
-	// the distribution is smooth and piecewise-amp breakpoints don't cluster.
-	// Tier bounds scale with tidalStrength so a low-tidal world gets
-	// proportionally smaller ranges, not just fewer cells per tier.
-	const MACRO_THRESHOLD_M = 3.0 * tidalStrength
-	const MESO_THRESHOLD_M = 1.0 * tidalStrength
-	const MACRO_MAX_M = 16 * tidalStrength
+	// ── Step 1b: Tier randomisation ───────────────────────────────────────
+	const MACRO_MAX_M = Math.min(11 * tidalStrength, 80)
+	const MACRO_THRESHOLD_M = MACRO_MAX_M * (3 / 11)
+	const MESO_THRESHOLD_M = MACRO_MAX_M * (1 / 11)
 	const TARGET_MACRO_FRACTION = 0.01
 	const TARGET_MESO_FRACTION = 0.13
 
@@ -134,7 +85,6 @@ function _computeTidalRange(
 		for (let i = 0; i < coastalIndices.length; i++) {
 			const r = coastalIndices[i]!
 			if (i < macroCount) {
-				// Squared bias so extreme values (Bay of Fundy scale) are rare.
 				result[r] =
 					MACRO_THRESHOLD_M + rng() ** 2 * (MACRO_MAX_M - MACRO_THRESHOLD_M)
 			} else if (i < macroCount + mesoCount) {
@@ -146,15 +96,8 @@ function _computeTidalRange(
 		}
 	}
 
-	// ── Step 2: Dijkstra propagation from coastal land → ocean ─────────
-	// f[r] = max_c( result[c] × exp(−km_dist(r,c) / DECAY_KM) )
-	// Processed highest-value-first; since exp(−d/D) < 1 for all d > 0,
-	// the value at every ocean cell can only be ≤ its source, guaranteeing
-	// the first-visit value is always the maximum.
-
+	// ── Step 2: Dijkstra propagation coastal land → ocean ─────────────────
 	const f = new Float32Array(N)
-
-	// Min-heap storing [−value, region] so highest value is popped first.
 	const hPri: number[] = []
 	const hIdx: number[] = []
 
@@ -195,7 +138,6 @@ function _computeTidalRange(
 		return [topPri, topIdx]
 	}
 
-	// Seed: all coastal land cells
 	for (let r = 0; r < N; r++) {
 		if (result[r] > 0 && isLand[r]) {
 			f[r] = result[r]
@@ -206,12 +148,11 @@ function _computeTidalRange(
 	while (hPri.length > 0) {
 		const [negVal, r] = hPop()
 		const val = -negVal
-		if (val < f[r] - 1e-6) continue // stale entry
+		if (val < f[r] - 1e-6) continue
 
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
 			if (!isOcean(nb)) continue
-
 			const edgeKm = (neighborDist[j] ?? 0) * planetRadiusKm
 			const propagated = val * Math.exp(-edgeKm / DECAY_KM)
 			if (propagated > f[nb] + 1e-6) {
@@ -221,7 +162,6 @@ function _computeTidalRange(
 		}
 	}
 
-	// ── Step 3: Copy propagated values into ocean cells ───────────────
 	for (let r = 0; r < N; r++) {
 		if (!isOcean(r)) continue
 		result[r] = f[r]

@@ -1,4 +1,10 @@
 import { useMemo } from "react"
+import {
+	getStarDiameterSol,
+	getStarTemperatureK,
+	isValidSpectralClass,
+	type MainSequenceClass,
+} from "@/model/celestial/star/star-types"
 import { EnergyBalanceModel } from "@/model/climate/ebm"
 import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
 import {
@@ -7,12 +13,6 @@ import {
 	sampleColorStops,
 } from "@/model/shared/color-interpolation"
 import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
-import {
-	getStarDiameterSol,
-	getStarTemperatureK,
-	isValidSpectralClass,
-	type MainSequenceClass,
-} from "@/model/shared/star-types"
 import type { RegularClimatePreviewData } from "@/ui/preview/types"
 
 interface EbmConfig {

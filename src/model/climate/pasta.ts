@@ -1,7 +1,7 @@
 import {
 	getStarPARFactor,
 	isValidSpectralClass,
-} from "@/model/shared/star-types"
+} from "@/model/celestial/star/star-types"
 import type {
 	GenesisClimate,
 	GenesisHydrology,

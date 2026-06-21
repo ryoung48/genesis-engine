@@ -358,7 +358,7 @@ describe("importHeightmap", () => {
 				orbitalDistanceAU: 1.0,
 				daysPerYear: 400,
 				hoursPerDay: 26,
-				tidalStrength: 1.2,
+				moons: [],
 				tidallyLocked: false,
 				antistellarLon: 170,
 				perihelion: 30,

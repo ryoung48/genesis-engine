@@ -20,6 +20,13 @@ import type {
 	SphereMesh,
 	StageTiming,
 } from ".."
+import { generateMoons, M_SOL_KG } from "../celestial/moons/orbital-mechanics"
+import type { MainSequenceClass } from "../celestial/star/star-types"
+import {
+	DEFAULT_SPECTRAL_CLASS,
+	getStarMassSol,
+	isValidSpectralClass,
+} from "../celestial/star/star-types"
 import {
 	applyDtrToClimateMinMax,
 	computeLandFraction,
@@ -45,7 +52,8 @@ import {
 	computeMonthlyRain,
 	computeThermalEquator,
 } from "../climate/rain"
-import { computeCoastalMask, computeTidalRange } from "../climate/tides"
+import { computeCoastalMask, computeSpringTideMap } from "../climate/tidal-map"
+import { computeTidalSchedule } from "../climate/tidal-schedule"
 import { computeTornadoRisk } from "../climate/tornadoes"
 import { assignClimateZones, assignVegetation } from "../climate/vegetation"
 import {
@@ -130,6 +138,7 @@ interface PostPipelineOutput {
 	cycloneRisk: Float32Array
 	tornadoRisk: Float32Array
 	tidalRange: Float32Array
+	tidalSchedule: import("../climate/tidal-schedule").TidalSchedule
 	landmarks: GenesisLandmarks
 	oceanCurrents: GenesisOceanCurrents | undefined
 	timings: StageTiming[]
@@ -518,12 +527,24 @@ export function runPostElevationPipeline(
 	// formation in classifyTopography.
 	t0 = performance.now()
 	const coastalMask = computeCoastalMask(mesh, isLand)
-	// params includes planetRadiusKm — Dijkstra uses it for km-distance edge weights
-	const tidalRange = computeTidalRange(
+	const cls = isValidSpectralClass(params.spectralClass)
+		? (params.spectralClass as MainSequenceClass)
+		: DEFAULT_SPECTRAL_CLASS
+	const starMassKg = getStarMassSol(cls, params.starSubtype ?? 5) * M_SOL_KG
+	const generatedMoons = generateMoons(
+		params.moonCount ?? 0,
+		params.moonSeed ?? params.seed + 8831,
+		params.planetRadiusKm,
+		params.orbitalDistanceAU,
+		params.hoursPerDay,
+		starMassKg,
+	)
+	const tidalSchedule = computeTidalSchedule(generatedMoons, params)
+	const tidalRange = computeSpringTideMap(
 		mesh,
 		isLand,
 		coastalMask,
-		elevation_km,
+		tidalSchedule,
 		params,
 		landmarks,
 	)
@@ -797,6 +818,7 @@ export function runPostElevationPipeline(
 		cycloneRisk,
 		tornadoRisk,
 		tidalRange,
+		tidalSchedule,
 		landmarks,
 		oceanCurrents,
 		timings,

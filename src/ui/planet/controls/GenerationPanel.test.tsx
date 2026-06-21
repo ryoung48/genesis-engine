@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
+import { LUNA_MOON_SEED } from "@/model/celestial/moons/orbital-mechanics"
 import {
 	GenerationPanel,
 	getGenerationTimingSummary,
@@ -33,8 +34,20 @@ function createProps(
 		tidallyLocked: false,
 		setTidallyLocked: vi.fn(),
 		setObliquity: vi.fn(),
+		moonCount: 1,
+		setMoonCount: vi.fn(),
+		moonSeed: LUNA_MOON_SEED,
+		setMoonSeed: vi.fn(),
+		daysPerYear: 365,
+		hoursPerDay: 24,
+		planetRadiusKm: 6371,
 		planetSliders: [],
 		terrainSliders: [],
+		spectralClass: "G",
+		setSpectralClass: vi.fn(),
+		starSubtype: 2,
+		setStarSubtype: vi.fn(),
+		orbitalDistanceAU: 1,
 		planetCode: "ABCD",
 		codeInput: "ABCD",
 		setCodeInput: vi.fn(),

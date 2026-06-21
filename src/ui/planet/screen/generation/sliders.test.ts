@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
+import { LUNA_MOON_SEED } from "@/model/celestial/moons/orbital-mechanics"
 import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
@@ -23,7 +24,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 48,
 			pressure: 1,
-			tidalStrength: 1.0,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: false,
@@ -36,7 +36,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setTidalStrength: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -64,7 +63,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 24,
 			pressure: 1,
-			tidalStrength: 1.0,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: false,
@@ -77,7 +75,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setTidalStrength: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution,
 			setLandCoverage: vi.fn(),
@@ -113,7 +110,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 24,
 			pressure: 1,
-			tidalStrength: 1.0,
 			landDistribution: 0.25,
 			landCoverage: 0.6,
 			tidallyLocked: false,
@@ -126,7 +122,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setTidalStrength: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -157,7 +152,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 48,
 			pressure: 1,
-			tidalStrength: 1.0,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: false,
@@ -170,7 +164,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setTidalStrength: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -215,7 +208,6 @@ describe("buildPlanetSliders", () => {
 			daysPerYear: 365,
 			hoursPerDay: 24,
 			pressure: 1,
-			tidalStrength: 1.0,
 			landDistribution: 0.25,
 			landCoverage: 0.3,
 			tidallyLocked: true,
@@ -228,7 +220,6 @@ describe("buildPlanetSliders", () => {
 			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
-			setTidalStrength: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
 			setLandDistribution: vi.fn(),
 			setLandCoverage: vi.fn(),
@@ -350,7 +341,8 @@ describe("resetWorldDefaults", () => {
 			setAntistellarLon: vi.fn(),
 			setPerihelion: vi.fn(),
 			setPressure: vi.fn(),
-			setTidalStrength: vi.fn(),
+			setMoonCount: vi.fn(),
+			setMoonSeed: vi.fn(),
 			setTerrainWarp: vi.fn(),
 			setSmoothing: vi.fn(),
 			setHydraulicErosion: vi.fn(),
@@ -449,8 +441,9 @@ describe("resetWorldDefaults", () => {
 		expect(setters.setMaxElevation).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.maxElevation,
 		)
-		expect(setters.setTidalStrength).toHaveBeenCalledWith(
-			DEFAULT_WORLD_PARAMS.tidalStrength,
+		expect(setters.setMoonCount).toHaveBeenCalledWith(
+			DEFAULT_WORLD_PARAMS.moonCount,
 		)
+		expect(setters.setMoonSeed).toHaveBeenCalledWith(LUNA_MOON_SEED)
 	})
 })

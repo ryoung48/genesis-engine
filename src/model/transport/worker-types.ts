@@ -67,6 +67,7 @@ export interface SerializedGenesisWorld {
 	cycloneRisk?: Float32Array
 	tornadoRisk?: Float32Array
 	tidalRange?: Float32Array
+	tidalSchedule?: import("../climate/tidal-schedule").TidalSchedule
 	hazards: {
 		earthquake: Float32Array
 		volcano: Float32Array
@@ -450,6 +451,7 @@ export type GenesisWorkerRequest =
 				antistellarLon?: number
 				perihelion?: number
 				pressure?: number
+				moonCount?: number
 			}
 	  }
 	| {
