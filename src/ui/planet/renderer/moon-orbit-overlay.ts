@@ -80,9 +80,6 @@ export interface MoonOrbitState {
 	group: THREE.Group
 	/** Update moon positions for a new day without rebuilding geometry. */
 	setDay(day: number): void
-	/** Tilt the orbit group to match the sun's current sub-solar latitude.
-	 *  Pass the unit sun direction vector (same coords as scene sun.position). */
-	setTilt(sx: number, sy: number, sz: number): void
 	dispose(): void
 }
 
@@ -99,7 +96,6 @@ export function buildMoonOrbitOverlay(
 		return {
 			group,
 			setDay: () => undefined,
-			setTilt: () => undefined,
 			dispose: () => {
 				group.clear()
 			},
@@ -283,23 +279,6 @@ export function buildMoonOrbitOverlay(
 		}
 	}
 
-	// Tilt the entire group so the equatorial plane appears tilted by the same
-	// angle as the planet's axial tilt illusion (sub-solar latitude).
-	// The tilt axis is perpendicular to the sun's XY projection, so the north
-	// pole tips toward the sun — matching what a real observer would see.
-	function setTilt(sx: number, sy: number, sz: number) {
-		const tiltAngle = Math.asin(Math.max(-1, Math.min(1, sz)))
-		const xyLen = Math.sqrt(sx * sx + sy * sy)
-		if (xyLen < 1e-6) {
-			group.rotation.set(0, 0, 0)
-			return
-		}
-		group.setRotationFromAxisAngle(
-			new THREE.Vector3(-sy / xyLen, sx / xyLen, 0),
-			-tiltAngle,
-		)
-	}
-
 	setDay(initialDay)
 
 	function dispose() {
@@ -314,5 +293,5 @@ export function buildMoonOrbitOverlay(
 		group.clear()
 	}
 
-	return { group, setDay, setTilt, dispose }
+	return { group, setDay, dispose }
 }

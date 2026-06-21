@@ -672,6 +672,11 @@ export function createGenesisScene(
 	mapControls.zoomToCursor = true
 	mapControls.enabled = false
 
+	// Planet group — all globe-surface objects live here so axial tilt
+	// can be applied as a group rotation rather than moving the sun.
+	const globeGroup = new THREE.Group()
+	scene.add(globeGroup)
+
 	// Lighting — low ambient so day/night contrast is visible
 	const DEFAULT_AMBIENT_INTENSITY = 0.55
 	const DEFAULT_SUN_INTENSITY = 2.8
@@ -693,7 +698,7 @@ export function createGenesisScene(
 		depthWrite: false,
 	})
 	const waterMesh = new THREE.Mesh(waterGeo, waterMat)
-	scene.add(waterMesh)
+	globeGroup.add(waterMesh)
 
 	// Atmosphere
 	const atmosGeo = new THREE.SphereGeometry(1.12, 48, 36)
@@ -732,7 +737,7 @@ export function createGenesisScene(
 		depthWrite: false,
 	})
 	const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat)
-	scene.add(atmosMesh)
+	globeGroup.add(atmosMesh)
 
 	function setAtmospherePressure(pressureBar: number) {
 		const clamped = Math.max(
@@ -815,6 +820,9 @@ export function createGenesisScene(
 	let solarTerminatorVisible = false
 	let solarTerminatorUseMeridiem = false
 	const currentSunDirection = new THREE.Vector3(1, 0, 0)
+	// Sun direction in globe-local space (includes obliquity Z component).
+	// Used by the solar terminator so it tracks the planet surface correctly.
+	const currentLocalSunDirection = new THREE.Vector3(1, 0, 0)
 	let currentSunHoursPerDay = 24
 	let globeWindArrows: THREE.LineSegments | null = null
 	let mapWindArrows: THREE.LineSegments | null = null
@@ -902,8 +910,10 @@ export function createGenesisScene(
 		const radius = elevationVisible
 			? SOLAR_TERMINATOR_ELEVATED_RADIUS
 			: SOLAR_TERMINATOR_RADIUS
-		const sunDir = currentSunDirection.clone().normalize()
-		const points = buildSolarTerminatorRingPoints(currentSunDirection, radius)
+		// Terminator geometry lives in globeGroup local space; use the pre-computed
+		// globe-local sun direction (includes obliquity Z component).
+		const sunDir = currentLocalSunDirection.clone().normalize()
+		const points = buildSolarTerminatorRingPoints(currentLocalSunDirection, radius)
 		if (!points) return null
 		const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
 		const sinH0 = Math.sin(h0)
@@ -1009,8 +1019,8 @@ export function createGenesisScene(
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 		)
-		const sunDir = currentSunDirection.clone().normalize()
-		const points = buildSolarTerminatorRingPoints(currentSunDirection, 1)
+		const sunDir = currentLocalSunDirection.clone().normalize()
+		const points = buildSolarTerminatorRingPoints(currentLocalSunDirection, 1)
 		if (!points) return null
 		const segments = projectSolarTerminatorPointsToMap(
 			points,
@@ -1100,7 +1110,7 @@ export function createGenesisScene(
 
 	function rebuildSolarTerminator() {
 		if (globeSolarTerminator) {
-			disposeGroup(scene, globeSolarTerminator)
+			disposeGroup(globeGroup, globeSolarTerminator)
 			globeSolarTerminator = null
 		}
 		if (mapSolarTerminator) {
@@ -1109,7 +1119,7 @@ export function createGenesisScene(
 		}
 		if (!solarTerminatorVisible) return
 		globeSolarTerminator = buildSolarTerminatorGroup()
-		if (globeSolarTerminator) scene.add(globeSolarTerminator)
+		if (globeSolarTerminator) globeGroup.add(globeSolarTerminator)
 		mapSolarTerminator = buildMapSolarTerminatorGroup()
 		if (mapSolarTerminator) scene.add(mapSolarTerminator)
 	}
@@ -1126,11 +1136,18 @@ export function createGenesisScene(
 		const baseHeight = Math.pow(depth, 0.65) * 0.022
 		const stride = camDist < 2.0 ? 1 : camDist < 3.2 ? 2 : 3
 
+		// Labels are children of globeGroup, so camera vectors must be in
+		// globe-local space to position them correctly when the globe is tilted.
+		const invQ = globeGroup.quaternion.clone().invert()
+		const localCamDir = solarTerminatorCameraDir.clone().applyQuaternion(invQ)
+		const localCamUp = solarTerminatorCameraUp.clone().applyQuaternion(invQ)
+		const localCamRight = solarTerminatorCameraRight.clone().applyQuaternion(invQ)
+
 		for (let index = 0; index < solarTerminatorLabels.length; index++) {
 			const label = solarTerminatorLabels[index]!
 			const frontFacing =
 				index % stride === 0 &&
-				label.anchor.dot(solarTerminatorCameraDir) > 0.06
+				label.anchor.dot(localCamDir) > 0.06
 			label.sprite.visible = frontFacing
 			label.leader.visible = frontFacing
 			if (!frontFacing) continue
@@ -1140,11 +1157,11 @@ export function createGenesisScene(
 				.copy(label.anchor)
 				.multiplyScalar(radius + 0.04)
 				.addScaledVector(
-					solarTerminatorCameraUp,
+					localCamUp,
 					baseHeight * (index % 2 === 0 ? 0.22 : -0.22),
 				)
 				.addScaledVector(
-					solarTerminatorCameraRight,
+					localCamRight,
 					baseHeight * ((index % 3) - 1) * 0.16,
 				)
 			label.sprite.position.copy(solarTerminatorLabelEnd)
@@ -1323,7 +1340,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildHierarchyOverlay() {
-		disposeGroup(scene, globeHierarchyOverlay)
+		disposeGroup(globeGroup, globeHierarchyOverlay)
 		disposeGroup(scene, mapHierarchyOverlay)
 		globeHierarchyOverlay = null
 		mapHierarchyOverlay = null
@@ -1343,7 +1360,7 @@ export function createGenesisScene(
 			currentViewMode,
 			canvas,
 		)
-		if (globeHierarchyOverlay) scene.add(globeHierarchyOverlay)
+		if (globeHierarchyOverlay) globeGroup.add(globeHierarchyOverlay)
 		if (mapHierarchyOverlay) {
 			addMapSlideClones(mapHierarchyOverlay)
 			scene.add(mapHierarchyOverlay)
@@ -1352,7 +1369,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildSettlementOverlay() {
-		disposeGroup(scene, globeSettlements)
+		disposeGroup(globeGroup, globeSettlements)
 		disposeGroup(scene, mapSettlements)
 		globeSettlements = null
 		mapSettlements = null
@@ -1377,7 +1394,7 @@ export function createGenesisScene(
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 		)
-		if (globeSettlements) scene.add(globeSettlements)
+		if (globeSettlements) globeGroup.add(globeSettlements)
 		if (mapSettlements) {
 			addMapSlideClones(mapSettlements)
 			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
@@ -1387,7 +1404,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildNationLabels() {
-		disposeGroup(scene, globeNationLabels)
+		disposeGroup(globeGroup, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
 		globeNationLabels = null
 		mapNationLabels = null
@@ -1414,7 +1431,7 @@ export function createGenesisScene(
 			nationLabelPools.map,
 			labelCullingEnabled,
 		)
-		if (globeNationLabels) scene.add(globeNationLabels)
+		if (globeNationLabels) globeGroup.add(globeNationLabels)
 		if (mapNationLabels) {
 			if (!labelCullingEnabled) addMapSlideClones(mapNationLabels)
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
@@ -1424,7 +1441,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildSettlementLabels() {
-		disposeGroup(scene, globeSettlementLabels)
+		disposeGroup(globeGroup, globeSettlementLabels)
 		disposeGroup(scene, mapSettlementLabels)
 		globeSettlementLabels = null
 		mapSettlementLabels = null
@@ -1451,7 +1468,7 @@ export function createGenesisScene(
 			settlementLabelPools.map,
 			labelCullingEnabled,
 		)
-		if (globeSettlementLabels) scene.add(globeSettlementLabels)
+		if (globeSettlementLabels) globeGroup.add(globeSettlementLabels)
 		if (mapSettlementLabels) {
 			if (!labelCullingEnabled) addMapSlideClones(mapSettlementLabels)
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
@@ -1461,7 +1478,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildCultureLabels() {
-		disposeGroup(scene, globeCultureLabels)
+		disposeGroup(globeGroup, globeCultureLabels)
 		disposeGroup(scene, mapCultureLabels)
 		globeCultureLabels = null
 		mapCultureLabels = null
@@ -1484,7 +1501,7 @@ export function createGenesisScene(
 			cultureLabelPools.map,
 			labelCullingEnabled,
 		)
-		if (globeCultureLabels) scene.add(globeCultureLabels)
+		if (globeCultureLabels) globeGroup.add(globeCultureLabels)
 		if (mapCultureLabels) {
 			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
 			scene.add(mapCultureLabels)
@@ -1493,7 +1510,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildHeritageLabels() {
-		disposeGroup(scene, globeHeritageLabels)
+		disposeGroup(globeGroup, globeHeritageLabels)
 		disposeGroup(scene, mapHeritageLabels)
 		globeHeritageLabels = null
 		mapHeritageLabels = null
@@ -1516,7 +1533,7 @@ export function createGenesisScene(
 			heritageLabelPools.map,
 			labelCullingEnabled,
 		)
-		if (globeHeritageLabels) scene.add(globeHeritageLabels)
+		if (globeHeritageLabels) globeGroup.add(globeHeritageLabels)
 		if (mapHeritageLabels) {
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 			scene.add(mapHeritageLabels)
@@ -1525,7 +1542,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildTradeRouteOverlay() {
-		disposeGroup(scene, globeInfrastructure)
+		disposeGroup(globeGroup, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
 		globeInfrastructure = null
 		mapInfrastructure = null
@@ -1567,7 +1584,7 @@ export function createGenesisScene(
 			...globeTradeRouteBuild.materials,
 			...mapTradeRouteBuild.materials,
 		]
-		if (globeInfrastructure) scene.add(globeInfrastructure)
+		if (globeInfrastructure) globeGroup.add(globeInfrastructure)
 		if (mapInfrastructure) {
 			addMapSlideClones(mapInfrastructure)
 			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
@@ -1577,9 +1594,9 @@ export function createGenesisScene(
 	}
 
 	function rebuildNationBorders() {
-		disposeObject3D(scene, globeNationBorders)
+		disposeObject3D(globeGroup, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
-		disposeObject3D(scene, globeLandNationBorders)
+		disposeObject3D(globeGroup, globeLandNationBorders)
 		disposeObject3D(scene, mapLandNationBorders)
 		globeNationBorders = null
 		mapNationBorders = null
@@ -1610,7 +1627,7 @@ export function createGenesisScene(
 			if (globeLand) {
 				globeLandNationBorders = globeLand.lines
 				landNationBorderMaterials.push(globeLand.material)
-				scene.add(globeLandNationBorders)
+				globeGroup.add(globeLandNationBorders)
 			}
 			if (mapLand) {
 				mapLandNationBorders = mapLand.lines
@@ -1643,7 +1660,7 @@ export function createGenesisScene(
 				globeNationBorders.visible = currentViewMode === "globe"
 				globeNationBorders.renderOrder = 1
 				nationBorderMaterials.push(mat)
-				scene.add(globeNationBorders)
+				globeGroup.add(globeNationBorders)
 			}
 			const mapRaw = collectAllNationBorderMapPositions(
 				currentWorld,
@@ -1683,7 +1700,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildSelectedProvinceBorder() {
-		disposeObject3D(scene, globeSelectedProvinceBorder)
+		disposeObject3D(globeGroup, globeSelectedProvinceBorder)
 		disposeObject3D(scene, mapSelectedProvinceBorder)
 		globeSelectedProvinceBorder = null
 		mapSelectedProvinceBorder = null
@@ -1713,7 +1730,7 @@ export function createGenesisScene(
 				resolution: [canvas.clientWidth || 1, canvas.clientHeight || 1],
 			},
 		)
-		if (globeSelectedProvinceBorder) scene.add(globeSelectedProvinceBorder)
+		if (globeSelectedProvinceBorder) globeGroup.add(globeSelectedProvinceBorder)
 		if (mapSelectedProvinceBorder) {
 			addMapSlideClones(mapSelectedProvinceBorder)
 			scene.add(mapSelectedProvinceBorder)
@@ -1789,32 +1806,32 @@ export function createGenesisScene(
 	function rebuildOverlays() {
 		disposeObject3D(scene, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
-		disposeObject3D(scene, globeGrid)
+		disposeObject3D(globeGroup, globeGrid)
 		disposeObject3D(scene, mapGrid)
-		disposeObject3D(scene, globeThermalEquator)
+		disposeObject3D(globeGroup, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
-		disposeObject3D(scene, globeWindArrows)
+		disposeObject3D(globeGroup, globeWindArrows)
 		disposeObject3D(scene, mapWindArrows)
 		disposeGroup(scene, mapSolarTerminator)
-		disposeObject3D(scene, globeNationBorders)
+		disposeObject3D(globeGroup, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
-		disposeObject3D(scene, globeLandNationBorders)
+		disposeObject3D(globeGroup, globeLandNationBorders)
 		disposeObject3D(scene, mapLandNationBorders)
-		disposeObject3D(scene, globeSelectedProvinceBorder)
+		disposeObject3D(globeGroup, globeSelectedProvinceBorder)
 		disposeObject3D(scene, mapSelectedProvinceBorder)
 		disposeObject3D(scene, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
-		disposeGroup(scene, globeRivers)
+		disposeGroup(globeGroup, globeRivers)
 		disposeGroup(scene, mapRivers)
-		disposeGroup(scene, globeHierarchyOverlay)
+		disposeGroup(globeGroup, globeHierarchyOverlay)
 		disposeGroup(scene, mapHierarchyOverlay)
-		disposeGroup(scene, globeSettlements)
+		disposeGroup(globeGroup, globeSettlements)
 		disposeGroup(scene, mapSettlements)
-		disposeGroup(scene, globeInfrastructure)
+		disposeGroup(globeGroup, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
-		disposeGroup(scene, globeNationLabels)
+		disposeGroup(globeGroup, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
-		disposeGroup(scene, globeSettlementLabels)
+		disposeGroup(globeGroup, globeSettlementLabels)
 		disposeGroup(scene, mapSettlementLabels)
 		terrainWireframe = null
 		mapWireframe = null
@@ -1859,7 +1876,7 @@ export function createGenesisScene(
 				currentViewMode,
 				elevationVisible,
 			)
-			scene.add(terrainWireframe)
+			globeGroup.add(terrainWireframe)
 		}
 		if (wireframeVisible && currentWorld) {
 			mapWireframe = buildMapWireframe(
@@ -1885,7 +1902,7 @@ export function createGenesisScene(
 				gridVisible,
 				currentViewMode,
 			)
-			scene.add(globeGrid)
+			globeGroup.add(globeGrid)
 			addMapSlideClones(mapGrid)
 			scene.add(mapGrid)
 		}
@@ -1900,7 +1917,7 @@ export function createGenesisScene(
 				currentMapProjectionLatitudeDeg,
 				currentViewMode,
 			)
-			scene.add(globeThermalEquator)
+			globeGroup.add(globeThermalEquator)
 			addMapSlideClones(mapThermalEquator)
 			scene.add(mapThermalEquator)
 		}
@@ -1912,7 +1929,7 @@ export function createGenesisScene(
 				elevationVisible,
 			)
 			mapWindArrows = buildMapWindArrows(windArrowData, currentViewMode)
-			if (globeWindArrows) scene.add(globeWindArrows)
+			if (globeWindArrows) globeGroup.add(globeWindArrows)
 			if (mapWindArrows) {
 				addMapSlideClones(mapWindArrows)
 				scene.add(mapWindArrows)
@@ -1938,7 +1955,7 @@ export function createGenesisScene(
 				riversVisible,
 				currentViewMode,
 			)
-			scene.add(globeRivers)
+			globeGroup.add(globeRivers)
 			addMapSlideClones(mapRivers)
 			scene.add(mapRivers)
 		}
@@ -2189,7 +2206,7 @@ export function createGenesisScene(
 		)
 		mapMesh = mapBuild.mesh
 		mapFaceToRegion = mapBuild.faceToRegion
-		scene.add(terrainMesh)
+		globeGroup.add(terrainMesh)
 		scene.add(mapMesh)
 		reapplyMeshOverlayState({
 			world: currentWorld,
@@ -2473,7 +2490,7 @@ export function createGenesisScene(
 		if (!pulseGlobe && !pulseMap) return
 		if (pulseGlobe) {
 			pulseGlobe.visible = currentViewMode === "globe"
-			scene.add(pulseGlobe)
+			globeGroup.add(pulseGlobe)
 		}
 		if (pulseMap) {
 			pulseMap.visible = currentViewMode === "map"
@@ -2806,31 +2823,31 @@ export function createGenesisScene(
 		disposeObject3D(scene, mapOccupationOverlay)
 		disposeObject3D(scene, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
-		disposeObject3D(scene, globeGrid)
+		disposeObject3D(globeGroup, globeGrid)
 		disposeObject3D(scene, mapGrid)
-		disposeObject3D(scene, globeThermalEquator)
+		disposeObject3D(globeGroup, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
-		disposeGroup(scene, globeSolarTerminator)
+		disposeGroup(globeGroup, globeSolarTerminator)
 		disposeGroup(scene, mapSolarTerminator)
-		disposeObject3D(scene, globeNationBorders)
+		disposeObject3D(globeGroup, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
-		disposeObject3D(scene, globeLandNationBorders)
+		disposeObject3D(globeGroup, globeLandNationBorders)
 		disposeObject3D(scene, mapLandNationBorders)
 		disposeObject3D(scene, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
-		disposeGroup(scene, globeRivers)
+		disposeGroup(globeGroup, globeRivers)
 		disposeGroup(scene, mapRivers)
-		disposeGroup(scene, globeHierarchyOverlay)
+		disposeGroup(globeGroup, globeHierarchyOverlay)
 		disposeGroup(scene, mapHierarchyOverlay)
-		disposeGroup(scene, globeSettlements)
+		disposeGroup(globeGroup, globeSettlements)
 		disposeGroup(scene, mapSettlements)
-		disposeGroup(scene, globeInfrastructure)
+		disposeGroup(globeGroup, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
-		disposeGroup(scene, globeNationLabels)
+		disposeGroup(globeGroup, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
 		disposePool(nationLabelPools.globe)
 		disposePool(nationLabelPools.map)
-		disposeGroup(scene, globeSettlementLabels)
+		disposeGroup(globeGroup, globeSettlementLabels)
 		disposeGroup(scene, mapSettlementLabels)
 		disposePool(settlementLabelPools.globe)
 		disposePool(settlementLabelPools.map)
@@ -2857,9 +2874,9 @@ export function createGenesisScene(
 		startXYZ: [number, number, number] | null,
 		endXYZ: [number, number, number] | null,
 	) {
-		disposeObject3D(scene, globeMeasureLine)
+		disposeObject3D(globeGroup, globeMeasureLine)
 		disposeObject3D(scene, mapMeasureLine)
-		disposeObject3D(scene, globeMeasureDots)
+		disposeObject3D(globeGroup, globeMeasureDots)
 		disposeObject3D(scene, mapMeasureDots)
 		globeMeasureLine = null
 		mapMeasureLine = null
@@ -2881,8 +2898,8 @@ export function createGenesisScene(
 		)
 		globeMeasureLine = globeOverlay.line
 		globeMeasureDots = globeOverlay.dots
-		if (globeMeasureLine) scene.add(globeMeasureLine)
-		scene.add(globeMeasureDots)
+		if (globeMeasureLine) globeGroup.add(globeMeasureLine)
+		globeGroup.add(globeMeasureDots)
 
 		const mapOverlay = buildMapMeasurementOverlay(
 			startXYZ,
@@ -2910,9 +2927,9 @@ export function createGenesisScene(
 		startXYZ: [number, number, number] | null,
 		endXYZ: [number, number, number] | null,
 	) {
-		disposeObject3D(scene, globePathfindingLine)
+		disposeObject3D(globeGroup, globePathfindingLine)
 		disposeObject3D(scene, mapPathfindingLine)
-		disposeObject3D(scene, globePathfindingDots)
+		disposeObject3D(globeGroup, globePathfindingDots)
 		disposeObject3D(scene, mapPathfindingDots)
 		globePathfindingLine = null
 		mapPathfindingLine = null
@@ -2940,8 +2957,8 @@ export function createGenesisScene(
 		)
 		globePathfindingLine = globeOverlay.line as LineSegments2 | null
 		globePathfindingDots = globeOverlay.dots
-		if (globePathfindingLine) scene.add(globePathfindingLine)
-		scene.add(globePathfindingDots)
+		if (globePathfindingLine) globeGroup.add(globePathfindingLine)
+		globeGroup.add(globePathfindingDots)
 
 		const mapOverlay = buildMapPathfindingOverlay(
 			pathRegions,
@@ -2993,6 +3010,8 @@ export function createGenesisScene(
 			if (mapMesh) v.add(mapMesh.position)
 		} else {
 			v.normalize().multiplyScalar(1.005)
+			// Transform into world space accounting for the globe group's tilt.
+			v.applyMatrix4(globeGroup.matrixWorld)
 		}
 		v.project(cam)
 		if (v.z > 1) return null
@@ -3027,6 +3046,27 @@ export function createGenesisScene(
 	 * month 0 = equinox, 1-12 = Jan-Dec.
 	 * timeOfDay in hours [0, hoursPerDay). hoursPerDay controls full rotation.
 	 */
+	// Tilt the globeGroup so the planet's north pole tips toward the sun by
+	// the current sub-solar latitude — maintaining the axial-tilt illusion
+	// while keeping the sun fixed in the XY plane.
+	function applyGlobeTilt(sx: number, sy: number, sz: number) {
+		const tiltAngle = Math.asin(Math.max(-1, Math.min(1, sz)))
+		const xyLen = Math.sqrt(sx * sx + sy * sy)
+		if (xyLen < 1e-6) {
+			globeGroup.rotation.set(0, 0, 0)
+			currentLocalSunDirection.copy(currentSunDirection)
+			return
+		}
+		globeGroup.setRotationFromAxisAngle(
+			new THREE.Vector3(-sy / xyLen, sx / xyLen, 0),
+			tiltAngle,
+		)
+		// Recompute globe-local sun direction after the quaternion is set.
+		currentLocalSunDirection
+			.copy(currentSunDirection)
+			.applyQuaternion(globeGroup.quaternion.clone().invert())
+	}
+
 	function setSunPosition(
 		month: number,
 		obliquityDeg: number,
@@ -3038,38 +3078,34 @@ export function createGenesisScene(
 		// December (month 12) = southern summer solstice (-obliquity)
 		const subSolarLat =
 			month === 0 ? 0 : oblRad * Math.sin((2 * Math.PI * (month - 4)) / 12)
-		const cosLat = Math.cos(subSolarLat)
-		const sinLat = Math.sin(subSolarLat)
 		// Longitude from time of day — offset so noon faces the default camera
 		const lon = Math.PI + 2 * Math.PI * (timeOfDay / (hoursPerDay || 24))
+		const cosLon = Math.cos(lon)
+		const sinLon = Math.sin(lon)
 		const dist = 10
-		sun.position.set(
-			dist * cosLat * Math.cos(lon),
-			dist * cosLat * Math.sin(lon),
-			dist * sinLat,
-		)
-		currentSunDirection.copy(sun.position).normalize()
+		// Sun stays in the XY plane; the globe group tilts to simulate obliquity.
+		sun.position.set(dist * cosLon, dist * sinLon, 0)
+		currentSunDirection.set(cosLon, sinLon, 0)
 		currentSunHoursPerDay = hoursPerDay || 24
-		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
+		atmosMat.uniforms.sunDirection.value.set(cosLon, sinLon, 0)
+		applyGlobeTilt(cosLon, sinLon, Math.sin(subSolarLat))
 		syncMapLighting()
 		if (solarTerminatorVisible) rebuildSolarTerminator()
-		moonOrbitState?.setTilt(
-			currentSunDirection.x,
-			currentSunDirection.y,
-			currentSunDirection.z,
-		)
 		requestRender()
 	}
 
 	function setSunDirection(x: number, y: number, z: number, hoursPerDay: number) {
+		const xyLen = Math.sqrt(x * x + y * y)
+		const wx = xyLen > 1e-6 ? x / xyLen : 0
+		const wy = xyLen > 1e-6 ? y / xyLen : 1
 		const dist = 10
-		sun.position.set(dist * x, dist * y, dist * z)
-		currentSunDirection.copy(sun.position).normalize()
+		sun.position.set(dist * wx, dist * wy, 0)
+		currentSunDirection.set(wx, wy, 0)
 		currentSunHoursPerDay = hoursPerDay || 24
-		atmosMat.uniforms.sunDirection.value.copy(sun.position).normalize()
+		atmosMat.uniforms.sunDirection.value.set(wx, wy, 0)
+		applyGlobeTilt(x, y, z)
 		syncMapLighting()
 		if (solarTerminatorVisible) rebuildSolarTerminator()
-		moonOrbitState?.setTilt(x, y, z)
 		requestRender()
 	}
 
@@ -3234,7 +3270,7 @@ export function createGenesisScene(
 		gridSpacing: number,
 	) {
 		if (moonOrbitState) {
-			scene.remove(moonOrbitState.group)
+			globeGroup.remove(moonOrbitState.group)
 			moonOrbitState.dispose()
 			moonOrbitState = null
 		}
@@ -3247,12 +3283,7 @@ export function createGenesisScene(
 				showGrid,
 				gridSpacing,
 			)
-			moonOrbitState.setTilt(
-				currentSunDirection.x,
-				currentSunDirection.y,
-				currentSunDirection.z,
-			)
-			scene.add(moonOrbitState.group)
+			globeGroup.add(moonOrbitState.group)
 		}
 		requestRender()
 	}
