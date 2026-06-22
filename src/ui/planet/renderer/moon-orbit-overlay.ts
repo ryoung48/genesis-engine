@@ -4,6 +4,11 @@ import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
 } from "@/model/celestial/moons/orbital-mechanics"
+import {
+	getMoonOrbitDistanceRelativeToPlanet,
+	getMoonRadiusRelativeToPlanet,
+	scaleMoonOrbitDistanceForDisplay,
+} from "../moon-visual-scale"
 
 const MOON_COLORS_HEX = [0x0ea5e9, 0x8b5cf6, 0x10b981]
 const TWO_PI = 2 * Math.PI
@@ -76,10 +81,91 @@ function orbitPoint(
 	)
 }
 
+/**
+ * Builds a moon sphere with optional lat/lon grid lines.
+ * Q is the orbital direction vector (90° ahead), used to orient axial tilt.
+ */
+function buildMoonMesh(
+	radius: number,
+	color: number,
+	axialTiltDeg: number,
+	retrogradeRotation: boolean,
+	Q: THREE.Vector3,
+	showGrid: boolean,
+	gridSpacing: number,
+): THREE.Mesh {
+	const geo = new THREE.SphereGeometry(radius, 8, 6)
+	const moonTex = new THREE.TextureLoader().load("/moon.jpg")
+	const mat = new THREE.MeshStandardMaterial({
+		map: moonTex,
+		roughness: 1,
+		metalness: 0,
+	})
+	const mesh = new THREE.Mesh(geo, mat)
+	const tiltRad =
+		((axialTiltDeg * Math.PI) / 180) * (retrogradeRotation ? -1 : 1)
+	mesh.setRotationFromAxisAngle(Q, tiltRad)
+
+	if (showGrid) {
+		const gridRadius = radius * 1.01
+		const STEPS = 64
+		const gridMat = new THREE.LineBasicMaterial({
+			color,
+			transparent: true,
+			opacity: 0.2,
+			linewidth: 0.5,
+			depthTest: true,
+		})
+		const addLine = (pts: THREE.Vector3[]) => {
+			mesh.add(
+				new THREE.Line(
+					new THREE.BufferGeometry().setFromPoints(pts),
+					gridMat.clone(),
+				),
+			)
+		}
+		for (let latDeg = -90 + gridSpacing; latDeg < 90; latDeg += gridSpacing) {
+			const lat = (latDeg * Math.PI) / 180
+			const pts: THREE.Vector3[] = []
+			for (let s = 0; s <= STEPS; s++) {
+				const lon = (s / STEPS) * TWO_PI
+				pts.push(
+					new THREE.Vector3(
+						gridRadius * Math.cos(lat) * Math.cos(lon),
+						gridRadius * Math.cos(lat) * Math.sin(lon),
+						gridRadius * Math.sin(lat),
+					),
+				)
+			}
+			addLine(pts)
+		}
+		for (let lonDeg = 0; lonDeg < 360; lonDeg += gridSpacing) {
+			const lon = (lonDeg * Math.PI) / 180
+			const pts: THREE.Vector3[] = []
+			for (let s = 0; s <= STEPS; s++) {
+				const lat = (s / STEPS - 0.5) * Math.PI
+				pts.push(
+					new THREE.Vector3(
+						gridRadius * Math.cos(lat) * Math.cos(lon),
+						gridRadius * Math.cos(lat) * Math.sin(lon),
+						gridRadius * Math.sin(lat),
+					),
+				)
+			}
+			addLine(pts)
+		}
+	}
+	return mesh
+}
+
 export interface MoonOrbitState {
 	group: THREE.Group
+	/** Suggested camera maxDistance for this system. */
+	suggestedMaxDistance?: number
 	/** Update moon positions for a new day without rebuilding geometry. */
 	setDay(day: number): void
+	/** Toggle daylight-dependent effects (atmosphere rim, lightning). */
+	setDaylightMode?(enabled: boolean): void
 	dispose(): void
 }
 
@@ -103,8 +189,14 @@ export function buildMoonOrbitOverlay(
 	}
 
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-	const maxSmaM = Math.max(
-		...moons.map((m) => moonSemiMajorAxisM(m, planetMassKg, hoursPerDay)),
+	const maxOrbitalDistancePlanetRadii = Math.max(
+		...moons.map((moon) =>
+			getMoonOrbitDistanceRelativeToPlanet(
+				moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay) *
+					(1 + moon.eccentricity),
+				planetRadiusKm,
+			),
+		),
 	)
 
 	// Scale all orbits to fit between 1.3 and 2.6 scene units
@@ -127,8 +219,16 @@ export function buildMoonOrbitOverlay(
 
 	moons.forEach((moon, i) => {
 		const smaM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
-		const frac = moons.length === 1 ? 0.5 : smaM / maxSmaM
-		const a = SCENE_MIN + frac * (SCENE_MAX - SCENE_MIN)
+		const orbitalDistancePlanetRadii = getMoonOrbitDistanceRelativeToPlanet(
+			smaM,
+			planetRadiusKm,
+		)
+		const a = scaleMoonOrbitDistanceForDisplay({
+			orbitalDistancePlanetRadii,
+			maxOrbitalDistancePlanetRadii,
+			minDisplayDistance: SCENE_MIN,
+			maxDisplayDistance: SCENE_MAX,
+		})
 		const e = moon.eccentricity
 		const b = a * Math.sqrt(1 - e * e)
 		const ae = a * e
@@ -192,76 +292,21 @@ export function buildMoonOrbitOverlay(
 			),
 		)
 
-		// --- Moon body (lit by the scene sun/ambient lights) ---
+		// --- Moon body ---
 		const moonR = Math.max(
 			0.008,
-			(0.035 * (moon.diameterKm / planetRadiusKm)) / (3474 / 6371),
+			getMoonRadiusRelativeToPlanet(moon.diameterKm, planetRadiusKm),
 		)
-		const moonGeo = new THREE.SphereGeometry(moonR, 8, 6)
-		const moonMat = new THREE.MeshStandardMaterial({
-			color: 0xcbd5e1,
-			roughness: 1,
-			metalness: 0,
-		})
-		const moonMesh = new THREE.Mesh(moonGeo, moonMat)
-		// Tilt the moon's rotation axis relative to its orbital plane.
-		// Q is 90° ahead in the orbit, so tilting around Q tips the pole
-		// toward/away from the planet — a reasonable reference orientation.
-		const tiltRad =
-			(moon.axialTiltDeg * Math.PI) / 180 *
-			(moon.retrogradeRotation ? -1 : 1)
-		moonMesh.setRotationFromAxisAngle(Q, tiltRad)
+		const moonMesh = buildMoonMesh(
+			moonR,
+			moonColor,
+			moon.axialTiltDeg,
+			moon.retrogradeRotation,
+			Q,
+			showGrid,
+			gridSpacing,
+		)
 		group.add(moonMesh)
-
-		// Lat/lon grid lines on moon surface matching the planet grid spacing
-		if (showGrid) {
-			const R = moonR
-			const gridRadius = R * 1.01
-			const STEPS = 64
-			const gridMat = new THREE.LineBasicMaterial({
-				color: moonColor,
-				transparent: true,
-				opacity: 0.45,
-				linewidth: 0.5,
-				depthTest: true,
-			})
-			const addLine = (pts: THREE.Vector3[]) => {
-				const g = new THREE.BufferGeometry().setFromPoints(pts)
-				moonMesh.add(new THREE.Line(g, gridMat.clone()))
-			}
-			// Latitude lines at every gridSpacing degrees
-			for (let latDeg = -90 + gridSpacing; latDeg < 90; latDeg += gridSpacing) {
-				const lat = (latDeg * Math.PI) / 180
-				const pts: THREE.Vector3[] = []
-				for (let s = 0; s <= STEPS; s++) {
-					const lon = (s / STEPS) * TWO_PI
-					pts.push(
-						new THREE.Vector3(
-							gridRadius * Math.cos(lat) * Math.cos(lon),
-							gridRadius * Math.cos(lat) * Math.sin(lon),
-							gridRadius * Math.sin(lat),
-						),
-					)
-				}
-				addLine(pts)
-			}
-			// Longitude lines at every gridSpacing degrees
-			for (let lonDeg = 0; lonDeg < 360; lonDeg += gridSpacing) {
-				const lon = (lonDeg * Math.PI) / 180
-				const pts: THREE.Vector3[] = []
-				for (let s = 0; s <= STEPS; s++) {
-					const lat = (s / STEPS - 0.5) * Math.PI
-					pts.push(
-						new THREE.Vector3(
-							gridRadius * Math.cos(lat) * Math.cos(lon),
-							gridRadius * Math.cos(lat) * Math.sin(lon),
-							gridRadius * Math.sin(lat),
-						),
-					)
-				}
-				addLine(pts)
-			}
-		}
 		moonMeshes.push(moonMesh)
 		moonData.push({
 			a,
@@ -301,4 +346,369 @@ export function buildMoonOrbitOverlay(
 	}
 
 	return { group, setDay, dispose }
+}
+
+// ── Gas giant system 3D overlay ───────────────────────────────────────────────
+
+const _GG_COLOR_HEX = 0x92400e
+const GG_BAND_COLOR = 0xa16207
+const MAIN_MOON_COLOR = 0x60a5fa
+const SIBLING_COLORS_HEX = [
+	0x94a3b8, 0xa78bfa, 0x34d399, 0xf472b6, 0xfb923c, 0xfbbf24,
+]
+
+export function buildGasGiantSystemOverlay(
+	system: import("@/model/celestial/moons/moon-types").GasGiantSystem,
+	planetRadiusKm: number,
+	initialDay: number,
+	showGrid: boolean,
+	gridSpacing: number,
+): MoonOrbitState {
+	const group = new THREE.Group()
+
+	const { gasGiant, mainMoonPd, mainMoonOrbitalPeriodDays, siblingMoons } =
+		system
+
+	// ── Derive display sizes from actual physical ratios ──────────────────────
+	// Planet globe = 1.0 scene unit radius.
+	// Gas giant ratio = how many planet-diameters fit across the gas giant.
+	const ggRatioToPlanet = gasGiant.diameterKm / (planetRadiusKm * 2)
+
+	// 1:1 scale vs planet globe (globe radius = 1.0), so a 9× gas giant → radius 9.0.
+	const GG_SPHERE_R = Math.max(0.5, ggRatioToPlanet)
+
+	// Place gas giant to the side (+X) so the planet–GG arm is horizontal and
+	// i=0 sibling orbits (in the GG equatorial XZ plane) look like proper rings.
+	const GG_DIR = new THREE.Vector3(1, 0, 0)
+
+	// ── Orbital scaling ───────────────────────────────────────────────────────
+	// Distances are measured from the gas giant's surface, not its center.
+	// smaDisplay(pd) = GG_SPHERE_R + pd * pdToScene * compressionScale
+	// so pd=0 sits on the surface and every pd adds proportional distance beyond it.
+	const pdToScene = GG_SPHERE_R * 2 // 1 gas-giant diameter in scene units
+	const MAX_ORBIT_RADIUS = Math.max(6.0, GG_SPHERE_R * 2.5)
+	// Available radius for the pd portion of orbits (beyond the gas giant surface).
+	const availR = MAX_ORBIT_RADIUS - GG_SPHERE_R
+	const rawMaxApoapsisInPd = Math.max(
+		mainMoonPd,
+		...siblingMoons.map((m) => m.pd * (1 + m.eccentricity)),
+		1,
+	)
+	const rawMaxApoapsisPdScene = rawMaxApoapsisInPd * pdToScene
+	const compressionScale =
+		rawMaxApoapsisPdScene > availR ? availR / rawMaxApoapsisPdScene : 1.0
+
+	// SMA from gas giant center = surface offset + scaled pd distance.
+	function smaDisplay(pd: number): number {
+		return GG_SPHERE_R + pd * pdToScene * compressionScale
+	}
+
+	// Gas giant sits at the main planet's actual (compressed) orbital distance.
+	const GG_DIST = smaDisplay(mainMoonPd)
+	const ggPos = GG_DIR.clone().multiplyScalar(GG_DIST)
+
+	// ── Gas giant subgroup ───────────────────────────────────────────────────
+	// perifocalBasis uses Z-north / XY equatorial — same convention as the planet globe.
+	// No rotation needed; i=0 orbits lie in XY and moon meshes (Z-north) appear upright.
+	const ggGroup = new THREE.Group()
+	ggGroup.position.copy(ggPos)
+	group.add(ggGroup)
+
+	// Gas giant sphere (at subgroup origin = ggPos in world)
+	const ggGeo = new THREE.SphereGeometry(GG_SPHERE_R, 24, 18)
+	const jupiterTex = new THREE.TextureLoader().load("/2k_jupiter.jpg")
+	const ggMat = new THREE.MeshStandardMaterial({
+		map: jupiterTex,
+		roughness: 1,
+		metalness: 0,
+	})
+	const ggMesh = new THREE.Mesh(ggGeo, ggMat)
+	ggGroup.add(ggMesh)
+
+	// Grid in Y-up space to match Three.js SphereGeometry UV mapping (poles at ±Y)
+	const gridR = GG_SPHERE_R * 1.002
+	const GRID_STEPS = 96
+	const ggGridMat = () =>
+		new THREE.LineBasicMaterial({
+			color: GG_BAND_COLOR,
+			transparent: true,
+			opacity: 0.4,
+		})
+	for (let latDeg = -90 + gridSpacing; latDeg < 90; latDeg += gridSpacing) {
+		const lat = (latDeg * Math.PI) / 180
+		const pts: THREE.Vector3[] = []
+		for (let s = 0; s <= GRID_STEPS; s++) {
+			const lon = (s / GRID_STEPS) * TWO_PI
+			pts.push(
+				new THREE.Vector3(
+					gridR * Math.cos(lat) * Math.cos(lon),
+					gridR * Math.sin(lat),
+					gridR * Math.cos(lat) * Math.sin(lon),
+				),
+			)
+		}
+		ggMesh.add(
+			new THREE.Line(
+				new THREE.BufferGeometry().setFromPoints(pts),
+				ggGridMat(),
+			),
+		)
+	}
+	for (let lonDeg = 0; lonDeg < 360; lonDeg += gridSpacing) {
+		const lon = (lonDeg * Math.PI) / 180
+		const pts: THREE.Vector3[] = []
+		for (let s = 0; s <= GRID_STEPS; s++) {
+			const lat = (s / GRID_STEPS - 0.5) * Math.PI
+			pts.push(
+				new THREE.Vector3(
+					gridR * Math.cos(lat) * Math.cos(lon),
+					gridR * Math.sin(lat),
+					gridR * Math.cos(lat) * Math.sin(lon),
+				),
+			)
+		}
+		ggMesh.add(
+			new THREE.Line(
+				new THREE.BufferGeometry().setFromPoints(pts),
+				ggGridMat(),
+			),
+		)
+	}
+
+	// ── Lightning flashes on the night side ───────────────────────────────────
+	const LIGHTNING_COUNT = 10
+	const lightningFlashes = Array.from({ length: LIGHTNING_COUNT }, () => {
+		const phi = Math.acos(2 * Math.random() - 1)
+		const theta = Math.random() * TWO_PI
+		const localPos = new THREE.Vector3(
+			GG_SPHERE_R * Math.sin(phi) * Math.cos(theta),
+			GG_SPHERE_R * Math.sin(phi) * Math.sin(theta),
+			GG_SPHERE_R * Math.cos(phi),
+		)
+		const mat = new THREE.MeshStandardMaterial({
+			color: 0x000000,
+			emissive: new THREE.Color(0xfff8c0),
+			emissiveIntensity: 0,
+			roughness: 1,
+			metalness: 0,
+			transparent: true,
+			opacity: 0,
+		})
+		const mesh = new THREE.Mesh(
+			new THREE.SphereGeometry(GG_SPHERE_R * 0.022, 4, 3),
+			mat,
+		)
+		mesh.position.copy(localPos)
+		ggMesh.add(mesh)
+		return {
+			mat,
+			localPos: localPos.clone().normalize(),
+			phase: Math.random() * TWO_PI,
+		}
+	})
+	let daylightEnabled = false
+
+	// ── Main planet orbit ring ────────────────────────────────────────────────
+	// In subgroup XY space: circle of radius GG_DIST centered at origin.
+	// After subgroup −90° X rotation this becomes an XZ world ring passing through origin.
+	const mainOrbitPts: THREE.Vector3[] = []
+	for (let j = 0; j <= ORBIT_SEGMENTS; j++) {
+		const theta = (j / ORBIT_SEGMENTS) * TWO_PI
+		mainOrbitPts.push(
+			new THREE.Vector3(
+				GG_DIST * Math.cos(theta),
+				GG_DIST * Math.sin(theta),
+				0,
+			),
+		)
+	}
+	ggGroup.add(
+		new THREE.Line(
+			new THREE.BufferGeometry().setFromPoints(mainOrbitPts),
+			new THREE.LineBasicMaterial({
+				color: MAIN_MOON_COLOR,
+				transparent: true,
+				opacity: 0.35,
+			}),
+		),
+	)
+
+	// Faint arm from gas giant center toward planet origin — updated each frame as GG orbits
+	const armGeo = new THREE.BufferGeometry().setFromPoints([
+		ggPos.clone(),
+		new THREE.Vector3(0, 0, 0),
+	])
+	group.add(
+		new THREE.Line(
+			armGeo,
+			new THREE.LineBasicMaterial({
+				color: MAIN_MOON_COLOR,
+				transparent: true,
+				opacity: 0.12,
+			}),
+		),
+	)
+
+	// ── Sibling moon orbits ───────────────────────────────────────────────────
+	const siblingData: Array<{
+		a: number
+		b: number
+		ae: number
+		e: number
+		period: number
+		M0: number
+		P: THREE.Vector3
+		Q: THREE.Vector3
+		mesh: THREE.Mesh
+	}> = []
+
+	siblingMoons.forEach((moon, i) => {
+		const e = moon.eccentricity
+		// Clamp SMA so periapsis (a*(1-e)) never dips inside the gas giant sphere
+		const rawA = smaDisplay(moon.pd)
+		const minA = e < 1 ? GG_SPHERE_R / (1 - e) : rawA
+		const a = Math.max(rawA, minA)
+		const b = a * Math.sqrt(1 - e * e)
+		const ae = a * e
+
+		const OmegaRad = (moon.longitudeOfAscendingNodeDeg * Math.PI) / 180
+		const incRad = (moon.inclinationDeg * Math.PI) / 180
+		const omegaRad = (moon.argumentOfPeriapsisDeg * Math.PI) / 180
+		const M0 = (moon.meanAnomalyAtEpochDeg * Math.PI) / 180
+
+		// No manual frame rotation needed — ggGroup's −90° X handles it.
+		const { P, Q } = perifocalBasis(OmegaRad, incRad, omegaRad)
+		const color = SIBLING_COLORS_HEX[i % SIBLING_COLORS_HEX.length] ?? 0x94a3b8
+
+		// Orbit path (in subgroup space, no ggPos offset)
+		const pathPts: THREE.Vector3[] = []
+		for (let j = 0; j <= ORBIT_SEGMENTS; j++) {
+			const E = (j / ORBIT_SEGMENTS) * TWO_PI
+			pathPts.push(orbitPoint(E, a, b, ae, P, Q))
+		}
+		ggGroup.add(
+			new THREE.Line(
+				new THREE.BufferGeometry().setFromPoints(pathPts),
+				new THREE.LineBasicMaterial({
+					color,
+					transparent: true,
+					opacity: 0.28,
+				}),
+			),
+		)
+
+		// Moon body in subgroup space — Z-north maps to world Y via ggGroup rotation
+		const moonRatioToGG = moon.diameterKm / gasGiant.diameterKm
+		const moonR = Math.max(
+			0.015,
+			Math.min(GG_SPHERE_R * 0.25, GG_SPHERE_R * moonRatioToGG * 2),
+		)
+		const moonMesh = buildMoonMesh(
+			moonR,
+			color,
+			moon.axialTiltDeg,
+			moon.retrogradeRotation,
+			Q,
+			showGrid,
+			gridSpacing,
+		)
+		ggGroup.add(moonMesh)
+
+		siblingData.push({
+			a,
+			b,
+			ae,
+			e,
+			period: moon.orbitalPeriodDays,
+			M0,
+			P,
+			Q,
+			mesh: moonMesh,
+		})
+	})
+
+	function setDay(day: number) {
+		// Gas giant orbits the planet (main planet orbits the GG at period mainMoonOrbitalPeriodDays).
+		// From the planet's frame the GG moves in a circle of radius GG_DIST in the XY plane.
+		const mainTheta = (TWO_PI / mainMoonOrbitalPeriodDays) * day
+		const newGGPos = new THREE.Vector3(
+			GG_DIST * Math.cos(mainTheta),
+			GG_DIST * Math.sin(mainTheta),
+			0,
+		)
+		ggGroup.position.copy(newGGPos)
+
+		// Spin gas giant on its axis
+		ggMesh.rotation.y = (TWO_PI / (gasGiant.dayLengthHours / 24)) * day
+
+		// Update arm line start point
+		const armPos = armGeo.getAttribute("position") as THREE.BufferAttribute
+		armPos.setXYZ(0, newGGPos.x, newGGPos.y, newGGPos.z)
+		armPos.needsUpdate = true
+
+		// Sun direction relative to GG center, so the lit hemisphere shifts as GG orbits
+		// Lightning flashes: MeshStandardMaterial handles day/night via scene lighting.
+		// Drive emissiveIntensity so flashes glow on the night side naturally.
+		if (daylightEnabled) {
+			for (const f of lightningFlashes) {
+				const t = day * 18 + f.phase
+				const pulse = Math.pow(
+					Math.max(0, Math.sin(t) * Math.sin(t * 1.73 + f.phase)),
+					6,
+				)
+				f.mat.opacity = pulse
+				f.mat.emissiveIntensity = pulse * 2.5
+			}
+		}
+
+		// Sibling moons in ggGroup space
+		for (const d of siblingData) {
+			const n = TWO_PI / d.period
+			const M = mod2pi(d.M0 + n * day)
+			const E = solveKepler(M, d.e)
+			const pos = orbitPoint(E, d.a, d.b, d.ae, d.P, d.Q)
+			d.mesh.position.copy(pos)
+		}
+	}
+
+	setDay(initialDay)
+
+	function dispose() {
+		group.traverse((obj) => {
+			if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
+				obj.geometry.dispose()
+				if (Array.isArray(obj.material))
+					obj.material.forEach((m) => m.dispose())
+				else obj.material.dispose()
+			}
+		})
+		group.clear()
+	}
+
+	// Suggest a camera distance that frames the whole system with breathing room.
+	const maxSiblingApoapsis =
+		siblingMoons.length > 0
+			? Math.max(
+					...siblingMoons.map((m) => {
+						const e = m.eccentricity
+						const rawA = smaDisplay(m.pd)
+						const minA = e < 1 ? GG_SPHERE_R / (1 - e) : rawA
+						return Math.max(rawA, minA) * (1 + e)
+					}),
+				)
+			: 0
+	const systemRadius = GG_DIST + Math.max(GG_SPHERE_R, maxSiblingApoapsis)
+	const suggestedMaxDistance = systemRadius * 2.5
+
+	function setDaylightMode(enabled: boolean) {
+		daylightEnabled = enabled
+		if (!enabled) {
+			for (const f of lightningFlashes) {
+				f.mat.opacity = 0
+				f.mat.emissiveIntensity = 0
+			}
+		}
+	}
+
+	return { group, setDay, dispose, suggestedMaxDistance, setDaylightMode }
 }

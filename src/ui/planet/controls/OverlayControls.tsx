@@ -188,6 +188,7 @@ interface OverlayControlsProps {
 	showSolarTerminator?: boolean
 	setShowSolarTerminator?: (v: boolean) => void
 	moonCount?: number
+	planetType?: import("@/model/celestial/moons/moon-types").PlanetType
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
@@ -297,6 +298,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowDaylight,
 	setShowSolarTerminator,
 	moonCount = 0,
+	planetType = "terrestrial",
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
 }) => {
@@ -313,7 +315,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
 	const hasCelestialControls = Boolean(
-		(moonCount > 0 && setShowMoonOrbits) ||
+		planetType === "gas-giant-moon" ||
+			(moonCount > 0 && setShowMoonOrbits) ||
 			setShowApparentDiameter ||
 			(setShowDaylight && setShowSolarTerminator),
 	)
@@ -763,7 +766,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														max={CLOCK_DIAL_HOURS}
 														step={0.5}
 														value={clampedClockHour}
-														onChange={(e) => setClockHour(Number(e.target.value))}
+														onChange={(e) =>
+															setClockHour(Number(e.target.value))
+														}
 														className="m-0 block w-full accent-slate-100"
 													/>
 													<label className="mt-1.5 flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
@@ -798,14 +803,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										</button>
 										{celestialExpanded && (
 											<div className="mt-1.5 space-y-1.5 pl-2">
-												{moonCount > 0 && setShowMoonOrbits && (
+												{(planetType === "gas-giant-moon" ||
+													(moonCount > 0 && setShowMoonOrbits)) && (
 													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
-														<span>Moon Orbits</span>
+														<span>Planetary System</span>
 														<input
 															type="checkbox"
 															checked={showMoonOrbits}
 															onChange={(e) =>
-																setShowMoonOrbits(e.target.checked)
+																setShowMoonOrbits?.(e.target.checked)
 															}
 															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 														/>

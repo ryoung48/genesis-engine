@@ -5,6 +5,11 @@ import {
 	moonSemiMajorAxisM,
 } from "@/model/celestial/moons/orbital-mechanics"
 import { scaleClockDialHourToDayLength } from "../clock"
+import {
+	getMoonOrbitDistanceRelativeToPlanet,
+	scaleMoonOrbitDistanceForDisplay,
+	scaleMoonRadiusToPlanetVisualRadius,
+} from "../moon-visual-scale"
 
 const MOON_COLORS = ["#0ea5e9", "#8b5cf6", "#10b981"]
 const TWO_PI = 2 * Math.PI
@@ -50,19 +55,29 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 	const orbits = useMemo(() => {
 		if (moons.length === 0) return []
 		const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-		const maxExtent = Math.max(
-			...moons.map(
-				(m) =>
+		const maxExtentPlanetRadii = Math.max(
+			...moons.map((m) =>
+				getMoonOrbitDistanceRelativeToPlanet(
 					moonSemiMajorAxisM(m, planetMassKg, hoursPerDay) *
-					(1 + m.eccentricity),
+						(1 + m.eccentricity),
+					planetRadiusKm,
+				),
 			),
 		)
-		const scale = (SIZE / 2 - MARGIN) / maxExtent
 
 		return moons.map((moon, i) => {
 			const smaM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
+			const orbitalDistancePlanetRadii = getMoonOrbitDistanceRelativeToPlanet(
+				smaM,
+				planetRadiusKm,
+			)
 			const e = moon.eccentricity
-			const a = smaM * scale
+			const a = scaleMoonOrbitDistanceForDisplay({
+				orbitalDistancePlanetRadii,
+				maxOrbitalDistancePlanetRadii: maxExtentPlanetRadii,
+				minDisplayDistance: PLANET_R + 8,
+				maxDisplayDistance: SIZE / 2 - MARGIN,
+			})
 			const b = a * Math.sqrt(1 - e * e)
 			const ae = a * e
 			const omegaDeg = moon.argumentOfPeriapsisDeg
@@ -125,7 +140,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 			{/* Header */}
 			<div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/8">
 				<span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
-					Moon Orbits
+					Planetary System
 				</span>
 				<div className="flex gap-2">
 					{orbits.map((o, i) => (
@@ -227,7 +242,14 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 									/>
 								</>
 							))(
-								Math.max(1.5, PLANET_R * (o.diameterKm / (2 * planetRadiusKm))),
+								Math.max(
+									1.5,
+									scaleMoonRadiusToPlanetVisualRadius(
+										o.diameterKm,
+										planetRadiusKm,
+										PLANET_R,
+									),
+								),
 							)}
 						</g>
 					</g>

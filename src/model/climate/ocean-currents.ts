@@ -572,11 +572,7 @@ export function applyCurrentTemperatureEffect(
 	monthlyTEQ?: Float32Array[],
 	params?: Pick<
 		GenesisParams,
-		| "antistellarLon"
-		| "eccentricity"
-		| "obliquity"
-		| "perihelion"
-		| "tideLock"
+		"antistellarLon" | "eccentricity" | "obliquity" | "perihelion" | "tideLock"
 	>,
 ): void {
 	if (params?.tideLock?.type === "solar") {

@@ -195,9 +195,10 @@ export function generateWorld(
 	callbacks.setSeed(overrideSeed)
 	callbacks.setWorld(null)
 
-	const tideLock = overrides?.tideLock !== undefined
-		? overrides.tideLock
-		: currentParams.tideLock
+	const tideLock =
+		overrides?.tideLock !== undefined
+			? overrides.tideLock
+			: currentParams.tideLock
 	const params = {
 		seed: overrideSeed,
 		numPoints: overrides?.numPoints ?? currentParams.numPoints,

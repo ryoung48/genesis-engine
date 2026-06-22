@@ -42,6 +42,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 }) => {
 	const { events, maxForce } = schedule
 	const moonCount = events[0]?.moonForces.length ?? 0
+	const contributorLabels = schedule.contributorLabels
 
 	const chartData = useMemo<ChartData<"line">>(() => {
 		const labels = events.map((e) => String(e.dayOfYear))
@@ -49,7 +50,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 
 		for (let m = 0; m < moonCount; m++) {
 			datasets.push({
-				label: `Moon ${m + 1}`,
+				label: contributorLabels[m] ?? `Moon ${m + 1}`,
 				data: events.map(
 					(e) => (e.moonForces[m] ?? 0) * EARTH_MOON_TIDE_REFERENCE,
 				),
@@ -84,7 +85,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 		})
 
 		return { labels, datasets }
-	}, [events, moonCount, compact])
+	}, [events, moonCount, compact, contributorLabels])
 
 	const options = useMemo<ChartOptions<"line">>(
 		() => ({

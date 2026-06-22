@@ -85,7 +85,8 @@ function _computeTidalRange(
 	const tidalStrength = params.tidalStrength ?? 1.0
 	const planetRadiusKm = params.planetRadiusKm ?? 6371
 
-	if (params.tideLock?.type === "solar" || tidalStrength <= 0) return new Float32Array(N)
+	if (params.tideLock?.type === "solar" || tidalStrength <= 0)
+		return new Float32Array(N)
 	const rng = makeRng(params.seed ^ 0x7a3f)
 
 	function isLandmarkLake(r: number): boolean {

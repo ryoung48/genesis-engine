@@ -124,7 +124,7 @@ export function buildPlanetSliders(state: {
 			set: state.setEccentricity,
 		},
 		{
-			label: "Perihelion",
+			label: "Periapsis",
 			help: "Orbital angle of closest approach to the star in degrees. Affects when peak insolation occurs during the year.",
 			value: state.perihelion,
 			display: `${state.perihelion.toFixed(0)}\u00B0`,
@@ -369,7 +369,12 @@ export function resetWorldDefaults(setters: {
 	setOrbitalDistanceAU: (v: number) => void
 	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
-	setTideLock: (v: import("@/model/celestial/moons/moon-types").TideLock | null) => void
+	setPlanetType: (
+		v: import("@/model/celestial/moons/moon-types").PlanetType,
+	) => void
+	setTideLock: (
+		v: import("@/model/celestial/moons/moon-types").TideLock | null,
+	) => void
 	setAntistellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
@@ -402,6 +407,7 @@ export function resetWorldDefaults(setters: {
 	setters.setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
 	setters.setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
+	setters.setPlanetType("terrestrial")
 	setters.setTideLock(null)
 	setters.setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)

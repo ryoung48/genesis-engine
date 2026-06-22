@@ -2,13 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import {
+	generateGasGiantSystem,
 	generateMoons,
 	M_SOL_KG,
 } from "@/model/celestial/moons/orbital-mechanics"
 import type { MainSequenceClass } from "@/model/celestial/star/star-types"
 import {
 	DEFAULT_SPECTRAL_CLASS,
+	getHabitableZoneAU,
 	getKeplerYearYears,
+	getStarLuminositySol,
 	getStarMassSol,
 	isValidSpectralClass,
 } from "@/model/celestial/star/star-types"
@@ -25,7 +28,10 @@ import {
 	computeThermalEquatorLine,
 	getClimateGeometry,
 } from "@/model/climate/rain"
-import { computeTidalSchedule } from "@/model/climate/tidal-schedule"
+import {
+	computeGasGiantTidalSchedule,
+	computeTidalSchedule,
+} from "@/model/climate/tidal-schedule"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
@@ -70,6 +76,7 @@ import {
 	windSpeedColor,
 } from "./colors"
 import { ApparentDiameterOverlay } from "./controls/ApparentDiameterOverlay"
+import { GasGiantSystemOverlay } from "./controls/GasGiantSystemOverlay"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import { MoonOrbitsOverlay } from "./controls/MoonOrbitsOverlay"
@@ -468,9 +475,9 @@ export const GenesisView: React.FC = () => {
 		initialViewPrefs.debugMapModes,
 	)
 	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
-	const [worldTab, setWorldTab] = useState<
-		"planet" | "terrain" | "society" | "star"
-	>("planet")
+	const [worldTab, setWorldTab] = useState<"planet" | "terrain" | "society">(
+		"planet",
+	)
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
 	const [showClimatePreview, setShowClimatePreview] = useState(false)
 	const [generationPreviewTab, setGenerationPreviewTab] =
@@ -660,10 +667,38 @@ export const GenesisView: React.FC = () => {
 	)
 		? spectralClass
 		: DEFAULT_SPECTRAL_CLASS
-	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
-	const [tideLock, setTideLock] = useState<import("@/model/celestial/moons/moon-types").TideLock | null>(
-		initialDecodedCode?.tideLock ?? null,
+
+	const currentHz = getHabitableZoneAU(
+		getStarLuminositySol(effectiveStarClass, starSubtype),
 	)
+
+	const setSpectralClassPreservingHz = (cls: string) => {
+		const newClass: MainSequenceClass = isValidSpectralClass(cls)
+			? cls
+			: DEFAULT_SPECTRAL_CLASS
+		const newHz = getHabitableZoneAU(
+			getStarLuminositySol(newClass, starSubtype),
+		)
+		const hzcFactor = currentHz > 0 ? orbitalDistanceAU / currentHz : 1
+		setOrbitalDistanceAU(hzcFactor * newHz)
+		setSpectralClass(cls)
+	}
+
+	const setStarSubtypePreservingHz = (subtype: number) => {
+		const newHz = getHabitableZoneAU(
+			getStarLuminositySol(effectiveStarClass, subtype),
+		)
+		const hzcFactor = currentHz > 0 ? orbitalDistanceAU / currentHz : 1
+		setOrbitalDistanceAU(hzcFactor * newHz)
+		setStarSubtype(subtype)
+	}
+	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
+	const [planetType, setPlanetType] = useState<
+		import("@/model/celestial/moons/moon-types").PlanetType
+	>(initialDecodedCode?.planetType ?? "terrestrial")
+	const [tideLock, setTideLock] = useState<
+		import("@/model/celestial/moons/moon-types").TideLock | null
+	>(initialDecodedCode?.tideLock ?? null)
 	const tidallyLocked = tideLock?.type === "solar"
 	const effectiveDaysPerYear = tidallyLocked
 		? 1
@@ -1564,8 +1599,7 @@ export const GenesisView: React.FC = () => {
 		scene.setSolarTerminatorUseMeridiem(clockUseMeridiem)
 		scene.setSolarTerminatorVisible(showSolarTerminator)
 		if (tidallyLocked) {
-			const selectedMonth =
-				clockMonthMode === "annual" ? 5 : clockMonth
+			const selectedMonth = clockMonthMode === "annual" ? 5 : clockMonth
 			const monthlyLibration = computeMonthlyLibration(eccentricity, perihelion)
 			const monthlyDeclination = computeMonthlyLockedDeclination(
 				obliquity,
@@ -2228,6 +2262,7 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
+			planetType,
 			tideLock,
 			antistellarLon,
 			jitter,
@@ -2263,6 +2298,7 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
+			planetType,
 			tideLock,
 			antistellarLon,
 			jitter,
@@ -2358,6 +2394,7 @@ export const GenesisView: React.FC = () => {
 			setOrbitalDistanceAU,
 			setDaysPerYear,
 			setHoursPerDay,
+			setPlanetType,
 			setTideLock,
 			setAntistellarLon,
 			setPressure,
@@ -2396,6 +2433,7 @@ export const GenesisView: React.FC = () => {
 			setters.setOrbitalDistanceAU(decoded.orbitalDistanceAU)
 			setters.setDaysPerYear(decoded.daysPerYear)
 			setters.setHoursPerDay(decoded.hoursPerDay)
+			setters.setPlanetType(decoded.planetType)
 			setters.setTideLock(decoded.tideLock)
 			setters.setAntistellarLon(decoded.antistellarLon)
 			setters.setPressure(decoded.pressure)
@@ -2829,12 +2867,66 @@ export const GenesisView: React.FC = () => {
 		starSubtype,
 	])
 
+	const gasGiantSystem = useMemo(() => {
+		if (planetType !== "gas-giant-moon") return null
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+		return generateGasGiantSystem(
+			moonSeed,
+			planetRadiusKm,
+			orbitalDistanceAU,
+			starMassKg,
+			obliquity,
+		)
+	}, [
+		planetType,
+		moonSeed,
+		planetRadiusKm,
+		orbitalDistanceAU,
+		spectralClass,
+		starSubtype,
+		obliquity,
+	])
+
+	const handlePlanetTypeChange = useCallback(
+		(
+			nextPlanetType: import("@/model/celestial/moons/moon-types").PlanetType,
+		) => {
+			setPlanetType(nextPlanetType)
+			if (nextPlanetType === "gas-giant-moon") {
+				setTideLock({ type: "lunar", target: 0 })
+				return
+			}
+			if (tideLock?.type === "lunar" && tideLock.target === 0) {
+				setTideLock(null)
+				setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
+			}
+		},
+		[tideLock],
+	)
+
+	useEffect(() => {
+		if (
+			planetType === "gas-giant-moon" &&
+			tideLock?.type === "lunar" &&
+			tideLock.target === 0 &&
+			gasGiantSystem
+		) {
+			setHoursPerDay(gasGiantSystem.mainMoonOrbitalPeriodDays * 24)
+		}
+	}, [gasGiantSystem, planetType, tideLock])
+
 	// --- Moon orbits (3D scene, globe mode only) ---
 	const moonOrbitDayOfYear =
 		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)
 	useEffect(() => {
 		sceneRef.current?.setMoonOrbitOverlay(
-			showMoonOrbits && viewMode === "globe" && generatedMoonsPreview.length > 0
+			showMoonOrbits &&
+				viewMode === "globe" &&
+				planetType !== "gas-giant-moon" &&
+				generatedMoonsPreview.length > 0
 				? generatedMoonsPreview
 				: null,
 			planetRadiusKm,
@@ -2852,6 +2944,7 @@ export const GenesisView: React.FC = () => {
 		moonOrbitDayOfYear,
 		showGrid,
 		gridSpacing,
+		planetType,
 	])
 
 	useEffect(() => {
@@ -2859,8 +2952,41 @@ export const GenesisView: React.FC = () => {
 			sceneRef.current?.updateMoonOrbitDay(moonOrbitDayOfYear)
 	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
 
+	useEffect(() => {
+		sceneRef.current?.setGasGiantSystemOverlay(
+			showMoonOrbits &&
+				viewMode === "globe" &&
+				planetType === "gas-giant-moon" &&
+				gasGiantSystem
+				? gasGiantSystem
+				: null,
+			planetRadiusKm,
+			moonOrbitDayOfYear,
+			showGrid,
+			gridSpacing,
+		)
+	}, [
+		showMoonOrbits,
+		viewMode,
+		planetType,
+		gasGiantSystem,
+		planetRadiusKm,
+		moonOrbitDayOfYear,
+		showGrid,
+		gridSpacing,
+	])
+
+	useEffect(() => {
+		if (
+			showMoonOrbits &&
+			viewMode === "globe" &&
+			planetType === "gas-giant-moon"
+		)
+			sceneRef.current?.updateGasGiantSystemDay(moonOrbitDayOfYear)
+	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode, planetType])
+
 	const tidalSchedulePreview = useMemo(() => {
-		return computeTidalSchedule(generatedMoonsPreview, {
+		const scheduleParams = {
 			seed,
 			daysPerYear,
 			hoursPerDay,
@@ -2871,8 +2997,14 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			eccentricity,
 			perihelion,
-		})
+		}
+		if (planetType === "gas-giant-moon" && gasGiantSystem) {
+			return computeGasGiantTidalSchedule(gasGiantSystem, scheduleParams)
+		}
+		return computeTidalSchedule(generatedMoonsPreview, scheduleParams)
 	}, [
+		planetType,
+		gasGiantSystem,
 		generatedMoonsPreview,
 		seed,
 		daysPerYear,
@@ -2913,16 +3045,15 @@ export const GenesisView: React.FC = () => {
 					worldTab={worldTab}
 					setWorldTab={setWorldTab}
 					resetWorldDefaults={handleResetDefaults}
+					planetType={planetType}
+					setPlanetType={handlePlanetTypeChange}
 					tideLock={tideLock}
 					setTideLock={setTideLock}
 					setObliquity={setObliquity}
 					moonCount={moonCount}
 					setMoonCount={(n) => {
 						setMoonCount(n)
-						if (
-							tideLock?.type === "lunar" &&
-							tideLock.target >= n
-						) {
+						if (tideLock?.type === "lunar" && tideLock.target > n) {
 							setTideLock(null)
 							setHoursPerDay(24)
 						}
@@ -2931,6 +3062,7 @@ export const GenesisView: React.FC = () => {
 					setMoonSeed={setMoonSeed}
 					tidalSchedulePreview={tidalSchedulePreview}
 					generatedMoons={generatedMoonsPreview}
+					gasGiantSystem={gasGiantSystem ?? undefined}
 					daysPerYear={daysPerYear}
 					hoursPerDay={hoursPerDay}
 					setHoursPerDay={setHoursPerDay}
@@ -2938,10 +3070,12 @@ export const GenesisView: React.FC = () => {
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
 					spectralClass={spectralClass}
-					setSpectralClass={setSpectralClass}
+					setSpectralClass={setSpectralClassPreservingHz}
 					starSubtype={starSubtype}
-					setStarSubtype={setStarSubtype}
+					setStarSubtype={setStarSubtypePreservingHz}
 					orbitalDistanceAU={orbitalDistanceAU}
+					eccentricity={eccentricity}
+					perihelion={perihelion}
 					era={era}
 					setEra={setEra}
 					planetCode={planetCode}
@@ -3227,10 +3361,25 @@ export const GenesisView: React.FC = () => {
 							showSolarTerminator={showSolarTerminator}
 							setShowSolarTerminator={setShowSolarTerminator}
 							moonCount={moonCount}
+							planetType={planetType}
 						/>
 
 						{showMoonOrbits &&
 							viewMode === "map" &&
+							planetType === "gas-giant-moon" &&
+							gasGiantSystem && (
+								<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
+									<GasGiantSystemOverlay
+										gasGiantSystem={gasGiantSystem}
+										planetRadiusKm={planetRadiusKm}
+										day={moonOrbitDayOfYear}
+									/>
+								</div>
+							)}
+
+						{showMoonOrbits &&
+							viewMode === "map" &&
+							planetType !== "gas-giant-moon" &&
 							generatedMoonsPreview.length > 0 && (
 								<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
 									<MoonOrbitsOverlay

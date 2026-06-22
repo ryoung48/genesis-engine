@@ -1,9 +1,18 @@
 import { SEED_MAX } from "../../shared/planet-code"
 import { createRng } from "../../shared/rng"
 import {
+	type GasGiantMoonParams,
+	type GasGiantParams,
+	type GasGiantSizeClass,
+	type GasGiantSystem,
 	MOON_DEFAULTS,
 	type MoonOrbitRange,
 	type MoonParams,
+	type Orbit,
+	orbitSizeClassFromDiameter,
+	type PlanetType,
+	type SolarSystem,
+	type StarParams,
 } from "./moon-types"
 
 const G = 6.674e-11
@@ -54,7 +63,7 @@ const MOON_ORBIT_RANGE_ORDER: MoonOrbitRange[] = [
 ]
 
 const LUNA_OUTER_COMPANION: MoonParams = {
-	id: 2,
+	idx: 2,
 	massKg: MOON_DEFAULTS.massKg * 0.34,
 	diameterKm: MOON_DEFAULTS.diameterKm * 0.72,
 	orbitalPeriodDays: MOON_DEFAULTS.orbitalPeriodDays * 1.82,
@@ -63,13 +72,15 @@ const LUNA_OUTER_COMPANION: MoonParams = {
 	longitudeOfAscendingNodeDeg: 0,
 	argumentOfPeriapsisDeg: 0,
 	meanAnomalyAtEpochDeg: 0,
+	axialTiltDeg: MOON_DEFAULTS.axialTiltDeg,
+	retrogradeRotation: MOON_DEFAULTS.retrogradeRotation,
 	orbitRange: "outer",
 	semiMajorAxisPlanetDiameters: 44.86,
 	sizeClass: 1,
 }
 
 const LUNA_INNER_COMPANION: MoonParams = {
-	id: 1,
+	idx: 1,
 	massKg: MOON_DEFAULTS.massKg * 0.18,
 	diameterKm: MOON_DEFAULTS.diameterKm * 0.57,
 	orbitalPeriodDays: MOON_DEFAULTS.orbitalPeriodDays * 0.56,
@@ -78,6 +89,8 @@ const LUNA_INNER_COMPANION: MoonParams = {
 	longitudeOfAscendingNodeDeg: 0,
 	argumentOfPeriapsisDeg: 0,
 	meanAnomalyAtEpochDeg: 0,
+	axialTiltDeg: MOON_DEFAULTS.axialTiltDeg,
+	retrogradeRotation: MOON_DEFAULTS.retrogradeRotation,
 	orbitRange: "inner",
 	semiMajorAxisPlanetDiameters: 20.48,
 	sizeClass: 1,
@@ -99,18 +112,27 @@ function withRandomizedAngles(baseMoon: MoonParams, seed: number): MoonParams {
 
 function generateLunaMoonSystem(count: number): MoonParams[] {
 	if (count <= 0) return []
-	if (count === 1) return [{ ...MOON_DEFAULTS, id: 1 }]
+	if (count === 1) return [{ ...MOON_DEFAULTS, idx: 1 }]
 	if (count === 2) {
 		return [
-			{ ...MOON_DEFAULTS, id: 1 },
-			{ ...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1), id: 2 },
+			{ ...MOON_DEFAULTS, idx: 1 },
+			{
+				...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1),
+				idx: 2,
+			},
 		]
 	}
 
 	return [
-		{ ...withRandomizedAngles(LUNA_INNER_COMPANION, LUNA_MOON_SEED + 2), id: 1 },
-		{ ...MOON_DEFAULTS, id: 2 },
-		{ ...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1), id: 3 },
+		{
+			...withRandomizedAngles(LUNA_INNER_COMPANION, LUNA_MOON_SEED + 2),
+			idx: 1,
+		},
+		{ ...MOON_DEFAULTS, idx: 2 },
+		{
+			...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1),
+			idx: 3,
+		},
 	]
 }
 
@@ -126,27 +148,34 @@ function rollMoonInclination(
 	// Inner/middle moons formed in-situ: nearly coplanar, rarely retrograde.
 	// Outer/extreme moons are often captured bodies: high inclination, frequently retrograde.
 	const retrogradeChance =
-		orbitRange === "extreme" ? 0.65
-		: orbitRange === "outer" ? 0.35
-		: orbitRange === "middle" ? 0.05
-		: 0.02 // inner
+		orbitRange === "extreme"
+			? 0.65
+			: orbitRange === "outer"
+				? 0.35
+				: orbitRange === "middle"
+					? 0.05
+					: 0.02 // inner
 
 	const isRetrograde = rng.uniform(0, 1) < retrogradeChance
 
 	if (isRetrograde) {
 		// Retrograde: 90°–175° (peaked toward 120°–160° for captured objects)
-		const base = orbitRange === "inner" || orbitRange === "middle"
-			? rng.uniform(95, 175)
-			: rng.uniform(100, 175)
+		const base =
+			orbitRange === "inner" || orbitRange === "middle"
+				? rng.uniform(95, 175)
+				: rng.uniform(100, 175)
 		return base
 	}
 
 	// Prograde: low inclination for inner/middle, higher for outer/extreme
 	const maxInc =
-		orbitRange === "extreme" ? 45
-		: orbitRange === "outer" ? 30
-		: orbitRange === "middle" ? 15
-		: 5 // inner
+		orbitRange === "extreme"
+			? 45
+			: orbitRange === "outer"
+				? 30
+				: orbitRange === "middle"
+					? 15
+					: 5 // inner
 	return rng.uniform(0, maxInc)
 }
 
@@ -412,6 +441,14 @@ interface OrbitalPosition {
 	trueAnomalyRad: number
 }
 
+interface OrbitalPositionVector {
+	x: number
+	y: number
+	z: number
+	distanceM: number
+	trueAnomalyRad: number
+}
+
 function solveKeplersEquation(
 	meanAnomalyRad: number,
 	eccentricity: number,
@@ -427,11 +464,11 @@ function solveKeplersEquation(
 	return E
 }
 
-export function keplerMoonPosition(
+export function keplerMoonPositionVector(
 	moon: MoonParams,
 	semiMajorAxisM: number,
 	t: number,
-): OrbitalPosition {
+): OrbitalPositionVector {
 	const M0 = (moon.meanAnomalyAtEpochDeg * Math.PI) / 180
 	const M = M0 + TWO_PI * (t / moon.orbitalPeriodDays)
 	const Mnorm = ((M % TWO_PI) + TWO_PI) % TWO_PI
@@ -474,13 +511,36 @@ export function keplerMoonPosition(
 		(-sinO * sino + cosO * coso * cosI) * yOrb
 	const z = sino * sinI * xOrb + coso * sinI * yOrb
 
+	return { x, y, z, distanceM: r, trueAnomalyRad: nu }
+}
+
+export function orbitalVectorToPlanetFixedPosition(
+	vector: OrbitalPositionVector,
+	t: number,
+): OrbitalPosition {
 	// Sub-moon point: account for planet rotation
 	const planetRotationRad = TWO_PI * (t % 1)
-	const lonRaw = Math.atan2(y, x) - planetRotationRad
+	const lonRaw = Math.atan2(vector.y, vector.x) - planetRotationRad
 	const lonRad = ((lonRaw % TWO_PI) + TWO_PI) % TWO_PI
-	const latRad = Math.asin(z / r)
+	const latRad = Math.asin(vector.z / vector.distanceM)
 
-	return { latRad, lonRad, distanceM: r, trueAnomalyRad: nu }
+	return {
+		latRad,
+		lonRad,
+		distanceM: vector.distanceM,
+		trueAnomalyRad: vector.trueAnomalyRad,
+	}
+}
+
+export function keplerMoonPosition(
+	moon: MoonParams,
+	semiMajorAxisM: number,
+	t: number,
+): OrbitalPosition {
+	return orbitalVectorToPlanetFixedPosition(
+		keplerMoonPositionVector(moon, semiMajorAxisM, t),
+		t,
+	)
 }
 
 // Generate moons using the galaxy-gen-style size ladder and PD-based orbit bands.
@@ -563,7 +623,7 @@ export function generateMoons(
 		const { axialTiltDeg, retrogradeRotation } = rollMoonAxialTilt(rng)
 
 		moons.push({
-			id: moons.length + 1,
+			idx: moons.length + 1,
 			massKg,
 			diameterKm,
 			orbitalPeriodDays,
@@ -581,4 +641,381 @@ export function generateMoons(
 	}
 
 	return moons
+}
+
+// Jupiter-like gas giant reference values.
+const JUPITER_MASS_KG = 1.898e27
+const JUPITER_DIAMETER_KM = 142984
+const JUPITER_DENSITY_KG_M3 = 1326
+
+function surfaceGravityG(massKg: number, diameterKm: number): number {
+	const r = (diameterKm / 2) * 1000
+	const g = (G * massKg) / (r * r)
+	return g / 9.807
+}
+
+function moonToOrbit(
+	moon: MoonParams,
+	parentIdx: number,
+	planetDiameterKm: number,
+	hoursPerDay: number,
+): Orbit {
+	const diameterKm = moon.diameterKm
+	const massKg = moon.massKg
+	const semiMajorKm =
+		(moon.semiMajorAxisPlanetDiameters ?? 0) * planetDiameterKm
+	const semiMajorAU = semiMajorKm / 1.496e8
+	return {
+		idx: moon.idx,
+		type: "moon",
+		parentIdx,
+		lock: null,
+		sizeClass: orbitSizeClassFromDiameter(diameterKm),
+		diameterKm,
+		massKg,
+		atmosphere: { bar: 0 },
+		axialTiltDeg: moon.axialTiltDeg,
+		inclinationDeg: moon.inclinationDeg,
+		eccentricity: moon.eccentricity,
+		perihelionDeg: moon.argumentOfPeriapsisDeg,
+		distanceFromParent: semiMajorAU,
+		orbitalPeriodDays: moon.orbitalPeriodDays,
+		rotationPeriodHours: hoursPerDay,
+		surfaceGravityG: surfaceGravityG(massKg, diameterKm),
+	}
+}
+
+interface BuildSolarSystemParams {
+	planetType: PlanetType
+	planetRadiusKm: number
+	obliquity: number
+	eccentricity: number
+	perihelionDeg: number
+	orbitalDistanceAU: number
+	hoursPerDay: number
+	pressure: number
+	moons: MoonParams[]
+	star: StarParams
+	tideLock: import("./moon-types").TideLock | null
+}
+
+function _buildSolarSystem(params: BuildSolarSystemParams): SolarSystem {
+	const {
+		planetType,
+		planetRadiusKm,
+		obliquity,
+		eccentricity,
+		perihelionDeg,
+		orbitalDistanceAU,
+		hoursPerDay,
+		pressure,
+		moons,
+		star,
+		tideLock,
+	} = params
+
+	const planetDiameterKm = planetRadiusKm * 2
+	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+	void JUPITER_DENSITY_KG_M3
+
+	if (planetType === "terrestrial") {
+		// orbits[0] = main planet, orbits[1..n] = its moons
+		const mainPlanetOrbit: Orbit = {
+			idx: 0,
+			type: "planet",
+			parentIdx: null,
+			lock: tideLock,
+			sizeClass: orbitSizeClassFromDiameter(planetDiameterKm),
+			diameterKm: planetDiameterKm,
+			massKg: planetMassKg,
+			atmosphere: { bar: pressure },
+			axialTiltDeg: obliquity,
+			inclinationDeg: 0,
+			eccentricity,
+			perihelionDeg,
+			distanceFromParent: orbitalDistanceAU,
+			orbitalPeriodDays: 0, // derived from star mass + distance, not stored separately
+			rotationPeriodHours: hoursPerDay,
+			surfaceGravityG: surfaceGravityG(planetMassKg, planetDiameterKm),
+		}
+
+		const moonOrbits: Orbit[] = moons.map((moon, i) =>
+			moonToOrbit({ ...moon, idx: i + 1 }, 0, planetDiameterKm, hoursPerDay),
+		)
+
+		// propagate lock to the correct moon orbit
+		for (const orbit of moonOrbits) {
+			if (tideLock?.type === "lunar" && tideLock.target === orbit.idx) {
+				orbit.lock = tideLock
+			}
+		}
+
+		return { star, orbits: [mainPlanetOrbit, ...moonOrbits], mainPlanetIdx: 0 }
+	}
+
+	// gas-giant-moon: orbits[0] = gas giant, orbits[1] = main planet, orbits[2..n] = sibling moons
+	const gasGiantOrbit: Orbit = {
+		idx: 0,
+		type: "planet",
+		parentIdx: null,
+		lock: null,
+		sizeClass: "giant",
+		diameterKm: JUPITER_DIAMETER_KM,
+		massKg: JUPITER_MASS_KG,
+		atmosphere: { bar: 0 }, // gas giant — no solid-surface pressure concept
+		axialTiltDeg: 3.1, // Jupiter-like
+		inclinationDeg: 1.3,
+		eccentricity: 0.049,
+		perihelionDeg: 14.3,
+		distanceFromParent: orbitalDistanceAU, // gas giant orbits the star at the same distance
+		orbitalPeriodDays: 0,
+		rotationPeriodHours: 9.9, // Jupiter-like
+		surfaceGravityG: surfaceGravityG(JUPITER_MASS_KG, JUPITER_DIAMETER_KM),
+	}
+
+	const mainPlanetOrbit: Orbit = {
+		idx: 1,
+		type: "moon",
+		parentIdx: 0,
+		lock: tideLock,
+		sizeClass: orbitSizeClassFromDiameter(planetDiameterKm),
+		diameterKm: planetDiameterKm,
+		massKg: planetMassKg,
+		atmosphere: { bar: pressure },
+		axialTiltDeg: obliquity,
+		inclinationDeg: 0,
+		eccentricity,
+		perihelionDeg,
+		distanceFromParent: orbitalDistanceAU,
+		orbitalPeriodDays: 0,
+		rotationPeriodHours: hoursPerDay,
+		surfaceGravityG: surfaceGravityG(planetMassKg, planetDiameterKm),
+	}
+
+	const siblingMoonOrbits: Orbit[] = moons.map((moon, i) =>
+		moonToOrbit({ ...moon, idx: i + 2 }, 0, JUPITER_DIAMETER_KM, hoursPerDay),
+	)
+
+	for (const orbit of siblingMoonOrbits) {
+		if (tideLock?.type === "lunar" && tideLock.target === orbit.idx) {
+			orbit.lock = tideLock
+		}
+	}
+
+	return {
+		star,
+		orbits: [gasGiantOrbit, mainPlanetOrbit, ...siblingMoonOrbits],
+		mainPlanetIdx: 1,
+	}
+}
+
+// ── Gas giant system generation ───────────────────────────────────────────────
+
+const EARTH_MASS_KG = 5.972e24
+const EARTH_DIAMETER_KM = 12742
+
+function lerpLinear(
+	x: number,
+	x1: number,
+	x2: number,
+	y1: number,
+	y2: number,
+): number {
+	return y1 + ((x - x1) / (x2 - x1)) * (y2 - y1)
+}
+
+function gasGiantMoonPeriodDays(
+	parentDiamEarths: number,
+	parentMassEarths: number,
+	pd: number,
+	moonMassEarths: number,
+): number {
+	return (
+		0.176927 *
+		Math.sqrt(
+			Math.pow(parentDiamEarths * pd, 3) / (parentMassEarths + moonMassEarths),
+		)
+	)
+}
+
+function rollGasGiantMoonSizeClass(rng: ReturnType<typeof createRng>): number {
+	const roll1 = rng.randint(1, 6)
+	if (roll1 <= 3) return 0
+	if (roll1 <= 5) return rng.randint(1, 3) - 1
+	const roll2 = rng.randint(1, 6)
+	if (roll2 <= 3) return Math.min(rng.randint(1, 6), 10)
+	if (roll2 <= 5) return Math.min(rng.randint(1, 6) + rng.randint(1, 6) - 2, 10)
+	return Math.min(rng.randint(1, 6) + rng.randint(1, 6) + 4, 10)
+}
+
+export function generateGasGiantSystem(
+	seed: number,
+	planetRadiusKm: number,
+	orbitalDistanceAU: number,
+	starMassKg: number,
+	obliquityDeg: number,
+): GasGiantSystem {
+	const rng = createRng(seed)
+
+	// Roll gas giant size class (16, 17, or 18)
+	const sizeClass = (15 + rng.randint(1, 3)) as GasGiantSizeClass
+	let diameterEarths: number
+	let massEarths: number
+	if (sizeClass === 16) {
+		diameterEarths = rng.uniform(2, 6)
+		massEarths = lerpLinear(diameterEarths, 2, 6, 10, 35)
+	} else if (sizeClass === 17) {
+		diameterEarths = rng.uniform(6, 12)
+		massEarths = lerpLinear(diameterEarths, 6, 12, 40, 340)
+	} else {
+		diameterEarths = rng.uniform(8, 18)
+		massEarths = lerpLinear(diameterEarths, 8, 18, 350, 2000)
+	}
+	const diameterKm = diameterEarths * EARTH_DIAMETER_KM
+	const density = massEarths / Math.pow(diameterEarths, 3)
+	const gravityG = density * diameterEarths
+	const massKg = massEarths * EARTH_MASS_KG
+
+	// Gas giants spin fast; larger ones trend slightly slower
+	const dayLengthHours = rng.uniform(
+		sizeClass === 16 ? 9 : sizeClass === 17 ? 10 : 12,
+		sizeClass === 16 ? 14 : sizeClass === 17 ? 18 : 24,
+	)
+
+	const gasGiant: GasGiantParams = {
+		sizeClass,
+		diameterKm,
+		diameterEarths,
+		massEarths,
+		massKg,
+		gravityG,
+		density,
+		dayLengthHours,
+	}
+
+	// Hill sphere and MOR
+	const starMassSol = starMassKg / M_SOL_KG
+	const hillSphereAU =
+		orbitalDistanceAU * Math.cbrt((massEarths * 3e-6) / (starMassSol * 3))
+	const hillPD = (hillSphereAU * 149597870.9) / diameterKm
+	const hillLimit = hillPD / 2
+
+	// Moon count (galaxy-gen MOONS.count, jovian path)
+	const isClose = orbitalDistanceAU < 0.4
+	const rollSum =
+		sizeClass <= 16
+			? rng.randint(1, 6) + rng.randint(1, 6) + rng.randint(1, 6) - 7
+			: rng.randint(1, 6) +
+				rng.randint(1, 6) +
+				rng.randint(1, 6) +
+				rng.randint(1, 6) -
+				6
+	const auPenalty = isClose ? (sizeClass > 16 ? 4 : 3) : 0
+	const moonCount = Math.max(rollSum - auPenalty, 0)
+
+	const mor = Math.min(hillLimit - 2, 200 + moonCount)
+
+	// Main planet orbit (middle range for habitability)
+	const mainPdFactor = rng.uniform(0.16, 0.5)
+	const mainMoonPd = ROCHE_PD + mor * mainPdFactor
+	const planetMassEarths = derivePlanetMassKg(planetRadiusKm) / EARTH_MASS_KG
+	const mainMoonOrbitalPeriodDays = gasGiantMoonPeriodDays(
+		diameterEarths,
+		massEarths,
+		mainMoonPd,
+		planetMassEarths,
+	)
+	const mainMoonOrbitRange: MoonOrbitRange =
+		mainPdFactor < 0.16 ? "inner" : mainPdFactor < 0.5 ? "middle" : "outer"
+	const mainMoonSizeClass = inferPlanetSizeClass(planetRadiusKm * 2)
+	const mainMoonInclinationDeg = rollMoonInclination(rng, mainMoonOrbitRange)
+	const mainMoonEccentricity = rollMoonEccentricity(
+		rng,
+		mainMoonOrbitRange,
+		mainMoonSizeClass,
+	)
+	const mainMoonLongitudeOfAscendingNodeDeg = rng.uniform(0, 360)
+	const mainMoonArgumentOfPeriapsisDeg = rng.uniform(0, 360)
+	const mainMoonMeanAnomalyAtEpochDeg = rng.uniform(0, 360)
+
+	// Sibling moons
+	const siblingMoons: GasGiantMoonParams[] = []
+	for (let i = 0; i < moonCount; i++) {
+		const moonSizeClass = Math.min(rollGasGiantMoonSizeClass(rng), 10)
+		const diamKm = rollMoonDiameterKm(rng, moonSizeClass)
+		const moonDensityKgM3 = rng.uniform(1500, 3500)
+		const moonRadiusM = (diamKm / 2) * 1000
+		const moonVol = (4 / 3) * Math.PI * moonRadiusM ** 3
+		const moonMassKg = moonVol * moonDensityKgM3
+		const moonMassEarths = moonMassKg / EARTH_MASS_KG
+		const moonGravityG = surfaceGravityG(moonMassKg, diamKm)
+
+		const orbitMod = mor < 60 ? 1 : 0
+		const orbitRoll = rng.randint(1, 6) + orbitMod
+		let orbitRange: MoonOrbitRange
+		let pd: number
+		if (orbitRoll <= 3) {
+			orbitRange = "inner"
+			pd = ROCHE_PD + mor * rng.uniform(0, 0.16)
+		} else if (orbitRoll <= 5) {
+			orbitRange = "middle"
+			pd = ROCHE_PD + mor * rng.uniform(0.16, 0.5)
+		} else {
+			const outerFactor = rng.uniform(0.5, 1.1)
+			orbitRange = outerFactor > 1 ? "extreme" : "outer"
+			pd = ROCHE_PD + mor * outerFactor
+		}
+
+		const orbitalPeriodDays = gasGiantMoonPeriodDays(
+			diameterEarths,
+			massEarths,
+			pd,
+			moonMassEarths,
+		)
+		const inclinationDeg = rollMoonInclination(rng, orbitRange)
+		const eccentricity = rollMoonEccentricity(rng, orbitRange, moonSizeClass)
+		const { axialTiltDeg, retrogradeRotation } = rollMoonAxialTilt(rng)
+		const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
+		const argumentOfPeriapsisDeg = rng.uniform(0, 360)
+		const meanAnomalyAtEpochDeg = rng.uniform(0, 360)
+
+		siblingMoons.push({
+			idx: i + 2,
+			sizeClass: moonSizeClass,
+			diameterKm: diamKm,
+			massKg: moonMassKg,
+			massEarths: moonMassEarths,
+			gravityG: moonGravityG,
+			orbitalPeriodDays,
+			pd,
+			orbitRange,
+			inclinationDeg,
+			eccentricity,
+			axialTiltDeg,
+			retrogradeRotation,
+			longitudeOfAscendingNodeDeg,
+			argumentOfPeriapsisDeg,
+			meanAnomalyAtEpochDeg,
+		})
+	}
+
+	siblingMoons.sort((a, b) => a.pd - b.pd)
+	siblingMoons.forEach((m, i) => {
+		m.idx = i + 2
+	})
+
+	return {
+		gasGiant,
+		mainMoonPd,
+		mainMoonOrbitalPeriodDays,
+		mainMoonOrbitRange,
+		mainMoonInclinationDeg,
+		mainMoonEccentricity,
+		mainMoonAxialTiltDeg: obliquityDeg,
+		mainMoonRetrogradeRotation: false,
+		mainMoonLongitudeOfAscendingNodeDeg,
+		mainMoonArgumentOfPeriapsisDeg,
+		mainMoonMeanAnomalyAtEpochDeg,
+		siblingMoons,
+	}
 }

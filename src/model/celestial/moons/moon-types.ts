@@ -1,7 +1,9 @@
 export type MoonOrbitRange = "inner" | "middle" | "outer" | "extreme"
 
+export type PlanetType = "terrestrial" | "gas-giant-moon"
+
 export interface MoonParams {
-	id: number
+	idx: number
 	massKg: number
 	diameterKm: number
 	orbitalPeriodDays: number
@@ -17,15 +19,15 @@ export interface MoonParams {
 	sizeClass?: number
 }
 
-/** ID reserved for the star (used as the target of a solar tide lock). */
-export const STAR_ID = 0
+/** Reserved for the star — used as target of a solar tide lock. */
+const _STAR_ID = 0
 
-export type TideLock = { type: "solar" | "lunar"; target: number }
+type TideLock = { type: "solar" | "lunar"; target: number }
 
 export const MAX_MOONS = 3
 
 export const MOON_DEFAULTS: MoonParams = {
-	id: 1,
+	idx: 1,
 	massKg: 7.34e22,
 	diameterKm: 3474,
 	orbitalPeriodDays: 27.3,
@@ -39,4 +41,117 @@ export const MOON_DEFAULTS: MoonParams = {
 	orbitRange: "middle",
 	semiMajorAxisPlanetDiameters: 30.17,
 	sizeClass: 2,
+}
+
+interface OrbitAtmosphere {
+	bar: number
+}
+
+type OrbitSizeClass = "tiny" | "small" | "medium" | "large" | "huge" | "giant"
+
+export interface Orbit {
+	/** Index into SolarSystem.orbits[]. */
+	idx: number
+	/** "planet" = orbits the star (or gas giant in gas-giant-moon mode); "moon" = orbits the main planet or gas giant. */
+	type: "planet" | "moon"
+	/** idx of parent body; null = orbits the star directly. */
+	parentIdx: number | null
+	lock: TideLock | null
+	sizeClass: OrbitSizeClass
+	diameterKm: number
+	massKg: number
+	atmosphere: OrbitAtmosphere
+	axialTiltDeg: number
+	inclinationDeg: number
+	eccentricity: number
+	perihelionDeg: number
+	/** AU for star-orbiting bodies; planet-diameters for moon orbits. */
+	distanceFromParent: number
+	orbitalPeriodDays: number
+	rotationPeriodHours: number
+	surfaceGravityG: number
+}
+
+export interface StarParams {
+	spectralClass: string
+	starSubtype: number
+	massKg: number
+}
+
+export interface SolarSystem {
+	star: StarParams
+	orbits: Orbit[]
+	/** idx of the main planet being simulated. */
+	mainPlanetIdx: number
+}
+
+export function orbitSizeClassFromDiameter(diameterKm: number): OrbitSizeClass {
+	if (diameterKm < 1000) return "tiny"
+	if (diameterKm < 3000) return "small"
+	if (diameterKm < 8000) return "medium"
+	if (diameterKm < 15000) return "large"
+	if (diameterKm < 50000) return "huge"
+	return "giant"
+}
+
+// ── Gas giant system ──────────────────────────────────────────────────────────
+
+/** Size class 16, 17, or 18 (galaxy-gen jovian scale). */
+export type GasGiantSizeClass = 16 | 17 | 18
+
+export interface GasGiantParams {
+	sizeClass: GasGiantSizeClass
+	/** Diameter in km. */
+	diameterKm: number
+	/** Diameter in Earth diameters (used for orbital mechanics formulae). */
+	diameterEarths: number
+	/** Mass in Earth masses. */
+	massEarths: number
+	massKg: number
+	/** Surface gravity in g. */
+	gravityG: number
+	/** Density in Earth-relative units (mass / diameter³). */
+	density: number
+	/** Day length in hours. */
+	dayLengthHours: number
+}
+
+export interface GasGiantMoonParams {
+	/** 2-based idx in the system (main planet = 1, gas giant = 0). */
+	idx: number
+	/** Galaxy-gen size class 0–10. */
+	sizeClass: number
+	diameterKm: number
+	massKg: number
+	massEarths: number
+	gravityG: number
+	orbitalPeriodDays: number
+	/** Semi-major axis in gas-giant diameters. */
+	pd: number
+	orbitRange: MoonOrbitRange
+	inclinationDeg: number
+	eccentricity: number
+	axialTiltDeg: number
+	retrogradeRotation: boolean
+	longitudeOfAscendingNodeDeg: number
+	argumentOfPeriapsisDeg: number
+	meanAnomalyAtEpochDeg: number
+}
+
+export interface GasGiantSystem {
+	gasGiant: GasGiantParams
+	/** Semi-major axis of the main planet around the gas giant, in gas-giant diameters. */
+	mainMoonPd: number
+	/** Orbital period of the main planet around the gas giant, in days. */
+	mainMoonOrbitalPeriodDays: number
+	mainMoonOrbitRange: MoonOrbitRange
+	mainMoonInclinationDeg: number
+	mainMoonEccentricity: number
+	mainMoonAxialTiltDeg: number
+	mainMoonRetrogradeRotation: boolean
+	mainMoonLongitudeOfAscendingNodeDeg: number
+	mainMoonArgumentOfPeriapsisDeg: number
+	mainMoonMeanAnomalyAtEpochDeg: number
+	/** All other moons of the gas giant (excludes the main planet). */
+	siblingMoons: GasGiantMoonParams[]
 }

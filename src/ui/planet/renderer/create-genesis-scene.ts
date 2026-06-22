@@ -30,6 +30,7 @@ import {
 	buildTerrainWireframe,
 } from "./mesh-builders"
 import {
+	buildGasGiantSystemOverlay,
 	buildMoonOrbitOverlay,
 	type MoonOrbitState,
 } from "./moon-orbit-overlay"
@@ -639,7 +640,7 @@ export function createGenesisScene(
 		50,
 		canvas.clientWidth / canvas.clientHeight,
 		0.01,
-		100,
+		2000,
 	)
 	camera.position.set(0, 0, 3)
 
@@ -653,7 +654,7 @@ export function createGenesisScene(
 	controls.noPan = true
 	controls.dynamicDampingFactor = 0.15
 	controls.minDistance = 1.2
-	controls.maxDistance = 8
+	controls.maxDistance = 12
 
 	const mapControls = new OrbitControls(mapCamera, canvas)
 	mapControls.enableRotate = false
@@ -757,7 +758,7 @@ export function createGenesisScene(
 	for (let i = 0; i < starCount; i++) {
 		const theta = Math.random() * 2 * Math.PI
 		const phi = Math.acos(2 * Math.random() - 1)
-		const r = 30 + Math.random() * 20
+		const r = 600 + Math.random() * 200
 		starPositions[3 * i] = r * Math.sin(phi) * Math.cos(theta)
 		starPositions[3 * i + 1] = r * Math.sin(phi) * Math.sin(theta)
 		starPositions[3 * i + 2] = r * Math.cos(phi)
@@ -766,8 +767,8 @@ export function createGenesisScene(
 	starGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3))
 	const starMat = new THREE.PointsMaterial({
 		color: 0xffffff,
-		size: 0.08,
-		sizeAttenuation: true,
+		size: 1.2,
+		sizeAttenuation: false,
 	})
 	scene.add(new THREE.Points(starGeo, starMat))
 
@@ -913,7 +914,10 @@ export function createGenesisScene(
 		// Terminator geometry lives in globeGroup local space; use the pre-computed
 		// globe-local sun direction (includes obliquity Z component).
 		const sunDir = currentLocalSunDirection.clone().normalize()
-		const points = buildSolarTerminatorRingPoints(currentLocalSunDirection, radius)
+		const points = buildSolarTerminatorRingPoints(
+			currentLocalSunDirection,
+			radius,
+		)
 		if (!points) return null
 		const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
 		const sinH0 = Math.sin(h0)
@@ -1141,13 +1145,14 @@ export function createGenesisScene(
 		const invQ = globeGroup.quaternion.clone().invert()
 		const localCamDir = solarTerminatorCameraDir.clone().applyQuaternion(invQ)
 		const localCamUp = solarTerminatorCameraUp.clone().applyQuaternion(invQ)
-		const localCamRight = solarTerminatorCameraRight.clone().applyQuaternion(invQ)
+		const localCamRight = solarTerminatorCameraRight
+			.clone()
+			.applyQuaternion(invQ)
 
 		for (let index = 0; index < solarTerminatorLabels.length; index++) {
 			const label = solarTerminatorLabels[index]!
 			const frontFacing =
-				index % stride === 0 &&
-				label.anchor.dot(localCamDir) > 0.06
+				index % stride === 0 && label.anchor.dot(localCamDir) > 0.06
 			label.sprite.visible = frontFacing
 			label.leader.visible = frontFacing
 			if (!frontFacing) continue
@@ -1160,10 +1165,7 @@ export function createGenesisScene(
 					localCamUp,
 					baseHeight * (index % 2 === 0 ? 0.22 : -0.22),
 				)
-				.addScaledVector(
-					localCamRight,
-					baseHeight * ((index % 3) - 1) * 0.16,
-				)
+				.addScaledVector(localCamRight, baseHeight * ((index % 3) - 1) * 0.16)
 			label.sprite.position.copy(solarTerminatorLabelEnd)
 			label.sprite.scale.set(label.aspect * baseHeight, baseHeight, 1)
 			;(label.leader.geometry as THREE.BufferGeometry).setFromPoints([
@@ -3094,7 +3096,12 @@ export function createGenesisScene(
 		requestRender()
 	}
 
-	function setSunDirection(x: number, y: number, z: number, hoursPerDay: number) {
+	function setSunDirection(
+		x: number,
+		y: number,
+		z: number,
+		hoursPerDay: number,
+	) {
 		const xyLen = Math.sqrt(x * x + y * y)
 		const wx = xyLen > 1e-6 ? x / xyLen : 0
 		const wy = xyLen > 1e-6 ? y / xyLen : 1
@@ -3156,6 +3163,8 @@ export function createGenesisScene(
 				currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000,
 			)
 		}
+		// Gas giant atmosphere follows the same daylight toggle
+		gasGiantOrbitState?.setDaylightMode?.(!enabled)
 		syncMapLighting()
 		requestRender()
 	}
@@ -3260,6 +3269,7 @@ export function createGenesisScene(
 
 	// Moon orbit overlay
 	let moonOrbitState: MoonOrbitState | null = null
+	let gasGiantOrbitState: MoonOrbitState | null = null
 
 	function setMoonOrbitOverlay(
 		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
@@ -3290,6 +3300,42 @@ export function createGenesisScene(
 
 	function updateMoonOrbitDay(day: number) {
 		moonOrbitState?.setDay(day)
+		requestRender()
+	}
+
+	function setGasGiantSystemOverlay(
+		system: import("@/model/celestial/moons/moon-types").GasGiantSystem | null,
+		planetRadiusKm: number,
+		day: number,
+		showGrid: boolean,
+		gridSpacing: number,
+	) {
+		if (gasGiantOrbitState) {
+			globeGroup.remove(gasGiantOrbitState.group)
+			gasGiantOrbitState.dispose()
+			gasGiantOrbitState = null
+		}
+		if (system) {
+			gasGiantOrbitState = buildGasGiantSystemOverlay(
+				system,
+				planetRadiusKm,
+				day,
+				showGrid,
+				gridSpacing,
+			)
+			globeGroup.add(gasGiantOrbitState.group)
+			if (gasGiantOrbitState.suggestedMaxDistance) {
+				controls.maxDistance = gasGiantOrbitState.suggestedMaxDistance
+			}
+			gasGiantOrbitState.setDaylightMode?.(sun.intensity > 0)
+		} else {
+			controls.maxDistance = 12
+		}
+		requestRender()
+	}
+
+	function updateGasGiantSystemDay(day: number) {
+		gasGiantOrbitState?.setDay(day)
 		requestRender()
 	}
 
@@ -3351,5 +3397,7 @@ export function createGenesisScene(
 		focusOnProvince,
 		setMoonOrbitOverlay,
 		updateMoonOrbitDay,
+		setGasGiantSystemOverlay,
+		updateGasGiantSystemDay,
 	}
 }
