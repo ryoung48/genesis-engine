@@ -8,12 +8,60 @@ import {
 	MOON_DEFAULTS,
 	type MoonOrbitRange,
 	type MoonParams,
-	type Orbit,
-	orbitSizeClassFromDiameter,
 	type PlanetType,
-	type SolarSystem,
-	type StarParams,
+	type TideLock,
 } from "./moon-types"
+
+interface OrbitAtmosphere {
+	bar: number
+}
+
+type OrbitSizeClass = "tiny" | "small" | "medium" | "large" | "huge" | "giant"
+
+interface Orbit {
+	/** Index into SolarSystem.orbits[]. */
+	idx: number
+	/** "planet" = orbits the star (or gas giant in gas-giant-moon mode); "moon" = orbits the main planet or gas giant. */
+	type: "planet" | "moon"
+	/** idx of parent body; null = orbits the star directly. */
+	parentIdx: number | null
+	lock: TideLock | null
+	sizeClass: OrbitSizeClass
+	diameterKm: number
+	massKg: number
+	atmosphere: OrbitAtmosphere
+	axialTiltDeg: number
+	inclinationDeg: number
+	eccentricity: number
+	perihelionDeg: number
+	/** AU for star-orbiting bodies; planet-diameters for moon orbits. */
+	distanceFromParent: number
+	orbitalPeriodDays: number
+	rotationPeriodHours: number
+	surfaceGravityG: number
+}
+
+interface StarParams {
+	spectralClass: string
+	starSubtype: number
+	massKg: number
+}
+
+interface SolarSystem {
+	star: StarParams
+	orbits: Orbit[]
+	/** idx of the main planet being simulated. */
+	mainPlanetIdx: number
+}
+
+function orbitSizeClassFromDiameter(diameterKm: number): OrbitSizeClass {
+	if (diameterKm < 1000) return "tiny"
+	if (diameterKm < 3000) return "small"
+	if (diameterKm < 8000) return "medium"
+	if (diameterKm < 15000) return "large"
+	if (diameterKm < 50000) return "huge"
+	return "giant"
+}
 
 const G = 6.674e-11
 const M_SOL_KG = 1.989e30
@@ -854,6 +902,7 @@ export function generateGasGiantSystem(
 	orbitalDistanceAU: number,
 	starMassKg: number,
 	obliquityDeg: number,
+	siblingMoonCount?: number,
 ): GasGiantSystem {
 	const rng = createRng(seed)
 
@@ -911,12 +960,14 @@ export function generateGasGiantSystem(
 				rng.randint(1, 6) -
 				6
 	const auPenalty = isClose ? (sizeClass > 16 ? 4 : 3) : 0
-	const moonCount = Math.max(rollSum - auPenalty, 0)
+	const moonCount =
+		siblingMoonCount !== undefined
+			? siblingMoonCount
+			: Math.max(rollSum - auPenalty, 0)
 
 	const mor = Math.min(hillLimit - 2, 200 + moonCount)
 
-	// Main planet orbit (middle range for habitability)
-	const mainPdFactor = rng.uniform(0.16, 0.5)
+	const mainPdFactor = rng.uniform(0, 1.1)
 	const mainMoonPd = ROCHE_PD + mor * mainPdFactor
 	const planetMassEarths = derivePlanetMassKg(planetRadiusKm) / EARTH_MASS_KG
 	const mainMoonOrbitalPeriodDays = gasGiantMoonPeriodDays(
@@ -926,7 +977,13 @@ export function generateGasGiantSystem(
 		planetMassEarths,
 	)
 	const mainMoonOrbitRange: MoonOrbitRange =
-		mainPdFactor < 0.16 ? "inner" : mainPdFactor < 0.5 ? "middle" : "outer"
+		mainPdFactor < 0.16
+			? "inner"
+			: mainPdFactor < 0.5
+				? "middle"
+				: mainPdFactor < 1.0
+					? "outer"
+					: "extreme"
 	const mainMoonSizeClass = inferPlanetSizeClass(planetRadiusKm * 2)
 	const mainMoonInclinationDeg = rollMoonInclination(rng, mainMoonOrbitRange)
 	const mainMoonEccentricity = rollMoonEccentricity(
@@ -941,7 +998,7 @@ export function generateGasGiantSystem(
 	// Sibling moons
 	const siblingMoons: GasGiantMoonParams[] = []
 	for (let i = 0; i < moonCount; i++) {
-		const moonSizeClass = Math.min(rollGasGiantMoonSizeClass(rng), 10)
+		const moonSizeClass = Math.min(rollGasGiantMoonSizeClass(rng), 5)
 		const diamKm = rollMoonDiameterKm(rng, moonSizeClass)
 		const moonDensityKgM3 = rng.uniform(1500, 3500)
 		const moonRadiusM = (diamKm / 2) * 1000

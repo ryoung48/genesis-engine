@@ -673,10 +673,15 @@ export function createGenesisScene(
 	mapControls.zoomToCursor = true
 	mapControls.enabled = false
 
-	// Planet group — all globe-surface objects live here so axial tilt
-	// can be applied as a group rotation rather than moving the sun.
+	// Planet group — all globe-surface objects live here. The globe spins for
+	// time-of-day (Z rotation) and tilts for obliquity (Y rotation).
 	const globeGroup = new THREE.Group()
 	scene.add(globeGroup)
+
+	// Orbit overlay group — in scene space, tilted for obliquity only (no spin)
+	// so moon/gas-giant orbit rings stay in the ecliptic plane.
+	const orbitGroup = new THREE.Group()
+	scene.add(orbitGroup)
 
 	// Lighting — low ambient so day/night contrast is visible
 	const DEFAULT_AMBIENT_INTENSITY = 0.55
@@ -3012,7 +3017,7 @@ export function createGenesisScene(
 			if (mapMesh) v.add(mapMesh.position)
 		} else {
 			v.normalize().multiplyScalar(1.005)
-			// Transform into world space accounting for the globe group's tilt.
+			globeGroup.updateWorldMatrix(true, false)
 			v.applyMatrix4(globeGroup.matrixWorld)
 		}
 		v.project(cam)
@@ -3043,32 +3048,39 @@ export function createGenesisScene(
 		rebuildOverlays()
 	}
 
-	/**
-	 * Position the sun from month (season → latitude) and time-of-day (→ longitude).
-	 * month 0 = equinox, 1-12 = Jan-Dec.
-	 * timeOfDay in hours [0, hoursPerDay). hoursPerDay controls full rotation.
-	 */
-	// Tilt the globeGroup so the planet's north pole tips toward the sun by
-	// the current sub-solar latitude — maintaining the axial-tilt illusion
-	// while keeping the sun fixed in the XY plane.
-	function applyGlobeTilt(sx: number, sy: number, sz: number) {
-		const tiltAngle = Math.asin(Math.max(-1, Math.min(1, sz)))
-		const xyLen = Math.sqrt(sx * sx + sy * sy)
-		if (xyLen < 1e-6) {
-			globeGroup.rotation.set(0, 0, 0)
-			currentLocalSunDirection.copy(currentSunDirection)
-			return
-		}
-		globeGroup.setRotationFromAxisAngle(
-			new THREE.Vector3(-sy / xyLen, sx / xyLen, 0),
-			tiltAngle,
+	// Sun is fixed at +X. The globe spins (Z) for time-of-day and tilts (Y)
+	// for obliquity. orbitGroup gets the obliquity tilt only so orbit rings
+	// stay in the ecliptic plane regardless of the planet's rotation.
+	const SUN_DIST = 10
+	const Y_AXIS = new THREE.Vector3(0, 1, 0)
+	const Z_AXIS = new THREE.Vector3(0, 0, 1)
+	sun.position.set(SUN_DIST, 0, 0)
+	currentSunDirection.set(1, 0, 0)
+	atmosMat.uniforms.sunDirection.value.set(1, 0, 0)
+
+	function applyGlobeOrientation(subSolarLatRad: number, spinAngle: number) {
+		// Obliquity: north pole tips toward sun (+X) by subSolarLatRad → Y rotation
+		const obliquityQ = new THREE.Quaternion().setFromAxisAngle(
+			Y_AXIS,
+			subSolarLatRad,
 		)
-		// Recompute globe-local sun direction after the quaternion is set.
+		// Spin: planet rotates around its own pole (Z) for time-of-day
+		const spinQ = new THREE.Quaternion().setFromAxisAngle(Z_AXIS, spinAngle)
+		// Globe = obliquity then spin (spin is in globe-local space)
+		globeGroup.quaternion.copy(obliquityQ).multiply(spinQ)
+		// Orbit rings: obliquity tilt only, no spin
+		orbitGroup.quaternion.copy(obliquityQ)
+		// Sun direction in globe-local space for the solar terminator
 		currentLocalSunDirection
 			.copy(currentSunDirection)
 			.applyQuaternion(globeGroup.quaternion.clone().invert())
 	}
 
+	/**
+	 * Position sun from month (season) and time-of-day (planet spin).
+	 * month 0 = equinox, 1-12 = Jan-Dec.
+	 * timeOfDay in hours [0, hoursPerDay).
+	 */
 	function setSunPosition(
 		month: number,
 		obliquityDeg: number,
@@ -3076,21 +3088,12 @@ export function createGenesisScene(
 		hoursPerDay: number,
 	) {
 		const oblRad = (obliquityDeg * Math.PI) / 180
-		// June (month 6) = northern summer solstice (+obliquity)
-		// December (month 12) = southern summer solstice (-obliquity)
 		const subSolarLat =
 			month === 0 ? 0 : oblRad * Math.sin((2 * Math.PI * (month - 4)) / 12)
-		// Longitude from time of day — offset so noon faces the default camera
-		const lon = Math.PI + 2 * Math.PI * (timeOfDay / (hoursPerDay || 24))
-		const cosLon = Math.cos(lon)
-		const sinLon = Math.sin(lon)
-		const dist = 10
-		// Sun stays in the XY plane; the globe group tilts to simulate obliquity.
-		sun.position.set(dist * cosLon, dist * sinLon, 0)
-		currentSunDirection.set(cosLon, sinLon, 0)
+		// Spin angle: offset by π so noon (timeOfDay=hoursPerDay/2) faces +X (sun)
+		const spinAngle = Math.PI + 2 * Math.PI * (timeOfDay / (hoursPerDay || 24))
 		currentSunHoursPerDay = hoursPerDay || 24
-		atmosMat.uniforms.sunDirection.value.set(cosLon, sinLon, 0)
-		applyGlobeTilt(cosLon, sinLon, Math.sin(subSolarLat))
+		applyGlobeOrientation(subSolarLat, spinAngle)
 		syncMapLighting()
 		if (solarTerminatorVisible) rebuildSolarTerminator()
 		requestRender()
@@ -3102,15 +3105,10 @@ export function createGenesisScene(
 		z: number,
 		hoursPerDay: number,
 	) {
-		const xyLen = Math.sqrt(x * x + y * y)
-		const wx = xyLen > 1e-6 ? x / xyLen : 0
-		const wy = xyLen > 1e-6 ? y / xyLen : 1
-		const dist = 10
-		sun.position.set(dist * wx, dist * wy, 0)
-		currentSunDirection.set(wx, wy, 0)
+		// For tidally-locked mode: sun direction is fixed, no spin
+		const subSolarLatRad = Math.asin(Math.max(-1, Math.min(1, z)))
 		currentSunHoursPerDay = hoursPerDay || 24
-		atmosMat.uniforms.sunDirection.value.set(wx, wy, 0)
-		applyGlobeTilt(x, y, z)
+		applyGlobeOrientation(subSolarLatRad, 0)
 		syncMapLighting()
 		if (solarTerminatorVisible) rebuildSolarTerminator()
 		requestRender()
@@ -3139,7 +3137,7 @@ export function createGenesisScene(
 			ambient.color.g * ambient.intensity * invPi,
 			ambient.color.b * ambient.intensity * invPi,
 		)
-		mat.uniforms.uSunDirection.value.copy(currentSunDirection).normalize()
+		mat.uniforms.uSunDirection.value.copy(currentLocalSunDirection).normalize()
 		mat.uniforms.uSunLight.value.set(
 			sun.color.r * sun.intensity * invPi,
 			sun.color.g * sun.intensity * invPi,
@@ -3278,9 +3276,10 @@ export function createGenesisScene(
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,
+		showEllipticalOrbits: boolean,
 	) {
 		if (moonOrbitState) {
-			globeGroup.remove(moonOrbitState.group)
+			orbitGroup.remove(moonOrbitState.group)
 			moonOrbitState.dispose()
 			moonOrbitState = null
 		}
@@ -3292,8 +3291,9 @@ export function createGenesisScene(
 				day,
 				showGrid,
 				gridSpacing,
+				showEllipticalOrbits,
 			)
-			globeGroup.add(moonOrbitState.group)
+			orbitGroup.add(moonOrbitState.group)
 		}
 		requestRender()
 	}
@@ -3309,9 +3309,10 @@ export function createGenesisScene(
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,
+		showEllipticalOrbits: boolean,
 	) {
 		if (gasGiantOrbitState) {
-			globeGroup.remove(gasGiantOrbitState.group)
+			orbitGroup.remove(gasGiantOrbitState.group)
 			gasGiantOrbitState.dispose()
 			gasGiantOrbitState = null
 		}
@@ -3322,8 +3323,9 @@ export function createGenesisScene(
 				day,
 				showGrid,
 				gridSpacing,
+				showEllipticalOrbits,
 			)
-			globeGroup.add(gasGiantOrbitState.group)
+			orbitGroup.add(gasGiantOrbitState.group)
 			if (gasGiantOrbitState.suggestedMaxDistance) {
 				controls.maxDistance = gasGiantOrbitState.suggestedMaxDistance
 			}
@@ -3367,9 +3369,13 @@ export function createGenesisScene(
 			if (currentViewMode !== "globe") return null
 			const p = camera.position
 			if (p.x === 0 && p.y === 0 && p.z === 0) return null
-			// Return unnormalized position — the caller uses dot(P, camPos) < 1
-			// as the exact sphere-silhouette test (accounts for zoom distance).
-			return [p.x, p.y, p.z]
+			// Transform camera world position into globe-body space so the
+			// dot-product visibility test matches particle positions (body space).
+			globeGroup.updateWorldMatrix(true, false)
+			const bodyPos = p.clone().applyMatrix4(
+				globeGroup.matrixWorld.clone().invert(),
+			)
+			return [bodyPos.x, bodyPos.y, bodyPos.z]
 		},
 		setThermalEquator,
 		setWindArrows,

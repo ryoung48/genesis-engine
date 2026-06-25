@@ -98,6 +98,7 @@ export const RegularClimatePreview: React.FC<RegularClimatePreviewProps> = ({
 			formatLegendValue={chartProps.formatLegendValue}
 			xAxisTitle="Day of Year"
 			yAxisTitle="Latitude"
+			yTickEvery={3}
 			fullHeight={true}
 		/>
 	)

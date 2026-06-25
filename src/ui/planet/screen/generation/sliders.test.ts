@@ -33,7 +33,6 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setOrbitalDistanceAU: vi.fn(),
-			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
@@ -72,7 +71,6 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setOrbitalDistanceAU: vi.fn(),
-			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
@@ -119,7 +117,6 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setOrbitalDistanceAU: vi.fn(),
-			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
@@ -161,7 +158,6 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setOrbitalDistanceAU: vi.fn(),
-			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
@@ -217,7 +213,6 @@ describe("buildPlanetSliders", () => {
 			setEccentricity: vi.fn(),
 			setPerihelion: vi.fn(),
 			setOrbitalDistanceAU: vi.fn(),
-			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setPressure: vi.fn(),
 			setAxialTiltDirection: vi.fn(),
@@ -335,7 +330,6 @@ describe("resetWorldDefaults", () => {
 			setSpectralClass: vi.fn(),
 			setStarSubtype: vi.fn(),
 			setOrbitalDistanceAU: vi.fn(),
-			setDaysPerYear: vi.fn(),
 			setHoursPerDay: vi.fn(),
 			setTidallyLocked: vi.fn(),
 			setAntistellarLon: vi.fn(),
@@ -395,9 +389,7 @@ describe("resetWorldDefaults", () => {
 		expect(setters.setOrbitalDistanceAU).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
 		)
-		expect(setters.setDaysPerYear).toHaveBeenCalledWith(
-			DEFAULT_WORLD_PARAMS.daysPerYear,
-		)
+
 		expect(setters.setHoursPerDay).toHaveBeenCalledWith(
 			DEFAULT_WORLD_PARAMS.hoursPerDay,
 		)

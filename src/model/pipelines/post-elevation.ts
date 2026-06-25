@@ -547,6 +547,7 @@ export function runPostElevationPipeline(
 						params.orbitalDistanceAU,
 						starMassKg,
 						params.obliquity,
+						params.moonCount,
 					),
 					params,
 				)

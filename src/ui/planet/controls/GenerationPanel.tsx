@@ -49,11 +49,22 @@ import { LockOpenIcon } from "@/ui/components/primitives/icons/LockOpenIcon"
 import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
 import { StarOutlineIcon } from "@/ui/components/primitives/icons/StarOutlineIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
+import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
+import { RegularClimatePreview } from "@/ui/preview/RegularClimatePreview"
 import { TidalCalendarChart } from "@/ui/preview/TidalCalendarChart"
-import { getGenerationPreviewToggleLabel } from "../screen/generation/generation-preview"
+import type {
+	ClimatePreviewData,
+	LockedClimatePreviewData,
+	RegularClimatePreviewData,
+} from "@/ui/preview/types"
+import {
+	GENERATION_PREVIEW_TABS,
+	type GenerationPreviewTab,
+} from "../screen/generation/generation-preview"
 import { getOrderedRecentCodes } from "../screen/generation/recent-codes"
 import type { SliderDef } from "../screen/generation/sliders"
 import { SPECTRAL_CLASS_COLORS } from "../screen/generation/star-utils"
+import type { UnitSystem } from "../screen/shared/ui-format"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 
@@ -106,8 +117,10 @@ interface GenerationPanelProps {
 	generationLabel: string
 	generationProgress: number
 	generationTimings?: StageTiming[] | null
-	showClimatePreview: boolean
-	onToggleClimatePreview: () => void
+	climatePreview: ClimatePreviewData
+	generationPreviewTab: GenerationPreviewTab
+	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
+	unitSystem: UnitSystem
 	handleGenerate: () => void
 	handleFileImport: (file: File) => void
 	handleEarthImport: () => void
@@ -332,14 +345,9 @@ const EARTH_DIAMETER_KM = 12742
 
 function formatHours(hours: number): string {
 	const days = hours / 24
-	const weeks = days / 7
-	const months = days / 30
 	const years = days / 365
 	if (years >= 100) return `${(years / 100).toFixed(1)} c`
-	if (years >= 10) return `${(years / 10).toFixed(1)} dec`
 	if (years >= 1) return `${years.toFixed(2)} y`
-	if (months >= 1) return `${months.toFixed(1)} mo`
-	if (weeks >= 1) return `${weeks.toFixed(1)} w`
 	if (days >= 1) return `${days.toFixed(1)} d`
 	return `${hours.toFixed(1)} h`
 }
@@ -410,7 +418,7 @@ function SystemBodyCard({
 	return (
 		<details
 			open={defaultOpen}
-			className={`group rounded border px-2 py-1.5 ${className}`}
+			className={`group rounded border bg-white/85 px-2 py-1.5 shadow-sm shadow-slate-200/20 ${className}`}
 		>
 			<summary
 				className={`flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] ${summaryClassName}`}
@@ -514,7 +522,7 @@ function buildMoonStats({
 		{ label: "Semi Major Axis", value: `${pd.toFixed(1)} PD` },
 		{
 			label: "Period",
-			value: `${orbitalPeriodDays.toFixed(2)} d`,
+			value: formatDays(orbitalPeriodDays),
 		},
 		{ label: "Eccentricity", value: eccentricity.toFixed(4) },
 		{
@@ -571,7 +579,7 @@ function StellarSystemCard({
 	const typeStatValue = getStarLabel(starClass, starSubtype)
 
 	return (
-		<details className="group rounded border border-yellow-200 px-2 py-1.5">
+		<details className="group rounded border border-yellow-200 bg-white/85 px-2 py-1.5 shadow-sm shadow-slate-200/20">
 			<summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-yellow-700">
 				<span>{typeStatValue} Star</span>
 				<div className="flex items-center gap-1">
@@ -837,6 +845,16 @@ function GasGiantSystemCards({
 							: undefined,
 					},
 					{ label: "Period", value: formatDays(daysPerYear) },
+					...(gasGiantSystem
+						? [
+								{
+									label: "Solar Day",
+									value: formatHours(
+										gasGiantSystem.gasGiant.dayLengthHours,
+									),
+								},
+							]
+						: []),
 					{
 						label: "Eccentricity",
 						value: eccentricity.toFixed(4),
@@ -904,17 +922,18 @@ function GasGiantSystemCards({
 					{
 						label: "Solar Day",
 						value: formatHours(hoursPerDay),
-						editor: dayLengthSlider
-							? {
-									label: "Solar Day",
-									value: dayLengthSlider.value,
-									min: dayLengthSlider.min,
-									max: dayLengthSlider.max,
-									step: dayLengthSlider.step,
-									display: dayLengthSlider.display,
-									set: dayLengthSlider.set,
-								}
-							: undefined,
+						editor:
+							dayLengthSlider && !isGasGiantParentLocked
+								? {
+										label: "Solar Day",
+										value: dayLengthSlider.value,
+										min: dayLengthSlider.min,
+										max: dayLengthSlider.max,
+										step: dayLengthSlider.step,
+										display: dayLengthSlider.display,
+										set: dayLengthSlider.set,
+									}
+								: undefined,
 					},
 					{
 						label: "Eccentricity",
@@ -1525,15 +1544,19 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	generationLabel,
 	generationProgress,
 	generationTimings,
-	showClimatePreview,
-	onToggleClimatePreview,
+	climatePreview,
+	generationPreviewTab,
+	onSelectGenerationPreviewTab,
+	unitSystem,
 	handleGenerate,
 	handleFileImport,
 	handleEarthImport,
 	onClose,
 }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null)
-	const [moonBoxTab, setMoonBoxTab] = useState<"count" | "tides">("count")
+	const [moonBoxTab, setMoonBoxTab] = useState<
+		"count" | "tides" | GenerationPreviewTab
+	>("count")
 	const [showRecentCodes, setShowRecentCodes] = useState(false)
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
 	type DrillDownState =
@@ -1625,6 +1648,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		planetType === "gas-giant-moon" &&
 		tideLock?.type === "lunar" &&
 		tideLock.target === 0
+	const climatePreviewTab =
+		moonBoxTab === "count" || moonBoxTab === "tides" ? null : moonBoxTab
 	const renderPlanetSliderSuffix = (item: SliderDef) => {
 		if (item.label === "Day Length" || item.label === "Antistellar Lon") {
 			const otherLockActive = isLunarLocked
@@ -1775,18 +1800,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 					<div className="flex items-center gap-2">
 						<button
 							type="button"
-							onClick={onToggleClimatePreview}
-							className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all ${
-								showClimatePreview
-									? "border-slate-900 bg-slate-900 text-white hover:bg-slate-800 hover:border-slate-800"
-									: "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
-							}`}
-							title="Toggle the climate preview in the main viewport"
-						>
-							{getGenerationPreviewToggleLabel(showClimatePreview)}
-						</button>
-						<button
-							type="button"
 							onClick={resetWorldDefaults}
 							className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
 						>
@@ -1805,7 +1818,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								"text-emerald-500",
 							]
 							return (
-								<div className="rounded-lg border border-slate-200/80 bg-white/85 shadow-sm shadow-slate-200/20 overflow-hidden">
+								<div className="overflow-hidden rounded-lg">
 									{/* Tab header */}
 									<div className="flex items-center border-b border-slate-100 px-2.5 pt-2 pb-2 gap-2">
 										<div className="flex gap-0 rounded border border-slate-200 overflow-hidden">
@@ -1826,19 +1839,33 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 												),
 											)}
 										</div>
-										<div className="flex gap-0 ml-auto">
-											{(["count", "tides"] as const).map((tab) => (
+										<div className="ml-auto flex gap-0">
+											{(
+												[
+													["count", "stats"],
+													...GENERATION_PREVIEW_TABS.map(
+														([value, label]) =>
+															[value, label.toLowerCase()] as const,
+													),
+													["tides", "tides"],
+												] as const
+											).map(([tab, label]) => (
 												<button
 													key={tab}
 													type="button"
-													onClick={() => setMoonBoxTab(tab)}
+													onClick={() => {
+														setMoonBoxTab(tab)
+														if (tab !== "count" && tab !== "tides") {
+															onSelectGenerationPreviewTab(tab)
+														}
+													}}
 													className={`px-2 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-2 ${
 														moonBoxTab === tab
 															? "border-slate-700 text-slate-900"
 															: "border-transparent text-slate-400 hover:text-slate-600"
 													}`}
 												>
-													{tab === "count" ? "stats" : tab}
+													{label}
 												</button>
 											))}
 										</div>
@@ -1872,47 +1899,41 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 													>
 														{moonSeedLabel}
 													</span>
-													{planetType === "terrestrial" && (
-														<div className="flex gap-0.5 ml-1 self-center">
-															{Array.from({ length: moonCount }, (_, i) => (
-																<span
-																	key={i}
-																	className={`${MOON_COLORS_CSS[i % MOON_COLORS_CSS.length]} inline-block text-[9px]`}
-																>
-																	●
-																</span>
-															))}
-														</div>
-													)}
-												</div>
-												{/* Moon count stepper — terrestrial only */}
-												{planetType === "terrestrial" && (
-													<div className="flex items-center gap-1.5 shrink-0">
-														<button
-															type="button"
-															disabled={moonCount === 0}
-															onClick={() => setMoonCount(moonCount - 1)}
-															className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
-														>
-															<span className="leading-none text-[11px]">
-																−
+													<div className="flex gap-0.5 ml-1 self-center">
+														{Array.from({ length: moonCount }, (_, i) => (
+															<span
+																key={i}
+																className={`${MOON_COLORS_CSS[i % MOON_COLORS_CSS.length]} inline-block text-[9px]`}
+															>
+																●
 															</span>
-														</button>
-														<span className="w-3 text-center text-[11px] font-mono text-slate-800">
-															{moonCount}
-														</span>
-														<button
-															type="button"
-															disabled={moonCount >= MAX_MOONS}
-															onClick={() => setMoonCount(moonCount + 1)}
-															className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
-														>
-															<span className="leading-none text-[11px]">
-																+
-															</span>
-														</button>
+														))}
 													</div>
-												)}
+												</div>
+												<div className="flex items-center gap-1.5 shrink-0">
+													<button
+														type="button"
+														disabled={moonCount === 0}
+														onClick={() => setMoonCount(moonCount - 1)}
+														className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+													>
+														<span className="leading-none text-[11px]">−</span>
+													</button>
+													<span className="w-3 text-center text-[11px] font-mono text-slate-800">
+														{moonCount}
+													</span>
+													<button
+														type="button"
+														disabled={
+															moonCount >=
+															(planetType === "gas-giant-moon" ? 5 : MAX_MOONS)
+														}
+														onClick={() => setMoonCount(moonCount + 1)}
+														className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
+													>
+														<span className="leading-none text-[11px]">+</span>
+													</button>
+												</div>
 											</div>
 											{isSolarLocked && moonCount > 0 && (
 												<p className="mt-1.5 text-[9px] text-slate-400 leading-tight">
@@ -2003,6 +2024,30 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 													{moonCount === 0 ? "No moons" : "Computing…"}
 												</div>
 											)}
+										</div>
+									)}
+
+									{climatePreviewTab && (
+										<div className="py-1">
+											<div className="h-[248px] overflow-hidden">
+												{isSolarLocked ? (
+													<LockedClimatePreview
+														preview={climatePreview as LockedClimatePreviewData}
+														activeTab={generationPreviewTab}
+														unitSystem={unitSystem}
+														daysPerYear={daysPerYear}
+													/>
+												) : (
+													<RegularClimatePreview
+														preview={
+															climatePreview as RegularClimatePreviewData
+														}
+														activeTab={generationPreviewTab}
+														unitSystem={unitSystem}
+														daysPerYear={daysPerYear}
+													/>
+												)}
+											</div>
 										</div>
 									)}
 								</div>

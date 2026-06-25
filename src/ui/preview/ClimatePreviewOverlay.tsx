@@ -1,12 +1,8 @@
 import React from "react"
 import { IconButton } from "@/ui/components/primitives/IconButton"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { uiTokens } from "@/ui/components/tokens"
-import {
-	GENERATION_PREVIEW_TABS,
-	type GenerationPreviewTab,
-} from "@/ui/planet/screen/generation/generation-preview"
+import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import { formatTemperature } from "@/ui/planet/screen/shared/ui-format"
 import { LockedClimatePreview } from "./LockedClimatePreview"
@@ -23,7 +19,6 @@ interface ClimatePreviewOverlayProps {
 	activeTab: GenerationPreviewTab
 	unitSystem: UnitSystem
 	daysPerYear: number
-	onSelectTab: (tab: GenerationPreviewTab) => void
 	onClose: () => void
 }
 
@@ -33,22 +28,11 @@ export const ClimatePreviewOverlay: React.FC<ClimatePreviewOverlayProps> = ({
 	activeTab,
 	unitSystem,
 	daysPerYear,
-	onSelectTab,
 	onClose,
 }) => {
 	return (
 		<div className="absolute inset-0 z-20 flex h-full flex-col bg-slate-50 text-slate-900">
 			<div className="flex items-center gap-3 border-b border-slate-200 bg-white/70 px-5 py-3">
-				<SegmentedControl
-					options={GENERATION_PREVIEW_TABS.map(([value, label]) => ({
-						value,
-						label,
-					}))}
-					value={activeTab}
-					onChange={onSelectTab}
-					tone="panel"
-					size="md"
-				/>
 				<div className="ml-auto flex items-center gap-3">
 					<Surface
 						tone="panelAccent"

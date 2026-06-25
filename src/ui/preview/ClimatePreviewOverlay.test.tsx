@@ -3,7 +3,6 @@ import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 import { IconButton } from "@/ui/components/primitives/IconButton"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { temperatureColor } from "@/ui/planet/colors"
 import { rgbToCss } from "@/ui/planet/screen/shared/ui-format"
 import { ClimatePreviewOverlay } from "./ClimatePreviewOverlay"
@@ -39,7 +38,7 @@ function createRegularProps(
 		tidallyLocked: false,
 		activeTab: "temperature",
 		unitSystem: "metric",
-		onSelectTab: vi.fn(),
+		daysPerYear: 365,
 		onClose: vi.fn(),
 		...overrides,
 	}
@@ -63,23 +62,20 @@ function createLockedProps(
 		tidallyLocked: true,
 		activeTab: "temperature",
 		unitSystem: "metric",
-		onSelectTab: vi.fn(),
+		daysPerYear: 365,
 		onClose: vi.fn(),
 		...overrides,
 	}
 }
 
 describe("ClimatePreviewOverlay", () => {
-	it("renders tabs, average temperature, and close action in the top control row", () => {
+	it("renders average temperature and the close action in the top control row", () => {
 		capturedHeatmapProps = null
 
 		const markup = renderToStaticMarkup(
 			<ClimatePreviewOverlay {...createRegularProps()} />,
 		)
 
-		expect(markup).toContain("TEMP")
-		expect(markup).toContain("INSOL")
-		expect(markup).toContain("LIGHT")
 		expect(markup).toContain("Close climate preview")
 		expect(markup).toContain("Avg Temp")
 		expect(markup).toContain("12.3°C")
@@ -189,12 +185,13 @@ describe("ClimatePreviewOverlay", () => {
 		).toBe("52.3°F")
 	})
 
-	it("wires the tab selector and close button callbacks", () => {
-		const onSelectTab = vi.fn()
+	it("wires the close button callback", () => {
 		const onClose = vi.fn()
 		const tree = ClimatePreviewOverlay(
-			createRegularProps({ onSelectTab, onClose }),
-		) as React.ReactElement<{ children?: React.ReactNode }>
+			createRegularProps({ onClose }),
+		) as React.ReactElement<{
+			children?: React.ReactNode
+		}>
 		const rootChildren = React.Children.toArray(
 			tree.props.children,
 		) as React.ReactElement[]
@@ -204,10 +201,7 @@ describe("ClimatePreviewOverlay", () => {
 		const headerChildren = React.Children.toArray(
 			header.props.children,
 		) as React.ReactElement[]
-		const tabs = headerChildren[0] as React.ReactElement<
-			React.ComponentProps<typeof SegmentedControl>
-		>
-		const actionRow = headerChildren[1] as React.ReactElement<{
+		const actionRow = headerChildren[0] as React.ReactElement<{
 			children?: React.ReactNode
 		}>
 		const actionChildren = React.Children.toArray(
@@ -217,10 +211,8 @@ describe("ClimatePreviewOverlay", () => {
 			React.ComponentProps<typeof IconButton>
 		>
 
-		tabs.props.onChange("insolation")
 		closeButton.props.onClick?.(undefined as never)
 
-		expect(onSelectTab).toHaveBeenCalledWith("insolation")
 		expect(onClose).toHaveBeenCalledTimes(1)
 	})
 })

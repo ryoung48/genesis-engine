@@ -21,11 +21,13 @@ interface GasGiantSystemOverlayProps {
 	gasGiantSystem: GasGiantSystem
 	planetRadiusKm: number
 	day: number
+	showEllipticalOrbits?: boolean
 }
 
 export const GasGiantSystemOverlay: React.FC<GasGiantSystemOverlayProps> = ({
 	gasGiantSystem,
 	day,
+	showEllipticalOrbits = true,
 }) => {
 	const SIZE = 230
 	const GAS_GIANT_R = 16
@@ -63,7 +65,7 @@ export const GasGiantSystemOverlay: React.FC<GasGiantSystemOverlayProps> = ({
 
 		const mainOrbit = {
 			a: smaDisplay(mainMoonPd),
-			e: 0,
+			e: showEllipticalOrbits ? 0 : 0,
 			b: smaDisplay(mainMoonPd),
 			ae: 0,
 			omegaDeg: 0,
@@ -88,11 +90,11 @@ export const GasGiantSystemOverlay: React.FC<GasGiantSystemOverlayProps> = ({
 			const rawA = smaDisplay(moon.pd)
 			const minA = e < 1 ? GAS_GIANT_R / (1 - e) : rawA
 			const a = Math.max(rawA, minA)
-			const b = a * Math.sqrt(1 - e * e)
-			const ae = a * e
+			const b = showEllipticalOrbits ? a * Math.sqrt(1 - e * e) : a
+			const ae = showEllipticalOrbits ? a * e : 0
 			return {
 				a,
-				e,
+				e: showEllipticalOrbits ? e : 0,
 				b,
 				ae,
 				omegaDeg: moon.argumentOfPeriapsisDeg,
@@ -106,7 +108,14 @@ export const GasGiantSystemOverlay: React.FC<GasGiantSystemOverlayProps> = ({
 		})
 
 		return [mainOrbit, ...siblingOrbits]
-	}, [mainMoonPd, mainMoonOrbitalPeriodDays, siblingMoons, cx, cy])
+	}, [
+		mainMoonPd,
+		mainMoonOrbitalPeriodDays,
+		siblingMoons,
+		cx,
+		cy,
+		showEllipticalOrbits,
+	])
 
 	// Compute body positions at current day
 	const positions = useMemo(() => {

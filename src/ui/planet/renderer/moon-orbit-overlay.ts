@@ -176,6 +176,7 @@ export function buildMoonOrbitOverlay(
 	initialDay: number,
 	showGrid: boolean,
 	gridSpacing: number,
+	showEllipticalOrbits: boolean,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 	if (moons.length === 0) {
@@ -229,7 +230,7 @@ export function buildMoonOrbitOverlay(
 			minDisplayDistance: SCENE_MIN,
 			maxDisplayDistance: SCENE_MAX,
 		})
-		const e = moon.eccentricity
+		const e = showEllipticalOrbits ? moon.eccentricity : 0
 		const b = a * Math.sqrt(1 - e * e)
 		const ae = a * e
 
@@ -255,42 +256,6 @@ export function buildMoonOrbitOverlay(
 			opacity: 0.4,
 		})
 		group.add(new THREE.Line(orbitGeo, orbitMat))
-
-		// Periapsis tick (E=0) — solid radial line
-		const periPos = orbitPoint(0, a, b, ae, P, Q)
-		const periDir = periPos.clone().normalize()
-		const periGeo = new THREE.BufferGeometry().setFromPoints([
-			periPos.clone().addScaledVector(periDir, -0.04),
-			periPos.clone().addScaledVector(periDir, 0.04),
-		])
-		group.add(
-			new THREE.Line(
-				periGeo,
-				new THREE.LineBasicMaterial({
-					color: lineColor,
-					transparent: true,
-					opacity: 0.55,
-				}),
-			),
-		)
-
-		// Apoapsis tick (E=π) — radial tick, slightly longer than periapsis
-		const apoPos = orbitPoint(Math.PI, a, b, ae, P, Q)
-		const apoDir = apoPos.clone().normalize()
-		const apoGeo = new THREE.BufferGeometry().setFromPoints([
-			apoPos.clone().addScaledVector(apoDir, -0.065),
-			apoPos.clone().addScaledVector(apoDir, 0.065),
-		])
-		group.add(
-			new THREE.Line(
-				apoGeo,
-				new THREE.LineBasicMaterial({
-					color: lineColor,
-					transparent: true,
-					opacity: 0.8,
-				}),
-			),
-		)
 
 		// --- Moon body ---
 		const moonR = Math.max(
@@ -363,11 +328,21 @@ export function buildGasGiantSystemOverlay(
 	initialDay: number,
 	showGrid: boolean,
 	gridSpacing: number,
+	showEllipticalOrbits: boolean,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 
-	const { gasGiant, mainMoonPd, mainMoonOrbitalPeriodDays, siblingMoons } =
-		system
+	const {
+		gasGiant,
+		mainMoonPd,
+		mainMoonOrbitalPeriodDays,
+		mainMoonInclinationDeg,
+		mainMoonEccentricity,
+		mainMoonLongitudeOfAscendingNodeDeg,
+		mainMoonArgumentOfPeriapsisDeg,
+		mainMoonMeanAnomalyAtEpochDeg,
+		siblingMoons,
+	} = system
 
 	// ── Derive display sizes from actual physical ratios ──────────────────────
 	// Planet globe = 1.0 scene unit radius.
@@ -376,10 +351,6 @@ export function buildGasGiantSystemOverlay(
 
 	// 1:1 scale vs planet globe (globe radius = 1.0), so a 9× gas giant → radius 9.0.
 	const GG_SPHERE_R = Math.max(0.5, ggRatioToPlanet)
-
-	// Place gas giant to the side (+X) so the planet–GG arm is horizontal and
-	// i=0 sibling orbits (in the GG equatorial XZ plane) look like proper rings.
-	const GG_DIR = new THREE.Vector3(1, 0, 0)
 
 	// ── Orbital scaling ───────────────────────────────────────────────────────
 	// Distances are measured from the gas giant's surface, not its center.
@@ -390,7 +361,7 @@ export function buildGasGiantSystemOverlay(
 	// Available radius for the pd portion of orbits (beyond the gas giant surface).
 	const availR = MAX_ORBIT_RADIUS - GG_SPHERE_R
 	const rawMaxApoapsisInPd = Math.max(
-		mainMoonPd,
+		mainMoonPd * (1 + mainMoonEccentricity),
 		...siblingMoons.map((m) => m.pd * (1 + m.eccentricity)),
 		1,
 	)
@@ -404,8 +375,29 @@ export function buildGasGiantSystemOverlay(
 	}
 
 	// Gas giant sits at the main planet's actual (compressed) orbital distance.
-	const GG_DIST = smaDisplay(mainMoonPd)
-	const ggPos = GG_DIR.clone().multiplyScalar(GG_DIST)
+	const mainOrbitE = showEllipticalOrbits ? mainMoonEccentricity : 0
+	const mainOrbitA = smaDisplay(mainMoonPd)
+	const mainOrbitB = mainOrbitA * Math.sqrt(1 - mainOrbitE * mainOrbitE)
+	const mainOrbitAe = mainOrbitA * mainOrbitE
+	const mainOrbitOmegaRad =
+		(mainMoonLongitudeOfAscendingNodeDeg * Math.PI) / 180
+	const mainOrbitIncRad = (mainMoonInclinationDeg * Math.PI) / 180
+	const mainOrbitPeriapsisRad = (mainMoonArgumentOfPeriapsisDeg * Math.PI) / 180
+	const mainOrbitM0 = (mainMoonMeanAnomalyAtEpochDeg * Math.PI) / 180
+	const { P: mainOrbitP, Q: mainOrbitQ } = perifocalBasis(
+		mainOrbitOmegaRad,
+		mainOrbitIncRad,
+		mainOrbitPeriapsisRad,
+	)
+	const initialMainOrbitE = solveKepler(mainOrbitM0, mainOrbitE)
+	const ggPos = orbitPoint(
+		initialMainOrbitE,
+		mainOrbitA,
+		mainOrbitB,
+		mainOrbitAe,
+		mainOrbitP,
+		mainOrbitQ,
+	).multiplyScalar(-1)
 
 	// ── Gas giant subgroup ───────────────────────────────────────────────────
 	// perifocalBasis uses Z-north / XY equatorial — same convention as the planet globe.
@@ -422,8 +414,11 @@ export function buildGasGiantSystemOverlay(
 		roughness: 1,
 		metalness: 0,
 	})
+	const ggSpinGroup = new THREE.Group()
+	ggGroup.add(ggSpinGroup)
 	const ggMesh = new THREE.Mesh(ggGeo, ggMat)
-	ggGroup.add(ggMesh)
+	ggMesh.rotation.x = Math.PI / 2
+	ggSpinGroup.add(ggMesh)
 
 	// Grid in Y-up space to match Three.js SphereGeometry UV mapping (poles at ±Y)
 	const gridR = GG_SPHERE_R * 1.002
@@ -509,17 +504,20 @@ export function buildGasGiantSystemOverlay(
 	let daylightEnabled = false
 
 	// ── Main planet orbit ring ────────────────────────────────────────────────
-	// In subgroup XY space: circle of radius GG_DIST centered at origin.
-	// After subgroup −90° X rotation this becomes an XZ world ring passing through origin.
+	// The world sits at the origin, so render the gas giant's mirrored orbital path
+	// using the generated main-moon orbital basis instead of a fixed flat circle.
 	const mainOrbitPts: THREE.Vector3[] = []
 	for (let j = 0; j <= ORBIT_SEGMENTS; j++) {
-		const theta = (j / ORBIT_SEGMENTS) * TWO_PI
+		const E = (j / ORBIT_SEGMENTS) * TWO_PI
 		mainOrbitPts.push(
-			new THREE.Vector3(
-				GG_DIST * Math.cos(theta),
-				GG_DIST * Math.sin(theta),
-				0,
-			),
+			orbitPoint(
+				E,
+				mainOrbitA,
+				mainOrbitB,
+				mainOrbitAe,
+				mainOrbitP,
+				mainOrbitQ,
+			).multiplyScalar(-1),
 		)
 	}
 	ggGroup.add(
@@ -563,7 +561,7 @@ export function buildGasGiantSystemOverlay(
 	}> = []
 
 	siblingMoons.forEach((moon, i) => {
-		const e = moon.eccentricity
+		const e = showEllipticalOrbits ? moon.eccentricity : 0
 		// Clamp SMA so periapsis (a*(1-e)) never dips inside the gas giant sphere
 		const rawA = smaDisplay(moon.pd)
 		const minA = e < 1 ? GG_SPHERE_R / (1 - e) : rawA
@@ -597,7 +595,7 @@ export function buildGasGiantSystemOverlay(
 			),
 		)
 
-		// Moon body in subgroup space — Z-north maps to world Y via ggGroup rotation
+		// Moon body in subgroup space — Z-north maps to world Y via ggGroup rotation.
 		const moonRatioToGG = moon.diameterKm / gasGiant.diameterKm
 		const moonR = Math.max(
 			0.015,
@@ -628,18 +626,23 @@ export function buildGasGiantSystemOverlay(
 	})
 
 	function setDay(day: number) {
-		// Gas giant orbits the planet (main planet orbits the GG at period mainMoonOrbitalPeriodDays).
-		// From the planet's frame the GG moves in a circle of radius GG_DIST in the XY plane.
-		const mainTheta = (TWO_PI / mainMoonOrbitalPeriodDays) * day
-		const newGGPos = new THREE.Vector3(
-			GG_DIST * Math.cos(mainTheta),
-			GG_DIST * Math.sin(mainTheta),
-			0,
-		)
+		// Mirror the main moon's orbit so the gas giant moves correctly in the
+		// terrestrial world's planet-centered frame.
+		const mainN = TWO_PI / mainMoonOrbitalPeriodDays
+		const mainM = mod2pi(mainOrbitM0 + mainN * day)
+		const mainE = solveKepler(mainM, mainOrbitE)
+		const newGGPos = orbitPoint(
+			mainE,
+			mainOrbitA,
+			mainOrbitB,
+			mainOrbitAe,
+			mainOrbitP,
+			mainOrbitQ,
+		).multiplyScalar(-1)
 		ggGroup.position.copy(newGGPos)
 
 		// Spin gas giant on its axis
-		ggMesh.rotation.y = (TWO_PI / (gasGiant.dayLengthHours / 24)) * day
+		ggSpinGroup.rotation.z = (TWO_PI / (gasGiant.dayLengthHours / 24)) * day
 
 		// Update arm line start point
 		const armPos = armGeo.getAttribute("position") as THREE.BufferAttribute
@@ -697,7 +700,9 @@ export function buildGasGiantSystemOverlay(
 					}),
 				)
 			: 0
-	const systemRadius = GG_DIST + Math.max(GG_SPHERE_R, maxSiblingApoapsis)
+	const mainOrbitApoapsis = mainOrbitA * (1 + mainOrbitE)
+	const systemRadius =
+		mainOrbitApoapsis + Math.max(GG_SPHERE_R, maxSiblingApoapsis)
 	const suggestedMaxDistance = systemRadius * 2.5
 
 	function setDaylightMode(enabled: boolean) {

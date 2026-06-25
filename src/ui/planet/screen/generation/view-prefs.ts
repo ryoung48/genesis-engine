@@ -36,6 +36,7 @@ interface StoredViewPrefs {
 	pathfindingLand: boolean
 	pathfindingSea: boolean
 	showMoonOrbits: boolean
+	showEllipticalOrbits: boolean
 	showApparentDiameter: boolean
 	showDaylight: boolean
 	showSolarTerminator: boolean
@@ -132,6 +133,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	pathfindingLand: true,
 	pathfindingSea: true,
 	showMoonOrbits: false,
+	showEllipticalOrbits: true,
 	showApparentDiameter: false,
 	showDaylight: false,
 	showSolarTerminator: false,
@@ -301,6 +303,10 @@ export function parseStoredViewPrefs(
 			showMoonOrbits: readBoolean(
 				parsed.showMoonOrbits,
 				DEFAULT_VIEW_PREFS.showMoonOrbits,
+			),
+			showEllipticalOrbits: readBoolean(
+				parsed.showEllipticalOrbits,
+				DEFAULT_VIEW_PREFS.showEllipticalOrbits,
 			),
 			showApparentDiameter: readBoolean(
 				parsed.showApparentDiameter,

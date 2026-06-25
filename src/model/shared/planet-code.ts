@@ -261,7 +261,7 @@ const FIELD_SPECS: FieldSpec[] = [
 		name: "moonCount",
 		min: 0,
 		step: 1,
-		count: 4, // 0, 1, 2, 3
+		count: 6, // 0–5
 		read: (p) => p.moonCount ?? 0,
 	},
 	{

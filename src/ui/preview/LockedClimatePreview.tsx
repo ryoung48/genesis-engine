@@ -98,6 +98,7 @@ export const LockedClimatePreview: React.FC<LockedClimatePreviewProps> = ({
 			formatLegendValue={chartProps.formatLegendValue}
 			xAxisTitle="Day of Year"
 			yAxisTitle="Equatorial Longitude"
+			yTickEvery={3}
 			fullHeight={true}
 		/>
 	)

@@ -31,8 +31,10 @@ function createProps(
 		worldTab: "planet",
 		setWorldTab: vi.fn(),
 		resetWorldDefaults: vi.fn(),
-		tidallyLocked: false,
-		setTidallyLocked: vi.fn(),
+		planetType: "terrestrial",
+		setPlanetType: vi.fn(),
+		tideLock: null,
+		setTideLock: vi.fn(),
 		setObliquity: vi.fn(),
 		moonCount: 1,
 		setMoonCount: vi.fn(),
@@ -40,6 +42,7 @@ function createProps(
 		setMoonSeed: vi.fn(),
 		daysPerYear: 365,
 		hoursPerDay: 24,
+		setHoursPerDay: vi.fn(),
 		planetRadiusKm: 6371,
 		planetSliders: [],
 		terrainSliders: [],
@@ -48,6 +51,8 @@ function createProps(
 		starSubtype: 2,
 		setStarSubtype: vi.fn(),
 		orbitalDistanceAU: 1,
+		eccentricity: 0.0167,
+		perihelion: 0,
 		planetCode: "ABCD",
 		codeInput: "ABCD",
 		setCodeInput: vi.fn(),
@@ -62,8 +67,20 @@ function createProps(
 		generationLabel: "Idle",
 		generationProgress: 0,
 		generationTimings: null,
-		showClimatePreview: false,
-		onToggleClimatePreview: vi.fn(),
+		climatePreview: {
+			heat: [[1, 2]],
+			avgTemp: 12.3,
+			insolation: [[3, 4]],
+			insolColorFn: vi.fn(() => "#000"),
+			daylight: [[5, 6]],
+			daylightColorFn: vi.fn(() => "#000"),
+			lats: [0],
+			columnValues: [0, 1],
+			columnLabels: ["0", "1"],
+		},
+		generationPreviewTab: "temperature",
+		onSelectGenerationPreviewTab: vi.fn(),
+		unitSystem: "metric",
 		handleGenerate: vi.fn(),
 		handleFileImport: vi.fn(),
 		handleEarthImport: vi.fn(),
@@ -74,10 +91,11 @@ function createProps(
 }
 
 describe("GenerationPanel", () => {
-	it("renders preview beside reset in the header actions", () => {
+	it("renders reset in the header actions without the old preview toggle", () => {
 		const markup = renderToStaticMarkup(<GenerationPanel {...createProps()} />)
 
-		expect(markup).toMatch(/>Preview<\/button><button[^>]*>Reset<\/button>/)
+		expect(markup).toContain(">Reset<")
+		expect(markup).not.toContain(">Preview<")
 	})
 
 	it("renders the recent-codes toggle and randomize control with icons", () => {
@@ -190,7 +208,6 @@ describe("GenerationPanel", () => {
 			<GenerationPanel
 				{...createProps({
 					worldTab: "terrain",
-					showClimatePreview: true,
 					codeError: true,
 					terrainSliders: [
 						{
@@ -214,7 +231,6 @@ describe("GenerationPanel", () => {
 			/>,
 		)
 
-		expect(markup).toContain(">Globe<")
 		expect(markup).toContain("Roughness")
 		expect(markup).toContain("flex items-center justify-between gap-3")
 		expect(markup).toContain("flex min-h-4 items-center gap-1.5")
@@ -228,7 +244,7 @@ describe("GenerationPanel", () => {
 		const markup = renderToStaticMarkup(
 			<GenerationPanel
 				{...createProps({
-					tidallyLocked: true,
+					tideLock: "solar",
 					planetSliders: [
 						{
 							label: "Axial Tilt",

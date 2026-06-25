@@ -102,8 +102,18 @@ export interface GenesisScene {
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,
+		showEllipticalOrbits: boolean,
 	): void
 	updateMoonOrbitDay(day: number): void
 	/** Unit vector pointing from origin toward the camera (globe mode only, null in map mode). */
 	getGlobeCameraDir(): [number, number, number] | null
+	setGasGiantSystemOverlay?(
+		system: import("@/model/celestial/moons/moon-types").GasGiantSystem | null,
+		planetRadiusKm: number,
+		day: number,
+		showGrid: boolean,
+		gridSpacing: number,
+		showEllipticalOrbits: boolean,
+	): void
+	updateGasGiantSystemDay?(day: number): void
 }

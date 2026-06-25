@@ -20,6 +20,7 @@ interface HeatmapChartProps {
 	legendTitle?: string
 	xAxisTitle?: string
 	yAxisTitle?: string
+	yTickEvery?: number
 	fullHeight?: boolean
 	showLegend?: boolean
 	showXAxis?: boolean
@@ -42,6 +43,7 @@ export const HeatmapChart: React.FC<HeatmapChartProps> = ({
 	legendTitle,
 	xAxisTitle,
 	yAxisTitle,
+	yTickEvery = 1,
 	fullHeight = false,
 	showLegend = true,
 	showXAxis = true,
@@ -141,6 +143,7 @@ export const HeatmapChart: React.FC<HeatmapChartProps> = ({
 								ticks: {
 									callback: (_value, index) => {
 										const rowValue = rowValues[index]
+										if (index % yTickEvery !== 0) return ""
 										return rowValue !== undefined
 											? rowTickLabel(rowValue, index)
 											: ""

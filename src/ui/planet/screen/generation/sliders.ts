@@ -51,7 +51,6 @@ export function buildPlanetSliders(state: {
 	setEccentricity: (v: number) => void
 	setPerihelion: (v: number) => void
 	setOrbitalDistanceAU: (v: number) => void
-	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPressure: (v: number) => void
 	setAxialTiltDirection: (v: number) => void
@@ -367,7 +366,6 @@ export function resetWorldDefaults(setters: {
 	setSpectralClass: (v: string) => void
 	setStarSubtype: (v: number) => void
 	setOrbitalDistanceAU: (v: number) => void
-	setDaysPerYear: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setPlanetType: (
 		v: import("@/model/celestial/moons/moon-types").PlanetType,
@@ -405,7 +403,6 @@ export function resetWorldDefaults(setters: {
 	setters.setSpectralClass(DEFAULT_WORLD_PARAMS.spectralClass)
 	setters.setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
 	setters.setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
-	setters.setDaysPerYear(DEFAULT_WORLD_PARAMS.daysPerYear)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
 	setters.setPlanetType("terrestrial")
 	setters.setTideLock(null)

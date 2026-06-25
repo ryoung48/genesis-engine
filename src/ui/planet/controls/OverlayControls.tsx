@@ -181,6 +181,8 @@ interface OverlayControlsProps {
 	onToggleGenerationPanel?: () => void
 	showMoonOrbits?: boolean
 	setShowMoonOrbits?: (v: boolean) => void
+	showEllipticalOrbits?: boolean
+	setShowEllipticalOrbits?: (v: boolean) => void
 	showApparentDiameter?: boolean
 	setShowApparentDiameter?: (v: boolean) => void
 	showDaylight?: boolean
@@ -292,10 +294,13 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	onToggleGenerationPanel,
 	showMoonOrbits = false,
 	setShowMoonOrbits,
+	showEllipticalOrbits = true,
+	setShowEllipticalOrbits,
 	showApparentDiameter = false,
 	setShowApparentDiameter,
 	showDaylight = false,
 	setShowDaylight,
+	showSolarTerminator = false,
 	setShowSolarTerminator,
 	moonCount = 0,
 	planetType = "terrestrial",
@@ -802,7 +807,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 											/>
 										</button>
 										{celestialExpanded && (
-											<div className="mt-1.5 space-y-1.5 pl-2">
+											<div className="mt-1.5 space-y-1.5">
 												{(planetType === "gas-giant-moon" ||
 													(moonCount > 0 && setShowMoonOrbits)) && (
 													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
@@ -812,6 +817,19 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															checked={showMoonOrbits}
 															onChange={(e) =>
 																setShowMoonOrbits?.(e.target.checked)
+															}
+															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+														/>
+													</label>
+												)}
+												{setShowEllipticalOrbits && showMoonOrbits && (
+													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
+														<span>Elliptical Orbits</span>
+														<input
+															type="checkbox"
+															checked={showEllipticalOrbits}
+															onChange={(e) =>
+																setShowEllipticalOrbits(e.target.checked)
 															}
 															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 														/>
@@ -830,16 +848,28 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														/>
 													</label>
 												)}
-												{setShowDaylight && setShowSolarTerminator && (
+												{setShowDaylight && (
 													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
 														<span>Daylight</span>
 														<input
 															type="checkbox"
 															checked={showDaylight}
-															onChange={(e) => {
+															onChange={(e) =>
 																setShowDaylight(e.target.checked)
+															}
+															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+														/>
+													</label>
+												)}
+												{setShowSolarTerminator && (
+													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
+														<span>Solar Terminator</span>
+														<input
+															type="checkbox"
+															checked={showSolarTerminator}
+															onChange={(e) =>
 																setShowSolarTerminator(e.target.checked)
-															}}
+															}
 															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 														/>
 													</label>

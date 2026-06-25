@@ -33,6 +33,7 @@ interface MoonOrbitsOverlayProps {
 	planetRadiusKm: number
 	hoursPerDay: number
 	day: number
+	showEllipticalOrbits?: boolean
 	showDaylight?: boolean
 	clockHour?: number
 }
@@ -42,6 +43,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 	planetRadiusKm,
 	hoursPerDay,
 	day,
+	showEllipticalOrbits = true,
 	showDaylight = false,
 	clockHour = 12,
 }) => {
@@ -71,7 +73,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				smaM,
 				planetRadiusKm,
 			)
-			const e = moon.eccentricity
+			const e = showEllipticalOrbits ? moon.eccentricity : 0
 			const a = scaleMoonOrbitDistanceForDisplay({
 				orbitalDistancePlanetRadii,
 				maxOrbitalDistancePlanetRadii: maxExtentPlanetRadii,
@@ -130,7 +132,14 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				label: `M${i + 1}`,
 			}
 		})
-	}, [moons, hoursPerDay, day, planetRadiusKm, scaledClockHour])
+	}, [
+		moons,
+		hoursPerDay,
+		day,
+		planetRadiusKm,
+		scaledClockHour,
+		showEllipticalOrbits,
+	])
 
 	return (
 		<div
@@ -195,16 +204,6 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 								strokeWidth={0.8}
 								strokeOpacity={0.35}
 								strokeDasharray="3 2"
-							/>
-							{/* Periapsis tick */}
-							<line
-								x1={o.a - o.ae - 3}
-								y1={0}
-								x2={o.a - o.ae + 3}
-								y2={0}
-								stroke={o.color}
-								strokeWidth={0.8}
-								strokeOpacity={0.5}
 							/>
 							{/* Moon body — size derived from live planetRadiusKm prop */}
 							{((_r) => (

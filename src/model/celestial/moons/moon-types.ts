@@ -22,7 +22,7 @@ export interface MoonParams {
 /** Reserved for the star — used as target of a solar tide lock. */
 const _STAR_ID = 0
 
-type TideLock = { type: "solar" | "lunar"; target: number }
+export type TideLock = { type: "solar" | "lunar"; target: number }
 
 export const MAX_MOONS = 3
 
@@ -41,57 +41,6 @@ export const MOON_DEFAULTS: MoonParams = {
 	orbitRange: "middle",
 	semiMajorAxisPlanetDiameters: 30.17,
 	sizeClass: 2,
-}
-
-interface OrbitAtmosphere {
-	bar: number
-}
-
-type OrbitSizeClass = "tiny" | "small" | "medium" | "large" | "huge" | "giant"
-
-export interface Orbit {
-	/** Index into SolarSystem.orbits[]. */
-	idx: number
-	/** "planet" = orbits the star (or gas giant in gas-giant-moon mode); "moon" = orbits the main planet or gas giant. */
-	type: "planet" | "moon"
-	/** idx of parent body; null = orbits the star directly. */
-	parentIdx: number | null
-	lock: TideLock | null
-	sizeClass: OrbitSizeClass
-	diameterKm: number
-	massKg: number
-	atmosphere: OrbitAtmosphere
-	axialTiltDeg: number
-	inclinationDeg: number
-	eccentricity: number
-	perihelionDeg: number
-	/** AU for star-orbiting bodies; planet-diameters for moon orbits. */
-	distanceFromParent: number
-	orbitalPeriodDays: number
-	rotationPeriodHours: number
-	surfaceGravityG: number
-}
-
-export interface StarParams {
-	spectralClass: string
-	starSubtype: number
-	massKg: number
-}
-
-export interface SolarSystem {
-	star: StarParams
-	orbits: Orbit[]
-	/** idx of the main planet being simulated. */
-	mainPlanetIdx: number
-}
-
-export function orbitSizeClassFromDiameter(diameterKm: number): OrbitSizeClass {
-	if (diameterKm < 1000) return "tiny"
-	if (diameterKm < 3000) return "small"
-	if (diameterKm < 8000) return "medium"
-	if (diameterKm < 15000) return "large"
-	if (diameterKm < 50000) return "huge"
-	return "giant"
 }
 
 // ── Gas giant system ──────────────────────────────────────────────────────────
