@@ -37,6 +37,8 @@ import {
 	tidalTierColor,
 	tornadoLandColor,
 	vegetationColor,
+	vegetationMapColor,
+	vegetationSatelliteColor,
 	volcanicLandColor,
 } from "../../colors"
 import type { DangerSubMode } from "../../controls/OverlayControls"
@@ -441,25 +443,42 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "vegetation" && world.vegetation) {
+	if (
+		(colorMode === "vegetation" || colorMode === "vegetationMaps") &&
+		world.vegetation
+	) {
 		for (let r = 0; r < N; r++) {
 			if (isOceanRegion(r)) {
-				const [cr, cg, cb] = getColor(
-					Math.min(0, world.elevation_km[r]),
-					"terrain",
-				)
+				const [cr, cg, cb] =
+					colorMode === "vegetationMaps"
+						? oceanRgb(r)
+						: getColor(Math.min(0, world.elevation_km[r]), "terrain")
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else {
-				const [cr, cg, cb] = darkenVegetationAtElevation(
-					vegetationColor(world.vegetation[r]),
-					world.elevation_km[r],
-				)
+				const biomeColor =
+					colorMode === "vegetationMaps"
+						? vegetationMapColor(world.vegetation[r], world.climateZones?.[r])
+						: vegetationColor(world.vegetation[r])
+				const [cr, cg, cb] =
+					colorMode === "vegetationMaps"
+						? biomeColor
+						: darkenVegetationAtElevation(biomeColor, world.elevation_km[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			}
+		}
+		return rgb
+	}
+
+	if (colorMode === "vegetationSatellite" && world.pastaClimate) {
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = vegetationSatelliteColor(world.pastaClimate[r])
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
 		}
 		return rgb
 	}

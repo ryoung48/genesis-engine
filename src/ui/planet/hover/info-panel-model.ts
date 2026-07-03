@@ -11,7 +11,13 @@ import {
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
-import { climateTempColor, climateZoneColor, vegetationColor } from "../colors"
+import {
+	climateTempColor,
+	climateZoneColor,
+	vegetationColor,
+	vegetationMapColor,
+	vegetationSatelliteColor,
+} from "../colors"
 import {
 	getDynastyColor,
 	getTerrainFeatureColor,
@@ -288,9 +294,27 @@ export function buildClimateSwatchColor(
 export function buildVegetationSwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
+	colorMode: ColorMode,
 ): string | null {
-	if (hoverRegion === null || !world?.vegetation) return null
-	return rgbToCss(vegetationColor(world.vegetation[hoverRegion]))
+	if (
+		hoverRegion === null ||
+		!world ||
+		(colorMode === "vegetationSatellite"
+			? !world.pastaClimate
+			: !world.vegetation)
+	) {
+		return null
+	}
+	const color =
+		colorMode === "vegetationSatellite" && world.pastaClimate
+			? vegetationSatelliteColor(world.pastaClimate[hoverRegion])
+			: colorMode === "vegetationMaps"
+				? vegetationMapColor(
+						world.vegetation[hoverRegion],
+						world.climateZones?.[hoverRegion],
+					)
+				: vegetationColor(world.vegetation[hoverRegion])
+	return rgbToCss(color)
 }
 
 export function buildTopographySwatchColor(

@@ -83,6 +83,7 @@ import {
 	type LabelMode,
 	type MeasureMode,
 	OverlayControls,
+	type VegetationSubMode,
 } from "./controls/OverlayControls"
 import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
@@ -458,6 +459,9 @@ export const GenesisView: React.FC = () => {
 	const [clockHour, setClockHour] = useState(initialViewPrefs.clockHour)
 	const [clockUseMeridiem, setClockUseMeridiem] = useState(
 		initialViewPrefs.clockUseMeridiem,
+	)
+	const [vegetationSubMode, setVegetationSubMode] = useState<VegetationSubMode>(
+		initialViewPrefs.vegetationSubMode,
 	)
 	const [climateSubMode, setClimateSubMode] = useState<
 		"basic" | "pasta" | "koppen"
@@ -880,6 +884,7 @@ export const GenesisView: React.FC = () => {
 				clockUseMeridiem,
 				clockMonthMode,
 				clockMonth,
+				vegetationSubMode,
 				climateSubMode,
 				elevationSubMode,
 				topographySubMode,
@@ -899,6 +904,7 @@ export const GenesisView: React.FC = () => {
 		clockUseMeridiem,
 		clockMonthMode,
 		clockMonth,
+		vegetationSubMode,
 		climateSubMode,
 		elevationSubMode,
 		topographySubMode,
@@ -3266,6 +3272,8 @@ export const GenesisView: React.FC = () => {
 						hoursPerDay={hoursPerDay}
 						tidallyLocked={tidallyLocked}
 						daysPerYear={effectiveDaysPerYear}
+						vegetationSubMode={vegetationSubMode}
+						setVegetationSubMode={setVegetationSubMode}
 						climateSubMode={climateSubMode}
 						setClimateSubMode={setClimateSubMode}
 						elevationSubMode={elevationSubMode}
@@ -3433,6 +3441,7 @@ export const GenesisView: React.FC = () => {
 								populationMode={populationMode}
 								setPopulationMode={setPopulationMode}
 								debugMapModes={debugMapModes}
+								vegetationSubMode={vegetationSubMode}
 								climateSubMode={climateSubMode}
 								elevationSubMode={elevationSubMode}
 								topographySubMode={topographySubMode}

@@ -3,6 +3,7 @@ import type {
 	DangerSubMode,
 	LabelMode,
 	MeasureMode,
+	VegetationSubMode,
 } from "../../controls/OverlayControls"
 import type { GenesisViewMode } from "../../renderer"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
@@ -46,6 +47,7 @@ interface StoredViewPrefs {
 	clockUseMeridiem: boolean
 	clockMonthMode: "annual" | "monthly"
 	clockMonth: number
+	vegetationSubMode: VegetationSubMode
 	climateSubMode: "basic" | "pasta" | "koppen"
 	elevationSubMode: "colored" | "grayscale"
 	topographySubMode: "classification" | "slope"
@@ -62,6 +64,8 @@ const COLOR_MODES = new Set<ColorMode>([
 	"precipitation",
 	"moisture",
 	"vegetation",
+	"vegetationMaps",
+	"vegetationSatellite",
 	"climate",
 	"pastaClimate",
 	"koppenClimate",
@@ -143,6 +147,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	clockUseMeridiem: false,
 	clockMonthMode: "monthly",
 	clockMonth: 0,
+	vegetationSubMode: "base",
 	climateSubMode: "basic",
 	elevationSubMode: "colored",
 	topographySubMode: "classification",
@@ -336,6 +341,12 @@ export function parseStoredViewPrefs(
 					? parsed.clockMonthMode
 					: DEFAULT_VIEW_PREFS.clockMonthMode,
 			clockMonth: readNumber(parsed.clockMonth, DEFAULT_VIEW_PREFS.clockMonth),
+			vegetationSubMode:
+				parsed.vegetationSubMode === "base" ||
+				parsed.vegetationSubMode === "maps" ||
+				parsed.vegetationSubMode === "satellite"
+					? parsed.vegetationSubMode
+					: DEFAULT_VIEW_PREFS.vegetationSubMode,
 			climateSubMode:
 				parsed.climateSubMode === "basic" ||
 				parsed.climateSubMode === "pasta" ||

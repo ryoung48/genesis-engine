@@ -38,6 +38,7 @@ export type DangerSubMode =
 	| "cyclone"
 	| "tornado"
 	| "tidal"
+export type VegetationSubMode = "base" | "maps" | "satellite"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
 export interface LabelMode {
 	nations: boolean
@@ -151,6 +152,8 @@ interface OverlayControlsProps {
 	hoursPerDay?: number
 	tidallyLocked?: boolean
 	daysPerYear: number
+	vegetationSubMode: VegetationSubMode
+	setVegetationSubMode: (v: VegetationSubMode) => void
 	climateSubMode: "basic" | "pasta" | "koppen"
 	setClimateSubMode: (v: "basic" | "pasta" | "koppen") => void
 	elevationSubMode: "colored" | "grayscale"
@@ -266,6 +269,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	hoursPerDay = 24,
 	tidallyLocked = false,
 	daysPerYear,
+	vegetationSubMode,
+	setVegetationSubMode,
 	climateSubMode,
 	setClimateSubMode,
 	elevationSubMode,
@@ -313,6 +318,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [labelsExpanded, setLabelsExpanded] = React.useState(false)
 	const [clockExpanded, setClockExpanded] = React.useState(false)
 	const [celestialExpanded, setCelestialExpanded] = React.useState(false)
+	const [vegetationExpanded, setVegetationExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
 	const [dangerExpanded, setDangerExpanded] = React.useState(false)
 	const [measureExpanded, setMeasureExpanded] = React.useState(false)
@@ -1358,6 +1364,67 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														onChange={() => {
 															setTopographySubMode("slope")
 															setColorMode("slope")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+											</div>
+										)}
+									</div>
+								)}
+
+								{(colorMode === "vegetation" ||
+									colorMode === "vegetationMaps" ||
+									colorMode === "vegetationSatellite") && (
+									<div>
+										<button
+											type="button"
+											onClick={() => setVegetationExpanded((v) => !v)}
+											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
+										>
+											<span>Vegetation</span>
+											<ChevronIcon
+												direction={vegetationExpanded ? "up" : "down"}
+												className="h-3 w-3 text-slate-400"
+											/>
+										</button>
+										{vegetationExpanded && (
+											<div className="mt-1.5 space-y-1.5">
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Base</span>
+													<input
+														type="radio"
+														name="vegetation-sub"
+														checked={vegetationSubMode === "base"}
+														onChange={() => {
+															setVegetationSubMode("base")
+															setColorMode("vegetation")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Maps</span>
+													<input
+														type="radio"
+														name="vegetation-sub"
+														checked={vegetationSubMode === "maps"}
+														onChange={() => {
+															setVegetationSubMode("maps")
+															setColorMode("vegetationMaps")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Satellite</span>
+													<input
+														type="radio"
+														name="vegetation-sub"
+														checked={vegetationSubMode === "satellite"}
+														onChange={() => {
+															setVegetationSubMode("satellite")
+															setColorMode("vegetationSatellite")
 														}}
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>

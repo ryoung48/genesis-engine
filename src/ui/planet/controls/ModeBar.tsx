@@ -14,6 +14,7 @@ import {
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "../screen/shared/map-modes"
 import { ModeButtonGroup } from "./mode-controls"
+import type { VegetationSubMode } from "./OverlayControls"
 
 interface ModeBarProps {
 	colorMode: ColorMode
@@ -25,6 +26,7 @@ interface ModeBarProps {
 	populationMode: PopulationMapMode
 	setPopulationMode: (v: PopulationMapMode) => void
 	debugMapModes: boolean
+	vegetationSubMode: VegetationSubMode
 	climateSubMode: "basic" | "pasta" | "koppen"
 	elevationSubMode: "colored" | "grayscale"
 	topographySubMode: "classification" | "slope"
@@ -32,10 +34,16 @@ interface ModeBarProps {
 
 function resolveSubMode(
 	baseMode: ColorMode,
+	vegetationSubMode: VegetationSubMode,
 	climateSubMode: "basic" | "pasta" | "koppen",
 	elevationSubMode: "colored" | "grayscale",
 	topographySubMode: "classification" | "slope",
 ): ColorMode {
+	if (baseMode === "vegetation") {
+		if (vegetationSubMode === "maps") return "vegetationMaps"
+		if (vegetationSubMode === "satellite") return "vegetationSatellite"
+		return "vegetation"
+	}
 	if (baseMode === "climate") {
 		if (climateSubMode === "pasta") return "pastaClimate"
 		if (climateSubMode === "koppen") return "koppenClimate"
@@ -63,6 +71,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	populationMode,
 	setPopulationMode,
 	debugMapModes,
+	vegetationSubMode,
 	climateSubMode,
 	elevationSubMode,
 	topographySubMode,
@@ -80,6 +89,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					setColorMode(
 						resolveSubMode(
 							mode,
+							vegetationSubMode,
 							climateSubMode,
 							elevationSubMode,
 							topographySubMode,
@@ -138,6 +148,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 							setColorMode(
 								resolveSubMode(
 									geographyMode,
+									vegetationSubMode,
 									climateSubMode,
 									elevationSubMode,
 									topographySubMode,
