@@ -1011,9 +1011,6 @@ function GasGiantSystemCards({
 						value: pressureSlider
 							? `${pressureSlider.value.toFixed(1)} bar`
 							: "1.0 bar",
-						valuePrefix: pressureSlider
-							? `${pressureSubtype(pressureSlider.value)} ·`
-							: "Standard ·",
 						editor: pressureSlider
 							? {
 									label: "Atmosphere",
@@ -1323,9 +1320,6 @@ function TerrestrialSystemCards({
 						value: pressureSlider
 							? `${pressureSlider.value.toFixed(1)} bar`
 							: "1.0 bar",
-						valuePrefix: pressureSlider
-							? `${pressureSubtype(pressureSlider.value)} ·`
-							: "Standard ·",
 						editor: pressureSlider
 							? {
 									label: "Atmosphere",

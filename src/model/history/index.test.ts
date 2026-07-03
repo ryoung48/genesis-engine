@@ -180,7 +180,10 @@ describe("history init", () => {
 		expect(getRelation(state, 0, 2)).not.toBe(REL.VASSAL)
 	})
 
-	it("uses a lower information-era urbanization floor while remaining above late medieval", () => {
+	it("drives urbanization by nation type and total population, not era", () => {
+		// The two-input urban demographics model keys urbanization off government
+		// type (nation_type) and total population only, so identical fixtures
+		// across eras should produce identical urban populations.
 		const medieval = initUrbanizationState("lateMedieval")
 		const industrial = initUrbanizationState("industrial")
 		const information = initUrbanizationState("information")
@@ -189,14 +192,7 @@ describe("history init", () => {
 		const industrialUrban = PROV.population.urban.get(industrial, 0)
 		const informationUrban = PROV.population.urban.get(information, 0)
 
-		expect(information.developmentCurrent[0]).toBeGreaterThan(
-			medieval.developmentCurrent[0],
-		)
-		expect(medievalUrban).toBeCloseTo(22_166.6667)
-		expect(industrialUrban).toBeCloseTo(46_260.8696)
-		expect(informationUrban).toBeCloseTo(46_260.8696)
-		expect(informationUrban).toBeGreaterThan(medievalUrban)
-		expect(informationUrban).toBeCloseTo(industrialUrban)
-		expect(informationUrban).toBeLessThan(60_000)
+		expect(industrialUrban).toBeCloseTo(medievalUrban)
+		expect(informationUrban).toBeCloseTo(medievalUrban)
 	})
 })

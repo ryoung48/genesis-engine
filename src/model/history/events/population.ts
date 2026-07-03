@@ -3,6 +3,7 @@
  * Port of src/model/history/events/population.ts
  */
 
+import { GOVERNMENT_TYPES, type GovernmentType } from "../../society/eras"
 import { getSettlementEraTuning } from "../../society/settlement-tuning"
 import { EVT } from "../event-heap"
 import { PROV } from "../fields"
@@ -16,11 +17,77 @@ import {
 	YEAR_MS,
 } from "../state"
 
-// Medieval Demographics Made Easy constants
 const MAX_ADJUSTMENT_RATE = 0.005
 const URBAN_GROWTH = 0.1
-const SECOND_CITY_RATIO = 0.5
-const CITY_DECAY = 0.75
+
+// 1444 Urban Demographics Ruleset (two-input edition): each government type
+// carries its own urbanization share (U) and rank-size steepness (q).
+interface NationProfile {
+	U: number
+	q: number
+}
+
+const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
+	// tribal — negligible true urbanization, flat-to-moderate hierarchy
+	chiefdom: { U: 0.015, q: 0.9 }, // single hereditary seat, no real hierarchy
+	tribal_monarchy: { U: 0.025, q: 1.0 }, // one organised royal seat
+	tribal_federation: { U: 0.03, q: 0.75 }, // multi-tribe council, several similar centers
+	native_council: { U: 0.015, q: 0.8 }, // small frontier council, flat and sparse
+
+	// monarchy — decentralised feudal through centralised absolutist to modern constitutional
+	feudal_monarchy: { U: 0.05, q: 0.85 }, // many small towns, few large cities
+	elective_monarchy: { U: 0.07, q: 0.8 }, // elected king over autonomous nobility, flat
+	absolute_monarchy: { U: 0.12, q: 1.2 }, // centralised crown, dominant capital
+	constitutional_monarchy: { U: 0.25, q: 1.0 }, // modern urbanization, moderate primacy
+
+	// republic — coastal oligarchy through modern mass-urban democracy
+	merchant_republic: { U: 0.35, q: 1.3 }, // trade oligarchy, one dominant port capital
+	noble_republic: { U: 0.2, q: 1.1 }, // aristocratic senate, strong core city
+	city_state_confederation: { U: 0.25, q: 0.75 }, // league of city-states, polycentric
+	presidential_republic: { U: 0.4, q: 1.0 }, // industrial+ mass urbanization
+	parliamentary_republic: { U: 0.4, q: 0.9 }, // industrial+, slightly less primacy
+
+	// theocracy — sacred-capital hierarchies
+	theocracy: { U: 0.08, q: 1.2 }, // one oversized holy city
+	monastic_state: { U: 0.06, q: 1.3 }, // small, centralized around the mother house
+	prince_bishopric: { U: 0.05, q: 1.1 }, // small landed medieval see
+	imperial_cult: { U: 0.1, q: 1.3 }, // large sacred-imperial capital, very steep
+
+	// republic extensions — modern authoritarian/centralized states
+	socialist_state: { U: 0.3, q: 1.15 }, // centrally planned, capital-heavy
+	military_junta: { U: 0.25, q: 1.2 }, // garrison-state, capital-dominant
+
+	// colonial
+	trading_company: { U: 0.3, q: 1.3 }, // chartered company rule, single dominant port
+	settler_colony: { U: 0.15, q: 1.0 }, // sparse frontier settlement, moderate primacy
+}
+
+function nationProfile(governmentTypeIndex: number): NationProfile {
+	const label = GOVERNMENT_TYPES[governmentTypeIndex]
+	return label
+		? GOVERNMENT_PROFILES[label]
+		: GOVERNMENT_PROFILES.feudal_monarchy
+}
+
+/** Below this settlement size, population is rural/nomadic rather than a town. */
+const TAU = 5_000
+
+// Rank-size hierarchy: grow the settlement count N until the smallest
+// settlement would fall below τ, then normalize sizes so they sum to urbanPop.
+function rankSizeCities(urbanPop: number, q: number): number[] {
+	let N = 0
+	let H = 0
+	for (;;) {
+		const nextN = N + 1
+		const nextH = H + nextN ** -q
+		const smallest = (urbanPop * nextN ** -q) / nextH
+		if (smallest < TAU) break
+		N = nextN
+		H = nextH
+	}
+	if (N === 0) return []
+	return Array.from({ length: N }, (_, i) => (urbanPop * (i + 1) ** -q) / H)
+}
 
 // Piecewise linear interpolation across fixed domain/range points.
 function lerpScale(domain: number[], range: number[], v: number): number {
@@ -50,17 +117,6 @@ function devToGrowthRate(dev: number): number {
 	)
 }
 
-function devToUrbanRate(
-	dev: number,
-	tuning: ReturnType<typeof getSettlementEraTuning>,
-): number {
-	return lerpScale(
-		[0.0, 0.15, 0.35, 0.55, 0.75, 0.95],
-		[...tuning.urbanRateRange],
-		dev,
-	)
-}
-
 function hierarchyDepth(state: HistoryState, province: number): number {
 	let depth = 0
 	let current = province
@@ -72,21 +128,20 @@ function hierarchyDepth(state: HistoryState, province: number): number {
 }
 
 function urbanization(state: HistoryState, init: boolean): void {
-	const tuning = getSettlementEraTuning(state.era)
-	const { cityMin, townMin } = tuning
-
 	// Process each sovereign nation
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p] || !isSovereign(state, p)) continue
 
 		const provinces = getNationProvinces(state, p)
-		let totalBase = 0
+		let totalPop = 0
 		for (const prov of provinces) {
-			totalBase += PROV.population.rural.get(state, prov)
+			totalPop +=
+				PROV.population.rural.get(state, prov) +
+				PROV.population.urban.get(state, prov)
 		}
 
-		const urbanRate = devToUrbanRate(PROV.development.get(state, p), tuning)
-		const totalUrban = (urbanRate * totalBase) / (1 - urbanRate)
+		const { U, q } = nationProfile(state.governmentType[p])
+		const urbanPop = totalPop * U
 
 		// Sort provinces by hierarchy depth ascending (sovereign = 0 gets the capital city),
 		// breaking ties by habitability so deeper-ranked provinces still differ meaningfully.
@@ -97,88 +152,13 @@ function urbanization(state: HistoryState, init: boolean): void {
 			return state.habitability[b] - state.habitability[a]
 		})
 
-		const largestCity = totalUrban * 0.2
-		const urbanPops: number[] = []
-		let prevCity = largestCity
-		let usedUrban = 0
-		let i = 0
-
-		// Assign cities using MDME decay
-		while (i < sorted.length && usedUrban < totalUrban) {
-			let cityPop: number
-			if (i === 0) {
-				cityPop = largestCity
-			} else if (i === 1) {
-				cityPop = prevCity * SECOND_CITY_RATIO
-			} else {
-				cityPop = prevCity * CITY_DECAY
-			}
-			if (cityPop < cityMin) break
-			urbanPops.push(cityPop)
-			usedUrban += cityPop
-			prevCity = cityPop
-			i++
-		}
-
-		// Distribute remaining as towns
-		const numCities = urbanPops.length
-		if (numCities === 0) {
-			let townPop = largestCity
-			let townsCreated = 0
-			while (
-				i < sorted.length &&
-				usedUrban < totalUrban &&
-				townPop >= townMin
-			) {
-				const cappedTown = Math.min(
-					townPop,
-					cityMin - 1,
-					totalUrban - usedUrban,
-				)
-				if (cappedTown >= townMin) {
-					urbanPops.push(cappedTown)
-					usedUrban += cappedTown
-					townsCreated++
-					townPop =
-						townsCreated === 1
-							? townPop * SECOND_CITY_RATIO
-							: townPop * CITY_DECAY
-				} else {
-					break
-				}
-				i++
-			}
-		} else {
-			const maxTownCount = numCities * 6
-			const townStart = Math.min(cityMin - 1, prevCity * 0.8)
-			const decay =
-				maxTownCount > 1
-					? Math.pow(townMin / townStart, 1 / (maxTownCount - 1))
-					: 1
-			let townsCreated = 0
-			let townTarget = townStart
-			while (
-				i < sorted.length &&
-				usedUrban < totalUrban &&
-				townsCreated < maxTownCount
-			) {
-				const remainingUrban = totalUrban - usedUrban
-				const actualPop = Math.min(townTarget, remainingUrban, cityMin - 1)
-				if (actualPop >= townMin) {
-					urbanPops.push(actualPop)
-					usedUrban += actualPop
-					townsCreated++
-					townTarget *= decay
-				} else {
-					break
-				}
-				i++
-			}
-		}
+		// Rank-size hierarchy: N settlements whose sizes sum to exactly urbanPop.
+		let sizes = rankSizeCities(urbanPop, q)
+		if (sizes.length > sorted.length) sizes = sizes.slice(0, sorted.length)
 
 		for (let idx = 0; idx < sorted.length; idx++) {
 			const prov = sorted[idx]
-			state.leaderRuntime.targetUrban[prov] = urbanPops[idx] ?? 0
+			state.leaderRuntime.targetUrban[prov] = sizes[idx] ?? 0
 			if (init) {
 				PROV.population.urban.set(
 					state,

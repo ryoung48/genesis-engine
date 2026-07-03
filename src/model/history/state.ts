@@ -157,6 +157,8 @@ export interface HistoryState {
 	habitability: Float32Array
 	culture: Int32Array
 	cultureCount: number
+	/** Per-province government type index into GOVERNMENT_TYPES (eras.ts) */
+	governmentType: Uint8Array
 
 	wars: War[]
 	events: HistoryNote[]
@@ -922,6 +924,7 @@ export function createHistoryState(
 		habitability: population.habitability.slice(),
 		culture: cultures.assignment.slice(),
 		cultureCount: cultures.count,
+		governmentType: nations.governmentType?.slice() ?? new Uint8Array(P),
 		wars: [],
 		events: [],
 		nextDynasty: 0,

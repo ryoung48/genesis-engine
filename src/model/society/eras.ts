@@ -16,7 +16,7 @@ export type SocietyEra =
  * Indices 17–18 are republic extensions (socialist, junta).
  * Indices 19–20 are colonial types assigned by the post-pass (earlyModern+).
  */
-type GovernmentType =
+export type GovernmentType =
 	// tribal (0–3)
 	| "chiefdom" // 0: small hereditary chief — default tribal
 	| "tribal_monarchy" // 1: medium organised tribal kingdom
