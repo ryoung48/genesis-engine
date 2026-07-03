@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from "react"
 import type { HistoryNote } from "@/model/history"
 import { DrawerShell } from "@/ui/components/composites/DrawerShell"
 import { IconButton } from "@/ui/components/primitives/IconButton"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import {
+	DEFAULT_NATION_SECTIONS,
+	DEFAULT_WORLD_SECTIONS,
 	type NationSection,
 	resolveDrawerStateOnOpen,
+	toggleSection,
 	type WorldSection,
 } from "./drawer-state"
 import { NationDetails } from "./nation/NationDetails"
@@ -37,6 +39,8 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	open,
 	onToggle,
 	nation,
+	planetName,
+	planetType,
 	planetStats,
 	worldPopulation,
 	activeWarCount,
@@ -67,9 +71,12 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	getDynastyName,
 }) => {
 	const [tab, setTab] = useState<"world" | "nation">("world")
-	const [worldSection, setWorldSection] = useState<WorldSection>("planetary")
-	const [nationSection, setNationSection] = useState<NationSection>("political")
+	const [openWorldSections, setOpenWorldSections] =
+		useState<ReadonlySet<WorldSection>>(DEFAULT_WORLD_SECTIONS)
+	const [openNationSections, setOpenNationSections] =
+		useState<ReadonlySet<NationSection>>(DEFAULT_NATION_SECTIONS)
 	const previousNationIdRef = useRef<number | null>(null)
+
 	const detailsIcon = (
 		<svg
 			width="12"
@@ -90,19 +97,13 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	useEffect(() => {
 		if (!open) return
 		const nextState = resolveDrawerStateOnOpen({
-			current: { tab, worldSection, nationSection },
+			current: { tab, openWorldSections, openNationSections },
 			selectedNationId: nation?.id ?? null,
 			previousNationId: previousNationIdRef.current,
 		})
 		if (nextState.tab !== tab) setTab(nextState.tab)
-		if (nextState.worldSection !== worldSection) {
-			setWorldSection(nextState.worldSection)
-		}
-		if (nextState.nationSection !== nationSection) {
-			setNationSection(nextState.nationSection)
-		}
 		previousNationIdRef.current = nation?.id ?? null
-	}, [open, nation?.id, tab, worldSection, nationSection])
+	}, [open, nation?.id, tab, openWorldSections, openNationSections])
 
 	return (
 		<>
@@ -122,35 +123,17 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 				) : null}
 			</div>
 			{open ? (
-				<DrawerShell
-					title="DETAILS"
-					onClose={onToggle}
-					closeTitle="Hide details"
-					icon={detailsIcon}
-				>
-					<div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
-						<div className="flex items-center justify-between">
-							<SegmentedControl
-								options={[
-									{ value: "world", label: "World" },
-									{ value: "nation", label: "Nation" },
-								]}
-								value={tab}
-								onChange={setTab}
-								tone="panel"
-								size="sm"
-							/>
-							{tab === "nation" && nation && (
-								<span className="font-mono text-[10px] text-slate-400">
-									#{nation.id}
-								</span>
-							)}
-						</div>
-
+				<DrawerShell>
+					<div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1">
 						{tab === "world" ? (
 							<WorldDetails
-								section={worldSection}
-								onSectionChange={setWorldSection}
+								openSections={openWorldSections}
+								onSectionToggle={(s) =>
+									setOpenWorldSections((prev) => toggleSection(prev, s))
+								}
+								onClose={onToggle}
+								planetName={planetName}
+								planetType={planetType}
 								planetStats={planetStats}
 								worldPopulation={worldPopulation}
 								activeWarCount={activeWarCount}
@@ -170,8 +153,11 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 						) : (
 							<NationDetails
 								nation={nation}
-								section={nationSection}
-								onSectionChange={setNationSection}
+								openSections={openNationSections}
+								onSectionToggle={(s) =>
+									setOpenNationSections((prev) => toggleSection(prev, s))
+								}
+								onClose={onToggle}
 								nationHistory={nationHistory}
 								windowedEvents={windowedEvents}
 								allPastEvents={allPastEvents}

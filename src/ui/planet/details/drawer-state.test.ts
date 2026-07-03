@@ -1,48 +1,46 @@
 import { describe, expect, it } from "vitest"
-import { resolveDrawerStateOnOpen } from "./drawer-state"
+import {
+	DEFAULT_NATION_SECTIONS,
+	DEFAULT_WORLD_SECTIONS,
+	resolveDrawerStateOnOpen,
+} from "./drawer-state"
 
 describe("resolveDrawerStateOnOpen", () => {
 	it("switches to the nation tab when a new nation is selected", () => {
 		const result = resolveDrawerStateOnOpen({
 			current: {
 				tab: "world",
-				worldSection: "environmental",
-				nationSection: "history",
+				openWorldSections: new Set(["environmental"]),
+				openNationSections: new Set(["history"]),
 			},
 			selectedNationId: 12,
 			previousNationId: null,
 		})
 
-		expect(result).toEqual({
-			tab: "nation",
-			worldSection: "environmental",
-			nationSection: "history",
-		})
+		expect(result.tab).toBe("nation")
+		expect(result.openWorldSections).toEqual(new Set(["environmental"]))
+		expect(result.openNationSections).toEqual(new Set(["history"]))
 	})
 
 	it("falls back to the world tab when no nation remains selected", () => {
 		const result = resolveDrawerStateOnOpen({
 			current: {
 				tab: "nation",
-				worldSection: "social",
-				nationSection: "political",
+				openWorldSections: new Set(["social"]),
+				openNationSections: new Set(["political"]),
 			},
 			selectedNationId: null,
 			previousNationId: 12,
 		})
 
-		expect(result).toEqual({
-			tab: "world",
-			worldSection: "social",
-			nationSection: "political",
-		})
+		expect(result.tab).toBe("world")
 	})
 
 	it("preserves the current drawer state when the selection context is unchanged", () => {
 		const current = {
 			tab: "world" as const,
-			worldSection: "planetary" as const,
-			nationSection: "demographics" as const,
+			openWorldSections: DEFAULT_WORLD_SECTIONS,
+			openNationSections: DEFAULT_NATION_SECTIONS,
 		}
 
 		expect(

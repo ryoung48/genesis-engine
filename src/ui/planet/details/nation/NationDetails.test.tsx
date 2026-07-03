@@ -44,8 +44,8 @@ describe("NationDetails", () => {
 					activeWars: [],
 					...emptyDistributions,
 				}}
-				section="political"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["political"])}
+				onSectionToggle={vi.fn()}
 				onNationClick={vi.fn()}
 			/>,
 		)
@@ -91,8 +91,8 @@ describe("NationDetails", () => {
 					],
 					...emptyDistributions,
 				}}
-				section="political"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["political"])}
+				onSectionToggle={vi.fn()}
 				onNationClick={vi.fn()}
 			/>,
 		)
@@ -128,8 +128,8 @@ describe("NationDetails", () => {
 					activeWars: [],
 					...emptyDistributions,
 				}}
-				section="political"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["political"])}
+				onSectionToggle={vi.fn()}
 				onNationClick={vi.fn()}
 			/>,
 		)
@@ -152,8 +152,8 @@ describe("NationDetails", () => {
 					activeWars: [],
 					...emptyDistributions,
 				}}
-				section="history"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["history"])}
+				onSectionToggle={vi.fn()}
 				nationHistory={[
 					{ timeMs: 0, size: 2, wealth: 4, optimalWealth: 5 },
 					{ timeMs: YEAR_MS, size: 3, wealth: 6, optimalWealth: 7 },
@@ -185,8 +185,8 @@ describe("NationDetails", () => {
 					activeWars: [],
 					...emptyDistributions,
 				}}
-				section="history"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["history"])}
+				onSectionToggle={vi.fn()}
 				nationHistory={[
 					{ timeMs: 0, size: 2, wealth: 4, optimalWealth: 5 },
 					{ timeMs: YEAR_MS, size: 3, wealth: 6, optimalWealth: 7 },
@@ -233,8 +233,8 @@ describe("NationDetails", () => {
 					activeWars: [],
 					...emptyDistributions,
 				}}
-				section="history"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["history"])}
+				onSectionToggle={vi.fn()}
 				nationHistory={[{ timeMs: 0, size: 1, wealth: 1, optimalWealth: 2 }]}
 				selectedTimeMs={0}
 				currentTimeMs={0}
@@ -268,8 +268,8 @@ describe("NationDetails", () => {
 		const markup = renderToStaticMarkup(
 			<NationDetails
 				nation={null}
-				section="political"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["political"])}
+				onSectionToggle={vi.fn()}
 			/>,
 		)
 
@@ -297,8 +297,8 @@ describe("NationDetails", () => {
 					],
 					religionDistribution: [],
 				}}
-				section="demographics"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["demographics"])}
+				onSectionToggle={vi.fn()}
 				nationHistory={[{ timeMs: 0, size: 1, wealth: 1, optimalWealth: 1 }]}
 				selectedTimeMs={0}
 				currentTimeMs={0}
@@ -319,8 +319,8 @@ describe("NationDetails", () => {
 		const markup = renderToStaticMarkup(
 			<NationDetails
 				nation={null}
-				section="political"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["political"])}
+				onSectionToggle={vi.fn()}
 			/>,
 		)
 
@@ -433,8 +433,8 @@ describe("NationDetails", () => {
 		const markup = renderToStaticMarkup(
 			<NationDetails
 				nation={null}
-				section="political"
-				onSectionChange={vi.fn()}
+				openSections={new Set(["political"])}
+				onSectionToggle={vi.fn()}
 			/>,
 		)
 		expect(markup).toContain("N/A")

@@ -8,13 +8,13 @@ import {
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
 import { Pagination } from "@/ui/components/primitives/Pagination"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { uiTokens } from "@/ui/components/tokens"
 import type { NationSection } from "../drawer-state"
 import {
 	AccordionSection,
 	DetailRow,
 	formatPopulation,
 	type NationDetailsData,
+	WikiHeader,
 } from "../shared"
 import {
 	NationHistoryChart,
@@ -119,14 +119,6 @@ export function PoliticalNeighborsTable({
 
 	return (
 		<div className="space-y-2">
-			<div className="flex items-center justify-between gap-2">
-				<span className={`${uiTokens.type.label} text-slate-500`}>
-					Neighbors
-				</span>
-				<span className="font-mono text-[10px] text-slate-400">
-					{neighbors.length.toLocaleString()}
-				</span>
-			</div>
 			<DataTable
 				columns={columns}
 				rows={visibleNeighbors}
@@ -152,8 +144,9 @@ const NEIGHBORS_PAGE_SIZE = 6
 
 interface NationDetailsProps {
 	nation: NationDetailsData | null
-	section: NationSection
-	onSectionChange: (section: NationSection) => void
+	openSections: ReadonlySet<NationSection>
+	onSectionToggle: (section: NationSection) => void
+	onClose?: () => void
 	nationHistory?: NationHistoryPoint[]
 	windowedEvents?: HistoryNote[]
 	allPastEvents?: HistoryNote[]
@@ -171,8 +164,9 @@ interface NationDetailsProps {
 
 export const NationDetails: React.FC<NationDetailsProps> = ({
 	nation,
-	section,
-	onSectionChange,
+	openSections,
+	onSectionToggle,
+	onClose,
 	nationHistory,
 	windowedEvents,
 	allPastEvents,
@@ -218,67 +212,66 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 
 	return (
 		<div className="space-y-2">
-			<LabeledValueRow
-				label="Nation"
-				value={
-					nation ? (
-						<button
-							type="button"
-							onClick={() => onNationClick?.(nation.id)}
-							className="inline-flex items-center gap-1.5 text-right font-mono text-[11px] text-slate-950 hover:underline"
-						>
-							<Swatch color={nation.color} />
-							<span>{nation.name}</span>
-						</button>
-					) : (
-						"N/A"
-					)
-				}
-			/>
-			<LabeledValueRow
-				label="Dynasty"
-				value={
-					nation?.ruler?.dynasty ? (
-						<span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-950">
-							<Swatch color={nation.ruler.dynastyColor} />
-							<span>{nation.ruler.dynasty}</span>
-						</span>
-					) : (
-						"N/A"
-					)
-				}
-			/>
-			<LabeledValueRow
-				label="Ruler"
-				align="start"
-				value={
-					nation?.ruler ? (
-						<span className="inline-flex flex-col items-end gap-1 font-mono text-[11px] text-slate-950">
-							<span>
-								{[
-									nation.ruler.name,
-									nation.ruler.genderSymbol,
-									nation.ruler.age !== null ? `${nation.ruler.age}` : null,
-								]
-									.filter(Boolean)
-									.join(" · ")}
-							</span>
-						</span>
-					) : (
-						"N/A"
-					)
-				}
-				valueClassName="text-right"
-			/>
+			{nation ? (
+				<WikiHeader
+					title={nation.name}
+					subtitle="Nation"
+					color={nation.color}
+					onClose={onClose}
+				/>
+			) : (
+				<WikiHeader title="No nation selected" subtitle="Nation" onClose={onClose} />
+			)}
+
 			<AccordionSection
 				title="Political"
-				open={section === "political"}
-				onToggle={() => onSectionChange("political")}
+				open={openSections.has("political")}
+				onToggle={() => onSectionToggle("political")}
 			>
 				<div className="space-y-2">
+					<LabeledValueRow
+						label="Government"
+						value={
+							nation?.governmentType ? (
+								<span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-950">
+									<Swatch color={nation.governmentColor} />
+									<span>{nation.governmentType}</span>
+								</span>
+							) : (
+								"N/A"
+							)
+						}
+					/>
 					<DetailRow
 						label="Provinces"
 						value={nation ? nation.provinceCount.toLocaleString() : "N/A"}
+					/>
+					<DetailRow
+						label="Ruler"
+						value={
+							nation?.ruler
+								? [
+										nation.ruler.name,
+										nation.ruler.genderSymbol,
+										nation.ruler.age !== null ? `${nation.ruler.age}` : null,
+									]
+										.filter(Boolean)
+										.join(" · ")
+								: "N/A"
+						}
+					/>
+					<LabeledValueRow
+						label="Dynasty"
+						value={
+							nation?.ruler?.dynasty ? (
+								<span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-slate-950">
+									<Swatch color={nation.ruler.dynastyColor} />
+									<span>{nation.ruler.dynasty}</span>
+								</span>
+							) : (
+								"N/A"
+							)
+						}
 					/>
 					{nation ? (
 						<PoliticalNeighborsTable
@@ -313,8 +306,8 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 
 			<AccordionSection
 				title="Demographics"
-				open={section === "demographics"}
-				onToggle={() => onSectionChange("demographics")}
+				open={openSections.has("demographics")}
+				onToggle={() => onSectionToggle("demographics")}
 			>
 				<div className="space-y-2">
 					<DetailRow
@@ -358,8 +351,8 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 			onTimeSelect ? (
 				<AccordionSection
 					title="History"
-					open={section === "history"}
-					onToggle={() => onSectionChange("history")}
+					open={openSections.has("history")}
+					onToggle={() => onSectionToggle("history")}
 				>
 					<NationHistoryChart
 						history={nationHistory}

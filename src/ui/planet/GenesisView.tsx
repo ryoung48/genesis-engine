@@ -39,6 +39,7 @@ import {
 	tradeGoodColor,
 	tradeGoodDisplayName,
 } from "@/model/economy/trade-goods"
+import { generatePlanetName } from "@/model/celestial/planet-name"
 import { encodePlanetCode, SEED_MAX } from "@/model/shared/planet-code"
 import { titleCase } from "@/model/shared/text"
 import {
@@ -2769,6 +2770,9 @@ export const GenesisView: React.FC = () => {
 		unitSystem,
 	})
 
+	// --- Planet identity ---
+	const planetName = useMemo(() => generatePlanetName(seed), [seed])
+
 	// --- Planet stats ---
 	const planetStats = useMemo(
 		() =>
@@ -3444,6 +3448,8 @@ export const GenesisView: React.FC = () => {
 				open={detailsDrawerOpen}
 				onToggle={() => setDetailsDrawerOpen((value) => !value)}
 				nation={selectedNation}
+				planetName={planetName}
+				planetType={planetType}
 				planetStats={planetStats}
 				worldPopulation={
 					selectedHistoryView?.totalPopulation ??

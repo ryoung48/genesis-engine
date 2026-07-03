@@ -11,6 +11,8 @@ function _renderDrawer(
 			open
 			onToggle={vi.fn()}
 			nation={null}
+			planetName="Velaryn"
+			planetType="terrestrial"
 			planetStats={[]}
 			worldPopulation={null}
 			activeWarCount={null}
@@ -44,7 +46,6 @@ describe("DetailsDrawer", () => {
 	it("renders the drawer shell when open", () => {
 		const markup = _renderDrawer()
 
-		expect(markup).toContain("DETAILS")
 		expect(markup).toContain('title="Hide details"')
 	})
 })

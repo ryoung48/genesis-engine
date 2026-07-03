@@ -1,6 +1,11 @@
 import { REL, YEAR_MS } from "@/model/history/state"
 import { maxFanoutForNationSize } from "@/model/society/hierarchy"
 import {
+	GOVERNMENT_TYPE_LABELS,
+	GOVERNMENT_TYPES,
+} from "@/model/society/eras"
+import { GOVERNMENT_COLORS_CSS } from "../../hover/info-panel-model"
+import {
 	RELIGION_TYPE_COLORS,
 	RELIGION_TYPE_NAMES,
 } from "@/model/society/religion"
@@ -342,12 +347,19 @@ export function buildSelectedNationDetails(params: {
 				}
 			: null
 
+	const govIdx = world.nations.governmentType?.[selectedNationId] ?? -1
+	const govKey = govIdx >= 0 ? (GOVERNMENT_TYPES[govIdx] ?? null) : null
+	const governmentType = govKey ? (GOVERNMENT_TYPE_LABELS[govKey] ?? null) : null
+	const governmentColor = govIdx >= 0 ? (GOVERNMENT_COLORS_CSS[govIdx] ?? null) : null
+
 	return {
 		id: selectedNationId,
 		name: getNationName(selectedNationId),
 		ruler,
 		provinceCount,
 		totalPopulation,
+		governmentType,
+		governmentColor,
 		color: getNationColor(selectedNationId),
 		neighbors,
 		activeWars: nationWars,

@@ -423,7 +423,7 @@ export function buildDemographicDisplayData(params: {
 	return null
 }
 
-const GOVERNMENT_COLORS_CSS: Record<number, string> = {
+export const GOVERNMENT_COLORS_CSS: Record<number, string> = {
 	// tribal — orange / brown
 	0: "rgb(204, 143, 71)", // chiefdom
 	1: "rgb(140, 89, 36)", // tribal monarchy

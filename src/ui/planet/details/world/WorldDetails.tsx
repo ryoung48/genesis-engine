@@ -8,7 +8,12 @@ import { Pagination } from "@/ui/components/primitives/Pagination"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import type { WorldSection } from "../drawer-state"
 import type { DetailsDrawerBaseProps } from "../shared"
-import { AccordionSection, DetailRow, formatPopulation } from "../shared"
+import {
+	AccordionSection,
+	DetailRow,
+	formatPopulation,
+	WikiHeader,
+} from "../shared"
 
 function hasValue(value: string): boolean {
 	const trimmed = value.trim()
@@ -98,16 +103,27 @@ function getWorldSections({
 	}
 }
 
+function getPlanetTypeLabel(
+	planetType: DetailsDrawerBaseProps["planetType"],
+): string {
+	if (planetType === "gas-giant-moon") return "Gas Giant Moon"
+	return "Terrestrial Planet"
+}
+
 const TRADE_GOODS_PAGE_SIZE = 5
 
 interface WorldDetailsProps extends DetailsDrawerBaseProps {
-	section: WorldSection
-	onSectionChange: (section: WorldSection) => void
+	openSections: ReadonlySet<WorldSection>
+	onSectionToggle: (section: WorldSection) => void
+	onClose?: () => void
 }
 
 export const WorldDetails: React.FC<WorldDetailsProps> = ({
-	section,
-	onSectionChange,
+	openSections,
+	onSectionToggle,
+	onClose,
+	planetName,
+	planetType,
 	planetStats,
 	worldPopulation,
 	activeWarCount,
@@ -174,89 +190,93 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 
 	return (
 		<div className="space-y-2">
-			<AccordionSection
-				title="Planetary"
-				open={section === "planetary"}
-				onToggle={() => onSectionChange("planetary")}
-			>
-				<div className="space-y-1.5">
-					{worldSections.planetary.map((stat) => (
-						<DetailRow key={stat.label} label={stat.label} value={stat.value} />
-					))}
-				</div>
-			</AccordionSection>
-			<AccordionSection
-				title="Environmental"
-				open={section === "environmental"}
-				onToggle={() => onSectionChange("environmental")}
-			>
-				<div className="space-y-2">
+			<WikiHeader title={planetName} subtitle={getPlanetTypeLabel(planetType)} onClose={onClose} />
+
+			<div className="space-y-1.5">
+				<AccordionSection
+					title="Planetary"
+					open={openSections.has("planetary")}
+					onToggle={() => onSectionToggle("planetary")}
+				>
 					<div className="space-y-1.5">
-						{worldSections.environmental.map((stat) => (
-							<DetailRow
-								key={stat.label}
-								label={stat.label}
-								value={stat.value}
-							/>
+						{worldSections.planetary.map((stat) => (
+							<DetailRow key={stat.label} label={stat.label} value={stat.value} />
 						))}
 					</div>
-					<DistributionChart title="Climate" buckets={climateDistribution} />
-					<DistributionChart
-						title="Vegetation"
-						buckets={vegetationDistribution}
-					/>
-					<DistributionChart
-						title="Topography"
-						buckets={topographyDistribution}
-					/>
-				</div>
-			</AccordionSection>
-			<AccordionSection
-				title="Social"
-				open={section === "social"}
-				onToggle={() => onSectionChange("social")}
-			>
-				<div className="space-y-2">
-					<div className="space-y-1.5">
-						{worldSections.social.map((stat) => (
-							<DetailRow
-								key={stat.label}
-								label={stat.label}
-								value={stat.value}
-							/>
-						))}
+				</AccordionSection>
+				<AccordionSection
+					title="Environmental"
+					open={openSections.has("environmental")}
+					onToggle={() => onSectionToggle("environmental")}
+				>
+					<div className="space-y-2">
+						<div className="space-y-1.5">
+							{worldSections.environmental.map((stat) => (
+								<DetailRow
+									key={stat.label}
+									label={stat.label}
+									value={stat.value}
+								/>
+							))}
+						</div>
+						<DistributionChart title="Climate" buckets={climateDistribution} />
+						<DistributionChart
+							title="Vegetation"
+							buckets={vegetationDistribution}
+						/>
+						<DistributionChart
+							title="Topography"
+							buckets={topographyDistribution}
+						/>
 					</div>
-					<DistributionChart
-						title="Nation Size"
-						buckets={nationSizeDistribution}
+				</AccordionSection>
+				<AccordionSection
+					title="Social"
+					open={openSections.has("social")}
+					onToggle={() => onSectionToggle("social")}
+				>
+					<div className="space-y-2">
+						<div className="space-y-1.5">
+							{worldSections.social.map((stat) => (
+								<DetailRow
+									key={stat.label}
+									label={stat.label}
+									value={stat.value}
+								/>
+							))}
+						</div>
+						<DistributionChart
+							title="Nation Size"
+							buckets={nationSizeDistribution}
+						/>
+						<DistributionChart
+							title="Government"
+							buckets={governmentDistribution}
+						/>
+						<DistributionChart title="Religion" buckets={religionDistribution} />
+						<DistributionChart title="Conflicts" buckets={conflictDistribution} />
+						<DistributionChart title="Relations" buckets={relationDistribution} />
+					</div>
+				</AccordionSection>
+				<AccordionSection
+					title="Trade Goods"
+					open={openSections.has("trade-goods")}
+					onToggle={() => onSectionToggle("trade-goods")}
+				>
+					<DataTable
+						columns={tradeGoodsColumns}
+						rows={pagedTradeGoods}
+						rowKey={(row) => row.label}
+						empty="No trade goods assigned"
 					/>
-					<DistributionChart
-						title="Government"
-						buckets={governmentDistribution}
+					<Pagination
+						pageIndex={tradeGoodsPage}
+						pageSize={TRADE_GOODS_PAGE_SIZE}
+						totalItems={tradeGoodsDistribution.length}
+						onPageChange={setTradeGoodsPage}
 					/>
-					<DistributionChart title="Religion" buckets={religionDistribution} />
-					<DistributionChart title="Conflicts" buckets={conflictDistribution} />
-					<DistributionChart title="Relations" buckets={relationDistribution} />
-				</div>
-			</AccordionSection>
-			<AccordionSection
-				title="Trade Goods"
-				open={section === "trade-goods"}
-				onToggle={() => onSectionChange("trade-goods")}
-			>
-				<DataTable
-					columns={tradeGoodsColumns}
-					rows={pagedTradeGoods}
-					rowKey={(row) => row.label}
-					empty="No trade goods assigned"
-				/>
-				<Pagination
-					pageIndex={tradeGoodsPage}
-					pageSize={TRADE_GOODS_PAGE_SIZE}
-					totalItems={tradeGoodsDistribution.length}
-					onPageChange={setTradeGoodsPage}
-				/>
-			</AccordionSection>
+				</AccordionSection>
+			</div>
 		</div>
 	)
 }

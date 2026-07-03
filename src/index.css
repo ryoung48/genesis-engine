@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+@font-face {
+	font-family: "Jedar";
+	src: url("./ui/assets/fonts/Jedar.otf") format("opentype");
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@theme {
+	--font-jedar: "Jedar", serif;
+}
+
 :root {
 	font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 	line-height: 1.5;

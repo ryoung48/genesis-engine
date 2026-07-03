@@ -8,8 +8,10 @@ function renderWorldDetails(
 ) {
 	return renderToStaticMarkup(
 		<WorldDetails
-			section="planetary"
-			onSectionChange={vi.fn()}
+			openSections={new Set(["planetary"])}
+			onSectionToggle={vi.fn()}
+			planetName="Velaryn"
+			planetType="terrestrial"
 			planetStats={[
 				{ label: "Radius", value: "6,371 km" },
 				{ label: "Sun", value: "G2V" },
@@ -50,8 +52,12 @@ function renderWorldDetails(
 
 describe("WorldDetails", () => {
 	it("renders filtered planetary and environmental details", () => {
-		const planetaryMarkup = renderWorldDetails({ section: "planetary" })
-		const environmentalMarkup = renderWorldDetails({ section: "environmental" })
+		const planetaryMarkup = renderWorldDetails({
+			openSections: new Set(["planetary"]),
+		})
+		const environmentalMarkup = renderWorldDetails({
+			openSections: new Set(["environmental"]),
+		})
 
 		expect(planetaryMarkup).toContain("Radius")
 		expect(planetaryMarkup).toContain("G2V")
@@ -66,7 +72,7 @@ describe("WorldDetails", () => {
 
 	it("renders location count and avg location area in planetary section", () => {
 		const markup = renderWorldDetails({
-			section: "planetary",
+			openSections: new Set(["planetary"]),
 			planetStats: [
 				{ label: "Radius", value: "6,371 km" },
 				{ label: "Locations", value: "90" },
@@ -81,23 +87,21 @@ describe("WorldDetails", () => {
 	})
 
 	it("renders all section titles and opens the correct section", () => {
-		const sections: Array<[string, string]> = [
+		const sections: Array<[string, WorldSection]> = [
 			["Planetary", "planetary"],
 			["Environmental", "environmental"],
 			["Social", "social"],
 			["Trade Goods", "trade-goods"],
 		]
 		for (const [title, key] of sections) {
-			const markup = renderWorldDetails({
-				section: key as Parameters<typeof renderWorldDetails>[0]["section"],
-			})
+			const markup = renderWorldDetails({ openSections: new Set([key]) })
 			expect(markup).toContain(title)
 		}
 	})
 
 	it("renders social section with fallback values for null stats", () => {
 		const markup = renderWorldDetails({
-			section: "social",
+			openSections: new Set(["social"]),
 			worldPopulation: null,
 			activeWarCount: null,
 			cultureCount: null,
@@ -120,7 +124,7 @@ describe("WorldDetails", () => {
 
 	it("renders trade goods distribution in trade-goods section", () => {
 		const markup = renderWorldDetails({
-			section: "trade-goods",
+			openSections: new Set(["trade-goods"]),
 			tradeGoodsDistribution: [
 				{ label: "Lumber", count: 200, color: "#4a7c59" },
 				{ label: "Fish", count: 100, color: "#4488aa" },
@@ -135,3 +139,5 @@ describe("WorldDetails", () => {
 		expect(markup).toContain("33.3%")
 	})
 })
+
+type WorldSection = "planetary" | "environmental" | "social" | "trade-goods"
