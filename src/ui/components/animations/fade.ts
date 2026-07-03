@@ -10,13 +10,3 @@ export function fadeVisibilityClassName(
 		className,
 	)
 }
-
-export function fadeBackdropClassName(
-	visible: boolean,
-	className?: string,
-): string {
-	return fadeVisibilityClassName(
-		visible,
-		cx("bg-slate-950/20", visible ? "pointer-events-auto" : "", className),
-	)
-}

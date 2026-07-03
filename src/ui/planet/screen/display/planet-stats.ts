@@ -35,6 +35,7 @@ export function computePlanetStats(
 		pressure: number
 		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 		moonCount?: number
+		moonSeed?: number
 		seaLevel?: number
 		maxElevation?: number
 		avgWindSpeedMs?: number | null

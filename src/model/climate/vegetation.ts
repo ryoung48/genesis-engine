@@ -113,7 +113,7 @@ const WET = 2200
  * Within [threshold − HALF_WIDTH, threshold + HALF_WIDTH] the transition is
  * linear-probabilistic; outside that window the result is deterministic.
  */
-export const RAINFALL_BLEND_HALF_WIDTH = 50
+const RAINFALL_BLEND_HALF_WIDTH = 50
 
 /**
  * Returns true if `rain` is considered to exceed `threshold`, with a linear

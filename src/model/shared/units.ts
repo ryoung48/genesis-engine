@@ -3,17 +3,10 @@ import type { SphereMesh } from ".."
 export const DEFAULT_PLANET_RADIUS_KM = 6371
 export const DEFAULT_OBLIQUITY_DEG = 23.5
 export const DEFAULT_ECCENTRICITY = 0.0167
-const _DEFAULT_SPECTRAL_CLASS = "G" as const
-const _DEFAULT_STAR_SUBTYPE = 2.0
-const _DEFAULT_ORBITAL_DISTANCE_AU = 1.0
 export const DEFAULT_DAYS_PER_YEAR = 365
 export const DEFAULT_HOURS_PER_DAY = 24
 export const DEFAULT_ANTISTELLAR_LON = 180
 export const DEFAULT_PERIHELION = 102
-
-export function getEarthYearFactor(daysPerYear: number): number {
-	return daysPerYear / DEFAULT_DAYS_PER_YEAR
-}
 
 type MeshWithOptionalNeighborDist = Pick<SphereMesh, "numRegions"> & {
 	neighborDist?: Float32Array
@@ -27,22 +20,10 @@ export function isRetrogradeObliquity(obliquity: number): boolean {
 	return obliquity > 90
 }
 
-/** Unit vector pointing at the substellar point (antistellar + 180°, lat=0). */
-export function getSubstellarDir(
-	antistellarLon: number,
-): [number, number, number] {
-	const subRad = ((antistellarLon + 180) % 360) * (Math.PI / 180)
-	return [Math.cos(subRad), Math.sin(subRad), 0]
-}
-
 /**
  * Max mountain height scales ~1/g, and g ∝ R for rocky bodies of similar density.
  * Earth (6371 km) → 6 km practical tectonic max.
  */
-export function getMaxElevationKm(_planetRadiusKm: number): number {
-	return 6
-}
-
 export function getMaxOceanDepthKm(_planetRadiusKm: number): number {
 	return 10
 }

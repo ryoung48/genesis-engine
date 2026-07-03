@@ -321,7 +321,7 @@ function projectSolarTerminatorPointsToMap(
 	return segments
 }
 
-export function reapplyMeshOverlayState(params: {
+function reapplyMeshOverlayState(params: {
 	world: SerializedGenesisWorld
 	colorMode: ColorMode
 	regionColors: Float32Array | null
@@ -390,13 +390,6 @@ interface MapExportOptions {
 	onProgress?: (percent: number, label: string) => void
 }
 
-interface MapExportTile {
-	x: number
-	y: number
-	width: number
-	height: number
-}
-
 interface ExportRenderTargetLike {
 	width?: number
 	height?: number
@@ -408,6 +401,16 @@ interface ExportRenderTargetLike {
 				colorSpace?: string
 		  }>
 	dispose: () => void
+}
+
+interface MapExportVisibilityTarget {
+	object: THREE.Object3D | null
+	visible: boolean
+}
+
+interface MapExportDependencies {
+	createRenderTarget?: (width: number, height: number) => ExportRenderTargetLike
+	yieldToMainThread?: () => Promise<void>
 }
 
 interface ExportRendererLike {
@@ -427,37 +430,7 @@ interface ExportRendererLike {
 	) => void
 }
 
-interface MapExportVisibilityTarget {
-	object: THREE.Object3D | null
-	visible: boolean
-}
-
-interface MapExportDependencies {
-	createRenderTarget?: (width: number, height: number) => ExportRenderTargetLike
-	yieldToMainThread?: () => Promise<void>
-}
-
-export function buildMapExportTiles(
-	width: number,
-	height: number,
-	maxTileSize: number,
-): MapExportTile[] {
-	const tileSize = Math.max(1, Math.min(maxTileSize, width, height))
-	const tiles: MapExportTile[] = []
-	for (let y = 0; y < height; y += tileSize) {
-		for (let x = 0; x < width; x += tileSize) {
-			tiles.push({
-				x,
-				y,
-				width: Math.min(tileSize, width - x),
-				height: Math.min(tileSize, height - y),
-			})
-		}
-	}
-	return tiles
-}
-
-export function normalizeMapCenterLongitudeDeg(longitudeDeg: number): number {
+function normalizeMapCenterLongitudeDeg(longitudeDeg: number): number {
 	return ((((longitudeDeg + 180) % 360) + 360) % 360) - 180
 }
 
@@ -472,7 +445,7 @@ function linearChannelToSrgb8(channel: number): number {
 
 const MAP_EXPORT_BAND_HEIGHT = 512
 
-export function renderMapExportPng(params: {
+function renderMapExportPng(params: {
 	scene: THREE.Scene
 	renderer: ExportRendererLike
 	camera: THREE.OrthographicCamera
@@ -594,7 +567,7 @@ export function renderMapExportPng(params: {
 	})
 }
 
-export function applyMapExportVisibility(
+function applyMapExportVisibility(
 	targets: ReadonlyArray<MapExportVisibilityTarget>,
 ): () => void {
 	const snapshot = new Map<THREE.Object3D, boolean>()
@@ -3100,8 +3073,8 @@ export function createGenesisScene(
 	}
 
 	function setSunDirection(
-		x: number,
-		y: number,
+		_x: number,
+		_y: number,
 		z: number,
 		hoursPerDay: number,
 	) {
@@ -3372,9 +3345,9 @@ export function createGenesisScene(
 			// Transform camera world position into globe-body space so the
 			// dot-product visibility test matches particle positions (body space).
 			globeGroup.updateWorldMatrix(true, false)
-			const bodyPos = p.clone().applyMatrix4(
-				globeGroup.matrixWorld.clone().invert(),
-			)
+			const bodyPos = p
+				.clone()
+				.applyMatrix4(globeGroup.matrixWorld.clone().invert())
 			return [bodyPos.x, bodyPos.y, bodyPos.z]
 		},
 		setThermalEquator,

@@ -30,7 +30,7 @@ interface LockedClimatePreviewConfig {
 
 const LONGITUDE_STEP = 10
 
-export function buildLockedClimatePreview(
+function buildLockedClimatePreview(
 	config: LockedClimatePreviewConfig,
 ): LockedClimatePreviewData {
 	const previewParams = {

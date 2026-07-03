@@ -115,7 +115,15 @@ export function WikiHeader({
 								title="Hide details"
 								className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600"
 							>
-								<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+								<svg
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									strokeWidth="2"
+									strokeLinecap="round"
+								>
 									<line x1="18" y1="6" x2="6" y2="18" />
 									<line x1="6" y1="6" x2="18" y2="18" />
 								</svg>
@@ -127,31 +135,6 @@ export function WikiHeader({
 					</span>
 				</div>
 			</div>
-		</div>
-	)
-}
-
-export function InfoboxGrid({ children }: { children: React.ReactNode }) {
-	return (
-		<div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-2">
-			{children}
-		</div>
-	)
-}
-
-export function InfoboxStat({
-	label,
-	value,
-}: {
-	label: string
-	value: React.ReactNode
-}) {
-	return (
-		<div className="flex flex-col gap-0 min-w-0">
-			<span className={`${uiTokens.type.label} text-slate-400`}>{label}</span>
-			<span className="font-mono text-[11px] text-slate-950 truncate leading-snug">
-				{value}
-			</span>
 		</div>
 	)
 }
@@ -193,7 +176,9 @@ export function AccordionSection({
 				</span>
 			</Button>
 			{open ? (
-				<div className="border-t border-slate-200 px-2.5 py-1.5">{children}</div>
+				<div className="border-t border-slate-200 px-2.5 py-1.5">
+					{children}
+				</div>
 			) : null}
 		</Surface>
 	)

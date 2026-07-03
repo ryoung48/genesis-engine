@@ -6,6 +6,7 @@ import {
 	generateMoons,
 	M_SOL_KG,
 } from "@/model/celestial/moons/orbital-mechanics"
+import { generatePlanetName } from "@/model/celestial/planet-name"
 import type { MainSequenceClass } from "@/model/celestial/star/star-types"
 import {
 	DEFAULT_SPECTRAL_CLASS,
@@ -39,7 +40,6 @@ import {
 	tradeGoodColor,
 	tradeGoodDisplayName,
 } from "@/model/economy/trade-goods"
-import { generatePlanetName } from "@/model/celestial/planet-name"
 import { encodePlanetCode, SEED_MAX } from "@/model/shared/planet-code"
 import { titleCase } from "@/model/shared/text"
 import {
@@ -64,8 +64,6 @@ import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { scaleClockDialHourToDayLength } from "./clock"
-
-const EARTH_DAYS_PER_YEAR = 365
 
 import type { ColorMode } from "./colors"
 import {
@@ -275,7 +273,7 @@ function sanitizeExportIdentity(
 	return sanitized.length > 0 ? sanitized : null
 }
 
-export function buildMapExportFilename(
+function buildMapExportFilename(
 	planetCode: string | null | undefined,
 	width: number,
 	date: Date = new Date(),
@@ -285,7 +283,7 @@ export function buildMapExportFilename(
 	return `genesis-map-${identity}-${width}w.png`
 }
 
-export function syncLabelModeToMapMode(params: {
+function syncLabelModeToMapMode(params: {
 	labelMode: LabelMode
 	colorMode: ColorMode
 	nationMode: NationMapMode

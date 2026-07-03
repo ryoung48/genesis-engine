@@ -19,9 +19,6 @@ export interface MoonParams {
 	sizeClass?: number
 }
 
-/** Reserved for the star — used as target of a solar tide lock. */
-const _STAR_ID = 0
-
 export type TideLock = { type: "solar" | "lunar"; target: number }
 
 export const MAX_MOONS = 3

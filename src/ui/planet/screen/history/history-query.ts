@@ -75,12 +75,6 @@ const historyQueryProfiles = new WeakMap<
 	HistoryQueryGetViewProfile
 >()
 
-export function readHistoryQueryBenchmark(
-	query: HistoryQuery,
-): HistoryQueryGetViewProfile | null {
-	return historyQueryProfiles.get(query) ?? null
-}
-
 interface IntTimelineChanges {
 	times: Float64Array
 	provinces: Int32Array

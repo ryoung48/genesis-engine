@@ -39,21 +39,3 @@ export function buildGenerationPreviewConfig(params: GenerationPreviewParams) {
 		pressure: params.pressure,
 	}
 }
-
-export function getGenerationPreviewToggleLabel(showPreview: boolean) {
-	return showPreview ? "Globe" : "Preview"
-}
-
-export function getGenerationPreviewExitState() {
-	return {
-		showPreview: false,
-		viewMode: "globe" as const,
-	}
-}
-
-export function getGenerationPreviewCanvasClassName(
-	showPreview: boolean,
-	isMeasuring: boolean,
-) {
-	return `h-full w-full block ${isMeasuring ? "cursor-crosshair " : ""}${showPreview ? "invisible" : ""}`.trim()
-}

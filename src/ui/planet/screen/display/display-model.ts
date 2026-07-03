@@ -14,7 +14,7 @@ export interface DisplayNationModel {
 	toDisplayId: (actualNationId: number) => number | null
 }
 
-export function buildSovereignRulerFields(params: {
+function buildSovereignRulerFields(params: {
 	world: SerializedGenesisWorld | null | undefined
 	fallbackLength?: number
 }): {

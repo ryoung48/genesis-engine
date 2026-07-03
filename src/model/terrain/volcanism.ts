@@ -35,7 +35,7 @@ export interface LipSite {
 	sigma: number
 }
 
-export type TerrainFeatureMarker = (
+type TerrainFeatureMarker = (
 	region: number,
 	feature: number,
 	delta: number,
@@ -66,14 +66,10 @@ export function getVolcanicActivityThreshold(
 	return Math.max(minThreshold, baseThreshold / Math.sqrt(frequency))
 }
 
-export function getVolcanicArcSpacing(volcanism: number): number {
+function getVolcanicArcSpacing(volcanism: number): number {
 	const frequency = getVolcanismFrequency(volcanism)
 	if (frequency <= 0) return Number.POSITIVE_INFINITY
 	return VOLC_MIN_SPACING / Math.sqrt(frequency)
-}
-
-export function getLipUpwellingThreshold(volcanism: number): number {
-	return getVolcanicActivityThreshold(0.2, volcanism, 0.05)
 }
 
 export function getLipSpawnChance(volcanism: number): number {

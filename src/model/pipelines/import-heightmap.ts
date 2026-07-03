@@ -41,7 +41,7 @@ import { applySeaLevelToElevation } from "../terrain/sea-level"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
-export interface ImportParams {
+interface ImportParams {
 	seed: number
 	numPoints: number
 	jitter: number
@@ -265,6 +265,7 @@ export function importGenesisWorld(
 	// Build GenesisParams from ImportParams
 	const genesisParams: GenesisParams = {
 		seed: params.seed,
+		tideLock: null,
 		numPoints: params.numPoints,
 		numPlates: plateIds.length,
 		landDistribution: 0.25,
@@ -288,7 +289,6 @@ export function importGenesisWorld(
 		orbitalDistanceAU: params.orbitalDistanceAU ?? DEFAULT_ORBITAL_DISTANCE_AU,
 		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
 		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
-		tidallyLocked: params.tidallyLocked ?? false,
 		antistellarLon: params.antistellarLon ?? DEFAULT_ANTISTELLAR_LON,
 		perihelion: params.perihelion ?? DEFAULT_PERIHELION,
 		pressure: params.pressure ?? 1.0,

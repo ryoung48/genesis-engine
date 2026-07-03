@@ -8,10 +8,8 @@ import {
 } from "@/model/climate/vegetation"
 import {
 	cssColorToRgb,
-	mixRgb,
 	quantizeRgb,
 	type RgbColor,
-	rgbToCss,
 	sampleBasisColorStops,
 	sampleColorStops,
 } from "@/model/shared/color-interpolation"
@@ -209,9 +207,7 @@ function interpolatePrecipitationStops(
 	return [last.r, last.g, last.b]
 }
 
-export function precipitationMonthlyColor(
-	mm: number,
-): [number, number, number] {
+function precipitationMonthlyColor(mm: number): [number, number, number] {
 	return interpolatePrecipitationStops(mm, monthlyPrecipStops)
 }
 
@@ -221,10 +217,6 @@ export function precipitationAnnualColor(mm: number): [number, number, number] {
 
 export function precipitationColor(mm: number): [number, number, number] {
 	return precipitationMonthlyColor(mm)
-}
-
-export function precipitationCssColor(mm: number): string {
-	return rgbToCss(precipitationColor(mm))
 }
 
 const eastMoistureTints: [number, number, number][] = [
@@ -404,7 +396,6 @@ export function dangerColor(score: number): [number, number, number] {
 	)
 }
 
-const DANGER_WHITE: [number, number, number] = [1, 1, 1]
 const DANGER_BASIS_STOPS: RgbColor[] = [
 	"#eff6ff",
 	"#facc15",
@@ -427,20 +418,6 @@ const SLOPE_BASIS_STOPS: RgbColor[] = [
 	"#f97316",
 	"#7f1d1d",
 ].map(cssColorToRgb)
-const DANGER_EARTHQUAKE_ORANGE = dangerColor(0.375)
-const DANGER_VOLCANO_RED = dangerColor(0.625)
-
-export function dangerMapColor(
-	earthquake: number,
-	volcano: number,
-): [number, number, number] {
-	const dominant =
-		volcano >= earthquake ? DANGER_VOLCANO_RED : DANGER_EARTHQUAKE_ORANGE
-	const score = Math.max(earthquake, volcano)
-	const t = Math.max(0, Math.min(1, (score - 0.25) / 0.75))
-	return mixRgb(DANGER_WHITE, dominant, t)
-}
-
 const TORNADO_LAND_STOPS: RgbColor[] = [
 	"#ffffff", // no risk — pure white
 	"#d9f99d", // lime-200

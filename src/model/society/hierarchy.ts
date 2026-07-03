@@ -6,13 +6,13 @@ type FanoutRanges = readonly FanoutLevel[]
 
 // Flat: all subjects become direct children of the duchy capital (mirrors CK3
 // where counties are direct vassals of the duke with no intermediate tier).
-export const DUCHY_FANOUT: FanoutRanges = []
+const DUCHY_FANOUT: FanoutRanges = []
 
 // One duchy-level split at depth 0; counties are flat-assigned at depth 1.
-export const KINGDOM_FANOUT: FanoutRanges = [[2, 6, 4]]
+const KINGDOM_FANOUT: FanoutRanges = [[2, 6, 4]]
 
 // Kingdom split at depth 0, duchy split at depth 1, then flat counties.
-export const EMPIRE_FANOUT: FanoutRanges = [
+const EMPIRE_FANOUT: FanoutRanges = [
 	[3, 8, 15],
 	[2, 6, 4],
 ]

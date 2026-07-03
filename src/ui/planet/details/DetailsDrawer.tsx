@@ -71,10 +71,12 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	getDynastyName,
 }) => {
 	const [tab, setTab] = useState<"world" | "nation">("world")
-	const [openWorldSections, setOpenWorldSections] =
-		useState<ReadonlySet<WorldSection>>(DEFAULT_WORLD_SECTIONS)
-	const [openNationSections, setOpenNationSections] =
-		useState<ReadonlySet<NationSection>>(DEFAULT_NATION_SECTIONS)
+	const [openWorldSections, setOpenWorldSections] = useState<
+		ReadonlySet<WorldSection>
+	>(DEFAULT_WORLD_SECTIONS)
+	const [openNationSections, setOpenNationSections] = useState<
+		ReadonlySet<NationSection>
+	>(DEFAULT_NATION_SECTIONS)
 	const previousNationIdRef = useRef<number | null>(null)
 
 	const detailsIcon = (
@@ -123,7 +125,7 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 				) : null}
 			</div>
 			{open ? (
-				<DrawerShell>
+				<DrawerShell title={planetName}>
 					<div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1">
 						{tab === "world" ? (
 							<WorldDetails

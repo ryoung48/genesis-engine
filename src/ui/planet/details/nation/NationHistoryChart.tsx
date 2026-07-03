@@ -357,7 +357,7 @@ export const NationHistoryChart: React.FC<NationHistoryChartProps> = ({
 	)
 }
 
-export function renderDescription(
+function renderDescription(
 	text: string,
 	options?: {
 		onNationClick?: (nationId: number) => void
@@ -492,7 +492,7 @@ export function renderDescription(
 	return parts
 }
 
-export function EventCards({
+function EventCards({
 	events,
 	year,
 	ctx,

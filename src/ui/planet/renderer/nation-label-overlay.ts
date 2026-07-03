@@ -913,6 +913,5 @@ export {
 	createNationLabelPools,
 	createSettlementLabelPools,
 	disposePool,
-	orientGlobeLabel,
 	updateGlobeLabelOrientations,
 }

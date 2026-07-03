@@ -193,9 +193,3 @@ export function computeSettlementAnchors(
 		settlementPortRegions,
 	}
 }
-
-export function computeSettlementRegions(
-	world: SettlementRegionWorld,
-): Int32Array {
-	return computeSettlementAnchors(world).settlementRegions
-}

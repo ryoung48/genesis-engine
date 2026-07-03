@@ -315,7 +315,6 @@ export function buildMoonOrbitOverlay(
 
 // ── Gas giant system 3D overlay ───────────────────────────────────────────────
 
-const _GG_COLOR_HEX = 0x92400e
 const GG_BAND_COLOR = 0xa16207
 const MAIN_MOON_COLOR = 0x60a5fa
 const SIBLING_COLORS_HEX = [

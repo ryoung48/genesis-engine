@@ -314,7 +314,6 @@ export function importHeightmap(
 			daysPerYear: importParams.daysPerYear as number,
 			hoursPerDay: importParams.hoursPerDay as number,
 			pressure: importParams.pressure as number,
-			tidallyLocked: importParams.tidallyLocked as boolean,
 			antistellarLon: importParams.antistellarLon as number,
 			terrainWarp: importParams.terrainWarp as number,
 			smoothing: importParams.smoothing as number,

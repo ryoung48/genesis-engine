@@ -30,7 +30,7 @@ import {
 	sortNationNeighbors,
 } from "./nation-neighbors-table"
 
-export function WarList({
+function WarList({
 	items,
 	onNationClick,
 }: {
@@ -61,7 +61,7 @@ export function WarList({
 	)
 }
 
-export function PoliticalNeighborsTable({
+function PoliticalNeighborsTable({
 	neighbors,
 	visibleNeighbors,
 	sort,
@@ -220,7 +220,11 @@ export const NationDetails: React.FC<NationDetailsProps> = ({
 					onClose={onClose}
 				/>
 			) : (
-				<WikiHeader title="No nation selected" subtitle="Nation" onClose={onClose} />
+				<WikiHeader
+					title="No nation selected"
+					subtitle="Nation"
+					onClose={onClose}
+				/>
 			)}
 
 			<AccordionSection

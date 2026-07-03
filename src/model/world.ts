@@ -65,6 +65,8 @@ export interface GenesisWorld {
 	tornadoRisk?: Float32Array
 	/** Per-cell modeled tidal range in meters. */
 	tidalRange?: Float32Array
+	/** Tidal schedule with events. */
+	tidalSchedule?: import("./climate/tidal-schedule").TidalSchedule
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation: Uint8Array
 	/** Per-cell topography code, index into GENESIS_TOPOGRAPHY_LABELS */

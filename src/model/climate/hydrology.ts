@@ -5,7 +5,7 @@ import type {
 	GenesisRainfall,
 } from ".."
 
-export function petMonthHargreaves(
+function petMonthHargreaves(
 	tas: number,
 	td: number,
 	raWm2: number,

@@ -365,12 +365,6 @@ function encodePlanetParams(params: GenesisParams): string {
 	return packed.toString(36).padStart(PARAMS_BASE_LEN, "0")
 }
 
-export function decodePlanetSeed(code: string): number | null {
-	const parts = parsePlanetCodeParts(code)
-	if (!parts) return null
-	return parseSeedPart(parts.seedPart)
-}
-
 export function encodePlanetCode(seed: number, params: GenesisParams): string {
 	const seedPart = BigInt(seed).toString(36)
 	const paramsPart = encodePlanetParams(params)

@@ -190,7 +190,11 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 
 	return (
 		<div className="space-y-2">
-			<WikiHeader title={planetName} subtitle={getPlanetTypeLabel(planetType)} onClose={onClose} />
+			<WikiHeader
+				title={planetName}
+				subtitle={getPlanetTypeLabel(planetType)}
+				onClose={onClose}
+			/>
 
 			<div className="space-y-1.5">
 				<AccordionSection
@@ -200,7 +204,11 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 				>
 					<div className="space-y-1.5">
 						{worldSections.planetary.map((stat) => (
-							<DetailRow key={stat.label} label={stat.label} value={stat.value} />
+							<DetailRow
+								key={stat.label}
+								label={stat.label}
+								value={stat.value}
+							/>
 						))}
 					</div>
 				</AccordionSection>
@@ -253,9 +261,18 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 							title="Government"
 							buckets={governmentDistribution}
 						/>
-						<DistributionChart title="Religion" buckets={religionDistribution} />
-						<DistributionChart title="Conflicts" buckets={conflictDistribution} />
-						<DistributionChart title="Relations" buckets={relationDistribution} />
+						<DistributionChart
+							title="Religion"
+							buckets={religionDistribution}
+						/>
+						<DistributionChart
+							title="Conflicts"
+							buckets={conflictDistribution}
+						/>
+						<DistributionChart
+							title="Relations"
+							buckets={relationDistribution}
+						/>
 					</div>
 				</AccordionSection>
 				<AccordionSection

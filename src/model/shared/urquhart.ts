@@ -6,21 +6,6 @@ function edgeKey(a: number, b: number, span: number): number {
 	return from * span + to
 }
 
-export function buildUrquhartEdges(
-	points: readonly [number, number][],
-): Array<[number, number]> {
-	if (points.length < 2) return []
-	if (points.length === 2) return [[0, 1]]
-
-	const flat = new Float64Array(points.length * 2)
-	for (let i = 0; i < points.length; i++) {
-		const point = points[i]
-		flat[i * 2] = point[0]
-		flat[i * 2 + 1] = point[1]
-	}
-	return buildUrquhartEdgesFromFlat(flat)
-}
-
 export function buildUrquhartEdgesFromFlat(
 	flatPoints: ArrayLike<number>,
 ): Array<[number, number]> {

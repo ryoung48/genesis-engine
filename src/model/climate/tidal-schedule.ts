@@ -401,7 +401,7 @@ function computeTidalScheduleFromContributors(
 						starPos.latRad,
 						starPos.lonRad,
 						starPos.distanceM,
-						spectralClass,
+						spectralClass as MainSequenceClass,
 						starSubtype,
 						surfaceLat,
 						surfaceLon,

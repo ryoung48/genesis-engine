@@ -5,11 +5,9 @@ import {
 import { LANGUAGE } from "@/model/society/language/languages"
 import type { Language } from "@/model/society/language/languages/types"
 import {
-	createNames,
 	createWorldNames,
 	type LanguageNameContext,
 	type LanguageNameCulture,
-	type LanguageNameDynasty,
 	type LanguageNameHeritage,
 	type LanguageNameLeaderEntry,
 	type LanguageNameProvince,
@@ -17,7 +15,6 @@ import {
 } from "@/model/society/language/names"
 import type {
 	SerializedGenesisWorld,
-	SerializedProvinceTimelineFloat,
 	SerializedProvinceTimelineInt,
 } from "@/model/transport/worker-types"
 import type { TimelineBundle } from "../history/history-query"
@@ -50,93 +47,6 @@ function getCultureLanguage(
 		? LANGUAGE.dialect(heritageLanguage, culture.languageSeed)
 		: LANGUAGE.spawn(`culture:${culture.languageSeed}`)
 	return culture.language
-}
-
-function buildLeaderEntries(
-	bundle: TimelineBundle,
-	provinceCount: number,
-): LanguageNameLeaderEntry[][] {
-	const seedField = bundle.timelines.leaderNameSeed
-	if (seedField) {
-		return Array.from({ length: provinceCount }, (_, province) => {
-			const entries: LanguageNameLeaderEntry[] = []
-			for (
-				let index = seedField.offsets[province];
-				index < seedField.offsets[province + 1];
-				index++
-			) {
-				const nameSeed = seedField.values[index] ?? -1
-				if (nameSeed < 0) continue
-				entries.push({
-					time: seedField.times[index] ?? bundle.timelines.startTimeMs,
-					nameSeed,
-				})
-			}
-			return entries.length > 0
-				? entries
-				: [{ time: bundle.timelines.startTimeMs }]
-		})
-	}
-
-	const timesByProvince = Array.from(
-		{ length: provinceCount },
-		() => new Set<number>([bundle.timelines.startTimeMs]),
-	)
-	for (const event of bundle.events) {
-		if (event.tag !== "succession") continue
-		const nation =
-			typeof event.data?.nation === "number"
-				? (event.data.nation as number)
-				: -1
-		if (nation < 0 || nation >= provinceCount) continue
-		timesByProvince[nation].add(event.time)
-	}
-	return timesByProvince.map((times) =>
-		Array.from(times)
-			.sort((a, b) => a - b)
-			.map((time) => ({ time })),
-	)
-}
-
-function buildDynasties(
-	context: LanguageNameContext,
-	world: SerializedGenesisWorld,
-	field: SerializedProvinceTimelineInt,
-): LanguageNameDynasty[] {
-	let maxDynastyId = -1
-	const dynastyCultureById = new Map<number, number>()
-	const provinceCount = world.provinces?.count ?? 0
-	for (let province = 0; province < provinceCount; province++) {
-		const cultureId = world.cultures?.assignment[province] ?? -1
-		for (
-			let index = field.offsets[province];
-			index < field.offsets[province + 1];
-			index++
-		) {
-			const dynastyId = field.values[index] ?? -1
-			if (dynastyId < 0) continue
-			if (dynastyId > maxDynastyId) maxDynastyId = dynastyId
-			if (!dynastyCultureById.has(dynastyId) && cultureId >= 0) {
-				dynastyCultureById.set(dynastyId, cultureId)
-			}
-		}
-	}
-	if (maxDynastyId < 0) return []
-	return Array.from({ length: maxDynastyId + 1 }, (_, dynastyId) => {
-		const cultureId = dynastyCultureById.get(dynastyId) ?? -1
-		const language =
-			cultureId >= 0 ? getCultureLanguage(context, cultureId) : null
-		return {
-			name: language
-				? LANGUAGE.word.unique({
-						lang: language,
-						key: "last",
-						namespace: "dynasty",
-						slot: `dynasty:${dynastyId}`,
-					}).word
-				: `Dynasty #${dynastyId}`,
-		}
-	})
 }
 
 function buildNameContext(
@@ -182,40 +92,6 @@ function buildNameContext(
 	}
 }
 
-function buildDynastiesFromCurrentWorld(
-	context: LanguageNameContext,
-	world: SerializedGenesisWorld,
-): LanguageNameDynasty[] {
-	const provinceCount = world.provinces?.count ?? 0
-	let maxDynastyId = -1
-	const dynastyCultureById = new Map<number, number>()
-	for (let province = 0; province < provinceCount; province++) {
-		const dynastyId = world.leaderDynasty?.[province] ?? -1
-		if (dynastyId < 0) continue
-		if (dynastyId > maxDynastyId) maxDynastyId = dynastyId
-		if (!dynastyCultureById.has(dynastyId)) {
-			const cultureId = world.cultures?.assignment[province] ?? -1
-			if (cultureId >= 0) dynastyCultureById.set(dynastyId, cultureId)
-		}
-	}
-	if (maxDynastyId < 0) return []
-	return Array.from({ length: maxDynastyId + 1 }, (_, dynastyId) => {
-		const cultureId = dynastyCultureById.get(dynastyId) ?? -1
-		const language =
-			cultureId >= 0 ? getCultureLanguage(context, cultureId) : null
-		return {
-			name: language
-				? LANGUAGE.word.unique({
-						lang: language,
-						key: "last",
-						namespace: "dynasty",
-						slot: `dynasty:${dynastyId}`,
-					}).word
-				: `Dynasty #${dynastyId}`,
-		}
-	})
-}
-
 function buildLeaderSlot(
 	provinceIdx: number,
 	entry: LanguageNameLeaderEntry,
@@ -250,22 +126,6 @@ function readTimelineValue(
 
 function readProvinceInt(
 	field: SerializedProvinceTimelineInt,
-	province: number,
-	time: number,
-	defaultValue: number,
-): number {
-	return readTimelineValue(
-		field.times,
-		field.values,
-		field.offsets[province],
-		field.offsets[province + 1],
-		defaultValue,
-		time,
-	)
-}
-
-function readProvinceFloat(
-	field: SerializedProvinceTimelineFloat,
 	province: number,
 	time: number,
 	defaultValue: number,
@@ -373,37 +233,6 @@ function findDynastyCultureId(
 	return -1
 }
 
-function createTimelineNames(
-	world: SerializedGenesisWorld,
-	bundle: TimelineBundle,
-): LanguageNames {
-	const provinceCount = world.provinces?.count ?? 0
-	const leaderEntries = buildLeaderEntries(bundle, provinceCount)
-	const context = buildNameContext(world, leaderEntries)
-	context.dynasties = buildDynasties(
-		context,
-		world,
-		bundle.timelines.leaderDynasty,
-	)
-	return createNames(context)
-}
-
-function createCurrentWorldPoliticalNames(
-	world: SerializedGenesisWorld,
-): LanguageNames {
-	const provinceCount = world.provinces?.count ?? 0
-	const leaderEntries = Array.from(
-		{ length: provinceCount },
-		(_, provinceIdx) => {
-			const nameSeed = world.leaderNameSeed?.[provinceIdx] ?? -1
-			return nameSeed >= 0 ? [{ time: 0, nameSeed }] : [{ time: 0 }]
-		},
-	)
-	const context = buildNameContext(world, leaderEntries)
-	context.dynasties = buildDynastiesFromCurrentWorld(context, world)
-	return createNames(context)
-}
-
 export function createDisplayNames(
 	world: SerializedGenesisWorld,
 	bundle: TimelineBundle | null,
@@ -481,22 +310,4 @@ export function createDisplayNames(
 			dynastyCultureIds.clear()
 		},
 	}
-}
-
-export const displayNamesInternals = {
-	getHeritageLanguage,
-	getCultureLanguage,
-	buildLeaderEntries,
-	buildDynasties,
-	buildNameContext,
-	buildDynastiesFromCurrentWorld,
-	findDynastyCultureId,
-	findLatestSuccessionTime,
-	createTimelineNames,
-	createCurrentWorldPoliticalNames,
-	readProvinceFloat,
-	readProvinceInt,
-	readProvinceTimelineTime,
-	readTimelineValue,
-	resolveLeaderEntry,
 }

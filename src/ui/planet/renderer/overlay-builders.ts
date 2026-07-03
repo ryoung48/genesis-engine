@@ -26,7 +26,7 @@ interface HierarchyNode {
 	xyz: [number, number, number]
 }
 
-export function collectHierarchyNodes(
+function collectHierarchyNodes(
 	world: SerializedGenesisWorld,
 	selectedNationId: number,
 ): HierarchyNode[] | null {
@@ -262,51 +262,6 @@ function unwrapLongitudeSequence(
 		unwrapped.push([adjustedLon, lat])
 	}
 	return unwrapped
-}
-
-export function buildNationBordersGlobe(
-	world: SerializedGenesisWorld,
-	viewMode: GenesisViewMode,
-	nationBordersVisible: boolean,
-	elevationVisible: boolean,
-	opts?: { color?: number; radiusBoost?: number; opacity?: number },
-) {
-	const positions = collectAllNationBorderGlobePositions(
-		world,
-		opts?.radiusBoost ?? 0,
-		elevationVisible,
-	)
-	return createLineSegments(
-		positions,
-		opts?.color ?? 0x020617,
-		opts?.opacity ?? 0.95,
-		viewMode === "globe" && nationBordersVisible,
-	)
-}
-
-export function buildNationBordersMap(
-	world: SerializedGenesisWorld,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	viewMode: GenesisViewMode,
-	nationBordersVisible: boolean,
-	opts?: { color?: number; opacity?: number; zBoost?: number },
-) {
-	const positions = repeatMapPositions(
-		collectAllNationBorderMapPositions(
-			world,
-			centerLongitudeDeg,
-			projectionLatitudeDeg,
-			opts?.zBoost ?? 0,
-		),
-		createMapProjection(centerLongitudeDeg, projectionLatitudeDeg).repeatWidth,
-	)
-	return createLineSegments(
-		positions,
-		opts?.color ?? 0x020617,
-		opts?.opacity ?? 0.95,
-		viewMode === "map" && nationBordersVisible,
-	)
 }
 
 export function collectNationBorderGlobePositions(

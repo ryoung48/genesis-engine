@@ -3,10 +3,7 @@ import * as THREE from "three"
 const MAP_X_SCALE = 2 / Math.PI
 export const MAX_MAP_PROJECTION_LATITUDE_DEG = 90
 
-export function wrapLongitudeRadians(
-	longitude: number,
-	centerLongitude = 0,
-): number {
+function wrapLongitudeRadians(longitude: number, centerLongitude = 0): number {
 	let wrapped = longitude - centerLongitude
 	if (wrapped > Math.PI) wrapped -= 2 * Math.PI
 	else if (wrapped < -Math.PI) wrapped += 2 * Math.PI

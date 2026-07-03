@@ -3,14 +3,15 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import type { GenesisParams, GenesisWorld } from ".."
 import { generateGenesisWorld } from "../pipelines/generate-world"
 
-export const TEST_WORLD_NUM_POINTS = 600
+const TEST_WORLD_NUM_POINTS = 600
 
 function makeTestParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 	return {
 		...DEFAULT_WORLD_PARAMS,
-		seed: 12345,
+		seed: 0,
+		tideLock: null,
+		planetType: "terrestrial",
 		numPoints: TEST_WORLD_NUM_POINTS,
-		tidallyLocked: false,
 		...overrides,
 	}
 }
@@ -26,10 +27,6 @@ function silenceConsoleTimings(): void {
 }
 
 const worldCache = new Map<string, GenesisWorld>()
-
-export function clearWorldCacheForTests(): void {
-	worldCache.clear()
-}
 
 export function getCachedWorld(
 	overrides: Partial<GenesisParams> = {},

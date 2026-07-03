@@ -9,7 +9,7 @@ export function computeSeaLevelOffsetKm(
 	return (seaLevel - 1) * maxDepthKm
 }
 
-export function heightKmToElev(
+function heightKmToElev(
 	heightKm: number,
 	maxElevKm = 6,
 	maxDepthKm = 10,

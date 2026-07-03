@@ -11,7 +11,7 @@ interface MeshBuildResult {
 	faceToRegion: Int32Array
 }
 
-export function usesSmoothedHeightmapColors(
+function usesSmoothedHeightmapColors(
 	colorMode: Parameters<typeof getColor>[1],
 ): boolean {
 	return colorMode === "landHeightmap"

@@ -199,7 +199,7 @@ const HISTORY_TIMING_PREFIX = "initHistory:"
 
 const COMPUTE_ROUTES_PREFIX = "computeRoutes:"
 
-export function handleRecentCodeSelection(
+function handleRecentCodeSelection(
 	recentCode: string,
 	handlers: RecentCodeSelectionHandlers,
 ): void {
@@ -233,7 +233,7 @@ function parseTimingEntries(
 		.filter((entry): entry is TimingEntry => entry !== null)
 }
 
-export function getGenerationTimingSummary(
+function getGenerationTimingSummary(
 	timings?: StageTiming[] | null,
 ): TimingSummary | null {
 	const orderedEntries = parseTimingEntries(
@@ -263,7 +263,7 @@ export function getGenerationTimingSummary(
 	}
 }
 
-export function getPostTimingSummary(
+function getPostTimingSummary(
 	timings?: StageTiming[] | null,
 ): TimingSummary | null {
 	const orderedEntries = parseTimingEntries(timings, (stage) =>
@@ -356,23 +356,9 @@ function formatDays(days: number): string {
 	return formatHours(days * 24)
 }
 
-function pressureSubtype(bar: number): string {
-	if (bar < 0.43) return "Wispy"
-	if (bar < 0.7) return "Thin"
-	if (bar < 1.5) return "Standard"
-	if (bar < 2.5) return "Dense"
-	if (bar < 10) return "Heavy"
-	return "Crushing"
-}
 const EARTH_MASS_KG = 5.972e24
 const LUNA_DIAMETER_KM = 3474
 const LUNA_MASS_KG = 7.342e22
-
-const _GAS_GIANT_SIZE_LABELS: Record<number, string> = {
-	16: "Gas Giant",
-	17: "Saturn-class",
-	18: "Jupiter-class",
-}
 const GAS_GIANT_AXIAL_TILT_DEG = 3.1
 const MOON_COLORS_CSS = ["text-sky-500", "text-violet-500", "text-emerald-500"]
 
@@ -849,9 +835,7 @@ function GasGiantSystemCards({
 						? [
 								{
 									label: "Solar Day",
-									value: formatHours(
-										gasGiantSystem.gasGiant.dayLengthHours,
-									),
+									value: formatHours(gasGiantSystem.gasGiant.dayLengthHours),
 								},
 							]
 						: []),

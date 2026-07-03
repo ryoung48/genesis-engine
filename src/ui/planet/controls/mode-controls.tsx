@@ -39,31 +39,3 @@ export function ModeButtonGroup<T extends string>({
 		</>
 	)
 }
-
-export function BinaryToggle({
-	value,
-	onChange,
-	trueLabel = "Annual",
-	falseLabel = "Monthly",
-	className,
-}: {
-	value: boolean
-	onChange: (v: boolean) => void
-	trueLabel?: string
-	falseLabel?: string
-	className?: string
-}) {
-	return (
-		<>
-			{([true, false] as const).map((opt) => (
-				<button
-					key={opt ? "true" : "false"}
-					onClick={() => onChange(opt)}
-					className={`${BUTTON_CLASS} ${value === opt ? ACTIVE_CLASS : INACTIVE_CLASS} ${className ?? ""}`}
-				>
-					{opt ? trueLabel : falseLabel}
-				</button>
-			))}
-		</>
-	)
-}

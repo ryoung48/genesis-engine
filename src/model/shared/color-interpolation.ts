@@ -2,11 +2,11 @@ import { clamp01 } from "./math"
 
 export type RgbColor = [number, number, number]
 
-export function lerp(a: number, b: number, t: number): number {
+function lerp(a: number, b: number, t: number): number {
 	return a + (b - a) * t
 }
 
-export function mixRgb(a: RgbColor, b: RgbColor, t: number): RgbColor {
+function mixRgb(a: RgbColor, b: RgbColor, t: number): RgbColor {
 	return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
 }
 

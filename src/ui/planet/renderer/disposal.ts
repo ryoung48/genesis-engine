@@ -1,7 +1,7 @@
 import * as THREE from "three"
 
 export function disposeObject3D(
-	scene: THREE.Scene,
+	scene: THREE.Object3D,
 	object: THREE.Object3D | null,
 ) {
 	if (!object) return
@@ -16,7 +16,7 @@ export function disposeObject3D(
 	}
 }
 
-export function disposeGroup(scene: THREE.Scene, group: THREE.Group | null) {
+export function disposeGroup(scene: THREE.Object3D, group: THREE.Group | null) {
 	if (!group) return
 	scene.remove(group)
 	group.traverse((child) => {

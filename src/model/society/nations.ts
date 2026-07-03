@@ -15,7 +15,7 @@ import { clamp01, hslToRgb, rgbToHsl } from "./shared"
 import { computeProvinceWaterAccess, WATER_ACCESS_BONUS } from "./water-access"
 
 // Hard cap on how far a nation can spread from its capital, in km.
-export const MAX_NATION_SPREAD_KM = 2000
+const MAX_NATION_SPREAD_KM = 2000
 
 // Province-mass weights per bucket — calibrated to EU4 extended-timeline 1350 AD data.
 // Each era overrides this via EraConfig.nationPercentages.
@@ -472,7 +472,7 @@ function integerMass(total: number, weights: number[]): number[] {
 	return base
 }
 
-export function buildNationPlan(
+function buildNationPlan(
 	total: number,
 	nationPercentages?: number[],
 	nationBuckets?: [number, number][],

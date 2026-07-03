@@ -3,6 +3,10 @@
 	"entry": ["src/model/genesis.worker.ts"],
 	"project": ["src/**/*.{ts,tsx,js,jsx}"],
 	"ignoreDependencies": ["tailwindcss", "babel-plugin-react-compiler"],
-	"ignore": ["src/types/*.d.ts", "src/model/society/language/**"],
+	"ignore": [
+		"src/types/*.d.ts",
+		"src/model/society/language/**",
+		"src/model/celestial/moons/moon-types.ts"
+	],
 	"tags": ["-lintignore"]
 }

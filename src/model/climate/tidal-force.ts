@@ -1,8 +1,10 @@
 import { AU_M, M_SOL_KG } from "../celestial/moons/orbital-mechanics"
-import { getStarMassSol } from "../celestial/star/star-types"
+import {
+	getStarMassSol,
+	type MainSequenceClass,
+} from "../celestial/star/star-types"
 
 const TWO_PI = 2 * Math.PI
-const _G = 6.674e-11
 
 function p2(cosX: number): number {
 	return (3 * cosX * cosX - 1) / 2
@@ -94,7 +96,7 @@ export function starTideContribution(
 	starLatRad: number,
 	starLonRad: number,
 	starDistanceM: number,
-	spectralClass: string,
+	spectralClass: MainSequenceClass,
 	starSubtype: number,
 	surfaceLatRad: number,
 	surfaceLonRad: number,

@@ -258,7 +258,7 @@ function trimLakeCorridors(
 	}
 }
 
-export function selectConnectedLakeCells(
+function selectConnectedLakeCells(
 	numRegions: number,
 	adjOffset: Int32Array,
 	adjList: Int32Array,

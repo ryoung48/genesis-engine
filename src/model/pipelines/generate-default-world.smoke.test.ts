@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
+import {
+	getStarTemperatureK,
+	type MainSequenceClass,
+} from "@/model/celestial/star/star-types"
 import { EnergyBalanceModel } from "@/model/climate/ebm"
 import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
 import { PASTA_LABELS } from "@/model/climate/pasta"
@@ -68,7 +72,7 @@ function buildSmokeParams(code: string): GenesisParams {
 			decoded.orbitalDistanceAU ?? DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
 		daysPerYear: decoded.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
 		hoursPerDay: decoded.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
-		tidallyLocked: decoded.tidallyLocked ?? false,
+		tideLock: decoded.tideLock,
 		antistellarLon:
 			decoded.antistellarLon ?? DEFAULT_WORLD_PARAMS.antistellarLon,
 		perihelion: decoded.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion,
@@ -78,7 +82,7 @@ function buildSmokeParams(code: string): GenesisParams {
 
 function computePreviewAverageTempC(params: GenesisParams): number {
 	const previewConfig = buildGenerationPreviewConfig({
-		tidallyLocked: params.tidallyLocked,
+		tideLock: params.tideLock,
 		obliquity: params.obliquity,
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
@@ -101,7 +105,10 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 		},
 		stellar: {
 			...EMB_CONSTANTS.stellar,
-			T_SUN: previewConfig.tSun,
+			T_SUN: getStarTemperatureK(
+				previewConfig.spectralClass as MainSequenceClass,
+				previewConfig.starSubtype,
+			),
 		},
 		time: {
 			HOURS_PER_DAY: previewConfig.hoursPerDay,
@@ -281,7 +288,7 @@ describe("full world smoke generation", () => {
 			daysPerYear: params.daysPerYear,
 			hoursPerDay: params.hoursPerDay,
 			pressure: params.pressure,
-			tidallyLocked: params.tidallyLocked,
+			tideLock: params.tideLock,
 			perihelion: params.perihelion,
 			antistellarLon: params.antistellarLon,
 		})
@@ -674,13 +681,14 @@ describe("full world smoke generation", () => {
 			}
 			const corridorCounts = {
 				major: corridorEntries.filter(
-					(corridor) => corridor.kind === ROUTE_LAND_MAJOR,
+					(corridor: { kind: number }) => corridor.kind === ROUTE_LAND_MAJOR,
 				).length,
 				minor: corridorEntries.filter(
-					(corridor) => corridor.kind === ROUTE_LAND_MINOR,
+					(corridor: { kind: number }) => corridor.kind === ROUTE_LAND_MINOR,
 				).length,
-				sea: corridorEntries.filter((corridor) => corridor.kind === ROUTE_SEA)
-					.length,
+				sea: corridorEntries.filter(
+					(corridor: { kind: number }) => corridor.kind === ROUTE_SEA,
+				).length,
 			}
 			console.info(
 				`Infrastructure edges -> corridors: major ${edgeCounts.major} -> ${corridorCounts.major}, minor ${edgeCounts.minor} -> ${corridorCounts.minor}, sea ${edgeCounts.sea} -> ${corridorCounts.sea}, total ${state.network.length} -> ${corridorEntries.length}`,

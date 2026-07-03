@@ -36,7 +36,9 @@ export const DrawerShell: React.FC<DrawerShellProps> = ({
 						{icon}
 					</div>
 				) : null}
-				<span className={cx(uiTokens.type.controlWide, "text-xs text-slate-900")}>
+				<span
+					className={cx(uiTokens.type.controlWide, "text-xs text-slate-900")}
+				>
 					{title}
 				</span>
 				{onClose ? (

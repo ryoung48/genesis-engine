@@ -155,7 +155,7 @@ interface PostPipelineOutput {
 
 const LAKE_RETENTION_THRESHOLD = 100 // mm/yr
 
-export function reconcileClosedWaterBodies(params: {
+function reconcileClosedWaterBodies(params: {
 	isLand: Uint8Array
 	riverLand: Uint8Array
 	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type" | "count">
