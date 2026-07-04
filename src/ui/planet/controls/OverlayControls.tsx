@@ -46,6 +46,7 @@ export interface LabelMode {
 	settlements: boolean
 	culture: boolean
 	heritage: boolean
+	script: boolean
 }
 
 const LAND_TRAVEL_KM_PER_DAY = 30
@@ -1079,6 +1080,20 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														setLabelMode({
 															...labelMode,
 															settlements: e.target.checked,
+														})
+													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Script</span>
+												<input
+													type="checkbox"
+													checked={labelMode.script}
+													onChange={(e) =>
+														setLabelMode({
+															...labelMode,
+															script: e.target.checked,
 														})
 													}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"

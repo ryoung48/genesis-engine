@@ -121,6 +121,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 		settlements: false,
 		culture: false,
 		heritage: false,
+		script: false,
 	},
 	showElevation: true,
 	showThermalEquator: false,
@@ -203,6 +204,7 @@ function parseLabelMode(value: unknown): LabelMode {
 		...base,
 		culture: typeof v?.culture === "boolean" ? v.culture : false,
 		heritage: typeof v?.heritage === "boolean" ? v.heritage : false,
+		script: typeof v?.script === "boolean" ? v.script : false,
 	}
 }
 

@@ -1,5 +1,10 @@
 import React from "react"
 import { titleCase } from "@/model/shared/text"
+import {
+	regionTimezoneOffset,
+	timezoneLandColor,
+	timezoneWaterColor,
+} from "@/model/society/timezone"
 import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import {
 	forEachRoute,
@@ -70,9 +75,7 @@ import {
 	buildDemographicDisplayData,
 	buildGovernmentDisplayData,
 	buildHoverChartData,
-	buildHoverNationRelationDistribution,
 	buildPastaMonthlyData,
-	buildPoliticalDisplayData,
 	buildProvinceDisplayData,
 	buildTerrainFeatureSwatches,
 	buildTopographySwatchColor,
@@ -324,6 +327,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverCoordinates,
 	hoverTimezone,
 	hoverLandmark,
+	hoverIsLand,
 	hoverTemperatureDelta,
 	hoverDtr,
 	hoverHumidity,
@@ -333,7 +337,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverBiome,
 	hoverProvince,
 	hoverNationId,
-	hoverOccupation,
 	hoverOceanDist,
 	hoverDistCoast,
 	hoverDistCoastKm,
@@ -353,8 +356,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	showOceanCurrentOverlay = false,
 	colorMode,
 	dangerSubMode,
-	populationMode,
-	selectedTimeMs,
 	displayMonth,
 	clockMonthMode,
 	clockMonth,
@@ -362,36 +363,19 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	world,
 	routes,
 	hoverCardRef,
-	getProvinceName,
 	getNationName,
-	getLeaderName,
-	getDynastyName,
 	getCultureName,
 	getHeritageName,
 	getLandmarkName,
 	getRiverName,
-	hoverNationAdjOffset,
-	hoverNationAdjList,
-	hoverNationCounts,
-	relationAt,
 	detailsDrawerOpen,
 }) => {
 	const activeBarIndex =
 		clockMonthMode === "monthly" ? clockMonth : displayMonth - 1
 	const activePrimary = getMapModePrimary(colorMode)
 	const showGeography = activePrimary === "geography"
-	const showPolitical = colorMode === "nations" || colorMode === "timezone"
-	const showDemographics = colorMode === "population"
+	const showSociety = activePrimary === "society"
 	const hoverRegion = hoverInfo?.region ?? null
-	const hoverNationRelationDistribution = showPolitical
-		? buildHoverNationRelationDistribution({
-				hoverNationId,
-				adjOffset: hoverNationAdjOffset ?? null,
-				adjList: hoverNationAdjList ?? null,
-				nationCounts: hoverNationCounts ?? new Map(),
-				relationAt: relationAt ?? null,
-			})
-		: []
 	const chartData =
 		showGeography && hoverInfo
 			? buildHoverChartData(hoverInfo, hoverElevationKm, world)
@@ -423,6 +407,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	const topographySwatch = showGeography
 		? buildTopographySwatchColor(hoverRegion, world)
 		: null
+	const timezoneSwatch =
+		hoverRegion !== null && world
+			? rgbToCss(
+					(hoverIsLand ?? true)
+						? timezoneLandColor(regionTimezoneOffset(world, hoverRegion))
+						: timezoneWaterColor(regionTimezoneOffset(world, hoverRegion)),
+				)
+			: null
 	const terrainFeatureSwatches = showGeography
 		? buildTerrainFeatureSwatches(hoverTerrainFeature)
 		: []
@@ -438,40 +430,25 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showGeography &&
 		hoverOceanCurrents !== null &&
 		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
-	const { provinceColor, provinceNation } = buildProvinceDisplayData({
+	const { provinceNation } = buildProvinceDisplayData({
 		hoverProvince,
 		hoverNationId,
 		world,
 	})
-	const { dynasty: provinceDynasty, ruler: provinceRuler } =
-		buildPoliticalDisplayData({
-			hoverNationId,
-			selectedTimeMs,
-			world,
-			getLeaderName,
-			getDynastyName,
-		})
-	const governmentDisplay = showPolitical
+	const governmentDisplay = showSociety
 		? buildGovernmentDisplayData({ hoverNationId, world })
 		: null
 	const demographicModes: PopulationMapMode[] = [
-		populationMode,
-		...(
-			[
-				"density",
-				"development",
-				"migration",
-				"culture",
-				"heritage",
-				"religion",
-			] as const
-		).filter((mode) => mode !== populationMode),
+		"density",
+		"development",
+		"culture",
+		"religion",
 	]
 	const hoverTradeGood =
 		colorMode === "trade_goods" || showGeography
 			? getHoverTradeGood(hoverInfo, world)
 			: null
-	const demographicDisplays = showDemographics
+	const demographicDisplays = showSociety
 		? demographicModes.flatMap((mode) => {
 				const display = buildDemographicDisplayData({
 					populationMode: mode,
@@ -484,21 +461,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				return display ? [display] : []
 			})
 		: []
-	const habitabilityEntry: DemographicEntry | null =
-		showDemographics &&
-		hoverProvince !== null &&
-		hoverProvince >= 0 &&
-		world?.population?.habitability &&
-		hoverProvince < world.population.habitability.length &&
-		!world.provinces?.desolate?.[hoverProvince]
-			? {
-					label: "Habitability",
-					value: world.population.habitability[hoverProvince].toFixed(2),
-					color: null,
-				}
-			: null
 	const urbanPopulation =
-		showDemographics &&
+		showSociety &&
 		hoverProvince !== null &&
 		hoverProvince >= 0 &&
 		world?.urbanPopulation &&
@@ -508,20 +472,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		!world.provinces.desolate[hoverProvince]
 			? Math.round(world.urbanPopulation[hoverProvince])
 			: null
-	const hoverPortLabel = showDemographics
+	const hoverPortLabel = showSociety
 		? buildHoverPortLabel(hoverProvince, world, getLandmarkName)
 		: null
-	const demographicEntries: DemographicEntry[] = []
-	for (const entry of demographicDisplays) {
-		demographicEntries.push(entry)
-		if (entry.label === "Population" && habitabilityEntry) {
-			demographicEntries.push(habitabilityEntry)
-		}
-	}
+	const demographicEntries: DemographicEntry[] = [...demographicDisplays]
 	if (urbanPopulation !== null && urbanPopulation > 0) {
 		demographicEntries.push({
 			label: "Urban Pop",
-			value: urbanPopulation.toLocaleString(),
+			value: formatCompactNumber(urbanPopulation),
 			color: null,
 		})
 	}
@@ -532,53 +490,17 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			color: null,
 		})
 	}
-	const demographicGroups = showDemographics
-		? [
-				{
-					id: "population",
-					title: "Population",
-					labels: [
-						"Population",
-						"Habitability",
-						"Urban Pop",
-						"Port",
-						"Development",
-						"Migration",
-					],
-				},
-				{
-					id: "culture",
-					title: "Culture",
-					labels: ["Culture", "Heritage"],
-				},
-				{
-					id: "belief",
-					title: "Belief",
-					labels: ["Faith", "Religion"],
-				},
-			]
-				.map((group) => ({
-					...group,
-					items: demographicEntries.filter((entry) =>
-						group.labels.includes(entry.label),
-					),
-				}))
-				.filter((group) => group.items.length > 0)
-		: []
-	const selectedDemographicGroupId =
-		populationMode === "culture" || populationMode === "heritage"
-			? "culture"
-			: populationMode === "religion"
-				? "belief"
-				: "population"
-	const orderedDemographicGroups = [
-		...demographicGroups.filter(
-			(group) => group.id === selectedDemographicGroupId,
-		),
-		...demographicGroups.filter(
-			(group) => group.id !== selectedDemographicGroupId,
-		),
-	]
+	const demographicEntryMap = new Map(
+		demographicEntries.map((entry) => [entry.label, entry] as const),
+	)
+	const orderedSocietyEntries = [
+		demographicEntryMap.get("Culture"),
+		demographicEntryMap.get("Religion"),
+		demographicEntryMap.get("Development"),
+		demographicEntryMap.get("Population"),
+		demographicEntryMap.get("Urban Pop"),
+		demographicEntryMap.get("Port"),
+	].filter((entry): entry is DemographicEntry => entry !== undefined)
 	return (
 		<FloatingPanel
 			className={`absolute top-3 z-20 w-64 px-3 py-2 ${detailsDrawerOpen ? "right-3" : "right-12"}`}
@@ -752,16 +674,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						)}
 					</>
 				)}
-				{showPolitical && hoverTimezone && (
-					<Row label="Timezone" value={hoverTimezone} />
+				{showSociety && hoverTimezone && (
+					<SwatchRow
+						label="Timezone"
+						value={hoverTimezone}
+						color={timezoneSwatch}
+					/>
 				)}
-				{showPolitical && hoverProvince !== null && hoverProvince >= 0 && (
+				{showSociety && hoverProvince !== null && hoverProvince >= 0 && (
 					<>
-						<SwatchRow
-							label="Province"
-							value={`${getProvinceName?.(hoverProvince) ?? `#${hoverProvince}`}${world?.provinces?.desolate[hoverProvince] ? " (desolate)" : ""}`}
-							color={provinceColor}
-						/>
 						{provinceNation && (
 							<SwatchRow
 								label="Nation"
@@ -776,89 +697,22 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								color={governmentDisplay.color}
 							/>
 						)}
-						{hoverOccupation && (
-							<SwatchRow
-								label="Occupier"
-								value={`${hoverOccupation.name}${hoverOccupation.rebel ? " (rebels)" : ""}`}
-								color={hoverOccupation.color}
-							/>
-						)}
-						{world?.waterAccess && hoverProvince < world.waterAccess.length && (
-							<Row
-								label="Water Access"
-								value={
-									world.waterAccess[hoverProvince] >= 2
-										? "Ocean"
-										: world.riverAccess?.[hoverProvince]
-											? "River"
-											: world.lakeAccess?.[hoverProvince]
-												? "Lake"
-												: world.waterAccess[hoverProvince] >= 1
-													? "River/Lake"
-													: "None"
-								}
-							/>
-						)}
-						{provinceDynasty && (
-							<SwatchRow
-								label="Dynasty"
-								value={provinceDynasty.name}
-								color={provinceDynasty.color}
-							/>
-						)}
-						{provinceRuler && (
-							<Row
-								label="Ruler"
-								value={[
-									provinceRuler.name,
-									provinceRuler.genderSymbol,
-									provinceRuler.age !== null ? `${provinceRuler.age}` : null,
-								]
-									.filter(Boolean)
-									.join(" · ")}
-							/>
-						)}
-						{hoverNationRelationDistribution.length > 0 && (
-							<div className="border-t border-white/5 pt-1">
-								<SeriesBars
-									label="Relations"
-									values={hoverNationRelationDistribution.map((b) => b.count)}
-									labels={hoverNationRelationDistribution.map(
-										(b) => b.shortLabel,
-									)}
-									colorForValue={(_, i) =>
-										hoverNationRelationDistribution[i]?.color ?? "#aaa"
-									}
-									tooltipLabel={({ value, index }) =>
-										`${hoverNationRelationDistribution[index]?.label ?? ""}: ${value}`
-									}
-								/>
-							</div>
-						)}
 					</>
 				)}
-				{showDemographics && (
+				{showSociety && (
 					<>
-						{orderedDemographicGroups.map((group) => (
-							<div key={group.id} className="space-y-0.5">
-								{group.items.map((item) =>
-									item.color ? (
-										<SwatchRow
-											key={item.label}
-											label={item.label}
-											value={item.value}
-											color={item.color}
-										/>
-									) : (
-										<Row
-											key={item.label}
-											label={item.label}
-											value={item.value}
-										/>
-									),
-								)}
-							</div>
-						))}
+						{orderedSocietyEntries.map((item) =>
+							item.color ? (
+								<SwatchRow
+									key={item.label}
+									label={item.label}
+									value={item.value}
+									color={item.color}
+								/>
+							) : (
+								<Row key={item.label} label={item.label} value={item.value} />
+							),
+						)}
 					</>
 				)}
 				{showGeography && chartData && world?.climate && (

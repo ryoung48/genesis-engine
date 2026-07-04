@@ -4,13 +4,15 @@ import { TrackballControls } from "three/examples/jsm/controls/TrackballControls
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
+import type { HeritageScript } from "@/model/society/script"
+import { SCRIPT } from "@/model/society/script"
 import {
 	networkCount,
 	type SerializedGenesisWorld,
 	type SerializedNetwork,
 } from "@/model/transport/worker-types"
 import { formatClockTimeDisplay } from "../clock"
-import type { ColorMode } from "../colors"
+import { type ColorMode, VEGETATION_WATER_BLUE } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
 import { disposeGroup, disposeObject3D } from "./disposal"
 import { getRegionFocusTargets } from "./focus"
@@ -49,6 +51,17 @@ import {
 	disposePool,
 	updateGlobeLabelOrientations,
 } from "./nation-label-overlay"
+import {
+	buildGlobeNationScripts,
+	buildMapNationScripts,
+	createNationScriptPools,
+	createPendingNationScriptTextureQueue,
+	disposeNationScriptPools,
+	disposeScriptTextureCache,
+	type PendingNationScriptTextureQueue,
+	processPendingNationScriptTextures,
+	type ScriptTextureCacheEntry,
+} from "./nation-script-overlay"
 import {
 	buildGlobeGrid,
 	buildGlobeHierarchyOverlay,
@@ -856,6 +869,8 @@ export function createGenesisScene(
 	let infrastructureVisible = false
 	let globeNationLabels: THREE.Group | null = null
 	let mapNationLabels: THREE.Group | null = null
+	let globeNationScripts: THREE.Group | null = null
+	let mapNationScripts: THREE.Group | null = null
 	let globeSettlementLabels: THREE.Group | null = null
 	let mapSettlementLabels: THREE.Group | null = null
 	let globeCultureLabels: THREE.Group | null = null
@@ -874,7 +889,12 @@ export function createGenesisScene(
 		settlements: false,
 		culture: false,
 		heritage: false,
+		script: false,
 	}
+	let heritageScripts: Map<number, HeritageScript> | null = null
+	const nationScriptTextureCache = new Map<string, ScriptTextureCacheEntry>()
+	let pendingNationScriptTextureQueue: PendingNationScriptTextureQueue | null =
+		null
 	const solarTerminatorLabels: SolarTerminatorLabel[] = []
 	const solarTerminatorCameraUp = new THREE.Vector3()
 	const solarTerminatorCameraDir = new THREE.Vector3()
@@ -1153,6 +1173,7 @@ export function createGenesisScene(
 		}
 	}
 	const nationLabelPools = createNationLabelPools()
+	const nationScriptPools = createNationScriptPools()
 	const settlementLabelPools = createSettlementLabelPools()
 	const cultureLabelPools = createNationLabelPools()
 	const heritageLabelPools = createNationLabelPools()
@@ -1216,6 +1237,18 @@ export function createGenesisScene(
 						mat.linewidth = mat.userData.baseWidth * zoomScale
 					}
 				}
+				const scriptTextureProgress = processPendingNationScriptTextures(
+					pendingNationScriptTextureQueue,
+					nationScriptTextureCache,
+					3,
+				)
+				if (scriptTextureProgress.pending === 0) {
+					pendingNationScriptTextureQueue = null
+				}
+				keepAnimating =
+					keepAnimating ||
+					scriptTextureProgress.pending > 0 ||
+					scriptTextureProgress.processed > 0
 				renderer.render(scene, mapCamera)
 				return keepAnimating
 			}
@@ -1265,8 +1298,25 @@ export function createGenesisScene(
 					globeControlsInteracting ||
 					globeControlActivityFrames > 0
 			}
+			const scriptTextureProgress = processPendingNationScriptTextures(
+				pendingNationScriptTextureQueue,
+				nationScriptTextureCache,
+				3,
+			)
+			if (scriptTextureProgress.pending === 0) {
+				pendingNationScriptTextureQueue = null
+			}
+			keepAnimating =
+				keepAnimating ||
+				scriptTextureProgress.pending > 0 ||
+				scriptTextureProgress.processed > 0
 			updateGlobeLabelOrientations(
 				globeNationLabels,
+				camera,
+				labelCullingEnabled,
+			)
+			updateGlobeLabelOrientations(
+				globeNationScripts,
 				camera,
 				labelCullingEnabled,
 			)
@@ -1298,6 +1348,27 @@ export function createGenesisScene(
 				globeControlActivityFrames > 0 ||
 				mapControlActivityFrames > 0,
 		)
+	}
+
+	function getHeritageScripts(
+		world: SerializedGenesisWorld,
+	): Map<number, HeritageScript> {
+		if (heritageScripts) return heritageScripts
+		const scripts = new Map<number, HeritageScript>()
+		if (world.heritages?.languageSeeds) {
+			for (
+				let heritageIdx = 0;
+				heritageIdx < world.heritages.count;
+				heritageIdx++
+			) {
+				scripts.set(
+					heritageIdx,
+					SCRIPT.spawn(`script:${world.heritages.languageSeeds[heritageIdx]}`),
+				)
+			}
+		}
+		heritageScripts = scripts
+		return scripts
 	}
 
 	function updateMapCameraFrustum() {
@@ -1386,8 +1457,13 @@ export function createGenesisScene(
 	function rebuildNationLabels() {
 		disposeGroup(globeGroup, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
+		if (globeNationScripts) globeGroup.remove(globeNationScripts)
+		if (mapNationScripts) scene.remove(mapNationScripts)
+		pendingNationScriptTextureQueue = null
 		globeNationLabels = null
 		mapNationLabels = null
+		globeNationScripts = null
+		mapNationScripts = null
 		if (!currentWorld?.nations) {
 			return
 		}
@@ -1416,6 +1492,42 @@ export function createGenesisScene(
 			if (!labelCullingEnabled) addMapSlideClones(mapNationLabels)
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
 			scene.add(mapNationLabels)
+		}
+		if (
+			labelMode.script &&
+			currentWorld.heritages &&
+			currentWorld.cultures &&
+			labelNames
+		) {
+			pendingNationScriptTextureQueue = createPendingNationScriptTextureQueue()
+			const scripts = getHeritageScripts(currentWorld)
+			globeNationScripts = buildGlobeNationScripts(
+				currentWorld,
+				labelNames,
+				scripts,
+				nationScriptTextureCache,
+				pendingNationScriptTextureQueue,
+				camera,
+				nationScriptPools.globe,
+				labelCullingEnabled,
+				elevationVisible,
+			)
+			mapNationScripts = buildMapNationScripts(
+				currentWorld,
+				labelNames,
+				scripts,
+				nationScriptTextureCache,
+				pendingNationScriptTextureQueue,
+				currentMapCenterLongitudeDeg,
+				currentMapProjectionLatitudeDeg,
+				nationScriptPools.map,
+				labelCullingEnabled,
+			)
+			if (globeNationScripts) globeGroup.add(globeNationScripts)
+			if (mapNationScripts) {
+				if (mapMesh) mapNationScripts.position.copy(mapMesh.position)
+				scene.add(mapNationScripts)
+			}
 		}
 		updateOverlayVisibility()
 	}
@@ -1758,14 +1870,35 @@ export function createGenesisScene(
 
 	function applyWaterMaterialForMode(mode: ColorMode) {
 		const useTerrainWaterMaterial = mode === "terrain"
+		const useVegetationWaterMaterial =
+			mode === "vegetation" ||
+			mode === "vegetationMaps" ||
+			mode === "vegetationSatellite"
 		if (useTerrainWaterMaterial) {
 			waterMat.color.set(0xffffff)
 			waterMat.opacity = 0.12
 			waterMat.specular.set(DEFAULT_WATER_SPECULAR)
 		} else {
-			waterMat.color.set(0x0c3a6e)
+			if (useVegetationWaterMaterial) {
+				waterMat.color.setRGB(
+					VEGETATION_WATER_BLUE[0],
+					VEGETATION_WATER_BLUE[1],
+					VEGETATION_WATER_BLUE[2],
+				)
+			} else {
+				waterMat.color.set(0x0c3a6e)
+			}
 			waterMat.opacity = 0.12
 			waterMat.specular.set(0x000000)
+		}
+		const riverHex = useVegetationWaterMaterial ? 0x90d9ed : 0x0978ab
+		for (const material of riverMaterials) {
+			material.color.setHex(riverHex)
+			material.opacity = useVegetationWaterMaterial
+				? 1
+				: (material.userData.baseOpacity ?? material.opacity)
+			material.transparent = !useVegetationWaterMaterial
+			material.needsUpdate = true
 		}
 		if (currentViewMode === "globe") {
 			waterMesh.visible = true
@@ -1811,6 +1944,8 @@ export function createGenesisScene(
 		disposeGroup(scene, mapInfrastructure)
 		disposeGroup(globeGroup, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
+		if (globeNationScripts) globeGroup.remove(globeNationScripts)
+		if (mapNationScripts) scene.remove(mapNationScripts)
 		disposeGroup(globeGroup, globeSettlementLabels)
 		disposeGroup(scene, mapSettlementLabels)
 		terrainWireframe = null
@@ -1845,6 +1980,8 @@ export function createGenesisScene(
 		mapInfrastructure = null
 		globeNationLabels = null
 		mapNationLabels = null
+		globeNationScripts = null
+		mapNationScripts = null
 		globeSettlementLabels = null
 		mapSettlementLabels = null
 		syncAnimationState()
@@ -1939,6 +2076,7 @@ export function createGenesisScene(
 			addMapSlideClones(mapRivers)
 			scene.add(mapRivers)
 		}
+		applyWaterMaterialForMode(currentColorMode)
 		rebuildNationBorders()
 		rebuildSelectedProvinceBorder()
 		rebuildHierarchyOverlay()
@@ -2044,10 +2182,22 @@ export function createGenesisScene(
 		if (globeNationLabels)
 			globeNationLabels.visible =
 				(labelMode.nations || labelMode.dynasty) && currentViewMode === "globe"
+		if (globeNationScripts)
+			globeNationScripts.visible =
+				labelMode.script &&
+				(labelMode.nations || labelMode.dynasty) &&
+				currentViewMode === "globe"
 		if (mapNationLabels) {
 			mapNationLabels.visible =
 				(labelMode.nations || labelMode.dynasty) && currentViewMode === "map"
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
+		}
+		if (mapNationScripts) {
+			mapNationScripts.visible =
+				labelMode.script &&
+				(labelMode.nations || labelMode.dynasty) &&
+				currentViewMode === "map"
+			if (mapMesh) mapNationScripts.position.copy(mapMesh.position)
 		}
 		if (globeSettlementLabels)
 			globeSettlementLabels.visible =
@@ -2092,6 +2242,7 @@ export function createGenesisScene(
 			mapSettlements,
 			mapInfrastructure,
 			mapNationLabels,
+			mapNationScripts,
 			mapSettlementLabels,
 			mapCultureLabels,
 			mapHeritageLabels,
@@ -2124,6 +2275,7 @@ export function createGenesisScene(
 			{ object: globeSettlements, visible: false },
 			{ object: globeInfrastructure, visible: false },
 			{ object: globeNationLabels, visible: false },
+			{ object: globeNationScripts, visible: false },
 			{ object: globeSettlementLabels, visible: false },
 			{ object: globeCultureLabels, visible: false },
 			{ object: globeHeritageLabels, visible: false },
@@ -2146,6 +2298,10 @@ export function createGenesisScene(
 			{
 				object: mapNationLabels,
 				visible: labelMode.nations || labelMode.dynasty,
+			},
+			{
+				object: mapNationScripts,
+				visible: labelMode.script && (labelMode.nations || labelMode.dynasty),
 			},
 			{ object: mapSettlementLabels, visible: labelMode.settlements },
 			{ object: mapCultureLabels, visible: labelMode.culture },
@@ -2219,6 +2375,11 @@ export function createGenesisScene(
 	}
 
 	function updateWorld(world: SerializedGenesisWorld | null) {
+		if (currentWorld !== world) {
+			heritageScripts = null
+			disposeScriptTextureCache(nationScriptTextureCache)
+			pendingNationScriptTextureQueue = null
+		}
 		if (!world) {
 			currentWorld = null
 			hoveredRegion = -1
@@ -2827,6 +2988,11 @@ export function createGenesisScene(
 		disposeGroup(scene, mapNationLabels)
 		disposePool(nationLabelPools.globe)
 		disposePool(nationLabelPools.map)
+		if (globeNationScripts) globeGroup.remove(globeNationScripts)
+		if (mapNationScripts) scene.remove(mapNationScripts)
+		pendingNationScriptTextureQueue = null
+		disposeScriptTextureCache(nationScriptTextureCache)
+		disposeNationScriptPools(nationScriptPools)
 		disposeGroup(globeGroup, globeSettlementLabels)
 		disposeGroup(scene, mapSettlementLabels)
 		disposePool(settlementLabelPools.globe)

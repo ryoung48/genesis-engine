@@ -204,8 +204,16 @@ function labelPositionMap(
 	]
 }
 
-function orientGlobeLabel(text: Text, cameraQuaternion: THREE.Quaternion) {
-	text.quaternion.copy(cameraQuaternion)
+type GlobeLabelLike = THREE.Object3D & {
+	visible: boolean
+	userData: Record<string, unknown>
+}
+
+function orientGlobeLabel(
+	label: GlobeLabelLike,
+	cameraQuaternion: THREE.Quaternion,
+) {
+	label.quaternion.copy(cameraQuaternion)
 }
 
 function globeLabelOffset(markerScale: number, fontSize: number): number {
@@ -216,12 +224,15 @@ function globeLabelOffset(markerScale: number, fontSize: number): number {
 	)
 }
 
-function updateGlobeLabelPosition(text: Text, cameraUp: THREE.Vector3): void {
-	const normal = text.userData.globeNormal as THREE.Vector3 | undefined
-	const basePosition = text.userData.globeBasePosition as
+function updateGlobeLabelPosition(
+	label: GlobeLabelLike,
+	cameraUp: THREE.Vector3,
+): void {
+	const normal = label.userData.globeNormal as THREE.Vector3 | undefined
+	const basePosition = label.userData.globeBasePosition as
 		| THREE.Vector3
 		| undefined
-	const offset = text.userData.globeLabelOffset as number | undefined
+	const offset = label.userData.globeLabelOffset as number | undefined
 	if (!normal || !basePosition || offset == null) return
 
 	GLOBE_PROJECTED_UP.copy(cameraUp).addScaledVector(
@@ -229,19 +240,19 @@ function updateGlobeLabelPosition(text: Text, cameraUp: THREE.Vector3): void {
 		-cameraUp.dot(normal),
 	)
 	if (GLOBE_PROJECTED_UP.lengthSq() < 1e-8) {
-		text.position.copy(basePosition)
+		label.position.copy(basePosition)
 		return
 	}
 	GLOBE_PROJECTED_UP.normalize()
-	text.position.copy(basePosition).addScaledVector(GLOBE_PROJECTED_UP, offset)
+	label.position.copy(basePosition).addScaledVector(GLOBE_PROJECTED_UP, offset)
 }
 
 function isGlobeLabelVisible(
-	text: Text,
+	label: GlobeLabelLike,
 	cameraPosition: THREE.Vector3,
 ): boolean {
-	const normal = text.userData.globeNormal as THREE.Vector3 | undefined
-	const basePosition = text.userData.globeBasePosition as
+	const normal = label.userData.globeNormal as THREE.Vector3 | undefined
+	const basePosition = label.userData.globeBasePosition as
 		| THREE.Vector3
 		| undefined
 	if (!normal || !basePosition) return false
@@ -285,16 +296,16 @@ function updateGlobeLabelOrientations(
 	}
 	GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
 	for (const child of group.children) {
-		const text = child as Text
+		const label = child as GlobeLabelLike
 		const visible = cullingEnabled
-			? isGlobeLabelVisible(text, GLOBE_CAMERA_LOCAL_POSITION)
+			? isGlobeLabelVisible(label, GLOBE_CAMERA_LOCAL_POSITION)
 			: true
 
-		text.visible = visible
+		label.visible = visible
 		if (!visible) continue
 
-		updateGlobeLabelPosition(text, GLOBE_CAMERA_UP)
-		orientGlobeLabel(text, camera.quaternion)
+		updateGlobeLabelPosition(label, GLOBE_CAMERA_UP)
+		orientGlobeLabel(label, camera.quaternion)
 	}
 }
 
@@ -910,8 +921,19 @@ export function buildMapSettlementLabels(
 }
 
 export {
+	LABEL_FONT_SIZE_GLOBE,
+	LABEL_FONT_SIZE_MAP,
+	LABEL_OUTLINE_COLOR,
+	LABEL_RENDER_ORDER,
 	createNationLabelPools,
 	createSettlementLabelPools,
 	disposePool,
+	globeLabelOffset,
+	labelPositionGlobe,
+	labelPositionMap,
+	nationCapitalProvince,
+	nationCapitalRegion,
+	nationProvinceCount,
+	computeLabelScale,
 	updateGlobeLabelOrientations,
 }

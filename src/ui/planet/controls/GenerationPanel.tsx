@@ -48,6 +48,7 @@ import { LockIcon } from "@/ui/components/primitives/icons/LockIcon"
 import { LockOpenIcon } from "@/ui/components/primitives/icons/LockOpenIcon"
 import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
 import { StarOutlineIcon } from "@/ui/components/primitives/icons/StarOutlineIcon"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
 import { RegularClimatePreview } from "@/ui/preview/RegularClimatePreview"
@@ -65,6 +66,7 @@ import { getOrderedRecentCodes } from "../screen/generation/recent-codes"
 import type { SliderDef } from "../screen/generation/sliders"
 import { SPECTRAL_CLASS_COLORS } from "../screen/generation/star-utils"
 import type { UnitSystem } from "../screen/shared/ui-format"
+import { SocietyRunesPanel } from "./SocietyRunesPanel"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 
@@ -1531,6 +1533,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	handleEarthImport,
 	onClose,
 }) => {
+	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const [moonBoxTab, setMoonBoxTab] = useState<
 		"count" | "tides" | GenerationPreviewTab
@@ -2051,74 +2054,93 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 
 				{worldTab === "society" && (
 					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
-						<p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 px-0.5">
-							Era Preset
-						</p>
-						<div className="grid grid-cols-2 gap-1.5">
-							{ERA_ORDER.map((eraId) => {
-								const cfg = ERA_CONFIGS[eraId]
-								const pop = cfg.targetPopulation
-								const popLabel =
-									pop >= 1e9
-										? `${(pop / 1e9).toFixed(1)}B`
-										: pop >= 1e6
-											? `${Math.round(pop / 1e6)}M`
-											: `${Math.round(pop / 1e3)}K`
-								const active = era === eraId
-								return (
-									<button
-										key={eraId}
-										type="button"
-										onClick={() => setEra(eraId)}
-										className={`rounded-lg border px-2.5 py-2 text-left transition-all ${
-											active
-												? "border-slate-900 bg-slate-900 text-white"
-												: "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-										}`}
-									>
-										<div
-											className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${active ? "text-white" : "text-slate-700"}`}
-										>
-											{cfg.label}
-										</div>
-										<div
-											className={`mt-0.5 font-mono text-[9px] ${active ? "text-slate-300" : "text-slate-400"}`}
-										>
-											~{popLabel} pop
-										</div>
-									</button>
-								)
-							})}
+						<div className="flex items-center justify-between gap-2">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 px-0.5">
+								Society
+							</p>
+							<SegmentedControl
+								options={[
+									{ value: "era", label: "Era" },
+									{ value: "runes", label: "Runes" },
+								]}
+								value={societySubtab}
+								onChange={setSocietySubtab}
+							/>
 						</div>
-						{(() => {
-							const cfg = ERA_CONFIGS[era]
-							return (
-								<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 space-y-1">
-									<div className="flex justify-between text-[10px]">
-										<span className="text-slate-500">Settled land</span>
-										<span className="font-mono text-slate-700">
-											{cfg.settlementFraction >= 1.0
-												? "100%"
-												: `${Math.round(cfg.settlementFraction * 100)}%`}
-										</span>
-									</div>
-									<div className="flex justify-between text-[10px]">
-										<span className="text-slate-500">Under states</span>
-										<span className="font-mono text-slate-700">
-											{!cfg.hasNations
-												? "none"
-												: cfg.statehoodFraction >= 1.0
-													? "all settled"
-													: `${Math.round(cfg.statehoodFraction * 100)}% of settled`}
-										</span>
-									</div>
+						{societySubtab === "era" ? (
+							<>
+								<p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 px-0.5">
+									Era Preset
+								</p>
+								<div className="grid grid-cols-2 gap-1.5">
+									{ERA_ORDER.map((eraId) => {
+										const cfg = ERA_CONFIGS[eraId]
+										const pop = cfg.targetPopulation
+										const popLabel =
+											pop >= 1e9
+												? `${(pop / 1e9).toFixed(1)}B`
+												: pop >= 1e6
+													? `${Math.round(pop / 1e6)}M`
+													: `${Math.round(pop / 1e3)}K`
+										const active = era === eraId
+										return (
+											<button
+												key={eraId}
+												type="button"
+												onClick={() => setEra(eraId)}
+												className={`rounded-lg border px-2.5 py-2 text-left transition-all ${
+													active
+														? "border-slate-900 bg-slate-900 text-white"
+														: "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+												}`}
+											>
+												<div
+													className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${active ? "text-white" : "text-slate-700"}`}
+												>
+													{cfg.label}
+												</div>
+												<div
+													className={`mt-0.5 font-mono text-[9px] ${active ? "text-slate-300" : "text-slate-400"}`}
+												>
+													~{popLabel} pop
+												</div>
+											</button>
+										)
+									})}
 								</div>
-							)
-						})()}
-						<p className="text-[9px] text-slate-400 px-0.5 leading-relaxed">
-							Applies on next Generate. White = settled stateless, gray =
-							unsettled, on the nations map.
-						</p>
+								{(() => {
+									const cfg = ERA_CONFIGS[era]
+									return (
+										<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 space-y-1">
+											<div className="flex justify-between text-[10px]">
+												<span className="text-slate-500">Settled land</span>
+												<span className="font-mono text-slate-700">
+													{cfg.settlementFraction >= 1.0
+														? "100%"
+														: `${Math.round(cfg.settlementFraction * 100)}%`}
+												</span>
+											</div>
+											<div className="flex justify-between text-[10px]">
+												<span className="text-slate-500">Under states</span>
+												<span className="font-mono text-slate-700">
+													{!cfg.hasNations
+														? "none"
+														: cfg.statehoodFraction >= 1.0
+															? "all settled"
+															: `${Math.round(cfg.statehoodFraction * 100)}% of settled`}
+												</span>
+											</div>
+										</div>
+									)
+								})()}
+								<p className="text-[9px] text-slate-400 px-0.5 leading-relaxed">
+									Applies on next Generate. White = settled stateless, gray =
+									unsettled, on the nations map.
+								</p>
+							</>
+						) : (
+							<SocietyRunesPanel />
+						)}
 					</div>
 				)}
 

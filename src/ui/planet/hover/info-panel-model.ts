@@ -2,7 +2,6 @@ import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
 import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
-import { REL } from "@/model/history/state"
 import { GOVERNMENT_TYPE_LABELS, GOVERNMENT_TYPES } from "@/model/society/eras"
 import {
 	RELIGION_TYPE_COLORS,
@@ -14,12 +13,12 @@ import type { ColorMode } from "../colors"
 import {
 	climateTempColor,
 	climateZoneColor,
+	VEGETATION_WATER_BLUE,
 	vegetationColor,
 	vegetationMapColor,
 	vegetationSatelliteColor,
 } from "../colors"
 import {
-	getDynastyColor,
 	getTerrainFeatureColor,
 	getTopographyColor,
 	toPastelNationColor,
@@ -28,7 +27,6 @@ import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
 } from "../screen/display/religion-type"
-import { buildRulerDisplayMeta } from "../screen/display/ruler-display"
 import type { PopulationMapMode } from "../screen/shared/map-modes"
 import {
 	formatDensity,
@@ -67,19 +65,6 @@ interface HoverDemographicDisplayData {
 	label: string
 	value: string
 	color: string | null
-}
-
-interface HoverPoliticalDisplayData {
-	dynasty: {
-		id: number
-		name: string
-		color: string
-	} | null
-	ruler: {
-		name: string
-		age: number | null
-		genderSymbol: string | null
-	} | null
 }
 
 export function buildHoverChartData(
@@ -230,49 +215,6 @@ export function buildProvinceDisplayData(params: {
 	return { provinceColor, provinceNation }
 }
 
-export function buildPoliticalDisplayData(params: {
-	hoverNationId: number | null
-	selectedTimeMs: number | null
-	world: SerializedGenesisWorld | null
-	getLeaderName?: (nationId: number, timeMs: number) => string
-	getDynastyName?: (dynastyId: number) => string
-}): HoverPoliticalDisplayData {
-	const {
-		hoverNationId,
-		selectedTimeMs,
-		world,
-		getLeaderName,
-		getDynastyName,
-	} = params
-	if (hoverNationId === null || hoverNationId < 0) {
-		return { dynasty: null, ruler: null }
-	}
-
-	const dynastyId = world?.leaderDynasty?.[hoverNationId] ?? -1
-	const dynasty =
-		dynastyId >= 0 && getDynastyName
-			? {
-					id: dynastyId,
-					name: getDynastyName(dynastyId),
-					color: rgbToCss(getDynastyColor(dynastyId)),
-				}
-			: null
-	const rulerMeta = buildRulerDisplayMeta({
-		world,
-		nationId: hoverNationId,
-		timeMs: selectedTimeMs,
-	})
-	const ruler =
-		selectedTimeMs !== null && getLeaderName
-			? {
-					name: getLeaderName(hoverNationId, selectedTimeMs),
-					age: rulerMeta.age,
-					genderSymbol: rulerMeta.genderSymbol,
-				}
-			: null
-	return { dynasty, ruler }
-}
-
 export function buildClimateSwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
@@ -305,8 +247,9 @@ export function buildVegetationSwatchColor(
 	) {
 		return null
 	}
-	const color =
-		colorMode === "vegetationSatellite" && world.pastaClimate
+	const color = !world.isLand?.[hoverRegion]
+		? VEGETATION_WATER_BLUE
+		: colorMode === "vegetationSatellite" && world.pastaClimate
 			? vegetationSatelliteColor(world.pastaClimate[hoverRegion])
 			: colorMode === "vegetationMaps"
 				? vegetationMapColor(
@@ -499,121 +442,6 @@ export function buildGovernmentDisplayData(params: {
 		label,
 		color: GOVERNMENT_COLORS_CSS[typeIndex] ?? GOVERNMENT_COLORS_CSS[7],
 	}
-}
-
-interface RelationBucket {
-	label: string
-	shortLabel: string
-	count: number
-	color: string
-}
-
-export function buildHoverNationRelationDistribution(params: {
-	hoverNationId: number | null
-	adjOffset: Int32Array | null
-	adjList: Int32Array | null
-	nationCounts: Map<number, number>
-	relationAt: ((a: number, b: number) => number) | null
-}): RelationBucket[] {
-	const { hoverNationId, adjOffset, adjList, nationCounts, relationAt } = params
-	if (
-		hoverNationId === null ||
-		hoverNationId < 0 ||
-		!adjOffset ||
-		!adjList ||
-		!relationAt
-	) {
-		return []
-	}
-	if (hoverNationId + 1 >= adjOffset.length) return []
-
-	const counts = {
-		PU: 0,
-		Colony: 0,
-		Vassal: 0,
-		Allied: 0,
-		Friendly: 0,
-		Neutral: 0,
-		Suspicious: 0,
-		Rival: 0,
-		War: 0,
-	}
-
-	for (
-		let e = adjOffset[hoverNationId];
-		e < adjOffset[hoverNationId + 1];
-		e++
-	) {
-		const neighborId = adjList[e]
-		if (!nationCounts.has(neighborId)) continue
-		const rel = relationAt(hoverNationId, neighborId)
-		if (rel === REL.OVERLORD || rel === REL.VASSAL) counts.Vassal++
-		else if (rel === REL.PU_SENIOR || rel === REL.PU_JUNIOR) counts.PU++
-		else if (rel === REL.COLONY) counts.Colony++
-		else if (rel === REL.ALLY) counts.Allied++
-		else if (rel === REL.FRIENDLY) counts.Friendly++
-		else if (rel === REL.SUSPICIOUS) counts.Suspicious++
-		else if (rel === REL.RIVAL) counts.Rival++
-		else if (rel === REL.WAR) counts.War++
-		else counts.Neutral++
-	}
-
-	return [
-		{
-			label: "Personal Union",
-			shortLabel: "PU",
-			count: counts.PU,
-			color: "rgb(99, 102, 241)",
-		},
-		{
-			label: "Colony",
-			shortLabel: "Col",
-			count: counts.Colony,
-			color: "rgb(230, 84, 61)",
-		},
-		{
-			label: "Vassal",
-			shortLabel: "Vas",
-			count: counts.Vassal,
-			color: "rgb(168, 85, 247)",
-		},
-		{
-			label: "Allied",
-			shortLabel: "Aly",
-			count: counts.Allied,
-			color: "rgb(59, 130, 246)",
-		},
-		{
-			label: "Friendly",
-			shortLabel: "Fri",
-			count: counts.Friendly,
-			color: "rgb(34, 197, 94)",
-		},
-		{
-			label: "Neutral",
-			shortLabel: "Neu",
-			count: counts.Neutral,
-			color: "rgb(201, 201, 201)",
-		},
-		{
-			label: "Suspicious",
-			shortLabel: "Sus",
-			count: counts.Suspicious,
-			color: "rgb(234, 179, 8)",
-		},
-		{
-			label: "Rival",
-			shortLabel: "Riv",
-			count: counts.Rival,
-			color: "rgb(249, 115, 22)",
-		},
-		{
-			label: "War",
-			shortLabel: "War",
-			count: counts.War,
-			color: "rgb(249, 56, 22)",
-		},
-	]
 }
 
 /**

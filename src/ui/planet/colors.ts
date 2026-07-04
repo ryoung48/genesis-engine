@@ -56,6 +56,11 @@ export type ColorMode =
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
+export const VEGETATION_WATER_BLUE: [number, number, number] = [
+	0x90 / 255,
+	0xd9 / 255,
+	0xed / 255,
+]
 
 const oceanColorStops: RgbColor[] = [
 	[0xd8 / 255, 0xf2 / 255, 0xfe / 255],
@@ -348,7 +353,7 @@ export function climateTempColor(celsius: number): [number, number, number] {
 }
 
 const biomeBaseColors: [number, number, number][] = [
-	OCEAN_LIGHT_BLUE,
+	VEGETATION_WATER_BLUE,
 	[0xcc / 255, 0xc4 / 255, 0xbc / 255],
 	[0xa0 / 255, 0xa6 / 255, 0x96 / 255],
 	[0x8e / 255, 0x9a / 255, 0x82 / 255],
@@ -362,7 +367,7 @@ export function vegetationColor(biomeCode: number): [number, number, number] {
 }
 
 const biomeMapColors: [number, number, number][] = [
-	OCEAN_LIGHT_BLUE,
+	VEGETATION_WATER_BLUE,
 	[1, 1, 1],
 	[0xee / 255, 0xe3 / 255, 0xd2 / 255],
 	[0xf0 / 255, 0xed / 255, 0xe2 / 255],
@@ -503,9 +508,9 @@ const PASTA_SATELLITE_TRUE_COLOR: Partial<
 }
 
 const DEFAULT_PASTA_SATELLITE_OCEAN: [number, number, number] = [
-	10 / 255,
-	10 / 255,
-	51 / 255,
+	VEGETATION_WATER_BLUE[0],
+	VEGETATION_WATER_BLUE[1],
+	VEGETATION_WATER_BLUE[2],
 ]
 
 export function vegetationSatelliteColor(

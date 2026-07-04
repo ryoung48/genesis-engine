@@ -36,6 +36,7 @@ import {
 	temperatureDeltaColor,
 	tidalTierColor,
 	tornadoLandColor,
+	VEGETATION_WATER_BLUE,
 	vegetationColor,
 	vegetationMapColor,
 	vegetationSatelliteColor,
@@ -449,10 +450,7 @@ export function computeRegionColors(
 	) {
 		for (let r = 0; r < N; r++) {
 			if (isOceanRegion(r)) {
-				const [cr, cg, cb] =
-					colorMode === "vegetationMaps"
-						? oceanRgb(r)
-						: getColor(Math.min(0, world.elevation_km[r]), "terrain")
+				const [cr, cg, cb] = VEGETATION_WATER_BLUE
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -475,7 +473,9 @@ export function computeRegionColors(
 
 	if (colorMode === "vegetationSatellite" && world.pastaClimate) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = vegetationSatelliteColor(world.pastaClimate[r])
+			const [cr, cg, cb] = isOceanRegion(r)
+				? VEGETATION_WATER_BLUE
+				: vegetationSatelliteColor(world.pastaClimate[r])
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

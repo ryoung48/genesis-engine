@@ -752,15 +752,17 @@ function buildRiverGroup(
 	for (const [binnedWidth, positions] of batchedPositions) {
 		if (positions.length < 6) continue
 		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
+		const baseOpacity = 0.55 + t * 0.4
 		const material = new LineMaterial({
 			color: 0x0978ab,
-			opacity: 0.55 + t * 0.4,
+			opacity: baseOpacity,
 			linewidth: binnedWidth,
 			transparent: true,
 			depthWrite: false,
 			worldUnits: false,
 		})
 		material.userData.baseWidth = binnedWidth
+		material.userData.baseOpacity = baseOpacity
 		material.resolution.set(width, height)
 		riverMaterials.push(material)
 

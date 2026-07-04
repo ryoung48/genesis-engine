@@ -3317,6 +3317,7 @@ export const GenesisView: React.FC = () => {
 								settlements: false,
 								culture: false,
 								heritage: false,
+								script: false,
 							})
 							setShowElevation(false)
 							setShowInfrastructure(false)
