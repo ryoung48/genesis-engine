@@ -99,6 +99,7 @@ export interface GenesisScene {
 		moons: MoonParams[] | null,
 		planetRadiusKm: number,
 		hoursPerDay: number,
+		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,

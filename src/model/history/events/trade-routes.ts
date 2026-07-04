@@ -35,7 +35,7 @@ const ROUTE_TUNING = {
 function routePopulationThresholds(era: HistoryState["era"]) {
 	const tuning = getSettlementEraTuning(era)
 	return {
-		majorSettlementMin: tuning.cityMin,
+		majorSettlementMin: tuning.cityMin * 2,
 		minorSettlementMin: tuning.townMin,
 		portSettlementMin: tuning.townMin,
 		shortRouteMaxPop: tuning.cityMin,

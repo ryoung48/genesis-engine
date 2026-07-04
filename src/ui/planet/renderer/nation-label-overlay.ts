@@ -23,17 +23,42 @@ const LABEL_OUTLINE_COLOR = 0x0f172a
 const LABEL_TEXT_COLOR = "#f1f5f9"
 const LABEL_RENDER_ORDER = 1001
 
+const LABEL_LEADER_COLOR = 0xf8fafc
+const LABEL_LEADER_OPACITY = 0.55
+const LABEL_LEADER_RENDER_ORDER = 1000
+const LABEL_LEADER_HEIGHT_FACTOR = 1.8
+
 const MIN_LABEL_SCALE = 0.5
 const MAX_LABEL_SCALE = 4.5
 
-const GLOBE_CAMERA_UP = new THREE.Vector3()
-const GLOBE_PROJECTED_UP = new THREE.Vector3()
 const GLOBE_BASE_POSITION = new THREE.Vector3()
 const GLOBE_CAMERA_LOCAL_POSITION = new THREE.Vector3()
 const GLOBE_TO_CAMERA = new THREE.Vector3()
+const GLOBE_GROUP_WORLD_QUATERNION = new THREE.Quaternion()
+const GLOBE_LOCAL_CAMERA_QUATERNION = new THREE.Quaternion()
+const GLOBE_CAMERA_UP = new THREE.Vector3()
+const GLOBE_PROJECTED_UP = new THREE.Vector3()
+const GLOBE_STUB_TIP = new THREE.Vector3()
+
+// Labels are children of globeGroup, which carries its own rotation (axial
+// tilt + day/night spin). Billboarding against camera.quaternion directly
+// ignores that parent rotation and produces mis-oriented ("backwards")
+// labels once the globe isn't at its identity orientation. Composing with
+// the inverse of the group's world quaternion cancels the parent rotation
+// so the label's resulting *world* orientation is a true camera billboard.
+function localCameraQuaternion(
+	group: THREE.Object3D,
+	camera: THREE.PerspectiveCamera,
+): THREE.Quaternion {
+	group.getWorldQuaternion(GLOBE_GROUP_WORLD_QUATERNION)
+	return GLOBE_LOCAL_CAMERA_QUATERNION.copy(GLOBE_GROUP_WORLD_QUATERNION)
+		.invert()
+		.multiply(camera.quaternion)
+}
 
 interface LabelPool {
 	items: Text[]
+	leaders: THREE.Line[]
 }
 
 interface NationLabelPools {
@@ -42,7 +67,7 @@ interface NationLabelPools {
 }
 
 function createLabelPool(): LabelPool {
-	return { items: [] }
+	return { items: [], leaders: [] }
 }
 
 function createNationLabelPools(): NationLabelPools {
@@ -50,6 +75,24 @@ function createNationLabelPools(): NationLabelPools {
 		globe: createLabelPool(),
 		map: createLabelPool(),
 	}
+}
+
+function createLabelLeaderLine(): THREE.Line {
+	const geometry = new THREE.BufferGeometry().setFromPoints([
+		new THREE.Vector3(),
+		new THREE.Vector3(),
+	])
+	const material = new THREE.LineBasicMaterial({
+		color: LABEL_LEADER_COLOR,
+		transparent: true,
+		opacity: LABEL_LEADER_OPACITY,
+		depthWrite: false,
+	})
+	const line = new THREE.Line(geometry, material)
+	line.renderOrder = LABEL_LEADER_RENDER_ORDER
+	line.visible = false
+	line.frustumCulled = false
+	return line
 }
 
 function ensurePoolSize(pool: LabelPool, count: number) {
@@ -67,7 +110,10 @@ function ensurePoolSize(pool: LabelPool, count: number) {
 		text.renderOrder = LABEL_RENDER_ORDER
 		text.frustumCulled = true
 		text.visible = false
+		const leader = createLabelLeaderLine()
+		text.userData.leaderLine = leader
 		pool.items.push(text)
+		pool.leaders.push(leader)
 	}
 }
 
@@ -85,6 +131,8 @@ function hideUnusedPool(pool: LabelPool, usedCount: number) {
 	for (let i = usedCount; i < pool.items.length; i++) {
 		const text = pool.items[i]
 		if (text.visible) text.visible = false
+		const leader = pool.leaders[i]
+		if (leader && leader.visible) leader.visible = false
 	}
 }
 
@@ -92,7 +140,12 @@ function disposePool(pool: LabelPool) {
 	for (const text of pool.items) {
 		text.dispose()
 	}
+	for (const leader of pool.leaders) {
+		leader.geometry.dispose()
+		;(leader.material as THREE.Material).dispose()
+	}
 	pool.items = []
+	pool.leaders = []
 }
 
 function nationCapitalRegion(
@@ -216,12 +269,32 @@ function orientGlobeLabel(
 	label.quaternion.copy(cameraQuaternion)
 }
 
-function globeLabelOffset(markerScale: number, fontSize: number): number {
-	return (
-		markerScale * 0.5 +
-		fontSize * LABEL_GLOBE_FONT_GAP_FACTOR +
-		LABEL_OFFSET_GLOBE_Y
-	)
+// The leader line is a short radial stub (straight out from the surface, like
+// the solar terminator's leader stubs). The label itself floats further out,
+// nudged tangentially toward the on-screen "up" direction so it reads above
+// its marker the same way map-view labels sit above their marker dot instead
+// of overlapping it. Bigger/more important names get a taller tangential
+// nudge (scaled by font size) so they sit further from their marker.
+function globeLabelStubLength(markerScale: number): number {
+	return markerScale * 0.5 + LABEL_OFFSET_GLOBE_Y
+}
+
+function globeLabelTangentOffset(fontSize: number): number {
+	return fontSize * LABEL_GLOBE_FONT_GAP_FACTOR + fontSize * LABEL_LEADER_HEIGHT_FACTOR
+}
+
+function updateLabelLeaderLine(
+	label: GlobeLabelLike,
+	basePosition: THREE.Vector3,
+): void {
+	const leader = label.userData.leaderLine as THREE.Line | undefined
+	if (!leader) return
+	const positions = (leader.geometry as THREE.BufferGeometry).attributes
+		.position as THREE.BufferAttribute
+	positions.setXYZ(0, basePosition.x, basePosition.y, basePosition.z)
+	positions.setXYZ(1, label.position.x, label.position.y, label.position.z)
+	positions.needsUpdate = true
+	leader.geometry.computeBoundingSphere()
 }
 
 function updateGlobeLabelPosition(
@@ -232,19 +305,31 @@ function updateGlobeLabelPosition(
 	const basePosition = label.userData.globeBasePosition as
 		| THREE.Vector3
 		| undefined
-	const offset = label.userData.globeLabelOffset as number | undefined
-	if (!normal || !basePosition || offset == null) return
+	const stubLength = label.userData.globeLeaderStubLength as number | undefined
+	const tangentOffset = label.userData.globeLabelTangentOffset as
+		| number
+		| undefined
+	if (!normal || !basePosition || stubLength == null || tangentOffset == null)
+		return
+
+	const stubTip = GLOBE_STUB_TIP.copy(basePosition).addScaledVector(
+		normal,
+		stubLength,
+	)
 
 	GLOBE_PROJECTED_UP.copy(cameraUp).addScaledVector(
 		normal,
 		-cameraUp.dot(normal),
 	)
 	if (GLOBE_PROJECTED_UP.lengthSq() < 1e-8) {
-		label.position.copy(basePosition)
-		return
+		label.position.copy(stubTip)
+	} else {
+		GLOBE_PROJECTED_UP.normalize()
+		label.position
+			.copy(stubTip)
+			.addScaledVector(GLOBE_PROJECTED_UP, tangentOffset)
 	}
-	GLOBE_PROJECTED_UP.normalize()
-	label.position.copy(basePosition).addScaledVector(GLOBE_PROJECTED_UP, offset)
+	updateLabelLeaderLine(label, basePosition)
 }
 
 function isGlobeLabelVisible(
@@ -268,8 +353,12 @@ function updateGlobeLabelOrientations(
 	if (!group) return
 	camera.getWorldPosition(GLOBE_CAMERA_LOCAL_POSITION)
 	group.worldToLocal(GLOBE_CAMERA_LOCAL_POSITION)
+	group.getWorldQuaternion(GLOBE_GROUP_WORLD_QUATERNION)
 
 	const lastCameraQuaternion = group.userData.globeCameraQuaternion as
+		| THREE.Quaternion
+		| undefined
+	const lastGroupQuaternion = group.userData.globeGroupWorldQuaternion as
 		| THREE.Quaternion
 		| undefined
 	const lastCameraPosition = group.userData.globeCameraPosition as
@@ -277,7 +366,9 @@ function updateGlobeLabelOrientations(
 		| undefined
 	const rotationChanged =
 		!lastCameraQuaternion ||
-		lastCameraQuaternion.angleTo(camera.quaternion) > 1e-8
+		lastCameraQuaternion.angleTo(camera.quaternion) > 1e-8 ||
+		!lastGroupQuaternion ||
+		lastGroupQuaternion.angleTo(GLOBE_GROUP_WORLD_QUATERNION) > 1e-8
 	const positionChanged =
 		!lastCameraPosition ||
 		lastCameraPosition.distanceToSquared(GLOBE_CAMERA_LOCAL_POSITION) > 1e-12
@@ -289,23 +380,33 @@ function updateGlobeLabelOrientations(
 	} else {
 		group.userData.globeCameraQuaternion = camera.quaternion.clone()
 	}
+	if (lastGroupQuaternion) {
+		lastGroupQuaternion.copy(GLOBE_GROUP_WORLD_QUATERNION)
+	} else {
+		group.userData.globeGroupWorldQuaternion = GLOBE_GROUP_WORLD_QUATERNION.clone()
+	}
 	if (lastCameraPosition) {
 		lastCameraPosition.copy(GLOBE_CAMERA_LOCAL_POSITION)
 	} else {
 		group.userData.globeCameraPosition = GLOBE_CAMERA_LOCAL_POSITION.clone()
 	}
-	GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(camera.quaternion)
+	const localCamQuat = localCameraQuaternion(group, camera)
+	GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(localCamQuat)
 	for (const child of group.children) {
+		if (child.type === "Line") continue
 		const label = child as GlobeLabelLike
 		const visible = cullingEnabled
 			? isGlobeLabelVisible(label, GLOBE_CAMERA_LOCAL_POSITION)
 			: true
 
+		const leader = label.userData.leaderLine as THREE.Line | undefined
+		if (leader) leader.visible = visible
+
 		label.visible = visible
 		if (!visible) continue
 
 		updateGlobeLabelPosition(label, GLOBE_CAMERA_UP)
-		orientGlobeLabel(label, camera.quaternion)
+		orientGlobeLabel(label, localCamQuat)
 	}
 }
 
@@ -325,7 +426,7 @@ export function buildGlobeNationLabels(
 	const nationCount = world.nations.seeds?.length ?? 0
 
 	ensurePoolSize(pool, nationCount)
-	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
+	const initialCameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
 		camera.quaternion,
 	)
 
@@ -364,15 +465,18 @@ export function buildGlobeNationLabels(
 		)
 			.multiplyScalar(globePlacement.radius)
 			.clone()
-		text.userData.globeLabelOffset = globeLabelOffset(
-			markerScale,
-			text.fontSize,
-		)
+		text.userData.globeLeaderStubLength =
+			globeLabelStubLength(markerScale) +
+			globeLabelTangentOffset(text.fontSize)
+		text.userData.globeLabelTangentOffset = 0
 		text.sync()
-		updateGlobeLabelPosition(text, cameraUp)
+		updateGlobeLabelPosition(text, initialCameraUp)
 		orientGlobeLabel(text, camera.quaternion)
 		text.visible = true
 		group.add(text)
+		const leader = pool.leaders[activeCount]
+		leader.visible = true
+		group.add(leader)
 		activeCount++
 	}
 
@@ -523,7 +627,7 @@ function buildGlobePartitionLabels(
 	const elevation = world.elevation
 
 	ensurePoolSize(pool, partitionCount)
-	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
+	const initialCameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
 		camera.quaternion,
 	)
 
@@ -551,12 +655,18 @@ function buildGlobePartitionLabels(
 		)
 			.multiplyScalar(globePlacement.radius)
 			.clone()
-		text.userData.globeLabelOffset = globeLabelOffset(0, text.fontSize)
+		text.userData.globeLeaderStubLength = globeLabelStubLength(0)
+		text.userData.globeLabelTangentOffset = globeLabelTangentOffset(
+			text.fontSize,
+		)
 		text.sync()
-		updateGlobeLabelPosition(text, cameraUp)
+		updateGlobeLabelPosition(text, initialCameraUp)
 		orientGlobeLabel(text, camera.quaternion)
 		text.visible = true
 		group.add(text)
+		const leader = pool.leaders[activeCount]
+		leader.visible = true
+		group.add(leader)
 		activeCount++
 	}
 
@@ -778,15 +888,8 @@ function settlementLabelPositionGlobe(
 	}
 }
 
-function settlementGlobeLabelOffset(
-	markerScale: number,
-	fontSize: number,
-): number {
-	return (
-		markerScale * 0.5 +
-		fontSize * LABEL_GLOBE_FONT_GAP_FACTOR +
-		SETTLEMENT_LABEL_OFFSET_GLOBE_Y
-	)
+function settlementGlobeLabelStubLength(markerScale: number): number {
+	return markerScale * 0.5 + SETTLEMENT_LABEL_OFFSET_GLOBE_Y
 }
 
 function createSettlementLabelPools(): NationLabelPools {
@@ -809,7 +912,7 @@ export function buildGlobeSettlementLabels(
 	const provinceCount = world.provinces.count ?? settlementNames.length
 
 	ensurePoolSize(pool, provinceCount)
-	const cameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
+	const initialCameraUp = GLOBE_CAMERA_UP.set(0, 1, 0).applyQuaternion(
 		camera.quaternion,
 	)
 
@@ -841,12 +944,11 @@ export function buildGlobeSettlementLabels(
 		)
 			.multiplyScalar(globePlacement.radius)
 			.clone()
-		text.userData.globeLabelOffset = settlementGlobeLabelOffset(
-			markerScale,
-			fontSize,
-		)
+		text.userData.globeLeaderStubLength =
+			settlementGlobeLabelStubLength(markerScale)
+		text.userData.globeLabelTangentOffset = globeLabelTangentOffset(fontSize)
 		text.sync()
-		updateGlobeLabelPosition(text, cameraUp)
+		updateGlobeLabelPosition(text, initialCameraUp)
 		orientGlobeLabel(text, camera.quaternion)
 		text.visible = true
 		group.add(text)
@@ -925,10 +1027,12 @@ export {
 	LABEL_FONT_SIZE_MAP,
 	LABEL_OUTLINE_COLOR,
 	LABEL_RENDER_ORDER,
+	createLabelLeaderLine,
 	createNationLabelPools,
 	createSettlementLabelPools,
 	disposePool,
-	globeLabelOffset,
+	globeLabelStubLength,
+	globeLabelTangentOffset,
 	labelPositionGlobe,
 	labelPositionMap,
 	nationCapitalProvince,

@@ -11,6 +11,7 @@ import {
 	moonPeriodBoundsDay,
 	moonSemiMajorAxisM,
 	orbitalVectorToPlanetFixedPosition,
+	resolveMoonOrbitHoursPerDay,
 	rocheLimitM,
 } from "../celestial/moons/orbital-mechanics"
 import type { MainSequenceClass } from "../celestial/star/star-types"
@@ -198,6 +199,7 @@ function buildMoonContributors(
 		| "hoursPerDay"
 		| "planetRadiusKm"
 		| "orbitalDistanceAU"
+		| "tideLock"
 		| "spectralClass"
 		| "starSubtype"
 	>,
@@ -211,7 +213,12 @@ function buildMoonContributors(
 		orbitalDistanceAU,
 		spectralClass,
 		starSubtype,
+		tideLock,
 	} = params
+	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+		hoursPerDay,
+		tideLock ?? null,
+	)
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
 	const cls = isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
@@ -227,14 +234,18 @@ function buildMoonContributors(
 				starMassKg,
 				planetRadiusKm,
 				orbitalDistanceAU,
-				hoursPerDay,
+				moonOrbitHoursPerDay,
 			)
 			if (result.clamped) moonsClamped = true
 			return { moon: result.moon, index }
 		})
 		.filter(({ moon }) => moon.orbitalPeriodDays > 0)
 		.map(({ moon, index }) => {
-			const semiMajorAxisM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
+			const semiMajorAxisM = moonSemiMajorAxisM(
+				moon,
+				planetMassKg,
+				moonOrbitHoursPerDay,
+			)
 			return {
 				idx: moon.idx,
 				label: `Moon ${index + 1}`,

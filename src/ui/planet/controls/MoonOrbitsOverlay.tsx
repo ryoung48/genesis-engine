@@ -1,8 +1,9 @@
 import React, { useMemo } from "react"
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
+	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
 import { scaleClockDialHourToDayLength } from "../clock"
 import {
@@ -36,6 +37,7 @@ interface MoonOrbitsOverlayProps {
 	showEllipticalOrbits?: boolean
 	showDaylight?: boolean
 	clockHour?: number
+	tideLock: TideLock | null
 }
 
 export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
@@ -46,6 +48,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 	showEllipticalOrbits = true,
 	showDaylight = false,
 	clockHour = 12,
+	tideLock,
 }) => {
 	const SIZE = 230
 	const PLANET_R = 10
@@ -57,10 +60,14 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 	const orbits = useMemo(() => {
 		if (moons.length === 0) return []
 		const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+		const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+			hoursPerDay,
+			tideLock,
+		)
 		const maxExtentPlanetRadii = Math.max(
 			...moons.map((m) =>
 				getMoonOrbitDistanceRelativeToPlanet(
-					moonSemiMajorAxisM(m, planetMassKg, hoursPerDay) *
+					moonSemiMajorAxisM(m, planetMassKg, moonOrbitHoursPerDay) *
 						(1 + m.eccentricity),
 					planetRadiusKm,
 				),
@@ -68,7 +75,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 		)
 
 		return moons.map((moon, i) => {
-			const smaM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
+			const smaM = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
 			const orbitalDistancePlanetRadii = getMoonOrbitDistanceRelativeToPlanet(
 				smaM,
 				planetRadiusKm,
@@ -139,6 +146,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 		planetRadiusKm,
 		scaledClockHour,
 		showEllipticalOrbits,
+		tideLock,
 	])
 
 	return (

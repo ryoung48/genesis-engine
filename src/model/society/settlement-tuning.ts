@@ -3,13 +3,11 @@ import type { SocietyEra } from "./eras"
 interface SettlementEraTuning {
 	townMin: number
 	cityMin: number
-	urbanRateRange: [number, number, number, number, number, number]
 }
 
 const LATE_MEDIEVAL_TUNING: SettlementEraTuning = {
 	townMin: 1_000,
 	cityMin: 8_000,
-	urbanRateRange: [0.04, 0.05, 0.06, 0.07, 0.08, 0.09],
 }
 
 const ERA_TUNING: Record<SocietyEra, SettlementEraTuning> = {
@@ -21,17 +19,14 @@ const ERA_TUNING: Record<SocietyEra, SettlementEraTuning> = {
 	earlyModern: {
 		townMin: 2_000,
 		cityMin: 12_000,
-		urbanRateRange: [0.05, 0.065, 0.08, 0.1, 0.12, 0.14],
 	},
 	industrial: {
 		townMin: 5_000,
 		cityMin: 20_000,
-		urbanRateRange: [0.08, 0.11, 0.15, 0.2, 0.24, 0.28],
 	},
 	information: {
 		townMin: 10_000,
 		cityMin: 50_000,
-		urbanRateRange: [0.08, 0.12, 0.18, 0.25, 0.31, 0.36],
 	},
 }
 

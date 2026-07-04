@@ -30,8 +30,10 @@ export const ContinuousLegend: React.FC<ContinuousLegendProps> = ({
 	)
 
 	return (
-		<div className={`mt-4 flex flex-col gap-2 px-1 ${className ?? ""}`.trim()}>
-			<div className="flex items-center justify-between text-[10px] font-mono text-gray-500 uppercase tracking-tighter">
+		<div
+			className={`mt-2 flex flex-col gap-1.5 px-0.5 ${className ?? ""}`.trim()}
+		>
+			<div className="flex items-center justify-between text-[9px] font-mono text-gray-500 uppercase tracking-tighter">
 				<span>{formatValue(min)}</span>
 				<span>{title}</span>
 				<span>{formatValue(max)}</span>

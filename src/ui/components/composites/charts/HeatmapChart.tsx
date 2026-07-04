@@ -97,6 +97,14 @@ export const HeatmapChart: React.FC<HeatmapChartProps> = ({
 					options={{
 						responsive: true,
 						maintainAspectRatio: false,
+						layout: {
+							padding: {
+								top: 2,
+								right: 2,
+								bottom: 0,
+								left: 0,
+							},
+						},
 						plugins: {
 							legend: { display: false },
 							tooltip: {
@@ -124,22 +132,28 @@ export const HeatmapChart: React.FC<HeatmapChartProps> = ({
 						scales: {
 							x: {
 								stacked: true,
+								offset: false,
 								ticks: {
 									display: showXAxis,
 									maxTicksLimit: 12,
 									autoSkip: true,
-									font: { size: 9, family: "monospace" },
+									maxRotation: 0,
+									minRotation: 0,
+									padding: 2,
+									font: { size: 8, family: "monospace" },
 								},
 								title: {
 									display: showXAxis && Boolean(xAxisTitle),
 									text: xAxisTitle,
-									font: { size: 10, family: "monospace", weight: "bold" },
+									padding: { top: 2 },
+									font: { size: 9, family: "monospace", weight: "bold" },
 								},
 								grid: { display: false },
 								border: { display: showXAxis },
 							},
 							y: {
 								stacked: true,
+								offset: false,
 								ticks: {
 									callback: (_value, index) => {
 										const rowValue = rowValues[index]
@@ -150,12 +164,14 @@ export const HeatmapChart: React.FC<HeatmapChartProps> = ({
 									},
 									autoSkip: false,
 									stepSize: 1,
-									font: { size: 8, family: "monospace" },
+									padding: 2,
+									font: { size: 7, family: "monospace" },
 								},
 								title: {
 									display: Boolean(yAxisTitle),
 									text: yAxisTitle,
-									font: { size: 10, family: "monospace", weight: "bold" },
+									padding: { bottom: 2 },
+									font: { size: 9, family: "monospace", weight: "bold" },
 								},
 								grid: { display: false },
 							},

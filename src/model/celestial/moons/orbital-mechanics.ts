@@ -8,6 +8,7 @@ import {
 	MOON_DEFAULTS,
 	type MoonOrbitRange,
 	type MoonParams,
+	type TideLock,
 } from "./moon-types"
 
 const G = 6.674e-11
@@ -15,6 +16,7 @@ const M_SOL_KG = 1.989e30
 const AU_M = 1.496e11
 const EARTH_DENSITY_KG_M3 = 5515
 const TWO_PI = 2 * Math.PI
+const SOLAR_LOCK_MOON_ORBIT_HOURS_PER_DAY = 24
 
 export { M_SOL_KG, AU_M }
 export const LUNA_MOON_SEED = SEED_MAX - 1
@@ -361,6 +363,15 @@ function rollMoonEccentricity(
 export function derivePlanetMassKg(radiusKm: number): number {
 	const r = radiusKm * 1000
 	return EARTH_DENSITY_KG_M3 * (4 / 3) * Math.PI * r * r * r
+}
+
+export function resolveMoonOrbitHoursPerDay(
+	hoursPerDay: number,
+	tideLock: TideLock | null,
+): number {
+	return tideLock?.type === "solar"
+		? SOLAR_LOCK_MOON_ORBIT_HOURS_PER_DAY
+		: hoursPerDay
 }
 
 export function moonSemiMajorAxisM(

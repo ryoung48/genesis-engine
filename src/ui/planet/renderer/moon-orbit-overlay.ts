@@ -1,8 +1,9 @@
 import * as THREE from "three"
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
+	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
 import {
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -173,6 +174,7 @@ export function buildMoonOrbitOverlay(
 	moons: MoonParams[],
 	planetRadiusKm: number,
 	hoursPerDay: number,
+	tideLock: TideLock | null,
 	initialDay: number,
 	showGrid: boolean,
 	gridSpacing: number,
@@ -190,10 +192,14 @@ export function buildMoonOrbitOverlay(
 	}
 
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+		hoursPerDay,
+		tideLock,
+	)
 	const maxOrbitalDistancePlanetRadii = Math.max(
 		...moons.map((moon) =>
 			getMoonOrbitDistanceRelativeToPlanet(
-				moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay) *
+				moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay) *
 					(1 + moon.eccentricity),
 				planetRadiusKm,
 			),
@@ -219,7 +225,7 @@ export function buildMoonOrbitOverlay(
 	}> = []
 
 	moons.forEach((moon, i) => {
-		const smaM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
+		const smaM = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
 		const orbitalDistancePlanetRadii = getMoonOrbitDistanceRelativeToPlanet(
 			smaM,
 			planetRadiusKm,

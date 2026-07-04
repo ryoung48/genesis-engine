@@ -38,20 +38,6 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.numPoints,
 	},
 	{
-		name: "jitter",
-		min: SR.jitter.min,
-		step: SR.jitter.step,
-		count: rangeCount(SR.jitter),
-		read: (p) => p.jitter,
-	},
-	{
-		name: "numPlates",
-		min: SR.numPlates.min,
-		step: SR.numPlates.step,
-		count: rangeCount(SR.numPlates),
-		read: (p) => p.numPlates,
-	},
-	{
 		name: "landDistribution",
 		min: SR.landDistribution.min,
 		step: SR.landDistribution.step,
@@ -59,60 +45,11 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.landDistribution,
 	},
 	{
-		name: "roughness",
-		min: SR.roughness.min,
-		step: SR.roughness.step,
-		count: rangeCount(SR.roughness),
-		read: (p) => p.roughness,
-	},
-	{
-		name: "smoothing",
-		min: SR.smoothing.min,
-		step: SR.smoothing.step,
-		count: rangeCount(SR.smoothing),
-		read: (p) => p.smoothing,
-	},
-	{
-		name: "glacialErosion",
-		min: SR.glacialErosion.min,
-		step: SR.glacialErosion.step,
-		count: rangeCount(SR.glacialErosion),
-		read: (p) => p.glacialErosion,
-	},
-	{
 		name: "seaLevel",
 		min: SR.seaLevel.min,
 		step: SR.seaLevel.step,
 		count: rangeCount(SR.seaLevel),
 		read: (p) => p.seaLevel,
-	},
-	{
-		name: "hydraulicErosion",
-		min: SR.hydraulicErosion.min,
-		step: SR.hydraulicErosion.step,
-		count: rangeCount(SR.hydraulicErosion),
-		read: (p) => p.hydraulicErosion,
-	},
-	{
-		name: "thermalErosion",
-		min: SR.thermalErosion.min,
-		step: SR.thermalErosion.step,
-		count: rangeCount(SR.thermalErosion),
-		read: (p) => p.thermalErosion,
-	},
-	{
-		name: "ridgeSharpening",
-		min: SR.ridgeSharpening.min,
-		step: SR.ridgeSharpening.step,
-		count: rangeCount(SR.ridgeSharpening),
-		read: (p) => p.ridgeSharpening,
-	},
-	{
-		name: "terrainWarp",
-		min: SR.terrainWarp.min,
-		step: SR.terrainWarp.step,
-		count: rangeCount(SR.terrainWarp),
-		read: (p) => p.terrainWarp,
 	},
 	{
 		name: "continentSizeVariety",
@@ -374,17 +311,8 @@ export function encodePlanetCode(seed: number, params: GenesisParams): string {
 interface DecodedPlanetCode {
 	seed: number
 	numPoints: number
-	jitter: number
-	numPlates: number
 	landDistribution: number
-	roughness: number
-	smoothing: number
-	glacialErosion: number
 	seaLevel: number
-	hydraulicErosion: number
-	thermalErosion: number
-	ridgeSharpening: number
-	terrainWarp: number
 	continentSizeVariety: number
 	landCoverage: number
 	planetRadiusKm: number
@@ -443,17 +371,8 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 	return {
 		seed,
 		numPoints: decodedFields.numPoints,
-		jitter: decodedFields.jitter,
-		numPlates: decodedFields.numPlates,
 		landDistribution: decodedFields.landDistribution,
-		roughness: decodedFields.roughness,
-		smoothing: decodedFields.smoothing,
-		glacialErosion: decodedFields.glacialErosion,
 		seaLevel: decodedFields.seaLevel,
-		hydraulicErosion: decodedFields.hydraulicErosion,
-		thermalErosion: decodedFields.thermalErosion,
-		ridgeSharpening: decodedFields.ridgeSharpening,
-		terrainWarp: decodedFields.terrainWarp,
 		continentSizeVariety: decodedFields.continentSizeVariety,
 		landCoverage: decodedFields.landCoverage,
 		planetRadiusKm: decodedFields.planetRadiusKm,

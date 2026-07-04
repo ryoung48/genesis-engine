@@ -181,32 +181,14 @@ export function buildPlanetSliders(state: {
 
 export function buildTerrainSliders(state: {
 	numPoints: number
-	jitter: number
-	numPlates: number
-	roughness: number
 	continentSizeVariety: number
-	terrainWarp: number
-	smoothing: number
-	hydraulicErosion: number
-	thermalErosion: number
-	ridgeSharpening: number
-	glacialErosion: number
 	seaLevel: number
 	craters: number
 	volcanism: number
 	unitSystem: UnitSystem
 	maxElevation: number
 	setNumPoints: (v: number) => void
-	setJitter: (v: number) => void
-	setNumPlates: (v: number) => void
-	setRoughness: (v: number) => void
 	setContinentSizeVariety: (v: number) => void
-	setTerrainWarp: (v: number) => void
-	setSmoothing: (v: number) => void
-	setHydraulicErosion: (v: number) => void
-	setThermalErosion: (v: number) => void
-	setRidgeSharpening: (v: number) => void
-	setGlacialErosion: (v: number) => void
 	setSeaLevel: (v: number) => void
 	setCraters: (v: number) => void
 	setVolcanism: (v: number) => void
@@ -222,84 +204,12 @@ export function buildTerrainSliders(state: {
 			set: state.setNumPoints,
 		},
 		{
-			label: "Irregularity",
-			help: "Controls how even or organic the underlying mesh feels.",
-			value: state.jitter,
-			display: state.jitter.toFixed(2),
-			...SR.jitter,
-			set: state.setJitter,
-		},
-		{
-			label: "Plates",
-			help: "More plates create more tectonic boundaries, coasts, and terrain partitions.",
-			value: state.numPlates,
-			display: String(state.numPlates),
-			...SR.numPlates,
-			set: state.setNumPlates,
-		},
-		{
-			label: "Roughness",
-			help: "Adds fractal detail to mountains, ridges, and coastlines.",
-			value: state.roughness,
-			display: state.roughness.toFixed(2),
-			...SR.roughness,
-			set: state.setRoughness,
-		},
-		{
 			label: "Size Variety",
 			help: "Makes plate-driven landmasses or seas more equal-sized or more uneven.",
 			value: state.continentSizeVariety,
 			display: state.continentSizeVariety.toFixed(2),
 			...SR.continentSizeVariety,
 			set: state.setContinentSizeVariety,
-		},
-		{
-			label: "Terrain Warp",
-			help: "Twists the raw terrain field into more organic coastlines and ridges.",
-			value: state.terrainWarp,
-			display: state.terrainWarp.toFixed(2),
-			...SR.terrainWarp,
-			set: state.setTerrainWarp,
-		},
-		{
-			label: "Smoothing",
-			help: "Softens hard tectonic edges and blends abrupt elevation transitions.",
-			value: state.smoothing,
-			display: state.smoothing.toFixed(2),
-			...SR.smoothing,
-			set: state.setSmoothing,
-		},
-		{
-			label: "Hydraulic Erosion",
-			help: "Cuts river valleys and drainage networks into the terrain.",
-			value: state.hydraulicErosion,
-			display: state.hydraulicErosion.toFixed(2),
-			...SR.hydraulicErosion,
-			set: state.setHydraulicErosion,
-		},
-		{
-			label: "Thermal Erosion",
-			help: "Moves loose material downhill, softening ridges and steep slopes.",
-			value: state.thermalErosion,
-			display: state.thermalErosion.toFixed(2),
-			...SR.thermalErosion,
-			set: state.setThermalErosion,
-		},
-		{
-			label: "Ridge Sharpening",
-			help: "Pushes ridgelines above their surroundings for a stronger mountain silhouette.",
-			value: state.ridgeSharpening,
-			display: state.ridgeSharpening.toFixed(2),
-			...SR.ridgeSharpening,
-			set: state.setRidgeSharpening,
-		},
-		{
-			label: "Glacial Erosion",
-			help: "Carves fjords, basins, and U-shaped valleys into cold high terrain.",
-			value: state.glacialErosion,
-			display: state.glacialErosion.toFixed(2),
-			...SR.glacialErosion,
-			set: state.setGlacialErosion,
 		},
 		{
 			label: "Sea Level",
@@ -354,12 +264,9 @@ export function buildTerrainSliders(state: {
 
 export function resetWorldDefaults(setters: {
 	setNumPoints: (v: number) => void
-	setJitter: (v: number) => void
-	setNumPlates: (v: number) => void
 	setLandDistribution: (v: number) => void
 	setContinentSizeVariety: (v: number) => void
 	setLandCoverage: (v: number) => void
-	setRoughness: (v: number) => void
 	setPlanetRadiusKm: (v: number) => void
 	setObliquity: (v: number) => void
 	setEccentricity: (v: number) => void
@@ -378,12 +285,6 @@ export function resetWorldDefaults(setters: {
 	setPressure: (v: number) => void
 	setMoonCount: (v: number) => void
 	setMoonSeed: (v: number) => void
-	setTerrainWarp: (v: number) => void
-	setSmoothing: (v: number) => void
-	setHydraulicErosion: (v: number) => void
-	setThermalErosion: (v: number) => void
-	setRidgeSharpening: (v: number) => void
-	setGlacialErosion: (v: number) => void
 	setSeaLevel: (v: number) => void
 	setCraters: (v: number) => void
 	setVolcanism: (v: number) => void
@@ -391,12 +292,9 @@ export function resetWorldDefaults(setters: {
 	setEra: (v: SocietyEra) => void
 }): void {
 	setters.setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
-	setters.setJitter(DEFAULT_WORLD_PARAMS.jitter)
-	setters.setNumPlates(DEFAULT_WORLD_PARAMS.numPlates)
 	setters.setLandDistribution(DEFAULT_WORLD_PARAMS.landDistribution)
 	setters.setContinentSizeVariety(DEFAULT_WORLD_PARAMS.continentSizeVariety)
 	setters.setLandCoverage(DEFAULT_WORLD_PARAMS.landCoverage)
-	setters.setRoughness(DEFAULT_WORLD_PARAMS.roughness)
 	setters.setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
 	setters.setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
 	setters.setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
@@ -411,12 +309,6 @@ export function resetWorldDefaults(setters: {
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
 	setters.setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)
 	setters.setMoonSeed(LUNA_MOON_SEED)
-	setters.setTerrainWarp(DEFAULT_WORLD_PARAMS.terrainWarp)
-	setters.setSmoothing(DEFAULT_WORLD_PARAMS.smoothing)
-	setters.setHydraulicErosion(DEFAULT_WORLD_PARAMS.hydraulicErosion)
-	setters.setThermalErosion(DEFAULT_WORLD_PARAMS.thermalErosion)
-	setters.setRidgeSharpening(DEFAULT_WORLD_PARAMS.ridgeSharpening)
-	setters.setGlacialErosion(DEFAULT_WORLD_PARAMS.glacialErosion)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
 	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)

@@ -5,6 +5,7 @@ import {
 	generateGasGiantSystem,
 	generateMoons,
 	M_SOL_KG,
+	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
 import { generatePlanetName } from "@/model/celestial/planet-name"
 import type { MainSequenceClass } from "@/model/celestial/star/star-types"
@@ -479,12 +480,10 @@ export const GenesisView: React.FC = () => {
 		initialViewPrefs.debugMapModes,
 	)
 	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
-	const [worldTab, setWorldTab] = useState<"planet" | "terrain" | "society">(
-		"planet",
-	)
+	const [worldTab, setWorldTab] = useState<"planet" | "society">("planet")
 	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
 	const [generationPreviewTab, setGenerationPreviewTab] =
-		useState<GenerationPreviewTab>("temperature")
+		useState<GenerationPreviewTab>("climate")
 	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
 
@@ -619,12 +618,8 @@ export const GenesisView: React.FC = () => {
 	const [numPoints, setNumPoints] = useState(
 		initialDecodedCode?.numPoints ?? DEFAULT_WORLD_PARAMS.numPoints,
 	)
-	const [jitter, setJitter] = useState(
-		initialDecodedCode?.jitter ?? DEFAULT_WORLD_PARAMS.jitter,
-	)
-	const [numPlates, setNumPlates] = useState(
-		initialDecodedCode?.numPlates ?? DEFAULT_WORLD_PARAMS.numPlates,
-	)
+	const jitter = DEFAULT_WORLD_PARAMS.jitter
+	const numPlates = DEFAULT_WORLD_PARAMS.numPlates
 	const [landDistribution, setLandDistribution] = useState(
 		initialDecodedCode?.landDistribution ??
 			DEFAULT_WORLD_PARAMS.landDistribution,
@@ -636,9 +631,7 @@ export const GenesisView: React.FC = () => {
 	const [landCoverage, setLandCoverage] = useState(
 		initialDecodedCode?.landCoverage ?? DEFAULT_WORLD_PARAMS.landCoverage,
 	)
-	const [roughness, setRoughness] = useState(
-		initialDecodedCode?.roughness ?? DEFAULT_WORLD_PARAMS.roughness,
-	)
+	const roughness = DEFAULT_WORLD_PARAMS.roughness
 	const [planetRadiusKm, setPlanetRadiusKm] = useState(
 		initialDecodedCode?.planetRadiusKm ?? DEFAULT_WORLD_PARAMS.planetRadiusKm,
 	)
@@ -744,32 +737,27 @@ export const GenesisView: React.FC = () => {
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
 			getKeplerYearYears(orbitalDistanceAU, effectiveStarMassSol) * 365.25 * 24
-		const dayHours = gasGiantSystem?.gasGiant.dayLengthHours ?? hoursPerDay
+		const dayHours =
+			gasGiantSystem?.gasGiant.dayLengthHours ??
+			resolveMoonOrbitHoursPerDay(hoursPerDay, tideLock)
 		return Math.round(keplerHours / dayHours)
-	}, [orbitalDistanceAU, effectiveStarMassSol, gasGiantSystem, hoursPerDay])
+	}, [
+		orbitalDistanceAU,
+		effectiveStarMassSol,
+		gasGiantSystem,
+		hoursPerDay,
+		tideLock,
+	])
 
 	const effectiveDaysPerYear = tidallyLocked ? 1 : daysPerYear
 
 	// Terrain params
-	const [terrainWarp, setTerrainWarp] = useState(
-		initialDecodedCode?.terrainWarp ?? DEFAULT_WORLD_PARAMS.terrainWarp,
-	)
-	const [smoothing, setSmoothing] = useState(
-		initialDecodedCode?.smoothing ?? DEFAULT_WORLD_PARAMS.smoothing,
-	)
-	const [hydraulicErosion, setHydraulicErosion] = useState(
-		initialDecodedCode?.hydraulicErosion ??
-			DEFAULT_WORLD_PARAMS.hydraulicErosion,
-	)
-	const [thermalErosion, setThermalErosion] = useState(
-		initialDecodedCode?.thermalErosion ?? DEFAULT_WORLD_PARAMS.thermalErosion,
-	)
-	const [ridgeSharpening, setRidgeSharpening] = useState(
-		initialDecodedCode?.ridgeSharpening ?? DEFAULT_WORLD_PARAMS.ridgeSharpening,
-	)
-	const [glacialErosion, setGlacialErosion] = useState(
-		initialDecodedCode?.glacialErosion ?? DEFAULT_WORLD_PARAMS.glacialErosion,
-	)
+	const terrainWarp = DEFAULT_WORLD_PARAMS.terrainWarp
+	const smoothing = DEFAULT_WORLD_PARAMS.smoothing
+	const hydraulicErosion = DEFAULT_WORLD_PARAMS.hydraulicErosion
+	const thermalErosion = DEFAULT_WORLD_PARAMS.thermalErosion
+	const ridgeSharpening = DEFAULT_WORLD_PARAMS.ridgeSharpening
+	const glacialErosion = DEFAULT_WORLD_PARAMS.glacialErosion
 	const [seaLevel, setSeaLevel] = useState(
 		initialDecodedCode?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 	)
@@ -2394,12 +2382,9 @@ export const GenesisView: React.FC = () => {
 	const setters = useMemo(
 		() => ({
 			setNumPoints,
-			setJitter,
-			setNumPlates,
 			setLandDistribution,
 			setContinentSizeVariety,
 			setLandCoverage,
-			setRoughness,
 			setPlanetRadiusKm,
 			setObliquity,
 			setEccentricity,
@@ -2414,12 +2399,6 @@ export const GenesisView: React.FC = () => {
 			setPressure,
 			setMoonCount,
 			setMoonSeed,
-			setTerrainWarp,
-			setSmoothing,
-			setHydraulicErosion,
-			setThermalErosion,
-			setRidgeSharpening,
-			setGlacialErosion,
 			setSeaLevel,
 			setVolcanism,
 			setCraters,
@@ -2432,12 +2411,9 @@ export const GenesisView: React.FC = () => {
 		(decoded: NonNullable<ReturnType<typeof decodePlanetCode>>) => {
 			setSeed(decoded.seed)
 			setters.setNumPoints(decoded.numPoints)
-			setters.setJitter(decoded.jitter)
-			setters.setNumPlates(decoded.numPlates)
 			setters.setLandDistribution(decoded.landDistribution)
 			setters.setContinentSizeVariety(decoded.continentSizeVariety)
 			setters.setLandCoverage(decoded.landCoverage)
-			setters.setRoughness(decoded.roughness)
 			setters.setPlanetRadiusKm(decoded.planetRadiusKm)
 			setters.setObliquity(decoded.obliquity)
 			setters.setEccentricity(decoded.eccentricity)
@@ -2454,12 +2430,6 @@ export const GenesisView: React.FC = () => {
 			setters.setMoonSeed(
 				decoded.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
 			)
-			setters.setTerrainWarp(decoded.terrainWarp)
-			setters.setSmoothing(decoded.smoothing)
-			setters.setHydraulicErosion(decoded.hydraulicErosion)
-			setters.setThermalErosion(decoded.thermalErosion)
-			setters.setRidgeSharpening(decoded.ridgeSharpening)
-			setters.setGlacialErosion(decoded.glacialErosion)
 			setters.setSeaLevel(decoded.seaLevel)
 			setters.setVolcanism(decoded.volcanism)
 			setters.setCraters(decoded.craters ?? 0)
@@ -2742,31 +2712,13 @@ export const GenesisView: React.FC = () => {
 	})
 	const terrainSliders = buildTerrainSliders({
 		numPoints,
-		jitter,
-		numPlates,
-		roughness,
 		continentSizeVariety,
-		terrainWarp,
-		smoothing,
-		hydraulicErosion,
-		thermalErosion,
-		ridgeSharpening,
-		glacialErosion,
 		seaLevel,
 		craters,
 		volcanism,
 		maxElevation,
 		setNumPoints,
-		setJitter,
-		setNumPlates,
-		setRoughness,
 		setContinentSizeVariety,
-		setTerrainWarp,
-		setSmoothing,
-		setHydraulicErosion,
-		setThermalErosion,
-		setRidgeSharpening,
-		setGlacialErosion,
 		setSeaLevel,
 		setCraters,
 		setVolcanism,
@@ -2864,12 +2816,16 @@ export const GenesisView: React.FC = () => {
 			? (spectralClass as MainSequenceClass)
 			: DEFAULT_SPECTRAL_CLASS
 		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+		const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+			hoursPerDay,
+			tideLock,
+		)
 		return generateMoons(
 			moonCount,
 			moonSeed,
 			planetRadiusKm,
 			orbitalDistanceAU,
-			hoursPerDay,
+			moonOrbitHoursPerDay,
 			starMassKg,
 		)
 	}, [
@@ -2878,6 +2834,7 @@ export const GenesisView: React.FC = () => {
 		planetRadiusKm,
 		orbitalDistanceAU,
 		hoursPerDay,
+		tideLock,
 		spectralClass,
 		starSubtype,
 	])
@@ -2923,6 +2880,7 @@ export const GenesisView: React.FC = () => {
 				: null,
 			planetRadiusKm,
 			hoursPerDay,
+			tideLock,
 			moonOrbitDayOfYear,
 			showGrid,
 			gridSpacing,
@@ -2935,6 +2893,7 @@ export const GenesisView: React.FC = () => {
 		generatedMoonsPreview,
 		planetRadiusKm,
 		hoursPerDay,
+		tideLock,
 		moonOrbitDayOfYear,
 		showGrid,
 		gridSpacing,
@@ -3372,6 +3331,7 @@ export const GenesisView: React.FC = () => {
 									moons={generatedMoonsPreview}
 									planetRadiusKm={planetRadiusKm}
 									hoursPerDay={hoursPerDay}
+									tideLock={tideLock}
 									day={moonOrbitDayOfYear}
 									showEllipticalOrbits={showEllipticalOrbits}
 									showDaylight={showDaylight}
@@ -3386,6 +3346,7 @@ export const GenesisView: React.FC = () => {
 								moons={generatedMoonsPreview}
 								planetRadiusKm={planetRadiusKm}
 								hoursPerDay={hoursPerDay}
+								tideLock={tideLock}
 								day={moonOrbitDayOfYear}
 								orbitalDistanceAU={orbitalDistanceAU}
 								spectralClass={spectralClass}

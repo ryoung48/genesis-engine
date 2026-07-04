@@ -5,7 +5,8 @@ import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 import { createMapProjection } from "./map-projection"
 import {
 	computeLabelScale,
-	globeLabelOffset,
+	globeLabelStubLength,
+	globeLabelTangentOffset,
 	LABEL_FONT_SIZE_GLOBE,
 	LABEL_FONT_SIZE_MAP,
 	LABEL_RENDER_ORDER,
@@ -50,7 +51,8 @@ interface ScriptMesh
 	userData: THREE.Mesh["userData"] & {
 		globeNormal?: THREE.Vector3
 		globeBasePosition?: THREE.Vector3
-		globeLabelOffset?: number
+		globeLeaderStubLength?: number
+		globeLabelTangentOffset?: number
 		scriptPlaneHeight?: number
 	}
 }
@@ -318,9 +320,16 @@ export function buildGlobeNationScripts(
 		mesh.userData.globeBasePosition = placement.normal
 			.clone()
 			.multiplyScalar(placement.radius)
-		mesh.userData.globeLabelOffset =
-			-globeLabelOffset(markerScale, fontSize) -
-			(planeHeight / 2 + fontSize * SCRIPT_GLOBE_GAP_FACTOR)
+		// Anchored at the exact same point as the nation label above it (no
+		// leader line of its own), then nudged down in screen space by a small
+		// tangential offset so it reads as a subtitle directly under the name.
+		const nationLabelRadialOffset =
+			globeLabelStubLength(markerScale) + globeLabelTangentOffset(fontSize)
+		mesh.userData.globeLeaderStubLength = nationLabelRadialOffset
+		mesh.userData.globeLabelTangentOffset = -(
+			planeHeight / 2 +
+			fontSize * SCRIPT_GLOBE_GAP_FACTOR
+		)
 		queueScriptTexture(
 			textureQueue,
 			textureCache,

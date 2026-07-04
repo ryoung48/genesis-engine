@@ -24,6 +24,7 @@ import {
 	generateGasGiantSystem,
 	generateMoons,
 	M_SOL_KG,
+	resolveMoonOrbitHoursPerDay,
 } from "../celestial/moons/orbital-mechanics"
 import type { MainSequenceClass } from "../celestial/star/star-types"
 import {
@@ -538,6 +539,10 @@ export function runPostElevationPipeline(
 		? (params.spectralClass as MainSequenceClass)
 		: DEFAULT_SPECTRAL_CLASS
 	const starMassKg = getStarMassSol(cls, params.starSubtype ?? 5) * M_SOL_KG
+	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+		params.hoursPerDay,
+		params.tideLock,
+	)
 	const tidalSchedule =
 		params.planetType === "gas-giant-moon"
 			? computeGasGiantTidalSchedule(
@@ -557,7 +562,7 @@ export function runPostElevationPipeline(
 						params.moonSeed ?? params.seed + 8831,
 						params.planetRadiusKm,
 						params.orbitalDistanceAU,
-						params.hoursPerDay,
+						moonOrbitHoursPerDay,
 						starMassKg,
 					),
 					params,

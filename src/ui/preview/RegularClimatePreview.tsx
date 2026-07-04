@@ -25,6 +25,8 @@ function buildPreviewChartProps(
 		case "insolation":
 			return {
 				matrix: preview.insolation,
+				columnValues: preview.columnValues,
+				columnLabels: preview.columnLabels,
 				colorForValue: preview.insolColorFn,
 				legendTitle: "Insolation",
 				formatLegendValue: (value: number) => `${value.toFixed(0)} W/m²`,
@@ -42,6 +44,8 @@ function buildPreviewChartProps(
 		case "daylight":
 			return {
 				matrix: preview.daylight,
+				columnValues: preview.columnValues,
+				columnLabels: preview.columnLabels,
 				colorForValue: preview.daylightColorFn,
 				legendTitle: "Daylight",
 				formatLegendValue: (value: number) => `${value.toFixed(1)} hrs`,
@@ -59,6 +63,8 @@ function buildPreviewChartProps(
 		default:
 			return {
 				matrix: preview.heat,
+				columnValues: preview.columnValues,
+				columnLabels: preview.columnLabels,
 				colorForValue: (value: number) => rgbToCss(temperatureColor(value)),
 				legendTitle: "Temperature",
 				formatLegendValue: (value: number) =>
@@ -88,16 +94,14 @@ export const RegularClimatePreview: React.FC<RegularClimatePreviewProps> = ({
 		<HeatmapChart
 			matrix={chartProps.matrix}
 			rowValues={preview.lats}
-			columnValues={preview.columnValues}
-			columnLabels={preview.columnLabels}
+			columnValues={chartProps.columnValues}
+			columnLabels={chartProps.columnLabels}
 			colorForValue={chartProps.colorForValue}
 			datasetLabel={(lat: number) => `Lat ${lat.toFixed(1)}°`}
 			rowTickLabel={(lat: number) => `${lat.toFixed(0)}°`}
 			tooltipLabel={chartProps.tooltipLabel}
 			legendTitle={chartProps.legendTitle}
 			formatLegendValue={chartProps.formatLegendValue}
-			xAxisTitle="Day of Year"
-			yAxisTitle="Latitude"
 			yTickEvery={3}
 			fullHeight={true}
 		/>

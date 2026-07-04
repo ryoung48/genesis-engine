@@ -1,9 +1,10 @@
 import React, { useMemo } from "react"
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
 import {
 	AU_M,
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
+	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
 import type { MainSequenceClass } from "@/model/celestial/star/star-types"
 import {
@@ -52,6 +53,7 @@ interface ApparentDiameterOverlayProps {
 	spectralClass: string
 	starSubtype: number
 	useAverageDistance: boolean
+	tideLock: TideLock | null
 }
 
 export const ApparentDiameterOverlay: React.FC<
@@ -65,6 +67,7 @@ export const ApparentDiameterOverlay: React.FC<
 	spectralClass,
 	starSubtype,
 	useAverageDistance,
+	tideLock,
 }) => {
 	const bodies = useMemo(() => {
 		const cls = isValidSpectralClass(spectralClass)
@@ -84,9 +87,17 @@ export const ApparentDiameterOverlay: React.FC<
 
 		if (moons.length > 0) {
 			const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+			const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+				hoursPerDay,
+				tideLock,
+			)
 			for (let i = 0; i < moons.length; i++) {
 				const moon = moons[i]
-				const smaM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
+				const smaM = moonSemiMajorAxisM(
+					moon,
+					planetMassKg,
+					moonOrbitHoursPerDay,
+				)
 				const distKm = useAverageDistance
 					? smaM / 1000
 					: moonDistanceKm(moon, smaM, day)
@@ -109,6 +120,7 @@ export const ApparentDiameterOverlay: React.FC<
 		orbitalDistanceAU,
 		spectralClass,
 		starSubtype,
+		tideLock,
 		useAverageDistance,
 	])
 

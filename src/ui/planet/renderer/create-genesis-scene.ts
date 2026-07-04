@@ -1325,6 +1325,16 @@ export function createGenesisScene(
 				camera,
 				labelCullingEnabled,
 			)
+			updateGlobeLabelOrientations(
+				globeCultureLabels,
+				camera,
+				labelCullingEnabled,
+			)
+			updateGlobeLabelOrientations(
+				globeHeritageLabels,
+				camera,
+				labelCullingEnabled,
+			)
 			updateSolarTerminatorLabels(
 				elevationVisible
 					? SOLAR_TERMINATOR_ELEVATED_RADIUS
@@ -3412,6 +3422,7 @@ export function createGenesisScene(
 		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
 		planetRadiusKm: number,
 		hoursPerDay: number,
+		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,
@@ -3427,6 +3438,7 @@ export function createGenesisScene(
 				moons,
 				planetRadiusKm,
 				hoursPerDay,
+				tideLock,
 				day,
 				showGrid,
 				gridSpacing,

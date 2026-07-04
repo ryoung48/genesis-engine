@@ -11,6 +11,7 @@ interface StatEditor {
 	step: number
 	display: string
 	set: (value: number) => void
+	content?: ReactNode
 }
 
 export interface StatEntry {
@@ -46,25 +47,27 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 				placement="top"
 				theme="light-border"
 				content={
-					<div className="flex w-36 flex-col px-1 pt-0.5 pb-2">
-						<div className="flex items-center justify-between gap-3">
-							<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-								{editor.label}
-							</span>
-							<span className="font-mono text-[10px] text-slate-400">
-								{editor.display.replace("× Earth", "×")}
-							</span>
+					editor.content ?? (
+						<div className="flex w-36 flex-col px-1 pt-0.5 pb-2">
+							<div className="flex items-center justify-between gap-3">
+								<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+									{editor.label}
+								</span>
+								<span className="font-mono text-[10px] text-slate-400">
+									{editor.display.replace("× Earth", "×")}
+								</span>
+							</div>
+							<input
+								type="range"
+								min={editor.min}
+								max={editor.max}
+								step={editor.step}
+								value={editor.value}
+								onChange={(e) => editor.set(parseFloat(e.target.value))}
+								className="mt-3 h-1 w-full cursor-pointer rounded-lg accent-slate-900"
+							/>
 						</div>
-						<input
-							type="range"
-							min={editor.min}
-							max={editor.max}
-							step={editor.step}
-							value={editor.value}
-							onChange={(e) => editor.set(parseFloat(e.target.value))}
-							className="mt-3 h-1 w-full cursor-pointer rounded-lg accent-slate-900"
-						/>
-					</div>
+					)
 				}
 			>
 				<span

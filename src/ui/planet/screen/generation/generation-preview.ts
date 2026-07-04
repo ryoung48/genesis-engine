@@ -1,5 +1,5 @@
 export const GENERATION_PREVIEW_TABS = [
-	["temperature", "TEMP"],
+	["climate", "CLIMATE"],
 	["insolation", "INSOL"],
 	["daylight", "LIGHT"],
 ] as const
