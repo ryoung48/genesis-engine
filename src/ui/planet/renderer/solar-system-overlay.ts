@@ -1,12 +1,17 @@
 import * as THREE from "three"
+import type { Text } from "troika-three-text"
+import { SOLAR_DIAMETER_KM } from "@/model/celestial/body-metrics"
 import type { TideLock } from "@/model/celestial/moons/moon-types"
+import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
 import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
 	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
 import {
+	getNonRealisticStarToPlanetRatio,
 	getStarDiameterSol,
+	getStarLabel,
 	type MainSequenceClass,
 } from "@/model/celestial/star/star-types"
 import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
@@ -16,6 +21,13 @@ import {
 	measureMoonOrbitOuterRadiusForDisplay,
 	scaleBodyDiameterToVisualRadius,
 } from "../moon-visual-scale"
+import {
+	createNameLabel,
+	createNameLeaderLine,
+	IDENTITY_QUATERNION,
+	sizeNameLabel,
+	updateLabelPlacement,
+} from "./body-name-label"
 import {
 	buildMoonOrbitOverlay,
 	type MoonOrbitState,
@@ -30,21 +42,14 @@ const DEG2RAD = Math.PI / 180
 const TWO_PI = 2 * Math.PI
 const ORBIT_SEGMENTS = 256
 const PLANET_SCENE_RADIUS = BODY_VISUAL_BASE_RADIUS
-const SOLAR_DIAMETER_KM = 1_391_400
 const MOON_SYSTEM_SCENE_MIN = 1.35
 const MOON_SYSTEM_SCENE_MAX = 2.55
+const MIN_MOON_VISUAL_RADIUS = 0.004
 // Visual clearance between one body's outer edge and the next body's orbit,
 // as a multiple of the (larger of the two) body's own radius — a real
 // AU-based distance would either bunch everything near the star or spread it
 // beyond any reasonable camera distance depending on spectral class.
 const ORBIT_GAP_STAR_RADII = 1.5
-// The true star/planet diameter ratio (~109x for a G star vs. Earth) would
-// either swallow the planet or vanish depending on distance if rendered
-// literally, so it's compressed with a sqrt curve (same trick used for the
-// gas-giant/moon proportions elsewhere in this renderer) — the star still
-// reads as dramatically bigger than the planet without dominating the scene.
-const MIN_STAR_TO_PLANET_RATIO = 3
-const MAX_STAR_TO_PLANET_RATIO = 24
 const GLOW_TEXTURE_SIZE = 128
 const BELT_SCENE_RADIUS = 0.05
 const BELT_WIDTH = 0.12
@@ -54,6 +59,33 @@ const ASTEROID_MAX_SCALE = 0.02
 const ASTEROID_Z_JITTER = 0.02
 const MAIN_WORLD_COLOR = 0x3b82f6
 const ROCKY_SIBLING_COLOR = 0x9ca3af
+const textureLoader = new THREE.TextureLoader()
+const sharedBodyTextureCache = new Map<string, THREE.Texture>()
+let sharedGrayscaleSunTexture: THREE.CanvasTexture | null = null
+let grayscaleSunTextureLoadPromise: Promise<THREE.CanvasTexture> | null = null
+
+const GROUP_LABEL: Record<SystemBody["group"], string> = {
+	"asteroid belt": "Asteroid Belt",
+	dwarf: "Dwarf World",
+	terrestrial: "Terrestrial Planet",
+	helian: "Helian World",
+	jovian: "Jovian Planet",
+}
+
+// `showRealNames` gates real Sol names the same way the stat-panel titles
+// do (see GenerationPanel's resolveSiblingBodyTitle) — off by default so a
+// procedurally generated system's bodies read as "Terrestrial Planet 2"
+// etc. rather than borrowing unrelated real names baked into the Sol seed
+// data.
+function bodyDisplayName(
+	body: SystemBody,
+	siblingNumber: number,
+	showRealNames: boolean,
+): string {
+	if (body.isMainWorld) return showRealNames ? "Earth" : "Main World"
+	if (showRealNames && body.name) return body.name
+	return `${GROUP_LABEL[body.group]} ${siblingNumber}`
+}
 
 // Matches the spectral-class palette used by galaxy-gen's system map.
 const STAR_COLOR_BY_CLASS: Record<MainSequenceClass, string> = {
@@ -76,30 +108,47 @@ function loadGrayscaleSunTexture(
 	onReady: (texture: THREE.CanvasTexture) => void,
 ): { cancel(): void } {
 	let cancelled = false
-	new THREE.TextureLoader().load("/2k_sun.jpg", (loaded) => {
-		const image = loaded.image as HTMLImageElement
-		const canvas = document.createElement("canvas")
-		canvas.width = image.width
-		canvas.height = image.height
-		const ctx = canvas.getContext("2d")
-		if (ctx) {
-			ctx.drawImage(image, 0, 0)
-			const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
-			const pixels = data.data
-			for (let i = 0; i < pixels.length; i += 4) {
-				const luminance =
-					0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
-				pixels[i] = luminance
-				pixels[i + 1] = luminance
-				pixels[i + 2] = luminance
-			}
-			ctx.putImageData(data, 0, 0)
+	if (sharedGrayscaleSunTexture) {
+		onReady(sharedGrayscaleSunTexture)
+		return {
+			cancel() {
+				cancelled = true
+			},
 		}
-		loaded.dispose()
+	}
+	if (!grayscaleSunTextureLoadPromise) {
+		grayscaleSunTextureLoadPromise = new Promise((resolve) => {
+			textureLoader.load("/2k_sun.jpg", (loaded) => {
+				const image = loaded.image as HTMLImageElement
+				const canvas = document.createElement("canvas")
+				canvas.width = image.width
+				canvas.height = image.height
+				const ctx = canvas.getContext("2d")
+				if (ctx) {
+					ctx.drawImage(image, 0, 0)
+					const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
+					const pixels = data.data
+					for (let i = 0; i < pixels.length; i += 4) {
+						const luminance =
+							0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
+						pixels[i] = luminance
+						pixels[i + 1] = luminance
+						pixels[i + 2] = luminance
+					}
+					ctx.putImageData(data, 0, 0)
+				}
+				loaded.dispose()
+				const grayTexture = new THREE.CanvasTexture(canvas)
+				grayTexture.needsUpdate = true
+				grayTexture.userData.sharedTexture = true
+				sharedGrayscaleSunTexture = grayTexture
+				resolve(grayTexture)
+			})
+		})
+	}
+	grayscaleSunTextureLoadPromise.then((texture) => {
 		if (cancelled) return
-		const grayTexture = new THREE.CanvasTexture(canvas)
-		grayTexture.needsUpdate = true
-		onReady(grayTexture)
+		onReady(texture)
 	})
 	return {
 		cancel() {
@@ -147,13 +196,24 @@ function createStarGlowTexture(hexColor: string): THREE.CanvasTexture {
 
 function bodySceneRadius(
 	diameterKm: number,
+	sizeClass: number,
+	realisticSizes: boolean,
 ): number {
-	return scaleBodyDiameterToVisualRadius(diameterKm, PLANET_SCENE_RADIUS)
+	return scaleBodyDiameterToVisualRadius(
+		diameterKm,
+		PLANET_SCENE_RADIUS,
+		realisticSizes,
+		sizeClass,
+	)
 }
 
 function loadBodyTexture(texturePath: string): THREE.Texture {
-	const texture = new THREE.TextureLoader().load(texturePath)
+	const cached = sharedBodyTextureCache.get(texturePath)
+	if (cached) return cached
+	const texture = textureLoader.load(texturePath)
 	texture.colorSpace = THREE.SRGBColorSpace
+	texture.userData.sharedTexture = true
+	sharedBodyTextureCache.set(texturePath, texture)
 	return texture
 }
 
@@ -163,6 +223,7 @@ function measureBodyMoonSystemOuterRadius(
 	hoursPerDay: number,
 	tideLock: TideLock | null,
 	showEllipticalOrbits: boolean,
+	realisticSizes: boolean,
 ): number {
 	if (body.moons.length === 0) return sceneRadius
 
@@ -183,9 +244,13 @@ function measureBodyMoonSystemOuterRadius(
 			),
 			eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
 			bodyVisualRadius: Math.max(
-				0.008,
-				scaleBodyDiameterToVisualRadius(moon.diameterKm, PLANET_SCENE_RADIUS) /
-					Math.max(sceneRadius, 1e-6),
+				MIN_MOON_VISUAL_RADIUS,
+				scaleBodyDiameterToVisualRadius(
+					moon.diameterKm,
+					PLANET_SCENE_RADIUS,
+					realisticSizes,
+					moon.sizeClass ?? estimateMoonSizeClassFromDiameter(moon.diameterKm),
+				) / Math.max(sceneRadius, 1e-6),
 			),
 		})),
 		parentVisualRadius: parentOccupiedRadiusRelativeToPlanet,
@@ -322,12 +387,37 @@ export interface SolarSystemOverlayParams {
 	/** When false, every body's orbit is flattened into the equatorial plane
 	 * regardless of its rolled inclination/ascending node. */
 	showInclination: boolean
+	/** When false, no body/moon renders any axial tilt (meshes, moon-orbit
+	 * planes, and rings all sit flat/untitled) — a diagnostic/visual toggle,
+	 * doesn't affect the underlying axialTiltDeg data. */
+	showAxialTilt: boolean
+	/** When true, every body (planets, moons, the star) renders at its true
+	 * relative diameter (clamped only by a floor/ceiling — see
+	 * scaleBodyDiameterToVisualRadius). When false, falls back to the old
+	 * sqrt-compressed sizing so nothing strays far from Earth's own scene
+	 * size. */
+	showRealisticSizes: boolean
+	/** Shows each body's (and the star's) name as a billboarded label with a
+	 * leader line to the top of the body, similar in spirit to the globe
+	 * view's solar-terminator/nation-label overlays. */
+	showBodyNames: boolean
+	/** When true and showBodyNames is on, uses real Sol names (star: "Sol",
+	 * main world: "Earth", named siblings/moons from the Sol seed data)
+	 * instead of generic group-based labels — same gating as the stat
+	 * panel's "Real Sol Names" toggle. */
+	showRealNames: boolean
 }
 
 export interface SolarSystemOverlayState {
 	group: THREE.Group
 	suggestedCameraDistance: number
 	setDay(day: number): void
+	updateBodies(bodies: SystemBody[]): boolean
+	/** Re-billboards every visible name label to face the camera — call this
+	 * every frame the solar-system view is active (labels don't rotate with
+	 * anything else in the scene, so there's no other hook that keeps them
+	 * camera-facing). */
+	updateLabelOrientations(camera: THREE.PerspectiveCamera): void
 	dispose(): void
 	/** Current world-space position + a reasonable framing radius for a body
 	 * (or one of its moons), for camera-focus purposes. `bodyIndex` is the
@@ -339,6 +429,16 @@ export interface SolarSystemOverlayState {
 		bodyIndex: number,
 		moonIndex?: number,
 	): { position: THREE.Vector3; radius: number } | null
+	/** Spins every body's (and their moons') mesh around its own axis by a
+	 * fraction of a full turn derived from `hours` and that body's own
+	 * siderealDayHours (moons assume tidal lock — see moon-orbit-overlay). */
+	setSpinHours(hours: number): void
+	/** Resolves a raycast hit's object back to a focus target — e.g. for
+	 * double-click-to-focus. Returns null if `object` isn't part of any
+	 * body/moon/the star in this overlay. */
+	resolveHitBodyIndex(
+		object: THREE.Object3D,
+	): { bodyIndex: number; moonIndex?: number } | null
 }
 
 interface PlacedBody {
@@ -347,7 +447,14 @@ interface PlacedBody {
 	moonSystemOuterRadius: number
 	isBelt: boolean
 	bodyGroup?: THREE.Group
+	mesh?: THREE.Mesh
+	ringMesh?: THREE.Mesh
+	orbitLine?: THREE.Line
+	meshRestQuaternion?: THREE.Quaternion
+	baseQuaternion?: THREE.Quaternion
 	moonState?: MoonOrbitState
+	nameLabel?: Text
+	nameLeader?: THREE.Line
 	orbitRadius: number
 	/** Mean anomaly at epoch — spreads bodies around their orbits instead of
 	 * lining them all up at day 0. */
@@ -385,22 +492,34 @@ export function buildSolarSystemOverlay(
 		showEllipticalOrbits,
 		showDaylight,
 		showInclination,
+		showAxialTilt,
+		showRealisticSizes,
+		showBodyNames,
+		showRealNames,
 	} = params
 
 	const group = new THREE.Group()
-	const mainWorld = bodies.find((b) => b.isMainWorld) ?? bodies[0]
-	const referenceDiameterKm = mainWorld?.diameterKm || 12_000
+	let currentDay = initialDay
+	let currentSpinHours = 0
 
 	// --- Star ---
 	const starDiameterSol = getStarDiameterSol(spectralClass, starSubtype)
 	const starDiameterKm = starDiameterSol * SOLAR_DIAMETER_KM
-	const trueDiameterRatio = starDiameterKm / referenceDiameterKm
-	const starToPlanetRatio = THREE.MathUtils.clamp(
-		Math.sqrt(trueDiameterRatio),
-		MIN_STAR_TO_PLANET_RATIO,
-		MAX_STAR_TO_PLANET_RATIO,
-	)
-	const starRadius = PLANET_SCENE_RADIUS * starToPlanetRatio
+	// Realistic mode uses the same shared floor/ceiling (and fixed
+	// Earth-diameter reference) as every other body in the scene — see
+	// scaleBodyDiameterToVisualRadius — so the star sits on the same absolute
+	// scale instead of being sized relative to the (resizable) main world.
+	// Non-realistic mode instead buckets by spectral class only, with no
+	// sizeClass equivalent to hand it — see getNonRealisticStarToPlanetRatio.
+	const starRadius = showRealisticSizes
+		? scaleBodyDiameterToVisualRadius(
+				starDiameterKm,
+				PLANET_SCENE_RADIUS,
+				true,
+				0,
+			)
+		: PLANET_SCENE_RADIUS *
+			getNonRealisticStarToPlanetRatio(spectralClass, starSubtype)
 	const starColorHex = STAR_COLOR_BY_CLASS[spectralClass] ?? "#fff772"
 	const starColor = new THREE.Color(starColorHex)
 	// A real photographic sun texture (NASA-derived, via Solar System Scope),
@@ -450,11 +569,37 @@ export function buildSolarSystemOverlay(
 	)
 	group.add(systemAmbient)
 
+	let starNameLabel: Text | undefined
+	let starNameLeader: THREE.Line | undefined
+	if (showBodyNames) {
+		starNameLabel = createNameLabel(
+			showRealNames
+				? "Sol"
+				: `${getStarLabel(spectralClass, starSubtype)} Star`,
+		)
+		starNameLeader = createNameLeaderLine()
+		sizeNameLabel(starNameLabel, starRadius)
+		group.add(starNameLabel)
+		group.add(starNameLeader)
+	}
+
+	// Per-group ordinal (1-indexed), matching GenerationPanel's own sibling
+	// numbering, so a label like "Terrestrial Planet 2" here matches the same
+	// body's title in the stat panel.
+	const groupCounters: Record<SystemBody["group"], number> = {
+		"asteroid belt": 0,
+		dwarf: 0,
+		terrestrial: 0,
+		helian: 0,
+		jovian: 0,
+	}
+
 	// --- Build every body (siblings + main world), each with its own nested
 	// moon system, but don't position them yet — spacing depends on every
 	// body's own size, computed below in orbital order. ---
 	const placed: PlacedBody[] = bodies.map((body, index) => {
 		const meanAnomalyAtEpoch = index * GOLDEN_ANGLE_RAD
+		groupCounters[body.group] += 1
 		if (body.group === "asteroid belt") {
 			return {
 				body,
@@ -466,7 +611,11 @@ export function buildSolarSystemOverlay(
 			}
 		}
 
-		const sceneRadius = bodySceneRadius(body.diameterKm)
+		const sceneRadius = bodySceneRadius(
+			body.diameterKm,
+			body.sizeClass,
+			showRealisticSizes,
+		)
 		const bodyGroup = new THREE.Group()
 		const isGasGiant = body.group === "jovian"
 		const texturePath = body.texturePath
@@ -495,6 +644,7 @@ export function buildSolarSystemOverlay(
 		if (isGasGiant || texturePath) mesh.rotation.x = Math.PI / 2
 		mesh.scale.setScalar(sceneRadius)
 		bodyGroup.add(mesh)
+		let ringMesh: THREE.Mesh | undefined
 		if (body.rings) {
 			const ringGeometry = new THREE.RingGeometry(
 				body.rings.innerRadiusRelative,
@@ -513,15 +663,12 @@ export function buildSolarSystemOverlay(
 						body.rings.outerRadiusRelative - body.rings.innerRadiusRelative,
 						1e-6,
 					)
-				const envelope =
-					0.18 + Math.sin(normalized * Math.PI) * 0.82
+				const envelope = 0.18 + Math.sin(normalized * Math.PI) * 0.82
 				const broadBands =
 					0.72 +
 					0.18 * Math.sin(normalized * Math.PI * 5.5 + 0.4) +
 					0.1 * Math.sin(normalized * Math.PI * 13.5 + 1.3)
-				const fineBands =
-					0.9 +
-					0.08 * Math.sin(normalized * Math.PI * 36 + 2.1)
+				const fineBands = 0.9 + 0.08 * Math.sin(normalized * Math.PI * 36 + 2.1)
 				const gapMask =
 					(normalized > 0.34 && normalized < 0.39) ||
 					(normalized > 0.73 && normalized < 0.755)
@@ -540,7 +687,7 @@ export function buildSolarSystemOverlay(
 				side: THREE.DoubleSide,
 				depthWrite: false,
 			})
-			const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial)
+			ringMesh = new THREE.Mesh(ringGeometry, ringMaterial)
 			ringMesh.scale.setScalar(sceneRadius)
 			bodyGroup.add(ringMesh)
 		}
@@ -557,6 +704,11 @@ export function buildSolarSystemOverlay(
 			showInclination,
 			body.rings?.outerRadiusRelative ?? 1,
 			sceneRadius,
+			showAxialTilt,
+			showRealisticSizes,
+			showBodyNames,
+			showRealNames,
+			body.isMainWorld ? "Luna" : undefined,
 		)
 		moonState.group.scale.setScalar(sceneRadius)
 		bodyGroup.add(moonState.group)
@@ -568,7 +720,20 @@ export function buildSolarSystemOverlay(
 			hoursPerDay,
 			tideLock,
 			showEllipticalOrbits,
+			showRealisticSizes,
 		)
+
+		let nameLabel: Text | undefined
+		let nameLeader: THREE.Line | undefined
+		if (showBodyNames) {
+			nameLabel = createNameLabel(
+				bodyDisplayName(body, groupCounters[body.group], showRealNames),
+			)
+			nameLeader = createNameLeaderLine()
+			sizeNameLabel(nameLabel, sceneRadius)
+			bodyGroup.add(nameLabel)
+			bodyGroup.add(nameLeader)
+		}
 
 		return {
 			body,
@@ -576,52 +741,169 @@ export function buildSolarSystemOverlay(
 			moonSystemOuterRadius,
 			isBelt: false,
 			bodyGroup,
+			mesh,
+			ringMesh,
+			meshRestQuaternion: mesh.quaternion.clone(),
+			baseQuaternion: mesh.quaternion.clone(),
 			moonState,
+			nameLabel,
+			nameLeader,
 			orbitRadius: 0,
 			meanAnomalyAtEpoch,
 		}
 	})
 
-	// --- Sequential diameter-based orbit spacing: each body's orbit clears
-	// the previous body's own outer edge (including its moon system) by a
-	// gap scaled to its own size, rather than any real AU distance.
-	// p.orbitRadius is this spacing floor — treated as the ellipse's
-	// periapsis (closest approach), not its semi-major axis, so an eccentric
-	// orbit's closest point never dips inside the previous body/star's
-	// cleared space regardless of how eccentric it is. The semi-major axis
-	// is derived from it (periapsis = a·(1−e)), and the next body's floor is
-	// pushed out to clear this body's real apoapsis (a·(1+e)), not just its
-	// periapsis, so eccentric orbits can't clip into what comes after them
-	// either. ---
-	let previousOuterEdge = starRadius
-	for (const p of placed) {
-		const gap =
-			ORBIT_GAP_STAR_RADII * Math.max(p.sceneRadius, starRadius * 0.05)
-		const periapsis = previousOuterEdge + gap + p.moonSystemOuterRadius
-		p.orbitRadius = periapsis
-
-		if (p.isBelt) {
-			previousOuterEdge = periapsis + p.moonSystemOuterRadius
-			continue
+	// --- Orbit rings + asteroid belt rings ---
+	function rebuildMoonState(p: PlacedBody) {
+		if (p.isBelt || !p.bodyGroup) return
+		if (p.moonState) {
+			p.bodyGroup.remove(p.moonState.group)
+			p.moonState.dispose()
 		}
-
-		const e = showEllipticalOrbits ? p.body.eccentricity : 0
-		const inc = (showInclination ? p.body.inclinationDeg : 0) * DEG2RAD
-		const Omega = p.body.longitudeOfAscendingNodeDeg * DEG2RAD
-		const omega = p.body.argumentOfPeriapsisDeg * DEG2RAD
-		const a = periapsis / (1 - e)
-		const b = a * Math.sqrt(1 - e * e)
-		const { P, Q } = perifocalBasis(Omega, inc, omega)
-		p.kepler = { P, Q, a, b, ae: a * e, e }
-		previousOuterEdge = a * (1 + e) + p.moonSystemOuterRadius
+		p.moonState = buildMoonOrbitOverlay(
+			p.body.moons,
+			p.body.diameterKm / 2,
+			hoursPerDay,
+			p.body.isMainWorld ? tideLock : null,
+			currentDay,
+			false,
+			15,
+			showEllipticalOrbits,
+			showInclination,
+			p.body.rings?.outerRadiusRelative ?? 1,
+			p.sceneRadius,
+			showAxialTilt,
+			showRealisticSizes,
+			showBodyNames,
+			showRealNames,
+			p.body.isMainWorld ? "Luna" : undefined,
+		)
+		p.moonState.group.scale.setScalar(p.sceneRadius)
+		p.bodyGroup.add(p.moonState.group)
 	}
-	const mainOrbitRadius =
+
+	function rebuildAsteroidFieldForPlacedBody(p: PlacedBody) {
+		if (!p.isBelt) return
+		if (p.asteroidField) {
+			group.remove(p.asteroidField.mesh)
+			p.asteroidField.mesh.geometry.dispose()
+			const material = p.asteroidField.mesh.material
+			if (Array.isArray(material)) material.forEach((entry) => entry.dispose())
+			else material.dispose()
+		}
+		p.asteroidField = buildAsteroidField(p.orbitRadius)
+		group.add(p.asteroidField.mesh)
+	}
+
+	function updateOrbitLineGeometry(p: PlacedBody) {
+		if (!p.orbitLine) return
+		const orbitPoints: THREE.Vector3[] = []
+		for (let i = 0; i <= ORBIT_SEGMENTS; i++) {
+			const a = (i / ORBIT_SEGMENTS) * TWO_PI
+			orbitPoints.push(
+				p.kepler
+					? orbitPoint(
+							a,
+							p.kepler.a,
+							p.kepler.b,
+							p.kepler.ae,
+							p.kepler.P,
+							p.kepler.Q,
+						)
+					: new THREE.Vector3(
+							p.orbitRadius * Math.cos(a),
+							p.orbitRadius * Math.sin(a),
+							0,
+						),
+			)
+		}
+		const nextGeometry = new THREE.BufferGeometry().setFromPoints(orbitPoints)
+		p.orbitLine.geometry.dispose()
+		p.orbitLine.geometry = nextGeometry
+	}
+
+	function applyPlacedBodyLayout() {
+		let previousOuterEdge = starRadius
+		for (const p of placed) {
+			p.sceneRadius = p.isBelt
+				? BELT_SCENE_RADIUS
+				: bodySceneRadius(
+						p.body.diameterKm,
+						p.body.sizeClass,
+						showRealisticSizes,
+					)
+			p.moonSystemOuterRadius = p.isBelt
+				? BELT_SCENE_RADIUS
+				: measureBodyMoonSystemOuterRadius(
+						p.body,
+						p.sceneRadius,
+						hoursPerDay,
+						tideLock,
+						showEllipticalOrbits,
+						showRealisticSizes,
+					)
+			const gap =
+				ORBIT_GAP_STAR_RADII * Math.max(p.sceneRadius, starRadius * 0.05)
+			const periapsis = previousOuterEdge + gap + p.moonSystemOuterRadius
+			p.orbitRadius = periapsis
+
+			if (p.isBelt) {
+				p.kepler = undefined
+				previousOuterEdge = periapsis + p.moonSystemOuterRadius
+				continue
+			}
+
+			p.mesh?.scale.setScalar(p.sceneRadius)
+			p.ringMesh?.scale.setScalar(p.sceneRadius)
+			p.moonState?.group.scale.setScalar(p.sceneRadius)
+			if (p.nameLabel) {
+				sizeNameLabel(p.nameLabel, p.sceneRadius)
+			}
+
+			const e = showEllipticalOrbits ? p.body.eccentricity : 0
+			const inc = (showInclination ? p.body.inclinationDeg : 0) * DEG2RAD
+			const Omega = p.body.longitudeOfAscendingNodeDeg * DEG2RAD
+			const omega = p.body.argumentOfPeriapsisDeg * DEG2RAD
+			const a = periapsis / (1 - e)
+			const b = a * Math.sqrt(1 - e * e)
+			const { P, Q } = perifocalBasis(Omega, inc, omega)
+			p.kepler = { P, Q, a, b, ae: a * e, e }
+			previousOuterEdge = a * (1 + e) + p.moonSystemOuterRadius
+
+			if (p.mesh && p.meshRestQuaternion) {
+				p.baseQuaternion = p.meshRestQuaternion.clone()
+				p.mesh.quaternion.copy(p.baseQuaternion)
+			}
+			if (p.moonState) p.moonState.group.quaternion.identity()
+			if (p.ringMesh) p.ringMesh.quaternion.identity()
+
+			if (showAxialTilt && p.body.axialTiltDeg) {
+				const { Q: tiltAxis } = perifocalBasis(Omega, inc, 0)
+				const tiltRad = p.body.axialTiltDeg * DEG2RAD
+				const tiltQuat = new THREE.Quaternion().setFromAxisAngle(
+					tiltAxis,
+					tiltRad,
+				)
+				if (p.mesh && p.baseQuaternion) {
+					p.baseQuaternion = new THREE.Quaternion().multiplyQuaternions(
+						tiltQuat,
+						p.baseQuaternion,
+					)
+					p.mesh.quaternion.copy(p.baseQuaternion)
+				}
+				p.moonState?.group.quaternion.premultiply(tiltQuat)
+				p.ringMesh?.quaternion.premultiply(tiltQuat)
+			}
+		}
+		return previousOuterEdge
+	}
+
+	let previousOuterEdge = applyPlacedBodyLayout()
+	let mainOrbitRadius =
 		placed.find((p) => p.body.isMainWorld)?.kepler?.a ??
 		placed[0]?.kepler?.a ??
 		placed[0]?.orbitRadius ??
 		1
-
-	// --- Orbit rings + asteroid belt rings ---
 	for (const p of placed) {
 		const orbitPoints: THREE.Vector3[] = []
 		for (let i = 0; i <= ORBIT_SEGMENTS; i++) {
@@ -653,6 +935,7 @@ export function buildSolarSystemOverlay(
 			}),
 		)
 		orbitLine.renderOrder = 1
+		p.orbitLine = orbitLine
 		group.add(orbitLine)
 
 		if (p.isBelt) {
@@ -686,6 +969,7 @@ export function buildSolarSystemOverlay(
 	const asteroidDummy = new THREE.Object3D()
 
 	function setDay(day: number) {
+		currentDay = day
 		for (const p of placed) {
 			if (p.isBelt) {
 				if (p.asteroidField) {
@@ -719,6 +1003,11 @@ export function buildSolarSystemOverlay(
 	function dispose() {
 		surfaceTextureLoad.cancel()
 		for (const p of placed) p.moonState?.dispose()
+		// troika Text's own dispose() releases its SDF glyph atlas/font
+		// ref-count too — the generic Mesh handling below only disposes the
+		// geometry/material, which isn't enough for it.
+		starNameLabel?.dispose()
+		for (const p of placed) p.nameLabel?.dispose()
 		group.traverse((obj) => {
 			if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
 				obj.geometry.dispose()
@@ -730,11 +1019,25 @@ export function buildSolarSystemOverlay(
 						m instanceof THREE.MeshBasicMaterial ||
 						m instanceof THREE.MeshStandardMaterial
 					)
-						m.map?.dispose()
+						if (
+							m.map &&
+							!(
+								"sharedTexture" in m.map.userData &&
+								m.map.userData.sharedTexture
+							)
+						)
+							m.map.dispose()
 					m.dispose()
 				}
 			} else if (obj instanceof THREE.Sprite) {
-				obj.material.map?.dispose()
+				if (
+					obj.material.map &&
+					!(
+						"sharedTexture" in obj.material.map.userData &&
+						obj.material.map.userData.sharedTexture
+					)
+				)
+					obj.material.map.dispose()
 				obj.material.dispose()
 			}
 		})
@@ -742,6 +1045,30 @@ export function buildSolarSystemOverlay(
 	}
 
 	const suggestedCameraDistance = previousOuterEdge * 2.2
+
+	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
+		if (starNameLabel && starNameLeader) {
+			updateLabelPlacement(
+				starNameLabel,
+				starNameLeader,
+				starRadius,
+				IDENTITY_QUATERNION,
+				camera,
+			)
+		}
+		for (const p of placed) {
+			if (p.nameLabel && p.nameLeader) {
+				updateLabelPlacement(
+					p.nameLabel,
+					p.nameLeader,
+					p.sceneRadius,
+					IDENTITY_QUATERNION,
+					camera,
+				)
+			}
+			p.moonState?.updateLabelOrientations?.(camera)
+		}
+	}
 
 	function getBodyFocus(
 		bodyIndex: number,
@@ -774,11 +1101,76 @@ export function buildSolarSystemOverlay(
 		}
 	}
 
+	const bodySpinQuat = new THREE.Quaternion()
+	const bodySpinAxis = new THREE.Vector3(0, 1, 0)
+	function setSpinHours(hours: number) {
+		currentSpinHours = hours
+		for (const p of placed) {
+			if (
+				!p.isBelt &&
+				p.mesh &&
+				p.baseQuaternion &&
+				p.body.siderealDayHours > 0
+			) {
+				const angle = (hours / p.body.siderealDayHours) * TWO_PI
+				bodySpinQuat.setFromAxisAngle(bodySpinAxis, angle)
+				p.mesh.quaternion.copy(p.baseQuaternion).multiply(bodySpinQuat)
+			}
+			p.moonState?.setSpinHours?.(hours)
+		}
+	}
+
+	function resolveHitBodyIndex(
+		object: THREE.Object3D,
+	): { bodyIndex: number; moonIndex?: number } | null {
+		if (object === starMesh) return { bodyIndex: -1 }
+		for (let i = 0; i < placed.length; i++) {
+			const p = placed[i]!
+			if (p.mesh === object || p.ringMesh === object) {
+				return { bodyIndex: i }
+			}
+			const moonIndex = p.moonState?.getMoonIndexForMesh?.(object)
+			if (moonIndex != null) return { bodyIndex: i, moonIndex }
+		}
+		return null
+	}
+
+	function updateBodies(nextBodies: SystemBody[]) {
+		if (nextBodies.length !== placed.length) return false
+
+		for (let i = 0; i < placed.length; i++) {
+			const p = placed[i]!
+			const nextBody = nextBodies[i]!
+			if (p.body.group !== nextBody.group) return false
+			if (!!p.body.rings !== !!nextBody.rings) return false
+			p.body = nextBody
+			if (!p.isBelt) rebuildMoonState(p)
+		}
+
+		previousOuterEdge = applyPlacedBodyLayout()
+		mainOrbitRadius =
+			placed.find((p) => p.body.isMainWorld)?.kepler?.a ??
+			placed[0]?.kepler?.a ??
+			placed[0]?.orbitRadius ??
+			1
+		for (const p of placed) {
+			updateOrbitLineGeometry(p)
+			if (p.isBelt) rebuildAsteroidFieldForPlacedBody(p)
+		}
+		setDay(currentDay)
+		setSpinHours(currentSpinHours)
+		return true
+	}
+
 	return {
 		group,
 		suggestedCameraDistance,
 		setDay,
+		updateBodies,
 		dispose,
 		getBodyFocus,
+		setSpinHours,
+		resolveHitBodyIndex,
+		updateLabelOrientations,
 	}
 }

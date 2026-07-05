@@ -31,7 +31,10 @@ import {
 	buildTerrainMesh,
 	buildTerrainWireframe,
 } from "./mesh-builders"
-import { buildMoonOrbitOverlay, type MoonOrbitState } from "./moon-orbit-overlay"
+import {
+	buildMoonOrbitOverlay,
+	type MoonOrbitState,
+} from "./moon-orbit-overlay"
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
 	buildGlobeCultureLabels,
@@ -677,10 +680,34 @@ export function createGenesisScene(
 	scene.add(solarSystemGroup)
 	let solarSystemActive = false
 	let solarSystemOverlayState: SolarSystemOverlayState | null = null
+	// The body/moon the camera is currently glued to in the solar-system view
+	// (set by focusOnSystemBody) — re-applied after every setDay/setSpinHours
+	// call so the clock knobs can move the focused body without the camera
+	// drifting away from it.
+	let solarSystemTrackedFocus: {
+		bodyIndex: number
+		moonIndex?: number
+	} | null = null
+	let solarSystemTrackedFocusPosition: THREE.Vector3 | null = null
+	let solarSystemFocusChangeHandler:
+		| ((bodyIndex: number, moonIndex?: number) => void)
+		| null = null
 	let savedCameraPosition: THREE.Vector3 | null = null
 	let savedControlsTarget: THREE.Vector3 | null = null
 	const DEFAULT_CONTROLS_MIN_DISTANCE = 1.2
 	const DEFAULT_CONTROLS_MAX_DISTANCE = 12
+	// The camera's far clipping plane is fixed at construction time (see
+	// `camera.far` below), but the solar-system view's camera distance scales
+	// with the system's real size — which can now run well past 2000 scene
+	// units for e.g. an O-class star (see MAX_BODY_DIAMETER_KM in
+	// moon-visual-scale.ts). Without extending `far` to match, zooming out
+	// toward `maxDistance` pushes the camera past its own far plane and the
+	// whole scene gets clipped — reads as the view going blank/"crashing".
+	const DEFAULT_CAMERA_FAR = 2000
+	function setCameraFarForMaxDistance(maxDistance: number) {
+		camera.far = Math.max(DEFAULT_CAMERA_FAR, maxDistance * 1.5)
+		camera.updateProjectionMatrix()
+	}
 
 	// Lighting — low ambient so day/night contrast is visible
 	const DEFAULT_AMBIENT_INTENSITY = 0.55
@@ -1239,6 +1266,10 @@ export function createGenesisScene(
 						globeControlsInteracting ||
 						globeControlActivityFrames > 0
 				}
+				// Body-name labels don't rotate with anything else in the scene
+				// (bodyGroups only ever translate), so they need their own
+				// per-frame billboard update to keep facing the camera.
+				solarSystemOverlayState?.updateLabelOrientations(camera)
 				renderer.render(scene, camera)
 				return keepAnimating
 			}
@@ -2782,14 +2813,14 @@ export function createGenesisScene(
 		if (!solarSystemOverlayState) return
 		const focus = solarSystemOverlayState.getBodyFocus(bodyIndex, moonIndex)
 		if (!focus) return
+		solarSystemTrackedFocus = { bodyIndex, moonIndex }
+		solarSystemTrackedFocusPosition = focus.position.clone()
+		solarSystemFocusChangeHandler?.(bodyIndex, moonIndex)
 		const distance = Math.max(
 			focus.radius * SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER,
 			SOLAR_SYSTEM_MIN_FOCUS_DISTANCE,
 		)
-		const dir = camera.position
-			.clone()
-			.sub(controls.target)
-			.normalize()
+		const dir = camera.position.clone().sub(controls.target).normalize()
 		if (!Number.isFinite(dir.x) || dir.lengthSq() === 0) dir.set(0, 0, 1)
 		const camTo = focus.position.clone().add(dir.multiplyScalar(distance))
 		solarSystemFocusTween = {
@@ -3034,11 +3065,13 @@ export function createGenesisScene(
 		const hits = raycaster.intersectObject(solarSystemOverlayState.group, true)
 		const hit = hits.find((h) => h.object instanceof THREE.Mesh)
 		if (!hit) return
-		const worldPos = new THREE.Vector3()
-		hit.object.getWorldPosition(worldPos)
-		controls.target.copy(worldPos)
-		controls.update()
-		requestRender()
+		const target = solarSystemOverlayState.resolveHitBodyIndex(hit.object)
+		if (!target) return
+		// Route through focusOnSystemBody (not a one-off controls.target set)
+		// so this double-click gets the same tracked-focus treatment as a GPS
+		// click — otherwise the camera would stop following as soon as the
+		// clock or any other slider moved the body.
+		focusOnSystemBody(target.bodyIndex, target.moonIndex)
 	}
 
 	canvas.addEventListener("pointermove", updateHover)
@@ -3537,6 +3570,16 @@ export function createGenesisScene(
 
 	// Moon orbit overlay
 	let moonOrbitState: MoonOrbitState | null = null
+	let currentMoonOrbitDay = 0
+	let currentSolarSystemDay = 0
+	let currentSolarSystemSpinHours = 0
+
+	function disposeMoonOrbitOverlay() {
+		if (!moonOrbitState) return
+		orbitGroup.remove(moonOrbitState.group)
+		moonOrbitState.dispose()
+		moonOrbitState = null
+	}
 
 	function setMoonOrbitOverlay(
 		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
@@ -3548,11 +3591,8 @@ export function createGenesisScene(
 		gridSpacing: number,
 		showEllipticalOrbits: boolean,
 	) {
-		if (moonOrbitState) {
-			orbitGroup.remove(moonOrbitState.group)
-			moonOrbitState.dispose()
-			moonOrbitState = null
-		}
+		currentMoonOrbitDay = day
+		disposeMoonOrbitOverlay()
 		if (moons && moons.length > 0) {
 			moonOrbitState = buildMoonOrbitOverlay(
 				moons,
@@ -3569,7 +3609,29 @@ export function createGenesisScene(
 		requestRender()
 	}
 
+	function updateMoonOrbitOverlay(
+		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
+		planetRadiusKm: number,
+		hoursPerDay: number,
+		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
+		showGrid: boolean,
+		gridSpacing: number,
+		showEllipticalOrbits: boolean,
+	) {
+		setMoonOrbitOverlay(
+			moons,
+			planetRadiusKm,
+			hoursPerDay,
+			tideLock,
+			currentMoonOrbitDay,
+			showGrid,
+			gridSpacing,
+			showEllipticalOrbits,
+		)
+	}
+
 	function updateMoonOrbitDay(day: number) {
+		currentMoonOrbitDay = day
 		moonOrbitState?.setDay(day)
 		requestRender()
 	}
@@ -3592,12 +3654,15 @@ export function createGenesisScene(
 			const dist = solarSystemOverlayState?.suggestedCameraDistance ?? 6
 			controls.minDistance = 0.1
 			controls.maxDistance = dist * 4
+			setCameraFarForMaxDistance(controls.maxDistance)
 			camera.position.set(0, 0, dist)
 		} else {
 			if (savedCameraPosition) camera.position.copy(savedCameraPosition)
 			if (savedControlsTarget) controls.target.copy(savedControlsTarget)
 			controls.minDistance = DEFAULT_CONTROLS_MIN_DISTANCE
 			controls.maxDistance = DEFAULT_CONTROLS_MAX_DISTANCE
+			camera.far = DEFAULT_CAMERA_FAR
+			camera.updateProjectionMatrix()
 		}
 		controls.update()
 		requestRender()
@@ -3616,14 +3681,69 @@ export function createGenesisScene(
 			if (solarSystemActive) {
 				controls.maxDistance =
 					solarSystemOverlayState.suggestedCameraDistance * 4
+				setCameraFarForMaxDistance(controls.maxDistance)
 			}
 		}
+		// The overlay just got torn down and rebuilt from scratch (this fires
+		// on nearly every slider tweak, not just clock changes) — without
+		// this, the camera would keep looking at wherever the tracked body
+		// used to be instead of following it into the new overlay.
+		reapplyTrackedSolarSystemFocus()
 		requestRender()
 	}
 
-	function updateSolarSystemDay(day: number) {
-		solarSystemOverlayState?.setDay(day)
+	function updateSolarSystemOverlay(params: SolarSystemOverlayParams | null) {
+		if (!params) {
+			setSolarSystemOverlay(null)
+			return
+		}
+		if (
+			!solarSystemOverlayState ||
+			!solarSystemOverlayState.updateBodies(params.bodies)
+		) {
+			setSolarSystemOverlay({
+				...params,
+				initialDay: currentSolarSystemDay,
+			})
+		}
+		solarSystemOverlayState?.setSpinHours(currentSolarSystemSpinHours)
+		reapplyTrackedSolarSystemFocus()
 		requestRender()
+	}
+
+	function reapplyTrackedSolarSystemFocus() {
+		if (!solarSystemTrackedFocus || !solarSystemOverlayState) return
+		const focus = solarSystemOverlayState.getBodyFocus(
+			solarSystemTrackedFocus.bodyIndex,
+			solarSystemTrackedFocus.moonIndex,
+		)
+		if (!focus) return
+		if (solarSystemTrackedFocusPosition) {
+			const delta = focus.position.clone().sub(solarSystemTrackedFocusPosition)
+			camera.position.add(delta)
+			controls.target.add(delta)
+		}
+		solarSystemTrackedFocusPosition = focus.position.clone()
+	}
+
+	function updateSolarSystemDay(day: number) {
+		currentSolarSystemDay = day
+		solarSystemOverlayState?.setDay(day)
+		reapplyTrackedSolarSystemFocus()
+		requestRender()
+	}
+
+	function setSolarSystemSpinHours(hours: number) {
+		currentSolarSystemSpinHours = hours
+		solarSystemOverlayState?.setSpinHours(hours)
+		reapplyTrackedSolarSystemFocus()
+		requestRender()
+	}
+
+	function setSolarSystemFocusChangeHandler(
+		handler: ((bodyIndex: number, moonIndex?: number) => void) | null,
+	) {
+		solarSystemFocusChangeHandler = handler
 	}
 
 	return {
@@ -3687,10 +3807,14 @@ export function createGenesisScene(
 		focusOnNation,
 		focusOnProvince,
 		setMoonOrbitOverlay,
+		updateMoonOrbitOverlay,
 		updateMoonOrbitDay,
 		setSolarSystemActive,
 		setSolarSystemOverlay,
+		updateSolarSystemOverlay,
 		updateSolarSystemDay,
+		setSolarSystemSpinHours,
 		focusOnSystemBody,
+		setSolarSystemFocusChangeHandler,
 	}
 }

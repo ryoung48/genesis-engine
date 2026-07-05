@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
+import type { MoonParams } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
 	generateMoons,
@@ -35,7 +36,12 @@ import {
 	computeThermalEquatorLine,
 	getClimateGeometry,
 } from "@/model/climate/rain"
-import { computeTidalSchedule } from "@/model/climate/tidal-schedule"
+import {
+	computeMoonSurfaceTidesM,
+	computeMoonTidalSchedule,
+	computeSurfaceTidesM,
+	computeTidalSchedule,
+} from "@/model/climate/tidal-schedule"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
@@ -64,8 +70,6 @@ import type {
 	SerializedHistoryFrame,
 } from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
-import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
-import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { scaleClockDialHourToDayLength } from "./clock"
 
 import type { ColorMode } from "./colors"
@@ -184,10 +188,7 @@ import {
 	pauseSimulation,
 	startSimulation,
 } from "./screen/generation/generation"
-import {
-	buildGenerationPreviewConfig,
-	type GenerationPreviewTab,
-} from "./screen/generation/generation-preview"
+import type { GenerationPreviewTab } from "./screen/generation/generation-preview"
 import {
 	parseStoredCodeList,
 	pushRecentCode,
@@ -387,6 +388,17 @@ export const GenesisView: React.FC = () => {
 	)
 	const [showSolarSystemInclination, setShowSolarSystemInclination] = useState(
 		initialViewPrefs.showSolarSystemInclination,
+	)
+	const [showSolarSystemAxialTilt, setShowSolarSystemAxialTilt] = useState(
+		initialViewPrefs.showSolarSystemAxialTilt,
+	)
+	const [showSolarSystemRealisticSizes, setShowSolarSystemRealisticSizes] =
+		useState(initialViewPrefs.showSolarSystemRealisticSizes)
+	const [showSolarSystemBodyNames, setShowSolarSystemBodyNames] = useState(
+		initialViewPrefs.showSolarSystemBodyNames,
+	)
+	const [showSolarSystemRealNames, setShowSolarSystemRealNames] = useState(
+		initialViewPrefs.showSolarSystemRealNames,
 	)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
@@ -723,6 +735,21 @@ export const GenesisView: React.FC = () => {
 	const [restSeed, setRestSeed] = useState(
 		initialDecodedCode?.restSeed ?? SOL_SEED,
 	)
+	const [mainWorldInclinationDeg, setMainWorldInclinationDeg] = useState<
+		number | null
+	>(null)
+	const [
+		mainWorldInclinationOverrideActive,
+		setMainWorldInclinationOverrideActive,
+	] = useState(false)
+	const [
+		mainWorldLongitudeOfAscendingNodeDeg,
+		setMainWorldLongitudeOfAscendingNodeDeg,
+	] = useState<number | null>(null)
+	const [
+		mainWorldLongitudeOfAscendingNodeOverrideActive,
+		setMainWorldLongitudeOfAscendingNodeOverrideActive,
+	] = useState(false)
 
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
@@ -827,6 +854,10 @@ export const GenesisView: React.FC = () => {
 				showSolarSystemEllipticalOrbits,
 				showSolarSystemDaylight,
 				showSolarSystemInclination,
+				showSolarSystemAxialTilt,
+				showSolarSystemRealisticSizes,
+				showSolarSystemBodyNames,
+				showSolarSystemRealNames,
 				showWireframe,
 				showGrid,
 				showNationBorders,
@@ -871,6 +902,10 @@ export const GenesisView: React.FC = () => {
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemDaylight,
 		showSolarSystemInclination,
+		showSolarSystemAxialTilt,
+		showSolarSystemRealisticSizes,
+		showSolarSystemBodyNames,
+		showSolarSystemRealNames,
 		showMoonOrbits,
 		showEllipticalOrbits,
 		showApparentDiameter,
@@ -2658,12 +2693,6 @@ export const GenesisView: React.FC = () => {
 		simTimeMs,
 	])
 
-	const setAxialTilt = useCallback(
-		(value: number) => {
-			setObliquity(isRetrogradeObliquity(obliquity) ? 180 - value : value)
-		},
-		[obliquity],
-	)
 	const setAxialTiltDirection = useCallback(
 		(value: number) => {
 			const retrograde = value === 1
@@ -2690,7 +2719,7 @@ export const GenesisView: React.FC = () => {
 		tideLock,
 		antistellarLon,
 		setPlanetRadiusKm,
-		setObliquity: setAxialTilt,
+		setObliquity,
 		setEccentricity,
 		setPerihelion,
 		setOrbitalDistanceAU,
@@ -2767,41 +2796,6 @@ export const GenesisView: React.FC = () => {
 			windStats,
 		],
 	)
-	const generationPreview = useEbmPreview(
-		buildGenerationPreviewConfig({
-			tideLock,
-			obliquity,
-			eccentricity,
-			perihelion,
-			antistellarLon,
-			spectralClass,
-			starSubtype,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			landCoverage,
-			planetRadiusKm,
-			pressure,
-		}),
-	)
-	const lockedGenerationPreview = useLockedClimatePreview(
-		buildGenerationPreviewConfig({
-			tideLock,
-			obliquity,
-			eccentricity,
-			perihelion,
-			antistellarLon,
-			spectralClass,
-			starSubtype,
-			orbitalDistanceAU,
-			hoursPerDay,
-			daysPerYear,
-			landCoverage,
-			planetRadiusKm,
-			pressure,
-		}),
-	)
-
 	const generatedMoonsPreview = useMemo(() => {
 		const cls = isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
@@ -2830,43 +2824,9 @@ export const GenesisView: React.FC = () => {
 		starSubtype,
 	])
 
-	// --- Moon orbits (3D scene, globe mode only) ---
-	const moonOrbitDayOfYear =
-		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)
-	useEffect(() => {
-		sceneRef.current?.setMoonOrbitOverlay(
-			showMoonOrbits && viewMode === "globe" && generatedMoonsPreview.length > 0
-				? generatedMoonsPreview
-				: null,
-			planetRadiusKm,
-			hoursPerDay,
-			tideLock,
-			moonOrbitDayOfYear,
-			showGrid,
-			gridSpacing,
-			showEllipticalOrbits,
-		)
-	}, [
-		showMoonOrbits,
-		showEllipticalOrbits,
-		viewMode,
-		generatedMoonsPreview,
-		planetRadiusKm,
-		hoursPerDay,
-		tideLock,
-		moonOrbitDayOfYear,
-		showGrid,
-		gridSpacing,
-	])
-
-	useEffect(() => {
-		if (showMoonOrbits && viewMode === "globe")
-			sceneRef.current?.updateMoonOrbitDay(moonOrbitDayOfYear)
-	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
-
 	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
 	// and by the solar system view) ---
-	const systemBodies: SystemBody[] = useMemo(() => {
+	const generatedSystemBodies: SystemBody[] = useMemo(() => {
 		const cls = isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: DEFAULT_SPECTRAL_CLASS
@@ -2880,10 +2840,20 @@ export const GenesisView: React.FC = () => {
 				(planetRadiusKm * 1000) ** 2 /
 				9.807,
 			orbitalPeriodDays: effectiveDaysPerYear,
-			dayLengthHours: hoursPerDay,
+			siderealDayHours: hoursPerDay,
 			eccentricity,
 			argumentOfPeriapsisDeg: perihelion,
 			axialTiltDeg: obliquity,
+			inclinationDeg:
+				mainWorldInclinationOverrideActive && mainWorldInclinationDeg !== null
+					? mainWorldInclinationDeg
+					: undefined,
+			longitudeOfAscendingNodeDeg:
+				mainWorldLongitudeOfAscendingNodeOverrideActive &&
+				mainWorldLongitudeOfAscendingNodeDeg !== null
+					? mainWorldLongitudeOfAscendingNodeDeg
+					: undefined,
+			tideLock,
 		}
 		return generateSystemBodies({
 			seed: restSeed,
@@ -2904,11 +2874,197 @@ export const GenesisView: React.FC = () => {
 		eccentricity,
 		perihelion,
 		obliquity,
+		mainWorldInclinationDeg,
+		mainWorldInclinationOverrideActive,
+		mainWorldLongitudeOfAscendingNodeDeg,
+		mainWorldLongitudeOfAscendingNodeOverrideActive,
+		tideLock,
+	])
+	const [editableSystemBodies, setEditableSystemBodies] = useState<
+		SystemBody[]
+	>([])
+	useEffect(() => {
+		setMainWorldInclinationDeg(null)
+		setMainWorldInclinationOverrideActive(false)
+		setMainWorldLongitudeOfAscendingNodeDeg(null)
+		setMainWorldLongitudeOfAscendingNodeOverrideActive(false)
+	}, [])
+	useEffect(() => {
+		setEditableSystemBodies(generatedSystemBodies)
+	}, [generatedSystemBodies])
+	useEffect(() => {
+		const mainWorldBody = generatedSystemBodies.find((body) => body.isMainWorld)
+		if (!mainWorldBody) return
+		if (mainWorldInclinationDeg === null)
+			setMainWorldInclinationDeg(mainWorldBody.inclinationDeg)
+		if (mainWorldLongitudeOfAscendingNodeDeg === null)
+			setMainWorldLongitudeOfAscendingNodeDeg(
+				mainWorldBody.longitudeOfAscendingNodeDeg,
+			)
+	}, [
+		generatedSystemBodies,
+		mainWorldInclinationDeg,
+		mainWorldLongitudeOfAscendingNodeDeg,
+	])
+	const systemBodies =
+		editableSystemBodies.length > 0
+			? editableSystemBodies
+			: generatedSystemBodies
+	const mainWorldSystemBody =
+		systemBodies.find((body) => body.isMainWorld) ?? null
+	const displayMoons = mainWorldSystemBody?.moons ?? generatedMoonsPreview
+	const systemBodiesRef = useRef(systemBodies)
+	systemBodiesRef.current = systemBodies
+	const displayMoonsRef = useRef(displayMoons)
+	displayMoonsRef.current = displayMoons
+	// --- Moon orbits (3D scene, globe mode only) ---
+	const moonOrbitDayOfYear =
+		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)
+	useEffect(() => {
+		sceneRef.current?.setMoonOrbitOverlay(
+			showMoonOrbits &&
+				viewMode === "globe" &&
+				displayMoonsRef.current.length > 0
+				? displayMoonsRef.current
+				: null,
+			planetRadiusKm,
+			hoursPerDay,
+			tideLock,
+			moonOrbitDayOfYear,
+			showGrid,
+			gridSpacing,
+			showEllipticalOrbits,
+		)
+	}, [
+		showMoonOrbits,
+		showEllipticalOrbits,
+		viewMode,
+		planetRadiusKm,
+		hoursPerDay,
+		tideLock,
+		moonOrbitDayOfYear,
+		showGrid,
+		gridSpacing,
+	])
+	useEffect(() => {
+		if (!showMoonOrbits || viewMode !== "globe") return
+		sceneRef.current?.updateMoonOrbitOverlay(
+			displayMoons.length > 0 ? displayMoons : null,
+			planetRadiusKm,
+			hoursPerDay,
+			tideLock,
+			showGrid,
+			gridSpacing,
+			showEllipticalOrbits,
+		)
+	}, [
+		displayMoons,
+		showMoonOrbits,
+		viewMode,
+		planetRadiusKm,
+		hoursPerDay,
+		tideLock,
+		showGrid,
+		gridSpacing,
+		showEllipticalOrbits,
 	])
 
 	useEffect(() => {
+		if (showMoonOrbits && viewMode === "globe")
+			sceneRef.current?.updateMoonOrbitDay(moonOrbitDayOfYear)
+	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
+	const updateEditableSystemBody = useCallback(
+		(bodyIndex: number, updater: (body: SystemBody) => SystemBody) => {
+			setEditableSystemBodies((prev) =>
+				prev.map((body, index) => (index === bodyIndex ? updater(body) : body)),
+			)
+		},
+		[],
+	)
+	const updateEditableSystemMoon = useCallback(
+		(
+			bodyIndex: number,
+			moonIndex: number,
+			updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+		) => {
+			setEditableSystemBodies((prev) =>
+				prev.map((body, index) => {
+					if (index !== bodyIndex) return body
+					return {
+						...body,
+						moons: body.moons.map((moon, currentMoonIndex) =>
+							currentMoonIndex === moonIndex ? updater(moon, body) : moon,
+						),
+					}
+				}),
+			)
+		},
+		[],
+	)
+
+	// The solar-system view's own clock — deliberately independent of the
+	// planet's day-of-year calendar (moonOrbitDayOfYear), which keeps driving
+	// the globe/map moon overlay as before. The two knobs are additive: each
+	// tracks its own elapsed hours (persisting across focus changes), and
+	// their sum is the single elapsed-time value that drives both the spin
+	// animation and the orbital day — so maxing both knobs out means "one
+	// full rotation's worth of time, plus one full orbit's worth of time,
+	// have passed."
+	const [solarSystemRotationHours, setSolarSystemRotationHours] = useState(0)
+	const [solarSystemOrbitHours, setSolarSystemOrbitHours] = useState(0)
+	const solarSystemElapsedHours =
+		solarSystemRotationHours + solarSystemOrbitHours
+	// The clock knobs drag continuously — reading this via a ref (rather than
+	// depending on the state directly) keeps them out of the rebuild effect's
+	// dependency list below, so dragging only repositions meshes via the
+	// lightweight update effects instead of disposing and rebuilding the
+	// whole overlay (and re-fetching every body's texture) on every tick.
+	const solarSystemElapsedHoursRef = useRef(solarSystemElapsedHours)
+	solarSystemElapsedHoursRef.current = solarSystemElapsedHours
+
+	useEffect(() => {
 		sceneRef.current?.setSolarSystemOverlay(
-			solarSystemViewActive && systemBodies.length > 0
+			solarSystemViewActive && systemBodiesRef.current.length > 0
+				? {
+						bodies: systemBodiesRef.current,
+						hoursPerDay,
+						tideLock,
+						daysPerYear: effectiveDaysPerYear,
+						spectralClass: isValidSpectralClass(spectralClass)
+							? (spectralClass as MainSequenceClass)
+							: DEFAULT_SPECTRAL_CLASS,
+						starSubtype,
+						initialDay: solarSystemElapsedHoursRef.current / 24,
+						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+						showDaylight: showSolarSystemDaylight,
+						showInclination: showSolarSystemInclination,
+						showAxialTilt: showSolarSystemAxialTilt,
+						showRealisticSizes: showSolarSystemRealisticSizes,
+						showBodyNames: showSolarSystemBodyNames,
+						showRealNames: restSeed === SOL_SEED && showSolarSystemRealNames,
+					}
+				: null,
+		)
+	}, [
+		solarSystemViewActive,
+		hoursPerDay,
+		tideLock,
+		effectiveDaysPerYear,
+		spectralClass,
+		starSubtype,
+		showSolarSystemEllipticalOrbits,
+		showSolarSystemInclination,
+		showSolarSystemAxialTilt,
+		showSolarSystemRealisticSizes,
+		showSolarSystemBodyNames,
+		restSeed,
+		showSolarSystemRealNames,
+		showSolarSystemDaylight,
+	])
+	useEffect(() => {
+		if (!solarSystemViewActive) return
+		sceneRef.current?.updateSolarSystemOverlay(
+			systemBodies.length > 0
 				? {
 						bodies: systemBodies,
 						hoursPerDay,
@@ -2918,30 +3074,42 @@ export const GenesisView: React.FC = () => {
 							? (spectralClass as MainSequenceClass)
 							: DEFAULT_SPECTRAL_CLASS,
 						starSubtype,
-						initialDay: moonOrbitDayOfYear,
+						initialDay: solarSystemElapsedHoursRef.current / 24,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
 						showDaylight: showSolarSystemDaylight,
 						showInclination: showSolarSystemInclination,
+						showAxialTilt: showSolarSystemAxialTilt,
+						showRealisticSizes: showSolarSystemRealisticSizes,
+						showBodyNames: showSolarSystemBodyNames,
+						showRealNames: restSeed === SOL_SEED && showSolarSystemRealNames,
 					}
 				: null,
 		)
 	}, [
-		solarSystemViewActive,
 		systemBodies,
+		solarSystemViewActive,
 		hoursPerDay,
 		tideLock,
 		effectiveDaysPerYear,
 		spectralClass,
 		starSubtype,
-		moonOrbitDayOfYear,
 		showSolarSystemEllipticalOrbits,
 		showSolarSystemInclination,
+		showSolarSystemAxialTilt,
+		showSolarSystemRealisticSizes,
+		showSolarSystemBodyNames,
+		restSeed,
+		showSolarSystemRealNames,
 		showSolarSystemDaylight,
 	])
 	useEffect(() => {
 		if (solarSystemViewActive)
-			sceneRef.current?.updateSolarSystemDay(moonOrbitDayOfYear)
-	}, [moonOrbitDayOfYear, solarSystemViewActive])
+			sceneRef.current?.updateSolarSystemDay(solarSystemElapsedHours / 24)
+	}, [solarSystemElapsedHours, solarSystemViewActive])
+	useEffect(() => {
+		if (solarSystemViewActive)
+			sceneRef.current?.setSolarSystemSpinHours(solarSystemElapsedHours)
+	}, [solarSystemElapsedHours, solarSystemViewActive])
 
 	// Entering the solar-system view and focusing a body both hinge on
 	// `solarSystemViewActive` — the overlay-building effect above only
@@ -2952,10 +3120,18 @@ export const GenesisView: React.FC = () => {
 		bodyIndex: number
 		moonIndex?: number
 	} | null>(null)
+	// The last body/moon focused via the GPS buttons — drives the clock
+	// knobs' reference periods and is not cleared on use (unlike pendingFocus,
+	// which just triggers the one-shot camera animation).
+	const [currentFocus, setCurrentFocus] = useState<{
+		bodyIndex: number
+		moonIndex?: number
+	} | null>(null)
 	const handleFocusBody = useCallback(
 		(bodyIndex: number, moonIndex?: number) => {
 			setSolarSystemViewActive(true)
 			setPendingFocus({ bodyIndex, moonIndex })
+			setCurrentFocus({ bodyIndex, moonIndex })
 		},
 		[],
 	)
@@ -2968,7 +3144,91 @@ export const GenesisView: React.FC = () => {
 		setPendingFocus(null)
 	}, [solarSystemViewActive, pendingFocus])
 
+	// Keeps `currentFocus` (and thus the clock knobs) in sync even when the
+	// focus change originates from a renderer-internal event — e.g.
+	// double-clicking a body in the 3D view — rather than the GPS buttons.
+	useEffect(() => {
+		if (!sceneRef.current) return
+		sceneRef.current.setSolarSystemFocusChangeHandler((bodyIndex, moonIndex) =>
+			setCurrentFocus({ bodyIndex, moonIndex }),
+		)
+		return () => sceneRef.current?.setSolarSystemFocusChangeHandler(null)
+	}, [])
+
+	// Clock-knob reference periods for whatever is currently focused — the
+	// knobs stay hidden for the star (no parent to orbit, and no rotation
+	// period worth exposing here) and default to the main world otherwise.
+	const solarSystemClock = useMemo(() => {
+		const mainWorldIndex = systemBodies.findIndex((b) => b.isMainWorld)
+		const focus = currentFocus ?? { bodyIndex: mainWorldIndex }
+		if (focus.bodyIndex === -1) return null
+		const body = systemBodies[focus.bodyIndex]
+		if (!body) return null
+		const moon =
+			focus.moonIndex !== undefined ? body.moons[focus.moonIndex] : undefined
+		const rotationPeriodHours = moon
+			? moon.siderealDayHours
+			: body.siderealDayHours
+		const orbitalPeriodDays = moon
+			? moon.orbitalPeriodDays
+			: body.orbitalPeriodDays
+		if (rotationPeriodHours <= 0 || orbitalPeriodDays <= 0) return null
+		return { rotationPeriodHours, orbitalPeriodDays }
+	}, [systemBodies, currentFocus])
+
+	const wrapFraction = (value: number, period: number) =>
+		period > 0 ? (((value % period) + period) % period) / period : 0
+	const solarSystemRotationFraction = solarSystemClock
+		? wrapFraction(
+				solarSystemRotationHours,
+				solarSystemClock.rotationPeriodHours,
+			)
+		: 0
+	const solarSystemOrbitFraction = solarSystemClock
+		? wrapFraction(
+				solarSystemOrbitHours,
+				solarSystemClock.orbitalPeriodDays * 24,
+			)
+		: 0
+	const setSolarSystemRotationFraction = (fraction: number) => {
+		if (!solarSystemClock) return
+		setSolarSystemRotationHours(fraction * solarSystemClock.rotationPeriodHours)
+	}
+	const setSolarSystemOrbitFraction = (fraction: number) => {
+		if (!solarSystemClock) return
+		setSolarSystemOrbitHours(fraction * solarSystemClock.orbitalPeriodDays * 24)
+	}
+
+	const focusedMoon =
+		solarSystemViewActive && currentFocus?.moonIndex !== undefined
+			? (systemBodies[currentFocus.bodyIndex]?.moons[currentFocus.moonIndex] ??
+				null)
+			: null
+	const focusedMoonParent =
+		focusedMoon && solarSystemViewActive
+			? systemBodies[currentFocus!.bodyIndex]
+			: null
+
 	const tidalSchedulePreview = useMemo(() => {
+		if (focusedMoon && focusedMoonParent) {
+			return computeMoonTidalSchedule(
+				focusedMoon,
+				{
+					idx: focusedMoonParent.idx,
+					massKg: focusedMoonParent.massKg,
+					moons: focusedMoonParent.moons,
+				},
+				{
+					daysPerYear,
+					hoursPerDay,
+					spectralClass,
+					starSubtype,
+					orbitalDistanceAU: focusedMoonParent.orbitalDistanceAU,
+					eccentricity: focusedMoonParent.eccentricity,
+					perihelion,
+				},
+			)
+		}
 		const scheduleParams = {
 			seed,
 			daysPerYear,
@@ -2981,9 +3241,11 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			perihelion,
 		}
-		return computeTidalSchedule(generatedMoonsPreview, scheduleParams)
+		return computeTidalSchedule(displayMoons, scheduleParams)
 	}, [
-		generatedMoonsPreview,
+		focusedMoon,
+		focusedMoonParent,
+		displayMoons,
 		seed,
 		daysPerYear,
 		hoursPerDay,
@@ -2996,14 +3258,54 @@ export const GenesisView: React.FC = () => {
 		perihelion,
 	])
 
-	const previewWithTides = useMemo(
-		() => ({ ...generationPreview, tidalSchedule: tidalSchedulePreview }),
-		[generationPreview, tidalSchedulePreview],
-	)
-	const lockedPreviewWithTides = useMemo(
-		() => ({ ...lockedGenerationPreview, tidalSchedule: tidalSchedulePreview }),
-		[lockedGenerationPreview, tidalSchedulePreview],
-	)
+	const solStarName =
+		restSeed === SOL_SEED && showSolarSystemRealNames ? "Sol" : undefined
+	const surfaceTidesM = useMemo(() => {
+		if (focusedMoon && focusedMoonParent) {
+			return computeMoonSurfaceTidesM(
+				focusedMoon,
+				{
+					name: showSolarSystemRealNames ? focusedMoonParent.name : undefined,
+					massKg: focusedMoonParent.massKg,
+					diameterKm: focusedMoonParent.diameterKm,
+					moons: focusedMoonParent.moons,
+				},
+				{
+					hoursPerDay,
+					spectralClass,
+					starSubtype,
+					orbitalDistanceAU: focusedMoonParent.orbitalDistanceAU,
+					eccentricity: focusedMoonParent.eccentricity,
+					starName: solStarName,
+				},
+			)
+		}
+		return computeSurfaceTidesM(
+			displayMoons,
+			{ diameterKm: planetRadiusKm * 2, tideLock },
+			{
+				hoursPerDay,
+				spectralClass,
+				starSubtype,
+				orbitalDistanceAU,
+				eccentricity,
+				starName: solStarName,
+			},
+		)
+	}, [
+		focusedMoon,
+		focusedMoonParent,
+		displayMoons,
+		planetRadiusKm,
+		tideLock,
+		hoursPerDay,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
+		eccentricity,
+		solStarName,
+		showSolarSystemRealNames,
+	])
 
 	const exportBusy = exportProgress !== null
 	const exportDisabled = !worldForDisplay || exportBusy
@@ -3022,11 +3324,15 @@ export const GenesisView: React.FC = () => {
 					moonCount={moonCount}
 					moonSeed={moonSeed}
 					restSeed={restSeed}
+					showRealSolNames={showSolarSystemRealNames}
 					setRestSeed={setRestSeed}
 					tidalSchedulePreview={tidalSchedulePreview}
-					generatedMoons={generatedMoonsPreview}
+					surfaceTidesM={surfaceTidesM}
+					generatedMoons={displayMoons}
 					siblingBodies={systemBodies.filter((b) => !b.isMainWorld)}
 					systemBodies={systemBodies}
+					onUpdateSystemBody={updateEditableSystemBody}
+					onUpdateSystemMoon={updateEditableSystemMoon}
 					onFocusBody={handleFocusBody}
 					daysPerYear={daysPerYear}
 					hoursPerDay={hoursPerDay}
@@ -3044,6 +3350,10 @@ export const GenesisView: React.FC = () => {
 					inclinationDeg={
 						systemBodies.find((b) => b.isMainWorld)?.inclinationDeg ?? 0
 					}
+					setInclinationDeg={(value) => {
+						setMainWorldInclinationOverrideActive(true)
+						setMainWorldInclinationDeg(value)
+					}}
 					longitudeOfAscendingNodeDeg={
 						systemBodies.find((b) => b.isMainWorld)
 							?.longitudeOfAscendingNodeDeg ?? 0
@@ -3064,9 +3374,8 @@ export const GenesisView: React.FC = () => {
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
 					generationTimings={generationTimings}
-					climatePreview={
-						tidallyLocked ? lockedPreviewWithTides : previewWithTides
-					}
+					obliquity={obliquity}
+					landCoverage={landCoverage}
 					generationPreviewTab={generationPreviewTab}
 					onSelectGenerationPreviewTab={setGenerationPreviewTab}
 					unitSystem={unitSystem}
@@ -3193,6 +3502,30 @@ export const GenesisView: React.FC = () => {
 							setShowDaylight={setShowSolarSystemDaylight}
 							showInclination={showSolarSystemInclination}
 							setShowInclination={setShowSolarSystemInclination}
+							showAxialTilt={showSolarSystemAxialTilt}
+							setShowAxialTilt={setShowSolarSystemAxialTilt}
+							showRealisticSizes={showSolarSystemRealisticSizes}
+							setShowRealisticSizes={setShowSolarSystemRealisticSizes}
+							showBodyNames={showSolarSystemBodyNames}
+							setShowBodyNames={setShowSolarSystemBodyNames}
+							showRealNames={
+								restSeed === SOL_SEED ? showSolarSystemRealNames : undefined
+							}
+							setShowRealNames={
+								restSeed === SOL_SEED ? setShowSolarSystemRealNames : undefined
+							}
+							clock={
+								solarSystemClock
+									? {
+											rotationFraction: solarSystemRotationFraction,
+											setRotationFraction: setSolarSystemRotationFraction,
+											orbitFraction: solarSystemOrbitFraction,
+											setOrbitFraction: setSolarSystemOrbitFraction,
+											rotationPeriodHours: solarSystemClock.rotationPeriodHours,
+											orbitalPeriodDays: solarSystemClock.orbitalPeriodDays,
+										}
+									: null
+							}
 						/>
 					) : (
 						<OverlayControls
@@ -3346,27 +3679,25 @@ export const GenesisView: React.FC = () => {
 						/>
 					)}
 
-					{showMoonOrbits &&
-						viewMode === "map" &&
-						generatedMoonsPreview.length > 0 && (
-							<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
-								<MoonOrbitsOverlay
-									moons={generatedMoonsPreview}
-									planetRadiusKm={planetRadiusKm}
-									hoursPerDay={hoursPerDay}
-									tideLock={tideLock}
-									day={moonOrbitDayOfYear}
-									showEllipticalOrbits={showEllipticalOrbits}
-									showDaylight={showDaylight}
-									clockHour={clockHour}
-								/>
-							</div>
-						)}
+					{showMoonOrbits && viewMode === "map" && displayMoons.length > 0 && (
+						<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
+							<MoonOrbitsOverlay
+								moons={displayMoons}
+								planetRadiusKm={planetRadiusKm}
+								hoursPerDay={hoursPerDay}
+								tideLock={tideLock}
+								day={moonOrbitDayOfYear}
+								showEllipticalOrbits={showEllipticalOrbits}
+								showDaylight={showDaylight}
+								clockHour={clockHour}
+							/>
+						</div>
+					)}
 
 					{showApparentDiameter && moonCount > 0 && !solarSystemViewActive && (
 						<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
 							<ApparentDiameterOverlay
-								moons={generatedMoonsPreview}
+								moons={displayMoons}
 								planetRadiusKm={planetRadiusKm}
 								hoursPerDay={hoursPerDay}
 								tideLock={tideLock}

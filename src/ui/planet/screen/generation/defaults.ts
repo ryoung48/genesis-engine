@@ -1,17 +1,8 @@
 import {
-	DEFAULT_ORBITAL_DISTANCE_AU,
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
 } from "@/model/celestial/star/star-types"
-import {
-	DEFAULT_ANTISTELLAR_LON,
-	DEFAULT_DAYS_PER_YEAR,
-	DEFAULT_ECCENTRICITY,
-	DEFAULT_HOURS_PER_DAY,
-	DEFAULT_OBLIQUITY_DEG,
-	DEFAULT_PERIHELION,
-	DEFAULT_PLANET_RADIUS_KM,
-} from "@/model/shared/units"
+import { SOL_MAIN_WORLD_DEFAULTS } from "@/model/celestial/system/sol-system"
 import { DEFAULT_ERA } from "@/model/society/eras"
 
 export const PLANET_CODE_STORAGE_KEY = "genesis:lastPlanetCode"
@@ -28,14 +19,14 @@ export const DEFAULT_WORLD_PARAMS = {
 	continentSizeVariety: 0.35,
 	landCoverage: 0.3,
 	roughness: 0.4,
-	planetRadiusKm: DEFAULT_PLANET_RADIUS_KM,
-	obliquity: DEFAULT_OBLIQUITY_DEG,
-	eccentricity: DEFAULT_ECCENTRICITY,
+	planetRadiusKm: SOL_MAIN_WORLD_DEFAULTS.planetRadiusKm,
+	obliquity: SOL_MAIN_WORLD_DEFAULTS.obliquity,
+	eccentricity: SOL_MAIN_WORLD_DEFAULTS.eccentricity,
 	spectralClass: DEFAULT_SPECTRAL_CLASS,
 	starSubtype: DEFAULT_STAR_SUBTYPE,
-	orbitalDistanceAU: DEFAULT_ORBITAL_DISTANCE_AU,
-	daysPerYear: DEFAULT_DAYS_PER_YEAR,
-	hoursPerDay: DEFAULT_HOURS_PER_DAY,
+	orbitalDistanceAU: SOL_MAIN_WORLD_DEFAULTS.orbitalDistanceAU,
+	daysPerYear: SOL_MAIN_WORLD_DEFAULTS.daysPerYear,
+	hoursPerDay: SOL_MAIN_WORLD_DEFAULTS.hoursPerDay,
 	terrainWarp: 0.75,
 	smoothing: 0.1,
 	hydraulicErosion: 0.5,
@@ -46,9 +37,9 @@ export const DEFAULT_WORLD_PARAMS = {
 	volcanism: 1,
 	craters: 0,
 	maxElevation: 6000,
-	pressure: 1.0,
-	antistellarLon: DEFAULT_ANTISTELLAR_LON,
-	perihelion: DEFAULT_PERIHELION,
+	pressure: SOL_MAIN_WORLD_DEFAULTS.pressureBar,
+	antistellarLon: SOL_MAIN_WORLD_DEFAULTS.antistellarLon,
+	perihelion: SOL_MAIN_WORLD_DEFAULTS.perihelion,
 	era: DEFAULT_ERA,
-	moonCount: 1,
+	moonCount: SOL_MAIN_WORLD_DEFAULTS.moonCount,
 } as const

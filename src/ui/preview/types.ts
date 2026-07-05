@@ -9,6 +9,10 @@ interface ClimatePreviewCommon {
 	columnValues: number[]
 	columnLabels: string[]
 	tidalSchedule?: TidalSchedule
+	/** EBM inputs actually used for this preview -- unset for the tidally
+	 * locked model, which doesn't have an equivalent greenhouse concept. */
+	albedo?: number
+	greenhouseFactor?: number
 }
 
 export interface RegularClimatePreviewData extends ClimatePreviewCommon {

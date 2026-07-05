@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
+import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
 import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
@@ -11,10 +12,20 @@ import {
 	layoutMoonOrbitPeriapsesForDisplay,
 	scaleBodyDiameterToVisualRadius,
 } from "../moon-visual-scale"
+import {
+	createNameLabel,
+	createNameLeaderLine,
+	sizeNameLabel,
+	type Text,
+	updateLabelPlacement,
+} from "./body-name-label"
 
 const MOON_COLORS_HEX = [0x0ea5e9, 0x8b5cf6, 0x10b981]
 const TWO_PI = 2 * Math.PI
 const ORBIT_SEGMENTS = 256
+const MIN_MOON_VISUAL_RADIUS = 0.004
+const textureLoader = new THREE.TextureLoader()
+let sharedMoonTexture: THREE.Texture | null = null
 
 export function solveKepler(M: number, e: number): number {
 	let E = M
@@ -85,28 +96,43 @@ export function orbitPoint(
 
 /**
  * Builds a moon sphere with optional lat/lon grid lines.
- * Q is the orbital direction vector (90° ahead), used to orient axial tilt.
+ * `tiltAxis` orients the axial tilt — anchored to the ascending node (not
+ * periapsis), so it stays fixed as the moon's own periapsis is varied.
  */
 function buildMoonMesh(
 	radius: number,
 	color: number,
 	axialTiltDeg: number,
-	retrogradeRotation: boolean,
-	Q: THREE.Vector3,
+	tiltAxis: THREE.Vector3,
 	showGrid: boolean,
 	gridSpacing: number,
 ): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(radius, 8, 6)
-	const moonTex = new THREE.TextureLoader().load("/moon.jpg")
+	if (!sharedMoonTexture) {
+		sharedMoonTexture = textureLoader.load("/moon.jpg")
+		sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
+		sharedMoonTexture.userData.sharedTexture = true
+	}
 	const mat = new THREE.MeshStandardMaterial({
-		map: moonTex,
+		map: sharedMoonTexture,
 		roughness: 1,
 		metalness: 0,
 	})
 	const mesh = new THREE.Mesh(geo, mat)
-	const tiltRad =
-		((axialTiltDeg * Math.PI) / 180) * (retrogradeRotation ? -1 : 1)
-	mesh.setRotationFromAxisAngle(Q, tiltRad)
+	// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
+	// XY (Z-north) — same quarter-turn the terrestrial/gas-giant meshes get
+	// elsewhere in this renderer. Composed as a quaternion (pole correction
+	// first, tilt on top) rather than baked into the geometry, so the spin
+	// axis below — which spins in the mesh's local (pre-pole-correction) Y,
+	// matching the same convention setSpinHours uses for planets — still
+	// lines up with the true polar axis.
+	const poleQuat = new THREE.Quaternion().setFromAxisAngle(
+		new THREE.Vector3(1, 0, 0),
+		Math.PI / 2,
+	)
+	const tiltRad = (axialTiltDeg * Math.PI) / 180
+	const tiltQuat = new THREE.Quaternion().setFromAxisAngle(tiltAxis, tiltRad)
+	mesh.quaternion.multiplyQuaternions(tiltQuat, poleQuat)
 
 	if (showGrid) {
 		const gridRadius = radius * 1.01
@@ -174,6 +200,16 @@ export interface MoonOrbitState {
 	getMoonFocus?(
 		moonIndex: number,
 	): { position: THREE.Vector3; localRadius: number } | null
+	/** Spins every moon mesh around its own (tilted) axis by a fraction of a
+	 * full turn derived from `hours` and that moon's own rotation period. */
+	setSpinHours?(hours: number): void
+	/** Index of the moon whose mesh is (or contains) `object`, e.g. for
+	 * resolving a raycast hit back to a moon — null if no match. */
+	getMoonIndexForMesh?(object: THREE.Object3D): number | null
+	/** Re-billboards every visible moon name label to face the camera — see
+	 * the same method on SolarSystemOverlayState for why this needs its own
+	 * per-frame hook. */
+	updateLabelOrientations?(camera: THREE.PerspectiveCamera): void
 }
 
 export function buildMoonOrbitOverlay(
@@ -188,6 +224,14 @@ export function buildMoonOrbitOverlay(
 	showInclination: boolean = true,
 	parentOccupiedRadiusRelativeToPlanet: number = 1,
 	parentSceneRadiusForGlobalScaling?: number,
+	showAxialTilt: boolean = true,
+	realisticSizes: boolean = true,
+	showMoonNames: boolean = false,
+	showRealNames: boolean = false,
+	/** Real-name fallback for the first moon (index 0) when it has no
+	 * `name` of its own — e.g. "Luna" for the main world's default single
+	 * moon, which may still be unnamed in non-Sol procedural systems. */
+	firstMoonFallbackRealName?: string,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 	if (moons.length === 0) {
@@ -211,13 +255,15 @@ export function buildMoonOrbitOverlay(
 	const SCENE_MAX = 2.55
 	const moonDisplayRadii = moons.map((moon) =>
 		Math.max(
-			0.008,
+			MIN_MOON_VISUAL_RADIUS,
 			parentSceneRadiusForGlobalScaling && parentSceneRadiusForGlobalScaling > 0
 				? scaleBodyDiameterToVisualRadius(
 						moon.diameterKm,
 						BODY_VISUAL_BASE_RADIUS,
-					) /
-					parentSceneRadiusForGlobalScaling
+						realisticSizes,
+						moon.sizeClass ??
+							estimateMoonSizeClassFromDiameter(moon.diameterKm),
+					) / parentSceneRadiusForGlobalScaling
 				: moon.diameterKm / Math.max(planetRadiusKm * 2, 1),
 		),
 	)
@@ -230,7 +276,7 @@ export function buildMoonOrbitOverlay(
 					planetRadiusKm,
 				),
 				eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
-				bodyVisualRadius: moonDisplayRadii[index] ?? 0.008,
+				bodyVisualRadius: moonDisplayRadii[index] ?? MIN_MOON_VISUAL_RADIUS,
 			}
 		}),
 		parentVisualRadius: parentOccupiedRadiusRelativeToPlanet,
@@ -249,6 +295,12 @@ export function buildMoonOrbitOverlay(
 		P: THREE.Vector3
 		Q: THREE.Vector3
 		moonMesh: THREE.Mesh
+		baseQuaternion: THREE.Quaternion
+		spinPeriodHours: number
+		nameLabelAnchor?: THREE.Group
+		nameLabel?: Text
+		nameLeader?: THREE.Line
+		localRadius: number
 	}> = []
 
 	moons.forEach((moon, i) => {
@@ -264,6 +316,14 @@ export function buildMoonOrbitOverlay(
 		const M0 = (moon.meanAnomalyAtEpochDeg * Math.PI) / 180
 
 		const { P, Q } = perifocalBasis(Omega, inc, omega)
+		// The tilt axis is deliberately NOT derived from omega (periapsis) —
+		// using the periapsis-relative Q here would lock the tilt direction
+		// to periapsis, so moving periapsis would drag the tilt axis along
+		// with it and the two could never be phased against each other (e.g.
+		// periapsis landing at a solstice vs. an equinox). Anchoring it to
+		// the ascending node instead (omega=0) keeps it fixed as periapsis
+		// moves independently.
+		const { Q: tiltAxis } = perifocalBasis(Omega, inc, 0)
 		const moonColor = MOON_COLORS_HEX[i % MOON_COLORS_HEX.length]
 		const lineColor = moonColor
 
@@ -282,18 +342,40 @@ export function buildMoonOrbitOverlay(
 		group.add(new THREE.Line(orbitGeo, orbitMat))
 
 		// --- Moon body ---
-		const moonR = moonDisplayRadii[i] ?? 0.008
+		const moonR = moonDisplayRadii[i] ?? MIN_MOON_VISUAL_RADIUS
 		const moonMesh = buildMoonMesh(
 			moonR,
 			moonColor,
-			moon.axialTiltDeg,
-			moon.retrogradeRotation,
-			Q,
+			showAxialTilt ? moon.axialTiltDeg : 0,
+			tiltAxis,
 			showGrid,
 			gridSpacing,
 		)
 		group.add(moonMesh)
 		moonMeshes.push(moonMesh)
+
+		// Name label — a translate-only anchor (not the moonMesh itself, which
+		// rotates via axial tilt + spin) so the label/leader don't inherit
+		// that rotation. Its position is kept in sync with moonMesh in setDay.
+		let nameLabelAnchor: THREE.Group | undefined
+		let nameLabel: Text | undefined
+		let nameLeader: THREE.Line | undefined
+		if (showMoonNames) {
+			nameLabelAnchor = new THREE.Group()
+			const moonName =
+				showRealNames && moon.name
+					? moon.name
+					: showRealNames && i === 0 && firstMoonFallbackRealName
+						? firstMoonFallbackRealName
+						: `Moon ${i + 1}`
+			nameLabel = createNameLabel(moonName)
+			nameLeader = createNameLeaderLine()
+			sizeNameLabel(nameLabel, moonR)
+			nameLabelAnchor.add(nameLabel)
+			nameLabelAnchor.add(nameLeader)
+			group.add(nameLabelAnchor)
+		}
+
 		moonData.push({
 			a,
 			b,
@@ -304,6 +386,12 @@ export function buildMoonOrbitOverlay(
 			P,
 			Q,
 			moonMesh,
+			baseQuaternion: moonMesh.quaternion.clone(),
+			spinPeriodHours: moon.siderealDayHours,
+			nameLabelAnchor,
+			nameLabel,
+			nameLeader,
+			localRadius: moonR,
 		})
 	})
 
@@ -314,18 +402,45 @@ export function buildMoonOrbitOverlay(
 			const E = solveKepler(M, d.e)
 			const pos = orbitPoint(E, d.a, d.b, d.ae, d.P, d.Q)
 			d.moonMesh.position.copy(pos)
+			d.nameLabelAnchor?.position.copy(pos)
 		}
 	}
 
 	setDay(initialDay)
 
 	function dispose() {
+		// troika Text's own dispose() releases its SDF glyph atlas/font
+		// ref-count too — the generic Mesh handling below only disposes the
+		// geometry/material, which isn't enough for it.
+		for (const d of moonData) d.nameLabel?.dispose()
 		group.traverse((obj) => {
 			if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
 				obj.geometry.dispose()
 				if (Array.isArray(obj.material))
-					obj.material.forEach((m) => m.dispose())
-				else obj.material.dispose()
+					obj.material.forEach((m) => {
+						if (
+							"map" in m &&
+							m.map &&
+							!(
+								"sharedTexture" in m.map.userData &&
+								m.map.userData.sharedTexture
+							)
+						)
+							m.map.dispose()
+						m.dispose()
+					})
+				else {
+					if (
+						"map" in obj.material &&
+						obj.material.map &&
+						!(
+							"sharedTexture" in obj.material.map.userData &&
+							obj.material.map.userData.sharedTexture
+						)
+					)
+						obj.material.map.dispose()
+					obj.material.dispose()
+				}
 			}
 		})
 		group.clear()
@@ -337,8 +452,52 @@ export function buildMoonOrbitOverlay(
 		mesh.updateWorldMatrix(true, false)
 		const position = new THREE.Vector3()
 		mesh.getWorldPosition(position)
-		return { position, localRadius: moonDisplayRadii[moonIndex] ?? 0.008 }
+		return {
+			position,
+			localRadius: moonDisplayRadii[moonIndex] ?? MIN_MOON_VISUAL_RADIUS,
+		}
 	}
 
-	return { group, setDay, dispose, getMoonFocus }
+	const spinQuat = new THREE.Quaternion()
+	const spinAxis = new THREE.Vector3(0, 1, 0)
+	function setSpinHours(hours: number) {
+		for (const d of moonData) {
+			if (d.spinPeriodHours <= 0) continue
+			const angle = (hours / d.spinPeriodHours) * TWO_PI
+			spinQuat.setFromAxisAngle(spinAxis, angle)
+			d.moonMesh.quaternion.copy(d.baseQuaternion).multiply(spinQuat)
+		}
+	}
+
+	function getMoonIndexForMesh(object: THREE.Object3D): number | null {
+		const index = moonMeshes.indexOf(object as THREE.Mesh)
+		return index === -1 ? null : index
+	}
+
+	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
+		for (const d of moonData) {
+			if (!d.nameLabel || !d.nameLeader) continue
+			// `group` carries the parent planet's axial tilt (premultiplied in
+			// once by the caller) — passing its quaternion here cancels that
+			// rotation so the label still points toward the camera's own
+			// on-screen "up" rather than the tilted orbital plane's.
+			updateLabelPlacement(
+				d.nameLabel,
+				d.nameLeader,
+				d.localRadius,
+				group.quaternion,
+				camera,
+			)
+		}
+	}
+
+	return {
+		group,
+		setDay,
+		dispose,
+		getMoonFocus,
+		setSpinHours,
+		getMoonIndexForMesh,
+		updateLabelOrientations,
+	}
 }

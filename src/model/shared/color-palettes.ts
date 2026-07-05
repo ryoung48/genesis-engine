@@ -74,3 +74,26 @@ export const PLASMA_STOPS = palette(
 	"#fcce25",
 	"#f0f921",
 )
+
+/**
+ * ColorBrewer/d3 "Spectral" 11-class diverging scheme, reordered cold->hot
+ * (d3.interpolateSpectral's raw t=0..1 goes hot-red->cold-purple; this array
+ * is reversed so index 0 is the cold end and the last index is the hot end,
+ * matching how callers normalize a real min..max range here). Sample with
+ * sampleBasisColorStops (not sampleColorStops) to reproduce d3's smoothed
+ * basis-spline interpolation through these control colors, not a plain
+ * linear blend between adjacent stops.
+ */
+export const SPECTRAL_STOPS = palette(
+	"#5e4fa2",
+	"#3288bd",
+	"#66c2a5",
+	"#abdda4",
+	"#e6f598",
+	"#ffffbf",
+	"#fee08b",
+	"#fdae61",
+	"#f46d43",
+	"#d53e4f",
+	"#9e0142",
+)

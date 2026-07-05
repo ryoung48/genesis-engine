@@ -1,11 +1,16 @@
 import { SEED_MAX } from "../../shared/planet-code"
-import { createRng, rollD } from "../../shared/rng"
+import { createRng } from "../../shared/rng"
+import { SOL_LUNA_DEFAULT } from "../system/sol-system"
 import {
-	MOON_DEFAULTS,
 	type MoonOrbitRange,
 	type MoonParams,
 	type TideLock,
 } from "./moon-types"
+import {
+	estimateMoonSizeClassFromDiameter,
+	MOON_SIZE_DIAMETER_BANDS_KM,
+	rollInclinationDeg,
+} from "./moon-utils"
 
 const G = 6.674e-11
 const M_SOL_KG = 1.989e30
@@ -21,24 +26,6 @@ const ROCHE_PD = 2
 const MINIMUM_MOON_SPACING_PD = 0.6
 const MINIMUM_MOON_SPACING_SCALE = 0.03
 const EXTREME_ORBIT_SKIP_CHANCE = 0.65
-const MOON_SIZE_DIAMETER_BANDS_KM = [
-	[400, 800],
-	[1000, 2000],
-	[2800, 3600],
-	[4000, 5600],
-	[5600, 7200],
-	[7200, 8800],
-	[8800, 10400],
-	[10400, 12000],
-	[12000, 13600],
-	[13600, 15200],
-	[15200, 16800],
-	[16800, 18400],
-	[18400, 20000],
-	[20000, 21600],
-	[21600, 23199],
-	[23200, 24800],
-] as const
 const ORBIT_RANGE_CONFIG: Record<
 	MoonOrbitRange,
 	{ minFactor: number; maxFactor: number; weight: number }
@@ -64,39 +51,51 @@ type ParentOrbitGroup =
 
 const LUNA_OUTER_COMPANION: MoonParams = {
 	idx: 2,
-	massKg: MOON_DEFAULTS.massKg * 0.34,
-	diameterKm: MOON_DEFAULTS.diameterKm * 0.72,
-	orbitalPeriodDays: MOON_DEFAULTS.orbitalPeriodDays * 1.82,
+	massKg: SOL_LUNA_DEFAULT.massKg * 0.34,
+	diameterKm: SOL_LUNA_DEFAULT.diameterKm * 0.72,
+	group: "dwarf",
+	classification: "rockball",
+	hydrosphereFraction: 0,
+	atmosphere: SOL_LUNA_DEFAULT.atmosphere,
+	orbitalPeriodDays: SOL_LUNA_DEFAULT.orbitalPeriodDays * 1.82,
+	siderealDayHours: SOL_LUNA_DEFAULT.orbitalPeriodDays * 1.82 * 24,
 	eccentricity: 0.038,
 	inclinationDeg: 4.8,
 	longitudeOfAscendingNodeDeg: 0,
 	argumentOfPeriapsisDeg: 0,
 	meanAnomalyAtEpochDeg: 0,
-	axialTiltDeg: MOON_DEFAULTS.axialTiltDeg,
-	retrogradeRotation: MOON_DEFAULTS.retrogradeRotation,
+	axialTiltDeg: SOL_LUNA_DEFAULT.axialTiltDeg,
 	orbitRange: "outer",
 	semiMajorAxisPlanetDiameters: 44.86,
 	sizeClass: 1,
+	albedo: SOL_LUNA_DEFAULT.albedo,
+	greenhouseFactor: SOL_LUNA_DEFAULT.greenhouseFactor,
 }
 
 const LUNA_INNER_COMPANION: MoonParams = {
 	idx: 1,
-	massKg: MOON_DEFAULTS.massKg * 0.18,
-	diameterKm: MOON_DEFAULTS.diameterKm * 0.57,
-	orbitalPeriodDays: MOON_DEFAULTS.orbitalPeriodDays * 0.56,
+	massKg: SOL_LUNA_DEFAULT.massKg * 0.18,
+	diameterKm: SOL_LUNA_DEFAULT.diameterKm * 0.57,
+	group: "dwarf",
+	classification: "rockball",
+	hydrosphereFraction: 0,
+	atmosphere: SOL_LUNA_DEFAULT.atmosphere,
+	orbitalPeriodDays: SOL_LUNA_DEFAULT.orbitalPeriodDays * 0.56,
+	siderealDayHours: SOL_LUNA_DEFAULT.orbitalPeriodDays * 0.56 * 24,
 	eccentricity: 0.024,
 	inclinationDeg: 2.6,
 	longitudeOfAscendingNodeDeg: 0,
 	argumentOfPeriapsisDeg: 0,
 	meanAnomalyAtEpochDeg: 0,
-	axialTiltDeg: MOON_DEFAULTS.axialTiltDeg,
-	retrogradeRotation: MOON_DEFAULTS.retrogradeRotation,
+	axialTiltDeg: SOL_LUNA_DEFAULT.axialTiltDeg,
 	orbitRange: "inner",
 	semiMajorAxisPlanetDiameters: 20.48,
 	sizeClass: 1,
+	albedo: SOL_LUNA_DEFAULT.albedo,
+	greenhouseFactor: SOL_LUNA_DEFAULT.greenhouseFactor,
 }
 
-export function isLunaMoonSeed(seed: number): boolean {
+function isLunaMoonSeed(seed: number): boolean {
 	return seed === LUNA_MOON_SEED
 }
 
@@ -112,10 +111,10 @@ function withRandomizedAngles(baseMoon: MoonParams, seed: number): MoonParams {
 
 function generateLunaMoonSystem(count: number): MoonParams[] {
 	if (count <= 0) return []
-	if (count === 1) return [{ ...MOON_DEFAULTS, idx: 1 }]
+	if (count === 1) return [{ ...SOL_LUNA_DEFAULT, idx: 1 }]
 	if (count === 2) {
 		return [
-			{ ...MOON_DEFAULTS, idx: 1 },
+			{ ...SOL_LUNA_DEFAULT, idx: 1 },
 			{
 				...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1),
 				idx: 2,
@@ -128,7 +127,7 @@ function generateLunaMoonSystem(count: number): MoonParams[] {
 			...withRandomizedAngles(LUNA_INNER_COMPANION, LUNA_MOON_SEED + 2),
 			idx: 1,
 		},
-		{ ...MOON_DEFAULTS, idx: 2 },
+		{ ...SOL_LUNA_DEFAULT, idx: 2 },
 		{
 			...withRandomizedAngles(LUNA_OUTER_COMPANION, LUNA_MOON_SEED + 1),
 			idx: 3,
@@ -140,69 +139,60 @@ function rollDie(rng: ReturnType<typeof createRng>, sides: number): number {
 	return rng.randint(1, sides)
 }
 
-/**
- * Centralized orbital-inclination roll, shared by every planet, moon, and
- * sibling body in the system so they all use the same table:
- *
- *   2D roll   Severity     Degrees
- *   2–6       Very Low     1D ÷ 2
- *   7         Low          1D
- *   8         Moderate     2D
- *   9         High         (2D × 3) + 1D
- *   10        Very High    (1D + 1) × 5 + 1D
- *   11        Extreme      (3D × 5) − 1D
- *   12        Retrograde   roll again, result subtracted from 180
- */
-export function rollInclinationDeg(rng: ReturnType<typeof createRng>): number {
-	const roll = rollD(rng, 2)
-	if (roll <= 6) return rollD(rng, 1) / 2
-	if (roll === 7) return rollD(rng, 1)
-	if (roll === 8) return rollD(rng, 2)
-	if (roll === 9) return rollD(rng, 2) * 3 + rollD(rng, 1)
-	if (roll === 10) return (rollD(rng, 1) + 1) * 5 + rollD(rng, 1)
-	if (roll === 11) return rollD(rng, 3) * 5 - rollD(rng, 1)
-	return 180 - rollInclinationDeg(rng)
+function roll2d6(rng: ReturnType<typeof createRng>): number {
+	return rollDie(rng, 6) + rollDie(rng, 6)
 }
 
-function rollMoonAxialTilt(rng: ReturnType<typeof createRng>): {
-	axialTiltDeg: number
-	retrogradeRotation: boolean
-} {
-	const raw = (() => {
-		const standard = rollDie(rng, 6) + rollDie(rng, 6)
-		if (standard <= 4) return rng.uniform(0.01, 0.1)
-		if (standard <= 5) return rng.uniform(0.2, 1.2)
-		if (standard <= 6) return rng.uniform(1, 6)
-		if (standard <= 7) return rng.uniform(7, 12)
-		if (standard <= 9) return rng.uniform(10, 35)
-		const extreme = rollDie(rng, 6)
-		if (extreme <= 2) return rng.uniform(20, 70)
-		if (extreme <= 4) return rng.uniform(40, 90)
-		if (extreme <= 5) return rng.uniform(91, 126)
-		return rng.uniform(144, 180)
-	})()
-	// Values >90 indicate retrograde rotation; fold back into 0–90 range.
-	if (raw > 90) return { axialTiltDeg: 180 - raw, retrogradeRotation: true }
-	return { axialTiltDeg: raw, retrogradeRotation: false }
+// Values >90° are kept as-is (not folded back into 0–90) — same convention
+// planets use, where axial tilt past 90° is itself what makes a body's spin
+// read as retrograde once composed with the render's tilt quaternion (see
+// buildMoonMesh), rather than needing a separate retrograde flag.
+function rollMoonAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
+	const standard = rollDie(rng, 6) + rollDie(rng, 6)
+	if (standard <= 4) return rng.uniform(0.01, 0.1)
+	if (standard <= 5) return rng.uniform(0.2, 1.2)
+	if (standard <= 6) return rng.uniform(1, 6)
+	if (standard <= 7) return rng.uniform(7, 12)
+	if (standard <= 9) return rng.uniform(10, 35)
+	const extreme = rollDie(rng, 6)
+	if (extreme <= 2) return rng.uniform(20, 70)
+	if (extreme <= 4) return rng.uniform(40, 90)
+	if (extreme <= 5) return rng.uniform(91, 126)
+	return rng.uniform(144, 180)
 }
 
-function inferPlanetSizeClass(planetDiameterKm: number): number {
-	let closestSizeClass = 0
-	let closestDelta = Number.POSITIVE_INFINITY
-	for (
-		let sizeClass = 0;
-		sizeClass < MOON_SIZE_DIAMETER_BANDS_KM.length;
-		sizeClass++
-	) {
-		const [minKm, maxKm] = MOON_SIZE_DIAMETER_BANDS_KM[sizeClass]!
-		const midpointKm = (minKm + maxKm) / 2
-		const delta = Math.abs(planetDiameterKm - midpointKm)
-		if (delta < closestDelta) {
-			closestDelta = delta
-			closestSizeClass = sizeClass
-		}
+// Tidal-locking timescale falls off steeply with orbital distance, so
+// close-in moons (Io, our own Moon) end up locked almost universally while
+// distant/irregular moons often aren't — approximated here as a per-range
+// chance rather than a universal assumption.
+const TIDAL_LOCK_CHANCE_BY_RANGE: Record<MoonOrbitRange, number> = {
+	inner: 0.97,
+	middle: 0.8,
+	outer: 0.45,
+	extreme: 0.15,
+}
+
+// Rolls a moon's own sidereal rotation period, independent of its orbital
+// period. Ported/adapted from the same sidereal-day dice feel used for
+// planets (see generate-system-bodies.ts's rollSiderealDayHours) but without
+// the tidal-lock cascade there, since we're rolling the lock itself here.
+function rollMoonSiderealDayHours(
+	rng: ReturnType<typeof createRng>,
+	orbitRange: MoonOrbitRange,
+	orbitalPeriodDays: number,
+): number {
+	const lockChance = TIDAL_LOCK_CHANCE_BY_RANGE[orbitRange]
+	if (rng.uniform(0, 1) < lockChance) return orbitalPeriodDays * 24
+	// Not tidally locked — spins independently, on the order of a fast
+	// rotator (a few hours to a couple of days), same rough scale real
+	// un-locked minor moons/asteroids fall into.
+	let base = (roll2d6(rng) - 2) * 3 + 2 + rng.randint(1, 6)
+	let rotation = base
+	while (base > 40 && rng.randint(1, 6) >= 5) {
+		base = (roll2d6(rng) - 2) * 3 + rng.randint(1, 6)
+		rotation += base
 	}
-	return closestSizeClass
+	return rotation * rng.uniform(0.95, 1.05)
 }
 
 export function rollMoonCountForParent(
@@ -425,6 +415,16 @@ export function moonSemiMajorAxisM(
 	return Math.cbrt((G * planetMassKg * T * T) / (TWO_PI * TWO_PI))
 }
 
+export function moonOrbitalPeriodDaysFromSemiMajorAxisM(
+	semiMajorAxisM: number,
+	planetMassKg: number,
+	hoursPerDay: number,
+): number {
+	const periodSeconds =
+		TWO_PI * Math.sqrt(semiMajorAxisM ** 3 / (G * planetMassKg))
+	return periodSeconds / (hoursPerDay * 3600)
+}
+
 function hillSphereM(
 	planetOrbitalDistanceM: number,
 	planetMassKg: number,
@@ -512,7 +512,7 @@ function solveKeplersEquation(
 	return E
 }
 
-export function keplerMoonPositionVector(
+function keplerMoonPositionVector(
 	moon: MoonParams,
 	semiMajorAxisM: number,
 	t: number,
@@ -562,7 +562,7 @@ export function keplerMoonPositionVector(
 	return { x, y, z, distanceM: r, trueAnomalyRad: nu }
 }
 
-export function orbitalVectorToPlanetFixedPosition(
+function orbitalVectorToPlanetFixedPosition(
 	vector: OrbitalPositionVector,
 	t: number,
 ): OrbitalPosition {
@@ -591,6 +591,18 @@ export function keplerMoonPosition(
 	)
 }
 
+// Planet-centered Cartesian position (not corrected for planet rotation,
+// unlike keplerMoonPosition's lat/lon) -- used for moon-to-moon separation,
+// where what matters is the two moons' actual 3D positions relative to each
+// other, not either one's sub-point on a rotating planet surface.
+export function keplerMoonPositionCartesian(
+	moon: MoonParams,
+	semiMajorAxisM: number,
+	t: number,
+): { x: number; y: number; z: number } {
+	return keplerMoonPositionVector(moon, semiMajorAxisM, t)
+}
+
 // Generate moons using the galaxy-gen-style size ladder and PD-based orbit bands.
 // Multiple moons may share inner/middle/outer bands as long as minimum spacing is preserved.
 export function generateMoons(
@@ -617,7 +629,7 @@ export function generateMoons(
 	const maxStablePd = maxStableM / planetDiameterM
 	if (maxStablePd <= ROCHE_PD) return []
 	const morPd = Math.max((maxStablePd - ROCHE_PD) / 1.1, 0.25)
-	const parentSizeClass = inferPlanetSizeClass(planetDiameterKm)
+	const parentSizeClass = estimateMoonSizeClassFromDiameter(planetDiameterKm)
 	const minimumSpacingPd = Math.max(
 		MINIMUM_MOON_SPACING_PD,
 		morPd * MINIMUM_MOON_SPACING_SCALE,
@@ -670,20 +682,24 @@ export function generateMoons(
 		const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
 		const argumentOfPeriapsisDeg = rng.uniform(0, 360)
 		const meanAnomalyAtEpochDeg = rng.uniform(0, 360)
-		const { axialTiltDeg, retrogradeRotation } = rollMoonAxialTilt(rng)
+		const axialTiltDeg = rollMoonAxialTiltDeg(rng)
 
 		moons.push({
 			idx: moons.length + 1,
 			massKg,
 			diameterKm,
 			orbitalPeriodDays,
+			siderealDayHours: rollMoonSiderealDayHours(
+				rng,
+				orbitRange,
+				orbitalPeriodDays,
+			),
 			eccentricity,
 			inclinationDeg,
 			longitudeOfAscendingNodeDeg,
 			argumentOfPeriapsisDeg,
 			meanAnomalyAtEpochDeg,
 			axialTiltDeg,
-			retrogradeRotation,
 			orbitRange,
 			semiMajorAxisPlanetDiameters: pd,
 			sizeClass,

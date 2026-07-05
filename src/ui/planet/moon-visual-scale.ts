@@ -1,26 +1,76 @@
-const EARTH_DIAMETER_KM = 12_742
-const MIN_BODY_VISUAL_RATIO = 0.15
-const MAX_BODY_VISUAL_RATIO = 3.6
+import {
+	EARTH_DIAMETER_KM,
+	SOLAR_DIAMETER_KM,
+} from "@/model/celestial/body-metrics"
+
+// Shared floor/ceiling for every rendered body's diameter — planets, moons,
+// and (via this same function) the star — when "realistic sizes" is on. A
+// floor keeps tiny bodies (small moons, asteroid-belt-adjacent dwarfs) from
+// shrinking to an unclickable/invisible speck; a ceiling keeps the largest
+// real stars (which can run to several hundred times Earth's diameter) from
+// swallowing the scene. Between the two, every body renders at its true
+// relative diameter.
+const MIN_BODY_DIAMETER_KM = 400
+const MAX_BODY_DIAMETER_KM = 5 * SOLAR_DIAMETER_KM
 export const BODY_VISUAL_BASE_RADIUS = 0.12
 
-function clamp(value: number, min: number, max: number): number {
-	return Math.max(min, Math.min(max, value))
+// The pre-"realistic sizes" behavior, taking its shape from galaxy-gen's
+// orbit-spacing curve (ORBIT.spawn's
+// `r = scaleLinear([-1, 0, 5, 10, 14, 15], [0, 1, 3, 6, 8, 10])(size)`):
+// a chunky, piecewise-linear step function keyed off the body's discrete
+// size class (0–15 rocky/moon, 16–18 gas giant — see size-class.ts /
+// estimateMoonSizeClassFromDiameter) rather than a continuous function of
+// true diameter. Bodies read in broad "size tiers" instead of smoothly
+// reflecting their real relative scale — e.g. every size-15 rocky world
+// renders the same regardless of whether it's just barely or hugely bigger
+// than a size-14 one.
+const SIZE_CLASS_RATIO_BREAKPOINTS: readonly [
+	sizeClass: number,
+	ratio: number,
+][] = [
+	[0, 0.2],
+	[1, 0.3],
+	[5, 0.6],
+	[10, 1.1],
+	[15, 1.8],
+	[16, 2.3],
+	[17, 2.9],
+	[18, 3.6],
+]
+
+function sizeClassToVisualRatio(sizeClass: number): number {
+	const points = SIZE_CLASS_RATIO_BREAKPOINTS
+	if (sizeClass <= points[0][0]) return points[0][1]
+	for (let i = 1; i < points.length; i++) {
+		const [x1, y1] = points[i]!
+		if (sizeClass <= x1) {
+			const [x0, y0] = points[i - 1]!
+			const t = x1 === x0 ? 0 : (sizeClass - x0) / (x1 - x0)
+			return y0 + t * (y1 - y0)
+		}
+	}
+	return points[points.length - 1]![1]
 }
 
 export function scaleBodyDiameterToVisualRadius(
 	diameterKm: number,
 	baseVisualRadius: number,
+	realisticSizes: boolean,
+	sizeClass: number,
 ): number {
 	if (!(diameterKm > 0) || !(baseVisualRadius > 0)) return 0
-	const ratio = clamp(
-		Math.sqrt(diameterKm / EARTH_DIAMETER_KM),
-		MIN_BODY_VISUAL_RATIO,
-		MAX_BODY_VISUAL_RATIO,
+	if (!realisticSizes) {
+		return baseVisualRadius * sizeClassToVisualRatio(sizeClass)
+	}
+	const clampedDiameterKm = Math.min(
+		Math.max(diameterKm, MIN_BODY_DIAMETER_KM),
+		MAX_BODY_DIAMETER_KM,
 	)
+	const ratio = clampedDiameterKm / EARTH_DIAMETER_KM
 	return baseVisualRadius * ratio
 }
 
-export function getMoonRadiusRelativeToPlanet(
+function getMoonRadiusRelativeToPlanet(
 	moonDiameterKm: number,
 	planetRadiusKm: number,
 ): number {
@@ -51,7 +101,7 @@ export function getMoonOrbitDistanceRelativeToPlanet(
 	return semiMajorAxisM / (planetRadiusKm * 1000)
 }
 
-export function scaleMoonOrbitDistanceForDisplay(params: {
+function scaleMoonOrbitDistanceForDisplay(params: {
 	orbitalDistancePlanetRadii: number
 	maxOrbitalDistancePlanetRadii: number
 	minDisplayDistance: number
@@ -134,7 +184,7 @@ function buildMoonOrbitDisplayLayout(
 			(a, b) =>
 				a.realPeriapsisPlanetRadii - b.realPeriapsisPlanetRadii ||
 				a.nominalPeriapsis - b.nominalPeriapsis,
-	)
+		)
 
 	const periapses = new Array<number>(orbits.length)
 	let previousOuterEdge = parentVisualRadius

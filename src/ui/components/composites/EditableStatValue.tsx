@@ -19,6 +19,9 @@ export interface StatEntry {
 	value: string
 	valuePrefix?: string
 	help?: string
+	/** Tooltip on the value itself (rather than the label) -- e.g. a
+	 * per-source contribution breakdown for a summed stat. */
+	valueHelp?: string
 	editor?: StatEditor
 	valueAction?: ReactNode
 }
@@ -26,13 +29,18 @@ export interface StatEntry {
 export function EditableStatValue({ stat }: { stat: StatEntry }) {
 	const [visible, setVisible] = useState(false)
 	const editor = stat.editor
+	const valueNode = (
+		<>
+			{stat.valuePrefix && <>{stat.valuePrefix} </>}
+			{stat.value}
+			{stat.valueAction}
+		</>
+	)
 
 	if (!editor) {
 		return (
 			<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
-				{stat.valuePrefix && <>{stat.valuePrefix} </>}
-				{stat.value}
-				{stat.valueAction}
+				{valueNode}
 			</span>
 		)
 	}

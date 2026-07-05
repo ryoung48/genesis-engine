@@ -106,13 +106,26 @@ export interface GenesisScene {
 		gridSpacing: number,
 		showEllipticalOrbits: boolean,
 	): void
+	updateMoonOrbitOverlay(
+		moons: MoonParams[] | null,
+		planetRadiusKm: number,
+		hoursPerDay: number,
+		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
+		showGrid: boolean,
+		gridSpacing: number,
+		showEllipticalOrbits: boolean,
+	): void
 	updateMoonOrbitDay(day: number): void
 	/** Unit vector pointing from origin toward the camera (globe mode only, null in map mode). */
 	getGlobeCameraDir(): [number, number, number] | null
 	/** Enter or exit the solar-system view (hides the globe/map, shows the star system). */
 	setSolarSystemActive(active: boolean): void
 	setSolarSystemOverlay(params: SolarSystemOverlayParams | null): void
+	updateSolarSystemOverlay(params: SolarSystemOverlayParams | null): void
 	updateSolarSystemDay(day: number): void
+	/** Spins every body/moon mesh around its own axis for the solar-system
+	 * view's rotation clock — independent of updateSolarSystemDay. */
+	setSolarSystemSpinHours(hours: number): void
 	/** Enters the solar-system view if needed, then animates the camera to
 	 * frame the given body (or one of its moons). `bodyIndex` is the index
 	 * into the `bodies` array passed to setSolarSystemOverlay, or -1 for the
@@ -122,5 +135,12 @@ export interface GenesisScene {
 		bodyIndex: number,
 		moonIndex?: number,
 		opts?: { durationMs?: number },
+	): void
+	/** Notifies the caller whenever the solar-system focus target changes for
+	 * any reason (GPS button, double-click, ...), so React state (e.g. the
+	 * clock knobs' reference body) can stay in sync even when the change
+	 * originated from a renderer-internal event like a canvas double-click. */
+	setSolarSystemFocusChangeHandler(
+		handler: ((bodyIndex: number, moonIndex?: number) => void) | null,
 	): void
 }

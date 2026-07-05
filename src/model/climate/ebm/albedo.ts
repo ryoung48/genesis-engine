@@ -14,12 +14,24 @@ export const ALBEDO = {
 		albedo: number[][]
 		lats_deg: number[]
 		temperature: number[][]
-		land_fraction: number[]
 		time: number
 		orbital: typeof EMB_CONSTANTS.orbital
+		/** Base (non-ice) Bond albedo -- a single value for the whole body.
+		 * Overrides surface.ALBEDO.BASE (0.35, an Earth default). */
+		baseAlbedo?: number
+		/** Ice-cap albedo, used below the local ice threshold. Overrides
+		 * surface.ALBEDO.ICE (0.65, an Earth default). */
+		iceAlbedo?: number
 	}): void => {
-		const { albedo, lats_deg, temperature, land_fraction, time, orbital } =
-			params
+		const {
+			albedo,
+			lats_deg,
+			temperature,
+			time,
+			orbital,
+			baseAlbedo,
+			iceAlbedo,
+		} = params
 		const { surface } = EMB_CONSTANTS
 		const obliquityFactor = Math.max(
 			0.1,
@@ -34,12 +46,12 @@ export const ALBEDO = {
 				effectiveIceLimit + latitudeEffect * (1 - obliquityFactor) * 10
 
 			if (temperature[i][time] < localIceLimit) {
+				// Obliquity-based dampening kept as-is: higher-obliquity worlds get
+				// a less reflective ice cap in this model.
 				const sensitivity = Math.min(1, orbital.OBLIQUITY / 35)
-				albedo[i][time] = surface.ALBEDO.ICE - sensitivity * 0.2
+				albedo[i][time] = (iceAlbedo ?? surface.ALBEDO.ICE) - sensitivity * 0.2
 			} else {
-				albedo[i][time] =
-					surface.ALBEDO.OCEAN * (1 - land_fraction[i]) +
-					surface.ALBEDO.LAND * land_fraction[i]
+				albedo[i][time] = baseAlbedo ?? surface.ALBEDO.BASE
 			}
 		}
 	},

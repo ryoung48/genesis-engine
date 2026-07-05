@@ -1,11 +1,15 @@
 import type {
 	AtmosphereProfile,
 	MoonParams,
+	TideLock,
 } from "@/model/celestial/moons/moon-types"
+import {
+	attachParentTideLocks,
+	rollInclinationDeg,
+} from "@/model/celestial/moons/moon-utils"
 import {
 	generateMoons,
 	M_SOL_KG,
-	rollInclinationDeg,
 	rollMoonCountForParent,
 } from "@/model/celestial/moons/orbital-mechanics"
 import {
@@ -13,9 +17,15 @@ import {
 	getStarLuminositySol,
 	getStarMassSol,
 	type MainSequenceClass,
+	rollStarAgeGyr,
 } from "@/model/celestial/star/star-types"
+import {
+	rollGasGiantGreenhouseFactor,
+	rollGreenhouseFactor,
+} from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
-import { SOL_SEED, SOL_SYSTEM_BODIES } from "./sol-system"
+import { estimateGasGiantSizeClass, estimateRockySizeClass } from "./size-class"
+import { SOL_SEED, SOL_STAR_AGE_GYR, SOL_SYSTEM_BODIES } from "./sol-system"
 
 const GRAVITATIONAL_CONSTANT = 6.674e-11
 const STANDARD_GRAVITY_MS2 = 9.807
@@ -66,6 +76,12 @@ interface RingProfile {
 }
 
 export interface SystemBody {
+	/** Stable identifier for this body within the system -- the main world is
+	 * always -1; siblings/preset planets get non-negative indices. Lets a
+	 * moon's tideLock reference "my parent" without embedding an object
+	 * reference. See attachParentTideLocks. */
+	idx: number
+	name?: string
 	sizeClass: number
 	density: DensityProfile | null
 	group: OrbitGroup
@@ -83,8 +99,9 @@ export interface SystemBody {
 	/** 0 / unused for asteroid belts. */
 	gravityG: number
 	orbitalPeriodDays: number
-	/** 0 / unused for asteroid belts. */
-	dayLengthHours: number
+	/** Sidereal rotation period (relative to the stars, not the sun) — 0 /
+	 * unused for asteroid belts. */
+	siderealDayHours: number
 	eccentricity: number
 	/** Argument of periapsis, in degrees. */
 	argumentOfPeriapsisDeg: number
@@ -97,6 +114,18 @@ export interface SystemBody {
 	 * port for this, so it's just a uniform 0–360° roll like the moons use. */
 	longitudeOfAscendingNodeDeg: number
 	moons: MoonParams[]
+	/** What (if anything) this body is tidally locked to. Undefined/null when
+	 * not locked to anything. */
+	tideLock?: TideLock | null
+	/** Bond albedo, 0..1 — real measured value where known, otherwise unset. */
+	albedo?: number
+	/** EBM greenhouseFactor, individually fit per body — see
+	 * sol-system.ts's SolPlanetSeed.greenhouseFactor doc. Unset elsewhere. */
+	greenhouseFactor?: number
+	/** EBM internalHeatTempK (residual/formation heat), relevant for gas
+	 * giants — see sol-system.ts's SolPlanetSeed.greenhouseFactor doc.
+	 * Unset (no known excess) for everything else. */
+	internalHeatTempK?: number
 }
 
 type Zone = "epistellar" | "inner" | "outer"
@@ -169,23 +198,6 @@ function classifyZoneFromOrbitalDistanceAU(orbitalDistanceAU: number): Zone {
 interface Slot {
 	zone: Zone
 	deviation: number
-}
-
-function clamp(value: number, min: number, max: number): number {
-	return Math.min(max, Math.max(min, value))
-}
-
-function estimateRockySizeClass(diameterKm: number): number {
-	if (diameterKm <= 800) return 0
-	if (diameterKm <= 2_000) return 1
-	return clamp(Math.round((diameterKm - 400) / 1_600), 0, 15)
-}
-
-function estimateGasGiantSizeClass(diameterKm: number): number {
-	const earthDiameters = diameterKm / EARTH_DIAMETER_KM
-	if (earthDiameters < 6) return 16
-	if (earthDiameters < 12) return 17
-	return 18
 }
 
 function describeDensity(
@@ -701,6 +713,7 @@ function buildBodyEnvironment(params: {
 	| "classification"
 	| "hydrosphereFraction"
 	| "atmosphere"
+	| "greenhouseFactor"
 > {
 	const sizeClass =
 		params.groupHint === "jovian"
@@ -710,6 +723,27 @@ function buildBodyEnvironment(params: {
 	const environment = CLASS_ENVIRONMENTS[body.classification]
 	const gravityG =
 		params.massKg > 0 ? computeGravityG(params.massKg, params.diameterKm) : 0
+	const atmosphere = atmosphereCodeToProfile(
+		params.rng,
+		environment.atmosphereCode,
+		{
+			chemistry: environment.chemistry,
+			sizeClass,
+			deviation: params.deviation,
+			hydrosphereCode: environment.hydrosphereCode,
+			gravityG,
+			classification: body.classification,
+			isPrimaryWorld: params.isPrimaryWorld,
+		},
+	)
+	const greenhouseFactor =
+		body.group === "jovian"
+			? rollGasGiantGreenhouseFactor(params.rng)
+			: rollGreenhouseFactor(
+					params.rng,
+					atmosphere?.pressureBar ?? 0,
+					atmosphere?.code ?? 0,
+				)
 	return {
 		sizeClass,
 		density: buildDensityProfile(
@@ -720,19 +754,8 @@ function buildBodyEnvironment(params: {
 		group: body.group,
 		classification: body.classification,
 		hydrosphereFraction: hydrosphereCodeToFraction(environment.hydrosphereCode),
-		atmosphere: atmosphereCodeToProfile(
-			params.rng,
-			environment.atmosphereCode,
-			{
-				chemistry: environment.chemistry,
-				sizeClass,
-				deviation: params.deviation,
-				hydrosphereCode: environment.hydrosphereCode,
-				gravityG,
-				classification: body.classification,
-				isPrimaryWorld: params.isPrimaryWorld,
-			},
-		),
+		atmosphere,
+		greenhouseFactor,
 	}
 }
 
@@ -756,6 +779,7 @@ function buildMoonEnvironment(params: {
 	| "classification"
 	| "hydrosphereFraction"
 	| "atmosphere"
+	| "greenhouseFactor"
 > {
 	const sizeClass =
 		params.sizeClass ?? estimateRockySizeClass(params.diameterKm)
@@ -779,6 +803,27 @@ function buildMoonEnvironment(params: {
 	)
 	const gravityG =
 		params.massKg > 0 ? computeGravityG(params.massKg, params.diameterKm) : 0
+	const atmosphere = atmosphereCodeToProfile(
+		params.rng,
+		environment.atmosphereCode,
+		{
+			chemistry: environment.chemistry,
+			sizeClass,
+			deviation: params.deviation,
+			hydrosphereCode: environment.hydrosphereCode,
+			gravityG,
+			classification: body.classification,
+			isPrimaryWorld: params.isPrimaryWorld,
+		},
+	)
+	const greenhouseFactor =
+		body.group === "jovian"
+			? rollGasGiantGreenhouseFactor(params.rng)
+			: rollGreenhouseFactor(
+					params.rng,
+					atmosphere?.pressureBar ?? 0,
+					atmosphere?.code ?? 0,
+				)
 	return {
 		sizeClass,
 		densityEarthRelative: density?.earthRelative,
@@ -786,19 +831,8 @@ function buildMoonEnvironment(params: {
 		group: body.group,
 		classification: body.classification,
 		hydrosphereFraction: hydrosphereCodeToFraction(environment.hydrosphereCode),
-		atmosphere: atmosphereCodeToProfile(
-			params.rng,
-			environment.atmosphereCode,
-			{
-				chemistry: environment.chemistry,
-				sizeClass,
-				deviation: params.deviation,
-				hydrosphereCode: environment.hydrosphereCode,
-				gravityG,
-				classification: body.classification,
-				isPrimaryWorld: params.isPrimaryWorld,
-			},
-		),
+		atmosphere,
+		greenhouseFactor,
 	}
 }
 
@@ -940,22 +974,37 @@ function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 	return rng.uniform(144, 180)
 }
 
-// Ported from galaxy-gen's ROTATION.get base roll — the day-length dice
-// table, without the tidal-lock cascade (locks/effect) or stellar-age
-// modifier (chaos-machine doesn't model star age), since decorative siblings
-// don't need the full lock simulation.
-function rollDayLengthHours(
+// Ported from galaxy-gen's ROTATION.get — the sidereal-day-length dice
+// table, including its stellar-age modifier (older stars' systems roll
+// slower base rotations), but without the tidal-lock cascade (locks/effect),
+// since decorative siblings don't need the full lock simulation.
+function rollSiderealDayHours(
 	rng: ReturnType<typeof createRng>,
 	isJovian: boolean,
+	starAgeGyr: number,
 ): number {
 	const mult = isJovian ? 2 : 4
-	let base = (roll2d6(rng) - 2) * mult + 2 + rng.randint(1, 6)
+	const ageMod = Math.floor(starAgeGyr / 2)
+	let base = (roll2d6(rng) - 2) * mult + 2 + rng.randint(1, 6) + ageMod
 	let rotation = base
 	while (base > 40 && rng.randint(1, 6) >= 5) {
 		base = (roll2d6(rng) - 2) * mult + rng.randint(1, 6)
 		rotation += base
 	}
 	return rotation * rng.uniform(0.95, 1.05)
+}
+
+// Star age is rolled from its own salted rng derived from the same system
+// seed, decorrelated from the main body-generation rng sequence (created
+// with a fresh `createRng` instance below) so callers (e.g. the UI's star
+// stat card) can reproduce the exact same value from just (seed, massSol)
+// without needing to replay the whole body-generation sequence.
+const STAR_AGE_SEED_SALT = 0x9e3779b1
+
+export function getStarAgeGyr(seed: number, massSol: number): number {
+	if (seed === SOL_SEED) return SOL_STAR_AGE_GYR
+	const rng = createRng(seed + STAR_AGE_SEED_SALT)
+	return rollStarAgeGyr(rng, massSol)
 }
 
 function massKgFromEarthRelativeDensity(
@@ -979,10 +1028,13 @@ interface MainWorldParams {
 	massKg: number
 	gravityG: number
 	orbitalPeriodDays: number
-	dayLengthHours: number
+	siderealDayHours: number
 	eccentricity: number
 	argumentOfPeriapsisDeg: number
 	axialTiltDeg: number
+	inclinationDeg?: number
+	longitudeOfAscendingNodeDeg?: number
+	tideLock?: TideLock | null
 }
 
 interface GenerateSystemBodiesParams {
@@ -1000,6 +1052,7 @@ interface GenerateSystemBodiesParams {
 function buildMainBody(
 	rng: ReturnType<typeof createRng>,
 	mainWorld: MainWorldParams,
+	texturePath?: string,
 ): SystemBody {
 	return {
 		...buildBodyEnvironment({
@@ -1014,19 +1067,23 @@ function buildMainBody(
 			isMoon: false,
 			tidal: false,
 		}),
+		idx: -1,
+		tideLock: mainWorld.tideLock,
 		isMainWorld: true,
 		orbitalDistanceAU: mainWorld.orbitalDistanceAU,
 		diameterKm: mainWorld.diameterKm,
 		massKg: mainWorld.massKg,
 		gravityG: mainWorld.gravityG,
 		orbitalPeriodDays: mainWorld.orbitalPeriodDays,
-		dayLengthHours: mainWorld.dayLengthHours,
+		siderealDayHours: mainWorld.siderealDayHours,
 		eccentricity: mainWorld.eccentricity,
 		argumentOfPeriapsisDeg: mainWorld.argumentOfPeriapsisDeg,
 		axialTiltDeg: mainWorld.axialTiltDeg,
-		inclinationDeg: rollInclinationDeg(rng),
-		longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
-		moons: mainWorld.moons,
+		inclinationDeg: mainWorld.inclinationDeg ?? rollInclinationDeg(rng),
+		longitudeOfAscendingNodeDeg:
+			mainWorld.longitudeOfAscendingNodeDeg ?? rng.uniform(0, 360),
+		moons: attachParentTideLocks(mainWorld.moons, -1),
+		texturePath,
 	}
 }
 
@@ -1046,9 +1103,10 @@ export function generateSystemBodies(
 	const rng = createRng(seed)
 
 	if (seed === SOL_SEED) {
-		return [...SOL_SYSTEM_BODIES, buildMainBody(rng, mainWorld)].sort(
-			(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-		)
+		return [
+			...SOL_SYSTEM_BODIES,
+			buildMainBody(rng, mainWorld, "/2k_earth.jpg"),
+		].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 	}
 
 	const luminositySol = getStarLuminositySol(spectralClass, starSubtype)
@@ -1076,8 +1134,9 @@ export function generateSystemBodies(
 	]
 
 	const starMassSol = getStarMassSol(spectralClass, starSubtype)
+	const starAgeGyr = getStarAgeGyr(seed, starMassSol)
 
-	const siblings: SystemBody[] = slots.map((slot) => {
+	const siblings: SystemBody[] = slots.map((slot, siblingIdx) => {
 		const orbitalDistanceAU = deviationToAU(slot.deviation, luminositySol)
 		const group = rollOrbitGroup(rng, slot.zone)
 		const sizeClass = rollSizeClass(rng, group)
@@ -1128,6 +1187,7 @@ export function generateSystemBodies(
 						...moon,
 					}))
 				: []
+		const moonsWithTideLocks = attachParentTideLocks(moons, siblingIdx)
 		const environment = buildBodyEnvironment({
 			rng,
 			groupHint: group,
@@ -1142,6 +1202,7 @@ export function generateSystemBodies(
 		})
 		return {
 			...environment,
+			idx: siblingIdx,
 			isMainWorld: false,
 			orbitalDistanceAU,
 			diameterKm,
@@ -1150,16 +1211,16 @@ export function generateSystemBodies(
 				group === "asteroid belt" ? 0 : computeGravityG(massKg, diameterKm),
 			orbitalPeriodDays:
 				getKeplerYearYears(orbitalDistanceAU, starMassSol) * DAYS_PER_YEAR,
-			dayLengthHours:
+			siderealDayHours:
 				group === "asteroid belt"
 					? 0
-					: rollDayLengthHours(rng, group === "jovian"),
+					: rollSiderealDayHours(rng, group === "jovian", starAgeGyr),
 			eccentricity: group === "asteroid belt" ? 0 : rollEccentricity(rng),
 			argumentOfPeriapsisDeg: rng.uniform(0, 360),
 			axialTiltDeg: group === "asteroid belt" ? 0 : rollAxialTiltDeg(rng),
 			inclinationDeg: group === "asteroid belt" ? 0 : rollInclinationDeg(rng),
 			longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
-			moons,
+			moons: moonsWithTideLocks,
 		}
 	})
 

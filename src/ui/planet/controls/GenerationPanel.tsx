@@ -14,17 +14,29 @@ import "tippy.js/themes/light-border.css"
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model"
+import {
+	computeEarthRelativeDensity as computeBodyEarthRelativeDensity,
+	computeGravityG,
+	massKgFromEarthRelativeDensity,
+} from "@/model/celestial/body-metrics"
+import {
+	computeSolarDayHours,
+	inferRetrogradeRotationFromAxialTiltDeg,
+} from "@/model/celestial/day-length"
 import type {
 	AtmosphereProfile,
 	MoonParams,
 } from "@/model/celestial/moons/moon-types"
+import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
 import {
 	derivePlanetMassKg,
+	moonOrbitalPeriodDaysFromSemiMajorAxisM,
 	moonSemiMajorAxisM,
 	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
 import {
 	getHabitableZoneAU,
+	getKeplerYearYears,
 	getStarDiameterSol,
 	getStarLabel,
 	getStarLuminositySol,
@@ -35,9 +47,24 @@ import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/star-types"
-import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
-import { SOL_SEED } from "@/model/celestial/system/sol-system"
-import { EARTH_MOON_TIDE_REFERENCE } from "@/model/climate/tidal-force"
+import {
+	getStarAgeGyr,
+	type SystemBody,
+} from "@/model/celestial/system/generate-system-bodies"
+import { estimatePlanetarySizeClass } from "@/model/celestial/system/size-class"
+import {
+	SOL_MAIN_WORLD_NAME,
+	SOL_SEED,
+	SOL_STAR_NAME,
+} from "@/model/celestial/system/sol-system"
+import { estimateGreenhouseFactor } from "@/model/climate/ebm/greenhouse-estimate"
+import {
+	computeMoonSurfaceTidesM,
+	computeMoonTidalSchedule,
+	computeSurfaceTidesM,
+	computeTidalSchedule,
+	type SurfaceTidesBreakdown,
+} from "@/model/climate/tidal-schedule"
 import { SEED_MAX } from "@/model/shared/planet-code"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
@@ -56,6 +83,8 @@ import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
 import { StarOutlineIcon } from "@/ui/components/primitives/icons/StarOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
+import { estimateAlbedo, useEbmPreview } from "@/ui/hooks/useEbmPreview"
+import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
 import { RegularClimatePreview } from "@/ui/preview/RegularClimatePreview"
 import { TidalCalendarChart } from "@/ui/preview/TidalCalendarChart"
@@ -88,8 +117,10 @@ interface GenerationPanelProps {
 	moonCount: number
 	moonSeed: number
 	restSeed: number
+	showRealSolNames: boolean
 	setRestSeed: (v: number) => void
 	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
+	surfaceTidesM?: SurfaceTidesBreakdown
 	generatedMoons?: import("@/model/celestial/moons/moon-types").MoonParams[]
 	siblingBodies?: SystemBody[]
 	/** Full sorted system body list (siblings + main world), used to resolve a
@@ -97,6 +128,15 @@ interface GenerationPanelProps {
 	systemBodies?: SystemBody[]
 	/** Focuses the 3D solar-system view's camera on a body. -1 = the star. */
 	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
+	onUpdateSystemBody?: (
+		bodyIndex: number,
+		updater: (body: SystemBody) => SystemBody,
+	) => void
+	onUpdateSystemMoon?: (
+		bodyIndex: number,
+		moonIndex: number,
+		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+	) => void
 	daysPerYear: number
 	hoursPerDay: number
 	setHoursPerDay: (v: number) => void
@@ -111,6 +151,7 @@ interface GenerationPanelProps {
 	eccentricity: number
 	perihelion: number
 	inclinationDeg: number
+	setInclinationDeg: (v: number) => void
 	longitudeOfAscendingNodeDeg: number
 	era: SocietyEra
 	setEra: (v: SocietyEra) => void
@@ -128,7 +169,8 @@ interface GenerationPanelProps {
 	generationLabel: string
 	generationProgress: number
 	generationTimings?: StageTiming[] | null
-	climatePreview: ClimatePreviewData
+	obliquity: number
+	landCoverage: number
 	generationPreviewTab: GenerationPreviewTab
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
@@ -308,6 +350,7 @@ function getComputeRoutesTimingSummary(
 const EARTH_DIAMETER_KM = 12742
 
 function formatHours(hours: number): string {
+	if (!Number.isFinite(hours)) return "Infinite"
 	const days = hours / 24
 	const years = days / 365
 	if (years >= 100) return `${(years / 100).toFixed(1)} c`
@@ -318,6 +361,30 @@ function formatHours(hours: number): string {
 
 function formatDays(days: number): string {
 	return formatHours(days * 24)
+}
+
+function buildDayLengthStats(params: {
+	siderealDayHours: number
+	orbitalPeriodDays: number
+	retrograde?: boolean
+	siderealEditor?: StatEntry["editor"]
+}): StatEntry[] {
+	const solarDayHours = computeSolarDayHours({
+		siderealDayHours: params.siderealDayHours,
+		orbitalPeriodDays: params.orbitalPeriodDays,
+		retrograde: params.retrograde,
+	})
+	return [
+		{
+			label: "Sidereal Day",
+			value: formatHours(params.siderealDayHours),
+			editor: params.siderealEditor,
+		},
+		{
+			label: "Solar Day",
+			value: solarDayHours === null ? "-" : formatHours(solarDayHours),
+		},
+	]
 }
 
 function formatClassificationLabel(classification: string): string {
@@ -410,10 +477,82 @@ function computeEarthRelativeDensity(
 
 const EARTH_MASS_KG = 5.972e24
 const MOON_COLORS_CSS = ["text-sky-500", "text-violet-500", "text-emerald-500"]
+const DAYS_PER_YEAR = 365.25
 
 const ORBIT_STAT_HELP = {
 	periapsis:
 		"Argument of periapsis. Where the closest point of the orbit sits within the orbital plane.",
+}
+
+function updateBodyDiameter(body: SystemBody, diameterKm: number): SystemBody {
+	const densityEarthRelative =
+		body.density?.earthRelative ??
+		computeBodyEarthRelativeDensity(body.massKg, body.diameterKm)
+	const massKg = massKgFromEarthRelativeDensity(
+		diameterKm,
+		densityEarthRelative,
+	)
+	return {
+		...body,
+		diameterKm,
+		massKg,
+		gravityG: computeGravityG(massKg, diameterKm),
+		sizeClass: estimatePlanetarySizeClass(diameterKm, body.group === "jovian"),
+		density: body.density
+			? {
+					...body.density,
+					earthRelative: densityEarthRelative,
+				}
+			: body.density,
+	}
+}
+
+function updateBodyOrbitalDistance(
+	body: SystemBody,
+	orbitalDistanceAU: number,
+	starMassSol: number,
+): SystemBody {
+	return {
+		...body,
+		orbitalDistanceAU,
+		orbitalPeriodDays:
+			getKeplerYearYears(orbitalDistanceAU, starMassSol) * DAYS_PER_YEAR,
+	}
+}
+
+function updateMoonDiameter(moon: MoonParams, diameterKm: number): MoonParams {
+	const densityEarthRelative =
+		moon.densityEarthRelative ??
+		computeBodyEarthRelativeDensity(moon.massKg, moon.diameterKm)
+	const massKg = massKgFromEarthRelativeDensity(
+		diameterKm,
+		densityEarthRelative,
+	)
+	return {
+		...moon,
+		diameterKm,
+		massKg,
+		sizeClass: estimateMoonSizeClassFromDiameter(diameterKm),
+		densityEarthRelative,
+	}
+}
+
+function updateMoonSemiMajorAxis(
+	moon: MoonParams,
+	parentBody: SystemBody,
+	pd: number,
+	hoursPerDay: number,
+): MoonParams {
+	const semiMajorAxisM = pd * parentBody.diameterKm * 1000
+	return {
+		...moon,
+		semiMajorAxisPlanetDiameters: pd,
+		orbitalPeriodDays: moonOrbitalPeriodDaysFromSemiMajorAxisM(
+			semiMajorAxisM,
+			parentBody.massKg,
+			hoursPerDay,
+		),
+	}
 }
 
 function GpsFocusButton({ onClick }: { onClick: () => void }) {
@@ -445,7 +584,15 @@ function renderStatGrid(stats: StatEntry[]) {
 				<span className="text-[9px] text-slate-400">{stat.label}</span>
 			)}
 			<div className="flex">
-				<EditableStatValue stat={stat} />
+				{stat.valueHelp ? (
+					<UITooltip content={stat.valueHelp} position="top" align="start">
+						<span className="inline-flex cursor-help items-center border-b border-dotted border-slate-300">
+							<EditableStatValue stat={stat} />
+						</span>
+					</UITooltip>
+				) : (
+					<EditableStatValue stat={stat} />
+				)}
 			</div>
 		</React.Fragment>
 	))
@@ -652,6 +799,7 @@ function MoonSystemCard({
 	lockButton,
 	gpsButton,
 	defaultOpen = false,
+	children,
 }: {
 	className?: string
 	summaryClassName: string
@@ -660,6 +808,7 @@ function MoonSystemCard({
 	lockButton?: React.ReactNode
 	gpsButton?: React.ReactNode
 	defaultOpen?: boolean
+	children?: React.ReactNode
 }) {
 	return (
 		<SystemBodyCard
@@ -670,11 +819,34 @@ function MoonSystemCard({
 			lockButton={lockButton}
 			gpsButton={gpsButton}
 			defaultOpen={defaultOpen}
-		/>
+		>
+			{children}
+		</SystemBodyCard>
 	)
 }
 
-function PlanetDetailTabs({
+function DataSectionSummary() {
+	return (
+		<summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+			<span>Data</span>
+			<svg
+				width="12"
+				height="12"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="2"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				className="text-slate-400 transition-transform group-open:rotate-180"
+			>
+				<polyline points="6 9 12 15 18 9" />
+			</svg>
+		</summary>
+	)
+}
+
+function PlanetDetailContent({
 	tidalSchedulePreview,
 	moonCount,
 	daysPerYear,
@@ -698,95 +870,402 @@ function PlanetDetailTabs({
 	)
 
 	return (
-		<details className="group border-t border-slate-100 pt-2">
-			<summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-				<span>Data</span>
-				<svg
-					width="12"
-					height="12"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					className="text-slate-400 transition-transform group-open:rotate-180"
-				>
-					<polyline points="6 9 12 15 18 9" />
-				</svg>
-			</summary>
-			<div className="mt-2">
-				<div className="flex gap-0 border-b border-slate-100">
-					{[
-						...GENERATION_PREVIEW_TABS.map(([tab, label]) => ({
-							tab,
-							label: label.toLowerCase(),
-						})),
-						{ tab: "tides" as const, label: "tides" },
-					].map(({ tab, label }) => (
-						<button
-							key={tab}
-							type="button"
-							onClick={() => {
-								setDetailTab(tab)
-								if (tab !== "tides") onSelectGenerationPreviewTab(tab)
-							}}
-							className={`px-2 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-2 ${
-								detailTab === tab
-									? "border-slate-700 text-slate-900"
-									: "border-transparent text-slate-400 hover:text-slate-600"
-							}`}
-						>
-							{label}
-						</button>
-					))}
+		<div className="mt-2">
+			<div className="flex gap-0 border-b border-slate-100">
+				{[
+					...GENERATION_PREVIEW_TABS.map(([tab, label]) => ({
+						tab,
+						label: label.toLowerCase(),
+					})),
+					{ tab: "tides" as const, label: "tides" },
+				].map(({ tab, label }) => (
+					<button
+						key={tab}
+						type="button"
+						onClick={() => {
+							setDetailTab(tab)
+							if (tab !== "tides") onSelectGenerationPreviewTab(tab)
+						}}
+						className={`px-2 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-2 ${
+							detailTab === tab
+								? "border-slate-700 text-slate-900"
+								: "border-transparent text-slate-400 hover:text-slate-600"
+						}`}
+					>
+						{label}
+					</button>
+				))}
+			</div>
+			{detailTab === "tides" ? (
+				<div className="px-1 py-1" style={{ minHeight: 140 }}>
+					{tidalSchedulePreview && tidalSchedulePreview.events.length > 0 ? (
+						<TidalCalendarChart
+							schedule={tidalSchedulePreview}
+							daysPerYear={daysPerYear}
+							compact={true}
+						/>
+					) : (
+						<div className="flex h-32 items-center justify-center text-[10px] text-slate-400">
+							{moonCount === 0 ? "No moons" : "Computing…"}
+						</div>
+					)}
 				</div>
-				{detailTab === "tides" ? (
-					<div className="px-1 py-1" style={{ minHeight: 140 }}>
-						{tidalSchedulePreview && tidalSchedulePreview.events.length > 0 ? (
-							<TidalCalendarChart
-								schedule={tidalSchedulePreview}
+			) : (
+				<div className="pt-1">
+					<div className="h-[248px] overflow-hidden">
+						{isSolarLocked ? (
+							<LockedClimatePreview
+								preview={climatePreview as LockedClimatePreviewData}
+								activeTab={generationPreviewTab}
+								unitSystem={unitSystem}
 								daysPerYear={daysPerYear}
-								compact={true}
 							/>
 						) : (
-							<div className="flex h-32 items-center justify-center text-[10px] text-slate-400">
-								{moonCount === 0 ? "No moons" : "Computing…"}
-							</div>
+							<RegularClimatePreview
+								preview={climatePreview as RegularClimatePreviewData}
+								activeTab={generationPreviewTab}
+								unitSystem={unitSystem}
+								daysPerYear={daysPerYear}
+							/>
 						)}
 					</div>
+				</div>
+			)}
+		</div>
+	)
+}
+
+function isApproxSolarLocked(
+	siderealDayHours: number,
+	orbitalPeriodDays: number,
+): boolean {
+	return Math.abs(siderealDayHours - orbitalPeriodDays * 24) < 0.1
+}
+
+function LazyPlanetDetailTabs({
+	seed,
+	moonCount,
+	moons,
+	moonContext,
+	daysPerYear,
+	hoursPerDay,
+	planetRadiusKm,
+	isSolarLocked,
+	spectralClass,
+	starSubtype,
+	orbitalDistanceAU,
+	eccentricity,
+	perihelion,
+	obliquity,
+	hydrosphereFraction,
+	atmosphere,
+	albedo,
+	greenhouseFactor,
+	internalHeatTempK,
+	tidalSchedulePreviewOverride,
+	generationPreviewTab,
+	onSelectGenerationPreviewTab,
+	unitSystem,
+}: {
+	seed: number
+	moonCount: number
+	moons: MoonParams[]
+	/** When this card is for a moon (not a planet), the tide raisers are its
+	 * parent + siblings rather than its own children -- see
+	 * computeMoonTidalSchedule. */
+	moonContext?: {
+		moon: MoonParams
+		parent: {
+			idx: number
+			massKg: number
+			diameterKm: number
+			moons: MoonParams[]
+		}
+	}
+	daysPerYear: number
+	hoursPerDay: number
+	planetRadiusKm: number
+	isSolarLocked: boolean
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
+	eccentricity: number
+	perihelion: number
+	obliquity: number
+	hydrosphereFraction: number
+	atmosphere: AtmosphereProfile | null | undefined
+	/** Real per-body EBM overrides -- see useEbmPreview.ts's EbmConfig doc.
+	 * Pass these for an actual known body (sol-system.ts data); leave unset
+	 * for a procedurally generated one, which falls back to the generic
+	 * landFraction/pressure heuristics. */
+	albedo?: number
+	greenhouseFactor?: number
+	internalHeatTempK?: number
+	/** Overrides the tidal schedule this would otherwise compute internally --
+	 * used only by the main world, whose own tides tab needs to switch to
+	 * whichever moon is currently "focused" in the 3D view rather than always
+	 * showing its own moons' aggregate schedule. Sibling bodies/moons don't
+	 * pass this and just get the internally-computed one. */
+	tidalSchedulePreviewOverride?: import("@/model/climate/tidal-schedule").TidalSchedule
+	generationPreviewTab: GenerationPreviewTab
+	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
+	unitSystem: UnitSystem
+}) {
+	const [enabled, setEnabled] = useState(false)
+	const canRenderClimate =
+		planetRadiusKm > 0 &&
+		orbitalDistanceAU > 0 &&
+		daysPerYear > 0 &&
+		hoursPerDay > 0
+
+	return (
+		<details
+			className="group border-t border-slate-100 pt-2"
+			onToggle={(event) => {
+				if ((event.currentTarget as HTMLDetailsElement).open) setEnabled(true)
+			}}
+		>
+			<DataSectionSummary />
+			{enabled ? (
+				canRenderClimate ? (
+					<LazyPlanetDetailTabsContent
+						seed={seed}
+						moonCount={moonCount}
+						moons={moons}
+						moonContext={moonContext}
+						daysPerYear={daysPerYear}
+						hoursPerDay={hoursPerDay}
+						planetRadiusKm={planetRadiusKm}
+						isSolarLocked={isSolarLocked}
+						spectralClass={spectralClass}
+						starSubtype={starSubtype}
+						orbitalDistanceAU={orbitalDistanceAU}
+						eccentricity={eccentricity}
+						perihelion={perihelion}
+						obliquity={obliquity}
+						hydrosphereFraction={hydrosphereFraction}
+						atmosphere={atmosphere}
+						albedo={albedo}
+						greenhouseFactor={greenhouseFactor}
+						internalHeatTempK={internalHeatTempK}
+						tidalSchedulePreviewOverride={tidalSchedulePreviewOverride}
+						generationPreviewTab={generationPreviewTab}
+						onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+						unitSystem={unitSystem}
+					/>
 				) : (
-					<div className="pt-1">
-						<div className="h-[248px] overflow-hidden">
-							{isSolarLocked ? (
-								<LockedClimatePreview
-									preview={climatePreview as LockedClimatePreviewData}
-									activeTab={generationPreviewTab}
-									unitSystem={unitSystem}
-									daysPerYear={daysPerYear}
-								/>
-							) : (
-								<RegularClimatePreview
-									preview={climatePreview as RegularClimatePreviewData}
-									activeTab={generationPreviewTab}
-									unitSystem={unitSystem}
-									daysPerYear={daysPerYear}
-								/>
-							)}
-						</div>
+					<div className="mt-2 flex h-32 items-center justify-center px-1 text-[10px] text-slate-400">
+						No climate preview for this object
 					</div>
-				)}
-			</div>
+				)
+			) : null}
 		</details>
 	)
 }
 
-function buildMoonCardTitle(
+function LazyPlanetDetailTabsContent({
+	seed,
+	moonCount,
+	moons,
+	moonContext,
+	daysPerYear,
+	hoursPerDay,
+	planetRadiusKm,
+	isSolarLocked,
+	spectralClass,
+	starSubtype,
+	orbitalDistanceAU,
+	eccentricity,
+	perihelion,
+	obliquity,
+	hydrosphereFraction,
+	atmosphere,
+	albedo,
+	greenhouseFactor,
+	internalHeatTempK,
+	tidalSchedulePreviewOverride,
+	generationPreviewTab,
+	onSelectGenerationPreviewTab,
+	unitSystem,
+}: {
+	seed: number
+	moonCount: number
+	moons: MoonParams[]
+	moonContext?: {
+		moon: MoonParams
+		parent: {
+			idx: number
+			massKg: number
+			diameterKm: number
+			moons: MoonParams[]
+		}
+	}
+	daysPerYear: number
+	hoursPerDay: number
+	planetRadiusKm: number
+	isSolarLocked: boolean
+	spectralClass: string
+	starSubtype: number
+	orbitalDistanceAU: number
+	eccentricity: number
+	perihelion: number
+	obliquity: number
+	hydrosphereFraction: number
+	atmosphere: AtmosphereProfile | null | undefined
+	albedo?: number
+	greenhouseFactor?: number
+	internalHeatTempK?: number
+	tidalSchedulePreviewOverride?: import("@/model/climate/tidal-schedule").TidalSchedule
+	generationPreviewTab: GenerationPreviewTab
+	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
+	unitSystem: UnitSystem
+}) {
+	const pressureBar = atmosphere?.pressureBar ?? 0
+	const landFraction = Math.max(0, Math.min(1, 1 - hydrosphereFraction))
+	const regularPreview = useEbmPreview({
+		obliquity,
+		eccentricity,
+		perihelion,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
+		hoursPerDay,
+		daysPerYear,
+		landFraction,
+		radius: planetRadiusKm,
+		pressure: pressureBar,
+		albedo,
+		greenhouseFactor,
+		internalHeatTempK,
+	})
+	const lockedPreview = useLockedClimatePreview({
+		obliquity,
+		eccentricity,
+		perihelion,
+		spectralClass,
+		starSubtype,
+		orbitalDistanceAU,
+		hoursPerDay,
+		daysPerYear,
+		radius: planetRadiusKm,
+		pressure: pressureBar,
+		planetRadiusKm,
+		antistellarLon: 180,
+	})
+	const climatePreview = isSolarLocked ? lockedPreview : regularPreview
+	const computedTidalSchedulePreview = useMemo(
+		() =>
+			moonContext
+				? computeMoonTidalSchedule(moonContext.moon, moonContext.parent, {
+						daysPerYear,
+						hoursPerDay,
+						spectralClass,
+						starSubtype,
+						orbitalDistanceAU,
+						eccentricity,
+						perihelion,
+					})
+				: moonCount > 0
+					? computeTidalSchedule(moons, {
+							seed,
+							daysPerYear,
+							hoursPerDay,
+							planetRadiusKm,
+							tideLock: null,
+							spectralClass,
+							starSubtype,
+							orbitalDistanceAU,
+							eccentricity,
+							perihelion,
+						})
+					: undefined,
+		[
+			moonContext,
+			moonCount,
+			moons,
+			seed,
+			daysPerYear,
+			hoursPerDay,
+			planetRadiusKm,
+			spectralClass,
+			starSubtype,
+			orbitalDistanceAU,
+			eccentricity,
+			perihelion,
+		],
+	)
+	// The main world passes an override so its tides tab can switch to
+	// whichever moon is currently "focused" in the 3D view; everything else
+	// just uses what it computed for its own moons above.
+	const tidalSchedulePreview =
+		tidalSchedulePreviewOverride ?? computedTidalSchedulePreview
+
+	return (
+		<PlanetDetailContent
+			tidalSchedulePreview={tidalSchedulePreview}
+			moonCount={moonCount}
+			daysPerYear={daysPerYear}
+			isSolarLocked={isSolarLocked}
+			climatePreview={climatePreview}
+			generationPreviewTab={generationPreviewTab}
+			onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+			unitSystem={unitSystem}
+		/>
+	)
+}
+
+function appendSizeToTitle(
+	title: string,
+	sizeClass: number | undefined,
+): string {
+	return sizeClass === undefined ? title : `${title} · Size ${sizeClass}`
+}
+
+function resolveSiblingBodyTitle(
+	body: SystemBody,
+	bodyNumber: number,
+	showRealSolNames: boolean,
+): string {
+	const baseTitle =
+		showRealSolNames && body.name
+			? body.name
+			: `${SIBLING_GROUP_LABEL[body.group]} ${bodyNumber}`
+	return body.group === "asteroid belt"
+		? baseTitle
+		: appendSizeToTitle(baseTitle, body.sizeClass)
+}
+
+function resolveMoonTitle(
+	moon: MoonParams,
 	moonNumber: number,
-	orbitRange: string | undefined,
-	diameterKm: number,
-) {
-	return `Moon ${moonNumber} · ${orbitRange ?? "middle"} · ${(diameterKm / EARTH_DIAMETER_KM).toFixed(2)}× Earth`
+	showRealSolNames: boolean,
+	fallbackRealName?: string,
+): string {
+	const name =
+		showRealSolNames && moon.name
+			? moon.name
+			: showRealSolNames && fallbackRealName
+				? fallbackRealName
+				: `Moon ${moonNumber}`
+	const orbitRange = moon.orbitRange ?? "middle"
+	return appendSizeToTitle(`${name} · ${orbitRange}`, moon.sizeClass)
+}
+
+// Shared by every "Surface Tides" stat entry (main world, sibling planets,
+// every moon) so the value/help/tooltip formatting only needs to exist once.
+function buildSurfaceTidesStat(breakdown: SurfaceTidesBreakdown): StatEntry {
+	const contributions = breakdown.contributions
+		.slice()
+		.sort((a, b) => b.valueM - a.valueM)
+		.map((c) => `${c.label}: ${c.valueM.toFixed(3)} m`)
+		.join("\n")
+	return {
+		label: "Surface Tides",
+		value: `${breakdown.totalM.toFixed(3)} m`,
+		help: contributions
+			? `Peak upper bound only.\n──────────\n${contributions}`
+			: "Peak upper bound only.",
+	}
 }
 
 function buildMoonStats({
@@ -800,14 +1279,18 @@ function buildMoonStats({
 	classification,
 	hydrosphereFraction,
 	atmosphere,
+	albedo,
+	greenhouseFactor,
 	pd,
 	orbitalPeriodDays,
+	siderealDayHours,
 	eccentricity,
 	argumentOfPeriapsisDeg,
 	inclinationDeg,
-	longitudeOfAscendingNodeDeg,
 	axialTiltDeg,
-	peakTideMeters,
+	parentOrbitalPeriodDays,
+	surfaceTidesM,
+	editors,
 }: {
 	diameterKm: number
 	massKg: number
@@ -819,14 +1302,28 @@ function buildMoonStats({
 	classification?: string
 	hydrosphereFraction?: number
 	atmosphere?: AtmosphereProfile | null
+	albedo?: number
+	greenhouseFactor?: number
+	surfaceTidesM?: SurfaceTidesBreakdown
 	pd: number
 	orbitalPeriodDays: number
+	/** Moon's own sidereal rotation period, in hours — independent of
+	 * orbitalPeriodDays (not assumed to be tidally locked). */
+	siderealDayHours: number
 	eccentricity: number
 	argumentOfPeriapsisDeg: number
 	inclinationDeg: number
-	longitudeOfAscendingNodeDeg: number
 	axialTiltDeg: number
-	peakTideMeters?: number
+	parentOrbitalPeriodDays?: number
+	editors?: {
+		diameter?: StatEntry["editor"]
+		semiMajorAxis?: StatEntry["editor"]
+		siderealDay?: StatEntry["editor"]
+		eccentricity?: StatEntry["editor"]
+		periapsis?: StatEntry["editor"]
+		inclination?: StatEntry["editor"]
+		axialTilt?: StatEntry["editor"]
+	}
 }) {
 	const diameterRel = diameterKm / EARTH_DIAMETER_KM
 	const massRel = massKg / EARTH_MASS_KG
@@ -852,36 +1349,52 @@ function buildMoonStats({
 			? [{ label: "Size", value: String(sizeClass) }]
 			: []),
 		{
-			label: "Diameter",
-			value: `${diameterRel.toFixed(2)}× Earth`,
+			label: "Radius",
+			value: `${diameterRel.toFixed(2)} R⊕`,
+			editor: editors?.diameter,
 		},
 		{
 			label: "Mass",
-			value: `${massRel.toFixed(3)}× Earth`,
+			value: `${massRel.toFixed(3)} M⊕`,
 		},
 		{ label: "Gravity", value: `${gravityG.toFixed(3)} g` },
-		{ label: "Semi Major Axis", value: `${pd.toFixed(1)} PD` },
+		{
+			label: "Semi Major Axis",
+			value: `${pd.toFixed(1)} PD`,
+			editor: editors?.semiMajorAxis,
+		},
 		{
 			label: "Period",
 			value: formatDays(orbitalPeriodDays),
 		},
-		{ label: "Eccentricity", value: eccentricity.toFixed(4) },
+		...(parentOrbitalPeriodDays
+			? buildDayLengthStats({
+					siderealDayHours,
+					orbitalPeriodDays: parentOrbitalPeriodDays,
+					retrograde: inferRetrogradeRotationFromAxialTiltDeg(axialTiltDeg),
+					siderealEditor: editors?.siderealDay,
+				})
+			: []),
+		{
+			label: "Eccentricity",
+			value: eccentricity.toFixed(4),
+			editor: editors?.eccentricity,
+		},
 		{
 			label: "Periapsis",
 			value: `${argumentOfPeriapsisDeg.toFixed(1)}°`,
 			help: ORBIT_STAT_HELP.periapsis,
+			editor: editors?.periapsis,
 		},
 		{
 			label: "Inclination",
 			value: `${inclinationDeg.toFixed(1)}°`,
-		},
-		{
-			label: "Ascending Node",
-			value: `${longitudeOfAscendingNodeDeg.toFixed(1)}°`,
+			editor: editors?.inclination,
 		},
 		{
 			label: "Axial Tilt",
 			value: `${axialTiltDeg.toFixed(1)}°`,
+			editor: editors?.axialTilt,
 		},
 		...(densityEarthRelative !== undefined
 			? [
@@ -902,14 +1415,11 @@ function buildMoonStats({
 					},
 				]
 			: []),
-		...(peakTideMeters === undefined
-			? []
-			: [
-					{
-						label: "Peak tide",
-						value: `${peakTideMeters.toFixed(3)} m`,
-					},
-				]),
+		...(albedo !== undefined
+			? [{ label: "Albedo", value: albedo.toFixed(3) }]
+			: []),
+		{ label: "Greenhouse", value: (greenhouseFactor ?? 0).toFixed(2) },
+		...(surfaceTidesM ? [buildSurfaceTidesStat(surfaceTidesM)] : []),
 	]
 }
 
@@ -929,10 +1439,13 @@ const SIBLING_GROUP_COLOR: Record<SystemBody["group"], string> = {
 	jovian: "text-amber-700",
 }
 
-// Mirrors the main world's own stat set (see worldStats in
-// TerrestrialSystemCards), just without any editors — siblings are
-// decorative and read-only.
-function buildSiblingBodyStats(body: SystemBody): StatEntry[] {
+function buildSiblingBodyStats(params: {
+	body: SystemBody
+	starMassSol: number
+	surfaceTidesM?: SurfaceTidesBreakdown
+	onUpdateBody?: (updater: (body: SystemBody) => SystemBody) => void
+}): StatEntry[] {
+	const { body, starMassSol, surfaceTidesM, onUpdateBody } = params
 	if (body.group === "asteroid belt") {
 		return [
 			{
@@ -943,7 +1456,6 @@ function buildSiblingBodyStats(body: SystemBody): StatEntry[] {
 				label: "Class",
 				value: formatClassificationLabel(body.classification),
 			},
-			{ label: "Size", value: String(body.sizeClass) },
 			{
 				label: "Semi Major Axis",
 				value: `${body.orbitalDistanceAU.toFixed(3)} AU`,
@@ -960,34 +1472,139 @@ function buildSiblingBodyStats(body: SystemBody): StatEntry[] {
 			label: "Class",
 			value: formatClassificationLabel(body.classification),
 		},
-		{ label: "Size", value: String(body.sizeClass) },
 		{
-			label: "Diameter",
-			value: `${(body.diameterKm / EARTH_DIAMETER_KM).toFixed(2)}× Earth`,
+			label: "Radius",
+			value: `${(body.diameterKm / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
+			editor: onUpdateBody
+				? {
+						label: "Radius",
+						value: body.diameterKm / EARTH_DIAMETER_KM,
+						min: 0.1,
+						max: 18,
+						step: 0.01,
+						display: `${(body.diameterKm / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
+						set: (value: number) =>
+							onUpdateBody((current) =>
+								updateBodyDiameter(current, value * EARTH_DIAMETER_KM),
+							),
+					}
+				: undefined,
 		},
 		{
 			label: "Mass",
-			value: `${(body.massKg / EARTH_MASS_KG).toFixed(2)}× Earth`,
+			value: `${(body.massKg / EARTH_MASS_KG).toFixed(2)} M⊕`,
 		},
 		{ label: "Gravity", value: `${body.gravityG.toFixed(3)} g` },
 		{
 			label: "Semi Major Axis",
 			value: `${body.orbitalDistanceAU.toFixed(3)} AU`,
+			editor: onUpdateBody
+				? {
+						label: "Semi Major Axis",
+						value: body.orbitalDistanceAU,
+						min: 0.01,
+						max: 60,
+						step: 0.01,
+						display: `${body.orbitalDistanceAU.toFixed(3)} AU`,
+						set: (value: number) =>
+							onUpdateBody((current) =>
+								updateBodyOrbitalDistance(current, value, starMassSol),
+							),
+					}
+				: undefined,
 		},
 		{ label: "Period", value: formatDays(body.orbitalPeriodDays) },
-		{ label: "Solar Day", value: formatHours(body.dayLengthHours) },
-		{ label: "Eccentricity", value: body.eccentricity.toFixed(4) },
+		...buildDayLengthStats({
+			siderealDayHours: body.siderealDayHours,
+			orbitalPeriodDays: body.orbitalPeriodDays,
+			retrograde: inferRetrogradeRotationFromAxialTiltDeg(body.axialTiltDeg),
+			siderealEditor: onUpdateBody
+				? {
+						label: "Sidereal Day",
+						value: body.siderealDayHours,
+						min: 1,
+						max: body.orbitalPeriodDays * 24 * 2,
+						step: 0.1,
+						display: formatHours(body.siderealDayHours),
+						set: (value: number) =>
+							onUpdateBody((current) => ({
+								...current,
+								siderealDayHours: value,
+							})),
+					}
+				: undefined,
+		}),
+		{
+			label: "Eccentricity",
+			value: body.eccentricity.toFixed(4),
+			editor: onUpdateBody
+				? {
+						label: "Eccentricity",
+						value: body.eccentricity,
+						min: 0,
+						max: 0.99,
+						step: 0.001,
+						display: body.eccentricity.toFixed(4),
+						set: (value: number) =>
+							onUpdateBody((current) => ({ ...current, eccentricity: value })),
+					}
+				: undefined,
+		},
 		{
 			label: "Periapsis",
 			value: `${body.argumentOfPeriapsisDeg.toFixed(0)}°`,
 			help: ORBIT_STAT_HELP.periapsis,
+			editor: onUpdateBody
+				? {
+						label: "Periapsis",
+						value: body.argumentOfPeriapsisDeg,
+						min: 0,
+						max: 360,
+						step: 1,
+						display: `${body.argumentOfPeriapsisDeg.toFixed(0)}°`,
+						set: (value: number) =>
+							onUpdateBody((current) => ({
+								...current,
+								argumentOfPeriapsisDeg: value,
+							})),
+					}
+				: undefined,
 		},
-		{ label: "Inclination", value: `${body.inclinationDeg.toFixed(1)}°` },
 		{
-			label: "Ascending Node",
-			value: `${body.longitudeOfAscendingNodeDeg.toFixed(1)}°`,
+			label: "Inclination",
+			value: `${body.inclinationDeg.toFixed(1)}°`,
+			editor: onUpdateBody
+				? {
+						label: "Inclination",
+						value: body.inclinationDeg,
+						min: 0,
+						max: 180,
+						step: 0.5,
+						display: `${body.inclinationDeg.toFixed(1)}°`,
+						set: (value: number) =>
+							onUpdateBody((current) => ({
+								...current,
+								inclinationDeg: value,
+							})),
+					}
+				: undefined,
 		},
-		{ label: "Axial Tilt", value: `${body.axialTiltDeg.toFixed(1)}°` },
+		{
+			label: "Axial Tilt",
+			value: `${body.axialTiltDeg.toFixed(1)}°`,
+			editor: onUpdateBody
+				? {
+						label: "Axial Tilt",
+						value: body.axialTiltDeg,
+						min: 0,
+						max: 180,
+						step: 0.5,
+						display: `${body.axialTiltDeg.toFixed(1)}°`,
+						set: (value: number) =>
+							onUpdateBody((current) => ({ ...current, axialTiltDeg: value })),
+					}
+				: undefined,
+		},
 		...(body.density
 			? [
 					{
@@ -1001,21 +1618,31 @@ function buildSiblingBodyStats(body: SystemBody): StatEntry[] {
 			label: "Hydrosphere",
 			value: `${Math.round(body.hydrosphereFraction * 100)}%`,
 		},
+		...(body.albedo !== undefined
+			? [{ label: "Albedo", value: body.albedo.toFixed(3) }]
+			: []),
+		{
+			label: "Greenhouse",
+			value: (body.greenhouseFactor ?? 0).toFixed(2),
+		},
+		...(surfaceTidesM ? [buildSurfaceTidesStat(surfaceTidesM)] : []),
 	]
 }
 
 interface MainBodyStatsConfig {
+	group?: StatEntry
+	classification?: StatEntry
+	sizeClass?: StatEntry
 	diameter: StatEntry
 	mass: StatEntry
 	gravity: StatEntry
 	density?: StatEntry
 	semiMajorAxis: StatEntry
 	period: StatEntry
-	solarDay?: StatEntry
+	dayLengths?: StatEntry[]
 	eccentricity: StatEntry
 	periapsis: StatEntry
-	inclinationDeg: number
-	longitudeOfAscendingNodeDeg: number
+	inclination: StatEntry
 	axialTilt: StatEntry
 	antistellarLon?: StatEntry
 	atmosphere?: StatEntry
@@ -1029,20 +1656,19 @@ interface MainBodyStatsConfig {
 // only need to exist once.
 function buildMainBodyStats(config: MainBodyStatsConfig): StatEntry[] {
 	return [
+		...(config.group ? [config.group] : []),
+		...(config.classification ? [config.classification] : []),
+		...(config.sizeClass ? [config.sizeClass] : []),
 		config.diameter,
 		config.mass,
 		config.gravity,
 		...(config.density ? [config.density] : []),
 		config.semiMajorAxis,
 		config.period,
-		...(config.solarDay ? [config.solarDay] : []),
+		...(config.dayLengths ?? []),
 		config.eccentricity,
 		config.periapsis,
-		{ label: "Inclination", value: `${config.inclinationDeg.toFixed(1)}°` },
-		{
-			label: "Ascending Node",
-			value: `${config.longitudeOfAscendingNodeDeg.toFixed(1)}°`,
-		},
+		config.inclination,
 		config.axialTilt,
 		...(config.antistellarLon ? [config.antistellarLon] : []),
 		...(config.atmosphere ? [config.atmosphere] : []),
@@ -1053,7 +1679,22 @@ function buildMainBodyStats(config: MainBodyStatsConfig): StatEntry[] {
 // Shares buildMoonStats with every other moon card in this panel (the main
 // world's own moons, a gas giant's sibling moons) so all moons present the
 // same stat set regardless of which body they orbit.
-function buildSiblingMoonStats(moon: MoonParams): StatEntry[] {
+function buildSiblingMoonStats(params: {
+	moon: MoonParams
+	parentOrbitalPeriodDays: number
+	hoursPerDay: number
+	surfaceTidesM?: SurfaceTidesBreakdown
+	onUpdateMoon?: (
+		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+	) => void
+}): StatEntry[] {
+	const {
+		moon,
+		parentOrbitalPeriodDays,
+		hoursPerDay,
+		surfaceTidesM,
+		onUpdateMoon,
+	} = params
 	const gravityG =
 		(6.674e-11 * moon.massKg) / ((moon.diameterKm / 2) * 1000) ** 2 / 9.807
 	return buildMoonStats({
@@ -1067,13 +1708,104 @@ function buildSiblingMoonStats(moon: MoonParams): StatEntry[] {
 		classification: moon.classification,
 		hydrosphereFraction: moon.hydrosphereFraction,
 		atmosphere: moon.atmosphere,
+		albedo: moon.albedo,
+		greenhouseFactor: moon.greenhouseFactor,
+		surfaceTidesM,
 		pd: moon.semiMajorAxisPlanetDiameters ?? 0,
 		orbitalPeriodDays: moon.orbitalPeriodDays,
+		siderealDayHours: moon.siderealDayHours,
 		eccentricity: moon.eccentricity,
 		argumentOfPeriapsisDeg: moon.argumentOfPeriapsisDeg,
 		inclinationDeg: moon.inclinationDeg,
-		longitudeOfAscendingNodeDeg: moon.longitudeOfAscendingNodeDeg,
 		axialTiltDeg: moon.axialTiltDeg,
+		parentOrbitalPeriodDays,
+		editors: onUpdateMoon
+			? {
+					diameter: {
+						label: "Radius",
+						value: moon.diameterKm / EARTH_DIAMETER_KM,
+						min: 0.01,
+						max: 3,
+						step: 0.01,
+						display: `${(moon.diameterKm / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
+						set: (value: number) =>
+							onUpdateMoon((current) =>
+								updateMoonDiameter(current, value * EARTH_DIAMETER_KM),
+							),
+					},
+					semiMajorAxis: {
+						label: "Semi Major Axis",
+						value: moon.semiMajorAxisPlanetDiameters ?? 0,
+						min: 0.5,
+						max: 120,
+						step: 0.1,
+						display: `${(moon.semiMajorAxisPlanetDiameters ?? 0).toFixed(1)} PD`,
+						set: (value: number) =>
+							onUpdateMoon((current, body) =>
+								updateMoonSemiMajorAxis(current, body, value, hoursPerDay),
+							),
+					},
+					siderealDay: {
+						label: "Sidereal Day",
+						value: moon.siderealDayHours,
+						min: 1,
+						max: moon.orbitalPeriodDays * 24 * 2,
+						step: 0.1,
+						display: formatHours(moon.siderealDayHours),
+						set: (value: number) =>
+							onUpdateMoon((current) => ({
+								...current,
+								siderealDayHours: value,
+							})),
+					},
+					eccentricity: {
+						label: "Eccentricity",
+						value: moon.eccentricity,
+						min: 0,
+						max: 0.99,
+						step: 0.001,
+						display: moon.eccentricity.toFixed(4),
+						set: (value: number) =>
+							onUpdateMoon((current) => ({ ...current, eccentricity: value })),
+					},
+					periapsis: {
+						label: "Periapsis",
+						value: moon.argumentOfPeriapsisDeg,
+						min: 0,
+						max: 360,
+						step: 1,
+						display: `${moon.argumentOfPeriapsisDeg.toFixed(1)}°`,
+						set: (value: number) =>
+							onUpdateMoon((current) => ({
+								...current,
+								argumentOfPeriapsisDeg: value,
+							})),
+					},
+					inclination: {
+						label: "Inclination",
+						value: moon.inclinationDeg,
+						min: 0,
+						max: 180,
+						step: 0.5,
+						display: `${moon.inclinationDeg.toFixed(1)}°`,
+						set: (value: number) =>
+							onUpdateMoon((current) => ({
+								...current,
+								inclinationDeg: value,
+							})),
+					},
+					axialTilt: {
+						label: "Axial Tilt",
+						value: moon.axialTiltDeg,
+						min: 0,
+						max: 180,
+						step: 0.5,
+						display: `${moon.axialTiltDeg.toFixed(1)}°`,
+						set: (value: number) =>
+							onUpdateMoon((current) => ({ ...current, axialTiltDeg: value })),
+					},
+				}
+			: undefined,
 	})
 }
 
@@ -1086,7 +1818,10 @@ interface LabeledSiblingBody {
 // rendered — the main world's own card is interleaved among these by AU,
 // which would otherwise reset the counters if numbering were computed
 // separately per render group.
-function labelSiblingBodies(bodies: SystemBody[]): LabeledSiblingBody[] {
+function labelSiblingBodies(
+	bodies: SystemBody[],
+	showRealSolNames: boolean,
+): LabeledSiblingBody[] {
 	const groupCounters: Record<SystemBody["group"], number> = {
 		"asteroid belt": 0,
 		dwarf: 0,
@@ -1098,7 +1833,11 @@ function labelSiblingBodies(bodies: SystemBody[]): LabeledSiblingBody[] {
 		groupCounters[body.group] += 1
 		return {
 			body,
-			title: `${SIBLING_GROUP_LABEL[body.group]} ${groupCounters[body.group]}`,
+			title: resolveSiblingBodyTitle(
+				body,
+				groupCounters[body.group],
+				showRealSolNames,
+			),
 		}
 	})
 }
@@ -1107,32 +1846,111 @@ function SiblingBodyCard({
 	body,
 	title,
 	bodyIndex,
+	restSeed,
+	showRealSolNames,
+	starMassSol,
+	spectralClass,
+	starSubtype,
+	hoursPerDay,
+	unitSystem,
+	generationPreviewTab,
+	onSelectGenerationPreviewTab,
 	onFocusBody,
+	onUpdateSystemBody,
+	onUpdateSystemMoon,
 }: LabeledSiblingBody & {
 	bodyIndex: number
+	restSeed: number
+	showRealSolNames: boolean
+	starMassSol: number
+	spectralClass: string
+	starSubtype: number
+	hoursPerDay: number
+	unitSystem: UnitSystem
+	generationPreviewTab: GenerationPreviewTab
+	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
+	onUpdateSystemBody?: (
+		bodyIndex: number,
+		updater: (body: SystemBody) => SystemBody,
+	) => void
+	onUpdateSystemMoon?: (
+		bodyIndex: number,
+		moonIndex: number,
+		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+	) => void
 }) {
 	const gpsButton = onFocusBody ? (
 		<GpsFocusButton onClick={() => onFocusBody(bodyIndex)} />
 	) : undefined
+	const bodySurfaceTidesM =
+		body.group === "asteroid belt"
+			? undefined
+			: computeSurfaceTidesM(
+					body.moons,
+					{ diameterKm: body.diameterKm, tideLock: body.tideLock },
+					{
+						hoursPerDay,
+						spectralClass,
+						starSubtype,
+						orbitalDistanceAU: body.orbitalDistanceAU,
+						eccentricity: body.eccentricity,
+						starName:
+							showRealSolNames && restSeed === SOL_SEED
+								? SOL_STAR_NAME
+								: undefined,
+					},
+				)
 	return (
 		<SystemBodyCard
 			className="border-slate-100"
 			summaryClassName={SIBLING_GROUP_COLOR[body.group]}
 			title={title}
-			stats={buildSiblingBodyStats(body)}
+			stats={buildSiblingBodyStats({
+				body,
+				starMassSol,
+				surfaceTidesM: bodySurfaceTidesM,
+				onUpdateBody:
+					onUpdateSystemBody && bodyIndex >= 0
+						? (updater) => onUpdateSystemBody(bodyIndex, updater)
+						: undefined,
+			})}
 			gpsButton={gpsButton}
 		>
 			{body.moons.map((moon, moonIndex) => (
 				<MoonSystemCard
 					key={moon.idx ?? moonIndex}
 					summaryClassName="text-emerald-700"
-					title={buildMoonCardTitle(
-						moonIndex + 1,
-						moon.orbitRange,
-						moon.diameterKm,
-					)}
-					stats={buildSiblingMoonStats(moon)}
+					title={resolveMoonTitle(moon, moonIndex + 1, showRealSolNames)}
+					stats={buildSiblingMoonStats({
+						moon,
+						surfaceTidesM: computeMoonSurfaceTidesM(
+							moon,
+							{
+								name: showRealSolNames ? body.name : undefined,
+								massKg: body.massKg,
+								diameterKm: body.diameterKm,
+								moons: body.moons,
+							},
+							{
+								hoursPerDay,
+								spectralClass,
+								starSubtype,
+								orbitalDistanceAU: body.orbitalDistanceAU,
+								eccentricity: body.eccentricity,
+								starName:
+									showRealSolNames && restSeed === SOL_SEED
+										? SOL_STAR_NAME
+										: undefined,
+							},
+						),
+						parentOrbitalPeriodDays: body.orbitalPeriodDays,
+						hoursPerDay,
+						onUpdateMoon:
+							onUpdateSystemMoon && bodyIndex >= 0
+								? (updater) => onUpdateSystemMoon(bodyIndex, moonIndex, updater)
+								: undefined,
+					})}
 					gpsButton={
 						onFocusBody ? (
 							<GpsFocusButton
@@ -1140,8 +1958,65 @@ function SiblingBodyCard({
 							/>
 						) : undefined
 					}
-				/>
+				>
+					<LazyPlanetDetailTabs
+						seed={restSeed}
+						moonCount={0}
+						moons={[]}
+						moonContext={{
+							moon,
+							parent: {
+								idx: body.idx,
+								massKg: body.massKg,
+								diameterKm: body.diameterKm,
+								moons: body.moons,
+							},
+						}}
+						daysPerYear={body.orbitalPeriodDays}
+						hoursPerDay={moon.siderealDayHours}
+						planetRadiusKm={moon.diameterKm / 2}
+						isSolarLocked={false}
+						spectralClass={spectralClass}
+						starSubtype={starSubtype}
+						orbitalDistanceAU={body.orbitalDistanceAU}
+						eccentricity={body.eccentricity}
+						perihelion={body.argumentOfPeriapsisDeg}
+						obliquity={moon.axialTiltDeg}
+						hydrosphereFraction={moon.hydrosphereFraction ?? 0}
+						atmosphere={moon.atmosphere}
+						albedo={moon.albedo}
+						generationPreviewTab={generationPreviewTab}
+						onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+						unitSystem={unitSystem}
+					/>
+				</MoonSystemCard>
 			))}
+			<LazyPlanetDetailTabs
+				seed={restSeed}
+				moonCount={body.moons.length}
+				moons={body.moons}
+				daysPerYear={body.orbitalPeriodDays}
+				hoursPerDay={body.siderealDayHours}
+				planetRadiusKm={body.diameterKm / 2}
+				isSolarLocked={isApproxSolarLocked(
+					body.siderealDayHours,
+					body.orbitalPeriodDays,
+				)}
+				spectralClass={spectralClass}
+				starSubtype={starSubtype}
+				orbitalDistanceAU={body.orbitalDistanceAU}
+				eccentricity={body.eccentricity}
+				perihelion={body.argumentOfPeriapsisDeg}
+				obliquity={body.axialTiltDeg}
+				hydrosphereFraction={body.hydrosphereFraction}
+				atmosphere={body.atmosphere}
+				albedo={body.albedo}
+				greenhouseFactor={body.greenhouseFactor}
+				internalHeatTempK={body.internalHeatTempK}
+				generationPreviewTab={generationPreviewTab}
+				onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+				unitSystem={unitSystem}
+			/>
 		</SystemBodyCard>
 	)
 }
@@ -1149,7 +2024,8 @@ function SiblingBodyCard({
 function StellarSystemCard({
 	spectralClass,
 	starSubtype,
-	peakTideMeters,
+	restSeed,
+	showRealSolNames,
 	lockButton,
 	gpsButton,
 	setSpectralClass,
@@ -1157,7 +2033,8 @@ function StellarSystemCard({
 }: {
 	spectralClass: string
 	starSubtype: number
-	peakTideMeters?: number
+	restSeed: number
+	showRealSolNames: boolean
 	lockButton?: React.ReactNode
 	gpsButton?: React.ReactNode
 	setSpectralClass?: (v: string) => void
@@ -1171,16 +2048,21 @@ function StellarSystemCard({
 	const starDiamSol = getStarDiameterSol(starClass, starSubtype).toFixed(3)
 	const starLuminosity = getStarLuminositySol(starClass, starSubtype)
 	const starLumSol = starLuminosity.toFixed(3)
-	const starMassSol = getStarMassSol(starClass, starSubtype).toFixed(3)
+	const starMassSolValue = getStarMassSol(starClass, starSubtype)
+	const starMassSol = starMassSolValue.toFixed(3)
 	const starHzAU = getHabitableZoneAU(starLuminosity).toFixed(3)
 	const starMaoAU = getStarMAO(starClass, starSubtype).toFixed(3)
+	const starAgeGyr = getStarAgeGyr(restSeed, starMassSolValue).toFixed(2)
 
 	const typeStatValue = getStarLabel(starClass, starSubtype)
+	const title = showRealSolNames
+		? `Sol · ${typeStatValue} Star`
+		: `${typeStatValue} Star`
 
 	return (
 		<details className="group rounded border border-yellow-200 bg-white/85 px-2 py-1.5 shadow-sm shadow-slate-200/20">
 			<summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-yellow-700">
-				<span>{typeStatValue} Star</span>
+				<span>{title}</span>
 				<div className="flex items-center gap-1">
 					{lockButton}
 					{gpsButton}
@@ -1280,12 +2162,8 @@ function StellarSystemCard({
 					{ label: "Luminosity", value: `${starLumSol} L☉` },
 					{ label: "HZ Center", value: `${starHzAU} AU` },
 					{ label: "MAO", value: `${starMaoAU} AU` },
+					{ label: "Age", value: `${starAgeGyr} Gyr` },
 					{ label: "Inclination", value: "0.0°" },
-					...(peakTideMeters === undefined
-						? []
-						: [
-								{ label: "Peak tide", value: `${peakTideMeters.toFixed(3)} m` },
-							]),
 				])}
 			</div>
 		</details>
@@ -1295,6 +2173,7 @@ function StellarSystemCard({
 function TerrestrialSystemCards({
 	generatedMoons,
 	tidalSchedulePreview,
+	surfaceTidesM,
 	tideLock,
 	setTideLock,
 	setHoursPerDay,
@@ -1309,6 +2188,7 @@ function TerrestrialSystemCards({
 	isRetrograde,
 	onToggleSpin,
 	planetRadiusKm,
+	restSeed,
 	hoursPerDay,
 	daysPerYear,
 	moonCount,
@@ -1317,19 +2197,39 @@ function TerrestrialSystemCards({
 	eccentricity,
 	perihelion,
 	axialTiltDisplay,
-	climatePreview,
+	obliquity,
+	landCoverage,
 	generationPreviewTab,
 	onSelectGenerationPreviewTab,
 	unitSystem,
 	inclinationDeg,
-	longitudeOfAscendingNodeDeg,
+	setInclinationDeg,
 	bodyIndex,
+	showRealSolNames,
+	spectralClass,
+	starSubtype,
 	onFocusBody,
+	onUpdateSystemMoon,
+	group,
+	classification,
+	sizeClass,
 }: {
 	bodyIndex: number
+	showRealSolNames: boolean
+	spectralClass: string
+	starSubtype: number
 	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
+	onUpdateSystemMoon?: (
+		bodyIndex: number,
+		moonIndex: number,
+		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+	) => void
+	group?: SystemBody["group"]
+	classification?: SystemBody["classification"]
+	sizeClass?: number
 	generatedMoons: import("@/model/celestial/moons/moon-types").MoonParams[]
 	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
+	surfaceTidesM?: SurfaceTidesBreakdown
 	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	setTideLock: (
 		v: import("@/model/celestial/moons/moon-types").TideLock | null,
@@ -1346,6 +2246,7 @@ function TerrestrialSystemCards({
 	isRetrograde: boolean
 	onToggleSpin?: () => void
 	planetRadiusKm: number
+	restSeed: number
 	hoursPerDay: number
 	daysPerYear: number
 	moonCount: number
@@ -1354,12 +2255,13 @@ function TerrestrialSystemCards({
 	eccentricity: number
 	perihelion: number
 	axialTiltDisplay: string
-	climatePreview: ClimatePreviewData
+	obliquity: number
+	landCoverage: number
 	generationPreviewTab: GenerationPreviewTab
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	inclinationDeg: number
-	longitudeOfAscendingNodeDeg: number
+	setInclinationDeg: (v: number) => void
 }) {
 	const planetDiamKm = planetRadiusKm * 2
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
@@ -1377,22 +2279,31 @@ function TerrestrialSystemCards({
 	const earthDiamRel = (planetDiamKm / EARTH_DIAMETER_KM).toFixed(2)
 	const isSolarLocked = tideLock?.type === "solar"
 	const worldStats = buildMainBodyStats({
+		group: group
+			? { label: "Group", value: formatClassificationLabel(group) }
+			: undefined,
+		classification: classification
+			? {
+					label: "Class",
+					value: formatClassificationLabel(classification),
+				}
+			: undefined,
 		diameter: {
-			label: "Diameter",
-			value: `${earthDiamRel}× Earth`,
+			label: "Radius",
+			value: `${earthDiamRel} R⊕`,
 			editor: radiusSlider
 				? {
-						label: "Diameter",
+						label: "Radius",
 						value: radiusSlider.value * 2,
 						min: radiusSlider.min * 2,
 						max: radiusSlider.max * 2,
 						step: radiusSlider.step * 2,
-						display: `${((radiusSlider.value * 2) / EARTH_DIAMETER_KM).toFixed(2)}× Earth`,
+						display: `${((radiusSlider.value * 2) / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
 						set: (v: number) => radiusSlider.set(v / 2),
 					}
 				: undefined,
 		},
-		mass: { label: "Mass", value: `${planetMassEarths.toFixed(2)}× Earth` },
+		mass: { label: "Mass", value: `${planetMassEarths.toFixed(2)} M⊕` },
 		gravity: { label: "Gravity", value: `${planetGravityG.toFixed(3)} g` },
 		density: {
 			label: "Density",
@@ -1414,12 +2325,13 @@ function TerrestrialSystemCards({
 				: undefined,
 		},
 		period: { label: "Period", value: formatDays(daysPerYear) },
-		solarDay: {
-			label: "Solar Day",
-			value: formatHours(hoursPerDay),
-			editor: dayLengthSlider
+		dayLengths: buildDayLengthStats({
+			siderealDayHours: hoursPerDay,
+			orbitalPeriodDays: daysPerYear,
+			retrograde: isRetrograde,
+			siderealEditor: dayLengthSlider
 				? {
-						label: "Solar Day",
+						label: "Sidereal Day",
 						value: dayLengthSlider.value,
 						min: dayLengthSlider.min,
 						max: dayLengthSlider.max,
@@ -1428,7 +2340,7 @@ function TerrestrialSystemCards({
 						set: dayLengthSlider.set,
 					}
 				: undefined,
-		},
+		}),
 		eccentricity: {
 			label: "Eccentricity",
 			value: eccentricity.toFixed(4),
@@ -1460,8 +2372,19 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		inclinationDeg,
-		longitudeOfAscendingNodeDeg,
+		inclination: {
+			label: "Inclination",
+			value: `${inclinationDeg.toFixed(1)}°`,
+			editor: {
+				label: "Inclination",
+				value: inclinationDeg,
+				min: 0,
+				max: 180,
+				step: 0.5,
+				display: `${inclinationDeg.toFixed(1)}°`,
+				set: setInclinationDeg,
+			},
+		},
 		axialTilt: {
 			label: "Axial Tilt",
 			value: axialTiltDisplay,
@@ -1474,27 +2397,56 @@ function TerrestrialSystemCards({
 						step: axialTiltSlider.step,
 						display: axialTiltSlider.display,
 						set: (v: number) => axialTiltSlider.set(v),
+						content: (
+							<div className="flex w-44 flex-col px-1 pt-0.5 pb-2">
+								<div className="flex items-center justify-between gap-2">
+									<div className="flex items-center gap-2 min-w-0">
+										{onToggleSpin ? (
+											<UITooltip
+												content={
+													isRetrograde
+														? "switch to prograde"
+														: "switch to retrograde"
+												}
+												position="top"
+												align="center"
+											>
+												<button
+													type="button"
+													onClick={onToggleSpin}
+													className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+												>
+													{isRetrograde ? (
+														<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
+													) : (
+														<AxisRotateClockwiseIcon className="h-3 w-3" />
+													)}
+												</button>
+											</UITooltip>
+										) : null}
+										<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+											{axialTiltSlider.label}
+										</span>
+									</div>
+									<span className="font-mono text-[10px] text-slate-400">
+										{axialTiltSlider.display}
+									</span>
+								</div>
+								<input
+									type="range"
+									min={axialTiltSlider.min}
+									max={axialTiltSlider.max}
+									step={axialTiltSlider.step}
+									value={axialTiltSlider.value}
+									onChange={(e) =>
+										axialTiltSlider.set(parseFloat(e.target.value))
+									}
+									className="mt-3 h-1 w-full cursor-pointer rounded-lg accent-slate-900"
+								/>
+							</div>
+						),
 					}
 				: undefined,
-			valueAction: onToggleSpin && (
-				<UITooltip
-					content={isRetrograde ? "switch to prograde" : "switch to retrograde"}
-					position="top"
-					align="center"
-				>
-					<button
-						type="button"
-						onClick={onToggleSpin}
-						className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-					>
-						{isRetrograde ? (
-							<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
-						) : (
-							<AxisRotateClockwiseIcon className="h-3 w-3" />
-						)}
-					</button>
-				</UITooltip>
-			),
 		},
 		antistellarLon:
 			isSolarLocked && antistellarLonSlider
@@ -1530,7 +2482,15 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		extra: surfaceStats,
+		extra: [
+			...surfaceStats,
+			{ label: "Albedo", value: estimateAlbedo(landCoverage).toFixed(3) },
+			{
+				label: "Greenhouse",
+				value: estimateGreenhouseFactor(pressureSlider?.value ?? 1).toFixed(2),
+			},
+			...(surfaceTidesM ? [buildSurfaceTidesStat(surfaceTidesM)] : []),
+		],
 	})
 
 	const gpsButton = onFocusBody ? (
@@ -1541,7 +2501,10 @@ function TerrestrialSystemCards({
 		<SystemBodyCard
 			className="border-blue-200"
 			summaryClassName="text-blue-700"
-			title={`Terrestrial Planet · ${earthDiamRel}× Earth`}
+			title={appendSizeToTitle(
+				showRealSolNames ? SOL_MAIN_WORLD_NAME : "Terrestrial Planet",
+				sizeClass,
+			)}
 			defaultOpen
 			stats={worldStats}
 			gpsButton={gpsButton}
@@ -1550,11 +2513,6 @@ function TerrestrialSystemCards({
 				const sma = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
 				const pd =
 					moon.semiMajorAxisPlanetDiameters ?? sma / (planetRadiusKm * 2000)
-				const peakForce =
-					tidalSchedulePreview?.events.reduce(
-						(max, ev) => Math.max(max, ev.moonForces[i] ?? 0),
-						0,
-					) ?? 0
 				const isThisMoonLocked =
 					tideLock?.type === "lunar" && tideLock.target === moon.idx
 				const otherLockActive = tideLock !== null && !isThisMoonLocked
@@ -1565,12 +2523,15 @@ function TerrestrialSystemCards({
 						summaryClassName={
 							MOON_COLORS_CSS[i % MOON_COLORS_CSS.length] ?? "text-slate-600"
 						}
-						title={buildMoonCardTitle(i + 1, moon.orbitRange, moon.diameterKm)}
+						title={resolveMoonTitle(
+							moon,
+							i + 1,
+							showRealSolNames,
+							i === 0 ? "Luna" : undefined,
+						)}
 						gpsButton={
 							onFocusBody ? (
-								<GpsFocusButton
-									onClick={() => onFocusBody(bodyIndex, i)}
-								/>
+								<GpsFocusButton onClick={() => onFocusBody(bodyIndex, i)} />
 							) : undefined
 						}
 						lockButton={
@@ -1606,24 +2567,202 @@ function TerrestrialSystemCards({
 								(6.674e-11 * moon.massKg) /
 								((moon.diameterKm / 2) * 1000) ** 2 /
 								9.807,
+							sizeClass: moon.sizeClass,
+							densityEarthRelative: moon.densityEarthRelative,
+							densityDescription: moon.densityDescription,
+							group: moon.group,
+							classification: moon.classification,
+							hydrosphereFraction: moon.hydrosphereFraction,
+							atmosphere: moon.atmosphere,
+							greenhouseFactor: moon.greenhouseFactor,
+							surfaceTidesM: computeMoonSurfaceTidesM(
+								moon,
+								{
+									name: showRealSolNames ? SOL_MAIN_WORLD_NAME : undefined,
+									massKg: planetMassKg,
+									diameterKm: planetDiamKm,
+									moons: generatedMoons,
+								},
+								{
+									hoursPerDay,
+									spectralClass,
+									starSubtype,
+									orbitalDistanceAU,
+									eccentricity,
+									starName:
+										showRealSolNames && restSeed === SOL_SEED
+											? SOL_STAR_NAME
+											: undefined,
+								},
+							),
 							pd,
 							orbitalPeriodDays: moon.orbitalPeriodDays,
+							siderealDayHours: moon.siderealDayHours,
 							eccentricity: moon.eccentricity,
 							argumentOfPeriapsisDeg: moon.argumentOfPeriapsisDeg,
 							inclinationDeg: moon.inclinationDeg,
-							longitudeOfAscendingNodeDeg: moon.longitudeOfAscendingNodeDeg,
 							axialTiltDeg: moon.axialTiltDeg,
-							peakTideMeters: peakForce * EARTH_MOON_TIDE_REFERENCE,
+							parentOrbitalPeriodDays: daysPerYear,
+							editors:
+								onUpdateSystemMoon && bodyIndex >= 0
+									? {
+											diameter: {
+												label: "Radius",
+												value: moon.diameterKm / EARTH_DIAMETER_KM,
+												min: 0.01,
+												max: 3,
+												step: 0.01,
+												display: `${(moon.diameterKm / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
+												set: (value: number) =>
+													onUpdateSystemMoon(bodyIndex, i, (current) =>
+														updateMoonDiameter(
+															current,
+															value * EARTH_DIAMETER_KM,
+														),
+													),
+											},
+											semiMajorAxis: {
+												label: "Semi Major Axis",
+												value: pd,
+												min: 0.5,
+												max: 120,
+												step: 0.1,
+												display: `${pd.toFixed(1)} PD`,
+												set: (value: number) =>
+													onUpdateSystemMoon(
+														bodyIndex,
+														i,
+														(current, parentBody) =>
+															updateMoonSemiMajorAxis(
+																current,
+																parentBody,
+																value,
+																hoursPerDay,
+															),
+													),
+											},
+											siderealDay: {
+												label: "Sidereal Day",
+												value: moon.siderealDayHours,
+												min: 1,
+												max: moon.orbitalPeriodDays * 24 * 2,
+												step: 0.1,
+												display: formatHours(moon.siderealDayHours),
+												set: (value: number) =>
+													onUpdateSystemMoon(bodyIndex, i, (current) => ({
+														...current,
+														siderealDayHours: value,
+													})),
+											},
+											eccentricity: {
+												label: "Eccentricity",
+												value: moon.eccentricity,
+												min: 0,
+												max: 0.99,
+												step: 0.001,
+												display: moon.eccentricity.toFixed(4),
+												set: (value: number) =>
+													onUpdateSystemMoon(bodyIndex, i, (current) => ({
+														...current,
+														eccentricity: value,
+													})),
+											},
+											periapsis: {
+												label: "Periapsis",
+												value: moon.argumentOfPeriapsisDeg,
+												min: 0,
+												max: 360,
+												step: 1,
+												display: `${moon.argumentOfPeriapsisDeg.toFixed(1)}°`,
+												set: (value: number) =>
+													onUpdateSystemMoon(bodyIndex, i, (current) => ({
+														...current,
+														argumentOfPeriapsisDeg: value,
+													})),
+											},
+											inclination: {
+												label: "Inclination",
+												value: moon.inclinationDeg,
+												min: 0,
+												max: 180,
+												step: 0.5,
+												display: `${moon.inclinationDeg.toFixed(1)}°`,
+												set: (value: number) =>
+													onUpdateSystemMoon(bodyIndex, i, (current) => ({
+														...current,
+														inclinationDeg: value,
+													})),
+											},
+											axialTilt: {
+												label: "Axial Tilt",
+												value: moon.axialTiltDeg,
+												min: 0,
+												max: 180,
+												step: 0.5,
+												display: `${moon.axialTiltDeg.toFixed(1)}°`,
+												set: (value: number) =>
+													onUpdateSystemMoon(bodyIndex, i, (current) => ({
+														...current,
+														axialTiltDeg: value,
+													})),
+											},
+										}
+									: undefined,
 						})}
-					/>
+					>
+						<LazyPlanetDetailTabs
+							seed={restSeed}
+							moonCount={0}
+							moons={[]}
+							moonContext={{
+								moon,
+								parent: {
+									// The main world's SystemBody.idx is always -1 (see
+									// buildMainBody), regardless of its position in the
+									// systemBodies array -- keep that in sync here so a
+									// moon's tideLock: {type: "planet", target: -1} matches.
+									idx: -1,
+									massKg: planetMassKg,
+									diameterKm: planetDiamKm,
+									moons: generatedMoons,
+								},
+							}}
+							daysPerYear={daysPerYear}
+							hoursPerDay={moon.siderealDayHours}
+							planetRadiusKm={moon.diameterKm / 2}
+							isSolarLocked={false}
+							spectralClass={spectralClass}
+							starSubtype={starSubtype}
+							orbitalDistanceAU={orbitalDistanceAU}
+							eccentricity={eccentricity}
+							perihelion={perihelion}
+							obliquity={moon.axialTiltDeg}
+							hydrosphereFraction={moon.hydrosphereFraction ?? 0}
+							atmosphere={moon.atmosphere}
+							generationPreviewTab={generationPreviewTab}
+							onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+							unitSystem={unitSystem}
+						/>
+					</MoonSystemCard>
 				)
 			})}
-			<PlanetDetailTabs
-				tidalSchedulePreview={tidalSchedulePreview}
+			<LazyPlanetDetailTabs
+				seed={restSeed}
 				moonCount={moonCount}
+				moons={generatedMoons}
 				daysPerYear={daysPerYear}
+				hoursPerDay={hoursPerDay}
+				planetRadiusKm={planetRadiusKm}
 				isSolarLocked={isSolarLocked}
-				climatePreview={climatePreview}
+				spectralClass={spectralClass}
+				starSubtype={starSubtype}
+				orbitalDistanceAU={orbitalDistanceAU}
+				eccentricity={eccentricity}
+				perihelion={perihelion}
+				obliquity={obliquity}
+				hydrosphereFraction={1 - landCoverage}
+				atmosphere={buildPressureAtmosphereProfile(pressureSlider?.value ?? 1)}
+				tidalSchedulePreviewOverride={tidalSchedulePreview}
 				generationPreviewTab={generationPreviewTab}
 				onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 				unitSystem={unitSystem}
@@ -1732,12 +2871,16 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	setObliquity,
 	moonCount,
 	restSeed,
+	showRealSolNames,
 	setRestSeed,
 	tidalSchedulePreview,
+	surfaceTidesM,
 	generatedMoons,
 	siblingBodies,
 	systemBodies,
 	onFocusBody,
+	onUpdateSystemBody,
+	onUpdateSystemMoon,
 	daysPerYear,
 	hoursPerDay,
 	setHoursPerDay,
@@ -1752,7 +2895,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	eccentricity,
 	perihelion,
 	inclinationDeg,
-	longitudeOfAscendingNodeDeg,
+	setInclinationDeg,
 	era,
 	setEra,
 	planetCode,
@@ -1769,7 +2912,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	generationLabel,
 	generationProgress,
 	generationTimings,
-	climatePreview,
+	obliquity,
+	landCoverage,
 	generationPreviewTab,
 	onSelectGenerationPreviewTab,
 	unitSystem,
@@ -1967,12 +3111,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							// is just an entry at some AU, sorted once and rendered in
 							// that order. The star always sorts first since it's the only
 							// thing at AU 0.
-							const labeledSiblings = labelSiblingBodies(siblingBodies ?? [])
-							const starPeakForce =
-								tidalSchedulePreview?.events.reduce(
-									(max, ev) => Math.max(max, Math.abs(ev.starForce ?? 0)),
-									0,
-								) ?? 0
+							const labeledSiblings = labelSiblingBodies(
+								siblingBodies ?? [],
+								showRealSolNames && restSeed === SOL_SEED,
+							)
+							const mainWorldBody = systemBodies?.find((b) => b.isMainWorld)
 							const mainWorldNode =
 								!generatedMoons || generatedMoons.length === 0 ? (
 									<div className="text-[10px] text-slate-400 py-2">
@@ -1986,8 +3129,12 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 											systemBodies?.findIndex((b) => b.isMainWorld) ?? -1
 										}
 										onFocusBody={onFocusBody}
+										group={mainWorldBody?.group}
+										classification={mainWorldBody?.classification}
+										sizeClass={mainWorldBody?.sizeClass}
 										generatedMoons={generatedMoons}
 										tidalSchedulePreview={tidalSchedulePreview}
+										surfaceTidesM={surfaceTidesM}
 										tideLock={tideLock}
 										setTideLock={setTideLock}
 										setHoursPerDay={setHoursPerDay}
@@ -2002,6 +3149,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										isRetrograde={isRetrograde}
 										onToggleSpin={onToggleSpin}
 										planetRadiusKm={planetRadiusKm}
+										restSeed={restSeed}
 										hoursPerDay={hoursPerDay}
 										daysPerYear={daysPerYear}
 										moonCount={moonCount}
@@ -2010,14 +3158,25 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										eccentricity={eccentricity}
 										perihelion={perihelion}
 										axialTiltDisplay={axialTiltDisplay}
-										climatePreview={climatePreview}
+										obliquity={obliquity}
+										landCoverage={landCoverage}
 										generationPreviewTab={generationPreviewTab}
 										onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 										unitSystem={unitSystem}
 										inclinationDeg={inclinationDeg}
-										longitudeOfAscendingNodeDeg={longitudeOfAscendingNodeDeg}
+										setInclinationDeg={setInclinationDeg}
+										showRealSolNames={showRealSolNames && restSeed === SOL_SEED}
+										spectralClass={spectralClass}
+										starSubtype={starSubtype}
+										onUpdateSystemMoon={onUpdateSystemMoon}
 									/>
 								)
+							const starMassSol = getStarMassSol(
+								isValidSpectralClass(spectralClass)
+									? (spectralClass as MainSequenceClass)
+									: "G",
+								starSubtype,
+							)
 							const orderedEntries = [
 								{
 									au: 0,
@@ -2026,14 +3185,15 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 											key="star"
 											spectralClass={spectralClass}
 											starSubtype={starSubtype}
-											peakTideMeters={starPeakForce * EARTH_MOON_TIDE_REFERENCE}
+											restSeed={restSeed}
+											showRealSolNames={
+												showRealSolNames && restSeed === SOL_SEED
+											}
 											setSpectralClass={setSpectralClass}
 											setStarSubtype={setStarSubtype}
 											gpsButton={
 												onFocusBody ? (
-													<GpsFocusButton
-														onClick={() => onFocusBody(-1)}
-													/>
+													<GpsFocusButton onClick={() => onFocusBody(-1)} />
 												) : undefined
 											}
 											lockButton={
@@ -2085,7 +3245,22 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 											key={`${entry.body.group}-${entry.body.orbitalDistanceAU}-${i}`}
 											{...entry}
 											bodyIndex={systemBodies?.indexOf(entry.body) ?? -1}
+											showRealSolNames={
+												showRealSolNames && restSeed === SOL_SEED
+											}
+											restSeed={restSeed}
+											starMassSol={starMassSol}
+											spectralClass={spectralClass}
+											starSubtype={starSubtype}
+											hoursPerDay={hoursPerDay}
+											unitSystem={unitSystem}
+											generationPreviewTab={generationPreviewTab}
+											onSelectGenerationPreviewTab={
+												onSelectGenerationPreviewTab
+											}
 											onFocusBody={onFocusBody}
+											onUpdateSystemBody={onUpdateSystemBody}
+											onUpdateSystemMoon={onUpdateSystemMoon}
 										/>
 									),
 								})),
@@ -2116,7 +3291,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															<input
 																type="text"
 																value={restSeedInput}
-																onChange={(e) => setRestSeedInput(e.target.value)}
+																onChange={(e) =>
+																	setRestSeedInput(e.target.value)
+																}
 																onKeyDown={(e) => {
 																	if (e.key === "Enter") {
 																		e.preventDefault()

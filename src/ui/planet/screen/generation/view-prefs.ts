@@ -20,6 +20,10 @@ interface StoredViewPrefs {
 	showSolarSystemEllipticalOrbits: boolean
 	showSolarSystemDaylight: boolean
 	showSolarSystemInclination: boolean
+	showSolarSystemAxialTilt: boolean
+	showSolarSystemRealisticSizes: boolean
+	showSolarSystemBodyNames: boolean
+	showSolarSystemRealNames: boolean
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
@@ -118,6 +122,10 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showSolarSystemEllipticalOrbits: true,
 	showSolarSystemDaylight: true,
 	showSolarSystemInclination: true,
+	showSolarSystemAxialTilt: true,
+	showSolarSystemRealisticSizes: true,
+	showSolarSystemBodyNames: true,
+	showSolarSystemRealNames: true,
 	showWireframe: false,
 	showGrid: true,
 	showNationBorders: false,
@@ -261,6 +269,22 @@ export function parseStoredViewPrefs(
 			showSolarSystemInclination: readBoolean(
 				parsed.showSolarSystemInclination,
 				DEFAULT_VIEW_PREFS.showSolarSystemInclination,
+			),
+			showSolarSystemAxialTilt: readBoolean(
+				parsed.showSolarSystemAxialTilt,
+				DEFAULT_VIEW_PREFS.showSolarSystemAxialTilt,
+			),
+			showSolarSystemRealisticSizes: readBoolean(
+				parsed.showSolarSystemRealisticSizes,
+				DEFAULT_VIEW_PREFS.showSolarSystemRealisticSizes,
+			),
+			showSolarSystemBodyNames: readBoolean(
+				parsed.showSolarSystemBodyNames,
+				DEFAULT_VIEW_PREFS.showSolarSystemBodyNames,
+			),
+			showSolarSystemRealNames: readBoolean(
+				parsed.showSolarSystemRealNames,
+				DEFAULT_VIEW_PREFS.showSolarSystemRealNames,
 			),
 			showWireframe: readBoolean(
 				parsed.showWireframe,

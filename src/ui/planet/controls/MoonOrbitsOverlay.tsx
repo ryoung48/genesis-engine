@@ -14,6 +14,7 @@ import {
 
 const MOON_COLORS = ["#0ea5e9", "#8b5cf6", "#10b981"]
 const TWO_PI = 2 * Math.PI
+const MIN_MOON_VISUAL_RADIUS = 0.75
 
 function solveKepler(M: number, e: number): number {
 	let E = M
@@ -66,7 +67,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 		)
 		const moonVisualRadii = moons.map((moon) =>
 			Math.max(
-				1.5,
+				MIN_MOON_VISUAL_RADIUS,
 				scaleMoonRadiusToPlanetVisualRadius(
 					moon.diameterKm,
 					planetRadiusKm,
@@ -76,14 +77,18 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 		)
 		const orbitPeriapses = layoutMoonOrbitPeriapsesForDisplay({
 			orbits: moons.map((moon, index) => {
-				const smaM = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
+				const smaM = moonSemiMajorAxisM(
+					moon,
+					planetMassKg,
+					moonOrbitHoursPerDay,
+				)
 				return {
 					orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
 						smaM,
 						planetRadiusKm,
 					),
 					eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
-					bodyVisualRadius: moonVisualRadii[index] ?? 1.5,
+					bodyVisualRadius: moonVisualRadii[index] ?? MIN_MOON_VISUAL_RADIUS,
 				}
 			}),
 			parentVisualRadius: PLANET_R,
@@ -139,7 +144,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				posX,
 				posY,
 				diameterKm: moon.diameterKm,
-				visualRadius: moonVisualRadii[i] ?? 1.5,
+				visualRadius: moonVisualRadii[i] ?? MIN_MOON_VISUAL_RADIUS,
 				color: MOON_COLORS[i % MOON_COLORS.length],
 				illumination,
 				sunDirX,

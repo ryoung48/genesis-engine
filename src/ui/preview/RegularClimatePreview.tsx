@@ -1,6 +1,10 @@
 import React from "react"
+import {
+	mapLinear,
+	sampleBasisColorStops,
+} from "@/model/shared/color-interpolation"
+import { SPECTRAL_STOPS } from "@/model/shared/color-palettes"
 import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
-import { temperatureColor } from "@/ui/planet/colors"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import {
 	formatTemperature,
@@ -14,6 +18,33 @@ interface RegularClimatePreviewProps {
 	activeTab: GenerationPreviewTab
 	unitSystem: UnitSystem
 	daysPerYear?: number
+}
+
+/**
+ * Normalized (min..max of this specific matrix, not a fixed Celsius scale)
+ * Spectral color function -- unlike temperatureColor's fixed absolute
+ * breakpoints (tuned for Earth-like -73..80C), this always spans the full
+ * gradient across whatever range is actually on screen, so an extreme body
+ * (Mercury, Venus) doesn't just render as a solid block of the hottest color.
+ */
+function buildNormalizedTemperatureColorFn(
+	matrix: readonly (readonly number[])[],
+): (value: number) => string {
+	let min = Infinity
+	let max = -Infinity
+	for (const row of matrix) {
+		for (const value of row) {
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+	}
+	return (value: number) =>
+		rgbToCss(
+			sampleBasisColorStops(
+				SPECTRAL_STOPS,
+				mapLinear(value, min, max, 0, 1, true),
+			),
+		)
 }
 
 function buildPreviewChartProps(
@@ -65,7 +96,7 @@ function buildPreviewChartProps(
 				matrix: preview.heat,
 				columnValues: preview.columnValues,
 				columnLabels: preview.columnLabels,
-				colorForValue: (value: number) => rgbToCss(temperatureColor(value)),
+				colorForValue: buildNormalizedTemperatureColorFn(preview.heat),
 				legendTitle: "Temperature",
 				formatLegendValue: (value: number) =>
 					formatTemperature(value, unitSystem, 1, { compact: true }),

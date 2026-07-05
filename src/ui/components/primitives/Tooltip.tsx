@@ -41,6 +41,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 			className={cx(
 				"pointer-events-none absolute z-20 w-max max-w-44 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[10px] normal-case leading-[1.35] text-slate-500 opacity-0 shadow-lg transition-opacity group-hover/tooltip:opacity-100",
 				positionClassName[position][align],
+				"whitespace-pre-line",
 				className,
 			)}
 		>

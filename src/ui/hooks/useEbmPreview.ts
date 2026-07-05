@@ -7,6 +7,7 @@ import {
 } from "@/model/celestial/star/star-types"
 import { EnergyBalanceModel } from "@/model/climate/ebm"
 import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
+import { estimateGreenhouseFactor } from "@/model/climate/ebm/greenhouse-estimate"
 import {
 	mapLinear,
 	rgbToCss,
@@ -27,6 +28,21 @@ interface EbmConfig {
 	landFraction: number
 	radius: number
 	pressure: number
+	/**
+	 * Real per-body overrides -- pass these when previewing an actual known
+	 * body (see sol-system.ts's SystemBody.albedo/greenhouseFactor/
+	 * internalHeatTempK) rather than a procedurally generated one. Without
+	 * them, albedo/greenhouseFactor fall back to the landFraction/pressure
+	 * heuristics below, which are only sanity-checked for modest,
+	 * terrestrial-ish parameter ranges -- at gas-giant pressure (thousands of
+	 * bar) the pressure heuristic alone overshoots by hundreds of degrees,
+	 * since it has no internal-heat term and was never fit against anything
+	 * that extreme. This is exactly the bug that made Jupiter's preview show
+	 * ~800C instead of its real ~-108C before these overrides existed.
+	 */
+	albedo?: number
+	greenhouseFactor?: number
+	internalHeatTempK?: number
 }
 
 function meanOf(values: readonly number[]): number {
@@ -34,6 +50,27 @@ function meanOf(values: readonly number[]): number {
 	let sum = 0
 	for (const value of values) sum += value
 	return sum / values.length
+}
+
+// UI-level heuristic for a generated (not real-data) world: EBM's own
+// defaults are Earth's individually-fitted values (see
+// EMB_CONSTANTS.surface), which shouldn't apply regardless of what the user
+// actually configured. These reuse the old land/ocean-blend albedo range
+// (0.25 ocean, 0.35 land) purely as a landCoverage-driven single Bond albedo,
+// and scale greenhouseFactor by sqrt(pressure) off Earth's fitted anchor at
+// pressure=1 bar -- not a real per-body fit (there's no known target
+// temperature for a generated world), just a reasonable monotonic response
+// to the pressure slider.
+const OCEAN_ALBEDO_ESTIMATE = 0.25
+const LAND_ALBEDO_ESTIMATE = 0.35
+
+/** Exported so stat-card display code can show the same estimate the model
+ * actually used without re-running the full simulation just to read it back. */
+export function estimateAlbedo(landCoverage: number): number {
+	return (
+		OCEAN_ALBEDO_ESTIMATE * (1 - landCoverage) +
+		LAND_ALBEDO_ESTIMATE * landCoverage
+	)
 }
 
 export function useEbmPreview(config: EbmConfig) {
@@ -49,6 +86,9 @@ export function useEbmPreview(config: EbmConfig) {
 		landFraction,
 		radius,
 		pressure,
+		albedo: albedoOverride,
+		greenhouseFactor: greenhouseFactorOverride,
+		internalHeatTempK,
 	} = config
 	return useMemo<RegularClimatePreviewData>(() => {
 		const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
@@ -77,6 +117,10 @@ export function useEbmPreview(config: EbmConfig) {
 			landFraction: new Array(EMB_CONSTANTS.grid.NUM_LAT).fill(landFraction),
 			radius: radius * 1000, // km to meters
 			pressure,
+			albedo: albedoOverride ?? estimateAlbedo(landFraction),
+			greenhouseFactor:
+				greenhouseFactorOverride ?? estimateGreenhouseFactor(pressure),
+			internalHeatTempK,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
@@ -133,6 +177,8 @@ export function useEbmPreview(config: EbmConfig) {
 			lats: model.lats_deg,
 			columnValues: sampledDays,
 			columnLabels: dayLabels,
+			albedo: modelConfig.albedo,
+			greenhouseFactor: modelConfig.greenhouseFactor,
 		}
 	}, [
 		obliquity,
@@ -146,5 +192,8 @@ export function useEbmPreview(config: EbmConfig) {
 		landFraction,
 		radius,
 		pressure,
+		albedoOverride,
+		greenhouseFactorOverride,
+		internalHeatTempK,
 	])
 }

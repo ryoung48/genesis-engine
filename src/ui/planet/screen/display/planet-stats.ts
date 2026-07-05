@@ -1,3 +1,7 @@
+import {
+	computeSolarDayHours,
+	inferRetrogradeRotationFromAxialTiltDeg,
+} from "@/model/celestial/day-length"
 import { getClimateGeometry } from "@/model/climate/rain"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
@@ -18,6 +22,12 @@ import {
 export interface PlanetStat {
 	label: string
 	value: string
+}
+
+function formatDayHours(hours: number | null): string {
+	if (hours == null) return "-"
+	if (!Number.isFinite(hours)) return "Infinite"
+	return `${hours.toFixed(1)} h`
 }
 
 export function computePlanetStats(
@@ -168,6 +178,12 @@ export function computePlanetStats(
 
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = (activeParams?.tideLock ?? params.tideLock)?.type === "solar"
+	const retrograde = inferRetrogradeRotationFromAxialTiltDeg(obliquityValue)
+	const solarDayHours = computeSolarDayHours({
+		siderealDayHours: hoursPerDayValue,
+		orbitalPeriodDays: daysPerYearValue,
+		retrograde,
+	})
 	const habitabilityScore = world?.population?.habitabilityScore ?? 0
 
 	const avgWindSpeedMs = params.avgWindSpeedMs ?? null
@@ -241,7 +257,8 @@ export function computePlanetStats(
 			value: `${spectralClassValue}${Math.round(starSubtypeValue)}`,
 		},
 		{ label: "Year", value: `${daysPerYearValue.toFixed(0)} d` },
-		{ label: "Day", value: `${hoursPerDayValue.toFixed(1)} h` },
+		{ label: "Sidereal Day", value: formatDayHours(hoursPerDayValue) },
+		{ label: "Solar Day", value: formatDayHours(solarDayHours) },
 		{ label: "Pressure", value: `${pressureValue.toFixed(1)} bar` },
 		{
 			label: "Radius",

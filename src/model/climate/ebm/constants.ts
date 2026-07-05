@@ -15,10 +15,21 @@ export const EMB_CONSTANTS = {
 	},
 	grid: { NUM_LAT: 36 },
 	surface: {
-		ALBEDO: { ICE: 0.65, LAND: 0.35, OCEAN: 0.25 },
-		OLR_A: 238,
-		OLR_B: 2.8,
-		OLR_T_REF: 288,
+		// Fallbacks used only when EBMConfig.albedo/iceAlbedo aren't set. No
+		// OCEAN/LAND blend anymore -- BASE is a single whole-body Bond albedo,
+		// set to Earth's real value since GREENHOUSE_FACTOR below is fit
+		// against it specifically (the two defaults have to be used together).
+		ALBEDO: { ICE: 0.65, BASE: 0.3 },
+		// Fallback used only when neither EBMConfig.greenhouseFactor nor a
+		// per-planet value is supplied. This is a per-planet DATA value now
+		// (see SolPlanetSeed.greenhouseFactor in sol-system.ts), not derived
+		// from a universal formula or scale -- each real body's value is
+		// individually fit so EBM's simulated average matches its known real
+		// surface temperature (see EnergyBalanceModel.computeGreenhouseOLR()
+		// for the T_eq = T_blackbody*(1+greenhouseFactor/4) relationship).
+		// 0.55 is Earth's fitted value (paired with ALBEDO.BASE=0.3 above,
+		// reproduces ~14.8C).
+		GREENHOUSE_FACTOR: 0.55,
 	},
 	thermal: {
 		OCEAN_HEAT_CAPACITY: 4e7,

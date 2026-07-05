@@ -47,6 +47,24 @@ export function tideContribution(
 	return C * p2(cosPsi)
 }
 
+// Peak (sub-point, P2(cos0)=1) tide-raising amplitude one moon induces on
+// another, using the same equilibrium-tide formula as tideContribution() but
+// with the raised moon's own radius/mass standing in for the planet's. Unlike
+// the planet-surface tides above, we don't track a fixed observation point on
+// either moon's surface -- the bulge always points at the other moon, so its
+// peak height is just the sub-point value at the current separation.
+export function moonMoonTideContribution(
+	raisedMoonRadiusM: number,
+	raisedMoonMassKg: number,
+	raisingMoonMassKg: number,
+	separationM: number,
+): number {
+	return (
+		(raisingMoonMassKg / raisedMoonMassKg) *
+		(raisedMoonRadiusM ** 4 / separationM ** 3)
+	)
+}
+
 interface StarTidalPosition {
 	latRad: number
 	lonRad: number

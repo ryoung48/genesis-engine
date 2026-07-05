@@ -1,3 +1,5 @@
+import type { SharedRng } from "@/model/shared/rng"
+
 export const MAIN_SEQUENCE_CLASSES = [
 	"O",
 	"B",
@@ -159,4 +161,42 @@ export function getStarLabel(cls: MainSequenceClass, subtype: number): string {
 
 export function isValidSpectralClass(cls: string): cls is MainSequenceClass {
 	return (MAIN_SEQUENCE_CLASSES as readonly string[]).includes(cls)
+}
+
+// Non-realistic-sizes star radius: same spirit as galaxy-gen's
+// getStarRenderRadius (a handful of fixed radii instead of scaling
+// continuously with the star's true diameter/luminosity), but interpolated
+// linearly across the full O0→M9 spectral position instead of galaxy-gen's
+// flat per-class buckets — so hotter/bigger subtypes within a class still
+// read as a bit bigger than cooler/smaller ones in the same class, without
+// ever reflecting the real (sqrt-of-hundreds-to-thousands-x) diameter ratio.
+const NON_REALISTIC_STAR_RATIO_AT_O0 = 24
+const NON_REALISTIC_STAR_RATIO_AT_M9 = 8
+const NON_REALISTIC_STAR_SPECTRAL_POSITION_MAX = 14 // O0 = 0 … M9 = 14
+
+export function getNonRealisticStarToPlanetRatio(
+	cls: MainSequenceClass,
+	subtype: number,
+): number {
+	const position = getStarSpectralPosition(cls, subtype)
+	const t = position / NON_REALISTIC_STAR_SPECTRAL_POSITION_MAX
+	return (
+		NON_REALISTIC_STAR_RATIO_AT_O0 +
+		t * (NON_REALISTIC_STAR_RATIO_AT_M9 - NON_REALISTIC_STAR_RATIO_AT_O0)
+	)
+}
+
+// Ported from galaxy-gen's rollStarAttributes age roll, restricted to the
+// main-sequence case — chaos-machine only models class V stars, so the
+// giant/subgiant/dead-star lifespan branches don't apply here.
+export function rollStarAgeGyr(
+	rng: Pick<SharedRng, "randint" | "uniform">,
+	massSol: number,
+): number {
+	const mainSequenceLifespanGyr = 10 / massSol ** 2.5
+	let age =
+		rng.randint(1, 6) * 2 + rng.randint(1, 3) - 2 + rng.uniform(0.1, 0.9)
+	if (massSol > 0.9) age = mainSequenceLifespanGyr * rng.uniform(0.1, 0.9)
+	if (age > 14) age = rng.uniform(13, 14)
+	return age
 }

@@ -1,15 +1,14 @@
 import { LUNA_MOON_SEED } from "@/model/celestial/moons/orbital-mechanics"
-import { SOL_SEED } from "@/model/celestial/system/sol-system"
 import {
 	getHabitableZoneAU,
 	getStarLuminositySol,
 	isValidSpectralClass,
 	type MainSequenceClass,
 } from "@/model/celestial/star/star-types"
+import { SOL_SEED } from "@/model/celestial/system/sol-system"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
-	getEffectiveObliquityDeg,
 	getMaxOceanDepthKm,
 } from "@/model/shared/units"
 import type { SocietyEra } from "@/model/society/eras"
@@ -96,11 +95,11 @@ export function buildPlanetSliders(state: {
 		},
 		{
 			label: "Axial Tilt",
-			help: "Sets the base seasonal tilt from 0 to 90 degrees. Use the direction control to switch between prograde and retrograde, which mirrors the stored obliquity as 180 - x. On tidally locked worlds this approximates a Cassini-state obliquity.",
-			value: getEffectiveObliquityDeg(state.obliquity),
-			display: `${getEffectiveObliquityDeg(state.obliquity).toFixed(1)}°`,
-			min: 0,
-			max: 90,
+			help: "Sets the planet's true obliquity. Prograde uses the 0 to 90 degree range; retrograde uses the 90 to 180 degree range. The direction control flips between the prograde and retrograde complements (x and 180 - x).",
+			value: state.obliquity,
+			display: `${state.obliquity.toFixed(1)}°`,
+			min: state.obliquity <= 90 ? 0 : 90,
+			max: state.obliquity <= 90 ? 90 : 180,
 			step: 0.5,
 			set: state.setObliquity,
 		},

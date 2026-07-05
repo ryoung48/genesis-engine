@@ -19,6 +19,11 @@ declare module "troika-three-text" {
 		sync(cb?: () => void): void
 	}
 
+	export interface TroikaTextRenderInfo {
+		/** [minX, minY, maxX, maxY] of the whole text block, in local units. */
+		blockBounds: [number, number, number, number]
+	}
+
 	export class Text extends Object3D {
 		constructor(props?: Partial<TextProps>)
 		text: string | null
@@ -33,6 +38,7 @@ declare module "troika-three-text" {
 		textRenderingMode: "distanceField" | "standard"
 		renderOrder: number
 		visible: boolean
+		readonly textRenderInfo: TroikaTextRenderInfo | null
 		dispose(): void
 		sync(cb?: () => void): void
 	}

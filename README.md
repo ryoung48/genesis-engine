@@ -73,3 +73,10 @@ export default defineConfig([
   },
 ])
 ```
+
+TODO:
+* galaxy star field
+* seismology
+* labels
+* long orbit period climate behavior
+* system editing
