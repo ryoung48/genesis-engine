@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import {
-	generateGasGiantSystem,
+	derivePlanetMassKg,
 	generateMoons,
 	M_SOL_KG,
 	resolveMoonOrbitHoursPerDay,
@@ -17,6 +17,11 @@ import {
 	getStarMassSol,
 	isValidSpectralClass,
 } from "@/model/celestial/star/star-types"
+import {
+	generateSystemBodies,
+	type SystemBody,
+} from "@/model/celestial/system/generate-system-bodies"
+import { SOL_SEED } from "@/model/celestial/system/sol-system"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import {
@@ -30,10 +35,7 @@ import {
 	computeThermalEquatorLine,
 	getClimateGeometry,
 } from "@/model/climate/rain"
-import {
-	computeGasGiantTidalSchedule,
-	computeTidalSchedule,
-} from "@/model/climate/tidal-schedule"
+import { computeTidalSchedule } from "@/model/climate/tidal-schedule"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
@@ -75,7 +77,6 @@ import {
 	windSpeedColor,
 } from "./colors"
 import { ApparentDiameterOverlay } from "./controls/ApparentDiameterOverlay"
-import { GasGiantSystemOverlay } from "./controls/GasGiantSystemOverlay"
 import { GenerationPanel } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import { MoonOrbitsOverlay } from "./controls/MoonOrbitsOverlay"
@@ -226,6 +227,7 @@ import {
 	rgbToCss,
 	type UnitSystem,
 } from "./screen/shared/ui-format"
+import { SolarSystemControls } from "./solar-system/SolarSystemControls"
 import { WindParticleCanvas } from "./WindParticleCanvas"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
@@ -372,6 +374,19 @@ export const GenesisView: React.FC = () => {
 	)
 	const [viewMode, setViewMode] = useState<GenesisViewMode>(
 		initialViewPrefs.viewMode,
+	)
+	const [solarSystemViewActive, setSolarSystemViewActive] = useState(
+		initialViewPrefs.solarSystemViewActive,
+	)
+	const [solarSystemControlsExpanded, setSolarSystemControlsExpanded] =
+		useState(false)
+	const [showSolarSystemEllipticalOrbits, setShowSolarSystemEllipticalOrbits] =
+		useState(initialViewPrefs.showSolarSystemEllipticalOrbits)
+	const [showSolarSystemDaylight, setShowSolarSystemDaylight] = useState(
+		initialViewPrefs.showSolarSystemDaylight,
+	)
+	const [showSolarSystemInclination, setShowSolarSystemInclination] = useState(
+		initialViewPrefs.showSolarSystemInclination,
 	)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
@@ -686,9 +701,6 @@ export const GenesisView: React.FC = () => {
 		setStarSubtype(subtype)
 	}
 	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
-	const [planetType, setPlanetType] = useState<
-		import("@/model/celestial/moons/moon-types").PlanetType
-	>(initialDecodedCode?.planetType ?? "terrestrial")
 	const [tideLock, setTideLock] = useState<
 		import("@/model/celestial/moons/moon-types").TideLock | null
 	>(initialDecodedCode?.tideLock ?? null)
@@ -708,46 +720,16 @@ export const GenesisView: React.FC = () => {
 	const [moonSeed, setMoonSeed] = useState(
 		initialDecodedCode?.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
 	)
-
-	const gasGiantSystem = useMemo(() => {
-		if (planetType !== "gas-giant-moon") return null
-		const cls = isValidSpectralClass(spectralClass)
-			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
-		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
-		return generateGasGiantSystem(
-			moonSeed,
-			planetRadiusKm,
-			orbitalDistanceAU,
-			starMassKg,
-			obliquity,
-			moonCount,
-		)
-	}, [
-		planetType,
-		moonSeed,
-		moonCount,
-		planetRadiusKm,
-		orbitalDistanceAU,
-		spectralClass,
-		starSubtype,
-		obliquity,
-	])
+	const [restSeed, setRestSeed] = useState(
+		initialDecodedCode?.restSeed ?? SOL_SEED,
+	)
 
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
 			getKeplerYearYears(orbitalDistanceAU, effectiveStarMassSol) * 365.25 * 24
-		const dayHours =
-			gasGiantSystem?.gasGiant.dayLengthHours ??
-			resolveMoonOrbitHoursPerDay(hoursPerDay, tideLock)
+		const dayHours = resolveMoonOrbitHoursPerDay(hoursPerDay, tideLock)
 		return Math.round(keplerHours / dayHours)
-	}, [
-		orbitalDistanceAU,
-		effectiveStarMassSol,
-		gasGiantSystem,
-		hoursPerDay,
-		tideLock,
-	])
+	}, [orbitalDistanceAU, effectiveStarMassSol, hoursPerDay, tideLock])
 
 	const effectiveDaysPerYear = tidallyLocked ? 1 : daysPerYear
 
@@ -841,6 +823,10 @@ export const GenesisView: React.FC = () => {
 				nationMode,
 				populationMode,
 				viewMode,
+				solarSystemViewActive,
+				showSolarSystemEllipticalOrbits,
+				showSolarSystemDaylight,
+				showSolarSystemInclination,
 				showWireframe,
 				showGrid,
 				showNationBorders,
@@ -881,6 +867,10 @@ export const GenesisView: React.FC = () => {
 		)
 	}, [
 		colorMode,
+		solarSystemViewActive,
+		showSolarSystemEllipticalOrbits,
+		showSolarSystemDaylight,
+		showSolarSystemInclination,
 		showMoonOrbits,
 		showEllipticalOrbits,
 		showApparentDiameter,
@@ -2117,6 +2107,9 @@ export const GenesisView: React.FC = () => {
 		sceneRef.current?.setViewMode(viewMode)
 	}, [viewMode])
 	useEffect(() => {
+		sceneRef.current?.setSolarSystemActive(solarSystemViewActive)
+	}, [solarSystemViewActive])
+	useEffect(() => {
 		sceneRef.current?.setMapProjectionLatitude(mapProjectionLatitude)
 	}, [mapProjectionLatitude])
 	useEffect(() => {
@@ -2277,7 +2270,6 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
-			planetType,
 			tideLock,
 			antistellarLon,
 			jitter,
@@ -2313,7 +2305,6 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			daysPerYear,
 			hoursPerDay,
-			planetType,
 			tideLock,
 			antistellarLon,
 			jitter,
@@ -2393,12 +2384,12 @@ export const GenesisView: React.FC = () => {
 			setStarSubtype,
 			setOrbitalDistanceAU,
 			setHoursPerDay,
-			setPlanetType,
 			setTideLock,
 			setAntistellarLon,
 			setPressure,
 			setMoonCount,
 			setMoonSeed,
+			setRestSeed,
 			setSeaLevel,
 			setVolcanism,
 			setCraters,
@@ -2422,7 +2413,6 @@ export const GenesisView: React.FC = () => {
 			setters.setStarSubtype(decoded.starSubtype)
 			setters.setOrbitalDistanceAU(decoded.orbitalDistanceAU)
 			setters.setHoursPerDay(decoded.hoursPerDay)
-			setters.setPlanetType(decoded.planetType)
 			setters.setTideLock(decoded.tideLock)
 			setters.setAntistellarLon(decoded.antistellarLon)
 			setters.setPressure(decoded.pressure)
@@ -2430,6 +2420,7 @@ export const GenesisView: React.FC = () => {
 			setters.setMoonSeed(
 				decoded.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
 			)
+			setters.setRestSeed(decoded.restSeed ?? SOL_SEED)
 			setters.setSeaLevel(decoded.seaLevel)
 			setters.setVolcanism(decoded.volcanism)
 			setters.setCraters(decoded.craters ?? 0)
@@ -2839,43 +2830,12 @@ export const GenesisView: React.FC = () => {
 		starSubtype,
 	])
 
-	const handlePlanetTypeChange = useCallback(
-		(
-			nextPlanetType: import("@/model/celestial/moons/moon-types").PlanetType,
-		) => {
-			setPlanetType(nextPlanetType)
-			if (nextPlanetType === "gas-giant-moon") {
-				setTideLock({ type: "lunar", target: 0 })
-				return
-			}
-			if (tideLock?.type === "lunar" && tideLock.target === 0) {
-				setTideLock(null)
-				setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
-			}
-		},
-		[tideLock],
-	)
-
-	useEffect(() => {
-		if (
-			planetType === "gas-giant-moon" &&
-			tideLock?.type === "lunar" &&
-			tideLock.target === 0 &&
-			gasGiantSystem
-		) {
-			setHoursPerDay(gasGiantSystem.mainMoonOrbitalPeriodDays * 24)
-		}
-	}, [gasGiantSystem, planetType, tideLock])
-
 	// --- Moon orbits (3D scene, globe mode only) ---
 	const moonOrbitDayOfYear =
 		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)
 	useEffect(() => {
 		sceneRef.current?.setMoonOrbitOverlay(
-			showMoonOrbits &&
-				viewMode === "globe" &&
-				planetType !== "gas-giant-moon" &&
-				generatedMoonsPreview.length > 0
+			showMoonOrbits && viewMode === "globe" && generatedMoonsPreview.length > 0
 				? generatedMoonsPreview
 				: null,
 			planetRadiusKm,
@@ -2897,7 +2857,6 @@ export const GenesisView: React.FC = () => {
 		moonOrbitDayOfYear,
 		showGrid,
 		gridSpacing,
-		planetType,
 	])
 
 	useEffect(() => {
@@ -2905,40 +2864,109 @@ export const GenesisView: React.FC = () => {
 			sceneRef.current?.updateMoonOrbitDay(moonOrbitDayOfYear)
 	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
 
-	useEffect(() => {
-		sceneRef.current?.setGasGiantSystemOverlay(
-			showMoonOrbits &&
-				viewMode === "globe" &&
-				planetType === "gas-giant-moon" &&
-				gasGiantSystem
-				? gasGiantSystem
-				: null,
-			planetRadiusKm,
-			moonOrbitDayOfYear,
-			showGrid,
-			gridSpacing,
-			showEllipticalOrbits,
-		)
+	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
+	// and by the solar system view) ---
+	const systemBodies: SystemBody[] = useMemo(() => {
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const mainWorld = {
+			orbitalDistanceAU,
+			diameterKm: planetRadiusKm * 2,
+			moons: generatedMoonsPreview,
+			massKg: derivePlanetMassKg(planetRadiusKm),
+			gravityG:
+				(6.674e-11 * derivePlanetMassKg(planetRadiusKm)) /
+				(planetRadiusKm * 1000) ** 2 /
+				9.807,
+			orbitalPeriodDays: effectiveDaysPerYear,
+			dayLengthHours: hoursPerDay,
+			eccentricity,
+			argumentOfPeriapsisDeg: perihelion,
+			axialTiltDeg: obliquity,
+		}
+		return generateSystemBodies({
+			seed: restSeed,
+			spectralClass: cls,
+			starSubtype,
+			hoursPerDay,
+			mainWorld,
+		})
 	}, [
-		showMoonOrbits,
-		showEllipticalOrbits,
-		viewMode,
-		planetType,
-		gasGiantSystem,
+		restSeed,
+		spectralClass,
+		starSubtype,
+		hoursPerDay,
+		orbitalDistanceAU,
 		planetRadiusKm,
-		moonOrbitDayOfYear,
-		showGrid,
-		gridSpacing,
+		generatedMoonsPreview,
+		effectiveDaysPerYear,
+		eccentricity,
+		perihelion,
+		obliquity,
 	])
 
 	useEffect(() => {
-		if (
-			showMoonOrbits &&
-			viewMode === "globe" &&
-			planetType === "gas-giant-moon"
+		sceneRef.current?.setSolarSystemOverlay(
+			solarSystemViewActive && systemBodies.length > 0
+				? {
+						bodies: systemBodies,
+						hoursPerDay,
+						tideLock,
+						daysPerYear: effectiveDaysPerYear,
+						spectralClass: isValidSpectralClass(spectralClass)
+							? (spectralClass as MainSequenceClass)
+							: DEFAULT_SPECTRAL_CLASS,
+						starSubtype,
+						initialDay: moonOrbitDayOfYear,
+						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
+						showDaylight: showSolarSystemDaylight,
+						showInclination: showSolarSystemInclination,
+					}
+				: null,
 		)
-			sceneRef.current?.updateGasGiantSystemDay(moonOrbitDayOfYear)
-	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode, planetType])
+	}, [
+		solarSystemViewActive,
+		systemBodies,
+		hoursPerDay,
+		tideLock,
+		effectiveDaysPerYear,
+		spectralClass,
+		starSubtype,
+		moonOrbitDayOfYear,
+		showSolarSystemEllipticalOrbits,
+		showSolarSystemInclination,
+		showSolarSystemDaylight,
+	])
+	useEffect(() => {
+		if (solarSystemViewActive)
+			sceneRef.current?.updateSolarSystemDay(moonOrbitDayOfYear)
+	}, [moonOrbitDayOfYear, solarSystemViewActive])
+
+	// Entering the solar-system view and focusing a body both hinge on
+	// `solarSystemViewActive` — the overlay-building effect above only
+	// populates the renderer's body positions once that flips true, so a
+	// focus request has to wait for that same commit before the renderer has
+	// anything to focus on.
+	const [pendingFocus, setPendingFocus] = useState<{
+		bodyIndex: number
+		moonIndex?: number
+	} | null>(null)
+	const handleFocusBody = useCallback(
+		(bodyIndex: number, moonIndex?: number) => {
+			setSolarSystemViewActive(true)
+			setPendingFocus({ bodyIndex, moonIndex })
+		},
+		[],
+	)
+	useEffect(() => {
+		if (!solarSystemViewActive || !pendingFocus) return
+		sceneRef.current?.focusOnSystemBody(
+			pendingFocus.bodyIndex,
+			pendingFocus.moonIndex,
+		)
+		setPendingFocus(null)
+	}, [solarSystemViewActive, pendingFocus])
 
 	const tidalSchedulePreview = useMemo(() => {
 		const scheduleParams = {
@@ -2953,13 +2981,8 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			perihelion,
 		}
-		if (planetType === "gas-giant-moon" && gasGiantSystem) {
-			return computeGasGiantTidalSchedule(gasGiantSystem, scheduleParams)
-		}
 		return computeTidalSchedule(generatedMoonsPreview, scheduleParams)
 	}, [
-		planetType,
-		gasGiantSystem,
 		generatedMoonsPreview,
 		seed,
 		daysPerYear,
@@ -2993,24 +3016,18 @@ export const GenesisView: React.FC = () => {
 					worldTab={worldTab}
 					setWorldTab={setWorldTab}
 					resetWorldDefaults={handleResetDefaults}
-					planetType={planetType}
-					setPlanetType={handlePlanetTypeChange}
 					tideLock={tideLock}
 					setTideLock={setTideLock}
 					setObliquity={setObliquity}
 					moonCount={moonCount}
-					setMoonCount={(n) => {
-						setMoonCount(n)
-						if (tideLock?.type === "lunar" && tideLock.target > n) {
-							setTideLock(null)
-							setHoursPerDay(24)
-						}
-					}}
 					moonSeed={moonSeed}
-					setMoonSeed={setMoonSeed}
+					restSeed={restSeed}
+					setRestSeed={setRestSeed}
 					tidalSchedulePreview={tidalSchedulePreview}
 					generatedMoons={generatedMoonsPreview}
-					gasGiantSystem={gasGiantSystem ?? undefined}
+					siblingBodies={systemBodies.filter((b) => !b.isMainWorld)}
+					systemBodies={systemBodies}
+					onFocusBody={handleFocusBody}
 					daysPerYear={daysPerYear}
 					hoursPerDay={hoursPerDay}
 					setHoursPerDay={setHoursPerDay}
@@ -3024,6 +3041,13 @@ export const GenesisView: React.FC = () => {
 					orbitalDistanceAU={orbitalDistanceAU}
 					eccentricity={eccentricity}
 					perihelion={perihelion}
+					inclinationDeg={
+						systemBodies.find((b) => b.isMainWorld)?.inclinationDeg ?? 0
+					}
+					longitudeOfAscendingNodeDeg={
+						systemBodies.find((b) => b.isMainWorld)
+							?.longitudeOfAscendingNodeDeg ?? 0
+					}
 					era={era}
 					setEra={setEra}
 					planetCode={planetCode}
@@ -3067,14 +3091,14 @@ export const GenesisView: React.FC = () => {
 					windGrid={windGrid}
 					projectToScreen={projectToScreen}
 					getGlobeCameraDir={getGlobeCameraDir}
-					visible={showWindArrows}
+					visible={showWindArrows && !solarSystemViewActive}
 					viewMode={viewMode}
 				/>
 				<OceanCurrentParticleCanvas
 					currentGrid={oceanCurrentGrid}
 					projectToScreen={projectToScreen}
 					getGlobeCameraDir={getGlobeCameraDir}
-					visible={showOceanCurrents}
+					visible={showOceanCurrents && !solarSystemViewActive}
 					viewMode={viewMode}
 				/>
 
@@ -3158,173 +3182,172 @@ export const GenesisView: React.FC = () => {
 						/>
 					) : null}
 
-					<OverlayControls
-						overlaysExpanded={overlaysExpanded}
-						setOverlaysExpanded={setOverlaysExpanded}
-						measureMode={measureMode}
-						setMeasureMode={setMeasureMode}
-						pathfindingLand={pathfindingLand}
-						setPathfindingLand={setPathfindingLand}
-						pathfindingSea={pathfindingSea}
-						setPathfindingSea={setPathfindingSea}
-						pathfindingResult={pathfindingResult}
-						showWireframe={showWireframe}
-						setShowWireframe={setShowWireframe}
-						showRivers={showRivers}
-						setShowRivers={setShowRivers}
-						showThermalEquator={showThermalEquator}
-						setShowThermalEquator={setShowThermalEquator}
-						showWindArrows={showWindArrows}
-						setShowWindArrows={setShowWindArrows}
-						showGdd={showGdd}
-						setShowGdd={setShowGdd}
-						showGint={showGint}
-						setShowGint={setShowGint}
-						showPet={showPet}
-						setShowPet={setShowPet}
-						showAet={showAet}
-						setShowAet={setShowAet}
-						showOceanCurrents={showOceanCurrents}
-						setShowOceanCurrents={setShowOceanCurrents}
-						showGrid={showGrid}
-						setShowGrid={setShowGrid}
-						showNationBorders={showNationBorders}
-						setShowNationBorders={setShowNationBorders}
-						showLandBorders={showLandBorders}
-						setShowLandBorders={setShowLandBorders}
-						showNationHierarchy={showNationHierarchy}
-						setShowNationHierarchy={setShowNationHierarchy}
-						nationMode={nationMode}
-						populationMode={populationMode}
-						labelMode={labelMode}
-						setLabelMode={setLabelMode}
-						showElevation={showElevation}
-						setShowElevation={setShowElevation}
-						showInfrastructure={showInfrastructure}
-						setShowInfrastructure={setShowInfrastructure}
-						gridSpacing={gridSpacing}
-						setGridSpacing={setGridSpacing}
-						viewMode={viewMode}
-						setViewMode={setViewMode}
-						unitSystem={unitSystem}
-						setUnitSystem={setUnitSystem}
-						mapProjectionLatitude={mapProjectionLatitude}
-						draftMapProjectionLatitude={draftMapProjectionLatitude}
-						setDraftMapProjectionLatitude={setDraftMapProjectionLatitude}
-						setMapProjectionLatitude={setMapProjectionLatitude}
-						debugMapModes={debugMapModes}
-						setDebugMapModes={setDebugMapModes}
-						colorMode={colorMode}
-						setColorMode={setColorMode}
-						clockCurrent={clockCurrent}
-						setClockCurrent={setClockCurrent}
-						clockMonthMode={clockMonthMode}
-						setClockMonthMode={setClockMonthMode}
-						clockMonth={clockMonth}
-						setClockMonth={setClockMonth}
-						clockDay={clockDay}
-						setClockDay={setClockDay}
-						clockHour={clockHour}
-						setClockHour={setClockHour}
-						clockUseMeridiem={clockUseMeridiem}
-						setClockUseMeridiem={setClockUseMeridiem}
-						hoursPerDay={hoursPerDay}
-						tidallyLocked={tidallyLocked}
-						daysPerYear={effectiveDaysPerYear}
-						vegetationSubMode={vegetationSubMode}
-						setVegetationSubMode={setVegetationSubMode}
-						climateSubMode={climateSubMode}
-						setClimateSubMode={setClimateSubMode}
-						elevationSubMode={elevationSubMode}
-						setElevationSubMode={setElevationSubMode}
-						topographySubMode={topographySubMode}
-						setTopographySubMode={setTopographySubMode}
-						dangerSubMode={dangerSubMode}
-						setDangerSubMode={setDangerSubMode}
-						hasCycloneRisk={!!world?.cycloneRisk}
-						hasTornadoRisk={!!world?.tornadoRisk}
-						hasTidalRisk={!!world?.tidalRange}
-						exportWidthPreset={exportWidthPreset}
-						setExportWidthPreset={setExportWidthPreset}
-						exportCenterLongitude={exportCenterLongitude}
-						setExportCenterLongitude={setExportCenterLongitude}
-						exportDisabled={exportDisabled}
-						exportBusy={exportBusy}
-						exportProgress={exportProgress}
-						exportError={exportError}
-						onExport={() => {
-							void handleExportMap()
-						}}
-						canCopyCode={!!planetCode}
-						codeCopied={codeCopied}
-						onCopyCode={() => {
-							void handleCopyCode()
-						}}
-						onReset={() => {
-							setViewMode("globe")
-							setUnitSystem("metric")
-							setShowGrid(true)
-							setGridSpacing(15)
-							setShowWireframe(false)
-							setShowRivers(false)
-							setShowThermalEquator(false)
-							setShowNationBorders(false)
-							setShowNationHierarchy(false)
-							setLabelMode({
-								nations: false,
-								dynasty: false,
-								settlements: false,
-								culture: false,
-								heritage: false,
-								script: false,
-							})
-							setShowElevation(false)
-							setShowInfrastructure(false)
-							setMeasureMode("off")
-							setPathfindingLand(true)
-							setPathfindingSea(true)
-							setDebugMapModes(false)
-							setShowEllipticalOrbits(true)
-							setShowDaylight(false)
-							setShowSolarTerminator(false)
-							setClockHour(12)
-							setExportCenterLongitude(0)
-							setMapProjectionLatitude(0)
-							setDraftMapProjectionLatitude(0)
-						}}
-						generationPanelOpen={generationPanelOpen}
-						onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
-						showMoonOrbits={showMoonOrbits}
-						setShowMoonOrbits={setShowMoonOrbits}
-						showEllipticalOrbits={showEllipticalOrbits}
-						setShowEllipticalOrbits={setShowEllipticalOrbits}
-						showApparentDiameter={showApparentDiameter}
-						setShowApparentDiameter={setShowApparentDiameter}
-						showDaylight={showDaylight}
-						setShowDaylight={setShowDaylight}
-						showSolarTerminator={showSolarTerminator}
-						setShowSolarTerminator={setShowSolarTerminator}
-						moonCount={moonCount}
-						planetType={planetType}
-					/>
+					{solarSystemViewActive ? (
+						<SolarSystemControls
+							expanded={solarSystemControlsExpanded}
+							setExpanded={setSolarSystemControlsExpanded}
+							onBack={() => setSolarSystemViewActive(false)}
+							showEllipticalOrbits={showSolarSystemEllipticalOrbits}
+							setShowEllipticalOrbits={setShowSolarSystemEllipticalOrbits}
+							showDaylight={showSolarSystemDaylight}
+							setShowDaylight={setShowSolarSystemDaylight}
+							showInclination={showSolarSystemInclination}
+							setShowInclination={setShowSolarSystemInclination}
+						/>
+					) : (
+						<OverlayControls
+							onEnterSolarSystem={() => setSolarSystemViewActive(true)}
+							overlaysExpanded={overlaysExpanded}
+							setOverlaysExpanded={setOverlaysExpanded}
+							measureMode={measureMode}
+							setMeasureMode={setMeasureMode}
+							pathfindingLand={pathfindingLand}
+							setPathfindingLand={setPathfindingLand}
+							pathfindingSea={pathfindingSea}
+							setPathfindingSea={setPathfindingSea}
+							pathfindingResult={pathfindingResult}
+							showWireframe={showWireframe}
+							setShowWireframe={setShowWireframe}
+							showRivers={showRivers}
+							setShowRivers={setShowRivers}
+							showThermalEquator={showThermalEquator}
+							setShowThermalEquator={setShowThermalEquator}
+							showWindArrows={showWindArrows}
+							setShowWindArrows={setShowWindArrows}
+							showGdd={showGdd}
+							setShowGdd={setShowGdd}
+							showGint={showGint}
+							setShowGint={setShowGint}
+							showPet={showPet}
+							setShowPet={setShowPet}
+							showAet={showAet}
+							setShowAet={setShowAet}
+							showOceanCurrents={showOceanCurrents}
+							setShowOceanCurrents={setShowOceanCurrents}
+							showGrid={showGrid}
+							setShowGrid={setShowGrid}
+							showNationBorders={showNationBorders}
+							setShowNationBorders={setShowNationBorders}
+							showLandBorders={showLandBorders}
+							setShowLandBorders={setShowLandBorders}
+							showNationHierarchy={showNationHierarchy}
+							setShowNationHierarchy={setShowNationHierarchy}
+							nationMode={nationMode}
+							populationMode={populationMode}
+							labelMode={labelMode}
+							setLabelMode={setLabelMode}
+							showElevation={showElevation}
+							setShowElevation={setShowElevation}
+							showInfrastructure={showInfrastructure}
+							setShowInfrastructure={setShowInfrastructure}
+							gridSpacing={gridSpacing}
+							setGridSpacing={setGridSpacing}
+							viewMode={viewMode}
+							setViewMode={setViewMode}
+							unitSystem={unitSystem}
+							setUnitSystem={setUnitSystem}
+							mapProjectionLatitude={mapProjectionLatitude}
+							draftMapProjectionLatitude={draftMapProjectionLatitude}
+							setDraftMapProjectionLatitude={setDraftMapProjectionLatitude}
+							setMapProjectionLatitude={setMapProjectionLatitude}
+							debugMapModes={debugMapModes}
+							setDebugMapModes={setDebugMapModes}
+							colorMode={colorMode}
+							setColorMode={setColorMode}
+							clockCurrent={clockCurrent}
+							setClockCurrent={setClockCurrent}
+							clockMonthMode={clockMonthMode}
+							setClockMonthMode={setClockMonthMode}
+							clockMonth={clockMonth}
+							setClockMonth={setClockMonth}
+							clockDay={clockDay}
+							setClockDay={setClockDay}
+							clockHour={clockHour}
+							setClockHour={setClockHour}
+							clockUseMeridiem={clockUseMeridiem}
+							setClockUseMeridiem={setClockUseMeridiem}
+							hoursPerDay={hoursPerDay}
+							tidallyLocked={tidallyLocked}
+							daysPerYear={effectiveDaysPerYear}
+							vegetationSubMode={vegetationSubMode}
+							setVegetationSubMode={setVegetationSubMode}
+							climateSubMode={climateSubMode}
+							setClimateSubMode={setClimateSubMode}
+							elevationSubMode={elevationSubMode}
+							setElevationSubMode={setElevationSubMode}
+							topographySubMode={topographySubMode}
+							setTopographySubMode={setTopographySubMode}
+							dangerSubMode={dangerSubMode}
+							setDangerSubMode={setDangerSubMode}
+							hasCycloneRisk={!!world?.cycloneRisk}
+							hasTornadoRisk={!!world?.tornadoRisk}
+							hasTidalRisk={!!world?.tidalRange}
+							exportWidthPreset={exportWidthPreset}
+							setExportWidthPreset={setExportWidthPreset}
+							exportCenterLongitude={exportCenterLongitude}
+							setExportCenterLongitude={setExportCenterLongitude}
+							exportDisabled={exportDisabled}
+							exportBusy={exportBusy}
+							exportProgress={exportProgress}
+							exportError={exportError}
+							onExport={() => {
+								void handleExportMap()
+							}}
+							canCopyCode={!!planetCode}
+							codeCopied={codeCopied}
+							onCopyCode={() => {
+								void handleCopyCode()
+							}}
+							onReset={() => {
+								setViewMode("globe")
+								setUnitSystem("metric")
+								setShowGrid(true)
+								setGridSpacing(15)
+								setShowWireframe(false)
+								setShowRivers(false)
+								setShowThermalEquator(false)
+								setShowNationBorders(false)
+								setShowNationHierarchy(false)
+								setLabelMode({
+									nations: false,
+									dynasty: false,
+									settlements: false,
+									culture: false,
+									heritage: false,
+									script: false,
+								})
+								setShowElevation(false)
+								setShowInfrastructure(false)
+								setMeasureMode("off")
+								setPathfindingLand(true)
+								setPathfindingSea(true)
+								setDebugMapModes(false)
+								setShowEllipticalOrbits(true)
+								setShowDaylight(false)
+								setShowSolarTerminator(false)
+								setClockHour(12)
+								setExportCenterLongitude(0)
+								setMapProjectionLatitude(0)
+								setDraftMapProjectionLatitude(0)
+							}}
+							generationPanelOpen={generationPanelOpen}
+							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
+							showMoonOrbits={showMoonOrbits}
+							setShowMoonOrbits={setShowMoonOrbits}
+							showEllipticalOrbits={showEllipticalOrbits}
+							setShowEllipticalOrbits={setShowEllipticalOrbits}
+							showApparentDiameter={showApparentDiameter}
+							setShowApparentDiameter={setShowApparentDiameter}
+							showDaylight={showDaylight}
+							setShowDaylight={setShowDaylight}
+							showSolarTerminator={showSolarTerminator}
+							setShowSolarTerminator={setShowSolarTerminator}
+							moonCount={moonCount}
+						/>
+					)}
 
 					{showMoonOrbits &&
 						viewMode === "map" &&
-						planetType === "gas-giant-moon" &&
-						gasGiantSystem && (
-							<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
-								<GasGiantSystemOverlay
-									gasGiantSystem={gasGiantSystem}
-									planetRadiusKm={planetRadiusKm}
-									day={moonOrbitDayOfYear}
-									showEllipticalOrbits={showEllipticalOrbits}
-								/>
-							</div>
-						)}
-
-					{showMoonOrbits &&
-						viewMode === "map" &&
-						planetType !== "gas-giant-moon" &&
 						generatedMoonsPreview.length > 0 && (
 							<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
 								<MoonOrbitsOverlay
@@ -3340,7 +3363,7 @@ export const GenesisView: React.FC = () => {
 							</div>
 						)}
 
-					{showApparentDiameter && moonCount > 0 && (
+					{showApparentDiameter && moonCount > 0 && !solarSystemViewActive && (
 						<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
 							<ApparentDiameterOverlay
 								moons={generatedMoonsPreview}
@@ -3391,25 +3414,27 @@ export const GenesisView: React.FC = () => {
 							</div>
 						</div>
 					)}
-					<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
-						<div className="pointer-events-auto">
-							<ModeBar
-								colorMode={colorMode}
-								setColorMode={setColorMode}
-								geographyMode={geographyMode}
-								setGeographyMode={setGeographyMode}
-								nationMode={nationMode}
-								setNationMode={setNationMode}
-								populationMode={populationMode}
-								setPopulationMode={setPopulationMode}
-								debugMapModes={debugMapModes}
-								vegetationSubMode={vegetationSubMode}
-								climateSubMode={climateSubMode}
-								elevationSubMode={elevationSubMode}
-								topographySubMode={topographySubMode}
-							/>
+					{!solarSystemViewActive && (
+						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
+							<div className="pointer-events-auto">
+								<ModeBar
+									colorMode={colorMode}
+									setColorMode={setColorMode}
+									geographyMode={geographyMode}
+									setGeographyMode={setGeographyMode}
+									nationMode={nationMode}
+									setNationMode={setNationMode}
+									populationMode={populationMode}
+									setPopulationMode={setPopulationMode}
+									debugMapModes={debugMapModes}
+									vegetationSubMode={vegetationSubMode}
+									climateSubMode={climateSubMode}
+									elevationSubMode={elevationSubMode}
+									topographySubMode={topographySubMode}
+								/>
+							</div>
 						</div>
-					</div>
+					)}
 				</>
 			</div>
 
@@ -3418,7 +3443,6 @@ export const GenesisView: React.FC = () => {
 				onToggle={() => setDetailsDrawerOpen((value) => !value)}
 				nation={selectedNation}
 				planetName={planetName}
-				planetType={planetType}
 				planetStats={planetStats}
 				worldPopulation={
 					selectedHistoryView?.totalPopulation ??

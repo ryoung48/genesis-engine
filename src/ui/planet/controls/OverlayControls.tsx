@@ -12,6 +12,7 @@ import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
 import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
+import { TransferUpIcon } from "@/ui/components/primitives/icons/TransferUpIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import {
@@ -194,7 +195,7 @@ interface OverlayControlsProps {
 	showSolarTerminator?: boolean
 	setShowSolarTerminator?: (v: boolean) => void
 	moonCount?: number
-	planetType?: import("@/model/celestial/moons/moon-types").PlanetType
+	onEnterSolarSystem?: () => void
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
@@ -309,7 +310,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	showSolarTerminator = false,
 	setShowSolarTerminator,
 	moonCount = 0,
-	planetType = "terrestrial",
+	onEnterSolarSystem,
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
 }) => {
@@ -327,8 +328,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
 	const hasCelestialControls = Boolean(
-		planetType === "gas-giant-moon" ||
-			(moonCount > 0 && setShowMoonOrbits) ||
+		(moonCount > 0 && setShowMoonOrbits) ||
 			setShowApparentDiameter ||
 			(setShowDaylight && setShowSolarTerminator),
 	)
@@ -815,8 +815,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										</button>
 										{celestialExpanded && (
 											<div className="mt-1.5 space-y-1.5">
-												{(planetType === "gas-giant-moon" ||
-													(moonCount > 0 && setShowMoonOrbits)) && (
+												{moonCount > 0 && setShowMoonOrbits && (
 													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
 														<span>Planetary System</span>
 														<input
@@ -1590,6 +1589,19 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										size="sm"
 										buttonClassName="px-1.5"
 									/>
+									{viewMode === "globe" && onEnterSolarSystem && (
+										<Tooltip content="Solar system view" position="top">
+											<IconButton
+												onClick={onEnterSolarSystem}
+												tone="overlay"
+												shape="pill"
+												size="sm"
+												className="shadow-none"
+											>
+												<TransferUpIcon className="h-3.5 w-3.5" />
+											</IconButton>
+										</Tooltip>
+									)}
 								</div>
 								{viewMode === "map" && (
 									<div className="space-y-1.5">

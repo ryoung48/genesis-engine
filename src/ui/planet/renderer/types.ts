@@ -6,6 +6,7 @@ import type {
 } from "@/model/transport/worker-types"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
+import type { SolarSystemOverlayParams } from "./solar-system-overlay"
 
 export type { WindArrowData }
 
@@ -108,13 +109,18 @@ export interface GenesisScene {
 	updateMoonOrbitDay(day: number): void
 	/** Unit vector pointing from origin toward the camera (globe mode only, null in map mode). */
 	getGlobeCameraDir(): [number, number, number] | null
-	setGasGiantSystemOverlay?(
-		system: import("@/model/celestial/moons/moon-types").GasGiantSystem | null,
-		planetRadiusKm: number,
-		day: number,
-		showGrid: boolean,
-		gridSpacing: number,
-		showEllipticalOrbits: boolean,
+	/** Enter or exit the solar-system view (hides the globe/map, shows the star system). */
+	setSolarSystemActive(active: boolean): void
+	setSolarSystemOverlay(params: SolarSystemOverlayParams | null): void
+	updateSolarSystemDay(day: number): void
+	/** Enters the solar-system view if needed, then animates the camera to
+	 * frame the given body (or one of its moons). `bodyIndex` is the index
+	 * into the `bodies` array passed to setSolarSystemOverlay, or -1 for the
+	 * star. `moonIndex`, if given, focuses that body's moon instead (index
+	 * into the body's own `moons` array). */
+	focusOnSystemBody(
+		bodyIndex: number,
+		moonIndex?: number,
+		opts?: { durationMs?: number },
 	): void
-	updateGasGiantSystemDay?(day: number): void
 }

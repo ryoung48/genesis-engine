@@ -1,16 +1,10 @@
-import type {
-	GasGiantMoonParams,
-	GasGiantSystem,
-	MoonParams,
-} from "../celestial/moons/moon-types"
+import type { MoonParams } from "../celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
 	keplerMoonPosition,
-	keplerMoonPositionVector,
 	M_SOL_KG,
 	moonPeriodBoundsDay,
 	moonSemiMajorAxisM,
-	orbitalVectorToPlanetFixedPosition,
 	resolveMoonOrbitHoursPerDay,
 	rocheLimitM,
 } from "../celestial/moons/orbital-mechanics"
@@ -258,107 +252,6 @@ function buildMoonContributors(
 	return { contributors, moonsClamped }
 }
 
-function gasGiantMoonToOrbitingBody(
-	moon: Pick<
-		GasGiantMoonParams,
-		| "idx"
-		| "orbitalPeriodDays"
-		| "eccentricity"
-		| "inclinationDeg"
-		| "longitudeOfAscendingNodeDeg"
-		| "argumentOfPeriapsisDeg"
-		| "meanAnomalyAtEpochDeg"
-	>,
-): MoonParams {
-	return {
-		idx: moon.idx,
-		massKg: 0,
-		diameterKm: 0,
-		orbitalPeriodDays: moon.orbitalPeriodDays,
-		eccentricity: moon.eccentricity,
-		inclinationDeg: moon.inclinationDeg,
-		longitudeOfAscendingNodeDeg: moon.longitudeOfAscendingNodeDeg,
-		argumentOfPeriapsisDeg: moon.argumentOfPeriapsisDeg,
-		meanAnomalyAtEpochDeg: moon.meanAnomalyAtEpochDeg,
-		axialTiltDeg: 0,
-		retrogradeRotation: false,
-	}
-}
-
-function buildGasGiantContributors(
-	gasGiantSystem: GasGiantSystem,
-): TidalContributor[] {
-	const gasGiantDiameterM = gasGiantSystem.gasGiant.diameterKm * 1000
-	const mainWorldOrbit = gasGiantMoonToOrbitingBody({
-		idx: 0,
-		orbitalPeriodDays: gasGiantSystem.mainMoonOrbitalPeriodDays,
-		eccentricity: gasGiantSystem.mainMoonEccentricity,
-		inclinationDeg: gasGiantSystem.mainMoonInclinationDeg,
-		longitudeOfAscendingNodeDeg:
-			gasGiantSystem.mainMoonLongitudeOfAscendingNodeDeg,
-		argumentOfPeriapsisDeg: gasGiantSystem.mainMoonArgumentOfPeriapsisDeg,
-		meanAnomalyAtEpochDeg: gasGiantSystem.mainMoonMeanAnomalyAtEpochDeg,
-	})
-	const mainWorldSemiMajorAxisM = gasGiantSystem.mainMoonPd * gasGiantDiameterM
-	const mainWorldVectorAt = (t: number) =>
-		keplerMoonPositionVector(mainWorldOrbit, mainWorldSemiMajorAxisM, t)
-
-	const gasGiantContributor: TidalContributor = {
-		idx: 0,
-		label: "Gas Giant",
-		massKg: gasGiantSystem.gasGiant.massKg,
-		diameterKm: gasGiantSystem.gasGiant.diameterKm,
-		positionAt: (t: number) => {
-			const mainWorldVector = mainWorldVectorAt(t)
-			return orbitalVectorToPlanetFixedPosition(
-				{
-					x: -mainWorldVector.x,
-					y: -mainWorldVector.y,
-					z: -mainWorldVector.z,
-					distanceM: mainWorldVector.distanceM,
-					trueAnomalyRad:
-						(mainWorldVector.trueAnomalyRad + Math.PI) % (2 * Math.PI),
-				},
-				t,
-			)
-		},
-	}
-
-	const siblingContributors = gasGiantSystem.siblingMoons.map((moon, index) => {
-		const siblingOrbit = gasGiantMoonToOrbitingBody(moon)
-		const siblingSemiMajorAxisM = moon.pd * gasGiantDiameterM
-		return {
-			idx: moon.idx,
-			label: `Moon ${index + 1}`,
-			massKg: moon.massKg,
-			diameterKm: moon.diameterKm,
-			positionAt: (t: number) => {
-				const mainWorldVector = mainWorldVectorAt(t)
-				const siblingVector = keplerMoonPositionVector(
-					siblingOrbit,
-					siblingSemiMajorAxisM,
-					t,
-				)
-				const dx = siblingVector.x - mainWorldVector.x
-				const dy = siblingVector.y - mainWorldVector.y
-				const dz = siblingVector.z - mainWorldVector.z
-				return orbitalVectorToPlanetFixedPosition(
-					{
-						x: dx,
-						y: dy,
-						z: dz,
-						distanceM: Math.hypot(dx, dy, dz),
-						trueAnomalyRad: siblingVector.trueAnomalyRad,
-					},
-					t,
-				)
-			},
-		}
-	})
-
-	return [gasGiantContributor, ...siblingContributors]
-}
-
 function computeTidalScheduleFromContributors(
 	contributors: TidalContributor[],
 	params: Pick<
@@ -481,8 +374,12 @@ function computeTidalScheduleFromContributors(
 	}
 
 	const forces = events.map((e) => e.tidalForce)
-	const maxForce = Math.max(...forces, 0)
-	const minForce = Math.min(...forces, 0)
+	let maxForce = 0
+	let minForce = 0
+	for (const f of forces) {
+		if (f > maxForce) maxForce = f
+		if (f < minForce) minForce = f
+	}
 
 	return {
 		events,
@@ -514,27 +411,5 @@ export function computeTidalSchedule(
 		contributors,
 		params,
 		moonsClamped,
-	)
-}
-
-export function computeGasGiantTidalSchedule(
-	gasGiantSystem: GasGiantSystem,
-	params: Pick<
-		GenesisParams,
-		| "daysPerYear"
-		| "hoursPerDay"
-		| "planetRadiusKm"
-		| "tideLock"
-		| "spectralClass"
-		| "starSubtype"
-		| "orbitalDistanceAU"
-		| "eccentricity"
-		| "perihelion"
-	>,
-): TidalSchedule {
-	return computeTidalScheduleFromContributors(
-		buildGasGiantContributors(gasGiantSystem),
-		params,
-		false,
 	)
 }

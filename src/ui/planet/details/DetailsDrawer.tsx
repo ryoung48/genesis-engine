@@ -40,7 +40,6 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 	onToggle,
 	nation,
 	planetName,
-	planetType,
 	planetStats,
 	worldPopulation,
 	activeWarCount,
@@ -135,7 +134,6 @@ export const DetailsDrawer: React.FC<DetailsDrawerProps> = ({
 								}
 								onClose={onToggle}
 								planetName={planetName}
-								planetType={planetType}
 								planetStats={planetStats}
 								worldPopulation={worldPopulation}
 								activeWarCount={activeWarCount}

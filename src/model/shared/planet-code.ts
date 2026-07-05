@@ -31,6 +31,17 @@ const SR = SLIDER_RANGES
 
 const FIELD_SPECS: FieldSpec[] = [
 	{
+		// Prepended (most-significant digit) so previously-shared codes —
+		// which have no bits allocated for this field — decode it as the
+		// leftover 0, i.e. SOL_SEED, once all the fields below are peeled off.
+		name: "restSeed",
+		min: 0,
+		step: 1,
+		count: SEED_MAX,
+		read: (p) =>
+			Math.max(0, Math.min(SEED_MAX - 1, Math.floor(p.restSeed ?? 0))),
+	},
+	{
 		name: "numPoints",
 		min: SR.numPoints.min,
 		step: SR.numPoints.step,
@@ -120,17 +131,18 @@ const FIELD_SPECS: FieldSpec[] = [
 		read: (p) => p.hoursPerDay,
 	},
 	{
-		// 0 = terrestrial, 1 = gas-giant-moon
+		// Reserved (formerly terrestrial/gas-giant-moon planet type, now that
+		// mode is gone) — kept as a fixed 0 so every field packed after it
+		// stays at its original position for previously-shared codes.
 		name: "planetType",
 		min: 0,
 		step: 1,
 		count: 2,
-		read: (p) => (p.planetType === "gas-giant-moon" ? 1 : 0),
+		read: () => 0,
 	},
 	{
 		// 0 = none, 1 = solar
-		// lunar: 2 = moon idx 0 (terrestrial) or gas giant idx (gas-giant-moon)
-		//        3 = moon idx 1, 4 = moon idx 2 (terrestrial moons 2+; or sibling moons)
+		// lunar: 2 = moon idx 0, 3 = moon idx 1, 4 = moon idx 2
 		name: "tidallyLocked",
 		min: 0,
 		step: 1,
@@ -323,7 +335,6 @@ interface DecodedPlanetCode {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	planetType: import("../celestial/moons/moon-types").PlanetType
 	tideLock: import("../celestial/moons/moon-types").TideLock | null
 	antistellarLon: number
 	perihelion: number
@@ -334,6 +345,7 @@ interface DecodedPlanetCode {
 	era: SocietyEra
 	moonCount: number
 	moonSeed: number
+	restSeed: number
 }
 
 export function decodePlanetCode(code: string): DecodedPlanetCode | null {
@@ -383,10 +395,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		orbitalDistanceAU: decodedFields.orbitalDistanceAU,
 		daysPerYear: decodedFields.daysPerYear,
 		hoursPerDay: decodedFields.hoursPerDay,
-		planetType:
-			decodedFields.planetType === 1
-				? ("gas-giant-moon" as const)
-				: ("terrestrial" as const),
 		tideLock: (() => {
 			const v = decodedFields.tidallyLocked
 			if (v === 1) return { type: "solar" as const, target: 0 }
@@ -402,5 +410,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		era: ERA_ORDER[eraIdx] ?? DEFAULT_ERA,
 		moonCount: decodedFields.moonCount ?? 1,
 		moonSeed: decodedFields.moonSeed ?? 0,
+		restSeed: decodedFields.restSeed ?? 0,
 	}
 }

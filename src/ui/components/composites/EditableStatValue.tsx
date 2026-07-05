@@ -39,7 +39,6 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 
 	return (
 		<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
-			{stat.valuePrefix && <>{stat.valuePrefix} </>}
 			<Tippy
 				visible={visible}
 				onClickOutside={() => setVisible(false)}
@@ -74,9 +73,10 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 					onClick={() => setVisible((v) => !v)}
 					className="inline-block cursor-pointer text-[9px] font-mono text-slate-700 underline decoration-dotted underline-offset-2 hover:text-slate-900"
 				>
-					{stat.value}
+					{stat.valuePrefix ?? stat.value}
 				</span>
 			</Tippy>
+			{stat.valuePrefix && <span>{stat.value}</span>}
 			{stat.valueAction}
 		</span>
 	)

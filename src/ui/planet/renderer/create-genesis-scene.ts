@@ -31,11 +31,7 @@ import {
 	buildTerrainMesh,
 	buildTerrainWireframe,
 } from "./mesh-builders"
-import {
-	buildGasGiantSystemOverlay,
-	buildMoonOrbitOverlay,
-	type MoonOrbitState,
-} from "./moon-orbit-overlay"
+import { buildMoonOrbitOverlay, type MoonOrbitState } from "./moon-orbit-overlay"
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
 	buildGlobeCultureLabels,
@@ -97,6 +93,11 @@ import {
 	buildGlobeSettlements,
 	buildMapSettlements,
 } from "./settlement-overlay"
+import {
+	buildSolarSystemOverlay,
+	type SolarSystemOverlayParams,
+	type SolarSystemOverlayState,
+} from "./solar-system-overlay"
 import {
 	buildGlobeTradeRoutes,
 	buildMapTradeRoutes,
@@ -669,6 +670,18 @@ export function createGenesisScene(
 	const orbitGroup = new THREE.Group()
 	scene.add(orbitGroup)
 
+	// Solar-system view group — an independent overlay that replaces the
+	// globe/map entirely while active (see setSolarSystemActive).
+	const solarSystemGroup = new THREE.Group()
+	solarSystemGroup.visible = false
+	scene.add(solarSystemGroup)
+	let solarSystemActive = false
+	let solarSystemOverlayState: SolarSystemOverlayState | null = null
+	let savedCameraPosition: THREE.Vector3 | null = null
+	let savedControlsTarget: THREE.Vector3 | null = null
+	const DEFAULT_CONTROLS_MIN_DISTANCE = 1.2
+	const DEFAULT_CONTROLS_MAX_DISTANCE = 12
+
 	// Lighting — low ambient so day/night contrast is visible
 	const DEFAULT_AMBIENT_INTENSITY = 0.55
 	const DEFAULT_SUN_INTENSITY = 2.8
@@ -793,6 +806,14 @@ export function createGenesisScene(
 		mapToY: number
 		mapFromZoom: number
 		mapToZoom: number
+	} | null = null
+	let solarSystemFocusTween: {
+		t0: number
+		duration: number
+		camFrom: THREE.Vector3
+		camTo: THREE.Vector3
+		targetFrom: THREE.Vector3
+		targetTo: THREE.Vector3
 	} | null = null
 	let pulseGlobe: LineSegments2 | null = null
 	let pulseMap: LineSegments2 | null = null
@@ -1202,6 +1223,26 @@ export function createGenesisScene(
 				keepAnimating = keepAnimating || pulse !== null
 			}
 
+			if (solarSystemFocusTween) {
+				stepSolarSystemFocusTween()
+				keepAnimating = keepAnimating || solarSystemFocusTween !== null
+			}
+
+			if (solarSystemActive) {
+				if (globeControlsInteracting || globeControlActivityFrames > 0) {
+					controls.update()
+					if (!globeControlsInteracting && globeControlActivityFrames > 0) {
+						globeControlActivityFrames--
+					}
+					keepAnimating =
+						keepAnimating ||
+						globeControlsInteracting ||
+						globeControlActivityFrames > 0
+				}
+				renderer.render(scene, camera)
+				return keepAnimating
+			}
+
 			if (currentViewMode === "map") {
 				if (mapControlsInteracting || mapControlActivityFrames > 0) {
 					mapControls.update()
@@ -1352,6 +1393,7 @@ export function createGenesisScene(
 	function syncAnimationState() {
 		renderScheduler.setAnimationActive(
 			!!focusTween ||
+				!!solarSystemFocusTween ||
 				!!pulse ||
 				globeControlsInteracting ||
 				mapControlsInteracting ||
@@ -2704,6 +2746,63 @@ export function createGenesisScene(
 		}
 	}
 
+	function stepSolarSystemFocusTween() {
+		if (!solarSystemFocusTween) return
+		const u = Math.min(
+			1,
+			(performance.now() - solarSystemFocusTween.t0) /
+				solarSystemFocusTween.duration,
+		)
+		const eased = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2
+		camera.position.lerpVectors(
+			solarSystemFocusTween.camFrom,
+			solarSystemFocusTween.camTo,
+			eased,
+		)
+		controls.target.lerpVectors(
+			solarSystemFocusTween.targetFrom,
+			solarSystemFocusTween.targetTo,
+			eased,
+		)
+		if (u >= 1) {
+			solarSystemFocusTween = null
+			syncAnimationState()
+		}
+	}
+
+	const SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER = 6
+	const SOLAR_SYSTEM_MIN_FOCUS_DISTANCE = 0.3
+
+	function focusOnSystemBody(
+		bodyIndex: number,
+		moonIndex?: number,
+		opts?: { durationMs?: number },
+	) {
+		if (!solarSystemActive) setSolarSystemActive(true)
+		if (!solarSystemOverlayState) return
+		const focus = solarSystemOverlayState.getBodyFocus(bodyIndex, moonIndex)
+		if (!focus) return
+		const distance = Math.max(
+			focus.radius * SOLAR_SYSTEM_FOCUS_DISTANCE_MULTIPLIER,
+			SOLAR_SYSTEM_MIN_FOCUS_DISTANCE,
+		)
+		const dir = camera.position
+			.clone()
+			.sub(controls.target)
+			.normalize()
+		if (!Number.isFinite(dir.x) || dir.lengthSq() === 0) dir.set(0, 0, 1)
+		const camTo = focus.position.clone().add(dir.multiplyScalar(distance))
+		solarSystemFocusTween = {
+			t0: performance.now(),
+			duration: opts?.durationMs ?? 900,
+			camFrom: camera.position.clone(),
+			camTo,
+			targetFrom: controls.target.clone(),
+			targetTo: focus.position.clone(),
+		}
+		syncAnimationState()
+	}
+
 	function setViewMode(mode: GenesisViewMode) {
 		currentViewMode = mode
 		const isMap = mode === "map"
@@ -2921,10 +3020,32 @@ export function createGenesisScene(
 		})
 	}
 
+	// Double-clicking any body in the solar-system view (star, planet, or a
+	// moon) recenters the orbit target on it. Returning to the planet view
+	// is a deliberate action via the settings panel, not a click gesture.
+	function handleSolarSystemDoubleClick(event: MouseEvent) {
+		if (!solarSystemActive || !solarSystemOverlayState) return
+		const rect = canvas.getBoundingClientRect()
+		const width = Math.max(rect.width, 1)
+		const height = Math.max(rect.height, 1)
+		pointer.x = ((event.clientX - rect.left) / width) * 2 - 1
+		pointer.y = -(((event.clientY - rect.top) / height) * 2 - 1)
+		raycaster.setFromCamera(pointer, camera)
+		const hits = raycaster.intersectObject(solarSystemOverlayState.group, true)
+		const hit = hits.find((h) => h.object instanceof THREE.Mesh)
+		if (!hit) return
+		const worldPos = new THREE.Vector3()
+		hit.object.getWorldPosition(worldPos)
+		controls.target.copy(worldPos)
+		controls.update()
+		requestRender()
+	}
+
 	canvas.addEventListener("pointermove", updateHover)
 	canvas.addEventListener("pointerleave", clearHover)
 	canvas.addEventListener("pointerdown", handlePointerDown)
 	canvas.addEventListener("pointerup", handleClick)
+	canvas.addEventListener("dblclick", handleSolarSystemDoubleClick)
 	controls.addEventListener("start", () => {
 		globeControlsInteracting = true
 		globeControlActivityFrames = CONTROL_SETTLE_FRAMES
@@ -2966,6 +3087,8 @@ export function createGenesisScene(
 		canvas.removeEventListener("pointerleave", clearHover)
 		canvas.removeEventListener("pointerdown", handlePointerDown)
 		canvas.removeEventListener("pointerup", handleClick)
+		canvas.removeEventListener("dblclick", handleSolarSystemDoubleClick)
+		solarSystemOverlayState?.dispose()
 		controls.dispose()
 		mapControls.dispose()
 		renderer.dispose()
@@ -3310,8 +3433,6 @@ export function createGenesisScene(
 				currentColorMode === "terrain" ? DEFAULT_WATER_SPECULAR : 0x000000,
 			)
 		}
-		// Gas giant atmosphere follows the same daylight toggle
-		gasGiantOrbitState?.setDaylightMode?.(!enabled)
 		syncMapLighting()
 		requestRender()
 	}
@@ -3416,7 +3537,6 @@ export function createGenesisScene(
 
 	// Moon orbit overlay
 	let moonOrbitState: MoonOrbitState | null = null
-	let gasGiantOrbitState: MoonOrbitState | null = null
 
 	function setMoonOrbitOverlay(
 		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
@@ -3454,41 +3574,55 @@ export function createGenesisScene(
 		requestRender()
 	}
 
-	function setGasGiantSystemOverlay(
-		system: import("@/model/celestial/moons/moon-types").GasGiantSystem | null,
-		planetRadiusKm: number,
-		day: number,
-		showGrid: boolean,
-		gridSpacing: number,
-		showEllipticalOrbits: boolean,
-	) {
-		if (gasGiantOrbitState) {
-			orbitGroup.remove(gasGiantOrbitState.group)
-			gasGiantOrbitState.dispose()
-			gasGiantOrbitState = null
-		}
-		if (system) {
-			gasGiantOrbitState = buildGasGiantSystemOverlay(
-				system,
-				planetRadiusKm,
-				day,
-				showGrid,
-				gridSpacing,
-				showEllipticalOrbits,
-			)
-			orbitGroup.add(gasGiantOrbitState.group)
-			if (gasGiantOrbitState.suggestedMaxDistance) {
-				controls.maxDistance = gasGiantOrbitState.suggestedMaxDistance
-			}
-			gasGiantOrbitState.setDaylightMode?.(sun.intensity > 0)
+	function setSolarSystemActive(active: boolean) {
+		if (solarSystemActive === active) return
+		solarSystemActive = active
+		solarSystemGroup.visible = active
+		globeGroup.visible = !active
+		orbitGroup.visible = !active
+		// The globe's own sun/ambient lights are scene-wide and would otherwise
+		// wash out the solar-system overlay's star light, making its Daylight
+		// toggle invisible — suppress them while this view is active.
+		ambient.visible = !active
+		sun.visible = !active
+		if (active) {
+			savedCameraPosition = camera.position.clone()
+			savedControlsTarget = controls.target.clone()
+			controls.target.set(0, 0, 0)
+			const dist = solarSystemOverlayState?.suggestedCameraDistance ?? 6
+			controls.minDistance = 0.1
+			controls.maxDistance = dist * 4
+			camera.position.set(0, 0, dist)
 		} else {
-			controls.maxDistance = 12
+			if (savedCameraPosition) camera.position.copy(savedCameraPosition)
+			if (savedControlsTarget) controls.target.copy(savedControlsTarget)
+			controls.minDistance = DEFAULT_CONTROLS_MIN_DISTANCE
+			controls.maxDistance = DEFAULT_CONTROLS_MAX_DISTANCE
+		}
+		controls.update()
+		requestRender()
+		syncAnimationState()
+	}
+
+	function setSolarSystemOverlay(params: SolarSystemOverlayParams | null) {
+		if (solarSystemOverlayState) {
+			solarSystemGroup.remove(solarSystemOverlayState.group)
+			solarSystemOverlayState.dispose()
+			solarSystemOverlayState = null
+		}
+		if (params) {
+			solarSystemOverlayState = buildSolarSystemOverlay(params)
+			solarSystemGroup.add(solarSystemOverlayState.group)
+			if (solarSystemActive) {
+				controls.maxDistance =
+					solarSystemOverlayState.suggestedCameraDistance * 4
+			}
 		}
 		requestRender()
 	}
 
-	function updateGasGiantSystemDay(day: number) {
-		gasGiantOrbitState?.setDay(day)
+	function updateSolarSystemDay(day: number) {
+		solarSystemOverlayState?.setDay(day)
 		requestRender()
 	}
 
@@ -3554,7 +3688,9 @@ export function createGenesisScene(
 		focusOnProvince,
 		setMoonOrbitOverlay,
 		updateMoonOrbitDay,
-		setGasGiantSystemOverlay,
-		updateGasGiantSystemDay,
+		setSolarSystemActive,
+		setSolarSystemOverlay,
+		updateSolarSystemDay,
+		focusOnSystemBody,
 	}
 }

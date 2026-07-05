@@ -10,7 +10,6 @@ function makeTestParams(overrides: Partial<GenesisParams> = {}): GenesisParams {
 		...DEFAULT_WORLD_PARAMS,
 		seed: 0,
 		tideLock: null,
-		planetType: "terrestrial",
 		numPoints: TEST_WORLD_NUM_POINTS,
 		...overrides,
 	}

@@ -1,5 +1,4 @@
 import React from "react"
-import type { PlanetType } from "@/model/celestial/moons/moon-types"
 import { type DistributionChartBucket as DistributionBucket } from "@/ui/components/composites/DistributionChart"
 import { Button } from "@/ui/components/primitives/Button"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
@@ -49,7 +48,6 @@ export interface NationDetailsData {
 
 export interface DetailsDrawerBaseProps {
 	planetName: string
-	planetType: PlanetType
 	planetStats: PlanetStat[]
 	worldPopulation: number | null
 	activeWarCount: number | null

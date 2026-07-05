@@ -1,10 +1,6 @@
 import { SEED_MAX } from "../../shared/planet-code"
-import { createRng } from "../../shared/rng"
+import { createRng, rollD } from "../../shared/rng"
 import {
-	type GasGiantMoonParams,
-	type GasGiantParams,
-	type GasGiantSizeClass,
-	type GasGiantSystem,
 	MOON_DEFAULTS,
 	type MoonOrbitRange,
 	type MoonParams,
@@ -58,6 +54,13 @@ const MOON_ORBIT_RANGE_ORDER: MoonOrbitRange[] = [
 	"outer",
 	"extreme",
 ]
+
+type ParentOrbitGroup =
+	| "asteroid belt"
+	| "dwarf"
+	| "terrestrial"
+	| "helian"
+	| "jovian"
 
 const LUNA_OUTER_COMPANION: MoonParams = {
 	idx: 2,
@@ -137,43 +140,28 @@ function rollDie(rng: ReturnType<typeof createRng>, sides: number): number {
 	return rng.randint(1, sides)
 }
 
-function rollMoonInclination(
-	rng: ReturnType<typeof createRng>,
-	orbitRange: MoonOrbitRange,
-): number {
-	// Retrograde probability and inclination ranges by orbit class.
-	// Inner/middle moons formed in-situ: nearly coplanar, rarely retrograde.
-	// Outer/extreme moons are often captured bodies: high inclination, frequently retrograde.
-	const retrogradeChance =
-		orbitRange === "extreme"
-			? 0.65
-			: orbitRange === "outer"
-				? 0.35
-				: orbitRange === "middle"
-					? 0.05
-					: 0.02 // inner
-
-	const isRetrograde = rng.uniform(0, 1) < retrogradeChance
-
-	if (isRetrograde) {
-		// Retrograde: 90°–175° (peaked toward 120°–160° for captured objects)
-		const base =
-			orbitRange === "inner" || orbitRange === "middle"
-				? rng.uniform(95, 175)
-				: rng.uniform(100, 175)
-		return base
-	}
-
-	// Prograde: low inclination for inner/middle, higher for outer/extreme
-	const maxInc =
-		orbitRange === "extreme"
-			? 45
-			: orbitRange === "outer"
-				? 30
-				: orbitRange === "middle"
-					? 15
-					: 5 // inner
-	return rng.uniform(0, maxInc)
+/**
+ * Centralized orbital-inclination roll, shared by every planet, moon, and
+ * sibling body in the system so they all use the same table:
+ *
+ *   2D roll   Severity     Degrees
+ *   2–6       Very Low     1D ÷ 2
+ *   7         Low          1D
+ *   8         Moderate     2D
+ *   9         High         (2D × 3) + 1D
+ *   10        Very High    (1D + 1) × 5 + 1D
+ *   11        Extreme      (3D × 5) − 1D
+ *   12        Retrograde   roll again, result subtracted from 180
+ */
+export function rollInclinationDeg(rng: ReturnType<typeof createRng>): number {
+	const roll = rollD(rng, 2)
+	if (roll <= 6) return rollD(rng, 1) / 2
+	if (roll === 7) return rollD(rng, 1)
+	if (roll === 8) return rollD(rng, 2)
+	if (roll === 9) return rollD(rng, 2) * 3 + rollD(rng, 1)
+	if (roll === 10) return (rollD(rng, 1) + 1) * 5 + rollD(rng, 1)
+	if (roll === 11) return rollD(rng, 3) * 5 - rollD(rng, 1)
+	return 180 - rollInclinationDeg(rng)
 }
 
 function rollMoonAxialTilt(rng: ReturnType<typeof createRng>): {
@@ -217,17 +205,65 @@ function inferPlanetSizeClass(planetDiameterKm: number): number {
 	return closestSizeClass
 }
 
+export function rollMoonCountForParent(
+	rng: ReturnType<typeof createRng>,
+	parentGroup: ParentOrbitGroup,
+	parentSizeClass: number,
+	orbitalDistanceAU: number,
+): number {
+	if (parentGroup === "asteroid belt") return 0
+	let roll = rollDie(rng, 6) + 2
+	if (parentSizeClass < 1) roll = 0
+	else if (parentSizeClass <= 2) roll = rollDie(rng, 6) - 5
+	else if (parentSizeClass <= 9) roll = rollDie(rng, 6) + rollDie(rng, 6) - 8
+	else if (parentSizeClass <= 15) roll = rollDie(rng, 6) + rollDie(rng, 6) - 6
+	else if (parentSizeClass <= 16)
+		roll = rollDie(rng, 6) + rollDie(rng, 6) + rollDie(rng, 6) - 7
+	else
+		roll =
+			rollDie(rng, 6) + rollDie(rng, 6) + rollDie(rng, 6) + rollDie(rng, 6) - 6
+
+	if (orbitalDistanceAU < 0.5) {
+		roll -=
+			parentSizeClass > 16
+				? 4
+				: parentSizeClass > 15
+					? 3
+					: parentSizeClass > 2
+						? 2
+						: 1
+	}
+	return Math.max(roll, 0)
+}
+
 function rollMoonSizeClass(
 	rng: ReturnType<typeof createRng>,
 	parentSizeClass: number,
+	parentGroup: ParentOrbitGroup,
 ): number {
 	const roll = rollDie(rng, 6)
 	let sizeClass = 0
-	if (roll <= 3) sizeClass = 0
+	const giant = parentGroup === "jovian"
+	if (roll <= 3 || parentGroup === "asteroid belt") sizeClass = 0
 	else if (roll <= 5) sizeClass = rollDie(rng, 3) - 1
-	else sizeClass = parentSizeClass - 1 - rollDie(rng, 6)
+	else if (!giant) {
+		sizeClass = parentSizeClass - 1 - rollDie(rng, 6)
+	} else {
+		const roll2 = rollDie(rng, 6)
+		if (roll2 <= 3) sizeClass = rollDie(rng, 6)
+		else if (roll2 <= 5) sizeClass = rollDie(rng, 6) + rollDie(rng, 6) - 2
+		else sizeClass = rollDie(rng, 6) + rollDie(rng, 6) + 4
+		if (sizeClass === 16 && parentSizeClass === 16) sizeClass = 15
+		else if (
+			sizeClass === 16 &&
+			parentSizeClass === 18 &&
+			rollDie(rng, 6) + rollDie(rng, 6) >= 12
+		) {
+			sizeClass = 17
+		}
+	}
 
-	if (sizeClass === parentSizeClass - 2) {
+	if (!giant && sizeClass === parentSizeClass - 2) {
 		const adjustmentRoll = rollDie(rng, 6) + rollDie(rng, 6)
 		if (adjustmentRoll === 2) sizeClass = parentSizeClass - 1
 		else if (adjustmentRoll === 12) sizeClass = parentSizeClass
@@ -297,6 +333,7 @@ interface PendingMoon {
 	sizeClass: number
 	moonMinimumPd: number
 	orbitRange: MoonOrbitRange
+	radiusPd: number
 }
 
 function placeMoonOrbits(
@@ -307,7 +344,7 @@ function placeMoonOrbits(
 	minimumSpacingPd: number,
 ): Array<PendingMoon & { pd: number }> {
 	const placedMoons: Array<PendingMoon & { pd: number }> = []
-	let previousPd = ROCHE_PD
+	let previousOuterPd = ROCHE_PD
 
 	for (const range of MOON_ORBIT_RANGE_ORDER) {
 		const rangeMoons = moons
@@ -324,18 +361,23 @@ function placeMoonOrbits(
 
 		for (let index = 0; index < rangeMoons.length; index++) {
 			const moon = rangeMoons[index]!
-			const remainingInBand = rangeMoons.length - index - 1
+			const reservePd = rangeMoons
+				.slice(index + 1)
+				.reduce(
+					(sum, nextMoon) => sum + nextMoon.radiusPd * 2 + minimumSpacingPd,
+					0,
+				)
 			const minPd = Math.max(
 				moon.moonMinimumPd,
 				rangeMinPd,
-				previousPd + minimumSpacingPd,
+				previousOuterPd + moon.radiusPd + minimumSpacingPd,
 			)
-			const maxPd = rangeMaxPd - remainingInBand * minimumSpacingPd
+			const maxPd = rangeMaxPd - reservePd - moon.radiusPd
 			if (maxPd <= minPd) continue
 
 			const pd = rng.uniform(minPd, maxPd)
 			placedMoons.push({ ...moon, pd })
-			previousPd = pd
+			previousOuterPd = pd + moon.radiusPd
 		}
 	}
 
@@ -558,6 +600,7 @@ export function generateMoons(
 	orbitalDistanceAU: number,
 	hoursPerDay: number,
 	starMassKg: number,
+	parentGroup: ParentOrbitGroup = "terrestrial",
 ): MoonParams[] {
 	if (count <= 0) return []
 	if (isLunaMoonSeed(seed)) return generateLunaMoonSystem(count)
@@ -589,7 +632,7 @@ export function generateMoons(
 	const pendingMoons: PendingMoon[] = []
 
 	for (let i = 0; i < count; i++) {
-		const sizeClass = rollMoonSizeClass(rng, parentSizeClass)
+		const sizeClass = rollMoonSizeClass(rng, parentSizeClass, parentGroup)
 		const diameterKm = rollMoonDiameterKm(rng, sizeClass)
 		const moonDensity = rng.uniform(2200, 4000)
 		const moonRadiusM = diameterKm * 500
@@ -607,6 +650,7 @@ export function generateMoons(
 			sizeClass,
 			moonMinimumPd,
 			orbitRange: orbit.range,
+			radiusPd: diameterKm / planetDiameterKm / 2,
 		})
 	}
 
@@ -622,7 +666,7 @@ export function generateMoons(
 		const semiMajorM = pd * planetDiameterM
 		const orbitalPeriodDays = periodFromDist(semiMajorM)
 		const eccentricity = rollMoonEccentricity(rng, orbitRange, sizeClass)
-		const inclinationDeg = rollMoonInclination(rng, orbitRange)
+		const inclinationDeg = rollInclinationDeg(rng)
 		const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
 		const argumentOfPeriapsisDeg = rng.uniform(0, 360)
 		const meanAnomalyAtEpochDeg = rng.uniform(0, 360)
@@ -647,230 +691,4 @@ export function generateMoons(
 	}
 
 	return moons
-}
-
-function surfaceGravityG(massKg: number, diameterKm: number): number {
-	const r = (diameterKm / 2) * 1000
-	const g = (G * massKg) / (r * r)
-	return g / 9.807
-}
-
-// ── Gas giant system generation ───────────────────────────────────────────────
-
-const EARTH_MASS_KG = 5.972e24
-const EARTH_DIAMETER_KM = 12742
-
-function lerpLinear(
-	x: number,
-	x1: number,
-	x2: number,
-	y1: number,
-	y2: number,
-): number {
-	return y1 + ((x - x1) / (x2 - x1)) * (y2 - y1)
-}
-
-function gasGiantMoonPeriodDays(
-	parentDiamEarths: number,
-	parentMassEarths: number,
-	pd: number,
-	moonMassEarths: number,
-): number {
-	return (
-		0.176927 *
-		Math.sqrt(
-			Math.pow(parentDiamEarths * pd, 3) / (parentMassEarths + moonMassEarths),
-		)
-	)
-}
-
-function rollGasGiantMoonSizeClass(rng: ReturnType<typeof createRng>): number {
-	const roll1 = rng.randint(1, 6)
-	if (roll1 <= 3) return 0
-	if (roll1 <= 5) return rng.randint(1, 3) - 1
-	const roll2 = rng.randint(1, 6)
-	if (roll2 <= 3) return Math.min(rng.randint(1, 6), 10)
-	if (roll2 <= 5) return Math.min(rng.randint(1, 6) + rng.randint(1, 6) - 2, 10)
-	return Math.min(rng.randint(1, 6) + rng.randint(1, 6) + 4, 10)
-}
-
-export function generateGasGiantSystem(
-	seed: number,
-	planetRadiusKm: number,
-	orbitalDistanceAU: number,
-	starMassKg: number,
-	obliquityDeg: number,
-	siblingMoonCount?: number,
-): GasGiantSystem {
-	const rng = createRng(seed)
-
-	// Roll gas giant size class (16, 17, or 18)
-	const sizeClass = (15 + rng.randint(1, 3)) as GasGiantSizeClass
-	let diameterEarths: number
-	let massEarths: number
-	if (sizeClass === 16) {
-		diameterEarths = rng.uniform(2, 6)
-		massEarths = lerpLinear(diameterEarths, 2, 6, 10, 35)
-	} else if (sizeClass === 17) {
-		diameterEarths = rng.uniform(6, 12)
-		massEarths = lerpLinear(diameterEarths, 6, 12, 40, 340)
-	} else {
-		diameterEarths = rng.uniform(8, 18)
-		massEarths = lerpLinear(diameterEarths, 8, 18, 350, 2000)
-	}
-	const diameterKm = diameterEarths * EARTH_DIAMETER_KM
-	const density = massEarths / Math.pow(diameterEarths, 3)
-	const gravityG = density * diameterEarths
-	const massKg = massEarths * EARTH_MASS_KG
-
-	// Gas giants spin fast; larger ones trend slightly slower
-	const dayLengthHours = rng.uniform(
-		sizeClass === 16 ? 9 : sizeClass === 17 ? 10 : 12,
-		sizeClass === 16 ? 14 : sizeClass === 17 ? 18 : 24,
-	)
-
-	const gasGiant: GasGiantParams = {
-		sizeClass,
-		diameterKm,
-		diameterEarths,
-		massEarths,
-		massKg,
-		gravityG,
-		density,
-		dayLengthHours,
-	}
-
-	// Hill sphere and MOR
-	const starMassSol = starMassKg / M_SOL_KG
-	const hillSphereAU =
-		orbitalDistanceAU * Math.cbrt((massEarths * 3e-6) / (starMassSol * 3))
-	const hillPD = (hillSphereAU * 149597870.9) / diameterKm
-	const hillLimit = hillPD / 2
-
-	// Moon count (galaxy-gen MOONS.count, jovian path)
-	const isClose = orbitalDistanceAU < 0.4
-	const rollSum =
-		sizeClass <= 16
-			? rng.randint(1, 6) + rng.randint(1, 6) + rng.randint(1, 6) - 7
-			: rng.randint(1, 6) +
-				rng.randint(1, 6) +
-				rng.randint(1, 6) +
-				rng.randint(1, 6) -
-				6
-	const auPenalty = isClose ? (sizeClass > 16 ? 4 : 3) : 0
-	const moonCount =
-		siblingMoonCount !== undefined
-			? siblingMoonCount
-			: Math.max(rollSum - auPenalty, 0)
-
-	const mor = Math.min(hillLimit - 2, 200 + moonCount)
-
-	const mainPdFactor = rng.uniform(0, 1.1)
-	const mainMoonPd = ROCHE_PD + mor * mainPdFactor
-	const planetMassEarths = derivePlanetMassKg(planetRadiusKm) / EARTH_MASS_KG
-	const mainMoonOrbitalPeriodDays = gasGiantMoonPeriodDays(
-		diameterEarths,
-		massEarths,
-		mainMoonPd,
-		planetMassEarths,
-	)
-	const mainMoonOrbitRange: MoonOrbitRange =
-		mainPdFactor < 0.16
-			? "inner"
-			: mainPdFactor < 0.5
-				? "middle"
-				: mainPdFactor < 1.0
-					? "outer"
-					: "extreme"
-	const mainMoonSizeClass = inferPlanetSizeClass(planetRadiusKm * 2)
-	const mainMoonInclinationDeg = rollMoonInclination(rng, mainMoonOrbitRange)
-	const mainMoonEccentricity = rollMoonEccentricity(
-		rng,
-		mainMoonOrbitRange,
-		mainMoonSizeClass,
-	)
-	const mainMoonLongitudeOfAscendingNodeDeg = rng.uniform(0, 360)
-	const mainMoonArgumentOfPeriapsisDeg = rng.uniform(0, 360)
-	const mainMoonMeanAnomalyAtEpochDeg = rng.uniform(0, 360)
-
-	// Sibling moons
-	const siblingMoons: GasGiantMoonParams[] = []
-	for (let i = 0; i < moonCount; i++) {
-		const moonSizeClass = Math.min(rollGasGiantMoonSizeClass(rng), 5)
-		const diamKm = rollMoonDiameterKm(rng, moonSizeClass)
-		const moonDensityKgM3 = rng.uniform(1500, 3500)
-		const moonRadiusM = (diamKm / 2) * 1000
-		const moonVol = (4 / 3) * Math.PI * moonRadiusM ** 3
-		const moonMassKg = moonVol * moonDensityKgM3
-		const moonMassEarths = moonMassKg / EARTH_MASS_KG
-		const moonGravityG = surfaceGravityG(moonMassKg, diamKm)
-
-		const orbitMod = mor < 60 ? 1 : 0
-		const orbitRoll = rng.randint(1, 6) + orbitMod
-		let orbitRange: MoonOrbitRange
-		let pd: number
-		if (orbitRoll <= 3) {
-			orbitRange = "inner"
-			pd = ROCHE_PD + mor * rng.uniform(0, 0.16)
-		} else if (orbitRoll <= 5) {
-			orbitRange = "middle"
-			pd = ROCHE_PD + mor * rng.uniform(0.16, 0.5)
-		} else {
-			const outerFactor = rng.uniform(0.5, 1.1)
-			orbitRange = outerFactor > 1 ? "extreme" : "outer"
-			pd = ROCHE_PD + mor * outerFactor
-		}
-
-		const orbitalPeriodDays = gasGiantMoonPeriodDays(
-			diameterEarths,
-			massEarths,
-			pd,
-			moonMassEarths,
-		)
-		const inclinationDeg = rollMoonInclination(rng, orbitRange)
-		const eccentricity = rollMoonEccentricity(rng, orbitRange, moonSizeClass)
-		const { axialTiltDeg, retrogradeRotation } = rollMoonAxialTilt(rng)
-		const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
-		const argumentOfPeriapsisDeg = rng.uniform(0, 360)
-		const meanAnomalyAtEpochDeg = rng.uniform(0, 360)
-
-		siblingMoons.push({
-			idx: i + 2,
-			sizeClass: moonSizeClass,
-			diameterKm: diamKm,
-			massKg: moonMassKg,
-			massEarths: moonMassEarths,
-			gravityG: moonGravityG,
-			orbitalPeriodDays,
-			pd,
-			orbitRange,
-			inclinationDeg,
-			eccentricity,
-			axialTiltDeg,
-			retrogradeRotation,
-			longitudeOfAscendingNodeDeg,
-			argumentOfPeriapsisDeg,
-			meanAnomalyAtEpochDeg,
-		})
-	}
-
-	siblingMoons.sort((a, b) => a.pd - b.pd)
-	siblingMoons.forEach((m, i) => {
-		m.idx = i + 2
-	})
-
-	return {
-		gasGiant,
-		mainMoonPd,
-		mainMoonOrbitalPeriodDays,
-		mainMoonOrbitRange,
-		mainMoonInclinationDeg,
-		mainMoonEccentricity,
-		mainMoonAxialTiltDeg: obliquityDeg,
-		mainMoonRetrogradeRotation: false,
-		mainMoonLongitudeOfAscendingNodeDeg,
-		mainMoonArgumentOfPeriapsisDeg,
-		mainMoonMeanAnomalyAtEpochDeg,
-		siblingMoons,
-	}
 }

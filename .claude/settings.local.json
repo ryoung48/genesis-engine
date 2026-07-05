@@ -9,7 +9,9 @@
 			"Bash(pnpm exec vitest:*)",
 			"Bash(LANGUAGE_SAMPLES=1 pnpm exec vitest:*)",
 			"Bash(python3:*)",
-			"Bash(node -e:*)"
+			"Bash(node -e:*)",
+			"Bash(echo \"EXIT:$?\")",
+			"WebSearch"
 		]
 	}
 }

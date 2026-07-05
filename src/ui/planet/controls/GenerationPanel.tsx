@@ -14,10 +14,12 @@ import "tippy.js/themes/light-border.css"
 import React, { useMemo, useRef, useState } from "react"
 import { Bar } from "react-chartjs-2"
 import type { StageTiming } from "@/model"
-import { MAX_MOONS } from "@/model/celestial/moons/moon-types"
+import type {
+	AtmosphereProfile,
+	MoonParams,
+} from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
-	isLunaMoonSeed,
 	moonSemiMajorAxisM,
 	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
@@ -33,6 +35,8 @@ import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/star-types"
+import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
+import { SOL_SEED } from "@/model/celestial/system/sol-system"
 import { EARTH_MOON_TIDE_REFERENCE } from "@/model/climate/tidal-force"
 import { SEED_MAX } from "@/model/shared/planet-code"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
@@ -43,6 +47,7 @@ import {
 } from "@/ui/components/composites/EditableStatValue"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
+import { CrosshairsGpsIcon } from "@/ui/components/primitives/icons/CrosshairsGpsIcon"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { HistoryIcon } from "@/ui/components/primitives/icons/HistoryIcon"
 import { LockIcon } from "@/ui/components/primitives/icons/LockIcon"
@@ -75,22 +80,23 @@ interface GenerationPanelProps {
 	worldTab: "planet" | "society"
 	setWorldTab: (tab: "planet" | "society") => void
 	resetWorldDefaults: () => void
-	planetType: import("@/model/celestial/moons/moon-types").PlanetType
-	setPlanetType: (
-		v: import("@/model/celestial/moons/moon-types").PlanetType,
-	) => void
 	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	setTideLock: (
 		v: import("@/model/celestial/moons/moon-types").TideLock | null,
 	) => void
 	setObliquity: (v: number) => void
 	moonCount: number
-	setMoonCount: (v: number) => void
 	moonSeed: number
-	setMoonSeed: (v: number) => void
+	restSeed: number
+	setRestSeed: (v: number) => void
 	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
 	generatedMoons?: import("@/model/celestial/moons/moon-types").MoonParams[]
-	gasGiantSystem?: import("@/model/celestial/moons/moon-types").GasGiantSystem
+	siblingBodies?: SystemBody[]
+	/** Full sorted system body list (siblings + main world), used to resolve a
+	 * body's index for onFocusBody. */
+	systemBodies?: SystemBody[]
+	/** Focuses the 3D solar-system view's camera on a body. -1 = the star. */
+	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
 	daysPerYear: number
 	hoursPerDay: number
 	setHoursPerDay: (v: number) => void
@@ -104,6 +110,8 @@ interface GenerationPanelProps {
 	orbitalDistanceAU: number
 	eccentricity: number
 	perihelion: number
+	inclinationDeg: number
+	longitudeOfAscendingNodeDeg: number
 	era: SocietyEra
 	setEra: (v: SocietyEra) => void
 	planetCode: string
@@ -312,15 +320,116 @@ function formatDays(days: number): string {
 	return formatHours(days * 24)
 }
 
+function formatClassificationLabel(classification: string): string {
+	return classification
+		.split("-")
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join("-")
+}
+
+function formatAtmosphereLabel(
+	atmosphere: AtmosphereProfile | null | undefined,
+): string {
+	if (!atmosphere) return "Vacuum"
+	return `${formatPressureBar(atmosphere.pressureBar)} · ${formatAtmosphereSuffix(atmosphere)}`
+}
+
+function buildPressureAtmosphereProfile(
+	pressureBar: number,
+): AtmosphereProfile {
+	if (pressureBar < 0.001) {
+		return { code: 0, pressureBar, type: "vacuum", breathable: false }
+	}
+	if (pressureBar < 0.1) {
+		return { code: 1, pressureBar, type: "trace", breathable: false }
+	}
+	if (pressureBar < 10) {
+		return {
+			code: 6,
+			pressureBar,
+			type: "breathable",
+			breathable: true,
+		}
+	}
+	if (pressureBar < 100) {
+		return {
+			code: 13,
+			pressureBar,
+			type: "exotic",
+			breathable: false,
+		}
+	}
+	if (pressureBar < 1000) {
+		return {
+			code: 16,
+			pressureBar,
+			type: "gas",
+			subtype: "helium",
+			breathable: false,
+		}
+	}
+	return {
+		code: 17,
+		pressureBar,
+		type: "gas",
+		subtype: "hydrogen",
+		breathable: false,
+	}
+}
+
+function formatAtmosphereSuffix(atmosphere: AtmosphereProfile): string {
+	if (atmosphere.type === "vacuum") return "Vacuum"
+	if (atmosphere.type === "trace") return "Trace"
+	if (atmosphere.type === "breathable") return "Breathable"
+	if (atmosphere.type === "corrosive") return "Corrosive"
+	if (atmosphere.type === "insidious") return "Insidious"
+	if (atmosphere.type === "gas" && atmosphere.subtype === "helium")
+		return "Helium"
+	if (atmosphere.type === "gas" && atmosphere.subtype === "hydrogen")
+		return "Hydrogen"
+	return "Exotic"
+}
+
+function formatPressureBar(pressureBar: number): string {
+	if (pressureBar >= 100) return `${pressureBar.toFixed(0)} bar`
+	if (pressureBar >= 10) return `${pressureBar.toFixed(1)} bar`
+	if (pressureBar >= 1) return `${pressureBar.toFixed(2)} bar`
+	if (pressureBar >= 0.1) return `${pressureBar.toFixed(2)} bar`
+	if (pressureBar >= 0.01) return `${pressureBar.toFixed(3)} bar`
+	return `${pressureBar.toFixed(4)} bar`
+}
+
+function computeEarthRelativeDensity(
+	massKg: number,
+	diameterKm: number,
+): number {
+	const diameterEarths = diameterKm / EARTH_DIAMETER_KM
+	const massEarths = massKg / EARTH_MASS_KG
+	return massEarths / diameterEarths ** 3
+}
+
 const EARTH_MASS_KG = 5.972e24
-const LUNA_DIAMETER_KM = 3474
-const LUNA_MASS_KG = 7.342e22
-const GAS_GIANT_AXIAL_TILT_DEG = 3.1
 const MOON_COLORS_CSS = ["text-sky-500", "text-violet-500", "text-emerald-500"]
 
 const ORBIT_STAT_HELP = {
 	periapsis:
 		"Argument of periapsis. Where the closest point of the orbit sits within the orbital plane.",
+}
+
+function GpsFocusButton({ onClick }: { onClick: () => void }) {
+	return (
+		<button
+			type="button"
+			onClick={(event) => {
+				event.preventDefault()
+				onClick()
+			}}
+			className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+			aria-label="Focus on this body"
+		>
+			<CrosshairsGpsIcon className="h-3 w-3" />
+		</button>
+	)
 }
 
 function renderStatGrid(stats: StatEntry[]) {
@@ -479,6 +588,7 @@ function SystemBodyCard({
 	title,
 	stats,
 	lockButton,
+	gpsButton,
 	defaultOpen = false,
 	children,
 	bodyContent,
@@ -488,6 +598,7 @@ function SystemBodyCard({
 	title: string
 	stats: StatEntry[]
 	lockButton?: React.ReactNode
+	gpsButton?: React.ReactNode
 	defaultOpen?: boolean
 	children?: React.ReactNode
 	bodyContent?: React.ReactNode
@@ -503,6 +614,7 @@ function SystemBodyCard({
 				<span>{title}</span>
 				<div className="flex items-center gap-1">
 					{lockButton}
+					{gpsButton}
 					<svg
 						width="12"
 						height="12"
@@ -525,7 +637,9 @@ function SystemBodyCard({
 					{renderStatGrid(stats)}
 				</div>
 			)}
-			{children ? <div className="mt-2">{children}</div> : null}
+			{children ? (
+				<div className="mt-2 flex flex-col gap-1.5">{children}</div>
+			) : null}
 		</details>
 	)
 }
@@ -536,6 +650,7 @@ function MoonSystemCard({
 	title,
 	stats,
 	lockButton,
+	gpsButton,
 	defaultOpen = false,
 }: {
 	className?: string
@@ -543,6 +658,7 @@ function MoonSystemCard({
 	title: string
 	stats: StatEntry[]
 	lockButton?: React.ReactNode
+	gpsButton?: React.ReactNode
 	defaultOpen?: boolean
 }) {
 	return (
@@ -552,6 +668,7 @@ function MoonSystemCard({
 			title={title}
 			stats={stats}
 			lockButton={lockButton}
+			gpsButton={gpsButton}
 			defaultOpen={defaultOpen}
 		/>
 	)
@@ -669,43 +786,78 @@ function buildMoonCardTitle(
 	orbitRange: string | undefined,
 	diameterKm: number,
 ) {
-	return `Moon ${moonNumber} · ${orbitRange ?? "middle"} · ${(diameterKm / LUNA_DIAMETER_KM).toFixed(2)}× Luna`
+	return `Moon ${moonNumber} · ${orbitRange ?? "middle"} · ${(diameterKm / EARTH_DIAMETER_KM).toFixed(2)}× Earth`
 }
 
 function buildMoonStats({
 	diameterKm,
 	massKg,
 	gravityG,
+	sizeClass,
+	densityEarthRelative,
+	densityDescription,
+	group,
+	classification,
+	hydrosphereFraction,
+	atmosphere,
 	pd,
 	orbitalPeriodDays,
 	eccentricity,
 	argumentOfPeriapsisDeg,
 	inclinationDeg,
+	longitudeOfAscendingNodeDeg,
 	axialTiltDeg,
 	peakTideMeters,
 }: {
 	diameterKm: number
 	massKg: number
 	gravityG: number
+	sizeClass?: number
+	densityEarthRelative?: number
+	densityDescription?: string
+	group?: string
+	classification?: string
+	hydrosphereFraction?: number
+	atmosphere?: AtmosphereProfile | null
 	pd: number
 	orbitalPeriodDays: number
 	eccentricity: number
 	argumentOfPeriapsisDeg: number
 	inclinationDeg: number
+	longitudeOfAscendingNodeDeg: number
 	axialTiltDeg: number
 	peakTideMeters?: number
 }) {
-	const diameterRel = diameterKm / LUNA_DIAMETER_KM
-	const massRel = massKg / LUNA_MASS_KG
+	const diameterRel = diameterKm / EARTH_DIAMETER_KM
+	const massRel = massKg / EARTH_MASS_KG
 
 	return [
+		...(group
+			? [
+					{
+						label: "Group",
+						value: formatClassificationLabel(group),
+					},
+				]
+			: []),
+		...(classification
+			? [
+					{
+						label: "Class",
+						value: formatClassificationLabel(classification),
+					},
+				]
+			: []),
+		...(sizeClass !== undefined
+			? [{ label: "Size", value: String(sizeClass) }]
+			: []),
 		{
 			label: "Diameter",
-			value: `${diameterRel.toFixed(2)}× Luna`,
+			value: `${diameterRel.toFixed(2)}× Earth`,
 		},
 		{
 			label: "Mass",
-			value: `${massRel.toFixed(3)}× Luna`,
+			value: `${massRel.toFixed(3)}× Earth`,
 		},
 		{ label: "Gravity", value: `${gravityG.toFixed(3)} g` },
 		{ label: "Semi Major Axis", value: `${pd.toFixed(1)} PD` },
@@ -724,9 +876,32 @@ function buildMoonStats({
 			value: `${inclinationDeg.toFixed(1)}°`,
 		},
 		{
+			label: "Ascending Node",
+			value: `${longitudeOfAscendingNodeDeg.toFixed(1)}°`,
+		},
+		{
 			label: "Axial Tilt",
 			value: `${axialTiltDeg.toFixed(1)}°`,
 		},
+		...(densityEarthRelative !== undefined
+			? [
+					{
+						label: "Density",
+						value: `${densityEarthRelative.toFixed(2)} rhoE${densityDescription ? ` · ${densityDescription}` : ""}`,
+					},
+				]
+			: []),
+		...(atmosphere !== undefined
+			? [{ label: "Atmosphere", value: formatAtmosphereLabel(atmosphere) }]
+			: []),
+		...(hydrosphereFraction !== undefined
+			? [
+					{
+						label: "Hydrosphere",
+						value: `${Math.round(hydrosphereFraction * 100)}%`,
+					},
+				]
+			: []),
 		...(peakTideMeters === undefined
 			? []
 			: [
@@ -738,11 +913,245 @@ function buildMoonStats({
 	]
 }
 
+const SIBLING_GROUP_LABEL: Record<SystemBody["group"], string> = {
+	"asteroid belt": "Asteroid Belt",
+	dwarf: "Dwarf World",
+	terrestrial: "Terrestrial Planet",
+	helian: "Helian World",
+	jovian: "Jovian Planet",
+}
+
+const SIBLING_GROUP_COLOR: Record<SystemBody["group"], string> = {
+	"asteroid belt": "text-slate-500",
+	dwarf: "text-stone-600",
+	terrestrial: "text-blue-700",
+	helian: "text-cyan-700",
+	jovian: "text-amber-700",
+}
+
+// Mirrors the main world's own stat set (see worldStats in
+// TerrestrialSystemCards), just without any editors — siblings are
+// decorative and read-only.
+function buildSiblingBodyStats(body: SystemBody): StatEntry[] {
+	if (body.group === "asteroid belt") {
+		return [
+			{
+				label: "Group",
+				value: formatClassificationLabel(body.group),
+			},
+			{
+				label: "Class",
+				value: formatClassificationLabel(body.classification),
+			},
+			{ label: "Size", value: String(body.sizeClass) },
+			{
+				label: "Semi Major Axis",
+				value: `${body.orbitalDistanceAU.toFixed(3)} AU`,
+			},
+			{ label: "Period", value: formatDays(body.orbitalPeriodDays) },
+		]
+	}
+	return [
+		{
+			label: "Group",
+			value: formatClassificationLabel(body.group),
+		},
+		{
+			label: "Class",
+			value: formatClassificationLabel(body.classification),
+		},
+		{ label: "Size", value: String(body.sizeClass) },
+		{
+			label: "Diameter",
+			value: `${(body.diameterKm / EARTH_DIAMETER_KM).toFixed(2)}× Earth`,
+		},
+		{
+			label: "Mass",
+			value: `${(body.massKg / EARTH_MASS_KG).toFixed(2)}× Earth`,
+		},
+		{ label: "Gravity", value: `${body.gravityG.toFixed(3)} g` },
+		{
+			label: "Semi Major Axis",
+			value: `${body.orbitalDistanceAU.toFixed(3)} AU`,
+		},
+		{ label: "Period", value: formatDays(body.orbitalPeriodDays) },
+		{ label: "Solar Day", value: formatHours(body.dayLengthHours) },
+		{ label: "Eccentricity", value: body.eccentricity.toFixed(4) },
+		{
+			label: "Periapsis",
+			value: `${body.argumentOfPeriapsisDeg.toFixed(0)}°`,
+			help: ORBIT_STAT_HELP.periapsis,
+		},
+		{ label: "Inclination", value: `${body.inclinationDeg.toFixed(1)}°` },
+		{
+			label: "Ascending Node",
+			value: `${body.longitudeOfAscendingNodeDeg.toFixed(1)}°`,
+		},
+		{ label: "Axial Tilt", value: `${body.axialTiltDeg.toFixed(1)}°` },
+		...(body.density
+			? [
+					{
+						label: "Density",
+						value: `${body.density.earthRelative.toFixed(2)} rhoE · ${body.density.description}`,
+					},
+				]
+			: []),
+		{ label: "Atmosphere", value: formatAtmosphereLabel(body.atmosphere) },
+		{
+			label: "Hydrosphere",
+			value: `${Math.round(body.hydrosphereFraction * 100)}%`,
+		},
+	]
+}
+
+interface MainBodyStatsConfig {
+	diameter: StatEntry
+	mass: StatEntry
+	gravity: StatEntry
+	density?: StatEntry
+	semiMajorAxis: StatEntry
+	period: StatEntry
+	solarDay?: StatEntry
+	eccentricity: StatEntry
+	periapsis: StatEntry
+	inclinationDeg: number
+	longitudeOfAscendingNodeDeg: number
+	axialTilt: StatEntry
+	antistellarLon?: StatEntry
+	atmosphere?: StatEntry
+	extra?: StatEntry[]
+}
+
+// Single source of truth for the stat list/order shown on every "main body"
+// card (the Terrestrial Planet card in TerrestrialSystemCards) — each caller
+// still builds its own StatEntry objects (with whatever editor a given field
+// has, since that varies per body), but the shape and the Inclination row
+// only need to exist once.
+function buildMainBodyStats(config: MainBodyStatsConfig): StatEntry[] {
+	return [
+		config.diameter,
+		config.mass,
+		config.gravity,
+		...(config.density ? [config.density] : []),
+		config.semiMajorAxis,
+		config.period,
+		...(config.solarDay ? [config.solarDay] : []),
+		config.eccentricity,
+		config.periapsis,
+		{ label: "Inclination", value: `${config.inclinationDeg.toFixed(1)}°` },
+		{
+			label: "Ascending Node",
+			value: `${config.longitudeOfAscendingNodeDeg.toFixed(1)}°`,
+		},
+		config.axialTilt,
+		...(config.antistellarLon ? [config.antistellarLon] : []),
+		...(config.atmosphere ? [config.atmosphere] : []),
+		...(config.extra ?? []),
+	]
+}
+
+// Shares buildMoonStats with every other moon card in this panel (the main
+// world's own moons, a gas giant's sibling moons) so all moons present the
+// same stat set regardless of which body they orbit.
+function buildSiblingMoonStats(moon: MoonParams): StatEntry[] {
+	const gravityG =
+		(6.674e-11 * moon.massKg) / ((moon.diameterKm / 2) * 1000) ** 2 / 9.807
+	return buildMoonStats({
+		diameterKm: moon.diameterKm,
+		massKg: moon.massKg,
+		gravityG,
+		sizeClass: moon.sizeClass,
+		densityEarthRelative: moon.densityEarthRelative,
+		densityDescription: moon.densityDescription,
+		group: moon.group,
+		classification: moon.classification,
+		hydrosphereFraction: moon.hydrosphereFraction,
+		atmosphere: moon.atmosphere,
+		pd: moon.semiMajorAxisPlanetDiameters ?? 0,
+		orbitalPeriodDays: moon.orbitalPeriodDays,
+		eccentricity: moon.eccentricity,
+		argumentOfPeriapsisDeg: moon.argumentOfPeriapsisDeg,
+		inclinationDeg: moon.inclinationDeg,
+		longitudeOfAscendingNodeDeg: moon.longitudeOfAscendingNodeDeg,
+		axialTiltDeg: moon.axialTiltDeg,
+	})
+}
+
+interface LabeledSiblingBody {
+	body: SystemBody
+	title: string
+}
+
+// Numbers siblings per group once, independent of where each card ends up
+// rendered — the main world's own card is interleaved among these by AU,
+// which would otherwise reset the counters if numbering were computed
+// separately per render group.
+function labelSiblingBodies(bodies: SystemBody[]): LabeledSiblingBody[] {
+	const groupCounters: Record<SystemBody["group"], number> = {
+		"asteroid belt": 0,
+		dwarf: 0,
+		terrestrial: 0,
+		helian: 0,
+		jovian: 0,
+	}
+	return bodies.map((body) => {
+		groupCounters[body.group] += 1
+		return {
+			body,
+			title: `${SIBLING_GROUP_LABEL[body.group]} ${groupCounters[body.group]}`,
+		}
+	})
+}
+
+function SiblingBodyCard({
+	body,
+	title,
+	bodyIndex,
+	onFocusBody,
+}: LabeledSiblingBody & {
+	bodyIndex: number
+	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
+}) {
+	const gpsButton = onFocusBody ? (
+		<GpsFocusButton onClick={() => onFocusBody(bodyIndex)} />
+	) : undefined
+	return (
+		<SystemBodyCard
+			className="border-slate-100"
+			summaryClassName={SIBLING_GROUP_COLOR[body.group]}
+			title={title}
+			stats={buildSiblingBodyStats(body)}
+			gpsButton={gpsButton}
+		>
+			{body.moons.map((moon, moonIndex) => (
+				<MoonSystemCard
+					key={moon.idx ?? moonIndex}
+					summaryClassName="text-emerald-700"
+					title={buildMoonCardTitle(
+						moonIndex + 1,
+						moon.orbitRange,
+						moon.diameterKm,
+					)}
+					stats={buildSiblingMoonStats(moon)}
+					gpsButton={
+						onFocusBody ? (
+							<GpsFocusButton
+								onClick={() => onFocusBody(bodyIndex, moonIndex)}
+							/>
+						) : undefined
+					}
+				/>
+			))}
+		</SystemBodyCard>
+	)
+}
+
 function StellarSystemCard({
 	spectralClass,
 	starSubtype,
 	peakTideMeters,
 	lockButton,
+	gpsButton,
 	setSpectralClass,
 	setStarSubtype,
 }: {
@@ -750,6 +1159,7 @@ function StellarSystemCard({
 	starSubtype: number
 	peakTideMeters?: number
 	lockButton?: React.ReactNode
+	gpsButton?: React.ReactNode
 	setSpectralClass?: (v: string) => void
 	setStarSubtype?: (v: number) => void
 }) {
@@ -773,6 +1183,7 @@ function StellarSystemCard({
 				<span>{typeStatValue} Star</span>
 				<div className="flex items-center gap-1">
 					{lockButton}
+					{gpsButton}
 					<svg
 						width="12"
 						height="12"
@@ -869,6 +1280,7 @@ function StellarSystemCard({
 					{ label: "Luminosity", value: `${starLumSol} L☉` },
 					{ label: "HZ Center", value: `${starHzAU} AU` },
 					{ label: "MAO", value: `${starMaoAU} AU` },
+					{ label: "Inclination", value: "0.0°" },
 					...(peakTideMeters === undefined
 						? []
 						: [
@@ -880,417 +1292,12 @@ function StellarSystemCard({
 	)
 }
 
-function GasGiantSystemCards({
-	gasGiantSystem,
-	tidalSchedulePreview,
-	radiusSlider,
-	orbitalDistanceSlider,
-	eccentricitySlider,
-	perihelionSlider,
-	axialTiltSlider,
-	dayLengthSlider,
-	pressureSlider,
-	planetRadiusKm,
-	orbitalDistanceAU,
-	eccentricity,
-	perihelion,
-	daysPerYear,
-	hoursPerDay,
-	isRetrograde,
-	onToggleSpin,
-	spectralClass,
-	starSubtype,
-	setSpectralClass,
-	setStarSubtype,
-	isGasGiantParentLocked,
-	setTideLock,
-	setHoursPerDay,
-	moonCount,
-	surfaceStats,
-	climatePreview,
-	generationPreviewTab,
-	onSelectGenerationPreviewTab,
-	unitSystem,
-}: {
-	gasGiantSystem:
-		| import("@/model/celestial/moons/moon-types").GasGiantSystem
-		| undefined
-	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
-	radiusSlider?: SliderDef
-	orbitalDistanceSlider?: SliderDef
-	eccentricitySlider?: SliderDef
-	perihelionSlider?: SliderDef
-	axialTiltSlider?: SliderDef
-	dayLengthSlider?: SliderDef
-	pressureSlider?: SliderDef
-	planetRadiusKm: number
-	orbitalDistanceAU: number
-	eccentricity: number
-	perihelion: number
-	daysPerYear: number
-	hoursPerDay: number
-	isRetrograde: boolean
-	onToggleSpin?: () => void
-	spectralClass: string
-	starSubtype: number
-	setSpectralClass: (v: string) => void
-	setStarSubtype: (v: number) => void
-	isGasGiantParentLocked: boolean
-	setTideLock: (
-		v: import("@/model/celestial/moons/moon-types").TideLock | null,
-	) => void
-	setHoursPerDay: (v: number) => void
-	moonCount: number
-	surfaceStats: StatEntry[]
-	climatePreview: ClimatePreviewData
-	generationPreviewTab: GenerationPreviewTab
-	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
-	unitSystem: UnitSystem
-}) {
-	if (!gasGiantSystem) {
-		return (
-			<div className="text-[10px] text-slate-400 py-2">
-				Generating gas giant system…
-			</div>
-		)
-	}
-	const {
-		gasGiant,
-		mainMoonPd,
-		mainMoonOrbitalPeriodDays,
-		mainMoonOrbitRange,
-		mainMoonEccentricity,
-		mainMoonInclinationDeg,
-		mainMoonAxialTiltDeg,
-		mainMoonArgumentOfPeriapsisDeg,
-		siblingMoons,
-	} = gasGiantSystem
-	const planetDiamKm = planetRadiusKm * 2
-	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-	const planetMassEarths = planetMassKg / EARTH_MASS_KG
-	const planetGravityG =
-		(6.674e-11 * planetMassKg) / ((planetDiamKm / 2) * 1000) ** 2 / 9.807
-	const earthDiamRel = (planetDiamKm / EARTH_DIAMETER_KM).toFixed(2)
-	const starPeakForce =
-		tidalSchedulePreview?.events.reduce(
-			(max, ev) => Math.max(max, Math.abs(ev.starForce ?? 0)),
-			0,
-		) ?? 0
-
-	return (
-		<div className="flex flex-col gap-2">
-			<StellarSystemCard
-				spectralClass={spectralClass}
-				starSubtype={starSubtype}
-				peakTideMeters={starPeakForce * EARTH_MOON_TIDE_REFERENCE}
-				setSpectralClass={setSpectralClass}
-				setStarSubtype={setStarSubtype}
-			/>
-
-			<SystemBodyCard
-				className="border-amber-200"
-				summaryClassName="text-amber-700"
-				title={`Jovian Planet · ${gasGiant.diameterEarths.toFixed(1)}× Earth`}
-				lockButton={
-					<button
-						type="button"
-						onClick={(event) => {
-							event.preventDefault()
-							if (isGasGiantParentLocked) {
-								setTideLock(null)
-								setHoursPerDay(24)
-								return
-							}
-							setTideLock({ type: "lunar", target: 0 })
-							setHoursPerDay(mainMoonOrbitalPeriodDays * 24)
-						}}
-						className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-						aria-label={
-							isGasGiantParentLocked
-								? "Unlock gas giant parent tide lock"
-								: "Lock to gas giant parent"
-						}
-						title={
-							isGasGiantParentLocked
-								? "Unlock gas giant parent tide lock"
-								: "Lock to gas giant parent"
-						}
-					>
-						{isGasGiantParentLocked ? (
-							<LockIcon className="h-3 w-3" />
-						) : (
-							<LockOpenIcon className="h-3 w-3" />
-						)}
-					</button>
-				}
-				stats={[
-					{
-						label: "Diameter",
-						value: `${gasGiant.diameterEarths.toFixed(1)}× Earth`,
-					},
-					{ label: "Mass", value: `${gasGiant.massEarths.toFixed(0)}× Earth` },
-					{ label: "Gravity", value: `${gasGiant.gravityG.toFixed(2)} g` },
-					{
-						label: "Semi Major Axis",
-						value: `${orbitalDistanceAU.toFixed(3)} AU`,
-						editor: orbitalDistanceSlider
-							? {
-									label: "Semi Major Axis",
-									value: orbitalDistanceSlider.value,
-									min: orbitalDistanceSlider.min,
-									max: orbitalDistanceSlider.max,
-									step: orbitalDistanceSlider.step,
-									display: orbitalDistanceSlider.display,
-									set: orbitalDistanceSlider.set,
-								}
-							: undefined,
-					},
-					{ label: "Period", value: formatDays(daysPerYear) },
-					...(gasGiantSystem
-						? [
-								{
-									label: "Solar Day",
-									value: formatHours(gasGiantSystem.gasGiant.dayLengthHours),
-								},
-							]
-						: []),
-					{
-						label: "Eccentricity",
-						value: eccentricity.toFixed(4),
-						editor: eccentricitySlider
-							? {
-									label: "Eccentricity",
-									value: eccentricitySlider.value,
-									min: eccentricitySlider.min,
-									max: eccentricitySlider.max,
-									step: eccentricitySlider.step,
-									display: eccentricitySlider.display,
-									set: (v: number) => eccentricitySlider.set(v),
-								}
-							: undefined,
-					},
-					{
-						label: "Periapsis",
-						value: `${perihelion.toFixed(0)}°`,
-						help: ORBIT_STAT_HELP.periapsis,
-						editor: perihelionSlider
-							? {
-									label: "Periapsis",
-									value: perihelionSlider.value,
-									min: perihelionSlider.min,
-									max: perihelionSlider.max,
-									step: perihelionSlider.step,
-									display: perihelionSlider.display,
-									set: (v: number) => perihelionSlider.set(v),
-								}
-							: undefined,
-					},
-					{ label: "Inclination", value: "0.0°" },
-					{
-						label: "Axial Tilt",
-						value: `${GAS_GIANT_AXIAL_TILT_DEG.toFixed(1)}°`,
-					},
-				]}
-			>
-				<PlanetDetailTabs
-					tidalSchedulePreview={tidalSchedulePreview}
-					moonCount={moonCount}
-					daysPerYear={daysPerYear}
-					isSolarLocked={false}
-					climatePreview={climatePreview}
-					generationPreviewTab={generationPreviewTab}
-					onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
-					unitSystem={unitSystem}
-				/>
-			</SystemBodyCard>
-
-			<SystemBodyCard
-				className="border-blue-200"
-				summaryClassName="text-blue-700"
-				title={`Terrestrial Moon · ${mainMoonOrbitRange} · ${earthDiamRel}× Earth`}
-				defaultOpen
-				stats={[
-					{
-						label: "Diameter",
-						value: `${earthDiamRel}× Earth`,
-						editor: radiusSlider
-							? {
-									label: "Diameter",
-									value: radiusSlider.value * 2,
-									min: radiusSlider.min * 2,
-									max: radiusSlider.max * 2,
-									step: radiusSlider.step * 2,
-									display: `${((radiusSlider.value * 2) / EARTH_DIAMETER_KM).toFixed(2)}× Earth`,
-									set: (v: number) => radiusSlider.set(v / 2),
-								}
-							: undefined,
-					},
-					{ label: "Mass", value: `${planetMassEarths.toFixed(2)}× Earth` },
-					{ label: "Gravity", value: `${planetGravityG.toFixed(3)} g` },
-					{ label: "Semi Major Axis", value: `${mainMoonPd.toFixed(1)} PD` },
-					{ label: "Period", value: formatDays(mainMoonOrbitalPeriodDays) },
-					{
-						label: "Solar Day",
-						value: formatHours(hoursPerDay),
-						editor:
-							dayLengthSlider && !isGasGiantParentLocked
-								? {
-										label: "Solar Day",
-										value: dayLengthSlider.value,
-										min: dayLengthSlider.min,
-										max: dayLengthSlider.max,
-										step: dayLengthSlider.step,
-										display: dayLengthSlider.display,
-										set: dayLengthSlider.set,
-									}
-								: undefined,
-					},
-					{
-						label: "Eccentricity",
-						value: mainMoonEccentricity.toFixed(4),
-						editor: eccentricitySlider
-							? {
-									label: "Eccentricity",
-									value: eccentricitySlider.value,
-									min: eccentricitySlider.min,
-									max: eccentricitySlider.max,
-									step: eccentricitySlider.step,
-									display: eccentricitySlider.display,
-									set: (v: number) => eccentricitySlider.set(v),
-								}
-							: undefined,
-					},
-					{
-						label: "Periapsis",
-						value: `${mainMoonArgumentOfPeriapsisDeg.toFixed(1)}°`,
-						help: ORBIT_STAT_HELP.periapsis,
-						editor: perihelionSlider
-							? {
-									label: "Periapsis",
-									value: perihelionSlider.value,
-									min: perihelionSlider.min,
-									max: perihelionSlider.max,
-									step: perihelionSlider.step,
-									display: perihelionSlider.display,
-									set: (v: number) => perihelionSlider.set(v),
-								}
-							: undefined,
-					},
-					{
-						label: "Inclination",
-						value: `${mainMoonInclinationDeg.toFixed(1)}°`,
-					},
-					{
-						label: "Axial Tilt",
-						value: `${mainMoonAxialTiltDeg.toFixed(1)}°`,
-						editor: axialTiltSlider
-							? {
-									label: "Axial Tilt",
-									value: axialTiltSlider.value,
-									min: axialTiltSlider.min,
-									max: axialTiltSlider.max,
-									step: axialTiltSlider.step,
-									display: axialTiltSlider.display,
-									set: (v: number) => axialTiltSlider.set(v),
-								}
-							: undefined,
-						valueAction: onToggleSpin ? (
-							<UITooltip
-								content={
-									isRetrograde ? "switch to prograde" : "switch to retrograde"
-								}
-								position="top"
-								align="center"
-							>
-								<button
-									type="button"
-									onClick={onToggleSpin}
-									className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-								>
-									{isRetrograde ? (
-										<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
-									) : (
-										<AxisRotateClockwiseIcon className="h-3 w-3" />
-									)}
-								</button>
-							</UITooltip>
-						) : undefined,
-					},
-					{
-						label: "Atmosphere",
-						value: pressureSlider
-							? `${pressureSlider.value.toFixed(1)} bar`
-							: "1.0 bar",
-						editor: pressureSlider
-							? {
-									label: "Atmosphere",
-									value: pressureSlider.value,
-									min: pressureSlider.min,
-									max: pressureSlider.max,
-									step: pressureSlider.step,
-									display: pressureSlider.display,
-									set: pressureSlider.set,
-								}
-							: undefined,
-					},
-					...surfaceStats,
-				]}
-			>
-				<PlanetDetailTabs
-					tidalSchedulePreview={tidalSchedulePreview}
-					moonCount={moonCount}
-					daysPerYear={daysPerYear}
-					isSolarLocked={false}
-					climatePreview={climatePreview}
-					generationPreviewTab={generationPreviewTab}
-					onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
-					unitSystem={unitSystem}
-				/>
-			</SystemBodyCard>
-
-			{/* Sibling moons */}
-			{siblingMoons.length === 0 && (
-				<div className="text-[9px] text-slate-400">No sibling moons.</div>
-			)}
-			{siblingMoons.map((moon, i) => {
-				const peakForce =
-					tidalSchedulePreview?.events.reduce(
-						(max, ev) => Math.max(max, ev.moonForces[i + 1] ?? 0),
-						0,
-					) ?? 0
-				return (
-					<MoonSystemCard
-						key={moon.idx}
-						summaryClassName={
-							MOON_COLORS_CSS[i % MOON_COLORS_CSS.length] ?? "text-slate-600"
-						}
-						title={buildMoonCardTitle(i + 1, moon.orbitRange, moon.diameterKm)}
-						stats={buildMoonStats({
-							diameterKm: moon.diameterKm,
-							massKg: moon.massKg,
-							gravityG: moon.gravityG,
-							pd: moon.pd,
-							orbitalPeriodDays: moon.orbitalPeriodDays,
-							eccentricity: moon.eccentricity,
-							argumentOfPeriapsisDeg: moon.argumentOfPeriapsisDeg,
-							inclinationDeg: moon.inclinationDeg,
-							axialTiltDeg: moon.axialTiltDeg,
-							peakTideMeters: peakForce * EARTH_MOON_TIDE_REFERENCE,
-						})}
-					/>
-				)
-			})}
-		</div>
-	)
-}
-
 function TerrestrialSystemCards({
 	generatedMoons,
 	tidalSchedulePreview,
 	tideLock,
 	setTideLock,
 	setHoursPerDay,
-	setObliquity,
 	radiusSlider,
 	orbitalDistanceSlider,
 	dayLengthSlider,
@@ -1309,16 +1316,18 @@ function TerrestrialSystemCards({
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
-	spectralClass,
-	starSubtype,
-	setSpectralClass,
-	setStarSubtype,
 	axialTiltDisplay,
 	climatePreview,
 	generationPreviewTab,
 	onSelectGenerationPreviewTab,
 	unitSystem,
+	inclinationDeg,
+	longitudeOfAscendingNodeDeg,
+	bodyIndex,
+	onFocusBody,
 }: {
+	bodyIndex: number
+	onFocusBody?: (bodyIndex: number, moonIndex?: number) => void
 	generatedMoons: import("@/model/celestial/moons/moon-types").MoonParams[]
 	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
 	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
@@ -1326,7 +1335,6 @@ function TerrestrialSystemCards({
 		v: import("@/model/celestial/moons/moon-types").TideLock | null,
 	) => void
 	setHoursPerDay: (v: number) => void
-	setObliquity: (v: number) => void
 	radiusSlider?: SliderDef
 	orbitalDistanceSlider?: SliderDef
 	dayLengthSlider?: SliderDef
@@ -1345,34 +1353,31 @@ function TerrestrialSystemCards({
 	orbitalDistanceAU: number
 	eccentricity: number
 	perihelion: number
-	spectralClass: string
-	starSubtype: number
-	setSpectralClass: (v: string) => void
-	setStarSubtype: (v: number) => void
 	axialTiltDisplay: string
 	climatePreview: ClimatePreviewData
 	generationPreviewTab: GenerationPreviewTab
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
+	inclinationDeg: number
+	longitudeOfAscendingNodeDeg: number
 }) {
 	const planetDiamKm = planetRadiusKm * 2
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
 	const planetMassEarths = planetMassKg / EARTH_MASS_KG
 	const planetGravityG =
 		(6.674e-11 * planetMassKg) / (planetRadiusKm * 1000) ** 2 / 9.807
+	const planetDensityEarthRelative = computeEarthRelativeDensity(
+		planetMassKg,
+		planetDiamKm,
+	)
 	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
 		hoursPerDay,
 		tideLock,
 	)
 	const earthDiamRel = (planetDiamKm / EARTH_DIAMETER_KM).toFixed(2)
-	const starPeakForce =
-		tidalSchedulePreview?.events.reduce(
-			(max, ev) => Math.max(max, Math.abs(ev.starForce ?? 0)),
-			0,
-		) ?? 0
 	const isSolarLocked = tideLock?.type === "solar"
-	const worldStats: StatEntry[] = [
-		{
+	const worldStats = buildMainBodyStats({
+		diameter: {
 			label: "Diameter",
 			value: `${earthDiamRel}× Earth`,
 			editor: radiusSlider
@@ -1387,9 +1392,13 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		{ label: "Mass", value: `${planetMassEarths.toFixed(2)}× Earth` },
-		{ label: "Gravity", value: `${planetGravityG.toFixed(3)} g` },
-		{
+		mass: { label: "Mass", value: `${planetMassEarths.toFixed(2)}× Earth` },
+		gravity: { label: "Gravity", value: `${planetGravityG.toFixed(3)} g` },
+		density: {
+			label: "Density",
+			value: `${planetDensityEarthRelative.toFixed(2)} rhoE · Mostly Rock`,
+		},
+		semiMajorAxis: {
 			label: "Semi Major Axis",
 			value: `${orbitalDistanceAU.toFixed(3)} AU`,
 			editor: orbitalDistanceSlider
@@ -1404,8 +1413,8 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		{ label: "Period", value: formatDays(daysPerYear) },
-		{
+		period: { label: "Period", value: formatDays(daysPerYear) },
+		solarDay: {
 			label: "Solar Day",
 			value: formatHours(hoursPerDay),
 			editor: dayLengthSlider
@@ -1420,7 +1429,7 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		{
+		eccentricity: {
 			label: "Eccentricity",
 			value: eccentricity.toFixed(4),
 			editor: eccentricitySlider
@@ -1435,7 +1444,7 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		{
+		periapsis: {
 			label: "Periapsis",
 			value: `${perihelion.toFixed(0)}°`,
 			help: ORBIT_STAT_HELP.periapsis,
@@ -1451,7 +1460,9 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		{
+		inclinationDeg,
+		longitudeOfAscendingNodeDeg,
+		axialTilt: {
 			label: "Axial Tilt",
 			value: axialTiltDisplay,
 			editor: axialTiltSlider
@@ -1485,9 +1496,9 @@ function TerrestrialSystemCards({
 				</UITooltip>
 			),
 		},
-		...(isSolarLocked && antistellarLonSlider
-			? [
-					{
+		antistellarLon:
+			isSolarLocked && antistellarLonSlider
+				? {
 						label: "Antistellar Lon",
 						value: antistellarLonSlider.display,
 						editor: {
@@ -1499,14 +1510,14 @@ function TerrestrialSystemCards({
 							display: antistellarLonSlider.display,
 							set: antistellarLonSlider.set,
 						},
-					},
-				]
-			: []),
-		{
+					}
+				: undefined,
+		atmosphere: {
 			label: "Atmosphere",
-			value: pressureSlider
-				? `${pressureSlider.value.toFixed(1)} bar`
-				: "1.0 bar",
+			valuePrefix: formatPressureBar(pressureSlider?.value ?? 1),
+			value: ` · ${formatAtmosphereSuffix(
+				buildPressureAtmosphereProfile(pressureSlider?.value ?? 1),
+			)}`,
 			editor: pressureSlider
 				? {
 						label: "Atmosphere",
@@ -1519,69 +1530,22 @@ function TerrestrialSystemCards({
 					}
 				: undefined,
 		},
-		...surfaceStats,
-	]
+		extra: surfaceStats,
+	})
+
+	const gpsButton = onFocusBody ? (
+		<GpsFocusButton onClick={() => onFocusBody(bodyIndex)} />
+	) : undefined
 
 	return (
-		<div className="flex flex-col gap-2">
-			<StellarSystemCard
-				spectralClass={spectralClass}
-				starSubtype={starSubtype}
-				peakTideMeters={starPeakForce * EARTH_MOON_TIDE_REFERENCE}
-				setSpectralClass={setSpectralClass}
-				setStarSubtype={setStarSubtype}
-				lockButton={
-					<UITooltip
-						content={
-							isSolarLocked
-								? "remove solar tidal lock"
-								: "add solar tidal lock (1:1 with star)"
-						}
-						position="top"
-						align="center"
-					>
-						<button
-							type="button"
-							onClick={(event) => {
-								event.preventDefault()
-								if (isSolarLocked) {
-									setTideLock(null)
-									setHoursPerDay(24)
-									return
-								}
-								setTideLock({ type: "solar", target: 0 })
-								setObliquity(0)
-								setHoursPerDay(daysPerYear * hoursPerDay)
-							}}
-							className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-						>
-							{isSolarLocked ? (
-								<LockIcon className="h-3 w-3" />
-							) : (
-								<LockOpenIcon className="h-3 w-3" />
-							)}
-						</button>
-					</UITooltip>
-				}
-			/>
-			<SystemBodyCard
-				className="border-blue-200"
-				summaryClassName="text-blue-700"
-				title={`Terrestrial Planet · ${earthDiamRel}× Earth`}
-				defaultOpen
-				stats={worldStats}
-			>
-				<PlanetDetailTabs
-					tidalSchedulePreview={tidalSchedulePreview}
-					moonCount={moonCount}
-					daysPerYear={daysPerYear}
-					isSolarLocked={isSolarLocked}
-					climatePreview={climatePreview}
-					generationPreviewTab={generationPreviewTab}
-					onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
-					unitSystem={unitSystem}
-				/>
-			</SystemBodyCard>
+		<SystemBodyCard
+			className="border-blue-200"
+			summaryClassName="text-blue-700"
+			title={`Terrestrial Planet · ${earthDiamRel}× Earth`}
+			defaultOpen
+			stats={worldStats}
+			gpsButton={gpsButton}
+		>
 			{generatedMoons.map((moon, i) => {
 				const sma = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
 				const pd =
@@ -1602,6 +1566,13 @@ function TerrestrialSystemCards({
 							MOON_COLORS_CSS[i % MOON_COLORS_CSS.length] ?? "text-slate-600"
 						}
 						title={buildMoonCardTitle(i + 1, moon.orbitRange, moon.diameterKm)}
+						gpsButton={
+							onFocusBody ? (
+								<GpsFocusButton
+									onClick={() => onFocusBody(bodyIndex, i)}
+								/>
+							) : undefined
+						}
 						lockButton={
 							<button
 								type="button"
@@ -1640,13 +1611,24 @@ function TerrestrialSystemCards({
 							eccentricity: moon.eccentricity,
 							argumentOfPeriapsisDeg: moon.argumentOfPeriapsisDeg,
 							inclinationDeg: moon.inclinationDeg,
+							longitudeOfAscendingNodeDeg: moon.longitudeOfAscendingNodeDeg,
 							axialTiltDeg: moon.axialTiltDeg,
 							peakTideMeters: peakForce * EARTH_MOON_TIDE_REFERENCE,
 						})}
 					/>
 				)
 			})}
-		</div>
+			<PlanetDetailTabs
+				tidalSchedulePreview={tidalSchedulePreview}
+				moonCount={moonCount}
+				daysPerYear={daysPerYear}
+				isSolarLocked={isSolarLocked}
+				climatePreview={climatePreview}
+				generationPreviewTab={generationPreviewTab}
+				onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+				unitSystem={unitSystem}
+			/>
+		</SystemBodyCard>
 	)
 }
 
@@ -1745,18 +1727,17 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	worldTab,
 	setWorldTab,
 	resetWorldDefaults,
-	planetType,
-	setPlanetType,
 	tideLock,
 	setTideLock,
 	setObliquity,
 	moonCount,
-	setMoonCount,
-	moonSeed,
-	setMoonSeed,
+	restSeed,
+	setRestSeed,
 	tidalSchedulePreview,
 	generatedMoons,
-	gasGiantSystem,
+	siblingBodies,
+	systemBodies,
+	onFocusBody,
 	daysPerYear,
 	hoursPerDay,
 	setHoursPerDay,
@@ -1770,6 +1751,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	orbitalDistanceAU,
 	eccentricity,
 	perihelion,
+	inclinationDeg,
+	longitudeOfAscendingNodeDeg,
 	era,
 	setEra,
 	planetCode,
@@ -1798,6 +1781,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const [showRecentCodes, setShowRecentCodes] = useState(false)
+	const [restSeedEditorVisible, setRestSeedEditorVisible] = useState(false)
+	const [restSeedInput, setRestSeedInput] = useState("")
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
 	type DrillDownState =
 		| null
@@ -1834,10 +1819,25 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 			onSelectRecentCode,
 			setShowRecentCodes,
 		})
-	const moonSeedLabel = isLunaMoonSeed(moonSeed)
-		? `${moonCount}-luna`
-		: `${moonCount}-${moonSeed.toString(36).padStart(6, "0")}`
-	const rerollMoonSeed = () => setMoonSeed(Math.floor(Math.random() * SEED_MAX))
+	const restSeedLabel =
+		restSeed === SOL_SEED ? "sol" : restSeed.toString(36).padStart(6, "0")
+	const rerollRestSeed = () => setRestSeed(Math.floor(Math.random() * SEED_MAX))
+	const openRestSeedEditor = () => {
+		setRestSeedInput(restSeedLabel)
+		setRestSeedEditorVisible(true)
+	}
+	const applyRestSeedInput = () => {
+		const trimmed = restSeedInput.trim().toLowerCase()
+		if (trimmed === "sol") {
+			setRestSeed(SOL_SEED)
+		} else {
+			const parsed = Number.parseInt(trimmed, 36)
+			if (Number.isFinite(parsed)) {
+				setRestSeed(Math.max(0, Math.min(SEED_MAX - 1, parsed)))
+			}
+		}
+		setRestSeedEditorVisible(false)
+	}
 	const dayLengthSlider = planetSliders.find(
 		(slider) => slider.label === "Day Length",
 	)
@@ -1869,10 +1869,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	)
 	const surfaceStats = buildSurfaceStats(planetSliders, terrainSliders)
 	const isSolarLocked = tideLock?.type === "solar"
-	const isGasGiantParentLocked =
-		planetType === "gas-giant-moon" &&
-		tideLock?.type === "lunar" &&
-		tideLock.target === 0
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col px-4 py-4 lg:px-5 lg:py-5 border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -1967,54 +1963,181 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								"text-violet-500",
 								"text-emerald-500",
 							]
+							// Every orbit — the star, the main world, and every sibling —
+							// is just an entry at some AU, sorted once and rendered in
+							// that order. The star always sorts first since it's the only
+							// thing at AU 0.
+							const labeledSiblings = labelSiblingBodies(siblingBodies ?? [])
+							const starPeakForce =
+								tidalSchedulePreview?.events.reduce(
+									(max, ev) => Math.max(max, Math.abs(ev.starForce ?? 0)),
+									0,
+								) ?? 0
+							const mainWorldNode =
+								!generatedMoons || generatedMoons.length === 0 ? (
+									<div className="text-[10px] text-slate-400 py-2">
+										{moonCount === 0
+											? "No moons configured."
+											: "Computing moon parameters…"}
+									</div>
+								) : (
+									<TerrestrialSystemCards
+										bodyIndex={
+											systemBodies?.findIndex((b) => b.isMainWorld) ?? -1
+										}
+										onFocusBody={onFocusBody}
+										generatedMoons={generatedMoons}
+										tidalSchedulePreview={tidalSchedulePreview}
+										tideLock={tideLock}
+										setTideLock={setTideLock}
+										setHoursPerDay={setHoursPerDay}
+										radiusSlider={radiusSlider}
+										orbitalDistanceSlider={orbitalDistanceSlider}
+										dayLengthSlider={dayLengthSlider}
+										antistellarLonSlider={antistellarLonSlider}
+										pressureSlider={pressureSlider}
+										eccentricitySlider={eccentricitySlider}
+										perihelionSlider={perihelionSlider}
+										axialTiltSlider={axialTiltSlider}
+										isRetrograde={isRetrograde}
+										onToggleSpin={onToggleSpin}
+										planetRadiusKm={planetRadiusKm}
+										hoursPerDay={hoursPerDay}
+										daysPerYear={daysPerYear}
+										moonCount={moonCount}
+										surfaceStats={surfaceStats}
+										orbitalDistanceAU={orbitalDistanceAU}
+										eccentricity={eccentricity}
+										perihelion={perihelion}
+										axialTiltDisplay={axialTiltDisplay}
+										climatePreview={climatePreview}
+										generationPreviewTab={generationPreviewTab}
+										onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+										unitSystem={unitSystem}
+										inclinationDeg={inclinationDeg}
+										longitudeOfAscendingNodeDeg={longitudeOfAscendingNodeDeg}
+									/>
+								)
+							const orderedEntries = [
+								{
+									au: 0,
+									node: (
+										<StellarSystemCard
+											key="star"
+											spectralClass={spectralClass}
+											starSubtype={starSubtype}
+											peakTideMeters={starPeakForce * EARTH_MOON_TIDE_REFERENCE}
+											setSpectralClass={setSpectralClass}
+											setStarSubtype={setStarSubtype}
+											gpsButton={
+												onFocusBody ? (
+													<GpsFocusButton
+														onClick={() => onFocusBody(-1)}
+													/>
+												) : undefined
+											}
+											lockButton={
+												<UITooltip
+													content={
+														isSolarLocked
+															? "remove solar tidal lock"
+															: "add solar tidal lock (1:1 with star)"
+													}
+													position="top"
+													align="center"
+												>
+													<button
+														type="button"
+														onClick={(event) => {
+															event.preventDefault()
+															if (isSolarLocked) {
+																setTideLock(null)
+																setHoursPerDay(24)
+																return
+															}
+															setTideLock({ type: "solar", target: 0 })
+															setObliquity(0)
+															setHoursPerDay(daysPerYear * hoursPerDay)
+														}}
+														className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+													>
+														{isSolarLocked ? (
+															<LockIcon className="h-3 w-3" />
+														) : (
+															<LockOpenIcon className="h-3 w-3" />
+														)}
+													</button>
+												</UITooltip>
+											}
+										/>
+									),
+								},
+								{
+									au: orbitalDistanceAU,
+									node: (
+										<React.Fragment key="main">{mainWorldNode}</React.Fragment>
+									),
+								},
+								...labeledSiblings.map((entry, i) => ({
+									au: entry.body.orbitalDistanceAU,
+									node: (
+										<SiblingBodyCard
+											key={`${entry.body.group}-${entry.body.orbitalDistanceAU}-${i}`}
+											{...entry}
+											bodyIndex={systemBodies?.indexOf(entry.body) ?? -1}
+											onFocusBody={onFocusBody}
+										/>
+									),
+								})),
+							].sort((a, b) => a.au - b.au)
 							return (
 								<div className="overflow-hidden rounded-lg">
-									<div className="flex items-center border-b border-slate-100 px-2.5 pt-2 pb-2 gap-2">
-										<div className="flex gap-0 rounded border border-slate-200 overflow-hidden">
-											{(["terrestrial", "gas-giant-moon"] as const).map(
-												(pt) => (
-													<button
-														key={pt}
-														type="button"
-														onClick={() => setPlanetType(pt)}
-														className={`px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.07em] transition-colors ${
-															planetType === pt
-																? "bg-slate-700 text-white"
-																: "bg-transparent text-slate-400 hover:text-slate-600"
-														}`}
-													>
-														{pt === "terrestrial" ? "Planet" : "Moon"}
-													</button>
-												),
-											)}
-										</div>
-									</div>
 									<div className="px-2.5 py-2">
 										<div className="flex items-center justify-between gap-2">
 											<div className="flex items-center gap-1.5 min-w-0">
-												<UITooltip
+												<button
+													type="button"
+													onClick={rerollRestSeed}
+													className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700"
+												>
+													<DiceMultipleOutlineIcon className="h-3 w-3" />
+												</button>
+												<Tippy
+													visible={restSeedEditorVisible}
+													onClickOutside={() => setRestSeedEditorVisible(false)}
+													interactive
+													placement="top"
+													theme="light-border"
 													content={
-														planetType === "gas-giant-moon"
-															? "Reroll gas giant system"
-															: "Reroll moon parameters"
+														<div className="flex w-32 flex-col gap-2 px-1 pt-0.5 pb-2">
+															<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+																System Seed
+															</span>
+															<input
+																type="text"
+																value={restSeedInput}
+																onChange={(e) => setRestSeedInput(e.target.value)}
+																onKeyDown={(e) => {
+																	if (e.key === "Enter") {
+																		e.preventDefault()
+																		applyRestSeedInput()
+																	}
+																}}
+																onBlur={applyRestSeedInput}
+																autoFocus
+																className="w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400"
+															/>
+														</div>
 													}
-													position="top"
-													align="start"
 												>
-													<button
-														type="button"
-														onClick={rerollMoonSeed}
-														className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700"
+													<span
+														onClick={openRestSeedEditor}
+														className="cursor-pointer font-mono text-[9px] text-slate-400 underline decoration-dotted underline-offset-2 truncate hover:text-slate-700"
+														title={String(restSeed)}
 													>
-														<DiceMultipleOutlineIcon className="h-3 w-3" />
-													</button>
-												</UITooltip>
-												<span
-													className="font-mono text-[9px] text-slate-400 truncate"
-													title={String(moonSeed)}
-												>
-													{moonSeedLabel}
-												</span>
+														{restSeedLabel}
+													</span>
+												</Tippy>
 												<div className="flex gap-0.5 ml-1 self-center">
 													{Array.from({ length: moonCount }, (_, i) => (
 														<span
@@ -2026,117 +2149,14 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 													))}
 												</div>
 											</div>
-											<div className="flex items-center gap-1.5 shrink-0">
-												<button
-													type="button"
-													disabled={moonCount === 0}
-													onClick={() => setMoonCount(moonCount - 1)}
-													className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
-												>
-													<span className="leading-none text-[11px]">−</span>
-												</button>
-												<span className="w-3 text-center text-[11px] font-mono text-slate-800">
-													{moonCount}
-												</span>
-												<button
-													type="button"
-													disabled={
-														moonCount >=
-														(planetType === "gas-giant-moon" ? 5 : MAX_MOONS)
-													}
-													onClick={() => setMoonCount(moonCount + 1)}
-													className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
-												>
-													<span className="leading-none text-[11px]">+</span>
-												</button>
-											</div>
 										</div>
 										{isSolarLocked && moonCount > 0 && (
 											<p className="mt-1.5 text-[9px] text-slate-400 leading-tight">
 												Solar tides suppressed · lunar tides active
 											</p>
 										)}
-										<div className="mt-2">
-											{planetType === "gas-giant-moon" ? (
-												<GasGiantSystemCards
-													gasGiantSystem={gasGiantSystem}
-													tidalSchedulePreview={tidalSchedulePreview}
-													radiusSlider={radiusSlider}
-													orbitalDistanceSlider={orbitalDistanceSlider}
-													eccentricitySlider={eccentricitySlider}
-													perihelionSlider={perihelionSlider}
-													axialTiltSlider={axialTiltSlider}
-													dayLengthSlider={dayLengthSlider}
-													pressureSlider={pressureSlider}
-													planetRadiusKm={planetRadiusKm}
-													orbitalDistanceAU={orbitalDistanceAU}
-													eccentricity={eccentricity}
-													perihelion={perihelion}
-													daysPerYear={daysPerYear}
-													hoursPerDay={hoursPerDay}
-													isRetrograde={isRetrograde}
-													onToggleSpin={onToggleSpin}
-													spectralClass={spectralClass}
-													starSubtype={starSubtype}
-													setSpectralClass={setSpectralClass}
-													setStarSubtype={setStarSubtype}
-													isGasGiantParentLocked={isGasGiantParentLocked}
-													setTideLock={setTideLock}
-													setHoursPerDay={setHoursPerDay}
-													moonCount={moonCount}
-													surfaceStats={surfaceStats}
-													climatePreview={climatePreview}
-													generationPreviewTab={generationPreviewTab}
-													onSelectGenerationPreviewTab={
-														onSelectGenerationPreviewTab
-													}
-													unitSystem={unitSystem}
-												/>
-											) : !generatedMoons || generatedMoons.length === 0 ? (
-												<div className="text-[10px] text-slate-400 py-2">
-													{moonCount === 0
-														? "No moons configured."
-														: "Computing moon parameters…"}
-												</div>
-											) : (
-												<TerrestrialSystemCards
-													generatedMoons={generatedMoons}
-													tidalSchedulePreview={tidalSchedulePreview}
-													tideLock={tideLock}
-													setTideLock={setTideLock}
-													setHoursPerDay={setHoursPerDay}
-													setObliquity={setObliquity}
-													radiusSlider={radiusSlider}
-													orbitalDistanceSlider={orbitalDistanceSlider}
-													dayLengthSlider={dayLengthSlider}
-													antistellarLonSlider={antistellarLonSlider}
-													pressureSlider={pressureSlider}
-													eccentricitySlider={eccentricitySlider}
-													perihelionSlider={perihelionSlider}
-													axialTiltSlider={axialTiltSlider}
-													isRetrograde={isRetrograde}
-													onToggleSpin={onToggleSpin}
-													planetRadiusKm={planetRadiusKm}
-													hoursPerDay={hoursPerDay}
-													daysPerYear={daysPerYear}
-													moonCount={moonCount}
-													surfaceStats={surfaceStats}
-													orbitalDistanceAU={orbitalDistanceAU}
-													eccentricity={eccentricity}
-													perihelion={perihelion}
-													spectralClass={spectralClass}
-													starSubtype={starSubtype}
-													setSpectralClass={setSpectralClass}
-													setStarSubtype={setStarSubtype}
-													axialTiltDisplay={axialTiltDisplay}
-													climatePreview={climatePreview}
-													generationPreviewTab={generationPreviewTab}
-													onSelectGenerationPreviewTab={
-														onSelectGenerationPreviewTab
-													}
-													unitSystem={unitSystem}
-												/>
-											)}
+										<div className="mt-2 flex flex-col gap-2">
+											{orderedEntries.map((entry) => entry.node)}
 										</div>
 									</div>
 								</div>

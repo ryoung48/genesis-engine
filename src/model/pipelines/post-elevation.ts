@@ -21,7 +21,6 @@ import type {
 	StageTiming,
 } from ".."
 import {
-	generateGasGiantSystem,
 	generateMoons,
 	M_SOL_KG,
 	resolveMoonOrbitHoursPerDay,
@@ -58,10 +57,7 @@ import {
 	computeThermalEquator,
 } from "../climate/rain"
 import { computeCoastalMask, computeSpringTideMap } from "../climate/tidal-map"
-import {
-	computeGasGiantTidalSchedule,
-	computeTidalSchedule,
-} from "../climate/tidal-schedule"
+import { computeTidalSchedule } from "../climate/tidal-schedule"
 import { computeTornadoRisk } from "../climate/tornadoes"
 import { assignClimateZones, assignVegetation } from "../climate/vegetation"
 import {
@@ -543,30 +539,17 @@ export function runPostElevationPipeline(
 		params.hoursPerDay,
 		params.tideLock,
 	)
-	const tidalSchedule =
-		params.planetType === "gas-giant-moon"
-			? computeGasGiantTidalSchedule(
-					generateGasGiantSystem(
-						params.moonSeed ?? params.seed + 8831,
-						params.planetRadiusKm,
-						params.orbitalDistanceAU,
-						starMassKg,
-						params.obliquity,
-						params.moonCount,
-					),
-					params,
-				)
-			: computeTidalSchedule(
-					generateMoons(
-						params.moonCount ?? 0,
-						params.moonSeed ?? params.seed + 8831,
-						params.planetRadiusKm,
-						params.orbitalDistanceAU,
-						moonOrbitHoursPerDay,
-						starMassKg,
-					),
-					params,
-				)
+	const tidalSchedule = computeTidalSchedule(
+		generateMoons(
+			params.moonCount ?? 0,
+			params.moonSeed ?? params.seed + 8831,
+			params.planetRadiusKm,
+			params.orbitalDistanceAU,
+			moonOrbitHoursPerDay,
+			starMassKg,
+		),
+		params,
+	)
 	const tidalRange = computeSpringTideMap(
 		mesh,
 		isLand,

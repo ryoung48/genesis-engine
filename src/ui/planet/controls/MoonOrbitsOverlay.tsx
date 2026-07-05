@@ -8,7 +8,7 @@ import {
 import { scaleClockDialHourToDayLength } from "../clock"
 import {
 	getMoonOrbitDistanceRelativeToPlanet,
-	scaleMoonOrbitDistanceForDisplay,
+	layoutMoonOrbitPeriapsesForDisplay,
 	scaleMoonRadiusToPlanetVisualRadius,
 } from "../moon-visual-scale"
 
@@ -64,29 +64,37 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 			hoursPerDay,
 			tideLock,
 		)
-		const maxExtentPlanetRadii = Math.max(
-			...moons.map((m) =>
-				getMoonOrbitDistanceRelativeToPlanet(
-					moonSemiMajorAxisM(m, planetMassKg, moonOrbitHoursPerDay) *
-						(1 + m.eccentricity),
+		const moonVisualRadii = moons.map((moon) =>
+			Math.max(
+				1.5,
+				scaleMoonRadiusToPlanetVisualRadius(
+					moon.diameterKm,
 					planetRadiusKm,
+					PLANET_R,
 				),
 			),
 		)
+		const orbitPeriapses = layoutMoonOrbitPeriapsesForDisplay({
+			orbits: moons.map((moon, index) => {
+				const smaM = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
+				return {
+					orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
+						smaM,
+						planetRadiusKm,
+					),
+					eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
+					bodyVisualRadius: moonVisualRadii[index] ?? 1.5,
+				}
+			}),
+			parentVisualRadius: PLANET_R,
+			minDisplayDistance: PLANET_R + 8,
+			maxDisplayDistance: SIZE / 2 - MARGIN,
+		})
 
 		return moons.map((moon, i) => {
-			const smaM = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
-			const orbitalDistancePlanetRadii = getMoonOrbitDistanceRelativeToPlanet(
-				smaM,
-				planetRadiusKm,
-			)
 			const e = showEllipticalOrbits ? moon.eccentricity : 0
-			const a = scaleMoonOrbitDistanceForDisplay({
-				orbitalDistancePlanetRadii,
-				maxOrbitalDistancePlanetRadii: maxExtentPlanetRadii,
-				minDisplayDistance: PLANET_R + 8,
-				maxDisplayDistance: SIZE / 2 - MARGIN,
-			})
+			const periapsis = orbitPeriapses[i] ?? PLANET_R + 8
+			const a = periapsis / (1 - e)
 			const b = a * Math.sqrt(1 - e * e)
 			const ae = a * e
 			const omegaDeg = moon.argumentOfPeriapsisDeg
@@ -131,6 +139,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 				posX,
 				posY,
 				diameterKm: moon.diameterKm,
+				visualRadius: moonVisualRadii[i] ?? 1.5,
 				color: MOON_COLORS[i % MOON_COLORS.length],
 				illumination,
 				sunDirX,
@@ -248,16 +257,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 										fillOpacity={0.15}
 									/>
 								</>
-							))(
-								Math.max(
-									1.5,
-									scaleMoonRadiusToPlanetVisualRadius(
-										o.diameterKm,
-										planetRadiusKm,
-										PLANET_R,
-									),
-								),
-							)}
+							))(o.visualRadius)}
 						</g>
 					</g>
 				))}

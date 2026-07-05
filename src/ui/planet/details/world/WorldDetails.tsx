@@ -103,13 +103,6 @@ function getWorldSections({
 	}
 }
 
-function getPlanetTypeLabel(
-	planetType: DetailsDrawerBaseProps["planetType"],
-): string {
-	if (planetType === "gas-giant-moon") return "Gas Giant Moon"
-	return "Terrestrial Planet"
-}
-
 const TRADE_GOODS_PAGE_SIZE = 5
 
 interface WorldDetailsProps extends DetailsDrawerBaseProps {
@@ -123,7 +116,6 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	onSectionToggle,
 	onClose,
 	planetName,
-	planetType,
 	planetStats,
 	worldPopulation,
 	activeWarCount,
@@ -192,7 +184,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		<div className="space-y-2">
 			<WikiHeader
 				title={planetName}
-				subtitle={getPlanetTypeLabel(planetType)}
+				subtitle="Terrestrial Planet"
 				onClose={onClose}
 			/>
 

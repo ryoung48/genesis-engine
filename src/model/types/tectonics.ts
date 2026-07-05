@@ -48,13 +48,14 @@ export interface GenesisParams {
 	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
-	planetType?: import("../celestial/moons/moon-types").PlanetType // default "terrestrial"
 	tideLock: import("../celestial/moons/moon-types").TideLock | null // null = not locked
 	antistellarLon: number // longitude of the antistellar point in degrees (0-360), default 180
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
 	moonCount?: number
 	moonSeed?: number
+	/** Seed for the sibling/system bodies shown in the Generation panel; 0 = Sol. Not used by terrain generation. */
+	restSeed?: number
 	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */
 	era?: import("../society/eras").SocietyEra
 }

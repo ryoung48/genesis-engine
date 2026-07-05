@@ -280,7 +280,10 @@ function globeLabelStubLength(markerScale: number): number {
 }
 
 function globeLabelTangentOffset(fontSize: number): number {
-	return fontSize * LABEL_GLOBE_FONT_GAP_FACTOR + fontSize * LABEL_LEADER_HEIGHT_FACTOR
+	return (
+		fontSize * LABEL_GLOBE_FONT_GAP_FACTOR +
+		fontSize * LABEL_LEADER_HEIGHT_FACTOR
+	)
 }
 
 function updateLabelLeaderLine(
@@ -383,7 +386,8 @@ function updateGlobeLabelOrientations(
 	if (lastGroupQuaternion) {
 		lastGroupQuaternion.copy(GLOBE_GROUP_WORLD_QUATERNION)
 	} else {
-		group.userData.globeGroupWorldQuaternion = GLOBE_GROUP_WORLD_QUATERNION.clone()
+		group.userData.globeGroupWorldQuaternion =
+			GLOBE_GROUP_WORLD_QUATERNION.clone()
 	}
 	if (lastCameraPosition) {
 		lastCameraPosition.copy(GLOBE_CAMERA_LOCAL_POSITION)
@@ -466,8 +470,7 @@ export function buildGlobeNationLabels(
 			.multiplyScalar(globePlacement.radius)
 			.clone()
 		text.userData.globeLeaderStubLength =
-			globeLabelStubLength(markerScale) +
-			globeLabelTangentOffset(text.fontSize)
+			globeLabelStubLength(markerScale) + globeLabelTangentOffset(text.fontSize)
 		text.userData.globeLabelTangentOffset = 0
 		text.sync()
 		updateGlobeLabelPosition(text, initialCameraUp)
@@ -1027,7 +1030,6 @@ export {
 	LABEL_FONT_SIZE_MAP,
 	LABEL_OUTLINE_COLOR,
 	LABEL_RENDER_ORDER,
-	createLabelLeaderLine,
 	createNationLabelPools,
 	createSettlementLabelPools,
 	disposePool,

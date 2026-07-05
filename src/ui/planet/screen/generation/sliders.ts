@@ -1,4 +1,5 @@
 import { LUNA_MOON_SEED } from "@/model/celestial/moons/orbital-mechanics"
+import { SOL_SEED } from "@/model/celestial/system/sol-system"
 import {
 	getHabitableZoneAU,
 	getStarLuminositySol,
@@ -274,9 +275,6 @@ export function resetWorldDefaults(setters: {
 	setStarSubtype: (v: number) => void
 	setOrbitalDistanceAU: (v: number) => void
 	setHoursPerDay: (v: number) => void
-	setPlanetType: (
-		v: import("@/model/celestial/moons/moon-types").PlanetType,
-	) => void
 	setTideLock: (
 		v: import("@/model/celestial/moons/moon-types").TideLock | null,
 	) => void
@@ -285,6 +283,7 @@ export function resetWorldDefaults(setters: {
 	setPressure: (v: number) => void
 	setMoonCount: (v: number) => void
 	setMoonSeed: (v: number) => void
+	setRestSeed: (v: number) => void
 	setSeaLevel: (v: number) => void
 	setCraters: (v: number) => void
 	setVolcanism: (v: number) => void
@@ -302,13 +301,13 @@ export function resetWorldDefaults(setters: {
 	setters.setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
 	setters.setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
-	setters.setPlanetType("terrestrial")
 	setters.setTideLock(null)
 	setters.setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
 	setters.setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)
 	setters.setMoonSeed(LUNA_MOON_SEED)
+	setters.setRestSeed(SOL_SEED)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
 	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)

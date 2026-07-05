@@ -16,6 +16,10 @@ interface StoredViewPrefs {
 	nationMode: NationMapMode
 	populationMode: PopulationMapMode
 	viewMode: GenesisViewMode
+	solarSystemViewActive: boolean
+	showSolarSystemEllipticalOrbits: boolean
+	showSolarSystemDaylight: boolean
+	showSolarSystemInclination: boolean
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
@@ -110,6 +114,10 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	nationMode: "borders",
 	populationMode: "density",
 	viewMode: "globe",
+	solarSystemViewActive: false,
+	showSolarSystemEllipticalOrbits: true,
+	showSolarSystemDaylight: true,
+	showSolarSystemInclination: true,
 	showWireframe: false,
 	showGrid: true,
 	showNationBorders: false,
@@ -238,6 +246,22 @@ export function parseStoredViewPrefs(
 			viewMode: isViewMode(parsed.viewMode)
 				? parsed.viewMode
 				: DEFAULT_VIEW_PREFS.viewMode,
+			solarSystemViewActive: readBoolean(
+				parsed.solarSystemViewActive,
+				DEFAULT_VIEW_PREFS.solarSystemViewActive,
+			),
+			showSolarSystemEllipticalOrbits: readBoolean(
+				parsed.showSolarSystemEllipticalOrbits,
+				DEFAULT_VIEW_PREFS.showSolarSystemEllipticalOrbits,
+			),
+			showSolarSystemDaylight: readBoolean(
+				parsed.showSolarSystemDaylight,
+				DEFAULT_VIEW_PREFS.showSolarSystemDaylight,
+			),
+			showSolarSystemInclination: readBoolean(
+				parsed.showSolarSystemInclination,
+				DEFAULT_VIEW_PREFS.showSolarSystemInclination,
+			),
 			showWireframe: readBoolean(
 				parsed.showWireframe,
 				DEFAULT_VIEW_PREFS.showWireframe,
