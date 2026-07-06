@@ -1021,7 +1021,11 @@ function computeGravityG(massKg: number, diameterKm: number): number {
 	return (GRAVITATIONAL_CONSTANT * massKg) / radiusM ** 2 / STANDARD_GRAVITY_MS2
 }
 
-interface MainWorldParams {
+/** The main world's raw physical parameters come from the user's live UI
+ * sliders, not RNG rolls — everything else (classification, atmosphere,
+ * density, greenhouse factor, ...) is derived via the same
+ * buildBodyEnvironment() path every sibling planet uses. */
+export interface HomeWorldParams {
 	orbitalDistanceAU: number
 	diameterKm: number
 	moons: MoonParams[]
@@ -1042,31 +1046,37 @@ interface GenerateSystemBodiesParams {
 	spectralClass: MainSequenceClass
 	starSubtype: number
 	hoursPerDay: number
-	mainWorld: MainWorldParams
+	mainWorld: HomeWorldParams
 }
 
-// The main world always keeps its real, already-rolled orbitalDistanceAU —
-// this just gives it a fresh inclination/ascending-node roll from the same
-// seeded sequence used for whichever sibling set (procedural or Sol) it's
-// paired with.
-function buildMainBody(
+// The main world always keeps its real, user-supplied orbitalDistanceAU and
+// physical parameters — it's routed through the exact same
+// buildBodyEnvironment() construction path every sibling body uses, just
+// with those parameters supplied directly instead of rolled from RNG. Its
+// deviation is pinned to 0 (the "temperate" slot reserved for it below) so
+// it always lands in the habitable-zone-adjacent classification, and it
+// still gets a fresh inclination/ascending-node roll from the same seeded
+// sequence used for whichever sibling set (procedural or Sol) it's paired
+// with, unless the caller supplies an override.
+function buildHomeBody(
 	rng: ReturnType<typeof createRng>,
-	mainWorld: MainWorldParams,
+	mainWorld: HomeWorldParams,
 	texturePath?: string,
 ): SystemBody {
+	const environment = buildBodyEnvironment({
+		rng,
+		groupHint: "terrestrial",
+		zone: classifyZoneFromOrbitalDistanceAU(mainWorld.orbitalDistanceAU),
+		deviation: 0,
+		diameterKm: mainWorld.diameterKm,
+		massKg: mainWorld.massKg,
+		orbitalDistanceAU: mainWorld.orbitalDistanceAU,
+		isPrimaryWorld: true,
+		isMoon: false,
+		tidal: false,
+	})
 	return {
-		...buildBodyEnvironment({
-			rng,
-			groupHint: "terrestrial",
-			zone: classifyZoneFromOrbitalDistanceAU(mainWorld.orbitalDistanceAU),
-			deviation: 0,
-			diameterKm: mainWorld.diameterKm,
-			massKg: mainWorld.massKg,
-			orbitalDistanceAU: mainWorld.orbitalDistanceAU,
-			isPrimaryWorld: true,
-			isMoon: false,
-			tidal: false,
-		}),
+		...environment,
 		idx: -1,
 		tideLock: mainWorld.tideLock,
 		isMainWorld: true,
@@ -1105,7 +1115,7 @@ export function generateSystemBodies(
 	if (seed === SOL_SEED) {
 		return [
 			...SOL_SYSTEM_BODIES,
-			buildMainBody(rng, mainWorld, "/2k_earth.jpg"),
+			buildHomeBody(rng, mainWorld, "/2k_earth.jpg"),
 		].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 	}
 
@@ -1224,7 +1234,7 @@ export function generateSystemBodies(
 		}
 	})
 
-	const mainBody = buildMainBody(rng, mainWorld)
+	const mainBody = buildHomeBody(rng, mainWorld)
 
 	return [...siblings, mainBody].sort(
 		(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,

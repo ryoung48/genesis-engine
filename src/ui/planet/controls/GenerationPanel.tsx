@@ -50,6 +50,7 @@ import {
 } from "@/model/celestial/system/generate-system-bodies"
 import { estimatePlanetarySizeClass } from "@/model/celestial/system/size-class"
 import {
+	SOL_LUNA_DEFAULT,
 	SOL_MAIN_WORLD_NAME,
 	SOL_SEED,
 	SOL_STAR_NAME,
@@ -431,7 +432,7 @@ function formatAtmosphereLabel(
 	return `${formatPressureBar(atmosphere.pressureBar)} · ${formatAtmosphereSuffix(atmosphere)}`
 }
 
-function buildPressureAtmosphereProfile(
+export function buildPressureAtmosphereProfile(
 	pressureBar: number,
 ): AtmosphereProfile {
 	if (pressureBar < 0.001) {
@@ -3396,6 +3397,9 @@ function GenerationPlanetNavigator({
 	unitSystem: UnitSystem
 	onClose?: () => void
 }) {
+	// The solar-lock UI button that used setObliquity was removed; kept as a
+	// prop for now since GenesisView still threads it through.
+	void setObliquity
 	const [selection, setSelection] = useState<OrbitSelection>({
 		kind: "star",
 	})
@@ -3514,41 +3518,6 @@ function GenerationPlanetNavigator({
 		hoursPerDay,
 		tideLock,
 	)
-	const isSolarLocked = tideLock?.type === "solar"
-	const solarLockButton = (
-		<UITooltip
-			content={
-				isSolarLocked
-					? "remove solar tidal lock"
-					: "add solar tidal lock (1:1 with star)"
-			}
-			position="top"
-			align="center"
-		>
-			<button
-				type="button"
-				onClick={(event) => {
-					event.preventDefault()
-					if (isSolarLocked) {
-						setTideLock(null)
-						setHoursPerDay(24)
-						return
-					}
-					setTideLock({ type: "solar", target: 0 })
-					setObliquity(0)
-					setHoursPerDay(daysPerYear * hoursPerDay)
-				}}
-				className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-			>
-				{isSolarLocked ? (
-					<LockIcon className="h-3 w-3" />
-				) : (
-					<LockOpenIcon className="h-3 w-3" />
-				)}
-			</button>
-		</UITooltip>
-	)
-
 	const focusSelection = useCallback(
 		(nextSelection: OrbitSelection) => {
 			if (!onFocusBody) return
@@ -3656,7 +3625,6 @@ function GenerationPlanetNavigator({
 				onFocus: onFocusBody
 					? () => focusSelection({ kind: "star" })
 					: undefined,
-				headerAction: solarLockButton,
 				stats: buildStarStats({
 					starClass,
 					starSubtype,
@@ -3773,14 +3741,10 @@ function GenerationPlanetNavigator({
 						daysPerYear={body.orbitalPeriodDays}
 						hoursPerDay={body.siderealDayHours}
 						planetRadiusKm={body.diameterKm / 2}
-						isSolarLocked={
-							isMainWorld
-								? tideLock?.type === "solar"
-								: isApproxSolarLocked(
-										body.siderealDayHours,
-										body.orbitalPeriodDays,
-									)
-						}
+						isSolarLocked={isApproxSolarLocked(
+							body.siderealDayHours,
+							body.orbitalPeriodDays,
+						)}
 						spectralClass={spectralClass}
 						starSubtype={starSubtype}
 						orbitalDistanceAU={body.orbitalDistanceAU}
@@ -3788,17 +3752,10 @@ function GenerationPlanetNavigator({
 						perihelion={body.argumentOfPeriapsisDeg}
 						obliquity={body.axialTiltDeg}
 						hydrosphereFraction={body.hydrosphereFraction}
-						atmosphere={
-							isMainWorld
-								? buildPressureAtmosphereProfile(pressureSlider?.value ?? 1)
-								: body.atmosphere
-						}
+						atmosphere={body.atmosphere}
 						albedo={body.albedo}
 						greenhouseFactor={body.greenhouseFactor}
 						internalHeatTempK={body.internalHeatTempK}
-						tidalSchedulePreviewOverride={
-							isMainWorld ? tidalSchedulePreview : undefined
-						}
 						generationPreviewTab={generationPreviewTab}
 						onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 						unitSystem={unitSystem}
@@ -3814,7 +3771,9 @@ function GenerationPlanetNavigator({
 							moon,
 							moonIndex + 1,
 							showRealSolNames,
-							isMainWorld && moonIndex === 0 ? "Luna" : undefined,
+							isMainWorld && moonIndex === 0 && restSeed === SOL_SEED
+								? SOL_LUNA_DEFAULT.name
+								: undefined,
 						),
 						subtitle: "Moon",
 						onClick: () =>
@@ -3857,12 +3816,6 @@ function GenerationPlanetNavigator({
 			const parentOrbitalDistanceAU = body.orbitalDistanceAU
 			const parentEccentricity = body.eccentricity
 			const parentPerihelionDeg = body.argumentOfPeriapsisDeg
-			const isThisMoonLocked =
-				isMainWorld &&
-				tideLock?.type === "lunar" &&
-				tideLock.target === moon.idx
-			const otherLockActive =
-				isMainWorld && tideLock !== null && !isThisMoonLocked
 			const pd = isMainWorld
 				? (moon.semiMajorAxisPlanetDiameters ??
 					moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay) /
@@ -3885,7 +3838,9 @@ function GenerationPlanetNavigator({
 					moon,
 					selection.moonIndex + 1,
 					showRealSolNames,
-					isMainWorld && selection.moonIndex === 0 ? "Luna" : undefined,
+					isMainWorld && selection.moonIndex === 0 && restSeed === SOL_SEED
+						? SOL_LUNA_DEFAULT.name
+						: undefined,
 				),
 				typeLabel: "Moon",
 				childrenLabel: "Orbits",
@@ -3899,29 +3854,6 @@ function GenerationPlanetNavigator({
 						}),
 				},
 				onFocus: onFocusBody ? () => focusSelection(selection) : undefined,
-				headerAction: isMainWorld ? (
-					<button
-						type="button"
-						disabled={otherLockActive}
-						onClick={(event) => {
-							event.preventDefault()
-							if (isThisMoonLocked) {
-								setTideLock(null)
-								setHoursPerDay(24)
-								return
-							}
-							setTideLock({ type: "lunar", target: moon.idx })
-							setHoursPerDay(moon.orbitalPeriodDays * 24)
-						}}
-						className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-30"
-					>
-						{isThisMoonLocked ? (
-							<LockIcon className="h-3 w-3" />
-						) : (
-							<LockOpenIcon className="h-3 w-3" />
-						)}
-					</button>
-				) : undefined,
 				stats: buildOrbitMoonStats({
 					moon,
 					surfaceTidesM: computeMoonSurfaceTidesM(
@@ -4027,7 +3959,6 @@ function GenerationPlanetNavigator({
 		setSpectralClass,
 		setStarSubtype,
 		showRealSolNames,
-		solarLockButton,
 		spectralClass,
 		starMassSol,
 		starClass,

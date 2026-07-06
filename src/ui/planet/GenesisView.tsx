@@ -81,7 +81,10 @@ import {
 	windSpeedColor,
 } from "./colors"
 import { ApparentDiameterOverlay } from "./controls/ApparentDiameterOverlay"
-import { GenerationPanel } from "./controls/GenerationPanel"
+import {
+	buildPressureAtmosphereProfile,
+	GenerationPanel,
+} from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import { MoonOrbitsOverlay } from "./controls/MoonOrbitsOverlay"
 import {
@@ -2853,6 +2856,7 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			argumentOfPeriapsisDeg: perihelion,
 			axialTiltDeg: obliquity,
+			atmosphere: buildPressureAtmosphereProfile(pressure),
 			inclinationDeg:
 				mainWorldInclinationOverrideActive && mainWorldInclinationDeg !== null
 					? mainWorldInclinationDeg
@@ -2883,6 +2887,7 @@ export const GenesisView: React.FC = () => {
 		eccentricity,
 		perihelion,
 		obliquity,
+		pressure,
 		mainWorldInclinationDeg,
 		mainWorldInclinationOverrideActive,
 		mainWorldLongitudeOfAscendingNodeDeg,
