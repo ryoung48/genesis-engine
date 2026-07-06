@@ -123,8 +123,8 @@ export function buildPlanetSliders(state: {
 			set: state.setEccentricity,
 		},
 		{
-			label: "Periapsis",
-			help: "Orbital angle of closest approach to the star in degrees. Affects when peak insolation occurs during the year.",
+			label: "Perihelion",
+			help: "Orbital angle of closest approach to the star in degrees, measured from a fixed reference direction. Affects when peak insolation occurs during the year.",
 			value: state.perihelion,
 			display: `${state.perihelion.toFixed(0)}\u00B0`,
 			...SR.perihelion,

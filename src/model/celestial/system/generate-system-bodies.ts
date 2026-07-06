@@ -20,12 +20,20 @@ import {
 	rollStarAgeGyr,
 } from "@/model/celestial/star/star-types"
 import {
+	estimateGreenhouseFactor,
 	rollGasGiantGreenhouseFactor,
 	rollGreenhouseFactor,
 } from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
 import { estimateGasGiantSizeClass, estimateRockySizeClass } from "./size-class"
-import { SOL_SEED, SOL_STAR_AGE_GYR, SOL_SYSTEM_BODIES } from "./sol-system"
+import {
+	buildPlanet,
+	SOL_MAIN_WORLD_DEFAULTS,
+	SOL_SEED,
+	SOL_STAR_AGE_GYR,
+	SOL_SYSTEM_BODIES,
+	type SolPlanetSeed,
+} from "./sol-system"
 
 const GRAVITATIONAL_CONSTANT = 6.674e-11
 const STANDARD_GRAVITY_MS2 = 9.807
@@ -103,8 +111,8 @@ export interface SystemBody {
 	 * unused for asteroid belts. */
 	siderealDayHours: number
 	eccentricity: number
-	/** Argument of periapsis, in degrees. */
-	argumentOfPeriapsisDeg: number
+	/** Longitude of perihelion, in degrees. */
+	longitudeOfPerihelionDeg: number
 	/** 0 / unused for asteroid belts. */
 	axialTiltDeg: number
 	/** Orbital inclination, in degrees — see rollInclinationDeg. */
@@ -126,6 +134,10 @@ export interface SystemBody {
 	 * giants — see sol-system.ts's SolPlanetSeed.greenhouseFactor doc.
 	 * Unset (no known excess) for everything else. */
 	internalHeatTempK?: number
+	/** Longitude of the antistellar point (the spot on the surface directly
+	 * facing away from the star), in degrees 0-360 — only meaningful when
+	 * tideLock is set. Defaults to 180° when unset. */
+	antistellarLon?: number
 }
 
 type Zone = "epistellar" | "inner" | "outer"
@@ -187,12 +199,6 @@ function deviationToAU(deviation: number, luminositySol: number): number {
 	const celsius = deviationToCelsius(deviation)
 	const kelvin = celsius + 273.15
 	return auFromTemperature(kelvin, luminositySol)
-}
-
-function classifyZoneFromOrbitalDistanceAU(orbitalDistanceAU: number): Zone {
-	if (orbitalDistanceAU < 0.5) return "epistellar"
-	if (orbitalDistanceAU <= 2.5) return "inner"
-	return "outer"
 }
 
 interface Slot {
@@ -1025,20 +1031,34 @@ function computeGravityG(massKg: number, diameterKm: number): number {
  * sliders, not RNG rolls — everything else (classification, atmosphere,
  * density, greenhouse factor, ...) is derived via the same
  * buildBodyEnvironment() path every sibling planet uses. */
+/** The main world's raw physical parameters come from the user's live UI
+ * sliders, not RNG rolls -- everything else (classification, hydrosphere,
+ * texture, ...) is fixed the same way it is for every other Sol body, since
+ * the main world is hydrated by the exact same buildPlanet() (see
+ * buildMainWorldSeed below). */
 export interface HomeWorldParams {
+	name?: string
 	orbitalDistanceAU: number
 	diameterKm: number
 	moons: MoonParams[]
 	massKg: number
 	gravityG: number
-	orbitalPeriodDays: number
 	siderealDayHours: number
 	eccentricity: number
-	argumentOfPeriapsisDeg: number
+	longitudeOfPerihelionDeg?: number
 	axialTiltDeg: number
 	inclinationDeg?: number
-	longitudeOfAscendingNodeDeg?: number
 	tideLock?: TideLock | null
+	atmosphere?: AtmosphereProfile | null
+	/** Real fitted values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) --
+	 * only supplied when generating the real Sol seed's Earth. A
+	 * procedurally generated main world has no "real" albedo (left unset,
+	 * same as any other generated body -- the UI estimates one from land
+	 * coverage) but still needs a real greenhouseFactor NUMBER (unlike
+	 * albedo, the stats UI has no estimate fallback for a missing one), so
+	 * that one gets a heuristic estimate when not supplied. */
+	albedo?: number
+	greenhouseFactor?: number
 }
 
 interface GenerateSystemBodiesParams {
@@ -1049,51 +1069,45 @@ interface GenerateSystemBodiesParams {
 	mainWorld: HomeWorldParams
 }
 
-// The main world always keeps its real, user-supplied orbitalDistanceAU and
-// physical parameters — it's routed through the exact same
-// buildBodyEnvironment() construction path every sibling body uses, just
-// with those parameters supplied directly instead of rolled from RNG. Its
-// deviation is pinned to 0 (the "temperate" slot reserved for it below) so
-// it always lands in the habitable-zone-adjacent classification, and it
-// still gets a fresh inclination/ascending-node roll from the same seeded
-// sequence used for whichever sibling set (procedural or Sol) it's paired
-// with, unless the caller supplies an override.
-function buildHomeBody(
-	rng: ReturnType<typeof createRng>,
-	mainWorld: HomeWorldParams,
-	texturePath?: string,
-): SystemBody {
-	const environment = buildBodyEnvironment({
-		rng,
-		groupHint: "terrestrial",
-		zone: classifyZoneFromOrbitalDistanceAU(mainWorld.orbitalDistanceAU),
-		deviation: 0,
-		diameterKm: mainWorld.diameterKm,
-		massKg: mainWorld.massKg,
-		orbitalDistanceAU: mainWorld.orbitalDistanceAU,
-		isPrimaryWorld: true,
-		isMoon: false,
-		tidal: false,
-	})
+// Builds a live SolPlanetSeed for the main world from the user's current UI
+// state -- hydrated by the exact same buildPlanet() every other Sol body
+// uses (see sol-system.ts), just from this freshly-built seed instead of a
+// fixed table entry. Its deviation/zone is always the temperate slot (see
+// the deviation: 0 reservation below), and real Earth data (Bond albedo,
+// fitted greenhouseFactor, real inclination/longitude of perihelion) only
+// applies when this actually IS Earth (the Sol seed) -- see the SOL_SEED
+// branch below, which merges in SOL_MAIN_WORLD_DEFAULTS's real values.
+function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
+	const diameterEarths = mainWorld.diameterKm / EARTH_DIAMETER_KM
+	const massEarths = mainWorld.massKg / EARTH_MASS_KG
+	const density = buildDensityProfile(
+		mainWorld.massKg,
+		mainWorld.diameterKm,
+		"tectonic",
+	)
+	const pressureBar = mainWorld.atmosphere?.pressureBar ?? 0
 	return {
-		...environment,
-		idx: -1,
-		tideLock: mainWorld.tideLock,
+		name: mainWorld.name,
 		isMainWorld: true,
-		orbitalDistanceAU: mainWorld.orbitalDistanceAU,
-		diameterKm: mainWorld.diameterKm,
-		massKg: mainWorld.massKg,
+		group: "terrestrial",
+		classification: "tectonic",
+		au: mainWorld.orbitalDistanceAU,
+		diameterEarths,
+		massEarths,
 		gravityG: mainWorld.gravityG,
-		orbitalPeriodDays: mainWorld.orbitalPeriodDays,
-		siderealDayHours: mainWorld.siderealDayHours,
+		densityEarthRelative: density?.earthRelative ?? 1,
+		densityDescription: density?.description ?? "Rock and Metal",
+		rotationHours: mainWorld.siderealDayHours,
+		tiltDeg: mainWorld.axialTiltDeg,
 		eccentricity: mainWorld.eccentricity,
-		argumentOfPeriapsisDeg: mainWorld.argumentOfPeriapsisDeg,
-		axialTiltDeg: mainWorld.axialTiltDeg,
-		inclinationDeg: mainWorld.inclinationDeg ?? rollInclinationDeg(rng),
-		longitudeOfAscendingNodeDeg:
-			mainWorld.longitudeOfAscendingNodeDeg ?? rng.uniform(0, 360),
-		moons: attachParentTideLocks(mainWorld.moons, -1),
-		texturePath,
+		longitudeOfPerihelionDeg: mainWorld.longitudeOfPerihelionDeg,
+		inclinationDeg: mainWorld.inclinationDeg,
+		tideLock: mainWorld.tideLock,
+		atmosphere: mainWorld.atmosphere ?? undefined,
+		hydrosphereFraction: 0.71,
+		albedo: mainWorld.albedo,
+		greenhouseFactor:
+			mainWorld.greenhouseFactor ?? estimateGreenhouseFactor(pressureBar),
 	}
 }
 
@@ -1113,9 +1127,17 @@ export function generateSystemBodies(
 	const rng = createRng(seed)
 
 	if (seed === SOL_SEED) {
+		const mainWorldSeed: SolPlanetSeed = {
+			...buildMainWorldSeed(mainWorld),
+			inclinationDeg:
+				mainWorld.inclinationDeg ?? SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
+		}
 		return [
 			...SOL_SYSTEM_BODIES,
-			buildHomeBody(rng, mainWorld, "/2k_earth.jpg"),
+			buildPlanet(mainWorldSeed, seed, -1, {
+				textureOverride: "/2k_earth.jpg",
+				moonsOverride: mainWorld.moons,
+			}),
 		].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 	}
 
@@ -1226,7 +1248,7 @@ export function generateSystemBodies(
 					? 0
 					: rollSiderealDayHours(rng, group === "jovian", starAgeGyr),
 			eccentricity: group === "asteroid belt" ? 0 : rollEccentricity(rng),
-			argumentOfPeriapsisDeg: rng.uniform(0, 360),
+			longitudeOfPerihelionDeg: rng.uniform(0, 360),
 			axialTiltDeg: group === "asteroid belt" ? 0 : rollAxialTiltDeg(rng),
 			inclinationDeg: group === "asteroid belt" ? 0 : rollInclinationDeg(rng),
 			longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
@@ -1234,7 +1256,10 @@ export function generateSystemBodies(
 		}
 	})
 
-	const mainBody = buildHomeBody(rng, mainWorld)
+	const mainBody = buildPlanet(buildMainWorldSeed(mainWorld), seed, -1, {
+		starMassSol,
+		moonsOverride: mainWorld.moons,
+	})
 
 	return [...siblings, mainBody].sort(
 		(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,

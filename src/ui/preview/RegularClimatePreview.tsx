@@ -115,7 +115,7 @@ function buildPreviewChartProps(
 				columnValues: preview.columnValues,
 				columnLabels: preview.columnLabels,
 				colorForValue: buildNormalizedTemperatureColorFn(preview.heat),
-				legendTitle: "Temperature",
+				legendTitle: `Temperature · ${formatTemperature(preview.avgTemp, unitSystem, 1, { compact: true })}`,
 				formatLegendValue: (value: number) =>
 					formatTemperature(value, unitSystem, 1, { compact: true }),
 				tooltipLabel: ({

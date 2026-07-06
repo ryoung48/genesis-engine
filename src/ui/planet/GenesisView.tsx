@@ -22,7 +22,10 @@ import {
 	generateSystemBodies,
 	type SystemBody,
 } from "@/model/celestial/system/generate-system-bodies"
-import { SOL_SEED } from "@/model/celestial/system/sol-system"
+import {
+	SOL_MAIN_WORLD_DEFAULTS,
+	SOL_SEED,
+} from "@/model/celestial/system/sol-system"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import {
@@ -748,21 +751,6 @@ export const GenesisView: React.FC = () => {
 	const [restSeed, setRestSeed] = useState(
 		initialDecodedCode?.restSeed ?? SOL_SEED,
 	)
-	const [mainWorldInclinationDeg, setMainWorldInclinationDeg] = useState<
-		number | null
-	>(null)
-	const [
-		mainWorldInclinationOverrideActive,
-		setMainWorldInclinationOverrideActive,
-	] = useState(false)
-	const [
-		mainWorldLongitudeOfAscendingNodeDeg,
-		setMainWorldLongitudeOfAscendingNodeDeg,
-	] = useState<number | null>(null)
-	const [
-		mainWorldLongitudeOfAscendingNodeOverrideActive,
-		setMainWorldLongitudeOfAscendingNodeOverrideActive,
-	] = useState(false)
 
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
@@ -2851,22 +2839,22 @@ export const GenesisView: React.FC = () => {
 				(6.674e-11 * derivePlanetMassKg(planetRadiusKm)) /
 				(planetRadiusKm * 1000) ** 2 /
 				9.807,
-			orbitalPeriodDays: effectiveDaysPerYear,
 			siderealDayHours: hoursPerDay,
 			eccentricity,
-			argumentOfPeriapsisDeg: perihelion,
+			longitudeOfPerihelionDeg: perihelion,
 			axialTiltDeg: obliquity,
 			atmosphere: buildPressureAtmosphereProfile(pressure),
-			inclinationDeg:
-				mainWorldInclinationOverrideActive && mainWorldInclinationDeg !== null
-					? mainWorldInclinationDeg
-					: undefined,
-			longitudeOfAscendingNodeDeg:
-				mainWorldLongitudeOfAscendingNodeOverrideActive &&
-				mainWorldLongitudeOfAscendingNodeDeg !== null
-					? mainWorldLongitudeOfAscendingNodeDeg
-					: undefined,
 			tideLock,
+			// Only the real Sol seed's Earth has known real climate-fit
+			// values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) -- a
+			// procedurally generated homeworld has no "real" data, so it
+			// keeps using the generic roll/estimate every other body gets.
+			albedo:
+				restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.albedo : undefined,
+			greenhouseFactor:
+				restSeed === SOL_SEED
+					? SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor
+					: undefined,
 		}
 		return generateSystemBodies({
 			seed: restSeed,
@@ -2883,15 +2871,10 @@ export const GenesisView: React.FC = () => {
 		orbitalDistanceAU,
 		planetRadiusKm,
 		generatedMoonsPreview,
-		effectiveDaysPerYear,
 		eccentricity,
 		perihelion,
 		obliquity,
 		pressure,
-		mainWorldInclinationDeg,
-		mainWorldInclinationOverrideActive,
-		mainWorldLongitudeOfAscendingNodeDeg,
-		mainWorldLongitudeOfAscendingNodeOverrideActive,
 		tideLock,
 	])
 	const [editableSystemBodies, setEditableSystemBodies] = useState<
@@ -2899,32 +2882,12 @@ export const GenesisView: React.FC = () => {
 	>([])
 	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
 	useEffect(() => {
-		setMainWorldInclinationDeg(null)
-		setMainWorldInclinationOverrideActive(false)
-		setMainWorldLongitudeOfAscendingNodeDeg(null)
-		setMainWorldLongitudeOfAscendingNodeOverrideActive(false)
-	}, [])
-	useEffect(() => {
 		if (skipNextGeneratedSystemBodiesSyncRef.current) {
 			skipNextGeneratedSystemBodiesSyncRef.current = false
 			return
 		}
 		setEditableSystemBodies(generatedSystemBodies)
 	}, [generatedSystemBodies])
-	useEffect(() => {
-		const mainWorldBody = generatedSystemBodies.find((body) => body.isMainWorld)
-		if (!mainWorldBody) return
-		if (mainWorldInclinationDeg === null)
-			setMainWorldInclinationDeg(mainWorldBody.inclinationDeg)
-		if (mainWorldLongitudeOfAscendingNodeDeg === null)
-			setMainWorldLongitudeOfAscendingNodeDeg(
-				mainWorldBody.longitudeOfAscendingNodeDeg,
-			)
-	}, [
-		generatedSystemBodies,
-		mainWorldInclinationDeg,
-		mainWorldLongitudeOfAscendingNodeDeg,
-	])
 	const systemBodies =
 		editableSystemBodies.length > 0
 			? editableSystemBodies
@@ -2999,6 +2962,49 @@ export const GenesisView: React.FC = () => {
 			)
 		},
 		[],
+	)
+	// Rebuilds a body (and everything nested inside it, e.g. its moons) back
+	// to its freshly-generated defaults for the current seed, without
+	// touching any other body -- e.g. rebuilding Earth also rebuilds Luna
+	// (nested in Earth's own `moons`), but leaves Mars/Jupiter/etc alone.
+	// Omitting `bodyIndex` rebuilds the whole system (star-level reset).
+	//
+	// The main world is a special case: unlike every other body, its own
+	// physical params (radius/obliquity/day length/orbital distance/
+	// eccentricity/perihelion/pressure) are owned by top-level React state
+	// (the 3D scene and terrain pipeline read them directly there), not
+	// derived purely from the seed -- so `generatedSystemBodies` always
+	// reflects whatever that state currently holds, edited or not. Just
+	// replacing the array entry would regenerate the SAME edited values.
+	// Resetting the main world means resetting that top-level state back to
+	// its defaults too.
+	const rebuildSystemBody = useCallback(
+		(bodyIndex?: number) => {
+			const isMainWorldReset =
+				bodyIndex !== undefined &&
+				generatedSystemBodies[bodyIndex]?.isMainWorld
+			if (bodyIndex === undefined || isMainWorldReset) {
+				setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
+				setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
+				setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
+				setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
+				setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
+				setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
+				setPressure(DEFAULT_WORLD_PARAMS.pressure)
+				setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
+				setTideLock(null)
+			}
+			if (bodyIndex === undefined) {
+				setEditableSystemBodies(generatedSystemBodies)
+				return
+			}
+			setEditableSystemBodies((prev) =>
+				prev.map((body, index) =>
+					index === bodyIndex ? (generatedSystemBodies[index] ?? body) : body,
+				),
+			)
+		},
+		[generatedSystemBodies],
 	)
 	const updateEditableSystemMoon = useCallback(
 		(
@@ -3161,16 +3167,6 @@ export const GenesisView: React.FC = () => {
 				setGenerationPanelOpen(snapshot.generationPanelOpen)
 				setGenerationPreviewTab(snapshot.generationPreviewTab)
 				setWorldTab(snapshot.worldTab)
-				setMainWorldInclinationDeg(snapshot.mainWorldInclinationDeg)
-				setMainWorldInclinationOverrideActive(
-					snapshot.mainWorldInclinationOverrideActive,
-				)
-				setMainWorldLongitudeOfAscendingNodeDeg(
-					snapshot.mainWorldLongitudeOfAscendingNodeDeg,
-				)
-				setMainWorldLongitudeOfAscendingNodeOverrideActive(
-					snapshot.mainWorldLongitudeOfAscendingNodeOverrideActive,
-				)
 				setCurrentFocus(snapshot.currentFocus)
 				setPendingFocus(
 					snapshot.solarSystemViewActive ? snapshot.currentFocus : null,
@@ -3230,10 +3226,6 @@ export const GenesisView: React.FC = () => {
 			generationPanelOpen,
 			generationPreviewTab,
 			worldTab,
-			mainWorldInclinationDeg,
-			mainWorldInclinationOverrideActive,
-			mainWorldLongitudeOfAscendingNodeDeg,
-			mainWorldLongitudeOfAscendingNodeOverrideActive,
 		}).catch((error) => {
 			console.warn(
 				`Failed to persist generation session to ${GENERATION_SESSION_STORAGE_KEY}:`,
@@ -3246,10 +3238,6 @@ export const GenesisView: React.FC = () => {
 		generationPanelOpen,
 		generationPreviewTab,
 		generationSessionRestored,
-		mainWorldInclinationDeg,
-		mainWorldInclinationOverrideActive,
-		mainWorldLongitudeOfAscendingNodeDeg,
-		mainWorldLongitudeOfAscendingNodeOverrideActive,
 		solarSystemViewActive,
 		world,
 		worldTab,
@@ -3432,6 +3420,7 @@ export const GenesisView: React.FC = () => {
 					systemBodies={systemBodies}
 					onUpdateSystemBody={updateEditableSystemBody}
 					onUpdateSystemMoon={updateEditableSystemMoon}
+					onRebuildSystemBody={rebuildSystemBody}
 					onFocusBody={handleFocusBody}
 					currentFocus={currentFocus}
 					daysPerYear={daysPerYear}
@@ -3449,17 +3438,6 @@ export const GenesisView: React.FC = () => {
 					eccentricity={eccentricity}
 					perihelion={perihelion}
 					obliquity={obliquity}
-					inclinationDeg={
-						systemBodies.find((b) => b.isMainWorld)?.inclinationDeg ?? 0
-					}
-					setInclinationDeg={(value) => {
-						setMainWorldInclinationOverrideActive(true)
-						setMainWorldInclinationDeg(value)
-					}}
-					longitudeOfAscendingNodeDeg={
-						systemBodies.find((b) => b.isMainWorld)
-							?.longitudeOfAscendingNodeDeg ?? 0
-					}
 					era={era}
 					setEra={setEra}
 					planetCode={planetCode}

@@ -56,7 +56,7 @@ export interface MoonParams {
 	eccentricity: number
 	inclinationDeg: number
 	longitudeOfAscendingNodeDeg: number
-	argumentOfPeriapsisDeg: number
+	longitudeOfPerihelionDeg: number
 	meanAnomalyAtEpochDeg: number
 	axialTiltDeg: number
 	orbitRange?: MoonOrbitRange
@@ -71,6 +71,10 @@ export interface MoonParams {
 	/** What (if anything) this moon is tidally locked to. Most large moons end
 	 * up locked to their parent planet; null when not locked to anything. */
 	tideLock?: TideLock | null
+	/** Longitude of the antistellar point (the spot on the surface directly
+	 * facing away from the star), in degrees 0-360 — only meaningful when
+	 * tideLock is set. Defaults to 180° when unset. */
+	antistellarLon?: number
 }
 
 export const MAX_MOONS = 3

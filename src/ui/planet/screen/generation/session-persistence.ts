@@ -20,10 +20,6 @@ interface GenerationSessionSnapshot {
 	generationPanelOpen: boolean
 	generationPreviewTab: GenerationPreviewTab
 	worldTab: "planet" | "society"
-	mainWorldInclinationDeg: number | null
-	mainWorldInclinationOverrideActive: boolean
-	mainWorldLongitudeOfAscendingNodeDeg: number | null
-	mainWorldLongitudeOfAscendingNodeOverrideActive: boolean
 }
 
 type StoredGenerationSession = {
@@ -195,14 +191,7 @@ function isGenerationSessionSnapshot(
 		validGenerationPreviewTabs.has(
 			candidate.generationPreviewTab as GenerationPreviewTab,
 		) &&
-		(candidate.worldTab === "planet" || candidate.worldTab === "society") &&
-		(candidate.mainWorldInclinationDeg === null ||
-			typeof candidate.mainWorldInclinationDeg === "number") &&
-		typeof candidate.mainWorldInclinationOverrideActive === "boolean" &&
-		(candidate.mainWorldLongitudeOfAscendingNodeDeg === null ||
-			typeof candidate.mainWorldLongitudeOfAscendingNodeDeg === "number") &&
-		typeof candidate.mainWorldLongitudeOfAscendingNodeOverrideActive ===
-			"boolean"
+		(candidate.worldTab === "planet" || candidate.worldTab === "society")
 	)
 }
 

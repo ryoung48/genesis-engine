@@ -251,7 +251,10 @@ export function computePlanetStats(
 			: []),
 		{ label: "Tilt", value: `${obliquityValue.toFixed(1)} deg` },
 		{ label: "Ecc", value: eccentricityValue.toFixed(3) },
-		{ label: "Periapsis", value: `${perihelionValue.toFixed(0)} deg` },
+		{
+			label: "Perihelion",
+			value: `${perihelionValue.toFixed(0)} deg`,
+		},
 		{
 			label: "Star",
 			value: `${spectralClassValue}${Math.round(starSubtypeValue)}`,

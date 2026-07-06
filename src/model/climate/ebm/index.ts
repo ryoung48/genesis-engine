@@ -1,4 +1,4 @@
-import { ALBEDO } from "./albedo"
+import { ALBEDO, meanPolarAlbedoBoost } from "./albedo"
 import { EMB_CONSTANTS } from "./constants"
 import { INSOLATION } from "./insolation"
 
@@ -316,7 +316,9 @@ export class EnergyBalanceModel {
 		// A single characteristic albedo just to center the linearization --
 		// the real per-cell albedo (ALBEDO.update's ice/base table) still
 		// drives the actual absorbed flux every step.
-		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
+		const albedoEstimate =
+			(this.config.albedo ?? surface.ALBEDO.BASE) +
+			meanPolarAlbedoBoost(this.config.orbital.OBLIQUITY)
 		const internalHeatTempK = this.config.internalHeatTempK ?? 0
 		this.internalHeatFlux = stellar.SIGMA * internalHeatTempK ** 4
 		const meanSolarFlux = (s0 * (1 - albedoEstimate)) / 4
@@ -356,7 +358,9 @@ export class EnergyBalanceModel {
 		// Same characteristic-albedo simplification computeGreenhouseOLR()
 		// uses -- the actual per-day ice/base table needs a temperature to
 		// evaluate, which is exactly what we're solving for.
-		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
+		const albedoEstimate =
+			(this.config.albedo ?? surface.ALBEDO.BASE) +
+			meanPolarAlbedoBoost(this.config.orbital.OBLIQUITY)
 		const lower = new Array(grid.NUM_LAT)
 		const diag = new Array(grid.NUM_LAT)
 		const upper = new Array(grid.NUM_LAT)

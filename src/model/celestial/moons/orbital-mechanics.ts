@@ -62,7 +62,7 @@ const LUNA_OUTER_COMPANION: MoonParams = {
 	eccentricity: 0.038,
 	inclinationDeg: 4.8,
 	longitudeOfAscendingNodeDeg: 0,
-	argumentOfPeriapsisDeg: 0,
+	longitudeOfPerihelionDeg: 0,
 	meanAnomalyAtEpochDeg: 0,
 	axialTiltDeg: SOL_LUNA_DEFAULT.axialTiltDeg,
 	orbitRange: "outer",
@@ -85,7 +85,7 @@ const LUNA_INNER_COMPANION: MoonParams = {
 	eccentricity: 0.024,
 	inclinationDeg: 2.6,
 	longitudeOfAscendingNodeDeg: 0,
-	argumentOfPeriapsisDeg: 0,
+	longitudeOfPerihelionDeg: 0,
 	meanAnomalyAtEpochDeg: 0,
 	axialTiltDeg: SOL_LUNA_DEFAULT.axialTiltDeg,
 	orbitRange: "inner",
@@ -104,7 +104,7 @@ function withRandomizedAngles(baseMoon: MoonParams, seed: number): MoonParams {
 	return {
 		...baseMoon,
 		longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
-		argumentOfPeriapsisDeg: rng.uniform(0, 360),
+		longitudeOfPerihelionDeg: rng.uniform(0, 360),
 		meanAnomalyAtEpochDeg: rng.uniform(0, 360),
 	}
 }
@@ -539,7 +539,7 @@ function keplerMoonPositionVector(
 	const yOrb = r * Math.sin(nu)
 
 	// Euler rotations: ω (arg of periapsis), i (inclination), Ω (lon of ascending node)
-	const omega = (moon.argumentOfPeriapsisDeg * Math.PI) / 180
+	const omega = (moon.longitudeOfPerihelionDeg * Math.PI) / 180
 	const inc = (moon.inclinationDeg * Math.PI) / 180
 	const Omega = (moon.longitudeOfAscendingNodeDeg * Math.PI) / 180
 
@@ -680,7 +680,7 @@ export function generateMoons(
 		const eccentricity = rollMoonEccentricity(rng, orbitRange, sizeClass)
 		const inclinationDeg = rollInclinationDeg(rng)
 		const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
-		const argumentOfPeriapsisDeg = rng.uniform(0, 360)
+		const longitudeOfPerihelionDeg = rng.uniform(0, 360)
 		const meanAnomalyAtEpochDeg = rng.uniform(0, 360)
 		const axialTiltDeg = rollMoonAxialTiltDeg(rng)
 
@@ -697,7 +697,7 @@ export function generateMoons(
 			eccentricity,
 			inclinationDeg,
 			longitudeOfAscendingNodeDeg,
-			argumentOfPeriapsisDeg,
+			longitudeOfPerihelionDeg,
 			meanAnomalyAtEpochDeg,
 			axialTiltDeg,
 			orbitRange,

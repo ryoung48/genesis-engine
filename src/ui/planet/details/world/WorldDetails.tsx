@@ -48,7 +48,10 @@ function getWorldSections({
 			{ label: "Sun", value: stats.get("Sun") },
 			{ label: "Tilt", value: stats.get("Tilt") },
 			{ label: "Ecc", value: stats.get("Ecc") },
-			{ label: "Periapsis", value: stats.get("Periapsis") },
+			{
+				label: "Perihelion",
+				value: stats.get("Perihelion"),
+			},
 			{ label: "Year", value: stats.get("Year") },
 			{ label: "Sidereal Day", value: stats.get("Sidereal Day") },
 			{ label: "Solar Day", value: stats.get("Solar Day") },

@@ -2,6 +2,7 @@ import type {
 	AtmosphereProfile,
 	MoonOrbitRange,
 	MoonParams,
+	TideLock,
 } from "@/model/celestial/moons/moon-types"
 import {
 	attachParentTideLocks,
@@ -13,12 +14,27 @@ import { createRng } from "@/model/shared/rng"
 import type { SystemBody } from "./generate-system-bodies"
 import { estimatePlanetarySizeClass } from "./size-class"
 
-// Ported from galaxy-gen's src/model/system/sol/data.ts (SOL_PLANETS). Earth
-// is intentionally omitted — the caller's own main-world params always stand
-// in for it at the habitable-zone center. Real orbital inclination/ascending
-// node/periapsis values aren't part of the ported data (galaxy-gen only
-// tracks a display `angle`), so those are rolled the same way any other
-// generated body's are, seeded per-body for determinism.
+// Ported from galaxy-gen's src/model/system/sol/data.ts (SOL_PLANETS), plus
+// Earth/Luna as regular entries alongside them (see SOL_PLANET_SEEDS below)
+// -- Earth is tagged `isMainWorld: true`, the only thing that flag should
+// ever control (which extra terrain-generation fields the UI exposes for
+// editing), not a separate construction/editing code path. Its own physical
+// parameters (radius/obliquity/pressure/day length/...) are still supplied
+// live from the UI at generation time (see buildHomeBody), so its entry here
+// only carries the values that AREN'T user-editable: real Bond albedo,
+// fitted greenhouseFactor, and Luna's real orbital data.
+//
+// Real inclination (to the Sun's equator, for planets; to the parent's
+// equator, for moons -- every body's inclination is relative to whatever it
+// orbits' own equatorial plane, not the ecliptic) and longitude of
+// perihelion are now authored per body too (see
+// SolPlanetSeed/SolMoonSeed's inclinationDeg/longitudeOfPerihelionDeg docs) --
+// longitude of ascending node and mean anomaly at epoch still aren't part of
+// the ported data (galaxy-gen only tracks a display `angle`), and for
+// near-circular moon orbits longitude of perihelion isn't a stable/meaningful
+// real figure either, so those are still rolled the same way any other
+// generated body's are, seeded per-body for determinism. Luna is the one
+// exception with all four fixed to real values.
 
 const EARTH_DIAMETER_KM = 12742
 const EARTH_MASS_KG = 5.972e24
@@ -27,50 +43,6 @@ export const SOL_SEED = 0
 export const SOL_STAR_AGE_GYR = 4.6
 export const SOL_STAR_NAME = "Sol"
 export const SOL_MAIN_WORLD_NAME = "Earth"
-export const SOL_MAIN_WORLD_DEFAULTS = {
-	name: SOL_MAIN_WORLD_NAME,
-	planetRadiusKm: EARTH_DIAMETER_KM / 2,
-	obliquity: 23.5,
-	eccentricity: 0.0167,
-	orbitalDistanceAU: 1,
-	daysPerYear: 365,
-	hoursPerDay: 24,
-	pressureBar: 1,
-	antistellarLon: 180,
-	perihelion: 102,
-	moonCount: 1,
-} as const
-
-export const SOL_LUNA_DEFAULT: MoonParams = {
-	idx: 1,
-	name: "Luna",
-	massKg: 7.34e22,
-	diameterKm: 3474,
-	sizeClass: 2,
-	densityEarthRelative: 0.607,
-	densityDescription: "Mostly Rock",
-	group: "dwarf",
-	classification: "rockball",
-	hydrosphereFraction: 0,
-	atmosphere: {
-		code: 0,
-		pressureBar: 0,
-		type: "vacuum",
-		breathable: false,
-	},
-	orbitalPeriodDays: 27.3,
-	siderealDayHours: 27.3 * 24,
-	eccentricity: 0.055,
-	inclinationDeg: 5.1,
-	longitudeOfAscendingNodeDeg: 0,
-	argumentOfPeriapsisDeg: 0,
-	meanAnomalyAtEpochDeg: 0,
-	axialTiltDeg: 6.7,
-	orbitRange: "middle",
-	semiMajorAxisPlanetDiameters: 30.17,
-	albedo: 0.12,
-	greenhouseFactor: 0,
-}
 
 const SOL_PLANET_TEXTURE_BY_NAME: Partial<Record<string, string>> = {
 	Mercury: "/2k_mercury.jpg",
@@ -115,9 +87,28 @@ interface SolMoonSeed {
 	 * zero (no meaningful real greenhouse effect) for airless/trace-
 	 * atmosphere moons, same as Mercury. */
 	greenhouseFactor: number
+	/** Real orbital inclination (degrees, to the parent planet's equator --
+	 * the commonly-cited reference frame for a moon), used instead of
+	 * rollExtras()'s seeded-random roll when set. */
+	inclinationDeg?: number
+	/** Real longitude of perihelion (degrees). Only Luna has this authored --
+	 * for every other (near-circular) moon here, real longitude of
+	 * perihelion isn't a stable/meaningful published figure (it precesses
+	 * rapidly and is barely defined at low eccentricity), so it still gets a
+	 * rolled value like the ported data intends. */
+	longitudeOfPerihelionDeg?: number
+	/** Real longitude of ascending node (degrees). Only Luna has this
+	 * authored (as a simplified fixed 0 -- its real node regresses over an
+	 * 18.6-year cycle, so no single "real" value exists); every other moon
+	 * here still gets a rolled value. */
+	longitudeOfAscendingNodeDeg?: number
+	/** Real mean anomaly at epoch (degrees). Only Luna has this authored (as
+	 * a simplified fixed 0); every other moon here still gets a rolled
+	 * value. */
+	meanAnomalyAtEpochDeg?: number
 }
 
-interface SolPlanetSeed {
+export interface SolPlanetSeed {
 	name: string
 	group: SystemBody["group"]
 	classification: SystemBody["classification"]
@@ -132,7 +123,21 @@ interface SolPlanetSeed {
 	eccentricity: number
 	atmosphere?: AtmosphereProfile
 	hydrosphereFraction: number
+	/** Static real moon data, hydrated via buildMoon() -- unused when
+	 * `moonsOverride` is passed to buildPlanet() instead (the main world's
+	 * moons come from a live generation pipeline, not this fixed table). */
 	moons?: SolMoonSeed[]
+	/** What (if anything) this body is tidally locked to -- fixed/known for
+	 * the static bodies here (e.g. Pluto-Charon's mutual lock), or a live
+	 * user-controlled value for the main world. */
+	tideLock?: TideLock | null
+	/** Tags the main/home world -- the only thing this flag should ever
+	 * control is which extra (terrain-generation) fields the UI exposes for
+	 * editing, not a separate construction/editing code path: the main
+	 * world is built via buildPlanet() exactly like every other body here,
+	 * just from a live seed object (its own physical params come from the
+	 * UI at generation time) rather than a fixed table entry. */
+	isMainWorld?: boolean
 	/** Bond albedo, 0..1 (real measured value; NASA planetary fact sheets). */
 	albedo: number
 	/**
@@ -148,6 +153,10 @@ interface SolPlanetSeed {
 	 * Earth, just not usually called "greenhouse" for a gas giant.
 	 */
 	greenhouseFactor: number
+	/** Real orbital inclination (degrees, to the Sun's equator). */
+	inclinationDeg?: number
+	/** Real longitude of perihelion (degrees, J2000). */
+	longitudeOfPerihelionDeg?: number
 }
 
 /**
@@ -192,7 +201,7 @@ function rollExtras(seedTag: number) {
 	return {
 		inclinationDeg: rollInclinationDeg(r),
 		longitudeOfAscendingNodeDeg: r.uniform(0, 360),
-		argumentOfPeriapsisDeg: r.uniform(0, 360),
+		longitudeOfPerihelionDeg: r.uniform(0, 360),
 		meanAnomalyAtEpochDeg: r.uniform(0, 360),
 	}
 }
@@ -220,6 +229,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		hydrosphereFraction: 0,
 		albedo: 0.088,
 		greenhouseFactor: 0,
+		inclinationDeg: 3.38,
+		longitudeOfPerihelionDeg: 77.457,
 	},
 	{
 		name: "Venus",
@@ -248,6 +259,71 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// seedPerLatitudeEquilibrium()), not by time-stepping to convergence --
 		// gives 463.82C, no meaningful time-stepping needed.
 		greenhouseFactor: 9,
+		inclinationDeg: 3.86,
+		longitudeOfPerihelionDeg: 131.533,
+	},
+	{
+		name: SOL_MAIN_WORLD_NAME,
+		isMainWorld: true,
+		group: "terrestrial",
+		// Matches classifyBody()'s isPrimaryWorld branch in
+		// generate-system-bodies.ts -- Earth is now built live by buildPlanet()
+		// exactly like every other body here, just from a live seed object
+		// whose physical params (radius/obliquity/pressure/day length/
+		// orbital distance/eccentricity/moons) get overwritten with the
+		// user's live UI state before each call.
+		classification: "tectonic",
+		au: 1,
+		diameterEarths: 1,
+		massEarths: 1,
+		gravityG: 1,
+		densityEarthRelative: 1,
+		densityDescription: "Rock and Metal",
+		rotationHours: 24,
+		tiltDeg: 23.5,
+		eccentricity: 0.0167,
+		inclinationDeg: 7.25,
+		longitudeOfPerihelionDeg: 102,
+		hydrosphereFraction: 0.71,
+		/** Real Earth Bond albedo (NASA planetary fact sheet). */
+		albedo: 0.3,
+		/** Refit against Earth's real ~14.8C mean surface temp with
+		 * ice-albedo feedback disabled (see ebm/earth-refit.smoke.test.ts) --
+		 * was 0.55 before that change. */
+		greenhouseFactor: 0.534,
+		moons: [
+			{
+				name: "Luna",
+				group: "dwarf",
+				classification: "rockball",
+				diameterEarths: 3474 / EARTH_DIAMETER_KM,
+				massEarths: 7.34e22 / EARTH_MASS_KG,
+				gravityG: 0.166,
+				densityEarthRelative: 0.607,
+				densityDescription: "Mostly Rock",
+				rotationHours: 27.3 * 24,
+				tiltDeg: 6.7,
+				eccentricity: 0.055,
+				pd: 30.17,
+				orbitRange: "middle",
+				atmosphere: {
+					code: 0,
+					pressureBar: 0,
+					type: "vacuum",
+					breathable: false,
+				},
+				hydrosphereFraction: 0,
+				albedo: 0.12,
+				greenhouseFactor: 0,
+				// Luna's real inclination/node/periapsis/anomaly are
+				// well-known, unlike every other moon here (which get a
+				// seeded roll instead).
+				inclinationDeg: 5.1,
+				longitudeOfAscendingNodeDeg: 0,
+				longitudeOfPerihelionDeg: 0,
+				meanAnomalyAtEpochDeg: 0,
+			},
+		],
 	},
 	{
 		name: "Mars",
@@ -273,6 +349,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// Fit against Mars's real ~-63C mean surface temp -- barely above 0,
 		// consistent with its thin CO2 atmosphere providing almost no warming.
 		greenhouseFactor: 0.0084,
+		inclinationDeg: 5.65,
+		longitudeOfPerihelionDeg: 336.041,
 		moons: [
 			{
 				name: "Phobos",
@@ -291,6 +369,9 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0,
 				albedo: 0.07,
 				greenhouseFactor: 0,
+				// Real inclination to Mars's equator; near-circular orbit
+				// makes a stable real longitude of perihelion undefined.
+				inclinationDeg: 1.093,
 			},
 			{
 				name: "Deimos",
@@ -309,6 +390,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0,
 				albedo: 0.08,
 				greenhouseFactor: 0,
+				inclinationDeg: 1.791,
 			},
 		],
 	},
@@ -356,6 +438,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// buildPlanet()) -- this remaining value represents the lapse-rate/
 		// opacity gap up to the 1-bar level, not internal heat.
 		greenhouseFactor: 1.4332,
+		inclinationDeg: 6.09,
+		longitudeOfPerihelionDeg: 14.754,
 		moons: [
 			{
 				name: "Io",
@@ -374,6 +458,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0,
 				albedo: 0.63,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.036,
 			},
 			{
 				name: "Europa",
@@ -392,6 +477,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.8,
 				albedo: 0.67,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.466,
 			},
 			{
 				name: "Ganymede",
@@ -410,6 +496,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.8,
 				albedo: 0.43,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.177,
 			},
 			{
 				name: "Callisto",
@@ -428,6 +515,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.8,
 				albedo: 0.22,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.192,
 			},
 		],
 	},
@@ -456,6 +544,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// Fit against Saturn's real ~-139C 1-bar-level temp, WITH
 		// estimateGasGiantInternalHeatTempK's ~77K already applied.
 		greenhouseFactor: 1.9196,
+		inclinationDeg: 5.51,
+		longitudeOfPerihelionDeg: 92.432,
 		moons: [
 			{
 				name: "Enceladus",
@@ -474,6 +564,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.8,
 				albedo: 0.81,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.009,
 			},
 			{
 				name: "Titan",
@@ -502,6 +593,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				// 1.45 bar N2/CH4 atmosphere gives a real, well-characterized
 				// greenhouse effect unlike every other Sol moon here.
 				greenhouseFactor: 0.6942,
+				inclinationDeg: 0.348,
 			},
 		],
 	},
@@ -535,6 +627,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// error on top of the real lapse-rate gap. Not a "purer" greenhouse
 		// value than Jupiter/Saturn's despite Uranus's real heat anomaly.
 		greenhouseFactor: 1.3257,
+		inclinationDeg: 6.48,
+		longitudeOfPerihelionDeg: 170.964,
 		moons: [
 			{
 				name: "Titania",
@@ -553,6 +647,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.6,
 				albedo: 0.35,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.34,
 			},
 			{
 				name: "Oberon",
@@ -571,6 +666,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.6,
 				albedo: 0.31,
 				greenhouseFactor: 0,
+				inclinationDeg: 0.058,
 			},
 		],
 	},
@@ -606,6 +702,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// from the Sun) closes that gap; this fitted value now represents just
 		// the remaining lapse-rate/opacity gap, same as the other giants.
 		greenhouseFactor: 2.4833,
+		inclinationDeg: 6.43,
+		longitudeOfPerihelionDeg: 44.971,
 		moons: [
 			{
 				name: "Triton",
@@ -619,6 +717,10 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				rotationHours: 141.04,
 				tiltDeg: 156.8,
 				eccentricity: 0,
+				// Retrograde orbit -- real inclination to Neptune's equator
+				// is ~156.8°, coincidentally close to its axial tilt above
+				// (both are consequences of its retrograde capture origin).
+				inclinationDeg: 156.8,
 				pd: 7.16,
 				orbitRange: "middle",
 				atmosphere: {
@@ -650,6 +752,10 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		rotationHours: 153.3,
 		tiltDeg: 119.6,
 		eccentricity: 0.248,
+		// Pluto-Charon is a mutual (double-synchronous) lock -- unlike every
+		// other preset planet here, Pluto itself keeps one face toward its
+		// moon rather than the star having any bearing on its rotation.
+		tideLock: { type: "lunar", target: 1 },
 		atmosphere: {
 			code: 1,
 			pressureBar: 0.03,
@@ -666,6 +772,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		// actually warms the surface. Not a sign of unusually potent Plutonian
 		// atmospheric trapping.
 		greenhouseFactor: 44.2956,
+		inclinationDeg: 11.88,
+		longitudeOfPerihelionDeg: 224.067,
 		moons: [
 			{
 				name: "Charon",
@@ -684,6 +792,9 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				hydrosphereFraction: 0.6,
 				albedo: 0.35,
 				greenhouseFactor: 0,
+				// Mutually tidally locked with Pluto in the same plane as
+				// Pluto's own equator/orbit -- effectively 0.
+				inclinationDeg: 0.08,
 			},
 		],
 	},
@@ -694,7 +805,7 @@ function buildMoon(
 	idx: number,
 	seedTag: number,
 ): MoonParams {
-	const extras = rollExtras(seedTag)
+	const rolled = rollExtras(seedTag)
 	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
 	return {
 		idx,
@@ -715,10 +826,13 @@ function buildMoon(
 		// from the ported data, not derived from orbitalPeriodDays.
 		siderealDayHours: seed.rotationHours,
 		eccentricity: seed.eccentricity,
-		inclinationDeg: extras.inclinationDeg,
-		longitudeOfAscendingNodeDeg: extras.longitudeOfAscendingNodeDeg,
-		argumentOfPeriapsisDeg: extras.argumentOfPeriapsisDeg,
-		meanAnomalyAtEpochDeg: extras.meanAnomalyAtEpochDeg,
+		inclinationDeg: seed.inclinationDeg ?? rolled.inclinationDeg,
+		longitudeOfAscendingNodeDeg:
+			seed.longitudeOfAscendingNodeDeg ?? rolled.longitudeOfAscendingNodeDeg,
+		longitudeOfPerihelionDeg:
+			seed.longitudeOfPerihelionDeg ?? rolled.longitudeOfPerihelionDeg,
+		meanAnomalyAtEpochDeg:
+			seed.meanAnomalyAtEpochDeg ?? rolled.meanAnomalyAtEpochDeg,
 		axialTiltDeg: seed.tiltDeg,
 		orbitRange: seed.orbitRange,
 		semiMajorAxisPlanetDiameters: seed.pd,
@@ -727,31 +841,53 @@ function buildMoon(
 	}
 }
 
+export interface BuildPlanetOptions {
+	/** Real orbital period needs the actual star's mass -- 1 (Sol) for the
+	 * static bodies here, but the main world can orbit an arbitrary
+	 * procedurally-generated star. Defaults to 1. */
+	starMassSol?: number
+	/** The main world's moons come from a live generation pipeline (already-
+	 * built MoonParams), not this file's static SolMoonSeed table -- bypasses
+	 * the seed.moons -> buildMoon() hydration below when supplied. */
+	moonsOverride?: MoonParams[]
+	/** Overrides the by-name texture lookup -- only the real Sol seed's Earth
+	 * gets its real texture; a live main world under a different star
+	 * doesn't. */
+	textureOverride?: string
+}
+
+// The single body-hydration path for every Sol body, real or live: Mercury
+// through Pluto hydrate straight from their fixed SolPlanetSeed entries, and
+// the main world (Earth, or a procedurally generated homeworld) hydrates
+// from a freshly-built live seed object whose physical params get
+// overwritten with the user's current UI state before each call -- see
+// generate-system-bodies.ts's buildMainWorldSeed.
 function buildPlanet(
 	seed: SolPlanetSeed,
 	seedTag: number,
 	idx: number,
+	options?: BuildPlanetOptions,
 ): SystemBody {
-	const extras = rollExtras(seedTag)
+	const rolled = rollExtras(seedTag)
 	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
 	const massKg = seed.massEarths * EARTH_MASS_KG
-	const orbitalPeriodDays = getKeplerYearYears(seed.au, 1) * 365.25
-	const moons = attachParentTideLocks(
-		(seed.moons ?? []).map((moonSeed, i) =>
-			buildMoon(moonSeed, i + 1, seedTag * 100 + i + 1),
-		),
-		idx,
-	)
+	const orbitalPeriodDays =
+		getKeplerYearYears(seed.au, options?.starMassSol ?? 1) * 365.25
+	const moons = options?.moonsOverride
+		? attachParentTideLocks(options.moonsOverride, idx)
+		: attachParentTideLocks(
+				(seed.moons ?? []).map((moonSeed, i) =>
+					buildMoon(moonSeed, i + 1, seedTag * 100 + i + 1),
+				),
+				idx,
+			)
 	const internalHeatTempK =
 		seed.group === "jovian"
 			? estimateGasGiantInternalHeatTempK(seed.massEarths, SOL_STAR_AGE_GYR)
 			: 0
 	return {
 		idx,
-		// Pluto-Charon is a mutual (double-synchronous) lock -- unlike every
-		// other preset planet here, Pluto itself keeps one face toward its
-		// moon rather than the star having any bearing on its rotation.
-		tideLock: seed.name === "Pluto" ? { type: "lunar", target: 1 } : undefined,
+		tideLock: seed.tideLock,
 		name: seed.name,
 		sizeClass:
 			seed.group === "asteroid belt"
@@ -766,11 +902,12 @@ function buildPlanet(
 					},
 		group: seed.group,
 		classification: seed.classification,
-		texturePath: SOL_PLANET_TEXTURE_BY_NAME[seed.name],
+		texturePath:
+			options?.textureOverride ?? SOL_PLANET_TEXTURE_BY_NAME[seed.name],
 		rings: SOL_PLANET_RINGS_BY_NAME[seed.name],
 		hydrosphereFraction: seed.hydrosphereFraction,
 		atmosphere: seed.atmosphere ?? null,
-		isMainWorld: false,
+		isMainWorld: seed.isMainWorld ?? false,
 		orbitalDistanceAU: seed.au,
 		diameterKm,
 		massKg,
@@ -778,10 +915,11 @@ function buildPlanet(
 		orbitalPeriodDays,
 		siderealDayHours: seed.rotationHours,
 		eccentricity: seed.eccentricity,
-		argumentOfPeriapsisDeg: extras.argumentOfPeriapsisDeg,
+		longitudeOfPerihelionDeg:
+			seed.longitudeOfPerihelionDeg ?? rolled.longitudeOfPerihelionDeg,
 		axialTiltDeg: seed.tiltDeg,
-		inclinationDeg: extras.inclinationDeg,
-		longitudeOfAscendingNodeDeg: extras.longitudeOfAscendingNodeDeg,
+		inclinationDeg: seed.inclinationDeg ?? rolled.inclinationDeg,
+		longitudeOfAscendingNodeDeg: rolled.longitudeOfAscendingNodeDeg,
 		moons,
 		albedo: seed.albedo,
 		greenhouseFactor: seed.greenhouseFactor,
@@ -789,6 +927,51 @@ function buildPlanet(
 	}
 }
 
-export const SOL_SYSTEM_BODIES: SystemBody[] = SOL_PLANET_SEEDS.map((seed, i) =>
-	buildPlanet(seed, i + 1, i),
-)
+export { buildPlanet }
+
+// The main world is excluded here -- it's hydrated separately, per
+// generation, from a live seed (see generate-system-bodies.ts).
+export const SOL_SYSTEM_BODIES: SystemBody[] = SOL_PLANET_SEEDS.filter(
+	(seed) => !seed.isMainWorld,
+).map((seed, i) => buildPlanet(seed, i + 1, i))
+
+const EARTH_SEED = SOL_PLANET_SEEDS.find((seed) => seed.isMainWorld)
+if (!EARTH_SEED) throw new Error("SOL_PLANET_SEEDS is missing its Earth entry")
+const LUNA_SEED = EARTH_SEED.moons?.[0]
+if (!LUNA_SEED) throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
+
+// Centralized default parameters for Earth (the main world) and Luna (its
+// default moon) -- planetRadiusKm/obliquity/eccentricity/orbitalDistanceAU/
+// hoursPerDay/perihelion/albedo/greenhouseFactor come straight from the seed
+// entry above; the rest (daysPerYear/pressureBar/antistellarLon/moonCount,
+// and the terrain-generation defaults below) are UI-slider-default-only
+// concepts with no equivalent on any other (non-editable) Sol body, so they
+// stay here rather than on the seed.
+export const SOL_MAIN_WORLD_DEFAULTS = {
+	name: EARTH_SEED.name,
+	isMainWorld: true,
+	planetRadiusKm: (EARTH_SEED.diameterEarths * EARTH_DIAMETER_KM) / 2,
+	obliquity: EARTH_SEED.tiltDeg,
+	eccentricity: EARTH_SEED.eccentricity,
+	orbitalDistanceAU: EARTH_SEED.au,
+	daysPerYear: 365,
+	hoursPerDay: EARTH_SEED.rotationHours,
+	pressureBar: 1,
+	antistellarLon: 180,
+	perihelion: EARTH_SEED.longitudeOfPerihelionDeg ?? 102,
+	inclinationDeg: EARTH_SEED.inclinationDeg ?? 0,
+	moonCount: EARTH_SEED.moons?.length ?? 1,
+	albedo: EARTH_SEED.albedo,
+	greenhouseFactor: EARTH_SEED.greenhouseFactor,
+	/** Terrain-generation defaults (not orbital/climate data, but centralized
+	 * here alongside the rest of Earth's defaults so nothing duplicates
+	 * these numbers elsewhere). */
+	seaLevel: 1,
+	/** 1 - landDistribution, i.e. what the UI calls "Land/Ocean
+	 * Concentration" -- see sliders.ts. */
+	landConcentration: 0.75,
+	maxElevation: 6000,
+	volcanism: 1,
+} as const
+
+export const SOL_LUNA_DEFAULT: MoonParams = buildMoon(LUNA_SEED, 1, 0)

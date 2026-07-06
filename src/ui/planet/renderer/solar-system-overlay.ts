@@ -863,7 +863,7 @@ export function buildSolarSystemOverlay(
 			const e = showEllipticalOrbits ? p.body.eccentricity : 0
 			const inc = (showInclination ? p.body.inclinationDeg : 0) * DEG2RAD
 			const Omega = p.body.longitudeOfAscendingNodeDeg * DEG2RAD
-			const omega = p.body.argumentOfPeriapsisDeg * DEG2RAD
+			const omega = p.body.longitudeOfPerihelionDeg * DEG2RAD
 			const a = periapsis / (1 - e)
 			const b = a * Math.sqrt(1 - e * e)
 			const { P, Q } = perifocalBasis(Omega, inc, omega)

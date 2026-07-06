@@ -102,7 +102,7 @@ export const MoonOrbitsOverlay: React.FC<MoonOrbitsOverlayProps> = ({
 			const a = periapsis / (1 - e)
 			const b = a * Math.sqrt(1 - e * e)
 			const ae = a * e
-			const omegaDeg = moon.argumentOfPeriapsisDeg
+			const omegaDeg = moon.longitudeOfPerihelionDeg
 
 			// Moon position at `day`
 			const n = TWO_PI / moon.orbitalPeriodDays
