@@ -172,6 +172,7 @@ import {
 } from "./screen/display/religion-type"
 import {
 	DEFAULT_WORLD_PARAMS,
+	GENERATION_SESSION_STORAGE_KEY,
 	MAX_RECENT_CODES,
 	PLANET_CODE_STORAGE_KEY,
 	RECENT_CODES_STORAGE_KEY,
@@ -188,12 +189,19 @@ import {
 	pauseSimulation,
 	startSimulation,
 } from "./screen/generation/generation"
-import type { GenerationPreviewTab } from "./screen/generation/generation-preview"
+import {
+	GENERATION_PREVIEW_TABS,
+	type GenerationPreviewTab,
+} from "./screen/generation/generation-preview"
 import {
 	parseStoredCodeList,
 	pushRecentCode,
 	toggleStarredRecentCode,
 } from "./screen/generation/recent-codes"
+import {
+	loadGenerationSessionSnapshot,
+	saveGenerationSessionSnapshot,
+} from "./screen/generation/session-persistence"
 import {
 	buildPlanetSliders,
 	buildTerrainSliders,
@@ -513,6 +521,8 @@ export const GenesisView: React.FC = () => {
 		useState<GenerationPreviewTab>("climate")
 	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
+	const [generationSessionRestored, setGenerationSessionRestored] =
+		useState(false)
 
 	// Simulation state
 	const [simPlaying, setSimPlaying] = useState(false)
@@ -947,7 +957,6 @@ export const GenesisView: React.FC = () => {
 		pathfindingLand,
 		pathfindingSea,
 	])
-
 	// --- Color mode guard ---
 	useEffect(() => {
 		if (!world) return
@@ -2883,6 +2892,7 @@ export const GenesisView: React.FC = () => {
 	const [editableSystemBodies, setEditableSystemBodies] = useState<
 		SystemBody[]
 	>([])
+	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
 	useEffect(() => {
 		setMainWorldInclinationDeg(null)
 		setMainWorldInclinationOverrideActive(false)
@@ -2890,6 +2900,10 @@ export const GenesisView: React.FC = () => {
 		setMainWorldLongitudeOfAscendingNodeOverrideActive(false)
 	}, [])
 	useEffect(() => {
+		if (skipNextGeneratedSystemBodiesSyncRef.current) {
+			skipNextGeneratedSystemBodiesSyncRef.current = false
+			return
+		}
 		setEditableSystemBodies(generatedSystemBodies)
 	}, [generatedSystemBodies])
 	useEffect(() => {
@@ -3127,6 +3141,49 @@ export const GenesisView: React.FC = () => {
 		bodyIndex: number
 		moonIndex?: number
 	} | null>(null)
+	useEffect(() => {
+		if (typeof window === "undefined") return
+		let cancelled = false
+		void loadGenerationSessionSnapshot()
+			.then((snapshot) => {
+				if (cancelled || !snapshot) return
+				setWorld(snapshot.world)
+				setGenerationTimings(snapshot.world?.timings ?? null)
+				skipNextGeneratedSystemBodiesSyncRef.current =
+					snapshot.editableSystemBodies.length > 0
+				setEditableSystemBodies(snapshot.editableSystemBodies)
+				setSolarSystemViewActive(snapshot.solarSystemViewActive)
+				setGenerationPanelOpen(snapshot.generationPanelOpen)
+				setGenerationPreviewTab(snapshot.generationPreviewTab)
+				setWorldTab(snapshot.worldTab)
+				setMainWorldInclinationDeg(snapshot.mainWorldInclinationDeg)
+				setMainWorldInclinationOverrideActive(
+					snapshot.mainWorldInclinationOverrideActive,
+				)
+				setMainWorldLongitudeOfAscendingNodeDeg(
+					snapshot.mainWorldLongitudeOfAscendingNodeDeg,
+				)
+				setMainWorldLongitudeOfAscendingNodeOverrideActive(
+					snapshot.mainWorldLongitudeOfAscendingNodeOverrideActive,
+				)
+				setCurrentFocus(snapshot.currentFocus)
+				setPendingFocus(
+					snapshot.solarSystemViewActive ? snapshot.currentFocus : null,
+				)
+			})
+			.catch((error) => {
+				console.warn(
+					`Failed to restore generation session from ${GENERATION_SESSION_STORAGE_KEY}:`,
+					error,
+				)
+			})
+			.finally(() => {
+				if (!cancelled) setGenerationSessionRestored(true)
+			})
+		return () => {
+			cancelled = true
+		}
+	}, [])
 	const handleFocusBody = useCallback(
 		(bodyIndex: number, moonIndex?: number) => {
 			setSolarSystemViewActive(true)
@@ -3154,6 +3211,44 @@ export const GenesisView: React.FC = () => {
 		)
 		return () => sceneRef.current?.setSolarSystemFocusChangeHandler(null)
 	}, [])
+	useEffect(() => {
+		if (typeof window === "undefined" || !generationSessionRestored) return
+		const validGenerationPreviewTabs = new Set(
+			GENERATION_PREVIEW_TABS.map(([tab]) => tab),
+		)
+		if (!validGenerationPreviewTabs.has(generationPreviewTab)) return
+		void saveGenerationSessionSnapshot({
+			world,
+			editableSystemBodies,
+			solarSystemViewActive,
+			currentFocus,
+			generationPanelOpen,
+			generationPreviewTab,
+			worldTab,
+			mainWorldInclinationDeg,
+			mainWorldInclinationOverrideActive,
+			mainWorldLongitudeOfAscendingNodeDeg,
+			mainWorldLongitudeOfAscendingNodeOverrideActive,
+		}).catch((error) => {
+			console.warn(
+				`Failed to persist generation session to ${GENERATION_SESSION_STORAGE_KEY}:`,
+				error,
+			)
+		})
+	}, [
+		currentFocus,
+		editableSystemBodies,
+		generationPanelOpen,
+		generationPreviewTab,
+		generationSessionRestored,
+		mainWorldInclinationDeg,
+		mainWorldInclinationOverrideActive,
+		mainWorldLongitudeOfAscendingNodeDeg,
+		mainWorldLongitudeOfAscendingNodeOverrideActive,
+		solarSystemViewActive,
+		world,
+		worldTab,
+	])
 
 	// Clock-knob reference periods for whatever is currently focused — the
 	// knobs stay hidden for the star (no parent to orbit, and no rotation
@@ -3328,16 +3423,17 @@ export const GenesisView: React.FC = () => {
 					setRestSeed={setRestSeed}
 					tidalSchedulePreview={tidalSchedulePreview}
 					surfaceTidesM={surfaceTidesM}
-					generatedMoons={displayMoons}
-					siblingBodies={systemBodies.filter((b) => !b.isMainWorld)}
+					orbitBodies={systemBodies.filter((b) => !b.isMainWorld)}
 					systemBodies={systemBodies}
 					onUpdateSystemBody={updateEditableSystemBody}
 					onUpdateSystemMoon={updateEditableSystemMoon}
 					onFocusBody={handleFocusBody}
+					currentFocus={currentFocus}
 					daysPerYear={daysPerYear}
 					hoursPerDay={hoursPerDay}
 					setHoursPerDay={setHoursPerDay}
 					planetRadiusKm={planetRadiusKm}
+					generatedMoons={displayMoons}
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
 					spectralClass={spectralClass}
@@ -3347,6 +3443,7 @@ export const GenesisView: React.FC = () => {
 					orbitalDistanceAU={orbitalDistanceAU}
 					eccentricity={eccentricity}
 					perihelion={perihelion}
+					obliquity={obliquity}
 					inclinationDeg={
 						systemBodies.find((b) => b.isMainWorld)?.inclinationDeg ?? 0
 					}
@@ -3374,7 +3471,6 @@ export const GenesisView: React.FC = () => {
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
 					generationTimings={generationTimings}
-					obliquity={obliquity}
 					landCoverage={landCoverage}
 					generationPreviewTab={generationPreviewTab}
 					onSelectGenerationPreviewTab={setGenerationPreviewTab}

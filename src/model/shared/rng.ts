@@ -21,7 +21,7 @@ interface CreateRngOptions {
 	nonPositiveWeightBehavior?: "first" | "undefined"
 }
 
-function seedStringToNumber(seed: string): number {
+export function seedStringToNumber(seed: string): number {
 	const normalized = seed.trim().toLowerCase()
 	if (/^[0-9a-z]+$/.test(normalized)) {
 		const parsed = Number.parseInt(normalized, 36)

@@ -33,26 +33,15 @@ export const ALBEDO = {
 			iceAlbedo,
 		} = params
 		const { surface } = EMB_CONSTANTS
-		const obliquityFactor = Math.max(
-			0.1,
-			Math.min(1, orbital.OBLIQUITY / 23.5) ** 0.5,
-		)
-		const effectiveIceLimit =
-			EMB_CONSTANTS.thermal.ICE_LIMIT + (1 - obliquityFactor) * 5
+		void iceAlbedo
+		void temperature
+		void orbital
+		void lats_deg
 
 		for (let i = 0; i < EMB_CONSTANTS.grid.NUM_LAT; i++) {
-			const latitudeEffect = Math.abs(lats_deg[i]) / 90
-			const localIceLimit =
-				effectiveIceLimit + latitudeEffect * (1 - obliquityFactor) * 10
-
-			if (temperature[i][time] < localIceLimit) {
-				// Obliquity-based dampening kept as-is: higher-obliquity worlds get
-				// a less reflective ice cap in this model.
-				const sensitivity = Math.min(1, orbital.OBLIQUITY / 35)
-				albedo[i][time] = (iceAlbedo ?? surface.ALBEDO.ICE) - sensitivity * 0.2
-			} else {
-				albedo[i][time] = baseAlbedo ?? surface.ALBEDO.BASE
-			}
+			// Ice-albedo feedback temporarily disabled -- see luna-repro
+			// discussion. Always use the base albedo, no ice/no-ice threshold.
+			albedo[i][time] = baseAlbedo ?? surface.ALBEDO.BASE
 		}
 	},
 }

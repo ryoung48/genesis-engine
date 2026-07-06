@@ -2,8 +2,9 @@ import React from "react"
 import {
 	mapLinear,
 	sampleBasisColorStops,
+	sampleColorStops,
 } from "@/model/shared/color-interpolation"
-import { SPECTRAL_STOPS } from "@/model/shared/color-palettes"
+import { PURPLES_STOPS, SPECTRAL_STOPS } from "@/model/shared/color-palettes"
 import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import {
@@ -42,6 +43,23 @@ function buildNormalizedTemperatureColorFn(
 		)
 }
 
+function buildNormalizedDaylightColorFn(
+	matrix: readonly (readonly number[])[],
+): (value: number) => string {
+	let min = Infinity
+	let max = -Infinity
+	for (const row of matrix) {
+		for (const value of row) {
+			if (value < min) min = value
+			if (value > max) max = value
+		}
+	}
+	return (value: number) =>
+		rgbToCss(
+			sampleColorStops(PURPLES_STOPS, mapLinear(value, min, max, 1, 0, true)),
+		)
+}
+
 function buildPreviewChartProps(
 	preview: LockedClimatePreviewData,
 	activeTab: GenerationPreviewTab,
@@ -68,7 +86,7 @@ function buildPreviewChartProps(
 		case "daylight":
 			return {
 				matrix: preview.daylight,
-				colorForValue: preview.daylightColorFn,
+				colorForValue: buildNormalizedDaylightColorFn(preview.daylight),
 				legendTitle: "Daylight",
 				formatLegendValue: (value: number) => `${value.toFixed(1)} hrs`,
 				tooltipLabel: ({
