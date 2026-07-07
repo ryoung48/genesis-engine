@@ -1,8 +1,6 @@
 export const EARTH_DIAMETER_KM = 12_742
 export const SOLAR_DIAMETER_KM = 1_391_400
 const EARTH_MASS_KG = 5.973886146404331e24
-const GRAVITATIONAL_CONSTANT = 6.674e-11
-const STANDARD_GRAVITY_MS2 = 9.807
 
 export function computeEarthRelativeDensity(
 	massKg: number,
@@ -22,7 +20,14 @@ export function massKgFromEarthRelativeDensity(
 	return massEarths * EARTH_MASS_KG
 }
 
+// Relative to Earth (g/g⊕ = (M/M⊕) / (R/R⊕)²) rather than derived from
+// absolute physical constants (G, standard gravity) -- G cancels out of the
+// ratio entirely, so this is exact for any body instead of drifting off
+// 1.000g at Earth's own defaults the way a G/g0-based computation would
+// (see derivePlanetMassKg's EARTH_DENSITY_KG_M3 for the mass side of the
+// same problem).
 export function computeGravityG(massKg: number, diameterKm: number): number {
-	const radiusM = (diameterKm / 2) * 1000
-	return (GRAVITATIONAL_CONSTANT * massKg) / radiusM ** 2 / STANDARD_GRAVITY_MS2
+	const massEarths = massKg / EARTH_MASS_KG
+	const diameterEarths = diameterKm / EARTH_DIAMETER_KM
+	return massEarths / diameterEarths ** 2
 }

@@ -8,7 +8,6 @@ describe("Earth's moons survive generateSystemBodies (moonsOverride wiring)", ()
 			seed: SOL_SEED,
 			spectralClass: "G",
 			starSubtype: 2,
-			hoursPerDay: 24,
 			mainWorld: {
 				orbitalDistanceAU: 1,
 				diameterKm: 12742,

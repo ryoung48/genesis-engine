@@ -46,8 +46,6 @@ import {
 	type SeismologyProfile,
 } from "./system-seismology"
 
-const GRAVITATIONAL_CONSTANT = 6.674e-11
-const STANDARD_GRAVITY_MS2 = 9.807
 const DAYS_PER_YEAR = 365.25
 const EARTH_DIAMETER_KM = 12_742
 const EARTH_MASS_KG = 5.973886146404331e24
@@ -295,12 +293,83 @@ function rollDiameterKmFromSizeClass(
 	if (sizeClass < 0) return 0
 	if (sizeClass === 0) return rng.uniform(400, 800)
 	if (sizeClass === 1) return rng.uniform(1000, 2000)
+	if (sizeClass === 2) return rng.uniform(2800, 3600)
+	if (sizeClass === 3) return rng.uniform(4000, 5600)
+	if (sizeClass === 4) return rng.uniform(5600, 7200)
+	if (sizeClass === 5) return rng.uniform(7200, 8800)
+	if (sizeClass === 6) return rng.uniform(8800, 10400)
+	if (sizeClass === 7) return rng.uniform(10400, 12000)
+	if (sizeClass === 8) return rng.uniform(12000, 13600)
+	if (sizeClass === 9) return rng.uniform(13600, 15200)
+	if (sizeClass === 10) return rng.uniform(15200, 16800)
+	if (sizeClass === 11) return rng.uniform(16800, 18400)
+	if (sizeClass === 12) return rng.uniform(18400, 20000)
+	if (sizeClass === 13) return rng.uniform(20000, 21600)
+	if (sizeClass === 14) return rng.uniform(21600, 23199)
+	if (sizeClass === 15) return rng.uniform(23200, 24800)
 	if (sizeClass === 16) return rng.uniform(2, 6) * EARTH_DIAMETER_KM
 	if (sizeClass === 17) return rng.uniform(6, 12) * EARTH_DIAMETER_KM
 	if (sizeClass === 18) return rng.uniform(8, 18) * EARTH_DIAMETER_KM
 	const minKm = 1200 + sizeClass * 1600
 	const maxKm = minKm + 1600
 	return rng.uniform(minKm, maxKm)
+}
+
+// Ported from galaxy-gen's getDensityFromTable/calculateDensity (orbits/groups.ts):
+// composition (ice/rocky/metallic) picks a weighted density category, then a
+// 2d6-2 roll indexes one of 11 specific values within that category -- a
+// triangular distribution clustered around the category's middle, instead of
+// a flat uniform range.
+const DENSITY_TABLE: Record<string, number[]> = {
+	"Exotic Ice": [0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.3, 0.33],
+	"Mostly Ice": [0.18, 0.21, 0.24, 0.27, 0.3, 0.33, 0.36, 0.39, 0.41, 0.44, 0.47],
+	"Mostly Rock": [0.5, 0.53, 0.56, 0.59, 0.62, 0.65, 0.68, 0.71, 0.74, 0.77, 0.8],
+	"Rock and Metal": [0.82, 0.85, 0.88, 0.91, 0.94, 0.97, 1.0, 1.03, 1.06, 1.09, 1.12],
+	"Mostly Metal": [1.15, 1.18, 1.21, 1.24, 1.27, 1.3, 1.33, 1.36, 1.39, 1.42, 1.45],
+	"Compressed Metal": [1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2.0],
+}
+
+type DensityComposition = "ice" | "rocky" | "metallic"
+
+function classificationToComposition(
+	classification: OrbitClassification,
+): DensityComposition {
+	if (
+		classification === "snowball" ||
+		classification === "panthalassic" ||
+		classification === "helian"
+	) {
+		return "ice"
+	}
+	if (
+		classification === "telluric" ||
+		classification === "meltball" ||
+		classification === "stygian" ||
+		classification === "acheronian" ||
+		classification === "asphodelian"
+	) {
+		return "metallic"
+	}
+	return "rocky"
+}
+
+function rollDensityFromComposition(
+	rng: ReturnType<typeof createRng>,
+	composition: DensityComposition,
+): number {
+	const description = rng.weightedChoice([
+		{ v: "Exotic Ice", w: composition === "ice" ? 1 : 0 },
+		{ v: "Mostly Ice", w: composition === "ice" ? 5 : 0 },
+		{ v: "Mostly Rock", w: composition === "rocky" ? 3 : 0 },
+		{
+			v: "Rock and Metal",
+			w: composition === "metallic" || composition === "rocky" ? 4 : 0,
+		},
+		{ v: "Mostly Metal", w: composition === "metallic" ? 5 : 0 },
+		{ v: "Compressed Metal", w: composition === "metallic" ? 1 : 0 },
+	])
+	const densityRoll = roll2d6(rng) - 2
+	return DENSITY_TABLE[description as string][densityRoll]
 }
 
 function pickDensityEarthRelative(
@@ -311,33 +380,10 @@ function pickDensityEarthRelative(
 	if (group === "jovian" || classification === "chthonian") {
 		return rng.uniform(0.08, 0.35)
 	}
-	if (
-		classification === "snowball" ||
-		classification === "panthalassic" ||
-		classification === "helian"
-	) {
-		return rng.uniform(0.2, 0.6)
-	}
-	if (
-		classification === "rockball" ||
-		classification === "geo-cyclic" ||
-		classification === "arid" ||
-		classification === "tectonic" ||
-		classification === "oceanic" ||
-		classification === "vesperian"
-	) {
-		return rng.uniform(0.55, 1.05)
-	}
-	if (
-		classification === "telluric" ||
-		classification === "meltball" ||
-		classification === "stygian" ||
-		classification === "acheronian" ||
-		classification === "asphodelian"
-	) {
-		return rng.uniform(0.9, 1.5)
-	}
-	return rng.uniform(0.6, 1.2)
+	return rollDensityFromComposition(
+		rng,
+		classificationToComposition(classification),
+	)
 }
 
 function roll2d6(rng: ReturnType<typeof createRng>): number {
@@ -414,9 +460,13 @@ function massKgFromEarthRelativeDensity(
 	return massEarths * EARTH_MASS_KG
 }
 
+// Relative to Earth (see body-metrics.ts's computeGravityG doc) -- G cancels
+// out of the ratio, so this is exact instead of drifting off 1.000g at
+// Earth's own defaults.
 function computeGravityG(massKg: number, diameterKm: number): number {
-	const radiusM = (diameterKm / 2) * 1000
-	return (GRAVITATIONAL_CONSTANT * massKg) / radiusM ** 2 / STANDARD_GRAVITY_MS2
+	const massEarths = massKg / EARTH_MASS_KG
+	const diameterEarths = diameterKm / EARTH_DIAMETER_KM
+	return massEarths / diameterEarths ** 2
 }
 
 /** The main world's raw physical parameters come from the user's live UI

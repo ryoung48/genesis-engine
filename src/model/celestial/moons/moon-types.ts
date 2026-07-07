@@ -61,6 +61,10 @@ export interface MoonParams {
 	classification?: string
 	hydrosphereFraction?: number
 	atmosphere?: AtmosphereProfile
+	/** Real photographic texture -- only Sol's named moons (see sol-system.ts's
+	 * SOL_MOON_TEXTURE_BY_NAME) carry one; a procedurally-generated moon falls
+	 * back to moon-orbit-overlay.ts's generic shared texture. */
+	texturePath?: string
 	orbitalPeriodDays: number
 	/** Sidereal rotation period, in hours — independent of orbitalPeriodDays.
 	 * Most moons end up tidally locked (siderealDayHours === orbitalPeriodDays

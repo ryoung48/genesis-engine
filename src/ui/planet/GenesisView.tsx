@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
+import { computeGravityG } from "@/model/celestial/body-metrics"
 import type { MoonParams } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
@@ -91,6 +92,8 @@ import { ApparentDiameterOverlay } from "./controls/ApparentDiameterOverlay"
 import {
 	buildPressureAtmosphereProfile,
 	GenerationPanel,
+	resolveBodyTideLockSiderealDayHours,
+	updateBodyDiameter,
 } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import { MoonOrbitsOverlay } from "./controls/MoonOrbitsOverlay"
@@ -679,27 +682,239 @@ export const GenesisView: React.FC = () => {
 		initialDecodedCode?.landCoverage ?? DEFAULT_WORLD_PARAMS.landCoverage,
 	)
 	const roughness = DEFAULT_WORLD_PARAMS.roughness
-	const [planetRadiusKm, setPlanetRadiusKm] = useState(
-		initialDecodedCode?.planetRadiusKm ?? DEFAULT_WORLD_PARAMS.planetRadiusKm,
-	)
-	const [obliquity, setObliquity] = useState(
-		initialDecodedCode?.obliquity ?? DEFAULT_WORLD_PARAMS.obliquity,
-	)
-	const [eccentricity, setEccentricity] = useState(
-		initialDecodedCode?.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity,
-	)
 	const [spectralClass, setSpectralClass] = useState(
 		initialDecodedCode?.spectralClass ?? DEFAULT_WORLD_PARAMS.spectralClass,
 	)
 	const [starSubtype, setStarSubtype] = useState(
 		initialDecodedCode?.starSubtype ?? DEFAULT_WORLD_PARAMS.starSubtype,
 	)
-	const [orbitalDistanceAU, setOrbitalDistanceAU] = useState(
-		initialDecodedCode?.orbitalDistanceAU ??
-			DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
+	const [moonCount, setMoonCount] = useState(
+		initialDecodedCode?.moonCount ?? DEFAULT_WORLD_PARAMS.moonCount,
 	)
-	const [hoursPerDay, setHoursPerDay] = useState(
-		initialDecodedCode?.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
+	const [moonSeed, setMoonSeed] = useState(
+		initialDecodedCode?.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
+	)
+	const [restSeed, setRestSeed] = useState(
+		initialDecodedCode?.restSeed ?? SOL_SEED,
+	)
+
+	// --- The main world's own physical/orbital state ---
+	// Every one of these fields lives ONLY on the main world's SystemBody
+	// entry in `editableSystemBodies`, exactly like every sibling planet --
+	// there is no separate slider state to keep in sync. `mainWorldBodyRef`
+	// breaks the circular dependency (regenerating the system on a star/moon
+	// change needs the main world's CURRENT physical values so it doesn't
+	// reset them) without making every physical field a reactive dependency
+	// of the generation memo below.
+	const mainWorldBodyRef = useRef<SystemBody | null>(null)
+
+	const generatedMoonsPreview = useMemo(() => {
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+		const prev = mainWorldBodyRef.current
+		const planetRadiusKm = prev
+			? prev.diameterKm / 2
+			: (initialDecodedCode?.planetRadiusKm ??
+				DEFAULT_WORLD_PARAMS.planetRadiusKm)
+		const orbitalDistanceAU = prev
+			? prev.orbitalDistanceAU
+			: (initialDecodedCode?.orbitalDistanceAU ??
+				DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
+		const hoursPerDay = prev
+			? prev.siderealDayHours
+			: (initialDecodedCode?.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay)
+		const tideLock = prev
+			? (prev.tideLock ?? null)
+			: (initialDecodedCode?.tideLock ?? null)
+		const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
+			hoursPerDay,
+			tideLock,
+		)
+		return generateMoons(
+			moonCount,
+			moonSeed,
+			planetRadiusKm,
+			orbitalDistanceAU,
+			moonOrbitHoursPerDay,
+			starMassKg,
+		)
+	}, [moonCount, moonSeed, spectralClass, starSubtype])
+
+	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
+	// and by the solar system view) ---
+	const systemSeismologyContext = useMemo(() => {
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const surfaceTidesCallbacks = buildSurfaceTidesSeismologyCallbacks({
+			spectralClass,
+			starSubtype,
+		})
+		if (restSeed === SOL_SEED) {
+			return {
+				starAgeGyr: SOL_STAR_AGE_GYR,
+				starLuminositySol: 1,
+				...surfaceTidesCallbacks,
+			}
+		}
+		return {
+			starAgeGyr: getStarAgeGyr(restSeed, getStarMassSol(cls, starSubtype)),
+			starLuminositySol: getStarLuminositySol(cls, starSubtype),
+			...surfaceTidesCallbacks,
+		}
+	}, [restSeed, spectralClass, starSubtype])
+
+	const generatedSystemBodies: SystemBody[] = useMemo(() => {
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const prev = mainWorldBodyRef.current
+		const planetRadiusKm = prev
+			? prev.diameterKm / 2
+			: (initialDecodedCode?.planetRadiusKm ??
+				DEFAULT_WORLD_PARAMS.planetRadiusKm)
+		const orbitalDistanceAU = prev
+			? prev.orbitalDistanceAU
+			: (initialDecodedCode?.orbitalDistanceAU ??
+				DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
+		const hoursPerDay = prev
+			? prev.siderealDayHours
+			: (initialDecodedCode?.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay)
+		const eccentricity = prev
+			? prev.eccentricity
+			: (initialDecodedCode?.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity)
+		const perihelion = prev
+			? prev.longitudeOfPerihelionDeg
+			: (initialDecodedCode?.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion)
+		const obliquity = prev
+			? prev.axialTiltDeg
+			: (initialDecodedCode?.obliquity ?? DEFAULT_WORLD_PARAMS.obliquity)
+		const substellarLon = prev
+			? (prev.substellarLon ?? 0)
+			: (initialDecodedCode?.substellarLon ??
+				DEFAULT_WORLD_PARAMS.substellarLon)
+		const pressure = prev
+			? (prev.atmosphere?.pressureBar ?? DEFAULT_WORLD_PARAMS.pressure)
+			: (initialDecodedCode?.pressure ?? DEFAULT_WORLD_PARAMS.pressure)
+		const tideLock = prev
+			? (prev.tideLock ?? null)
+			: (initialDecodedCode?.tideLock ?? null)
+		const mainWorld = {
+			orbitalDistanceAU,
+			diameterKm: planetRadiusKm * 2,
+			moons: generatedMoonsPreview,
+			massKg: derivePlanetMassKg(planetRadiusKm),
+			gravityG: computeGravityG(
+				derivePlanetMassKg(planetRadiusKm),
+				planetRadiusKm * 2,
+			),
+			siderealDayHours: hoursPerDay,
+			eccentricity,
+			longitudeOfPerihelionDeg: perihelion,
+			axialTiltDeg: obliquity,
+			substellarLon,
+			atmosphere: buildPressureAtmosphereProfile(pressure),
+			tideLock,
+			// Only the real Sol seed's Earth has known real climate-fit
+			// values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) -- a
+			// procedurally generated homeworld has no "real" data, so it
+			// keeps using the generic roll/estimate every other body gets.
+			albedo:
+				restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.albedo : undefined,
+			greenhouseFactor:
+				restSeed === SOL_SEED
+					? SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor
+					: undefined,
+		}
+		return generateSystemBodies({
+			seed: restSeed,
+			spectralClass: cls,
+			starSubtype,
+			mainWorld,
+		})
+	}, [restSeed, spectralClass, starSubtype, generatedMoonsPreview])
+
+	const [editableSystemBodies, setEditableSystemBodies] = useState<
+		SystemBody[]
+	>([])
+	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
+	useEffect(() => {
+		if (skipNextGeneratedSystemBodiesSyncRef.current) {
+			skipNextGeneratedSystemBodiesSyncRef.current = false
+			return
+		}
+		setEditableSystemBodies(generatedSystemBodies)
+	}, [generatedSystemBodies])
+	const systemBodies =
+		editableSystemBodies.length > 0
+			? editableSystemBodies
+			: generatedSystemBodies
+	const mainWorldSystemBody =
+		systemBodies.find((body) => body.isMainWorld) ?? null
+	const displayMoons = mainWorldSystemBody?.moons ?? generatedMoonsPreview
+	const systemBodiesRef = useRef(systemBodies)
+	systemBodiesRef.current = systemBodies
+	const displayMoonsRef = useRef(displayMoons)
+	displayMoonsRef.current = displayMoons
+	mainWorldBodyRef.current = mainWorldSystemBody
+
+	// Every physical/orbital field the main world exposes is a plain read off
+	// its own SystemBody entry -- editing any of them (from the dedicated
+	// Planet-tab sliders below, or from the generic orbit-navigator stat
+	// card) goes through `updateMainWorldBody`, which patches that one entry
+	// in `editableSystemBodies` exactly like `updateEditableSystemBody` does
+	// for every sibling planet.
+	const updateMainWorldBody = useCallback(
+		(updater: (body: SystemBody) => SystemBody) => {
+			setEditableSystemBodies((prev) =>
+				applySystemSeismology({
+					bodies: prev.map((body) =>
+						body.isMainWorld ? updater(body) : body,
+					),
+					...systemSeismologyContext,
+				}),
+			)
+		},
+		[systemSeismologyContext],
+	)
+	const planetRadiusKm =
+		(mainWorldSystemBody?.diameterKm ?? DEFAULT_WORLD_PARAMS.planetRadiusKm * 2) /
+		2
+	const setPlanetRadiusKm = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => updateBodyDiameter(body, value * 2)),
+		[updateMainWorldBody],
+	)
+	const obliquity =
+		mainWorldSystemBody?.axialTiltDeg ?? DEFAULT_WORLD_PARAMS.obliquity
+	const setObliquity = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, axialTiltDeg: value })),
+		[updateMainWorldBody],
+	)
+	const eccentricity =
+		mainWorldSystemBody?.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity
+	const setEccentricity = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, eccentricity: value })),
+		[updateMainWorldBody],
+	)
+	const orbitalDistanceAU =
+		mainWorldSystemBody?.orbitalDistanceAU ??
+		DEFAULT_WORLD_PARAMS.orbitalDistanceAU
+	const setOrbitalDistanceAU = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, orbitalDistanceAU: value })),
+		[updateMainWorldBody],
+	)
+	const hoursPerDay =
+		mainWorldSystemBody?.siderealDayHours ?? DEFAULT_WORLD_PARAMS.hoursPerDay
+	const setHoursPerDay = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, siderealDayHours: value })),
+		[updateMainWorldBody],
 	)
 	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
 	const effectiveStarClass: MainSequenceClass = isValidSpectralClass(
@@ -733,34 +948,57 @@ export const GenesisView: React.FC = () => {
 		setStarSubtype(subtype)
 	}
 	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
-	const [tideLock, setTideLock] = useState<
-		import("@/model/celestial/moons/moon-types").TideLock | null
-	>(initialDecodedCode?.tideLock ?? null)
+	const tideLock = mainWorldSystemBody?.tideLock ?? null
+	const setTideLock = useCallback(
+		(lock: import("@/model/celestial/moons/moon-types").TideLock | null) =>
+			updateMainWorldBody((body) => {
+				const siderealDayHours = resolveBodyTideLockSiderealDayHours(
+					lock,
+					body,
+				)
+				return {
+					...body,
+					tideLock: lock,
+					...(siderealDayHours !== undefined ? { siderealDayHours } : {}),
+				}
+			}),
+		[updateMainWorldBody],
+	)
 	const tidallyLocked = tideLock?.type === "solar"
-	const [substellarLon, setSubstellarLon] = useState(
-		initialDecodedCode?.substellarLon ?? DEFAULT_WORLD_PARAMS.substellarLon,
+	const substellarLon = mainWorldSystemBody?.substellarLon ?? 0
+	const setSubstellarLon = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, substellarLon: value })),
+		[updateMainWorldBody],
 	)
-	const [perihelion, setPerihelion] = useState(
-		initialDecodedCode?.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion,
+	const perihelion =
+		mainWorldSystemBody?.longitudeOfPerihelionDeg ??
+		DEFAULT_WORLD_PARAMS.perihelion
+	const setPerihelion = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({
+				...body,
+				longitudeOfPerihelionDeg: value,
+			})),
+		[updateMainWorldBody],
 	)
-	const [pressure, setPressure] = useState(
-		initialDecodedCode?.pressure ?? DEFAULT_WORLD_PARAMS.pressure,
-	)
-	const [moonCount, setMoonCount] = useState(
-		initialDecodedCode?.moonCount ?? DEFAULT_WORLD_PARAMS.moonCount,
-	)
-	const [moonSeed, setMoonSeed] = useState(
-		initialDecodedCode?.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
-	)
-	const [restSeed, setRestSeed] = useState(
-		initialDecodedCode?.restSeed ?? SOL_SEED,
+	const pressure =
+		mainWorldSystemBody?.atmosphere?.pressureBar ??
+		DEFAULT_WORLD_PARAMS.pressure
+	const setPressure = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({
+				...body,
+				atmosphere: buildPressureAtmosphereProfile(value),
+			})),
+		[updateMainWorldBody],
 	)
 
 	useEffect(() => {
 		if (tideLock?.type !== "solar") return
 		if (obliquity !== 0) setObliquity(0)
 		if (eccentricity !== 0) setEccentricity(0)
-	}, [tideLock, obliquity, eccentricity])
+	}, [tideLock, obliquity, eccentricity, setObliquity, setEccentricity])
 
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
@@ -2806,131 +3044,6 @@ export const GenesisView: React.FC = () => {
 			windStats,
 		],
 	)
-	const generatedMoonsPreview = useMemo(() => {
-		const cls = isValidSpectralClass(spectralClass)
-			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
-		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
-		const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
-			hoursPerDay,
-			tideLock,
-		)
-		return generateMoons(
-			moonCount,
-			moonSeed,
-			planetRadiusKm,
-			orbitalDistanceAU,
-			moonOrbitHoursPerDay,
-			starMassKg,
-		)
-	}, [
-		moonCount,
-		moonSeed,
-		planetRadiusKm,
-		orbitalDistanceAU,
-		hoursPerDay,
-		tideLock,
-		spectralClass,
-		starSubtype,
-	])
-
-	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
-	// and by the solar system view) ---
-	const systemSeismologyContext = useMemo(() => {
-		const cls = isValidSpectralClass(spectralClass)
-			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
-		const surfaceTidesCallbacks = buildSurfaceTidesSeismologyCallbacks({
-			spectralClass,
-			starSubtype,
-		})
-		if (restSeed === SOL_SEED) {
-			return {
-				starAgeGyr: SOL_STAR_AGE_GYR,
-				starLuminositySol: 1,
-				...surfaceTidesCallbacks,
-			}
-		}
-		return {
-			starAgeGyr: getStarAgeGyr(restSeed, getStarMassSol(cls, starSubtype)),
-			starLuminositySol: getStarLuminositySol(cls, starSubtype),
-			...surfaceTidesCallbacks,
-		}
-	}, [restSeed, spectralClass, starSubtype])
-	const generatedSystemBodies: SystemBody[] = useMemo(() => {
-		const cls = isValidSpectralClass(spectralClass)
-			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
-		const mainWorld = {
-			orbitalDistanceAU,
-			diameterKm: planetRadiusKm * 2,
-			moons: generatedMoonsPreview,
-			massKg: derivePlanetMassKg(planetRadiusKm),
-			gravityG:
-				(6.674e-11 * derivePlanetMassKg(planetRadiusKm)) /
-				(planetRadiusKm * 1000) ** 2 /
-				9.807,
-			siderealDayHours: hoursPerDay,
-			eccentricity,
-			longitudeOfPerihelionDeg: perihelion,
-			axialTiltDeg: obliquity,
-			substellarLon,
-			atmosphere: buildPressureAtmosphereProfile(pressure),
-			tideLock,
-			// Only the real Sol seed's Earth has known real climate-fit
-			// values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) -- a
-			// procedurally generated homeworld has no "real" data, so it
-			// keeps using the generic roll/estimate every other body gets.
-			albedo:
-				restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.albedo : undefined,
-			greenhouseFactor:
-				restSeed === SOL_SEED
-					? SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor
-					: undefined,
-		}
-		return generateSystemBodies({
-			seed: restSeed,
-			spectralClass: cls,
-			starSubtype,
-			mainWorld,
-		})
-	}, [
-		restSeed,
-		spectralClass,
-		starSubtype,
-		hoursPerDay,
-		orbitalDistanceAU,
-		planetRadiusKm,
-		generatedMoonsPreview,
-		eccentricity,
-		perihelion,
-		obliquity,
-		substellarLon,
-		pressure,
-		tideLock,
-	])
-	const [editableSystemBodies, setEditableSystemBodies] = useState<
-		SystemBody[]
-	>([])
-	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
-	useEffect(() => {
-		if (skipNextGeneratedSystemBodiesSyncRef.current) {
-			skipNextGeneratedSystemBodiesSyncRef.current = false
-			return
-		}
-		setEditableSystemBodies(generatedSystemBodies)
-	}, [generatedSystemBodies])
-	const systemBodies =
-		editableSystemBodies.length > 0
-			? editableSystemBodies
-			: generatedSystemBodies
-	const mainWorldSystemBody =
-		systemBodies.find((body) => body.isMainWorld) ?? null
-	const displayMoons = mainWorldSystemBody?.moons ?? generatedMoonsPreview
-	const systemBodiesRef = useRef(systemBodies)
-	systemBodiesRef.current = systemBodies
-	const displayMoonsRef = useRef(displayMoons)
-	displayMoonsRef.current = displayMoons
 	// --- Moon orbits (3D scene, globe mode only) ---
 	const moonOrbitDayOfYear =
 		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)

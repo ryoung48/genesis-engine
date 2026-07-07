@@ -26,6 +26,17 @@ const ORBIT_SEGMENTS = 256
 const MIN_MOON_VISUAL_RADIUS = 0.004
 const textureLoader = new THREE.TextureLoader()
 let sharedMoonTexture: THREE.Texture | null = null
+const namedMoonTextureCache = new Map<string, THREE.Texture>()
+
+function loadMoonTexture(texturePath: string): THREE.Texture {
+	const cached = namedMoonTextureCache.get(texturePath)
+	if (cached) return cached
+	const texture = textureLoader.load(texturePath)
+	texture.colorSpace = THREE.SRGBColorSpace
+	texture.userData.sharedTexture = true
+	namedMoonTextureCache.set(texturePath, texture)
+	return texture
+}
 
 export function solveKepler(M: number, e: number): number {
 	let E = M
@@ -106,15 +117,22 @@ function buildMoonMesh(
 	tiltAxis: THREE.Vector3,
 	showGrid: boolean,
 	gridSpacing: number,
+	texturePath?: string,
 ): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(radius, 8, 6)
-	if (!sharedMoonTexture) {
-		sharedMoonTexture = textureLoader.load("/sol/earth/moon.jpg")
-		sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
-		sharedMoonTexture.userData.sharedTexture = true
+	let map: THREE.Texture
+	if (texturePath) {
+		map = loadMoonTexture(texturePath)
+	} else {
+		if (!sharedMoonTexture) {
+			sharedMoonTexture = textureLoader.load("/sol/earth/moon.jpg")
+			sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
+			sharedMoonTexture.userData.sharedTexture = true
+		}
+		map = sharedMoonTexture
 	}
 	const mat = new THREE.MeshStandardMaterial({
-		map: sharedMoonTexture,
+		map,
 		roughness: 1,
 		metalness: 0,
 	})
@@ -350,6 +368,7 @@ export function buildMoonOrbitOverlay(
 			tiltAxis,
 			showGrid,
 			gridSpacing,
+			moon.texturePath,
 		)
 		group.add(moonMesh)
 		moonMeshes.push(moonMesh)

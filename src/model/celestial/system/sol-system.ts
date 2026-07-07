@@ -56,12 +56,32 @@ export const SOL_MAIN_WORLD_NAME = "Earth"
 const SOL_PLANET_TEXTURE_BY_NAME: Partial<Record<string, string>> = {
 	Mercury: "/sol/2k_mercury.jpg",
 	Venus: "/sol/2k_venus.jpg",
-	Mars: "/sol/2k_mars.jpg",
+	Mars: "/sol/mars/2k_mars.jpg",
 	Jupiter: "/sol/jupiter/2k_jupiter.jpg",
 	Saturn: "/sol/saturn/2k_saturn.jpg",
-	Uranus: "/sol/2k_uranus.jpg",
-	Neptune: "/sol/2k_neptune.jpg",
-	Pluto: "/sol/pluto.jpg",
+	Uranus: "/sol/uranus/2k_uranus.jpg",
+	Neptune: "/sol/neptune/2k_neptune.jpg",
+	Pluto: "/sol/pluto/pluto.jpg",
+}
+
+// Real photographic textures for Sol's named moons (see buildMoon()) --
+// procedurally-generated moons (any other star) have no entry here and fall
+// back to moon-orbit-overlay.ts's generic shared texture, the same way an
+// unlisted planet name falls back to a plain color in solar-system-overlay.ts.
+const SOL_MOON_TEXTURE_BY_NAME: Partial<Record<string, string>> = {
+	Luna: "/sol/earth/moon.jpg",
+	Phobos: "/sol/mars/phobos.jpg",
+	Deimos: "/sol/mars/deimos.jpg",
+	Io: "/sol/jupiter/io.jpg",
+	Europa: "/sol/jupiter/europa.jpg",
+	Ganymede: "/sol/jupiter/ganymede.jpg",
+	Callisto: "/sol/jupiter/callisto.jpg",
+	Titan: "/sol/saturn/titan.jpg",
+	Enceladus: "/sol/saturn/enceladus.jpg",
+	Titania: "/sol/uranus/titania.jpg",
+	Oberon: "/sol/uranus/oberon.jpg",
+	Triton: "/sol/neptune/triton.jpg",
+	Charon: "/sol/pluto/charon.jpg",
 }
 
 const SOL_PLANET_RINGS_BY_NAME: Partial<Record<string, SystemBody["rings"]>> = {
@@ -831,6 +851,7 @@ function buildMoon(
 	return {
 		idx,
 		name: seed.name,
+		texturePath: SOL_MOON_TEXTURE_BY_NAME[seed.name],
 		massKg: seed.massEarths * EARTH_MASS_KG,
 		diameterKm,
 		sizeClass: estimateMoonSizeClassFromDiameter(diameterKm),

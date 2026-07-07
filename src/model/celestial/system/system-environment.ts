@@ -6,8 +6,6 @@ import {
 } from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
 
-const GRAVITATIONAL_CONSTANT = 6.674e-11
-const STANDARD_GRAVITY_MS2 = 9.807
 const EARTH_DIAMETER_KM = 12_742
 const EARTH_MASS_KG = 5.973886146404331e24
 
@@ -177,9 +175,13 @@ function roll2d6(rng: ReturnType<typeof createRng>): number {
 	return rng.randint(1, 6) + rng.randint(1, 6)
 }
 
+// Relative to Earth (see body-metrics.ts's computeGravityG doc) -- G cancels
+// out of the ratio, so this is exact instead of drifting off 1.000g at
+// Earth's own defaults.
 function computeGravityG(massKg: number, diameterKm: number): number {
-	const radiusM = (diameterKm / 2) * 1000
-	return (GRAVITATIONAL_CONSTANT * massKg) / radiusM ** 2 / STANDARD_GRAVITY_MS2
+	const massEarths = massKg / EARTH_MASS_KG
+	const diameterEarths = diameterKm / EARTH_DIAMETER_KM
+	return massEarths / diameterEarths ** 2
 }
 
 function rollAtmosphereBar(

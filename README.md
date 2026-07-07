@@ -75,9 +75,7 @@ export default defineConfig([
 ```
 
 TODO:
-* seismology
 * adding + removing moons
-* antistellar lon (rename to subsetllar lon) and then feed into climate ebm preview and solar system overlay rendering
 * test randomly generated systems
 * multi star
 * jovian moon main worlds

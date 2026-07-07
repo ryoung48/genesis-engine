@@ -629,7 +629,7 @@ function buildTideLockStat(params: {
 // that target, i.e. its sidereal day becomes equal to its orbital period
 // around whatever it's now locked to. Returns undefined (leave the current
 // sidereal day alone) for "None" or a target this stat card can't resolve.
-function resolveBodyTideLockSiderealDayHours(
+export function resolveBodyTideLockSiderealDayHours(
 	lock: import("@/model/celestial/moons/moon-types").TideLock | null,
 	body: SystemBody,
 ): number | undefined {
@@ -851,7 +851,10 @@ const ORBIT_STAT_HELP = {
 		"Longitude of perihelion. Where the closest point of the orbit sits, measured from a fixed reference direction.",
 }
 
-function updateBodyDiameter(body: SystemBody, diameterKm: number): SystemBody {
+export function updateBodyDiameter(
+	body: SystemBody,
+	diameterKm: number,
+): SystemBody {
 	const densityEarthRelative =
 		body.density?.earthRelative ??
 		computeBodyEarthRelativeDensity(body.massKg, body.diameterKm)
@@ -1785,11 +1788,10 @@ function buildSeismologyStats(
 // Single stat-row builder shared by every orbit body's card in this panel --
 // planets/dwarfs/jovians (via buildOrbitBodyStats) and moons (via
 // buildMoonStats) -- so the two kinds of body can never drift out of field
-// order with each other; only the handful of fields one kind lacks (a moon's
-// sizeClass, a planet's terrain surfaceStats tail, the asteroid-belt short
-// list) are conditional.
+// order with each other; only the handful of fields one kind lacks (a
+// planet's terrain surfaceStats tail, the asteroid-belt short list) are
+// conditional.
 function buildBodyStats({
-	kind,
 	group,
 	classification,
 	sizeClass,
@@ -1818,13 +1820,16 @@ function buildBodyStats({
 	kind: "planet" | "moon"
 	group?: string
 	classification?: string
-	/** Moons show a rolled size class; planets don't have an equivalent. */
+	/** Shown as a " · Size N" suffix on the Radius row rather than its own
+	 * row. */
 	sizeClass?: number
 	semiMajorAxis: {
 		value: number
 		unit: "AU" | "PD"
 		precision: number
 		editor?: StatEntry["editor"]
+		/** Shown as a " · <Range>" suffix -- moons only (see MoonOrbitRange). */
+		rangeLabel?: string
 	}
 	orbitalPeriodDays: number
 	/** null omits the Sidereal/Solar Day (+ tide-lock) block entirely --
@@ -1878,12 +1883,10 @@ function buildBodyStats({
 					},
 				]
 			: []),
-		...(kind === "moon" && sizeClass !== undefined
-			? [{ label: "Size", value: String(sizeClass) }]
-			: []),
 		{
 			label: "Semi Major Axis",
-			value: semiMajorAxisLabel,
+			valuePrefix: semiMajorAxisLabel,
+			value: semiMajorAxis.rangeLabel ? ` · ${semiMajorAxis.rangeLabel}` : "",
 			editor: semiMajorAxis.editor,
 		},
 		{ label: "Period", value: formatDays(orbitalPeriodDays) },
@@ -1913,11 +1916,15 @@ function buildBodyStats({
 		},
 		{
 			label: "Radius",
-			value: `${diameterRel.toFixed(2)} R⊕`,
+			valuePrefix: `${diameterRel.toFixed(2)} R⊕`,
+			value: sizeClass !== undefined ? ` · Size ${sizeClass}` : "",
 			editor: radiusEditor,
 		},
-		{ label: "Mass", value: `${massRel.toFixed(3)} M⊕` },
-		{ label: "Gravity", value: `${gravityG.toFixed(3)} g` },
+		{
+			label: "Mass",
+			valuePrefix: `${massRel.toFixed(3)} M⊕`,
+			value: ` · ${gravityG.toFixed(3)} g`,
+		},
 		...(densityEarthRelative !== undefined
 			? [
 					{
@@ -1958,6 +1965,7 @@ function buildMoonStats({
 	greenhouseFactor,
 	seismology,
 	pd,
+	orbitRange,
 	orbitalPeriodDays,
 	siderealDayHours,
 	eccentricity,
@@ -1986,6 +1994,7 @@ function buildMoonStats({
 	seismology?: import("@/model/celestial/moons/moon-types").SeismologyProfile
 	surfaceTidesM?: SurfaceTidesBreakdown
 	pd: number
+	orbitRange?: import("@/model/celestial/moons/moon-types").MoonOrbitRange
 	orbitalPeriodDays: number
 	/** Moon's own sidereal rotation period, in hours — independent of
 	 * orbitalPeriodDays (not assumed to be tidally locked). */
@@ -2024,6 +2033,7 @@ function buildMoonStats({
 			unit: "PD",
 			precision: 1,
 			editor: editors?.semiMajorAxis,
+			rangeLabel: orbitRange ? formatClassificationLabel(orbitRange) : undefined,
 		},
 		orbitalPeriodDays,
 		dayLength: parentOrbitalPeriodDays
@@ -2155,6 +2165,7 @@ function buildOrbitBodyStats(params: {
 		kind: "planet",
 		group: body.group,
 		classification: body.classification,
+		sizeClass: body.sizeClass,
 		semiMajorAxis: {
 			value: body.orbitalDistanceAU,
 			unit: "AU",
@@ -2357,7 +2368,6 @@ function buildOrbitBodyStats(params: {
 function buildOrbitMoonStats(params: {
 	moon: MoonParams
 	parentOrbitalPeriodDays: number
-	hoursPerDay: number
 	pdOverride?: number
 	surfaceTidesM?: SurfaceTidesBreakdown
 	tideLockStat?: StatEntry
@@ -2368,15 +2378,13 @@ function buildOrbitMoonStats(params: {
 	const {
 		moon,
 		parentOrbitalPeriodDays,
-		hoursPerDay,
 		pdOverride,
 		surfaceTidesM,
 		tideLockStat,
 		onUpdateMoon,
 	} = params
 	const pd = moon.semiMajorAxisPlanetDiameters ?? pdOverride ?? 0
-	const gravityG =
-		(6.674e-11 * moon.massKg) / ((moon.diameterKm / 2) * 1000) ** 2 / 9.807
+	const gravityG = computeGravityG(moon.massKg, moon.diameterKm)
 	return buildMoonStats({
 		diameterKm: moon.diameterKm,
 		massKg: moon.massKg,
@@ -2393,6 +2401,7 @@ function buildOrbitMoonStats(params: {
 		seismology: moon.seismology,
 		surfaceTidesM,
 		pd,
+		orbitRange: moon.orbitRange,
 		orbitalPeriodDays: moon.orbitalPeriodDays,
 		siderealDayHours: moon.siderealDayHours,
 		eccentricity: moon.eccentricity,
@@ -3576,7 +3585,6 @@ function GenerationPlanetNavigator({
 					),
 					pdOverride: pd,
 					parentOrbitalPeriodDays,
-					hoursPerDay: parentHoursPerDay,
 					onUpdateMoon:
 						onUpdateSystemMoon && selection.bodyIndex >= 0
 							? (updater) =>

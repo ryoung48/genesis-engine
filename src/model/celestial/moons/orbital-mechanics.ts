@@ -16,10 +16,13 @@ import {
 const G = 6.674e-11
 const M_SOL_KG = 1.989e30
 const AU_M = 1.496e11
-// Tuned (not the textbook 5515) so derivePlanetMassKg() at Earth's default
-// radius, combined with this file's G and GenesisView's 9.807 STANDARD_GRAVITY
-// constants, yields exactly 1.000g rather than 1.0016g.
-const EARTH_DENSITY_KG_M3 = 5506.22
+// Earth's real mean density -- with this value, derivePlanetMassKg() at
+// Earth's default radius (EARTH_DIAMETER_KM/2) comes out to exactly
+// EARTH_MASS_KG. gravityG is derived from mass/radius directly (relative to
+// Earth, G cancels out -- see body-metrics.ts's computeGravityG), not from
+// G and a rounded standard-gravity constant, so it comes out to exactly
+// 1.000g at the same defaults without needing to detune this density.
+const EARTH_DENSITY_KG_M3 = 5515
 const TWO_PI = 2 * Math.PI
 const SOLAR_LOCK_MOON_ORBIT_HOURS_PER_DAY = 24
 

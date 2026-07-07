@@ -852,6 +852,8 @@ export function buildSurfaceTidesSeismologyCallbacks(
 			massKg: number
 			diameterKm: number
 			siderealDayHours: number
+			orbitalDistanceAU: number
+			eccentricity: number
 			moons: MoonParams[]
 		},
 		moon: MoonParams,
