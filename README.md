@@ -79,3 +79,8 @@ TODO:
 * test randomly generated systems
 * multi star
 * jovian moon main worlds
+
+
+8wqaf
+b29k1h
+b5ushj
