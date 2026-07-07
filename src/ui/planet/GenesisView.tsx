@@ -20,12 +20,15 @@ import {
 } from "@/model/celestial/star/star-types"
 import {
 	generateSystemBodies,
+	getStarAgeGyr,
 	type SystemBody,
 } from "@/model/celestial/system/generate-system-bodies"
 import {
 	SOL_MAIN_WORLD_DEFAULTS,
 	SOL_SEED,
+	SOL_STAR_AGE_GYR,
 } from "@/model/celestial/system/sol-system"
+import { applySystemSeismology } from "@/model/celestial/system/system-seismology"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import {
@@ -40,6 +43,7 @@ import {
 	getClimateGeometry,
 } from "@/model/climate/rain"
 import {
+	buildSurfaceTidesSeismologyCallbacks,
 	computeMoonSurfaceTidesM,
 	computeMoonTidalSchedule,
 	computeSurfaceTidesM,
@@ -733,8 +737,8 @@ export const GenesisView: React.FC = () => {
 		import("@/model/celestial/moons/moon-types").TideLock | null
 	>(initialDecodedCode?.tideLock ?? null)
 	const tidallyLocked = tideLock?.type === "solar"
-	const [antistellarLon, setAntistellarLon] = useState(
-		initialDecodedCode?.antistellarLon ?? DEFAULT_WORLD_PARAMS.antistellarLon,
+	const [substellarLon, setSubstellarLon] = useState(
+		initialDecodedCode?.substellarLon ?? DEFAULT_WORLD_PARAMS.substellarLon,
 	)
 	const [perihelion, setPerihelion] = useState(
 		initialDecodedCode?.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion,
@@ -751,6 +755,12 @@ export const GenesisView: React.FC = () => {
 	const [restSeed, setRestSeed] = useState(
 		initialDecodedCode?.restSeed ?? SOL_SEED,
 	)
+
+	useEffect(() => {
+		if (tideLock?.type !== "solar") return
+		if (obliquity !== 0) setObliquity(0)
+		if (eccentricity !== 0) setEccentricity(0)
+	}, [tideLock, obliquity, eccentricity])
 
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
@@ -1647,7 +1657,7 @@ export const GenesisView: React.FC = () => {
 				perihelion,
 			)
 			const [sx, sy, sz] = getSubstellarDirWithOffsetAndDeclination(
-				antistellarLon,
+				substellarLon,
 				monthlyLibration[selectedMonth] ?? 0,
 				monthlyDeclination[selectedMonth] ?? 0,
 			)
@@ -1678,7 +1688,7 @@ export const GenesisView: React.FC = () => {
 		perihelion,
 		hoursPerDay,
 		tidallyLocked,
-		antistellarLon,
+		substellarLon,
 	])
 
 	// --- Measure click handler ---
@@ -2306,7 +2316,7 @@ export const GenesisView: React.FC = () => {
 			daysPerYear,
 			hoursPerDay,
 			tideLock,
-			antistellarLon,
+			substellarLon,
 			jitter,
 			roughness,
 			terrainWarp,
@@ -2341,7 +2351,7 @@ export const GenesisView: React.FC = () => {
 			daysPerYear,
 			hoursPerDay,
 			tideLock,
-			antistellarLon,
+			substellarLon,
 			jitter,
 			roughness,
 			terrainWarp,
@@ -2420,7 +2430,7 @@ export const GenesisView: React.FC = () => {
 			setOrbitalDistanceAU,
 			setHoursPerDay,
 			setTideLock,
-			setAntistellarLon,
+			setSubstellarLon,
 			setPressure,
 			setMoonCount,
 			setMoonSeed,
@@ -2449,7 +2459,7 @@ export const GenesisView: React.FC = () => {
 			setters.setOrbitalDistanceAU(decoded.orbitalDistanceAU)
 			setters.setHoursPerDay(decoded.hoursPerDay)
 			setters.setTideLock(decoded.tideLock)
-			setters.setAntistellarLon(decoded.antistellarLon)
+			setters.setSubstellarLon(decoded.substellarLon)
 			setters.setPressure(decoded.pressure)
 			setters.setMoonCount(decoded.moonCount ?? 1)
 			setters.setMoonSeed(
@@ -2506,7 +2516,7 @@ export const GenesisView: React.FC = () => {
 				moonCount,
 				moonSeed,
 				tideLock,
-				antistellarLon,
+				substellarLon,
 				terrainWarp,
 				smoothing,
 				hydraulicErosion,
@@ -2540,7 +2550,7 @@ export const GenesisView: React.FC = () => {
 			daysPerYear,
 			hoursPerDay,
 			tideLock,
-			antistellarLon,
+			substellarLon,
 			terrainWarp,
 			smoothing,
 			hydraulicErosion,
@@ -2574,7 +2584,7 @@ export const GenesisView: React.FC = () => {
 	const handleEarthImport = useCallback(async () => {
 		try {
 			const { grayscale, width, height } =
-				await loadImageAsGrayscale("/earth.png")
+				await loadImageAsGrayscale("/heightmap/earth.png")
 			handleImportHeightmap(grayscale, width, height)
 		} catch (err) {
 			console.error("Failed to load Earth heightmap:", err)
@@ -2717,7 +2727,7 @@ export const GenesisView: React.FC = () => {
 		landDistribution,
 		landCoverage,
 		tideLock,
-		antistellarLon,
+		substellarLon,
 		setPlanetRadiusKm,
 		setObliquity,
 		setEccentricity,
@@ -2728,7 +2738,7 @@ export const GenesisView: React.FC = () => {
 		setAxialTiltDirection,
 		setLandDistribution,
 		setLandCoverage,
-		setAntistellarLon,
+		setSubstellarLon,
 	})
 	const terrainSliders = buildTerrainSliders({
 		numPoints,
@@ -2758,7 +2768,7 @@ export const GenesisView: React.FC = () => {
 					obliquity,
 					eccentricity,
 					perihelion,
-					antistellarLon,
+					substellarLon,
 					spectralClass,
 					starSubtype,
 					daysPerYear,
@@ -2778,7 +2788,7 @@ export const GenesisView: React.FC = () => {
 		[
 			daysPerYear,
 			eccentricity,
-			antistellarLon,
+			substellarLon,
 			perihelion,
 			hoursPerDay,
 			obliquity,
@@ -2826,6 +2836,27 @@ export const GenesisView: React.FC = () => {
 
 	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
 	// and by the solar system view) ---
+	const systemSeismologyContext = useMemo(() => {
+		const cls = isValidSpectralClass(spectralClass)
+			? (spectralClass as MainSequenceClass)
+			: DEFAULT_SPECTRAL_CLASS
+		const surfaceTidesCallbacks = buildSurfaceTidesSeismologyCallbacks({
+			spectralClass,
+			starSubtype,
+		})
+		if (restSeed === SOL_SEED) {
+			return {
+				starAgeGyr: SOL_STAR_AGE_GYR,
+				starLuminositySol: 1,
+				...surfaceTidesCallbacks,
+			}
+		}
+		return {
+			starAgeGyr: getStarAgeGyr(restSeed, getStarMassSol(cls, starSubtype)),
+			starLuminositySol: getStarLuminositySol(cls, starSubtype),
+			...surfaceTidesCallbacks,
+		}
+	}, [restSeed, spectralClass, starSubtype])
 	const generatedSystemBodies: SystemBody[] = useMemo(() => {
 		const cls = isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
@@ -2843,6 +2874,7 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			longitudeOfPerihelionDeg: perihelion,
 			axialTiltDeg: obliquity,
+			substellarLon,
 			atmosphere: buildPressureAtmosphereProfile(pressure),
 			tideLock,
 			// Only the real Sol seed's Earth has known real climate-fit
@@ -2860,7 +2892,6 @@ export const GenesisView: React.FC = () => {
 			seed: restSeed,
 			spectralClass: cls,
 			starSubtype,
-			hoursPerDay,
 			mainWorld,
 		})
 	}, [
@@ -2874,6 +2905,7 @@ export const GenesisView: React.FC = () => {
 		eccentricity,
 		perihelion,
 		obliquity,
+		substellarLon,
 		pressure,
 		tideLock,
 	])
@@ -2958,10 +2990,15 @@ export const GenesisView: React.FC = () => {
 	const updateEditableSystemBody = useCallback(
 		(bodyIndex: number, updater: (body: SystemBody) => SystemBody) => {
 			setEditableSystemBodies((prev) =>
-				prev.map((body, index) => (index === bodyIndex ? updater(body) : body)),
+				applySystemSeismology({
+					bodies: prev.map((body, index) =>
+						index === bodyIndex ? updater(body) : body,
+					),
+					...systemSeismologyContext,
+				}),
 			)
 		},
-		[],
+		[systemSeismologyContext],
 	)
 	// Rebuilds a body (and everything nested inside it, e.g. its moons) back
 	// to its freshly-generated defaults for the current seed, without
@@ -2981,8 +3018,7 @@ export const GenesisView: React.FC = () => {
 	const rebuildSystemBody = useCallback(
 		(bodyIndex?: number) => {
 			const isMainWorldReset =
-				bodyIndex !== undefined &&
-				generatedSystemBodies[bodyIndex]?.isMainWorld
+				bodyIndex !== undefined && generatedSystemBodies[bodyIndex]?.isMainWorld
 			if (bodyIndex === undefined || isMainWorldReset) {
 				setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
 				setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
@@ -2991,7 +3027,7 @@ export const GenesisView: React.FC = () => {
 				setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
 				setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 				setPressure(DEFAULT_WORLD_PARAMS.pressure)
-				setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
+				setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
 				setTideLock(null)
 			}
 			if (bodyIndex === undefined) {
@@ -3013,18 +3049,33 @@ export const GenesisView: React.FC = () => {
 			updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
 		) => {
 			setEditableSystemBodies((prev) =>
-				prev.map((body, index) => {
-					if (index !== bodyIndex) return body
-					return {
-						...body,
-						moons: body.moons.map((moon, currentMoonIndex) =>
-							currentMoonIndex === moonIndex ? updater(moon, body) : moon,
-						),
-					}
+				applySystemSeismology({
+					bodies: prev.map((body, index) => {
+						if (index !== bodyIndex) return body
+						return {
+							...body,
+							moons: body.moons.map((moon, currentMoonIndex) =>
+								currentMoonIndex === moonIndex ? updater(moon, body) : moon,
+							),
+						}
+					}),
+					...systemSeismologyContext,
 				}),
 			)
 		},
-		[],
+		[systemSeismologyContext],
+	)
+	// Resets a single moon back to its freshly-generated defaults for the
+	// current seed, leaving its parent body's own fields and every sibling
+	// moon untouched -- unlike rebuildSystemBody, which replaces the whole
+	// body (and therefore every one of its moons) at once.
+	const resetSystemMoon = useCallback(
+		(bodyIndex: number, moonIndex: number) => {
+			const generatedMoon = generatedSystemBodies[bodyIndex]?.moons[moonIndex]
+			if (!generatedMoon) return
+			updateEditableSystemMoon(bodyIndex, moonIndex, () => generatedMoon)
+		},
+		[generatedSystemBodies, updateEditableSystemMoon],
 	)
 
 	// The solar-system view's own clock — deliberately independent of the
@@ -3421,6 +3472,7 @@ export const GenesisView: React.FC = () => {
 					onUpdateSystemBody={updateEditableSystemBody}
 					onUpdateSystemMoon={updateEditableSystemMoon}
 					onRebuildSystemBody={rebuildSystemBody}
+					onResetSystemMoon={resetSystemMoon}
 					onFocusBody={handleFocusBody}
 					currentFocus={currentFocus}
 					daysPerYear={daysPerYear}

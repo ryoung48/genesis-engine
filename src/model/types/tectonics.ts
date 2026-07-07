@@ -49,7 +49,7 @@ export interface GenesisParams {
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
 	tideLock: import("../celestial/moons/moon-types").TideLock | null // null = not locked
-	antistellarLon: number // longitude of the antistellar point in degrees (0-360), default 180
+	substellarLon: number // longitude of the substellar point in degrees (0-360), default 0
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
 	moonCount?: number

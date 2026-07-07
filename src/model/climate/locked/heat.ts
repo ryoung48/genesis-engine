@@ -182,11 +182,11 @@ export function computeMonthlyLockedDeclination(
 }
 
 export function getSubstellarDirWithOffsetAndDeclination(
-	antistellarLon: number,
+	substellarLon: number,
 	lonOffsetRad: number,
 	declinationRad: number,
 ): [number, number, number] {
-	const subRad = ((antistellarLon + 180) % 360) * (Math.PI / 180) + lonOffsetRad
+	const subRad = (substellarLon % 360) * (Math.PI / 180) + lonOffsetRad
 	const cosDeclination = Math.cos(declinationRad)
 	return [
 		cosDeclination * Math.cos(subRad),
@@ -209,7 +209,7 @@ export function computeLockedMonthlyDaylightHours(
 	mesh: SphereMesh,
 	params: Pick<
 		GenesisParams,
-		| "antistellarLon"
+		| "substellarLon"
 		| "eccentricity"
 		| "hoursPerDay"
 		| "obliquity"
@@ -229,7 +229,7 @@ export function computeLockedMonthlyDaylightHours(
 	)
 	for (let month = 0; month < 12; month++) {
 		const sub = getSubstellarDirWithOffsetAndDeclination(
-			params.antistellarLon,
+			params.substellarLon,
 			monthlyLibration[month],
 			monthlyDeclination[month],
 		)
@@ -378,7 +378,7 @@ export function computeTidalTemperature(
 
 		for (let month = 0; month < 12; month++) {
 			const sub = getSubstellarDirWithOffsetAndDeclination(
-				params.antistellarLon,
+				params.substellarLon,
 				monthlyLibration[month],
 				monthlyDeclination[month],
 			)
@@ -421,7 +421,7 @@ export function computeTidalTemperature(
 			let ct = -1
 			for (let month = 0; month < 12; month++) {
 				const baseSub = getSubstellarDirWithOffsetAndDeclination(
-					params.antistellarLon,
+					params.substellarLon,
 					monthlyLibration[month],
 					monthlyDeclination[month],
 				)

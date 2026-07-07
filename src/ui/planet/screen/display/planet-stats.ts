@@ -36,7 +36,7 @@ export function computePlanetStats(
 		obliquity: number
 		eccentricity: number
 		perihelion: number
-		antistellarLon: number
+		substellarLon: number
 		spectralClass: string
 		starSubtype: number
 		daysPerYear: number

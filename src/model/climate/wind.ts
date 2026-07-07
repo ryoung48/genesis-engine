@@ -403,7 +403,7 @@ export function computeWindVectors(
 		| "obliquity"
 		| "hoursPerDay"
 		| "tideLock"
-		| "antistellarLon"
+		| "substellarLon"
 		| "eccentricity"
 		| "perihelion"
 		| "pressure"

@@ -2,6 +2,7 @@ import { SEED_MAX } from "../../shared/planet-code"
 import { createRng } from "../../shared/rng"
 import { SOL_LUNA_DEFAULT } from "../system/sol-system"
 import {
+	DEFAULT_MOON_ATMOSPHERE,
 	type MoonOrbitRange,
 	type MoonParams,
 	type TideLock,
@@ -15,7 +16,10 @@ import {
 const G = 6.674e-11
 const M_SOL_KG = 1.989e30
 const AU_M = 1.496e11
-const EARTH_DENSITY_KG_M3 = 5515
+// Tuned (not the textbook 5515) so derivePlanetMassKg() at Earth's default
+// radius, combined with this file's G and GenesisView's 9.807 STANDARD_GRAVITY
+// constants, yields exactly 1.000g rather than 1.0016g.
+const EARTH_DENSITY_KG_M3 = 5506.22
 const TWO_PI = 2 * Math.PI
 const SOLAR_LOCK_MOON_ORBIT_HOURS_PER_DAY = 24
 
@@ -703,6 +707,12 @@ export function generateMoons(
 			orbitRange,
 			semiMajorAxisPlanetDiameters: pd,
 			sizeClass,
+			// Fallback only -- generate-system-bodies.ts's sibling-planet path
+			// layers a real classification-derived atmosphere on top of this via
+			// buildMoonEnvironment(); this default only sticks for callers (main
+			// world's own live moon preview, tidal-schedule-only generation) that
+			// don't run that enrichment step.
+			atmosphere: DEFAULT_MOON_ATMOSPHERE,
 		})
 	}
 

@@ -419,7 +419,7 @@ export function computeOceanCurrents(
 	landmarks: GenesisLandmarks,
 	params?: Pick<
 		Partial<GenesisParams>,
-		| "antistellarLon"
+		| "substellarLon"
 		| "eccentricity"
 		| "obliquity"
 		| "perihelion"
@@ -572,7 +572,7 @@ export function applyCurrentTemperatureEffect(
 	monthlyTEQ?: Float32Array[],
 	params?: Pick<
 		GenesisParams,
-		"antistellarLon" | "eccentricity" | "obliquity" | "perihelion" | "tideLock"
+		"substellarLon" | "eccentricity" | "obliquity" | "perihelion" | "tideLock"
 	>,
 ): void {
 	if (params?.tideLock?.type === "solar") {

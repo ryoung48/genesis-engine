@@ -4,6 +4,7 @@ import type {
 	MoonParams,
 	TideLock,
 } from "@/model/celestial/moons/moon-types"
+import { DEFAULT_MOON_ATMOSPHERE } from "@/model/celestial/moons/moon-types"
 import {
 	attachParentTideLocks,
 	estimateMoonSizeClassFromDiameter,
@@ -13,6 +14,7 @@ import { getKeplerYearYears } from "@/model/celestial/star/star-types"
 import { createRng } from "@/model/shared/rng"
 import type { SystemBody } from "./generate-system-bodies"
 import { estimatePlanetarySizeClass } from "./size-class"
+import { applySystemSeismology } from "./system-seismology"
 
 // Ported from galaxy-gen's src/model/system/sol/data.ts (SOL_PLANETS), plus
 // Earth/Luna as regular entries alongside them (see SOL_PLANET_SEEDS below)
@@ -37,7 +39,14 @@ import { estimatePlanetarySizeClass } from "./size-class"
 // exception with all four fixed to real values.
 
 const EARTH_DIAMETER_KM = 12742
-const EARTH_MASS_KG = 5.972e24
+const EARTH_MASS_KG = 5.973886146404331e24
+
+// Every moon should carry an explicit atmosphere so its stats card shows an
+// Atmosphere row -- omitting the field (rather than stating "none") used to
+// silently drop the row for every real airless moon here (Phobos, Io,
+// Callisto, ...), while Titan/Luna (which do have one authored) showed it
+// fine.
+const NO_MOON_ATMOSPHERE = DEFAULT_MOON_ATMOSPHERE
 
 export const SOL_SEED = 0
 export const SOL_STAR_AGE_GYR = 4.6
@@ -45,14 +54,14 @@ export const SOL_STAR_NAME = "Sol"
 export const SOL_MAIN_WORLD_NAME = "Earth"
 
 const SOL_PLANET_TEXTURE_BY_NAME: Partial<Record<string, string>> = {
-	Mercury: "/2k_mercury.jpg",
-	Venus: "/2k_venus.jpg",
-	Mars: "/2k_mars.jpg",
-	Jupiter: "/2k_jupiter.jpg",
-	Saturn: "/2k_saturn.jpg",
-	Uranus: "/2k_uranus.jpg",
-	Neptune: "/2k_neptune.jpg",
-	Pluto: "/pluto.jpg",
+	Mercury: "/sol/2k_mercury.jpg",
+	Venus: "/sol/2k_venus.jpg",
+	Mars: "/sol/2k_mars.jpg",
+	Jupiter: "/sol/jupiter/2k_jupiter.jpg",
+	Saturn: "/sol/saturn/2k_saturn.jpg",
+	Uranus: "/sol/2k_uranus.jpg",
+	Neptune: "/sol/2k_neptune.jpg",
+	Pluto: "/sol/pluto.jpg",
 }
 
 const SOL_PLANET_RINGS_BY_NAME: Partial<Record<string, SystemBody["rings"]>> = {
@@ -131,6 +140,8 @@ export interface SolPlanetSeed {
 	 * the static bodies here (e.g. Pluto-Charon's mutual lock), or a live
 	 * user-controlled value for the main world. */
 	tideLock?: TideLock | null
+	/** Longitude of the substellar point, in degrees 0-360. */
+	substellarLon?: number
 	/** Tags the main/home world -- the only thing this flag should ever
 	 * control is which extra (terrain-generation) fields the UI exposes for
 	 * editing, not a separate construction/editing code path: the main
@@ -366,6 +377,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0151,
 				pd: 2.76,
 				orbitRange: "inner",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0,
 				albedo: 0.07,
 				greenhouseFactor: 0,
@@ -387,6 +399,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0002,
 				pd: 6.92,
 				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0,
 				albedo: 0.08,
 				greenhouseFactor: 0,
@@ -455,6 +468,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0041,
 				pd: 2.95,
 				orbitRange: "inner",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0,
 				albedo: 0.63,
 				greenhouseFactor: 0,
@@ -474,6 +488,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0094,
 				pd: 4.69,
 				orbitRange: "inner",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.8,
 				albedo: 0.67,
 				greenhouseFactor: 0,
@@ -493,6 +508,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0013,
 				pd: 7.49,
 				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.8,
 				albedo: 0.43,
 				greenhouseFactor: 0,
@@ -512,6 +528,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0074,
 				pd: 13.17,
 				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.8,
 				albedo: 0.22,
 				greenhouseFactor: 0,
@@ -561,6 +578,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0047,
 				pd: 1.97,
 				orbitRange: "inner",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.8,
 				albedo: 0.81,
 				greenhouseFactor: 0,
@@ -644,6 +662,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0011,
 				pd: 8.53,
 				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.6,
 				albedo: 0.35,
 				greenhouseFactor: 0,
@@ -663,6 +682,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0.0014,
 				pd: 11.42,
 				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.6,
 				albedo: 0.31,
 				greenhouseFactor: 0,
@@ -789,6 +809,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				eccentricity: 0,
 				pd: 8.24,
 				orbitRange: "middle",
+				atmosphere: NO_MOON_ATMOSPHERE,
 				hydrosphereFraction: 0.6,
 				albedo: 0.35,
 				greenhouseFactor: 0,
@@ -841,7 +862,7 @@ function buildMoon(
 	}
 }
 
-export interface BuildPlanetOptions {
+interface BuildPlanetOptions {
 	/** Real orbital period needs the actual star's mass -- 1 (Sol) for the
 	 * static bodies here, but the main world can orbit an arbitrary
 	 * procedurally-generated star. Defaults to 1. */
@@ -888,6 +909,7 @@ function buildPlanet(
 	return {
 		idx,
 		tideLock: seed.tideLock,
+		substellarLon: seed.substellarLon,
 		name: seed.name,
 		sizeClass:
 			seed.group === "asteroid belt"
@@ -931,19 +953,26 @@ export { buildPlanet }
 
 // The main world is excluded here -- it's hydrated separately, per
 // generation, from a live seed (see generate-system-bodies.ts).
-export const SOL_SYSTEM_BODIES: SystemBody[] = SOL_PLANET_SEEDS.filter(
+const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_PLANET_SEEDS.filter(
 	(seed) => !seed.isMainWorld,
 ).map((seed, i) => buildPlanet(seed, i + 1, i))
+
+export const SOL_SYSTEM_BODIES: SystemBody[] = applySystemSeismology({
+	bodies: SOL_SYSTEM_BODIES_RAW,
+	starAgeGyr: SOL_STAR_AGE_GYR,
+	starLuminositySol: 1,
+})
 
 const EARTH_SEED = SOL_PLANET_SEEDS.find((seed) => seed.isMainWorld)
 if (!EARTH_SEED) throw new Error("SOL_PLANET_SEEDS is missing its Earth entry")
 const LUNA_SEED = EARTH_SEED.moons?.[0]
-if (!LUNA_SEED) throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
+if (!LUNA_SEED)
+	throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
 
 // Centralized default parameters for Earth (the main world) and Luna (its
 // default moon) -- planetRadiusKm/obliquity/eccentricity/orbitalDistanceAU/
 // hoursPerDay/perihelion/albedo/greenhouseFactor come straight from the seed
-// entry above; the rest (daysPerYear/pressureBar/antistellarLon/moonCount,
+// entry above; the rest (daysPerYear/pressureBar/substellarLon/moonCount,
 // and the terrain-generation defaults below) are UI-slider-default-only
 // concepts with no equivalent on any other (non-editable) Sol body, so they
 // stay here rather than on the seed.
@@ -957,7 +986,7 @@ export const SOL_MAIN_WORLD_DEFAULTS = {
 	daysPerYear: 365,
 	hoursPerDay: EARTH_SEED.rotationHours,
 	pressureBar: 1,
-	antistellarLon: 180,
+	substellarLon: 0,
 	perihelion: EARTH_SEED.longitudeOfPerihelionDeg ?? 102,
 	inclinationDeg: EARTH_SEED.inclinationDeg ?? 0,
 	moonCount: EARTH_SEED.moons?.length ?? 1,

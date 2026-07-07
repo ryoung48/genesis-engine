@@ -19,11 +19,8 @@ import {
 	type MainSequenceClass,
 	rollStarAgeGyr,
 } from "@/model/celestial/star/star-types"
-import {
-	estimateGreenhouseFactor,
-	rollGasGiantGreenhouseFactor,
-	rollGreenhouseFactor,
-} from "@/model/climate/ebm/greenhouse-estimate"
+import { estimateGreenhouseFactor } from "@/model/climate/ebm/greenhouse-estimate"
+import { buildSurfaceTidesSeismologyCallbacks } from "@/model/climate/tidal-schedule"
 import { createRng } from "@/model/shared/rng"
 import { estimateGasGiantSizeClass, estimateRockySizeClass } from "./size-class"
 import {
@@ -34,47 +31,26 @@ import {
 	SOL_SYSTEM_BODIES,
 	type SolPlanetSeed,
 } from "./sol-system"
+import {
+	buildClassificationEnvironment,
+	buildDensityProfile,
+	classifyBody,
+	type DensityProfile,
+	deviationToAU,
+	type OrbitClassification,
+	type OrbitGroup,
+	type Zone,
+} from "./system-environment"
+import {
+	applySystemSeismology,
+	type SeismologyProfile,
+} from "./system-seismology"
 
 const GRAVITATIONAL_CONSTANT = 6.674e-11
 const STANDARD_GRAVITY_MS2 = 9.807
 const DAYS_PER_YEAR = 365.25
 const EARTH_DIAMETER_KM = 12_742
-const EARTH_MASS_KG = 5.972e24
-
-type OrbitGroup =
-	| "asteroid belt"
-	| "dwarf"
-	| "terrestrial"
-	| "helian"
-	| "jovian"
-
-type OrbitClassification =
-	| "acheronian"
-	| "arid"
-	| "asphodelian"
-	| "asteroid"
-	| "asteroid belt"
-	| "chthonian"
-	| "geo-cyclic"
-	| "geo-tidal"
-	| "hebean"
-	| "helian"
-	| "jani-lithic"
-	| "jovian"
-	| "meltball"
-	| "oceanic"
-	| "panthalassic"
-	| "rockball"
-	| "snowball"
-	| "stygian"
-	| "tectonic"
-	| "telluric"
-	| "vesperian"
-
-interface DensityProfile {
-	earthRelative: number
-	description: string
-}
+const EARTH_MASS_KG = 5.973886146404331e24
 
 interface RingProfile {
 	innerRadiusRelative: number
@@ -134,19 +110,11 @@ export interface SystemBody {
 	 * giants — see sol-system.ts's SolPlanetSeed.greenhouseFactor doc.
 	 * Unset (no known excess) for everything else. */
 	internalHeatTempK?: number
-	/** Longitude of the antistellar point (the spot on the surface directly
-	 * facing away from the star), in degrees 0-360 — only meaningful when
-	 * tideLock is set. Defaults to 180° when unset. */
-	antistellarLon?: number
-}
-
-type Zone = "epistellar" | "inner" | "outer"
-
-interface ClassifiedEnvironment {
-	classification: OrbitClassification
-	atmosphereCode: number
-	hydrosphereCode: number
-	chemistry: string
+	/** Longitude of the substellar point (the spot on the surface directly
+	 * facing the star), in degrees 0-360 — only meaningful when tideLock is
+	 * set. Defaults to 0° when unset. */
+	substellarLon?: number
+	seismology?: SeismologyProfile
 }
 
 const EPISTELLAR_DEVIATIONS = [2.25, 1.75, 1.25]
@@ -155,549 +123,9 @@ const OUTER_DEVIATIONS = [
 	-1.25, -1.75, -2.25, -2.75, -3.25, -3.75, -4, -4.25, -4.5,
 ]
 
-// Ported from galaxy-gen's orbits/temperature module: a deviation value (how
-// many "steps" hot/cold an orbital slot is from temperate) maps to a baseline
-// Celsius temperature via this piecewise-linear curve (repeated domain values
-// are intentional — they create a vertical jump at that deviation, matching
-// galaxy-gen's original d3 scaleLinear definition).
-const DEVIATION_DOMAIN = [
-	-4.5, -4.0, -4.0, -3.5, -3.5, -3.0, -3.0, -2.5, -2.5, -2.0, -2.0, -1.5, -1.5,
-	-1.0, -1.0, -0.5, -0.5, 0.5, 0.5, 1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.5,
-]
-const DEVIATION_RANGE = [
-	-250, -230, -210, -190, -180, -160, -150, -130, -120, -100, -95, -75, -65,
-	-50, -40, 0, 5, 25, 35, 75, 85, 180, 200, 300, 350, 450,
-]
-
-function deviationToCelsius(deviation: number): number {
-	if (deviation <= DEVIATION_DOMAIN[0]) return DEVIATION_RANGE[0]
-	const lastIndex = DEVIATION_DOMAIN.length - 1
-	if (deviation >= DEVIATION_DOMAIN[lastIndex])
-		return DEVIATION_RANGE[lastIndex]
-	for (let i = 0; i < lastIndex; i++) {
-		const x0 = DEVIATION_DOMAIN[i]
-		const x1 = DEVIATION_DOMAIN[i + 1]
-		if (deviation >= x0 && deviation <= x1) {
-			if (x1 === x0) return DEVIATION_RANGE[i + 1]
-			const t = (deviation - x0) / (x1 - x0)
-			return (
-				DEVIATION_RANGE[i] + t * (DEVIATION_RANGE[i + 1] - DEVIATION_RANGE[i])
-			)
-		}
-	}
-	return DEVIATION_RANGE[lastIndex]
-}
-
-// Ported from galaxy-gen's MATH.orbits.distance: the AU distance at which an
-// orbit sitting at `kelvin` would occur for a star of the given luminosity
-// (279 K is the reference blackbody temperature at 1 AU / 1 solar luminosity).
-function auFromTemperature(kelvinTemp: number, luminositySol: number): number {
-	return (luminositySol / (kelvinTemp / 279) ** 4) ** 0.5
-}
-
-function deviationToAU(deviation: number, luminositySol: number): number {
-	const celsius = deviationToCelsius(deviation)
-	const kelvin = celsius + 273.15
-	return auFromTemperature(kelvin, luminositySol)
-}
-
 interface Slot {
 	zone: Zone
 	deviation: number
-}
-
-function describeDensity(
-	earthRelative: number,
-	classification: OrbitClassification,
-): string {
-	if (classification === "jovian" || classification === "chthonian") {
-		return "Hydrogen-Helium Envelope"
-	}
-	if (earthRelative < 0.18) return "Exotic Ice"
-	if (earthRelative < 0.5) return "Mostly Ice"
-	if (earthRelative < 0.82) return "Mostly Rock"
-	if (earthRelative < 1.15) return "Rock and Metal"
-	if (earthRelative < 1.5) return "Mostly Metal"
-	return "Compressed Metal"
-}
-
-function buildDensityProfile(
-	massKg: number,
-	diameterKm: number,
-	classification: OrbitClassification,
-): DensityProfile | null {
-	if (massKg <= 0 || diameterKm <= 0) return null
-	const diameterEarths = diameterKm / EARTH_DIAMETER_KM
-	const massEarths = massKg / EARTH_MASS_KG
-	const earthRelative = massEarths / diameterEarths ** 3
-	return {
-		earthRelative,
-		description: describeDensity(earthRelative, classification),
-	}
-}
-
-function hydrosphereCodeToFraction(hydrosphereCode: number): number {
-	if (hydrosphereCode <= 0) return 0
-	if (hydrosphereCode >= 12) return 1
-	if (hydrosphereCode === 11) return 0.95
-	if (hydrosphereCode === 10) return 0.9
-	return hydrosphereCode / 10
-}
-
-function roll2d5(rng: ReturnType<typeof createRng>): number {
-	return rng.randint(1, 5) + rng.randint(1, 5)
-}
-
-function rollAtmosphereBar(
-	rng: ReturnType<typeof createRng>,
-	profile: Pick<AtmosphereProfile, "type" | "subtype">,
-	panthalassic: boolean,
-): number {
-	if (profile.type === "vacuum") return rng.uniform(0, 0.0009)
-	if (profile.type === "trace") return rng.uniform(0.001, 0.09)
-	if (profile.subtype === "very thin") return rng.uniform(0.1, 0.42)
-	if (profile.subtype === "thin") return rng.uniform(0.43, 0.69)
-	if (profile.subtype === "standard" || profile.subtype === "unusual") {
-		return panthalassic ? rng.uniform(1, 1.49) : rng.uniform(0.7, 1.49)
-	}
-	if (profile.subtype === "dense") return rng.uniform(1.5, 2.49)
-	if (profile.subtype === "very dense") return rng.uniform(2.5, 10)
-	if (profile.type === "gas" && profile.subtype === "helium") {
-		return rng.uniform(100, 1000)
-	}
-	if (profile.type === "gas" && profile.subtype === "hydrogen") {
-		return rng.uniform(1000, 5000)
-	}
-	return 0
-}
-
-function atmosphereCodeToProfile(
-	rng: ReturnType<typeof createRng>,
-	atmosphereCode: number,
-	params: {
-		chemistry: string
-		sizeClass: number
-		deviation: number
-		hydrosphereCode: number
-		gravityG: number
-		classification: OrbitClassification
-		isPrimaryWorld: boolean
-	},
-): AtmosphereProfile | null {
-	let code = atmosphereCode
-	const nonhabitable = params.deviation < -1.5 || params.deviation > 1.5
-	if (params.isPrimaryWorld && (code < 4 || (code > 9 && code <= 10))) {
-		code = [5, 6, 6, 8][rng.randint(0, 3)]!
-	}
-	if (params.sizeClass <= 1) code = Math.min(code, 1)
-	else if (nonhabitable && code >= 2 && code <= 9) code = 10
-
-	let profile: Omit<AtmosphereProfile, "pressureBar"> | null = null
-	if (code === 0) profile = { code, type: "vacuum", breathable: false }
-	else if (code === 1) profile = { code, type: "trace", breathable: false }
-	else if (code === 2) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "very thin",
-			tainted: true,
-			breathable: true,
-		}
-	} else if (code === 3) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "very thin",
-			breathable: true,
-		}
-	} else if (code === 4) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "thin",
-			tainted: true,
-			breathable: true,
-		}
-	} else if (code === 5) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "thin",
-			breathable: true,
-		}
-	} else if (code === 6) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "standard",
-			breathable: true,
-		}
-	} else if (code === 7) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "standard",
-			tainted: true,
-			breathable: true,
-		}
-	} else if (code === 8) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "dense",
-			breathable: true,
-		}
-	} else if (code === 9) {
-		profile = {
-			code,
-			type: "breathable",
-			subtype: "dense",
-			tainted: true,
-			breathable: true,
-		}
-	} else if (code === 10) {
-		let roll = roll2d5(rng)
-		if (params.sizeClass <= 4) roll -= 2
-		if (params.deviation >= 1.5) roll -= 2
-		if (params.deviation <= -1.5) roll += 2
-		if (roll <= 2) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "very thin",
-				tainted: true,
-				breathable: false,
-			}
-		} else if (roll <= 3) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "very thin",
-				breathable: false,
-			}
-		} else if (roll <= 4) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "thin",
-				tainted: true,
-				breathable: false,
-			}
-		} else if (roll <= 5) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "thin",
-				breathable: false,
-			}
-		} else if (roll <= 6) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "standard",
-				tainted: true,
-				breathable: false,
-			}
-		} else if (roll <= 8) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "standard",
-				breathable: false,
-			}
-		} else if (roll <= 9) {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "dense",
-				tainted: true,
-				breathable: false,
-			}
-		} else {
-			profile = {
-				code,
-				type: "exotic",
-				subtype: "dense",
-				breathable: false,
-			}
-		}
-	} else if (code === 11 || code === 12) {
-		let roll = roll2d6(rng)
-		if (params.sizeClass <= 4) roll -= 3
-		if (params.sizeClass >= 8) roll += 2
-		if (params.deviation >= 1.5) roll += 4
-		if (params.deviation <= -1.5) roll -= 2
-		if (code === 12) roll += 2
-		if (params.classification === "telluric") roll += 4
-		profile = {
-			code,
-			type: code === 12 ? "insidious" : "corrosive",
-			subtype:
-				roll <= 3
-					? "very thin"
-					: roll <= 5
-						? "thin"
-						: roll <= 7
-							? "standard"
-							: roll <= 10
-								? "dense"
-								: "very dense",
-			breathable: false,
-		}
-	} else if (code === 13) {
-		const panthalassic = params.classification === "panthalassic"
-		const gasRoll = rng.uniform(0, 1)
-		if (!params.isPrimaryWorld && !panthalassic && gasRoll > 0.8) {
-			profile = {
-				code: gasRoll > 0.92 ? 17 : 16,
-				type: "gas",
-				subtype: gasRoll > 0.92 ? "hydrogen" : "helium",
-				breathable: false,
-			}
-		} else {
-			const breathable = params.isPrimaryWorld || !nonhabitable
-			profile = {
-				code: breathable ? 13 : 10,
-				type: breathable ? "breathable" : "exotic",
-				subtype: "very dense",
-				breathable,
-			}
-		}
-	} else if (code === 16 || code === 17 || code === 14) {
-		profile = {
-			code: code === 14 ? 17 : code,
-			type: "gas",
-			subtype: code === 16 ? "helium" : "hydrogen",
-			breathable: false,
-		}
-	}
-
-	if (!profile) return null
-	return {
-		...profile,
-		pressureBar: rollAtmosphereBar(
-			rng,
-			profile,
-			params.classification === "panthalassic",
-		),
-	}
-}
-
-const CLASS_ENVIRONMENTS: Record<OrbitClassification, ClassifiedEnvironment> = {
-	acheronian: {
-		classification: "acheronian",
-		atmosphereCode: 1,
-		hydrosphereCode: 0,
-		chemistry: "water",
-	},
-	arid: {
-		classification: "arid",
-		atmosphereCode: 6,
-		hydrosphereCode: 2,
-		chemistry: "water",
-	},
-	asphodelian: {
-		classification: "asphodelian",
-		atmosphereCode: 1,
-		hydrosphereCode: 0,
-		chemistry: "water",
-	},
-	asteroid: {
-		classification: "asteroid",
-		atmosphereCode: 0,
-		hydrosphereCode: 0,
-		chemistry: "rocky",
-	},
-	"asteroid belt": {
-		classification: "asteroid belt",
-		atmosphereCode: 0,
-		hydrosphereCode: 0,
-		chemistry: "rocky",
-	},
-	chthonian: {
-		classification: "chthonian",
-		atmosphereCode: 1,
-		hydrosphereCode: 0,
-		chemistry: "hydrogen-helium",
-	},
-	"geo-cyclic": {
-		classification: "geo-cyclic",
-		atmosphereCode: 1,
-		hydrosphereCode: 2,
-		chemistry: "water",
-	},
-	"geo-tidal": {
-		classification: "geo-tidal",
-		atmosphereCode: 7,
-		hydrosphereCode: 3,
-		chemistry: "water",
-	},
-	hebean: {
-		classification: "hebean",
-		atmosphereCode: 10,
-		hydrosphereCode: 3,
-		chemistry: "water",
-	},
-	helian: {
-		classification: "helian",
-		atmosphereCode: 13,
-		hydrosphereCode: 6,
-		chemistry: "water",
-	},
-	"jani-lithic": {
-		classification: "jani-lithic",
-		atmosphereCode: 1,
-		hydrosphereCode: 0,
-		chemistry: "water",
-	},
-	jovian: {
-		classification: "jovian",
-		atmosphereCode: 17,
-		hydrosphereCode: 13,
-		chemistry: "hydrogen-helium",
-	},
-	meltball: {
-		classification: "meltball",
-		atmosphereCode: 1,
-		hydrosphereCode: 12,
-		chemistry: "silicate vapor",
-	},
-	oceanic: {
-		classification: "oceanic",
-		atmosphereCode: 8,
-		hydrosphereCode: 10,
-		chemistry: "water",
-	},
-	panthalassic: {
-		classification: "panthalassic",
-		atmosphereCode: 11,
-		hydrosphereCode: 11,
-		chemistry: "water",
-	},
-	rockball: {
-		classification: "rockball",
-		atmosphereCode: 0,
-		hydrosphereCode: 0,
-		chemistry: "rocky",
-	},
-	snowball: {
-		classification: "snowball",
-		atmosphereCode: 1,
-		hydrosphereCode: 10,
-		chemistry: "water",
-	},
-	stygian: {
-		classification: "stygian",
-		atmosphereCode: 0,
-		hydrosphereCode: 0,
-		chemistry: "rocky",
-	},
-	tectonic: {
-		classification: "tectonic",
-		atmosphereCode: 7,
-		hydrosphereCode: 7,
-		chemistry: "water",
-	},
-	telluric: {
-		classification: "telluric",
-		atmosphereCode: 12,
-		hydrosphereCode: 0,
-		chemistry: "water",
-	},
-	vesperian: {
-		classification: "vesperian",
-		atmosphereCode: 7,
-		hydrosphereCode: 4,
-		chemistry: "water",
-	},
-}
-
-function classifyGroup(params: {
-	groupHint?: OrbitGroup
-	sizeClass: number
-}): OrbitGroup {
-	if (params.groupHint) return params.groupHint
-	const { sizeClass } = params
-	if (sizeClass <= 4) return "dwarf"
-	if (sizeClass <= 10) return "terrestrial"
-	return "helian"
-}
-
-function classifyBody(params: {
-	groupHint?: OrbitGroup
-	zone: Zone
-	orbitalDistanceAU: number
-	sizeClass: number
-	isPrimaryWorld: boolean
-	isMoon: boolean
-	tidal: boolean
-}): { group: OrbitGroup; classification: OrbitClassification } {
-	const { zone, orbitalDistanceAU, sizeClass, isPrimaryWorld, isMoon, tidal } =
-		params
-	const group = classifyGroup({ groupHint: params.groupHint, sizeClass })
-	if (isPrimaryWorld)
-		return { group: "terrestrial", classification: "tectonic" }
-	if (group === "asteroid belt") {
-		return { group, classification: isMoon ? "asteroid" : "asteroid belt" }
-	}
-	if (group === "jovian") {
-		if (zone === "epistellar" && orbitalDistanceAU < 0.15) {
-			return { group, classification: "chthonian" }
-		}
-		return { group, classification: "jovian" }
-	}
-	if (group === "helian") {
-		if (zone === "epistellar" && orbitalDistanceAU < 0.2) {
-			return { group, classification: "asphodelian" }
-		}
-		if (zone === "inner" && sizeClass >= 12) {
-			return { group, classification: "panthalassic" }
-		}
-		return { group, classification: "helian" }
-	}
-	if (group === "terrestrial") {
-		if (zone === "epistellar" && orbitalDistanceAU < 0.15) {
-			return { group, classification: "acheronian" }
-		}
-		if (tidal) {
-			if (zone === "epistellar") return { group, classification: "jani-lithic" }
-			if (zone === "inner") return { group, classification: "vesperian" }
-		}
-		if (zone === "epistellar") {
-			return { group, classification: sizeClass >= 8 ? "telluric" : "arid" }
-		}
-		if (zone === "inner") {
-			if (sizeClass <= 5) return { group, classification: "telluric" }
-			if (sizeClass <= 7) return { group, classification: "arid" }
-			if (sizeClass <= 9) return { group, classification: "oceanic" }
-			return { group, classification: "tectonic" }
-		}
-		if (sizeClass <= 7) return { group, classification: "arid" }
-		if (sizeClass <= 9) return { group, classification: "tectonic" }
-		return { group, classification: "oceanic" }
-	}
-	if (zone === "epistellar" && orbitalDistanceAU < 0.15) {
-		return { group, classification: "stygian" }
-	}
-	if (zone === "epistellar") {
-		if (tidal && sizeClass >= 2) {
-			return { group, classification: sizeClass >= 4 ? "geo-tidal" : "hebean" }
-		}
-		return { group, classification: sizeClass <= 2 ? "rockball" : "meltball" }
-	}
-	if (zone === "inner") {
-		if (tidal && sizeClass >= 2) {
-			return { group, classification: sizeClass >= 4 ? "geo-tidal" : "hebean" }
-		}
-		if (sizeClass >= 4) return { group, classification: "geo-cyclic" }
-		return { group, classification: "rockball" }
-	}
-	if (tidal && sizeClass >= 2) {
-		return { group, classification: sizeClass >= 4 ? "geo-tidal" : "hebean" }
-	}
-	if (sizeClass <= 1) return { group, classification: "snowball" }
-	if (sizeClass >= 4) return { group, classification: "geo-cyclic" }
-	return { group, classification: "rockball" }
 }
 
 function buildBodyEnvironment(params: {
@@ -726,42 +154,25 @@ function buildBodyEnvironment(params: {
 			? estimateGasGiantSizeClass(params.diameterKm)
 			: estimateRockySizeClass(params.diameterKm)
 	const body = classifyBody({ ...params, sizeClass })
-	const environment = CLASS_ENVIRONMENTS[body.classification]
-	const gravityG =
-		params.massKg > 0 ? computeGravityG(params.massKg, params.diameterKm) : 0
-	const atmosphere = atmosphereCodeToProfile(
-		params.rng,
-		environment.atmosphereCode,
-		{
-			chemistry: environment.chemistry,
-			sizeClass,
-			deviation: params.deviation,
-			hydrosphereCode: environment.hydrosphereCode,
-			gravityG,
-			classification: body.classification,
-			isPrimaryWorld: params.isPrimaryWorld,
-		},
-	)
-	const greenhouseFactor =
-		body.group === "jovian"
-			? rollGasGiantGreenhouseFactor(params.rng)
-			: rollGreenhouseFactor(
-					params.rng,
-					atmosphere?.pressureBar ?? 0,
-					atmosphere?.code ?? 0,
-				)
-	return {
-		sizeClass,
-		density: buildDensityProfile(
-			params.massKg,
-			params.diameterKm,
-			body.classification,
-		),
+	const environment = buildClassificationEnvironment({
+		rng: params.rng,
 		group: body.group,
 		classification: body.classification,
-		hydrosphereFraction: hydrosphereCodeToFraction(environment.hydrosphereCode),
-		atmosphere,
-		greenhouseFactor,
+		sizeClass,
+		deviation: params.deviation,
+		diameterKm: params.diameterKm,
+		massKg: params.massKg,
+		isPrimaryWorld: params.isPrimaryWorld,
+		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
+	})
+	return {
+		sizeClass,
+		density: environment.density,
+		group: body.group,
+		classification: body.classification,
+		hydrosphereFraction: environment.hydrosphereFraction,
+		atmosphere: environment.atmosphere,
+		greenhouseFactor: environment.greenhouseFactor,
 	}
 }
 
@@ -801,44 +212,25 @@ function buildMoonEnvironment(params: {
 		isMoon: true,
 		tidal,
 	})
-	const environment = CLASS_ENVIRONMENTS[body.classification]
-	const density = buildDensityProfile(
-		params.massKg,
-		params.diameterKm,
-		body.classification,
-	)
-	const gravityG =
-		params.massKg > 0 ? computeGravityG(params.massKg, params.diameterKm) : 0
-	const atmosphere = atmosphereCodeToProfile(
-		params.rng,
-		environment.atmosphereCode,
-		{
-			chemistry: environment.chemistry,
-			sizeClass,
-			deviation: params.deviation,
-			hydrosphereCode: environment.hydrosphereCode,
-			gravityG,
-			classification: body.classification,
-			isPrimaryWorld: params.isPrimaryWorld,
-		},
-	)
-	const greenhouseFactor =
-		body.group === "jovian"
-			? rollGasGiantGreenhouseFactor(params.rng)
-			: rollGreenhouseFactor(
-					params.rng,
-					atmosphere?.pressureBar ?? 0,
-					atmosphere?.code ?? 0,
-				)
-	return {
-		sizeClass,
-		densityEarthRelative: density?.earthRelative,
-		densityDescription: density?.description,
+	const environment = buildClassificationEnvironment({
+		rng: params.rng,
 		group: body.group,
 		classification: body.classification,
-		hydrosphereFraction: hydrosphereCodeToFraction(environment.hydrosphereCode),
-		atmosphere,
-		greenhouseFactor,
+		sizeClass,
+		deviation: params.deviation,
+		diameterKm: params.diameterKm,
+		massKg: params.massKg,
+		isPrimaryWorld: params.isPrimaryWorld,
+	})
+	return {
+		sizeClass,
+		densityEarthRelative: environment.density?.earthRelative,
+		densityDescription: environment.density?.description,
+		group: body.group,
+		classification: body.classification,
+		hydrosphereFraction: environment.hydrosphereFraction,
+		atmosphere: environment.atmosphere,
+		greenhouseFactor: environment.greenhouseFactor,
 	}
 }
 
@@ -1036,7 +428,7 @@ function computeGravityG(massKg: number, diameterKm: number): number {
  * texture, ...) is fixed the same way it is for every other Sol body, since
  * the main world is hydrated by the exact same buildPlanet() (see
  * buildMainWorldSeed below). */
-export interface HomeWorldParams {
+interface HomeWorldParams {
 	name?: string
 	orbitalDistanceAU: number
 	diameterKm: number
@@ -1049,6 +441,7 @@ export interface HomeWorldParams {
 	axialTiltDeg: number
 	inclinationDeg?: number
 	tideLock?: TideLock | null
+	substellarLon?: number
 	atmosphere?: AtmosphereProfile | null
 	/** Real fitted values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) --
 	 * only supplied when generating the real Sol seed's Earth. A
@@ -1065,7 +458,6 @@ interface GenerateSystemBodiesParams {
 	seed: number
 	spectralClass: MainSequenceClass
 	starSubtype: number
-	hoursPerDay: number
 	mainWorld: HomeWorldParams
 }
 
@@ -1103,6 +495,7 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		longitudeOfPerihelionDeg: mainWorld.longitudeOfPerihelionDeg,
 		inclinationDeg: mainWorld.inclinationDeg,
 		tideLock: mainWorld.tideLock,
+		substellarLon: mainWorld.substellarLon,
 		atmosphere: mainWorld.atmosphere ?? undefined,
 		hydrosphereFraction: 0.71,
 		albedo: mainWorld.albedo,
@@ -1123,7 +516,7 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 export function generateSystemBodies(
 	params: GenerateSystemBodiesParams,
 ): SystemBody[] {
-	const { seed, spectralClass, starSubtype, hoursPerDay, mainWorld } = params
+	const { seed, spectralClass, starSubtype, mainWorld } = params
 	const rng = createRng(seed)
 
 	if (seed === SOL_SEED) {
@@ -1132,13 +525,21 @@ export function generateSystemBodies(
 			inclinationDeg:
 				mainWorld.inclinationDeg ?? SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
 		}
-		return [
-			...SOL_SYSTEM_BODIES,
-			buildPlanet(mainWorldSeed, seed, -1, {
-				textureOverride: "/2k_earth.jpg",
-				moonsOverride: mainWorld.moons,
+		return applySystemSeismology({
+			bodies: [
+				...SOL_SYSTEM_BODIES,
+				buildPlanet(mainWorldSeed, seed, -1, {
+					textureOverride: "/sol/earth/2k_earth.jpg",
+					moonsOverride: mainWorld.moons,
+				}),
+			].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU),
+			starAgeGyr: SOL_STAR_AGE_GYR,
+			starLuminositySol: 1,
+			...buildSurfaceTidesSeismologyCallbacks({
+				spectralClass,
+				starSubtype,
 			}),
-		].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
+		})
 	}
 
 	const luminositySol = getStarLuminositySol(spectralClass, starSubtype)
@@ -1190,6 +591,15 @@ export function generateSystemBodies(
 			group === "asteroid belt"
 				? 0
 				: massKgFromEarthRelativeDensity(diameterKm, densityEarthRelative)
+		// Rolled here (rather than down with this body's other physical
+		// properties, where it conceptually belongs) because generateMoons()
+		// below needs THIS body's own day length as its Kepler day-length
+		// basis -- passing the main world's hoursPerDay there instead used to
+		// silently mis-scale every sibling planet's own moons' orbital periods.
+		const siderealDayHours =
+			group === "asteroid belt"
+				? 0
+				: rollSiderealDayHours(rng, group === "jovian", starAgeGyr)
 		const moonCount =
 			group === "asteroid belt"
 				? 0
@@ -1201,10 +611,15 @@ export function generateSystemBodies(
 						rng.randint(1, 1_000_000_000),
 						diameterKm / 2,
 						orbitalDistanceAU,
-						hoursPerDay,
+						siderealDayHours,
 						starMassKg,
 						group,
 					).map((moon) => ({
+						...moon,
+						// Spread after `moon` so its real classification-derived
+						// atmosphere/group/density wins over generateMoons()'s bare
+						// vacuum-atmosphere fallback (and its own sizeClass estimate,
+						// now told about the roll already made, wins too).
 						...buildMoonEnvironment({
 							rng,
 							diameterKm: moon.diameterKm,
@@ -1212,11 +627,11 @@ export function generateSystemBodies(
 							orbitalDistanceAU,
 							zone: slot.zone,
 							deviation: slot.deviation,
+							sizeClass: moon.sizeClass,
 							isPrimaryWorld: false,
 							orbitRange: moon.orbitRange,
 							semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters,
 						}),
-						...moon,
 					}))
 				: []
 		const moonsWithTideLocks = attachParentTideLocks(moons, siblingIdx)
@@ -1243,10 +658,7 @@ export function generateSystemBodies(
 				group === "asteroid belt" ? 0 : computeGravityG(massKg, diameterKm),
 			orbitalPeriodDays:
 				getKeplerYearYears(orbitalDistanceAU, starMassSol) * DAYS_PER_YEAR,
-			siderealDayHours:
-				group === "asteroid belt"
-					? 0
-					: rollSiderealDayHours(rng, group === "jovian", starAgeGyr),
+			siderealDayHours,
 			eccentricity: group === "asteroid belt" ? 0 : rollEccentricity(rng),
 			longitudeOfPerihelionDeg: rng.uniform(0, 360),
 			axialTiltDeg: group === "asteroid belt" ? 0 : rollAxialTiltDeg(rng),
@@ -1261,7 +673,15 @@ export function generateSystemBodies(
 		moonsOverride: mainWorld.moons,
 	})
 
-	return [...siblings, mainBody].sort(
-		(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-	)
+	return applySystemSeismology({
+		bodies: [...siblings, mainBody].sort(
+			(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
+		),
+		starAgeGyr,
+		starLuminositySol: luminositySol,
+		...buildSurfaceTidesSeismologyCallbacks({
+			spectralClass,
+			starSubtype,
+		}),
+	})
 }

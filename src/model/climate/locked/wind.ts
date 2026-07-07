@@ -3,7 +3,7 @@
  *
  * A locked planet has negligible rotation relative to its star, so Coriolis
  * is effectively zero. Surface circulation is driven by the day-side thermal
- * low (substellar hot spot) vs the night-side thermal high (antistellar cold
+ * low (substellar hot spot) vs the night-side thermal high (Substellar cold
  * point). Wind at every surface cell points toward the substellar low.
  *
  * The substellar position shifts monthly via libration (eccentricity) and
@@ -11,7 +11,7 @@
  */
 import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
-import { DEFAULT_ANTISTELLAR_LON } from "../../shared/units"
+import { DEFAULT_SUBSTELLAR_LON } from "../../shared/units"
 import { getClimateGeometry } from "../rain"
 import type { WindSurface } from "../wind"
 import {
@@ -99,7 +99,7 @@ export function computeLockedWindVectors(
 	elevation_km: Float32Array,
 	params?: Pick<
 		GenesisParams,
-		"antistellarLon" | "obliquity" | "eccentricity" | "perihelion" | "pressure"
+		"substellarLon" | "obliquity" | "eccentricity" | "perihelion" | "pressure"
 	>,
 	month?: number,
 	surface?: WindSurface,
@@ -113,7 +113,7 @@ export function computeLockedWindVectors(
 	const { adjOffset, adjList, r_xyz } = mesh
 	const { edgeEastward, edgeNorthward } = getClimateGeometry(mesh)
 
-	const antistellarLon = params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON
+	const substellarLon = params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON
 	const obliquity = params?.obliquity ?? 0
 	const eccentricity = params?.eccentricity ?? 0
 	const perihelion = params?.perihelion ?? 102
@@ -137,12 +137,12 @@ export function computeLockedWindVectors(
 			: 0
 
 	const sub = getSubstellarDirWithOffsetAndDeclination(
-		antistellarLon,
+		substellarLon,
 		libRad,
 		decRad,
 	)
 
-	// Primary pressure: minimum at substellar (hot), maximum at antistellar (cold)
+	// Primary pressure: minimum at substellar (hot), maximum at Substellar (cold)
 	const pressure = new Float32Array(N)
 	const temps =
 		month !== undefined && month >= 0 && month < 12
@@ -188,7 +188,7 @@ export function computeLockedWindVectors(
 	}
 
 	for (let r = 0; r < N; r++) {
-		// Stellar pressure: -1 at substellar, +1 at antistellar
+		// Stellar pressure: -1 at substellar, +1 at Substellar
 		const stellarPressure = -cellCt[r]
 
 		if (elevation_km[r] > 0.5) {

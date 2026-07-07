@@ -1,7 +1,7 @@
 import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
 import { SimplexNoise } from "../../shared/simplex-noise"
-import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
+import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
 import {
 	buildRegionGraph,
 	ceilingScale,
@@ -29,7 +29,7 @@ export function computeTidalRain(
 	params?: Pick<
 		GenesisParams,
 		| "seed"
-		| "antistellarLon"
+		| "substellarLon"
 		| "obliquity"
 		| "pressure"
 		| "eccentricity"
@@ -88,7 +88,7 @@ export function computeTidalRain(
 
 		for (let month = 0; month < 12; month++) {
 			const sub = getSubstellarDirWithOffsetAndDeclination(
-				params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON,
+				params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
 				monthlyLibration[month],
 				monthlyDeclination[month],
 			)

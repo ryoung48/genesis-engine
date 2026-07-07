@@ -67,10 +67,17 @@ export function estimateMoonSizeClassFromDiameter(
 
 // Stamps each moon's tideLock now that its parent's SystemBody idx is known
 // (moons are generated/rolled before that idx is assigned). "Locked" is read
-// off siderealDayHours === orbitalPeriodDays × 24, which is how the lock roll
+// off siderealDayHours ≈ orbitalPeriodDays × 24, which is how the lock roll
 // (rollMoonSiderealDayHours, or a preset's ported real rotation period) is
 // already expressed -- this just makes that fact explicit as data instead of
-// leaving callers to re-derive it via a float comparison.
+// leaving callers to re-derive it via a float comparison. Uses a tolerance
+// rather than strict equality: orbitalPeriodDays is itself derived as
+// rotationHours / 24 for these ported presets, and re-multiplying by 24
+// doesn't always round-trip exactly (e.g. Callisto's 400.54 comes back as
+// 400.5400000000001), which previously made an actually-locked moon read as
+// unlocked.
+const TIDE_LOCK_TOLERANCE_HOURS = 1e-6
+
 export function attachParentTideLocks(
 	moons: MoonParams[],
 	parentIdx: number,
@@ -78,7 +85,8 @@ export function attachParentTideLocks(
 	return moons.map((moon) => ({
 		...moon,
 		tideLock:
-			moon.siderealDayHours === moon.orbitalPeriodDays * 24
+			Math.abs(moon.siderealDayHours - moon.orbitalPeriodDays * 24) <
+			TIDE_LOCK_TOLERANCE_HOURS
 				? { type: "planet", target: parentIdx }
 				: null,
 	}))

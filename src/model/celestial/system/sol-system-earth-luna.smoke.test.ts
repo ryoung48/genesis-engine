@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { SOL_LUNA_DEFAULT, SOL_MAIN_WORLD_DEFAULTS, SOL_SYSTEM_BODIES } from "./sol-system"
+import {
+	SOL_LUNA_DEFAULT,
+	SOL_MAIN_WORLD_DEFAULTS,
+	SOL_SYSTEM_BODIES,
+} from "./sol-system"
 
 describe("Earth/Luna as SOL_PLANET_SEEDS entries", () => {
 	it("SOL_SYSTEM_BODIES excludes Earth (built live by buildHomeBody instead)", () => {

@@ -138,7 +138,7 @@ export function starTideContribution(
 // C_earth = (M_moon / M_earth) × (R_earth^4 / d_moon^3)
 // P2(cos 0) = 1
 const EARTH_MOON_MASS_KG = 7.34e22
-const EARTH_MASS_KG = 5.972e24
+const EARTH_MASS_KG = 5.973886146404331e24
 const EARTH_RADIUS_M = 6.371e6
 const EARTH_MOON_DIST_M = 3.844e8
 

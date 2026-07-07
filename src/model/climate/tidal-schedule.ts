@@ -818,3 +818,61 @@ export function computeMoonSurfaceTidesM(
 		contributions,
 	}
 }
+
+// Wires computeSurfaceTidesM/computeMoonSurfaceTidesM up as the
+// getSurfaceTidesHeatingForBody/Moon callbacks applySystemSeismology()
+// accepts, so its regime/totalHeating fold in surface tides alongside
+// residual and tidal heating -- system-seismology.ts takes callbacks rather
+// than importing this module directly to avoid a module cycle (this file ->
+// orbital-mechanics.ts -> sol-system.ts -> system-seismology.ts).
+//
+// hoursPerDay is deliberately NOT part of the fixed `params` here: it's the
+// day-length basis moonSemiMajorAxisM uses to turn a moon's orbitalPeriodDays
+// back into a real distance via Kepler, so it has to be each PARENT
+// PLANET'S OWN siderealDayHours (Jupiter's ~9.93h, not the main world's),
+// matching the convention the live stats card already uses
+// (GenerationPanel.tsx's parentHoursPerDay = body.siderealDayHours) --
+// passing the system-wide main-world hoursPerDay here instead silently
+// mis-scaled every non-main-world moon's tide contribution.
+export function buildSurfaceTidesSeismologyCallbacks(
+	params: Pick<GenesisParams, "spectralClass" | "starSubtype">,
+): {
+	getSurfaceTidesHeatingForBody: (body: {
+		group?: string
+		diameterKm: number
+		tideLock?: TideLock | null
+		orbitalDistanceAU: number
+		eccentricity: number
+		siderealDayHours: number
+		moons: MoonParams[]
+	}) => number
+	getSurfaceTidesHeatingForMoon: (
+		parent: {
+			name?: string
+			massKg: number
+			diameterKm: number
+			siderealDayHours: number
+			moons: MoonParams[]
+		},
+		moon: MoonParams,
+	) => number
+} {
+	return {
+		getSurfaceTidesHeatingForBody: (body) =>
+			body.group === "asteroid belt"
+				? 0
+				: computeSurfaceTidesM(body.moons, body, {
+						...params,
+						hoursPerDay: body.siderealDayHours,
+						orbitalDistanceAU: body.orbitalDistanceAU,
+						eccentricity: body.eccentricity,
+					}).totalM,
+		getSurfaceTidesHeatingForMoon: (parent, moon) =>
+			computeMoonSurfaceTidesM(moon, parent, {
+				...params,
+				hoursPerDay: parent.siderealDayHours,
+				orbitalDistanceAU: parent.orbitalDistanceAU,
+				eccentricity: parent.eccentricity,
+			}).totalM,
+	}
+}

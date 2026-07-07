@@ -154,11 +154,11 @@ const FIELD_SPECS: FieldSpec[] = [
 		},
 	},
 	{
-		name: "antistellarLon",
-		min: SR.antistellarLon.min,
-		step: SR.antistellarLon.step,
-		count: rangeCount(SR.antistellarLon),
-		read: (p) => p.antistellarLon,
+		name: "substellarLon",
+		min: SR.substellarLon.min,
+		step: SR.substellarLon.step,
+		count: rangeCount(SR.substellarLon),
+		read: (p) => p.substellarLon,
 	},
 	{
 		name: "perihelion",
@@ -336,7 +336,7 @@ interface DecodedPlanetCode {
 	daysPerYear: number
 	hoursPerDay: number
 	tideLock: import("../celestial/moons/moon-types").TideLock | null
-	antistellarLon: number
+	substellarLon: number
 	perihelion: number
 	pressure: number
 	volcanism: number
@@ -401,7 +401,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 			if (v >= 2) return { type: "lunar" as const, target: v - 2 }
 			return null
 		})(),
-		antistellarLon: decodedFields.antistellarLon,
+		substellarLon: decodedFields.substellarLon,
 		perihelion: decodedFields.perihelion,
 		pressure: decodedFields.pressure,
 		volcanism: decodedFields.volcanism,

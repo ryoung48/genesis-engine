@@ -36,7 +36,7 @@ interface ImportHeightmapParams {
 	daysPerYear: number
 	hoursPerDay: number
 	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
-	antistellarLon: number
+	substellarLon: number
 	perihelion: number
 	pressure: number
 	moonCount: number
@@ -222,7 +222,7 @@ export function generateWorld(
 		moonCount: overrides?.moonCount ?? currentParams.moonCount,
 		moonSeed: overrides?.moonSeed ?? currentParams.moonSeed,
 		tideLock,
-		antistellarLon: overrides?.antistellarLon ?? currentParams.antistellarLon,
+		substellarLon: overrides?.substellarLon ?? currentParams.substellarLon,
 		jitter: overrides?.jitter ?? currentParams.jitter,
 		roughness: overrides?.roughness ?? currentParams.roughness,
 		terrainWarp: overrides?.terrainWarp ?? currentParams.terrainWarp,
@@ -314,7 +314,7 @@ export function importHeightmap(
 			daysPerYear: importParams.daysPerYear as number,
 			hoursPerDay: importParams.hoursPerDay as number,
 			pressure: importParams.pressure as number,
-			antistellarLon: importParams.antistellarLon as number,
+			substellarLon: importParams.substellarLon as number,
 			terrainWarp: importParams.terrainWarp as number,
 			smoothing: importParams.smoothing as number,
 			hydraulicErosion: importParams.hydraulicErosion as number,

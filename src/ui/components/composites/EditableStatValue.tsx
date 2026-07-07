@@ -18,7 +18,8 @@ export interface StatEntry {
 	help?: string
 	/** Tooltip on the value itself (rather than the label) -- e.g. a
 	 * per-source contribution breakdown for a summed stat. */
-	valueHelp?: string
+	valueHelp?: ReactNode
+	valueHelpTarget?: "all" | "prefix"
 	editor?: StatEditor
 	valueAction?: ReactNode
 }

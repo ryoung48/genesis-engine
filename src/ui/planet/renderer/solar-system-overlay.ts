@@ -118,7 +118,7 @@ function loadGrayscaleSunTexture(
 	}
 	if (!grayscaleSunTextureLoadPromise) {
 		grayscaleSunTextureLoadPromise = new Promise((resolve) => {
-			textureLoader.load("/2k_sun.jpg", (loaded) => {
+			textureLoader.load("/sol/2k_sun.jpg", (loaded) => {
 				const image = loaded.image as HTMLImageElement
 				const canvas = document.createElement("canvas")
 				canvas.width = image.width
@@ -627,7 +627,7 @@ export function buildSolarSystemOverlay(
 				})
 			: isGasGiant
 				? new THREE.MeshStandardMaterial({
-						map: loadBodyTexture("/2k_jupiter.jpg"),
+						map: loadBodyTexture("/sol/jupiter/2k_jupiter.jpg"),
 						roughness: 1,
 						metalness: 0,
 					})
@@ -1112,7 +1112,12 @@ export function buildSolarSystemOverlay(
 				p.baseQuaternion &&
 				p.body.siderealDayHours > 0
 			) {
-				const angle = (hours / p.body.siderealDayHours) * TWO_PI
+				const lockedSubstellarLon =
+					p.body.tideLock?.type === "solar" ? (p.body.substellarLon ?? 0) : null
+				const angle =
+					lockedSubstellarLon !== null
+						? -(lockedSubstellarLon * DEG2RAD)
+						: (hours / p.body.siderealDayHours) * TWO_PI
 				bodySpinQuat.setFromAxisAngle(bodySpinAxis, angle)
 				p.mesh.quaternion.copy(p.baseQuaternion).multiply(bodySpinQuat)
 			}

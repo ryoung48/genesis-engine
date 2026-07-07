@@ -109,7 +109,7 @@ function buildMoonMesh(
 ): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(radius, 8, 6)
 	if (!sharedMoonTexture) {
-		sharedMoonTexture = textureLoader.load("/moon.jpg")
+		sharedMoonTexture = textureLoader.load("/sol/earth/moon.jpg")
 		sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
 		sharedMoonTexture.userData.sharedTexture = true
 	}

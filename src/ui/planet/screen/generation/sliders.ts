@@ -45,7 +45,7 @@ export function buildPlanetSliders(state: {
 	landDistribution: number
 	landCoverage: number
 	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
-	antistellarLon: number
+	substellarLon: number
 	setPlanetRadiusKm: (v: number) => void
 	setObliquity: (v: number) => void
 	setEccentricity: (v: number) => void
@@ -56,7 +56,7 @@ export function buildPlanetSliders(state: {
 	setAxialTiltDirection: (v: number) => void
 	setLandDistribution: (v: number) => void
 	setLandCoverage: (v: number) => void
-	setAntistellarLon: (v: number) => void
+	setSubstellarLon: (v: number) => void
 }): SliderDef[] {
 	return [
 		{
@@ -145,12 +145,12 @@ export function buildPlanetSliders(state: {
 		...(state.tideLock?.type === "solar"
 			? [
 					{
-						label: "Antistellar Lon",
-						help: "Longitude of the antistellar point (permanent dark side center).",
-						value: state.antistellarLon,
-						display: `${state.antistellarLon.toFixed(0)}\u00B0`,
-						...SR.antistellarLon,
-						set: state.setAntistellarLon,
+						label: "Substellar Lon",
+						help: "Longitude of the substellar point (permanent day side center).",
+						value: state.substellarLon,
+						display: `${state.substellarLon.toFixed(0)}\u00B0`,
+						...SR.substellarLon,
+						set: state.setSubstellarLon,
 					},
 				]
 			: []),
@@ -277,7 +277,7 @@ export function resetWorldDefaults(setters: {
 	setTideLock: (
 		v: import("@/model/celestial/moons/moon-types").TideLock | null,
 	) => void
-	setAntistellarLon: (v: number) => void
+	setSubstellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
 	setMoonCount: (v: number) => void
@@ -301,7 +301,7 @@ export function resetWorldDefaults(setters: {
 	setters.setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
 	setters.setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
 	setters.setTideLock(null)
-	setters.setAntistellarLon(DEFAULT_WORLD_PARAMS.antistellarLon)
+	setters.setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
 	setters.setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)

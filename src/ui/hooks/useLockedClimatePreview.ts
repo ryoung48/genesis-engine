@@ -25,7 +25,7 @@ interface LockedClimatePreviewConfig {
 	radius: number
 	pressure: number
 	planetRadiusKm: number
-	antistellarLon: number
+	substellarLon: number
 }
 
 const LONGITUDE_STEP = 10
@@ -42,7 +42,7 @@ function buildLockedClimatePreview(
 		orbitalDistanceAU: config.orbitalDistanceAU,
 		daysPerYear: config.daysPerYear,
 		perihelion: config.perihelion,
-		antistellarLon: config.antistellarLon,
+		substellarLon: config.substellarLon,
 		obliquity: config.obliquity,
 	} as const
 	const { flux, libration, solarLongitude } = computeDailyLockedOrbit({
@@ -81,7 +81,7 @@ function buildLockedClimatePreview(
 
 		for (let day = 0; day < dayCount; day++) {
 			const substellar = getSubstellarDirWithOffsetAndDeclination(
-				config.antistellarLon,
+				config.substellarLon,
 				libration[day],
 				computeLockedSubstellarDeclinationRad(
 					config.obliquity,
@@ -149,7 +149,7 @@ export function useLockedClimatePreview(config: LockedClimatePreviewConfig) {
 	return useMemo(
 		() => buildLockedClimatePreview(config),
 		[
-			config.antistellarLon,
+			config.substellarLon,
 			config.daysPerYear,
 			config.eccentricity,
 			config.hoursPerDay,

@@ -1,6 +1,6 @@
 import { describe, it } from "vitest"
-import { EnergyBalanceModel } from "./index"
 import { EMB_CONSTANTS } from "./constants"
+import { EnergyBalanceModel } from "./index"
 
 // Re-fits every Sol body's greenhouseFactor now that ice-albedo feedback is
 // disabled in albedo.ts (see luna-repro/earth-refit) -- using the exact same

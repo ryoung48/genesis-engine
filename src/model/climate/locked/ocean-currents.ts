@@ -4,7 +4,7 @@ import type {
 	GenesisParams,
 	SphereMesh,
 } from "../.."
-import { DEFAULT_ANTISTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
+import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
 import type { GenesisLandmarks } from "../../terrain/landmarks"
 import { computeCoastalWarmthFromOceanWarmth } from "../ocean-currents-shared"
 import type { FlowGrid } from "../wind"
@@ -22,7 +22,7 @@ const TYPE_LAKE = 5
 
 type LockedCurrentParams = Pick<
 	Partial<GenesisParams>,
-	| "antistellarLon"
+	| "substellarLon"
 	| "eccentricity"
 	| "obliquity"
 	| "perihelion"
@@ -66,7 +66,7 @@ function buildLakeMask(
 function computeMonthlySubstellarDirections(
 	params?: LockedCurrentParams,
 ): Array<[number, number, number]> {
-	const antistellarLon = params?.antistellarLon ?? DEFAULT_ANTISTELLAR_LON
+	const substellarLon = params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON
 	const obliquity = params?.obliquity ?? 0
 	const eccentricity = params?.eccentricity ?? 0
 	const perihelion = params?.perihelion ?? 102
@@ -78,7 +78,7 @@ function computeMonthlySubstellarDirections(
 	)
 	return Array.from({ length: CURRENT_EFFECT_MONTHS }, (_, month) =>
 		getSubstellarDirWithOffsetAndDeclination(
-			antistellarLon,
+			substellarLon,
 			monthlyLibration[month],
 			monthlyDeclination[month],
 		),
@@ -330,7 +330,7 @@ export function buildLockedOceanCurrentGrid(
 	lonDeg: Float32Array,
 	params?: Pick<
 		GenesisParams,
-		"antistellarLon" | "eccentricity" | "obliquity" | "perihelion"
+		"substellarLon" | "eccentricity" | "obliquity" | "perihelion"
 	>,
 	currentMonth?: number,
 ): FlowGrid {

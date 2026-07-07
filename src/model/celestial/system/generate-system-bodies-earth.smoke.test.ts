@@ -44,7 +44,7 @@ describe("Earth's moons survive generateSystemBodies (moonsOverride wiring)", ()
 						greenhouseFactor: 0,
 					},
 				],
-				massKg: 5.972e24,
+				massKg: 5.973886146404331e24,
 				gravityG: 1,
 				siderealDayHours: 24,
 				eccentricity: 0.0167,

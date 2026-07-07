@@ -11,7 +11,7 @@ interface GenerationPreviewParams {
 	obliquity: number
 	eccentricity: number
 	perihelion: number
-	antistellarLon: number
+	substellarLon: number
 	spectralClass: string
 	starSubtype: number
 	orbitalDistanceAU: number
@@ -27,7 +27,7 @@ export function buildGenerationPreviewConfig(params: GenerationPreviewParams) {
 		obliquity: params.obliquity,
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
-		antistellarLon: params.antistellarLon,
+		substellarLon: params.substellarLon,
 		spectralClass: params.spectralClass,
 		starSubtype: params.starSubtype,
 		orbitalDistanceAU: params.orbitalDistanceAU,

@@ -3405,15 +3405,18 @@ export function createGenesisScene(
 	}
 
 	function setSunDirection(
-		_x: number,
-		_y: number,
+		x: number,
+		y: number,
 		z: number,
 		hoursPerDay: number,
 	) {
-		// For tidally-locked mode: sun direction is fixed, no spin
+		// For tidally-locked mode: the sun direction is fixed in world space,
+		// so the globe spin is whatever longitude places that substellar point
+		// under +X.
 		const subSolarLatRad = Math.asin(Math.max(-1, Math.min(1, z)))
+		const spinAngle = -Math.atan2(y, x)
 		currentSunHoursPerDay = hoursPerDay || 24
-		applyGlobeOrientation(subSolarLatRad, 0)
+		applyGlobeOrientation(subSolarLatRad, spinAngle)
 		syncMapLighting()
 		if (solarTerminatorVisible) rebuildSolarTerminator()
 		requestRender()

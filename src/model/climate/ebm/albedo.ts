@@ -17,7 +17,7 @@ import { EMB_CONSTANTS } from "./constants"
  */
 const POLAR_ALBEDO_BOOST_MAX = 0.08
 
-export function polarAlbedoBoost(latDeg: number, obliquityDeg: number): number {
+function polarAlbedoBoost(latDeg: number, obliquityDeg: number): number {
 	const obliquityFactor = Math.min(1, Math.max(0, obliquityDeg) / 23.5)
 	const latitudeFactor = Math.abs(latDeg) / 90
 	return POLAR_ALBEDO_BOOST_MAX * (1 - obliquityFactor) * latitudeFactor

@@ -35,6 +35,20 @@ export type TideLock = {
 	target: number
 }
 
+export interface SeismologyProfile {
+	residualHeating: number
+	tidalHeating: number
+	/** Theoretical-max equilibrium surface tide, folded into totalHeating/
+	 * regime alongside residual and tidal heating -- see the identically-
+	 * shaped SeismologyProfile in system/system-seismology.ts (the actual
+	 * producer of this data; duplicated here rather than imported to avoid a
+	 * moon-types.ts -> system-seismology.ts dependency from this low-level
+	 * shared-types file). */
+	surfaceTidesHeating: number
+	totalHeating: number
+	regime: "dead" | "low" | "active" | "extreme"
+}
+
 export interface MoonParams {
 	idx: number
 	name?: string
@@ -71,10 +85,23 @@ export interface MoonParams {
 	/** What (if anything) this moon is tidally locked to. Most large moons end
 	 * up locked to their parent planet; null when not locked to anything. */
 	tideLock?: TideLock | null
-	/** Longitude of the antistellar point (the spot on the surface directly
-	 * facing away from the star), in degrees 0-360 — only meaningful when
-	 * tideLock is set. Defaults to 180° when unset. */
-	antistellarLon?: number
+	/** Longitude of the substellar point (the spot on the surface directly
+	 * facing the star), in degrees 0-360 — only meaningful when tideLock is
+	 * set. Defaults to 0° when unset. */
+	substellarLon?: number
+	seismology?: SeismologyProfile
 }
 
 export const MAX_MOONS = 3
+
+// Fallback for any moon that doesn't get a rolled/authored atmosphere of its
+// own (see generateMoons() and sol-system.ts's SolMoonSeed table) -- most
+// moons in reality are airless, and an explicit vacuum profile keeps the
+// stats card's Atmosphere row from silently disappearing (the row is only
+// omitted when `atmosphere` is `undefined`, not when it's vacuum).
+export const DEFAULT_MOON_ATMOSPHERE: AtmosphereProfile = {
+	code: 0,
+	pressureBar: 0,
+	type: "vacuum",
+	breathable: false,
+}

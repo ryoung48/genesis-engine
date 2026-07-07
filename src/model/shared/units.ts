@@ -5,7 +5,7 @@ export const DEFAULT_OBLIQUITY_DEG = 23.5
 export const DEFAULT_ECCENTRICITY = 0.0167
 export const DEFAULT_DAYS_PER_YEAR = 365
 export const DEFAULT_HOURS_PER_DAY = 24
-export const DEFAULT_ANTISTELLAR_LON = 180
+export const DEFAULT_SUBSTELLAR_LON = 0
 export const DEFAULT_PERIHELION = 102
 
 type MeshWithOptionalNeighborDist = Pick<SphereMesh, "numRegions"> & {

@@ -1,5 +1,7 @@
 # AGENTS.md
 
+NEVER git stash without asking for permission first.
+
 Before finishing any code change in this repository, verify it with:
 
 - `pnpm lint`

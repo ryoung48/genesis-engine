@@ -14,13 +14,13 @@ import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
 import {
-	DEFAULT_ANTISTELLAR_LON,
 	DEFAULT_DAYS_PER_YEAR,
 	DEFAULT_ECCENTRICITY,
 	DEFAULT_HOURS_PER_DAY,
 	DEFAULT_OBLIQUITY_DEG,
 	DEFAULT_PERIHELION,
 	DEFAULT_PLANET_RADIUS_KM,
+	DEFAULT_SUBSTELLAR_LON,
 	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
 } from "../shared/units"
@@ -67,7 +67,7 @@ interface ImportParams {
 	daysPerYear?: number
 	hoursPerDay?: number
 	tidallyLocked?: boolean
-	antistellarLon?: number
+	substellarLon?: number
 	perihelion?: number
 	pressure?: number
 }
@@ -289,7 +289,7 @@ export function importGenesisWorld(
 		orbitalDistanceAU: params.orbitalDistanceAU ?? DEFAULT_ORBITAL_DISTANCE_AU,
 		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
 		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
-		antistellarLon: params.antistellarLon ?? DEFAULT_ANTISTELLAR_LON,
+		substellarLon: params.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
 		perihelion: params.perihelion ?? DEFAULT_PERIHELION,
 		pressure: params.pressure ?? 1.0,
 	}

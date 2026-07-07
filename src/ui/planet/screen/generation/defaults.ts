@@ -39,7 +39,7 @@ export const DEFAULT_WORLD_PARAMS = {
 	craters: 0,
 	maxElevation: SOL_MAIN_WORLD_DEFAULTS.maxElevation,
 	pressure: SOL_MAIN_WORLD_DEFAULTS.pressureBar,
-	antistellarLon: SOL_MAIN_WORLD_DEFAULTS.antistellarLon,
+	substellarLon: SOL_MAIN_WORLD_DEFAULTS.substellarLon,
 	perihelion: SOL_MAIN_WORLD_DEFAULTS.perihelion,
 	era: DEFAULT_ERA,
 	moonCount: SOL_MAIN_WORLD_DEFAULTS.moonCount,

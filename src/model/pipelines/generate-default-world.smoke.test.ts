@@ -74,8 +74,7 @@ function buildSmokeParams(code: string): GenesisParams {
 		daysPerYear: decoded.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
 		hoursPerDay: decoded.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
 		tideLock: decoded.tideLock,
-		antistellarLon:
-			decoded.antistellarLon ?? DEFAULT_WORLD_PARAMS.antistellarLon,
+		substellarLon: decoded.substellarLon ?? DEFAULT_WORLD_PARAMS.substellarLon,
 		perihelion: decoded.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion,
 		pressure: decoded.pressure ?? DEFAULT_WORLD_PARAMS.pressure,
 	}
@@ -87,7 +86,7 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 		obliquity: params.obliquity,
 		eccentricity: params.eccentricity,
 		perihelion: params.perihelion,
-		antistellarLon: params.antistellarLon,
+		substellarLon: params.substellarLon,
 		spectralClass: params.spectralClass,
 		starSubtype: params.starSubtype,
 		orbitalDistanceAU: params.orbitalDistanceAU,
@@ -291,7 +290,7 @@ describe("full world smoke generation", () => {
 			pressure: params.pressure,
 			tideLock: params.tideLock,
 			perihelion: params.perihelion,
-			antistellarLon: params.antistellarLon,
+			substellarLon: params.substellarLon,
 		})
 		console.info("Smoke climate summary", {
 			previewAvgTempC: Number(previewAvgTempC.toFixed(1)),
