@@ -1,4 +1,4 @@
-import type { MoonParams, TideLock } from "../celestial/moons/moon-types"
+import type { MoonBody, TideLock } from "../celestial/moons/moon-types"
 import {
 	AU_M,
 	derivePlanetMassKg,
@@ -74,13 +74,13 @@ function starDiameterM(spectralClass: string, starSubtype: number): number {
 
 // Clamp moon orbital period to valid bounds and return adjusted moon + clamped flag
 function validateMoon(
-	moon: MoonParams,
+	moon: MoonBody,
 	planetMassKg: number,
 	starMassKg: number,
 	planetRadiusKm: number,
 	orbitalDistanceAU: number,
 	hoursPerDay: number,
-): { moon: MoonParams; clamped: boolean } {
+): { moon: MoonBody; clamped: boolean } {
 	const bounds = moonPeriodBoundsDay(
 		moon,
 		planetMassKg,
@@ -196,7 +196,7 @@ function detectEclipse(
 }
 
 function buildMoonContributors(
-	moons: MoonParams[],
+	moons: MoonBody[],
 	params: Pick<
 		GenesisParams,
 		| "hoursPerDay"
@@ -466,8 +466,8 @@ function computeTidalScheduleFromContributors(
 // there) rather than tracking a rotating local surface point -- so there's
 // no eclipse/phase detail here, just the tidal-force time series.
 export function computeMoonTidalSchedule(
-	moon: MoonParams,
-	parent: { idx: number; massKg: number; moons: MoonParams[] },
+	moon: MoonBody,
+	parent: { idx: number; massKg: number; moons: MoonBody[] },
 	params: Pick<
 		GenesisParams,
 		| "daysPerYear"
@@ -608,7 +608,7 @@ export function computeMoonTidalSchedule(
 }
 
 export function computeTidalSchedule(
-	moons: MoonParams[],
+	moons: MoonBody[],
 	params: Pick<
 		GenesisParams,
 		| "seed"
@@ -650,7 +650,7 @@ export interface SurfaceTidesBreakdown {
 // won't be exceeded either. Returns the per-source breakdown alongside the
 // total so callers can show where the number comes from.
 export function computeSurfaceTidesM(
-	moons: MoonParams[],
+	moons: MoonBody[],
 	planet: { diameterKm: number; tideLock?: TideLock | null },
 	params: Pick<
 		GenesisParams,
@@ -728,12 +728,12 @@ export function computeSurfaceTidesM(
 // -- the same "assume best-case alignment" convention as the rest of this
 // ceiling, not the real time-varying separation.
 export function computeMoonSurfaceTidesM(
-	moon: MoonParams,
+	moon: MoonBody,
 	parent: {
 		name?: string
 		massKg: number
 		diameterKm: number
-		moons: MoonParams[]
+		moons: MoonBody[]
 	},
 	params: Pick<
 		GenesisParams,
@@ -844,7 +844,7 @@ export function buildSurfaceTidesSeismologyCallbacks(
 		orbitalDistanceAU: number
 		eccentricity: number
 		siderealDayHours: number
-		moons: MoonParams[]
+		moons: MoonBody[]
 	}) => number
 	getSurfaceTidesHeatingForMoon: (
 		parent: {
@@ -854,9 +854,9 @@ export function buildSurfaceTidesSeismologyCallbacks(
 			siderealDayHours: number
 			orbitalDistanceAU: number
 			eccentricity: number
-			moons: MoonParams[]
+			moons: MoonBody[]
 		},
-		moon: MoonParams,
+		moon: MoonBody,
 	) => number
 } {
 	return {

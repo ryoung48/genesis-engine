@@ -3585,7 +3585,7 @@ export function createGenesisScene(
 	}
 
 	function setMoonOrbitOverlay(
-		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
+		moons: import("@/model/celestial/moons/moon-types").MoonBody[] | null,
 		planetRadiusKm: number,
 		hoursPerDay: number,
 		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
@@ -3613,7 +3613,7 @@ export function createGenesisScene(
 	}
 
 	function updateMoonOrbitOverlay(
-		moons: import("@/model/celestial/moons/moon-types").MoonParams[] | null,
+		moons: import("@/model/celestial/moons/moon-types").MoonBody[] | null,
 		planetRadiusKm: number,
 		hoursPerDay: number,
 		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,

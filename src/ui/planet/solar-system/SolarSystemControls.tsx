@@ -4,6 +4,7 @@ import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
+import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 
 interface SolarSystemClockProps {
@@ -21,6 +22,8 @@ interface SolarSystemControlsProps {
 	expanded: boolean
 	setExpanded: (v: boolean | ((prev: boolean) => boolean)) => void
 	onBack: () => void
+	generationPanelOpen?: boolean
+	onToggleGenerationPanel?: () => void
 	showEllipticalOrbits: boolean
 	setShowEllipticalOrbits: (v: boolean) => void
 	showDaylight: boolean
@@ -53,6 +56,8 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 	expanded,
 	setExpanded,
 	onBack,
+	generationPanelOpen,
+	onToggleGenerationPanel,
 	showEllipticalOrbits,
 	setShowEllipticalOrbits,
 	showDaylight,
@@ -204,6 +209,17 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 				</div>
 			</div>
 			<div className="flex items-center gap-2 pointer-events-auto">
+				{!generationPanelOpen && onToggleGenerationPanel && (
+					<Tooltip content="Show generation panel" position="top">
+						<IconButton
+							onClick={onToggleGenerationPanel}
+							tone="overlay"
+							size="sm"
+						>
+							<LightningIcon className="h-4 w-4 text-white" />
+						</IconButton>
+					</Tooltip>
+				)}
 				<Tooltip
 					content={expanded ? "Hide settings" : "Show settings"}
 					position="top"

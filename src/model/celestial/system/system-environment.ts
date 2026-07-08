@@ -1,4 +1,9 @@
 import type { AtmosphereProfile } from "@/model/celestial/moons/moon-types"
+import type {
+	DensityProfile,
+	OrbitClassification,
+	OrbitGroup,
+} from "@/model/celestial/orbit-body"
 import {
 	estimateGreenhouseFactor,
 	rollGasGiantGreenhouseFactor,
@@ -6,45 +11,12 @@ import {
 } from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
 
+export type { DensityProfile, OrbitClassification, OrbitGroup }
+
 const EARTH_DIAMETER_KM = 12_742
 const EARTH_MASS_KG = 5.973886146404331e24
 
-export type OrbitGroup =
-	| "asteroid belt"
-	| "dwarf"
-	| "terrestrial"
-	| "helian"
-	| "jovian"
-
-export type OrbitClassification =
-	| "acheronian"
-	| "arid"
-	| "asphodelian"
-	| "asteroid"
-	| "asteroid belt"
-	| "chthonian"
-	| "geo-cyclic"
-	| "geo-tidal"
-	| "hebean"
-	| "helian"
-	| "jani-lithic"
-	| "jovian"
-	| "meltball"
-	| "oceanic"
-	| "panthalassic"
-	| "rockball"
-	| "snowball"
-	| "stygian"
-	| "tectonic"
-	| "telluric"
-	| "vesperian"
-
 export type Zone = "epistellar" | "inner" | "outer"
-
-export interface DensityProfile {
-	earthRelative: number
-	description: string
-}
 
 interface ClassifiedEnvironment {
 	atmosphereCode: number
@@ -558,7 +530,7 @@ export function buildClassificationEnvironment(params: {
 	greenhouseMode?: "estimate" | "roll"
 }): {
 	density: DensityProfile | null
-	hydrosphereFraction: number
+	landCoverage: number
 	atmosphere: AtmosphereProfile | null
 	greenhouseFactor: number
 } {
@@ -594,7 +566,7 @@ export function buildClassificationEnvironment(params: {
 			params.diameterKm,
 			params.classification,
 		),
-		hydrosphereFraction: hydrosphereCodeToFraction(environment.hydrosphereCode),
+		landCoverage: 1 - hydrosphereCodeToFraction(environment.hydrosphereCode),
 		atmosphere,
 		greenhouseFactor,
 	}

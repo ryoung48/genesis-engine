@@ -1,4 +1,4 @@
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonBody } from "@/model/celestial/moons/moon-types"
 import { createRng } from "@/model/shared/rng"
 import type { SystemBody } from "./generate-system-bodies"
 import {
@@ -13,7 +13,7 @@ import {
 const EARTH_DIAMETER_KM = 12_742
 const EARTH_MASS_KG = 5.973886146404331e24
 
-export interface SeismologyProfile {
+interface SeismologyProfile {
 	residualHeating: number
 	tidalHeating: number
 	/** Theoretical-max equilibrium surface tide (see computeSurfaceTidesM /
@@ -51,11 +51,11 @@ function computeResidualHeating(params: {
 	return Math.floor(stress) ** 2
 }
 
-function computeMoonTidalHeating(parent: SystemBody, moon: MoonParams): number {
+function computeMoonTidalHeating(parent: SystemBody, moon: MoonBody): number {
 	const distanceMillionKm =
 		((moon.semiMajorAxisPlanetDiameters ?? 0) * parent.diameterKm) / 1e6
 	const orbitalPeriodDays = moon.orbitalPeriodDays
-	const densityEarthRelative = moon.densityEarthRelative ?? 0
+	const densityEarthRelative = moon.density?.earthRelative ?? 0
 	if (
 		distanceMillionKm <= 0 ||
 		orbitalPeriodDays <= 0 ||
@@ -78,7 +78,7 @@ function seedForBody(body: SystemBody): number {
 	return (body.idx + 2) * 10_007 + Math.round(body.orbitalDistanceAU * 1_000)
 }
 
-function seedForMoon(parent: SystemBody, moon: MoonParams): number {
+function seedForMoon(parent: SystemBody, moon: MoonBody): number {
 	return (
 		(parent.idx + 2) * 100_003 +
 		moon.idx * 10_007 +
@@ -176,15 +176,15 @@ function applyBodySeismology(params: {
 
 function applyMoonSeismology(params: {
 	parent: SystemBody
-	moon: MoonParams
+	moon: MoonBody
 	starAgeGyr: number
 	starLuminositySol: number
 	surfaceTidesHeating: number
-}): MoonParams {
+}): MoonBody {
 	const { parent, moon, starAgeGyr, starLuminositySol, surfaceTidesHeating } =
 		params
 	const sizeClass = moon.sizeClass ?? 0
-	const densityEarthRelative = moon.densityEarthRelative ?? 0
+	const densityEarthRelative = moon.density?.earthRelative ?? 0
 	const residualHeating = computeResidualHeating({
 		sizeClass,
 		starAgeGyr,
@@ -230,12 +230,8 @@ function applyMoonSeismology(params: {
 		...moon,
 		group: nextGroup,
 		classification: nextClassification,
-		densityEarthRelative:
-			rerolled?.density?.earthRelative ?? moon.densityEarthRelative,
-		densityDescription:
-			rerolled?.density?.description ?? moon.densityDescription,
-		hydrosphereFraction:
-			rerolled?.hydrosphereFraction ?? moon.hydrosphereFraction,
+		density: rerolled?.density ?? moon.density,
+		landCoverage: rerolled?.landCoverage ?? moon.landCoverage,
 		atmosphere: rerolled?.atmosphere ?? moon.atmosphere,
 		greenhouseFactor: rerolled?.greenhouseFactor ?? moon.greenhouseFactor,
 		seismology: {
@@ -262,7 +258,7 @@ export function applySystemSeismology(params: {
 	 * caller re-runs this over anyway once real generation params are known)
 	 * that can't supply real numbers yet -- surfaceTidesHeating is then 0. */
 	getSurfaceTidesHeatingForBody?: (body: SystemBody) => number
-	getSurfaceTidesHeatingForMoon?: (parent: SystemBody, moon: MoonParams) => number
+	getSurfaceTidesHeatingForMoon?: (parent: SystemBody, moon: MoonBody) => number
 }): SystemBody[] {
 	return params.bodies.map((body) => {
 		const seismologyBody = applyBodySeismology({
@@ -317,7 +313,7 @@ export function applySystemSeismology(params: {
 			...seismologyBody,
 			classification: nextClassification,
 			density: rerolled.density,
-			hydrosphereFraction: rerolled.hydrosphereFraction,
+			landCoverage: rerolled.landCoverage,
 			atmosphere: rerolled.atmosphere,
 			greenhouseFactor: rerolled.greenhouseFactor,
 			moons,

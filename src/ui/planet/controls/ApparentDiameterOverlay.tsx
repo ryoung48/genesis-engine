@@ -1,5 +1,5 @@
 import React, { useMemo } from "react"
-import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
+import type { MoonBody, TideLock } from "@/model/celestial/moons/moon-types"
 import {
 	AU_M,
 	derivePlanetMassKg,
@@ -35,7 +35,7 @@ function angularDiameterArcmin(diameterKm: number, distanceKm: number): number {
 	return 2 * Math.atan2(diameterKm, 2 * distanceKm) * (180 / Math.PI) * 60
 }
 
-function moonDistanceKm(moon: MoonParams, smaM: number, day: number): number {
+function moonDistanceKm(moon: MoonBody, smaM: number, day: number): number {
 	const e = moon.eccentricity
 	const n = TWO_PI / moon.orbitalPeriodDays
 	const M0 = (moon.meanAnomalyAtEpochDeg * Math.PI) / 180
@@ -45,7 +45,7 @@ function moonDistanceKm(moon: MoonParams, smaM: number, day: number): number {
 }
 
 interface ApparentDiameterOverlayProps {
-	moons: MoonParams[]
+	moons: MoonBody[]
 	planetRadiusKm: number
 	hoursPerDay: number
 	day: number

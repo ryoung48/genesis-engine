@@ -1,7 +1,7 @@
 import type {
 	AtmosphereProfile,
+	MoonBody,
 	MoonOrbitRange,
-	MoonParams,
 	TideLock,
 } from "@/model/celestial/moons/moon-types"
 import { DEFAULT_MOON_ATMOSPHERE } from "@/model/celestial/moons/moon-types"
@@ -10,7 +10,10 @@ import {
 	estimateMoonSizeClassFromDiameter,
 	rollInclinationDeg,
 } from "@/model/celestial/moons/moon-utils"
-import { getKeplerYearYears } from "@/model/celestial/star/star-types"
+import {
+	getKeplerYearYears,
+	type MainSequenceClass,
+} from "@/model/celestial/star/star-types"
 import { createRng } from "@/model/shared/rng"
 import type { SystemBody } from "./generate-system-bodies"
 import { estimatePlanetarySizeClass } from "./size-class"
@@ -53,35 +56,15 @@ export const SOL_STAR_AGE_GYR = 4.6
 export const SOL_STAR_NAME = "Sol"
 export const SOL_MAIN_WORLD_NAME = "Earth"
 
-const SOL_PLANET_TEXTURE_BY_NAME: Partial<Record<string, string>> = {
-	Mercury: "/sol/2k_mercury.jpg",
-	Venus: "/sol/2k_venus.jpg",
-	Mars: "/sol/mars/2k_mars.jpg",
-	Jupiter: "/sol/jupiter/2k_jupiter.jpg",
-	Saturn: "/sol/saturn/2k_saturn.jpg",
-	Uranus: "/sol/uranus/2k_uranus.jpg",
-	Neptune: "/sol/neptune/2k_neptune.jpg",
-	Pluto: "/sol/pluto/pluto.jpg",
+interface Star {
+	class: MainSequenceClass
+	subtype: number
+	seed: string
 }
 
-// Real photographic textures for Sol's named moons (see buildMoon()) --
-// procedurally-generated moons (any other star) have no entry here and fall
-// back to moon-orbit-overlay.ts's generic shared texture, the same way an
-// unlisted planet name falls back to a plain color in solar-system-overlay.ts.
-const SOL_MOON_TEXTURE_BY_NAME: Partial<Record<string, string>> = {
-	Luna: "/sol/earth/moon.jpg",
-	Phobos: "/sol/mars/phobos.jpg",
-	Deimos: "/sol/mars/deimos.jpg",
-	Io: "/sol/jupiter/io.jpg",
-	Europa: "/sol/jupiter/europa.jpg",
-	Ganymede: "/sol/jupiter/ganymede.jpg",
-	Callisto: "/sol/jupiter/callisto.jpg",
-	Titan: "/sol/saturn/titan.jpg",
-	Enceladus: "/sol/saturn/enceladus.jpg",
-	Titania: "/sol/uranus/titania.jpg",
-	Oberon: "/sol/uranus/oberon.jpg",
-	Triton: "/sol/neptune/triton.jpg",
-	Charon: "/sol/pluto/charon.jpg",
+export interface SolarSystemState {
+	star: Star
+	orbits: SystemBody[]
 }
 
 const SOL_PLANET_RINGS_BY_NAME: Partial<Record<string, SystemBody["rings"]>> = {
@@ -97,6 +80,9 @@ interface SolMoonSeed {
 	name: string
 	group: SystemBody["group"]
 	classification: SystemBody["classification"]
+	/** Optional authored texture for a named moon. Procedural moons omit this
+	 * and fall back to moon-orbit-overlay.ts's generic shared texture. */
+	texturePath?: string
 	diameterEarths: number
 	massEarths: number
 	gravityG: number
@@ -108,7 +94,9 @@ interface SolMoonSeed {
 	pd: number
 	orbitRange: MoonOrbitRange
 	atmosphere?: AtmosphereProfile
-	hydrosphereFraction: number
+	/** Fraction of surface covered by land, 0..1 (retired hydrosphereFraction,
+	 * which was the inverse -- ocean/ice coverage). */
+	landCoverage: number
 	/** Bond albedo, 0..1 (real measured/estimated value). */
 	albedo: number
 	/** EBM greenhouseFactor -- see SolPlanetSeed.greenhouseFactor doc. Only
@@ -139,8 +127,12 @@ interface SolMoonSeed {
 
 export interface SolPlanetSeed {
 	name: string
+	seed?: string
 	group: SystemBody["group"]
 	classification: SystemBody["classification"]
+	/** Optional authored texture for a named body. Untextured bodies fall back
+	 * to a plain color in solar-system-overlay.ts. */
+	texturePath?: string
 	au: number
 	diameterEarths: number
 	massEarths: number
@@ -151,7 +143,13 @@ export interface SolPlanetSeed {
 	tiltDeg: number
 	eccentricity: number
 	atmosphere?: AtmosphereProfile
-	hydrosphereFraction: number
+	landDistribution?: number
+	/** Fraction of surface covered by land, 0..1 (retired hydrosphereFraction,
+	 * which was the inverse -- ocean/ice coverage). */
+	landCoverage: number
+	continentSizeVariety?: number
+	seaLevel?: number
+	maxElevation?: number
 	/** Static real moon data, hydrated via buildMoon() -- unused when
 	 * `moonsOverride` is passed to buildPlanet() instead (the main world's
 	 * moons come from a live generation pipeline, not this fixed table). */
@@ -242,6 +240,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Mercury",
 		group: "dwarf",
 		classification: "rockball",
+		texturePath: "/sol/2k_mercury.jpg",
 		au: 0.387,
 		diameterEarths: 0.383,
 		massEarths: 0.0553,
@@ -257,7 +256,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			type: "trace",
 			breathable: false,
 		},
-		hydrosphereFraction: 0,
+		landCoverage: 1,
 		albedo: 0.088,
 		greenhouseFactor: 0,
 		inclinationDeg: 3.38,
@@ -267,6 +266,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Venus",
 		group: "terrestrial",
 		classification: "telluric",
+		texturePath: "/sol/2k_venus.jpg",
 		au: 0.723,
 		diameterEarths: 0.9495,
 		massEarths: 0.815,
@@ -283,7 +283,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			subtype: "very dense",
 			breathable: false,
 		},
-		hydrosphereFraction: 0,
+		landCoverage: 1,
 		albedo: 0.76,
 		// Fit against Venus's real ~737K/463.85C surface temp using
 		// EnergyBalanceModel's direct annual-mean equilibrium solve (see
@@ -297,6 +297,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: SOL_MAIN_WORLD_NAME,
 		isMainWorld: true,
 		group: "terrestrial",
+		texturePath: "/sol/earth/2k_earth.jpg",
 		// Matches classifyBody()'s isPrimaryWorld branch in
 		// generate-system-bodies.ts -- Earth is now built live by buildPlanet()
 		// exactly like every other body here, just from a live seed object
@@ -315,7 +316,11 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		eccentricity: 0.0167,
 		inclinationDeg: 7.25,
 		longitudeOfPerihelionDeg: 102,
-		hydrosphereFraction: 0.71,
+		landDistribution: 0.25,
+		landCoverage: 0.3,
+		continentSizeVariety: 0.35,
+		seaLevel: 1,
+		maxElevation: 6000,
 		/** Real Earth Bond albedo (NASA planetary fact sheet). */
 		albedo: 0.3,
 		/** Refit against Earth's real ~14.8C mean surface temp with
@@ -327,6 +332,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Luna",
 				group: "dwarf",
 				classification: "rockball",
+				texturePath: "/sol/earth/moon.jpg",
 				diameterEarths: 3474 / EARTH_DIAMETER_KM,
 				massEarths: 7.34e22 / EARTH_MASS_KG,
 				gravityG: 0.166,
@@ -343,7 +349,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 					type: "vacuum",
 					breathable: false,
 				},
-				hydrosphereFraction: 0,
+				landCoverage: 1,
 				albedo: 0.12,
 				greenhouseFactor: 0,
 				// Luna's real inclination/node/periapsis/anomaly are
@@ -360,6 +366,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Mars",
 		group: "terrestrial",
 		classification: "arid",
+		texturePath: "/sol/mars/2k_mars.jpg",
 		au: 1.524,
 		diameterEarths: 0.532,
 		massEarths: 0.1074,
@@ -375,7 +382,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			type: "trace",
 			breathable: false,
 		},
-		hydrosphereFraction: 0.1,
+		landCoverage: 0.9,
 		albedo: 0.25,
 		// Fit against Mars's real ~-63C mean surface temp -- barely above 0,
 		// consistent with its thin CO2 atmosphere providing almost no warming.
@@ -387,6 +394,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Phobos",
 				group: "dwarf",
 				classification: "asteroid",
+				texturePath: "/sol/mars/phobos.jpg",
 				diameterEarths: 0.0035,
 				massEarths: 0.000000018,
 				gravityG: 0.00058,
@@ -398,7 +406,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 2.76,
 				orbitRange: "inner",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0,
+				landCoverage: 1,
 				albedo: 0.07,
 				greenhouseFactor: 0,
 				// Real inclination to Mars's equator; near-circular orbit
@@ -409,6 +417,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Deimos",
 				group: "dwarf",
 				classification: "asteroid",
+				texturePath: "/sol/mars/deimos.jpg",
 				diameterEarths: 0.0019,
 				massEarths: 0.0000000025,
 				gravityG: 0.00031,
@@ -420,7 +429,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 6.92,
 				orbitRange: "middle",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0,
+				landCoverage: 1,
 				albedo: 0.08,
 				greenhouseFactor: 0,
 				inclinationDeg: 1.791,
@@ -442,12 +451,13 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		eccentricity: 0,
 		albedo: 0,
 		greenhouseFactor: 0,
-		hydrosphereFraction: 0,
+		landCoverage: 1,
 	},
 	{
 		name: "Jupiter",
 		group: "jovian",
 		classification: "jovian",
+		texturePath: "/sol/jupiter/2k_jupiter.jpg",
 		au: 5.2,
 		diameterEarths: 11.209,
 		massEarths: 317.83,
@@ -464,7 +474,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			subtype: "hydrogen",
 			breathable: false,
 		},
-		hydrosphereFraction: 1,
+		landCoverage: 0,
 		albedo: 0.503,
 		// Fit against Jupiter's real ~-108C 1-bar-level temp, WITH
 		// estimateGasGiantInternalHeatTempK's ~104K already applied (see
@@ -478,6 +488,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Io",
 				group: "dwarf",
 				classification: "geo-tidal",
+				texturePath: "/sol/jupiter/io.jpg",
 				diameterEarths: 0.286,
 				massEarths: 0.015,
 				gravityG: 0.183,
@@ -489,7 +500,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 2.95,
 				orbitRange: "inner",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0,
+				landCoverage: 1,
 				albedo: 0.63,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.036,
@@ -498,6 +509,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Europa",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/jupiter/europa.jpg",
 				diameterEarths: 0.245,
 				massEarths: 0.008,
 				gravityG: 0.134,
@@ -509,7 +521,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 4.69,
 				orbitRange: "inner",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.8,
+				landCoverage: 0.2,
 				albedo: 0.67,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.466,
@@ -518,6 +530,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Ganymede",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/jupiter/ganymede.jpg",
 				diameterEarths: 0.413,
 				massEarths: 0.025,
 				gravityG: 0.146,
@@ -529,7 +542,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 7.49,
 				orbitRange: "middle",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.8,
+				landCoverage: 0.2,
 				albedo: 0.43,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.177,
@@ -538,6 +551,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Callisto",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/jupiter/callisto.jpg",
 				diameterEarths: 0.378,
 				massEarths: 0.018,
 				gravityG: 0.126,
@@ -549,7 +563,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 13.17,
 				orbitRange: "middle",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.8,
+				landCoverage: 0.2,
 				albedo: 0.22,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.192,
@@ -560,6 +574,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Saturn",
 		group: "jovian",
 		classification: "jovian",
+		texturePath: "/sol/saturn/2k_saturn.jpg",
 		au: 9.58,
 		diameterEarths: 9.449,
 		massEarths: 95.16,
@@ -576,7 +591,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			subtype: "hydrogen",
 			breathable: false,
 		},
-		hydrosphereFraction: 1,
+		landCoverage: 0,
 		albedo: 0.342,
 		// Fit against Saturn's real ~-139C 1-bar-level temp, WITH
 		// estimateGasGiantInternalHeatTempK's ~77K already applied.
@@ -588,6 +603,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Enceladus",
 				group: "dwarf",
 				classification: "geo-tidal",
+				texturePath: "/sol/saturn/enceladus.jpg",
 				diameterEarths: 0.0395,
 				massEarths: 0.000018,
 				gravityG: 0.0114,
@@ -599,7 +615,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 1.97,
 				orbitRange: "inner",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.8,
+				landCoverage: 0.2,
 				albedo: 0.81,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.009,
@@ -608,6 +624,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Titan",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/saturn/titan.jpg",
 				diameterEarths: 0.404,
 				massEarths: 0.0225,
 				gravityG: 0.14,
@@ -625,7 +642,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 					subtype: "very dense",
 					breathable: false,
 				},
-				hydrosphereFraction: 0.4,
+				landCoverage: 0.6,
 				albedo: 0.22,
 				// Fit against Titan's real ~-179.5C surface temp -- its thick
 				// 1.45 bar N2/CH4 atmosphere gives a real, well-characterized
@@ -639,6 +656,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Uranus",
 		group: "jovian",
 		classification: "jovian",
+		texturePath: "/sol/uranus/2k_uranus.jpg",
 		au: 19.22,
 		diameterEarths: 4.007,
 		massEarths: 14.54,
@@ -655,7 +673,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			subtype: "hydrogen",
 			breathable: false,
 		},
-		hydrosphereFraction: 1,
+		landCoverage: 0,
 		albedo: 0.3,
 		// Fit against Uranus's real ~-197C 1-bar-level temp, WITH
 		// estimateGasGiantInternalHeatTempK's ~48K applied -- note real Uranus
@@ -672,6 +690,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Titania",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/uranus/titania.jpg",
 				diameterEarths: 0.124,
 				massEarths: 0.00059,
 				gravityG: 0.038,
@@ -683,7 +702,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 8.53,
 				orbitRange: "middle",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.6,
+				landCoverage: 0.4,
 				albedo: 0.35,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.34,
@@ -692,6 +711,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Oberon",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/uranus/oberon.jpg",
 				diameterEarths: 0.119,
 				massEarths: 0.0005,
 				gravityG: 0.036,
@@ -703,7 +723,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 11.42,
 				orbitRange: "middle",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.6,
+				landCoverage: 0.4,
 				albedo: 0.31,
 				greenhouseFactor: 0,
 				inclinationDeg: 0.058,
@@ -714,6 +734,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Neptune",
 		group: "jovian",
 		classification: "jovian",
+		texturePath: "/sol/neptune/2k_neptune.jpg",
 		au: 30.047,
 		diameterEarths: 3.883,
 		massEarths: 17.15,
@@ -730,7 +751,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			subtype: "hydrogen",
 			breathable: false,
 		},
-		hydrosphereFraction: 1,
+		landCoverage: 0,
 		albedo: 0.29,
 		// Previously UNFITTABLE by greenhouseFactor alone: Neptune's huge
 		// pressure (1500 bar) drives so much diffusion redistribution that the
@@ -749,6 +770,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Triton",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/neptune/triton.jpg",
 				diameterEarths: 0.212,
 				massEarths: 0.0036,
 				gravityG: 0.08,
@@ -769,7 +791,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 					type: "trace",
 					breathable: false,
 				},
-				hydrosphereFraction: 0.8,
+				landCoverage: 0.2,
 				albedo: 0.76,
 				// Real Triton attempted-fit against ~-235C showed no g-sensitivity
 				// at all (diffusion-ceiling degeneracy at these extreme parameters,
@@ -783,6 +805,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: "Pluto",
 		group: "dwarf",
 		classification: "snowball",
+		texturePath: "/sol/pluto/pluto.jpg",
 		au: 39.482,
 		diameterEarths: 0.186,
 		massEarths: 0.0022,
@@ -802,7 +825,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 			type: "trace",
 			breathable: false,
 		},
-		hydrosphereFraction: 0.8,
+		landCoverage: 0.2,
 		albedo: 0.72,
 		// Fit against Pluto's real ~-229C mean surface temp. Needed a
 		// surprisingly large value given the blackbody gap alone is only
@@ -819,6 +842,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				name: "Charon",
 				group: "dwarf",
 				classification: "snowball",
+				texturePath: "/sol/pluto/charon.jpg",
 				diameterEarths: 0.095,
 				massEarths: 0.00025,
 				gravityG: 0.029,
@@ -830,7 +854,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				pd: 8.24,
 				orbitRange: "middle",
 				atmosphere: NO_MOON_ATMOSPHERE,
-				hydrosphereFraction: 0.6,
+				landCoverage: 0.4,
 				albedo: 0.35,
 				greenhouseFactor: 0,
 				// Mutually tidally locked with Pluto in the same plane as
@@ -841,25 +865,23 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 	},
 ]
 
-function buildMoon(
-	seed: SolMoonSeed,
-	idx: number,
-	seedTag: number,
-): MoonParams {
+function buildMoon(seed: SolMoonSeed, idx: number, seedTag: number): MoonBody {
 	const rolled = rollExtras(seedTag)
 	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
 	return {
 		idx,
 		name: seed.name,
-		texturePath: SOL_MOON_TEXTURE_BY_NAME[seed.name],
+		texturePath: seed.texturePath,
 		massKg: seed.massEarths * EARTH_MASS_KG,
 		diameterKm,
 		sizeClass: estimateMoonSizeClassFromDiameter(diameterKm),
-		densityEarthRelative: seed.densityEarthRelative,
-		densityDescription: seed.densityDescription,
+		density: {
+			earthRelative: seed.densityEarthRelative,
+			description: seed.densityDescription,
+		},
 		group: seed.group,
 		classification: seed.classification,
-		hydrosphereFraction: seed.hydrosphereFraction,
+		landCoverage: seed.landCoverage,
 		atmosphere: seed.atmosphere,
 		orbitalPeriodDays: seed.rotationHours / 24,
 		// Real named moons here are (like nearly every major moon in our own
@@ -889,10 +911,10 @@ interface BuildPlanetOptions {
 	 * procedurally-generated star. Defaults to 1. */
 	starMassSol?: number
 	/** The main world's moons come from a live generation pipeline (already-
-	 * built MoonParams), not this file's static SolMoonSeed table -- bypasses
+	 * built MoonBody), not this file's static SolMoonSeed table -- bypasses
 	 * the seed.moons -> buildMoon() hydration below when supplied. */
-	moonsOverride?: MoonParams[]
-	/** Overrides the by-name texture lookup -- only the real Sol seed's Earth
+	moonsOverride?: MoonBody[]
+	/** Overrides the seed-authored texture -- only the real Sol seed's Earth
 	 * gets its real texture; a live main world under a different star
 	 * doesn't. */
 	textureOverride?: string
@@ -929,6 +951,13 @@ function buildPlanet(
 			: 0
 	return {
 		idx,
+		seed:
+			seed.seed ??
+			(seed.name
+				? seed.name.toLowerCase()
+				: seed.isMainWorld
+					? "world"
+					: `orbit-${Math.max(0, idx) + 1}`),
 		tideLock: seed.tideLock,
 		substellarLon: seed.substellarLon,
 		name: seed.name,
@@ -945,10 +974,13 @@ function buildPlanet(
 					},
 		group: seed.group,
 		classification: seed.classification,
-		texturePath:
-			options?.textureOverride ?? SOL_PLANET_TEXTURE_BY_NAME[seed.name],
+		texturePath: options?.textureOverride ?? seed.texturePath,
 		rings: SOL_PLANET_RINGS_BY_NAME[seed.name],
-		hydrosphereFraction: seed.hydrosphereFraction,
+		landDistribution: seed.landDistribution,
+		landCoverage: seed.landCoverage,
+		continentSizeVariety: seed.continentSizeVariety,
+		seaLevel: seed.seaLevel,
+		maxElevation: seed.maxElevation,
 		atmosphere: seed.atmosphere ?? null,
 		isMainWorld: seed.isMainWorld ?? false,
 		orbitalDistanceAU: seed.au,
@@ -972,11 +1004,15 @@ function buildPlanet(
 
 export { buildPlanet }
 
-// The main world is excluded here -- it's hydrated separately, per
-// generation, from a live seed (see generate-system-bodies.ts).
-const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_PLANET_SEEDS.filter(
-	(seed) => !seed.isMainWorld,
-).map((seed, i) => buildPlanet(seed, i + 1, i))
+const EARTH_SEED = SOL_PLANET_SEEDS.find((seed) => seed.isMainWorld)
+if (!EARTH_SEED) throw new Error("SOL_PLANET_SEEDS is missing its Earth entry")
+const LUNA_SEED = EARTH_SEED.moons?.[0]
+if (!LUNA_SEED)
+	throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
+
+const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_PLANET_SEEDS.map((seed, i) =>
+	buildPlanet(seed, i + 1, seed.isMainWorld ? -1 : i),
+).sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 
 export const SOL_SYSTEM_BODIES: SystemBody[] = applySystemSeismology({
 	bodies: SOL_SYSTEM_BODIES_RAW,
@@ -984,11 +1020,14 @@ export const SOL_SYSTEM_BODIES: SystemBody[] = applySystemSeismology({
 	starLuminositySol: 1,
 })
 
-const EARTH_SEED = SOL_PLANET_SEEDS.find((seed) => seed.isMainWorld)
-if (!EARTH_SEED) throw new Error("SOL_PLANET_SEEDS is missing its Earth entry")
-const LUNA_SEED = EARTH_SEED.moons?.[0]
-if (!LUNA_SEED)
-	throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
+export const SOL_DEFAULT_SOLAR_SYSTEM: SolarSystemState = {
+	star: {
+		class: "G",
+		subtype: 2,
+		seed: "sol",
+	},
+	orbits: SOL_SYSTEM_BODIES,
+}
 
 // Centralized default parameters for Earth (the main world) and Luna (its
 // default moon) -- planetRadiusKm/obliquity/eccentricity/orbitalDistanceAU/
@@ -1013,6 +1052,7 @@ export const SOL_MAIN_WORLD_DEFAULTS = {
 	moonCount: EARTH_SEED.moons?.length ?? 1,
 	albedo: EARTH_SEED.albedo,
 	greenhouseFactor: EARTH_SEED.greenhouseFactor,
+	landCoverage: EARTH_SEED.landCoverage,
 	/** Terrain-generation defaults (not orbital/climate data, but centralized
 	 * here alongside the rest of Earth's defaults so nothing duplicates
 	 * these numbers elsewhere). */
@@ -1024,4 +1064,7 @@ export const SOL_MAIN_WORLD_DEFAULTS = {
 	volcanism: 1,
 } as const
 
-export const SOL_LUNA_DEFAULT: MoonParams = buildMoon(LUNA_SEED, 1, 0)
+export const SOL_LUNA_DEFAULT: MoonBody = attachParentTideLocks(
+	[buildMoon(LUNA_SEED, 1, 0)],
+	-1,
+)[0]!

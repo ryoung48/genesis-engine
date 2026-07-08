@@ -13,7 +13,6 @@ import {
 } from "@/model/shared/units"
 import type { SocietyEra } from "@/model/society/eras"
 import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
-import { formatCompactNumber } from "../../hover/info-panel-format"
 import type { UnitSystem } from "../shared/ui-format"
 import { DEFAULT_WORLD_PARAMS } from "./defaults"
 
@@ -180,29 +179,13 @@ export function buildPlanetSliders(state: {
 }
 
 export function buildTerrainSliders(state: {
-	numPoints: number
 	continentSizeVariety: number
 	seaLevel: number
-	craters: number
-	volcanism: number
 	unitSystem: UnitSystem
-	maxElevation: number
-	setNumPoints: (v: number) => void
 	setContinentSizeVariety: (v: number) => void
 	setSeaLevel: (v: number) => void
-	setCraters: (v: number) => void
-	setVolcanism: (v: number) => void
-	setMaxElevation: (v: number) => void
 }): SliderDef[] {
 	return [
-		{
-			label: "Detail",
-			help: "Higher detail sharpens coastlines and terrain, but takes longer to build.",
-			value: state.numPoints,
-			display: formatCompactNumber(state.numPoints),
-			...SR.numPoints,
-			set: state.setNumPoints,
-		},
 		{
 			label: "Size Variety",
 			help: "Makes plate-driven landmasses or seas more equal-sized or more uneven.",
@@ -229,41 +212,10 @@ export function buildTerrainSliders(state: {
 			...SR.seaLevel,
 			set: state.setSeaLevel,
 		},
-		{
-			label: "Max Elevation",
-			help: "Sets the maximum mountain height in meters. Higher values allow taller mountain ranges to form during tectonic uplift.",
-			value: state.maxElevation,
-			display: (() => {
-				const km = state.maxElevation / 1000
-				if (state.unitSystem === "imperial") {
-					return `${(km * 0.621371).toFixed(1)} mi`
-				}
-				return `${km.toFixed(1)} km`
-			})(),
-			...SR.maxElevation,
-			set: state.setMaxElevation,
-		},
-		{
-			label: "Craters",
-			help: "Stamps impact craters onto the surface. Higher values produce more and larger craters.",
-			value: state.craters,
-			display: state.craters.toFixed(2),
-			...SR.craters,
-			set: state.setCraters,
-		},
-		{
-			label: "Volcanism",
-			help: "Controls hotspot and volcanic feature frequency on a 0-10 scale. 0 disables hotspots, island arcs, volcanic arcs, and LIPs. 1 matches the old baseline setting, and values above 1 progressively make volcanic features more common without relying on runaway peak heights.",
-			value: state.volcanism,
-			display: state.volcanism.toFixed(2),
-			...SR.volcanism,
-			set: state.setVolcanism,
-		},
 	]
 }
 
 export function resetWorldDefaults(setters: {
-	setNumPoints: (v: number) => void
 	setLandDistribution: (v: number) => void
 	setContinentSizeVariety: (v: number) => void
 	setLandCoverage: (v: number) => void
@@ -284,12 +236,8 @@ export function resetWorldDefaults(setters: {
 	setMoonSeed: (v: number) => void
 	setRestSeed: (v: number) => void
 	setSeaLevel: (v: number) => void
-	setCraters: (v: number) => void
-	setVolcanism: (v: number) => void
-	setMaxElevation: (v: number) => void
 	setEra: (v: SocietyEra) => void
 }): void {
-	setters.setNumPoints(DEFAULT_WORLD_PARAMS.numPoints)
 	setters.setLandDistribution(DEFAULT_WORLD_PARAMS.landDistribution)
 	setters.setContinentSizeVariety(DEFAULT_WORLD_PARAMS.continentSizeVariety)
 	setters.setLandCoverage(DEFAULT_WORLD_PARAMS.landCoverage)
@@ -308,8 +256,5 @@ export function resetWorldDefaults(setters: {
 	setters.setMoonSeed(LUNA_MOON_SEED)
 	setters.setRestSeed(SOL_SEED)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
-	setters.setCraters(DEFAULT_WORLD_PARAMS.craters)
-	setters.setVolcanism(DEFAULT_WORLD_PARAMS.volcanism)
-	setters.setMaxElevation(DEFAULT_WORLD_PARAMS.maxElevation)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)
 }

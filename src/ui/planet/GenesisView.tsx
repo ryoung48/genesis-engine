@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { computeGravityG } from "@/model/celestial/body-metrics"
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonBody } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
 	generateMoons,
+	LUNA_MOON_SEED,
 	M_SOL_KG,
 	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
@@ -25,9 +26,11 @@ import {
 	type SystemBody,
 } from "@/model/celestial/system/generate-system-bodies"
 import {
+	SOL_DEFAULT_SOLAR_SYSTEM,
 	SOL_MAIN_WORLD_DEFAULTS,
 	SOL_SEED,
 	SOL_STAR_AGE_GYR,
+	type SolarSystemState,
 } from "@/model/celestial/system/sol-system"
 import { applySystemSeismology } from "@/model/celestial/system/system-seismology"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
@@ -57,7 +60,13 @@ import {
 	tradeGoodColor,
 	tradeGoodDisplayName,
 } from "@/model/economy/trade-goods"
-import { encodePlanetCode, SEED_MAX } from "@/model/shared/planet-code"
+import { SEED_MAX } from "@/model/shared/planet-code"
+import { seedStringToNumber } from "@/model/shared/rng"
+import {
+	formatSeedLabel,
+	makeRandomSeedLabel,
+	resolveSeedLabel,
+} from "@/model/shared/seed-label"
 import { titleCase } from "@/model/shared/text"
 import {
 	getEffectiveObliquityDeg,
@@ -186,14 +195,10 @@ import {
 import {
 	DEFAULT_WORLD_PARAMS,
 	GENERATION_SESSION_STORAGE_KEY,
-	MAX_RECENT_CODES,
-	PLANET_CODE_STORAGE_KEY,
-	RECENT_CODES_STORAGE_KEY,
-	STARRED_RECENT_CODES_STORAGE_KEY,
+	PLANET_SEED_STORAGE_KEY,
 	VIEW_PREFS_STORAGE_KEY,
 } from "./screen/generation/defaults"
 import {
-	decodePlanetCode,
 	type GenerationCallbacks,
 	type GenerationParams,
 	generateWorld,
@@ -207,12 +212,8 @@ import {
 	type GenerationPreviewTab,
 } from "./screen/generation/generation-preview"
 import {
-	parseStoredCodeList,
-	pushRecentCode,
-	toggleStarredRecentCode,
-} from "./screen/generation/recent-codes"
-import {
 	loadGenerationSessionSnapshot,
+	loadGenerationSessionSnapshotSync,
 	saveGenerationSessionSnapshot,
 } from "./screen/generation/session-persistence"
 import {
@@ -300,12 +301,12 @@ function sanitizeExportIdentity(
 }
 
 function buildMapExportFilename(
-	planetCode: string | null | undefined,
+	seed: number | null | undefined,
 	width: number,
 	date: Date = new Date(),
 ): string {
 	const identity =
-		sanitizeExportIdentity(planetCode) ?? buildExportTimestamp(date)
+		sanitizeExportIdentity(seed?.toString()) ?? buildExportTimestamp(date)
 	return `genesis-map-${identity}-${width}w.png`
 }
 
@@ -373,6 +374,8 @@ export const GenesisView: React.FC = () => {
 			: (parseStoredViewPrefs(
 					window.localStorage.getItem(VIEW_PREFS_STORAGE_KEY),
 				) ?? DEFAULT_VIEW_PREFS)
+	const initialGenerationSession =
+		typeof window === "undefined" ? null : loadGenerationSessionSnapshotSync()
 
 	// Core state
 	const [world, setWorld] = useState<SerializedGenesisWorld | null>(null)
@@ -398,7 +401,8 @@ export const GenesisView: React.FC = () => {
 		initialViewPrefs.viewMode,
 	)
 	const [solarSystemViewActive, setSolarSystemViewActive] = useState(
-		initialViewPrefs.solarSystemViewActive,
+		initialGenerationSession?.solarSystemViewActive ??
+			initialViewPrefs.solarSystemViewActive,
 	)
 	const [solarSystemControlsExpanded, setSolarSystemControlsExpanded] =
 		useState(false)
@@ -529,13 +533,18 @@ export const GenesisView: React.FC = () => {
 	)
 	const [gridSpacing, setGridSpacing] = useState(initialViewPrefs.gridSpacing)
 	const [worldTab, setWorldTab] = useState<"planet" | "society">("planet")
-	const [generationPanelOpen, setGenerationPanelOpen] = useState(true)
+	const [generationPanelOpen, setGenerationPanelOpen] = useState(
+		initialGenerationSession?.generationPanelOpen ?? true,
+	)
 	const [generationPreviewTab, setGenerationPreviewTab] =
-		useState<GenerationPreviewTab>("climate")
+		useState<GenerationPreviewTab>(
+			initialGenerationSession?.generationPreviewTab ?? "climate",
+		)
 	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
-	const [generationSessionRestored, setGenerationSessionRestored] =
-		useState(false)
+	const [generationSessionRestored, setGenerationSessionRestored] = useState(
+		initialGenerationSession !== null,
+	)
 
 	// Simulation state
 	const [simPlaying, setSimPlaying] = useState(false)
@@ -613,48 +622,16 @@ export const GenesisView: React.FC = () => {
 	})
 
 	// Generation params
-	const [recentCodes, setRecentCodes] = useState<string[]>(() => {
-		if (typeof window === "undefined") return []
-		const starredCodes = parseStoredCodeList(
-			window.localStorage.getItem(STARRED_RECENT_CODES_STORAGE_KEY),
-		)
-		return parseStoredCodeList(
-			window.localStorage.getItem(RECENT_CODES_STORAGE_KEY),
-		)
-			.filter((code) => !starredCodes.includes(code))
-			.slice(0, MAX_RECENT_CODES)
-	})
-	const [starredRecentCodes, setStarredRecentCodes] = useState<string[]>(() => {
-		if (typeof window === "undefined") return []
-		return parseStoredCodeList(
-			window.localStorage.getItem(STARRED_RECENT_CODES_STORAGE_KEY),
-		)
-	})
-	const initialCode = (() => {
-		if (typeof window !== "undefined") {
-			const stored = window.localStorage.getItem(PLANET_CODE_STORAGE_KEY)
-			if (stored) return stored
-		}
-		if (recentCodes[0]) return recentCodes[0]
-		if (starredRecentCodes[0]) return starredRecentCodes[0]
-		const fallbackSeed = makeRandomSeed()
-		return encodePlanetCode(fallbackSeed, {
-			seed: fallbackSeed,
-			...DEFAULT_WORLD_PARAMS,
-			tideLock: null,
-		})
+	const initialStoredSeed = (() => {
+		if (typeof window === "undefined") return null
+		const stored = window.localStorage.getItem(PLANET_SEED_STORAGE_KEY)
+		return stored ? resolveSeedLabel(stored) : null
 	})()
-	const initialDecodedCode = decodePlanetCode(initialCode)
-	const initialSeed = initialDecodedCode?.seed ?? makeRandomSeed()
+	const initialSeed = initialStoredSeed ?? makeRandomSeed()
 	const [seed, setSeed] = useState(() => initialSeed)
-	const [planetCode, setPlanetCode] = useState(() => {
-		return initialCode
-	})
-	const [planetCodeInput, setPlanetCodeInput] = useState(() => {
-		return initialCode
-	})
-	const [codeInputDirty, setCodeInputDirty] = useState(false)
-	const [codeError, setCodeError] = useState(false)
+	const [seedInput, setSeedInput] = useState(() => formatSeedLabel(initialSeed))
+	const [seedInputDirty, setSeedInputDirty] = useState(false)
+	const [seedError, setSeedError] = useState(false)
 	const [codeCopied, setCodeCopied] = useState(false)
 	const [exportWidthPreset, setExportWidthPreset] =
 		useState<ExportWidthPreset>("8192")
@@ -665,42 +642,40 @@ export const GenesisView: React.FC = () => {
 	const [exportError, setExportError] = useState<string | null>(null)
 
 	// Planet params
-	const [numPoints, setNumPoints] = useState(
-		initialDecodedCode?.numPoints ?? DEFAULT_WORLD_PARAMS.numPoints,
-	)
+	const numPoints = DEFAULT_WORLD_PARAMS.numPoints
 	const jitter = DEFAULT_WORLD_PARAMS.jitter
 	const numPlates = DEFAULT_WORLD_PARAMS.numPlates
-	const [landDistribution, setLandDistribution] = useState(
-		initialDecodedCode?.landDistribution ??
-			DEFAULT_WORLD_PARAMS.landDistribution,
-	)
-	const [continentSizeVariety, setContinentSizeVariety] = useState(
-		initialDecodedCode?.continentSizeVariety ??
-			DEFAULT_WORLD_PARAMS.continentSizeVariety,
-	)
-	const [landCoverage, setLandCoverage] = useState(
-		initialDecodedCode?.landCoverage ?? DEFAULT_WORLD_PARAMS.landCoverage,
-	)
 	const roughness = DEFAULT_WORLD_PARAMS.roughness
-	const [spectralClass, setSpectralClass] = useState(
-		initialDecodedCode?.spectralClass ?? DEFAULT_WORLD_PARAMS.spectralClass,
+	const [moonCount, setMoonCount] = useState<number>(
+		DEFAULT_WORLD_PARAMS.moonCount,
 	)
-	const [starSubtype, setStarSubtype] = useState(
-		initialDecodedCode?.starSubtype ?? DEFAULT_WORLD_PARAMS.starSubtype,
+	const [moonSeed, setMoonSeed] = useState<number>(
+		Math.floor(Math.random() * SEED_MAX),
 	)
-	const [moonCount, setMoonCount] = useState(
-		initialDecodedCode?.moonCount ?? DEFAULT_WORLD_PARAMS.moonCount,
+	const [solarSystem, setSolarSystem] = useState<SolarSystemState>(() =>
+		structuredClone(
+			initialGenerationSession?.solarSystem ?? SOL_DEFAULT_SOLAR_SYSTEM,
+		),
 	)
-	const [moonSeed, setMoonSeed] = useState(
-		initialDecodedCode?.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
-	)
-	const [restSeed, setRestSeed] = useState(
-		initialDecodedCode?.restSeed ?? SOL_SEED,
-	)
+	const spectralClass = solarSystem.star.class
+	const starSubtype = solarSystem.star.subtype
+	const restSeed =
+		solarSystem.star.seed === "sol"
+			? SOL_SEED
+			: seedStringToNumber(solarSystem.star.seed)
+	const setRestSeed = useCallback((value: number) => {
+		setSolarSystem((current) => ({
+			...current,
+			star: {
+				...current.star,
+				seed: value === SOL_SEED ? "sol" : value.toString(36).padStart(6, "0"),
+			},
+		}))
+	}, [])
 
 	// --- The main world's own physical/orbital state ---
 	// Every one of these fields lives ONLY on the main world's SystemBody
-	// entry in `editableSystemBodies`, exactly like every sibling planet --
+	// entry in `solarSystem.orbits`, exactly like every sibling planet --
 	// there is no separate slider state to keep in sync. `mainWorldBodyRef`
 	// breaks the circular dependency (regenerating the system on a star/moon
 	// change needs the main world's CURRENT physical values so it doesn't
@@ -716,18 +691,14 @@ export const GenesisView: React.FC = () => {
 		const prev = mainWorldBodyRef.current
 		const planetRadiusKm = prev
 			? prev.diameterKm / 2
-			: (initialDecodedCode?.planetRadiusKm ??
-				DEFAULT_WORLD_PARAMS.planetRadiusKm)
+			: DEFAULT_WORLD_PARAMS.planetRadiusKm
 		const orbitalDistanceAU = prev
 			? prev.orbitalDistanceAU
-			: (initialDecodedCode?.orbitalDistanceAU ??
-				DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
+			: DEFAULT_WORLD_PARAMS.orbitalDistanceAU
 		const hoursPerDay = prev
 			? prev.siderealDayHours
-			: (initialDecodedCode?.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay)
-		const tideLock = prev
-			? (prev.tideLock ?? null)
-			: (initialDecodedCode?.tideLock ?? null)
+			: DEFAULT_WORLD_PARAMS.hoursPerDay
+		const tideLock = prev ? (prev.tideLock ?? null) : null
 		const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
 			hoursPerDay,
 			tideLock,
@@ -773,35 +744,29 @@ export const GenesisView: React.FC = () => {
 		const prev = mainWorldBodyRef.current
 		const planetRadiusKm = prev
 			? prev.diameterKm / 2
-			: (initialDecodedCode?.planetRadiusKm ??
-				DEFAULT_WORLD_PARAMS.planetRadiusKm)
+			: DEFAULT_WORLD_PARAMS.planetRadiusKm
 		const orbitalDistanceAU = prev
 			? prev.orbitalDistanceAU
-			: (initialDecodedCode?.orbitalDistanceAU ??
-				DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
+			: DEFAULT_WORLD_PARAMS.orbitalDistanceAU
 		const hoursPerDay = prev
 			? prev.siderealDayHours
-			: (initialDecodedCode?.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay)
+			: DEFAULT_WORLD_PARAMS.hoursPerDay
 		const eccentricity = prev
 			? prev.eccentricity
-			: (initialDecodedCode?.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity)
+			: DEFAULT_WORLD_PARAMS.eccentricity
 		const perihelion = prev
 			? prev.longitudeOfPerihelionDeg
-			: (initialDecodedCode?.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion)
-		const obliquity = prev
-			? prev.axialTiltDeg
-			: (initialDecodedCode?.obliquity ?? DEFAULT_WORLD_PARAMS.obliquity)
+			: DEFAULT_WORLD_PARAMS.perihelion
+		const obliquity = prev ? prev.axialTiltDeg : DEFAULT_WORLD_PARAMS.obliquity
 		const substellarLon = prev
 			? (prev.substellarLon ?? 0)
-			: (initialDecodedCode?.substellarLon ??
-				DEFAULT_WORLD_PARAMS.substellarLon)
+			: DEFAULT_WORLD_PARAMS.substellarLon
 		const pressure = prev
 			? (prev.atmosphere?.pressureBar ?? DEFAULT_WORLD_PARAMS.pressure)
-			: (initialDecodedCode?.pressure ?? DEFAULT_WORLD_PARAMS.pressure)
-		const tideLock = prev
-			? (prev.tideLock ?? null)
-			: (initialDecodedCode?.tideLock ?? null)
+			: DEFAULT_WORLD_PARAMS.pressure
+		const tideLock = prev ? (prev.tideLock ?? null) : null
 		const mainWorld = {
+			name: restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.name : undefined,
 			orbitalDistanceAU,
 			diameterKm: planetRadiusKm * 2,
 			moons: generatedMoonsPreview,
@@ -817,6 +782,13 @@ export const GenesisView: React.FC = () => {
 			substellarLon,
 			atmosphere: buildPressureAtmosphereProfile(pressure),
 			tideLock,
+			landDistribution:
+				prev?.landDistribution ?? DEFAULT_WORLD_PARAMS.landDistribution,
+			landCoverage: prev?.landCoverage ?? DEFAULT_WORLD_PARAMS.landCoverage,
+			continentSizeVariety:
+				prev?.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
+			seaLevel: prev?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
+			maxElevation: 6000,
 			// Only the real Sol seed's Earth has known real climate-fit
 			// values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) -- a
 			// procedurally generated homeworld has no "real" data, so it
@@ -835,22 +807,26 @@ export const GenesisView: React.FC = () => {
 			mainWorld,
 		})
 	}, [restSeed, spectralClass, starSubtype, generatedMoonsPreview])
+	const resetSourceSystemBodies = useMemo(
+		() =>
+			restSeed === SOL_SEED
+				? SOL_DEFAULT_SOLAR_SYSTEM.orbits
+				: generatedSystemBodies,
+		[generatedSystemBodies, restSeed],
+	)
 
-	const [editableSystemBodies, setEditableSystemBodies] = useState<
-		SystemBody[]
-	>([])
 	const skipNextGeneratedSystemBodiesSyncRef = useRef(false)
 	useEffect(() => {
 		if (skipNextGeneratedSystemBodiesSyncRef.current) {
 			skipNextGeneratedSystemBodiesSyncRef.current = false
 			return
 		}
-		setEditableSystemBodies(generatedSystemBodies)
+		setSolarSystem((current) => ({
+			...current,
+			orbits: generatedSystemBodies,
+		}))
 	}, [generatedSystemBodies])
-	const systemBodies =
-		editableSystemBodies.length > 0
-			? editableSystemBodies
-			: generatedSystemBodies
+	const systemBodies = solarSystem.orbits
 	const mainWorldSystemBody =
 		systemBodies.find((body) => body.isMainWorld) ?? null
 	const displayMoons = mainWorldSystemBody?.moons ?? generatedMoonsPreview
@@ -864,27 +840,57 @@ export const GenesisView: React.FC = () => {
 	// its own SystemBody entry -- editing any of them (from the dedicated
 	// Planet-tab sliders below, or from the generic orbit-navigator stat
 	// card) goes through `updateMainWorldBody`, which patches that one entry
-	// in `editableSystemBodies` exactly like `updateEditableSystemBody` does
+	// in `solarSystem.orbits` exactly like `updateEditableSystemBody` does
 	// for every sibling planet.
 	const updateMainWorldBody = useCallback(
 		(updater: (body: SystemBody) => SystemBody) => {
-			setEditableSystemBodies((prev) =>
-				applySystemSeismology({
-					bodies: prev.map((body) =>
+			setSolarSystem((current) => ({
+				...current,
+				orbits: applySystemSeismology({
+					bodies: current.orbits.map((body) =>
 						body.isMainWorld ? updater(body) : body,
 					),
 					...systemSeismologyContext,
 				}),
-			)
+			}))
 		},
 		[systemSeismologyContext],
 	)
 	const planetRadiusKm =
-		(mainWorldSystemBody?.diameterKm ?? DEFAULT_WORLD_PARAMS.planetRadiusKm * 2) /
-		2
+		(mainWorldSystemBody?.diameterKm ??
+			DEFAULT_WORLD_PARAMS.planetRadiusKm * 2) / 2
 	const setPlanetRadiusKm = useCallback(
 		(value: number) =>
 			updateMainWorldBody((body) => updateBodyDiameter(body, value * 2)),
+		[updateMainWorldBody],
+	)
+	const landDistribution =
+		mainWorldSystemBody?.landDistribution ??
+		DEFAULT_WORLD_PARAMS.landDistribution
+	const setLandDistribution = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, landDistribution: value })),
+		[updateMainWorldBody],
+	)
+	const continentSizeVariety =
+		mainWorldSystemBody?.continentSizeVariety ??
+		DEFAULT_WORLD_PARAMS.continentSizeVariety
+	const setContinentSizeVariety = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({
+				...body,
+				continentSizeVariety: value,
+			})),
+		[updateMainWorldBody],
+	)
+	const landCoverage =
+		mainWorldSystemBody?.landCoverage ?? DEFAULT_WORLD_PARAMS.landCoverage
+	const setLandCoverage = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({
+				...body,
+				landCoverage: value,
+			})),
 		[updateMainWorldBody],
 	)
 	const obliquity =
@@ -926,6 +932,21 @@ export const GenesisView: React.FC = () => {
 	const currentHz = getHabitableZoneAU(
 		getStarLuminositySol(effectiveStarClass, starSubtype),
 	)
+	const setSpectralClass = useCallback((cls: string) => {
+		const nextClass: MainSequenceClass = isValidSpectralClass(cls)
+			? cls
+			: DEFAULT_SPECTRAL_CLASS
+		setSolarSystem((current) => ({
+			...current,
+			star: { ...current.star, class: nextClass },
+		}))
+	}, [])
+	const setStarSubtype = useCallback((subtype: number) => {
+		setSolarSystem((current) => ({
+			...current,
+			star: { ...current.star, subtype },
+		}))
+	}, [])
 
 	const setSpectralClassPreservingHz = (cls: string) => {
 		const newClass: MainSequenceClass = isValidSpectralClass(cls)
@@ -936,7 +957,10 @@ export const GenesisView: React.FC = () => {
 		)
 		const hzcFactor = currentHz > 0 ? orbitalDistanceAU / currentHz : 1
 		setOrbitalDistanceAU(hzcFactor * newHz)
-		setSpectralClass(cls)
+		setSolarSystem((current) => ({
+			...current,
+			star: { ...current.star, class: newClass },
+		}))
 	}
 
 	const setStarSubtypePreservingHz = (subtype: number) => {
@@ -945,17 +969,17 @@ export const GenesisView: React.FC = () => {
 		)
 		const hzcFactor = currentHz > 0 ? orbitalDistanceAU / currentHz : 1
 		setOrbitalDistanceAU(hzcFactor * newHz)
-		setStarSubtype(subtype)
+		setSolarSystem((current) => ({
+			...current,
+			star: { ...current.star, subtype },
+		}))
 	}
 	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
 	const tideLock = mainWorldSystemBody?.tideLock ?? null
 	const setTideLock = useCallback(
 		(lock: import("@/model/celestial/moons/moon-types").TideLock | null) =>
 			updateMainWorldBody((body) => {
-				const siderealDayHours = resolveBodyTideLockSiderealDayHours(
-					lock,
-					body,
-				)
+				const siderealDayHours = resolveBodyTideLockSiderealDayHours(lock, body)
 				return {
 					...body,
 					tideLock: lock,
@@ -1016,21 +1040,17 @@ export const GenesisView: React.FC = () => {
 	const thermalErosion = DEFAULT_WORLD_PARAMS.thermalErosion
 	const ridgeSharpening = DEFAULT_WORLD_PARAMS.ridgeSharpening
 	const glacialErosion = DEFAULT_WORLD_PARAMS.glacialErosion
-	const [seaLevel, setSeaLevel] = useState(
-		initialDecodedCode?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
+	const seaLevel =
+		mainWorldSystemBody?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel
+	const setSeaLevel = useCallback(
+		(value: number) =>
+			updateMainWorldBody((body) => ({ ...body, seaLevel: value })),
+		[updateMainWorldBody],
 	)
-	const [volcanism, setVolcanism] = useState(
-		initialDecodedCode?.volcanism ?? DEFAULT_WORLD_PARAMS.volcanism,
-	)
-	const [craters, setCraters] = useState(
-		initialDecodedCode?.craters ?? DEFAULT_WORLD_PARAMS.craters,
-	)
-	const [maxElevation, setMaxElevation] = useState(
-		initialDecodedCode?.maxElevation ?? DEFAULT_WORLD_PARAMS.maxElevation,
-	)
-	const [era, setEra] = useState<SocietyEra>(
-		initialDecodedCode?.era ?? DEFAULT_WORLD_PARAMS.era,
-	)
+	// Not user-adjustable -- fixed at Earth's real max elevation for every
+	// generated world rather than tracked as UI state.
+	const maxElevation = 6000
+	const [era, setEra] = useState<SocietyEra>(DEFAULT_WORLD_PARAMS.era)
 
 	// --- Three.js scene lifecycle ---
 	useEffect(() => {
@@ -1071,24 +1091,8 @@ export const GenesisView: React.FC = () => {
 	}, [world])
 	useEffect(() => {
 		if (typeof window === "undefined") return
-		if (planetCode)
-			window.localStorage.setItem(PLANET_CODE_STORAGE_KEY, planetCode)
-		else window.localStorage.removeItem(PLANET_CODE_STORAGE_KEY)
-	}, [planetCode])
-	useEffect(() => {
-		if (typeof window === "undefined") return
-		window.localStorage.setItem(
-			RECENT_CODES_STORAGE_KEY,
-			JSON.stringify(recentCodes),
-		)
-	}, [recentCodes])
-	useEffect(() => {
-		if (typeof window === "undefined") return
-		window.localStorage.setItem(
-			STARRED_RECENT_CODES_STORAGE_KEY,
-			JSON.stringify(starredRecentCodes),
-		)
-	}, [starredRecentCodes])
+		window.localStorage.setItem(PLANET_SEED_STORAGE_KEY, formatSeedLabel(seed))
+	}, [seed])
 	useEffect(() => {
 		if (typeof window === "undefined") return
 		window.localStorage.setItem(
@@ -2467,18 +2471,6 @@ export const GenesisView: React.FC = () => {
 			setGenerationProgress,
 			setGenerationLabel,
 			setSeed,
-			pushRecentCode: (nextCode: string) => {
-				setRecentCodes((current) =>
-					pushRecentCode(
-						current,
-						starredRecentCodes,
-						nextCode,
-						MAX_RECENT_CODES,
-					),
-				)
-			},
-			setPlanetCode,
-			setPlanetCodeInput,
 			setWorld,
 			workerRef,
 			onGenerationFrame: (frame) => {
@@ -2532,7 +2524,7 @@ export const GenesisView: React.FC = () => {
 				}
 			},
 		}),
-		[starredRecentCodes],
+		[],
 	)
 
 	const currentParams = useMemo<GenerationParams>(
@@ -2564,8 +2556,8 @@ export const GenesisView: React.FC = () => {
 			ridgeSharpening,
 			glacialErosion,
 			seaLevel,
-			volcanism,
-			craters,
+			volcanism: 1,
+			craters: 0,
 			maxElevation,
 			pressure,
 			moonCount,
@@ -2599,26 +2591,17 @@ export const GenesisView: React.FC = () => {
 			ridgeSharpening,
 			glacialErosion,
 			seaLevel,
-			volcanism,
-			craters,
-			maxElevation,
 			pressure,
 			moonCount,
 			moonSeed,
 		],
 	)
-	const derivedPlanetCode = useMemo(
-		() => encodePlanetCode(seed, currentParams),
-		[currentParams, seed],
-	)
-
 	useEffect(() => {
-		setPlanetCode(derivedPlanetCode)
-		if (!codeInputDirty) {
-			setPlanetCodeInput(derivedPlanetCode)
-			setCodeError(false)
+		if (!seedInputDirty) {
+			setSeedInput(formatSeedLabel(seed))
+			setSeedError(false)
 		}
-	}, [codeInputDirty, derivedPlanetCode])
+	}, [seed, seedInputDirty])
 
 	const handleGenerateWorld = useCallback(
 		(overrideSeed: number, overrides?: Partial<GenerationParams>) => {
@@ -2634,28 +2617,25 @@ export const GenesisView: React.FC = () => {
 	)
 
 	const resolveSeedInput = useCallback(() => {
-		const trimmed = planetCodeInput.trim()
-		if (!trimmed) return null
-		return decodePlanetCode(trimmed)
-	}, [planetCodeInput])
+		return resolveSeedLabel(seedInput)
+	}, [seedInput])
 	const handleGenerate = useCallback(() => {
-		const decoded = resolveSeedInput()
-		if (planetCodeInput.trim()) {
-			if (!decoded) {
-				setCodeError(true)
-				window.setTimeout(() => setCodeError(false), 1500)
+		if (seedInput.trim()) {
+			const nextSeed = resolveSeedInput()
+			if (nextSeed === null) {
+				setSeedError(true)
+				window.setTimeout(() => setSeedError(false), 1500)
 				return
 			}
-			setCodeError(false)
-			handleGenerateWorld(decoded.seed, decoded as Partial<GenerationParams>)
+			setSeedError(false)
+			handleGenerateWorld(nextSeed)
 			return
 		}
 		handleGenerateWorld(seed)
-	}, [handleGenerateWorld, planetCodeInput, resolveSeedInput, seed])
+	}, [handleGenerateWorld, resolveSeedInput, seed, seedInput])
 
 	const setters = useMemo(
 		() => ({
-			setNumPoints,
 			setLandDistribution,
 			setContinentSizeVariety,
 			setLandCoverage,
@@ -2674,65 +2654,50 @@ export const GenesisView: React.FC = () => {
 			setMoonSeed,
 			setRestSeed,
 			setSeaLevel,
-			setVolcanism,
-			setCraters,
-			setMaxElevation,
 			setEra,
 		}),
-		[],
+		[
+			setEccentricity,
+			setHoursPerDay,
+			setObliquity,
+			setOrbitalDistanceAU,
+			setPerihelion,
+			setPlanetRadiusKm,
+			setPressure,
+			setSubstellarLon,
+			setTideLock,
+			setSpectralClass,
+			setStarSubtype,
+			setRestSeed,
+			setContinentSizeVariety,
+			setLandCoverage,
+			setLandDistribution,
+			setSeaLevel,
+		],
 	)
-	const applyDecodedCode = useCallback(
-		(decoded: NonNullable<ReturnType<typeof decodePlanetCode>>) => {
-			setSeed(decoded.seed)
-			setters.setNumPoints(decoded.numPoints)
-			setters.setLandDistribution(decoded.landDistribution)
-			setters.setContinentSizeVariety(decoded.continentSizeVariety)
-			setters.setLandCoverage(decoded.landCoverage)
-			setters.setPlanetRadiusKm(decoded.planetRadiusKm)
-			setters.setObliquity(decoded.obliquity)
-			setters.setEccentricity(decoded.eccentricity)
-			setters.setPerihelion(decoded.perihelion)
-			setters.setSpectralClass(decoded.spectralClass)
-			setters.setStarSubtype(decoded.starSubtype)
-			setters.setOrbitalDistanceAU(decoded.orbitalDistanceAU)
-			setters.setHoursPerDay(decoded.hoursPerDay)
-			setters.setTideLock(decoded.tideLock)
-			setters.setSubstellarLon(decoded.substellarLon)
-			setters.setPressure(decoded.pressure)
-			setters.setMoonCount(decoded.moonCount ?? 1)
-			setters.setMoonSeed(
-				decoded.moonSeed ?? Math.floor(Math.random() * SEED_MAX),
-			)
-			setters.setRestSeed(decoded.restSeed ?? SOL_SEED)
-			setters.setSeaLevel(decoded.seaLevel)
-			setters.setVolcanism(decoded.volcanism)
-			setters.setCraters(decoded.craters ?? 0)
-			setters.setMaxElevation(decoded.maxElevation)
-			setters.setEra(decoded.era)
-		},
-		[setters],
-	)
-	const handleApplyCode = useCallback(() => {
-		const trimmed = planetCodeInput.trim()
+	const handleApplySeed = useCallback(() => {
+		const trimmed = seedInput.trim()
 		if (!trimmed) {
-			setCodeInputDirty(false)
-			setCodeError(false)
+			setSeedInputDirty(false)
+			setSeedError(false)
+			setSeedInput(formatSeedLabel(seed))
 			return
 		}
-		const decoded = decodePlanetCode(trimmed)
-		if (!decoded) {
-			setCodeError(true)
+		const parsed = resolveSeedLabel(trimmed)
+		if (parsed === null) {
+			setSeedError(true)
 			return
 		}
-		setCodeError(false)
-		setCodeInputDirty(false)
-		applyDecodedCode(decoded)
-	}, [applyDecodedCode, planetCodeInput])
+		setSeedError(false)
+		setSeedInputDirty(false)
+		setSeed(parsed)
+		setSeedInput(formatSeedLabel(parsed))
+	}, [seed, seedInput])
 
-	const handleCodeInputChange = useCallback((nextCode: string) => {
-		setPlanetCodeInput(nextCode)
-		setCodeInputDirty(true)
-		setCodeError(false)
+	const handleSeedInputChange = useCallback((nextSeed: string) => {
+		setSeedInput(nextSeed)
+		setSeedInputDirty(true)
+		setSeedError(false)
 	}, [])
 
 	const handleImportHeightmap = useCallback(
@@ -2762,9 +2727,9 @@ export const GenesisView: React.FC = () => {
 				ridgeSharpening,
 				glacialErosion,
 				seaLevel,
-				volcanism,
 				maxElevation,
-				craters,
+				volcanism: 1,
+				craters: 0,
 			}
 			importHeightmap(
 				grayscale,
@@ -2796,33 +2761,18 @@ export const GenesisView: React.FC = () => {
 			ridgeSharpening,
 			glacialErosion,
 			seaLevel,
-			volcanism,
-			craters,
 			pressure,
 			moonCount,
 			moonSeed,
 			generationCallbacks,
-			maxElevation,
 		],
-	)
-
-	const handleFileImport = useCallback(
-		async (file: File) => {
-			try {
-				const { grayscale, width, height } = await loadImageAsGrayscale(file)
-				handleImportHeightmap(grayscale, width, height)
-			} catch (err) {
-				console.error("Failed to load heightmap:", err)
-				setGenerationLabel("Failed to load image")
-			}
-		},
-		[handleImportHeightmap],
 	)
 
 	const handleEarthImport = useCallback(async () => {
 		try {
-			const { grayscale, width, height } =
-				await loadImageAsGrayscale("/heightmap/earth.png")
+			const { grayscale, width, height } = await loadImageAsGrayscale(
+				"/heightmap/earth.png",
+			)
 			handleImportHeightmap(grayscale, width, height)
 		} catch (err) {
 			console.error("Failed to load Earth heightmap:", err)
@@ -2835,48 +2785,24 @@ export const GenesisView: React.FC = () => {
 		[setters],
 	)
 	const handleRandomizeCode = useCallback(() => {
-		const nextSeed = makeRandomSeed()
+		const nextLabel = makeRandomSeedLabel()
+		const nextSeed = resolveSeedLabel(nextLabel)
+		if (nextSeed === null) return
 		setSeed(nextSeed)
-		setCodeInputDirty(false)
-		setCodeError(false)
-	}, [makeRandomSeed])
-
-	const handleSelectRecentCode = useCallback(
-		(nextCode: string) => {
-			setPlanetCodeInput(nextCode)
-			setCodeInputDirty(false)
-			setCodeError(false)
-			const decoded = decodePlanetCode(nextCode)
-			if (decoded) applyDecodedCode(decoded)
-		},
-		[applyDecodedCode],
-	)
-	const handleToggleRecentCodeStar = useCallback(
-		(code: string) => {
-			setRecentCodes((currentRecentCodes) => {
-				const nextState = toggleStarredRecentCode(
-					currentRecentCodes,
-					starredRecentCodes,
-					code,
-					MAX_RECENT_CODES,
-				)
-				setStarredRecentCodes(nextState.starredRecentCodes)
-				return nextState.recentCodes
-			})
-		},
-		[starredRecentCodes],
-	)
+		setSeedInput(nextLabel)
+		setSeedInputDirty(false)
+		setSeedError(false)
+	}, [])
 
 	const handleCopyCode = useCallback(async () => {
-		if (!planetCode) return
 		try {
-			await navigator.clipboard.writeText(planetCode)
+			await navigator.clipboard.writeText(formatSeedLabel(seed))
 			setCodeCopied(true)
 			window.setTimeout(() => setCodeCopied(false), 1200)
 		} catch (err) {
-			console.error("Failed to copy code:", err)
+			console.error("Failed to copy seed:", err)
 		}
-	}, [planetCode])
+	}, [seed])
 
 	const handleExportMap = useCallback(async () => {
 		if (!worldForDisplay || !sceneRef.current || exportProgress) return
@@ -2894,7 +2820,7 @@ export const GenesisView: React.FC = () => {
 			const objectUrl = window.URL.createObjectURL(blob)
 			const link = document.createElement("a")
 			link.href = objectUrl
-			link.download = buildMapExportFilename(planetCode, width)
+			link.download = buildMapExportFilename(seed, width)
 			document.body.appendChild(link)
 			link.click()
 			link.remove()
@@ -2909,7 +2835,7 @@ export const GenesisView: React.FC = () => {
 		exportCenterLongitude,
 		exportProgress,
 		exportWidthPreset,
-		planetCode,
+		seed,
 		worldForDisplay,
 	])
 
@@ -2947,7 +2873,7 @@ export const GenesisView: React.FC = () => {
 			const baseTilt = getEffectiveObliquityDeg(obliquity)
 			setObliquity(retrograde ? 180 - baseTilt : baseTilt)
 		},
-		[obliquity],
+		[obliquity, setObliquity],
 	)
 
 	// --- Slider definitions ---
@@ -2979,18 +2905,10 @@ export const GenesisView: React.FC = () => {
 		setSubstellarLon,
 	})
 	const terrainSliders = buildTerrainSliders({
-		numPoints,
 		continentSizeVariety,
 		seaLevel,
-		craters,
-		volcanism,
-		maxElevation,
-		setNumPoints,
 		setContinentSizeVariety,
 		setSeaLevel,
-		setCraters,
-		setVolcanism,
-		setMaxElevation,
 		unitSystem,
 	})
 
@@ -3038,7 +2956,6 @@ export const GenesisView: React.FC = () => {
 			moonCount,
 			moonSeed,
 			seaLevel,
-			maxElevation,
 			unitSystem,
 			world,
 			windStats,
@@ -3102,14 +3019,15 @@ export const GenesisView: React.FC = () => {
 	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
 	const updateEditableSystemBody = useCallback(
 		(bodyIndex: number, updater: (body: SystemBody) => SystemBody) => {
-			setEditableSystemBodies((prev) =>
-				applySystemSeismology({
-					bodies: prev.map((body, index) =>
+			setSolarSystem((current) => ({
+				...current,
+				orbits: applySystemSeismology({
+					bodies: current.orbits.map((body, index) =>
 						index === bodyIndex ? updater(body) : body,
 					),
 					...systemSeismologyContext,
 				}),
-			)
+			}))
 		},
 		[systemSeismologyContext],
 	)
@@ -3131,7 +3049,15 @@ export const GenesisView: React.FC = () => {
 	const rebuildSystemBody = useCallback(
 		(bodyIndex?: number) => {
 			const isMainWorldReset =
-				bodyIndex !== undefined && generatedSystemBodies[bodyIndex]?.isMainWorld
+				bodyIndex !== undefined &&
+				resetSourceSystemBodies[bodyIndex]?.isMainWorld
+			if (bodyIndex === undefined) {
+				setSpectralClass(DEFAULT_WORLD_PARAMS.spectralClass)
+				setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
+				setRestSeed(SOL_SEED)
+				setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)
+				setMoonSeed(LUNA_MOON_SEED)
+			}
 			if (bodyIndex === undefined || isMainWorldReset) {
 				setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
 				setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
@@ -3144,26 +3070,61 @@ export const GenesisView: React.FC = () => {
 				setTideLock(null)
 			}
 			if (bodyIndex === undefined) {
-				setEditableSystemBodies(generatedSystemBodies)
+				// Explicit, rather than relying on the generatedSystemBodies
+				// memo/sync-effect to pick up the spectralClass/starSubtype/
+				// restSeed resets above -- if those were already at their
+				// defaults (e.g. resetting an already-default Sol seed after
+				// editing individual planets/moons), the memo's dependencies
+				// wouldn't actually change, so it would never recompute and
+				// every edited child body/moon would silently survive the
+				// "reset". Resetting orbits directly here always restores
+				// every planet (and, since each planet's own moons array is
+				// replaced wholesale, every moon) unconditionally.
+				setSolarSystem((current) => ({
+					...current,
+					orbits: structuredClone(SOL_DEFAULT_SOLAR_SYSTEM.orbits),
+				}))
 				return
 			}
-			setEditableSystemBodies((prev) =>
-				prev.map((body, index) =>
-					index === bodyIndex ? (generatedSystemBodies[index] ?? body) : body,
-				),
-			)
+			setSolarSystem((current) => ({
+				...current,
+				orbits: applySystemSeismology({
+					bodies: current.orbits.map((body, index) =>
+						index === bodyIndex
+							? structuredClone(resetSourceSystemBodies[index] ?? body)
+							: body,
+					),
+					...systemSeismologyContext,
+				}),
+			}))
 		},
-		[generatedSystemBodies],
+		[
+			resetSourceSystemBodies,
+			systemSeismologyContext,
+			setEccentricity,
+			setHoursPerDay,
+			setObliquity,
+			setOrbitalDistanceAU,
+			setPerihelion,
+			setPlanetRadiusKm,
+			setPressure,
+			setSubstellarLon,
+			setTideLock,
+			setRestSeed,
+			setSpectralClass,
+			setStarSubtype,
+		],
 	)
 	const updateEditableSystemMoon = useCallback(
 		(
 			bodyIndex: number,
 			moonIndex: number,
-			updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+			updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 		) => {
-			setEditableSystemBodies((prev) =>
-				applySystemSeismology({
-					bodies: prev.map((body, index) => {
+			setSolarSystem((current) => ({
+				...current,
+				orbits: applySystemSeismology({
+					bodies: current.orbits.map((body, index) => {
 						if (index !== bodyIndex) return body
 						return {
 							...body,
@@ -3174,7 +3135,7 @@ export const GenesisView: React.FC = () => {
 					}),
 					...systemSeismologyContext,
 				}),
-			)
+			}))
 		},
 		[systemSeismologyContext],
 	)
@@ -3184,11 +3145,13 @@ export const GenesisView: React.FC = () => {
 	// body (and therefore every one of its moons) at once.
 	const resetSystemMoon = useCallback(
 		(bodyIndex: number, moonIndex: number) => {
-			const generatedMoon = generatedSystemBodies[bodyIndex]?.moons[moonIndex]
-			if (!generatedMoon) return
-			updateEditableSystemMoon(bodyIndex, moonIndex, () => generatedMoon)
+			const resetMoon = resetSourceSystemBodies[bodyIndex]?.moons[moonIndex]
+			if (!resetMoon) return
+			updateEditableSystemMoon(bodyIndex, moonIndex, () =>
+				structuredClone(resetMoon),
+			)
 		},
-		[generatedSystemBodies, updateEditableSystemMoon],
+		[resetSourceSystemBodies, updateEditableSystemMoon],
 	)
 
 	// The solar-system view's own clock — deliberately independent of the
@@ -3308,29 +3271,30 @@ export const GenesisView: React.FC = () => {
 	const [pendingFocus, setPendingFocus] = useState<{
 		bodyIndex: number
 		moonIndex?: number
-	} | null>(null)
+	} | null>(
+		initialGenerationSession?.solarSystemViewActive
+			? (initialGenerationSession.currentFocus ?? null)
+			: null,
+	)
 	// The last body/moon focused via the GPS buttons — drives the clock
 	// knobs' reference periods and is not cleared on use (unlike pendingFocus,
 	// which just triggers the one-shot camera animation).
 	const [currentFocus, setCurrentFocus] = useState<{
 		bodyIndex: number
 		moonIndex?: number
-	} | null>(null)
+	} | null>(initialGenerationSession?.currentFocus ?? null)
 	useEffect(() => {
 		if (typeof window === "undefined") return
 		let cancelled = false
 		void loadGenerationSessionSnapshot()
 			.then((snapshot) => {
 				if (cancelled || !snapshot) return
-				setWorld(snapshot.world)
-				setGenerationTimings(snapshot.world?.timings ?? null)
 				skipNextGeneratedSystemBodiesSyncRef.current =
-					snapshot.editableSystemBodies.length > 0
-				setEditableSystemBodies(snapshot.editableSystemBodies)
+					snapshot.solarSystem.orbits.length > 0
+				setSolarSystem(snapshot.solarSystem)
 				setSolarSystemViewActive(snapshot.solarSystemViewActive)
 				setGenerationPanelOpen(snapshot.generationPanelOpen)
 				setGenerationPreviewTab(snapshot.generationPreviewTab)
-				setWorldTab(snapshot.worldTab)
 				setCurrentFocus(snapshot.currentFocus)
 				setPendingFocus(
 					snapshot.solarSystemViewActive ? snapshot.currentFocus : null,
@@ -3383,13 +3347,11 @@ export const GenesisView: React.FC = () => {
 		)
 		if (!validGenerationPreviewTabs.has(generationPreviewTab)) return
 		void saveGenerationSessionSnapshot({
-			world,
-			editableSystemBodies,
+			solarSystem,
 			solarSystemViewActive,
 			currentFocus,
 			generationPanelOpen,
 			generationPreviewTab,
-			worldTab,
 		}).catch((error) => {
 			console.warn(
 				`Failed to persist generation session to ${GENERATION_SESSION_STORAGE_KEY}:`,
@@ -3398,13 +3360,11 @@ export const GenesisView: React.FC = () => {
 		})
 	}, [
 		currentFocus,
-		editableSystemBodies,
 		generationPanelOpen,
 		generationPreviewTab,
 		generationSessionRestored,
 		solarSystemViewActive,
-		world,
-		worldTab,
+		solarSystem,
 	])
 
 	// Clock-knob reference periods for whatever is currently focused — the
@@ -3605,16 +3565,11 @@ export const GenesisView: React.FC = () => {
 					obliquity={obliquity}
 					era={era}
 					setEra={setEra}
-					planetCode={planetCode}
-					codeInput={planetCodeInput}
-					setCodeInput={handleCodeInputChange}
-					onApplyCode={handleApplyCode}
-					codeError={codeError}
-					recentCodes={recentCodes}
-					starredRecentCodes={starredRecentCodes}
-					onSelectRecentCode={handleSelectRecentCode}
-					onToggleRecentCodeStar={handleToggleRecentCodeStar}
-					onRandomizeCode={handleRandomizeCode}
+					seedInput={seedInput}
+					setSeedInput={handleSeedInputChange}
+					onApplySeed={handleApplySeed}
+					seedError={seedError}
+					onRandomizeSeed={handleRandomizeCode}
 					generating={generating}
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
@@ -3624,7 +3579,6 @@ export const GenesisView: React.FC = () => {
 					onSelectGenerationPreviewTab={setGenerationPreviewTab}
 					unitSystem={unitSystem}
 					handleGenerate={handleGenerate}
-					handleFileImport={handleFileImport}
 					handleEarthImport={handleEarthImport}
 					onClose={() => setGenerationPanelOpen(false)}
 				/>
@@ -3740,6 +3694,8 @@ export const GenesisView: React.FC = () => {
 							expanded={solarSystemControlsExpanded}
 							setExpanded={setSolarSystemControlsExpanded}
 							onBack={() => setSolarSystemViewActive(false)}
+							generationPanelOpen={generationPanelOpen}
+							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
 							showEllipticalOrbits={showSolarSystemEllipticalOrbits}
 							setShowEllipticalOrbits={setShowSolarSystemEllipticalOrbits}
 							showDaylight={showSolarSystemDaylight}
@@ -3870,7 +3826,7 @@ export const GenesisView: React.FC = () => {
 							onExport={() => {
 								void handleExportMap()
 							}}
-							canCopyCode={!!planetCode}
+							canCopyCode
 							codeCopied={codeCopied}
 							onCopyCode={() => {
 								void handleCopyCode()

@@ -3,8 +3,8 @@ import { createRng } from "../../shared/rng"
 import { SOL_LUNA_DEFAULT } from "../system/sol-system"
 import {
 	DEFAULT_MOON_ATMOSPHERE,
+	type MoonBody,
 	type MoonOrbitRange,
-	type MoonParams,
 	type TideLock,
 } from "./moon-types"
 import {
@@ -56,13 +56,13 @@ type ParentOrbitGroup =
 	| "helian"
 	| "jovian"
 
-const LUNA_OUTER_COMPANION: MoonParams = {
+const LUNA_OUTER_COMPANION: MoonBody = {
 	idx: 2,
 	massKg: SOL_LUNA_DEFAULT.massKg * 0.34,
 	diameterKm: SOL_LUNA_DEFAULT.diameterKm * 0.72,
 	group: "dwarf",
 	classification: "rockball",
-	hydrosphereFraction: 0,
+	landCoverage: 1,
 	atmosphere: SOL_LUNA_DEFAULT.atmosphere,
 	orbitalPeriodDays: SOL_LUNA_DEFAULT.orbitalPeriodDays * 1.82,
 	siderealDayHours: SOL_LUNA_DEFAULT.orbitalPeriodDays * 1.82 * 24,
@@ -79,13 +79,13 @@ const LUNA_OUTER_COMPANION: MoonParams = {
 	greenhouseFactor: SOL_LUNA_DEFAULT.greenhouseFactor,
 }
 
-const LUNA_INNER_COMPANION: MoonParams = {
+const LUNA_INNER_COMPANION: MoonBody = {
 	idx: 1,
 	massKg: SOL_LUNA_DEFAULT.massKg * 0.18,
 	diameterKm: SOL_LUNA_DEFAULT.diameterKm * 0.57,
 	group: "dwarf",
 	classification: "rockball",
-	hydrosphereFraction: 0,
+	landCoverage: 1,
 	atmosphere: SOL_LUNA_DEFAULT.atmosphere,
 	orbitalPeriodDays: SOL_LUNA_DEFAULT.orbitalPeriodDays * 0.56,
 	siderealDayHours: SOL_LUNA_DEFAULT.orbitalPeriodDays * 0.56 * 24,
@@ -106,7 +106,7 @@ function isLunaMoonSeed(seed: number): boolean {
 	return seed === LUNA_MOON_SEED
 }
 
-function withRandomizedAngles(baseMoon: MoonParams, seed: number): MoonParams {
+function withRandomizedAngles(baseMoon: MoonBody, seed: number): MoonBody {
 	const rng = createRng(seed)
 	return {
 		...baseMoon,
@@ -116,7 +116,7 @@ function withRandomizedAngles(baseMoon: MoonParams, seed: number): MoonParams {
 	}
 }
 
-function generateLunaMoonSystem(count: number): MoonParams[] {
+function generateLunaMoonSystem(count: number): MoonBody[] {
 	if (count <= 0) return []
 	if (count === 1) return [{ ...SOL_LUNA_DEFAULT, idx: 1 }]
 	if (count === 2) {
@@ -414,7 +414,7 @@ export function resolveMoonOrbitHoursPerDay(
 }
 
 export function moonSemiMajorAxisM(
-	moon: MoonParams,
+	moon: MoonBody,
 	planetMassKg: number,
 	hoursPerDay: number,
 ): number {
@@ -458,7 +458,7 @@ interface MoonPeriodBounds {
 }
 
 export function moonPeriodBoundsDay(
-	moon: MoonParams,
+	moon: MoonBody,
 	planetMassKg: number,
 	starMassKg: number,
 	planetRadiusKm: number,
@@ -520,7 +520,7 @@ function solveKeplersEquation(
 }
 
 function keplerMoonPositionVector(
-	moon: MoonParams,
+	moon: MoonBody,
 	semiMajorAxisM: number,
 	t: number,
 ): OrbitalPositionVector {
@@ -588,7 +588,7 @@ function orbitalVectorToPlanetFixedPosition(
 }
 
 export function keplerMoonPosition(
-	moon: MoonParams,
+	moon: MoonBody,
 	semiMajorAxisM: number,
 	t: number,
 ): OrbitalPosition {
@@ -603,7 +603,7 @@ export function keplerMoonPosition(
 // where what matters is the two moons' actual 3D positions relative to each
 // other, not either one's sub-point on a rotating planet surface.
 export function keplerMoonPositionCartesian(
-	moon: MoonParams,
+	moon: MoonBody,
 	semiMajorAxisM: number,
 	t: number,
 ): { x: number; y: number; z: number } {
@@ -620,7 +620,7 @@ export function generateMoons(
 	hoursPerDay: number,
 	starMassKg: number,
 	parentGroup: ParentOrbitGroup = "terrestrial",
-): MoonParams[] {
+): MoonBody[] {
 	if (count <= 0) return []
 	if (isLunaMoonSeed(seed)) return generateLunaMoonSystem(count)
 
@@ -647,7 +647,7 @@ export function generateMoons(
 		return T / (hoursPerDay * 3600)
 	}
 
-	const moons: MoonParams[] = []
+	const moons: MoonBody[] = []
 	const pendingMoons: PendingMoon[] = []
 
 	for (let i = 0; i < count; i++) {
@@ -711,11 +711,12 @@ export function generateMoons(
 			semiMajorAxisPlanetDiameters: pd,
 			sizeClass,
 			// Fallback only -- generate-system-bodies.ts's sibling-planet path
-			// layers a real classification-derived atmosphere on top of this via
-			// buildMoonEnvironment(); this default only sticks for callers (main
-			// world's own live moon preview, tidal-schedule-only generation) that
-			// don't run that enrichment step.
+			// layers a real classification-derived atmosphere/landCoverage on top
+			// of these via buildMoonEnvironment(); these defaults only stick for
+			// callers (main world's own live moon preview, tidal-schedule-only
+			// generation) that don't run that enrichment step.
 			atmosphere: DEFAULT_MOON_ATMOSPHERE,
+			landCoverage: 0,
 		})
 	}
 

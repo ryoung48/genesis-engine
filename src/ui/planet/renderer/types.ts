@@ -1,4 +1,4 @@
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonBody } from "@/model/celestial/moons/moon-types"
 import type { WindArrowData } from "@/model/climate/wind"
 import type {
 	SerializedGenesisWorld,
@@ -97,7 +97,7 @@ export interface GenesisScene {
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void
 	setMoonOrbitOverlay(
-		moons: MoonParams[] | null,
+		moons: MoonBody[] | null,
 		planetRadiusKm: number,
 		hoursPerDay: number,
 		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
@@ -107,7 +107,7 @@ export interface GenesisScene {
 		showEllipticalOrbits: boolean,
 	): void
 	updateMoonOrbitOverlay(
-		moons: MoonParams[] | null,
+		moons: MoonBody[] | null,
 		planetRadiusKm: number,
 		hoursPerDay: number,
 		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,

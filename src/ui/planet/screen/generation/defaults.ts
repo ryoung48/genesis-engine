@@ -5,12 +5,9 @@ import {
 import { SOL_MAIN_WORLD_DEFAULTS } from "@/model/celestial/system/sol-system"
 import { DEFAULT_ERA } from "@/model/society/eras"
 
-export const PLANET_CODE_STORAGE_KEY = "genesis:lastPlanetCode"
-export const RECENT_CODES_STORAGE_KEY = "genesis:recentCodes"
-export const STARRED_RECENT_CODES_STORAGE_KEY = "genesis:starredRecentCodes"
+export const PLANET_SEED_STORAGE_KEY = "genesis:lastPlanetSeed"
 export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"
 export const GENERATION_SESSION_STORAGE_KEY = "genesis:generationSession"
-export const MAX_RECENT_CODES = 10
 
 export const DEFAULT_WORLD_PARAMS = {
 	numPoints: 204000,

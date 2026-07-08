@@ -1,6 +1,6 @@
-import type { MoonParams } from "@/model/celestial/moons/moon-types"
+import type { MoonBody } from "@/model/celestial/moons/moon-types"
 import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+import type { SolarSystemState } from "@/model/celestial/system/sol-system"
 import { GENERATION_SESSION_STORAGE_KEY } from "./defaults"
 import {
 	GENERATION_PREVIEW_TABS,
@@ -13,17 +13,15 @@ type FocusTarget = {
 } | null
 
 interface GenerationSessionSnapshot {
-	world: SerializedGenesisWorld | null
-	editableSystemBodies: SystemBody[]
+	solarSystem: SolarSystemState
 	solarSystemViewActive: boolean
 	currentFocus: FocusTarget
 	generationPanelOpen: boolean
 	generationPreviewTab: GenerationPreviewTab
-	worldTab: "planet" | "society"
 }
 
 type StoredGenerationSession = {
-	version: 1
+	version: 4
 	snapshot: GenerationSessionSnapshot
 }
 
@@ -125,15 +123,6 @@ function deserializeValue<T>(value: unknown): T {
 	return value as T
 }
 
-async function compressString(value: string): Promise<string> {
-	if (typeof CompressionStream === "undefined") return value
-	const stream = new Blob([value])
-		.stream()
-		.pipeThrough(new CompressionStream("gzip"))
-	const compressed = new Uint8Array(await new Response(stream).arrayBuffer())
-	return `gzip:${encodeBytes(compressed)}`
-}
-
 async function decompressString(value: string): Promise<string | null> {
 	if (!value.startsWith("gzip:")) return value
 	if (typeof DecompressionStream === "undefined") return null
@@ -144,17 +133,21 @@ async function decompressString(value: string): Promise<string | null> {
 	return await new Response(stream).text()
 }
 
-function isMoonParamsArray(value: unknown): value is MoonParams[] {
+function isMoonBodyArray(value: unknown): value is MoonBody[] {
 	return Array.isArray(value)
 }
 
-function isSystemBodyArray(value: unknown): value is SystemBody[] {
+function isSystemBodyArray(
+	value: unknown,
+): value is SolarSystemState["orbits"] {
 	if (!Array.isArray(value)) return false
 	return value.every((body) => {
 		if (!body || typeof body !== "object") return false
 		const candidate = body as Partial<SystemBody>
 		return (
-			typeof candidate.idx === "number" && isMoonParamsArray(candidate.moons)
+			typeof candidate.idx === "number" &&
+			typeof candidate.seed === "string" &&
+			isMoonBodyArray(candidate.moons)
 		)
 	})
 }
@@ -183,28 +176,58 @@ function isGenerationSessionSnapshot(
 		GENERATION_PREVIEW_TABS.map(([tab]) => tab),
 	)
 	return (
-		("world" in candidate ? true : false) &&
-		isSystemBodyArray(candidate.editableSystemBodies) &&
+		(() => {
+			const solarSystem = candidate.solarSystem
+			if (!solarSystem || typeof solarSystem !== "object") return false
+			const typedSolarSystem = solarSystem as Record<string, unknown>
+			const star = typedSolarSystem.star
+			if (!star || typeof star !== "object") return false
+			const typedStar = star as Record<string, unknown>
+			return (
+				typeof typedStar.class === "string" &&
+				typeof typedStar.subtype === "number" &&
+				typeof typedStar.seed === "string" &&
+				isSystemBodyArray(typedSolarSystem.orbits)
+			)
+		})() &&
 		typeof candidate.solarSystemViewActive === "boolean" &&
 		isFocusTarget(candidate.currentFocus) &&
 		typeof candidate.generationPanelOpen === "boolean" &&
 		validGenerationPreviewTabs.has(
 			candidate.generationPreviewTab as GenerationPreviewTab,
-		) &&
-		(candidate.worldTab === "planet" || candidate.worldTab === "society")
+		)
 	)
+}
+
+function parseStoredGenerationSession(
+	stored: string,
+): GenerationSessionSnapshot | null {
+	const parsed = deserializeValue<StoredGenerationSession>(JSON.parse(stored))
+	if (parsed.version !== 4 || !isGenerationSessionSnapshot(parsed.snapshot)) {
+		return null
+	}
+	return parsed.snapshot
+}
+
+export function loadGenerationSessionSnapshotSync(): GenerationSessionSnapshot | null {
+	const stored = window.localStorage.getItem(GENERATION_SESSION_STORAGE_KEY)
+	if (!stored || stored.startsWith("gzip:")) return null
+	try {
+		return parseStoredGenerationSession(stored)
+	} catch {
+		return null
+	}
 }
 
 export async function saveGenerationSessionSnapshot(
 	snapshot: GenerationSessionSnapshot,
 ): Promise<void> {
 	const payload: StoredGenerationSession = {
-		version: 1,
+		version: 4,
 		snapshot,
 	}
 	const serialized = JSON.stringify(serializeValue(payload))
-	const compressed = await compressString(serialized)
-	window.localStorage.setItem(GENERATION_SESSION_STORAGE_KEY, compressed)
+	window.localStorage.setItem(GENERATION_SESSION_STORAGE_KEY, serialized)
 }
 
 export async function loadGenerationSessionSnapshot(): Promise<GenerationSessionSnapshot | null> {
@@ -212,11 +235,5 @@ export async function loadGenerationSessionSnapshot(): Promise<GenerationSession
 	if (!stored) return null
 	const decompressed = await decompressString(stored)
 	if (!decompressed) return null
-	const parsed = deserializeValue<StoredGenerationSession>(
-		JSON.parse(decompressed),
-	)
-	if (parsed.version !== 1 || !isGenerationSessionSnapshot(parsed.snapshot)) {
-		return null
-	}
-	return parsed.snapshot
+	return parseStoredGenerationSession(decompressed)
 }

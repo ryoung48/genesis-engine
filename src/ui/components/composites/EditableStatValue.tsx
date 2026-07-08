@@ -37,7 +37,8 @@ function splitNumericAndUnit(text: string): { numeric: string; unit: string } {
 	const match = text.match(/^(-?[\d.]+)\s*(.*)$/)
 	if (!match) return { numeric: text, unit: "" }
 	const [, numeric, unit] = match
-	if (ATTACHED_UNITS.has(unit)) return { numeric: `${numeric}${unit}`, unit: "" }
+	if (ATTACHED_UNITS.has(unit))
+		return { numeric: `${numeric}${unit}`, unit: "" }
 	return { numeric, unit }
 }
 

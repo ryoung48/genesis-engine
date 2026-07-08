@@ -1,7 +1,6 @@
 import type { GenesisParams } from "@/model"
 import type { HistoryNote } from "@/model/history"
 import { MONTH_MS } from "@/model/history/state"
-import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
@@ -9,9 +8,6 @@ import type {
 	SerializedHistoryFrame,
 	SerializedTimelines,
 } from "@/model/transport/worker-types"
-
-export { decodePlanetCode }
-
 export type GenerationParams = GenesisParams
 
 interface ImportHeightmapParams {
@@ -80,9 +76,6 @@ export interface GenerationCallbacks {
 	setGenerationProgress: (v: number | ((current: number) => number)) => void
 	setGenerationLabel: (v: string) => void
 	setSeed: (v: number) => void
-	pushRecentCode: (code: string) => void
-	setPlanetCode: (v: string) => void
-	setPlanetCodeInput: (v: string) => void
 	setWorld: (v: SerializedGenesisWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
 	onGenerationFrame?: (frame: SerializedHistoryFrame) => void
@@ -245,10 +238,6 @@ export function generateWorld(
 		const worker = createWorker(
 			callbacks,
 			(message, _w) => {
-				const code = encodePlanetCode(overrideSeed, params)
-				callbacks.pushRecentCode(code)
-				callbacks.setPlanetCode(code)
-				callbacks.setPlanetCodeInput(code)
 				callbacks.setWorld(message.world)
 				if (message.frame) callbacks.onGenerationFrame?.(message.frame)
 				callbacks.setGenerationLabel("Done")
@@ -291,8 +280,6 @@ export function importHeightmap(
 	callbacks.setGenerating(true)
 	callbacks.setGenerationProgress(0)
 	callbacks.setGenerationLabel("Importing heightmap...")
-	callbacks.setPlanetCode("")
-	callbacks.setPlanetCodeInput("")
 	callbacks.setWorld(null)
 
 	const request: GenesisWorkerRequest = {

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react"
-import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
+import type { MoonBody, TideLock } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
 	moonSemiMajorAxisM,
@@ -31,7 +31,7 @@ function mod2pi(angle: number): number {
 }
 
 interface MoonOrbitsOverlayProps {
-	moons: MoonParams[]
+	moons: MoonBody[]
 	planetRadiusKm: number
 	hoursPerDay: number
 	day: number

@@ -1,5 +1,5 @@
 import { type createRng, rollD } from "../../shared/rng"
-import type { MoonParams } from "./moon-types"
+import type { MoonBody } from "./moon-types"
 
 export const MOON_SIZE_DIAMETER_BANDS_KM = [
 	[400, 800],
@@ -79,9 +79,9 @@ export function estimateMoonSizeClassFromDiameter(
 const TIDE_LOCK_TOLERANCE_HOURS = 1e-6
 
 export function attachParentTideLocks(
-	moons: MoonParams[],
+	moons: MoonBody[],
 	parentIdx: number,
-): MoonParams[] {
+): MoonBody[] {
 	return moons.map((moon) => ({
 		...moon,
 		tideLock:

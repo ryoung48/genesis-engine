@@ -1,5 +1,5 @@
 import * as THREE from "three"
-import type { MoonParams, TideLock } from "@/model/celestial/moons/moon-types"
+import type { MoonBody, TideLock } from "@/model/celestial/moons/moon-types"
 import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
 import {
 	derivePlanetMassKg,
@@ -231,7 +231,7 @@ export interface MoonOrbitState {
 }
 
 export function buildMoonOrbitOverlay(
-	moons: MoonParams[],
+	moons: MoonBody[],
 	planetRadiusKm: number,
 	hoursPerDay: number,
 	tideLock: TideLock | null,

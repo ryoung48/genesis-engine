@@ -18,11 +18,10 @@ describe("Earth's moons survive generateSystemBodies (moonsOverride wiring)", ()
 						massKg: 7.34e22,
 						diameterKm: 3474,
 						sizeClass: 2,
-						densityEarthRelative: 0.607,
-						densityDescription: "Mostly Rock",
+						density: { earthRelative: 0.607, description: "Mostly Rock" },
 						group: "dwarf",
 						classification: "rockball",
-						hydrosphereFraction: 0,
+						landCoverage: 1,
 						atmosphere: {
 							code: 0,
 							pressureBar: 0,

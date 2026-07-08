@@ -1,6 +1,6 @@
 import type {
 	AtmosphereProfile,
-	MoonParams,
+	MoonBody,
 	TideLock,
 } from "@/model/celestial/moons/moon-types"
 import {
@@ -12,6 +12,7 @@ import {
 	M_SOL_KG,
 	rollMoonCountForParent,
 } from "@/model/celestial/moons/orbital-mechanics"
+import type { OrbitBody } from "@/model/celestial/orbit-body"
 import {
 	getKeplerYearYears,
 	getStarLuminositySol,
@@ -41,10 +42,7 @@ import {
 	type OrbitGroup,
 	type Zone,
 } from "./system-environment"
-import {
-	applySystemSeismology,
-	type SeismologyProfile,
-} from "./system-seismology"
+import { applySystemSeismology } from "./system-seismology"
 
 const DAYS_PER_YEAR = 365.25
 const EARTH_DIAMETER_KM = 12_742
@@ -57,20 +55,17 @@ interface RingProfile {
 	opacity: number
 }
 
-export interface SystemBody {
+export interface SystemBody extends OrbitBody {
 	/** Stable identifier for this body within the system -- the main world is
 	 * always -1; siblings/preset planets get non-negative indices. Lets a
 	 * moon's tideLock reference "my parent" without embedding an object
 	 * reference. See attachParentTideLocks. */
-	idx: number
-	name?: string
+	seed: string
 	sizeClass: number
 	density: DensityProfile | null
 	group: OrbitGroup
 	classification: OrbitClassification
-	texturePath?: string
 	rings?: RingProfile
-	hydrosphereFraction: number
 	atmosphere: AtmosphereProfile | null
 	isMainWorld: boolean
 	orbitalDistanceAU: number
@@ -80,11 +75,9 @@ export interface SystemBody {
 	massKg: number
 	/** 0 / unused for asteroid belts. */
 	gravityG: number
-	orbitalPeriodDays: number
 	/** Sidereal rotation period (relative to the stars, not the sun) — 0 /
 	 * unused for asteroid belts. */
 	siderealDayHours: number
-	eccentricity: number
 	/** Longitude of perihelion, in degrees. */
 	longitudeOfPerihelionDeg: number
 	/** 0 / unused for asteroid belts. */
@@ -95,24 +88,16 @@ export interface SystemBody {
 	 * the reference (equatorial) plane heading "north". No existing table to
 	 * port for this, so it's just a uniform 0–360° roll like the moons use. */
 	longitudeOfAscendingNodeDeg: number
-	moons: MoonParams[]
-	/** What (if anything) this body is tidally locked to. Undefined/null when
-	 * not locked to anything. */
-	tideLock?: TideLock | null
-	/** Bond albedo, 0..1 — real measured value where known, otherwise unset. */
-	albedo?: number
-	/** EBM greenhouseFactor, individually fit per body — see
-	 * sol-system.ts's SolPlanetSeed.greenhouseFactor doc. Unset elsewhere. */
-	greenhouseFactor?: number
+	moons: MoonBody[]
 	/** EBM internalHeatTempK (residual/formation heat), relevant for gas
 	 * giants — see sol-system.ts's SolPlanetSeed.greenhouseFactor doc.
 	 * Unset (no known excess) for everything else. */
 	internalHeatTempK?: number
-	/** Longitude of the substellar point (the spot on the surface directly
-	 * facing the star), in degrees 0-360 — only meaningful when tideLock is
-	 * set. Defaults to 0° when unset. */
-	substellarLon?: number
-	seismology?: SeismologyProfile
+	/** Main-world-only terrain generation controls. */
+	landDistribution?: number
+	continentSizeVariety?: number
+	seaLevel?: number
+	maxElevation?: number
 }
 
 const EPISTELLAR_DEVIATIONS = [2.25, 1.75, 1.25]
@@ -143,7 +128,7 @@ function buildBodyEnvironment(params: {
 	| "density"
 	| "group"
 	| "classification"
-	| "hydrosphereFraction"
+	| "landCoverage"
 	| "atmosphere"
 	| "greenhouseFactor"
 > {
@@ -168,7 +153,7 @@ function buildBodyEnvironment(params: {
 		density: environment.density,
 		group: body.group,
 		classification: body.classification,
-		hydrosphereFraction: environment.hydrosphereFraction,
+		landCoverage: environment.landCoverage,
 		atmosphere: environment.atmosphere,
 		greenhouseFactor: environment.greenhouseFactor,
 	}
@@ -183,16 +168,15 @@ function buildMoonEnvironment(params: {
 	deviation: number
 	sizeClass?: number
 	isPrimaryWorld: boolean
-	orbitRange?: MoonParams["orbitRange"]
+	orbitRange?: MoonBody["orbitRange"]
 	semiMajorAxisPlanetDiameters?: number
 }): Pick<
-	MoonParams,
+	MoonBody,
 	| "sizeClass"
-	| "densityEarthRelative"
-	| "densityDescription"
+	| "density"
 	| "group"
 	| "classification"
-	| "hydrosphereFraction"
+	| "landCoverage"
 	| "atmosphere"
 	| "greenhouseFactor"
 > {
@@ -222,11 +206,10 @@ function buildMoonEnvironment(params: {
 	})
 	return {
 		sizeClass,
-		densityEarthRelative: environment.density?.earthRelative,
-		densityDescription: environment.density?.description,
+		density: environment.density,
 		group: body.group,
 		classification: body.classification,
-		hydrosphereFraction: environment.hydrosphereFraction,
+		landCoverage: environment.landCoverage,
 		atmosphere: environment.atmosphere,
 		greenhouseFactor: environment.greenhouseFactor,
 	}
@@ -321,12 +304,24 @@ function rollDiameterKmFromSizeClass(
 // triangular distribution clustered around the category's middle, instead of
 // a flat uniform range.
 const DENSITY_TABLE: Record<string, number[]> = {
-	"Exotic Ice": [0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.3, 0.33],
-	"Mostly Ice": [0.18, 0.21, 0.24, 0.27, 0.3, 0.33, 0.36, 0.39, 0.41, 0.44, 0.47],
-	"Mostly Rock": [0.5, 0.53, 0.56, 0.59, 0.62, 0.65, 0.68, 0.71, 0.74, 0.77, 0.8],
-	"Rock and Metal": [0.82, 0.85, 0.88, 0.91, 0.94, 0.97, 1.0, 1.03, 1.06, 1.09, 1.12],
-	"Mostly Metal": [1.15, 1.18, 1.21, 1.24, 1.27, 1.3, 1.33, 1.36, 1.39, 1.42, 1.45],
-	"Compressed Metal": [1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2.0],
+	"Exotic Ice": [
+		0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.3, 0.33,
+	],
+	"Mostly Ice": [
+		0.18, 0.21, 0.24, 0.27, 0.3, 0.33, 0.36, 0.39, 0.41, 0.44, 0.47,
+	],
+	"Mostly Rock": [
+		0.5, 0.53, 0.56, 0.59, 0.62, 0.65, 0.68, 0.71, 0.74, 0.77, 0.8,
+	],
+	"Rock and Metal": [
+		0.82, 0.85, 0.88, 0.91, 0.94, 0.97, 1.0, 1.03, 1.06, 1.09, 1.12,
+	],
+	"Mostly Metal": [
+		1.15, 1.18, 1.21, 1.24, 1.27, 1.3, 1.33, 1.36, 1.39, 1.42, 1.45,
+	],
+	"Compressed Metal": [
+		1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2.0,
+	],
 }
 
 type DensityComposition = "ice" | "rocky" | "metallic"
@@ -482,7 +477,7 @@ interface HomeWorldParams {
 	name?: string
 	orbitalDistanceAU: number
 	diameterKm: number
-	moons: MoonParams[]
+	moons: MoonBody[]
 	massKg: number
 	gravityG: number
 	siderealDayHours: number
@@ -493,6 +488,11 @@ interface HomeWorldParams {
 	tideLock?: TideLock | null
 	substellarLon?: number
 	atmosphere?: AtmosphereProfile | null
+	landDistribution?: number
+	landCoverage?: number
+	continentSizeVariety?: number
+	seaLevel?: number
+	maxElevation?: number
 	/** Real fitted values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) --
 	 * only supplied when generating the real Sol seed's Earth. A
 	 * procedurally generated main world has no "real" albedo (left unset,
@@ -547,7 +547,12 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		tideLock: mainWorld.tideLock,
 		substellarLon: mainWorld.substellarLon,
 		atmosphere: mainWorld.atmosphere ?? undefined,
-		hydrosphereFraction: 0.71,
+		landDistribution: mainWorld.landDistribution,
+		landCoverage:
+			mainWorld.landCoverage ?? SOL_MAIN_WORLD_DEFAULTS.landCoverage,
+		continentSizeVariety: mainWorld.continentSizeVariety,
+		seaLevel: mainWorld.seaLevel,
+		maxElevation: mainWorld.maxElevation,
 		albedo: mainWorld.albedo,
 		greenhouseFactor:
 			mainWorld.greenhouseFactor ?? estimateGreenhouseFactor(pressureBar),
@@ -576,13 +581,14 @@ export function generateSystemBodies(
 				mainWorld.inclinationDeg ?? SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
 		}
 		return applySystemSeismology({
-			bodies: [
-				...SOL_SYSTEM_BODIES,
-				buildPlanet(mainWorldSeed, seed, -1, {
-					textureOverride: "/sol/earth/2k_earth.jpg",
-					moonsOverride: mainWorld.moons,
-				}),
-			].sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU),
+			bodies: SOL_SYSTEM_BODIES.map((body) =>
+				body.isMainWorld
+					? buildPlanet(mainWorldSeed, seed, -1, {
+							textureOverride: "/sol/earth/2k_earth.jpg",
+							moonsOverride: mainWorld.moons,
+						})
+					: body,
+			),
 			starAgeGyr: SOL_STAR_AGE_GYR,
 			starLuminositySol: 1,
 			...buildSurfaceTidesSeismologyCallbacks({
@@ -700,6 +706,7 @@ export function generateSystemBodies(
 		return {
 			...environment,
 			idx: siblingIdx,
+			seed: `orbit-${siblingIdx + 1}`,
 			isMainWorld: false,
 			orbitalDistanceAU,
 			diameterKm,

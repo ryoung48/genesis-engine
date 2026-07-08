@@ -22,7 +22,7 @@ import {
 } from "@/model/celestial/day-length"
 import type {
 	AtmosphereProfile,
-	MoonParams,
+	MoonBody,
 } from "@/model/celestial/moons/moon-types"
 import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
 import {
@@ -62,8 +62,12 @@ import {
 	computeTidalSchedule,
 	type SurfaceTidesBreakdown,
 } from "@/model/climate/tidal-schedule"
-import { SEED_MAX } from "@/model/shared/planet-code"
 import { seedStringToNumber } from "@/model/shared/rng"
+import {
+	makeRandomSeedLabel,
+	normalizeSeedLabel,
+	resolveSeedLabel,
+} from "@/model/shared/seed-label"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
@@ -76,13 +80,10 @@ import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRo
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
 import { CrosshairsGpsIcon } from "@/ui/components/primitives/icons/CrosshairsGpsIcon"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
-import { HistoryIcon } from "@/ui/components/primitives/icons/HistoryIcon"
 import { MinusBoxIcon } from "@/ui/components/primitives/icons/MinusBoxIcon"
 import { PlusBoxIcon } from "@/ui/components/primitives/icons/PlusBoxIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { SproutIcon } from "@/ui/components/primitives/icons/SproutIcon"
-import { StarIcon } from "@/ui/components/primitives/icons/StarIcon"
-import { StarOutlineIcon } from "@/ui/components/primitives/icons/StarOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
@@ -100,7 +101,6 @@ import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
 } from "../screen/generation/generation-preview"
-import { getOrderedRecentCodes } from "../screen/generation/recent-codes"
 import type { SliderDef } from "../screen/generation/sliders"
 import { SPECTRAL_CLASS_COLORS } from "../screen/generation/star-utils"
 import type { UnitSystem } from "../screen/shared/ui-format"
@@ -141,7 +141,7 @@ interface GenerationPanelProps {
 	onUpdateSystemMoon?: (
 		bodyIndex: number,
 		moonIndex: number,
-		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
 	/** Rebuilds one body (and everything nested inside it, e.g. its own
 	 * moons) back to its freshly-generated defaults for the current seed,
@@ -155,7 +155,7 @@ interface GenerationPanelProps {
 	hoursPerDay: number
 	setHoursPerDay: (v: number) => void
 	planetRadiusKm: number
-	generatedMoons: MoonParams[]
+	generatedMoons: MoonBody[]
 	planetSliders: SliderDef[]
 	terrainSliders: SliderDef[]
 	spectralClass: string
@@ -168,16 +168,11 @@ interface GenerationPanelProps {
 	obliquity: number
 	era: SocietyEra
 	setEra: (v: SocietyEra) => void
-	planetCode: string
-	codeInput: string
-	setCodeInput: (v: string) => void
-	onApplyCode: () => void
-	codeError: boolean
-	recentCodes: string[]
-	starredRecentCodes: string[]
-	onSelectRecentCode: (code: string) => void
-	onToggleRecentCodeStar: (code: string) => void
-	onRandomizeCode: () => void
+	seedInput: string
+	setSeedInput: (v: string) => void
+	onApplySeed: () => void
+	seedError: boolean
+	onRandomizeSeed: () => void
 	generating: boolean
 	generationLabel: string
 	generationProgress: number
@@ -187,7 +182,6 @@ interface GenerationPanelProps {
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	handleGenerate: () => void
-	handleFileImport: (file: File) => void
 	handleEarthImport: () => void
 	onClose?: () => void
 }
@@ -207,23 +201,10 @@ interface TimingSummary {
 	totalMs: number
 }
 
-interface RecentCodeSelectionHandlers {
-	onSelectRecentCode: (code: string) => void
-	setShowRecentCodes: (show: boolean) => void
-}
-
 const POST_TIMING_PREFIX = "Post:"
 const HISTORY_TIMING_PREFIX = "initHistory:"
 
 const COMPUTE_ROUTES_PREFIX = "computeRoutes:"
-
-function handleRecentCodeSelection(
-	recentCode: string,
-	handlers: RecentCodeSelectionHandlers,
-): void {
-	handlers.setShowRecentCodes(false)
-	handlers.onSelectRecentCode(recentCode)
-}
 
 function stripTimingPrefix(stage: string): string {
 	if (stage.startsWith("genesis:")) return stage.slice("genesis:".length)
@@ -494,9 +475,9 @@ function buildTideLockStat(params: {
 	onSelectStar: () => void
 	parentTitle?: string
 	onSelectParent?: () => void
-	siblingMoons?: MoonParams[]
+	siblingMoons?: MoonBody[]
 	onSelectSiblingMoon?: (moonIndex: number) => void
-	resolveSiblingMoonLabel?: (moon: MoonParams, moonIndex: number) => string
+	resolveSiblingMoonLabel?: (moon: MoonBody, moonIndex: number) => string
 	/** When set, the stat becomes editable: clicking the value opens a
 	 * dropdown of valid lock targets for this body (star + own moons for a
 	 * planet, or just its parent for a moon). */
@@ -644,7 +625,7 @@ export function resolveBodyTideLockSiderealDayHours(
 
 function resolveMoonTideLockSiderealDayHours(
 	lock: import("@/model/celestial/moons/moon-types").TideLock | null,
-	moon: MoonParams,
+	moon: MoonBody,
 ): number | undefined {
 	if (!lock) return undefined
 	if (lock.type === "planet") return moon.orbitalPeriodDays * 24
@@ -743,23 +724,8 @@ function formatClassificationLabel(classification: string): string {
 		.join("-")
 }
 
-function normalizeSeedLabel(value: string): string {
-	const normalized = value
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-	return normalized || "seed"
-}
-
-function randomSeedLabel(): string {
-	return Math.floor(Math.random() * SEED_MAX)
-		.toString(36)
-		.padStart(6, "0")
-}
-
 function getMoonSeedBaseName(params: {
-	moon: MoonParams | undefined
+	moon: MoonBody | undefined
 	moonIndex: number
 	showRealSolNames: boolean
 	lunaFallback?: boolean
@@ -890,9 +856,9 @@ function updateBodyOrbitalDistance(
 	}
 }
 
-function updateMoonDiameter(moon: MoonParams, diameterKm: number): MoonParams {
+function updateMoonDiameter(moon: MoonBody, diameterKm: number): MoonBody {
 	const densityEarthRelative =
-		moon.densityEarthRelative ??
+		moon.density?.earthRelative ??
 		computeBodyEarthRelativeDensity(moon.massKg, moon.diameterKm)
 	const massKg = massKgFromEarthRelativeDensity(
 		diameterKm,
@@ -903,16 +869,18 @@ function updateMoonDiameter(moon: MoonParams, diameterKm: number): MoonParams {
 		diameterKm,
 		massKg,
 		sizeClass: estimateMoonSizeClassFromDiameter(diameterKm),
-		densityEarthRelative,
+		density: moon.density
+			? { ...moon.density, earthRelative: densityEarthRelative }
+			: moon.density,
 	}
 }
 
 function updateMoonSemiMajorAxis(
-	moon: MoonParams,
+	moon: MoonBody,
 	parentBody: SystemBody,
 	pd: number,
 	hoursPerDay: number,
-): MoonParams {
+): MoonBody {
 	const semiMajorAxisM = pd * parentBody.diameterKm * 1000
 	return {
 		...moon,
@@ -981,22 +949,6 @@ function renderStatGrid(stats: StatEntry[]) {
 	))
 }
 
-function buildStatEditor(
-	slider: SliderDef | undefined,
-	label = slider?.label,
-): StatEntry["editor"] | undefined {
-	if (!slider || !label) return undefined
-	return {
-		label,
-		value: slider.value,
-		min: slider.min,
-		max: slider.max,
-		step: slider.step,
-		display: slider.display,
-		set: slider.set,
-	}
-}
-
 function renderMiniSlider(
 	slider: SliderDef,
 	label = slider.label,
@@ -1027,7 +979,7 @@ function buildSurfaceStats(
 	planetSliders: SliderDef[],
 	terrainSliders: SliderDef[],
 ): StatEntry[] {
-	const hydrosphereSlider = planetSliders.find(
+	const landCoverageSlider = planetSliders.find(
 		(slider) => slider.label === "Land Coverage",
 	)
 	const compositionSlider = planetSliders.find(
@@ -1041,38 +993,35 @@ function buildSurfaceStats(
 	const seaLevelSlider = terrainSliders.find(
 		(slider) => slider.label === "Sea Level",
 	)
-	const maxElevationSlider = terrainSliders.find(
-		(slider) => slider.label === "Max Elevation",
-	)
-	const volcanismSlider = terrainSliders.find(
-		(slider) => slider.label === "Volcanism",
-	)
-	const hydrosphere = hydrosphereSlider ? 1 - hydrosphereSlider.value : 0
-	const compositionLabel = hydrosphere >= 0.5 ? "Land" : "Water"
-	const variationLabel = hydrosphere >= 0.5 ? "Land" : "Water"
+	const landCoverage = landCoverageSlider ? landCoverageSlider.value : 0.5
+	// Displayed as "Hydrosphere" even though the underlying slider/state is
+	// landCoverage -- the shown value is the water fraction (1 - landCoverage).
+	const hydrosphere = 1 - landCoverage
+	const compositionLabel = landCoverage < 0.5 ? "Land" : "Water"
+	const variationLabel = landCoverage < 0.5 ? "Land" : "Water"
 
 	return [
 		{
 			label: "Hydrosphere",
-			value: hydrosphereSlider ? `${Math.round(hydrosphere * 100)}%` : "50%",
-			help: "Sets the overall water-to-land balance for the world.",
-			editor: hydrosphereSlider
+			value: landCoverageSlider ? `${Math.round(hydrosphere * 100)}%` : "50%",
+			help: "Sets the overall land-to-water balance for the world.",
+			editor: landCoverageSlider
 				? {
 						label: "Hydrosphere",
 						value: hydrosphere,
-						min: 1 - hydrosphereSlider.max,
-						max: 1 - hydrosphereSlider.min,
-						step: hydrosphereSlider.step,
+						min: 1 - landCoverageSlider.max,
+						max: 1 - landCoverageSlider.min,
+						step: landCoverageSlider.step,
 						display: `${Math.round(hydrosphere * 100)}%`,
-						set: (value: number) => hydrosphereSlider.set(1 - value),
+						set: (value: number) => landCoverageSlider.set(1 - value),
 						content: (
 							<div className="flex w-44 flex-col gap-3 px-1 pt-0.5 pb-2">
 								{renderMiniSlider(
 									{
-										...hydrosphereSlider,
+										...landCoverageSlider,
 										value: hydrosphere,
 										display: `${Math.round(hydrosphere * 100)}%`,
-										set: (value: number) => hydrosphereSlider.set(1 - value),
+										set: (value: number) => landCoverageSlider.set(1 - value),
 									},
 									"Hydrosphere",
 									`${Math.round(hydrosphere * 100)}%`,
@@ -1096,18 +1045,6 @@ function buildSurfaceStats(
 						),
 					}
 				: undefined,
-		},
-		{
-			label: "Max Elevation",
-			value: maxElevationSlider?.display ?? "0.0 km",
-			help: maxElevationSlider?.help,
-			editor: buildStatEditor(maxElevationSlider),
-		},
-		{
-			label: "Volcanism",
-			value: volcanismSlider?.display ?? "1.00",
-			help: volcanismSlider?.help,
-			editor: buildStatEditor(volcanismSlider),
 		},
 	]
 }
@@ -1346,7 +1283,7 @@ function LazyPlanetDetailTabs({
 	perihelion,
 	obliquity,
 	substellarLon,
-	hydrosphereFraction,
+	landCoverage,
 	atmosphere,
 	albedo,
 	greenhouseFactor,
@@ -1360,17 +1297,17 @@ function LazyPlanetDetailTabs({
 }: {
 	seed: number
 	moonCount: number
-	moons: MoonParams[]
+	moons: MoonBody[]
 	/** When this card is for a moon (not a planet), the tide raisers are its
 	 * parent + peer orbits rather than its own children -- see
 	 * computeMoonTidalSchedule. */
 	moonContext?: {
-		moon: MoonParams
+		moon: MoonBody
 		parent: {
 			idx: number
 			massKg: number
 			diameterKm: number
-			moons: MoonParams[]
+			moons: MoonBody[]
 		}
 	}
 	moonTideContext?: {
@@ -1388,7 +1325,7 @@ function LazyPlanetDetailTabs({
 	perihelion: number
 	obliquity: number
 	substellarLon: number
-	hydrosphereFraction: number
+	landCoverage: number
 	atmosphere: AtmosphereProfile | null | undefined
 	/** Real per-body EBM overrides -- see useEbmPreview.ts's EbmConfig doc.
 	 * Pass these for an actual known body (sol-system.ts data); leave unset
@@ -1433,7 +1370,7 @@ function LazyPlanetDetailTabs({
 			perihelion={perihelion}
 			obliquity={obliquity}
 			substellarLon={substellarLon}
-			hydrosphereFraction={hydrosphereFraction}
+			landCoverage={landCoverage}
 			atmosphere={atmosphere}
 			albedo={albedo}
 			greenhouseFactor={greenhouseFactor}
@@ -1484,7 +1421,7 @@ function LazyPlanetDetailTabsContent({
 	perihelion,
 	obliquity,
 	substellarLon,
-	hydrosphereFraction,
+	landCoverage,
 	atmosphere,
 	albedo,
 	greenhouseFactor,
@@ -1497,14 +1434,14 @@ function LazyPlanetDetailTabsContent({
 }: {
 	seed: number
 	moonCount: number
-	moons: MoonParams[]
+	moons: MoonBody[]
 	moonContext?: {
-		moon: MoonParams
+		moon: MoonBody
 		parent: {
 			idx: number
 			massKg: number
 			diameterKm: number
-			moons: MoonParams[]
+			moons: MoonBody[]
 		}
 	}
 	moonTideContext?: {
@@ -1522,7 +1459,7 @@ function LazyPlanetDetailTabsContent({
 	perihelion: number
 	obliquity: number
 	substellarLon: number
-	hydrosphereFraction: number
+	landCoverage: number
 	atmosphere: AtmosphereProfile | null | undefined
 	albedo?: number
 	greenhouseFactor?: number
@@ -1534,7 +1471,7 @@ function LazyPlanetDetailTabsContent({
 	tidesEmptyLabel?: string
 }) {
 	const pressureBar = atmosphere?.pressureBar ?? 0
-	const landFraction = Math.max(0, Math.min(1, 1 - hydrosphereFraction))
+	const landFraction = Math.max(0, Math.min(1, landCoverage))
 	const regularPreviewConfig = useMemo(
 		() => ({
 			obliquity,
@@ -1706,7 +1643,7 @@ function resolveOrbitBodyTitle(
 }
 
 function resolveMoonTitle(
-	moon: MoonParams,
+	moon: MoonBody,
 	moonNumber: number,
 	showRealSolNames: boolean,
 	fallbackRealName?: string,
@@ -1756,7 +1693,7 @@ function buildSeismologyStats(
 	return [
 		{
 			label: "Seismology",
-			valuePrefix: seismology.totalHeating.toFixed(2),
+			valuePrefix: seismology.totalHeating.toFixed(3),
 			value: `· ${formatClassificationLabel(seismology.regime)}`,
 			valueHelp: (
 				<ContributionTooltipContent
@@ -1788,8 +1725,8 @@ function buildSeismologyStats(
 // Single stat-row builder shared by every orbit body's card in this panel --
 // planets/dwarfs/jovians (via buildOrbitBodyStats) and moons (via
 // buildMoonStats) -- so the two kinds of body can never drift out of field
-// order with each other; only the handful of fields one kind lacks (a
-// planet's terrain surfaceStats tail, the asteroid-belt short list) are
+// order with each other; only the handful of fields one kind lacks (the main
+// world's editable Hydrosphere row, the asteroid-belt short list) are
 // conditional.
 function buildBodyStats({
 	group,
@@ -1810,12 +1747,12 @@ function buildBodyStats({
 	densityEarthRelative,
 	densityDescription,
 	atmosphereStat,
-	hydrosphereFraction,
+	landCoverage,
+	landCoverageEditor,
 	greenhouseFactor,
 	surfaceTidesM,
 	seismology,
 	albedo,
-	surfaceStats,
 }: {
 	kind: "planet" | "moon"
 	group?: string
@@ -1855,14 +1792,15 @@ function buildBodyStats({
 	densityDescription?: string
 	/** Omitted (not just falsy) when a moon has no known atmosphere. */
 	atmosphereStat?: StatEntry
-	/** Omitted when a surfaceStats tail already carries a Hydrosphere row. */
-	hydrosphereFraction?: number
+	landCoverage?: number
+	/** Only the main world's Hydrosphere row is directly editable (with the
+	 * composition/variation/sea-level mini-sliders) -- a generated sibling or
+	 * moon's land coverage is rolled, not hand-authored. */
+	landCoverageEditor?: StatEntry["editor"]
 	greenhouseFactor?: number
 	surfaceTidesM?: SurfaceTidesBreakdown
 	seismology?: import("@/model/celestial/moons/moon-types").SeismologyProfile
 	albedo?: number
-	/** Terrain-generation fields -- only the main world's card supplies these. */
-	surfaceStats?: StatEntry[]
 }): StatEntry[] {
 	const diameterRel = diameterKm / EARTH_DIAMETER_KM
 	const massRel = massKg / EARTH_MASS_KG
@@ -1934,19 +1872,25 @@ function buildBodyStats({
 				]
 			: []),
 		...(atmosphereStat ? [atmosphereStat] : []),
-		...(hydrosphereFraction !== undefined
+		...(landCoverage !== undefined
 			? [
 					{
+						// Displayed as "Hydrosphere" (water fraction) even though the
+						// underlying state is landCoverage (land fraction). Always sits
+						// right after Atmosphere for every body -- only the main world
+						// supplies landCoverageEditor, making this row editable there.
 						label: "Hydrosphere",
-						value: `${Math.round(hydrosphereFraction * 100)}%`,
+						value: `${Math.round((1 - landCoverage) * 100)}%`,
+						editor: landCoverageEditor,
 					},
 				]
 			: []),
 		{ label: "Greenhouse", value: (greenhouseFactor ?? 0).toFixed(2) },
+		...(albedo !== undefined
+			? [{ label: "Albedo", value: albedo.toFixed(3) }]
+			: []),
 		...(surfaceTidesM ? [buildSurfaceTidesStat(surfaceTidesM)] : []),
 		...buildSeismologyStats(seismology),
-		...(albedo !== undefined ? [{ label: "Albedo", value: albedo.toFixed(3) }] : []),
-		...(surfaceStats ?? []),
 	]
 }
 
@@ -1959,7 +1903,7 @@ function buildMoonStats({
 	densityDescription,
 	group,
 	classification,
-	hydrosphereFraction,
+	landCoverage,
 	atmosphere,
 	albedo,
 	greenhouseFactor,
@@ -1987,7 +1931,7 @@ function buildMoonStats({
 	densityDescription?: string
 	group?: string
 	classification?: string
-	hydrosphereFraction?: number
+	landCoverage?: number
 	atmosphere?: AtmosphereProfile | null
 	albedo?: number
 	greenhouseFactor?: number
@@ -2033,7 +1977,9 @@ function buildMoonStats({
 			unit: "PD",
 			precision: 1,
 			editor: editors?.semiMajorAxis,
-			rangeLabel: orbitRange ? formatClassificationLabel(orbitRange) : undefined,
+			rangeLabel: orbitRange
+				? formatClassificationLabel(orbitRange)
+				: undefined,
 		},
 		orbitalPeriodDays,
 		dayLength: parentOrbitalPeriodDays
@@ -2064,7 +2010,7 @@ function buildMoonStats({
 			atmosphere !== undefined
 				? { label: "Atmosphere", value: formatAtmosphereLabel(atmosphere) }
 				: undefined,
-		hydrosphereFraction,
+		landCoverage,
 		greenhouseFactor,
 		surfaceTidesM,
 		seismology,
@@ -2095,9 +2041,10 @@ function buildOrbitBodyStats(params: {
 	 * this makes the Atmosphere row editable; omitting it keeps the
 	 * generic read-only display. */
 	pressureSlider?: SliderDef
-	/** Terrain-generation fields (Hydrosphere/Max Elevation/Volcanism) --
-	 * only the main world has an actual rendered surface to configure. */
-	surfaceStats?: StatEntry[]
+	/** Only the main world's Hydrosphere row is directly editable (with the
+	 * composition/variation/sea-level mini-sliders) -- only it has an actual
+	 * rendered surface to configure. */
+	landCoverageEditor?: StatEntry["editor"]
 	/** Substellar-longitude editing only makes sense for a solar-locked
 	 * body, and only the main world currently exposes a solar-lock control. */
 	substellarLonSlider?: SliderDef
@@ -2110,13 +2057,10 @@ function buildOrbitBodyStats(params: {
 		tideLockStat,
 		onUpdateBody,
 		pressureSlider,
-		surfaceStats,
+		landCoverageEditor,
 		substellarLonSlider,
 		onToggleSpin,
 	} = params
-	const surfaceStatLabels = new Set(
-		surfaceStats?.map((stat) => stat.label) ?? [],
-	)
 	if (body.group === "asteroid belt") {
 		return [
 			{
@@ -2134,33 +2078,34 @@ function buildOrbitBodyStats(params: {
 			{ label: "Period", value: formatDays(body.orbitalPeriodDays) },
 		]
 	}
-	const substellarLonStat = body.tideLock?.type === "solar"
-		? substellarLonSlider
-			? ({
-					label: "Substellar Lon",
-					value: substellarLonSlider.display,
-					editor: {
+	const substellarLonStat =
+		body.tideLock?.type === "solar"
+			? substellarLonSlider
+				? ({
 						label: "Substellar Lon",
-						value: substellarLonSlider.value,
-						min: substellarLonSlider.min,
-						max: substellarLonSlider.max,
-						step: substellarLonSlider.step,
-						display: substellarLonSlider.display,
-						set: substellarLonSlider.set,
-					},
-				} as StatEntry)
-			: (buildSubstellarLonStat({
-					tideLock: body.tideLock,
-					substellarLon: body.substellarLon,
-					onSet: onUpdateBody
-						? (value: number) =>
-								onUpdateBody((current) => ({
-									...current,
-									substellarLon: value,
-								}))
-						: undefined,
-				}) as StatEntry)
-		: undefined
+						value: substellarLonSlider.display,
+						editor: {
+							label: "Substellar Lon",
+							value: substellarLonSlider.value,
+							min: substellarLonSlider.min,
+							max: substellarLonSlider.max,
+							step: substellarLonSlider.step,
+							display: substellarLonSlider.display,
+							set: substellarLonSlider.set,
+						},
+					} as StatEntry)
+				: (buildSubstellarLonStat({
+						tideLock: body.tideLock,
+						substellarLon: body.substellarLon,
+						onSet: onUpdateBody
+							? (value: number) =>
+									onUpdateBody((current) => ({
+										...current,
+										substellarLon: value,
+									}))
+							: undefined,
+					}) as StatEntry)
+			: undefined
 	return buildBodyStats({
 		kind: "planet",
 		group: body.group,
@@ -2351,14 +2296,12 @@ function buildOrbitBodyStats(params: {
 					},
 				}
 			: { label: "Atmosphere", value: formatAtmosphereLabel(body.atmosphere) },
-		hydrosphereFraction: surfaceStatLabels.has("Hydrosphere")
-			? undefined
-			: body.hydrosphereFraction,
+		landCoverage: body.landCoverage,
+		landCoverageEditor,
 		greenhouseFactor: body.greenhouseFactor,
 		surfaceTidesM,
 		seismology: body.seismology,
-		albedo: body.albedo ?? estimateAlbedo(1 - body.hydrosphereFraction),
-		surfaceStats,
+		albedo: body.albedo ?? estimateAlbedo(body.landCoverage),
 	})
 }
 
@@ -2366,13 +2309,13 @@ function buildOrbitBodyStats(params: {
 // world's own moons, a gas giant's orbit moons) so all moons present the
 // same stat set regardless of which body they orbit.
 function buildOrbitMoonStats(params: {
-	moon: MoonParams
+	moon: MoonBody
 	parentOrbitalPeriodDays: number
 	pdOverride?: number
 	surfaceTidesM?: SurfaceTidesBreakdown
 	tideLockStat?: StatEntry
 	onUpdateMoon?: (
-		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
 }): StatEntry[] {
 	const {
@@ -2390,11 +2333,11 @@ function buildOrbitMoonStats(params: {
 		massKg: moon.massKg,
 		gravityG,
 		sizeClass: moon.sizeClass,
-		densityEarthRelative: moon.densityEarthRelative,
-		densityDescription: moon.densityDescription,
+		densityEarthRelative: moon.density?.earthRelative,
+		densityDescription: moon.density?.description,
 		group: moon.group,
 		classification: moon.classification,
-		hydrosphereFraction: moon.hydrosphereFraction,
+		landCoverage: moon.landCoverage,
 		atmosphere: moon.atmosphere,
 		albedo: moon.albedo,
 		greenhouseFactor: moon.greenhouseFactor,
@@ -2761,7 +2704,7 @@ function OrbitChildCard({
 	onClick,
 	insertRowsVisible,
 	onToggleInsertRows,
-}: OrbitChildCardModel & {
+}: Omit<OrbitChildCardModel, "key"> & {
 	insertRowsVisible: boolean
 	onToggleInsertRows: () => void
 }) {
@@ -2817,12 +2760,12 @@ function OrbitInsertPlaceholder() {
 
 function buildMoonPreviewDataProps(params: {
 	seed: number
-	moon: MoonParams
+	moon: MoonBody
 	parent: {
 		idx: number
 		massKg: number
 		diameterKm: number
-		moons: MoonParams[]
+		moons: MoonBody[]
 	}
 	parentHoursPerDay: number
 	parentOrbitalPeriodDays: number
@@ -2871,7 +2814,7 @@ function buildMoonPreviewDataProps(params: {
 		perihelion: params.parentPerihelionDeg,
 		obliquity: params.moon.axialTiltDeg,
 		substellarLon: params.moon.substellarLon ?? 0,
-		hydrosphereFraction: params.moon.hydrosphereFraction ?? 0,
+		landCoverage: params.moon.landCoverage,
 		atmosphere: params.moon.atmosphere,
 		albedo: params.moon.albedo,
 		greenhouseFactor: params.moon.greenhouseFactor,
@@ -2937,7 +2880,7 @@ function GenerationPlanetNavigator({
 	onUpdateSystemMoon?: (
 		bodyIndex: number,
 		moonIndex: number,
-		updater: (moon: MoonParams, parentBody: SystemBody) => MoonParams,
+		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
 	surfaceTidesM?: SurfaceTidesBreakdown
 	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
@@ -3037,15 +2980,7 @@ function GenerationPlanetNavigator({
 			if (target.kind === "star") return rootSeedLabel
 			if (target.kind === "orbit") {
 				const body = systemBodies?.[target.bodyIndex]
-				return normalizeSeedLabel(
-					body?.name ??
-						(showRealSolNames && body?.isMainWorld
-							? SOL_MAIN_WORLD_NAME
-							: (labeledOrbits.find((entry) => entry.body === body)?.title ??
-								(body?.isMainWorld
-									? "world"
-									: `orbit-${target.bodyIndex + 1}`))),
-				)
+				return normalizeSeedLabel(body?.seed ?? `orbit-${target.bodyIndex + 1}`)
 			}
 			const body = systemBodies?.[target.bodyIndex]
 			const moon = body?.moons[target.moonIndex]
@@ -3057,7 +2992,7 @@ function GenerationPlanetNavigator({
 				}),
 			)
 		},
-		[labeledOrbits, rootSeedLabel, showRealSolNames, systemBodies],
+		[rootSeedLabel, showRealSolNames, systemBodies],
 	)
 	const getSeedLabel = useCallback(
 		(target: OrbitSelection): string =>
@@ -3134,7 +3069,9 @@ function GenerationPlanetNavigator({
 		}
 		if (selection.kind === "star") {
 			const numericSeed =
-				normalized === "sol" ? SOL_SEED : seedStringToNumber(normalized)
+				normalized === "sol"
+					? SOL_SEED
+					: (resolveSeedLabel(normalized) ?? seedStringToNumber(normalized))
 			lastAppliedRootSeedRef.current = {
 				numeric: numericSeed,
 				label: normalized,
@@ -3151,9 +3088,10 @@ function GenerationPlanetNavigator({
 		setSeedInput(normalized)
 	}, [seedDisplay, seedInput, selection, selectionKey, setRestSeed])
 	const randomizeSeed = useCallback(() => {
-		const nextLabel = randomSeedLabel()
+		const nextLabel = makeRandomSeedLabel()
 		if (selection.kind === "star") {
-			const numericSeed = seedStringToNumber(nextLabel)
+			const numericSeed = resolveSeedLabel(nextLabel)
+			if (numericSeed === null) return
 			lastAppliedRootSeedRef.current = {
 				numeric: numericSeed,
 				label: nextLabel,
@@ -3170,14 +3108,14 @@ function GenerationPlanetNavigator({
 		setSeedInput(nextLabel)
 	}, [selection, selectionKey, setRestSeed])
 	const getMainWorldMoonOrbitDistance = useCallback(
-		(moon: MoonParams) =>
+		(moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
 			moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay) /
 				(planetRadiusKm * 2000),
 		[moonOrbitHoursPerDay, planetMassKg, planetRadiusKm],
 	)
 	const getBodyMoonOrbitDistance = useCallback(
-		(body: SystemBody, moon: MoonParams) =>
+		(body: SystemBody, moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
 			moonSemiMajorAxisM(moon, body.massKg, body.siderealDayHours) /
 				(body.diameterKm * 1000),
@@ -3345,7 +3283,7 @@ function GenerationPlanetNavigator({
 					}),
 					isMainWorld,
 					pressureSlider: isMainWorld ? pressureSlider : undefined,
-					surfaceStats: isMainWorld ? surfaceStats : undefined,
+					landCoverageEditor: isMainWorld ? surfaceStats[0]?.editor : undefined,
 					substellarLonSlider: isMainWorld ? substellarLonSlider : undefined,
 					onToggleSpin: isMainWorld ? onToggleSpin : undefined,
 					onUpdateBody: isMainWorld
@@ -3377,65 +3315,71 @@ function GenerationPlanetNavigator({
 							? (updater) => onUpdateSystemBody(selection.bodyIndex, updater)
 							: undefined,
 				}),
-				dataContent: (
-					<LazyPlanetDetailTabs
-						inline
-						seed={getDerivedSeedNumber(selection)}
-						moonCount={orbitMoons.length}
-						moons={orbitMoons}
-						daysPerYear={body.orbitalPeriodDays}
-						hoursPerDay={body.siderealDayHours}
-						planetRadiusKm={body.diameterKm / 2}
-						isSolarLocked={isApproxSolarLocked(
-							body.siderealDayHours,
-							body.orbitalPeriodDays,
-						)}
-						spectralClass={spectralClass}
-						starSubtype={starSubtype}
-						orbitalDistanceAU={body.orbitalDistanceAU}
-						eccentricity={body.eccentricity}
-						perihelion={body.longitudeOfPerihelionDeg}
-						obliquity={body.axialTiltDeg}
-						substellarLon={body.substellarLon ?? 0}
-						hydrosphereFraction={body.hydrosphereFraction}
-						atmosphere={body.atmosphere}
-						albedo={body.albedo}
-						greenhouseFactor={body.greenhouseFactor}
-						internalHeatTempK={body.internalHeatTempK}
-						generationPreviewTab={generationPreviewTab}
-						onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
-						unitSystem={unitSystem}
-					/>
-				),
-				children: orbitMoons
-					.map((moon, moonIndex) => ({
-						key: `orbit-moon-${body.idx}-${moon.idx ?? moonIndex}`,
-						order: isMainWorld
-							? getMainWorldMoonOrbitDistance(moon)
-							: getBodyMoonOrbitDistance(body, moon),
-						title: resolveMoonTitle(
-							moon,
-							moonIndex + 1,
-							showRealSolNames,
-							isMainWorld && moonIndex === 0 && restSeed === SOL_SEED
-								? SOL_LUNA_DEFAULT.name
-								: undefined,
-						),
-						subtitle: "Moon",
-						onClick: () =>
-							selectAndFocus({
-								kind: "orbit-moon",
-								bodyIndex: selection.bodyIndex,
-								moonIndex,
-							}),
-					}))
-					.sort((a, b) => a.order - b.order),
+				dataContent:
+					body.group === "asteroid belt" ? undefined : (
+						<LazyPlanetDetailTabs
+							inline
+							seed={getDerivedSeedNumber(selection)}
+							moonCount={orbitMoons.length}
+							moons={orbitMoons}
+							daysPerYear={body.orbitalPeriodDays}
+							hoursPerDay={body.siderealDayHours}
+							planetRadiusKm={body.diameterKm / 2}
+							isSolarLocked={isApproxSolarLocked(
+								body.siderealDayHours,
+								body.orbitalPeriodDays,
+							)}
+							spectralClass={spectralClass}
+							starSubtype={starSubtype}
+							orbitalDistanceAU={body.orbitalDistanceAU}
+							eccentricity={body.eccentricity}
+							perihelion={body.longitudeOfPerihelionDeg}
+							obliquity={body.axialTiltDeg}
+							substellarLon={body.substellarLon ?? 0}
+							landCoverage={body.landCoverage}
+							atmosphere={body.atmosphere}
+							albedo={body.albedo}
+							greenhouseFactor={body.greenhouseFactor}
+							internalHeatTempK={body.internalHeatTempK}
+							generationPreviewTab={generationPreviewTab}
+							onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
+							unitSystem={unitSystem}
+						/>
+					),
+				children:
+					body.group === "asteroid belt"
+						? []
+						: orbitMoons
+								.map((moon, moonIndex) => ({
+									key: `orbit-moon-${body.idx}-${moon.idx ?? moonIndex}`,
+									order: isMainWorld
+										? getMainWorldMoonOrbitDistance(moon)
+										: getBodyMoonOrbitDistance(body, moon),
+									title: resolveMoonTitle(
+										moon,
+										moonIndex + 1,
+										showRealSolNames,
+										isMainWorld && moonIndex === 0 && restSeed === SOL_SEED
+											? SOL_LUNA_DEFAULT.name
+											: undefined,
+									),
+									subtitle: "Moon",
+									onClick: () =>
+										selectAndFocus({
+											kind: "orbit-moon",
+											bodyIndex: selection.bodyIndex,
+											moonIndex,
+										}),
+								}))
+								.sort((a, b) => a.order - b.order),
 				emptyChildrenLabel:
-					isMainWorld && moonCount > 0 && orbitMoons.length === 0
-						? "Computing moon parameters…"
-						: orbitMoons.length === 0
-							? "No child orbits."
-							: "Computing moon parameters…",
+					body.group === "asteroid belt"
+						? "No moons"
+						: isMainWorld && moonCount > 0 && orbitMoons.length === 0
+							? "Computing moon parameters…"
+							: orbitMoons.length === 0
+								? "No child orbits."
+								: "Computing moon parameters…",
 			}
 		}
 
@@ -3627,7 +3571,6 @@ function GenerationPlanetNavigator({
 		axialTiltSlider,
 		dayLengthSlider,
 		eccentricitySlider,
-		hoursPerDay,
 		labeledOrbits,
 		moonCount,
 		getBodyMoonOrbitDistance,
@@ -3697,7 +3640,9 @@ function GenerationPlanetNavigator({
 				</div>
 			</Surface>
 
-			{selection.kind === "star" || selection.kind === "orbit" ? (
+			{selection.kind === "star" ||
+			(selection.kind === "orbit" &&
+				systemBodies?.[selection.bodyIndex]?.group !== "asteroid belt") ? (
 				<Surface
 					tone="panel"
 					borderTone="default"
@@ -3731,26 +3676,29 @@ function GenerationPlanetNavigator({
 							<>
 								{viewModel.children.length > 0 ? (
 									<div className="space-y-1.5">
-										{viewModel.children.map((child) => (
-											<React.Fragment key={child.key}>
-												{orbitInsertRowsByKey[child.key] ? (
-													<OrbitInsertPlaceholder />
-												) : null}
-												<OrbitChildCard
-													{...child}
-													insertRowsVisible={!!orbitInsertRowsByKey[child.key]}
-													onToggleInsertRows={() =>
-														setOrbitInsertRowsByKey((current) => ({
-															...current,
-															[child.key]: !current[child.key],
-														}))
-													}
-												/>
-												{orbitInsertRowsByKey[child.key] ? (
-													<OrbitInsertPlaceholder />
-												) : null}
-											</React.Fragment>
-										))}
+										{viewModel.children.map((child) => {
+											const { key, ...cardProps } = child
+											return (
+												<React.Fragment key={key}>
+													{orbitInsertRowsByKey[key] ? (
+														<OrbitInsertPlaceholder />
+													) : null}
+													<OrbitChildCard
+														{...cardProps}
+														insertRowsVisible={!!orbitInsertRowsByKey[key]}
+														onToggleInsertRows={() =>
+															setOrbitInsertRowsByKey((current) => ({
+																...current,
+																[key]: !current[key],
+															}))
+														}
+													/>
+													{orbitInsertRowsByKey[key] ? (
+														<OrbitInsertPlaceholder />
+													) : null}
+												</React.Fragment>
+											)
+										})}
 									</div>
 								) : (
 									<OrbitInsertPlaceholder />
@@ -3928,16 +3876,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	obliquity,
 	era,
 	setEra,
-	planetCode,
-	codeInput,
-	setCodeInput,
-	onApplyCode,
-	codeError,
-	recentCodes,
-	starredRecentCodes,
-	onSelectRecentCode,
-	onToggleRecentCodeStar,
-	onRandomizeCode,
+	seedInput,
+	setSeedInput,
+	onApplySeed,
+	seedError,
+	onRandomizeSeed,
 	generating,
 	generationLabel,
 	generationProgress,
@@ -3947,14 +3890,12 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	onSelectGenerationPreviewTab,
 	unitSystem,
 	handleGenerate,
-	handleFileImport,
 	handleEarthImport,
 	onClose,
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
-	const fileInputRef = useRef<HTMLInputElement>(null)
-	const [showRecentCodes, setShowRecentCodes] = useState(false)
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
+	const [generateExpanded, setGenerateExpanded] = useState(true)
 	void generatedMoons
 	void obliquity
 	void worldTab
@@ -3987,15 +3928,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		() => getComputeRoutesTimingSummary(generationTimings),
 		[generationTimings],
 	)
-	const orderedRecentCodes = useMemo(
-		() => getOrderedRecentCodes(recentCodes, starredRecentCodes),
-		[recentCodes, starredRecentCodes],
-	)
-	const selectRecentCode = (recentCode: string) =>
-		handleRecentCodeSelection(recentCode, {
-			onSelectRecentCode,
-			setShowRecentCodes,
-		})
 	const dayLengthSlider = planetSliders.find(
 		(slider) => slider.label === "Day Length",
 	)
@@ -4026,11 +3958,18 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		(slider) => slider.label === "Substellar Lon",
 	)
 	const surfaceStats = buildSurfaceStats(planetSliders, terrainSliders)
+	const selectedOrbitBody =
+		currentFocus &&
+		currentFocus.bodyIndex >= 0 &&
+		currentFocus.moonIndex === undefined
+			? systemBodies?.[currentFocus.bodyIndex]
+			: null
+	const showMainWorldGenerationControls = !!selectedOrbitBody?.isMainWorld
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3">
-				<div className="rounded-[20px] bg-slate-50 px-3 py-3">
+				<div className="rounded-[20px] bg-slate-50 px-3 py-3 space-y-3">
 					<GenerationPlanetNavigator
 						orbitBodies={orbitBodies}
 						systemBodies={systemBodies}
@@ -4078,6 +4017,428 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						unitSystem={unitSystem}
 						onClose={onClose}
 					/>
+
+					{showMainWorldGenerationControls ? (
+						<Surface
+							tone="panel"
+							borderTone="default"
+							radius="xl"
+							className="px-3 py-3"
+						>
+							<div className="space-y-1.5">
+								<button
+									type="button"
+									onClick={() => setGenerateExpanded((current) => !current)}
+									className="flex w-full items-center justify-between gap-3 text-left"
+								>
+									<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+										Generate
+									</span>
+									<svg
+										width="12"
+										height="12"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										className={`text-slate-400 transition-transform ${generateExpanded ? "rotate-180" : ""}`}
+									>
+										<polyline points="6 9 12 15 18 9" />
+									</svg>
+								</button>
+								{generateExpanded ? (
+									<div className="space-y-2.5 pt-1.5">
+										<div className="space-y-2">
+											<div className="flex items-stretch gap-1.5">
+												<div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5">
+													<div className="flex items-center gap-1.5">
+														<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+															Seed
+														</span>
+														<input
+															type="text"
+															value={seedInput}
+															onChange={(e) => setSeedInput(e.target.value)}
+															onBlur={onApplySeed}
+															onKeyDown={(e) => {
+																if (e.key === "Enter") {
+																	e.preventDefault()
+																	onApplySeed()
+																}
+															}}
+															disabled={generating}
+															placeholder="World seed"
+															className={`min-w-0 flex-1 bg-transparent border-none font-mono text-[11px] focus:ring-0 focus:outline-none placeholder:text-slate-300 disabled:opacity-50 ${
+																seedError ? "text-red-500" : "text-slate-700"
+															}`}
+														/>
+														<button
+															type="button"
+															onClick={onRandomizeSeed}
+															disabled={generating}
+															aria-label="Generate new seed"
+															className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+															title="New seed"
+														>
+															<DiceMultipleOutlineIcon className="h-4 w-4" />
+														</button>
+														<button
+															type="button"
+															onClick={handleEarthImport}
+															disabled={generating}
+															aria-label="Load Earth seed"
+															className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+															title="Load Earth"
+														>
+															<svg
+																className="h-4 w-4"
+																viewBox="0 0 24 24"
+																fill="currentColor"
+																aria-hidden="true"
+															>
+																<title>earth</title>
+																<path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+															</svg>
+														</button>
+														<button
+															type="button"
+															onClick={handleGenerate}
+															disabled={generating}
+															aria-label={
+																generating ? "Generating" : "Generate"
+															}
+															className="rounded-md border border-slate-900 bg-slate-900 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-white transition-all hover:bg-slate-800 hover:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+															title={generating ? "Generating..." : "Generate"}
+														>
+															Generate
+														</button>
+													</div>
+												</div>
+											</div>
+											{seedError && (
+												<p className="mt-1 border-t border-slate-200 pt-2 text-[11px] font-medium text-red-500">
+													Invalid seed
+												</p>
+											)}
+										</div>
+
+										{generating ? (
+											<div className="space-y-1">
+												<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
+													<span>{generationLabel}</span>
+													<span>{Math.round(generationProgress)}%</span>
+												</div>
+												<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+													<div
+														className="h-full rounded-full bg-slate-900 transition-all duration-200"
+														style={{
+															width: `${Math.max(0, Math.min(100, generationProgress))}%`,
+														}}
+													/>
+												</div>
+											</div>
+										) : null}
+
+										{generationTimingSummary && (
+											<div className="pt-1">
+												<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
+													<button
+														type="button"
+														onClick={() => {
+															setShowGenerationTimings((current) => !current)
+															if (showGenerationTimings)
+																setTimingDrillDown(null)
+														}}
+														className="flex w-full items-center justify-between gap-3 text-left"
+													>
+														<div>
+															<div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+																Timing
+															</div>
+														</div>
+														<div className="flex items-center gap-2">
+															<span className="font-mono text-[10px] text-slate-400">
+																{formatTimingSeconds(
+																	generationTimingSummary.totalMs,
+																)}
+															</span>
+															<svg
+																width="12"
+																height="12"
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth="2"
+																strokeLinecap="round"
+																strokeLinejoin="round"
+																className={`text-slate-400 transition-transform ${showGenerationTimings ? "rotate-180" : ""}`}
+															>
+																<polyline points="6 9 12 15 18 9" />
+															</svg>
+														</div>
+													</button>
+													{showGenerationTimings && (
+														<div className="mt-3 space-y-3">
+															{timingDrillDown === "post" &&
+															postTimingSummary ? (
+																<div className="space-y-2">
+																	<div className="flex items-center gap-2">
+																		<button
+																			type="button"
+																			onClick={() => setTimingDrillDown(null)}
+																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+																		>
+																			<svg
+																				width="10"
+																				height="10"
+																				viewBox="0 0 24 24"
+																				fill="none"
+																				stroke="currentColor"
+																				strokeWidth="2"
+																				strokeLinecap="round"
+																				strokeLinejoin="round"
+																			>
+																				<polyline points="15 18 9 12 15 6" />
+																			</svg>
+																			Back
+																		</button>
+																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+																			Post breakdown
+																		</div>
+																		<span className="ml-auto font-mono text-[10px] text-slate-400">
+																			{formatTimingSeconds(
+																				postTimingSummary.totalMs,
+																			)}
+																		</span>
+																	</div>
+																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+																		<GenerationTimingChart
+																			entries={postTimingSummary.entries}
+																			onBarClick={(label) => {
+																				if (label === "Other")
+																					setTimingDrillDown({
+																						kind: "other",
+																						parent: "post",
+																					})
+																			}}
+																		/>
+																	</div>
+																</div>
+															) : timingDrillDown === "history" &&
+																historyTimingSummary ? (
+																<div className="space-y-2">
+																	<div className="flex items-center gap-2">
+																		<button
+																			type="button"
+																			onClick={() => setTimingDrillDown(null)}
+																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+																		>
+																			<svg
+																				width="10"
+																				height="10"
+																				viewBox="0 0 24 24"
+																				fill="none"
+																				stroke="currentColor"
+																				strokeWidth="2"
+																				strokeLinecap="round"
+																				strokeLinejoin="round"
+																			>
+																				<polyline points="15 18 9 12 15 6" />
+																			</svg>
+																			Back
+																		</button>
+																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+																			History breakdown
+																		</div>
+																		<span className="ml-auto font-mono text-[10px] text-slate-400">
+																			{formatTimingSeconds(
+																				historyTimingSummary.totalMs,
+																			)}
+																		</span>
+																	</div>
+																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+																		<GenerationTimingChart
+																			entries={historyTimingSummary.entries}
+																			onBarClick={(label) => {
+																				if (
+																					label === "computeRoutes" &&
+																					computeRoutesTimingSummary
+																				)
+																					setTimingDrillDown("computeRoutes")
+																				else if (label === "Other")
+																					setTimingDrillDown({
+																						kind: "other",
+																						parent: "history",
+																					})
+																			}}
+																		/>
+																	</div>
+																</div>
+															) : timingDrillDown === "computeRoutes" &&
+																computeRoutesTimingSummary ? (
+																<div className="space-y-2">
+																	<div className="flex items-center gap-2">
+																		<button
+																			type="button"
+																			onClick={() =>
+																				setTimingDrillDown("history")
+																			}
+																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+																		>
+																			<svg
+																				width="10"
+																				height="10"
+																				viewBox="0 0 24 24"
+																				fill="none"
+																				stroke="currentColor"
+																				strokeWidth="2"
+																				strokeLinecap="round"
+																				strokeLinejoin="round"
+																			>
+																				<polyline points="15 18 9 12 15 6" />
+																			</svg>
+																			Back
+																		</button>
+																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+																			Compute routes breakdown
+																		</div>
+																		<span className="ml-auto font-mono text-[10px] text-slate-400">
+																			{formatTimingSeconds(
+																				computeRoutesTimingSummary.totalMs,
+																			)}
+																		</span>
+																	</div>
+																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+																		<GenerationTimingChart
+																			entries={
+																				computeRoutesTimingSummary.entries
+																			}
+																			onBarClick={(label) => {
+																				if (label === "Other")
+																					setTimingDrillDown({
+																						kind: "other",
+																						parent: "computeRoutes",
+																					})
+																			}}
+																		/>
+																	</div>
+																</div>
+															) : typeof timingDrillDown === "object" &&
+																timingDrillDown?.kind === "other" ? (
+																<div className="space-y-2">
+																	<div className="flex items-center gap-2">
+																		<button
+																			type="button"
+																			onClick={() => {
+																				const parent = timingDrillDown.parent
+																				if (parent === "pipeline")
+																					setTimingDrillDown(null)
+																				else setTimingDrillDown(parent)
+																			}}
+																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
+																		>
+																			<svg
+																				width="10"
+																				height="10"
+																				viewBox="0 0 24 24"
+																				fill="none"
+																				stroke="currentColor"
+																				strokeWidth="2"
+																				strokeLinecap="round"
+																				strokeLinejoin="round"
+																			>
+																				<polyline points="15 18 9 12 15 6" />
+																			</svg>
+																			Back
+																		</button>
+																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+																			Other items
+																		</div>
+																		<span className="ml-auto font-mono text-[10px] text-slate-400">
+																			{formatTimingSeconds(
+																				timingDrillDown.parent === "pipeline"
+																					? (generationTimingSummary?.totalMs ??
+																							0)
+																					: timingDrillDown.parent === "post"
+																						? (postTimingSummary?.totalMs ?? 0)
+																						: timingDrillDown.parent ===
+																								"history"
+																							? (historyTimingSummary?.totalMs ??
+																								0)
+																							: (computeRoutesTimingSummary?.totalMs ??
+																								0),
+																			)}
+																		</span>
+																	</div>
+																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+																		<GenerationTimingChart
+																			entries={
+																				timingDrillDown.parent === "pipeline"
+																					? (generationTimingSummary?.otherEntries ??
+																						[])
+																					: timingDrillDown.parent === "post"
+																						? (postTimingSummary?.otherEntries ??
+																							[])
+																						: timingDrillDown.parent ===
+																								"history"
+																							? (historyTimingSummary?.otherEntries ??
+																								[])
+																							: (computeRoutesTimingSummary?.otherEntries ??
+																								[])
+																			}
+																		/>
+																	</div>
+																</div>
+															) : (
+																<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+																	<div className="mb-2 flex items-center justify-between px-1">
+																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+																			Pipeline
+																		</div>
+																		<span className="font-mono text-[10px] text-slate-400">
+																			{formatTimingSeconds(
+																				generationTimingSummary.totalMs,
+																			)}
+																		</span>
+																	</div>
+																	<GenerationTimingChart
+																		entries={generationTimingSummary.entries}
+																		onBarClick={(label) => {
+																			if (
+																				label === "post-pipeline" &&
+																				postTimingSummary
+																			)
+																				setTimingDrillDown("post")
+																			else if (
+																				label === "initHistory" &&
+																				historyTimingSummary
+																			)
+																				setTimingDrillDown("history")
+																			else if (
+																				label === "Other" &&
+																				generationTimingSummary.otherEntries
+																					.length > 0
+																			)
+																				setTimingDrillDown({
+																					kind: "other",
+																					parent: "pipeline",
+																				})
+																		}}
+																	/>
+																</div>
+															)}
+														</div>
+													)}
+												</div>
+											</div>
+										)}
+									</div>
+								) : null}
+							</div>
+						</Surface>
+					) : null}
 				</div>
 
 				<div className="hidden" aria-hidden="true">
@@ -4170,460 +4531,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							<SocietyRunesPanel />
 						)}
 					</div>
-				</div>
-
-				<div className="space-y-2.5 pt-3 mt-1 border-t border-slate-100">
-					<div className="space-y-2">
-						<input
-							ref={fileInputRef}
-							type="file"
-							accept="image/png,image/jpeg,image/webp"
-							className="hidden"
-							onChange={(e) => {
-								const file = e.target.files?.[0]
-								if (file) handleFileImport(file)
-								e.target.value = ""
-							}}
-						/>
-						<div className="flex items-stretch gap-2">
-							<div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-								<div className="flex items-center gap-2">
-									<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-										Code
-									</span>
-									<input
-										type="text"
-										value={codeInput}
-										onChange={(e) => setCodeInput(e.target.value)}
-										onBlur={onApplyCode}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") {
-												e.preventDefault()
-												onApplyCode()
-											}
-										}}
-										disabled={generating}
-										placeholder="Planet code"
-										className={`min-w-0 flex-1 bg-transparent border-none font-mono text-[11px] focus:ring-0 focus:outline-none placeholder:text-slate-300 disabled:opacity-50 ${
-											codeError ? "text-red-500" : "text-slate-700"
-										}`}
-									/>
-									{orderedRecentCodes.length > 0 && (
-										<button
-											type="button"
-											onClick={() => setShowRecentCodes((current) => !current)}
-											disabled={generating}
-											aria-label={
-												showRecentCodes
-													? "Hide recent codes"
-													: "Show recent codes"
-											}
-											className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-										>
-											<HistoryIcon className="h-4 w-4" />
-										</button>
-									)}
-									<button
-										type="button"
-										onClick={onRandomizeCode}
-										disabled={generating}
-										aria-label="Generate new code"
-										className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-										title="New code"
-									>
-										<DiceMultipleOutlineIcon className="h-4 w-4" />
-									</button>
-								</div>
-							</div>
-						</div>
-						{codeError && (
-							<p className="mt-1 border-t border-slate-200 pt-2 text-[11px] font-medium text-red-500">
-								Invalid code
-							</p>
-						)}
-						{showRecentCodes && orderedRecentCodes.length > 0 && (
-							<div className="mt-2 flex flex-col gap-1.5 border-t border-slate-200 pt-2">
-								{orderedRecentCodes.map((recentCode) => {
-									const starred = starredRecentCodes.includes(recentCode)
-									return (
-										<div
-											key={recentCode}
-											className="flex w-full items-stretch overflow-hidden rounded-md border border-slate-200 bg-white"
-										>
-											<button
-												type="button"
-												onClick={() => selectRecentCode(recentCode)}
-												disabled={generating}
-												className={`min-w-0 flex-1 px-2 py-1 text-left font-mono text-[11px] transition-colors ${
-													recentCode === codeInput || recentCode === planetCode
-														? "bg-slate-900 text-white"
-														: "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-												} disabled:opacity-50 disabled:cursor-not-allowed`}
-												title="Use recent code"
-											>
-												{recentCode}
-											</button>
-											<button
-												type="button"
-												onClick={() => onToggleRecentCodeStar(recentCode)}
-												disabled={generating}
-												aria-label={
-													starred
-														? `Unstar recent code ${recentCode}`
-														: `Star recent code ${recentCode}`
-												}
-												className={`border-l border-slate-200 p-1.5 transition-colors ${
-													starred
-														? "bg-amber-50 text-amber-500 hover:bg-amber-100 hover:text-amber-600"
-														: "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-												} disabled:cursor-not-allowed disabled:opacity-50`}
-												title={
-													starred
-														? "Remove pinned recent code"
-														: "Pin recent code"
-												}
-											>
-												{starred ? (
-													<StarIcon className="h-4 w-4" />
-												) : (
-													<StarOutlineIcon className="h-4 w-4" />
-												)}
-											</button>
-										</div>
-									)
-								})}
-							</div>
-						)}
-					</div>
-
-					<div className="flex gap-2">
-						<button
-							onClick={() => {
-								setShowRecentCodes(false)
-								handleGenerate()
-							}}
-							disabled={generating}
-							className="flex-1 rounded-lg border border-slate-900 bg-slate-900 px-3 py-2.5 text-[11px] font-semibold text-white transition-all hover:bg-slate-800 hover:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							<span className="flex items-center gap-2">
-								<svg
-									width="14"
-									height="14"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="2"
-								>
-									<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
-								</svg>
-								{generating ? "Generating..." : "Generate"}
-							</span>
-						</button>
-						<button
-							type="button"
-							onClick={() => fileInputRef.current?.click()}
-							disabled={generating}
-							className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-							title="Import an equirectangular B&W heightmap (PNG, JPEG, WebP)"
-						>
-							Import
-						</button>
-						<button
-							type="button"
-							onClick={handleEarthImport}
-							disabled={generating}
-							className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-							title="Load Earth's heightmap"
-						>
-							Earth
-						</button>
-					</div>
-
-					<div className="space-y-1">
-						<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
-							<span>{generating ? generationLabel : "Generation"}</span>
-							<span>{Math.round(generationProgress)}%</span>
-						</div>
-						<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-							<div
-								className="h-full rounded-full bg-slate-900 transition-all duration-200"
-								style={{
-									width: `${Math.max(0, Math.min(100, generationProgress))}%`,
-								}}
-							/>
-						</div>
-					</div>
-
-					{generationTimingSummary && (
-						<div className="pt-1">
-							<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
-								<button
-									type="button"
-									onClick={() => {
-										setShowGenerationTimings((current) => !current)
-										if (showGenerationTimings) setTimingDrillDown(null)
-									}}
-									className="flex w-full items-center justify-between gap-3 text-left"
-								>
-									<div>
-										<div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-											Timing
-										</div>
-									</div>
-									<div className="flex items-center gap-2">
-										<span className="font-mono text-[10px] text-slate-400">
-											{formatTimingSeconds(generationTimingSummary.totalMs)}
-										</span>
-										<svg
-											width="12"
-											height="12"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth="2"
-											strokeLinecap="round"
-											strokeLinejoin="round"
-											className={`text-slate-400 transition-transform ${showGenerationTimings ? "rotate-180" : ""}`}
-										>
-											<polyline points="6 9 12 15 18 9" />
-										</svg>
-									</div>
-								</button>
-								{showGenerationTimings && (
-									<div className="mt-3 space-y-3">
-										{timingDrillDown === "post" && postTimingSummary ? (
-											<div className="space-y-2">
-												<div className="flex items-center gap-2">
-													<button
-														type="button"
-														onClick={() => setTimingDrillDown(null)}
-														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-													>
-														<svg
-															width="10"
-															height="10"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2"
-															strokeLinecap="round"
-															strokeLinejoin="round"
-														>
-															<polyline points="15 18 9 12 15 6" />
-														</svg>
-														Back
-													</button>
-													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-														Post breakdown
-													</div>
-													<span className="ml-auto font-mono text-[10px] text-slate-400">
-														{formatTimingSeconds(postTimingSummary.totalMs)}
-													</span>
-												</div>
-												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-													<GenerationTimingChart
-														entries={postTimingSummary.entries}
-														onBarClick={(label) => {
-															if (label === "Other")
-																setTimingDrillDown({
-																	kind: "other",
-																	parent: "post",
-																})
-														}}
-													/>
-												</div>
-											</div>
-										) : timingDrillDown === "history" &&
-											historyTimingSummary ? (
-											<div className="space-y-2">
-												<div className="flex items-center gap-2">
-													<button
-														type="button"
-														onClick={() => setTimingDrillDown(null)}
-														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-													>
-														<svg
-															width="10"
-															height="10"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2"
-															strokeLinecap="round"
-															strokeLinejoin="round"
-														>
-															<polyline points="15 18 9 12 15 6" />
-														</svg>
-														Back
-													</button>
-													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-														History breakdown
-													</div>
-													<span className="ml-auto font-mono text-[10px] text-slate-400">
-														{formatTimingSeconds(historyTimingSummary.totalMs)}
-													</span>
-												</div>
-												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-													<GenerationTimingChart
-														entries={historyTimingSummary.entries}
-														onBarClick={(label) => {
-															if (
-																label === "computeRoutes" &&
-																computeRoutesTimingSummary
-															)
-																setTimingDrillDown("computeRoutes")
-															else if (label === "Other")
-																setTimingDrillDown({
-																	kind: "other",
-																	parent: "history",
-																})
-														}}
-													/>
-												</div>
-											</div>
-										) : timingDrillDown === "computeRoutes" &&
-											computeRoutesTimingSummary ? (
-											<div className="space-y-2">
-												<div className="flex items-center gap-2">
-													<button
-														type="button"
-														onClick={() => setTimingDrillDown("history")}
-														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-													>
-														<svg
-															width="10"
-															height="10"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2"
-															strokeLinecap="round"
-															strokeLinejoin="round"
-														>
-															<polyline points="15 18 9 12 15 6" />
-														</svg>
-														Back
-													</button>
-													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-														Compute routes breakdown
-													</div>
-													<span className="ml-auto font-mono text-[10px] text-slate-400">
-														{formatTimingSeconds(
-															computeRoutesTimingSummary.totalMs,
-														)}
-													</span>
-												</div>
-												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-													<GenerationTimingChart
-														entries={computeRoutesTimingSummary.entries}
-														onBarClick={(label) => {
-															if (label === "Other")
-																setTimingDrillDown({
-																	kind: "other",
-																	parent: "computeRoutes",
-																})
-														}}
-													/>
-												</div>
-											</div>
-										) : typeof timingDrillDown === "object" &&
-											timingDrillDown?.kind === "other" ? (
-											<div className="space-y-2">
-												<div className="flex items-center gap-2">
-													<button
-														type="button"
-														onClick={() => {
-															const parent = timingDrillDown.parent
-															if (parent === "pipeline")
-																setTimingDrillDown(null)
-															else setTimingDrillDown(parent)
-														}}
-														className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-													>
-														<svg
-															width="10"
-															height="10"
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="currentColor"
-															strokeWidth="2"
-															strokeLinecap="round"
-															strokeLinejoin="round"
-														>
-															<polyline points="15 18 9 12 15 6" />
-														</svg>
-														Back
-													</button>
-													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-														Other items
-													</div>
-													<span className="ml-auto font-mono text-[10px] text-slate-400">
-														{formatTimingSeconds(
-															timingDrillDown.parent === "pipeline"
-																? (generationTimingSummary?.totalMs ?? 0)
-																: timingDrillDown.parent === "post"
-																	? (postTimingSummary?.totalMs ?? 0)
-																	: timingDrillDown.parent === "history"
-																		? (historyTimingSummary?.totalMs ?? 0)
-																		: (computeRoutesTimingSummary?.totalMs ??
-																			0),
-														)}
-													</span>
-												</div>
-												<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-													<GenerationTimingChart
-														entries={
-															timingDrillDown.parent === "pipeline"
-																? (generationTimingSummary?.otherEntries ?? [])
-																: timingDrillDown.parent === "post"
-																	? (postTimingSummary?.otherEntries ?? [])
-																	: timingDrillDown.parent === "history"
-																		? (historyTimingSummary?.otherEntries ?? [])
-																		: (computeRoutesTimingSummary?.otherEntries ??
-																			[])
-														}
-													/>
-												</div>
-											</div>
-										) : (
-											<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-												<div className="mb-2 flex items-center justify-between px-1">
-													<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-														Pipeline
-													</div>
-													<span className="font-mono text-[10px] text-slate-400">
-														{formatTimingSeconds(
-															generationTimingSummary.totalMs,
-														)}
-													</span>
-												</div>
-												<GenerationTimingChart
-													entries={generationTimingSummary.entries}
-													onBarClick={(label) => {
-														if (label === "post-pipeline" && postTimingSummary)
-															setTimingDrillDown("post")
-														else if (
-															label === "initHistory" &&
-															historyTimingSummary
-														)
-															setTimingDrillDown("history")
-														else if (
-															label === "Other" &&
-															generationTimingSummary.otherEntries.length > 0
-														)
-															setTimingDrillDown({
-																kind: "other",
-																parent: "pipeline",
-															})
-													}}
-												/>
-											</div>
-										)}
-									</div>
-								)}
-							</div>
-						</div>
-					)}
 				</div>
 			</div>
 		</div>
