@@ -1,12 +1,11 @@
 import React from "react"
 import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
+import { CopyButton } from "@/ui/components/composites/CopyButton"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { BugIcon } from "@/ui/components/primitives/icons/BugIcon"
-import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
-import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
 import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
@@ -178,23 +177,11 @@ interface OverlayControlsProps {
 	exportProgress: { percent: number; label: string } | null
 	exportError?: string | null
 	onExport: () => void
-	canCopyCode?: boolean
-	codeCopied?: boolean
-	onCopyCode?: () => void
 	onReset?: () => void
 	generationPanelOpen?: boolean
 	onToggleGenerationPanel?: () => void
-	showMoonOrbits?: boolean
-	setShowMoonOrbits?: (v: boolean) => void
-	showEllipticalOrbits?: boolean
-	setShowEllipticalOrbits?: (v: boolean) => void
-	showApparentDiameter?: boolean
-	setShowApparentDiameter?: (v: boolean) => void
 	showDaylight?: boolean
 	setShowDaylight?: (v: boolean) => void
-	showSolarTerminator?: boolean
-	setShowSolarTerminator?: (v: boolean) => void
-	moonCount?: number
 	onEnterSolarSystem?: () => void
 }
 
@@ -293,23 +280,11 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	exportProgress,
 	exportError,
 	onExport,
-	canCopyCode = false,
-	codeCopied = false,
-	onCopyCode,
 	onReset,
 	generationPanelOpen,
 	onToggleGenerationPanel,
-	showMoonOrbits = false,
-	setShowMoonOrbits,
-	showEllipticalOrbits = true,
-	setShowEllipticalOrbits,
-	showApparentDiameter = false,
-	setShowApparentDiameter,
 	showDaylight = false,
 	setShowDaylight,
-	showSolarTerminator = false,
-	setShowSolarTerminator,
-	moonCount = 0,
 	onEnterSolarSystem,
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
@@ -319,7 +294,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [geographyExpanded, setGeographyExpanded] = React.useState(false)
 	const [labelsExpanded, setLabelsExpanded] = React.useState(false)
 	const [clockExpanded, setClockExpanded] = React.useState(false)
-	const [celestialExpanded, setCelestialExpanded] = React.useState(false)
 	const [vegetationExpanded, setVegetationExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
 	const [dangerExpanded, setDangerExpanded] = React.useState(false)
@@ -327,11 +301,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [elevationExpanded, setElevationExpanded] = React.useState(false)
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
-	const hasCelestialControls = Boolean(
-		(moonCount > 0 && setShowMoonOrbits) ||
-			setShowApparentDiameter ||
-			(setShowDaylight && setShowSolarTerminator),
-	)
 	const [lastTempSubMode, setLastTempSubMode] = React.useState<
 		"temperature" | "dtr" | "misery"
 	>("temperature")
@@ -403,24 +372,16 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 					</IconButton>
 				</Tooltip>
 			)}
-			{canCopyCode && onCopyCode && (
-				<Tooltip content={codeCopied ? "Copied" : "Copy seed"} position="top">
+			{onEnterSolarSystem && (
+				<Tooltip content="Solar system view" position="top">
 					<IconButton
-						onClick={onCopyCode}
+						onClick={onEnterSolarSystem}
 						tone="overlay"
 						shape="pill"
 						size="sm"
-						className={
-							codeCopied
-								? "border-emerald-300/60 bg-emerald-400/20 shadow-none"
-								: "shadow-none"
-						}
+						className="shadow-none"
 					>
-						{codeCopied ? (
-							<CheckIcon className="h-3.5 w-3.5 text-emerald-300" />
-						) : (
-							<CopyIcon className="h-3.5 w-3.5" />
-						)}
+						<TransferUpIcon className="h-3.5 w-3.5" />
 					</IconButton>
 				</Tooltip>
 			)}
@@ -429,6 +390,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 
 	return (
 		<div className="absolute inset-0 z-20 pointer-events-none">
+			<div className="hidden" aria-hidden="true">
+				<CopyButton text="" disabled tone="overlay" size="sm" />
+			</div>
 			<div className="absolute top-3 left-3 pointer-events-auto">
 				{!generationPanelOpen && onToggleGenerationPanel && (
 					<Tooltip content="Show generation panel" position="bottom">
@@ -796,94 +760,20 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													</label>
 												</div>
 											)}
+											{setShowDaylight && (
+												<label className="mt-1.5 flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Daylight</span>
+													<input
+														type="checkbox"
+														checked={showDaylight}
+														onChange={(e) => setShowDaylight(e.target.checked)}
+														className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+											)}
 										</div>
 									)}
 								</div>
-
-								{hasCelestialControls && (
-									<div>
-										<button
-											type="button"
-											onClick={() => setCelestialExpanded((v) => !v)}
-											className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
-										>
-											<span>Celestial</span>
-											<ChevronIcon
-												direction={celestialExpanded ? "up" : "down"}
-												className="h-3 w-3 text-slate-400"
-											/>
-										</button>
-										{celestialExpanded && (
-											<div className="mt-1.5 space-y-1.5">
-												{moonCount > 0 && setShowMoonOrbits && (
-													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
-														<span>Planetary System</span>
-														<input
-															type="checkbox"
-															checked={showMoonOrbits}
-															onChange={(e) =>
-																setShowMoonOrbits?.(e.target.checked)
-															}
-															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-														/>
-													</label>
-												)}
-												{setShowEllipticalOrbits && showMoonOrbits && (
-													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
-														<span>Elliptical Orbits</span>
-														<input
-															type="checkbox"
-															checked={showEllipticalOrbits}
-															onChange={(e) =>
-																setShowEllipticalOrbits(e.target.checked)
-															}
-															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-														/>
-													</label>
-												)}
-												{setShowApparentDiameter && (
-													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
-														<span>Apparent Diameter</span>
-														<input
-															type="checkbox"
-															checked={showApparentDiameter}
-															onChange={(e) =>
-																setShowApparentDiameter(e.target.checked)
-															}
-															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-														/>
-													</label>
-												)}
-												{setShowDaylight && (
-													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
-														<span>Daylight</span>
-														<input
-															type="checkbox"
-															checked={showDaylight}
-															onChange={(e) =>
-																setShowDaylight(e.target.checked)
-															}
-															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-														/>
-													</label>
-												)}
-												{setShowSolarTerminator && (
-													<label className="flex items-center justify-between gap-3 text-[11px] text-slate-300">
-														<span>Solar Terminator</span>
-														<input
-															type="checkbox"
-															checked={showSolarTerminator}
-															onChange={(e) =>
-																setShowSolarTerminator(e.target.checked)
-															}
-															className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-														/>
-													</label>
-												)}
-											</div>
-										)}
-									</div>
-								)}
 
 								<div>
 									<button
@@ -1589,19 +1479,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										size="sm"
 										buttonClassName="px-1.5"
 									/>
-									{viewMode === "globe" && onEnterSolarSystem && (
-										<Tooltip content="Solar system view" position="top">
-											<IconButton
-												onClick={onEnterSolarSystem}
-												tone="overlay"
-												shape="pill"
-												size="sm"
-												className="shadow-none"
-											>
-												<TransferUpIcon className="h-3.5 w-3.5" />
-											</IconButton>
-										</Tooltip>
-									)}
 								</div>
 								{viewMode === "map" && (
 									<div className="space-y-1.5">

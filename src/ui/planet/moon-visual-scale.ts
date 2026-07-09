@@ -70,25 +70,6 @@ export function scaleBodyDiameterToVisualRadius(
 	return baseVisualRadius * ratio
 }
 
-function getMoonRadiusRelativeToPlanet(
-	moonDiameterKm: number,
-	planetRadiusKm: number,
-): number {
-	if (!(moonDiameterKm > 0) || !(planetRadiusKm > 0)) return 0
-	return moonDiameterKm / (planetRadiusKm * 2)
-}
-
-export function scaleMoonRadiusToPlanetVisualRadius(
-	moonDiameterKm: number,
-	planetRadiusKm: number,
-	planetVisualRadius: number,
-): number {
-	return (
-		planetVisualRadius *
-		getMoonRadiusRelativeToPlanet(moonDiameterKm, planetRadiusKm)
-	)
-}
-
 const MIN_REAL_ORBIT_PLANET_RADII = 2
 const REFERENCE_MAX_REAL_ORBIT_PLANET_RADII = 60
 const ORBIT_DISTANCE_COMPRESSION_POWER = 0.6

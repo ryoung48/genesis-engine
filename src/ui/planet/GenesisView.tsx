@@ -97,7 +97,6 @@ import {
 	vegetationColor,
 	windSpeedColor,
 } from "./colors"
-import { ApparentDiameterOverlay } from "./controls/ApparentDiameterOverlay"
 import {
 	buildPressureAtmosphereProfile,
 	GenerationPanel,
@@ -105,7 +104,6 @@ import {
 	updateBodyDiameter,
 } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
-import { MoonOrbitsOverlay } from "./controls/MoonOrbitsOverlay"
 import {
 	type ExportWidthPreset,
 	type LabelMode,
@@ -490,20 +488,8 @@ export const GenesisView: React.FC = () => {
 	const [clockCurrent, setClockCurrent] = useState(
 		initialViewPrefs.clockCurrent,
 	)
-	const [showMoonOrbits, setShowMoonOrbits] = useState(
-		initialViewPrefs.showMoonOrbits,
-	)
-	const [showEllipticalOrbits, setShowEllipticalOrbits] = useState(
-		initialViewPrefs.showEllipticalOrbits,
-	)
-	const [showApparentDiameter, setShowApparentDiameter] = useState(
-		initialViewPrefs.showApparentDiameter,
-	)
 	const [showDaylight, setShowDaylight] = useState(
 		initialViewPrefs.showDaylight,
-	)
-	const [showSolarTerminator, setShowSolarTerminator] = useState(
-		initialViewPrefs.showSolarTerminator,
 	)
 	const [clockMonthMode, setClockMonthMode] = useState<"annual" | "monthly">(
 		initialViewPrefs.clockMonthMode === "annual" ? "annual" : "monthly",
@@ -632,7 +618,6 @@ export const GenesisView: React.FC = () => {
 	const [seedInput, setSeedInput] = useState(() => formatSeedLabel(initialSeed))
 	const [seedInputDirty, setSeedInputDirty] = useState(false)
 	const [seedError, setSeedError] = useState(false)
-	const [codeCopied, setCodeCopied] = useState(false)
 	const [exportWidthPreset, setExportWidthPreset] =
 		useState<ExportWidthPreset>("8192")
 	const [exportProgress, setExportProgress] = useState<{
@@ -1131,11 +1116,7 @@ export const GenesisView: React.FC = () => {
 				measureMode,
 				pathfindingLand,
 				pathfindingSea,
-				showMoonOrbits,
-				showEllipticalOrbits,
-				showApparentDiameter,
 				showDaylight,
-				showSolarTerminator,
 				clockCurrent,
 				clockDay,
 				clockHour,
@@ -1159,11 +1140,7 @@ export const GenesisView: React.FC = () => {
 		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
 		showSolarSystemRealNames,
-		showMoonOrbits,
-		showEllipticalOrbits,
-		showApparentDiameter,
 		showDaylight,
-		showSolarTerminator,
 		clockCurrent,
 		clockDay,
 		clockHour,
@@ -1889,7 +1866,7 @@ export const GenesisView: React.FC = () => {
 		if (!scene) return
 		scene.setFullAmbient(!showDaylight)
 		scene.setSolarTerminatorUseMeridiem(clockUseMeridiem)
-		scene.setSolarTerminatorVisible(showSolarTerminator)
+		scene.setSolarTerminatorVisible(showDaylight)
 		if (tidallyLocked) {
 			const selectedMonth = clockMonthMode === "annual" ? 5 : clockMonth
 			const monthlyLibration = computeMonthlyLibration(eccentricity, perihelion)
@@ -1918,7 +1895,6 @@ export const GenesisView: React.FC = () => {
 		}
 	}, [
 		showDaylight,
-		showSolarTerminator,
 		clockUseMeridiem,
 		clockMonthMode,
 		clockMonth,
@@ -2619,6 +2595,9 @@ export const GenesisView: React.FC = () => {
 	const resolveSeedInput = useCallback(() => {
 		return resolveSeedLabel(seedInput)
 	}, [seedInput])
+	const handleReturnToPlanetView = useCallback(() => {
+		setSolarSystemViewActive(false)
+	}, [])
 	const handleGenerate = useCallback(() => {
 		if (seedInput.trim()) {
 			const nextSeed = resolveSeedInput()
@@ -2628,11 +2607,19 @@ export const GenesisView: React.FC = () => {
 				return
 			}
 			setSeedError(false)
+			handleReturnToPlanetView()
 			handleGenerateWorld(nextSeed)
 			return
 		}
+		handleReturnToPlanetView()
 		handleGenerateWorld(seed)
-	}, [handleGenerateWorld, resolveSeedInput, seed, seedInput])
+	}, [
+		handleGenerateWorld,
+		handleReturnToPlanetView,
+		resolveSeedInput,
+		seed,
+		seedInput,
+	])
 
 	const setters = useMemo(
 		() => ({
@@ -2794,16 +2781,6 @@ export const GenesisView: React.FC = () => {
 		setSeedError(false)
 	}, [])
 
-	const handleCopyCode = useCallback(async () => {
-		try {
-			await navigator.clipboard.writeText(formatSeedLabel(seed))
-			setCodeCopied(true)
-			window.setTimeout(() => setCodeCopied(false), 1200)
-		} catch (err) {
-			console.error("Failed to copy seed:", err)
-		}
-	}, [seed])
-
 	const handleExportMap = useCallback(async () => {
 		if (!worldForDisplay || !sceneRef.current || exportProgress) return
 		const width = Number(exportWidthPreset)
@@ -2961,62 +2938,6 @@ export const GenesisView: React.FC = () => {
 			windStats,
 		],
 	)
-	// --- Moon orbits (3D scene, globe mode only) ---
-	const moonOrbitDayOfYear =
-		clockDay + clockMonth * Math.round(effectiveDaysPerYear / 12)
-	useEffect(() => {
-		sceneRef.current?.setMoonOrbitOverlay(
-			showMoonOrbits &&
-				viewMode === "globe" &&
-				displayMoonsRef.current.length > 0
-				? displayMoonsRef.current
-				: null,
-			planetRadiusKm,
-			hoursPerDay,
-			tideLock,
-			moonOrbitDayOfYear,
-			showGrid,
-			gridSpacing,
-			showEllipticalOrbits,
-		)
-	}, [
-		showMoonOrbits,
-		showEllipticalOrbits,
-		viewMode,
-		planetRadiusKm,
-		hoursPerDay,
-		tideLock,
-		moonOrbitDayOfYear,
-		showGrid,
-		gridSpacing,
-	])
-	useEffect(() => {
-		if (!showMoonOrbits || viewMode !== "globe") return
-		sceneRef.current?.updateMoonOrbitOverlay(
-			displayMoons.length > 0 ? displayMoons : null,
-			planetRadiusKm,
-			hoursPerDay,
-			tideLock,
-			showGrid,
-			gridSpacing,
-			showEllipticalOrbits,
-		)
-	}, [
-		displayMoons,
-		showMoonOrbits,
-		viewMode,
-		planetRadiusKm,
-		hoursPerDay,
-		tideLock,
-		showGrid,
-		gridSpacing,
-		showEllipticalOrbits,
-	])
-
-	useEffect(() => {
-		if (showMoonOrbits && viewMode === "globe")
-			sceneRef.current?.updateMoonOrbitDay(moonOrbitDayOfYear)
-	}, [moonOrbitDayOfYear, showMoonOrbits, viewMode])
 	const updateEditableSystemBody = useCallback(
 		(bodyIndex: number, updater: (body: SystemBody) => SystemBody) => {
 			setSolarSystem((current) => ({
@@ -3154,9 +3075,8 @@ export const GenesisView: React.FC = () => {
 		[resetSourceSystemBodies, updateEditableSystemMoon],
 	)
 
-	// The solar-system view's own clock — deliberately independent of the
-	// planet's day-of-year calendar (moonOrbitDayOfYear), which keeps driving
-	// the globe/map moon overlay as before. The two knobs are additive: each
+	// The solar-system view's own clock is deliberately independent of the
+	// planet overlay timing. The two knobs are additive: each
 	// tracks its own elapsed hours (persisting across focus changes), and
 	// their sum is the single elapsed-time value that drives both the spin
 	// animation and the orbital day — so maxing both knobs out means "one
@@ -3366,12 +3286,26 @@ export const GenesisView: React.FC = () => {
 		solarSystemViewActive,
 		solarSystem,
 	])
+	const mainWorldIndex = useMemo(
+		() => systemBodies.findIndex((body) => body.isMainWorld),
+		[systemBodies],
+	)
+	const handleEnterSolarSystem = useCallback(() => {
+		const targetBodyIndex =
+			currentFocus && currentFocus.bodyIndex >= 0
+				? currentFocus.bodyIndex
+				: mainWorldIndex
+		if (targetBodyIndex >= 0) {
+			handleFocusBody(targetBodyIndex)
+			return
+		}
+		setSolarSystemViewActive(true)
+	}, [currentFocus, handleFocusBody, mainWorldIndex])
 
 	// Clock-knob reference periods for whatever is currently focused — the
 	// knobs stay hidden for the star (no parent to orbit, and no rotation
 	// period worth exposing here) and default to the main world otherwise.
 	const solarSystemClock = useMemo(() => {
-		const mainWorldIndex = systemBodies.findIndex((b) => b.isMainWorld)
 		const focus = currentFocus ?? { bodyIndex: mainWorldIndex }
 		if (focus.bodyIndex === -1) return null
 		const body = systemBodies[focus.bodyIndex]
@@ -3386,7 +3320,7 @@ export const GenesisView: React.FC = () => {
 			: body.orbitalPeriodDays
 		if (rotationPeriodHours <= 0 || orbitalPeriodDays <= 0) return null
 		return { rotationPeriodHours, orbitalPeriodDays }
-	}, [systemBodies, currentFocus])
+	}, [systemBodies, currentFocus, mainWorldIndex])
 
 	const wrapFraction = (value: number, period: number) =>
 		period > 0 ? (((value % period) + period) % period) / period : 0
@@ -3533,8 +3467,6 @@ export const GenesisView: React.FC = () => {
 					tideLock={tideLock}
 					setTideLock={setTideLock}
 					setObliquity={setObliquity}
-					moonCount={moonCount}
-					moonSeed={moonSeed}
 					restSeed={restSeed}
 					showRealSolNames={showSolarSystemRealNames}
 					setRestSeed={setRestSeed}
@@ -3693,7 +3625,8 @@ export const GenesisView: React.FC = () => {
 						<SolarSystemControls
 							expanded={solarSystemControlsExpanded}
 							setExpanded={setSolarSystemControlsExpanded}
-							onBack={() => setSolarSystemViewActive(false)}
+							onBack={handleReturnToPlanetView}
+							canReturnToPlanetMap={!!worldForDisplay}
 							generationPanelOpen={generationPanelOpen}
 							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
 							showEllipticalOrbits={showSolarSystemEllipticalOrbits}
@@ -3729,7 +3662,7 @@ export const GenesisView: React.FC = () => {
 						/>
 					) : (
 						<OverlayControls
-							onEnterSolarSystem={() => setSolarSystemViewActive(true)}
+							onEnterSolarSystem={handleEnterSolarSystem}
 							overlaysExpanded={overlaysExpanded}
 							setOverlaysExpanded={setOverlaysExpanded}
 							measureMode={measureMode}
@@ -3826,11 +3759,6 @@ export const GenesisView: React.FC = () => {
 							onExport={() => {
 								void handleExportMap()
 							}}
-							canCopyCode
-							codeCopied={codeCopied}
-							onCopyCode={() => {
-								void handleCopyCode()
-							}}
 							onReset={() => {
 								setViewMode("globe")
 								setUnitSystem("metric")
@@ -3855,9 +3783,7 @@ export const GenesisView: React.FC = () => {
 								setPathfindingLand(true)
 								setPathfindingSea(true)
 								setDebugMapModes(false)
-								setShowEllipticalOrbits(true)
 								setShowDaylight(false)
-								setShowSolarTerminator(false)
 								setClockHour(12)
 								setExportCenterLongitude(0)
 								setMapProjectionLatitude(0)
@@ -3865,49 +3791,9 @@ export const GenesisView: React.FC = () => {
 							}}
 							generationPanelOpen={generationPanelOpen}
 							onToggleGenerationPanel={() => setGenerationPanelOpen(true)}
-							showMoonOrbits={showMoonOrbits}
-							setShowMoonOrbits={setShowMoonOrbits}
-							showEllipticalOrbits={showEllipticalOrbits}
-							setShowEllipticalOrbits={setShowEllipticalOrbits}
-							showApparentDiameter={showApparentDiameter}
-							setShowApparentDiameter={setShowApparentDiameter}
 							showDaylight={showDaylight}
 							setShowDaylight={setShowDaylight}
-							showSolarTerminator={showSolarTerminator}
-							setShowSolarTerminator={setShowSolarTerminator}
-							moonCount={moonCount}
 						/>
-					)}
-
-					{showMoonOrbits && viewMode === "map" && displayMoons.length > 0 && (
-						<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
-							<MoonOrbitsOverlay
-								moons={displayMoons}
-								planetRadiusKm={planetRadiusKm}
-								hoursPerDay={hoursPerDay}
-								tideLock={tideLock}
-								day={moonOrbitDayOfYear}
-								showEllipticalOrbits={showEllipticalOrbits}
-								showDaylight={showDaylight}
-								clockHour={clockHour}
-							/>
-						</div>
-					)}
-
-					{showApparentDiameter && moonCount > 0 && !solarSystemViewActive && (
-						<div className="absolute right-4 bottom-4 z-20 pointer-events-none">
-							<ApparentDiameterOverlay
-								moons={displayMoons}
-								planetRadiusKm={planetRadiusKm}
-								hoursPerDay={hoursPerDay}
-								tideLock={tideLock}
-								day={moonOrbitDayOfYear}
-								orbitalDistanceAU={orbitalDistanceAU}
-								spectralClass={spectralClass}
-								starSubtype={starSubtype}
-								useAverageDistance={clockMonthMode === "annual"}
-							/>
-						</div>
 					)}
 
 					{measureDistanceKm !== null && measureLabelPos && (

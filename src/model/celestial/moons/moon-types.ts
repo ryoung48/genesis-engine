@@ -1,10 +1,11 @@
-import type { AtmosphereProfile, OrbitBody } from "../orbit-body"
-
-export type {
+import type {
 	AtmosphereProfile,
+	OrbitBody,
 	SeismologyProfile,
 	TideLock,
 } from "../orbit-body"
+
+export type { AtmosphereProfile, SeismologyProfile, TideLock }
 
 export type MoonOrbitRange = "inner" | "middle" | "outer" | "extreme"
 

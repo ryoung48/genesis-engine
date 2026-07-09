@@ -117,8 +117,6 @@ interface GenerationPanelProps {
 		v: import("@/model/celestial/moons/moon-types").TideLock | null,
 	) => void
 	setObliquity: (v: number) => void
-	moonCount: number
-	moonSeed: number
 	restSeed: number
 	showRealSolNames: boolean
 	setRestSeed: (v: number) => void
@@ -1170,7 +1168,6 @@ function DataSectionSummary() {
 
 function PlanetDetailContent({
 	tidalSchedulePreview,
-	moonCount,
 	daysPerYear,
 	isSolarLocked,
 	climatePreview,
@@ -1180,7 +1177,6 @@ function PlanetDetailContent({
 	tidesEmptyLabel,
 }: {
 	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
-	moonCount: number
 	daysPerYear: number
 	isSolarLocked: boolean
 	climatePreview: ClimatePreviewData
@@ -1230,7 +1226,7 @@ function PlanetDetailContent({
 						/>
 					) : (
 						<div className="flex h-32 items-center justify-center text-[10px] text-slate-400">
-							{tidesEmptyLabel ?? (moonCount === 0 ? "No moons" : "Computing…")}
+							{tidesEmptyLabel ?? "No tides"}
 						</div>
 					)}
 				</div>
@@ -1268,7 +1264,6 @@ function isApproxSolarLocked(
 
 function LazyPlanetDetailTabs({
 	seed,
-	moonCount,
 	moons,
 	moonContext,
 	moonTideContext,
@@ -1296,7 +1291,6 @@ function LazyPlanetDetailTabs({
 	tidesEmptyLabel,
 }: {
 	seed: number
-	moonCount: number
 	moons: MoonBody[]
 	/** When this card is for a moon (not a planet), the tide raisers are its
 	 * parent + peer orbits rather than its own children -- see
@@ -1355,7 +1349,6 @@ function LazyPlanetDetailTabs({
 	const content = canRenderClimate ? (
 		<LazyPlanetDetailTabsContent
 			seed={seed}
-			moonCount={moonCount}
 			moons={moons}
 			moonContext={moonContext}
 			moonTideContext={moonTideContext}
@@ -1406,7 +1399,6 @@ function LazyPlanetDetailTabs({
 
 function LazyPlanetDetailTabsContent({
 	seed,
-	moonCount,
 	moons,
 	moonContext,
 	moonTideContext,
@@ -1433,7 +1425,6 @@ function LazyPlanetDetailTabsContent({
 	tidesEmptyLabel,
 }: {
 	seed: number
-	moonCount: number
 	moons: MoonBody[]
 	moonContext?: {
 		moon: MoonBody
@@ -1569,7 +1560,7 @@ function LazyPlanetDetailTabsContent({
 						eccentricity,
 						perihelion,
 					})
-				: moonCount > 0
+				: moons.length > 0
 					? computeTidalSchedule(moons, {
 							seed,
 							daysPerYear,
@@ -1586,7 +1577,6 @@ function LazyPlanetDetailTabsContent({
 		[
 			moonContext,
 			moonTideContext,
-			moonCount,
 			moons,
 			seed,
 			daysPerYear,
@@ -1608,7 +1598,6 @@ function LazyPlanetDetailTabsContent({
 	return (
 		<PlanetDetailContent
 			tidalSchedulePreview={tidalSchedulePreview}
-			moonCount={moonCount}
 			daysPerYear={daysPerYear}
 			isSolarLocked={isSolarLocked}
 			climatePreview={climatePreview}
@@ -2793,7 +2782,6 @@ function buildMoonPreviewDataProps(params: {
 	return {
 		inline: true,
 		seed: params.seed,
-		moonCount: 0,
 		moons: [],
 		moonContext: {
 			moon: params.moon,
@@ -2850,7 +2838,6 @@ function GenerationPlanetNavigator({
 	planetRadiusKm,
 	restSeed,
 	hoursPerDay,
-	moonCount,
 	surfaceStats,
 	showRealSolNames,
 	spectralClass,
@@ -2902,7 +2889,6 @@ function GenerationPlanetNavigator({
 	restSeed: number
 	hoursPerDay: number
 	daysPerYear: number
-	moonCount: number
 	surfaceStats: StatEntry[]
 	orbitalDistanceAU: number
 	eccentricity: number
@@ -3320,7 +3306,6 @@ function GenerationPlanetNavigator({
 						<LazyPlanetDetailTabs
 							inline
 							seed={getDerivedSeedNumber(selection)}
-							moonCount={orbitMoons.length}
 							moons={orbitMoons}
 							daysPerYear={body.orbitalPeriodDays}
 							hoursPerDay={body.siderealDayHours}
@@ -3375,7 +3360,7 @@ function GenerationPlanetNavigator({
 				emptyChildrenLabel:
 					body.group === "asteroid belt"
 						? "No moons"
-						: isMainWorld && moonCount > 0 && orbitMoons.length === 0
+						: orbitMoons.length === 0
 							? "Computing moon parameters…"
 							: orbitMoons.length === 0
 								? "No child orbits."
@@ -3572,7 +3557,6 @@ function GenerationPlanetNavigator({
 		dayLengthSlider,
 		eccentricitySlider,
 		labeledOrbits,
-		moonCount,
 		getBodyMoonOrbitDistance,
 		getDerivedSeedNumber,
 		getMainWorldMoonOrbitDistance,
@@ -3845,7 +3829,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	tideLock,
 	setTideLock,
 	setObliquity,
-	moonCount,
 	restSeed,
 	showRealSolNames,
 	setRestSeed,
@@ -3997,7 +3980,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						restSeed={restSeed}
 						hoursPerDay={hoursPerDay}
 						daysPerYear={daysPerYear}
-						moonCount={moonCount}
 						surfaceStats={surfaceStats}
 						orbitalDistanceAU={orbitalDistanceAU}
 						eccentricity={eccentricity}

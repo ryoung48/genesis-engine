@@ -44,11 +44,7 @@ interface StoredViewPrefs {
 	measureMode: MeasureMode
 	pathfindingLand: boolean
 	pathfindingSea: boolean
-	showMoonOrbits: boolean
-	showEllipticalOrbits: boolean
-	showApparentDiameter: boolean
 	showDaylight: boolean
-	showSolarTerminator: boolean
 	clockCurrent: boolean
 	clockDay: number
 	clockHour: number
@@ -153,11 +149,7 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	measureMode: "off",
 	pathfindingLand: true,
 	pathfindingSea: true,
-	showMoonOrbits: false,
-	showEllipticalOrbits: true,
-	showApparentDiameter: false,
 	showDaylight: false,
-	showSolarTerminator: false,
 	clockCurrent: true,
 	clockDay: 0,
 	clockHour: 12,
@@ -355,25 +347,9 @@ export function parseStoredViewPrefs(
 				parsed.pathfindingSea,
 				DEFAULT_VIEW_PREFS.pathfindingSea,
 			),
-			showMoonOrbits: readBoolean(
-				parsed.showMoonOrbits,
-				DEFAULT_VIEW_PREFS.showMoonOrbits,
-			),
-			showEllipticalOrbits: readBoolean(
-				parsed.showEllipticalOrbits,
-				DEFAULT_VIEW_PREFS.showEllipticalOrbits,
-			),
-			showApparentDiameter: readBoolean(
-				parsed.showApparentDiameter,
-				DEFAULT_VIEW_PREFS.showApparentDiameter,
-			),
 			showDaylight: readBoolean(
 				parsed.showDaylight,
 				DEFAULT_VIEW_PREFS.showDaylight,
-			),
-			showSolarTerminator: readBoolean(
-				parsed.showSolarTerminator,
-				DEFAULT_VIEW_PREFS.showSolarTerminator,
 			),
 			clockCurrent: readBoolean(
 				parsed.clockCurrent,
