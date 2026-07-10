@@ -1,100 +1,220 @@
-import type { GenesisLandmarks, SphereMesh } from ".."
-import { LANDMARK_TYPE_OCEAN } from "../terrain/landmarks"
+import { PriorityQueue } from "@datastructures-js/priority-queue"
+import type { SphereMesh } from ".."
+import { DEFAULT_PLANET_RADIUS_KM } from "./units"
 
+// Any connected water body at least this large (in real km²) counts as a
+// valid oceanDist source. This is intentionally NOT a fraction of the mesh
+// point count (unlike landmarks.ts's ocean/sea/lake classification, which
+// exists for other purposes) — a ratio-based threshold conflates "large
+// lake at low mesh resolution" with "large lake at high resolution", and on
+// a real-Earth-scale mesh it misclassifies genuinely large seas (Caspian
+// ~371,000 km², Black Sea ~436,000 km²) as too-small-to-count, since they're
+// tiny relative to Earth's real ocean area even though they're geographically
+// significant. 200,000 km² sits comfortably below both while still excluding
+// small lakes that shouldn't count as moderating "distance to open water".
+const SEA_AREA_THRESHOLD_KM2 = 200_000
+
+/**
+ * Multi-source shortest-path distance from the nearest sufficiently-large
+ * body of water, in km. Uses each edge's real chord distance
+ * (mesh.neighborDist, scaled by planet radius) rather than a hop count ×
+ * global-average-edge-length — hop count assumes uniform region size, which
+ * adaptive/coastline-biased meshes (see coast-density.ts) deliberately
+ * violate: coastal cells are much smaller than interior ones, so a "hop"
+ * there covers far less real distance.
+ */
 export function computeOceanDistanceBFS(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	avgEdgeKm: number,
-	landmarks?: GenesisLandmarks,
+	planetRadiusKm: number,
 ): Float32Array {
-	const { numRegions, adjOffset, adjList } = mesh
-	const oceanDist = new Float32Array(numRegions)
-	const visited = new Uint8Array(numRegions)
-	const queue: number[] = []
-	const hops = new Int32Array(numRegions)
+	const { numRegions, adjOffset, adjList, neighborDist } = mesh
+	// Full-precision working distances during the algorithm — comparing a
+	// dequeued entry's exact candidate against a Float32Array-rounded
+	// "current best" (real km distances can be in the thousands, where
+	// float32's ~7 significant digits leave a rounding gap bigger than any
+	// sane staleness epsilon) causes the entry that should settle a node to
+	// be misidentified as stale and dropped, silently orphaning that node
+	// and anything only reachable through it. Round to float32 only once, on
+	// the final return value.
+	const dist = new Float64Array(numRegions).fill(Infinity)
+	const settled = new Uint8Array(numRegions)
+	const queue = new PriorityQueue<{ region: number; dist: number }>(
+		(a, b) => a.dist - b.dist,
+	)
+
+	// Label connected water components and measure each one's real area, so
+	// seeding isn't gated on a separate module's ratio-based ocean/sea/lake
+	// classification (see SEA_AREA_THRESHOLD_KM2 above for why that misfires
+	// at Earth scale). A component also counts if it's disconnected from the
+	// rest of the world ocean in the mesh graph (e.g. a strait narrower than
+	// local mesh resolution) — the Black Sea is still meaningfully "a big
+	// body of water" for climate/continentality purposes even if the
+	// Bosphorus isn't resolved as a connected channel at this mesh density.
+	const meanCellAreaKm2 = (4 * Math.PI * planetRadiusKm * planetRadiusKm) / numRegions
+	const componentId = new Int32Array(numRegions).fill(-1)
+	const componentSizes: number[] = []
+	const scratch: number[] = []
+	for (let r = 0; r < numRegions; r++) {
+		if (isLand[r] || componentId[r] >= 0) continue
+		const id = componentSizes.length
+		scratch.length = 0
+		scratch.push(r)
+		componentId[r] = id
+		let size = 0
+		let head = 0
+		while (head < scratch.length) {
+			const curr = scratch[head++]
+			size++
+			for (let j = adjOffset[curr], jEnd = adjOffset[curr + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (isLand[nb] || componentId[nb] >= 0) continue
+				componentId[nb] = id
+				scratch.push(nb)
+			}
+		}
+		componentSizes.push(size)
+	}
 
 	for (let r = 0; r < numRegions; r++) {
 		if (isLand[r]) continue
-		if (landmarks) {
-			const lm = landmarks.regionLandmark[r]
-			if (lm < 0 || landmarks.type[lm] !== LANDMARK_TYPE_OCEAN) continue
-		}
-		visited[r] = 1
-		queue.push(r)
+		if (componentSizes[componentId[r]] * meanCellAreaKm2 < SEA_AREA_THRESHOLD_KM2)
+			continue
+		dist[r] = 0
+		queue.enqueue({ region: r, dist: 0 })
 	}
 
-	let head = 0
-	while (head < queue.length) {
-		const r = queue[head++]
+	while (!queue.isEmpty()) {
+		const next = queue.dequeue()
+		if (!next) break
+		const { region: r, dist: d } = next
+		if (settled[r]) continue
+		if (d > dist[r] + 1e-6) continue
+		settled[r] = 1
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
-			if (!visited[nb]) {
-				visited[nb] = 1
-				hops[nb] = hops[r] + 1
-				oceanDist[nb] = hops[nb] * avgEdgeKm
-				queue.push(nb)
+			if (settled[nb]) continue
+			const candidate = d + neighborDist[j] * planetRadiusKm
+			if (candidate < dist[nb]) {
+				dist[nb] = candidate
+				queue.enqueue({ region: nb, dist: candidate })
 			}
 		}
 	}
 
+	// Dijkstra explores every adjacency edge, not just water-to-water ones, so
+	// any region reachable at all from a qualifying source — which, on a
+	// single connected sphere mesh with the real world ocean present, is
+	// every region — gets settled. A leftover Infinity here means the mesh
+	// graph is genuinely disconnected or nothing qualified as a source at
+	// all (e.g. SEA_AREA_THRESHOLD_KM2 miscalculated and excluded the whole
+	// ocean) — a real bug, not an expected "landlocked" case, so surface it
+	// instead of quietly inventing a plausible-looking distance.
+	const oceanDist = new Float32Array(numRegions)
+	let unreachable = 0
+	for (let r = 0; r < numRegions; r++) {
+		if (Number.isFinite(dist[r])) {
+			oceanDist[r] = dist[r]
+		} else {
+			unreachable++
+			oceanDist[r] = 0
+		}
+	}
+	if (unreachable > 0) {
+		console.warn(
+			`computeOceanDistanceBFS: ${unreachable} region(s) unreachable from any qualifying water source — mesh graph is disconnected or seeding failed; this should not happen for a well-formed planet.`,
+		)
+	}
 	return oceanDist
 }
 
 /**
- * BFS coast-distance fields from an isLand mask.
- * distCoast: hop count from nearest coast boundary (land or ocean side).
- * distCoastLand: hop count from nearest coast, land cells only.
+ * Shortest-path coast-distance fields from an isLand mask, in km (real edge
+ * distance, same rationale as computeOceanDistanceBFS — hop count assumes
+ * uniform region size, which the adaptive mesh violates).
+ * distCoast: distance from the nearest coast boundary (land or water side),
+ *   every region reachable (single connected mesh).
+ * distCoastLand: distance from the nearest coast, land cells only, computed
+ *   over land-only edges — water cells are never visited and stay Infinity
+ *   by design (matches prior hop-count behavior; only land cells are
+ *   meaningful for this field).
  */
 export function computeCoastDistances(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
+	planetRadiusKm: number = DEFAULT_PLANET_RADIUS_KM,
 ): { distCoast: Float32Array; distCoastLand: Float32Array } {
 	const N = mesh.numRegions
-	const { adjOffset, adjList } = mesh
-	const distCoast = new Float32Array(N).fill(Infinity)
-	const distCoastLand = new Float32Array(N).fill(Infinity)
+	const { adjOffset, adjList, neighborDist } = mesh
 
-	const coastQueue: number[] = []
-	const landQueue: number[] = []
+	const coastSources: number[] = []
+	const landCoastSources: number[] = []
 	for (let r = 0; r < N; r++) {
 		const r_isLand = isLand[r]
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			if (isLand[adjList[j]] !== r_isLand) {
-				distCoast[r] = 0
-				coastQueue.push(r)
-				if (r_isLand) {
-					distCoastLand[r] = 0
-					landQueue.push(r)
-				}
+				coastSources.push(r)
+				if (r_isLand) landCoastSources.push(r)
 				break
 			}
 		}
 	}
 
-	let head = 0
-	while (head < coastQueue.length) {
-		const r = coastQueue[head++]
-		const d = distCoast[r] + 1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (d < distCoast[nb]) {
-				distCoast[nb] = d
-				coastQueue.push(nb)
+	// Full-precision working distances — see computeOceanDistanceBFS for why
+	// comparing against a Float32Array-rounded "current best" at real km
+	// scale silently drops the entry that should settle a node.
+	function dijkstra(
+		sources: number[],
+		restrictToLand: boolean,
+	): Float64Array {
+		const dist = new Float64Array(N).fill(Infinity)
+		const settled = new Uint8Array(N)
+		const queue = new PriorityQueue<{ region: number; dist: number }>(
+			(a, b) => a.dist - b.dist,
+		)
+		for (const r of sources) {
+			dist[r] = 0
+			queue.enqueue({ region: r, dist: 0 })
+		}
+		while (!queue.isEmpty()) {
+			const next = queue.dequeue()
+			if (!next) break
+			const { region: r, dist: d } = next
+			if (settled[r]) continue
+			if (d > dist[r] + 1e-6) continue
+			settled[r] = 1
+			for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (settled[nb]) continue
+				if (restrictToLand && !isLand[nb]) continue
+				const candidate = d + neighborDist[j] * planetRadiusKm
+				if (candidate < dist[nb]) {
+					dist[nb] = candidate
+					queue.enqueue({ region: nb, dist: candidate })
+				}
 			}
 		}
+		return dist
 	}
 
-	head = 0
-	while (head < landQueue.length) {
-		const r = landQueue[head++]
-		const d = distCoastLand[r] + 1
-		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-			const nb = adjList[j]
-			if (d < distCoastLand[nb] && isLand[nb]) {
-				distCoastLand[nb] = d
-				landQueue.push(nb)
-			}
-		}
+	const coastDistWorking = dijkstra(coastSources, false)
+	const landCoastDistWorking = dijkstra(landCoastSources, true)
+
+	const distCoast = new Float32Array(N)
+	const distCoastLand = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		distCoast[r] = Number.isFinite(coastDistWorking[r]) ? coastDistWorking[r] : 0
+		distCoastLand[r] = landCoastDistWorking[r] // Infinity for water cells, by design
+	}
+
+	let unreachable = 0
+	for (let r = 0; r < N; r++) {
+		if (!Number.isFinite(coastDistWorking[r])) unreachable++
+	}
+	if (unreachable > 0) {
+		console.warn(
+			`computeCoastDistances: ${unreachable} region(s) unreachable from any coastline — mesh graph is disconnected; this should not happen for a well-formed planet.`,
+		)
 	}
 
 	return { distCoast, distCoastLand }

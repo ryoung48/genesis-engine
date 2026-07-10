@@ -12,7 +12,11 @@ import {
 	smoothstep,
 } from "../shared/math"
 import { SimplexNoise } from "../shared/simplex-noise"
-import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
+import {
+	DEFAULT_PLANET_RADIUS_KM,
+	isRetrogradeObliquity,
+	meanEdgeLengthKm,
+} from "../shared/units"
 import {
 	type GenesisLandmarks,
 	LANDMARK_TYPE_OCEAN,
@@ -286,13 +290,17 @@ export function computeAdvection(
 		typeof params === "number" ? params : params?.planetRadiusKm
 	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
 	const scale = 94.5 / avgEdgeKm
-	const deepOceanThreshold = 1260 / avgEdgeKm
+	// computeCoastDistances now returns real km (not a hop count), so this
+	// threshold is compared against distCoast directly in km — no more
+	// dividing by avgEdgeKm to convert km into "number of hops".
+	const deepOceanThreshold = 1260
 
 	const { latDeg, absLatDeg, regionBin, edgeEastward, edgeNorthward } =
 		getClimateGeometry(mesh)
 
-	const { adjOffset, adjList } = mesh
+	const { adjOffset, adjList, neighborDist } = mesh
 	const land = isLand
+	const planetRadiusKmResolved = planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
 
 	const computePair = (teqByLon: Float32Array) => {
 		const basinLabel = new Int32Array(N).fill(-1)
@@ -413,12 +421,22 @@ export function computeAdvection(
 					? elevation_km[r]
 					: elevToHeightKm(elevation[r])
 				const orographic = heightKm > 2 ? -1.8 : -0.6
-				const impact = (!land[r] ? 0.5 : orographic) / scale
-				const m = Math.max(Math.min(Math.max(moisture[r], 0) + impact, wet), 0)
+				const baseImpact = (!land[r] ? 0.5 : orographic) / scale
 
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
 					if (!isValidFlow(attr, r, edgeEastward[j], edgeNorthward[j])) continue
+					// Scale the per-hop moisture change by this edge's real
+					// distance relative to the mesh average — a hop between two
+					// coastline-dense cells covers far less ground than a hop
+					// through the sparse open ocean, and should lose/gain
+					// proportionally less moisture.
+					const edgeKm = neighborDist[j] * planetRadiusKmResolved
+					const impact = baseImpact * (edgeKm / avgEdgeKm)
+					const m = Math.max(
+						Math.min(Math.max(moisture[r], 0) + impact, wet),
+						0,
+					)
 					if (!settled[nb] && m > moisture[nb] + 1e-3) {
 						moisture[nb] = m
 						queue.enqueue({ region: nb, moisture: m })

@@ -20,7 +20,7 @@ import {
 	computeOceanDistanceBFS,
 	countContinents,
 } from "../shared/stats"
-import { getMaxOceanDepthKm, meanEdgeLengthKm } from "../shared/units"
+import { getMaxOceanDepthKm } from "../shared/units"
 import {
 	generateCoarsePlates,
 	projectCoarsePlates,
@@ -510,7 +510,7 @@ export function generateGenesisWorld(
 		}
 	}
 	const finalCoastDist = withTiming("coastDist", pipelineTiming, () =>
-		computeCoastDistances(mesh, isLand),
+		computeCoastDistances(mesh, isLand, params.planetRadiusKm),
 	)
 	distFields.distCoast = finalCoastDist.distCoast
 	distFields.distCoastLand = finalCoastDist.distCoastLand
@@ -518,11 +518,7 @@ export function generateGenesisWorld(
 
 	// 13. Ocean distance (BFS hop count → km)
 	const oceanDist = withTiming("oceanDist", pipelineTiming, () =>
-		computeOceanDistanceBFS(
-			mesh,
-			isLand,
-			meanEdgeLengthKm(mesh, params.planetRadiusKm),
-		),
+		computeOceanDistanceBFS(mesh, isLand, params.planetRadiusKm),
 	)
 	onProgress?.("oceanDist", 39)
 	// 17. Small ocean detection — patches < 0.1% of land become lakes so rivers drain through them
@@ -622,6 +618,7 @@ export function generateGenesisWorld(
 
 	return {
 		mesh,
+		isEarthImport: false,
 		plates,
 		plateAssignment,
 		boundary,

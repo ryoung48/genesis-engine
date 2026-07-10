@@ -96,6 +96,8 @@ interface OverlayControlsProps {
 	setShowRivers: (v: boolean) => void
 	showThermalEquator: boolean
 	setShowThermalEquator: (v: boolean) => void
+	showCoastlines: boolean
+	setShowCoastlines: (v: boolean) => void
 	showWindArrows: boolean
 	setShowWindArrows: (v: boolean) => void
 	showGdd: boolean
@@ -201,6 +203,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowRivers,
 	showThermalEquator,
 	setShowThermalEquator,
+	showCoastlines,
+	setShowCoastlines,
 	showWindArrows,
 	setShowWindArrows,
 	showGdd,
@@ -302,7 +306,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
 	const [lastTempSubMode, setLastTempSubMode] = React.useState<
-		"temperature" | "dtr" | "misery"
+		"temperature" | "realTemperature" | "temperatureDiff" | "dtr" | "misery"
 	>("temperature")
 	const [lastRainSubMode, setLastRainSubMode] = React.useState<
 		"precipitation" | "humidity"
@@ -426,7 +430,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									<input
 										type="checkbox"
 										checked={showWireframe}
-										onChange={(e) => setShowWireframe(e.target.checked)}
+										onChange={() => setShowWireframe(!showWireframe)}
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
@@ -794,7 +798,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												<input
 													type="checkbox"
 													checked={showElevation}
-													onChange={(e) => setShowElevation(e.target.checked)}
+													onChange={() => setShowElevation(!showElevation)}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>
@@ -846,6 +850,15 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													onChange={(e) =>
 														setShowThermalEquator(e.target.checked)
 													}
+													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+												/>
+											</label>
+											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+												<span>Coastlines</span>
+												<input
+													type="checkbox"
+													checked={showCoastlines}
+													onChange={(e) => setShowCoastlines(e.target.checked)}
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>
@@ -993,6 +1006,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								</div>
 
 								{(colorMode === "temperature" ||
+									colorMode === "realTemperature" ||
+									colorMode === "temperatureDiff" ||
 									colorMode === "precipitation" ||
 									colorMode === "humidity" ||
 									colorMode === "wind" ||
@@ -1006,6 +1021,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										>
 											<span>
 												{colorMode === "temperature" ||
+												colorMode === "realTemperature" ||
+												colorMode === "temperatureDiff" ||
 												colorMode === "dtr" ||
 												colorMode === "misery"
 													? "Temperature"
@@ -1054,49 +1071,81 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													</>
 												)}
 												{(colorMode === "temperature" ||
+													colorMode === "realTemperature" ||
+													colorMode === "temperatureDiff" ||
 													colorMode === "dtr" ||
 													colorMode === "misery") && (
 													<>
-														<div className="flex items-center gap-4 text-[11px] font-medium">
-															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																<input
-																	type="radio"
-																	name="temp-sub"
-																	checked={colorMode === "temperature"}
-																	onChange={() => {
-																		setColorMode("temperature")
-																		setLastTempSubMode("temperature")
-																	}}
-																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																/>
-																Temp
-															</label>
-															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																<input
-																	type="radio"
-																	name="temp-sub"
-																	checked={colorMode === "dtr"}
-																	onChange={() => {
-																		setColorMode("dtr")
-																		setLastTempSubMode("dtr")
-																	}}
-																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																/>
-																DTR
-															</label>
-															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																<input
-																	type="radio"
-																	name="temp-sub"
-																	checked={colorMode === "misery"}
-																	onChange={() => {
-																		setColorMode("misery")
-																		setLastTempSubMode("misery")
-																	}}
-																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																/>
-																MI
-															</label>
+														<div className="space-y-1 text-[11px] font-medium">
+															<div className="flex items-center gap-4">
+																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																	<input
+																		type="radio"
+																		name="temp-sub"
+																		checked={colorMode === "temperature"}
+																		onChange={() => {
+																			setColorMode("temperature")
+																			setLastTempSubMode("temperature")
+																		}}
+																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																	/>
+																	Temp
+																</label>
+																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																	<input
+																		type="radio"
+																		name="temp-sub"
+																		checked={colorMode === "dtr"}
+																		onChange={() => {
+																			setColorMode("dtr")
+																			setLastTempSubMode("dtr")
+																		}}
+																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																	/>
+																	DTR
+																</label>
+																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																	<input
+																		type="radio"
+																		name="temp-sub"
+																		checked={colorMode === "misery"}
+																		onChange={() => {
+																			setColorMode("misery")
+																			setLastTempSubMode("misery")
+																		}}
+																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																	/>
+																	MI
+																</label>
+															</div>
+															<div className="flex items-center gap-4">
+																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																	<input
+																		type="radio"
+																		name="temp-sub"
+																		checked={colorMode === "realTemperature"}
+																		onChange={() => {
+																			setColorMode("realTemperature")
+																			setLastTempSubMode("realTemperature")
+																		}}
+																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																	/>
+																	Observed
+																</label>
+																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																	<input
+																		type="radio"
+																		name="temp-sub"
+																		checked={colorMode === "temperatureDiff"}
+																		onChange={() => {
+																			setColorMode("temperatureDiff")
+																			setLastTempSubMode("temperatureDiff")
+																		}}
+																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																	/>
+																	EBM-Real
+																</label>
+															</div>
 														</div>
 														<div className="border-t border-white/10" />
 													</>

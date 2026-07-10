@@ -3,6 +3,10 @@ export interface GenesisClimate {
 	temperature_min: Float32Array // per-cell annual min °C
 	temperature_max: Float32Array // per-cell annual max °C
 	temperature_monthly: Float32Array // flattened [month * numRegions + region] mean °C
+	real_temperature_avg?: Float32Array // per-cell observed annual mean °C for imported Earth worlds
+	real_temperature_monthly?: Float32Array // flattened [month * numRegions + region] observed mean °C
+	temperature_diff_avg?: Float32Array // per-cell annual modeled minus observed °C
+	temperature_diff_monthly?: Float32Array // flattened [month * numRegions + region] modeled minus observed °C
 	temperature_monthly_nolapse: Float32Array // flattened [month * numRegions + region] mean °C before terrain lapse correction
 	temperature_monthly_range: Float32Array // flattened [month * numRegions + region] within-month temp range °C (for Hargreaves td)
 	insolation_monthly: Float32Array // flattened [month * numRegions + region] mean insolation W/m²

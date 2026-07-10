@@ -13,6 +13,7 @@ import type { ColorMode } from "../colors"
 import {
 	climateTempColor,
 	climateZoneColor,
+	temperatureDifferenceColor,
 	VEGETATION_WATER_BLUE,
 	vegetationColor,
 	vegetationMapColor,
@@ -37,6 +38,8 @@ import type { HoverInfo, HoverTerrainFeature } from "./hover"
 
 interface HoverChartData {
 	temps: number[]
+	realTemps: number[]
+	tempDiffs: number[]
 	precip: number[]
 	daylight: number[]
 	pet: number[]
@@ -76,6 +79,8 @@ export function buildHoverChartData(
 	const region = hoverInfo.region
 	const regionCount = world.mesh.numRegions
 	const temps: number[] = []
+	const realTemps: number[] = []
+	const tempDiffs: number[] = []
 	const precip: number[] = []
 	const daylight: number[] = []
 	const pet: number[] = []
@@ -84,6 +89,16 @@ export function buildHoverChartData(
 		temps.push(
 			world.climate
 				? world.climate.temperature_monthly[month * regionCount + region]
+				: 0,
+		)
+		realTemps.push(
+			world.climate?.real_temperature_monthly
+				? world.climate.real_temperature_monthly[month * regionCount + region]
+				: 0,
+		)
+		tempDiffs.push(
+			world.climate?.temperature_diff_monthly
+				? world.climate.temperature_diff_monthly[month * regionCount + region]
 				: 0,
 		)
 		precip.push(
@@ -107,6 +122,8 @@ export function buildHoverChartData(
 	}
 	return {
 		temps,
+		realTemps,
+		tempDiffs,
 		precip,
 		daylight,
 		pet,
@@ -225,6 +242,14 @@ export function buildClimateSwatchColor(
 		return rgbToCss(pastaClimateColor(world.pastaClimate[hoverRegion]))
 	if (colorMode === "koppenClimate" && world.koppenClimate)
 		return rgbToCss(koppenClimateColor(world.koppenClimate[hoverRegion]))
+	if (colorMode === "realTemperature" && world.climate?.real_temperature_avg)
+		return rgbToCss(
+			climateTempColor(world.climate.real_temperature_avg[hoverRegion]),
+		)
+	if (colorMode === "temperatureDiff" && world.climate?.temperature_diff_avg)
+		return rgbToCss(
+			temperatureDifferenceColor(world.climate.temperature_diff_avg[hoverRegion]),
+		)
 	if (!world.climateZones) return null
 	return rgbToCss(
 		colorMode === "climate" && world.climate

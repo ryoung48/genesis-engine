@@ -30,6 +30,10 @@ interface SerializedGenesisClimate {
 	temperature_min: Float32Array
 	temperature_max: Float32Array
 	temperature_monthly: Float32Array
+	real_temperature_avg?: Float32Array
+	real_temperature_monthly?: Float32Array
+	temperature_diff_avg?: Float32Array
+	temperature_diff_monthly?: Float32Array
 	temperature_monthly_nolapse: Float32Array
 	temperature_monthly_range: Float32Array
 	insolation_monthly: Float32Array
@@ -53,6 +57,7 @@ export interface SerializedGenesisWorld {
 	}
 	elevation_km: Float32Array
 	params: GenesisParams
+	isEarthImport?: boolean
 	timings?: StageTiming[]
 	continentCount: number
 	climate: SerializedGenesisClimate
@@ -429,6 +434,20 @@ export type GenesisWorkerRequest =
 				grayscale: Uint8Array
 				imageWidth: number
 				imageHeight: number
+				coastlineMask?: Uint8Array
+				maskWidth?: number
+				maskHeight?: number
+				coastDensityBoost?: number
+				lakeMask?: Uint8Array
+				lakeMaskWidth?: number
+				lakeMaskHeight?: number
+				riverLines?: { points: number[]; strokeweig: number }[]
+				realClimateMonthly?: Int16Array
+				realClimateWidth?: number
+				realClimateHeight?: number
+				realClimateMonths?: number
+				realClimateScale?: number
+				realClimateNoData?: number
 				terrainWarp: number
 				smoothing: number
 				hydraulicErosion: number

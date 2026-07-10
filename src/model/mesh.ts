@@ -47,6 +47,73 @@ function generateFibonacciSphere(
 }
 
 /**
+ * Density-weighted point set of size `targetN`, biased by `densityWeight`
+ * (e.g. higher near a coastline). Oversamples a larger uniform Fibonacci
+ * spiral and rejection-samples down to targetN so the final point count is
+ * exact — a spatial thinning of a low-discrepancy set, not true Poisson-disk,
+ * but sufficient to concentrate mesh resolution where it's wanted without
+ * changing total point budget.
+ */
+function generateAdaptiveFibonacciSphere(
+	targetN: number,
+	jitter: number,
+	rng: GenesisRng,
+	densityWeight: (latDeg: number, lonDeg: number) => number,
+): Float32Array {
+	const OVERSAMPLE = 8
+	const candidateN = targetN * OVERSAMPLE
+	const candidates = generateFibonacciSphere(candidateN, jitter, rng)
+
+	const weights = new Float32Array(candidateN)
+	let wMax = 0
+	for (let k = 0; k < candidateN; k++) {
+		const x = candidates[3 * k]
+		const y = candidates[3 * k + 1]
+		const z = candidates[3 * k + 2]
+		const latDeg = (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
+		const lonDeg = (Math.atan2(y, x) * 180) / Math.PI
+		const w = densityWeight(latDeg, lonDeg)
+		weights[k] = w
+		if (w > wMax) wMax = w
+	}
+	if (wMax <= 0) wMax = 1
+
+	const accepted: number[] = []
+	const order = Array.from({ length: candidateN }, (_, k) => k)
+	// Shuffle so the fallback fill (below) doesn't systematically favor the
+	// early part of the spiral if rejection sampling comes up short.
+	for (let i = order.length - 1; i > 0; i--) {
+		const j = Math.floor(rng.random() * (i + 1))
+		;[order[i], order[j]] = [order[j], order[i]]
+	}
+
+	for (const k of order) {
+		if (accepted.length >= targetN) break
+		if (rng.random() < weights[k] / wMax) accepted.push(k)
+	}
+	// Rejection sampling can come up short if targetN is a large fraction of
+	// candidateN's effective weighted mass; top up from the remaining
+	// (already-shuffled) candidates regardless of weight so the point count
+	// is always exactly targetN.
+	if (accepted.length < targetN) {
+		const acceptedSet = new Set(accepted)
+		for (const k of order) {
+			if (accepted.length >= targetN) break
+			if (!acceptedSet.has(k)) accepted.push(k)
+		}
+	}
+
+	const r_xyz = new Float32Array(3 * targetN)
+	for (let i = 0; i < targetN; i++) {
+		const k = accepted[i]
+		r_xyz[3 * i] = candidates[3 * k]
+		r_xyz[3 * i + 1] = candidates[3 * k + 1]
+		r_xyz[3 * i + 2] = candidates[3 * k + 2]
+	}
+	return r_xyz
+}
+
+/**
  * Stereographic projection from north pole (0,0,1) onto a plane.
  */
 function stereographicProjection(r_xyz: Float32Array, N: number): Float64Array {
@@ -114,8 +181,11 @@ export function buildSphereMesh(
 	n: number,
 	jitter: number,
 	rng: GenesisRng,
+	densityWeight?: (latDeg: number, lonDeg: number) => number,
 ): SphereMesh {
-	const baseXyz = generateFibonacciSphere(n, jitter, rng)
+	const baseXyz = densityWeight
+		? generateAdaptiveFibonacciSphere(n, jitter, rng, densityWeight)
+		: generateFibonacciSphere(n, jitter, rng)
 	const flat = stereographicProjection(baseXyz, n)
 	const delaunay = new Delaunator(flat)
 

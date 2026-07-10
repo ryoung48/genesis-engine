@@ -33,6 +33,7 @@ import {
 	precipitationColor,
 	slopeColor,
 	temperatureColor,
+	temperatureDifferenceColor,
 	temperatureDeltaColor,
 	tidalTierColor,
 	tornadoLandColor,
@@ -337,18 +338,36 @@ export function computeRegionColors(
 	}
 
 	if (
-		(colorMode === "temperature" || colorMode === "temperatureDelta") &&
+		(colorMode === "temperature" ||
+			colorMode === "realTemperature" ||
+			colorMode === "temperatureDiff" ||
+			colorMode === "temperatureDelta") &&
 		world.climate
 	) {
 		const darkenMapWaterTemperature =
-			colorMode === "temperature" && (viewMode === "map" || !showElevation)
+			(colorMode === "temperature" || colorMode === "realTemperature") &&
+			(viewMode === "map" || !showElevation)
 		const temps =
-			temperatureMonth === 0
-				? world.climate.temperature_avg
-				: world.climate.temperature_monthly.subarray(
-						(temperatureMonth - 1) * N,
-						temperatureMonth * N,
-					)
+			colorMode === "realTemperature"
+				? temperatureMonth === 0
+					? world.climate.real_temperature_avg
+					: world.climate.real_temperature_monthly?.subarray(
+							(temperatureMonth - 1) * N,
+							temperatureMonth * N,
+						)
+				: colorMode === "temperatureDiff"
+					? temperatureMonth === 0
+						? world.climate.temperature_diff_avg
+						: world.climate.temperature_diff_monthly?.subarray(
+								(temperatureMonth - 1) * N,
+								temperatureMonth * N,
+							)
+					: temperatureMonth === 0
+						? world.climate.temperature_avg
+						: world.climate.temperature_monthly.subarray(
+								(temperatureMonth - 1) * N,
+								temperatureMonth * N,
+							)
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] =
 				colorMode === "temperatureDelta"
@@ -356,7 +375,9 @@ export function computeRegionColors(
 							world.climate.temperature_max[r] -
 								world.climate.temperature_min[r],
 						)
-					: temperatureColor(temps[r])
+					: colorMode === "temperatureDiff"
+						? temperatureDifferenceColor(temps?.[r] ?? 0)
+						: temperatureColor(temps?.[r] ?? world.climate.temperature_avg[r])
 			const factor = darkenMapWaterTemperature && isOceanRegion(r) ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor

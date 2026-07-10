@@ -14,6 +14,13 @@ import {
 import { formatClockTimeDisplay } from "../clock"
 import { type ColorMode, VEGETATION_WATER_BLUE } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
+import {
+	buildCoastlineGlobeLines,
+	buildCoastlineMapLines,
+	type CoastlineLineData,
+	deriveCoastlineFromWorld,
+	loadCoastlineLines,
+} from "./coastline-overlay"
 import { disposeGroup, disposeObject3D } from "./disposal"
 import { getRegionFocusTargets } from "./focus"
 import { createMapProjection } from "./map-projection"
@@ -771,6 +778,79 @@ export function createGenesisScene(
 	const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat)
 	globeGroup.add(atmosMesh)
 
+	// Coastline overlay, on both the globe and the flat map. For a real
+	// "Load Earth" world this is the exact Natural Earth vector data
+	// (fetched once, cached, independent of any generated world). For a
+	// procedurally generated world there's no real coastline to load, so
+	// one is derived from the mesh's own land/ocean boundary and
+	// Catmull-Rom-smoothed (see deriveCoastlineFromWorld) — computed lazily
+	// (only when the overlay is actually toggled on) and cached per world
+	// instance so toggling or map-longitude changes don't recompute it.
+	function rebuildCoastlineOverlay() {
+		disposeObject3D(globeGroup, globeCoastlineOverlay)
+		disposeObject3D(scene, mapCoastlineOverlay)
+		globeCoastlineOverlay = null
+		mapCoastlineOverlay = null
+		coastlineMaterials = []
+
+		if (!coastlineOverlayVisible) return
+
+		let lineData: CoastlineLineData | null
+		if (currentWorld?.isEarthImport) {
+			if (!cachedCoastlineData) {
+				loadCoastlineLines()
+					.then((data) => {
+						cachedCoastlineData = data
+						rebuildCoastlineOverlay()
+						requestRender()
+					})
+					.catch((err) => {
+						console.error("Failed to load coastline overlay:", err)
+					})
+				return
+			}
+			lineData = cachedCoastlineData
+		} else if (currentWorld) {
+			if (derivedCoastlineWorld !== currentWorld) {
+				derivedCoastlineWorld = currentWorld
+				derivedCoastlineData = deriveCoastlineFromWorld(currentWorld)
+			}
+			lineData = derivedCoastlineData
+		} else {
+			lineData = null
+		}
+		if (!lineData) return
+
+		const w = canvas.clientWidth
+		const h = canvas.clientHeight
+
+		const globeLines = buildCoastlineGlobeLines(lineData, 1.004, [w, h])
+		globeCoastlineOverlay = globeLines
+		globeGroup.add(globeLines)
+
+		const projection = createMapProjection(
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+		)
+		const mapLines = buildCoastlineMapLines(lineData, projection, 0.004, [w, h])
+		mapCoastlineOverlay = mapLines
+		addMapSlideClones(mapLines)
+		scene.add(mapLines)
+
+		// addMapSlideClones' clones share mapLines' material instance (Three's
+		// default Object3D.clone() behavior for Mesh-derived objects), so
+		// updating it here also updates both slide clones.
+		coastlineMaterials = [globeLines.material, mapLines.material]
+		updateOverlayVisibility()
+	}
+
+	function setCoastlineOverlayVisible(visible: boolean) {
+		if (coastlineOverlayVisible === visible) return
+		coastlineOverlayVisible = visible
+		rebuildCoastlineOverlay()
+		requestRender()
+	}
+
 	function setAtmospherePressure(pressureBar: number) {
 		const clamped = Math.max(
 			0.1,
@@ -869,6 +949,13 @@ export function createGenesisScene(
 	let windArrowData: WindArrowData | null = null
 	let globeRivers: THREE.Group | null = null
 	let mapRivers: THREE.Group | null = null
+	let globeCoastlineOverlay: LineSegments2 | null = null
+	let mapCoastlineOverlay: LineSegments2 | null = null
+	let cachedCoastlineData: CoastlineLineData | null = null
+	let derivedCoastlineWorld: SerializedGenesisWorld | null = null
+	let derivedCoastlineData: CoastlineLineData | null = null
+	let coastlineOverlayVisible = false
+	let coastlineMaterials: LineMaterial[] = []
 	let riverData: RiverData | null = null
 	let riversVisible = false
 	let globeRiverMaterials: LineMaterial[] = []
@@ -2000,7 +2087,7 @@ export function createGenesisScene(
 	}
 
 	function rebuildOverlays() {
-		disposeObject3D(scene, terrainWireframe)
+		disposeObject3D(globeGroup, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
 		disposeObject3D(globeGroup, globeGrid)
 		disposeObject3D(scene, mapGrid)
@@ -2015,7 +2102,7 @@ export function createGenesisScene(
 		disposeObject3D(scene, mapLandNationBorders)
 		disposeObject3D(globeGroup, globeSelectedProvinceBorder)
 		disposeObject3D(scene, mapSelectedProvinceBorder)
-		disposeObject3D(scene, pulseGlobe)
+		disposeObject3D(globeGroup, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
 		disposeGroup(globeGroup, globeRivers)
 		disposeGroup(scene, mapRivers)
@@ -2106,6 +2193,7 @@ export function createGenesisScene(
 			addMapSlideClones(mapGrid)
 			scene.add(mapGrid)
 		}
+		rebuildCoastlineOverlay()
 		if (thermalEquatorPoints) {
 			globeThermalEquator = buildGlobeThermalEquator(
 				thermalEquatorPoints,
@@ -2170,6 +2258,14 @@ export function createGenesisScene(
 	}
 
 	function updateOverlayVisibility() {
+		if (globeCoastlineOverlay)
+			globeCoastlineOverlay.visible =
+				coastlineOverlayVisible && currentViewMode === "globe"
+		if (mapCoastlineOverlay) {
+			mapCoastlineOverlay.visible =
+				coastlineOverlayVisible && currentViewMode === "map"
+			if (mapMesh) mapCoastlineOverlay.position.copy(mapMesh.position)
+		}
 		if (terrainWireframe)
 			terrainWireframe.visible = wireframeVisible && currentViewMode === "globe"
 		if (mapWireframe) {
@@ -2400,7 +2496,7 @@ export function createGenesisScene(
 
 	function rebuildTerrain() {
 		if (!currentWorld) return
-		disposeObject3D(scene, terrainMesh)
+		disposeObject3D(globeGroup, terrainMesh)
 		disposeObject3D(scene, mapMesh)
 		disposeObject3D(scene, mapOccupationOverlay)
 		disposeGroup(scene, mapSolarTerminator)
@@ -2466,7 +2562,7 @@ export function createGenesisScene(
 		if (!world) {
 			currentWorld = null
 			hoveredRegion = -1
-			disposeObject3D(scene, terrainMesh)
+			disposeObject3D(globeGroup, terrainMesh)
 			disposeObject3D(scene, mapMesh)
 			disposeObject3D(scene, mapOccupationOverlay)
 			terrainMesh = null
@@ -2627,7 +2723,7 @@ export function createGenesisScene(
 	}
 
 	function clearPulse() {
-		disposeObject3D(scene, pulseGlobe)
+		disposeObject3D(globeGroup, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
 		pulseGlobe = null
 		pulseMap = null
@@ -2955,6 +3051,7 @@ export function createGenesisScene(
 		camera.updateProjectionMatrix()
 		updateMapCameraFrustum()
 		renderer.setSize(w, h, false)
+		for (const mat of coastlineMaterials) mat.resolution.set(w, h)
 		for (const mat of riverMaterials) mat.resolution.set(w, h)
 		for (const mat of pulseMaterials) mat.resolution.set(w, h)
 		for (const mat of infrastructureMaterials) mat.resolution.set(w, h)
@@ -3125,10 +3222,10 @@ export function createGenesisScene(
 		controls.dispose()
 		mapControls.dispose()
 		renderer.dispose()
-		disposeObject3D(scene, terrainMesh)
+		disposeObject3D(globeGroup, terrainMesh)
 		disposeObject3D(scene, mapMesh)
 		disposeObject3D(scene, mapOccupationOverlay)
-		disposeObject3D(scene, terrainWireframe)
+		disposeObject3D(globeGroup, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
 		disposeObject3D(globeGroup, globeGrid)
 		disposeObject3D(scene, mapGrid)
@@ -3140,8 +3237,10 @@ export function createGenesisScene(
 		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(globeGroup, globeLandNationBorders)
 		disposeObject3D(scene, mapLandNationBorders)
-		disposeObject3D(scene, pulseGlobe)
+		disposeObject3D(globeGroup, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
+		disposeObject3D(globeGroup, globeCoastlineOverlay)
+		disposeObject3D(scene, mapCoastlineOverlay)
 		disposeGroup(globeGroup, globeRivers)
 		disposeGroup(scene, mapRivers)
 		disposeGroup(globeGroup, globeHierarchyOverlay)
@@ -3806,6 +3905,7 @@ export function createGenesisScene(
 		setSolarTerminatorUseMeridiem,
 		setSolarTerminatorVisible,
 		setAtmospherePressure,
+		setCoastlineOverlayVisible,
 		setFullAmbient,
 		focusOnNation,
 		focusOnProvince,

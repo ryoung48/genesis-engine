@@ -36,6 +36,8 @@ export interface GenesisWorld {
 	/** Per-cell elevation in km (radius-scaled). Positive = land height, negative = ocean depth. */
 	elevation_km: Float32Array
 	params: GenesisParams
+	/** True when this world came from the "Load Earth" heightmap-import pipeline, not procedural generation. */
+	isEarthImport?: boolean
 	timings?: StageTiming[]
 	climate: GenesisClimate
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */

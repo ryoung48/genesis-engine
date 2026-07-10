@@ -257,7 +257,9 @@ function buildCoastSites(
 				lonDeg,
 				openScanSteps,
 			)
-			if (scanEnd >= 0 && distCoast[scanEnd] * avgEdgeKm >= openOceanCoastKm) {
+			// distCoast is already real km (computeCoastDistances), not a hop
+			// count, so no further *avgEdgeKm conversion is needed here.
+			if (scanEnd >= 0 && distCoast[scanEnd] >= openOceanCoastKm) {
 				hasOpenOcean = true
 				break
 			}

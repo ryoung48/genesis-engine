@@ -81,6 +81,7 @@ export interface GenesisScene {
 	setSolarTerminatorUseMeridiem(enabled: boolean): void
 	setSolarTerminatorVisible(visible: boolean): void
 	setAtmospherePressure(pressureBar: number): void
+	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
 	focusOnNation(nationId: number, opts?: { durationMs?: number }): void
 	focusOnProvince(provinceId: number, opts?: { durationMs?: number }): void

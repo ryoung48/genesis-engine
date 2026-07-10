@@ -253,6 +253,7 @@ function serializeWorld(
 		terrainFeatures: world.terrainFeatures,
 		elevation_km: world.elevation_km,
 		params: world.params,
+		isEarthImport: world.isEarthImport,
 		timings: world.timings,
 		continentCount: world.continentCount,
 		climate: world.climate,
@@ -489,6 +490,18 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.climate.pet_monthly.buffer,
 			world.climate.daylight_hours_monthly.buffer,
 		)
+		if (world.climate.real_temperature_avg) {
+			add(world.climate.real_temperature_avg.buffer)
+		}
+		if (world.climate.real_temperature_monthly) {
+			add(world.climate.real_temperature_monthly.buffer)
+		}
+		if (world.climate.temperature_diff_avg) {
+			add(world.climate.temperature_diff_avg.buffer)
+		}
+		if (world.climate.temperature_diff_monthly) {
+			add(world.climate.temperature_diff_monthly.buffer)
+		}
 	}
 	if (world.oceanDist) add(world.oceanDist.buffer)
 	if (world.distCoast) add(world.distCoast.buffer)
@@ -840,6 +853,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				era: seedWorld.params.era,
 				seed: generated.params.seed,
 				landmarks: seedWorld.landmarks,
+				skipRoutes: message.type === "import",
 				regionProvince: seedWorld.provinces.regionProvince,
 				regionAdjOffset: seedWorld.mesh.adjOffset,
 				regionAdjList: seedWorld.mesh.adjList,

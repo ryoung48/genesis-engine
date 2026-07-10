@@ -36,6 +36,8 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["vegetation", "Vegetation"],
 	["climate", "Climate"],
 	["temperature", "Temperature"],
+	["realTemperature", "Observed Temp"],
+	["temperatureDiff", "EBM - Real"],
 	["precipitation", "Rain"],
 	["dangerZones", "Danger"],
 	["trade_goods", "Trade Goods"],

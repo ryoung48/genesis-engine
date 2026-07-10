@@ -64,6 +64,8 @@ const COLOR_MODES = new Set<ColorMode>([
 	"slope",
 	"topography",
 	"temperature",
+	"realTemperature",
+	"temperatureDiff",
 	"temperatureDelta",
 	"precipitation",
 	"moisture",
@@ -86,6 +88,7 @@ const COLOR_MODES = new Set<ColorMode>([
 	"trade_goods",
 	"timezone",
 	"wind",
+	"misery",
 ])
 
 const NATION_MAP_MODES = new Set<NationMapMode>([

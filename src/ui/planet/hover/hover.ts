@@ -8,7 +8,6 @@ import { KOPPEN_LABELS, koppenClimateName } from "@/model/climate/koppen"
 import { PASTA_LABELS, pastaClimateName } from "@/model/climate/pasta"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
-import { meanEdgeLengthKm } from "@/model/shared/units"
 import { regionTimezoneLabel } from "@/model/society/timezone"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
@@ -61,6 +60,12 @@ export interface HoverTerrainFeature {
 }
 
 export interface HoverDtr {
+	value: number
+	annual: number
+	monthly: number[]
+}
+
+export interface HoverTemperatureSeries {
 	value: number
 	annual: number
 	monthly: number[]
@@ -173,6 +178,56 @@ export function getHoverDtr(
 		annual,
 		monthly,
 	}
+}
+
+function getHoverMonthlySeries(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	month: number,
+	annual: Float32Array | undefined,
+	monthly: Float32Array | undefined,
+): HoverTemperatureSeries | null {
+	if (!(hoverInfo && world && annual)) return null
+	const r = hoverInfo.region
+	const annualValue = annual[r]
+	const monthlyValues: number[] = []
+	if (monthly) {
+		const N = world.mesh.numRegions
+		for (let m = 0; m < 12; m++) monthlyValues.push(monthly[m * N + r] ?? annualValue)
+	}
+	return {
+		value: month === 0 ? annualValue : (monthlyValues[month - 1] ?? annualValue),
+		annual: annualValue,
+		monthly: monthlyValues,
+	}
+}
+
+export function getHoverRealTemperature(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	temperatureMonth: number,
+): HoverTemperatureSeries | null {
+	return getHoverMonthlySeries(
+		hoverInfo,
+		world,
+		temperatureMonth,
+		world?.climate?.real_temperature_avg,
+		world?.climate?.real_temperature_monthly,
+	)
+}
+
+export function getHoverTemperatureDiff(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	temperatureMonth: number,
+): HoverTemperatureSeries | null {
+	return getHoverMonthlySeries(
+		hoverInfo,
+		world,
+		temperatureMonth,
+		world?.climate?.temperature_diff_avg,
+		world?.climate?.temperature_diff_monthly,
+	)
 }
 
 export function getHoverHumidity(
@@ -483,20 +538,17 @@ export function getHoverTerrainFeature(
 	}
 }
 
-export function getCoastHopLengthKm(
-	world: SerializedGenesisWorld | null,
-): number | null {
-	if (!world) return null
-	return meanEdgeLengthKm(world.mesh, world.params.planetRadiusKm)
-}
-
+// computeCoastDistances (src/model/shared/stats.ts) returns distCoast
+// already in real km (a Dijkstra shortest-path distance, not a hop count),
+// so no further per-hop conversion is needed here — this used to multiply
+// by an average edge length to convert a hop count into km, which is now
+// stale and would double-convert an already-km value.
 export function getHoverDistCoastKm(
 	hoverDistCoast: number | null,
-	coastHopLengthKm: number | null,
 ): number | null {
-	return hoverDistCoast !== null && coastHopLengthKm !== null
+	return hoverDistCoast !== null
 		? Number.isFinite(hoverDistCoast)
-			? hoverDistCoast * coastHopLengthKm
+			? hoverDistCoast
 			: Infinity
 		: null
 }

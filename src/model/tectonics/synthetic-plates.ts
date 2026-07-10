@@ -109,11 +109,16 @@ export function buildDummyBoundary(
 export function computeSimpleDistanceFields(
 	mesh: SphereMesh,
 	elevation: Float32Array,
+	planetRadiusKm?: number,
 ): DistanceFields {
 	const N = mesh.numRegions
 	const isLand = new Uint8Array(N)
 	for (let r = 0; r < N; r++) isLand[r] = elevation[r] > 0 ? 1 : 0
-	const { distCoast, distCoastLand } = computeCoastDistances(mesh, isLand)
+	const { distCoast, distCoastLand } = computeCoastDistances(
+		mesh,
+		isLand,
+		planetRadiusKm,
+	)
 	return {
 		distMountain: new Float32Array(N),
 		distOcean: new Float32Array(N),

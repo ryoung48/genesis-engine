@@ -14,6 +14,7 @@
  */
 import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import { TIME } from "../shared/time"
+import { meanEdgeLengthKm } from "../shared/units"
 
 // Positive degree-day melt factor: 4 mm w.e. per degree-day
 const MELT_FACTOR = 6.0
@@ -38,6 +39,7 @@ export function computeIceAccumulation(
 	isLand: Uint8Array,
 	distCoast: Float32Array,
 	cycles = 15,
+	planetRadiusKm?: number,
 ): IceResult {
 	const N = mesh.numRegions
 	const ice = new Float32Array(N)
@@ -49,8 +51,12 @@ export function computeIceAccumulation(
 
 	// Pre-compute coastal boost for ocean cells.
 	// Near-coast ocean freezes easier (shallow water, land sheltering).
-	// Boost fades over ~8 BFS hops from coastline.
-	const COAST_FADE = 8
+	// Boost fades over ~8 mesh-edge-lengths from coastline (distCoast is real
+	// km — see computeCoastDistances — so this converts the old "~8 hops"
+	// heuristic into an equivalent km distance rather than comparing hops
+	// against km directly).
+	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
+	const COAST_FADE = 8 * avgEdgeKm
 	const coastBoost = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		if (isLand[r]) continue

@@ -30,6 +30,8 @@ export type ColorMode =
 	| "slope"
 	| "topography"
 	| "temperature"
+	| "realTemperature"
+	| "temperatureDiff"
 	| "temperatureDelta"
 	| "precipitation"
 	| "moisture"
@@ -177,6 +179,39 @@ export function temperatureDeltaColor(
 ): [number, number, number] {
 	const normalized = Math.pow(Math.max(0, Math.min(1, celsiusDelta / 60)), 0.8)
 	return quantizeRgb(sampleColorStops(YL_OR_RD_STOPS, normalized))
+}
+
+const observedDiffStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: -15, r: 0.08, g: 0.22, b: 0.62 },
+	{ v: -8, r: 0.29, g: 0.53, b: 0.87 },
+	{ v: -3, r: 0.72, g: 0.86, b: 0.97 },
+	{ v: 0, r: 0.98, g: 0.97, b: 0.95 },
+	{ v: 3, r: 0.99, g: 0.8, b: 0.61 },
+	{ v: 8, r: 0.9, g: 0.38, b: 0.22 },
+	{ v: 15, r: 0.57, g: 0.06, b: 0.08 },
+]
+
+export function temperatureDifferenceColor(
+	celsiusDiff: number,
+): [number, number, number] {
+	const clamped = Math.max(
+		observedDiffStops[0].v,
+		Math.min(observedDiffStops[observedDiffStops.length - 1].v, celsiusDiff),
+	)
+	for (let i = 0; i < observedDiffStops.length - 1; i++) {
+		const a = observedDiffStops[i]
+		const b = observedDiffStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = observedDiffStops[observedDiffStops.length - 1]
+	return [last.r, last.g, last.b]
 }
 
 const monthlyPrecipStops: { mm: number; r: number; g: number; b: number }[] = [

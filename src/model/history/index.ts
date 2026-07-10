@@ -77,6 +77,8 @@ export function initHistory(params: {
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
 	settlementPortRegions?: Int32Array
+	/** Skip trade-route/road network computation (state.routes/network stay empty). */
+	skipRoutes?: boolean
 	timings?: StageTiming[]
 }): HistoryState {
 	const startYear = params.startYear ?? 800
@@ -120,20 +122,22 @@ export function initHistory(params: {
 	timed("initHistory:initCultureSpread", params.timings, () =>
 		initCultureSpread(state),
 	)
-	const infrastructure = timed(
-		"initHistory:computeRoutes",
-		params.timings,
-		() =>
-			computeRoutes(state, {
-				planetRadiusKm: params.planetRadiusKm,
-				settlementRegions: params.settlementRegions,
-				settlementWaterLandmarks: params.settlementWaterLandmarks,
-				settlementPortRegions: params.settlementPortRegions,
-				timings: params.timings,
-			}),
-	)
-	state.routes = infrastructure.routes
-	state.network = infrastructure.network
+	if (!params.skipRoutes) {
+		const infrastructure = timed(
+			"initHistory:computeRoutes",
+			params.timings,
+			() =>
+				computeRoutes(state, {
+					planetRadiusKm: params.planetRadiusKm,
+					settlementRegions: params.settlementRegions,
+					settlementWaterLandmarks: params.settlementWaterLandmarks,
+					settlementPortRegions: params.settlementPortRegions,
+					timings: params.timings,
+				}),
+		)
+		state.routes = infrastructure.routes
+		state.network = infrastructure.network
+	}
 
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations(state, params.nations)

@@ -66,7 +66,6 @@ import {
 } from "../economy/trade-goods"
 import { makeRng } from "../shared/rng"
 import { computeCoastDistances, computeOceanDistanceBFS } from "../shared/stats"
-import { meanEdgeLengthKm } from "../shared/units"
 import { getEraConfig, wavePercentileThreshold } from "../society/eras"
 import type { ProvincePopulation } from "../society/population"
 import {
@@ -86,6 +85,23 @@ import {
 import { computeLocations } from "../terrain/locations"
 import { computeProvinces } from "../terrain/provinces"
 import { computeRivers } from "../terrain/rivers"
+
+/**
+ * Real (non-procedural) river network for the Earth-import path, already
+ * snapped onto mesh regions by import-heightmap.ts. Supplying this skips
+ * computeRivers/computeLakes entirely — the fields that would normally come
+ * from flow-accumulation simulation (flow, flow_monthly, basinId, terminal*)
+ * are left at zero-filled defaults since there's no simulated discharge to
+ * report for a real river; lines/visible/riverId/riverLengthKm are real.
+ */
+interface RealRiversInput {
+	lines: [number, number, number, number][][]
+	visible: Uint8Array
+	riverId: Int32Array
+	riverLengthKm: Float32Array
+	minFlow: number
+	maxFlow: number
+}
 
 interface PostPipelineInput {
 	mesh: SphereMesh
@@ -110,6 +126,10 @@ interface PostPipelineInput {
 	terrainFeatures?: GenesisTerrainFeatures
 	enableOceanCurrents: boolean
 	onProgress?: (label: string, pct?: number) => void
+	/** Real lake cells (from a vector lake mask) that must survive the arid/rainfall-based lake-draining heuristic below — real lakes (e.g. the Aral Sea) can sit in regions too dry for computeLakes' own rainfall model to have created them procedurally. */
+	realLakeRegions?: Uint8Array
+	/** Real river network — see RealRiversInput. */
+	realRivers?: RealRiversInput
 }
 
 interface PostPipelineOutput {
@@ -157,8 +177,9 @@ function reconcileClosedWaterBodies(params: {
 	riverLand: Uint8Array
 	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type" | "count">
 	rainfall: Pick<GenesisRainfall, "annual">
+	protectedRegions?: Uint8Array
 }): boolean {
-	const { isLand, riverLand, landmarks, rainfall } = params
+	const { isLand, riverLand, landmarks, rainfall, protectedRegions } = params
 	const rainfallSum = new Float32Array(landmarks.count)
 	const rainfallCount = new Int32Array(landmarks.count)
 
@@ -174,6 +195,7 @@ function reconcileClosedWaterBodies(params: {
 	let changed = false
 	for (let r = 0; r < isLand.length; r++) {
 		if (isLand[r]) continue
+		if (protectedRegions?.[r]) continue
 		const landmarkId = landmarks.regionLandmark[r]
 		if (landmarkId < 0 || landmarks.type[landmarkId] !== LANDMARK_TYPE_LAKE)
 			continue
@@ -210,6 +232,8 @@ export function runPostElevationPipeline(
 		r_hotspot,
 		enableOceanCurrents,
 		onProgress,
+		realLakeRegions,
+		realRivers,
 	} = input
 	const timings: StageTiming[] = []
 	function record(stage: string, startMs: number) {
@@ -318,6 +342,7 @@ export function runPostElevationPipeline(
 		riverLand,
 		landmarks: currentLandmarks,
 		rainfall,
+		protectedRegions: realLakeRegions,
 	})
 	if (drainedClosedWater) {
 		t0 = performance.now()
@@ -378,30 +403,61 @@ export function runPostElevationPipeline(
 	onProgress?.("Post: hydrology", 57)
 
 	// ── Rivers ─────────────────────────────────────────────────────────
+	// Real river/lake data (Earth import) replaces the whole procedural
+	// flow-accumulation + lake-flooding simulation: real lake cells are
+	// already reflected in `isLand` by import-heightmap.ts, and the
+	// `rivers` object is built directly from real polylines rather than
+	// simulated. Fields that only make sense for a simulated discharge
+	// (flow, flow_monthly, basinId, terminal*) stay zero-filled.
 	t0 = performance.now()
-	const rivers = computeRivers(
-		mesh,
-		elevation,
-		rainfall,
-		climate,
-		hydrology,
-		riverLand,
-		params,
-	)
-	record("Post: rivers", t0)
+	let rivers: GenesisRivers
+	if (realRivers) {
+		rivers = {
+			lines: realRivers.lines,
+			maxFlow: realRivers.maxFlow,
+			minFlow: realRivers.minFlow,
+			flow: new Float32Array(N),
+			flow_monthly: new Float32Array(12 * N),
+			visible: realRivers.visible,
+			riverId: realRivers.riverId,
+			riverLengthKm: realRivers.riverLengthKm,
+			terminal: new Uint8Array(N),
+			terminalCoastal: new Uint8Array(N),
+			terminalInterior: new Uint8Array(N),
+			basinId: new Int32Array(N).fill(-1),
+			waterLevel: new Float32Array(N),
+		}
+		if (realLakeRegions) {
+			for (let r = 0; r < N; r++) {
+				if (realLakeRegions[r]) rivers.waterLevel[r] = elevation_km[r]
+			}
+		}
+		record("Post: rivers (real)", t0)
+	} else {
+		rivers = computeRivers(
+			mesh,
+			elevation,
+			rainfall,
+			climate,
+			hydrology,
+			riverLand,
+			params,
+		)
+		record("Post: rivers", t0)
 
-	t0 = performance.now()
-	computeLakes(
-		mesh,
-		elevation,
-		rainfall,
-		rivers.waterLevel,
-		rivers.basinId,
-		isLand,
-		emergedLand,
-		elevation_km,
-	)
-	record("Post: lakes", t0)
+		t0 = performance.now()
+		computeLakes(
+			mesh,
+			elevation,
+			rainfall,
+			rivers.waterLevel,
+			rivers.basinId,
+			isLand,
+			emergedLand,
+			elevation_km,
+		)
+		record("Post: lakes", t0)
+	}
 	onProgress?.("Post: rivers", 62)
 
 	// ── Landmarks + distances + temperature (post-lake) ────────────────
@@ -411,15 +467,8 @@ export function runPostElevationPipeline(
 	// Ice, pasta climate, and vegetation run below on the corrected climate.
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
-	distCoast.set(computeCoastDistances(mesh, isLand).distCoast)
-	oceanDist.set(
-		computeOceanDistanceBFS(
-			mesh,
-			isLand,
-			meanEdgeLengthKm(mesh, params.planetRadiusKm),
-			landmarks,
-		),
-	)
+	distCoast.set(computeCoastDistances(mesh, isLand, params.planetRadiusKm).distCoast)
+	oceanDist.set(computeOceanDistanceBFS(mesh, isLand, params.planetRadiusKm))
 	climate = computeTemperature(
 		mesh,
 		elevation,
@@ -473,6 +522,8 @@ export function runPostElevationPipeline(
 		rainfall,
 		isLand,
 		distCoast,
+		15,
+		params.planetRadiusKm,
 	)
 	record("Post: ice", t0)
 	onProgress?.("Post: ice", 58)

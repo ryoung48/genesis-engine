@@ -40,6 +40,15 @@ interface ImportHeightmapParams {
 	craters: number
 }
 
+interface RealClimateRaster {
+	monthly: Int16Array
+	width: number
+	height: number
+	months: number
+	scale: number
+	nodata: number
+}
+
 export function loadImageAsGrayscale(
 	src: string | File,
 ): Promise<{ grayscale: Uint8Array; width: number; height: number }> {
@@ -276,6 +285,10 @@ export function importHeightmap(
 	imageHeight: number,
 	importParams: ImportHeightmapParams,
 	callbacks: GenerationCallbacks,
+	coastlineMask?: { mask: Uint8Array; width: number; height: number },
+	lakeMask?: { mask: Uint8Array; width: number; height: number },
+	riverLines?: { points: number[]; strokeweig: number }[],
+	realClimate?: RealClimateRaster,
 ): void {
 	callbacks.setGenerating(true)
 	callbacks.setGenerationProgress(0)
@@ -291,6 +304,19 @@ export function importHeightmap(
 			grayscale,
 			imageWidth,
 			imageHeight,
+			coastlineMask: coastlineMask?.mask,
+			maskWidth: coastlineMask?.width,
+			maskHeight: coastlineMask?.height,
+			lakeMask: lakeMask?.mask,
+			lakeMaskWidth: lakeMask?.width,
+			lakeMaskHeight: lakeMask?.height,
+			riverLines,
+			realClimateMonthly: realClimate?.monthly,
+			realClimateWidth: realClimate?.width,
+			realClimateHeight: realClimate?.height,
+			realClimateMonths: realClimate?.months,
+			realClimateScale: realClimate?.scale,
+			realClimateNoData: realClimate?.nodata,
 			planetRadiusKm: importParams.planetRadiusKm as number,
 			obliquity: importParams.obliquity as number,
 			eccentricity: importParams.eccentricity as number,
@@ -327,6 +353,10 @@ export function importHeightmap(
 			},
 			"Import failed",
 		)
-		worker.postMessage(request, [grayscale.buffer])
+		const transfer = [grayscale.buffer]
+		if (coastlineMask) transfer.push(coastlineMask.mask.buffer)
+		if (lakeMask) transfer.push(lakeMask.mask.buffer)
+		if (realClimate) transfer.push(realClimate.monthly.buffer)
+		worker.postMessage(request, transfer)
 	})
 }

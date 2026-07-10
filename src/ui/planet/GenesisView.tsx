@@ -115,7 +115,6 @@ import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
 import { createDrawerNationClickHandler } from "./details/nation-clicks"
 import {
-	getCoastHopLengthKm,
 	getHoverBiome,
 	getHoverClimateDisplay,
 	getHoverClimateZone,
@@ -136,8 +135,10 @@ import {
 	getHoverPastaClimate,
 	getHoverProvince,
 	getHoverRainfall,
+	getHoverRealTemperature,
 	getHoverRiver,
 	getHoverTemperatureDelta,
+	getHoverTemperatureDiff,
 	getHoverTerrainFeature,
 	getHoverTimezone,
 	getHoverTopography,
@@ -308,6 +309,41 @@ function buildMapExportFilename(
 	return `genesis-map-${identity}-${width}w.png`
 }
 
+async function loadEarthRealClimate(): Promise<{
+	monthly: Int16Array
+	width: number
+	height: number
+	months: number
+	scale: number
+	nodata: number
+}> {
+	const metaRes = await fetch("/heightmap/earth-real-temperature.json")
+	if (!metaRes.ok) {
+		throw new Error(`Failed to load observed climate metadata: ${metaRes.status}`)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		width: number
+		height: number
+		months: number
+		scale: number
+		nodata: number
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(`Failed to load observed climate raster: ${binRes.status}`)
+	}
+	const buffer = await binRes.arrayBuffer()
+	return {
+		monthly: new Int16Array(buffer),
+		width: meta.width,
+		height: meta.height,
+		months: meta.months,
+		scale: meta.scale,
+		nodata: meta.nodata,
+	}
+}
+
 function syncLabelModeToMapMode(params: {
 	labelMode: LabelMode
 	colorMode: ColorMode
@@ -451,6 +487,7 @@ export const GenesisView: React.FC = () => {
 	const [showThermalEquator, setShowThermalEquator] = useState(
 		initialViewPrefs.showThermalEquator,
 	)
+	const [showCoastlines, setShowCoastlines] = useState(false)
 	const [showWindArrows, setShowWindArrows] = useState(
 		initialViewPrefs.showWindArrows,
 	)
@@ -530,6 +567,20 @@ export const GenesisView: React.FC = () => {
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
+	)
+	const handleSetWireframe = useCallback((next: boolean) => {
+		setShowWireframe(next)
+		sceneRef.current?.setWireframeVisible(next)
+	}, [])
+	const handleSetElevation = useCallback(
+		(next: boolean) => {
+			setShowElevation(next)
+			sceneRef.current?.setElevationVisible(next)
+			if (!next && (colorMode === "terrain" || colorMode === "landHeightmap")) {
+				setColorMode(geographyMode)
+			}
+		},
+		[colorMode, geographyMode],
 	)
 
 	// Simulation state
@@ -1310,6 +1361,16 @@ export const GenesisView: React.FC = () => {
 	)
 	const hoverDtr = getHoverDtr(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverHumidity = getHoverHumidity(hoverInfo, worldForDisplay, dtrMonth)
+	const hoverRealTemperature = getHoverRealTemperature(
+		hoverInfo,
+		worldForDisplay,
+		temperatureMonth,
+	)
+	const hoverTemperatureDiff = getHoverTemperatureDiff(
+		hoverInfo,
+		worldForDisplay,
+		temperatureMonth,
+	)
 	const hoverClimateZone = getHoverClimateZone(hoverInfo, worldForDisplay)
 	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
 	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
@@ -1405,11 +1466,7 @@ export const GenesisView: React.FC = () => {
 		},
 		[worldForDisplay],
 	)
-	const coastHopLengthKm = useMemo(
-		() => getCoastHopLengthKm(worldForDisplay),
-		[worldForDisplay],
-	)
-	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast, coastHopLengthKm)
+	const hoverDistCoastKm = getHoverDistCoastKm(hoverDistCoast)
 	const hoverOccupation = useMemo(() => {
 		const occupation = getPoliticalHoverOccupation({
 			hoverProvince,
@@ -2386,6 +2443,9 @@ export const GenesisView: React.FC = () => {
 		sceneRef.current?.setWireframeVisible(showWireframe)
 	}, [showWireframe])
 	useEffect(() => {
+		sceneRef.current?.setCoastlineOverlayVisible(showCoastlines)
+	}, [showCoastlines])
+	useEffect(() => {
 		sceneRef.current?.setGridVisible(showGrid)
 	}, [showGrid])
 	useEffect(() => {
@@ -2587,6 +2647,7 @@ export const GenesisView: React.FC = () => {
 			setSelectedTimeMs(simStartTimeMs)
 			setTimelineBundle(undefined)
 			setLiveFrame(null)
+			setShowCoastlines(false)
 			generateWorld(overrideSeed, overrides, currentParams, generationCallbacks)
 		},
 		[currentParams, generationCallbacks, simStartTimeMs],
@@ -2688,7 +2749,22 @@ export const GenesisView: React.FC = () => {
 	}, [])
 
 	const handleImportHeightmap = useCallback(
-		(grayscale: Uint8Array, imageWidth: number, imageHeight: number) => {
+		(
+			grayscale: Uint8Array,
+			imageWidth: number,
+			imageHeight: number,
+			coastlineMask?: { mask: Uint8Array; width: number; height: number },
+			lakeMask?: { mask: Uint8Array; width: number; height: number },
+			riverLines?: { points: number[]; strokeweig: number }[],
+			realClimate?: {
+				monthly: Int16Array
+				width: number
+				height: number
+				months: number
+				scale: number
+				nodata: number
+			},
+		) => {
 			const importParams = {
 				seed,
 				numPoints,
@@ -2724,6 +2800,10 @@ export const GenesisView: React.FC = () => {
 				imageHeight,
 				importParams,
 				generationCallbacks,
+				coastlineMask,
+				lakeMask,
+				riverLines,
+				realClimate,
 			)
 		},
 		[
@@ -2757,10 +2837,34 @@ export const GenesisView: React.FC = () => {
 
 	const handleEarthImport = useCallback(async () => {
 		try {
-			const { grayscale, width, height } = await loadImageAsGrayscale(
-				"/heightmap/earth.png",
+			const [
+				{ grayscale, width, height },
+				{ grayscale: maskPixels, width: maskWidth, height: maskHeight },
+				{ grayscale: lakePixels, width: lakeWidth, height: lakeHeight },
+				riverLines,
+				realClimate,
+			] = await Promise.all([
+				loadImageAsGrayscale("/heightmap/earth.png"),
+				loadImageAsGrayscale("/heightmap/coastline-mask.png"),
+				loadImageAsGrayscale("/heightmap/lake-mask.png"),
+				fetch("/heightmap/river-lines.json").then((res) => {
+					if (!res.ok) throw new Error(`Failed to load river lines: ${res.status}`)
+					return res.json() as Promise<{
+						lines: { points: number[]; strokeweig: number }[]
+					}>
+				}),
+				loadEarthRealClimate(),
+			])
+			handleImportHeightmap(
+				grayscale,
+				width,
+				height,
+				{ mask: maskPixels, width: maskWidth, height: maskHeight },
+				{ mask: lakePixels, width: lakeWidth, height: lakeHeight },
+				riverLines.lines,
+				realClimate,
 			)
-			handleImportHeightmap(grayscale, width, height)
+			setShowCoastlines(true)
 		} catch (err) {
 			console.error("Failed to load Earth heightmap:", err)
 			setGenerationLabel("Failed to load Earth heightmap")
@@ -3552,6 +3656,8 @@ export const GenesisView: React.FC = () => {
 							hoverLandmark={hoverLandmark}
 							hoverIsLand={hoverIsLand}
 							hoverTemperatureDelta={hoverTemperatureDelta}
+							hoverRealTemperature={hoverRealTemperature}
+							hoverTemperatureDiff={hoverTemperatureDiff}
 							hoverRainfall={hoverRainfall}
 							hoverDtr={hoverDtr}
 							hoverHumidity={hoverHumidity}
@@ -3673,11 +3779,13 @@ export const GenesisView: React.FC = () => {
 							setPathfindingSea={setPathfindingSea}
 							pathfindingResult={pathfindingResult}
 							showWireframe={showWireframe}
-							setShowWireframe={setShowWireframe}
+							setShowWireframe={handleSetWireframe}
 							showRivers={showRivers}
 							setShowRivers={setShowRivers}
 							showThermalEquator={showThermalEquator}
 							setShowThermalEquator={setShowThermalEquator}
+							showCoastlines={showCoastlines}
+							setShowCoastlines={setShowCoastlines}
 							showWindArrows={showWindArrows}
 							setShowWindArrows={setShowWindArrows}
 							showGdd={showGdd}
@@ -3703,7 +3811,7 @@ export const GenesisView: React.FC = () => {
 							labelMode={labelMode}
 							setLabelMode={setLabelMode}
 							showElevation={showElevation}
-							setShowElevation={setShowElevation}
+							setShowElevation={handleSetElevation}
 							showInfrastructure={showInfrastructure}
 							setShowInfrastructure={setShowInfrastructure}
 							gridSpacing={gridSpacing}

@@ -77,7 +77,9 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	topographySubMode,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
-	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes)
+	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes).filter(
+		([mode]) => mode !== "realTemperature" && mode !== "temperatureDiff",
+	)
 	const societyOptions = getVisibleSocietyModeOptions(debugMapModes)
 
 	const submodeControl =

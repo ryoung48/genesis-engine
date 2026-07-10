@@ -77,8 +77,10 @@ export function computeTidalRain(
 
 		const temp = climate.temperature_avg[r]
 		const ceiling = ceilingScale(temp)
+		// distCoast is already real km (computeCoastDistances), not a hop
+		// count, so no further *avgEdgeKm conversion is needed here.
 		const moistureAvail = distCoast
-			? clamp(1 - (distCoast[r] * avgEdgeKm) / 2835, 0, 1)
+			? clamp(1 - distCoast[r] / 2835, 0, 1)
 			: 1
 
 		const n =

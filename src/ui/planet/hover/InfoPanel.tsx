@@ -54,6 +54,7 @@ import type {
 	HoverOceanCurrents,
 	HoverRiver,
 	HoverTerrainFeature,
+	HoverTemperatureSeries,
 } from "./hover"
 import { getHoverTradeGood } from "./hover"
 import {
@@ -261,6 +262,8 @@ interface InfoPanelProps {
 	hoverLandmark: HoverLandmark | null
 	hoverIsLand: boolean | null
 	hoverTemperatureDelta: number | null
+	hoverRealTemperature: HoverTemperatureSeries | null
+	hoverTemperatureDiff: HoverTemperatureSeries | null
 	hoverRainfall: number | null
 	hoverDtr: HoverDtr | null
 	hoverHumidity: HoverHumidity | null
@@ -329,6 +332,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverLandmark,
 	hoverIsLand,
 	hoverTemperatureDelta,
+	hoverRealTemperature,
+	hoverTemperatureDiff,
 	hoverDtr,
 	hoverHumidity,
 	hoverMisery,
@@ -532,6 +537,28 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									value={formatTemperatureDelta(
 										hoverTemperatureDelta,
 										unitSystem,
+									)}
+								/>
+							)}
+						{colorMode === "realTemperature" &&
+							hoverRealTemperature && (
+								<Row
+									label="Observed"
+									value={formatTemperature(
+										hoverRealTemperature.value,
+										unitSystem,
+										1,
+									)}
+								/>
+							)}
+						{colorMode === "temperatureDiff" &&
+							hoverTemperatureDiff && (
+								<Row
+									label="EBM - Real"
+									value={formatTemperatureDelta(
+										hoverTemperatureDiff.value,
+										unitSystem,
+										1,
 									)}
 								/>
 							)}
@@ -785,6 +812,58 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								}
 								tooltipLabel={({ index, value }) =>
 									`${monthLabels[index + 1]}: ${formatTemperature(value, unitSystem, 1)}`
+								}
+								showValues
+							/>
+						) : colorMode === "realTemperature" &&
+							hoverRealTemperature &&
+							hoverRealTemperature.monthly.length === 12 ? (
+							<SeriesBars
+								values={chartData.realTemps}
+								labels={MONTH_SHORT}
+								label="Observed Temp"
+								colorForValue={(value) => tempColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(hoverRealTemperature.annual, {
+									prefix: "AVG",
+									formatValue: (value) =>
+										formatTemperature(value, unitSystem, 1),
+								})}
+								formatValue={(value) =>
+									formatTemperature(value, unitSystem, 1).replace(
+										/ ?°[CF]$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatTemperature(value, unitSystem, 1)}`
+								}
+								showValues
+							/>
+						) : colorMode === "temperatureDiff" &&
+							hoverTemperatureDiff &&
+							hoverTemperatureDiff.monthly.length === 12 ? (
+							<SeriesBars
+								values={chartData.tempDiffs}
+								labels={MONTH_SHORT}
+								label="EBM - Real"
+								colorForValue={(value) =>
+									value >= 0 ? "rgb(220, 90, 56)" : "rgb(64, 126, 220)"
+								}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(hoverTemperatureDiff.annual, {
+									prefix: "AVG",
+									formatValue: (value) =>
+										formatTemperatureDelta(value, unitSystem, 1),
+								})}
+								formatValue={(value) =>
+									formatTemperatureDelta(value, unitSystem, 1).replace(
+										/ ?°[CF]$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatTemperatureDelta(value, unitSystem, 1)}`
 								}
 								showValues
 							/>
