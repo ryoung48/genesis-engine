@@ -58,7 +58,7 @@ export function refreshClimatePetMonthly(
 	)
 }
 
-function computeAetFromPet(
+export function computeAetFromPet(
 	rain: Float64Array,
 	petBuf: Float64Array,
 	aetBuf: Float64Array,

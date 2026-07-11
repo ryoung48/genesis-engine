@@ -587,6 +587,29 @@ export function computeRegionColors(
 		return rgb
 	}
 
+	if (colorMode === "realPastaClimate" && world.realPastaClimate) {
+		const darkenMapWaterRealPastaClimate =
+			viewMode === "map" && colorMode === "realPastaClimate"
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = pastaClimateColor(world.realPastaClimate[r])
+			const factor = darkenMapWaterRealPastaClimate && isOceanRegion(r) ? 0.74 : 1
+			rgb[3 * r] = cr * factor
+			rgb[3 * r + 1] = cg * factor
+			rgb[3 * r + 2] = cb * factor
+		}
+		return rgb
+	}
+
+	if (colorMode === "realKoppenClimate" && world.realKoppenClimate) {
+		for (let r = 0; r < N; r++) {
+			const [cr, cg, cb] = koppenClimateColor(world.realKoppenClimate[r])
+			rgb[3 * r] = cr
+			rgb[3 * r + 1] = cg
+			rgb[3 * r + 2] = cb
+		}
+		return rgb
+	}
+
 	if (colorMode === "climate" && world.climate) {
 		const BLEND_THRESHOLD = 15
 		const chaoticRgb = climateZoneColor(8)

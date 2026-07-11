@@ -39,7 +39,13 @@ export type DangerSubMode =
 	| "tornado"
 	| "tidal"
 export type VegetationSubMode = "base" | "maps" | "satellite" | "eu5"
-export type ClimateSubMode = "basic" | "pasta" | "koppen" | "eu5"
+export type ClimateSubMode =
+	| "basic"
+	| "pasta"
+	| "koppen"
+	| "eu5"
+	| "realPasta"
+	| "realKoppen"
 export type TopographySubMode = "classification" | "slope" | "eu5"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
 export interface LabelMode {
@@ -187,6 +193,7 @@ interface OverlayControlsProps {
 	showDaylight?: boolean
 	setShowDaylight?: (v: boolean) => void
 	onEnterSolarSystem?: () => void
+	isEarthImport?: boolean
 }
 
 export const OverlayControls: React.FC<OverlayControlsProps> = ({
@@ -294,6 +301,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	onEnterSolarSystem,
 	exportExpanded: controlledExportExpanded,
 	setExportExpanded: controlledSetExportExpanded,
+	isEarthImport = false,
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
 	const [politicalExpanded, setPoliticalExpanded] = React.useState(false)
@@ -1085,6 +1093,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 																	Humidity
 																</label>
 															</div>
+															{isEarthImport && (
 															<div className="flex items-center gap-4">
 																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
 																	<input
@@ -1113,6 +1122,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 																	Diff
 																</label>
 															</div>
+															)}
 														</div>
 													</>
 												)}
@@ -1166,6 +1176,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 																	MI
 																</label>
 															</div>
+															{isEarthImport && (
 															<div className="flex items-center gap-4">
 																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
 																	<input
@@ -1194,6 +1205,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 																	EBM-Real
 																</label>
 															</div>
+															)}
+															{isEarthImport && (
 															<div className="flex items-center gap-4">
 																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
 																	<input
@@ -1222,6 +1235,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 																	DTR Diff
 																</label>
 															</div>
+															)}
 														</div>
 														<div className="border-t border-white/10" />
 													</>
@@ -1399,6 +1413,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
+												{isEarthImport && (
 												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 													<span>EU5</span>
 													<input
@@ -1412,6 +1427,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
+												)}
 											</div>
 										)}
 									</div>
@@ -1474,6 +1490,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
+												{isEarthImport && (
 												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 													<span>EU5</span>
 													<input
@@ -1487,6 +1504,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
+												)}
 											</div>
 										)}
 									</div>
@@ -1495,6 +1513,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								{(colorMode === "climate" ||
 									colorMode === "pastaClimate" ||
 									colorMode === "koppenClimate" ||
+									colorMode === "realPastaClimate" ||
+									colorMode === "realKoppenClimate" ||
 									colorMode === "eu5Climate") && (
 									<div>
 										<button
@@ -1549,6 +1569,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
+												{isEarthImport && (
 												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 													<span>EU5</span>
 													<input
@@ -1562,6 +1583,37 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
+												)}
+												{isEarthImport && (
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Observed Pasta</span>
+													<input
+														type="radio"
+														name="climate-sub"
+														checked={climateSubMode === "realPasta"}
+														onChange={() => {
+															setClimateSubMode("realPasta")
+															setColorMode("realPastaClimate")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												)}
+												{isEarthImport && (
+												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
+													<span>Observed Koppen</span>
+													<input
+														type="radio"
+														name="climate-sub"
+														checked={climateSubMode === "realKoppen"}
+														onChange={() => {
+															setClimateSubMode("realKoppen")
+															setColorMode("realKoppenClimate")
+														}}
+														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+													/>
+												</label>
+												)}
 												<div className="border-t border-white/10" />
 												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 													<span>GDD</span>

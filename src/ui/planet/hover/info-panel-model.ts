@@ -242,6 +242,10 @@ export function buildClimateSwatchColor(
 		return rgbToCss(pastaClimateColor(world.pastaClimate[hoverRegion]))
 	if (colorMode === "koppenClimate" && world.koppenClimate)
 		return rgbToCss(koppenClimateColor(world.koppenClimate[hoverRegion]))
+	if (colorMode === "realPastaClimate" && world.realPastaClimate)
+		return rgbToCss(pastaClimateColor(world.realPastaClimate[hoverRegion]))
+	if (colorMode === "realKoppenClimate" && world.realKoppenClimate)
+		return rgbToCss(koppenClimateColor(world.realKoppenClimate[hoverRegion]))
 	if (colorMode === "realTemperature" && world.climate?.real_temperature_avg)
 		return rgbToCss(
 			climateTempColor(world.climate.real_temperature_avg[hoverRegion]),

@@ -101,17 +101,34 @@ export function isDebugGeographyMode(colorMode: ColorMode): boolean {
 	return DEBUG_GEOGRAPHY_MODE_OPTIONS.some(([mode]) => mode === colorMode)
 }
 
+const EARTH_IMPORT_ONLY_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
+	"realTemperature",
+	"temperatureDiff",
+	"realDtr",
+	"dtrDiff",
+	"realPrecipitation",
+	"precipitationDiff",
+	"realPastaClimate",
+	"realKoppenClimate",
+	"eu5Topography",
+	"eu5Vegetation",
+	"eu5Climate",
+])
+
 export function normalizeGeographyColorMode({
 	colorMode,
 	hasHazards,
 	hasVolcanism,
+	isEarthImport = true,
 }: {
 	colorMode: ColorMode
 	hasHazards: boolean
 	hasVolcanism: boolean
+	isEarthImport?: boolean
 }): ColorMode {
 	if (!hasHazards && colorMode === "dangerZones") return "terrain"
 	if (!hasVolcanism && colorMode === "hotspots") return "terrain"
+	if (!isEarthImport && EARTH_IMPORT_ONLY_MODES.has(colorMode)) return "terrain"
 	return colorMode
 }
 

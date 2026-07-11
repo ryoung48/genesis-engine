@@ -2,6 +2,7 @@ import {
 	getStarPARFactor,
 	isValidSpectralClass,
 } from "@/model/celestial/star/star-types"
+import { computeAetFromPet, fillPetMonthlyHargreaves } from "./hydrology"
 import type {
 	GenesisClimate,
 	GenesisHydrology,
@@ -562,12 +563,22 @@ export interface PastaDebug {
 	maxT: Float32Array
 }
 
-export function assignPastaClimate(
+/**
+ * Core Pasta classification from raw per-region arrays, flattened
+ * [month * numRegions + region] for monthly fields. Shared by the procedural
+ * model (assignPastaClimate) and the observed-Earth approximation
+ * (assignEarthPastaClimate).
+ */
+function computePastaZones(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: GenesisClimate,
-	rainfall: GenesisRainfall,
-	hydrology: GenesisHydrology,
+	temperatureMonthly: Float32Array,
+	temperatureMax: Float32Array,
+	temperatureMin: Float32Array,
+	insolationMonthly: Float32Array,
+	rainfallMonthly: Float32Array,
+	petMonthly: Float32Array,
+	aetMonthly: Float32Array,
 	params: GenesisParams,
 	iceThickness?: Float32Array,
 	iceMinMonthly?: Float32Array,
@@ -576,7 +587,6 @@ export function assignPastaClimate(
 	const N = mesh.numRegions
 	const dpm = params.daysPerYear / 12
 	const output = new Uint8Array(N)
-	const insolation = climate.insolation_monthly
 	const cls = isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
@@ -605,11 +615,11 @@ export function assignPastaClimate(
 
 	for (let r = 0; r < N; r++) {
 		for (let m = 0; m < 12; m++) {
-			temps[m] = climate.temperature_monthly[m * N + r]
-			insol[m] = insolation[m * N + r] * parFactor
+			temps[m] = temperatureMonthly[m * N + r]
+			insol[m] = insolationMonthly[m * N + r] * parFactor
 		}
-		const warmest = climate.temperature_max[r]
-		const coldest = climate.temperature_min[r]
+		const warmest = temperatureMax[r]
+		const coldest = temperatureMin[r]
 		debug.minT[r] = coldest
 		debug.maxT[r] = warmest
 		if (!isLand[r]) {
@@ -631,9 +641,9 @@ export function assignPastaClimate(
 		} else {
 			for (let m = 0; m < 12; m++) {
 				const idx = m * N + r
-				rain[m] = rainfall.monthly[idx]
-				petBuf[m] = climate.pet_monthly[idx]
-				aetBuf[m] = hydrology.aet_monthly[idx]
+				rain[m] = rainfallMonthly[idx]
+				petBuf[m] = petMonthly[idx]
+				aetBuf[m] = aetMonthly[idx]
 			}
 			const result = classifyLand(
 				temps,
@@ -662,6 +672,121 @@ export function assignPastaClimate(
 	}
 
 	return { zones: output, debug }
+}
+
+export function assignPastaClimate(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
+	hydrology: GenesisHydrology,
+	params: GenesisParams,
+	iceThickness?: Float32Array,
+	iceMinMonthly?: Float32Array,
+	iceMaxMonthly?: Float32Array,
+): { zones: Uint8Array; debug: PastaDebug } {
+	return computePastaZones(
+		mesh,
+		isLand,
+		climate.temperature_monthly,
+		climate.temperature_max,
+		climate.temperature_min,
+		climate.insolation_monthly,
+		rainfall.monthly,
+		climate.pet_monthly,
+		hydrology.aet_monthly,
+		params,
+		iceThickness,
+		iceMinMonthly,
+		iceMaxMonthly,
+	)
+}
+
+/**
+ * Observed-Earth Pasta classification approximation. Uses real monthly
+ * temperature/precipitation (climate.real_temperature_monthly,
+ * rainfall.real_monthly). PET is derived with the same Hargreaves formula
+ * (fillPetMonthlyHargreaves) and AET with the same bucket water-balance
+ * (computeAetFromPet) the procedural model uses for pet_monthly/aet_monthly —
+ * reusing these keeps the aridity thresholds in classifyLand (tuned against
+ * this exact PET/AET pairing) meaningful for observed data too. DTR prefers
+ * the observed monthly DTR dataset (observedDtr.real_monthly) when attached,
+ * falling back to the procedural model's DTR proxy otherwise. Ice and
+ * insolation are reused from the procedural model, since there's no observed
+ * counterpart for either. Returns undefined if real climate or rainfall data
+ * isn't attached.
+ */
+export function assignEarthPastaClimate(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	climate: GenesisClimate,
+	rainfall: GenesisRainfall,
+	params: GenesisParams,
+	realDtrMonthly?: Float32Array,
+	iceThickness?: Float32Array,
+	iceMinMonthly?: Float32Array,
+	iceMaxMonthly?: Float32Array,
+): { zones: Uint8Array; debug: PastaDebug } | undefined {
+	const temperatureMonthly = climate.real_temperature_monthly
+	const rainfallMonthly = rainfall.real_monthly
+	if (!temperatureMonthly || !rainfallMonthly) return undefined
+
+	const N = mesh.numRegions
+	const dpm = params.daysPerYear / 12
+	const temperatureMax = new Float32Array(N)
+	const temperatureMin = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		let hot = -Infinity
+		let cold = Infinity
+		for (let m = 0; m < 12; m++) {
+			const t = temperatureMonthly[m * N + r]
+			if (t > hot) hot = t
+			if (t < cold) cold = t
+		}
+		temperatureMax[r] = hot
+		temperatureMin[r] = cold
+	}
+
+	const dtrMonthly = realDtrMonthly ?? climate.temperature_monthly_range
+	const petMonthly = new Float32Array(12 * N)
+	fillPetMonthlyHargreaves(
+		temperatureMonthly,
+		dtrMonthly,
+		climate.insolation_monthly,
+		petMonthly,
+		dpm,
+	)
+
+	const aetMonthly = new Float32Array(12 * N)
+	const rainBuf = new Float64Array(12)
+	const petBuf = new Float64Array(12)
+	const aetBuf = new Float64Array(12)
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		for (let m = 0; m < 12; m++) {
+			const idx = m * N + r
+			rainBuf[m] = rainfallMonthly[idx]
+			petBuf[m] = petMonthly[idx]
+		}
+		computeAetFromPet(rainBuf, petBuf, aetBuf)
+		for (let m = 0; m < 12; m++) aetMonthly[m * N + r] = aetBuf[m]
+	}
+
+	return computePastaZones(
+		mesh,
+		isLand,
+		temperatureMonthly,
+		temperatureMax,
+		temperatureMin,
+		climate.insolation_monthly,
+		rainfallMonthly,
+		petMonthly,
+		aetMonthly,
+		params,
+		iceThickness,
+		iceMinMonthly,
+		iceMaxMonthly,
+	)
 }
 
 export function pastaClimateColor(zoneCode: number): [number, number, number] {

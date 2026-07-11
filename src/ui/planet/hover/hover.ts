@@ -494,6 +494,32 @@ export function getHoverKoppenClimate(
 		: null
 }
 
+export function getHoverRealPastaClimate(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+): { code: string | null; name: string } | null {
+	return hoverInfo && world?.realPastaClimate
+		? {
+				code: PASTA_LABELS[world.realPastaClimate[hoverInfo.region]] ?? null,
+				name: pastaClimateName(world.realPastaClimate[hoverInfo.region]),
+			}
+		: null
+}
+
+export function getHoverRealKoppenClimate(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+): { code: string | null; name: string } | null {
+	return hoverInfo &&
+		world?.realKoppenClimate &&
+		world?.isLand?.[hoverInfo.region]
+		? {
+				code: KOPPEN_LABELS[world.realKoppenClimate[hoverInfo.region]] ?? null,
+				name: koppenClimateName(world.realKoppenClimate[hoverInfo.region]),
+			}
+		: null
+}
+
 export function getHoverBiome(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
@@ -673,12 +699,20 @@ export function getHoverClimateDisplay(
 	hoverPastaClimate: { code: string | null; name: string } | null,
 	hoverKoppenClimate: { code: string | null; name: string } | null,
 	hoverClimateZone: string | null,
+	hoverRealPastaClimate?: { code: string | null; name: string } | null,
+	hoverRealKoppenClimate?: { code: string | null; name: string } | null,
 ): string | null {
 	if (colorMode === "pastaClimate" && hoverPastaClimate) {
 		return hoverPastaClimate.name.toLowerCase()
 	}
 	if (colorMode === "koppenClimate" && hoverKoppenClimate) {
 		return `${hoverKoppenClimate.name}${hoverKoppenClimate.code ? ` (${hoverKoppenClimate.code})` : ""}`
+	}
+	if (colorMode === "realPastaClimate" && hoverRealPastaClimate) {
+		return hoverRealPastaClimate.name.toLowerCase()
+	}
+	if (colorMode === "realKoppenClimate" && hoverRealKoppenClimate) {
+		return `${hoverRealKoppenClimate.name}${hoverRealKoppenClimate.code ? ` (${hoverRealKoppenClimate.code})` : ""}`
 	}
 	return hoverClimateZone
 }

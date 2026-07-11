@@ -726,7 +726,17 @@ export function createGenesisScene(
 	sun.position.set(5, 3, 4)
 	scene.add(sun)
 
-	// Water sphere
+	// Water sphere. Not added to the scene — it z-fights with the terrain
+	// mesh's ocean surface, which sits at exactly the same radius (1.0)
+	// whenever elevation display is off, since both are semi-transparent
+	// surfaces at identical depth. That produced visible concentric rings
+	// (GPU depth-buffer precision varies smoothly but non-linearly with view
+	// angle across a sphere, so the z-fight winner flips in a ring pattern
+	// centered on whatever point faces the camera). A radius offset avoided
+	// the z-fight but the result still looked wrong, so this mesh (and the
+	// code that recolors it per view mode — search "waterMat"/"waterMesh")
+	// is kept around but unused rather than torn out, in case the shine
+	// effect is worth rebuilding later without the z-fighting.
 	const waterGeo = new THREE.SphereGeometry(1.0, 64, 48)
 	const waterMat = new THREE.MeshPhongMaterial({
 		color: 0xffffff,
@@ -737,7 +747,6 @@ export function createGenesisScene(
 		depthWrite: false,
 	})
 	const waterMesh = new THREE.Mesh(waterGeo, waterMat)
-	globeGroup.add(waterMesh)
 
 	// Atmosphere
 	const atmosGeo = new THREE.SphereGeometry(1.12, 48, 36)

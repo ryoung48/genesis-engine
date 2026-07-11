@@ -1,4 +1,4 @@
-import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
+import type { SphereMesh } from ".."
 
 const KOPPEN_CLASSES = [
 	{
@@ -166,11 +166,18 @@ const CLASS_ID: Record<string, number> = Object.fromEntries(
 	KOPPEN_CLASSES.map((entry, index) => [entry.code, index]),
 )
 
+/**
+ * Classify Köppen climate from per-region monthly temperature and
+ * precipitation arrays, flattened [month * numRegions + region]. Callers pass
+ * either the procedural model's arrays (climate.temperature_monthly,
+ * rainfall.monthly) or observed-Earth arrays (climate.real_temperature_monthly,
+ * rainfall.real_monthly) — the classification only needs these two fields.
+ */
 export function assignKoppenClimate(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: GenesisClimate,
-	rainfall: GenesisRainfall,
+	temperatureMonthly: Float32Array,
+	rainfallMonthly: Float32Array,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const classes = new Uint8Array(N)
@@ -192,8 +199,8 @@ export function assignKoppenClimate(
 		let nhSummerTempSum = 0,
 			nhWinterTempSum = 0
 		for (let month = 0; month < 12; month++) {
-			const t = climate.temperature_monthly[month * N + r]
-			const rain = rainfall.monthly[month * N + r]
+			const t = temperatureMonthly[month * N + r]
+			const rain = rainfallMonthly[month * N + r]
 			mTemps[month] = t
 			mRain[month] = rain
 			if (t > hot) hot = t

@@ -172,8 +172,70 @@ export function buildTerrainMesh(
 		}
 	}
 
+	// Smooth normals by averaging face normals at coincident vertex positions.
+	// This geometry is non-indexed — each face owns private copies of its 3
+	// vertices, even where two faces meet at the same point in space — so
+	// THREE's computeVertexNormals() can't tell those copies are "the same"
+	// vertex and falls back to a flat per-face normal. Every fragment inside
+	// a face then gets an identical normal (true flat shading), which reads
+	// as hard-edged brightness steps that exactly trace the mesh's triangle
+	// edges — most visible on the huge, sparse triangles coast-density.ts
+	// leaves in the open ocean, where it looked like concentric rings. This
+	// groups faces by coincident position and averages their face normals,
+	// like an indexed mesh's shared vertex normals would be.
+	const normals = new Float32Array(positions.length)
+	{
+		const keyOf = (i: number) =>
+			`${Math.round(positions[i] * 1e5)},${Math.round(positions[i + 1] * 1e5)},${Math.round(positions[i + 2] * 1e5)}`
+		const accum = new Map<string, [number, number, number]>()
+		for (let face = 0; face < validSideCount; face++) {
+			const base = face * 9
+			const ax = positions[base]
+			const ay = positions[base + 1]
+			const az = positions[base + 2]
+			const bx = positions[base + 3]
+			const by = positions[base + 4]
+			const bz = positions[base + 5]
+			const cx = positions[base + 6]
+			const cy = positions[base + 7]
+			const cz = positions[base + 8]
+			const e1x = bx - ax
+			const e1y = by - ay
+			const e1z = bz - az
+			const e2x = cx - ax
+			const e2y = cy - ay
+			const e2z = cz - az
+			let fnx = e1y * e2z - e1z * e2y
+			let fny = e1z * e2x - e1x * e2z
+			let fnz = e1x * e2y - e1y * e2x
+			const flen = Math.sqrt(fnx * fnx + fny * fny + fnz * fnz) || 1
+			fnx /= flen
+			fny /= flen
+			fnz /= flen
+			for (const idx of [base, base + 3, base + 6]) {
+				const key = keyOf(idx)
+				const acc = accum.get(key)
+				if (acc) {
+					acc[0] += fnx
+					acc[1] += fny
+					acc[2] += fnz
+				} else {
+					accum.set(key, [fnx, fny, fnz])
+				}
+			}
+		}
+		for (let i = 0; i < positions.length; i += 3) {
+			const acc = accum.get(keyOf(i))!
+			const len = Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) || 1
+			normals[i] = acc[0] / len
+			normals[i + 1] = acc[1] / len
+			normals[i + 2] = acc[2] / len
+		}
+	}
+
 	const geometry = new THREE.BufferGeometry()
 	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
+	geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3))
 	geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3))
 	geometry.setAttribute(
 		"occColor",
@@ -183,14 +245,17 @@ export function buildTerrainMesh(
 		"occMask",
 		new THREE.BufferAttribute(new Float32Array(validSideCount * 3), 1),
 	)
-	geometry.computeVertexNormals()
 
-	const material = new THREE.MeshLambertMaterial({ vertexColors: true })
+	// Dithering breaks up 8-bit banding in the smooth Lambertian light falloff
+	// across the sphere — without it, the lighting gradient quantizes into
+	// visible concentric rings around the terminator.
+	const material = new THREE.MeshLambertMaterial({
+		vertexColors: true,
+		dithering: true,
+	})
 	material.onBeforeCompile = (shader) => {
-		shader.vertexShader = shader.vertexShader.replace(
-			"#include <beginnormal_vertex>",
-			"vec3 objectNormal = normalize(position);",
-		)
+		// Normals now come from the geometry's own (properly smoothed)
+		// "normal" attribute — no need to fake one from raw position here.
 		shader.vertexShader = shader.vertexShader.replace(
 			"void main() {",
 			`attribute vec3 occColor;

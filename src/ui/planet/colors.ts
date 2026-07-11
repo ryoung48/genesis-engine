@@ -45,6 +45,8 @@ export type ColorMode =
 	| "climate"
 	| "pastaClimate"
 	| "koppenClimate"
+	| "realPastaClimate"
+	| "realKoppenClimate"
 	| "oceanCurrents"
 	| "dangerZones"
 	| "hotspots"
@@ -143,11 +145,6 @@ const TOPO_MARSH = hex(0x2d8e72)
 const TOPO_OCEAN = hex(0x75afd4)
 const TOPO_LAKE = TOPO_OCEAN
 const VEG_DESERT = hex(0xccc4bc)
-const VEG_SPARSE = hex(0xa0a696)
-const VEG_GRASSLANDS = hex(0x8e9a82)
-const VEG_WOODS = hex(0x78806a)
-const VEG_FOREST = hex(0x525c4a)
-const VEG_JUNGLE = hex(0x344432)
 
 /** Flat per-category colors for the "eu5Topography" overlay, index-aligned to EU5_TOPOGRAPHY_CATEGORIES. */
 export const EU5_TOPOGRAPHY_COLORS: [number, number, number][] = [
@@ -177,25 +174,25 @@ export const EU5_TOPOGRAPHY_COLORS: [number, number, number][] = [
 
 /** Flat per-category colors for the "eu5Vegetation" overlay, index-aligned to EU5_VEGETATION_CATEGORIES. */
 export const EU5_VEGETATION_COLORS: [number, number, number][] = [
-	VEG_DESERT, // desert
-	hex(0xc9d15a), // farmland (no app equivalent)
-	VEG_FOREST, // forest
-	VEG_GRASSLANDS, // grasslands
-	VEG_JUNGLE, // jungle
-	VEG_SPARSE, // sparse
-	VEG_WOODS, // woods
+	hex(0x85855d), // desert
+	hex(0x0c8709), // farmland
+	hex(0x284b1d), // forest
+	hex(0x548331), // grasslands
+	hex(0x1b3a11), // jungle
+	hex(0x697850), // sparse
+	hex(0x3a692b), // woods
 ]
 
 /** Flat per-category colors for the "eu5Climate" overlay, index-aligned to EU5_CLIMATE_CATEGORIES. */
 export const EU5_CLIMATE_COLORS: [number, number, number][] = [
-	hex(0xe6f0f5), // arctic
-	hex(0xd9b36a), // arid
-	hex(0xb08f6a), // cold_arid
-	hex(0x6a9c6a), // continental
-	hex(0xd97a4a), // mediterranean
-	hex(0x5a9ac2), // oceanic
-	hex(0xe0a84a), // subtropical
-	hex(0xc2453a), // tropical
+	hex(0x6d7c7b), // arctic
+	hex(0x6d5d44), // arid
+	hex(0x726f5e), // cold_arid
+	hex(0x486b4d), // continental
+	hex(0x7a8950), // mediterranean
+	hex(0x598741), // oceanic
+	hex(0x285635), // subtropical
+	hex(0x23431d), // tropical
 ]
 export const VEGETATION_WATER_BLUE: [number, number, number] = [
 	0x90 / 255,

@@ -109,6 +109,8 @@ export interface SerializedGenesisWorld {
 	iceMinMonthly: Float32Array
 	iceMaxMonthly: Float32Array
 	koppenClimate: Uint8Array
+	realKoppenClimate?: Uint8Array
+	realPastaClimate?: Uint8Array
 	vegetation: Uint8Array
 	topography: Uint8Array
 	eu5Topography?: Int16Array

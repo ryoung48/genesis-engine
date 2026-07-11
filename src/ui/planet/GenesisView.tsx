@@ -140,6 +140,8 @@ import {
 	getHoverRainfall,
 	getHoverRainfallDiff,
 	getHoverRealDtr,
+	getHoverRealKoppenClimate,
+	getHoverRealPastaClimate,
 	getHoverRealRainfall,
 	getHoverRealTemperature,
 	getHoverRiver,
@@ -1384,12 +1386,13 @@ export const GenesisView: React.FC = () => {
 			colorMode,
 			hasHazards: !!world?.hazards,
 			hasVolcanism: !!world?.volcanism,
+			isEarthImport: !!world?.isEarthImport,
 		})
 		if (normalizedColorMode !== colorMode) {
 			setColorMode(normalizedColorMode)
 			setGeographyMode(normalizedColorMode)
 		}
-	}, [colorMode, world?.hazards, world?.volcanism, world])
+	}, [colorMode, world?.hazards, world?.volcanism, world?.isEarthImport, world])
 
 	useEffect(() => {
 		if (debugMapModes) return
@@ -1535,6 +1538,14 @@ export const GenesisView: React.FC = () => {
 	const hoverClimateZone = getHoverClimateZone(hoverInfo, worldForDisplay)
 	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
 	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
+	const hoverRealPastaClimate = getHoverRealPastaClimate(
+		hoverInfo,
+		worldForDisplay,
+	)
+	const hoverRealKoppenClimate = getHoverRealKoppenClimate(
+		hoverInfo,
+		worldForDisplay,
+	)
 	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay)
 	const hoverProvince = getHoverProvince(hoverInfo, worldForDisplay)
 	const hoverLandmark = getHoverLandmark(hoverInfo, worldForDisplay)
@@ -1664,6 +1675,8 @@ export const GenesisView: React.FC = () => {
 		hoverPastaClimate,
 		hoverKoppenClimate,
 		hoverClimateZone,
+		hoverRealPastaClimate,
+		hoverRealKoppenClimate,
 	)
 
 	// Shared wind computation — runs when wind arrows or wind color mode is active
@@ -4016,6 +4029,7 @@ export const GenesisView: React.FC = () => {
 						/>
 					) : (
 						<OverlayControls
+							isEarthImport={worldForDisplay?.isEarthImport ?? false}
 							onEnterSolarSystem={handleEnterSolarSystem}
 							overlaysExpanded={overlaysExpanded}
 							setOverlaysExpanded={setOverlaysExpanded}

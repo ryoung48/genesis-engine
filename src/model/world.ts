@@ -60,6 +60,10 @@ export interface GenesisWorld {
 	iceMaxMonthly: Float32Array
 	/** Per-cell Koppen climate code (index into KOPPEN_CLASSES) */
 	koppenClimate: Uint8Array
+	/** Per-cell Koppen climate code classified from observed-Earth temp/rain instead of the procedural model. Earth-import only. */
+	realKoppenClimate?: Uint8Array
+	/** Per-cell pasta climate code classified from observed-Earth temp/rain (PET/AET approximated via Thornthwaite/bucket model). Earth-import only. */
+	realPastaClimate?: Uint8Array
 	/** Ocean current warmth (ocean cells) and diffused coastal warmth (land cells) */
 	oceanCurrents?: GenesisOceanCurrents
 	/** Per-cell cyclone risk score in [0, 1]. */

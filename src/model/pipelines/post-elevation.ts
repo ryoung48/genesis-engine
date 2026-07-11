@@ -148,6 +148,8 @@ interface PostPipelineOutput {
 	slopeScore: Float32Array
 	climateZones: Uint8Array
 	koppenClimate: Uint8Array
+	realKoppenClimate?: Uint8Array
+	realPastaClimate?: Uint8Array
 	pastaClimate: Uint8Array | undefined
 	pastaDebug: PastaDebug | undefined
 	dtr_annual: Float32Array
@@ -662,7 +664,12 @@ export function runPostElevationPipeline(
 
 	// ── Koppen climate ─────────────────────────────────────────────────
 	t0 = performance.now()
-	const koppenClimate = assignKoppenClimate(mesh, isLand, climate, rainfall)
+	const koppenClimate = assignKoppenClimate(
+		mesh,
+		isLand,
+		climate.temperature_monthly,
+		rainfall.monthly,
+	)
 	record("Post: koppen climate", t0)
 	onProgress?.("Post: koppen climate", 69)
 

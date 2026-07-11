@@ -10,6 +10,8 @@ import {
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
 } from "../celestial/star/star-types"
+import { assignKoppenClimate } from "../climate/koppen"
+import { assignEarthPastaClimate } from "../climate/pasta"
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
@@ -1226,6 +1228,29 @@ export function importGenesisWorld(
 		record("Observed Earth DTR sampling", t0)
 	}
 
+	if (post.climate.real_temperature_monthly && post.rainfall.real_monthly) {
+		t0 = performance.now()
+		post.realKoppenClimate = assignKoppenClimate(
+			mesh,
+			isLand,
+			post.climate.real_temperature_monthly,
+			post.rainfall.real_monthly,
+		)
+		const earthPasta = assignEarthPastaClimate(
+			mesh,
+			isLand,
+			post.climate,
+			post.rainfall,
+			genesisParams,
+			post.observedDtr?.real_monthly,
+			post.iceThickness,
+			post.iceMinMonthly,
+			post.iceMaxMonthly,
+		)
+		if (earthPasta) post.realPastaClimate = earthPasta.zones
+		record("Observed Earth koppen/pasta classification", t0)
+	}
+
 	t0 = performance.now()
 	const provinceSociety = deriveProvinceSociety({
 		mesh,
@@ -1261,6 +1286,8 @@ export function importGenesisWorld(
 		pastaClimate: post.pastaClimate,
 		pastaDebug: post.pastaDebug,
 		koppenClimate: post.koppenClimate,
+		realKoppenClimate: post.realKoppenClimate,
+		realPastaClimate: post.realPastaClimate,
 		vegetation: post.vegetation,
 		topography: post.topography,
 		coastal: post.coastal,
