@@ -248,7 +248,9 @@ export function buildClimateSwatchColor(
 		)
 	if (colorMode === "temperatureDiff" && world.climate?.temperature_diff_avg)
 		return rgbToCss(
-			temperatureDifferenceColor(world.climate.temperature_diff_avg[hoverRegion]),
+			temperatureDifferenceColor(
+				world.climate.temperature_diff_avg[hoverRegion],
+			),
 		)
 	if (!world.climateZones) return null
 	return rgbToCss(

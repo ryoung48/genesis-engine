@@ -6,17 +6,17 @@ from pathlib import Path
 from build_earth_real_raster import build_monthly_stack, load_month_array, write_asset
 
 
-DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_tavg")
+DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_prec")
 DEFAULT_OUTPUT_DIR = Path("public/heightmap")
-DEFAULT_PREFIX = "earth-real-temperature"
+DEFAULT_PREFIX = "earth-real-precipitation"
 DEFAULT_WIDTH = 360
 DEFAULT_HEIGHT = 180
 MONTHS = 12
-SCALE = 10.0
+SCALE = 1.0
 
 
 def month_path(source_dir: Path, month: int) -> Path:
-    return source_dir / f"wc2.1_10m_tavg_{month:02d}.tif"
+    return source_dir / f"wc2.1_10m_prec_{month:02d}.tif"
 
 
 def build_asset(
@@ -37,16 +37,16 @@ def build_asset(
         monthly,
         output_dir,
         prefix,
-        field="worldclim_monthly_tavg_celsius",
+        field="worldclim_monthly_precipitation_mm",
         scale_factor=SCALE,
-        stored_scale=0.1,
+        stored_scale=1.0,
         source=str(source_dir),
     )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build compact Earth monthly observed-temperature assets from WorldClim GeoTIFFs."
+        description="Build compact Earth monthly observed-precipitation assets from WorldClim GeoTIFFs."
     )
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

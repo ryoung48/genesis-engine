@@ -52,9 +52,10 @@ import type {
 	HoverLandmark,
 	HoverMisery,
 	HoverOceanCurrents,
+	HoverRainfallSeries,
 	HoverRiver,
-	HoverTerrainFeature,
 	HoverTemperatureSeries,
+	HoverTerrainFeature,
 } from "./hover"
 import { getHoverTradeGood } from "./hover"
 import {
@@ -265,7 +266,11 @@ interface InfoPanelProps {
 	hoverRealTemperature: HoverTemperatureSeries | null
 	hoverTemperatureDiff: HoverTemperatureSeries | null
 	hoverRainfall: number | null
+	hoverRealRainfall: HoverRainfallSeries | null
+	hoverRainfallDiff: HoverRainfallSeries | null
 	hoverDtr: HoverDtr | null
+	hoverRealDtr: HoverDtr | null
+	hoverDtrDiff: HoverDtr | null
 	hoverHumidity: HoverHumidity | null
 	hoverMisery: HoverMisery | null
 	hoverClimateDisplay: string | null
@@ -334,7 +339,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverTemperatureDelta,
 	hoverRealTemperature,
 	hoverTemperatureDiff,
+	hoverRainfall,
+	hoverRealRainfall,
+	hoverRainfallDiff,
 	hoverDtr,
+	hoverRealDtr,
+	hoverDtrDiff,
 	hoverHumidity,
 	hoverMisery,
 	hoverClimateDisplay,
@@ -403,6 +413,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		: null
 	const showPrecipChart =
 		!!chartData && (!!chartData.isLand || !!chartData.isLake)
+	const activeDtrSeries =
+		colorMode === "dtr"
+			? hoverDtr
+			: colorMode === "realDtr"
+				? hoverRealDtr
+				: colorMode === "dtrDiff"
+					? hoverDtrDiff
+					: null
 	const climateColor = showGeography
 		? buildClimateSwatchColor(hoverRegion, world, colorMode)
 		: null
@@ -540,28 +558,46 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									)}
 								/>
 							)}
-						{colorMode === "realTemperature" &&
-							hoverRealTemperature && (
-								<Row
-									label="Observed"
-									value={formatTemperature(
-										hoverRealTemperature.value,
-										unitSystem,
-										1,
-									)}
-								/>
-							)}
-						{colorMode === "temperatureDiff" &&
-							hoverTemperatureDiff && (
-								<Row
-									label="EBM - Real"
-									value={formatTemperatureDelta(
-										hoverTemperatureDiff.value,
-										unitSystem,
-										1,
-									)}
-								/>
-							)}
+						{colorMode === "realTemperature" && hoverRealTemperature && (
+							<Row
+								label="Observed"
+								value={formatTemperature(
+									hoverRealTemperature.value,
+									unitSystem,
+									1,
+								)}
+							/>
+						)}
+						{colorMode === "temperatureDiff" && hoverTemperatureDiff && (
+							<Row
+								label="EBM - Real"
+								value={formatTemperatureDelta(
+									hoverTemperatureDiff.value,
+									unitSystem,
+									1,
+								)}
+							/>
+						)}
+						{colorMode === "realDtr" && hoverRealDtr && (
+							<Row
+								label="Observed DTR"
+								value={formatTemperatureDelta(
+									hoverRealDtr.value,
+									unitSystem,
+									1,
+								)}
+							/>
+						)}
+						{colorMode === "dtrDiff" && hoverDtrDiff && (
+							<Row
+								label="DTR Diff"
+								value={`${hoverDtrDiff.value >= 0 ? "+" : ""}${formatTemperatureDelta(
+									hoverDtrDiff.value,
+									unitSystem,
+									1,
+								)}`}
+							/>
+						)}
 						{!hoverWindMonthly &&
 							hoverWindSpeed !== null &&
 							hoverWindDir !== null && (
@@ -674,6 +710,32 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								)}
 							/>
 						)}
+						{colorMode === "precipitation" && hoverRainfall !== null && (
+							<Row
+								label="Rain"
+								value={formatPrecipitation(hoverRainfall, unitSystem, 0)}
+							/>
+						)}
+						{colorMode === "realPrecipitation" && hoverRealRainfall && (
+							<Row
+								label="Observed Rain"
+								value={formatPrecipitation(
+									hoverRealRainfall.value,
+									unitSystem,
+									0,
+								)}
+							/>
+						)}
+						{colorMode === "precipitationDiff" && hoverRainfallDiff && (
+							<Row
+								label="Rain Diff"
+								value={`${hoverRainfallDiff.value >= 0 ? "+" : ""}${formatPrecipitation(
+									hoverRainfallDiff.value,
+									unitSystem,
+									0,
+								)}`}
+							/>
+						)}
 						{hoverTradeGood && (
 							<SwatchRow
 								label="Trade Good"
@@ -765,28 +827,44 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							}
 							showValues
 						/>
-						{colorMode === "dtr" &&
-						hoverDtr &&
-						hoverDtr.monthly.length === 12 ? (
+						{activeDtrSeries &&
+						(colorMode === "dtr" ||
+							colorMode === "realDtr" ||
+							colorMode === "dtrDiff") &&
+						activeDtrSeries.monthly.length === 12 ? (
 							<SeriesBars
-								values={hoverDtr.monthly}
+								values={activeDtrSeries.monthly}
 								labels={MONTH_SHORT}
-								label="DTR"
-								colorForValue={(value) => dtrChartColor(value)}
+								label={
+									colorMode === "realDtr"
+										? "Observed DTR"
+										: colorMode === "dtrDiff"
+											? "DTR Diff"
+											: "DTR"
+								}
+								colorForValue={(value) =>
+									colorMode === "dtrDiff"
+										? currentImpactColor(value)
+										: dtrChartColor(value)
+								}
 								activeIndex={activeBarIndex}
-								summary={buildSummary(hoverDtr.annual, {
+								summary={buildSummary(activeDtrSeries.annual, {
 									prefix: "AVG",
 									formatValue: (value) =>
-										formatTemperatureDelta(value, unitSystem, 1),
+										`${colorMode === "dtrDiff" && value >= 0 ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`,
 								})}
-								formatValue={(value) =>
-									formatTemperatureDelta(value, unitSystem, 1).replace(
-										/ ?°[CF]$/,
-										"",
-									)
-								}
+								formatValue={(value) => {
+									const formatted = formatTemperatureDelta(
+										value,
+										unitSystem,
+										1,
+									).replace(/ ?°[CF]$/, "")
+									return colorMode === "dtrDiff" && value >= 0
+										? `+${formatted}`
+										: formatted
+								}}
 								tooltipLabel={({ index, value }) =>
-									`${monthLabels[index + 1]}: ${formatTemperatureDelta(value, unitSystem, 1)}`
+									`${monthLabels[index + 1]}: ${value >= 0 && colorMode === "dtrDiff" ? "+" : ""}${formatTemperatureDelta(value, unitSystem, 1)}`
 								}
 								showValues
 							/>
@@ -931,6 +1009,59 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								formatValue={(value) => value.toFixed(0)}
 								tooltipLabel={({ index, value }) =>
 									`${monthLabels[index + 1]}: ${value.toFixed(0)}%`
+								}
+								showValues
+							/>
+						) : colorMode === "realPrecipitation" &&
+							hoverRealRainfall &&
+							hoverRealRainfall.monthly.length === 12 ? (
+							<SeriesBars
+								values={hoverRealRainfall.monthly}
+								labels={MONTH_SHORT}
+								label="Observed Rain"
+								colorForValue={(value) => rainColor(value)}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(hoverRealRainfall.annual, {
+									prefix: "ANN",
+									formatValue: (value) =>
+										formatPrecipitation(value, unitSystem, 0),
+								})}
+								formatValue={(value) =>
+									formatPrecipitation(value, unitSystem, 0).replace(
+										/ (mm|in)$/,
+										"",
+									)
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${formatPrecipitation(value, unitSystem, 0)}`
+								}
+								showValues
+							/>
+						) : colorMode === "precipitationDiff" &&
+							hoverRainfallDiff &&
+							hoverRainfallDiff.monthly.length === 12 ? (
+							<SeriesBars
+								values={hoverRainfallDiff.monthly}
+								labels={MONTH_SHORT}
+								label="Rain Diff"
+								colorForValue={(value) =>
+									value >= 0 ? "rgb(66, 148, 170)" : "rgb(196, 116, 46)"
+								}
+								activeIndex={activeBarIndex}
+								summary={buildSummary(hoverRainfallDiff.annual, {
+									prefix: "ANN",
+									formatValue: (value) =>
+										`${value >= 0 ? "+" : ""}${formatPrecipitation(value, unitSystem, 0)}`,
+								})}
+								formatValue={(value) =>
+									`${value >= 0 ? "+" : ""}${formatPrecipitation(
+										value,
+										unitSystem,
+										0,
+									).replace(/ (mm|in)$/, "")}`
+								}
+								tooltipLabel={({ index, value }) =>
+									`${monthLabels[index + 1]}: ${value >= 0 ? "+" : ""}${formatPrecipitation(value, unitSystem, 0)}`
 								}
 								showValues
 							/>

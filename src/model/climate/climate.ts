@@ -289,6 +289,8 @@ export function computeTemperature(
 		pressure: params.pressure ?? 1.0,
 		radius: params.planetRadiusKm * 1000,
 		landFraction,
+		albedo: params.albedo,
+		greenhouseFactor: params.greenhouseFactor,
 	})
 	ebm.runModel(30, 0.5)
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)

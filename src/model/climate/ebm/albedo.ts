@@ -3,37 +3,68 @@ import { EMB_CONSTANTS } from "./constants"
 /* eslint-disable camelcase */
 
 /**
- * Static (temperature-independent) polar albedo boost representing
- * permanent, non-seasonal polar ice on a low-obliquity world -- unlike the
- * old ice-albedo feedback (removed, see git history / luna-repro), this
- * depends only on latitude and obliquity, never on temperature, so it can't
- * reintroduce the temperature-threshold discontinuity that feedback caused.
- *
- * obliquityFactor -> 1 at/above Earth's 23.5deg tilt (no boost), -> 0 as tilt
- * -> 0 (full boost at the poles). POLAR_ALBEDO_BOOST_MAX is the tunable
- * coefficient: the max additional albedo applied exactly at the poles for a
- * 0-obliquity world; it scales linearly to 0 at the equator and at
- * Earth-like obliquity.
+ * Half-width (K) of the smooth ice/snow transition band centered on
+ * EMB_CONSTANTS.thermal.ICE_LIMIT. Below (ICE_LIMIT - this), a cell is fully
+ * at iceAlbedo; above (ICE_LIMIT + this), fully at baseAlbedo; in between it
+ * ramps continuously. This width is a numerical-stability choice (wide
+ * enough that a day-to-day temperature wiggle can't jump the whole band and
+ * cause the old hard-threshold oscillation -- see luna-repro), not a fit to
+ * any specific body's climatology.
  */
-const POLAR_ALBEDO_BOOST_MAX = 0.08
+const ICE_TRANSITION_HALF_WIDTH_K = 8
 
-function polarAlbedoBoost(latDeg: number, obliquityDeg: number): number {
-	const obliquityFactor = Math.min(1, Math.max(0, obliquityDeg) / 23.5)
-	const latitudeFactor = Math.abs(latDeg) / 90
-	return POLAR_ALBEDO_BOOST_MAX * (1 - obliquityFactor) * latitudeFactor
+function smoothstep(t: number): number {
+	const clamped = Math.min(1, Math.max(0, t))
+	return clamped * clamped * (3 - 2 * clamped)
 }
 
 /**
- * Grid-independent approximation of polarAlbedoBoost's mean across all
- * latitudes -- the mean of |latDeg|/90 over a uniform -90..90 spread is 0.5,
- * so this is just polarAlbedoBoost's formula with that constant baked in.
- * Used where the actual per-latitude grid isn't built yet (see
- * computeGreenhouseOLR's linearization point, which runs before initModel
- * constructs lats_deg).
+ * Per-cell albedo from a smooth, purely temperature-driven ice/snow
+ * transition -- no latitude or obliquity term. Because it reacts to each
+ * cell's own already-computed temperature (which already reflects that
+ * world's obliquity, eccentricity, and orbital distance through the
+ * insolation/diffusion solve upstream), the ice line shifts automatically for
+ * exotic configs instead of following a curve baked in for Earth's current
+ * climate: a high-obliquity world's poles run warmer and naturally keep less
+ * ice; a high-eccentricity world's ice line moves in and out seasonally
+ * because this runs once per simulated day already.
+ *
+ * Replaces an earlier hard step (`if temp < limit: ICE else BASE`) that was
+ * disabled after it caused a runaway oscillation for a low-heat-capacity body
+ * (see git history / luna-repro): each day's temperature would cross the
+ * threshold, the albedo would jump discretely, overshoot, and cross back.
+ * The smoothstep ramp removes the discontinuity that caused it while keeping
+ * the same physical mechanism.
  */
-export function meanPolarAlbedoBoost(obliquityDeg: number): number {
-	const obliquityFactor = Math.min(1, Math.max(0, obliquityDeg) / 23.5)
-	return POLAR_ALBEDO_BOOST_MAX * (1 - obliquityFactor) * 0.5
+/**
+ * couplingFactor: fades the feedback out toward a flat `baseAlbedo` as
+ * pressure -> 0, using the same sqrt(pressure) scaling
+ * computeDiffusionCoefficients() already uses for inter-latitude heat
+ * transport. At zero pressure there's no atmosphere to move heat between
+ * latitude bands or to support the cloud/frost dynamics this feedback
+ * approximates, so each band solves an independent, nonlinear (bistable)
+ * equilibrium -- neighboring bands can then land on opposite sides of the
+ * ice threshold with nothing smoothing across them, producing a real
+ * multi-degree jump between adjacent bands (reproduced for an airless,
+ * pressure=0, slow-rotating body -- see luna-repro). Damping the feedback's
+ * strength by the same knob that already zeroes out cross-band coupling
+ * removes exactly that regime instead of widening the temperature transition
+ * band, which wouldn't fix a spatial (cross-latitude) discontinuity anyway.
+ */
+function iceAlbedoAt(
+	temperatureK: number,
+	baseAlbedo: number,
+	iceAlbedo: number,
+	couplingFactor: number,
+): number {
+	const { ICE_LIMIT } = EMB_CONSTANTS.thermal
+	const t =
+		(temperatureK - (ICE_LIMIT - ICE_TRANSITION_HALF_WIDTH_K)) /
+		(2 * ICE_TRANSITION_HALF_WIDTH_K)
+	const warmthFraction = smoothstep(t)
+	const fullFeedback =
+		iceAlbedo * (1 - warmthFraction) + baseAlbedo * warmthFraction
+	return baseAlbedo + (fullFeedback - baseAlbedo) * couplingFactor
 }
 
 export const ALBEDO = {
@@ -47,37 +78,47 @@ export const ALBEDO = {
 	},
 	update: (params: {
 		albedo: number[][]
-		lats_deg: number[]
 		temperature: number[][]
 		time: number
-		orbital: typeof EMB_CONSTANTS.orbital
 		/** Base (non-ice) Bond albedo -- a single value for the whole body.
-		 * Overrides surface.ALBEDO.BASE (0.35, an Earth default). */
+		 * Overrides surface.ALBEDO.BASE (0.3, an Earth default). */
 		baseAlbedo?: number
 		/** Ice-cap albedo, used below the local ice threshold. Overrides
 		 * surface.ALBEDO.ICE (0.65, an Earth default). */
 		iceAlbedo?: number
+		/**
+		 * Enables the temperature-driven ice/snow albedo transition above.
+		 * Defaults to true (procedural worldgen wants this). Sol-system bodies
+		 * that pass their own real, empirically-measured Bond albedo should set
+		 * this false -- their `albedo` already IS their true known reflectivity
+		 * (ice caps and all), so layering a synthetic ice model on top would
+		 * override a real measurement with a generic guess.
+		 */
+		iceAlbedoFeedback?: boolean
+		/** Atmospheric pressure (bar), used to fade the feedback out toward a
+		 * flat baseAlbedo as pressure -> 0 -- see iceAlbedoAt's couplingFactor
+		 * doc. Defaults to 1.0 (full strength, Earth-like). */
+		pressure?: number
 	}): void => {
 		const {
 			albedo,
-			lats_deg,
 			temperature,
 			time,
-			orbital,
 			baseAlbedo,
 			iceAlbedo,
+			iceAlbedoFeedback,
+			pressure,
 		} = params
 		const { surface } = EMB_CONSTANTS
-		void iceAlbedo
-		void temperature
+		const base = baseAlbedo ?? surface.ALBEDO.BASE
+		const ice = iceAlbedo ?? surface.ALBEDO.ICE
+		const couplingFactor = Math.min(1, Math.sqrt(Math.max(0, pressure ?? 1.0)))
 
 		for (let i = 0; i < EMB_CONSTANTS.grid.NUM_LAT; i++) {
-			// Ice-albedo feedback (temperature-threshold based) temporarily
-			// disabled -- see luna-repro discussion. The static polar boost below
-			// is latitude/obliquity-only and unaffected by that bug.
 			albedo[i][time] =
-				(baseAlbedo ?? surface.ALBEDO.BASE) +
-				polarAlbedoBoost(lats_deg[i], orbital.OBLIQUITY)
+				(iceAlbedoFeedback ?? true)
+					? iceAlbedoAt(temperature[i][time], base, ice, couplingFactor)
+					: base
 		}
 	},
 }

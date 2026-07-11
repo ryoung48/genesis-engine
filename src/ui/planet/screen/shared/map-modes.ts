@@ -38,7 +38,11 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["temperature", "Temperature"],
 	["realTemperature", "Observed Temp"],
 	["temperatureDiff", "EBM - Real"],
+	["realDtr", "Observed DTR"],
+	["dtrDiff", "DTR Diff"],
 	["precipitation", "Rain"],
+	["realPrecipitation", "Observed Rain"],
+	["precipitationDiff", "Rain Diff"],
 	["dangerZones", "Danger"],
 	["trade_goods", "Trade Goods"],
 ]

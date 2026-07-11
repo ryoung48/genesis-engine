@@ -275,6 +275,9 @@ function serializeWorld(
 		koppenClimate: world.koppenClimate,
 		vegetation: world.vegetation,
 		topography: world.topography,
+		eu5Topography: world.eu5Topography,
+		eu5Vegetation: world.eu5Vegetation,
+		eu5Climate: world.eu5Climate,
 		coastal: world.coastal,
 		waterAccess: world.waterAccess,
 		riverAccess: world.riverAccess,
@@ -341,6 +344,7 @@ function serializeWorld(
 		hydrology: world.hydrology
 			? { aet_monthly: world.hydrology.aet_monthly }
 			: undefined,
+		observedDtr: world.observedDtr,
 		tradeGoods: world.tradeGoods?.material,
 		settlementRegions: world.settlementRegions,
 		settlementWaterLandmarks: world.settlementWaterLandmarks,
@@ -512,6 +516,10 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			world.rainfall.east.buffer,
 			world.rainfall.west.buffer,
 		)
+		if (world.rainfall.real_monthly) add(world.rainfall.real_monthly.buffer)
+		if (world.rainfall.real_annual) add(world.rainfall.real_annual.buffer)
+		if (world.rainfall.diff_monthly) add(world.rainfall.diff_monthly.buffer)
+		if (world.rainfall.diff_annual) add(world.rainfall.diff_annual.buffer)
 	}
 	if (world.cycloneRisk) add(world.cycloneRisk.buffer)
 	if (world.tornadoRisk) add(world.tornadoRisk.buffer)
@@ -545,6 +553,12 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.slopeScore) add(world.slopeScore.buffer)
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)
+	if (world.observedDtr?.real_monthly)
+		add(world.observedDtr.real_monthly.buffer)
+	if (world.observedDtr?.real_annual) add(world.observedDtr.real_annual.buffer)
+	if (world.observedDtr?.diff_monthly)
+		add(world.observedDtr.diff_monthly.buffer)
+	if (world.observedDtr?.diff_annual) add(world.observedDtr.diff_annual.buffer)
 	if (world.hydrology) add(world.hydrology.aet_monthly.buffer)
 	if (world.isLand) add(world.isLand.buffer)
 	if (world.riverLand) add(world.riverLand.buffer)

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "format": "int16-single-band-categorical",
+  "field": "eu5_climate",
+  "width": 1440,
+  "height": 720,
+  "nodata": -32768,
+  "categories": [
+    "arctic",
+    "arid",
+    "cold_arid",
+    "continental",
+    "mediterranean",
+    "oceanic",
+    "subtropical",
+    "tropical"
+  ],
+  "source": "c:\\Users\\rayou\\Downloads\\EU5toGIS\\EU5toGIS\\datasets\\locations.tif + c:\\Users\\rayou\\Downloads\\EU5toGIS\\EU5toGIS\\datasets\\locations_L.tif + c:\\Users\\rayou\\Downloads\\EU5toGIS\\EU5toGIS\\datasets\\locations.gpkg",
+  "bin": "eu5-climate.bin"
+}

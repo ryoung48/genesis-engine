@@ -4,6 +4,7 @@ import type {
 	GenesisClimate,
 	GenesisHazards,
 	GenesisHydrology,
+	GenesisObservedDtr,
 	GenesisOceanCurrents,
 	GenesisRainfall,
 	GenesisVolcanism,
@@ -73,6 +74,12 @@ export interface GenesisWorld {
 	vegetation: Uint8Array
 	/** Per-cell topography code, index into GENESIS_TOPOGRAPHY_LABELS */
 	topography: Uint8Array
+	/** Per-cell EU5 (Project Caesar) location topography code, -1 if unmapped. Index into EU5_TOPOGRAPHY_CATEGORIES in src/ui/planet/colors.ts. Earth-import only. */
+	eu5Topography?: Int16Array
+	/** Per-cell EU5 location vegetation code, -1 if unmapped. Index into EU5_VEGETATION_CATEGORIES. Earth-import only. */
+	eu5Vegetation?: Int16Array
+	/** Per-cell EU5 location climate code, -1 if unmapped. Index into EU5_CLIMATE_CATEGORIES. Earth-import only. */
+	eu5Climate?: Int16Array
 	/** Per-cell coastal flag (1 = borders ocean or lake, 0 = otherwise). */
 	coastal: Uint8Array
 	/** Per-province water access level (0=none, 1=river/lake, 2=ocean). */
@@ -86,6 +93,7 @@ export interface GenesisWorld {
 	rivers: GenesisRivers
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
+	observedDtr?: GenesisObservedDtr
 	hydrology: GenesisHydrology
 	isLand: Uint8Array
 	riverLand: Uint8Array

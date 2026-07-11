@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"format": "int16-month-major",
+	"field": "worldclim_monthly_precipitation_mm",
+	"width": 360,
+	"height": 180,
+	"months": 12,
+	"scale": 1.0,
+	"nodata": -32768,
+	"source": "C:\\Users\\rayou\\Downloads\\wc2.1_10m_prec",
+	"bin": "earth-real-precipitation.bin"
+}

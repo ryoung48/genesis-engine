@@ -13,6 +13,7 @@
 		"gen:history": "vitest run --project smoke src/model/history/history.smoke.test.ts",
 		"gen:snapshot": "vitest run --project smoke src/model/history/snapshot.smoke.test.ts",
 		"gen:world": "vitest run --project smoke src/model/pipelines/generate-default-world.smoke.test.ts",
+		"gen:world:earth-temp-compare": "vitest run --project smoke src/model/pipelines/earth-real-temperature-compare.smoke.test.ts",
 		"knip": "knip"
 	},
 	"dependencies": {

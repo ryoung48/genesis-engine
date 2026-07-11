@@ -1,8 +1,10 @@
 import type { ColorMode } from "../../colors"
 import type {
+	ClimateSubMode,
 	DangerSubMode,
 	LabelMode,
 	MeasureMode,
+	TopographySubMode,
 	VegetationSubMode,
 } from "../../controls/OverlayControls"
 import type { GenesisViewMode } from "../../renderer"
@@ -52,9 +54,9 @@ interface StoredViewPrefs {
 	clockMonthMode: "annual" | "monthly"
 	clockMonth: number
 	vegetationSubMode: VegetationSubMode
-	climateSubMode: "basic" | "pasta" | "koppen"
+	climateSubMode: ClimateSubMode
 	elevationSubMode: "colored" | "grayscale"
-	topographySubMode: "classification" | "slope"
+	topographySubMode: TopographySubMode
 	dangerSubMode: DangerSubMode
 }
 
@@ -66,8 +68,12 @@ const COLOR_MODES = new Set<ColorMode>([
 	"temperature",
 	"realTemperature",
 	"temperatureDiff",
+	"realDtr",
+	"dtrDiff",
 	"temperatureDelta",
 	"precipitation",
+	"realPrecipitation",
+	"precipitationDiff",
 	"moisture",
 	"vegetation",
 	"vegetationMaps",
@@ -373,13 +379,15 @@ export function parseStoredViewPrefs(
 			vegetationSubMode:
 				parsed.vegetationSubMode === "base" ||
 				parsed.vegetationSubMode === "maps" ||
-				parsed.vegetationSubMode === "satellite"
+				parsed.vegetationSubMode === "satellite" ||
+				parsed.vegetationSubMode === "eu5"
 					? parsed.vegetationSubMode
 					: DEFAULT_VIEW_PREFS.vegetationSubMode,
 			climateSubMode:
 				parsed.climateSubMode === "basic" ||
 				parsed.climateSubMode === "pasta" ||
-				parsed.climateSubMode === "koppen"
+				parsed.climateSubMode === "koppen" ||
+				parsed.climateSubMode === "eu5"
 					? parsed.climateSubMode
 					: DEFAULT_VIEW_PREFS.climateSubMode,
 			elevationSubMode:
@@ -389,7 +397,8 @@ export function parseStoredViewPrefs(
 					: DEFAULT_VIEW_PREFS.elevationSubMode,
 			topographySubMode:
 				parsed.topographySubMode === "classification" ||
-				parsed.topographySubMode === "slope"
+				parsed.topographySubMode === "slope" ||
+				parsed.topographySubMode === "eu5"
 					? parsed.topographySubMode
 					: DEFAULT_VIEW_PREFS.topographySubMode,
 			dangerSubMode:

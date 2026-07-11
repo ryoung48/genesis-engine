@@ -133,7 +133,10 @@ function smoothLoopToLonLatRing(
 		(t) => new THREE.Vector3(t_xyz[3 * t], t_xyz[3 * t + 1], t_xyz[3 * t + 2]),
 	)
 	const curve = new THREE.CatmullRomCurve3(points, true, "catmullrom", 0.5)
-	const sampleCount = Math.min(2000, Math.max(8, loop.length * samplesPerSegment))
+	const sampleCount = Math.min(
+		2000,
+		Math.max(8, loop.length * samplesPerSegment),
+	)
 	const sampled = curve.getPoints(sampleCount)
 
 	const ring: number[] = []

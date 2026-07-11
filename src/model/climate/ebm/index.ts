@@ -1,4 +1,4 @@
-import { ALBEDO, meanPolarAlbedoBoost } from "./albedo"
+import { ALBEDO } from "./albedo"
 import { EMB_CONSTANTS } from "./constants"
 import { INSOLATION } from "./insolation"
 
@@ -107,6 +107,14 @@ interface EBMConfig {
 		YEAR_LENGTH_DAYS?: number
 		HOURS_PER_DAY?: number
 	}
+	/**
+	 * Enables the smooth, temperature-driven ice/snow albedo transition (see
+	 * albedo.ts's iceAlbedoAt). Defaults to true. Set false for bodies whose
+	 * `albedo` is already a real, empirically-measured whole-body Bond albedo
+	 * (every case in sol-bodies-refit.smoke.test.ts) -- synthetic ice modeling
+	 * would override that known value instead of refining it.
+	 */
+	iceAlbedoFeedback?: boolean
 }
 
 const radiansToDegrees = (rad: number) => rad * (180 / Math.PI)
@@ -314,11 +322,9 @@ export class EnergyBalanceModel {
 			stellar.T_SUN ** 4 *
 			((stellar.R_SUN * stellar.R_SUN) / (stellar.AU * stellar.AU))
 		// A single characteristic albedo just to center the linearization --
-		// the real per-cell albedo (ALBEDO.update's ice/base table) still
-		// drives the actual absorbed flux every step.
-		const albedoEstimate =
-			(this.config.albedo ?? surface.ALBEDO.BASE) +
-			meanPolarAlbedoBoost(this.config.orbital.OBLIQUITY)
+		// the real per-cell albedo (ALBEDO.update's temperature-driven ice
+		// transition) still drives the actual absorbed flux every step.
+		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
 		const internalHeatTempK = this.config.internalHeatTempK ?? 0
 		this.internalHeatFlux = stellar.SIGMA * internalHeatTempK ** 4
 		const meanSolarFlux = (s0 * (1 - albedoEstimate)) / 4
@@ -356,11 +362,9 @@ export class EnergyBalanceModel {
 	private seedPerLatitudeEquilibrium(): void {
 		const { grid, surface } = EMB_CONSTANTS
 		// Same characteristic-albedo simplification computeGreenhouseOLR()
-		// uses -- the actual per-day ice/base table needs a temperature to
+		// uses -- the actual per-day ice transition needs a temperature to
 		// evaluate, which is exactly what we're solving for.
-		const albedoEstimate =
-			(this.config.albedo ?? surface.ALBEDO.BASE) +
-			meanPolarAlbedoBoost(this.config.orbital.OBLIQUITY)
+		const albedoEstimate = this.config.albedo ?? surface.ALBEDO.BASE
 		const lower = new Array(grid.NUM_LAT)
 		const diag = new Array(grid.NUM_LAT)
 		const upper = new Array(grid.NUM_LAT)
@@ -414,12 +418,12 @@ export class EnergyBalanceModel {
 
 		ALBEDO.update({
 			albedo: this.albedo,
-			lats_deg: this.lats_deg,
 			temperature: this.temperature,
 			time: nextIdx,
-			orbital: this.config.orbital,
 			baseAlbedo: this.config.albedo,
 			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
 		})
 	}
 
@@ -473,12 +477,12 @@ export class EnergyBalanceModel {
 
 		ALBEDO.update({
 			albedo: this.albedo,
-			lats_deg: this.lats_deg,
 			temperature: this.temperature,
 			time: 0,
-			orbital: this.config.orbital,
 			baseAlbedo: this.config.albedo,
 			iceAlbedo: this.config.iceAlbedo,
+			iceAlbedoFeedback: this.config.iceAlbedoFeedback,
+			pressure: this.config.pressure,
 		})
 	}
 

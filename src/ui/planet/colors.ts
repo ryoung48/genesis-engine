@@ -32,8 +32,12 @@ export type ColorMode =
 	| "temperature"
 	| "realTemperature"
 	| "temperatureDiff"
+	| "realDtr"
+	| "dtrDiff"
 	| "temperatureDelta"
 	| "precipitation"
+	| "realPrecipitation"
+	| "precipitationDiff"
 	| "moisture"
 	| "vegetation"
 	| "vegetationMaps"
@@ -55,9 +59,144 @@ export type ColorMode =
 	| "timezone"
 	| "wind"
 	| "misery"
+	| "eu5Topography"
+	| "eu5Vegetation"
+	| "eu5Climate"
 
 /** Light blue used for ocean on thematic maps (non-terrain modes). */
 export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
+
+/**
+ * EU5 (Project Caesar) location category labels, in the fixed alphabetical
+ * order produced by scripts/build-eu5-categorical.py (`sorted()` over each
+ * field's distinct values from locations.gpkg). The per-region category
+ * codes stored on GenesisWorld.eu5Topography/eu5Vegetation/eu5Climate are
+ * indices into these arrays; keep them in sync with the .json `categories`
+ * field the build script writes to public/heightmap/eu5-*.json.
+ */
+export const EU5_TOPOGRAPHY_CATEGORIES = [
+	"atoll",
+	"coastal_ocean",
+	"deep_ocean",
+	"dune_wasteland",
+	"flatland",
+	"flatland_wasteland",
+	"high_lakes",
+	"hills",
+	"hills_wasteland",
+	"inland_sea",
+	"lakes",
+	"mesa_wasteland",
+	"mountain_wasteland",
+	"mountains",
+	"narrows",
+	"ocean",
+	"ocean_wasteland",
+	"plateau",
+	"plateau_wasteland",
+	"salt_pans",
+	"wetlands",
+	"wetlands_wasteland",
+] as const
+
+export const EU5_VEGETATION_CATEGORIES = [
+	"desert",
+	"farmland",
+	"forest",
+	"grasslands",
+	"jungle",
+	"sparse",
+	"woods",
+] as const
+
+export const EU5_CLIMATE_CATEGORIES = [
+	"arctic",
+	"arid",
+	"cold_arid",
+	"continental",
+	"mediterranean",
+	"oceanic",
+	"subtropical",
+	"tropical",
+] as const
+
+function hex(rgb: number): [number, number, number] {
+	return [
+		((rgb >> 16) & 0xff) / 255,
+		((rgb >> 8) & 0xff) / 255,
+		(rgb & 0xff) / 255,
+	]
+}
+
+// EU5 category colors below reuse the app's existing topography
+// (TOPOGRAPHY_COLORS in region-colors.ts) and vegetation (biomeBaseColors
+// above) palettes wherever a category is conceptually the same landform or
+// cover type, so the EU5 overlay reads consistently with the procedural
+// "Topography"/"Vegetation" overlays. Categories with no clean equivalent
+// (atoll, salt_pans, farmland, wasteland-of-nothing textures) keep bespoke
+// semantic colors.
+const TOPO_FLAT = hex(0x6c9d35)
+const TOPO_HILL = hex(0x728476)
+const TOPO_PLATEAU = hex(0x92762d)
+const TOPO_MOUNTAINS = hex(0x6c2c14)
+const TOPO_MARSH = hex(0x2d8e72)
+const TOPO_OCEAN = hex(0x75afd4)
+const TOPO_LAKE = TOPO_OCEAN
+const VEG_DESERT = hex(0xccc4bc)
+const VEG_SPARSE = hex(0xa0a696)
+const VEG_GRASSLANDS = hex(0x8e9a82)
+const VEG_WOODS = hex(0x78806a)
+const VEG_FOREST = hex(0x525c4a)
+const VEG_JUNGLE = hex(0x344432)
+
+/** Flat per-category colors for the "eu5Topography" overlay, index-aligned to EU5_TOPOGRAPHY_CATEGORIES. */
+export const EU5_TOPOGRAPHY_COLORS: [number, number, number][] = [
+	hex(0x4fc3d9), // atoll (no app equivalent)
+	TOPO_OCEAN, // coastal_ocean
+	TOPO_OCEAN, // deep_ocean
+	VEG_DESERT, // dune_wasteland (dunes ~ desert cover)
+	TOPO_FLAT, // flatland
+	TOPO_FLAT, // flatland_wasteland (same landform, barren)
+	TOPO_LAKE, // high_lakes
+	TOPO_HILL, // hills
+	TOPO_HILL, // hills_wasteland
+	TOPO_OCEAN, // inland_sea
+	TOPO_LAKE, // lakes
+	TOPO_PLATEAU, // mesa_wasteland (mesa ~ plateau landform)
+	TOPO_MOUNTAINS, // mountain_wasteland
+	TOPO_MOUNTAINS, // mountains
+	TOPO_OCEAN, // narrows
+	TOPO_OCEAN, // ocean
+	TOPO_OCEAN, // ocean_wasteland
+	TOPO_PLATEAU, // plateau
+	TOPO_PLATEAU, // plateau_wasteland
+	hex(0xe8e2c8), // salt_pans (no app equivalent)
+	TOPO_MARSH, // wetlands
+	TOPO_MARSH, // wetlands_wasteland
+]
+
+/** Flat per-category colors for the "eu5Vegetation" overlay, index-aligned to EU5_VEGETATION_CATEGORIES. */
+export const EU5_VEGETATION_COLORS: [number, number, number][] = [
+	VEG_DESERT, // desert
+	hex(0xc9d15a), // farmland (no app equivalent)
+	VEG_FOREST, // forest
+	VEG_GRASSLANDS, // grasslands
+	VEG_JUNGLE, // jungle
+	VEG_SPARSE, // sparse
+	VEG_WOODS, // woods
+]
+
+/** Flat per-category colors for the "eu5Climate" overlay, index-aligned to EU5_CLIMATE_CATEGORIES. */
+export const EU5_CLIMATE_COLORS: [number, number, number][] = [
+	hex(0xe6f0f5), // arctic
+	hex(0xd9b36a), // arid
+	hex(0xb08f6a), // cold_arid
+	hex(0x6a9c6a), // continental
+	hex(0xd97a4a), // mediterranean
+	hex(0x5a9ac2), // oceanic
+	hex(0xe0a84a), // subtropical
+	hex(0xc2453a), // tropical
+]
 export const VEGETATION_WATER_BLUE: [number, number, number] = [
 	0x90 / 255,
 	0xd9 / 255,
@@ -260,6 +399,39 @@ export function precipitationAnnualColor(mm: number): [number, number, number] {
 
 export function precipitationColor(mm: number): [number, number, number] {
 	return precipitationMonthlyColor(mm)
+}
+
+const precipDiffStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: -200, r: 0.35, g: 0.16, b: 0.06 },
+	{ v: -100, r: 0.79, g: 0.46, b: 0.18 },
+	{ v: -25, r: 0.96, g: 0.86, b: 0.62 },
+	{ v: 0, r: 0.98, g: 0.97, b: 0.95 },
+	{ v: 25, r: 0.76, g: 0.9, b: 0.78 },
+	{ v: 100, r: 0.23, g: 0.63, b: 0.69 },
+	{ v: 200, r: 0.08, g: 0.28, b: 0.48 },
+]
+
+export function precipitationDifferenceColor(
+	diffMm: number,
+): [number, number, number] {
+	const clamped = Math.max(
+		precipDiffStops[0].v,
+		Math.min(precipDiffStops[precipDiffStops.length - 1].v, diffMm),
+	)
+	for (let i = 0; i < precipDiffStops.length - 1; i++) {
+		const a = precipDiffStops[i]
+		const b = precipDiffStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = precipDiffStops[precipDiffStops.length - 1]
+	return [last.r, last.g, last.b]
 }
 
 const eastMoistureTints: [number, number, number][] = [
@@ -782,6 +954,12 @@ export function dtrColor(celsius: number): [number, number, number] {
 	}
 	const last = dtrStops[dtrStops.length - 1]
 	return [last.r, last.g, last.b]
+}
+
+export function dtrDifferenceColor(
+	celsiusDiff: number,
+): [number, number, number] {
+	return temperatureDifferenceColor(celsiusDiff)
 }
 
 // Relative-humidity ramp (0–100%): ochre → muted brown-gray-purple → dark blue-purple → saturated blue → violet-blue → cyan.

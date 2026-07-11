@@ -71,6 +71,12 @@ export interface HoverTemperatureSeries {
 	monthly: number[]
 }
 
+export interface HoverRainfallSeries {
+	value: number
+	annual: number
+	monthly: number[]
+}
+
 export interface HoverHumidity {
 	value: number
 	annual: number
@@ -158,26 +164,133 @@ export function getHoverRainfall(
 		: null
 }
 
+function getHoverRainfallSeriesFromArrays(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	rainfallMonth: number,
+	annual: Float32Array | undefined,
+	monthly: Float32Array | undefined,
+): HoverRainfallSeries | null {
+	const region = hoverInfo?.region
+	const canShowRainfall =
+		region !== undefined &&
+		annual &&
+		(!!world?.isLand?.[region] ||
+			(world?.landmarks != null &&
+				world.landmarks.regionLandmark[region] >= 0 &&
+				world.landmarks.type[world.landmarks.regionLandmark[region]] ===
+					LANDMARK_TYPE_LAKE))
+	if (!(hoverInfo && world && canShowRainfall)) return null
+	const r = hoverInfo.region
+	const N = world.mesh.numRegions
+	const monthlyValues: number[] = []
+	if (monthly) {
+		for (let m = 0; m < 12; m++)
+			monthlyValues.push(monthly[m * N + r] ?? annual[r])
+	}
+	return {
+		value:
+			rainfallMonth === 0
+				? annual[r]
+				: (monthlyValues[rainfallMonth - 1] ?? annual[r]),
+		annual: annual[r],
+		monthly: monthlyValues,
+	}
+}
+
+export function getHoverRealRainfall(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	rainfallMonth: number,
+): HoverRainfallSeries | null {
+	return getHoverRainfallSeriesFromArrays(
+		hoverInfo,
+		world,
+		rainfallMonth,
+		world?.rainfall?.real_annual,
+		world?.rainfall?.real_monthly,
+	)
+}
+
+export function getHoverRainfallDiff(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	rainfallMonth: number,
+): HoverRainfallSeries | null {
+	return getHoverRainfallSeriesFromArrays(
+		hoverInfo,
+		world,
+		rainfallMonth,
+		world?.rainfall?.diff_annual,
+		world?.rainfall?.diff_monthly,
+	)
+}
+
 export function getHoverDtr(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 ): HoverDtr | null {
-	if (!(hoverInfo && world?.dtr_annual)) return null
+	return getHoverDtrSeries(
+		hoverInfo,
+		world,
+		dtrMonth,
+		world?.dtr_annual,
+		world?.dtr_monthly,
+	)
+}
+
+function getHoverDtrSeries(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+	annual: Float32Array | undefined,
+	monthlySource: Float32Array | undefined,
+): HoverDtr | null {
+	if (!(hoverInfo && world && annual)) return null
 	const r = hoverInfo.region
-	const annual = world.dtr_annual[r]
+	const annualValue = annual[r]
 	const monthly: number[] = []
-	if (world.dtr_monthly) {
+	if (monthlySource) {
 		const N = world.mesh.numRegions
 		for (let m = 0; m < 12; m++) {
-			monthly.push(world.dtr_monthly[m * N + r] ?? annual)
+			monthly.push(monthlySource[m * N + r] ?? annualValue)
 		}
 	}
 	return {
-		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
-		annual,
+		value:
+			dtrMonth === 0 ? annualValue : (monthly[dtrMonth - 1] ?? annualValue),
+		annual: annualValue,
 		monthly,
 	}
+}
+
+export function getHoverRealDtr(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+): HoverDtr | null {
+	return getHoverDtrSeries(
+		hoverInfo,
+		world,
+		dtrMonth,
+		world?.observedDtr?.real_annual,
+		world?.observedDtr?.real_monthly,
+	)
+}
+
+export function getHoverDtrDiff(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+): HoverDtr | null {
+	return getHoverDtrSeries(
+		hoverInfo,
+		world,
+		dtrMonth,
+		world?.observedDtr?.diff_annual,
+		world?.observedDtr?.diff_monthly,
+	)
 }
 
 function getHoverMonthlySeries(
@@ -193,10 +306,12 @@ function getHoverMonthlySeries(
 	const monthlyValues: number[] = []
 	if (monthly) {
 		const N = world.mesh.numRegions
-		for (let m = 0; m < 12; m++) monthlyValues.push(monthly[m * N + r] ?? annualValue)
+		for (let m = 0; m < 12; m++)
+			monthlyValues.push(monthly[m * N + r] ?? annualValue)
 	}
 	return {
-		value: month === 0 ? annualValue : (monthlyValues[month - 1] ?? annualValue),
+		value:
+			month === 0 ? annualValue : (monthlyValues[month - 1] ?? annualValue),
 		annual: annualValue,
 		monthly: monthlyValues,
 	}

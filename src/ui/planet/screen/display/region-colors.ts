@@ -20,6 +20,7 @@ import {
 	cycloneLandColor,
 	developmentColor,
 	dtrColor,
+	dtrDifferenceColor,
 	earthquakeLandColor,
 	getColor,
 	hotspotColor,
@@ -31,12 +32,16 @@ import {
 	populationColor,
 	precipitationAnnualColor,
 	precipitationColor,
+	precipitationDifferenceColor,
 	slopeColor,
 	temperatureColor,
-	temperatureDifferenceColor,
 	temperatureDeltaColor,
+	temperatureDifferenceColor,
 	tidalTierColor,
 	tornadoLandColor,
+	EU5_CLIMATE_COLORS,
+	EU5_TOPOGRAPHY_COLORS,
+	EU5_VEGETATION_COLORS,
 	VEGETATION_WATER_BLUE,
 	vegetationColor,
 	vegetationMapColor,
@@ -338,6 +343,42 @@ export function computeRegionColors(
 	}
 
 	if (
+		colorMode === "eu5Topography" ||
+		colorMode === "eu5Vegetation" ||
+		colorMode === "eu5Climate"
+	) {
+		const codes =
+			colorMode === "eu5Topography"
+				? world.eu5Topography
+				: colorMode === "eu5Vegetation"
+					? world.eu5Vegetation
+					: world.eu5Climate
+		const palette =
+			colorMode === "eu5Topography"
+				? EU5_TOPOGRAPHY_COLORS
+				: colorMode === "eu5Vegetation"
+					? EU5_VEGETATION_COLORS
+					: EU5_CLIMATE_COLORS
+		// Outside the EU5 map's coverage (most of the globe -- this is a
+		// regional dataset, not a whole-world one) or nodata: fall back to
+		// ocean shading for water, neutral gray for land.
+		const NO_COVERAGE_LAND: [number, number, number] = [0.55, 0.53, 0.5]
+		for (let r = 0; r < N; r++) {
+			const code = codes?.[r] ?? -1
+			const color =
+				code >= 0 && code < palette.length
+					? palette[code]
+					: isOceanRegion(r)
+						? oceanRgb(r)
+						: NO_COVERAGE_LAND
+			rgb[3 * r] = color[0]
+			rgb[3 * r + 1] = color[1]
+			rgb[3 * r + 2] = color[2]
+		}
+		return rgb
+	}
+
+	if (
 		(colorMode === "temperature" ||
 			colorMode === "realTemperature" ||
 			colorMode === "temperatureDiff" ||
@@ -386,15 +427,27 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "precipitation" && world.rainfall) {
+	if (
+		(colorMode === "precipitation" ||
+			colorMode === "realPrecipitation" ||
+			colorMode === "precipitationDiff") &&
+		world.rainfall
+	) {
 		if (rainfallMonth === 0) {
 			for (let r = 0; r < N; r++) {
+				const annualValue =
+					colorMode === "realPrecipitation"
+						? world.rainfall.real_annual?.[r]
+						: colorMode === "precipitationDiff"
+							? world.rainfall.diff_annual?.[r]
+							: world.rainfall.annual[r]
+				const baseColor =
+					colorMode === "precipitationDiff"
+						? precipitationDifferenceColor(annualValue ?? 0)
+						: precipitationAnnualColor(annualValue ?? 0)
 				const [cr, cg, cb] = isOceanRegion(r)
 					? oceanRgb(r)
-					: darkenClimateAtElevation(
-							precipitationAnnualColor(world.rainfall.annual[r]),
-							world.elevation_km[r],
-						)
+					: darkenClimateAtElevation(baseColor, world.elevation_km[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -402,12 +455,19 @@ export function computeRegionColors(
 		} else {
 			const offset = (rainfallMonth - 1) * N
 			for (let r = 0; r < N; r++) {
+				const monthlyValue =
+					colorMode === "realPrecipitation"
+						? world.rainfall.real_monthly?.[offset + r]
+						: colorMode === "precipitationDiff"
+							? world.rainfall.diff_monthly?.[offset + r]
+							: world.rainfall.monthly[offset + r]
+				const baseColor =
+					colorMode === "precipitationDiff"
+						? precipitationDifferenceColor(monthlyValue ?? 0)
+						: precipitationColor(monthlyValue ?? 0)
 				const [cr, cg, cb] = isOceanRegion(r)
 					? oceanRgb(r)
-					: darkenClimateAtElevation(
-							precipitationColor(world.rainfall.monthly[offset + r]),
-							world.elevation_km[r],
-						)
+					: darkenClimateAtElevation(baseColor, world.elevation_km[r])
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -560,16 +620,40 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "dtr" && world.dtr_annual) {
-		const monthly = dtrMonth === 0 ? null : world.dtr_monthly
+	if (
+		(colorMode === "dtr" ||
+			colorMode === "realDtr" ||
+			colorMode === "dtrDiff") &&
+		world.dtr_annual
+	) {
+		const annual =
+			colorMode === "realDtr"
+				? world.observedDtr?.real_annual
+				: colorMode === "dtrDiff"
+					? world.observedDtr?.diff_annual
+					: world.dtr_annual
+		const monthly =
+			dtrMonth === 0
+				? null
+				: colorMode === "realDtr"
+					? world.observedDtr?.real_monthly
+					: colorMode === "dtrDiff"
+						? world.observedDtr?.diff_monthly
+						: world.dtr_monthly
 		const offset = monthly ? (dtrMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = isLandRegion(r)
-				? dtrColor(
-						monthly
-							? (monthly[offset + r] ?? world.dtr_annual[r])
-							: world.dtr_annual[r],
-					)
+				? colorMode === "dtrDiff"
+					? dtrDifferenceColor(
+							monthly
+								? (monthly[offset + r] ?? annual?.[r] ?? 0)
+								: (annual?.[r] ?? 0),
+						)
+					: dtrColor(
+							monthly
+								? (monthly[offset + r] ?? annual?.[r] ?? 0)
+								: (annual?.[r] ?? 0),
+						)
 				: oceanRgb(r)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg

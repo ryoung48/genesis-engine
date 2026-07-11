@@ -1,4 +1,3 @@
-export type { GenesisLandmarks } from "./terrain/landmarks"
 export type {
 	GenesisClimate,
 	GenesisHazards,

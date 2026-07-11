@@ -66,6 +66,10 @@ export interface SerializedGenesisWorld {
 	rainfall: {
 		monthly: Float32Array
 		annual: Float32Array
+		real_monthly?: Float32Array
+		real_annual?: Float32Array
+		diff_monthly?: Float32Array
+		diff_annual?: Float32Array
 		east: Float32Array
 		west: Float32Array
 	}
@@ -107,6 +111,9 @@ export interface SerializedGenesisWorld {
 	koppenClimate: Uint8Array
 	vegetation: Uint8Array
 	topography: Uint8Array
+	eu5Topography?: Int16Array
+	eu5Vegetation?: Int16Array
+	eu5Climate?: Int16Array
 	coastal: Uint8Array
 	waterAccess?: Uint8Array
 	riverAccess?: Uint8Array
@@ -116,6 +123,12 @@ export interface SerializedGenesisWorld {
 	riverLand: Uint8Array
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
+	observedDtr?: {
+		real_monthly?: Float32Array
+		real_annual?: Float32Array
+		diff_monthly?: Float32Array
+		diff_annual?: Float32Array
+	}
 	rivers: {
 		lines: [number, number, number, number][][]
 		maxFlow: number
@@ -448,6 +461,35 @@ export type GenesisWorkerRequest =
 				realClimateMonths?: number
 				realClimateScale?: number
 				realClimateNoData?: number
+				realPrecipMonthly?: Int16Array
+				realPrecipWidth?: number
+				realPrecipHeight?: number
+				realPrecipMonths?: number
+				realPrecipScale?: number
+				realPrecipNoData?: number
+				realDtrMonthly?: Int16Array
+				realDtrWidth?: number
+				realDtrHeight?: number
+				realDtrMonths?: number
+				realDtrScale?: number
+				realDtrNoData?: number
+				realElevationRaster?: Int16Array
+				realElevationWidth?: number
+				realElevationHeight?: number
+				realElevationScale?: number
+				realElevationNoData?: number
+				eu5TopographyRaster?: Int16Array
+				eu5TopographyWidth?: number
+				eu5TopographyHeight?: number
+				eu5TopographyNoData?: number
+				eu5VegetationRaster?: Int16Array
+				eu5VegetationWidth?: number
+				eu5VegetationHeight?: number
+				eu5VegetationNoData?: number
+				eu5ClimateRaster?: Int16Array
+				eu5ClimateWidth?: number
+				eu5ClimateHeight?: number
+				eu5ClimateNoData?: number
 				terrainWarp: number
 				smoothing: number
 				hydraulicErosion: number
@@ -470,6 +512,8 @@ export type GenesisWorkerRequest =
 				substellarLon?: number
 				perihelion?: number
 				pressure?: number
+				albedo?: number
+				greenhouseFactor?: number
 				moonCount?: number
 			}
 	  }

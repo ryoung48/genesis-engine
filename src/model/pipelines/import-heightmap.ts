@@ -62,6 +62,49 @@ interface ImportParams {
 	realClimateMonths?: number
 	realClimateScale?: number
 	realClimateNoData?: number
+	realPrecipMonthly?: Int16Array
+	realPrecipWidth?: number
+	realPrecipHeight?: number
+	realPrecipMonths?: number
+	realPrecipScale?: number
+	realPrecipNoData?: number
+	realDtrMonthly?: Int16Array
+	realDtrWidth?: number
+	realDtrHeight?: number
+	realDtrMonths?: number
+	realDtrScale?: number
+	realDtrNoData?: number
+	/**
+	 * Real-world elevation (meters, single band -- ocean is nodata, this
+	 * covers land only), sampled onto each land region and substituted for
+	 * elevation_km after applySeaLevelToElevation. The 8-bit grayscale
+	 * heightmap's sqrt-curve elevation reconstruction has its own systematic
+	 * error independent of terrain-warp/erosion (overestimates mid-range
+	 * elevation, underestimates the highest peaks -- see
+	 * earth-real-temperature-compare.smoke.test.ts's elevation-bin
+	 * diagnostic), so this replaces it outright for land cells rather than
+	 * just skipping erosion on top of the same flawed base.
+	 */
+	realElevationRaster?: Int16Array
+	realElevationWidth?: number
+	realElevationHeight?: number
+	realElevationScale?: number
+	realElevationNoData?: number
+	/** EU5 (Project Caesar) location topography/vegetation/climate category
+	 * codes, sampled nearest-neighbor onto each region. Index into the
+	 * matching EU5_*_CATEGORIES array in src/ui/planet/colors.ts. */
+	eu5TopographyRaster?: Int16Array
+	eu5TopographyWidth?: number
+	eu5TopographyHeight?: number
+	eu5TopographyNoData?: number
+	eu5VegetationRaster?: Int16Array
+	eu5VegetationWidth?: number
+	eu5VegetationHeight?: number
+	eu5VegetationNoData?: number
+	eu5ClimateRaster?: Int16Array
+	eu5ClimateWidth?: number
+	eu5ClimateHeight?: number
+	eu5ClimateNoData?: number
 	terrainWarp: number
 	smoothing: number
 	hydraulicErosion: number
@@ -84,6 +127,11 @@ interface ImportParams {
 	substellarLon?: number
 	perihelion?: number
 	pressure?: number
+	/** Real per-body EBM overrides -- see GenesisParams.albedo/greenhouseFactor
+	 * doc. Pass both for a known real body (e.g. importing the real Earth
+	 * heightmap); leave unset for a generic imported heightmap. */
+	albedo?: number
+	greenhouseFactor?: number
 }
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -235,6 +283,79 @@ function sampleMonthlyFloatRaster(
 	return out
 }
 
+/** Single-band variant of sampleMonthlyFloatRaster (no month dimension) --
+ * same equirectangular lon/lat -> pixel convention. Returns NaN for regions
+ * where every bilinear tap is nodata (e.g. ocean, for a land-only raster
+ * like WorldClim elevation). */
+function sampleSingleBandFloatRaster(
+	mesh: SphereMesh,
+	raster: Int16Array,
+	rasterW: number,
+	rasterH: number,
+	scale: number,
+	nodata: number,
+): Float32Array {
+	const N = mesh.numRegions
+	const { r_xyz } = mesh
+	const out = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		const x = r_xyz[3 * r]
+		const y = r_xyz[3 * r + 1]
+		const z = r_xyz[3 * r + 2]
+
+		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
+		const lon = Math.atan2(y, x)
+		const px = (lon / Math.PI + 1) * 0.5 * rasterW
+		const py = (0.5 - lat / Math.PI) * rasterH
+
+		const x0 = Math.floor(px)
+		const y0 = Math.floor(py)
+		const x1 = (x0 + 1) % rasterW
+		const y1 = Math.min(y0 + 1, rasterH - 1)
+		const fx = px - x0
+		const fy = py - y0
+		const xi0 = (((x0 % rasterW) + rasterW) % rasterW) | 0
+		const yi0 = Math.max(0, Math.min(rasterH - 1, y0)) | 0
+
+		const q00 = raster[yi0 * rasterW + xi0]
+		const q10 = raster[yi0 * rasterW + x1]
+		const q01 = raster[y1 * rasterW + xi0]
+		const q11 = raster[y1 * rasterW + x1]
+		const v00 = q00 === nodata ? NaN : q00 * scale
+		const v10 = q10 === nodata ? NaN : q10 * scale
+		const v01 = q01 === nodata ? NaN : q01 * scale
+		const v11 = q11 === nodata ? NaN : q11 * scale
+
+		let weighted = 0
+		let weightSum = 0
+		if (Number.isFinite(v00)) {
+			const w = (1 - fx) * (1 - fy)
+			weighted += v00 * w
+			weightSum += w
+		}
+		if (Number.isFinite(v10)) {
+			const w = fx * (1 - fy)
+			weighted += v10 * w
+			weightSum += w
+		}
+		if (Number.isFinite(v01)) {
+			const w = (1 - fx) * fy
+			weighted += v01 * w
+			weightSum += w
+		}
+		if (Number.isFinite(v11)) {
+			const w = fx * fy
+			weighted += v11 * w
+			weightSum += w
+		}
+
+		out[r] = weightSum > 0 ? weighted / weightSum : NaN
+	}
+
+	return out
+}
+
 function attachObservedEarthClimate(params: {
 	mesh: SphereMesh
 	climate: GenesisWorld["climate"]
@@ -299,6 +420,139 @@ function attachObservedEarthClimate(params: {
 	climate.temperature_diff_avg = diffAnnual
 }
 
+function attachObservedEarthRainfall(params: {
+	mesh: SphereMesh
+	rainfall: GenesisWorld["rainfall"]
+	realPrecipMonthly: Int16Array
+	realPrecipWidth: number
+	realPrecipHeight: number
+	realPrecipMonths: number
+	realPrecipScale: number
+	realPrecipNoData: number
+}): void {
+	const {
+		mesh,
+		rainfall,
+		realPrecipMonthly,
+		realPrecipWidth,
+		realPrecipHeight,
+		realPrecipMonths,
+		realPrecipScale,
+		realPrecipNoData,
+	} = params
+	if (realPrecipMonths !== 12) return
+
+	const N = mesh.numRegions
+	const observedMonthly = sampleMonthlyFloatRaster(
+		mesh,
+		realPrecipMonthly,
+		realPrecipWidth,
+		realPrecipHeight,
+		realPrecipMonths,
+		realPrecipScale,
+		realPrecipNoData,
+	)
+	const observedAnnual = new Float32Array(N)
+	const diffMonthly = new Float32Array(N * realPrecipMonths)
+	const diffAnnual = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		let observedSum = 0
+		let observedCount = 0
+		let diffSum = 0
+		let diffCount = 0
+		for (let month = 0; month < realPrecipMonths; month++) {
+			const idx = month * N + r
+			const observed = observedMonthly[idx]
+			if (Number.isFinite(observed)) {
+				observedSum += observed
+				observedCount++
+				diffMonthly[idx] = rainfall.monthly[idx] - observed
+				diffSum += diffMonthly[idx]
+				diffCount++
+			} else {
+				diffMonthly[idx] = NaN
+			}
+		}
+		observedAnnual[r] = observedCount > 0 ? observedSum : NaN
+		diffAnnual[r] = diffCount > 0 ? diffSum : NaN
+	}
+
+	rainfall.real_monthly = observedMonthly
+	rainfall.real_annual = observedAnnual
+	rainfall.diff_monthly = diffMonthly
+	rainfall.diff_annual = diffAnnual
+}
+
+function attachObservedEarthDtr(params: {
+	mesh: SphereMesh
+	world: {
+		dtr_monthly: Float32Array
+		observedDtr?: GenesisWorld["observedDtr"]
+	}
+	realDtrMonthly: Int16Array
+	realDtrWidth: number
+	realDtrHeight: number
+	realDtrMonths: number
+	realDtrScale: number
+	realDtrNoData: number
+}): void {
+	const {
+		mesh,
+		world,
+		realDtrMonthly,
+		realDtrWidth,
+		realDtrHeight,
+		realDtrMonths,
+		realDtrScale,
+		realDtrNoData,
+	} = params
+	if (realDtrMonths !== 12) return
+
+	const N = mesh.numRegions
+	const observedMonthly = sampleMonthlyFloatRaster(
+		mesh,
+		realDtrMonthly,
+		realDtrWidth,
+		realDtrHeight,
+		realDtrMonths,
+		realDtrScale,
+		realDtrNoData,
+	)
+	const observedAnnual = new Float32Array(N)
+	const diffMonthly = new Float32Array(N * realDtrMonths)
+	const diffAnnual = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		let observedSum = 0
+		let observedCount = 0
+		let diffSum = 0
+		let diffCount = 0
+		for (let month = 0; month < realDtrMonths; month++) {
+			const idx = month * N + r
+			const observed = observedMonthly[idx]
+			if (Number.isFinite(observed)) {
+				observedSum += observed
+				observedCount++
+				diffMonthly[idx] = world.dtr_monthly[idx] - observed
+				diffSum += diffMonthly[idx]
+				diffCount++
+			} else {
+				diffMonthly[idx] = NaN
+			}
+		}
+		observedAnnual[r] = observedCount > 0 ? observedSum / observedCount : NaN
+		diffAnnual[r] = diffCount > 0 ? diffSum / diffCount : NaN
+	}
+
+	world.observedDtr = {
+		real_monthly: observedMonthly,
+		real_annual: observedAnnual,
+		diff_monthly: diffMonthly,
+		diff_annual: diffAnnual,
+	}
+}
+
 // Nearest-neighbor sample of a binary land/ocean mask (255 = land, 0 =
 // ocean), using the same lat/lon -> pixel convention as sampleHeightmap.
 // Nearest (not bilinear) is deliberate: the mask is a hard vector boundary,
@@ -331,6 +585,46 @@ function sampleCoastlineMask(
 	}
 
 	return isLand
+}
+
+// Nearest-neighbor sample of an EU5 categorical raster (topography/
+// vegetation/climate code per pixel). Nearest, not bilinear -- category
+// codes aren't a continuous field, so interpolating them is meaningless.
+// Returns -1 for regions the raster has no coverage for (nodata, or outside
+// the EU5 map's extent).
+function sampleCategoricalRaster(
+	mesh: SphereMesh,
+	raster: Int16Array,
+	rasterW: number,
+	rasterH: number,
+	nodata: number,
+): Int16Array {
+	const N = mesh.numRegions
+	const { r_xyz } = mesh
+	const out = new Int16Array(N)
+
+	for (let r = 0; r < N; r++) {
+		const x = r_xyz[3 * r]
+		const y = r_xyz[3 * r + 1]
+		const z = r_xyz[3 * r + 2]
+
+		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
+		const lon = Math.atan2(y, x)
+
+		const px =
+			((((lon / Math.PI + 1) * 0.5 * rasterW) % rasterW) + rasterW) % rasterW
+		const py = Math.max(
+			0,
+			Math.min(rasterH - 1, (0.5 - lat / Math.PI) * rasterH),
+		)
+
+		const xi = Math.min(rasterW - 1, Math.round(px))
+		const yi = Math.min(rasterH - 1, Math.round(py))
+		const value = raster[yi * rasterW + xi]
+		out[r] = value === nodata ? -1 : value
+	}
+
+	return out
 }
 
 // Clamps elevation sign to match the authoritative coastline mask so that
@@ -505,7 +799,8 @@ function buildRealRiversData(
 	})
 
 	let maxFlow = 0
-	for (const line of outLines) for (const [, , flow] of line) maxFlow = Math.max(maxFlow, flow)
+	for (const line of outLines)
+		for (const [, , flow] of line) maxFlow = Math.max(maxFlow, flow)
 
 	return {
 		lines: outLines,
@@ -742,6 +1037,8 @@ export function importGenesisWorld(
 		substellarLon: params.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
 		perihelion: params.perihelion ?? DEFAULT_PERIHELION,
 		pressure: params.pressure ?? 1.0,
+		albedo: params.albedo,
+		greenhouseFactor: params.greenhouseFactor,
 	}
 
 	const maxElevKm = (genesisParams.maxElevation ?? 6000) / 1000
@@ -754,6 +1051,77 @@ export function importGenesisWorld(
 		seaLevel: genesisParams.seaLevel,
 	})
 	elevation.set(finalElevation)
+
+	// Real-world elevation override (land only): the 8-bit grayscale
+	// heightmap's sqrt-curve reconstruction has its own systematic error
+	// (overestimates mid-range elevation, underestimates the highest peaks)
+	// independent of terrain-warp/erosion -- substitute accurate WorldClim
+	// elevation for land cells so climate lapse-rate correction (and anything
+	// else reading elevation_km) sees real values instead. Ocean cells and any
+	// land cell the raster has no coverage for keep the heightmap-derived
+	// value. Does not touch the normalized `elevation` array (rendering/mesh
+	// geometry), only elevation_km.
+	if (
+		params.realElevationRaster &&
+		params.realElevationWidth &&
+		params.realElevationHeight &&
+		params.realElevationScale !== undefined &&
+		params.realElevationNoData !== undefined
+	) {
+		const realElevationM = sampleSingleBandFloatRaster(
+			mesh,
+			params.realElevationRaster,
+			params.realElevationWidth,
+			params.realElevationHeight,
+			params.realElevationScale,
+			params.realElevationNoData,
+		)
+		for (let r = 0; r < mesh.numRegions; r++) {
+			if (!isLand[r]) continue
+			const realKm = realElevationM[r] / 1000
+			if (Number.isFinite(realKm)) elevation_km[r] = Math.max(0, realKm)
+		}
+	}
+
+	const eu5Topography =
+		params.eu5TopographyRaster &&
+		params.eu5TopographyWidth &&
+		params.eu5TopographyHeight &&
+		params.eu5TopographyNoData !== undefined
+			? sampleCategoricalRaster(
+					mesh,
+					params.eu5TopographyRaster,
+					params.eu5TopographyWidth,
+					params.eu5TopographyHeight,
+					params.eu5TopographyNoData,
+				)
+			: undefined
+	const eu5Vegetation =
+		params.eu5VegetationRaster &&
+		params.eu5VegetationWidth &&
+		params.eu5VegetationHeight &&
+		params.eu5VegetationNoData !== undefined
+			? sampleCategoricalRaster(
+					mesh,
+					params.eu5VegetationRaster,
+					params.eu5VegetationWidth,
+					params.eu5VegetationHeight,
+					params.eu5VegetationNoData,
+				)
+			: undefined
+	const eu5Climate =
+		params.eu5ClimateRaster &&
+		params.eu5ClimateWidth &&
+		params.eu5ClimateHeight &&
+		params.eu5ClimateNoData !== undefined
+			? sampleCategoricalRaster(
+					mesh,
+					params.eu5ClimateRaster,
+					params.eu5ClimateWidth,
+					params.eu5ClimateHeight,
+					params.eu5ClimateNoData,
+				)
+			: undefined
 
 	let realRivers: ReturnType<typeof buildRealRiversData> | undefined
 	if (params.riverLines?.length) {
@@ -814,6 +1182,50 @@ export function importGenesisWorld(
 		record("Observed Earth climate sampling", t0)
 	}
 
+	if (
+		params.realPrecipMonthly &&
+		params.realPrecipWidth &&
+		params.realPrecipHeight &&
+		params.realPrecipMonths &&
+		params.realPrecipScale !== undefined &&
+		params.realPrecipNoData !== undefined
+	) {
+		t0 = performance.now()
+		attachObservedEarthRainfall({
+			mesh,
+			rainfall: post.rainfall,
+			realPrecipMonthly: params.realPrecipMonthly,
+			realPrecipWidth: params.realPrecipWidth,
+			realPrecipHeight: params.realPrecipHeight,
+			realPrecipMonths: params.realPrecipMonths,
+			realPrecipScale: params.realPrecipScale,
+			realPrecipNoData: params.realPrecipNoData,
+		})
+		record("Observed Earth precipitation sampling", t0)
+	}
+
+	if (
+		params.realDtrMonthly &&
+		params.realDtrWidth &&
+		params.realDtrHeight &&
+		params.realDtrMonths &&
+		params.realDtrScale !== undefined &&
+		params.realDtrNoData !== undefined
+	) {
+		t0 = performance.now()
+		attachObservedEarthDtr({
+			mesh,
+			world: post,
+			realDtrMonthly: params.realDtrMonthly,
+			realDtrWidth: params.realDtrWidth,
+			realDtrHeight: params.realDtrHeight,
+			realDtrMonths: params.realDtrMonths,
+			realDtrScale: params.realDtrScale,
+			realDtrNoData: params.realDtrNoData,
+		})
+		record("Observed Earth DTR sampling", t0)
+	}
+
 	t0 = performance.now()
 	const provinceSociety = deriveProvinceSociety({
 		mesh,
@@ -833,6 +1245,9 @@ export function importGenesisWorld(
 		distFields,
 		elevation,
 		elevation_km,
+		eu5Topography,
+		eu5Vegetation,
+		eu5Climate,
 		params: genesisParams,
 		climate: post.climate,
 		oceanDist,
@@ -855,6 +1270,7 @@ export function importGenesisWorld(
 		slopeScore: post.slopeScore,
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,
+		observedDtr: post.observedDtr,
 		iceThickness: post.iceThickness,
 		iceMinMonthly: post.iceMinMonthly,
 		iceMaxMonthly: post.iceMaxMonthly,

@@ -17,6 +17,7 @@ import type {
 	GenesisRainfall,
 	GenesisRivers,
 	GenesisTerrainFeatures,
+	GenesisWorld,
 	SphereMesh,
 	StageTiming,
 } from ".."
@@ -151,6 +152,7 @@ interface PostPipelineOutput {
 	pastaDebug: PastaDebug | undefined
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
+	observedDtr?: GenesisWorld["observedDtr"]
 	waterAccess: Uint8Array
 	riverAccess: Uint8Array
 	lakeAccess: Uint8Array
@@ -467,7 +469,9 @@ export function runPostElevationPipeline(
 	// Ice, pasta climate, and vegetation run below on the corrected climate.
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
-	distCoast.set(computeCoastDistances(mesh, isLand, params.planetRadiusKm).distCoast)
+	distCoast.set(
+		computeCoastDistances(mesh, isLand, params.planetRadiusKm).distCoast,
+	)
 	oceanDist.set(computeOceanDistanceBFS(mesh, isLand, params.planetRadiusKm))
 	climate = computeTemperature(
 		mesh,

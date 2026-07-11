@@ -2258,23 +2258,24 @@ export function createGenesisScene(
 	}
 
 	function updateOverlayVisibility() {
+		const showMap = currentViewMode === "map" && !solarSystemActive
 		if (globeCoastlineOverlay)
 			globeCoastlineOverlay.visible =
 				coastlineOverlayVisible && currentViewMode === "globe"
 		if (mapCoastlineOverlay) {
 			mapCoastlineOverlay.visible =
-				coastlineOverlayVisible && currentViewMode === "map"
+				coastlineOverlayVisible && showMap
 			if (mapMesh) mapCoastlineOverlay.position.copy(mapMesh.position)
 		}
 		if (terrainWireframe)
 			terrainWireframe.visible = wireframeVisible && currentViewMode === "globe"
 		if (mapWireframe) {
-			mapWireframe.visible = wireframeVisible && currentViewMode === "map"
+			mapWireframe.visible = wireframeVisible && showMap
 			if (mapMesh) mapWireframe.position.copy(mapMesh.position)
 		}
 		if (mapOccupationOverlay) {
 			mapOccupationOverlay.visible =
-				currentViewMode === "map" && !!currentOccupationOverlay
+				showMap && !!currentOccupationOverlay
 			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
 		}
 		if (globeLandNationBorders)
@@ -2282,7 +2283,7 @@ export function createGenesisScene(
 				currentViewMode === "globe" && landNationBordersVisible
 		if (mapLandNationBorders) {
 			mapLandNationBorders.visible =
-				currentViewMode === "map" && landNationBordersVisible
+				showMap && landNationBordersVisible
 			if (mapMesh) mapLandNationBorders.position.copy(mapMesh.position)
 		}
 		if (globeNationBorders)
@@ -2290,64 +2291,64 @@ export function createGenesisScene(
 				currentViewMode === "globe" && nationBordersVisible
 		if (mapNationBorders) {
 			mapNationBorders.visible =
-				currentViewMode === "map" && nationBordersVisible
+				showMap && nationBordersVisible
 			if (mapMesh) mapNationBorders.position.copy(mapMesh.position)
 		}
 		if (globeSelectedProvinceBorder)
 			globeSelectedProvinceBorder.visible = currentViewMode === "globe"
 		if (mapSelectedProvinceBorder) {
-			mapSelectedProvinceBorder.visible = currentViewMode === "map"
+			mapSelectedProvinceBorder.visible = showMap
 			if (mapMesh) mapSelectedProvinceBorder.position.copy(mapMesh.position)
 		}
 		if (globeGrid)
 			globeGrid.visible = gridVisible && currentViewMode === "globe"
 		if (mapGrid) {
-			mapGrid.visible = gridVisible && currentViewMode === "map"
+			mapGrid.visible = gridVisible && showMap
 			if (mapMesh) mapGrid.position.copy(mapMesh.position)
 		}
 		if (globeThermalEquator)
 			globeThermalEquator.visible = currentViewMode === "globe"
 		if (mapThermalEquator) {
-			mapThermalEquator.visible = currentViewMode === "map"
+			mapThermalEquator.visible = showMap
 			if (mapMesh) mapThermalEquator.position.copy(mapMesh.position)
 		}
 		if (mapSolarTerminator) {
 			mapSolarTerminator.visible =
-				solarTerminatorVisible && currentViewMode === "map"
+				solarTerminatorVisible && showMap
 			if (mapMesh) mapSolarTerminator.position.copy(mapMesh.position)
 		}
 		if (globeWindArrows) globeWindArrows.visible = currentViewMode === "globe"
 		if (mapWindArrows) {
-			mapWindArrows.visible = currentViewMode === "map"
+			mapWindArrows.visible = showMap
 			if (mapMesh) mapWindArrows.position.copy(mapMesh.position)
 		}
 		if (globeRivers)
 			globeRivers.visible = riversVisible && currentViewMode === "globe"
 		if (mapRivers) {
-			mapRivers.visible = riversVisible && currentViewMode === "map"
+			mapRivers.visible = riversVisible && showMap
 			if (mapMesh) mapRivers.position.copy(mapMesh.position)
 		}
 		if (globeMeasureLine) globeMeasureLine.visible = currentViewMode === "globe"
 		if (mapMeasureLine) {
-			mapMeasureLine.visible = currentViewMode === "map"
+			mapMeasureLine.visible = showMap
 			if (mapMesh) mapMeasureLine.position.copy(mapMesh.position)
 		}
 		if (globeMeasureDots) globeMeasureDots.visible = currentViewMode === "globe"
 		if (mapMeasureDots) {
-			mapMeasureDots.visible = currentViewMode === "map"
+			mapMeasureDots.visible = showMap
 			if (mapMesh) mapMeasureDots.position.copy(mapMesh.position)
 		}
 		if (globeHierarchyOverlay)
 			globeHierarchyOverlay.visible = currentViewMode === "globe"
 		if (mapHierarchyOverlay) {
-			mapHierarchyOverlay.visible = currentViewMode === "map"
+			mapHierarchyOverlay.visible = showMap
 			if (mapMesh) mapHierarchyOverlay.position.copy(mapMesh.position)
 		}
 		if (globeSettlements)
 			globeSettlements.visible =
 				settlementsVisible && currentViewMode === "globe"
 		if (mapSettlements) {
-			mapSettlements.visible = settlementsVisible && currentViewMode === "map"
+			mapSettlements.visible = settlementsVisible && showMap
 			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
 		}
 		if (globeInfrastructure)
@@ -2355,7 +2356,7 @@ export function createGenesisScene(
 				infrastructureVisible && currentViewMode === "globe"
 		if (mapInfrastructure) {
 			mapInfrastructure.visible =
-				infrastructureVisible && currentViewMode === "map"
+				infrastructureVisible && showMap
 			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
 		}
 		if (globeNationLabels)
@@ -2368,14 +2369,14 @@ export function createGenesisScene(
 				currentViewMode === "globe"
 		if (mapNationLabels) {
 			mapNationLabels.visible =
-				(labelMode.nations || labelMode.dynasty) && currentViewMode === "map"
+				(labelMode.nations || labelMode.dynasty) && showMap
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
 		}
 		if (mapNationScripts) {
 			mapNationScripts.visible =
 				labelMode.script &&
 				(labelMode.nations || labelMode.dynasty) &&
-				currentViewMode === "map"
+				showMap
 			if (mapMesh) mapNationScripts.position.copy(mapMesh.position)
 		}
 		if (globeSettlementLabels)
@@ -2383,14 +2384,14 @@ export function createGenesisScene(
 				labelMode.settlements && currentViewMode === "globe"
 		if (mapSettlementLabels) {
 			mapSettlementLabels.visible =
-				labelMode.settlements && currentViewMode === "map"
+				labelMode.settlements && showMap
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
 		}
 		if (globeCultureLabels)
 			globeCultureLabels.visible =
 				labelMode.culture && currentViewMode === "globe"
 		if (mapCultureLabels) {
-			mapCultureLabels.visible = labelMode.culture && currentViewMode === "map"
+			mapCultureLabels.visible = labelMode.culture && showMap
 			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
 		}
 		if (globeHeritageLabels)
@@ -2398,7 +2399,7 @@ export function createGenesisScene(
 				labelMode.heritage && currentViewMode === "globe"
 		if (mapHeritageLabels) {
 			mapHeritageLabels.visible =
-				labelMode.heritage && currentViewMode === "map"
+				labelMode.heritage && showMap
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 		}
 		requestRender()
@@ -2994,7 +2995,7 @@ export function createGenesisScene(
 	}
 
 	function updateHover(event: PointerEvent) {
-		if (!currentWorld) {
+		if (!currentWorld || solarSystemActive) {
 			clearHover()
 			return
 		}
@@ -3116,7 +3117,7 @@ export function createGenesisScene(
 	}
 
 	function handleClick(event: PointerEvent) {
-		if (!clickHandler || !currentWorld) return
+		if (!clickHandler || !currentWorld || solarSystemActive) return
 		if (pointerDownPos) {
 			const dx = event.clientX - pointerDownPos.x
 			const dy = event.clientY - pointerDownPos.y
@@ -3744,6 +3745,16 @@ export function createGenesisScene(
 		solarSystemGroup.visible = active
 		globeGroup.visible = !active
 		orbitGroup.visible = !active
+		// mapMesh lives directly on `scene`, not inside globeGroup, since the
+		// flat-map view uses its own orthographic camera alongside the globe's
+		// perspective one -- so it needs its own visibility toggle here. Every
+		// other map overlay (grid, coastline, borders, etc.) is toggled by
+		// updateOverlayVisibility, which also accounts for solarSystemActive.
+		const showMap = !active && currentViewMode === "map"
+		if (mapMesh) mapMesh.visible = showMap
+		mapControls.enabled = showMap
+		controls.enabled = active || currentViewMode !== "map"
+		updateOverlayVisibility()
 		// The globe's own sun/ambient lights are scene-wide and would otherwise
 		// wash out the solar-system overlay's star light, making its Daylight
 		// toggle invisible — suppress them while this view is active.

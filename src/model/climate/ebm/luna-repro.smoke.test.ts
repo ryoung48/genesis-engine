@@ -59,6 +59,7 @@ describe("Luna EBM repro", () => {
 			radius: config.radius * 1000,
 			pressure: config.pressure,
 			albedo: config.albedo,
+			iceAlbedoFeedback: false,
 			greenhouseFactor:
 				config.greenhouseFactor ?? estimateGreenhouseFactor(config.pressure),
 		}

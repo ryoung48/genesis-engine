@@ -51,7 +51,8 @@ export function computeOceanDistanceBFS(
 	// local mesh resolution) — the Black Sea is still meaningfully "a big
 	// body of water" for climate/continentality purposes even if the
 	// Bosphorus isn't resolved as a connected channel at this mesh density.
-	const meanCellAreaKm2 = (4 * Math.PI * planetRadiusKm * planetRadiusKm) / numRegions
+	const meanCellAreaKm2 =
+		(4 * Math.PI * planetRadiusKm * planetRadiusKm) / numRegions
 	const componentId = new Int32Array(numRegions).fill(-1)
 	const componentSizes: number[] = []
 	const scratch: number[] = []
@@ -78,7 +79,10 @@ export function computeOceanDistanceBFS(
 
 	for (let r = 0; r < numRegions; r++) {
 		if (isLand[r]) continue
-		if (componentSizes[componentId[r]] * meanCellAreaKm2 < SEA_AREA_THRESHOLD_KM2)
+		if (
+			componentSizes[componentId[r]] * meanCellAreaKm2 <
+			SEA_AREA_THRESHOLD_KM2
+		)
 			continue
 		dist[r] = 0
 		queue.enqueue({ region: r, dist: 0 })
@@ -163,10 +167,7 @@ export function computeCoastDistances(
 	// Full-precision working distances — see computeOceanDistanceBFS for why
 	// comparing against a Float32Array-rounded "current best" at real km
 	// scale silently drops the entry that should settle a node.
-	function dijkstra(
-		sources: number[],
-		restrictToLand: boolean,
-	): Float64Array {
+	function dijkstra(sources: number[], restrictToLand: boolean): Float64Array {
 		const dist = new Float64Array(N).fill(Infinity)
 		const settled = new Uint8Array(N)
 		const queue = new PriorityQueue<{ region: number; dist: number }>(
@@ -203,7 +204,9 @@ export function computeCoastDistances(
 	const distCoast = new Float32Array(N)
 	const distCoastLand = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		distCoast[r] = Number.isFinite(coastDistWorking[r]) ? coastDistWorking[r] : 0
+		distCoast[r] = Number.isFinite(coastDistWorking[r])
+			? coastDistWorking[r]
+			: 0
 		distCoastLand[r] = landCoastDistWorking[r] // Infinity for water cells, by design
 	}
 

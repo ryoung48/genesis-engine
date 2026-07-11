@@ -167,6 +167,7 @@ function buildConfig(body: BodyCase, greenhouseFactor: number) {
 		),
 		greenhouseFactor,
 		internalHeatTempK,
+		iceAlbedoFeedback: false,
 	}
 }
 

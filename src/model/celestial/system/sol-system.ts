@@ -323,10 +323,31 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		maxElevation: 6000,
 		/** Real Earth Bond albedo (NASA planetary fact sheet). */
 		albedo: 0.3,
-		/** Refit against Earth's real ~14.8C mean surface temp with
-		 * ice-albedo feedback disabled (see ebm/earth-refit.smoke.test.ts) --
-		 * was 0.55 before that change. */
-		greenhouseFactor: 0.534,
+		/** Bisected directly against the real imported Earth world's own
+		 * land-only WorldClim bias (zeroed exactly; see
+		 * ebm/earth-import-greenhouse-refit.smoke.test.ts), with the
+		 * temperature-driven ice-albedo feedback ON (default) -- was 0.534
+		 * when that feedback was disabled. useEbmPreview.ts never disables it
+		 * for this override, so the calibration has to match, not the model
+		 * behavior. */
+		greenhouseFactor: 0.578,
+		/** Real Earth sea-level pressure (~1 bar), matching every sibling
+		 * body's own hand-authored atmosphere below. Without this, the static
+		 * Sol system's Earth entry (restSeed === SOL_SEED, unlike the live
+		 * procedurally-generated path in GenesisView.tsx, which builds its own
+		 * atmosphere from the live pressure slider before calling buildPlanet)
+		 * has no atmosphere at all -- buildPlanet() reads seed.atmosphere
+		 * straight through with no fallback, so the real Sol Earth ends up
+		 * vacuum (0 bar). At 0 bar the EBM's heat diffusion and thermal
+		 * inertia both collapse to zero, removing all seasonal lag and
+		 * producing a much wider climate-preview min/max swing than any real
+		 * atmosphere would. */
+		atmosphere: {
+			code: 6,
+			pressureBar: 1,
+			type: "breathable",
+			breathable: true,
+		},
 		moons: [
 			{
 				name: "Luna",

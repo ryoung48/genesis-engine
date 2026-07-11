@@ -3,19 +3,17 @@ import { ALBEDO } from "./albedo"
 import { EMB_CONSTANTS } from "./constants"
 import { EnergyBalanceModel } from "./index"
 
-// Pins Earth's greenhouseFactor for the no-ice-feedback configuration (an
-// explicit, empirically-measured whole-body albedo with the temperature-
-// driven ice transition turned off -- see EBMConfig.iceAlbedoFeedback doc).
-// See earth-default-refit.smoke.test.ts for the real in-game default path
-// (no albedo override, ice feedback on), which is the one that needs to stay
-// fitted for computeTemperature()'s actual generation behavior.
-function earthConfig(greenhouseFactor: number) {
+// Re-fits GREENHOUSE_FACTOR for the *actual* in-game default path --
+// computeTemperature() in climate.ts builds EnergyBalanceModel with no
+// albedo/iceAlbedo/iceAlbedoFeedback override, so it always gets the smooth
+// temperature-driven ice transition (albedo.ts) at its default settings. That
+// differs from earth-refit.smoke.test.ts, which pins iceAlbedoFeedback:false
+// to keep its own (no-feedback) fitted constant stable for comparison.
+function earthDefaultConfig(greenhouseFactor: number) {
 	return {
 		orbital: { ...EMB_CONSTANTS.orbital },
 		radius: EMB_CONSTANTS.planet.EARTH_RADIUS,
 		pressure: 1.0,
-		albedo: EMB_CONSTANTS.surface.ALBEDO.BASE,
-		iceAlbedoFeedback: false,
 		landFraction: ALBEDO.landFraction(),
 		greenhouseFactor,
 	}
@@ -35,7 +33,7 @@ function areaWeightedMean(model: EnergyBalanceModel): number {
 	return totalWeightedTemp / totalArea
 }
 
-describe("Earth greenhouseFactor refit (ice-albedo feedback disabled)", () => {
+describe("Earth greenhouseFactor refit (default ice-albedo feedback enabled)", () => {
 	it("bisects greenhouseFactor against the real ~14.8C target", () => {
 		const target = 14.8
 		let lo = 0
@@ -45,7 +43,7 @@ describe("Earth greenhouseFactor refit (ice-albedo feedback disabled)", () => {
 
 		for (let iter = 0; iter < 40; iter++) {
 			const mid = (lo + hi) / 2
-			const model = new EnergyBalanceModel(earthConfig(mid))
+			const model = new EnergyBalanceModel(earthDefaultConfig(mid))
 			model.runModel(30, 0.5)
 			const avg = areaWeightedMean(model)
 			bestG = mid

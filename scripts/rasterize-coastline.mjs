@@ -65,8 +65,10 @@ function fillRing(ring, crossingsByRow) {
 function unwrapRingX(ring) {
 	const unwrapped = ring.map((p) => [...p])
 	for (let i = 1; i < unwrapped.length; i++) {
-		while (unwrapped[i][0] - unwrapped[i - 1][0] > width / 2) unwrapped[i][0] -= width
-		while (unwrapped[i][0] - unwrapped[i - 1][0] < -width / 2) unwrapped[i][0] += width
+		while (unwrapped[i][0] - unwrapped[i - 1][0] > width / 2)
+			unwrapped[i][0] -= width
+		while (unwrapped[i][0] - unwrapped[i - 1][0] < -width / 2)
+			unwrapped[i][0] += width
 	}
 	return unwrapped
 }

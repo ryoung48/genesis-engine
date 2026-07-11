@@ -14,7 +14,11 @@ import {
 	PRIMARY_MAP_MODE_OPTIONS,
 } from "../screen/shared/map-modes"
 import { ModeButtonGroup } from "./mode-controls"
-import type { VegetationSubMode } from "./OverlayControls"
+import type {
+	ClimateSubMode,
+	TopographySubMode,
+	VegetationSubMode,
+} from "./OverlayControls"
 
 interface ModeBarProps {
 	colorMode: ColorMode
@@ -27,33 +31,37 @@ interface ModeBarProps {
 	setPopulationMode: (v: PopulationMapMode) => void
 	debugMapModes: boolean
 	vegetationSubMode: VegetationSubMode
-	climateSubMode: "basic" | "pasta" | "koppen"
+	climateSubMode: ClimateSubMode
 	elevationSubMode: "colored" | "grayscale"
-	topographySubMode: "classification" | "slope"
+	topographySubMode: TopographySubMode
 }
 
 function resolveSubMode(
 	baseMode: ColorMode,
 	vegetationSubMode: VegetationSubMode,
-	climateSubMode: "basic" | "pasta" | "koppen",
+	climateSubMode: ClimateSubMode,
 	elevationSubMode: "colored" | "grayscale",
-	topographySubMode: "classification" | "slope",
+	topographySubMode: TopographySubMode,
 ): ColorMode {
 	if (baseMode === "vegetation") {
 		if (vegetationSubMode === "maps") return "vegetationMaps"
 		if (vegetationSubMode === "satellite") return "vegetationSatellite"
+		if (vegetationSubMode === "eu5") return "eu5Vegetation"
 		return "vegetation"
 	}
 	if (baseMode === "climate") {
 		if (climateSubMode === "pasta") return "pastaClimate"
 		if (climateSubMode === "koppen") return "koppenClimate"
+		if (climateSubMode === "eu5") return "eu5Climate"
 		return "climate"
 	}
 	if (baseMode === "terrain") {
 		return elevationSubMode === "grayscale" ? "landHeightmap" : "terrain"
 	}
 	if (baseMode === "topography") {
-		return topographySubMode === "slope" ? "slope" : "topography"
+		if (topographySubMode === "slope") return "slope"
+		if (topographySubMode === "eu5") return "eu5Topography"
+		return "topography"
 	}
 	return baseMode
 }
@@ -78,7 +86,13 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes).filter(
-		([mode]) => mode !== "realTemperature" && mode !== "temperatureDiff",
+		([mode]) =>
+			mode !== "realTemperature" &&
+			mode !== "temperatureDiff" &&
+			mode !== "realDtr" &&
+			mode !== "dtrDiff" &&
+			mode !== "realPrecipitation" &&
+			mode !== "precipitationDiff",
 	)
 	const societyOptions = getVisibleSocietyModeOptions(debugMapModes)
 

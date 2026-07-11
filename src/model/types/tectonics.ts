@@ -52,6 +52,17 @@ export interface GenesisParams {
 	substellarLon: number // longitude of the substellar point in degrees (0-360), default 0
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
+	/** Real per-body Bond albedo override (0..1) -- pass this for a known real
+	 * body (e.g. Sol's Earth, see sol-system.ts's SolPlanetSeed.albedo doc);
+	 * leave unset for a procedurally generated world, which falls back to
+	 * EMB_CONSTANTS.surface.ALBEDO.BASE. */
+	albedo?: number
+	/** Real per-body EBM greenhouseFactor override -- pass this alongside
+	 * albedo for a known real body (see ebm/index.ts's EBMConfig.
+	 * greenhouseFactor doc for what it means and how it's fit); leave unset
+	 * for a procedurally generated world, which falls back to
+	 * EMB_CONSTANTS.surface.GREENHOUSE_FACTOR. */
+	greenhouseFactor?: number
 	moonCount?: number
 	moonSeed?: number
 	/** Seed for the sibling/system bodies shown in the Generation panel; 0 = Sol. Not used by terrain generation. */

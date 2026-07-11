@@ -105,10 +105,12 @@ import {
 } from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import {
+	type ClimateSubMode,
 	type ExportWidthPreset,
 	type LabelMode,
 	type MeasureMode,
 	OverlayControls,
+	type TopographySubMode,
 	type VegetationSubMode,
 } from "./controls/OverlayControls"
 import { SimulationControls } from "./controls/SimulationControls"
@@ -122,6 +124,7 @@ import {
 	getHoverDistCoast,
 	getHoverDistCoastKm,
 	getHoverDtr,
+	getHoverDtrDiff,
 	getHoverElevationKm,
 	getHoverHazards,
 	getHoverHotspot,
@@ -135,6 +138,9 @@ import {
 	getHoverPastaClimate,
 	getHoverProvince,
 	getHoverRainfall,
+	getHoverRainfallDiff,
+	getHoverRealDtr,
+	getHoverRealRainfall,
 	getHoverRealTemperature,
 	getHoverRiver,
 	getHoverTemperatureDelta,
@@ -319,7 +325,9 @@ async function loadEarthRealClimate(): Promise<{
 }> {
 	const metaRes = await fetch("/heightmap/earth-real-temperature.json")
 	if (!metaRes.ok) {
-		throw new Error(`Failed to load observed climate metadata: ${metaRes.status}`)
+		throw new Error(
+			`Failed to load observed climate metadata: ${metaRes.status}`,
+		)
 	}
 	const meta = (await metaRes.json()) as {
 		bin: string
@@ -341,6 +349,148 @@ async function loadEarthRealClimate(): Promise<{
 		months: meta.months,
 		scale: meta.scale,
 		nodata: meta.nodata,
+	}
+}
+
+async function loadEarthRealPrecip(): Promise<{
+	monthly: Int16Array
+	width: number
+	height: number
+	months: number
+	scale: number
+	nodata: number
+}> {
+	const metaRes = await fetch("/heightmap/earth-real-precipitation.json")
+	if (!metaRes.ok) {
+		throw new Error(
+			`Failed to load observed precipitation metadata: ${metaRes.status}`,
+		)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		width: number
+		height: number
+		months: number
+		scale: number
+		nodata: number
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(
+			`Failed to load observed precipitation raster: ${binRes.status}`,
+		)
+	}
+	const buffer = await binRes.arrayBuffer()
+	return {
+		monthly: new Int16Array(buffer),
+		width: meta.width,
+		height: meta.height,
+		months: meta.months,
+		scale: meta.scale,
+		nodata: meta.nodata,
+	}
+}
+
+async function loadEarthRealDtr(): Promise<{
+	monthly: Int16Array
+	width: number
+	height: number
+	months: number
+	scale: number
+	nodata: number
+}> {
+	const metaRes = await fetch("/heightmap/earth-real-dtr.json")
+	if (!metaRes.ok) {
+		throw new Error(`Failed to load observed DTR metadata: ${metaRes.status}`)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		width: number
+		height: number
+		months: number
+		scale: number
+		nodata: number
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(`Failed to load observed DTR raster: ${binRes.status}`)
+	}
+	const buffer = await binRes.arrayBuffer()
+	return {
+		monthly: new Int16Array(buffer),
+		width: meta.width,
+		height: meta.height,
+		months: meta.months,
+		scale: meta.scale,
+		nodata: meta.nodata,
+	}
+}
+
+async function loadEarthRealElevation(): Promise<{
+	raster: Int16Array
+	width: number
+	height: number
+	scale: number
+	nodata: number
+}> {
+	const metaRes = await fetch("/heightmap/earth-real-elevation.json")
+	if (!metaRes.ok) {
+		throw new Error(
+			`Failed to load observed elevation metadata: ${metaRes.status}`,
+		)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		width: number
+		height: number
+		scale: number
+		nodata: number
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(
+			`Failed to load observed elevation raster: ${binRes.status}`,
+		)
+	}
+	const buffer = await binRes.arrayBuffer()
+	return {
+		raster: new Int16Array(buffer),
+		width: meta.width,
+		height: meta.height,
+		scale: meta.scale,
+		nodata: meta.nodata,
+	}
+}
+
+async function loadEu5Categorical(prefix: string): Promise<{
+	raster: Int16Array
+	width: number
+	height: number
+	nodata: number
+	categories: string[]
+}> {
+	const metaRes = await fetch(`/heightmap/${prefix}.json`)
+	if (!metaRes.ok) {
+		throw new Error(`Failed to load ${prefix} metadata: ${metaRes.status}`)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		width: number
+		height: number
+		nodata: number
+		categories: string[]
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(`Failed to load ${prefix} raster: ${binRes.status}`)
+	}
+	const buffer = await binRes.arrayBuffer()
+	return {
+		raster: new Int16Array(buffer),
+		width: meta.width,
+		height: meta.height,
+		nodata: meta.nodata,
+		categories: meta.categories,
 	}
 }
 
@@ -539,15 +689,14 @@ export const GenesisView: React.FC = () => {
 	const [vegetationSubMode, setVegetationSubMode] = useState<VegetationSubMode>(
 		initialViewPrefs.vegetationSubMode,
 	)
-	const [climateSubMode, setClimateSubMode] = useState<
-		"basic" | "pasta" | "koppen"
-	>(initialViewPrefs.climateSubMode)
+	const [climateSubMode, setClimateSubMode] = useState<ClimateSubMode>(
+		initialViewPrefs.climateSubMode,
+	)
 	const [elevationSubMode, setElevationSubMode] = useState<
 		"colored" | "grayscale"
 	>(initialViewPrefs.elevationSubMode)
-	const [topographySubMode, setTopographySubMode] = useState<
-		"classification" | "slope"
-	>(initialViewPrefs.topographySubMode)
+	const [topographySubMode, setTopographySubMode] =
+		useState<TopographySubMode>(initialViewPrefs.topographySubMode)
 	const [dangerSubMode, setDangerSubMode] = useState<
 		"earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
 	>(initialViewPrefs.dangerSubMode)
@@ -1359,7 +1508,19 @@ export const GenesisView: React.FC = () => {
 		worldForDisplay,
 		rainfallMonth,
 	)
+	const hoverRealRainfall = getHoverRealRainfall(
+		hoverInfo,
+		worldForDisplay,
+		rainfallMonth,
+	)
+	const hoverRainfallDiff = getHoverRainfallDiff(
+		hoverInfo,
+		worldForDisplay,
+		rainfallMonth,
+	)
 	const hoverDtr = getHoverDtr(hoverInfo, worldForDisplay, dtrMonth)
+	const hoverRealDtr = getHoverRealDtr(hoverInfo, worldForDisplay, dtrMonth)
+	const hoverDtrDiff = getHoverDtrDiff(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverHumidity = getHoverHumidity(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverRealTemperature = getHoverRealTemperature(
 		hoverInfo,
@@ -2596,6 +2757,8 @@ export const GenesisView: React.FC = () => {
 			craters: 0,
 			maxElevation,
 			pressure,
+			albedo: mainWorldSystemBody?.albedo,
+			greenhouseFactor: mainWorldSystemBody?.greenhouseFactor,
 			moonCount,
 			moonSeed,
 		}),
@@ -2628,6 +2791,8 @@ export const GenesisView: React.FC = () => {
 			glacialErosion,
 			seaLevel,
 			pressure,
+			mainWorldSystemBody?.albedo,
+			mainWorldSystemBody?.greenhouseFactor,
 			moonCount,
 			moonSeed,
 		],
@@ -2764,6 +2929,50 @@ export const GenesisView: React.FC = () => {
 				scale: number
 				nodata: number
 			},
+			realPrecip?: {
+				monthly: Int16Array
+				width: number
+				height: number
+				months: number
+				scale: number
+				nodata: number
+			},
+			realDtr?: {
+				monthly: Int16Array
+				width: number
+				height: number
+				months: number
+				scale: number
+				nodata: number
+			},
+			realElevation?: {
+				raster: Int16Array
+				width: number
+				height: number
+				scale: number
+				nodata: number
+			},
+			eu5Topography?: {
+				raster: Int16Array
+				width: number
+				height: number
+				nodata: number
+				categories: string[]
+			},
+			eu5Vegetation?: {
+				raster: Int16Array
+				width: number
+				height: number
+				nodata: number
+				categories: string[]
+			},
+			eu5Climate?: {
+				raster: Int16Array
+				width: number
+				height: number
+				nodata: number
+				categories: string[]
+			},
 		) => {
 			const importParams = {
 				seed,
@@ -2779,16 +2988,29 @@ export const GenesisView: React.FC = () => {
 				daysPerYear,
 				hoursPerDay,
 				pressure,
+				// Real Earth values, not the live sliders -- this path is
+				// Earth-only (see callers). Prefer the live mainWorldSystemBody
+				// (matches whatever GenerationPanel's own preview is showing,
+				// including any live edits) and fall back to the static defaults
+				// only if it isn't available yet.
+				albedo: mainWorldSystemBody?.albedo ?? SOL_MAIN_WORLD_DEFAULTS.albedo,
+				greenhouseFactor:
+					mainWorldSystemBody?.greenhouseFactor ??
+					SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
 				moonCount,
 				moonSeed,
 				tideLock,
 				substellarLon,
-				terrainWarp,
-				smoothing,
-				hydraulicErosion,
-				thermalErosion,
-				ridgeSharpening,
-				glacialErosion,
+				// Zeroed, not the live sliders -- this path is Earth-only (see
+				// callers), and a real heightmap is already realistic terrain.
+				// Warping/smoothing/eroding it distorts real elevation instead of
+				// preserving it (see earth-real-temperature-compare.smoke.test.ts).
+				terrainWarp: 0,
+				smoothing: 0,
+				hydraulicErosion: 0,
+				thermalErosion: 0,
+				ridgeSharpening: 0,
+				glacialErosion: 0,
 				seaLevel,
 				maxElevation,
 				volcanism: 1,
@@ -2804,6 +3026,12 @@ export const GenesisView: React.FC = () => {
 				lakeMask,
 				riverLines,
 				realClimate,
+				realPrecip,
+				realDtr,
+				realElevation,
+				eu5Topography,
+				eu5Vegetation,
+				eu5Climate,
 			)
 		},
 		[
@@ -2821,14 +3049,10 @@ export const GenesisView: React.FC = () => {
 			hoursPerDay,
 			tideLock,
 			substellarLon,
-			terrainWarp,
-			smoothing,
-			hydraulicErosion,
-			thermalErosion,
-			ridgeSharpening,
-			glacialErosion,
 			seaLevel,
 			pressure,
+			mainWorldSystemBody?.albedo,
+			mainWorldSystemBody?.greenhouseFactor,
 			moonCount,
 			moonSeed,
 			generationCallbacks,
@@ -2843,18 +3067,32 @@ export const GenesisView: React.FC = () => {
 				{ grayscale: lakePixels, width: lakeWidth, height: lakeHeight },
 				riverLines,
 				realClimate,
+				realPrecip,
+				realDtr,
+				realElevation,
+				eu5Topography,
+				eu5Vegetation,
+				eu5Climate,
 			] = await Promise.all([
 				loadImageAsGrayscale("/heightmap/earth.png"),
 				loadImageAsGrayscale("/heightmap/coastline-mask.png"),
 				loadImageAsGrayscale("/heightmap/lake-mask.png"),
 				fetch("/heightmap/river-lines.json").then((res) => {
-					if (!res.ok) throw new Error(`Failed to load river lines: ${res.status}`)
+					if (!res.ok)
+						throw new Error(`Failed to load river lines: ${res.status}`)
 					return res.json() as Promise<{
 						lines: { points: number[]; strokeweig: number }[]
 					}>
 				}),
 				loadEarthRealClimate(),
+				loadEarthRealPrecip(),
+				loadEarthRealDtr(),
+				loadEarthRealElevation(),
+				loadEu5Categorical("eu5-topography"),
+				loadEu5Categorical("eu5-vegetation"),
+				loadEu5Categorical("eu5-climate"),
 			])
+			handleReturnToPlanetView()
 			handleImportHeightmap(
 				grayscale,
 				width,
@@ -2863,13 +3101,19 @@ export const GenesisView: React.FC = () => {
 				{ mask: lakePixels, width: lakeWidth, height: lakeHeight },
 				riverLines.lines,
 				realClimate,
+				realPrecip,
+				realDtr,
+				realElevation,
+				eu5Topography,
+				eu5Vegetation,
+				eu5Climate,
 			)
 			setShowCoastlines(true)
 		} catch (err) {
 			console.error("Failed to load Earth heightmap:", err)
 			setGenerationLabel("Failed to load Earth heightmap")
 		}
-	}, [handleImportHeightmap])
+	}, [handleImportHeightmap, handleReturnToPlanetView])
 
 	const handleResetDefaults = useCallback(
 		() => resetWorldDefaults(setters),
@@ -3659,7 +3903,11 @@ export const GenesisView: React.FC = () => {
 							hoverRealTemperature={hoverRealTemperature}
 							hoverTemperatureDiff={hoverTemperatureDiff}
 							hoverRainfall={hoverRainfall}
+							hoverRealRainfall={hoverRealRainfall}
+							hoverRainfallDiff={hoverRainfallDiff}
 							hoverDtr={hoverDtr}
+							hoverRealDtr={hoverRealDtr}
+							hoverDtrDiff={hoverDtrDiff}
 							hoverHumidity={hoverHumidity}
 							hoverMisery={hoverMisery}
 							hoverClimateDisplay={hoverClimateDisplay}

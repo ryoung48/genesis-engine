@@ -96,7 +96,10 @@ interface CoastDensityOptions {
 // classification: land minus lake pixels. Lake shorelines then fall out of
 // the same boundary-distance computation used for the real coastline, with
 // no separate code path needed.
-function mergeLandLakeMask(mask: Uint8Array, lakeMask?: Uint8Array): Uint8Array {
+function mergeLandLakeMask(
+	mask: Uint8Array,
+	lakeMask?: Uint8Array,
+): Uint8Array {
 	if (!lakeMask) return mask
 	const merged = new Uint8Array(mask.length)
 	for (let i = 0; i < mask.length; i++) {

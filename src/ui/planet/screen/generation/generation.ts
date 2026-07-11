@@ -35,6 +35,8 @@ interface ImportHeightmapParams {
 	substellarLon: number
 	perihelion: number
 	pressure: number
+	albedo?: number
+	greenhouseFactor?: number
 	moonCount: number
 	moonSeed: number
 	craters: number
@@ -47,6 +49,22 @@ interface RealClimateRaster {
 	months: number
 	scale: number
 	nodata: number
+}
+
+interface RealElevationRaster {
+	raster: Int16Array
+	width: number
+	height: number
+	scale: number
+	nodata: number
+}
+
+export interface Eu5CategoricalRaster {
+	raster: Int16Array
+	width: number
+	height: number
+	nodata: number
+	categories: string[]
 }
 
 export function loadImageAsGrayscale(
@@ -221,6 +239,9 @@ export function generateWorld(
 		daysPerYear: overrides?.daysPerYear ?? currentParams.daysPerYear,
 		hoursPerDay: overrides?.hoursPerDay ?? currentParams.hoursPerDay,
 		pressure: overrides?.pressure ?? currentParams.pressure,
+		albedo: overrides?.albedo ?? currentParams.albedo,
+		greenhouseFactor:
+			overrides?.greenhouseFactor ?? currentParams.greenhouseFactor,
 		moonCount: overrides?.moonCount ?? currentParams.moonCount,
 		moonSeed: overrides?.moonSeed ?? currentParams.moonSeed,
 		tideLock,
@@ -289,6 +310,12 @@ export function importHeightmap(
 	lakeMask?: { mask: Uint8Array; width: number; height: number },
 	riverLines?: { points: number[]; strokeweig: number }[],
 	realClimate?: RealClimateRaster,
+	realPrecip?: RealClimateRaster,
+	realDtr?: RealClimateRaster,
+	realElevation?: RealElevationRaster,
+	eu5Topography?: Eu5CategoricalRaster,
+	eu5Vegetation?: Eu5CategoricalRaster,
+	eu5Climate?: Eu5CategoricalRaster,
 ): void {
 	callbacks.setGenerating(true)
 	callbacks.setGenerationProgress(0)
@@ -317,6 +344,35 @@ export function importHeightmap(
 			realClimateMonths: realClimate?.months,
 			realClimateScale: realClimate?.scale,
 			realClimateNoData: realClimate?.nodata,
+			realPrecipMonthly: realPrecip?.monthly,
+			realPrecipWidth: realPrecip?.width,
+			realPrecipHeight: realPrecip?.height,
+			realPrecipMonths: realPrecip?.months,
+			realPrecipScale: realPrecip?.scale,
+			realPrecipNoData: realPrecip?.nodata,
+			realDtrMonthly: realDtr?.monthly,
+			realDtrWidth: realDtr?.width,
+			realDtrHeight: realDtr?.height,
+			realDtrMonths: realDtr?.months,
+			realDtrScale: realDtr?.scale,
+			realDtrNoData: realDtr?.nodata,
+			realElevationRaster: realElevation?.raster,
+			realElevationWidth: realElevation?.width,
+			realElevationHeight: realElevation?.height,
+			realElevationScale: realElevation?.scale,
+			realElevationNoData: realElevation?.nodata,
+			eu5TopographyRaster: eu5Topography?.raster,
+			eu5TopographyWidth: eu5Topography?.width,
+			eu5TopographyHeight: eu5Topography?.height,
+			eu5TopographyNoData: eu5Topography?.nodata,
+			eu5VegetationRaster: eu5Vegetation?.raster,
+			eu5VegetationWidth: eu5Vegetation?.width,
+			eu5VegetationHeight: eu5Vegetation?.height,
+			eu5VegetationNoData: eu5Vegetation?.nodata,
+			eu5ClimateRaster: eu5Climate?.raster,
+			eu5ClimateWidth: eu5Climate?.width,
+			eu5ClimateHeight: eu5Climate?.height,
+			eu5ClimateNoData: eu5Climate?.nodata,
 			planetRadiusKm: importParams.planetRadiusKm as number,
 			obliquity: importParams.obliquity as number,
 			eccentricity: importParams.eccentricity as number,
@@ -327,6 +383,8 @@ export function importHeightmap(
 			daysPerYear: importParams.daysPerYear as number,
 			hoursPerDay: importParams.hoursPerDay as number,
 			pressure: importParams.pressure as number,
+			albedo: importParams.albedo,
+			greenhouseFactor: importParams.greenhouseFactor,
 			substellarLon: importParams.substellarLon as number,
 			terrainWarp: importParams.terrainWarp as number,
 			smoothing: importParams.smoothing as number,
@@ -357,6 +415,9 @@ export function importHeightmap(
 		if (coastlineMask) transfer.push(coastlineMask.mask.buffer)
 		if (lakeMask) transfer.push(lakeMask.mask.buffer)
 		if (realClimate) transfer.push(realClimate.monthly.buffer)
+		if (realPrecip) transfer.push(realPrecip.monthly.buffer)
+		if (realDtr) transfer.push(realDtr.monthly.buffer)
+		if (realElevation) transfer.push(realElevation.raster.buffer)
 		worker.postMessage(request, transfer)
 	})
 }

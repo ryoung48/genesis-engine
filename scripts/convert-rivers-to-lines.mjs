@@ -13,7 +13,9 @@ import { readFileSync, writeFileSync } from "node:fs"
 
 const [, , inPath, outPath] = process.argv
 if (!inPath || !outPath) {
-	console.error("Usage: node convert-rivers-to-lines.mjs <input.geojson> <output.json>")
+	console.error(
+		"Usage: node convert-rivers-to-lines.mjs <input.geojson> <output.json>",
+	)
 	process.exit(1)
 }
 

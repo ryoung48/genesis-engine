@@ -41,7 +41,7 @@ export function computeTidalRain(
 	const N = mesh.numRegions
 	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
 	const pressureRainFactor = getPressureRainFactor(params?.pressure)
-	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
+	void meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 	const { landRegions, landNeighborOffset, landNeighborList } =
 		buildRegionGraph(mesh, isLand)
 
@@ -79,9 +79,7 @@ export function computeTidalRain(
 		const ceiling = ceilingScale(temp)
 		// distCoast is already real km (computeCoastDistances), not a hop
 		// count, so no further *avgEdgeKm conversion is needed here.
-		const moistureAvail = distCoast
-			? clamp(1 - distCoast[r] / 2835, 0, 1)
-			: 1
+		const moistureAvail = distCoast ? clamp(1 - distCoast[r] / 2835, 0, 1) : 1
 
 		const n =
 			sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1 +
