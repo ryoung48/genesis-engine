@@ -59,12 +59,19 @@ interface RealElevationRaster {
 	nodata: number
 }
 
-export interface Eu5CategoricalRaster {
+interface Eu5CategoricalRaster {
 	raster: Int16Array
 	width: number
 	height: number
 	nodata: number
 	categories: string[]
+}
+
+interface IdRaster {
+	raster: Int16Array
+	width: number
+	height: number
+	nodata: number
 }
 
 export function loadImageAsGrayscale(
@@ -308,7 +315,8 @@ export function importHeightmap(
 	callbacks: GenerationCallbacks,
 	coastlineMask?: { mask: Uint8Array; width: number; height: number },
 	lakeMask?: { mask: Uint8Array; width: number; height: number },
-	riverLines?: { points: number[]; strokeweig: number }[],
+	riverLines?: { points: number[]; strokeweig: number; name?: string | null }[],
+	realProvinces?: { name: string; lon: number; lat: number; weight: number }[],
 	realClimate?: RealClimateRaster,
 	realPrecip?: RealClimateRaster,
 	realDtr?: RealClimateRaster,
@@ -316,6 +324,9 @@ export function importHeightmap(
 	eu5Topography?: Eu5CategoricalRaster,
 	eu5Vegetation?: Eu5CategoricalRaster,
 	eu5Climate?: Eu5CategoricalRaster,
+	eu4Provinces?: IdRaster,
+	eu4ProvinceFallbackSeeds?: { id: number; lon: number; lat: number }[],
+	lakeNames?: { name: string; ring: [number, number][] }[],
 ): void {
 	callbacks.setGenerating(true)
 	callbacks.setGenerationProgress(0)
@@ -338,6 +349,8 @@ export function importHeightmap(
 			lakeMaskWidth: lakeMask?.width,
 			lakeMaskHeight: lakeMask?.height,
 			riverLines,
+			lakeNames,
+			realProvinces,
 			realClimateMonthly: realClimate?.monthly,
 			realClimateWidth: realClimate?.width,
 			realClimateHeight: realClimate?.height,
@@ -373,6 +386,11 @@ export function importHeightmap(
 			eu5ClimateWidth: eu5Climate?.width,
 			eu5ClimateHeight: eu5Climate?.height,
 			eu5ClimateNoData: eu5Climate?.nodata,
+			eu4ProvincesRaster: eu4Provinces?.raster,
+			eu4ProvincesWidth: eu4Provinces?.width,
+			eu4ProvincesHeight: eu4Provinces?.height,
+			eu4ProvincesNoData: eu4Provinces?.nodata,
+			eu4ProvinceFallbackSeeds,
 			planetRadiusKm: importParams.planetRadiusKm as number,
 			obliquity: importParams.obliquity as number,
 			eccentricity: importParams.eccentricity as number,

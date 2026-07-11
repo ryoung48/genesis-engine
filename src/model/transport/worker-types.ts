@@ -139,6 +139,7 @@ export interface SerializedGenesisWorld {
 		flow_monthly: Float32Array
 		riverId: Int32Array
 		riverLengthKm: Float32Array
+		riverNames?: (string | null)[]
 		visible: Uint8Array
 		basinId: Int32Array
 		waterLevel: Float32Array
@@ -168,6 +169,7 @@ export interface SerializedGenesisWorld {
 		size: Int32Array
 		dominantCulture?: Int32Array
 		nameSeeds?: Int32Array
+		realNames?: (string | null)[]
 		count: number
 	}
 	development?: Float32Array
@@ -457,6 +459,13 @@ export type GenesisWorkerRequest =
 				lakeMaskWidth?: number
 				lakeMaskHeight?: number
 				riverLines?: { points: number[]; strokeweig: number }[]
+				lakeNames?: { name: string; ring: [number, number][] }[]
+				realProvinces?: {
+					name: string
+					lon: number
+					lat: number
+					weight: number
+				}[]
 				realClimateMonthly?: Int16Array
 				realClimateWidth?: number
 				realClimateHeight?: number
@@ -492,6 +501,11 @@ export type GenesisWorkerRequest =
 				eu5ClimateWidth?: number
 				eu5ClimateHeight?: number
 				eu5ClimateNoData?: number
+				eu4ProvincesRaster?: Int16Array
+				eu4ProvincesWidth?: number
+				eu4ProvincesHeight?: number
+				eu4ProvincesNoData?: number
+				eu4ProvinceFallbackSeeds?: { id: number; lon: number; lat: number }[]
 				terrainWarp: number
 				smoothing: number
 				hydraulicErosion: number

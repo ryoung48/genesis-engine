@@ -2,7 +2,6 @@ import {
 	getStarPARFactor,
 	isValidSpectralClass,
 } from "@/model/celestial/star/star-types"
-import { computeAetFromPet, fillPetMonthlyHargreaves } from "./hydrology"
 import type {
 	GenesisClimate,
 	GenesisHydrology,
@@ -10,6 +9,7 @@ import type {
 	GenesisRainfall,
 	SphereMesh,
 } from ".."
+import { computeAetFromPet, fillPetMonthlyHargreaves } from "./hydrology"
 
 const ZONE_COLOR_MAP = {
 	Ofi: [220, 245, 255],

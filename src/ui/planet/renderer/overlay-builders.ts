@@ -655,9 +655,9 @@ function buildRiverGroup(
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
 	const height = canvas.clientHeight || 1
-	const minWidth = 0.15
-	const maxWidth = 1.2
-	const binStep = 0.3
+	const minWidth = 0.4
+	const maxWidth = 1.6
+	const binStep = 0.05
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
 	const logRange = logMax - logMin || 1
@@ -754,7 +754,7 @@ function buildRiverGroup(
 		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
 		const baseOpacity = 0.55 + t * 0.4
 		const material = new LineMaterial({
-			color: 0x0978ab,
+			color: 0x8fc4e8,
 			opacity: baseOpacity,
 			linewidth: binnedWidth,
 			transparent: true,
@@ -829,9 +829,9 @@ export function buildMapRivers(
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
 	const height = canvas.clientHeight || 1
-	const minWidth = 0.15
-	const maxWidth = 1.2
-	const binStep = 0.3
+	const minWidth = 0.4
+	const maxWidth = 1.6
+	const binStep = 0.05
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
 	const logRange = logMax - logMin || 1
@@ -955,7 +955,7 @@ export function buildMapRivers(
 		if (positions.length < 6) continue
 		const t = (binnedWidth - minWidth) / (maxWidth - minWidth)
 		const material = new LineMaterial({
-			color: 0x0978ab,
+			color: 0x8fc4e8,
 			opacity: 0.55 + t * 0.4,
 			linewidth: binnedWidth,
 			transparent: true,

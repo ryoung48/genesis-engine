@@ -293,6 +293,7 @@ function serializeWorld(
 					flow_monthly: world.rivers.flow_monthly,
 					riverId: world.rivers.riverId,
 					riverLengthKm: world.rivers.riverLengthKm,
+					riverNames: world.rivers.riverNames,
 					visible: world.rivers.visible,
 					basinId: world.rivers.basinId,
 					waterLevel: world.rivers.waterLevel,
@@ -322,6 +323,7 @@ function serializeWorld(
 					size: world.landmarks.size,
 					dominantCulture: world.landmarks.dominantCulture,
 					nameSeeds: world.landmarks.nameSeeds,
+					realNames: world.landmarks.realNames,
 					count: world.landmarks.count,
 				}
 			: undefined,

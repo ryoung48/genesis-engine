@@ -24,6 +24,11 @@ import type { ColorMode } from "../colors"
 import type { GenesisViewMode } from "../renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
 import { gridSpacingOptions } from "../screen/shared/constants"
+import {
+	type DataVariant,
+	getAvailableVariants,
+	getBaseMapMode,
+} from "../screen/shared/data-variant"
 import type {
 	NationMapMode,
 	PopulationMapMode,
@@ -39,13 +44,7 @@ export type DangerSubMode =
 	| "tornado"
 	| "tidal"
 export type VegetationSubMode = "base" | "maps" | "satellite" | "eu5"
-export type ClimateSubMode =
-	| "basic"
-	| "pasta"
-	| "koppen"
-	| "eu5"
-	| "realPasta"
-	| "realKoppen"
+export type ClimateSubMode = "basic" | "pasta" | "koppen" | "eu5"
 export type TopographySubMode = "classification" | "slope" | "eu5"
 export type ExportWidthPreset = "4096" | "8192" | "16384" | "32768"
 export interface LabelMode {
@@ -148,6 +147,8 @@ interface OverlayControlsProps {
 	setDebugMapModes: (v: boolean) => void
 	colorMode: ColorMode
 	setColorMode: (v: ColorMode) => void
+	dataVariant: DataVariant
+	setDataVariant: (v: DataVariant) => void
 	clockCurrent: boolean
 	setClockCurrent: (v: boolean) => void
 	clockMonthMode: "annual" | "monthly"
@@ -256,6 +257,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setDebugMapModes,
 	colorMode,
 	setColorMode,
+	dataVariant,
+	setDataVariant,
 	clockCurrent,
 	setClockCurrent,
 	clockMonthMode,
@@ -315,35 +318,14 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	const [elevationExpanded, setElevationExpanded] = React.useState(false)
 	const [topographyExpanded, setTopographyExpanded] = React.useState(false)
 	const [localExportExpanded, setLocalExportExpanded] = React.useState(false)
-	const [lastTempSubMode, setLastTempSubMode] = React.useState<
-		| "temperature"
-		| "realTemperature"
-		| "temperatureDiff"
-		| "dtr"
-		| "realDtr"
-		| "dtrDiff"
-		| "misery"
-	>("temperature")
-	const [lastRainSubMode, setLastRainSubMode] = React.useState<
-		"precipitation" | "realPrecipitation" | "precipitationDiff" | "humidity"
-	>("precipitation")
-
-	React.useEffect(() => {
-		if (colorMode === "temperature" && lastTempSubMode !== "temperature") {
-			setColorMode(lastTempSubMode)
-		} else if (
-			colorMode === "precipitation" &&
-			lastRainSubMode !== "precipitation"
-		) {
-			setColorMode(lastRainSubMode)
-		}
-	}, [colorMode, lastTempSubMode, lastRainSubMode, setColorMode])
 	const exportExpanded =
 		controlledExportExpanded !== undefined
 			? controlledExportExpanded
 			: localExportExpanded
 	const setExportExpanded =
 		controlledSetExportExpanded ?? setLocalExportExpanded
+	const availableVariants = getAvailableVariants(colorMode)
+	const baseColorMode = getBaseMapMode(colorMode)
 	const clampedClockHour = clampClockDialHour(clockHour)
 	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
 	const daysPerMonth = Math.max(1, Math.round(daysPerYear / 12))
@@ -878,6 +860,44 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 												/>
 											</label>
+											{isEarthImport && availableVariants.length > 1 && (
+												<div className="pt-1">
+													<div className="flex items-center gap-4 text-[11px] font-medium">
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="data-variant"
+																checked={dataVariant === "generated"}
+																onChange={() => setDataVariant("generated")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															Model
+														</label>
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="data-variant"
+																checked={dataVariant === "observed"}
+																onChange={() => setDataVariant("observed")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															Observed
+														</label>
+														{availableVariants.includes("diff") && (
+															<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+																<input
+																	type="radio"
+																	name="data-variant"
+																	checked={dataVariant === "diff"}
+																	onChange={() => setDataVariant("diff")}
+																	className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+																/>
+																Diff
+															</label>
+														)}
+													</div>
+												</div>
+											)}
 										</div>
 									)}
 								</div>
@@ -1063,68 +1083,28 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													colorMode === "realPrecipitation" ||
 													colorMode === "precipitationDiff" ||
 													colorMode === "humidity") && (
-													<>
-														<div className="space-y-1 text-[11px] font-medium">
-															<div className="flex items-center gap-4">
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="rain-sub"
-																		checked={colorMode === "precipitation"}
-																		onChange={() => {
-																			setColorMode("precipitation")
-																			setLastRainSubMode("precipitation")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Precipitation
-																</label>
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="rain-sub"
-																		checked={colorMode === "humidity"}
-																		onChange={() => {
-																			setColorMode("humidity")
-																			setLastRainSubMode("humidity")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Humidity
-																</label>
-															</div>
-															{isEarthImport && (
-															<div className="flex items-center gap-4">
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="rain-sub"
-																		checked={colorMode === "realPrecipitation"}
-																		onChange={() => {
-																			setColorMode("realPrecipitation")
-																			setLastRainSubMode("realPrecipitation")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Observed
-																</label>
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="rain-sub"
-																		checked={colorMode === "precipitationDiff"}
-																		onChange={() => {
-																			setColorMode("precipitationDiff")
-																			setLastRainSubMode("precipitationDiff")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Diff
-																</label>
-															</div>
-															)}
-														</div>
-													</>
+													<div className="flex items-center gap-4 text-[11px] font-medium">
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="rain-sub"
+																checked={baseColorMode === "precipitation"}
+																onChange={() => setColorMode("precipitation")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															Precipitation
+														</label>
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="rain-sub"
+																checked={colorMode === "humidity"}
+																onChange={() => setColorMode("humidity")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															Humidity
+														</label>
+													</div>
 												)}
 												{(colorMode === "temperature" ||
 													colorMode === "realTemperature" ||
@@ -1133,112 +1113,38 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													colorMode === "realDtr" ||
 													colorMode === "dtrDiff" ||
 													colorMode === "misery") && (
-													<>
-														<div className="space-y-1 text-[11px] font-medium">
-															<div className="flex items-center gap-4">
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "temperature"}
-																		onChange={() => {
-																			setColorMode("temperature")
-																			setLastTempSubMode("temperature")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Temp
-																</label>
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "dtr"}
-																		onChange={() => {
-																			setColorMode("dtr")
-																			setLastTempSubMode("dtr")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	DTR
-																</label>
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "misery"}
-																		onChange={() => {
-																			setColorMode("misery")
-																			setLastTempSubMode("misery")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	MI
-																</label>
-															</div>
-															{isEarthImport && (
-															<div className="flex items-center gap-4">
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "realTemperature"}
-																		onChange={() => {
-																			setColorMode("realTemperature")
-																			setLastTempSubMode("realTemperature")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Observed
-																</label>
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "temperatureDiff"}
-																		onChange={() => {
-																			setColorMode("temperatureDiff")
-																			setLastTempSubMode("temperatureDiff")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	EBM-Real
-																</label>
-															</div>
-															)}
-															{isEarthImport && (
-															<div className="flex items-center gap-4">
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "realDtr"}
-																		onChange={() => {
-																			setColorMode("realDtr")
-																			setLastTempSubMode("realDtr")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	Obs DTR
-																</label>
-																<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-																	<input
-																		type="radio"
-																		name="temp-sub"
-																		checked={colorMode === "dtrDiff"}
-																		onChange={() => {
-																			setColorMode("dtrDiff")
-																			setLastTempSubMode("dtrDiff")
-																		}}
-																		className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-																	/>
-																	DTR Diff
-																</label>
-															</div>
-															)}
-														</div>
-														<div className="border-t border-white/10" />
-													</>
+													<div className="flex items-center gap-4 text-[11px] font-medium">
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="temp-sub"
+																checked={baseColorMode === "temperature"}
+																onChange={() => setColorMode("temperature")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															Temp
+														</label>
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="temp-sub"
+																checked={baseColorMode === "dtr"}
+																onChange={() => setColorMode("dtr")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															DTR
+														</label>
+														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
+															<input
+																type="radio"
+																name="temp-sub"
+																checked={colorMode === "misery"}
+																onChange={() => setColorMode("misery")}
+																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
+															/>
+															MI
+														</label>
+													</div>
 												)}
 											</div>
 										)}
@@ -1413,21 +1319,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
-												{isEarthImport && (
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>EU5</span>
-													<input
-														type="radio"
-														name="topography-sub"
-														checked={topographySubMode === "eu5"}
-														onChange={() => {
-															setTopographySubMode("eu5")
-															setColorMode("eu5Topography")
-														}}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												)}
 											</div>
 										)}
 									</div>
@@ -1490,21 +1381,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
-												{isEarthImport && (
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>EU5</span>
-													<input
-														type="radio"
-														name="vegetation-sub"
-														checked={vegetationSubMode === "eu5"}
-														onChange={() => {
-															setVegetationSubMode("eu5")
-															setColorMode("eu5Vegetation")
-														}}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												)}
 											</div>
 										)}
 									</div>
@@ -1569,51 +1445,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 													/>
 												</label>
-												{isEarthImport && (
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>EU5</span>
-													<input
-														type="radio"
-														name="climate-sub"
-														checked={climateSubMode === "eu5"}
-														onChange={() => {
-															setClimateSubMode("eu5")
-															setColorMode("eu5Climate")
-														}}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												)}
-												{isEarthImport && (
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>Observed Pasta</span>
-													<input
-														type="radio"
-														name="climate-sub"
-														checked={climateSubMode === "realPasta"}
-														onChange={() => {
-															setClimateSubMode("realPasta")
-															setColorMode("realPastaClimate")
-														}}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												)}
-												{isEarthImport && (
-												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-													<span>Observed Koppen</span>
-													<input
-														type="radio"
-														name="climate-sub"
-														checked={climateSubMode === "realKoppen"}
-														onChange={() => {
-															setClimateSubMode("realKoppen")
-															setColorMode("realKoppenClimate")
-														}}
-														className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-													/>
-												</label>
-												)}
 												<div className="border-t border-white/10" />
 												<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 													<span>GDD</span>

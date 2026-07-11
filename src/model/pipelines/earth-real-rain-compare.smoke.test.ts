@@ -49,7 +49,13 @@ function loadRiverLines() {
 function loadRealElevation() {
 	const meta = JSON.parse(
 		readFileSync(join(HEIGHTMAP_DIR, "earth-real-elevation.json"), "utf8"),
-	) as { bin: string; width: number; height: number; scale: number; nodata: number }
+	) as {
+		bin: string
+		width: number
+		height: number
+		scale: number
+		nodata: number
+	}
 	const bin = readFileSync(join(HEIGHTMAP_DIR, meta.bin))
 	const raster = new Int16Array(
 		bin.buffer,
@@ -256,7 +262,9 @@ describe("Rain model vs observed Earth precipitation (land only)", () => {
 			}
 
 			const elevKm = elevation_km ? elevation_km[r] : NaN
-			const elevBin = elevationStats.find((b) => elevKm >= b.lo && elevKm < b.hi)
+			const elevBin = elevationStats.find(
+				(b) => elevKm >= b.lo && elevKm < b.hi,
+			)
 			if (elevBin) {
 				elevBin.n++
 				elevBin.sumDiff += diff
@@ -264,7 +272,9 @@ describe("Rain model vs observed Earth precipitation (land only)", () => {
 				elevBin.sumModeled += modeled
 			}
 
-			const wetBin = wetnessStats.find((b) => observed >= b.lo && observed < b.hi)
+			const wetBin = wetnessStats.find(
+				(b) => observed >= b.lo && observed < b.hi,
+			)
 			if (wetBin) {
 				wetBin.n++
 				wetBin.sumDiff += diff
@@ -299,7 +309,8 @@ describe("Rain model vs observed Earth precipitation (land only)", () => {
 			bandStats.map((b) => ({
 				band: b.label,
 				landCells: b.n,
-				meanObservedMm: b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
+				meanObservedMm:
+					b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
 				meanModeledMm: b.n > 0 ? Number((b.sumModeled / b.n).toFixed(0)) : NaN,
 				meanBiasMm: b.n > 0 ? Number((b.sumDiff / b.n).toFixed(0)) : NaN,
 			})),
@@ -310,7 +321,8 @@ describe("Rain model vs observed Earth precipitation (land only)", () => {
 			hemisphereStats.map((b) => ({
 				hemisphere: b.label,
 				landCells: b.n,
-				meanObservedMm: b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
+				meanObservedMm:
+					b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
 				meanModeledMm: b.n > 0 ? Number((b.sumModeled / b.n).toFixed(0)) : NaN,
 				meanBiasMm: b.n > 0 ? Number((b.sumDiff / b.n).toFixed(0)) : NaN,
 			})),
@@ -321,7 +333,8 @@ describe("Rain model vs observed Earth precipitation (land only)", () => {
 			elevationStats.map((b) => ({
 				elevation: b.label,
 				landCells: b.n,
-				meanObservedMm: b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
+				meanObservedMm:
+					b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
 				meanModeledMm: b.n > 0 ? Number((b.sumModeled / b.n).toFixed(0)) : NaN,
 				meanBiasMm: b.n > 0 ? Number((b.sumDiff / b.n).toFixed(0)) : NaN,
 			})),
@@ -334,7 +347,8 @@ describe("Rain model vs observed Earth precipitation (land only)", () => {
 			wetnessStats.map((b) => ({
 				wetness: b.label,
 				landCells: b.n,
-				meanObservedMm: b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
+				meanObservedMm:
+					b.n > 0 ? Number((b.sumObserved / b.n).toFixed(0)) : NaN,
 				meanModeledMm: b.n > 0 ? Number((b.sumModeled / b.n).toFixed(0)) : NaN,
 				meanBiasMm: b.n > 0 ? Number((b.sumDiff / b.n).toFixed(0)) : NaN,
 			})),

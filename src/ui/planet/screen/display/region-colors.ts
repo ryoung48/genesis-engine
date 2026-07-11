@@ -21,6 +21,9 @@ import {
 	developmentColor,
 	dtrColor,
 	dtrDifferenceColor,
+	EU5_CLIMATE_COLORS,
+	EU5_TOPOGRAPHY_COLORS,
+	EU5_VEGETATION_COLORS,
 	earthquakeLandColor,
 	getColor,
 	hotspotColor,
@@ -39,9 +42,6 @@ import {
 	temperatureDifferenceColor,
 	tidalTierColor,
 	tornadoLandColor,
-	EU5_CLIMATE_COLORS,
-	EU5_TOPOGRAPHY_COLORS,
-	EU5_VEGETATION_COLORS,
 	VEGETATION_WATER_BLUE,
 	vegetationColor,
 	vegetationMapColor,
@@ -592,7 +592,8 @@ export function computeRegionColors(
 			viewMode === "map" && colorMode === "realPastaClimate"
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = pastaClimateColor(world.realPastaClimate[r])
-			const factor = darkenMapWaterRealPastaClimate && isOceanRegion(r) ? 0.74 : 1
+			const factor =
+				darkenMapWaterRealPastaClimate && isOceanRegion(r) ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
 			rgb[3 * r + 2] = cb * factor
@@ -975,7 +976,7 @@ export function computeRegionColors(
 			}
 			return rgb
 		}
-		if (nationMode === "provinces") {
+		if (nationMode === "provinces" || nationMode === "earthProvinces") {
 			const { regionProvince, colors: provColors, desolate } = world.provinces
 			for (let r = 0; r < N; r++) {
 				const p = regionProvince[r]
@@ -1131,7 +1132,10 @@ export function computeRegionColors(
 		}
 	}
 
-	if (colorMode === "provinces" && world.provinces) {
+	if (
+		(colorMode === "provinces" || colorMode === "earthProvinces") &&
+		world.provinces
+	) {
 		const { regionProvince, colors: provColors, desolate } = world.provinces
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]

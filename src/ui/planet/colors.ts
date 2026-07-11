@@ -53,6 +53,7 @@ export type ColorMode =
 	| "nations"
 	| "population"
 	| "provinces"
+	| "earthProvinces"
 	| "basins"
 	| "terrainFeatures"
 	| "dtr"
@@ -76,7 +77,7 @@ export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
  * indices into these arrays; keep them in sync with the .json `categories`
  * field the build script writes to public/heightmap/eu5-*.json.
  */
-export const EU5_TOPOGRAPHY_CATEGORIES = [
+const EU5_TOPOGRAPHY_CATEGORIES = [
 	"atoll",
 	"coastal_ocean",
 	"deep_ocean",
@@ -101,7 +102,7 @@ export const EU5_TOPOGRAPHY_CATEGORIES = [
 	"wetlands_wasteland",
 ] as const
 
-export const EU5_VEGETATION_CATEGORIES = [
+const EU5_VEGETATION_CATEGORIES = [
 	"desert",
 	"farmland",
 	"forest",
@@ -111,7 +112,7 @@ export const EU5_VEGETATION_CATEGORIES = [
 	"woods",
 ] as const
 
-export const EU5_CLIMATE_CATEGORIES = [
+const EU5_CLIMATE_CATEGORIES = [
 	"arctic",
 	"arid",
 	"cold_arid",
@@ -194,6 +195,17 @@ export const EU5_CLIMATE_COLORS: [number, number, number][] = [
 	hex(0x285635), // subtropical
 	hex(0x23431d), // tropical
 ]
+
+if (EU5_TOPOGRAPHY_COLORS.length !== EU5_TOPOGRAPHY_CATEGORIES.length) {
+	throw new Error("EU5 topography categories/colors are out of sync")
+}
+if (EU5_VEGETATION_COLORS.length !== EU5_VEGETATION_CATEGORIES.length) {
+	throw new Error("EU5 vegetation categories/colors are out of sync")
+}
+if (EU5_CLIMATE_COLORS.length !== EU5_CLIMATE_CATEGORIES.length) {
+	throw new Error("EU5 climate categories/colors are out of sync")
+}
+
 export const VEGETATION_WATER_BLUE: [number, number, number] = [
 	0x90 / 255,
 	0xd9 / 255,

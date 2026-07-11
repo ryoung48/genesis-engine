@@ -19,6 +19,8 @@ export interface GenesisLandmarks {
 	dominantCulture?: Int32Array
 	/** Deterministic per-landmark display/name seed */
 	nameSeeds?: Int32Array
+	/** Real-world name per landmark (Earth import, lake landmarks only). */
+	realNames?: (string | null)[]
 	/** Total number of landmarks */
 	count: number
 }

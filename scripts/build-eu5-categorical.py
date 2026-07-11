@@ -10,7 +10,7 @@ from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = None
 
-INT16_NODATA = -32768
+UINT8_NODATA = 255
 
 DEFAULT_TIF = Path(r"c:\Users\rayou\Downloads\EU5toGIS\EU5toGIS\datasets\locations.tif")
 DEFAULT_TIF_L = Path(r"c:\Users\rayou\Downloads\EU5toGIS\EU5toGIS\datasets\locations_L.tif")
@@ -148,27 +148,30 @@ def build_assets(
     results = []
     for field in FIELDS:
         field_codes = codes_sorted[field][lookup_idx_c]
-        quantized = np.full((height, width), INT16_NODATA, dtype=np.int16)
+        quantized = np.full((height, width), UINT8_NODATA, dtype=np.uint8)
         valid = matched & (field_codes >= 0)
-        quantized[valid] = field_codes[valid].astype(np.int16)
+        quantized[valid] = field_codes[valid].astype(np.uint8)
 
         prefix = f"eu5-{field}"
         bin_path = output_dir / f"{prefix}.bin"
         meta_path = output_dir / f"{prefix}.json"
-        quantized.astype("<i2", copy=False).tofile(bin_path)
+        quantized.astype(np.uint8, copy=False).tofile(bin_path)
 
         metadata = {
             "version": 1,
-            "format": "int16-single-band-categorical",
+            "format": "uint8-single-band-categorical",
             "field": f"eu5_{field}",
             "width": width,
             "height": height,
-            "nodata": INT16_NODATA,
+            "nodata": UINT8_NODATA,
             "categories": categories[field],
             "source": f"{tif_path} + {tif_l_path} + {gpkg_path}",
             "bin": bin_path.name,
         }
-        meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        meta_path.write_text(
+            json.dumps(metadata, separators=(",", ":"), ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
         results.append((meta_path, bin_path))
     return results
 

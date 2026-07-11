@@ -10,6 +10,7 @@ from build_earth_real_raster import INT16_NODATA, load_month_array, resample_mon
 
 
 DEFAULT_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public\wc2.1_10m_elev.tif")
+DEFAULT_BATHY_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public\elev.tif")
 DEFAULT_OUTPUT_DIR = Path("public/heightmap")
 DEFAULT_PREFIX = "earth-real-elevation"
 # Native WorldClim 10-arcmin resolution -- full precision, no need to
@@ -21,6 +22,7 @@ SCALE = 1.0
 
 def build_asset(
     source: Path,
+    bathy_source: Path | None,
     output_dir: Path,
     prefix: str,
     width: int,
@@ -28,13 +30,29 @@ def build_asset(
 ) -> tuple[Path, Path]:
     if not source.exists():
         raise FileNotFoundError(f"Missing source raster: {source}")
+    if bathy_source is not None and not bathy_source.exists():
+        raise FileNotFoundError(f"Missing bathymetry raster: {bathy_source}")
 
-    data = load_month_array(source)
-    resampled = (
-        data
-        if (width, height) == (data.shape[1], data.shape[0])
-        else resample_month(data, width, height)
+    land_data = load_month_array(source)
+    land_resampled = (
+        land_data
+        if (width, height) == (land_data.shape[1], land_data.shape[0])
+        else resample_month(land_data, width, height)
     )
+    resampled = land_resampled.copy()
+
+    if bathy_source is not None:
+        bathy_data = load_month_array(bathy_source)
+        bathy_resampled = (
+            bathy_data
+            if (width, height) == (bathy_data.shape[1], bathy_data.shape[0])
+            else resample_month(bathy_data, width, height)
+        )
+        # WorldClim provides land elevation with ocean as nodata. Fill only
+        # those ocean gaps from the bathymetry raster, never with positive land.
+        ocean_mask = ~np.isfinite(land_resampled)
+        bathy_mask = ocean_mask & np.isfinite(bathy_resampled) & (bathy_resampled <= 0)
+        resampled[bathy_mask] = bathy_resampled[bathy_mask]
 
     output_dir.mkdir(parents=True, exist_ok=True)
     bin_path = output_dir / f"{prefix}.bin"
@@ -58,6 +76,7 @@ def build_asset(
         "scale": 1.0,
         "nodata": INT16_NODATA,
         "source": str(source),
+        "bathySource": str(bathy_source) if bathy_source is not None else None,
         "bin": bin_path.name,
     }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
@@ -69,6 +88,7 @@ def parse_args() -> argparse.Namespace:
         description="Build a compact Earth real-elevation asset from a WorldClim GeoTIFF."
     )
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
+    parser.add_argument("--bathy-source", type=Path, default=DEFAULT_BATHY_SOURCE)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--prefix", default=DEFAULT_PREFIX)
     parser.add_argument("--width", type=int, default=DEFAULT_WIDTH)
@@ -80,6 +100,7 @@ def main() -> None:
     args = parse_args()
     meta_path, bin_path = build_asset(
         source=args.source,
+        bathy_source=args.bathy_source,
         output_dir=args.output_dir,
         prefix=args.prefix,
         width=args.width,

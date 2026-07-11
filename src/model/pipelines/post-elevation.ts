@@ -84,7 +84,11 @@ import {
 	LANDMARK_TYPE_OCEAN,
 } from "../terrain/landmarks"
 import { computeLocations } from "../terrain/locations"
-import { computeProvinces } from "../terrain/provinces"
+import {
+	computeProvinces,
+	computeProvincesFromRaster,
+	computeWeightedProvinces,
+} from "../terrain/provinces"
 import { computeRivers } from "../terrain/rivers"
 
 /**
@@ -100,6 +104,7 @@ interface RealRiversInput {
 	visible: Uint8Array
 	riverId: Int32Array
 	riverLengthKm: Float32Array
+	riverNames?: (string | null)[]
 	minFlow: number
 	maxFlow: number
 }
@@ -131,6 +136,23 @@ interface PostPipelineInput {
 	realLakeRegions?: Uint8Array
 	/** Real river network — see RealRiversInput. */
 	realRivers?: RealRiversInput
+	/** Real-world province seeds (already resolved to mesh regions by the
+	 * caller), used to assign provinces via computeWeightedProvinces instead
+	 * of computeProvinces' procedural BFS. */
+	realProvinceSeeds?: {
+		regions: Int32Array
+		weights: Float32Array
+		names: string[]
+	}
+	/** Per-region real-world province id sampled from a rasterized source
+	 * (e.g. EU4 province polygons), -1 = no data. Takes priority over
+	 * realProvinceSeeds -- assigns provinces via computeProvincesFromRaster
+	 * instead of Voronoi-partitioning from seed points. */
+	eu4ProvinceIds?: Int16Array
+	/** Guaranteed-inside-polygon fallback point per eu4ProvinceIds source id,
+	 * used to force-place ids the raster sampling missed entirely -- see
+	 * computeProvincesFromRaster. */
+	eu4ProvinceFallbackSeeds?: { id: number; lon: number; lat: number }[]
 }
 
 interface PostPipelineOutput {
@@ -238,6 +260,9 @@ export function runPostElevationPipeline(
 		onProgress,
 		realLakeRegions,
 		realRivers,
+		realProvinceSeeds,
+		eu4ProvinceIds,
+		eu4ProvinceFallbackSeeds,
 	} = input
 	const timings: StageTiming[] = []
 	function record(stage: string, startMs: number) {
@@ -425,6 +450,7 @@ export function runPostElevationPipeline(
 			visible: realRivers.visible,
 			riverId: realRivers.riverId,
 			riverLengthKm: realRivers.riverLengthKm,
+			riverNames: realRivers.riverNames,
 			terminal: new Uint8Array(N),
 			terminalCoastal: new Uint8Array(N),
 			terminalInterior: new Uint8Array(N),
@@ -713,20 +739,35 @@ export function runPostElevationPipeline(
 
 	// ── Provinces ──────────────────────────────────────────────────────
 	t0 = performance.now()
-	const provinces: GenesisProvinces = computeProvinces(
-		mesh,
-		isLand,
-		topography,
-		params.seed,
-		{
-			climateZones,
-			rainfall,
-			oceanCoastal,
-			lakeCoastal,
-			riverVisible: rivers.visible,
-			planetRadiusKm: params.planetRadiusKm,
-		},
-	)
+	const provinceOptions = {
+		climateZones,
+		rainfall,
+		oceanCoastal,
+		lakeCoastal,
+		riverVisible: rivers.visible,
+		planetRadiusKm: params.planetRadiusKm,
+	}
+	const provinces: GenesisProvinces = eu4ProvinceIds
+		? computeProvincesFromRaster(
+				mesh,
+				isLand,
+				eu4ProvinceIds,
+				params.seed,
+				provinceOptions,
+				eu4ProvinceFallbackSeeds,
+			)
+		: realProvinceSeeds && realProvinceSeeds.regions.length > 0
+			? computeWeightedProvinces(
+					mesh,
+					isLand,
+					topography,
+					realProvinceSeeds.regions,
+					realProvinceSeeds.names,
+					params.seed,
+					provinceOptions,
+					realProvinceSeeds.weights,
+				)
+			: computeProvinces(mesh, isLand, topography, params.seed, provinceOptions)
 	record("Post: provinces", t0)
 	onProgress?.("Post: provinces", 72)
 

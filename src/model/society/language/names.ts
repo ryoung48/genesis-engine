@@ -286,6 +286,10 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 
 	function cachedLandmarkName(landmarkIdx: number): string {
 		const landmark = context.landmarks?.[landmarkIdx]
+		if (landmark?.name) {
+			landmarkNames.set(landmarkIdx, landmark.name)
+			return landmark.name
+		}
 		const cultureIdx = landmark?.culture ?? -1
 		return cachedScopedName({
 			cache: landmarkNames,
@@ -316,6 +320,10 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 		landmark: cachedLandmarkName,
 		river: (riverIdx: number) => {
 			const river = context.rivers?.[riverIdx]
+			if (river?.name) {
+				riverNames.set(riverIdx, river.name)
+				return river.name
+			}
 			if (!context.rivers) {
 				return cachedName(
 					riverNames,
@@ -445,6 +453,7 @@ export function createWorldNames(
 		(_, landmarkIdx): LanguageNameLandmark => ({
 			culture: world.landmarks?.dominantCulture?.[landmarkIdx] ?? -1,
 			nameSeed: world.landmarks?.nameSeeds?.[landmarkIdx],
+			name: world.landmarks?.realNames?.[landmarkIdx] ?? undefined,
 		}),
 	)
 	const riverProvinceById = new Map<number, number>()
@@ -475,6 +484,7 @@ export function createWorldNames(
 		{ length: riverCount },
 		(_, riverIdx): LanguageNameRiver => ({
 			province: riverProvinceById.get(riverIdx) ?? -1,
+			name: world.rivers?.riverNames?.[riverIdx] ?? undefined,
 		}),
 	)
 	const provinces = Array.from({ length: provinceCount }, (_, provinceIdx) => ({

@@ -23,6 +23,10 @@ export interface GenesisProvinces {
 	riverAccess: Uint8Array
 	/** Per-province flag: adjacent to a lake */
 	lakeAccess: Uint8Array
+	/** Real-world province name, only set when provinces were assigned from
+	 * imported Earth data (computeWeightedProvinces) rather than the
+	 * procedural BFS partition. */
+	names?: string[]
 }
 
 export interface GenesisPartition {
@@ -105,6 +109,8 @@ export interface GenesisRivers {
 	visible: Uint8Array
 	/** Per-cell river system ID (-1 = not a river cell). Tributaries share the main river's ID. */
 	riverId: Int32Array
+	/** Real-world name per river system ID (Earth import only), indexed by riverId. */
+	riverNames?: (string | null)[]
 	/** Per-cell total length of the visible river system, in km. */
 	riverLengthKm: Float32Array
 	/** Per-cell terminal flag for the last visible river cell before its sink. */

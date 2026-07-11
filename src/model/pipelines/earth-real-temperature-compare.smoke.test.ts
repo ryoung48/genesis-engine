@@ -49,7 +49,13 @@ function loadRiverLines() {
 function loadRealElevation() {
 	const meta = JSON.parse(
 		readFileSync(join(HEIGHTMAP_DIR, "earth-real-elevation.json"), "utf8"),
-	) as { bin: string; width: number; height: number; scale: number; nodata: number }
+	) as {
+		bin: string
+		width: number
+		height: number
+		scale: number
+		nodata: number
+	}
 	const bin = readFileSync(join(HEIGHTMAP_DIR, meta.bin))
 	const raster = new Int16Array(
 		bin.buffer,
@@ -224,7 +230,9 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			}
 
 			const elevKm = elevation_km ? elevation_km[r] : NaN
-			const elevBin = elevationStats.find((b) => elevKm >= b.lo && elevKm < b.hi)
+			const elevBin = elevationStats.find(
+				(b) => elevKm >= b.lo && elevKm < b.hi,
+			)
 			if (elevBin) {
 				elevBin.n++
 				elevBin.sumDiff += diff

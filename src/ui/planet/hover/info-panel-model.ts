@@ -58,6 +58,7 @@ interface HoverPastaMonthlyData {
 
 interface HoverProvinceDisplayData {
 	provinceColor: string | null
+	provinceName: string | null
 	provinceNation: {
 		id: number
 		color: string | null
@@ -229,7 +230,14 @@ export function buildProvinceDisplayData(params: {
 					world.provinces.colors[hoverProvince * 3 + 2],
 				])
 			: null
-	return { provinceColor, provinceNation }
+	const provinceName =
+		hoverProvince !== null &&
+		hoverProvince >= 0 &&
+		world?.provinces?.names &&
+		hoverProvince < world.provinces.names.length
+			? world.provinces.names[hoverProvince]
+			: null
+	return { provinceColor, provinceName, provinceNation }
 }
 
 export function buildClimateSwatchColor(

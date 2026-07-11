@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, it } from "vitest"
-import { computeLandFraction, computeTemperature } from "@/model/climate/climate"
+import {
+	computeLandFraction,
+	computeTemperature,
+} from "@/model/climate/climate"
 import { decodePng } from "@/model/pipelines/node-png"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { importGenesisWorld } from "../../pipelines/import-heightmap"
@@ -61,7 +64,13 @@ function loadRiverLines() {
 function loadRealElevation() {
 	const meta = JSON.parse(
 		readFileSync(join(HEIGHTMAP_DIR, "earth-real-elevation.json"), "utf8"),
-	) as { bin: string; width: number; height: number; scale: number; nodata: number }
+	) as {
+		bin: string
+		width: number
+		height: number
+		scale: number
+		nodata: number
+	}
 	const bin = readFileSync(join(HEIGHTMAP_DIR, meta.bin))
 	const raster = new Int16Array(
 		bin.buffer,

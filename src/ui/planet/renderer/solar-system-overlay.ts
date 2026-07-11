@@ -448,6 +448,7 @@ interface PlacedBody {
 	isBelt: boolean
 	bodyGroup?: THREE.Group
 	mesh?: THREE.Mesh
+	cloudsMesh?: THREE.Mesh
 	ringMesh?: THREE.Mesh
 	orbitLine?: THREE.Line
 	meshRestQuaternion?: THREE.Quaternion
@@ -644,6 +645,24 @@ export function buildSolarSystemOverlay(
 		if (isGasGiant || texturePath) mesh.rotation.x = Math.PI / 2
 		mesh.scale.setScalar(sceneRadius)
 		bodyGroup.add(mesh)
+		let cloudsMesh: THREE.Mesh | undefined
+		if (body.cloudsTexturePath) {
+			const cloudsMaterial = new THREE.MeshStandardMaterial({
+				map: loadBodyTexture(body.cloudsTexturePath),
+				transparent: true,
+				opacity: 0.6,
+				depthWrite: false,
+				roughness: 1,
+				metalness: 0,
+			})
+			cloudsMesh = new THREE.Mesh(
+				new THREE.SphereGeometry(1, 24, 18),
+				cloudsMaterial,
+			)
+			cloudsMesh.rotation.x = Math.PI / 2
+			cloudsMesh.scale.setScalar(sceneRadius * 1.01)
+			bodyGroup.add(cloudsMesh)
+		}
 		let ringMesh: THREE.Mesh | undefined
 		if (body.rings) {
 			const ringGeometry = new THREE.RingGeometry(
@@ -742,6 +761,7 @@ export function buildSolarSystemOverlay(
 			isBelt: false,
 			bodyGroup,
 			mesh,
+			cloudsMesh,
 			ringMesh,
 			meshRestQuaternion: mesh.quaternion.clone(),
 			baseQuaternion: mesh.quaternion.clone(),
@@ -1120,6 +1140,12 @@ export function buildSolarSystemOverlay(
 						: (hours / p.body.siderealDayHours) * TWO_PI
 				bodySpinQuat.setFromAxisAngle(bodySpinAxis, angle)
 				p.mesh.quaternion.copy(p.baseQuaternion).multiply(bodySpinQuat)
+				if (p.cloudsMesh) {
+					// Clouds drift slightly faster than the surface -- real
+					// atmospheric circulation outpaces solid-body rotation.
+					bodySpinQuat.setFromAxisAngle(bodySpinAxis, angle * 1.1)
+					p.cloudsMesh.quaternion.copy(p.baseQuaternion).multiply(bodySpinQuat)
+				}
 			}
 			p.moonState?.setSpinHours?.(hours)
 		}

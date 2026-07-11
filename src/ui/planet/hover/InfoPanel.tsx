@@ -453,7 +453,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showGeography &&
 		hoverOceanCurrents !== null &&
 		hoverOceanCurrents.monthlyDelta.some((value) => Math.abs(value) > 0.01)
-	const { provinceNation } = buildProvinceDisplayData({
+	const { provinceName, provinceNation } = buildProvinceDisplayData({
 		hoverProvince,
 		hoverNationId,
 		world,
@@ -772,6 +772,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				)}
 				{showSociety && hoverProvince !== null && hoverProvince >= 0 && (
 					<>
+						{provinceName && (
+							<SwatchRow label="Province" value={provinceName} color={null} />
+						)}
 						{provinceNation && (
 							<SwatchRow
 								label="Nation"

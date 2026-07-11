@@ -242,6 +242,12 @@ import {
 	historyYearToTime,
 } from "./screen/history/history-time"
 import { buildLiveHistoryView } from "./screen/history/live-history-view"
+import {
+	applyDataVariant,
+	type DataVariant,
+	getBaseMapMode,
+	getDataVariant,
+} from "./screen/shared/data-variant"
 import type {
 	NationMapMode,
 	PopulationMapMode,
@@ -476,6 +482,7 @@ async function loadEu5Categorical(prefix: string): Promise<{
 		throw new Error(`Failed to load ${prefix} metadata: ${metaRes.status}`)
 	}
 	const meta = (await metaRes.json()) as {
+		format: string
 		bin: string
 		width: number
 		height: number
@@ -487,13 +494,65 @@ async function loadEu5Categorical(prefix: string): Promise<{
 		throw new Error(`Failed to load ${prefix} raster: ${binRes.status}`)
 	}
 	const buffer = await binRes.arrayBuffer()
+	const raster =
+		meta.format === "uint8-single-band-categorical"
+			? Int16Array.from(new Uint8Array(buffer))
+			: new Int16Array(buffer)
 	return {
-		raster: new Int16Array(buffer),
+		raster,
 		width: meta.width,
 		height: meta.height,
 		nodata: meta.nodata,
 		categories: meta.categories,
 	}
+}
+
+async function loadEu4Provinces(): Promise<{
+	raster: Int16Array
+	width: number
+	height: number
+	nodata: number
+}> {
+	const metaRes = await fetch("/heightmap/eu4-provinces.json")
+	if (!metaRes.ok) {
+		throw new Error(`Failed to load EU4 provinces metadata: ${metaRes.status}`)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		width: number
+		height: number
+		nodata: number
+		compression?: "gzip"
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(`Failed to load EU4 provinces raster: ${binRes.status}`)
+	}
+	// A server may already transparently decode a *.gz file via the standard
+	// Content-Encoding response header (e.g. Vite's dev static middleware
+	// does this) -- decompressing again here would double-decode garbage.
+	// Only run DecompressionStream when the bytes are still actually gzipped.
+	const alreadyDecoded = binRes.headers.get("content-encoding") === "gzip"
+	const buffer =
+		meta.compression === "gzip" && !alreadyDecoded
+			? await new Response(
+					binRes.body?.pipeThrough(new DecompressionStream("gzip")),
+				).arrayBuffer()
+			: await binRes.arrayBuffer()
+	return {
+		raster: new Int16Array(buffer),
+		width: meta.width,
+		height: meta.height,
+		nodata: meta.nodata,
+	}
+}
+
+async function loadOptionalJson<T>(url: string): Promise<T | undefined> {
+	const res = await fetch(url)
+	if (!res.ok) return undefined
+	const contentType = res.headers.get("content-type") ?? ""
+	if (!contentType.includes("application/json")) return undefined
+	return (await res.json()) as T
 }
 
 function syncLabelModeToMapMode(params: {
@@ -574,6 +633,17 @@ export const GenesisView: React.FC = () => {
 	const [colorMode, setColorMode] = useState<ColorMode>(
 		initialViewPrefs.colorMode,
 	)
+	const [dataVariant, setDataVariant] = useState<DataVariant>(() =>
+		getDataVariant(initialViewPrefs.colorMode),
+	)
+	const setGeographyColorMode = useCallback(
+		(mode: ColorMode) => setColorMode(applyDataVariant(mode, dataVariant)),
+		[dataVariant],
+	)
+	const handleSetDataVariant = useCallback((next: DataVariant) => {
+		setDataVariant(next)
+		setColorMode((current) => applyDataVariant(getBaseMapMode(current), next))
+	}, [])
 	const [geographyMode, setGeographyMode] = useState<ColorMode>(
 		initialViewPrefs.geographyMode,
 	)
@@ -697,8 +767,9 @@ export const GenesisView: React.FC = () => {
 	const [elevationSubMode, setElevationSubMode] = useState<
 		"colored" | "grayscale"
 	>(initialViewPrefs.elevationSubMode)
-	const [topographySubMode, setTopographySubMode] =
-		useState<TopographySubMode>(initialViewPrefs.topographySubMode)
+	const [topographySubMode, setTopographySubMode] = useState<TopographySubMode>(
+		initialViewPrefs.topographySubMode,
+	)
 	const [dangerSubMode, setDangerSubMode] = useState<
 		"earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
 	>(initialViewPrefs.dangerSubMode)
@@ -2933,7 +3004,17 @@ export const GenesisView: React.FC = () => {
 			imageHeight: number,
 			coastlineMask?: { mask: Uint8Array; width: number; height: number },
 			lakeMask?: { mask: Uint8Array; width: number; height: number },
-			riverLines?: { points: number[]; strokeweig: number }[],
+			riverLines?: {
+				points: number[]
+				strokeweig: number
+				name?: string | null
+			}[],
+			realProvinces?: {
+				name: string
+				lon: number
+				lat: number
+				weight: number
+			}[],
 			realClimate?: {
 				monthly: Int16Array
 				width: number
@@ -2986,6 +3067,14 @@ export const GenesisView: React.FC = () => {
 				nodata: number
 				categories: string[]
 			},
+			eu4Provinces?: {
+				raster: Int16Array
+				width: number
+				height: number
+				nodata: number
+			},
+			eu4ProvinceFallbackSeeds?: { id: number; lon: number; lat: number }[],
+			lakeNames?: { name: string; ring: [number, number][] }[],
 		) => {
 			const importParams = {
 				seed,
@@ -3038,6 +3127,7 @@ export const GenesisView: React.FC = () => {
 				coastlineMask,
 				lakeMask,
 				riverLines,
+				realProvinces,
 				realClimate,
 				realPrecip,
 				realDtr,
@@ -3045,6 +3135,9 @@ export const GenesisView: React.FC = () => {
 				eu5Topography,
 				eu5Vegetation,
 				eu5Climate,
+				eu4Provinces,
+				eu4ProvinceFallbackSeeds,
+				lakeNames,
 			)
 		},
 		[
@@ -3079,6 +3172,7 @@ export const GenesisView: React.FC = () => {
 				{ grayscale: maskPixels, width: maskWidth, height: maskHeight },
 				{ grayscale: lakePixels, width: lakeWidth, height: lakeHeight },
 				riverLines,
+				realProvinces,
 				realClimate,
 				realPrecip,
 				realDtr,
@@ -3086,6 +3180,9 @@ export const GenesisView: React.FC = () => {
 				eu5Topography,
 				eu5Vegetation,
 				eu5Climate,
+				eu4Provinces,
+				eu4ProvinceFallbackSeeds,
+				lakeNames,
 			] = await Promise.all([
 				loadImageAsGrayscale("/heightmap/earth.png"),
 				loadImageAsGrayscale("/heightmap/coastline-mask.png"),
@@ -3094,9 +3191,16 @@ export const GenesisView: React.FC = () => {
 					if (!res.ok)
 						throw new Error(`Failed to load river lines: ${res.status}`)
 					return res.json() as Promise<{
-						lines: { points: number[]; strokeweig: number }[]
+						lines: {
+							points: number[]
+							strokeweig: number
+							name?: string | null
+						}[]
 					}>
 				}),
+				loadOptionalJson<
+					{ name: string; lon: number; lat: number; weight: number }[]
+				>("/heightmap/earth-provinces-weighted.json"),
 				loadEarthRealClimate(),
 				loadEarthRealPrecip(),
 				loadEarthRealDtr(),
@@ -3104,6 +3208,17 @@ export const GenesisView: React.FC = () => {
 				loadEu5Categorical("eu5-topography"),
 				loadEu5Categorical("eu5-vegetation"),
 				loadEu5Categorical("eu5-climate"),
+				loadEu4Provinces(),
+				loadOptionalJson<{ id: number; lon: number; lat: number }[]>(
+					"/heightmap/eu4-provinces-seeds.json",
+				),
+				fetch("/heightmap/lake-names.json").then((res) => {
+					if (!res.ok)
+						throw new Error(`Failed to load lake names: ${res.status}`)
+					return res.json() as Promise<{
+						lakes: { name: string; ring: [number, number][] }[]
+					}>
+				}),
 			])
 			handleReturnToPlanetView()
 			handleImportHeightmap(
@@ -3113,6 +3228,7 @@ export const GenesisView: React.FC = () => {
 				{ mask: maskPixels, width: maskWidth, height: maskHeight },
 				{ mask: lakePixels, width: lakeWidth, height: lakeHeight },
 				riverLines.lines,
+				realProvinces,
 				realClimate,
 				realPrecip,
 				realDtr,
@@ -3120,6 +3236,9 @@ export const GenesisView: React.FC = () => {
 				eu5Topography,
 				eu5Vegetation,
 				eu5Climate,
+				eu4Provinces,
+				eu4ProvinceFallbackSeeds,
+				lakeNames.lakes,
 			)
 			setShowCoastlines(true)
 		} catch (err) {
@@ -3364,7 +3483,15 @@ export const GenesisView: React.FC = () => {
 				// replaced wholesale, every moon) unconditionally.
 				setSolarSystem((current) => ({
 					...current,
-					orbits: structuredClone(SOL_DEFAULT_SOLAR_SYSTEM.orbits),
+					// SOL_DEFAULT_SOLAR_SYSTEM.orbits is built without the surface-
+					// tides callbacks (see sol-system.ts's SOL_SYSTEM_BODIES), so its
+					// seismology is frozen with surfaceTidesHeating: 0 -- re-run
+					// applySystemSeismology here with the real callbacks so the reset
+					// system's totals/regimes match every other recompute path.
+					orbits: applySystemSeismology({
+						bodies: structuredClone(SOL_DEFAULT_SOLAR_SYSTEM.orbits),
+						...systemSeismologyContext,
+					}),
 				}))
 				return
 			}
@@ -4089,7 +4216,9 @@ export const GenesisView: React.FC = () => {
 							debugMapModes={debugMapModes}
 							setDebugMapModes={setDebugMapModes}
 							colorMode={colorMode}
-							setColorMode={setColorMode}
+							setColorMode={setGeographyColorMode}
+							dataVariant={dataVariant}
+							setDataVariant={handleSetDataVariant}
 							clockCurrent={clockCurrent}
 							setClockCurrent={setClockCurrent}
 							clockMonthMode={clockMonthMode}
@@ -4206,7 +4335,7 @@ export const GenesisView: React.FC = () => {
 							<div className="pointer-events-auto">
 								<ModeBar
 									colorMode={colorMode}
-									setColorMode={setColorMode}
+									setColorMode={setGeographyColorMode}
 									geographyMode={geographyMode}
 									setGeographyMode={setGeographyMode}
 									nationMode={nationMode}
@@ -4218,6 +4347,7 @@ export const GenesisView: React.FC = () => {
 									climateSubMode={climateSubMode}
 									elevationSubMode={elevationSubMode}
 									topographySubMode={topographySubMode}
+									isEarthImport={worldForDisplay?.isEarthImport ?? false}
 								/>
 							</div>
 						</div>

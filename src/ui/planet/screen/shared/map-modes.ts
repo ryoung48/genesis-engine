@@ -11,6 +11,7 @@ export type PopulationMapMode =
 export type NationMapMode =
 	| "borders"
 	| "provinces"
+	| "earthProvinces"
 	| "dynasty"
 	| "diplomacy"
 	| "government"
@@ -89,6 +90,13 @@ const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	["provinces", "Provinces"],
 ]
 
+// Only meaningful for a real-Earth import (see world.isEarthImport) — the
+// province boundaries/names come from imported real-world data, not the
+// procedural BFS partition every other world uses.
+const EARTH_IMPORT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
+	readonly [NationMapMode, string]
+> = [["earthProvinces", "Provinces (Real)"]]
+
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
 	return colorMode === "nations" ||
 		colorMode === "timezone" ||
@@ -113,6 +121,7 @@ const EARTH_IMPORT_ONLY_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
 	"eu5Topography",
 	"eu5Vegetation",
 	"eu5Climate",
+	"earthProvinces",
 ])
 
 export function normalizeGeographyColorMode({
@@ -142,10 +151,13 @@ export function getVisibleGeographyModeOptions(
 
 export function getVisibleSocietyModeOptions(
 	debugEnabled: boolean,
+	isEarthImport = false,
 ): ReadonlyArray<readonly [SocietyMapMode, string]> {
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
+	if (isEarthImport)
+		politicalOptions.push(...EARTH_IMPORT_POLITICAL_MODE_OPTIONS)
 	const demographicOptions = debugEnabled
 		? [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS, ...DEBUG_DEMOGRAPHIC_MODE_OPTIONS]
 		: [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS]

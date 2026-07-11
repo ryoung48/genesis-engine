@@ -133,6 +133,10 @@ export interface SolPlanetSeed {
 	/** Optional authored texture for a named body. Untextured bodies fall back
 	 * to a plain color in solar-system-overlay.ts. */
 	texturePath?: string
+	/** Optional separate cloud-layer texture, rendered as a slightly larger
+	 * transparent sphere over the surface texture -- only Earth has one
+	 * authored today. */
+	cloudsTexturePath?: string
 	au: number
 	diameterEarths: number
 	massEarths: number
@@ -298,6 +302,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		isMainWorld: true,
 		group: "terrestrial",
 		texturePath: "/sol/earth/2k_earth.jpg",
+		// cloudsTexturePath: "/sol/earth/2k_earth_clouds.jpg",
 		// Matches classifyBody()'s isPrimaryWorld branch in
 		// generate-system-bodies.ts -- Earth is now built live by buildPlanet()
 		// exactly like every other body here, just from a live seed object
@@ -996,6 +1001,7 @@ function buildPlanet(
 		group: seed.group,
 		classification: seed.classification,
 		texturePath: options?.textureOverride ?? seed.texturePath,
+		cloudsTexturePath: seed.cloudsTexturePath,
 		rings: SOL_PLANET_RINGS_BY_NAME[seed.name],
 		landDistribution: seed.landDistribution,
 		landCoverage: seed.landCoverage,

@@ -226,7 +226,8 @@ export function buildTerrainMesh(
 		}
 		for (let i = 0; i < positions.length; i += 3) {
 			const acc = accum.get(keyOf(i))!
-			const len = Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) || 1
+			const len =
+				Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) || 1
 			normals[i] = acc[0] / len
 			normals[i + 1] = acc[1] / len
 			normals[i + 2] = acc[2] / len

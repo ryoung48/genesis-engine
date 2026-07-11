@@ -106,6 +106,10 @@ export interface OrbitBody {
 	 * sol-system.ts; a procedurally-generated body falls back to a generic
 	 * shared texture/color. */
 	texturePath?: string
+	/** Optional separate cloud-layer texture, rendered as a slightly larger
+	 * transparent sphere over the surface texture -- only Earth has one
+	 * authored today. */
+	cloudsTexturePath?: string
 	orbitalPeriodDays: number
 	/** Sidereal rotation period, in hours — independent of orbitalPeriodDays.
 	 * Most moons end up tidally locked (siderealDayHours === orbitalPeriodDays

@@ -2070,7 +2070,7 @@ export function createGenesisScene(
 			waterMat.opacity = 0.12
 			waterMat.specular.set(0x000000)
 		}
-		const riverHex = useVegetationWaterMaterial ? 0x90d9ed : 0x0978ab
+		const riverHex = 0x8fc4e8
 		for (const material of riverMaterials) {
 			material.color.setHex(riverHex)
 			material.opacity = useVegetationWaterMaterial
@@ -2272,8 +2272,7 @@ export function createGenesisScene(
 			globeCoastlineOverlay.visible =
 				coastlineOverlayVisible && currentViewMode === "globe"
 		if (mapCoastlineOverlay) {
-			mapCoastlineOverlay.visible =
-				coastlineOverlayVisible && showMap
+			mapCoastlineOverlay.visible = coastlineOverlayVisible && showMap
 			if (mapMesh) mapCoastlineOverlay.position.copy(mapMesh.position)
 		}
 		if (terrainWireframe)
@@ -2283,24 +2282,21 @@ export function createGenesisScene(
 			if (mapMesh) mapWireframe.position.copy(mapMesh.position)
 		}
 		if (mapOccupationOverlay) {
-			mapOccupationOverlay.visible =
-				showMap && !!currentOccupationOverlay
+			mapOccupationOverlay.visible = showMap && !!currentOccupationOverlay
 			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
 		}
 		if (globeLandNationBorders)
 			globeLandNationBorders.visible =
 				currentViewMode === "globe" && landNationBordersVisible
 		if (mapLandNationBorders) {
-			mapLandNationBorders.visible =
-				showMap && landNationBordersVisible
+			mapLandNationBorders.visible = showMap && landNationBordersVisible
 			if (mapMesh) mapLandNationBorders.position.copy(mapMesh.position)
 		}
 		if (globeNationBorders)
 			globeNationBorders.visible =
 				currentViewMode === "globe" && nationBordersVisible
 		if (mapNationBorders) {
-			mapNationBorders.visible =
-				showMap && nationBordersVisible
+			mapNationBorders.visible = showMap && nationBordersVisible
 			if (mapMesh) mapNationBorders.position.copy(mapMesh.position)
 		}
 		if (globeSelectedProvinceBorder)
@@ -2322,8 +2318,7 @@ export function createGenesisScene(
 			if (mapMesh) mapThermalEquator.position.copy(mapMesh.position)
 		}
 		if (mapSolarTerminator) {
-			mapSolarTerminator.visible =
-				solarTerminatorVisible && showMap
+			mapSolarTerminator.visible = solarTerminatorVisible && showMap
 			if (mapMesh) mapSolarTerminator.position.copy(mapMesh.position)
 		}
 		if (globeWindArrows) globeWindArrows.visible = currentViewMode === "globe"
@@ -2364,8 +2359,7 @@ export function createGenesisScene(
 			globeInfrastructure.visible =
 				infrastructureVisible && currentViewMode === "globe"
 		if (mapInfrastructure) {
-			mapInfrastructure.visible =
-				infrastructureVisible && showMap
+			mapInfrastructure.visible = infrastructureVisible && showMap
 			if (mapMesh) mapInfrastructure.position.copy(mapMesh.position)
 		}
 		if (globeNationLabels)
@@ -2383,17 +2377,14 @@ export function createGenesisScene(
 		}
 		if (mapNationScripts) {
 			mapNationScripts.visible =
-				labelMode.script &&
-				(labelMode.nations || labelMode.dynasty) &&
-				showMap
+				labelMode.script && (labelMode.nations || labelMode.dynasty) && showMap
 			if (mapMesh) mapNationScripts.position.copy(mapMesh.position)
 		}
 		if (globeSettlementLabels)
 			globeSettlementLabels.visible =
 				labelMode.settlements && currentViewMode === "globe"
 		if (mapSettlementLabels) {
-			mapSettlementLabels.visible =
-				labelMode.settlements && showMap
+			mapSettlementLabels.visible = labelMode.settlements && showMap
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
 		}
 		if (globeCultureLabels)
@@ -2407,8 +2398,7 @@ export function createGenesisScene(
 			globeHeritageLabels.visible =
 				labelMode.heritage && currentViewMode === "globe"
 		if (mapHeritageLabels) {
-			mapHeritageLabels.visible =
-				labelMode.heritage && showMap
+			mapHeritageLabels.visible = labelMode.heritage && showMap
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 		}
 		requestRender()

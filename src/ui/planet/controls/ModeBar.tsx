@@ -34,6 +34,7 @@ interface ModeBarProps {
 	climateSubMode: ClimateSubMode
 	elevationSubMode: "colored" | "grayscale"
 	topographySubMode: TopographySubMode
+	isEarthImport?: boolean
 }
 
 function resolveSubMode(
@@ -46,13 +47,11 @@ function resolveSubMode(
 	if (baseMode === "vegetation") {
 		if (vegetationSubMode === "maps") return "vegetationMaps"
 		if (vegetationSubMode === "satellite") return "vegetationSatellite"
-		if (vegetationSubMode === "eu5") return "eu5Vegetation"
 		return "vegetation"
 	}
 	if (baseMode === "climate") {
 		if (climateSubMode === "pasta") return "pastaClimate"
 		if (climateSubMode === "koppen") return "koppenClimate"
-		if (climateSubMode === "eu5") return "eu5Climate"
 		return "climate"
 	}
 	if (baseMode === "terrain") {
@@ -60,7 +59,6 @@ function resolveSubMode(
 	}
 	if (baseMode === "topography") {
 		if (topographySubMode === "slope") return "slope"
-		if (topographySubMode === "eu5") return "eu5Topography"
 		return "topography"
 	}
 	return baseMode
@@ -83,6 +81,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 	climateSubMode,
 	elevationSubMode,
 	topographySubMode,
+	isEarthImport = false,
 }) => {
 	const activePrimary = getMapModePrimary(colorMode)
 	const geographyOptions = getVisibleGeographyModeOptions(debugMapModes).filter(
@@ -94,7 +93,10 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 			mode !== "realPrecipitation" &&
 			mode !== "precipitationDiff",
 	)
-	const societyOptions = getVisibleSocietyModeOptions(debugMapModes)
+	const societyOptions = getVisibleSocietyModeOptions(
+		debugMapModes,
+		isEarthImport,
+	)
 
 	const submodeControl =
 		activePrimary === "geography" ? (
