@@ -317,35 +317,7 @@ function getHoverMonthlySeries(
 	}
 }
 
-export function getHoverRealTemperature(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-	temperatureMonth: number,
-): HoverTemperatureSeries | null {
-	return getHoverMonthlySeries(
-		hoverInfo,
-		world,
-		temperatureMonth,
-		world?.climate?.real_temperature_avg,
-		world?.climate?.real_temperature_monthly,
-	)
-}
-
-export function getHoverTemperatureDiff(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-	temperatureMonth: number,
-): HoverTemperatureSeries | null {
-	return getHoverMonthlySeries(
-		hoverInfo,
-		world,
-		temperatureMonth,
-		world?.climate?.temperature_diff_avg,
-		world?.climate?.temperature_diff_monthly,
-	)
-}
-
-export function getHoverHumidity(
+function getHoverModeledHumiditySeries(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
@@ -355,7 +327,6 @@ export function getHoverHumidity(
 	if (world.isLand && !world.isLand[r]) return null
 	const N = world.mesh.numRegions
 
-	// Annual aridity ratio for the FAO-56 dewpoint correction.
 	let annualAridity: number | undefined
 	const aet = world.hydrology?.aet_monthly
 	const pet = world.climate.pet_monthly
@@ -399,6 +370,97 @@ export function getHoverHumidity(
 	}
 }
 
+function getHoverObservedHumiditySeries(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+): HoverHumidity | null {
+	if (
+		!(hoverInfo && world && world.observedHumidity?.real_annual) ||
+		(world.isLand && !world.isLand[hoverInfo.region])
+	) {
+		return null
+	}
+	const r = hoverInfo.region
+	const annualValue = world.observedHumidity.real_annual[r]
+	const monthly: number[] = []
+	const monthlySource = world.observedHumidity.real_monthly
+	if (monthlySource) {
+		const N = world.mesh.numRegions
+		for (let m = 0; m < 12; m++)
+			monthly.push(monthlySource[m * N + r] ?? annualValue)
+	}
+	return {
+		value:
+			dtrMonth === 0 ? annualValue : (monthly[dtrMonth - 1] ?? annualValue),
+		annual: annualValue,
+		monthly,
+	}
+}
+
+export function getHoverRealTemperature(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	temperatureMonth: number,
+): HoverTemperatureSeries | null {
+	return getHoverMonthlySeries(
+		hoverInfo,
+		world,
+		temperatureMonth,
+		world?.climate?.real_temperature_avg,
+		world?.climate?.real_temperature_monthly,
+	)
+}
+
+export function getHoverTemperatureDiff(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	temperatureMonth: number,
+): HoverTemperatureSeries | null {
+	return getHoverMonthlySeries(
+		hoverInfo,
+		world,
+		temperatureMonth,
+		world?.climate?.temperature_diff_avg,
+		world?.climate?.temperature_diff_monthly,
+	)
+}
+
+export function getHoverHumidity(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+): HoverHumidity | null {
+	return getHoverModeledHumiditySeries(hoverInfo, world, dtrMonth)
+}
+
+export function getHoverRealHumidity(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+): HoverHumidity | null {
+	return getHoverObservedHumiditySeries(hoverInfo, world, dtrMonth)
+}
+
+export function getHoverHumidityDiff(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+	dtrMonth: number,
+): HoverHumidity | null {
+	const modeled = getHoverModeledHumiditySeries(hoverInfo, world, dtrMonth)
+	const observed = getHoverObservedHumiditySeries(hoverInfo, world, dtrMonth)
+	if (!(modeled && observed)) return null
+	const monthly = modeled.monthly.map(
+		(value, index) => value - (observed.monthly[index] ?? observed.annual),
+	)
+	const annual = modeled.annual - observed.annual
+	return {
+		value: dtrMonth === 0 ? annual : (monthly[dtrMonth - 1] ?? annual),
+		annual,
+		monthly,
+	}
+}
+
 export function getHoverMisery(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
@@ -410,6 +472,11 @@ export function getHoverMisery(
 	const r = hoverInfo.region
 	if (world.isLand && !world.isLand[r]) return null
 	const N = world.mesh.numRegions
+	const observedHumidity = getHoverObservedHumiditySeries(
+		hoverInfo,
+		world,
+		dtrMonth,
+	)
 
 	let annualAridity: number | undefined
 	const aet = world.hydrology?.aet_monthly
@@ -426,12 +493,14 @@ export function getHoverMisery(
 
 	const annualRainfall = world.rainfall?.annual[r]
 	const annualWind = windSpeedMs ?? 0
-	const annualRh = relativeHumidityFromTempRange(
-		world.climate.temperature_avg[r],
-		world.dtr_annual[r],
-		annualAridity,
-		annualRainfall,
-	)
+	const annualRh =
+		observedHumidity?.annual ??
+		relativeHumidityFromTempRange(
+			world.climate.temperature_avg[r],
+			world.dtr_annual[r],
+			annualAridity,
+			annualRainfall,
+		)
 	const annual = apparentTemperatureC(
 		world.climate.temperature_avg[r],
 		annualRh,
@@ -443,12 +512,9 @@ export function getHoverMisery(
 		for (let m = 0; m < 12; m++) {
 			const T = world.climate.temperature_monthly[m * N + r]
 			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
-			const rh = relativeHumidityFromTempRange(
-				T,
-				dtr,
-				annualAridity,
-				annualRainfall,
-			)
+			const rh =
+				observedHumidity?.monthly[m] ??
+				relativeHumidityFromTempRange(T, dtr, annualAridity, annualRainfall)
 			const wind = monthlyWindSpeedMs?.[m] ?? annualWind
 			monthly.push(apparentTemperatureC(T, rh, wind))
 		}

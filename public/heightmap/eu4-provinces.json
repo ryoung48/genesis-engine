@@ -1,12 +1,12 @@
 {
-  "version": 2,
-  "format": "int16-single-band-ids",
-  "compression": "gzip",
-  "field": "eu4_province_id",
-  "width": 4096,
-  "height": 2048,
-  "nodata": -32768,
-  "numProvinces": 3113,
-  "source": "c:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4.json",
-  "bin": "eu4-provinces.bin.gz"
+	"version": 2,
+	"format": "int16-single-band-ids",
+	"compression": "gzip",
+	"field": "eu4_province_id",
+	"width": 4096,
+	"height": 2048,
+	"nodata": -32768,
+	"numProvinces": 3113,
+	"source": "c:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4.json",
+	"bin": "eu4-provinces.bin.gz"
 }

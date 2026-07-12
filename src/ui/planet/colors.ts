@@ -58,6 +58,8 @@ export type ColorMode =
 	| "terrainFeatures"
 	| "dtr"
 	| "humidity"
+	| "realHumidity"
+	| "humidityDiff"
 	| "trade_goods"
 	| "timezone"
 	| "wind"
@@ -999,6 +1001,39 @@ export function humidityColor(rhPercent: number): [number, number, number] {
 		}
 	}
 	const last = humidityStops[humidityStops.length - 1]
+	return [last.r, last.g, last.b]
+}
+
+const humidityDiffStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: -40, r: 0.62, g: 0.36, b: 0.08 },
+	{ v: -20, r: 0.89, g: 0.68, b: 0.22 },
+	{ v: -5, r: 0.98, g: 0.91, b: 0.74 },
+	{ v: 0, r: 0.98, g: 0.97, b: 0.95 },
+	{ v: 5, r: 0.78, g: 0.9, b: 0.94 },
+	{ v: 20, r: 0.28, g: 0.56, b: 0.84 },
+	{ v: 40, r: 0.09, g: 0.23, b: 0.56 },
+]
+
+export function humidityDifferenceColor(
+	diffPercent: number,
+): [number, number, number] {
+	const clamped = Math.max(
+		humidityDiffStops[0].v,
+		Math.min(humidityDiffStops[humidityDiffStops.length - 1].v, diffPercent),
+	)
+	for (let i = 0; i < humidityDiffStops.length - 1; i++) {
+		const a = humidityDiffStops[i]
+		const b = humidityDiffStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = humidityDiffStops[humidityDiffStops.length - 1]
 	return [last.r, last.g, last.b]
 }
 

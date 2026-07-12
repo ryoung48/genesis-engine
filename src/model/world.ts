@@ -5,6 +5,7 @@ import type {
 	GenesisHazards,
 	GenesisHydrology,
 	GenesisObservedDtr,
+	GenesisObservedHumidity,
 	GenesisOceanCurrents,
 	GenesisRainfall,
 	GenesisVolcanism,
@@ -98,6 +99,7 @@ export interface GenesisWorld {
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
 	observedDtr?: GenesisObservedDtr
+	observedHumidity?: GenesisObservedHumidity
 	hydrology: GenesisHydrology
 	isLand: Uint8Array
 	riverLand: Uint8Array

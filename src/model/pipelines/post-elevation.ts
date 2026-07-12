@@ -177,6 +177,7 @@ interface PostPipelineOutput {
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
 	observedDtr?: GenesisWorld["observedDtr"]
+	observedHumidity?: GenesisWorld["observedHumidity"]
 	waterAccess: Uint8Array
 	riverAccess: Uint8Array
 	lakeAccess: Uint8Array

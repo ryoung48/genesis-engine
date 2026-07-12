@@ -1,6 +1,23 @@
 // August–Roche–Magnus saturation vapor pressure over water (kPa), T in °C.
+// This keeps the observed-Earth RH overlay aligned with the project's
+// liquid-water-relative convention; using ice below freezing raises polar RH.
 function saturationVaporPressureKpa(tempC: number): number {
 	return 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3))
+}
+
+function clampRelativeHumidity(rh: number): number {
+	if (rh <= 0) return 0
+	if (rh >= 100) return 100
+	return rh
+}
+
+export function relativeHumidityFromVaporPressure(
+	meanTempC: number,
+	vaporPressureKpa: number,
+): number {
+	return clampRelativeHumidity(
+		100 * (vaporPressureKpa / saturationVaporPressureKpa(meanTempC)),
+	)
 }
 
 // FAO-56 arid correction: in dry climates the night never reaches saturation,
@@ -97,6 +114,7 @@ export function relativeHumidityFromTempRange(
 	// Soft compression above 80 %: each additional raw point yields diminishing
 	// returns, asymptoting near 92. Makes 90+ achievable only in the most
 	// persistently humid conditions rather than any high-rainfall tropical cell.
-	if (rh >= 80) return 80 + 12 * (1 - Math.exp(-(rh - 80) / 4))
-	return rh
+	if (rh >= 80)
+		return clampRelativeHumidity(80 + 12 * (1 - Math.exp(-(rh - 80) / 4)))
+	return clampRelativeHumidity(rh)
 }

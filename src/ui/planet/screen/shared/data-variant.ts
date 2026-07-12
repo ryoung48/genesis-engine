@@ -16,6 +16,11 @@ const VARIANT_FAMILIES: Partial<
 		observed: "realPrecipitation",
 		diff: "precipitationDiff",
 	},
+	humidity: {
+		generated: "humidity",
+		observed: "realHumidity",
+		diff: "humidityDiff",
+	},
 	pastaClimate: { generated: "pastaClimate", observed: "realPastaClimate" },
 	koppenClimate: { generated: "koppenClimate", observed: "realKoppenClimate" },
 	climate: { generated: "climate", observed: "eu5Climate" },

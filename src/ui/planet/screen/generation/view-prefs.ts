@@ -91,6 +91,8 @@ const COLOR_MODES = new Set<ColorMode>([
 	"terrainFeatures",
 	"dtr",
 	"humidity",
+	"realHumidity",
+	"humidityDiff",
 	"trade_goods",
 	"timezone",
 	"wind",

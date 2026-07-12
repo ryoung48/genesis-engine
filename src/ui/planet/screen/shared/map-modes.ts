@@ -44,6 +44,7 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["precipitation", "Rain"],
 	["realPrecipitation", "Observed Rain"],
 	["precipitationDiff", "Rain Diff"],
+	["humidity", "Humidity"],
 	["dangerZones", "Danger"],
 	["trade_goods", "Trade Goods"],
 ]
@@ -116,6 +117,8 @@ const EARTH_IMPORT_ONLY_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
 	"dtrDiff",
 	"realPrecipitation",
 	"precipitationDiff",
+	"realHumidity",
+	"humidityDiff",
 	"realPastaClimate",
 	"realKoppenClimate",
 	"eu5Topography",

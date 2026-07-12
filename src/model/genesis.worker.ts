@@ -349,6 +349,7 @@ function serializeWorld(
 			? { aet_monthly: world.hydrology.aet_monthly }
 			: undefined,
 		observedDtr: world.observedDtr,
+		observedHumidity: world.observedHumidity,
 		tradeGoods: world.tradeGoods?.material,
 		settlementRegions: world.settlementRegions,
 		settlementWaterLandmarks: world.settlementWaterLandmarks,
@@ -565,6 +566,10 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.observedDtr?.diff_monthly)
 		add(world.observedDtr.diff_monthly.buffer)
 	if (world.observedDtr?.diff_annual) add(world.observedDtr.diff_annual.buffer)
+	if (world.observedHumidity?.real_monthly)
+		add(world.observedHumidity.real_monthly.buffer)
+	if (world.observedHumidity?.real_annual)
+		add(world.observedHumidity.real_annual.buffer)
 	if (world.hydrology) add(world.hydrology.aet_monthly.buffer)
 	if (world.isLand) add(world.isLand.buffer)
 	if (world.riverLand) add(world.riverLand.buffer)

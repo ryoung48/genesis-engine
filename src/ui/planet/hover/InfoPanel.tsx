@@ -272,6 +272,8 @@ interface InfoPanelProps {
 	hoverRealDtr: HoverDtr | null
 	hoverDtrDiff: HoverDtr | null
 	hoverHumidity: HoverHumidity | null
+	hoverRealHumidity: HoverHumidity | null
+	hoverHumidityDiff: HoverHumidity | null
 	hoverMisery: HoverMisery | null
 	hoverClimateDisplay: string | null
 	hoverIceSummary: string | null
@@ -346,6 +348,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	hoverRealDtr,
 	hoverDtrDiff,
 	hoverHumidity,
+	hoverRealHumidity,
+	hoverHumidityDiff,
 	hoverMisery,
 	hoverClimateDisplay,
 	hoverIceSummary,
@@ -596,6 +600,24 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									unitSystem,
 									1,
 								)}`}
+							/>
+						)}
+						{colorMode === "humidity" && hoverHumidity && (
+							<Row
+								label="Humidity"
+								value={`${hoverHumidity.value.toFixed(0)}%`}
+							/>
+						)}
+						{colorMode === "realHumidity" && hoverRealHumidity && (
+							<Row
+								label="Observed RH"
+								value={`${hoverRealHumidity.value.toFixed(0)}%`}
+							/>
+						)}
+						{colorMode === "humidityDiff" && hoverHumidityDiff && (
+							<Row
+								label="RH Diff"
+								value={`${hoverHumidityDiff.value >= 0 ? "+" : ""}${hoverHumidityDiff.value.toFixed(0)}%`}
 							/>
 						)}
 						{!hoverWindMonthly &&
@@ -996,22 +1018,56 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 									</span>
 								</div>
 							)}
-						{colorMode === "humidity" &&
-						hoverHumidity &&
-						hoverHumidity.monthly.length === 12 ? (
+						{(colorMode === "humidity" ||
+							colorMode === "realHumidity" ||
+							colorMode === "humidityDiff") &&
+						(colorMode === "humidity"
+							? hoverHumidity
+							: colorMode === "realHumidity"
+								? hoverRealHumidity
+								: hoverHumidityDiff
+						)?.monthly.length === 12 ? (
 							<SeriesBars
-								values={hoverHumidity.monthly}
+								values={
+									(colorMode === "humidity"
+										? hoverHumidity
+										: colorMode === "realHumidity"
+											? hoverRealHumidity
+											: hoverHumidityDiff
+									)?.monthly ?? []
+								}
 								labels={MONTH_SHORT}
-								label="Humidity"
-								colorForValue={(value) => humidityChartColor(value)}
+								label={
+									colorMode === "realHumidity"
+										? "Observed RH"
+										: colorMode === "humidityDiff"
+											? "RH Diff"
+											: "Humidity"
+								}
+								colorForValue={(value) =>
+									colorMode === "humidityDiff"
+										? currentImpactColor(value)
+										: humidityChartColor(value)
+								}
 								activeIndex={activeBarIndex}
-								summary={buildSummary(hoverHumidity.annual, {
-									prefix: "AVG",
-									formatValue: (value) => `${value.toFixed(0)}%`,
-								})}
-								formatValue={(value) => value.toFixed(0)}
+								summary={buildSummary(
+									(colorMode === "humidity"
+										? hoverHumidity
+										: colorMode === "realHumidity"
+											? hoverRealHumidity
+											: hoverHumidityDiff
+									)?.annual,
+									{
+										prefix: "AVG",
+										formatValue: (value) =>
+											`${colorMode === "humidityDiff" && value >= 0 ? "+" : ""}${value.toFixed(0)}%`,
+									},
+								)}
+								formatValue={(value) =>
+									`${colorMode === "humidityDiff" && value >= 0 ? "+" : ""}${value.toFixed(0)}`
+								}
 								tooltipLabel={({ index, value }) =>
-									`${monthLabels[index + 1]}: ${value.toFixed(0)}%`
+									`${monthLabels[index + 1]}: ${colorMode === "humidityDiff" && value >= 0 ? "+" : ""}${value.toFixed(0)}%`
 								}
 								showValues
 							/>

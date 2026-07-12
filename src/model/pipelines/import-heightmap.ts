@@ -10,6 +10,7 @@ import {
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
 } from "../celestial/star/star-types"
+import { relativeHumidityFromVaporPressure } from "../climate/humidity"
 import { assignKoppenClimate } from "../climate/koppen"
 import { assignEarthPastaClimate } from "../climate/pasta"
 import { buildSphereMesh } from "../mesh"
@@ -85,6 +86,12 @@ interface ImportParams {
 	realDtrMonths?: number
 	realDtrScale?: number
 	realDtrNoData?: number
+	realVaporPressureMonthly?: Int16Array
+	realVaporPressureWidth?: number
+	realVaporPressureHeight?: number
+	realVaporPressureMonths?: number
+	realVaporPressureScale?: number
+	realVaporPressureNoData?: number
 	/**
 	 * Real-world elevation (meters, single band), sampled onto each region
 	 * and substituted for elevation_km after applySeaLevelToElevation. This
@@ -574,6 +581,73 @@ function attachObservedEarthDtr(params: {
 		real_annual: observedAnnual,
 		diff_monthly: diffMonthly,
 		diff_annual: diffAnnual,
+	}
+}
+
+function attachObservedEarthHumidity(params: {
+	mesh: SphereMesh
+	world: {
+		climate: GenesisWorld["climate"]
+		observedHumidity?: GenesisWorld["observedHumidity"]
+	}
+	realVaporPressureMonthly: Int16Array
+	realVaporPressureWidth: number
+	realVaporPressureHeight: number
+	realVaporPressureMonths: number
+	realVaporPressureScale: number
+	realVaporPressureNoData: number
+}): void {
+	const {
+		mesh,
+		world,
+		realVaporPressureMonthly,
+		realVaporPressureWidth,
+		realVaporPressureHeight,
+		realVaporPressureMonths,
+		realVaporPressureScale,
+		realVaporPressureNoData,
+	} = params
+	if (realVaporPressureMonths !== 12 || !world.climate.real_temperature_monthly)
+		return
+
+	const N = mesh.numRegions
+	const observedVaporPressureMonthly = sampleMonthlyFloatRaster(
+		mesh,
+		realVaporPressureMonthly,
+		realVaporPressureWidth,
+		realVaporPressureHeight,
+		realVaporPressureMonths,
+		realVaporPressureScale,
+		realVaporPressureNoData,
+	)
+	const observedMonthly = new Float32Array(N * realVaporPressureMonths)
+	const observedAnnual = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		let observedSum = 0
+		let observedCount = 0
+		for (let month = 0; month < realVaporPressureMonths; month++) {
+			const idx = month * N + r
+			const vaporPressure = observedVaporPressureMonthly[idx]
+			const meanTemp = world.climate.real_temperature_monthly[idx]
+			if (Number.isFinite(vaporPressure) && Number.isFinite(meanTemp)) {
+				const observed = relativeHumidityFromVaporPressure(
+					meanTemp,
+					vaporPressure,
+				)
+				observedMonthly[idx] = observed
+				observedSum += observed
+				observedCount++
+			} else {
+				observedMonthly[idx] = NaN
+			}
+		}
+		observedAnnual[r] = observedCount > 0 ? observedSum / observedCount : NaN
+	}
+
+	world.observedHumidity = {
+		real_monthly: observedMonthly,
+		real_annual: observedAnnual,
 	}
 }
 
@@ -1485,6 +1559,28 @@ export function importGenesisWorld(
 		record("Observed Earth DTR sampling", t0)
 	}
 
+	if (
+		params.realVaporPressureMonthly &&
+		params.realVaporPressureWidth &&
+		params.realVaporPressureHeight &&
+		params.realVaporPressureMonths &&
+		params.realVaporPressureScale !== undefined &&
+		params.realVaporPressureNoData !== undefined
+	) {
+		t0 = performance.now()
+		attachObservedEarthHumidity({
+			mesh,
+			world: post,
+			realVaporPressureMonthly: params.realVaporPressureMonthly,
+			realVaporPressureWidth: params.realVaporPressureWidth,
+			realVaporPressureHeight: params.realVaporPressureHeight,
+			realVaporPressureMonths: params.realVaporPressureMonths,
+			realVaporPressureScale: params.realVaporPressureScale,
+			realVaporPressureNoData: params.realVaporPressureNoData,
+		})
+		record("Observed Earth humidity sampling", t0)
+	}
+
 	if (post.climate.real_temperature_monthly && post.rainfall.real_monthly) {
 		t0 = performance.now()
 		post.realKoppenClimate = assignKoppenClimate(
@@ -1566,6 +1662,7 @@ export function importGenesisWorld(
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,
 		observedDtr: post.observedDtr,
+		observedHumidity: post.observedHumidity,
 		iceThickness: post.iceThickness,
 		iceMinMonthly: post.iceMinMonthly,
 		iceMaxMonthly: post.iceMaxMonthly,

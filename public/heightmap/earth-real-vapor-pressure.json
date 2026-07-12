@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"format": "int16-month-major",
+	"field": "worldclim_monthly_vapor_pressure_kpa",
+	"width": 360,
+	"height": 180,
+	"months": 12,
+	"scale": 0.001,
+	"nodata": -32768,
+	"source": "C:\\Users\\rayou\\Downloads\\wc2.1_10m_vapr",
+	"bin": "earth-real-vapor-pressure.bin"
+}

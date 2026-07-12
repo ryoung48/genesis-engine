@@ -48,6 +48,11 @@ export interface GenesisObservedDtr {
 	diff_annual?: Float32Array // per-cell annual modeled minus observed DTR °C
 }
 
+export interface GenesisObservedHumidity {
+	real_monthly?: Float32Array // [month * N + r] observed monthly relative humidity % for imported Earth worlds
+	real_annual?: Float32Array // per-cell observed annual-mean relative humidity %
+}
+
 export interface GenesisHydrology {
 	aet_monthly: Float32Array // [month * N + r] mm
 	aridity_monthly: Float32Array // [month * N + r] AET / PET

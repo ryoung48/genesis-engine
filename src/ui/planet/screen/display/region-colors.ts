@@ -28,6 +28,7 @@ import {
 	getColor,
 	hotspotColor,
 	humidityColor,
+	humidityDifferenceColor,
 	migrationColor,
 	moistureDirectionalColor,
 	OCEAN_LIGHT_BLUE,
@@ -686,9 +687,16 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "humidity" && world.climate && world.dtr_annual) {
-		// RH estimated from mean temp + diurnal range (Tdew ≈ Tmin). Follows the
-		// same month index as DTR, since DTR is the dominant input.
+	if (
+		(colorMode === "humidity" ||
+			colorMode === "realHumidity" ||
+			colorMode === "humidityDiff") &&
+		world.climate &&
+		world.dtr_annual
+	) {
+		// Earth imports can carry observed RH sampled from WorldClim vapor
+		// pressure + observed temperature. Otherwise fall back to the temp/DTR
+		// estimate, which follows the same month index as DTR.
 		const monthlyTemp =
 			dtrMonth === 0 ? null : world.climate.temperature_monthly
 		const monthlyDtr = dtrMonth === 0 ? null : world.dtr_monthly
@@ -709,6 +717,10 @@ export function computeRegionColors(
 			const dtr = monthlyDtr
 				? (monthlyDtr[offset + r] ?? world.dtr_annual[r])
 				: world.dtr_annual[r]
+			const observedRh =
+				dtrMonth === 0
+					? world.observedHumidity?.real_annual?.[r]
+					: world.observedHumidity?.real_monthly?.[offset + r]
 			let annualAridity: number | undefined
 			if (aet && pet) {
 				let aetSum = 0
@@ -719,15 +731,23 @@ export function computeRegionColors(
 				}
 				annualAridity = petSum > 0 ? aetSum / petSum : 1
 			}
-			const [cr, cg, cb] = humidityColor(
-				relativeHumidityFromTempRange(
-					meanT,
-					dtr,
-					annualAridity,
-					world.rainfall?.annual[r],
-					world.oceanDist[r],
-				),
+			const modeledRh = relativeHumidityFromTempRange(
+				meanT,
+				dtr,
+				annualAridity,
+				world.rainfall?.annual[r],
+				world.oceanDist[r],
 			)
+			const value =
+				colorMode === "realHumidity"
+					? observedRh
+					: colorMode === "humidityDiff" && Number.isFinite(observedRh)
+						? modeledRh - observedRh
+						: modeledRh
+			const [cr, cg, cb] =
+				colorMode === "humidityDiff"
+					? humidityDifferenceColor(value)
+					: humidityColor(Number.isFinite(value) ? value : modeledRh)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

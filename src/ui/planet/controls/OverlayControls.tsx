@@ -1050,6 +1050,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									colorMode === "realPrecipitation" ||
 									colorMode === "precipitationDiff" ||
 									colorMode === "humidity" ||
+									colorMode === "realHumidity" ||
+									colorMode === "humidityDiff" ||
 									colorMode === "wind" ||
 									colorMode === "dtr" ||
 									colorMode === "misery") && (
@@ -1082,7 +1084,9 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												{(colorMode === "precipitation" ||
 													colorMode === "realPrecipitation" ||
 													colorMode === "precipitationDiff" ||
-													colorMode === "humidity") && (
+													colorMode === "humidity" ||
+													colorMode === "realHumidity" ||
+													colorMode === "humidityDiff") && (
 													<div className="flex items-center gap-4 text-[11px] font-medium">
 														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
 															<input
@@ -1098,7 +1102,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															<input
 																type="radio"
 																name="rain-sub"
-																checked={colorMode === "humidity"}
+																checked={baseColorMode === "humidity"}
 																onChange={() => setColorMode("humidity")}
 																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 															/>

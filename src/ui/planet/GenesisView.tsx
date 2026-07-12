@@ -129,6 +129,7 @@ import {
 	getHoverHazards,
 	getHoverHotspot,
 	getHoverHumidity,
+	getHoverHumidityDiff,
 	getHoverIsLand,
 	getHoverKoppenClimate,
 	getHoverLandmark,
@@ -140,6 +141,7 @@ import {
 	getHoverRainfall,
 	getHoverRainfallDiff,
 	getHoverRealDtr,
+	getHoverRealHumidity,
 	getHoverRealKoppenClimate,
 	getHoverRealPastaClimate,
 	getHoverRealRainfall,
@@ -323,19 +325,22 @@ function buildMapExportFilename(
 	return `genesis-map-${identity}-${width}w.png`
 }
 
-async function loadEarthRealClimate(): Promise<{
+interface MonthlyRasterAsset {
 	monthly: Int16Array
 	width: number
 	height: number
 	months: number
 	scale: number
 	nodata: number
-}> {
-	const metaRes = await fetch("/heightmap/earth-real-temperature.json")
+}
+
+async function loadEarthMonthlyRaster(
+	prefix: string,
+	label: string,
+): Promise<MonthlyRasterAsset> {
+	const metaRes = await fetch(`/heightmap/${prefix}.json`)
 	if (!metaRes.ok) {
-		throw new Error(
-			`Failed to load observed climate metadata: ${metaRes.status}`,
-		)
+		throw new Error(`Failed to load ${label} metadata: ${metaRes.status}`)
 	}
 	const meta = (await metaRes.json()) as {
 		bin: string
@@ -347,7 +352,7 @@ async function loadEarthRealClimate(): Promise<{
 	}
 	const binRes = await fetch(`/heightmap/${meta.bin}`)
 	if (!binRes.ok) {
-		throw new Error(`Failed to load observed climate raster: ${binRes.status}`)
+		throw new Error(`Failed to load ${label} raster: ${binRes.status}`)
 	}
 	const buffer = await binRes.arrayBuffer()
 	return {
@@ -360,78 +365,26 @@ async function loadEarthRealClimate(): Promise<{
 	}
 }
 
-async function loadEarthRealPrecip(): Promise<{
-	monthly: Int16Array
-	width: number
-	height: number
-	months: number
-	scale: number
-	nodata: number
-}> {
-	const metaRes = await fetch("/heightmap/earth-real-precipitation.json")
-	if (!metaRes.ok) {
-		throw new Error(
-			`Failed to load observed precipitation metadata: ${metaRes.status}`,
-		)
-	}
-	const meta = (await metaRes.json()) as {
-		bin: string
-		width: number
-		height: number
-		months: number
-		scale: number
-		nodata: number
-	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(
-			`Failed to load observed precipitation raster: ${binRes.status}`,
-		)
-	}
-	const buffer = await binRes.arrayBuffer()
-	return {
-		monthly: new Int16Array(buffer),
-		width: meta.width,
-		height: meta.height,
-		months: meta.months,
-		scale: meta.scale,
-		nodata: meta.nodata,
-	}
+async function loadEarthRealClimate(): Promise<MonthlyRasterAsset> {
+	return loadEarthMonthlyRaster("earth-real-temperature", "observed climate")
 }
 
-async function loadEarthRealDtr(): Promise<{
-	monthly: Int16Array
-	width: number
-	height: number
-	months: number
-	scale: number
-	nodata: number
-}> {
-	const metaRes = await fetch("/heightmap/earth-real-dtr.json")
-	if (!metaRes.ok) {
-		throw new Error(`Failed to load observed DTR metadata: ${metaRes.status}`)
-	}
-	const meta = (await metaRes.json()) as {
-		bin: string
-		width: number
-		height: number
-		months: number
-		scale: number
-		nodata: number
-	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(`Failed to load observed DTR raster: ${binRes.status}`)
-	}
-	const buffer = await binRes.arrayBuffer()
-	return {
-		monthly: new Int16Array(buffer),
-		width: meta.width,
-		height: meta.height,
-		months: meta.months,
-		scale: meta.scale,
-		nodata: meta.nodata,
-	}
+async function loadEarthRealPrecip(): Promise<MonthlyRasterAsset> {
+	return loadEarthMonthlyRaster(
+		"earth-real-precipitation",
+		"observed precipitation",
+	)
+}
+
+async function loadEarthRealDtr(): Promise<MonthlyRasterAsset> {
+	return loadEarthMonthlyRaster("earth-real-dtr", "observed DTR")
+}
+
+async function loadEarthRealVaporPressure(): Promise<MonthlyRasterAsset> {
+	return loadEarthMonthlyRaster(
+		"earth-real-vapor-pressure",
+		"observed vapor pressure",
+	)
 }
 
 async function loadEarthRealElevation(): Promise<{
@@ -1596,6 +1549,16 @@ export const GenesisView: React.FC = () => {
 	const hoverRealDtr = getHoverRealDtr(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverDtrDiff = getHoverDtrDiff(hoverInfo, worldForDisplay, dtrMonth)
 	const hoverHumidity = getHoverHumidity(hoverInfo, worldForDisplay, dtrMonth)
+	const hoverRealHumidity = getHoverRealHumidity(
+		hoverInfo,
+		worldForDisplay,
+		dtrMonth,
+	)
+	const hoverHumidityDiff = getHoverHumidityDiff(
+		hoverInfo,
+		worldForDisplay,
+		dtrMonth,
+	)
 	const hoverRealTemperature = getHoverRealTemperature(
 		hoverInfo,
 		worldForDisplay,
@@ -1946,8 +1909,13 @@ export const GenesisView: React.FC = () => {
 					annualAridity,
 					worldForDisplay.rainfall?.annual[r],
 				)
+				const observedRh =
+					currentMonth === 0
+						? worldForDisplay.observedHumidity?.real_annual?.[r]
+						: worldForDisplay.observedHumidity?.real_monthly?.[offset + r]
+				const humidity = Number.isFinite(observedRh) ? observedRh : rh
 				const [cr, cg, cb] = miseryColor(
-					apparentTemperatureC(meanT, rh, windSpeed[r]),
+					apparentTemperatureC(meanT, humidity, windSpeed[r]),
 				)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -3039,6 +3007,7 @@ export const GenesisView: React.FC = () => {
 				scale: number
 				nodata: number
 			},
+			realVaporPressure?: MonthlyRasterAsset,
 			realElevation?: {
 				raster: Int16Array
 				width: number
@@ -3131,6 +3100,7 @@ export const GenesisView: React.FC = () => {
 				realClimate,
 				realPrecip,
 				realDtr,
+				realVaporPressure,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -3176,6 +3146,7 @@ export const GenesisView: React.FC = () => {
 				realClimate,
 				realPrecip,
 				realDtr,
+				realVaporPressure,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -3204,6 +3175,7 @@ export const GenesisView: React.FC = () => {
 				loadEarthRealClimate(),
 				loadEarthRealPrecip(),
 				loadEarthRealDtr(),
+				loadEarthRealVaporPressure(),
 				loadEarthRealElevation(),
 				loadEu5Categorical("eu5-topography"),
 				loadEu5Categorical("eu5-vegetation"),
@@ -3232,6 +3204,7 @@ export const GenesisView: React.FC = () => {
 				realClimate,
 				realPrecip,
 				realDtr,
+				realVaporPressure,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -4049,6 +4022,8 @@ export const GenesisView: React.FC = () => {
 							hoverRealDtr={hoverRealDtr}
 							hoverDtrDiff={hoverDtrDiff}
 							hoverHumidity={hoverHumidity}
+							hoverRealHumidity={hoverRealHumidity}
+							hoverHumidityDiff={hoverHumidityDiff}
 							hoverMisery={hoverMisery}
 							hoverClimateDisplay={hoverClimateDisplay}
 							hoverIceSummary={hoverIceSummary}
