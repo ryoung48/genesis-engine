@@ -4,6 +4,10 @@ import { TrackballControls } from "three/examples/jsm/controls/TrackballControls
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
+import {
+	type Eu4ProvinceBorderGeometry,
+	loadEu4ProvinceBorderGeometry,
+} from "@/model/earth/history/data-source"
 import type { HeritageScript } from "@/model/society/script"
 import { SCRIPT } from "@/model/society/script"
 import {
@@ -22,6 +26,18 @@ import {
 	loadCoastlineLines,
 } from "./coastline-overlay"
 import { disposeGroup, disposeObject3D } from "./disposal"
+import {
+	buildEu4NationBorderContext,
+	buildEu4NationBordersGlobe,
+	buildEu4NationBordersMap,
+	buildEu4SelectedProvinceBorderGlobe,
+	buildEu4SelectedProvinceBorderMap,
+	buildRealIdToNation,
+	collectEu4NationBorderGlobePositions,
+	collectEu4NationBorderMapPositions,
+	collectEu4ProvinceBorderGlobePositions,
+	collectEu4ProvinceBorderMapPositions,
+} from "./eu4-nation-border-overlay"
 import { getRegionFocusTargets } from "./focus"
 import { createMapProjection } from "./map-projection"
 import {
@@ -44,17 +60,18 @@ import {
 } from "./moon-orbit-overlay"
 import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
 import {
-	buildGlobeCultureLabels,
 	buildGlobeHeritageLabels,
 	buildGlobeNationLabels,
+	buildGlobePartitionLabels,
 	buildGlobeSettlementLabels,
-	buildMapCultureLabels,
 	buildMapHeritageLabels,
 	buildMapNationLabels,
+	buildMapPartitionLabels,
 	buildMapSettlementLabels,
 	createNationLabelPools,
 	createSettlementLabelPools,
 	disposePool,
+	EARTH_HISTORY_LABEL_SCALE_CURVE,
 	updateGlobeLabelOrientations,
 } from "./nation-label-overlay"
 import {
@@ -100,7 +117,9 @@ import {
 } from "./province-overlay"
 import { createRenderScheduler } from "./render-scheduler"
 import {
+	buildGlobeRealSettlements,
 	buildGlobeSettlements,
+	buildMapRealSettlements,
 	buildMapSettlements,
 } from "./settlement-overlay"
 import {
@@ -964,6 +983,10 @@ export function createGenesisScene(
 	let derivedCoastlineWorld: SerializedGenesisWorld | null = null
 	let derivedCoastlineData: CoastlineLineData | null = null
 	let coastlineOverlayVisible = false
+	// Real EU4 province boundary vectors, used instead of the procedural mesh's
+	// own Voronoi edges for nation/province borders when world.isEarthImport.
+	// Static across all Earth-imported worlds, so fetched once and reused.
+	let cachedEu4BorderGeometry: Eu4ProvinceBorderGeometry | null = null
 	let coastlineMaterials: LineMaterial[] = []
 	let riverData: RiverData | null = null
 	let riversVisible = false
@@ -984,6 +1007,20 @@ export function createGenesisScene(
 	let mapLandNationBorders: LineSegments2 | null = null
 	let landNationBordersVisible = false
 	let landNationBorderMaterials: LineMaterial[] = []
+	// Border LINES and nation LABELS are both traced/placed from
+	// currentWorld.nations (assignment for border tracing; seeds for label
+	// capital anchors) independently of the fill-color path
+	// (setDisplayColors/setRegionColors) -- for Earth-imported worlds
+	// scrubbing the earth-history timeline this override substitutes a
+	// shadow nations object sourced from the folded history state, so both
+	// track the selected date instead of always reflecting the static
+	// generation-time assignment. See docs/earth-history-plan.md "Map modes
+	// and hover gating".
+	let earthHistoryNationOverride: {
+		assignment: Int32Array
+		seeds: Int32Array
+		names: string[]
+	} | null = null
 	const raycaster = new THREE.Raycaster()
 	const pointer = new THREE.Vector2()
 	let globeMeasureLine: THREE.Line | null = null
@@ -1004,6 +1041,15 @@ export function createGenesisScene(
 	let settlementUrbanPop: Float32Array | null = null
 	let settlementsVisible = false
 	let settlementsDirty = false
+	let globeEu4Settlements: THREE.Group | null = null
+	let mapEu4Settlements: THREE.Group | null = null
+	let eu4SettlementLats: Float32Array | null = null
+	let eu4SettlementLons: Float32Array | null = null
+	let eu4SettlementPopulation: Float32Array | null = null
+	let eu4SettlementProvinceIds: Int32Array | null = null
+	let eu4CapitalProvinceIds: ReadonlySet<number> = new Set()
+	let eu4SettlementIndices: number[] = []
+	let eu4SettlementsVisible = false
 	let globeInfrastructure: THREE.Group | null = null
 	let mapInfrastructure: THREE.Group | null = null
 	let infrastructureData: SerializedNetwork | null = null
@@ -1021,6 +1067,21 @@ export function createGenesisScene(
 	let mapCultureLabels: THREE.Group | null = null
 	let globeHeritageLabels: THREE.Group | null = null
 	let mapHeritageLabels: THREE.Group | null = null
+	// Religion labels have no procedural equivalent (world.religions is
+	// culture-indexed, not province-indexed, and the procedural UI never
+	// exposed a religion label toggle) -- this overlay only ever renders
+	// for Earth-imported worlds, driven by earthHistoryLabelPartitions.
+	let globeReligionLabels: THREE.Group | null = null
+	let mapReligionLabels: THREE.Group | null = null
+	// Real culture/religion partitions (from the earth-history engine's
+	// folded state) for Earth-imported worlds -- a different id space than
+	// the procedural world.cultures/world.heritages, so culture/religion
+	// labels are built directly via buildGlobePartitionLabels rather than
+	// through a shadow `.cultures` object (see rebuildCultureLabels).
+	let earthHistoryLabelPartitions: {
+		culture: { assignment: Int32Array; count: number; names: string[] }
+		religion: { assignment: Int32Array; count: number; names: string[] }
+	} | null = null
 	interface SolarTerminatorLabel {
 		anchor: THREE.Vector3
 		sprite: THREE.Sprite
@@ -1033,6 +1094,7 @@ export function createGenesisScene(
 		settlements: false,
 		culture: false,
 		heritage: false,
+		religion: false,
 		script: false,
 	}
 	let heritageScripts: Map<number, HeritageScript> | null = null
@@ -1321,6 +1383,7 @@ export function createGenesisScene(
 	const settlementLabelPools = createSettlementLabelPools()
 	const cultureLabelPools = createNationLabelPools()
 	const heritageLabelPools = createNationLabelPools()
+	const religionLabelPools = createNationLabelPools()
 	let nationNames: string[] | null = null
 	let dynastyNames: string[] | null = null
 	let settlementLabelNames: string[] | null = null
@@ -1503,6 +1566,11 @@ export function createGenesisScene(
 				camera,
 				labelCullingEnabled,
 			)
+			updateGlobeLabelOrientations(
+				globeReligionLabels,
+				camera,
+				labelCullingEnabled,
+			)
 			updateSolarTerminatorLabels(
 				elevationVisible
 					? SOLAR_TERMINATOR_ELEVATED_RADIUS
@@ -1633,6 +1701,48 @@ export function createGenesisScene(
 		updateOverlayVisibility()
 	}
 
+	function rebuildEu4SettlementOverlay() {
+		disposeGroup(globeGroup, globeEu4Settlements)
+		disposeGroup(scene, mapEu4Settlements)
+		globeEu4Settlements = null
+		mapEu4Settlements = null
+		if (
+			!eu4SettlementLats ||
+			!eu4SettlementLons ||
+			!eu4SettlementPopulation ||
+			!eu4SettlementProvinceIds ||
+			eu4SettlementIndices.length === 0 ||
+			!eu4SettlementsVisible
+		) {
+			return
+		}
+		globeEu4Settlements = buildGlobeRealSettlements(
+			eu4SettlementLats,
+			eu4SettlementLons,
+			eu4SettlementPopulation,
+			eu4SettlementProvinceIds,
+			eu4CapitalProvinceIds,
+			eu4SettlementIndices,
+		)
+		mapEu4Settlements = buildMapRealSettlements(
+			eu4SettlementLats,
+			eu4SettlementLons,
+			eu4SettlementPopulation,
+			eu4SettlementProvinceIds,
+			eu4CapitalProvinceIds,
+			eu4SettlementIndices,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+		)
+		if (globeEu4Settlements) globeGroup.add(globeEu4Settlements)
+		if (mapEu4Settlements) {
+			addMapSlideClones(mapEu4Settlements)
+			if (mapMesh) mapEu4Settlements.position.copy(mapMesh.position)
+			scene.add(mapEu4Settlements)
+		}
+		updateOverlayVisibility()
+	}
+
 	function rebuildNationLabels() {
 		disposeGroup(globeGroup, globeNationLabels)
 		disposeGroup(scene, mapNationLabels)
@@ -1643,28 +1753,75 @@ export function createGenesisScene(
 		mapNationLabels = null
 		globeNationScripts = null
 		mapNationScripts = null
-		if (!currentWorld?.nations) {
+		// Earth-imported worlds skip procedural nation/government generation
+		// entirely (see derive-province-society.ts), so currentWorld.nations
+		// is genuinely undefined there -- only bail when there's neither a
+		// real procedural nations object NOR an earth-history override to
+		// build a shadow one from.
+		if (
+			!currentWorld ||
+			(!currentWorld.nations && !earthHistoryNationOverride)
+		) {
 			return
 		}
 		const showNationLabels = labelMode.nations || labelMode.dynasty
 		if (!showNationLabels) return
-		const labelNames = labelMode.dynasty ? dynastyNames : nationNames
+		// Earth-imported worlds always show real nation names when scrubbing
+		// earth-history, regardless of the dynasty label toggle -- dynasty
+		// data isn't part of this engine's scope (see foldedStateToNationInfo,
+		// which does track rulers, just not dynastic succession trees).
+		const worldForLabels = earthHistoryNationOverride
+			? {
+					...currentWorld,
+					nations: {
+						...currentWorld?.nations,
+						assignment: earthHistoryNationOverride.assignment,
+						seeds: earthHistoryNationOverride.seeds,
+						// nationProvinceCount (nation-label-overlay.ts) uses
+						// nations.size[id] directly -- without a positive-length
+						// check -- as label font-scale input, only falling back to
+						// scanning `assignment` when size[id] isn't a positive
+						// number. Leaving the stale procedural size array in place
+						// (like sovereign for borders, see rebuildNationBorders)
+						// would size labels by the wrong nation's province count.
+						// An empty array makes size[id] undefined for every id,
+						// forcing the correct assignment-scan fallback.
+						size: new Int32Array(0),
+					},
+				}
+			: currentWorld
+		const labelNames = earthHistoryNationOverride
+			? earthHistoryNationOverride.names
+			: labelMode.dynasty
+				? dynastyNames
+				: nationNames
 		if (!labelNames) return
+		// Real historical province-count distributions are far more skewed
+		// than the procedural generator's (e.g. Ming's 113 provinces vs. a
+		// 1-province German principality, same era) -- the default label
+		// scale curve compressed large real empires together almost
+		// indistinguishably, so Earth-imported worlds use a wider curve. See
+		// EARTH_HISTORY_LABEL_SCALE_CURVE's doc comment.
+		const labelScaleCurve = earthHistoryNationOverride
+			? EARTH_HISTORY_LABEL_SCALE_CURVE
+			: undefined
 		globeNationLabels = buildGlobeNationLabels(
-			currentWorld,
+			worldForLabels,
 			labelNames,
 			camera,
 			nationLabelPools.globe,
 			labelCullingEnabled,
 			elevationVisible,
+			labelScaleCurve,
 		)
 		mapNationLabels = buildMapNationLabels(
-			currentWorld,
+			worldForLabels,
 			labelNames,
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 			nationLabelPools.map,
 			labelCullingEnabled,
+			labelScaleCurve,
 		)
 		if (globeNationLabels) globeGroup.add(globeNationLabels)
 		if (mapNationLabels) {
@@ -1673,6 +1830,7 @@ export function createGenesisScene(
 			scene.add(mapNationLabels)
 		}
 		if (
+			!earthHistoryNationOverride &&
 			labelMode.script &&
 			currentWorld.heritages &&
 			currentWorld.cultures &&
@@ -1753,29 +1911,88 @@ export function createGenesisScene(
 		disposeGroup(scene, mapCultureLabels)
 		globeCultureLabels = null
 		mapCultureLabels = null
-		if (!currentWorld?.cultures || !labelMode.culture || !cultureNames) {
-			return
-		}
-		globeCultureLabels = buildGlobeCultureLabels(
+		if (!currentWorld || !labelMode.culture) return
+
+		const earthCulture = earthHistoryLabelPartitions?.culture
+		if (!earthCulture && (!currentWorld.cultures || !cultureNames)) return
+
+		const names = earthCulture ? earthCulture.names : (cultureNames as string[])
+		const partitionCount = earthCulture
+			? earthCulture.count
+			: currentWorld.cultures!.count
+		const getPartition = earthCulture
+			? (p: number) => earthCulture.assignment[p] ?? -1
+			: (p: number) => currentWorld!.cultures!.assignment[p] ?? -1
+		const scaleCurve = earthCulture
+			? EARTH_HISTORY_LABEL_SCALE_CURVE
+			: undefined
+
+		globeCultureLabels = buildGlobePartitionLabels(
 			currentWorld,
-			cultureNames,
+			names,
+			partitionCount,
+			getPartition,
 			camera,
 			cultureLabelPools.globe,
 			labelCullingEnabled,
 			elevationVisible,
+			scaleCurve,
 		)
-		mapCultureLabels = buildMapCultureLabels(
+		mapCultureLabels = buildMapPartitionLabels(
 			currentWorld,
-			cultureNames,
+			names,
+			partitionCount,
+			getPartition,
 			currentMapCenterLongitudeDeg,
 			currentMapProjectionLatitudeDeg,
 			cultureLabelPools.map,
 			labelCullingEnabled,
+			scaleCurve,
 		)
 		if (globeCultureLabels) globeGroup.add(globeCultureLabels)
 		if (mapCultureLabels) {
 			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
 			scene.add(mapCultureLabels)
+		}
+		updateOverlayVisibility()
+	}
+
+	/** Only ever populated for Earth-imported worlds -- see
+	 * earthHistoryLabelPartitions's doc comment. */
+	function rebuildReligionLabels() {
+		disposeGroup(globeGroup, globeReligionLabels)
+		disposeGroup(scene, mapReligionLabels)
+		globeReligionLabels = null
+		mapReligionLabels = null
+		const earthReligion = earthHistoryLabelPartitions?.religion
+		if (!currentWorld || !labelMode.religion || !earthReligion) return
+
+		globeReligionLabels = buildGlobePartitionLabels(
+			currentWorld,
+			earthReligion.names,
+			earthReligion.count,
+			(p) => earthReligion.assignment[p] ?? -1,
+			camera,
+			religionLabelPools.globe,
+			labelCullingEnabled,
+			elevationVisible,
+			EARTH_HISTORY_LABEL_SCALE_CURVE,
+		)
+		mapReligionLabels = buildMapPartitionLabels(
+			currentWorld,
+			earthReligion.names,
+			earthReligion.count,
+			(p) => earthReligion.assignment[p] ?? -1,
+			currentMapCenterLongitudeDeg,
+			currentMapProjectionLatitudeDeg,
+			religionLabelPools.map,
+			labelCullingEnabled,
+			EARTH_HISTORY_LABEL_SCALE_CURVE,
+		)
+		if (globeReligionLabels) globeGroup.add(globeReligionLabels)
+		if (mapReligionLabels) {
+			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
+			scene.add(mapReligionLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -1879,16 +2096,128 @@ export function createGenesisScene(
 		const w = canvas.clientWidth || 1
 		const h = canvas.clientHeight || 1
 
-		if (currentWorld && landNationBordersVisible) {
+		const worldForBorders =
+			earthHistoryNationOverride && currentWorld
+				? {
+						...currentWorld,
+						nations: {
+							...currentWorld.nations,
+							assignment: earthHistoryNationOverride.assignment,
+							// forEachNationBorderSide (overlay-builders.ts) also reads
+							// sovereign/activeRebelWars to skip vassal and active-rebel
+							// border segments -- those still held the *procedural*
+							// world's stale values here, which happened to coincide for
+							// unrelated earth-history nations often enough to silently
+							// drop real border segments (the reported "gaps"). Aliasing
+							// sovereign to the same array as assignment makes the
+							// same-sovereign check degenerate to the same-nation check
+							// (already skipped separately), and clearing
+							// activeRebelWars removes the other stale-id comparison.
+							sovereign: earthHistoryNationOverride.assignment,
+							activeRebelWars: [],
+						},
+					}
+				: currentWorld
+
+		if (worldForBorders?.isEarthImport) {
+			if (!cachedEu4BorderGeometry) {
+				loadEu4ProvinceBorderGeometry()
+					.then((geometry) => {
+						cachedEu4BorderGeometry = geometry
+						rebuildNationBorders()
+						requestRender()
+					})
+					.catch((err) => {
+						console.error("Failed to load EU4 province border geometry:", err)
+					})
+				return
+			}
+			const borderContext = buildEu4NationBorderContext(worldForBorders)
+			const geometry = cachedEu4BorderGeometry
+
+			if (borderContext && landNationBordersVisible) {
+				const globeLand = buildEu4NationBordersGlobe(
+					geometry,
+					borderContext,
+					currentViewMode,
+					landNationBordersVisible,
+					elevationVisible ? 1.004 : 1.001,
+					[w, h],
+					{ color: 0x7d556f, opacity: 0.9, lineWidth: 2 },
+				)
+				const mapLand = buildEu4NationBordersMap(
+					geometry,
+					borderContext,
+					currentMapCenterLongitudeDeg,
+					currentMapProjectionLatitudeDeg,
+					currentViewMode,
+					landNationBordersVisible,
+					0.001,
+					[w, h],
+					{ color: 0x7d556f, opacity: 0.9, lineWidth: 2 },
+				)
+				if (globeLand) {
+					globeLandNationBorders = globeLand.lines
+					landNationBorderMaterials.push(globeLand.material)
+					globeGroup.add(globeLandNationBorders)
+				}
+				if (mapLand) {
+					mapLandNationBorders = mapLand.lines
+					landNationBorderMaterials.push(mapLand.material)
+					scene.add(mapLandNationBorders)
+				}
+			}
+
+			if (borderContext && nationBordersVisible) {
+				const BORDER_BASE_WIDTH = 1.2
+				const globeThin = buildEu4NationBordersGlobe(
+					geometry,
+					borderContext,
+					currentViewMode,
+					nationBordersVisible,
+					elevationVisible ? 1.006 : 1.003,
+					[w, h],
+					{ color: 0x020617, opacity: 0.95, lineWidth: BORDER_BASE_WIDTH },
+				)
+				const mapThin = buildEu4NationBordersMap(
+					geometry,
+					borderContext,
+					currentMapCenterLongitudeDeg,
+					currentMapProjectionLatitudeDeg,
+					currentViewMode,
+					nationBordersVisible,
+					0,
+					[w, h],
+					{ color: 0x020617, opacity: 0.95, lineWidth: BORDER_BASE_WIDTH },
+				)
+				if (globeThin) {
+					globeThin.lines.renderOrder = 1
+					globeNationBorders = globeThin.lines
+					nationBorderMaterials.push(globeThin.material)
+					globeGroup.add(globeNationBorders)
+				}
+				if (mapThin) {
+					mapThin.lines.renderOrder = 1
+					mapNationBorders = mapThin.lines
+					nationBorderMaterials.push(mapThin.material)
+					scene.add(mapNationBorders)
+				}
+			}
+
+			updateOverlayVisibility()
+			return
+		}
+
+		if (worldForBorders && landNationBordersVisible) {
 			const globeLand = buildLandNationBordersGlobe(
-				currentWorld,
+				worldForBorders,
 				currentViewMode,
 				landNationBordersVisible,
 				elevationVisible,
 				[w, h],
 			)
 			const mapLand = buildLandNationBordersMap(
-				currentWorld,
+				worldForBorders,
 				currentMapCenterLongitudeDeg,
 				currentMapProjectionLatitudeDeg,
 				currentViewMode,
@@ -1907,10 +2236,10 @@ export function createGenesisScene(
 			}
 		}
 
-		if (currentWorld && nationBordersVisible) {
+		if (worldForBorders && nationBordersVisible) {
 			const BORDER_BASE_WIDTH = 1.2
 			const globePos = collectAllNationBorderGlobePositions(
-				currentWorld,
+				worldForBorders,
 				0,
 				elevationVisible,
 			)
@@ -1934,7 +2263,7 @@ export function createGenesisScene(
 				globeGroup.add(globeNationBorders)
 			}
 			const mapRaw = collectAllNationBorderMapPositions(
-				currentWorld,
+				worldForBorders,
 				currentMapCenterLongitudeDeg,
 				currentMapProjectionLatitudeDeg,
 				0,
@@ -1976,6 +2305,58 @@ export function createGenesisScene(
 		globeSelectedProvinceBorder = null
 		mapSelectedProvinceBorder = null
 		if (!currentWorld?.provinces || selectedProvince < 0) return
+		const resolution: [number, number] = [
+			canvas.clientWidth || 1,
+			canvas.clientHeight || 1,
+		]
+
+		if (currentWorld.isEarthImport) {
+			if (!cachedEu4BorderGeometry) {
+				loadEu4ProvinceBorderGeometry()
+					.then((geometry) => {
+						cachedEu4BorderGeometry = geometry
+						rebuildSelectedProvinceBorder()
+						requestRender()
+					})
+					.catch((err) => {
+						console.error("Failed to load EU4 province border geometry:", err)
+					})
+				return
+			}
+			const provinceRealId = currentWorld.provinces.realIds?.[selectedProvince]
+			if (provinceRealId === undefined) return
+			const geometry = cachedEu4BorderGeometry
+			const globeBorder = buildEu4SelectedProvinceBorderGlobe(
+				geometry,
+				provinceRealId,
+				currentViewMode,
+				1.006,
+				resolution,
+				{ color: 0xfffbeb, opacity: 0.95, lineWidth: 4 },
+			)
+			const mapBorder = buildEu4SelectedProvinceBorderMap(
+				geometry,
+				provinceRealId,
+				currentMapCenterLongitudeDeg,
+				currentMapProjectionLatitudeDeg,
+				currentViewMode,
+				0.007,
+				resolution,
+				{ color: 0xfffbeb, opacity: 0.95, lineWidth: 4 },
+			)
+			if (globeBorder) {
+				globeSelectedProvinceBorder = globeBorder.lines
+				globeGroup.add(globeSelectedProvinceBorder)
+			}
+			if (mapBorder) {
+				mapSelectedProvinceBorder = mapBorder.lines
+				addMapSlideClones(mapSelectedProvinceBorder)
+				scene.add(mapSelectedProvinceBorder)
+			}
+			updateOverlayVisibility()
+			return
+		}
+
 		globeSelectedProvinceBorder = buildSelectedProvinceBorderGlobe(
 			currentWorld,
 			selectedProvince,
@@ -1985,7 +2366,7 @@ export function createGenesisScene(
 				color: 0xfffbeb,
 				radiusBoost: 0.003,
 				lineWidth: 4,
-				resolution: [canvas.clientWidth || 1, canvas.clientHeight || 1],
+				resolution,
 			},
 		)
 		mapSelectedProvinceBorder = buildSelectedProvinceBorderMap(
@@ -1998,7 +2379,7 @@ export function createGenesisScene(
 				color: 0xfffbeb,
 				zBoost: 0.004,
 				lineWidth: 4,
-				resolution: [canvas.clientWidth || 1, canvas.clientHeight || 1],
+				resolution,
 			},
 		)
 		if (globeSelectedProvinceBorder) globeGroup.add(globeSelectedProvinceBorder)
@@ -2119,6 +2500,8 @@ export function createGenesisScene(
 		disposeGroup(scene, mapHierarchyOverlay)
 		disposeGroup(globeGroup, globeSettlements)
 		disposeGroup(scene, mapSettlements)
+		disposeGroup(globeGroup, globeEu4Settlements)
+		disposeGroup(scene, mapEu4Settlements)
 		disposeGroup(globeGroup, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
 		disposeGroup(globeGroup, globeNationLabels)
@@ -2261,6 +2644,7 @@ export function createGenesisScene(
 		rebuildSelectedProvinceBorder()
 		rebuildHierarchyOverlay()
 		rebuildSettlementOverlay()
+		rebuildEu4SettlementOverlay()
 		rebuildTradeRouteOverlay()
 		rebuildNationLabels()
 		updateOverlayVisibility()
@@ -2355,6 +2739,13 @@ export function createGenesisScene(
 			mapSettlements.visible = settlementsVisible && showMap
 			if (mapMesh) mapSettlements.position.copy(mapMesh.position)
 		}
+		if (globeEu4Settlements)
+			globeEu4Settlements.visible =
+				eu4SettlementsVisible && currentViewMode === "globe"
+		if (mapEu4Settlements) {
+			mapEu4Settlements.visible = eu4SettlementsVisible && showMap
+			if (mapMesh) mapEu4Settlements.position.copy(mapMesh.position)
+		}
 		if (globeInfrastructure)
 			globeInfrastructure.visible =
 				infrastructureVisible && currentViewMode === "globe"
@@ -2401,6 +2792,13 @@ export function createGenesisScene(
 			mapHeritageLabels.visible = labelMode.heritage && showMap
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
 		}
+		if (globeReligionLabels)
+			globeReligionLabels.visible =
+				labelMode.religion && currentViewMode === "globe"
+		if (mapReligionLabels) {
+			mapReligionLabels.visible = labelMode.religion && showMap
+			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
+		}
 		requestRender()
 	}
 
@@ -2419,12 +2817,14 @@ export function createGenesisScene(
 			mapMeasureDots,
 			mapHierarchyOverlay,
 			mapSettlements,
+			mapEu4Settlements,
 			mapInfrastructure,
 			mapNationLabels,
 			mapNationScripts,
 			mapSettlementLabels,
 			mapCultureLabels,
 			mapHeritageLabels,
+			mapReligionLabels,
 			mapPathfindingLine,
 			mapPathfindingDots,
 			pulseMap,
@@ -2452,12 +2852,14 @@ export function createGenesisScene(
 			{ object: globePathfindingDots, visible: false },
 			{ object: globeHierarchyOverlay, visible: false },
 			{ object: globeSettlements, visible: false },
+			{ object: globeEu4Settlements, visible: false },
 			{ object: globeInfrastructure, visible: false },
 			{ object: globeNationLabels, visible: false },
 			{ object: globeNationScripts, visible: false },
 			{ object: globeSettlementLabels, visible: false },
 			{ object: globeCultureLabels, visible: false },
 			{ object: globeHeritageLabels, visible: false },
+			{ object: globeReligionLabels, visible: false },
 			{ object: pulseGlobe, visible: false },
 			{ object: mapMesh, visible: true },
 			{
@@ -2473,6 +2875,7 @@ export function createGenesisScene(
 			{ object: mapNationBorders, visible: nationBordersVisible },
 			{ object: mapHierarchyOverlay, visible: hierarchyOverlayNationId >= 0 },
 			{ object: mapSettlements, visible: settlementsVisible },
+			{ object: mapEu4Settlements, visible: eu4SettlementsVisible },
 			{ object: mapInfrastructure, visible: infrastructureVisible },
 			{
 				object: mapNationLabels,
@@ -2485,6 +2888,7 @@ export function createGenesisScene(
 			{ object: mapSettlementLabels, visible: labelMode.settlements },
 			{ object: mapCultureLabels, visible: labelMode.culture },
 			{ object: mapHeritageLabels, visible: labelMode.heritage },
+			{ object: mapReligionLabels, visible: labelMode.religion },
 			{ object: mapSelectedProvinceBorder, visible: false },
 			{ object: mapMeasureLine, visible: false },
 			{ object: mapMeasureDots, visible: false },
@@ -2620,6 +3024,19 @@ export function createGenesisScene(
 
 	function setHoveredRegion(region: number | null) {
 		hoveredRegion = region ?? -1
+	}
+
+	function setEarthHistoryNationOverride(
+		override: {
+			assignment: Int32Array
+			seeds: Int32Array
+			names: string[]
+		} | null,
+	) {
+		if (earthHistoryNationOverride === override) return
+		earthHistoryNationOverride = override
+		rebuildNationBorders()
+		rebuildNationLabels()
 	}
 
 	function setNationBordersVisible(visible: boolean) {
@@ -2763,8 +3180,33 @@ export function createGenesisScene(
 		clearPulse()
 		if (!currentWorld) return
 		const lineWidth = target === "province" ? 5 : 4
-		const globePositions =
-			target === "province"
+		const useEu4Vectors = currentWorld.isEarthImport && cachedEu4BorderGeometry
+		const provinceRealId = useEu4Vectors
+			? currentWorld.provinces?.realIds?.[province]
+			: undefined
+		const globePositions = useEu4Vectors
+			? target === "province"
+				? provinceRealId === undefined
+					? []
+					: collectEu4ProvinceBorderGlobePositions(
+							cachedEu4BorderGeometry!,
+							provinceRealId,
+							1.006,
+						)
+				: (() => {
+						const nation = currentWorld.nations?.assignment[province]
+						if (nation === undefined || nation < 0) return []
+						const realIdToNation = buildRealIdToNation(currentWorld)
+						return realIdToNation
+							? collectEu4NationBorderGlobePositions(
+									cachedEu4BorderGeometry!,
+									realIdToNation,
+									nation,
+									1.006,
+								)
+							: []
+					})()
+			: target === "province"
 				? collectProvinceBorderGlobePositions(
 						currentWorld,
 						province,
@@ -2783,8 +3225,33 @@ export function createGenesisScene(
 									elevationVisible,
 								)
 					})()
-		const mapPositions =
-			target === "province"
+		const mapPositions = useEu4Vectors
+			? target === "province"
+				? provinceRealId === undefined
+					? []
+					: collectEu4ProvinceBorderMapPositions(
+							cachedEu4BorderGeometry!,
+							provinceRealId,
+							currentMapCenterLongitudeDeg,
+							currentMapProjectionLatitudeDeg,
+							0.007,
+						)
+				: (() => {
+						const nation = currentWorld.nations?.assignment[province]
+						if (nation === undefined || nation < 0) return []
+						const realIdToNation = buildRealIdToNation(currentWorld)
+						return realIdToNation
+							? collectEu4NationBorderMapPositions(
+									cachedEu4BorderGeometry!,
+									realIdToNation,
+									nation,
+									currentMapCenterLongitudeDeg,
+									currentMapProjectionLatitudeDeg,
+									0.001,
+								)
+							: []
+					})()
+			: target === "province"
 				? collectProvinceBorderMapPositions(
 						currentWorld,
 						province,
@@ -3247,6 +3714,8 @@ export function createGenesisScene(
 		disposeGroup(scene, mapHierarchyOverlay)
 		disposeGroup(globeGroup, globeSettlements)
 		disposeGroup(scene, mapSettlements)
+		disposeGroup(globeGroup, globeEu4Settlements)
+		disposeGroup(scene, mapEu4Settlements)
 		disposeGroup(globeGroup, globeInfrastructure)
 		disposeGroup(scene, mapInfrastructure)
 		disposeGroup(globeGroup, globeNationLabels)
@@ -3614,6 +4083,29 @@ export function createGenesisScene(
 		rebuildSettlementOverlay()
 	}
 
+	function setEu4Settlements(
+		lats: Float32Array | null,
+		lons: Float32Array | null,
+		population: Float32Array | null,
+		provinceIds: Int32Array | null,
+		capitalProvinceIds: ReadonlySet<number>,
+		indices: number[],
+	) {
+		eu4SettlementLats = lats
+		eu4SettlementLons = lons
+		eu4SettlementPopulation = population
+		eu4SettlementProvinceIds = provinceIds
+		eu4CapitalProvinceIds = capitalProvinceIds
+		eu4SettlementIndices = indices
+		rebuildEu4SettlementOverlay()
+	}
+
+	function setEu4SettlementsVisible(visible: boolean) {
+		if (eu4SettlementsVisible === visible) return
+		eu4SettlementsVisible = visible
+		rebuildEu4SettlementOverlay()
+	}
+
 	function setInfrastructure(edges: SerializedNetwork | null) {
 		infrastructureData = edges
 		rebuildTradeRouteOverlay()
@@ -3632,6 +4124,7 @@ export function createGenesisScene(
 		rebuildSettlementLabels()
 		rebuildCultureLabels()
 		rebuildHeritageLabels()
+		rebuildReligionLabels()
 	}
 
 	function setNationNames(names: string[] | null) {
@@ -3668,6 +4161,19 @@ export function createGenesisScene(
 		rebuildSettlementLabels()
 		rebuildCultureLabels()
 		rebuildHeritageLabels()
+		rebuildReligionLabels()
+	}
+
+	function setEarthHistoryLabelPartitions(
+		partitions: {
+			culture: { assignment: Int32Array; count: number; names: string[] }
+			religion: { assignment: Int32Array; count: number; names: string[] }
+		} | null,
+	) {
+		if (earthHistoryLabelPartitions === partitions) return
+		earthHistoryLabelPartitions = partitions
+		rebuildCultureLabels()
+		rebuildReligionLabels()
 	}
 
 	// Moon orbit overlay
@@ -3869,6 +4375,7 @@ export function createGenesisScene(
 		setOccupationOverlay,
 		setHoveredRegion,
 		setNationBordersVisible,
+		setEarthHistoryNationOverride,
 		setLandNationBordersVisible,
 		setViewMode,
 		setWireframeVisible,
@@ -3901,6 +4408,8 @@ export function createGenesisScene(
 		setHierarchyOverlay,
 		setSettlements,
 		setSettlementsVisible,
+		setEu4Settlements,
+		setEu4SettlementsVisible,
 		setInfrastructure,
 		setInfrastructureVisible,
 		setLabelMode,
@@ -3908,6 +4417,7 @@ export function createGenesisScene(
 		setDynastyNames,
 		setCultureNames,
 		setHeritageNames,
+		setEarthHistoryLabelPartitions,
 		setSettlementNames,
 		setElevationVisible,
 		setSunPosition,

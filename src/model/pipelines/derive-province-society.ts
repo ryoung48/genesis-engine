@@ -93,7 +93,17 @@ export function deriveProvinceSociety({
 				}
 			}
 
-			if (eraConfig.hasNations) {
+			// Earth-imported worlds (raster-based provinces, identifiable by
+			// realIds -- see computeProvincesFromRaster) get their political
+			// layer from the earth-history engine (src/model/earth/history/),
+			// not the procedural flood-fill nation/government generator. Running
+			// it anyway wasted a full generation pass and, worse, its output
+			// silently leaked into hover/map fallbacks for provinces the real
+			// history data doesn't cover (see InfoPanel.tsx's earth-history
+			// override handling). Skipping it here removes the stale data at
+			// the source instead of only masking it in the UI.
+			const isEarthImportRaster = !!post.provinces.realIds
+			if (eraConfig.hasNations && !isEarthImportRaster) {
 				nations = record("nations", () =>
 					computeNations({
 						provinces: post.provinces,

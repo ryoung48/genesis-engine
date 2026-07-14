@@ -53,6 +53,11 @@ export interface LabelMode {
 	settlements: boolean
 	culture: boolean
 	heritage: boolean
+	/** Only meaningful for Earth-imported worlds -- there is no procedural
+	 * religion label overlay (world.religions is culture-indexed, not
+	 * province-indexed). See create-genesis-scene.ts's
+	 * earthHistoryLabelPartitions. */
+	religion: boolean
 	script: boolean
 }
 
@@ -967,10 +972,10 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 										<div className="mt-1.5 space-y-1.5">
 											<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
 												<span>
-													{colorMode === "population" &&
+													{getBaseMapMode(colorMode) === "population" &&
 													populationMode === "culture"
 														? "Culture"
-														: colorMode === "population" &&
+														: getBaseMapMode(colorMode) === "population" &&
 																(populationMode === "heritage" ||
 																	populationMode === "religion")
 															? "Heritage"
@@ -987,7 +992,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 														labelMode.heritage
 													}
 													onChange={(e) => {
-														const isPopMode = colorMode === "population"
+														const isPopMode =
+															getBaseMapMode(colorMode) === "population"
 														const isDynasty = nationMode === "dynasty"
 														setLabelMode({
 															...labelMode,

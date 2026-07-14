@@ -328,6 +328,31 @@ interface InfoPanelProps {
 	hoverNationCounts?: Map<number, number> | null
 	relationAt?: ((a: number, b: number) => number) | null
 	detailsDrawerOpen?: boolean
+	/** Diplomacy info for the hovered province's current owner, resolved by
+	 * the caller via earth-history's queryNation (only meaningful when
+	 * world.isEarthImport). See docs/earth-history-plan.md "Hover / info
+	 * panel". Pre-resolved rather than computed here so InfoPanel stays a
+	 * pure formatter, consistent with the other buildXDisplayData calls. */
+	earthHistoryDiplomacyRows?: { label: string; value: string }[]
+	/** Overrides the Nation/Government/Culture/Religion rows with real
+	 * history for the currently-scrubbed date, for the same reason as
+	 * earthHistoryDiplomacyRows -- see docs/earth-history-plan.md. Resolved
+	 * by the caller (GenesisView); undefined when earth-history isn't active
+	 * for the hovered province, in which case the usual procedural builders
+	 * are used unchanged. */
+	earthHistoryHoverOverride?: {
+		nationName: string | null
+		nationColor: string | null
+		governmentLabel: string | null
+		governmentColor: string | null
+		cultureName: string | null
+		cultureColor: string | null
+		religionName: string | null
+		religionColor: string | null
+		/** Real EU4 province name (geo-explorer's political.json), overrides
+		 * the generic "Province N" placeholder from procedural naming. */
+		provinceName: string | null
+	}
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -375,6 +400,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	showOceanCurrentOverlay = false,
 	colorMode,
 	dangerSubMode,
+	populationMode,
 	displayMonth,
 	clockMonthMode,
 	clockMonth,
@@ -388,6 +414,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getLandmarkName,
 	getRiverName,
 	detailsDrawerOpen,
+	earthHistoryDiplomacyRows,
+	earthHistoryHoverOverride,
 }) => {
 	const activeBarIndex =
 		clockMonthMode === "monthly" ? clockMonth : displayMonth - 1
@@ -467,6 +495,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		: null
 	const demographicModes: PopulationMapMode[] = [
 		"density",
+		"urban",
 		"development",
 		"culture",
 		"religion",
@@ -479,6 +508,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		? demographicModes.flatMap((mode) => {
 				const display = buildDemographicDisplayData({
 					populationMode: mode,
+					colorMode,
 					hoverProvince,
 					world,
 					unitSystem,
@@ -492,12 +522,21 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		showSociety &&
 		hoverProvince !== null &&
 		hoverProvince >= 0 &&
-		world?.urbanPopulation &&
+		(populationMode === "urban"
+			? world?.realUrbanPopulation?.population
+			: world?.urbanPopulation) &&
 		world?.provinces &&
-		hoverProvince < world.urbanPopulation.length &&
+		hoverProvince <
+			(populationMode === "urban"
+				? (world.realUrbanPopulation?.population.length ?? 0)
+				: world.urbanPopulation.length) &&
 		hoverProvince < world.provinces.desolate.length &&
 		!world.provinces.desolate[hoverProvince]
-			? Math.round(world.urbanPopulation[hoverProvince])
+			? Math.round(
+					populationMode === "urban"
+						? (world.realUrbanPopulation?.population[hoverProvince] ?? 0)
+						: (world.urbanPopulation[hoverProvince] ?? 0),
+				)
 			: null
 	const hoverPortLabel = showSociety
 		? buildHoverPortLabel(hoverProvince, world, getLandmarkName)
@@ -517,15 +556,56 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 			color: null,
 		})
 	}
+	const settlementName =
+		showSociety && hoverProvince !== null && hoverProvince >= 0
+			? (world?.realSettlement?.names[hoverProvince] ?? null)
+			: null
+	const settlementPopulation =
+		world?.realSettlement?.population[hoverProvince ?? -1]
+	if (settlementName && settlementPopulation && settlementPopulation > 0) {
+		demographicEntries.push({
+			label: "Settlement",
+			value: `${settlementName} · ${formatCompactNumber(settlementPopulation)}`,
+			color: null,
+		})
+	}
 	const demographicEntryMap = new Map(
 		demographicEntries.map((entry) => [entry.label, entry] as const),
 	)
+	// When earth-history is active, it always wins over the procedural
+	// Culture/Religion entries computed above (via buildDemographicDisplayData
+	// off world.cultures/religions) -- including suppressing them entirely
+	// for a province with no real owner/culture/religion data, rather than
+	// silently falling back to generation-time procedural values.
+	if (earthHistoryHoverOverride) {
+		if (earthHistoryHoverOverride.cultureName) {
+			demographicEntryMap.set("Culture", {
+				label: "Culture",
+				value: earthHistoryHoverOverride.cultureName,
+				color: earthHistoryHoverOverride.cultureColor,
+			})
+		} else {
+			demographicEntryMap.delete("Culture")
+		}
+		if (earthHistoryHoverOverride.religionName) {
+			demographicEntryMap.set("Religion", {
+				label: "Religion",
+				value: earthHistoryHoverOverride.religionName,
+				color: earthHistoryHoverOverride.religionColor,
+			})
+		} else {
+			demographicEntryMap.delete("Religion")
+		}
+	}
 	const orderedSocietyEntries = [
 		demographicEntryMap.get("Culture"),
 		demographicEntryMap.get("Religion"),
 		demographicEntryMap.get("Development"),
-		demographicEntryMap.get("Population"),
+		demographicEntryMap.get("Population") ??
+			demographicEntryMap.get("Population (Real)") ??
+			demographicEntryMap.get("Population Δ"),
 		demographicEntryMap.get("Urban Pop"),
+		demographicEntryMap.get("Settlement"),
 		demographicEntryMap.get("Port"),
 	].filter((entry): entry is DemographicEntry => entry !== undefined)
 	return (
@@ -794,23 +874,46 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 				)}
 				{showSociety && hoverProvince !== null && hoverProvince >= 0 && (
 					<>
-						{provinceName && (
-							<SwatchRow label="Province" value={provinceName} color={null} />
-						)}
-						{provinceNation && (
+						{(earthHistoryHoverOverride?.provinceName ?? provinceName) && (
 							<SwatchRow
-								label="Nation"
-								value={getNationName(provinceNation.id)}
-								color={provinceNation.color}
+								label="Province"
+								value={
+									earthHistoryHoverOverride?.provinceName ?? provinceName ?? ""
+								}
+								color={null}
 							/>
 						)}
-						{provinceNation && governmentDisplay && (
-							<SwatchRow
-								label="Government"
-								value={governmentDisplay.label}
-								color={governmentDisplay.color}
-							/>
-						)}
+						{earthHistoryHoverOverride
+							? earthHistoryHoverOverride.nationName && (
+									<SwatchRow
+										label="Nation"
+										value={earthHistoryHoverOverride.nationName}
+										color={earthHistoryHoverOverride.nationColor}
+									/>
+								)
+							: provinceNation && (
+									<SwatchRow
+										label="Nation"
+										value={getNationName(provinceNation.id)}
+										color={provinceNation.color}
+									/>
+								)}
+						{earthHistoryHoverOverride
+							? earthHistoryHoverOverride.governmentLabel && (
+									<SwatchRow
+										label="Government"
+										value={earthHistoryHoverOverride.governmentLabel}
+										color={earthHistoryHoverOverride.governmentColor}
+									/>
+								)
+							: provinceNation &&
+								governmentDisplay && (
+									<SwatchRow
+										label="Government"
+										value={governmentDisplay.label}
+										color={governmentDisplay.color}
+									/>
+								)}
 					</>
 				)}
 				{showSociety && (
@@ -827,6 +930,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								<Row key={item.label} label={item.label} value={item.value} />
 							),
 						)}
+						{earthHistoryDiplomacyRows?.map((row, i) => (
+							<Row
+								key={`${row.label}-${i}`}
+								label={row.label}
+								value={row.value}
+							/>
+						))}
 					</>
 				)}
 				{showGeography && chartData && world?.climate && (

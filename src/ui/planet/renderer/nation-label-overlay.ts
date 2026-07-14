@@ -192,13 +192,47 @@ function nationProvinceCount(
 	return count
 }
 
-function computeLabelScale(componentSize: number, name: string): number {
-	const areaScale = 0.1 + Math.pow(componentSize, 0.55) * 0.5
+interface LabelScaleCurve {
+	exponent: number
+	factor: number
+	maxScale: number
+}
+
+/** Default curve, tuned for the procedural generator's nation sizes. Earth
+ * import passes a wider curve (see EARTH_HISTORY_LABEL_SCALE_CURVE below) --
+ * real historical province-count distributions are far more skewed (Ming's
+ * 113 provinces vs. a 1-province German principality in the same era) than
+ * anything the procedural generator produces, so this curve's exponent/cap
+ * compressed large real empires together almost indistinguishably (e.g.
+ * Vijayanagara's 33 provinces and Ming's 113 both landing near/at the same
+ * clamped scale). */
+const DEFAULT_LABEL_SCALE_CURVE: LabelScaleCurve = {
+	exponent: 0.55,
+	factor: 0.5,
+	maxScale: MAX_LABEL_SCALE,
+}
+
+/** Lower exponent/factor spread mid-size nations out more before the curve
+ * flattens, and a higher cap keeps only genuinely massive empires (a few
+ * hundred+ provinces, e.g. the British Empire by 1900) pinned at the max
+ * instead of every empire past ~50 provinces looking the same size. */
+export const EARTH_HISTORY_LABEL_SCALE_CURVE: LabelScaleCurve = {
+	exponent: 0.6,
+	factor: 0.32,
+	maxScale: 6,
+}
+
+function computeLabelScale(
+	componentSize: number,
+	name: string,
+	curve: LabelScaleCurve = DEFAULT_LABEL_SCALE_CURVE,
+): number {
+	const areaScale = 0.1 + Math.pow(componentSize, curve.exponent) * curve.factor
 	const lengthPenalty = Math.max(0.7, 1 - Math.max(0, name.length - 12) * 0.02)
 	return THREE.MathUtils.clamp(
 		areaScale * lengthPenalty,
 		MIN_LABEL_SCALE,
-		MAX_LABEL_SCALE,
+		curve.maxScale,
 	)
 }
 
@@ -421,6 +455,7 @@ export function buildGlobeNationLabels(
 	pool: LabelPool,
 	cullingEnabled = false,
 	elevationVisible = true,
+	scaleCurve?: LabelScaleCurve,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces || !world.nations) return group
@@ -444,7 +479,11 @@ export function buildGlobeNationLabels(
 		const settlementRegion = world.settlementRegions?.[capitalProvince] ?? -1
 		const anchorRegion =
 			settlementRegion >= 0 ? settlementRegion : capitalRegion
-		const scale = computeLabelScale(nationProvinceCount(world, n), name)
+		const scale = computeLabelScale(
+			nationProvinceCount(world, n),
+			name,
+			scaleCurve,
+		)
 		const globePlacement = labelPositionGlobe(
 			r_xyz,
 			elevation,
@@ -495,6 +534,7 @@ export function buildMapNationLabels(
 	projectionLatitudeDeg: number,
 	pool: LabelPool,
 	cullingEnabled = false,
+	scaleCurve?: LabelScaleCurve,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces || !world.nations) return group
@@ -519,7 +559,11 @@ export function buildMapNationLabels(
 		const capitalRegion = nationCapitalRegion(world, n)
 		if (capitalRegion < 0) continue
 
-		const scale = computeLabelScale(nationProvinceCount(world, n), name)
+		const scale = computeLabelScale(
+			nationProvinceCount(world, n),
+			name,
+			scaleCurve,
+		)
 		const fontSize = LABEL_FONT_SIZE_MAP * scale
 		const capitalProvince = nationCapitalProvince(world, n)
 		const settlementRegion = world.settlementRegions?.[capitalProvince] ?? -1
@@ -608,7 +652,15 @@ function computePartitionCentralData(
 	return { centralRegions, provinceCounts: counts }
 }
 
-function buildGlobePartitionLabels(
+/** Generic label placement shared by culture/heritage labels and, for Earth
+ * imports, real culture/religion labels (see create-genesis-scene.ts's
+ * rebuildCultureLabels/rebuildReligionLabels) -- callers that don't have a
+ * `world.cultures`/`world.heritages`-shaped structure (religion has no such
+ * field at all; earth-history's culture/religion partitions are keyed by
+ * different ids than the procedural ones) can supply an arbitrary
+ * `getProvincePartition` directly instead of going through the
+ * buildGlobeCultureLabels-style wrappers below. */
+export function buildGlobePartitionLabels(
 	world: SerializedGenesisWorld,
 	names: string[],
 	partitionCount: number,
@@ -617,6 +669,7 @@ function buildGlobePartitionLabels(
 	pool: LabelPool,
 	cullingEnabled: boolean,
 	elevationVisible: boolean,
+	scaleCurve?: LabelScaleCurve,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces) return group
@@ -640,7 +693,7 @@ function buildGlobePartitionLabels(
 		if (!name) continue
 		const centralRegion = centralRegions[c]
 		if (centralRegion < 0) continue
-		const scale = computeLabelScale(provinceCounts[c] ?? 0, name)
+		const scale = computeLabelScale(provinceCounts[c] ?? 0, name, scaleCurve)
 		const globePlacement = labelPositionGlobe(
 			r_xyz,
 			elevation,
@@ -678,7 +731,7 @@ function buildGlobePartitionLabels(
 	return group
 }
 
-function buildMapPartitionLabels(
+export function buildMapPartitionLabels(
 	world: SerializedGenesisWorld,
 	names: string[],
 	partitionCount: number,
@@ -687,6 +740,7 @@ function buildMapPartitionLabels(
 	projectionLatitudeDeg: number,
 	pool: LabelPool,
 	cullingEnabled: boolean,
+	scaleCurve?: LabelScaleCurve,
 ): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces) return group
@@ -714,7 +768,7 @@ function buildMapPartitionLabels(
 		if (!name) continue
 		const centralRegion = centralRegions[c]
 		if (centralRegion < 0) continue
-		const scale = computeLabelScale(provinceCounts[c] ?? 0, name)
+		const scale = computeLabelScale(provinceCounts[c] ?? 0, name, scaleCurve)
 		const fontSize = LABEL_FONT_SIZE_MAP * scale
 		const [px, py, pz] = labelPositionMap(
 			projection,
@@ -741,50 +795,6 @@ function buildMapPartitionLabels(
 
 	hideUnusedPool(pool, activeCount)
 	return group
-}
-
-export function buildGlobeCultureLabels(
-	world: SerializedGenesisWorld,
-	cultureNames: string[],
-	camera: THREE.PerspectiveCamera,
-	pool: LabelPool,
-	cullingEnabled = false,
-	elevationVisible = true,
-): THREE.Group {
-	if (!world.cultures || !world.provinces) return new THREE.Group()
-	const ca = world.cultures.assignment
-	return buildGlobePartitionLabels(
-		world,
-		cultureNames,
-		world.cultures.count,
-		(p) => ca[p] ?? -1,
-		camera,
-		pool,
-		cullingEnabled,
-		elevationVisible,
-	)
-}
-
-export function buildMapCultureLabels(
-	world: SerializedGenesisWorld,
-	cultureNames: string[],
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	pool: LabelPool,
-	cullingEnabled = false,
-): THREE.Group {
-	if (!world.cultures || !world.provinces) return new THREE.Group()
-	const ca = world.cultures.assignment
-	return buildMapPartitionLabels(
-		world,
-		cultureNames,
-		world.cultures.count,
-		(p) => ca[p] ?? -1,
-		centerLongitudeDeg,
-		projectionLatitudeDeg,
-		pool,
-		cullingEnabled,
-	)
 }
 
 export function buildGlobeHeritageLabels(

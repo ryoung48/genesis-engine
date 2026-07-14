@@ -16,6 +16,11 @@ const VARIANT_FAMILIES: Partial<
 		observed: "realPrecipitation",
 		diff: "precipitationDiff",
 	},
+	population: {
+		generated: "population",
+		observed: "realPopulation",
+		diff: "populationDiff",
+	},
 	humidity: {
 		generated: "humidity",
 		observed: "realHumidity",

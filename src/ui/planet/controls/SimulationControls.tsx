@@ -23,6 +23,15 @@ interface SimulationControlsProps {
 	floating?: boolean
 	onPlayPause?: () => void
 	simPlaying?: boolean
+	/** Overrides the default YEAR_MS-based month label and step (used for
+	 * Earth-imported history, whose timeline runs in the earth-history
+	 * engine's own day units rather than genesis.worker.ts's YEAR_MS ticks).
+	 * See docs/earth-history-plan.md "Reuse the existing scrubber". */
+	formatLabel?: (timeValue: number) => string
+	stepValue?: number
+	/** Extra content rendered after the play/pause button, e.g. the
+	 * Earth-history bookmark popup trigger. */
+	extraControls?: React.ReactNode
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
@@ -33,30 +42,26 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	floating = true,
 	onPlayPause,
 	simPlaying = false,
+	formatLabel,
+	stepValue,
+	extraControls,
 }) => {
 	const wrapperClassName = floating
 		? "absolute bottom-3 left-1/2 z-20 -translate-x-1/2 pointer-events-none"
 		: "pointer-events-none"
-	const { year, month, day } = historyTimeParts(selectedTimeMs)
-	const timelineLabel = `Y${year} ${monthLabels[month] ?? `M${month}`} ${day}`
+	const timelineLabel = formatLabel
+		? formatLabel(selectedTimeMs)
+		: (() => {
+				const { year, month, day } = historyTimeParts(selectedTimeMs)
+				return `Y${year} ${monthLabels[month] ?? `M${month}`} ${day}`
+			})()
+	const step = stepValue ?? TIMELINE_STEP_MS
 
 	const handleStepBackward = () =>
-		onTimeChange(
-			clampTimelineTime(
-				selectedTimeMs - TIMELINE_STEP_MS,
-				minTimeMs,
-				maxTimeMs,
-			),
-		)
+		onTimeChange(clampTimelineTime(selectedTimeMs - step, minTimeMs, maxTimeMs))
 
 	const handleStepForward = () =>
-		onTimeChange(
-			clampTimelineTime(
-				selectedTimeMs + TIMELINE_STEP_MS,
-				minTimeMs,
-				maxTimeMs,
-			),
-		)
+		onTimeChange(clampTimelineTime(selectedTimeMs + step, minTimeMs, maxTimeMs))
 
 	return (
 		<div className={wrapperClassName}>
@@ -94,7 +99,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 						type="range"
 						min={minTimeMs}
 						max={maxTimeMs}
-						step={TIMELINE_STEP_MS}
+						step={step}
 						value={selectedTimeMs}
 						onChange={(e) => onTimeChange(Number(e.target.value))}
 						className="min-w-0 flex-1 accent-slate-100"
@@ -161,6 +166,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 							</IconButton>
 						</>
 					)}
+					{extraControls}
 				</FloatingPanel>
 			</div>
 		</div>

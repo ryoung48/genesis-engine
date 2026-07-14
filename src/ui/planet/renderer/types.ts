@@ -39,6 +39,13 @@ export interface GenesisScene {
 	setOccupationOverlay(overlay: Float32Array | null): void
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void
+	setEarthHistoryNationOverride(
+		override: {
+			assignment: Int32Array
+			seeds: Int32Array
+			names: string[]
+		} | null,
+	): void
 	setLandNationBordersVisible(visible: boolean): void
 	setViewMode(mode: GenesisViewMode): void
 	setWireframeVisible(visible: boolean): void
@@ -87,6 +94,15 @@ export interface GenesisScene {
 	focusOnProvince(provinceId: number, opts?: { durationMs?: number }): void
 	setSettlements(urbanPop: Float32Array | null): void
 	setSettlementsVisible(visible: boolean): void
+	setEu4Settlements(
+		lats: Float32Array | null,
+		lons: Float32Array | null,
+		population: Float32Array | null,
+		provinceIds: Int32Array | null,
+		capitalProvinceIds: ReadonlySet<number>,
+		indices: number[],
+	): void
+	setEu4SettlementsVisible(visible: boolean): void
 	setInfrastructure(edges: SerializedNetwork | null): void
 	setInfrastructureVisible(visible: boolean): void
 	setLabelMode(mode: LabelMode): void
@@ -94,6 +110,14 @@ export interface GenesisScene {
 	setDynastyNames(names: string[] | null): void
 	setCultureNames(names: string[] | null): void
 	setHeritageNames(names: string[] | null): void
+	/** Real culture/religion partitions for Earth-imported worlds -- see
+	 * create-genesis-scene.ts's earthHistoryLabelPartitions doc comment. */
+	setEarthHistoryLabelPartitions(
+		partitions: {
+			culture: { assignment: Int32Array; count: number; names: string[] }
+			religion: { assignment: Int32Array; count: number; names: string[] }
+		} | null,
+	): void
 	setSettlementNames(names: string[] | null): void
 	setElevationVisible(visible: boolean): void
 	setWindArrows(data: WindArrowData | null): void

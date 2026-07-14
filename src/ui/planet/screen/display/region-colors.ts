@@ -34,6 +34,7 @@ import {
 	OCEAN_LIGHT_BLUE,
 	oceanCurrentColor,
 	populationColor,
+	populationDifferenceColor,
 	precipitationAnnualColor,
 	precipitationColor,
 	precipitationDifferenceColor,
@@ -50,7 +51,9 @@ import {
 	volcanicLandColor,
 } from "../../colors"
 import type { DangerSubMode } from "../../controls/OverlayControls"
+import { getDataVariant } from "../shared/data-variant"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
+import { getProvincePopulationDensity } from "../shared/population-density"
 import {
 	darkenClimateAtElevation,
 	darkenPoliticalAtElevation,
@@ -1181,16 +1184,45 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "population" && world.provinces) {
+	if (
+		(colorMode === "population" ||
+			colorMode === "realPopulation" ||
+			colorMode === "populationDiff") &&
+		world.provinces
+	) {
 		const { regionProvince, desolate } = world.provinces
-		const pop = world.population?.population
-		const { size } = world.provinces
+		const populationVariant = getDataVariant(colorMode)
+		const pop =
+			populationMode === "density"
+				? populationVariant === "observed"
+					? world.realPopulation?.population
+					: world.population?.population
+				: world.population?.population
+		const urbanPop = world.realUrbanPopulation?.population
 		let maxDensity = 0
 		if (populationMode === "density" && pop) {
 			for (let i = 0; i < world.provinces.count; i++) {
-				if (!desolate[i] && size[i] > 0) {
-					const d = pop[i] / size[i]
+				if (!desolate[i]) {
+					const d = getProvincePopulationDensity(world, i, pop[i])
 					if (d > maxDensity) maxDensity = d
+				}
+			}
+		}
+		let maxAbsDensityDiff = 0
+		if (
+			populationMode === "density" &&
+			populationVariant === "diff" &&
+			world.realPopulation?.difference
+		) {
+			for (let i = 0; i < world.provinces.count; i++) {
+				if (!desolate[i]) {
+					const d = getProvincePopulationDensity(
+						world,
+						i,
+						world.realPopulation.difference[i],
+					)
+					const absD = Math.abs(d)
+					if (absD > maxAbsDensityDiff) maxAbsDensityDiff = absD
 				}
 			}
 		}
@@ -1201,8 +1233,18 @@ export function computeRegionColors(
 					maxDevelopment = world.development[i]
 			}
 		}
+		let maxUrbanPopulation = 0
+		if (populationMode === "urban" && urbanPop) {
+			for (let i = 0; i < world.provinces.count; i++) {
+				if (!desolate[i] && urbanPop[i] > maxUrbanPopulation) {
+					maxUrbanPopulation = urbanPop[i]
+				}
+			}
+		}
 		const invMax = maxDensity > 0 ? 1 / maxDensity : 0
+		const invAbsDiffMax = maxAbsDensityDiff > 0 ? 1 / maxAbsDensityDiff : 0
 		const invDevelopmentMax = maxDevelopment > 0 ? 1 / maxDevelopment : 0
+		const invUrbanMax = maxUrbanPopulation > 0 ? 1 / maxUrbanPopulation : 0
 		for (let r = 0; r < N; r++) {
 			const p = regionProvince[r]
 			if (p < 0) {
@@ -1221,10 +1263,34 @@ export function computeRegionColors(
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			} else {
-				if (populationMode === "density" && pop) {
+				if (
+					populationMode === "density" &&
+					populationVariant !== "diff" &&
+					pop
+				) {
 					const [cr, cg, cb] = populationColor(
-						(pop[p] / Math.max(1, size[p])) * invMax,
+						getProvincePopulationDensity(world, p, pop[p]) * invMax,
 					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (
+					populationMode === "density" &&
+					populationVariant === "diff" &&
+					world.realPopulation?.difference
+				) {
+					const [cr, cg, cb] = populationDifferenceColor(
+						getProvincePopulationDensity(
+							world,
+							p,
+							world.realPopulation.difference[p],
+						) * invAbsDiffMax,
+					)
+					rgb[3 * r] = cr
+					rgb[3 * r + 1] = cg
+					rgb[3 * r + 2] = cb
+				} else if (populationMode === "urban" && urbanPop) {
+					const [cr, cg, cb] = populationColor(urbanPop[p] * invUrbanMax)
 					rgb[3 * r] = cr
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb

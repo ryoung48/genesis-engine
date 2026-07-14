@@ -635,20 +635,13 @@ export function computeProvincesFromRaster(
 	}
 
 	if (fallbackSeeds?.length) {
-		const planetRadiusKm = options?.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
-		// Beyond this, "nearest land" is a different landmass entirely (e.g. a
-		// remote island nation like the Maldives or Rapa Nui with no land in
-		// the mesh's own heightmap/coastline data at its true coordinates) --
-		// silently teleporting the province onto that distant landmass would
-		// be worse than a gap. Past this distance we instead carve a
-		// single-region island at the true coordinates.
-		const FAR_ISLAND_KM = 400
-
-		const provinceSize: number[] = new Array(seedRegions.length).fill(0)
-		for (let r = 0; r < N; r++) {
-			const p = regionProvince[r]
-			if (p >= 0) provinceSize[p]++
-		}
+		// Every fallback-seeded province is a real, named, precisely-located
+		// EU4 province (see the param doc) -- always carve it its own
+		// single-region island at its true coordinates rather than merging it
+		// onto whatever land happens to be nearest (which previously could
+		// silently absorb a small real island, like Malta, into a much larger
+		// neighboring landmass, like Sicily, just because the base heightmap
+		// never resolved the small island as land in the first place).
 		for (const { id, lon, lat } of fallbackSeeds) {
 			if (idToIndex.has(id)) continue
 			const latR = (lat * Math.PI) / 180
@@ -657,12 +650,6 @@ export function computeProvincesFromRaster(
 			const qx = cosLat * Math.cos(lonR)
 			const qy = cosLat * Math.sin(lonR)
 			const qz = Math.sin(latR)
-			let best = -1
-			let bestD = Infinity
-			// Prefer a region whose current province has other regions left,
-			// so force-placing a tiny province doesn't erase a different one.
-			let bestSafe = -1
-			let bestSafeD = Infinity
 			let bestAny = -1
 			let bestAnyD = Infinity
 			for (let r = 0; r < N; r++) {
@@ -674,39 +661,15 @@ export function computeProvincesFromRaster(
 					bestAnyD = d
 					bestAny = r
 				}
-				if (!isLand[r]) continue
-				if (d < bestD) {
-					bestD = d
-					best = r
-				}
-				const p = regionProvince[r]
-				if (d < bestSafeD && (p < 0 || provinceSize[p] > 1)) {
-					bestSafeD = d
-					bestSafe = r
-				}
 			}
+			if (bestAny < 0) continue
+			isLand[bestAny] = 1
 
-			const nearestLandKm =
-				best >= 0
-					? 2 * Math.asin(Math.min(1, Math.sqrt(bestD) / 2)) * planetRadiusKm
-					: Infinity
-			let chosen: number
-			if (nearestLandKm > FAR_ISLAND_KM && bestAny >= 0) {
-				chosen = bestAny
-				isLand[chosen] = 1
-			} else {
-				chosen = bestSafe >= 0 ? bestSafe : best
-			}
-			if (chosen < 0) continue
-
-			const oldProvince = regionProvince[chosen]
-			if (oldProvince >= 0) provinceSize[oldProvince]--
 			const idx = seedRegions.length
 			idToIndex.set(id, idx)
-			seedRegions.push(chosen)
+			seedRegions.push(bestAny)
 			names.push(`Province ${id}`)
-			regionProvince[chosen] = idx
-			provinceSize.push(1)
+			regionProvince[bestAny] = idx
 		}
 	}
 
@@ -722,7 +685,9 @@ export function computeProvincesFromRaster(
 		options,
 		/* skipDesolate */ true,
 	)
-	return { ...result, names }
+	const realIds = new Int32Array(seedRegions.length)
+	for (const [id, idx] of idToIndex) realIds[idx] = id
+	return { ...result, names, realIds }
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

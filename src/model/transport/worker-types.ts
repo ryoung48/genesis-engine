@@ -187,6 +187,27 @@ export interface SerializedGenesisWorld {
 		cradleProvinces?: Int32Array
 		settlementWave?: number
 	}
+	realPopulation?: {
+		population: Float32Array
+		difference: Float32Array
+		totalPopulation: number
+		sourceTimeDays: number
+		sourceTimeLabel: string
+	}
+	realUrbanPopulation?: {
+		population: Float32Array
+		totalPopulation: number
+		sourceTimeDays: number
+		sourceTimeLabel: string
+	}
+	/** Per compact province index: the largest real GHSL settlement in that
+	 * province at the current date, if any (see
+	 * scripts/build-ghsl-settlements.py, GenesisView.tsx's
+	 * buildBestSettlementByProvince). null/0 where there isn't one. */
+	realSettlement?: {
+		names: (string | null)[]
+		population: Float32Array
+	}
 	monthlyTEQ?: Float32Array[]
 	/** Per-location trade good index (0=unassigned, 1-based into TRADE_GOOD_LABELS). */
 	tradeGoods?: Uint8Array

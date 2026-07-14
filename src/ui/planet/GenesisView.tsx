@@ -55,6 +55,8 @@ import {
 } from "@/model/climate/tidal-schedule"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
+import { hashColorForKey, rgb01ToCss } from "@/model/earth/history/color"
+import { daysToEu4Date, eu4DateToDays } from "@/model/earth/history/date"
 import {
 	TRADE_GOOD_LABELS,
 	tradeGoodColor,
@@ -88,7 +90,6 @@ import type {
 } from "@/model/transport/worker-types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { scaleClockDialHourToDayLength } from "./clock"
-
 import type { ColorMode } from "./colors"
 import {
 	climateZoneColor,
@@ -97,6 +98,7 @@ import {
 	vegetationColor,
 	windSpeedColor,
 } from "./colors"
+import { EarthHistoryBookmarks } from "./controls/EarthHistoryBookmarks"
 import {
 	buildPressureAtmosphereProfile,
 	GenerationPanel,
@@ -116,6 +118,7 @@ import {
 import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
 import { createDrawerNationClickHandler } from "./details/nation-clicks"
+import { useEarthHistoryTimeline } from "./hooks/useEarthHistoryTimeline"
 import {
 	getHoverBiome,
 	getHoverClimateDisplay,
@@ -156,6 +159,7 @@ import {
 	type HoverMisery,
 } from "./hover/hover"
 import { InfoPanel } from "./hover/InfoPanel"
+import { buildEarthHistoryDiplomacyDisplayData } from "./hover/info-panel-model"
 import { canHandlePlanetClick } from "./measurement-click"
 import { OceanCurrentParticleCanvas } from "./OceanCurrentParticleCanvas"
 import {
@@ -170,6 +174,10 @@ import {
 	buildNationAdjacency,
 } from "./screen/display/display-model"
 import { createDisplayNames } from "./screen/display/display-names"
+import {
+	computeEarthHistoryOccupationOverlay,
+	computeEarthHistoryRegionColors,
+} from "./screen/display/earth-history-region-colors"
 import {
 	buildCultureLabelNames,
 	buildHeritageLabelNames,
@@ -334,6 +342,63 @@ interface MonthlyRasterAsset {
 	nodata: number
 }
 
+interface Eu4PopulationTimelineAsset {
+	values: Int16Array
+	provinceCount: number
+	rawProvinceIds: Int32Array
+	rawIdToIndex: Map<number, number>
+	provinceAreasKm2: Float32Array | null
+	times: Int32Array
+	timeLabels: string[]
+	scale: number
+	nodata: number
+}
+
+interface RealPopulationSlice {
+	population: Float32Array
+	difference: Float32Array
+	totalPopulation: number
+	sourceTimeDays: number
+	sourceTimeLabel: string
+}
+
+interface RealUrbanPopulationSlice {
+	population: Float32Array
+	totalPopulation: number
+	sourceTimeDays: number
+	sourceTimeLabel: string
+}
+
+function hydeTimeToEu4Days(label: string): number {
+	const match = label.match(/^(-?\d+)-(\d{2})-(\d{2}) /)
+	if (!match) throw new Error(`Unsupported HYDE time label: ${label}`)
+	const [, year, month, day] = match
+	return eu4DateToDays(`${Number(year)}.${Number(month)}.${Number(day)}`)
+}
+
+function findSortedTimeBracket(
+	times: Int32Array,
+	target: number,
+): { lo: number; hi: number; t: number } | null {
+	if (times.length === 0) return null
+	if (times.length === 1) return { lo: 0, hi: 0, t: 0 }
+	if (target <= times[0]) return { lo: 0, hi: 0, t: 0 }
+	const lastIndex = times.length - 1
+	if (target >= times[lastIndex]) return { lo: lastIndex, hi: lastIndex, t: 0 }
+
+	let lo = 0
+	let hi = lastIndex
+	while (lo + 1 < hi) {
+		const mid = Math.floor((lo + hi) / 2)
+		if (times[mid] <= target) lo = mid
+		else hi = mid
+	}
+	const start = times[lo]
+	const end = times[hi]
+	if (end <= start) return { lo, hi: lo, t: 0 }
+	return { lo, hi, t: (target - start) / (end - start) }
+}
+
 async function loadEarthMonthlyRaster(
 	prefix: string,
 	label: string,
@@ -421,6 +486,294 @@ async function loadEarthRealElevation(): Promise<{
 		scale: meta.scale,
 		nodata: meta.nodata,
 	}
+}
+
+async function loadEarthProvinceTimeline(
+	prefix: string,
+	label: string,
+): Promise<Eu4PopulationTimelineAsset> {
+	const metaRes = await fetch(`/heightmap/${prefix}.json`)
+	if (!metaRes.ok) {
+		throw new Error(`Failed to load ${label} metadata: ${metaRes.status}`)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		provinceCount: number
+		rawProvinceIds: number[]
+		provinceAreasKm2?: number[]
+		times: string[]
+		encoding: { scale: number }
+		nodata: number
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(`Failed to load ${label} asset: ${binRes.status}`)
+	}
+	const buffer = await binRes.arrayBuffer()
+	const rawProvinceIds = Int32Array.from(meta.rawProvinceIds)
+	const rawIdToIndex = new Map<number, number>()
+	for (let i = 0; i < rawProvinceIds.length; i++) {
+		rawIdToIndex.set(rawProvinceIds[i], i)
+	}
+	return {
+		values: new Int16Array(buffer),
+		provinceCount: meta.provinceCount,
+		rawProvinceIds,
+		rawIdToIndex,
+		provinceAreasKm2: meta.provinceAreasKm2
+			? Float32Array.from(meta.provinceAreasKm2)
+			: null,
+		times: Int32Array.from(meta.times.map(hydeTimeToEu4Days)),
+		timeLabels: meta.times,
+		scale: meta.encoding.scale,
+		nodata: meta.nodata,
+	}
+}
+
+function attachEarthProvinceAreas(params: {
+	provinces: SerializedGenesisWorld["provinces"]
+	asset: Eu4PopulationTimelineAsset | null
+}): SerializedGenesisWorld["provinces"] {
+	const { provinces, asset } = params
+	if (
+		!provinces?.realIds ||
+		!asset?.provinceAreasKm2 ||
+		asset.provinceAreasKm2.length !== asset.rawProvinceIds.length
+	) {
+		return provinces
+	}
+	const areaKm2 = new Float32Array(provinces.count)
+	let hasArea = false
+	for (let province = 0; province < provinces.count; province++) {
+		const rawId = provinces.realIds[province]
+		const column = asset.rawIdToIndex.get(rawId)
+		if (column === undefined) continue
+		const area = asset.provinceAreasKm2[column]
+		if (!Number.isFinite(area) || area <= 0) continue
+		areaKm2[province] = area
+		hasArea = true
+	}
+	return hasArea ? { ...provinces, areaKm2 } : provinces
+}
+
+async function loadEarthRealPopulationEu4(): Promise<Eu4PopulationTimelineAsset> {
+	return loadEarthProvinceTimeline(
+		"earth-real-population-eu4",
+		"observed population",
+	)
+}
+
+async function loadEarthRealUrbanPopulationEu4(): Promise<Eu4PopulationTimelineAsset> {
+	return loadEarthProvinceTimeline(
+		"earth-real-urban-population-eu4",
+		"observed urban population",
+	)
+}
+
+function buildInterpolatedProvinceTimelineSlice(params: {
+	asset: Eu4PopulationTimelineAsset
+	provinces: SerializedGenesisWorld["provinces"]
+	selectedDays: number
+}): {
+	population: Float32Array
+	totalPopulation: number
+	sourceTimeDays: number
+	sourceTimeLabel: string
+} | null {
+	const { asset, provinces, selectedDays } = params
+	if (!provinces?.realIds) return null
+	const bracket = findSortedTimeBracket(asset.times, selectedDays)
+	if (!bracket) return null
+	const provinceCount = provinces.count
+	const population = new Float32Array(provinceCount)
+	let totalPopulation = 0
+	const loOffset = bracket.lo * asset.provinceCount
+	const hiOffset = bracket.hi * asset.provinceCount
+
+	for (let province = 0; province < provinceCount; province++) {
+		const rawId = provinces.realIds[province]
+		const column = asset.rawIdToIndex.get(rawId)
+		if (column === undefined) {
+			population[province] = 0
+			continue
+		}
+		const loStored = asset.values[loOffset + column]
+		const hiStored = asset.values[hiOffset + column]
+		const loValue = loStored === asset.nodata ? 0 : loStored * asset.scale
+		const hiValue = hiStored === asset.nodata ? loValue : hiStored * asset.scale
+		const value = loValue + (hiValue - loValue) * bracket.t
+		population[province] = value
+		totalPopulation += value
+	}
+
+	return {
+		population,
+		totalPopulation,
+		sourceTimeDays: selectedDays,
+		sourceTimeLabel: daysToEu4Date(selectedDays),
+	}
+}
+
+function buildRealPopulationSlice(params: {
+	asset: Eu4PopulationTimelineAsset
+	provinces: SerializedGenesisWorld["provinces"]
+	syntheticPopulation: Float32Array | undefined
+	selectedDays: number
+}): RealPopulationSlice | null {
+	const { asset, provinces, syntheticPopulation, selectedDays } = params
+	const interpolated = buildInterpolatedProvinceTimelineSlice({
+		asset,
+		provinces,
+		selectedDays,
+	})
+	if (!interpolated) return null
+	const population = interpolated.population
+	const provinceCount = population.length
+	const difference = new Float32Array(provinceCount)
+
+	for (let province = 0; province < provinceCount; province++) {
+		difference[province] =
+			(syntheticPopulation?.[province] ?? 0) - population[province]
+	}
+
+	return {
+		population,
+		difference,
+		totalPopulation: interpolated.totalPopulation,
+		sourceTimeDays: interpolated.sourceTimeDays,
+		sourceTimeLabel: interpolated.sourceTimeLabel,
+	}
+}
+
+function buildRealUrbanPopulationSlice(params: {
+	asset: Eu4PopulationTimelineAsset
+	provinces: SerializedGenesisWorld["provinces"]
+	selectedDays: number
+}): RealUrbanPopulationSlice | null {
+	const interpolated = buildInterpolatedProvinceTimelineSlice(params)
+	if (!interpolated) return null
+	return interpolated
+}
+
+/** Real named settlements (GHSL, via scripts/build-ghsl-settlements.py) --
+ * positioned by raw lon/lat rather than the procedural mesh's province
+ * regions, so unlike Eu4PopulationTimelineAsset there's no
+ * provinces.realIds indirection needed here at all. */
+interface Eu4GhslSettlementAsset {
+	settlementCount: number
+	values: Int16Array
+	times: Int32Array
+	scale: number
+	nodata: number
+	lats: Float32Array
+	lons: Float32Array
+	names: string[]
+	/** Raw EU4 province id each settlement falls within (from
+	 * scripts/build-ghsl-settlements.py's point-in-polygon assignment against
+	 * the same eu4.json used everywhere else), or -1 if it didn't land inside
+	 * any province polygon. Used to render only the largest settlement per
+	 * province rather than an arbitrary global top-N. */
+	provinceIds: Int32Array
+}
+
+async function loadEu4GhslSettlements(): Promise<Eu4GhslSettlementAsset> {
+	const metaRes = await fetch("/heightmap/eu4-ghsl-settlements.json")
+	if (!metaRes.ok) {
+		throw new Error(
+			`Failed to load GHSL settlements metadata: ${metaRes.status}`,
+		)
+	}
+	const meta = (await metaRes.json()) as {
+		bin: string
+		timeCount: number
+		settlementCount: number
+		times: string[]
+		names: string[]
+		provinceIds: number[]
+		encoding: { scale: number }
+		nodata: number
+	}
+	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	if (!binRes.ok) {
+		throw new Error(`Failed to load GHSL settlements asset: ${binRes.status}`)
+	}
+	const buffer = await binRes.arrayBuffer()
+	const populationValueCount = meta.timeCount * meta.settlementCount
+	const values = new Int16Array(buffer, 0, populationValueCount)
+	const coordsView = new DataView(buffer, populationValueCount * 2)
+	const lats = new Float32Array(meta.settlementCount)
+	const lons = new Float32Array(meta.settlementCount)
+	for (let i = 0; i < meta.settlementCount; i++) {
+		lats[i] = coordsView.getFloat32(i * 8, true)
+		lons[i] = coordsView.getFloat32(i * 8 + 4, true)
+	}
+	return {
+		settlementCount: meta.settlementCount,
+		values,
+		times: Int32Array.from(meta.times.map(hydeTimeToEu4Days)),
+		scale: meta.encoding.scale,
+		nodata: meta.nodata,
+		lats,
+		lons,
+		names: meta.names,
+		provinceIds: Int32Array.from(meta.provinceIds),
+	}
+}
+
+/** Interpolated population per settlement at selectedDays, same time-bracket
+ * linear-interpolation convention as buildInterpolatedProvinceTimelineSlice. */
+function buildGhslSettlementPopulationSlice(
+	asset: Eu4GhslSettlementAsset,
+	selectedDays: number,
+): Float32Array | null {
+	const bracket = findSortedTimeBracket(asset.times, selectedDays)
+	if (!bracket) return null
+	const population = new Float32Array(asset.settlementCount)
+	const loOffset = bracket.lo * asset.settlementCount
+	const hiOffset = bracket.hi * asset.settlementCount
+	for (let s = 0; s < asset.settlementCount; s++) {
+		const loStored = asset.values[loOffset + s]
+		const hiStored = asset.values[hiOffset + s]
+		const loValue = loStored === asset.nodata ? 0 : loStored * asset.scale
+		const hiValue = hiStored === asset.nodata ? loValue : hiStored * asset.scale
+		population[s] = loValue + (hiValue - loValue) * bracket.t
+	}
+	return population
+}
+
+/** Raw EU4 province id -> index of the single largest-population settlement
+ * in that province at the current date -- excludes zero-population (not
+ * founded yet / abandoned) entries and settlements that didn't land inside
+ * any province (provinceId === -1). One settlement per province is far more
+ * meaningful than an arbitrary global population cutoff, and naturally caps
+ * the marker count at the province count regardless of era. Shared by the
+ * settlement-marker overlay (values()) and the hover panel's "Settlement"
+ * row (keyed by province). */
+function buildBestSettlementByProvince(
+	population: Float32Array,
+	provinceIds: Int32Array,
+): Map<number, number> {
+	const bestIndexByProvince = new Map<number, number>()
+	for (let i = 0; i < population.length; i++) {
+		const pop = population[i]
+		if (pop <= 0) continue
+		const provinceId = provinceIds[i]
+		if (provinceId < 0) continue
+		const currentBest = bestIndexByProvince.get(provinceId)
+		if (currentBest === undefined || pop > population[currentBest]) {
+			bestIndexByProvince.set(provinceId, i)
+		}
+	}
+	return bestIndexByProvince
+}
+
+function topSettlementIndices(
+	population: Float32Array,
+	provinceIds: Int32Array,
+): number[] {
+	return Array.from(
+		buildBestSettlementByProvince(population, provinceIds).values(),
+	)
 }
 
 async function loadEu5Categorical(prefix: string): Promise<{
@@ -513,13 +866,16 @@ function syncLabelModeToMapMode(params: {
 	colorMode: ColorMode
 	nationMode: NationMapMode
 	populationMode: PopulationMapMode
+	isEarthImport: boolean
 }): LabelMode {
-	const { labelMode, colorMode, nationMode, populationMode } = params
+	const { labelMode, colorMode, nationMode, populationMode, isEarthImport } =
+		params
 	const anyActive =
 		labelMode.nations ||
 		labelMode.dynasty ||
 		labelMode.culture ||
-		labelMode.heritage
+		labelMode.heritage ||
+		labelMode.religion
 	if (!anyActive) return labelMode
 
 	const politicalFallback = {
@@ -528,9 +884,10 @@ function syncLabelModeToMapMode(params: {
 		dynasty: nationMode === "dynasty",
 		culture: false,
 		heritage: false,
+		religion: false,
 	}
 
-	if (colorMode === "population") {
+	if (getBaseMapMode(colorMode) === "population") {
 		if (populationMode === "culture") {
 			return {
 				...labelMode,
@@ -538,15 +895,42 @@ function syncLabelModeToMapMode(params: {
 				dynasty: false,
 				culture: true,
 				heritage: false,
+				religion: false,
 			}
 		}
-		if (populationMode === "heritage" || populationMode === "religion") {
+		if (populationMode === "religion") {
+			// Real per-province religion labels only exist for Earth imports
+			// (see create-genesis-scene.ts's earthHistoryLabelPartitions);
+			// the procedural generator has no religion label overlay at all
+			// (world.religions is culture-indexed, not province-indexed), so
+			// procedural worlds keep the previous heritage-label
+			// approximation rather than showing nothing.
+			return isEarthImport
+				? {
+						...labelMode,
+						nations: false,
+						dynasty: false,
+						culture: false,
+						heritage: false,
+						religion: true,
+					}
+				: {
+						...labelMode,
+						nations: false,
+						dynasty: false,
+						culture: false,
+						heritage: true,
+						religion: false,
+					}
+		}
+		if (populationMode === "heritage") {
 			return {
 				...labelMode,
 				nations: false,
 				dynasty: false,
 				culture: false,
 				heritage: true,
+				religion: false,
 			}
 		}
 		return politicalFallback
@@ -662,7 +1046,9 @@ export const GenesisView: React.FC = () => {
 	const [showThermalEquator, setShowThermalEquator] = useState(
 		initialViewPrefs.showThermalEquator,
 	)
-	const [showCoastlines, setShowCoastlines] = useState(false)
+	const [showCoastlines, setShowCoastlines] = useState(
+		initialViewPrefs.showCoastlines,
+	)
 	const [showWindArrows, setShowWindArrows] = useState(
 		initialViewPrefs.showWindArrows,
 	)
@@ -670,10 +1056,10 @@ export const GenesisView: React.FC = () => {
 		initialViewPrefs.showOceanCurrents,
 	)
 	const [showRivers, setShowRivers] = useState(initialViewPrefs.showRivers)
-	const [showGdd, setShowGdd] = useState(false)
-	const [showGint, setShowGint] = useState(false)
-	const [showPet, setShowPet] = useState(false)
-	const [showAet, setShowAet] = useState(false)
+	const [showGdd, setShowGdd] = useState(initialViewPrefs.showGdd)
+	const [showGint, setShowGint] = useState(initialViewPrefs.showGint)
+	const [showPet, setShowPet] = useState(initialViewPrefs.showPet)
+	const [showAet, setShowAet] = useState(initialViewPrefs.showAet)
 	const [showInfrastructure, setShowInfrastructure] = useState(
 		initialViewPrefs.showInfrastructure,
 	)
@@ -687,9 +1073,10 @@ export const GenesisView: React.FC = () => {
 				colorMode,
 				nationMode,
 				populationMode,
+				isEarthImport: !!world?.isEarthImport,
 			}),
 		)
-	}, [nationMode, colorMode, populationMode])
+	}, [nationMode, colorMode, populationMode, world?.isEarthImport])
 	const [showElevation, setShowElevation] = useState(
 		initialViewPrefs.showElevation,
 	)
@@ -769,6 +1156,56 @@ export const GenesisView: React.FC = () => {
 		null,
 	)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
+	// Earth-imported worlds get their own real-history timeline instead of
+	// the procedural sim's; selectedTimeMs above stays untouched since it
+	// also drives climate-month display and other procedural-only derived
+	// state. See docs/earth-history-plan.md "Reuse the existing scrubber".
+	const earthHistory = useEarthHistoryTimeline(
+		world?.provinces,
+		!!world?.isEarthImport,
+	)
+	const [earthRealPopulation, setEarthRealPopulation] =
+		useState<Eu4PopulationTimelineAsset | null>(null)
+	const [earthRealUrbanPopulation, setEarthRealUrbanPopulation] =
+		useState<Eu4PopulationTimelineAsset | null>(null)
+	const [eu4GhslSettlements, setEu4GhslSettlements] =
+		useState<Eu4GhslSettlementAsset | null>(null)
+	useEffect(() => {
+		if (!world?.isEarthImport) {
+			setEarthRealPopulation(null)
+			setEarthRealUrbanPopulation(null)
+			setEu4GhslSettlements(null)
+			return
+		}
+		let cancelled = false
+		loadEarthRealPopulationEu4()
+			.then((asset) => {
+				if (!cancelled) setEarthRealPopulation(asset)
+			})
+			.catch((error) => {
+				console.error("Failed to load Earth population asset", error)
+				if (!cancelled) setEarthRealPopulation(null)
+			})
+		loadEarthRealUrbanPopulationEu4()
+			.then((asset) => {
+				if (!cancelled) setEarthRealUrbanPopulation(asset)
+			})
+			.catch((error) => {
+				console.error("Failed to load Earth urban population asset", error)
+				if (!cancelled) setEarthRealUrbanPopulation(null)
+			})
+		loadEu4GhslSettlements()
+			.then((asset) => {
+				if (!cancelled) setEu4GhslSettlements(asset)
+			})
+			.catch((error) => {
+				console.error("Failed to load GHSL settlements asset", error)
+				if (!cancelled) setEu4GhslSettlements(null)
+			})
+		return () => {
+			cancelled = true
+		}
+	}, [world?.isEarthImport])
 	const displayMonth = historyTimeToMonth(selectedTimeMs)
 	// When clock is locked to current sim time, sync month control (day resets to 0)
 	useEffect(() => {
@@ -1330,7 +1767,12 @@ export const GenesisView: React.FC = () => {
 				labelMode,
 				showElevation,
 				showThermalEquator,
+				showCoastlines,
 				showWindArrows,
+				showGdd,
+				showGint,
+				showPet,
+				showAet,
 				showOceanCurrents,
 				showRivers,
 				showInfrastructure,
@@ -1394,7 +1836,12 @@ export const GenesisView: React.FC = () => {
 		showElevation,
 		showRivers,
 		showThermalEquator,
+		showCoastlines,
 		showWindArrows,
+		showGdd,
+		showGint,
+		showPet,
+		showAet,
 		showOceanCurrents,
 		showWireframe,
 		unitSystem,
@@ -1456,14 +1903,91 @@ export const GenesisView: React.FC = () => {
 		[selectedHistoryView],
 	)
 
-	const worldForDisplay = useMemo(
-		() =>
-			buildDisplayWorld({
-				world,
-				selectedHistoryView,
-				selectedHistoryChildren,
-			}),
-		[world, selectedHistoryChildren, selectedHistoryView],
+	const worldForDisplay = useMemo(() => {
+		const displayWorld = buildDisplayWorld({
+			world,
+			selectedHistoryView,
+			selectedHistoryChildren,
+		})
+		if (!displayWorld) return null
+		const displayProvinces = attachEarthProvinceAreas({
+			provinces: displayWorld.provinces,
+			asset: earthRealPopulation,
+		})
+		const realPopulationSlice =
+			displayWorld.isEarthImport && earthRealPopulation
+				? buildRealPopulationSlice({
+						asset: earthRealPopulation,
+						provinces: displayProvinces,
+						syntheticPopulation: displayWorld.population?.population,
+						selectedDays: earthHistory.selectedDays,
+					})
+				: null
+		const realUrbanPopulationSlice =
+			displayWorld.isEarthImport && earthRealUrbanPopulation
+				? buildRealUrbanPopulationSlice({
+						asset: earthRealUrbanPopulation,
+						provinces: displayProvinces,
+						selectedDays: earthHistory.selectedDays,
+					})
+				: null
+		const realSettlementSlice =
+			displayWorld.isEarthImport &&
+			eu4GhslSettlements &&
+			displayProvinces.realIds
+				? (() => {
+						const population = buildGhslSettlementPopulationSlice(
+							eu4GhslSettlements,
+							earthHistory.selectedDays,
+						)
+						if (!population) return null
+						const bestByProvince = buildBestSettlementByProvince(
+							population,
+							eu4GhslSettlements.provinceIds,
+						)
+						const provinceCount = displayProvinces.count
+						const names = new Array<string | null>(provinceCount).fill(null)
+						const pops = new Float32Array(provinceCount)
+						const realIds = displayProvinces.realIds!
+						for (let compactIdx = 0; compactIdx < provinceCount; compactIdx++) {
+							const settlementIdx = bestByProvince.get(realIds[compactIdx])
+							if (settlementIdx === undefined) continue
+							names[compactIdx] = eu4GhslSettlements.names[settlementIdx]
+							pops[compactIdx] = population[settlementIdx]
+						}
+						return { names, population: pops }
+					})()
+				: null
+		return realPopulationSlice ||
+			realUrbanPopulationSlice ||
+			realSettlementSlice ||
+			displayProvinces !== displayWorld.provinces
+			? {
+					...displayWorld,
+					provinces: displayProvinces,
+					...(realPopulationSlice
+						? { realPopulation: realPopulationSlice }
+						: {}),
+					...(realUrbanPopulationSlice
+						? { realUrbanPopulation: realUrbanPopulationSlice }
+						: {}),
+					...(realSettlementSlice
+						? { realSettlement: realSettlementSlice }
+						: {}),
+				}
+			: displayWorld
+	}, [
+		world,
+		selectedHistoryChildren,
+		selectedHistoryView,
+		earthRealPopulation,
+		earthRealUrbanPopulation,
+		eu4GhslSettlements,
+		earthHistory.selectedDays,
+	])
+	const earthHistoryFormatLabel = useCallback(
+		(timeValue: number) => earthHistory.formatLabel(timeValue),
+		[earthHistory.formatLabel],
 	)
 	const nationModel = useMemo(
 		() => buildDisplayNationModel(worldForDisplay),
@@ -1503,6 +2027,26 @@ export const GenesisView: React.FC = () => {
 		},
 		[nationColorById],
 	)
+	const drawerWorldPopulation = useMemo(() => {
+		if (
+			getBaseMapMode(colorMode) === "population" &&
+			dataVariant === "observed" &&
+			worldForDisplay?.realPopulation
+		) {
+			return worldForDisplay.realPopulation.totalPopulation
+		}
+		return (
+			selectedHistoryView?.totalPopulation ??
+			world?.population?.totalPopulation ??
+			null
+		)
+	}, [
+		colorMode,
+		dataVariant,
+		worldForDisplay?.realPopulation,
+		selectedHistoryView?.totalPopulation,
+		world?.population?.totalPopulation,
+	])
 
 	useEffect(() => {
 		if (!worldForDisplay) {
@@ -1923,6 +2467,32 @@ export const GenesisView: React.FC = () => {
 			}
 			return rgb
 		}
+		if (
+			worldForDisplay?.isEarthImport &&
+			earthHistory.engine &&
+			earthHistory.query &&
+			earthHistory.nationReference &&
+			worldForDisplay.provinces &&
+			worldForDisplay.elevation_km
+		) {
+			const earthColors = computeEarthHistoryRegionColors({
+				colorMode,
+				nationMode,
+				populationMode,
+				state: earthHistory.query.state,
+				provinceMap: earthHistory.engine.provinceMap,
+				nationIds: earthHistory.query.frame.nationIds,
+				nationReference: earthHistory.nationReference,
+				regionProvince: worldForDisplay.provinces.regionProvince,
+				desolate: worldForDisplay.provinces.desolate,
+				elevationKm: worldForDisplay.elevation_km,
+				isLand: worldForDisplay.isLand,
+				religionColorById: earthHistory.religionColorById ?? undefined,
+				cultureColorById: earthHistory.cultureColorById ?? undefined,
+				provinceMeta: earthHistory.provinceMeta ?? undefined,
+			})
+			if (earthColors) return earthColors
+		}
 		return computeRegionColors(
 			worldForDisplay,
 			colorMode,
@@ -1955,16 +2525,173 @@ export const GenesisView: React.FC = () => {
 		selectedNationId,
 		windVectors,
 		dangerSubMode,
+		earthHistory.engine,
+		earthHistory.query,
+		earthHistory.nationReference,
+		earthHistory.religionColorById,
+		earthHistory.cultureColorById,
+		earthHistory.provinceMeta,
+	])
+
+	const earthHistoryDiplomacyRows = useMemo(() => {
+		if (
+			!worldForDisplay?.isEarthImport ||
+			!earthHistory.engine ||
+			!earthHistory.query ||
+			hoverProvince === null ||
+			hoverProvince < 0
+		)
+			return undefined
+		const rawId = String(
+			earthHistory.engine.provinceMap.compactToRealId[hoverProvince],
+		)
+		const owner = earthHistory.query.state.provinces.get(rawId)?.owner
+		if (!owner) return undefined
+		const info = earthHistory.queryNation(owner)
+		return buildEarthHistoryDiplomacyDisplayData(info)
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- queryNation closes over selectedDays via earthHistory.query, already a dep
+	}, [
+		worldForDisplay?.isEarthImport,
+		earthHistory.engine,
+		earthHistory.query,
+		hoverProvince,
+		earthHistory.queryNation,
+	])
+
+	// Overrides Nation/Government/Culture/Religion hover rows with real
+	// history for the currently-scrubbed date -- the procedural builders
+	// (buildProvinceDisplayData/buildGovernmentDisplayData/
+	// buildDemographicDisplayData) read the generation-time-only
+	// world.nations/world.cultures snapshot, which doesn't vary with the
+	// earth-history scrubber. Colors reuse hashColorForKey so a hovered
+	// swatch always matches its map tile (see earth-history-region-colors.ts,
+	// which uses the same helper). Gated on world.isEarthImport, per
+	// docs/earth-history-plan.md.
+	const earthHistoryHoverOverride = useMemo(() => {
+		if (
+			!worldForDisplay?.isEarthImport ||
+			!earthHistory.engine ||
+			!earthHistory.query ||
+			hoverProvince === null ||
+			hoverProvince < 0
+		)
+			return undefined
+		const rawId = String(
+			earthHistory.engine.provinceMap.compactToRealId[hoverProvince],
+		)
+		const ps = earthHistory.query.state.provinces.get(rawId)
+		if (!ps) return undefined
+
+		const meta = earthHistory.provinceMeta?.get(rawId)
+		// EU4's own "wasteland" flag describes present-day/in-engine
+		// uninhabitability, not history -- a wasteland province can still
+		// have real recorded culture/religion data (EU4 itself records this
+		// for many of its own wasteland provinces), so it only suppresses
+		// nation/government, matching computeEarthHistoryRegionColors'
+		// map-coloring behavior.
+		const isWasteland = !!meta?.wasteland
+		const owner = isWasteland ? null : ps.owner
+		const nationRef = owner ? earthHistory.nationReference?.get(owner) : null
+		const nationName = owner ? (nationRef?.name ?? owner) : null
+		const nationColor = owner
+			? nationRef
+				? rgb01ToCss([
+						nationRef.color[0] / 255,
+						nationRef.color[1] / 255,
+						nationRef.color[2] / 255,
+					])
+				: rgb01ToCss(hashColorForKey(`nation:${owner}`))
+			: null
+
+		const govType = owner
+			? (earthHistory.query.state.nations.get(owner)?.governmentType ?? null)
+			: null
+		const governmentLabel = govType
+			? govType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+			: null
+		const governmentColor = govType
+			? rgb01ToCss(hashColorForKey(`gov:${govType}`))
+			: null
+
+		const cultureId = ps.cultureId
+		const cultureName = cultureId
+			? (earthHistory.cultureNameById?.get(cultureId) ?? cultureId)
+			: null
+		const cultureColorRgb = cultureId
+			? earthHistory.cultureColorById?.get(cultureId)
+			: null
+		const cultureColor = cultureId
+			? rgb01ToCss(cultureColorRgb ?? hashColorForKey(`culture:${cultureId}`))
+			: null
+
+		const provinceName = meta?.name ?? null
+
+		const religionId = ps.religionId
+		const religionName = religionId
+			? (earthHistory.religionNameById?.get(religionId) ?? religionId)
+			: null
+		const religionColorRgb = religionId
+			? earthHistory.religionColorById?.get(religionId)
+			: null
+		const religionColor = religionId
+			? rgb01ToCss(
+					religionColorRgb ?? hashColorForKey(`religion:${religionId}`),
+				)
+			: null
+
+		return {
+			nationName,
+			nationColor,
+			governmentLabel,
+			governmentColor,
+			cultureName,
+			cultureColor,
+			religionName,
+			religionColor,
+			provinceName,
+		}
+	}, [
+		worldForDisplay?.isEarthImport,
+		earthHistory.engine,
+		earthHistory.query,
+		earthHistory.nationReference,
+		earthHistory.cultureNameById,
+		earthHistory.cultureColorById,
+		earthHistory.religionNameById,
+		earthHistory.religionColorById,
+		earthHistory.provinceMeta,
+		hoverProvince,
 	])
 
 	const occupationOverlay = useMemo(() => {
+		if (
+			worldForDisplay?.isEarthImport &&
+			earthHistory.engine &&
+			earthHistory.query &&
+			earthHistory.nationReference &&
+			worldForDisplay.provinces
+		) {
+			return computeEarthHistoryOccupationOverlay({
+				state: earthHistory.query.state,
+				provinceMap: earthHistory.engine.provinceMap,
+				regionProvince: worldForDisplay.provinces.regionProvince,
+				nationReference: earthHistory.nationReference,
+			})
+		}
 		return buildPoliticalOccupationOverlay({
 			regionProvince: worldForDisplay?.provinces?.regionProvince,
 			assignment: worldForDisplay?.nations?.assignment,
 			activeWars: selectedHistoryView?.activeWars,
 			getNationColorRgb,
 		})
-	}, [selectedHistoryView, getNationColorRgb, worldForDisplay])
+	}, [
+		selectedHistoryView,
+		getNationColorRgb,
+		worldForDisplay,
+		earthHistory.query,
+		earthHistory.nationReference,
+		earthHistory.engine,
+	])
 
 	const cultureBlendOverlay = useMemo(() => {
 		if (colorMode !== "population") return null
@@ -2038,10 +2765,45 @@ export const GenesisView: React.FC = () => {
 		scene.setOccupationOverlay(
 			colorMode === "nations" && nationMode === "borders"
 				? occupationOverlay
-				: colorMode === "population" &&
+				: getBaseMapMode(colorMode) === "population" &&
 						["culture", "heritage", "religion"].includes(populationMode)
 					? cultureBlendOverlay
 					: null,
+		)
+		// Border LINES and nation LABELS are traced/placed from
+		// world.nations.assignment/seeds independently of the fill colors
+		// above -- swap them the same way for Earth-imported worlds so
+		// "Nations > Borders" and nation labels actually follow the scrubbed
+		// date and show real EU4 names instead of the static generation-time
+		// assignment and procedural names.
+		scene.setEarthHistoryNationOverride(
+			worldForDisplay.isEarthImport && earthHistory.query
+				? {
+						assignment: earthHistory.query.frame.assignment,
+						seeds: earthHistory.query.frame.seeds,
+						names: earthHistory.query.frame.names,
+					}
+				: null,
+		)
+		// Culture/religion LABELS are also placed from a different id space
+		// than the procedural world.cultures/world.heritages -- see
+		// earthHistoryLabelPartitions's doc comment in
+		// create-genesis-scene.ts.
+		scene.setEarthHistoryLabelPartitions(
+			worldForDisplay.isEarthImport && earthHistory.query
+				? {
+						culture: {
+							assignment: earthHistory.query.frame.cultureAssignment,
+							count: earthHistory.query.frame.cultureCount,
+							names: earthHistory.query.frame.cultureNames,
+						},
+						religion: {
+							assignment: earthHistory.query.frame.religionAssignment,
+							count: earthHistory.query.frame.religionCount,
+							names: earthHistory.query.frame.religionNames,
+						},
+					}
+				: null,
 		)
 	}, [
 		colorMode,
@@ -2051,6 +2813,7 @@ export const GenesisView: React.FC = () => {
 		cultureBlendOverlay,
 		regionColors,
 		worldForDisplay,
+		earthHistory.query,
 	])
 
 	const thermalEquator = useMemo(() => {
@@ -2664,30 +3427,100 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setGridSpacing(gridSpacing)
 	}, [gridSpacing])
+	// Real (EU4-import) settlements replace the procedural province settlement
+	// dots and trade-route "roads" entirely -- both share the Infrastructure
+	// toggle, but only one of the two marker sets is ever shown at once.
+	const isEarthImportDisplay = !!worldForDisplay?.isEarthImport
 	useEffect(() => {
-		sceneRef.current?.setSettlementsVisible(showInfrastructure)
-	}, [showInfrastructure])
+		sceneRef.current?.setSettlementsVisible(
+			showInfrastructure && !isEarthImportDisplay,
+		)
+	}, [showInfrastructure, isEarthImportDisplay])
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showInfrastructure && worldForDisplay?.urbanPopulation) {
+		if (
+			showInfrastructure &&
+			!isEarthImportDisplay &&
+			worldForDisplay?.urbanPopulation
+		) {
 			scene.setSettlements(worldForDisplay.urbanPopulation)
 		} else {
 			scene.setSettlements(null)
 		}
-	}, [showInfrastructure, worldForDisplay])
+	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay])
 	useEffect(() => {
-		sceneRef.current?.setInfrastructureVisible(showInfrastructure)
-	}, [showInfrastructure])
+		sceneRef.current?.setInfrastructureVisible(
+			showInfrastructure && !isEarthImportDisplay,
+		)
+	}, [showInfrastructure, isEarthImportDisplay])
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
-		if (showInfrastructure && worldForDisplay?.network) {
+		if (
+			showInfrastructure &&
+			!isEarthImportDisplay &&
+			worldForDisplay?.network
+		) {
 			scene.setInfrastructure(worldForDisplay.network)
 		} else {
 			scene.setInfrastructure(null)
 		}
-	}, [showInfrastructure, worldForDisplay])
+	}, [showInfrastructure, isEarthImportDisplay, worldForDisplay])
+	useEffect(() => {
+		sceneRef.current?.setEu4SettlementsVisible(
+			showInfrastructure && isEarthImportDisplay,
+		)
+	}, [showInfrastructure, isEarthImportDisplay])
+	useEffect(() => {
+		const scene = sceneRef.current
+		if (!scene) return
+		if (showInfrastructure && isEarthImportDisplay && eu4GhslSettlements) {
+			const population = buildGhslSettlementPopulationSlice(
+				eu4GhslSettlements,
+				earthHistory.selectedDays,
+			)
+			const indices = population
+				? topSettlementIndices(population, eu4GhslSettlements.provinceIds)
+				: []
+			// worldForDisplay.nations.seeds is stale procedural-world data --
+			// buildDisplayWorld overrides assignment/sovereign/colors/etc for
+			// earth-history playback but never seeds (display-model.ts), and
+			// the replay-based HistoryView it's built from doesn't compute
+			// capitals at all. earthHistory.query.frame comes from the
+			// separate fold-based engine (queryEarthHistory ->
+			// foldedStateToGenesisFrame) which *does* compute real,
+			// capital-preferring seeds per nation for the current date -- see
+			// adapter.ts's GenesisFrameFromHistory.seeds.
+			const capitalProvinceIds = new Set<number>()
+			const frameSeeds = earthHistory.query?.frame.seeds
+			const realIds = worldForDisplay?.provinces?.realIds
+			if (frameSeeds && realIds) {
+				for (const compactIdx of frameSeeds) {
+					if (compactIdx >= 0 && compactIdx < realIds.length) {
+						capitalProvinceIds.add(realIds[compactIdx])
+					}
+				}
+			}
+			scene.setEu4Settlements(
+				eu4GhslSettlements.lats,
+				eu4GhslSettlements.lons,
+				population,
+				eu4GhslSettlements.provinceIds,
+				capitalProvinceIds,
+				indices,
+			)
+		} else {
+			scene.setEu4Settlements(null, null, null, null, new Set(), [])
+		}
+	}, [
+		showInfrastructure,
+		isEarthImportDisplay,
+		eu4GhslSettlements,
+		earthHistory.selectedDays,
+		earthHistory.query,
+		worldForDisplay,
+	])
 
 	// --- Labels ---
 	useEffect(() => {
@@ -2728,7 +3561,6 @@ export const GenesisView: React.FC = () => {
 				setLiveFrame(frame)
 			},
 			onGenerationComplete: () => {
-				setGenerationPanelOpen(false)
 				setTimeout(() => setDetailsDrawerOpen(true), 400)
 			},
 			onSimProgress: (timeMs, frame) => {
@@ -4087,6 +4919,8 @@ export const GenesisView: React.FC = () => {
 									: null
 							}
 							detailsDrawerOpen={detailsDrawerOpen}
+							earthHistoryDiplomacyRows={earthHistoryDiplomacyRows}
+							earthHistoryHoverOverride={earthHistoryHoverOverride}
 						/>
 					) : null}
 
@@ -4249,6 +5083,7 @@ export const GenesisView: React.FC = () => {
 									settlements: false,
 									culture: false,
 									heritage: false,
+									religion: false,
 									script: false,
 								})
 								setShowElevation(false)
@@ -4290,20 +5125,42 @@ export const GenesisView: React.FC = () => {
 						</FloatingPanel>
 					)}
 
-					{canSimulate && (
+					{worldForDisplay?.isEarthImport ? (
 						<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
 							<div className="pointer-events-auto">
 								<SimulationControls
-									selectedTimeMs={selectedTimeMs}
-									minTimeMs={simStartTimeMs}
-									maxTimeMs={simTimeMs}
-									onTimeChange={setSelectedTimeMs}
+									selectedTimeMs={earthHistory.selectedDays}
+									minTimeMs={earthHistory.minDays}
+									maxTimeMs={earthHistory.maxDays}
+									onTimeChange={earthHistory.setSelectedDays}
 									floating={false}
-									onPlayPause={handleToggleSimulationPlayback}
-									simPlaying={simPlaying}
+									formatLabel={earthHistoryFormatLabel}
+									stepValue={365}
+									extraControls={
+										<EarthHistoryBookmarks
+											onSelect={earthHistory.setSelectedDays}
+											placement="below"
+										/>
+									}
 								/>
 							</div>
 						</div>
+					) : (
+						canSimulate && (
+							<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+								<div className="pointer-events-auto">
+									<SimulationControls
+										selectedTimeMs={selectedTimeMs}
+										minTimeMs={simStartTimeMs}
+										maxTimeMs={simTimeMs}
+										onTimeChange={setSelectedTimeMs}
+										floating={false}
+										onPlayPause={handleToggleSimulationPlayback}
+										simPlaying={simPlaying}
+									/>
+								</div>
+							</div>
+						)
 					)}
 					{!solarSystemViewActive && (
 						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
@@ -4336,11 +5193,7 @@ export const GenesisView: React.FC = () => {
 				nation={selectedNation}
 				planetName={planetName}
 				planetStats={planetStats}
-				worldPopulation={
-					selectedHistoryView?.totalPopulation ??
-					world?.population?.totalPopulation ??
-					null
-				}
+				worldPopulation={drawerWorldPopulation}
 				activeWarCount={selectedHistoryView?.activeWars.length ?? null}
 				cultureCount={worldForDisplay?.cultures?.count ?? null}
 				heritageCount={worldForDisplay?.heritages?.count ?? null}

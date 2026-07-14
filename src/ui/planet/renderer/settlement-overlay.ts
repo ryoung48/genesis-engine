@@ -7,6 +7,8 @@ const TERRAIN_ELEVATION_SCALE = 0.04
 const SETTLEMENT_LIFT = 0.005
 const MAP_Z_LIFT = 0.005
 const MAP_Z_ELEVATION_FACTOR = 0.5
+const SETTLEMENT_GLOBE_SCALE_MULTIPLIER = 0.75
+const SETTLEMENT_MAP_RADIUS_MULTIPLIER = 0.5
 
 // ── Tier definitions ─────────────────────────────────────────────────────────
 
@@ -268,7 +270,10 @@ export function globeScaleForPop(
 	if (t < 0) return 0
 	const tier = tiers[t]
 	const f = tierFraction(pop, tier)
-	return tier.minGlobeScale + (tier.maxGlobeScale - tier.minGlobeScale) * f
+	return (
+		(tier.minGlobeScale + (tier.maxGlobeScale - tier.minGlobeScale) * f) *
+		SETTLEMENT_GLOBE_SCALE_MULTIPLIER
+	)
 }
 
 export function mapRadiusForPop(
@@ -282,7 +287,10 @@ export function mapRadiusForPop(
 	if (t < 0) return 0
 	const tier = tiers[t]
 	const f = tierFraction(pop, tier)
-	return tier.minMapRadius + (tier.maxMapRadius - tier.minMapRadius) * f
+	return (
+		(tier.minMapRadius + (tier.maxMapRadius - tier.minMapRadius) * f) *
+		SETTLEMENT_MAP_RADIUS_MULTIPLIER
+	)
 }
 
 // ── Globe settlements ───────────────────────────────────────────────────────
@@ -441,6 +449,121 @@ export function buildMapSettlements(
 		circle.position.set(px, py, pz)
 		circle.renderOrder = 998
 		circle.userData = { isCapital, province: p }
+		group.add(circle)
+	}
+
+	return group
+}
+
+// ── Real (EU4-import) settlements: positioned by raw lon/lat, not the
+// procedural mesh's province regions -- see eu4-nation-border-overlay.ts for
+// the same lon/lat-direct convention used for border vectors. Capital
+// styling reuses world.nations.seeds the same way the procedural overlay's
+// collectCapitalProvinces does -- see GenesisView.tsx's capitalProvinceIds
+// (raw EU4 ids, not compact indices, since these settlements are matched to
+// provinces by raw id). Reuses the same tier textures as the procedural
+// overlay for a consistent look. ───────────────────────────────────────────
+
+const DEFAULT_ERA: SerializedGenesisWorld["params"]["era"] = "lateMedieval"
+
+function realSettlementTiers(): SettlementTier[] {
+	return settlementTiers({
+		params: { era: DEFAULT_ERA },
+	} as SerializedGenesisWorld)
+}
+
+function lonLatToUnitXyz(
+	lonDeg: number,
+	latDeg: number,
+): [number, number, number] {
+	const lon = (lonDeg * Math.PI) / 180
+	const lat = (latDeg * Math.PI) / 180
+	const cosLat = Math.cos(lat)
+	return [Math.cos(lon) * cosLat, Math.sin(lon) * cosLat, Math.sin(lat)]
+}
+
+export function buildGlobeRealSettlements(
+	lats: Float32Array,
+	lons: Float32Array,
+	populations: Float32Array,
+	provinceIds: Int32Array,
+	capitalProvinceIds: ReadonlySet<number>,
+	indices: number[],
+): THREE.Group {
+	const group = new THREE.Group()
+	const tiers = realSettlementTiers()
+	const tierTextures = tiers.map((tier) => ({
+		normal: tier.buildTexture(false),
+		capital: tier.buildTexture(true),
+	}))
+
+	for (const i of indices) {
+		const pop = populations[i]
+		const t = getTierIndex(pop, tiers)
+		if (t < 0) continue
+
+		const isCapital = capitalProvinceIds.has(provinceIds[i])
+		const [nx, ny, nz] = lonLatToUnitXyz(lons[i], lats[i])
+		const radius = 1 + SETTLEMENT_LIFT
+		const scale = globeScaleForPop(pop, DEFAULT_ERA)
+
+		const spriteMat = new THREE.SpriteMaterial({
+			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
+			depthWrite: false,
+			transparent: true,
+		})
+		const sprite = new THREE.Sprite(spriteMat)
+		sprite.position.set(nx * radius, ny * radius, nz * radius)
+		sprite.scale.setScalar(scale)
+		sprite.renderOrder = 998
+		sprite.userData = { settlement: i, isCapital }
+		group.add(sprite)
+	}
+
+	return group
+}
+
+export function buildMapRealSettlements(
+	lats: Float32Array,
+	lons: Float32Array,
+	populations: Float32Array,
+	provinceIds: Int32Array,
+	capitalProvinceIds: ReadonlySet<number>,
+	indices: number[],
+	centerLongitudeDeg: number,
+	projectionLatitudeDeg: number,
+): THREE.Group {
+	const group = new THREE.Group()
+	const tiers = realSettlementTiers()
+	const tierTextures = tiers.map((tier) => ({
+		normal: tier.buildTexture(false),
+		capital: tier.buildTexture(true),
+	}))
+	const projection = createMapProjection(
+		centerLongitudeDeg,
+		projectionLatitudeDeg,
+	)
+
+	for (const i of indices) {
+		const pop = populations[i]
+		const t = getTierIndex(pop, tiers)
+		if (t < 0) continue
+
+		const isCapital = capitalProvinceIds.has(provinceIds[i])
+		const [x, y, z] = projection.projectDegrees(lons[i], lats[i], MAP_Z_LIFT)
+		const radius = mapRadiusForPop(pop, DEFAULT_ERA)
+
+		const circleGeo = new THREE.CircleGeometry(radius, 16)
+		const mat = new THREE.MeshBasicMaterial({
+			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
+			depthWrite: false,
+			transparent: true,
+			side: THREE.DoubleSide,
+		})
+		const circle = new THREE.Mesh(circleGeo, mat)
+		circle.position.set(x, y, z)
+		circle.renderOrder = 998
+		circle.userData = { settlement: i, isCapital }
 		group.add(circle)
 	}
 

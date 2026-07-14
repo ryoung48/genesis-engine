@@ -15,6 +15,8 @@ export interface GenesisProvinces {
 	adjList: Int32Array
 	/** Per-province land region count */
 	size: Int32Array
+	/** Per-province land area in km², when known from the source geometry. */
+	areaKm2?: Float32Array
 	/** Per-province RGB colors, length count*3 */
 	colors: Float32Array
 	/** Per-province water access level: 0=none, 1=river/lake, 2=ocean */
@@ -27,6 +29,12 @@ export interface GenesisProvinces {
 	 * imported Earth data (computeWeightedProvinces) rather than the
 	 * procedural BFS partition. */
 	names?: string[]
+	/** Raw source province id (e.g. EU4 province id) per compact province
+	 * index, only set when provinces were assigned from a rasterized
+	 * real-world id map (computeProvincesFromRaster). Lets downstream code
+	 * (e.g. the earth-history event engine) translate id-keyed historical
+	 * data onto this partition's compact indices without re-matching. */
+	realIds?: Int32Array
 }
 
 export interface GenesisPartition {

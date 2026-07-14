@@ -2,6 +2,7 @@ import type { ColorMode } from "../../colors"
 
 export type PopulationMapMode =
 	| "density"
+	| "urban"
 	| "development"
 	| "culture"
 	| "heritage"
@@ -76,6 +77,10 @@ const DEBUG_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
 	["migration", "Migration"],
 ]
 
+const EARTH_IMPORT_DEMOGRAPHIC_MODE_OPTIONS: ReadonlyArray<
+	readonly [PopulationMapMode, string]
+> = [["urban", "Urban"]]
+
 const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
 > = [
@@ -101,7 +106,9 @@ const EARTH_IMPORT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
 	return colorMode === "nations" ||
 		colorMode === "timezone" ||
-		colorMode === "population"
+		colorMode === "population" ||
+		colorMode === "realPopulation" ||
+		colorMode === "populationDiff"
 		? "society"
 		: "geography"
 }
@@ -119,6 +126,8 @@ const EARTH_IMPORT_ONLY_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
 	"precipitationDiff",
 	"realHumidity",
 	"humidityDiff",
+	"realPopulation",
+	"populationDiff",
 	"realPastaClimate",
 	"realKoppenClimate",
 	"eu5Topography",
@@ -159,13 +168,29 @@ export function getVisibleSocietyModeOptions(
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
-	if (isEarthImport)
+	if (isEarthImport) {
 		politicalOptions.push(...EARTH_IMPORT_POLITICAL_MODE_OPTIONS)
+		// Diplomacy is debug-only for procedural worlds, but is a first-class
+		// earth-history engine output for Earth imports (vassals/alliances/
+		// unions -- see docs/earth-history-plan.md "Map modes and hover
+		// gating"), so surface it without needing debugMapModes when real
+		// history data is available. (Government is already default-visible.)
+		if (
+			!debugEnabled &&
+			!politicalOptions.some(([mode]) => mode === "diplomacy")
+		) {
+			politicalOptions.push(["diplomacy", "Diplomacy"])
+		}
+	}
 	const demographicOptions = debugEnabled
 		? [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS, ...DEBUG_DEMOGRAPHIC_MODE_OPTIONS]
 		: [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS]
+	if (isEarthImport) {
+		demographicOptions.splice(1, 0, ...EARTH_IMPORT_DEMOGRAPHIC_MODE_OPTIONS)
+	}
 	const trailingSocietyModes = new Set<PopulationMapMode>([
 		"density",
+		"urban",
 		"development",
 	])
 	const leadingDemographicOptions = demographicOptions.filter(

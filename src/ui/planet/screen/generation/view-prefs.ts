@@ -34,7 +34,12 @@ interface StoredViewPrefs {
 	labelMode: LabelMode
 	showElevation: boolean
 	showThermalEquator: boolean
+	showCoastlines: boolean
 	showWindArrows: boolean
+	showGdd: boolean
+	showGint: boolean
+	showPet: boolean
+	showAet: boolean
 	showOceanCurrents: boolean
 	showRivers: boolean
 	showInfrastructure: boolean
@@ -86,6 +91,8 @@ const COLOR_MODES = new Set<ColorMode>([
 	"hotspots",
 	"nations",
 	"population",
+	"realPopulation",
+	"populationDiff",
 	"provinces",
 	"basins",
 	"terrainFeatures",
@@ -109,6 +116,7 @@ const NATION_MAP_MODES = new Set<NationMapMode>([
 
 const POPULATION_MAP_MODES = new Set<PopulationMapMode>([
 	"density",
+	"urban",
 	"development",
 	"culture",
 	"heritage",
@@ -144,11 +152,17 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 		settlements: false,
 		culture: false,
 		heritage: false,
+		religion: false,
 		script: false,
 	},
 	showElevation: true,
 	showThermalEquator: false,
+	showCoastlines: false,
 	showWindArrows: false,
+	showGdd: false,
+	showGint: false,
+	showPet: false,
+	showAet: false,
 	showOceanCurrents: false,
 	showRivers: false,
 	showInfrastructure: false,
@@ -223,6 +237,7 @@ function parseLabelMode(value: unknown): LabelMode {
 		...base,
 		culture: typeof v?.culture === "boolean" ? v.culture : false,
 		heritage: typeof v?.heritage === "boolean" ? v.heritage : false,
+		religion: typeof v?.religion === "boolean" ? v.religion : false,
 		script: typeof v?.script === "boolean" ? v.script : false,
 	}
 }
@@ -315,10 +330,18 @@ export function parseStoredViewPrefs(
 				parsed.showThermalEquator,
 				DEFAULT_VIEW_PREFS.showThermalEquator,
 			),
+			showCoastlines: readBoolean(
+				parsed.showCoastlines,
+				DEFAULT_VIEW_PREFS.showCoastlines,
+			),
 			showWindArrows: readBoolean(
 				parsed.showWindArrows,
 				DEFAULT_VIEW_PREFS.showWindArrows,
 			),
+			showGdd: readBoolean(parsed.showGdd, DEFAULT_VIEW_PREFS.showGdd),
+			showGint: readBoolean(parsed.showGint, DEFAULT_VIEW_PREFS.showGint),
+			showPet: readBoolean(parsed.showPet, DEFAULT_VIEW_PREFS.showPet),
+			showAet: readBoolean(parsed.showAet, DEFAULT_VIEW_PREFS.showAet),
 			showOceanCurrents: readBoolean(
 				parsed.showOceanCurrents,
 				DEFAULT_VIEW_PREFS.showOceanCurrents,

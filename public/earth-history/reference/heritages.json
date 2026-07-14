@@ -1,0 +1,6800 @@
+[
+	{
+		"id": "germanic",
+		"name": "Germanic",
+		"cultures": [
+			{
+				"id": "pommeranian",
+				"name": "Pommeranian",
+				"primaryTag": "POM",
+				"color": [144, 79, 111]
+			},
+			{
+				"id": "prussian",
+				"name": "Prussian",
+				"primaryTag": "PRU",
+				"color": [144, 66, 97]
+			},
+			{
+				"id": "baltic_german",
+				"name": "Baltic German",
+				"primaryTag": "RIG",
+				"color": [144, 53, 81]
+			},
+			{
+				"id": "lower_saxon",
+				"name": "Lower Saxon",
+				"primaryTag": "HAN",
+				"color": [144, 40, 63]
+			},
+			{
+				"id": "hannoverian",
+				"name": "Hannoverian",
+				"primaryTag": "WES",
+				"color": [171, 94, 104]
+			},
+			{
+				"id": "hessian",
+				"name": "Hessian",
+				"primaryTag": "HES",
+				"color": [171, 78, 124]
+			},
+			{
+				"id": "saxon",
+				"name": "Saxon",
+				"primaryTag": "SAX",
+				"color": [171, 63, 106]
+			},
+			{
+				"id": "franconian",
+				"name": "Franconian",
+				"primaryTag": "FKN",
+				"color": [171, 47, 86]
+			},
+			{
+				"id": "swabian",
+				"name": "Swabian",
+				"primaryTag": "SWA",
+				"color": [199, 109, 129]
+			},
+			{
+				"id": "silesian_german",
+				"name": "Silesian German",
+				"primaryTag": "SIL",
+				"color": [199, 91, 105]
+			},
+			{
+				"id": "swiss",
+				"name": "Swiss",
+				"primaryTag": "SWI",
+				"color": [199, 73, 135]
+			},
+			{
+				"id": "bavarian",
+				"name": "Bavarian",
+				"primaryTag": "BAV",
+				"color": [199, 55, 113]
+			},
+			{
+				"id": "austrian",
+				"name": "Austrian",
+				"primaryTag": "HAB",
+				"color": [144, 79, 99]
+			},
+			{
+				"id": "dutch",
+				"name": "Dutch",
+				"primaryTag": "NED",
+				"color": [144, 66, 83]
+			},
+			{
+				"id": "frisian",
+				"name": "Frisian",
+				"primaryTag": "FRY",
+				"color": [144, 53, 65]
+			},
+			{
+				"id": "flemish",
+				"name": "Flemish",
+				"primaryTag": "FLA",
+				"color": [144, 40, 91]
+			},
+			{
+				"id": "gothic",
+				"name": "Gothic",
+				"primaryTag": "GCR",
+				"color": [171, 94, 125]
+			},
+			{
+				"id": "gepid",
+				"name": "Gepid",
+				"primaryTag": "GEP",
+				"color": [171, 78, 107]
+			},
+			{
+				"id": "vandal",
+				"name": "Vandal",
+				"primaryTag": "VAN",
+				"color": [171, 63, 87]
+			},
+			{
+				"id": "anglo_saxon",
+				"name": "Anglo Saxon",
+				"primaryTag": "WSX",
+				"color": [171, 47, 64]
+			},
+			{
+				"id": "langobardi",
+				"name": "Langobardi",
+				"primaryTag": "LOM",
+				"color": [199, 109, 153]
+			},
+			{
+				"id": "burgundione",
+				"name": "Burgundione",
+				"primaryTag": "BUR",
+				"color": [199, 91, 134]
+			},
+			{
+				"id": "frankish",
+				"name": "Frankish",
+				"primaryTag": "FRK",
+				"color": [199, 73, 112]
+			},
+			{
+				"id": "quadian",
+				"name": "Quadian",
+				"primaryTag": "QUA",
+				"color": [199, 55, 87]
+			},
+			{
+				"id": "scirian",
+				"name": "Scirian",
+				"primaryTag": "SCI",
+				"color": [144, 79, 88]
+			},
+			{
+				"id": "germanic_canadian",
+				"name": "Germanic Canadian",
+				"primaryTag": null,
+				"color": [144, 66, 104]
+			},
+			{
+				"id": "germanic_east_american",
+				"name": "Germanic East American",
+				"primaryTag": null,
+				"color": [144, 53, 90]
+			},
+			{
+				"id": "germanic_louisianan",
+				"name": "Germanic Louisianan",
+				"primaryTag": null,
+				"color": [144, 40, 72]
+			},
+			{
+				"id": "germanic_californian",
+				"name": "Germanic Californian",
+				"primaryTag": null,
+				"color": [171, 94, 111]
+			},
+			{
+				"id": "germanic_mexican",
+				"name": "Germanic Mexican",
+				"primaryTag": null,
+				"color": [171, 78, 91]
+			},
+			{
+				"id": "germanic_caribbean",
+				"name": "Germanic Caribbean",
+				"primaryTag": null,
+				"color": [171, 63, 116]
+			},
+			{
+				"id": "germanic_colombian",
+				"name": "Germanic Colombian",
+				"primaryTag": null,
+				"color": [171, 47, 97]
+			},
+			{
+				"id": "germanic_peruvian",
+				"name": "Germanic Peruvian",
+				"primaryTag": null,
+				"color": [199, 109, 137]
+			},
+			{
+				"id": "germanic_la_platan",
+				"name": "Germanic La Platan",
+				"primaryTag": null,
+				"color": [199, 91, 115]
+			},
+			{
+				"id": "germanic_brazilian",
+				"name": "Germanic Brazilian",
+				"primaryTag": null,
+				"color": [199, 73, 89]
+			},
+			{
+				"id": "germanic_australian",
+				"name": "Germanic Australian",
+				"primaryTag": null,
+				"color": [199, 55, 125]
+			},
+			{
+				"id": "germanic_oceanian",
+				"name": "Germanic Oceanian",
+				"primaryTag": null,
+				"color": [144, 79, 105]
+			}
+		]
+	},
+	{
+		"id": "scandinavian",
+		"name": "Scandinavian",
+		"cultures": [
+			{
+				"id": "swedish",
+				"name": "Swedish",
+				"primaryTag": "SWE",
+				"color": [176, 109, 78]
+			},
+			{
+				"id": "danish",
+				"name": "Danish",
+				"primaryTag": "DAN",
+				"color": [176, 106, 58]
+			},
+			{
+				"id": "norwegian",
+				"name": "Norwegian",
+				"primaryTag": "NOR",
+				"color": [176, 107, 39]
+			},
+			{
+				"id": "icelandic",
+				"name": "Icelandic",
+				"primaryTag": "ICE",
+				"color": [176, 111, 19]
+			},
+			{
+				"id": "jute",
+				"name": "Jute",
+				"primaryTag": "JUT",
+				"color": [209, 171, 92]
+			},
+			{
+				"id": "scanian",
+				"name": "Scanian",
+				"primaryTag": null,
+				"color": [209, 113, 69]
+			},
+			{
+				"id": "gutnish",
+				"name": "Gutnish",
+				"primaryTag": "GEE",
+				"color": [209, 112, 46]
+			},
+			{
+				"id": "scandinavian_canadian",
+				"name": "Scandinavian Canadian",
+				"primaryTag": null,
+				"color": [209, 115, 23]
+			},
+			{
+				"id": "scandinavian_east_american",
+				"name": "Scandinavian East American",
+				"primaryTag": null,
+				"color": [242, 186, 107]
+			},
+			{
+				"id": "scandinavian_louisianan",
+				"name": "Scandinavian Louisianan",
+				"primaryTag": null,
+				"color": [242, 189, 80]
+			},
+			{
+				"id": "scandinavian_californian",
+				"name": "Scandinavian Californian",
+				"primaryTag": null,
+				"color": [242, 113, 53]
+			},
+			{
+				"id": "scandinavian_mexican",
+				"name": "Scandinavian Mexican",
+				"primaryTag": null,
+				"color": [242, 114, 26]
+			},
+			{
+				"id": "scandinavian_caribbean",
+				"name": "Scandinavian Caribbean",
+				"primaryTag": null,
+				"color": [176, 126, 78]
+			},
+			{
+				"id": "scandinavian_colombian",
+				"name": "Scandinavian Colombian",
+				"primaryTag": null,
+				"color": [176, 127, 58]
+			},
+			{
+				"id": "scandinavian_peruvian",
+				"name": "Scandinavian Peruvian",
+				"primaryTag": null,
+				"color": [176, 131, 39]
+			},
+			{
+				"id": "scandinavian_la_platan",
+				"name": "Scandinavian La Platan",
+				"primaryTag": null,
+				"color": [176, 69, 19]
+			},
+			{
+				"id": "scandinavian_brazilian",
+				"name": "Scandinavian Brazilian",
+				"primaryTag": null,
+				"color": [209, 140, 92]
+			},
+			{
+				"id": "scandinavian_australian",
+				"name": "Scandinavian Australian",
+				"primaryTag": null,
+				"color": [209, 138, 69]
+			},
+			{
+				"id": "scandinavian_oceanian",
+				"name": "Scandinavian Oceanian",
+				"primaryTag": null,
+				"color": [209, 141, 46]
+			}
+		]
+	},
+	{
+		"id": "british",
+		"name": "British",
+		"cultures": [
+			{
+				"id": "english",
+				"name": "English",
+				"primaryTag": "ENG",
+				"color": [80, 134, 171]
+			},
+			{
+				"id": "american",
+				"name": "American",
+				"primaryTag": null,
+				"color": [62, 116, 171]
+			},
+			{
+				"id": "scottish",
+				"name": "Scottish",
+				"primaryTag": "SCO",
+				"color": [44, 96, 171]
+			},
+			{
+				"id": "british_canadian",
+				"name": "British Canadian",
+				"primaryTag": null,
+				"color": [26, 72, 171]
+			},
+			{
+				"id": "british_louisianan",
+				"name": "British Louisianan",
+				"primaryTag": null,
+				"color": [95, 120, 203]
+			},
+			{
+				"id": "british_californian",
+				"name": "British Californian",
+				"primaryTag": null,
+				"color": [74, 150, 203]
+			},
+			{
+				"id": "british_mexican",
+				"name": "British Mexican",
+				"primaryTag": null,
+				"color": [52, 128, 203]
+			},
+			{
+				"id": "british_caribbean",
+				"name": "British Caribbean",
+				"primaryTag": null,
+				"color": [31, 101, 203]
+			},
+			{
+				"id": "british_colombian",
+				"name": "British Colombian",
+				"primaryTag": null,
+				"color": [110, 150, 235]
+			},
+			{
+				"id": "british_peruvian",
+				"name": "British Peruvian",
+				"primaryTag": null,
+				"color": [85, 120, 235]
+			},
+			{
+				"id": "british_la_platan",
+				"name": "British La Platan",
+				"primaryTag": null,
+				"color": [60, 163, 235]
+			},
+			{
+				"id": "british_brazilian",
+				"name": "British Brazilian",
+				"primaryTag": null,
+				"color": [36, 135, 235]
+			},
+			{
+				"id": "british_australian",
+				"name": "British Australian",
+				"primaryTag": null,
+				"color": [80, 117, 171]
+			},
+			{
+				"id": "british_oceanian",
+				"name": "British Oceanian",
+				"primaryTag": null,
+				"color": [62, 97, 171]
+			}
+		]
+	},
+	{
+		"id": "gaelic",
+		"name": "Gaelic",
+		"cultures": [
+			{
+				"id": "welsh",
+				"name": "Welsh",
+				"primaryTag": "WLS",
+				"color": [65, 133, 114]
+			},
+			{
+				"id": "cornish",
+				"name": "Cornish",
+				"primaryTag": "CRN",
+				"color": [52, 133, 118]
+			},
+			{
+				"id": "breton",
+				"name": "Breton",
+				"primaryTag": "BRI",
+				"color": [38, 133, 124]
+			},
+			{
+				"id": "irish",
+				"name": "Irish",
+				"primaryTag": "IRE",
+				"color": [25, 133, 132]
+			},
+			{
+				"id": "briton",
+				"name": "Briton",
+				"primaryTag": "BGT",
+				"color": [78, 151, 158]
+			},
+			{
+				"id": "cumbric",
+				"name": "Cumbric",
+				"primaryTag": "RHE",
+				"color": [62, 158, 131]
+			},
+			{
+				"id": "highland_scottish",
+				"name": "Highland Scottish",
+				"primaryTag": "HSC",
+				"color": [45, 158, 137]
+			},
+			{
+				"id": "pictish",
+				"name": "Pictish",
+				"primaryTag": "PCT",
+				"color": [29, 158, 146]
+			},
+			{
+				"id": "gaelic_canadian",
+				"name": "Gaelic Canadian",
+				"primaryTag": null,
+				"color": [90, 183, 183]
+			},
+			{
+				"id": "gaelic_east_american",
+				"name": "Gaelic East American",
+				"primaryTag": null,
+				"color": [71, 174, 183]
+			},
+			{
+				"id": "gaelic_louisianan",
+				"name": "Gaelic Louisianan",
+				"primaryTag": null,
+				"color": [53, 183, 147]
+			},
+			{
+				"id": "gaelic_californian",
+				"name": "Gaelic Californian",
+				"primaryTag": null,
+				"color": [34, 183, 155]
+			},
+			{
+				"id": "gaelic_mexican",
+				"name": "Gaelic Mexican",
+				"primaryTag": null,
+				"color": [65, 133, 127]
+			},
+			{
+				"id": "gaelic_caribbean",
+				"name": "Gaelic Caribbean",
+				"primaryTag": null,
+				"color": [52, 133, 133]
+			},
+			{
+				"id": "gaelic_colombian",
+				"name": "Gaelic Colombian",
+				"primaryTag": null,
+				"color": [38, 125, 133]
+			},
+			{
+				"id": "gaelic_peruvian",
+				"name": "Gaelic Peruvian",
+				"primaryTag": null,
+				"color": [25, 133, 103]
+			},
+			{
+				"id": "gaelic_la_platan",
+				"name": "Gaelic La Platan",
+				"primaryTag": null,
+				"color": [78, 158, 143]
+			},
+			{
+				"id": "gaelic_brazilian",
+				"name": "Gaelic Brazilian",
+				"primaryTag": null,
+				"color": [62, 158, 149]
+			},
+			{
+				"id": "gaelic_australian",
+				"name": "Gaelic Australian",
+				"primaryTag": null,
+				"color": [45, 158, 157]
+			},
+			{
+				"id": "gaelic_oceanian",
+				"name": "Gaelic Oceanian",
+				"primaryTag": null,
+				"color": [29, 148, 158]
+			}
+		]
+	},
+	{
+		"id": "celtic",
+		"name": "Celtic",
+		"cultures": [
+			{
+				"id": "gallian",
+				"name": "Gallian",
+				"primaryTag": "GLL",
+				"color": [175, 118, 137]
+			},
+			{
+				"id": "belgae",
+				"name": "Belgae",
+				"primaryTag": null,
+				"color": [175, 106, 123]
+			},
+			{
+				"id": "helvetian",
+				"name": "Helvetian",
+				"primaryTag": null,
+				"color": [175, 95, 108]
+			},
+			{
+				"id": "noric",
+				"name": "Noric",
+				"primaryTag": null,
+				"color": [175, 84, 90]
+			},
+			{
+				"id": "galatian",
+				"name": "Galatian",
+				"primaryTag": null,
+				"color": [208, 141, 140]
+			},
+			{
+				"id": "celtiberian",
+				"name": "Celtiberian",
+				"primaryTag": null,
+				"color": [208, 126, 154]
+			},
+			{
+				"id": "cantabrian",
+				"name": "Cantabrian",
+				"primaryTag": "CNT",
+				"color": [208, 113, 136]
+			},
+			{
+				"id": "gallaecian",
+				"name": "Gallaecian",
+				"primaryTag": null,
+				"color": [208, 99, 116]
+			},
+			{
+				"id": "celtic_canadian",
+				"name": "Celtic Canadian",
+				"primaryTag": null,
+				"color": [240, 162, 167]
+			},
+			{
+				"id": "celtic_east_american",
+				"name": "Celtic East American",
+				"primaryTag": null,
+				"color": [240, 148, 146]
+			},
+			{
+				"id": "celtic_louisianan",
+				"name": "Celtic Louisianan",
+				"primaryTag": null,
+				"color": [240, 131, 168]
+			},
+			{
+				"id": "celtic_californian",
+				"name": "Celtic Californian",
+				"primaryTag": null,
+				"color": [240, 115, 146]
+			},
+			{
+				"id": "celtic_mexican",
+				"name": "Celtic Mexican",
+				"primaryTag": null,
+				"color": [175, 118, 127]
+			},
+			{
+				"id": "celtic_caribbean",
+				"name": "Celtic Caribbean",
+				"primaryTag": null,
+				"color": [175, 106, 111]
+			},
+			{
+				"id": "celtic_colombian",
+				"name": "Celtic Colombian",
+				"primaryTag": null,
+				"color": [175, 97, 95]
+			},
+			{
+				"id": "celtic_peruvian",
+				"name": "Celtic Peruvian",
+				"primaryTag": null,
+				"color": [175, 84, 114]
+			},
+			{
+				"id": "celtic_la_platan",
+				"name": "Celtic La Platan",
+				"primaryTag": null,
+				"color": [208, 140, 157]
+			},
+			{
+				"id": "celtic_brazilian",
+				"name": "Celtic Brazilian",
+				"primaryTag": null,
+				"color": [208, 126, 139]
+			},
+			{
+				"id": "celtic_australian",
+				"name": "Celtic Australian",
+				"primaryTag": null,
+				"color": [208, 113, 119]
+			},
+			{
+				"id": "celtic_oceanian",
+				"name": "Celtic Oceanian",
+				"primaryTag": null,
+				"color": [208, 102, 99]
+			}
+		]
+	},
+	{
+		"id": "latin",
+		"name": "Latin",
+		"cultures": [
+			{
+				"id": "lombard",
+				"name": "Lombard",
+				"primaryTag": "LOM",
+				"color": [66, 128, 81]
+			},
+			{
+				"id": "tuscan",
+				"name": "Tuscan",
+				"primaryTag": "TUS",
+				"color": [53, 128, 78]
+			},
+			{
+				"id": "sardinian",
+				"name": "Sardinian",
+				"primaryTag": "SAR",
+				"color": [41, 128, 78]
+			},
+			{
+				"id": "romagnan",
+				"name": "Romagnan",
+				"primaryTag": "FER",
+				"color": [29, 128, 80]
+			},
+			{
+				"id": "ligurian",
+				"name": "Ligurian",
+				"primaryTag": "GEN",
+				"color": [78, 152, 123]
+			},
+			{
+				"id": "venetian",
+				"name": "Venetian",
+				"primaryTag": "VEN",
+				"color": [63, 152, 85]
+			},
+			{
+				"id": "dalmatian",
+				"name": "Dalmatian",
+				"primaryTag": "DAL",
+				"color": [49, 152, 83]
+			},
+			{
+				"id": "neapolitan",
+				"name": "Neapolitan",
+				"primaryTag": "NAP",
+				"color": [34, 152, 84]
+			},
+			{
+				"id": "piedmontese",
+				"name": "Piedmontese",
+				"primaryTag": "SAV",
+				"color": [91, 176, 134]
+			},
+			{
+				"id": "umbrian",
+				"name": "Umbrian",
+				"primaryTag": "URB",
+				"color": [74, 176, 135]
+			},
+			{
+				"id": "sicilian",
+				"name": "Sicilian",
+				"primaryTag": "SIC",
+				"color": [57, 176, 86]
+			},
+			{
+				"id": "maltese",
+				"name": "Maltese",
+				"primaryTag": "JAI",
+				"color": [40, 176, 85]
+			},
+			{
+				"id": "etruscan",
+				"name": "Etruscan",
+				"primaryTag": null,
+				"color": [66, 128, 92]
+			},
+			{
+				"id": "roman",
+				"name": "Roman",
+				"primaryTag": "ROM",
+				"color": [53, 128, 92]
+			},
+			{
+				"id": "rhaetian",
+				"name": "Rhaetian",
+				"primaryTag": null,
+				"color": [41, 128, 94]
+			},
+			{
+				"id": "latin_canadian",
+				"name": "Latin Canadian",
+				"primaryTag": null,
+				"color": [29, 128, 53]
+			},
+			{
+				"id": "latin_east_american",
+				"name": "Latin East American",
+				"primaryTag": null,
+				"color": [78, 152, 103]
+			},
+			{
+				"id": "latin_louisianan",
+				"name": "Latin Louisianan",
+				"primaryTag": null,
+				"color": [63, 152, 101]
+			},
+			{
+				"id": "latin_californian",
+				"name": "Latin Californian",
+				"primaryTag": null,
+				"color": [49, 152, 102]
+			},
+			{
+				"id": "latin_mexican",
+				"name": "Latin Mexican",
+				"primaryTag": null,
+				"color": [34, 152, 105]
+			},
+			{
+				"id": "latin_caribbean",
+				"name": "Latin Caribbean",
+				"primaryTag": null,
+				"color": [91, 176, 112]
+			},
+			{
+				"id": "latin_colombian",
+				"name": "Latin Colombian",
+				"primaryTag": null,
+				"color": [74, 176, 108]
+			},
+			{
+				"id": "latin_peruvian",
+				"name": "Latin Peruvian",
+				"primaryTag": null,
+				"color": [57, 176, 107]
+			},
+			{
+				"id": "latin_la_platan",
+				"name": "Latin La Platan",
+				"primaryTag": null,
+				"color": [40, 176, 110]
+			},
+			{
+				"id": "latin_brazilian",
+				"name": "Latin Brazilian",
+				"primaryTag": null,
+				"color": [66, 128, 103]
+			},
+			{
+				"id": "latin_australian",
+				"name": "Latin Australian",
+				"primaryTag": null,
+				"color": [53, 128, 72]
+			},
+			{
+				"id": "latin_oceanian",
+				"name": "Latin Oceanian",
+				"primaryTag": null,
+				"color": [41, 128, 70]
+			}
+		]
+	},
+	{
+		"id": "iberian",
+		"name": "Iberian",
+		"cultures": [
+			{
+				"id": "castillian",
+				"name": "Castillian",
+				"primaryTag": "CAS",
+				"color": [155, 109, 77]
+			},
+			{
+				"id": "leonese",
+				"name": "Leonese",
+				"primaryTag": "LON",
+				"color": [155, 109, 64]
+			},
+			{
+				"id": "aragonese",
+				"name": "Aragonese",
+				"primaryTag": "ARA",
+				"color": [155, 112, 51]
+			},
+			{
+				"id": "catalan",
+				"name": "Catalan",
+				"primaryTag": "CAT",
+				"color": [184, 159, 107]
+			},
+			{
+				"id": "galician",
+				"name": "Galician",
+				"primaryTag": "GAL",
+				"color": [184, 121, 91]
+			},
+			{
+				"id": "andalucian",
+				"name": "Andalucian",
+				"primaryTag": "GRA",
+				"color": [184, 120, 76]
+			},
+			{
+				"id": "portugese",
+				"name": "Portugese",
+				"primaryTag": "POR",
+				"color": [184, 122, 61]
+			},
+			{
+				"id": "lusitanian",
+				"name": "Lusitanian",
+				"primaryTag": "LUS",
+				"color": [213, 176, 124]
+			},
+			{
+				"id": "turduli",
+				"name": "Turduli",
+				"primaryTag": null,
+				"color": [213, 179, 106]
+			},
+			{
+				"id": "iberi",
+				"name": "Iberi",
+				"primaryTag": null,
+				"color": [213, 128, 88]
+			},
+			{
+				"id": "iberian_canadian",
+				"name": "Iberian Canadian",
+				"primaryTag": null,
+				"color": [213, 129, 70]
+			},
+			{
+				"id": "iberian_east_american",
+				"name": "Iberian East American",
+				"primaryTag": null,
+				"color": [155, 122, 90]
+			},
+			{
+				"id": "iberian_louisianan",
+				"name": "Iberian Louisianan",
+				"primaryTag": null,
+				"color": [155, 123, 77]
+			},
+			{
+				"id": "iberian_californian",
+				"name": "Iberian Californian",
+				"primaryTag": null,
+				"color": [155, 126, 64]
+			},
+			{
+				"id": "mexican",
+				"name": "Mexican",
+				"primaryTag": "MEX",
+				"color": [155, 84, 51]
+			},
+			{
+				"id": "iberian_caribbean",
+				"name": "Iberian Caribbean",
+				"primaryTag": null,
+				"color": [184, 138, 107]
+			},
+			{
+				"id": "iberian_colombian",
+				"name": "Iberian Colombian",
+				"primaryTag": null,
+				"color": [184, 138, 91]
+			},
+			{
+				"id": "iberian_peruvian",
+				"name": "Iberian Peruvian",
+				"primaryTag": null,
+				"color": [184, 140, 76]
+			},
+			{
+				"id": "iberian_la_platan",
+				"name": "Iberian La Platan",
+				"primaryTag": null,
+				"color": [184, 144, 61]
+			},
+			{
+				"id": "brazilian",
+				"name": "Brazilian",
+				"primaryTag": "BRZ",
+				"color": [213, 152, 124]
+			},
+			{
+				"id": "iberian_australian",
+				"name": "Iberian Australian",
+				"primaryTag": null,
+				"color": [213, 150, 106]
+			},
+			{
+				"id": "iberian_oceanian",
+				"name": "Iberian Oceanian",
+				"primaryTag": null,
+				"color": [213, 151, 88]
+			}
+		]
+	},
+	{
+		"id": "basque_group",
+		"name": "Basque Group",
+		"cultures": [
+			{
+				"id": "basque",
+				"name": "Basque",
+				"primaryTag": "VAS",
+				"color": [159, 129, 24]
+			},
+			{
+				"id": "aquitanian",
+				"name": "Aquitanian",
+				"primaryTag": "AQT",
+				"color": [159, 139, 2]
+			},
+			{
+				"id": "basque_canadian",
+				"name": "Basque Canadian",
+				"primaryTag": null,
+				"color": [159, 153, 0]
+			},
+			{
+				"id": "basque_east_american",
+				"name": "Basque East American",
+				"primaryTag": null,
+				"color": [182, 189, 55]
+			},
+			{
+				"id": "basque_louisianan",
+				"name": "Basque Louisianan",
+				"primaryTag": null,
+				"color": [189, 139, 29]
+			},
+			{
+				"id": "basque_californian",
+				"name": "Basque Californian",
+				"primaryTag": null,
+				"color": [189, 148, 2]
+			},
+			{
+				"id": "basque_mexican",
+				"name": "Basque Mexican",
+				"primaryTag": null,
+				"color": [189, 164, 0]
+			},
+			{
+				"id": "basque_caribbean",
+				"name": "Basque Caribbean",
+				"primaryTag": null,
+				"color": [218, 212, 64]
+			},
+			{
+				"id": "basque_colombian",
+				"name": "Basque Colombian",
+				"primaryTag": null,
+				"color": [209, 218, 33]
+			},
+			{
+				"id": "basque_peruvian",
+				"name": "Basque Peruvian",
+				"primaryTag": null,
+				"color": [218, 152, 2]
+			},
+			{
+				"id": "basque_la_platan",
+				"name": "Basque La Platan",
+				"primaryTag": null,
+				"color": [218, 171, 0]
+			},
+			{
+				"id": "basque_brazilian",
+				"name": "Basque Brazilian",
+				"primaryTag": null,
+				"color": [159, 144, 47]
+			},
+			{
+				"id": "basque_australian",
+				"name": "Basque Australian",
+				"primaryTag": null,
+				"color": [159, 154, 24]
+			},
+			{
+				"id": "basque_oceanian",
+				"name": "Basque Oceanian",
+				"primaryTag": null,
+				"color": [151, 159, 2]
+			}
+		]
+	},
+	{
+		"id": "french",
+		"name": "French",
+		"cultures": [
+			{
+				"id": "cosmopolitan_french",
+				"name": "French",
+				"primaryTag": "FRA",
+				"color": [83, 150, 166]
+			},
+			{
+				"id": "gascon",
+				"name": "Gascon",
+				"primaryTag": "GUY",
+				"color": [66, 138, 166]
+			},
+			{
+				"id": "normand",
+				"name": "Normand",
+				"primaryTag": "NRM",
+				"color": [49, 123, 166]
+			},
+			{
+				"id": "aquitaine",
+				"name": "Aquitaine",
+				"primaryTag": "TOU",
+				"color": [32, 105, 166]
+			},
+			{
+				"id": "burgundian",
+				"name": "Burgundian",
+				"primaryTag": "BUR",
+				"color": [98, 143, 197]
+			},
+			{
+				"id": "occitain",
+				"name": "Occitain",
+				"primaryTag": "PRO",
+				"color": [78, 175, 197]
+			},
+			{
+				"id": "wallonian",
+				"name": "Wallonian",
+				"primaryTag": "HAI",
+				"color": [58, 159, 197]
+			},
+			{
+				"id": "arpitan",
+				"name": "Arpitan",
+				"primaryTag": null,
+				"color": [39, 139, 197]
+			},
+			{
+				"id": "anglois",
+				"name": "Anglois",
+				"primaryTag": null,
+				"color": [114, 176, 228]
+			},
+			{
+				"id": "french_canadian",
+				"name": "French Canadian",
+				"primaryTag": null,
+				"color": [91, 153, 228]
+			},
+			{
+				"id": "french_east_american",
+				"name": "French East American",
+				"primaryTag": null,
+				"color": [68, 198, 228]
+			},
+			{
+				"id": "french_louisianan",
+				"name": "French Louisianan",
+				"primaryTag": null,
+				"color": [45, 177, 228]
+			},
+			{
+				"id": "french_californian",
+				"name": "French Californian",
+				"primaryTag": null,
+				"color": [83, 135, 166]
+			},
+			{
+				"id": "french_mexican",
+				"name": "French Mexican",
+				"primaryTag": null,
+				"color": [66, 120, 166]
+			},
+			{
+				"id": "french_caribbean",
+				"name": "French Caribbean",
+				"primaryTag": null,
+				"color": [49, 102, 166]
+			},
+			{
+				"id": "french_colombian",
+				"name": "French Colombian",
+				"primaryTag": null,
+				"color": [32, 141, 166]
+			},
+			{
+				"id": "french_peruvian",
+				"name": "French Peruvian",
+				"primaryTag": null,
+				"color": [98, 170, 197]
+			},
+			{
+				"id": "french_la_platan",
+				"name": "French La Platan",
+				"primaryTag": null,
+				"color": [78, 153, 197]
+			},
+			{
+				"id": "french_brazilian",
+				"name": "French Brazilian",
+				"primaryTag": null,
+				"color": [58, 134, 197]
+			},
+			{
+				"id": "french_australian",
+				"name": "French Australian",
+				"primaryTag": null,
+				"color": [39, 110, 197]
+			},
+			{
+				"id": "french_oceanian",
+				"name": "French Oceanian",
+				"primaryTag": null,
+				"color": [114, 207, 228]
+			}
+		]
+	},
+	{
+		"id": "finno_ugric",
+		"name": "Finno Ugric",
+		"cultures": [
+			{
+				"id": "finnish",
+				"name": "Finnish",
+				"primaryTag": "FIN",
+				"color": [107, 144, 150]
+			},
+			{
+				"id": "estonian",
+				"name": "Estonian",
+				"primaryTag": null,
+				"color": [99, 138, 150]
+			},
+			{
+				"id": "sapmi",
+				"name": "Sapmi",
+				"primaryTag": "SMI",
+				"color": [90, 131, 150]
+			},
+			{
+				"id": "ingrian",
+				"name": "Ingrian",
+				"primaryTag": "CUD",
+				"color": [82, 122, 150]
+			},
+			{
+				"id": "karelian",
+				"name": "Karelian",
+				"primaryTag": "KRL",
+				"color": [128, 153, 178]
+			},
+			{
+				"id": "veps",
+				"name": "Veps",
+				"primaryTag": "VEP",
+				"color": [117, 169, 178]
+			},
+			{
+				"id": "volga_finnic",
+				"name": "Volga Finnic",
+				"primaryTag": "MA0",
+				"color": [107, 162, 178]
+			},
+			{
+				"id": "meshchera",
+				"name": "Meshchera",
+				"primaryTag": "MES",
+				"color": [97, 152, 178]
+			},
+			{
+				"id": "merya",
+				"name": "Merya",
+				"primaryTag": "MRY",
+				"color": [148, 182, 206]
+			},
+			{
+				"id": "muromian",
+				"name": "Muromian",
+				"primaryTag": "MUR",
+				"color": [136, 171, 206]
+			},
+			{
+				"id": "mordvin",
+				"name": "Mordvin",
+				"primaryTag": "MRD",
+				"color": [124, 194, 206]
+			},
+			{
+				"id": "uralic",
+				"name": "Uralic",
+				"primaryTag": "PRM",
+				"color": [113, 184, 206]
+			},
+			{
+				"id": "samoyed",
+				"name": "Samoyed",
+				"primaryTag": "SMY",
+				"color": [107, 136, 150]
+			},
+			{
+				"id": "selkup",
+				"name": "Selkup",
+				"primaryTag": null,
+				"color": [99, 129, 150]
+			},
+			{
+				"id": "ostyaki",
+				"name": "Ostyaki",
+				"primaryTag": null,
+				"color": [90, 120, 150]
+			},
+			{
+				"id": "finno_ugric_canadian",
+				"name": "Finno Ugric Canadian",
+				"primaryTag": null,
+				"color": [82, 140, 150]
+			},
+			{
+				"id": "finno_ugric_east_american",
+				"name": "Finno Ugric East American",
+				"primaryTag": null,
+				"color": [128, 166, 178]
+			},
+			{
+				"id": "finno_ugric_louisianan",
+				"name": "Finno Ugric Louisianan",
+				"primaryTag": null,
+				"color": [117, 158, 178]
+			},
+			{
+				"id": "finno_ugric_californian",
+				"name": "Finno Ugric Californian",
+				"primaryTag": null,
+				"color": [107, 149, 178]
+			},
+			{
+				"id": "finno_ugric_mexican",
+				"name": "Finno Ugric Mexican",
+				"primaryTag": null,
+				"color": [97, 137, 178]
+			},
+			{
+				"id": "finno_ugric_caribbean",
+				"name": "Finno Ugric Caribbean",
+				"primaryTag": null,
+				"color": [148, 198, 206]
+			},
+			{
+				"id": "finno_ugric_colombian",
+				"name": "Finno Ugric Colombian",
+				"primaryTag": null,
+				"color": [136, 190, 206]
+			},
+			{
+				"id": "finno_ugric_peruvian",
+				"name": "Finno Ugric Peruvian",
+				"primaryTag": null,
+				"color": [124, 180, 206]
+			},
+			{
+				"id": "finno_ugric_la_platan",
+				"name": "Finno Ugric La Platan",
+				"primaryTag": null,
+				"color": [113, 168, 206]
+			},
+			{
+				"id": "finno_ugric_brazilian",
+				"name": "Finno Ugric Brazilian",
+				"primaryTag": null,
+				"color": [107, 128, 150]
+			},
+			{
+				"id": "finno_ugric_australian",
+				"name": "Finno Ugric Australian",
+				"primaryTag": null,
+				"color": [99, 143, 150]
+			},
+			{
+				"id": "finno_ugric_oceanian",
+				"name": "Finno Ugric Oceanian",
+				"primaryTag": null,
+				"color": [90, 136, 150]
+			}
+		]
+	},
+	{
+		"id": "south_slavic",
+		"name": "South Slavic",
+		"cultures": [
+			{
+				"id": "croatian",
+				"name": "Croatian",
+				"primaryTag": "CRO",
+				"color": [164, 138, 99]
+			},
+			{
+				"id": "serbian",
+				"name": "Serbian",
+				"primaryTag": "SER",
+				"color": [164, 139, 86]
+			},
+			{
+				"id": "bulgarian",
+				"name": "Bulgarian",
+				"primaryTag": "BUL",
+				"color": [164, 143, 73]
+			},
+			{
+				"id": "bosnian",
+				"name": "Bosnian",
+				"primaryTag": "BOS",
+				"color": [164, 150, 60]
+			},
+			{
+				"id": "slovene",
+				"name": "Slovene",
+				"primaryTag": "SLO",
+				"color": [195, 191, 118]
+			},
+			{
+				"id": "macedonian",
+				"name": "Macedonian",
+				"primaryTag": "MAC",
+				"color": [195, 157, 102]
+			},
+			{
+				"id": "south_slavic_canadian",
+				"name": "South Slavic Canadian",
+				"primaryTag": null,
+				"color": [195, 160, 86]
+			},
+			{
+				"id": "south_slavic_east_american",
+				"name": "South Slavic East American",
+				"primaryTag": null,
+				"color": [195, 167, 71]
+			},
+			{
+				"id": "south_slavic_louisianan",
+				"name": "South Slavic Louisianan",
+				"primaryTag": null,
+				"color": [226, 214, 136]
+			},
+			{
+				"id": "south_slavic_californian",
+				"name": "South Slavic Californian",
+				"primaryTag": null,
+				"color": [226, 221, 118]
+			},
+			{
+				"id": "south_slavic_mexican",
+				"name": "South Slavic Mexican",
+				"primaryTag": null,
+				"color": [226, 175, 100]
+			},
+			{
+				"id": "south_slavic_caribbean",
+				"name": "South Slavic Caribbean",
+				"primaryTag": null,
+				"color": [226, 180, 82]
+			},
+			{
+				"id": "south_slavic_colombian",
+				"name": "South Slavic Colombian",
+				"primaryTag": null,
+				"color": [164, 149, 99]
+			},
+			{
+				"id": "south_slavic_peruvian",
+				"name": "South Slavic Peruvian",
+				"primaryTag": null,
+				"color": [164, 153, 86]
+			},
+			{
+				"id": "south_slavic_la_platan",
+				"name": "South Slavic La Platan",
+				"primaryTag": null,
+				"color": [164, 160, 73]
+			},
+			{
+				"id": "south_slavic_brazilian",
+				"name": "South Slavic Brazilian",
+				"primaryTag": null,
+				"color": [164, 121, 60]
+			},
+			{
+				"id": "south_slavic_australian",
+				"name": "South Slavic Australian",
+				"primaryTag": null,
+				"color": [195, 170, 118]
+			},
+			{
+				"id": "south_slavic_oceanian",
+				"name": "South Slavic Oceanian",
+				"primaryTag": null,
+				"color": [195, 174, 102]
+			}
+		]
+	},
+	{
+		"id": "west_slavic",
+		"name": "West Slavic",
+		"cultures": [
+			{
+				"id": "czech",
+				"name": "Czech",
+				"primaryTag": "BOH",
+				"color": [156, 124, 134]
+			},
+			{
+				"id": "polish",
+				"name": "Polish",
+				"primaryTag": "POL",
+				"color": [156, 122, 130]
+			},
+			{
+				"id": "schlesian",
+				"name": "Schlesian",
+				"primaryTag": "SIL",
+				"color": [156, 117, 122]
+			},
+			{
+				"id": "slovak",
+				"name": "Slovak",
+				"primaryTag": "SVK",
+				"color": [156, 111, 113]
+			},
+			{
+				"id": "sorbian",
+				"name": "Sorbian",
+				"primaryTag": "SRB",
+				"color": [185, 150, 148]
+			},
+			{
+				"id": "kashubian",
+				"name": "Kashubian",
+				"primaryTag": "PMR",
+				"color": [185, 145, 158]
+			},
+			{
+				"id": "polabian",
+				"name": "Polabian",
+				"primaryTag": "VEL",
+				"color": [185, 139, 149]
+			},
+			{
+				"id": "west_slavic_canadian",
+				"name": "West Slavic Canadian",
+				"primaryTag": null,
+				"color": [185, 132, 139]
+			},
+			{
+				"id": "west_slavic_east_american",
+				"name": "West Slavic East American",
+				"primaryTag": null,
+				"color": [214, 171, 173]
+			},
+			{
+				"id": "west_slavic_louisianan",
+				"name": "West Slavic Louisianan",
+				"primaryTag": null,
+				"color": [214, 171, 168]
+			},
+			{
+				"id": "west_slavic_californian",
+				"name": "West Slavic Californian",
+				"primaryTag": null,
+				"color": [214, 161, 177]
+			},
+			{
+				"id": "west_slavic_mexican",
+				"name": "West Slavic Mexican",
+				"primaryTag": null,
+				"color": [214, 153, 167]
+			},
+			{
+				"id": "west_slavic_caribbean",
+				"name": "West Slavic Caribbean",
+				"primaryTag": null,
+				"color": [156, 124, 128]
+			},
+			{
+				"id": "west_slavic_colombian",
+				"name": "West Slavic Colombian",
+				"primaryTag": null,
+				"color": [156, 122, 124]
+			},
+			{
+				"id": "west_slavic_peruvian",
+				"name": "West Slavic Peruvian",
+				"primaryTag": null,
+				"color": [156, 119, 117]
+			},
+			{
+				"id": "west_slavic_la_platan",
+				"name": "West Slavic La Platan",
+				"primaryTag": null,
+				"color": [156, 111, 125]
+			},
+			{
+				"id": "west_slavic_brazilian",
+				"name": "West Slavic Brazilian",
+				"primaryTag": null,
+				"color": [185, 148, 156]
+			},
+			{
+				"id": "west_slavic_australian",
+				"name": "West Slavic Australian",
+				"primaryTag": null,
+				"color": [185, 145, 151]
+			},
+			{
+				"id": "west_slavic_oceanian",
+				"name": "West Slavic Oceanian",
+				"primaryTag": null,
+				"color": [185, 139, 141]
+			}
+		]
+	},
+	{
+		"id": "oghur",
+		"name": "Oghur",
+		"cultures": [
+			{
+				"id": "hungarian",
+				"name": "Hungarian",
+				"primaryTag": "HUN",
+				"color": [94, 130, 152]
+			},
+			{
+				"id": "transylvanian",
+				"name": "Transylvanian",
+				"primaryTag": null,
+				"color": [82, 119, 152]
+			},
+			{
+				"id": "hunnic",
+				"name": "Hunnic",
+				"primaryTag": "HNS",
+				"color": [71, 106, 152]
+			},
+			{
+				"id": "khazar",
+				"name": "Khazar",
+				"primaryTag": "KHZ",
+				"color": [59, 91, 152]
+			},
+			{
+				"id": "avar",
+				"name": "Avar",
+				"primaryTag": "AVR",
+				"color": [112, 129, 181]
+			},
+			{
+				"id": "bulgar",
+				"name": "Bulgar",
+				"primaryTag": null,
+				"color": [98, 149, 181]
+			},
+			{
+				"id": "magyar_canadian",
+				"name": "Magyar Canadian",
+				"primaryTag": null,
+				"color": [84, 135, 181]
+			},
+			{
+				"id": "magyar_east_american",
+				"name": "Magyar East American",
+				"primaryTag": null,
+				"color": [70, 118, 181]
+			},
+			{
+				"id": "magyar_louisianan",
+				"name": "Magyar Louisianan",
+				"primaryTag": null,
+				"color": [130, 157, 210]
+			},
+			{
+				"id": "magyar_californian",
+				"name": "Magyar Californian",
+				"primaryTag": null,
+				"color": [114, 138, 210]
+			},
+			{
+				"id": "magyar_mexican",
+				"name": "Magyar Mexican",
+				"primaryTag": null,
+				"color": [98, 166, 210]
+			},
+			{
+				"id": "magyar_caribbean",
+				"name": "Magyar Caribbean",
+				"primaryTag": null,
+				"color": [82, 149, 210]
+			},
+			{
+				"id": "magyar_colombian",
+				"name": "Magyar Colombian",
+				"primaryTag": null,
+				"color": [94, 119, 152]
+			},
+			{
+				"id": "magyar_peruvian",
+				"name": "Magyar Peruvian",
+				"primaryTag": null,
+				"color": [82, 106, 152]
+			},
+			{
+				"id": "magyar_la_platan",
+				"name": "Magyar La Platan",
+				"primaryTag": null,
+				"color": [71, 91, 152]
+			},
+			{
+				"id": "magyar_brazilian",
+				"name": "Magyar Brazilian",
+				"primaryTag": null,
+				"color": [59, 116, 152]
+			},
+			{
+				"id": "magyar_australian",
+				"name": "Magyar Australian",
+				"primaryTag": null,
+				"color": [112, 148, 181]
+			},
+			{
+				"id": "magyar_oceanian",
+				"name": "Magyar Oceanian",
+				"primaryTag": null,
+				"color": [98, 134, 181]
+			}
+		]
+	},
+	{
+		"id": "east_slavic",
+		"name": "East Slavic",
+		"cultures": [
+			{
+				"id": "russian",
+				"name": "Russian",
+				"primaryTag": "RUS",
+				"color": [184, 131, 53]
+			},
+			{
+				"id": "novgorodian",
+				"name": "Novgorodian",
+				"primaryTag": "NOV",
+				"color": [184, 134, 27]
+			},
+			{
+				"id": "byelorussian",
+				"name": "Byelorussian",
+				"primaryTag": "BLR",
+				"color": [184, 142, 0]
+			},
+			{
+				"id": "ruthenian",
+				"name": "Ruthenian",
+				"primaryTag": "UKR",
+				"color": [184, 159, 0]
+			},
+			{
+				"id": "east_slavic_canadian",
+				"name": "East Slavic Canadian",
+				"primaryTag": null,
+				"color": [219, 211, 63]
+			},
+			{
+				"id": "east_slavic_east_american",
+				"name": "East Slavic East American",
+				"primaryTag": null,
+				"color": [219, 142, 32]
+			},
+			{
+				"id": "east_slavic_louisianan",
+				"name": "East Slavic Louisianan",
+				"primaryTag": null,
+				"color": [219, 149, 0]
+			},
+			{
+				"id": "east_slavic_californian",
+				"name": "East Slavic Californian",
+				"primaryTag": null,
+				"color": [219, 169, 0]
+			},
+			{
+				"id": "east_slavic_mexican",
+				"name": "East Slavic Mexican",
+				"primaryTag": null,
+				"color": [254, 229, 73]
+			},
+			{
+				"id": "east_slavic_caribbean",
+				"name": "East Slavic Caribbean",
+				"primaryTag": null,
+				"color": [254, 243, 37]
+			},
+			{
+				"id": "east_slavic_colombian",
+				"name": "East Slavic Colombian",
+				"primaryTag": null,
+				"color": [254, 150, 1]
+			},
+			{
+				"id": "east_slavic_peruvian",
+				"name": "East Slavic Peruvian",
+				"primaryTag": null,
+				"color": [254, 173, 0]
+			},
+			{
+				"id": "east_slavic_la_platan",
+				"name": "East Slavic La Platan",
+				"primaryTag": null,
+				"color": [184, 154, 53]
+			},
+			{
+				"id": "east_slavic_brazilian",
+				"name": "East Slavic Brazilian",
+				"primaryTag": null,
+				"color": [184, 162, 27]
+			},
+			{
+				"id": "east_slavic_australian",
+				"name": "East Slavic Australian",
+				"primaryTag": null,
+				"color": [184, 175, 0]
+			},
+			{
+				"id": "east_slavic_oceanian",
+				"name": "East Slavic Oceanian",
+				"primaryTag": null,
+				"color": [184, 109, 0]
+			}
+		]
+	},
+	{
+		"id": "baltic",
+		"name": "Baltic",
+		"cultures": [
+			{
+				"id": "lithuanian",
+				"name": "Lithuanian",
+				"primaryTag": "LIT",
+				"color": [112, 93, 116]
+			},
+			{
+				"id": "old_prussian",
+				"name": "Old Prussian",
+				"primaryTag": "PRS",
+				"color": [114, 89, 116]
+			},
+			{
+				"id": "latvian",
+				"name": "Latvian",
+				"primaryTag": "LTV",
+				"color": [116, 84, 116]
+			},
+			{
+				"id": "yotvingian",
+				"name": "Yotvingian",
+				"primaryTag": "YOT",
+				"color": [116, 80, 113]
+			},
+			{
+				"id": "baltic_canadian",
+				"name": "Baltic Canadian",
+				"primaryTag": null,
+				"color": [138, 110, 133]
+			},
+			{
+				"id": "baltic_east_american",
+				"name": "Baltic East American",
+				"primaryTag": null,
+				"color": [132, 106, 138]
+			},
+			{
+				"id": "baltic_louisianan",
+				"name": "Baltic Louisianan",
+				"primaryTag": null,
+				"color": [135, 100, 138]
+			},
+			{
+				"id": "baltic_californian",
+				"name": "Baltic Californian",
+				"primaryTag": null,
+				"color": [138, 95, 138]
+			},
+			{
+				"id": "baltic_mexican",
+				"name": "Baltic Mexican",
+				"primaryTag": null,
+				"color": [160, 128, 157]
+			},
+			{
+				"id": "baltic_caribbean",
+				"name": "Baltic Caribbean",
+				"primaryTag": null,
+				"color": [160, 122, 153]
+			},
+			{
+				"id": "baltic_colombian",
+				"name": "Baltic Colombian",
+				"primaryTag": null,
+				"color": [152, 116, 160]
+			},
+			{
+				"id": "baltic_peruvian",
+				"name": "Baltic Peruvian",
+				"primaryTag": null,
+				"color": [156, 110, 160]
+			},
+			{
+				"id": "baltic_la_platan",
+				"name": "Baltic La Platan",
+				"primaryTag": null,
+				"color": [116, 93, 116]
+			},
+			{
+				"id": "baltic_brazilian",
+				"name": "Baltic Brazilian",
+				"primaryTag": null,
+				"color": [116, 89, 114]
+			},
+			{
+				"id": "baltic_australian",
+				"name": "Baltic Australian",
+				"primaryTag": null,
+				"color": [116, 84, 111]
+			},
+			{
+				"id": "baltic_oceanian",
+				"name": "Baltic Oceanian",
+				"primaryTag": null,
+				"color": [110, 80, 116]
+			}
+		]
+	},
+	{
+		"id": "byzantine",
+		"name": "Byzantine",
+		"cultures": [
+			{
+				"id": "greek",
+				"name": "Greek",
+				"primaryTag": "GRE",
+				"color": [81, 133, 162]
+			},
+			{
+				"id": "pontic_greek",
+				"name": "Pontic Greek",
+				"primaryTag": "PON",
+				"color": [65, 118, 162]
+			},
+			{
+				"id": "cappadocian_greek",
+				"name": "Cappadocian Greek",
+				"primaryTag": "CAP",
+				"color": [49, 101, 162]
+			},
+			{
+				"id": "bactrian",
+				"name": "Bactrian",
+				"primaryTag": "GRB",
+				"color": [33, 80, 162]
+			},
+			{
+				"id": "griko",
+				"name": "Griko",
+				"primaryTag": "NAP",
+				"color": [97, 123, 192]
+			},
+			{
+				"id": "phrygian",
+				"name": "Phrygian",
+				"primaryTag": null,
+				"color": [78, 151, 192]
+			},
+			{
+				"id": "byzantine_canadian",
+				"name": "Byzantine Canadian",
+				"primaryTag": null,
+				"color": [59, 132, 192]
+			},
+			{
+				"id": "byzantine_east_american",
+				"name": "Byzantine East American",
+				"primaryTag": null,
+				"color": [40, 109, 192]
+			},
+			{
+				"id": "byzantine_louisianan",
+				"name": "Byzantine Louisianan",
+				"primaryTag": null,
+				"color": [112, 153, 223]
+			},
+			{
+				"id": "byzantine_californian",
+				"name": "Byzantine Californian",
+				"primaryTag": null,
+				"color": [90, 127, 223]
+			},
+			{
+				"id": "byzantine_mexican",
+				"name": "Byzantine Mexican",
+				"primaryTag": null,
+				"color": [68, 166, 223]
+			},
+			{
+				"id": "byzantine_caribbean",
+				"name": "Byzantine Caribbean",
+				"primaryTag": null,
+				"color": [46, 142, 223]
+			},
+			{
+				"id": "byzantine_colombian",
+				"name": "Byzantine Colombian",
+				"primaryTag": null,
+				"color": [81, 118, 162]
+			},
+			{
+				"id": "byzantine_peruvian",
+				"name": "Byzantine Peruvian",
+				"primaryTag": null,
+				"color": [65, 101, 162]
+			},
+			{
+				"id": "byzantine_la_platan",
+				"name": "Byzantine La Platan",
+				"primaryTag": null,
+				"color": [49, 80, 162]
+			},
+			{
+				"id": "byzantine_brazilian",
+				"name": "Byzantine Brazilian",
+				"primaryTag": null,
+				"color": [33, 115, 162]
+			},
+			{
+				"id": "byzantine_australian",
+				"name": "Byzantine Australian",
+				"primaryTag": null,
+				"color": [97, 149, 192]
+			},
+			{
+				"id": "byzantine_oceanian",
+				"name": "Byzantine Oceanian",
+				"primaryTag": null,
+				"color": [78, 130, 192]
+			}
+		]
+	},
+	{
+		"id": "carpathian",
+		"name": "Carpathian",
+		"cultures": [
+			{
+				"id": "dacian",
+				"name": "Dacian",
+				"primaryTag": "DAC",
+				"color": [67, 126, 95]
+			},
+			{
+				"id": "thracian",
+				"name": "Thracian",
+				"primaryTag": "ODR",
+				"color": [55, 126, 96]
+			},
+			{
+				"id": "romanian",
+				"name": "Romanian",
+				"primaryTag": "RMN",
+				"color": [43, 126, 98]
+			},
+			{
+				"id": "eastern_balkan_canadian",
+				"name": "Eastern Balkan Canadian",
+				"primaryTag": null,
+				"color": [31, 126, 103]
+			},
+			{
+				"id": "eastern_balkan_east_american",
+				"name": "Eastern Balkan East American",
+				"primaryTag": null,
+				"color": [79, 150, 139]
+			},
+			{
+				"id": "eastern_balkan_louisianan",
+				"name": "Eastern Balkan Louisianan",
+				"primaryTag": null,
+				"color": [65, 150, 106]
+			},
+			{
+				"id": "eastern_balkan_californian",
+				"name": "Eastern Balkan Californian",
+				"primaryTag": null,
+				"color": [51, 150, 108]
+			},
+			{
+				"id": "eastern_balkan_mexican",
+				"name": "Eastern Balkan Mexican",
+				"primaryTag": null,
+				"color": [37, 150, 112]
+			},
+			{
+				"id": "eastern_balkan_caribbean",
+				"name": "Eastern Balkan Caribbean",
+				"primaryTag": null,
+				"color": [92, 173, 153]
+			},
+			{
+				"id": "eastern_balkan_colombian",
+				"name": "Eastern Balkan Colombian",
+				"primaryTag": null,
+				"color": [75, 173, 158]
+			},
+			{
+				"id": "eastern_balkan_peruvian",
+				"name": "Eastern Balkan Peruvian",
+				"primaryTag": null,
+				"color": [59, 173, 115]
+			},
+			{
+				"id": "eastern_balkan_la_platan",
+				"name": "Eastern Balkan La Platan",
+				"primaryTag": null,
+				"color": [43, 173, 118]
+			},
+			{
+				"id": "eastern_balkan_brazilian",
+				"name": "Eastern Balkan Brazilian",
+				"primaryTag": null,
+				"color": [67, 126, 106]
+			},
+			{
+				"id": "eastern_balkan_australian",
+				"name": "Eastern Balkan Australian",
+				"primaryTag": null,
+				"color": [55, 126, 109]
+			},
+			{
+				"id": "eastern_balkan_oceanian",
+				"name": "Eastern Balkan Oceanian",
+				"primaryTag": null,
+				"color": [43, 126, 113]
+			}
+		]
+	},
+	{
+		"id": "western_balkan",
+		"name": "Western Balkan",
+		"cultures": [
+			{
+				"id": "illyrian",
+				"name": "Illyrian",
+				"primaryTag": null,
+				"color": [37, 140, 142]
+			},
+			{
+				"id": "pannonian",
+				"name": "Pannonian",
+				"primaryTag": null,
+				"color": [17, 129, 142]
+			},
+			{
+				"id": "albanian",
+				"name": "Albanian",
+				"primaryTag": "ALB",
+				"color": [0, 114, 142]
+			},
+			{
+				"id": "western_balkan_canadian",
+				"name": "Western Balkan Canadian",
+				"primaryTag": null,
+				"color": [0, 101, 142]
+			},
+			{
+				"id": "western_balkan_east_american",
+				"name": "Western Balkan East American",
+				"primaryTag": null,
+				"color": [45, 122, 169]
+			},
+			{
+				"id": "western_balkan_louisianan",
+				"name": "Western Balkan Louisianan",
+				"primaryTag": null,
+				"color": [20, 166, 169]
+			},
+			{
+				"id": "western_balkan_californian",
+				"name": "Western Balkan Californian",
+				"primaryTag": null,
+				"color": [0, 151, 169]
+			},
+			{
+				"id": "western_balkan_mexican",
+				"name": "Western Balkan Mexican",
+				"primaryTag": null,
+				"color": [0, 136, 169]
+			},
+			{
+				"id": "western_balkan_caribbean",
+				"name": "Western Balkan Caribbean",
+				"primaryTag": null,
+				"color": [52, 154, 195]
+			},
+			{
+				"id": "western_balkan_colombian",
+				"name": "Western Balkan Colombian",
+				"primaryTag": null,
+				"color": [23, 131, 195]
+			},
+			{
+				"id": "western_balkan_peruvian",
+				"name": "Western Balkan Peruvian",
+				"primaryTag": null,
+				"color": [0, 192, 195]
+			},
+			{
+				"id": "western_balkan_la_platan",
+				"name": "Western Balkan La Platan",
+				"primaryTag": null,
+				"color": [0, 175, 195]
+			},
+			{
+				"id": "western_balkan_brazilian",
+				"name": "Western Balkan Brazilian",
+				"primaryTag": null,
+				"color": [37, 121, 142]
+			},
+			{
+				"id": "western_balkan_australian",
+				"name": "Western Balkan Australian",
+				"primaryTag": null,
+				"color": [17, 106, 142]
+			},
+			{
+				"id": "western_balkan_oceanian",
+				"name": "Western Balkan Oceanian",
+				"primaryTag": null,
+				"color": [0, 88, 142]
+			}
+		]
+	},
+	{
+		"id": "caucasian",
+		"name": "Caucasian",
+		"cultures": [
+			{
+				"id": "georgian",
+				"name": "Georgian",
+				"primaryTag": "GEO",
+				"color": [152, 105, 126]
+			},
+			{
+				"id": "circassian",
+				"name": "Circassian",
+				"primaryTag": "CIR",
+				"color": [152, 96, 116]
+			},
+			{
+				"id": "dagestani",
+				"name": "Dagestani",
+				"primaryTag": "GAZ",
+				"color": [152, 87, 104]
+			},
+			{
+				"id": "armenian",
+				"name": "Armenian",
+				"primaryTag": "ARM",
+				"color": [152, 77, 90]
+			},
+			{
+				"id": "aghwan",
+				"name": "Aghwan",
+				"primaryTag": "CAA",
+				"color": [181, 125, 130]
+			},
+			{
+				"id": "caucasian_canadian",
+				"name": "Caucasian Canadian",
+				"primaryTag": null,
+				"color": [181, 114, 143]
+			},
+			{
+				"id": "caucasian_east_american",
+				"name": "Caucasian East American",
+				"primaryTag": null,
+				"color": [181, 103, 130]
+			},
+			{
+				"id": "caucasian_louisianan",
+				"name": "Caucasian Louisianan",
+				"primaryTag": null,
+				"color": [181, 92, 115]
+			},
+			{
+				"id": "caucasian_californian",
+				"name": "Caucasian Californian",
+				"primaryTag": null,
+				"color": [210, 145, 156]
+			},
+			{
+				"id": "caucasian_mexican",
+				"name": "Caucasian Mexican",
+				"primaryTag": null,
+				"color": [210, 132, 138]
+			},
+			{
+				"id": "caucasian_caribbean",
+				"name": "Caucasian Caribbean",
+				"primaryTag": null,
+				"color": [210, 120, 159]
+			},
+			{
+				"id": "caucasian_colombian",
+				"name": "Caucasian Colombian",
+				"primaryTag": null,
+				"color": [210, 107, 142]
+			},
+			{
+				"id": "caucasian_peruvian",
+				"name": "Caucasian Peruvian",
+				"primaryTag": null,
+				"color": [152, 105, 118]
+			},
+			{
+				"id": "caucasian_la_platan",
+				"name": "Caucasian La Platan",
+				"primaryTag": null,
+				"color": [152, 96, 105]
+			},
+			{
+				"id": "caucasian_brazilian",
+				"name": "Caucasian Brazilian",
+				"primaryTag": null,
+				"color": [152, 87, 92]
+			},
+			{
+				"id": "caucasian_australian",
+				"name": "Caucasian Australian",
+				"primaryTag": null,
+				"color": [152, 77, 110]
+			},
+			{
+				"id": "caucasian_oceanian",
+				"name": "Caucasian Oceanian",
+				"primaryTag": null,
+				"color": [181, 125, 145]
+			}
+		]
+	},
+	{
+		"id": "turko_semitic",
+		"name": "Turko Semitic",
+		"cultures": [
+			{
+				"id": "al_suryah_arabic",
+				"name": "Syrian",
+				"primaryTag": "SYR",
+				"color": [125, 122, 77]
+			},
+			{
+				"id": "al_iraqiya_arabic",
+				"name": "Mashriqi",
+				"primaryTag": "IRQ",
+				"color": [123, 125, 67]
+			},
+			{
+				"id": "gulf_arabic",
+				"name": "Khaleeji",
+				"primaryTag": "ALH",
+				"color": [117, 125, 57]
+			},
+			{
+				"id": "mahri_culture",
+				"name": "Mahri",
+				"primaryTag": "MHR",
+				"color": [109, 125, 47]
+			},
+			{
+				"id": "hejazi_culture",
+				"name": "Hejazi",
+				"primaryTag": "HED",
+				"color": [131, 149, 91]
+			},
+			{
+				"id": "bedouin_arabic",
+				"name": "Bedouin",
+				"primaryTag": "NAJ",
+				"color": [149, 145, 79]
+			},
+			{
+				"id": "nabataean_culture",
+				"name": "Nabataean",
+				"primaryTag": "NAB",
+				"color": [146, 149, 68]
+			},
+			{
+				"id": "omani_culture",
+				"name": "Omani",
+				"primaryTag": "OMA",
+				"color": [137, 149, 56]
+			},
+			{
+				"id": "yemeni_culture",
+				"name": "Yemeni",
+				"primaryTag": "ADE",
+				"color": [158, 172, 105]
+			},
+			{
+				"id": "palestinian",
+				"name": "Palestinian",
+				"primaryTag": "PLS",
+				"color": [148, 172, 92]
+			},
+			{
+				"id": "al_misr_arabic",
+				"name": "Egyptian",
+				"primaryTag": "EGY",
+				"color": [172, 167, 79]
+			},
+			{
+				"id": "saidi",
+				"name": "Saidi",
+				"primaryTag": null,
+				"color": [169, 172, 65]
+			},
+			{
+				"id": "sudanese",
+				"name": "Sudanese",
+				"primaryTag": "SUD",
+				"color": [119, 125, 77]
+			},
+			{
+				"id": "turko_semitic_canadian",
+				"name": "Turko Semitic Canadian",
+				"primaryTag": null,
+				"color": [113, 125, 67]
+			},
+			{
+				"id": "turko_semitic_east_american",
+				"name": "Turko Semitic East American",
+				"primaryTag": null,
+				"color": [104, 125, 57]
+			},
+			{
+				"id": "turko_semitic_louisianan",
+				"name": "Turko Semitic Louisianan",
+				"primaryTag": null,
+				"color": [125, 121, 47]
+			},
+			{
+				"id": "turko_semitic_californian",
+				"name": "Turko Semitic Californian",
+				"primaryTag": null,
+				"color": [147, 149, 91]
+			},
+			{
+				"id": "turko_semitic_mexican",
+				"name": "Turko Semitic Mexican",
+				"primaryTag": null,
+				"color": [140, 149, 79]
+			},
+			{
+				"id": "turko_semitic_caribbean",
+				"name": "Turko Semitic Caribbean",
+				"primaryTag": null,
+				"color": [131, 149, 68]
+			},
+			{
+				"id": "turko_semitic_colombian",
+				"name": "Turko Semitic Colombian",
+				"primaryTag": null,
+				"color": [121, 149, 56]
+			},
+			{
+				"id": "turko_semitic_peruvian",
+				"name": "Turko Semitic Peruvian",
+				"primaryTag": null,
+				"color": [172, 168, 105]
+			},
+			{
+				"id": "turko_semitic_la_platan",
+				"name": "Turko Semitic La Platan",
+				"primaryTag": null,
+				"color": [170, 172, 92]
+			},
+			{
+				"id": "turko_semitic_brazilian",
+				"name": "Turko Semitic Brazilian",
+				"primaryTag": null,
+				"color": [161, 172, 79]
+			},
+			{
+				"id": "turko_semitic_australian",
+				"name": "Turko Semitic Australian",
+				"primaryTag": null,
+				"color": [149, 172, 65]
+			},
+			{
+				"id": "turko_semitic_oceanian",
+				"name": "Turko Semitic Oceanian",
+				"primaryTag": null,
+				"color": [110, 125, 77]
+			}
+		]
+	},
+	{
+		"id": "israeli_group",
+		"name": "Israeli Group",
+		"cultures": [
+			{
+				"id": "israeli",
+				"name": "Israeli",
+				"primaryTag": "ISR",
+				"color": [50, 83, 141]
+			},
+			{
+				"id": "israeli_canadian",
+				"name": "Israeli Canadian",
+				"primaryTag": null,
+				"color": [0, 12, 141]
+			},
+			{
+				"id": "israeli_east_american",
+				"name": "Israeli East American",
+				"primaryTag": null,
+				"color": [60, 60, 168]
+			},
+			{
+				"id": "israeli_louisianan",
+				"name": "Israeli Louisianan",
+				"primaryTag": null,
+				"color": [39, 85, 168]
+			},
+			{
+				"id": "israeli_californian",
+				"name": "Israeli Californian",
+				"primaryTag": null,
+				"color": [17, 58, 168]
+			},
+			{
+				"id": "israeli_mexican",
+				"name": "Israeli Mexican",
+				"primaryTag": null,
+				"color": [0, 30, 168]
+			},
+			{
+				"id": "israeli_caribbean",
+				"name": "Israeli Caribbean",
+				"primaryTag": null,
+				"color": [70, 81, 194]
+			},
+			{
+				"id": "israeli_colombian",
+				"name": "Israeli Colombian",
+				"primaryTag": null,
+				"color": [45, 45, 194]
+			},
+			{
+				"id": "israeli_peruvian",
+				"name": "Israeli Peruvian",
+				"primaryTag": null,
+				"color": [20, 82, 194]
+			},
+			{
+				"id": "israeli_la_platan",
+				"name": "Israeli La Platan",
+				"primaryTag": null,
+				"color": [0, 52, 194]
+			},
+			{
+				"id": "israeli_brazilian",
+				"name": "Israeli Brazilian",
+				"primaryTag": null,
+				"color": [50, 67, 141]
+			},
+			{
+				"id": "israeli_australian",
+				"name": "Israeli Australian",
+				"primaryTag": null,
+				"color": [32, 42, 141]
+			},
+			{
+				"id": "israeli_oceanian",
+				"name": "Israeli Oceanian",
+				"primaryTag": null,
+				"color": [14, 14, 141]
+			}
+		]
+	},
+	{
+		"id": "maghrebi",
+		"name": "Maghrebi",
+		"cultures": [
+			{
+				"id": "moroccan",
+				"name": "Moroccan",
+				"primaryTag": "MOR",
+				"color": [100, 80, 94]
+			},
+			{
+				"id": "tunisian",
+				"name": "Tunisian",
+				"primaryTag": "TUN",
+				"color": [100, 76, 91]
+			},
+			{
+				"id": "algerian",
+				"name": "Algerian",
+				"primaryTag": "ALG",
+				"color": [100, 72, 87]
+			},
+			{
+				"id": "berber",
+				"name": "Berber",
+				"primaryTag": "TLC",
+				"color": [100, 68, 82]
+			},
+			{
+				"id": "atlas",
+				"name": "Atlas",
+				"primaryTag": "ATL",
+				"color": [118, 95, 103]
+			},
+			{
+				"id": "eastern_berber",
+				"name": "Eastern Berber",
+				"primaryTag": "GAR",
+				"color": [118, 90, 111]
+			},
+			{
+				"id": "tuareg",
+				"name": "Tuareg",
+				"primaryTag": "AIR",
+				"color": [118, 85, 106]
+			},
+			{
+				"id": "haratin",
+				"name": "Haratin",
+				"primaryTag": null,
+				"color": [118, 81, 101]
+			},
+			{
+				"id": "maghrebi_canadian",
+				"name": "Maghrebi Canadian",
+				"primaryTag": null,
+				"color": [137, 110, 122]
+			},
+			{
+				"id": "maghrebi_east_american",
+				"name": "Maghrebi East American",
+				"primaryTag": null,
+				"color": [137, 104, 116]
+			},
+			{
+				"id": "maghrebi_louisianan",
+				"name": "Maghrebi Louisianan",
+				"primaryTag": null,
+				"color": [137, 99, 127]
+			},
+			{
+				"id": "maghrebi_californian",
+				"name": "Maghrebi Californian",
+				"primaryTag": null,
+				"color": [137, 93, 121]
+			},
+			{
+				"id": "maghrebi_mexican",
+				"name": "Maghrebi Mexican",
+				"primaryTag": null,
+				"color": [100, 80, 90]
+			},
+			{
+				"id": "maghrebi_caribbean",
+				"name": "Maghrebi Caribbean",
+				"primaryTag": null,
+				"color": [100, 76, 87]
+			},
+			{
+				"id": "maghrebi_colombian",
+				"name": "Maghrebi Colombian",
+				"primaryTag": null,
+				"color": [100, 72, 82]
+			},
+			{
+				"id": "maghrebi_peruvian",
+				"name": "Maghrebi Peruvian",
+				"primaryTag": null,
+				"color": [100, 68, 91]
+			},
+			{
+				"id": "maghrebi_la_platan",
+				"name": "Maghrebi La Platan",
+				"primaryTag": null,
+				"color": [118, 95, 110]
+			},
+			{
+				"id": "maghrebi_brazilian",
+				"name": "Maghrebi Brazilian",
+				"primaryTag": null,
+				"color": [118, 90, 105]
+			},
+			{
+				"id": "maghrebi_australian",
+				"name": "Maghrebi Australian",
+				"primaryTag": null,
+				"color": [118, 85, 100]
+			},
+			{
+				"id": "maghrebi_oceanian",
+				"name": "Maghrebi Oceanian",
+				"primaryTag": null,
+				"color": [118, 81, 94]
+			}
+		]
+	},
+	{
+		"id": "iranian",
+		"name": "Iranian",
+		"cultures": [
+			{
+				"id": "persian",
+				"name": "Persian",
+				"primaryTag": "PER",
+				"color": [110, 129, 97]
+			},
+			{
+				"id": "luri",
+				"name": "Luri",
+				"primaryTag": "LRI",
+				"color": [103, 129, 91]
+			},
+			{
+				"id": "khuzi",
+				"name": "Khuzi",
+				"primaryTag": "ELY",
+				"color": [95, 129, 85]
+			},
+			{
+				"id": "khorasani",
+				"name": "Khorasani",
+				"primaryTag": "KHO",
+				"color": [85, 129, 78]
+			},
+			{
+				"id": "baluchi",
+				"name": "Baluchi",
+				"primaryTag": "BAL",
+				"color": [117, 153, 116]
+			},
+			{
+				"id": "afghani",
+				"name": "Afghani",
+				"primaryTag": "AFG",
+				"color": [127, 153, 108]
+			},
+			{
+				"id": "alan",
+				"name": "Alan",
+				"primaryTag": "ALN",
+				"color": [117, 153, 101]
+			},
+			{
+				"id": "sarmatian",
+				"name": "Sarmatian",
+				"primaryTag": "SRT",
+				"color": [107, 153, 93]
+			},
+			{
+				"id": "kurdish",
+				"name": "Kurdish",
+				"primaryTag": "KRD",
+				"color": [140, 178, 134]
+			},
+			{
+				"id": "mazandarani",
+				"name": "Mazandarani",
+				"primaryTag": "TAB",
+				"color": [128, 178, 125]
+			},
+			{
+				"id": "parthian",
+				"name": "Parthian",
+				"primaryTag": "PRT",
+				"color": [141, 178, 116]
+			},
+			{
+				"id": "sogdian",
+				"name": "Sogdian",
+				"primaryTag": "SOG",
+				"color": [130, 178, 108]
+			},
+			{
+				"id": "tocharian",
+				"name": "Tocharian",
+				"primaryTag": null,
+				"color": [104, 129, 97]
+			},
+			{
+				"id": "tajik",
+				"name": "Tajik",
+				"primaryTag": "TJK",
+				"color": [96, 129, 91]
+			},
+			{
+				"id": "khwarezmian",
+				"name": "Khwarezmian",
+				"primaryTag": "KHW",
+				"color": [87, 129, 85]
+			},
+			{
+				"id": "hazara",
+				"name": "Hazara",
+				"primaryTag": null,
+				"color": [99, 129, 78]
+			},
+			{
+				"id": "scythian",
+				"name": "Scythian",
+				"primaryTag": null,
+				"color": [128, 153, 116]
+			},
+			{
+				"id": "saka",
+				"name": "Saka",
+				"primaryTag": null,
+				"color": [118, 153, 108]
+			},
+			{
+				"id": "talysh",
+				"name": "Talysh",
+				"primaryTag": null,
+				"color": [108, 153, 101]
+			},
+			{
+				"id": "iranian_canadian",
+				"name": "Iranian Canadian",
+				"primaryTag": null,
+				"color": [96, 153, 93]
+			},
+			{
+				"id": "iranian_east_american",
+				"name": "Iranian East American",
+				"primaryTag": null,
+				"color": [152, 178, 134]
+			},
+			{
+				"id": "iranian_louisianan",
+				"name": "Iranian Louisianan",
+				"primaryTag": null,
+				"color": [142, 178, 125]
+			},
+			{
+				"id": "iranian_californian",
+				"name": "Iranian Californian",
+				"primaryTag": null,
+				"color": [130, 178, 116]
+			},
+			{
+				"id": "iranian_mexican",
+				"name": "Iranian Mexican",
+				"primaryTag": null,
+				"color": [117, 178, 108]
+			},
+			{
+				"id": "iranian_caribbean",
+				"name": "Iranian Caribbean",
+				"primaryTag": null,
+				"color": [99, 129, 97]
+			},
+			{
+				"id": "iranian_colombian",
+				"name": "Iranian Colombian",
+				"primaryTag": null,
+				"color": [106, 129, 91]
+			},
+			{
+				"id": "iranian_peruvian",
+				"name": "Iranian Peruvian",
+				"primaryTag": null,
+				"color": [99, 129, 85]
+			},
+			{
+				"id": "iranian_la_platan",
+				"name": "Iranian La Platan",
+				"primaryTag": null,
+				"color": [90, 129, 78]
+			},
+			{
+				"id": "iranian_brazilian",
+				"name": "Iranian Brazilian",
+				"primaryTag": null,
+				"color": [121, 153, 116]
+			},
+			{
+				"id": "iranian_australian",
+				"name": "Iranian Australian",
+				"primaryTag": null,
+				"color": [110, 153, 108]
+			},
+			{
+				"id": "iranian_oceanian",
+				"name": "Iranian Oceanian",
+				"primaryTag": null,
+				"color": [122, 153, 101]
+			}
+		]
+	},
+	{
+		"id": "oghuz",
+		"name": "Oghuz",
+		"cultures": [
+			{
+				"id": "turkish",
+				"name": "Turkish",
+				"primaryTag": "TUR",
+				"color": [145, 107, 96]
+			},
+			{
+				"id": "azerbaijani",
+				"name": "Azerbaijani",
+				"primaryTag": "AZE",
+				"color": [145, 105, 86]
+			},
+			{
+				"id": "turkmeni",
+				"name": "Turkmeni",
+				"primaryTag": "TRK",
+				"color": [145, 105, 76]
+			},
+			{
+				"id": "pecheneg",
+				"name": "Pecheneg",
+				"primaryTag": "PEC",
+				"color": [145, 106, 66]
+			},
+			{
+				"id": "oghuz_canadian",
+				"name": "Oghuz Canadian",
+				"primaryTag": null,
+				"color": [172, 149, 114]
+			},
+			{
+				"id": "oghuz_east_american",
+				"name": "Oghuz East American",
+				"primaryTag": null,
+				"color": [172, 119, 102]
+			},
+			{
+				"id": "oghuz_louisianan",
+				"name": "Oghuz Louisianan",
+				"primaryTag": null,
+				"color": [172, 117, 91]
+			},
+			{
+				"id": "oghuz_californian",
+				"name": "Oghuz Californian",
+				"primaryTag": null,
+				"color": [172, 118, 79]
+			},
+			{
+				"id": "oghuz_mexican",
+				"name": "Oghuz Mexican",
+				"primaryTag": null,
+				"color": [200, 166, 132]
+			},
+			{
+				"id": "oghuz_caribbean",
+				"name": "Oghuz Caribbean",
+				"primaryTag": null,
+				"color": [200, 167, 119]
+			},
+			{
+				"id": "oghuz_colombian",
+				"name": "Oghuz Colombian",
+				"primaryTag": null,
+				"color": [200, 127, 105]
+			},
+			{
+				"id": "oghuz_peruvian",
+				"name": "Oghuz Peruvian",
+				"primaryTag": null,
+				"color": [200, 127, 91]
+			},
+			{
+				"id": "oghuz_la_platan",
+				"name": "Oghuz La Platan",
+				"primaryTag": null,
+				"color": [145, 116, 96]
+			},
+			{
+				"id": "oghuz_brazilian",
+				"name": "Oghuz Brazilian",
+				"primaryTag": null,
+				"color": [145, 116, 86]
+			},
+			{
+				"id": "oghuz_australian",
+				"name": "Oghuz Australian",
+				"primaryTag": null,
+				"color": [145, 117, 76]
+			},
+			{
+				"id": "oghuz_oceanian",
+				"name": "Oghuz Oceanian",
+				"primaryTag": null,
+				"color": [145, 85, 66]
+			}
+		]
+	},
+	{
+		"id": "mongolic",
+		"name": "Mongolic",
+		"cultures": [
+			{
+				"id": "mongol",
+				"name": "Mongol",
+				"primaryTag": "KHA",
+				"color": [160, 84, 84]
+			},
+			{
+				"id": "chahar",
+				"name": "Chahar",
+				"primaryTag": "CHH",
+				"color": [160, 77, 69]
+			},
+			{
+				"id": "oirats",
+				"name": "Oirats",
+				"primaryTag": "OIR",
+				"color": [160, 73, 54]
+			},
+			{
+				"id": "buryat",
+				"name": "Buryat",
+				"primaryTag": "BRT",
+				"color": [160, 71, 38]
+			},
+			{
+				"id": "khitan",
+				"name": "Khitan",
+				"primaryTag": "KHT",
+				"color": [190, 133, 100]
+			},
+			{
+				"id": "rouran",
+				"name": "Rouran",
+				"primaryTag": "ROU",
+				"color": [190, 82, 82]
+			},
+			{
+				"id": "mongolic_canadian",
+				"name": "Mongolic Canadian",
+				"primaryTag": null,
+				"color": [190, 75, 64]
+			},
+			{
+				"id": "mongolic_east_american",
+				"name": "Mongolic East American",
+				"primaryTag": null,
+				"color": [190, 72, 46]
+			},
+			{
+				"id": "mongolic_louisianan",
+				"name": "Mongolic Louisianan",
+				"primaryTag": null,
+				"color": [221, 144, 116]
+			},
+			{
+				"id": "mongolic_californian",
+				"name": "Mongolic Californian",
+				"primaryTag": null,
+				"color": [221, 140, 95]
+			},
+			{
+				"id": "mongolic_mexican",
+				"name": "Mongolic Mexican",
+				"primaryTag": null,
+				"color": [221, 74, 74]
+			},
+			{
+				"id": "mongolic_caribbean",
+				"name": "Mongolic Caribbean",
+				"primaryTag": null,
+				"color": [221, 68, 53]
+			},
+			{
+				"id": "mongolic_colombian",
+				"name": "Mongolic Colombian",
+				"primaryTag": null,
+				"color": [160, 98, 84]
+			},
+			{
+				"id": "mongolic_peruvian",
+				"name": "Mongolic Peruvian",
+				"primaryTag": null,
+				"color": [160, 94, 69]
+			},
+			{
+				"id": "mongolic_la_platan",
+				"name": "Mongolic La Platan",
+				"primaryTag": null,
+				"color": [160, 92, 54]
+			},
+			{
+				"id": "mongolic_brazilian",
+				"name": "Mongolic Brazilian",
+				"primaryTag": null,
+				"color": [160, 39, 38]
+			},
+			{
+				"id": "mongolic_australian",
+				"name": "Mongolic Australian",
+				"primaryTag": null,
+				"color": [190, 108, 100]
+			},
+			{
+				"id": "mongolic_oceanian",
+				"name": "Mongolic Oceanian",
+				"primaryTag": null,
+				"color": [190, 102, 82]
+			}
+		]
+	},
+	{
+		"id": "altaic",
+		"name": "Altaic",
+		"cultures": [
+			{
+				"id": "uzbehk",
+				"name": "Uzbehk",
+				"primaryTag": "SHY",
+				"color": [92, 70, 46]
+			},
+			{
+				"id": "uyghur",
+				"name": "Uyghur",
+				"primaryTag": "UIG",
+				"color": [92, 70, 37]
+			},
+			{
+				"id": "khazak",
+				"name": "Khazak",
+				"primaryTag": "KZH",
+				"color": [92, 72, 28]
+			},
+			{
+				"id": "kirgiz",
+				"name": "Kirgiz",
+				"primaryTag": "CHG",
+				"color": [92, 76, 18]
+			},
+			{
+				"id": "cuman",
+				"name": "Cuman",
+				"primaryTag": "CUM",
+				"color": [110, 102, 55]
+			},
+			{
+				"id": "kimek",
+				"name": "Kimek",
+				"primaryTag": "KIM",
+				"color": [110, 77, 44]
+			},
+			{
+				"id": "yakut",
+				"name": "Yakut",
+				"primaryTag": null,
+				"color": [110, 79, 33]
+			},
+			{
+				"id": "tuvan",
+				"name": "Tuvan",
+				"primaryTag": "TUV",
+				"color": [110, 82, 22]
+			},
+			{
+				"id": "altaic_canadian",
+				"name": "Altaic Canadian",
+				"primaryTag": null,
+				"color": [127, 113, 64]
+			},
+			{
+				"id": "altaic_east_american",
+				"name": "Altaic East American",
+				"primaryTag": null,
+				"color": [127, 117, 51]
+			},
+			{
+				"id": "altaic_louisianan",
+				"name": "Altaic Louisianan",
+				"primaryTag": null,
+				"color": [127, 83, 38]
+			},
+			{
+				"id": "altaic_californian",
+				"name": "Altaic Californian",
+				"primaryTag": null,
+				"color": [127, 86, 25]
+			},
+			{
+				"id": "altaic_mexican",
+				"name": "Altaic Mexican",
+				"primaryTag": null,
+				"color": [92, 78, 46]
+			},
+			{
+				"id": "altaic_caribbean",
+				"name": "Altaic Caribbean",
+				"primaryTag": null,
+				"color": [92, 80, 37]
+			},
+			{
+				"id": "altaic_colombian",
+				"name": "Altaic Colombian",
+				"primaryTag": null,
+				"color": [92, 84, 28]
+			},
+			{
+				"id": "altaic_peruvian",
+				"name": "Altaic Peruvian",
+				"primaryTag": null,
+				"color": [92, 56, 18]
+			},
+			{
+				"id": "altaic_la_platan",
+				"name": "Altaic La Platan",
+				"primaryTag": null,
+				"color": [110, 88, 55]
+			},
+			{
+				"id": "altaic_brazilian",
+				"name": "Altaic Brazilian",
+				"primaryTag": null,
+				"color": [110, 89, 44]
+			},
+			{
+				"id": "altaic_australian",
+				"name": "Altaic Australian",
+				"primaryTag": null,
+				"color": [110, 93, 33]
+			},
+			{
+				"id": "altaic_oceanian",
+				"name": "Altaic Oceanian",
+				"primaryTag": null,
+				"color": [110, 98, 22]
+			}
+		]
+	},
+	{
+		"id": "central_american",
+		"name": "Central American",
+		"cultures": [
+			{
+				"id": "totonac",
+				"name": "Totonac",
+				"primaryTag": "TOT",
+				"color": [47, 99, 109]
+			},
+			{
+				"id": "purepecha",
+				"name": "Purepecha",
+				"primaryTag": "TAR",
+				"color": [34, 90, 109]
+			},
+			{
+				"id": "coahuiltecan",
+				"name": "Coahuiltecan",
+				"primaryTag": null,
+				"color": [22, 79, 109]
+			},
+			{
+				"id": "guamares",
+				"name": "Guamares",
+				"primaryTag": "GAM",
+				"color": [9, 66, 109]
+			},
+			{
+				"id": "tecos",
+				"name": "Tecos",
+				"primaryTag": null,
+				"color": [56, 91, 130]
+			},
+			{
+				"id": "mixe",
+				"name": "Mixe",
+				"primaryTag": "TZP",
+				"color": [41, 115, 130]
+			}
+		]
+	},
+	{
+		"id": "aridoamerican",
+		"name": "Aridoamerican",
+		"cultures": [
+			{
+				"id": "tepic",
+				"name": "Tepic",
+				"primaryTag": null,
+				"color": [118, 141, 110]
+			},
+			{
+				"id": "piman",
+				"name": "Piman",
+				"primaryTag": "PIM",
+				"color": [110, 141, 104]
+			},
+			{
+				"id": "yaqui",
+				"name": "Yaqui",
+				"primaryTag": "YAQ",
+				"color": [101, 141, 97]
+			},
+			{
+				"id": "aztek",
+				"name": "Aztek",
+				"primaryTag": "AZT",
+				"color": [91, 141, 92]
+			}
+		]
+	},
+	{
+		"id": "maya",
+		"name": "Maya",
+		"cultures": [
+			{
+				"id": "yucatec",
+				"name": "Yucatec",
+				"primaryTag": "XIU",
+				"color": [95, 89, 120]
+			},
+			{
+				"id": "putun",
+				"name": "Putun",
+				"primaryTag": "ITZ",
+				"color": [93, 83, 120]
+			},
+			{
+				"id": "highland_mayan",
+				"name": "Highland Mayan",
+				"primaryTag": null,
+				"color": [93, 77, 120]
+			},
+			{
+				"id": "lacandon",
+				"name": "Lacandon",
+				"primaryTag": "LAC",
+				"color": [93, 70, 120]
+			},
+			{
+				"id": "wastek",
+				"name": "Wastek",
+				"primaryTag": "HST",
+				"color": [126, 106, 143]
+			},
+			{
+				"id": "chontales",
+				"name": "Chontales",
+				"primaryTag": "YOK",
+				"color": [107, 98, 143]
+			}
+		]
+	},
+	{
+		"id": "andean_group",
+		"name": "Andean Group",
+		"cultures": [
+			{
+				"id": "inca",
+				"name": "Inca",
+				"primaryTag": "CSU",
+				"color": [42, 109, 114]
+			},
+			{
+				"id": "aimara",
+				"name": "Aimara",
+				"primaryTag": "CRA",
+				"color": [27, 101, 114]
+			},
+			{
+				"id": "diaguita",
+				"name": "Diaguita",
+				"primaryTag": "CCQ",
+				"color": [13, 90, 114]
+			},
+			{
+				"id": "chimuan",
+				"name": "Chimuan",
+				"primaryTag": "CHM",
+				"color": [0, 76, 114]
+			}
+		]
+	},
+	{
+		"id": "otomanguean",
+		"name": "Otomanguean",
+		"cultures": [
+			{
+				"id": "zapotek",
+				"name": "Zapotek",
+				"primaryTag": "ZAP",
+				"color": [100, 138, 105]
+			},
+			{
+				"id": "mixtec",
+				"name": "Mixtec",
+				"primaryTag": "MIX",
+				"color": [93, 138, 102]
+			},
+			{
+				"id": "tlapanec",
+				"name": "Tlapanec",
+				"primaryTag": "TLA",
+				"color": [85, 138, 101]
+			},
+			{
+				"id": "otomi",
+				"name": "Otomi",
+				"primaryTag": "OTO",
+				"color": [77, 138, 101]
+			},
+			{
+				"id": "matlatzinca",
+				"name": "Matlatzinca",
+				"primaryTag": "MAT",
+				"color": [119, 164, 141]
+			},
+			{
+				"id": "chichimecan",
+				"name": "Chichimecan",
+				"primaryTag": "CCM",
+				"color": [110, 164, 117]
+			}
+		]
+	},
+	{
+		"id": "je_tupi",
+		"name": "Je Tupi",
+		"cultures": [
+			{
+				"id": "tupinamba",
+				"name": "Tupinamba",
+				"primaryTag": "TPQ",
+				"color": [118, 47, 84]
+			},
+			{
+				"id": "guarani",
+				"name": "Guarani",
+				"primaryTag": "GUA",
+				"color": [118, 33, 69]
+			}
+		]
+	},
+	{
+		"id": "je",
+		"name": "Je",
+		"cultures": [
+			{
+				"id": "charruan",
+				"name": "Charruan",
+				"primaryTag": "CUA",
+				"color": [80, 80, 100]
+			},
+			{
+				"id": "ge",
+				"name": "Ge",
+				"primaryTag": "TUA",
+				"color": [79, 77, 100]
+			}
+		]
+	},
+	{
+		"id": "maranon",
+		"name": "Maranon",
+		"cultures": [
+			{
+				"id": "jivaro",
+				"name": "Jivaro",
+				"primaryTag": null,
+				"color": [48, 96, 55]
+			},
+			{
+				"id": "chachapoyan",
+				"name": "Chachapoyan",
+				"primaryTag": "CYA",
+				"color": [38, 96, 51]
+			}
+		]
+	},
+	{
+		"id": "chibchan",
+		"name": "Chibchan",
+		"cultures": [
+			{
+				"id": "muisca",
+				"name": "Muisca",
+				"primaryTag": "MCA",
+				"color": [59, 102, 139]
+			},
+			{
+				"id": "cara",
+				"name": "Cara",
+				"primaryTag": "QTO",
+				"color": [43, 86, 139]
+			},
+			{
+				"id": "miskito",
+				"name": "Miskito",
+				"primaryTag": null,
+				"color": [27, 67, 139]
+			}
+		]
+	},
+	{
+		"id": "mataco",
+		"name": "Mataco",
+		"cultures": [
+			{
+				"id": "chacoan",
+				"name": "Chacoan",
+				"primaryTag": null,
+				"color": [192, 136, 126]
+			}
+		]
+	},
+	{
+		"id": "araucanian",
+		"name": "Araucanian",
+		"cultures": [
+			{
+				"id": "mapuche",
+				"name": "Mapuche",
+				"primaryTag": "MPC",
+				"color": [154, 70, 79]
+			},
+			{
+				"id": "patagonian",
+				"name": "Patagonian",
+				"primaryTag": null,
+				"color": [154, 54, 55]
+			},
+			{
+				"id": "het",
+				"name": "Het",
+				"primaryTag": null,
+				"color": [154, 46, 37]
+			},
+			{
+				"id": "huarpe",
+				"name": "Huarpe",
+				"primaryTag": null,
+				"color": [154, 43, 20]
+			}
+		]
+	},
+	{
+		"id": "carribean",
+		"name": "Carribean",
+		"cultures": [
+			{
+				"id": "arawak",
+				"name": "Arawak",
+				"primaryTag": null,
+				"color": [109, 154, 122]
+			},
+			{
+				"id": "maipurean",
+				"name": "Maipurean",
+				"primaryTag": null,
+				"color": [100, 154, 120]
+			},
+			{
+				"id": "carib",
+				"name": "Carib",
+				"primaryTag": "CAB",
+				"color": [91, 154, 120]
+			},
+			{
+				"id": "guajiro",
+				"name": "Guajiro",
+				"primaryTag": "ARW",
+				"color": [82, 154, 122]
+			}
+		]
+	},
+	{
+		"id": "eskaleut",
+		"name": "Eskaleut",
+		"cultures": [
+			{
+				"id": "aleutian",
+				"name": "Aleutian",
+				"primaryTag": null,
+				"color": [103, 144, 81]
+			},
+			{
+				"id": "inuit",
+				"name": "Inuit",
+				"primaryTag": "GRL",
+				"color": [88, 144, 69]
+			}
+		]
+	},
+	{
+		"id": "central_algonquian",
+		"name": "Central Algonquian",
+		"cultures": [
+			{
+				"id": "shawnee",
+				"name": "Shawnee",
+				"primaryTag": "SHA",
+				"color": [94, 118, 107]
+			},
+			{
+				"id": "illini",
+				"name": "Illini",
+				"primaryTag": "ILL",
+				"color": [94, 118, 109]
+			},
+			{
+				"id": "miami",
+				"name": "Miami",
+				"primaryTag": "MMI",
+				"color": [94, 118, 111]
+			},
+			{
+				"id": "anishinabe",
+				"name": "Anishinabe",
+				"primaryTag": "OJI",
+				"color": [91, 118, 113]
+			},
+			{
+				"id": "algonquin",
+				"name": "Algonquin",
+				"primaryTag": "AGQ",
+				"color": [112, 140, 137]
+			},
+			{
+				"id": "bungi",
+				"name": "Bungi",
+				"primaryTag": "NAK",
+				"color": [112, 140, 127]
+			},
+			{
+				"id": "cree",
+				"name": "Cree",
+				"primaryTag": "WCR",
+				"color": [112, 140, 130]
+			},
+			{
+				"id": "plains_cree",
+				"name": "Plains Cree",
+				"primaryTag": "NEH",
+				"color": [108, 140, 131]
+			},
+			{
+				"id": "innu",
+				"name": "Innu",
+				"primaryTag": "INN",
+				"color": [130, 162, 156]
+			},
+			{
+				"id": "mesquakie",
+				"name": "Mesquakie",
+				"primaryTag": "FOX",
+				"color": [130, 162, 159]
+			}
+		]
+	},
+	{
+		"id": "plains_algonquian",
+		"name": "Plains Algonquian",
+		"cultures": [
+			{
+				"id": "cheyenne",
+				"name": "Cheyenne",
+				"primaryTag": "CHY",
+				"color": [128, 102, 56]
+			},
+			{
+				"id": "blackfoot",
+				"name": "Blackfoot",
+				"primaryTag": "BLA",
+				"color": [128, 105, 41]
+			},
+			{
+				"id": "arapaho",
+				"name": "Arapaho",
+				"primaryTag": "ARP",
+				"color": [128, 110, 27]
+			}
+		]
+	},
+	{
+		"id": "eastern_algonquian",
+		"name": "Eastern Algonquian",
+		"cultures": [
+			{
+				"id": "delaware",
+				"name": "Delaware",
+				"primaryTag": "LEN",
+				"color": [60, 121, 155]
+			},
+			{
+				"id": "abenaki",
+				"name": "Abenaki",
+				"primaryTag": "ABE",
+				"color": [41, 104, 155]
+			},
+			{
+				"id": "mikmaq",
+				"name": "Mikmaq",
+				"primaryTag": "MIK",
+				"color": [22, 83, 155]
+			},
+			{
+				"id": "maliseet",
+				"name": "Maliseet",
+				"primaryTag": "MLS",
+				"color": [3, 59, 155]
+			},
+			{
+				"id": "mahican",
+				"name": "Mahican",
+				"primaryTag": "MAH",
+				"color": [71, 103, 184]
+			},
+			{
+				"id": "powhatan",
+				"name": "Powhatan",
+				"primaryTag": "POW",
+				"color": [49, 135, 184]
+			},
+			{
+				"id": "pequot",
+				"name": "Pequot",
+				"primaryTag": "PEQ",
+				"color": [26, 113, 184]
+			},
+			{
+				"id": "massachusset",
+				"name": "Massachusset",
+				"primaryTag": "WAM",
+				"color": [4, 87, 184]
+			}
+		]
+	},
+	{
+		"id": "iroquoian",
+		"name": "Iroquoian",
+		"cultures": [
+			{
+				"id": "iroquois",
+				"name": "Iroquois",
+				"primaryTag": "IRO",
+				"color": [135, 165, 111]
+			},
+			{
+				"id": "cherokee",
+				"name": "Cherokee",
+				"primaryTag": "CHE",
+				"color": [123, 165, 100]
+			},
+			{
+				"id": "huron",
+				"name": "Huron",
+				"primaryTag": "HUR",
+				"color": [109, 165, 89]
+			},
+			{
+				"id": "laurentian",
+				"name": "Laurentian",
+				"primaryTag": "OSH",
+				"color": [93, 165, 78]
+			},
+			{
+				"id": "tionontate",
+				"name": "Tionontate",
+				"primaryTag": "TIO",
+				"color": [137, 196, 131]
+			},
+			{
+				"id": "susquehannock",
+				"name": "Susquehannock",
+				"primaryTag": "SUS",
+				"color": [153, 196, 118]
+			}
+		]
+	},
+	{
+		"id": "siouan",
+		"name": "Siouan",
+		"cultures": [
+			{
+				"id": "dakota",
+				"name": "Dakota",
+				"primaryTag": "SIO",
+				"color": [104, 40, 81]
+			},
+			{
+				"id": "nakota",
+				"name": "Nakota",
+				"primaryTag": "ASI",
+				"color": [104, 28, 70]
+			},
+			{
+				"id": "chiwere",
+				"name": "Chiwere",
+				"primaryTag": "OEO",
+				"color": [104, 15, 56]
+			},
+			{
+				"id": "osage",
+				"name": "Osage",
+				"primaryTag": "OSA",
+				"color": [104, 3, 41]
+			},
+			{
+				"id": "catawba",
+				"name": "Catawba",
+				"primaryTag": "COF",
+				"color": [123, 48, 70]
+			}
+		]
+	},
+	{
+		"id": "caddoan",
+		"name": "Caddoan",
+		"cultures": [
+			{
+				"id": "wichita",
+				"name": "Wichita",
+				"primaryTag": "WIC",
+				"color": [142, 125, 113]
+			},
+			{
+				"id": "caddo",
+				"name": "Caddo",
+				"primaryTag": "CAD",
+				"color": [142, 127, 113]
+			},
+			{
+				"id": "pawnee",
+				"name": "Pawnee",
+				"primaryTag": "PAW",
+				"color": [142, 129, 113]
+			}
+		]
+	},
+	{
+		"id": "muskogean",
+		"name": "Muskogean",
+		"cultures": [
+			{
+				"id": "creek",
+				"name": "Creek",
+				"primaryTag": "CRE",
+				"color": [123, 95, 51]
+			},
+			{
+				"id": "choctaw",
+				"name": "Choctaw",
+				"primaryTag": "CHO",
+				"color": [123, 97, 37]
+			},
+			{
+				"id": "chickasaw",
+				"name": "Chickasaw",
+				"primaryTag": "CHI",
+				"color": [123, 102, 23]
+			},
+			{
+				"id": "yuchi",
+				"name": "Yuchi",
+				"primaryTag": "CIA",
+				"color": [123, 109, 8]
+			},
+			{
+				"id": "yoron",
+				"name": "Yoron",
+				"primaryTag": "CAQ",
+				"color": [146, 143, 61]
+			},
+			{
+				"id": "yamasee",
+				"name": "Yamasee",
+				"primaryTag": "ALT",
+				"color": [146, 106, 44]
+			},
+			{
+				"id": "natchez",
+				"name": "Natchez",
+				"primaryTag": "NTZ",
+				"color": [146, 110, 27]
+			}
+		]
+	},
+	{
+		"id": "sonoran",
+		"name": "Sonoran",
+		"cultures": [
+			{
+				"id": "pueblo",
+				"name": "Pueblo",
+				"primaryTag": "PUE",
+				"color": [112, 128, 72]
+			},
+			{
+				"id": "shoshone",
+				"name": "Shoshone",
+				"primaryTag": "SHO",
+				"color": [103, 128, 61]
+			},
+			{
+				"id": "kiowa",
+				"name": "Kiowa",
+				"primaryTag": "KIO",
+				"color": [91, 128, 49]
+			}
+		]
+	},
+	{
+		"id": "apachean",
+		"name": "Apachean",
+		"cultures": [
+			{
+				"id": "apache",
+				"name": "Apache",
+				"primaryTag": "APA",
+				"color": [105, 68, 94]
+			},
+			{
+				"id": "mescalero",
+				"name": "Mescalero",
+				"primaryTag": "MES",
+				"color": [105, 60, 88]
+			},
+			{
+				"id": "lipan",
+				"name": "Lipan",
+				"primaryTag": "LIP",
+				"color": [105, 53, 80]
+			},
+			{
+				"id": "navajo",
+				"name": "Navajo",
+				"primaryTag": "NAH",
+				"color": [105, 46, 71]
+			}
+		]
+	},
+	{
+		"id": "na_dene",
+		"name": "Na Dene",
+		"cultures": [
+			{
+				"id": "chipewyan",
+				"name": "Chipewyan",
+				"primaryTag": null,
+				"color": [91, 64, 89]
+			},
+			{
+				"id": "athabascan",
+				"name": "Athabascan",
+				"primaryTag": null,
+				"color": [91, 59, 86]
+			}
+		]
+	},
+	{
+		"id": "penutian",
+		"name": "Penutian",
+		"cultures": [
+			{
+				"id": "salish",
+				"name": "Salish",
+				"primaryTag": "SAL",
+				"color": [86, 93, 56]
+			},
+			{
+				"id": "chinook",
+				"name": "Chinook",
+				"primaryTag": "CNK",
+				"color": [81, 93, 48]
+			},
+			{
+				"id": "yokuts",
+				"name": "Yokuts",
+				"primaryTag": null,
+				"color": [74, 93, 41]
+			},
+			{
+				"id": "haida",
+				"name": "Haida",
+				"primaryTag": "HDA",
+				"color": [66, 93, 34]
+			}
+		]
+	},
+	{
+		"id": "east_asian",
+		"name": "East Asian",
+		"cultures": [
+			{
+				"id": "chihan",
+				"name": "Chihan",
+				"primaryTag": "YAN",
+				"color": [75, 124, 151]
+			},
+			{
+				"id": "jianghuai",
+				"name": "Jianghuai",
+				"primaryTag": "MNG",
+				"color": [59, 111, 151]
+			},
+			{
+				"id": "xibei",
+				"name": "Xibei",
+				"primaryTag": "CSH",
+				"color": [44, 94, 151]
+			},
+			{
+				"id": "hubei",
+				"name": "Hubei",
+				"primaryTag": "ZAO",
+				"color": [29, 75, 151]
+			},
+			{
+				"id": "zhongyuan",
+				"name": "Zhongyuan",
+				"primaryTag": "LNG",
+				"color": [89, 115, 179]
+			},
+			{
+				"id": "shandong_culture",
+				"name": "Jiaoliao",
+				"primaryTag": "QIC",
+				"color": [70, 141, 179]
+			},
+			{
+				"id": "cantonese",
+				"name": "Cantonese",
+				"primaryTag": "YUE",
+				"color": [52, 124, 179]
+			},
+			{
+				"id": "wu",
+				"name": "Wu",
+				"primaryTag": "WUU",
+				"color": [34, 103, 179]
+			},
+			{
+				"id": "chimin",
+				"name": "Chimin",
+				"primaryTag": "MIN",
+				"color": [103, 143, 207]
+			},
+			{
+				"id": "hakka",
+				"name": "Hakka",
+				"primaryTag": "HUA",
+				"color": [82, 118, 207]
+			},
+			{
+				"id": "gan",
+				"name": "Gan",
+				"primaryTag": "NNG",
+				"color": [61, 156, 207]
+			},
+			{
+				"id": "xiang",
+				"name": "Xiang",
+				"primaryTag": "CHC",
+				"color": [40, 134, 207]
+			},
+			{
+				"id": "sichuanese",
+				"name": "Sichuanese",
+				"primaryTag": "SHU",
+				"color": [75, 111, 151]
+			},
+			{
+				"id": "jin",
+				"name": "Jin",
+				"primaryTag": "JIN",
+				"color": [59, 94, 151]
+			},
+			{
+				"id": "taiwanese",
+				"name": "Taiwanese",
+				"primaryTag": "FRM",
+				"color": [44, 75, 151]
+			},
+			{
+				"id": "miao",
+				"name": "Miao",
+				"primaryTag": "CMI",
+				"color": [29, 108, 151]
+			},
+			{
+				"id": "manchu_new",
+				"name": "Manchu",
+				"primaryTag": null,
+				"color": [89, 139, 179]
+			},
+			{
+				"id": "bai",
+				"name": "Bai",
+				"primaryTag": "CDL",
+				"color": [70, 122, 179]
+			},
+			{
+				"id": "vietnamese_new",
+				"name": "Vietnamese New",
+				"primaryTag": null,
+				"color": [52, 101, 179]
+			},
+			{
+				"id": "korean_new",
+				"name": "Korean New",
+				"primaryTag": null,
+				"color": [34, 77, 179]
+			},
+			{
+				"id": "tibetan_new",
+				"name": "Tibetan New",
+				"primaryTag": null,
+				"color": [103, 171, 207]
+			},
+			{
+				"id": "altaic_new",
+				"name": "Altaic New",
+				"primaryTag": null,
+				"color": [82, 152, 207]
+			},
+			{
+				"id": "east_asian_canadian",
+				"name": "East Asian Canadian",
+				"primaryTag": null,
+				"color": [61, 130, 207]
+			},
+			{
+				"id": "east_asian_east_american",
+				"name": "East Asian East American",
+				"primaryTag": null,
+				"color": [40, 104, 207]
+			},
+			{
+				"id": "east_asian_louisianan",
+				"name": "East Asian Louisianan",
+				"primaryTag": null,
+				"color": [75, 97, 151]
+			},
+			{
+				"id": "east_asian_californian",
+				"name": "East Asian Californian",
+				"primaryTag": null,
+				"color": [59, 119, 151]
+			},
+			{
+				"id": "east_asian_mexican",
+				"name": "East Asian Mexican",
+				"primaryTag": null,
+				"color": [44, 104, 151]
+			},
+			{
+				"id": "east_asian_caribbean",
+				"name": "East Asian Caribbean",
+				"primaryTag": null,
+				"color": [29, 86, 151]
+			},
+			{
+				"id": "east_asian_colombian",
+				"name": "East Asian Colombian",
+				"primaryTag": null,
+				"color": [89, 123, 179]
+			},
+			{
+				"id": "east_asian_peruvian",
+				"name": "East Asian Peruvian",
+				"primaryTag": null,
+				"color": [70, 102, 179]
+			},
+			{
+				"id": "east_asian_la_platan",
+				"name": "East Asian La Platan",
+				"primaryTag": null,
+				"color": [52, 135, 179]
+			},
+			{
+				"id": "east_asian_brazilian",
+				"name": "East Asian Brazilian",
+				"primaryTag": null,
+				"color": [34, 116, 179]
+			},
+			{
+				"id": "east_asian_australian",
+				"name": "East Asian Australian",
+				"primaryTag": null,
+				"color": [103, 152, 207]
+			},
+			{
+				"id": "east_asian_oceanian",
+				"name": "East Asian Oceanian",
+				"primaryTag": null,
+				"color": [82, 130, 207]
+			}
+		]
+	},
+	{
+		"id": "korean_g",
+		"name": "Korean G",
+		"cultures": [
+			{
+				"id": "korean",
+				"name": "Korean",
+				"primaryTag": "JOE",
+				"color": [154, 46, 59]
+			},
+			{
+				"id": "buyeo",
+				"name": "Buyeo",
+				"primaryTag": "BUY",
+				"color": [154, 25, 28]
+			},
+			{
+				"id": "jeju",
+				"name": "Jeju",
+				"primaryTag": "TAM",
+				"color": [154, 14, 4]
+			},
+			{
+				"id": "korean_canadian",
+				"name": "Korean Canadian",
+				"primaryTag": null,
+				"color": [154, 24, 0]
+			},
+			{
+				"id": "korean_east_american",
+				"name": "Korean East American",
+				"primaryTag": null,
+				"color": [183, 87, 55]
+			},
+			{
+				"id": "korean_louisianan",
+				"name": "Korean Louisianan",
+				"primaryTag": null,
+				"color": [183, 30, 47]
+			},
+			{
+				"id": "korean_californian",
+				"name": "Korean Californian",
+				"primaryTag": null,
+				"color": [183, 4, 8]
+			},
+			{
+				"id": "korean_mexican",
+				"name": "Korean Mexican",
+				"primaryTag": null,
+				"color": [183, 12, 0]
+			},
+			{
+				"id": "korean_caribbean",
+				"name": "Korean Caribbean",
+				"primaryTag": null,
+				"color": [212, 87, 64]
+			},
+			{
+				"id": "korean_colombian",
+				"name": "Korean Colombian",
+				"primaryTag": null,
+				"color": [212, 78, 35]
+			},
+			{
+				"id": "korean_peruvian",
+				"name": "Korean Peruvian",
+				"primaryTag": null,
+				"color": [212, 5, 28]
+			},
+			{
+				"id": "korean_la_platan",
+				"name": "Korean La Platan",
+				"primaryTag": null,
+				"color": [212, 0, 4]
+			},
+			{
+				"id": "korean_brazilian",
+				"name": "Korean Brazilian",
+				"primaryTag": null,
+				"color": [154, 54, 46]
+			},
+			{
+				"id": "korean_australian",
+				"name": "Korean Australian",
+				"primaryTag": null,
+				"color": [154, 45, 25]
+			},
+			{
+				"id": "korean_oceanian",
+				"name": "Korean Oceanian",
+				"primaryTag": null,
+				"color": [154, 41, 4]
+			}
+		]
+	},
+	{
+		"id": "japanese_g",
+		"name": "Japanese G",
+		"cultures": [
+			{
+				"id": "province",
+				"name": "Province",
+				"primaryTag": null,
+				"color": [176, 109, 78]
+			},
+			{
+				"id": "togoku",
+				"name": "Togoku",
+				"primaryTag": "JAP",
+				"color": [176, 106, 58]
+			},
+			{
+				"id": "japanese",
+				"name": "Saigoku",
+				"primaryTag": "MRI",
+				"color": [176, 107, 39]
+			},
+			{
+				"id": "kyushuan",
+				"name": "Kyushuan",
+				"primaryTag": "OTM",
+				"color": [176, 111, 19]
+			},
+			{
+				"id": "ainu",
+				"name": "Ainu",
+				"primaryTag": "ANU",
+				"color": [209, 171, 92]
+			},
+			{
+				"id": "ryukyuan",
+				"name": "Ryukyuan",
+				"primaryTag": "RYU",
+				"color": [209, 113, 69]
+			},
+			{
+				"id": "emishi",
+				"name": "Emishi",
+				"primaryTag": "EMI",
+				"color": [209, 112, 46]
+			},
+			{
+				"id": "kumaso",
+				"name": "Kumaso",
+				"primaryTag": "HAY",
+				"color": [209, 115, 23]
+			},
+			{
+				"id": "koshibito",
+				"name": "Koshibito",
+				"primaryTag": "KO0",
+				"color": [242, 186, 107]
+			},
+			{
+				"id": "saeki",
+				"name": "Saeki",
+				"primaryTag": "KEO",
+				"color": [242, 189, 80]
+			},
+			{
+				"id": "jinhan",
+				"name": "Jinhan",
+				"primaryTag": "JHN",
+				"color": [242, 113, 53]
+			},
+			{
+				"id": "japanese_canadian",
+				"name": "Japanese Canadian",
+				"primaryTag": null,
+				"color": [242, 114, 26]
+			},
+			{
+				"id": "japanese_east_american",
+				"name": "Japanese East American",
+				"primaryTag": null,
+				"color": [176, 126, 78]
+			},
+			{
+				"id": "japanese_louisianan",
+				"name": "Japanese Louisianan",
+				"primaryTag": null,
+				"color": [176, 127, 58]
+			},
+			{
+				"id": "japanese_californian",
+				"name": "Japanese Californian",
+				"primaryTag": null,
+				"color": [176, 131, 39]
+			},
+			{
+				"id": "japanese_mexican",
+				"name": "Japanese Mexican",
+				"primaryTag": null,
+				"color": [176, 69, 19]
+			},
+			{
+				"id": "japanese_caribbean",
+				"name": "Japanese Caribbean",
+				"primaryTag": null,
+				"color": [209, 140, 92]
+			},
+			{
+				"id": "japanese_colombian",
+				"name": "Japanese Colombian",
+				"primaryTag": null,
+				"color": [209, 138, 69]
+			},
+			{
+				"id": "japanese_peruvian",
+				"name": "Japanese Peruvian",
+				"primaryTag": null,
+				"color": [209, 141, 46]
+			},
+			{
+				"id": "japanese_la_platan",
+				"name": "Japanese La Platan",
+				"primaryTag": null,
+				"color": [209, 148, 23]
+			},
+			{
+				"id": "japanese_brazilian",
+				"name": "Japanese Brazilian",
+				"primaryTag": null,
+				"color": [242, 150, 107]
+			},
+			{
+				"id": "japanese_australian",
+				"name": "Japanese Australian",
+				"primaryTag": null,
+				"color": [242, 146, 80]
+			},
+			{
+				"id": "japanese_oceanian",
+				"name": "Japanese Oceanian",
+				"primaryTag": null,
+				"color": [242, 147, 53]
+			}
+		]
+	},
+	{
+		"id": "southeastasian_group",
+		"name": "Southeastasian Group",
+		"cultures": [
+			{
+				"id": "khmer",
+				"name": "Khmer",
+				"primaryTag": "KHM",
+				"color": [125, 123, 45]
+			},
+			{
+				"id": "mon",
+				"name": "Mon",
+				"primaryTag": "PEG",
+				"color": [119, 125, 29]
+			},
+			{
+				"id": "vietnamese",
+				"name": "Vietnamese",
+				"primaryTag": "DAI",
+				"color": [107, 125, 13]
+			},
+			{
+				"id": "wa",
+				"name": "Wa",
+				"primaryTag": "WAA",
+				"color": [94, 125, 0]
+			},
+			{
+				"id": "katu",
+				"name": "Katu",
+				"primaryTag": "KUY",
+				"color": [117, 149, 53]
+			},
+			{
+				"id": "khmu",
+				"name": "Khmu",
+				"primaryTag": "CTB",
+				"color": [149, 146, 34]
+			},
+			{
+				"id": "bahnaric",
+				"name": "Bahnaric",
+				"primaryTag": "KOH",
+				"color": [140, 149, 15]
+			},
+			{
+				"id": "khasi",
+				"name": "Khasi",
+				"primaryTag": "JNT",
+				"color": [125, 149, 0]
+			},
+			{
+				"id": "pear",
+				"name": "Pear",
+				"primaryTag": "PEA",
+				"color": [145, 172, 62]
+			},
+			{
+				"id": "mon_khmer_canadian",
+				"name": "Mon Khmer Canadian",
+				"primaryTag": null,
+				"color": [128, 172, 40]
+			},
+			{
+				"id": "mon_khmer_east_american",
+				"name": "Mon Khmer East American",
+				"primaryTag": null,
+				"color": [172, 169, 17]
+			},
+			{
+				"id": "mon_khmer_louisianan",
+				"name": "Mon Khmer Louisianan",
+				"primaryTag": null,
+				"color": [161, 172, 0]
+			},
+			{
+				"id": "mon_khmer_californian",
+				"name": "Mon Khmer Californian",
+				"primaryTag": null,
+				"color": [113, 125, 45]
+			},
+			{
+				"id": "mon_khmer_mexican",
+				"name": "Mon Khmer Mexican",
+				"primaryTag": null,
+				"color": [101, 125, 29]
+			},
+			{
+				"id": "mon_khmer_caribbean",
+				"name": "Mon Khmer Caribbean",
+				"primaryTag": null,
+				"color": [87, 125, 13]
+			},
+			{
+				"id": "mon_khmer_colombian",
+				"name": "Mon Khmer Colombian",
+				"primaryTag": null,
+				"color": [125, 122, 0]
+			},
+			{
+				"id": "mon_khmer_peruvian",
+				"name": "Mon Khmer Peruvian",
+				"primaryTag": null,
+				"color": [142, 149, 53]
+			},
+			{
+				"id": "mon_khmer_la_platan",
+				"name": "Mon Khmer La Platan",
+				"primaryTag": null,
+				"color": [131, 149, 34]
+			},
+			{
+				"id": "mon_khmer_brazilian",
+				"name": "Mon Khmer Brazilian",
+				"primaryTag": null,
+				"color": [116, 149, 15]
+			},
+			{
+				"id": "mon_khmer_australian",
+				"name": "Mon Khmer Australian",
+				"primaryTag": null,
+				"color": [98, 149, 0]
+			},
+			{
+				"id": "mon_khmer_oceanian",
+				"name": "Mon Khmer Oceanian",
+				"primaryTag": null,
+				"color": [172, 170, 62]
+			}
+		]
+	},
+	{
+		"id": "malay",
+		"name": "Malay",
+		"cultures": [
+			{
+				"id": "cham",
+				"name": "Cham",
+				"primaryTag": "CHA",
+				"color": [72, 131, 61]
+			},
+			{
+				"id": "malayan",
+				"name": "Malayan",
+				"primaryTag": "MLC",
+				"color": [53, 131, 47]
+			},
+			{
+				"id": "sumatran",
+				"name": "Sumatran",
+				"primaryTag": "BRS",
+				"color": [33, 131, 36]
+			},
+			{
+				"id": "javanese",
+				"name": "Javanese",
+				"primaryTag": "MAJ",
+				"color": [19, 131, 32]
+			},
+			{
+				"id": "sundanese",
+				"name": "Sundanese",
+				"primaryTag": "SUN",
+				"color": [73, 155, 90]
+			},
+			{
+				"id": "bornean",
+				"name": "Bornean",
+				"primaryTag": "BEI",
+				"color": [71, 155, 56]
+			},
+			{
+				"id": "madagasque",
+				"name": "Madagasque",
+				"primaryTag": "MDG",
+				"color": [47, 155, 40]
+			},
+			{
+				"id": "sulawesi",
+				"name": "Sulawesi",
+				"primaryTag": "MKS",
+				"color": [23, 155, 26]
+			},
+			{
+				"id": "moluccan",
+				"name": "Moluccan",
+				"primaryTag": "ETI",
+				"color": [84, 180, 95]
+			},
+			{
+				"id": "acehnese",
+				"name": "Acehnese",
+				"primaryTag": "ATJ",
+				"color": [65, 180, 89]
+			},
+			{
+				"id": "minangkabau",
+				"name": "Minangkabau",
+				"primaryTag": "PGR",
+				"color": [67, 180, 46]
+			},
+			{
+				"id": "banjarese",
+				"name": "Banjarese",
+				"primaryTag": "BNJ",
+				"color": [37, 180, 27]
+			},
+			{
+				"id": "kutainese",
+				"name": "Kutainese",
+				"primaryTag": "KUT",
+				"color": [61, 131, 63]
+			},
+			{
+				"id": "dayak",
+				"name": "Dayak",
+				"primaryTag": "TNP",
+				"color": [47, 131, 57]
+			},
+			{
+				"id": "malay_canadian",
+				"name": "Malay Canadian",
+				"primaryTag": null,
+				"color": [33, 131, 53]
+			},
+			{
+				"id": "malay_east_american",
+				"name": "Malay East American",
+				"primaryTag": null,
+				"color": [37, 131, 19]
+			},
+			{
+				"id": "malay_louisianan",
+				"name": "Malay Louisianan",
+				"primaryTag": null,
+				"color": [78, 155, 73]
+			},
+			{
+				"id": "malay_californian",
+				"name": "Malay Californian",
+				"primaryTag": null,
+				"color": [56, 155, 59]
+			},
+			{
+				"id": "malay_mexican",
+				"name": "Malay Mexican",
+				"primaryTag": null,
+				"color": [40, 155, 53]
+			},
+			{
+				"id": "malay_caribbean",
+				"name": "Malay Caribbean",
+				"primaryTag": null,
+				"color": [23, 155, 50]
+			},
+			{
+				"id": "malay_colombian",
+				"name": "Malay Colombian",
+				"primaryTag": null,
+				"color": [99, 180, 84]
+			},
+			{
+				"id": "malay_peruvian",
+				"name": "Malay Peruvian",
+				"primaryTag": null,
+				"color": [72, 180, 65]
+			},
+			{
+				"id": "malay_la_platan",
+				"name": "Malay La Platan",
+				"primaryTag": null,
+				"color": [46, 180, 49]
+			},
+			{
+				"id": "malay_brazilian",
+				"name": "Malay Brazilian",
+				"primaryTag": null,
+				"color": [27, 180, 45]
+			},
+			{
+				"id": "malay_australian",
+				"name": "Malay Australian",
+				"primaryTag": null,
+				"color": [61, 131, 75]
+			},
+			{
+				"id": "malay_oceanian",
+				"name": "Malay Oceanian",
+				"primaryTag": null,
+				"color": [60, 131, 47]
+			}
+		]
+	},
+	{
+		"id": "filipino_group",
+		"name": "Filipino Group",
+		"cultures": [
+			{
+				"id": "filipino",
+				"name": "Filipino",
+				"primaryTag": "TDO",
+				"color": [145, 107, 96]
+			},
+			{
+				"id": "visayan",
+				"name": "Visayan",
+				"primaryTag": "CEB",
+				"color": [145, 105, 86]
+			},
+			{
+				"id": "ilocano",
+				"name": "Ilocano",
+				"primaryTag": "PGS",
+				"color": [145, 105, 76]
+			},
+			{
+				"id": "formosan",
+				"name": "Formosan",
+				"primaryTag": null,
+				"color": [145, 106, 66]
+			},
+			{
+				"id": "filipino_canadian",
+				"name": "Filipino Canadian",
+				"primaryTag": null,
+				"color": [172, 149, 114]
+			},
+			{
+				"id": "filipino_east_american",
+				"name": "Filipino East American",
+				"primaryTag": null,
+				"color": [172, 119, 102]
+			},
+			{
+				"id": "filipino_louisianan",
+				"name": "Filipino Louisianan",
+				"primaryTag": null,
+				"color": [172, 117, 91]
+			},
+			{
+				"id": "filipino_californian",
+				"name": "Filipino Californian",
+				"primaryTag": null,
+				"color": [172, 118, 79]
+			},
+			{
+				"id": "filipino_mexican",
+				"name": "Filipino Mexican",
+				"primaryTag": null,
+				"color": [200, 166, 132]
+			},
+			{
+				"id": "filipino_caribbean",
+				"name": "Filipino Caribbean",
+				"primaryTag": null,
+				"color": [200, 167, 119]
+			},
+			{
+				"id": "filipino_colombian",
+				"name": "Filipino Colombian",
+				"primaryTag": null,
+				"color": [200, 127, 105]
+			},
+			{
+				"id": "filipino_peruvian",
+				"name": "Filipino Peruvian",
+				"primaryTag": null,
+				"color": [200, 127, 91]
+			},
+			{
+				"id": "filipino_la_platan",
+				"name": "Filipino La Platan",
+				"primaryTag": null,
+				"color": [145, 116, 96]
+			},
+			{
+				"id": "filipino_brazilian",
+				"name": "Filipino Brazilian",
+				"primaryTag": null,
+				"color": [145, 116, 86]
+			},
+			{
+				"id": "filipino_australian",
+				"name": "Filipino Australian",
+				"primaryTag": null,
+				"color": [145, 117, 76]
+			},
+			{
+				"id": "filipino_oceanian",
+				"name": "Filipino Oceanian",
+				"primaryTag": null,
+				"color": [145, 85, 66]
+			}
+		]
+	},
+	{
+		"id": "thai_group",
+		"name": "Thai Group",
+		"cultures": [
+			{
+				"id": "central_thai",
+				"name": "Central Thai",
+				"primaryTag": "SIA",
+				"color": [51, 103, 112]
+			},
+			{
+				"id": "lao",
+				"name": "Lao",
+				"primaryTag": "LUA",
+				"color": [39, 95, 112]
+			},
+			{
+				"id": "northern_thai",
+				"name": "Northern Thai",
+				"primaryTag": "LNA",
+				"color": [27, 85, 112]
+			},
+			{
+				"id": "shan",
+				"name": "Shan",
+				"primaryTag": "SST",
+				"color": [15, 72, 112]
+			},
+			{
+				"id": "zhuang",
+				"name": "Zhuang",
+				"primaryTag": null,
+				"color": [61, 97, 133]
+			},
+			{
+				"id": "ahom",
+				"name": "Ahom",
+				"primaryTag": null,
+				"color": [46, 121, 133]
+			},
+			{
+				"id": "thai_canadian",
+				"name": "Thai Canadian",
+				"primaryTag": null,
+				"color": [32, 110, 133]
+			},
+			{
+				"id": "thai_east_american",
+				"name": "Thai East American",
+				"primaryTag": null,
+				"color": [17, 96, 133]
+			},
+			{
+				"id": "thai_louisianan",
+				"name": "Thai Louisianan",
+				"primaryTag": null,
+				"color": [70, 120, 154]
+			},
+			{
+				"id": "thai_californian",
+				"name": "Thai Californian",
+				"primaryTag": null,
+				"color": [54, 104, 154]
+			},
+			{
+				"id": "thai_mexican",
+				"name": "Thai Mexican",
+				"primaryTag": null,
+				"color": [37, 138, 154]
+			},
+			{
+				"id": "thai_caribbean",
+				"name": "Thai Caribbean",
+				"primaryTag": null,
+				"color": [20, 123, 154]
+			},
+			{
+				"id": "thai_colombian",
+				"name": "Thai Colombian",
+				"primaryTag": null,
+				"color": [51, 92, 112]
+			},
+			{
+				"id": "thai_peruvian",
+				"name": "Thai Peruvian",
+				"primaryTag": null,
+				"color": [39, 82, 112]
+			},
+			{
+				"id": "thai_la_platan",
+				"name": "Thai La Platan",
+				"primaryTag": null,
+				"color": [27, 69, 112]
+			},
+			{
+				"id": "thai_brazilian",
+				"name": "Thai Brazilian",
+				"primaryTag": null,
+				"color": [15, 98, 112]
+			},
+			{
+				"id": "thai_australian",
+				"name": "Thai Australian",
+				"primaryTag": null,
+				"color": [61, 116, 133]
+			},
+			{
+				"id": "thai_oceanian",
+				"name": "Thai Oceanian",
+				"primaryTag": null,
+				"color": [46, 105, 133]
+			}
+		]
+	},
+	{
+		"id": "tibetan_group",
+		"name": "Tibetan Group",
+		"cultures": [
+			{
+				"id": "tibetan",
+				"name": "Tibetan",
+				"primaryTag": "TIB",
+				"color": [102, 120, 93]
+			},
+			{
+				"id": "ladakhi",
+				"name": "Ladakhi",
+				"primaryTag": "LDK",
+				"color": [95, 120, 87]
+			},
+			{
+				"id": "khams",
+				"name": "Khams",
+				"primaryTag": "KAM",
+				"color": [88, 120, 82]
+			},
+			{
+				"id": "kochi",
+				"name": "Kochi",
+				"primaryTag": "BHU",
+				"color": [79, 120, 76]
+			},
+			{
+				"id": "zhangzhung",
+				"name": "Zhangzhung",
+				"primaryTag": "ZHA",
+				"color": [110, 142, 111]
+			},
+			{
+				"id": "di",
+				"name": "Di",
+				"primaryTag": "DI0",
+				"color": [116, 142, 104]
+			},
+			{
+				"id": "tangut",
+				"name": "Tangut",
+				"primaryTag": "TUY",
+				"color": [108, 142, 97]
+			},
+			{
+				"id": "tibetan_canadian",
+				"name": "Tibetan Canadian",
+				"primaryTag": null,
+				"color": [99, 142, 91]
+			},
+			{
+				"id": "tibetan_east_american",
+				"name": "Tibetan East American",
+				"primaryTag": null,
+				"color": [130, 165, 127]
+			},
+			{
+				"id": "tibetan_louisianan",
+				"name": "Tibetan Louisianan",
+				"primaryTag": null,
+				"color": [120, 165, 121]
+			},
+			{
+				"id": "tibetan_californian",
+				"name": "Tibetan Californian",
+				"primaryTag": null,
+				"color": [130, 165, 113]
+			},
+			{
+				"id": "tibetan_mexican",
+				"name": "Tibetan Mexican",
+				"primaryTag": null,
+				"color": [120, 165, 105]
+			},
+			{
+				"id": "tibetan_caribbean",
+				"name": "Tibetan Caribbean",
+				"primaryTag": null,
+				"color": [97, 120, 93]
+			},
+			{
+				"id": "tibetan_colombian",
+				"name": "Tibetan Colombian",
+				"primaryTag": null,
+				"color": [89, 120, 87]
+			},
+			{
+				"id": "tibetan_peruvian",
+				"name": "Tibetan Peruvian",
+				"primaryTag": null,
+				"color": [82, 120, 83]
+			},
+			{
+				"id": "tibetan_la_platan",
+				"name": "Tibetan La Platan",
+				"primaryTag": null,
+				"color": [91, 120, 76]
+			},
+			{
+				"id": "tibetan_brazilian",
+				"name": "Tibetan Brazilian",
+				"primaryTag": null,
+				"color": [118, 142, 110]
+			}
+		]
+	},
+	{
+		"id": "burman",
+		"name": "Burman",
+		"cultures": [
+			{
+				"id": "burmese",
+				"name": "Burmese",
+				"primaryTag": "TAU",
+				"color": [152, 105, 126]
+			},
+			{
+				"id": "chin",
+				"name": "Chin",
+				"primaryTag": "MLB",
+				"color": [152, 96, 116]
+			},
+			{
+				"id": "brahmaputran",
+				"name": "Brahmaputran",
+				"primaryTag": "DAV",
+				"color": [152, 87, 104]
+			},
+			{
+				"id": "karen",
+				"name": "Karen",
+				"primaryTag": null,
+				"color": [152, 77, 90]
+			},
+			{
+				"id": "kachin",
+				"name": "Kachin",
+				"primaryTag": null,
+				"color": [181, 125, 130]
+			},
+			{
+				"id": "arakanese",
+				"name": "Arakanese",
+				"primaryTag": "ARK",
+				"color": [181, 114, 143]
+			},
+			{
+				"id": "pyu",
+				"name": "Pyu",
+				"primaryTag": "PYU",
+				"color": [181, 103, 130]
+			},
+			{
+				"id": "yi",
+				"name": "Yi",
+				"primaryTag": "CYI",
+				"color": [181, 92, 115]
+			},
+			{
+				"id": "burman_canadian",
+				"name": "Burman Canadian",
+				"primaryTag": null,
+				"color": [210, 145, 156]
+			},
+			{
+				"id": "burman_east_american",
+				"name": "Burman East American",
+				"primaryTag": null,
+				"color": [210, 132, 138]
+			},
+			{
+				"id": "burman_louisianan",
+				"name": "Burman Louisianan",
+				"primaryTag": null,
+				"color": [210, 120, 159]
+			},
+			{
+				"id": "burman_californian",
+				"name": "Burman Californian",
+				"primaryTag": null,
+				"color": [210, 107, 142]
+			},
+			{
+				"id": "burman_mexican",
+				"name": "Burman Mexican",
+				"primaryTag": null,
+				"color": [152, 105, 118]
+			},
+			{
+				"id": "burman_caribbean",
+				"name": "Burman Caribbean",
+				"primaryTag": null,
+				"color": [152, 96, 105]
+			},
+			{
+				"id": "burman_colombian",
+				"name": "Burman Colombian",
+				"primaryTag": null,
+				"color": [152, 87, 92]
+			},
+			{
+				"id": "burman_peruvian",
+				"name": "Burman Peruvian",
+				"primaryTag": null,
+				"color": [152, 77, 110]
+			},
+			{
+				"id": "burman_la_platan",
+				"name": "Burman La Platan",
+				"primaryTag": null,
+				"color": [181, 125, 145]
+			},
+			{
+				"id": "burman_brazilian",
+				"name": "Burman Brazilian",
+				"primaryTag": null,
+				"color": [181, 114, 131]
+			},
+			{
+				"id": "burman_australian",
+				"name": "Burman Australian",
+				"primaryTag": null,
+				"color": [181, 103, 116]
+			},
+			{
+				"id": "burman_oceanian",
+				"name": "Burman Oceanian",
+				"primaryTag": null,
+				"color": [181, 92, 99]
+			}
+		]
+	},
+	{
+		"id": "pacific",
+		"name": "Pacific",
+		"cultures": [
+			{
+				"id": "papuan",
+				"name": "Papuan",
+				"primaryTag": "PNG",
+				"color": [90, 90, 135]
+			},
+			{
+				"id": "polynesian",
+				"name": "Polynesian",
+				"primaryTag": null,
+				"color": [85, 81, 135]
+			},
+			{
+				"id": "micronesian",
+				"name": "Micronesian",
+				"primaryTag": "MIC",
+				"color": [83, 72, 135]
+			},
+			{
+				"id": "melanesian",
+				"name": "Melanesian",
+				"primaryTag": "SLM",
+				"color": [82, 63, 135]
+			},
+			{
+				"id": "maori",
+				"name": "Maori",
+				"primaryTag": null,
+				"color": [125, 107, 160]
+			},
+			{
+				"id": "pacific_canadian",
+				"name": "Pacific Canadian",
+				"primaryTag": null,
+				"color": [96, 96, 160]
+			},
+			{
+				"id": "pacific_east_american",
+				"name": "Pacific East American",
+				"primaryTag": null,
+				"color": [91, 85, 160]
+			},
+			{
+				"id": "pacific_louisianan",
+				"name": "Pacific Louisianan",
+				"primaryTag": null,
+				"color": [89, 75, 160]
+			},
+			{
+				"id": "pacific_californian",
+				"name": "Pacific Californian",
+				"primaryTag": null,
+				"color": [140, 124, 185]
+			},
+			{
+				"id": "pacific_mexican",
+				"name": "Pacific Mexican",
+				"primaryTag": null,
+				"color": [137, 111, 185]
+			},
+			{
+				"id": "pacific_caribbean",
+				"name": "Pacific Caribbean",
+				"primaryTag": null,
+				"color": [99, 99, 185]
+			},
+			{
+				"id": "pacific_colombian",
+				"name": "Pacific Colombian",
+				"primaryTag": null,
+				"color": [95, 86, 185]
+			},
+			{
+				"id": "pacific_peruvian",
+				"name": "Pacific Peruvian",
+				"primaryTag": null,
+				"color": [98, 90, 135]
+			},
+			{
+				"id": "pacific_la_platan",
+				"name": "Pacific La Platan",
+				"primaryTag": null,
+				"color": [95, 81, 135]
+			},
+			{
+				"id": "pacific_brazilian",
+				"name": "Pacific Brazilian",
+				"primaryTag": null,
+				"color": [94, 72, 135]
+			}
+		]
+	},
+	{
+		"id": "aboriginal_australian",
+		"name": "Aboriginal Australian",
+		"cultures": [
+			{
+				"id": "aboriginal",
+				"name": "Aboriginal",
+				"primaryTag": "EOR",
+				"color": [110, 129, 97]
+			},
+			{
+				"id": "yura",
+				"name": "Yura",
+				"primaryTag": "KAU",
+				"color": [103, 129, 91]
+			},
+			{
+				"id": "paman",
+				"name": "Paman",
+				"primaryTag": "AWN",
+				"color": [95, 129, 85]
+			},
+			{
+				"id": "gunwinyguan",
+				"name": "Gunwinyguan",
+				"primaryTag": "LAR",
+				"color": [85, 129, 78]
+			},
+			{
+				"id": "palawa",
+				"name": "Palawa",
+				"primaryTag": "PLW",
+				"color": [117, 153, 116]
+			},
+			{
+				"id": "kulin",
+				"name": "Kulin",
+				"primaryTag": "WRU",
+				"color": [127, 153, 108]
+			},
+			{
+				"id": "gamilaraay",
+				"name": "Gamilaraay",
+				"primaryTag": "GMI",
+				"color": [117, 153, 101]
+			},
+			{
+				"id": "nyoongah",
+				"name": "Nyoongah",
+				"primaryTag": "NOO",
+				"color": [107, 153, 93]
+			}
+		]
+	},
+	{
+		"id": "eastern_aryan",
+		"name": "Eastern Aryan",
+		"cultures": [
+			{
+				"id": "assamese",
+				"name": "Assamese",
+				"primaryTag": "KMR",
+				"color": [107, 144, 150]
+			},
+			{
+				"id": "bengali",
+				"name": "Bengali",
+				"primaryTag": "BNG",
+				"color": [99, 138, 150]
+			},
+			{
+				"id": "bihari",
+				"name": "Bihari",
+				"primaryTag": "TRT",
+				"color": [90, 131, 150]
+			},
+			{
+				"id": "oriya",
+				"name": "Oriya",
+				"primaryTag": "ORI",
+				"color": [82, 122, 150]
+			},
+			{
+				"id": "garjati",
+				"name": "Garjati",
+				"primaryTag": "GRJ",
+				"color": [128, 153, 178]
+			},
+			{
+				"id": "eastern_aryan_canadian",
+				"name": "Eastern Aryan Canadian",
+				"primaryTag": null,
+				"color": [117, 169, 178]
+			},
+			{
+				"id": "eastern_aryan_east_american",
+				"name": "Eastern Aryan East American",
+				"primaryTag": null,
+				"color": [107, 162, 178]
+			},
+			{
+				"id": "eastern_aryan_louisianan",
+				"name": "Eastern Aryan Louisianan",
+				"primaryTag": null,
+				"color": [97, 152, 178]
+			},
+			{
+				"id": "eastern_aryan_californian",
+				"name": "Eastern Aryan Californian",
+				"primaryTag": null,
+				"color": [148, 182, 206]
+			},
+			{
+				"id": "eastern_aryan_mexican",
+				"name": "Eastern Aryan Mexican",
+				"primaryTag": null,
+				"color": [136, 171, 206]
+			},
+			{
+				"id": "eastern_aryan_caribbean",
+				"name": "Eastern Aryan Caribbean",
+				"primaryTag": null,
+				"color": [124, 194, 206]
+			},
+			{
+				"id": "eastern_aryan_colombian",
+				"name": "Eastern Aryan Colombian",
+				"primaryTag": null,
+				"color": [113, 184, 206]
+			},
+			{
+				"id": "eastern_aryan_peruvian",
+				"name": "Eastern Aryan Peruvian",
+				"primaryTag": null,
+				"color": [107, 136, 150]
+			},
+			{
+				"id": "eastern_aryan_la_platan",
+				"name": "Eastern Aryan La Platan",
+				"primaryTag": null,
+				"color": [99, 129, 150]
+			},
+			{
+				"id": "eastern_aryan_brazilian",
+				"name": "Eastern Aryan Brazilian",
+				"primaryTag": null,
+				"color": [90, 120, 150]
+			},
+			{
+				"id": "eastern_aryan_australian",
+				"name": "Eastern Aryan Australian",
+				"primaryTag": null,
+				"color": [82, 140, 150]
+			},
+			{
+				"id": "eastern_aryan_oceanian",
+				"name": "Eastern Aryan Oceanian",
+				"primaryTag": null,
+				"color": [128, 166, 178]
+			}
+		]
+	},
+	{
+		"id": "hindusthani",
+		"name": "Hindusthani",
+		"cultures": [
+			{
+				"id": "avadhi",
+				"name": "Avadhi",
+				"primaryTag": "ODH",
+				"color": [161, 94, 91]
+			},
+			{
+				"id": "kanauji",
+				"name": "Kanauji",
+				"primaryTag": "DLH",
+				"color": [161, 89, 77]
+			},
+			{
+				"id": "vindhyan",
+				"name": "Vindhyan",
+				"primaryTag": "BND",
+				"color": [161, 86, 63]
+			},
+			{
+				"id": "bagheli",
+				"name": "Bagheli",
+				"primaryTag": "BGL",
+				"color": [161, 85, 49]
+			},
+			{
+				"id": "jharkhandi",
+				"name": "Jharkhandi",
+				"primaryTag": "RTT",
+				"color": [191, 142, 108]
+			},
+			{
+				"id": "panjabi",
+				"name": "Panjabi",
+				"primaryTag": "PUN",
+				"color": [191, 96, 91]
+			},
+			{
+				"id": "sindhi",
+				"name": "Sindhi",
+				"primaryTag": "SND",
+				"color": [191, 91, 75]
+			},
+			{
+				"id": "hindusthani_canadian",
+				"name": "Hindusthani Canadian",
+				"primaryTag": null,
+				"color": [191, 89, 58]
+			},
+			{
+				"id": "hindusthani_east_american",
+				"name": "Hindusthani East American",
+				"primaryTag": null,
+				"color": [222, 156, 125]
+			},
+			{
+				"id": "hindusthani_louisianan",
+				"name": "Hindusthani Louisianan",
+				"primaryTag": null,
+				"color": [222, 153, 106]
+			},
+			{
+				"id": "hindusthani_californian",
+				"name": "Hindusthani Californian",
+				"primaryTag": null,
+				"color": [222, 93, 87]
+			},
+			{
+				"id": "hindusthani_mexican",
+				"name": "Hindusthani Mexican",
+				"primaryTag": null,
+				"color": [222, 89, 67]
+			},
+			{
+				"id": "hindusthani_caribbean",
+				"name": "Hindusthani Caribbean",
+				"primaryTag": null,
+				"color": [161, 107, 91]
+			},
+			{
+				"id": "hindusthani_colombian",
+				"name": "Hindusthani Colombian",
+				"primaryTag": null,
+				"color": [161, 104, 77]
+			},
+			{
+				"id": "hindusthani_peruvian",
+				"name": "Hindusthani Peruvian",
+				"primaryTag": null,
+				"color": [161, 103, 63]
+			},
+			{
+				"id": "hindusthani_la_platan",
+				"name": "Hindusthani La Platan",
+				"primaryTag": null,
+				"color": [161, 54, 49]
+			},
+			{
+				"id": "hindusthani_brazilian",
+				"name": "Hindusthani Brazilian",
+				"primaryTag": null,
+				"color": [191, 120, 108]
+			},
+			{
+				"id": "hindusthani_australian",
+				"name": "Hindusthani Australian",
+				"primaryTag": null,
+				"color": [191, 114, 91]
+			},
+			{
+				"id": "hindusthani_oceanian",
+				"name": "Hindusthani Oceanian",
+				"primaryTag": null,
+				"color": [191, 112, 75]
+			}
+		]
+	},
+	{
+		"id": "central_indic",
+		"name": "Central Indic",
+		"cultures": [
+			{
+				"id": "kashmiri",
+				"name": "Kashmiri",
+				"primaryTag": "KSH",
+				"color": [89, 112, 109]
+			},
+			{
+				"id": "pahari",
+				"name": "Pahari",
+				"primaryTag": "GHR",
+				"color": [86, 112, 111]
+			},
+			{
+				"id": "nepali",
+				"name": "Nepali",
+				"primaryTag": "NPL",
+				"color": [81, 109, 112]
+			},
+			{
+				"id": "central_indic_canadian",
+				"name": "Central Indic Canadian",
+				"primaryTag": null,
+				"color": [77, 106, 112]
+			},
+			{
+				"id": "central_indic_east_american",
+				"name": "Central Indic East American",
+				"primaryTag": null,
+				"color": [106, 125, 133]
+			},
+			{
+				"id": "central_indic_louisianan",
+				"name": "Central Indic Louisianan",
+				"primaryTag": null,
+				"color": [102, 133, 130]
+			},
+			{
+				"id": "central_indic_californian",
+				"name": "Central Indic Californian",
+				"primaryTag": null,
+				"color": [97, 133, 132]
+			},
+			{
+				"id": "central_indic_mexican",
+				"name": "Central Indic Mexican",
+				"primaryTag": null,
+				"color": [91, 129, 133]
+			},
+			{
+				"id": "central_indic_caribbean",
+				"name": "Central Indic Caribbean",
+				"primaryTag": null,
+				"color": [123, 148, 154]
+			},
+			{
+				"id": "central_indic_colombian",
+				"name": "Central Indic Colombian",
+				"primaryTag": null,
+				"color": [118, 144, 154]
+			},
+			{
+				"id": "central_indic_peruvian",
+				"name": "Central Indic Peruvian",
+				"primaryTag": null,
+				"color": [112, 154, 149]
+			},
+			{
+				"id": "central_indic_la_platan",
+				"name": "Central Indic La Platan",
+				"primaryTag": null,
+				"color": [106, 154, 153]
+			},
+			{
+				"id": "central_indic_brazilian",
+				"name": "Central Indic Brazilian",
+				"primaryTag": null,
+				"color": [89, 110, 112]
+			},
+			{
+				"id": "central_indic_australian",
+				"name": "Central Indic Australian",
+				"primaryTag": null,
+				"color": [86, 107, 112]
+			},
+			{
+				"id": "central_indic_oceanian",
+				"name": "Central Indic Oceanian",
+				"primaryTag": null,
+				"color": [81, 104, 112]
+			}
+		]
+	},
+	{
+		"id": "western_aryan",
+		"name": "Western Aryan",
+		"cultures": [
+			{
+				"id": "gujarati",
+				"name": "Gujarati",
+				"primaryTag": "GUJ",
+				"color": [176, 134, 146]
+			},
+			{
+				"id": "parsi",
+				"name": "Parsi",
+				"primaryTag": null,
+				"color": [176, 125, 135]
+			},
+			{
+				"id": "saurashtri",
+				"name": "Saurashtri",
+				"primaryTag": "CMP",
+				"color": [176, 117, 123]
+			},
+			{
+				"id": "marathi",
+				"name": "Marathi",
+				"primaryTag": "MAR",
+				"color": [176, 108, 110]
+			},
+			{
+				"id": "rajput",
+				"name": "Rajput",
+				"primaryTag": "MER",
+				"color": [209, 162, 159]
+			},
+			{
+				"id": "malvi",
+				"name": "Malvi",
+				"primaryTag": "MLW",
+				"color": [209, 149, 166]
+			},
+			{
+				"id": "sinhala",
+				"name": "Sinhala",
+				"primaryTag": "CEY",
+				"color": [209, 139, 153]
+			},
+			{
+				"id": "western_aryan_canadian",
+				"name": "Western Aryan Canadian",
+				"primaryTag": null,
+				"color": [209, 129, 138]
+			},
+			{
+				"id": "western_aryan_east_american",
+				"name": "Western Aryan East American",
+				"primaryTag": null,
+				"color": [242, 184, 185]
+			},
+			{
+				"id": "western_aryan_louisianan",
+				"name": "Western Aryan Louisianan",
+				"primaryTag": null,
+				"color": [242, 177, 172]
+			},
+			{
+				"id": "western_aryan_californian",
+				"name": "Western Aryan Californian",
+				"primaryTag": null,
+				"color": [242, 161, 184]
+			},
+			{
+				"id": "western_aryan_mexican",
+				"name": "Western Aryan Mexican",
+				"primaryTag": null,
+				"color": [242, 149, 168]
+			},
+			{
+				"id": "western_aryan_caribbean",
+				"name": "Western Aryan Caribbean",
+				"primaryTag": null,
+				"color": [176, 134, 138]
+			},
+			{
+				"id": "western_aryan_colombian",
+				"name": "Western Aryan Colombian",
+				"primaryTag": null,
+				"color": [176, 125, 126]
+			},
+			{
+				"id": "western_aryan_peruvian",
+				"name": "Western Aryan Peruvian",
+				"primaryTag": null,
+				"color": [176, 121, 117]
+			},
+			{
+				"id": "western_aryan_la_platan",
+				"name": "Western Aryan La Platan",
+				"primaryTag": null,
+				"color": [176, 108, 128]
+			},
+			{
+				"id": "western_aryan_brazilian",
+				"name": "Western Aryan Brazilian",
+				"primaryTag": null,
+				"color": [209, 159, 169]
+			},
+			{
+				"id": "western_aryan_australian",
+				"name": "Western Aryan Australian",
+				"primaryTag": null,
+				"color": [209, 149, 155]
+			},
+			{
+				"id": "western_aryan_oceanian",
+				"name": "Western Aryan Oceanian",
+				"primaryTag": null,
+				"color": [209, 139, 140]
+			}
+		]
+	},
+	{
+		"id": "dravidian",
+		"name": "Dravidian",
+		"cultures": [
+			{
+				"id": "kannada",
+				"name": "Kannada",
+				"primaryTag": "MYS",
+				"color": [132, 67, 70]
+			},
+			{
+				"id": "malayalam",
+				"name": "Malayalam",
+				"primaryTag": "VND",
+				"color": [132, 58, 54]
+			},
+			{
+				"id": "tamil",
+				"name": "Tamil",
+				"primaryTag": "MAD",
+				"color": [132, 53, 41]
+			},
+			{
+				"id": "telegu",
+				"name": "Telegu",
+				"primaryTag": "GOC",
+				"color": [132, 51, 28]
+			},
+			{
+				"id": "gondi",
+				"name": "Gondi",
+				"primaryTag": "GDW",
+				"color": [157, 104, 80]
+			},
+			{
+				"id": "dravidian_canadian",
+				"name": "Dravidian Canadian",
+				"primaryTag": null,
+				"color": [157, 64, 68]
+			},
+			{
+				"id": "dravidian_east_american",
+				"name": "Dravidian East American",
+				"primaryTag": null,
+				"color": [157, 54, 48]
+			},
+			{
+				"id": "dravidian_louisianan",
+				"name": "Dravidian Louisianan",
+				"primaryTag": null,
+				"color": [157, 50, 33]
+			},
+			{
+				"id": "dravidian_californian",
+				"name": "Dravidian Californian",
+				"primaryTag": null,
+				"color": [182, 113, 92]
+			},
+			{
+				"id": "dravidian_mexican",
+				"name": "Dravidian Mexican",
+				"primaryTag": null,
+				"color": [182, 108, 74]
+			},
+			{
+				"id": "dravidian_caribbean",
+				"name": "Dravidian Caribbean",
+				"primaryTag": null,
+				"color": [182, 56, 62]
+			},
+			{
+				"id": "dravidian_colombian",
+				"name": "Dravidian Colombian",
+				"primaryTag": null,
+				"color": [182, 45, 38]
+			},
+			{
+				"id": "dravidian_peruvian",
+				"name": "Dravidian Peruvian",
+				"primaryTag": null,
+				"color": [132, 76, 67]
+			},
+			{
+				"id": "dravidian_la_platan",
+				"name": "Dravidian La Platan",
+				"primaryTag": null,
+				"color": [132, 72, 54]
+			},
+			{
+				"id": "dravidian_brazilian",
+				"name": "Dravidian Brazilian",
+				"primaryTag": null,
+				"color": [132, 70, 41]
+			},
+			{
+				"id": "dravidian_australian",
+				"name": "Dravidian Australian",
+				"primaryTag": null,
+				"color": [132, 28, 32]
+			},
+			{
+				"id": "dravidian_oceanian",
+				"name": "Dravidian Oceanian",
+				"primaryTag": null,
+				"color": [157, 83, 80]
+			}
+		]
+	},
+	{
+		"id": "mande",
+		"name": "Mande",
+		"cultures": [
+			{
+				"id": "mali",
+				"name": "Mali",
+				"primaryTag": "MAL",
+				"color": [159, 124, 47]
+			},
+			{
+				"id": "soninke",
+				"name": "Soninke",
+				"primaryTag": "ZAF",
+				"color": [159, 129, 24]
+			},
+			{
+				"id": "bambara",
+				"name": "Bambara",
+				"primaryTag": "SOF",
+				"color": [159, 139, 2]
+			},
+			{
+				"id": "bozo",
+				"name": "Bozo",
+				"primaryTag": "JNN",
+				"color": [159, 153, 0]
+			},
+			{
+				"id": "dyola",
+				"name": "Dyola",
+				"primaryTag": "KNG",
+				"color": [182, 189, 55]
+			},
+			{
+				"id": "senegambian",
+				"name": "Senegambian",
+				"primaryTag": "JOL",
+				"color": [189, 139, 29]
+			},
+			{
+				"id": "fulani",
+				"name": "Fulani",
+				"primaryTag": "FUL",
+				"color": [189, 148, 2]
+			}
+		]
+	},
+	{
+		"id": "sahelian",
+		"name": "Sahelian",
+		"cultures": [
+			{
+				"id": "hausa",
+				"name": "Hausa",
+				"primaryTag": "HAU",
+				"color": [144, 79, 111]
+			},
+			{
+				"id": "kanuri",
+				"name": "Kanuri",
+				"primaryTag": "KBO",
+				"color": [144, 66, 97]
+			},
+			{
+				"id": "toubou",
+				"name": "Toubou",
+				"primaryTag": null,
+				"color": [144, 53, 81]
+			},
+			{
+				"id": "sara",
+				"name": "Sara",
+				"primaryTag": null,
+				"color": [144, 40, 63]
+			},
+			{
+				"id": "bilala",
+				"name": "Bilala",
+				"primaryTag": "YAO",
+				"color": [171, 94, 104]
+			},
+			{
+				"id": "songhai",
+				"name": "Songhai",
+				"primaryTag": "SON",
+				"color": [171, 78, 124]
+			}
+		]
+	},
+	{
+		"id": "west_african",
+		"name": "West African",
+		"cultures": [
+			{
+				"id": "yorumba",
+				"name": "Yorumba",
+				"primaryTag": "OYO",
+				"color": [128, 103, 109]
+			},
+			{
+				"id": "edo",
+				"name": "Edo",
+				"primaryTag": "BEN",
+				"color": [128, 103, 106]
+			},
+			{
+				"id": "igbo",
+				"name": "Igbo",
+				"primaryTag": "NR1",
+				"color": [128, 99, 101]
+			},
+			{
+				"id": "aka",
+				"name": "Aka",
+				"primaryTag": "ASH",
+				"color": [128, 96, 95]
+			},
+			{
+				"id": "nupe",
+				"name": "Nupe",
+				"primaryTag": "NUP",
+				"color": [152, 126, 122]
+			},
+			{
+				"id": "fon",
+				"name": "Fon",
+				"primaryTag": "DAH",
+				"color": [152, 122, 129]
+			},
+			{
+				"id": "mossi",
+				"name": "Mossi",
+				"primaryTag": "MSI",
+				"color": [152, 118, 123]
+			},
+			{
+				"id": "dagomba",
+				"name": "Dagomba",
+				"primaryTag": "DGB",
+				"color": [152, 113, 115]
+			},
+			{
+				"id": "bariba",
+				"name": "Bariba",
+				"primaryTag": "BOR",
+				"color": [177, 142, 141]
+			},
+			{
+				"id": "kru",
+				"name": "Kru",
+				"primaryTag": null,
+				"color": [177, 146, 141]
+			}
+		]
+	},
+	{
+		"id": "southern_african",
+		"name": "Southern African",
+		"cultures": [
+			{
+				"id": "makua",
+				"name": "Makua",
+				"primaryTag": "MKU",
+				"color": [104, 81, 77]
+			},
+			{
+				"id": "nguni",
+				"name": "Nguni",
+				"primaryTag": "ZUL",
+				"color": [104, 80, 71]
+			},
+			{
+				"id": "bemba",
+				"name": "Bemba",
+				"primaryTag": "ZAM",
+				"color": [104, 79, 66]
+			},
+			{
+				"id": "shona",
+				"name": "Shona",
+				"primaryTag": "ZIM",
+				"color": [104, 79, 60]
+			},
+			{
+				"id": "nyasa",
+				"name": "Nyasa",
+				"primaryTag": "MRA",
+				"color": [124, 108, 91]
+			},
+			{
+				"id": "tswana",
+				"name": "Tswana",
+				"primaryTag": "BOT",
+				"color": [124, 91, 85]
+			},
+			{
+				"id": "tonga",
+				"name": "Tonga",
+				"primaryTag": null,
+				"color": [124, 90, 78]
+			}
+		]
+	},
+	{
+		"id": "kongo_group",
+		"name": "Kongo Group",
+		"cultures": [
+			{
+				"id": "lunda",
+				"name": "Lunda",
+				"primaryTag": "LND",
+				"color": [90, 86, 72]
+			},
+			{
+				"id": "luba",
+				"name": "Luba",
+				"primaryTag": "LUB",
+				"color": [90, 87, 72]
+			},
+			{
+				"id": "kongolese",
+				"name": "Kongolese",
+				"primaryTag": "KON",
+				"color": [90, 89, 72]
+			},
+			{
+				"id": "yaka",
+				"name": "Yaka",
+				"primaryTag": "YAK",
+				"color": [89, 90, 72]
+			},
+			{
+				"id": "kuba",
+				"name": "Kuba",
+				"primaryTag": "KUB",
+				"color": [104, 107, 85]
+			},
+			{
+				"id": "mbundu",
+				"name": "Mbundu",
+				"primaryTag": "NDO",
+				"color": [107, 102, 85]
+			},
+			{
+				"id": "chokwe",
+				"name": "Chokwe",
+				"primaryTag": "CKW",
+				"color": [107, 104, 85]
+			},
+			{
+				"id": "mbangala",
+				"name": "Mbangala",
+				"primaryTag": "KSJ",
+				"color": [107, 106, 85]
+			},
+			{
+				"id": "jukun",
+				"name": "Jukun",
+				"primaryTag": "KWA",
+				"color": [123, 124, 99]
+			},
+			{
+				"id": "sawabantu",
+				"name": "Sawabantu",
+				"primaryTag": "CMR",
+				"color": [121, 124, 99]
+			},
+			{
+				"id": "northern_bantu",
+				"name": "Northern Bantu",
+				"primaryTag": "CMR",
+				"color": [124, 118, 99]
+			},
+			{
+				"id": "gbaya",
+				"name": "Gbaya",
+				"primaryTag": "CAF",
+				"color": [124, 120, 99]
+			},
+			{
+				"id": "herero",
+				"name": "Herero",
+				"primaryTag": null,
+				"color": [90, 89, 72]
+			},
+			{
+				"id": "mongo",
+				"name": "Mongo",
+				"primaryTag": null,
+				"color": [89, 90, 72]
+			},
+			{
+				"id": "fang",
+				"name": "Fang",
+				"primaryTag": "GAB",
+				"color": [88, 90, 72]
+			}
+		]
+	},
+	{
+		"id": "great_lakes_group",
+		"name": "Great Lakes Group",
+		"cultures": [
+			{
+				"id": "rwandan",
+				"name": "Rwandan",
+				"primaryTag": "RWA",
+				"color": [121, 81, 92]
+			},
+			{
+				"id": "ganda",
+				"name": "Ganda",
+				"primaryTag": "BUG",
+				"color": [121, 73, 82]
+			},
+			{
+				"id": "masaba",
+				"name": "Masaba",
+				"primaryTag": null,
+				"color": [121, 65, 71]
+			}
+		]
+	},
+	{
+		"id": "african",
+		"name": "African",
+		"cultures": [
+			{
+				"id": "takama",
+				"name": "Takama",
+				"primaryTag": null,
+				"color": [105, 117, 139]
+			},
+			{
+				"id": "bena",
+				"name": "Bena",
+				"primaryTag": null,
+				"color": [98, 109, 139]
+			},
+			{
+				"id": "bantu",
+				"name": "Bantu",
+				"primaryTag": null,
+				"color": [91, 99, 139]
+			},
+			{
+				"id": "swahili",
+				"name": "Swahili",
+				"primaryTag": "ZAN",
+				"color": [84, 89, 139]
+			}
+		]
+	},
+	{
+		"id": "cushitic",
+		"name": "Cushitic",
+		"cultures": [
+			{
+				"id": "somali",
+				"name": "Somali",
+				"primaryTag": "ADA",
+				"color": [192, 136, 126]
+			},
+			{
+				"id": "harari",
+				"name": "Harari",
+				"primaryTag": "HAR",
+				"color": [192, 132, 112]
+			},
+			{
+				"id": "afar",
+				"name": "Afar",
+				"primaryTag": "AFA",
+				"color": [192, 130, 99]
+			},
+			{
+				"id": "oromo",
+				"name": "Oromo",
+				"primaryTag": "JIM",
+				"color": [192, 131, 86]
+			},
+			{
+				"id": "tigray",
+				"name": "Tigray",
+				"primaryTag": "MED",
+				"color": [228, 190, 149]
+			},
+			{
+				"id": "sidamo",
+				"name": "Sidamo",
+				"primaryTag": "KAF",
+				"color": [228, 148, 133]
+			},
+			{
+				"id": "amhara",
+				"name": "Amhara",
+				"primaryTag": "ETH",
+				"color": [228, 145, 118]
+			},
+			{
+				"id": "beja",
+				"name": "Beja",
+				"primaryTag": "BEJ",
+				"color": [228, 144, 102]
+			},
+			{
+				"id": "agaw",
+				"name": "Agaw",
+				"primaryTag": "AWI",
+				"color": [255, 204, 167]
+			}
+		]
+	},
+	{
+		"id": "nilotic",
+		"name": "Nilotic",
+		"cultures": [
+			{
+				"id": "old_egyptian",
+				"name": "Old Egyptian",
+				"primaryTag": "EGP",
+				"color": [125, 162, 112]
+			},
+			{
+				"id": "nubian",
+				"name": "Nubian",
+				"primaryTag": "NUB",
+				"color": [112, 162, 102]
+			},
+			{
+				"id": "dinka",
+				"name": "Dinka",
+				"primaryTag": "SSU",
+				"color": [97, 162, 92]
+			},
+			{
+				"id": "masai",
+				"name": "Masai",
+				"primaryTag": "KEY",
+				"color": [82, 162, 84]
+			},
+			{
+				"id": "acholi",
+				"name": "Acholi",
+				"primaryTag": null,
+				"color": [133, 192, 140]
+			},
+			{
+				"id": "fur_culture",
+				"name": "Fur",
+				"primaryTag": "DAR",
+				"color": [139, 192, 121]
+			},
+			{
+				"id": "maba",
+				"name": "Maba",
+				"primaryTag": "WAD",
+				"color": [123, 192, 110]
+			},
+			{
+				"id": "daju",
+				"name": "Daju",
+				"primaryTag": "DAJ",
+				"color": [105, 192, 98]
+			},
+			{
+				"id": "tunjur",
+				"name": "Tunjur",
+				"primaryTag": "TJR",
+				"color": [154, 223, 156]
+			},
+			{
+				"id": "kushite",
+				"name": "Kushite",
+				"primaryTag": "MEO",
+				"color": [141, 223, 149]
+			},
+			{
+				"id": "egyptian_canadian",
+				"name": "Egyptian Canadian",
+				"primaryTag": null,
+				"color": [151, 223, 127]
+			},
+			{
+				"id": "egyptian_east_american",
+				"name": "Egyptian East American",
+				"primaryTag": null,
+				"color": [131, 223, 113]
+			},
+			{
+				"id": "egyptian_louisianan",
+				"name": "Egyptian Louisianan",
+				"primaryTag": null,
+				"color": [116, 162, 112]
+			},
+			{
+				"id": "egyptian_californian",
+				"name": "Egyptian Californian",
+				"primaryTag": null,
+				"color": [102, 162, 103]
+			},
+			{
+				"id": "egyptian_mexican",
+				"name": "Egyptian Mexican",
+				"primaryTag": null,
+				"color": [92, 162, 100]
+			},
+			{
+				"id": "egyptian_caribbean",
+				"name": "Egyptian Caribbean",
+				"primaryTag": null,
+				"color": [102, 162, 82]
+			},
+			{
+				"id": "egyptian_colombian",
+				"name": "Egyptian Colombian",
+				"primaryTag": null,
+				"color": [143, 192, 133]
+			},
+			{
+				"id": "egyptian_peruvian",
+				"name": "Egyptian Peruvian",
+				"primaryTag": null,
+				"color": [127, 192, 121]
+			},
+			{
+				"id": "egyptian_la_platan",
+				"name": "Egyptian La Platan",
+				"primaryTag": null,
+				"color": [110, 192, 111]
+			},
+			{
+				"id": "egyptian_brazilian",
+				"name": "Egyptian Brazilian",
+				"primaryTag": null,
+				"color": [98, 192, 108]
+			},
+			{
+				"id": "egyptian_australian",
+				"name": "Egyptian Australian",
+				"primaryTag": null,
+				"color": [172, 223, 154]
+			},
+			{
+				"id": "egyptian_oceanian",
+				"name": "Egyptian Oceanian",
+				"primaryTag": null,
+				"color": [154, 223, 141]
+			}
+		]
+	},
+	{
+		"id": "khoisan",
+		"name": "Khoisan",
+		"cultures": [
+			{
+				"id": "khoi",
+				"name": "Khoi",
+				"primaryTag": "NMB",
+				"color": [108, 136, 80]
+			},
+			{
+				"id": "san",
+				"name": "San",
+				"primaryTag": null,
+				"color": [96, 136, 69]
+			},
+			{
+				"id": "sandawa",
+				"name": "Sandawa",
+				"primaryTag": null,
+				"color": [83, 136, 57]
+			},
+			{
+				"id": "twa",
+				"name": "Twa",
+				"primaryTag": null,
+				"color": [67, 136, 46]
+			},
+			{
+				"id": "kwi",
+				"name": "Kwi",
+				"primaryTag": null,
+				"color": [104, 161, 95]
+			},
+			{
+				"id": "kxa",
+				"name": "Kxa",
+				"primaryTag": null,
+				"color": [121, 161, 81]
+			},
+			{
+				"id": "tshu",
+				"name": "Tshu",
+				"primaryTag": null,
+				"color": [107, 161, 68]
+			},
+			{
+				"id": "zembere",
+				"name": "Zembere",
+				"primaryTag": null,
+				"color": [89, 161, 55]
+			}
+		]
+	},
+	{
+		"id": "evenks",
+		"name": "Evenks",
+		"cultures": [
+			{
+				"id": "yukagyr",
+				"name": "Yukagyr",
+				"primaryTag": "HOD",
+				"color": [135, 165, 111]
+			},
+			{
+				"id": "tungus",
+				"name": "Tungus",
+				"primaryTag": null,
+				"color": [123, 165, 100]
+			},
+			{
+				"id": "kamchatkan",
+				"name": "Kamchatkan",
+				"primaryTag": "KMC",
+				"color": [109, 165, 89]
+			},
+			{
+				"id": "nivkh",
+				"name": "Nivkh",
+				"primaryTag": "NVK",
+				"color": [93, 165, 78]
+			},
+			{
+				"id": "manchu",
+				"name": "Manchu",
+				"primaryTag": "MCH",
+				"color": [137, 196, 131]
+			},
+			{
+				"id": "evenks_canadian",
+				"name": "Evenks Canadian",
+				"primaryTag": null,
+				"color": [153, 196, 118]
+			},
+			{
+				"id": "evenks_east_american",
+				"name": "Evenks East American",
+				"primaryTag": null,
+				"color": [137, 196, 105]
+			},
+			{
+				"id": "evenks_louisianan",
+				"name": "Evenks Louisianan",
+				"primaryTag": null,
+				"color": [120, 196, 92]
+			},
+			{
+				"id": "evenks_californian",
+				"name": "Evenks Californian",
+				"primaryTag": null,
+				"color": [165, 227, 152]
+			},
+			{
+				"id": "evenks_mexican",
+				"name": "Evenks Mexican",
+				"primaryTag": null,
+				"color": [145, 227, 137]
+			},
+			{
+				"id": "evenks_caribbean",
+				"name": "Evenks Caribbean",
+				"primaryTag": null,
+				"color": [169, 227, 122]
+			},
+			{
+				"id": "evenks_colombian",
+				"name": "Evenks Colombian",
+				"primaryTag": null,
+				"color": [150, 227, 107]
+			},
+			{
+				"id": "evenks_peruvian",
+				"name": "Evenks Peruvian",
+				"primaryTag": null,
+				"color": [125, 165, 111]
+			},
+			{
+				"id": "evenks_la_platan",
+				"name": "Evenks La Platan",
+				"primaryTag": null,
+				"color": [111, 165, 100]
+			},
+			{
+				"id": "evenks_brazilian",
+				"name": "Evenks Brazilian",
+				"primaryTag": null,
+				"color": [95, 165, 89]
+			},
+			{
+				"id": "evenks_australian",
+				"name": "Evenks Australian",
+				"primaryTag": null,
+				"color": [117, 165, 78]
+			},
+			{
+				"id": "evenks_oceanian",
+				"name": "Evenks Oceanian",
+				"primaryTag": null,
+				"color": [154, 196, 131]
+			}
+		]
+	},
+	{
+		"id": "tartar",
+		"name": "Tartar",
+		"cultures": [
+			{
+				"id": "astrakhani",
+				"name": "Astrakhani",
+				"primaryTag": "AST",
+				"color": [79, 119, 85]
+			},
+			{
+				"id": "bashkir",
+				"name": "Bashkir",
+				"primaryTag": "BSH",
+				"color": [71, 119, 83]
+			},
+			{
+				"id": "crimean",
+				"name": "Crimean",
+				"primaryTag": "CRI",
+				"color": [63, 119, 82]
+			},
+			{
+				"id": "kazani",
+				"name": "Kazani",
+				"primaryTag": "KAZ",
+				"color": [55, 119, 82]
+			},
+			{
+				"id": "mishary",
+				"name": "Mishary",
+				"primaryTag": "GOL",
+				"color": [94, 141, 118]
+			},
+			{
+				"id": "nogaybak",
+				"name": "Nogaybak",
+				"primaryTag": "NOG",
+				"color": [85, 141, 93]
+			},
+			{
+				"id": "qasim",
+				"name": "Qasim",
+				"primaryTag": "QAS",
+				"color": [75, 141, 91]
+			},
+			{
+				"id": "siberian",
+				"name": "Siberian",
+				"primaryTag": "SIB",
+				"color": [66, 141, 91]
+			},
+			{
+				"id": "tartar_canadian",
+				"name": "Tartar Canadian",
+				"primaryTag": null,
+				"color": [109, 163, 132]
+			},
+			{
+				"id": "tartar_east_american",
+				"name": "Tartar East American",
+				"primaryTag": null,
+				"color": [98, 163, 132]
+			},
+			{
+				"id": "tartar_louisianan",
+				"name": "Tartar Louisianan",
+				"primaryTag": null,
+				"color": [87, 163, 99]
+			},
+			{
+				"id": "tartar_californian",
+				"name": "Tartar Californian",
+				"primaryTag": null,
+				"color": [76, 163, 97]
+			},
+			{
+				"id": "tartar_mexican",
+				"name": "Tartar Mexican",
+				"primaryTag": null,
+				"color": [79, 119, 92]
+			},
+			{
+				"id": "tartar_caribbean",
+				"name": "Tartar Caribbean",
+				"primaryTag": null,
+				"color": [71, 119, 91]
+			},
+			{
+				"id": "tartar_colombian",
+				"name": "Tartar Colombian",
+				"primaryTag": null,
+				"color": [63, 119, 92]
+			},
+			{
+				"id": "tartar_peruvian",
+				"name": "Tartar Peruvian",
+				"primaryTag": null,
+				"color": [55, 119, 65]
+			},
+			{
+				"id": "tartar_la_platan",
+				"name": "Tartar La Platan",
+				"primaryTag": null,
+				"color": [94, 141, 105]
+			},
+			{
+				"id": "tartar_brazilian",
+				"name": "Tartar Brazilian",
+				"primaryTag": null,
+				"color": [85, 141, 103]
+			},
+			{
+				"id": "tartar_australian",
+				"name": "Tartar Australian",
+				"primaryTag": null,
+				"color": [75, 141, 103]
+			},
+			{
+				"id": "tartar_oceanian",
+				"name": "Tartar Oceanian",
+				"primaryTag": null,
+				"color": [66, 141, 104]
+			}
+		]
+	},
+	{
+		"id": "mesopotamian",
+		"name": "Mesopotamian",
+		"cultures": [
+			{
+				"id": "assyrian",
+				"name": "Assyrian",
+				"primaryTag": "ASY",
+				"color": [168, 135, 152]
+			},
+			{
+				"id": "babylonian",
+				"name": "Babylonian",
+				"primaryTag": "BAB",
+				"color": [168, 135, 149]
+			},
+			{
+				"id": "aramaic",
+				"name": "Aramaic",
+				"primaryTag": null,
+				"color": [168, 135, 146]
+			}
+		]
+	},
+	{
+		"id": "canaanite",
+		"name": "Canaanite",
+		"cultures": [
+			{
+				"id": "phoenician",
+				"name": "Phoenician",
+				"primaryTag": null,
+				"color": [204, 103, 145]
+			},
+			{
+				"id": "punic",
+				"name": "Punic",
+				"primaryTag": null,
+				"color": [204, 83, 122]
+			}
+		]
+	},
+	{
+		"id": "bonus_group",
+		"name": "Bonus Group",
+		"cultures": [
+			{
+				"id": "uninhabited",
+				"name": "Uninhabited",
+				"primaryTag": null,
+				"color": [130, 124, 155]
+			},
+			{
+				"id": "polar_bear",
+				"name": "Polar Bear",
+				"primaryTag": null,
+				"color": [133, 124, 155]
+			}
+		]
+	}
+]

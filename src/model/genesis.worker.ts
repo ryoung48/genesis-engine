@@ -94,10 +94,12 @@ function cloneProvinces(p: GenesisProvinces): GenesisProvinces {
 		adjOffset: p.adjOffset.slice(),
 		adjList: p.adjList.slice(),
 		size: p.size.slice(),
+		...(p.areaKm2 ? { areaKm2: p.areaKm2.slice() } : {}),
 		colors: p.colors.slice(),
 		waterAccess: p.waterAccess.slice(),
 		riverAccess: p.riverAccess.slice(),
 		lakeAccess: p.lakeAccess.slice(),
+		...(p.realIds ? { realIds: p.realIds.slice() } : {}),
 	}
 }
 

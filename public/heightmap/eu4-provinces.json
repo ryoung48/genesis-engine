@@ -6,7 +6,7 @@
 	"width": 4096,
 	"height": 2048,
 	"nodata": -32768,
-	"numProvinces": 3113,
+	"numProvinces": 3114,
 	"source": "c:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4.json",
 	"bin": "eu4-provinces.bin.gz"
 }

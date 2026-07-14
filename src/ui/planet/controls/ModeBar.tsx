@@ -1,6 +1,7 @@
 import React from "react"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import type { ColorMode } from "../colors"
+import { getBaseMapMode } from "../screen/shared/data-variant"
 import type {
 	MapModePrimary,
 	NationMapMode,
@@ -121,7 +122,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 			<ModeButtonGroup<SocietyMapMode>
 				options={societyOptions}
 				value={
-					colorMode === "population"
+					getBaseMapMode(colorMode) === "population"
 						? populationMode
 						: colorMode === "timezone"
 							? "timezone"
@@ -134,6 +135,7 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					}
 					if (
 						mode === "density" ||
+						mode === "urban" ||
 						mode === "development" ||
 						mode === "culture" ||
 						mode === "heritage" ||

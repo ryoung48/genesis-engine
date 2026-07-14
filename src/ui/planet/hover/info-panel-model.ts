@@ -28,7 +28,9 @@ import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
 } from "../screen/display/religion-type"
+import { getBaseMapMode, getDataVariant } from "../screen/shared/data-variant"
 import type { PopulationMapMode } from "../screen/shared/map-modes"
+import { getProvincePopulationDensity } from "../screen/shared/population-density"
 import {
 	formatDensity,
 	rgbToCss,
@@ -69,6 +71,13 @@ interface HoverDemographicDisplayData {
 	label: string
 	value: string
 	color: string | null
+}
+
+function formatPopulationValue(value: number): string {
+	if (!Number.isFinite(value) || value <= 0) return "0"
+	if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+	if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`
+	return Math.round(value).toLocaleString()
 }
 
 export function buildHoverChartData(
@@ -310,6 +319,7 @@ export function buildTopographySwatchColor(
 
 export function buildDemographicDisplayData(params: {
 	populationMode: PopulationMapMode
+	colorMode: ColorMode
 	hoverProvince: number | null
 	world: SerializedGenesisWorld | null
 	unitSystem: UnitSystem
@@ -318,6 +328,7 @@ export function buildDemographicDisplayData(params: {
 }): HoverDemographicDisplayData | null {
 	const {
 		populationMode,
+		colorMode,
 		hoverProvince,
 		world,
 		unitSystem,
@@ -334,24 +345,32 @@ export function buildDemographicDisplayData(params: {
 	}
 	const province = hoverProvince
 	const isDesolate = !!world.provinces.desolate[province]
+	const populationVariant =
+		getBaseMapMode(colorMode) === "population"
+			? getDataVariant(colorMode)
+			: "generated"
 
 	if (populationMode === "density") {
-		const pop = world.population?.population?.[province] ?? 0
-		if (isDesolate || pop <= 0) return null
-		const popStr =
-			pop >= 1_000_000
-				? `${(pop / 1_000_000).toFixed(1)}M`
-				: pop >= 1_000
-					? `${(pop / 1_000).toFixed(0)}K`
-					: Math.round(pop).toLocaleString()
-		const radiusKm = world.params?.planetRadiusKm ?? 6371
-		const cellAreaKm2 =
-			(4 * Math.PI * radiusKm * radiusKm) / world.mesh.numRegions
-		const areaKm2 = world.provinces.size[province] * cellAreaKm2
-		const density = areaKm2 > 0 ? pop / areaKm2 : 0
+		const densitySource =
+			populationVariant === "observed"
+				? (world.realPopulation?.population?.[province] ?? 0)
+				: populationVariant === "diff"
+					? (world.realPopulation?.difference?.[province] ?? 0)
+					: (world.population?.population?.[province] ?? 0)
+		if (isDesolate || !Number.isFinite(densitySource)) return null
+		if (populationVariant !== "diff" && densitySource <= 0) return null
+		const density = getProvincePopulationDensity(world, province, densitySource)
+		const densityText =
+			populationVariant === "diff"
+				? `${density >= 0 ? "+" : ""}${formatDensity(Math.abs(density), unitSystem)}`
+				: formatDensity(density, unitSystem)
+		const populationText =
+			populationVariant === "diff"
+				? `${densitySource >= 0 ? "+" : ""}${formatPopulationValue(Math.abs(densitySource))}`
+				: formatPopulationValue(densitySource)
 		return {
 			label: "Population",
-			value: `${popStr} · ${formatDensity(density, unitSystem)}`,
+			value: `${densityText} · ${populationText}`,
 			color: null,
 		}
 	}
@@ -361,6 +380,17 @@ export function buildDemographicDisplayData(params: {
 		return {
 			label: "Development",
 			value: world.development[province].toFixed(2),
+			color: null,
+		}
+	}
+
+	if (populationMode === "urban") {
+		const urbanPopulation =
+			world.realUrbanPopulation?.population?.[province] ?? 0
+		if (isDesolate || urbanPopulation <= 0) return null
+		return {
+			label: "Urban Pop",
+			value: formatPopulationValue(urbanPopulation),
 			color: null,
 		}
 	}
@@ -481,6 +511,42 @@ export function buildGovernmentDisplayData(params: {
 		label,
 		color: GOVERNMENT_COLORS_CSS[typeIndex] ?? GOVERNMENT_COLORS_CSS[7],
 	}
+}
+
+/**
+ * Diplomacy row for the hover panel, sourced from the earth-history engine
+ * (src/model/earth/history/adapter.ts's NationInfoFromHistory) rather than
+ * the procedural world -- only meaningful when world.isEarthImport is true.
+ * Callers must resolve `info` themselves (via queryEarthHistoryNation) and
+ * pass null when earth-history isn't active or the tag has no data, so this
+ * stays a pure formatter like the other builders on this file. See
+ * docs/earth-history-plan.md "Map modes and hover gating".
+ */
+export function buildEarthHistoryDiplomacyDisplayData(
+	info: {
+		overlord: string | null
+		vassals: string[]
+		allies: string[]
+		unionWith: string[]
+		atWar: { name: string; isRebel: boolean; asAttacker: boolean }[]
+	} | null,
+): { label: string; value: string }[] {
+	if (!info) return []
+	const rows: { label: string; value: string }[] = []
+	if (info.overlord) rows.push({ label: "Overlord", value: info.overlord })
+	if (info.vassals.length)
+		rows.push({ label: "Vassals", value: info.vassals.join(", ") })
+	if (info.unionWith.length)
+		rows.push({ label: "Union", value: info.unionWith.join(", ") })
+	if (info.allies.length)
+		rows.push({ label: "Allies", value: info.allies.join(", ") })
+	for (const war of info.atWar) {
+		rows.push({
+			label: war.isRebel ? "Rebellion" : "At War",
+			value: `${war.name} (${war.asAttacker ? "attacker" : "defender"})`,
+		})
+	}
+	return rows
 }
 
 /**

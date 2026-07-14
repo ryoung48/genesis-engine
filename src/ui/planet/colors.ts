@@ -52,6 +52,8 @@ export type ColorMode =
 	| "hotspots"
 	| "nations"
 	| "population"
+	| "realPopulation"
+	| "populationDiff"
 	| "provinces"
 	| "earthProvinces"
 	| "basins"
@@ -895,6 +897,42 @@ export function populationColor(
 			Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4),
 		),
 	)
+}
+
+const populationDiffStops: { v: number; r: number; g: number; b: number }[] = [
+	{ v: -1, r: 0.1, g: 0.24, b: 0.58 },
+	{ v: -0.5, r: 0.33, g: 0.57, b: 0.87 },
+	{ v: -0.1, r: 0.77, g: 0.89, b: 0.97 },
+	{ v: 0, r: 0.98, g: 0.97, b: 0.95 },
+	{ v: 0.1, r: 0.98, g: 0.86, b: 0.71 },
+	{ v: 0.5, r: 0.9, g: 0.46, b: 0.25 },
+	{ v: 1, r: 0.55, g: 0.08, b: 0.09 },
+]
+
+export function populationDifferenceColor(
+	normalizedDiff: number,
+): [number, number, number] {
+	const clamped = Math.max(
+		populationDiffStops[0].v,
+		Math.min(
+			populationDiffStops[populationDiffStops.length - 1].v,
+			normalizedDiff,
+		),
+	)
+	for (let i = 0; i < populationDiffStops.length - 1; i++) {
+		const a = populationDiffStops[i]
+		const b = populationDiffStops[i + 1]
+		if (clamped <= b.v) {
+			const t = (clamped - a.v) / (b.v - a.v)
+			return [
+				a.r + t * (b.r - a.r),
+				a.g + t * (b.g - a.g),
+				a.b + t * (b.b - a.b),
+			]
+		}
+	}
+	const last = populationDiffStops[populationDiffStops.length - 1]
+	return [last.r, last.g, last.b]
 }
 
 export function migrationColor(

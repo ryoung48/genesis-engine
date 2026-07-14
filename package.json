@@ -14,6 +14,8 @@
 		"gen:snapshot": "vitest run --project smoke src/model/history/snapshot.smoke.test.ts",
 		"gen:world": "vitest run --project smoke src/model/pipelines/generate-default-world.smoke.test.ts",
 		"gen:world:earth-temp-compare": "vitest run --project smoke src/model/pipelines/earth-real-temperature-compare.smoke.test.ts",
+		"build:earth-real-population-eu4": "python scripts/regenerate-earth-population.py",
+		"build:earth-real-urban-population-eu4": "python scripts/regenerate-earth-population.py",
 		"knip": "knip"
 	},
 	"dependencies": {
