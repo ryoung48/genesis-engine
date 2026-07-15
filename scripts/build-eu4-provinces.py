@@ -9,18 +9,13 @@ import numpy as np
 from PIL import Image, ImageDraw
 from shapely.geometry import shape
 
-from eu4_province_id_swaps import (
-    rename_province_id,
-    split_province_part_geom,
-    split_province_part_rings,
-    swap_province_id,
-)
-
 Image.MAX_IMAGE_PIXELS = None
 
 INT16_NODATA = -32768
 
-DEFAULT_GEOJSON = Path(r"c:\Users\rayou\projects\geo-explorer\public\eu4.json")
+DEFAULT_GEOJSON = Path(
+    r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
+)
 DEFAULT_OUTPUT_DIR = Path("public/heightmap")
 DEFAULT_WIDTH = 4096
 DEFAULT_HEIGHT = 2048
@@ -44,22 +39,21 @@ def rasterize(geojson_path: Path, width: int, height: int) -> np.ndarray:
 
     features = data["features"]
     for feat in features:
-        province_id = swap_province_id(rename_province_id(feat["properties"]["id"]))
+        province_id = feat["properties"]["id"]
         geom = feat["geometry"]
         polygons = (
             [geom["coordinates"]]
             if geom["type"] == "Polygon"
             else geom["coordinates"]
         )
-        for split_id, split_polygons in split_province_part_rings(province_id, polygons):
-            for rings in split_polygons:
-                if not rings:
-                    continue
-                exterior = [lonlat_to_px(lon, lat, width, height) for lon, lat in rings[0]]
-                draw.polygon(exterior, fill=split_id)
-                for hole in rings[1:]:
-                    hole_px = [lonlat_to_px(lon, lat, width, height) for lon, lat in hole]
-                    draw.polygon(hole_px, fill=0)
+        for rings in polygons:
+            if not rings:
+                continue
+            exterior = [lonlat_to_px(lon, lat, width, height) for lon, lat in rings[0]]
+            draw.polygon(exterior, fill=province_id)
+            for hole in rings[1:]:
+                hole_px = [lonlat_to_px(lon, lat, width, height) for lon, lat in hole]
+                draw.polygon(hole_px, fill=0)
 
     return np.array(canvas, dtype=np.int32)
 
@@ -76,11 +70,10 @@ def compute_seed_points(geojson_path: Path) -> list[dict]:
 
     seeds = []
     for feat in data["features"]:
-        province_id = swap_province_id(rename_province_id(feat["properties"]["id"]))
+        province_id = feat["properties"]["id"]
         geom = shape(feat["geometry"])
-        for split_id, split_geom in split_province_part_geom(province_id, geom):
-            point = split_geom.representative_point()
-            seeds.append({"id": split_id, "lon": point.x, "lat": point.y})
+        point = geom.representative_point()
+        seeds.append({"id": province_id, "lon": point.x, "lat": point.y})
     return seeds
 
 

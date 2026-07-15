@@ -21,6 +21,13 @@ outside the edge (offset perpendicular to it) and ask which *other*
 province's polygon contains that point via a spatial index. This only
 depends on geometric proximity of the two polygons, not on their vertex
 sequences lining up, so it's robust to the mismatched-density source data.
+
+When the probe point falls in a sliver gap between two independently-traced
+polygons and lands inside no polygon at all, a progressively-widening
+nearest-polygon search (see `_find_nearest_neighbor`) is used as a fallback
+before conceding "no neighbor" -- otherwise these gap edges default to the
+no-neighbor sentinel and always render as a border, producing seams in the
+middle of same-nation territory that don't correspond to any real boundary.
 """
 
 from __future__ import annotations
@@ -37,12 +44,8 @@ from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry import shape
 from shapely.strtree import STRtree
 
-from eu4_province_id_swaps import rename_province_id as _rename_province_id
-from eu4_province_id_swaps import split_province_part_geom
-from eu4_province_id_swaps import swap_province_id as _swap_province_id
-
 DEFAULT_GEOJSON = Path(
-    r"c:\Users\rayou\projects\geo-explorer\public\eu4.json"
+    r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
 DEFAULT_OUTPUT_DIR = Path("public/earth-history/reference")
 DEFAULT_PREFIX = "eu4-province-borders"
@@ -58,6 +61,18 @@ DEFAULT_PROBE_OFFSET_DEG = 2e-4
 # casing is needed on the TS side -- these segments just always count as a
 # border.
 NO_NEIGHBOR_PROVINCE_ID = -1
+
+# When the outside-probe point doesn't land inside any polygon at all (it
+# fell in a sliver gap between two independently-digitized provinces -- the
+# same vertex-density mismatch described above, just missing the probe
+# entirely instead of only missing edge-matching), search progressively
+# wider rings around the probe for the nearest other polygon before giving
+# up. Radii are multiples of the probe offset; the cap keeps this from
+# bridging a real coastline/dataset edge into some unrelated distant
+# province -- true "no neighbor" edges (open ocean, unmapped land) are much
+# farther than any digitization gap.
+NEAREST_FALLBACK_RADII_MULT = (4, 16, 64)
+NEAREST_FALLBACK_MAX_DEG = 5e-3
 
 # The source GeoJSON has hundreds of degenerate sliver polygons scattered
 # across province MultiPolygons -- digitization/tracing noise, not real
@@ -92,9 +107,7 @@ def _load_province_polygons(
 
     by_id: dict[int, list] = defaultdict(list)
     for feat in data["features"]:
-        province_id = _swap_province_id(
-            _rename_province_id(int(feat["properties"]["id"]))
-        )
+        province_id = int(feat["properties"]["id"])
         geom = shape(feat["geometry"])
         # buffer(0) repairs self-intersecting/invalid rings (a handful of
         # source features are invalid) by re-noding to a valid simple form.
@@ -104,8 +117,7 @@ def _load_province_polygons(
         if not geom.is_valid:
             geom = geom.buffer(0)
         geom = shapely.set_precision(geom, snap_grid_size)
-        for split_id, split_geom in split_province_part_geom(province_id, geom):
-            by_id[split_id].append(split_geom)
+        by_id[province_id].append(geom)
 
     polygons: dict[int, "shapely.Geometry"] = {}
     for province_id, geoms in by_id.items():
@@ -124,6 +136,33 @@ def _iter_rings(geom: "shapely.Geometry"):
     elif geom.geom_type == "MultiPolygon":
         for poly in geom.geoms:
             yield from _iter_rings(poly)
+
+
+def _find_nearest_neighbor(
+    tree: STRtree,
+    geoms: list,
+    province_ids: list[int],
+    pid: int,
+    outside_probe: ShapelyPoint,
+    probe_offset_deg: float,
+) -> int:
+    for mult in NEAREST_FALLBACK_RADII_MULT:
+        radius = min(probe_offset_deg * mult, NEAREST_FALLBACK_MAX_DEG)
+        best_idx = None
+        best_dist = float("inf")
+        for idx in tree.query(outside_probe.buffer(radius)):
+            idx = int(idx)
+            if province_ids[idx] == pid:
+                continue
+            dist = geoms[idx].distance(outside_probe)
+            if dist < best_dist:
+                best_dist = dist
+                best_idx = idx
+        if best_idx is not None:
+            return province_ids[best_idx]
+        if radius >= NEAREST_FALLBACK_MAX_DEG:
+            break
+    return NO_NEIGHBOR_PROVINCE_ID
 
 
 def _classify_edges(
@@ -167,6 +206,11 @@ def _classify_edges(
                     if geoms[idx].contains(outside_probe):
                         neighbor_id = other_pid
                         break
+
+                if neighbor_id == NO_NEIGHBOR_PROVINCE_ID:
+                    neighbor_id = _find_nearest_neighbor(
+                        tree, geoms, province_ids, pid, outside_probe, probe_offset_deg
+                    )
 
                 edges.append((pid, neighbor_id, a, b))
 

@@ -20,20 +20,76 @@ import sys
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).parent
+DEFAULT_GEOJSON = Path(
+    r"C:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
+)
+DEFAULT_PROVINCE_NAMES_TOPOJSON = Path(
+    r"C:\Users\rayou\projects\geo-explorer\public\provinces.topojson"
+)
+DEFAULT_GHSL_SOURCE = Path(
+    r"C:\Users\rayou\Downloads\metro_adjusted_rasters_and_json\stadester_ghsl.json"
+)
 
-STEPS: list[tuple[str, str]] = [
-    ("Reference data (nations/cultures/religions)", "build-eu4-reference-data.py"),
-    ("History events (provinces/nations/wars/diplomacy)", "build-eu4-history-events.py"),
-    ("Province raster + seeds (procedural mesh mapping)", "build-eu4-provinces.py"),
-    ("Province border vectors", "build-eu4-province-borders.py"),
-    ("Population (total + urban, with province swaps)", "regenerate-earth-population.py"),
+STEPS: list[tuple[str, str, list[str]]] = [
+    ("Reference data (nations/cultures/religions)", "build-eu4-reference-data.py", []),
+    (
+        "History events (provinces/nations/wars/diplomacy)",
+        "build-eu4-history-events.py",
+        ["--province-names-topojson", "{province_names_topojson}"],
+    ),
+    (
+        "Province raster + seeds (procedural mesh mapping)",
+        "build-eu4-provinces.py",
+        ["--geojson", "{geojson}"],
+    ),
+    (
+        "Province border vectors",
+        "build-eu4-province-borders.py",
+        ["--geojson", "{geojson}"],
+    ),
+    (
+        "Population (total + urban, with province swaps)",
+        "regenerate-earth-population.py",
+        ["--province-geojson", "{geojson}"],
+    ),
+    (
+        "GHSL settlements",
+        "build-ghsl-settlements.py",
+        [
+            "--source",
+            "{ghsl_source}",
+            "--population-asset",
+            "public/heightmap/earth-real-population-eu4.json",
+            "--province-geojson",
+            "{geojson}",
+        ],
+    ),
 ]
 
 
 def main() -> None:
-    for label, script_name in STEPS:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--geojson", type=Path, default=DEFAULT_GEOJSON)
+    parser.add_argument(
+        "--province-names-topojson",
+        type=Path,
+        default=DEFAULT_PROVINCE_NAMES_TOPOJSON,
+    )
+    parser.add_argument("--ghsl-source", type=Path, default=DEFAULT_GHSL_SOURCE)
+    args = parser.parse_args()
+
+    replacements = {
+        "{geojson}": str(args.geojson),
+        "{province_names_topojson}": str(args.province_names_topojson),
+        "{ghsl_source}": str(args.ghsl_source),
+    }
+
+    for label, script_name, extra_args in STEPS:
         print(f"\n=== {label} ({script_name}) ===")
-        result = subprocess.run([sys.executable, str(SCRIPTS_DIR / script_name)])
+        resolved_args = [replacements.get(arg, arg) for arg in extra_args]
+        result = subprocess.run([sys.executable, str(SCRIPTS_DIR / script_name), *resolved_args])
         if result.returncode != 0:
             print(f"\nFailed at: {label} ({script_name})", file=sys.stderr)
             sys.exit(result.returncode)

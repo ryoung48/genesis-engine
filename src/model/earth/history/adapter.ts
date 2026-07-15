@@ -202,7 +202,10 @@ export function foldedStateToGenesisFrame(
 
 	const names = new Array<string>(nationIds.size)
 	for (const [tag, id] of nationIds) {
-		names[id] = nationReference?.get(tag)?.name ?? tag
+		names[id] =
+			state.nations.get(tag)?.currentName ??
+			nationReference?.get(tag)?.name ??
+			tag
 		// Prefer the real capital as the label anchor over the fallback
 		// first-owned-province from the loop above, when that capital is
 		// currently owned by this same nation.
@@ -269,6 +272,7 @@ export function foldedStateToGenesisFrame(
 
 export interface NationInfoFromHistory {
 	tag: string
+	name: string | null
 	governmentType: string | null
 	reforms: string[]
 	ruler: { name: string; dynasty?: string } | null
@@ -309,6 +313,7 @@ export function foldedStateToNationInfo(
 	}
 	return {
 		tag,
+		name: n.currentName,
 		governmentType: n.governmentType,
 		reforms: Array.from(n.reforms),
 		ruler: n.ruler,

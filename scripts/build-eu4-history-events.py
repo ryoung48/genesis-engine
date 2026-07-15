@@ -17,18 +17,94 @@ from pathlib import Path
 
 from clausewitz import get_all, is_date_key, parse_file
 from eu4_date import eu4_date_to_days
-from eu4_province_id_swaps import SYNTHETIC_WASTELAND_PROVINCES
 
 DEFAULT_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public")
 DEFAULT_OUTPUT = Path("public/earth-history/events")
+DEFAULT_PROVINCE_NAMES_TOPOJSON = Path(
+    r"C:\Users\rayou\projects\geo-explorer\public\provinces.topojson"
+)
 
 PROVINCE_FILE_RE = re.compile(r"^(\d+)\s*-\s*(.+)$")
+
+CURATED_WASTELAND_PROVINCE_IDS = {
+    "1784",
+    "1785",
+    "1786",
+    "1787",
+    "2194",
+    "2200",
+    "2608",
+    "2740",
+    "3115",
+    "3116",
+    "3117",
+    "3121",
+    "3123",
+    "3143",
+    "3247",
+    "3248",
+    "4146",
+    "4153",
+    "4154",
+    "4155",
+    "4156",
+    "4157",
+    "4159",
+    "4160",
+    "4161",
+    "4162",
+    "4168",
+    "4169",
+    "4170",
+    "4276",
+    "4322",
+    "4400",
+    "4401",
+    "4402",
+    "4403",
+    "4763",
+    "4930",
+    "4931",
+    "4932",
+}
+
+NATION_NAME_EVENT_OVERRIDES = {
+    # geo-explorer's static country file path gives FRM the timeless display
+    # name "Formosa", but the polity on Taiwan changes identity across this
+    # timeline. Emit dated rename events here so the Earth-history UI can
+    # show the historically appropriate name while scrubbing.
+    "FRM": [
+        ("1661.6.14", "Tungning"),
+        ("1949.10.1", "Taiwan"),
+    ],
+}
 
 
 # ── Provinces ────────────────────────────────────────────────────────────
 
 
-def _load_province_names(source: Path) -> dict[str, str]:
+def _load_province_names_from_topojson(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as f:
+        data = json.load(f)
+    geometries = (
+        data.get("objects", {})
+        .get("provinces", {})
+        .get("geometries", [])
+    )
+    names: dict[str, str] = {}
+    for geom in geometries:
+        properties = geom.get("properties", {})
+        province_id = properties.get("province_id")
+        name = properties.get("name")
+        if province_id is None or not isinstance(name, str) or not name.strip():
+            continue
+        names.setdefault(str(province_id), name.strip())
+    return names
+
+
+def _load_province_names_from_political_json(source: Path) -> dict[str, str]:
     """geo-explorer's political.json is pre-flattened JSON keyed by EU4
     province id, e.g. {"236": {"name": "London", "history": [...], ...}}."""
     path = source / "political.json"
@@ -40,20 +116,11 @@ def _load_province_names(source: Path) -> dict[str, str]:
 
 
 def _load_wasteland_province_ids(source: Path) -> set[str]:
-    """geo-explorer's wastelands.json is a GeoJSON FeatureCollection with a
-    single feature whose properties.provinces lists raw EU4 province ids
-    (EU4's uninhabitable "wasteland" terrain, e.g. the Sahara core or
-    Siberia) -- unrelated to this app's own desolate/habitability model."""
-    path = source / "wastelands.json"
-    if not path.exists():
-        return set()
-    with path.open(encoding="utf-8") as f:
-        data = json.load(f)
-    ids: set[str] = set()
-    for feature in data.get("features", []):
-        for pid in feature.get("properties", {}).get("provinces", []):
-            ids.add(str(pid))
-    return ids
+    """Uses the repo's curated wasteland set instead of geo-explorer's
+    wastelands.json so Earth-history output can intentionally diverge from
+    upstream classification while remaining deterministic across rebuilds."""
+    del source
+    return set(CURATED_WASTELAND_PROVINCE_IDS)
 
 
 EU4_COVERAGE_START_DATE = eu4_date_to_days("2.1.1")
@@ -71,8 +138,14 @@ event at EU4_COVERAGE_START_DATE instead, leaving `base` unclaimed
 happened before EU4's own coverage starts."""
 
 
-def convert_provinces(source: Path) -> dict:
-    names = _load_province_names(source)
+def convert_provinces(source: Path, province_names_topojson: Path | None = None) -> dict:
+    names = (
+        _load_province_names_from_topojson(province_names_topojson)
+        if province_names_topojson is not None
+        else {}
+    )
+    if not names:
+        names = _load_province_names_from_political_json(source)
     wasteland_ids = _load_wasteland_province_ids(source)
 
     out: dict[str, dict] = {}
@@ -166,22 +239,6 @@ def convert_provinces(source: Path) -> dict:
         events.sort(key=lambda e: e["date"])
         out[province_id] = {"base": base, "events": events}
 
-    # Ids from eu4_province_id_swaps.PROVINCE_ID_RENAMES have no real EU4
-    # province-history file under their new id (the file that used to exist
-    # stayed conceptually with the old id) -- give them an explicit empty
-    # wasteland entry instead of silently omitting them from provinces.json.
-    for synthetic_id in SYNTHETIC_WASTELAND_PROVINCES:
-        out[str(synthetic_id)] = {
-            "base": {
-                "owner": None,
-                "controller": None,
-                "cores": [],
-                "name": None,
-                "wasteland": True,
-            },
-            "events": [],
-        }
-
     return out
 
 
@@ -232,6 +289,15 @@ def convert_nations(source: Path) -> dict:
                             },
                         }
                     )
+
+        for date_str, name in NATION_NAME_EVENT_OVERRIDES.get(tag, ()):
+            events.append(
+                {
+                    "date": eu4_date_to_days(date_str),
+                    "kind": "nameChange",
+                    "payload": {"name": name},
+                }
+            )
 
         # Un-dated add_government_reform lines at file top are the nation's
         # starting reforms (no event date -- folded into base, same spirit
@@ -341,10 +407,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--province-names-topojson",
+        type=Path,
+        default=DEFAULT_PROVINCE_NAMES_TOPOJSON,
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    provinces = convert_provinces(args.source)
+    provinces = convert_provinces(args.source, args.province_names_topojson)
     (args.output_dir / "provinces.json").write_text(json.dumps(provinces), encoding="utf-8")
     print(f"provinces.json: {len(provinces)} provinces")
 

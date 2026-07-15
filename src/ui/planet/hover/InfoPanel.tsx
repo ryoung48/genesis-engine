@@ -877,9 +877,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						{(earthHistoryHoverOverride?.provinceName ?? provinceName) && (
 							<SwatchRow
 								label="Province"
-								value={
-									earthHistoryHoverOverride?.provinceName ?? provinceName ?? ""
-								}
+								value={`#${hoverProvince} ${earthHistoryHoverOverride?.provinceName ?? provinceName ?? ""}`}
 								color={null}
 							/>
 						)}

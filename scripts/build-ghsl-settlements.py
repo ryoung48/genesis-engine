@@ -31,19 +31,15 @@ from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry import shape
 from shapely.strtree import STRtree
 
-from eu4_province_id_swaps import (
-    rename_province_id,
-    split_province_part_geom,
-    swap_province_id,
-)
-
 _LABEL_YEAR_RE = re.compile(r"^(-?\d+)-\d{2}-\d{2} ")
 
 DEFAULT_SOURCE = Path(
     r"C:\Users\rayou\Downloads\metro_adjusted_rasters_and_json\stadester_ghsl.json"
 )
 DEFAULT_POPULATION_ASSET = Path("public/heightmap/earth-real-population-eu4.json")
-DEFAULT_PROVINCE_GEOJSON = Path(r"c:\Users\rayou\projects\geo-explorer\public\eu4.json")
+DEFAULT_PROVINCE_GEOJSON = Path(
+    r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
+)
 DEFAULT_OUTPUT_DIR = Path("public/heightmap")
 DEFAULT_PREFIX = "eu4-ghsl-settlements"
 DEFAULT_SCALE = 2000.0
@@ -105,7 +101,7 @@ def resample_settlement(
 
 
 def load_province_polygons(geojson_path: Path) -> dict[int, "shapely.Geometry"]:
-    """Same load/repair/id-correction pipeline as build-eu4-province-borders.py
+    """Same load/repair pipeline as build-eu4-province-borders.py
     /build-eu4-provinces.py, so settlement->province assignment agrees with
     everything else keyed by EU4 province id."""
     with geojson_path.open(encoding="utf-8") as f:
@@ -113,12 +109,11 @@ def load_province_polygons(geojson_path: Path) -> dict[int, "shapely.Geometry"]:
 
     by_id: dict[int, list] = defaultdict(list)
     for feat in data["features"]:
-        province_id = swap_province_id(rename_province_id(int(feat["properties"]["id"])))
+        province_id = int(feat["properties"]["id"])
         geom = shape(feat["geometry"])
         if not geom.is_valid:
             geom = geom.buffer(0)
-        for split_id, split_geom in split_province_part_geom(province_id, geom):
-            by_id[split_id].append(split_geom)
+        by_id[province_id].append(geom)
 
     polygons: dict[int, "shapely.Geometry"] = {}
     for province_id, geoms in by_id.items():

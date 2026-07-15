@@ -14,6 +14,7 @@ interface FoldedProvinceState {
 }
 
 interface FoldedNationState {
+	currentName: string | null
 	governmentType: string | null
 	/** Additive reforms (add_government_reform), stacked onto governmentType
 	 * rather than replacing it -- see docs/earth-history-plan.md. */
@@ -54,6 +55,7 @@ export interface FoldedState {
 
 function emptyNationState(): FoldedNationState {
 	return {
+		currentName: null,
 		governmentType: null,
 		reforms: new Set(),
 		ruler: null,
@@ -148,6 +150,9 @@ function foldNation(
 						name: e.payload.name as string,
 						dynasty: e.payload.dynasty as string | undefined,
 					}
+					break
+				case "nameChange":
+					state.currentName = e.payload.name as string
 					break
 				case "capitalChange":
 					state.capitalProvinceId = e.payload.provinceId as string

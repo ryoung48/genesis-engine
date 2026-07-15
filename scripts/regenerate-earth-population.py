@@ -41,7 +41,9 @@ DEFAULT_TOTAL_SOURCE_NETCDF = Path(r"C:\Users\rayou\Downloads\population.nc")
 DEFAULT_URBAN_SOURCE_DIR = Path(
     r"C:\Users\rayou\Downloads\stadester_urban_rasters\stadester_urban_rasters"
 )
-DEFAULT_PROVINCE_GEOJSON = Path(r"c:\Users\rayou\projects\geo-explorer\public\eu4.json")
+DEFAULT_PROVINCE_GEOJSON = Path(
+    r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
+)
 DEFAULT_PROVINCE_META = Path("public/heightmap/eu4-provinces.json")
 DEFAULT_OUTPUT_DIR = Path("public/heightmap")
 DEFAULT_URBAN_PREFIX = "earth-real-urban-population-eu4"

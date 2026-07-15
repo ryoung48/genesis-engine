@@ -27,6 +27,7 @@ import {
 } from "@/model/celestial/system/generate-system-bodies"
 import {
 	SOL_DEFAULT_SOLAR_SYSTEM,
+	SOL_LUNA_DEFAULT,
 	SOL_MAIN_WORLD_DEFAULTS,
 	SOL_SEED,
 	SOL_STAR_AGE_GYR,
@@ -1360,6 +1361,13 @@ export const GenesisView: React.FC = () => {
 			starMassKg,
 		)
 	}, [moonCount, moonSeed, spectralClass, starSubtype])
+	const mainWorldMoonsPreview = useMemo(
+		() =>
+			restSeed === SOL_SEED
+				? [{ ...SOL_LUNA_DEFAULT, idx: 1 }]
+				: generatedMoonsPreview,
+		[generatedMoonsPreview, restSeed],
+	)
 
 	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
 	// and by the solar system view) ---
@@ -1417,7 +1425,7 @@ export const GenesisView: React.FC = () => {
 			name: restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.name : undefined,
 			orbitalDistanceAU,
 			diameterKm: planetRadiusKm * 2,
-			moons: generatedMoonsPreview,
+			moons: mainWorldMoonsPreview,
 			massKg: derivePlanetMassKg(planetRadiusKm),
 			gravityG: computeGravityG(
 				derivePlanetMassKg(planetRadiusKm),
@@ -1454,7 +1462,7 @@ export const GenesisView: React.FC = () => {
 			starSubtype,
 			mainWorld,
 		})
-	}, [restSeed, spectralClass, starSubtype, generatedMoonsPreview])
+	}, [restSeed, spectralClass, starSubtype, mainWorldMoonsPreview])
 	const resetSourceSystemBodies = useMemo(
 		() =>
 			restSeed === SOL_SEED
@@ -1477,7 +1485,7 @@ export const GenesisView: React.FC = () => {
 	const systemBodies = solarSystem.orbits
 	const mainWorldSystemBody =
 		systemBodies.find((body) => body.isMainWorld) ?? null
-	const displayMoons = mainWorldSystemBody?.moons ?? generatedMoonsPreview
+	const displayMoons = mainWorldSystemBody?.moons ?? mainWorldMoonsPreview
 	const systemBodiesRef = useRef(systemBodies)
 	systemBodiesRef.current = systemBodies
 	const displayMoonsRef = useRef(displayMoons)
@@ -2592,7 +2600,11 @@ export const GenesisView: React.FC = () => {
 		const isWasteland = !!meta?.wasteland
 		const owner = isWasteland ? null : ps.owner
 		const nationRef = owner ? earthHistory.nationReference?.get(owner) : null
-		const nationName = owner ? (nationRef?.name ?? owner) : null
+		const nationName = owner
+			? (earthHistory.query.state.nations.get(owner)?.currentName ??
+				nationRef?.name ??
+				owner)
+			: null
 		const nationColor = owner
 			? nationRef
 				? rgb01ToCss([
@@ -3559,9 +3571,6 @@ export const GenesisView: React.FC = () => {
 				setSimTimeMs(frame.timeMs)
 				setSelectedTimeMs(frame.timeMs)
 				setLiveFrame(frame)
-			},
-			onGenerationComplete: () => {
-				setTimeout(() => setDetailsDrawerOpen(true), 400)
 			},
 			onSimProgress: (timeMs, frame) => {
 				setSimTimeMs(timeMs)

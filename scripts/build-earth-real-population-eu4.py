@@ -14,7 +14,7 @@ INT16_NODATA = -32768
 DEFAULT_SOURCE_NETCDF = Path(r"C:\Users\rayou\Downloads\population.nc")
 DEFAULT_PROVINCE_META = Path("public/heightmap/eu4-provinces.json")
 DEFAULT_PROVINCE_GEOJSON = Path(
-    r"c:\Users\rayou\projects\geo-explorer\public\eu4.json"
+    r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
 DEFAULT_OUTPUT_DIR = Path("public/heightmap")
 DEFAULT_PREFIX = "earth-real-population-eu4"
