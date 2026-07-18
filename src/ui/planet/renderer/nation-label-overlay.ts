@@ -136,6 +136,12 @@ function hideUnusedPool(pool: LabelPool, usedCount: number) {
 	}
 }
 
+function prepareLabelGroup(targetGroup?: THREE.Group): THREE.Group {
+	const group = targetGroup ?? new THREE.Group()
+	group.clear()
+	return group
+}
+
 function disposePool(pool: LabelPool) {
 	for (const text of pool.items) {
 		text.dispose()
@@ -456,8 +462,9 @@ export function buildGlobeNationLabels(
 	cullingEnabled = false,
 	elevationVisible = true,
 	scaleCurve?: LabelScaleCurve,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
-	const group = new THREE.Group()
+	const group = prepareLabelGroup(targetGroup)
 	if (!world.provinces || !world.nations) return group
 
 	const { r_xyz } = world.mesh
@@ -535,8 +542,9 @@ export function buildMapNationLabels(
 	pool: LabelPool,
 	cullingEnabled = false,
 	scaleCurve?: LabelScaleCurve,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
-	const group = new THREE.Group()
+	const group = prepareLabelGroup(targetGroup)
 	if (!world.provinces || !world.nations) return group
 
 	const projection = createMapProjection(
@@ -670,8 +678,9 @@ export function buildGlobePartitionLabels(
 	cullingEnabled: boolean,
 	elevationVisible: boolean,
 	scaleCurve?: LabelScaleCurve,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
-	const group = new THREE.Group()
+	const group = prepareLabelGroup(targetGroup)
 	if (!world.provinces) return group
 
 	const { centralRegions, provinceCounts } = computePartitionCentralData(
@@ -741,8 +750,9 @@ export function buildMapPartitionLabels(
 	pool: LabelPool,
 	cullingEnabled: boolean,
 	scaleCurve?: LabelScaleCurve,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
-	const group = new THREE.Group()
+	const group = prepareLabelGroup(targetGroup)
 	if (!world.provinces) return group
 
 	const { centralRegions, provinceCounts } = computePartitionCentralData(
@@ -804,9 +814,10 @@ export function buildGlobeHeritageLabels(
 	pool: LabelPool,
 	cullingEnabled = false,
 	elevationVisible = true,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
 	if (!world.heritages || !world.cultures || !world.provinces)
-		return new THREE.Group()
+		return prepareLabelGroup(targetGroup)
 	const ca = world.cultures.assignment
 	const ha = world.heritages.assignment
 	return buildGlobePartitionLabels(
@@ -821,6 +832,8 @@ export function buildGlobeHeritageLabels(
 		pool,
 		cullingEnabled,
 		elevationVisible,
+		undefined,
+		targetGroup,
 	)
 }
 
@@ -831,9 +844,10 @@ export function buildMapHeritageLabels(
 	projectionLatitudeDeg: number,
 	pool: LabelPool,
 	cullingEnabled = false,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
 	if (!world.heritages || !world.cultures || !world.provinces)
-		return new THREE.Group()
+		return prepareLabelGroup(targetGroup)
 	const ca = world.cultures.assignment
 	const ha = world.heritages.assignment
 	return buildMapPartitionLabels(
@@ -848,6 +862,8 @@ export function buildMapHeritageLabels(
 		projectionLatitudeDeg,
 		pool,
 		cullingEnabled,
+		undefined,
+		targetGroup,
 	)
 }
 
@@ -916,8 +932,9 @@ export function buildGlobeSettlementLabels(
 	pool: LabelPool,
 	cullingEnabled = false,
 	elevationVisible = true,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
-	const group = new THREE.Group()
+	const group = prepareLabelGroup(targetGroup)
 	if (!world.provinces || !world.settlementRegions) return group
 
 	const { r_xyz } = world.mesh
@@ -980,8 +997,9 @@ export function buildMapSettlementLabels(
 	projectionLatitudeDeg: number,
 	pool: LabelPool,
 	cullingEnabled = false,
+	targetGroup?: THREE.Group,
 ): THREE.Group {
-	const group = new THREE.Group()
+	const group = prepareLabelGroup(targetGroup)
 	if (!world.provinces || !world.settlementRegions) return group
 
 	const projection = createMapProjection(

@@ -1,6 +1,7 @@
 import type {
 	RawDiplomacyEvent,
 	RawNationEvents,
+	RawNationReference,
 	RawProvinceEvents,
 	RawWar,
 } from "./data-source"
@@ -16,9 +17,9 @@ interface FoldedProvinceState {
 interface FoldedNationState {
 	currentName: string | null
 	governmentType: string | null
-	/** Additive reforms (add_government_reform), stacked onto governmentType
-	 * rather than replacing it -- see docs/earth-history-plan.md. */
-	reforms: Set<string>
+	/** Current government reform. Earth-history data here only supports one
+	 * active reform at a time for a nation. */
+	governmentReform: string | null
 	ruler: { name: string; dynasty?: string } | null
 	/** Raw EU4 province id (string) of the nation's current capital, from
 	 * history/countries/*.txt's `capital` field (dated changes tracked as
@@ -39,9 +40,19 @@ interface ActiveWar {
 	defenders: Set<string>
 }
 
+function normalizeNationTag(tag: string | null | undefined): string | null {
+	if (!tag || tag === "---" || tag === "XXX") return null
+	return tag
+}
+
+function isGenericEarlyGovernmentReform(reformId: string | null | undefined) {
+	return !!reformId && /^early_gov_reform_\d+$/.test(reformId)
+}
+
 export interface EarthHistoryData {
 	provinceEvents: RawProvinceEvents
 	nationEvents: RawNationEvents
+	nationReference?: Map<string, RawNationReference>
 	wars: RawWar[]
 	diplomacy: RawDiplomacyEvent[]
 }
@@ -57,7 +68,7 @@ function emptyNationState(): FoldedNationState {
 	return {
 		currentName: null,
 		governmentType: null,
-		reforms: new Set(),
+		governmentReform: null,
 		ruler: null,
 		capitalProvinceId: null,
 		overlord: null,
@@ -79,8 +90,8 @@ function foldProvince(
 	const state: FoldedProvinceState = base
 		? { ...base, cores: new Set(base.cores) }
 		: {
-				owner: entry.base.owner ?? null,
-				controller: entry.base.controller ?? null,
+				owner: normalizeNationTag(entry.base.owner),
+				controller: normalizeNationTag(entry.base.controller),
 				cultureId: entry.base.culture ?? null,
 				religionId: entry.base.religion ?? null,
 				cores: new Set(entry.base.cores),
@@ -89,10 +100,12 @@ function foldProvince(
 		if (e.date <= fromTime || e.date > toTime) continue
 		switch (e.kind) {
 			case "owner":
-				state.owner = e.payload.tag as string
+				state.owner = normalizeNationTag(e.payload.tag as string | undefined)
 				break
 			case "controller":
-				state.controller = e.payload.tag as string
+				state.controller = normalizeNationTag(
+					e.payload.tag as string | undefined,
+				)
 				break
 			case "coreAdd":
 				state.cores.add(e.payload.tag as string)
@@ -122,14 +135,18 @@ function foldNation(
 	const state: FoldedNationState = base
 		? {
 				...base,
-				reforms: new Set(base.reforms),
 				vassals: new Set(base.vassals),
 				unionWith: new Set(base.unionWith),
 				allies: new Set(base.allies),
 			}
 		: emptyNationState()
 	if (!base && entry) {
-		for (const r of entry.base.reforms) state.reforms.add(r)
+		state.governmentType =
+			data.nationReference?.get(tag)?.initialGovernmentType ?? null
+		state.governmentReform =
+			entry.base.reforms.findLast(
+				(reformId) => !isGenericEarlyGovernmentReform(reformId),
+			) ?? null
 		state.capitalProvinceId = entry.base.capital
 	}
 	if (entry) {
@@ -140,10 +157,14 @@ function foldNation(
 					state.governmentType = e.payload.governmentType as string
 					break
 				case "governmentReformAdd":
-					state.reforms.add(e.payload.reformId as string)
+					if (!isGenericEarlyGovernmentReform(e.payload.reformId as string)) {
+						state.governmentReform = e.payload.reformId as string
+					}
 					break
 				case "governmentReformRemove":
-					state.reforms.delete(e.payload.reformId as string)
+					if (state.governmentReform === (e.payload.reformId as string)) {
+						state.governmentReform = null
+					}
 					break
 				case "rulerChange":
 					state.ruler = {

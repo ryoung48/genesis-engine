@@ -42,6 +42,7 @@ from pathlib import Path
 import shapely
 from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry import shape
+from shapely.ops import triangulate
 from shapely.strtree import STRtree
 
 DEFAULT_GEOJSON = Path(
@@ -217,6 +218,118 @@ def _classify_edges(
     return edges
 
 
+def _iter_fill_rings(geom: "shapely.Geometry"):
+    """Yields (polygon_index, is_hole, ring) for every ring of every Polygon
+    part of geom, so a MultiPolygon's islands stay grouped by polygon_index
+    (a hole must only be cut out of its own exterior, not a sibling
+    island's)."""
+    if geom.geom_type == "Polygon":
+        yield 0, False, geom.exterior
+        for interior in geom.interiors:
+            yield 0, True, interior
+    elif geom.geom_type == "MultiPolygon":
+        for poly_idx, poly in enumerate(geom.geoms):
+            yield poly_idx, False, poly.exterior
+            for interior in poly.interiors:
+                yield poly_idx, True, interior
+
+
+def _write_fill_geometry(
+    polygons: dict[int, "shapely.Geometry"],
+    output_dir: Path,
+    prefix: str,
+    geojson_path: Path,
+    snap_grid_size: float,
+) -> tuple[Path, Path]:
+    rings_bin_path = output_dir / f"{prefix}-fills-rings.bin"
+    triangles_bin_path = output_dir / f"{prefix}-fills-triangles.bin"
+    meta_path = output_dir / f"{prefix}-fills.json"
+
+    ring_count = 0
+    with rings_bin_path.open("wb") as f:
+        for province_id, geom in polygons.items():
+            for poly_idx, is_hole, ring in _iter_fill_rings(geom):
+                coords = list(ring.coords)
+                # Rings are closed (first point == last); drop the repeated
+                # closing point since the renderer treats each ring as an
+                # implicitly-closed loop.
+                if len(coords) > 1 and coords[0] == coords[-1]:
+                    coords = coords[:-1]
+                if len(coords) < 3:
+                    continue
+                f.write(
+                    struct.pack(
+                        "<iiii",
+                        province_id,
+                        poly_idx,
+                        1 if is_hole else 0,
+                        len(coords),
+                    )
+                )
+                for lon, lat in coords:
+                    f.write(struct.pack("<ff", lon, lat))
+                ring_count += 1
+
+    triangle_group_count = 0
+    triangle_vertex_total = 0
+    with triangles_bin_path.open("wb") as f:
+        for province_id, geom in polygons.items():
+            triangle_vertices: list[tuple[float, float]] = []
+            for tri in triangulate(geom):
+                if tri.area <= 0:
+                    continue
+                overlap = tri.intersection(geom)
+                if overlap.is_empty:
+                    continue
+                # shapely.ops.triangulate is unconstrained Delaunay over the
+                # polygon's vertices, so it may emit triangles outside the
+                # polygon or across hole mouths/concavities. Keep only
+                # triangles whose full area survives intersection.
+                if abs(overlap.area - tri.area) > max(1e-9, tri.area * 1e-6):
+                    continue
+                coords = list(tri.exterior.coords)
+                if len(coords) != 4:
+                    continue
+                triangle_vertices.extend(
+                    [(coords[0][0], coords[0][1]), (coords[1][0], coords[1][1]), (coords[2][0], coords[2][1])]
+                )
+            if not triangle_vertices:
+                continue
+            f.write(struct.pack("<ii", province_id, len(triangle_vertices)))
+            for lon, lat in triangle_vertices:
+                f.write(struct.pack("<ff", lon, lat))
+            triangle_group_count += 1
+            triangle_vertex_total += len(triangle_vertices)
+
+    metadata = {
+        "version": 2,
+        "format": "eu4-province-fill-geometry-v2",
+        "ringRecordLayout": [
+            "provinceId:i32",
+            "polygonIndex:i32",
+            "ringType:i32 (0=exterior,1=hole)",
+            "pointCount:i32",
+            "points:pointCount*(lon:f32,lat:f32)",
+        ],
+        "triangleRecordLayout": [
+            "provinceId:i32",
+            "vertexCount:i32 (multiple of 3)",
+            "vertices:vertexCount*(lon:f32,lat:f32)",
+        ],
+        "ringCount": ring_count,
+        "triangleGroupCount": triangle_group_count,
+        "triangleVertexCount": triangle_vertex_total,
+        "units": "degrees",
+        "source": str(geojson_path),
+        "snapGridSize": snap_grid_size,
+        "ringsBin": rings_bin_path.name,
+        "trianglesBin": triangles_bin_path.name,
+    }
+    meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
+    return meta_path, triangles_bin_path
+
+
 def build_assets(
     geojson_path: Path,
     output_dir: Path,
@@ -261,6 +374,8 @@ def build_assets(
         "bin": bin_path.name,
     }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
+    _write_fill_geometry(polygons, output_dir, prefix, geojson_path, snap_grid_size)
 
     return meta_path, bin_path
 

@@ -19,6 +19,11 @@ export interface HoverInfo {
 	y: number
 }
 
+interface HoverLonLat {
+	lonDeg: number
+	latDeg: number
+}
+
 export interface HoverLandmark {
 	id: number
 	type: string | null
@@ -109,16 +114,27 @@ export function getHoverCoordinates(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
 ): string | null {
+	const lonLat = getHoverLonLat(hoverInfo, world)
+	if (!lonLat) return null
+	const { lonDeg: lon, latDeg: lat } = lonLat
+	const latLabel = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? "N" : "S"}`
+	const lonLabel = `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? "E" : "W"}`
+	return `${latLabel}, ${lonLabel}`
+}
+
+export function getHoverLonLat(
+	hoverInfo: HoverInfo | null,
+	world: SerializedGenesisWorld | null,
+): HoverLonLat | null {
 	if (!hoverInfo || !world) return null
 	const base = hoverInfo.region * 3
 	const x = world.mesh.r_xyz[base]
 	const y = world.mesh.r_xyz[base + 1]
 	const z = world.mesh.r_xyz[base + 2]
-	const lat = Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI)
-	const lon = Math.atan2(y, x) * (180 / Math.PI)
-	const latLabel = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? "N" : "S"}`
-	const lonLabel = `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? "E" : "W"}`
-	return `${latLabel}, ${lonLabel}`
+	return {
+		latDeg: Math.asin(Math.max(-1, Math.min(1, z))) * (180 / Math.PI),
+		lonDeg: Math.atan2(y, x) * (180 / Math.PI),
+	}
 }
 
 export function getHoverTimezone(

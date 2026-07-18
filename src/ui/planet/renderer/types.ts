@@ -36,6 +36,12 @@ export interface GenesisScene {
 	setColorMode(mode: ColorMode): void
 	setRegionColors(colors: Float32Array | null): void
 	setDisplayColors(mode: ColorMode, colors: Float32Array | null): void
+	setNationFillColorForRawId(
+		fn: ((rawId: number) => [number, number, number] | null) | null,
+	): void
+	setNationOccupationStripeColorForRawId(
+		fn: ((rawId: number) => [number, number, number] | null) | null,
+	): void
 	setOccupationOverlay(overlay: Float32Array | null): void
 	setHoveredRegion(region: number | null): void
 	setNationBordersVisible(visible: boolean): void

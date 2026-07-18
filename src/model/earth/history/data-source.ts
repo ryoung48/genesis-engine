@@ -238,3 +238,176 @@ export function loadEu4ProvinceBorderGeometry(): Promise<Eu4ProvinceBorderGeomet
 	}
 	return provinceBorderGeometryPromise
 }
+
+/** Closed fill-polygon rings per EU4 province, in raw EU4 province ids --
+ * from scripts/build-eu4-province-borders.py's fill-geometry export. Used to
+ * paint nation territory following the game's real province shapes instead
+ * of the procedural planet mesh's own Voronoi cells, when world.isEarthImport.
+ * Rings are grouped by (provinceId, polygonIndex) -- a hole ring only
+ * applies to the exterior ring sharing its polygonIndex, so a province's
+ * separate islands (different polygonIndex) don't leak holes into each
+ * other. Flat parallel arrays indexed by ring; `ringPointOffset[i]` is the
+ * index into `pointsLonLatDeg` (in lon/lat *pairs*, not floats) where ring
+ * i's points begin, and it has `ringCount + 1` entries so a ring's point
+ * count is `ringPointOffset[i + 1] - ringPointOffset[i]`. */
+export interface Eu4ProvinceFillGeometry {
+	ringCount: number
+	ringProvinceId: Int32Array
+	ringPolygonIndex: Int32Array
+	ringIsHole: Uint8Array
+	ringPointOffset: Int32Array
+	pointsLonLatDeg: Float32Array
+	triangleGroupCount: number
+	triangleProvinceId: Int32Array
+	trianglePointOffset: Int32Array
+	trianglePointsLonLatDeg: Float32Array
+}
+
+let provinceFillGeometryPromise: Promise<Eu4ProvinceFillGeometry> | null = null
+
+export function loadEu4ProvinceFillGeometry(): Promise<Eu4ProvinceFillGeometry> {
+	if (!provinceFillGeometryPromise) {
+		provinceFillGeometryPromise = fetch(
+			`${EARTH_HISTORY_BASE}/reference/eu4-province-borders-fills.json`,
+			{ cache: "no-store" },
+		)
+			.then((res) => {
+				if (!res.ok)
+					throw new Error(
+						`Failed to load eu4-province-borders-fills.json: ${res.status}`,
+					)
+				return res.json() as Promise<{
+					ringCount: number
+					triangleGroupCount?: number
+					bin?: string
+					ringsBin?: string
+					trianglesBin?: string
+				}>
+			})
+			.then(async (meta) => {
+				const ringsBin = meta.ringsBin ?? meta.bin
+				if (!ringsBin)
+					throw new Error("EU4 fill geometry metadata missing rings bin")
+				const ringsRes = await fetch(
+					`${EARTH_HISTORY_BASE}/reference/${ringsBin}`,
+					{ cache: "no-store" },
+				)
+				if (!ringsRes.ok)
+					throw new Error(`Failed to load ${ringsBin}: ${ringsRes.status}`)
+				const ringsBuffer = await ringsRes.arrayBuffer()
+				const view = new DataView(ringsBuffer)
+
+				const ringProvinceId = new Int32Array(meta.ringCount)
+				const ringPolygonIndex = new Int32Array(meta.ringCount)
+				const ringIsHole = new Uint8Array(meta.ringCount)
+				const ringPointOffset = new Int32Array(meta.ringCount + 1)
+
+				// Records are variable-length (pointCount differs per ring), so
+				// a first pass reads only headers to size the flat point buffer,
+				// then a second pass fills it in.
+				let byteOffset = 0
+				let pointTotal = 0
+				const pointCounts = new Int32Array(meta.ringCount)
+				for (let i = 0; i < meta.ringCount; i++) {
+					ringProvinceId[i] = view.getInt32(byteOffset, true)
+					ringPolygonIndex[i] = view.getInt32(byteOffset + 4, true)
+					ringIsHole[i] = view.getInt32(byteOffset + 8, true)
+					const pointCount = view.getInt32(byteOffset + 12, true)
+					pointCounts[i] = pointCount
+					ringPointOffset[i] = pointTotal
+					pointTotal += pointCount
+					byteOffset += 16 + pointCount * 8
+				}
+				ringPointOffset[meta.ringCount] = pointTotal
+
+				const pointsLonLatDeg = new Float32Array(pointTotal * 2)
+				byteOffset = 0
+				for (let i = 0; i < meta.ringCount; i++) {
+					const pointCount = pointCounts[i]
+					let pointByteOffset = byteOffset + 16
+					const base = ringPointOffset[i] * 2
+					for (let p = 0; p < pointCount; p++) {
+						pointsLonLatDeg[base + 2 * p] = view.getFloat32(
+							pointByteOffset,
+							true,
+						)
+						pointsLonLatDeg[base + 2 * p + 1] = view.getFloat32(
+							pointByteOffset + 4,
+							true,
+						)
+						pointByteOffset += 8
+					}
+					byteOffset += 16 + pointCount * 8
+				}
+
+				const triangleGroupCount = meta.triangleGroupCount ?? 0
+				const triangleProvinceId = new Int32Array(triangleGroupCount)
+				const trianglePointOffset = new Int32Array(triangleGroupCount + 1)
+				let trianglePointsLonLatDeg = new Float32Array(0)
+				if (triangleGroupCount > 0) {
+					const trianglesBin = meta.trianglesBin
+					if (!trianglesBin)
+						throw new Error("EU4 fill geometry metadata missing triangles bin")
+					const trianglesRes = await fetch(
+						`${EARTH_HISTORY_BASE}/reference/${trianglesBin}`,
+						{ cache: "no-store" },
+					)
+					if (!trianglesRes.ok)
+						throw new Error(
+							`Failed to load ${trianglesBin}: ${trianglesRes.status}`,
+						)
+					const trianglesBuffer = await trianglesRes.arrayBuffer()
+					const trianglesView = new DataView(trianglesBuffer)
+					let triangleByteOffset = 0
+					let trianglePointTotal = 0
+					const trianglePointCounts = new Int32Array(triangleGroupCount)
+					for (let i = 0; i < triangleGroupCount; i++) {
+						triangleProvinceId[i] = trianglesView.getInt32(
+							triangleByteOffset,
+							true,
+						)
+						const pointCount = trianglesView.getInt32(
+							triangleByteOffset + 4,
+							true,
+						)
+						trianglePointCounts[i] = pointCount
+						trianglePointOffset[i] = trianglePointTotal
+						trianglePointTotal += pointCount
+						triangleByteOffset += 8 + pointCount * 8
+					}
+					trianglePointOffset[triangleGroupCount] = trianglePointTotal
+					trianglePointsLonLatDeg = new Float32Array(trianglePointTotal * 2)
+					triangleByteOffset = 0
+					for (let i = 0; i < triangleGroupCount; i++) {
+						const pointCount = trianglePointCounts[i]
+						let pointByteOffset = triangleByteOffset + 8
+						const base = trianglePointOffset[i] * 2
+						for (let p = 0; p < pointCount; p++) {
+							trianglePointsLonLatDeg[base + 2 * p] = trianglesView.getFloat32(
+								pointByteOffset,
+								true,
+							)
+							trianglePointsLonLatDeg[base + 2 * p + 1] =
+								trianglesView.getFloat32(pointByteOffset + 4, true)
+							pointByteOffset += 8
+						}
+						triangleByteOffset += 8 + pointCount * 8
+					}
+				}
+
+				return {
+					ringCount: meta.ringCount,
+					ringProvinceId,
+					ringPolygonIndex,
+					ringIsHole,
+					ringPointOffset,
+					pointsLonLatDeg,
+					triangleGroupCount,
+					triangleProvinceId,
+					trianglePointOffset,
+					trianglePointsLonLatDeg,
+				}
+			})
+	}
+	return provinceFillGeometryPromise
+}

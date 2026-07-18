@@ -1,19 +1,19 @@
 {
-  "version": 1,
-  "format": "eu4-province-border-segments-v1",
-  "recordLayout": [
-    "provinceA:i32",
-    "provinceB:i32",
-    "lon0:f32",
-    "lat0:f32",
-    "lon1:f32",
-    "lat1:f32"
-  ],
-  "recordBytes": 24,
-  "segmentCount": 167021,
-  "units": "degrees",
-  "source": "C:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4-extended-timeline-aligned.json",
-  "snapGridSize": 1e-05,
-  "probeOffsetDeg": 0.0002,
-  "bin": "eu4-province-borders.bin"
+	"version": 1,
+	"format": "eu4-province-border-segments-v1",
+	"recordLayout": [
+		"provinceA:i32",
+		"provinceB:i32",
+		"lon0:f32",
+		"lat0:f32",
+		"lon1:f32",
+		"lat1:f32"
+	],
+	"recordBytes": 24,
+	"segmentCount": 167021,
+	"units": "degrees",
+	"source": "C:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4-extended-timeline-aligned.json",
+	"snapGridSize": 1e-5,
+	"probeOffsetDeg": 0.0002,
+	"bin": "eu4-province-borders.bin"
 }

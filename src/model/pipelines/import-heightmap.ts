@@ -13,7 +13,7 @@ import {
 import { relativeHumidityFromVaporPressure } from "../climate/humidity"
 import { assignKoppenClimate } from "../climate/koppen"
 import { assignEarthPastaClimate } from "../climate/pasta"
-import { buildSphereMesh } from "../mesh"
+import { buildRegionSpatialIndex, buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
 import {
@@ -745,78 +745,6 @@ function reconcileElevationWithMask(
 
 // ── Real rivers/lakes (vector data) ─────────────────────────────────
 
-// Uniform 1°×1° lat/lon bucket grid over mesh region centers, for snapping
-// arbitrary lon/lat query points (river polyline vertices) onto the nearest
-// mesh region. Brute-force nearest-of-N (N≈200k) per query would be too
-// slow for thousands of river vertices; this is a one-time O(N) build plus
-// an expanding-ring bucket search per query, typically O(1).
-function buildRegionSpatialIndex(mesh: SphereMesh) {
-	const N = mesh.numRegions
-	const binsLon = 360
-	const binsLat = 180
-	const buckets: number[][] = new Array(binsLon * binsLat)
-	const { r_xyz } = mesh
-
-	for (let r = 0; r < N; r++) {
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-		const lat = (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
-		const lon = (Math.atan2(y, x) * 180) / Math.PI
-		const bx = Math.min(binsLon - 1, Math.max(0, Math.floor(lon + 180)))
-		const by = Math.min(binsLat - 1, Math.max(0, Math.floor(90 - lat)))
-		const idx = by * binsLon + bx
-		;(buckets[idx] ??= []).push(r)
-	}
-
-	return {
-		nearest(lonDeg: number, latDeg: number): number {
-			const bx0 = Math.min(binsLon - 1, Math.max(0, Math.floor(lonDeg + 180)))
-			const by0 = Math.min(binsLat - 1, Math.max(0, Math.floor(90 - latDeg)))
-			const latR = (latDeg * Math.PI) / 180
-			const lonR = (lonDeg * Math.PI) / 180
-			const cosLat = Math.cos(latR)
-			const qx = cosLat * Math.cos(lonR)
-			const qy = cosLat * Math.sin(lonR)
-			const qz = Math.sin(latR)
-
-			let best = -1
-			let bestD = Infinity
-			for (let ring = 0; ring <= 12; ring++) {
-				let sawBucket = false
-				for (let dy = -ring; dy <= ring; dy++) {
-					const by = by0 + dy
-					if (by < 0 || by >= binsLat) continue
-					const onYEdge = dy === -ring || dy === ring
-					for (let dx = -ring; dx <= ring; dx++) {
-						if (!onYEdge && dx !== -ring && dx !== ring) continue
-						const bx = (((bx0 + dx) % binsLon) + binsLon) % binsLon
-						const bucket = buckets[by * binsLon + bx]
-						if (!bucket) continue
-						sawBucket = true
-						for (const r of bucket) {
-							const dxp = r_xyz[3 * r] - qx
-							const dyp = r_xyz[3 * r + 1] - qy
-							const dzp = r_xyz[3 * r + 2] - qz
-							const d = dxp * dxp + dyp * dyp + dzp * dzp
-							if (d < bestD) {
-								bestD = d
-								best = r
-							}
-						}
-					}
-				}
-				// Stop one ring after first finding candidates, so the true
-				// nearest (which could be just across a bucket boundary) isn't
-				// missed by stopping the instant the first bucket is hit.
-				if (best >= 0 && !sawBucket) break
-				if (best >= 0 && ring > 0 && bestD < ring * ring * 1e-4) break
-			}
-			return best
-		},
-	}
-}
-
 interface RealRiverLineInput {
 	points: number[] // flat [lon0, lat0, lon1, lat1, ...] degrees
 	strokeweig: number
@@ -1145,6 +1073,15 @@ export function importGenesisWorld(
 							params.lakeMaskWidth === params.maskWidth &&
 							params.lakeMaskHeight === params.maskHeight
 								? params.lakeMask
+								: undefined,
+						// Same-resolution province raster doubles as a source of
+						// density-boosting boundaries (province borders), not
+						// just land/ocean coastline.
+						provinceRaster:
+							params.eu4ProvincesRaster &&
+							params.eu4ProvincesWidth === params.maskWidth &&
+							params.eu4ProvincesHeight === params.maskHeight
+								? params.eu4ProvincesRaster
 								: undefined,
 					},
 				)

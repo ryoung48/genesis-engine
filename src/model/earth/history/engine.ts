@@ -14,6 +14,7 @@ import type { RawNationReference } from "./data-source"
 import {
 	loadDiplomacyEvents,
 	loadNationEvents,
+	loadNationReference,
 	loadProvinceCoordinates,
 	loadProvinceEvents,
 	loadWars,
@@ -87,18 +88,31 @@ export async function createEarthHistoryEngine(
 	const provinceMap = buildEu4ProvinceMap(provinces)
 	if (!provinceMap) return null
 
-	const [provinceEvents, nationEvents, wars, diplomacy, provinceCoords] =
-		await Promise.all([
-			loadProvinceEvents(),
-			loadNationEvents(),
-			loadWars(),
-			loadDiplomacyEvents(),
-			loadProvinceCoordinates(),
-		])
+	const [
+		provinceEvents,
+		nationEvents,
+		wars,
+		diplomacy,
+		provinceCoords,
+		nationReferenceRows,
+	] = await Promise.all([
+		loadProvinceEvents(),
+		loadNationEvents(),
+		loadWars(),
+		loadDiplomacyEvents(),
+		loadProvinceCoordinates(),
+		loadNationReference(),
+	])
+
+	const nationReference = new Map<string, RawNationReference>()
+	for (const nation of nationReferenceRows) {
+		nationReference.set(nation.tag, nation)
+	}
 
 	const cache = createCheckpointCache({
 		provinceEvents,
 		nationEvents,
+		nationReference,
 		wars,
 		diplomacy,
 	})

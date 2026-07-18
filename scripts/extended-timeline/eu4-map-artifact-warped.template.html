@@ -1,0 +1,476 @@
+<title>Extended Timeline — Recovered Projection</title>
+<style>
+  :root {
+    --ground: #eff2ee;
+    --plate: #e7ebe5;
+    --ink: #232a26;
+    --ink-soft: #5b645e;
+    --line: #c9d0c7;
+    --accent: #3f6f8f;
+    --flag: #b05a4a;
+    --border-stroke: #eff2ee;
+    --tint-0: #a9bda5;
+    --tint-1: #d3ab98;
+    --tint-2: #9cafc4;
+    --tint-3: #d4bd8b;
+    --tint-4: #b7a3bd;
+    --tint-5: #aebb92;
+    --chip-bg: rgba(239, 242, 238, 0.94);
+    --code-bg: #e7ebe5;
+    --ref-line: rgba(52, 61, 57, 0.60);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #10161d;
+      --plate: #151d26;
+      --ink: #dbe2e0;
+      --ink-soft: #8b968f;
+      --line: #2a3540;
+      --accent: #7fa8c4;
+      --flag: #cd7a68;
+      --border-stroke: #10161d;
+      --tint-0: #3d4f42;
+      --tint-1: #59423a;
+      --tint-2: #35455a;
+      --tint-3: #575030;
+      --tint-4: #4a3d52;
+      --tint-5: #45502f;
+      --chip-bg: rgba(16, 22, 29, 0.94);
+      --code-bg: #151d26;
+      --ref-line: rgba(214, 222, 218, 0.55);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #eff2ee;
+    --plate: #e7ebe5;
+    --ink: #232a26;
+    --ink-soft: #5b645e;
+    --line: #c9d0c7;
+    --accent: #3f6f8f;
+    --flag: #b05a4a;
+    --border-stroke: #eff2ee;
+    --tint-0: #a9bda5;
+    --tint-1: #d3ab98;
+    --tint-2: #9cafc4;
+    --tint-3: #d4bd8b;
+    --tint-4: #b7a3bd;
+    --tint-5: #aebb92;
+    --chip-bg: rgba(239, 242, 238, 0.94);
+    --code-bg: #e7ebe5;
+    --ref-line: rgba(52, 61, 57, 0.60);
+  }
+  :root[data-theme="dark"] {
+    --ground: #10161d;
+    --plate: #151d26;
+    --ink: #dbe2e0;
+    --ink-soft: #8b968f;
+    --line: #2a3540;
+    --accent: #7fa8c4;
+    --flag: #cd7a68;
+    --border-stroke: #10161d;
+    --tint-0: #3d4f42;
+    --tint-1: #59423a;
+    --tint-2: #35455a;
+    --tint-3: #575030;
+    --tint-4: #4a3d52;
+    --tint-5: #45502f;
+    --chip-bg: rgba(16, 22, 29, 0.94);
+    --code-bg: #151d26;
+    --ref-line: rgba(214, 222, 218, 0.55);
+  }
+  html, body { background: var(--ground); color: var(--ink); }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1200px; width: 100%; margin: 0 auto; padding: 0 20px; }
+
+  header { padding: 26px 0 14px; }
+  .plate-head {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    justify-content: space-between; gap: 8px 24px;
+    border-bottom: 1px solid var(--line); padding-bottom: 14px;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 4px;
+  }
+  h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 500; font-size: clamp(24px, 3.4vw, 34px);
+    letter-spacing: 0.01em; margin: 0; text-wrap: balance;
+  }
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 4px 22px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats b { color: var(--ink); font-weight: 600; }
+
+  .maprow { padding: 16px 0 6px; }
+  .plate {
+    position: relative; border: 1px solid var(--line);
+    background: var(--plate); border-radius: 3px; overflow: hidden;
+  }
+  canvas#map { display: block; width: 100%; height: auto; cursor: grab; touch-action: none; }
+  canvas#map.dragging { cursor: grabbing; }
+
+  .chip {
+    position: absolute; pointer-events: none; display: none;
+    background: var(--chip-bg); border: 1px solid var(--line); border-radius: 3px;
+    padding: 7px 10px; max-width: 260px;
+    font-size: 12.5px; line-height: 1.45;
+  }
+  .chip .pname {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: 15px; display: block;
+  }
+  .chip .pmeta {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+  }
+  .chip .reloc { color: var(--flag); font-weight: 600; }
+
+  .plate-foot {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px;
+    padding: 8px 2px 0; font-size: 12px; color: var(--ink-soft);
+  }
+  .plate-foot .coords {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  label.reloc-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  label.reloc-toggle input { accent-color: var(--flag); }
+
+  section.notes { padding: 22px 0 40px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; }
+  @media (max-width: 820px) { section.notes { grid-template-columns: 1fr; } }
+  section.notes h2 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 500; font-size: 19px; margin: 0 0 8px;
+  }
+  section.notes p { margin: 0 0 10px; max-width: 62ch; font-size: 14px; color: var(--ink-soft); }
+  section.notes p b { color: var(--ink); font-weight: 600; }
+  pre.record {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 3px;
+    padding: 14px 16px; margin: 0; overflow-x: auto;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; line-height: 1.5; color: var(--ink);
+  }
+  pre.record .k { color: var(--accent); }
+  pre.record .s { color: var(--flag); }
+  a { color: var(--accent); }
+  canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+</style>
+
+<header class="wrap">
+  <p class="eyebrow">chaos machine · eu4 mod map extraction</p>
+  <div class="plate-head">
+    <h1>Extended Timeline, re-projected to Earth</h1>
+    <div class="stats">
+      <span><b>__PROVINCE_COUNT__</b> provinces</span>
+      <span><b>__VERTEX_COUNT__</b> vertices</span>
+      <span>fit error <b>__FIT_MEDIAN_KM__ km</b> median · <b>__FIT_P90_KM__ km</b> p90</span>
+      <span>source <b>__RASTER_WIDTH__ × __RASTER_HEIGHT__</b> px bmp</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap maprow">
+  <div class="plate">
+    <canvas id="map" tabindex="0" aria-label="World map of extracted provinces; drag to pan, scroll to zoom"></canvas>
+    <div class="chip" id="chip"></div>
+  </div>
+  <div class="plate-foot">
+    <span>drag to pan · scroll or pinch to zoom · double-click to reset · hover to identify</span>
+    <label class="reloc-toggle"><input type="checkbox" id="showref" checked> vanilla EU4 outlines (old)</label>
+    <label class="reloc-toggle"><input type="checkbox" id="showreloc"> outline the __RELOCATED_COUNT__ relocated ids</label>
+    <span class="coords" id="coords">—</span>
+  </div>
+</div>
+
+<section class="notes wrap">
+  <div>
+    <h2>What you're looking at</h2>
+    <p>Every polygon here was traced from the mod's hand-drawn <b>provinces.bmp</b> — a bitmap in no known
+    projection — then warped onto real latitude/longitude. The projection was recovered empirically:
+    ~3,000 provinces keep their vanilla EU4 ids, so their pixel centroids were matched to known Earth
+    coordinates and a thin-plate spline fitted through the correspondences. From there, two ICP passes
+    refine it: first each kept province's <i>entire</i> boundary — not just its centroid — is matched
+    against that same id's reference shape, then a second pass snaps every continent's edge onto
+    Natural Earth's global land coastline (land-50m).</p>
+    <p>The thin dark outlines are the <b>old map</b> — vanilla EU4's provinces from
+    <b>eu4.json</b>, the reference the projection was fitted against. Where a tinted shape and a dark
+    outline track each other, the recovered warp is doing its job; where they part ways, the mod
+    genuinely redrew the geography (NE Siberia, the arctic). Tints only distinguish neighbors; they
+    carry no meaning. Provinces the mod moved away from their vanilla location (the <b>relocated</b>
+    toggle) were excluded from the fit and are drawn where the mod put them.</p>
+    <p>Regenerate with <b>scripts/build-mod-province-geojson.py</b> · output
+    <b>geo-explorer/public/eu4-extended-timeline.json</b>. This is the direct output of that
+    step, before the grid-snap alignment pass.</p>
+  </div>
+  <div>
+    <h2>One record from the file</h2>
+    <pre class="record"><span class="k">{</span>
+  <span class="k">"type"</span>: <span class="s">"Feature"</span>,
+  <span class="k">"properties"</span>: <span class="k">{</span>
+    <span class="k">"id"</span>: 1,
+    <span class="k">"type"</span>: <span class="s">"land"</span>,
+    <span class="k">"name"</span>: <span class="s">"Stockholm"</span>
+  <span class="k">}</span>,
+  <span class="k">"geometry"</span>: <span class="k">{</span>
+    <span class="k">"type"</span>: <span class="s">"MultiPolygon"</span>,
+    <span class="k">"coordinates"</span>: <span class="k">[[[</span>
+      [18.17235, 60.48398],
+      [18.26552, 60.25168],
+      [18.46960, 60.15301],
+      …
+    <span class="k">]]]</span>
+  <span class="k">}</span>
+<span class="k">}</span></pre>
+  </div>
+</section>
+
+<script id="data" type="application/json">
+__FEATS_JSON__</script>
+<script id="refdata" type="application/json">__REFDATA_JSON__</script>
+<script>
+(function () {
+  "use strict";
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const feats = DATA.feats;
+  const REF_RINGS = JSON.parse(document.getElementById("refdata").textContent);
+
+  const canvas = document.getElementById("map");
+  const chip = document.getElementById("chip");
+  const coordsEl = document.getElementById("coords");
+  const relocBox = document.getElementById("showreloc");
+  const refBox = document.getElementById("showref");
+  const ctx = canvas.getContext("2d");
+  const pick = document.createElement("canvas");
+  const pctx = pick.getContext("2d", { willReadFrequently: true });
+
+  // world units: x = lon*100, y = -lat*100 (y down)
+  const paths = new Array(feats.length);
+  for (let i = 0; i < feats.length; i++) {
+    const p = new Path2D();
+    for (const poly of feats[i].p) {
+      for (const ring of poly) {
+        p.moveTo(ring[0], -ring[1]);
+        for (let k = 2; k < ring.length; k += 2) p.lineTo(ring[k], -ring[k + 1]);
+        p.closePath();
+      }
+    }
+    paths[i] = p;
+  }
+
+  const refPath = new Path2D();
+  for (const ring of REF_RINGS) {
+    refPath.moveTo(ring[0], -ring[1]);
+    for (let k = 2; k < ring.length; k += 2) refPath.lineTo(ring[k], -ring[k + 1]);
+    refPath.closePath();
+  }
+
+  const css = () => getComputedStyle(document.documentElement);
+  let tints = [], plateBg = "#000", strokeCol = "#fff", accent = "#000", flag = "#000", refCol = "#888";
+  function readTheme() {
+    const c = css();
+    tints = [0, 1, 2, 3, 4, 5].map((i) => c.getPropertyValue(`--tint-${i}`).trim());
+    plateBg = c.getPropertyValue("--plate").trim();
+    strokeCol = c.getPropertyValue("--border-stroke").trim();
+    accent = c.getPropertyValue("--accent").trim();
+    flag = c.getPropertyValue("--flag").trim();
+    refCol = c.getPropertyValue("--ref-line").trim();
+  }
+  readTheme();
+
+  const tintOf = (i) => tints[(feats[i].i * 2654435761 >>> 0) % 6];
+
+  // view transform: device = dpr * (scale * world + tx, ty)
+  let W = 0, H = 0, dpr = 1, scale = 0, tx = 0, ty = 0;
+  let hover = -1;
+
+  function resetView() {
+    scale = W / 36200;
+    tx = (W - 36000 * scale) / 2 + 18000 * scale;
+    ty = H / 2;
+  }
+
+  function size() {
+    const w = canvas.parentElement.clientWidth;
+    const h = Math.max(320, Math.min(Math.round(w * 0.52), window.innerHeight - 180));
+    dpr = window.devicePixelRatio || 1;
+    const firstTime = W === 0;
+    W = w; H = h;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    canvas.style.height = h + "px";
+    pick.width = canvas.width; pick.height = canvas.height;
+    if (firstTime) resetView();
+    draw(); drawPick();
+  }
+
+  function applyT(c) { c.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * tx, dpr * ty); }
+
+  function draw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = plateBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    applyT(ctx);
+
+    // graticule
+    ctx.strokeStyle = strokeCol;
+    ctx.lineWidth = 0.9 / scale;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (let lon = -180; lon <= 180; lon += 30) { ctx.moveTo(lon * 100, -9000); ctx.lineTo(lon * 100, 9000); }
+    for (let lat = -90; lat <= 90; lat += 30) { ctx.moveTo(-18000, -lat * 100); ctx.lineTo(18000, -lat * 100); }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    const lw = Math.max(0.5, 0.7) / scale;
+    for (let i = 0; i < feats.length; i++) {
+      ctx.fillStyle = i === hover ? accent : tintOf(i);
+      ctx.fill(paths[i], "evenodd");
+    }
+    ctx.strokeStyle = strokeCol;
+    ctx.lineWidth = lw;
+    for (let i = 0; i < feats.length; i++) ctx.stroke(paths[i]);
+
+    if (refBox.checked) {
+      ctx.strokeStyle = refCol;
+      ctx.lineWidth = 1.0 / scale;
+      ctx.stroke(refPath);
+    }
+
+    if (relocBox.checked) {
+      ctx.strokeStyle = flag;
+      ctx.lineWidth = 1.6 / scale;
+      for (let i = 0; i < feats.length; i++) if (feats[i].r) ctx.stroke(paths[i]);
+    }
+  }
+
+  let pickDirty = true;
+  function drawPick() {
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    pctx.fillStyle = "#000000";
+    pctx.fillRect(0, 0, pick.width, pick.height);
+    applyT(pctx);
+    for (let i = 0; i < feats.length; i++) {
+      const n = i + 1;
+      pctx.fillStyle = `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`;
+      pctx.fill(paths[i], "evenodd");
+    }
+    pickDirty = false;
+  }
+
+  let raf = 0;
+  function requestDraw(withPick) {
+    if (withPick) pickDirty = true;
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; draw(); });
+  }
+
+  // interactions
+  let pointers = new Map();
+  let dragStart = null, pinchStart = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+    if (pointers.size === 1) {
+      dragStart = { x: e.offsetX, y: e.offsetY, tx, ty };
+      canvas.classList.add("dragging");
+    } else if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      pinchStart = {
+        d: Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]),
+        cx: (pts[0][0] + pts[1][0]) / 2, cy: (pts[0][1] + pts[1][1]) / 2,
+        scale, tx, ty,
+      };
+      dragStart = null;
+    }
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) { dragStart = null; pinchStart = null; canvas.classList.remove("dragging"); if (pickDirty) drawPick(); }
+  });
+  canvas.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); dragStart = null; pinchStart = null; });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+    if (pinchStart && pointers.size === 2) {
+      const pts = [...pointers.values()];
+      const d = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
+      const cx = (pts[0][0] + pts[1][0]) / 2, cy = (pts[0][1] + pts[1][1]) / 2;
+      const f = Math.max(0.2, d / Math.max(1, pinchStart.d));
+      scale = pinchStart.scale * f;
+      tx = cx - (pinchStart.cx - pinchStart.tx) * f;
+      ty = cy - (pinchStart.cy - pinchStart.ty) * f;
+      requestDraw(true);
+      return;
+    }
+    if (dragStart) {
+      tx = dragStart.tx + (e.offsetX - dragStart.x);
+      ty = dragStart.ty + (e.offsetY - dragStart.y);
+      requestDraw(true);
+      hideChip();
+      return;
+    }
+    onHover(e.offsetX, e.offsetY);
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const f = Math.exp(-e.deltaY * 0.0016);
+    const ns = Math.min(Math.max(scale, W / 100000) * f, W / 300);
+    const r = ns / scale;
+    tx = e.offsetX - (e.offsetX - tx) * r;
+    ty = e.offsetY - (e.offsetY - ty) * r;
+    scale = ns;
+    requestDraw(true);
+    clearTimeout(canvas._wt);
+    canvas._wt = setTimeout(() => { if (pickDirty) { drawPick(); } }, 120);
+  }, { passive: false });
+
+  canvas.addEventListener("dblclick", () => { resetView(); requestDraw(true); setTimeout(drawPick, 0); });
+
+  function hideChip() { chip.style.display = "none"; if (hover !== -1) { hover = -1; requestDraw(false); } }
+  canvas.addEventListener("pointerleave", () => { hideChip(); coordsEl.textContent = "—"; });
+
+  function onHover(mx, my) {
+    const lon = (mx - tx) / scale / 100;
+    const lat = -((my - ty) / scale / 100);
+    coordsEl.textContent =
+      Math.abs(lat).toFixed(2) + "°" + (lat >= 0 ? "N" : "S") + "  " +
+      Math.abs(lon).toFixed(2) + "°" + (lon >= 0 ? "E" : "W");
+    if (pickDirty) drawPick();
+    const px = pctx.getImageData(Math.round(mx * dpr), Math.round(my * dpr), 1, 1).data;
+    const idx = ((px[0] << 16) | (px[1] << 8) | px[2]) - 1;
+    if (idx < 0 || idx >= feats.length) { hideChip(); return; }
+    if (idx !== hover) { hover = idx; requestDraw(false); }
+    const f = feats[idx];
+    chip.innerHTML =
+      '<span class="pname">' + (f.n || "unnamed") + "</span>" +
+      '<span class="pmeta">id ' + f.i + (f.r ? ' · <span class="reloc">relocated</span>' : "") + "</span>";
+    chip.style.display = "block";
+    const cw = chip.offsetWidth, ch = chip.offsetHeight;
+    chip.style.left = Math.min(mx + 14, W - cw - 8) + "px";
+    chip.style.top = Math.max(8, Math.min(my + 14, H - ch - 8)) + "px";
+  }
+
+  relocBox.addEventListener("change", () => requestDraw(false));
+  refBox.addEventListener("change", () => requestDraw(false));
+
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", () => { readTheme(); requestDraw(false); });
+  new MutationObserver(() => { readTheme(); requestDraw(false); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  window.addEventListener("resize", size);
+  size();
+})();
+</script>

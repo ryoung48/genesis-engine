@@ -3,6 +3,10 @@ import type { RawNationReference } from "./data-source"
 import type { FoldedState } from "./fold"
 import type { Eu4ProvinceMap } from "./import/eu4-province-map"
 
+function isPlaceholderNationTag(tag: string): boolean {
+	return tag === "---" || tag === "XXX"
+}
+
 /** Assigns a stable internal numeric id per nation tag encountered as a
  * province owner *or controller* in `state` -- a war's attacker may only
  * ever appear as a controller (e.g. a rebel faction that never owns
@@ -16,8 +20,9 @@ import type { Eu4ProvinceMap } from "./import/eu4-province-map"
 function assignNationIds(state: FoldedState): Map<string, number> {
 	const tags = new Set<string>()
 	for (const p of state.provinces.values()) {
-		if (p.owner) tags.add(p.owner)
-		if (p.controller) tags.add(p.controller)
+		if (p.owner && !isPlaceholderNationTag(p.owner)) tags.add(p.owner)
+		if (p.controller && !isPlaceholderNationTag(p.controller))
+			tags.add(p.controller)
 	}
 	const sorted = Array.from(tags).sort()
 	const ids = new Map<string, number>()
@@ -274,7 +279,7 @@ export interface NationInfoFromHistory {
 	tag: string
 	name: string | null
 	governmentType: string | null
-	reforms: string[]
+	governmentReform: string | null
 	ruler: { name: string; dynasty?: string } | null
 	overlord: string | null
 	vassals: string[]
@@ -315,7 +320,7 @@ export function foldedStateToNationInfo(
 		tag,
 		name: n.currentName,
 		governmentType: n.governmentType,
-		reforms: Array.from(n.reforms),
+		governmentReform: n.governmentReform,
 		ruler: n.ruler,
 		overlord: n.overlord,
 		vassals: Array.from(n.vassals),

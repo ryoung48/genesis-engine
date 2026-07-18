@@ -1,10 +1,11 @@
 """Canonical entry point for regenerating every EU4-derived asset in one
 pass: reference data (nations/cultures/religions), history events
 (provinces/nations/wars/diplomacy), the province raster + seeds used to map
-EU4 provinces onto the procedural mesh, the vector province-border asset,
-and total/urban population (including the population province-swap
-postprocessing step). Run this instead of calling the individual scripts by
-hand so nothing gets forgotten or run out of order.
+EU4 provinces onto the procedural mesh, Cliopatria's pre-2AD dated-polygon
+history layer, the vector province-border asset, and total/urban population
+(including the population province-swap postprocessing step). Run this
+instead of calling the individual scripts by hand so nothing gets forgotten
+or run out of order.
 
     python scripts/regenerate-all-eu4-data.py
 
@@ -29,6 +30,9 @@ DEFAULT_PROVINCE_NAMES_TOPOJSON = Path(
 DEFAULT_GHSL_SOURCE = Path(
     r"C:\Users\rayou\Downloads\metro_adjusted_rasters_and_json\stadester_ghsl.json"
 )
+DEFAULT_CLIOPATRIA_SOURCE = Path(
+    r"C:\Users\rayou\Downloads\cliopatria.geojson\cliopatria_polities_only.geojson"
+)
 
 STEPS: list[tuple[str, str, list[str]]] = [
     ("Reference data (nations/cultures/religions)", "build-eu4-reference-data.py", []),
@@ -41,6 +45,11 @@ STEPS: list[tuple[str, str, list[str]]] = [
         "Province raster + seeds (procedural mesh mapping)",
         "build-eu4-provinces.py",
         ["--geojson", "{geojson}"],
+    ),
+    (
+        "Cliopatria pre-2AD history layer",
+        "build-cliopatria-events.py",
+        ["--source", "{cliopatria_source}"],
     ),
     (
         "Province border vectors",
@@ -78,12 +87,14 @@ def main() -> None:
         default=DEFAULT_PROVINCE_NAMES_TOPOJSON,
     )
     parser.add_argument("--ghsl-source", type=Path, default=DEFAULT_GHSL_SOURCE)
+    parser.add_argument("--cliopatria-source", type=Path, default=DEFAULT_CLIOPATRIA_SOURCE)
     args = parser.parse_args()
 
     replacements = {
         "{geojson}": str(args.geojson),
         "{province_names_topojson}": str(args.province_names_topojson),
         "{ghsl_source}": str(args.ghsl_source),
+        "{cliopatria_source}": str(args.cliopatria_source),
     }
 
     for label, script_name, extra_args in STEPS:

@@ -6,8 +6,11 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import {
 	type Eu4ProvinceBorderGeometry,
+	type Eu4ProvinceFillGeometry,
 	loadEu4ProvinceBorderGeometry,
+	loadEu4ProvinceFillGeometry,
 } from "@/model/earth/history/data-source"
+import { buildRegionSpatialIndex } from "@/model/mesh"
 import type { HeritageScript } from "@/model/society/script"
 import { SCRIPT } from "@/model/society/script"
 import {
@@ -38,6 +41,16 @@ import {
 	collectEu4ProvinceBorderGlobePositions,
 	collectEu4ProvinceBorderMapPositions,
 } from "./eu4-nation-border-overlay"
+import {
+	buildEu4NationFillGlobe,
+	buildEu4NationFillMap,
+	buildEu4OccupationStripesGlobe,
+	buildEu4OccupationStripesMap,
+	type ColorForRawId,
+	type ElevationKmForLonLat,
+	updateEu4NationFillGlobeColors,
+	updateEu4NationFillMapColors,
+} from "./eu4-nation-fill-overlay"
 import { getRegionFocusTargets } from "./focus"
 import { createMapProjection } from "./map-projection"
 import {
@@ -640,6 +653,30 @@ function addMapSlideClones(object: THREE.Object3D) {
 	}
 }
 
+// lon/lat -> elevation_km, via nearest-mesh-region snapping (same technique
+// import-heightmap.ts uses to place real river lines at the right height).
+// Keyed by mesh object identity so it's built once per world's mesh, not
+// once per rebuildNationBorders() call (which fires on most color-mode/
+// timeline changes, far more often than the mesh itself changes).
+const elevationLookupCache = new WeakMap<object, ElevationKmForLonLat>()
+
+function buildElevationLookup(
+	world: SerializedGenesisWorld | null | undefined,
+): ElevationKmForLonLat | undefined {
+	if (!world?.mesh || !world.elevation_km) return undefined
+	let lookup = elevationLookupCache.get(world.mesh)
+	if (!lookup) {
+		const index = buildRegionSpatialIndex(world.mesh)
+		const elevationKm = world.elevation_km
+		lookup = (lonDeg, latDeg) => {
+			const region = index.nearest(lonDeg, latDeg)
+			return region >= 0 ? elevationKm[region] : 0
+		}
+		elevationLookupCache.set(world.mesh, lookup)
+	}
+	return lookup
+}
+
 export function createGenesisScene(
 	canvas: HTMLCanvasElement,
 	initialWorld?: SerializedGenesisWorld,
@@ -987,6 +1024,33 @@ export function createGenesisScene(
 	// own Voronoi edges for nation/province borders when world.isEarthImport.
 	// Static across all Earth-imported worlds, so fetched once and reused.
 	let cachedEu4BorderGeometry: Eu4ProvinceBorderGeometry | null = null
+	// Real EU4 province fill polygons, paired with cachedEu4BorderGeometry --
+	// see eu4-nation-fill-overlay.ts. Also static/fetched once.
+	let cachedEu4FillGeometry: Eu4ProvinceFillGeometry | null = null
+	let currentNationFillColorForRawId: ColorForRawId | null = null
+	let globeNationFill: THREE.Mesh | null = null
+	let mapNationFill: THREE.Mesh | null = null
+	// Radius/projection the current fill meshes were actually built at, so a
+	// rebuild triggered purely by a nation-ownership change (the common case
+	// -- every timeline scrub tick creates a new currentNationFillColorForRawId
+	// closure) can recolor the existing mesh in place instead of rebuilding
+	// its (unchanged) position buffer from scratch. Null whenever the mesh
+	// itself is null, so a stale radius never causes a wrongly-skipped rebuild.
+	let globeNationFillRadius: number | null = null
+	let mapNationFillParams: {
+		z: number
+		centerLongitudeDeg: number
+		projectionLatitudeDeg: number
+	} | null = null
+	// Contested-province stripe overlay, drawn from the same real EU4
+	// province polygons as the fill mesh above -- see eu4-nation-fill-
+	// overlay.ts's buildEu4OccupationStripesGlobe/Map. Rebuilt fresh each
+	// call (no in-place recolor path like the fill mesh has): contested
+	// status is rare enough, and the mesh usually small enough, that this
+	// hasn't needed the same optimization.
+	let currentOccupationStripeColorForRawId: ColorForRawId | null = null
+	let globeOccupationStripes: THREE.Mesh | null = null
+	let mapOccupationStripes: THREE.Mesh | null = null
 	let coastlineMaterials: LineMaterial[] = []
 	let riverData: RiverData | null = null
 	let riversVisible = false
@@ -1389,6 +1453,73 @@ export function createGenesisScene(
 	let settlementLabelNames: string[] | null = null
 	let cultureNames: string[] | null = null
 	let heritageNames: string[] | null = null
+
+	function stringArraysEqual(
+		a: readonly string[] | null,
+		b: readonly string[] | null,
+	): boolean {
+		if (a === b) return true
+		if (!a || !b || a.length !== b.length) return false
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) return false
+		}
+		return true
+	}
+
+	function int32ArraysEqual(
+		a: Int32Array | null,
+		b: Int32Array | null,
+	): boolean {
+		if (a === b) return true
+		if (!a || !b || a.length !== b.length) return false
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) return false
+		}
+		return true
+	}
+
+	function earthHistoryNationOverridesEqual(
+		a: {
+			assignment: Int32Array
+			seeds: Int32Array
+			names: string[]
+		} | null,
+		b: {
+			assignment: Int32Array
+			seeds: Int32Array
+			names: string[]
+		} | null,
+	): boolean {
+		if (a === b) return true
+		if (!a || !b) return false
+		return (
+			int32ArraysEqual(a.assignment, b.assignment) &&
+			int32ArraysEqual(a.seeds, b.seeds) &&
+			stringArraysEqual(a.names, b.names)
+		)
+	}
+
+	function earthHistoryLabelPartitionsEqual(
+		a: {
+			culture: { assignment: Int32Array; count: number; names: string[] }
+			religion: { assignment: Int32Array; count: number; names: string[] }
+		} | null,
+		b: {
+			culture: { assignment: Int32Array; count: number; names: string[] }
+			religion: { assignment: Int32Array; count: number; names: string[] }
+		} | null,
+	): boolean {
+		if (a === b) return true
+		if (!a || !b) return false
+		return (
+			a.culture.count === b.culture.count &&
+			a.religion.count === b.religion.count &&
+			int32ArraysEqual(a.culture.assignment, b.culture.assignment) &&
+			int32ArraysEqual(a.religion.assignment, b.religion.assignment) &&
+			stringArraysEqual(a.culture.names, b.culture.names) &&
+			stringArraysEqual(a.religion.names, b.religion.names)
+		)
+	}
 	let globeControlsInteracting = false
 	let mapControlsInteracting = false
 	let globeControlActivityFrames = 0
@@ -1744,13 +1875,9 @@ export function createGenesisScene(
 	}
 
 	function rebuildNationLabels() {
-		disposeGroup(globeGroup, globeNationLabels)
-		disposeGroup(scene, mapNationLabels)
 		if (globeNationScripts) globeGroup.remove(globeNationScripts)
 		if (mapNationScripts) scene.remove(mapNationScripts)
 		pendingNationScriptTextureQueue = null
-		globeNationLabels = null
-		mapNationLabels = null
 		globeNationScripts = null
 		mapNationScripts = null
 		// Earth-imported worlds skip procedural nation/government generation
@@ -1762,10 +1889,16 @@ export function createGenesisScene(
 			!currentWorld ||
 			(!currentWorld.nations && !earthHistoryNationOverride)
 		) {
+			globeNationLabels?.clear()
+			mapNationLabels?.clear()
 			return
 		}
 		const showNationLabels = labelMode.nations || labelMode.dynasty
-		if (!showNationLabels) return
+		if (!showNationLabels) {
+			globeNationLabels?.clear()
+			mapNationLabels?.clear()
+			return
+		}
 		// Earth-imported worlds always show real nation names when scrubbing
 		// earth-history, regardless of the dynasty label toggle -- dynasty
 		// data isn't part of this engine's scope (see foldedStateToNationInfo,
@@ -1795,7 +1928,11 @@ export function createGenesisScene(
 			: labelMode.dynasty
 				? dynastyNames
 				: nationNames
-		if (!labelNames) return
+		if (!labelNames) {
+			globeNationLabels?.clear()
+			mapNationLabels?.clear()
+			return
+		}
 		// Real historical province-count distributions are far more skewed
 		// than the procedural generator's (e.g. Ming's 113 provinces vs. a
 		// 1-province German principality, same era) -- the default label
@@ -1813,6 +1950,7 @@ export function createGenesisScene(
 			labelCullingEnabled,
 			elevationVisible,
 			labelScaleCurve,
+			globeNationLabels ?? undefined,
 		)
 		mapNationLabels = buildMapNationLabels(
 			worldForLabels,
@@ -1822,12 +1960,14 @@ export function createGenesisScene(
 			nationLabelPools.map,
 			labelCullingEnabled,
 			labelScaleCurve,
+			mapNationLabels ?? undefined,
 		)
-		if (globeNationLabels) globeGroup.add(globeNationLabels)
+		if (globeNationLabels.parent !== globeGroup)
+			globeGroup.add(globeNationLabels)
 		if (mapNationLabels) {
 			if (!labelCullingEnabled) addMapSlideClones(mapNationLabels)
 			if (mapMesh) mapNationLabels.position.copy(mapMesh.position)
-			scene.add(mapNationLabels)
+			if (mapNationLabels.parent !== scene) scene.add(mapNationLabels)
 		}
 		if (
 			!earthHistoryNationOverride &&
@@ -1870,15 +2010,13 @@ export function createGenesisScene(
 	}
 
 	function rebuildSettlementLabels() {
-		disposeGroup(globeGroup, globeSettlementLabels)
-		disposeGroup(scene, mapSettlementLabels)
-		globeSettlementLabels = null
-		mapSettlementLabels = null
 		if (
 			!currentWorld?.settlementRegions ||
 			!labelMode.settlements ||
 			!settlementLabelNames
 		) {
+			globeSettlementLabels?.clear()
+			mapSettlementLabels?.clear()
 			return
 		}
 		globeSettlementLabels = buildGlobeSettlementLabels(
@@ -1888,6 +2026,7 @@ export function createGenesisScene(
 			settlementLabelPools.globe,
 			labelCullingEnabled,
 			elevationVisible,
+			globeSettlementLabels ?? undefined,
 		)
 		mapSettlementLabels = buildMapSettlementLabels(
 			currentWorld,
@@ -1896,25 +2035,32 @@ export function createGenesisScene(
 			currentMapProjectionLatitudeDeg,
 			settlementLabelPools.map,
 			labelCullingEnabled,
+			mapSettlementLabels ?? undefined,
 		)
-		if (globeSettlementLabels) globeGroup.add(globeSettlementLabels)
+		if (globeSettlementLabels.parent !== globeGroup) {
+			globeGroup.add(globeSettlementLabels)
+		}
 		if (mapSettlementLabels) {
 			if (!labelCullingEnabled) addMapSlideClones(mapSettlementLabels)
 			if (mapMesh) mapSettlementLabels.position.copy(mapMesh.position)
-			scene.add(mapSettlementLabels)
+			if (mapSettlementLabels.parent !== scene) scene.add(mapSettlementLabels)
 		}
 		updateOverlayVisibility()
 	}
 
 	function rebuildCultureLabels() {
-		disposeGroup(globeGroup, globeCultureLabels)
-		disposeGroup(scene, mapCultureLabels)
-		globeCultureLabels = null
-		mapCultureLabels = null
-		if (!currentWorld || !labelMode.culture) return
+		if (!currentWorld || !labelMode.culture) {
+			globeCultureLabels?.clear()
+			mapCultureLabels?.clear()
+			return
+		}
 
 		const earthCulture = earthHistoryLabelPartitions?.culture
-		if (!earthCulture && (!currentWorld.cultures || !cultureNames)) return
+		if (!earthCulture && (!currentWorld.cultures || !cultureNames)) {
+			globeCultureLabels?.clear()
+			mapCultureLabels?.clear()
+			return
+		}
 
 		const names = earthCulture ? earthCulture.names : (cultureNames as string[])
 		const partitionCount = earthCulture
@@ -1937,6 +2083,7 @@ export function createGenesisScene(
 			labelCullingEnabled,
 			elevationVisible,
 			scaleCurve,
+			globeCultureLabels ?? undefined,
 		)
 		mapCultureLabels = buildMapPartitionLabels(
 			currentWorld,
@@ -1948,11 +2095,13 @@ export function createGenesisScene(
 			cultureLabelPools.map,
 			labelCullingEnabled,
 			scaleCurve,
+			mapCultureLabels ?? undefined,
 		)
-		if (globeCultureLabels) globeGroup.add(globeCultureLabels)
+		if (globeCultureLabels.parent !== globeGroup)
+			globeGroup.add(globeCultureLabels)
 		if (mapCultureLabels) {
 			if (mapMesh) mapCultureLabels.position.copy(mapMesh.position)
-			scene.add(mapCultureLabels)
+			if (mapCultureLabels.parent !== scene) scene.add(mapCultureLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -1960,12 +2109,12 @@ export function createGenesisScene(
 	/** Only ever populated for Earth-imported worlds -- see
 	 * earthHistoryLabelPartitions's doc comment. */
 	function rebuildReligionLabels() {
-		disposeGroup(globeGroup, globeReligionLabels)
-		disposeGroup(scene, mapReligionLabels)
-		globeReligionLabels = null
-		mapReligionLabels = null
 		const earthReligion = earthHistoryLabelPartitions?.religion
-		if (!currentWorld || !labelMode.religion || !earthReligion) return
+		if (!currentWorld || !labelMode.religion || !earthReligion) {
+			globeReligionLabels?.clear()
+			mapReligionLabels?.clear()
+			return
+		}
 
 		globeReligionLabels = buildGlobePartitionLabels(
 			currentWorld,
@@ -1977,6 +2126,7 @@ export function createGenesisScene(
 			labelCullingEnabled,
 			elevationVisible,
 			EARTH_HISTORY_LABEL_SCALE_CURVE,
+			globeReligionLabels ?? undefined,
 		)
 		mapReligionLabels = buildMapPartitionLabels(
 			currentWorld,
@@ -1988,21 +2138,22 @@ export function createGenesisScene(
 			religionLabelPools.map,
 			labelCullingEnabled,
 			EARTH_HISTORY_LABEL_SCALE_CURVE,
+			mapReligionLabels ?? undefined,
 		)
-		if (globeReligionLabels) globeGroup.add(globeReligionLabels)
+		if (globeReligionLabels.parent !== globeGroup) {
+			globeGroup.add(globeReligionLabels)
+		}
 		if (mapReligionLabels) {
 			if (mapMesh) mapReligionLabels.position.copy(mapMesh.position)
-			scene.add(mapReligionLabels)
+			if (mapReligionLabels.parent !== scene) scene.add(mapReligionLabels)
 		}
 		updateOverlayVisibility()
 	}
 
 	function rebuildHeritageLabels() {
-		disposeGroup(globeGroup, globeHeritageLabels)
-		disposeGroup(scene, mapHeritageLabels)
-		globeHeritageLabels = null
-		mapHeritageLabels = null
 		if (!currentWorld?.heritages || !labelMode.heritage || !heritageNames) {
+			globeHeritageLabels?.clear()
+			mapHeritageLabels?.clear()
 			return
 		}
 		globeHeritageLabels = buildGlobeHeritageLabels(
@@ -2012,6 +2163,7 @@ export function createGenesisScene(
 			heritageLabelPools.globe,
 			labelCullingEnabled,
 			elevationVisible,
+			globeHeritageLabels ?? undefined,
 		)
 		mapHeritageLabels = buildMapHeritageLabels(
 			currentWorld,
@@ -2020,11 +2172,14 @@ export function createGenesisScene(
 			currentMapProjectionLatitudeDeg,
 			heritageLabelPools.map,
 			labelCullingEnabled,
+			mapHeritageLabels ?? undefined,
 		)
-		if (globeHeritageLabels) globeGroup.add(globeHeritageLabels)
+		if (globeHeritageLabels.parent !== globeGroup) {
+			globeGroup.add(globeHeritageLabels)
+		}
 		if (mapHeritageLabels) {
 			if (mapMesh) mapHeritageLabels.position.copy(mapMesh.position)
-			scene.add(mapHeritageLabels)
+			if (mapHeritageLabels.parent !== scene) scene.add(mapHeritageLabels)
 		}
 		updateOverlayVisibility()
 	}
@@ -2090,6 +2245,12 @@ export function createGenesisScene(
 		mapNationBorders = null
 		globeLandNationBorders = null
 		mapLandNationBorders = null
+		// The fill mesh is intentionally NOT disposed unconditionally here
+		// (unlike the border lines above, which must always be fully rebuilt
+		// since their segment set is re-filtered every call) -- see the
+		// isEarthImport branch below, which recolors it in place when only
+		// nation ownership changed and only disposes/rebuilds it when the
+		// radius/projection actually changed.
 		nationBorderMaterials = []
 		landNationBorderMaterials = []
 
@@ -2134,6 +2295,146 @@ export function createGenesisScene(
 			}
 			const borderContext = buildEu4NationBorderContext(worldForBorders)
 			const geometry = cachedEu4BorderGeometry
+
+			if (currentNationFillColorForRawId) {
+				if (!cachedEu4FillGeometry) {
+					loadEu4ProvinceFillGeometry()
+						.then((fillGeometry) => {
+							cachedEu4FillGeometry = fillGeometry
+							rebuildNationBorders()
+							requestRender()
+						})
+						.catch((err) => {
+							console.error("Failed to load EU4 province fill geometry:", err)
+						})
+				} else {
+					const elevationLookup = buildElevationLookup(worldForBorders)
+					const globeRadius = elevationVisible ? 1.002 : 1.0005
+					const mapZ = 0.0003
+
+					// Recolor in place when the only thing that changed since the
+					// last rebuild is nation ownership (the common case -- every
+					// timeline scrub tick creates a new currentNationFillColorForRawId
+					// closure, but the mesh's positions are still valid for the same
+					// radius/projection). Falls through to a full rebuild on the
+					// first build, or a real radius/pan/zoom change.
+					if (globeNationFill && globeNationFillRadius === globeRadius) {
+						updateEu4NationFillGlobeColors(
+							globeNationFill,
+							cachedEu4FillGeometry,
+							currentNationFillColorForRawId,
+							elevationLookup,
+						)
+					} else {
+						disposeObject3D(globeGroup, globeNationFill)
+						const globeFill = buildEu4NationFillGlobe(
+							cachedEu4FillGeometry,
+							currentNationFillColorForRawId,
+							currentViewMode,
+							true,
+							globeRadius,
+							elevationLookup,
+						)
+						globeNationFill = globeFill?.mesh ?? null
+						globeNationFillRadius = globeFill ? globeRadius : null
+						if (globeNationFill) globeGroup.add(globeNationFill)
+					}
+
+					if (
+						mapNationFill &&
+						mapNationFillParams?.z === mapZ &&
+						mapNationFillParams.centerLongitudeDeg ===
+							currentMapCenterLongitudeDeg &&
+						mapNationFillParams.projectionLatitudeDeg ===
+							currentMapProjectionLatitudeDeg
+					) {
+						updateEu4NationFillMapColors(
+							mapNationFill,
+							cachedEu4FillGeometry,
+							currentNationFillColorForRawId,
+							elevationLookup,
+						)
+					} else {
+						disposeObject3D(scene, mapNationFill)
+						const mapFill = buildEu4NationFillMap(
+							cachedEu4FillGeometry,
+							currentNationFillColorForRawId,
+							currentMapCenterLongitudeDeg,
+							currentMapProjectionLatitudeDeg,
+							currentViewMode,
+							true,
+							mapZ,
+							elevationLookup,
+						)
+						mapNationFill = mapFill?.mesh ?? null
+						mapNationFillParams = mapFill
+							? {
+									z: mapZ,
+									centerLongitudeDeg: currentMapCenterLongitudeDeg,
+									projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+								}
+							: null
+						if (mapNationFill) scene.add(mapNationFill)
+					}
+					// Visibility/position (view-mode gating, map-pan following) is
+					// handled uniformly by updateOverlayVisibility() below, same as
+					// every other overlay in this function.
+				}
+			} else if (globeNationFill || mapNationFill) {
+				// Fill overlay just got switched off (e.g. left political display
+				// mode) -- dispose it rather than leaving it hidden and stale, so
+				// the next time it's switched back on this takes the full-rebuild
+				// path instead of finding a null radius that never matches.
+				disposeObject3D(globeGroup, globeNationFill)
+				disposeObject3D(scene, mapNationFill)
+				globeNationFill = null
+				mapNationFill = null
+				globeNationFillRadius = null
+				mapNationFillParams = null
+			}
+
+			disposeObject3D(globeGroup, globeOccupationStripes)
+			disposeObject3D(scene, mapOccupationStripes)
+			globeOccupationStripes = null
+			mapOccupationStripes = null
+			if (currentOccupationStripeColorForRawId) {
+				if (!cachedEu4FillGeometry) {
+					loadEu4ProvinceFillGeometry()
+						.then((fillGeometry) => {
+							cachedEu4FillGeometry = fillGeometry
+							rebuildNationBorders()
+							requestRender()
+						})
+						.catch((err) => {
+							console.error("Failed to load EU4 province fill geometry:", err)
+						})
+				} else {
+					const globeStripes = buildEu4OccupationStripesGlobe(
+						cachedEu4FillGeometry,
+						currentOccupationStripeColorForRawId,
+						currentViewMode,
+						true,
+						elevationVisible ? 1.002 : 1.0005,
+					)
+					const mapStripes = buildEu4OccupationStripesMap(
+						cachedEu4FillGeometry,
+						currentOccupationStripeColorForRawId,
+						currentMapCenterLongitudeDeg,
+						currentMapProjectionLatitudeDeg,
+						currentViewMode,
+						true,
+						0.0003,
+					)
+					if (globeStripes) {
+						globeOccupationStripes = globeStripes.mesh
+						globeGroup.add(globeOccupationStripes)
+					}
+					if (mapStripes) {
+						mapOccupationStripes = mapStripes.mesh
+						scene.add(mapOccupationStripes)
+					}
+				}
+			}
 
 			if (borderContext && landNationBordersVisible) {
 				const globeLand = buildEu4NationBordersGlobe(
@@ -2490,6 +2791,10 @@ export function createGenesisScene(
 		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(globeGroup, globeLandNationBorders)
 		disposeObject3D(scene, mapLandNationBorders)
+		disposeObject3D(globeGroup, globeNationFill)
+		disposeObject3D(scene, mapNationFill)
+		disposeObject3D(globeGroup, globeOccupationStripes)
+		disposeObject3D(scene, mapOccupationStripes)
 		disposeObject3D(globeGroup, globeSelectedProvinceBorder)
 		disposeObject3D(scene, mapSelectedProvinceBorder)
 		disposeObject3D(globeGroup, pulseGlobe)
@@ -2523,6 +2828,12 @@ export function createGenesisScene(
 		mapNationBorders = null
 		globeLandNationBorders = null
 		mapLandNationBorders = null
+		globeNationFill = null
+		mapNationFill = null
+		globeNationFillRadius = null
+		mapNationFillParams = null
+		globeOccupationStripes = null
+		mapOccupationStripes = null
 		nationBorderMaterials = []
 		landNationBorderMaterials = []
 		pulseGlobe = null
@@ -2668,6 +2979,17 @@ export function createGenesisScene(
 		if (mapOccupationOverlay) {
 			mapOccupationOverlay.visible = showMap && !!currentOccupationOverlay
 			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
+		}
+		if (globeNationFill) globeNationFill.visible = currentViewMode === "globe"
+		if (mapNationFill) {
+			mapNationFill.visible = showMap
+			if (mapMesh) mapNationFill.position.copy(mapMesh.position)
+		}
+		if (globeOccupationStripes)
+			globeOccupationStripes.visible = currentViewMode === "globe"
+		if (mapOccupationStripes) {
+			mapOccupationStripes.visible = showMap
+			if (mapMesh) mapOccupationStripes.position.copy(mapMesh.position)
 		}
 		if (globeLandNationBorders)
 			globeLandNationBorders.visible =
@@ -3012,6 +3334,30 @@ export function createGenesisScene(
 		refreshMeshColors()
 	}
 
+	/** Nation fill color source for the real-EU4-province-polygon overlay
+	 * (eu4-nation-fill-overlay.ts), keyed by raw EU4 province id. Pass null
+	 * to hide the fill overlay -- e.g. when the color mode isn't political,
+	 * or the world isn't an Earth import -- and fall back to the normal
+	 * per-region terrain-mesh vertex coloring (setDisplayColors). */
+	function setNationFillColorForRawId(fn: ColorForRawId | null) {
+		if (currentNationFillColorForRawId === fn) return
+		currentNationFillColorForRawId = fn
+		rebuildNationBorders()
+	}
+
+	/** Contested-province stripe color source for the real-EU4-province-
+	 * polygon overlay (eu4-nation-fill-overlay.ts's stripe builders), keyed
+	 * by raw EU4 province id -- null (from the color function itself, per
+	 * province) means "not contested, no stripe". Pass a null function to
+	 * hide the whole overlay. Draws on top of both the fill mesh and the
+	 * border lines regardless of view; see buildEu4OccupationStripesGlobe/
+	 * Map's renderOrder doc comment. */
+	function setNationOccupationStripeColorForRawId(fn: ColorForRawId | null) {
+		if (currentOccupationStripeColorForRawId === fn) return
+		currentOccupationStripeColorForRawId = fn
+		rebuildNationBorders()
+	}
+
 	function setOccupationOverlay(overlay: Float32Array | null) {
 		if (currentOccupationOverlay === overlay) return
 		currentOccupationOverlay = overlay
@@ -3033,7 +3379,8 @@ export function createGenesisScene(
 			names: string[]
 		} | null,
 	) {
-		if (earthHistoryNationOverride === override) return
+		if (earthHistoryNationOverridesEqual(earthHistoryNationOverride, override))
+			return
 		earthHistoryNationOverride = override
 		rebuildNationBorders()
 		rebuildNationLabels()
@@ -3704,6 +4051,10 @@ export function createGenesisScene(
 		disposeObject3D(scene, mapNationBorders)
 		disposeObject3D(globeGroup, globeLandNationBorders)
 		disposeObject3D(scene, mapLandNationBorders)
+		disposeObject3D(globeGroup, globeNationFill)
+		disposeObject3D(scene, mapNationFill)
+		disposeObject3D(globeGroup, globeOccupationStripes)
+		disposeObject3D(scene, mapOccupationStripes)
 		disposeObject3D(globeGroup, pulseGlobe)
 		disposeObject3D(scene, pulseMap)
 		disposeObject3D(globeGroup, globeCoastlineOverlay)
@@ -4128,26 +4479,31 @@ export function createGenesisScene(
 	}
 
 	function setNationNames(names: string[] | null) {
+		if (stringArraysEqual(nationNames, names)) return
 		nationNames = names
 		rebuildNationLabels()
 	}
 
 	function setDynastyNames(names: string[] | null) {
+		if (stringArraysEqual(dynastyNames, names)) return
 		dynastyNames = names
 		rebuildNationLabels()
 	}
 
 	function setCultureNames(names: string[] | null) {
+		if (stringArraysEqual(cultureNames, names)) return
 		cultureNames = names
 		rebuildCultureLabels()
 	}
 
 	function setHeritageNames(names: string[] | null) {
+		if (stringArraysEqual(heritageNames, names)) return
 		heritageNames = names
 		rebuildHeritageLabels()
 	}
 
 	function setSettlementNames(names: string[] | null) {
+		if (stringArraysEqual(settlementLabelNames, names)) return
 		settlementLabelNames = names
 		rebuildSettlementLabels()
 	}
@@ -4170,7 +4526,10 @@ export function createGenesisScene(
 			religion: { assignment: Int32Array; count: number; names: string[] }
 		} | null,
 	) {
-		if (earthHistoryLabelPartitions === partitions) return
+		if (
+			earthHistoryLabelPartitionsEqual(earthHistoryLabelPartitions, partitions)
+		)
+			return
 		earthHistoryLabelPartitions = partitions
 		rebuildCultureLabels()
 		rebuildReligionLabels()
@@ -4372,6 +4731,8 @@ export function createGenesisScene(
 		setColorMode,
 		setRegionColors,
 		setDisplayColors,
+		setNationFillColorForRawId,
+		setNationOccupationStripeColorForRawId,
 		setOccupationOverlay,
 		setHoveredRegion,
 		setNationBordersVisible,

@@ -1,7 +1,22 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
 	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-	"files": { "ignoreUnknown": false },
+	"files": {
+		"ignoreUnknown": false,
+		"includes": [
+			"**",
+			"!dist",
+			"!dist/**",
+			"!coverage",
+			"!coverage/**",
+			"!.hotspot-baseline",
+			"!.hotspot-baseline/**",
+			"!scripts",
+			"!scripts/**",
+			"!public/earth-history/events/*.json",
+			"!public/heightmap/coastline-lines.json"
+		]
+	},
 	"formatter": { "enabled": true, "indentStyle": "tab" },
 	"linter": {
 		"enabled": true,

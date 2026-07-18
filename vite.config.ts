@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
 		base,
 		server: {
 			watch: {
-				ignored: ["**/*.smoke.test.ts"],
+				ignored: ["**/*.smoke.test.ts", "**/scripts/**"],
 			},
 		},
 		optimizeDeps: isTest

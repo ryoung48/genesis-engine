@@ -12,10 +12,10 @@ import type {
 	DistributionBucket,
 	NationDetailsData,
 } from "../../details/shared"
-import { GOVERNMENT_COLORS_CSS } from "../../hover/info-panel-model"
 import type { HistoryQuery, HistoryView } from "../history/history-query"
 import { rgbToCss } from "../shared/ui-format"
 import type { DisplayNationModel } from "./display-model"
+import { GOVERNMENT_COLORS_CSS } from "./government-colors"
 import { getDynastyColor } from "./region-colors"
 import { buildRulerDisplayMeta } from "./ruler-display"
 

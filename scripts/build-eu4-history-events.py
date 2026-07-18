@@ -77,6 +77,32 @@ NATION_NAME_EVENT_OVERRIDES = {
         ("1661.6.14", "Tungning"),
         ("1949.10.1", "Taiwan"),
     ],
+    # La Plata's static name never reflects independence or unification --
+    # the Viceroyalty/junta era isn't distinguished by these events (base
+    # name covers it), but the post-independence identity shifts are worth
+    # showing while scrubbing.
+    "LAP": [
+        ("1816.7.9", "United Provinces of the Río de la Plata"),
+        ("1862.10.12", "Argentina"),
+    ],
+    # Siam was renamed to Thailand in 1939, briefly reverted after WWII
+    # (partly to distance the state from its wartime Japan-aligned
+    # government), then renamed back permanently in 1949.
+    "SIA": [
+        ("1939.6.24", "Thailand"),
+        ("1945.9.8", "Siam"),
+        ("1949.5.11", "Thailand"),
+    ],
+    # Cambodia's name/regime changed repeatedly across the 20th century --
+    # republic, Khmer Rouge-era "Kampuchea", Vietnamese-backed
+    # reconstruction, and finally the restored kingdom.
+    "KHM": [
+        ("1970.10.9", "Khmer Republic"),
+        ("1975.4.17", "Democratic Kampuchea"),
+        ("1979.1.10", "People's Republic of Kampuchea"),
+        ("1989.4.29", "State of Cambodia"),
+        ("1993.9.24", "Kingdom of Cambodia"),
+    ],
 }
 
 

@@ -59,6 +59,7 @@ import {
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
 } from "./color-helpers"
+import { governmentColorForIndex } from "./government-colors"
 import {
 	getRebelDisplayColorNationId,
 	type PoliticalMapWar,
@@ -82,36 +83,6 @@ const DIPLOMACY_RGB_COLORS: Record<number, [number, number, number]> = {
 	[REL.RIVAL]: [0.976, 0.451, 0.086],
 	[REL.WAR]: [0.976, 0.22, 0.086],
 	[REL.COLONY]: [0.961, 0.549, 0.502],
-}
-
-const GOVERNMENT_COLORS: Record<number, [number, number, number]> = {
-	// tribal — orange / brown family
-	0: [0.8, 0.56, 0.28], // chiefdom               — ochre
-	1: [0.55, 0.35, 0.14], // tribal monarchy        — dark brown
-	2: [0.93, 0.76, 0.5], // tribal federation      — light sand
-	3: [0.44, 0.24, 0.11], // native council         — deep red-brown
-	// monarchy — blue family
-	4: [0.42, 0.54, 0.72], // feudal monarchy        — desaturated steel blue
-	5: [0.55, 0.78, 0.95], // elective monarchy      — light sky blue
-	6: [0.06, 0.16, 0.44], // absolute monarchy      — dark navy
-	7: [0.13, 0.4, 0.85], // constitutional monarchy — vivid royal blue
-	// republic — green family
-	8: [0.1, 0.56, 0.46], // merchant republic      — teal-green
-	9: [0.11, 0.36, 0.18], // noble republic         — dark forest
-	10: [0.64, 0.8, 0.24], // city-state confederation — lime
-	11: [0.24, 0.64, 0.34], // presidential republic  — emerald
-	12: [0.48, 0.84, 0.46], // parliamentary republic — bright spring green
-	// theocracy — purple / magenta family
-	13: [0.52, 0.24, 0.7], // theocracy              — medium purple
-	14: [0.28, 0.11, 0.46], // monastic state         — dark indigo
-	15: [0.76, 0.56, 0.9], // prince-bishopric       — light lavender
-	16: [0.82, 0.18, 0.58], // imperial cult          — magenta
-	// republic extensions
-	17: [0.74, 0.14, 0.14], // socialist state        — deep red (republic)
-	18: [0.44, 0.46, 0.24], // military junta         — olive drab (republic)
-	// colonial — red family
-	19: [0.902, 0.329, 0.239], // trading company     — vermilion red
-	20: [0.961, 0.549, 0.502], // settler colony      — light salmon red
 }
 
 function basinColor(id: number): [number, number, number] {
@@ -928,7 +899,7 @@ export function computeRegionColors(
 				} else {
 					const nationId = world.nations.assignment[p]
 					const govType = world.nations.governmentType[nationId] ?? 1
-					const baseColor = GOVERNMENT_COLORS[govType] ?? GOVERNMENT_COLORS[1]
+					const baseColor = governmentColorForIndex(govType)
 					const [cr, cg, cb] = darkenPoliticalAtElevation(
 						baseColor,
 						world.elevation_km[r],

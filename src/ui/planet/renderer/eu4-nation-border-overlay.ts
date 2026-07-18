@@ -150,6 +150,108 @@ function appendProjectedSegment(
 	positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
 }
 
+// Per-segment endpoint xyz, cached per (geometry, radius) -- segment
+// coordinates never change once loaded (only which segments count as a
+// "border" does, via nation ownership), so recomputing lonLatToXyz for
+// every one of ~167k segments on every timeline scrub tick was pure waste.
+// Flat Float32Array(segmentCount*6): [ax,ay,az,bx,by,bz] per segment.
+const globeSegmentXyzCache = new WeakMap<
+	Eu4ProvinceBorderGeometry,
+	Map<number, Float32Array>
+>()
+
+function getGlobeSegmentXyz(
+	geometry: Eu4ProvinceBorderGeometry,
+	radius: number,
+): Float32Array {
+	let byRadius = globeSegmentXyzCache.get(geometry)
+	if (!byRadius) {
+		byRadius = new Map()
+		globeSegmentXyzCache.set(geometry, byRadius)
+	}
+	let cached = byRadius.get(radius)
+	if (!cached) {
+		const { segmentCount, segmentLonLatDeg } = geometry
+		cached = new Float32Array(segmentCount * 6)
+		for (let i = 0; i < segmentCount; i++) {
+			const a = lonLatToXyz(
+				segmentLonLatDeg[4 * i],
+				segmentLonLatDeg[4 * i + 1],
+				radius,
+			)
+			const b = lonLatToXyz(
+				segmentLonLatDeg[4 * i + 2],
+				segmentLonLatDeg[4 * i + 3],
+				radius,
+			)
+			const o = 6 * i
+			cached[o] = a[0]
+			cached[o + 1] = a[1]
+			cached[o + 2] = a[2]
+			cached[o + 3] = b[0]
+			cached[o + 4] = b[1]
+			cached[o + 5] = b[2]
+		}
+		byRadius.set(radius, cached)
+	}
+	return cached
+}
+
+// Map-mode counterpart. Variable-length per segment (appendProjectedSegment
+// emits 2 points normally, 4 when a segment straddles the antimeridian), so
+// this uses the same offset-table convention as
+// eu4-nation-fill-overlay.ts/data-source.ts's fill-ring records: `offset[i]`
+// is the float-index into `positions` where segment i's points begin, with
+// `segmentCount + 1` entries. Independent of centerLongitudeDeg/
+// projectionLatitudeDeg -- createMapProjection's projectRadians (unlike
+// projectDegrees) doesn't rotate by center, it only scales, so those two
+// params don't affect this cache's contents (confirmed by
+// collectEu4AllNationBorderMapPositions never passing them through to
+// appendProjectedSegment either, historically).
+interface MapSegmentCache {
+	positions: Float32Array
+	offset: Int32Array
+}
+
+const mapSegmentCache = new WeakMap<
+	Eu4ProvinceBorderGeometry,
+	Map<number, MapSegmentCache>
+>()
+
+function getMapSegmentCache(
+	geometry: Eu4ProvinceBorderGeometry,
+	z: number,
+): MapSegmentCache {
+	let byZ = mapSegmentCache.get(geometry)
+	if (!byZ) {
+		byZ = new Map()
+		mapSegmentCache.set(geometry, byZ)
+	}
+	let cached = byZ.get(z)
+	if (!cached) {
+		const { segmentCount, segmentLonLatDeg } = geometry
+		const projection = createMapProjection(0, 0)
+		const offset = new Int32Array(segmentCount + 1)
+		const chunks: number[] = []
+		for (let i = 0; i < segmentCount; i++) {
+			offset[i] = chunks.length
+			appendProjectedSegment(
+				chunks,
+				projection,
+				segmentLonLatDeg[4 * i],
+				segmentLonLatDeg[4 * i + 1],
+				segmentLonLatDeg[4 * i + 2],
+				segmentLonLatDeg[4 * i + 3],
+				z,
+			)
+		}
+		offset[segmentCount] = chunks.length
+		cached = { positions: Float32Array.from(chunks), offset }
+		byZ.set(z, cached)
+	}
+	return cached
+}
+
 function buildThickLineSegments2(
 	positions: number[],
 	color: number,
@@ -183,10 +285,10 @@ function collectEu4AllNationBorderGlobePositions(
 	context: Eu4NationBorderContext,
 	radius: number,
 ) {
+	const xyz = getGlobeSegmentXyz(geometry, radius)
 	const positions: number[] = []
 	const { realIdToNation, realIdToSovereign, rebelPairs } = context
-	const { segmentCount, segmentProvinceA, segmentProvinceB, segmentLonLatDeg } =
-		geometry
+	const { segmentCount, segmentProvinceA, segmentProvinceB } = geometry
 	for (let i = 0; i < segmentCount; i++) {
 		const provinceA = segmentProvinceA[i]
 		const provinceB = segmentProvinceB[i]
@@ -196,17 +298,15 @@ function collectEu4AllNationBorderGlobePositions(
 		const sovereignB = realIdToSovereign.get(provinceB) ?? -1
 		if (!isNationBorder(nationA, nationB, sovereignA, sovereignB, rebelPairs))
 			continue
-		const a = lonLatToXyz(
-			segmentLonLatDeg[4 * i],
-			segmentLonLatDeg[4 * i + 1],
-			radius,
+		const o = 6 * i
+		positions.push(
+			xyz[o],
+			xyz[o + 1],
+			xyz[o + 2],
+			xyz[o + 3],
+			xyz[o + 4],
+			xyz[o + 5],
 		)
-		const b = lonLatToXyz(
-			segmentLonLatDeg[4 * i + 2],
-			segmentLonLatDeg[4 * i + 3],
-			radius,
-		)
-		positions.push(a[0], a[1], a[2], b[0], b[1], b[2])
 	}
 	return positions
 }
@@ -214,18 +314,12 @@ function collectEu4AllNationBorderGlobePositions(
 function collectEu4AllNationBorderMapPositions(
 	geometry: Eu4ProvinceBorderGeometry,
 	context: Eu4NationBorderContext,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
 	z: number,
 ) {
+	const { positions: cachedPositions, offset } = getMapSegmentCache(geometry, z)
 	const positions: number[] = []
 	const { realIdToNation, realIdToSovereign, rebelPairs } = context
-	const projection = createMapProjection(
-		centerLongitudeDeg,
-		projectionLatitudeDeg,
-	)
-	const { segmentCount, segmentProvinceA, segmentProvinceB, segmentLonLatDeg } =
-		geometry
+	const { segmentCount, segmentProvinceA, segmentProvinceB } = geometry
 	for (let i = 0; i < segmentCount; i++) {
 		const provinceA = segmentProvinceA[i]
 		const provinceB = segmentProvinceB[i]
@@ -235,15 +329,8 @@ function collectEu4AllNationBorderMapPositions(
 		const sovereignB = realIdToSovereign.get(provinceB) ?? -1
 		if (!isNationBorder(nationA, nationB, sovereignA, sovereignB, rebelPairs))
 			continue
-		appendProjectedSegment(
-			positions,
-			projection,
-			segmentLonLatDeg[4 * i],
-			segmentLonLatDeg[4 * i + 1],
-			segmentLonLatDeg[4 * i + 2],
-			segmentLonLatDeg[4 * i + 3],
-			z,
-		)
+		for (let k = offset[i]; k < offset[i + 1]; k++)
+			positions.push(cachedPositions[k])
 	}
 	return positions
 }
@@ -283,14 +370,13 @@ export function buildEu4NationBordersMap(
 	resolution: readonly [number, number],
 	opts: { color: number; opacity: number; lineWidth: number },
 ) {
+	// centerLongitudeDeg/projectionLatitudeDeg aren't threaded into the
+	// cached collector below -- see getMapSegmentCache's doc comment: this
+	// map projection mode doesn't rotate by center, only scale, so segment
+	// positions are the same regardless (repeatWidth is likewise a fixed
+	// constant, not center-dependent).
 	const positions = repeatMapPositions(
-		collectEu4AllNationBorderMapPositions(
-			geometry,
-			context,
-			centerLongitudeDeg,
-			projectionLatitudeDeg,
-			z,
-		),
+		collectEu4AllNationBorderMapPositions(geometry, context, z),
 		createMapProjection(centerLongitudeDeg, projectionLatitudeDeg).repeatWidth,
 	)
 	return buildThickLineSegments2(

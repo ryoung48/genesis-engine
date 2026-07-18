@@ -32,6 +32,10 @@ interface SimulationControlsProps {
 	/** Extra content rendered after the play/pause button, e.g. the
 	 * Earth-history bookmark popup trigger. */
 	extraControls?: React.ReactNode
+	playPauseLabels?: {
+		play: string
+		pause: string
+	}
 }
 
 export const SimulationControls: React.FC<SimulationControlsProps> = ({
@@ -45,6 +49,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 	formatLabel,
 	stepValue,
 	extraControls,
+	playPauseLabels,
 }) => {
 	const wrapperClassName = floating
 		? "absolute bottom-3 left-1/2 z-20 -translate-x-1/2 pointer-events-none"
@@ -56,6 +61,10 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 				return `Y${year} ${monthLabels[month] ?? `M${month}`} ${day}`
 			})()
 	const step = stepValue ?? TIMELINE_STEP_MS
+	const resolvedPlayPauseLabels = playPauseLabels ?? {
+		play: "Start simulation",
+		pause: "Pause simulation",
+	}
 
 	const handleStepBackward = () =>
 		onTimeChange(clampTimelineTime(selectedTimeMs - step, minTimeMs, maxTimeMs))
@@ -135,9 +144,15 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 								size="sm"
 								shape="rounded"
 								className="h-7 w-7 shrink-0 border-white/0 bg-white/5 text-slate-100 shadow-none hover:bg-white/10"
-								title={simPlaying ? "Pause simulation" : "Start simulation"}
+								title={
+									simPlaying
+										? resolvedPlayPauseLabels.pause
+										: resolvedPlayPauseLabels.play
+								}
 								aria-label={
-									simPlaying ? "Pause simulation" : "Start simulation"
+									simPlaying
+										? resolvedPlayPauseLabels.pause
+										: resolvedPlayPauseLabels.play
 								}
 								selected={simPlaying}
 							>

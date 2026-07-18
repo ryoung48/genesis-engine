@@ -57,7 +57,16 @@ import {
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import { hashColorForKey, rgb01ToCss } from "@/model/earth/history/color"
+import {
+	type Eu4ProvinceFillGeometry,
+	loadEu4ProvinceFillGeometry,
+} from "@/model/earth/history/data-source"
 import { daysToEu4Date, eu4DateToDays } from "@/model/earth/history/date"
+import {
+	EARTH_HISTORY_NO_GOVERNMENT_COLOR,
+	formatEarthHistoryGovernmentLabel,
+	getEarthHistoryGovernmentColor,
+} from "@/model/earth/history/government"
 import {
 	TRADE_GOOD_LABELS,
 	tradeGoodColor,
@@ -120,6 +129,7 @@ import { SimulationControls } from "./controls/SimulationControls"
 import { DetailsDrawer } from "./details/DetailsDrawer"
 import { createDrawerNationClickHandler } from "./details/nation-clicks"
 import { useEarthHistoryTimeline } from "./hooks/useEarthHistoryTimeline"
+import { findEu4ProvinceForLonLat } from "./hover/eu4-hover-province"
 import {
 	getHoverBiome,
 	getHoverClimateDisplay,
@@ -137,6 +147,7 @@ import {
 	getHoverIsLand,
 	getHoverKoppenClimate,
 	getHoverLandmark,
+	getHoverLonLat,
 	getHoverMisery,
 	getHoverOceanCurrents,
 	getHoverOceanDist,
@@ -310,6 +321,29 @@ function buildDistribution(
 
 function buildExportTimestamp(date: Date): string {
 	return date.toISOString().replace(/[:.]/g, "-")
+}
+
+function usePlaybackSampledValue<T>(
+	value: T,
+	delayMs: number,
+	enabled: boolean,
+): T {
+	const [sampledValue, setSampledValue] = useState(value)
+	const latestValueRef = useRef(value)
+	latestValueRef.current = value
+
+	useEffect(() => {
+		if (!enabled) {
+			setSampledValue(value)
+			return
+		}
+		const timer = window.setInterval(() => {
+			setSampledValue(latestValueRef.current)
+		}, delayMs)
+		return () => window.clearInterval(timer)
+	}, [delayMs, enabled, value])
+
+	return enabled ? sampledValue : value
 }
 
 function sanitizeExportIdentity(
@@ -1148,6 +1182,7 @@ export const GenesisView: React.FC = () => {
 
 	// Simulation state
 	const [simPlaying, setSimPlaying] = useState(false)
+	const [earthHistoryPlaying, setEarthHistoryPlaying] = useState(false)
 	const simStartTimeMs = historyYearToTime(800)
 	const [simTimeMs, setSimTimeMs] = useState(simStartTimeMs)
 	const [timelineBundle, setTimelineBundle] = useState<
@@ -1173,6 +1208,7 @@ export const GenesisView: React.FC = () => {
 		useState<Eu4GhslSettlementAsset | null>(null)
 	useEffect(() => {
 		if (!world?.isEarthImport) {
+			setEarthHistoryPlaying(false)
 			setEarthRealPopulation(null)
 			setEarthRealUrbanPopulation(null)
 			setEu4GhslSettlements(null)
@@ -1226,9 +1262,38 @@ export const GenesisView: React.FC = () => {
 	const dtrMonth = resolvedClimateMonth
 	const currentMonth = resolvedClimateMonth
 	const canSimulate = !!world && !!world.nations && !generating
+	useEffect(() => {
+		if (!world?.isEarthImport || earthHistory.loading || !earthHistoryPlaying)
+			return
+		const timer = window.setInterval(() => {
+			earthHistory.setSelectedDays((prev) => {
+				if (prev >= earthHistory.maxDays) {
+					setEarthHistoryPlaying(false)
+					return prev
+				}
+				const next = Math.min(prev + 365, earthHistory.maxDays)
+				if (next >= earthHistory.maxDays) setEarthHistoryPlaying(false)
+				return next
+			})
+		}, 1000)
+		return () => window.clearInterval(timer)
+	}, [
+		earthHistory.loading,
+		earthHistory.maxDays,
+		earthHistory.setSelectedDays,
+		earthHistoryPlaying,
+		world?.isEarthImport,
+	])
+	useEffect(() => {
+		if (earthHistory.selectedDays >= earthHistory.maxDays) {
+			setEarthHistoryPlaying(false)
+		}
+	}, [earthHistory.maxDays, earthHistory.selectedDays])
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
+	const [eu4HoverFillGeometry, setEu4HoverFillGeometry] =
+		useState<Eu4ProvinceFillGeometry | null>(null)
 	const [measureStart, setMeasureStart] = useState<number | null>(null)
 	const [measureEnd, setMeasureEnd] = useState<number | null>(null)
 	const [measureLabelPos, setMeasureLabelPos] = useState<
@@ -1993,6 +2058,25 @@ export const GenesisView: React.FC = () => {
 		eu4GhslSettlements,
 		earthHistory.selectedDays,
 	])
+	useEffect(() => {
+		let cancelled = false
+		if (!worldForDisplay?.isEarthImport) {
+			setEu4HoverFillGeometry(null)
+			return () => {
+				cancelled = true
+			}
+		}
+		loadEu4ProvinceFillGeometry()
+			.then((geometry) => {
+				if (!cancelled) setEu4HoverFillGeometry(geometry)
+			})
+			.catch((err) => {
+				console.error("Failed to load EU4 province fill geometry:", err)
+			})
+		return () => {
+			cancelled = true
+		}
+	}, [worldForDisplay?.isEarthImport])
 	const earthHistoryFormatLabel = useCallback(
 		(timeValue: number) => earthHistory.formatLabel(timeValue),
 		[earthHistory.formatLabel],
@@ -2133,7 +2217,41 @@ export const GenesisView: React.FC = () => {
 		worldForDisplay,
 	)
 	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay)
-	const hoverProvince = getHoverProvince(hoverInfo, worldForDisplay)
+	const earthImportRawIdToCompact = useMemo(() => {
+		const realIds = worldForDisplay?.provinces?.realIds
+		if (!realIds) return null
+		const map = new Map<number, number>()
+		for (let idx = 0; idx < realIds.length; idx++) {
+			map.set(realIds[idx], idx)
+		}
+		return map
+	}, [worldForDisplay?.provinces?.realIds])
+	const hoverProvince = useMemo(() => {
+		const fallbackProvince = getHoverProvince(hoverInfo, worldForDisplay)
+		if (
+			!hoverInfo ||
+			!worldForDisplay?.isEarthImport ||
+			!worldForDisplay.provinces?.realIds ||
+			!earthImportRawIdToCompact ||
+			!eu4HoverFillGeometry
+		) {
+			return fallbackProvince
+		}
+		const lonLat = getHoverLonLat(hoverInfo, worldForDisplay)
+		if (!lonLat) return fallbackProvince
+		const rawProvinceId = findEu4ProvinceForLonLat(
+			eu4HoverFillGeometry,
+			lonLat.lonDeg,
+			lonLat.latDeg,
+		)
+		if (rawProvinceId === null) return fallbackProvince
+		return earthImportRawIdToCompact.get(rawProvinceId) ?? fallbackProvince
+	}, [
+		earthImportRawIdToCompact,
+		eu4HoverFillGeometry,
+		hoverInfo,
+		worldForDisplay,
+	])
 	const hoverLandmark = getHoverLandmark(hoverInfo, worldForDisplay)
 	const hoverIsLand = getHoverIsLand(hoverInfo, worldForDisplay)
 	const hoverOceanDist = getHoverOceanDist(hoverInfo, worldForDisplay)
@@ -2169,6 +2287,32 @@ export const GenesisView: React.FC = () => {
 	const heritageLabelsArray = useMemo(() => {
 		return buildHeritageLabelNames(worldForDisplay, worldNames)
 	}, [worldForDisplay, worldNames])
+	const labelsPlaybackActive = simPlaying || earthHistoryPlaying
+	const sampledNationLabelsArray = usePlaybackSampledValue(
+		nationLabelsArray,
+		350,
+		labelsPlaybackActive,
+	)
+	const sampledDynastyLabelsArray = usePlaybackSampledValue(
+		dynastyLabelsArray,
+		350,
+		labelsPlaybackActive,
+	)
+	const sampledSettlementLabelsArray = usePlaybackSampledValue(
+		settlementLabelsArray,
+		350,
+		labelsPlaybackActive,
+	)
+	const sampledCultureLabelsArray = usePlaybackSampledValue(
+		cultureLabelsArray,
+		350,
+		labelsPlaybackActive,
+	)
+	const sampledHeritageLabelsArray = usePlaybackSampledValue(
+		heritageLabelsArray,
+		350,
+		labelsPlaybackActive,
+	)
 	const getNationName = useCallback(
 		(nationId: number) => worldNames?.nation(nationId) ?? `#${nationId}`,
 		[worldNames],
@@ -2497,7 +2641,6 @@ export const GenesisView: React.FC = () => {
 				isLand: worldForDisplay.isLand,
 				religionColorById: earthHistory.religionColorById ?? undefined,
 				cultureColorById: earthHistory.cultureColorById ?? undefined,
-				provinceMeta: earthHistory.provinceMeta ?? undefined,
 			})
 			if (earthColors) return earthColors
 		}
@@ -2538,8 +2681,12 @@ export const GenesisView: React.FC = () => {
 		earthHistory.nationReference,
 		earthHistory.religionColorById,
 		earthHistory.cultureColorById,
-		earthHistory.provinceMeta,
 	])
+
+	// Earth-import political/demographic fills are temporarily rendered only
+	// via the base region mesh, not the real-EU4-province overlay, to avoid
+	// the heavier first-render vector-overlay setup cost.
+	const nationFillColorForRawId = useMemo<null>(() => null, [])
 
 	const earthHistoryDiplomacyRows = useMemo(() => {
 		if (
@@ -2615,15 +2762,22 @@ export const GenesisView: React.FC = () => {
 				: rgb01ToCss(hashColorForKey(`nation:${owner}`))
 			: null
 
-		const govType = owner
-			? (earthHistory.query.state.nations.get(owner)?.governmentType ?? null)
+		const nationState = owner
+			? (earthHistory.query.state.nations.get(owner) ?? null)
 			: null
-		const governmentLabel = govType
-			? govType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+		const governmentLabel = nationState
+			? formatEarthHistoryGovernmentLabel({
+					governmentType: nationState.governmentType,
+					governmentReform: nationState.governmentReform,
+				})
 			: null
-		const governmentColor = govType
-			? rgb01ToCss(hashColorForKey(`gov:${govType}`))
-			: null
+		const governmentColorRgb = getEarthHistoryGovernmentColor({
+			governmentType: nationState?.governmentType ?? null,
+			governmentReform: nationState?.governmentReform,
+		})
+		const governmentColor = rgb01ToCss(
+			governmentColorRgb ?? EARTH_HISTORY_NO_GOVERNMENT_COLOR,
+		)
 
 		const cultureId = ps.cultureId
 		const cultureName = cultureId
@@ -2705,6 +2859,8 @@ export const GenesisView: React.FC = () => {
 		earthHistory.engine,
 	])
 
+	const occupationStripeColorForRawId = useMemo<null>(() => null, [])
+
 	const cultureBlendOverlay = useMemo(() => {
 		if (colorMode !== "population") return null
 		const world = worldForDisplay
@@ -2759,6 +2915,35 @@ export const GenesisView: React.FC = () => {
 			getOverlayColor,
 		})
 	}, [colorMode, populationMode, worldForDisplay, selectedHistoryView])
+	const earthHistorySceneNationOverride = usePlaybackSampledValue(
+		worldForDisplay?.isEarthImport && earthHistory.query
+			? {
+					assignment: earthHistory.query.frame.assignment,
+					seeds: earthHistory.query.frame.seeds,
+					names: earthHistory.query.frame.names,
+				}
+			: null,
+		350,
+		labelsPlaybackActive,
+	)
+	const earthHistorySceneLabelPartitions = usePlaybackSampledValue(
+		worldForDisplay?.isEarthImport && earthHistory.query
+			? {
+					culture: {
+						assignment: earthHistory.query.frame.cultureAssignment,
+						count: earthHistory.query.frame.cultureCount,
+						names: earthHistory.query.frame.cultureNames,
+					},
+					religion: {
+						assignment: earthHistory.query.frame.religionAssignment,
+						count: earthHistory.query.frame.religionCount,
+						names: earthHistory.query.frame.religionNames,
+					},
+				}
+			: null,
+		350,
+		labelsPlaybackActive,
+	)
 
 	useEffect(() => {
 		const scene = sceneRef.current
@@ -2770,6 +2955,8 @@ export const GenesisView: React.FC = () => {
 			return
 		}
 		scene.setDisplayColors(colorMode, regionColors)
+		scene.setNationFillColorForRawId(nationFillColorForRawId)
+		scene.setNationOccupationStripeColorForRawId(occupationStripeColorForRawId)
 		if (lastWorldRef.current !== worldForDisplay) {
 			scene.updateWorld(worldForDisplay)
 			lastWorldRef.current = worldForDisplay
@@ -2788,35 +2975,12 @@ export const GenesisView: React.FC = () => {
 		// "Nations > Borders" and nation labels actually follow the scrubbed
 		// date and show real EU4 names instead of the static generation-time
 		// assignment and procedural names.
-		scene.setEarthHistoryNationOverride(
-			worldForDisplay.isEarthImport && earthHistory.query
-				? {
-						assignment: earthHistory.query.frame.assignment,
-						seeds: earthHistory.query.frame.seeds,
-						names: earthHistory.query.frame.names,
-					}
-				: null,
-		)
+		scene.setEarthHistoryNationOverride(earthHistorySceneNationOverride)
 		// Culture/religion LABELS are also placed from a different id space
 		// than the procedural world.cultures/world.heritages -- see
 		// earthHistoryLabelPartitions's doc comment in
 		// create-genesis-scene.ts.
-		scene.setEarthHistoryLabelPartitions(
-			worldForDisplay.isEarthImport && earthHistory.query
-				? {
-						culture: {
-							assignment: earthHistory.query.frame.cultureAssignment,
-							count: earthHistory.query.frame.cultureCount,
-							names: earthHistory.query.frame.cultureNames,
-						},
-						religion: {
-							assignment: earthHistory.query.frame.religionAssignment,
-							count: earthHistory.query.frame.religionCount,
-							names: earthHistory.query.frame.religionNames,
-						},
-					}
-				: null,
-		)
+		scene.setEarthHistoryLabelPartitions(earthHistorySceneLabelPartitions)
 	}, [
 		colorMode,
 		nationMode,
@@ -2824,8 +2988,11 @@ export const GenesisView: React.FC = () => {
 		occupationOverlay,
 		cultureBlendOverlay,
 		regionColors,
+		nationFillColorForRawId,
+		occupationStripeColorForRawId,
 		worldForDisplay,
-		earthHistory.query,
+		earthHistorySceneNationOverride,
+		earthHistorySceneLabelPartitions,
 	])
 
 	const thermalEquator = useMemo(() => {
@@ -3539,20 +3706,20 @@ export const GenesisView: React.FC = () => {
 		sceneRef.current?.setLabelMode(labelMode)
 	}, [labelMode])
 	useEffect(() => {
-		sceneRef.current?.setNationNames(nationLabelsArray)
-	}, [nationLabelsArray])
+		sceneRef.current?.setNationNames(sampledNationLabelsArray)
+	}, [sampledNationLabelsArray])
 	useEffect(() => {
-		sceneRef.current?.setDynastyNames(dynastyLabelsArray)
-	}, [dynastyLabelsArray])
+		sceneRef.current?.setDynastyNames(sampledDynastyLabelsArray)
+	}, [sampledDynastyLabelsArray])
 	useEffect(() => {
-		sceneRef.current?.setSettlementNames(settlementLabelsArray)
-	}, [settlementLabelsArray])
+		sceneRef.current?.setSettlementNames(sampledSettlementLabelsArray)
+	}, [sampledSettlementLabelsArray])
 	useEffect(() => {
-		sceneRef.current?.setCultureNames(cultureLabelsArray)
-	}, [cultureLabelsArray])
+		sceneRef.current?.setCultureNames(sampledCultureLabelsArray)
+	}, [sampledCultureLabelsArray])
 	useEffect(() => {
-		sceneRef.current?.setHeritageNames(heritageLabelsArray)
-	}, [heritageLabelsArray])
+		sceneRef.current?.setHeritageNames(sampledHeritageLabelsArray)
+	}, [sampledHeritageLabelsArray])
 	// --- Elevation ---
 	useEffect(() => {
 		sceneRef.current?.setElevationVisible(showElevation)
@@ -4136,6 +4303,21 @@ export const GenesisView: React.FC = () => {
 		selectedTimeMs,
 		simPlaying,
 		simTimeMs,
+	])
+	const handleToggleEarthHistoryPlayback = useCallback(() => {
+		if (earthHistory.loading) return
+		if (earthHistory.selectedDays >= earthHistory.maxDays) {
+			earthHistory.setSelectedDays(earthHistory.minDays)
+			setEarthHistoryPlaying(true)
+			return
+		}
+		setEarthHistoryPlaying((playing) => !playing)
+	}, [
+		earthHistory.loading,
+		earthHistory.maxDays,
+		earthHistory.minDays,
+		earthHistory.selectedDays,
+		earthHistory.setSelectedDays,
 	])
 
 	const setAxialTiltDirection = useCallback(
@@ -5143,8 +5325,14 @@ export const GenesisView: React.FC = () => {
 									maxTimeMs={earthHistory.maxDays}
 									onTimeChange={earthHistory.setSelectedDays}
 									floating={false}
+									onPlayPause={handleToggleEarthHistoryPlayback}
+									simPlaying={earthHistoryPlaying}
 									formatLabel={earthHistoryFormatLabel}
 									stepValue={365}
+									playPauseLabels={{
+										play: "Start timeline",
+										pause: "Pause timeline",
+									}}
 									extraControls={
 										<EarthHistoryBookmarks
 											onSelect={earthHistory.setSelectedDays}

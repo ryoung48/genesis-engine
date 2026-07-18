@@ -19,6 +19,7 @@ import {
 	vegetationMapColor,
 	vegetationSatelliteColor,
 } from "../colors"
+import { GOVERNMENT_COLORS_CSS } from "../screen/display/government-colors"
 import {
 	getTerrainFeatureColor,
 	getTopographyColor,
@@ -457,36 +458,6 @@ export function buildDemographicDisplayData(params: {
 	}
 
 	return null
-}
-
-export const GOVERNMENT_COLORS_CSS: Record<number, string> = {
-	// tribal — orange / brown
-	0: "rgb(204, 143, 71)", // chiefdom
-	1: "rgb(140, 89, 36)", // tribal monarchy
-	2: "rgb(237, 194, 128)", // tribal federation
-	3: "rgb(112, 61, 28)", // native council
-	// monarchy — blue
-	4: "rgb(107, 138, 184)", // feudal monarchy
-	5: "rgb(140, 199, 242)", // elective monarchy
-	6: "rgb(15, 41, 112)", // absolute monarchy
-	7: "rgb(33, 102, 217)", // constitutional monarchy
-	// republic — green
-	8: "rgb(26, 143, 117)", // merchant republic
-	9: "rgb(28, 92, 46)", // noble republic
-	10: "rgb(163, 204, 61)", // city-state confederation
-	11: "rgb(61, 163, 87)", // presidential republic
-	12: "rgb(122, 214, 117)", // parliamentary republic
-	// theocracy — purple / magenta
-	13: "rgb(133, 61, 179)", // theocracy
-	14: "rgb(71, 28, 117)", // monastic state
-	15: "rgb(194, 143, 230)", // prince-bishopric
-	16: "rgb(209, 46, 148)", // imperial cult
-	// republic extensions
-	17: "rgb(189, 36, 36)", // socialist state
-	18: "rgb(112, 117, 61)", // military junta
-	// colonial — red family
-	19: "rgb(230, 84, 61)", // trading company — vermilion red
-	20: "rgb(245, 140, 128)", // settler colony — light salmon red
 }
 
 export function buildGovernmentDisplayData(params: {

@@ -1,0 +1,494 @@
+<title>Imperium Universalis — Recovered Projection</title>
+<style>
+  :root {
+    --ground: #eff2ee;
+    --plate: #e7ebe5;
+    --ink: #232a26;
+    --ink-soft: #5b645e;
+    --line: #c9d0c7;
+    --accent: #3f6f8f;
+    --flag: #b05a4a;
+    --border-stroke: #eff2ee;
+    --tint-0: #a9bda5;
+    --tint-1: #d3ab98;
+    --tint-2: #9cafc4;
+    --tint-3: #d4bd8b;
+    --tint-4: #b7a3bd;
+    --tint-5: #aebb92;
+    --chip-bg: rgba(239, 242, 238, 0.94);
+    --code-bg: #e7ebe5;
+    --ref-line: rgba(52, 61, 57, 0.60);
+    --waste: #d9ddd6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #10161d;
+      --plate: #151d26;
+      --ink: #dbe2e0;
+      --ink-soft: #8b968f;
+      --line: #2a3540;
+      --accent: #7fa8c4;
+      --flag: #cd7a68;
+      --border-stroke: #10161d;
+      --tint-0: #3d4f42;
+      --tint-1: #59423a;
+      --tint-2: #35455a;
+      --tint-3: #575030;
+      --tint-4: #4a3d52;
+      --tint-5: #45502f;
+      --chip-bg: rgba(16, 22, 29, 0.94);
+      --code-bg: #151d26;
+      --ref-line: rgba(214, 222, 218, 0.55);
+    --waste: #1c242d;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #eff2ee;
+    --plate: #e7ebe5;
+    --ink: #232a26;
+    --ink-soft: #5b645e;
+    --line: #c9d0c7;
+    --accent: #3f6f8f;
+    --flag: #b05a4a;
+    --border-stroke: #eff2ee;
+    --tint-0: #a9bda5;
+    --tint-1: #d3ab98;
+    --tint-2: #9cafc4;
+    --tint-3: #d4bd8b;
+    --tint-4: #b7a3bd;
+    --tint-5: #aebb92;
+    --chip-bg: rgba(239, 242, 238, 0.94);
+    --code-bg: #e7ebe5;
+    --ref-line: rgba(52, 61, 57, 0.60);
+    --waste: #d9ddd6;
+  }
+  :root[data-theme="dark"] {
+    --ground: #10161d;
+    --plate: #151d26;
+    --ink: #dbe2e0;
+    --ink-soft: #8b968f;
+    --line: #2a3540;
+    --accent: #7fa8c4;
+    --flag: #cd7a68;
+    --border-stroke: #10161d;
+    --tint-0: #3d4f42;
+    --tint-1: #59423a;
+    --tint-2: #35455a;
+    --tint-3: #575030;
+    --tint-4: #4a3d52;
+    --tint-5: #45502f;
+    --chip-bg: rgba(16, 22, 29, 0.94);
+    --code-bg: #151d26;
+    --ref-line: rgba(214, 222, 218, 0.55);
+    --waste: #1c242d;
+  }
+  html, body { background: var(--ground); color: var(--ink); }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1200px; width: 100%; margin: 0 auto; padding: 0 20px; }
+
+  header { padding: 26px 0 14px; }
+  .plate-head {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    justify-content: space-between; gap: 8px 24px;
+    border-bottom: 1px solid var(--line); padding-bottom: 14px;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 4px;
+  }
+  h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 500; font-size: clamp(24px, 3.4vw, 34px);
+    letter-spacing: 0.01em; margin: 0; text-wrap: balance;
+  }
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 4px 22px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats b { color: var(--ink); font-weight: 600; }
+
+  .maprow { padding: 16px 0 6px; }
+  .plate {
+    position: relative; border: 1px solid var(--line);
+    background: var(--plate); border-radius: 3px; overflow: hidden;
+  }
+  canvas#map { display: block; width: 100%; height: auto; cursor: grab; touch-action: none; }
+  canvas#map.dragging { cursor: grabbing; }
+
+  .chip {
+    position: absolute; pointer-events: none; display: none;
+    background: var(--chip-bg); border: 1px solid var(--line); border-radius: 3px;
+    padding: 7px 10px; max-width: 260px;
+    font-size: 12.5px; line-height: 1.45;
+  }
+  .chip .pname {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: 15px; display: block;
+  }
+  .chip .pmeta {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+  }
+  .chip .reloc { color: var(--flag); font-weight: 600; }
+
+  .plate-foot {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px;
+    padding: 8px 2px 0; font-size: 12px; color: var(--ink-soft);
+  }
+  .plate-foot .coords {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  label.reloc-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  label.reloc-toggle input { accent-color: var(--flag); }
+
+  section.notes { padding: 22px 0 40px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; }
+  @media (max-width: 820px) { section.notes { grid-template-columns: 1fr; } }
+  section.notes h2 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 500; font-size: 19px; margin: 0 0 8px;
+  }
+  section.notes p { margin: 0 0 10px; max-width: 62ch; font-size: 14px; color: var(--ink-soft); }
+  section.notes p b { color: var(--ink); font-weight: 600; }
+  pre.record {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 3px;
+    padding: 14px 16px; margin: 0; overflow-x: auto;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px; line-height: 1.5; color: var(--ink);
+  }
+  pre.record .k { color: var(--accent); }
+  pre.record .s { color: var(--flag); }
+  a { color: var(--accent); }
+  canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+</style>
+
+<header class="wrap">
+  <p class="eyebrow">chaos machine · eu4 mod map extraction</p>
+  <div class="plate-head">
+    <h1>Imperium Universalis, re-projected to Earth</h1>
+    <div class="stats">
+      <span><b>__PROVINCE_COUNT__</b> provinces</span>
+      <span><b>__VERTEX_COUNT__</b> vertices</span>
+      <span>coast fit <b>__FIT_MEDIAN_KM__ km</b> median · <b>__FIT_P90_KM__ km</b> p90</span>
+      <span><b>__ANCHOR_COUNT__</b> hand anchors</span>
+      <span>source <b>__RASTER_WIDTH__ × __RASTER_HEIGHT__</b> px bmp</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap maprow">
+  <div class="plate">
+    <canvas id="map" tabindex="0" aria-label="Old World map of extracted provinces; drag to pan, scroll to zoom"></canvas>
+    <div class="chip" id="chip"></div>
+  </div>
+  <div class="plate-foot">
+    <span>drag to pan · scroll or pinch to zoom · double-click to reset · hover to identify</span>
+    <label class="reloc-toggle"><input type="checkbox" id="showref" checked> real coastline (Natural Earth)</label>
+    <label class="reloc-toggle"><input type="checkbox" id="showanchors"> mark the __ANCHOR_COUNT__ hand anchors</label>
+    <span class="coords" id="coords">—</span>
+  </div>
+</div>
+
+<section class="notes wrap">
+  <div>
+    <h2>What you're looking at</h2>
+    <p>Every polygon here was traced from Imperium Universalis's hand-drawn <b>provinces.bmp</b> — a
+    6400×2560 bitmap that covers only the Old World, in no known projection (the top edge visibly
+    curves through Siberia and the map cuts off mid-continent on three sides) — then warped onto real
+    latitude/longitude. Unlike the extended-timeline extraction, there were <i>no</i> province-id
+    correspondences to fit against: IU copied vanilla's definition.csv but reassigned every id to a
+    brand-new location (id 1, nominally "Stockholm", is a small island near Sicily), which poisons any
+    id- or name-based matching beyond repair.</p>
+    <p>The projection was instead recovered from geography alone: <b>__ANCHOR_COUNT__ hand-placed
+    landmark anchors</b> — straits, river deltas, capes, and inland lakes read off the terrain
+    bitmap — bootstrap a thin-plate spline, which a coarse-to-fine ICP pass then snaps onto Natural
+    Earth's land-50m coastline (match caps shrinking 8°→1.2°, with the mod's 1-px river-provinces
+    excluded so the Nile can't get glued to the Red Sea). The thin dark line is that <b>real
+    coastline</b>: where a tinted shape's edge tracks it, the recovered warp is doing its job.
+    Tints only distinguish neighbors; they carry no meaning; flat gray marks impassable
+    <b>wasteland</b> (the giant impassable fillers IU paints over map-border oceans are omitted).
+    Interior accuracy is interpolated between coasts and lake anchors — there is no inland
+    reference to do better with.</p>
+    <p>Regenerate with <b>scripts/extended-timeline/imperialis/build-mod-province-geojson.py</b> ·
+    output <b>geo-explorer/public/eu4-imperialis.json</b>.</p>
+  </div>
+  <div>
+    <h2>One record from the file</h2>
+    <pre class="record">__SAMPLE_RECORD__</pre>
+  </div>
+</section>
+
+<script id="data" type="application/json">
+__FEATS_JSON__</script>
+<script id="refdata" type="application/json">__REFDATA_JSON__</script>
+<script id="anchordata" type="application/json">__ANCHORS_JSON__</script>
+<script>
+(function () {
+  "use strict";
+  const DATA = JSON.parse(document.getElementById("data").textContent);
+  const feats = DATA.feats;
+  const REF_RINGS = JSON.parse(document.getElementById("refdata").textContent);
+  const ANCHORS = JSON.parse(document.getElementById("anchordata").textContent);
+
+  const canvas = document.getElementById("map");
+  const chip = document.getElementById("chip");
+  const coordsEl = document.getElementById("coords");
+  const anchorsBox = document.getElementById("showanchors");
+  const refBox = document.getElementById("showref");
+  const ctx = canvas.getContext("2d");
+  const pick = document.createElement("canvas");
+  const pctx = pick.getContext("2d", { willReadFrequently: true });
+
+  // world units: x = lon*100, y = -lat*100 (y down)
+  const paths = new Array(feats.length);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < feats.length; i++) {
+    const p = new Path2D();
+    const inBounds = !feats[i].w; // wasteland smears would blow up the fit
+    for (const poly of feats[i].p) {
+      for (const ring of poly) {
+        p.moveTo(ring[0], -ring[1]);
+        for (let k = 2; k < ring.length; k += 2) {
+          p.lineTo(ring[k], -ring[k + 1]);
+          if (inBounds) {
+            if (ring[k] < minX) minX = ring[k];
+            if (ring[k] > maxX) maxX = ring[k];
+            if (-ring[k + 1] < minY) minY = -ring[k + 1];
+            if (-ring[k + 1] > maxY) maxY = -ring[k + 1];
+          }
+        }
+        p.closePath();
+      }
+    }
+    paths[i] = p;
+  }
+
+  const refPath = new Path2D();
+  for (const ring of REF_RINGS) {
+    refPath.moveTo(ring[0], -ring[1]);
+    for (let k = 2; k < ring.length; k += 2) refPath.lineTo(ring[k], -ring[k + 1]);
+    refPath.closePath();
+  }
+
+  // anchors: [name, lon*100, lat*100]
+  const anchorPts = ANCHORS.map((a) => [a[1], -a[2], a[0]]);
+
+  const css = () => getComputedStyle(document.documentElement);
+  let tints = [], plateBg = "#000", strokeCol = "#fff", accent = "#000", flag = "#000", refCol = "#888", wasteCol = "#ccc";
+  function readTheme() {
+    const c = css();
+    tints = [0, 1, 2, 3, 4, 5].map((i) => c.getPropertyValue(`--tint-${i}`).trim());
+    plateBg = c.getPropertyValue("--plate").trim();
+    strokeCol = c.getPropertyValue("--border-stroke").trim();
+    accent = c.getPropertyValue("--accent").trim();
+    flag = c.getPropertyValue("--flag").trim();
+    refCol = c.getPropertyValue("--ref-line").trim();
+    wasteCol = c.getPropertyValue("--waste").trim();
+  }
+  readTheme();
+
+  const tintOf = (i) => feats[i].w ? wasteCol : tints[(feats[i].i * 2654435761 >>> 0) % 6];
+
+  // view transform: device = dpr * (scale * world + tx, ty)
+  let W = 0, H = 0, dpr = 1, scale = 0, tx = 0, ty = 0;
+  let hover = -1;
+
+  function resetView() {
+    // fit the data's own bounds (a regional map, not the whole globe)
+    const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+    scale = Math.min(W / (bw * 1.05), H / (bh * 1.05));
+    tx = (W - (minX + maxX) * scale) / 2;
+    ty = (H - (minY + maxY) * scale) / 2;
+  }
+
+  function size() {
+    const w = canvas.parentElement.clientWidth;
+    const h = Math.max(320, Math.min(Math.round(w * 0.52), window.innerHeight - 180));
+    dpr = window.devicePixelRatio || 1;
+    const firstTime = W === 0;
+    W = w; H = h;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    canvas.style.height = h + "px";
+    pick.width = canvas.width; pick.height = canvas.height;
+    if (firstTime) resetView();
+    draw(); drawPick();
+  }
+
+  function applyT(c) { c.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * tx, dpr * ty); }
+
+  function draw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = plateBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    applyT(ctx);
+
+    // graticule (10° for a regional map)
+    ctx.strokeStyle = strokeCol;
+    ctx.lineWidth = 0.9 / scale;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (let lon = -180; lon <= 180; lon += 10) { ctx.moveTo(lon * 100, -9000); ctx.lineTo(lon * 100, 9000); }
+    for (let lat = -90; lat <= 90; lat += 10) { ctx.moveTo(-18000, -lat * 100); ctx.lineTo(18000, -lat * 100); }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    const lw = Math.max(0.5, 0.7) / scale;
+    for (let i = 0; i < feats.length; i++) {
+      ctx.fillStyle = i === hover ? accent : tintOf(i);
+      ctx.fill(paths[i], "evenodd");
+    }
+    ctx.strokeStyle = strokeCol;
+    ctx.lineWidth = lw;
+    for (let i = 0; i < feats.length; i++) ctx.stroke(paths[i]);
+
+    if (refBox.checked) {
+      ctx.strokeStyle = refCol;
+      ctx.lineWidth = 1.0 / scale;
+      ctx.stroke(refPath);
+    }
+
+    if (anchorsBox.checked) {
+      ctx.strokeStyle = flag;
+      ctx.lineWidth = 1.6 / scale;
+      const r = 7 / scale;
+      ctx.beginPath();
+      for (const [x, y] of anchorPts) {
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.moveTo(x - r * 1.6, y); ctx.lineTo(x + r * 1.6, y);
+        ctx.moveTo(x, y - r * 1.6); ctx.lineTo(x, y + r * 1.6);
+      }
+      ctx.stroke();
+    }
+  }
+
+  let pickDirty = true;
+  function drawPick() {
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    pctx.fillStyle = "#000000";
+    pctx.fillRect(0, 0, pick.width, pick.height);
+    applyT(pctx);
+    for (let i = 0; i < feats.length; i++) {
+      const n = i + 1;
+      pctx.fillStyle = `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`;
+      pctx.fill(paths[i], "evenodd");
+    }
+    pickDirty = false;
+  }
+
+  let raf = 0;
+  function requestDraw(withPick) {
+    if (withPick) pickDirty = true;
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; draw(); });
+  }
+
+  // interactions
+  let pointers = new Map();
+  let dragStart = null, pinchStart = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+    if (pointers.size === 1) {
+      dragStart = { x: e.offsetX, y: e.offsetY, tx, ty };
+      canvas.classList.add("dragging");
+    } else if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      pinchStart = {
+        d: Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]),
+        cx: (pts[0][0] + pts[1][0]) / 2, cy: (pts[0][1] + pts[1][1]) / 2,
+        scale, tx, ty,
+      };
+      dragStart = null;
+    }
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) { dragStart = null; pinchStart = null; canvas.classList.remove("dragging"); if (pickDirty) drawPick(); }
+  });
+  canvas.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); dragStart = null; pinchStart = null; });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
+    if (pinchStart && pointers.size === 2) {
+      const pts = [...pointers.values()];
+      const d = Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]);
+      const cx = (pts[0][0] + pts[1][0]) / 2, cy = (pts[0][1] + pts[1][1]) / 2;
+      const f = Math.max(0.2, d / Math.max(1, pinchStart.d));
+      scale = pinchStart.scale * f;
+      tx = cx - (pinchStart.cx - pinchStart.tx) * f;
+      ty = cy - (pinchStart.cy - pinchStart.ty) * f;
+      requestDraw(true);
+      return;
+    }
+    if (dragStart) {
+      tx = dragStart.tx + (e.offsetX - dragStart.x);
+      ty = dragStart.ty + (e.offsetY - dragStart.y);
+      requestDraw(true);
+      hideChip();
+      return;
+    }
+    onHover(e.offsetX, e.offsetY);
+  });
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const f = Math.exp(-e.deltaY * 0.0016);
+    const ns = Math.min(Math.max(scale, W / 100000) * f, W / 300);
+    const r = ns / scale;
+    tx = e.offsetX - (e.offsetX - tx) * r;
+    ty = e.offsetY - (e.offsetY - ty) * r;
+    scale = ns;
+    requestDraw(true);
+    clearTimeout(canvas._wt);
+    canvas._wt = setTimeout(() => { if (pickDirty) { drawPick(); } }, 120);
+  }, { passive: false });
+
+  canvas.addEventListener("dblclick", () => { resetView(); requestDraw(true); setTimeout(drawPick, 0); });
+
+  function hideChip() { chip.style.display = "none"; if (hover !== -1) { hover = -1; requestDraw(false); } }
+  canvas.addEventListener("pointerleave", () => { hideChip(); coordsEl.textContent = "—"; });
+
+  function onHover(mx, my) {
+    const lon = (mx - tx) / scale / 100;
+    const lat = -((my - ty) / scale / 100);
+    coordsEl.textContent =
+      Math.abs(lat).toFixed(2) + "°" + (lat >= 0 ? "N" : "S") + "  " +
+      Math.abs(lon).toFixed(2) + "°" + (lon >= 0 ? "E" : "W");
+    if (pickDirty) drawPick();
+    const px = pctx.getImageData(Math.round(mx * dpr), Math.round(my * dpr), 1, 1).data;
+    const idx = ((px[0] << 16) | (px[1] << 8) | px[2]) - 1;
+    if (idx < 0 || idx >= feats.length) { hideChip(); return; }
+    if (idx !== hover) { hover = idx; requestDraw(false); }
+    const f = feats[idx];
+    chip.innerHTML =
+      '<span class="pname">' + (f.n || "unnamed") + "</span>" +
+      '<span class="pmeta">id ' + f.i + (f.w ? " · wasteland" : "") + "</span>";
+    chip.style.display = "block";
+    const cw = chip.offsetWidth, ch = chip.offsetHeight;
+    chip.style.left = Math.min(mx + 14, W - cw - 8) + "px";
+    chip.style.top = Math.max(8, Math.min(my + 14, H - ch - 8)) + "px";
+  }
+
+  anchorsBox.addEventListener("change", () => requestDraw(false));
+  refBox.addEventListener("change", () => requestDraw(false));
+
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", () => { readTheme(); requestDraw(false); });
+  new MutationObserver(() => { readTheme(); requestDraw(false); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  window.addEventListener("resize", size);
+  size();
+})();
+</script>

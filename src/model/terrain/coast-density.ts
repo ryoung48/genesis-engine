@@ -19,9 +19,13 @@ function computeBoundaryDistancePx(
 	mask: Uint8Array,
 	width: number,
 	height: number,
+	provinceRaster?: Int16Array,
 ): Uint16Array {
 	const dist = new Uint16Array(width * height).fill(BOUNDARY_SEARCH_CAP_PX)
 	const isLand = (x: number, y: number) => mask[y * width + x] >= 128
+	const provinceAt = provinceRaster
+		? (x: number, y: number) => provinceRaster[y * width + x]
+		: undefined
 
 	const queue = new Int32Array(width * height)
 	let qHead = 0
@@ -32,11 +36,22 @@ function computeBoundaryDistancePx(
 			const land = isLand(x, y)
 			const xw = (x + 1) % width
 			const xe = (x - 1 + width) % width
-			const neighborsDiffer =
+			let neighborsDiffer =
 				land !== isLand(xw, y) ||
 				land !== isLand(xe, y) ||
 				(y > 0 && land !== isLand(x, y - 1)) ||
 				(y < height - 1 && land !== isLand(x, y + 1))
+			// Province borders are also treated as a density-boosting boundary,
+			// alongside coastline, so interior political borders get the same
+			// resolution boost as coastlines rather than only the coast.
+			if (!neighborsDiffer && provinceAt) {
+				const p = provinceAt(x, y)
+				neighborsDiffer =
+					p !== provinceAt(xw, y) ||
+					p !== provinceAt(xe, y) ||
+					(y > 0 && p !== provinceAt(x, y - 1)) ||
+					(y < height - 1 && p !== provinceAt(x, y + 1))
+			}
 			if (neighborsDiffer) {
 				const idx = y * width + x
 				dist[idx] = 0
@@ -90,6 +105,13 @@ interface CoastDensityOptions {
 	 * the sparse ocean-interior baseline rather than the dense land baseline.
 	 */
 	lakeMask?: Uint8Array
+	/**
+	 * Optional province-id raster (same resolution as `mask`). Pixels
+	 * adjacent to a differently-numbered province are treated as an extra
+	 * density-boosting boundary alongside the coastline, so province borders
+	 * get dense mesh coverage even deep inland, away from any coast.
+	 */
+	provinceRaster?: Int16Array
 }
 
 // Merges the land/ocean mask with a lake mask into a single land/water
@@ -117,11 +139,17 @@ export function buildCoastDensityWeight(
 	const {
 		boost,
 		landInteriorWeight = 1,
-		oceanInteriorWeight = 0.075 / 8,
+		oceanInteriorWeight = 0.075 / 32,
 		lakeMask,
+		provinceRaster,
 	} = options
 	const combined = mergeLandLakeMask(mask, lakeMask)
-	const distPx = computeBoundaryDistancePx(combined, width, height)
+	const distPx = computeBoundaryDistancePx(
+		combined,
+		width,
+		height,
+		provinceRaster,
+	)
 
 	return (latDeg: number, lonDeg: number) => {
 		const px = (((lonDeg + 180) / 360) * width) % width
