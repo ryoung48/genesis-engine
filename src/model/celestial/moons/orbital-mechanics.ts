@@ -27,7 +27,7 @@ const TWO_PI = 2 * Math.PI
 const SOLAR_LOCK_MOON_ORBIT_HOURS_PER_DAY = 24
 
 export { M_SOL_KG, AU_M }
-export const LUNA_MOON_SEED = SEED_MAX - 1
+const LUNA_MOON_SEED = SEED_MAX - 1
 
 const ROCHE_PD = 2
 const MINIMUM_MOON_SPACING_PD = 0.6
@@ -168,31 +168,16 @@ function rollMoonAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 	return rng.uniform(144, 180)
 }
 
-// Tidal-locking timescale falls off steeply with orbital distance, so
-// close-in moons (Io, our own Moon) end up locked almost universally while
-// distant/irregular moons often aren't — approximated here as a per-range
-// chance rather than a universal assumption.
-const TIDAL_LOCK_CHANCE_BY_RANGE: Record<MoonOrbitRange, number> = {
-	inner: 0.97,
-	middle: 0.8,
-	outer: 0.45,
-	extreme: 0.15,
-}
-
-// Rolls a moon's own sidereal rotation period, independent of its orbital
-// period. Ported/adapted from the same sidereal-day dice feel used for
-// planets (see generate-system-bodies.ts's rollSiderealDayHours) but without
-// the tidal-lock cascade there, since we're rolling the lock itself here.
-function rollMoonSiderealDayHours(
-	rng: ReturnType<typeof createRng>,
-	orbitRange: MoonOrbitRange,
-	orbitalPeriodDays: number,
-): number {
-	const lockChance = TIDAL_LOCK_CHANCE_BY_RANGE[orbitRange]
-	if (rng.uniform(0, 1) < lockChance) return orbitalPeriodDays * 24
-	// Not tidally locked — spins independently, on the order of a fast
-	// rotator (a few hours to a couple of days), same rough scale real
-	// un-locked minor moons/asteroids fall into.
+// Rolls a moon's own pre-lock, "naturally" independent sidereal rotation
+// period -- the same role rollSiderealDayHours plays for a sibling planet
+// (see generate-system-bodies.ts). Tidal locking itself is no longer decided
+// here by a flat per-range chance; generate-system-bodies.ts's real-moon path
+// now runs the actual DM+roll tide-lock mechanic on top of this baseline (see
+// tide-lock.ts's rollMoonTideLock), same as it does for planets. This
+// baseline still stands unmodified for callers that don't run that
+// enrichment step (post-elevation.ts's tidal-schedule-only moon, whose own
+// rotation period is never read downstream).
+function rollMoonSiderealDayHours(rng: ReturnType<typeof createRng>): number {
 	let base = (roll2d6(rng) - 2) * 3 + 2 + rng.randint(1, 6)
 	let rotation = base
 	while (base > 40 && rng.randint(1, 6) >= 5) {
@@ -381,7 +366,7 @@ function placeMoonOrbits(
 	return placedMoons
 }
 
-function rollMoonEccentricity(
+export function rollMoonEccentricity(
 	rng: ReturnType<typeof createRng>,
 	range: MoonOrbitRange,
 	sizeClass: number,
@@ -696,11 +681,7 @@ export function generateMoons(
 			massKg,
 			diameterKm,
 			orbitalPeriodDays,
-			siderealDayHours: rollMoonSiderealDayHours(
-				rng,
-				orbitRange,
-				orbitalPeriodDays,
-			),
+			siderealDayHours: rollMoonSiderealDayHours(rng),
 			eccentricity,
 			inclinationDeg,
 			longitudeOfAscendingNodeDeg,

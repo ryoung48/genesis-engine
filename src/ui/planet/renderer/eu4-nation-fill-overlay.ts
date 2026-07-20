@@ -393,6 +393,22 @@ export function buildEu4NationFillMap(
 	)
 }
 
+// ── International organization territory highlight ──
+//
+// Unlike the fill overlay above (which always covers every province, falling
+// back to FALLBACK_COLOR for anything colorForRawId doesn't resolve), this
+// draws a solid single-color mesh over ONLY an organization's current member
+// provinces -- everywhere else is left untouched so non-member nations keep
+// showing whatever the current map mode already renders underneath.
+//
+// This subset-mesh approach (buildOrgFillGlobe/Map, buildOrgStripesGlobe/Map)
+// was removed: the underlying EU4 province-polygon triangulation
+// (eu4-province-borders-fills.json) only covers ~85% of provinces, so a mesh
+// built from it always left visible gaps. Org highlighting is now done
+// entirely at the region level (GenesisView.tsx's withOrgHighlight /
+// computeOrgStripeOverlay), which has no coverage gap and gets correct
+// elevation shading for free from the terrain's own material.
+
 // repeatMapPositions triples the position array (original + two horizontal
 // copies); the parallel color attribute needs the same tripling to stay
 // index-aligned with it.

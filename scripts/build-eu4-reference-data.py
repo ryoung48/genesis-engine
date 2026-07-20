@@ -39,7 +39,8 @@ CULTURE_NAME_OVERRIDES = {
 }
 NATION_NAME_OVERRIDES = {
     "MAM": "Mamluks",
-    "FR2": "France"
+    "FR2": "France",
+    "TEU": "Teutonic Order"
 }
 
 

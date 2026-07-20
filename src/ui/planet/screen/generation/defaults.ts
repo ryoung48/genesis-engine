@@ -39,5 +39,4 @@ export const DEFAULT_WORLD_PARAMS = {
 	substellarLon: SOL_MAIN_WORLD_DEFAULTS.substellarLon,
 	perihelion: SOL_MAIN_WORLD_DEFAULTS.perihelion,
 	era: DEFAULT_ERA,
-	moonCount: SOL_MAIN_WORLD_DEFAULTS.moonCount,
 } as const

@@ -5,15 +5,64 @@ import {
 	type DataTableColumn,
 } from "@/ui/components/primitives/DataTable"
 import { Pagination } from "@/ui/components/primitives/Pagination"
+import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import type { WorldSection } from "../drawer-state"
 import type { DetailsDrawerBaseProps } from "../shared"
-import {
-	AccordionSection,
-	DetailRow,
-	formatPopulation,
-	WikiHeader,
-} from "../shared"
+import { DetailRow, formatPopulation } from "../shared"
+
+// Matches GenerationPanel's own top-level collapsible blocks ("Generate",
+// "Moons"/"Orbits", "Climate") exactly -- a Surface sibling in the panel's
+// own flow, not the nested AccordionSection look (Surface-inside-a-Surface)
+// shared.tsx's AccordionSection still uses for NationDetails' drawer. Kept
+// local to this file rather than added to shared.tsx, since NationDetails'
+// own accordion look is intentionally different and unrelated.
+function TopLevelSection({
+	title,
+	open,
+	onToggle,
+	children,
+}: {
+	title: string
+	open: boolean
+	onToggle: () => void
+	children: React.ReactNode
+}) {
+	return (
+		<Surface
+			tone="panel"
+			borderTone="default"
+			radius="xl"
+			className="border-t border-slate-200 px-3 py-3"
+		>
+			<div className="space-y-1.5">
+				<button
+					type="button"
+					onClick={onToggle}
+					className="flex w-full items-center justify-between gap-3 text-left"
+				>
+					<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+						{title}
+					</span>
+					<svg
+						width="12"
+						height="12"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+					>
+						<polyline points="6 9 12 15 18 9" />
+					</svg>
+				</button>
+				{open ? children : null}
+			</div>
+		</Surface>
+	)
+}
 
 function hasValue(value: string): boolean {
 	const trimmed = value.trim()
@@ -25,7 +74,6 @@ function getWorldSections({
 	worldPopulation,
 	activeWarCount,
 	cultureCount,
-	heritageCount,
 	religionCount,
 }: Pick<
 	DetailsDrawerBaseProps,
@@ -33,7 +81,6 @@ function getWorldSections({
 	| "worldPopulation"
 	| "activeWarCount"
 	| "cultureCount"
-	| "heritageCount"
 	| "religionCount"
 >) {
 	const stats = new Map(
@@ -43,33 +90,23 @@ function getWorldSections({
 	)
 
 	return {
-		planetary: [
-			{ label: "Radius", value: stats.get("Radius") },
-			{ label: "Sun", value: stats.get("Sun") },
-			{ label: "Tilt", value: stats.get("Tilt") },
-			{ label: "Ecc", value: stats.get("Ecc") },
-			{
-				label: "Perihelion",
-				value: stats.get("Perihelion"),
-			},
-			{ label: "Year", value: stats.get("Year") },
-			{ label: "Sidereal Day", value: stats.get("Sidereal Day") },
-			{ label: "Solar Day", value: stats.get("Solar Day") },
-			{ label: "Pressure", value: stats.get("Pressure") },
-			{ label: "Lock", value: stats.get("Lock") },
-			{ label: "Habitability", value: stats.get("Habitability") },
-			{ label: "Cell", value: stats.get("Cell") },
+		// No "Planetary" section here anymore -- Radius/Tilt/Ecc/Perihelion/
+		// Year/Sidereal Day/Solar Day/Pressure/Lock are all already shown on
+		// the main world's own stat card in GenerationPanel (buildBodyStats),
+		// and Habitability/Sun had no other purpose worth a whole section for
+		// just two rows. Cell/Land Coverage/Provinces/Avg Province Area/
+		// Locations/Avg Location Area are genuinely unique to this panel (not
+		// shown anywhere in GenerationPanel) and world-derived, so they moved
+		// into Environmental instead of staying in an always-visible section.
+		environmental: [
+			{ label: "Continents", value: stats.get("Continents") },
+			{ label: "Land Area", value: stats.get("Land Area") },
 			{ label: "Land Coverage", value: stats.get("Land Coverage") },
+			{ label: "Cell", value: stats.get("Cell") },
 			{ label: "Provinces", value: stats.get("Provinces") },
 			{ label: "Avg Province Area", value: stats.get("Avg Province Area") },
 			{ label: "Locations", value: stats.get("Locations") },
 			{ label: "Avg Location Area", value: stats.get("Avg Location Area") },
-		].filter((stat): stat is { label: string; value: string } =>
-			Boolean(stat.value),
-		),
-		environmental: [
-			{ label: "Continents", value: stats.get("Continents") },
-			{ label: "Land Area", value: stats.get("Land Area") },
 			{ label: "Avg Temp", value: stats.get("Avg Temp") },
 			{ label: "Pole-Eq Gradient", value: stats.get("Pole-Eq Gradient") },
 			{ label: "Avg Rain", value: stats.get("Avg Rain") },
@@ -96,10 +133,6 @@ function getWorldSections({
 				value: cultureCount != null ? cultureCount.toLocaleString() : "N/A",
 			},
 			{
-				label: "Heritage Count",
-				value: heritageCount != null ? heritageCount.toLocaleString() : "N/A",
-			},
-			{
 				label: "Religion Count",
 				value: religionCount != null ? religionCount.toLocaleString() : "N/A",
 			},
@@ -112,19 +145,25 @@ const TRADE_GOODS_PAGE_SIZE = 5
 interface WorldDetailsProps extends DetailsDrawerBaseProps {
 	openSections: ReadonlySet<WorldSection>
 	onSectionToggle: (section: WorldSection) => void
-	onClose?: () => void
+	/** Whether a world has actually finished generating. The Planetary
+	 * section's own rows already self-filter (see hasValue above -- a
+	 * world-derived stat like Provinces/Land Coverage/Cell just reads "-"
+	 * pre-generation and gets dropped), but Environmental/Social/Trade Goods
+	 * are ALL world-derived (their rows fall back to "N/A" text or render
+	 * empty charts/tables instead of disappearing) -- those three whole
+	 * sections are gated on this instead, so they're simply absent rather
+	 * than showing empty pre-generation. */
+	hasGeneratedWorld: boolean
 }
 
 export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	openSections,
 	onSectionToggle,
-	onClose,
-	planetName,
+	hasGeneratedWorld,
 	planetStats,
 	worldPopulation,
 	activeWarCount,
 	cultureCount,
-	heritageCount,
 	religionCount,
 	nationSizeDistribution,
 	governmentDistribution,
@@ -134,6 +173,7 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 	climateDistribution,
 	vegetationDistribution,
 	topographyDistribution,
+	showObservedDistributions,
 	tradeGoodsDistribution,
 }) => {
 	const worldSections = getWorldSections({
@@ -141,7 +181,6 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		worldPopulation,
 		activeWarCount,
 		cultureCount,
-		heritageCount,
 		religionCount,
 	})
 
@@ -184,22 +223,18 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 		},
 	]
 
-	return (
-		<div className="space-y-2">
-			<WikiHeader
-				title={planetName}
-				subtitle="Terrestrial Planet"
-				onClose={onClose}
-			/>
+	if (!hasGeneratedWorld) return null
 
-			<div className="space-y-1.5">
-				<AccordionSection
-					title="Planetary"
-					open={openSections.has("planetary")}
-					onToggle={() => onSectionToggle("planetary")}
-				>
+	return (
+		<>
+			<TopLevelSection
+				title="Environmental"
+				open={openSections.has("environmental")}
+				onToggle={() => onSectionToggle("environmental")}
+			>
+				<div className="space-y-2">
 					<div className="space-y-1.5">
-						{worldSections.planetary.map((stat) => (
+						{worldSections.environmental.map((stat) => (
 							<DetailRow
 								key={stat.label}
 								label={stat.label}
@@ -207,89 +242,70 @@ export const WorldDetails: React.FC<WorldDetailsProps> = ({
 							/>
 						))}
 					</div>
-				</AccordionSection>
-				<AccordionSection
-					title="Environmental"
-					open={openSections.has("environmental")}
-					onToggle={() => onSectionToggle("environmental")}
-				>
-					<div className="space-y-2">
-						<div className="space-y-1.5">
-							{worldSections.environmental.map((stat) => (
-								<DetailRow
-									key={stat.label}
-									label={stat.label}
-									value={stat.value}
-								/>
-							))}
-						</div>
-						<DistributionChart title="Climate" buckets={climateDistribution} />
-						<DistributionChart
-							title="Vegetation"
-							buckets={vegetationDistribution}
-						/>
-						<DistributionChart
-							title="Topography"
-							buckets={topographyDistribution}
-						/>
-					</div>
-				</AccordionSection>
-				<AccordionSection
-					title="Social"
-					open={openSections.has("social")}
-					onToggle={() => onSectionToggle("social")}
-				>
-					<div className="space-y-2">
-						<div className="space-y-1.5">
-							{worldSections.social.map((stat) => (
-								<DetailRow
-									key={stat.label}
-									label={stat.label}
-									value={stat.value}
-								/>
-							))}
-						</div>
-						<DistributionChart
-							title="Nation Size"
-							buckets={nationSizeDistribution}
-						/>
-						<DistributionChart
-							title="Government"
-							buckets={governmentDistribution}
-						/>
-						<DistributionChart
-							title="Religion"
-							buckets={religionDistribution}
-						/>
-						<DistributionChart
-							title="Conflicts"
-							buckets={conflictDistribution}
-						/>
-						<DistributionChart
-							title="Relations"
-							buckets={relationDistribution}
-						/>
-					</div>
-				</AccordionSection>
-				<AccordionSection
-					title="Trade Goods"
-					open={openSections.has("trade-goods")}
-					onToggle={() => onSectionToggle("trade-goods")}
-				>
-					<DataTable
-						columns={tradeGoodsColumns}
-						rows={pagedTradeGoods}
-						rowKey={(row) => row.label}
-						empty="No trade goods assigned"
+					<DistributionChart
+						title={showObservedDistributions ? "Climate (Observed)" : "Climate"}
+						buckets={climateDistribution}
 					/>
-					<Pagination
-						pageIndex={tradeGoodsPage}
-						pageSize={TRADE_GOODS_PAGE_SIZE}
-						totalItems={tradeGoodsDistribution.length}
-						onPageChange={setTradeGoodsPage}
+					<DistributionChart
+						title={
+							showObservedDistributions ? "Vegetation (Observed)" : "Vegetation"
+						}
+						buckets={vegetationDistribution}
 					/>
-				</AccordionSection>
-			</div>
-		</div>
+					<DistributionChart
+						title={
+							showObservedDistributions ? "Topography (Observed)" : "Topography"
+						}
+						buckets={topographyDistribution}
+					/>
+				</div>
+			</TopLevelSection>
+			<TopLevelSection
+				title="Social"
+				open={openSections.has("social")}
+				onToggle={() => onSectionToggle("social")}
+			>
+				<div className="space-y-2">
+					<div className="space-y-1.5">
+						{worldSections.social.map((stat) => (
+							<DetailRow
+								key={stat.label}
+								label={stat.label}
+								value={stat.value}
+							/>
+						))}
+					</div>
+					<DistributionChart
+						title="Nation Size"
+						buckets={nationSizeDistribution}
+					/>
+					<DistributionChart
+						title="Government"
+						buckets={governmentDistribution}
+					/>
+					<DistributionChart title="Religion" buckets={religionDistribution} />
+					<DistributionChart title="Conflicts" buckets={conflictDistribution} />
+					<DistributionChart title="Relations" buckets={relationDistribution} />
+				</div>
+			</TopLevelSection>
+			<TopLevelSection
+				title="Trade Goods"
+				open={openSections.has("trade-goods")}
+				onToggle={() => onSectionToggle("trade-goods")}
+			>
+				<DataTable
+					columns={tradeGoodsColumns}
+					rows={pagedTradeGoods}
+					rowKey={(row) => row.label}
+					empty="No trade goods assigned"
+				/>
+				<Pagination
+					pageIndex={tradeGoodsPage}
+					pageSize={TRADE_GOODS_PAGE_SIZE}
+					totalItems={tradeGoodsDistribution.length}
+					onPageChange={setTradeGoodsPage}
+				/>
+			</TopLevelSection>
+		</>
 	)
 }

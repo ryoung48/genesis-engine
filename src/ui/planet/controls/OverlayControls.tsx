@@ -6,9 +6,9 @@ import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { BugIcon } from "@/ui/components/primitives/icons/BugIcon"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
+import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
-import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { TransferUpIcon } from "@/ui/components/primitives/icons/TransferUpIcon"
@@ -408,7 +408,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 							tone="overlay"
 							size="sm"
 						>
-							<LightningIcon className="h-4 w-4 text-white" />
+							<DetailsIcon className="h-4 w-4 text-white" />
 						</IconButton>
 					</Tooltip>
 				)}
@@ -420,8 +420,16 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 						"pointer-events-none absolute bottom-full left-0 mb-2",
 					)}
 				>
-					<div className="pointer-events-auto">
-						<FloatingPanel className="w-64" padding="md">
+					<div
+						className={
+							overlaysExpanded ? "pointer-events-auto" : "pointer-events-none"
+						}
+					>
+						<FloatingPanel
+							interactive={overlaysExpanded}
+							className="w-64"
+							padding="md"
+						>
 							<PanelHeader
 								title="Settings"
 								tone="overlay"

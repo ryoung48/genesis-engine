@@ -74,7 +74,18 @@ function isNationBorder(
 	sovereignA: number,
 	sovereignB: number,
 	rebelPairs: Set<number>,
+	// True when this segment's provinceB is the raw -1 sentinel written by
+	// build-eu4-province-borders.py for a genuine coastline/dataset edge
+	// (no neighboring province at all -- see NO_NEIGHBOR_PROVINCE_ID there).
+	// Without this, such a segment resolves to nationB = -1 via realIdToNation's
+	// `?? -1` fallback -- the exact same value a real, currently-*unowned*
+	// province resolves to -- so a coastline edge along an unowned/wasteland
+	// province wrongly satisfied `nationA === nationB` (-1 === -1) and got
+	// dropped, producing real gaps in the coastline border. A genuine
+	// no-neighbor edge must always draw regardless of ownership.
+	isNoNeighborEdge = false,
 ): boolean {
+	if (isNoNeighborEdge) return true
 	if (nationA === nationB) return false
 	if (sovereignA === sovereignB) return false
 	if (nationA >= 0 && nationB >= 0 && rebelPairs.has(nationA * 65536 + nationB))
@@ -296,7 +307,16 @@ function collectEu4AllNationBorderGlobePositions(
 		const nationB = realIdToNation.get(provinceB) ?? -1
 		const sovereignA = realIdToSovereign.get(provinceA) ?? -1
 		const sovereignB = realIdToSovereign.get(provinceB) ?? -1
-		if (!isNationBorder(nationA, nationB, sovereignA, sovereignB, rebelPairs))
+		if (
+			!isNationBorder(
+				nationA,
+				nationB,
+				sovereignA,
+				sovereignB,
+				rebelPairs,
+				provinceB < 0,
+			)
+		)
 			continue
 		const o = 6 * i
 		positions.push(
@@ -327,7 +347,16 @@ function collectEu4AllNationBorderMapPositions(
 		const nationB = realIdToNation.get(provinceB) ?? -1
 		const sovereignA = realIdToSovereign.get(provinceA) ?? -1
 		const sovereignB = realIdToSovereign.get(provinceB) ?? -1
-		if (!isNationBorder(nationA, nationB, sovereignA, sovereignB, rebelPairs))
+		if (
+			!isNationBorder(
+				nationA,
+				nationB,
+				sovereignA,
+				sovereignB,
+				rebelPairs,
+				provinceB < 0,
+			)
+		)
 			continue
 		for (let k = offset[i]; k < offset[i + 1]; k++)
 			positions.push(cachedPositions[k])

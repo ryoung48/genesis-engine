@@ -291,6 +291,7 @@ export function computeTemperature(
 		landFraction,
 		albedo: params.albedo,
 		greenhouseFactor: params.greenhouseFactor,
+		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
 	})
 	ebm.runModel(30, 0.5)
 	const daylight_hours_monthly = computeMonthlyDaylightHours(mesh, params)

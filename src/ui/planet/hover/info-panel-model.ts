@@ -9,10 +9,13 @@ import {
 } from "@/model/society/religion"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
-import type { ColorMode } from "../colors"
 import {
+	type ColorMode,
 	climateTempColor,
 	climateZoneColor,
+	EU5_CLIMATE_COLORS,
+	EU5_TOPOGRAPHY_COLORS,
+	EU5_VEGETATION_COLORS,
 	temperatureDifferenceColor,
 	VEGETATION_WATER_BLUE,
 	vegetationColor,
@@ -29,6 +32,7 @@ import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
 } from "../screen/display/religion-type"
+import type { DataVariant } from "../screen/shared/data-variant"
 import { getBaseMapMode, getDataVariant } from "../screen/shared/data-variant"
 import type { PopulationMapMode } from "../screen/shared/map-modes"
 import { getProvincePopulationDensity } from "../screen/shared/population-density"
@@ -254,8 +258,15 @@ export function buildClimateSwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
 	colorMode: ColorMode,
+	dataVariant: DataVariant,
 ): string | null {
 	if (hoverRegion === null || !world) return null
+	if (dataVariant === "observed" && world.isEarthImport) {
+		const code = world.eu5Climate?.[hoverRegion] ?? -1
+		return code >= 0 && code < EU5_CLIMATE_COLORS.length
+			? rgbToCss(EU5_CLIMATE_COLORS[code])
+			: null
+	}
 	if (colorMode === "pastaClimate" && world.pastaClimate)
 		return rgbToCss(pastaClimateColor(world.pastaClimate[hoverRegion]))
 	if (colorMode === "koppenClimate" && world.koppenClimate)
@@ -286,7 +297,19 @@ export function buildVegetationSwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
 	colorMode: ColorMode,
+	dataVariant: DataVariant,
 ): string | null {
+	if (
+		hoverRegion !== null &&
+		world &&
+		dataVariant === "observed" &&
+		world.isEarthImport
+	) {
+		const code = world.eu5Vegetation?.[hoverRegion] ?? -1
+		return code >= 0 && code < EU5_VEGETATION_COLORS.length
+			? rgbToCss(EU5_VEGETATION_COLORS[code])
+			: null
+	}
 	if (
 		hoverRegion === null ||
 		!world ||
@@ -312,7 +335,19 @@ export function buildVegetationSwatchColor(
 export function buildTopographySwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
+	dataVariant: DataVariant,
 ): string | null {
+	if (
+		hoverRegion !== null &&
+		world &&
+		dataVariant === "observed" &&
+		world.isEarthImport
+	) {
+		const code = world.eu5Topography?.[hoverRegion] ?? -1
+		return code >= 0 && code < EU5_TOPOGRAPHY_COLORS.length
+			? rgbToCss(EU5_TOPOGRAPHY_COLORS[code])
+			: null
+	}
 	if (hoverRegion === null || !world?.topography) return null
 	const color = getTopographyColor(world.topography[hoverRegion])
 	return color ? rgbToCss(color) : null
@@ -482,42 +517,6 @@ export function buildGovernmentDisplayData(params: {
 		label,
 		color: GOVERNMENT_COLORS_CSS[typeIndex] ?? GOVERNMENT_COLORS_CSS[7],
 	}
-}
-
-/**
- * Diplomacy row for the hover panel, sourced from the earth-history engine
- * (src/model/earth/history/adapter.ts's NationInfoFromHistory) rather than
- * the procedural world -- only meaningful when world.isEarthImport is true.
- * Callers must resolve `info` themselves (via queryEarthHistoryNation) and
- * pass null when earth-history isn't active or the tag has no data, so this
- * stays a pure formatter like the other builders on this file. See
- * docs/earth-history-plan.md "Map modes and hover gating".
- */
-export function buildEarthHistoryDiplomacyDisplayData(
-	info: {
-		overlord: string | null
-		vassals: string[]
-		allies: string[]
-		unionWith: string[]
-		atWar: { name: string; isRebel: boolean; asAttacker: boolean }[]
-	} | null,
-): { label: string; value: string }[] {
-	if (!info) return []
-	const rows: { label: string; value: string }[] = []
-	if (info.overlord) rows.push({ label: "Overlord", value: info.overlord })
-	if (info.vassals.length)
-		rows.push({ label: "Vassals", value: info.vassals.join(", ") })
-	if (info.unionWith.length)
-		rows.push({ label: "Union", value: info.unionWith.join(", ") })
-	if (info.allies.length)
-		rows.push({ label: "Allies", value: info.allies.join(", ") })
-	for (const war of info.atWar) {
-		rows.push({
-			label: war.isRebel ? "Rebellion" : "At War",
-			value: `${war.name} (${war.asAttacker ? "attacker" : "defender"})`,
-		})
-	}
-	return rows
 }
 
 /**

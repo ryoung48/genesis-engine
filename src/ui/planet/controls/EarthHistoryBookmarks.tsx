@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import {
 	EARTH_HISTORY_BOOKMARK_ERAS,
 	EARTH_HISTORY_BOOKMARKS,
@@ -7,6 +7,9 @@ import { IconButton } from "@/ui/components/primitives/IconButton"
 
 interface EarthHistoryBookmarksProps {
 	onSelect: (dateDays: number) => void
+	/** Currently selected timeline date (in days), used to auto-scroll the
+	 * popup to the nearest bookmark when it opens. */
+	selectedDate?: number
 	/** Which side of the trigger button the popup opens toward. The scrubber
 	 * this lives in is docked near the top of the viewport for Earth-imported
 	 * worlds, so opening "above" (the original bottom-docked-panel default)
@@ -20,11 +23,32 @@ interface EarthHistoryBookmarksProps {
  * same onTimeChange path as manual scrubbing. */
 export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 	onSelect,
+	selectedDate,
 	placement = "above",
 }) => {
 	const [open, setOpen] = useState(false)
+	const popupRef = useRef<HTMLDivElement>(null)
+	const activeButtonRef = useRef<HTMLButtonElement>(null)
 	const popupPositionClassName =
 		placement === "below" ? "top-full mt-2" : "bottom-full mb-2"
+
+	const nearestBookmark =
+		selectedDate === undefined
+			? undefined
+			: EARTH_HISTORY_BOOKMARKS.reduce((nearest, bookmark) =>
+					Math.abs(bookmark.date - selectedDate) <
+					Math.abs(nearest.date - selectedDate)
+						? bookmark
+						: nearest,
+				)
+
+	useEffect(() => {
+		if (!open) return
+		activeButtonRef.current?.scrollIntoView({
+			block: "center",
+			behavior: "instant",
+		})
+	}, [open])
 
 	return (
 		<div className="relative">
@@ -49,6 +73,7 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 			</IconButton>
 			{open && (
 				<div
+					ref={popupRef}
 					className={`absolute left-1/2 z-30 max-h-80 w-72 -translate-x-1/2 overflow-y-auto rounded-lg border border-white/20 bg-slate-900/95 p-3 shadow-xl backdrop-blur ${popupPositionClassName}`}
 				>
 					{EARTH_HISTORY_BOOKMARK_ERAS.map((era) => (
@@ -58,18 +83,26 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 							</div>
 							<div className="flex flex-wrap gap-1">
 								{EARTH_HISTORY_BOOKMARKS.filter((b) => b.era === era).map(
-									(bookmark) => (
-										<button
-											key={bookmark.eu4Date}
-											onClick={() => {
-												onSelect(bookmark.date)
-												setOpen(false)
-											}}
-											className="rounded border border-white/10 bg-white/5 px-1.5 py-1 text-[10px] text-slate-200 hover:bg-white/15"
-										>
-											{bookmark.label}
-										</button>
-									),
+									(bookmark) => {
+										const isNearest = bookmark === nearestBookmark
+										return (
+											<button
+												key={bookmark.eu4Date}
+												ref={isNearest ? activeButtonRef : undefined}
+												onClick={() => {
+													onSelect(bookmark.date)
+													setOpen(false)
+												}}
+												className={`rounded border px-1.5 py-1 text-[10px] hover:bg-white/15 ${
+													isNearest
+														? "border-amber-400/60 bg-amber-400/10 text-amber-200"
+														: "border-white/10 bg-white/5 text-slate-200"
+												}`}
+											>
+												{bookmark.label}
+											</button>
+										)
+									},
 								)}
 							</div>
 						</div>

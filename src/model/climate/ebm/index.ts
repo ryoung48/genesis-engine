@@ -115,10 +115,52 @@ interface EBMConfig {
 	 * would override that known value instead of refining it.
 	 */
 	iceAlbedoFeedback?: boolean
+	/**
+	 * Ported from galaxy-gen's TEMPERATURE.finalize seismologyMod -- a body's
+	 * geologic/tidal heating (system-seismology.ts's SeismologyProfile.
+	 * totalHeating, itself ported from galaxy-gen's SEISMOLOGY.total and on
+	 * the same Kelvin-equivalent flux scale), applied as
+	 * (T_solve^4 + seismologyTotalHeatingK^4)^0.25 to every cell AFTER
+	 * runModel()'s full diffusive/seasonal solve has already converged.
+	 *
+	 * Deliberately NOT folded in like internalHeatTempK (which participates
+	 * in computeGreenhouseOLR's blackbody linearization and every step's
+	 * absorbed flux, so it reshapes the whole equilibrium -- ice-albedo
+	 * feedback, seasonal amplitude, latitude diffusion, all of it). Unlike
+	 * internal formation heat, seismology.totalHeating is a coarse,
+	 * dice-driven worldbuilder figure (tidal stress, age/size-based residual
+	 * heat), not a calibrated physical constant -- galaxy-gen itself only
+	 * ever adds it as one final algebraic bump on an already-computed mean
+	 * temperature, never inside a spatial energy-balance solve (it doesn't
+	 * have one). A uniform post-solve bump is the equivalent operation here:
+	 * every latitude/day gets the same floor-raise, with no interaction with
+	 * the dynamics that produced the pre-bump field.
+	 *
+	 * 0 (no bump) for the overwhelming majority of bodies -- old, low-stress
+	 * worlds sit in system-seismology.ts's "dead" heating regime, and this
+	 * only matters for geologically/tidally active worlds (e.g. an Io-analog
+	 * moon).
+	 *
+	 * Callers should NOT pass this for a jovian: computeResidualHeating's
+	 * stress formula (sizeClass - starAgeGyr + moonSizeClassTotal, squared)
+	 * was tuned for rocky/icy geologic stress, and a jovian's huge sizeClass
+	 * (16-18) plus several sizeable moons routinely produces a totalHeating
+	 * of 100-400+ -- large enough that (T_solve^4 + that^4)^0.25 alone
+	 * exceeds Jupiter/Saturn/Uranus/Neptune's real known temperature even at
+	 * greenhouseFactor's floor of 0, since greenhouseFactor can only ever
+	 * warm a body above its blackbody-with-albedo temperature, never cool it
+	 * below. Jovians already get real internal heat correctly, and
+	 * individually, via their own fitted internalHeatTempK -- see
+	 * sol-bodies-refit.smoke.test.ts's failed attempt to refit
+	 * greenhouseFactor against a jovian with this bump included, in git
+	 * history, for the numbers.
+	 */
+	seismologyTotalHeatingK?: number
 }
 
 const radiansToDegrees = (rad: number) => rad * (180 / Math.PI)
 const kelvinToCelsius = (kelvin: number) => kelvin - 273.15
+const celsiusToKelvin = (celsius: number) => celsius + 273.15
 
 function meanOf(values: readonly number[]): number {
 	if (values.length === 0) return 0
@@ -534,6 +576,20 @@ export class EnergyBalanceModel {
 		for (const row of this.temperature) {
 			for (let i = 0; i < row.length; i++) {
 				row[i] = kelvinToCelsius(Number.isNaN(row[i]) ? 0 : row[i])
+			}
+		}
+
+		// Ported from galaxy-gen's TEMPERATURE.finalize seismologyMod -- see
+		// EBMConfig.seismologyTotalHeatingK's doc for why this runs as a final
+		// post-solve bump rather than a flux term inside the simulation above.
+		const seismologyTotalHeatingK = this.config.seismologyTotalHeatingK ?? 0
+		if (seismologyTotalHeatingK > 0) {
+			const seismology4 = seismologyTotalHeatingK ** 4
+			for (const row of this.temperature) {
+				for (let i = 0; i < row.length; i++) {
+					const kelvin = celsiusToKelvin(row[i])
+					row[i] = kelvinToCelsius((kelvin ** 4 + seismology4) ** 0.25)
+				}
 			}
 		}
 

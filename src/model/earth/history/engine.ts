@@ -15,12 +15,13 @@ import {
 	loadDiplomacyEvents,
 	loadNationEvents,
 	loadNationReference,
+	loadOrganizationEvents,
 	loadProvinceCoordinates,
 	loadProvinceEvents,
 	loadWars,
 } from "./data-source"
 import { eu4DateToDays } from "./date"
-import type { FoldedState } from "./fold"
+import type { EarthHistoryData, FoldedState } from "./fold"
 import {
 	buildEu4ProvinceMap,
 	type Eu4ProvinceMap,
@@ -29,6 +30,7 @@ import {
 export interface EarthHistoryEngine {
 	provinceMap: Eu4ProvinceMap
 	cache: CheckpointCache
+	data: EarthHistoryData
 	/** Actual earliest/latest event date found across all loaded data, in the
 	 * same day units as date.ts. Used to bound the UI slider to where real
 	 * data actually exists instead of the full geo-explorer 2..9999 range,
@@ -59,6 +61,7 @@ function computeDateRange(data: {
 	nationEvents: Record<string, { events: { date: number }[] }>
 	wars: { events: { date: number }[] }[]
 	diplomacy: { date: number }[]
+	organizationEvents: { date: number }[]
 }): { minDate: number; maxDate: number } {
 	let min = Infinity
 	let max = -Infinity
@@ -73,6 +76,7 @@ function computeDateRange(data: {
 		for (const e of entry.events) consider(e.date)
 	for (const war of data.wars) for (const e of war.events) consider(e.date)
 	for (const e of data.diplomacy) consider(e.date)
+	for (const e of data.organizationEvents) consider(e.date)
 	if (min === Infinity) return { minDate: 0, maxDate: 0 }
 	return { minDate: min, maxDate: max }
 }
@@ -93,6 +97,7 @@ export async function createEarthHistoryEngine(
 		nationEvents,
 		wars,
 		diplomacy,
+		organizationEvents,
 		provinceCoords,
 		nationReferenceRows,
 	] = await Promise.all([
@@ -100,6 +105,7 @@ export async function createEarthHistoryEngine(
 		loadNationEvents(),
 		loadWars(),
 		loadDiplomacyEvents(),
+		loadOrganizationEvents(),
 		loadProvinceCoordinates(),
 		loadNationReference(),
 	])
@@ -115,12 +121,14 @@ export async function createEarthHistoryEngine(
 		nationReference,
 		wars,
 		diplomacy,
+		organizationEvents,
 	})
 	const { minDate, maxDate } = computeDateRange({
 		provinceEvents,
 		nationEvents,
 		wars,
 		diplomacy,
+		organizationEvents,
 	})
 	const provinceMeta = new Map<
 		string,
@@ -132,7 +140,22 @@ export async function createEarthHistoryEngine(
 			wasteland: entry.base.wasteland,
 		})
 	}
-	return { provinceMap, cache, minDate, maxDate, provinceMeta, provinceCoords }
+	return {
+		provinceMap,
+		cache,
+		data: {
+			provinceEvents,
+			nationEvents,
+			nationReference,
+			wars,
+			diplomacy,
+			organizationEvents,
+		},
+		minDate,
+		maxDate,
+		provinceMeta,
+		provinceCoords,
+	}
 }
 
 interface EarthHistoryQuery {

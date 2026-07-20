@@ -584,106 +584,15 @@ export function buildMapMesh(
 	}
 }
 
-export function buildMapOccupationOverlay(
-	mapMesh: THREE.Mesh | null,
-	occupationOverlay: Float32Array | null,
-	mapFaceToRegion: Int32Array,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-): THREE.Mesh | null {
-	if (!mapMesh || !occupationOverlay) return null
-	const projection = createMapProjection(
-		centerLongitudeDeg,
-		projectionLatitudeDeg,
-	)
-	const geometry = mapMesh.geometry.clone()
-	const positionAttribute = geometry.getAttribute("position")
-	if (!(positionAttribute instanceof THREE.BufferAttribute)) return null
-
-	const vertexCount = Math.floor(positionAttribute.count)
-	const overlayColors = new Float32Array(vertexCount * 3)
-	const overlayMask = new Float32Array(vertexCount)
-	const faceCount = Math.min(
-		mapFaceToRegion.length,
-		Math.floor(vertexCount / 3),
-	)
-
-	for (let face = 0; face < faceCount; face++) {
-		const region = mapFaceToRegion[face]
-		const overlayBase = region * 4
-		const r = occupationOverlay[overlayBase]
-		const g = occupationOverlay[overlayBase + 1]
-		const b = occupationOverlay[overlayBase + 2]
-		const a = occupationOverlay[overlayBase + 3]
-		const vertexBase = face * 9
-		for (let offset = 0; offset < 9; offset += 3) {
-			overlayColors[vertexBase + offset] = r
-			overlayColors[vertexBase + offset + 1] = g
-			overlayColors[vertexBase + offset + 2] = b
-		}
-		const maskBase = face * 3
-		overlayMask[maskBase] = a
-		overlayMask[maskBase + 1] = a
-		overlayMask[maskBase + 2] = a
-	}
-
-	geometry.setAttribute(
-		"overlayColor",
-		new THREE.BufferAttribute(overlayColors, 3),
-	)
-	geometry.setAttribute(
-		"overlayMask",
-		new THREE.BufferAttribute(overlayMask, 1),
-	)
-
-	const material = new THREE.ShaderMaterial({
-		transparent: true,
-		depthTest: false,
-		depthWrite: false,
-		toneMapped: false,
-		side: THREE.DoubleSide,
-		polygonOffset: true,
-		polygonOffsetFactor: -1,
-		polygonOffsetUnits: -1,
-		vertexShader: `
-			attribute vec3 overlayColor;
-			attribute float overlayMask;
-			varying vec3 vOverlayColor;
-			varying float vOverlayMask;
-			varying vec2 vStripePos;
-			void main() {
-				vOverlayColor = overlayColor;
-				vOverlayMask = overlayMask;
-				vStripePos = position.xy;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-			}
-		`,
-		fragmentShader: `
-			varying vec3 vOverlayColor;
-			varying float vOverlayMask;
-			varying vec2 vStripePos;
-			void main() {
-				if (vOverlayMask < 0.5) discard;
-				float stripe = fract((vStripePos.x + vStripePos.y) * 150.0);
-				if (stripe <= 0.25 || stripe >= 0.75) discard;
-				gl_FragColor = vec4(vOverlayColor, 0.9);
-			}
-		`,
-	})
-
-	const meshObject = new THREE.Mesh(geometry, material)
-	meshObject.renderOrder = 1000
-	meshObject.position.z += 0.01
-	const cloneL = new THREE.Mesh(geometry, material)
-	const cloneR = new THREE.Mesh(geometry, material)
-	cloneL.renderOrder = 1000
-	cloneR.renderOrder = 1000
-	cloneL.position.set(-projection.repeatWidth, 0, 0.01)
-	cloneR.position.set(projection.repeatWidth, 0, 0.01)
-	meshObject.add(cloneL, cloneR)
-	meshObject.userData.builtCenterLonDeg = centerLongitudeDeg
-	return meshObject
-}
+// buildMapOccupationOverlay was removed: it duplicated, via a full clone of
+// mapMesh's geometry rendered as an always-on separate draw call, exactly
+// what mapMesh's own occColor/occMask attributes + fragment shader already
+// render in place (see buildMapMesh above and applyFaceRegionColors below).
+// That redundant clone was rebuilt on every rebuildTerrain() call --
+// including ones triggered by map panning -- making it a real per-pan CPU
+// and per-frame GPU cost whenever an occupation overlay was active. Since
+// mapMesh already paints the identical stripe for free, nothing else needs
+// to build or render this separately.
 
 export function buildMapWireframe(
 	world: SerializedGenesisWorld,

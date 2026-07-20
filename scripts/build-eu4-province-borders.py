@@ -75,6 +75,21 @@ NO_NEIGHBOR_PROVINCE_ID = -1
 NEAREST_FALLBACK_RADII_MULT = (4, 16, 64)
 NEAREST_FALLBACK_MAX_DEG = 5e-3
 
+# Once a nearest-neighbor CANDIDATE is found (nearest to the outward PROBE
+# POINT, which can be up to NEAREST_FALLBACK_MAX_DEG away), it's only
+# accepted if the candidate's polygon boundary also comes this close to the
+# ORIGINAL EDGE itself (not just the probe point). Without this check, a
+# coastline edge with open sea on one side -- there is no sea polygon in this
+# dataset, only land -- can have its probe's widened search ring sweep in
+# some unrelated inland province that merely happens to be the closest LAND
+# within NEAREST_FALLBACK_MAX_DEG, wrongly turning a real coastline into a
+# fabricated "border" against that inland province. A genuine digitization
+# gap between two adjacent land parcels leaves the neighbor's boundary
+# running right along the edge itself, not just near one offset probe point,
+# so this stays tight (a small multiple of the probe offset) while
+# NEAREST_FALLBACK_MAX_DEG stays wide enough to actually find that neighbor.
+NEAREST_FALLBACK_ACCEPT_EDGE_DIST_MULT = 6
+
 # The source GeoJSON has hundreds of degenerate sliver polygons scattered
 # across province MultiPolygons -- digitization/tracing noise, not real
 # terrain: near-zero area (a fraction of a km^2) but real perimeter length
@@ -102,7 +117,19 @@ def _drop_sliver_parts(geom: "shapely.Geometry") -> "shapely.Geometry":
 
 def _load_province_polygons(
     geojson_path: Path, snap_grid_size: float
-) -> dict[int, "shapely.Geometry"]:
+) -> tuple[dict[int, "shapely.Geometry"], dict[int, "shapely.Geometry"]]:
+    """Returns (full, sliver_dropped) -- two dicts over the same province ids.
+
+    Border edge classification (_classify_edges) must run against `full`:
+    every ring edge of every real polygon part has to produce a border
+    segment (even a tiny disconnected islet's own coastline is a real
+    coastline), so dropping "sliver" parts before classification silently
+    deletes real border geometry -- exactly the kind of gap that's
+    indistinguishable, on screen, from an actual data/classification bug.
+    Sliver-dropping is still applied (via `sliver_dropped`) for the FILL
+    geometry only, where its only job is decluttering visually-negligible
+    digitization noise, not preserving every border segment.
+    """
     with geojson_path.open(encoding="utf-8") as f:
         data = json.load(f)
 
@@ -120,14 +147,15 @@ def _load_province_polygons(
         geom = shapely.set_precision(geom, snap_grid_size)
         by_id[province_id].append(geom)
 
-    polygons: dict[int, "shapely.Geometry"] = {}
+    full: dict[int, "shapely.Geometry"] = {}
+    sliver_dropped: dict[int, "shapely.Geometry"] = {}
     for province_id, geoms in by_id.items():
         merged = geoms[0] if len(geoms) == 1 else shapely.unary_union(geoms)
         if not merged.is_valid:
             merged = merged.buffer(0)
-        merged = _drop_sliver_parts(merged)
-        polygons[province_id] = merged
-    return polygons
+        full[province_id] = merged
+        sliver_dropped[province_id] = _drop_sliver_parts(merged)
+    return full, sliver_dropped
 
 
 def _iter_rings(geom: "shapely.Geometry"):
@@ -145,8 +173,10 @@ def _find_nearest_neighbor(
     province_ids: list[int],
     pid: int,
     outside_probe: ShapelyPoint,
+    edge_line: "shapely.LineString",
     probe_offset_deg: float,
 ) -> int:
+    accept_edge_dist = probe_offset_deg * NEAREST_FALLBACK_ACCEPT_EDGE_DIST_MULT
     for mult in NEAREST_FALLBACK_RADII_MULT:
         radius = min(probe_offset_deg * mult, NEAREST_FALLBACK_MAX_DEG)
         best_idx = None
@@ -160,7 +190,14 @@ def _find_nearest_neighbor(
                 best_dist = dist
                 best_idx = idx
         if best_idx is not None:
-            return province_ids[best_idx]
+            # The candidate closest to the offset PROBE isn't automatically
+            # a real neighbor -- confirm its boundary actually runs near the
+            # EDGE ITSELF too (see NEAREST_FALLBACK_ACCEPT_EDGE_DIST_MULT's
+            # doc). A true digitization-gap neighbor passes this easily; an
+            # unrelated inland province an open-sea probe happened to sweep
+            # up along a wide search ring does not.
+            if geoms[best_idx].distance(edge_line) <= accept_edge_dist:
+                return province_ids[best_idx]
         if radius >= NEAREST_FALLBACK_MAX_DEG:
             break
     return NO_NEIGHBOR_PROVINCE_ID
@@ -210,7 +247,13 @@ def _classify_edges(
 
                 if neighbor_id == NO_NEIGHBOR_PROVINCE_ID:
                     neighbor_id = _find_nearest_neighbor(
-                        tree, geoms, province_ids, pid, outside_probe, probe_offset_deg
+                        tree,
+                        geoms,
+                        province_ids,
+                        pid,
+                        outside_probe,
+                        shapely.LineString([a, b]),
+                        probe_offset_deg,
                     )
 
                 edges.append((pid, neighbor_id, a, b))
@@ -340,8 +383,8 @@ def build_assets(
     if not geojson_path.exists():
         raise FileNotFoundError(f"Missing source GeoJSON: {geojson_path}")
 
-    polygons = _load_province_polygons(geojson_path, snap_grid_size)
-    edges = _classify_edges(polygons, probe_offset_deg)
+    full_polygons, fill_polygons = _load_province_polygons(geojson_path, snap_grid_size)
+    edges = _classify_edges(full_polygons, probe_offset_deg)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     bin_path = output_dir / f"{prefix}.bin"
@@ -375,7 +418,7 @@ def build_assets(
     }
     meta_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
-    _write_fill_geometry(polygons, output_dir, prefix, geojson_path, snap_grid_size)
+    _write_fill_geometry(fill_polygons, output_dir, prefix, geojson_path, snap_grid_size)
 
     return meta_path, bin_path
 

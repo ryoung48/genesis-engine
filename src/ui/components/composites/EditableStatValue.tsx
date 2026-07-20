@@ -32,11 +32,16 @@ const ATTACHED_UNITS = new Set(["°", "%"])
 // Splits a formatted stat string like "12.00 R⊕" or "102.0°" into its
 // leading numeric portion and trailing unit text, so an editable stat's
 // underline lands on just the number -- the unit reads as plain static text
-// next to it rather than being part of the clickable target.
+// next to it rather than being part of the clickable target. Requires the
+// unit (if any) to be whitespace-separated from the number -- a non-numeric
+// value that merely starts with a digit (e.g. "1:1 tidal lock") has no such
+// gap, so the whole regex fails to match and the entire string falls
+// through as one unsplit "numeric" (i.e. clickable/underlined) target,
+// rather than silently chopping off just its leading digit.
 function splitNumericAndUnit(text: string): { numeric: string; unit: string } {
-	const match = text.match(/^(-?[\d.]+)\s*(.*)$/)
+	const match = text.match(/^(-?[\d.]+)(?:\s+(.*))?$/)
 	if (!match) return { numeric: text, unit: "" }
-	const [, numeric, unit] = match
+	const [, numeric, unit = ""] = match
 	if (ATTACHED_UNITS.has(unit))
 		return { numeric: `${numeric}${unit}`, unit: "" }
 	return { numeric, unit }

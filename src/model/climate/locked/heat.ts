@@ -270,6 +270,7 @@ export function computeTidalTransportParams(
 		| "spectralClass"
 		| "starSubtype"
 		| "orbitalDistanceAU"
+		| "seismologyTotalHeatingK"
 	>,
 ): TidalTransportParams {
 	const radiusM = params.planetRadiusKm * 1000
@@ -286,7 +287,14 @@ export function computeTidalTransportParams(
 	const S0 =
 		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
 	const albedo = 0.3
-	const T_eq = Math.pow((S0 * (1 - albedo)) / (4 * SIGMA), 0.25)
+	let T_eq = Math.pow((S0 * (1 - albedo)) / (4 * SIGMA), 0.25)
+	// See ebm/index.ts's EBMConfig.seismologyTotalHeatingK doc -- same
+	// post-solve quartic bump, applied here to this model's own equilibrium
+	// temperature instead of a per-latitude EBM solve.
+	const seismologyTotalHeatingK = params.seismologyTotalHeatingK ?? 0
+	if (seismologyTotalHeatingK > 0) {
+		T_eq = (T_eq ** 4 + seismologyTotalHeatingK ** 4) ** 0.25
+	}
 	const GREENHOUSE_OFFSET = 33
 	const T_mean_C = T_eq - 273.15 + GREENHOUSE_OFFSET
 

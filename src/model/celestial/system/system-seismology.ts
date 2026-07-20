@@ -1,4 +1,5 @@
 import type { MoonBody } from "@/model/celestial/moons/moon-types"
+import type { MainSequenceClass } from "@/model/celestial/star/star-types"
 import { createRng } from "@/model/shared/rng"
 import type { SystemBody } from "./generate-system-bodies"
 import {
@@ -51,27 +52,59 @@ function computeResidualHeating(params: {
 	return Math.floor(stress) ** 2
 }
 
-function computeMoonTidalHeating(parent: SystemBody, moon: MoonBody): number {
+/** Ported from galaxy-gen's SEISMOLOGY.tides.heating -- a moon whose orbit
+ * puts this above MAX_SAFE_MOON_TIDAL_HEATING would be tidally shredded
+ * rather than merely reclassified (see nextSeismologyClass's much lower
+ * >5/>20/>1000 thresholds, which are about surface effects, not survival).
+ * Exported as raw numeric params (rather than requiring a built SystemBody)
+ * so generate-system-bodies.ts can call this mid-construction, before a
+ * moon's parent planet object exists yet. */
+export function computeMoonTidalHeatingRaw(params: {
+	parentMassKg: number
+	parentDiameterKm: number
+	moonDiameterKm: number
+	moonMassKg: number
+	semiMajorAxisPlanetDiameters: number
+	orbitalPeriodDays: number
+	eccentricity: number
+	densityEarthRelative: number
+}): number {
 	const distanceMillionKm =
-		((moon.semiMajorAxisPlanetDiameters ?? 0) * parent.diameterKm) / 1e6
-	const orbitalPeriodDays = moon.orbitalPeriodDays
-	const densityEarthRelative = moon.density?.earthRelative ?? 0
+		(params.semiMajorAxisPlanetDiameters * params.parentDiameterKm) / 1e6
 	if (
 		distanceMillionKm <= 0 ||
-		orbitalPeriodDays <= 0 ||
-		moon.massKg <= 0 ||
-		densityEarthRelative <= 0
+		params.orbitalPeriodDays <= 0 ||
+		params.moonMassKg <= 0 ||
+		params.densityEarthRelative <= 0
 	) {
 		return 0
 	}
 
 	return (
 		(10.83 *
-			(parent.massKg / EARTH_MASS_KG) ** 2 *
-			(moon.diameterKm / EARTH_DIAMETER_KM) ** 2 *
-			moon.eccentricity ** 2) /
-		(distanceMillionKm ** 5 * orbitalPeriodDays * densityEarthRelative)
+			(params.parentMassKg / EARTH_MASS_KG) ** 2 *
+			(params.moonDiameterKm / EARTH_DIAMETER_KM) ** 2 *
+			params.eccentricity ** 2) /
+		(distanceMillionKm ** 5 *
+			params.orbitalPeriodDays *
+			params.densityEarthRelative)
 	)
+}
+
+// Ported from galaxy-gen's MAX_SAFE_MOON_TIDAL_HEATING (orbits/seismology).
+export const MAX_SAFE_MOON_TIDAL_HEATING = 5_000
+
+function computeMoonTidalHeating(parent: SystemBody, moon: MoonBody): number {
+	return computeMoonTidalHeatingRaw({
+		parentMassKg: parent.massKg,
+		parentDiameterKm: parent.diameterKm,
+		moonDiameterKm: moon.diameterKm,
+		moonMassKg: moon.massKg,
+		semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters ?? 0,
+		orbitalPeriodDays: moon.orbitalPeriodDays,
+		eccentricity: moon.eccentricity,
+		densityEarthRelative: moon.density?.earthRelative ?? 0,
+	})
 }
 
 function seedForBody(body: SystemBody): number {
@@ -179,10 +212,17 @@ function applyMoonSeismology(params: {
 	moon: MoonBody
 	starAgeGyr: number
 	starLuminositySol: number
+	spectralClass: MainSequenceClass
 	surfaceTidesHeating: number
 }): MoonBody {
-	const { parent, moon, starAgeGyr, starLuminositySol, surfaceTidesHeating } =
-		params
+	const {
+		parent,
+		moon,
+		starAgeGyr,
+		starLuminositySol,
+		spectralClass,
+		surfaceTidesHeating,
+	} = params
 	const sizeClass = moon.sizeClass ?? 0
 	const densityEarthRelative = moon.density?.earthRelative ?? 0
 	const residualHeating = computeResidualHeating({
@@ -219,7 +259,9 @@ function applyMoonSeismology(params: {
 				group: nextGroup,
 				classification: nextClassification,
 				sizeClass,
+				zone,
 				deviation,
+				spectralClass,
 				diameterKm: moon.diameterKm,
 				massKg: moon.massKg,
 				isPrimaryWorld: false,
@@ -231,6 +273,11 @@ function applyMoonSeismology(params: {
 		group: nextGroup,
 		classification: nextClassification,
 		density: rerolled?.density ?? moon.density,
+		subtype: rerolled?.subtype ?? moon.subtype,
+		composition: rerolled?.composition ?? moon.composition,
+		chemistry: rerolled?.chemistry ?? moon.chemistry,
+		hydrosphereCode: rerolled?.hydrosphereCode ?? moon.hydrosphereCode,
+		hydrosphere: rerolled?.hydrosphere ?? moon.hydrosphere,
 		landCoverage: rerolled?.landCoverage ?? moon.landCoverage,
 		atmosphere: rerolled?.atmosphere ?? moon.atmosphere,
 		greenhouseFactor: rerolled?.greenhouseFactor ?? moon.greenhouseFactor,
@@ -248,6 +295,7 @@ export function applySystemSeismology(params: {
 	bodies: SystemBody[]
 	starAgeGyr: number
 	starLuminositySol: number
+	spectralClass: MainSequenceClass
 	/** Optional hooks for folding each body/moon's theoretical-max surface
 	 * tide into totalHeating/regime alongside residual and tidal heating.
 	 * Callbacks rather than a direct import of climate/tidal-schedule.ts's
@@ -272,6 +320,7 @@ export function applySystemSeismology(params: {
 				moon,
 				starAgeGyr: params.starAgeGyr,
 				starLuminositySol: params.starLuminositySol,
+				spectralClass: params.spectralClass,
 				surfaceTidesHeating:
 					params.getSurfaceTidesHeatingForMoon?.(seismologyBody, moon) ?? 0,
 			}),
@@ -303,7 +352,9 @@ export function applySystemSeismology(params: {
 			group: seismologyBody.group,
 			classification: nextClassification,
 			sizeClass: seismologyBody.sizeClass,
+			zone: zoneFromDeviation(deviation),
 			deviation,
+			spectralClass: params.spectralClass,
 			diameterKm: seismologyBody.diameterKm,
 			massKg: seismologyBody.massKg,
 			isPrimaryWorld: seismologyBody.isMainWorld,
@@ -313,6 +364,11 @@ export function applySystemSeismology(params: {
 			...seismologyBody,
 			classification: nextClassification,
 			density: rerolled.density,
+			subtype: rerolled.subtype,
+			composition: rerolled.composition,
+			chemistry: rerolled.chemistry,
+			hydrosphereCode: rerolled.hydrosphereCode,
+			hydrosphere: rerolled.hydrosphere,
 			landCoverage: rerolled.landCoverage,
 			atmosphere: rerolled.atmosphere,
 			greenhouseFactor: rerolled.greenhouseFactor,

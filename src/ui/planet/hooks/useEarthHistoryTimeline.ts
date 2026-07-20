@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import type { RawNationReference } from "@/model/earth/history/data-source"
+import type {
+	RawNationReference,
+	RawOrganizationReference,
+} from "@/model/earth/history/data-source"
 import {
 	daysToEu4Date,
 	EARTH_HISTORY_DEFAULT_START_DAYS,
@@ -14,6 +17,7 @@ import {
 } from "@/model/earth/history/engine"
 import { getHeritageIndex } from "@/model/earth/history/reference/heritages"
 import { getNationReferenceIndex } from "@/model/earth/history/reference/nations"
+import { getOrganizationReferenceIndex } from "@/model/earth/history/reference/organizations"
 import { getReligionIndex } from "@/model/earth/history/reference/religion-groups"
 import type { GenesisProvinces } from "@/model/types/society"
 
@@ -37,6 +41,10 @@ export function useEarthHistoryTimeline(
 		string,
 		RawNationReference
 	> | null>(null)
+	const [organizationReference, setOrganizationReference] = useState<Map<
+		string,
+		RawOrganizationReference
+	> | null>(null)
 	const [religionColorById, setReligionColorById] = useState<Map<
 		string,
 		[number, number, number]
@@ -57,6 +65,7 @@ export function useEarthHistoryTimeline(
 	useEffect(() => {
 		if (!isEarthImport) return
 		getNationReferenceIndex().then(setNationReference)
+		getOrganizationReferenceIndex().then(setOrganizationReference)
 		getReligionIndex().then((index) => {
 			const scaled = new Map<string, [number, number, number]>()
 			const names = new Map<string, string>()
@@ -158,6 +167,7 @@ export function useEarthHistoryTimeline(
 		// since they're keyed by the same raw EU4 province id as everything
 		// else there (see scripts/build-eu4-history-events.py).
 		provinceMeta: engine?.provinceMeta ?? null,
+		organizationReference,
 		// Bound the slider to where real converted data actually exists
 		// (mostly ~year 2 to present) rather than geo-explorer's full
 		// 2..9999 Extended-Timeline-mod range, which is almost entirely

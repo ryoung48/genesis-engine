@@ -207,21 +207,6 @@ const FIELD_SPECS: FieldSpec[] = [
 		},
 	},
 	{
-		name: "moonCount",
-		min: 0,
-		step: 1,
-		count: 6, // 0–5
-		read: (p) => p.moonCount ?? 0,
-	},
-	{
-		name: "moonSeed",
-		min: 0,
-		step: 1,
-		count: SEED_MAX,
-		read: (p) =>
-			Math.max(0, Math.min(SEED_MAX - 1, Math.floor(p.moonSeed ?? 0))),
-	},
-	{
 		name: "orbitalDistanceAU",
 		min: SR.orbitalDistanceAU.min,
 		step: SR.orbitalDistanceAU.step,
@@ -343,8 +328,6 @@ interface DecodedPlanetCode {
 	craters?: number
 	maxElevation: number
 	era: SocietyEra
-	moonCount: number
-	moonSeed: number
 	restSeed: number
 }
 
@@ -408,8 +391,6 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		craters: craters > 0 ? craters : undefined,
 		maxElevation: decodedFields.maxElevation,
 		era: ERA_ORDER[eraIdx] ?? DEFAULT_ERA,
-		moonCount: decodedFields.moonCount ?? 1,
-		moonSeed: decodedFields.moonSeed ?? 0,
 		restSeed: decodedFields.restSeed ?? 0,
 	}
 }

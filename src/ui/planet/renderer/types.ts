@@ -24,6 +24,24 @@ export interface RiverData {
 	minFlow: number
 }
 
+/** One international organization's current territory while its wiki page
+ * is open -- only drives the map-name label now (a single org-name label in
+ * place of member nations' own labels, sized by total member province
+ * count via nation-label-overlay.ts's buildGlobe/MapPartitionLabels).
+ * Territory *coloring* is handled entirely at region level in GenesisView's
+ * regionColors (see withOrgHighlight there) rather than a separate mesh
+ * overlay -- the real EU4 province-polygon triangulation
+ * (eu4-province-borders-fills.json) only covers ~85% of provinces, so a
+ * mesh built from it always left gaps showing whatever was underneath;
+ * region-level painting has no such coverage gap. */
+export interface OrgHighlightSpec {
+	orgId: string
+	name: string
+	/** Compact province indexes (world.provinces space) for the org's full
+	 * territory -- keys the partition label. */
+	memberProvinceCompactIndexes: Set<number>
+}
+
 export interface GenesisScene {
 	dispose(): void
 	resize(): void
@@ -53,6 +71,8 @@ export interface GenesisScene {
 		} | null,
 	): void
 	setLandNationBordersVisible(visible: boolean): void
+	/** Pass null to clear the highlight (e.g. no org wiki page open). */
+	setOrganizationHighlight(spec: OrgHighlightSpec | null): void
 	setViewMode(mode: GenesisViewMode): void
 	setWireframeVisible(visible: boolean): void
 	setGridVisible(visible: boolean): void
@@ -96,8 +116,18 @@ export interface GenesisScene {
 	setAtmospherePressure(pressureBar: number): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
-	focusOnNation(nationId: number, opts?: { durationMs?: number }): void
-	focusOnProvince(provinceId: number, opts?: { durationMs?: number }): void
+	focusOnNation(
+		nationId: number,
+		opts?: { durationMs?: number; distanceScale?: number },
+	): void
+	focusOnProvince(
+		provinceId: number,
+		opts?: {
+			durationMs?: number
+			distanceScale?: number
+			pulseTarget?: "nation" | "province"
+		},
+	): void
 	setSettlements(urbanPop: Float32Array | null): void
 	setSettlementsVisible(visible: boolean): void
 	setEu4Settlements(

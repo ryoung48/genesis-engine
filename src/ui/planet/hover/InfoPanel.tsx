@@ -29,6 +29,7 @@ import {
 	windSpeedColor,
 } from "../colors"
 import { monthLabels } from "../screen/shared/constants"
+import type { DataVariant } from "../screen/shared/data-variant"
 import {
 	getMapModePrimary,
 	type PopulationMapMode,
@@ -307,6 +308,7 @@ interface InfoPanelProps {
 	colorMode: ColorMode
 	dangerSubMode: "earthquake" | "volcanic" | "cyclone" | "tornado" | "tidal"
 	populationMode: PopulationMapMode
+	dataVariant: DataVariant
 	selectedTimeMs: number | null
 	displayMonth: number
 	clockMonthMode: "annual" | "monthly"
@@ -328,16 +330,9 @@ interface InfoPanelProps {
 	hoverNationCounts?: Map<number, number> | null
 	relationAt?: ((a: number, b: number) => number) | null
 	detailsDrawerOpen?: boolean
-	/** Diplomacy info for the hovered province's current owner, resolved by
-	 * the caller via earth-history's queryNation (only meaningful when
-	 * world.isEarthImport). See docs/earth-history-plan.md "Hover / info
-	 * panel". Pre-resolved rather than computed here so InfoPanel stays a
-	 * pure formatter, consistent with the other buildXDisplayData calls. */
-	earthHistoryDiplomacyRows?: { label: string; value: string }[]
 	/** Overrides the Nation/Government/Culture/Religion rows with real
-	 * history for the currently-scrubbed date, for the same reason as
-	 * earthHistoryDiplomacyRows -- see docs/earth-history-plan.md. Resolved
-	 * by the caller (GenesisView); undefined when earth-history isn't active
+	 * history for the currently-scrubbed date. Resolved by the caller
+	 * (GenesisView); undefined when earth-history isn't active
 	 * for the hovered province, in which case the usual procedural builders
 	 * are used unchanged. */
 	earthHistoryHoverOverride?: {
@@ -401,6 +396,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	colorMode,
 	dangerSubMode,
 	populationMode,
+	dataVariant,
 	displayMonth,
 	clockMonthMode,
 	clockMonth,
@@ -414,7 +410,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getLandmarkName,
 	getRiverName,
 	detailsDrawerOpen,
-	earthHistoryDiplomacyRows,
 	earthHistoryHoverOverride,
 }) => {
 	const activeBarIndex =
@@ -454,13 +449,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					? hoverDtrDiff
 					: null
 	const climateColor = showGeography
-		? buildClimateSwatchColor(hoverRegion, world, colorMode)
+		? buildClimateSwatchColor(hoverRegion, world, colorMode, dataVariant)
 		: null
 	const vegetationSwatch = showGeography
-		? buildVegetationSwatchColor(hoverRegion, world, colorMode)
+		? buildVegetationSwatchColor(hoverRegion, world, colorMode, dataVariant)
 		: null
 	const topographySwatch = showGeography
-		? buildTopographySwatchColor(hoverRegion, world)
+		? buildTopographySwatchColor(hoverRegion, world, dataVariant)
 		: null
 	const timezoneSwatch =
 		hoverRegion !== null && world
@@ -490,6 +485,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		hoverNationId,
 		world,
 	})
+	const hoverProvinceDisplayId =
+		world?.isEarthImport &&
+		hoverProvince !== null &&
+		hoverProvince >= 0 &&
+		world.provinces?.realIds &&
+		hoverProvince < world.provinces.realIds.length
+			? world.provinces.realIds[hoverProvince]
+			: hoverProvince
 	const governmentDisplay = showSociety
 		? buildGovernmentDisplayData({ hoverNationId, world })
 		: null
@@ -877,7 +880,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						{(earthHistoryHoverOverride?.provinceName ?? provinceName) && (
 							<SwatchRow
 								label="Province"
-								value={`#${hoverProvince} ${earthHistoryHoverOverride?.provinceName ?? provinceName ?? ""}`}
+								value={`#${hoverProvinceDisplayId} ${earthHistoryHoverOverride?.provinceName ?? provinceName ?? ""}`}
 								color={null}
 							/>
 						)}
@@ -928,13 +931,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								<Row key={item.label} label={item.label} value={item.value} />
 							),
 						)}
-						{earthHistoryDiplomacyRows?.map((row, i) => (
-							<Row
-								key={`${row.label}-${i}`}
-								label={row.label}
-								value={row.value}
-							/>
-						))}
 					</>
 				)}
 				{showGeography && chartData && world?.climate && (

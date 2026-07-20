@@ -12,7 +12,7 @@
 	"recordBytes": 24,
 	"segmentCount": 167021,
 	"units": "degrees",
-	"source": "C:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4-extended-timeline-aligned.json",
+	"source": "c:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4-extended-timeline-aligned.json",
 	"snapGridSize": 1e-5,
 	"probeOffsetDeg": 0.0002,
 	"bin": "eu4-province-borders.bin"

@@ -34,6 +34,10 @@ export function daysToEu4Date(days: number): string {
 	return `${y}.${m}.${dayInYear}`
 }
 
+export function eu4DaysToYear(days: number): number {
+	return EARTH_HISTORY_START_YEAR + Math.floor(days / 365)
+}
+
 export const EARTH_HISTORY_MIN_DAYS = 0
 export const EARTH_HISTORY_MAX_DAYS = eu4DateToDays(
 	`${EARTH_HISTORY_END_YEAR}.12.31`,

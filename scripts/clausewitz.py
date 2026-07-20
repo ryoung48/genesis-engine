@@ -80,7 +80,15 @@ def parse_text(text: str) -> Entries:
 
 
 def parse_file(path: Path) -> Entries:
-    return parse_text(path.read_text(encoding="utf-8-sig", errors="replace"))
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        # EU4 and Extended Timeline text assets are not consistently UTF-8;
+        # many historical names are Windows-1252 encoded. Do not use
+        # errors="replace" here, because that permanently turns names like
+        # Yúsuf into Y�suf in generated JSON.
+        text = path.read_text(encoding="cp1252")
+    return parse_text(text)
 
 
 def get(entries: Entries, key: str, default: Any = None) -> Any:

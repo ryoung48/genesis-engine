@@ -1,3 +1,5 @@
+import { DYNASTY_COLOR_PALETTE } from "./dynasty-color-palette"
+
 /** Deterministic hash-based color for ids with no explicit reference color
  * (most EU4 cultures/governments have none). Shared by the map-mode renderer
  * (earth-history-region-colors.ts) and the hover panel so a culture/religion/
@@ -41,4 +43,24 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 
 export function rgb01ToCss([r, g, b]: [number, number, number]): string {
 	return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
+}
+
+const DYNASTY_PALETTE_RGB: Array<[number, number, number]> =
+	DYNASTY_COLOR_PALETTE.map(([r, g, b]) => [r / 255, g / 255, b / 255])
+
+/** Deterministic dynasty -> color from EU4's own 400-color dynasty palette
+ * (DYNASTY_COLOR_PALETTE, not hashColorForKey's continuous hue wheel -- a
+ * fixed, hand-curated palette keeps colors visually distinct at the small
+ * swatch sizes this renders at, where a hash-driven hue can land two
+ * unrelated dynasties on near-identical colors; 400 entries makes collisions
+ * between dynasties that actually appear together rare). Shared by the wiki
+ * timeline/stats dynasty swatches and the "Dynasty" map mode
+ * (earth-history-region-colors.ts) so a dynasty's map color always matches
+ * its swatch elsewhere. */
+export function dynastyColor(dynasty: string): [number, number, number] {
+	let hash = 0
+	for (let index = 0; index < dynasty.length; index++) {
+		hash = (hash * 31 + dynasty.charCodeAt(index)) | 0
+	}
+	return DYNASTY_PALETTE_RGB[Math.abs(hash) % DYNASTY_PALETTE_RGB.length]
 }

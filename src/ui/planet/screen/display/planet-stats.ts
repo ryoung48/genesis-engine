@@ -44,8 +44,6 @@ export function computePlanetStats(
 		planetRadiusKm: number
 		pressure: number
 		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
-		moonCount?: number
-		moonSeed?: number
 		seaLevel?: number
 		maxElevation?: number
 		avgWindSpeedMs?: number | null
@@ -215,7 +213,10 @@ export function computePlanetStats(
 			value: habitabilityScore != null ? habitabilityScore.toFixed(3) : "0.000",
 		},
 		...(isTidal ? [{ label: "Lock", value: "Tidal" }] : []),
-		{ label: "Moons", value: String(params.moonCount ?? 0) },
+		{
+			label: "Moons",
+			value: String(world?.tidalSchedule?.events[0]?.moonForces.length ?? 1),
+		},
 		...(world?.tidalSchedule
 			? [
 					{

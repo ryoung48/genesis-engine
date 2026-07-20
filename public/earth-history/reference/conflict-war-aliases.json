@@ -1,0 +1,57 @@
+[
+	{
+		"warId": "PortugueseRestorationWar",
+		"conflictId": "portuguese-independence-war",
+		"note": "The external conflicts source names this as Portuguese Independence War."
+	},
+	{
+		"warId": "ConquestOfGranada",
+		"conflictId": "spanish-moorish-Granada",
+		"note": "Same late Reconquista conflict with different source naming."
+	},
+	{
+		"warId": "CretanWar",
+		"conflictId": "ottoman-venetian-war-crete",
+		"note": "Same Ottoman-Venetian Cretan War."
+	},
+	{
+		"warId": "FirstItalianWar",
+		"conflictId": "italian-wars-start",
+		"note": "External conflict groups the First Italian War as the start of the Italian Wars."
+	},
+	{
+		"warId": "FourthVenetianOttomanWar",
+		"conflictId": "fourth-ottoman-venetian-war-1499",
+		"note": "Same war with source-specific naming order."
+	},
+	{
+		"warId": "FirstAngloMysoreWar",
+		"conflictId": "anglo-mysore-war-1767",
+		"note": "External conflict ID uses start year."
+	},
+	{
+		"warId": "ThirdAngloMysoreWar",
+		"conflictId": "anglo-mysore-war-1790",
+		"note": "External conflict ID uses start year."
+	},
+	{
+		"warId": "FourthAngloMysoreWar",
+		"conflictId": "anglo-mysore-war-1798",
+		"note": "External conflict ID uses start year."
+	},
+	{
+		"warId": "SecondAngloMarathaWar",
+		"conflictId": "maratha-british-second-war",
+		"note": "Same numbered Anglo-Maratha conflict with source-specific naming order."
+	},
+	{
+		"warId": "ThirdAngloMarathaWar",
+		"conflictId": "maratha-british-third-war",
+		"note": "Same numbered Anglo-Maratha conflict with source-specific naming order."
+	},
+	{
+		"warId": "WarOfTheAustrianSuccession",
+		"conflictId": "war-of-austrian-succession",
+		"note": "External conflict source omits 'the': War of Austrian Succession."
+	}
+]

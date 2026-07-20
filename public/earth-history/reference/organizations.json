@@ -1,0 +1,23 @@
+[
+	{
+		"id": "HRE",
+		"name": "Holy Roman Empire",
+		"color": [34, 197, 94],
+		"borderLightColor": [134, 239, 172],
+		"borderDarkColor": [22, 101, 52]
+	},
+	{
+		"id": "HSA",
+		"name": "Hanseatic League",
+		"color": [202, 138, 4],
+		"borderLightColor": [253, 224, 71],
+		"borderDarkColor": [120, 53, 15]
+	},
+	{
+		"id": "GG",
+		"name": "Guelphs and Ghibellines",
+		"color": [153, 27, 27],
+		"borderLightColor": [252, 165, 165],
+		"borderDarkColor": [69, 10, 10]
+	}
+]

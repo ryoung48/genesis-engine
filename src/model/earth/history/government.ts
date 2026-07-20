@@ -7,6 +7,35 @@ type EarthHistoryGovernmentFamily =
 	| "republic"
 	| "theocracy"
 
+/** Ordered list of families, for building a stable-order distribution
+ * (e.g. Social's "Government" chart for Earth-imported worlds). */
+export const EARTH_HISTORY_GOVERNMENT_FAMILIES: readonly EarthHistoryGovernmentFamily[] =
+	["tribal", "monarchy", "republic", "theocracy"]
+
+export const EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS: Record<
+	EarthHistoryGovernmentFamily,
+	string
+> = {
+	tribal: "Tribal",
+	monarchy: "Monarchy",
+	republic: "Republic",
+	theocracy: "Theocracy",
+}
+
+/** One fixed, legend-stable color per family -- distinct from
+ * getEarthHistoryGovernmentColor below, which deliberately hashes in a
+ * random family subtype + blend for per-nation map-fill variety and would
+ * make a distribution chart's legend inconsistent nation to nation. */
+export const EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS: Record<
+	EarthHistoryGovernmentFamily,
+	[number, number, number]
+> = {
+	tribal: GOVERNMENT_COLORS_BY_TYPE.tribal_monarchy,
+	monarchy: GOVERNMENT_COLORS_BY_TYPE.absolute_monarchy,
+	republic: GOVERNMENT_COLORS_BY_TYPE.presidential_republic,
+	theocracy: GOVERNMENT_COLORS_BY_TYPE.theocracy,
+}
+
 export const EARTH_HISTORY_NO_GOVERNMENT_COLOR: [number, number, number] = [
 	0.2, 0.2, 0.22,
 ]
@@ -91,7 +120,7 @@ function currentEarthHistoryReformLabel(
 	return formatGovernmentReformLabel(normalized)
 }
 
-function getEarthHistoryGovernmentFamily(
+export function getEarthHistoryGovernmentFamily(
 	governmentType: string | null,
 ): EarthHistoryGovernmentFamily | null {
 	switch (normalizeGovernmentBase(governmentType)) {

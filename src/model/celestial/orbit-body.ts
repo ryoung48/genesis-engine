@@ -58,6 +58,38 @@ export interface AtmosphereProfile {
 	breathable: boolean
 }
 
+export type OrbitChemistry =
+	| "water"
+	| "ammonia"
+	| "methane"
+	| "sulfur"
+	| "chlorine"
+
+export type OrbitComposition = "rocky" | "ice" | "metallic" | "gas"
+type OrbitZone = "epistellar" | "inner" | "outer"
+
+interface HydrosphereSurfaceComponent {
+	pct: number
+	count?: number
+}
+
+export interface HydrosphereProfile {
+	code: number
+	distribution: number
+	surface: {
+		land: {
+			major: HydrosphereSurfaceComponent & { count: number }
+			minor: HydrosphereSurfaceComponent & { count: number }
+			small: HydrosphereSurfaceComponent
+		}
+		water: {
+			major: HydrosphereSurfaceComponent & { count: number }
+			minor: HydrosphereSurfaceComponent & { count: number }
+			small: HydrosphereSurfaceComponent
+		}
+	}
+}
+
 // "solar": locked to the star. "lunar": locked to one of this body's own
 // moons (target = that moon's idx). "planet": a moon locked to the planet
 // it orbits (target = that planet's SystemBody idx).
@@ -98,7 +130,13 @@ export interface OrbitBody {
 	sizeClass?: number
 	density?: DensityProfile | null
 	group?: OrbitGroup
+	zone?: OrbitZone
 	classification?: OrbitClassification
+	subtype?: string
+	composition?: OrbitComposition
+	chemistry?: OrbitChemistry
+	hydrosphereCode?: number
+	hydrosphere?: HydrosphereProfile
 	/** Fraction of surface covered by land, 0..1 */
 	landCoverage: number
 	atmosphere?: AtmosphereProfile | null
@@ -130,6 +168,14 @@ export interface OrbitBody {
 	greenhouseFactor?: number
 	/** What (if anything) this body is tidally locked to. */
 	tideLock?: TideLock | null
+	/** Explicit rotation/resonance descriptor, derived from siderealDayHours
+	 * vs. orbitalPeriodDays (see tide-lock.ts's deriveTideLockStatus) --
+	 * "1:1" whenever tideLock is set, "3:2" for a spin-orbit resonance like
+	 * real Mercury's (day exactly 2/3 or 3/2 of the year, tideLock stays
+	 * null), undefined otherwise. The UI shows this descriptor when set, and
+	 * falls back to a plain prograde/retrograde read off axialTiltDeg when
+	 * it isn't -- see GenerationPanel.tsx's buildTideLockStat. */
+	tideLockStatus?: "1:1" | "3:2"
 	/** Longitude of the substellar point (the spot on the surface directly
 	 * facing the star), in degrees 0-360 — only meaningful when tideLock is
 	 * set. Defaults to 0° when unset. */

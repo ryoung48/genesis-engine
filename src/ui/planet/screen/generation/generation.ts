@@ -37,8 +37,6 @@ interface ImportHeightmapParams {
 	pressure: number
 	albedo?: number
 	greenhouseFactor?: number
-	moonCount: number
-	moonSeed: number
 	craters: number
 }
 
@@ -249,8 +247,6 @@ export function generateWorld(
 		albedo: overrides?.albedo ?? currentParams.albedo,
 		greenhouseFactor:
 			overrides?.greenhouseFactor ?? currentParams.greenhouseFactor,
-		moonCount: overrides?.moonCount ?? currentParams.moonCount,
-		moonSeed: overrides?.moonSeed ?? currentParams.moonSeed,
 		tideLock,
 		substellarLon: overrides?.substellarLon ?? currentParams.substellarLon,
 		jitter: overrides?.jitter ?? currentParams.jitter,

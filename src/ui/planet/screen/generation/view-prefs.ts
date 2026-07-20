@@ -25,7 +25,6 @@ interface StoredViewPrefs {
 	showSolarSystemAxialTilt: boolean
 	showSolarSystemRealisticSizes: boolean
 	showSolarSystemBodyNames: boolean
-	showSolarSystemRealNames: boolean
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
@@ -109,6 +108,7 @@ const COLOR_MODES = new Set<ColorMode>([
 const NATION_MAP_MODES = new Set<NationMapMode>([
 	"borders",
 	"provinces",
+	"earthProvinces",
 	"dynasty",
 	"diplomacy",
 	"government",
@@ -140,7 +140,6 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showSolarSystemAxialTilt: true,
 	showSolarSystemRealisticSizes: true,
 	showSolarSystemBodyNames: true,
-	showSolarSystemRealNames: true,
 	showWireframe: false,
 	showGrid: true,
 	showNationBorders: false,
@@ -299,10 +298,6 @@ export function parseStoredViewPrefs(
 			showSolarSystemBodyNames: readBoolean(
 				parsed.showSolarSystemBodyNames,
 				DEFAULT_VIEW_PREFS.showSolarSystemBodyNames,
-			),
-			showSolarSystemRealNames: readBoolean(
-				parsed.showSolarSystemRealNames,
-				DEFAULT_VIEW_PREFS.showSolarSystemRealNames,
 			),
 			showWireframe: readBoolean(
 				parsed.showWireframe,

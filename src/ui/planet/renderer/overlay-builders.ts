@@ -154,12 +154,20 @@ function forEachNationBorderSide(
 		if (desolateA && desolateB) continue
 		const nationA = provinceA >= 0 ? assignment[provinceA] : -1
 		const nationB = provinceB >= 0 ? assignment[provinceB] : -1
+		// A true ocean side (provinceA/B < 0, i.e. no province at all) always
+		// resolves nationA/B to -1 regardless of the other side -- the exact
+		// same sentinel an *unowned land* province resolves to. Without this
+		// check, an ocean-vs-unowned-land side wrongly satisfied
+		// `nationA === nationB` (-1 === -1) below and got skipped, leaving
+		// gaps in the coastline wherever unclaimed/unowned land meets the
+		// sea. Exactly one side being genuine ocean must always draw.
+		const isCoastlineSide = provinceA < 0 !== provinceB < 0
 		// Skip same nation
-		if (nationA === nationB) continue
+		if (!isCoastlineSide && nationA === nationB) continue
 		// Skip vassals: same sovereign root means one is subordinate of the other
 		const sovereignA = provinceA >= 0 ? sovereign[provinceA] : -1
 		const sovereignB = provinceB >= 0 ? sovereign[provinceB] : -1
-		if (sovereignA === sovereignB) continue
+		if (!isCoastlineSide && sovereignA === sovereignB) continue
 		// Skip active rebel wars: rebels are released before war starts so sovereigns differ,
 		// but we still don't want a border between rebel and parent during the war
 		if (

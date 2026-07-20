@@ -9,6 +9,11 @@ export function getRegionFocusTargets(params: {
 	mapOffsetX: number
 	mapOffsetY: number
 	minDistance: number
+	/** Multiplies the globe camera distance and divides the map zoom, so
+	 * callers can size the view to whatever they're focusing on (e.g. a
+	 * nation's geographic extent) rather than always using the single-point
+	 * default. 1 = unchanged, <1 = closer/tighter, >1 = further/wider. */
+	distanceScale?: number
 }) {
 	const {
 		meshXYZ,
@@ -19,6 +24,7 @@ export function getRegionFocusTargets(params: {
 		mapOffsetX,
 		mapOffsetY,
 		minDistance,
+		distanceScale = 1,
 	} = params
 	if (region < 0 || region >= numRegions || region * 3 + 2 >= meshXYZ.length) {
 		return null
@@ -43,14 +49,15 @@ export function getRegionFocusTargets(params: {
 		projected.lat,
 	)
 
+	const globeDistance = Math.max(minDistance, 1.8) * distanceScale
 	return {
 		globeTarget: [
-			nx * Math.max(minDistance, 1.8),
-			ny * Math.max(minDistance, 1.8),
-			nz * Math.max(minDistance, 1.8),
+			nx * globeDistance,
+			ny * globeDistance,
+			nz * globeDistance,
 		] as const,
 		mapToX: mapX + mapOffsetX,
 		mapToY: mapY + mapOffsetY,
-		mapToZoom: 6,
+		mapToZoom: 6 / distanceScale,
 	}
 }

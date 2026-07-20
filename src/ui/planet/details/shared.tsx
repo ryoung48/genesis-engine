@@ -52,7 +52,6 @@ export interface DetailsDrawerBaseProps {
 	worldPopulation: number | null
 	activeWarCount: number | null
 	cultureCount: number | null
-	heritageCount: number | null
 	religionCount: number | null
 	nationSizeDistribution: DistributionBucket[]
 	governmentDistribution: DistributionBucket[]
@@ -62,6 +61,11 @@ export interface DetailsDrawerBaseProps {
 	climateDistribution: DistributionBucket[]
 	vegetationDistribution: DistributionBucket[]
 	topographyDistribution: DistributionBucket[]
+	/** Whether climate/vegetation/topography above are bucketed from real EU5
+	 * observed data rather than the procedural model -- tracks the map
+	 * overlay's model/observed dataVariant flag (Earth import only). Used to
+	 * label the Environmental charts accordingly. */
+	showObservedDistributions: boolean
 	tradeGoodsDistribution: DistributionBucket[]
 }
 

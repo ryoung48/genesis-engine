@@ -8,6 +8,7 @@ import {
 	moonSemiMajorAxisM,
 	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
+import type { OrbitClassification } from "@/model/celestial/orbit-body"
 import {
 	getNonRealisticStarToPlanetRatio,
 	getStarDiameterSol,
@@ -57,8 +58,45 @@ const ASTEROID_COUNT_PER_BELT = 900
 const ASTEROID_MIN_SCALE = 0.006
 const ASTEROID_MAX_SCALE = 0.02
 const ASTEROID_Z_JITTER = 0.02
+// Fallbacks only for a body whose classification isn't in
+// CLASSIFICATION_COLOR below (shouldn't happen in practice, since every
+// classification is mapped) -- MAIN_WORLD_COLOR for the main world,
+// ROCKY_SIBLING_COLOR for anything else.
 const MAIN_WORLD_COLOR = 0x3b82f6
 const ROCKY_SIBLING_COLOR = 0x9ca3af
+// Ported from galaxy-gen's ORBIT_CLASSIFICATION[type].color.primary (orbits/
+// classification.ts) -- used as the untextured solid-color fallback for any
+// body (main world or sibling) whose classification has no generated art
+// (see generate-system-bodies.ts's GENERATED_TEXTURE_FILES), instead of a
+// single flat color. Applies to the main world too, so an Earth-like
+// tectonic main world renders the same green a tectonic sibling would, not
+// a fixed "this is home" blue regardless of classification. Never applies
+// to a jovian in practice (jovians always get a texture -- either generated
+// art or the Jupiter photo fallback just below -- so they never reach this
+// branch), even though jovian is included below for completeness.
+const CLASSIFICATION_COLOR: Partial<Record<OrbitClassification, number>> = {
+	acheronian: 0x848484,
+	arid: 0xdeb887,
+	asphodelian: 0x778899,
+	"asteroid belt": 0x575656,
+	asteroid: 0x778899,
+	chthonian: 0xa52a2a,
+	"geo-cyclic": 0x782fe0,
+	"geo-tidal": 0x4682b4,
+	hebean: 0xbce02f,
+	helian: 0xffa500,
+	"jani-lithic": 0xd2b48c,
+	jovian: 0xffdab9,
+	meltball: 0xff625d,
+	oceanic: 0x1e90ff,
+	panthalassic: 0x4169e1,
+	rockball: 0x8b7d7b,
+	snowball: 0xadd8e6,
+	stygian: 0x2f4f4f,
+	tectonic: 0x7cfc00,
+	telluric: 0x8b0000,
+	vesperian: 0xdaa520,
+}
 const textureLoader = new THREE.TextureLoader()
 const sharedBodyTextureCache = new Map<string, THREE.Texture>()
 let sharedGrayscaleSunTexture: THREE.CanvasTexture | null = null
@@ -81,9 +119,14 @@ function bodyDisplayName(
 	body: SystemBody,
 	siblingNumber: number,
 	showRealNames: boolean,
+	namesEnabled: boolean,
 ): string {
-	if (body.isMainWorld) return showRealNames ? "Earth" : "Main World"
-	if (showRealNames && body.name) return body.name
+	if (body.isMainWorld) {
+		if (showRealNames) return "Earth"
+		if (namesEnabled && body.name) return body.name
+		return "Main World"
+	}
+	if (namesEnabled && body.name) return body.name
 	return `${GROUP_LABEL[body.group]} ${siblingNumber}`
 }
 
@@ -403,9 +446,18 @@ export interface SolarSystemOverlayParams {
 	showBodyNames: boolean
 	/** When true and showBodyNames is on, uses real Sol names (star: "Sol",
 	 * main world: "Earth", named siblings/moons from the Sol seed data)
-	 * instead of generic group-based labels — same gating as the stat
-	 * panel's "Real Sol Names" toggle. */
+	 * instead of generic group-based labels — true exactly when this is the
+	 * real Sol seed (see GenesisView's showRealNames computation). */
 	showRealNames: boolean
+	/** Whether to show a sibling/moon/main-world's own `name` label at all —
+	 * unlike showRealNames (a Sol-only spoiler gate for the curated real
+	 * names), this is true for any generated name, Sol or a procedural
+	 * system's own language-generated names alike. */
+	namesEnabled: boolean
+	/** The star's own procedurally generated name (see generateStarName in
+	 * generate-system-bodies.ts) — undefined for the real Sol seed, which
+	 * uses its own hardcoded "Sol" (behind showRealNames) instead. */
+	starName?: string
 }
 
 export interface SolarSystemOverlayState {
@@ -497,6 +549,8 @@ export function buildSolarSystemOverlay(
 		showRealisticSizes,
 		showBodyNames,
 		showRealNames,
+		namesEnabled,
+		starName,
 	} = params
 
 	const group = new THREE.Group()
@@ -576,7 +630,9 @@ export function buildSolarSystemOverlay(
 		starNameLabel = createNameLabel(
 			showRealNames
 				? "Sol"
-				: `${getStarLabel(spectralClass, starSubtype)} Star`,
+				: namesEnabled && starName
+					? starName
+					: `${getStarLabel(spectralClass, starSubtype)} Star`,
 		)
 		starNameLeader = createNameLeaderLine()
 		sizeNameLabel(starNameLabel, starRadius)
@@ -633,7 +689,9 @@ export function buildSolarSystemOverlay(
 						metalness: 0,
 					})
 				: new THREE.MeshStandardMaterial({
-						color: body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR,
+						color:
+							CLASSIFICATION_COLOR[body.classification] ??
+							(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR),
 						roughness: 0.9,
 						metalness: 0,
 					})
@@ -728,6 +786,7 @@ export function buildSolarSystemOverlay(
 			showBodyNames,
 			showRealNames,
 			body.isMainWorld ? "Luna" : undefined,
+			namesEnabled,
 		)
 		moonState.group.scale.setScalar(sceneRadius)
 		bodyGroup.add(moonState.group)
@@ -746,7 +805,12 @@ export function buildSolarSystemOverlay(
 		let nameLeader: THREE.Line | undefined
 		if (showBodyNames) {
 			nameLabel = createNameLabel(
-				bodyDisplayName(body, groupCounters[body.group], showRealNames),
+				bodyDisplayName(
+					body,
+					groupCounters[body.group],
+					showRealNames,
+					namesEnabled,
+				),
 			)
 			nameLeader = createNameLeaderLine()
 			sizeNameLabel(nameLabel, sceneRadius)
@@ -797,6 +861,7 @@ export function buildSolarSystemOverlay(
 			showBodyNames,
 			showRealNames,
 			p.body.isMainWorld ? "Luna" : undefined,
+			namesEnabled,
 		)
 		p.moonState.group.scale.setScalar(p.sceneRadius)
 		p.bodyGroup.add(p.moonState.group)

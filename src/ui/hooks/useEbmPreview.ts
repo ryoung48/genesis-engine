@@ -43,6 +43,10 @@ interface EbmConfig {
 	albedo?: number
 	greenhouseFactor?: number
 	internalHeatTempK?: number
+	/** See EBMConfig.seismologyTotalHeatingK's doc -- a body/moon's
+	 * system-seismology.ts SeismologyProfile.totalHeating, applied as a
+	 * post-solve bump on top of the EBM's own equilibrium. */
+	seismologyTotalHeatingK?: number
 }
 
 function meanOf(values: readonly number[]): number {
@@ -89,6 +93,7 @@ export function useEbmPreview(config: EbmConfig) {
 		albedo: albedoOverride,
 		greenhouseFactor: greenhouseFactorOverride,
 		internalHeatTempK,
+		seismologyTotalHeatingK,
 	} = config
 	return useMemo<RegularClimatePreviewData>(() => {
 		const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
@@ -121,6 +126,7 @@ export function useEbmPreview(config: EbmConfig) {
 			greenhouseFactor:
 				greenhouseFactorOverride ?? estimateGreenhouseFactor(pressure),
 			internalHeatTempK,
+			seismologyTotalHeatingK,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel(30, 0.5)
@@ -195,5 +201,6 @@ export function useEbmPreview(config: EbmConfig) {
 		albedoOverride,
 		greenhouseFactorOverride,
 		internalHeatTempK,
+		seismologyTotalHeatingK,
 	])
 }

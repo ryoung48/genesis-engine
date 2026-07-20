@@ -11,7 +11,13 @@ import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
 import { regionTimezoneLabel } from "@/model/society/timezone"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
-import type { ColorMode } from "../colors"
+import {
+	type ColorMode,
+	EU5_CLIMATE_CATEGORIES,
+	EU5_TOPOGRAPHY_CATEGORIES,
+	EU5_VEGETATION_CATEGORIES,
+} from "../colors"
+import type { DataVariant } from "../screen/shared/data-variant"
 
 export interface HoverInfo {
 	region: number
@@ -104,10 +110,23 @@ export function getHoverElevationKm(
 export function getHoverTopography(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
+	dataVariant: DataVariant,
 ): string | null {
+	if (!hoverInfo || !world) return null
+	const region = hoverInfo.region
+	if (dataVariant === "observed" && world.isEarthImport) {
+		const code = world.eu5Topography?.[region] ?? -1
+		return code >= 0
+			? formatObservedCategoryLabel(EU5_TOPOGRAPHY_CATEGORIES[code])
+			: "unmapped"
+	}
 	return hoverInfo && world?.topography
 		? (GENESIS_TOPOGRAPHY_LABELS[world.topography[hoverInfo.region]] ?? null)
 		: null
+}
+
+function formatObservedCategoryLabel(value: string | undefined): string | null {
+	return value ? value.replace(/_/g, " ") : null
 }
 
 export function getHoverCoordinates(
@@ -546,7 +565,16 @@ export function getHoverMisery(
 export function getHoverClimateZone(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
+	dataVariant: DataVariant,
 ): string | null {
+	if (!hoverInfo || !world) return null
+	const region = hoverInfo.region
+	if (dataVariant === "observed" && world.isEarthImport) {
+		const code = world.eu5Climate?.[region] ?? -1
+		return code >= 0
+			? formatObservedCategoryLabel(EU5_CLIMATE_CATEGORIES[code])
+			: "unmapped"
+	}
 	return hoverInfo && world?.climateZones && world?.isLand?.[hoverInfo.region]
 		? (CLIMATE_LABELS[world.climateZones[hoverInfo.region]] ?? null)
 		: null
@@ -605,7 +633,16 @@ export function getHoverRealKoppenClimate(
 export function getHoverBiome(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
+	dataVariant: DataVariant,
 ): string | null {
+	if (!hoverInfo || !world) return null
+	const region = hoverInfo.region
+	if (dataVariant === "observed" && world.isEarthImport) {
+		const code = world.eu5Vegetation?.[region] ?? -1
+		return code >= 0
+			? formatObservedCategoryLabel(EU5_VEGETATION_CATEGORIES[code])
+			: "unmapped"
+	}
 	return hoverInfo && world?.vegetation && world?.isLand?.[hoverInfo.region]
 		? (BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null)
 		: null

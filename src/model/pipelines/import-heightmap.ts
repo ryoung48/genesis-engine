@@ -163,6 +163,7 @@ interface ImportParams {
 	 * heightmap); leave unset for a generic imported heightmap. */
 	albedo?: number
 	greenhouseFactor?: number
+	seismologyTotalHeatingK?: number
 }
 
 type ProgressFn = (label: string, pct?: number) => void
@@ -1281,6 +1282,7 @@ export function importGenesisWorld(
 		pressure: params.pressure ?? 1.0,
 		albedo: params.albedo,
 		greenhouseFactor: params.greenhouseFactor,
+		seismologyTotalHeatingK: params.seismologyTotalHeatingK,
 	}
 
 	const maxElevKm = (genesisParams.maxElevation ?? 6000) / 1000

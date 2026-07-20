@@ -17,7 +17,13 @@ import {
 import { createRng } from "@/model/shared/rng"
 import type { SystemBody } from "./generate-system-bodies"
 import { estimatePlanetarySizeClass } from "./size-class"
+import {
+	estimateDeviationFromOrbitalDistance,
+	hydrosphereCodeFromWaterPct,
+	zoneFromDeviation,
+} from "./system-environment"
 import { applySystemSeismology } from "./system-seismology"
+import { deriveTideLockStatus } from "./tide-lock"
 
 // Ported from galaxy-gen's src/model/system/sol/data.ts (SOL_PLANETS), plus
 // Earth/Luna as regular entries alongside them (see SOL_PLANET_SEEDS below)
@@ -251,7 +257,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 0.378,
 		densityEarthRelative: 0.984,
 		densityDescription: "Rock and Metal",
-		rotationHours: 1407.6,
+		rotationHours: 1407.5088,
 		tiltDeg: 0.03,
 		eccentricity: 0.2056,
 		atmosphere: {
@@ -277,7 +283,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 0.904,
 		densityEarthRelative: 0.952,
 		densityDescription: "Rock and Metal",
-		rotationHours: 5832.43,
+		rotationHours: 5832.432,
 		tiltDeg: 177.36,
 		eccentricity: 0.0068,
 		atmosphere: {
@@ -316,7 +322,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 1,
 		densityEarthRelative: 1,
 		densityDescription: "Rock and Metal",
-		rotationHours: 24,
+		rotationHours: 23.93447232,
 		tiltDeg: 23.5,
 		eccentricity: 0.0167,
 		inclinationDeg: 7.25,
@@ -399,7 +405,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 0.379,
 		densityEarthRelative: 0.713,
 		densityDescription: "Mostly Rock",
-		rotationHours: 24.62,
+		rotationHours: 24.62296224,
 		tiltDeg: 25.19,
 		eccentricity: 0.0934,
 		atmosphere: {
@@ -490,7 +496,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 2.528,
 		densityEarthRelative: 0.241,
 		densityDescription: "Hydrogen-Helium Envelope",
-		rotationHours: 9.93,
+		rotationHours: 9.92496,
 		tiltDeg: 3.13,
 		eccentricity: 0.049,
 		atmosphere: {
@@ -607,7 +613,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 1.065,
 		densityEarthRelative: 0.125,
 		densityDescription: "Hydrogen-Helium Envelope",
-		rotationHours: 10.66,
+		rotationHours: 10.65624,
 		tiltDeg: 26.73,
 		eccentricity: 0.0565,
 		atmosphere: {
@@ -689,7 +695,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 0.886,
 		densityEarthRelative: 0.231,
 		densityDescription: "Hydrogen-Helium Envelope",
-		rotationHours: 17.24,
+		rotationHours: 17.23992,
 		tiltDeg: 97.8,
 		eccentricity: 0.0464,
 		atmosphere: {
@@ -838,7 +844,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		gravityG: 0.063,
 		densityEarthRelative: 0.336,
 		densityDescription: "Mostly Ice",
-		rotationHours: 153.3,
+		rotationHours: 153.2928,
 		tiltDeg: 119.6,
 		eccentricity: 0.248,
 		// Pluto-Charon is a mutual (double-synchronous) lock -- unlike every
@@ -874,7 +880,7 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				gravityG: 0.029,
 				densityEarthRelative: 0.309,
 				densityDescription: "Mostly Ice",
-				rotationHours: 153.3,
+				rotationHours: 153.2928,
 				tiltDeg: 0,
 				eccentricity: 0,
 				pd: 8.24,
@@ -908,6 +914,7 @@ function buildMoon(seed: SolMoonSeed, idx: number, seedTag: number): MoonBody {
 		group: seed.group,
 		classification: seed.classification,
 		landCoverage: seed.landCoverage,
+		hydrosphereCode: hydrosphereCodeFromWaterPct((1 - seed.landCoverage) * 100),
 		atmosphere: seed.atmosphere,
 		orbitalPeriodDays: seed.rotationHours / 24,
 		// Real named moons here are (like nearly every major moon in our own
@@ -963,14 +970,23 @@ function buildPlanet(
 	const massKg = seed.massEarths * EARTH_MASS_KG
 	const orbitalPeriodDays =
 		getKeplerYearYears(seed.au, options?.starMassSol ?? 1) * 365.25
-	const moons = options?.moonsOverride
-		? attachParentTideLocks(options.moonsOverride, idx)
-		: attachParentTideLocks(
-				(seed.moons ?? []).map((moonSeed, i) =>
-					buildMoon(moonSeed, i + 1, seedTag * 100 + i + 1),
-				),
-				idx,
-			)
+	const moons = (
+		options?.moonsOverride
+			? attachParentTideLocks(options.moonsOverride, idx)
+			: attachParentTideLocks(
+					(seed.moons ?? []).map((moonSeed, i) =>
+						buildMoon(moonSeed, i + 1, seedTag * 100 + i + 1),
+					),
+					idx,
+				)
+	).map((moon) => ({
+		...moon,
+		tideLockStatus: deriveTideLockStatus({
+			siderealDayHours: moon.siderealDayHours,
+			orbitalPeriodDays: moon.orbitalPeriodDays,
+			tideLock: moon.tideLock,
+		}),
+	}))
 	const internalHeatTempK =
 		seed.group === "jovian"
 			? estimateGasGiantInternalHeatTempK(seed.massEarths, SOL_STAR_AGE_GYR)
@@ -985,6 +1001,11 @@ function buildPlanet(
 					? "world"
 					: `orbit-${Math.max(0, idx) + 1}`),
 		tideLock: seed.tideLock,
+		tideLockStatus: deriveTideLockStatus({
+			siderealDayHours: seed.rotationHours,
+			orbitalPeriodDays,
+			tideLock: seed.tideLock,
+		}),
 		substellarLon: seed.substellarLon,
 		name: seed.name,
 		sizeClass:
@@ -999,12 +1020,17 @@ function buildPlanet(
 						description: seed.densityDescription,
 					},
 		group: seed.group,
+		zone: zoneFromDeviation(estimateDeviationFromOrbitalDistance(seed.au, 1)),
 		classification: seed.classification,
 		texturePath: options?.textureOverride ?? seed.texturePath,
 		cloudsTexturePath: seed.cloudsTexturePath,
 		rings: SOL_PLANET_RINGS_BY_NAME[seed.name],
 		landDistribution: seed.landDistribution,
 		landCoverage: seed.landCoverage,
+		hydrosphereCode:
+			seed.group === "jovian"
+				? 13
+				: hydrosphereCodeFromWaterPct((1 - seed.landCoverage) * 100),
 		continentSizeVariety: seed.continentSizeVariety,
 		seaLevel: seed.seaLevel,
 		maxElevation: seed.maxElevation,
@@ -1045,6 +1071,7 @@ export const SOL_SYSTEM_BODIES: SystemBody[] = applySystemSeismology({
 	bodies: SOL_SYSTEM_BODIES_RAW,
 	starAgeGyr: SOL_STAR_AGE_GYR,
 	starLuminositySol: 1,
+	spectralClass: "G",
 })
 
 export const SOL_DEFAULT_SOLAR_SYSTEM: SolarSystemState = {
@@ -1091,7 +1118,15 @@ export const SOL_MAIN_WORLD_DEFAULTS = {
 	volcanism: 1,
 } as const
 
-export const SOL_LUNA_DEFAULT: MoonBody = attachParentTideLocks(
+const SOL_LUNA_BUILT: MoonBody = attachParentTideLocks(
 	[buildMoon(LUNA_SEED, 1, 0)],
 	-1,
 )[0]!
+export const SOL_LUNA_DEFAULT: MoonBody = {
+	...SOL_LUNA_BUILT,
+	tideLockStatus: deriveTideLockStatus({
+		siderealDayHours: SOL_LUNA_BUILT.siderealDayHours,
+		orbitalPeriodDays: SOL_LUNA_BUILT.orbitalPeriodDays,
+		tideLock: SOL_LUNA_BUILT.tideLock,
+	}),
+}

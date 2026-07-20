@@ -625,8 +625,8 @@ export function runPostElevationPipeline(
 	)
 	const tidalSchedule = computeTidalSchedule(
 		generateMoons(
-			params.moonCount ?? 0,
-			params.moonSeed ?? params.seed + 8831,
+			1,
+			params.seed + 8831,
 			params.planetRadiusKm,
 			params.orbitalDistanceAU,
 			moonOrbitHoursPerDay,

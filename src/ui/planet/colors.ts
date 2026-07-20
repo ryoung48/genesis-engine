@@ -81,7 +81,7 @@ export const OCEAN_LIGHT_BLUE: [number, number, number] = [0.75, 0.88, 0.96]
  * indices into these arrays; keep them in sync with the .json `categories`
  * field the build script writes to public/heightmap/eu5-*.json.
  */
-const EU5_TOPOGRAPHY_CATEGORIES = [
+export const EU5_TOPOGRAPHY_CATEGORIES = [
 	"atoll",
 	"coastal_ocean",
 	"deep_ocean",
@@ -106,7 +106,7 @@ const EU5_TOPOGRAPHY_CATEGORIES = [
 	"wetlands_wasteland",
 ] as const
 
-const EU5_VEGETATION_CATEGORIES = [
+export const EU5_VEGETATION_CATEGORIES = [
 	"desert",
 	"farmland",
 	"forest",
@@ -116,7 +116,7 @@ const EU5_VEGETATION_CATEGORIES = [
 	"woods",
 ] as const
 
-const EU5_CLIMATE_CATEGORIES = [
+export const EU5_CLIMATE_CATEGORIES = [
 	"arctic",
 	"arid",
 	"cold_arid",
@@ -199,6 +199,41 @@ export const EU5_CLIMATE_COLORS: [number, number, number][] = [
 	hex(0x285635), // subtropical
 	hex(0x23431d), // tropical
 ]
+
+/** Collapses EU5_TOPOGRAPHY_CATEGORIES down to land-only landforms for
+ * distribution charts (e.g. Environmental/nation-page "Topography"): water
+ * categories map to null (dropped entirely -- topography distributions
+ * describe land, not sea coverage) and each `_wasteland` variant folds into
+ * its non-wasteland counterpart's label (same landform, just barren) rather
+ * than getting its own bucket. dune_wasteland has no non-wasteland
+ * counterpart in the category list, so it keeps its own "Dune" bucket. */
+export const EU5_TOPOGRAPHY_MERGE_LABEL: Record<
+	(typeof EU5_TOPOGRAPHY_CATEGORIES)[number],
+	string | null
+> = {
+	atoll: "atoll",
+	coastal_ocean: null,
+	deep_ocean: null,
+	dune_wasteland: "dune",
+	flatland: "flatland",
+	flatland_wasteland: "flatland",
+	high_lakes: null,
+	hills: "hills",
+	hills_wasteland: "hills",
+	inland_sea: null,
+	lakes: null,
+	mesa_wasteland: "plateau",
+	mountain_wasteland: "mountains",
+	mountains: "mountains",
+	narrows: null,
+	ocean: null,
+	ocean_wasteland: null,
+	plateau: "plateau",
+	plateau_wasteland: "plateau",
+	salt_pans: "salt pans",
+	wetlands: "wetlands",
+	wetlands_wasteland: "wetlands",
+}
 
 if (EU5_TOPOGRAPHY_COLORS.length !== EU5_TOPOGRAPHY_CATEGORIES.length) {
 	throw new Error("EU5 topography categories/colors are out of sync")

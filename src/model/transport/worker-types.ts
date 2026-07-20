@@ -561,7 +561,7 @@ export type GenesisWorkerRequest =
 				pressure?: number
 				albedo?: number
 				greenhouseFactor?: number
-				moonCount?: number
+				seismologyTotalHeatingK?: number
 			}
 	  }
 	| {

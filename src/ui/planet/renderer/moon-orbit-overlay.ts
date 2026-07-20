@@ -250,6 +250,10 @@ export function buildMoonOrbitOverlay(
 	 * `name` of its own — e.g. "Luna" for the main world's default single
 	 * moon, which may still be unnamed in non-Sol procedural systems. */
 	firstMoonFallbackRealName?: string,
+	/** Whether to show a moon's own (procedurally generated or real) `name`
+	 * at all — unlike showRealNames (Sol-only real-name spoiler gate), this
+	 * is true for any generated moon name, Sol or not. */
+	namesEnabled: boolean = false,
 ): MoonOrbitState {
 	const group = new THREE.Group()
 	if (moons.length === 0) {
@@ -382,7 +386,7 @@ export function buildMoonOrbitOverlay(
 		if (showMoonNames) {
 			nameLabelAnchor = new THREE.Group()
 			const moonName =
-				showRealNames && moon.name
+				namesEnabled && moon.name
 					? moon.name
 					: showRealNames && i === 0 && firstMoonFallbackRealName
 						? firstMoonFallbackRealName

@@ -1,0 +1,2722 @@
+[
+	{
+		"sourceName": "Parthian Empire",
+		"tag": "PRT",
+		"note": "conflicts.json uses the formal empire name; nations.json stores Parthia."
+	},
+	{
+		"sourceName": "Sassanid Empire",
+		"tag": "ERS",
+		"note": "conflicts.json spelling/form variant for Eranshahr."
+	},
+	{
+		"sourceName": "Sasanian Empire",
+		"tag": "ERS",
+		"note": "Formal dynasty/empire name for Eranshahr."
+	},
+	{
+		"sourceName": "Kingdom of Aksum",
+		"tag": "AKS",
+		"note": "Prefer the main Aksumite Empire tag over the snapshot-only cp tag."
+	},
+	{
+		"sourceName": "Axum",
+		"tag": "AKS",
+		"note": "Spelling variant of Aksum."
+	},
+	{
+		"sourceName": "Axumite Empire",
+		"tag": "AKS",
+		"note": "Exact historical form for Aksumite Empire."
+	},
+	{
+		"sourceName": "Judea",
+		"tag": "JUD",
+		"note": "Use the Judea tag even when province-derived activity is incomplete."
+	},
+	{
+		"sourceName": "Roman Empire",
+		"rules": [
+			{
+				"endYear": 395,
+				"tag": "ROM"
+			},
+			{
+				"startYear": 395,
+				"endYear": 476,
+				"tag": "ROW"
+			},
+			{
+				"startYear": 476,
+				"tag": "BYZ"
+			}
+		],
+		"note": "After the 395 split, vague western invasions usually mean West Rome; later eastern continuity is Byzantine."
+	},
+	{
+		"sourceName": "Western Roman Empire",
+		"tag": "ROW"
+	},
+	{
+		"sourceName": "Eastern Roman Empire",
+		"tag": "BYZ"
+	},
+	{
+		"sourceName": "Vandal Kingdom",
+		"tag": "VAN"
+	},
+	{
+		"sourceName": "Visigothic Kingdom",
+		"tag": "GVI"
+	},
+	{
+		"sourceName": "Shu Han",
+		"tag": "SHU"
+	},
+	{
+		"sourceName": "Jin Dynasty",
+		"rules": [
+			{
+				"endYear": 420,
+				"tag": "JIN"
+			},
+			{
+				"startYear": 1616,
+				"tag": "CJN"
+			}
+		],
+		"note": "Chinese Jin dynasty vs Later Jin/Qing precursor."
+	},
+	{
+		"sourceName": "France",
+		"rules": [
+			{
+				"endYear": 1871,
+				"tag": "FRA"
+			},
+			{
+				"startYear": 1871,
+				"tag": "FR2"
+			}
+		]
+	},
+	{
+		"sourceName": "Kingdom of France",
+		"tag": "FRA"
+	},
+	{
+		"sourceName": "Austria-Hungary",
+		"tags": ["HAB", "HUN"],
+		"note": "Composite polity represented by separate Austria and Hungary tags."
+	},
+	{
+		"sourceName": "United Kingdom",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "British Empire",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "United States",
+		"tag": "USA"
+	},
+	{
+		"sourceName": "Confederate States of America",
+		"tag": "CSA"
+	},
+	{
+		"sourceName": "Ottoman Empire",
+		"tag": "TUR"
+	},
+	{
+		"sourceName": "Habsburg Empire",
+		"tag": "HAB"
+	},
+	{
+		"sourceName": "Spanish Empire",
+		"tag": "SPA"
+	},
+	{
+		"sourceName": "Portuguese Empire",
+		"tag": "POR"
+	},
+	{
+		"sourceName": "Ethiopian Empire",
+		"tag": "ETH"
+	},
+	{
+		"sourceName": "German Empire",
+		"tag": "GER"
+	},
+	{
+		"sourceName": "Russian Empire",
+		"tag": "RUS"
+	},
+	{
+		"sourceName": "Safavid Empire",
+		"tag": "PER"
+	},
+	{
+		"sourceName": "Asante Empire",
+		"tag": "ASH"
+	},
+	{
+		"sourceName": "Konbaung dynasty",
+		"tag": "BRM"
+	},
+	{
+		"sourceName": "Toungoo dynasty",
+		"tag": "TAU"
+	},
+	{
+		"sourceName": "French Third Republic",
+		"tag": "FR2"
+	},
+	{
+		"sourceName": "Third French Republic",
+		"tag": "FR2"
+	},
+	{
+		"sourceName": "Irish Free State",
+		"tag": "IRE"
+	},
+	{
+		"sourceName": "Central African Republic",
+		"tag": "CAF"
+	},
+	{
+		"sourceName": "United States of America",
+		"tag": "USA"
+	},
+	{
+		"sourceName": "Holy Roman Empire",
+		"tag": "HLR"
+	},
+	{
+		"sourceName": "Mongol Empire",
+		"tag": "MGE"
+	},
+	{
+		"sourceName": "Sardinia",
+		"tag": "SAR"
+	},
+	{
+		"sourceName": "Cambodia",
+		"tag": "CMB"
+	},
+	{
+		"sourceName": "Wales",
+		"tag": "WLS"
+	},
+	{
+		"sourceName": "Maine",
+		"tag": "MNE"
+	},
+	{
+		"sourceName": "Neustria",
+		"tag": "NEU"
+	},
+	{
+		"sourceName": "Austrasia",
+		"tag": "AUT"
+	},
+	{
+		"sourceName": "Himyarite Kingdom",
+		"tag": "HIM"
+	},
+	{
+		"sourceName": "Mon Kingdom",
+		"tag": "MNX"
+	},
+	{
+		"sourceName": "Arabia",
+		"tag": "ARB"
+	},
+	{
+		"sourceName": "Arapaho",
+		"tag": "ARP"
+	},
+	{
+		"sourceName": "Ceylon",
+		"tag": "CEY"
+	},
+	{
+		"sourceName": "Cherokee",
+		"tag": "CHE"
+	},
+	{
+		"sourceName": "Inca",
+		"tag": "INC"
+	},
+	{
+		"sourceName": "Kashmir",
+		"tag": "KSH"
+	},
+	{
+		"sourceName": "Khitans",
+		"tag": "KHT"
+	},
+	{
+		"sourceName": "Kingdom of Germany",
+		"tag": "GER"
+	},
+	{
+		"sourceName": "Kingdom of Kush",
+		"tag": "KUS"
+	},
+	{
+		"sourceName": "Kush",
+		"tag": "KUS"
+	},
+	{
+		"sourceName": "Mapuche",
+		"tag": "MPC"
+	},
+	{
+		"sourceName": "Nubia",
+		"tag": "NBI"
+	},
+	{
+		"sourceName": "Palmyra",
+		"tag": "PLM"
+	},
+	{
+		"sourceName": "Shewa",
+		"tag": "SOA"
+	},
+	{
+		"sourceName": "Sioux",
+		"tag": "SIO"
+	},
+	{
+		"sourceName": "Xianbei",
+		"tag": "XIB"
+	},
+	{
+		"sourceName": "South African Republic",
+		"tag": "RSA"
+	},
+	{
+		"sourceName": "Nguyễn dynasty",
+		"tag": "VTN"
+	},
+	{
+		"sourceName": "Yuan dynasty",
+		"tag": "YUA"
+	},
+	{
+		"sourceName": "Bornu Empire",
+		"tag": "KBO"
+	},
+	{
+		"sourceName": "Congo Free State",
+		"tag": "DRC"
+	},
+	{
+		"sourceName": "Maratha Empire",
+		"tag": "MAR"
+	},
+	{
+		"sourceName": "Frankish Empire",
+		"tag": "FRK"
+	},
+	{
+		"sourceName": "Dutch Republic",
+		"tag": "NED"
+	},
+	{
+		"sourceName": "Asante Kingdom",
+		"tag": "ASH"
+	},
+	{
+		"sourceName": "Khwarazmian Empire",
+		"tag": "KHW"
+	},
+	{
+		"sourceName": "Khwarezmian Empire",
+		"tag": "KHW"
+	},
+	{
+		"sourceName": "Polish-Lithuanian Commonwealth",
+		"tag": "PLC"
+	},
+	{
+		"sourceName": "Lithuanian-Polish Commonwealth",
+		"tag": "PLC"
+	},
+	{
+		"sourceName": "Poland-Lithuania",
+		"tag": "PLC"
+	},
+	{
+		"sourceName": "Central American Federation",
+		"tag": "CAM"
+	},
+	{
+		"sourceName": "Dutch Cape Colony",
+		"tag": "NED"
+	},
+	{
+		"sourceName": "Cape Colony",
+		"tag": "GBR",
+		"note": "The matching conflicts use the Cape Colony as a British colonial participant; Dutch Cape Colony is mapped separately."
+	},
+	{
+		"sourceName": "Maya city-states",
+		"tag": "cp_mayan_city_states"
+	},
+	{
+		"sourceName": "Mayan city-states",
+		"tag": "cp_mayan_city_states"
+	},
+	{
+		"sourceName": "Ahom Kingdom",
+		"tag": "ASS"
+	},
+	{
+		"sourceName": "Deccan Sultanates",
+		"tags": ["BAH", "BIJ", "GOC", "AHM", "BRR", "DEC"],
+		"note": "Composite label for the Deccan sultanates represented by separate tags."
+	},
+	{
+		"sourceName": "Hausa states",
+		"tags": ["HAU", "ZZZ", "GOB", "KWA", "NUP"],
+		"note": "Composite label for Hausa-region states represented by separate tags."
+	},
+	{
+		"sourceName": "Hausa kingdoms",
+		"tags": ["HAU", "ZZZ", "GOB", "KWA", "NUP"]
+	},
+	{
+		"sourceName": "Hausa city-states",
+		"tags": ["HAU", "ZZZ", "GOB", "KWA", "NUP"]
+	},
+	{
+		"sourceName": "Ummayad Caliphate",
+		"tag": "UMA"
+	},
+	{
+		"sourceName": "Ummayyad Caliphate",
+		"tag": "UMA"
+	},
+	{
+		"sourceName": "Umayyad Emirate",
+		"tag": "UMA"
+	},
+	{
+		"sourceName": "Ayyubid Caliphate",
+		"tag": "HSN"
+	},
+	{
+		"sourceName": "Ayyubid Dynasty",
+		"tag": "HSN"
+	},
+	{
+		"sourceName": "Ayubbid Dynasty",
+		"tag": "HSN"
+	},
+	{
+		"sourceName": "Sikh Empire",
+		"tag": "PUN"
+	},
+	{
+		"sourceName": "Sikh Kingdom",
+		"tag": "PUN"
+	},
+	{
+		"sourceName": "Swiss Confederation",
+		"tag": "SWI"
+	},
+	{
+		"sourceName": "Old Swiss Confederacy",
+		"tag": "SWI"
+	},
+	{
+		"sourceName": "Tibetan Empire",
+		"tag": "TIB"
+	},
+	{
+		"sourceName": "Hunnic Empire",
+		"tag": "HNS"
+	},
+	{
+		"sourceName": "Ghanaian Empire",
+		"tag": "GHA"
+	},
+	{
+		"sourceName": "Byzantine Empire in Nicea",
+		"tag": "NCA"
+	},
+	{
+		"sourceName": "First French Republic",
+		"tag": "FRA"
+	},
+	{
+		"sourceName": "French Empire",
+		"tag": "FRA"
+	},
+	{
+		"sourceName": "Italian Empire",
+		"tag": "ITA"
+	},
+	{
+		"sourceName": "Boer states",
+		"tags": ["RSA", "OFS", "NTL"]
+	},
+	{
+		"sourceName": "Boer Republic",
+		"tags": ["RSA", "OFS"]
+	},
+	{
+		"sourceName": "Boer Republics",
+		"tags": ["RSA", "OFS"]
+	},
+	{
+		"sourceName": "Colony of Natal",
+		"tag": "NTL"
+	},
+	{
+		"sourceName": "Avar Kingdom",
+		"tag": "AVR"
+	},
+	{
+		"sourceName": "Armenian Kingdom",
+		"tag": "ARM"
+	},
+	{
+		"sourceName": "Crusader States",
+		"tags": ["KOJ", "ANC", "EDE", "TPL"]
+	},
+	{
+		"sourceName": "Crusaders (Kingdom of Jerusalem)",
+		"tag": "KOJ"
+	},
+	{
+		"sourceName": "County of Edessa (Crusaders)",
+		"tag": "EDE"
+	},
+	{
+		"sourceName": "Crusader Principality of Antioch",
+		"tag": "ANC"
+	},
+	{
+		"sourceName": "Mon",
+		"tag": "MNX"
+	},
+	{
+		"sourceName": "Mossi",
+		"tag": "MSI"
+	},
+	{
+		"sourceName": "Mossi kingdoms",
+		"tag": "MSI"
+	},
+	{
+		"sourceName": "Danzig",
+		"tag": "DNZ"
+	},
+	{
+		"sourceName": "Annam",
+		"tag": "ANN"
+	},
+	{
+		"sourceName": "Abkhazia",
+		"tag": "ABK"
+	},
+	{
+		"sourceName": "Bahrain",
+		"tag": "BHR"
+	},
+	{
+		"sourceName": "Emirate of Kano",
+		"tag": "KAN"
+	},
+	{
+		"sourceName": "Kano Emirate",
+		"tag": "KAN"
+	},
+	{
+		"sourceName": "Kingdom of Butua",
+		"tag": "RZW"
+	},
+	{
+		"sourceName": "Kingdom of Congo",
+		"tag": "CNG"
+	},
+	{
+		"sourceName": "Kingdom of Ndongo",
+		"tag": "NDO"
+	},
+	{
+		"sourceName": "Kuba Kingdom",
+		"tag": "KUB"
+	},
+	{
+		"sourceName": "Mauretania",
+		"tag": "MRN"
+	},
+	{
+		"sourceName": "Pahang",
+		"tag": "PAH"
+	},
+	{
+		"sourceName": "Pyu",
+		"tag": "PYU"
+	},
+	{
+		"sourceName": "Qasim",
+		"tag": "QAS"
+	},
+	{
+		"sourceName": "Shawnee",
+		"tag": "SHA"
+	},
+	{
+		"sourceName": "Duchy of Schleswig",
+		"tag": "SCH"
+	},
+	{
+		"sourceName": "Schleswig",
+		"tag": "SCH"
+	},
+	{
+		"sourceName": "Tonkin",
+		"tag": "TOK"
+	},
+	{
+		"sourceName": "Xhosa Kingdom",
+		"tag": "XHO"
+	},
+	{
+		"sourceName": "Natchez people",
+		"tag": "NTZ"
+	},
+	{
+		"sourceName": "Somaliland",
+		"tag": "SML"
+	},
+	{
+		"sourceName": "Kurdistan",
+		"tag": "KRD"
+	},
+	{
+		"sourceName": "Florida",
+		"tag": "FLO"
+	},
+	{
+		"sourceName": "Geneva",
+		"tag": "GNV"
+	},
+	{
+		"sourceName": "Friesland",
+		"tag": "FRI"
+	},
+	{
+		"sourceName": "County of Frisia",
+		"tag": "FRI"
+	},
+	{
+		"sourceName": "Gojjam",
+		"tag": "GOJ"
+	},
+	{
+		"sourceName": "Huron",
+		"tag": "HUR"
+	},
+	{
+		"sourceName": "Ife",
+		"tag": "IFE"
+	},
+	{
+		"sourceName": "Muslim Caliphate",
+		"rules": [
+			{
+				"endYear": 661,
+				"tag": "RSD"
+			},
+			{
+				"startYear": 661,
+				"endYear": 750,
+				"tag": "UMA"
+			},
+			{
+				"startYear": 750,
+				"tag": "ABA"
+			}
+		],
+		"note": "Broad source label; use the dated caliphate tags modeled in nations.json."
+	},
+	{
+		"sourceName": "Arab Caliphate",
+		"rules": [
+			{
+				"endYear": 661,
+				"tag": "RSD"
+			},
+			{
+				"startYear": 661,
+				"endYear": 750,
+				"tag": "UMA"
+			},
+			{
+				"startYear": 750,
+				"tag": "ABA"
+			}
+		]
+	},
+	{
+		"sourceName": "Caliphate",
+		"rules": [
+			{
+				"endYear": 661,
+				"tag": "RSD"
+			},
+			{
+				"startYear": 661,
+				"endYear": 750,
+				"tag": "UMA"
+			},
+			{
+				"startYear": 750,
+				"tag": "ABA"
+			}
+		]
+	},
+	{
+		"sourceName": "Caliph Ali (Rashidun Caliphate)",
+		"tag": "RSD"
+	},
+	{
+		"sourceName": "Almohad Caliphate",
+		"tags": ["SOS", "MOR", "MHD"],
+		"note": "No single Almohad tag exists; represent its modeled Maghreb footprint with Sus, Morocco, and Mahdia."
+	},
+	{
+		"sourceName": "Almoravid Empire",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Almoravid dynasty",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Almoravid Caliphate",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Almorahid Caliphate",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Barbary States",
+		"tags": ["TUN", "TGT", "TUR"]
+	},
+	{
+		"sourceName": "Duchy of Warsaw",
+		"tag": "POL"
+	},
+	{
+		"sourceName": "Ndebele Kingdom",
+		"tag": "MTB"
+	},
+	{
+		"sourceName": "Northwestern Confederacy",
+		"tags": ["HUR", "MMI", "POT", "CLG"]
+	},
+	{
+		"sourceName": "Rabih's empire",
+		"tags": ["KBO", "BAG"]
+	},
+	{
+		"sourceName": "Somali Republic",
+		"tag": "SOM"
+	},
+	{
+		"sourceName": "Swahili city-states",
+		"tag": "ZAN"
+	},
+	{
+		"sourceName": "Tây Sơn dynasty",
+		"tag": "DAI"
+	},
+	{
+		"sourceName": "Trịnh dynasty",
+		"tag": "ANN"
+	},
+	{
+		"sourceName": "Zirid dynasty",
+		"tags": ["TUN", "MHD"]
+	},
+	{
+		"sourceName": "Bulgar Empire",
+		"tag": "BUL"
+	},
+	{
+		"sourceName": "Bulgar Kingdom",
+		"tag": "BUL"
+	},
+	{
+		"sourceName": "Bulgarian Empire",
+		"tag": "BUL"
+	},
+	{
+		"sourceName": "Central American states",
+		"tag": "CAM"
+	},
+	{
+		"sourceName": "Chimú Kingdom",
+		"tag": "CHM"
+	},
+	{
+		"sourceName": "Denanke Kingdom",
+		"tags": ["FUL", "JOL"]
+	},
+	{
+		"sourceName": "Hanthawaddy Kingdom",
+		"tag": "PEG"
+	},
+	{
+		"sourceName": "Hotak Dynasty (Afghans)",
+		"tag": "PER"
+	},
+	{
+		"sourceName": "Lagos Kingdom",
+		"tag": "BEN"
+	},
+	{
+		"sourceName": "Macina Empire",
+		"tags": ["JNN", "YAT"]
+	},
+	{
+		"sourceName": "Pedi Kingdom",
+		"tag": "RSA"
+	},
+	{
+		"sourceName": "Peru-Bolivia Confederation",
+		"tags": ["PEU", "BOL"]
+	},
+	{
+		"sourceName": "Republic of the Rif",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Rozvi Empire",
+		"tag": "RZI"
+	},
+	{
+		"sourceName": "Southern Song dynasty",
+		"tag": "SNG"
+	},
+	{
+		"sourceName": "Wattasid dynasty",
+		"tags": ["FEZ", "MRK", "MOR"]
+	},
+	{
+		"sourceName": "Yuan dynasty (Mongols)",
+		"tag": "YUA"
+	},
+	{
+		"sourceName": "Vijayanagara Empire",
+		"tag": "VIJ"
+	},
+	{
+		"sourceName": "Vijayanagara",
+		"tag": "VIJ"
+	},
+	{
+		"sourceName": "Chola Empire",
+		"tag": "CLS"
+	},
+	{
+		"sourceName": "Chola",
+		"tag": "CLS"
+	},
+	{
+		"sourceName": "Khwarezm Empire",
+		"tag": "KHW"
+	},
+	{
+		"sourceName": "Khwarezm",
+		"tag": "KHW"
+	},
+	{
+		"sourceName": "Seljuk Empire",
+		"tag": "SEL"
+	},
+	{
+		"sourceName": "Seljuk Sultanate",
+		"tag": "SEL"
+	},
+	{
+		"sourceName": "Mahdist State",
+		"tag": "SUD",
+		"note": "No separate Mahdist tag exists; use Sudan as the modeled territorial successor for Sudanese Mahdist conflicts."
+	},
+	{
+		"sourceName": "Maratha Confederacy",
+		"tag": "MAR"
+	},
+	{
+		"sourceName": "People's Republic of China",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "United Kingdom and Commonwealth",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "Untied Kingdom",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "Austrian Empire",
+		"tag": "HAB"
+	},
+	{
+		"sourceName": "Austro-Hungarian Empire",
+		"tags": ["HAB", "HUN"]
+	},
+	{
+		"sourceName": "German Confederation",
+		"tag": "GER"
+	},
+	{
+		"sourceName": "German states",
+		"tag": "GER"
+	},
+	{
+		"sourceName": "United Provinces",
+		"tag": "NED"
+	},
+	{
+		"sourceName": "Russian principalities",
+		"tags": ["MOS", "NOV", "RUS"]
+	},
+	{
+		"sourceName": "Sotho-Tswana polities",
+		"tags": ["LES", "BOT"]
+	},
+	{
+		"sourceName": "Basotho Kingdom",
+		"tag": "LES"
+	},
+	{
+		"sourceName": "Basutho Kingdom",
+		"tag": "LES"
+	},
+	{
+		"sourceName": "Lê dynasty",
+		"tag": "DAI"
+	},
+	{
+		"sourceName": "Toucouleur Empire",
+		"tags": ["JNN", "YAT", "KNG", "FUL"],
+		"note": "No Toucouleur tag exists; use the modeled West African tags covering the conflict theaters."
+	},
+	{
+		"sourceName": "Wassoulou Empire",
+		"tags": ["KNG", "FUL", "ASH"],
+		"note": "No Wassoulou tag exists; use nearby modeled West African polities from the conflict theaters."
+	},
+	{
+		"sourceName": "Bambara Kingdom of Segou",
+		"tags": ["JNN", "YAT", "KNG"],
+		"note": "No Segou/Bambara tag exists; use modeled adjacent West African polities for these conflicts."
+	},
+	{
+		"sourceName": "Sosso Empire",
+		"tags": ["MAL", "GHA"],
+		"note": "No Sosso tag exists; use Mali/Ghana region tags for the source conflicts."
+	},
+	{
+		"sourceName": "Gaza Empire",
+		"tags": ["POR", "SWZ", "RSA"],
+		"note": "No Gaza Empire tag exists; use modeled southeast African territorial tags around the conflict theaters."
+	},
+	{
+		"sourceName": "Colonial New England",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "New England Confederation",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "Colonial North Carolina",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "Colonial Pennsylvania",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "Colonial South Carolina",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "Colonial Virginia",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "Colony of Massachussetts",
+		"tags": ["ENG", "USA"]
+	},
+	{
+		"sourceName": "Irish Confederation",
+		"tag": "IRE"
+	},
+	{
+		"sourceName": "Irish kingdoms",
+		"tag": "IRE"
+	},
+	{
+		"sourceName": "Kabyle confederations",
+		"tag": "KBA"
+	},
+	{
+		"sourceName": "Zaian Berber confederation",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Tuareg confederations",
+		"tags": ["TGT", "KBO", "MAL"]
+	},
+	{
+		"sourceName": "Maori kingdoms",
+		"tag": "NZL"
+	},
+	{
+		"sourceName": "Indigenous confederation",
+		"tags": ["HUR", "MMI", "POT", "CLG"]
+	},
+	{
+		"sourceName": "Tecumseh's Confederacy",
+		"tags": ["SHA", "MMI", "POT", "CLG"]
+	},
+	{
+		"sourceName": "British Empire and Tecumseh's Confederacy",
+		"tags": ["GBR", "SHA", "MMI", "POT", "CLG"]
+	},
+	{
+		"sourceName": "Rajput Confederacy (Chahamanas)",
+		"tags": ["RJP", "MER", "DHU"]
+	},
+	{
+		"sourceName": "Rajput Principalities",
+		"tags": ["RJP", "MER", "DHU"]
+	},
+	{
+		"sourceName": "Rajput kingdoms",
+		"tags": ["RJP", "MER", "DHU"]
+	},
+	{
+		"sourceName": "Northern Dynasties",
+		"tags": ["WEI", "TNG"]
+	},
+	{
+		"sourceName": "Southern Dynasties",
+		"tags": ["LSO", "SNG"]
+	},
+	{
+		"sourceName": "Five Dynasties",
+		"tags": ["LSO", "SNG", "TNG"]
+	},
+	{
+		"sourceName": "Anuradhapura Kingdom",
+		"tag": "CEY"
+	},
+	{
+		"sourceName": "Allada Kingdom",
+		"tag": "DAH"
+	},
+	{
+		"sourceName": "Hueda Kingdom",
+		"tag": "DAH"
+	},
+	{
+		"sourceName": "Fante Confederacy",
+		"tag": "ASH"
+	},
+	{
+		"sourceName": "Ewe states",
+		"tag": "ASH"
+	},
+	{
+		"sourceName": "Ga states",
+		"tag": "ASH"
+	},
+	{
+		"sourceName": "Kingdom of Alodia (Alwa)",
+		"tag": "ALO"
+	},
+	{
+		"sourceName": "Berber Kingdom of Altava",
+		"tag": "ATV"
+	},
+	{
+		"sourceName": "Latin Empire in Byzantium",
+		"tag": "LAE"
+	},
+	{
+		"sourceName": "Latin Empire of Byzantium",
+		"tag": "LAE"
+	},
+	{
+		"sourceName": "Latin Principality of Achaea",
+		"tag": "cp_achaean_league"
+	},
+	{
+		"sourceName": "Kingdom of Tripoli",
+		"tag": "TPL"
+	},
+	{
+		"sourceName": "Emirate of Tripoli",
+		"tag": "TRP"
+	},
+	{
+		"sourceName": "Kingdom of Mewar (Rajput Confederacy)",
+		"tag": "MER"
+	},
+	{
+		"sourceName": "Kingdom of Imerina",
+		"tag": "MIR"
+	},
+	{
+		"sourceName": "Kingdom of Jersusalem",
+		"tag": "KOJ"
+	},
+	{
+		"sourceName": "Liao dynasty (Khitan)",
+		"tag": "LIO"
+	},
+	{
+		"sourceName": "Mongol Golden Horde",
+		"tag": "GLH"
+	},
+	{
+		"sourceName": "Norman Kingdom of Sicily",
+		"tag": "SIC"
+	},
+	{
+		"sourceName": "Ostrogothic Kingdom",
+		"tag": "OST"
+	},
+	{
+		"sourceName": "Norse Kingdom of Dublin",
+		"tag": "IRE"
+	},
+	{
+		"sourceName": "State of Buenos Aires (Mitre)",
+		"tag": "BUA"
+	},
+	{
+		"sourceName": "Republic of Korea",
+		"tag": "SKO"
+	},
+	{
+		"sourceName": "Revolutionary Government of the Republic of Indonesia",
+		"tag": "IDN"
+	},
+	{
+		"sourceName": "First Philippine Republic",
+		"tag": "PHI"
+	},
+	{
+		"sourceName": "Democratic Republic of Afghanistan (Khalq government)",
+		"tag": "AFG"
+	},
+	{
+		"sourceName": "Goryeo and Yuan dynasty",
+		"tags": ["GOR", "YUA"]
+	},
+	{
+		"sourceName": "Ming dynasty and Joseon",
+		"tags": ["MNG", "KOR"]
+	},
+	{
+		"sourceName": "Jin dynasty (Jurchen)",
+		"tag": "CJN"
+	},
+	{
+		"sourceName": "Qing dynasty (Manchu)",
+		"tag": "QNG"
+	},
+	{
+		"sourceName": "Chinese Republic",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "Nguyen Dynasty",
+		"tag": "VTN"
+	},
+	{
+		"sourceName": "Le Dynasty",
+		"tag": "DAI"
+	},
+	{
+		"sourceName": "Northern Song dynasty",
+		"tag": "SNG"
+	},
+	{
+		"sourceName": "Persian Empire",
+		"tag": "PER"
+	},
+	{
+		"sourceName": "Second Saudi State",
+		"tag": "SAU"
+	},
+	{
+		"sourceName": "Sokoto Caliphate (Muhammad Bello)",
+		"tag": "SOK"
+	},
+	{
+		"sourceName": "Tangut Empire",
+		"tag": "TAG"
+	},
+	{
+		"sourceName": "Tangut Kingdom",
+		"tag": "TAG"
+	},
+	{
+		"sourceName": "Swabian Confederation",
+		"tag": "SWA"
+	},
+	{
+		"sourceName": "Albanian states",
+		"tag": "ALB"
+	},
+	{
+		"sourceName": "Arab Caliphates",
+		"tags": ["RSD", "UMA", "ABA", "FAT"]
+	},
+	{
+		"sourceName": "Arab states",
+		"tag": "ARB"
+	},
+	{
+		"sourceName": "Burmese kingdom",
+		"tag": "BRM"
+	},
+	{
+		"sourceName": "Cocom dynasty",
+		"tag": "COC"
+	},
+	{
+		"sourceName": "Crown of Aragon and County of Toulouse",
+		"tags": ["ARA", "TOU"]
+	},
+	{
+		"sourceName": "Ethiopian Empire (Yohannes IV)",
+		"tag": "ETH"
+	},
+	{
+		"sourceName": "France and Commonwealth of England",
+		"tags": ["FRA", "ENG"]
+	},
+	{
+		"sourceName": "Frankish Kingdom of Burgundy",
+		"tag": "BUR"
+	},
+	{
+		"sourceName": "Frankish/French kingdoms",
+		"tags": ["FRK", "FRA"]
+	},
+	{
+		"sourceName": "French First Republic",
+		"tag": "FRA"
+	},
+	{
+		"sourceName": "French Kingdom of Athens",
+		"tags": ["FRA", "ATH"]
+	},
+	{
+		"sourceName": "French colonial power",
+		"tag": "FR2"
+	},
+	{
+		"sourceName": "German kingdom of Italy",
+		"tags": ["GER", "ITA"]
+	},
+	{
+		"sourceName": "Gothic Kingdom of Spain",
+		"tags": ["GVI", "SPA"]
+	},
+	{
+		"sourceName": "Holy Roman Empire and Saxony",
+		"tags": ["HLR", "SAX"]
+	},
+	{
+		"sourceName": "Indian/West Bengal state",
+		"tag": "BNG"
+	},
+	{
+		"sourceName": "Italian states",
+		"tag": "ITC"
+	},
+	{
+		"sourceName": "Itzá Maya kingdom",
+		"tags": ["ITZ", "MAY"]
+	},
+	{
+		"sourceName": "July Monarchy / French Republic",
+		"tag": "FR2"
+	},
+	{
+		"sourceName": "Kingdom of Dahomey (Behanzin)",
+		"tag": "DAH"
+	},
+	{
+		"sourceName": "Kingdom of England (Edward III and Edward Balliol)",
+		"tag": "ENG"
+	},
+	{
+		"sourceName": "Kingdom of Germany (East Francia)",
+		"tag": "GER"
+	},
+	{
+		"sourceName": "Kingdom of Gobir (Yunfa)",
+		"tag": "GOB"
+	},
+	{
+		"sourceName": "Lombard Kingdom",
+		"tag": "LOM"
+	},
+	{
+		"sourceName": "Maya polities (Tzotzil, Tzeltal, Lacandon)",
+		"tags": ["MAY", "ITZ", "COC"]
+	},
+	{
+		"sourceName": "Peru-Bolivian Confederation",
+		"tags": ["PEU", "BOL"]
+	},
+	{
+		"sourceName": "Peruvian-Bolivian Confederation",
+		"tags": ["PEU", "BOL"]
+	},
+	{
+		"sourceName": "Rashidun and Umayyad Caliphates",
+		"tags": ["RSD", "UMA"]
+	},
+	{
+		"sourceName": "Rif Confederation",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Roman Empire (Diocletian)",
+		"tag": "ROM"
+	},
+	{
+		"sourceName": "Siamese kingdom",
+		"tag": "SIA"
+	},
+	{
+		"sourceName": "Spanish Empire (Coronado expedition)",
+		"tag": "SPA"
+	},
+	{
+		"sourceName": "Spanish Empire (Onate)",
+		"tag": "SPA"
+	},
+	{
+		"sourceName": "Spanish Empire and Mexico",
+		"tags": ["SPA", "MEX"]
+	},
+	{
+		"sourceName": "30th Dynasty Egypt",
+		"tag": "EGY"
+	},
+	{
+		"sourceName": "Alawi dynasty",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Anglo-Saxon kingdoms",
+		"tags": ["ENG", "NOL", "WSX"]
+	},
+	{
+		"sourceName": "Argentine Confederation (Rosas)",
+		"tag": "LAP"
+	},
+	{
+		"sourceName": "Argentine Confederation (Urquiza)",
+		"tag": "LAP"
+	},
+	{
+		"sourceName": "Awraba Berber confederation",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Bambara Kingdom of Kaarta",
+		"tags": ["JNN", "YAT", "KNG"]
+	},
+	{
+		"sourceName": "Barue Kingdom",
+		"tag": "ZIM"
+	},
+	{
+		"sourceName": "Berber Jarawa confederation",
+		"tag": "ATV"
+	},
+	{
+		"sourceName": "Berber Kharijite confederation",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Berber tribal confederations",
+		"tags": ["MOR", "KBA", "TGT"]
+	},
+	{
+		"sourceName": "Betsileo kingdoms",
+		"tag": "MIR"
+	},
+	{
+		"sourceName": "Bornu Empire (al-Kanemi)",
+		"tag": "KBO"
+	},
+	{
+		"sourceName": "Bosnia and Hercegovina; Croatian Republic of Herzeg-Bosnia",
+		"tags": ["BHE", "HRZ", "CRO"]
+	},
+	{
+		"sourceName": "Croatian Republic of Herzeg Bosnia",
+		"tags": ["HRZ", "CRO"]
+	},
+	{
+		"sourceName": "Croatian Republic of Herzeg-Bosnia",
+		"tags": ["HRZ", "CRO"]
+	},
+	{
+		"sourceName": "Bou Amama's confederation",
+		"tags": ["MOR", "TGT"]
+	},
+	{
+		"sourceName": "British Empire and allied Māori",
+		"tags": ["GBR", "NZL"]
+	},
+	{
+		"sourceName": "Colonial government and kūpapa Māori",
+		"tags": ["GBR", "NZL"]
+	},
+	{
+		"sourceName": "Catholic states",
+		"tags": ["PAP", "HAB", "SPA"]
+	},
+	{
+		"sourceName": "Central Asian states",
+		"tags": ["BUK", "KOK", "TRS"]
+	},
+	{
+		"sourceName": "Chahamana Kingdom of Ranthambore",
+		"tag": "RJP"
+	},
+	{
+		"sourceName": "Chanca confederation",
+		"tag": "INC"
+	},
+	{
+		"sourceName": "County of Beziers and Carcassone",
+		"tag": "TOU"
+	},
+	{
+		"sourceName": "County of Blois and Champaigne",
+		"tag": "CHP"
+	},
+	{
+		"sourceName": "Danish Confederation of the Five Boroughs",
+		"tags": ["DAN", "NOL"]
+	},
+	{
+		"sourceName": "Diponegoro Kingdom",
+		"tag": "MTR"
+	},
+	{
+		"sourceName": "Eastern Empire",
+		"tag": "BYZ"
+	},
+	{
+		"sourceName": "Hafsid Dynasty",
+		"tag": "TUN"
+	},
+	{
+		"sourceName": "Hafsid Kingdom",
+		"tag": "TUN"
+	},
+	{
+		"sourceName": "Hamdanid Dynasty",
+		"tag": "SYR"
+	},
+	{
+		"sourceName": "Hammadid dynasty",
+		"tag": "KBA"
+	},
+	{
+		"sourceName": "Herero Kingdom",
+		"tag": "HER"
+	},
+	{
+		"sourceName": "Hindu kingdoms",
+		"tags": ["VIJ", "MYS", "MER"]
+	},
+	{
+		"sourceName": "Ijebu Kingdom",
+		"tag": "OYO"
+	},
+	{
+		"sourceName": "Islamic State - Sinai Province",
+		"tag": "EGY"
+	},
+	{
+		"sourceName": "Japanese kingdoms",
+		"tag": "JAP"
+	},
+	{
+		"sourceName": "Jewish kingdoms",
+		"tag": "JUD"
+	},
+	{
+		"sourceName": "Kasai Kingdom",
+		"tag": "KON"
+	},
+	{
+		"sourceName": "Kingdom of Ankole",
+		"tag": "BUG"
+	},
+	{
+		"sourceName": "Kingdom of Cayor",
+		"tag": "JOL"
+	},
+	{
+		"sourceName": "Kingdom of Kaba",
+		"tag": "KNG"
+	},
+	{
+		"sourceName": "Kingdom of Sine",
+		"tag": "JOL"
+	},
+	{
+		"sourceName": "Kingdom of Thessaly",
+		"tag": "THS"
+	},
+	{
+		"sourceName": "Kénédougou Kingdom",
+		"tag": "KNG"
+	},
+	{
+		"sourceName": "Lebanese government (with United States)",
+		"tags": ["LEB", "USA"]
+	},
+	{
+		"sourceName": "Lithuanian state",
+		"tag": "LIT"
+	},
+	{
+		"sourceName": "Malinke states",
+		"tags": ["MAL", "KNG"]
+	},
+	{
+		"sourceName": "Marabout states",
+		"tags": ["JNN", "YAT", "FUL"]
+	},
+	{
+		"sourceName": "Massina Empire",
+		"tags": ["JNN", "YAT"]
+	},
+	{
+		"sourceName": "Melayu Kingdom",
+		"tag": "PLB"
+	},
+	{
+		"sourceName": "Indian kingdoms",
+		"tags": ["DLH", "VIJ", "MUG", "MAR", "MYS", "MER"],
+		"note": "Broad source bucket; represented by major modeled Indian states."
+	},
+	{
+		"sourceName": "Christian kingdoms",
+		"tags": ["KOJ", "ARM", "ETH"]
+	},
+	{
+		"sourceName": "Islamic states",
+		"tags": ["RSD", "UMA", "ABA", "FAT", "MAM", "HSN"]
+	},
+	{
+		"sourceName": "Marabout state of Rip",
+		"tags": ["JNN", "YAT", "FUL"]
+	},
+	{
+		"sourceName": "Oromo confederations",
+		"tags": ["ETH", "GOJ"]
+	},
+	{
+		"sourceName": "Banu Bakr (Arab tribal confederation)",
+		"tag": "ARB"
+	},
+	{
+		"sourceName": "Moorish/Berber confederations",
+		"tags": ["MOR", "KBA", "TGT"]
+	},
+	{
+		"sourceName": "Mạc dynasty",
+		"tag": "DAI"
+	},
+	{
+		"sourceName": "Nembe Kingdom",
+		"tag": "BEN"
+	},
+	{
+		"sourceName": "Neo-Inca State",
+		"tag": "INC"
+	},
+	{
+		"sourceName": "Neo-Inca State (Manco Inca)",
+		"tag": "INC"
+	},
+	{
+		"sourceName": "Nso Kingdom",
+		"tag": "CMR"
+	},
+	{
+		"sourceName": "Principality of Dulgadir",
+		"tag": "DUL"
+	},
+	{
+		"sourceName": "Principality of Herat",
+		"tag": "AFG"
+	},
+	{
+		"sourceName": "Protestant states",
+		"tags": ["ENG", "NED", "SWE"]
+	},
+	{
+		"sourceName": "Reguibat / Ma al-Aynayn's confederation",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Republic of Goryokaku",
+		"tag": "JAP"
+	},
+	{
+		"sourceName": "Republic of South Maluku",
+		"tag": "IDN"
+	},
+	{
+		"sourceName": "Riograndense Republic",
+		"tag": "RIO"
+	},
+	{
+		"sourceName": "Rus principalities and Cumans",
+		"tags": ["MOS", "NOV", "RUS"]
+	},
+	{
+		"sourceName": "Senegalese kingdoms",
+		"tags": ["JOL", "FUL"]
+	},
+	{
+		"sourceName": "Senussi Kingdom",
+		"tag": "TUN"
+	},
+	{
+		"sourceName": "Serbian kingdoms",
+		"tag": "SER"
+	},
+	{
+		"sourceName": "Suri Empire",
+		"tag": "DLH"
+	},
+	{
+		"sourceName": "Tibetan Confederation",
+		"tag": "TIB"
+	},
+	{
+		"sourceName": "Tibetan states",
+		"tag": "TIB"
+	},
+	{
+		"sourceName": "Torwa Kingdom",
+		"tag": "RZI"
+	},
+	{
+		"sourceName": "Toungoo Empire",
+		"tag": "TAU"
+	},
+	{
+		"sourceName": "Trinh Dynasty",
+		"tag": "ANN"
+	},
+	{
+		"sourceName": "Tripolitanian Republic",
+		"tag": "TRP"
+	},
+	{
+		"sourceName": "Tukulor Empire",
+		"tags": ["JNN", "YAT", "KNG", "FUL"]
+	},
+	{
+		"sourceName": "Turcoman Confederacy",
+		"tag": "TRS"
+	},
+	{
+		"sourceName": "Umayyad Caliphate (Yazid I)",
+		"tag": "UMA"
+	},
+	{
+		"sourceName": "United Kingdom (British India)",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "United Kingdom of Great Britain and Ireland",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "United Provinces of Rio de la Plata",
+		"tag": "LAP"
+	},
+	{
+		"sourceName": "Algeria",
+		"tag": "ALG"
+	},
+	{
+		"sourceName": "Alemmani",
+		"tag": "ALM"
+	},
+	{
+		"sourceName": "Argentina",
+		"tag": "LAP"
+	},
+	{
+		"sourceName": "Basotho",
+		"tag": "LES"
+	},
+	{
+		"sourceName": "Bern",
+		"tag": "SWI"
+	},
+	{
+		"sourceName": "Britain",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "British India",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "Byzantine Nicea",
+		"tag": "NCA"
+	},
+	{
+		"sourceName": "Byzantium",
+		"tag": "BYZ"
+	},
+	{
+		"sourceName": "Cao Cao",
+		"tag": "WEI"
+	},
+	{
+		"sourceName": "Cao Wei",
+		"tag": "WEI"
+	},
+	{
+		"sourceName": "Castile",
+		"tag": "CAS"
+	},
+	{
+		"sourceName": "Colombian Government",
+		"tag": "COL"
+	},
+	{
+		"sourceName": "Crown of Castile",
+		"tag": "CAS"
+	},
+	{
+		"sourceName": "Dutch",
+		"tag": "NED"
+	},
+	{
+		"sourceName": "Eastern Wei",
+		"tag": "WEI"
+	},
+	{
+		"sourceName": "Eastern Wu",
+		"tag": "WUU"
+	},
+	{
+		"sourceName": "Egypt (Muhammad Ali)",
+		"tag": "EGY"
+	},
+	{
+		"sourceName": "Ethiopia (Derg)",
+		"tag": "ETH"
+	},
+	{
+		"sourceName": "Free France",
+		"tag": "FR2"
+	},
+	{
+		"sourceName": "French Indochina",
+		"tags": ["FR2", "ANN", "KHM", "LAO"]
+	},
+	{
+		"sourceName": "Ghazni",
+		"tag": "GHZ"
+	},
+	{
+		"sourceName": "Greek Government",
+		"tag": "GRE"
+	},
+	{
+		"sourceName": "Habsburg Spain",
+		"tags": ["SPA", "HAB"]
+	},
+	{
+		"sourceName": "Han China",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "Hanover",
+		"tag": "HAN"
+	},
+	{
+		"sourceName": "Hauhau",
+		"tag": "NZL"
+	},
+	{
+		"sourceName": "Hauhau Maori",
+		"tag": "NZL"
+	},
+	{
+		"sourceName": "Hesse",
+		"tag": "HES"
+	},
+	{
+		"sourceName": "Huerta Regime",
+		"tag": "MEX"
+	},
+	{
+		"sourceName": "Joseon (Korea)",
+		"tag": "KOR"
+	},
+	{
+		"sourceName": "Jordan",
+		"tag": "JOR"
+	},
+	{
+		"sourceName": "Kanauj",
+		"tag": "KNN"
+	},
+	{
+		"sourceName": "Khedivate of Egypt",
+		"tag": "EGY"
+	},
+	{
+		"sourceName": "Khmer Rouge",
+		"tag": "KHM"
+	},
+	{
+		"sourceName": "Kuomintang",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "Lakota Sioux",
+		"tag": "SIO"
+	},
+	{
+		"sourceName": "Latin Byzantium",
+		"tag": "LAE"
+	},
+	{
+		"sourceName": "Mahmud of Ghazni",
+		"tag": "GHZ"
+	},
+	{
+		"sourceName": "Mamluk Egypt",
+		"tag": "MAM"
+	},
+	{
+		"sourceName": "Maori",
+		"tag": "NZL"
+	},
+	{
+		"sourceName": "Matamba",
+		"tag": "NDO"
+	},
+	{
+		"sourceName": "Mexican Government",
+		"tag": "MEX"
+	},
+	{
+		"sourceName": "Ming China",
+		"tag": "MNG"
+	},
+	{
+		"sourceName": "Moscow",
+		"tag": "MOS"
+	},
+	{
+		"sourceName": "Muslim Spain",
+		"tag": "CRD"
+	},
+	{
+		"sourceName": "Nazi Germany",
+		"tag": "GER"
+	},
+	{
+		"sourceName": "New Zealand",
+		"tag": "NZL"
+	},
+	{
+		"sourceName": "Northumbria",
+		"tag": "NOL"
+	},
+	{
+		"sourceName": "Oda Nobunaga",
+		"tag": "ODA"
+	},
+	{
+		"sourceName": "Piedmont",
+		"tag": "SPI"
+	},
+	{
+		"sourceName": "Qing China",
+		"tag": "QNG"
+	},
+	{
+		"sourceName": "Rome",
+		"tag": "ROM"
+	},
+	{
+		"sourceName": "Sassanid Persia",
+		"tag": "ERS"
+	},
+	{
+		"sourceName": "Satsuma",
+		"tag": "SMZ"
+	},
+	{
+		"sourceName": "Sikh Punjab",
+		"tag": "PUN"
+	},
+	{
+		"sourceName": "South Carolina",
+		"tags": ["USA", "CSA"]
+	},
+	{
+		"sourceName": "Spanish Government",
+		"tag": "SPA"
+	},
+	{
+		"sourceName": "Switzerland",
+		"tag": "SWI"
+	},
+	{
+		"sourceName": "Tang China",
+		"tag": "TNG"
+	},
+	{
+		"sourceName": "Thailand",
+		"tag": "SIA"
+	},
+	{
+		"sourceName": "Toyotomo Hideyoshi",
+		"tag": "TYT"
+	},
+	{
+		"sourceName": "Transvaal",
+		"tag": "RSA"
+	},
+	{
+		"sourceName": "Transylvannia",
+		"tag": "TRA"
+	},
+	{
+		"sourceName": "USSR",
+		"tag": "SOV"
+	},
+	{
+		"sourceName": "Union of South Africa",
+		"tag": "RSA"
+	},
+	{
+		"sourceName": "Viet Minh",
+		"tag": "NVI"
+	},
+	{
+		"sourceName": "Vijayanagar",
+		"tag": "VIJ"
+	},
+	{
+		"sourceName": "Virginia",
+		"tags": ["USA", "CSA"]
+	},
+	{
+		"sourceName": "Western Wei",
+		"tag": "WEI"
+	},
+	{
+		"sourceName": "Wu Beifu",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "Zaire",
+		"tag": "DRC"
+	},
+	{
+		"sourceName": "Zimbabwe",
+		"tag": "ZIM"
+	},
+	{
+		"sourceName": "Đại Cồ Việt",
+		"tag": "DAI"
+	},
+	{
+		"sourceName": "Đại Việt",
+		"tag": "DAI"
+	},
+	{
+		"sourceName": "Abbasid Caliphate",
+		"tag": "ABA"
+	},
+	{
+		"sourceName": "Adal Sultanate",
+		"tag": "ADA"
+	},
+	{
+		"sourceName": "Alawi Sultanate",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Ayutthaya Kingdom",
+		"tag": "AYU"
+	},
+	{
+		"sourceName": "Aztec Empire",
+		"tag": "AZT"
+	},
+	{
+		"sourceName": "Delhi Sultanate",
+		"tag": "DLH"
+	},
+	{
+		"sourceName": "Democratic Republic of the Congo",
+		"tag": "DRC"
+	},
+	{
+		"sourceName": "Empire of Japan",
+		"tag": "JAP"
+	},
+	{
+		"sourceName": "Fatimid Caliphate",
+		"tag": "FAT"
+	},
+	{
+		"sourceName": "Franks",
+		"tag": "FRK"
+	},
+	{
+		"sourceName": "Goths",
+		"tags": ["GOT", "GVI"]
+	},
+	{
+		"sourceName": "Han Dynasty",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "Hyderabad",
+		"tag": "HDY"
+	},
+	{
+		"sourceName": "Inca Empire",
+		"tag": "INC"
+	},
+	{
+		"sourceName": "Kingdom of Italy",
+		"tag": "ITA"
+	},
+	{
+		"sourceName": "Kingdom of Jerusalem",
+		"tag": "KOJ"
+	},
+	{
+		"sourceName": "Kingdom of Kandy",
+		"tag": "KND"
+	},
+	{
+		"sourceName": "Kingdom of Kongo",
+		"tag": "KON"
+	},
+	{
+		"sourceName": "Kingdom of Naples",
+		"tag": "NAP"
+	},
+	{
+		"sourceName": "Kingdom of Spain",
+		"tag": "SPA"
+	},
+	{
+		"sourceName": "Khmer Empire",
+		"tag": "KHM"
+	},
+	{
+		"sourceName": "Mali Empire",
+		"tag": "MAL"
+	},
+	{
+		"sourceName": "Mamlukes",
+		"tag": "MAM"
+	},
+	{
+		"sourceName": "Mataram Sultanate",
+		"tag": "MTR"
+	},
+	{
+		"sourceName": "Ming Dynasty",
+		"tag": "MNG"
+	},
+	{
+		"sourceName": "Mongols",
+		"tag": "MGE"
+	},
+	{
+		"sourceName": "Mughal Empire",
+		"tag": "MUG"
+	},
+	{
+		"sourceName": "Papal States",
+		"tag": "PAP"
+	},
+	{
+		"sourceName": "Principality of Antioch",
+		"tag": "ANT"
+	},
+	{
+		"sourceName": "Qing Dynasty",
+		"tag": "QNG"
+	},
+	{
+		"sourceName": "Regency of Algiers",
+		"tag": "ALG"
+	},
+	{
+		"sourceName": "Song Dynasty",
+		"tag": "SNG"
+	},
+	{
+		"sourceName": "Songhai Empire",
+		"tag": "SON"
+	},
+	{
+		"sourceName": "Sokoto Caliphate",
+		"tag": "SOK"
+	},
+	{
+		"sourceName": "Swabian League",
+		"tag": "SWA"
+	},
+	{
+		"sourceName": "Tang Dynasty",
+		"tag": "TNG"
+	},
+	{
+		"sourceName": "Teutonic Knights",
+		"tag": "TEU"
+	},
+	{
+		"sourceName": "Timurid Empire",
+		"tag": "TIM"
+	},
+	{
+		"sourceName": "Umayyad Caliphate",
+		"tag": "UMA"
+	},
+	{
+		"sourceName": "Zulu Kingdom",
+		"tag": "ZUL"
+	},
+	{
+		"sourceName": "Almoravids",
+		"tag": "MOR"
+	},
+	{
+		"sourceName": "Ashanti Kingdom",
+		"tag": "ASH"
+	},
+	{
+		"sourceName": "Bulgar Khanate",
+		"tag": "BUL"
+	},
+	{
+		"sourceName": "House of Saud",
+		"tag": "SAU"
+	},
+	{
+		"sourceName": "Ifat Sultanate",
+		"tag": "IFA"
+	},
+	{
+		"sourceName": "Kingdom of Portugal",
+		"tag": "POR"
+	},
+	{
+		"sourceName": "Lordship of the Isles",
+		"tag": "KOI"
+	},
+	{
+		"sourceName": "Mamluk Sultanate",
+		"tag": "MAM"
+	},
+	{
+		"sourceName": "Manchus",
+		"tag": "QNG"
+	},
+	{
+		"sourceName": "Maoris",
+		"tag": "NZL"
+	},
+	{
+		"sourceName": "Massachussetts",
+		"tag": "USA"
+	},
+	{
+		"sourceName": "Navarre",
+		"tag": "NAV"
+	},
+	{
+		"sourceName": "Normans",
+		"tag": "NRM"
+	},
+	{
+		"sourceName": "Oyo Empire",
+		"tag": "OYO"
+	},
+	{
+		"sourceName": "Rashidun Caliphate",
+		"tag": "RSD"
+	},
+	{
+		"sourceName": "Republic of China",
+		"tag": "CHN"
+	},
+	{
+		"sourceName": "Saxons",
+		"tag": "SAX"
+	},
+	{
+		"sourceName": "Seljuk Turks",
+		"tag": "SEL"
+	},
+	{
+		"sourceName": "Sui Dynasty",
+		"tag": "SUI"
+	},
+	{
+		"sourceName": "Sultanate of Rum",
+		"tag": "RUM"
+	},
+	{
+		"sourceName": "Aceh Sultanate",
+		"tag": "ATJ"
+	},
+	{
+		"sourceName": "Angevins",
+		"tag": "ANJ"
+	},
+	{
+		"sourceName": "Bahmani Sultanate",
+		"tag": "BAH"
+	},
+	{
+		"sourceName": "British East India Company",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "British South Africa Company",
+		"tag": "GBR"
+	},
+	{
+		"sourceName": "Dutch East India Company",
+		"tag": "NED"
+	},
+	{
+		"sourceName": "Ghana Empire",
+		"tag": "GHA"
+	},
+	{
+		"sourceName": "Kingdom of England",
+		"tag": "ENG"
+	},
+	{
+		"sourceName": "Knights Hospitallier",
+		"tag": "KNI"
+	},
+	{
+		"sourceName": "Lombards",
+		"tag": "LOM"
+	},
+	{
+		"sourceName": "Mapuche people",
+		"tag": "MPC"
+	},
+	{
+		"sourceName": "Marinid Sultanate",
+		"tag": "MRN"
+	},
+	{
+		"sourceName": "Merina Kingdom",
+		"tag": "MIR"
+	},
+	{
+		"sourceName": "Mutapa Empire",
+		"tag": "ZIM"
+	},
+	{
+		"sourceName": "Pueblo peoples",
+		"tag": "PUE"
+	},
+	{
+		"sourceName": "Saudis",
+		"tag": "SAU"
+	},
+	{
+		"sourceName": "Sultanate of Oman",
+		"tag": "OMA"
+	},
+	{
+		"sourceName": "Tatar Khanate",
+		"tag": "TAT"
+	},
+	{
+		"sourceName": "Boers",
+		"tags": ["RSA", "OFS"]
+	},
+	{
+		"sourceName": "Britons",
+		"tags": ["BRI", "WLS", "CRN"]
+	},
+	{
+		"sourceName": "Crusaders",
+		"tags": ["KOJ", "ANT", "CYP", "KNI"]
+	},
+	{
+		"sourceName": "Danish Vikings",
+		"tag": "DEN"
+	},
+	{
+		"sourceName": "Gurkhas",
+		"tag": "NPL"
+	},
+	{
+		"sourceName": "Hussites",
+		"tag": "BOH"
+	},
+	{
+		"sourceName": "Lancastrians",
+		"tag": "LAN"
+	},
+	{
+		"sourceName": "Rashidis",
+		"tag": "RSH"
+	},
+	{
+		"sourceName": "Tuareg",
+		"tags": ["TGT", "AIR", "AZA", "KBO", "MAL"]
+	},
+	{
+		"sourceName": "Vikings",
+		"tags": ["DEN", "NOR", "SWE"]
+	},
+	{
+		"sourceName": "Yorkists",
+		"tag": "YOR"
+	},
+	{
+		"sourceName": "26th Dynasty Egypt",
+		"tag": "cp_twenty_sixth_dynasty_of_egypt"
+	},
+	{
+		"sourceName": "Achaemenid Persian Empire",
+		"tag": "cp_achaemenid_empire"
+	},
+	{
+		"sourceName": "Achea",
+		"tag": "cp_achaean_league"
+	},
+	{
+		"sourceName": "Achean League",
+		"tag": "cp_achaean_league"
+	},
+	{
+		"sourceName": "Akkad",
+		"tag": "cp_akkadian_empire"
+	},
+	{
+		"sourceName": "Antigonid Macedon",
+		"tag": "cp_antigonid_macedonia"
+	},
+	{
+		"sourceName": "Argos",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Athens",
+		"tag": "ATH"
+	},
+	{
+		"sourceName": "Babylonia",
+		"tag": "cp_babylonia"
+	},
+	{
+		"sourceName": "Canaanite city-states",
+		"tag": "cp_phoenician_colonies"
+	},
+	{
+		"sourceName": "Canaanite coalition",
+		"tag": "cp_phoenician_colonies"
+	},
+	{
+		"sourceName": "Canaanite states",
+		"tag": "cp_phoenician_colonies"
+	},
+	{
+		"sourceName": "Carchemish",
+		"tag": "cp_neo_hittite_states"
+	},
+	{
+		"sourceName": "Carthage",
+		"tag": "cp_carthage"
+	},
+	{
+		"sourceName": "Chios",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Corinth",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Duke of Chu",
+		"tag": "cp_warring_states_china"
+	},
+	{
+		"sourceName": "Duke of Jin",
+		"tag": "cp_warring_states_china"
+	},
+	{
+		"sourceName": "Elam",
+		"tag": "cp_elam"
+	},
+	{
+		"sourceName": "Greek coalition (Sparta, Athens and allies)",
+		"tags": ["cp_peloponnesian_league", "cp_athenian_coalition"]
+	},
+	{
+		"sourceName": "Hittite Empire",
+		"tag": "cp_hittites"
+	},
+	{
+		"sourceName": "Hyksos 15th Dynasty",
+		"tag": "cp_fifteenth_dynasty_of_egypt"
+	},
+	{
+		"sourceName": "Hyksos confederation",
+		"tag": "cp_hyksos"
+	},
+	{
+		"sourceName": "Illyria",
+		"tag": "cp_illyrian_kingdom"
+	},
+	{
+		"sourceName": "Judah",
+		"tag": "cp_kingdom_of_judah"
+	},
+	{
+		"sourceName": "Kingdom of Kerma",
+		"tag": "cp_kingdom_of_kush"
+	},
+	{
+		"sourceName": "Larsa",
+		"tag": "cp_sumerian_city_states"
+	},
+	{
+		"sourceName": "Lysimachus",
+		"tag": "cp_kingdom_of_lysimachus"
+	},
+	{
+		"sourceName": "Macedon",
+		"tag": "MAC"
+	},
+	{
+		"sourceName": "Mauryan Empire",
+		"tag": "cp_maurya_empire"
+	},
+	{
+		"sourceName": "Media",
+		"tag": "cp_median_kingdom"
+	},
+	{
+		"sourceName": "Middle Kingdom Egypt",
+		"tag": "cp_middle_kingdom_of_egypt"
+	},
+	{
+		"sourceName": "Mitanni Empire",
+		"tag": "cp_mitanni"
+	},
+	{
+		"sourceName": "New Kingdom Egypt",
+		"tag": "cp_new_kingdom_of_egypt"
+	},
+	{
+		"sourceName": "Nubian kingdoms",
+		"tag": "NBI"
+	},
+	{
+		"sourceName": "Old Kingdom Egypt",
+		"tag": "cp_old_kingdom_of_egypt"
+	},
+	{
+		"sourceName": "Pergamon",
+		"tag": "cp_kingdom_of_pergamon"
+	},
+	{
+		"sourceName": "Pergamum",
+		"tag": "cp_kingdom_of_pergamon"
+	},
+	{
+		"sourceName": "Philistines",
+		"tag": "cp_philistia"
+	},
+	{
+		"sourceName": "Phoenician cities",
+		"tag": "cp_phoenicia"
+	},
+	{
+		"sourceName": "Ptolemaic Egypt",
+		"tag": "cp_ptolemaic_kingdom"
+	},
+	{
+		"sourceName": "Ptolmeic Egypt",
+		"tag": "cp_ptolemaic_kingdom"
+	},
+	{
+		"sourceName": "Ptolmey",
+		"tag": "cp_ptolemaic_kingdom"
+	},
+	{
+		"sourceName": "Scythian tribes",
+		"tag": "cp_scythia"
+	},
+	{
+		"sourceName": "Scythians",
+		"tag": "cp_scythia"
+	},
+	{
+		"sourceName": "Seleucids",
+		"tag": "cp_seleucid_empire"
+	},
+	{
+		"sourceName": "Seleucus",
+		"tag": "cp_seleucid_empire"
+	},
+	{
+		"sourceName": "Shang",
+		"tag": "cp_shang_dynasty"
+	},
+	{
+		"sourceName": "Sumerian city-states",
+		"tag": "cp_sumerian_city_states"
+	},
+	{
+		"sourceName": "Syrian city-states",
+		"tag": "SYR"
+	},
+	{
+		"sourceName": "Syrian states",
+		"tag": "SYR"
+	},
+	{
+		"sourceName": "Theban 11th Dynasty",
+		"tag": "cp_middle_kingdom_of_egypt"
+	},
+	{
+		"sourceName": "Theban 17th Dynasty",
+		"tag": "cp_seventeenth_dynasty_of_egypt"
+	},
+	{
+		"sourceName": "Thebes",
+		"tag": "cp_thebans"
+	},
+	{
+		"sourceName": "Thrace",
+		"tag": "cp_thracian_kingdom"
+	},
+	{
+		"sourceName": "Umma",
+		"tag": "cp_sumerian_city_states"
+	},
+	{
+		"sourceName": "Ur",
+		"tag": "cp_sumerian_city_states"
+	},
+	{
+		"sourceName": "Ugarit",
+		"tag": "cp_phoenician_colonies"
+	},
+	{
+		"sourceName": "Xiang Yu",
+		"tag": "cp_western_chu"
+	},
+	{
+		"sourceName": "Arcadia",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Boii",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "Boii Gauls",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "British Tribes",
+		"tag": "BRI"
+	},
+	{
+		"sourceName": "Cimbri",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "Duke of Wu",
+		"tag": "WUU"
+	},
+	{
+		"sourceName": "Gallic tribes",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "Gauls",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "Insubrian Gauls",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "Lucania",
+		"tag": "cp_italian_city_states"
+	},
+	{
+		"sourceName": "Marsi",
+		"tag": "cp_italian_city_states"
+	},
+	{
+		"sourceName": "Numidia",
+		"tag": "cp_kingdom_of_numidia"
+	},
+	{
+		"sourceName": "Olynthus",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Phocia",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Potidaea",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Samnites",
+		"tag": "cp_italian_city_states"
+	},
+	{
+		"sourceName": "Sparta",
+		"tag": "cp_peloponnesian_league"
+	},
+	{
+		"sourceName": "State of Jin",
+		"tag": "JIN"
+	},
+	{
+		"sourceName": "State of Qi",
+		"tag": "QIC"
+	},
+	{
+		"sourceName": "Syracuse",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Teutones",
+		"tag": "cp_galatia"
+	},
+	{
+		"sourceName": "Thessaly",
+		"tag": "cp_greek_city_states"
+	},
+	{
+		"sourceName": "Alexander Balas",
+		"tag": "cp_seleucid_empire"
+	},
+	{
+		"sourceName": "Antigonus",
+		"tag": "cp_antigonid_dynasty"
+	},
+	{
+		"sourceName": "Brutus",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Caesar",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Caesarians",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Cleopatra",
+		"tag": "cp_ptolemaic_kingdom"
+	},
+	{
+		"sourceName": "Eumenes",
+		"tag": "cp_kingdom_of_pergamon"
+	},
+	{
+		"sourceName": "Gaius Marius the Younger",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Julius Caesar",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Liu Bang",
+		"tag": "cp_han"
+	},
+	{
+		"sourceName": "Marc Antony",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Mark Antony",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Octavian",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Pompey",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Pompey the Younger",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Pompeians",
+		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "Quintus Sertorius",
+		"tag": "cp_roman_republic"
+	}
+]

@@ -26,6 +26,7 @@ interface LockedClimatePreviewConfig {
 	pressure: number
 	planetRadiusKm: number
 	substellarLon: number
+	seismologyTotalHeatingK?: number
 }
 
 const LONGITUDE_STEP = 10
@@ -44,6 +45,7 @@ function buildLockedClimatePreview(
 		perihelion: config.perihelion,
 		substellarLon: config.substellarLon,
 		obliquity: config.obliquity,
+		seismologyTotalHeatingK: config.seismologyTotalHeatingK,
 	} as const
 	const { flux, libration, solarLongitude } = computeDailyLockedOrbit({
 		eccentricity: config.eccentricity,
@@ -161,6 +163,7 @@ export function useLockedClimatePreview(config: LockedClimatePreviewConfig) {
 			config.radius,
 			config.spectralClass,
 			config.starSubtype,
+			config.seismologyTotalHeatingK,
 			config,
 		],
 	)

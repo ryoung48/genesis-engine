@@ -1,4 +1,3 @@
-import { LUNA_MOON_SEED } from "@/model/celestial/moons/orbital-mechanics"
 import {
 	getHabitableZoneAU,
 	getStarLuminositySol,
@@ -232,8 +231,6 @@ export function resetWorldDefaults(setters: {
 	setSubstellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
-	setMoonCount: (v: number) => void
-	setMoonSeed: (v: number) => void
 	setRestSeed: (v: number) => void
 	setSeaLevel: (v: number) => void
 	setEra: (v: SocietyEra) => void
@@ -252,8 +249,6 @@ export function resetWorldDefaults(setters: {
 	setters.setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
-	setters.setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)
-	setters.setMoonSeed(LUNA_MOON_SEED)
 	setters.setRestSeed(SOL_SEED)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)

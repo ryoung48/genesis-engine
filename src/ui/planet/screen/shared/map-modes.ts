@@ -86,12 +86,12 @@ const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["borders", "Nations"],
 	["government", "Government"],
+	["dynasty", "Dynasty"],
 ]
 
 const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
 > = [
-	["dynasty", "Dynasty"],
 	["diplomacy", "Diplomacy"],
 	["provinces", "Provinces"],
 ]
@@ -115,6 +115,13 @@ export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
 
 export function isDebugGeographyMode(colorMode: ColorMode): boolean {
 	return DEBUG_GEOGRAPHY_MODE_OPTIONS.some(([mode]) => mode === colorMode)
+}
+
+export function isDebugNationMode(nationMode: NationMapMode): boolean {
+	return (
+		DEBUG_POLITICAL_MODE_OPTIONS.some(([mode]) => mode === nationMode) ||
+		EARTH_IMPORT_POLITICAL_MODE_OPTIONS.some(([mode]) => mode === nationMode)
+	)
 }
 
 const EARTH_IMPORT_ONLY_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
@@ -168,19 +175,8 @@ export function getVisibleSocietyModeOptions(
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
-	if (isEarthImport) {
+	if (debugEnabled && isEarthImport) {
 		politicalOptions.push(...EARTH_IMPORT_POLITICAL_MODE_OPTIONS)
-		// Diplomacy is debug-only for procedural worlds, but is a first-class
-		// earth-history engine output for Earth imports (vassals/alliances/
-		// unions -- see docs/earth-history-plan.md "Map modes and hover
-		// gating"), so surface it without needing debugMapModes when real
-		// history data is available. (Government is already default-visible.)
-		if (
-			!debugEnabled &&
-			!politicalOptions.some(([mode]) => mode === "diplomacy")
-		) {
-			politicalOptions.push(["diplomacy", "Diplomacy"])
-		}
 	}
 	const demographicOptions = debugEnabled
 		? [...DEFAULT_DEMOGRAPHIC_MODE_OPTIONS, ...DEBUG_DEMOGRAPHIC_MODE_OPTIONS]

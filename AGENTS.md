@@ -2,14 +2,12 @@
 
 NEVER git stash without asking for permission first.
 
-Before finishing any code change in this repository, verify it with:
+Before finishing any TypeScript or TSX code change in this repository, verify it with:
 
 - `pnpm lint`
 - `pnpm typecheck`
 
 For model-generation changes, also run `pnpm gen:world` before handing the work back.
-
-If `pnpm lint` changes files, rerun `pnpm lint` and then `pnpm typecheck` before handing the work back. If any verification command fails, fix the reported issues and rerun the verification steps in that order.
 
 Unless the user explicitly asks for backwards compatibility, never preserve or optimize for backwards compatibility.
 

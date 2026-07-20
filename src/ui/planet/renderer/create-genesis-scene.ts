@@ -62,7 +62,6 @@ import {
 	applyMapColorModeColors,
 	applyTerrainColorModeColors,
 	buildMapMesh,
-	buildMapOccupationOverlay,
 	buildMapWireframe,
 	buildTerrainMesh,
 	buildTerrainWireframe,
@@ -148,6 +147,7 @@ import type {
 	GenesisHoverInfo,
 	GenesisScene,
 	GenesisViewMode,
+	OrgHighlightSpec,
 	RiverData,
 	WindArrowData,
 } from "./types"
@@ -951,7 +951,6 @@ export function createGenesisScene(
 	// Terrain mesh placeholder
 	let terrainMesh: THREE.Mesh | null = null
 	let mapMesh: THREE.Mesh | null = null
-	let mapOccupationOverlay: THREE.Mesh | null = null
 	let terrainWireframe: THREE.LineSegments | null = null
 	let mapWireframe: THREE.LineSegments | null = null
 	let globeGrid: THREE.LineSegments | null = null
@@ -1071,6 +1070,18 @@ export function createGenesisScene(
 	let mapLandNationBorders: LineSegments2 | null = null
 	let landNationBordersVisible = false
 	let landNationBorderMaterials: LineMaterial[] = []
+	// International organization label (HRE, Hanseatic League, ...) -- a
+	// single org-name label in place of the member nations' own name labels
+	// (see rebuildNationLabels' currentOrgHighlight branch). Territory
+	// *coloring* is handled at region level in GenesisView's regionColors,
+	// not here -- see OrgHighlightSpec's doc comment. currentOrgHighlight is
+	// provided fresh each earth-history scrub tick while an organization's
+	// wiki page is open (see GenesisView's organizationHighlightSpec), and
+	// null the rest of the time.
+	let currentOrgHighlight: OrgHighlightSpec | null = null
+	const orgLabelPools = createNationLabelPools()
+	const globeOrgLabel: THREE.Group | null = null
+	const mapOrgLabel: THREE.Group | null = null
 	// Border LINES and nation LABELS are both traced/placed from
 	// currentWorld.nations (assignment for border tracing; seeds for label
 	// capital anchors) independently of the fill-color path
@@ -1875,6 +1886,23 @@ export function createGenesisScene(
 	}
 
 	function rebuildNationLabels() {
+		if (currentOrgHighlight) {
+			// Org map mode shows no labels at all -- neither the underlying
+			// nation names/scripts nor the org's own name label (rebuildOrgLabels
+			// used to build that one) -- keeping the recolored territory clean.
+			if (globeNationScripts) globeGroup.remove(globeNationScripts)
+			if (mapNationScripts) scene.remove(mapNationScripts)
+			pendingNationScriptTextureQueue = null
+			globeNationScripts = null
+			mapNationScripts = null
+			globeNationLabels?.clear()
+			mapNationLabels?.clear()
+			globeOrgLabel?.clear()
+			mapOrgLabel?.clear()
+			return
+		}
+		globeOrgLabel?.clear()
+		mapOrgLabel?.clear()
 		if (globeNationScripts) globeGroup.remove(globeNationScripts)
 		if (mapNationScripts) scene.remove(mapNationScripts)
 		pendingNationScriptTextureQueue = null
@@ -2236,6 +2264,30 @@ export function createGenesisScene(
 		updateOverlayVisibility()
 	}
 
+	// Earth-imported worlds never have a procedural world.nations (see
+	// derive-province-society.ts's isEarthImportRaster check), so anything
+	// needing "which nation owns this province" for such a world -- nation
+	// border rendering, nation-border focus pulses -- has to read from
+	// earthHistoryNationOverride instead. Shadows world.nations with the real
+	// per-date assignment so existing nation/sovereign/rebel-aware helpers
+	// (buildRealIdToNation, forEachNationBorderSide, etc.) work unmodified.
+	function getWorldForBorders() {
+		return earthHistoryNationOverride && currentWorld
+			? {
+					...currentWorld,
+					nations: {
+						...currentWorld.nations,
+						assignment: earthHistoryNationOverride.assignment,
+						// See rebuildNationBorders' identical aliasing below for why
+						// sovereign points at the same array and activeRebelWars is
+						// cleared -- same stale-procedural-id gap this fixes there.
+						sovereign: earthHistoryNationOverride.assignment,
+						activeRebelWars: [],
+					},
+				}
+			: currentWorld
+	}
+
 	function rebuildNationBorders() {
 		disposeObject3D(globeGroup, globeNationBorders)
 		disposeObject3D(scene, mapNationBorders)
@@ -2257,28 +2309,7 @@ export function createGenesisScene(
 		const w = canvas.clientWidth || 1
 		const h = canvas.clientHeight || 1
 
-		const worldForBorders =
-			earthHistoryNationOverride && currentWorld
-				? {
-						...currentWorld,
-						nations: {
-							...currentWorld.nations,
-							assignment: earthHistoryNationOverride.assignment,
-							// forEachNationBorderSide (overlay-builders.ts) also reads
-							// sovereign/activeRebelWars to skip vassal and active-rebel
-							// border segments -- those still held the *procedural*
-							// world's stale values here, which happened to coincide for
-							// unrelated earth-history nations often enough to silently
-							// drop real border segments (the reported "gaps"). Aliasing
-							// sovereign to the same array as assignment makes the
-							// same-sovereign check degenerate to the same-nation check
-							// (already skipped separately), and clearing
-							// activeRebelWars removes the other stale-id comparison.
-							sovereign: earthHistoryNationOverride.assignment,
-							activeRebelWars: [],
-						},
-					}
-				: currentWorld
+		const worldForBorders = getWorldForBorders()
 
 		if (worldForBorders?.isEarthImport) {
 			if (!cachedEu4BorderGeometry) {
@@ -2976,10 +3007,6 @@ export function createGenesisScene(
 			mapWireframe.visible = wireframeVisible && showMap
 			if (mapMesh) mapWireframe.position.copy(mapMesh.position)
 		}
-		if (mapOccupationOverlay) {
-			mapOccupationOverlay.visible = showMap && !!currentOccupationOverlay
-			if (mapMesh) mapOccupationOverlay.position.copy(mapMesh.position)
-		}
 		if (globeNationFill) globeNationFill.visible = currentViewMode === "globe"
 		if (mapNationFill) {
 			mapNationFill.visible = showMap
@@ -3004,6 +3031,11 @@ export function createGenesisScene(
 		if (mapNationBorders) {
 			mapNationBorders.visible = showMap && nationBordersVisible
 			if (mapMesh) mapNationBorders.position.copy(mapMesh.position)
+		}
+		if (globeOrgLabel) globeOrgLabel.visible = currentViewMode === "globe"
+		if (mapOrgLabel) {
+			mapOrgLabel.visible = showMap
+			if (mapMesh) mapOrgLabel.position.copy(mapMesh.position)
 		}
 		if (globeSelectedProvinceBorder)
 			globeSelectedProvinceBorder.visible = currentViewMode === "globe"
@@ -3127,7 +3159,6 @@ export function createGenesisScene(
 	function syncMapExportObjectPositions() {
 		const mapObjects = [
 			mapWireframe,
-			mapOccupationOverlay,
 			mapLandNationBorders,
 			mapNationBorders,
 			mapSelectedProvinceBorder,
@@ -3184,10 +3215,6 @@ export function createGenesisScene(
 			{ object: globeReligionLabels, visible: false },
 			{ object: pulseGlobe, visible: false },
 			{ object: mapMesh, visible: true },
-			{
-				object: mapOccupationOverlay,
-				visible: !!currentOccupationOverlay,
-			},
 			{ object: mapWireframe, visible: wireframeVisible },
 			{ object: mapGrid, visible: gridVisible },
 			{ object: mapThermalEquator, visible: false },
@@ -3224,11 +3251,9 @@ export function createGenesisScene(
 		if (!currentWorld) return
 		disposeObject3D(globeGroup, terrainMesh)
 		disposeObject3D(scene, mapMesh)
-		disposeObject3D(scene, mapOccupationOverlay)
 		disposeGroup(scene, mapSolarTerminator)
 		terrainMesh = null
 		mapMesh = null
-		mapOccupationOverlay = null
 		mapSolarTerminator = null
 		const terrainBuild = buildTerrainMesh(
 			currentWorld,
@@ -3262,19 +3287,6 @@ export function createGenesisScene(
 			mapProjectionLatitudeDeg: currentMapProjectionLatitudeDeg,
 		})
 		syncMapLighting()
-		if (currentOccupationOverlay) {
-			mapOccupationOverlay = buildMapOccupationOverlay(
-				mapMesh,
-				currentOccupationOverlay,
-				mapFaceToRegion,
-				currentMapCenterLongitudeDeg,
-				currentMapProjectionLatitudeDeg,
-			)
-			if (mapOccupationOverlay) {
-				addMapSlideClones(mapOccupationOverlay)
-				scene.add(mapOccupationOverlay)
-			}
-		}
 		rebuildOverlays()
 		setViewMode(currentViewMode)
 	}
@@ -3290,10 +3302,8 @@ export function createGenesisScene(
 			hoveredRegion = -1
 			disposeObject3D(globeGroup, terrainMesh)
 			disposeObject3D(scene, mapMesh)
-			disposeObject3D(scene, mapOccupationOverlay)
 			terrainMesh = null
 			mapMesh = null
-			mapOccupationOverlay = null
 			rebuildOverlays()
 			emitHover(null)
 			return
@@ -3418,12 +3428,35 @@ export function createGenesisScene(
 		updateOverlayVisibility()
 	}
 
+	/** Current territory highlight for one international organization (HRE,
+	 * Hanseatic League, ...), from GenesisView's organizationHighlightSpec --
+	 * recomputed fresh from FoldedState each earth-history scrub tick, so
+	 * this always does a full rebuild rather than an in-place update. Pass
+	 * null exactly when no organization's wiki page is open, which both
+	 * clears the fill highlight and lets rebuildNationLabels resume showing
+	 * normal nation name labels. */
+	function setOrganizationHighlight(spec: OrgHighlightSpec | null) {
+		if (currentOrgHighlight === spec) return
+		currentOrgHighlight = spec
+		// rebuildNationBorders' border-line tracing never reads
+		// currentOrgHighlight (territory coloring is region-level, handled by
+		// GenesisView's withOrgHighlight instead) -- only labels branch on it
+		// (rebuildNationLabels' currentOrgHighlight check). Calling
+		// rebuildNationBorders here would re-trace every border in the world a
+		// second time for no visual effect, on top of the identical rebuild
+		// setEarthHistoryNationOverride already triggers the same tick.
+		rebuildNationLabels()
+	}
+
 	function setSelectedProvince(provinceId: number | null) {
 		selectedProvince = provinceId ?? -1
 		rebuildSelectedProvinceBorder()
 	}
 
-	function focusOnRegion(region: number, opts?: { durationMs?: number }) {
+	function focusOnRegion(
+		region: number,
+		opts?: { durationMs?: number; distanceScale?: number },
+	) {
 		if (!currentWorld) return
 		const targets = getRegionFocusTargets({
 			meshXYZ: currentWorld.mesh.r_xyz,
@@ -3434,6 +3467,7 @@ export function createGenesisScene(
 			mapOffsetX: mapMesh?.position.x ?? 0,
 			mapOffsetY: mapMesh?.position.y ?? 0,
 			minDistance: controls.minDistance,
+			distanceScale: opts?.distanceScale,
 		})
 		if (!targets) return
 
@@ -3456,7 +3490,10 @@ export function createGenesisScene(
 		requestRender()
 	}
 
-	function focusOnNation(nationId: number, opts?: { durationMs?: number }) {
+	function focusOnNation(
+		nationId: number,
+		opts?: { durationMs?: number; distanceScale?: number },
+	) {
 		if (!currentWorld?.nations || !currentWorld.provinces) return
 		if (nationId < 0) return
 		setSelectedProvince(null)
@@ -3470,20 +3507,38 @@ export function createGenesisScene(
 		startBorderPulse(province)
 	}
 
-	function focusOnProvince(provinceId: number, opts?: { durationMs?: number }) {
+	function focusOnProvince(
+		provinceId: number,
+		opts?: {
+			durationMs?: number
+			distanceScale?: number
+			/** "nation" highlights the whole nation's border instead of just
+			 * this one province's -- used when the caller is really focusing
+			 * on a nation (e.g. Earth import, which has no procedural nation
+			 * id to pass to focusOnNation) and only has a representative
+			 * province to hand in. */
+			pulseTarget?: "nation" | "province"
+		},
+	) {
 		if (!currentWorld?.provinces) return
 		if (provinceId < 0 || provinceId >= currentWorld.provinces.count) {
 			setSelectedProvince(null)
 			return
 		}
-		setSelectedProvince(provinceId)
+		const pulseTarget = opts?.pulseTarget ?? "province"
+		// The persistent yellow "selected province" outline is a distinct,
+		// separate overlay from the pulse below -- only mark this as the
+		// selected province when it really is one; a "nation" focus just
+		// uses provinceId as a representative anchor point, not something
+		// the user selected, and leaving it set would draw a stray
+		// single-province outline alongside the nation-wide pulse.
+		setSelectedProvince(pulseTarget === "province" ? provinceId : null)
 		const region = currentWorld.provinces.seeds[provinceId]
 		if (region < 0) {
-			setSelectedProvince(null)
 			return
 		}
 		focusOnRegion(region, opts)
-		startBorderPulse(provinceId, "province")
+		startBorderPulse(provinceId, pulseTarget)
 	}
 
 	function clearPulse() {
@@ -3541,9 +3596,12 @@ export function createGenesisScene(
 							1.006,
 						)
 				: (() => {
-						const nation = currentWorld.nations?.assignment[province]
+						const worldForBorders = getWorldForBorders()
+						const nation = worldForBorders?.nations?.assignment[province]
 						if (nation === undefined || nation < 0) return []
-						const realIdToNation = buildRealIdToNation(currentWorld)
+						const realIdToNation = worldForBorders
+							? buildRealIdToNation(worldForBorders)
+							: null
 						return realIdToNation
 							? collectEu4NationBorderGlobePositions(
 									cachedEu4BorderGeometry!,
@@ -3584,9 +3642,12 @@ export function createGenesisScene(
 							0.007,
 						)
 				: (() => {
-						const nation = currentWorld.nations?.assignment[province]
+						const worldForBorders = getWorldForBorders()
+						const nation = worldForBorders?.nations?.assignment[province]
 						if (nation === undefined || nation < 0) return []
-						const realIdToNation = buildRealIdToNation(currentWorld)
+						const realIdToNation = worldForBorders
+							? buildRealIdToNation(worldForBorders)
+							: null
 						return realIdToNation
 							? collectEu4NationBorderMapPositions(
 									cachedEu4BorderGeometry!,
@@ -4038,7 +4099,6 @@ export function createGenesisScene(
 		renderer.dispose()
 		disposeObject3D(globeGroup, terrainMesh)
 		disposeObject3D(scene, mapMesh)
-		disposeObject3D(scene, mapOccupationOverlay)
 		disposeObject3D(globeGroup, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
 		disposeObject3D(globeGroup, globeGrid)
@@ -4073,6 +4133,10 @@ export function createGenesisScene(
 		disposeGroup(scene, mapNationLabels)
 		disposePool(nationLabelPools.globe)
 		disposePool(nationLabelPools.map)
+		disposeGroup(globeGroup, globeOrgLabel)
+		disposeGroup(scene, mapOrgLabel)
+		disposePool(orgLabelPools.globe)
+		disposePool(orgLabelPools.map)
 		if (globeNationScripts) globeGroup.remove(globeNationScripts)
 		if (mapNationScripts) scene.remove(mapNationScripts)
 		pendingNationScriptTextureQueue = null
@@ -4738,6 +4802,7 @@ export function createGenesisScene(
 		setNationBordersVisible,
 		setEarthHistoryNationOverride,
 		setLandNationBordersVisible,
+		setOrganizationHighlight,
 		setViewMode,
 		setWireframeVisible,
 		setGridVisible,

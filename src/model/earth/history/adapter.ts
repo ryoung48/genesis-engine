@@ -283,8 +283,11 @@ export interface NationInfoFromHistory {
 	ruler: { name: string; dynasty?: string } | null
 	overlord: string | null
 	vassals: string[]
-	unionWith: string[]
+	unionSeniorOf: string[]
+	unionJuniorPartner: string | null
 	allies: string[]
+	guarantees: string[]
+	royalMarriages: string[]
 	atWar: {
 		warId: string
 		name: string
@@ -324,8 +327,11 @@ export function foldedStateToNationInfo(
 		ruler: n.ruler,
 		overlord: n.overlord,
 		vassals: Array.from(n.vassals),
-		unionWith: Array.from(n.unionWith),
+		unionSeniorOf: Array.from(n.unionSeniorOf),
+		unionJuniorPartner: n.unionJuniorPartner,
 		allies: Array.from(n.allies),
+		guarantees: Array.from(n.guarantees),
+		royalMarriages: Array.from(n.royalMarriages),
 		atWar,
 	}
 }

@@ -12,6 +12,7 @@ dist
 dist-ssr
 coverage/**
 *.local
+__pycache__/
 
 # Editor directories and files
 .vscode/*
@@ -27,3 +28,5 @@ coverage/**
 
 
 scripts/namelists
+scripts/planets/output/
+scripts/planets/tmp-*/

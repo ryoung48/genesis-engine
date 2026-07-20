@@ -11,11 +11,13 @@ import {
 	generateMoons,
 	M_SOL_KG,
 	rollMoonCountForParent,
+	rollMoonEccentricity,
 } from "@/model/celestial/moons/orbital-mechanics"
 import type { OrbitBody } from "@/model/celestial/orbit-body"
 import {
 	getKeplerYearYears,
 	getStarLuminositySol,
+	getStarMAO,
 	getStarMassSol,
 	type MainSequenceClass,
 	rollStarAgeGyr,
@@ -23,6 +25,7 @@ import {
 import { estimateGreenhouseFactor } from "@/model/climate/ebm/greenhouse-estimate"
 import { buildSurfaceTidesSeismologyCallbacks } from "@/model/climate/tidal-schedule"
 import { createRng } from "@/model/shared/rng"
+import { LANGUAGE } from "@/model/society/language/languages"
 import { estimateGasGiantSizeClass, estimateRockySizeClass } from "./size-class"
 import {
 	buildPlanet,
@@ -33,20 +36,74 @@ import {
 	type SolPlanetSeed,
 } from "./sol-system"
 import {
+	auFromTemperature,
 	buildClassificationEnvironment,
 	buildDensityProfile,
+	type ClassifiedEnvironment,
 	classifyBody,
 	type DensityProfile,
 	deviationToAU,
 	type OrbitClassification,
 	type OrbitGroup,
+	rollClassificationAssignment,
 	type Zone,
 } from "./system-environment"
-import { applySystemSeismology } from "./system-seismology"
+import {
+	applySystemSeismology,
+	computeMoonTidalHeatingRaw,
+	MAX_SAFE_MOON_TIDAL_HEATING,
+} from "./system-seismology"
+import {
+	deriveTideLockStatus,
+	rollMoonTideLock,
+	rollPlanetTideLock,
+} from "./tide-lock"
 
 const DAYS_PER_YEAR = 365.25
 const EARTH_DIAMETER_KM = 12_742
 const EARTH_MASS_KG = 5.973886146404331e24
+// Mirrors the UI's DEFAULT_WORLD_PARAMS.continentSizeVariety (defaults.ts) --
+// duplicated here since this model-layer file must not import from the UI
+// layer. A rolled main world's continentSizeVariety starts at this Earth-like
+// default, edited by hand afterward via the normal slider.
+const EARTH_DEFAULT_CONTINENT_SIZE_VARIETY = 0.35
+
+// Procedurally generated body textures (public/generated/<classification>/...)
+// -- only classifications with real art get a texturePath; anything else
+// (tectonic, oceanic, panthalassic, helian, ...) is left unset and falls back
+// to the renderer's plain "blue" solid-color material, same as before this
+// existed. Never applies to the real Sol seed, which keeps its own authored
+// textures.
+const GENERATED_TEXTURE_FILES: Partial<Record<OrbitClassification, string[]>> =
+	{
+		jovian: ["1.png", "2.png", "3.png", "4.png", "5.png", "6.png"],
+		rockball: ["1.png", "2.png", "3.png", "4.png", "5.png"],
+		telluric: ["1.png", "2.png", "3.png", "4.png", "5.png"],
+		meltball: ["1.png", "2.png", "3.png", "4.png", "5.png"],
+		snowball: ["1.png", "2.png", "3.png", "4.png", "5.png"],
+		arid: [
+			"Dry-EQUIRECTANGULAR-1-1024x512.png",
+			"Dry-EQUIRECTANGULAR-2-1024x512.png",
+			"Dry-EQUIRECTANGULAR-3-1024x512.png",
+			"Dry-EQUIRECTANGULAR-4-1024x512.png",
+			"Dry-EQUIRECTANGULAR-5-1024x512.png",
+			"Martian-EQUIRECTANGULAR-1-1024x512.png",
+			"Martian-EQUIRECTANGULAR-2-1024x512.png",
+			"Martian-EQUIRECTANGULAR-3-1024x512.png",
+			"Martian-EQUIRECTANGULAR-4-1024x512.png",
+			"Martian-EQUIRECTANGULAR-5-1024x512.png",
+		],
+	}
+
+function pickGeneratedTexturePath(
+	rng: ReturnType<typeof createRng>,
+	classification: OrbitClassification,
+): string | undefined {
+	const files = GENERATED_TEXTURE_FILES[classification]
+	if (!files || files.length === 0) return undefined
+	const file = files[rng.randint(0, files.length - 1)]
+	return `/generated/${classification}/${file}`
+}
 
 interface RingProfile {
 	innerRadiusRelative: number
@@ -109,6 +166,9 @@ const OUTER_DEVIATIONS = [
 interface Slot {
 	zone: Zone
 	deviation: number
+	/** True for the single reserved deviation-0 inner slot when
+	 * forceMainWorld is set -- see generateSystemBodies. */
+	isMainWorld?: boolean
 }
 
 function buildBodyEnvironment(params: {
@@ -116,21 +176,30 @@ function buildBodyEnvironment(params: {
 	groupHint?: OrbitGroup
 	zone: Zone
 	deviation: number
+	spectralClass: MainSequenceClass
 	diameterKm: number
 	massKg: number
 	orbitalDistanceAU: number
 	isPrimaryWorld: boolean
 	isMoon: boolean
 	tidal: boolean
+	forceMeltball?: boolean
+	assignment?: ClassifiedEnvironment
 }): Pick<
 	SystemBody,
 	| "sizeClass"
 	| "density"
 	| "group"
 	| "classification"
+	| "subtype"
+	| "composition"
+	| "chemistry"
+	| "hydrosphereCode"
+	| "hydrosphere"
 	| "landCoverage"
 	| "atmosphere"
 	| "greenhouseFactor"
+	| "albedo"
 > {
 	const sizeClass =
 		params.groupHint === "jovian"
@@ -142,20 +211,93 @@ function buildBodyEnvironment(params: {
 		group: body.group,
 		classification: body.classification,
 		sizeClass,
+		zone: params.zone,
 		deviation: params.deviation,
+		spectralClass: params.spectralClass,
 		diameterKm: params.diameterKm,
 		massKg: params.massKg,
 		isPrimaryWorld: params.isPrimaryWorld,
 		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
+		assignment: params.assignment,
 	})
 	return {
 		sizeClass,
 		density: environment.density,
 		group: body.group,
 		classification: body.classification,
+		subtype: environment.subtype,
+		composition: environment.composition,
+		chemistry: environment.chemistry,
+		hydrosphereCode: environment.hydrosphereCode,
+		hydrosphere: environment.hydrosphere,
 		landCoverage: environment.landCoverage,
 		atmosphere: environment.atmosphere,
 		greenhouseFactor: environment.greenhouseFactor,
+		albedo: environment.albedo,
+	}
+}
+
+// Ported from galaxy-gen's classify() (orbits/rotation/index.ts) -- rerolls
+// atmosphere/hydrosphere/subtype/chemistry for a terrestrial body that just
+// became star-locked (see tide-lock.ts's rollPlanetTideLock), the same way
+// its real classification's dice table would if it had been rolled that way
+// from the start. Density is also recomputed (buildClassificationEnvironment
+// always derives it from mass/diameter, which don't change here) rather than
+// carried over -- galaxy-gen doesn't touch density on reclassify either,
+// since it's independent of classification other than its description label.
+function buildForcedClassificationEnvironment(params: {
+	rng: ReturnType<typeof createRng>
+	classification: "jani-lithic" | "vesperian"
+	sizeClass: number
+	zone: Zone
+	deviation: number
+	spectralClass: MainSequenceClass
+	diameterKm: number
+	massKg: number
+	isPrimaryWorld: boolean
+}): Pick<
+	SystemBody,
+	| "sizeClass"
+	| "density"
+	| "group"
+	| "classification"
+	| "subtype"
+	| "composition"
+	| "chemistry"
+	| "hydrosphereCode"
+	| "hydrosphere"
+	| "landCoverage"
+	| "atmosphere"
+	| "greenhouseFactor"
+	| "albedo"
+> {
+	const environment = buildClassificationEnvironment({
+		rng: params.rng,
+		group: "terrestrial",
+		classification: params.classification,
+		sizeClass: params.sizeClass,
+		zone: params.zone,
+		deviation: params.deviation,
+		spectralClass: params.spectralClass,
+		diameterKm: params.diameterKm,
+		massKg: params.massKg,
+		isPrimaryWorld: params.isPrimaryWorld,
+		greenhouseMode: params.isPrimaryWorld ? "estimate" : "roll",
+	})
+	return {
+		sizeClass: params.sizeClass,
+		density: environment.density,
+		group: "terrestrial",
+		classification: params.classification,
+		subtype: environment.subtype,
+		composition: environment.composition,
+		chemistry: environment.chemistry,
+		hydrosphereCode: environment.hydrosphereCode,
+		hydrosphere: environment.hydrosphere,
+		landCoverage: environment.landCoverage,
+		atmosphere: environment.atmosphere,
+		greenhouseFactor: environment.greenhouseFactor,
+		albedo: environment.albedo,
 	}
 }
 
@@ -166,6 +308,7 @@ function buildMoonEnvironment(params: {
 	orbitalDistanceAU: number
 	zone: Zone
 	deviation: number
+	spectralClass: MainSequenceClass
 	sizeClass?: number
 	isPrimaryWorld: boolean
 	orbitRange?: MoonBody["orbitRange"]
@@ -176,9 +319,15 @@ function buildMoonEnvironment(params: {
 	| "density"
 	| "group"
 	| "classification"
+	| "subtype"
+	| "composition"
+	| "chemistry"
+	| "hydrosphereCode"
+	| "hydrosphere"
 	| "landCoverage"
 	| "atmosphere"
 	| "greenhouseFactor"
+	| "albedo"
 > {
 	const sizeClass =
 		params.sizeClass ?? estimateRockySizeClass(params.diameterKm)
@@ -199,7 +348,9 @@ function buildMoonEnvironment(params: {
 		group: body.group,
 		classification: body.classification,
 		sizeClass,
+		zone: params.zone,
 		deviation: params.deviation,
+		spectralClass: params.spectralClass,
 		diameterKm: params.diameterKm,
 		massKg: params.massKg,
 		isPrimaryWorld: params.isPrimaryWorld,
@@ -209,10 +360,58 @@ function buildMoonEnvironment(params: {
 		density: environment.density,
 		group: body.group,
 		classification: body.classification,
+		subtype: environment.subtype,
+		composition: environment.composition,
+		chemistry: environment.chemistry,
+		hydrosphereCode: environment.hydrosphereCode,
+		hydrosphere: environment.hydrosphere,
 		landCoverage: environment.landCoverage,
 		atmosphere: environment.atmosphere,
 		greenhouseFactor: environment.greenhouseFactor,
+		albedo: environment.albedo,
 	}
+}
+
+const MAX_MOON_ECCENTRICITY_SAFETY_ATTEMPTS = 8
+
+// Ported from galaxy-gen's ORBIT.safeMoonOrbit (orbits/index.ts) -- Hill-
+// sphere/Roche spacing (already enforced by generateMoons' own orbit-band
+// placement, see orbital-mechanics.ts's morPd/placeMoonOrbits) only keeps a
+// moon's orbit geometrically stable; it says nothing about whether that
+// orbit's *tidal heating* would tear the moon apart. Rerolls the cheapest
+// knob (eccentricity, which the heating formula is most sensitive to) a
+// bounded number of times and drops the moon entirely if no safe orbit is
+// found, exactly like galaxy-gen's discard-and-reroll loop.
+function enforceMoonTidalSafety(
+	rng: ReturnType<typeof createRng>,
+	parentMassKg: number,
+	parentDiameterKm: number,
+	moon: MoonBody,
+): MoonBody | null {
+	const heatingFor = (eccentricity: number) =>
+		computeMoonTidalHeatingRaw({
+			parentMassKg,
+			parentDiameterKm,
+			moonDiameterKm: moon.diameterKm,
+			moonMassKg: moon.massKg,
+			semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters ?? 0,
+			orbitalPeriodDays: moon.orbitalPeriodDays,
+			eccentricity,
+			densityEarthRelative: moon.density?.earthRelative ?? 0,
+		})
+	let eccentricity = moon.eccentricity
+	let heating = heatingFor(eccentricity)
+	let attempts = 0
+	while (
+		heating > MAX_SAFE_MOON_TIDAL_HEATING &&
+		attempts < MAX_MOON_ECCENTRICITY_SAFETY_ATTEMPTS
+	) {
+		eccentricity = rng.uniform(0, eccentricity / 2)
+		heating = heatingFor(eccentricity)
+		attempts += 1
+	}
+	if (heating > MAX_SAFE_MOON_TIDAL_HEATING) return null
+	return { ...moon, eccentricity }
 }
 
 function rollOrbitGroup(
@@ -371,14 +570,18 @@ function pickDensityEarthRelative(
 	rng: ReturnType<typeof createRng>,
 	group: OrbitGroup,
 	classification: OrbitClassification,
+	composition?: string,
 ): number {
 	if (group === "jovian" || classification === "chthonian") {
 		return rng.uniform(0.08, 0.35)
 	}
-	return rollDensityFromComposition(
-		rng,
-		classificationToComposition(classification),
-	)
+	const densityComposition: DensityComposition =
+		composition === "ice" ||
+		composition === "rocky" ||
+		composition === "metallic"
+			? composition
+			: classificationToComposition(classification)
+	return rollDensityFromComposition(rng, densityComposition)
 }
 
 function roll2d6(rng: ReturnType<typeof createRng>): number {
@@ -411,6 +614,40 @@ function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 	if (extreme <= 4) return rng.uniform(40, 90)
 	if (extreme <= 5) return rng.uniform(91, 126)
 	return rng.uniform(144, 180)
+}
+
+// Ported from galaxy-gen's orbit.rings roll (orbits/index.ts) -- restricted
+// to jovians for now. Galaxy-gen also rolls a 1-in-20 chance of rings for any
+// other non-asteroid-belt/non-dwarf body, and only ever allows "complex"
+// rings for a jovian; that non-jovian roll isn't ported yet, so every other
+// group stays ringless here. The concrete ring geometry/color bands below
+// have no galaxy-gen equivalent (it only stores a flavor string, "none" /
+// "minor" / "complex" -- rendering real ring geometry is this codebase's own
+// addition); authored against Saturn's real values (sol-system.ts's
+// SOL_PLANET_RINGS_BY_NAME: inner 1.52, outer 2.08, opacity 0.52) as an
+// anchor for "complex", with "minor" scaled down to a fainter, narrower band.
+const JOVIAN_RING_COLOR_CHOICES = [0xd8c69a, 0xcac2b0, 0xb8c4cf, 0xa89f8f]
+
+function rollJovianRings(
+	rng: ReturnType<typeof createRng>,
+): RingProfile | undefined {
+	const tier = rng.weightedChoice([
+		{ v: "none", w: 6 },
+		{ v: "minor", w: 2 },
+		{ v: "complex", w: 1 },
+	] as const)
+	if (!tier || tier === "none") return undefined
+	const color =
+		JOVIAN_RING_COLOR_CHOICES[
+			rng.randint(0, JOVIAN_RING_COLOR_CHOICES.length - 1)
+		]!
+	const innerRadiusRelative = rng.uniform(1.3, 1.7)
+	const outerRadiusRelative =
+		innerRadiusRelative +
+		(tier === "complex" ? rng.uniform(0.4, 0.7) : rng.uniform(0.15, 0.35))
+	const opacity =
+		tier === "complex" ? rng.uniform(0.35, 0.6) : rng.uniform(0.12, 0.25)
+	return { innerRadiusRelative, outerRadiusRelative, color, opacity }
 }
 
 // Ported from galaxy-gen's ROTATION.get — the sidereal-day-length dice
@@ -446,6 +683,23 @@ export function getStarAgeGyr(seed: number, massSol: number): number {
 	return rollStarAgeGyr(rng, massSol)
 }
 
+/** The star's own name, from the same per-system language every sibling
+ * planet/moon in this system is named from (see generateSystemBodies) --
+ * spawning the language again here (rather than threading generateSystemBodies'
+ * own instance out) is cheap and keeps this callable standalone from the UI
+ * wherever just a star label is needed. Sol keeps its real name (SOL_STAR_NAME
+ * in sol-system.ts) untouched -- callers should check `seed === SOL_SEED`
+ * themselves rather than calling this for Sol. */
+export function generateStarName(seed: number): string {
+	const lang = LANGUAGE.spawn(`system:${seed}`)
+	return LANGUAGE.word.simple({
+		lang,
+		key: "region",
+		namespace: "planet",
+		slot: "star",
+	}).word
+}
+
 function massKgFromEarthRelativeDensity(
 	diameterKm: number,
 	densityEarthRelative: number,
@@ -464,15 +718,14 @@ function computeGravityG(massKg: number, diameterKm: number): number {
 	return massEarths / diameterEarths ** 2
 }
 
-/** The main world's raw physical parameters come from the user's live UI
- * sliders, not RNG rolls — everything else (classification, atmosphere,
- * density, greenhouse factor, ...) is derived via the same
- * buildBodyEnvironment() path every sibling planet uses. */
-/** The main world's raw physical parameters come from the user's live UI
- * sliders, not RNG rolls -- everything else (classification, hydrosphere,
- * texture, ...) is fixed the same way it is for every other Sol body, since
- * the main world is hydrated by the exact same buildPlanet() (see
- * buildMainWorldSeed below). */
+/** Only used for the real Sol seed's Earth, whose physical parameters come
+ * from the user's live UI sliders (or the real fitted Earth data), not RNG
+ * rolls -- everything else (classification, hydrosphere, texture, ...) is
+ * fixed the same way it is for every other Sol body, since Earth is hydrated
+ * by the exact same buildPlanet() (see buildMainWorldSeed below). A
+ * procedurally generated (non-Sol) main world is no longer built from this
+ * shape at all -- it's rolled inline alongside its siblings in
+ * generateSystemBodies, see the `forceMainWorld` slot below. */
 interface HomeWorldParams {
 	name?: string
 	orbitalDistanceAU: number
@@ -508,7 +761,19 @@ interface GenerateSystemBodiesParams {
 	seed: number
 	spectralClass: MainSequenceClass
 	starSubtype: number
-	mainWorld: HomeWorldParams
+	/** Whether to reserve the temperate (deviation 0) inner slot for a rolled
+	 * main world, tagged isMainWorld: true -- deviation 0 is, by construction
+	 * (see deviationToAU), always exactly the star's habitable-zone center,
+	 * for any star type, so no separate "keep the main world at the HZ
+	 * center" bookkeeping is needed elsewhere. When false, no body in the
+	 * generated system is tagged isMainWorld. Ignored for the real Sol seed,
+	 * which always has Earth. */
+	forceMainWorld: boolean
+	/** Only consulted for the real Sol seed -- Earth's live-edited slider
+	 * values (or real fitted data) to hydrate onto the fixed SOL_SYSTEM_BODIES
+	 * table. Ignored for every other seed, where the main world (if any) is
+	 * rolled fresh alongside its siblings instead. */
+	solMainWorldOverrides?: HomeWorldParams
 }
 
 // Builds a live SolPlanetSeed for the main world from the user's current UI
@@ -571,26 +836,39 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 export function generateSystemBodies(
 	params: GenerateSystemBodiesParams,
 ): SystemBody[] {
-	const { seed, spectralClass, starSubtype, mainWorld } = params
+	const {
+		seed,
+		spectralClass,
+		starSubtype,
+		forceMainWorld,
+		solMainWorldOverrides,
+	} = params
 	const rng = createRng(seed)
 
 	if (seed === SOL_SEED) {
+		if (!solMainWorldOverrides) {
+			throw new Error(
+				"generateSystemBodies: Sol seed requires solMainWorldOverrides",
+			)
+		}
 		const mainWorldSeed: SolPlanetSeed = {
-			...buildMainWorldSeed(mainWorld),
+			...buildMainWorldSeed(solMainWorldOverrides),
 			inclinationDeg:
-				mainWorld.inclinationDeg ?? SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
+				solMainWorldOverrides.inclinationDeg ??
+				SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
 		}
 		return applySystemSeismology({
 			bodies: SOL_SYSTEM_BODIES.map((body) =>
 				body.isMainWorld
 					? buildPlanet(mainWorldSeed, seed, -1, {
 							textureOverride: "/sol/earth/2k_earth.jpg",
-							moonsOverride: mainWorld.moons,
+							moonsOverride: solMainWorldOverrides.moons,
 						})
 					: body,
 			),
 			starAgeGyr: SOL_STAR_AGE_GYR,
 			starLuminositySol: 1,
+			spectralClass,
 			...buildSurfaceTidesSeismologyCallbacks({
 				spectralClass,
 				starSubtype,
@@ -601,6 +879,20 @@ export function generateSystemBodies(
 	const luminositySol = getStarLuminositySol(spectralClass, starSubtype)
 	const starMassKg = M_SOL_KG
 
+	// Every non-Sol system gets its own procedurally generated language (see
+	// LANGUAGE.spawn/planet-name.ts), used to name every sibling planet and
+	// moon so a system's bodies read as belonging to one another instead of
+	// each carrying an unrelated one-off name. Sol keeps its real, curated
+	// names untouched (see the seed === SOL_SEED branch above).
+	const systemLanguage = LANGUAGE.spawn(`system:${seed}`)
+	const nameBody = (slot: string): string =>
+		LANGUAGE.word.simple({
+			lang: systemLanguage,
+			key: "region",
+			namespace: "planet",
+			slot,
+		}).word
+
 	const epistellarCount = rng.randint(0, 2)
 	const innerCount = rng.randint(1, 3)
 	const outerCount = rng.randint(1, 5)
@@ -610,11 +902,19 @@ export function generateSystemBodies(
 			.sample(EPISTELLAR_DEVIATIONS, epistellarCount)
 			.map((deviation) => ({ zone: "epistellar" as const, deviation })),
 		// One inner slot is reserved for the main world (deviation 0, the
-		// "temperate" slot) — same guarantee galaxy-gen gives its homeworld.
+		// "temperate" slot -- always exactly the HZ center, see deviationToAU)
+		// when forceMainWorld is set -- same guarantee galaxy-gen gives its
+		// homeworld. It's rolled through the exact same pipeline as any other
+		// slot below, just tagged isMainWorld/isPrimaryWorld true.
+		...(forceMainWorld
+			? [{ zone: "inner" as const, deviation: 0, isMainWorld: true }]
+			: []),
 		...rng
 			.sample(
-				INNER_DEVIATIONS.filter((d) => d !== 0),
-				Math.max(0, innerCount - 1),
+				forceMainWorld
+					? INNER_DEVIATIONS.filter((d) => d !== 0)
+					: INNER_DEVIATIONS,
+				forceMainWorld ? Math.max(0, innerCount - 1) : innerCount,
 			)
 			.map((deviation) => ({ zone: "inner" as const, deviation })),
 		...rng
@@ -625,24 +925,99 @@ export function generateSystemBodies(
 	const starMassSol = getStarMassSol(spectralClass, starSubtype)
 	const starAgeGyr = getStarAgeGyr(seed, starMassSol)
 
-	const siblings: SystemBody[] = slots.map((slot, siblingIdx) => {
-		const orbitalDistanceAU = deviationToAU(slot.deviation, luminositySol)
-		const group = rollOrbitGroup(rng, slot.zone)
-		const sizeClass = rollSizeClass(rng, group)
+	// Ported from galaxy-gen's non-homeworld "primary" bias (orbits/index.ts)
+	// -- even a system with no forced main world still gets one significant,
+	// habitability-biased sibling: whichever slot sits closest to the star's
+	// temperate (deviation 0) center, as long as that's an inner-zone slot
+	// (an epistellar/outer "closest" pick just means this system has no
+	// primary, same as galaxy-gen). Skipped entirely when forceMainWorld
+	// already reserves the deviation-0 inner slot for an actual playable
+	// homeworld.
+	let primarySlotIndex: number | undefined
+	if (!forceMainWorld && slots.length > 0) {
+		let closestIndex = 0
+		for (let i = 1; i < slots.length; i++) {
+			if (
+				Math.abs(slots[i]!.deviation) < Math.abs(slots[closestIndex]!.deviation)
+			) {
+				closestIndex = i
+			}
+		}
+		if (slots[closestIndex]!.zone === "inner") primarySlotIndex = closestIndex
+	}
+
+	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
+		const isMainWorld = slot.isMainWorld === true
+		const isPrimaryWorld = isMainWorld || siblingIdx === primarySlotIndex
+		let group = rollOrbitGroup(rng, slot.zone)
+		// A main world can't be an asteroid belt (no surface to generate
+		// terrain on) -- reroll until it isn't. Low-probability in the inner
+		// zone already, so this terminates quickly.
+		while (isMainWorld && group === "asteroid belt") {
+			group = rollOrbitGroup(rng, slot.zone)
+		}
+		let orbitalDistanceAU = deviationToAU(slot.deviation, luminositySol)
+		// Ported from galaxy-gen's forced-meltball roll (orbits/index.ts) -- a
+		// close-in epistellar dwarf beyond the star's dust-clearing boundary
+		// (getStarMAO) can get shoved into a scorching orbit instead of
+		// forming further out. Only ever checked for the very first slot in
+		// generation order (mirroring galaxy-gen's firstStarOrbit gate) and
+		// never for the main world.
+		let forceMeltball = false
+		if (
+			siblingIdx === 0 &&
+			!isMainWorld &&
+			slot.zone === "epistellar" &&
+			group === "dwarf" &&
+			rng.uniform(0, 1) <= 0.2
+		) {
+			const candidateAu = auFromTemperature(
+				rng.uniform(1000, 2000),
+				luminositySol,
+			)
+			const maoAu = getStarMAO(spectralClass, starSubtype)
+			if (candidateAu > maoAu) {
+				forceMeltball = true
+				orbitalDistanceAU = candidateAu
+			}
+		}
+		// A primary/main world is meant to be a significant, habitable-scale
+		// body -- floor its rolled size the way galaxy-gen floors `size` to
+		// at least 2 for its own primary designation, adapted to our
+		// terrestrial-sized (5-10) sizeClass band since classifyBody always
+		// reclassifies an isPrimaryWorld body to group "terrestrial".
+		const sizeClass = isPrimaryWorld
+			? Math.max(rollSizeClass(rng, group), 5)
+			: rollSizeClass(rng, group)
 		const classification = classifyBody({
 			groupHint: group,
 			zone: slot.zone,
 			orbitalDistanceAU,
 			sizeClass,
-			isPrimaryWorld: false,
+			isPrimaryWorld,
 			isMoon: false,
 			tidal: false,
+			forceMeltball,
 		}).classification
+		const assignment = rollClassificationAssignment({
+			rng,
+			classification,
+			sizeClass,
+			zone: slot.zone,
+			deviation: slot.deviation,
+			spectralClass,
+			isPrimaryWorld,
+		})
 		const diameterKm = rollDiameterKmFromSizeClass(rng, sizeClass)
 		const densityEarthRelative =
 			group === "asteroid belt"
 				? 0
-				: pickDensityEarthRelative(rng, group, classification)
+				: pickDensityEarthRelative(
+						rng,
+						group,
+						classification,
+						assignment.composition,
+					)
 		const massKg =
 			group === "asteroid belt"
 				? 0
@@ -652,14 +1027,26 @@ export function generateSystemBodies(
 		// below needs THIS body's own day length as its Kepler day-length
 		// basis -- passing the main world's hoursPerDay there instead used to
 		// silently mis-scale every sibling planet's own moons' orbital periods.
+		// This is the pre-tide-lock "natural" rotation baseline -- see
+		// rollPlanetTideLock below, which may override it entirely.
 		const siderealDayHours =
 			group === "asteroid belt"
 				? 0
 				: rollSiderealDayHours(rng, group === "jovian", starAgeGyr)
+		// Moved up from this body's other orbital elements (previously rolled
+		// inline in the returned object below) because rollPlanetTideLock needs
+		// them as pre-lock inputs -- its own DM/roll may still adjust them
+		// further (circularizing eccentricity, flattening or flipping tilt).
+		const orbitalPeriodDays =
+			getKeplerYearYears(orbitalDistanceAU, starMassSol) * DAYS_PER_YEAR
+		const eccentricity = group === "asteroid belt" ? 0 : rollEccentricity(rng)
+		const rolledAxialTiltDeg =
+			group === "asteroid belt" ? 0 : rollAxialTiltDeg(rng)
 		const moonCount =
 			group === "asteroid belt"
 				? 0
 				: rollMoonCountForParent(rng, group, sizeClass, orbitalDistanceAU)
+		const moonSlotName = isMainWorld ? "main" : `orbit-${siblingIdx}`
 		const moons =
 			moonCount > 0
 				? generateMoons(
@@ -670,72 +1057,205 @@ export function generateSystemBodies(
 						siderealDayHours,
 						starMassKg,
 						group,
-					).map((moon) => ({
-						...moon,
-						// Spread after `moon` so its real classification-derived
-						// atmosphere/group/density wins over generateMoons()'s bare
-						// vacuum-atmosphere fallback (and its own sizeClass estimate,
-						// now told about the roll already made, wins too).
-						...buildMoonEnvironment({
-							rng,
-							diameterKm: moon.diameterKm,
-							massKg: moon.massKg,
-							orbitalDistanceAU,
-							zone: slot.zone,
-							deviation: slot.deviation,
-							sizeClass: moon.sizeClass,
-							isPrimaryWorld: false,
-							orbitRange: moon.orbitRange,
-							semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters,
-						}),
-					}))
+					)
+						.map((moon, moonIdx) => {
+							const moonEnvironment = buildMoonEnvironment({
+								rng,
+								diameterKm: moon.diameterKm,
+								massKg: moon.massKg,
+								orbitalDistanceAU,
+								zone: slot.zone,
+								deviation: slot.deviation,
+								spectralClass,
+								sizeClass: moon.sizeClass,
+								isPrimaryWorld,
+								orbitRange: moon.orbitRange,
+								semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters,
+							})
+							// Ported from galaxy-gen's ROTATION.locks.get's per-moon loop
+							// (see tide-lock.ts's rollMoonTideLock) -- may override this
+							// moon's rotation/tilt/eccentricity with a partial spin-down, a
+							// 3:2 resonance, or a full 1:1 lock to ITS planet. Runs before
+							// enforceMoonTidalSafety below so the safety check validates the
+							// post-lock (often circularized, lower-heating) orbit. The
+							// resulting tideLock itself isn't set here -- attachParentTideLocks
+							// below infers it from whether siderealDayHours ended up equal to
+							// the orbital period, which a 1:1 lock result always does.
+							const moonTideLock = rollMoonTideLock({
+								rng,
+								sizeClass: moonEnvironment.sizeClass,
+								eccentricity: moon.eccentricity,
+								axialTiltDeg: moon.axialTiltDeg,
+								atmospherePressureBar:
+									moonEnvironment.atmosphere?.pressureBar ?? 0,
+								starAgeGyr,
+								semiMajorAxisPlanetDiameters:
+									moon.semiMajorAxisPlanetDiameters ?? 0,
+								orbitalPeriodDays: moon.orbitalPeriodDays,
+								planetMassEarths: massKg / EARTH_MASS_KG,
+								baseSiderealDayHours: moon.siderealDayHours,
+								rerollEccentricity: () =>
+									rollMoonEccentricity(
+										rng,
+										moon.orbitRange ?? "middle",
+										moonEnvironment.sizeClass,
+									),
+							})
+							return enforceMoonTidalSafety(rng, massKg, diameterKm, {
+								...moon,
+								// Spread after `moon` so its real classification-derived
+								// atmosphere/group/density wins over generateMoons()'s bare
+								// vacuum-atmosphere fallback (and its own sizeClass estimate,
+								// now told about the roll already made, wins too).
+								...moonEnvironment,
+								siderealDayHours: moonTideLock.siderealDayHours,
+								axialTiltDeg: moonTideLock.axialTiltDeg,
+								eccentricity: moonTideLock.eccentricity,
+								// A rolled moon gets its OWN classification-based texture here
+								// -- it must never inherit SOL_LUNA_DEFAULT's photo. Only when
+								// its classification has no matching generated art (not in
+								// GENERATED_TEXTURE_FILES) does it fall through moon-orbit-
+								// overlay.ts's untextured branch, which happens to reuse Luna's
+								// moon.jpg as a generic gray placeholder -- a pre-existing,
+								// unrelated renderer default, not something this assigns.
+								texturePath: pickGeneratedTexturePath(
+									rng,
+									moonEnvironment.classification,
+								),
+								name: nameBody(`${moonSlotName}-moon-${moonIdx}`),
+							})
+						})
+						.filter((moon): moon is MoonBody => moon !== null)
 				: []
-		const moonsWithTideLocks = attachParentTideLocks(moons, siblingIdx)
+		const idx = isMainWorld ? -1 : siblingIdx
+		const moonsWithTideLocks = attachParentTideLocks(moons, idx).map(
+			(moon) => ({
+				...moon,
+				tideLockStatus: deriveTideLockStatus({
+					siderealDayHours: moon.siderealDayHours,
+					orbitalPeriodDays: moon.orbitalPeriodDays,
+					tideLock: moon.tideLock,
+				}),
+			}),
+		)
 		const environment = buildBodyEnvironment({
 			rng,
 			groupHint: group,
 			zone: slot.zone,
 			deviation: slot.deviation,
+			spectralClass,
 			diameterKm,
 			massKg,
 			orbitalDistanceAU,
-			isPrimaryWorld: false,
+			isPrimaryWorld,
 			isMoon: false,
 			tidal: false,
+			forceMeltball,
+			assignment,
 		})
+		// Ported from galaxy-gen's ROTATION.locks.get (see tide-lock.ts) -- may
+		// override this body's rotation/tilt/eccentricity entirely (a partial
+		// spin-down, a 3:2 resonance, or a full 1:1 lock to its star or to one
+		// of its own already-planet-locked moons). Never applies to an asteroid
+		// belt, which has no rotation of its own to lock.
+		let finalSiderealDayHours = siderealDayHours
+		let finalAxialTiltDeg = rolledAxialTiltDeg
+		let finalEccentricity = eccentricity
+		let tideLock: TideLock | null = null
+		let finalEnvironment = environment
+		if (group !== "asteroid belt") {
+			const tideLockResult = rollPlanetTideLock({
+				rng,
+				sizeClass,
+				eccentricity,
+				axialTiltDeg: rolledAxialTiltDeg,
+				atmospherePressureBar: environment.atmosphere?.pressureBar ?? 0,
+				starAgeGyr,
+				starMassSol,
+				orbitalDistanceAU,
+				orbitalPeriodDays,
+				baseSiderealDayHours: siderealDayHours,
+				moons: moonsWithTideLocks,
+				homeworld: isMainWorld,
+				rerollEccentricity: () => rollEccentricity(rng),
+			})
+			finalSiderealDayHours = tideLockResult.siderealDayHours
+			finalAxialTiltDeg = tideLockResult.axialTiltDeg
+			finalEccentricity = tideLockResult.eccentricity
+			tideLock = tideLockResult.tideLock
+			if (
+				tideLockResult.starLocked &&
+				environment.group === "terrestrial" &&
+				environment.classification !== "acheronian"
+			) {
+				finalEnvironment = buildForcedClassificationEnvironment({
+					rng,
+					classification:
+						slot.zone === "epistellar" ? "jani-lithic" : "vesperian",
+					sizeClass,
+					zone: slot.zone,
+					deviation: slot.deviation,
+					spectralClass,
+					diameterKm,
+					massKg,
+					isPrimaryWorld,
+				})
+			}
+		}
 		return {
-			...environment,
-			idx: siblingIdx,
-			seed: `orbit-${siblingIdx + 1}`,
-			isMainWorld: false,
+			...finalEnvironment,
+			idx,
+			seed: isMainWorld ? "main-world" : `orbit-${siblingIdx + 1}`,
+			name: nameBody(isMainWorld ? "main-world" : `orbit-${siblingIdx}`),
+			isMainWorld,
+			zone: slot.zone,
+			texturePath: pickGeneratedTexturePath(
+				rng,
+				finalEnvironment.classification,
+			),
+			rings:
+				finalEnvironment.group === "jovian" ? rollJovianRings(rng) : undefined,
 			orbitalDistanceAU,
 			diameterKm,
 			massKg,
 			gravityG:
 				group === "asteroid belt" ? 0 : computeGravityG(massKg, diameterKm),
-			orbitalPeriodDays:
-				getKeplerYearYears(orbitalDistanceAU, starMassSol) * DAYS_PER_YEAR,
-			siderealDayHours,
-			eccentricity: group === "asteroid belt" ? 0 : rollEccentricity(rng),
+			orbitalPeriodDays,
+			siderealDayHours: finalSiderealDayHours,
+			eccentricity: finalEccentricity,
 			longitudeOfPerihelionDeg: rng.uniform(0, 360),
-			axialTiltDeg: group === "asteroid belt" ? 0 : rollAxialTiltDeg(rng),
+			axialTiltDeg: finalAxialTiltDeg,
 			inclinationDeg: group === "asteroid belt" ? 0 : rollInclinationDeg(rng),
 			longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+			tideLock,
+			tideLockStatus: deriveTideLockStatus({
+				siderealDayHours: finalSiderealDayHours,
+				orbitalPeriodDays,
+				tideLock,
+			}),
+			substellarLon:
+				tideLock?.type === "solar" ? rng.uniform(0, 360) : undefined,
 			moons: moonsWithTideLocks,
+			// Terrain-generation-only fields, meaningless for anything but the
+			// main world -- set to Earth's own defaults (not rolled) per
+			// SOL_MAIN_WORLD_DEFAULTS/the UI's DEFAULT_WORLD_PARAMS, since the
+			// player edits these by hand afterward via the normal sliders.
+			...(isMainWorld
+				? {
+						landDistribution: 1 - SOL_MAIN_WORLD_DEFAULTS.landConcentration,
+						continentSizeVariety: EARTH_DEFAULT_CONTINENT_SIZE_VARIETY,
+						seaLevel: SOL_MAIN_WORLD_DEFAULTS.seaLevel,
+						maxElevation: SOL_MAIN_WORLD_DEFAULTS.maxElevation,
+					}
+				: {}),
 		}
 	})
 
-	const mainBody = buildPlanet(buildMainWorldSeed(mainWorld), seed, -1, {
-		starMassSol,
-		moonsOverride: mainWorld.moons,
-	})
-
 	return applySystemSeismology({
-		bodies: [...siblings, mainBody].sort(
-			(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-		),
+		bodies: bodies.sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU),
 		starAgeGyr,
 		starLuminositySol: luminositySol,
+		spectralClass,
 		...buildSurfaceTidesSeismologyCallbacks({
 			spectralClass,
 			starSubtype,

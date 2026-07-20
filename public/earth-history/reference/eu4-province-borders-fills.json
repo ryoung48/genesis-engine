@@ -17,7 +17,7 @@
 	"triangleGroupCount": 3522,
 	"triangleVertexCount": 470952,
 	"units": "degrees",
-	"source": "C:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4-extended-timeline-aligned.json",
+	"source": "c:\\Users\\rayou\\projects\\geo-explorer\\public\\eu4-extended-timeline-aligned.json",
 	"snapGridSize": 1e-5,
 	"ringsBin": "eu4-province-borders-fills-rings.bin",
 	"trianglesBin": "eu4-province-borders-fills-triangles.bin"

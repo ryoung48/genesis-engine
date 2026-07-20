@@ -8,7 +8,8 @@ describe("Earth's moons survive generateSystemBodies (moonsOverride wiring)", ()
 			seed: SOL_SEED,
 			spectralClass: "G",
 			starSubtype: 2,
-			mainWorld: {
+			forceMainWorld: true,
+			solMainWorldOverrides: {
 				orbitalDistanceAU: 1,
 				diameterKm: 12742,
 				moons: [
@@ -44,7 +45,7 @@ describe("Earth's moons survive generateSystemBodies (moonsOverride wiring)", ()
 				],
 				massKg: 5.973886146404331e24,
 				gravityG: 1,
-				siderealDayHours: 24,
+				siderealDayHours: 23.93447232,
 				eccentricity: 0.0167,
 				longitudeOfPerihelionDeg: 102,
 				axialTiltDeg: 23.5,

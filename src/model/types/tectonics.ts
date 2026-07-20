@@ -63,8 +63,14 @@ export interface GenesisParams {
 	 * for a procedurally generated world, which falls back to
 	 * EMB_CONSTANTS.surface.GREENHOUSE_FACTOR. */
 	greenhouseFactor?: number
-	moonCount?: number
-	moonSeed?: number
+	/** Geologic/tidal heating (system-seismology.ts's SeismologyProfile.
+	 * totalHeating), applied on top of the EBM's own solved equilibrium --
+	 * see ebm/index.ts's EBMConfig.seismologyTotalHeatingK doc. 0/unset for
+	 * the overwhelming majority of bodies; only matters for a geologically or
+	 * tidally active world/moon (e.g. an Io-analog). Never pass this for a
+	 * jovian -- see that doc's explanation of why it breaks their
+	 * temperature calibration. */
+	seismologyTotalHeatingK?: number
 	/** Seed for the sibling/system bodies shown in the Generation panel; 0 = Sol. Not used by terrain generation. */
 	restSeed?: number
 	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */

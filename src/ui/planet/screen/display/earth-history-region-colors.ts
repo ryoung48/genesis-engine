@@ -1,10 +1,11 @@
-import { hashColorForKey } from "@/model/earth/history/color"
+import { dynastyColor, hashColorForKey } from "@/model/earth/history/color"
 import type { RawNationReference } from "@/model/earth/history/data-source"
 import type { FoldedState } from "@/model/earth/history/fold"
 import {
 	EARTH_HISTORY_NO_GOVERNMENT_COLOR,
 	getEarthHistoryGovernmentColor,
 } from "@/model/earth/history/government"
+import type { OrgCategorizer } from "@/model/earth/history/organization-categories"
 import { type ColorMode, OCEAN_LIGHT_BLUE } from "../../colors"
 import { getBaseMapMode, getDataVariant } from "../shared/data-variant"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
@@ -103,7 +104,9 @@ export function computeEarthHistoryRegionColors(params: {
 
 	const isPolitical =
 		colorMode === "nations" &&
-		(nationMode === "borders" || nationMode === "government")
+		(nationMode === "borders" ||
+			nationMode === "government" ||
+			nationMode === "dynasty")
 	const isDemographic =
 		getBaseMapMode(colorMode as ColorMode) === "population" &&
 		(populationMode === "culture" || populationMode === "religion")
@@ -195,6 +198,21 @@ export function computeEarthHistoryRegionColors(params: {
 					r,
 					darkenPoliticalAtElevation(
 						governmentColor ?? EARTH_HISTORY_NO_GOVERNMENT_COLOR,
+						elevationKm[r] ?? 0,
+					),
+				)
+			} else if (nationMode === "dynasty") {
+				// No stored reference color for a dynasty (unlike nations/
+				// religions) -- dynastyColor's fixed palette keeps this
+				// consistent with the swatch NationWikiPage shows for the same
+				// dynasty. A republic, an interregnum, or simply no ruler
+				// recorded at this date all fall back to the same neutral gray
+				// as "no culture"/"no religion" below.
+				const dynasty = state.nations.get(owner)?.ruler?.dynasty ?? null
+				write(
+					r,
+					darkenPoliticalAtElevation(
+						dynasty ? dynastyColor(dynasty) : [0.35, 0.33, 0.32],
 						elevationKm[r] ?? 0,
 					),
 				)
@@ -306,6 +324,66 @@ export function computeEarthHistoryOccupationOverlay(params: {
 		const ps = state.provinces.get(rawId)
 		if (!ps?.owner || !ps?.controller || ps.owner === ps.controller) continue
 		const color = colorForTag(ps.controller)
+		const base = r * 4
+		overlay[base] = color[0]
+		overlay[base + 1] = color[1]
+		overlay[base + 2] = color[2]
+		overlay[base + 3] = 1
+		hasAny = true
+	}
+	return hasAny ? overlay : null
+}
+
+/** Diagonal-stripe overlay marking every province an org's OrgCategorizer
+ * (organization-categories.ts) flags `striped` -- territory/sites associated
+ * with the org without being a genuine member (HRE's foreign-held Imperial
+ * soil, HSA's Hanseatic kontors/trade posts). Same Float32Array(numRegions*4)
+ * shape as computeEarthHistoryOccupationOverlay above, feeding the exact
+ * same scene.setOccupationOverlay -> applyFaceRegionColors path -- both
+ * terrain and mapMesh already carry occColor/occMask attributes that this
+ * writes into in place (mesh-builders.ts), so this does NOT need (and must
+ * never gain back) a separate cloned overlay mesh: an earlier version of
+ * this feature built one for map view mode (buildMapOccupationOverlay, since
+ * removed) and it turned into a standing per-frame + per-pan rendering cost,
+ * since HRE foreign-holder status is non-null across centuries of the
+ * timeline (unlike ordinary occupation, which is only non-null during rare
+ * active sieges). */
+export function computeOrgStripeOverlay(params: {
+	state: FoldedState
+	provinceMap: { compactToRealId: Int32Array }
+	regionProvince: Int32Array
+	categorize: OrgCategorizer
+	categoryColor: (categoryId: string) => [number, number, number]
+}): Float32Array | null {
+	const { state, provinceMap, regionProvince, categorize, categoryColor } =
+		params
+	const rawIdByProvince = provinceMap.compactToRealId
+
+	// Precompute a stripe color per province ONCE here (a single, small
+	// ~province-count pass calling categorize), rather than calling it once
+	// per region below -- the region loop can be two orders of magnitude
+	// larger than the province count, and this runs every earth-history
+	// scrub tick (see organization-categories.ts's OrgCategorySchema doc
+	// comment for the perf incident this avoids repeating).
+	const stripeColorByRawId = new Map<number, [number, number, number]>()
+	for (const rawId of state.provinces.keys()) {
+		const numericRawId = Number(rawId)
+		const category = categorize(numericRawId)
+		if (category?.striped) {
+			stripeColorByRawId.set(numericRawId, categoryColor(category.categoryId))
+		}
+	}
+	if (stripeColorByRawId.size === 0) return null
+
+	const N = regionProvince.length
+	const overlay = new Float32Array(N * 4)
+	let hasAny = false
+	for (let r = 0; r < N; r++) {
+		const p = regionProvince[r]
+		if (p < 0) continue
+		const rawId = rawIdByProvince[p]
+		const color = stripeColorByRawId.get(rawId)
+		if (!color) continue
 		const base = r * 4
 		overlay[base] = color[0]
 		overlay[base + 1] = color[1]

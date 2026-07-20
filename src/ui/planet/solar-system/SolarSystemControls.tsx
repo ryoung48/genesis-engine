@@ -3,8 +3,8 @@ import { fadeVisibilityClassName } from "@/ui/components/animations/fade"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { PanelHeader } from "@/ui/components/composites/PanelHeader"
 import { IconButton } from "@/ui/components/primitives/IconButton"
+import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
-import { LightningIcon } from "@/ui/components/primitives/icons/LightningIcon"
 import { TransferDownIcon } from "@/ui/components/primitives/icons/TransferDownIcon"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 
@@ -38,8 +38,6 @@ interface SolarSystemControlsProps {
 	setShowRealisticSizes: (v: boolean) => void
 	showBodyNames: boolean
 	setShowBodyNames: (v: boolean) => void
-	showRealNames?: boolean
-	setShowRealNames?: (v: boolean) => void
 	/** null when the star is focused (no rotation/orbit knobs to show). */
 	clock: SolarSystemClockProps | null
 }
@@ -73,8 +71,6 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 	setShowRealisticSizes,
 	showBodyNames,
 	setShowBodyNames,
-	showRealNames,
-	setShowRealNames,
 	clock,
 }) => {
 	const headerAction = canReturnToPlanetMap ? (
@@ -95,7 +91,7 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 							tone="overlay"
 							size="sm"
 						>
-							<LightningIcon className="h-4 w-4 text-white" />
+							<DetailsIcon className="h-4 w-4 text-white" />
 						</IconButton>
 					</Tooltip>
 				)}
@@ -169,17 +165,6 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 									/>
 								</label>
-								{showRealNames !== undefined && setShowRealNames && (
-									<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-										<span>Real Sol Names</span>
-										<input
-											type="checkbox"
-											checked={showRealNames}
-											onChange={(e) => setShowRealNames(e.target.checked)}
-											className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-										/>
-									</label>
-								)}
 								{clock && (
 									<div className="space-y-3 border-t border-white/10 pt-3">
 										<div className="space-y-1">

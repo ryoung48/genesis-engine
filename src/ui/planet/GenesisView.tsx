@@ -5,22 +5,18 @@ import { computeGravityG } from "@/model/celestial/body-metrics"
 import type { MoonBody } from "@/model/celestial/moons/moon-types"
 import {
 	derivePlanetMassKg,
-	generateMoons,
-	LUNA_MOON_SEED,
-	M_SOL_KG,
 	resolveMoonOrbitHoursPerDay,
 } from "@/model/celestial/moons/orbital-mechanics"
-import { generatePlanetName } from "@/model/celestial/planet-name"
 import type { MainSequenceClass } from "@/model/celestial/star/star-types"
 import {
 	DEFAULT_SPECTRAL_CLASS,
-	getHabitableZoneAU,
 	getKeplerYearYears,
 	getStarLuminositySol,
 	getStarMassSol,
 	isValidSpectralClass,
 } from "@/model/celestial/star/star-types"
 import {
+	generateStarName,
 	generateSystemBodies,
 	getStarAgeGyr,
 	type SystemBody,
@@ -33,6 +29,7 @@ import {
 	SOL_STAR_AGE_GYR,
 	type SolarSystemState,
 } from "@/model/celestial/system/sol-system"
+import { hydrosphereCodeFromWaterPct } from "@/model/celestial/system/system-environment"
 import { applySystemSeismology } from "@/model/celestial/system/system-seismology"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
@@ -56,17 +53,43 @@ import {
 } from "@/model/climate/tidal-schedule"
 import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
 import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
-import { hashColorForKey, rgb01ToCss } from "@/model/earth/history/color"
+import {
+	dynastyColor,
+	hashColorForKey,
+	rgb01ToCss,
+} from "@/model/earth/history/color"
 import {
 	type Eu4ProvinceFillGeometry,
 	loadEu4ProvinceFillGeometry,
+	type RawOrganizationReference,
+	type RawWarParticipantEvent,
 } from "@/model/earth/history/data-source"
-import { daysToEu4Date, eu4DateToDays } from "@/model/earth/history/date"
 import {
+	daysToEu4Date,
+	eu4DateToDays,
+	eu4DaysToYear,
+} from "@/model/earth/history/date"
+import {
+	collectOrgForeignHolderNations,
+	collectOrgMemberProvinceRawIds,
+	type FoldedState,
+	fold,
+} from "@/model/earth/history/fold"
+import {
+	EARTH_HISTORY_GOVERNMENT_FAMILIES,
+	EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS,
+	EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS,
 	EARTH_HISTORY_NO_GOVERNMENT_COLOR,
 	formatEarthHistoryGovernmentLabel,
 	getEarthHistoryGovernmentColor,
+	getEarthHistoryGovernmentFamily,
 } from "@/model/earth/history/government"
+import {
+	listOrgMembers,
+	ORG_CATEGORY_SCHEMAS,
+	type OrgCategorizer,
+	type OrgProvinceCategory,
+} from "@/model/earth/history/organization-categories"
 import {
 	TRADE_GOOD_LABELS,
 	tradeGoodColor,
@@ -98,23 +121,44 @@ import type {
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
 } from "@/model/transport/worker-types"
+import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
+import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
+import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
+import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
+import { Swatch } from "@/ui/components/primitives/Swatch"
+import { GenerationPanel } from "../wiki/GenerationPanel"
+import type { NationWikiData } from "../wiki/nation/NationWikiPage"
+import type { OrganizationWikiData } from "../wiki/organization/OrganizationWikiPage"
+import type {
+	WikiTimelineEvent as NationTimelineEvent,
+	WikiCountHistoryPoint,
+} from "../wiki/shared/WikiTimeline"
+import {
+	buildDistributionForRegions,
+	buildEu5TopographyDistribution,
+	buildStringIdDistributionForProvinces,
+} from "../wiki/stats/nation/nation-distributions"
+import { buildNationWikiStats } from "../wiki/stats/nation/nation-stats"
+import { updateBodyDiameter } from "../wiki/stats/orbit/body-mutations"
+import { buildPressureAtmosphereProfile } from "../wiki/stats/orbit/formatters"
+import { resolveBodyTideLockSiderealDayHours } from "../wiki/stats/orbit/tide-lock-stats"
+import { buildOrganizationWikiStats } from "../wiki/stats/organization/organization-stats"
+import type { WarWikiData } from "../wiki/war/WarWikiPage"
 import { scaleClockDialHourToDayLength } from "./clock"
 import type { ColorMode } from "./colors"
 import {
 	climateZoneColor,
+	EU5_CLIMATE_CATEGORIES,
+	EU5_CLIMATE_COLORS,
+	EU5_VEGETATION_CATEGORIES,
+	EU5_VEGETATION_COLORS,
 	miseryColor,
 	OCEAN_LIGHT_BLUE,
 	vegetationColor,
 	windSpeedColor,
 } from "./colors"
 import { EarthHistoryBookmarks } from "./controls/EarthHistoryBookmarks"
-import {
-	buildPressureAtmosphereProfile,
-	GenerationPanel,
-	resolveBodyTideLockSiderealDayHours,
-	updateBodyDiameter,
-} from "./controls/GenerationPanel"
 import { ModeBar } from "./controls/ModeBar"
 import {
 	type ClimateSubMode,
@@ -171,13 +215,13 @@ import {
 	type HoverMisery,
 } from "./hover/hover"
 import { InfoPanel } from "./hover/InfoPanel"
-import { buildEarthHistoryDiplomacyDisplayData } from "./hover/info-panel-model"
 import { canHandlePlanetClick } from "./measurement-click"
 import { OceanCurrentParticleCanvas } from "./OceanCurrentParticleCanvas"
 import {
 	createGenesisScene,
 	type GenesisScene,
 	type GenesisViewMode,
+	type OrgHighlightSpec,
 } from "./renderer"
 import {
 	buildDisplayNationModel,
@@ -189,6 +233,7 @@ import { createDisplayNames } from "./screen/display/display-names"
 import {
 	computeEarthHistoryOccupationOverlay,
 	computeEarthHistoryRegionColors,
+	computeOrgStripeOverlay,
 } from "./screen/display/earth-history-region-colors"
 import {
 	buildCultureLabelNames,
@@ -278,6 +323,7 @@ import {
 	DEFAULT_GEOGRAPHY_MODE,
 	getMapModePrimary,
 	isDebugGeographyMode,
+	isDebugNationMode,
 	normalizeGeographyColorMode,
 } from "./screen/shared/map-modes"
 import {
@@ -293,6 +339,23 @@ const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 function windDirectionLabel(u: number, v: number): string {
 	const deg = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360
 	return WIND_DIR_LABELS[Math.round(deg / 45) % 8] ?? "N"
+}
+
+// Nation focus is anchored on a representative seed province, so province
+// count is only a rough proxy for framing. Use a slow logarithmic curve:
+// single-province minors need a much tighter view than the default point
+// focus, while large nations should pull back only moderately instead of
+// hitting the far-out cap early.
+function nationFocusDistanceScale(provinceCount: number): number {
+	if (provinceCount <= 0) return 1
+	const minScale = 0.18
+	const maxScale = 1.0
+	const referenceProvinceCount = 400
+	const t = Math.min(
+		1,
+		Math.log2(Math.max(1, provinceCount)) / Math.log2(referenceProvinceCount),
+	)
+	return minScale + (maxScale - minScale) * t
 }
 
 function buildDistribution(
@@ -973,6 +1036,225 @@ function syncLabelModeToMapMode(params: {
 	return politicalFallback
 }
 
+// EU4's own "no real value" sentinels, shared by the nation- and
+// organization-timeline builders below.
+function normalizeTimelineTag(value: unknown): string | null {
+	return typeof value === "string" && value !== "---" && value !== "XXX"
+		? value
+		: null
+}
+
+// Cleans an EU4 identifier like "cb_civil_war" or "take_capital_imperial"
+// into a readable label ("Civil War", "Take Capital Imperial") for display
+// on WarWikiPage -- strips the "cb_" casus-belli prefix (war_goal `type`
+// values never have it, so the strip is a no-op there) and title-cases the
+// remaining underscore-separated words.
+function cleanEu4Identifier(id: string): string {
+	return id
+		.replace(/^cb_/, "")
+		.split("_")
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ")
+}
+
+function timelineTypeColor(type: string): string {
+	switch (type.replace(/\s+\([+-]\)$/, "")) {
+		case "Territory":
+			return "#16a34a"
+		case "Province":
+			return "#0891b2"
+		case "Culture":
+			return "#c026d3"
+		case "Religion":
+			return "#ca8a04"
+		case "Diplomacy":
+			return "#0d9488"
+		case "War":
+			return "#ea580c"
+		case "Battle":
+			return "#b91c1c"
+		case "Government":
+			return "#7c3aed"
+		case "Capital":
+			return "#2563eb"
+		case "Ruler":
+			return "#db2777"
+		case "Heir":
+		case "Queen":
+		case "Leader":
+			return "#be185d"
+		case "Name":
+			return "#4f46e5"
+		case "Tech":
+			return "#475569"
+		case "Decision":
+			return "#9333ea"
+		case "Trait":
+			return "#e11d48"
+		case "Flag":
+			return "#64748b"
+		case "Economy":
+			return "#059669"
+		case "Revolution":
+			return "#dc2626"
+		case "HRE":
+			return "#78716c"
+		case "Emperor":
+			return "#b45309"
+		case "Elector":
+			return "#a16207"
+		case "Organization":
+			return "#0e7490"
+		case "Site":
+			return "#0284c7"
+		default:
+			return "#64748b"
+	}
+}
+
+function eventComment(comment: unknown): string | undefined {
+	return typeof comment === "string" && comment.trim() ? comment : undefined
+}
+
+function isRebelTag(tag: string | null | undefined): boolean {
+	return tag === "REB"
+}
+
+function formatRebelTypeLabel(rebelType: unknown): string | null {
+	if (typeof rebelType !== "string" || !rebelType.trim()) return null
+	const normalized = rebelType.trim().toLowerCase()
+	return cleanEu4Identifier(normalized.replace(/_rebels$/, ""))
+}
+
+function formatRebelName(rebelType?: unknown): string {
+	const rebelTypeLabel = formatRebelTypeLabel(rebelType)
+	return rebelTypeLabel ? `Rebels (${rebelTypeLabel})` : "Rebels"
+}
+
+function paletteColorForDynasty(dynasty: string): string {
+	return rgb01ToCss(dynastyColor(dynasty))
+}
+
+function formatRulerAgeLabel(
+	birthDate: unknown,
+	deathDate: unknown,
+	selectedDays: number,
+): string | null {
+	if (
+		typeof deathDate === "string" &&
+		eu4DateToDays(deathDate) <= selectedDays
+	) {
+		return "Deceased"
+	}
+	if (typeof birthDate !== "string") return null
+	const age = Math.floor((selectedDays - eu4DateToDays(birthDate)) / 365)
+	return Number.isFinite(age) && age >= 0 ? String(age) : null
+}
+
+function formatRulerStatLabel(
+	payload: Record<string, unknown> | null,
+	fallbackName: string,
+	selectedDays: number,
+): string {
+	const rulerName = String(payload?.name ?? fallbackName)
+	const parts: string[] = []
+	const ageLabel = formatRulerAgeLabel(
+		payload?.birthDate,
+		payload?.deathDate,
+		selectedDays,
+	)
+	if (ageLabel) parts.push(ageLabel)
+	if (/^(regency council|interregnum)$/i.test(rulerName.trim()))
+		return parts.join(" · ")
+	parts.push(payload?.female === true ? "♀" : "♂")
+	if (payload?.regent === true) parts.push("Regent")
+	return parts.join(" · ")
+}
+
+function indefiniteArticle(label: string): "a" | "an" {
+	return /^[aeiou]/i.test(label) ? "an" : "a"
+}
+
+function subjectTypeLabel(subjectType: unknown): string {
+	if (subjectType === "vassal") return "vassal"
+	return typeof subjectType === "string" && subjectType.trim()
+		? cleanEu4Identifier(subjectType).toLowerCase()
+		: "subject"
+}
+
+function subjectRelationDescription(params: {
+	title: string
+	otherName: string
+	isStart: boolean
+	isOverlordPage: boolean
+	subjectType: unknown
+}): string {
+	const relation = subjectTypeLabel(params.subjectType)
+	const article = indefiniteArticle(relation)
+	if (params.isStart) {
+		return params.isOverlordPage
+			? `${params.title} gained ${params.otherName} as ${article} ${relation}.`
+			: `${params.title} became ${article} ${relation} of ${params.otherName}.`
+	}
+	return params.isOverlordPage
+		? `${params.title} lost ${params.otherName} as ${article} ${relation}.`
+		: `${params.title} stopped being ${article} ${relation} of ${params.otherName}.`
+}
+
+// "A", "A and B", "A, B, and C" -- used to merge same-date war join/leave
+// events (multiple nations joining/leaving on the same day, e.g. a shared
+// peace treaty) into one WarWikiPage timeline entry instead of one per
+// nation.
+function joinWithAnd(names: string[]): string {
+	if (names.length <= 1) return names[0] ?? ""
+	if (names.length === 2) return `${names[0]} and ${names[1]}`
+	return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`
+}
+
+function pushTimelineEvent(
+	events: NationTimelineEvent[],
+	params: {
+		id: string
+		date: number
+		type: string
+		description: string
+		comment?: string
+		plainTextRanges?: NationTimelineEvent["plainTextRanges"]
+		nations?: NationTimelineEvent["nations"]
+		provinces?: NationTimelineEvent["provinces"]
+		cultures?: NationTimelineEvent["cultures"]
+		religions?: NationTimelineEvent["religions"]
+		dynasties?: NationTimelineEvent["dynasties"]
+		organizations?: NationTimelineEvent["organizations"]
+		wars?: NationTimelineEvent["wars"]
+	},
+) {
+	events.push({
+		id: params.id,
+		date: params.date,
+		dateLabel: daysToEu4Date(params.date),
+		type: params.type,
+		typeColor: timelineTypeColor(params.type),
+		description: params.description,
+		comment: params.comment,
+		plainTextRanges: params.plainTextRanges,
+		nations: params.nations ?? [],
+		provinces: params.provinces ?? [],
+		cultures: params.cultures ?? [],
+		religions: params.religions ?? [],
+		dynasties: params.dynasties ?? [],
+		organizations: params.organizations ?? [],
+		wars: params.wars ?? [],
+	})
+}
+
+// organization-categories.ts's colors are 0-255 (organizations.json
+// convention); rgb01ToCss expects 0-1.
+function rgb255ToCss(rgb: [number, number, number]): string {
+	return rgb01ToCss([rgb[0] / 255, rgb[1] / 255, rgb[2] / 255])
+}
+
 export const GenesisView: React.FC = () => {
 	const makeRandomSeed = useCallback(
 		() => Math.floor(Math.random() * SEED_MAX),
@@ -1049,9 +1331,6 @@ export const GenesisView: React.FC = () => {
 		useState(initialViewPrefs.showSolarSystemRealisticSizes)
 	const [showSolarSystemBodyNames, setShowSolarSystemBodyNames] = useState(
 		initialViewPrefs.showSolarSystemBodyNames,
-	)
-	const [showSolarSystemRealNames, setShowSolarSystemRealNames] = useState(
-		initialViewPrefs.showSolarSystemRealNames,
 	)
 	const [mapProjectionLatitude, setMapProjectionLatitude] = useState(
 		initialViewPrefs.mapProjectionLatitude,
@@ -1162,6 +1441,38 @@ export const GenesisView: React.FC = () => {
 		)
 	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
+	// Separate from selectedNationId above -- that one drives the existing
+	// right-side DetailsDrawer (procedural nations only). This is the new
+	// left-panel "nation wiki page" selection (Earth import only for now),
+	// identified by EU4 tag rather than a procedural nation id.
+	const [selectedWikiNationTag, setSelectedWikiNationTagRaw] = useState<
+		string | null
+	>(null)
+	// International organization wiki page selection (e.g. "HRE"/"HSA") --
+	// mutually exclusive with the nation wiki page above; selecting either
+	// clears the other so GenerationPanel only ever renders one at a time.
+	const [selectedWikiOrganizationId, setSelectedWikiOrganizationIdRaw] =
+		useState<string | null>(null)
+	// War wiki page selection (wars.json warId) -- also mutually exclusive
+	// with the nation/organization wiki pages above.
+	const [selectedWikiWarId, setSelectedWikiWarIdRaw] = useState<string | null>(
+		null,
+	)
+	const setSelectedWikiNationTag = useCallback((tag: string | null) => {
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiNationTagRaw(tag)
+	}, [])
+	const setSelectedWikiOrganizationId = useCallback((orgId: string | null) => {
+		setSelectedWikiNationTagRaw(null)
+		setSelectedWikiWarIdRaw(null)
+		setSelectedWikiOrganizationIdRaw(orgId)
+	}, [])
+	const setSelectedWikiWarId = useCallback((warId: string | null) => {
+		setSelectedWikiNationTagRaw(null)
+		setSelectedWikiOrganizationIdRaw(null)
+		setSelectedWikiWarIdRaw(warId)
+	}, [])
 	const [generationSessionRestored, setGenerationSessionRestored] = useState(
 		initialGenerationSession !== null,
 	)
@@ -1192,14 +1503,25 @@ export const GenesisView: React.FC = () => {
 		null,
 	)
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
-	// Earth-imported worlds get their own real-history timeline instead of
-	// the procedural sim's; selectedTimeMs above stays untouched since it
-	// also drives climate-month display and other procedural-only derived
-	// state. See docs/earth-history-plan.md "Reuse the existing scrubber".
+	// Earth-imported worlds scrub real Gregorian dates via earthHistory's own
+	// slider instead of the procedural one (which stays hidden -- see the
+	// SimulationControls branch below). But selectedTimeMs is still what
+	// drives selectedHistoryView (and from there Social's population/
+	// culture/heritage/religion counts and distributions), so it needs to
+	// track the real slider for Earth import -- otherwise those stats stay
+	// frozen at whatever year the procedural sim happened to finish on.
+	// eu4DaysToYear/historyYearToTime share the same linear year axis, so
+	// this is a direct year-for-year mapping, not a rescale.
 	const earthHistory = useEarthHistoryTimeline(
 		world?.provinces,
 		!!world?.isEarthImport,
 	)
+	useEffect(() => {
+		if (!world?.isEarthImport) return
+		setSelectedTimeMs(
+			historyYearToTime(eu4DaysToYear(earthHistory.selectedDays)),
+		)
+	}, [world?.isEarthImport, earthHistory.selectedDays])
 	const [earthRealPopulation, setEarthRealPopulation] =
 		useState<Eu4PopulationTimelineAsset | null>(null)
 	const [earthRealUrbanPopulation, setEarthRealUrbanPopulation] =
@@ -1360,12 +1682,6 @@ export const GenesisView: React.FC = () => {
 	const jitter = DEFAULT_WORLD_PARAMS.jitter
 	const numPlates = DEFAULT_WORLD_PARAMS.numPlates
 	const roughness = DEFAULT_WORLD_PARAMS.roughness
-	const [moonCount, setMoonCount] = useState<number>(
-		DEFAULT_WORLD_PARAMS.moonCount,
-	)
-	const [moonSeed, setMoonSeed] = useState<number>(
-		Math.floor(Math.random() * SEED_MAX),
-	)
 	const [solarSystem, setSolarSystem] = useState<SolarSystemState>(() =>
 		structuredClone(
 			initialGenerationSession?.solarSystem ?? SOL_DEFAULT_SOLAR_SYSTEM,
@@ -1377,6 +1693,16 @@ export const GenesisView: React.FC = () => {
 		solarSystem.star.seed === "sol"
 			? SOL_SEED
 			: seedStringToNumber(solarSystem.star.seed)
+	// Sol always shows its real, curated body names; a procedurally generated
+	// system's own language-generated names aren't spoilers either, so a body
+	// name is always shown once it exists.
+	const namesEnabled = true
+	// undefined for Sol -- Sol's star uses its own hardcoded "Sol" name
+	// instead of a generated one.
+	const starName = useMemo(
+		() => (restSeed === SOL_SEED ? undefined : generateStarName(restSeed)),
+		[restSeed],
+	)
 	const setRestSeed = useCallback((value: number) => {
 		setSolarSystem((current) => ({
 			...current,
@@ -1386,53 +1712,27 @@ export const GenesisView: React.FC = () => {
 			},
 		}))
 	}, [])
+	// Whether a star reroll reserves the HZ-center slot for a rolled main
+	// world (see generateSystemBodies) -- ignored for Sol, which always has
+	// Earth. Plain component state, not persisted, matching spectral
+	// class/subtype/seed.
+	const [forceMainWorld, setForceMainWorld] = useState(true)
 
 	// --- The main world's own physical/orbital state ---
 	// Every one of these fields lives ONLY on the main world's SystemBody
-	// entry in `solarSystem.orbits`, exactly like every sibling planet --
-	// there is no separate slider state to keep in sync. `mainWorldBodyRef`
-	// breaks the circular dependency (regenerating the system on a star/moon
-	// change needs the main world's CURRENT physical values so it doesn't
-	// reset them) without making every physical field a reactive dependency
-	// of the generation memo below.
+	// entry in `solarSystem.orbits`, exactly like every sibling planet -- no
+	// separate slider state to keep in sync. A procedurally generated (non-
+	// Sol) main world is fully rolled fresh by generateSystemBodies itself on
+	// every restSeed/star-type/forceMainWorld change (see generatedSystemBodies
+	// below); its live edits persist via direct solarSystem.orbits mutation
+	// (updateEditableSystemBody), never threaded back through regeneration.
+	// Sol is the one remaining exception: Earth's live-edited values (e.g.
+	// from the heightmap-import flow) DO need to survive a Sol-seed
+	// regeneration, so `mainWorldBodyRef` still exists, scoped to that single
+	// case, to avoid making every one of those fields a reactive dependency
+	// of the memo below (which would otherwise loop: edit -> regenerate ->
+	// new object identity -> sync effect -> "changed" again).
 	const mainWorldBodyRef = useRef<SystemBody | null>(null)
-
-	const generatedMoonsPreview = useMemo(() => {
-		const cls = isValidSpectralClass(spectralClass)
-			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
-		const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
-		const prev = mainWorldBodyRef.current
-		const planetRadiusKm = prev
-			? prev.diameterKm / 2
-			: DEFAULT_WORLD_PARAMS.planetRadiusKm
-		const orbitalDistanceAU = prev
-			? prev.orbitalDistanceAU
-			: DEFAULT_WORLD_PARAMS.orbitalDistanceAU
-		const hoursPerDay = prev
-			? prev.siderealDayHours
-			: DEFAULT_WORLD_PARAMS.hoursPerDay
-		const tideLock = prev ? (prev.tideLock ?? null) : null
-		const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
-			hoursPerDay,
-			tideLock,
-		)
-		return generateMoons(
-			moonCount,
-			moonSeed,
-			planetRadiusKm,
-			orbitalDistanceAU,
-			moonOrbitHoursPerDay,
-			starMassKg,
-		)
-	}, [moonCount, moonSeed, spectralClass, starSubtype])
-	const mainWorldMoonsPreview = useMemo(
-		() =>
-			restSeed === SOL_SEED
-				? [{ ...SOL_LUNA_DEFAULT, idx: 1 }]
-				: generatedMoonsPreview,
-		[generatedMoonsPreview, restSeed],
-	)
 
 	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
 	// and by the solar system view) ---
@@ -1448,12 +1748,14 @@ export const GenesisView: React.FC = () => {
 			return {
 				starAgeGyr: SOL_STAR_AGE_GYR,
 				starLuminositySol: 1,
+				spectralClass: cls,
 				...surfaceTidesCallbacks,
 			}
 		}
 		return {
 			starAgeGyr: getStarAgeGyr(restSeed, getStarMassSol(cls, starSubtype)),
 			starLuminositySol: getStarLuminositySol(cls, starSubtype),
+			spectralClass: cls,
 			...surfaceTidesCallbacks,
 		}
 	}, [restSeed, spectralClass, starSubtype])
@@ -1462,6 +1764,20 @@ export const GenesisView: React.FC = () => {
 		const cls = isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: DEFAULT_SPECTRAL_CLASS
+		if (restSeed !== SOL_SEED) {
+			// Non-Sol: the main world (if any) is rolled fresh right alongside
+			// its siblings -- no external params to build here at all.
+			return generateSystemBodies({
+				seed: restSeed,
+				spectralClass: cls,
+				starSubtype,
+				forceMainWorld,
+			})
+		}
+		// Sol: Earth's real live-edited slider values need to survive this
+		// regeneration (e.g. the heightmap-import flow) -- see mainWorldBodyRef's
+		// doc comment above for why this reads off the ref instead of reactive
+		// state.
 		const prev = mainWorldBodyRef.current
 		const planetRadiusKm = prev
 			? prev.diameterKm / 2
@@ -1486,11 +1802,12 @@ export const GenesisView: React.FC = () => {
 			? (prev.atmosphere?.pressureBar ?? DEFAULT_WORLD_PARAMS.pressure)
 			: DEFAULT_WORLD_PARAMS.pressure
 		const tideLock = prev ? (prev.tideLock ?? null) : null
-		const mainWorld = {
-			name: restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.name : undefined,
+		const moons = prev ? prev.moons : [{ ...SOL_LUNA_DEFAULT, idx: 1 }]
+		const solMainWorldOverrides = {
+			name: SOL_MAIN_WORLD_DEFAULTS.name,
 			orbitalDistanceAU,
 			diameterKm: planetRadiusKm * 2,
-			moons: mainWorldMoonsPreview,
+			moons,
 			massKg: derivePlanetMassKg(planetRadiusKm),
 			gravityG: computeGravityG(
 				derivePlanetMassKg(planetRadiusKm),
@@ -1510,24 +1827,17 @@ export const GenesisView: React.FC = () => {
 				prev?.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
 			seaLevel: prev?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 			maxElevation: 6000,
-			// Only the real Sol seed's Earth has known real climate-fit
-			// values (see sol-system.ts's SOL_MAIN_WORLD_DEFAULTS) -- a
-			// procedurally generated homeworld has no "real" data, so it
-			// keeps using the generic roll/estimate every other body gets.
-			albedo:
-				restSeed === SOL_SEED ? SOL_MAIN_WORLD_DEFAULTS.albedo : undefined,
-			greenhouseFactor:
-				restSeed === SOL_SEED
-					? SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor
-					: undefined,
+			albedo: SOL_MAIN_WORLD_DEFAULTS.albedo,
+			greenhouseFactor: SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
 		}
 		return generateSystemBodies({
 			seed: restSeed,
 			spectralClass: cls,
 			starSubtype,
-			mainWorld,
+			forceMainWorld: true,
+			solMainWorldOverrides,
 		})
-	}, [restSeed, spectralClass, starSubtype, mainWorldMoonsPreview])
+	}, [restSeed, spectralClass, starSubtype, forceMainWorld])
 	const resetSourceSystemBodies = useMemo(
 		() =>
 			restSeed === SOL_SEED
@@ -1550,7 +1860,7 @@ export const GenesisView: React.FC = () => {
 	const systemBodies = solarSystem.orbits
 	const mainWorldSystemBody =
 		systemBodies.find((body) => body.isMainWorld) ?? null
-	const displayMoons = mainWorldSystemBody?.moons ?? mainWorldMoonsPreview
+	const displayMoons = mainWorldSystemBody?.moons ?? []
 	const systemBodiesRef = useRef(systemBodies)
 	systemBodiesRef.current = systemBodies
 	const displayMoonsRef = useRef(displayMoons)
@@ -1611,6 +1921,10 @@ export const GenesisView: React.FC = () => {
 			updateMainWorldBody((body) => ({
 				...body,
 				landCoverage: value,
+				// Keep hydrosphereCode (and its HYDROSPHERE_DESCRIPTIONS text) in
+				// sync with the hand-edited land coverage, instead of leaving it
+				// stuck at whatever value it was originally rolled with.
+				hydrosphereCode: hydrosphereCodeFromWaterPct((1 - value) * 100),
 			})),
 		[updateMainWorldBody],
 	)
@@ -1650,9 +1964,6 @@ export const GenesisView: React.FC = () => {
 		? spectralClass
 		: DEFAULT_SPECTRAL_CLASS
 
-	const currentHz = getHabitableZoneAU(
-		getStarLuminositySol(effectiveStarClass, starSubtype),
-	)
 	const setSpectralClass = useCallback((cls: string) => {
 		const nextClass: MainSequenceClass = isValidSpectralClass(cls)
 			? cls
@@ -1669,32 +1980,11 @@ export const GenesisView: React.FC = () => {
 		}))
 	}, [])
 
-	const setSpectralClassPreservingHz = (cls: string) => {
-		const newClass: MainSequenceClass = isValidSpectralClass(cls)
-			? cls
-			: DEFAULT_SPECTRAL_CLASS
-		const newHz = getHabitableZoneAU(
-			getStarLuminositySol(newClass, starSubtype),
-		)
-		const hzcFactor = currentHz > 0 ? orbitalDistanceAU / currentHz : 1
-		setOrbitalDistanceAU(hzcFactor * newHz)
-		setSolarSystem((current) => ({
-			...current,
-			star: { ...current.star, class: newClass },
-		}))
-	}
-
-	const setStarSubtypePreservingHz = (subtype: number) => {
-		const newHz = getHabitableZoneAU(
-			getStarLuminositySol(effectiveStarClass, subtype),
-		)
-		const hzcFactor = currentHz > 0 ? orbitalDistanceAU / currentHz : 1
-		setOrbitalDistanceAU(hzcFactor * newHz)
-		setSolarSystem((current) => ({
-			...current,
-			star: { ...current.star, subtype },
-		}))
-	}
+	// Changing star class/subtype re-rolls the whole system (including the
+	// main world) from the same restSeed -- generatedSystemBodies already
+	// depends on spectralClass/starSubtype, and deviation 0 is always exactly
+	// the new star's HZ center by construction (see generateSystemBodies), so
+	// no separate "preserve HZ position" math is needed here anymore.
 	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
 	const tideLock = mainWorldSystemBody?.tideLock ?? null
 	const setTideLock = useCallback(
@@ -1831,7 +2121,6 @@ export const GenesisView: React.FC = () => {
 				showSolarSystemAxialTilt,
 				showSolarSystemRealisticSizes,
 				showSolarSystemBodyNames,
-				showSolarSystemRealNames,
 				showWireframe,
 				showGrid,
 				showNationBorders,
@@ -1880,7 +2169,6 @@ export const GenesisView: React.FC = () => {
 		showSolarSystemAxialTilt,
 		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
-		showSolarSystemRealNames,
 		showDaylight,
 		clockCurrent,
 		clockDay,
@@ -1943,8 +2231,12 @@ export const GenesisView: React.FC = () => {
 		if (isDebugGeographyMode(colorMode)) {
 			setColorMode(DEFAULT_GEOGRAPHY_MODE)
 			setGeographyMode(DEFAULT_GEOGRAPHY_MODE)
+			return
 		}
-	}, [colorMode, debugMapModes])
+		if (colorMode === "nations" && isDebugNationMode(nationMode)) {
+			setNationMode("borders")
+		}
+	}, [colorMode, debugMapModes, nationMode])
 
 	useEffect(() => {
 		if (!canSimulate) {
@@ -2127,6 +2419,19 @@ export const GenesisView: React.FC = () => {
 		) {
 			return worldForDisplay.realPopulation.totalPopulation
 		}
+		// Earth import never builds a procedural timelineBundle (no UI path
+		// ever calls startSimulation for it -- its own Play button only
+		// animates earthHistory.selectedDays), so selectedHistoryView is
+		// always null there and would otherwise pin this at the static
+		// generation-time total regardless of the real-history slider.
+		// worldForDisplay.realPopulation is already real, per-real-date data
+		// (built from earthRealPopulation/earthRealUrbanPopulation via
+		// earthHistory.selectedDays), so prefer it outright for Earth import
+		// rather than only when the map's own colorMode happens to be on
+		// the population overlay.
+		if (worldForDisplay?.isEarthImport && worldForDisplay?.realPopulation) {
+			return worldForDisplay.realPopulation.totalPopulation
+		}
 		return (
 			selectedHistoryView?.totalPopulation ??
 			world?.population?.totalPopulation ??
@@ -2135,10 +2440,26 @@ export const GenesisView: React.FC = () => {
 	}, [
 		colorMode,
 		dataVariant,
+		worldForDisplay?.isEarthImport,
 		worldForDisplay?.realPopulation,
 		selectedHistoryView?.totalPopulation,
 		world?.population?.totalPopulation,
 	])
+
+	// Same underlying issue as drawerWorldPopulation above -- Earth import has
+	// no procedural timelineBundle to read culture/religion/war counts from,
+	// so for that path prefer earthHistory's own real per-date engine
+	// (already time-varying with the real-history slider) over the static
+	// procedural worldForDisplay fields used below.
+	const earthSocialCounts = useMemo(() => {
+		if (!world?.isEarthImport || !earthHistory.query) return null
+		const frame = earthHistory.query.frame
+		return {
+			cultureCount: frame.cultureCount,
+			religionCount: frame.religionCount,
+			activeWarCount: frame.activeWars.length,
+		}
+	}, [world?.isEarthImport, earthHistory.query])
 
 	useEffect(() => {
 		if (!worldForDisplay) {
@@ -2153,7 +2474,11 @@ export const GenesisView: React.FC = () => {
 
 	// --- Hover computations ---
 	const hoverElevationKm = getHoverElevationKm(hoverInfo, worldForDisplay)
-	const hoverTopography = getHoverTopography(hoverInfo, worldForDisplay)
+	const hoverTopography = getHoverTopography(
+		hoverInfo,
+		worldForDisplay,
+		dataVariant,
+	)
 	const hoverCoordinates = useMemo(
 		() => getHoverCoordinates(hoverInfo, worldForDisplay),
 		[hoverInfo, worldForDisplay],
@@ -2205,7 +2530,11 @@ export const GenesisView: React.FC = () => {
 		worldForDisplay,
 		temperatureMonth,
 	)
-	const hoverClimateZone = getHoverClimateZone(hoverInfo, worldForDisplay)
+	const hoverClimateZone = getHoverClimateZone(
+		hoverInfo,
+		worldForDisplay,
+		dataVariant,
+	)
 	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
 	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
 	const hoverRealPastaClimate = getHoverRealPastaClimate(
@@ -2216,7 +2545,7 @@ export const GenesisView: React.FC = () => {
 		hoverInfo,
 		worldForDisplay,
 	)
-	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay)
+	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay, dataVariant)
 	const earthImportRawIdToCompact = useMemo(() => {
 		const realIds = worldForDisplay?.provinces?.realIds
 		if (!realIds) return null
@@ -2544,6 +2873,155 @@ export const GenesisView: React.FC = () => {
 		return { avg: speeds.length > 0 ? sum / speeds.length : 0, max }
 	}, [world])
 
+	// Resolves the per-org category schema (organization-categories.ts) into
+	// a ready-to-use categorizer + color lookup for one folded state --
+	// shared by resolveOrgProvinceColor below (the base region-color fill)
+	// and the occupationOverlay memo's stripe pass (computeOrgStripeOverlay),
+	// so both always agree on which province belongs to which category. Only
+	// built once per (state, org) rather than once per region/call site --
+	// see OrgCategorySchema's doc comment for why that matters. Returns null
+	// for an org with no registered schema (organization-categories.ts's
+	// ORG_CATEGORY_SCHEMAS) -- callers fall back to plain solid-member-color/
+	// white-elsewhere coloring with no stripe in that case.
+	const buildOrgCategorizer = useCallback(
+		(
+			state: FoldedState,
+			orgRef: RawOrganizationReference,
+		): {
+			categorize: OrgCategorizer
+			categoryColor: (categoryId: string) => [number, number, number]
+		} | null => {
+			const schema = ORG_CATEGORY_SCHEMAS[orgRef.id]
+			if (!schema) return null
+			const categorize = schema.createCategorizer(state)
+			const colorCache = new Map<string, [number, number, number]>()
+			const categoryColor = (categoryId: string): [number, number, number] => {
+				let color = colorCache.get(categoryId)
+				if (color) return color
+				const rgb =
+					schema.categories.find((c) => c.id === categoryId)?.color ??
+					orgRef.color
+				color = [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255]
+				colorCache.set(categoryId, color)
+				return color
+			}
+			return { categorize, categoryColor }
+		},
+		[],
+	)
+
+	// Recolors provinces belonging to the currently-open org's wiki page,
+	// entirely at region level -- eu4-province-borders-fills.json's real
+	// polygon triangulation only covers ~85% of provinces (3522 of 4195),
+	// so a mesh-overlay approach left the other ~15% showing whatever the
+	// base map already had underneath. The region mesh (world.mesh) always
+	// covers 100% of the globe, so painting it directly (same mechanism
+	// computeEarthHistoryRegionColors already uses for ordinary political
+	// coloring) has no coverage gaps and no separate-mesh depth/elevation
+	// concerns. Every org replaces every region's color outright: white
+	// outside the organization, and a per-category color (from
+	// buildOrgCategorizer) for every province a category covers.
+	const resolveOrgProvinceColor = useCallback(
+		(
+			state: FoldedState,
+			orgRef: RawOrganizationReference,
+		): ((rawId: number) => [number, number, number] | null) => {
+			const WHITE: [number, number, number] = [1, 1, 1]
+			const colorByRawId = new Map<number, [number, number, number]>()
+			const resolvers = buildOrgCategorizer(state, orgRef)
+			if (resolvers) {
+				const { categorize, categoryColor } = resolvers
+				for (const rawId of state.provinces.keys()) {
+					const numericRawId = Number(rawId)
+					const category = categorize(numericRawId)
+					// Striped categories (HRE's foreign holders, HSA's trade posts)
+					// stay white at this base layer -- their diagonal stripe
+					// (computeOrgStripeOverlay, fed through the SAME occColor/
+					// occMask attributes as the ordinary occupation stripe) is the
+					// sole indicator, same convention as the real occupation
+					// overlay (owner's own color underneath, controller's color
+					// striped on top).
+					colorByRawId.set(
+						numericRawId,
+						category && !category.striped
+							? categoryColor(category.categoryId)
+							: WHITE,
+					)
+				}
+			} else {
+				// No registered schema: fall back to plain solid-member-color/
+				// white-elsewhere coloring, so a brand new org still renders
+				// reasonably before anyone gets around to giving it a real schema.
+				const memberProvinceRawIds = collectOrgMemberProvinceRawIds(
+					state,
+					orgRef.id,
+				)
+				const orgColor: [number, number, number] = [
+					orgRef.color[0] / 255,
+					orgRef.color[1] / 255,
+					orgRef.color[2] / 255,
+				]
+				for (const rawId of state.provinces.keys()) {
+					const numericRawId = Number(rawId)
+					colorByRawId.set(
+						numericRawId,
+						memberProvinceRawIds.has(numericRawId) ? orgColor : WHITE,
+					)
+				}
+			}
+			return (rawId: number) => colorByRawId.get(rawId) ?? WHITE
+		},
+		[buildOrgCategorizer],
+	)
+	const withOrgHighlight = useCallback(
+		(baseColors: Float32Array | null): Float32Array | null => {
+			if (
+				!selectedWikiOrganizationId ||
+				!worldForDisplay?.provinces?.regionProvince ||
+				!earthHistory.query ||
+				!earthHistory.organizationReference ||
+				!earthHistory.engine
+			)
+				return baseColors
+			const orgRef = earthHistory.organizationReference.get(
+				selectedWikiOrganizationId,
+			)
+			if (!orgRef) return baseColors
+			const provinceColor = resolveOrgProvinceColor(
+				earthHistory.query.state,
+				orgRef,
+			)
+			const regionProvince = worldForDisplay.provinces.regionProvince
+			const compactToRealId = earthHistory.engine.provinceMap.compactToRealId
+			const N = worldForDisplay.mesh.numRegions
+			// Mutate baseColors in place rather than copying it first -- every
+			// caller (see regionColors' useMemo) computes a brand-new
+			// Float32Array on the spot and never reads it again itself, so
+			// there's nothing to protect by copying, only a wasted full-array
+			// allocation + copy on top of the write loop below.
+			const out = baseColors ?? new Float32Array(N * 3)
+			for (let region = 0; region < N; region++) {
+				const compact = regionProvince[region]
+				if (compact < 0 || compact >= compactToRealId.length) continue
+				const rawId = compactToRealId[compact]
+				const color = provinceColor(rawId)
+				if (!color) continue
+				out[3 * region] = color[0]
+				out[3 * region + 1] = color[1]
+				out[3 * region + 2] = color[2]
+			}
+			return out
+		},
+		[
+			selectedWikiOrganizationId,
+			worldForDisplay,
+			earthHistory.query,
+			earthHistory.organizationReference,
+			earthHistory.engine,
+			resolveOrgProvinceColor,
+		],
+	)
+
 	// --- Region colors ---
 	const regionColors = useMemo(() => {
 		if (!worldForDisplay) return null
@@ -2557,7 +3035,7 @@ export const GenesisView: React.FC = () => {
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			}
-			return rgb
+			return withOrgHighlight(rgb)
 		}
 		if (
 			colorMode === "misery" &&
@@ -2617,7 +3095,7 @@ export const GenesisView: React.FC = () => {
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
 			}
-			return rgb
+			return withOrgHighlight(rgb)
 		}
 		if (
 			worldForDisplay?.isEarthImport &&
@@ -2642,24 +3120,26 @@ export const GenesisView: React.FC = () => {
 				religionColorById: earthHistory.religionColorById ?? undefined,
 				cultureColorById: earthHistory.cultureColorById ?? undefined,
 			})
-			if (earthColors) return earthColors
+			if (earthColors) return withOrgHighlight(earthColors)
 		}
-		return computeRegionColors(
-			worldForDisplay,
-			colorMode,
-			nationMode,
-			populationMode,
-			temperatureMonth,
-			rainfallMonth,
-			dtrMonth,
-			currentMonth,
-			viewMode,
-			showElevation,
-			undefined,
-			selectedHistoryView?.activeWars,
-			selectedNationId,
-			selectedHistoryView?.relationAt ?? null,
-			dangerSubMode,
+		return withOrgHighlight(
+			computeRegionColors(
+				worldForDisplay,
+				colorMode,
+				nationMode,
+				populationMode,
+				temperatureMonth,
+				rainfallMonth,
+				dtrMonth,
+				currentMonth,
+				viewMode,
+				showElevation,
+				undefined,
+				selectedHistoryView?.activeWars,
+				selectedNationId,
+				selectedHistoryView?.relationAt ?? null,
+				dangerSubMode,
+			),
 		)
 	}, [
 		colorMode,
@@ -2681,37 +3161,13 @@ export const GenesisView: React.FC = () => {
 		earthHistory.nationReference,
 		earthHistory.religionColorById,
 		earthHistory.cultureColorById,
+		withOrgHighlight,
 	])
 
 	// Earth-import political/demographic fills are temporarily rendered only
 	// via the base region mesh, not the real-EU4-province overlay, to avoid
 	// the heavier first-render vector-overlay setup cost.
 	const nationFillColorForRawId = useMemo<null>(() => null, [])
-
-	const earthHistoryDiplomacyRows = useMemo(() => {
-		if (
-			!worldForDisplay?.isEarthImport ||
-			!earthHistory.engine ||
-			!earthHistory.query ||
-			hoverProvince === null ||
-			hoverProvince < 0
-		)
-			return undefined
-		const rawId = String(
-			earthHistory.engine.provinceMap.compactToRealId[hoverProvince],
-		)
-		const owner = earthHistory.query.state.provinces.get(rawId)?.owner
-		if (!owner) return undefined
-		const info = earthHistory.queryNation(owner)
-		return buildEarthHistoryDiplomacyDisplayData(info)
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- queryNation closes over selectedDays via earthHistory.query, already a dep
-	}, [
-		worldForDisplay?.isEarthImport,
-		earthHistory.engine,
-		earthHistory.query,
-		hoverProvince,
-		earthHistory.queryNation,
-	])
 
 	// Overrides Nation/Government/Culture/Religion hover rows with real
 	// history for the currently-scrubbed date -- the procedural builders
@@ -2837,6 +3293,36 @@ export const GenesisView: React.FC = () => {
 			earthHistory.nationReference &&
 			worldForDisplay.provinces
 		) {
+			// Any org wiki page open: its own striped categories (HRE's
+			// foreign-held territory, HSA's Hanseatic kontors/trade posts, ...)
+			// take priority over the normal contested-province stripe while
+			// browsing that org's territory. Both write into the SAME
+			// occColor/occMask attributes already present on terrainMesh/
+			// mapMesh (see applyFaceRegionColors) -- no separate overlay mesh
+			// is built for this (see computeOrgStripeOverlay's doc comment for
+			// why that mattered).
+			if (selectedWikiOrganizationId) {
+				const orgRef = earthHistory.organizationReference.get(
+					selectedWikiOrganizationId,
+				)
+				const resolvers = orgRef
+					? buildOrgCategorizer(earthHistory.query.state, orgRef)
+					: null
+				if (resolvers) {
+					return computeOrgStripeOverlay({
+						state: earthHistory.query.state,
+						provinceMap: earthHistory.engine.provinceMap,
+						regionProvince: worldForDisplay.provinces.regionProvince,
+						categorize: resolvers.categorize,
+						categoryColor: resolvers.categoryColor,
+					})
+				}
+				// No registered category schema for this org (nothing striped) --
+				// the ordinary contested-province stripe is nation-mode furniture
+				// unrelated to org membership, so it's suppressed rather than
+				// bleeding through org territory coloring.
+				return null
+			}
 			return computeEarthHistoryOccupationOverlay({
 				state: earthHistory.query.state,
 				provinceMap: earthHistory.engine.provinceMap,
@@ -2857,6 +3343,9 @@ export const GenesisView: React.FC = () => {
 		earthHistory.query,
 		earthHistory.nationReference,
 		earthHistory.engine,
+		earthHistory.organizationReference,
+		selectedWikiOrganizationId,
+		buildOrgCategorizer,
 	])
 
 	const occupationStripeColorForRawId = useMemo<null>(() => null, [])
@@ -2920,7 +3409,20 @@ export const GenesisView: React.FC = () => {
 			? {
 					assignment: earthHistory.query.frame.assignment,
 					seeds: earthHistory.query.frame.seeds,
-					names: earthHistory.query.frame.names,
+					names:
+						colorMode === "nations" && nationMode === "dynasty"
+							? (() => {
+									const { frame, state } = earthHistory.query!
+									const dynastyNames = new Array<string>(frame.names.length).fill(
+										"",
+									)
+									for (const [tag, id] of frame.nationIds) {
+										const dynasty = state.nations.get(tag)?.ruler?.dynasty
+										if (dynasty) dynastyNames[id] = dynasty
+									}
+									return dynastyNames
+								})()
+							: earthHistory.query.frame.names,
 				}
 			: null,
 		350,
@@ -2945,6 +3447,57 @@ export const GenesisView: React.FC = () => {
 		labelsPlaybackActive,
 	)
 
+	// Map territory highlight (HRE, Hanseatic League, ...) -- recomputed on
+	// every timeline scrub tick since membership is derived fresh from
+	// FoldedState each time (see fold.ts's collectOrgMemberProvinceRawIds).
+	// setOrganizationHighlight rebuilds nation BORDERS and LABELS (border
+	// tracing + label-texture regeneration, both far more expensive than a
+	// region-color array fill) whenever the spec reference changes, so this
+	// is throttled through usePlaybackSampledValue exactly like
+	// earthHistorySceneNationOverride/LabelPartitions just above -- without
+	// it, an open org wiki page rebuilt borders+labels every single tick
+	// instead of at most once per 350ms during playback.
+	const organizationHighlightSpecRaw = useMemo<OrgHighlightSpec | null>(() => {
+		if (
+			!selectedWikiOrganizationId ||
+			!world?.isEarthImport ||
+			!earthHistory.query ||
+			!earthHistory.organizationReference
+		)
+			return null
+		const orgRef = earthHistory.organizationReference.get(
+			selectedWikiOrganizationId,
+		)
+		if (!orgRef) return null
+		const { state } = earthHistory.query
+		const memberProvinceRawIds = collectOrgMemberProvinceRawIds(
+			state,
+			orgRef.id,
+		)
+		if (memberProvinceRawIds.size === 0) return null
+		const memberProvinceCompactIndexes = new Set<number>()
+		for (const rawId of memberProvinceRawIds) {
+			const compact = earthImportRawIdToCompact?.get(rawId)
+			if (compact !== undefined) memberProvinceCompactIndexes.add(compact)
+		}
+		return {
+			orgId: orgRef.id,
+			name: orgRef.name,
+			memberProvinceCompactIndexes,
+		}
+	}, [
+		selectedWikiOrganizationId,
+		world,
+		earthHistory.query,
+		earthHistory.organizationReference,
+		earthImportRawIdToCompact,
+	])
+	const organizationHighlightSpec = usePlaybackSampledValue(
+		organizationHighlightSpecRaw,
+		350,
+		labelsPlaybackActive,
+	)
+
 	useEffect(() => {
 		const scene = sceneRef.current
 		if (!scene) return
@@ -2962,7 +3515,8 @@ export const GenesisView: React.FC = () => {
 			lastWorldRef.current = worldForDisplay
 		}
 		scene.setOccupationOverlay(
-			colorMode === "nations" && nationMode === "borders"
+			selectedWikiOrganizationId === "HRE" ||
+				(colorMode === "nations" && nationMode === "borders")
 				? occupationOverlay
 				: getBaseMapMode(colorMode) === "population" &&
 						["culture", "heritage", "religion"].includes(populationMode)
@@ -2976,6 +3530,7 @@ export const GenesisView: React.FC = () => {
 		// date and show real EU4 names instead of the static generation-time
 		// assignment and procedural names.
 		scene.setEarthHistoryNationOverride(earthHistorySceneNationOverride)
+		scene.setOrganizationHighlight(organizationHighlightSpec)
 		// Culture/religion LABELS are also placed from a different id space
 		// than the procedural world.cultures/world.heritages -- see
 		// earthHistoryLabelPartitions's doc comment in
@@ -2993,6 +3548,8 @@ export const GenesisView: React.FC = () => {
 		worldForDisplay,
 		earthHistorySceneNationOverride,
 		earthHistorySceneLabelPartitions,
+		organizationHighlightSpec,
+		selectedWikiOrganizationId,
 	])
 
 	const thermalEquator = useMemo(() => {
@@ -3130,6 +3687,7 @@ export const GenesisView: React.FC = () => {
 					hasWorld: !!worldForDisplay,
 					hasProvinces: !!worldForDisplay?.provinces,
 					hasNationModel: !!nationModel,
+					isEarthImport: !!worldForDisplay?.isEarthImport,
 				})
 			) {
 				return
@@ -3170,10 +3728,56 @@ export const GenesisView: React.FC = () => {
 
 			const province =
 				worldForDisplay.provinces.regionProvince[info.region] ?? -1
-			const nation =
-				province >= 0 ? (nationModel.assignment[province] ?? -1) : -1
 
 			if (measureMode === "off") {
+				// Earth import routes clicks to the left-panel nation wiki page
+				// instead of the procedural right-side drawer -- see
+				// selectedWikiNationTag's doc. Falls through to the procedural
+				// path below when there's no real EU4 mapping for this province
+				// (e.g. still loading) or no owner.
+				if (worldForDisplay.isEarthImport) {
+					// No procedural nations exist for Earth import (see
+					// derive-province-society.ts's isEarthImportRaster check), so
+					// nationModel is always null here -- never fall through to the
+					// procedural path below, which would crash on it. Just no-op
+					// until the real EU4 engine has loaded.
+					if (!earthHistory.engine) return
+					// The procedural regionProvince[region] mapping is only an
+					// approximation for Earth import -- real EU4 province polygons
+					// don't align with the underlying mesh cells, so prefer a
+					// point-in-polygon lookup against the actual province vector
+					// geometry (same approach hoverProvince uses above), falling
+					// back to the approximate mapping only when that geometry
+					// isn't loaded yet.
+					let rawId: string | null = null
+					if (worldForDisplay.provinces?.realIds && eu4HoverFillGeometry) {
+						const base = info.region * 3
+						const r_xyz = worldForDisplay.mesh.r_xyz
+						const latDeg =
+							Math.asin(Math.max(-1, Math.min(1, r_xyz[base + 2]))) *
+							(180 / Math.PI)
+						const lonDeg =
+							Math.atan2(r_xyz[base + 1], r_xyz[base]) * (180 / Math.PI)
+						const rawProvinceId = findEu4ProvinceForLonLat(
+							eu4HoverFillGeometry,
+							lonDeg,
+							latDeg,
+						)
+						if (rawProvinceId !== null) rawId = String(rawProvinceId)
+					}
+					if (rawId === null && province >= 0) {
+						rawId = String(
+							earthHistory.engine.provinceMap.compactToRealId[province],
+						)
+					}
+					const owner = rawId
+						? (earthHistory.query?.state.provinces.get(rawId)?.owner ?? null)
+						: null
+					setSelectedWikiNationTag(owner)
+					return
+				}
+				const nation =
+					province >= 0 ? (nationModel.assignment[province] ?? -1) : -1
 				setSelectedNationId(nation >= 0 ? nation : null)
 				if (nation >= 0) setDetailsDrawerOpen(true)
 				return
@@ -3216,6 +3820,10 @@ export const GenesisView: React.FC = () => {
 		pathfindingSea,
 		worldForDisplay,
 		setMeasureMode,
+		earthHistory.engine,
+		earthHistory.query,
+		eu4HoverFillGeometry,
+		setSelectedWikiNationTag,
 	])
 
 	const selectedNation = useMemo(() => {
@@ -3288,12 +3896,61 @@ export const GenesisView: React.FC = () => {
 		return currentHistoryQuery.getEventsUntil(selectedTimeMs)
 	}, [currentHistoryQuery, selectedTimeMs])
 
+	// Real per-nation province counts + government type for Earth import --
+	// same rationale as earthSocialCounts above: worldForDisplay.nations is
+	// static procedural data there (no timelineBundle ever built), so build
+	// these straight from earthHistory's own real per-date engine instead.
+	const earthNationProvinceCounts = useMemo(() => {
+		if (!world?.isEarthImport || !earthHistory.query) return null
+		const counts = new Map<number, number>()
+		for (const nationId of earthHistory.query.frame.assignment) {
+			if (nationId < 0) continue
+			counts.set(nationId, (counts.get(nationId) ?? 0) + 1)
+		}
+		return counts
+	}, [world?.isEarthImport, earthHistory.query])
+
+	const earthGovernmentDistribution = useMemo(() => {
+		if (
+			!world?.isEarthImport ||
+			!earthHistory.query ||
+			!earthNationProvinceCounts
+		)
+			return null
+		const { nationIds } = earthHistory.query.frame
+		const { nations } = earthHistory.query.state
+		const tagById = new Map<number, string>()
+		for (const [tag, id] of nationIds) tagById.set(id, tag)
+		const counts = new Map<
+			(typeof EARTH_HISTORY_GOVERNMENT_FAMILIES)[number],
+			number
+		>()
+		for (const nationId of earthNationProvinceCounts.keys()) {
+			const tag = tagById.get(nationId)
+			const governmentType = tag
+				? (nations.get(tag)?.governmentType ?? null)
+				: null
+			const family = getEarthHistoryGovernmentFamily(governmentType)
+			if (!family) continue
+			counts.set(family, (counts.get(family) ?? 0) + 1)
+		}
+		return EARTH_HISTORY_GOVERNMENT_FAMILIES.map((family) => ({
+			label: EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS[family],
+			count: counts.get(family) ?? 0,
+			color: rgbToCss(EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS[family]),
+		}))
+	}, [world?.isEarthImport, earthHistory.query, earthNationProvinceCounts])
+
 	const nationSizeDistribution = useMemo(
-		() => buildNationSizeDistribution(nationProvinceCounts),
-		[nationProvinceCounts],
+		() =>
+			buildNationSizeDistribution(
+				earthNationProvinceCounts ?? nationProvinceCounts,
+			),
+		[earthNationProvinceCounts, nationProvinceCounts],
 	)
 
 	const governmentDistribution = useMemo(() => {
+		if (earthGovernmentDistribution) return earthGovernmentDistribution
 		// Indexed by government type (aligns with GOVERNMENT_TYPES / region-colors).
 		const GOV_COLORS = [
 			"rgb(204, 143, 71)", // 0 chiefdom
@@ -3331,7 +3988,11 @@ export const GenesisView: React.FC = () => {
 			count: counts[i] ?? 0,
 			color: GOV_COLORS[i] ?? "rgb(148, 163, 184)",
 		}))
-	}, [worldForDisplay?.nations?.governmentType, nationModel])
+	}, [
+		earthGovernmentDistribution,
+		worldForDisplay?.nations?.governmentType,
+		nationModel,
+	])
 
 	const religionTypeDistribution = useMemo(() => {
 		const world = worldForDisplay
@@ -3425,40 +4086,66 @@ export const GenesisView: React.FC = () => {
 		[selectedHistoryView, nationModel, nationAdjacency],
 	)
 
+	// "Observed" reuses the EU5-derived per-cell rasters already loaded for
+	// Earth import (world.eu5Climate/eu5Vegetation/eu5Topography, -1 where
+	// unmapped) instead of the procedural climateZones/vegetation/topography
+	// arrays -- same buildDistribution bucketer, different source, so
+	// Environmental's charts track the same model-vs-observed flag the map
+	// overlay uses (see OverlayControls' dataVariant).
+	const showObservedDistributions =
+		dataVariant === "observed" && !!world?.isEarthImport
+
 	const climateDistribution = useMemo(
 		() =>
-			buildDistribution(
-				CLIMATE_LABELS,
-				world?.climateZones,
-				(index) => rgbToCss(climateZoneColor(index)),
-				new Set([0]),
-			),
-		[world?.climateZones],
+			showObservedDistributions
+				? buildDistribution(
+						EU5_CLIMATE_CATEGORIES.map((label) => label.replace(/_/g, " ")),
+						world?.eu5Climate,
+						(index) => rgbToCss(EU5_CLIMATE_COLORS[index]),
+					)
+				: buildDistribution(
+						CLIMATE_LABELS,
+						world?.climateZones,
+						(index) => rgbToCss(climateZoneColor(index)),
+						new Set([0]),
+					),
+		[showObservedDistributions, world?.eu5Climate, world?.climateZones],
 	)
 
 	const vegetationDistribution = useMemo(
 		() =>
-			buildDistribution(
-				BIOME_LABELS,
-				world?.vegetation,
-				(index) => rgbToCss(vegetationColor(index)),
-				new Set([0]),
-			),
-		[world?.vegetation],
+			showObservedDistributions
+				? buildDistribution(
+						EU5_VEGETATION_CATEGORIES.map((label) => label.replace(/_/g, " ")),
+						world?.eu5Vegetation,
+						(index) => rgbToCss(EU5_VEGETATION_COLORS[index]),
+					)
+				: buildDistribution(
+						BIOME_LABELS,
+						world?.vegetation,
+						(index) => rgbToCss(vegetationColor(index)),
+						new Set([0]),
+					),
+		[showObservedDistributions, world?.eu5Vegetation, world?.vegetation],
 	)
 
 	const topographyDistribution = useMemo(
 		() =>
-			buildDistribution(
-				GENESIS_TOPOGRAPHY_LABELS,
-				world?.topography,
-				(index) => {
-					const color = getTopographyColor(index)
-					return color ? rgbToCss(color) : "rgb(148, 163, 184)"
-				},
-				new Set([TOPO_LAKE, TOPO_OCEAN]),
-			),
-		[world?.topography],
+			showObservedDistributions
+				? buildEu5TopographyDistribution({
+						values: world?.eu5Topography,
+						rgbToCss,
+					})
+				: buildDistribution(
+						GENESIS_TOPOGRAPHY_LABELS,
+						world?.topography,
+						(index) => {
+							const color = getTopographyColor(index)
+							return color ? rgbToCss(color) : "rgb(148, 163, 184)"
+						},
+						new Set([TOPO_LAKE, TOPO_OCEAN]),
+					),
+		[showObservedDistributions, world?.eu5Topography, world?.topography],
 	)
 
 	const tradeGoodsDistribution = useMemo(() => {
@@ -3819,8 +4506,7 @@ export const GenesisView: React.FC = () => {
 			pressure,
 			albedo: mainWorldSystemBody?.albedo,
 			greenhouseFactor: mainWorldSystemBody?.greenhouseFactor,
-			moonCount,
-			moonSeed,
+			seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 		}),
 		[
 			seed,
@@ -3853,8 +4539,7 @@ export const GenesisView: React.FC = () => {
 			pressure,
 			mainWorldSystemBody?.albedo,
 			mainWorldSystemBody?.greenhouseFactor,
-			moonCount,
-			moonSeed,
+			mainWorldSystemBody?.seismology?.totalHeating,
 		],
 	)
 	useEffect(() => {
@@ -3923,8 +4608,6 @@ export const GenesisView: React.FC = () => {
 			setTideLock,
 			setSubstellarLon,
 			setPressure,
-			setMoonCount,
-			setMoonSeed,
 			setRestSeed,
 			setSeaLevel,
 			setEra,
@@ -4076,8 +4759,7 @@ export const GenesisView: React.FC = () => {
 				greenhouseFactor:
 					mainWorldSystemBody?.greenhouseFactor ??
 					SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
-				moonCount,
-				moonSeed,
+				seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 				tideLock,
 				substellarLon,
 				// Zeroed, not the live sliders -- this path is Earth-only (see
@@ -4137,8 +4819,7 @@ export const GenesisView: React.FC = () => {
 			pressure,
 			mainWorldSystemBody?.albedo,
 			mainWorldSystemBody?.greenhouseFactor,
-			moonCount,
-			moonSeed,
+			mainWorldSystemBody?.seismology?.totalHeating,
 			generationCallbacks,
 		],
 	)
@@ -4366,7 +5047,2187 @@ export const GenesisView: React.FC = () => {
 	})
 
 	// --- Planet identity ---
-	const planetName = useMemo(() => generatePlanetName(seed), [seed])
+	// Same name the main world shows everywhere else in GenerationPanel (its
+	// stat card title, breadcrumbs, etc.) -- previously this was a separate,
+	// unrelated generatePlanetName(seed) call, which could (and did) produce
+	// a completely different name than the one shown in the generation panel
+	// for the same body.
+	const planetName = mainWorldSystemBody?.name || "Main World"
+
+	// --- Nation wiki page (Earth import only for now) ---
+	const nationWikiData = useMemo<NationWikiData | null>(() => {
+		if (
+			!selectedWikiNationTag ||
+			!world?.isEarthImport ||
+			!earthHistory.engine ||
+			!earthHistory.query ||
+			!worldForDisplay
+		)
+			return null
+		const tag = selectedWikiNationTag
+		const { frame, state } = earthHistory.query
+		const nationId = frame.nationIds.get(tag) ?? -1
+		if (nationId < 0) return null
+
+		const provinceIndexes: number[] = []
+		for (let p = 0; p < frame.assignment.length; p++) {
+			if (frame.assignment[p] === nationId) provinceIndexes.push(p)
+		}
+		const ownedProvinceIndexes = new Set(provinceIndexes)
+		const regionIndexes: number[] = []
+		const regionProvince = world.provinces?.regionProvince
+		if (regionProvince) {
+			for (let region = 0; region < regionProvince.length; region++) {
+				if (ownedProvinceIndexes.has(regionProvince[region])) {
+					regionIndexes.push(region)
+				}
+			}
+		}
+
+		const areaKm2 = worldForDisplay.provinces?.areaKm2
+		const totalAreaKm2 = areaKm2
+			? provinceIndexes.reduce((sum, p) => sum + (areaKm2[p] ?? 0), 0)
+			: 0
+		const realPopulation = worldForDisplay.realPopulation?.population
+		const totalPopulation = realPopulation
+			? provinceIndexes.reduce((sum, p) => sum + (realPopulation[p] ?? 0), 0)
+			: 0
+
+		const nationState = state.nations.get(tag)
+		const resolveNationName = (otherTag: string): string =>
+			isRebelTag(otherTag)
+				? "Rebels"
+				: (state.nations.get(otherTag)?.currentName ??
+					earthHistory.nationReference?.get(otherTag)?.name ??
+					frame.names[frame.nationIds.get(otherTag) ?? -1] ??
+					otherTag)
+		// Matches the actual "nations" map-mode fill exactly (see
+		// earth-history-region-colors.ts's buildNationColorByTag) -- real EU4
+		// reference color when known, the same neutral gray fallback
+		// otherwise. hashColorForKey is a different, hash-based scheme used
+		// only for hover swatches when no reference color exists; using it
+		// here would make this swatch not match the map.
+		const resolveNationColor = (otherTag: string): string => {
+			if (isRebelTag(otherTag)) return "#020617"
+			const ref = earthHistory.nationReference?.get(otherTag)
+			return ref
+				? rgb01ToCss([
+						ref.color[0] / 255,
+						ref.color[1] / 255,
+						ref.color[2] / 255,
+					])
+				: rgb01ToCss([0.5, 0.5, 0.5])
+		}
+		const title = resolveNationName(tag)
+		const color = resolveNationColor(tag)
+		const governmentLabel = formatEarthHistoryGovernmentLabel({
+			governmentType: nationState?.governmentType ?? null,
+			governmentReform: nationState?.governmentReform ?? null,
+		})
+		const currentRulerPayload =
+			earthHistory.engine.data.nationEvents[tag]?.events
+				.filter(
+					(event) =>
+						event.kind === "rulerChange" &&
+						event.date <= earthHistory.selectedDays,
+				)
+				.at(-1)?.payload ?? null
+		const rulerLabel = nationState?.ruler
+			? formatRulerStatLabel(
+					currentRulerPayload,
+					nationState.ruler.name,
+					earthHistory.selectedDays,
+				)
+			: null
+		const dynastyName =
+			(typeof currentRulerPayload?.dynasty === "string"
+				? currentRulerPayload.dynasty
+				: nationState?.ruler?.dynasty) ?? null
+		const activeConflicts = state.activeWars
+			.filter((war) => war.attackers.has(tag) || war.defenders.has(tag))
+			.map((war) => ({
+				warId: war.warId,
+				name: war.name,
+				side: war.attackers.has(tag)
+					? ("attacker" as const)
+					: ("defender" as const),
+			}))
+			.sort((a, b) => a.name.localeCompare(b.name))
+
+		// "Dependency" here covers every cross-nation political tie the Earth
+		// engine tracks (fold.ts's FoldedNationState) -- overlord/vassals is
+		// the literal subject hierarchy, union/allies/guarantees/marriages aren't strictly
+		// dependencies but share the same "line per relation type, links to
+		// other nations" shape so they're folded in here too.
+		const dependencyGroups: Array<[string, string[]]> = [
+			["Overlord", nationState?.overlord ? [nationState.overlord] : []],
+			["Vassals", nationState?.vassals ? Array.from(nationState.vassals) : []],
+			[
+				"Union (Senior)",
+				nationState?.unionSeniorOf ? Array.from(nationState.unionSeniorOf) : [],
+			],
+			[
+				"Union (Junior)",
+				nationState?.unionJuniorPartner ? [nationState.unionJuniorPartner] : [],
+			],
+			["Allies", nationState?.allies ? Array.from(nationState.allies) : []],
+			[
+				"Guarantees",
+				nationState?.guarantees ? Array.from(nationState.guarantees) : [],
+			],
+			[
+				"Royal Marriages",
+				nationState?.royalMarriages
+					? Array.from(nationState.royalMarriages)
+					: [],
+			],
+		]
+		const dependencies = dependencyGroups
+			.map(([label, tags]) => ({
+				label,
+				nations: tags.map((otherTag) => ({
+					tag: otherTag,
+					name: resolveNationName(otherTag),
+					color: resolveNationColor(otherTag),
+				})),
+			}))
+			.filter((group) => group.nations.length > 0)
+
+		const resolveOrganizationColor = (orgId: string): string => {
+			const ref = earthHistory.organizationReference?.get(orgId)
+			return ref
+				? rgb01ToCss([
+						ref.color[0] / 255,
+						ref.color[1] / 255,
+						ref.color[2] / 255,
+					])
+				: rgb01ToCss([0.5, 0.5, 0.5])
+		}
+		const organizationIds = new Set<string>(nationState?.organizations.keys())
+		if (state.hreMemberNations.has(tag)) organizationIds.add("HRE")
+		const organizations = Array.from(organizationIds).map((orgId) => {
+			// A nation can hold enclave territory of an org without being
+			// genuinely "part of" it -- e.g. Venice's Terraferma stayed
+			// formally inside the HRE after Venice (never an Imperial Estate)
+			// conquered it. Shown as this nation's own color striped with
+			// transparent instead of a plain solid swatch, so the wiki
+			// doesn't silently overstate membership -- see
+			// collectOrgForeignHolderNations.
+			const striped = collectOrgForeignHolderNations(state, orgId).has(tag)
+			// For orgs whose categories split into rival sides (GG's
+			// Guelphs/Ghibellines) rather than just estate/site types, show
+			// which side this nation is on instead of the shared org name --
+			// see OrgCategory.factionLabel.
+			const role = nationState?.organizations.get(orgId)
+			const category = role
+				? ORG_CATEGORY_SCHEMAS[orgId]?.categories.find((c) => c.id === role)
+				: undefined
+			return {
+				id: orgId,
+				name:
+					category?.factionLabel ??
+					earthHistory.organizationReference?.get(orgId)?.name ??
+					orgId,
+				color: category?.color
+					? rgb01ToCss([
+							category.color[0] / 255,
+							category.color[1] / 255,
+							category.color[2] / 255,
+						])
+					: resolveOrganizationColor(orgId),
+				striped,
+			}
+		})
+
+		const stats = buildNationWikiStats({
+			totalAreaKm2,
+			totalPopulation,
+			provinceCount: provinceIndexes.length,
+			rulerLabel,
+			governmentLabel,
+		})
+		const rulerStat = stats.find((stat) => stat.label === "Ruler")
+		if (rulerStat && nationState?.ruler) {
+			const rulerSuffix = rulerLabel ? `· ${rulerLabel}` : ""
+			if (dynastyName) {
+				rulerStat.value = ""
+				rulerStat.valueAction = (
+					<span className="inline-flex items-center gap-1">
+						<span>{nationState.ruler.name}</span>
+						<Swatch color={paletteColorForDynasty(dynastyName)} />
+						<span>{dynastyName}</span>
+						{rulerSuffix ? <span>{rulerSuffix}</span> : null}
+					</span>
+				)
+			} else {
+				rulerStat.valuePrefix = nationState.ruler.name
+				rulerStat.value = rulerSuffix
+			}
+		}
+		if (activeConflicts.length > 0) {
+			stats.push({
+				label: "Conflicts",
+				value: "",
+				valueAction: (
+					<span className="inline-flex flex-wrap items-center gap-x-1.5">
+						{activeConflicts.map((conflict) => {
+							const SideIcon =
+								conflict.side === "attacker"
+									? SwordCrossIcon
+									: ShieldHalfFullIcon
+							return (
+								<span
+									key={conflict.warId}
+									className="inline-flex items-center gap-0.5"
+									title={conflict.side === "attacker" ? "Attacker" : "Defender"}
+								>
+									<SideIcon className="h-2.5 w-2.5 text-slate-400" />
+									<InlineTextButton
+										onClick={() => setSelectedWikiWarId(conflict.warId)}
+									>
+										{conflict.name}
+									</InlineTextButton>
+								</span>
+							)
+						})}
+					</span>
+				),
+			})
+		}
+		const focusNation = (targetTag: string) => {
+			const targetId = frame.nationIds.get(targetTag)
+			const seedProvince =
+				targetId !== undefined ? frame.seeds[targetId] : undefined
+			if (seedProvince === undefined || seedProvince < 0) return
+
+			let targetProvinceCount = 0
+			for (const assigned of frame.assignment) {
+				if (assigned === targetId) targetProvinceCount++
+			}
+			sceneRef.current?.focusOnProvince(seedProvince, {
+				distanceScale: nationFocusDistanceScale(targetProvinceCount),
+				pulseTarget: "nation",
+			})
+		}
+
+		const eventNation = (otherTag: string, rebelType?: unknown) =>
+			isRebelTag(otherTag)
+				? {
+						tag: otherTag,
+						name: formatRebelName(rebelType),
+						color: "#020617",
+						link: false,
+					}
+				: {
+						tag: otherTag,
+						name: resolveNationName(otherTag),
+						color: resolveNationColor(otherTag),
+					}
+		const addNationMention = (
+			nations: NationTimelineEvent["nations"],
+			otherTag: string | null,
+			rebelType?: unknown,
+		) => {
+			if (
+				!otherTag ||
+				nations.some(
+					(entry) =>
+						entry.tag === otherTag &&
+						(!isRebelTag(otherTag) ||
+							entry.name === formatRebelName(rebelType)),
+				)
+			)
+				return
+			nations.push(eventNation(otherTag, rebelType))
+		}
+		const provinceMention = (
+			rawId: string,
+			fallbackColor: string,
+		): NationTimelineEvent["provinces"][number] | null => {
+			const provinceId = earthImportRawIdToCompact?.get(Number(rawId))
+			if (provinceId === undefined) return null
+			return {
+				id: provinceId,
+				name:
+					earthHistory.provinceMeta?.get(rawId)?.name ?? `Province ${rawId}`,
+				color: getProvinceColor(provinceId) ?? fallbackColor,
+			}
+		}
+		const organizationMention = (
+			orgId: string,
+			categoryId?: string,
+		): NationTimelineEvent["organizations"][number] => {
+			const ref = earthHistory.organizationReference?.get(orgId)
+			const category = categoryId
+				? ORG_CATEGORY_SCHEMAS[orgId]?.categories.find(
+						(c) => c.id === categoryId,
+					)
+				: undefined
+			const color = category?.color ?? ref?.color
+			return {
+				id: orgId,
+				name: category?.factionLabel ?? ref?.name ?? orgId,
+				color: color
+					? rgb01ToCss([color[0] / 255, color[1] / 255, color[2] / 255])
+					: rgb01ToCss([0.5, 0.5, 0.5]),
+			}
+		}
+		const warMention = (war: {
+			warId: string
+			name: string
+		}): NationTimelineEvent["wars"][number] => ({
+			id: war.warId,
+			name: war.name,
+			color: "#b91c1c",
+		})
+		const cultureMention = (
+			cultureId: string,
+		): NationTimelineEvent["cultures"][number] => ({
+			id: cultureId,
+			name:
+				earthHistory.cultureNameById?.get(cultureId) ??
+				cultureId.replace(/_/g, " "),
+			color: rgbToCss(
+				earthHistory.cultureColorById?.get(cultureId) ??
+					hashColorForKey(`culture:${cultureId}`),
+			),
+		})
+		const religionMention = (
+			religionId: string,
+		): NationTimelineEvent["religions"][number] => ({
+			id: religionId,
+			name:
+				earthHistory.religionNameById?.get(religionId) ??
+				religionId.replace(/_/g, " "),
+			color: rgbToCss(
+				earthHistory.religionColorById?.get(religionId) ??
+					hashColorForKey(`religion:${religionId}`),
+			),
+		})
+		const dynastyMention = (
+			dynasty: string,
+		): NationTimelineEvent["dynasties"][number] => ({
+			id: dynasty,
+			name: dynasty,
+			color: paletteColorForDynasty(dynasty),
+		})
+		const personDisplay = (payload: Record<string, unknown>) => {
+			const name = String(payload.name ?? payload.monarchName ?? "unknown")
+			const dynasty =
+				typeof payload.dynasty === "string" && payload.dynasty.trim()
+					? payload.dynasty
+					: null
+			return {
+				description: dynasty ? `${name} ${dynasty}` : name,
+				dynasties: dynasty ? [dynastyMention(dynasty)] : [],
+			}
+		}
+		const mergeById = <T extends { id: string | number }>(items: T[]): T[] => {
+			const seen = new Set<string | number>()
+			const merged: T[] = []
+			for (const item of items) {
+				if (seen.has(item.id)) continue
+				seen.add(item.id)
+				merged.push(item)
+			}
+			return merged
+		}
+		const mergeNations = (
+			items: NationTimelineEvent["nations"],
+		): NationTimelineEvent["nations"] => {
+			const seen = new Set<string>()
+			const merged: NationTimelineEvent["nations"] = []
+			for (const item of items) {
+				const key = item.link === false ? `${item.tag}:${item.name}` : item.tag
+				if (seen.has(key)) continue
+				seen.add(key)
+				merged.push(item)
+			}
+			return merged
+		}
+		const formatList = (items: string[]): string => {
+			if (items.length <= 2) return items.join(" and ")
+			return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`
+		}
+		const formatPayloadLabel = (value: unknown): string =>
+			typeof value === "string"
+				? cleanEu4Identifier(value)
+				: value === true
+					? "yes"
+					: value === false
+						? "no"
+						: String(value)
+		const payloadValue = (
+			payload: Record<string, unknown>,
+			...keys: string[]
+		): unknown => {
+			for (const key of keys) {
+				if (payload[key] !== undefined) return payload[key]
+			}
+			return payload.value
+		}
+		const formatSignedValue = (value: unknown): string =>
+			typeof value === "number" && value > 0 ? `+${value}` : String(value)
+		const mergeEventComments = (
+			events: NationTimelineEvent[],
+		): string | undefined => {
+			const comments = Array.from(
+				new Set(events.map((event) => event.comment).filter(Boolean)),
+			)
+			return comments.length > 0 ? comments.join(" | ") : undefined
+		}
+		const escapeRegExp = (value: string): string =>
+			value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+		const buildMergedTerritoryDescription = (
+			events: NationTimelineEvent[],
+		): string => {
+			const actionEntries = new Map<
+				string,
+				Map<string | null, { objects: string[]; objectKeys: string[] }>
+			>()
+			const fallbackClauses: string[] = []
+			for (const event of events) {
+				const clause = event.description
+					.replace(new RegExp(`^${escapeRegExp(title)} `), "")
+					.replace(/\.$/, "")
+				const match =
+					/^(took control of|lost control of|gained|lost) (.+)$/.exec(clause)
+				if (!match) {
+					fallbackClauses.push(clause)
+					continue
+				}
+				const [, action, object] = match
+				const targetMatch = /^(.+) to (.+)$/.exec(object)
+				const objectName = targetMatch?.[1] ?? object
+				const targetName = targetMatch?.[2] ?? null
+				const targetEntries = actionEntries.get(action) ?? new Map()
+				const entry = targetEntries.get(targetName) ?? {
+					objects: [],
+					objectKeys: [],
+				}
+				entry.objects.push(objectName)
+				entry.objectKeys.push(object)
+				targetEntries.set(targetName, entry)
+				actionEntries.set(action, targetEntries)
+			}
+			for (const [ownershipAction, controlAction] of [
+				["gained", "took control of"],
+				["lost", "lost control of"],
+			] as const) {
+				const ownershipObjects = new Set<string>()
+				for (const entry of actionEntries.get(ownershipAction)?.values() ??
+					[]) {
+					for (const objectKey of entry.objectKeys)
+						ownershipObjects.add(objectKey)
+				}
+				if (ownershipObjects.size === 0) continue
+				const controlTargets = actionEntries.get(controlAction)
+				if (!controlTargets) continue
+				for (const [targetName, entry] of controlTargets) {
+					const filteredObjects: string[] = []
+					const filteredObjectKeys: string[] = []
+					for (let index = 0; index < entry.objectKeys.length; index++) {
+						if (ownershipObjects.has(entry.objectKeys[index])) continue
+						filteredObjects.push(entry.objects[index])
+						filteredObjectKeys.push(entry.objectKeys[index])
+					}
+					if (filteredObjects.length > 0) {
+						controlTargets.set(targetName, {
+							objects: filteredObjects,
+							objectKeys: filteredObjectKeys,
+						})
+					} else {
+						controlTargets.delete(targetName)
+					}
+				}
+				if (controlTargets.size === 0) {
+					actionEntries.delete(controlAction)
+				}
+			}
+			const clauses = [
+				...Array.from(actionEntries.entries()).flatMap(
+					([action, targetEntries]) =>
+						Array.from(targetEntries.entries()).map(([targetName, entry]) =>
+							targetName
+								? `${action} ${formatList(entry.objects)} to ${targetName}`
+								: `${action} ${formatList(entry.objects)}`,
+						),
+				),
+				...fallbackClauses,
+			]
+			return `${title} ${formatList(clauses)}.`
+		}
+		const buildMergedProvinceAttributeDescription = (
+			events: NationTimelineEvent[],
+			attribute: "culture" | "religion",
+		): string => {
+			const valueEntries = new Map<string, string[]>()
+			const fallbackClauses: string[] = []
+			const pattern = new RegExp(`^(.+) changed ${attribute} to (.+)$`)
+			for (const event of events) {
+				const clause = event.description.replace(/\.$/, "")
+				const match = pattern.exec(clause)
+				if (!match) {
+					fallbackClauses.push(clause)
+					continue
+				}
+				const [, provinceName, valueName] = match
+				const entries = valueEntries.get(valueName) ?? []
+				entries.push(provinceName)
+				valueEntries.set(valueName, entries)
+			}
+			const clauses = [
+				...Array.from(valueEntries.entries()).map(
+					([valueName, provinceNames]) =>
+						`${formatList(provinceNames)} changed ${attribute} to ${valueName}`,
+				),
+				...fallbackClauses,
+			]
+			return `${formatList(clauses)}.`
+		}
+		const mergedTerritoryType = (events: NationTimelineEvent[]): string => {
+			const signs = new Set(
+				events
+					.map((event) => /\(([+-])\)$/.exec(event.type)?.[1])
+					.filter((sign): sign is string => sign !== undefined),
+			)
+			if (signs.size === 1) return `Territory (${Array.from(signs)[0]})`
+			return "Territory"
+		}
+		const ownedProvinceCountByDate = new Map<number, number>()
+		const territoryDeltasByDate = new Map<number, number>()
+		let timelineEvents: NationTimelineEvent[] = []
+		const nationEvents = earthHistory.engine.data.nationEvents[tag]
+		if (nationEvents) {
+			for (const [index, event] of nationEvents.events.entries()) {
+				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+				const provinces: NationTimelineEvent["provinces"] = []
+				const dateId = `nation:${tag}:${event.date}:${index}`
+				switch (event.kind) {
+					case "governmentChange": {
+						const governmentType = String(event.payload.governmentType ?? "")
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Government",
+							description: `${title} changed government to ${formatEarthHistoryGovernmentLabel({ governmentType, governmentReform: null })}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					}
+					case "governmentReformAdd": {
+						const reformId = String(event.payload.reformId ?? "")
+						if (!/^early_gov_reform_\d+$/.test(reformId)) {
+							pushTimelineEvent(timelineEvents, {
+								id: dateId,
+								date: event.date,
+								type: "Government",
+								description: `${title} adopted ${reformId.replace(/_/g, " ")}.`,
+								comment: eventComment(event.comment),
+								nations,
+							})
+						}
+						break
+					}
+					case "governmentReformRemove": {
+						const reformId = String(event.payload.reformId ?? "")
+						if (!/^early_gov_reform_\d+$/.test(reformId)) {
+							pushTimelineEvent(timelineEvents, {
+								id: dateId,
+								date: event.date,
+								type: "Government",
+								description: `${title} abandoned ${reformId.replace(/_/g, " ")}.`,
+								comment: eventComment(event.comment),
+								nations,
+							})
+						}
+						break
+					}
+					case "rulerChange": {
+						const person = personDisplay(event.payload)
+						const isInterregnum = /^interregnum$/i.test(
+							String(event.payload.name ?? "").trim(),
+						)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Ruler",
+							description: isInterregnum
+								? `${title} entered an interregnum.`
+								: `${title} gained ruler ${person.description}.`,
+							comment: eventComment(event.comment),
+							nations,
+							dynasties: isInterregnum ? [] : person.dynasties,
+						})
+						break
+					}
+					case "heirChange": {
+						const person = personDisplay(event.payload)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Heir",
+							description: `${title} gained heir ${person.description}.`,
+							comment: eventComment(event.comment),
+							nations,
+							dynasties: person.dynasties,
+						})
+						break
+					}
+					case "queenChange": {
+						const person = personDisplay(event.payload)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Queen",
+							description: `${title} gained queen ${person.description}.`,
+							comment: eventComment(event.comment),
+							nations,
+							dynasties: person.dynasties,
+						})
+						break
+					}
+					case "leaderAdd": {
+						const person = personDisplay(event.payload)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Leader",
+							description: `${title} gained leader ${person.description}.`,
+							comment: eventComment(event.comment),
+							nations,
+							dynasties: person.dynasties,
+						})
+						break
+					}
+					case "nameChange":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Government",
+							description: `${title} changed name to ${String(event.payload.name ?? tag)}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "nameRestore":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Name",
+							description: `${title} restored its historical name.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "capitalChange": {
+						const rawId = String(event.payload.provinceId ?? "")
+						const province = provinceMention(rawId, color)
+						if (province) provinces.push(province)
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Capital",
+							description: province
+								? `${title} moved its capital to ${province.name}.`
+								: `${title} moved its capital.`,
+							comment: eventComment(event.comment),
+							nations,
+							provinces,
+						})
+						break
+					}
+					case "primaryCulture":
+					case "acceptedCultureAdd":
+					case "acceptedCultureRemove": {
+						const cultureId = String(
+							payloadValue(event.payload, "cultureId") ?? "",
+						)
+						const culture = cultureMention(cultureId)
+						const verb =
+							event.kind === "acceptedCultureAdd"
+								? "accepted"
+								: event.kind === "acceptedCultureRemove"
+									? "stopped accepting"
+									: "made its primary culture"
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Culture",
+							description: `${title} ${verb} ${culture.name}.`,
+							comment: eventComment(event.comment),
+							nations,
+							cultures: [culture],
+						})
+						break
+					}
+					case "religion":
+					case "school": {
+						const religionId =
+							event.kind === "religion"
+								? String(payloadValue(event.payload, "religionId") ?? "")
+								: ""
+						const religion = religionId ? religionMention(religionId) : null
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Religion",
+							description:
+								event.kind === "school"
+									? `${title} adopted ${formatPayloadLabel(payloadValue(event.payload, "schoolId"))} school.`
+									: `${title} changed religion to ${religion?.name ?? "unknown"}.`,
+							comment: eventComment(event.comment),
+							nations,
+							religions: religion ? [religion] : [],
+						})
+						break
+					}
+					case "elector":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Elector",
+							description:
+								event.payload.enabled === false ||
+								event.payload.elector === false
+									? `${title} stopped being an elector.`
+									: `${title} became an elector.`,
+							comment: eventComment(event.comment),
+							nations,
+							organizations: [organizationMention("HRE")],
+						})
+						break
+					case "govRank":
+					case "legacyGov":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Government",
+							description:
+								event.kind === "govRank"
+									? `${title} changed government rank to ${formatPayloadLabel(payloadValue(event.payload, "rank"))}.`
+									: `${title} changed legacy government to ${formatPayloadLabel(payloadValue(event.payload, "legacyGovernmentId"))}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "techGroup":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Tech",
+							description: `${title} changed technology group to ${formatPayloadLabel(payloadValue(event.payload, "techGroupId"))}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "decision":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Decision",
+							description: `${title} enacted ${formatPayloadLabel(payloadValue(event.payload, "decisionId"))}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "rulerTrait":
+					case "heirTrait":
+					case "queenTrait":
+					case "clearTraits":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Trait",
+							description:
+								event.kind === "clearTraits"
+									? `${title} cleared ruler traits.`
+									: `${title} added ${formatPayloadLabel(payloadValue(event.payload, "traitId"))} ${event.kind.replace("Trait", "")} trait.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "countryFlagSet":
+					case "countryFlagClear":
+					case "globalFlagSet":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Flag",
+							description:
+								event.kind === "countryFlagClear"
+									? `${title} cleared flag ${formatPayloadLabel(payloadValue(event.payload, "flagId"))}.`
+									: `${title} set ${event.kind === "globalFlagSet" ? "global " : ""}flag ${formatPayloadLabel(payloadValue(event.payload, "flagId"))}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "piety":
+					case "mercantilism":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Economy",
+							description:
+								event.kind === "piety"
+									? `${title} changed piety by ${formatSignedValue(payloadValue(event.payload))}.`
+									: `${title} changed mercantilism by ${formatSignedValue(payloadValue(event.payload))}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "ambientShow":
+					case "ambientHide":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Site",
+							description: `${title} ${event.kind === "ambientShow" ? "showed" : "hid"} ambient object ${formatPayloadLabel(payloadValue(event.payload, "ambientObjectId", "objectId"))}.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+					case "revolutionTarget":
+						pushTimelineEvent(timelineEvents, {
+							id: dateId,
+							date: event.date,
+							type: "Revolution",
+							description: `${title} became the revolution target.`,
+							comment: eventComment(event.comment),
+							nations,
+						})
+						break
+				}
+			}
+		}
+
+		for (const [rawId, entry] of Object.entries(
+			earthHistory.engine.data.provinceEvents,
+		)) {
+			let owner = normalizeTimelineTag(entry.base.owner)
+			let controller = normalizeTimelineTag(entry.base.controller)
+			const revoltTypeByDate = new Map<number, unknown>()
+			for (const event of entry.events) {
+				if (
+					event.kind === "revolt" &&
+					event.payload.revolt &&
+					typeof event.payload.revolt === "object" &&
+					"type" in event.payload.revolt
+				) {
+					revoltTypeByDate.set(
+						event.date,
+						(event.payload.revolt as Record<string, unknown>).type,
+					)
+				}
+			}
+			if (owner === tag) {
+				territoryDeltasByDate.set(
+					Number.NEGATIVE_INFINITY,
+					(territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0) + 1,
+				)
+			}
+			for (const [index, event] of entry.events.entries()) {
+				const eventId = `province:${rawId}:${event.date}:${index}`
+				const nextTag = normalizeTimelineTag(event.payload.tag)
+				const rebelType = isRebelTag(nextTag)
+					? revoltTypeByDate.get(event.date)
+					: undefined
+				const provinceColor = nextTag ? resolveNationColor(nextTag) : color
+				const province = provinceMention(rawId, provinceColor)
+				const provinces = province ? [province] : []
+				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+				if (event.kind === "owner") {
+					addNationMention(nations, nextTag, rebelType)
+					if (nextTag === tag || owner === tag) {
+						if (nextTag !== owner) {
+							const delta = nextTag === tag ? 1 : -1
+							territoryDeltasByDate.set(
+								event.date,
+								(territoryDeltasByDate.get(event.date) ?? 0) + delta,
+							)
+						}
+						const description =
+							nextTag === tag
+								? `${title} gained ${province?.name ?? `province ${rawId}`}.`
+								: `${title} lost ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, rebelType).name}` : ""}.`
+						pushTimelineEvent(timelineEvents, {
+							id: eventId,
+							date: event.date,
+							type: nextTag === tag ? "Territory (+)" : "Territory (-)",
+							description,
+							comment: eventComment(event.comment),
+							nations,
+							provinces,
+						})
+					}
+					owner = nextTag
+				} else if (event.kind === "controller") {
+					addNationMention(nations, nextTag, rebelType)
+					if (nextTag === tag || controller === tag) {
+						const description =
+							nextTag === tag
+								? `${title} took control of ${province?.name ?? `province ${rawId}`}.`
+								: `${title} lost control of ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, rebelType).name}` : ""}.`
+						pushTimelineEvent(timelineEvents, {
+							id: eventId,
+							date: event.date,
+							type: nextTag === tag ? "Territory (+)" : "Territory (-)",
+							description,
+							comment: eventComment(event.comment),
+							nations,
+							provinces,
+						})
+					}
+					controller = nextTag
+				} else if (owner === tag && event.kind === "culture") {
+					const cultureId = String(event.payload.cultureId ?? "")
+					const culture = cultureMention(cultureId)
+					pushTimelineEvent(timelineEvents, {
+						id: eventId,
+						date: event.date,
+						type: "Culture",
+						description: `${province?.name ?? `Province ${rawId}`} changed culture to ${culture.name}.`,
+						comment: eventComment(event.comment),
+						nations,
+						provinces,
+						cultures: [culture],
+					})
+				} else if (owner === tag && event.kind === "religion") {
+					const religionId = String(event.payload.religionId ?? "")
+					const religion = religionMention(religionId)
+					pushTimelineEvent(timelineEvents, {
+						id: eventId,
+						date: event.date,
+						type: "Religion",
+						description: `${province?.name ?? `Province ${rawId}`} changed religion to ${religion.name}.`,
+						comment: eventComment(event.comment),
+						nations,
+						provinces,
+						religions: [religion],
+					})
+				} else if (owner === tag && event.kind === "hre") {
+					const joined = Boolean(event.payload.member)
+					pushTimelineEvent(timelineEvents, {
+						id: eventId,
+						date: event.date,
+						type: joined ? "HRE (+)" : "HRE (-)",
+						description: joined
+							? `${province?.name ?? `Province ${rawId}`} joined the Holy Roman Empire.`
+							: `${province?.name ?? `Province ${rawId}`} left the Holy Roman Empire.`,
+						comment: eventComment(event.comment),
+						nations,
+						provinces,
+						organizations: [organizationMention("HRE")],
+					})
+				}
+			}
+		}
+
+		for (const [index, event] of earthHistory.engine.data.diplomacy.entries()) {
+			const firstTag = normalizeTimelineTag(event.payload.firstTag)
+			const secondTag = normalizeTimelineTag(event.payload.secondTag)
+			if (firstTag !== tag && secondTag !== tag) continue
+			const otherTag = firstTag === tag ? secondTag : firstTag
+			const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+			addNationMention(nations, otherTag)
+			const otherName = otherTag
+				? resolveNationName(otherTag)
+				: "another nation"
+			const starts = event.kind.endsWith("Start")
+			if (event.kind === "emperorStart" || event.kind === "emperorEnd") {
+				// firstTag is always the emperor tag, secondTag is "HLR" (the
+				// empire's own nation entry) -- see convert_emperors in
+				// build-eu4-history-events.py. Only the emperor's own wiki page
+				// reaches this branch (tag === firstTag), never HLR's.
+				pushTimelineEvent(timelineEvents, {
+					id: `diplomacy:${event.date}:${index}`,
+					date: event.date,
+					type: starts ? "Emperor (+)" : "Emperor (-)",
+					description: starts
+						? `${title} became Emperor of the Holy Roman Empire.`
+						: `${title}'s reign as Emperor of the Holy Roman Empire ended.`,
+					nations,
+					organizations: [organizationMention("HRE")],
+				})
+				continue
+			}
+			const relation = event.kind.startsWith("alliance")
+				? "alliance"
+				: event.kind.startsWith("guarantee")
+					? "guarantee"
+					: event.kind.startsWith("royalMarriage")
+						? "royal marriage"
+						: event.kind.startsWith("union")
+							? "personal union"
+							: "dependency"
+			let description: string
+			if (
+				event.kind === "vassalStart" ||
+				event.kind === "vassalEnd" ||
+				event.kind === "dependencyStart" ||
+				event.kind === "dependencyEnd"
+			) {
+				description = subjectRelationDescription({
+					title,
+					otherName,
+					isStart: starts,
+					isOverlordPage: firstTag === tag,
+					subjectType:
+						event.kind === "vassalStart" || event.kind === "vassalEnd"
+							? "vassal"
+							: event.payload.subjectType,
+				})
+			} else if (event.kind === "guaranteeStart") {
+				description =
+					firstTag === tag
+						? `${title} guaranteed ${otherName}.`
+						: `${title} received a guarantee from ${otherName}.`
+			} else if (event.kind === "guaranteeEnd") {
+				description =
+					firstTag === tag
+						? `${title} stopped guaranteeing ${otherName}.`
+						: `${title} lost ${otherName}'s guarantee.`
+			} else if (event.kind === "unionStart") {
+				description =
+					firstTag === tag
+						? `${title} gained ${otherName} as a junior partner in a personal union.`
+						: `${title} became junior partner in a personal union under ${otherName}.`
+			} else if (event.kind === "unionEnd") {
+				description =
+					firstTag === tag
+						? `${title}'s personal union over ${otherName} ended.`
+						: `${title} left the personal union under ${otherName}.`
+			} else {
+				description = `${title} ${starts ? "formed" : "ended"} a ${relation} with ${otherName}.`
+			}
+			pushTimelineEvent(timelineEvents, {
+				id: `diplomacy:${event.date}:${index}`,
+				date: event.date,
+				type: starts ? "Diplomacy (+)" : "Diplomacy (-)",
+				description,
+				nations,
+			})
+		}
+
+		for (const [
+			index,
+			event,
+		] of earthHistory.engine.data.organizationEvents.entries()) {
+			if (
+				(event.kind !== "join" && event.kind !== "leave") ||
+				event.nationTag !== tag
+			)
+				continue
+			const orgId = event.payload.orgId
+			const org = organizationMention(orgId, event.payload.role)
+			const joined = event.kind === "join"
+			pushTimelineEvent(timelineEvents, {
+				id: `organization:${orgId}:${event.date}:${index}`,
+				date: event.date,
+				type: joined ? "Organization (+)" : "Organization (-)",
+				description: joined
+					? `${title} joined the ${org.name}.`
+					: `${title} left the ${org.name}.`,
+				nations: [eventNation(tag)],
+				organizations: [org],
+			})
+		}
+
+		for (const war of earthHistory.engine.data.wars) {
+			const participants = new Map<string, "attacker" | "defender">()
+			for (const event of war.events)
+				participants.set(event.nationTag, event.side)
+			for (const [index, event] of war.events.entries()) {
+				if (event.nationTag !== tag) continue
+				const opponentTags = Array.from(participants.entries())
+					.filter(([, side]) => side !== event.side)
+					.map(([opponentTag]) => opponentTag)
+				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+				for (const opponentTag of opponentTags)
+					addNationMention(nations, opponentTag)
+				const opponents = opponentTags.map(resolveNationName).join(", ")
+				const warPrefix =
+					event.kind === "warStart" ? `${title} entered ` : `${title} left `
+				const warDescription =
+					event.kind === "warStart"
+						? `${warPrefix}${war.name}${opponents ? ` against ${opponents}` : ""}.`
+						: `${warPrefix}${war.name}.`
+				pushTimelineEvent(timelineEvents, {
+					id: `war:${war.warId}:${event.date}:${index}`,
+					date: event.date,
+					type: event.kind === "warStart" ? "War (+)" : "War (-)",
+					description: warDescription,
+					comment: eventComment(event.comment),
+					nations,
+					wars: [warMention(war)],
+				})
+			}
+			for (const [index, battle] of war.battles.entries()) {
+				const isAttacker = battle.attacker.country === tag
+				const isDefender = battle.defender.country === tag
+				if (!isAttacker && !isDefender) continue
+				const opponent = isAttacker ? battle.defender : battle.attacker
+				const won = isAttacker ? battle.attackerWon : !battle.attackerWon
+				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
+				addNationMention(nations, opponent.country)
+				const province = battle.locationProvinceId
+					? provinceMention(battle.locationProvinceId, "#94a3b8")
+					: null
+				const description = `${title} ${won ? "won" : "lost"} the Battle of ${battle.name} against ${resolveNationName(opponent.country)} (${war.name}).`
+				pushTimelineEvent(timelineEvents, {
+					id: `warBattle:${war.warId}:${battle.date}:${index}`,
+					date: battle.date,
+					type: won ? "Battle (+)" : "Battle (-)",
+					description,
+					comment: eventComment(battle.comment),
+					nations,
+					provinces: province ? [province] : [],
+					wars: [warMention(war)],
+				})
+			}
+		}
+		let ownedProvinceCount =
+			territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0
+		for (const date of Array.from(territoryDeltasByDate.keys())
+			.filter((date) => Number.isFinite(date))
+			.sort((a, b) => a - b)) {
+			ownedProvinceCount += territoryDeltasByDate.get(date) ?? 0
+			ownedProvinceCountByDate.set(date, ownedProvinceCount)
+		}
+		// Step-chart series for the wiki page: the base ownership count at the
+		// simulation start, then the running count at each ownership change.
+		// ownedProvinceCountByDate iterates in ascending date order because it
+		// was filled from sorted dates above.
+		const provinceHistory: Array<{ date: number; count: number }> = [
+			{
+				date: earthHistory.minDays,
+				count: territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0,
+			},
+		]
+		for (const [date, count] of ownedProvinceCountByDate) {
+			if (date <= earthHistory.minDays) {
+				provinceHistory[0] = { date: earthHistory.minDays, count }
+			} else {
+				provinceHistory.push({ date, count })
+			}
+		}
+		const hasOwnedProvinceAtDate = (date: number): boolean => {
+			let count = territoryDeltasByDate.get(Number.NEGATIVE_INFINITY) ?? 0
+			for (const [changeDate, changedCount] of ownedProvinceCountByDate) {
+				if (changeDate > date) break
+				count = changedCount
+			}
+			return count > 0
+		}
+		timelineEvents = timelineEvents.filter((event) =>
+			hasOwnedProvinceAtDate(event.date),
+		)
+		const mergedTimelineEvents: NationTimelineEvent[] = []
+		const territorialGroups = new Map<number, NationTimelineEvent[]>()
+		const cultureGroups = new Map<number, NationTimelineEvent[]>()
+		const religionGroups = new Map<number, NationTimelineEvent[]>()
+		for (const event of timelineEvents) {
+			if (event.type.startsWith("Territory")) {
+				const group = territorialGroups.get(event.date) ?? []
+				group.push(event)
+				territorialGroups.set(event.date, group)
+			} else if (event.type === "Culture") {
+				const group = cultureGroups.get(event.date) ?? []
+				group.push(event)
+				cultureGroups.set(event.date, group)
+			} else if (event.type === "Religion") {
+				const group = religionGroups.get(event.date) ?? []
+				group.push(event)
+				religionGroups.set(event.date, group)
+			} else {
+				mergedTimelineEvents.push(event)
+			}
+		}
+		for (const [date, group] of territorialGroups) {
+			if (group.length === 1) {
+				mergedTimelineEvents.push(group[0])
+				continue
+			}
+			const mergedType = mergedTerritoryType(group)
+			mergedTimelineEvents.push({
+				id: `territory:${tag}:${date}:merged`,
+				date,
+				dateLabel: daysToEu4Date(date),
+				type: mergedType,
+				typeColor: timelineTypeColor(mergedType),
+				description: buildMergedTerritoryDescription(group),
+				comment: mergeEventComments(group),
+				nations: mergeNations(group.flatMap((event) => event.nations)),
+				provinces: mergeById(group.flatMap((event) => event.provinces)),
+				cultures: mergeById(group.flatMap((event) => event.cultures)),
+				religions: mergeById(group.flatMap((event) => event.religions)),
+				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				organizations: mergeById(group.flatMap((event) => event.organizations)),
+				wars: mergeById(group.flatMap((event) => event.wars)),
+			})
+		}
+		for (const [date, group] of cultureGroups) {
+			if (group.length === 1) {
+				mergedTimelineEvents.push(group[0])
+				continue
+			}
+			mergedTimelineEvents.push({
+				id: `culture:${tag}:${date}:merged`,
+				date,
+				dateLabel: daysToEu4Date(date),
+				type: "Culture",
+				typeColor: timelineTypeColor("Culture"),
+				description: buildMergedProvinceAttributeDescription(group, "culture"),
+				comment: mergeEventComments(group),
+				nations: mergeNations(group.flatMap((event) => event.nations)),
+				provinces: mergeById(group.flatMap((event) => event.provinces)),
+				cultures: mergeById(group.flatMap((event) => event.cultures)),
+				religions: mergeById(group.flatMap((event) => event.religions)),
+				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				organizations: mergeById(group.flatMap((event) => event.organizations)),
+				wars: mergeById(group.flatMap((event) => event.wars)),
+			})
+		}
+		for (const [date, group] of religionGroups) {
+			if (group.length === 1) {
+				mergedTimelineEvents.push(group[0])
+				continue
+			}
+			mergedTimelineEvents.push({
+				id: `religion:${tag}:${date}:merged`,
+				date,
+				dateLabel: daysToEu4Date(date),
+				type: "Religion",
+				typeColor: timelineTypeColor("Religion"),
+				description: buildMergedProvinceAttributeDescription(group, "religion"),
+				comment: mergeEventComments(group),
+				nations: mergeNations(group.flatMap((event) => event.nations)),
+				provinces: mergeById(group.flatMap((event) => event.provinces)),
+				cultures: mergeById(group.flatMap((event) => event.cultures)),
+				religions: mergeById(group.flatMap((event) => event.religions)),
+				dynasties: mergeById(group.flatMap((event) => event.dynasties)),
+				organizations: mergeById(group.flatMap((event) => event.organizations)),
+				wars: mergeById(group.flatMap((event) => event.wars)),
+			})
+		}
+		timelineEvents = mergedTimelineEvents
+		timelineEvents.sort(
+			(a, b) => a.date - b.date || a.type.localeCompare(b.type),
+		)
+
+		const cultureDistribution = buildStringIdDistributionForProvinces({
+			idByProvince: frame.cultureByProvince,
+			provinceIndexes,
+			nameById: earthHistory.cultureNameById ?? undefined,
+			colorById: earthHistory.cultureColorById ?? undefined,
+			rgbToCss,
+			fallbackColor: "rgb(148, 163, 184)",
+		})
+		const religionDistribution = buildStringIdDistributionForProvinces({
+			idByProvince: frame.religionByProvince,
+			provinceIndexes,
+			nameById: earthHistory.religionNameById ?? undefined,
+			colorById: earthHistory.religionColorById ?? undefined,
+			rgbToCss,
+			fallbackColor: "rgb(148, 163, 184)",
+		})
+
+		const climateDistribution = showObservedDistributions
+			? buildDistributionForRegions(
+					EU5_CLIMATE_CATEGORIES.map((label) => label.replace(/_/g, " ")),
+					world.eu5Climate,
+					regionIndexes,
+					(index) => rgbToCss(EU5_CLIMATE_COLORS[index]),
+				)
+			: buildDistributionForRegions(
+					CLIMATE_LABELS,
+					world.climateZones,
+					regionIndexes,
+					(index) => rgbToCss(climateZoneColor(index)),
+					new Set([0]),
+				)
+		const vegetationDistribution = showObservedDistributions
+			? buildDistributionForRegions(
+					EU5_VEGETATION_CATEGORIES.map((label) => label.replace(/_/g, " ")),
+					world.eu5Vegetation,
+					regionIndexes,
+					(index) => rgbToCss(EU5_VEGETATION_COLORS[index]),
+				)
+			: buildDistributionForRegions(
+					BIOME_LABELS,
+					world.vegetation,
+					regionIndexes,
+					(index) => rgbToCss(vegetationColor(index)),
+					new Set([0]),
+				)
+		const topographyDistribution = showObservedDistributions
+			? buildEu5TopographyDistribution({
+					values: world.eu5Topography,
+					regionIndexes,
+					rgbToCss,
+				})
+			: buildDistributionForRegions(
+					GENESIS_TOPOGRAPHY_LABELS,
+					world.topography,
+					regionIndexes,
+					(index) => {
+						const color = getTopographyColor(index)
+						return color ? rgbToCss(color) : "rgb(148, 163, 184)"
+					},
+					new Set([TOPO_LAKE, TOPO_OCEAN]),
+				)
+
+		return {
+			title,
+			color,
+			planetTitle: planetName,
+			stats,
+			dependencies,
+			organizations,
+			cultureDistribution,
+			religionDistribution,
+			climateDistribution,
+			vegetationDistribution,
+			topographyDistribution,
+			showObservedDistributions,
+			provinceHistory,
+			dateRangeStart: earthHistory.minDays,
+			dateRangeEnd: earthHistory.maxDays,
+			currentDate: earthHistory.selectedDays,
+			currentDateLabel: daysToEu4Date(earthHistory.selectedDays),
+			timelineEvents,
+			onBack: () => setSelectedWikiNationTag(null),
+			onFocusNation: () => focusNation(tag),
+			onSelectNation: (targetTag: string) => {
+				focusNation(targetTag)
+				setSelectedWikiNationTag(targetTag)
+			},
+			onSelectProvince: (provinceId: number) => {
+				sceneRef.current?.focusOnProvince(provinceId)
+			},
+			onSelectDate: earthHistory.setSelectedDays,
+			onSelectOrganization: (orgId: string) => {
+				setSelectedWikiOrganizationId(orgId)
+			},
+			onSelectWar: (warId: string) => {
+				setSelectedWikiWarId(warId)
+			},
+		}
+	}, [
+		selectedWikiNationTag,
+		world,
+		earthHistory.query,
+		earthHistory.engine,
+		earthHistory.selectedDays,
+		earthHistory.setSelectedDays,
+		earthHistory.minDays,
+		earthHistory.maxDays,
+		earthHistory.nationReference,
+		earthHistory.organizationReference,
+		earthHistory.cultureNameById,
+		earthHistory.cultureColorById,
+		earthHistory.religionNameById,
+		earthHistory.religionColorById,
+		earthHistory.provinceMeta,
+		earthImportRawIdToCompact,
+		worldForDisplay,
+		showObservedDistributions,
+		planetName,
+		getProvinceColor,
+		setSelectedWikiNationTag,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
+	])
+
+	const organizationWikiData = useMemo<OrganizationWikiData | null>(() => {
+		if (
+			!selectedWikiOrganizationId ||
+			!world?.isEarthImport ||
+			!earthHistory.engine ||
+			!earthHistory.query ||
+			!worldForDisplay
+		)
+			return null
+		const orgId = selectedWikiOrganizationId
+		const orgRef = earthHistory.organizationReference?.get(orgId)
+		if (!orgRef) return null
+		const engine = earthHistory.engine
+		const { frame, state } = earthHistory.query
+		const focusOrgNation = (targetTag: string) => {
+			const targetId = frame.nationIds.get(targetTag)
+			const seedProvince =
+				targetId !== undefined ? frame.seeds[targetId] : undefined
+			if (seedProvince === undefined || seedProvince < 0) return
+			let targetProvinceCount = 0
+			for (const assigned of frame.assignment) {
+				if (assigned === targetId) targetProvinceCount++
+			}
+			sceneRef.current?.focusOnProvince(seedProvince, {
+				distanceScale: nationFocusDistanceScale(targetProvinceCount),
+				pulseTarget: "nation",
+			})
+		}
+		const resolveNationName = (otherTag: string): string =>
+			isRebelTag(otherTag)
+				? "Rebels"
+				: (state.nations.get(otherTag)?.currentName ??
+					earthHistory.nationReference?.get(otherTag)?.name ??
+					otherTag)
+		const resolveNationColor = (otherTag: string): string => {
+			const ref = earthHistory.nationReference?.get(otherTag)
+			return ref
+				? rgb01ToCss([
+						ref.color[0] / 255,
+						ref.color[1] / 255,
+						ref.color[2] / 255,
+					])
+				: rgb01ToCss([0.5, 0.5, 0.5])
+		}
+		const nationMention = (otherTag: string) =>
+			isRebelTag(otherTag)
+				? {
+						tag: otherTag,
+						name: "Rebels",
+						color: "#020617",
+						link: false,
+					}
+				: {
+						tag: otherTag,
+						name: resolveNationName(otherTag),
+						color: resolveNationColor(otherTag),
+					}
+		const color = rgb01ToCss([
+			orgRef.color[0] / 255,
+			orgRef.color[1] / 255,
+			orgRef.color[2] / 255,
+		])
+		const orgMention = { id: orgId, name: orgRef.name, color }
+		const mentionForRole = (categoryId?: string): typeof orgMention => {
+			const category = categoryId
+				? ORG_CATEGORY_SCHEMAS[orgId]?.categories.find(
+						(c) => c.id === categoryId,
+					)
+				: undefined
+			if (!category) return orgMention
+			const categoryColor = category.color
+				? rgb01ToCss([
+						category.color[0] / 255,
+						category.color[1] / 255,
+						category.color[2] / 255,
+					])
+				: color
+			return {
+				id: orgId,
+				name: category.factionLabel ?? orgRef.name,
+				color: categoryColor,
+			}
+		}
+		const provinceMention = (
+			rawId: string,
+		): NationTimelineEvent["provinces"][number] | null => {
+			const provinceId = earthImportRawIdToCompact?.get(Number(rawId))
+			if (provinceId === undefined) return null
+			return {
+				id: provinceId,
+				name:
+					earthHistory.provinceMeta?.get(rawId)?.name ?? `Province ${rawId}`,
+				color: getProvinceColor(provinceId) ?? color,
+			}
+		}
+
+		const timelineEvents: NationTimelineEvent[] = []
+		if (orgId === "HRE") {
+			// Leadership tracked via emperorStart/End diplomacy events (secondTag
+			// "HLR") rather than organizations.json, which only covers HSA.
+			// Every province's own hre join/leave history, not filtered to any
+			// single nation -- owner is tracked while walking each province's
+			// events chronologically so the mention can name who held it.
+			for (const [rawId, entry] of Object.entries(engine.data.provinceEvents)) {
+				let owner = normalizeTimelineTag(entry.base.owner)
+				for (const [index, event] of entry.events.entries()) {
+					if (event.kind === "owner") {
+						owner = normalizeTimelineTag(
+							event.payload.tag as string | undefined,
+						)
+						continue
+					}
+					if (event.kind !== "hre") continue
+					const joined = Boolean(event.payload.member)
+					const province = provinceMention(rawId)
+					pushTimelineEvent(timelineEvents, {
+						id: `hre:${rawId}:${event.date}:${index}`,
+						date: event.date,
+						type: joined ? "HRE (+)" : "HRE (-)",
+						description: joined
+							? `${province?.name ?? `Province ${rawId}`} joined the Holy Roman Empire.`
+							: `${province?.name ?? `Province ${rawId}`} left the Holy Roman Empire.`,
+						nations: owner ? [nationMention(owner)] : [],
+						provinces: province ? [province] : [],
+						organizations: [orgMention],
+					})
+				}
+			}
+			for (const [index, e] of engine.data.diplomacy.entries()) {
+				if (
+					(e.kind !== "emperorStart" && e.kind !== "emperorEnd") ||
+					e.payload.secondTag !== "HLR"
+				)
+					continue
+				const starts = e.kind === "emperorStart"
+				const emperorName = resolveNationName(e.payload.firstTag)
+				pushTimelineEvent(timelineEvents, {
+					id: `emperor:${e.date}:${index}`,
+					date: e.date,
+					type: starts ? "Emperor (+)" : "Emperor (-)",
+					description: starts
+						? `${emperorName} became Emperor of the Holy Roman Empire.`
+						: `${emperorName}'s reign as Emperor of the Holy Roman Empire ended.`,
+					nations: [nationMention(e.payload.firstTag)],
+					organizations: [orgMention],
+				})
+			}
+			for (const [tag, entry] of Object.entries(engine.data.nationEvents)) {
+				for (const [index, event] of entry.events.entries()) {
+					if (event.kind !== "elector") continue
+					const elected = Boolean(event.payload.elector)
+					const nationName = resolveNationName(tag)
+					pushTimelineEvent(timelineEvents, {
+						id: `elector:${tag}:${event.date}:${index}`,
+						date: event.date,
+						type: elected ? "Elector (+)" : "Elector (-)",
+						description: elected
+							? `${nationName} became an Elector in the Holy Roman Empire.`
+							: `${nationName} ceased to be an Elector in the Holy Roman Empire.`,
+						nations: [nationMention(tag)],
+						organizations: [orgMention],
+					})
+				}
+			}
+		} else {
+			for (const [index, e] of engine.data.organizationEvents.entries()) {
+				if (e.payload.orgId !== orgId) continue
+				if (e.kind === "siteStart" || e.kind === "siteEnd") {
+					const started = e.kind === "siteStart"
+					const province = provinceMention(e.provinceId)
+					if (e.payload.role === "member_seat") {
+						const siteDescription = province
+							? `${e.payload.name} ${started ? "became" : "ceased to be"} a member seat of the ${orgRef.name} in ${province.name}.`
+							: `${e.payload.name} ${started ? "became" : "ceased to be"} a member seat of the ${orgRef.name}.`
+						pushTimelineEvent(timelineEvents, {
+							id: `organization-site:${orgId}:${e.provinceId}:${e.date}:${index}`,
+							date: e.date,
+							type: started ? "Organization (+)" : "Organization (-)",
+							description: siteDescription,
+							provinces: province ? [province] : [],
+							organizations: [orgMention],
+						})
+						continue
+					}
+					// "kontor" is the historical/EU4 term for a Hanseatic trading
+					// post -- displayed as "trade post" to match the org-categories
+					// naming (organization-categories.ts's tradePost category)
+					// rather than the raw EU4 role id.
+					const roleLabel =
+						e.payload.role === "kontor"
+							? "trade post"
+							: e.payload.role.replace(/_/g, " ")
+					const siteDescription = province
+						? `${e.payload.name} ${started ? "opened" : "closed"} as a ${roleLabel} of the ${orgRef.name} in ${province.name}.`
+						: `${e.payload.name} ${started ? "opened" : "closed"} as a ${roleLabel} of the ${orgRef.name}.`
+					pushTimelineEvent(timelineEvents, {
+						id: `organization-site:${orgId}:${e.provinceId}:${e.date}:${index}`,
+						date: e.date,
+						type: started ? "Organization (+)" : "Organization (-)",
+						description: siteDescription,
+						provinces: province ? [province] : [],
+						organizations: [orgMention],
+					})
+					continue
+				}
+				if (e.kind === "join" || e.kind === "leave") {
+					const joined = e.kind === "join"
+					const nationName = resolveNationName(e.nationTag)
+					const mention = mentionForRole(e.payload.role)
+					pushTimelineEvent(timelineEvents, {
+						id: `organization:${orgId}:${e.date}:${index}`,
+						date: e.date,
+						type: joined ? "Organization (+)" : "Organization (-)",
+						description: joined
+							? `${nationName} joined the ${mention.name}.`
+							: `${nationName} left the ${mention.name}.`,
+						nations: [nationMention(e.nationTag)],
+						organizations: [mention],
+					})
+				}
+			}
+		}
+		timelineEvents.sort(
+			(a, b) => a.date - b.date || a.type.localeCompare(b.type),
+		)
+		// Nation-level membership, generic across every org: derived straight
+		// from the org's own category schema (organization-categories.ts) via
+		// listOrgMembers, rather than bespoke per-org membership/foreign-holder
+		// logic -- adding a new org or member type (e.g. HSA's trade posts) is
+		// then just a data entry in that schema, not new branches here.
+		const orgCategorizers = buildOrgCategorizer(state, orgRef)
+		const memberCategories: Map<string, OrgProvinceCategory> = (() => {
+			if (!orgCategorizers) {
+				return new Map(
+					Array.from(state.nations.entries())
+						.filter(([, nation]) => nation.organizations.has(orgId))
+						.map(([tag]) => [tag, { categoryId: "member", striped: false }]),
+				)
+			}
+			if (orgId !== "HSA") {
+				return listOrgMembers(state, orgCategorizers.categorize)
+			}
+			const categories = new Map<string, OrgProvinceCategory>()
+			for (const site of state.organizationSites.values()) {
+				if (
+					site.orgId !== orgId ||
+					(site.role !== "kontor" && site.role !== "trade_branch")
+				)
+					continue
+				const owner = state.provinces.get(site.provinceId)?.owner
+				if (owner)
+					categories.set(owner, { categoryId: "tradePost", striped: true })
+			}
+			for (const [tag, nation] of state.nations) {
+				if (nation.organizations.has(orgId)) {
+					categories.set(tag, { categoryId: "member", striped: false })
+				}
+			}
+			return categories
+		})()
+		const categoryLabelById = new Map(
+			ORG_CATEGORY_SCHEMAS[orgId]?.categories.map((c) => [c.id, c] as const),
+		)
+		const categoryOrderById = new Map(
+			ORG_CATEGORY_SCHEMAS[orgId]?.categories.map((c, i) => [c.id, i] as const),
+		)
+		const members = Array.from(memberCategories.entries())
+			.map(([memberTag, memberCategory]) => {
+				const categoryDef = categoryLabelById.get(memberCategory.categoryId)
+				return {
+					...nationMention(memberTag),
+					striped: memberCategory.striped,
+					category: categoryDef
+						? {
+								label: categoryDef.label,
+								color: rgb255ToCss(categoryDef.color ?? orgRef.color),
+								order: categoryOrderById.get(memberCategory.categoryId) ?? 0,
+								striped: memberCategory.striped,
+							}
+						: undefined,
+				}
+			})
+			.sort((a, b) => a.name.localeCompare(b.name))
+
+		// Member-territory province count over time -- recomputed with a fresh
+		// full fold at each transition date (see collectOrgMemberProvinceRawIds)
+		// since, unlike a nation's own owned-province count, this can't be
+		// tracked incrementally from the timeline events above alone (HSA
+		// territory changes with member nations' wars, not just membership).
+		const transitionDates = Array.from(
+			new Set(timelineEvents.map((event) => event.date)),
+		).sort((a, b) => a - b)
+		const countHistory: WikiCountHistoryPoint[] = transitionDates.map(
+			(date) => {
+				const foldedAtDate = fold(engine.data, date, {
+					provinceIds: engine.cache.provinceIds,
+					nationTags: engine.cache.nationTags,
+				})
+				return {
+					date,
+					count: collectOrgMemberProvinceRawIds(foldedAtDate, orgId).size,
+				}
+			},
+		)
+		if (
+			countHistory.length === 0 ||
+			countHistory[0].date > earthHistory.minDays
+		) {
+			countHistory.unshift({
+				date: earthHistory.minDays,
+				count: collectOrgMemberProvinceRawIds(
+					fold(engine.data, earthHistory.minDays, {
+						provinceIds: engine.cache.provinceIds,
+						nationTags: engine.cache.nationTags,
+					}),
+					orgId,
+				).size,
+			})
+		}
+
+		// Current member territory, for the stat block and Environmental/
+		// Demographics distributions -- the exact same province set the map's
+		// striped border draws, so the numbers always agree with what's shown.
+		const memberProvinceRawIds = collectOrgMemberProvinceRawIds(state, orgId)
+		const provinceIndexes: number[] = []
+		for (const rawId of memberProvinceRawIds) {
+			const compact = earthImportRawIdToCompact?.get(rawId)
+			if (compact !== undefined) provinceIndexes.push(compact)
+		}
+		const ownedProvinceIndexes = new Set(provinceIndexes)
+		const regionIndexes: number[] = []
+		const regionProvince = world.provinces?.regionProvince
+		if (regionProvince) {
+			for (let region = 0; region < regionProvince.length; region++) {
+				if (ownedProvinceIndexes.has(regionProvince[region])) {
+					regionIndexes.push(region)
+				}
+			}
+		}
+		const areaKm2 = worldForDisplay.provinces?.areaKm2
+		const totalAreaKm2 = areaKm2
+			? provinceIndexes.reduce((sum, p) => sum + (areaKm2[p] ?? 0), 0)
+			: 0
+		const realPopulation = worldForDisplay.realPopulation?.population
+		const totalPopulation = realPopulation
+			? provinceIndexes.reduce((sum, p) => sum + (realPopulation[p] ?? 0), 0)
+			: 0
+		const stats = buildOrganizationWikiStats({
+			totalAreaKm2,
+			totalPopulation,
+			provinceCount: provinceIndexes.length,
+		})
+
+		const cultureDistribution = buildStringIdDistributionForProvinces({
+			idByProvince: frame.cultureByProvince,
+			provinceIndexes,
+			nameById: earthHistory.cultureNameById ?? undefined,
+			colorById: earthHistory.cultureColorById ?? undefined,
+			rgbToCss,
+			fallbackColor: "rgb(148, 163, 184)",
+		})
+		const religionDistribution = buildStringIdDistributionForProvinces({
+			idByProvince: frame.religionByProvince,
+			provinceIndexes,
+			nameById: earthHistory.religionNameById ?? undefined,
+			colorById: earthHistory.religionColorById ?? undefined,
+			rgbToCss,
+			fallbackColor: "rgb(148, 163, 184)",
+		})
+		const climateDistribution = showObservedDistributions
+			? buildDistributionForRegions(
+					EU5_CLIMATE_CATEGORIES.map((label) => label.replace(/_/g, " ")),
+					world.eu5Climate,
+					regionIndexes,
+					(index) => rgbToCss(EU5_CLIMATE_COLORS[index]),
+				)
+			: buildDistributionForRegions(
+					CLIMATE_LABELS,
+					world.climateZones,
+					regionIndexes,
+					(index) => rgbToCss(climateZoneColor(index)),
+					new Set([0]),
+				)
+		const vegetationDistribution = showObservedDistributions
+			? buildDistributionForRegions(
+					EU5_VEGETATION_CATEGORIES.map((label) => label.replace(/_/g, " ")),
+					world.eu5Vegetation,
+					regionIndexes,
+					(index) => rgbToCss(EU5_VEGETATION_COLORS[index]),
+				)
+			: buildDistributionForRegions(
+					BIOME_LABELS,
+					world.vegetation,
+					regionIndexes,
+					(index) => rgbToCss(vegetationColor(index)),
+					new Set([0]),
+				)
+		const topographyDistribution = showObservedDistributions
+			? buildEu5TopographyDistribution({
+					values: world.eu5Topography,
+					regionIndexes,
+					rgbToCss,
+				})
+			: buildDistributionForRegions(
+					GENESIS_TOPOGRAPHY_LABELS,
+					world.topography,
+					regionIndexes,
+					(index) => {
+						const topoColor = getTopographyColor(index)
+						return topoColor ? rgbToCss(topoColor) : "rgb(148, 163, 184)"
+					},
+					new Set([TOPO_LAKE, TOPO_OCEAN]),
+				)
+
+		return {
+			id: orgId,
+			name: orgRef.name,
+			color,
+			planetTitle: planetName,
+			stats,
+			members,
+			cultureDistribution,
+			religionDistribution,
+			climateDistribution,
+			vegetationDistribution,
+			topographyDistribution,
+			showObservedDistributions,
+			countHistory,
+			dateRangeStart: earthHistory.minDays,
+			dateRangeEnd: earthHistory.maxDays,
+			currentDate: earthHistory.selectedDays,
+			currentDateLabel: daysToEu4Date(earthHistory.selectedDays),
+			timelineEvents,
+			onBack: () => setSelectedWikiOrganizationId(null),
+			onSelectNation: (targetTag: string) => {
+				focusOrgNation(targetTag)
+				setSelectedWikiNationTag(targetTag)
+			},
+			onSelectProvince: (provinceId: number) => {
+				sceneRef.current?.focusOnProvince(provinceId)
+			},
+			onSelectDate: earthHistory.setSelectedDays,
+			onSelectWar: (warId: string) => {
+				setSelectedWikiWarId(warId)
+			},
+		}
+	}, [
+		selectedWikiOrganizationId,
+		world,
+		earthHistory.query,
+		earthHistory.engine,
+		earthHistory.selectedDays,
+		earthHistory.setSelectedDays,
+		earthHistory.minDays,
+		earthHistory.maxDays,
+		earthHistory.nationReference,
+		earthHistory.organizationReference,
+		earthHistory.cultureNameById,
+		earthHistory.cultureColorById,
+		earthHistory.religionNameById,
+		earthHistory.religionColorById,
+		earthHistory.provinceMeta,
+		earthImportRawIdToCompact,
+		worldForDisplay,
+		showObservedDistributions,
+		planetName,
+		getProvinceColor,
+		setSelectedWikiNationTag,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
+		buildOrgCategorizer,
+	])
+
+	const warWikiData = useMemo<WarWikiData | null>(() => {
+		if (
+			!selectedWikiWarId ||
+			!world?.isEarthImport ||
+			!earthHistory.engine ||
+			!earthHistory.query
+		)
+			return null
+		const war = earthHistory.engine.data.wars.find(
+			(w) => w.warId === selectedWikiWarId,
+		)
+		if (!war || war.events.length === 0) return null
+		const { state } = earthHistory.query
+		const resolveNationName = (otherTag: string): string =>
+			isRebelTag(otherTag)
+				? "Rebels"
+				: (state.nations.get(otherTag)?.currentName ??
+					earthHistory.nationReference?.get(otherTag)?.name ??
+					otherTag)
+		const resolveNationColor = (otherTag: string): string => {
+			if (isRebelTag(otherTag)) return "#020617"
+			const ref = earthHistory.nationReference?.get(otherTag)
+			return ref
+				? rgb01ToCss([
+						ref.color[0] / 255,
+						ref.color[1] / 255,
+						ref.color[2] / 255,
+					])
+				: rgb01ToCss([0.5, 0.5, 0.5])
+		}
+		const nationMention = (otherTag: string) =>
+			isRebelTag(otherTag)
+				? {
+						tag: otherTag,
+						name: "Rebels",
+						color: "#020617",
+						link: false,
+					}
+				: {
+						tag: otherTag,
+						name: resolveNationName(otherTag),
+						color: resolveNationColor(otherTag),
+					}
+		const provinceMention = (
+			rawId: string,
+			fallbackColor: string,
+		): NationTimelineEvent["provinces"][number] | null => {
+			const provinceId = earthImportRawIdToCompact?.get(Number(rawId))
+			if (provinceId === undefined) return null
+			return {
+				id: provinceId,
+				name:
+					earthHistory.provinceMeta?.get(rawId)?.name ?? `Province ${rawId}`,
+				color: getProvinceColor(provinceId) ?? fallbackColor,
+			}
+		}
+		// Last-known side per nation across the whole war (matches the
+		// existing nation-timeline convention) -- a nation that switched
+		// sides mid-war ends up bucketed by whichever side it held last.
+		const sideByTag = new Map<string, "attacker" | "defender">()
+		for (const event of war.events) sideByTag.set(event.nationTag, event.side)
+
+		const dates = war.events.map((event) => event.date)
+		const dateRangeStart = Math.min(...dates)
+		const dateRangeEnd = Math.max(...dates)
+		const dateRangeLabel = `${daysToEu4Date(dateRangeStart)} – ${daysToEu4Date(dateRangeEnd)}`
+
+		const stats: StatEntry[] = []
+		if (war.warGoalType)
+			stats.push({
+				label: "War Goal",
+				value: cleanEu4Identifier(war.warGoalType),
+			})
+		if (war.casusBelli)
+			stats.push({
+				label: "Casus Belli",
+				value: cleanEu4Identifier(war.casusBelli),
+			})
+		if (war.warGoalTag) {
+			const target = nationMention(war.warGoalTag)
+			stats.push({
+				label: "War Goal Target",
+				value: "",
+				valueAction: (
+					<InlineTextButton
+						onClick={() => setSelectedWikiNationTag(target.tag)}
+					>
+						{target.name}
+					</InlineTextButton>
+				),
+			})
+		} else if (war.warGoalProvince) {
+			const province = provinceMention(war.warGoalProvince, "#94a3b8")
+			if (province) {
+				stats.push({
+					label: "War Goal Target",
+					value: "",
+					valueAction: (
+						<InlineTextButton
+							onClick={() => sceneRef.current?.focusOnProvince(province.id)}
+						>
+							{province.name}
+						</InlineTextButton>
+					),
+				})
+			}
+		}
+		if (war.isRebel) stats.push({ label: "Type", value: "Rebellion" })
+
+		const sideOrder: Array<"attacker" | "defender"> = ["attacker", "defender"]
+		const participants: WarWikiData["participants"] = sideOrder.map((side) => ({
+			side,
+			nations: Array.from(sideByTag.entries())
+				.filter(([, tagSide]) => tagSide === side)
+				.map(([nationTag]) => nationTag)
+				.sort((a, b) =>
+					resolveNationName(a).localeCompare(resolveNationName(b)),
+				)
+				.map(nationMention),
+		}))
+
+		const timelineEvents: NationTimelineEvent[] = []
+		// Multiple nations often join/leave on the same date (a shared peace
+		// treaty ending the war for every belligerent at once, or several
+		// allies declaring together) -- group by (date, kind) so that shows
+		// up as one combined entry instead of one per nation.
+		const eventGroups = new Map<string, RawWarParticipantEvent[]>()
+		for (const event of war.events) {
+			const key = `${event.date}:${event.kind}`
+			const group = eventGroups.get(key)
+			if (group) group.push(event)
+			else eventGroups.set(key, [event])
+		}
+		for (const [key, group] of eventGroups) {
+			const date = group[0].date
+			const kind = group[0].kind
+			const comment = group.find((event) => event.comment)?.comment
+			const attackerTags = group
+				.filter((event) => event.side === "attacker")
+				.map((event) => event.nationTag)
+			const defenderTags = group
+				.filter((event) => event.side === "defender")
+				.map((event) => event.nationTag)
+			const nations: NationTimelineEvent["nations"] = []
+			for (const nationTag of [...attackerTags, ...defenderTags]) {
+				if (!nations.some((entry) => entry.tag === nationTag))
+					nations.push(nationMention(nationTag))
+			}
+			let description: string
+			if (kind === "warStart") {
+				const attackerNames = attackerTags.map(resolveNationName)
+				const defenderNames = defenderTags.map(resolveNationName)
+				if (attackerNames.length > 0 && defenderNames.length > 0) {
+					description = `${joinWithAnd(attackerNames)} entered the war against ${joinWithAnd(defenderNames)}.`
+				} else {
+					const joiningSide = attackerNames.length > 0 ? "attacker" : "defender"
+					const joiningTags =
+						attackerNames.length > 0 ? attackerTags : defenderTags
+					const joiningNames =
+						attackerNames.length > 0 ? attackerNames : defenderNames
+					const opponentTags = Array.from(sideByTag.entries())
+						.filter(
+							([opponentTag, side]) =>
+								side !== joiningSide && !joiningTags.includes(opponentTag),
+						)
+						.map(([opponentTag]) => opponentTag)
+					for (const opponentTag of opponentTags) {
+						if (!nations.some((entry) => entry.tag === opponentTag))
+							nations.push(nationMention(opponentTag))
+					}
+					const opponentNames = opponentTags.map(resolveNationName)
+					description = `${joinWithAnd(joiningNames)} entered the war${opponentNames.length > 0 ? ` against ${joinWithAnd(opponentNames)}` : ""}.`
+				}
+			} else {
+				const names = [...attackerTags, ...defenderTags].map(resolveNationName)
+				description = `${joinWithAnd(names)} left the war.`
+			}
+			pushTimelineEvent(timelineEvents, {
+				id: `warEvent:${key}`,
+				date,
+				type: kind === "warStart" ? "War (+)" : "War (-)",
+				description,
+				comment: eventComment(comment),
+				nations,
+			})
+		}
+
+		for (const [index, battle] of war.battles.entries()) {
+			const province = battle.locationProvinceId
+				? provinceMention(battle.locationProvinceId, "#94a3b8")
+				: null
+			const winner = battle.attackerWon ? battle.attacker : battle.defender
+			const loser = battle.attackerWon ? battle.defender : battle.attacker
+			const description = `${resolveNationName(winner.country)} defeated ${resolveNationName(loser.country)} at the Battle of ${battle.name}.`
+			pushTimelineEvent(timelineEvents, {
+				id: `warBattle:${battle.date}:${index}`,
+				date: battle.date,
+				type: "Battle",
+				description,
+				comment: eventComment(battle.comment),
+				nations: [
+					nationMention(battle.attacker.country),
+					nationMention(battle.defender.country),
+				],
+				provinces: province ? [province] : [],
+			})
+		}
+
+		// Territory that changed hands directly between two participants
+		// (not just any ownership change anywhere in the world) during the
+		// war's span -- walks every province's owner history once, which is
+		// only done when a war page is actually opened. A single treaty (e.g.
+		// the American Revolution's 1776.7.4 mass transfer) can flip dozens
+		// of provinces on one date between the same two nations, so these are
+		// grouped by (date, owner, nextOwner) into one combined entry instead
+		// of one per province.
+		const territoryGroups = new Map<
+			string,
+			{
+				date: number
+				owner: string
+				nextOwner: string
+				provinces: NationTimelineEvent["provinces"]
+			}
+		>()
+		for (const [rawId, entry] of Object.entries(
+			earthHistory.engine.data.provinceEvents,
+		)) {
+			let owner = normalizeTimelineTag(entry.base.owner)
+			for (const event of entry.events) {
+				if (event.kind !== "owner") continue
+				const nextOwner = normalizeTimelineTag(event.payload.tag)
+				if (
+					event.date >= dateRangeStart &&
+					event.date <= dateRangeEnd &&
+					owner &&
+					nextOwner &&
+					owner !== nextOwner &&
+					sideByTag.has(owner) &&
+					sideByTag.has(nextOwner)
+				) {
+					const province = provinceMention(rawId, "#94a3b8")
+					if (province) {
+						const key = `${event.date}:${owner}:${nextOwner}`
+						const group = territoryGroups.get(key)
+						if (group) group.provinces.push(province)
+						else
+							territoryGroups.set(key, {
+								date: event.date,
+								owner,
+								nextOwner,
+								provinces: [province],
+							})
+					}
+				}
+				owner = nextOwner
+			}
+		}
+		for (const [key, group] of territoryGroups) {
+			const provinceNames = group.provinces.map((province) => province.name)
+			const description =
+				group.provinces.length === 1
+					? `${provinceNames[0]} was ceded from ${resolveNationName(group.owner)} to ${resolveNationName(group.nextOwner)}.`
+					: `${group.provinces.length} provinces (${joinWithAnd(provinceNames)}) were ceded from ${resolveNationName(group.owner)} to ${resolveNationName(group.nextOwner)}.`
+			pushTimelineEvent(timelineEvents, {
+				id: `warTerritory:${key}`,
+				date: group.date,
+				type: "Territory",
+				description,
+				nations: [nationMention(group.owner), nationMention(group.nextOwner)],
+				provinces: group.provinces,
+			})
+		}
+		timelineEvents.sort((a, b) => a.date - b.date)
+
+		return {
+			id: war.warId,
+			name: war.name,
+			planetTitle: planetName,
+			dateRangeLabel,
+			stats,
+			participants,
+			timelineEvents,
+			dateRangeStart,
+			dateRangeEnd,
+			currentDate: earthHistory.selectedDays,
+			currentDateLabel: daysToEu4Date(earthHistory.selectedDays),
+			onBack: () => setSelectedWikiWarId(null),
+			onSelectNation: (targetTag: string) => {
+				setSelectedWikiNationTag(targetTag)
+			},
+			onSelectProvince: (provinceId: number) => {
+				sceneRef.current?.focusOnProvince(provinceId)
+			},
+			onSelectDate: earthHistory.setSelectedDays,
+			onSelectOrganization: (orgId: string) => {
+				setSelectedWikiOrganizationId(orgId)
+			},
+		}
+	}, [
+		selectedWikiWarId,
+		world,
+		earthHistory.query,
+		earthHistory.engine,
+		earthHistory.nationReference,
+		earthHistory.provinceMeta,
+		earthHistory.selectedDays,
+		earthHistory.setSelectedDays,
+		earthImportRawIdToCompact,
+		getProvinceColor,
+		planetName,
+		setSelectedWikiNationTag,
+		setSelectedWikiOrganizationId,
+		setSelectedWikiWarId,
+	])
 
 	// --- Planet stats ---
 	const planetStats = useMemo(
@@ -4385,8 +7246,6 @@ export const GenesisView: React.FC = () => {
 					planetRadiusKm,
 					pressure,
 					tideLock,
-					moonCount,
-					moonSeed,
 					seaLevel,
 					maxElevation,
 					avgWindSpeedMs: windStats?.avg ?? null,
@@ -4406,8 +7265,6 @@ export const GenesisView: React.FC = () => {
 			spectralClass,
 			starSubtype,
 			tideLock,
-			moonCount,
-			moonSeed,
 			seaLevel,
 			unitSystem,
 			world,
@@ -4434,37 +7291,16 @@ export const GenesisView: React.FC = () => {
 	// (nested in Earth's own `moons`), but leaves Mars/Jupiter/etc alone.
 	// Omitting `bodyIndex` rebuilds the whole system (star-level reset).
 	//
-	// The main world is a special case: unlike every other body, its own
-	// physical params (radius/obliquity/day length/orbital distance/
-	// eccentricity/perihelion/pressure) are owned by top-level React state
-	// (the 3D scene and terrain pipeline read them directly there), not
-	// derived purely from the seed -- so `generatedSystemBodies` always
-	// reflects whatever that state currently holds, edited or not. Just
-	// replacing the array entry would regenerate the SAME edited values.
-	// Resetting the main world means resetting that top-level state back to
-	// its defaults too.
+	// The main world needs no special case here anymore: `resetSourceSystemBodies`
+	// is already either the real Sol defaults or `generatedSystemBodies` (the
+	// freshly-seed-rolled body list, main world included), so the generic
+	// per-index reset below already resets it correctly, live edits and all.
 	const rebuildSystemBody = useCallback(
 		(bodyIndex?: number) => {
-			const isMainWorldReset =
-				bodyIndex !== undefined &&
-				resetSourceSystemBodies[bodyIndex]?.isMainWorld
 			if (bodyIndex === undefined) {
 				setSpectralClass(DEFAULT_WORLD_PARAMS.spectralClass)
 				setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
 				setRestSeed(SOL_SEED)
-				setMoonCount(DEFAULT_WORLD_PARAMS.moonCount)
-				setMoonSeed(LUNA_MOON_SEED)
-			}
-			if (bodyIndex === undefined || isMainWorldReset) {
-				setPlanetRadiusKm(DEFAULT_WORLD_PARAMS.planetRadiusKm)
-				setObliquity(DEFAULT_WORLD_PARAMS.obliquity)
-				setEccentricity(DEFAULT_WORLD_PARAMS.eccentricity)
-				setOrbitalDistanceAU(DEFAULT_WORLD_PARAMS.orbitalDistanceAU)
-				setHoursPerDay(DEFAULT_WORLD_PARAMS.hoursPerDay)
-				setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
-				setPressure(DEFAULT_WORLD_PARAMS.pressure)
-				setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
-				setTideLock(null)
 			}
 			if (bodyIndex === undefined) {
 				// Explicit, rather than relying on the generatedSystemBodies
@@ -4506,15 +7342,6 @@ export const GenesisView: React.FC = () => {
 		[
 			resetSourceSystemBodies,
 			systemSeismologyContext,
-			setEccentricity,
-			setHoursPerDay,
-			setObliquity,
-			setOrbitalDistanceAU,
-			setPerihelion,
-			setPlanetRadiusKm,
-			setPressure,
-			setSubstellarLon,
-			setTideLock,
 			setRestSeed,
 			setSpectralClass,
 			setStarSubtype,
@@ -4597,7 +7424,9 @@ export const GenesisView: React.FC = () => {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SOL_SEED && showSolarSystemRealNames,
+						showRealNames: restSeed === SOL_SEED,
+						namesEnabled,
+						starName,
 					}
 				: null,
 		)
@@ -4614,7 +7443,7 @@ export const GenesisView: React.FC = () => {
 		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
 		restSeed,
-		showSolarSystemRealNames,
+		starName,
 		showSolarSystemDaylight,
 	])
 	useEffect(() => {
@@ -4637,7 +7466,9 @@ export const GenesisView: React.FC = () => {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SOL_SEED && showSolarSystemRealNames,
+						showRealNames: restSeed === SOL_SEED,
+						namesEnabled,
+						starName,
 					}
 				: null,
 		)
@@ -4655,7 +7486,7 @@ export const GenesisView: React.FC = () => {
 		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
 		restSeed,
-		showSolarSystemRealNames,
+		starName,
 		showSolarSystemDaylight,
 	])
 	useEffect(() => {
@@ -4888,14 +7719,13 @@ export const GenesisView: React.FC = () => {
 		perihelion,
 	])
 
-	const solStarName =
-		restSeed === SOL_SEED && showSolarSystemRealNames ? "Sol" : undefined
+	const solStarName = restSeed === SOL_SEED ? "Sol" : undefined
 	const surfaceTidesM = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
 			return computeMoonSurfaceTidesM(
 				focusedMoon,
 				{
-					name: showSolarSystemRealNames ? focusedMoonParent.name : undefined,
+					name: restSeed === SOL_SEED ? focusedMoonParent.name : undefined,
 					massKg: focusedMoonParent.massKg,
 					diameterKm: focusedMoonParent.diameterKm,
 					moons: focusedMoonParent.moons,
@@ -4934,7 +7764,7 @@ export const GenesisView: React.FC = () => {
 		orbitalDistanceAU,
 		eccentricity,
 		solStarName,
-		showSolarSystemRealNames,
+		restSeed,
 	])
 
 	const exportBusy = exportProgress !== null
@@ -4952,8 +7782,11 @@ export const GenesisView: React.FC = () => {
 					setTideLock={setTideLock}
 					setObliquity={setObliquity}
 					restSeed={restSeed}
-					showRealSolNames={showSolarSystemRealNames}
+					starName={starName}
+					showRealSolNames={restSeed === SOL_SEED}
 					setRestSeed={setRestSeed}
+					forceMainWorld={forceMainWorld}
+					setForceMainWorld={setForceMainWorld}
 					tidalSchedulePreview={tidalSchedulePreview}
 					surfaceTidesM={surfaceTidesM}
 					orbitBodies={systemBodies.filter((b) => !b.isMainWorld)}
@@ -4972,9 +7805,9 @@ export const GenesisView: React.FC = () => {
 					planetSliders={planetSliders}
 					terrainSliders={terrainSliders}
 					spectralClass={spectralClass}
-					setSpectralClass={setSpectralClassPreservingHz}
+					setSpectralClass={setSpectralClass}
 					starSubtype={starSubtype}
-					setStarSubtype={setStarSubtypePreservingHz}
+					setStarSubtype={setStarSubtype}
 					orbitalDistanceAU={orbitalDistanceAU}
 					eccentricity={eccentricity}
 					perihelion={perihelion}
@@ -4997,6 +7830,37 @@ export const GenesisView: React.FC = () => {
 					handleGenerate={handleGenerate}
 					handleEarthImport={handleEarthImport}
 					onClose={() => setGenerationPanelOpen(false)}
+					worldDetails={{
+						hasGeneratedWorld: !!world && !generating,
+						planetName,
+						planetStats,
+						worldPopulation: drawerWorldPopulation,
+						activeWarCount:
+							earthSocialCounts?.activeWarCount ??
+							selectedHistoryView?.activeWars.length ??
+							null,
+						cultureCount:
+							earthSocialCounts?.cultureCount ??
+							worldForDisplay?.cultures?.count ??
+							null,
+						religionCount:
+							earthSocialCounts?.religionCount ??
+							worldForDisplay?.religions?.count ??
+							null,
+						nationSizeDistribution,
+						governmentDistribution,
+						religionDistribution: religionTypeDistribution,
+						conflictDistribution,
+						relationDistribution,
+						climateDistribution,
+						vegetationDistribution,
+						topographyDistribution,
+						showObservedDistributions,
+						tradeGoodsDistribution,
+					}}
+					nationWiki={nationWikiData}
+					organizationWiki={organizationWikiData}
+					warWiki={warWikiData}
 				/>
 			)}
 
@@ -5075,6 +7939,7 @@ export const GenesisView: React.FC = () => {
 							colorMode={colorMode}
 							dangerSubMode={dangerSubMode}
 							populationMode={populationMode}
+							dataVariant={dataVariant}
 							selectedTimeMs={selectedTimeMs}
 							displayMonth={displayMonth}
 							clockMonthMode={clockMonthMode}
@@ -5110,7 +7975,6 @@ export const GenesisView: React.FC = () => {
 									: null
 							}
 							detailsDrawerOpen={detailsDrawerOpen}
-							earthHistoryDiplomacyRows={earthHistoryDiplomacyRows}
 							earthHistoryHoverOverride={earthHistoryHoverOverride}
 						/>
 					) : null}
@@ -5135,12 +7999,6 @@ export const GenesisView: React.FC = () => {
 							setShowRealisticSizes={setShowSolarSystemRealisticSizes}
 							showBodyNames={showSolarSystemBodyNames}
 							setShowBodyNames={setShowSolarSystemBodyNames}
-							showRealNames={
-								restSeed === SOL_SEED ? showSolarSystemRealNames : undefined
-							}
-							setShowRealNames={
-								restSeed === SOL_SEED ? setShowSolarSystemRealNames : undefined
-							}
 							clock={
 								solarSystemClock
 									? {
@@ -5336,6 +8194,7 @@ export const GenesisView: React.FC = () => {
 									extraControls={
 										<EarthHistoryBookmarks
 											onSelect={earthHistory.setSelectedDays}
+											selectedDate={earthHistory.selectedDays}
 											placement="below"
 										/>
 									}
@@ -5388,22 +8247,6 @@ export const GenesisView: React.FC = () => {
 				open={detailsDrawerOpen}
 				onToggle={() => setDetailsDrawerOpen((value) => !value)}
 				nation={selectedNation}
-				planetName={planetName}
-				planetStats={planetStats}
-				worldPopulation={drawerWorldPopulation}
-				activeWarCount={selectedHistoryView?.activeWars.length ?? null}
-				cultureCount={worldForDisplay?.cultures?.count ?? null}
-				heritageCount={worldForDisplay?.heritages?.count ?? null}
-				religionCount={worldForDisplay?.religions?.count ?? null}
-				nationSizeDistribution={nationSizeDistribution}
-				governmentDistribution={governmentDistribution}
-				religionDistribution={religionTypeDistribution}
-				conflictDistribution={conflictDistribution}
-				relationDistribution={relationDistribution}
-				climateDistribution={climateDistribution}
-				vegetationDistribution={vegetationDistribution}
-				topographyDistribution={topographyDistribution}
-				tradeGoodsDistribution={tradeGoodsDistribution}
 				nationHistory={nationHistory}
 				windowedEvents={windowedEvents}
 				allPastEvents={allPastEvents}

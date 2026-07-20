@@ -919,7 +919,7 @@
 	},
 	{
 		"tag": "TEU",
-		"name": "Teutonicorder",
+		"name": "Teutonic Order",
 		"color": [102, 105, 104],
 		"graphicalCulture": "westerngfx",
 		"initialGovernmentType": "theocracy",
