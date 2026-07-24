@@ -13,6 +13,7 @@ import {
 import type { RawNationReference } from "./data-source"
 import {
 	loadDiplomacyEvents,
+	loadGeography,
 	loadNationEvents,
 	loadNationReference,
 	loadOrganizationEvents,
@@ -39,9 +40,20 @@ export interface EarthHistoryEngine {
 	minDate: number
 	maxDate: number
 	/** Raw EU4 province id -> static (time-invariant) name/wasteland flag,
-	 * from provinces.json's `base` fields. Built once at load, not part of
-	 * the time-varying fold since neither field changes with the scrubber. */
-	provinceMeta: Map<string, { name: string | null; wasteland: boolean }>
+	 * plus area/region/superregion display names from geo-explorer's
+	 * area.json/region.json/superregion.json (see build-eu4-geography.py).
+	 * Built once at load, not part of the time-varying fold since none of
+	 * these fields change with the scrubber. */
+	provinceMeta: Map<
+		string,
+		{
+			name: string | null
+			wasteland: boolean
+			area: string | null
+			region: string | null
+			superregion: string | null
+		}
+	>
 	/** Raw EU4 province id -> representative point. Used for nation-label
 	 * placement when no capital is known -- see adapter.ts. */
 	provinceCoords: Map<string, { lon: number; lat: number }>
@@ -100,6 +112,7 @@ export async function createEarthHistoryEngine(
 		organizationEvents,
 		provinceCoords,
 		nationReferenceRows,
+		geography,
 	] = await Promise.all([
 		loadProvinceEvents(),
 		loadNationEvents(),
@@ -108,6 +121,7 @@ export async function createEarthHistoryEngine(
 		loadOrganizationEvents(),
 		loadProvinceCoordinates(),
 		loadNationReference(),
+		loadGeography(),
 	])
 
 	const nationReference = new Map<string, RawNationReference>()
@@ -132,12 +146,22 @@ export async function createEarthHistoryEngine(
 	})
 	const provinceMeta = new Map<
 		string,
-		{ name: string | null; wasteland: boolean }
+		{
+			name: string | null
+			wasteland: boolean
+			area: string | null
+			region: string | null
+			superregion: string | null
+		}
 	>()
 	for (const [rawId, entry] of Object.entries(provinceEvents)) {
+		const geo = geography[rawId]
 		provinceMeta.set(rawId, {
 			name: entry.base.name,
 			wasteland: entry.base.wasteland,
+			area: geo?.area ?? null,
+			region: geo?.region ?? null,
+			superregion: geo?.superregion ?? null,
 		})
 	}
 	return {

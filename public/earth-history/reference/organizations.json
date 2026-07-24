@@ -19,5 +19,47 @@
 		"color": [153, 27, 27],
 		"borderLightColor": [252, 165, 165],
 		"borderDarkColor": [69, 10, 10]
+	},
+	{
+		"id": "GPL",
+		"name": "Peloponnesian League",
+		"color": [125, 92, 54],
+		"borderLightColor": [217, 179, 118],
+		"borderDarkColor": [86, 52, 25]
+	},
+	{
+		"id": "DAL",
+		"name": "Delian League",
+		"color": [37, 99, 235],
+		"borderLightColor": [147, 197, 253],
+		"borderDarkColor": [30, 64, 175]
+	},
+	{
+		"id": "SAL",
+		"name": "Second Athenian League",
+		"color": [14, 165, 233],
+		"borderLightColor": [125, 211, 252],
+		"borderDarkColor": [3, 105, 161]
+	},
+	{
+		"id": "ACL",
+		"name": "Achaean League",
+		"color": [22, 163, 74],
+		"borderLightColor": [134, 239, 172],
+		"borderDarkColor": [21, 128, 61]
+	},
+	{
+		"id": "AEL",
+		"name": "Aetolian League",
+		"color": [101, 163, 13],
+		"borderLightColor": [190, 242, 100],
+		"borderDarkColor": [77, 124, 15]
+	},
+	{
+		"id": "LCO",
+		"name": "League of Corinth",
+		"color": [202, 138, 4],
+		"borderLightColor": [253, 224, 71],
+		"borderDarkColor": [161, 98, 7]
 	}
 ]

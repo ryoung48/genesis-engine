@@ -4,10 +4,10 @@ import type {
 	RawOrganizationReference,
 } from "@/model/earth/history/data-source"
 import {
-	daysToEu4Date,
 	EARTH_HISTORY_DEFAULT_START_DAYS,
 	EARTH_HISTORY_MAX_DAYS,
 	EARTH_HISTORY_MIN_DAYS,
+	formatEu4Days,
 } from "@/model/earth/history/date"
 import {
 	createEarthHistoryEngine,
@@ -175,6 +175,6 @@ export function useEarthHistoryTimeline(
 		// to the full range while the engine is still loading.
 		minDays: engine?.minDate ?? EARTH_HISTORY_MIN_DAYS,
 		maxDays: engine?.maxDate ?? EARTH_HISTORY_MAX_DAYS,
-		formatLabel: daysToEu4Date,
+		formatLabel: formatEu4Days,
 	}
 }

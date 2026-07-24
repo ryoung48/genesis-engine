@@ -65,9 +65,9 @@ import {
 	type RawWarParticipantEvent,
 } from "@/model/earth/history/data-source"
 import {
-	daysToEu4Date,
 	eu4DateToDays,
 	eu4DaysToYear,
+	formatEu4Days,
 } from "@/model/earth/history/date"
 import {
 	collectOrgForeignHolderNations,
@@ -357,6 +357,12 @@ function nationFocusDistanceScale(provinceCount: number): number {
 	)
 	return minScale + (maxScale - minScale) * t
 }
+
+// Focusing on a single province (as opposed to a whole nation) should use
+// the same tight framing as a single-province nation -- the unscaled
+// default (distanceScale 1) is tuned for the far-out nation case and looks
+// much too zoomed-out for one province.
+const SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE = nationFocusDistanceScale(1)
 
 function buildDistribution(
 	labels: ReadonlyArray<string>,
@@ -708,7 +714,7 @@ function buildInterpolatedProvinceTimelineSlice(params: {
 		population,
 		totalPopulation,
 		sourceTimeDays: selectedDays,
-		sourceTimeLabel: daysToEu4Date(selectedDays),
+		sourceTimeLabel: formatEu4Days(selectedDays),
 	}
 }
 
@@ -1165,10 +1171,14 @@ function formatRulerStatLabel(
 		selectedDays,
 	)
 	if (ageLabel) parts.push(ageLabel)
-	if (/^(regency council|interregnum)$/i.test(rulerName.trim()))
+	if (
+		payload?.regent === true ||
+		/^(regency council|interregnum)$/i.test(rulerName.trim())
+	) {
+		if (payload?.regent === true) parts.push("Regent")
 		return parts.join(" · ")
+	}
 	parts.push(payload?.female === true ? "♀" : "♂")
-	if (payload?.regent === true) parts.push("Regent")
 	return parts.join(" · ")
 }
 
@@ -1181,6 +1191,23 @@ function subjectTypeLabel(subjectType: unknown): string {
 	return typeof subjectType === "string" && subjectType.trim()
 		? cleanEu4Identifier(subjectType).toLowerCase()
 		: "subject"
+}
+
+function pluralizeSubjectTypeLabel(label: string): string {
+	const words = label.split(" ")
+	const lastWord = words[words.length - 1]
+	words[words.length - 1] =
+		lastWord.endsWith("y") && !/[aeiou]y$/i.test(lastWord)
+			? `${lastWord.slice(0, -1)}ies`
+			: lastWord.endsWith("s")
+				? `${lastWord}es`
+				: `${lastWord}s`
+	return words.join(" ")
+}
+
+function subjectTypeGroupLabel(subjectType: unknown): string {
+	const label = cleanEu4Identifier(subjectTypeLabel(subjectType))
+	return pluralizeSubjectTypeLabel(label)
 }
 
 function subjectRelationDescription(params: {
@@ -1233,7 +1260,7 @@ function pushTimelineEvent(
 	events.push({
 		id: params.id,
 		date: params.date,
-		dateLabel: daysToEu4Date(params.date),
+		dateLabel: formatEu4Days(params.date),
 		type: params.type,
 		typeColor: timelineTypeColor(params.type),
 		description: params.description,
@@ -2742,7 +2769,10 @@ export const GenesisView: React.FC = () => {
 	const windVectors = useMemo(() => {
 		if (
 			!world?.climate ||
-			(!showWindArrows && colorMode !== "wind" && colorMode !== "misery")
+			(!showWindArrows &&
+				colorMode !== "wind" &&
+				colorMode !== "misery" &&
+				colorMode !== "realMisery")
 		)
 			return null
 		const month =
@@ -2845,6 +2875,7 @@ export const GenesisView: React.FC = () => {
 		dtrMonth,
 		hoverWindSpeed,
 		hoverWindMonthly?.map((w) => w.speedMs) ?? null,
+		colorMode === "realMisery",
 	)
 
 	const windStats = useMemo(() => {
@@ -3038,17 +3069,25 @@ export const GenesisView: React.FC = () => {
 			return withOrgHighlight(rgb)
 		}
 		if (
-			colorMode === "misery" &&
+			(colorMode === "misery" || colorMode === "realMisery") &&
 			windVectors &&
 			worldForDisplay.climate &&
 			worldForDisplay.dtr_annual
 		) {
+			// realMisery uses observed temperature/humidity throughout; misery
+			// (model) uses the modeled climate estimates throughout. Wind has no
+			// observed variant (no per-region historical wind data is
+			// available), so it always comes from the model regardless of mode.
+			const isObserved = colorMode === "realMisery"
 			const N = worldForDisplay.mesh.numRegions
 			const rgb = new Float32Array(N * 3)
 			const isMonthly = dtrMonth > 0
 			const offset = isMonthly ? (dtrMonth - 1) * N : 0
 			const monthlyTemp = isMonthly
 				? worldForDisplay.climate.temperature_monthly
+				: null
+			const monthlyRealTemp = isMonthly
+				? worldForDisplay.climate.real_temperature_monthly
 				: null
 			const monthlyDtr = isMonthly ? worldForDisplay.dtr_monthly : null
 			const aet = worldForDisplay.hydrology?.aet_monthly
@@ -3061,33 +3100,53 @@ export const GenesisView: React.FC = () => {
 					rgb[3 * r + 2] = OCEAN_LIGHT_BLUE[2]
 					continue
 				}
-				const meanT = monthlyTemp
+				const modeledT = monthlyTemp
 					? monthlyTemp[offset + r]
 					: worldForDisplay.climate.temperature_avg[r]
-				const dtr = monthlyDtr
-					? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
-					: worldForDisplay.dtr_annual[r]
-				let annualAridity: number | undefined
-				if (aet && pet) {
-					let aetSum = 0
-					let petSum = 0
-					for (let m = 0; m < 12; m++) {
-						aetSum += aet[m * N + r]
-						petSum += pet[m * N + r]
+				const observedT = monthlyRealTemp
+					? monthlyRealTemp[offset + r]
+					: worldForDisplay.climate.real_temperature_avg?.[r]
+				const meanT =
+					isObserved && Number.isFinite(observedT) ? observedT : modeledT
+				let humidity: number
+				if (isObserved) {
+					const observedRh = isMonthly
+						? worldForDisplay.observedHumidity?.real_monthly?.[offset + r]
+						: worldForDisplay.observedHumidity?.real_annual?.[r]
+					if (Number.isFinite(observedRh)) {
+						humidity = observedRh as number
+					} else {
+						const dtr = monthlyDtr
+							? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
+							: worldForDisplay.dtr_annual[r]
+						humidity = relativeHumidityFromTempRange(
+							meanT,
+							dtr,
+							undefined,
+							worldForDisplay.rainfall?.annual[r],
+						)
 					}
-					annualAridity = petSum > 0 ? aetSum / petSum : 1
+				} else {
+					const dtr = monthlyDtr
+						? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
+						: worldForDisplay.dtr_annual[r]
+					let annualAridity: number | undefined
+					if (aet && pet) {
+						let aetSum = 0
+						let petSum = 0
+						for (let m = 0; m < 12; m++) {
+							aetSum += aet[m * N + r]
+							petSum += pet[m * N + r]
+						}
+						annualAridity = petSum > 0 ? aetSum / petSum : 1
+					}
+					humidity = relativeHumidityFromTempRange(
+						meanT,
+						dtr,
+						annualAridity,
+						worldForDisplay.rainfall?.annual[r],
+					)
 				}
-				const rh = relativeHumidityFromTempRange(
-					meanT,
-					dtr,
-					annualAridity,
-					worldForDisplay.rainfall?.annual[r],
-				)
-				const observedRh =
-					currentMonth === 0
-						? worldForDisplay.observedHumidity?.real_annual?.[r]
-						: worldForDisplay.observedHumidity?.real_monthly?.[offset + r]
-				const humidity = Number.isFinite(observedRh) ? observedRh : rh
 				const [cr, cg, cb] = miseryColor(
 					apparentTemperatureC(meanT, humidity, windSpeed[r]),
 				)
@@ -3190,8 +3249,12 @@ export const GenesisView: React.FC = () => {
 		const rawId = String(
 			earthHistory.engine.provinceMap.compactToRealId[hoverProvince],
 		)
-		const ps = earthHistory.query.state.provinces.get(rawId)
-		if (!ps) return undefined
+		// ps (folded owner/culture/religion state) can be missing for
+		// provinces with no recorded history at all -- area/region/
+		// superregion are static and come from `meta` regardless, so this no
+		// longer bails out entirely; it just leaves the history-derived
+		// fields null below.
+		const ps = earthHistory.query.state.provinces.get(rawId) ?? null
 
 		const meta = earthHistory.provinceMeta?.get(rawId)
 		// EU4's own "wasteland" flag describes present-day/in-engine
@@ -3201,7 +3264,7 @@ export const GenesisView: React.FC = () => {
 		// nation/government, matching computeEarthHistoryRegionColors'
 		// map-coloring behavior.
 		const isWasteland = !!meta?.wasteland
-		const owner = isWasteland ? null : ps.owner
+		const owner = isWasteland ? null : (ps?.owner ?? null)
 		const nationRef = owner ? earthHistory.nationReference?.get(owner) : null
 		const nationName = owner
 			? (earthHistory.query.state.nations.get(owner)?.currentName ??
@@ -3235,7 +3298,7 @@ export const GenesisView: React.FC = () => {
 			governmentColorRgb ?? EARTH_HISTORY_NO_GOVERNMENT_COLOR,
 		)
 
-		const cultureId = ps.cultureId
+		const cultureId = ps?.cultureId
 		const cultureName = cultureId
 			? (earthHistory.cultureNameById?.get(cultureId) ?? cultureId)
 			: null
@@ -3247,8 +3310,11 @@ export const GenesisView: React.FC = () => {
 			: null
 
 		const provinceName = meta?.name ?? null
+		const area = meta?.area ?? null
+		const region = meta?.region ?? null
+		const superregion = meta?.superregion ?? null
 
-		const religionId = ps.religionId
+		const religionId = ps?.religionId
 		const religionName = religionId
 			? (earthHistory.religionNameById?.get(religionId) ?? religionId)
 			: null
@@ -3271,6 +3337,9 @@ export const GenesisView: React.FC = () => {
 			religionName,
 			religionColor,
 			provinceName,
+			area,
+			region,
+			superregion,
 		}
 	}, [
 		worldForDisplay?.isEarthImport,
@@ -3413,9 +3482,9 @@ export const GenesisView: React.FC = () => {
 						colorMode === "nations" && nationMode === "dynasty"
 							? (() => {
 									const { frame, state } = earthHistory.query!
-									const dynastyNames = new Array<string>(frame.names.length).fill(
-										"",
-									)
+									const dynastyNames = new Array<string>(
+										frame.names.length,
+									).fill("")
 									for (const [tag, id] of frame.nationIds) {
 										const dynasty = state.nations.get(tag)?.ruler?.dynasty
 										if (dynasty) dynastyNames[id] = dynasty
@@ -3862,7 +3931,9 @@ export const GenesisView: React.FC = () => {
 		[],
 	)
 	const handleProvinceClick = useCallback((provinceId: number) => {
-		sceneRef.current?.focusOnProvince(provinceId)
+		sceneRef.current?.focusOnProvince(provinceId, {
+			distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+		})
 	}, [])
 
 	const nationHistory = useMemo(() => {
@@ -5070,9 +5141,24 @@ export const GenesisView: React.FC = () => {
 		if (nationId < 0) return null
 
 		const provinceIndexes: number[] = []
-		for (let p = 0; p < frame.assignment.length; p++) {
-			if (frame.assignment[p] === nationId) provinceIndexes.push(p)
+		const provinceCountByNationTag = new Map<string, number>()
+		const tagByNationId = new Map<number, string>()
+		for (const [nationTag, id] of frame.nationIds) {
+			tagByNationId.set(id, nationTag)
 		}
+		for (let p = 0; p < frame.assignment.length; p++) {
+			const assignedNationId = frame.assignment[p]
+			if (assignedNationId === nationId) provinceIndexes.push(p)
+			const assignedTag = tagByNationId.get(assignedNationId)
+			if (assignedTag) {
+				provinceCountByNationTag.set(
+					assignedTag,
+					(provinceCountByNationTag.get(assignedTag) ?? 0) + 1,
+				)
+			}
+		}
+		const hasOwnedProvinces = (otherTag: string): boolean =>
+			(provinceCountByNationTag.get(otherTag) ?? 0) > 0
 		const ownedProvinceIndexes = new Set(provinceIndexes)
 		const regionIndexes: number[] = []
 		const regionProvince = world.provinces?.regionProvince
@@ -5091,6 +5177,13 @@ export const GenesisView: React.FC = () => {
 		const realPopulation = worldForDisplay.realPopulation?.population
 		const totalPopulation = realPopulation
 			? provinceIndexes.reduce((sum, p) => sum + (realPopulation[p] ?? 0), 0)
+			: 0
+		const realUrbanPopulation = worldForDisplay.realUrbanPopulation?.population
+		const totalUrbanPopulation = realUrbanPopulation
+			? provinceIndexes.reduce(
+					(sum, p) => sum + (realUrbanPopulation[p] ?? 0),
+					0,
+				)
 			: 0
 
 		const nationState = state.nations.get(tag)
@@ -5159,26 +5252,53 @@ export const GenesisView: React.FC = () => {
 		// the literal subject hierarchy, union/allies/guarantees/marriages aren't strictly
 		// dependencies but share the same "line per relation type, links to
 		// other nations" shape so they're folded in here too.
+		const subjectDependencyGroups = new Map<string, string[]>()
+		for (const subjectTag of nationState?.vassals ?? []) {
+			if (!hasOwnedProvinces(subjectTag)) continue
+			const subjectType =
+				nationState?.vassalSubjectTypes.get(subjectTag) ?? "vassal"
+			const label = subjectTypeGroupLabel(subjectType)
+			const subjects = subjectDependencyGroups.get(label) ?? []
+			subjects.push(subjectTag)
+			subjectDependencyGroups.set(label, subjects)
+		}
 		const dependencyGroups: Array<[string, string[]]> = [
-			["Overlord", nationState?.overlord ? [nationState.overlord] : []],
-			["Vassals", nationState?.vassals ? Array.from(nationState.vassals) : []],
+			[
+				"Overlord",
+				nationState?.overlord && hasOwnedProvinces(nationState.overlord)
+					? [nationState.overlord]
+					: [],
+			],
+			...subjectDependencyGroups,
 			[
 				"Union (Senior)",
-				nationState?.unionSeniorOf ? Array.from(nationState.unionSeniorOf) : [],
+				nationState?.unionSeniorOf
+					? Array.from(nationState.unionSeniorOf).filter(hasOwnedProvinces)
+					: [],
 			],
 			[
 				"Union (Junior)",
-				nationState?.unionJuniorPartner ? [nationState.unionJuniorPartner] : [],
+				nationState?.unionJuniorPartner &&
+				hasOwnedProvinces(nationState.unionJuniorPartner)
+					? [nationState.unionJuniorPartner]
+					: [],
 			],
-			["Allies", nationState?.allies ? Array.from(nationState.allies) : []],
+			[
+				"Allies",
+				nationState?.allies
+					? Array.from(nationState.allies).filter(hasOwnedProvinces)
+					: [],
+			],
 			[
 				"Guarantees",
-				nationState?.guarantees ? Array.from(nationState.guarantees) : [],
+				nationState?.guarantees
+					? Array.from(nationState.guarantees).filter(hasOwnedProvinces)
+					: [],
 			],
 			[
 				"Royal Marriages",
 				nationState?.royalMarriages
-					? Array.from(nationState.royalMarriages)
+					? Array.from(nationState.royalMarriages).filter(hasOwnedProvinces)
 					: [],
 			],
 		]
@@ -5242,6 +5362,7 @@ export const GenesisView: React.FC = () => {
 		const stats = buildNationWikiStats({
 			totalAreaKm2,
 			totalPopulation,
+			totalUrbanPopulation,
 			provinceCount: provinceIndexes.length,
 			rulerLabel,
 			governmentLabel,
@@ -5380,6 +5501,35 @@ export const GenesisView: React.FC = () => {
 			name: war.name,
 			color: "#b91c1c",
 		})
+		// Index every war's participant span once so territory/control-change
+		// events below can guess which war (if any) caused them: a transfer
+		// between two nations that were both belligerents in some war whose
+		// span covers the transfer date is presumed to be that war's doing --
+		// same heuristic WarWikiPage's own territory section uses, just run
+		// against every war instead of one already-selected war.
+		const warSpans = earthHistory.engine.data.wars.map((war) => {
+			const sideByTag = new Map<string, "attacker" | "defender">()
+			for (const event of war.events) sideByTag.set(event.nationTag, event.side)
+			const dates = war.events.map((event) => event.date)
+			return {
+				war,
+				sideByTag,
+				dateRangeStart: dates.length > 0 ? Math.min(...dates) : Infinity,
+				dateRangeEnd: dates.length > 0 ? Math.max(...dates) : -Infinity,
+			}
+		})
+		const findWarForTransfer = (
+			date: number,
+			tagA: string,
+			tagB: string,
+		): { warId: string; name: string } | null => {
+			for (const span of warSpans) {
+				if (date < span.dateRangeStart || date > span.dateRangeEnd) continue
+				if (!span.sideByTag.has(tagA) || !span.sideByTag.has(tagB)) continue
+				return span.war
+			}
+			return null
+		}
 		const cultureMention = (
 			cultureId: string,
 		): NationTimelineEvent["cultures"][number] => ({
@@ -5483,7 +5633,15 @@ export const GenesisView: React.FC = () => {
 		): string => {
 			const actionEntries = new Map<
 				string,
-				Map<string | null, { objects: string[]; objectKeys: string[] }>
+				Map<
+					string | null,
+					{
+						objects: string[]
+						objectKeys: string[]
+						separator: "to" | "from"
+						warName: string | null
+					}
+				>
 			>()
 			const fallbackClauses: string[] = []
 			for (const event of events) {
@@ -5496,17 +5654,37 @@ export const GenesisView: React.FC = () => {
 					fallbackClauses.push(clause)
 					continue
 				}
-				const [, action, object] = match
-				const targetMatch = /^(.+) to (.+)$/.exec(object)
+				const [, action] = match
+				let object = match[2]
+				// Individual events append " (War Name)" (see
+				// findWarForTransfer) when a war looks responsible -- pull
+				// that off before parsing the to/from clause below.
+				const warSuffixMatch = /^(.+) \(([^()]+)\)$/.exec(object)
+				const warName = warSuffixMatch?.[2] ?? null
+				if (warSuffixMatch) object = warSuffixMatch[1]
+				const targetMatch = /^(.+) (to|from) (.+)$/.exec(object)
 				const objectName = targetMatch?.[1] ?? object
-				const targetName = targetMatch?.[2] ?? null
+				const separator =
+					(targetMatch?.[2] as "to" | "from" | undefined) ?? "to"
+				const targetName = targetMatch?.[3] ?? null
 				const targetEntries = actionEntries.get(action) ?? new Map()
+				// Dedup key is the bare province name (not the full "X to/from
+				// Y" clause) so the ownership/control cross-filtering below
+				// (which compares against "gained"/"lost" entries that never
+				// carry a target suffix) matches correctly regardless of
+				// which nation the control side names.
 				const entry = targetEntries.get(targetName) ?? {
 					objects: [],
 					objectKeys: [],
+					separator,
+					warName,
 				}
 				entry.objects.push(objectName)
-				entry.objectKeys.push(object)
+				entry.objectKeys.push(objectName)
+				// Only keep the war name if every province merged into this
+				// clause agrees on it -- an ambiguous mix stays unlabeled
+				// rather than naming one war for provinces it didn't cause.
+				if (entry.warName !== warName) entry.warName = null
 				targetEntries.set(targetName, entry)
 				actionEntries.set(action, targetEntries)
 			}
@@ -5535,6 +5713,8 @@ export const GenesisView: React.FC = () => {
 						controlTargets.set(targetName, {
 							objects: filteredObjects,
 							objectKeys: filteredObjectKeys,
+							separator: entry.separator,
+							warName: entry.warName,
 						})
 					} else {
 						controlTargets.delete(targetName)
@@ -5544,18 +5724,37 @@ export const GenesisView: React.FC = () => {
 					actionEntries.delete(controlAction)
 				}
 			}
+			const clauseEntries = Array.from(actionEntries.entries()).flatMap(
+				([action, targetEntries]) =>
+					Array.from(targetEntries.entries()).map(([targetName, entry]) => ({
+						text: targetName
+							? `${action} ${formatList(entry.objects)} ${entry.separator} ${targetName}`
+							: `${action} ${formatList(entry.objects)}`,
+						warName: entry.warName,
+					})),
+			)
 			const clauses = [
-				...Array.from(actionEntries.entries()).flatMap(
-					([action, targetEntries]) =>
-						Array.from(targetEntries.entries()).map(([targetName, entry]) =>
-							targetName
-								? `${action} ${formatList(entry.objects)} to ${targetName}`
-								: `${action} ${formatList(entry.objects)}`,
-						),
-				),
+				...clauseEntries.map((entry) => entry.text),
 				...fallbackClauses,
 			]
-			return `${title} ${formatList(clauses)}.`
+			// War names sit at the very end of the whole sentence rather than
+			// inline after whichever clause happened to carry one -- a
+			// parenthetical mid-sentence reads as if it qualifies only that
+			// clause, and readers expect the "why" to cap off the sentence.
+			const warNames = Array.from(
+				new Set(
+					clauseEntries
+						.map((entry) => entry.warName)
+						.filter((warName): warName is string => warName !== null),
+				),
+			)
+			// formatList's "A, B, and C" is for a list of nouns -- these are
+			// full verb clauses (one per distinct action, e.g. "gained ..."
+			// and "lost control of ..."), and running them together with
+			// "and" reads as one run-on sentence. Semicolons keep each action
+			// visually separate.
+			const warSuffix = warNames.length > 0 ? ` (${warNames.join(", ")})` : ""
+			return `${title} ${clauses.join("; ")}${warSuffix}.`
 		}
 		const buildMergedProvinceAttributeDescription = (
 			events: NationTimelineEvent[],
@@ -5907,6 +6106,8 @@ export const GenesisView: React.FC = () => {
 		)) {
 			let owner = normalizeTimelineTag(entry.base.owner)
 			let controller = normalizeTimelineTag(entry.base.controller)
+			let ownerRebelType: unknown
+			let controllerRebelType: unknown
 			const revoltTypeByDate = new Map<number, unknown>()
 			for (const event of entry.events) {
 				if (
@@ -5930,7 +6131,7 @@ export const GenesisView: React.FC = () => {
 			for (const [index, event] of entry.events.entries()) {
 				const eventId = `province:${rawId}:${event.date}:${index}`
 				const nextTag = normalizeTimelineTag(event.payload.tag)
-				const rebelType = isRebelTag(nextTag)
+				const nextRebelType = isRebelTag(nextTag)
 					? revoltTypeByDate.get(event.date)
 					: undefined
 				const provinceColor = nextTag ? resolveNationColor(nextTag) : color
@@ -5938,7 +6139,10 @@ export const GenesisView: React.FC = () => {
 				const provinces = province ? [province] : []
 				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
 				if (event.kind === "owner") {
-					addNationMention(nations, nextTag, rebelType)
+					const previousOwnerRebelType = ownerRebelType
+					const otherRebelType =
+						nextTag === tag ? previousOwnerRebelType : nextRebelType
+					addNationMention(nations, nextTag, nextRebelType)
 					if (nextTag === tag || owner === tag) {
 						if (nextTag !== owner) {
 							const delta = nextTag === tag ? 1 : -1
@@ -5947,10 +6151,15 @@ export const GenesisView: React.FC = () => {
 								(territoryDeltasByDate.get(event.date) ?? 0) + delta,
 							)
 						}
+						const otherTag = nextTag === tag ? owner : nextTag
+						const war =
+							otherTag && !isRebelTag(otherTag)
+								? findWarForTransfer(event.date, tag, otherTag)
+								: null
 						const description =
 							nextTag === tag
-								? `${title} gained ${province?.name ?? `province ${rawId}`}.`
-								: `${title} lost ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, rebelType).name}` : ""}.`
+								? `${title} gained ${province?.name ?? `province ${rawId}`}${war ? ` (${war.name})` : ""}.`
+								: `${title} lost ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
 						pushTimelineEvent(timelineEvents, {
 							id: eventId,
 							date: event.date,
@@ -5959,16 +6168,32 @@ export const GenesisView: React.FC = () => {
 							comment: eventComment(event.comment),
 							nations,
 							provinces,
+							wars: war ? [warMention(war)] : [],
 						})
 					}
 					owner = nextTag
+					ownerRebelType = isRebelTag(nextTag) ? nextRebelType : undefined
 				} else if (event.kind === "controller") {
-					addNationMention(nations, nextTag, rebelType)
-					if (nextTag === tag || controller === tag) {
+					const previousController = controller
+					const previousControllerRebelType = controllerRebelType
+					const otherRebelType =
+						nextTag === tag ? previousControllerRebelType : nextRebelType
+					addNationMention(nations, nextTag, nextRebelType)
+					if (nextTag === tag)
+						addNationMention(nations, previousController, otherRebelType)
+					if (
+						nextTag !== previousController &&
+						(nextTag === tag || previousController === tag)
+					) {
+						const otherTag = nextTag === tag ? controller : nextTag
+						const war =
+							otherTag && !isRebelTag(otherTag)
+								? findWarForTransfer(event.date, tag, otherTag)
+								: null
 						const description =
 							nextTag === tag
-								? `${title} took control of ${province?.name ?? `province ${rawId}`}.`
-								: `${title} lost control of ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, rebelType).name}` : ""}.`
+								? `${title} took control of ${province?.name ?? `province ${rawId}`}${previousController ? ` from ${eventNation(previousController, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
+								: `${title} lost control of ${province?.name ?? `province ${rawId}`}${nextTag ? ` to ${eventNation(nextTag, otherRebelType).name}` : ""}${war ? ` (${war.name})` : ""}.`
 						pushTimelineEvent(timelineEvents, {
 							id: eventId,
 							date: event.date,
@@ -5977,9 +6202,11 @@ export const GenesisView: React.FC = () => {
 							comment: eventComment(event.comment),
 							nations,
 							provinces,
+							wars: war ? [warMention(war)] : [],
 						})
 					}
 					controller = nextTag
+					controllerRebelType = isRebelTag(nextTag) ? nextRebelType : undefined
 				} else if (owner === tag && event.kind === "culture") {
 					const cultureId = String(event.payload.cultureId ?? "")
 					const culture = cultureMention(cultureId)
@@ -6138,27 +6365,71 @@ export const GenesisView: React.FC = () => {
 			const participants = new Map<string, "attacker" | "defender">()
 			for (const event of war.events)
 				participants.set(event.nationTag, event.side)
-			for (const [index, event] of war.events.entries()) {
-				if (event.nationTag !== tag) continue
-				const opponentTags = Array.from(participants.entries())
-					.filter(([, side]) => side !== event.side)
-					.map(([opponentTag]) => opponentTag)
-				const nations: NationTimelineEvent["nations"] = [eventNation(tag)]
-				for (const opponentTag of opponentTags)
-					addNationMention(nations, opponentTag)
-				const opponents = opponentTags.map(resolveNationName).join(", ")
-				const warPrefix =
-					event.kind === "warStart" ? `${title} entered ` : `${title} left `
-				const warDescription =
-					event.kind === "warStart"
-						? `${warPrefix}${war.name}${opponents ? ` against ${opponents}` : ""}.`
-						: `${warPrefix}${war.name}.`
+			// Multiple nations often join/leave on the same date (a shared
+			// peace treaty, allies declaring together) -- group by
+			// (date, kind) the same way WarWikiPage does, so this nation's
+			// entry reads as "X, Y, and Z entered War against A and B"
+			// instead of only naming this nation.
+			const eventGroups = new Map<string, RawWarParticipantEvent[]>()
+			for (const event of war.events) {
+				const key = `${event.date}:${event.kind}`
+				const group = eventGroups.get(key)
+				if (group) group.push(event)
+				else eventGroups.set(key, [event])
+			}
+			for (const [key, group] of eventGroups) {
+				if (!group.some((event) => event.nationTag === tag)) continue
+				const date = group[0].date
+				const kind = group[0].kind
+				const comment = group.find((event) => event.comment)?.comment
+				const attackerTags = group
+					.filter((event) => event.side === "attacker")
+					.map((event) => event.nationTag)
+				const defenderTags = group
+					.filter((event) => event.side === "defender")
+					.map((event) => event.nationTag)
+				const nations: NationTimelineEvent["nations"] = []
+				for (const nationTag of [...attackerTags, ...defenderTags])
+					addNationMention(nations, nationTag)
+				let description: string
+				if (kind === "warStart") {
+					const attackerNames = attackerTags.map(resolveNationName)
+					const defenderNames = defenderTags.map(resolveNationName)
+					if (attackerNames.length > 0 && defenderNames.length > 0) {
+						description = `${joinWithAnd(attackerNames)} entered ${war.name} against ${joinWithAnd(defenderNames)}.`
+					} else {
+						// Only one side declared this day (the other side's
+						// members were already in the war) -- find its
+						// existing opponents so "against" still shows up.
+						const joiningSide =
+							attackerNames.length > 0 ? "attacker" : "defender"
+						const joiningTags =
+							attackerNames.length > 0 ? attackerTags : defenderTags
+						const joiningNames =
+							attackerNames.length > 0 ? attackerNames : defenderNames
+						const opponentTags = Array.from(participants.entries())
+							.filter(
+								([opponentTag, side]) =>
+									side !== joiningSide && !joiningTags.includes(opponentTag),
+							)
+							.map(([opponentTag]) => opponentTag)
+						for (const opponentTag of opponentTags)
+							addNationMention(nations, opponentTag)
+						const opponentNames = opponentTags.map(resolveNationName)
+						description = `${joinWithAnd(joiningNames)} entered ${war.name}${opponentNames.length > 0 ? ` against ${joinWithAnd(opponentNames)}` : ""}.`
+					}
+				} else {
+					const names = [...attackerTags, ...defenderTags].map(
+						resolveNationName,
+					)
+					description = `${joinWithAnd(names)} left ${war.name}.`
+				}
 				pushTimelineEvent(timelineEvents, {
-					id: `war:${war.warId}:${event.date}:${index}`,
-					date: event.date,
-					type: event.kind === "warStart" ? "War (+)" : "War (-)",
-					description: warDescription,
-					comment: eventComment(event.comment),
+					id: `war:${war.warId}:${key}`,
+					date,
+					type: kind === "warStart" ? "War (+)" : "War (-)",
+					description,
+					comment: eventComment(comment),
 					nations,
 					wars: [warMention(war)],
 				})
@@ -6253,7 +6524,7 @@ export const GenesisView: React.FC = () => {
 			mergedTimelineEvents.push({
 				id: `territory:${tag}:${date}:merged`,
 				date,
-				dateLabel: daysToEu4Date(date),
+				dateLabel: formatEu4Days(date),
 				type: mergedType,
 				typeColor: timelineTypeColor(mergedType),
 				description: buildMergedTerritoryDescription(group),
@@ -6275,7 +6546,7 @@ export const GenesisView: React.FC = () => {
 			mergedTimelineEvents.push({
 				id: `culture:${tag}:${date}:merged`,
 				date,
-				dateLabel: daysToEu4Date(date),
+				dateLabel: formatEu4Days(date),
 				type: "Culture",
 				typeColor: timelineTypeColor("Culture"),
 				description: buildMergedProvinceAttributeDescription(group, "culture"),
@@ -6297,7 +6568,7 @@ export const GenesisView: React.FC = () => {
 			mergedTimelineEvents.push({
 				id: `religion:${tag}:${date}:merged`,
 				date,
-				dateLabel: daysToEu4Date(date),
+				dateLabel: formatEu4Days(date),
 				type: "Religion",
 				typeColor: timelineTypeColor("Religion"),
 				description: buildMergedProvinceAttributeDescription(group, "religion"),
@@ -6395,7 +6666,7 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart: earthHistory.minDays,
 			dateRangeEnd: earthHistory.maxDays,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: daysToEu4Date(earthHistory.selectedDays),
+			currentDateLabel: formatEu4Days(earthHistory.selectedDays),
 			timelineEvents,
 			onBack: () => setSelectedWikiNationTag(null),
 			onFocusNation: () => focusNation(tag),
@@ -6404,7 +6675,9 @@ export const GenesisView: React.FC = () => {
 				setSelectedWikiNationTag(targetTag)
 			},
 			onSelectProvince: (provinceId: number) => {
-				sceneRef.current?.focusOnProvince(provinceId)
+				sceneRef.current?.focusOnProvince(provinceId, {
+					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				})
 			},
 			onSelectDate: earthHistory.setSelectedDays,
 			onSelectOrganization: (orgId: string) => {
@@ -6871,7 +7144,7 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart: earthHistory.minDays,
 			dateRangeEnd: earthHistory.maxDays,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: daysToEu4Date(earthHistory.selectedDays),
+			currentDateLabel: formatEu4Days(earthHistory.selectedDays),
 			timelineEvents,
 			onBack: () => setSelectedWikiOrganizationId(null),
 			onSelectNation: (targetTag: string) => {
@@ -6879,7 +7152,9 @@ export const GenesisView: React.FC = () => {
 				setSelectedWikiNationTag(targetTag)
 			},
 			onSelectProvince: (provinceId: number) => {
-				sceneRef.current?.focusOnProvince(provinceId)
+				sceneRef.current?.focusOnProvince(provinceId, {
+					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				})
 			},
 			onSelectDate: earthHistory.setSelectedDays,
 			onSelectWar: (warId: string) => {
@@ -6978,7 +7253,7 @@ export const GenesisView: React.FC = () => {
 		const dates = war.events.map((event) => event.date)
 		const dateRangeStart = Math.min(...dates)
 		const dateRangeEnd = Math.max(...dates)
-		const dateRangeLabel = `${daysToEu4Date(dateRangeStart)} – ${daysToEu4Date(dateRangeEnd)}`
+		const dateRangeLabel = `${formatEu4Days(dateRangeStart)} – ${formatEu4Days(dateRangeEnd)}`
 
 		const stats: StatEntry[] = []
 		if (war.warGoalType)
@@ -7022,6 +7297,42 @@ export const GenesisView: React.FC = () => {
 		}
 		if (war.isRebel) stats.push({ label: "Type", value: "Rebellion" })
 
+		// A nation stays listed under whichever side it last held (sideByTag
+		// above), but whether it's actually *in* the war right now depends on
+		// the selected date -- find each tag's most recent join/leave at or
+		// before that date and check whether it was a join. A tag with no
+		// qualifying event yet (hasn't joined) is treated as inactive too.
+		const currentDate = earthHistory.selectedDays
+		const eventsByTag = new Map<string, RawWarParticipantEvent[]>()
+		for (const event of war.events) {
+			const list = eventsByTag.get(event.nationTag)
+			if (list) list.push(event)
+			else eventsByTag.set(event.nationTag, [event])
+		}
+		const isActiveAtCurrentDate = (nationTag: string): boolean => {
+			const events = eventsByTag.get(nationTag)
+			if (!events) return false
+			let active = false
+			for (const event of [...events].sort((a, b) => a.date - b.date)) {
+				if (event.date > currentDate) break
+				active = event.kind === "warStart"
+			}
+			return active
+		}
+		// Outside the war's own span entirely (viewing history well before it
+		// started or long after it ended), graying out participants who
+		// "haven't joined yet" or "already left" reads as broken rather than
+		// informative -- only apply the per-nation check while the selected
+		// date actually falls within the war.
+		const dateWithinWar =
+			currentDate >= dateRangeStart && currentDate <= dateRangeEnd
+		const participantMention = (
+			nationTag: string,
+		): WarWikiData["participants"][number]["nations"][number] => ({
+			...nationMention(nationTag),
+			active: !dateWithinWar || isActiveAtCurrentDate(nationTag),
+		})
+
 		const sideOrder: Array<"attacker" | "defender"> = ["attacker", "defender"]
 		const participants: WarWikiData["participants"] = sideOrder.map((side) => ({
 			side,
@@ -7031,7 +7342,7 @@ export const GenesisView: React.FC = () => {
 				.sort((a, b) =>
 					resolveNationName(a).localeCompare(resolveNationName(b)),
 				)
-				.map(nationMention),
+				.map(participantMention),
 		}))
 
 		const timelineEvents: NationTimelineEvent[] = []
@@ -7138,37 +7449,81 @@ export const GenesisView: React.FC = () => {
 				provinces: NationTimelineEvent["provinces"]
 			}
 		>()
+		// Occupation (military control changing hands without a change of
+		// legal ownership, e.g. the province is still being fought over) is
+		// tracked separately from the ownership transfers above -- same
+		// grouping shape, but keyed off `controller` events instead of
+		// `owner` ones, matching the nation-page timeline's "took control
+		// of" vs. "gained"/"lost" distinction (see the `owner`/`controller`
+		// branches above).
+		const controlGroups = new Map<
+			string,
+			{
+				date: number
+				controller: string
+				nextController: string
+				provinces: NationTimelineEvent["provinces"]
+			}
+		>()
 		for (const [rawId, entry] of Object.entries(
 			earthHistory.engine.data.provinceEvents,
 		)) {
 			let owner = normalizeTimelineTag(entry.base.owner)
+			let controller = normalizeTimelineTag(entry.base.controller)
 			for (const event of entry.events) {
-				if (event.kind !== "owner") continue
-				const nextOwner = normalizeTimelineTag(event.payload.tag)
-				if (
-					event.date >= dateRangeStart &&
-					event.date <= dateRangeEnd &&
-					owner &&
-					nextOwner &&
-					owner !== nextOwner &&
-					sideByTag.has(owner) &&
-					sideByTag.has(nextOwner)
-				) {
-					const province = provinceMention(rawId, "#94a3b8")
-					if (province) {
-						const key = `${event.date}:${owner}:${nextOwner}`
-						const group = territoryGroups.get(key)
-						if (group) group.provinces.push(province)
-						else
-							territoryGroups.set(key, {
-								date: event.date,
-								owner,
-								nextOwner,
-								provinces: [province],
-							})
+				if (event.kind === "owner") {
+					const nextOwner = normalizeTimelineTag(event.payload.tag)
+					if (
+						event.date >= dateRangeStart &&
+						event.date <= dateRangeEnd &&
+						owner &&
+						nextOwner &&
+						owner !== nextOwner &&
+						sideByTag.has(owner) &&
+						sideByTag.has(nextOwner)
+					) {
+						const province = provinceMention(rawId, "#94a3b8")
+						if (province) {
+							const key = `${event.date}:${owner}:${nextOwner}`
+							const group = territoryGroups.get(key)
+							if (group) group.provinces.push(province)
+							else
+								territoryGroups.set(key, {
+									date: event.date,
+									owner,
+									nextOwner,
+									provinces: [province],
+								})
+						}
 					}
+					owner = nextOwner
+				} else if (event.kind === "controller") {
+					const nextController = normalizeTimelineTag(event.payload.tag)
+					if (
+						event.date >= dateRangeStart &&
+						event.date <= dateRangeEnd &&
+						controller &&
+						nextController &&
+						controller !== nextController &&
+						sideByTag.has(controller) &&
+						sideByTag.has(nextController)
+					) {
+						const province = provinceMention(rawId, "#94a3b8")
+						if (province) {
+							const key = `${event.date}:${controller}:${nextController}`
+							const group = controlGroups.get(key)
+							if (group) group.provinces.push(province)
+							else
+								controlGroups.set(key, {
+									date: event.date,
+									controller,
+									nextController,
+									provinces: [province],
+								})
+						}
+					}
+					controller = nextController
 				}
-				owner = nextOwner
 			}
 		}
 		for (const [key, group] of territoryGroups) {
@@ -7186,6 +7541,24 @@ export const GenesisView: React.FC = () => {
 				provinces: group.provinces,
 			})
 		}
+		for (const [key, group] of controlGroups) {
+			const provinceNames = group.provinces.map((province) => province.name)
+			const description =
+				group.provinces.length === 1
+					? `${resolveNationName(group.nextController)} took control of ${provinceNames[0]} from ${resolveNationName(group.controller)}.`
+					: `${resolveNationName(group.nextController)} took control of ${group.provinces.length} provinces (${joinWithAnd(provinceNames)}) from ${resolveNationName(group.controller)}.`
+			pushTimelineEvent(timelineEvents, {
+				id: `warControl:${key}`,
+				date: group.date,
+				type: "Territory",
+				description,
+				nations: [
+					nationMention(group.controller),
+					nationMention(group.nextController),
+				],
+				provinces: group.provinces,
+			})
+		}
 		timelineEvents.sort((a, b) => a.date - b.date)
 
 		return {
@@ -7199,13 +7572,15 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart,
 			dateRangeEnd,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: daysToEu4Date(earthHistory.selectedDays),
+			currentDateLabel: formatEu4Days(earthHistory.selectedDays),
 			onBack: () => setSelectedWikiWarId(null),
 			onSelectNation: (targetTag: string) => {
 				setSelectedWikiNationTag(targetTag)
 			},
 			onSelectProvince: (provinceId: number) => {
-				sceneRef.current?.focusOnProvince(provinceId)
+				sceneRef.current?.focusOnProvince(provinceId, {
+					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				})
 			},
 			onSelectDate: earthHistory.setSelectedDays,
 			onSelectOrganization: (orgId: string) => {
@@ -7974,7 +8349,6 @@ export const GenesisView: React.FC = () => {
 									? (selectedHistoryView?.relationAt ?? null)
 									: null
 							}
-							detailsDrawerOpen={detailsDrawerOpen}
 							earthHistoryHoverOverride={earthHistoryHoverOverride}
 						/>
 					) : null}

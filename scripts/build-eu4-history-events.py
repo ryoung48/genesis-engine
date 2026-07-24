@@ -11,6 +11,7 @@ UI slider bounds (START_YEAR=2 .. END_YEAR=9999).
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 from pathlib import Path
@@ -24,9 +25,13 @@ from eu4_date import eu4_date_to_days
 
 DEFAULT_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public")
 DEFAULT_OUTPUT = Path("public/earth-history/events")
+DEFAULT_REFERENCE_DIR = Path("public/earth-history/reference")
+DEFAULT_AUDITS_DIR = Path("public/earth-history/audits")
+DEFAULT_PROVINCE_SEEDS = Path("public/heightmap/eu4-provinces-seeds.json")
 DEFAULT_PROVINCE_NAMES_TOPOJSON = Path(
     r"C:\Users\rayou\projects\geo-explorer\public\provinces.topojson"
 )
+CLIOPATRIA_EVENTS_SCRIPT = Path(__file__).resolve().parent / "build-cliopatria-events.py"
 
 PROVINCE_FILE_RE = re.compile(r"^(\d+)\s*-\s*(.+)$")
 DATE_BLOCK_START_RE = re.compile(r"^\s*(-?\d+\.\d+\.\d+)\s*=")
@@ -671,7 +676,11 @@ def convert_nations(source: Path) -> dict:
     out: dict[str, dict] = {}
     hist_dir = source / "history" / "countries"
     for f in hist_dir.glob("*.txt"):
-        tag = f.stem.split(" - ", 1)[0].strip()
+        # Filenames are "TAG - Name.txt", but a few source files omit the
+        # space before the dash (e.g. "CLY- Chalukya.txt", "KER- Keres.txt");
+        # split on the dash with optional surrounding whitespace so those
+        # still resolve to the real tag instead of the whole stem.
+        tag = re.split(r"\s*-\s*", f.stem, maxsplit=1)[0].strip()
         entries = parse_file(f)
         comments_by_date = _extract_dated_comments(f)
 
@@ -1098,6 +1107,220 @@ def convert_organizations(source: Path) -> list:
     return out
 
 
+def _load_cliopatria_events_module():
+    spec = importlib.util.spec_from_file_location("build_cliopatria_events", CLIOPATRIA_EVENTS_SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {CLIOPATRIA_EVENTS_SCRIPT}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def apply_cliopatria_enrichment(provinces: dict) -> tuple[int, int, int, int, int, int]:
+    cliopatria = _load_cliopatria_events_module()
+
+    with DEFAULT_PROVINCE_SEEDS.open(encoding="utf-8") as f:
+        seeds = json.load(f)
+
+    polities = cliopatria.load_polities(cliopatria.DEFAULT_SOURCE)
+    polity_names = {p["name"] for p in polities}
+
+    nations_path = DEFAULT_REFERENCE_DIR / "nations.json"
+    with nations_path.open(encoding="utf-8") as f:
+        reference_nations = json.load(f)
+    tag_resolve, reused, minted = cliopatria.resolve_tags(polity_names, reference_nations)
+    if minted:
+        nations_path.write_text(json.dumps(reference_nations, indent=2) + "\n", encoding="utf-8")
+
+    culture_religion_2ad = cliopatria.extract_2ad_culture_religion(provinces)
+    wasteland_province_ids = {
+        province_id
+        for province_id, entry in provinces.items()
+        if entry.get("base", {}).get("wasteland")
+    }
+
+    new_events, matched_total = cliopatria.build_province_events(
+        seeds,
+        polities,
+        tag_resolve,
+        culture_religion_2ad,
+        wasteland_province_ids,
+    )
+    touched_provinces = sum(1 for events in new_events.values() if events)
+    merged = cliopatria.merge_provinces(provinces, new_events)
+    return len(polities), reused, minted, matched_total, touched_provinces, merged
+
+
+# ── Ancient-nation audits (pre-2AD reconstructions) ────────────────────
+
+
+def _audit_event_to_app_event(event: dict) -> dict:
+    """Audit files (public/earth-history/audits/*.json, produced per
+    scripts/audit/ancient-nation-audit-prompt.md) carry `note` / `sourceConfidence`
+    fields alongside the standard date/kind/payload shape -- fold them into
+    the app's `comment` field so the provenance survives without inventing a
+    new event schema."""
+    out = {"date": event["date"], "kind": event["kind"], "payload": event["payload"]}
+    comment = event.get("comment")
+    note = event.get("note")
+    confidence = event.get("sourceConfidence")
+    comment_parts = [
+        p for p in (comment, note, f"confidence: {confidence}" if confidence else None) if p
+    ]
+    if comment_parts:
+        out["comment"] = " | ".join(dict.fromkeys(comment_parts))
+    return out
+
+
+def _dedupe_sorted_events(events: list[dict]) -> list[dict]:
+    seen = {}
+    for event in events:
+        key = (event["date"], event["kind"], json.dumps(event["payload"], sort_keys=True), event.get("comment"))
+        seen[key] = event
+    return sorted(seen.values(), key=lambda e: e["date"])
+
+
+def apply_audit_enrichment(
+    nations: dict, provinces: dict, audits_dir: Path = DEFAULT_AUDITS_DIR
+) -> tuple[int, int, int]:
+    """Merges the ancient-nation audit/proposal files into the converted
+    nations and provinces dicts, in place. Audit tags are pre-registered in
+    reference/nations.json (both real EU4 tags and cp_ tags minted by
+    Cliopatria enrichment), so no new tags are minted here -- a nation entry
+    is simply created if the tag has no EU4 country-history file of its own.
+    """
+    audit_files = sorted(audits_dir.glob("*.json"))
+    nation_events_added = 0
+    province_events_added = 0
+
+    for f in audit_files:
+        with f.open(encoding="utf-8") as fh:
+            audit = json.load(fh)
+
+        deprecated_nation_tags = set(audit.get("deprecatedNationTags", []))
+        for deprecated_tag in deprecated_nation_tags:
+            nations.pop(deprecated_tag, None)
+
+        replaced_owner_tags = set(audit.get("replacesProvinceOwnerTags", []))
+        tag = audit["tag"]
+        events = [_audit_event_to_app_event(e) for e in audit.get("events", [])]
+        if events:
+            entry = nations.setdefault(tag, {"base": {"reforms": [], "capital": None}, "events": []})
+            entry["events"] = _dedupe_sorted_events([*entry["events"], *events])
+            nation_events_added += len(events)
+
+        for province_id, province_events in audit.get("provinceEvents", {}).items():
+            if province_id not in provinces:
+                raise ValueError(f"{f}: province {province_id!r} not found in converted provinces")
+            converted = [_audit_event_to_app_event(e) for e in province_events]
+            if replaced_owner_tags:
+                provinces[province_id]["events"] = [
+                    e
+                    for e in provinces[province_id]["events"]
+                    if not (
+                        e.get("kind") in {"owner", "controller"}
+                        and e.get("payload", {}).get("tag") in replaced_owner_tags
+                    )
+                ]
+            provinces[province_id]["events"] = _dedupe_sorted_events(
+                [*provinces[province_id]["events"], *converted]
+            )
+            province_events_added += len(converted)
+
+    return len(audit_files), nation_events_added, province_events_added
+
+
+def apply_audit_province_events(
+    provinces: dict, subdir: Path
+) -> int:
+    """Merges province-keyed audit files (revolts/, occupations/) that use
+    the `{"provinces": {provinceId: {"events": [...]}}}` shape -- distinct
+    from apply_audit_enrichment's top-level `provinceEvents`, since these
+    aren't tied to a single owning nation tag."""
+    events_added = 0
+    for f in sorted(subdir.glob("*.json")):
+        with f.open(encoding="utf-8") as fh:
+            audit = json.load(fh)
+        for province_id, entry in audit.get("provinces", {}).items():
+            if province_id not in provinces:
+                raise ValueError(f"{f}: province {province_id!r} not found in converted provinces")
+            converted = [_audit_event_to_app_event(e) for e in entry.get("events", [])]
+            provinces[province_id]["events"] = _dedupe_sorted_events(
+                [*provinces[province_id]["events"], *converted]
+            )
+            events_added += len(converted)
+    return events_added
+
+
+def _audit_battle_to_app_battle(battle: dict) -> dict:
+    out = {
+        "date": battle["date"],
+        "name": battle["name"],
+        "locationProvinceId": battle["locationProvinceId"],
+        "attacker": battle["attacker"],
+        "defender": battle["defender"],
+        "attackerWon": battle["attackerWon"],
+    }
+    note = battle.get("note")
+    confidence = battle.get("sourceConfidence")
+    comment_parts = [
+        p for p in (battle.get("comment"), note, f"confidence: {confidence}" if confidence else None) if p
+    ]
+    if comment_parts:
+        out["comment"] = " | ".join(dict.fromkeys(comment_parts))
+    return out
+
+
+def _audit_war_participant_event(event: dict) -> dict:
+    """War participant events (warStart/warEnd) use {date, nationTag, kind,
+    side} -- no `payload` -- unlike every other audit event shape, so this
+    can't reuse _audit_event_to_app_event."""
+    out = {"date": event["date"], "nationTag": event["nationTag"], "kind": event["kind"], "side": event["side"]}
+    note = event.get("note")
+    confidence = event.get("sourceConfidence")
+    comment_parts = [
+        p for p in (event.get("comment"), note, f"confidence: {confidence}" if confidence else None) if p
+    ]
+    if comment_parts:
+        out["comment"] = " | ".join(dict.fromkeys(comment_parts))
+    return out
+
+
+def apply_audit_wars(wars: list, wars_dir: Path = DEFAULT_AUDITS_DIR / "wars") -> tuple[int, int]:
+    """Merges audit war files (each holding a top-level `wars` list, one
+    entry per war using the same warId/events/battles shape convert_wars
+    produces, plus note/sourceConfidence) into the converted wars list *in
+    place*, reusing merge_war_record so a war split across multiple audit
+    batches (or already present from convert_wars) combines correctly."""
+    wars_by_id = {war["warId"]: war for war in wars}
+    files_merged = 0
+    wars_added = 0
+    for f in sorted(wars_dir.glob("*.json")):
+        with f.open(encoding="utf-8") as fh:
+            audit = json.load(fh)
+        files_merged += 1
+        for war in audit.get("wars", []):
+            record = {
+                "warId": war["warId"],
+                "name": war["name"],
+                "casusBelli": war["casusBelli"],
+                "warGoalType": war["warGoalType"],
+                "warGoalTag": war.get("warGoalTag"),
+                "warGoalProvince": war.get("warGoalProvince"),
+                "isRebel": bool(war.get("isRebel", False)),
+                "events": [_audit_war_participant_event(e) for e in war.get("events", [])],
+                "battles": [_audit_battle_to_app_battle(b) for b in war.get("battles", [])],
+            }
+            wars_by_id[record["warId"]] = (
+                merge_war_record(wars_by_id[record["warId"]], record)
+                if record["warId"] in wars_by_id
+                else record
+            )
+            wars_added += 1
+    wars[:] = wars_by_id.values()
+    return files_merged, wars_added
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
@@ -1111,18 +1334,54 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     provinces = convert_provinces(args.source, args.province_names_topojson)
+    (
+        cliopatria_polities,
+        cliopatria_reused,
+        cliopatria_minted,
+        cliopatria_owner_transitions,
+        cliopatria_touched_provinces,
+        cliopatria_merged_provinces,
+    ) = apply_cliopatria_enrichment(provinces)
+    print(f"loaded {cliopatria_polities} Cliopatria polity slices")
+    print(
+        "Cliopatria countries: "
+        f"reused {cliopatria_reused} existing tags by name, "
+        f"minted {cliopatria_minted} new cp_ tags"
+    )
+    print(
+        "Cliopatria provinces: "
+        f"resolved {cliopatria_owner_transitions} owner transitions "
+        f"across {cliopatria_touched_provinces} provinces, "
+        f"merged into {cliopatria_merged_provinces} provinces"
+    )
+    nations = convert_nations(args.source)
+    wars = convert_wars(args.source)
+    diplomacy = convert_diplomacy(args.source)
+
+    audit_files, audit_nation_events, audit_province_events = apply_audit_enrichment(nations, provinces)
+    print(
+        f"audits: merged {audit_files} audit files "
+        f"({audit_nation_events} nation events, {audit_province_events} province events)"
+    )
+
+    audit_revolt_events = apply_audit_province_events(provinces, DEFAULT_AUDITS_DIR / "revolts")
+    print(f"audits: merged revolts/ ({audit_revolt_events} province events)")
+
+    audit_occupation_events = apply_audit_province_events(provinces, DEFAULT_AUDITS_DIR / "occupations")
+    print(f"audits: merged occupations/ ({audit_occupation_events} province events)")
+
+    audit_war_files, audit_wars_merged = apply_audit_wars(wars)
+    print(f"audits: merged {audit_war_files} war files ({audit_wars_merged} wars)")
+
     (args.output_dir / "provinces.json").write_text(json.dumps(provinces), encoding="utf-8")
     print(f"provinces.json: {len(provinces)} provinces")
 
-    nations = convert_nations(args.source)
     (args.output_dir / "nations.json").write_text(json.dumps(nations), encoding="utf-8")
     print(f"nations.json: {len(nations)} nations with events")
 
-    wars = convert_wars(args.source)
     (args.output_dir / "wars.json").write_text(json.dumps(wars), encoding="utf-8")
     print(f"wars.json: {len(wars)} wars")
 
-    diplomacy = convert_diplomacy(args.source)
     (args.output_dir / "diplomacy.json").write_text(json.dumps(diplomacy), encoding="utf-8")
     print(f"diplomacy.json: {len(diplomacy)} relation events")
 

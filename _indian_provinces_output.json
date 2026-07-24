@@ -1,0 +1,3349 @@
+{
+	"cp_kanva_dynasty": [
+		{
+			"provinceId": "511",
+			"provinceName": "Garhwal",
+			"date": -24455
+		},
+		{
+			"provinceId": "522",
+			"provinceName": "Upper Doab",
+			"date": -24455
+		},
+		{
+			"provinceId": "523",
+			"provinceName": "Oudh",
+			"date": -24455
+		},
+		{
+			"provinceId": "550",
+			"provinceName": "Mahakoshal",
+			"date": -24455
+		},
+		{
+			"provinceId": "551",
+			"provinceName": "Mahakoshal",
+			"date": -24455
+		},
+		{
+			"provinceId": "553",
+			"provinceName": "Sambalpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "554",
+			"provinceName": "Baisi Rayja",
+			"date": -24455
+		},
+		{
+			"provinceId": "555",
+			"provinceName": "Jaunpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "556",
+			"provinceName": "Lower Doab",
+			"date": -24455
+		},
+		{
+			"provinceId": "558",
+			"provinceName": "Bihar",
+			"date": -24455
+		},
+		{
+			"provinceId": "559",
+			"provinceName": "Bundelkhand",
+			"date": -24455
+		},
+		{
+			"provinceId": "560",
+			"provinceName": "Jharkand",
+			"date": -24455
+		},
+		{
+			"provinceId": "561",
+			"provinceName": "Bangala",
+			"date": -24455
+		},
+		{
+			"provinceId": "562",
+			"provinceName": "Koch",
+			"date": -24455
+		},
+		{
+			"provinceId": "563",
+			"provinceName": "Gauda",
+			"date": -24455
+		},
+		{
+			"provinceId": "740",
+			"provinceName": "Chanderi",
+			"date": -24455
+		},
+		{
+			"provinceId": "2038",
+			"provinceName": "Midnapore",
+			"date": -24455
+		},
+		{
+			"provinceId": "2039",
+			"provinceName": "Sunderbans",
+			"date": -24455
+		},
+		{
+			"provinceId": "2043",
+			"provinceName": "Balasore",
+			"date": -24455
+		},
+		{
+			"provinceId": "2044",
+			"provinceName": "Bhagalpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "2045",
+			"provinceName": "Barind",
+			"date": -24455
+		},
+		{
+			"provinceId": "2047",
+			"provinceName": "Tirhut",
+			"date": -24455
+		},
+		{
+			"provinceId": "2049",
+			"provinceName": "Khurda",
+			"date": -24455
+		},
+		{
+			"provinceId": "2055",
+			"provinceName": "Gorakhpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "2057",
+			"provinceName": "Bhilsa",
+			"date": -24455
+		},
+		{
+			"provinceId": "2059",
+			"provinceName": "Kalpi",
+			"date": -24455
+		},
+		{
+			"provinceId": "2060",
+			"provinceName": "Upper Doab",
+			"date": -24455
+		},
+		{
+			"provinceId": "2061",
+			"provinceName": "Katehar",
+			"date": -24455
+		},
+		{
+			"provinceId": "2062",
+			"provinceName": "Panipat",
+			"date": -24455
+		},
+		{
+			"provinceId": "2063",
+			"provinceName": "Etawah",
+			"date": -24455
+		},
+		{
+			"provinceId": "2069",
+			"provinceName": "Kumaon",
+			"date": -24455
+		},
+		{
+			"provinceId": "2070",
+			"provinceName": "Chaubusi Rayjas",
+			"date": -24455
+		},
+		{
+			"provinceId": "2081",
+			"provinceName": "Lakhnor",
+			"date": -24455
+		},
+		{
+			"provinceId": "2082",
+			"provinceName": "Raipur",
+			"date": -24455
+		},
+		{
+			"provinceId": "2094",
+			"provinceName": "Bahreich",
+			"date": -24455
+		},
+		{
+			"provinceId": "2095",
+			"provinceName": "Varanasi",
+			"date": -24455
+		},
+		{
+			"provinceId": "2096",
+			"provinceName": "Damin",
+			"date": -24455
+		},
+		{
+			"provinceId": "2097",
+			"provinceName": "Baghelkhand",
+			"date": -24455
+		},
+		{
+			"provinceId": "2098",
+			"provinceName": "Mandla",
+			"date": -24455
+		},
+		{
+			"provinceId": "4446",
+			"provinceName": "Kalahandi",
+			"date": -24455
+		},
+		{
+			"provinceId": "4447",
+			"provinceName": "Patna",
+			"date": -24455
+		},
+		{
+			"provinceId": "4450",
+			"provinceName": "Mayurbhanj",
+			"date": -24455
+		},
+		{
+			"provinceId": "4451",
+			"provinceName": "Sonpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4452",
+			"provinceName": "Ratanpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4458",
+			"provinceName": "Narbada",
+			"date": -24455
+		},
+		{
+			"provinceId": "4459",
+			"provinceName": "Saugor",
+			"date": -24455
+		},
+		{
+			"provinceId": "4460",
+			"provinceName": "Handia",
+			"date": -24455
+		},
+		{
+			"provinceId": "4466",
+			"provinceName": "Mahoba",
+			"date": -24455
+		},
+		{
+			"provinceId": "4467",
+			"provinceName": "Kalinjar",
+			"date": -24455
+		},
+		{
+			"provinceId": "4468",
+			"provinceName": "Bandogarh",
+			"date": -24455
+		},
+		{
+			"provinceId": "4469",
+			"provinceName": "Rohtasgarh",
+			"date": -24455
+		},
+		{
+			"provinceId": "4470",
+			"provinceName": "Soumelpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4471",
+			"provinceName": "Bishnupur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4472",
+			"provinceName": "Monghyr",
+			"date": -24455
+		},
+		{
+			"provinceId": "4476",
+			"provinceName": "Nadia",
+			"date": -24455
+		},
+		{
+			"provinceId": "4477",
+			"provinceName": "Satgaon",
+			"date": -24455
+		},
+		{
+			"provinceId": "4479",
+			"provinceName": "Goraghat",
+			"date": -24455
+		},
+		{
+			"provinceId": "4483",
+			"provinceName": "Morang",
+			"date": -24455
+		},
+		{
+			"provinceId": "4484",
+			"provinceName": "Makwanpur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4485",
+			"provinceName": "Palpa",
+			"date": -24455
+		},
+		{
+			"provinceId": "4486",
+			"provinceName": "Purnia",
+			"date": -24455
+		},
+		{
+			"provinceId": "4487",
+			"provinceName": "Saran",
+			"date": -24455
+		},
+		{
+			"provinceId": "4488",
+			"provinceName": "Champaran",
+			"date": -24455
+		},
+		{
+			"provinceId": "4489",
+			"provinceName": "Hajipur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4490",
+			"provinceName": "Ghazipur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4491",
+			"provinceName": "Dang",
+			"date": -24455
+		},
+		{
+			"provinceId": "4492",
+			"provinceName": "Doti",
+			"date": -24455
+		},
+		{
+			"provinceId": "4493",
+			"provinceName": "Sirmur",
+			"date": -24455
+		},
+		{
+			"provinceId": "4494",
+			"provinceName": "Khairabad",
+			"date": -24455
+		},
+		{
+			"provinceId": "4495",
+			"provinceName": "Feyzabad",
+			"date": -24455
+		},
+		{
+			"provinceId": "4496",
+			"provinceName": "Kora",
+			"date": -24455
+		},
+		{
+			"provinceId": "4497",
+			"provinceName": "Kannauj",
+			"date": -24455
+		},
+		{
+			"provinceId": "4498",
+			"provinceName": "Sambhal",
+			"date": -24455
+		},
+		{
+			"provinceId": "4499",
+			"provinceName": "Bareily",
+			"date": -24455
+		}
+	],
+	"cp_mahameghavahana_dynasty": [
+		{
+			"provinceId": "514",
+			"provinceName": "Marwar",
+			"date": -62415
+		},
+		{
+			"provinceId": "518",
+			"provinceName": "Chittor",
+			"date": -62415
+		},
+		{
+			"provinceId": "519",
+			"provinceName": "Dundhar",
+			"date": -62415
+		},
+		{
+			"provinceId": "520",
+			"provinceName": "Mewat",
+			"date": -62415
+		},
+		{
+			"provinceId": "522",
+			"provinceName": "Upper Doab",
+			"date": -62415
+		},
+		{
+			"provinceId": "524",
+			"provinceName": "Central Doab",
+			"date": -62415
+		},
+		{
+			"provinceId": "525",
+			"provinceName": "Gird",
+			"date": -62415
+		},
+		{
+			"provinceId": "526",
+			"provinceName": "Mandu",
+			"date": -62415
+		},
+		{
+			"provinceId": "527",
+			"provinceName": "Khandesh",
+			"date": -62415
+		},
+		{
+			"provinceId": "528",
+			"provinceName": "Hadoti",
+			"date": -62415
+		},
+		{
+			"provinceId": "529",
+			"provinceName": "North Konkan",
+			"date": -62415
+		},
+		{
+			"provinceId": "532",
+			"provinceName": "Raichur Doab",
+			"date": -62415
+		},
+		{
+			"provinceId": "542",
+			"provinceName": "Colconda",
+			"date": -62415
+		},
+		{
+			"provinceId": "543",
+			"provinceName": "Velanadi",
+			"date": -62415
+		},
+		{
+			"provinceId": "544",
+			"provinceName": "Ahmadnagar",
+			"date": -62415
+		},
+		{
+			"provinceId": "545",
+			"provinceName": "Maharastra",
+			"date": -62415
+		},
+		{
+			"provinceId": "546",
+			"provinceName": "East Berar",
+			"date": -62415
+		},
+		{
+			"provinceId": "547",
+			"provinceName": "Bastar",
+			"date": -62415
+		},
+		{
+			"provinceId": "548",
+			"provinceName": "West Berar",
+			"date": -62415
+		},
+		{
+			"provinceId": "549",
+			"provinceName": "Kalingandhra",
+			"date": -62415
+		},
+		{
+			"provinceId": "550",
+			"provinceName": "Mahakoshal",
+			"date": -62415
+		},
+		{
+			"provinceId": "551",
+			"provinceName": "Mahakoshal",
+			"date": -62415
+		},
+		{
+			"provinceId": "552",
+			"provinceName": "Rajabara",
+			"date": -62415
+		},
+		{
+			"provinceId": "553",
+			"provinceName": "Sambalpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "556",
+			"provinceName": "Lower Doab",
+			"date": -62415
+		},
+		{
+			"provinceId": "558",
+			"provinceName": "Bihar",
+			"date": -62415
+		},
+		{
+			"provinceId": "559",
+			"provinceName": "Bundelkhand",
+			"date": -62415
+		},
+		{
+			"provinceId": "560",
+			"provinceName": "Jharkand",
+			"date": -62415
+		},
+		{
+			"provinceId": "561",
+			"provinceName": "Bangala",
+			"date": -62415
+		},
+		{
+			"provinceId": "564",
+			"provinceName": "Dacca",
+			"date": -62415
+		},
+		{
+			"provinceId": "740",
+			"provinceName": "Chanderi",
+			"date": -62415
+		},
+		{
+			"provinceId": "1948",
+			"provinceName": "Bidar",
+			"date": -62415
+		},
+		{
+			"provinceId": "2028",
+			"provinceName": "Mahur",
+			"date": -62415
+		},
+		{
+			"provinceId": "2034",
+			"provinceName": "Pune",
+			"date": -62415
+		},
+		{
+			"provinceId": "2035",
+			"provinceName": "Gulbarga",
+			"date": -62415
+		},
+		{
+			"provinceId": "2036",
+			"provinceName": "Baglana",
+			"date": -62415
+		},
+		{
+			"provinceId": "2037",
+			"provinceName": "Telingana",
+			"date": -62415
+		},
+		{
+			"provinceId": "2038",
+			"provinceName": "Midnapore",
+			"date": -62415
+		},
+		{
+			"provinceId": "2039",
+			"provinceName": "Sunderbans",
+			"date": -62415
+		},
+		{
+			"provinceId": "2043",
+			"provinceName": "Balasore",
+			"date": -62415
+		},
+		{
+			"provinceId": "2048",
+			"provinceName": "Garjat",
+			"date": -62415
+		},
+		{
+			"provinceId": "2049",
+			"provinceName": "Khurda",
+			"date": -62415
+		},
+		{
+			"provinceId": "2050",
+			"provinceName": "Chanda",
+			"date": -62415
+		},
+		{
+			"provinceId": "2057",
+			"provinceName": "Bhilsa",
+			"date": -62415
+		},
+		{
+			"provinceId": "2058",
+			"provinceName": "Mewar",
+			"date": -62415
+		},
+		{
+			"provinceId": "2059",
+			"provinceName": "Kalpi",
+			"date": -62415
+		},
+		{
+			"provinceId": "2064",
+			"provinceName": "Shekhawati",
+			"date": -62415
+		},
+		{
+			"provinceId": "2066",
+			"provinceName": "Nagaur",
+			"date": -62415
+		},
+		{
+			"provinceId": "2067",
+			"provinceName": "Gorwar",
+			"date": -62415
+		},
+		{
+			"provinceId": "2080",
+			"provinceName": "Srikakulam",
+			"date": -62415
+		},
+		{
+			"provinceId": "2081",
+			"provinceName": "Lakhnor",
+			"date": -62415
+		},
+		{
+			"provinceId": "2082",
+			"provinceName": "Raipur",
+			"date": -62415
+		},
+		{
+			"provinceId": "2083",
+			"provinceName": "Kosta",
+			"date": -62415
+		},
+		{
+			"provinceId": "2084",
+			"provinceName": "Konaseema",
+			"date": -62415
+		},
+		{
+			"provinceId": "2087",
+			"provinceName": "Ajmer",
+			"date": -62415
+		},
+		{
+			"provinceId": "2089",
+			"provinceName": "Chaul",
+			"date": -62415
+		},
+		{
+			"provinceId": "2090",
+			"provinceName": "Kurnool",
+			"date": -62415
+		},
+		{
+			"provinceId": "2092",
+			"provinceName": "Mahadeo",
+			"date": -62415
+		},
+		{
+			"provinceId": "2093",
+			"provinceName": "Malwa",
+			"date": -62415
+		},
+		{
+			"provinceId": "2095",
+			"provinceName": "Varanasi",
+			"date": -62415
+		},
+		{
+			"provinceId": "2096",
+			"provinceName": "Damin",
+			"date": -62415
+		},
+		{
+			"provinceId": "2097",
+			"provinceName": "Baghelkhand",
+			"date": -62415
+		},
+		{
+			"provinceId": "2098",
+			"provinceName": "Mandla",
+			"date": -62415
+		},
+		{
+			"provinceId": "4418",
+			"provinceName": "Nelore",
+			"date": -62415
+		},
+		{
+			"provinceId": "4419",
+			"provinceName": "Adanki",
+			"date": -62415
+		},
+		{
+			"provinceId": "4425",
+			"provinceName": "Kondavidu",
+			"date": -62415
+		},
+		{
+			"provinceId": "4432",
+			"provinceName": "Junir",
+			"date": -62415
+		},
+		{
+			"provinceId": "4433",
+			"provinceName": "Nasik",
+			"date": -62415
+		},
+		{
+			"provinceId": "4434",
+			"provinceName": "Dharangaon",
+			"date": -62415
+		},
+		{
+			"provinceId": "4435",
+			"provinceName": "Sholapur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4436",
+			"provinceName": "Devarakonda",
+			"date": -62415
+		},
+		{
+			"provinceId": "4437",
+			"provinceName": "Paithre",
+			"date": -62415
+		},
+		{
+			"provinceId": "4438",
+			"provinceName": "Nander",
+			"date": -62415
+		},
+		{
+			"provinceId": "4439",
+			"provinceName": "Khamammet",
+			"date": -62415
+		},
+		{
+			"provinceId": "4441",
+			"provinceName": "Ganjam",
+			"date": -62415
+		},
+		{
+			"provinceId": "4442",
+			"provinceName": "Washim",
+			"date": -62415
+		},
+		{
+			"provinceId": "4443",
+			"provinceName": "Karanja",
+			"date": -62415
+		},
+		{
+			"provinceId": "4444",
+			"provinceName": "Manidurg",
+			"date": -62415
+		},
+		{
+			"provinceId": "4445",
+			"provinceName": "Kanker",
+			"date": -62415
+		},
+		{
+			"provinceId": "4446",
+			"provinceName": "Kalahandi",
+			"date": -62415
+		},
+		{
+			"provinceId": "4447",
+			"provinceName": "Patna",
+			"date": -62415
+		},
+		{
+			"provinceId": "4448",
+			"provinceName": "Parlakhimedi",
+			"date": -62415
+		},
+		{
+			"provinceId": "4450",
+			"provinceName": "Mayurbhanj",
+			"date": -62415
+		},
+		{
+			"provinceId": "4451",
+			"provinceName": "Sonpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4452",
+			"provinceName": "Ratanpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4453",
+			"provinceName": "Thalner",
+			"date": -62415
+		},
+		{
+			"provinceId": "4458",
+			"provinceName": "Narbada",
+			"date": -62415
+		},
+		{
+			"provinceId": "4459",
+			"provinceName": "Saugor",
+			"date": -62415
+		},
+		{
+			"provinceId": "4460",
+			"provinceName": "Handia",
+			"date": -62415
+		},
+		{
+			"provinceId": "4461",
+			"provinceName": "Ujjain",
+			"date": -62415
+		},
+		{
+			"provinceId": "4464",
+			"provinceName": "Bundi",
+			"date": -62415
+		},
+		{
+			"provinceId": "4465",
+			"provinceName": "Ranthambore",
+			"date": -62415
+		},
+		{
+			"provinceId": "4466",
+			"provinceName": "Mahoba",
+			"date": -62415
+		},
+		{
+			"provinceId": "4467",
+			"provinceName": "Kalinjar",
+			"date": -62415
+		},
+		{
+			"provinceId": "4468",
+			"provinceName": "Bandogarh",
+			"date": -62415
+		},
+		{
+			"provinceId": "4469",
+			"provinceName": "Rohtasgarh",
+			"date": -62415
+		},
+		{
+			"provinceId": "4470",
+			"provinceName": "Soumelpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4471",
+			"provinceName": "Bishnupur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4472",
+			"provinceName": "Monghyr",
+			"date": -62415
+		},
+		{
+			"provinceId": "4475",
+			"provinceName": "Fathabad",
+			"date": -62415
+		},
+		{
+			"provinceId": "4476",
+			"provinceName": "Nadia",
+			"date": -62415
+		},
+		{
+			"provinceId": "4477",
+			"provinceName": "Satgaon",
+			"date": -62415
+		},
+		{
+			"provinceId": "4479",
+			"provinceName": "Goraghat",
+			"date": -62415
+		},
+		{
+			"provinceId": "4500",
+			"provinceName": "Bharatpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4501",
+			"provinceName": "Bhilwara",
+			"date": -62415
+		},
+		{
+			"provinceId": "4502",
+			"provinceName": "Merta",
+			"date": -62415
+		}
+	],
+	"cp_maurya_empire": [
+		{
+			"provinceId": "448",
+			"provinceName": "Gazni",
+			"date": -110230
+		},
+		{
+			"provinceId": "452",
+			"provinceName": "Dakhshan",
+			"date": -110230
+		},
+		{
+			"provinceId": "503",
+			"provinceName": "Kutch",
+			"date": -106580
+		},
+		{
+			"provinceId": "504",
+			"provinceName": "Lower Sind",
+			"date": -115340
+		},
+		{
+			"provinceId": "505",
+			"provinceName": "Sehwan",
+			"date": -115340
+		},
+		{
+			"provinceId": "506",
+			"provinceName": "Multan",
+			"date": -115340
+		},
+		{
+			"provinceId": "507",
+			"provinceName": "Punjab",
+			"date": -110230
+		},
+		{
+			"provinceId": "508",
+			"provinceName": "Jammu",
+			"date": -110230
+		},
+		{
+			"provinceId": "510",
+			"provinceName": "Sirhind",
+			"date": -116435
+		},
+		{
+			"provinceId": "511",
+			"provinceName": "Garhwal",
+			"date": -116435
+		},
+		{
+			"provinceId": "512",
+			"provinceName": "Jangladesh",
+			"date": -116435
+		},
+		{
+			"provinceId": "513",
+			"provinceName": "Jaisalmer",
+			"date": -116435
+		},
+		{
+			"provinceId": "514",
+			"provinceName": "Marwar",
+			"date": -116435
+		},
+		{
+			"provinceId": "515",
+			"provinceName": "Girnar",
+			"date": -106580
+		},
+		{
+			"provinceId": "516",
+			"provinceName": "Baroda",
+			"date": -106580
+		},
+		{
+			"provinceId": "517",
+			"provinceName": "Surat",
+			"date": -106580
+		},
+		{
+			"provinceId": "518",
+			"provinceName": "Chittor",
+			"date": -116435
+		},
+		{
+			"provinceId": "519",
+			"provinceName": "Dundhar",
+			"date": -116435
+		},
+		{
+			"provinceId": "520",
+			"provinceName": "Mewat",
+			"date": -116435
+		},
+		{
+			"provinceId": "521",
+			"provinceName": "Rajkot",
+			"date": -106580
+		},
+		{
+			"provinceId": "522",
+			"provinceName": "Upper Doab",
+			"date": -116435
+		},
+		{
+			"provinceId": "523",
+			"provinceName": "Oudh",
+			"date": -116435
+		},
+		{
+			"provinceId": "524",
+			"provinceName": "Central Doab",
+			"date": -116435
+		},
+		{
+			"provinceId": "525",
+			"provinceName": "Gird",
+			"date": -116435
+		},
+		{
+			"provinceId": "526",
+			"provinceName": "Mandu",
+			"date": -106580
+		},
+		{
+			"provinceId": "527",
+			"provinceName": "Khandesh",
+			"date": -106580
+		},
+		{
+			"provinceId": "528",
+			"provinceName": "Hadoti",
+			"date": -116435
+		},
+		{
+			"provinceId": "529",
+			"provinceName": "North Konkan",
+			"date": -106580
+		},
+		{
+			"provinceId": "530",
+			"provinceName": "Malvana",
+			"date": -106580
+		},
+		{
+			"provinceId": "531",
+			"provinceName": "North Kanara",
+			"date": -106580
+		},
+		{
+			"provinceId": "532",
+			"provinceName": "Raichur Doab",
+			"date": -106580
+		},
+		{
+			"provinceId": "533",
+			"provinceName": "Mysore",
+			"date": -106580
+		},
+		{
+			"provinceId": "534",
+			"provinceName": "Malabar",
+			"date": -106580
+		},
+		{
+			"provinceId": "539",
+			"provinceName": "Tondainadu",
+			"date": -106580
+		},
+		{
+			"provinceId": "540",
+			"provinceName": "Coromandel",
+			"date": -106580
+		},
+		{
+			"provinceId": "541",
+			"provinceName": "Vijayanagar",
+			"date": -106580
+		},
+		{
+			"provinceId": "542",
+			"provinceName": "Colconda",
+			"date": -106580
+		},
+		{
+			"provinceId": "543",
+			"provinceName": "Velanadi",
+			"date": -106580
+		},
+		{
+			"provinceId": "544",
+			"provinceName": "Ahmadnagar",
+			"date": -106580
+		},
+		{
+			"provinceId": "545",
+			"provinceName": "Maharastra",
+			"date": -106580
+		},
+		{
+			"provinceId": "546",
+			"provinceName": "East Berar",
+			"date": -106580
+		},
+		{
+			"provinceId": "547",
+			"provinceName": "Bastar",
+			"date": -106580
+		},
+		{
+			"provinceId": "548",
+			"provinceName": "West Berar",
+			"date": -106580
+		},
+		{
+			"provinceId": "549",
+			"provinceName": "Kalingandhra",
+			"date": -93805
+		},
+		{
+			"provinceId": "550",
+			"provinceName": "Mahakoshal",
+			"date": -116435
+		},
+		{
+			"provinceId": "551",
+			"provinceName": "Mahakoshal",
+			"date": -116435
+		},
+		{
+			"provinceId": "552",
+			"provinceName": "Rajabara",
+			"date": -93805
+		},
+		{
+			"provinceId": "553",
+			"provinceName": "Sambalpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "554",
+			"provinceName": "Baisi Rayja",
+			"date": -116435
+		},
+		{
+			"provinceId": "555",
+			"provinceName": "Jaunpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "556",
+			"provinceName": "Lower Doab",
+			"date": -116435
+		},
+		{
+			"provinceId": "557",
+			"provinceName": "Katmandu",
+			"date": -116435
+		},
+		{
+			"provinceId": "558",
+			"provinceName": "Bihar",
+			"date": -116435
+		},
+		{
+			"provinceId": "559",
+			"provinceName": "Bundelkhand",
+			"date": -116435
+		},
+		{
+			"provinceId": "560",
+			"provinceName": "Jharkand",
+			"date": -116435
+		},
+		{
+			"provinceId": "561",
+			"provinceName": "Bangala",
+			"date": -116435
+		},
+		{
+			"provinceId": "562",
+			"provinceName": "Koch",
+			"date": -116435
+		},
+		{
+			"provinceId": "563",
+			"provinceName": "Gauda",
+			"date": -116435
+		},
+		{
+			"provinceId": "564",
+			"provinceName": "Dacca",
+			"date": -116435
+		},
+		{
+			"provinceId": "565",
+			"provinceName": "Bhutan",
+			"date": -116435
+		},
+		{
+			"provinceId": "567",
+			"provinceName": "Sylhet",
+			"date": -116435
+		},
+		{
+			"provinceId": "568",
+			"provinceName": "Chittagong",
+			"date": -116435
+		},
+		{
+			"provinceId": "569",
+			"provinceName": "Bijapur",
+			"date": -106580
+		},
+		{
+			"provinceId": "575",
+			"provinceName": "Baluchistan",
+			"date": -115340
+		},
+		{
+			"provinceId": "576",
+			"provinceName": "Indus",
+			"date": -115340
+		},
+		{
+			"provinceId": "577",
+			"provinceName": "Quetta",
+			"date": -110230
+		},
+		{
+			"provinceId": "578",
+			"provinceName": "Khyber",
+			"date": -110230
+		},
+		{
+			"provinceId": "740",
+			"provinceName": "Chanderi",
+			"date": -116435
+		},
+		{
+			"provinceId": "1946",
+			"provinceName": "Desh",
+			"date": -106580
+		},
+		{
+			"provinceId": "1947",
+			"provinceName": "Gingee",
+			"date": -106580
+		},
+		{
+			"provinceId": "1948",
+			"provinceName": "Bidar",
+			"date": -106580
+		},
+		{
+			"provinceId": "1949",
+			"provinceName": "Rayalaseema",
+			"date": -106580
+		},
+		{
+			"provinceId": "1950",
+			"provinceName": "Meghalaya",
+			"date": -116435
+		},
+		{
+			"provinceId": "2027",
+			"provinceName": "Arcot",
+			"date": -106580
+		},
+		{
+			"provinceId": "2028",
+			"provinceName": "Mahur",
+			"date": -106580
+		},
+		{
+			"provinceId": "2029",
+			"provinceName": "South Kanara",
+			"date": -106580
+		},
+		{
+			"provinceId": "2030",
+			"provinceName": "Kanara",
+			"date": -106580
+		},
+		{
+			"provinceId": "2031",
+			"provinceName": "Morasanadu",
+			"date": -106580
+		},
+		{
+			"provinceId": "2032",
+			"provinceName": "Malenadu",
+			"date": -106580
+		},
+		{
+			"provinceId": "2033",
+			"provinceName": "Savanaur",
+			"date": -106580
+		},
+		{
+			"provinceId": "2034",
+			"provinceName": "Pune",
+			"date": -106580
+		},
+		{
+			"provinceId": "2035",
+			"provinceName": "Gulbarga",
+			"date": -106580
+		},
+		{
+			"provinceId": "2036",
+			"provinceName": "Baglana",
+			"date": -106580
+		},
+		{
+			"provinceId": "2037",
+			"provinceName": "Telingana",
+			"date": -106580
+		},
+		{
+			"provinceId": "2038",
+			"provinceName": "Midnapore",
+			"date": -116435
+		},
+		{
+			"provinceId": "2039",
+			"provinceName": "Sunderbans",
+			"date": -116435
+		},
+		{
+			"provinceId": "2042",
+			"provinceName": "Koch Hajo",
+			"date": -116435
+		},
+		{
+			"provinceId": "2043",
+			"provinceName": "Balasore",
+			"date": -116435
+		},
+		{
+			"provinceId": "2044",
+			"provinceName": "Bhagalpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "2045",
+			"provinceName": "Barind",
+			"date": -116435
+		},
+		{
+			"provinceId": "2046",
+			"provinceName": "Nasirabad",
+			"date": -116435
+		},
+		{
+			"provinceId": "2047",
+			"provinceName": "Tirhut",
+			"date": -116435
+		},
+		{
+			"provinceId": "2048",
+			"provinceName": "Garjat",
+			"date": -93805
+		},
+		{
+			"provinceId": "2049",
+			"provinceName": "Khurda",
+			"date": -93805
+		},
+		{
+			"provinceId": "2050",
+			"provinceName": "Chanda",
+			"date": -106580
+		},
+		{
+			"provinceId": "2051",
+			"provinceName": "Bhavnagar",
+			"date": -106580
+		},
+		{
+			"provinceId": "2052",
+			"provinceName": "Kathiawar",
+			"date": -106580
+		},
+		{
+			"provinceId": "2053",
+			"provinceName": "Patan",
+			"date": -116435
+		},
+		{
+			"provinceId": "2054",
+			"provinceName": "Gujarat",
+			"date": -106580
+		},
+		{
+			"provinceId": "2055",
+			"provinceName": "Gorakhpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "2056",
+			"provinceName": "Rewa Kantha",
+			"date": -106580
+		},
+		{
+			"provinceId": "2057",
+			"provinceName": "Bhilsa",
+			"date": -116435
+		},
+		{
+			"provinceId": "2058",
+			"provinceName": "Mewar",
+			"date": -116435
+		},
+		{
+			"provinceId": "2059",
+			"provinceName": "Kalpi",
+			"date": -116435
+		},
+		{
+			"provinceId": "2060",
+			"provinceName": "Upper Doab",
+			"date": -116435
+		},
+		{
+			"provinceId": "2061",
+			"provinceName": "Katehar",
+			"date": -116435
+		},
+		{
+			"provinceId": "2062",
+			"provinceName": "Panipat",
+			"date": -116435
+		},
+		{
+			"provinceId": "2063",
+			"provinceName": "Etawah",
+			"date": -116435
+		},
+		{
+			"provinceId": "2064",
+			"provinceName": "Shekhawati",
+			"date": -116435
+		},
+		{
+			"provinceId": "2065",
+			"provinceName": "Bathlana",
+			"date": -116435
+		},
+		{
+			"provinceId": "2066",
+			"provinceName": "Nagaur",
+			"date": -116435
+		},
+		{
+			"provinceId": "2067",
+			"provinceName": "Gorwar",
+			"date": -116435
+		},
+		{
+			"provinceId": "2068",
+			"provinceName": "Siwi",
+			"date": -115340
+		},
+		{
+			"provinceId": "2069",
+			"provinceName": "Kumaon",
+			"date": -116435
+		},
+		{
+			"provinceId": "2070",
+			"provinceName": "Chaubusi Rayjas",
+			"date": -116435
+		},
+		{
+			"provinceId": "2072",
+			"provinceName": "Upper Sind",
+			"date": -115340
+		},
+		{
+			"provinceId": "2073",
+			"provinceName": "Kashmir",
+			"date": -110230
+		},
+		{
+			"provinceId": "2075",
+			"provinceName": "Doaba",
+			"date": -110230
+		},
+		{
+			"provinceId": "2076",
+			"provinceName": "Sialkot",
+			"date": -110230
+		},
+		{
+			"provinceId": "2077",
+			"provinceName": "Margalla",
+			"date": -110230
+		},
+		{
+			"provinceId": "2078",
+			"provinceName": "Sind Sagar",
+			"date": -110230
+		},
+		{
+			"provinceId": "2079",
+			"provinceName": "Derajat",
+			"date": -115340
+		},
+		{
+			"provinceId": "2080",
+			"provinceName": "Srikakulam",
+			"date": -93805
+		},
+		{
+			"provinceId": "2081",
+			"provinceName": "Lakhnor",
+			"date": -116435
+		},
+		{
+			"provinceId": "2082",
+			"provinceName": "Raipur",
+			"date": -106580
+		},
+		{
+			"provinceId": "2083",
+			"provinceName": "Kosta",
+			"date": -106580
+		},
+		{
+			"provinceId": "2084",
+			"provinceName": "Konaseema",
+			"date": -106580
+		},
+		{
+			"provinceId": "2086",
+			"provinceName": "Cholistan",
+			"date": -115340
+		},
+		{
+			"provinceId": "2087",
+			"provinceName": "Ajmer",
+			"date": -116435
+		},
+		{
+			"provinceId": "2088",
+			"provinceName": "Umarkot",
+			"date": -116435
+		},
+		{
+			"provinceId": "2089",
+			"provinceName": "Chaul",
+			"date": -106580
+		},
+		{
+			"provinceId": "2090",
+			"provinceName": "Kurnool",
+			"date": -106580
+		},
+		{
+			"provinceId": "2091",
+			"provinceName": "Tripura",
+			"date": -116435
+		},
+		{
+			"provinceId": "2092",
+			"provinceName": "Mahadeo",
+			"date": -106580
+		},
+		{
+			"provinceId": "2093",
+			"provinceName": "Malwa",
+			"date": -116435
+		},
+		{
+			"provinceId": "2094",
+			"provinceName": "Bahreich",
+			"date": -116435
+		},
+		{
+			"provinceId": "2095",
+			"provinceName": "Varanasi",
+			"date": -116435
+		},
+		{
+			"provinceId": "2096",
+			"provinceName": "Damin",
+			"date": -116435
+		},
+		{
+			"provinceId": "2097",
+			"provinceName": "Baghelkhand",
+			"date": -116435
+		},
+		{
+			"provinceId": "2098",
+			"provinceName": "Mandla",
+			"date": -116435
+		},
+		{
+			"provinceId": "2226",
+			"provinceName": "Jalalabad",
+			"date": -110230
+		},
+		{
+			"provinceId": "2231",
+			"provinceName": "Bela",
+			"date": -115340
+		},
+		{
+			"provinceId": "2232",
+			"provinceName": "Kharan",
+			"date": -115340
+		},
+		{
+			"provinceId": "4411",
+			"provinceName": "Samana",
+			"date": -116435
+		},
+		{
+			"provinceId": "4413",
+			"provinceName": "Cannanore",
+			"date": -106580
+		},
+		{
+			"provinceId": "4414",
+			"provinceName": "Salem",
+			"date": -106580
+		},
+		{
+			"provinceId": "4416",
+			"provinceName": "Tranqebar",
+			"date": -106580
+		},
+		{
+			"provinceId": "4417",
+			"provinceName": "Kanchipuram",
+			"date": -106580
+		},
+		{
+			"provinceId": "4418",
+			"provinceName": "Nelore",
+			"date": -106580
+		},
+		{
+			"provinceId": "4419",
+			"provinceName": "Adanki",
+			"date": -106580
+		},
+		{
+			"provinceId": "4420",
+			"provinceName": "Chandragiri",
+			"date": -106580
+		},
+		{
+			"provinceId": "4421",
+			"provinceName": "Seringapatam",
+			"date": -106580
+		},
+		{
+			"provinceId": "4422",
+			"provinceName": "Sira",
+			"date": -106580
+		},
+		{
+			"provinceId": "4423",
+			"provinceName": "Gutti",
+			"date": -106580
+		},
+		{
+			"provinceId": "4424",
+			"provinceName": "Adavani",
+			"date": -106580
+		},
+		{
+			"provinceId": "4425",
+			"provinceName": "Kondavidu",
+			"date": -106580
+		},
+		{
+			"provinceId": "4426",
+			"provinceName": "Chitaldurg",
+			"date": -106580
+		},
+		{
+			"provinceId": "4427",
+			"provinceName": "Honnavara",
+			"date": -106580
+		},
+		{
+			"provinceId": "4428",
+			"provinceName": "Mudgal",
+			"date": -106580
+		},
+		{
+			"provinceId": "4429",
+			"provinceName": "Rajapur",
+			"date": -106580
+		},
+		{
+			"provinceId": "4430",
+			"provinceName": "Daman",
+			"date": -106580
+		},
+		{
+			"provinceId": "4431",
+			"provinceName": "Kolhapur",
+			"date": -106580
+		},
+		{
+			"provinceId": "4432",
+			"provinceName": "Junir",
+			"date": -106580
+		},
+		{
+			"provinceId": "4433",
+			"provinceName": "Nasik",
+			"date": -106580
+		},
+		{
+			"provinceId": "4434",
+			"provinceName": "Dharangaon",
+			"date": -106580
+		},
+		{
+			"provinceId": "4435",
+			"provinceName": "Sholapur",
+			"date": -106580
+		},
+		{
+			"provinceId": "4436",
+			"provinceName": "Devarakonda",
+			"date": -106580
+		},
+		{
+			"provinceId": "4437",
+			"provinceName": "Paithre",
+			"date": -106580
+		},
+		{
+			"provinceId": "4438",
+			"provinceName": "Nander",
+			"date": -106580
+		},
+		{
+			"provinceId": "4439",
+			"provinceName": "Khamammet",
+			"date": -106580
+		},
+		{
+			"provinceId": "4441",
+			"provinceName": "Ganjam",
+			"date": -93805
+		},
+		{
+			"provinceId": "4442",
+			"provinceName": "Washim",
+			"date": -106580
+		},
+		{
+			"provinceId": "4443",
+			"provinceName": "Karanja",
+			"date": -106580
+		},
+		{
+			"provinceId": "4444",
+			"provinceName": "Manidurg",
+			"date": -106580
+		},
+		{
+			"provinceId": "4445",
+			"provinceName": "Kanker",
+			"date": -106580
+		},
+		{
+			"provinceId": "4446",
+			"provinceName": "Kalahandi",
+			"date": -93805
+		},
+		{
+			"provinceId": "4447",
+			"provinceName": "Patna",
+			"date": -106580
+		},
+		{
+			"provinceId": "4448",
+			"provinceName": "Parlakhimedi",
+			"date": -93805
+		},
+		{
+			"provinceId": "4449",
+			"provinceName": "Jammu",
+			"date": -110230
+		},
+		{
+			"provinceId": "4450",
+			"provinceName": "Mayurbhanj",
+			"date": -116435
+		},
+		{
+			"provinceId": "4451",
+			"provinceName": "Sonpur",
+			"date": -106580
+		},
+		{
+			"provinceId": "4452",
+			"provinceName": "Ratanpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4453",
+			"provinceName": "Thalner",
+			"date": -106580
+		},
+		{
+			"provinceId": "4454",
+			"provinceName": "Porbandar",
+			"date": -106580
+		},
+		{
+			"provinceId": "4455",
+			"provinceName": "Diu",
+			"date": -106580
+		},
+		{
+			"provinceId": "4456",
+			"provinceName": "Jhalavad",
+			"date": -106580
+		},
+		{
+			"provinceId": "4457",
+			"provinceName": "Cambay",
+			"date": -106580
+		},
+		{
+			"provinceId": "4458",
+			"provinceName": "Narbada",
+			"date": -116435
+		},
+		{
+			"provinceId": "4459",
+			"provinceName": "Saugor",
+			"date": -116435
+		},
+		{
+			"provinceId": "4460",
+			"provinceName": "Handia",
+			"date": -106580
+		},
+		{
+			"provinceId": "4461",
+			"provinceName": "Ujjain",
+			"date": -116435
+		},
+		{
+			"provinceId": "4462",
+			"provinceName": "Vagad",
+			"date": -116435
+		},
+		{
+			"provinceId": "4463",
+			"provinceName": "Bhatnair",
+			"date": -116435
+		},
+		{
+			"provinceId": "4464",
+			"provinceName": "Bundi",
+			"date": -116435
+		},
+		{
+			"provinceId": "4465",
+			"provinceName": "Ranthambore",
+			"date": -116435
+		},
+		{
+			"provinceId": "4466",
+			"provinceName": "Mahoba",
+			"date": -116435
+		},
+		{
+			"provinceId": "4467",
+			"provinceName": "Kalinjar",
+			"date": -116435
+		},
+		{
+			"provinceId": "4468",
+			"provinceName": "Bandogarh",
+			"date": -116435
+		},
+		{
+			"provinceId": "4469",
+			"provinceName": "Rohtasgarh",
+			"date": -116435
+		},
+		{
+			"provinceId": "4470",
+			"provinceName": "Soumelpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4471",
+			"provinceName": "Bishnupur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4472",
+			"provinceName": "Monghyr",
+			"date": -116435
+		},
+		{
+			"provinceId": "4474",
+			"provinceName": "Sonargaon",
+			"date": -116435
+		},
+		{
+			"provinceId": "4475",
+			"provinceName": "Fathabad",
+			"date": -116435
+		},
+		{
+			"provinceId": "4476",
+			"provinceName": "Nadia",
+			"date": -116435
+		},
+		{
+			"provinceId": "4477",
+			"provinceName": "Satgaon",
+			"date": -116435
+		},
+		{
+			"provinceId": "4478",
+			"provinceName": "Haibitnagar",
+			"date": -116435
+		},
+		{
+			"provinceId": "4479",
+			"provinceName": "Goraghat",
+			"date": -116435
+		},
+		{
+			"provinceId": "4480",
+			"provinceName": "Mahikantha",
+			"date": -116435
+		},
+		{
+			"provinceId": "4482",
+			"provinceName": "Sikkim",
+			"date": -116435
+		},
+		{
+			"provinceId": "4483",
+			"provinceName": "Morang",
+			"date": -116435
+		},
+		{
+			"provinceId": "4484",
+			"provinceName": "Makwanpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4485",
+			"provinceName": "Palpa",
+			"date": -116435
+		},
+		{
+			"provinceId": "4486",
+			"provinceName": "Purnia",
+			"date": -116435
+		},
+		{
+			"provinceId": "4487",
+			"provinceName": "Saran",
+			"date": -116435
+		},
+		{
+			"provinceId": "4488",
+			"provinceName": "Champaran",
+			"date": -116435
+		},
+		{
+			"provinceId": "4489",
+			"provinceName": "Hajipur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4490",
+			"provinceName": "Ghazipur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4491",
+			"provinceName": "Dang",
+			"date": -116435
+		},
+		{
+			"provinceId": "4492",
+			"provinceName": "Doti",
+			"date": -116435
+		},
+		{
+			"provinceId": "4493",
+			"provinceName": "Sirmur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4494",
+			"provinceName": "Khairabad",
+			"date": -116435
+		},
+		{
+			"provinceId": "4495",
+			"provinceName": "Feyzabad",
+			"date": -116435
+		},
+		{
+			"provinceId": "4496",
+			"provinceName": "Kora",
+			"date": -116435
+		},
+		{
+			"provinceId": "4497",
+			"provinceName": "Kannauj",
+			"date": -116435
+		},
+		{
+			"provinceId": "4498",
+			"provinceName": "Sambhal",
+			"date": -116435
+		},
+		{
+			"provinceId": "4499",
+			"provinceName": "Bareily",
+			"date": -116435
+		},
+		{
+			"provinceId": "4500",
+			"provinceName": "Bharatpur",
+			"date": -116435
+		},
+		{
+			"provinceId": "4501",
+			"provinceName": "Bhilwara",
+			"date": -116435
+		},
+		{
+			"provinceId": "4502",
+			"provinceName": "Merta",
+			"date": -116435
+		},
+		{
+			"provinceId": "4503",
+			"provinceName": "Mansura",
+			"date": -115340
+		},
+		{
+			"provinceId": "4504",
+			"provinceName": "Nasirpur",
+			"date": -115340
+		},
+		{
+			"provinceId": "4505",
+			"provinceName": "Khairpur",
+			"date": -115340
+		},
+		{
+			"provinceId": "4506",
+			"provinceName": "Barmer",
+			"date": -116435
+		},
+		{
+			"provinceId": "4507",
+			"provinceName": "Churu",
+			"date": -116435
+		},
+		{
+			"provinceId": "4508",
+			"provinceName": "Bahawalpur",
+			"date": -115340
+		},
+		{
+			"provinceId": "4509",
+			"provinceName": "Karor",
+			"date": -110230
+		},
+		{
+			"provinceId": "4510",
+			"provinceName": "Shorkot",
+			"date": -110230
+		},
+		{
+			"provinceId": "4511",
+			"provinceName": "Bhera",
+			"date": -110230
+		},
+		{
+			"provinceId": "4512",
+			"provinceName": "Bharuch",
+			"date": -106580
+		},
+		{
+			"provinceId": "4513",
+			"provinceName": "Dipalpur",
+			"date": -110230
+		}
+	],
+	"cp_nanda_empire": [
+		{
+			"provinceId": "504",
+			"provinceName": "Lower Sind",
+			"date": -121910
+		},
+		{
+			"provinceId": "505",
+			"provinceName": "Sehwan",
+			"date": -121910
+		},
+		{
+			"provinceId": "510",
+			"provinceName": "Sirhind",
+			"date": -121910
+		},
+		{
+			"provinceId": "512",
+			"provinceName": "Jangladesh",
+			"date": -121910
+		},
+		{
+			"provinceId": "513",
+			"provinceName": "Jaisalmer",
+			"date": -121910
+		},
+		{
+			"provinceId": "514",
+			"provinceName": "Marwar",
+			"date": -121910
+		},
+		{
+			"provinceId": "518",
+			"provinceName": "Chittor",
+			"date": -121910
+		},
+		{
+			"provinceId": "519",
+			"provinceName": "Dundhar",
+			"date": -121910
+		},
+		{
+			"provinceId": "520",
+			"provinceName": "Mewat",
+			"date": -121910
+		},
+		{
+			"provinceId": "522",
+			"provinceName": "Upper Doab",
+			"date": -121910
+		},
+		{
+			"provinceId": "523",
+			"provinceName": "Oudh",
+			"date": -121910
+		},
+		{
+			"provinceId": "524",
+			"provinceName": "Central Doab",
+			"date": -121910
+		},
+		{
+			"provinceId": "525",
+			"provinceName": "Gird",
+			"date": -121910
+		},
+		{
+			"provinceId": "528",
+			"provinceName": "Hadoti",
+			"date": -121910
+		},
+		{
+			"provinceId": "550",
+			"provinceName": "Mahakoshal",
+			"date": -121910
+		},
+		{
+			"provinceId": "551",
+			"provinceName": "Mahakoshal",
+			"date": -121910
+		},
+		{
+			"provinceId": "553",
+			"provinceName": "Sambalpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "555",
+			"provinceName": "Jaunpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "556",
+			"provinceName": "Lower Doab",
+			"date": -121910
+		},
+		{
+			"provinceId": "558",
+			"provinceName": "Bihar",
+			"date": -121910
+		},
+		{
+			"provinceId": "559",
+			"provinceName": "Bundelkhand",
+			"date": -121910
+		},
+		{
+			"provinceId": "560",
+			"provinceName": "Jharkand",
+			"date": -121910
+		},
+		{
+			"provinceId": "561",
+			"provinceName": "Bangala",
+			"date": -121910
+		},
+		{
+			"provinceId": "563",
+			"provinceName": "Gauda",
+			"date": -121910
+		},
+		{
+			"provinceId": "564",
+			"provinceName": "Dacca",
+			"date": -121910
+		},
+		{
+			"provinceId": "740",
+			"provinceName": "Chanderi",
+			"date": -121910
+		},
+		{
+			"provinceId": "2038",
+			"provinceName": "Midnapore",
+			"date": -121910
+		},
+		{
+			"provinceId": "2039",
+			"provinceName": "Sunderbans",
+			"date": -121910
+		},
+		{
+			"provinceId": "2043",
+			"provinceName": "Balasore",
+			"date": -121910
+		},
+		{
+			"provinceId": "2044",
+			"provinceName": "Bhagalpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "2045",
+			"provinceName": "Barind",
+			"date": -121910
+		},
+		{
+			"provinceId": "2046",
+			"provinceName": "Nasirabad",
+			"date": -121910
+		},
+		{
+			"provinceId": "2047",
+			"provinceName": "Tirhut",
+			"date": -121910
+		},
+		{
+			"provinceId": "2053",
+			"provinceName": "Patan",
+			"date": -121910
+		},
+		{
+			"provinceId": "2055",
+			"provinceName": "Gorakhpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "2057",
+			"provinceName": "Bhilsa",
+			"date": -121910
+		},
+		{
+			"provinceId": "2058",
+			"provinceName": "Mewar",
+			"date": -121910
+		},
+		{
+			"provinceId": "2059",
+			"provinceName": "Kalpi",
+			"date": -121910
+		},
+		{
+			"provinceId": "2060",
+			"provinceName": "Upper Doab",
+			"date": -121910
+		},
+		{
+			"provinceId": "2061",
+			"provinceName": "Katehar",
+			"date": -121910
+		},
+		{
+			"provinceId": "2062",
+			"provinceName": "Panipat",
+			"date": -121910
+		},
+		{
+			"provinceId": "2063",
+			"provinceName": "Etawah",
+			"date": -121910
+		},
+		{
+			"provinceId": "2064",
+			"provinceName": "Shekhawati",
+			"date": -121910
+		},
+		{
+			"provinceId": "2065",
+			"provinceName": "Bathlana",
+			"date": -121910
+		},
+		{
+			"provinceId": "2066",
+			"provinceName": "Nagaur",
+			"date": -121910
+		},
+		{
+			"provinceId": "2067",
+			"provinceName": "Gorwar",
+			"date": -121910
+		},
+		{
+			"provinceId": "2072",
+			"provinceName": "Upper Sind",
+			"date": -121910
+		},
+		{
+			"provinceId": "2081",
+			"provinceName": "Lakhnor",
+			"date": -121910
+		},
+		{
+			"provinceId": "2086",
+			"provinceName": "Cholistan",
+			"date": -121910
+		},
+		{
+			"provinceId": "2087",
+			"provinceName": "Ajmer",
+			"date": -121910
+		},
+		{
+			"provinceId": "2088",
+			"provinceName": "Umarkot",
+			"date": -121910
+		},
+		{
+			"provinceId": "2093",
+			"provinceName": "Malwa",
+			"date": -121910
+		},
+		{
+			"provinceId": "2095",
+			"provinceName": "Varanasi",
+			"date": -121910
+		},
+		{
+			"provinceId": "2096",
+			"provinceName": "Damin",
+			"date": -121910
+		},
+		{
+			"provinceId": "2097",
+			"provinceName": "Baghelkhand",
+			"date": -121910
+		},
+		{
+			"provinceId": "2098",
+			"provinceName": "Mandla",
+			"date": -121910
+		},
+		{
+			"provinceId": "2231",
+			"provinceName": "Bela",
+			"date": -121910
+		},
+		{
+			"provinceId": "4411",
+			"provinceName": "Samana",
+			"date": -121910
+		},
+		{
+			"provinceId": "4450",
+			"provinceName": "Mayurbhanj",
+			"date": -121910
+		},
+		{
+			"provinceId": "4452",
+			"provinceName": "Ratanpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4458",
+			"provinceName": "Narbada",
+			"date": -121910
+		},
+		{
+			"provinceId": "4459",
+			"provinceName": "Saugor",
+			"date": -121910
+		},
+		{
+			"provinceId": "4461",
+			"provinceName": "Ujjain",
+			"date": -121910
+		},
+		{
+			"provinceId": "4462",
+			"provinceName": "Vagad",
+			"date": -121910
+		},
+		{
+			"provinceId": "4463",
+			"provinceName": "Bhatnair",
+			"date": -121910
+		},
+		{
+			"provinceId": "4464",
+			"provinceName": "Bundi",
+			"date": -121910
+		},
+		{
+			"provinceId": "4465",
+			"provinceName": "Ranthambore",
+			"date": -121910
+		},
+		{
+			"provinceId": "4466",
+			"provinceName": "Mahoba",
+			"date": -121910
+		},
+		{
+			"provinceId": "4467",
+			"provinceName": "Kalinjar",
+			"date": -121910
+		},
+		{
+			"provinceId": "4468",
+			"provinceName": "Bandogarh",
+			"date": -121910
+		},
+		{
+			"provinceId": "4469",
+			"provinceName": "Rohtasgarh",
+			"date": -121910
+		},
+		{
+			"provinceId": "4470",
+			"provinceName": "Soumelpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4471",
+			"provinceName": "Bishnupur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4472",
+			"provinceName": "Monghyr",
+			"date": -121910
+		},
+		{
+			"provinceId": "4474",
+			"provinceName": "Sonargaon",
+			"date": -121910
+		},
+		{
+			"provinceId": "4475",
+			"provinceName": "Fathabad",
+			"date": -121910
+		},
+		{
+			"provinceId": "4476",
+			"provinceName": "Nadia",
+			"date": -121910
+		},
+		{
+			"provinceId": "4477",
+			"provinceName": "Satgaon",
+			"date": -121910
+		},
+		{
+			"provinceId": "4478",
+			"provinceName": "Haibitnagar",
+			"date": -121910
+		},
+		{
+			"provinceId": "4479",
+			"provinceName": "Goraghat",
+			"date": -121910
+		},
+		{
+			"provinceId": "4480",
+			"provinceName": "Mahikantha",
+			"date": -118260
+		},
+		{
+			"provinceId": "4487",
+			"provinceName": "Saran",
+			"date": -121910
+		},
+		{
+			"provinceId": "4488",
+			"provinceName": "Champaran",
+			"date": -121910
+		},
+		{
+			"provinceId": "4489",
+			"provinceName": "Hajipur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4490",
+			"provinceName": "Ghazipur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4494",
+			"provinceName": "Khairabad",
+			"date": -121910
+		},
+		{
+			"provinceId": "4495",
+			"provinceName": "Feyzabad",
+			"date": -121910
+		},
+		{
+			"provinceId": "4496",
+			"provinceName": "Kora",
+			"date": -121910
+		},
+		{
+			"provinceId": "4497",
+			"provinceName": "Kannauj",
+			"date": -121910
+		},
+		{
+			"provinceId": "4498",
+			"provinceName": "Sambhal",
+			"date": -121910
+		},
+		{
+			"provinceId": "4499",
+			"provinceName": "Bareily",
+			"date": -121910
+		},
+		{
+			"provinceId": "4500",
+			"provinceName": "Bharatpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4501",
+			"provinceName": "Bhilwara",
+			"date": -121910
+		},
+		{
+			"provinceId": "4502",
+			"provinceName": "Merta",
+			"date": -121910
+		},
+		{
+			"provinceId": "4503",
+			"provinceName": "Mansura",
+			"date": -121910
+		},
+		{
+			"provinceId": "4504",
+			"provinceName": "Nasirpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4505",
+			"provinceName": "Khairpur",
+			"date": -121910
+		},
+		{
+			"provinceId": "4506",
+			"provinceName": "Barmer",
+			"date": -121910
+		},
+		{
+			"provinceId": "4507",
+			"provinceName": "Churu",
+			"date": -121910
+		}
+	],
+	"cp_satavahana_dynasty": [
+		{
+			"provinceId": "517",
+			"provinceName": "Surat",
+			"date": -11680
+		},
+		{
+			"provinceId": "526",
+			"provinceName": "Mandu",
+			"date": -11680
+		},
+		{
+			"provinceId": "527",
+			"provinceName": "Khandesh",
+			"date": -82490
+		},
+		{
+			"provinceId": "529",
+			"provinceName": "North Konkan",
+			"date": -82490
+		},
+		{
+			"provinceId": "530",
+			"provinceName": "Malvana",
+			"date": -11680
+		},
+		{
+			"provinceId": "532",
+			"provinceName": "Raichur Doab",
+			"date": -82490
+		},
+		{
+			"provinceId": "541",
+			"provinceName": "Vijayanagar",
+			"date": -11680
+		},
+		{
+			"provinceId": "542",
+			"provinceName": "Colconda",
+			"date": -82490
+		},
+		{
+			"provinceId": "543",
+			"provinceName": "Velanadi",
+			"date": -82490
+		},
+		{
+			"provinceId": "544",
+			"provinceName": "Ahmadnagar",
+			"date": -82490
+		},
+		{
+			"provinceId": "545",
+			"provinceName": "Maharastra",
+			"date": -82490
+		},
+		{
+			"provinceId": "546",
+			"provinceName": "East Berar",
+			"date": -52925
+		},
+		{
+			"provinceId": "547",
+			"provinceName": "Bastar",
+			"date": -82490
+		},
+		{
+			"provinceId": "548",
+			"provinceName": "West Berar",
+			"date": -82490
+		},
+		{
+			"provinceId": "549",
+			"provinceName": "Kalingandhra",
+			"date": -60225
+		},
+		{
+			"provinceId": "550",
+			"provinceName": "Mahakoshal",
+			"date": -10220
+		},
+		{
+			"provinceId": "551",
+			"provinceName": "Mahakoshal",
+			"date": -10220
+		},
+		{
+			"provinceId": "552",
+			"provinceName": "Rajabara",
+			"date": -60225
+		},
+		{
+			"provinceId": "569",
+			"provinceName": "Bijapur",
+			"date": -11680
+		},
+		{
+			"provinceId": "740",
+			"provinceName": "Chanderi",
+			"date": -10220
+		},
+		{
+			"provinceId": "1946",
+			"provinceName": "Desh",
+			"date": -11680
+		},
+		{
+			"provinceId": "1948",
+			"provinceName": "Bidar",
+			"date": -82490
+		},
+		{
+			"provinceId": "2028",
+			"provinceName": "Mahur",
+			"date": -82490
+		},
+		{
+			"provinceId": "2033",
+			"provinceName": "Savanaur",
+			"date": -11680
+		},
+		{
+			"provinceId": "2034",
+			"provinceName": "Pune",
+			"date": -82490
+		},
+		{
+			"provinceId": "2035",
+			"provinceName": "Gulbarga",
+			"date": -82490
+		},
+		{
+			"provinceId": "2036",
+			"provinceName": "Baglana",
+			"date": -82490
+		},
+		{
+			"provinceId": "2037",
+			"provinceName": "Telingana",
+			"date": -82490
+		},
+		{
+			"provinceId": "2048",
+			"provinceName": "Garjat",
+			"date": -60225
+		},
+		{
+			"provinceId": "2050",
+			"provinceName": "Chanda",
+			"date": -82490
+		},
+		{
+			"provinceId": "2056",
+			"provinceName": "Rewa Kantha",
+			"date": -11680
+		},
+		{
+			"provinceId": "2057",
+			"provinceName": "Bhilsa",
+			"date": -10220
+		},
+		{
+			"provinceId": "2080",
+			"provinceName": "Srikakulam",
+			"date": -60225
+		},
+		{
+			"provinceId": "2082",
+			"provinceName": "Raipur",
+			"date": -10220
+		},
+		{
+			"provinceId": "2083",
+			"provinceName": "Kosta",
+			"date": -82490
+		},
+		{
+			"provinceId": "2084",
+			"provinceName": "Konaseema",
+			"date": -82490
+		},
+		{
+			"provinceId": "2089",
+			"provinceName": "Chaul",
+			"date": -82490
+		},
+		{
+			"provinceId": "2090",
+			"provinceName": "Kurnool",
+			"date": -82490
+		},
+		{
+			"provinceId": "2092",
+			"provinceName": "Mahadeo",
+			"date": -52925
+		},
+		{
+			"provinceId": "2093",
+			"provinceName": "Malwa",
+			"date": -11680
+		},
+		{
+			"provinceId": "4418",
+			"provinceName": "Nelore",
+			"date": -82490
+		},
+		{
+			"provinceId": "4419",
+			"provinceName": "Adanki",
+			"date": -82490
+		},
+		{
+			"provinceId": "4423",
+			"provinceName": "Gutti",
+			"date": -11680
+		},
+		{
+			"provinceId": "4424",
+			"provinceName": "Adavani",
+			"date": -11680
+		},
+		{
+			"provinceId": "4425",
+			"provinceName": "Kondavidu",
+			"date": -82490
+		},
+		{
+			"provinceId": "4426",
+			"provinceName": "Chitaldurg",
+			"date": -11680
+		},
+		{
+			"provinceId": "4428",
+			"provinceName": "Mudgal",
+			"date": -11680
+		},
+		{
+			"provinceId": "4429",
+			"provinceName": "Rajapur",
+			"date": -11680
+		},
+		{
+			"provinceId": "4430",
+			"provinceName": "Daman",
+			"date": -11680
+		},
+		{
+			"provinceId": "4431",
+			"provinceName": "Kolhapur",
+			"date": -11680
+		},
+		{
+			"provinceId": "4432",
+			"provinceName": "Junir",
+			"date": -82490
+		},
+		{
+			"provinceId": "4433",
+			"provinceName": "Nasik",
+			"date": -82490
+		},
+		{
+			"provinceId": "4434",
+			"provinceName": "Dharangaon",
+			"date": -82490
+		},
+		{
+			"provinceId": "4435",
+			"provinceName": "Sholapur",
+			"date": -82490
+		},
+		{
+			"provinceId": "4436",
+			"provinceName": "Devarakonda",
+			"date": -82490
+		},
+		{
+			"provinceId": "4437",
+			"provinceName": "Paithre",
+			"date": -82490
+		},
+		{
+			"provinceId": "4438",
+			"provinceName": "Nander",
+			"date": -82490
+		},
+		{
+			"provinceId": "4439",
+			"provinceName": "Khamammet",
+			"date": -82490
+		},
+		{
+			"provinceId": "4441",
+			"provinceName": "Ganjam",
+			"date": -60225
+		},
+		{
+			"provinceId": "4442",
+			"provinceName": "Washim",
+			"date": -82490
+		},
+		{
+			"provinceId": "4443",
+			"provinceName": "Karanja",
+			"date": -82490
+		},
+		{
+			"provinceId": "4444",
+			"provinceName": "Manidurg",
+			"date": -82490
+		},
+		{
+			"provinceId": "4445",
+			"provinceName": "Kanker",
+			"date": -82490
+		},
+		{
+			"provinceId": "4447",
+			"provinceName": "Patna",
+			"date": -10220
+		},
+		{
+			"provinceId": "4448",
+			"provinceName": "Parlakhimedi",
+			"date": -60225
+		},
+		{
+			"provinceId": "4452",
+			"provinceName": "Ratanpur",
+			"date": -10220
+		},
+		{
+			"provinceId": "4453",
+			"provinceName": "Thalner",
+			"date": -82490
+		},
+		{
+			"provinceId": "4458",
+			"provinceName": "Narbada",
+			"date": -10220
+		},
+		{
+			"provinceId": "4459",
+			"provinceName": "Saugor",
+			"date": -10220
+		},
+		{
+			"provinceId": "4460",
+			"provinceName": "Handia",
+			"date": -10220
+		},
+		{
+			"provinceId": "4461",
+			"provinceName": "Ujjain",
+			"date": -11680
+		}
+	],
+	"cp_shunga_empire": [
+		{
+			"provinceId": "511",
+			"provinceName": "Garhwal",
+			"date": -33580
+		},
+		{
+			"provinceId": "522",
+			"provinceName": "Upper Doab",
+			"date": -33580
+		},
+		{
+			"provinceId": "523",
+			"provinceName": "Oudh",
+			"date": -62415
+		},
+		{
+			"provinceId": "546",
+			"provinceName": "East Berar",
+			"date": -60225
+		},
+		{
+			"provinceId": "550",
+			"provinceName": "Mahakoshal",
+			"date": -60225
+		},
+		{
+			"provinceId": "551",
+			"provinceName": "Mahakoshal",
+			"date": -60225
+		},
+		{
+			"provinceId": "553",
+			"provinceName": "Sambalpur",
+			"date": -60225
+		},
+		{
+			"provinceId": "554",
+			"provinceName": "Baisi Rayja",
+			"date": -62415
+		},
+		{
+			"provinceId": "555",
+			"provinceName": "Jaunpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "556",
+			"provinceName": "Lower Doab",
+			"date": -60225
+		},
+		{
+			"provinceId": "558",
+			"provinceName": "Bihar",
+			"date": -60225
+		},
+		{
+			"provinceId": "559",
+			"provinceName": "Bundelkhand",
+			"date": -60225
+		},
+		{
+			"provinceId": "560",
+			"provinceName": "Jharkand",
+			"date": -60225
+		},
+		{
+			"provinceId": "561",
+			"provinceName": "Bangala",
+			"date": -60225
+		},
+		{
+			"provinceId": "562",
+			"provinceName": "Koch",
+			"date": -62415
+		},
+		{
+			"provinceId": "563",
+			"provinceName": "Gauda",
+			"date": -62415
+		},
+		{
+			"provinceId": "740",
+			"provinceName": "Chanderi",
+			"date": -60225
+		},
+		{
+			"provinceId": "2038",
+			"provinceName": "Midnapore",
+			"date": -60225
+		},
+		{
+			"provinceId": "2039",
+			"provinceName": "Sunderbans",
+			"date": -60225
+		},
+		{
+			"provinceId": "2043",
+			"provinceName": "Balasore",
+			"date": -60225
+		},
+		{
+			"provinceId": "2044",
+			"provinceName": "Bhagalpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "2045",
+			"provinceName": "Barind",
+			"date": -62415
+		},
+		{
+			"provinceId": "2047",
+			"provinceName": "Tirhut",
+			"date": -62415
+		},
+		{
+			"provinceId": "2049",
+			"provinceName": "Khurda",
+			"date": -60225
+		},
+		{
+			"provinceId": "2055",
+			"provinceName": "Gorakhpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "2057",
+			"provinceName": "Bhilsa",
+			"date": -60225
+		},
+		{
+			"provinceId": "2059",
+			"provinceName": "Kalpi",
+			"date": -60225
+		},
+		{
+			"provinceId": "2060",
+			"provinceName": "Upper Doab",
+			"date": -33580
+		},
+		{
+			"provinceId": "2061",
+			"provinceName": "Katehar",
+			"date": -62415
+		},
+		{
+			"provinceId": "2062",
+			"provinceName": "Panipat",
+			"date": -33580
+		},
+		{
+			"provinceId": "2063",
+			"provinceName": "Etawah",
+			"date": -62415
+		},
+		{
+			"provinceId": "2069",
+			"provinceName": "Kumaon",
+			"date": -62415
+		},
+		{
+			"provinceId": "2070",
+			"provinceName": "Chaubusi Rayjas",
+			"date": -62415
+		},
+		{
+			"provinceId": "2081",
+			"provinceName": "Lakhnor",
+			"date": -60225
+		},
+		{
+			"provinceId": "2082",
+			"provinceName": "Raipur",
+			"date": -60225
+		},
+		{
+			"provinceId": "2092",
+			"provinceName": "Mahadeo",
+			"date": -60225
+		},
+		{
+			"provinceId": "2094",
+			"provinceName": "Bahreich",
+			"date": -62415
+		},
+		{
+			"provinceId": "2095",
+			"provinceName": "Varanasi",
+			"date": -60225
+		},
+		{
+			"provinceId": "2096",
+			"provinceName": "Damin",
+			"date": -60225
+		},
+		{
+			"provinceId": "2097",
+			"provinceName": "Baghelkhand",
+			"date": -60225
+		},
+		{
+			"provinceId": "2098",
+			"provinceName": "Mandla",
+			"date": -60225
+		},
+		{
+			"provinceId": "4446",
+			"provinceName": "Kalahandi",
+			"date": -60225
+		},
+		{
+			"provinceId": "4447",
+			"provinceName": "Patna",
+			"date": -60225
+		},
+		{
+			"provinceId": "4450",
+			"provinceName": "Mayurbhanj",
+			"date": -60225
+		},
+		{
+			"provinceId": "4451",
+			"provinceName": "Sonpur",
+			"date": -60225
+		},
+		{
+			"provinceId": "4452",
+			"provinceName": "Ratanpur",
+			"date": -60225
+		},
+		{
+			"provinceId": "4458",
+			"provinceName": "Narbada",
+			"date": -60225
+		},
+		{
+			"provinceId": "4459",
+			"provinceName": "Saugor",
+			"date": -60225
+		},
+		{
+			"provinceId": "4460",
+			"provinceName": "Handia",
+			"date": -60225
+		},
+		{
+			"provinceId": "4466",
+			"provinceName": "Mahoba",
+			"date": -60225
+		},
+		{
+			"provinceId": "4467",
+			"provinceName": "Kalinjar",
+			"date": -60225
+		},
+		{
+			"provinceId": "4468",
+			"provinceName": "Bandogarh",
+			"date": -60225
+		},
+		{
+			"provinceId": "4469",
+			"provinceName": "Rohtasgarh",
+			"date": -60225
+		},
+		{
+			"provinceId": "4470",
+			"provinceName": "Soumelpur",
+			"date": -60225
+		},
+		{
+			"provinceId": "4471",
+			"provinceName": "Bishnupur",
+			"date": -60225
+		},
+		{
+			"provinceId": "4472",
+			"provinceName": "Monghyr",
+			"date": -60225
+		},
+		{
+			"provinceId": "4476",
+			"provinceName": "Nadia",
+			"date": -60225
+		},
+		{
+			"provinceId": "4477",
+			"provinceName": "Satgaon",
+			"date": -60225
+		},
+		{
+			"provinceId": "4479",
+			"provinceName": "Goraghat",
+			"date": -60225
+		},
+		{
+			"provinceId": "4483",
+			"provinceName": "Morang",
+			"date": -62415
+		},
+		{
+			"provinceId": "4484",
+			"provinceName": "Makwanpur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4485",
+			"provinceName": "Palpa",
+			"date": -62415
+		},
+		{
+			"provinceId": "4486",
+			"provinceName": "Purnia",
+			"date": -62415
+		},
+		{
+			"provinceId": "4487",
+			"provinceName": "Saran",
+			"date": -62415
+		},
+		{
+			"provinceId": "4488",
+			"provinceName": "Champaran",
+			"date": -62415
+		},
+		{
+			"provinceId": "4489",
+			"provinceName": "Hajipur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4490",
+			"provinceName": "Ghazipur",
+			"date": -62415
+		},
+		{
+			"provinceId": "4491",
+			"provinceName": "Dang",
+			"date": -62415
+		},
+		{
+			"provinceId": "4492",
+			"provinceName": "Doti",
+			"date": -62415
+		},
+		{
+			"provinceId": "4493",
+			"provinceName": "Sirmur",
+			"date": -33580
+		},
+		{
+			"provinceId": "4494",
+			"provinceName": "Khairabad",
+			"date": -62415
+		},
+		{
+			"provinceId": "4495",
+			"provinceName": "Feyzabad",
+			"date": -62415
+		},
+		{
+			"provinceId": "4496",
+			"provinceName": "Kora",
+			"date": -62415
+		},
+		{
+			"provinceId": "4497",
+			"provinceName": "Kannauj",
+			"date": -62415
+		},
+		{
+			"provinceId": "4498",
+			"provinceName": "Sambhal",
+			"date": -62415
+		},
+		{
+			"provinceId": "4499",
+			"provinceName": "Bareily",
+			"date": -62415
+		}
+	]
+}

@@ -19,12 +19,16 @@ export function eu4DateToDays(dateStr: string): number {
 	return yearDays + dayOfYear(m, d) - startD
 }
 
-export function daysToEu4Date(days: number): string {
+function daysToEu4Date(days: number): string {
 	const startD = dayOfYear(1, 1)
 	const totalDays = days + startD
-	const y = EARTH_HISTORY_START_YEAR + Math.floor((totalDays - 1) / 365)
-	let dayInYear = totalDays % 365
-	if (dayInYear === 0) dayInYear = 365
+	const yearIndex = Math.floor((totalDays - 1) / 365)
+	const y = EARTH_HISTORY_START_YEAR + yearIndex
+	// totalDays - 1 - yearIndex * 365 is in [0, 365) by construction of
+	// yearIndex (a floor division), so this stays positive even when
+	// totalDays is negative (BC dates) -- JS's `%` would return a negative
+	// remainder there instead.
+	let dayInYear = totalDays - 1 - yearIndex * 365 + 1
 
 	let m = 1
 	while (m <= 12 && dayInYear > MONTH_DAYS[m - 1]) {
@@ -32,6 +36,27 @@ export function daysToEu4Date(days: number): string {
 		m++
 	}
 	return `${y}.${m}.${dayInYear}`
+}
+
+export function formatEu4Year(year: number): string {
+	if (year <= 0) return `${1 - year} BC`
+	return `${year} AD`
+}
+
+function formatEu4Date(dateStr: string): string {
+	const [year, month, day] = dateStr.split(".").map(Number)
+	if (
+		!Number.isFinite(year) ||
+		!Number.isFinite(month) ||
+		!Number.isFinite(day)
+	) {
+		return dateStr
+	}
+	return `${formatEu4Year(year)}.${month}.${day}`
+}
+
+export function formatEu4Days(days: number): string {
+	return formatEu4Date(daysToEu4Date(days))
 }
 
 export function eu4DaysToYear(days: number): number {

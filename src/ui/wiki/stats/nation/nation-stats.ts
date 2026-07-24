@@ -25,9 +25,29 @@ export function formatDensity(perKm2: number): string {
 	return `${perKm2.toFixed(perKm2 >= 100 ? 0 : 1)} /km²`
 }
 
+function formatUrbanization(
+	totalUrbanPopulation: number,
+	totalPopulation: number,
+) {
+	if (
+		!Number.isFinite(totalUrbanPopulation) ||
+		!Number.isFinite(totalPopulation) ||
+		totalUrbanPopulation <= 0 ||
+		totalPopulation <= 0
+	) {
+		return "0%"
+	}
+	const percent = Math.min(
+		100,
+		Math.max(0, (totalUrbanPopulation / totalPopulation) * 100),
+	)
+	return `${percent.toFixed(0)}%`
+}
+
 export function buildNationWikiStats(params: {
 	totalAreaKm2: number
 	totalPopulation: number
+	totalUrbanPopulation: number
 	provinceCount: number
 	rulerLabel?: string | null
 	governmentLabel: string | null
@@ -35,6 +55,7 @@ export function buildNationWikiStats(params: {
 	const {
 		totalAreaKm2,
 		totalPopulation,
+		totalUrbanPopulation,
 		provinceCount,
 		rulerLabel,
 		governmentLabel,
@@ -48,7 +69,7 @@ export function buildNationWikiStats(params: {
 		{
 			label: "Population",
 			valuePrefix: formatCount(totalPopulation),
-			value: ` · ${formatDensity(density)}`,
+			value: ` · ${formatDensity(density)} · ${formatUrbanization(totalUrbanPopulation, totalPopulation)} urbanized`,
 		},
 		...(rulerLabel !== null && rulerLabel !== undefined
 			? [{ label: "Ruler", value: rulerLabel }]

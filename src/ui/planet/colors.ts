@@ -66,6 +66,7 @@ export type ColorMode =
 	| "timezone"
 	| "wind"
 	| "misery"
+	| "realMisery"
 	| "eu5Topography"
 	| "eu5Vegetation"
 	| "eu5Climate"

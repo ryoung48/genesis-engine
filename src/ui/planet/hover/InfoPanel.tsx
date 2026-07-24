@@ -329,7 +329,6 @@ interface InfoPanelProps {
 	hoverNationAdjList?: Int32Array | null
 	hoverNationCounts?: Map<number, number> | null
 	relationAt?: ((a: number, b: number) => number) | null
-	detailsDrawerOpen?: boolean
 	/** Overrides the Nation/Government/Culture/Religion rows with real
 	 * history for the currently-scrubbed date. Resolved by the caller
 	 * (GenesisView); undefined when earth-history isn't active
@@ -347,6 +346,13 @@ interface InfoPanelProps {
 		/** Real EU4 province name (geo-explorer's political.json), overrides
 		 * the generic "Province N" placeholder from procedural naming. */
 		provinceName: string | null
+		/** EU4 area/region/superregion names (geo-explorer's
+		 * area.json/region.json/superregion.json), shown in place of the
+		 * procedural landmark/ocean/continent row when hovering an Earth
+		 * import in geography map mode. */
+		area: string | null
+		region: string | null
+		superregion: string | null
 	}
 }
 
@@ -409,7 +415,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	getHeritageName,
 	getLandmarkName,
 	getRiverName,
-	detailsDrawerOpen,
 	earthHistoryHoverOverride,
 }) => {
 	const activeBarIndex =
@@ -613,22 +618,42 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 	].filter((entry): entry is DemographicEntry => entry !== undefined)
 	return (
 		<FloatingPanel
-			className={`absolute top-3 z-20 w-64 px-3 py-2 ${detailsDrawerOpen ? "right-3" : "right-12"}`}
+			className="absolute top-3 right-3 z-20 w-64 px-3 py-2"
 			padding="sm"
 		>
 			<div ref={hoverCardRef} className="space-y-0.5">
 				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
 				{showGeography && (
 					<>
-						{hoverLandmark && (
-							<Row
-								label={
-									hoverLandmark.type
-										? titleCase(hoverLandmark.type)
-										: "Landmark"
-								}
-								value={`${getLandmarkName(hoverLandmark.id)}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
-							/>
+						{world?.isEarthImport && earthHistoryHoverOverride ? (
+							<>
+								{earthHistoryHoverOverride.superregion && (
+									<Row
+										label="Superregion"
+										value={earthHistoryHoverOverride.superregion}
+									/>
+								)}
+								{earthHistoryHoverOverride.region && (
+									<Row
+										label="Region"
+										value={earthHistoryHoverOverride.region}
+									/>
+								)}
+								{earthHistoryHoverOverride.area && (
+									<Row label="Area" value={earthHistoryHoverOverride.area} />
+								)}
+							</>
+						) : (
+							hoverLandmark && (
+								<Row
+									label={
+										hoverLandmark.type
+											? titleCase(hoverLandmark.type)
+											: "Landmark"
+									}
+									value={`${getLandmarkName(hoverLandmark.id)}${landmarkShare !== null ? ` (${landmarkShare.toFixed(1)}%)` : ""}`}
+								/>
+							)
 						)}
 						<Row
 							label="Elev"
@@ -997,13 +1022,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								}
 								showValues
 							/>
-						) : colorMode === "misery" &&
+						) : (colorMode === "misery" || colorMode === "realMisery") &&
 							hoverMisery &&
 							hoverMisery.monthly.length === 12 ? (
 							<SeriesBars
 								values={hoverMisery.monthly}
 								labels={MONTH_SHORT}
-								label="MI"
+								label={colorMode === "realMisery" ? "Observed MI" : "MI"}
 								colorForValue={(value) => miseryChartColor(value)}
 								activeIndex={activeBarIndex}
 								summary={buildSummary(hoverMisery.annual, {

@@ -240,6 +240,20 @@ export const loadDiplomacyEvents = () =>
 export const loadOrganizationEvents = () =>
 	loadJson<RawOrganizationEvent[]>("events/organizations.json")
 
+/** Per-province area/region/superregion display names, keyed by raw EU4
+ * province id (string, matches GenesisProvinces.realIds) -- flattened from
+ * geo-explorer's area.json/region.json/superregion.json by
+ * scripts/build-eu4-geography.py. A province may be missing any tier (e.g.
+ * wasteland/ocean provinces have no area). */
+interface RawProvinceGeography {
+	area?: string
+	region?: string
+	superregion?: string
+}
+
+export const loadGeography = () =>
+	loadJson<Record<string, RawProvinceGeography>>("reference/geography.json")
+
 export const loadNationReference = () =>
 	loadJson<RawNationReference[]>("reference/nations.json")
 export const loadOrganizationReference = () =>

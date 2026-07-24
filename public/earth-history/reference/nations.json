@@ -7276,9 +7276,9 @@
 		"name": "Keres",
 		"color": [162, 28, 58],
 		"graphicalCulture": "northamericagfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
+		"initialGovernmentType": "native",
+		"primaryCulture": "pueblo",
+		"religion": "totemism"
 	},
 	{
 		"tag": "ZNI",
@@ -15637,9 +15637,9 @@
 		"name": "Chalukya",
 		"color": [169, 149, 49],
 		"graphicalCulture": "indiangfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
+		"initialGovernmentType": "monarchy",
+		"primaryCulture": "marathi",
+		"religion": "jainism"
 	},
 	{
 		"tag": "DAK",
@@ -16353,27 +16353,9 @@
 		"religion": null
 	},
 	{
-		"tag": "cp_achaean_league",
-		"name": "Achaean League",
-		"color": [57, 198, 116],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
 		"tag": "cp_achaemenid_empire",
 		"name": "Achaemenid Empire",
 		"color": [57, 90, 198],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
-		"tag": "cp_aetolian_league",
-		"name": "Aetolian League",
-		"color": [198, 57, 106],
 		"graphicalCulture": "westerngfx",
 		"initialGovernmentType": null,
 		"primaryCulture": null,
@@ -16428,15 +16410,6 @@
 		"tag": "cp_assyrian_egypt",
 		"name": "Assyrian Egypt",
 		"color": [198, 174, 57],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
-		"tag": "cp_athenian_coalition",
-		"name": "Athenian Coalition",
-		"color": [198, 57, 74],
 		"graphicalCulture": "westerngfx",
 		"initialGovernmentType": null,
 		"primaryCulture": null,
@@ -16626,24 +16599,6 @@
 		"tag": "cp_greco_bactrian_kingdom",
 		"name": "Greco-Bactrian Kingdom",
 		"color": [57, 198, 195],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
-		"tag": "cp_greek_city_states",
-		"name": "Greek City-States",
-		"color": [57, 177, 198],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
-		"tag": "cp_greek_colonies",
-		"name": "Greek Colonies",
-		"color": [198, 153, 57],
 		"graphicalCulture": "westerngfx",
 		"initialGovernmentType": null,
 		"primaryCulture": null,
@@ -17176,9 +17131,9 @@
 		"name": "Lydia",
 		"color": [198, 163, 57],
 		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
+		"initialGovernmentType": "monarchy",
+		"primaryCulture": "lydian",
+		"religion": "hellenism"
 	},
 	{
 		"tag": "cp_magadha_haryanka_dynasty",
@@ -17406,15 +17361,6 @@
 		"religion": null
 	},
 	{
-		"tag": "cp_peloponnesian_league",
-		"name": "Peloponnesian League",
-		"color": [57, 60, 198],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
 		"tag": "cp_perdiccas",
 		"name": "Perdiccas",
 		"color": [198, 57, 146],
@@ -17553,15 +17499,6 @@
 		"tag": "cp_scythia",
 		"name": "Scythia",
 		"color": [57, 69, 198],
-		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
-	},
-	{
-		"tag": "cp_second_athenian_league",
-		"name": "Second Athenian League",
-		"color": [57, 198, 181],
 		"graphicalCulture": "westerngfx",
 		"initialGovernmentType": null,
 		"primaryCulture": null,
@@ -17743,9 +17680,9 @@
 		"name": "Yuezhi",
 		"color": [67, 57, 198],
 		"graphicalCulture": "westerngfx",
-		"initialGovernmentType": null,
-		"primaryCulture": null,
-		"religion": null
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "yuezhi",
+		"religion": "tengri_pagan_reformed"
 	},
 	{
 		"tag": "cp_zapotec_civilization",
@@ -17809,5 +17746,671 @@
 		"initialGovernmentType": null,
 		"primaryCulture": null,
 		"religion": null
+	},
+	{
+		"tag": "cp_state_of_jin",
+		"name": "State of Jin",
+		"color": [116, 198, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_mauretania",
+		"name": "Mauretania",
+		"color": [198, 74, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_state_of_song",
+		"name": "State of Song",
+		"color": [198, 163, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_state_of_wei",
+		"name": "State of Wei",
+		"color": [57, 106, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_state_of_wu",
+		"name": "State of Wu",
+		"color": [57, 198, 146],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_dayuan",
+		"name": "Dayuan",
+		"color": [113, 198, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_athens",
+		"name": "Athens",
+		"color": [198, 74, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_sparta",
+		"name": "Sparta",
+		"color": [198, 163, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "monarchy",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_corinth",
+		"name": "Corinth",
+		"color": [198, 163, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_achaea",
+		"name": "Achaea",
+		"color": [172, 57, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_aetolia",
+		"name": "Aetolia",
+		"color": [57, 181, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_euboea",
+		"name": "Euboea",
+		"color": [57, 198, 102],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_lesbos",
+		"name": "Lesbos",
+		"color": [198, 57, 99],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_crete_city_states",
+		"name": "Cretan City-States",
+		"color": [198, 57, 104],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_naxos",
+		"name": "Naxos",
+		"color": [74, 57, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_syracuse",
+		"name": "Syracuse",
+		"color": [198, 158, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "monarchy",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_siceliote_city_states",
+		"name": "Siceliote City-States",
+		"color": [57, 76, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_magna_graecia",
+		"name": "Magna Graecia",
+		"color": [57, 198, 116],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_taras",
+		"name": "Taras",
+		"color": [57, 198, 181],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_cypriot_city_kingdoms",
+		"name": "Cypriot City-Kingdoms",
+		"color": [198, 57, 167],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "monarchy",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_smyrna",
+		"name": "Smyrna",
+		"color": [57, 57, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_ionian_islands",
+		"name": "Ionian Islands",
+		"color": [74, 57, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_corcyra",
+		"name": "Corcyra",
+		"color": [153, 57, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_epirus_city_states",
+		"name": "Epirote City-States",
+		"color": [57, 163, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "monarchy",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_thessalian_city_states",
+		"name": "Thessalian City-States",
+		"color": [57, 142, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_macedonian_greek_city_states",
+		"name": "Macedonian Greek City-States",
+		"color": [198, 109, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_chalcidice_city_states",
+		"name": "Chalcidice City-States",
+		"color": [57, 198, 172],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_thracian_greek_city_states",
+		"name": "Thracian Greek City-States",
+		"color": [142, 57, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_hellespontine_greek_city_states",
+		"name": "Hellespontine Greek City-States",
+		"color": [198, 57, 130],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_anatolian_greek_city_states",
+		"name": "Anatolian Greek City-States",
+		"color": [191, 198, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_black_sea_greek_colonies",
+		"name": "Black Sea Greek Colonies",
+		"color": [57, 198, 135],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_cyrenaica_greek_colonies",
+		"name": "Cyrenaican Greek Colonies",
+		"color": [198, 88, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_epidamnos",
+		"name": "Epidamnos",
+		"color": [198, 57, 174],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "republic",
+		"primaryCulture": "greek",
+		"religion": "hellenism"
+	},
+	{
+		"tag": "cp_achaean_league",
+		"name": "Achaean League",
+		"color": [57, 198, 116],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_aetolian_league",
+		"name": "Aetolian League",
+		"color": [198, 57, 106],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_athenian_coalition",
+		"name": "Athenian Coalition",
+		"color": [198, 57, 74],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_greek_city_states",
+		"name": "Greek City-States",
+		"color": [57, 177, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_greek_colonies",
+		"name": "Greek Colonies",
+		"color": [198, 153, 57],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_peloponnesian_league",
+		"name": "Peloponnesian League",
+		"color": [57, 60, 198],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_second_athenian_league",
+		"name": "Second Athenian League",
+		"color": [57, 198, 181],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": null,
+		"primaryCulture": null,
+		"religion": null
+	},
+	{
+		"tag": "cp_helvetii",
+		"name": "Helvetii",
+		"color": [150, 168, 189],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_aedui",
+		"name": "Aedui",
+		"color": [96, 140, 96],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_arverni",
+		"name": "Arverni",
+		"color": [140, 60, 60],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_carnutes",
+		"name": "Carnutes",
+		"color": [120, 110, 60],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_treveri",
+		"name": "Treveri",
+		"color": [80, 90, 140],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_cadurci",
+		"name": "Cadurci",
+		"color": [160, 120, 70],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_volcae",
+		"name": "Volcae Tectosages",
+		"color": [180, 150, 60],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_allobroges",
+		"name": "Allobroges",
+		"color": [100, 130, 160],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_boii_cisalpine",
+		"name": "Boii (Cisalpine)",
+		"color": [110, 80, 130],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_insubres",
+		"name": "Insubres",
+		"color": [70, 100, 70],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_taurini",
+		"name": "Taurini",
+		"color": [130, 100, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_senones_gaul",
+		"name": "Senones",
+		"color": [160, 90, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "gallian",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_suebi",
+		"name": "Suebi",
+		"color": [90, 110, 130],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_cimbri",
+		"name": "Cimbri",
+		"color": [130, 140, 160],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_teutones",
+		"name": "Teutones",
+		"color": [110, 90, 130],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_marcomanni",
+		"name": "Marcomanni",
+		"color": [100, 70, 60],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_sugambri",
+		"name": "Sugambri",
+		"color": [140, 110, 70],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_chatti",
+		"name": "Chatti",
+		"color": [80, 120, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_cherusci",
+		"name": "Cherusci",
+		"color": [120, 130, 70],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_bructeri",
+		"name": "Bructeri",
+		"color": [150, 100, 100],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_chauci",
+		"name": "Chauci",
+		"color": [70, 100, 120],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_usipetes_tencteri",
+		"name": "Usipetes and Tencteri",
+		"color": [130, 130, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "hannoverian",
+		"religion": "germanic"
+	},
+	{
+		"tag": "cp_lusitani",
+		"name": "Lusitani",
+		"color": [150, 90, 60],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_celtiberians",
+		"name": "Celtiberians",
+		"color": [110, 120, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_cantabri",
+		"name": "Cantabri",
+		"color": [90, 100, 110],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_astures",
+		"name": "Astures",
+		"color": [100, 90, 80],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_vaccaei",
+		"name": "Vaccaei",
+		"color": [140, 130, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_vettones",
+		"name": "Vettones",
+		"color": [120, 100, 70],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_turdetani",
+		"name": "Turdetani",
+		"color": [160, 140, 60],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_carpetani",
+		"name": "Carpetani",
+		"color": [130, 110, 100],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_bastetani",
+		"name": "Bastetani",
+		"color": [150, 100, 90],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_gallaeci",
+		"name": "Gallaeci",
+		"color": [80, 110, 100],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_ilergetes",
+		"name": "Ilergetes",
+		"color": [110, 90, 130],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
+	},
+	{
+		"tag": "cp_vascones",
+		"name": "Vascones",
+		"color": [100, 130, 80],
+		"graphicalCulture": "westerngfx",
+		"initialGovernmentType": "tribal",
+		"primaryCulture": "iberi",
+		"religion": "druidism"
 	}
 ]

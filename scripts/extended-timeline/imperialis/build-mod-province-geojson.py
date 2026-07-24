@@ -80,6 +80,7 @@ DEFAULT_MOD_MAP = Path(
     r"c:\Program Files (x86)\Steam\steamapps\workshop\content\236850\679204773\map"
 )
 DEFAULT_ANCHORS = HERE / "anchor-landmarks.json"
+DEFAULT_REGION_ANCHORS = HERE / "region-landmarks.json"
 DEFAULT_COASTLINE_TOPOJSON = Path(
     r"c:\Users\rayou\projects\geo-explorer\public\land-50m.json"
 )
@@ -318,16 +319,29 @@ def coastline_icp(
     coast_px: np.ndarray,
     ref_coast_xyz: np.ndarray,
     neighbors: int,
+    region_px: np.ndarray | None = None,
+    region_ll: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float, float]:
     """Coarse-to-fine ICP from the anchor bootstrap. Returns the augmented
-    control set and the final coast-match median/p90 in km."""
+    control set and the final coast-match median/p90 in km.
+
+    region_px/region_ll (optional) are low-precision region-centroid anchors
+    (area.txt/region.txt aggregates, hand-geocoded) that densify the map
+    interior where point landmarks and coastline ICP have no reach. They are
+    always included at a flat 1x weight -- never duplicated like the point
+    anchors -- so precise coastal evidence dominates wherever it exists and
+    the regional prior only matters where nothing else constrains the warp.
+    """
     from scipy.spatial import cKDTree
 
+    has_regions = region_px is not None and len(region_px)
     ref_tree = cKDTree(ref_coast_xyz)
     aug_px = np.vstack([anchor_px] * ICP_ANCHOR_DUP[0])
     aug_ll = np.vstack([anchor_ll] * ICP_ANCHOR_DUP[0])
     for it, (cap, dup) in enumerate(zip(ICP_CAPS_DEG, ICP_ANCHOR_DUP)):
-        rbf = make_rbf(aug_px, aug_ll, neighbors)
+        fit_px = np.vstack([aug_px, region_px]) if has_regions else aug_px
+        fit_ll = np.vstack([aug_ll, region_ll]) if has_regions else aug_ll
+        rbf = make_rbf(fit_px, fit_ll, neighbors)
         warped = rbf(coast_px)
         warped /= np.linalg.norm(warped, axis=1, keepdims=True)
         dist, j = ref_tree.query(warped)
@@ -345,6 +359,10 @@ def coastline_icp(
         )
         aug_px = np.vstack([anchor_px] * dup + [src_px])
         aug_ll = np.vstack([anchor_ll] * dup + [tgt_ll])
+
+    if has_regions:
+        aug_px = np.vstack([aug_px, region_px])
+        aug_ll = np.vstack([aug_ll, region_ll])
 
     # final quality: coast match distances through the final fit
     rbf = make_rbf(aug_px, aug_ll, neighbors)
@@ -378,6 +396,14 @@ def main() -> None:
     )
     parser.add_argument("--mod-map", type=Path, default=DEFAULT_MOD_MAP)
     parser.add_argument("--anchors", type=Path, default=DEFAULT_ANCHORS)
+    parser.add_argument(
+        "--region-anchors",
+        type=Path,
+        default=DEFAULT_REGION_ANCHORS,
+        help="low-precision region-centroid anchors (area.txt/region.txt "
+        "aggregates) that densify the interior; pass empty path or "
+        "nonexistent file to disable",
+    )
     parser.add_argument(
         "--coastline-topojson",
         type=Path,
@@ -418,15 +444,34 @@ def main() -> None:
     anchor_ll = np.array([a["lonlat"] for a in anchors], dtype=np.float64)
     print(f"  {len(anchor_px)} anchors")
 
+    region_px = region_ll = None
+    if args.region_anchors and args.region_anchors.is_file():
+        region_anchors = json.loads(args.region_anchors.read_text(encoding="utf-8"))["anchors"]
+        region_px = np.array([a["px"] for a in region_anchors], dtype=np.float64)
+        region_ll = np.array([a["lonlat"] for a in region_anchors], dtype=np.float64)
+        print(f"  {len(region_px)} region anchors (interior densification, 1x weight)")
+
     print("coastline ICP (coarse-to-fine from anchor bootstrap) ...")
     ref_coast = reference_coastline_xyz(args.coastline_topojson)
     coast_px = mod_coast_pixels(ids, sea_ids | lake_ids)
     fit_px, fit_ll, fit_median_km, fit_p90_km = coastline_icp(
-        anchor_px, anchor_ll, coast_px, ref_coast, args.neighbors
+        anchor_px, anchor_ll, coast_px, ref_coast, args.neighbors,
+        region_px=region_px, region_ll=region_ll,
     )
 
     print("fitting final thin-plate-spline warp + evaluation grid ...")
-    rbf = make_rbf(fit_px, fit_ll, args.neighbors)
+    if len(fit_px) > 5000:
+        rbf = make_rbf(fit_px, fit_ll, args.neighbors)
+    else:
+        # global (untruncated) fit: neighbor-local RBF fitting (used during the
+        # ICP loop for speed) disagrees across nearby grid points on either side
+        # of unconstrained regions -- open water far from any coast or anchor,
+        # e.g. mid-North-Sea -- producing folds that stretch provinces into thin
+        # diagonal smears. A global solve over ~2-3k control points is cheap
+        # enough to do for the fit that actually gets rasterized.
+        rbf = RBFInterpolator(
+            fit_px, to_xyz(fit_ll), neighbors=None, kernel="thin_plate_spline", smoothing=1e-6
+        )
     grid = build_warp_grid(rbf, width, height, step=8)
 
     print("tracing province polygons from raster ...")
@@ -504,6 +549,7 @@ def main() -> None:
         "fit_median_km": round(fit_median_km, 1),
         "fit_p90_km": round(fit_p90_km, 1),
         "anchor_count": len(anchor_px),
+        "region_anchor_count": 0 if region_px is None else len(region_px),
         "raster_width": width,
         "raster_height": height,
     }

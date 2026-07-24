@@ -1,5 +1,9 @@
 import React, { useState } from "react"
-import { daysToEu4Date, eu4DaysToYear } from "@/model/earth/history/date"
+import {
+	eu4DaysToYear,
+	formatEu4Days,
+	formatEu4Year,
+} from "@/model/earth/history/date"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 
@@ -161,6 +165,30 @@ function renderLinkedTimelineText(
 		})),
 	].sort(compareMentionsByLength)
 
+	// Two distinct mentions can coincidentally share the same name (e.g. a
+	// province named after the nation that once ruled it, "Armagnac" the
+	// county vs. "Armagnac" the country) -- the plain "first entry in array
+	// order wins every tie" rule below would then hand every occurrence of
+	// that text to the same one, leaving the other never linked. Tie-break
+	// instead by least-recently-used (so repeat occurrences of a shared name
+	// alternate between the colliding entities instead of all going to one),
+	// then prefer non-nation kinds (province/org/war/...) -- description
+	// templates consistently name the object of an action before the nation
+	// clause ("<subject> took control of <object> from <nation>"), so on a
+	// fresh tie the earlier occurrence is the non-nation entity.
+	const usageCounts = new Map<string, number>()
+	const kindPriority = (kind: (typeof mentions)[number]["kind"]): number =>
+		kind === "nation" ? 1 : 0
+	const isBetterTie = (
+		candidate: (typeof mentions)[number],
+		current: (typeof mentions)[number],
+	): boolean => {
+		const candidateCount = usageCounts.get(candidate.key) ?? 0
+		const currentCount = usageCounts.get(current.key) ?? 0
+		if (candidateCount !== currentCount) return candidateCount < currentCount
+		return kindPriority(candidate.kind) < kindPriority(current.kind)
+	}
+
 	const nodes: React.ReactNode[] = []
 	let cursor = 0
 	let key = 0
@@ -186,12 +214,22 @@ function renderLinkedTimelineText(
 				)
 			}
 			if (index < 0) continue
-			if (!match || index < match.index) match = { mention, index }
+			if (
+				!match ||
+				index < match.index ||
+				(index === match.index && isBetterTie(mention, match.mention))
+			) {
+				match = { mention, index }
+			}
 		}
 		if (!match) {
 			nodes.push(event.description.slice(cursor))
 			break
 		}
+		usageCounts.set(
+			match.mention.key,
+			(usageCounts.get(match.mention.key) ?? 0) + 1,
+		)
 		if (match.index > cursor) {
 			nodes.push(event.description.slice(cursor, match.index))
 		}
@@ -298,10 +336,12 @@ function TimelineDivider({ label }: { label: string }) {
 
 const PLOT_HEIGHT = 64
 
-// The chart x-domain is a sliding 100-year window centered on the current
-// date (shifted, not shrunk, when the current date sits near either end of
-// the simulation range).
+// The chart x-domain is a sliding window centered on the current date
+// (shifted, not shrunk, when the current date sits near either end of the
+// simulation range). Default width is 100 years; zoom narrows/widens it
+// between MIN_CHART_WINDOW_DAYS and the full simulation span.
 const CHART_WINDOW_DAYS = 50 * 365
+const MIN_CHART_WINDOW_DAYS = 2 * 365
 
 function niceCeil(value: number): number {
 	if (value <= 1) return 1
@@ -338,6 +378,7 @@ function CountHistoryChart({
 }) {
 	const [hoverDate, setHoverDate] = useState<number | null>(null)
 	const [hoverYear, setHoverYear] = useState<number | null>(null)
+	const [halfWindowDays, setHalfWindowDays] = useState(CHART_WINDOW_DAYS)
 	const allPoints = countHistory
 	if (allPoints.length === 0) return null
 	const rangeStart = dateRangeStart
@@ -346,8 +387,20 @@ function CountHistoryChart({
 		allPoints[allPoints.length - 1].date,
 		currentDate,
 	)
-	let start = currentDate - CHART_WINDOW_DAYS
-	let end = currentDate + CHART_WINDOW_DAYS
+	const maxHalfWindowDays = Math.max(
+		MIN_CHART_WINDOW_DAYS,
+		(rangeEnd - rangeStart) / 2,
+	)
+	const zoomBy = (factor: number) => {
+		setHalfWindowDays((prev) =>
+			Math.min(
+				maxHalfWindowDays,
+				Math.max(MIN_CHART_WINDOW_DAYS, prev * factor),
+			),
+		)
+	}
+	let start = currentDate - halfWindowDays
+	let end = currentDate + halfWindowDays
 	if (start < rangeStart) {
 		end = Math.min(rangeEnd, end + (rangeStart - start))
 		start = rangeStart
@@ -453,9 +506,31 @@ function CountHistoryChart({
 				<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
 					{countChartLabel}
 				</span>
-				<span className="font-mono text-[8px] text-slate-400">
-					0–{maxCount}
-				</span>
+				<div className="flex items-center gap-1.5">
+					<span className="font-mono text-[8px] text-slate-400">
+						0–{maxCount}
+					</span>
+					<div className="flex items-center gap-0.5">
+						<button
+							type="button"
+							onClick={() => zoomBy(2)}
+							disabled={halfWindowDays >= maxHalfWindowDays}
+							title="Zoom out"
+							className="flex h-3.5 w-3.5 items-center justify-center rounded-sm border border-slate-300 font-mono text-[9px] leading-none text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+						>
+							−
+						</button>
+						<button
+							type="button"
+							onClick={() => zoomBy(0.5)}
+							disabled={halfWindowDays <= MIN_CHART_WINDOW_DAYS}
+							title="Zoom in"
+							className="flex h-3.5 w-3.5 items-center justify-center rounded-sm border border-slate-300 font-mono text-[9px] leading-none text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+						>
+							+
+						</button>
+					</div>
+				</div>
 			</div>
 			<div
 				role="img"
@@ -467,6 +542,10 @@ function CountHistoryChart({
 				onClick={(event) => {
 					const date = dateFromPointer(event)
 					if (date !== null) onSelectDate(date)
+				}}
+				onWheel={(event) => {
+					event.preventDefault()
+					zoomBy(event.deltaY > 0 ? 1.2 : 1 / 1.2)
 				}}
 			>
 				<svg
@@ -528,7 +607,7 @@ function CountHistoryChart({
 						<span className="font-semibold">{countAt(hoverDate)}</span>
 						<span className="text-slate-300">
 							{" "}
-							{countUnitLabel} · {daysToEu4Date(hoverDate)}
+							{countUnitLabel} · {formatEu4Days(hoverDate)}
 						</span>
 					</div>
 				) : null}
@@ -573,15 +652,15 @@ function CountHistoryChart({
 							<span className="text-slate-300">
 								{" "}
 								event{hoveredYearEntry.count === 1 ? "" : "s"} ·{" "}
-								{hoveredYearEntry.year}
+								{formatEu4Year(hoveredYearEntry.year)}
 							</span>
 						</div>
 					) : null}
 				</div>
 			) : null}
 			<div className="mt-0.5 flex justify-between font-mono text-[7px] text-slate-400">
-				<span>{eu4DaysToYear(start)}</span>
-				<span>{eu4DaysToYear(end)}</span>
+				<span>{formatEu4Year(eu4DaysToYear(start))}</span>
+				<span>{formatEu4Year(eu4DaysToYear(end))}</span>
 			</div>
 		</div>
 	)

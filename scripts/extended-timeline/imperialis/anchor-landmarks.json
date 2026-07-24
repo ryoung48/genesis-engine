@@ -68,6 +68,33 @@
     {"name": "kyushu", "px": [6290, 1160], "lonlat": [130.6, 32.6]},
     {"name": "baikal", "px": [5410, 290], "lonlat": [108.0, 53.5]},
     {"name": "balkhash", "px": [4640, 864], "lonlat": [74.0, 46.3]},
-    {"name": "aceh", "px": [4876, 2320], "lonlat": [95.3, 5.6]}
+    {"name": "aceh", "px": [4876, 2320], "lonlat": [95.3, 5.6]},
+
+    {"name": "shetland", "px": [875, 37], "lonlat": [-1.3, 60.3]},
+    {"name": "orkney", "px": [805, 95], "lonlat": [-2.96, 59.0]},
+    {"name": "cape-wrath", "px": [620, 128], "lonlat": [-5.0, 58.6]},
+    {"name": "firth-of-forth", "px": [790, 210], "lonlat": [-2.8, 56.05]},
+    {"name": "solway-firth", "px": [690, 255], "lonlat": [-3.5, 54.85]},
+    {"name": "isle-of-man", "px": [730, 290], "lonlat": [-4.5, 54.2]},
+    {"name": "dublin-bay", "px": [665, 275], "lonlat": [-6.25, 53.35]},
+    {"name": "anglesey", "px": [710, 335], "lonlat": [-4.3, 53.3]},
+    {"name": "cardigan-bay", "px": [730, 365], "lonlat": [-4.3, 52.4]},
+    {"name": "the-wash", "px": [890, 310], "lonlat": [0.3, 52.9]},
+    {"name": "ijsselmeer", "px": [1130, 350], "lonlat": [5.3, 52.7]},
+    {"name": "rhine-scheldt-delta", "px": [1065, 345], "lonlat": [4.2, 51.9]},
+    {"name": "elbe-mouth", "px": [1285, 310], "lonlat": [8.7, 53.9]},
+    {"name": "frisian-islands", "px": [1325, 240], "lonlat": [7.0, 53.7]},
+    {"name": "lindesnes", "px": [1183, 130], "lonlat": [7.05, 58.0]},
+    {"name": "sognefjord-mouth", "px": [1150, 50], "lonlat": [4.9, 61.1]},
+    {"name": "limfjord", "px": [1267, 190], "lonlat": [8.5, 57.1]},
+    {"name": "fyn-zealand", "px": [1367, 250], "lonlat": [10.4, 55.4]},
+    {"name": "lizard-point", "px": [695, 465], "lonlat": [-5.2, 49.95]},
+    {"name": "scilly-isles", "px": [658, 475], "lonlat": [-6.3, 49.9]},
+    {"name": "cotentin-cape-la-hague", "px": [845, 495], "lonlat": [-1.9, 49.7]},
+
+    {"name": "cap-corse", "px": [1295, 757], "lonlat": [9.4, 43.0]},
+    {"name": "corsica-centroid", "px": [1290, 795], "lonlat": [9.1, 42.15]},
+    {"name": "sardinia-north", "px": [1255, 835], "lonlat": [9.2, 41.2]},
+    {"name": "sardinia-centroid", "px": [1285, 875], "lonlat": [9.1, 40.1]}
   ]
 }

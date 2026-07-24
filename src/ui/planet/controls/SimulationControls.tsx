@@ -15,6 +15,11 @@ function clampTimelineTime(
 	return Math.min(maxTimeMs, Math.max(minTimeMs, timeMs))
 }
 
+function formatTimelineYear(year: number): string {
+	if (year <= 0) return `${1 - year} BC`
+	return `Y${year}`
+}
+
 interface SimulationControlsProps {
 	selectedTimeMs: number
 	minTimeMs: number
@@ -58,7 +63,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
 		? formatLabel(selectedTimeMs)
 		: (() => {
 				const { year, month, day } = historyTimeParts(selectedTimeMs)
-				return `Y${year} ${monthLabels[month] ?? `M${month}`} ${day}`
+				return `${formatTimelineYear(year)} ${monthLabels[month] ?? `M${month}`} ${day}`
 			})()
 	const step = stepValue ?? TIMELINE_STEP_MS
 	const resolvedPlayPauseLabels = playPauseLabels ?? {

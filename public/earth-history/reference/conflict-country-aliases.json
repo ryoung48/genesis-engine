@@ -554,7 +554,7 @@
 	},
 	{
 		"sourceName": "Mauretania",
-		"tag": "MRN"
+		"tag": "cp_mauretania"
 	},
 	{
 		"sourceName": "Pahang",
@@ -1064,7 +1064,7 @@
 	},
 	{
 		"sourceName": "Latin Principality of Achaea",
-		"tag": "cp_achaean_league"
+		"tag": "cp_achaea"
 	},
 	{
 		"sourceName": "Kingdom of Tripoli",
@@ -2337,11 +2337,11 @@
 	},
 	{
 		"sourceName": "Achea",
-		"tag": "cp_achaean_league"
+		"tag": "cp_achaea"
 	},
 	{
 		"sourceName": "Achean League",
-		"tag": "cp_achaean_league"
+		"tag": "cp_achaea"
 	},
 	{
 		"sourceName": "Akkad",
@@ -2353,7 +2353,7 @@
 	},
 	{
 		"sourceName": "Argos",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_sparta"
 	},
 	{
 		"sourceName": "Athens",
@@ -2385,11 +2385,11 @@
 	},
 	{
 		"sourceName": "Chios",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_lesbos"
 	},
 	{
 		"sourceName": "Corinth",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_corinth"
 	},
 	{
 		"sourceName": "Duke of Chu",
@@ -2405,7 +2405,7 @@
 	},
 	{
 		"sourceName": "Greek coalition (Sparta, Athens and allies)",
-		"tags": ["cp_peloponnesian_league", "cp_athenian_coalition"]
+		"tags": ["cp_sparta", "cp_athens"]
 	},
 	{
 		"sourceName": "Hittite Empire",
@@ -2565,7 +2565,7 @@
 	},
 	{
 		"sourceName": "Arcadia",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_sparta"
 	},
 	{
 		"sourceName": "Boii",
@@ -2585,7 +2585,7 @@
 	},
 	{
 		"sourceName": "Duke of Wu",
-		"tag": "WUU"
+		"tag": "cp_state_of_wu"
 	},
 	{
 		"sourceName": "Gallic tribes",
@@ -2613,15 +2613,15 @@
 	},
 	{
 		"sourceName": "Olynthus",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_chalcidice_city_states"
 	},
 	{
 		"sourceName": "Phocia",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_thessalian_city_states"
 	},
 	{
 		"sourceName": "Potidaea",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_chalcidice_city_states"
 	},
 	{
 		"sourceName": "Samnites",
@@ -2629,11 +2629,11 @@
 	},
 	{
 		"sourceName": "Sparta",
-		"tag": "cp_peloponnesian_league"
+		"tag": "cp_sparta"
 	},
 	{
 		"sourceName": "State of Jin",
-		"tag": "JIN"
+		"tag": "cp_state_of_jin"
 	},
 	{
 		"sourceName": "State of Qi",
@@ -2641,7 +2641,7 @@
 	},
 	{
 		"sourceName": "Syracuse",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_syracuse"
 	},
 	{
 		"sourceName": "Teutones",
@@ -2649,7 +2649,7 @@
 	},
 	{
 		"sourceName": "Thessaly",
-		"tag": "cp_greek_city_states"
+		"tag": "cp_thessalian_city_states"
 	},
 	{
 		"sourceName": "Alexander Balas",
@@ -2718,5 +2718,113 @@
 	{
 		"sourceName": "Quintus Sertorius",
 		"tag": "cp_roman_republic"
+	},
+	{
+		"sourceName": "State of Song",
+		"tag": "cp_state_of_song"
+	},
+	{
+		"sourceName": "State of Wei",
+		"tag": "cp_state_of_wei"
+	},
+	{
+		"sourceName": "State of Wu",
+		"tag": "cp_state_of_wu"
+	},
+	{
+		"sourceName": "Dayuan",
+		"tag": "cp_dayuan"
+	},
+	{
+		"sourceName": "Kingdom of Mauretania",
+		"tag": "cp_mauretania"
+	},
+	{
+		"sourceName": "Athens",
+		"tag": "cp_athens"
+	},
+	{
+		"sourceName": "Corinth",
+		"tag": "cp_corinth"
+	},
+	{
+		"sourceName": "Euboea",
+		"tag": "cp_euboea"
+	},
+	{
+		"sourceName": "Lesbos",
+		"tag": "cp_lesbos"
+	},
+	{
+		"sourceName": "Crete",
+		"tag": "cp_crete_city_states"
+	},
+	{
+		"sourceName": "Naxos",
+		"tag": "cp_naxos"
+	},
+	{
+		"sourceName": "Siceliote city-states",
+		"tag": "cp_siceliote_city_states"
+	},
+	{
+		"sourceName": "Magna Graecia",
+		"tag": "cp_magna_graecia"
+	},
+	{
+		"sourceName": "Taras",
+		"tag": "cp_taras"
+	},
+	{
+		"sourceName": "Tarentum",
+		"tag": "cp_taras"
+	},
+	{
+		"sourceName": "Cypriot city-kingdoms",
+		"tag": "cp_cypriot_city_kingdoms"
+	},
+	{
+		"sourceName": "Smyrna",
+		"tag": "cp_smyrna"
+	},
+	{
+		"sourceName": "Ionian Islands",
+		"tag": "cp_ionian_islands"
+	},
+	{
+		"sourceName": "Corcyra",
+		"tag": "cp_corcyra"
+	},
+	{
+		"sourceName": "Epirote city-states",
+		"tag": "cp_epirus_city_states"
+	},
+	{
+		"sourceName": "Chalcidian League",
+		"tag": "cp_chalcidice_city_states"
+	},
+	{
+		"sourceName": "Olynthus",
+		"tag": "cp_chalcidice_city_states"
+	},
+	{
+		"sourceName": "Anatolian Greek city-states",
+		"tag": "cp_anatolian_greek_city_states"
+	},
+	{
+		"sourceName": "Black Sea Greek colonies",
+		"tag": "cp_black_sea_greek_colonies"
+	},
+	{
+		"sourceName": "Sinope",
+		"tag": "cp_black_sea_greek_colonies"
+	},
+	{
+		"sourceName": "Cyrenaica",
+		"tag": "cp_cyrenaica_greek_colonies"
+	},
+	{
+		"sourceName": "Epidamnos",
+		"tag": "cp_epidamnos"
 	}
 ]

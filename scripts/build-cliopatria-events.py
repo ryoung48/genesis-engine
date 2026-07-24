@@ -136,6 +136,19 @@ in resolve_tags misses these, minting an unnecessary separate synthetic
 tag. Maps lowercased Cliopatria name -> lowercased target name to look up
 instead."""
 
+POLITY_FORCED_TAGS = {
+    # These Cliopatria names collide with much later EU4 countries that reuse
+    # the same short dynastic/geographic names. Keep the ancient owner records
+    # on synthetic cp_* tags so Yuan/Song/Jin/etc. are not shown thousands of
+    # years before their actual medieval/early-modern polities.
+    "jin": ("cp_state_of_jin", "State of Jin"),
+    "mauretania": ("cp_mauretania", "Mauretania"),
+    "song": ("cp_state_of_song", "State of Song"),
+    "wei": ("cp_state_of_wei", "State of Wei"),
+    "wu": ("cp_state_of_wu", "State of Wu"),
+    "yuan": ("cp_dayuan", "Dayuan"),
+}
+
 
 def resolve_tags(polity_names: set[str], nations: list[dict]) -> tuple[dict[str, str], int, int]:
     name_to_existing_tag = {n["name"].strip().lower(): n["tag"] for n in nations if n.get("name")}
@@ -146,6 +159,25 @@ def resolve_tags(polity_names: set[str], nations: list[dict]) -> tuple[dict[str,
     minted = 0
     for name in sorted(polity_names):
         lookup_name = POLITY_NAME_ALIASES.get(name.strip().lower(), name.strip().lower())
+        forced = POLITY_FORCED_TAGS.get(lookup_name)
+        if forced is not None:
+            tag, display_name = forced
+            resolve[name] = tag
+            if tag not in existing_tags:
+                nations.append(
+                    {
+                        "tag": tag,
+                        "name": display_name,
+                        "color": hash_color(tag),
+                        "graphicalCulture": "westerngfx",
+                        "initialGovernmentType": None,
+                        "primaryCulture": None,
+                        "religion": None,
+                    }
+                )
+                existing_tags.add(tag)
+                minted += 1
+            continue
         existing_tag = name_to_existing_tag.get(lookup_name)
         if existing_tag is not None:
             resolve[name] = existing_tag

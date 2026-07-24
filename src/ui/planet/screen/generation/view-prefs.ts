@@ -103,6 +103,7 @@ const COLOR_MODES = new Set<ColorMode>([
 	"timezone",
 	"wind",
 	"misery",
+	"realMisery",
 ])
 
 const NATION_MAP_MODES = new Set<NationMapMode>([

@@ -385,6 +385,17 @@ export function computeRegionColors(
 								temperatureMonth * N,
 							)
 		for (let r = 0; r < N; r++) {
+			// Earth imports color the ocean with the same flat blue rain uses
+			// (oceanRgb) rather than the temperature gradient -- real sea-surface
+			// temperature isn't modeled here, so letting ocean cells take the
+			// land temperature palette just shows noisy, misleading color.
+			if (world.isEarthImport && isOceanRegion(r)) {
+				const [cr, cg, cb] = oceanRgb(r)
+				rgb[3 * r] = cr
+				rgb[3 * r + 1] = cg
+				rgb[3 * r + 2] = cb
+				continue
+			}
 			const [cr, cg, cb] =
 				colorMode === "temperatureDelta"
 					? temperatureDeltaColor(

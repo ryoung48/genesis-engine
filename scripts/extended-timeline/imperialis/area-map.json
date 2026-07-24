@@ -1,0 +1,2958 @@
+{
+  "comment": "Curated Extended Timeline area -> Imperium Universalis area gates. These override the broader region gate for province matching where the region-level map is too coarse. Entries not originally hand-curated may be generated from region-gated area centroid/name candidates.",
+  "mappings": {
+    "adamawa_plateau_area": [
+      "gobir_area",
+      "biram_area",
+      "nok_area"
+    ],
+    "aegean_archipelago_area": [
+      "archipelagos_area",
+      "lesbos_et_chios",
+      "cyclades_area"
+    ],
+    "ahmedabad_area": [
+      "nishada_area",
+      "kunti_area",
+      "abhiradesa_area"
+    ],
+    "ahmednagar_area": [
+      "asmaka_east",
+      "asmaka_west",
+      "pulinda_north"
+    ],
+    "ajuuran_area": [
+      "tiami_area",
+      "cadupi_area",
+      "astasobas_area"
+    ],
+    "al_wahat_area": [
+      "oasis_magna_prima",
+      "ma_hedj",
+      "atef_pehu"
+    ],
+    "albania_area": [
+      "calabria_area",
+      "salento_area",
+      "praevalitana_area"
+    ],
+    "alentejo_area": [
+      "pacensis_area",
+      "scallabitanus_area",
+      "lassira_area"
+    ],
+    "aleppo_area": [
+      "chalcidene_area",
+      "amanus_mons_area",
+      "casiotis_area"
+    ],
+    "alfold_area": [
+      "tisia_area",
+      "pannonia_transdanubia",
+      "dacia_porolissensis"
+    ],
+    "algiers_area": [
+      "deserta_mauretania",
+      "caesariensis_west",
+      "diur_mons"
+    ],
+    "alsace_area": [
+      "helvetica_area",
+      "germania_superior",
+      "treverorum_area"
+    ],
+    "amdo_area": [
+      "qiang_area",
+      "nangqen_area",
+      "kham_area"
+    ],
+    "andhra_area": [
+      "krishnaveni_area",
+      "andhraka_north",
+      "musika_area"
+    ],
+    "angkor_area": [
+      "ratanagiri_area",
+      "angkor_area",
+      "sresthapura_area"
+    ],
+    "anhui_area": [
+      "henan_area",
+      "hongnong_area_east",
+      "west_pingyi_area"
+    ],
+    "apulia_area": [
+      "daunia_area",
+      "apulia_area",
+      "lucania_area"
+    ],
+    "aqmola_area": [
+      "onon_area",
+      "khovsgol_area",
+      "hanhai_area"
+    ],
+    "aragon_area": [
+      "caesaraugustanus_area",
+      "lacetania_area",
+      "vasconensis_area"
+    ],
+    "arkhangelsk_area": [
+      "aorsia",
+      "nesietis_regio",
+      "upper_aorsia"
+    ],
+    "armenia_area": [
+      "obarene_area",
+      "armenia_maior",
+      "utia_armenia_area"
+    ],
+    "arys_area": [
+      "kangju_area",
+      "chach_area",
+      "lower_kangju_area"
+    ],
+    "asir_area": [
+      "libanotophoros_regio",
+      "saba_area",
+      "hadramaut_area"
+    ],
+    "assam_area": [
+      "upper_lauhitya",
+      "kamata_area",
+      "lauhitya_area"
+    ],
+    "astrakhan_area": [
+      "ptestianica_area",
+      "mithridatis_regio",
+      "sarmatia_asiatica_area"
+    ],
+    "asturias_area": [
+      "cantabria_sea_area",
+      "cantabria_area",
+      "segovia_area"
+    ],
+    "atacora_oueme_area": [
+      "adamawa_area",
+      "casena_area",
+      "nok_area"
+    ],
+    "aussa_area": [
+      "azania_area",
+      "rhausae_area",
+      "elephas_area"
+    ],
+    "azawad_area": [
+      "tegazza_area",
+      "acha_area",
+      "zanfara_area"
+    ],
+    "azbin_area": [
+      "biram_area",
+      "memea_area",
+      "casena_area"
+    ],
+    "azerbaijan_area": [
+      "upper_atropatene",
+      "choromithrene_area",
+      "lower_atropatene"
+    ],
+    "azov_area": [
+      "tyrambica_area",
+      "sarmatia_maeotica",
+      "ophlonica_area"
+    ],
+    "baghelkhand_area": [
+      "south_kikata_area",
+      "magadha_area",
+      "kikata_area"
+    ],
+    "baghena_area": [
+      "cerne_area",
+      "acha_area",
+      "tegazza_area"
+    ],
+    "bahrain_area": [
+      "ichtyophagorum_sinus",
+      "gerrah_area",
+      "makan_area"
+    ],
+    "baisi_rajya_area": [
+      "magadha_area",
+      "gopala_area",
+      "kikata_area"
+    ],
+    "balchasj_area": [
+      "sha_mo_area",
+      "zavkhan_area",
+      "tarvagatai_area"
+    ],
+    "baleares_area": [
+      "hispania_citerior_area",
+      "edetania_area",
+      "iberus_area"
+    ],
+    "balkh_area": [
+      "astakana_area",
+      "candara_area",
+      "cholbisina_area"
+    ],
+    "banjar_area": [
+      "panai_area",
+      "suvarnagiri_area",
+      "batak_area"
+    ],
+    "banten_area": [
+      "suvarnagiri_area",
+      "batak_area",
+      "melayu_area"
+    ],
+    "barbary_coast_area": [
+      "caesariensis_west",
+      "caesariensis_east",
+      "siga_area"
+    ],
+    "bashkiria_area": [
+      "aorsia",
+      "upper_aorsia",
+      "nesietis_regio"
+    ],
+    "basque_country": [
+      "vasconensis_sea_area",
+      "vasconensis_area",
+      "caesaraugustanus_area"
+    ],
+    "basra_area": [
+      "characene_area",
+      "arabia_east",
+      "samati_area"
+    ],
+    "batak_area": [
+      "jakun_area",
+      "barus_area",
+      "batak_area"
+    ],
+    "beieras_area": [
+      "lusitania_west",
+      "transduriana_area",
+      "bracarensis_area"
+    ],
+    "beloozero_area": [
+      "sarmatia_deserta_area",
+      "thyssagetae_area",
+      "neuri_area"
+    ],
+    "benin_area": [
+      "edo_area",
+      "gobir_area",
+      "owo_area"
+    ],
+    "berar_area": [
+      "orugallu_area",
+      "vakataka_area",
+      "vidarbha_north"
+    ],
+    "berau_area": [
+      "sulu_area",
+      "zamboanga_area",
+      "lower_lanao_area"
+    ],
+    "bessarabia_area": [
+      "alpes_bastarnicae",
+      "carpatae_area",
+      "dacia_maluensis"
+    ],
+    "betsimasaraka_area": [
+      "elephas_area",
+      "azania_area",
+      "barbaria_area"
+    ],
+    "bhutan_area": [
+      "kirata_area",
+      "tsang_area",
+      "yarlung_area"
+    ],
+    "bihar_area": [
+      "south_kikata_area",
+      "kikata_area",
+      "magadha_area"
+    ],
+    "birjand_area": [
+      "tabiene_area",
+      "arcticene_area",
+      "sipharene_area"
+    ],
+    "bohemia_area": [
+      "suebia_transdanuvia",
+      "sarmatici_mons",
+      "boiohemum_area"
+    ],
+    "borkou_ennedi_tibesti": [
+      "garamantum_ulterior",
+      "libya_west",
+      "libya_interior"
+    ],
+    "bornu_area": [
+      "biram_area",
+      "nok_area",
+      "gobir_area"
+    ],
+    "bosnia_area": [
+      "alpes_dinaricae",
+      "scordiscia_area",
+      "dalmatia_interior"
+    ],
+    "bothnia_area": [
+      "gothica_insulae_area",
+      "suehonia_area",
+      "ostrogothica_area"
+    ],
+    "braunschweig_area": [
+      "cheruscia_area",
+      "albis_area",
+      "nertereansis_area"
+    ],
+    "brunei_area": [
+      "sulu_area",
+      "panai_area",
+      "suvarnagiri_area"
+    ],
+    "buha_area": [
+      "thala_mons_area",
+      "rhypaei_area",
+      "artabatitia_area"
+    ],
+    "bulgaria_area": [
+      "dardania_area",
+      "dacia_ripensis",
+      "moesia_superior"
+    ],
+    "bundelkhand_area": [
+      "pasubhumi_area",
+      "south_nishadha_area",
+      "karusha_north"
+    ],
+    "bunyoro_area": [
+      "aethiopia_superior",
+      "astacuri_area",
+      "rhypaei_area"
+    ],
+    "buryatia_area": [
+      "western_sushen_area",
+      "inbollo_area",
+      "chha_hol_area"
+    ],
+    "buzinza_area": [
+      "artabatitia_area",
+      "astacuri_area",
+      "rhypaei_area"
+    ],
+    "calabria_area": [
+      "lucania_area",
+      "bruttium_area",
+      "calabria_area"
+    ],
+    "cambodia_area": [
+      "chonlapura_area",
+      "lingapura_area",
+      "angkor_area"
+    ],
+    "cameroon_area": [
+      "nigir_area",
+      "gobir_area",
+      "edo_area"
+    ],
+    "cap_verde_area": [
+      "cerne_area",
+      "gaetulia_darae",
+      "acha_area"
+    ],
+    "catalonia_area": [
+      "lacetania_area",
+      "pyrenaei_mons",
+      "ilercavonesis_area"
+    ],
+    "central_burma_area": [
+      "dala_area",
+      "yilumo_area",
+      "zhanli_area"
+    ],
+    "central_ethiopia_area": [
+      "calaa_area",
+      "akridophagia_area",
+      "bega_area"
+    ],
+    "central_greece_area": [
+      "doris_greece_area",
+      "euboea_inferior",
+      "euboea_superior"
+    ],
+    "central_heilongjiang_area": [
+      "inbollo_area",
+      "chha_hol_area",
+      "sushen_area",
+      "bukbuyeo_area",
+      "western_sushen_area",
+      "buyeo_area",
+      "seobuyeo_area",
+      "dongbuyeo_area"
+    ],
+    "central_ilin_hala_area": [
+      "yilou_area",
+      "sushen_area",
+      "chha_hol_area",
+      "inbollo_area",
+      "dongbuyeo_area",
+      "bukbuyeo_area",
+      "buyeo_area"
+    ],
+    "central_italy_area": [
+      "etruria_centralis_area",
+      "etruria_east",
+      "etruria_west"
+    ],
+    "central_java_area": [
+      "suvarnagiri_area",
+      "melayu_area",
+      "panai_area"
+    ],
+    "central_jilin_area": [
+      "yilou_area",
+      "sushen_area",
+      "chha_hol_area",
+      "dongbuyeo_area",
+      "inbollo_area",
+      "bukbuyeo_area",
+      "buyeo_area",
+      "bukokjeo_area"
+    ],
+    "central_mongolia_area": [
+      "yunzhong_area",
+      "jiuyuan_area_northern",
+      "jiuyuan_area"
+    ],
+    "central_poland_area": [
+      "transvistuliana_area",
+      "suebia_transdanuvia",
+      "sarmatici_mons"
+    ],
+    "central_siberia_area": [
+      "north_wuhuan_area",
+      "xianbei_steppe_area",
+      "yenisei_area"
+    ],
+    "central_sumatra_area": [
+      "temuan_area",
+      "jakun_area",
+      "gangganagara_area"
+    ],
+    "central_swahili_coast_area": [
+      "elephas_area",
+      "azania_area",
+      "barbaria_area"
+    ],
+    "central_thai_area": [
+      "sabarapura_area",
+      "rajapura_area",
+      "suvarnapura_area"
+    ],
+    "chahar_area": [
+      "shang_area",
+      "shang_area_northern",
+      "yunzhong_area_southern"
+    ],
+    "champa_area": [
+      "champa_central_area",
+      "champa_south_area",
+      "champa_area"
+    ],
+    "champagne_area": [
+      "remorum_area",
+      "belgica_prima",
+      "belgica_secunda"
+    ],
+    "champasak_area": [
+      "champa_area",
+      "champa_central_area",
+      "ratanagiri_area"
+    ],
+    "changtang_area": [
+      "tsang_north",
+      "tsang_area",
+      "kirata_area"
+    ],
+    "chari_logone_area": [
+      "tagama_area",
+      "chuaritae_area",
+      "melano_gaetulia"
+    ],
+    "chernigov_area": [
+      "scythia_therion_area",
+      "budinia_area",
+      "gelonia_area"
+    ],
+    "chindwin_area": [
+      "thaungdut_area",
+      "halin_area",
+      "maingmaw_area"
+    ],
+    "chuanbei_area": [
+      "wudu_area",
+      "badong_area",
+      "guanghan_area"
+    ],
+    "chuannan_area": [
+      "south_zangke_area",
+      "zangke_area",
+      "yizhou_area"
+    ],
+    "chukotka_area": [
+      "western_sushen_area",
+      "inbollo_area",
+      "chha_hol_area"
+    ],
+    "cicigar_area": [
+      "yunzhong_area_southern",
+      "shang_area_northern",
+      "xihe_area_eastern"
+    ],
+    "circassia_area": [
+      "caucasus_mons",
+      "sarmatia_hyrcania_area",
+      "phasis_area"
+    ],
+    "connacht_area": [
+      "hibernia_west",
+      "hibernia_borealis",
+      "hibernia_inferior"
+    ],
+    "corsica_sardinia_area": [
+      "sardinia_falisca_area",
+      "sardinia_turritana_area",
+      "sardinia_caralitana_area"
+    ],
+    "crimea_area": [
+      "taurica_area",
+      "chersonesus_zenonis",
+      "taphrae_area"
+    ],
+    "curonia_area": [
+      "glaesum_area",
+      "hyperborea_area",
+      "transvistuliana_area"
+    ],
+    "cyrenaica_area": [
+      "cyrenaica_west",
+      "cyrenaica_east",
+      "nasamonia_area"
+    ],
+    "dagbon_area": [
+      "dogo_area",
+      "kainji_area",
+      "hausa_area"
+    ],
+    "dagestan_area": [
+      "caucasus_east",
+      "scythia_caspica",
+      "iberia_east"
+    ],
+    "damot_area": [
+      "calaa_area",
+      "zankor_area",
+      "syrbotae_area"
+    ],
+    "darfur_central_sahara_area": [
+      "alitampi_area",
+      "tagama_area",
+      "melano_gaetulia"
+    ],
+    "delta_area": [
+      "ament_area",
+      "khaset",
+      "aneb_hetch"
+    ],
+    "dendi_area": [
+      "dendebre_area",
+      "casena_area",
+      "memea_area"
+    ],
+    "denmark_area": [
+      "scandza_area",
+      "scandiae_insulae_area",
+      "visigothica_area"
+    ],
+    "desh_area": [
+      "sahyadri_area",
+      "anupa_west",
+      "janasthana_area"
+    ],
+    "dhofar_area": [
+      "makan_area",
+      "omanitis_area",
+      "ichtyophagorum_sinus"
+    ],
+    "djerba_area": [
+      "emporia_area",
+      "gaetulia",
+      "tripolitania_west"
+    ],
+    "dongola_area": [
+      "meroe_insula_area",
+      "meroe_area",
+      "cataracta_quarta"
+    ],
+    "east_adriatic_coast_area": [
+      "dalmatia_area",
+      "dalmatia_interior",
+      "alpes_dalmatia"
+    ],
+    "east_anglia_area": [
+      "corieltauvorum_area",
+      "icenorum_area",
+      "londinium_area"
+    ],
+    "east_azbin_area": [
+      "garamantum_ulterior",
+      "biram_area",
+      "memea_area"
+    ],
+    "east_bavaria_area": [
+      "alpes_noricae",
+      "noricum_area",
+      "raetia_prima"
+    ],
+    "east_bengal_area": [
+      "agartala_vanga_area",
+      "east_vanga_area",
+      "wari_bateshwar_area"
+    ],
+    "east_dniepr_area": [
+      "budinia_area",
+      "sarmatia_deserta_area",
+      "gelonia_area"
+    ],
+    "east_heilongjiang_area": [
+      "sushen_area",
+      "inbollo_area",
+      "chha_hol_area",
+      "western_sushen_area",
+      "yilou_area",
+      "bukbuyeo_area",
+      "dongbuyeo_area"
+    ],
+    "east_java_area": [
+      "suvarnagiri_area",
+      "melayu_area",
+      "batak_area"
+    ],
+    "east_midlands_area": [
+      "corieltauvorum_area",
+      "brigantum_area",
+      "cornoviorum_area"
+    ],
+    "east_prussia_area": [
+      "hyperborea_area",
+      "transvistuliana_area",
+      "vistula_area"
+    ],
+    "east_sahara_area": [
+      "oasis_magna_prima",
+      "augila_area",
+      "ammonium_area"
+    ],
+    "eastern_chubu_area": [
+      "bungo_area",
+      "higo_area",
+      "north_saikaido_area"
+    ],
+    "eastern_kanto_area": [
+      "north_saikaido_area",
+      "bungo_area",
+      "higo_area"
+    ],
+    "eastern_korea_area": [
+      "kamme_baeki_area",
+      "nannan_area",
+      "jinhan_area",
+      "poryumji_area",
+      "sinwolson_area",
+      "soyabol_area",
+      "saro_area",
+      "silla_area",
+      "yecheon_area",
+      "byeonhan_area"
+    ],
+    "eastern_mongolia": [
+      "yunzhong_area_southern",
+      "shang_area_northern",
+      "shang_area"
+    ],
+    "eastern_norway": [
+      "aetelrugia_area",
+      "raumaricia_area",
+      "suehonia_area"
+    ],
+    "erzgebirge_area": [
+      "suebia_transdanuvia",
+      "deserta_boiorum",
+      "gabreta_hyle"
+    ],
+    "erzurum_area": [
+      "orbalisene_area",
+      "acilisene_area",
+      "west_sacasene_area",
+      "basilisene_area",
+      "bolbene_area",
+      "sophene_area",
+      "chorzene_area",
+      "armenia_minor"
+    ],
+    "estonia_ingria_area": [
+      "glaesum_area",
+      "hyperborea_area",
+      "transvistuliana_area"
+    ],
+    "extremadura_area": [
+      "lusitania_east",
+      "emeritanus_area",
+      "lassira_area"
+    ],
+    "farsistan_area": [
+      "paraepaphitis_area",
+      "persepolis_area",
+      "paraetacene_area"
+    ],
+    "ferghana_area": [
+      "fergana_lower_area",
+      "fergana_media_area",
+      "fergana_area"
+    ],
+    "fez_area": [
+      "diur_mons",
+      "tingitana_west",
+      "tingitana_east"
+    ],
+    "fezzan_area": [
+      "libya_west",
+      "deserta_numidia",
+      "tripolitania_east"
+    ],
+    "finland_area": [
+      "gothica_insulae_area",
+      "suehonia_area",
+      "ostrogothica_area"
+    ],
+    "flanders_area": [
+      "belgica_prima",
+      "belgica_secunda",
+      "belgica_maritimae"
+    ],
+    "frisia_area": [
+      "germania_inferior",
+      "batavorum_area",
+      "mogontiacum_area"
+    ],
+    "fujian_area": [
+      "minzhong_area",
+      "minzhong_area_north"
+    ],
+    "furdan_area": [
+      "yilou_area",
+      "sushen_area",
+      "dongbuyeo_area",
+      "chha_hol_area",
+      "bukokjeo_area",
+      "inbollo_area"
+    ],
+    "futa_jallon_area": [
+      "hesperia_aethiopia",
+      "manneh_area",
+      "massitholus_area"
+    ],
+    "galich_area": [
+      "nesietis_regio",
+      "aorsia",
+      "upper_aorsia"
+    ],
+    "galicia_area": [
+      "limicensis_area",
+      "gallaecia_east_area",
+      "asturica_area"
+    ],
+    "gansu_area": [
+      "tianshui_area_eastern",
+      "tianshui_area",
+      "anding_area_western"
+    ],
+    "garjat_area": [
+      "vidarbha_area",
+      "utkala_south_area",
+      "musika_area"
+    ],
+    "gaur_area": [
+      "anga_south",
+      "anga_area",
+      "prasuhma_area"
+    ],
+    "gird_area": [
+      "karusha_north",
+      "virata_area",
+      "dasarna_area"
+    ],
+    "golconda_area": [
+      "andhraka_north",
+      "orugallu_area",
+      "upper_krishnaveni_area"
+    ],
+    "gondwana_area": [
+      "vidarbha_north",
+      "vidarbha_area",
+      "vakataka_area"
+    ],
+    "gotaland_area": [
+      "suehonia_area",
+      "ostrogothica_area",
+      "gothica_insulae_area"
+    ],
+    "guangdong_area": [
+      "nanhai_area",
+      "nanhai_area_north"
+    ],
+    "guangxi_area": [
+      "guilin_area",
+      "guilin_area_west",
+      "hepu_area"
+    ],
+    "guangzhou_area": [
+      "nanhai_area",
+      "nanhai_area_north"
+    ],
+    "guinea_coast_area": [
+      "manneh_area",
+      "accra_area",
+      "akan_area"
+    ],
+    "gulf_of_guinea_area": [
+      "gobir_area",
+      "nigir_area",
+      "edo_area"
+    ],
+    "guyenne_area": [
+      "aquitania_prima",
+      "aquitania_tertia",
+      "burdigala_area"
+    ],
+    "hadiya_area": [
+      "astapus_area",
+      "melanorum_area",
+      "golaissae_area"
+    ],
+    "hadramut_area": [
+      "hadramaut_area",
+      "libanotophoros_regio",
+      "myrrhifera_exterior"
+    ],
+    "hamgyeong_area": [
+      "ye_area",
+      "kugwonson_area",
+      "okjeo_area",
+      "puri_area",
+      "upper_yalu_area",
+      "bukokjeo_area",
+      "biryu_area",
+      "xuantu_area",
+      "maek_area"
+    ],
+    "hausa_area": [
+      "biram_area",
+      "nok_area",
+      "memea_area"
+    ],
+    "hautes_plaines_area": [
+      "caesariensis_west",
+      "madethubadus_area",
+      "caesariensis_east"
+    ],
+    "hebei_area": [
+      "youbeiping_area",
+      "hejian_area",
+      "liaoxi_area"
+    ],
+    "heilongjiang_area": [
+      "western_sushen_area",
+      "inbollo_area",
+      "toge_area",
+      "sushen_area",
+      "chha_hol_area",
+      "bukbuyeo_area",
+      "buyeo_area"
+    ],
+    "henan_area": [
+      "huaiyang_area",
+      "yingchuan_area",
+      "runan_area"
+    ],
+    "herat_area": [
+      "aratha_area",
+      "maxerane_area",
+      "haomana_area"
+    ],
+    "hesse_area": [
+      "moenus_area",
+      "rhenus_area",
+      "nertereansis_area"
+    ],
+    "highlands_area": [
+      "britannae_insulae",
+      "caledonia_superior",
+      "graupius_mons"
+    ],
+    "himalayan_hills_area": [
+      "himalaya_area",
+      "kapilavastu_area",
+      "sthanisvara_area"
+    ],
+    "hinter_pommern_area": [
+      "transvistuliana_area",
+      "vistula_area",
+      "carrodumum_area"
+    ],
+    "hoggar_area": [
+      "lixiane_area",
+      "libya_west",
+      "gaetulia_darae"
+    ],
+    "hokkaido_area": [
+      "north_saikaido_area",
+      "higo_area",
+      "tsushima_area"
+    ],
+    "hokuriku_area": [
+      "north_saikaido_area",
+      "higo_area",
+      "bungo_area"
+    ],
+    "holland_area": [
+      "batavorum_area",
+      "belgica_prima",
+      "germania_inferior"
+    ],
+    "holstein_area": [
+      "treva_area",
+      "caucia_minor",
+      "cimbricus_chersonesus"
+    ],
+    "home_counties_area": [
+      "londinium_area",
+      "icenorum_area",
+      "dubris_area"
+    ],
+    "hudavendigar_area": [
+      "propontis_area",
+      "heraclea_pontica",
+      "maryandinia_area",
+      "bosporos_area",
+      "asian_hellospont_area",
+      "bithynia_area",
+      "bithynia_superior_area",
+      "mysia_area"
+    ],
+    "huguang_area": [
+      "jiangxia_area",
+      "jiangxia_area_south",
+      "nan_area",
+      "nan_area_east",
+      "north_nan_area",
+      "north_nan_area_west"
+    ],
+    "hunan_area": [
+      "changsha_area",
+      "changsha_area_south",
+      "guiyang_area",
+      "guiyang_area_west",
+      "wuling_area",
+      "wuling_area_south"
+    ],
+    "iceland_area": [
+      "aetelrugia_area",
+      "raumaricia_area",
+      "scandiae_insulae_area"
+    ],
+    "ifat_area": [
+      "atalmo_area",
+      "tiami_area",
+      "sembobitis_area"
+    ],
+    "ilan_hala_area": [
+      "yilou_area",
+      "chha_hol_area",
+      "sushen_area",
+      "inbollo_area",
+      "dongbuyeo_area",
+      "bukbuyeo_area"
+    ],
+    "ile_de_france_area": [
+      "lutetia_area",
+      "belgica_secunda",
+      "liger_area"
+    ],
+    "imereti_area": [
+      "ecrecticene_area",
+      "colchis_superior",
+      "colchis_inferior"
+    ],
+    "indian_ocean_islands_area": [
+      "barus_area",
+      "melayu_area",
+      "suvarnagiri_area"
+    ],
+    "inner_austria_area": [
+      "vindobona_area",
+      "alpes_noricae",
+      "alpes_carnae"
+    ],
+    "inner_mongolia_area": [
+      "yunzhong_area_southern",
+      "xihe_area_eastern",
+      "shang_area_northern"
+    ],
+    "iraq_arabi_area": [
+      "babylonia_area",
+      "akkad_area",
+      "upper_chaldea"
+    ],
+    "iraq_e_ajam_area": [
+      "choarene_area",
+      "caspius_mons",
+      "artacene_area"
+    ],
+    "irkutsk_area": [
+      "southern_wuhuan_area",
+      "lower_irtysh_area",
+      "sayan_area"
+    ],
+    "isfahan_area": [
+      "sagartia_east",
+      "paraetacene_area",
+      "temisdia_area"
+    ],
+    "ishim_area": [
+      "hentey_area",
+      "orkhon_area",
+      "khangai_area"
+    ],
+    "jaipur_area": [
+      "abhira_area",
+      "besnagara_area",
+      "abhiradesa_area"
+    ],
+    "jambi_area": [
+      "suvarnagiri_area",
+      "panai_area",
+      "melayu_area"
+    ],
+    "jangladesh_area": [
+      "abhira_area",
+      "abhiradesa_area",
+      "sindhu_area"
+    ],
+    "jenne_area": [
+      "tegazza_area",
+      "acha_area",
+      "gurma_area"
+    ],
+    "jharkhand_area": [
+      "odra_area",
+      "south_odra",
+      "mahanadi_area"
+    ],
+    "jiangsu_area": [
+      "donghai_area",
+      "donghai_area_north",
+      "donghai_area_south",
+      "linhuai_area",
+      "linhuai_area_south"
+    ],
+    "jiangxi_area": [
+      "yuzhang_area",
+      "yuzhang_area_south",
+      "jiujiang_area",
+      "jiujiang_area_west"
+    ],
+    "jilin_area": [
+      "seobuyeo_area",
+      "miylson_area",
+      "buyeo_area",
+      "bukbuyeo_area",
+      "maek_area",
+      "biryu_area",
+      "inbollo_area",
+      "chha_hol_area"
+    ],
+    "johor_area": [
+      "panpan_area",
+      "tambralinga_area",
+      "oranglaut_area"
+    ],
+    "jolof_area": [
+      "mandori_area",
+      "massitholus_area",
+      "sinus_hespericus_area"
+    ],
+    "jubba_area": [
+      "melanorum_area",
+      "cadupi_area",
+      "golaissae_area"
+    ],
+    "jutland_area": [
+      "raumaricia_area",
+      "scandiae_insulae_area",
+      "scandza_area"
+    ],
+    "kabylia_area": [
+      "cartenna_area",
+      "gaetulia",
+      "mauretania_sitifensis"
+    ],
+    "kachin_area": [
+      "putao_area",
+      "upper_lauhitya",
+      "halin_area"
+    ],
+    "kalat_area": [
+      "sattagydia_area",
+      "india_alba",
+      "pactyene_area"
+    ],
+    "kalimantan_area": [
+      "panai_area",
+      "suvarnagiri_area",
+      "batak_area"
+    ],
+    "kama_area": [
+      "aorsia",
+      "upper_aorsia",
+      "nesietis_regio"
+    ],
+    "kamchatka_area": [
+      "yilou_area",
+      "sushen_area",
+      "chha_hol_area"
+    ],
+    "kanara_area": [
+      "konkana_area",
+      "karavira_area",
+      "gomanta_area"
+    ],
+    "kanem_area": [
+      "tagama_area",
+      "melano_gaetulia",
+      "garamantum_ulterior"
+    ],
+    "kanto_area": [
+      "bungo_area",
+      "north_saikaido_area",
+      "higo_area"
+    ],
+    "kara_area": [
+      "hanhai_area",
+      "xianbei_steppe_area",
+      "khangai_area"
+    ],
+    "karaman_area": [
+      "iconion_area",
+      "tyanitys_area",
+      "chammanene_area",
+      "isauria_area",
+      "saravene_area",
+      "saravene_superior_area",
+      "cappadocia_inferior_area",
+      "lycaonia_area"
+    ],
+    "karelia_area": [
+      "germano_sarmatia",
+      "sarmatia_deserta_area",
+      "neuri_area"
+    ],
+    "karenni_area": [
+      "manglon_area",
+      "karenni_area",
+      "kengtung_area"
+    ],
+    "kartli_kakheti_area": [
+      "lynitis_area",
+      "cambysene_area",
+      "sapiri_area"
+    ],
+    "kashgaria_area": [
+      "imaus_mons_area",
+      "fergana_area",
+      "fergana_media_area"
+    ],
+    "kashmir_area": [
+      "north_pamir_area",
+      "gandhara_area",
+      "katocha_area"
+    ],
+    "kastamonu_area": [
+      "pontus_cappadocicus_area",
+      "paryadres_area",
+      "pontus_area",
+      "pontus_maritimae",
+      "sinope_area",
+      "chaldea_anatolia_area"
+    ],
+    "katehar_area": [
+      "keshin_area",
+      "panchala_area",
+      "suparsa_area"
+    ],
+    "katsina_area": [
+      "biram_area",
+      "casena_area",
+      "memea_area"
+    ],
+    "kazakhstan_area": [
+      "tuul_area",
+      "riphaean_mons_area",
+      "orkhon_area"
+    ],
+    "kazan_area": [
+      "aorsia",
+      "nesietis_regio",
+      "upper_aorsia"
+    ],
+    "kenya_area": [
+      "rhypaei_area",
+      "syrbotae_area",
+      "aethiopia_superior"
+    ],
+    "kerman_area": [
+      "carmania_deserta",
+      "agdinitis_area",
+      "paraepaphitis_area"
+    ],
+    "kham_area": [
+      "kham_area",
+      "qiang_area",
+      "nangqen_area"
+    ],
+    "khandesh_area": [
+      "uparichara_area",
+      "karusha_area",
+      "besnagara_area"
+    ],
+    "khiva_area": [
+      "chorasamia_media_area",
+      "chorasamia_ostia_area",
+      "chorasamia_area"
+    ],
+    "khorat_area": [
+      "savaka_area",
+      "khanthapura_area",
+      "sukhothai_area"
+    ],
+    "khuzestan_area": [
+      "cabandene_area",
+      "susiane_area",
+      "taocene_area"
+    ],
+    "kingdom_of_the_isles_area": [
+      "britannae_insulae",
+      "caledonia_superior",
+      "graupius_mons"
+    ],
+    "kolyma_area": [
+      "western_sushen_area",
+      "inbollo_area",
+      "chha_hol_area"
+    ],
+    "komi_area": [
+      "aorsia",
+      "upper_aorsia",
+      "nesietis_regio"
+    ],
+    "kong_area": [
+      "akan_area",
+      "kwahu_area",
+      "mima_area"
+    ],
+    "kongu_area": [
+      "kongu_nadu_area",
+      "kuda_nadu_area",
+      "coleyas_area"
+    ],
+    "konkan_area": [
+      "aparanta_area",
+      "anupa_west",
+      "dandaka_area"
+    ],
+    "kutai_area": [
+      "sulu_area",
+      "unayan_area",
+      "maguindanao_area"
+    ],
+    "kuyavia_area": [
+      "transvistuliana_area",
+      "vistula_area",
+      "hyperborea_area"
+    ],
+    "kyushu_area": [
+      "hyuga_area",
+      "south_saikaido_area",
+      "bungo_area"
+    ],
+    "kyzylkum_area": [
+      "oxia_deserta",
+      "sakadahyu_zranka_area",
+      "massagetica_area"
+    ],
+    "lahore_area": [
+      "vatadhana_area",
+      "katocha_area",
+      "sagala_area"
+    ],
+    "languedoc_area": [
+      "tectosagia_area",
+      "arecomicia_area",
+      "ilercavonesis_area"
+    ],
+    "lanka_area": [
+      "rajarata_area",
+      "pacina_desa_area",
+      "polonnaruwa_area"
+    ],
+    "laponia_area": [
+      "gothica_insulae_area",
+      "suehonia_area",
+      "aetelrugia_area"
+    ],
+    "lazio_area": [
+      "latium_area",
+      "latium_novum_area",
+      "sabinia_area"
+    ],
+    "leinster_area": [
+      "hibernia_east",
+      "hibernia_borealis",
+      "hibernia_inferior"
+    ],
+    "leon_area": [
+      "segovia_area",
+      "cantabria_area",
+      "lucensis_area"
+    ],
+    "lesser_sunda_islands_area": [
+      "maguindanao_area",
+      "sulu_area",
+      "suvarnagiri_area"
+    ],
+    "liaoning_area": [
+      "liaodong_area",
+      "miylson_area",
+      "liaodong_area_northern",
+      "yiju_area",
+      "syuantu_area",
+      "cholbon_area",
+      "ului_area",
+      "maek_area",
+      "seobuyeo_area"
+    ],
+    "liguria_area": [
+      "liguria_area",
+      "liguria_septentrionalis_area",
+      "alpes_cottiae"
+    ],
+    "lithuania_area": [
+      "hyperborea_area",
+      "glaesum_area",
+      "transvistuliana_area"
+    ],
+    "livonia_area": [
+      "glaesum_area",
+      "hyperborea_area",
+      "transvistuliana_area"
+    ],
+    "lombardy_area": [
+      "alpes_cottiae",
+      "transpadana_area",
+      "cenomania_area"
+    ],
+    "lorraine_area": [
+      "remorum_area",
+      "belgica_prima",
+      "alesia_area"
+    ],
+    "lower_andalucia_area": [
+      "turdetani_area",
+      "lusitania_south_area",
+      "hispalensis_area"
+    ],
+    "lower_bavaria_area": [
+      "raetia_secunda",
+      "raetia_prima",
+      "deserta_boiorum"
+    ],
+    "lower_burma_area": [
+      "dagon_area",
+      "thaton_area",
+      "zhanli_area"
+    ],
+    "lower_don_area": [
+      "sarmatia_ulterior",
+      "lower_tanais",
+      "upper_tanais"
+    ],
+    "lower_niger_area": [
+      "gobir_area",
+      "nok_area",
+      "adamawa_area"
+    ],
+    "lower_nubia_area": [
+      "blemmyorum_area",
+      "nubia_citerior",
+      "troglodytica_area"
+    ],
+    "lower_rhineland_area": [
+      "mogontiacum_area",
+      "germania_inferior",
+      "agri_decumates"
+    ],
+    "lower_saxony_area": [
+      "suebia_west",
+      "caucia_major",
+      "treva_area"
+    ],
+    "lower_swabia_area": [
+      "germania_superior",
+      "alpes_raetae",
+      "helvetica_area"
+    ],
+    "lower_volta_area": [
+      "mima_area",
+      "owo_area",
+      "dogo_area"
+    ],
+    "lower_yik_area": [
+      "araxes_area",
+      "atara_area",
+      "hippicia_area"
+    ],
+    "lowlands_area": [
+      "caledonia_superior",
+      "graupius_mons",
+      "caledonia_inferior"
+    ],
+    "luba_area": [
+      "thala_mons_area",
+      "xylinces_area",
+      "odrangidi_area"
+    ],
+    "luristan_area": [
+      "charbanus_mons",
+      "siggrane_area",
+      "kossiane_area"
+    ],
+    "lusatia_area": [
+      "sarmatici_mons",
+      "suebia_transdanuvia",
+      "medoslanum_area"
+    ],
+    "luzon_area": [
+      "south_luzon_area",
+      "east_luzon_area",
+      "durorui_area"
+    ],
+    "macaronesia_area": [
+      "fortunatae_insulae",
+      "mauretania_ulterior",
+      "mauretania_superior"
+    ],
+    "macedonia_area": [
+      "macedonia_interior_area",
+      "macedonia_secunda",
+      "mygdonia_macedonia_area"
+    ],
+    "madagascar_highlands_area": [
+      "elephas_area",
+      "azania_area",
+      "barbaria_area"
+    ],
+    "madura_area": [
+      "kakkanadu_area",
+      "venadu_area",
+      "kaandhal_kura_nadu_area"
+    ],
+    "magadan_area": [
+      "yilou_area",
+      "sushen_area",
+      "inbollo_area"
+    ],
+    "mahra_area": [
+      "makan_area",
+      "omanitis_area",
+      "libanotophoros_regio"
+    ],
+    "maidan_area": [
+      "asmaka_south",
+      "mulaka_area",
+      "asmaka_east"
+    ],
+    "majarteen_area": [
+      "elephas_area",
+      "sembobitis_area",
+      "tiami_area"
+    ],
+    "makassar_area": [
+      "maguindanao_area",
+      "sulu_area",
+      "davao_area"
+    ],
+    "makran_area": [
+      "saranga_area",
+      "makarene_area",
+      "paricania_area"
+    ],
+    "malabar_area": [
+      "mushika_area",
+      "cera_payaal_malai_area",
+      "kakkanadu_area"
+    ],
+    "malacca_area": [
+      "jahai_area",
+      "semai_area",
+      "semaq_area"
+    ],
+    "malaya_area": [
+      "tambralinga_area",
+      "jahai_area",
+      "cahaya_area"
+    ],
+    "malopolska_area": [
+      "sarmatici_mons",
+      "suebia_transdanuvia",
+      "transvistuliana_area"
+    ],
+    "manding_area": [
+      "accra_area",
+      "dangra_area",
+      "gyaaman_area"
+    ],
+    "marrekesh_area": [
+      "mauretania_superior",
+      "mauretania_ulterior",
+      "atlas_mons"
+    ],
+    "marwar_area": [
+      "abhira_area",
+      "sauvira_area",
+      "deserta_indica_area"
+    ],
+    "mascarenes_area": [
+      "elephas_area",
+      "azania_area",
+      "barbaria_area"
+    ],
+    "mascat_area": [
+      "makan_area",
+      "ichtyophagorum_sinus",
+      "omanitis_area"
+    ],
+    "mashhad_area": [
+      "comisene_area",
+      "sipharene_area",
+      "traxiene_area"
+    ],
+    "massif_central_area": [
+      "cebenna_mons",
+      "arvernica_area",
+      "avaricum_area"
+    ],
+    "massina_area": [
+      "dangra_area",
+      "gyaaman_area",
+      "kwahu_area"
+    ],
+    "mazovia_area": [
+      "transvistuliana_area",
+      "hyperborea_area",
+      "vistula_area"
+    ],
+    "mecca_area": [
+      "main_area",
+      "myrrhifera_interior",
+      "cinaedocolpitis"
+    ],
+    "mecklenburg_area": [
+      "burgundica_area",
+      "rugia_area",
+      "suebia_west"
+    ],
+    "minangkabau_area": [
+      "barus_area",
+      "melayu_area",
+      "batak_area"
+    ],
+    "mindanao_area": [
+      "amihanan_area",
+      "butuan_area",
+      "tandaya_area"
+    ],
+    "minsk_area": [
+      "germano_sarmatia",
+      "budinia_area",
+      "sarmatia_deserta_area"
+    ],
+    "mithila_area": [
+      "south_kikata_area",
+      "magadha_area",
+      "kikata_area"
+    ],
+    "mittelmark_area": [
+      "carrodumum_area",
+      "viadrus_area",
+      "vistula_area"
+    ],
+    "mogadishu_area": [
+      "sembobitis_area",
+      "tiami_area",
+      "cadupi_area"
+    ],
+    "mogostan_area": [
+      "agdinitis_area",
+      "carmania_deserta",
+      "utia_area"
+    ],
+    "moldavia_area": [
+      "alpes_bastarnicae",
+      "dacia_superior",
+      "dacia_maluensis"
+    ],
+    "molluca_area": [
+      "davao_area",
+      "maguindanao_area",
+      "butuan_area"
+    ],
+    "mombasa_area": [
+      "barbaria_area",
+      "azania_area",
+      "elephas_area"
+    ],
+    "moravia_area": [
+      "suebia_transdanuvia",
+      "sarmatici_mons",
+      "transvistuliana_area"
+    ],
+    "morea_area": [
+      "corinthia_area",
+      "arcadia_area",
+      "achaea_area"
+    ],
+    "moscow_area": [
+      "sarmatia_deserta_area",
+      "osilica_area",
+      "thyssagetae_area"
+    ],
+    "mozambique_area": [
+      "azania_area",
+      "elephas_area",
+      "barbaria_area"
+    ],
+    "multan_area": [
+      "malloi_area",
+      "amvastha_area",
+      "sindhu_area"
+    ],
+    "munster_area": [
+      "hibernia_west",
+      "hibernia_inferior",
+      "hibernia_citerior"
+    ],
+    "mysore_area": [
+      "kishkindha_area",
+      "karanataka_area",
+      "dravida_west"
+    ],
+    "nafud_area": [
+      "arabia_felix_area",
+      "arabia_magna",
+      "deserta_arabia"
+    ],
+    "naga_hills_area": [
+      "upper_lauhitya",
+      "lauhitya_area",
+      "prakjyotisha_area"
+    ],
+    "naples_area": [
+      "daunia_area",
+      "campania_area",
+      "lucania_area"
+    ],
+    "nepal_area": [
+      "gopala_area",
+      "south_kikata_area",
+      "chomolangma_area"
+    ],
+    "ngari_area": [
+      "jangtang_area",
+      "zhanzhung_area",
+      "ladakh_area"
+    ],
+    "ngonde_area": [
+      "odrangidi_area",
+      "rhypaei_area",
+      "syrbotae_area"
+    ],
+    "niger_bend_area": [
+      "gurma_area",
+      "tegazza_area",
+      "acha_area"
+    ],
+    "ningguta_area": [
+      "dongbuyeo_area",
+      "chha_hol_area",
+      "sushen_area",
+      "buyeo_area",
+      "inbollo_area",
+      "bukbuyeo_area",
+      "kugwonson_area",
+      "seobuyeo_area",
+      "bukokjeo_area"
+    ],
+    "nogai_area": [
+      "aorsia",
+      "upper_aorsia",
+      "atara_area"
+    ],
+    "normandy_area": [
+      "venellica_area",
+      "armorica_area",
+      "lutetia_area"
+    ],
+    "norrland_area": [
+      "gothica_insulae_area",
+      "suehonia_area",
+      "aetelrugia_area"
+    ],
+    "north_bengal_area": [
+      "prasuhma_area",
+      "anga_area",
+      "north_vrji_area"
+    ],
+    "north_brabant_area": [
+      "batavorum_area",
+      "germania_inferior",
+      "mogontiacum_area"
+    ],
+    "north_carnatic_area": [
+      "andhraka_north",
+      "upper_krishnaveni_area",
+      "pulli_nadu_area"
+    ],
+    "north_henan_area": [
+      "runan_area",
+      "fufeng_area",
+      "huaiyang_area"
+    ],
+    "north_karelia": [
+      "germano_sarmatia",
+      "sarmatia_deserta_area",
+      "scythia_aroteria_area"
+    ],
+    "north_kurdistan_area": [
+      "corduene_area",
+      "basilisene_area",
+      "astianene_area",
+      "arrhene_area",
+      "tospites_area",
+      "basoropeda_area",
+      "hanzitene_area",
+      "araxene_area",
+      "sophanene_area"
+    ],
+    "north_laos_area": [
+      "namxam_area",
+      "namha_area",
+      "lixian_area"
+    ],
+    "north_malaya_area": [
+      "cahaya_area",
+      "langkasuka_area",
+      "semaq_area"
+    ],
+    "north_rhine_area": [
+      "germania_inferior",
+      "mogontiacum_area",
+      "batavorum_area"
+    ],
+    "north_saharan_area": [
+      "caesariensis_east",
+      "gaetulia",
+      "emporia_area"
+    ],
+    "north_sumatra_area": [
+      "aceh_area",
+      "langkasuka_area",
+      "semaq_area"
+    ],
+    "north_tenasserim_area": [
+      "tanintharyi_area",
+      "rajapura_area",
+      "suvarnapura_area"
+    ],
+    "north_westphalia_area": [
+      "frisia_area",
+      "albis_area",
+      "cheruscia_area"
+    ],
+    "north_zungaria": [
+      "western_dzungaria_area",
+      "danhuan_area",
+      "south_dzungaria_area"
+    ],
+    "northern_greece_area": [
+      "doris_greece_area",
+      "thesprotia_area",
+      "perrhaebia_area"
+    ],
+    "northern_kyushu": [
+      "north_saikaido_area",
+      "tsushima_area",
+      "higo_area"
+    ],
+    "northern_morocco_area": [
+      "tingitana_west",
+      "diur_mons",
+      "mauretania_superior"
+    ],
+    "northern_norway": [
+      "aetelrugia_area",
+      "gothica_insulae_area",
+      "suehonia_area"
+    ],
+    "northern_papua_area": [
+      "davao_area",
+      "butuan_area",
+      "maguindanao_area"
+    ],
+    "northern_sindh_area": [
+      "sauvira_area",
+      "prasiane_area",
+      "aporapa_area"
+    ],
+    "northern_swahili_coast_area": [
+      "elephas_area",
+      "azania_area",
+      "akridophagia_area"
+    ],
+    "northern_thai_area": [
+      "kengtung_area",
+      "upper_mekong_area",
+      "mongnawn_area"
+    ],
+    "novgorod_area": [
+      "sarmatia_deserta_area",
+      "germano_sarmatia",
+      "neuri_area"
+    ],
+    "ob_area": [
+      "xianbei_steppe_area",
+      "hanhai_area",
+      "north_wuhuan_area"
+    ],
+    "ogaden_area": [
+      "tiami_area",
+      "bangenia_area",
+      "sembobitis_area"
+    ],
+    "oka_area": [
+      "sarmatia_deserta_area",
+      "thyssagetae_area",
+      "osilica_area"
+    ],
+    "okhotsk_area": [
+      "western_sushen_area",
+      "inbollo_area",
+      "sushen_area"
+    ],
+    "oman_area": [
+      "makan_area",
+      "ichtyophagorum_sinus",
+      "omanitis_area"
+    ],
+    "ordos_area": [
+      "jiuyuan_area_northern",
+      "xihe_area",
+      "jiuyuan_area"
+    ],
+    "orissa_area": [
+      "mahendra_proper_area",
+      "sabara_north",
+      "rajapuram_area"
+    ],
+    "orleans_area": [
+      "limonum_area",
+      "lutetia_area",
+      "haeduica_area"
+    ],
+    "ostra_svealand_area": [
+      "gothica_insulae_area",
+      "suehonia_area",
+      "ostrogothica_area"
+    ],
+    "oudh_area": [
+      "south_kikata_area",
+      "magadha_area",
+      "south_suparsa_area"
+    ],
+    "ouled_nail_area": [
+      "caesariensis_east",
+      "cartenna_area",
+      "gaetulia"
+    ],
+    "outer_mongolia_area": [
+      "yunzhong_area",
+      "jiuyuan_area_northern",
+      "jiuyuan_area"
+    ],
+    "palatinate_area": [
+      "agri_decumates",
+      "mogontiacum_area",
+      "helvetica_area"
+    ],
+    "palawan_area": [
+      "palawan_area",
+      "simsiman_area",
+      "bisayas_area"
+    ],
+    "palestine_area": [
+      "philistaeia_area",
+      "idumaea_area",
+      "ascalonitis_area"
+    ],
+    "papua_area": [
+      "davao_area",
+      "maguindanao_area",
+      "butuan_area"
+    ],
+    "patan_area": [
+      "abhiradesa_area",
+      "abhira_area",
+      "nishada_area"
+    ],
+    "perm_area": [
+      "upper_aorsia",
+      "aorsia",
+      "nesietis_regio"
+    ],
+    "persian_gulf_coast": [
+      "rudiane_area",
+      "utia_area",
+      "persepolis_area"
+    ],
+    "picardy_area": [
+      "belgica_maritimae",
+      "belgica_secunda",
+      "belgica_prima"
+    ],
+    "piedmont_area": [
+      "alpes_cottiae",
+      "liguria_septentrionalis_area",
+      "transpadana_area"
+    ],
+    "pirate_coast_area": [
+      "makan_area",
+      "ichtyophagorum_sinus",
+      "omanitis_area"
+    ],
+    "po_valley_area": [
+      "transpadana_area",
+      "cenomania_area",
+      "aemilia_area"
+    ],
+    "podlasie_area": [
+      "germano_sarmatia",
+      "rhodes_area",
+      "sarmatia_deserta_area"
+    ],
+    "podolia_volhynia_area": [
+      "germano_sarmatia",
+      "rhodes_area",
+      "stavanica_area"
+    ],
+    "poitou_area": [
+      "santonica_area",
+      "pictonica_area",
+      "aquitania_prima"
+    ],
+    "pomor_area": [
+      "sarmatia_deserta_area",
+      "germano_sarmatia",
+      "sarmatia_ulterior"
+    ],
+    "pripyat_area": [
+      "germano_sarmatia",
+      "sarmatia_deserta_area",
+      "budinia_area"
+    ],
+    "provence_area": [
+      "alpes_maritimae",
+      "arecomicia_area",
+      "rhoda_area"
+    ],
+    "pskov_area": [
+      "germano_sarmatia",
+      "sarmatia_deserta_area",
+      "stavanica_area"
+    ],
+    "purvanchal_area": [
+      "south_kikata_area",
+      "magadha_area",
+      "kikata_area"
+    ],
+    "pyongan_area": [
+      "syuantu_area",
+      "liaodong_area",
+      "liaodong_area_northern",
+      "ului_area",
+      "cholbon_area",
+      "jeungji_area",
+      "xuantu_area",
+      "ye_area",
+      "yiju_area",
+      "lelang_area",
+      "maek_area",
+      "upper_yalu_area"
+    ],
+    "pyrenees_area": [
+      "pyrenaei_mons",
+      "aquitania_tertia",
+      "burdigala_area"
+    ],
+    "qasim_area": [
+      "arabia_felix_area",
+      "main_area",
+      "ichtyophagorum_sinus"
+    ],
+    "raichur_doab_area": [
+      "asika_area",
+      "karavira_area",
+      "kolhapuri_area"
+    ],
+    "rascia_area": [
+      "praevalitana_interior",
+      "sarmates_area",
+      "praevalitana_area"
+    ],
+    "rayalaseema_area": [
+      "upper_krishnaveni_area",
+      "kuntala_area",
+      "asika_area"
+    ],
+    "red_river_delta_area": [
+      "au_lac_area",
+      "lac_viet_area",
+      "giao_chi_area"
+    ],
+    "red_ruthenia_area": [
+      "transvistuliana_area",
+      "suebia_transdanuvia",
+      "sarmatici_mons"
+    ],
+    "red_sea_coast_area": [
+      "adoulis_area",
+      "aethiopia_maritima_area",
+      "tangiatae_area"
+    ],
+    "rejang_area": [
+      "suvarnagiri_area",
+      "melayu_area",
+      "panai_area"
+    ],
+    "romandie_area": [
+      "alpes_cottiae",
+      "cenomania_area",
+      "transpadana_area"
+    ],
+    "rum_area": [
+      "lyeus_area",
+      "paryadres_area",
+      "cappadocia_area",
+      "pontus_cappadocicus_area",
+      "pontus_galaticus_area",
+      "cappadocia_inferior_area"
+    ],
+    "ruvuma_area": [
+      "barbaria_area",
+      "azania_area",
+      "elephas_area"
+    ],
+    "rwanda_area": [
+      "odrangidi_area",
+      "thala_mons_area",
+      "artabatitia_area"
+    ],
+    "ryazan_area": [
+      "thyssagetae_area",
+      "sarmatia_ulterior",
+      "sargatica_area"
+    ],
+    "sabah_area": [
+      "sulu_area",
+      "zamboanga_area",
+      "unayan_area"
+    ],
+    "said_area": [
+      "desertum_aegypticum",
+      "waset_area",
+      "iqer"
+    ],
+    "saigoku_area": [
+      "higo_area",
+      "north_saikaido_area",
+      "bungo_area"
+    ],
+    "sakalava_area": [
+      "azania_area",
+      "elephas_area",
+      "barbaria_area"
+    ],
+    "sakha_area": [
+      "western_sushen_area",
+      "sushen_area",
+      "chha_hol_area"
+    ],
+    "samara_area": [
+      "sattara_area",
+      "atara_area",
+      "nesietis_regio"
+    ],
+    "samogitia_area": [
+      "hyperborea_area",
+      "glaesum_area",
+      "transvistuliana_area"
+    ],
+    "samtskhe_area": [
+      "syspiritis_area",
+      "catarzene_area",
+      "astianene_area"
+    ],
+    "sandomierz_area": [
+      "transvistuliana_area",
+      "suebia_transdanuvia",
+      "sarmatici_mons"
+    ],
+    "sanindo_area": [
+      "north_saikaido_area",
+      "higo_area",
+      "bungo_area"
+    ],
+    "sankuru_area": [
+      "thala_mons_area",
+      "xylinces_area",
+      "odrangidi_area"
+    ],
+    "sao_tome_area": [
+      "owo_area",
+      "mima_area",
+      "edo_area"
+    ],
+    "saratov_area": [
+      "sattara_area",
+      "sarmatia_ulterior",
+      "scythia_amazonica_area"
+    ],
+    "saurashtra_area": [
+      "saurashtra_area",
+      "upper_saurashtra",
+      "sarmista_area"
+    ],
+    "savoy_dauphine_area": [
+      "rhodanus_area",
+      "alpes_graiae",
+      "arecomicia_area"
+    ],
+    "scottish_marches_area": [
+      "valentia_area",
+      "caledonia_inferior",
+      "brigantum_area"
+    ],
+    "sennar_area": [
+      "zankor_area",
+      "syrbotae_area",
+      "calaa_area"
+    ],
+    "serbia_area": [
+      "sarmates_area",
+      "scordiscia_area",
+      "moesia_superior"
+    ],
+    "shaanxi_area": [
+      "anding_area",
+      "tianshui_area_eastern",
+      "beidi_area"
+    ],
+    "shan_hill_area": [
+      "manglon_area",
+      "beikthano_area",
+      "fudandulu_area"
+    ],
+    "shandong_area": [
+      "linzi_area",
+      "langya_area",
+      "chengyang_area"
+    ],
+    "shanshan_area": [
+      "shanshan_area",
+      "khotan_area",
+      "cadota_area"
+    ],
+    "shanxi_area": [
+      "shang_area",
+      "shang_area_northern",
+      "yanmen_area"
+    ],
+    "shewa_area": [
+      "sannar_area",
+      "gambala_area",
+      "sesca_area"
+    ],
+    "shikoku_area": [
+      "higo_area",
+      "north_saikaido_area",
+      "bungo_area"
+    ],
+    "sichuan_area": [
+      "baxi_area",
+      "guanghan_area",
+      "shu_area"
+    ],
+    "sicily_area": [
+      "sicelia_area",
+      "sicani_area",
+      "sicilia_west"
+    ],
+    "silesia_area": [
+      "suebia_transdanuvia",
+      "sarmatici_mons",
+      "transvistuliana_area"
+    ],
+    "silistria_area": [
+      "peucinitis_area",
+      "scythia_minor",
+      "ister_area"
+    ],
+    "sind_sagar_area": [
+      "parusni_area",
+      "trigarta_area",
+      "madra_area"
+    ],
+    "sindh_area": [
+      "aporapa_area",
+      "sauvira_area",
+      "deserta_indica_area"
+    ],
+    "sirhind_area": [
+      "kashi_area",
+      "upper_kashi",
+      "kamyaka_area"
+    ],
+    "sistan_area": [
+      "parsiene_area",
+      "tatacene_area",
+      "drangiana_area"
+    ],
+    "skaneland_area": [
+      "scandza_area",
+      "visigothica_area",
+      "ostrogothica_area"
+    ],
+    "slavonia_area": [
+      "pannonia_savia",
+      "pannonia_secunda",
+      "pannonia_superior"
+    ],
+    "sloboda_ukraine_area": [
+      "scythia_therion_area",
+      "melanchlenia_area",
+      "budinia_area"
+    ],
+    "slovakia_area": [
+      "pannonia_transdanubia",
+      "tisia_area",
+      "biessia_area"
+    ],
+    "smolensk_area": [
+      "sarmatia_deserta_area",
+      "stavanica_area",
+      "neuri_area"
+    ],
+    "somaliland_area": [
+      "elephas_area",
+      "myrrhifera_exterior",
+      "sembobitis_area"
+    ],
+    "south_anhui_area": [
+      "lujiang_area",
+      "hengshan_area",
+      "hengshan_area_north"
+    ],
+    "south_hebei_area": [
+      "north_taiyuan_area",
+      "changshan_area_southern",
+      "changshan_area"
+    ],
+    "south_jiangsu_area": [
+      "danyang_area",
+      "danyang_area_south",
+      "piling_area",
+      "piling_area_south",
+      "wu_area"
+    ],
+    "south_korea_area": [
+      "hubaekje_area",
+      "baekje_area",
+      "geonma_area",
+      "ungjin_area",
+      "chonyi_area",
+      "temogak_paek_area",
+      "guso_area",
+      "sollim_paek_area",
+      "mahan_area"
+    ],
+    "south_lanka_area": [
+      "ruhunu_area",
+      "malaya_ceylon_area",
+      "dakkina_area"
+    ],
+    "south_saxony_area": [
+      "medoslanum_area",
+      "sudeti_montes",
+      "asciburgius_mons"
+    ],
+    "south_sudan_area": [
+      "aethiopia_superior",
+      "artabatitia_area",
+      "astacuri_area"
+    ],
+    "south_sulawesi_area": [
+      "maguindanao_area",
+      "sulu_area",
+      "davao_area"
+    ],
+    "south_sumatra_area": [
+      "suvarnagiri_area",
+      "melayu_area",
+      "batak_area"
+    ],
+    "southern_ethiopia_area": [
+      "syrbotae_area",
+      "astapus_area",
+      "rhypaei_area"
+    ],
+    "southern_luzon_area": [
+      "south_luzon_area",
+      "north_luzon_area",
+      "east_luzon_area"
+    ],
+    "southern_madagascar": [
+      "elephas_area",
+      "azania_area",
+      "akridophagia_area"
+    ],
+    "southern_morocco_area": [
+      "mauretania_ulterior",
+      "cerne_area",
+      "gaetulia_darae"
+    ],
+    "southern_transylvania_area": [
+      "dacia_alutensis_area",
+      "dacia_apulensis",
+      "montes_serrorum"
+    ],
+    "spice_islands_area": [
+      "davao_area",
+      "maguindanao_area",
+      "lanao_area"
+    ],
+    "subarctic_islands_area": [
+      "aetelrugia_area",
+      "raumaricia_area",
+      "scandiae_insulae_area"
+    ],
+    "sukhothai_area": [
+      "sukhothai_area",
+      "chamotchieng_area",
+      "khanthapura_area"
+    ],
+    "sulawesi_area": [
+      "sulu_area",
+      "maguindanao_area",
+      "davao_area"
+    ],
+    "surabaya_area": [
+      "suvarnagiri_area",
+      "melayu_area",
+      "batak_area"
+    ],
+    "sus_area": [
+      "mauretania_ulterior",
+      "atlas_mons",
+      "mauretania_superior"
+    ],
+    "suzdal_area": [
+      "stumica_area",
+      "sarmatia_ulterior",
+      "thyssagetae_area"
+    ],
+    "svealand_area": [
+      "suehonia_area",
+      "gothica_insulae_area",
+      "ostrogothica_area"
+    ],
+    "switzerland_area": [
+      "alpes_raetae",
+      "transpadana_area",
+      "cenomania_area"
+    ],
+    "syr_darya_area": [
+      "sakadahyu_zranka_area",
+      "dzankath_area",
+      "vashdasaka_area"
+    ],
+    "syria_area": [
+      "cava_syria",
+      "abilene_area",
+      "anti_lebanon"
+    ],
+    "tabarestan_area": [
+      "caspius_mons",
+      "amardiene_area",
+      "choarene_area"
+    ],
+    "tabriz_area": [
+      "otene_area",
+      "araxene_area",
+      "basoropeda_area"
+    ],
+    "tabuk_area": [
+      "macoraba_area",
+      "iathrippa_area",
+      "sidenica_area"
+    ],
+    "tafilalt_area": [
+      "atlas_mons",
+      "tingitana_east",
+      "deserta_mauretania"
+    ],
+    "taiwan_area": [
+      "taizhou_taiwan_area",
+      "yizhou_taiwan_area"
+    ],
+    "tambov_area": [
+      "sarmatia_ulterior",
+      "thyssagetae_area",
+      "stumica_area"
+    ],
+    "tanjore_area": [
+      "pandya_area",
+      "pothigai_nadu_area",
+      "karuvoor_nadu_area"
+    ],
+    "tannu_uriankhai_area": [
+      "southern_wuhuan_area",
+      "north_dzungaria_area",
+      "sayan_area"
+    ],
+    "tanzania_area": [
+      "artabatitia_area",
+      "rhypaei_area",
+      "syrbotae_area"
+    ],
+    "tarim_basin_area": [
+      "tarim_area",
+      "shanshan_area",
+      "eastern_tarim_area"
+    ],
+    "tay_nguyen_area": [
+      "champa_central_area",
+      "champa_south_area",
+      "ratanagiri_area"
+    ],
+    "tekrur_area": [
+      "sinus_hespericus_area",
+      "mandori_area",
+      "massitholus_area"
+    ],
+    "telingana_area": [
+      "vakataka_area",
+      "orugallu_area",
+      "pulinda_area"
+    ],
+    "tenasserim_area": [
+      "myeik_area",
+      "aceh_area",
+      "aksajapura_area"
+    ],
+    "thohoku_area": [
+      "north_saikaido_area",
+      "higo_area",
+      "tsushima_area"
+    ],
+    "thrace_area": [
+      "thracia_east_area",
+      "thracia_area",
+      "pontus_sinistrus_area"
+    ],
+    "thuringia_area": [
+      "nariscia_area",
+      "gabreta_hyle",
+      "boiohemum_area"
+    ],
+    "tigray_area": [
+      "asayta_area",
+      "agame_area",
+      "rhausae_area"
+    ],
+    "tihama_al_yemen_area": [
+      "hadramaut_area",
+      "qataban_area",
+      "myrrhifera_exterior"
+    ],
+    "timor_area": [
+      "davao_area",
+      "maguindanao_area",
+      "lanao_area"
+    ],
+    "tirol_area": [
+      "alpes_raetae",
+      "raetia_prima",
+      "alpes_tridentinus"
+    ],
+    "toledo_area": [
+      "toletum_area",
+      "olcadia_area",
+      "hispania_ulterior_area"
+    ],
+    "trans_jordan_area": [
+      "moab_area",
+      "old_edom_area",
+      "arabia_petraea_area"
+    ],
+    "transcaspia_area": [
+      "scythia_pontica_area",
+      "chorasamia_ostia_area",
+      "scythia_ultima_area"
+    ],
+    "transoxiana_area": [
+      "nautaca_area",
+      "sisimithrena_area",
+      "sogdia_area"
+    ],
+    "transylvania_area": [
+      "dacia_porolissensis",
+      "dacia_superior",
+      "dacia_apulensis"
+    ],
+    "tripolitania_area": [
+      "tripolitania_east",
+      "deserta_numidia",
+      "tripolitania_west"
+    ],
+    "tripura_area": [
+      "tripuri_vanga_area",
+      "harikela_area",
+      "wari_bateshwar_area"
+    ],
+    "tsang_area": [
+      "tsang_area",
+      "tsang_north",
+      "yarlung_area"
+    ],
+    "tunguska_area": [
+      "tangdy_ula_area",
+      "north_wuhuan_area",
+      "southern_wuhuan_area"
+    ],
+    "tunisia_area": [
+      "thevestis_area",
+      "zeugitana_area",
+      "cirta_area"
+    ],
+    "turpan_kumul_area": [
+      "turfan_area",
+      "west_hexi_area",
+      "altai_area"
+    ],
+    "tuscany_area": [
+      "etruria_west",
+      "umbria_area",
+      "sabinia_area"
+    ],
+    "tver_area": [
+      "sarmatia_deserta_area",
+      "neuri_area",
+      "stavanica_area"
+    ],
+    "uganda_area": [
+      "artabatitia_area",
+      "odrangidi_area",
+      "rhypaei_area"
+    ],
+    "uliastai_area": [
+      "southern_wuhuan_area",
+      "altai_area",
+      "jiuyuan_area_northern"
+    ],
+    "ulster_area": [
+      "hibernia_borealis",
+      "caledonia_inferior",
+      "hibernia_east"
+    ],
+    "upper_andalucia_area": [
+      "tugiensis_saltus_area",
+      "solorius_mons",
+      "malaca_area"
+    ],
+    "upper_doab_area": [
+      "upper_kashi",
+      "kurukshetra_area",
+      "kuru_north"
+    ],
+    "upper_franconia_area": [
+      "deserta_boiorum",
+      "nariscia_area",
+      "gabreta_hyle"
+    ],
+    "upper_mahanadi_area": [
+      "amarakandaka_area",
+      "vidarbha_area",
+      "utkala_south_area"
+    ],
+    "upper_nubia_area": [
+      "attiroia_area",
+      "alodia_area",
+      "nubia_ulterior"
+    ],
+    "upper_rhineland_area": [
+      "germania_superior",
+      "helvetica_area",
+      "agri_decumates"
+    ],
+    "upper_swabia_area": [
+      "raetia_prima",
+      "raetia_secunda",
+      "germania_superior"
+    ],
+    "upper_volta_area": [
+      "gurma_area",
+      "acha_area",
+      "tegazza_area"
+    ],
+    "ural_area": [
+      "aorsia",
+      "upper_aorsia",
+      "riphaean_mons_area"
+    ],
+    "uticulo_makuana_area": [
+      "azania_area",
+      "elephas_area",
+      "akridophagia_area"
+    ],
+    "utsang_area": [
+      "kirata_area",
+      "tsang_area",
+      "chomolangma_area"
+    ],
+    "valencia_area": [
+      "numantia_area",
+      "olcadia_area",
+      "edetania_area"
+    ],
+    "vastra_gotaland_area": [
+      "ostrogothica_area",
+      "visigothica_area",
+      "raumaricia_area"
+    ],
+    "venetia_area": [
+      "venetia_area",
+      "cenomania_area",
+      "gallia_cispadana"
+    ],
+    "vientiane_area": [
+      "savaka_area",
+      "srigotapura_area",
+      "namxam_area"
+    ],
+    "vietnam_area": [
+      "nhat_nam_area",
+      "cuu_duc_area",
+      "lac_viet_area"
+    ],
+    "visayas_area": [
+      "bisayas_area",
+      "samar_area",
+      "buglas_area"
+    ],
+    "vladimir_area": [
+      "carionica_area",
+      "thyssagetae_area",
+      "sarmatia_ulterior"
+    ],
+    "vogelkop_area": [
+      "davao_area",
+      "maguindanao_area",
+      "butuan_area"
+    ],
+    "vojvodina_area": [
+      "scordiscia_area",
+      "pannonia_secunda",
+      "danuvius_river_area"
+    ],
+    "volga_area": [
+      "aorsia",
+      "upper_aorsia",
+      "nesietis_regio"
+    ],
+    "volhynia_area": [
+      "germano_sarmatia",
+      "gelonia_area",
+      "budinia_area"
+    ],
+    "vologda_area": [
+      "thyssagetae_area",
+      "ophlonica_area",
+      "osilica_area"
+    ],
+    "vorpommern_area": [
+      "burgundica_area",
+      "vistula_area",
+      "carrodumum_area"
+    ],
+    "vostani_area": [
+      "sep_area",
+      "saracena_area",
+      "atef_pehu"
+    ],
+    "wallachia_area": [
+      "dacia_inferior",
+      "dacia_maluensis",
+      "carpatae_area"
+    ],
+    "wallonia_area": [
+      "belgica_prima",
+      "germania_inferior",
+      "batavorum_area"
+    ],
+    "weser_area": [
+      "treva_area",
+      "caucia_major",
+      "caucia_minor"
+    ],
+    "wessex_area": [
+      "silurum_area",
+      "durotrigum_area",
+      "dummoniorum_area"
+    ],
+    "west_africa_coast_area": [
+      "mima_area",
+      "owo_area",
+      "stachirae_area"
+    ],
+    "west_bengal_area": [
+      "east_vanga_area",
+      "tamralipi_area",
+      "shabara_area"
+    ],
+    "west_burgundy_area": [
+      "alesia_area",
+      "haeduica_area",
+      "arvernica_area"
+    ],
+    "west_dniepr_area": [
+      "germano_sarmatia",
+      "sarmatia_deserta_area",
+      "budinia_area"
+    ],
+    "west_gansu_area": [
+      "central_hexi_area",
+      "east_hexi_area",
+      "west_hexi_area"
+    ],
+    "west_guangdong_area": [
+      "hepu_area",
+      "guilin_area",
+      "guilin_area_west"
+    ],
+    "west_java_area": [
+      "suvarnagiri_area",
+      "melayu_area",
+      "panai_area"
+    ],
+    "west_midlands_area": [
+      "cornoviorum_area",
+      "brigantum_area",
+      "corieltauvorum_area"
+    ],
+    "west_mindanao_area": [
+      "lower_lanao_area",
+      "zamboanga_area",
+      "unayan_area"
+    ],
+    "west_prussia_area": [
+      "hyperborea_area",
+      "transvistuliana_area",
+      "vistula_area"
+    ],
+    "west_shandong_area": [
+      "south_shangdang_area",
+      "shangdang_area",
+      "dong_area"
+    ],
+    "western_assam_area": [
+      "pundra_east",
+      "vardhamana_area",
+      "pundra_area"
+    ],
+    "western_korea_area": [
+      "sulchhon_area",
+      "hansan_area",
+      "daifang_chan_area",
+      "yangeun_area",
+      "zhenfan_area",
+      "lelang_area",
+      "mahan_area",
+      "poryumji_area",
+      "jeungji_area"
+    ],
+    "western_morocco_area": [
+      "mauretania_superior",
+      "mauretania_ulterior",
+      "atlas_mons"
+    ],
+    "western_norway": [
+      "aetelrugia_area",
+      "raumaricia_area",
+      "visigothica_area"
+    ],
+    "western_sahara_area": [
+      "lixiane_area",
+      "madethubadus_area",
+      "deserta_mauretania"
+    ],
+    "western_sicily_area": [
+      "sicilia_west",
+      "sicelia_area",
+      "sicani_area"
+    ],
+    "westphalia_area": [
+      "cheruscia_area",
+      "albis_area",
+      "rhenus_area"
+    ],
+    "white_ruthenia_area": [
+      "budinia_area",
+      "scythia_therion_area",
+      "transborysthenia_area"
+    ],
+    "wielkopolska_area": [
+      "transvistuliana_area",
+      "vistula_area",
+      "sarmatici_mons"
+    ],
+    "xilin_gol_area": [
+      "yunzhong_area_southern",
+      "xihe_area_eastern",
+      "yunzhong_area"
+    ],
+    "yakutia_area": [
+      "western_sushen_area",
+      "inbollo_area",
+      "sushen_area"
+    ],
+    "yamamah_area": [
+      "omanitis_area",
+      "makan_area",
+      "libanotophoros_regio"
+    ],
+    "yaroslavl_area": [
+      "thyssagetae_area",
+      "sarmatia_deserta_area",
+      "carionica_area"
+    ],
+    "yedisan_area": [
+      "axiaces_area",
+      "pasyris_area",
+      "scythia_thissamatica"
+    ],
+    "yemen_area": [
+      "myrrhifera_exterior",
+      "hadramaut_area",
+      "qataban_area"
+    ],
+    "yorkshire_area": [
+      "brigantum_area",
+      "cornoviorum_area",
+      "corieltauvorum_area"
+    ],
+    "yrtesh_area": [
+      "hanhai_area",
+      "xianbei_steppe_area",
+      "north_wuhuan_area"
+    ],
+    "yun_gui_area": [
+      "south_zangke_area",
+      "zangke_area",
+      "yizhou_area"
+    ],
+    "yun_gui_borderland_area": [
+      "ailao_area",
+      "yizhou_area",
+      "south_zangke_area"
+    ],
+    "zaporizhia_area": [
+      "melanchlenia_area",
+      "cimmero_scythia",
+      "exobygica_area"
+    ],
+    "zazzau_area": [
+      "biram_area",
+      "nok_area",
+      "memea_area"
+    ],
+    "zhejiang_area": [
+      "kuaiji_area",
+      "kuaiji_area_west",
+      "linhai_area"
+    ]
+  },
+  "manualOverrides": [
+    "central_heilongjiang_area",
+    "central_ilin_hala_area",
+    "central_jilin_area",
+    "east_heilongjiang_area",
+    "eastern_korea_area",
+    "fujian_area",
+    "furdan_area",
+    "guangdong_area",
+    "guangxi_area",
+    "guangzhou_area",
+    "hamgyeong_area",
+    "heilongjiang_area",
+    "huguang_area",
+    "hunan_area",
+    "ilan_hala_area",
+    "jiangsu_area",
+    "jiangxi_area",
+    "jilin_area",
+    "liaoning_area",
+    "ningguta_area",
+    "pyongan_area",
+    "south_anhui_area",
+    "south_jiangsu_area",
+    "south_korea_area",
+    "taiwan_area",
+    "west_guangdong_area",
+    "western_korea_area",
+    "zhejiang_area"
+  ]
+}

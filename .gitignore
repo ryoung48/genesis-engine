@@ -28,5 +28,7 @@ __pycache__/
 
 
 scripts/namelists
+audits
+.opencode
 scripts/planets/output/
 scripts/planets/tmp-*/

@@ -13,6 +13,11 @@ interface WarWikiNationMention {
 	tag: string
 	name: string
 	color: string
+	/** Whether this nation is currently a war participant at the wiki's
+	 * selected date -- false for a nation that hasn't joined yet or has
+	 * already left/made peace, which the Participants panel grays out
+	 * instead of hiding (its side membership doesn't change). */
+	active?: boolean
 }
 
 interface WarWikiParticipant {
@@ -52,8 +57,12 @@ function NationLink({
 	nation: WarWikiNationMention
 	onSelectNation: (tag: string) => void
 }) {
+	const active = nation.active ?? true
 	return (
-		<span className="inline-flex items-center gap-1">
+		<span
+			className={`inline-flex items-center gap-1 ${active ? "" : "opacity-40"}`}
+			title={active ? undefined : "Not a participant at the selected date"}
+		>
 			<Swatch color={nation.color} />
 			<InlineTextButton onClick={() => onSelectNation(nation.tag)}>
 				{nation.name}

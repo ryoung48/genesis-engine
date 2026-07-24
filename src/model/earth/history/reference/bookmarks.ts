@@ -80,7 +80,7 @@ const RAW_BOOKMARKS: { eu4Date: string; label: string; era: string }[] = [
 		label: "100 BC Late Roman Republic",
 		era: "Classical Era",
 	},
-	{ eu4Date: "0.1.1", label: "1 BC Roman Expansion", era: "Classical Era" },
+	{ eu4Date: "2.1.1", label: "2 Roman Expansion", era: "Classical Era" },
 	{ eu4Date: "58.2.1", label: "58 Roman-Parthian War", era: "Classical Era" },
 	{ eu4Date: "224.4.24", label: "224 Rise of Sassanids", era: "Classical Era" },
 	{

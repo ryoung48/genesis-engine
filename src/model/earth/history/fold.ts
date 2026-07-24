@@ -32,7 +32,9 @@ interface FoldedNationState {
 	 * capital instead of an arbitrary owned province -- see adapter.ts. */
 	capitalProvinceId: string | null
 	overlord: string | null
+	overlordSubjectType: string | null
 	vassals: Set<string>
+	vassalSubjectTypes: Map<string, string>
 	/** Junior partners of a personal union this nation is the senior/ruling
 	 * side of -- same "who's subordinate to us" role vassals plays for
 	 * dependencyStart/End. */
@@ -130,7 +132,9 @@ function emptyNationState(): FoldedNationState {
 		ruler: null,
 		capitalProvinceId: null,
 		overlord: null,
+		overlordSubjectType: null,
 		vassals: new Set(),
+		vassalSubjectTypes: new Map(),
 		unionSeniorOf: new Set(),
 		unionJuniorPartner: null,
 		allies: new Set(),
@@ -204,6 +208,7 @@ function foldNation(
 		? {
 				...base,
 				vassals: new Set(base.vassals),
+				vassalSubjectTypes: new Map(base.vassalSubjectTypes),
 				unionSeniorOf: new Set(base.unionSeniorOf),
 				allies: new Set(base.allies),
 				guarantees: new Set(base.guarantees),
@@ -280,19 +285,34 @@ function applyDiplomacyDelta(
 		switch (e.kind) {
 			case "vassalStart":
 				first.vassals.add(secondTag)
+				first.vassalSubjectTypes.set(secondTag, "vassal")
 				second.overlord = firstTag
+				second.overlordSubjectType = "vassal"
 				break
 			case "vassalEnd":
 				first.vassals.delete(secondTag)
-				if (second.overlord === firstTag) second.overlord = null
+				first.vassalSubjectTypes.delete(secondTag)
+				if (second.overlord === firstTag) {
+					second.overlord = null
+					second.overlordSubjectType = null
+				}
 				break
 			case "dependencyStart":
 				first.vassals.add(secondTag)
+				first.vassalSubjectTypes.set(
+					secondTag,
+					e.payload.subjectType ?? "subject",
+				)
 				second.overlord = firstTag
+				second.overlordSubjectType = e.payload.subjectType ?? "subject"
 				break
 			case "dependencyEnd":
 				first.vassals.delete(secondTag)
-				if (second.overlord === firstTag) second.overlord = null
+				first.vassalSubjectTypes.delete(secondTag)
+				if (second.overlord === firstTag) {
+					second.overlord = null
+					second.overlordSubjectType = null
+				}
 				break
 			case "allianceStart":
 				first.allies.add(secondTag)

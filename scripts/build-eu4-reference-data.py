@@ -201,7 +201,12 @@ def build_nations(source: Path) -> list[dict]:
     tag_to_history: dict[str, Path] = {}
     if history_dir.exists():
         for f in history_dir.glob("*.txt"):
-            tag = f.stem.split(" - ", 1)[0].strip()
+            # Filenames are "TAG - Name.txt", but a few source files omit
+            # the space before the dash (e.g. "CLY- Chalukya.txt",
+            # "KER- Keres.txt"); split on the dash with optional
+            # surrounding whitespace so those still resolve to the real
+            # tag instead of the whole stem.
+            tag = re.split(r"\s*-\s*", f.stem, maxsplit=1)[0].strip()
             tag_to_history[tag] = f
 
     nations = []
@@ -240,6 +245,41 @@ def build_nations(source: Path) -> list[dict]:
     return nations
 
 
+ANCIENT_NATIONS_OVERRIDES_PATH = (
+    Path(__file__).resolve().parent / "data" / "ancient-nations-reference-overrides.json"
+)
+
+
+def _apply_ancient_nations_overrides(nations: list[dict]) -> list[dict]:
+    """The `cp_*` pre-2AD placeholder tags (Greek city-states, Gallic/Germanic/
+    Iberian tribes, Dayuan, etc.) don't come from geo-explorer's raw EU4
+    source data at all -- they were minted and hand-filled in by the
+    scripts/audit/build-*-audit.{py,cjs} passes across many one-off sessions,
+    and most of those scripts never persisted their reference/nations.json
+    additions back into a reproducible source. Without this override file, a
+    plain `build-eu4-reference-data.py` + `build-cliopatria-events.py` regen
+    silently drops all of them. This file is the durable snapshot of those
+    entries; regenerate it (see scripts/audit/ancient-nation-audit-prompt.md)
+    only if you deliberately add/change one."""
+    if not ANCIENT_NATIONS_OVERRIDES_PATH.exists():
+        return nations
+    with ANCIENT_NATIONS_OVERRIDES_PATH.open(encoding="utf-8") as f:
+        overrides = json.load(f)
+    by_tag = {n["tag"]: n for n in nations}
+    added = 0
+    updated = 0
+    for override in overrides:
+        if override["tag"] in by_tag:
+            by_tag[override["tag"]].update(override)
+            updated += 1
+        else:
+            nations.append(override)
+            by_tag[override["tag"]] = override
+            added += 1
+    print(f"ancient-nations-reference-overrides.json: added {added}, updated {updated} entries")
+    return nations
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
@@ -261,6 +301,7 @@ def main() -> None:
     print(f"religion-groups.json: {len(religion_groups)} groups")
 
     nations = build_nations(args.source)
+    nations = _apply_ancient_nations_overrides(nations)
     (args.output_dir / "nations.json").write_text(
         json.dumps(nations, indent=2) + "\n", encoding="utf-8"
     )

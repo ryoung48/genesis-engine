@@ -496,22 +496,28 @@ export function getHoverHumidityDiff(
 	}
 }
 
+/** `useObserved` selects the data source for both temperature and humidity
+ * together (the "misery"/"realMisery" colorMode pair, mirroring
+ * temperature/realTemperature) -- observed values are used where available
+ * and fall back to the modeled estimate only when missing, model mode never
+ * touches observed data at all. Wind has no observed variant (no per-region
+ * historical wind data exists), so it always comes from the model in both
+ * modes. */
 export function getHoverMisery(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 	windSpeedMs: number | null,
 	monthlyWindSpeedMs: number[] | null,
+	useObserved: boolean,
 ): HoverMisery | null {
 	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
 	const r = hoverInfo.region
 	if (world.isLand && !world.isLand[r]) return null
 	const N = world.mesh.numRegions
-	const observedHumidity = getHoverObservedHumiditySeries(
-		hoverInfo,
-		world,
-		dtrMonth,
-	)
+	const observedHumidity = useObserved
+		? getHoverObservedHumiditySeries(hoverInfo, world, dtrMonth)
+		: null
 
 	let annualAridity: number | undefined
 	const aet = world.hydrology?.aet_monthly
@@ -528,24 +534,31 @@ export function getHoverMisery(
 
 	const annualRainfall = world.rainfall?.annual[r]
 	const annualWind = windSpeedMs ?? 0
+	const modeledAnnualT = world.climate.temperature_avg[r]
+	const observedAnnualT = world.climate.real_temperature_avg?.[r]
+	const annualT =
+		useObserved && Number.isFinite(observedAnnualT)
+			? (observedAnnualT as number)
+			: modeledAnnualT
 	const annualRh =
 		observedHumidity?.annual ??
 		relativeHumidityFromTempRange(
-			world.climate.temperature_avg[r],
+			annualT,
 			world.dtr_annual[r],
 			annualAridity,
 			annualRainfall,
 		)
-	const annual = apparentTemperatureC(
-		world.climate.temperature_avg[r],
-		annualRh,
-		annualWind,
-	)
+	const annual = apparentTemperatureC(annualT, annualRh, annualWind)
 
 	const monthly: number[] = []
 	if (world.dtr_monthly && world.climate.temperature_monthly) {
 		for (let m = 0; m < 12; m++) {
-			const T = world.climate.temperature_monthly[m * N + r]
+			const modeledT = world.climate.temperature_monthly[m * N + r]
+			const observedT = world.climate.real_temperature_monthly?.[m * N + r]
+			const T =
+				useObserved && Number.isFinite(observedT)
+					? (observedT as number)
+					: modeledT
 			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
 			const rh =
 				observedHumidity?.monthly[m] ??

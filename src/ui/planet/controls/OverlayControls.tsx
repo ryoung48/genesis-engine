@@ -1068,7 +1068,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									colorMode === "humidityDiff" ||
 									colorMode === "wind" ||
 									colorMode === "dtr" ||
-									colorMode === "misery") && (
+									baseColorMode === "misery") && (
 									<div>
 										<button
 											type="button"
@@ -1082,7 +1082,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 												colorMode === "dtr" ||
 												colorMode === "realDtr" ||
 												colorMode === "dtrDiff" ||
-												colorMode === "misery"
+												baseColorMode === "misery"
 													? "Temperature"
 													: colorMode === "wind"
 														? "Wind"
@@ -1130,7 +1130,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 													colorMode === "dtr" ||
 													colorMode === "realDtr" ||
 													colorMode === "dtrDiff" ||
-													colorMode === "misery") && (
+													baseColorMode === "misery") && (
 													<div className="flex items-center gap-4 text-[11px] font-medium">
 														<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
 															<input
@@ -1156,7 +1156,7 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 															<input
 																type="radio"
 																name="temp-sub"
-																checked={colorMode === "misery"}
+																checked={baseColorMode === "misery"}
 																onChange={() => setColorMode("misery")}
 																className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
 															/>

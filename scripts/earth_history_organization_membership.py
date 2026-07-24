@@ -237,6 +237,44 @@ GUELPH_GHIBELLINE_MEMBERSHIPS: tuple[OrganizationMembership, ...] = (
 )
 
 
+GREEK_LEAGUE_MEMBERSHIPS: tuple[OrganizationMembership, ...] = (
+    # Greek leagues are modeled as international organizations rather than
+    # countries. The member tags below are polis/regional owner tags from the
+    # ancient audit split; membership must not transfer province ownership to
+    # Athens, Sparta, or any other hegemon.
+    OrganizationMembership("GPL", "cp_sparta", "-549.1.1", "-337.1.1", role="leader"),
+    OrganizationMembership("GPL", "cp_corinth", "-549.1.1", "-337.1.1"),
+    OrganizationMembership("GPL", "cp_achaea", "-549.1.1", "-337.1.1"),
+    OrganizationMembership("GPL", "cp_ionian_islands", "-549.1.1", "-337.1.1"),
+    OrganizationMembership("DAL", "cp_athens", "-477.1.1", "-403.1.1", role="leader"),
+    OrganizationMembership("DAL", "cp_euboea", "-477.1.1", "-403.1.1"),
+    OrganizationMembership("DAL", "cp_lesbos", "-477.1.1", "-403.1.1"),
+    OrganizationMembership("DAL", "cp_naxos", "-477.1.1", "-403.1.1"),
+    OrganizationMembership("DAL", "cp_smyrna", "-477.1.1", "-403.1.1"),
+    OrganizationMembership("DAL", "cp_anatolian_greek_city_states", "-477.1.1", "-403.1.1"),
+    OrganizationMembership("SAL", "cp_athens", "-377.1.1", "-354.1.1", role="leader"),
+    OrganizationMembership("SAL", "cp_euboea", "-377.1.1", "-354.1.1"),
+    OrganizationMembership("SAL", "cp_lesbos", "-377.1.1", "-354.1.1"),
+    OrganizationMembership("SAL", "cp_naxos", "-377.1.1", "-354.1.1"),
+    OrganizationMembership("SAL", "cp_smyrna", "-377.1.1", "-354.1.1"),
+    OrganizationMembership("ACL", "cp_achaea", "-279.1.1", "-145.1.1", role="leader"),
+    OrganizationMembership("ACL", "cp_corinth", "-242.1.1", "-145.1.1"),
+    OrganizationMembership("ACL", "cp_sparta", "-191.1.1", "-145.1.1"),
+    OrganizationMembership("AEL", "cp_aetolia", "-369.1.1", "-188.1.1", role="leader"),
+    OrganizationMembership("AEL", "cp_epirus_city_states", "-369.1.1", "-188.1.1"),
+    OrganizationMembership("AEL", "cp_thessalian_city_states", "-369.1.1", "-188.1.1"),
+    OrganizationMembership("LCO", "cp_macedonian_empire", "-337.1.1", "-321.1.1", role="leader"),
+    OrganizationMembership("LCO", "cp_athens", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_corinth", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_achaea", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_aetolia", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_thessalian_city_states", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_chalcidice_city_states", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_macedonian_greek_city_states", "-337.1.1", "-321.1.1"),
+    OrganizationMembership("LCO", "cp_thracian_greek_city_states", "-337.1.1", "-321.1.1"),
+)
+
+
 CURATED_ORGANIZATION_MEMBERSHIPS: tuple[OrganizationMembership, ...] = (
     OrganizationMembership("HSA", "HSA", "1356.1.1", "1669.1.1"),
     OrganizationMembership("HSA", "HAM", "1356.1.1", "1669.1.1"),
@@ -257,6 +295,7 @@ CURATED_ORGANIZATION_MEMBERSHIPS: tuple[OrganizationMembership, ...] = (
     OrganizationMembership("HSA", "EFR", "1356.1.1", "1669.1.1"),
     OrganizationMembership("HSA", "UTR", "1356.1.1", "1669.1.1"),
     OrganizationMembership("HSA", "GEL", "1356.1.1", "1669.1.1"),
+    *GREEK_LEAGUE_MEMBERSHIPS,
     *GUELPH_GHIBELLINE_MEMBERSHIPS,
 )
 
