@@ -33,29 +33,37 @@ const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 	tribal_monarchy: { U: 0.025, q: 1.0 }, // one organised royal seat
 	tribal_federation: { U: 0.03, q: 0.75 }, // multi-tribe council, several similar centers
 	native_council: { U: 0.015, q: 0.8 }, // small frontier council, flat and sparse
+	steppe_horde: { U: 0.01, q: 0.6 }, // nomadic, no fixed urban seat, very flat
 
 	// monarchy — decentralised feudal through centralised absolutist to modern constitutional
 	feudal_monarchy: { U: 0.05, q: 0.85 }, // many small towns, few large cities
 	elective_monarchy: { U: 0.07, q: 0.8 }, // elected king over autonomous nobility, flat
 	absolute_monarchy: { U: 0.12, q: 1.2 }, // centralised crown, dominant capital
 	constitutional_monarchy: { U: 0.25, q: 1.0 }, // modern urbanization, moderate primacy
+	dynastic_signoria: { U: 0.3, q: 1.3 }, // one dominant princely city (Florence, Milan)
+	warlord_state: { U: 0.1, q: 0.85 }, // fragmented garrison towns, weak primacy
+	shogunate: { U: 0.15, q: 1.15 }, // institutionalized military capital, strong primacy
+	bureaucratic_monarchy: { U: 0.18, q: 1.15 }, // imperial capital plus provincial admin cities
 
 	// republic — coastal oligarchy through modern mass-urban democracy
 	merchant_republic: { U: 0.35, q: 1.3 }, // trade oligarchy, one dominant port capital
-	noble_republic: { U: 0.2, q: 1.1 }, // aristocratic senate, strong core city
-	city_state_confederation: { U: 0.25, q: 0.75 }, // league of city-states, polycentric
+	oligarchic_republic: { U: 0.2, q: 1.1 }, // aristocratic senate, strong core city
+	free_city: { U: 0.5, q: 0.9 }, // self-governing city or loose league, mostly urban
+	peasant_republic: { U: 0.04, q: 0.65 }, // lord-less free-peasant commune, rural and flat
 	presidential_republic: { U: 0.4, q: 1.0 }, // industrial+ mass urbanization
 	parliamentary_republic: { U: 0.4, q: 0.9 }, // industrial+, slightly less primacy
+	pirate_republic: { U: 0.35, q: 1.0 }, // single small haven port
 
 	// theocracy — sacred-capital hierarchies
 	theocracy: { U: 0.08, q: 1.2 }, // one oversized holy city
 	monastic_state: { U: 0.06, q: 1.3 }, // small, centralized around the mother house
-	prince_bishopric: { U: 0.05, q: 1.1 }, // small landed medieval see
 	imperial_cult: { U: 0.1, q: 1.3 }, // large sacred-imperial capital, very steep
 
 	// republic extensions — modern authoritarian/centralized states
 	socialist_state: { U: 0.3, q: 1.15 }, // centrally planned, capital-heavy
 	military_junta: { U: 0.25, q: 1.2 }, // garrison-state, capital-dominant
+	fascist_state: { U: 0.32, q: 1.25 }, // mass-party propaganda capital, very centralized
+	dictatorial_rule: { U: 0.28, q: 1.15 }, // personalist autocracy, less institutionalized than junta
 
 	// colonial
 	trading_company: { U: 0.3, q: 1.3 }, // chartered company rule, single dominant port

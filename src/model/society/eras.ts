@@ -11,39 +11,47 @@ export type SocietyEra =
 	| "information"
 
 /**
- * 21 government subtypes across 4 main groups plus colonial extensions.
- * Encoding: tribal 0–3, monarchy 4–7, republic 8–12, theocracy 13–16.
- * Indices 17–18 are republic extensions (socialist, junta).
- * Indices 19–20 are colonial types assigned by the post-pass (earlyModern+).
+ * 29 government subtypes across 4 main groups plus colonial extensions.
+ * Encoding: tribal 0–4, monarchy 5–12, republic 13–19, theocracy 20–22.
+ * Indices 23–26 are republic extensions (socialist, junta, fascist, dictatorial).
+ * Indices 27–28 are colonial types assigned by the post-pass (earlyModern+).
  */
 export type GovernmentType =
-	// tribal (0–3)
+	// tribal (0–4)
 	| "chiefdom" // 0: small hereditary chief — default tribal
 	| "tribal_monarchy" // 1: medium organised tribal kingdom
 	| "tribal_federation" // 2: medium+ multi-tribe council
 	| "native_council" // 3: small frontier indigenous council
-	// monarchy (4–7)
-	| "feudal_monarchy" // 4: decentralised lords-and-vassals — ancient/medieval
-	| "elective_monarchy" // 5: elected king — medium+
-	| "absolute_monarchy" // 6: centralised crown — large, earlyModern+
-	| "constitutional_monarchy" // 7: limited monarchy — earlyModern+
-	// republic (8–12)
-	| "merchant_republic" // 8: trade oligarchy — small coastal core
-	| "noble_republic" // 9: aristocratic senate — medium ancient core
-	| "city_state_confederation" // 10: league of city-states — medium
-	| "presidential_republic" // 11: elected executive — industrial+
-	| "parliamentary_republic" // 12: legislature-led — industrial+
-	// theocracy (13–16)
-	| "theocracy" // 13: religious government — medium+, default
-	| "monastic_state" // 14: military-religious order — small coastal
-	| "prince_bishopric" // 15: prince-bishop — small landed medieval
-	| "imperial_cult" // 16: state religion as imperial authority — large
-	// republic extensions (17–18)
-	| "socialist_state" // 17: one-party socialist republic — industrial+
-	| "military_junta" // 18: authoritarian military regime — industrial+
-	// colonial (19–20) — assigned by post-pass, not the normal gov mix
-	| "trading_company" // 19: chartered company rule — earlyModern+, coastal
-	| "settler_colony" // 20: settler-majority territory — industrial+, large
+	| "steppe_horde" // 4: large nomadic confederation — Mongols, Huns, Xiongnu
+	// monarchy (5–12)
+	| "feudal_monarchy" // 5: decentralised lords-and-vassals — ancient/medieval
+	| "elective_monarchy" // 6: elected king — medium+
+	| "absolute_monarchy" // 7: centralised crown, patrimonial administration — large, earlyModern+
+	| "constitutional_monarchy" // 8: limited monarchy — earlyModern+
+	| "dynastic_signoria" // 9: republic fallen under one dynastic lord — small, earlyModern (Medici, Visconti)
+	| "warlord_state" // 10: fragmented post-imperial military rule — no legitimate succession
+	| "shogunate" // 11: military rule under a figurehead monarch — large, institutionalized
+	| "bureaucratic_monarchy" // 12: centralised crown, impersonal exam-selected bureaucracy — large (China)
+	// republic (13–19)
+	| "merchant_republic" // 13: trade oligarchy — small coastal core
+	| "oligarchic_republic" // 14: aristocratic senate — medium ancient core
+	| "free_city" // 15: self-governing city or league (poleis, Swiss cantons, HRE free cities) — medium
+	| "peasant_republic" // 16: lord-less free-peasant commune — small coastal/marsh (Dithmarschen, Frisia)
+	| "presidential_republic" // 17: elected executive — industrial+
+	| "parliamentary_republic" // 18: legislature-led — industrial+
+	| "pirate_republic" // 19: small outlaw haven — coastal, earlyModern
+	// theocracy (20–22)
+	| "theocracy" // 20: religious government — medium+, default
+	| "monastic_state" // 21: military-religious order — small coastal
+	| "imperial_cult" // 22: state religion as imperial authority — large
+	// republic extensions (23–26)
+	| "socialist_state" // 23: one-party socialist republic — industrial+
+	| "military_junta" // 24: authoritarian military regime — industrial+
+	| "fascist_state" // 25: totalitarian nationalist mass-party regime — industrial (WWII-era)
+	| "dictatorial_rule" // 26: personalist authoritarian rule, no military/party institution — industrial+
+	// colonial (27–28) — assigned by post-pass, not the normal gov mix
+	| "trading_company" // 27: chartered company rule — earlyModern+, coastal
+	| "settler_colony" // 28: settler-majority territory — industrial+, large
 
 export const GOVERNMENT_TYPES: GovernmentType[] = [
 	// tribal
@@ -51,25 +59,33 @@ export const GOVERNMENT_TYPES: GovernmentType[] = [
 	"tribal_monarchy",
 	"tribal_federation",
 	"native_council",
+	"steppe_horde",
 	// monarchy
 	"feudal_monarchy",
 	"elective_monarchy",
 	"absolute_monarchy",
 	"constitutional_monarchy",
+	"dynastic_signoria",
+	"warlord_state",
+	"shogunate",
+	"bureaucratic_monarchy",
 	// republic
 	"merchant_republic",
-	"noble_republic",
-	"city_state_confederation",
+	"oligarchic_republic",
+	"free_city",
+	"peasant_republic",
 	"presidential_republic",
 	"parliamentary_republic",
+	"pirate_republic",
 	// theocracy
 	"theocracy",
 	"monastic_state",
-	"prince_bishopric",
 	"imperial_cult",
 	// republic extensions
 	"socialist_state",
 	"military_junta",
+	"fascist_state",
+	"dictatorial_rule",
 	// colonial
 	"trading_company",
 	"settler_colony",
@@ -80,24 +96,74 @@ export const GOVERNMENT_TYPE_LABELS: Record<GovernmentType, string> = {
 	tribal_monarchy: "Tribal Monarchy",
 	tribal_federation: "Tribal Federation",
 	native_council: "Native Council",
+	steppe_horde: "Steppe Horde",
 	feudal_monarchy: "Feudal Monarchy",
 	elective_monarchy: "Elective Monarchy",
 	absolute_monarchy: "Absolute Monarchy",
 	constitutional_monarchy: "Constitutional Monarchy",
+	dynastic_signoria: "Dynastic Signoria",
+	warlord_state: "Warlord State",
+	shogunate: "Shogunate",
+	bureaucratic_monarchy: "Bureaucratic Monarchy",
 	merchant_republic: "Merchant Republic",
-	noble_republic: "Noble Republic",
-	city_state_confederation: "City-State Confederation",
+	oligarchic_republic: "Oligarchic Republic",
+	free_city: "Free City",
+	peasant_republic: "Peasant Republic",
 	presidential_republic: "Presidential Republic",
 	parliamentary_republic: "Parliamentary Republic",
+	pirate_republic: "Pirate Republic",
 	theocracy: "Theocracy",
 	monastic_state: "Monastic State",
-	prince_bishopric: "Prince-Bishopric",
 	imperial_cult: "Imperial Cult",
 	socialist_state: "Socialist State",
 	military_junta: "Military Junta",
+	fascist_state: "Fascist State",
+	dictatorial_rule: "Dictatorial Rule",
 	trading_company: "Trading Company",
 	settler_colony: "Settler Colony",
 }
+
+export type GovernmentFamily =
+	| "tribal"
+	| "monarchy"
+	| "republic"
+	| "theocracy"
+	| "colonial"
+
+/** Which of the 5 top-level families each subtype belongs to. Republic
+ * extensions (socialist/junta/fascist/dictatorial) count as "republic" here. */
+export const GOVERNMENT_TYPE_FAMILY: Record<GovernmentType, GovernmentFamily> =
+	{
+		chiefdom: "tribal",
+		tribal_monarchy: "tribal",
+		tribal_federation: "tribal",
+		native_council: "tribal",
+		steppe_horde: "tribal",
+		feudal_monarchy: "monarchy",
+		elective_monarchy: "monarchy",
+		absolute_monarchy: "monarchy",
+		constitutional_monarchy: "monarchy",
+		dynastic_signoria: "monarchy",
+		warlord_state: "monarchy",
+		shogunate: "monarchy",
+		bureaucratic_monarchy: "monarchy",
+		merchant_republic: "republic",
+		oligarchic_republic: "republic",
+		free_city: "republic",
+		peasant_republic: "republic",
+		presidential_republic: "republic",
+		parliamentary_republic: "republic",
+		pirate_republic: "republic",
+		theocracy: "theocracy",
+		monastic_state: "theocracy",
+		imperial_cult: "theocracy",
+		socialist_state: "republic",
+		military_junta: "republic",
+		fascist_state: "republic",
+		dictatorial_rule: "republic",
+		trading_company: "colonial",
+		settler_colony: "colonial",
+	}
 
 /** Fraction of nations assigned each government type. Must sum to ~1. */
 export interface GovernmentMix {

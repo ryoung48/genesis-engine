@@ -88,8 +88,4 @@ b5ushj
 claude --resume b4f38b78-14c8-47dc-bcc4-d62e7b281103
 codex resume 019f8775-0271-7a70-8d80-a58fe1d0b10b
 
-
-narrative is a short, reader-facing sentence meant to be displayed directly on the timeline UI — distinct in purpose from note, which is an internal sourcing/citation annotation for the audit (why the date/fact was chosen, what source it matches, caveats, etc.).
-
-- note: for the auditor/maintainer — can be long, technical, cite sources like "Matches Imperium Universalis countries.json PSE history[1]", discuss confidence/discrepancies.
-- narrative: for the end user browsing the timeline — one clean, plain-language sentence describing what happened, no citations or hedging, phrased so it reads well standalone next to a date.
+claude --resume 4bca0dbc-45ea-4d75-a053-bcbd86cfb4b1

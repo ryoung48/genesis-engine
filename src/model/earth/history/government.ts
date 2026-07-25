@@ -49,26 +49,28 @@ const FAMILY_TYPES: Record<
 		"tribal_monarchy",
 		"tribal_federation",
 		"native_council",
+		"steppe_horde",
 	],
 	monarchy: [
 		"feudal_monarchy",
 		"elective_monarchy",
 		"absolute_monarchy",
 		"constitutional_monarchy",
+		"dynastic_signoria",
+		"warlord_state",
+		"shogunate",
+		"bureaucratic_monarchy",
 	],
 	republic: [
 		"merchant_republic",
-		"noble_republic",
-		"city_state_confederation",
+		"oligarchic_republic",
+		"free_city",
+		"peasant_republic",
 		"presidential_republic",
 		"parliamentary_republic",
+		"pirate_republic",
 	],
-	theocracy: [
-		"theocracy",
-		"monastic_state",
-		"prince_bishopric",
-		"imperial_cult",
-	],
+	theocracy: ["theocracy", "monastic_state", "imperial_cult"],
 }
 
 function hashUint(key: string): number {

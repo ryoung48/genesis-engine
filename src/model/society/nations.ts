@@ -2,7 +2,13 @@ import type { GenesisNationHierarchy, GenesisProvinces } from ".."
 import { buildIdentitySeeds } from "../shared/identity-seeds"
 import { SimplexNoise } from "../shared/simplex-noise"
 import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
-import type { GovernmentMix } from "./eras"
+import {
+	GOVERNMENT_TYPE_FAMILY,
+	GOVERNMENT_TYPES,
+	type GovernmentFamily,
+	type GovernmentMix,
+	type GovernmentType,
+} from "./eras"
 import {
 	buildChildrenCSR,
 	buildSovereign,
@@ -863,7 +869,7 @@ function assignColonialRelations(params: {
 	// Score colonizer candidates: non-tribal, coastal, large enough.
 	const colonizers: Array<{ nation: number }> = []
 	for (let n = 0; n < nationCount; n++) {
-		if (nationGovType[n] < 4) continue // tribal cannot colonize
+		if (govFamilyOfIndex(nationGovType[n]) === "tribal") continue // tribal cannot colonize
 		if (nationColonizer[n] >= 0) continue
 		if (waterAccess[seeds[n]] < 2) continue // must be ocean-coastal
 		if (size[n] < 8) continue
@@ -881,12 +887,9 @@ function assignColonialRelations(params: {
 	}> = []
 	for (let n = 0; n < nationCount; n++) {
 		if (nationColonizer[n] >= 0) continue
-		if (
-			(nationGovType[n] >= 8 && nationGovType[n] <= 12) ||
-			nationGovType[n] >= 17
-		)
-			continue // skip republic types & colonial
-		if (nationGovType[n] >= 4 && size[n] >= 8 && waterAccess[seeds[n]] >= 2)
+		const family = govFamilyOfIndex(nationGovType[n])
+		if (family === "republic" || family === "colonial") continue // skip republic types & colonial
+		if (family !== "tribal" && size[n] >= 8 && waterAccess[seeds[n]] >= 2)
 			continue // matches colonizer criteria — skip
 		if (!nationHasOceanCoastal[n]) continue
 		targets.push({ nation: n, capital: seeds[n], hab: habitability[seeds[n]] })
@@ -935,8 +938,33 @@ function assignColonialRelations(params: {
 		const settlerChance =
 			sizeWeight < 0.4 ? 0.15 + 0.6 * Math.min(1, size[target.nation] / 30) : 0
 		const isSettler = target.hab >= 0.5 && r < settlerChance
-		nationGovType[target.nation] = isSettler ? 20 : 19
+		nationGovType[target.nation] = isSettler
+			? getGovIdx().settler_colony
+			: getGovIdx().trading_company
 	}
+}
+
+// Named indices into GOVERNMENT_TYPES — computed from the taxonomy rather than
+// hardcoded, so adding/removing/reordering GovernmentType entries in eras.ts
+// can't silently desync the numeric assignments below.
+// Lazily computed and memoized (rather than evaluated eagerly at module
+// load) because eras.ts imports NATION_BUCKETS from this file -- a circular
+// import that was harmless while nations.ts only used eras.ts as a type-only
+// import, but would hit a temporal-dead-zone ReferenceError on GOVERNMENT_TYPES
+// if read eagerly at the top level here.
+let _govIdx: Record<GovernmentType, number> | null = null
+function getGovIdx(): Record<GovernmentType, number> {
+	if (!_govIdx) {
+		_govIdx = Object.fromEntries(
+			GOVERNMENT_TYPES.map((type, index) => [type, index]),
+		) as Record<GovernmentType, number>
+	}
+	return _govIdx
+}
+
+function govFamilyOfIndex(index: number): GovernmentFamily {
+	const type = GOVERNMENT_TYPES[index]
+	return type ? GOVERNMENT_TYPE_FAMILY[type] : "monarchy"
 }
 
 // Size-based government prior: larger nations tend toward monarchy/theocracy,
@@ -1119,81 +1147,114 @@ function refineGovernmentSubtype(
 ): number {
 	switch (mainType) {
 		case 0: {
-			// tribal → 0=chiefdom, 1=tribal monarchy, 2=tribal federation, 3=native council
-			if (size >= 10) return r < 0.55 ? 2 : 1 // federation or tribal monarchy
-			if (size >= 5) return 1 // tribal monarchy
+			// tribal → chiefdom, tribal monarchy, tribal federation, native council, steppe horde
+			// Steppe hordes: large, arid/frontier nomadic confederations (Mongols, Huns, Xiongnu).
+			if (size >= 15 && hab < 0.4 && r < 0.4) return getGovIdx().steppe_horde
+			if (size >= 10)
+				return r < 0.55
+					? getGovIdx().tribal_federation
+					: getGovIdx().tribal_monarchy
+			if (size >= 5) return getGovIdx().tribal_monarchy
 			// frontier/harsh → mostly native council; core → mostly chiefdom
-			return r < (wave > 0.35 || hab < 0.35 ? 0.35 : 0.7) ? 0 : 3
+			return r < (wave > 0.35 || hab < 0.35 ? 0.35 : 0.7)
+				? getGovIdx().chiefdom
+				: getGovIdx().native_council
 		}
 
 		case 1: {
-			// monarchy → 4=feudal, 5=elective, 6=absolute, 7=constitutional
+			// monarchy → feudal, elective, absolute, constitutional, dynastic signoria,
+			// warlord state, shogunate, bureaucratic monarchy
 			// Information era (sizeWeight ~0.15): constitutional dominant, a few
 			// absolute holdouts (Gulf-style states).
 			if (sizeWeight < 0.22) {
-				if (size >= 12 && r < 0.3) return 6 // absolute holdout
-				return 7 // constitutional
+				if (size >= 12 && r < 0.3) return getGovIdx().absolute_monarchy // absolute holdout
+				return getGovIdx().constitutional_monarchy
 			}
 			// Industrial era (~0.30): constitutional rises, absolute for medium+,
-			// no surviving feudalism.
+			// no surviving feudalism. Warlord states can emerge from post-imperial
+			// collapse (Warlord-Era China is squarely this era).
 			if (sizeWeight < 0.4) {
-				if (r < 0.55) return 7 // constitutional
-				if (size >= 6) return 6 // absolute: medium+
-				return 7
+				if (size >= 6 && r < 0.15) return getGovIdx().warlord_state
+				if (r < 0.55) return getGovIdx().constitutional_monarchy
+				if (size >= 6) return getGovIdx().absolute_monarchy
+				return getGovIdx().constitutional_monarchy
 			}
 			// Early modern (~0.45): age of absolutism; elective and feudal persist;
-			// constitutional begins to emerge.
+			// constitutional begins to emerge. Small polities under one dynastic
+			// lord (dynastic signoria) are an early-modern-specific phenomenon
+			// (Medici Florence, Visconti Milan).
 			if (sizeWeight < 0.55) {
-				if (size >= 8 && r < 0.45) return 6 // absolute: medium+
-				if (size >= 8 && r < 0.65) return 5 // elective: medium+ (Poland, HRE)
-				if (r < 0.88) return 4 // feudal still widespread
-				return 7 // early constitutional
+				if (size >= 8 && r < 0.45) return getGovIdx().absolute_monarchy // medium+
+				if (size >= 8 && r < 0.65) return getGovIdx().elective_monarchy // medium+ (Poland, HRE)
+				if (size < 6 && r < 0.15) return getGovIdx().dynastic_signoria // small princely city-state
+				if (r < 0.88) return getGovIdx().feudal_monarchy // still widespread
+				return getGovIdx().constitutional_monarchy // early constitutional
 			}
 			// Ancient & medieval (>=0.55): feudal default; elective for medium+
-			// kingdoms; absolute for large autocratic empires.
-			if (size >= 20 && r < 0.65) return 6 // absolute: large empires
-			if (size >= 5 && r < 0.75) return 5 // elective: medium+ kingdoms
-			return 4 // feudal: default
+			// kingdoms; large empires split between absolute, bureaucratic
+			// (exam-selected administration, e.g. China), and shogunate (military
+			// rule under a figurehead monarch, e.g. Japan).
+			if (size >= 20 && r < 0.65) {
+				if (r < 0.25) return getGovIdx().bureaucratic_monarchy
+				if (r < 0.35) return getGovIdx().shogunate
+				return getGovIdx().absolute_monarchy
+			}
+			if (size >= 5 && r < 0.75) return getGovIdx().elective_monarchy // medium+ kingdoms
+			return getGovIdx().feudal_monarchy // default
 		}
 
 		case 2: {
-			// republic → 8=merchant, 9=noble, 10=confederation, 11=presidential, 12=parliamentary, 17=socialist, 18=junta
-			// Information era: socialist states emerge alongside parliamentary, presidential, and juntas.
+			// republic → merchant, oligarchic, free city, presidential, parliamentary,
+			// pirate republic, socialist, junta, fascist, dictatorial
+			// Information era: socialist states emerge alongside parliamentary,
+			// presidential, juntas, and personalist dictatorships. Fascism is a
+			// 20th-century-specific (WWII) phenomenon, excluded here.
 			if (sizeWeight < 0.22) {
-				if (size >= 20 && r < 0.35) return 17 // socialist: large one-party states
-				if (r < 0.18) return 17 // socialist: minority elsewhere
-				if (r < 0.36) return 18 // military junta
-				if (r < 0.68) return 12 // parliamentary
-				return 11 // presidential
+				if (size >= 20 && r < 0.28) return getGovIdx().socialist_state // large one-party states
+				if (r < 0.12) return getGovIdx().socialist_state // minority elsewhere
+				if (r < 0.22) return getGovIdx().military_junta
+				if (r < 0.3) return getGovIdx().dictatorial_rule // personalist autocracy
+				if (r < 0.62) return getGovIdx().parliamentary_republic
+				return getGovIdx().presidential_republic
 			}
 			// Industrial era: no socialist states (predates 1917); juntas dominate
-			// unstable republics (Latin America), parliamentary in France/Europe,
+			// unstable republics (Latin America); fascism appears here (WWII-era
+			// totalitarian nationalist regimes); parliamentary in France/Europe,
 			// presidential in the USA.
 			if (sizeWeight < 0.4) {
-				if (r < 0.3) return 18 // military junta
-				if (r < 0.7) return 12 // parliamentary
-				return 11 // presidential
+				if (r < 0.08) return getGovIdx().fascist_state
+				if (r < 0.32) return getGovIdx().military_junta
+				if (r < 0.72) return getGovIdx().parliamentary_republic
+				return getGovIdx().presidential_republic
 			}
 			// Pre-modern republics
-			if (water >= 2 && size <= 10 && wave >= 0 && wave < 0.35) return 8 // merchant: coastal core
+			if (water >= 2 && size <= 3 && r < 0.06)
+				return getGovIdx().pirate_republic // small remote coastal havens
+			if (water >= 1 && size <= 4 && hab >= 0.4 && r < 0.1)
+				return getGovIdx().peasant_republic // lord-less coastal/marsh free-peasant commune
+			if (water >= 2 && size <= 10 && wave >= 0 && wave < 0.35)
+				return getGovIdx().merchant_republic // coastal core
 			if (water >= 1 && size <= 6 && wave >= 0 && wave < 0.3 && r < 0.55)
-				return 8
-			if (size >= 10 && r < 0.4) return 10 // confederation: medium chance
-			if (size >= 8 && wave >= 0 && wave < 0.28) return 9 // noble or confederation
-			return 8 // merchant: default
+				return getGovIdx().merchant_republic
+			if (size >= 6 && size <= 12 && water >= 1 && r < 0.3)
+				return getGovIdx().free_city // self-governing city or canton
+			if (size >= 10 && r < 0.4) return getGovIdx().free_city // league of free cities
+			if (size >= 8 && wave >= 0 && wave < 0.28)
+				return getGovIdx().oligarchic_republic
+			return getGovIdx().merchant_republic // default
 		}
 
 		case 3: {
-			// theocracy → 13=theocracy, 14=monastic state, 15=prince-bishopric, 16=imperial cult
+			// theocracy → theocracy, monastic state, imperial cult
 			// Imperial cult: large, early modern and earlier only (no industrial/information)
-			if (size >= 20 && sizeWeight >= 0.4) return r < 0.45 ? 16 : 13
-			if (size >= 10) return 13 // theocracy: medium+
-			if (water >= 1 && r < 0.55) return 14 // monastic: coastal small
-			if (sizeWeight > 0.4 && r < 0.55) return 15 // prince-bishopric: medieval small
-			return 13 // default theocracy
+			if (size >= 20 && sizeWeight >= 0.4)
+				return r < 0.45 ? getGovIdx().imperial_cult : getGovIdx().theocracy
+			if (size >= 10) return getGovIdx().theocracy // medium+
+			if (water >= 1 && r < 0.55) return getGovIdx().monastic_state // coastal small
+			return getGovIdx().theocracy // default
 		}
 	}
-	return 0
+	return getGovIdx().chiefdom
 }
 
 function normalize(values: number[]): number[] {

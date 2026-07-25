@@ -1,650 +1,402 @@
 [
-  {
-    "id": "christian",
-    "name": "Christian",
-    "religions": [
-      {
-        "id": "chalcedonism",
-        "name": "Chalcedonism",
-        "color": [
-          200,
-          160,
-          0
-        ]
-      },
-      {
-        "id": "catholic",
-        "name": "Catholic",
-        "color": [
-          204,
-          204,
-          0
-        ]
-      },
-      {
-        "id": "anglican",
-        "name": "Anglican",
-        "color": [
-          135,
-          77,
-          255
-        ]
-      },
-      {
-        "id": "cathar",
-        "name": "Cathar",
-        "color": [
-          90,
-          90,
-          240
-        ]
-      },
-      {
-        "id": "hussite",
-        "name": "Hussite",
-        "color": [
-          244,
-          55,
-          9
-        ]
-      },
-      {
-        "id": "protestant",
-        "name": "Protestant",
-        "color": [
-          0,
-          0,
-          178
-        ]
-      },
-      {
-        "id": "reformed",
-        "name": "Reformed",
-        "color": [
-          76,
-          76,
-          229
-        ]
-      },
-      {
-        "id": "orthodox",
-        "name": "Orthodox",
-        "color": [
-          178,
-          127,
-          0
-        ]
-      },
-      {
-        "id": "coptic",
-        "name": "Coptic",
-        "color": [
-          178,
-          120,
-          120
-        ]
-      },
-      {
-        "id": "nestorian",
-        "name": "Nestorian",
-        "color": [
-          160,
-          160,
-          0
-        ]
-      },
-      {
-        "id": "arianism",
-        "name": "Arianism",
-        "color": [
-          120,
-          120,
-          0
-        ]
-      },
-      {
-        "id": "mormon",
-        "name": "Mormon",
-        "color": [
-          175,
-          198,
-          235
-        ]
-      },
-      {
-        "id": "reformed_chalcedonism",
-        "name": "Reformed Chalcedonism",
-        "color": [
-          220,
-          180,
-          70
-        ]
-      },
-      {
-        "id": "bogomilism",
-        "name": "Bogomilism",
-        "color": [
-          170,
-          0,
-          0
-        ]
-      },
-      {
-        "id": "waldensian",
-        "name": "Waldensian",
-        "color": [
-          215,
-          255,
-          90
-        ]
-      },
-      {
-        "id": "lollard",
-        "name": "Lollard",
-        "color": [
-          215,
-          70,
-          235
-        ]
-      }
-    ]
-  },
-  {
-    "id": "muslim",
-    "name": "Muslim",
-    "religions": [
-      {
-        "id": "islam",
-        "name": "Islam",
-        "color": [
-          0,
-          178,
-          0
-        ]
-      },
-      {
-        "id": "sunni",
-        "name": "Sunni",
-        "color": [
-          0,
-          153,
-          0
-        ]
-      },
-      {
-        "id": "shiite",
-        "name": "Shiite",
-        "color": [
-          0,
-          204,
-          0
-        ]
-      },
-      {
-        "id": "ibadi",
-        "name": "Ibadi",
-        "color": [
-          0,
-          102,
-          0
-        ]
-      }
-    ]
-  },
-  {
-    "id": "buddhic",
-    "name": "Buddhic",
-    "religions": [
-      {
-        "id": "buddhism",
-        "name": "Theravada",
-        "color": [
-          204,
-          76,
-          0
-        ]
-      },
-      {
-        "id": "vajrayana",
-        "name": "Vajrayana",
-        "color": [
-          204,
-          76,
-          76
-        ]
-      },
-      {
-        "id": "mahayana",
-        "name": "Mahayana",
-        "color": [
-          204,
-          76,
-          127
-        ]
-      }
-    ]
-  },
-  {
-    "id": "dharmic",
-    "name": "Dharmic",
-    "religions": [
-      {
-        "id": "hinduism",
-        "name": "Hinduism",
-        "color": [
-          0,
-          204,
-          204
-        ]
-      },
-      {
-        "id": "sikhism",
-        "name": "Sikhism",
-        "color": [
-          0,
-          153,
-          153
-        ]
-      },
-      {
-        "id": "jainism",
-        "name": "Jainism",
-        "color": [
-          150,
-          230,
-          230
-        ]
-      },
-      {
-        "id": "zunism",
-        "name": "Zunism",
-        "color": [
-          200,
-          200,
-          150
-        ]
-      },
-      {
-        "id": "sanamahism",
-        "name": "Sanamahism",
-        "color": [
-          160,
-          90,
-          180
-        ]
-      }
-    ]
-  },
-  {
-    "id": "eastern",
-    "name": "Eastern",
-    "religions": [
-      {
-        "id": "confucianism",
-        "name": "Confucianism",
-        "color": [
-          214,
-          229,
-          140
-        ]
-      },
-      {
-        "id": "shinto",
-        "name": "Shinto",
-        "color": [
-          204,
-          0,
-          0
-        ]
-      },
-      {
-        "id": "tibetan_bon",
-        "name": "Tibetan Bon",
-        "color": [
-          0,
-          100,
-          100
-        ]
-      },
-      {
-        "id": "muism",
-        "name": "Muism",
-        "color": [
-          130,
-          130,
-          50
-        ]
-      },
-      {
-        "id": "tengri_pagan_reformed",
-        "name": "Tengri",
-        "color": [
-          25,
-          76,
-          217
-        ]
-      },
-      {
-        "id": "satsana_phi",
-        "name": "Satsana Phi",
-        "color": [
-          180,
-          130,
-          50
-        ]
-      }
-    ]
-  },
-  {
-    "id": "pagan",
-    "name": "Pagan",
-    "religions": [
-      {
-        "id": "animism",
-        "name": "Animism",
-        "color": [
-          127,
-          0,
-          0
-        ]
-      },
-      {
-        "id": "shamanist",
-        "name": "Shamanist",
-        "color": [
-          100,
-          60,
-          60
-        ]
-      },
-      {
-        "id": "dreamtime",
-        "name": "Dreamtime",
-        "color": [
-          197,
-          133,
-          43
-        ]
-      }
-    ]
-  },
-  {
-    "id": "hellenic",
-    "name": "Hellenic",
-    "religions": [
-      {
-        "id": "hellenism",
-        "name": "Hellenism",
-        "color": [
-          100,
-          0,
-          80
-        ]
-      },
-      {
-        "id": "druidism",
-        "name": "Druidism",
-        "color": [
-          100,
-          200,
-          20
-        ]
-      },
-      {
-        "id": "zamolxism",
-        "name": "Zamolxism",
-        "color": [
-          0,
-          0,
-          100
-        ]
-      },
-      {
-        "id": "nabataean",
-        "name": "Nabataean",
-        "color": [
-          80,
-          80,
-          80
-        ]
-      }
-    ]
-  },
-  {
-    "id": "zoroastrian_group",
-    "name": "Zoroastrian Group",
-    "religions": [
-      {
-        "id": "zoroastrian",
-        "name": "Zoroastrian",
-        "color": [
-          127,
-          178,
-          51
-        ]
-      },
-      {
-        "id": "manichaeism",
-        "name": "Manichaeism",
-        "color": [
-          100,
-          200,
-          100
-        ]
-      },
-      {
-        "id": "armenian_religion",
-        "name": "Armenian Religion",
-        "color": [
-          200,
-          140,
-          140
-        ]
-      },
-      {
-        "id": "georgian_religion",
-        "name": "Georgian Religion",
-        "color": [
-          160,
-          60,
-          60
-        ]
-      }
-    ]
-  },
-  {
-    "id": "jewish_group",
-    "name": "Jewish Group",
-    "religions": [
-      {
-        "id": "jewish",
-        "name": "Jewish",
-        "color": [
-          100,
-          160,
-          210
-        ]
-      }
-    ]
-  },
-  {
-    "id": "secular",
-    "name": "Secular",
-    "religions": [
-      {
-        "id": "secularism",
-        "name": "Secularism",
-        "color": [
-          0,
-          0,
-          0
-        ]
-      },
-      {
-        "id": "irreligious",
-        "name": "Irreligious",
-        "color": [
-          0,
-          0,
-          0
-        ]
-      }
-    ]
-  },
-  {
-    "id": "american_pagan",
-    "name": "American Pagan",
-    "religions": [
-      {
-        "id": "totemism",
-        "name": "Totemism",
-        "color": [
-          157,
-          120,
-          120
-        ]
-      },
-      {
-        "id": "mesoamerican_religion",
-        "name": "Mayan",
-        "color": [
-          127,
-          25,
-          178
-        ]
-      },
-      {
-        "id": "south_american",
-        "name": "South American",
-        "color": [
-          120,
-          20,
-          20
-        ]
-      },
-      {
-        "id": "nahuatl",
-        "name": "Nahuatl",
-        "color": [
-          64,
-          115,
-          64
-        ]
-      },
-      {
-        "id": "inti",
-        "name": "Inti",
-        "color": [
-          64,
-          115,
-          115
-        ]
-      }
-    ]
-  },
-  {
-    "id": "slavic_pagan",
-    "name": "Slavic Pagan",
-    "religions": [
-      {
-        "id": "romuva",
-        "name": "Romuva",
-        "color": [
-          150,
-          120,
-          60
-        ]
-      },
-      {
-        "id": "slavic",
-        "name": "Slavic",
-        "color": [
-          40,
-          120,
-          170
-        ]
-      },
-      {
-        "id": "suomenusko",
-        "name": "Suomenusko",
-        "color": [
-          120,
-          100,
-          0
-        ]
-      }
-    ]
-  },
-  {
-    "id": "german_pagan",
-    "name": "German Pagan",
-    "religions": [
-      {
-        "id": "norse_pagan_reformed",
-        "name": "Norse",
-        "color": [
-          120,
-          120,
-          120
-        ]
-      },
-      {
-        "id": "germanic",
-        "name": "Germanic",
-        "color": [
-          180,
-          180,
-          180
-        ]
-      }
-    ]
-  },
-  {
-    "id": "african_pagan",
-    "name": "African Pagan",
-    "religions": [
-      {
-        "id": "egyptian",
-        "name": "Egyptian",
-        "color": [
-          210,
-          210,
-          80
-        ]
-      },
-      {
-        "id": "shamanism",
-        "name": "Fetishist",
-        "color": [
-          127,
-          76,
-          76
-        ]
-      }
-    ]
-  },
-  {
-    "id": "mesopotamian",
-    "name": "Mesopotamian",
-    "religions": [
-      {
-        "id": "ashurism",
-        "name": "Ashurism",
-        "color": [
-          210,
-          210,
-          210
-        ]
-      },
-      {
-        "id": "south_arabian",
-        "name": "South Arabian",
-        "color": [
-          140,
-          20,
-          50
-        ]
-      }
-    ]
-  }
+	{
+		"id": "christian",
+		"name": "Christian",
+		"religions": [
+			{
+				"id": "chalcedonism",
+				"name": "Chalcedonism",
+				"color": [200, 160, 0]
+			},
+			{
+				"id": "catholic",
+				"name": "Catholic",
+				"color": [204, 204, 0]
+			},
+			{
+				"id": "anglican",
+				"name": "Anglican",
+				"color": [135, 77, 255]
+			},
+			{
+				"id": "cathar",
+				"name": "Cathar",
+				"color": [90, 90, 240]
+			},
+			{
+				"id": "hussite",
+				"name": "Hussite",
+				"color": [244, 55, 9]
+			},
+			{
+				"id": "protestant",
+				"name": "Protestant",
+				"color": [0, 0, 178]
+			},
+			{
+				"id": "reformed",
+				"name": "Reformed",
+				"color": [76, 76, 229]
+			},
+			{
+				"id": "orthodox",
+				"name": "Orthodox",
+				"color": [178, 127, 0]
+			},
+			{
+				"id": "coptic",
+				"name": "Coptic",
+				"color": [178, 120, 120]
+			},
+			{
+				"id": "nestorian",
+				"name": "Nestorian",
+				"color": [160, 160, 0]
+			},
+			{
+				"id": "arianism",
+				"name": "Arianism",
+				"color": [120, 120, 0]
+			},
+			{
+				"id": "mormon",
+				"name": "Mormon",
+				"color": [175, 198, 235]
+			},
+			{
+				"id": "reformed_chalcedonism",
+				"name": "Reformed Chalcedonism",
+				"color": [220, 180, 70]
+			},
+			{
+				"id": "bogomilism",
+				"name": "Bogomilism",
+				"color": [170, 0, 0]
+			},
+			{
+				"id": "waldensian",
+				"name": "Waldensian",
+				"color": [215, 255, 90]
+			},
+			{
+				"id": "lollard",
+				"name": "Lollard",
+				"color": [215, 70, 235]
+			}
+		]
+	},
+	{
+		"id": "muslim",
+		"name": "Muslim",
+		"religions": [
+			{
+				"id": "islam",
+				"name": "Islam",
+				"color": [0, 178, 0]
+			},
+			{
+				"id": "sunni",
+				"name": "Sunni",
+				"color": [0, 153, 0]
+			},
+			{
+				"id": "shiite",
+				"name": "Shiite",
+				"color": [0, 204, 0]
+			},
+			{
+				"id": "ibadi",
+				"name": "Ibadi",
+				"color": [0, 102, 0]
+			}
+		]
+	},
+	{
+		"id": "buddhic",
+		"name": "Buddhic",
+		"religions": [
+			{
+				"id": "buddhism",
+				"name": "Theravada",
+				"color": [204, 76, 0]
+			},
+			{
+				"id": "vajrayana",
+				"name": "Vajrayana",
+				"color": [204, 76, 76]
+			},
+			{
+				"id": "mahayana",
+				"name": "Mahayana",
+				"color": [204, 76, 127]
+			}
+		]
+	},
+	{
+		"id": "dharmic",
+		"name": "Dharmic",
+		"religions": [
+			{
+				"id": "hinduism",
+				"name": "Hinduism",
+				"color": [0, 204, 204]
+			},
+			{
+				"id": "sikhism",
+				"name": "Sikhism",
+				"color": [0, 153, 153]
+			},
+			{
+				"id": "jainism",
+				"name": "Jainism",
+				"color": [150, 230, 230]
+			},
+			{
+				"id": "zunism",
+				"name": "Zunism",
+				"color": [200, 200, 150]
+			},
+			{
+				"id": "sanamahism",
+				"name": "Sanamahism",
+				"color": [160, 90, 180]
+			}
+		]
+	},
+	{
+		"id": "eastern",
+		"name": "Eastern",
+		"religions": [
+			{
+				"id": "confucianism",
+				"name": "Confucianism",
+				"color": [214, 229, 140]
+			},
+			{
+				"id": "shinto",
+				"name": "Shinto",
+				"color": [204, 0, 0]
+			},
+			{
+				"id": "tibetan_bon",
+				"name": "Tibetan Bon",
+				"color": [0, 100, 100]
+			},
+			{
+				"id": "muism",
+				"name": "Muism",
+				"color": [130, 130, 50]
+			},
+			{
+				"id": "tengri_pagan_reformed",
+				"name": "Tengri",
+				"color": [25, 76, 217]
+			},
+			{
+				"id": "satsana_phi",
+				"name": "Satsana Phi",
+				"color": [180, 130, 50]
+			}
+		]
+	},
+	{
+		"id": "pagan",
+		"name": "Pagan",
+		"religions": [
+			{
+				"id": "animism",
+				"name": "Animism",
+				"color": [127, 0, 0]
+			},
+			{
+				"id": "shamanist",
+				"name": "Shamanist",
+				"color": [100, 60, 60]
+			},
+			{
+				"id": "dreamtime",
+				"name": "Dreamtime",
+				"color": [197, 133, 43]
+			}
+		]
+	},
+	{
+		"id": "hellenic",
+		"name": "Hellenic",
+		"religions": [
+			{
+				"id": "hellenism",
+				"name": "Hellenism",
+				"color": [100, 0, 80]
+			},
+			{
+				"id": "druidism",
+				"name": "Druidism",
+				"color": [100, 200, 20]
+			},
+			{
+				"id": "zamolxism",
+				"name": "Zamolxism",
+				"color": [0, 0, 100]
+			},
+			{
+				"id": "nabataean",
+				"name": "Nabataean",
+				"color": [80, 80, 80]
+			}
+		]
+	},
+	{
+		"id": "zoroastrian_group",
+		"name": "Zoroastrian Group",
+		"religions": [
+			{
+				"id": "zoroastrian",
+				"name": "Zoroastrian",
+				"color": [127, 178, 51]
+			},
+			{
+				"id": "manichaeism",
+				"name": "Manichaeism",
+				"color": [100, 200, 100]
+			},
+			{
+				"id": "armenian_religion",
+				"name": "Armenian Religion",
+				"color": [200, 140, 140]
+			},
+			{
+				"id": "georgian_religion",
+				"name": "Georgian Religion",
+				"color": [160, 60, 60]
+			}
+		]
+	},
+	{
+		"id": "jewish_group",
+		"name": "Jewish Group",
+		"religions": [
+			{
+				"id": "jewish",
+				"name": "Jewish",
+				"color": [100, 160, 210]
+			}
+		]
+	},
+	{
+		"id": "secular",
+		"name": "Secular",
+		"religions": [
+			{
+				"id": "secularism",
+				"name": "Secularism",
+				"color": [0, 0, 0]
+			},
+			{
+				"id": "irreligious",
+				"name": "Irreligious",
+				"color": [0, 0, 0]
+			}
+		]
+	},
+	{
+		"id": "american_pagan",
+		"name": "American Pagan",
+		"religions": [
+			{
+				"id": "totemism",
+				"name": "Totemism",
+				"color": [157, 120, 120]
+			},
+			{
+				"id": "mesoamerican_religion",
+				"name": "Mayan",
+				"color": [127, 25, 178]
+			},
+			{
+				"id": "south_american",
+				"name": "South American",
+				"color": [120, 20, 20]
+			},
+			{
+				"id": "nahuatl",
+				"name": "Nahuatl",
+				"color": [64, 115, 64]
+			},
+			{
+				"id": "inti",
+				"name": "Inti",
+				"color": [64, 115, 115]
+			}
+		]
+	},
+	{
+		"id": "slavic_pagan",
+		"name": "Slavic Pagan",
+		"religions": [
+			{
+				"id": "romuva",
+				"name": "Romuva",
+				"color": [150, 120, 60]
+			},
+			{
+				"id": "slavic",
+				"name": "Slavic",
+				"color": [40, 120, 170]
+			},
+			{
+				"id": "suomenusko",
+				"name": "Suomenusko",
+				"color": [120, 100, 0]
+			}
+		]
+	},
+	{
+		"id": "german_pagan",
+		"name": "German Pagan",
+		"religions": [
+			{
+				"id": "norse_pagan_reformed",
+				"name": "Norse",
+				"color": [120, 120, 120]
+			},
+			{
+				"id": "germanic",
+				"name": "Germanic",
+				"color": [180, 180, 180]
+			}
+		]
+	},
+	{
+		"id": "african_pagan",
+		"name": "African Pagan",
+		"religions": [
+			{
+				"id": "egyptian",
+				"name": "Egyptian",
+				"color": [210, 210, 80]
+			},
+			{
+				"id": "shamanism",
+				"name": "Fetishist",
+				"color": [127, 76, 76]
+			}
+		]
+	},
+	{
+		"id": "mesopotamian",
+		"name": "Mesopotamian",
+		"religions": [
+			{
+				"id": "ashurism",
+				"name": "Ashurism",
+				"color": [210, 210, 210]
+			},
+			{
+				"id": "south_arabian",
+				"name": "South Arabian",
+				"color": [140, 20, 50]
+			}
+		]
+	}
 ]
