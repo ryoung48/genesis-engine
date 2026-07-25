@@ -13,10 +13,8 @@ import { DetailRow, formatPopulation } from "../shared"
 
 // Matches GenerationPanel's own top-level collapsible blocks ("Generate",
 // "Moons"/"Orbits", "Climate") exactly -- a Surface sibling in the panel's
-// own flow, not the nested AccordionSection look (Surface-inside-a-Surface)
-// shared.tsx's AccordionSection still uses for NationDetails' drawer. Kept
-// local to this file rather than added to shared.tsx, since NationDetails'
-// own accordion look is intentionally different and unrelated.
+// own flow. Kept local to this file rather than added to shared.tsx since
+// nothing else needs this accordion look.
 function TopLevelSection({
 	title,
 	open,

@@ -49,6 +49,8 @@ export interface GenesisWorld {
 	volcanism: GenesisVolcanism
 	/** Per-cell climate zone code (0=ocean, 1=arctic, 2=subarctic, 3=boreal, 4=temperate, 5=subtropical, 6=tropical, 7=infernal, 8=chaotic) */
 	climateZones: Uint8Array
+	/** Per-cell climate zone code classified from observed-Earth temperature instead of the procedural model. Earth-import only. */
+	realClimateZones?: Uint8Array
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
 	pastaClimate: Uint8Array
 	/** Per-cell pasta climate detail metrics used by hover charts */

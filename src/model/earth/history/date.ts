@@ -5,7 +5,7 @@
 const CUM_MONTH_DAYS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-const EARTH_HISTORY_START_YEAR = 2
+export const EARTH_HISTORY_START_YEAR = 2
 const EARTH_HISTORY_END_YEAR = 9999
 
 function dayOfYear(month: number, day: number): number {

@@ -1,8 +1,10 @@
 import type { GenesisParams } from "@/model"
+import type { HistoryNote } from "@/model/history"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
+	SerializedHistoryFrame,
 } from "@/model/transport/worker-types"
 export type GenerationParams = GenesisParams
 
@@ -115,6 +117,16 @@ export interface GenerationCallbacks {
 		travelDays: number
 		reachable: boolean
 	}) => void
+	/** The seed history frame attached to "done", if the generated world has
+	 * nations/provinces/population wired up for the live-play sim. */
+	onHistoryFrame?: (frame: SerializedHistoryFrame) => void
+	/** Fired for each "sim-progress" tick emitted while a "simulate" request
+	 * is running in the worker. */
+	onSimProgress?: (
+		timeMs: number,
+		frame: SerializedHistoryFrame,
+		newEvents: HistoryNote[],
+	) => void
 }
 
 function createWorker(
@@ -162,6 +174,14 @@ function createWorker(
 				travelDays: message.travelDays,
 				reachable: message.reachable,
 			})
+			return
+		}
+		if (message.type === "sim-progress") {
+			callbacks.onSimProgress?.(
+				message.timeMs,
+				message.frame,
+				message.newEvents,
+			)
 			return
 		}
 	}
@@ -252,6 +272,7 @@ export function generateWorld(
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
+				if (message.frame) callbacks.onHistoryFrame?.(message.frame)
 				callbacks.onGenerationComplete?.()
 				// Keep the worker alive to serve pathfind requests.
 			},
@@ -385,6 +406,7 @@ export function importHeightmap(
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
+				if (message.frame) callbacks.onHistoryFrame?.(message.frame)
 				callbacks.onGenerationComplete?.()
 				// Keep worker alive for simulation
 			},

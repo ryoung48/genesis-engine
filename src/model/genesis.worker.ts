@@ -1,5 +1,17 @@
 /// <reference lib="webworker" />
 
+import {
+	computeMapGeometryArrays,
+	computeTerrainGeometryArrays,
+} from "@/ui/planet/renderer/terrain-geometry"
+import {
+	createHistoryRng,
+	initHistory,
+	simulateUntil,
+	YEAR_MS,
+} from "./history"
+import { buildHistoryFrame } from "./history/snapshot"
+import type { HistoryState } from "./history/state"
 import { pathfind } from "./pathfinding/pathfind"
 import { generateGenesisWorld } from "./pipelines/generate-world"
 import { importGenesisWorld } from "./pipelines/import-heightmap"
@@ -7,10 +19,79 @@ import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
+	SerializedHistoryFrame,
 } from "./transport/worker-types"
 import { packNetwork, packRoutes } from "./transport/worker-types"
 
 declare const self: DedicatedWorkerGlobalScope
+
+// Live-play sim state: the sim only ever advances as far as "simulate" has
+// ticked it, never precomputed ahead of what's been played (see
+// PROCEDURAL-HISTORY-PLAN.md). historyState is (re)seeded at generate/import
+// time via initHistory (cheap - just seeds the start year, no simulateUntil).
+let historyState: HistoryState | null = null
+let historyRng: ReturnType<typeof createHistoryRng> | null = null
+let historyTime = 800 * YEAR_MS
+let simulationRunning = false
+// Index into historyState.events already sent to the main thread, so each
+// "sim-progress" only carries newly-pushed events instead of the whole log.
+let historyEventCursor = 0
+
+function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
+	return [
+		frame.assignment.buffer,
+		frame.parent.buffer,
+		frame.sovereign.buffer,
+		frame.leaderDynasty.buffer,
+		frame.leaderNameSeed.buffer,
+		frame.leaderClaim.buffer,
+		frame.leaderBirthYear.buffer,
+		frame.colors.buffer,
+		frame.populationTotal.buffer,
+		frame.populationUrban.buffer,
+		frame.development.buffer,
+		frame.consumption.buffer,
+		frame.nationWealth.buffer,
+		frame.nationOptimalWealth.buffer,
+		frame.relationA.buffer,
+		frame.relationB.buffer,
+		frame.relationValues.buffer,
+		frame.cultureBlendSecondary.buffer,
+		frame.cultureBlendWeight.buffer,
+	]
+}
+
+async function runSimulation(tickMs = YEAR_MS): Promise<void> {
+	if (!historyState || !historyRng) return
+	simulationRunning = true
+
+	while (simulationRunning) {
+		try {
+			historyTime += tickMs
+			simulateUntil(historyState, historyTime, historyRng)
+			const frame = buildHistoryFrame(historyState)
+			const newEvents = historyState.events.slice(historyEventCursor)
+			historyEventCursor = historyState.events.length
+			const progress: GenesisWorkerResponse = {
+				type: "sim-progress",
+				timeMs: historyTime,
+				frame,
+				newEvents,
+			}
+			self.postMessage(progress, buildFrameTransferList(frame))
+		} catch (error) {
+			const err = error instanceof Error ? error : new Error(String(error))
+			self.postMessage({
+				type: "error",
+				message: `Simulation error at ${historyTime}: ${err.message}`,
+				stack: err.stack,
+			} satisfies GenesisWorkerResponse)
+			simulationRunning = false
+			return
+		}
+		await new Promise((resolve) => setTimeout(resolve, 0))
+	}
+}
 
 interface PathfindSeedWorld {
 	params: { planetRadiusKm?: number }
@@ -142,6 +223,21 @@ function serializeWorld(
 		routes: world.routes ? packRoutes(world.routes) : undefined,
 		network: world.network ? packNetwork(world.network) : undefined,
 	}
+}
+
+/** Precomputes the default-display-state terrain/map geometry (see
+ * SerializedGenesisWorld's doc comment) so create-genesis-scene.ts's first
+ * rebuildTerrain() after "Generate"/"Load Earth" can skip straight to
+ * wrapping these arrays in THREE.BufferGeometry instead of running the
+ * per-vertex color/normal-averaging pass on the main thread. */
+function attachPrecomputedGeometry(
+	world: SerializedGenesisWorld,
+): SerializedGenesisWorld {
+	const terrain = computeTerrainGeometryArrays(world, "terrain", null, true)
+	const map = computeMapGeometryArrays(world, "terrain", null, 0, 0)
+	world.precomputedTerrainGeometry = terrain
+	world.precomputedMapGeometry = map
+	return world
 }
 
 function partitionBuffers(p: {
@@ -444,11 +540,44 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 			add(world.population.cradleProvinces.buffer)
 	}
 	if (world.tradeGoods) add(world.tradeGoods.buffer)
+	if (world.precomputedTerrainGeometry) {
+		add(
+			world.precomputedTerrainGeometry.positions.buffer,
+			world.precomputedTerrainGeometry.normals.buffer,
+			world.precomputedTerrainGeometry.colors.buffer,
+			world.precomputedTerrainGeometry.faceToRegion.buffer,
+		)
+	}
+	if (world.precomputedMapGeometry) {
+		add(
+			world.precomputedMapGeometry.positions.buffer,
+			world.precomputedMapGeometry.colors.buffer,
+			world.precomputedMapGeometry.lonLat.buffer,
+			world.precomputedMapGeometry.faceToRegion.buffer,
+		)
+	}
 	return Array.from(transfer)
 }
 
 self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 	const message = event.data
+
+	if (message.type === "pause") {
+		simulationRunning = false
+		return
+	}
+
+	if (message.type === "simulate") {
+		if (!historyState || !historyRng) {
+			self.postMessage({
+				type: "error",
+				message: "No world generated yet - generate a world first",
+			} satisfies GenesisWorkerResponse)
+			return
+		}
+		void runSimulation(message.tickMs ?? YEAR_MS)
+		return
+	}
 
 	if (message.type === "pathfind") {
 		if (!lastGeneratedWorld) {
@@ -527,13 +656,56 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			return
 		}
 
+		historyState = null
+		historyRng = null
+		historyTime = 800 * YEAR_MS
+		simulationRunning = false
+		historyEventCursor = 0
+		if (
+			generated.nations &&
+			generated.provinces &&
+			generated.population &&
+			generated.coastal &&
+			generated.waterAccess &&
+			generated.rivers?.visible &&
+			generated.cultures
+		) {
+			progressCb("Initializing history", 95)
+			historyRng = createHistoryRng(generated.params.seed + 99999)
+			historyState = initHistory({
+				nations: generated.nations,
+				provinces: generated.provinces,
+				population: generated.population,
+				coastal: generated.coastal,
+				waterAccess: generated.waterAccess,
+				riverVisible: generated.rivers.visible,
+				r_xyz: generated.mesh.r_xyz,
+				cultures: generated.cultures,
+				era: generated.params.era,
+				seed: generated.params.seed,
+				landmarks: generated.landmarks,
+				regionProvince: generated.provinces.regionProvince,
+				regionAdjOffset: generated.mesh.adjOffset,
+				regionAdjList: generated.mesh.adjList,
+				regionIsLand: generated.isLand,
+				planetRadiusKm: generated.params.planetRadiusKm,
+				settlementRegions: generated.settlementRegions,
+				settlementWaterLandmarks: generated.settlementWaterLandmarks,
+				settlementPortRegions: generated.settlementPortRegions,
+			})
+			historyTime = historyState.time
+		}
+
 		lastGeneratedWorld = clonePathfindSeedWorld(generated)
 
-		const world = serializeWorld(generated)
+		const world = attachPrecomputedGeometry(serializeWorld(generated))
 		progressCb("Done", 100)
+		const frame = historyState ? buildHistoryFrame(historyState) : undefined
 		self.postMessage(
-			{ type: "done", world } satisfies GenesisWorkerResponse,
-			buildTransferList(world),
+			{ type: "done", world, frame } satisfies GenesisWorkerResponse,
+			frame
+				? [...buildTransferList(world), ...buildFrameTransferList(frame)]
+				: buildTransferList(world),
 		)
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error))

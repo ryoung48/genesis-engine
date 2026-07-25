@@ -7,8 +7,6 @@ Before finishing any TypeScript or TSX code change in this repository, verify it
 - `pnpm lint`
 - `pnpm typecheck`
 
-For model-generation changes, also run `pnpm gen:world` before handing the work back.
-
 Unless the user explicitly asks for backwards compatibility, never preserve or optimize for backwards compatibility.
 
 Always check for duplicated logic before adding new code. Reuse or extract shared logic instead of copying behavior into another file.

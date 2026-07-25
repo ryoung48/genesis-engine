@@ -316,12 +316,34 @@ export const ERA_CONFIGS: Record<SocietyEra, EraConfig> = {
 		migrationFalloff: 1.5,
 		statehoodFraction: 1.0,
 		hasNations: true,
-		// Count-calibrated against Late Medieval size-tier targets:
-		// 45% [1], 35% [2-4], 12% [5-9], 6% [10-24], 2% [25-49], 1% [50-250], 0% [251-600]
+		// Measured directly from EU4 extended-timeline ownership folded to
+		// 1444.11.11 (public/earth-history/events/provinces.json): 711 nations
+		// holding 2,563 provinces. Share of *provinces* per size bucket --
+		// which is what buildNationPlan budgets against:
+		//   50+   4.4%   25-49 13.8%   10-24 25.7%
+		//   5-9  16.0%   2-4   27.3%   1     12.8%
+		// By nation count that is 46.1% [1], 37.3% [2-4], 9.1% [5-9],
+		// 5.9% [10-24], 1.4% [25-49], 0.1% [50+].
+		//
+		// These are taken as province shares rather than converted from count
+		// shares: the previous weights assumed the 50-250 bucket averaged 150
+		// provinces, which handed it 26.8% of all provinces. In 1444 the only
+		// nation above 49 is Ming at 113, so that bucket is really 4.4%.
 		nationPercentages: normalize([
-			0.0, 0.2679, 0.1321, 0.1821, 0.15, 0.1875, 0.0804,
+			0.0, 0.044, 0.138, 0.257, 0.16, 0.273, 0.128,
 		]),
-		nationBuckets: NATION_BUCKETS,
+		// Top bucket stays empty and the 50+ tier is capped near Ming's 113
+		// rather than the shared 250 ceiling, so the largest generated nation
+		// lands in the right range instead of doubling the real maximum.
+		nationBuckets: [
+			[251, 600],
+			[50, 120],
+			[25, 49],
+			[10, 24],
+			[5, 9],
+			[2, 4],
+			[1, 1],
+		],
 		governmentMix: {
 			tribal: 0.44,
 			monarchy: 0.48,

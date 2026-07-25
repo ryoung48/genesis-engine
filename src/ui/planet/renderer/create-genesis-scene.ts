@@ -21,6 +21,7 @@ import {
 import { formatClockTimeDisplay } from "../clock"
 import { type ColorMode, VEGETATION_WATER_BLUE } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
+import { boostCloudAlphaMap } from "./cloud-material"
 import {
 	buildCoastlineGlobeLines,
 	buildCoastlineMapLines,
@@ -166,6 +167,20 @@ const SOLAR_TERMINATOR_LABEL_BG_FILL = "rgba(248, 250, 252, 0.94)"
 const SOLAR_TERMINATOR_LABEL_BG_STROKE = "rgba(148, 163, 184, 0.55)"
 const SOLAR_TERMINATOR_LABEL_BASE_FONT_PX = 12
 const SOLAR_TERMINATOR_LABEL_TEXTURE_SCALE = 2
+const GLOBE_CLOUD_RADIUS = 1.035
+
+const globeCloudTextureLoader = new THREE.TextureLoader()
+const globeCloudTextureCache = new Map<string, THREE.Texture>()
+
+function loadGlobeCloudTexture(texturePath: string): THREE.Texture {
+	const cached = globeCloudTextureCache.get(texturePath)
+	if (cached) return cached
+	const texture = globeCloudTextureLoader.load(texturePath)
+	texture.colorSpace = THREE.SRGBColorSpace
+	texture.userData.sharedTexture = true
+	globeCloudTextureCache.set(texturePath, texture)
+	return texture
+}
 
 function drawRoundedRect(
 	ctx: CanvasRenderingContext2D,
@@ -842,6 +857,35 @@ export function createGenesisScene(
 	})
 	const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat)
 	globeGroup.add(atmosMesh)
+
+	const globeCloudGeo = new THREE.SphereGeometry(GLOBE_CLOUD_RADIUS, 64, 48)
+	const globeCloudMat = new THREE.MeshBasicMaterial({
+		color: 0xffffff,
+		transparent: true,
+		opacity: 1,
+		alphaTest: 0.02,
+		depthWrite: false,
+	})
+	boostCloudAlphaMap(globeCloudMat)
+	const globeCloudMesh = new THREE.Mesh(globeCloudGeo, globeCloudMat)
+	globeCloudMesh.rotation.x = Math.PI / 2
+	globeCloudMesh.renderOrder = 2
+	globeCloudMesh.visible = false
+	globeGroup.add(globeCloudMesh)
+
+	function setGlobeCloudTexturePath(texturePath: string | null): void {
+		if (!texturePath) {
+			globeCloudMat.alphaMap = null
+			globeCloudMat.needsUpdate = true
+			globeCloudMesh.visible = false
+			requestRender()
+			return
+		}
+		globeCloudMat.alphaMap = loadGlobeCloudTexture(texturePath)
+		globeCloudMat.needsUpdate = true
+		globeCloudMesh.visible = false
+		requestRender()
+	}
 
 	// Coastline overlay, on both the globe and the flat map. For a real
 	// "Load Earth" world this is the exact Natural Earth vector data
@@ -3814,6 +3858,7 @@ export function createGenesisScene(
 		if (mapMesh) mapMesh.visible = isMap
 		waterMesh.visible = !isMap
 		atmosMesh.visible = !isMap && sun.intensity > 0
+		globeCloudMesh.visible = false
 		if (globeSolarTerminator) globeSolarTerminator.visible = !isMap
 		if (mapSolarTerminator) mapSolarTerminator.visible = isMap
 		updateOverlayVisibility()
@@ -4102,6 +4147,7 @@ export function createGenesisScene(
 		disposeObject3D(globeGroup, terrainWireframe)
 		disposeObject3D(scene, mapWireframe)
 		disposeObject3D(globeGroup, globeGrid)
+		disposeObject3D(globeGroup, globeCloudMesh)
 		disposeObject3D(scene, mapGrid)
 		disposeObject3D(globeGroup, globeThermalEquator)
 		disposeObject3D(scene, mapThermalEquator)
@@ -4851,6 +4897,7 @@ export function createGenesisScene(
 		setSolarTerminatorUseMeridiem,
 		setSolarTerminatorVisible,
 		setAtmospherePressure,
+		setGlobeCloudTexturePath,
 		setCoastlineOverlayVisible,
 		setFullAmbient,
 		focusOnNation,

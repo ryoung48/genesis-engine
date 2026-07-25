@@ -29,6 +29,8 @@ import { LANGUAGE } from "@/model/society/language/languages"
 import { estimateGasGiantSizeClass, estimateRockySizeClass } from "./size-class"
 import {
 	buildPlanet,
+	SOL_EARTH_CLOUDS_TEXTURE_PATH,
+	SOL_EARTH_TEXTURE_PATH,
 	SOL_MAIN_WORLD_DEFAULTS,
 	SOL_SEED,
 	SOL_STAR_AGE_GYR,
@@ -853,6 +855,7 @@ export function generateSystemBodies(
 		}
 		const mainWorldSeed: SolPlanetSeed = {
 			...buildMainWorldSeed(solMainWorldOverrides),
+			cloudsTexturePath: SOL_EARTH_CLOUDS_TEXTURE_PATH,
 			inclinationDeg:
 				solMainWorldOverrides.inclinationDeg ??
 				SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
@@ -861,7 +864,7 @@ export function generateSystemBodies(
 			bodies: SOL_SYSTEM_BODIES.map((body) =>
 				body.isMainWorld
 					? buildPlanet(mainWorldSeed, seed, -1, {
-							textureOverride: "/sol/earth/2k_earth.jpg",
+							textureOverride: SOL_EARTH_TEXTURE_PATH,
 							moonsOverride: solMainWorldOverrides.moons,
 						})
 					: body,

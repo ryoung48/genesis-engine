@@ -8,7 +8,17 @@ import type { GenesisProvinces, GenesisRainfall, SphereMesh } from ".."
 import { createRng } from "../shared/rng"
 import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "../shared/units"
 
-export const PROVINCE_AREA_TARGET_KM2 = 10_000
+/**
+ * Target mean province area. 37,000 km² is the mean real-world area of an EU4
+ * extended-timeline land province, measured from the Earth-aligned fill
+ * vectors in public/earth-history/reference (3,522 land provinces totalling
+ * 131.0M km², mean 37,203 km², median 20,035 km²). Matching the mean rather
+ * than the median reproduces EU4's province *count* on an Earth-sized world;
+ * the generator's own size spread is tighter than EU4's, which has a long
+ * tail of Siberian/Saharan wasteland-scale cells pulling its mean well above
+ * its median.
+ */
+export const PROVINCE_AREA_TARGET_KM2 = 37_000
 // How far a coastal province's frontier may expand across open ocean before
 // giving up on finding a neighbor -- caps sea-crossing adjacency search, see
 // assemblePartition's phase 5b.
@@ -37,14 +47,27 @@ export function computeProvinces(
 	for (let r = 0; r < N; r++) if (isLand[r]) landCount++
 	if (landCount === 0) return emptyProvinces(N)
 
-	// Target area only influences seed density approximately: the actual province
-	// count comes from greedy seed placement below, not this estimate directly.
 	const planetRadiusKm = options?.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
 	const avgEdgeKm = meanEdgeLengthKm(mesh, options?.planetRadiusKm)
 	const regionAreaKm2 = avgEdgeKm * avgEdgeKm * Math.sqrt(3) * 0.5
+	// Greedy seed placement below rejects candidates that fall inside an
+	// existing seed's claim radius, so it lands fewer seeds than asked for and
+	// provinces come out correspondingly larger. Asking for proportionally
+	// more keeps the delivered mean area on PROVINCE_AREA_TARGET_KM2.
+	//
+	// The ratio is mildly scale-dependent -- bigger claim radii suffer less
+	// boundary waste, measuring ~0.83 at a 20,000 km² target and ~0.89 at
+	// 37,000 km² on an Earth-sized world. This is calibrated for the current
+	// target; a large change to PROVINCE_AREA_TARGET_KM2 wants a re-measure
+	// via province-nation-calibration.smoke.test.ts.
+	const SEED_PACKING_EFFICIENCY = 0.89
 	const targetCount = Math.max(
 		1,
-		Math.round((landCount * regionAreaKm2) / PROVINCE_AREA_TARGET_KM2),
+		Math.round(
+			(landCount * regionAreaKm2) /
+				PROVINCE_AREA_TARGET_KM2 /
+				SEED_PACKING_EFFICIENCY,
+		),
 	)
 
 	// Compute a continuous seed-claim radius from target density instead of

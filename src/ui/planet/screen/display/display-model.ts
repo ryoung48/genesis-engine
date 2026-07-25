@@ -89,19 +89,22 @@ export function buildDisplayWorld(params: {
 
 	if (!base.nations || !base.provinces) return base
 
-	const assignment = base.nations.sovereign.slice()
-	const size = new Int32Array(base.provinces.count)
-	for (let province = 0; province < assignment.length; province++) {
-		const sovereign = assignment[province]
-		if (sovereign >= 0) size[sovereign] += 1
-	}
+	// `assignment` and `colors` are province-indexed for display: each province
+	// carries its sovereign's province index and that sovereign's color.
+	//
+	// `size` is deliberately NOT rebuilt here. It is nation-indexed
+	// (GenesisPartition.size, length nations.count) and nation-label-overlay's
+	// nationProvinceCount reads size[nationIdx] as the label scale input,
+	// keyed by position in nations.seeds. Writing a province-indexed count
+	// array over it scales every label by an unrelated nation's province
+	// count -- and because those values are usually positive, the
+	// assignment-scan fallback never kicks in to correct it.
 	return {
 		...base,
 		nations: {
 			...base.nations,
-			assignment,
+			assignment: base.nations.sovereign.slice(),
 			colors: buildBaseNationColors(base),
-			size,
 		},
 	}
 }

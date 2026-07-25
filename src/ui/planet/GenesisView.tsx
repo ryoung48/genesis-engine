@@ -23,6 +23,7 @@ import {
 } from "@/model/celestial/system/generate-system-bodies"
 import {
 	SOL_DEFAULT_SOLAR_SYSTEM,
+	SOL_EARTH_CLOUDS_TEXTURE_PATH,
 	SOL_LUNA_DEFAULT,
 	SOL_MAIN_WORLD_DEFAULTS,
 	SOL_SEED,
@@ -95,6 +96,9 @@ import {
 	tradeGoodColor,
 	tradeGoodDisplayName,
 } from "@/model/economy/trade-goods"
+import type { HistoryNote } from "@/model/history"
+import { YEAR_MS } from "@/model/history"
+import { historyMsToEu4Days } from "@/model/history/eu4-days"
 import { SEED_MAX } from "@/model/shared/planet-code"
 import { seedStringToNumber } from "@/model/shared/rng"
 import {
@@ -117,7 +121,11 @@ import {
 	RELIGION_TYPE_NAMES,
 } from "@/model/society/religion"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+import type {
+	GenesisWorkerRequest,
+	SerializedGenesisWorld,
+	SerializedHistoryFrame,
+} from "@/model/transport/worker-types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
@@ -125,7 +133,9 @@ import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfF
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import { GenerationPanel } from "../wiki/GenerationPanel"
+import { eventInvolvesNation } from "../wiki/nation/event-description"
 import type { NationWikiData } from "../wiki/nation/NationWikiPage"
+import { buildProceduralWikiTimelineEvent } from "../wiki/nation/procedural-timeline-event"
 import type { OrganizationWikiData } from "../wiki/organization/OrganizationWikiPage"
 import type {
 	WikiTimelineEvent as NationTimelineEvent,
@@ -167,8 +177,6 @@ import {
 	type VegetationSubMode,
 } from "./controls/OverlayControls"
 import { SimulationControls } from "./controls/SimulationControls"
-import { DetailsDrawer } from "./details/DetailsDrawer"
-import { createDrawerNationClickHandler } from "./details/nation-clicks"
 import type { DistributionBucket } from "./details/shared"
 import { useEarthHistoryTimeline } from "./hooks/useEarthHistoryTimeline"
 import { findEu4ProvinceForLonLat } from "./hover/eu4-hover-province"
@@ -1442,12 +1450,11 @@ export const GenesisView: React.FC = () => {
 		useState<GenerationPreviewTab>(
 			initialGenerationSession?.generationPreviewTab ?? "climate",
 		)
-	const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false)
 	const [selectedNationId, setSelectedNationId] = useState<number | null>(null)
-	// Separate from selectedNationId above -- that one drives the existing
-	// right-side DetailsDrawer (procedural nations only). This is the new
-	// left-panel "nation wiki page" selection (Earth import only for now),
-	// identified by EU4 tag rather than a procedural nation id.
+	// Left-panel "nation wiki page" selection for Earth-import worlds,
+	// identified by EU4 tag rather than a procedural nation id. Procedural
+	// worlds instead drive the wiki page off selectedNationId above (see
+	// proceduralNationWikiData).
 	const [selectedWikiNationTag, setSelectedWikiNationTagRaw] = useState<
 		string | null
 	>(null)
@@ -1600,6 +1607,93 @@ export const GenesisView: React.FC = () => {
 			setEarthHistoryPlaying(false)
 		}
 	}, [earthHistory.maxDays, earthHistory.selectedDays])
+
+	// --- Procedural (non-Earth-import) live-play history sim ---
+	// Unlike earthHistory (a precomputed fold scrubbable across the whole
+	// span), procedural worlds only ever exist as far as "simulate" has
+	// ticked them forward in the worker -- see PROCEDURAL-HISTORY-PLAN.md.
+	// There is no stored past: only the latest frame is kept, so the
+	// timeline below can't scrub backward, only play/pause at the sim's
+	// current time.
+	const [proceduralHistoryFrame, setProceduralHistoryFrame] =
+		useState<SerializedHistoryFrame | null>(null)
+	const [proceduralHistoryTimeMs, setProceduralHistoryTimeMs] = useState(
+		800 * YEAR_MS,
+	)
+	const [proceduralHistoryPlaying, setProceduralHistoryPlaying] =
+		useState(false)
+	// All HistoryNotes observed so far, growing as "sim-progress" ticks
+	// arrive, for the wiki page's per-nation timeline.
+	const proceduralHistoryEventsRef = useRef<HistoryNote[]>([])
+	// Per-nation running province-count series, appended only when a
+	// nation's count actually changes (WikiCountHistoryPoint's step-chart
+	// contract -- see WikiTimeline.tsx).
+	const proceduralProvinceHistoryRef = useRef<
+		Map<number, WikiCountHistoryPoint[]>
+	>(new Map())
+	const proceduralLastCountsRef = useRef<Map<number, number>>(new Map())
+
+	const resetProceduralHistoryAccumulation = useCallback(() => {
+		proceduralHistoryEventsRef.current = []
+		proceduralProvinceHistoryRef.current = new Map()
+		proceduralLastCountsRef.current = new Map()
+	}, [])
+
+	const recordProceduralFrame = useCallback(
+		(
+			timeMs: number,
+			frame: SerializedHistoryFrame,
+			newEvents: HistoryNote[],
+		) => {
+			if (newEvents.length > 0) {
+				proceduralHistoryEventsRef.current =
+					proceduralHistoryEventsRef.current.concat(newEvents)
+			}
+			const days = historyMsToEu4Days(timeMs)
+			const counts = new Map<number, number>()
+			for (const nationId of frame.assignment) {
+				if (nationId < 0) continue
+				counts.set(nationId, (counts.get(nationId) ?? 0) + 1)
+			}
+			const last = proceduralLastCountsRef.current
+			for (const [nationId, count] of counts) {
+				if (last.get(nationId) !== count) {
+					const series =
+						proceduralProvinceHistoryRef.current.get(nationId) ?? []
+					series.push({ date: days, count })
+					proceduralProvinceHistoryRef.current.set(nationId, series)
+				}
+			}
+			for (const nationId of last.keys()) {
+				if (!counts.has(nationId) && last.get(nationId) !== 0) {
+					const series =
+						proceduralProvinceHistoryRef.current.get(nationId) ?? []
+					series.push({ date: days, count: 0 })
+					proceduralProvinceHistoryRef.current.set(nationId, series)
+				}
+			}
+			proceduralLastCountsRef.current = counts
+			setProceduralHistoryFrame(frame)
+			setProceduralHistoryTimeMs(timeMs)
+		},
+		[],
+	)
+
+	const handleToggleProceduralHistoryPlayback = useCallback(() => {
+		if (!workerRef.current) return
+		if (proceduralHistoryPlaying) {
+			workerRef.current.postMessage({
+				type: "pause",
+			} satisfies GenesisWorkerRequest)
+			setProceduralHistoryPlaying(false)
+		} else {
+			workerRef.current.postMessage({
+				type: "simulate",
+				tickMs: YEAR_MS,
+			} satisfies GenesisWorkerRequest)
+			setProceduralHistoryPlaying(true)
+		}
+	}, [proceduralHistoryPlaying])
 
 	// Hover & measurement
 	const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
@@ -2082,6 +2176,11 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setAtmospherePressure(world?.params.pressure ?? pressure)
 	}, [world, pressure])
+	useEffect(() => {
+		sceneRef.current?.setGlobeCloudTexturePath(
+			restSeed === SOL_SEED ? SOL_EARTH_CLOUDS_TEXTURE_PATH : null,
+		)
+	}, [restSeed])
 	useEffect(() => {
 		if (!world) {
 			setHoverInfo(null)
@@ -3681,7 +3780,6 @@ export const GenesisView: React.FC = () => {
 				const nation =
 					province >= 0 ? (nationModel.assignment[province] ?? -1) : -1
 				setSelectedNationId(nation >= 0 ? nation : null)
-				if (nation >= 0) setDetailsDrawerOpen(true)
 				return
 			}
 
@@ -3747,14 +3845,10 @@ export const GenesisView: React.FC = () => {
 		selectedNationId,
 		worldForDisplay,
 	])
-	const handleDrawerNationClick = useMemo(
-		() =>
-			createDrawerNationClickHandler({
-				openDetailsDrawer: () => setDetailsDrawerOpen(true),
-				focusOnNation: (nationId) => sceneRef.current?.focusOnNation(nationId),
-			}),
-		[],
-	)
+	const handleWikiNationClick = useCallback((nationId: number) => {
+		setSelectedNationId(nationId)
+		sceneRef.current?.focusOnNation(nationId)
+	}, [])
 	// Real per-nation province counts + government type for Earth import --
 	// same rationale as earthSocialCounts above: worldForDisplay.nations is
 	// static procedural data there, so build these straight from earthHistory's
@@ -3800,12 +3894,36 @@ export const GenesisView: React.FC = () => {
 		}))
 	}, [world?.isEarthImport, earthHistory.query, earthNationProvinceCounts])
 
+	// Habitable provinces owned by nobody. On Earth import that is land EU4 has
+	// not colonised at the scrubbed date; procedurally it is the era's stateless
+	// land (see the neolithic/lateMedieval statehoodFraction). Desolate
+	// provinces are excluded -- they are uninhabitable, not merely unclaimed.
+	const unclaimedProvinceCount = useMemo(() => {
+		if (world?.isEarthImport && earthHistory.query) {
+			let unclaimed = 0
+			for (const nationId of earthHistory.query.frame.assignment) {
+				if (nationId < 0) unclaimed++
+			}
+			return unclaimed
+		}
+		const provinces = worldForDisplay?.provinces
+		const sovereign = worldForDisplay?.nations?.sovereign
+		if (!provinces || !sovereign) return 0
+		let unclaimed = 0
+		for (let province = 0; province < provinces.count; province++) {
+			if (provinces.desolate[province]) continue
+			if ((sovereign[province] ?? -1) < 0) unclaimed++
+		}
+		return unclaimed
+	}, [world?.isEarthImport, earthHistory.query, worldForDisplay])
+
 	const nationSizeDistribution = useMemo(
 		() =>
 			buildNationSizeDistribution(
 				earthNationProvinceCounts ?? nationProvinceCounts,
+				unclaimedProvinceCount,
 			),
-		[earthNationProvinceCounts, nationProvinceCounts],
+		[earthNationProvinceCounts, nationProvinceCounts, unclaimedProvinceCount],
 	)
 
 	const governmentDistribution = useMemo(() => {
@@ -4262,14 +4380,34 @@ export const GenesisView: React.FC = () => {
 	}, [showElevation])
 
 	// --- Generation callbacks ---
+	const handleSetWorld = useCallback(
+		(w: SerializedGenesisWorld | null) => {
+			if (w === null) {
+				setProceduralHistoryFrame(null)
+				setProceduralHistoryPlaying(false)
+				setProceduralHistoryTimeMs(800 * YEAR_MS)
+				resetProceduralHistoryAccumulation()
+			}
+			setWorld(w)
+		},
+		[resetProceduralHistoryAccumulation],
+	)
+
 	const generationCallbacks: GenerationCallbacks = useMemo(
 		() => ({
 			setGenerating,
 			setGenerationProgress,
 			setGenerationLabel,
 			setSeed,
-			setWorld,
+			setWorld: handleSetWorld,
 			workerRef,
+			onHistoryFrame: (frame) => {
+				resetProceduralHistoryAccumulation()
+				recordProceduralFrame(frame.timeMs, frame, [])
+			},
+			onSimProgress: (timeMs, frame, newEvents) => {
+				recordProceduralFrame(timeMs, frame, newEvents)
+			},
 			onPathfindResult: (result) => {
 				if (result.reachable) {
 					const pathArray = Array.from(result.pathRegions)
@@ -4300,7 +4438,7 @@ export const GenesisView: React.FC = () => {
 				}
 			},
 		}),
-		[],
+		[handleSetWorld, resetProceduralHistoryAccumulation, recordProceduralFrame],
 	)
 
 	const currentParams = useMemo<GenerationParams>(
@@ -6442,6 +6580,88 @@ export const GenesisView: React.FC = () => {
 		setSelectedWikiWarId,
 	])
 
+	// Nation wiki page for procedural (non-Earth-import) worlds -- mirrors
+	// nationWikiData above but sourced from buildSelectedNationDetails
+	// (selectedNation) rather than the Earth-history fold engine. Procedural
+	// nations have no event log or diplomatic-tie data wired up yet, so
+	// timeline/dependencies/organizations/environmental distributions are
+	// empty until src/model/history is wired into generation.
+	const proceduralNationWikiData = useMemo<NationWikiData | null>(() => {
+		if (world?.isEarthImport || !selectedNation) return null
+		const stats = buildNationWikiStats({
+			totalAreaKm2: 0,
+			totalPopulation: selectedNation.totalPopulation,
+			totalUrbanPopulation: 0,
+			provinceCount: selectedNation.provinceCount,
+			governmentLabel: selectedNation.governmentType,
+		})
+		const nationId = selectedNation.id
+		const currentDate = historyMsToEu4Days(proceduralHistoryTimeMs)
+		const allEvents = proceduralHistoryEventsRef.current
+		const timelineEvents = allEvents
+			.filter((event) => eventInvolvesNation(event, nationId))
+			.map((event, index) =>
+				buildProceduralWikiTimelineEvent(
+					event,
+					nationId,
+					allEvents,
+					getNationName,
+					getNationColor,
+					index,
+				),
+			)
+		return {
+			title: selectedNation.name,
+			color: selectedNation.color ?? "rgb(148, 163, 184)",
+			planetTitle: planetName,
+			stats,
+			dependencies: [],
+			organizations: [],
+			cultureDistribution: selectedNation.cultureDistribution,
+			religionDistribution: selectedNation.religionDistribution,
+			climateDistribution: [],
+			topographyDistribution: [],
+			vegetationDistribution: [],
+			showObservedDistributions: false,
+			provinceHistory: proceduralProvinceHistoryRef.current.get(nationId) ?? [],
+			dateRangeStart: historyMsToEu4Days(800 * YEAR_MS),
+			dateRangeEnd: currentDate,
+			currentDate,
+			currentDateLabel: formatEu4Days(currentDate),
+			timelineEvents,
+			onBack: () => setSelectedNationId(null),
+			onFocusNation: () => {
+				if (selectedNation.id >= 0)
+					sceneRef.current?.focusOnNation(selectedNation.id)
+			},
+			onSelectNation: (tag: string) => handleWikiNationClick(Number(tag)),
+			onSelectProvince: (provinceId: number) => {
+				sceneRef.current?.focusOnProvince(provinceId, {
+					distanceScale: SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
+				})
+			},
+			// Procedural nations have no stored past frames to scrub to (see
+			// PROCEDURAL-HISTORY-PLAN.md's live-play design) and no orgs/wars yet.
+			onSelectDate: () => {
+				/* no-op: no scrubbable timeline */
+			},
+			onSelectOrganization: () => {
+				/* no-op: no organizations */
+			},
+			onSelectWar: () => {
+				/* no-op: no wars */
+			},
+		}
+	}, [
+		world?.isEarthImport,
+		selectedNation,
+		planetName,
+		handleWikiNationClick,
+		proceduralHistoryTimeMs,
+		getNationName,
+		getNationColor,
+	])
+
 	const organizationWikiData = useMemo<OrganizationWikiData | null>(() => {
 		if (
 			!selectedWikiOrganizationId ||
@@ -7337,7 +7557,10 @@ export const GenesisView: React.FC = () => {
 	const planetStats = useMemo(
 		() =>
 			computePlanetStats(
-				world,
+				// worldForDisplay, not world: for an Earth import it carries the
+				// per-province areaKm2 attached by attachEarthProvinceAreas, which
+				// Avg Province Area averages directly.
+				worldForDisplay ?? world,
 				{
 					obliquity,
 					eccentricity,
@@ -7372,6 +7595,7 @@ export const GenesisView: React.FC = () => {
 			seaLevel,
 			unitSystem,
 			world,
+			worldForDisplay,
 			windStats,
 		],
 	)
@@ -7959,7 +8183,7 @@ export const GenesisView: React.FC = () => {
 						showObservedDistributions,
 						tradeGoodsDistribution,
 					}}
-					nationWiki={nationWikiData}
+					nationWiki={nationWikiData ?? proceduralNationWikiData}
 					organizationWiki={organizationWikiData}
 					warWiki={warWikiData}
 				/>
@@ -8298,6 +8522,27 @@ export const GenesisView: React.FC = () => {
 							</div>
 						</div>
 					) : null}
+					{worldForDisplay &&
+					!worldForDisplay.isEarthImport &&
+					proceduralHistoryFrame ? (
+						<div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2">
+							<div className="pointer-events-auto">
+								<SimulationControls
+									selectedTimeMs={proceduralHistoryTimeMs}
+									minTimeMs={proceduralHistoryTimeMs}
+									maxTimeMs={proceduralHistoryTimeMs}
+									onTimeChange={() => {
+										// Scrubbing is disabled while this control is pinned to one frame.
+									}}
+									floating={false}
+									onPlayPause={handleToggleProceduralHistoryPlayback}
+									simPlaying={proceduralHistoryPlaying}
+									formatLabel={(ms) => formatEu4Days(historyMsToEu4Days(ms))}
+									stepValue={YEAR_MS}
+								/>
+							</div>
+						</div>
+					) : null}
 					{!solarSystemViewActive && (
 						<div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-1.5 pb-3 pointer-events-none">
 							<div className="pointer-events-auto">
@@ -8322,13 +8567,6 @@ export const GenesisView: React.FC = () => {
 					)}
 				</>
 			</div>
-
-			<DetailsDrawer
-				open={detailsDrawerOpen}
-				onToggle={() => setDetailsDrawerOpen((value) => !value)}
-				nation={selectedNation}
-				onNationClick={handleDrawerNationClick}
-			/>
 		</div>
 	)
 }

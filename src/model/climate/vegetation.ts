@@ -41,12 +41,17 @@ export const CHAOTIC_MIN = 15
 export const CHAOTIC_MAX = 40
 
 /**
- * Assign a climate zone to each land cell based on temperature.
+ * Assign a climate zone to each land cell based on temperature. Takes raw
+ * avg/min/max arrays (rather than a GenesisClimate object) so the same
+ * classifier can run on either procedural EBM temperature or observed-Earth
+ * temperature — see assignEarthClimateZones.
  */
 export function assignClimateZones(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
-	climate: GenesisClimate,
+	temperatureAvg: Float32Array,
+	temperatureMin: Float32Array,
+	temperatureMax: Float32Array,
 ): Uint8Array {
 	const N = mesh.numRegions
 	const zones = new Uint8Array(N) // 0 = ocean by default
@@ -54,9 +59,9 @@ export function assignClimateZones(
 	for (let r = 0; r < N; r++) {
 		if (!isLand[r]) continue
 
-		const avg = climate.temperature_avg[r]
-		const min = climate.temperature_min[r]
-		const max = climate.temperature_max[r]
+		const avg = temperatureAvg[r]
+		const min = temperatureMin[r]
+		const max = temperatureMax[r]
 
 		const isChaotic = min < CHAOTIC_MIN && max > CHAOTIC_MAX
 		const isInfernal = avg > CHAOTIC_MAX
@@ -77,6 +82,43 @@ export function assignClimateZones(
 	}
 
 	return zones
+}
+
+/**
+ * Observed-Earth counterpart to assignClimateZones. Derives avg/min/max from
+ * climate.real_temperature_monthly instead of the procedural EBM output.
+ * Returns undefined if no observed temperature is attached (procedural
+ * worlds, or an Earth import that didn't supply a real climate raster).
+ */
+export function assignEarthClimateZones(
+	mesh: SphereMesh,
+	isLand: Uint8Array,
+	climate: GenesisClimate,
+): Uint8Array | undefined {
+	const monthly = climate.real_temperature_monthly
+	if (!monthly) return undefined
+
+	const N = mesh.numRegions
+	const avg = new Float32Array(N)
+	const min = new Float32Array(N)
+	const max = new Float32Array(N)
+	for (let r = 0; r < N; r++) {
+		if (!isLand[r]) continue
+		let sum = 0
+		let hot = -Infinity
+		let cold = Infinity
+		for (let m = 0; m < 12; m++) {
+			const t = monthly[m * N + r]
+			sum += t
+			if (t > hot) hot = t
+			if (t < cold) cold = t
+		}
+		avg[r] = sum / 12
+		min[r] = cold
+		max[r] = hot
+	}
+
+	return assignClimateZones(mesh, isLand, avg, min, max)
 }
 
 /**

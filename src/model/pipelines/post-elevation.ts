@@ -47,11 +47,16 @@ import {
 import { computeIceAccumulation } from "../climate/ice"
 import { assignKoppenClimate } from "../climate/koppen"
 import {
+	attachObservedEarthClimate,
+	attachObservedEarthDtr,
+	attachObservedEarthRainfall,
+} from "../climate/observed-earth"
+import {
 	applyCurrentTemperatureEffect,
 	computeOceanCurrents,
 } from "../climate/ocean-currents"
 import type { PastaDebug } from "../climate/pasta"
-import { assignPastaClimate } from "../climate/pasta"
+import { assignEarthPastaClimate, assignPastaClimate } from "../climate/pasta"
 import {
 	computeAdvection,
 	computeMonthlyRain,
@@ -60,7 +65,11 @@ import {
 import { computeCoastalMask, computeSpringTideMap } from "../climate/tidal-map"
 import { computeTidalSchedule } from "../climate/tidal-schedule"
 import { computeTornadoRisk } from "../climate/tornadoes"
-import { assignClimateZones, assignVegetation } from "../climate/vegetation"
+import {
+	assignClimateZones,
+	assignEarthClimateZones,
+	assignVegetation,
+} from "../climate/vegetation"
 import {
 	computeTradeGoods,
 	type LocationTradeGoods,
@@ -153,6 +162,29 @@ interface PostPipelineInput {
 	 * used to force-place ids the raster sampling missed entirely -- see
 	 * computeProvincesFromRaster. */
 	eu4ProvinceFallbackSeeds?: { id: number; lon: number; lat: number }[]
+	/** Observed-Earth monthly temperature raster (°C * scale), attached before
+	 * Pasta climate classification so Earth-import vegetation is derived from
+	 * observed rather than procedural climate. See attachObservedEarthClimate. */
+	realClimateMonthly?: Int16Array
+	realClimateWidth?: number
+	realClimateHeight?: number
+	realClimateMonths?: number
+	realClimateScale?: number
+	realClimateNoData?: number
+	/** Observed-Earth monthly precipitation raster (mm * scale). */
+	realPrecipMonthly?: Int16Array
+	realPrecipWidth?: number
+	realPrecipHeight?: number
+	realPrecipMonths?: number
+	realPrecipScale?: number
+	realPrecipNoData?: number
+	/** Observed-Earth monthly diurnal temperature range raster (°C * scale). */
+	realDtrMonthly?: Int16Array
+	realDtrWidth?: number
+	realDtrHeight?: number
+	realDtrMonths?: number
+	realDtrScale?: number
+	realDtrNoData?: number
 }
 
 interface PostPipelineOutput {
@@ -264,6 +296,24 @@ export function runPostElevationPipeline(
 		realProvinceSeeds,
 		eu4ProvinceIds,
 		eu4ProvinceFallbackSeeds,
+		realClimateMonthly,
+		realClimateWidth,
+		realClimateHeight,
+		realClimateMonths,
+		realClimateScale,
+		realClimateNoData,
+		realPrecipMonthly,
+		realPrecipWidth,
+		realPrecipHeight,
+		realPrecipMonths,
+		realPrecipScale,
+		realPrecipNoData,
+		realDtrMonthly,
+		realDtrWidth,
+		realDtrHeight,
+		realDtrMonths,
+		realDtrScale,
+		realDtrNoData,
 	} = input
 	const timings: StageTiming[] = []
 	function record(stage: string, startMs: number) {
@@ -547,6 +597,73 @@ export function runPostElevationPipeline(
 	record("Post: landmarks + distances + temperature (post-lake)", t0)
 	onProgress?.("Post: landmarks", 62)
 
+	// ── Observed Earth climate (must run before pasta/vegetation so Earth
+	// imports classify vegetation from observed rather than procedural
+	// climate) ───────────────────────────────────────────────────────────
+	t0 = performance.now()
+	let observedDtr: GenesisWorld["observedDtr"] | undefined
+	if (
+		realClimateMonthly &&
+		realClimateWidth &&
+		realClimateHeight &&
+		realClimateMonths &&
+		realClimateScale !== undefined &&
+		realClimateNoData !== undefined
+	) {
+		attachObservedEarthClimate({
+			mesh,
+			climate,
+			realClimateMonthly,
+			realClimateWidth,
+			realClimateHeight,
+			realClimateMonths,
+			realClimateScale,
+			realClimateNoData,
+		})
+	}
+	if (
+		realPrecipMonthly &&
+		realPrecipWidth &&
+		realPrecipHeight &&
+		realPrecipMonths &&
+		realPrecipScale !== undefined &&
+		realPrecipNoData !== undefined
+	) {
+		attachObservedEarthRainfall({
+			mesh,
+			rainfall,
+			realPrecipMonthly,
+			realPrecipWidth,
+			realPrecipHeight,
+			realPrecipMonths,
+			realPrecipScale,
+			realPrecipNoData,
+		})
+	}
+	if (
+		realDtrMonthly &&
+		realDtrWidth &&
+		realDtrHeight &&
+		realDtrMonths &&
+		realDtrScale !== undefined &&
+		realDtrNoData !== undefined
+	) {
+		const dtrHolder = { dtr_monthly, observedDtr }
+		attachObservedEarthDtr({
+			mesh,
+			world: dtrHolder,
+			realDtrMonthly,
+			realDtrWidth,
+			realDtrHeight,
+			realDtrMonths,
+			realDtrScale,
+			realDtrNoData,
+		})
+		observedDtr = dtrHolder.observedDtr
+	}
+	record("Post: observed Earth climate", t0)
+	onProgress?.("Post: observed Earth climate", 57)
+
 	// ── Ice (needed for pasta climate) ─────────────────────────────────
 	t0 = performance.now()
 	const { iceThickness, iceMinMonthly, iceMaxMonthly } = computeIceAccumulation(
@@ -574,9 +691,29 @@ export function runPostElevationPipeline(
 		iceMinMonthly,
 		iceMaxMonthly,
 	)
-	record("Post: pasta climate", t0)
 	const pastaClimate: Uint8Array = pastaResult.zones
 	const pastaDebug: PastaDebug = pastaResult.debug
+
+	// Earth imports classify vegetation from observed climate, not the
+	// procedural EBM output, when real temperature/rainfall are attached.
+	const earthPastaResult =
+		climate.real_temperature_monthly && rainfall.real_monthly
+			? assignEarthPastaClimate(
+					mesh,
+					isLand,
+					climate,
+					rainfall,
+					params,
+					observedDtr?.real_monthly,
+					iceThickness,
+					iceMinMonthly,
+					iceMaxMonthly,
+				)
+			: undefined
+	const realPastaClimate: Uint8Array | undefined = earthPastaResult?.zones
+	const vegPastaZones = realPastaClimate ?? pastaClimate
+	const vegPastaDebug = earthPastaResult?.debug ?? pastaDebug
+	record("Post: pasta climate", t0)
 	onProgress?.("Post: pasta climate", 59)
 
 	// ── Vegetation ─────────────────────────────────────────────────────
@@ -603,8 +740,8 @@ export function runPostElevationPipeline(
 		climate,
 		rainfall,
 		makeRng(params.seed),
-		pastaClimate,
-		pastaDebug.gdd,
+		vegPastaZones,
+		vegPastaDebug.gdd,
 		garField,
 	)
 	record("Post: vegetation", t0)
@@ -685,7 +822,15 @@ export function runPostElevationPipeline(
 
 	// ── Climate zones ──────────────────────────────────────────────────
 	t0 = performance.now()
-	const climateZones = assignClimateZones(mesh, isLand, climate)
+	const climateZones =
+		assignEarthClimateZones(mesh, isLand, climate) ??
+		assignClimateZones(
+			mesh,
+			isLand,
+			climate.temperature_avg,
+			climate.temperature_min,
+			climate.temperature_max,
+		)
 	record("Post: climate zones", t0)
 	onProgress?.("Post: climate zones", 64)
 
@@ -919,8 +1064,10 @@ export function runPostElevationPipeline(
 		koppenClimate,
 		pastaClimate,
 		pastaDebug,
+		realPastaClimate,
 		dtr_annual,
 		dtr_monthly,
+		observedDtr,
 		waterAccess,
 		riverAccess,
 		lakeAccess,

@@ -7,7 +7,7 @@ import {
 } from "@/model/earth/history/government"
 import type { OrgCategorizer } from "@/model/earth/history/organization-categories"
 import { type ColorMode, OCEAN_LIGHT_BLUE } from "../../colors"
-import { getBaseMapMode, getDataVariant } from "../shared/data-variant"
+import { getBaseMapMode } from "../shared/data-variant"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
 import {
 	darkenPoliticalAtElevation,
@@ -78,11 +78,7 @@ export function computeEarthHistoryRegionColors(params: {
 	 * (eu4-nation-fill-overlay.ts) instead, and this per-region layer only
 	 * needs to exist as an underlying background (wasteland/desolate
 	 * classification still shows through it; only the mode-specific color
-	 * is suppressed, since the overlay renders that more precisely). The
-	 * isPopulationVector branch (density/urban) is always suppressed this
-	 * way regardless of this flag -- those modes have no per-region
-	 * rendering path of their own left in this app, only the polygon-fill
-	 * one, so there's nothing meaningful to toggle. */
+	 * is suppressed, since the overlay renders that more precisely). */
 	suppressFill?: boolean
 }): Float32Array | null {
 	const {
@@ -110,20 +106,16 @@ export function computeEarthHistoryRegionColors(params: {
 	const isDemographic =
 		getBaseMapMode(colorMode as ColorMode) === "population" &&
 		(populationMode === "culture" || populationMode === "religion")
-	// Excludes the "observed" (realPopulation) and "diff" (populationDiff)
-	// variants -- those compare the model against real-world census data
-	// (world.realPopulation.population/.difference in region-colors.ts,
-	// via populationDifferenceColor), which the polygon-fill overlay this
-	// branch defers to (buildEarthHistoryPopulationFillColorForRawId) has
-	// no notion of. Only the plain modeled-population "generated" variant
-	// has a fill-overlay counterpart; getBaseMapMode collapses all three
-	// colorModes ("population"/"realPopulation"/"populationDiff") to the
-	// same "population" base, so that alone isn't a narrow enough check.
-	const isPopulationVector =
-		getDataVariant(colorMode as ColorMode) === "generated" &&
-		getBaseMapMode(colorMode as ColorMode) === "population" &&
-		(populationMode === "density" || populationMode === "urban")
-	if (!isPolitical && !isDemographic && !isPopulationVector) return null
+	// density/urban (any variant -- generated/observed/diff) has no
+	// per-region rendering path here: it falls through to the plain
+	// computeRegionColors in region-colors.ts, which reads world.population/
+	// world.realPopulation/world.realPopulation.difference directly and
+	// renders per-region density correctly. There is no polygon-fill overlay
+	// for population (unlike nations' nationFillColorForRawId) -- an earlier
+	// version of this function routed the generated variant through one, but
+	// that overlay was never implemented, which left the map solid gray for
+	// Model/Density on earth-import worlds.
+	if (!isPolitical && !isDemographic) return null
 
 	const N = regionProvince.length
 	const rgb = new Float32Array(N * 3)
@@ -170,7 +162,7 @@ export function computeEarthHistoryRegionColors(params: {
 		// no cultureId/religionId recorded). EU4's own "wasteland" flag gets
 		// no special treatment here -- wasteland provinces are colored by
 		// ownership/culture/religion/population like any other province.
-		if ((isPolitical || isPopulationVector) && desolate[p]) {
+		if (isPolitical && desolate[p]) {
 			write(
 				r,
 				darkenPoliticalAtElevation([0.35, 0.33, 0.32], elevationKm[r] ?? 0),
@@ -220,15 +212,6 @@ export function computeEarthHistoryRegionColors(params: {
 				const color = nationColorByTag.get(owner) ?? colorFor(`nation:${owner}`)
 				write(r, darkenPoliticalAtElevation(color, elevationKm[r] ?? 0))
 			}
-			continue
-		}
-
-		if (isPopulationVector) {
-			// Always suppressed -- see suppressFill's doc comment: density/
-			// urban have no per-region rendering path left, only the
-			// polygon-fill overlay (GenesisView.tsx's populationFillColorForRawId),
-			// so this per-region layer is purely the background under it.
-			write(r, darkenPoliticalAtElevation(UNOWNED_GRAY, elevationKm[r] ?? 0))
 			continue
 		}
 

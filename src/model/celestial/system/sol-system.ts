@@ -61,6 +61,8 @@ export const SOL_SEED = 0
 export const SOL_STAR_AGE_GYR = 4.6
 export const SOL_STAR_NAME = "Sol"
 export const SOL_MAIN_WORLD_NAME = "Earth"
+export const SOL_EARTH_TEXTURE_PATH = "/sol/earth/2k_earth.jpg"
+export const SOL_EARTH_CLOUDS_TEXTURE_PATH = "/sol/earth/2k_earth_clouds.jpg"
 
 interface Star {
 	class: MainSequenceClass
@@ -307,8 +309,8 @@ const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		name: SOL_MAIN_WORLD_NAME,
 		isMainWorld: true,
 		group: "terrestrial",
-		texturePath: "/sol/earth/2k_earth.jpg",
-		// cloudsTexturePath: "/sol/earth/2k_earth_clouds.jpg",
+		texturePath: SOL_EARTH_TEXTURE_PATH,
+		cloudsTexturePath: SOL_EARTH_CLOUDS_TEXTURE_PATH,
 		// Matches classifyBody()'s isPrimaryWorld branch in
 		// generate-system-bodies.ts -- Earth is now built live by buildPlanet()
 		// exactly like every other body here, just from a live seed object

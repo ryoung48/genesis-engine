@@ -76,8 +76,30 @@ export function computePlanetStats(
 		landAreaKm2 = surfaceAreaKm2 * (landPercent / 100)
 	}
 
+	// Earth import carries true per-province areas measured from the EU4 source
+	// geometry (see attachEarthProvinceAreas), so average those directly rather
+	// than dividing total land area by the province count. The two disagree for
+	// an import: land area is derived from every land mesh cell, including
+	// Antarctica and other ground EU4 has no province for, which inflates the
+	// quotient. Procedural worlds have no areaKm2 and keep the quotient.
 	let avgProvinceAreaKm2: number | null = null
-	if (landAreaKm2 !== null && world?.provinces?.count) {
+	const provinceAreasKm2 = world?.provinces?.areaKm2
+	if (provinceAreasKm2 && world?.provinces?.count) {
+		let areaSum = 0
+		let counted = 0
+		for (let province = 0; province < world.provinces.count; province++) {
+			const area = provinceAreasKm2[province]
+			if (!Number.isFinite(area) || area <= 0) continue
+			areaSum += area
+			counted++
+		}
+		if (counted > 0) avgProvinceAreaKm2 = areaSum / counted
+	}
+	if (
+		avgProvinceAreaKm2 === null &&
+		landAreaKm2 !== null &&
+		world?.provinces?.count
+	) {
 		avgProvinceAreaKm2 = landAreaKm2 / world.provinces.count
 	}
 

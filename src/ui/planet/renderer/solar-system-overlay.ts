@@ -29,6 +29,7 @@ import {
 	sizeNameLabel,
 	updateLabelPlacement,
 } from "./body-name-label"
+import { boostCloudAlphaMap } from "./cloud-material"
 import {
 	buildMoonOrbitOverlay,
 	type MoonOrbitState,
@@ -705,20 +706,25 @@ export function buildSolarSystemOverlay(
 		bodyGroup.add(mesh)
 		let cloudsMesh: THREE.Mesh | undefined
 		if (body.cloudsTexturePath) {
+			const cloudsTexture = loadBodyTexture(body.cloudsTexturePath)
 			const cloudsMaterial = new THREE.MeshStandardMaterial({
-				map: loadBodyTexture(body.cloudsTexturePath),
+				color: 0xffffff,
+				alphaMap: cloudsTexture,
 				transparent: true,
-				opacity: 0.6,
+				opacity: 1,
+				alphaTest: 0.02,
 				depthWrite: false,
 				roughness: 1,
 				metalness: 0,
 			})
+			boostCloudAlphaMap(cloudsMaterial)
 			cloudsMesh = new THREE.Mesh(
 				new THREE.SphereGeometry(1, 24, 18),
 				cloudsMaterial,
 			)
 			cloudsMesh.rotation.x = Math.PI / 2
-			cloudsMesh.scale.setScalar(sceneRadius * 1.01)
+			cloudsMesh.scale.setScalar(sceneRadius * 1.025)
+			cloudsMesh.renderOrder = 2
 			bodyGroup.add(cloudsMesh)
 		}
 		let ringMesh: THREE.Mesh | undefined
@@ -939,6 +945,7 @@ export function buildSolarSystemOverlay(
 			}
 
 			p.mesh?.scale.setScalar(p.sceneRadius)
+			p.cloudsMesh?.scale.setScalar(p.sceneRadius * 1.025)
 			p.ringMesh?.scale.setScalar(p.sceneRadius)
 			p.moonState?.group.scale.setScalar(p.sceneRadius)
 			if (p.nameLabel) {
@@ -1239,6 +1246,8 @@ export function buildSolarSystemOverlay(
 			const nextBody = nextBodies[i]!
 			if (p.body.group !== nextBody.group) return false
 			if (!!p.body.rings !== !!nextBody.rings) return false
+			if (p.body.texturePath !== nextBody.texturePath) return false
+			if (p.body.cloudsTexturePath !== nextBody.cloudsTexturePath) return false
 			p.body = nextBody
 			if (!p.isBelt) rebuildMoonState(p)
 		}

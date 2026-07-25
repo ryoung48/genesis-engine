@@ -6,6 +6,7 @@ import type {
 	GenesisProvinces,
 	StageTiming,
 } from ".."
+import type { HistoryNote } from "../history"
 
 interface SerializedSphereMesh {
 	numRegions: number
@@ -215,6 +216,110 @@ export interface SerializedGenesisWorld {
 	settlementPortRegions?: Int32Array
 	routes?: SerializedRoutes
 	network?: SerializedNetwork
+	/** Terrain/map geometry for the default display state (colorMode
+	 * "terrain", no region colors, elevation on, map centered at lon/lat 0),
+	 * computed once in genesis.worker.ts so the main thread doesn't have to
+	 * run that per-vertex color/normal-averaging pass synchronously right
+	 * before the first paint after "Generate"/"Load Earth" -- see
+	 * mesh-builders.ts's buildTerrainMesh/buildMapMesh. Any other display
+	 * state (a non-default color mode, region colors, a panned map) is
+	 * computed on the main thread as before. */
+	precomputedTerrainGeometry?: {
+		positions: Float32Array
+		normals: Float32Array
+		colors: Float32Array
+		faceToRegion: Int32Array
+	}
+	precomputedMapGeometry?: {
+		positions: Float32Array
+		colors: Float32Array
+		lonLat: Float32Array
+		faceToRegion: Int32Array
+	}
+}
+
+export interface SerializedProvinceTimelineInt {
+	times: Float64Array
+	values: Int32Array
+	offsets: Int32Array
+}
+
+export interface SerializedProvinceTimelineFloat {
+	times: Float64Array
+	values: Float32Array
+	offsets: Int32Array
+}
+
+interface SerializedRelationTimelines {
+	aIdx: Int32Array
+	bIdx: Int32Array
+	offsets: Int32Array
+	times: Float64Array
+	values: Int32Array
+}
+
+export interface SerializedTimelines {
+	P: number
+	startTimeMs: number
+	endTimeMs: number
+	parent: SerializedProvinceTimelineInt
+	assignment: SerializedProvinceTimelineInt
+	populationRural: SerializedProvinceTimelineFloat
+	populationUrban: SerializedProvinceTimelineFloat
+	development: SerializedProvinceTimelineFloat
+	consumption: SerializedProvinceTimelineFloat
+	leaderDynasty: SerializedProvinceTimelineInt
+	leaderNameSeed?: SerializedProvinceTimelineInt
+	leaderClaim: SerializedProvinceTimelineInt
+	leaderBirthYear?: SerializedProvinceTimelineFloat
+	occupation: SerializedProvinceTimelineInt
+	cultureBlendSecondary: SerializedProvinceTimelineInt
+	cultureBlendWeight: SerializedProvinceTimelineFloat
+	relations: SerializedRelationTimelines
+	nationColorKeys: Int32Array
+	nationColorValues: Float32Array
+	wars: Array<{
+		idx: number
+		attacker: number
+		defender: number
+		startTime: number
+		endTime?: number
+		rebel: boolean
+	}>
+}
+
+export interface SerializedHistoryFrame {
+	timeMs: number
+	assignment: Int32Array
+	parent: Int32Array
+	sovereign: Int32Array
+	leaderDynasty: Int32Array
+	leaderNameSeed: Int32Array
+	leaderClaim: Int32Array
+	leaderBirthYear: Float32Array
+	colors: Float32Array
+	populationTotal: Float32Array
+	populationUrban: Float32Array
+	development: Float32Array
+	consumption: Float32Array
+	nationWealth: Float32Array
+	nationOptimalWealth: Float32Array
+	relationA: Int32Array
+	relationB: Int32Array
+	relationValues: Uint8Array
+	activeWars: Array<{
+		idx: number
+		attacker: number
+		defender: number
+		rebel: boolean
+		occupied: number[]
+	}>
+	sovereignCount: number
+	totalPopulation: number
+	/** Per-province secondary (bleeding) culture index. -1 = no blend. */
+	cultureBlendSecondary: Int32Array
+	/** Per-province blend weight [0, 1]. 0 = pure primary culture. */
+	cultureBlendWeight: Float32Array
 }
 
 export const ROUTE_LAND_MAJOR = 0
@@ -480,6 +585,13 @@ export type GenesisWorkerRequest =
 			allowSea: boolean
 			network?: SerializedNetwork | null
 	  }
+	| {
+			type: "simulate"
+			tickMs?: number
+	  }
+	| {
+			type: "pause"
+	  }
 
 export type GenesisWorkerResponse =
 	| {
@@ -490,6 +602,7 @@ export type GenesisWorkerResponse =
 	| {
 			type: "done"
 			world: SerializedGenesisWorld
+			frame?: SerializedHistoryFrame
 	  }
 	| {
 			type: "error"
@@ -504,4 +617,14 @@ export type GenesisWorkerResponse =
 			seaKm: number
 			travelDays: number
 			reachable: boolean
+	  }
+	| {
+			type: "sim-progress"
+			timeMs: number
+			frame: SerializedHistoryFrame
+			/** Events pushed to HistoryState.events since the previous
+			 * "sim-progress" (or since init, for the first tick) -- lets the
+			 * main thread accumulate a running event log without resending the
+			 * whole history each tick. */
+			newEvents: HistoryNote[]
 	  }
