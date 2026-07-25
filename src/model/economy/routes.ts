@@ -1,7 +1,10 @@
-import { MinHeap } from "../../shared/min-heap"
-import { regionDistanceKm, regionPathLengthKm } from "../../shared/units"
-import { buildUrquhartEdgesFromFlat } from "../../shared/urquhart"
-import { getSettlementEraTuning } from "../../society/settlement-tuning"
+import type { GenesisParams, SphereMesh } from ".."
+import { MinHeap } from "../shared/min-heap"
+import { regionDistanceKm, regionPathLengthKm } from "../shared/units"
+import { buildUrquhartEdgesFromFlat } from "../shared/urquhart"
+import type { SocietyEra } from "../society/eras"
+import { getSettlementEraTuning } from "../society/settlement-tuning"
+import type { GenesisLandmarks } from "../terrain/landmarks"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -9,9 +12,64 @@ import {
 	type Route,
 	type RouteEdge,
 	type SerializedRouteKind,
-} from "../../transport/worker-types"
-import { PROV } from "../fields"
-import type { HistoryState } from "../state"
+} from "../transport/worker-types"
+import type { GenesisNationHierarchy, GenesisProvinces } from "../types/society"
+
+/**
+ * Route computation runs mid-pipeline, before the GenesisWorld literal is
+ * assembled, so it takes the world's sub-objects directly the same way
+ * deriveProvinceSociety does rather than the (fully optional) world type.
+ */
+interface RouteWorldInput {
+	mesh: Pick<SphereMesh, "r_xyz" | "adjOffset" | "adjList">
+	params: Pick<GenesisParams, "planetRadiusKm" | "era">
+	provinces: Pick<
+		GenesisProvinces,
+		"count" | "desolate" | "regionProvince" | "adjOffset" | "adjList"
+	>
+	nations: Pick<GenesisNationHierarchy, "sovereign">
+	landmarks: GenesisLandmarks
+	isLand: Uint8Array
+}
+
+/**
+ * Flattened view the search helpers read. Derived from RouteWorldInput at the
+ * top of computeRoutes; internal to this module.
+ */
+interface RouteWorld {
+	/** Province count. */
+	P: number
+	era: SocietyEra
+	desolate: Uint8Array
+	/** Settled but nation-less provinces, impassable to routes. */
+	stateless: Uint8Array
+	regionProvince: Int32Array
+	regionAdjOffset: Int32Array
+	regionAdjList: Int32Array
+	regionIsLand: Uint8Array
+	r_xyz: Float32Array
+	landmarks: GenesisLandmarks
+}
+
+function toRouteWorld(input: RouteWorldInput): RouteWorld {
+	const { provinces, nations } = input
+	const stateless = new Uint8Array(provinces.count)
+	for (let p = 0; p < provinces.count; p++) {
+		if (!provinces.desolate[p] && nations.sovereign[p] < 0) stateless[p] = 1
+	}
+	return {
+		P: provinces.count,
+		era: input.params.era ?? "lateMedieval",
+		desolate: provinces.desolate,
+		stateless,
+		regionProvince: provinces.regionProvince,
+		regionAdjOffset: input.mesh.adjOffset,
+		regionAdjList: input.mesh.adjList,
+		regionIsLand: input.isLand,
+		r_xyz: input.mesh.r_xyz,
+		landmarks: input.landmarks,
+	}
+}
 
 const ROUTE_TUNING = {
 	land: {
@@ -32,7 +90,7 @@ const ROUTE_TUNING = {
 	},
 } as const
 
-function routePopulationThresholds(era: HistoryState["era"]) {
+function routePopulationThresholds(era: SocietyEra) {
 	const tuning = getSettlementEraTuning(era)
 	return {
 		majorSettlementMin: tuning.cityMin * 2,
@@ -42,12 +100,13 @@ function routePopulationThresholds(era: HistoryState["era"]) {
 	}
 }
 
-export function seaRoutePortMinPopulation(era: HistoryState["era"]): number {
-	return routePopulationThresholds(era).portSettlementMin
-}
-
 interface RouteInputs {
-	planetRadiusKm?: number
+	/**
+	 * Per-province urban population, sizing settlements into major/minor/port
+	 * route candidates. Supplied by the urbanization pipeline stage; this used
+	 * to be read out of the sim's population timelines.
+	 */
+	urbanPopulation: Float32Array
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
 	settlementPortRegions?: Int32Array
@@ -176,7 +235,7 @@ function createSeaNeighborWorkspace(size: number): SeaNeighborWorkspace {
 	}
 }
 
-function computeLandPassableMask(state: HistoryState): Uint8Array {
+function computeLandPassableMask(state: RouteWorld): Uint8Array {
 	const mask = new Uint8Array(state.regionProvince.length)
 	for (let region = 0; region < state.regionProvince.length; region++) {
 		const province = state.regionProvince[region]
@@ -193,7 +252,7 @@ function computeLandPassableMask(state: HistoryState): Uint8Array {
 }
 
 function computeProvinceLandClusters(
-	state: HistoryState,
+	state: RouteWorld,
 	landPassable: Uint8Array,
 ): Int32Array {
 	const regionCluster = new Int32Array(state.regionProvince.length).fill(-1)
@@ -234,7 +293,7 @@ function computeProvinceLandClusters(
 	return provinceCluster
 }
 
-function computeWaterDepthPenalty(state: HistoryState): Float32Array {
+function computeWaterDepthPenalty(state: RouteWorld): Float32Array {
 	const waterDepth = new Int32Array(state.regionProvince.length).fill(-1)
 	const penalty = new Float32Array(state.regionProvince.length)
 	const queue = new Int32Array(state.regionProvince.length)
@@ -344,7 +403,7 @@ function tangentProjectFlat(
 }
 
 function collectLandCandidatesByKind(
-	state: HistoryState,
+	state: RouteWorld,
 	settlementRegions: Int32Array,
 	provinceClusters: Int32Array,
 	urbanPopulation: Float32Array,
@@ -405,7 +464,7 @@ function pushLandCandidate(
 }
 
 function collectSeaCandidates(
-	state: HistoryState,
+	state: RouteWorld,
 	settlementRegions: Int32Array,
 	settlementWaterLandmarks: Int32Array,
 	settlementPortRegions: Int32Array,
@@ -445,7 +504,7 @@ function collectSeaCandidates(
 }
 
 function findLandPath(
-	state: HistoryState,
+	state: RouteWorld,
 	workspace: SearchWorkspace,
 	startRegion: number,
 	endRegion: number,
@@ -522,7 +581,7 @@ function findLandPath(
 }
 
 function findSeaPathsToTargets(
-	state: HistoryState,
+	state: RouteWorld,
 	workspace: SearchWorkspace,
 	startRegion: number,
 	targetRegions: ArrayLike<number>,
@@ -623,7 +682,7 @@ function reconstructPathFromTree(
 }
 
 function computeSeaRouteMaxLengthKm(
-	state: HistoryState,
+	state: RouteWorld,
 	sourcePopulation: number,
 	targetPopulation: number,
 ): number {
@@ -635,7 +694,7 @@ function computeSeaRouteMaxLengthKm(
 }
 
 function collectSeaNeighborPairs(
-	state: HistoryState,
+	state: RouteWorld,
 	waterLandmark: number,
 	candidates: SeaCandidateGroup["candidates"],
 	waterDepthPenalty: Float32Array,
@@ -724,7 +783,7 @@ function collectSeaNeighborPairs(
 }
 
 function appendLandRoutes(
-	state: HistoryState,
+	state: RouteWorld,
 	kind: SerializedRouteKind,
 	candidateGroups: LandCandidateGroup[],
 	provinceClusters: Int32Array,
@@ -806,7 +865,7 @@ function appendLandRoutes(
 }
 
 function appendSeaRoutes(
-	state: HistoryState,
+	state: RouteWorld,
 	candidateGroups: SeaCandidateGroup[],
 	waterDepthPenalty: Float32Array,
 	workspace: SearchWorkspace,
@@ -929,7 +988,7 @@ function appendSeaRoutes(
 
 function buildRouteNetwork(
 	routes: Route[],
-	state: HistoryState,
+	state: RouteWorld,
 	urbanPopulation: Float32Array,
 ): RouteEdge[] {
 	const regionPairSpan = state.regionProvince.length
@@ -971,19 +1030,17 @@ function buildRouteNetwork(
 }
 
 export function computeRoutes(
-	state: HistoryState,
+	world: RouteWorldInput,
 	inputs: RouteInputs,
 ): RouteComputation {
+	const state = toRouteWorld(world)
 	const settlementRegions =
 		inputs.settlementRegions ?? new Int32Array(state.P).fill(-1)
 	const settlementWaterLandmarks =
 		inputs.settlementWaterLandmarks ?? new Int32Array(state.P).fill(-1)
 	const settlementPortRegions =
 		inputs.settlementPortRegions ?? new Int32Array(state.P).fill(-1)
-	const urbanPopulation = new Float32Array(state.P)
-	for (let province = 0; province < state.P; province++) {
-		urbanPopulation[province] = PROV.population.urban.get(state, province)
-	}
+	const { urbanPopulation } = inputs
 
 	const landPassable = timed(
 		"computeRoutes:computeLandPassableMask",
@@ -1027,7 +1084,7 @@ export function computeRoutes(
 			workspace,
 			landUsage,
 			regionPairSpan,
-			inputs.planetRadiusKm,
+			world.params.planetRadiusKm,
 			provincePairSpan,
 			new Set<number>(),
 			routes,
@@ -1049,7 +1106,7 @@ export function computeRoutes(
 			workspace,
 			landUsage,
 			regionPairSpan,
-			inputs.planetRadiusKm,
+			world.params.planetRadiusKm,
 			provincePairSpan,
 			majorPairs,
 			routes,
@@ -1071,7 +1128,7 @@ export function computeRoutes(
 			seaUsage,
 			regionPairSpan,
 			urbanPopulation,
-			inputs.planetRadiusKm,
+			world.params.planetRadiusKm,
 			routes,
 		),
 	)

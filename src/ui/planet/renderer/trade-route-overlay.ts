@@ -135,7 +135,7 @@ function smoothPoints(points: THREE.Vector3[]): THREE.Vector3[] {
 	return curve.getPoints(segments)
 }
 
-export function buildTradeRouteCorridors(
+function buildTradeRouteCorridors(
 	edges: readonly RouteEdge[] | SerializedNetwork,
 ): Corridor[] {
 	const adjacency = new Map<

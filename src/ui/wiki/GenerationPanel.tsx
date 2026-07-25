@@ -30,7 +30,6 @@ import {
 	formatTimingSeconds,
 	getComputeRoutesTimingSummary,
 	getGenerationTimingSummary,
-	getHistoryTimingSummary,
 	getPostTimingSummary,
 } from "./timing/timing-summary"
 import { type WarWikiData, WarWikiPage } from "./war/WarWikiPage"
@@ -211,11 +210,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	type DrillDownState =
 		| null
 		| "post"
-		| "history"
 		| "computeRoutes"
 		| {
 				kind: "other"
-				parent: "pipeline" | "post" | "history" | "computeRoutes"
+				parent: "pipeline" | "post" | "computeRoutes"
 		  }
 	const [timingDrillDown, setTimingDrillDown] = useState<DrillDownState>(null)
 	const generationTimingSummary = useMemo(
@@ -224,10 +222,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	)
 	const postTimingSummary = useMemo(
 		() => getPostTimingSummary(generationTimings),
-		[generationTimings],
-	)
-	const historyTimingSummary = useMemo(
-		() => getHistoryTimingSummary(generationTimings),
 		[generationTimings],
 	)
 	const computeRoutesTimingSummary = useMemo(
@@ -555,65 +549,13 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																		/>
 																	</div>
 																</div>
-															) : timingDrillDown === "history" &&
-																historyTimingSummary ? (
-																<div className="space-y-2">
-																	<div className="flex items-center gap-2">
-																		<button
-																			type="button"
-																			onClick={() => setTimingDrillDown(null)}
-																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-																		>
-																			<svg
-																				width="10"
-																				height="10"
-																				viewBox="0 0 24 24"
-																				fill="none"
-																				stroke="currentColor"
-																				strokeWidth="2"
-																				strokeLinecap="round"
-																				strokeLinejoin="round"
-																			>
-																				<polyline points="15 18 9 12 15 6" />
-																			</svg>
-																			Back
-																		</button>
-																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-																			History breakdown
-																		</div>
-																		<span className="ml-auto font-mono text-[10px] text-slate-400">
-																			{formatTimingSeconds(
-																				historyTimingSummary.totalMs,
-																			)}
-																		</span>
-																	</div>
-																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-																		<GenerationTimingChart
-																			entries={historyTimingSummary.entries}
-																			onBarClick={(label) => {
-																				if (
-																					label === "computeRoutes" &&
-																					computeRoutesTimingSummary
-																				)
-																					setTimingDrillDown("computeRoutes")
-																				else if (label === "Other")
-																					setTimingDrillDown({
-																						kind: "other",
-																						parent: "history",
-																					})
-																			}}
-																		/>
-																	</div>
-																</div>
 															) : timingDrillDown === "computeRoutes" &&
 																computeRoutesTimingSummary ? (
 																<div className="space-y-2">
 																	<div className="flex items-center gap-2">
 																		<button
 																			type="button"
-																			onClick={() =>
-																				setTimingDrillDown("history")
-																			}
+																			onClick={() => setTimingDrillDown(null)}
 																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
 																		>
 																			<svg
@@ -692,12 +634,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																							0)
 																					: timingDrillDown.parent === "post"
 																						? (postTimingSummary?.totalMs ?? 0)
-																						: timingDrillDown.parent ===
-																								"history"
-																							? (historyTimingSummary?.totalMs ??
-																								0)
-																							: (computeRoutesTimingSummary?.totalMs ??
-																								0),
+																						: (computeRoutesTimingSummary?.totalMs ??
+																							0),
 																			)}
 																		</span>
 																	</div>
@@ -710,12 +648,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																					: timingDrillDown.parent === "post"
 																						? (postTimingSummary?.otherEntries ??
 																							[])
-																						: timingDrillDown.parent ===
-																								"history"
-																							? (historyTimingSummary?.otherEntries ??
-																								[])
-																							: (computeRoutesTimingSummary?.otherEntries ??
-																								[])
+																						: (computeRoutesTimingSummary?.otherEntries ??
+																							[])
 																			}
 																		/>
 																	</div>
@@ -741,10 +675,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																			)
 																				setTimingDrillDown("post")
 																			else if (
-																				label === "initHistory" &&
-																				historyTimingSummary
+																				label === "computeRoutes" &&
+																				computeRoutesTimingSummary
 																			)
-																				setTimingDrillDown("history")
+																				setTimingDrillDown("computeRoutes")
 																			else if (
 																				label === "Other" &&
 																				generationTimingSummary.otherEntries

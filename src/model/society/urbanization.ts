@@ -1,24 +1,19 @@
 /**
- * POPULATION / CENSUS EVENT — growth, urbanization, development spread.
- * Port of src/model/history/events/population.ts
+ * URBANIZATION AND DEVELOPMENT — one-shot worldgen stage.
+ *
+ * Splits each nation's population into a rank-size settlement hierarchy and
+ * spreads development outward from the resulting cities. This used to run as
+ * the init pass of the procedural history sim's CENSUS event, writing into
+ * per-province timelines; the sim's year-over-year relaxation toward these
+ * targets is gone, so the init-time result is now simply the world's static
+ * urban/development layer.
  */
 
-import { GOVERNMENT_TYPES, type GovernmentType } from "../../society/eras"
-import { getSettlementEraTuning } from "../../society/settlement-tuning"
-import { EVT } from "../event-heap"
-import { PROV } from "../fields"
-import type { HistoryRng } from "../history-rng"
-import {
-	getNationProvinces,
-	getProvinceNeighbors,
-	getSovereign,
-	type HistoryState,
-	isSovereign,
-	YEAR_MS,
-} from "../state"
-
-const MAX_ADJUSTMENT_RATE = 0.005
-const URBAN_GROWTH = 0.1
+import type { GenesisParams } from ".."
+import type { GenesisNationHierarchy, GenesisProvinces } from "../types/society"
+import { GOVERNMENT_TYPES, type GovernmentType } from "./eras"
+import type { ProvincePopulation } from "./population"
+import { getSettlementEraTuning } from "./settlement-tuning"
 
 // 1444 Urban Demographics Ruleset (two-input edition): each government type
 // carries its own urbanization share (U) and rank-size steepness (q).
@@ -117,94 +112,123 @@ function urbanPopToDev(pop: number): number {
 	)
 }
 
-function devToGrowthRate(dev: number): number {
-	return lerpScale(
-		[0.0, 0.15, 0.35, 0.55, 0.75, 0.95],
-		[0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.002],
-		dev,
-	)
+/** Max spread distance in province hops (simplified from km-based) */
+const MAX_SPREAD_HOPS = 20
+
+/**
+ * Runs mid-pipeline, before the GenesisWorld literal is assembled, so it takes
+ * the world's sub-objects directly the same way deriveProvinceSociety does
+ * rather than the (fully optional) world type.
+ */
+interface UrbanizationInputs {
+	params: Pick<GenesisParams, "era">
+	provinces: Pick<
+		GenesisProvinces,
+		"count" | "desolate" | "adjOffset" | "adjList" | "waterAccess"
+	>
+	nations: Pick<
+		GenesisNationHierarchy,
+		"parent" | "depth" | "sovereign" | "governmentType"
+	>
+	population: Pick<ProvincePopulation, "population" | "habitability">
 }
 
-function hierarchyDepth(state: HistoryState, province: number): number {
-	let depth = 0
-	let current = province
-	while (state.parentCurrent[current] >= 0) {
-		current = state.parentCurrent[current]
-		depth++
+interface UrbanizationResult {
+	/** Per-province urban population. */
+	urbanPopulation: Float32Array
+	/** Per-province rural population (total minus urban). */
+	ruralPopulation: Float32Array
+	/** Per-province development in [0, 1]. */
+	development: Float32Array
+}
+
+/**
+ * Distributes each nation's population across a rank-size settlement
+ * hierarchy, largest settlement at the shallowest hierarchy depth.
+ */
+function computeUrbanPopulation(inputs: UrbanizationInputs): Float32Array {
+	const { count: P, desolate } = inputs.provinces
+	const { parent, depth, sovereign, governmentType } = inputs.nations
+	const { population, habitability } = inputs.population
+	const urbanPopulation = new Float32Array(P)
+
+	// Bucket provinces under their sovereign so each nation can be sized as a
+	// whole. The sim walked the live hierarchy for this; the static hierarchy
+	// gives the same grouping directly.
+	const provincesByNation = new Map<number, number[]>()
+	for (let p = 0; p < P; p++) {
+		if (desolate[p]) continue
+		const root = sovereign[p]
+		if (root < 0) continue
+		const bucket = provincesByNation.get(root)
+		if (bucket) bucket.push(p)
+		else provincesByNation.set(root, [p])
 	}
-	return depth
-}
 
-function urbanization(state: HistoryState, init: boolean): void {
-	// Process each sovereign nation
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p] || !isSovereign(state, p)) continue
+	for (const [nation, provinces] of provincesByNation) {
+		if (desolate[nation] || parent[nation] >= 0) continue
 
-		const provinces = getNationProvinces(state, p)
 		let totalPop = 0
-		for (const prov of provinces) {
-			totalPop +=
-				PROV.population.rural.get(state, prov) +
-				PROV.population.urban.get(state, prov)
-		}
+		for (const prov of provinces) totalPop += population[prov]
 
-		const { U, q } = nationProfile(state.governmentType[p])
+		const { U, q } = nationProfile(governmentType?.[nation] ?? 1)
 		const urbanPop = totalPop * U
 
-		// Sort provinces by hierarchy depth ascending (sovereign = 0 gets the capital city),
-		// breaking ties by habitability so deeper-ranked provinces still differ meaningfully.
+		// Sort by hierarchy depth ascending (the sovereign, depth 0, gets the
+		// capital city), breaking ties by habitability so deeper-ranked
+		// provinces still differ meaningfully.
 		const sorted = provinces.slice().sort((a, b) => {
-			const da = hierarchyDepth(state, a)
-			const db = hierarchyDepth(state, b)
-			if (da !== db) return da - db
-			return state.habitability[b] - state.habitability[a]
+			if (depth[a] !== depth[b]) return depth[a] - depth[b]
+			return habitability[b] - habitability[a]
 		})
 
-		// Rank-size hierarchy: N settlements whose sizes sum to exactly urbanPop.
 		let sizes = rankSizeCities(urbanPop, q)
 		if (sizes.length > sorted.length) sizes = sizes.slice(0, sorted.length)
 
 		for (let idx = 0; idx < sorted.length; idx++) {
-			const prov = sorted[idx]
-			state.leaderRuntime.targetUrban[prov] = sizes[idx] ?? 0
-			if (init) {
-				PROV.population.urban.set(
-					state,
-					prov,
-					state.time,
-					state.leaderRuntime.targetUrban[prov],
-				)
-			}
+			urbanPopulation[sorted[idx]] = sizes[idx] ?? 0
 		}
 	}
+
+	return urbanPopulation
 }
 
-/** Max spread distance in province hops (simplified from km-based) */
-const MAX_SPREAD_HOPS = 20
-
-function development(state: HistoryState, init: boolean): void {
-	const { cityMin } = getSettlementEraTuning(state.era)
+/**
+ * Spreads development outward from every city by multi-source best-first
+ * search, decaying per hop and further across a national border.
+ */
+function computeDevelopment(
+	inputs: UrbanizationInputs,
+	urbanPopulation: Float32Array,
+): Float32Array {
+	const {
+		count: P,
+		desolate,
+		adjOffset,
+		adjList,
+		waterAccess,
+	} = inputs.provinces
+	const { sovereign } = inputs.nations
+	const { cityMin } = getSettlementEraTuning(
+		inputs.params.era ?? "lateMedieval",
+	)
 	const BASE_DECAY = 0.75
 	const FOREIGN_DECAY = 0.65
 	const WATER_ACCESS_BONUS = 1.1
 
-	// Gather all cities
 	const cities: { province: number; dev: number; sourceNation: number }[] = []
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-		if (PROV.population.urban.get(state, p) >= cityMin) {
+	for (let p = 0; p < P; p++) {
+		if (desolate[p]) continue
+		if (urbanPopulation[p] >= cityMin) {
 			cities.push({
 				province: p,
-				dev: urbanPopToDev(PROV.population.urban.get(state, p)),
-				sourceNation: getSovereign(state, p),
+				dev: urbanPopToDev(urbanPopulation[p]),
+				sourceNation: sovereign[p],
 			})
 		}
 	}
 
-	// Multi-source BFS from all cities
-	const devFromCities = new Float32Array(state.P)
-	const visited = new Uint8Array(state.P)
-	// Priority queue approximation: process highest dev first using a sorted array
+	const devFromCities = new Float32Array(P)
 	const queue: {
 		province: number
 		dev: number
@@ -212,24 +236,23 @@ function development(state: HistoryState, init: boolean): void {
 		hops: number
 	}[] = cities.map((c) => ({ ...c, hops: 0 })).sort((a, b) => b.dev - a.dev)
 
-	for (const city of cities) {
-		devFromCities[city.province] = city.dev
-		visited[city.province] = 1
-	}
+	for (const city of cities) devFromCities[city.province] = city.dev
 
 	while (queue.length > 0) {
 		const { province, dev, sourceNation, hops } = queue.shift()!
 		if (dev < 0.01 || hops >= MAX_SPREAD_HOPS) continue
 
-		const neighbors = getProvinceNeighbors(state, province)
-		for (const nb of neighbors) {
-			if (state.desolate[nb]) continue
-			const nbNation = getSovereign(state, nb)
-			const isForeign = nbNation !== sourceNation
-			const hasWaterAccess = state.waterAccess[nb] === 1
+		for (
+			let i = adjOffset[province], end = adjOffset[province + 1];
+			i < end;
+			i++
+		) {
+			const nb = adjList[i]
+			if (desolate[nb]) continue
+			const isForeign = sovereign[nb] !== sourceNation
+			const hasWaterAccess = waterAccess[nb] === 1
 
-			let decay = BASE_DECAY
-			if (isForeign) decay = FOREIGN_DECAY
+			let decay = isForeign ? FOREIGN_DECAY : BASE_DECAY
 			if (hasWaterAccess) decay *= WATER_ACCESS_BONUS
 
 			const spreadDev = dev * decay
@@ -238,7 +261,7 @@ function development(state: HistoryState, init: boolean): void {
 
 			devFromCities[nb] = spreadDev
 
-			// Insert maintaining sorted order
+			// Insert maintaining descending-dev order.
 			let lo = 0
 			let hi = queue.length
 			while (lo < hi) {
@@ -255,70 +278,29 @@ function development(state: HistoryState, init: boolean): void {
 		}
 	}
 
-	// Apply development
-	const DEV_RISE = 0.1
-	const DEV_FALL = 0.05
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-		const cityDev = devFromCities[p]
-		const localDev = urbanPopToDev(PROV.population.urban.get(state, p))
-		const targetDev = Math.max(cityDev, localDev)
-
-		if (init) {
-			PROV.development.set(state, p, state.time, targetDev)
-		} else {
-			const currentDev = PROV.development.get(state, p)
-			const gap = targetDev - currentDev
-			const rate = gap > 0 ? DEV_RISE : DEV_FALL
-			PROV.development.set(state, p, state.time, currentDev + gap * rate)
-		}
+	const development = new Float32Array(P)
+	for (let p = 0; p < P; p++) {
+		if (desolate[p]) continue
+		development[p] = Math.max(
+			devFromCities[p],
+			urbanPopToDev(urbanPopulation[p]),
+		)
 	}
+	return development
 }
 
-export function initPopulation(state: HistoryState, _rng: HistoryRng): void {
-	urbanization(state, true)
-	development(state, true)
-	state.heap.enqueue(state.time + YEAR_MS, EVT.CENSUS, 0, 0, 0, 0, state.time)
-}
+export function computeUrbanization(
+	inputs: UrbanizationInputs,
+): UrbanizationResult {
+	const urbanPopulation = computeUrbanPopulation(inputs)
+	const development = computeDevelopment(inputs, urbanPopulation)
 
-export function runPopulation(
-	state: HistoryState,
-	previousTime: number,
-	_rng: HistoryRng,
-): void {
-	const duration = state.time - previousTime
-	const yearFraction = duration / YEAR_MS
-
-	urbanization(state, false)
-	development(state, false)
-
-	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p]) continue
-
-		const growth =
-			1 + devToGrowthRate(PROV.development.get(state, p)) * yearFraction
-		const rural = PROV.population.rural.get(state, p)
-		PROV.population.rural.set(state, p, state.time, rural * growth)
-
-		const urban = PROV.population.urban.get(state, p)
-		const targetPop = state.leaderRuntime.targetUrban[p]
-		const urbanGrowth = urban * growth
-		const maxAdjustment = urbanGrowth * MAX_ADJUSTMENT_RATE * yearFraction
-
-		let finalPop: number
-		if (targetPop >= urbanGrowth) {
-			const gap = targetPop - urbanGrowth
-			const adjustment = Math.min(gap * URBAN_GROWTH, maxAdjustment)
-			finalPop = Math.min(urbanGrowth + adjustment, targetPop)
-		} else {
-			const gap = urbanGrowth - targetPop
-			const adjustment = Math.min(gap * URBAN_GROWTH, maxAdjustment)
-			finalPop = Math.max(urbanGrowth - adjustment, targetPop)
-		}
-
-		PROV.population.urban.set(state, p, state.time, finalPop)
+	const P = inputs.provinces.count
+	const total = inputs.population.population
+	const ruralPopulation = new Float32Array(P)
+	for (let p = 0; p < P; p++) {
+		ruralPopulation[p] = Math.max(0, total[p] - urbanPopulation[p])
 	}
 
-	// Schedule next census
-	state.heap.enqueue(state.time + YEAR_MS, EVT.CENSUS, 0, 0, 0, 0, state.time)
+	return { urbanPopulation, ruralPopulation, development }
 }

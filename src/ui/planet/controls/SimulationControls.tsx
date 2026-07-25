@@ -1,11 +1,11 @@
 import React from "react"
-import { MONTH_MS } from "@/model/history/state"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 import { historyTimeParts } from "../screen/history/history-time"
 import { monthLabels } from "../screen/shared/constants"
 
-const TIMELINE_STEP_MS = MONTH_MS
+/** One 30-day month on the history time axis. */
+const TIMELINE_STEP_MS = 30 * 24 * 60 * 60 * 1000
 
 function clampTimelineTime(
 	timeMs: number,

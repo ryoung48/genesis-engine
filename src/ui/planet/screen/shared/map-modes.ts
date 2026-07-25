@@ -86,22 +86,30 @@ const DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 > = [
 	["borders", "Nations"],
 	["government", "Government"],
-	["dynasty", "Dynasty"],
 ]
 
 const DEBUG_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
-> = [
-	["diplomacy", "Diplomacy"],
-	["provinces", "Provinces"],
-]
+> = [["provinces", "Provinces"]]
 
-// Only meaningful for a real-Earth import (see world.isEarthImport) — the
-// province boundaries/names come from imported real-world data, not the
-// procedural BFS partition every other world uses.
+// Earth-import-only, but not a debug mode: dynasty coloring was fed by the
+// procedural history sim's leader timelines, which no longer exist, so on a
+// procedural world it would render blank. Earth import sources dynasties from
+// the earth-history engine instead.
+const EARTH_IMPORT_DEFAULT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
+	readonly [NationMapMode, string]
+> = [["dynasty", "Dynasty"]]
+
+// Only meaningful for a real-Earth import (see world.isEarthImport). Province
+// boundaries/names come from imported real-world data rather than the
+// procedural BFS partition; diplomacy was fed by the procedural sim's relation
+// timelines, which are likewise gone.
 const EARTH_IMPORT_POLITICAL_MODE_OPTIONS: ReadonlyArray<
 	readonly [NationMapMode, string]
-> = [["earthProvinces", "Provinces (Real)"]]
+> = [
+	["earthProvinces", "Provinces (Real)"],
+	["diplomacy", "Diplomacy"],
+]
 
 export function getMapModePrimary(colorMode: ColorMode): MapModePrimary {
 	return colorMode === "nations" ||
@@ -143,6 +151,27 @@ const EARTH_IMPORT_ONLY_MODES: ReadonlySet<ColorMode> = new Set<ColorMode>([
 	"earthProvinces",
 ])
 
+const EARTH_IMPORT_ONLY_NATION_MODES: ReadonlySet<NationMapMode> =
+	new Set<NationMapMode>([
+		...EARTH_IMPORT_DEFAULT_POLITICAL_MODE_OPTIONS.map(([mode]) => mode),
+		...EARTH_IMPORT_POLITICAL_MODE_OPTIONS.map(([mode]) => mode),
+	])
+
+/**
+ * Falls back to "borders" when a persisted nation mode has no data source on
+ * the current world — e.g. a saved "dynasty" pref carried into a procedural
+ * world, whose leader and relation data went away with the history sim.
+ */
+export function normalizeNationMapMode(
+	nationMode: NationMapMode,
+	isEarthImport: boolean,
+): NationMapMode {
+	if (!isEarthImport && EARTH_IMPORT_ONLY_NATION_MODES.has(nationMode)) {
+		return "borders"
+	}
+	return nationMode
+}
+
 export function normalizeGeographyColorMode({
 	colorMode,
 	hasHazards,
@@ -175,6 +204,9 @@ export function getVisibleSocietyModeOptions(
 	const politicalOptions = debugEnabled
 		? [...DEFAULT_POLITICAL_MODE_OPTIONS, ...DEBUG_POLITICAL_MODE_OPTIONS]
 		: [...DEFAULT_POLITICAL_MODE_OPTIONS]
+	if (isEarthImport) {
+		politicalOptions.push(...EARTH_IMPORT_DEFAULT_POLITICAL_MODE_OPTIONS)
+	}
 	if (debugEnabled && isEarthImport) {
 		politicalOptions.push(...EARTH_IMPORT_POLITICAL_MODE_OPTIONS)
 	}

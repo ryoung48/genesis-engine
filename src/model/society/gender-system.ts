@@ -62,9 +62,3 @@ export function resolveLeaderGender(
 	}
 	return roll < 0.95 ? "male" : "female"
 }
-
-export function leaderGenderSymbol(gender: LeaderGender | null): string | null {
-	if (gender === "male") return "♂"
-	if (gender === "female") return "♀"
-	return null
-}

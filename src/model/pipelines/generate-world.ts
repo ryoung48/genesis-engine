@@ -13,6 +13,7 @@ import type {
 	StageTiming,
 	TectonicPlate,
 } from ".."
+import { computeRoutes } from "../economy/routes"
 import { buildSphereMesh } from "../mesh"
 import { createRng } from "../shared/rng"
 import {
@@ -21,6 +22,7 @@ import {
 	countContinents,
 } from "../shared/stats"
 import { getMaxOceanDepthKm } from "../shared/units"
+import { computeUrbanization } from "../society/urbanization"
 import {
 	generateCoarsePlates,
 	projectCoarsePlates,
@@ -609,6 +611,42 @@ export function generateGenesisWorld(
 	pipelineTiming.push(...provinceSociety.timings)
 	onProgress?.("cultures", 77)
 
+	// Urbanization, development and the route/road network used to be produced
+	// by the procedural history sim's init passes. They are one-shot functions
+	// of geography, hierarchy and settlement size, so they run here instead.
+	const infrastructureTiming: StageTiming[] = []
+	const urbanization = withTiming("urbanization", infrastructureTiming, () =>
+		computeUrbanization({
+			params,
+			provinces: post.provinces,
+			nations: provinceSociety.nations,
+			population: post.population,
+		}),
+	)
+	onProgress?.("urbanization", 80)
+
+	const infrastructure = withTiming("computeRoutes", infrastructureTiming, () =>
+		computeRoutes(
+			{
+				mesh,
+				params,
+				provinces: post.provinces,
+				nations: provinceSociety.nations,
+				landmarks: provinceSociety.landmarks,
+				isLand,
+			},
+			{
+				urbanPopulation: urbanization.urbanPopulation,
+				settlementRegions: provinceSociety.settlementRegions,
+				settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
+				settlementPortRegions: provinceSociety.settlementPortRegions,
+				timings: infrastructureTiming,
+			},
+		),
+	)
+	pipelineTiming.push(...infrastructureTiming)
+	onProgress?.("routes", 85)
+
 	const timings = [...pipelineTiming, ...post.timings]
 	console.timeEnd("total")
 	console.table(pipelineTiming)
@@ -672,6 +710,10 @@ export function generateGenesisWorld(
 		settlementRegions: provinceSociety.settlementRegions,
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
 		settlementPortRegions: provinceSociety.settlementPortRegions,
+		urbanPopulation: urbanization.urbanPopulation,
+		development: urbanization.development,
+		routes: infrastructure.routes,
+		network: infrastructure.network,
 		oceanCurrents: post.oceanCurrents,
 		continentCount: countContinents(mesh, isLand),
 		monthlyTEQ: post.monthlyTEQ,

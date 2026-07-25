@@ -4,7 +4,6 @@ import { koppenClimateColor } from "@/model/climate/koppen"
 import { pastaClimateColor } from "@/model/climate/pasta"
 import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/climate/vegetation"
 import { tradeGoodColor } from "@/model/economy/trade-goods"
-import { REL } from "@/model/history/state"
 import { RELIGION_TYPE_COLORS } from "@/model/society/religion"
 import {
 	regionTimezoneOffset,
@@ -60,16 +59,34 @@ import {
 	darkenVegetationAtElevation,
 } from "./color-helpers"
 import { governmentColorForIndex } from "./government-colors"
-import {
-	getRebelDisplayColorNationId,
-	type PoliticalMapWar,
-} from "./political-conflict-display"
+import type { PoliticalMapWar } from "./political-conflict-display"
 import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
 } from "./religion-type"
 
-// Relation value → RGB tuple (consistent with buildRelationDistribution palette)
+/**
+ * Relation values the diplomacy map mode colors by. These mirrored the
+ * procedural history sim's REL enum, which no longer exists; the numbering is
+ * kept so an `relationAt` supplied by any future relation source stays
+ * compatible.
+ */
+const REL = {
+	NONE: 0,
+	OVERLORD: 1,
+	VASSAL: 2,
+	PU_SENIOR: 3,
+	PU_JUNIOR: 4,
+	ALLY: 5,
+	FRIENDLY: 6,
+	NEUTRAL: 7,
+	SUSPICIOUS: 8,
+	RIVAL: 9,
+	WAR: 10,
+	COLONY: 11,
+} as const
+
+// Relation value → RGB tuple
 const DIPLOMACY_RGB_COLORS: Record<number, [number, number, number]> = {
 	[REL.NONE]: [0.58, 0.64, 0.69],
 	[REL.OVERLORD]: [0.659, 0.333, 0.969],
@@ -114,7 +131,7 @@ function basinColor(id: number): [number, number, number] {
 	return [r, g, b]
 }
 
-export function getDynastyColor(id: number): [number, number, number] {
+function getDynastyColor(id: number): [number, number, number] {
 	if (id < 0) return [0.35, 0.33, 0.32]
 	let h = (id * 2246822519) >>> 0
 	h ^= h >>> 15
@@ -222,7 +239,7 @@ export function computeRegionColors(
 	viewMode: "globe" | "map" = "globe",
 	showElevation = true,
 	_occupiedRegions?: Set<number>,
-	activeWars?: readonly PoliticalMapWar[] | null,
+	_activeWars?: readonly PoliticalMapWar[] | null,
 	selectedNationId?: number | null,
 	relationAt?: ((a: number, b: number) => number) | null,
 	dangerSubMode: DangerSubMode = "earthquake",
@@ -930,11 +947,7 @@ export function computeRegionColors(
 				const p = regionProvince[r]
 				const assignedNationId =
 					p >= 0 ? (world.nations?.assignment?.[p] ?? -1) : -1
-				const rulerNationId =
-					assignedNationId >= 0
-						? (getRebelDisplayColorNationId(activeWars, assignedNationId) ??
-							assignedNationId)
-						: -1
+				const rulerNationId = assignedNationId
 				const dynastyId =
 					rulerNationId >= 0 ? (world.leaderDynasty?.[rulerNationId] ?? -1) : -1
 				if (p < 0) {
@@ -1095,11 +1108,7 @@ export function computeRegionColors(
 					rgb[3 * r + 1] = cg
 					rgb[3 * r + 2] = cb
 				} else if (world.nations && world.nations.assignment[p] >= 0) {
-					const displayColorNationId =
-						getRebelDisplayColorNationId(
-							activeWars,
-							world.nations.assignment[p],
-						) ?? world.nations.assignment[p]
+					const displayColorNationId = world.nations.assignment[p]
 					const [cr, cg, cb] = darkenPoliticalAtElevation(
 						toPastelNationColor([
 							world.nations.colors[3 * displayColorNationId],

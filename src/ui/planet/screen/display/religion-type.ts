@@ -1,6 +1,6 @@
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
 
-export function getReligionIndexForCulture(
+function getReligionIndexForCulture(
 	world: Pick<SerializedGenesisWorld, "religions">,
 	cultureIdx: number,
 ): number {
@@ -18,7 +18,7 @@ function getReligionTypeIndexForCulture(
 	return world.religionTypes[religionIdx] ?? -1
 }
 
-export function getReligionColorForCulture(
+function getReligionColorForCulture(
 	world: Pick<SerializedGenesisWorld, "religions">,
 	cultureIdx: number,
 ): readonly [number, number, number] | null {

@@ -1,252 +1,53 @@
 /// <reference lib="webworker" />
 
-import type { GenesisNationHierarchy, GenesisProvinces, StageTiming } from "."
-import {
-	createHistoryRng,
-	initHistory,
-	simulateUntil,
-	YEAR_MS,
-} from "./history"
-import { PROV } from "./history/fields"
-import {
-	buildHistoryFrame,
-	serializeHistoryTimelines,
-} from "./history/snapshot"
-import { type HistoryState, validateLiveHierarchy } from "./history/state"
 import { pathfind } from "./pathfinding/pathfind"
 import { generateGenesisWorld } from "./pipelines/generate-world"
 import { importGenesisWorld } from "./pipelines/import-heightmap"
-import type { SocietyEra } from "./society/eras"
-import type { ProvincePopulation } from "./society/population"
-import type { GenesisLandmarks } from "./terrain/landmarks"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
-	SerializedHistoryFrame,
-	SerializedTimelines,
 } from "./transport/worker-types"
 import { packNetwork, packRoutes } from "./transport/worker-types"
 
 declare const self: DedicatedWorkerGlobalScope
 
-let historyState: HistoryState | null = null
-let historyRng: ReturnType<typeof createHistoryRng> | null = null
-let historyTime = 800 * YEAR_MS
-let simulationRunning = false
-
-interface HistorySeedWorld {
-	params: { seed: number; planetRadiusKm?: number; era?: SocietyEra }
+interface PathfindSeedWorld {
+	params: { planetRadiusKm?: number }
 	mesh: { r_xyz: Float32Array; adjOffset: Int32Array; adjList: Int32Array }
-	nations: GenesisNationHierarchy | null
-	provinces: GenesisProvinces | null
-	population: ProvincePopulation | null
-	coastal: Uint8Array | null
-	waterAccess: Uint8Array | null
-	riverAccess: Uint8Array | null
-	lakeAccess: Uint8Array | null
-	riverVisible: Uint8Array | null
 	isLand: Uint8Array | null
 	vegetation: Uint8Array | null
 	topography: Uint8Array | null
-	cultures: {
-		assignment: Int32Array
-		count: number
-		genderSystems?: Uint8Array
-	} | null
-	landmarks: GenesisLandmarks | null
-	settlementRegions: Int32Array | null
-	settlementWaterLandmarks: Int32Array | null
-	settlementPortRegions: Int32Array | null
+	regionProvince: Int32Array | null
+	desolate: Uint8Array | null
 }
 
-let lastGeneratedWorld: HistorySeedWorld | null = null
+// Retained across messages so a later "pathfind" request can route over the
+// most recently generated world without regenerating it. This used to be a
+// much larger HistorySeedWorld carrying nations/population/cultures so the
+// worker could seed the procedural history sim; only the routing inputs
+// remain.
+let lastGeneratedWorld: PathfindSeedWorld | null = null
 
-function cloneNations(n: GenesisNationHierarchy): GenesisNationHierarchy {
-	return {
-		assignment: n.assignment.slice(),
-		seeds: n.seeds.slice(),
-		languageSeeds: n.languageSeeds?.slice() ?? new Int32Array(0),
-		nameSeeds: n.nameSeeds?.slice() ?? new Int32Array(0),
-		count: n.count,
-		adjOffset: n.adjOffset.slice(),
-		adjList: n.adjList.slice(),
-		size: n.size.slice(),
-		colors: n.colors.slice(),
-		parent: n.parent.slice(),
-		depth: n.depth.slice(),
-		childOffset: n.childOffset.slice(),
-		childList: n.childList.slice(),
-		sovereign: n.sovereign.slice(),
-		gravity: n.gravity.slice(),
-		governmentType: n.governmentType?.slice(),
-		nationColonizer: n.nationColonizer?.slice(),
-	}
-}
-
-function cloneProvinces(p: GenesisProvinces): GenesisProvinces {
-	return {
-		regionProvince: p.regionProvince.slice(),
-		seeds: p.seeds.slice(),
-		count: p.count,
-		desolate: p.desolate.slice(),
-		landmassId: p.landmassId.slice(),
-		adjOffset: p.adjOffset.slice(),
-		adjList: p.adjList.slice(),
-		size: p.size.slice(),
-		...(p.areaKm2 ? { areaKm2: p.areaKm2.slice() } : {}),
-		colors: p.colors.slice(),
-		waterAccess: p.waterAccess.slice(),
-		riverAccess: p.riverAccess.slice(),
-		lakeAccess: p.lakeAccess.slice(),
-		...(p.realIds ? { realIds: p.realIds.slice() } : {}),
-	}
-}
-
-function cloneHistorySeedWorld(
+function clonePathfindSeedWorld(
 	world: ReturnType<typeof generateGenesisWorld>,
-): HistorySeedWorld {
+): PathfindSeedWorld {
 	return {
-		params: {
-			seed: world.params.seed,
-			planetRadiusKm: world.params.planetRadiusKm,
-			era: world.params.era,
-		},
+		params: { planetRadiusKm: world.params.planetRadiusKm },
 		mesh: {
 			r_xyz: world.mesh.r_xyz.slice(),
 			adjOffset: world.mesh.adjOffset.slice(),
 			adjList: world.mesh.adjList.slice(),
 		},
-		nations: world.nations ? cloneNations(world.nations) : null,
-		provinces: world.provinces ? cloneProvinces(world.provinces) : null,
-		population: world.population
-			? {
-					habitability: world.population.habitability.slice(),
-					population: world.population.population.slice(),
-					habitabilityScore: world.population.habitabilityScore,
-					totalPopulation: world.population.totalPopulation,
-					...(world.population.migrationWave && {
-						migrationWave: world.population.migrationWave.slice(),
-					}),
-					...(world.population.cradleProvinces && {
-						cradleProvinces: world.population.cradleProvinces.slice(),
-					}),
-					...(world.population.settlementWave !== undefined && {
-						settlementWave: world.population.settlementWave,
-					}),
-				}
-			: null,
-		coastal: world.coastal ? world.coastal.slice() : null,
-		waterAccess: world.waterAccess ? world.waterAccess.slice() : null,
-		riverAccess: world.riverAccess ? world.riverAccess.slice() : null,
-		lakeAccess: world.lakeAccess ? world.lakeAccess.slice() : null,
-		riverVisible: world.rivers?.visible ? world.rivers.visible.slice() : null,
 		isLand: world.isLand ? world.isLand.slice() : null,
 		vegetation: world.vegetation ? world.vegetation.slice() : null,
 		topography: world.topography ? world.topography.slice() : null,
-		cultures: world.cultures
-			? {
-					assignment: world.cultures.assignment.slice(),
-					count: world.cultures.count,
-					genderSystems: world.cultures.genderSystems?.slice(),
-				}
-			: null,
-		landmarks: world.landmarks
-			? {
-					regionLandmark: world.landmarks.regionLandmark.slice(),
-					type: world.landmarks.type.slice(),
-					size: world.landmarks.size.slice(),
-					count: world.landmarks.count,
-				}
-			: null,
-		settlementRegions: world.settlementRegions?.slice() ?? null,
-		settlementWaterLandmarks: world.settlementWaterLandmarks?.slice() ?? null,
-		settlementPortRegions: world.settlementPortRegions?.slice() ?? null,
+		regionProvince: world.provinces?.regionProvince.slice() ?? null,
+		desolate: world.provinces?.desolate.slice() ?? null,
 	}
 }
-
-function buildTimelineTransferList(
-	timelines: SerializedTimelines,
-): Transferable[] {
-	return [
-		timelines.parent.times.buffer,
-		timelines.parent.values.buffer,
-		timelines.parent.offsets.buffer,
-		timelines.assignment.times.buffer,
-		timelines.assignment.values.buffer,
-		timelines.assignment.offsets.buffer,
-		timelines.populationRural.times.buffer,
-		timelines.populationRural.values.buffer,
-		timelines.populationRural.offsets.buffer,
-		timelines.populationUrban.times.buffer,
-		timelines.populationUrban.values.buffer,
-		timelines.populationUrban.offsets.buffer,
-		timelines.development.times.buffer,
-		timelines.development.values.buffer,
-		timelines.development.offsets.buffer,
-		timelines.consumption.times.buffer,
-		timelines.consumption.values.buffer,
-		timelines.consumption.offsets.buffer,
-		timelines.leaderDynasty.times.buffer,
-		timelines.leaderDynasty.values.buffer,
-		timelines.leaderDynasty.offsets.buffer,
-		...(timelines.leaderNameSeed
-			? [
-					timelines.leaderNameSeed.times.buffer,
-					timelines.leaderNameSeed.values.buffer,
-					timelines.leaderNameSeed.offsets.buffer,
-				]
-			: []),
-		timelines.leaderClaim.times.buffer,
-		timelines.leaderClaim.values.buffer,
-		timelines.leaderClaim.offsets.buffer,
-		...(timelines.leaderBirthYear
-			? [
-					timelines.leaderBirthYear.times.buffer,
-					timelines.leaderBirthYear.values.buffer,
-					timelines.leaderBirthYear.offsets.buffer,
-				]
-			: []),
-		timelines.occupation.times.buffer,
-		timelines.occupation.values.buffer,
-		timelines.occupation.offsets.buffer,
-		timelines.relations.aIdx.buffer,
-		timelines.relations.bIdx.buffer,
-		timelines.relations.offsets.buffer,
-		timelines.relations.times.buffer,
-		timelines.relations.values.buffer,
-		timelines.nationColorKeys.buffer,
-		timelines.nationColorValues.buffer,
-	]
-}
-
-function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
-	return [
-		frame.assignment.buffer,
-		frame.parent.buffer,
-		frame.sovereign.buffer,
-		frame.leaderDynasty.buffer,
-		frame.leaderNameSeed.buffer,
-		frame.leaderClaim.buffer,
-		frame.leaderBirthYear.buffer,
-		frame.colors.buffer,
-		frame.populationTotal.buffer,
-		frame.populationUrban.buffer,
-		frame.development.buffer,
-		frame.consumption.buffer,
-		frame.nationWealth.buffer,
-		frame.nationOptimalWealth.buffer,
-		frame.relationA.buffer,
-		frame.relationB.buffer,
-		frame.relationValues.buffer,
-		frame.cultureBlendSecondary.buffer,
-		frame.cultureBlendWeight.buffer,
-	]
-}
-
 function serializeWorld(
 	world: ReturnType<typeof generateGenesisWorld>,
-	seedHistoryState: HistoryState | null,
 ): SerializedGenesisWorld {
 	return {
 		mesh: world.mesh,
@@ -308,12 +109,6 @@ function serializeWorld(
 		provinces: world.provinces,
 		locations: world.locations,
 		nations: world.nations,
-		leaderDynasty: seedHistoryState?.leaderDynCurrent.slice(),
-		leaderNameSeed: seedHistoryState?.leaderNameSeedCurrent.slice(),
-		leaderClaim: seedHistoryState
-			? Int32Array.from(seedHistoryState.leaderClaimCurrent)
-			: undefined,
-		leaderBirthYear: seedHistoryState?.leaderBirthYearCurrent.slice(),
 		cultures: world.cultures,
 		heritages: world.heritages,
 		religions: world.religions,
@@ -329,20 +124,8 @@ function serializeWorld(
 					count: world.landmarks.count,
 				}
 			: undefined,
-		development: world.provinces
-			? Float32Array.from({ length: world.provinces.count }, (_, province) =>
-					seedHistoryState
-						? PROV.development.get(seedHistoryState, province)
-						: 0,
-				)
-			: undefined,
-		urbanPopulation: world.provinces
-			? Float32Array.from({ length: world.provinces.count }, (_, province) =>
-					seedHistoryState
-						? PROV.population.urban.get(seedHistoryState, province)
-						: 0,
-				)
-			: undefined,
+		development: world.development,
+		urbanPopulation: world.urbanPopulation,
 		population: world.population,
 		monthlyTEQ: world.monthlyTEQ,
 		dtr_annual: world.dtr_annual,
@@ -356,10 +139,8 @@ function serializeWorld(
 		settlementRegions: world.settlementRegions,
 		settlementWaterLandmarks: world.settlementWaterLandmarks,
 		settlementPortRegions: world.settlementPortRegions,
-		routes: seedHistoryState ? packRoutes(seedHistoryState.routes) : undefined,
-		network: seedHistoryState
-			? packNetwork(seedHistoryState.network)
-			: undefined,
+		routes: world.routes ? packRoutes(world.routes) : undefined,
+		network: world.network ? packNetwork(world.network) : undefined,
 	}
 }
 
@@ -666,111 +447,8 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	return Array.from(transfer)
 }
 
-function emitSimulationDone(): void {
-	if (!historyState) return
-	const timelines = serializeHistoryTimelines(historyState, historyTime)
-	const done: GenesisWorkerResponse = {
-		type: "sim-done",
-		timeMs: historyTime,
-		timelines,
-		events: historyState.events,
-	}
-	self.postMessage(done, buildTimelineTransferList(timelines))
-}
-
-async function runSimulation(tickMs = YEAR_MS): Promise<void> {
-	if (!historyState || !historyRng) return
-	simulationRunning = true
-
-	while (simulationRunning) {
-		try {
-			historyTime += tickMs
-			simulateUntil(historyState, historyTime, historyRng)
-			validateLiveHierarchy(historyState, `worker-post-simulate ${historyTime}`)
-			const frame = buildHistoryFrame(historyState)
-			const progress: GenesisWorkerResponse = {
-				type: "sim-progress",
-				timeMs: historyTime,
-				frame,
-			}
-			self.postMessage(progress, buildFrameTransferList(frame))
-		} catch (error) {
-			const err = error instanceof Error ? error : new Error(String(error))
-			const failure: GenesisWorkerResponse = {
-				type: "error",
-				message: `Simulation error at ${historyTime}: ${err.message}`,
-				stack: err.stack,
-			}
-			self.postMessage(failure)
-			simulationRunning = false
-			return
-		}
-		await new Promise((resolve) => setTimeout(resolve, 0))
-	}
-
-	emitSimulationDone()
-}
-
 self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 	const message = event.data
-
-	if (message.type === "pause") {
-		simulationRunning = false
-		return
-	}
-
-	if (message.type === "simulate") {
-		if (!lastGeneratedWorld) {
-			self.postMessage({
-				type: "error",
-				message: "No world generated yet - generate a world first",
-			} satisfies GenesisWorkerResponse)
-			return
-		}
-		if (!historyState) {
-			const world = lastGeneratedWorld
-			if (
-				!world.nations ||
-				!world.provinces ||
-				!world.population ||
-				!world.coastal ||
-				!world.riverVisible ||
-				!world.cultures
-			) {
-				self.postMessage({
-					type: "error",
-					message:
-						"World is missing nations/provinces/population - cannot simulate",
-				} satisfies GenesisWorkerResponse)
-				return
-			}
-			historyRng = createHistoryRng(world.params.seed + 99999)
-			historyState = initHistory({
-				nations: world.nations,
-				provinces: world.provinces,
-				population: world.population,
-				coastal: world.coastal,
-				waterAccess: world.waterAccess,
-				riverVisible: world.riverVisible,
-				r_xyz: world.mesh.r_xyz,
-				cultures: world.cultures,
-				era: world.params.era,
-				seed: world.params.seed,
-				landmarks: world.landmarks ?? undefined,
-				regionProvince: world.provinces?.regionProvince,
-				regionAdjOffset: world.mesh.adjOffset,
-				regionAdjList: world.mesh.adjList,
-				regionIsLand: world.isLand ?? undefined,
-				planetRadiusKm: world.params.planetRadiusKm,
-				settlementRegions: world.settlementRegions ?? undefined,
-				settlementWaterLandmarks: world.settlementWaterLandmarks ?? undefined,
-				settlementPortRegions: world.settlementPortRegions ?? undefined,
-			})
-			historyTime = historyState.time
-		}
-		void runSimulation(message.tickMs ?? YEAR_MS)
-		return
-	}
 
 	if (message.type === "pathfind") {
 		if (!lastGeneratedWorld) {
@@ -808,8 +486,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				waterDepth: null,
 				routeEdges,
 				planetRadiusKm: world.params.planetRadiusKm ?? 6371,
-				regionProvince: world.provinces.regionProvince ?? null,
-				desolate: world.provinces.desolate ?? null,
+				regionProvince: world.regionProvince,
+				desolate: world.desolate,
 			},
 			{
 				startRegion: message.startRegion,
@@ -849,65 +527,13 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			return
 		}
 
-		historyState = null
-		historyRng = null
-		historyTime = 800 * YEAR_MS
-		simulationRunning = false
-		lastGeneratedWorld = cloneHistorySeedWorld(generated)
-		const seedWorld = lastGeneratedWorld
-		if (
-			seedWorld.nations &&
-			seedWorld.provinces &&
-			seedWorld.population &&
-			seedWorld.coastal &&
-			seedWorld.waterAccess &&
-			seedWorld.riverVisible &&
-			seedWorld.cultures
-		) {
-			const t0 = performance.now()
-			progressCb("Initializing history", 80)
-			const historyTimings: StageTiming[] = []
-			historyRng = createHistoryRng(generated.params.seed + 99999)
-			historyState = initHistory({
-				nations: seedWorld.nations,
-				provinces: seedWorld.provinces,
-				population: seedWorld.population,
-				coastal: seedWorld.coastal,
-				waterAccess: seedWorld.waterAccess,
-				riverVisible: seedWorld.riverVisible,
-				r_xyz: seedWorld.mesh.r_xyz,
-				cultures: seedWorld.cultures,
-				era: seedWorld.params.era,
-				seed: generated.params.seed,
-				landmarks: seedWorld.landmarks,
-				skipRoutes: message.type === "import",
-				regionProvince: seedWorld.provinces.regionProvince,
-				regionAdjOffset: seedWorld.mesh.adjOffset,
-				regionAdjList: seedWorld.mesh.adjList,
-				regionIsLand: seedWorld.isLand,
-				planetRadiusKm: seedWorld.params.planetRadiusKm,
-				settlementRegions: seedWorld.settlementRegions,
-				settlementWaterLandmarks: seedWorld.settlementWaterLandmarks,
-				settlementPortRegions: seedWorld.settlementPortRegions,
-				timings: historyTimings,
-			})
-			historyTime = historyState.time
-			progressCb("Computing trade routes", 90)
-			generated.timings.push({
-				Stage: "initHistory",
-				ms: (performance.now() - t0).toFixed(1),
-			})
-			generated.timings.push(...historyTimings)
-		}
+		lastGeneratedWorld = clonePathfindSeedWorld(generated)
 
-		const world = serializeWorld(generated, historyState)
+		const world = serializeWorld(generated)
 		progressCb("Done", 100)
-		const frame = historyState ? buildHistoryFrame(historyState) : undefined
 		self.postMessage(
-			{ type: "done", world, frame } satisfies GenesisWorkerResponse,
-			frame
-				? [...buildTransferList(world), ...buildFrameTransferList(frame)]
-				: buildTransferList(world),
+			{ type: "done", world } satisfies GenesisWorkerResponse,
+			buildTransferList(world),
 		)
 	} catch (error) {
 		const err = error instanceof Error ? error : new Error(String(error))

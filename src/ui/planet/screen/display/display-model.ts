@@ -1,10 +1,4 @@
 import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
-import type { HistoryView } from "../history/history-query"
-
-interface HistoryChildrenIndex {
-	childOffset: Int32Array
-	childList: Int32Array
-}
 
 export interface DisplayNationModel {
 	assignment: Int32Array
@@ -12,52 +6,6 @@ export interface DisplayNationModel {
 	colorById: Map<number, [number, number, number]>
 	toActualId: (displayNationId: number) => number | null
 	toDisplayId: (actualNationId: number) => number | null
-}
-
-function buildSovereignRulerFields(params: {
-	world: SerializedGenesisWorld | null | undefined
-	fallbackLength?: number
-}): {
-	leaderDynasty: Int32Array
-	leaderNameSeed: Int32Array
-	leaderClaim: Int32Array
-	leaderBirthYear: Float32Array
-} {
-	const { world, fallbackLength = 0 } = params
-	const provinceCount =
-		world?.provinces?.count ??
-		world?.nations?.assignment.length ??
-		fallbackLength
-	const leaderDynasty = new Int32Array(provinceCount).fill(-1)
-	const leaderNameSeed = new Int32Array(provinceCount).fill(-1)
-	const leaderClaim = new Int32Array(provinceCount)
-	const leaderBirthYear = new Float32Array(provinceCount).fill(-1)
-	if (!world?.nations) {
-		return {
-			leaderDynasty,
-			leaderNameSeed,
-			leaderClaim,
-			leaderBirthYear,
-		}
-	}
-
-	for (let province = 0; province < provinceCount; province++) {
-		const isSovereign =
-			(world.nations.parent?.[province] ?? -1) < 0 &&
-			(world.nations.sovereign?.[province] ?? -1) >= 0
-		if (!isSovereign) continue
-		leaderDynasty[province] = world.leaderDynasty?.[province] ?? -1
-		leaderNameSeed[province] = world.leaderNameSeed?.[province] ?? -1
-		leaderClaim[province] = world.leaderClaim?.[province] ?? 0
-		leaderBirthYear[province] = world.leaderBirthYear?.[province] ?? -1
-	}
-
-	return {
-		leaderDynasty,
-		leaderNameSeed,
-		leaderClaim,
-		leaderBirthYear,
-	}
 }
 
 function buildBaseNationColors(world: SerializedGenesisWorld): Float32Array {
@@ -132,97 +80,29 @@ export function buildNationAdjacency(
 	return { adjOffset, adjList }
 }
 
-export function buildHistoryChildrenIndex(
-	selectedHistoryView: HistoryView | null,
-): HistoryChildrenIndex | null {
-	if (!selectedHistoryView) return null
-	if (selectedHistoryView.childOffset && selectedHistoryView.childList) {
-		return {
-			childOffset: selectedHistoryView.childOffset,
-			childList: selectedHistoryView.childList,
-		}
-	}
-	const parent = selectedHistoryView.parent
-	const childOffset = new Int32Array(parent.length + 1)
-	for (let province = 0; province < parent.length; province++) {
-		const ancestor = parent[province]
-		if (ancestor >= 0) childOffset[ancestor + 1]++
-	}
-	for (let province = 0; province < parent.length; province++) {
-		childOffset[province + 1] += childOffset[province]
-	}
-	const childList = new Int32Array(childOffset[parent.length])
-	const cursor = childOffset.slice()
-	for (let province = 0; province < parent.length; province++) {
-		const ancestor = parent[province]
-		if (ancestor < 0) continue
-		childList[cursor[ancestor]++] = province
-	}
-	selectedHistoryView.childOffset = childOffset
-	selectedHistoryView.childList = childList
-	return { childOffset, childList }
-}
-
 export function buildDisplayWorld(params: {
 	world: SerializedGenesisWorld | null
-	selectedHistoryView: HistoryView | null
-	selectedHistoryChildren: HistoryChildrenIndex | null
 }): SerializedGenesisWorld | null {
-	const { world, selectedHistoryView, selectedHistoryChildren } = params
+	const { world } = params
 	if (!world) return null
 	const base = world
 
 	if (!base.nations || !base.provinces) return base
 
-	if (!selectedHistoryView) {
-		const sovereignRulerFields = buildSovereignRulerFields({ world: base })
-		const assignment = base.nations.sovereign.slice()
-		const size = new Int32Array(base.provinces.count)
-		for (let province = 0; province < assignment.length; province++) {
-			const sovereign = assignment[province]
-			if (sovereign >= 0) size[sovereign] += 1
-		}
-		return {
-			...base,
-			leaderDynasty: sovereignRulerFields.leaderDynasty,
-			leaderNameSeed: sovereignRulerFields.leaderNameSeed,
-			leaderClaim: sovereignRulerFields.leaderClaim,
-			leaderBirthYear: sovereignRulerFields.leaderBirthYear,
-			nations: {
-				...base.nations,
-				assignment,
-				colors: buildBaseNationColors(base),
-				size,
-			},
-		}
+	const assignment = base.nations.sovereign.slice()
+	const size = new Int32Array(base.provinces.count)
+	for (let province = 0; province < assignment.length; province++) {
+		const sovereign = assignment[province]
+		if (sovereign >= 0) size[sovereign] += 1
 	}
-
 	return {
 		...base,
-		leaderDynasty: selectedHistoryView.leaderDynasty,
-		leaderNameSeed: selectedHistoryView.leaderNameSeed,
-		leaderClaim: selectedHistoryView.leaderClaim,
-		leaderBirthYear: selectedHistoryView.leaderBirthYear,
 		nations: {
 			...base.nations,
-			assignment: selectedHistoryView.assignment,
-			parent: selectedHistoryView.parent,
-			childOffset:
-				selectedHistoryChildren?.childOffset ?? base.nations.childOffset,
-			childList: selectedHistoryChildren?.childList ?? base.nations.childList,
-			sovereign: selectedHistoryView.sovereign,
-			colors: selectedHistoryView.colors,
-			activeRebelWars:
-				selectedHistoryView.activeWars?.filter((w) => w.rebel) ?? [],
+			assignment,
+			colors: buildBaseNationColors(base),
+			size,
 		},
-		population: base.population
-			? {
-					...base.population,
-					population: selectedHistoryView.populationTotal,
-				}
-			: undefined,
-		urbanPopulation: selectedHistoryView.populationUrban,
-		development: selectedHistoryView.development,
 	}
 }
 

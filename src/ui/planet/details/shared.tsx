@@ -12,15 +12,6 @@ export type { DistributionBucket }
 export interface NationDetailsData {
 	id: number
 	name: string
-	ruler?: {
-		name: string
-		age: number | null
-		genderSymbol: string | null
-		claimStrength: string | null
-		isRegency: boolean
-		dynasty: string | null
-		dynastyColor: string | null
-	} | null
 	provinceCount: number
 	totalPopulation: number
 	color: string | null
@@ -28,16 +19,6 @@ export interface NationDetailsData {
 		id: number
 		name: string
 		color: string | null
-		relation: string
-		threat: number | null
-	}>
-	activeWars: Array<{
-		id: number
-		opponentId: number
-		opponentName: string
-		opponentColor: string | null
-		role: string
-		rebel: boolean
 	}>
 	governmentType: string | null
 	governmentColor: string | null

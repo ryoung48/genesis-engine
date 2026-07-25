@@ -32,12 +32,6 @@ export function fanoutRangesForSize(size: number): FanoutRanges {
 	return DUCHY_FANOUT
 }
 
-/** Max direct children before a node is considered overextended, given nation size. */
-export function maxFanoutForNationSize(size: number): number {
-	const ranges = fanoutRangesForSize(size)
-	return ranges[0]?.[1] ?? Infinity
-}
-
 const TRIBUTE = 0.25
 const OVEREXTENSION = 0.9
 const URBAN_POP_SCALE = 10_000

@@ -6,7 +6,6 @@ import type {
 	GenesisProvinces,
 	StageTiming,
 } from ".."
-import type { HistoryNote } from "../history"
 
 interface SerializedSphereMesh {
 	numRegions: number
@@ -218,90 +217,6 @@ export interface SerializedGenesisWorld {
 	network?: SerializedNetwork
 }
 
-export interface SerializedProvinceTimelineInt {
-	times: Float64Array
-	values: Int32Array
-	offsets: Int32Array
-}
-
-export interface SerializedProvinceTimelineFloat {
-	times: Float64Array
-	values: Float32Array
-	offsets: Int32Array
-}
-
-interface SerializedRelationTimelines {
-	aIdx: Int32Array
-	bIdx: Int32Array
-	offsets: Int32Array
-	times: Float64Array
-	values: Int32Array
-}
-
-export interface SerializedTimelines {
-	P: number
-	startTimeMs: number
-	endTimeMs: number
-	parent: SerializedProvinceTimelineInt
-	assignment: SerializedProvinceTimelineInt
-	populationRural: SerializedProvinceTimelineFloat
-	populationUrban: SerializedProvinceTimelineFloat
-	development: SerializedProvinceTimelineFloat
-	consumption: SerializedProvinceTimelineFloat
-	leaderDynasty: SerializedProvinceTimelineInt
-	leaderNameSeed?: SerializedProvinceTimelineInt
-	leaderClaim: SerializedProvinceTimelineInt
-	leaderBirthYear?: SerializedProvinceTimelineFloat
-	occupation: SerializedProvinceTimelineInt
-	cultureBlendSecondary: SerializedProvinceTimelineInt
-	cultureBlendWeight: SerializedProvinceTimelineFloat
-	relations: SerializedRelationTimelines
-	nationColorKeys: Int32Array
-	nationColorValues: Float32Array
-	wars: Array<{
-		idx: number
-		attacker: number
-		defender: number
-		startTime: number
-		endTime?: number
-		rebel: boolean
-	}>
-}
-
-export interface SerializedHistoryFrame {
-	timeMs: number
-	assignment: Int32Array
-	parent: Int32Array
-	sovereign: Int32Array
-	leaderDynasty: Int32Array
-	leaderNameSeed: Int32Array
-	leaderClaim: Int32Array
-	leaderBirthYear: Float32Array
-	colors: Float32Array
-	populationTotal: Float32Array
-	populationUrban: Float32Array
-	development: Float32Array
-	consumption: Float32Array
-	nationWealth: Float32Array
-	nationOptimalWealth: Float32Array
-	relationA: Int32Array
-	relationB: Int32Array
-	relationValues: Uint8Array
-	activeWars: Array<{
-		idx: number
-		attacker: number
-		defender: number
-		rebel: boolean
-		occupied: number[]
-	}>
-	sovereignCount: number
-	totalPopulation: number
-	/** Per-province secondary (bleeding) culture index. -1 = no blend. */
-	cultureBlendSecondary: Int32Array
-	/** Per-province blend weight [0, 1]. 0 = pure primary culture. */
-	cultureBlendWeight: Float32Array
-}
-
 export const ROUTE_LAND_MAJOR = 0
 export const ROUTE_LAND_MINOR = 1
 export const ROUTE_SEA = 2
@@ -461,13 +376,6 @@ export type GenesisWorkerRequest =
 			params: GenesisParams
 	  }
 	| {
-			type: "simulate"
-			tickMs?: number
-	  }
-	| {
-			type: "pause"
-	  }
-	| {
 			type: "import"
 			params: {
 				seed: number
@@ -582,23 +490,11 @@ export type GenesisWorkerResponse =
 	| {
 			type: "done"
 			world: SerializedGenesisWorld
-			frame?: SerializedHistoryFrame
 	  }
 	| {
 			type: "error"
 			message: string
 			stack?: string
-	  }
-	| {
-			type: "sim-progress"
-			timeMs: number
-			frame: SerializedHistoryFrame
-	  }
-	| {
-			type: "sim-done"
-			timeMs: number
-			timelines: SerializedTimelines
-			events: HistoryNote[]
 	  }
 	| {
 			type: "pathfind-result"

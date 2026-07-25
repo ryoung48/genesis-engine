@@ -1,12 +1,8 @@
 import type { GenesisParams } from "@/model"
-import type { HistoryNote } from "@/model/history"
-import { MONTH_MS } from "@/model/history/state"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
-	SerializedHistoryFrame,
-	SerializedTimelines,
 } from "@/model/transport/worker-types"
 export type GenerationParams = GenesisParams
 
@@ -110,14 +106,7 @@ export interface GenerationCallbacks {
 	setSeed: (v: number) => void
 	setWorld: (v: SerializedGenesisWorld | null) => void
 	workerRef: React.MutableRefObject<Worker | null>
-	onGenerationFrame?: (frame: SerializedHistoryFrame) => void
 	onGenerationComplete?: () => void
-	onSimProgress?: (timeMs: number, frame: SerializedHistoryFrame) => void
-	onSimComplete?: (
-		timeMs: number,
-		timelines: SerializedTimelines,
-		events: HistoryNote[],
-	) => void
 	onPathfindResult?: (result: {
 		pathRegions: Int32Array
 		distanceKm: number
@@ -156,18 +145,6 @@ function createWorker(
 		}
 		if (message.type === "done") {
 			onDone(message, worker)
-			return
-		}
-		if (message.type === "sim-progress") {
-			callbacks.onSimProgress?.(message.timeMs, message.frame)
-			return
-		}
-		if (message.type === "sim-done") {
-			callbacks.onSimComplete?.(
-				message.timeMs,
-				message.timelines,
-				message.events,
-			)
 			return
 		}
 		if (message.type === "error") {
@@ -272,35 +249,16 @@ export function generateWorld(
 			callbacks,
 			(message, _w) => {
 				callbacks.setWorld(message.world)
-				if (message.frame) callbacks.onGenerationFrame?.(message.frame)
 				callbacks.setGenerationLabel("Done")
 				callbacks.setGenerationProgress(100)
 				callbacks.setGenerating(false)
 				callbacks.onGenerationComplete?.()
-				// Keep worker alive for simulation
+				// Keep the worker alive to serve pathfind requests.
 			},
 			"Generation failed",
 		)
 		worker.postMessage(request)
 	})
-}
-
-export function startSimulation(
-	workerRef: React.MutableRefObject<Worker | null>,
-): void {
-	const worker = workerRef.current
-	if (!worker) return
-	const request: GenesisWorkerRequest = { type: "simulate", tickMs: MONTH_MS }
-	worker.postMessage(request)
-}
-
-export function pauseSimulation(
-	workerRef: React.MutableRefObject<Worker | null>,
-): void {
-	const worker = workerRef.current
-	if (!worker) return
-	const request: GenesisWorkerRequest = { type: "pause" }
-	worker.postMessage(request)
 }
 
 export function importHeightmap(

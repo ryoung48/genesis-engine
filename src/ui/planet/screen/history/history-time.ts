@@ -1,4 +1,11 @@
-import { YEAR_MS } from "@/model/history/state"
+/**
+ * Length of a year on the history time axis. Earth-imported history runs in
+ * the earth-history engine's own day units, but eu4DaysToYear and
+ * historyYearToTime share this same linear year axis so the scrubber can
+ * address both. Previously imported from the procedural history sim's state
+ * module, which no longer exists.
+ */
+const YEAR_MS = 365 * 24 * 60 * 60 * 1000
 
 const HISTORY_DAY_STEP_MS = YEAR_MS / 365
 const HISTORY_MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -7,7 +14,7 @@ export function historyYearToTime(year: number): number {
 	return year * YEAR_MS
 }
 
-export function historyTimeToYear(timeMs: number): number {
+function historyTimeToYear(timeMs: number): number {
 	return Math.floor(timeMs / YEAR_MS)
 }
 

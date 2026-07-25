@@ -189,7 +189,8 @@ export function resolveSocietyGovernmentType(params: {
 	governmentType: string | null
 	governmentReform?: string | null
 }): GovernmentType {
-	const family = getEarthHistoryGovernmentFamily(params.governmentType) ?? "monarchy"
+	const family =
+		getEarthHistoryGovernmentFamily(params.governmentType) ?? "monarchy"
 	const reform = params.governmentReform?.trim().toLowerCase() || null
 
 	if (reform) {

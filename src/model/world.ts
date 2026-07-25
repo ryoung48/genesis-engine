@@ -116,6 +116,14 @@ export interface GenesisWorld {
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
 	settlementPortRegions?: Int32Array
+	/** Per-province urban population from the urbanization stage. */
+	urbanPopulation?: Float32Array
+	/** Per-province development in [0, 1] from the urbanization stage. */
+	development?: Float32Array
+	/** Trade and road routes between settlements. */
+	routes?: import("./transport/worker-types").Route[]
+	/** Deduplicated route network edges, for rendering and pathfinding. */
+	network?: import("./transport/worker-types").RouteEdge[]
 	continentCount: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]
