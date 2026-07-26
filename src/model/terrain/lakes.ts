@@ -1,5 +1,11 @@
 ﻿import type { GenesisRainfall, SphereMesh } from ".."
 import { MinHeap } from "../shared"
+import type {
+	SelectCompactLakeFallbackParams,
+	TrimLakeCorridorsParams,
+	SelectConnectedLakeCellsParams,
+	ComputeLakesParams,
+} from "./types"
 
 function computeSubgraphNeighborCount(
 	numRegions: number,
@@ -70,14 +76,14 @@ function estimateSubgraphDiameter(
 	return bfs(first.farthest).distance
 }
 
-function selectCompactLakeFallback(
-	numRegions: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	elevation: Float32Array,
-	lakeCells: number[],
-	targetCellCount: number,
-): number[] {
+function selectCompactLakeFallback({
+	numRegions,
+	adjOffset,
+	adjList,
+	elevation,
+	lakeCells,
+	targetCellCount,
+}: SelectCompactLakeFallbackParams): number[] {
 	if (lakeCells.length === 0 || targetCellCount <= 0) return []
 
 	const allowed = new Uint8Array(numRegions)
@@ -123,14 +129,14 @@ function selectCompactLakeFallback(
 	return compactCells
 }
 
-function trimLakeCorridors(
-	numRegions: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	elevation: Float32Array,
-	basinCells: number[],
-	lakeCells: number[],
-): { lakeCells: number[]; lakeSurface: number } {
+function trimLakeCorridors({
+	numRegions,
+	adjOffset,
+	adjList,
+	elevation,
+	basinCells,
+	lakeCells,
+}: TrimLakeCorridorsParams): { lakeCells: number[]; lakeSurface: number } {
 	if (lakeCells.length === 0) return { lakeCells: [], lakeSurface: 0 }
 	if (lakeCells.length <= 3) {
 		return { lakeCells, lakeSurface: computeLakeSurface(lakeCells, elevation) }
@@ -238,14 +244,14 @@ function trimLakeCorridors(
 	if (trimmedLakeCells.length === 0) {
 		const fallbackTarget =
 			lakeCells.length <= 3 ? lakeCells.length : Math.min(2, lakeCells.length)
-		const fallbackLakeCells = selectCompactLakeFallback(
+		const fallbackLakeCells = selectCompactLakeFallback({
 			numRegions,
 			adjOffset,
 			adjList,
 			elevation,
 			lakeCells,
-			fallbackTarget,
-		)
+			targetCellCount: fallbackTarget,
+		})
 		return {
 			lakeCells: fallbackLakeCells,
 			lakeSurface: computeLakeSurface(fallbackLakeCells, elevation),
@@ -258,14 +264,17 @@ function trimLakeCorridors(
 	}
 }
 
-function selectConnectedLakeCells(
-	numRegions: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	elevation: Float32Array,
-	basinCells: number[],
-	targetCellCount: number,
-): { lakeCells: number[]; lakeSurface: number } {
+function selectConnectedLakeCells({
+	numRegions,
+	adjOffset,
+	adjList,
+	elevation,
+	basinCells,
+	targetCellCount,
+}: SelectConnectedLakeCellsParams): {
+	lakeCells: number[]
+	lakeSurface: number
+} {
 	if (basinCells.length === 0 || targetCellCount <= 0) {
 		return { lakeCells: [], lakeSurface: 0 }
 	}
@@ -313,26 +322,26 @@ function selectConnectedLakeCells(
 		}
 	}
 
-	return trimLakeCorridors(
+	return trimLakeCorridors({
 		numRegions,
 		adjOffset,
 		adjList,
 		elevation,
 		basinCells,
 		lakeCells,
-	)
+	})
 }
 
-export function computeLakes(
-	mesh: Pick<SphereMesh, "numRegions" | "adjOffset" | "adjList">,
-	elevation: Float32Array,
-	rainfall: Pick<GenesisRainfall, "annual">,
-	waterLevel: Float32Array,
-	basinId: Int32Array,
-	isLand: Uint8Array,
-	emergedLand?: Uint8Array,
-	elevationKm?: Float32Array,
-): void {
+export function computeLakes({
+	mesh,
+	elevation,
+	rainfall,
+	waterLevel,
+	basinId,
+	isLand,
+	emergedLand,
+	elevationKm,
+}: ComputeLakesParams): void {
 	const { numRegions: N, adjOffset, adjList } = mesh
 	const lakes = new Uint8Array(N)
 
@@ -367,14 +376,14 @@ export function computeLakes(
 			continue
 		}
 		const targetCellCount = Math.ceil(inflow / EVAP_RATE)
-		const { lakeCells, lakeSurface } = selectConnectedLakeCells(
-			N,
+		const { lakeCells, lakeSurface } = selectConnectedLakeCells({
+			numRegions: N,
 			adjOffset,
 			adjList,
 			elevation,
-			allCells,
+			basinCells: allCells,
 			targetCellCount,
-		)
+		})
 		for (const c of lakeCells) {
 			lakes[c] = 1
 			waterLevel[c] = lakeSurface

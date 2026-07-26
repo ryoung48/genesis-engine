@@ -1,14 +1,12 @@
 import * as THREE from "three"
 import type { Text } from "troika-three-text"
-import {
-	derivePlanetMassKg,
-	MOON,
-	moonSemiMajorAxisM,
-} from "@/model/celestial/moons"
-import type { OrbitClassification } from "@/model/celestial/orbit-body"
+import { MOON } from "@/model/celestial/moons"
+import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import { SOLAR_DIAMETER_KM } from "@/model/celestial/orbit-body"
-import { type MainSequenceClass, STAR } from "@/model/celestial/star"
-import type { SystemBody } from "@/model/celestial/system"
+import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
+import { STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -263,14 +261,14 @@ function measureBodyMoonSystemOuterRadius(
 	if (body.moons.length === 0) return sceneRadius
 
 	const planetRadiusKm = body.diameterKm / 2
-	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 	const parentOccupiedRadiusRelativeToPlanet =
 		body.rings?.outerRadiusRelative ?? 1
 
 	const outerRadiusInMoonOverlayUnits = measureMoonOrbitOuterRadiusForDisplay({
 		orbits: body.moons.map((moon) => ({
 			orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
-				moonSemiMajorAxisM({ moon, planetMassKg }),
+				MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }),
 				planetRadiusKm,
 			),
 			eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
@@ -876,14 +874,7 @@ export function buildSolarSystemOverlay(
 			const a = (i / ORBIT_SEGMENTS) * TWO_PI
 			orbitPoints.push(
 				p.kepler
-					? orbitPoint(
-							a,
-							p.kepler.a,
-							p.kepler.b,
-							p.kepler.ae,
-							p.kepler.P,
-							p.kepler.Q,
-						)
+					? orbitPoint(a, p.kepler.a, p.kepler.b, p.kepler.ae, p.kepler.P, p.kepler.Q)
 					: new THREE.Vector3(
 							p.orbitRadius * Math.cos(a),
 							p.orbitRadius * Math.sin(a),
@@ -983,14 +974,7 @@ export function buildSolarSystemOverlay(
 			const a = (i / ORBIT_SEGMENTS) * TWO_PI
 			orbitPoints.push(
 				p.kepler
-					? orbitPoint(
-							a,
-							p.kepler.a,
-							p.kepler.b,
-							p.kepler.ae,
-							p.kepler.P,
-							p.kepler.Q,
-						)
+					? orbitPoint(a, p.kepler.a, p.kepler.b, p.kepler.ae, p.kepler.P, p.kepler.Q)
 					: new THREE.Vector3(
 							p.orbitRadius * Math.cos(a),
 							p.orbitRadius * Math.sin(a),
@@ -1059,14 +1043,7 @@ export function buildSolarSystemOverlay(
 			const period = periodDaysFor(p.kepler.a)
 			const M = mod2pi(p.meanAnomalyAtEpoch + (TWO_PI * day) / period)
 			const E = solveKepler(M, p.kepler.e)
-			const pos = orbitPoint(
-				E,
-				p.kepler.a,
-				p.kepler.b,
-				p.kepler.ae,
-				p.kepler.P,
-				p.kepler.Q,
-			)
+			const pos = orbitPoint(E, p.kepler.a, p.kepler.b, p.kepler.ae, p.kepler.P, p.kepler.Q)
 			p.bodyGroup.position.copy(pos)
 			p.moonState?.setDay(day)
 		}
@@ -1121,23 +1098,11 @@ export function buildSolarSystemOverlay(
 
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
 		if (starNameLabel && starNameLeader) {
-			updateLabelPlacement(
-				starNameLabel,
-				starNameLeader,
-				starRadius,
-				IDENTITY_QUATERNION,
-				camera,
-			)
+			updateLabelPlacement(starNameLabel, starNameLeader, starRadius, IDENTITY_QUATERNION, camera)
 		}
 		for (const p of placed) {
 			if (p.nameLabel && p.nameLeader) {
-				updateLabelPlacement(
-					p.nameLabel,
-					p.nameLeader,
-					p.sceneRadius,
-					IDENTITY_QUATERNION,
-					camera,
-				)
+				updateLabelPlacement(p.nameLabel, p.nameLeader, p.sceneRadius, IDENTITY_QUATERNION, camera)
 			}
 			p.moonState?.updateLabelOrientations?.(camera)
 		}

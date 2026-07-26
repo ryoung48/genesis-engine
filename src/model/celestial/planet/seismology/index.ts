@@ -1,34 +1,12 @@
 ﻿import { createRng } from "@/model/shared/rng"
-import {
-	computeMoonTidalHeating,
-	computeResidualHeating,
-} from "./seismology/heating"
-import { describeRegime, nextSeismologyClass } from "./seismology/reclassify"
-
-export {
-	computeMoonTidalHeatingRaw,
-	MAX_SAFE_MOON_TIDAL_HEATING,
-} from "./seismology/heating"
-
-interface SeismologyProfile {
-	residualHeating: number
-	tidalHeating: number
-	surfaceTidesHeating: number
-	totalHeating: number
-	regime: "dead" | "low" | "active" | "extreme"
-}
-
-import type { MoonBody } from "../moons"
-import type { OrbitClassification } from "../orbit-body"
-import type { MainSequenceClass } from "../star"
-import type { SystemBody } from "../system"
-import {
-	buildClassificationEnvironment,
-	classifyGroup,
-	estimateDeviationFromOrbitalDistance,
-	zoneFromDeviation,
-} from "./environment"
-import type { SeedForMoonInput } from "./seismology/types"
+import type { MoonBody } from "../../moons/types"
+import type { OrbitClassification } from "../../orbit-body/types"
+import type { MainSequenceClass } from "../../star/types"
+import type { SystemBody } from "../../system/types"
+import { ENVIRONMENT } from "../environment"
+import { HEATING } from "./heating"
+import { RECLASSIFY } from "./reclassify"
+import type { SeedForMoonInput, SeismologyProfile } from "./types"
 
 function seedForBody(body: SystemBody): number {
 	return (body.idx + 2) * 10_007 + Math.round(body.orbitalDistanceAU * 1_000)
@@ -62,7 +40,7 @@ function applyBodySeismology(params: {
 	}
 
 	const densityEarthRelative = body.density?.earthRelative ?? 0
-	const residualHeating = computeResidualHeating({
+	const residualHeating = HEATING.computeResidualHeating({
 		sizeClass: body.sizeClass,
 		starAgeGyr,
 		densityEarthRelative,
@@ -80,7 +58,7 @@ function applyBodySeismology(params: {
 		tidalHeating: 0,
 		surfaceTidesHeating,
 		totalHeating,
-		regime: describeRegime(totalHeating),
+		regime: RECLASSIFY.describeRegime(totalHeating),
 	}
 	return { ...body, seismology }
 }
@@ -102,9 +80,9 @@ function applyMoonSeismology(params: {
 		surfaceTidesHeating,
 	} = params
 	const sizeClass = moon.sizeClass ?? 0
-	const group = moon.group ?? classifyGroup({ sizeClass })
+	const group = moon.group ?? ENVIRONMENT.classifyGroup({ sizeClass })
 	const densityEarthRelative = moon.density?.earthRelative ?? 0
-	const residualHeating = computeResidualHeating({
+	const residualHeating = HEATING.computeResidualHeating({
 		sizeClass,
 		starAgeGyr,
 		densityEarthRelative,
@@ -112,16 +90,16 @@ function applyMoonSeismology(params: {
 		isMoon: true,
 		group,
 	})
-	const tidalHeating = computeMoonTidalHeating({ parent, moon })
+	const tidalHeating = HEATING.computeMoonTidalHeating({ parent, moon })
 	const totalHeating = residualHeating + tidalHeating + surfaceTidesHeating
-	const deviation = estimateDeviationFromOrbitalDistance({
+	const deviation = ENVIRONMENT.estimateDeviationFromOrbitalDistance({
 		orbitalDistanceAU: parent.orbitalDistanceAU,
 		luminositySol: starLuminositySol,
 	})
-	const zone = zoneFromDeviation(deviation)
+	const zone = ENVIRONMENT.zoneFromDeviation(deviation)
 	const currentClassification =
 		(moon.classification as OrbitClassification | undefined) ?? "rockball"
-	const nextClassification = nextSeismologyClass({
+	const nextClassification = RECLASSIFY.nextSeismologyClass({
 		current: currentClassification,
 		group,
 		zone,
@@ -133,7 +111,7 @@ function applyMoonSeismology(params: {
 	const shouldReclassify = nextClassification !== currentClassification
 	const nextGroup = group
 	const rerolled = shouldReclassify
-		? buildClassificationEnvironment({
+		? ENVIRONMENT.buildClassificationEnvironment({
 				rng: createRng(seedForMoon({ parent, moon })),
 				group: nextGroup,
 				classification: nextClassification,
@@ -166,12 +144,12 @@ function applyMoonSeismology(params: {
 			tidalHeating,
 			surfaceTidesHeating,
 			totalHeating,
-			regime: describeRegime(totalHeating),
+			regime: RECLASSIFY.describeRegime(totalHeating),
 		},
 	}
 }
 
-export function applySystemSeismology(params: {
+function applySystemSeismology(params: {
 	bodies: SystemBody[]
 	starAgeGyr: number
 	starLuminositySol: number
@@ -186,7 +164,10 @@ export function applySystemSeismology(params: {
 	 * caller re-runs this over anyway once real generation params are known)
 	 * that can't supply real numbers yet -- surfaceTidesHeating is then 0. */
 	getSurfaceTidesHeatingForBody?: (body: SystemBody) => number
-	getSurfaceTidesHeatingForMoon?: (parent: SystemBody, moon: MoonBody) => number
+	getSurfaceTidesHeatingForMoon?: (params: {
+		parent: SystemBody
+		moon: MoonBody
+	}) => number
 }): SystemBody[] {
 	return params.bodies.map((body) => {
 		const seismologyBody = applyBodySeismology({
@@ -202,15 +183,18 @@ export function applySystemSeismology(params: {
 				starLuminositySol: params.starLuminositySol,
 				spectralClass: params.spectralClass,
 				surfaceTidesHeating:
-					params.getSurfaceTidesHeatingForMoon?.(seismologyBody, moon) ?? 0,
+					params.getSurfaceTidesHeatingForMoon?.({
+						parent: seismologyBody,
+						moon,
+					}) ?? 0,
 			}),
 		)
 		const currentClassification = seismologyBody.classification
-		const nextClassification = nextSeismologyClass({
+		const nextClassification = RECLASSIFY.nextSeismologyClass({
 			current: currentClassification,
 			group: seismologyBody.group,
-			zone: zoneFromDeviation(
-				estimateDeviationFromOrbitalDistance({
+			zone: ENVIRONMENT.zoneFromDeviation(
+				ENVIRONMENT.estimateDeviationFromOrbitalDistance({
 					orbitalDistanceAU: seismologyBody.orbitalDistanceAU,
 					luminositySol: params.starLuminositySol,
 				}),
@@ -223,16 +207,16 @@ export function applySystemSeismology(params: {
 		if (nextClassification === currentClassification) {
 			return { ...seismologyBody, moons }
 		}
-		const deviation = estimateDeviationFromOrbitalDistance({
+		const deviation = ENVIRONMENT.estimateDeviationFromOrbitalDistance({
 			orbitalDistanceAU: seismologyBody.orbitalDistanceAU,
 			luminositySol: params.starLuminositySol,
 		})
-		const rerolled = buildClassificationEnvironment({
+		const rerolled = ENVIRONMENT.buildClassificationEnvironment({
 			rng: createRng(seedForBody(seismologyBody)),
 			group: seismologyBody.group,
 			classification: nextClassification,
 			sizeClass: seismologyBody.sizeClass,
-			zone: zoneFromDeviation(deviation),
+			zone: ENVIRONMENT.zoneFromDeviation(deviation),
 			deviation,
 			spectralClass: params.spectralClass,
 			diameterKm: seismologyBody.diameterKm,
@@ -255,4 +239,10 @@ export function applySystemSeismology(params: {
 			moons,
 		}
 	})
+}
+
+export const SEISMOLOGY = {
+	applySystemSeismology,
+	computeMoonTidalHeatingRaw: HEATING.computeMoonTidalHeatingRaw,
+	MAX_SAFE_MOON_TIDAL_HEATING: HEATING.MAX_SAFE_MOON_TIDAL_HEATING,
 }

@@ -7,6 +7,7 @@ import type {
 	SphereMesh,
 } from ".."
 import { MinHeap, smoothstep } from "../shared"
+import type { ComputeRiversParams } from "./types"
 
 function polylineLengthKm(
 	line: [number, number, number, number][],
@@ -30,18 +31,15 @@ function polylineLengthKm(
 	return sum
 }
 
-export function computeRivers(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-	rainfall: GenesisRainfall,
-	climate: GenesisClimate,
-	hydrology: GenesisHydrology,
-	isLand: Uint8Array,
-	params?: Pick<
-		GenesisParams,
-		"planetRadiusKm" | "daysPerYear" | "hoursPerDay"
-	>,
-): GenesisRivers {
+export function computeRivers({
+	mesh,
+	elevation,
+	rainfall,
+	climate,
+	hydrology,
+	isLand,
+	params,
+}: ComputeRiversParams): GenesisRivers {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
 	const DEG = 180 / Math.PI

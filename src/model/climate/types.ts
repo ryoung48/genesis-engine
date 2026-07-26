@@ -1,6 +1,23 @@
-export type { PastaDebug } from "./pasta"
+import type { MainSequenceClass } from "../celestial/star/types"
+import type { GenesisLandmarks } from "../terrain"
+import type {
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisOceanCurrents,
+	GenesisParams,
+	GenesisRainfall,
+	SphereMesh,
+} from "../types"
+import type { WindSurface } from "./wind"
+export type PastaDebug = {
+	gdd: Float32Array
+	gint: Float32Array
+	gdd_monthly: Float32Array
+	gint_monthly: Float32Array
+	minT: Float32Array
+	maxT: Float32Array
+}
 export type { TidalSchedule } from "./tidal-schedule"
-export type { WindArrowData } from "./wind"
 
 export type ApparentTemperatureParams = {
 	tempC: number
@@ -34,14 +51,14 @@ export type FillPetMonthlyHargreavesParams = {
 
 export type RefreshClimatePetMonthlyParams = {
 	climate: Pick<
-		import("../types").GenesisClimate,
+		GenesisClimate,
 		| "temperature_monthly"
 		| "temperature_monthly_range"
 		| "insolation_monthly"
 		| "pet_monthly"
 	>
 	/** Optional day-count conversion used when deriving monthly PET. */
-	params?: Pick<import("../types").GenesisParams, "daysPerYear">
+	params?: Pick<GenesisParams, "daysPerYear">
 }
 
 export type ComputeAetFromPetParams = {
@@ -51,39 +68,39 @@ export type ComputeAetFromPetParams = {
 }
 
 export type ComputeHydrologyFieldsParams = {
-	climate: Pick<import("../types").GenesisClimate, "pet_monthly">
-	rainfall: Pick<import("../types").GenesisRainfall, "monthly">
+	climate: Pick<GenesisClimate, "pet_monthly">
+	rainfall: Pick<GenesisRainfall, "monthly">
 	isLand: Uint8Array
 }
 
 export type ComputeLandFractionParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	isLand: Uint8Array
 }
 
 export type ComputeMonthlyDaylightHoursParams = {
-	mesh: import("../types").SphereMesh
-	params: import("../types").GenesisParams
+	mesh: SphereMesh
+	params: GenesisParams
 }
 
 export type ApplyDtrToClimateMinMaxParams = {
-	climate: import("../types").GenesisClimate
+	climate: GenesisClimate
 	dtr_monthly: Float32Array
 	N: number
 }
 
 export type ComputeTemperatureParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	elevation: Float32Array
 	landFraction: number[]
-	params: import("../types").GenesisParams
+	params: GenesisParams
 	oceanDist?: Float32Array
 	isLand?: Uint8Array
 	elevation_km?: Float32Array
 }
 
 export type ApplyTemperatureNoiseParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	N: number
 	seed: number
 	temperature_monthly: Float32Array
@@ -107,6 +124,205 @@ export type MonthlyLibrationParams = {
 	eccentricity: number
 	perihelion: number
 }
+
+export type GdmParams = {
+	temp: number
+	monthDays: number
+	base: number
+	platStart: number
+	platEnd: number
+	comp: number
+}
+
+export type GddiDayParams = {
+	insolationWm2: number
+	baseline: number
+}
+
+export type GddTotalParams = {
+	gdd: Float64Array
+	gint: Float64Array
+	gddAcc: Float64Array
+	giAcc: Float64Array
+	threshold: number
+}
+
+export type PastaClassificationBuffers = {
+	temps: Float64Array
+	insol: Float64Array
+	mGDDz: Float64Array
+	mGInt: Float64Array
+	gddAccBuf: Float64Array
+	giAccBuf: Float64Array
+}
+
+export type ClassifyOceanParams = PastaClassificationBuffers & {
+	iceMin: number
+	iceMax: number
+	dpm: number
+	warmest: number
+	coldest: number
+}
+
+export type ClassifyLandParams = PastaClassificationBuffers & {
+	rain: Float64Array
+	petBuf: Float64Array
+	aetBuf: Float64Array
+	mGDD: Float64Array
+	iceVal: number
+	dpm: number
+	warmest: number
+	coldest: number
+}
+
+export type ComputePastaZonesParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	temperatureMonthly: Float32Array
+	temperatureMax: Float32Array
+	temperatureMin: Float32Array
+	insolationMonthly: Float32Array
+	rainfallMonthly: Float32Array
+	petMonthly: Float32Array
+	aetMonthly: Float32Array
+	params: GenesisParams
+	/** Omitted when no ice model has been computed. */
+	iceThickness?: Float32Array
+	/** Omitted when no monthly minimum ice values have been computed. */
+	iceMinMonthly?: Float32Array
+	/** Omitted when no monthly maximum ice values have been computed. */
+	iceMaxMonthly?: Float32Array
+}
+
+export type AssignPastaClimateParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	climate: GenesisClimate
+	rainfall: GenesisRainfall
+	hydrology: GenesisHydrology
+	params: GenesisParams
+	/** Omitted when no ice model has been computed. */
+	iceThickness?: Float32Array
+	/** Omitted when no monthly minimum ice values have been computed. */
+	iceMinMonthly?: Float32Array
+	/** Omitted when no monthly maximum ice values have been computed. */
+	iceMaxMonthly?: Float32Array
+}
+
+export type AssignEarthPastaClimateParams = Omit<
+	AssignPastaClimateParams,
+	"hydrology"
+> & {
+	/** Omitted when observed monthly temperature ranges are unavailable. */
+	realDtrMonthly?: Float32Array
+}
+
+export type BuildRegionGraphParams = {
+	mesh: SphereMesh
+	mask: Uint8Array
+}
+
+export type ComputeRainBandWarpFieldParams = {
+	mesh: SphereMesh
+	seed: number
+	amplitudeDeg: number
+	/** Omitted to generate a warp value for every mesh region. */
+	regions?: ArrayLike<number>
+}
+
+export type BuildRainRegionMaskParams = {
+	isLand: Uint8Array
+	/** Omitted when every land cell should be eligible for rainfall. */
+	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">
+}
+
+export type ComputeThermalEquatorParams = {
+	mesh: SphereMesh
+	temps: Float32Array
+	/** Omitted to use the standard 120 longitude bins. */
+	numBins?: number
+}
+
+export type ComputeAdvectionParams = {
+	mesh: SphereMesh
+	elevation: Float32Array
+	distCoast: Float32Array
+	/** Omitted when annual thermal-equator steering is unavailable. */
+	climate?: GenesisClimate
+	/** Accepts a radius directly for callers that only have that value. */
+	params?: number | Pick<GenesisParams, "planetRadiusKm">
+	isLand: Uint8Array
+	/** Omitted when elevation must be derived from the normalized field. */
+	elevation_km?: Float32Array
+}
+
+export type ComputeRainWeightParams = {
+	cellLat: number
+	teq: number
+	eastMoisture: number
+	westMoisture: number
+	daysPerYear: number
+	bandOffsetDeg: number
+}
+
+export type ComputeMonthlyRainParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	eastAdv: Float32Array
+	westAdv: Float32Array
+	isLand: Uint8Array
+	/** Omitted only in callers without generation settings. */
+	params?: GenesisParams
+	/** Omitted to derive thermal equator fields from monthly temperatures. */
+	monthlyTEQ?: Float32Array[]
+	/** Omitted when coastal distance does not influence rainfall. */
+	distCoast?: Float32Array
+	/** Omitted when landmarks do not alter the rain mask. */
+	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">
+}
+
+export type TideContributionParams = {
+	bodyLatRad: number
+	bodyLonRad: number
+	bodyDistanceM: number
+	bodyMassKg: number
+	surfaceLatRad: number
+	surfaceLonRad: number
+	planetMassKg: number
+	planetRadiusM: number
+}
+
+export type MoonMoonTideContributionParams = {
+	raisedMoonRadiusM: number
+	raisedMoonMassKg: number
+	raisingMoonMassKg: number
+	separationM: number
+}
+
+export type StarTidalPositionParams = {
+	orbitalDistanceAU: number
+	planetEccentricity: number
+	perihelionLonDeg: number
+	t: number
+	daysPerYear: number
+}
+
+export type StarTideContributionParams = {
+	starLatRad: number
+	starLonRad: number
+	starDistanceM: number
+	spectralClass: MainSequenceClass
+	starSubtype: number
+	surfaceLatRad: number
+	surfaceLonRad: number
+	planetMassKg: number
+	planetRadiusM: number
+}
+
+export type ApparentDiameterRadParams = {
+	bodyDiameterM: number
+	distanceM: number
+}
 export type LockedDeclinationParams = {
 	obliquity: number
 	eccentricity: number
@@ -118,9 +334,9 @@ export type SubstellarDirectionParams = {
 	declinationRad: number
 }
 export type LockedMonthlyDaylightHoursParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	params: Pick<
-		import("../types").GenesisParams,
+		GenesisParams,
 		| "substellarLon"
 		| "eccentricity"
 		| "hoursPerDay"
@@ -130,38 +346,183 @@ export type LockedMonthlyDaylightHoursParams = {
 }
 
 export type ComputeTidalTemperatureParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	elevation: Float32Array
 	landFraction: number[]
-	params: import("../types").GenesisParams
+	params: GenesisParams
 	oceanDist?: Float32Array
 	elevation_km?: Float32Array
 }
 
 export type ComputeLockedOceanCurrentsParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	isLand: Uint8Array
-	landmarks: import("../terrain/landmarks").GenesisLandmarks
-	params?: Partial<import("../types").GenesisParams>
+	landmarks: GenesisLandmarks
+	params?: Partial<GenesisParams>
 }
 
 export type ApplyLockedCurrentTemperatureEffectParams = {
-	mesh: import("../types").SphereMesh
-	climate: import("../types").GenesisClimate
+	mesh: SphereMesh
+	climate: GenesisClimate
 	isLand: Uint8Array
-	currents: import("../types").GenesisOceanCurrents
-	params?: Partial<import("../types").GenesisParams>
+	currents: GenesisOceanCurrents
+	params?: Partial<GenesisParams>
 }
 
 export type BuildLockedOceanCurrentGridParams = {
-	mesh: import("../types").SphereMesh
+	mesh: SphereMesh
 	oceanWarmth: Float32Array
 	isLand: Uint8Array
 	latDeg: Float32Array
 	lonDeg: Float32Array
 	params?: Pick<
-		import("../types").GenesisParams,
+		GenesisParams,
 		"substellarLon" | "eccentricity" | "obliquity" | "perihelion"
 	>
 	currentMonth?: number
+}
+
+export type ComputeCycloneRiskParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	topography: Uint8Array
+	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">
+	oceanCurrents?: GenesisOceanCurrents | null
+}
+
+export type ComputeIceAccumulationParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	rainfall: GenesisRainfall
+	isLand: Uint8Array
+	distCoast: Float32Array
+	cycles?: number
+	planetRadiusKm?: number
+}
+
+export type AssignKoppenClimateParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	temperatureMonthly: Float32Array
+	rainfallMonthly: Float32Array
+}
+
+export type SampleMonthlyFloatRasterParams = {
+	mesh: SphereMesh
+	raster: Int16Array
+	rasterW: number
+	rasterH: number
+	months: number
+	scale: number
+	nodata: number
+}
+
+export type ComputeTidalRainParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	params?: Pick<
+		GenesisParams,
+		| "seed"
+		| "substellarLon"
+		| "obliquity"
+		| "pressure"
+		| "eccentricity"
+		| "perihelion"
+		| "planetRadiusKm"
+	>
+	distCoast?: Float32Array
+}
+
+export type ComputeLockedWindVectorsParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	elevation_km: Float32Array
+	params?: Pick<
+		GenesisParams,
+		"substellarLon" | "obliquity" | "eccentricity" | "perihelion" | "pressure"
+	>
+	month?: number
+	surface?: WindSurface
+}
+
+export type ComputeOceanCurrentsParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	distCoast: Float32Array
+	landmarks: GenesisLandmarks
+	params?: Pick<
+		Partial<GenesisParams>,
+		| "substellarLon"
+		| "eccentricity"
+		| "obliquity"
+		| "perihelion"
+		| "planetRadiusKm"
+		| "tideLock"
+		| "hoursPerDay"
+	>
+	monthlyTEQ?: Float32Array[]
+}
+
+export type ApplyCurrentTemperatureEffectParams = {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	isLand: Uint8Array
+	currents: GenesisOceanCurrents
+	monthlyTEQ?: Float32Array[]
+	params?: Pick<
+		GenesisParams,
+		"substellarLon" | "eccentricity" | "obliquity" | "perihelion" | "tideLock"
+	>
+}
+
+export type BuildOceanCurrentGridParams = {
+	mesh: SphereMesh
+	oceanWarmth: Float32Array
+	isLand: Uint8Array
+	latDeg: Float32Array
+	lonDeg: Float32Array
+	reverseCirculation?: boolean
+	planetRadiusKm?: number
+}
+
+export type ComputeTornadoRiskParams = {
+	mesh: SphereMesh
+	temperatureAvg: Float32Array
+	temperatureMax: Float32Array
+	temperatureMin: Float32Array
+	isLand: Uint8Array
+	topography: Uint8Array
+	vegetation: Uint8Array
+	oceanDist: Float32Array
+	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">
+}
+
+export type AssignClimateZonesParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	temperatureAvg: Float32Array
+	temperatureMin: Float32Array
+	temperatureMax: Float32Array
+}
+
+export type AssignEarthClimateZonesParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	climate: GenesisClimate
+}
+
+export type AssignVegetationParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	climate: GenesisClimate
+	rainfall: GenesisRainfall
+	rng: () => number
+	/** Omitted when Pasta zones are unavailable and the fallback classifier is used. */
+	pastaZones?: Uint8Array
+	/** Omitted when no growing-degree-day diagnostics were computed. */
+	gdd?: Float32Array
+	/** Omitted when no growing-aridity diagnostics were computed. */
+	gar?: Float32Array
 }

@@ -1,15 +1,11 @@
 ﻿import { createRng } from "@/model/shared"
+import type { CultureGenderSystem, LeaderGender } from "./types"
 
 export const CULTURE_GENDER_SYSTEM = {
 	PATRIARCHAL: 0,
 	EQUAL: 1,
 	MATRIARCHAL: 2,
 } as const
-
-export type CultureGenderSystem =
-	(typeof CULTURE_GENDER_SYSTEM)[keyof typeof CULTURE_GENDER_SYSTEM]
-
-type LeaderGender = "male" | "female"
 
 function hashSeed(seed: number): number {
 	let value = Math.trunc(seed) | 0

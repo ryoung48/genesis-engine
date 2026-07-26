@@ -6,16 +6,17 @@
  * than procedural climate) and any other caller wanting the same sampling.
  */
 import type { GenesisWorld, SphereMesh } from ".."
+import type { SampleMonthlyFloatRasterParams } from "./types"
 
-export function sampleMonthlyFloatRaster(
-	mesh: SphereMesh,
-	raster: Int16Array,
-	rasterW: number,
-	rasterH: number,
-	months: number,
-	scale: number,
-	nodata: number,
-): Float32Array {
+export function sampleMonthlyFloatRaster({
+	mesh,
+	raster,
+	rasterW,
+	rasterH,
+	months,
+	scale,
+	nodata,
+}: SampleMonthlyFloatRasterParams): Float32Array {
 	const N = mesh.numRegions
 	const { r_xyz } = mesh
 	const out = new Float32Array(months * N)
@@ -103,15 +104,15 @@ export function attachObservedEarthClimate(params: {
 	if (realClimateMonths !== 12) return
 
 	const N = mesh.numRegions
-	const observedMonthly = sampleMonthlyFloatRaster(
+	const observedMonthly = sampleMonthlyFloatRaster({
 		mesh,
-		realClimateMonthly,
-		realClimateWidth,
-		realClimateHeight,
-		realClimateMonths,
-		realClimateScale,
-		realClimateNoData,
-	)
+		raster: realClimateMonthly,
+		rasterW: realClimateWidth,
+		rasterH: realClimateHeight,
+		months: realClimateMonths,
+		scale: realClimateScale,
+		nodata: realClimateNoData,
+	})
 	const observedAnnual = new Float32Array(N)
 	const diffMonthly = new Float32Array(N * realClimateMonths)
 	const diffAnnual = new Float32Array(N)
@@ -167,15 +168,15 @@ export function attachObservedEarthRainfall(params: {
 	if (realPrecipMonths !== 12) return
 
 	const N = mesh.numRegions
-	const observedMonthly = sampleMonthlyFloatRaster(
+	const observedMonthly = sampleMonthlyFloatRaster({
 		mesh,
-		realPrecipMonthly,
-		realPrecipWidth,
-		realPrecipHeight,
-		realPrecipMonths,
-		realPrecipScale,
-		realPrecipNoData,
-	)
+		raster: realPrecipMonthly,
+		rasterW: realPrecipWidth,
+		rasterH: realPrecipHeight,
+		months: realPrecipMonths,
+		scale: realPrecipScale,
+		nodata: realPrecipNoData,
+	})
 	const observedAnnual = new Float32Array(N)
 	const diffMonthly = new Float32Array(N * realPrecipMonths)
 	const diffAnnual = new Float32Array(N)
@@ -234,15 +235,15 @@ export function attachObservedEarthDtr(params: {
 	if (realDtrMonths !== 12) return
 
 	const N = mesh.numRegions
-	const observedMonthly = sampleMonthlyFloatRaster(
+	const observedMonthly = sampleMonthlyFloatRaster({
 		mesh,
-		realDtrMonthly,
-		realDtrWidth,
-		realDtrHeight,
-		realDtrMonths,
-		realDtrScale,
-		realDtrNoData,
-	)
+		raster: realDtrMonthly,
+		rasterW: realDtrWidth,
+		rasterH: realDtrHeight,
+		months: realDtrMonths,
+		scale: realDtrScale,
+		nodata: realDtrNoData,
+	})
 	const observedAnnual = new Float32Array(N)
 	const diffMonthly = new Float32Array(N * realDtrMonths)
 	const diffAnnual = new Float32Array(N)

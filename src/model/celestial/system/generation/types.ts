@@ -1,6 +1,8 @@
-import type { MoonBody } from "../../moons"
-import type { AtmosphereProfile, TideLock } from "../../orbit-body"
-import type { MainSequenceClass } from "../../star"
+import type { MoonBody } from "../../moons/types"
+import type { AtmosphereProfile, TideLock } from "../../orbit-body/types"
+import type { MainSequenceClass } from "../../star/types"
+
+export type DensityComposition = "ice" | "rocky" | "metallic"
 
 /** Inputs used to hydrate the authored Sol main world or a generated world. */
 export interface HomeWorldParams {

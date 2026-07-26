@@ -1,5 +1,8 @@
-import type { SharedRng } from "../../shared/rng"
-import type { AtmosphereProfile, OrbitBody } from "../orbit-body"
+import type {
+	AtmosphereProfile,
+	OrbitBody,
+} from "@/model/celestial/orbit-body/types"
+import type { SharedRng } from "@/model/shared/rng"
 
 export type MoonOrbitRange = "inner" | "middle" | "outer" | "extreme"
 type ParentOrbitGroup =

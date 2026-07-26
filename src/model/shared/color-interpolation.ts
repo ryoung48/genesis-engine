@@ -1,4 +1,5 @@
 import { clamp01 } from "./math"
+import type { BasisParams } from "./types"
 
 export type RgbColor = [number, number, number]
 
@@ -76,13 +77,7 @@ export function sampleColorStops(
 	return mixRgb(stops[index], stops[index + 1], scaled - index)
 }
 
-function basis(
-	t: number,
-	v0: number,
-	v1: number,
-	v2: number,
-	v3: number,
-): number {
+function basis({ t, v0, v1, v2, v3 }: BasisParams): number {
 	const t2 = t * t
 	const t3 = t2 * t
 	return (
@@ -118,8 +113,8 @@ export function sampleBasisColorStops(
 			: ([2 * v2[0] - v1[0], 2 * v2[1] - v1[1], 2 * v2[2] - v1[2]] as RgbColor)
 
 	return [
-		basis(localT, v0[0], v1[0], v2[0], v3[0]),
-		basis(localT, v0[1], v1[1], v2[1], v3[1]),
-		basis(localT, v0[2], v1[2], v2[2], v3[2]),
+		basis({ t: localT, v0: v0[0], v1: v1[0], v2: v2[0], v3: v3[0] }),
+		basis({ t: localT, v0: v0[1], v1: v1[1], v2: v2[1], v3: v3[1] }),
+		basis({ t: localT, v0: v0[2], v1: v1[2], v2: v2[2], v3: v3[2] }),
 	]
 }

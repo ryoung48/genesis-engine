@@ -1,10 +1,7 @@
 import * as THREE from "three"
-import type { MoonBody } from "@/model/celestial/moons"
-import {
-	derivePlanetMassKg,
-	MOON,
-	moonSemiMajorAxisM,
-} from "@/model/celestial/moons"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import { MOON } from "@/model/celestial/moons"
+import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -263,7 +260,7 @@ export function buildMoonOrbitOverlay(
 		}
 	}
 
-	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 	// Scale all orbits to fit between 1.3 and 2.6 scene units
 	// (planet surface = 1.0 scene unit).
 	const SCENE_MIN = 1.35
@@ -284,7 +281,7 @@ export function buildMoonOrbitOverlay(
 	)
 	const orbitPeriapses = layoutMoonOrbitPeriapsesForDisplay({
 		orbits: moons.map((moon, index) => {
-			const smaM = moonSemiMajorAxisM({ moon, planetMassKg })
+			const smaM = MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg })
 			return {
 				orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
 					smaM,

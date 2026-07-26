@@ -47,6 +47,11 @@ import {
 } from "../terrain"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
+import type {
+	SampleBilinearParams,
+	SampleSingleBandFloatRasterParams,
+	SampleCategoricalRasterParams,
+} from "./types"
 
 interface ImportParams {
 	seed: number
@@ -186,13 +191,13 @@ function createTimingRecorder() {
 
 // ── Bilinear sampling ──────────────────────────────────────────────
 
-function sampleBilinear(
-	pixels: Uint8Array,
-	imgW: number,
-	imgH: number,
-	px: number,
-	py: number,
-): number {
+function sampleBilinear({
+	pixels,
+	imgW,
+	imgH,
+	px,
+	py,
+}: SampleBilinearParams): number {
 	py = Math.max(0, Math.min(py, imgH - 1))
 	const x0 = Math.floor(px)
 	const y0 = Math.floor(py)
@@ -238,7 +243,7 @@ function sampleHeightmap(
 		const px = (lon / Math.PI + 1) * 0.5 * imgW
 		const py = (0.5 - lat / Math.PI) * imgH
 
-		const gray = sampleBilinear(grayscale, imgW, imgH, px, py)
+		const gray = sampleBilinear({ pixels: grayscale, imgW, imgH, px, py })
 		elevation[r] = grayscaleToElevation(gray)
 	}
 
@@ -249,14 +254,14 @@ function sampleHeightmap(
  * same equirectangular lon/lat -> pixel convention. Returns NaN for regions
  * where every bilinear tap is nodata (e.g. ocean, for a land-only raster
  * like WorldClim elevation). */
-function sampleSingleBandFloatRaster(
-	mesh: SphereMesh,
-	raster: Int16Array,
-	rasterW: number,
-	rasterH: number,
-	scale: number,
-	nodata: number,
-): Float32Array {
+function sampleSingleBandFloatRaster({
+	mesh,
+	raster,
+	rasterW,
+	rasterH,
+	scale,
+	nodata,
+}: SampleSingleBandFloatRasterParams): Float32Array {
 	const N = mesh.numRegions
 	const { r_xyz } = mesh
 	const out = new Float32Array(N)
@@ -345,15 +350,15 @@ function attachObservedEarthHumidity(params: {
 		return
 
 	const N = mesh.numRegions
-	const observedVaporPressureMonthly = sampleMonthlyFloatRaster(
+	const observedVaporPressureMonthly = sampleMonthlyFloatRaster({
 		mesh,
-		realVaporPressureMonthly,
-		realVaporPressureWidth,
-		realVaporPressureHeight,
-		realVaporPressureMonths,
-		realVaporPressureScale,
-		realVaporPressureNoData,
-	)
+		raster: realVaporPressureMonthly,
+		rasterW: realVaporPressureWidth,
+		rasterH: realVaporPressureHeight,
+		months: realVaporPressureMonths,
+		scale: realVaporPressureScale,
+		nodata: realVaporPressureNoData,
+	})
 	const observedMonthly = new Float32Array(N * realVaporPressureMonths)
 	const observedAnnual = new Float32Array(N)
 
@@ -424,13 +429,13 @@ function sampleCoastlineMask(
 // codes aren't a continuous field, so interpolating them is meaningless.
 // Returns -1 for regions the raster has no coverage for (nodata, or outside
 // the EU5 map's extent).
-function sampleCategoricalRaster(
-	mesh: SphereMesh,
-	raster: Int16Array,
-	rasterW: number,
-	rasterH: number,
-	nodata: number,
-): Int16Array {
+function sampleCategoricalRaster({
+	mesh,
+	raster,
+	rasterW,
+	rasterH,
+	nodata,
+}: SampleCategoricalRasterParams): Int16Array {
 	const N = mesh.numRegions
 	const { r_xyz } = mesh
 	const out = new Int16Array(N)
@@ -858,13 +863,13 @@ export function importGenesisWorld(
 	// Post-processing
 	if (params.terrainWarp > 0) {
 		t0 = performance.now()
-		warpTerrain(
+		warpTerrain({
 			mesh,
-			elevation,
-			params.seed,
-			params.terrainWarp,
-			new Float32Array(mesh.numRegions),
-		)
+			elev: elevation,
+			seed: params.seed,
+			strength: params.terrainWarp,
+			r_hotspot: new Float32Array(mesh.numRegions),
+		})
 		record(`Terrain warp (strength=${params.terrainWarp.toFixed(2)})`, t0)
 	}
 
@@ -887,7 +892,13 @@ export function importGenesisWorld(
 		const smoothIters = Math.round(1 + params.smoothing * 4)
 		const smoothStr = 0.2 + params.smoothing * 0.5
 		t0 = performance.now()
-		smoothElevation(mesh, elevation, r_isOcean, smoothIters, smoothStr)
+		smoothElevation({
+			mesh,
+			elev: elevation,
+			r_isOcean,
+			iterations: smoothIters,
+			strength: smoothStr,
+		})
 		record(`Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`, t0)
 	}
 
@@ -920,12 +931,24 @@ export function importGenesisWorld(
 		const rsIters = Math.round(1 + params.ridgeSharpening * 3)
 		const rsStr = params.ridgeSharpening * 0.08
 		t0 = performance.now()
-		sharpenRidges(mesh, elevation, r_isOcean, rsIters, rsStr)
+		sharpenRidges({
+			mesh,
+			elev: elevation,
+			r_isOcean,
+			iterations: rsIters,
+			strength: rsStr,
+		})
 		record(`Ridge sharpening (${rsIters} iters)`, t0)
 	}
 
 	t0 = performance.now()
-	applySoilCreep(mesh, elevation, r_isOcean, 3, 0.1125)
+	applySoilCreep({
+		mesh,
+		elev: elevation,
+		r_isOcean,
+		iterations: 3,
+		strength: 0.1125,
+	})
 	record("Soil creep (3 iters)", t0)
 	onProgress?.("import:post", 20)
 
@@ -1042,14 +1065,14 @@ export function importGenesisWorld(
 		params.realElevationScale !== undefined &&
 		params.realElevationNoData !== undefined
 	) {
-		const realElevationM = sampleSingleBandFloatRaster(
+		const realElevationM = sampleSingleBandFloatRaster({
 			mesh,
-			params.realElevationRaster,
-			params.realElevationWidth,
-			params.realElevationHeight,
-			params.realElevationScale,
-			params.realElevationNoData,
-		)
+			raster: params.realElevationRaster,
+			rasterW: params.realElevationWidth,
+			rasterH: params.realElevationHeight,
+			scale: params.realElevationScale,
+			nodata: params.realElevationNoData,
+		})
 		for (let r = 0; r < mesh.numRegions; r++) {
 			const realKm = realElevationM[r] / 1000
 			if (Number.isFinite(realKm)) elevation_km[r] = realKm
@@ -1061,39 +1084,39 @@ export function importGenesisWorld(
 		params.eu5TopographyWidth &&
 		params.eu5TopographyHeight &&
 		params.eu5TopographyNoData !== undefined
-			? sampleCategoricalRaster(
+			? sampleCategoricalRaster({
 					mesh,
-					params.eu5TopographyRaster,
-					params.eu5TopographyWidth,
-					params.eu5TopographyHeight,
-					params.eu5TopographyNoData,
-				)
+					raster: params.eu5TopographyRaster,
+					rasterW: params.eu5TopographyWidth,
+					rasterH: params.eu5TopographyHeight,
+					nodata: params.eu5TopographyNoData,
+				})
 			: undefined
 	const eu5Vegetation =
 		params.eu5VegetationRaster &&
 		params.eu5VegetationWidth &&
 		params.eu5VegetationHeight &&
 		params.eu5VegetationNoData !== undefined
-			? sampleCategoricalRaster(
+			? sampleCategoricalRaster({
 					mesh,
-					params.eu5VegetationRaster,
-					params.eu5VegetationWidth,
-					params.eu5VegetationHeight,
-					params.eu5VegetationNoData,
-				)
+					raster: params.eu5VegetationRaster,
+					rasterW: params.eu5VegetationWidth,
+					rasterH: params.eu5VegetationHeight,
+					nodata: params.eu5VegetationNoData,
+				})
 			: undefined
 	const eu5Climate =
 		params.eu5ClimateRaster &&
 		params.eu5ClimateWidth &&
 		params.eu5ClimateHeight &&
 		params.eu5ClimateNoData !== undefined
-			? sampleCategoricalRaster(
+			? sampleCategoricalRaster({
 					mesh,
-					params.eu5ClimateRaster,
-					params.eu5ClimateWidth,
-					params.eu5ClimateHeight,
-					params.eu5ClimateNoData,
-				)
+					raster: params.eu5ClimateRaster,
+					rasterW: params.eu5ClimateWidth,
+					rasterH: params.eu5ClimateHeight,
+					nodata: params.eu5ClimateNoData,
+				})
 			: undefined
 
 	let realRivers: ReturnType<typeof buildRealRiversData> | undefined
@@ -1127,13 +1150,13 @@ export function importGenesisWorld(
 		params.eu4ProvincesNoData !== undefined
 	) {
 		t0 = performance.now()
-		eu4ProvinceIds = sampleCategoricalRaster(
+		eu4ProvinceIds = sampleCategoricalRaster({
 			mesh,
-			params.eu4ProvincesRaster,
-			params.eu4ProvincesWidth,
-			params.eu4ProvincesHeight,
-			params.eu4ProvincesNoData,
-		)
+			raster: params.eu4ProvincesRaster,
+			rasterW: params.eu4ProvincesWidth,
+			rasterH: params.eu4ProvincesHeight,
+			nodata: params.eu4ProvincesNoData,
+		})
 		record("EU4 province raster sampling", t0)
 	}
 
@@ -1212,12 +1235,12 @@ export function importGenesisWorld(
 
 	if (post.climate.real_temperature_monthly && post.rainfall.real_monthly) {
 		t0 = performance.now()
-		post.realKoppenClimate = assignKoppenClimate(
+		post.realKoppenClimate = assignKoppenClimate({
 			mesh,
 			isLand,
-			post.climate.real_temperature_monthly,
-			post.rainfall.real_monthly,
-		)
+			temperatureMonthly: post.climate.real_temperature_monthly,
+			rainfallMonthly: post.rainfall.real_monthly,
+		})
 		record("Observed Earth koppen classification", t0)
 	}
 

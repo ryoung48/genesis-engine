@@ -18,6 +18,7 @@ import {
 	warThreat,
 	wealthOptimal,
 } from "../state"
+import type { RunBattleParams } from "./types"
 
 type VictoryDegree =
 	| "decisive"
@@ -78,18 +79,24 @@ function findReconquestTarget(_state: HistoryState, war: War): number | null {
 	return war.occupied.length > 0 ? war.occupied[war.occupied.length - 1] : null
 }
 
-export function runBattle(
-	state: HistoryState,
-	warIdx: number,
-	eventAttacker: number,
-	eventDefender: number,
-	rng: HistoryRng,
-): void {
+export function runBattle({
+	state,
+	warIdx,
+	eventAttacker,
+	eventDefender,
+	rng,
+}: RunBattleParams): void {
 	const war = state.wars[warIdx]
 	if (war.endTime !== undefined) return
 
 	if (!isSovereign(state, war.attacker) || !isSovereign(state, war.defender)) {
-		resolveWar(state, war, rng, false, "nations no longer sovereign")
+		resolveWar({
+			state,
+			war,
+			rng,
+			victory: false,
+			stalemate: "nations no longer sovereign",
+		})
 		return
 	}
 
@@ -99,7 +106,13 @@ export function runBattle(
 		: findInvasionTarget(state, war, rng)
 
 	if (target === null) {
-		resolveWar(state, war, rng, false, "no valid target found")
+		resolveWar({
+			state,
+			war,
+			rng,
+			victory: false,
+			stalemate: "no valid target found",
+		})
 		return
 	}
 
@@ -154,30 +167,36 @@ export function runBattle(
 	const occupiedCount = war.occupied.length
 
 	if (outcome && restoration && occupiedCount === 0) {
-		resolveWar(state, war, rng)
+		resolveWar({ state, war, rng })
 	} else if (outcome && target === war.defender) {
-		resolveWar(state, war, rng, true)
+		resolveWar({ state, war, rng, victory: true })
 	} else if (atkExhausted && defExhausted) {
-		resolveWar(state, war, rng, false, "both nations exhausted")
+		resolveWar({
+			state,
+			war,
+			rng,
+			victory: false,
+			stalemate: "both nations exhausted",
+		})
 	} else if (eventAttacker === war.attacker && occupiedCount === 0) {
 		if (atkExhausted) {
-			resolveWar(state, war, rng)
+			resolveWar({ state, war, rng })
 		} else {
-			queueBattleEvent(
+			queueBattleEvent({
 				state,
-				war.idx,
-				war.attacker,
-				war.defender,
-				state.time + deltaMonth(rng.uniform(4, 24)),
-			)
+				warIdx: war.idx,
+				attacker: war.attacker,
+				defender: war.defender,
+				time: state.time + deltaMonth(rng.uniform(4, 24)),
+			})
 		}
 	} else {
-		queueBattleEvent(
+		queueBattleEvent({
 			state,
-			war.idx,
-			outcome ? eventAttacker : eventDefender,
-			outcome ? eventDefender : eventAttacker,
-			state.time + deltaMonth(rng.uniform(4, 24)),
-		)
+			warIdx: war.idx,
+			attacker: outcome ? eventAttacker : eventDefender,
+			defender: outcome ? eventDefender : eventAttacker,
+			time: state.time + deltaMonth(rng.uniform(4, 24)),
+		})
 	}
 }

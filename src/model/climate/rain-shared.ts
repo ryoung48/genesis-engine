@@ -1,5 +1,8 @@
-import type { SphereMesh } from ".."
 import { piecewise, SimplexNoise } from "../shared"
+import type {
+	BuildRegionGraphParams,
+	ComputeRainBandWarpFieldParams,
+} from "./types"
 
 export const ceilingScale = (x: number) =>
 	piecewise(
@@ -12,7 +15,7 @@ export function getPressureRainFactor(pressure: number | undefined): number {
 	return Math.pow(1 / (pressure ?? 1.0), 0.4)
 }
 
-export function buildRegionGraph(mesh: SphereMesh, mask: Uint8Array) {
+export function buildRegionGraph({ mesh, mask }: BuildRegionGraphParams) {
 	const { adjOffset, adjList } = mesh
 	const landRegions: number[] = []
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -43,12 +46,12 @@ export function buildRegionGraph(mesh: SphereMesh, mask: Uint8Array) {
 	return { landRegions, landNeighborOffset, landNeighborList }
 }
 
-export function computeRainBandWarpField(
-	mesh: SphereMesh,
-	seed: number,
-	amplitudeDeg: number,
-	regions?: ArrayLike<number>,
-): Float32Array {
+export function computeRainBandWarpField({
+	mesh,
+	seed,
+	amplitudeDeg,
+	regions,
+}: ComputeRainBandWarpFieldParams): Float32Array {
 	const N = mesh.numRegions
 	const warpXNoise = new SimplexNoise(seed + 4011)
 	const warpYNoise = new SimplexNoise(seed + 4012)

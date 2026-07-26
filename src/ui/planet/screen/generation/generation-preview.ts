@@ -1,3 +1,4 @@
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 export const GENERATION_PREVIEW_TABS = [
 	["climate", "CLIMATE"],
 	["insolation", "INSOL"],
@@ -7,7 +8,7 @@ export const GENERATION_PREVIEW_TABS = [
 export type GenerationPreviewTab = (typeof GENERATION_PREVIEW_TABS)[number][0]
 
 interface GenerationPreviewParams {
-	tideLock: import("@/model/celestial/orbit-body").TideLock | null
+	tideLock: TideLock | null
 	obliquity: number
 	eccentricity: number
 	perihelion: number

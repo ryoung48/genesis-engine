@@ -9,19 +9,17 @@
  * urban/development layer.
  */
 
-import type { GenesisParams } from ".."
-import type { GenesisNationHierarchy, GenesisProvinces } from "../types"
-import { GOVERNMENT_TYPES, type GovernmentType } from "./eras"
-import type { ProvincePopulation } from "./population"
+import { GOVERNMENT_TYPES } from "./eras"
 import { getSettlementEraTuning } from "./settlement-tuning"
+import type {
+	GovernmentType,
+	NationProfile,
+	UrbanizationInputs,
+	UrbanizationResult,
+} from "./types"
 
 // 1444 Urban Demographics Ruleset (two-input edition): each government type
 // carries its own urbanization share (U) and rank-size steepness (q).
-interface NationProfile {
-	U: number
-	q: number
-}
-
 const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 	// tribal — negligible true urbanization, flat-to-moderate hierarchy
 	chiefdom: { U: 0.015, q: 0.9 }, // single hereditary seat, no real hierarchy
@@ -114,33 +112,6 @@ function urbanPopToDev(pop: number): number {
 
 /** Max spread distance in province hops (simplified from km-based) */
 const MAX_SPREAD_HOPS = 20
-
-/**
- * Runs mid-pipeline, before the GenesisWorld literal is assembled, so it takes
- * the world's sub-objects directly the same way deriveProvinceSociety does
- * rather than the (fully optional) world type.
- */
-interface UrbanizationInputs {
-	params: Pick<GenesisParams, "era">
-	provinces: Pick<
-		GenesisProvinces,
-		"count" | "desolate" | "adjOffset" | "adjList" | "waterAccess"
-	>
-	nations: Pick<
-		GenesisNationHierarchy,
-		"parent" | "depth" | "sovereign" | "governmentType"
-	>
-	population: Pick<ProvincePopulation, "population" | "habitability">
-}
-
-interface UrbanizationResult {
-	/** Per-province urban population. */
-	urbanPopulation: Float32Array
-	/** Per-province rural population (total minus urban). */
-	ruralPopulation: Float32Array
-	/** Per-province development in [0, 1]. */
-	development: Float32Array
-}
 
 /**
  * Distributes each nation's population across a rank-size settlement

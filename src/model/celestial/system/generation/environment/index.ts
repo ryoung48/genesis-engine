@@ -1,9 +1,10 @@
 import type { createRng } from "../../../../shared/rng"
-import type { MoonBody } from "../../../moons"
-import type { OrbitGroup } from "../../../orbit-body"
-import type { ClassifiedEnvironment, Zone } from "../../../planet"
+import type { MoonBody } from "../../../moons/types"
+import type { OrbitGroup } from "../../../orbit-body/types"
 import { PLANET } from "../../../planet"
-import type { MainSequenceClass } from "../../../star"
+import type { ClassifiedEnvironment } from "../../../planet/environment/classification/dice-table/types"
+import type { Zone } from "../../../planet/types"
+import type { MainSequenceClass } from "../../../star/types"
 import type { SystemBody } from "../../types"
 
 export const EPISTELLAR_DEVIATIONS = [2.25, 1.75, 1.25]
@@ -11,8 +12,6 @@ export const INNER_DEVIATIONS = [0.75, 0, -0.75]
 export const OUTER_DEVIATIONS = [
 	-1.25, -1.75, -2.25, -2.75, -3.25, -3.75, -4, -4.25, -4.5,
 ]
-
-export type { Slot } from "./types"
 
 export function buildBodyEnvironment(params: {
 	rng: ReturnType<typeof createRng>
@@ -233,13 +232,17 @@ const MAX_MOON_ECCENTRICITY_SAFETY_ATTEMPTS = 8
 // knob (eccentricity, which the heating formula is most sensitive to) a
 // bounded number of times and drops the moon entirely if no safe orbit is
 // found, exactly like galaxy-gen's discard-and-reroll loop.
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function enforceMoonTidalSafety(
-	rng: ReturnType<typeof createRng>,
-	parentMassKg: number,
-	parentDiameterKm: number,
-	moon: MoonBody,
-): MoonBody | null {
+export function enforceMoonTidalSafety({
+	rng,
+	parentMassKg,
+	parentDiameterKm,
+	moon,
+}: {
+	rng: ReturnType<typeof createRng>
+	parentMassKg: number
+	parentDiameterKm: number
+	moon: MoonBody
+}): MoonBody | null {
 	const heatingFor = (eccentricity: number) =>
 		PLANET.computeMoonTidalHeatingRaw({
 			parentMassKg,

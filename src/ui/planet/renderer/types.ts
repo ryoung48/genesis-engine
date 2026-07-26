@@ -1,11 +1,19 @@
-﻿import type { MoonBody } from "@/model/celestial/moons"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import type { WindArrowData } from "@/model/climate"
+import type {
+	Eu4ProvinceBorderGeometry,
+	Eu4ProvinceFillGeometry,
+} from "@/model/earth"
 import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
 } from "@/model/transport"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
+import type {
+	ColorForRawId,
+	ElevationKmForLonLat,
+} from "./eu4-nation-fill-overlay"
 import type { SolarSystemOverlayParams } from "./solar-system-overlay"
 
 export type { WindArrowData }
@@ -201,4 +209,204 @@ export interface GenesisScene {
 	setSolarSystemFocusChangeHandler(
 		handler: ((bodyIndex: number, moonIndex?: number) => void) | null,
 	): void
+}
+
+export interface BuildStripeMeshParams {
+	positions: Float32Array
+	colors: Float32Array
+	mask: Float32Array
+	stripeVertexShader: string
+	stripeFragmentShader: string
+	visible: boolean
+}
+
+export interface RotateForProjectionParams {
+	x: number
+	y: number
+	z: number
+	centerLongitude: number
+	centerLatitude: number
+}
+
+export interface CreateLineSegmentsParams {
+	positions: number[]
+	color: number
+	opacity: number
+	visible: boolean
+	opts?: { lineWidth?: number; resolution?: readonly [number, number] }
+}
+
+export interface BuildGlobeRealSettlementsParams {
+	lats: Float32Array
+	lons: Float32Array
+	populations: Float32Array
+	provinceIds: Int32Array
+	capitalProvinceIds: ReadonlySet<number>
+	indices: number[]
+}
+
+export interface BuildMapRealSettlementsParams {
+	lats: Float32Array
+	lons: Float32Array
+	populations: Float32Array
+	provinceIds: Int32Array
+	capitalProvinceIds: ReadonlySet<number>
+	indices: number[]
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+}
+
+export interface CollectEu4NationBorderMapPositionsParams {
+	geometry: Eu4ProvinceBorderGeometry
+	realIdToNation: Map<number, number>
+	nation: number
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	z: number
+}
+
+export interface CollectEu4ProvinceBorderMapPositionsParams {
+	geometry: Eu4ProvinceBorderGeometry
+	provinceRealId: number
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	z: number
+}
+
+export interface BuildEu4SelectedProvinceBorderGlobeParams {
+	geometry: Eu4ProvinceBorderGeometry
+	provinceRealId: number
+	viewMode: GenesisViewMode
+	radius: number
+	resolution: readonly [number, number]
+	opts: { color: number; opacity: number; lineWidth: number }
+}
+
+export interface BuildEu4SelectedProvinceBorderMapParams {
+	geometry: Eu4ProvinceBorderGeometry
+	provinceRealId: number
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	viewMode: GenesisViewMode
+	z: number
+	resolution: readonly [number, number]
+	opts: { color: number; opacity: number; lineWidth: number }
+}
+
+export interface BuildEu4NationFillGlobeParams {
+	geometry: Eu4ProvinceFillGeometry
+	colorForRawId: ColorForRawId
+	viewMode: GenesisViewMode
+	visible: boolean
+	radius: number
+	elevationKmForLonLat?: ElevationKmForLonLat
+}
+
+export interface BuildEu4NationFillMapParams {
+	geometry: Eu4ProvinceFillGeometry
+	colorForRawId: ColorForRawId
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	viewMode: GenesisViewMode
+	visible: boolean
+	z: number
+	elevationKmForLonLat?: ElevationKmForLonLat
+}
+
+export interface BuildEu4OccupationStripesGlobeParams {
+	geometry: Eu4ProvinceFillGeometry
+	colorForRawId: ColorForRawId
+	viewMode: GenesisViewMode
+	visible: boolean
+	radius: number
+}
+
+export interface BuildEu4OccupationStripesMapParams {
+	geometry: Eu4ProvinceFillGeometry
+	colorForRawId: ColorForRawId
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	viewMode: GenesisViewMode
+	visible: boolean
+	z: number
+}
+
+export interface BuildMapWireframeParams {
+	world: SerializedGenesisWorld
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	wireframeVisible: boolean
+	viewMode: GenesisViewMode
+}
+
+export interface CollectNationBorderMapPositionsParams {
+	world: SerializedGenesisWorld
+	nation: number
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	zBoost: number
+}
+
+export interface BuildLandNationBordersGlobeParams {
+	world: SerializedGenesisWorld
+	viewMode: GenesisViewMode
+	visible: boolean
+	elevationVisible: boolean
+	resolution: [number, number]
+	opts?: { color?: number; lineWidth?: number; opacity?: number }
+}
+
+export interface BuildLandNationBordersMapParams {
+	world: SerializedGenesisWorld
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	viewMode: GenesisViewMode
+	visible: boolean
+	resolution: [number, number]
+	opts?: { color?: number; lineWidth?: number; opacity?: number }
+}
+
+export interface CollectProvinceBorderMapPositionsParams {
+	world: SerializedGenesisWorld
+	province: number
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	zBoost: number
+}
+
+export interface BuildSelectedProvinceBorderGlobeParams {
+	world: SerializedGenesisWorld
+	province: number
+	viewMode: GenesisViewMode
+	elevationVisible: boolean
+	opts?: {
+		color?: number
+		radiusBoost?: number
+		opacity?: number
+		lineWidth?: number
+		resolution?: readonly [number, number]
+	}
+}
+
+export interface BuildSelectedProvinceBorderMapParams {
+	world: SerializedGenesisWorld
+	province: number
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
+	viewMode: GenesisViewMode
+	opts?: {
+		color?: number
+		opacity?: number
+		zBoost?: number
+		lineWidth?: number
+		resolution?: readonly [number, number]
+	}
+}
+
+export interface BuildMapSettlementsParams {
+	world: SerializedGenesisWorld
+	locations: Int32Array
+	urbanPop: Float32Array
+	centerLongitudeDeg: number
+	projectionLatitudeDeg: number
 }

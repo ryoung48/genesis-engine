@@ -1,4 +1,3 @@
-import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
 import { SimplexNoise } from "../../shared/simplex-noise"
 import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "../../shared/units"
@@ -8,6 +7,7 @@ import {
 	computeRainBandWarpField,
 	getPressureRainFactor,
 } from "../rain-shared"
+import type { ComputeTidalRainParams } from "../types"
 import {
 	computeMonthlyLibration,
 	computeMonthlyLockedDeclination,
@@ -22,28 +22,19 @@ const RAD2DEG = 180 / Math.PI
  * and is near-zero on the nightside. Uses temperature and moisture
  * availability (ocean proximity) rather than latitude-band circulation.
  */
-export function computeTidalRain(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	isLand: Uint8Array,
-	params?: Pick<
-		GenesisParams,
-		| "seed"
-		| "substellarLon"
-		| "obliquity"
-		| "pressure"
-		| "eccentricity"
-		| "perihelion"
-		| "planetRadiusKm"
-	>,
-	distCoast?: Float32Array,
-): { monthly: Float32Array; annual: Float32Array } {
+export function computeTidalRain({
+	mesh,
+	climate,
+	isLand,
+	params,
+	distCoast,
+}: ComputeTidalRainParams): { monthly: Float32Array; annual: Float32Array } {
 	const N = mesh.numRegions
 	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
 	const pressureRainFactor = getPressureRainFactor(params?.pressure)
 	void meanEdgeLengthKm(mesh, params?.planetRadiusKm)
 	const { landRegions, landNeighborOffset, landNeighborList } =
-		buildRegionGraph(mesh, isLand)
+		buildRegionGraph({ mesh, mask: isLand })
 
 	const ecc = params?.eccentricity ?? 0
 	const monthlyLibration = computeMonthlyLibration({
@@ -67,7 +58,12 @@ export function computeTidalRain(
 	const FREQ2 = 7.0
 	const AMP1 = 0.35
 	const AMP2 = 0.15
-	const boundaryWarpDeg = computeRainBandWarpField(mesh, seed, 8, landRegions)
+	const boundaryWarpDeg = computeRainBandWarpField({
+		mesh,
+		seed,
+		amplitudeDeg: 8,
+		regions: landRegions,
+	})
 
 	const monthly = new Float32Array(N * 12)
 	for (const r of landRegions) {

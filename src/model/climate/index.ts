@@ -67,7 +67,6 @@ export { computeTornadoRisk } from "./tornadoes"
 export type {
 	PastaDebug,
 	TidalSchedule,
-	WindArrowData,
 } from "./types"
 export {
 	assignClimateZones,
@@ -83,3 +82,4 @@ export {
 	TEMPERATURE_BOUNDARY_TEMPERATE,
 	TEMPERATURE_BOUNDARY_TROPICAL,
 } from "./vegetation"
+export type { WindArrowData } from "./wind"

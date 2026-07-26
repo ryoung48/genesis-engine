@@ -10,6 +10,7 @@
 
 import type { HistoryNote } from "@/model/history"
 import { YEAR_MS } from "@/model/history"
+import type { GrudgePhraseParams, WarStreakPhraseParams } from "./types"
 
 type VictoryDegree =
 	| "decisive"
@@ -304,13 +305,13 @@ const warDurationPhrase = (
 	return `after an extended ${years}-year conflict`
 }
 
-const grudgePhrase = (
-	pastEvents: HistoryNote[],
-	attackerIdx: number,
-	defenderIdx: number,
-	currentWarIdx: number,
-	seed: number,
-): string | null => {
+const grudgePhrase = ({
+	pastEvents,
+	attackerIdx,
+	defenderIdx,
+	currentWarIdx,
+	seed,
+}: GrudgePhraseParams): string | null => {
 	let priorWarCount = 0
 	for (const e of pastEvents) {
 		if (
@@ -335,13 +336,13 @@ const grudgePhrase = (
 	return `the ${ordinal(priorWarCount + 1)} instance of armed conflict between the nations`
 }
 
-const warStreakPhrase = (
-	pastEvents: HistoryNote[],
-	warIdx: number,
-	beforeTime: number,
-	viewingNation: number,
-	seed: number,
-): string | null => {
+const warStreakPhrase = ({
+	pastEvents,
+	warIdx,
+	beforeTime,
+	viewingNation,
+	seed,
+}: WarStreakPhraseParams): string | null => {
 	const priorBattles = pastEvents.filter(
 		(e): e is HistoryNote =>
 			e.tag === "battle" && e.data.war === warIdx && e.time < beforeTime,
@@ -447,13 +448,13 @@ export function getEventDescription(event: HistoryNote, ctx: EventCtx): string {
 			const odd = oddsFlavor(odds, won, seed + 2)
 			if (odd) phrases.push(odd)
 
-			const streakWar = warStreakPhrase(
+			const streakWar = warStreakPhrase({
 				pastEvents,
 				warIdx,
-				event.time,
+				beforeTime: event.time,
 				viewingNation,
-				seed + 3,
-			)
+				seed: seed + 3,
+			})
 			if (streakWar) phrases.push(streakWar)
 
 			const streakBattle = streakPhrase(
@@ -479,13 +480,13 @@ export function getEventDescription(event: HistoryNote, ctx: EventCtx): string {
 					? `#${viewingNation} declared war on #${defender}`
 					: `#${attacker} declared war on #${viewingNation}`,
 			)
-			const grudge = grudgePhrase(
+			const grudge = grudgePhrase({
 				pastEvents,
-				attacker,
-				defender,
-				warIdx,
-				seed + 1,
-			)
+				attackerIdx: attacker,
+				defenderIdx: defender,
+				currentWarIdx: warIdx,
+				seed: seed + 1,
+			})
 			if (grudge) phrases.push(grudge)
 			const season = seasonPhrase(event.time, seed + 2)
 			if (season) phrases.push(season)

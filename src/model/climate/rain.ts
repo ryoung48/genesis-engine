@@ -4,7 +4,7 @@
  * SphereMesh and GenesisClimate data (no Cell/window.world dependencies).
  */
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
+import type { SphereMesh } from ".."
 import {
 	clamp,
 	DEFAULT_PLANET_RADIUS_KM,
@@ -15,7 +15,7 @@ import {
 	SimplexNoise,
 	smoothstep,
 } from "../shared"
-import { type GenesisLandmarks, LANDMARK_TYPE_OCEAN } from "../terrain"
+import { LANDMARK_TYPE_OCEAN } from "../terrain"
 import { elevToHeightKm } from "./elevation"
 import { computeTidalRain } from "./locked/rain"
 import {
@@ -24,6 +24,13 @@ import {
 	computeRainBandWarpField,
 	getPressureRainFactor,
 } from "./rain-shared"
+import type {
+	BuildRainRegionMaskParams,
+	ComputeAdvectionParams,
+	ComputeMonthlyRainParams,
+	ComputeRainWeightParams,
+	ComputeThermalEquatorParams,
+} from "./types"
 
 const DEG2RAD = Math.PI / 180
 const EAST_MOISTURE_WIN_BIAS = 1.03
@@ -119,10 +126,10 @@ export function getClimateGeometry(mesh: SphereMesh): ClimateGeometry {
 	return geometry
 }
 
-function buildRainRegionMask(
-	isLand: Uint8Array,
-	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
-): Uint8Array {
+function buildRainRegionMask({
+	isLand,
+	landmarks,
+}: BuildRainRegionMaskParams): Uint8Array {
 	const rainMask = new Uint8Array(isLand)
 	if (!landmarks) return rainMask
 
@@ -144,11 +151,14 @@ function buildRainRegionMask(
 const TEQ_NUM_BINS = 120 // 3 deg per bin
 const TEQ_HALF_WIN = 10 // circular smoothing window
 
-function computeTEQBins(
-	mesh: SphereMesh,
-	temps: Float32Array,
-	numBins: number,
-): { binMaxTemp: Float32Array; smoothLat: Float32Array } {
+function computeTEQBins({
+	mesh,
+	temps,
+	numBins,
+}: Required<ComputeThermalEquatorParams>): {
+	binMaxTemp: Float32Array
+	smoothLat: Float32Array
+} {
 	const N = mesh.numRegions
 	const { latDeg, lonDeg, regionBin } = getClimateGeometry(mesh)
 	const binMaxTemp = new Float32Array(numBins).fill(-Infinity)
@@ -192,24 +202,24 @@ function computeTEQBins(
  * Compute per-longitude-bin thermal equator latitude for a given temperature field.
  * Returns a Float32Array of length NUM_BINS with the smoothed TEQ latitude per bin.
  */
-export function computeThermalEquator(
-	mesh: SphereMesh,
-	temps: Float32Array,
-	numBins: number = TEQ_NUM_BINS,
-): Float32Array {
-	return computeTEQBins(mesh, temps, numBins).smoothLat
+export function computeThermalEquator({
+	mesh,
+	temps,
+	numBins = TEQ_NUM_BINS,
+}: ComputeThermalEquatorParams): Float32Array {
+	return computeTEQBins({ mesh, temps, numBins }).smoothLat
 }
 
 /**
  * Get thermal equator line as [lon, lat] points (for rendering).
  * Returns null if insufficient data.
  */
-export function computeThermalEquatorLine(
-	mesh: SphereMesh,
-	temps: Float32Array,
-	numBins: number = TEQ_NUM_BINS,
-): [number, number][] | null {
-	const { binMaxTemp, smoothLat } = computeTEQBins(mesh, temps, numBins)
+export function computeThermalEquatorLine({
+	mesh,
+	temps,
+	numBins = TEQ_NUM_BINS,
+}: ComputeThermalEquatorParams): [number, number][] | null {
+	const { binMaxTemp, smoothLat } = computeTEQBins({ mesh, temps, numBins })
 	const points: [number, number][] = []
 	for (let i = 0; i < numBins; i++) {
 		if (binMaxTemp[i] === -Infinity) continue
@@ -228,15 +238,15 @@ export function computeThermalEquatorLine(
  * Compute east/west moisture advection fields.
  * Best-first propagation from weighted ocean sources with latitude-band steering.
  */
-export function computeAdvection(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-	distCoast: Float32Array,
-	climate: GenesisClimate | undefined,
-	params: number | Pick<GenesisParams, "planetRadiusKm"> | undefined,
-	isLand: Uint8Array,
-	elevation_km?: Float32Array,
-): {
+export function computeAdvection({
+	mesh,
+	elevation,
+	distCoast,
+	climate,
+	params,
+	isLand,
+	elevation_km,
+}: ComputeAdvectionParams): {
 	east: Float32Array
 	west: Float32Array
 } {
@@ -302,12 +312,17 @@ export function computeAdvection(
 
 		const east = new Float32Array(N)
 		const west = new Float32Array(N)
-		const isValidFlow = (
-			attr: "east" | "west",
-			r: number,
-			eastward: number,
-			northward: number,
-		): boolean => {
+		const isValidFlow = ({
+			attr,
+			r,
+			eastward,
+			northward,
+		}: {
+			attr: "east" | "west"
+			r: number
+			eastward: number
+			northward: number
+		}): boolean => {
 			const lat = latDeg[r]
 			const absLat = absLatDeg[r]
 			const teq = teqByLon[regionBin[r]]
@@ -357,6 +372,7 @@ export function computeAdvection(
 			const moisture = attr === "east" ? east : west
 			const settled = new Uint8Array(N)
 			const queue = new PriorityQueue<{ region: number; moisture: number }>(
+				// biome-ignore lint/nursery/useMaxParams: third-party queue comparator signature
 				(a, b) => b.moisture - a.moisture,
 			)
 
@@ -382,7 +398,15 @@ export function computeAdvection(
 
 				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 					const nb = adjList[j]
-					if (!isValidFlow(attr, r, edgeEastward[j], edgeNorthward[j])) continue
+					if (
+						!isValidFlow({
+							attr,
+							r,
+							eastward: edgeEastward[j],
+							northward: edgeNorthward[j],
+						})
+					)
+						continue
 					// Scale the per-hop moisture change by this edge's real
 					// distance relative to the mesh average — a hop between two
 					// coastline-dense cells covers far less ground than a hop
@@ -435,7 +459,7 @@ export function computeAdvection(
 	}
 
 	const annualTeq = climate
-		? computeThermalEquator(mesh, climate.temperature_avg)
+		? computeThermalEquator({ mesh, temps: climate.temperature_avg })
 		: new Float32Array(TEQ_NUM_BINS)
 	const annual = computePair(annualTeq)
 
@@ -449,14 +473,14 @@ export function computeAdvection(
 /**
  * Compute 0-1 rainfall weight from zone drivers.
  */
-function computeWeight(
-	cellLat: number,
-	teq: number,
-	eastMoisture: number,
-	westMoisture: number,
-	daysPerYear: number,
-	bandOffsetDeg: number = 0,
-): number {
+function computeWeight({
+	cellLat,
+	teq,
+	eastMoisture,
+	westMoisture,
+	daysPerYear,
+	bandOffsetDeg = 0,
+}: ComputeRainWeightParams): number {
 	const hadley = hadleyWidth(daysPerYear)
 	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
 	const moisture = Math.max(eastMoisture, westMoisture)
@@ -470,20 +494,26 @@ function computeWeight(
 /**
  * Compute monthly and annual rainfall for all regions.
  */
-export function computeMonthlyRain(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	eastAdv: Float32Array,
-	westAdv: Float32Array,
-	isLand: Uint8Array,
-	params?: GenesisParams,
-	monthlyTEQ?: Float32Array[],
-	distCoast?: Float32Array,
-	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
-): { monthly: Float32Array; annual: Float32Array } {
-	const rainRegionMask = buildRainRegionMask(isLand, landmarks)
+export function computeMonthlyRain({
+	mesh,
+	climate,
+	eastAdv,
+	westAdv,
+	isLand,
+	params,
+	monthlyTEQ,
+	distCoast,
+	landmarks,
+}: ComputeMonthlyRainParams): { monthly: Float32Array; annual: Float32Array } {
+	const rainRegionMask = buildRainRegionMask({ isLand, landmarks })
 	if (params?.tideLock?.type === "solar") {
-		return computeTidalRain(mesh, climate, rainRegionMask, params, distCoast)
+		return computeTidalRain({
+			mesh,
+			climate,
+			isLand: rainRegionMask,
+			params,
+			distCoast,
+		})
 	}
 
 	const N = mesh.numRegions
@@ -492,42 +522,45 @@ export function computeMonthlyRain(
 
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
 	const { landRegions, landNeighborOffset, landNeighborList } =
-		buildRegionGraph(mesh, rainRegionMask)
+		buildRegionGraph({ mesh, mask: rainRegionMask })
 
 	const teqPerMonth: Float32Array[] =
 		monthlyTEQ ??
 		(() => {
 			const result: Float32Array[] = new Array(12)
 			for (let month = 0; month < 12; month++) {
-				result[month] = computeThermalEquator(
+				result[month] = computeThermalEquator({
 					mesh,
-					climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-				)
+					temps: climate.temperature_monthly.subarray(
+						month * N,
+						(month + 1) * N,
+					),
+				})
 			}
 			return result
 		})()
 
 	const monthly = new Float32Array(N * 12)
-	const boundaryWarpDeg = computeRainBandWarpField(
+	const boundaryWarpDeg = computeRainBandWarpField({
 		mesh,
-		params?.seed ?? 0,
-		5.5,
-		landRegions,
-	)
+		seed: params?.seed ?? 0,
+		amplitudeDeg: 5.5,
+		regions: landRegions,
+	})
 	for (const r of landRegions) {
 		const e = reverseCirculation ? westAdv[r] : eastAdv[r]
 		const w = reverseCirculation ? eastAdv[r] : westAdv[r]
 		const bin = regionBin[r]
 		for (let month = 0; month < 12; month++) {
 			const teq = teqPerMonth[month][bin]
-			const weight = computeWeight(
-				latDeg[r],
+			const weight = computeWeight({
+				cellLat: latDeg[r],
 				teq,
-				e,
-				w,
-				params.hoursPerDay,
-				boundaryWarpDeg[r],
-			)
+				eastMoisture: e,
+				westMoisture: w,
+				daysPerYear: params?.daysPerYear ?? 365,
+				bandOffsetDeg: boundaryWarpDeg[r],
+			})
 			const monthTemp = climate.temperature_monthly[month * N + r]
 			monthly[month * N + r] =
 				weight * ceilingScale(monthTemp) * pressureRainFactor

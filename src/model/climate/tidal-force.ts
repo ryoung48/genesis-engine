@@ -4,7 +4,14 @@ import {
 	EARTH_RADIUS_M,
 	SOLAR_MASS_KG,
 } from "../celestial/orbit-body"
-import { type MainSequenceClass, STAR } from "../celestial/star"
+import { STAR } from "../celestial/star"
+import type {
+	ApparentDiameterRadParams,
+	MoonMoonTideContributionParams,
+	StarTidalPositionParams,
+	StarTideContributionParams,
+	TideContributionParams,
+} from "./types"
 
 const TWO_PI = 2 * Math.PI
 
@@ -12,12 +19,15 @@ function p2(cosX: number): number {
 	return (3 * cosX * cosX - 1) / 2
 }
 
-function angularSeparationCos(
-	bodyLatRad: number,
-	bodyLonRad: number,
-	surfaceLatRad: number,
-	surfaceLonRad: number,
-): number {
+function angularSeparationCos({
+	bodyLatRad,
+	bodyLonRad,
+	surfaceLatRad,
+	surfaceLonRad,
+}: Pick<
+	TideContributionParams,
+	"bodyLatRad" | "bodyLonRad" | "surfaceLatRad" | "surfaceLonRad"
+>): number {
 	return (
 		Math.sin(surfaceLatRad) * Math.sin(bodyLatRad) +
 		Math.cos(surfaceLatRad) *
@@ -26,22 +36,22 @@ function angularSeparationCos(
 	)
 }
 
-export function tideContribution(
-	bodyLatRad: number,
-	bodyLonRad: number,
-	bodyDistanceM: number,
-	bodyMassKg: number,
-	surfaceLatRad: number,
-	surfaceLonRad: number,
-	planetMassKg: number,
-	planetRadiusM: number,
-): number {
-	const cosPsi = angularSeparationCos(
+export function tideContribution({
+	bodyLatRad,
+	bodyLonRad,
+	bodyDistanceM,
+	bodyMassKg,
+	surfaceLatRad,
+	surfaceLonRad,
+	planetMassKg,
+	planetRadiusM,
+}: TideContributionParams): number {
+	const cosPsi = angularSeparationCos({
 		bodyLatRad,
 		bodyLonRad,
 		surfaceLatRad,
 		surfaceLonRad,
-	)
+	})
 	const R = planetRadiusM
 	const C =
 		(bodyMassKg / planetMassKg) *
@@ -55,12 +65,12 @@ export function tideContribution(
 // the planet-surface tides above, we don't track a fixed observation point on
 // either moon's surface -- the bulge always points at the other moon, so its
 // peak height is just the sub-point value at the current separation.
-export function moonMoonTideContribution(
-	raisedMoonRadiusM: number,
-	raisedMoonMassKg: number,
-	raisingMoonMassKg: number,
-	separationM: number,
-): number {
+export function moonMoonTideContribution({
+	raisedMoonRadiusM,
+	raisedMoonMassKg,
+	raisingMoonMassKg,
+	separationM,
+}: MoonMoonTideContributionParams): number {
 	return (
 		(raisingMoonMassKg / raisedMoonMassKg) *
 		(raisedMoonRadiusM ** 4 / separationM ** 3)
@@ -73,13 +83,13 @@ interface StarTidalPosition {
 	distanceM: number
 }
 
-export function starTidalPosition(
-	orbitalDistanceAU: number,
-	planetEccentricity: number,
-	perihelionLonDeg: number,
-	t: number,
-	daysPerYear: number,
-): StarTidalPosition {
+export function starTidalPosition({
+	orbitalDistanceAU,
+	planetEccentricity,
+	perihelionLonDeg,
+	t,
+	daysPerYear,
+}: StarTidalPositionParams): StarTidalPosition {
 	// Mean anomaly of planet around star
 	const M = TWO_PI * (t / daysPerYear)
 	// Eccentric anomaly via Newton-Raphson
@@ -112,30 +122,30 @@ export function starTidalPosition(
 	return { latRad: 0, lonRad, distanceM: r }
 }
 
-export function starTideContribution(
-	starLatRad: number,
-	starLonRad: number,
-	starDistanceM: number,
-	spectralClass: MainSequenceClass,
-	starSubtype: number,
-	surfaceLatRad: number,
-	surfaceLonRad: number,
-	planetMassKg: number,
-	planetRadiusM: number,
-): number {
+export function starTideContribution({
+	starLatRad,
+	starLonRad,
+	starDistanceM,
+	spectralClass,
+	starSubtype,
+	surfaceLatRad,
+	surfaceLonRad,
+	planetMassKg,
+	planetRadiusM,
+}: StarTideContributionParams): number {
 	const starMassKg =
 		STAR.getStarMassSol({ cls: spectralClass, subtype: starSubtype }) *
 		SOLAR_MASS_KG
-	return tideContribution(
-		starLatRad,
-		starLonRad,
-		starDistanceM,
-		starMassKg,
+	return tideContribution({
+		bodyLatRad: starLatRad,
+		bodyLonRad: starLonRad,
+		bodyDistanceM: starDistanceM,
+		bodyMassKg: starMassKg,
 		surfaceLatRad,
 		surfaceLonRad,
 		planetMassKg,
 		planetRadiusM,
-	)
+	})
 }
 
 // Earth-Moon reference tidal scale at equator (lat=0, lon=0, moon overhead)
@@ -149,9 +159,9 @@ export const EARTH_MOON_TIDE_REFERENCE =
 	(EARTH_RADIUS_M ** 4 / EARTH_MOON_DIST_M ** 3) *
 	p2(1)
 
-export function apparentDiameterRad(
-	bodyDiameterM: number,
-	distanceM: number,
-): number {
+export function apparentDiameterRad({
+	bodyDiameterM,
+	distanceM,
+}: ApparentDiameterRadParams): number {
 	return bodyDiameterM / distanceM
 }

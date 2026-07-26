@@ -1,4 +1,5 @@
 ﻿import type { GenesisParams } from "@/model"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { HistoryNote } from "@/model/history"
 import type {
 	GenesisWorkerRequest,
@@ -29,7 +30,7 @@ interface ImportHeightmapParams {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	tideLock: import("@/model/celestial/orbit-body").TideLock | null
+	tideLock: TideLock | null
 	substellarLon: number
 	perihelion: number
 	pressure: number

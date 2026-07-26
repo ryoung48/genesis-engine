@@ -6,10 +6,10 @@ import {
 	GRAVITATIONAL_CONSTANT_M3_KG_S2,
 	ORBIT_BODY,
 } from "../orbit-body"
-import { derivePlanetMassKg, hillSphereM, rocheLimitM } from "./mechanics"
+import { MECHANICS } from "./mechanics"
 import {
 	type AttachParentTideLocksInput,
-	DEFAULT_MOON_ATMOSPHERE,
+	DEFAULT_MOON_ATMOSPHERE as DEFAULT_MOON_ATMOSPHERE_VALUE,
 	type GenerateMoonsInput,
 	type MoonBody,
 	type MoonOrbitRange,
@@ -344,13 +344,13 @@ export const MOON = {
 		if (count <= 0) return []
 
 		const rng = createRng(seed)
-		const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+		const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 		const planetRadiusM = planetRadiusKm * 1000
 		const planetDiameterM = planetRadiusM * 2
 		const planetDiameterKm = planetRadiusKm * 2
 		const planetOrbitalDistanceM = orbitalDistanceAU * ASTRONOMICAL_UNIT_M
 
-		const hill = hillSphereM({
+		const hill = MECHANICS.hillSphereM({
 			planetOrbitalDistanceM,
 			planetMassKg,
 			starMassKg,
@@ -388,7 +388,7 @@ export const MOON = {
 				(4 / 3) * Math.PI * moonRadiusM * moonRadiusM * moonRadiusM
 			const massKg = moonVol * moonDensity
 			const rochePd =
-				rocheLimitM({
+				MECHANICS.rocheLimitM({
 					planetRadiusM,
 					moonMassKg: massKg,
 					moonDiameterM: moonRadiusM * 2,
@@ -454,7 +454,7 @@ export const MOON = {
 				// of these via buildMoonEnvironment(); these defaults only stick for
 				// callers (main world's own live moon preview, tidal-schedule-only
 				// generation) that don't run that enrichment step.
-				atmosphere: DEFAULT_MOON_ATMOSPHERE,
+				atmosphere: DEFAULT_MOON_ATMOSPHERE_VALUE,
 				landCoverage: 0,
 			})
 		}
@@ -463,17 +463,4 @@ export const MOON = {
 	},
 }
 
-export {
-	derivePlanetMassKg,
-	keplerMoonPosition,
-	keplerMoonPositionCartesian,
-	moonOrbitalPeriodDaysFromSemiMajorAxisM,
-	moonPeriodBoundsDay,
-	moonSemiMajorAxisM,
-	rocheLimitM,
-} from "./mechanics"
-export {
-	DEFAULT_MOON_ATMOSPHERE,
-	type MoonBody,
-	type MoonOrbitRange,
-} from "./types"
+export const DEFAULT_MOON_ATMOSPHERE = DEFAULT_MOON_ATMOSPHERE_VALUE

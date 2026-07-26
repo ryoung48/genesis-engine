@@ -1,5 +1,8 @@
+import type { PastaDebug } from "./climate/pasta"
+import type { TidalSchedule } from "./climate/tidal-schedule"
 import type { LocationTradeGoods } from "./economy/trade-goods"
 import type { GenesisLandmarks } from "./terrain/landmarks"
+import type { Route, RouteEdge } from "./transport/worker-types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -22,6 +25,7 @@ import type {
 	StageTiming,
 	TectonicPlate,
 } from "./types"
+import type { ProvincePopulation } from "./society/types";
 
 export interface GenesisWorld {
 	mesh: SphereMesh
@@ -50,7 +54,7 @@ export interface GenesisWorld {
 	/** Per-cell pasta climate code (0=fallback/ocean, 1+=PASTA_LABELS order) */
 	pastaClimate: Uint8Array
 	/** Per-cell pasta climate detail metrics used by hover charts */
-	pastaDebug?: import("./climate/pasta").PastaDebug
+	pastaDebug?: PastaDebug
 	/** Per-cell ice thickness in mm water equivalent (0 for ice-free) */
 	iceThickness: Float32Array
 	/** Per-cell minimum ice across final-year months (mm w.e.) — for sea ice classification */
@@ -72,7 +76,7 @@ export interface GenesisWorld {
 	/** Per-cell modeled tidal range in meters. */
 	tidalRange?: Float32Array
 	/** Tidal schedule with events. */
-	tidalSchedule?: import("./climate/tidal-schedule").TidalSchedule
+	tidalSchedule?: TidalSchedule
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation: Uint8Array
 	/** Per-cell topography code, index into GENESIS_TOPOGRAPHY_LABELS */
@@ -109,7 +113,7 @@ export interface GenesisWorld {
 	religions?: GenesisPartition
 	religionTypes?: Uint8Array
 	landmarks?: GenesisLandmarks
-	population?: import("./society/population").ProvincePopulation
+	population?: ProvincePopulation
 	tradeGoods?: LocationTradeGoods
 	settlementRegions?: Int32Array
 	settlementWaterLandmarks?: Int32Array
@@ -119,9 +123,9 @@ export interface GenesisWorld {
 	/** Per-province development in [0, 1] from the urbanization stage. */
 	development?: Float32Array
 	/** Trade and road routes between settlements. */
-	routes?: import("./transport/worker-types").Route[]
+	routes?: Route[]
 	/** Deduplicated route network edges, for rendering and pathfinding. */
-	network?: import("./transport/worker-types").RouteEdge[]
+	network?: RouteEdge[]
 	continentCount: number
 	/** Pre-computed monthly thermal equator latitude (deg) per longitude bin, 12 months */
 	monthlyTEQ?: Float32Array[]

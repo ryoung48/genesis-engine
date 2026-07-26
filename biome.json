@@ -29,8 +29,8 @@
 					"options": {
 						"patterns": [
 							{
-								"group": ["@/model/**/internal", "@/model/**/types"],
-								"message": "Import through the domain's public index.ts API."
+								"group": ["../*", "../**"],
+								"message": "Use the @/ path alias instead of relative parent imports."
 							}
 						]
 					}

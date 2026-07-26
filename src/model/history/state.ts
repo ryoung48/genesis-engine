@@ -17,6 +17,12 @@ import { EVT, EventHeap } from "./event-heap"
 import { PROV, REL as REL_FIELD } from "./fields"
 import type { HistoryRng } from "./history-rng"
 import type { Timeline } from "./timeline"
+import type {
+	QueueBattleEventParams,
+	WealthCurrentParams,
+	WarStrengthCoalitionParams,
+	ResolveWarParams,
+} from "./types"
 
 export const REL = {
 	NONE: 0,
@@ -334,13 +340,13 @@ export function wealthOptimal(state: HistoryState, p: number): number {
 	return deriveWealthOptimal(state, p, state.time)
 }
 
-function wealthCurrent(
-	state: HistoryState,
-	p: number,
-	exclude?: number,
-	freedom?: boolean,
-	cache?: DerivedCache,
-): number {
+function wealthCurrent({
+	state,
+	p,
+	exclude,
+	freedom,
+	cache,
+}: WealthCurrentParams): number {
 	return deriveWealthCurrent(state, p, state.time, cache, exclude, freedom)
 }
 
@@ -364,7 +370,7 @@ export function warStrengthSolo(
 ): number {
 	const curr = Math.max(
 		0.1,
-		wealthCurrent(state, p, exclude, exclude === p, cache),
+		wealthCurrent({ state, p, exclude, freedom: exclude === p, cache }),
 	)
 	return curr / (1 + deriveProvinceWars(state, p, state.time, cache).length)
 }
@@ -397,13 +403,13 @@ function getWarAllies(
 	return allies
 }
 
-function warStrengthCoalition(
-	state: HistoryState,
-	attacker: number,
-	defender: number,
-	exclude?: number,
-	cache?: DerivedCache,
-): { attacker: number; defender: number } {
+function warStrengthCoalition({
+	state,
+	attacker,
+	defender,
+	exclude,
+	cache,
+}: WarStrengthCoalitionParams): { attacker: number; defender: number } {
 	const c = cache ?? makeDerivedCache()
 	const atkAllies = getWarAllies(state, attacker, "offensive", defender)
 	const defAllies = getWarAllies(state, defender, "defensive", attacker)
@@ -422,13 +428,13 @@ export function warThreat(
 	defender: number,
 	exclude?: number,
 ): number {
-	const strength = warStrengthCoalition(
+	const strength = warStrengthCoalition({
 		state,
 		attacker,
 		defender,
 		exclude,
-		makeDerivedCache(),
-	)
+		cache: makeDerivedCache(),
+	})
 	const atk = strength.attacker ** 2
 	const def = strength.defender ** 2
 	return 1 - atk / (atk + def)
@@ -638,13 +644,13 @@ export function startWar(
 	createActiveWar(state, attacker, defender, rng, { rebel })
 }
 
-export function queueBattleEvent(
-	state: HistoryState,
-	warIdx: number,
-	attacker: number,
-	defender: number,
-	time: number,
-): void {
+export function queueBattleEvent({
+	state,
+	warIdx,
+	attacker,
+	defender,
+	time,
+}: QueueBattleEventParams): void {
 	state.heap.enqueue(time, EVT.BATTLE, warIdx, attacker, defender)
 }
 
@@ -704,23 +710,23 @@ export function createActiveWar(
 		}
 		war.occupied.push(province)
 	}
-	queueBattleEvent(
+	queueBattleEvent({
 		state,
-		war.idx,
+		warIdx: war.idx,
 		attacker,
 		defender,
-		options.nextBattleTime ?? state.time + deltaMonth(rng.uniform(1, 6)),
-	)
+		time: options.nextBattleTime ?? state.time + deltaMonth(rng.uniform(1, 6)),
+	})
 	return war
 }
 
-export function resolveWar(
-	state: HistoryState,
-	war: War,
-	rng: HistoryRng,
-	victory?: boolean,
-	stalemate?: string,
-): void {
+export function resolveWar({
+	state,
+	war,
+	rng,
+	victory,
+	stalemate,
+}: ResolveWarParams): void {
 	war.endTime = state.time
 	const transferred = (
 		victory ? getNationProvinces(state, war.defender) : [...war.occupied]

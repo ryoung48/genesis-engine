@@ -10,6 +10,7 @@ import {
 	loadEu4ProvinceBorderGeometry,
 	loadEu4ProvinceFillGeometry,
 } from "@/model/earth"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import { buildRegionSpatialIndex } from "@/model/mesh"
 import type { HeritageScript } from "@/model/society"
 import { SCRIPT } from "@/model/society"
@@ -1871,13 +1872,7 @@ export function createGenesisScene(
 			settlementUrbanPop,
 			elevationVisible,
 		)
-		mapSettlements = buildMapSettlements(
-			currentWorld,
-			settlementLocations,
-			settlementUrbanPop,
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-		)
+		mapSettlements = buildMapSettlements({ world: currentWorld, locations: settlementLocations, urbanPop: settlementUrbanPop, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg })
 		if (globeSettlements) globeGroup.add(globeSettlements)
 		if (mapSettlements) {
 			addMapSlideClones(mapSettlements)
@@ -1902,24 +1897,8 @@ export function createGenesisScene(
 		) {
 			return
 		}
-		globeEu4Settlements = buildGlobeRealSettlements(
-			eu4SettlementLats,
-			eu4SettlementLons,
-			eu4SettlementPopulation,
-			eu4SettlementProvinceIds,
-			eu4CapitalProvinceIds,
-			eu4SettlementIndices,
-		)
-		mapEu4Settlements = buildMapRealSettlements(
-			eu4SettlementLats,
-			eu4SettlementLons,
-			eu4SettlementPopulation,
-			eu4SettlementProvinceIds,
-			eu4CapitalProvinceIds,
-			eu4SettlementIndices,
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-		)
+		globeEu4Settlements = buildGlobeRealSettlements({ lats: eu4SettlementLats, lons: eu4SettlementLons, populations: eu4SettlementPopulation, provinceIds: eu4SettlementProvinceIds, capitalProvinceIds: eu4CapitalProvinceIds, indices: eu4SettlementIndices })
+		mapEu4Settlements = buildMapRealSettlements({ lats: eu4SettlementLats, lons: eu4SettlementLons, populations: eu4SettlementPopulation, provinceIds: eu4SettlementProvinceIds, capitalProvinceIds: eu4CapitalProvinceIds, indices: eu4SettlementIndices, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg })
 		if (globeEu4Settlements) globeGroup.add(globeEu4Settlements)
 		if (mapEu4Settlements) {
 			addMapSlideClones(mapEu4Settlements)
@@ -2402,14 +2381,7 @@ export function createGenesisScene(
 						)
 					} else {
 						disposeObject3D(globeGroup, globeNationFill)
-						const globeFill = buildEu4NationFillGlobe(
-							cachedEu4FillGeometry,
-							currentNationFillColorForRawId,
-							currentViewMode,
-							true,
-							globeRadius,
-							elevationLookup,
-						)
+						const globeFill = buildEu4NationFillGlobe({ geometry: cachedEu4FillGeometry, colorForRawId: currentNationFillColorForRawId, viewMode: currentViewMode, visible: true, radius: globeRadius, elevationKmForLonLat: elevationLookup })
 						globeNationFill = globeFill?.mesh ?? null
 						globeNationFillRadius = globeFill ? globeRadius : null
 						if (globeNationFill) globeGroup.add(globeNationFill)
@@ -2431,16 +2403,7 @@ export function createGenesisScene(
 						)
 					} else {
 						disposeObject3D(scene, mapNationFill)
-						const mapFill = buildEu4NationFillMap(
-							cachedEu4FillGeometry,
-							currentNationFillColorForRawId,
-							currentMapCenterLongitudeDeg,
-							currentMapProjectionLatitudeDeg,
-							currentViewMode,
-							true,
-							mapZ,
-							elevationLookup,
-						)
+						const mapFill = buildEu4NationFillMap({ geometry: cachedEu4FillGeometry, colorForRawId: currentNationFillColorForRawId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, visible: true, z: mapZ, elevationKmForLonLat: elevationLookup })
 						mapNationFill = mapFill?.mesh ?? null
 						mapNationFillParams = mapFill
 							? {
@@ -2484,22 +2447,8 @@ export function createGenesisScene(
 							console.error("Failed to load EU4 province fill geometry:", err)
 						})
 				} else {
-					const globeStripes = buildEu4OccupationStripesGlobe(
-						cachedEu4FillGeometry,
-						currentOccupationStripeColorForRawId,
-						currentViewMode,
-						true,
-						elevationVisible ? 1.002 : 1.0005,
-					)
-					const mapStripes = buildEu4OccupationStripesMap(
-						cachedEu4FillGeometry,
-						currentOccupationStripeColorForRawId,
-						currentMapCenterLongitudeDeg,
-						currentMapProjectionLatitudeDeg,
-						currentViewMode,
-						true,
-						0.0003,
-					)
+					const globeStripes = buildEu4OccupationStripesGlobe({ geometry: cachedEu4FillGeometry, colorForRawId: currentOccupationStripeColorForRawId, viewMode: currentViewMode, visible: true, radius: elevationVisible ? 1.002 : 1.0005 })
+					const mapStripes = buildEu4OccupationStripesMap({ geometry: cachedEu4FillGeometry, colorForRawId: currentOccupationStripeColorForRawId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, visible: true, z: 0.0003 })
 					if (globeStripes) {
 						globeOccupationStripes = globeStripes.mesh
 						globeGroup.add(globeOccupationStripes)
@@ -2585,21 +2534,8 @@ export function createGenesisScene(
 		}
 
 		if (worldForBorders && landNationBordersVisible) {
-			const globeLand = buildLandNationBordersGlobe(
-				worldForBorders,
-				currentViewMode,
-				landNationBordersVisible,
-				elevationVisible,
-				[w, h],
-			)
-			const mapLand = buildLandNationBordersMap(
-				worldForBorders,
-				currentMapCenterLongitudeDeg,
-				currentMapProjectionLatitudeDeg,
-				currentViewMode,
-				landNationBordersVisible,
-				[w, h],
-			)
+			const globeLand = buildLandNationBordersGlobe({ world: worldForBorders, viewMode: currentViewMode, visible: landNationBordersVisible, elevationVisible, resolution: [w, h] })
+			const mapLand = buildLandNationBordersMap({ world: worldForBorders, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, visible: landNationBordersVisible, resolution: [w, h] })
 			if (globeLand) {
 				globeLandNationBorders = globeLand.lines
 				landNationBorderMaterials.push(globeLand.material)
@@ -2702,24 +2638,8 @@ export function createGenesisScene(
 			const provinceRealId = currentWorld.provinces.realIds?.[selectedProvince]
 			if (provinceRealId === undefined) return
 			const geometry = cachedEu4BorderGeometry
-			const globeBorder = buildEu4SelectedProvinceBorderGlobe(
-				geometry,
-				provinceRealId,
-				currentViewMode,
-				1.006,
-				resolution,
-				{ color: 0xfffbeb, opacity: 0.95, lineWidth: 4 },
-			)
-			const mapBorder = buildEu4SelectedProvinceBorderMap(
-				geometry,
-				provinceRealId,
-				currentMapCenterLongitudeDeg,
-				currentMapProjectionLatitudeDeg,
-				currentViewMode,
-				0.007,
-				resolution,
-				{ color: 0xfffbeb, opacity: 0.95, lineWidth: 4 },
-			)
+			const globeBorder = buildEu4SelectedProvinceBorderGlobe({ geometry, provinceRealId, viewMode: currentViewMode, radius: 1.006, resolution, opts: { color: 0xfffbeb, opacity: 0.95, lineWidth: 4 } })
+			const mapBorder = buildEu4SelectedProvinceBorderMap({ geometry, provinceRealId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, z: 0.007, resolution, opts: { color: 0xfffbeb, opacity: 0.95, lineWidth: 4 } })
 			if (globeBorder) {
 				globeSelectedProvinceBorder = globeBorder.lines
 				globeGroup.add(globeSelectedProvinceBorder)
@@ -2733,31 +2653,18 @@ export function createGenesisScene(
 			return
 		}
 
-		globeSelectedProvinceBorder = buildSelectedProvinceBorderGlobe(
-			currentWorld,
-			selectedProvince,
-			currentViewMode,
-			elevationVisible,
-			{
-				color: 0xfffbeb,
-				radiusBoost: 0.003,
-				lineWidth: 4,
-				resolution,
-			},
-		)
-		mapSelectedProvinceBorder = buildSelectedProvinceBorderMap(
-			currentWorld,
-			selectedProvince,
-			currentMapCenterLongitudeDeg,
-			currentMapProjectionLatitudeDeg,
-			currentViewMode,
-			{
-				color: 0xfffbeb,
-				zBoost: 0.004,
-				lineWidth: 4,
-				resolution,
-			},
-		)
+		globeSelectedProvinceBorder = buildSelectedProvinceBorderGlobe({ world: currentWorld, province: selectedProvince, viewMode: currentViewMode, elevationVisible, opts: {
+        				color: 0xfffbeb,
+        				radiusBoost: 0.003,
+        				lineWidth: 4,
+        				resolution,
+        			} })
+		mapSelectedProvinceBorder = buildSelectedProvinceBorderMap({ world: currentWorld, province: selectedProvince, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, opts: {
+        				color: 0xfffbeb,
+        				zBoost: 0.004,
+        				lineWidth: 4,
+        				resolution,
+        			} })
 		if (globeSelectedProvinceBorder) globeGroup.add(globeSelectedProvinceBorder)
 		if (mapSelectedProvinceBorder) {
 			addMapSlideClones(mapSelectedProvinceBorder)
@@ -2944,13 +2851,7 @@ export function createGenesisScene(
 			globeGroup.add(terrainWireframe)
 		}
 		if (wireframeVisible && currentWorld) {
-			mapWireframe = buildMapWireframe(
-				currentWorld,
-				currentMapCenterLongitudeDeg,
-				currentMapProjectionLatitudeDeg,
-				wireframeVisible,
-				currentViewMode,
-			)
+			mapWireframe = buildMapWireframe({ world: currentWorld, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, wireframeVisible, viewMode: currentViewMode })
 			addMapSlideClones(mapWireframe)
 			scene.add(mapWireframe)
 		}
@@ -3678,13 +3579,7 @@ export function createGenesisScene(
 			? target === "province"
 				? provinceRealId === undefined
 					? []
-					: collectEu4ProvinceBorderMapPositions(
-							cachedEu4BorderGeometry!,
-							provinceRealId,
-							currentMapCenterLongitudeDeg,
-							currentMapProjectionLatitudeDeg,
-							0.007,
-						)
+					: collectEu4ProvinceBorderMapPositions({ geometry: cachedEu4BorderGeometry!, provinceRealId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, z: 0.007 })
 				: (() => {
 						const worldForBorders = getWorldForBorders()
 						const nation = worldForBorders?.nations?.assignment[province]
@@ -3693,36 +3588,17 @@ export function createGenesisScene(
 							? buildRealIdToNation(worldForBorders)
 							: null
 						return realIdToNation
-							? collectEu4NationBorderMapPositions(
-									cachedEu4BorderGeometry!,
-									realIdToNation,
-									nation,
-									currentMapCenterLongitudeDeg,
-									currentMapProjectionLatitudeDeg,
-									0.001,
-								)
+							? collectEu4NationBorderMapPositions({ geometry: cachedEu4BorderGeometry!, realIdToNation, nation, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, z: 0.001 })
 							: []
 					})()
 			: target === "province"
-				? collectProvinceBorderMapPositions(
-						currentWorld,
-						province,
-						currentMapCenterLongitudeDeg,
-						currentMapProjectionLatitudeDeg,
-						0.004,
-					)
+				? collectProvinceBorderMapPositions({ world: currentWorld, province, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, zBoost: 0.004 })
 				: (() => {
 						if (!currentWorld.nations) return []
 						const nation = currentWorld.nations.assignment[province]
 						return nation < 0
 							? []
-							: collectNationBorderMapPositions(
-									currentWorld,
-									nation,
-									currentMapCenterLongitudeDeg,
-									currentMapProjectionLatitudeDeg,
-									0.001,
-								)
+							: collectNationBorderMapPositions({ world: currentWorld, nation, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, zBoost: 0.001 })
 					})()
 		pulseGlobe = makeThickPulseLine(globePositions, lineWidth)
 		pulseMap = makeThickPulseLine(mapPositions, lineWidth)
@@ -4659,7 +4535,7 @@ export function createGenesisScene(
 	}
 
 	function setMoonOrbitOverlay(
-		moons: import("@/model/celestial/moons").MoonBody[] | null,
+		moons: MoonBody[] | null,
 		planetRadiusKm: number,
 		day: number,
 		showGrid: boolean,
@@ -4683,7 +4559,7 @@ export function createGenesisScene(
 	}
 
 	function updateMoonOrbitOverlay(
-		moons: import("@/model/celestial/moons").MoonBody[] | null,
+		moons: MoonBody[] | null,
 		planetRadiusKm: number,
 		showGrid: boolean,
 		gridSpacing: number,

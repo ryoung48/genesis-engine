@@ -1,15 +1,18 @@
-import { roll2d6 } from "../../../shared/dice"
-import type { createRng } from "../../../shared/rng"
-import type { OrbitClassification, OrbitGroup } from "../../orbit-body"
-import { EARTH_DIAMETER_KM, ORBIT_BODY } from "../../orbit-body"
-import type { Zone } from "../../planet"
-import type { RingProfile } from "../../system"
+import { roll2d6 } from "../../../../shared/dice"
+import type { createRng } from "../../../../shared/rng"
+import { EARTH_DIAMETER_KM, ORBIT_BODY } from "../../../orbit-body"
+import type { OrbitClassification, OrbitGroup } from "../../../orbit-body/types"
+import type { Zone } from "../../../planet/types"
+import type { RingProfile } from "../../types"
+import type { DensityComposition } from "../types"
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function rollOrbitGroup(
-	rng: ReturnType<typeof createRng>,
-	zone: Zone,
-): OrbitGroup {
+export function rollOrbitGroup({
+	rng,
+	zone,
+}: {
+	rng: ReturnType<typeof createRng>
+	zone: Zone
+}): OrbitGroup {
 	const weights: Record<OrbitGroup, number> =
 		zone === "outer"
 			? {
@@ -53,11 +56,13 @@ export function rollOrbitGroup(
 	return "dwarf"
 }
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function rollSizeClass(
-	rng: ReturnType<typeof createRng>,
-	group: OrbitGroup,
-): number {
+export function rollSizeClass({
+	rng,
+	group,
+}: {
+	rng: ReturnType<typeof createRng>
+	group: OrbitGroup
+}): number {
 	if (group === "asteroid belt") return -1
 	if (group === "dwarf") return rng.randint(0, 4)
 	if (group === "terrestrial") return rng.randint(5, 10)
@@ -65,11 +70,13 @@ export function rollSizeClass(
 	return rng.randint(16, 18)
 }
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function rollDiameterKmFromSizeClass(
-	rng: ReturnType<typeof createRng>,
-	sizeClass: number,
-): number {
+export function rollDiameterKmFromSizeClass({
+	rng,
+	sizeClass,
+}: {
+	rng: ReturnType<typeof createRng>
+	sizeClass: number
+}): number {
 	if (sizeClass < 0) return 0
 	if (sizeClass <= 15) {
 		const [minKm, maxKm] = ORBIT_BODY.sizeClassToRockyDiameterRangeKm(sizeClass)
@@ -109,8 +116,6 @@ const DENSITY_TABLE: Record<string, number[]> = {
 	],
 }
 
-type DensityComposition = "ice" | "rocky" | "metallic"
-
 function classificationToComposition(
 	classification: OrbitClassification,
 ): DensityComposition {
@@ -133,11 +138,13 @@ function classificationToComposition(
 	return "rocky"
 }
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-function rollDensityFromComposition(
-	rng: ReturnType<typeof createRng>,
-	composition: DensityComposition,
-): number {
+function rollDensityFromComposition({
+	rng,
+	composition,
+}: {
+	rng: ReturnType<typeof createRng>
+	composition: DensityComposition
+}): number {
 	const description = rng.weightedChoice([
 		{ v: "Exotic Ice", w: composition === "ice" ? 1 : 0 },
 		{ v: "Mostly Ice", w: composition === "ice" ? 5 : 0 },
@@ -153,15 +160,19 @@ function rollDensityFromComposition(
 	return DENSITY_TABLE[description as string][densityRoll]
 }
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function pickDensityEarthRelative(
-	rng: ReturnType<typeof createRng>,
-	group: OrbitGroup,
-	classification: OrbitClassification,
+export function pickDensityEarthRelative({
+	rng,
+	group,
+	classification,
+	composition,
+}: {
+	rng: ReturnType<typeof createRng>
+	group: OrbitGroup
+	classification: OrbitClassification
 	/** Omitted before classification has produced a composition; the
 	 * classification table then provides the density-roll category. */
-	composition?: string,
-): number {
+	composition?: string
+}): number {
 	if (group === "jovian" || classification === "chthonian") {
 		return rng.uniform(0.08, 0.35)
 	}
@@ -171,7 +182,7 @@ export function pickDensityEarthRelative(
 		composition === "metallic"
 			? composition
 			: classificationToComposition(classification)
-	return rollDensityFromComposition(rng, densityComposition)
+	return rollDensityFromComposition({ rng, composition: densityComposition })
 }
 
 // Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts), with
@@ -237,12 +248,15 @@ export function rollJovianRings(
 // table, including its stellar-age modifier (older stars' systems roll
 // slower base rotations), but without the tidal-lock cascade (locks/effect),
 // since decorative siblings don't need the full lock simulation.
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function rollSiderealDayHours(
-	rng: ReturnType<typeof createRng>,
-	isJovian: boolean,
-	starAgeGyr: number,
-): number {
+export function rollSiderealDayHours({
+	rng,
+	isJovian,
+	starAgeGyr,
+}: {
+	rng: ReturnType<typeof createRng>
+	isJovian: boolean
+	starAgeGyr: number
+}): number {
 	const mult = isJovian ? 2 : 4
 	const ageMod = Math.floor(starAgeGyr / 2)
 	let base = (roll2d6(rng) - 2) * mult + 2 + rng.randint(1, 6) + ageMod

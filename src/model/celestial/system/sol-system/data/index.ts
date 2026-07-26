@@ -1,8 +1,7 @@
 import { HOURS_PER_DAY } from "@/model/shared"
-import type { MoonOrbitRange } from "../../moons"
-import { DEFAULT_MOON_ATMOSPHERE } from "../../moons"
-import type { AtmosphereProfile, TideLock } from "../../orbit-body"
-import type { SystemBody } from "../types"
+import { DEFAULT_MOON_ATMOSPHERE } from "../../../moons"
+import type { SystemBody } from "../../types"
+import type { SolPlanetSeed } from "../types"
 // live from the UI at generation time (see buildHomeBody), so its entry here
 // only carries the values that AREN'T user-editable: real Bond albedo,
 // fitted greenhouseFactor, and Luna's real orbital data.
@@ -18,7 +17,7 @@ import type { SystemBody } from "../types"
 // real figure either, so those are still rolled the same way any other
 // exception with all four fixed to real values.
 
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../orbit-body"
+import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../../orbit-body"
 
 // Every moon should carry an explicit atmosphere so its stats card shows an
 // Atmosphere row -- omitting the field (rather than stating "none") used to
@@ -43,128 +42,6 @@ export const SOL_PLANET_RINGS_BY_NAME: Partial<
 		color: 0xd8c69a,
 		opacity: 0.52,
 	},
-}
-
-export interface SolMoonSeed {
-	name: string
-	group: SystemBody["group"]
-	classification: SystemBody["classification"]
-	/** Optional authored texture for a named moon. Procedural moons omit this
-	 * and fall back to moon-orbit-overlay.ts's generic shared texture. */
-	texturePath?: string
-	diameterEarths: number
-	massEarths: number
-	gravityG: number
-	densityEarthRelative: number
-	densityDescription: string
-	rotationHours: number
-	tiltDeg: number
-	eccentricity: number
-	pd: number
-	orbitRange: MoonOrbitRange
-	/** Omitted for airless named moons; buildMoon supplies the shared vacuum
-	 * profile in that case. */
-	atmosphere?: AtmosphereProfile
-	/** Fraction of surface covered by land, 0..1 (retired hydrosphereFraction,
-	 * which was the inverse -- ocean/ice coverage). */
-	landCoverage: number
-	/** Bond albedo, 0..1 (real measured/estimated value). */
-	albedo: number
-	/** EBM greenhouseFactor -- see SolPlanetSeed.greenhouseFactor doc. Only
-	 * fit for moons with a real, well-characterized atmosphere (Titan);
-	 * zero (no meaningful real greenhouse effect) for airless/trace-
-	 * atmosphere moons, same as Mercury. */
-	greenhouseFactor: number
-	/** Real orbital inclination (degrees, to the parent planet's equator --
-	 * the commonly-cited reference frame for a moon), used instead of
-	 * rollExtras()'s seeded-random roll when set. */
-	inclinationDeg?: number
-	/** Real longitude of perihelion (degrees). Only Luna has this authored --
-	 * for every other (near-circular) moon here, real longitude of
-	 * perihelion isn't a stable/meaningful published figure (it precesses
-	 * rapidly and is barely defined at low eccentricity), so it still gets a
-	 * rolled value like the ported data intends. */
-	longitudeOfPerihelionDeg?: number
-	/** Real longitude of ascending node (degrees). Only Luna has this
-	 * authored (as a simplified fixed 0 -- its real node regresses over an
-	 * 18.6-year cycle, so no single "real" value exists); every other moon
-	 * here still gets a rolled value. */
-	longitudeOfAscendingNodeDeg?: number
-	/** Real mean anomaly at epoch (degrees). Only Luna has this authored (as
-	 * a simplified fixed 0); every other moon here still gets a rolled
-	 * value. */
-	meanAnomalyAtEpochDeg?: number
-}
-
-export interface SolPlanetSeed {
-	name: string
-	/** A live main-world seed may provide a stable identifier; static named
-	 * bodies derive theirs from name when this is absent. */
-	seed?: string
-	group: SystemBody["group"]
-	classification: SystemBody["classification"]
-	/** Optional authored texture for a named body. Untextured bodies fall back
-	 * to a plain color in solar-system-overlay.ts. */
-	texturePath?: string
-	/** Optional separate cloud-layer texture, rendered as a slightly larger
-	 * transparent sphere over the surface texture -- only Earth has one
-	 * authored today. */
-	cloudsTexturePath?: string
-	au: number
-	diameterEarths: number
-	massEarths: number
-	gravityG: number
-	densityEarthRelative: number
-	densityDescription: string
-	rotationHours: number
-	tiltDeg: number
-	eccentricity: number
-	/** Omitted for airless bodies; buildPlanet preserves that absence. */
-	atmosphere?: AtmosphereProfile
-	/** Main-world terrain controls are absent on fixed non-homeworld seeds. */
-	landDistribution?: number
-	/** Fraction of surface covered by land, 0..1 (retired hydrosphereFraction,
-	 * which was the inverse -- ocean/ice coverage). */
-	landCoverage: number
-	continentSizeVariety?: number
-	seaLevel?: number
-	maxElevation?: number
-	/** Static real moon data, hydrated via buildMoon() -- unused when
-	 * `moonsOverride` is passed to buildPlanet() instead (the main world's
-	 * moons come from a live generation pipeline, not this fixed table). */
-	moons?: SolMoonSeed[]
-	/** What (if anything) this body is tidally locked to -- fixed/known for
-	 * the static bodies here (e.g. Pluto-Charon's mutual lock), or a live
-	 * user-controlled value for the main world. */
-	tideLock?: TideLock | null
-	/** Longitude of the substellar point, in degrees 0-360. */
-	substellarLon?: number
-	/** Tags the main/home world -- the only thing this flag should ever
-	 * control is which extra (terrain-generation) fields the UI exposes for
-	 * editing, not a separate construction/editing code path: the main
-	 * world is built via buildPlanet() exactly like every other body here,
-	 * just from a live seed object (its own physical params come from the
-	 * UI at generation time) rather than a fixed table entry. */
-	isMainWorld?: boolean
-	/** Bond albedo, 0..1 (real measured value; NASA planetary fact sheets). */
-	albedo: number
-	/**
-	 * EBM greenhouseFactor, individually fit per body so the model's simulated
-	 * average matches its real known surface temperature (see
-	 * ebm/index.ts's EBMConfig.greenhouseFactor doc) -- not derived from a
-	 * formula, and not comparable in magnitude between bodies (a thick
-	 * atmosphere's fitted value isn't a scaled-up version of a thin one's).
-	 * For the gas/ice giants this is fit AFTER internalHeatTempK is applied,
-	 * so it represents the lapse-rate/opacity gap between the effective
-	 * (radiating) temperature and the deeper "1-bar level" temperature used
-	 * as the real-world target -- structurally the same role it plays for
-	 * Earth, just not usually called "greenhouse" for a gas giant.
-	 */
-	greenhouseFactor: number
-	/** Real orbital inclination (degrees, to the Sun's equator). */
-	inclinationDeg?: number
-	/** Real longitude of perihelion (degrees, J2000). */
-	longitudeOfPerihelionDeg?: number
 }
 
 /**

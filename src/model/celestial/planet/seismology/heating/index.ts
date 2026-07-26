@@ -1,7 +1,8 @@
-import type { OrbitGroup } from "../../../orbit-body"
 import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../../orbit-body"
+import type { OrbitGroup } from "../../../orbit-body/types"
 import type { MoonTidalHeatingInput } from "./types"
-export function computeResidualHeating(params: {
+
+function computeResidualHeating(params: {
 	sizeClass: number
 	starAgeGyr: number
 	densityEarthRelative: number
@@ -25,7 +26,7 @@ export function computeResidualHeating(params: {
  * Exported as raw numeric params (rather than requiring a built SystemBody)
  * so generate-system-bodies.ts can call this mid-construction, before a
  * moon's parent planet object exists yet. */
-export function computeMoonTidalHeatingRaw(params: {
+function computeMoonTidalHeatingRaw(params: {
 	parentMassKg: number
 	parentDiameterKm: number
 	moonDiameterKm: number
@@ -58,9 +59,9 @@ export function computeMoonTidalHeatingRaw(params: {
 }
 
 // Ported from galaxy-gen's MAX_SAFE_MOON_TIDAL_HEATING (orbits/seismology).
-export const MAX_SAFE_MOON_TIDAL_HEATING = 5_000
+const MAX_SAFE_MOON_TIDAL_HEATING = 5_000
 
-export function computeMoonTidalHeating({
+function computeMoonTidalHeating({
 	parent,
 	moon,
 }: MoonTidalHeatingInput): number {
@@ -74,4 +75,11 @@ export function computeMoonTidalHeating({
 		eccentricity: moon.eccentricity,
 		densityEarthRelative: moon.density?.earthRelative ?? 0,
 	})
+}
+
+export const HEATING = {
+	computeResidualHeating,
+	computeMoonTidalHeatingRaw,
+	computeMoonTidalHeating,
+	MAX_SAFE_MOON_TIDAL_HEATING,
 }

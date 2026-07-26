@@ -1,22 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
-import type { MoonBody } from "@/model/celestial/moons"
-import { derivePlanetMassKg } from "@/model/celestial/moons"
+import { MECHANICS } from "@/model/celestial/moons/mechanics"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
-import type { MainSequenceClass } from "@/model/celestial/star"
 import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
-import {
-	type SolarSystemState,
-	SYSTEM,
-	type SystemBody,
-} from "@/model/celestial/system"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { SYSTEM } from "@/model/celestial/system"
 import {
 	SOL_DEFAULT_SOLAR_SYSTEM,
 	SOL_EARTH_CLOUDS_TEXTURE_PATH,
 	SOL_STAR_AGE_GYR,
 } from "@/model/celestial/system/sol-system"
+import type {
+	SolarSystemState,
+	SystemBody,
+} from "@/model/celestial/system/types"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import {
@@ -96,8 +97,7 @@ import {
 } from "@/model/shared"
 import {
 	GOVERNMENT_TYPE_LABELS,
-	GOVERNMENT_TYPES,
-	type SocietyEra,
+	GOVERNMENT_TYPES
 } from "@/model/society/eras"
 import {
 	RELIGION_TYPE_COLORS,
@@ -300,6 +300,7 @@ import {
 } from "./screen/shared/ui-format"
 import { SolarSystemControls } from "./solar-system/SolarSystemControls"
 import { WindParticleCanvas } from "./WindParticleCanvas"
+import type { SocietyEra } from "../../model/society/types";
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -1825,10 +1826,10 @@ export const GenesisView: React.FC = () => {
 			}
 		}
 		return {
-			starAgeGyr: SYSTEM.getStarAgeGyr(
-				restSeed,
-				STAR.getStarMassSol({ cls, subtype: starSubtype }),
-			),
+			starAgeGyr: SYSTEM.getStarAgeGyr({
+				seed: restSeed,
+				massSol: STAR.getStarMassSol({ cls, subtype: starSubtype }),
+			}),
 			starLuminositySol: STAR.getStarLuminositySol({
 				cls,
 				subtype: starSubtype,
@@ -1886,9 +1887,9 @@ export const GenesisView: React.FC = () => {
 			orbitalDistanceAU,
 			diameterKm: planetRadiusKm * 2,
 			moons,
-			massKg: derivePlanetMassKg(planetRadiusKm),
+			massKg: MECHANICS.derivePlanetMassKg(planetRadiusKm),
 			gravityG: ORBIT_BODY.computeGravityG({
-				massKg: derivePlanetMassKg(planetRadiusKm),
+				massKg: MECHANICS.derivePlanetMassKg(planetRadiusKm),
 				diameterKm: planetRadiusKm * 2,
 			}),
 			siderealDayHours: hoursPerDay,
@@ -2069,7 +2070,7 @@ export const GenesisView: React.FC = () => {
 	})
 	const tideLock = mainWorldSystemBody?.tideLock ?? null
 	const setTideLock = useCallback(
-		(lock: import("@/model/celestial/orbit-body").TideLock | null) =>
+		(lock: TideLock | null) =>
 			updateMainWorldBody((body) => {
 				const siderealDayHours = resolveBodyTideLockSiderealDayHours(lock, body)
 				return {
@@ -2749,14 +2750,7 @@ export const GenesisView: React.FC = () => {
 		if (iceThickness <= 0 && iceMax <= 0) return null
 		return `${(iceThickness / 1000).toFixed(2)} m (${(iceMin / 1000).toFixed(2)}-${(iceMax / 1000).toFixed(2)})`
 	})()
-	const hoverClimateDisplay = getHoverClimateDisplay(
-		colorMode,
-		hoverPastaClimate,
-		hoverKoppenClimate,
-		hoverClimateZone,
-		hoverRealPastaClimate,
-		hoverRealKoppenClimate,
-	)
+	const hoverClimateDisplay = getHoverClimateDisplay({ colorMode, hoverPastaClimate, hoverKoppenClimate, hoverClimateZone, hoverRealPastaClimate, hoverRealKoppenClimate })
 
 	// Shared wind computation — runs when wind arrows or wind color mode is active
 	const windVectors = useMemo(() => {
@@ -2770,19 +2764,19 @@ export const GenesisView: React.FC = () => {
 			return null
 		const month =
 			resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
-		return computeWindVectors(
-			world.mesh,
-			world.climate,
-			world.elevation_km,
-			world.params,
+		return computeWindVectors({
+			mesh: world.mesh,
+			climate: world.climate,
+			elevation_km: world.elevation_km,
+			params: world.params,
 			month,
-			{
+			surface: {
 				vegetation: world.vegetation,
 				topography: world.topography,
 				slopeScore: world.slopeScore,
 				oceanDist: world.oceanDist,
 			},
-		)
+		})
 	}, [world, showWindArrows, colorMode, resolvedClimateMonth])
 
 	// Monthly wind: computed lazily across setTimeout ticks when wind is active
@@ -2810,19 +2804,19 @@ export const GenesisView: React.FC = () => {
 				return
 			}
 			results.push(
-				computeWindVectors(
-					world.mesh,
-					world.climate,
-					world.elevation_km,
-					world.params,
-					m++,
-					{
+				computeWindVectors({
+					mesh: world.mesh,
+					climate: world.climate,
+					elevation_km: world.elevation_km,
+					params: world.params,
+					month: m++,
+					surface: {
 						vegetation: world.vegetation,
 						topography: world.topography,
 						slopeScore: world.slopeScore,
 						oceanDist: world.oceanDist,
 					},
-				),
+				}),
 			)
 			setTimeout(tick, 0)
 		}
@@ -2862,30 +2856,22 @@ export const GenesisView: React.FC = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hoverInfo?.region, monthlyWindReady, hoverInfo])
 
-	const hoverMisery: HoverMisery | null = getHoverMisery(
-		hoverInfo,
-		worldForDisplay,
-		dtrMonth,
-		hoverWindSpeed,
-		hoverWindMonthly?.map((w) => w.speedMs) ?? null,
-		colorMode === "realMisery",
-	)
+	const hoverMisery: HoverMisery | null = getHoverMisery({ hoverInfo, world: worldForDisplay, dtrMonth, windSpeedMs: hoverWindSpeed, monthlyWindSpeedMs: hoverWindMonthly?.map((w) => w.speedMs) ?? null, useObserved: colorMode === "realMisery" })
 
 	const windStats = useMemo(() => {
 		if (!world?.climate) return null
-		const vectors = computeWindVectors(
-			world.mesh,
-			world.climate,
-			world.elevation_km,
-			world.params,
-			undefined,
-			{
+		const vectors = computeWindVectors({
+			mesh: world.mesh,
+			climate: world.climate,
+			elevation_km: world.elevation_km,
+			params: world.params,
+			surface: {
 				vegetation: world.vegetation,
 				topography: world.topography,
 				slopeScore: world.slopeScore,
 				oceanDist: world.oceanDist,
 			},
-		)
+		})
 		const speeds = vectors.windSpeed
 		let sum = 0
 		let max = 0
@@ -3568,7 +3554,7 @@ export const GenesisView: React.FC = () => {
 						(resolvedClimateMonth - 1) * N,
 						resolvedClimateMonth * N,
 					)
-		return computeThermalEquatorLine(world.mesh, temps)
+		return computeThermalEquatorLine({ mesh: world.mesh, temps })
 	}, [resolvedClimateMonth, world])
 
 	useEffect(() => {
@@ -3579,12 +3565,12 @@ export const GenesisView: React.FC = () => {
 
 	const windGrid = useMemo(() => {
 		if (!windVectors || !world) return null
-		return computeWindGrid(
-			world.mesh,
-			windVectors.windU,
-			windVectors.windV,
-			windVectors.windSpeed,
-		)
+		return computeWindGrid({
+			mesh: world.mesh,
+			windU: windVectors.windU,
+			windV: windVectors.windV,
+			windSpeed: windVectors.windSpeed,
+		})
 	}, [windVectors, world])
 
 	const oceanCurrentGrid = useMemo(() => {
@@ -3595,7 +3581,7 @@ export const GenesisView: React.FC = () => {
 			monthlyWarmth && currentMonth > 0
 				? monthlyWarmth.subarray((currentMonth - 1) * N, currentMonth * N)
 				: world.oceanCurrents.oceanWarmth
-		const { latDeg, lonDeg, regionBin } = getClimateGeometry(world.mesh)
+		const { latDeg, lonDeg } = getClimateGeometry(world.mesh)
 		if (world.params.tideLock?.type === "solar") {
 			return buildLockedOceanCurrentGrid({
 				mesh: world.mesh,
@@ -3607,18 +3593,15 @@ export const GenesisView: React.FC = () => {
 				currentMonth,
 			})
 		}
-		return buildOceanCurrentGrid(
-			world.mesh,
-			warmth,
-			world.isLand,
+		return buildOceanCurrentGrid({
+			mesh: world.mesh,
+			oceanWarmth: warmth,
+			isLand: world.isLand,
 			latDeg,
 			lonDeg,
-			isRetrogradeObliquity(world.params.obliquity),
-			undefined,
-			regionBin,
-			world.params.hoursPerDay,
-			world.params.planetRadiusKm,
-		)
+			reverseCirculation: isRetrogradeObliquity(world.params.obliquity),
+			planetRadiusKm: world.params.planetRadiusKm,
+		})
 	}, [world, showOceanCurrents, currentMonth])
 
 	// Particles replace the static arrow overlay — keep arrows cleared
@@ -6610,14 +6593,7 @@ export const GenesisView: React.FC = () => {
 		const timelineEvents = allEvents
 			.filter((event) => eventInvolvesNation(event, nationId))
 			.map((event, index) =>
-				buildProceduralWikiTimelineEvent(
-					event,
-					nationId,
-					allEvents,
-					getNationName,
-					getNationColor,
-					index,
-				),
+				buildProceduralWikiTimelineEvent({ event, viewingNation: nationId, pastEvents: allEvents, getNationName, getNationColor, index }),
 			)
 		return {
 			title: selectedNation.name,
@@ -8013,14 +7989,14 @@ export const GenesisView: React.FC = () => {
 
 	const tidalSchedulePreview = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
-			return computeMoonTidalSchedule(
-				focusedMoon,
-				{
+			return computeMoonTidalSchedule({
+				moon: focusedMoon,
+				parent: {
 					idx: focusedMoonParent.idx,
 					massKg: focusedMoonParent.massKg,
 					moons: focusedMoonParent.moons,
 				},
-				{
+				params: {
 					daysPerYear,
 					hoursPerDay,
 					spectralClass,
@@ -8029,7 +8005,7 @@ export const GenesisView: React.FC = () => {
 					eccentricity: focusedMoonParent.eccentricity,
 					perihelion,
 				},
-			)
+			})
 		}
 		const scheduleParams = {
 			seed,
@@ -8043,7 +8019,7 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			perihelion,
 		}
-		return computeTidalSchedule(displayMoons, scheduleParams)
+		return computeTidalSchedule({ moons: displayMoons, params: scheduleParams })
 	}, [
 		focusedMoon,
 		focusedMoonParent,
@@ -8063,16 +8039,16 @@ export const GenesisView: React.FC = () => {
 	const solStarName = restSeed === SYSTEM.SOL_SEED ? "Sol" : undefined
 	const surfaceTidesM = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
-			return computeMoonSurfaceTidesM(
-				focusedMoon,
-				{
+			return computeMoonSurfaceTidesM({
+				moon: focusedMoon,
+				parent: {
 					name:
 						restSeed === SYSTEM.SOL_SEED ? focusedMoonParent.name : undefined,
 					massKg: focusedMoonParent.massKg,
 					diameterKm: focusedMoonParent.diameterKm,
 					moons: focusedMoonParent.moons,
 				},
-				{
+				params: {
 					hoursPerDay,
 					spectralClass,
 					starSubtype,
@@ -8080,12 +8056,12 @@ export const GenesisView: React.FC = () => {
 					eccentricity: focusedMoonParent.eccentricity,
 					starName: solStarName,
 				},
-			)
+			})
 		}
-		return computeSurfaceTidesM(
-			displayMoons,
-			{ diameterKm: planetRadiusKm * 2, tideLock },
-			{
+		return computeSurfaceTidesM({
+			moons: displayMoons,
+			planet: { diameterKm: planetRadiusKm * 2, tideLock },
+			params: {
 				hoursPerDay,
 				spectralClass,
 				starSubtype,
@@ -8093,7 +8069,7 @@ export const GenesisView: React.FC = () => {
 				eccentricity,
 				starName: solStarName,
 			},
-		)
+		})
 	}, [
 		focusedMoon,
 		focusedMoonParent,

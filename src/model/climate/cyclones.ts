@@ -13,24 +13,20 @@
  * that the Coriolis no-go zone around the thermal equator covers the entire
  * valid formation band (roughly hoursPerDay > 61 h).
  */
-import type {
-	GenesisClimate,
-	GenesisOceanCurrents,
-	GenesisParams,
-	SphereMesh,
-} from ".."
+
 import { clamp, HOURS_PER_DAY, smoothstep } from "../shared"
 import { TOPO_OCEAN } from "../terrain"
 import { computeThermalEquator, getClimateGeometry } from "./rain"
+import type { ComputeCycloneRiskParams } from "./types"
 
-export function computeCycloneRisk(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	isLand: Uint8Array,
-	topography: Uint8Array,
-	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">,
-	oceanCurrents?: GenesisOceanCurrents | null,
-): Float32Array {
+export function computeCycloneRisk({
+	mesh,
+	climate,
+	isLand,
+	topography,
+	params,
+	oceanCurrents,
+}: ComputeCycloneRiskParams): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
@@ -51,7 +47,10 @@ export function computeCycloneRisk(
 	const SST_THRESHOLD = globalMeanTemp + 11
 	const SST_RANGE = 12 // full score at threshold + 12°C
 
-	const annualTEQ = computeThermalEquator(mesh, climate.temperature_avg)
+	const annualTEQ = computeThermalEquator({
+		mesh,
+		temps: climate.temperature_avg,
+	})
 
 	// --- Step 1: Genesis potential (ocean cells only) ---
 	const genesis = new Float32Array(N)

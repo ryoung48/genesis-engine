@@ -2,6 +2,11 @@
 import { getSettlementRenderThresholds } from "@/model/society"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
+import type {
+	BuildGlobeRealSettlementsParams,
+	BuildMapRealSettlementsParams,
+	BuildMapSettlementsParams,
+} from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 const SETTLEMENT_LIFT = 0.005
@@ -398,13 +403,13 @@ function settlementPositionMap(
 	return [x, y, z]
 }
 
-export function buildMapSettlements(
-	world: SerializedGenesisWorld,
-	locations: Int32Array,
-	urbanPop: Float32Array,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-): THREE.Group {
+export function buildMapSettlements({
+	world,
+	locations,
+	urbanPop,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+}: BuildMapSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
 	if (!world.provinces) return group
 
@@ -482,14 +487,14 @@ function lonLatToUnitXyz(
 	return [Math.cos(lon) * cosLat, Math.sin(lon) * cosLat, Math.sin(lat)]
 }
 
-export function buildGlobeRealSettlements(
-	lats: Float32Array,
-	lons: Float32Array,
-	populations: Float32Array,
-	provinceIds: Int32Array,
-	capitalProvinceIds: ReadonlySet<number>,
-	indices: number[],
-): THREE.Group {
+export function buildGlobeRealSettlements({
+	lats,
+	lons,
+	populations,
+	provinceIds,
+	capitalProvinceIds,
+	indices,
+}: BuildGlobeRealSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
 	const tiers = realSettlementTiers()
 	const tierTextures = tiers.map((tier) => ({
@@ -523,16 +528,16 @@ export function buildGlobeRealSettlements(
 	return group
 }
 
-export function buildMapRealSettlements(
-	lats: Float32Array,
-	lons: Float32Array,
-	populations: Float32Array,
-	provinceIds: Int32Array,
-	capitalProvinceIds: ReadonlySet<number>,
-	indices: number[],
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-): THREE.Group {
+export function buildMapRealSettlements({
+	lats,
+	lons,
+	populations,
+	provinceIds,
+	capitalProvinceIds,
+	indices,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+}: BuildMapRealSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
 	const tiers = realSettlementTiers()
 	const tierTextures = tiers.map((tier) => ({

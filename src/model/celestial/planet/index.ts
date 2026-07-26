@@ -1,52 +1,27 @@
-export type { ClassifiedEnvironment } from "./environment/classification"
-export type * from "./types"
-
-import {
-	auFromTemperature,
-	buildClassificationEnvironment,
-	buildDensityProfile,
-	classifyBody,
-	classifyGroup,
-	deviationToAU,
-	estimateDeviationFromOrbitalDistance,
-	hydrosphereCodeFromWaterPct,
-	rollClassificationAssignment,
-	zoneFromDeviation,
-} from "./environment"
-import {
-	applySystemSeismology,
-	computeMoonTidalHeatingRaw,
-	MAX_SAFE_MOON_TIDAL_HEATING,
-} from "./seismology"
-import {
-	estimateGasGiantSizeClass,
-	estimatePlanetarySizeClass,
-	estimateRockySizeClass,
-} from "./size-class"
-import {
-	deriveTideLockStatus,
-	rollMoonTideLock,
-	rollPlanetTideLock,
-} from "./tide-lock"
+import { ENVIRONMENT } from "./environment"
+import { SEISMOLOGY } from "./seismology"
+import { SIZE_CLASS } from "./size-class"
+import { TIDE_LOCK } from "./tide-lock"
 
 export const PLANET = {
-	auFromTemperature,
-	buildClassificationEnvironment,
-	buildDensityProfile,
-	classifyBody,
-	classifyGroup,
-	computeMoonTidalHeatingRaw,
-	deviationToAU,
-	deriveTideLockStatus,
-	estimateDeviationFromOrbitalDistance,
-	estimateGasGiantSizeClass,
-	estimatePlanetarySizeClass,
-	estimateRockySizeClass,
-	hydrosphereCodeFromWaterPct,
-	rollClassificationAssignment,
-	rollMoonTideLock,
-	rollPlanetTideLock,
-	zoneFromDeviation,
-	MAX_SAFE_MOON_TIDAL_HEATING,
-	applySystemSeismology,
+	auFromTemperature: ENVIRONMENT.auFromTemperature,
+	buildClassificationEnvironment: ENVIRONMENT.buildClassificationEnvironment,
+	buildDensityProfile: ENVIRONMENT.buildDensityProfile,
+	classifyBody: ENVIRONMENT.classifyBody,
+	classifyGroup: ENVIRONMENT.classifyGroup,
+	computeMoonTidalHeatingRaw: SEISMOLOGY.computeMoonTidalHeatingRaw,
+	deviationToAU: ENVIRONMENT.deviationToAU,
+	deriveTideLockStatus: TIDE_LOCK.deriveTideLockStatus,
+	estimateDeviationFromOrbitalDistance:
+		ENVIRONMENT.estimateDeviationFromOrbitalDistance,
+	estimateGasGiantSizeClass: SIZE_CLASS.estimateGasGiant,
+	estimatePlanetarySizeClass: SIZE_CLASS.estimatePlanetary,
+	estimateRockySizeClass: SIZE_CLASS.estimateRocky,
+	hydrosphereCodeFromWaterPct: ENVIRONMENT.codeFromWaterPct,
+	rollClassificationAssignment: ENVIRONMENT.rollClassificationAssignment,
+	rollMoonTideLock: TIDE_LOCK.rollMoonTideLock,
+	rollPlanetTideLock: TIDE_LOCK.rollPlanetTideLock,
+	zoneFromDeviation: ENVIRONMENT.zoneFromDeviation,
+	MAX_SAFE_MOON_TIDAL_HEATING: SEISMOLOGY.MAX_SAFE_MOON_TIDAL_HEATING,
+	applySystemSeismology: SEISMOLOGY.applySystemSeismology,
 }

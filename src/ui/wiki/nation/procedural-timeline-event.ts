@@ -1,8 +1,8 @@
 ﻿import { formatEu4Days } from "@/model/earth"
-import type { HistoryNote } from "@/model/history"
 import { historyMsToEu4Days } from "@/model/history"
 import type { WikiTimelineEvent } from "../shared/WikiTimeline"
 import { getEventDescription, getEventDotColor } from "./event-description"
+import type { BuildProceduralWikiTimelineEventParams } from "./types"
 
 const NATION_TOKEN_RE = /#(-?\d+)/g
 
@@ -14,14 +14,14 @@ const NATION_TOKEN_RE = /#(-?\d+)/g
  * against earth-history's own nation reference table. Only nation mentions
  * are supported for now -- provinces/cultures/religions/dynasties/
  * organizations/wars aren't tracked by the sim's event log yet. */
-export function buildProceduralWikiTimelineEvent(
-	event: HistoryNote,
-	viewingNation: number,
-	pastEvents: HistoryNote[],
-	getNationName: (nationId: number) => string,
-	getNationColor: (nationId: number) => string | null,
-	index: number,
-): WikiTimelineEvent {
+export function buildProceduralWikiTimelineEvent({
+	event,
+	viewingNation,
+	pastEvents,
+	getNationName,
+	getNationColor,
+	index,
+}: BuildProceduralWikiTimelineEventParams): WikiTimelineEvent {
 	const raw = getEventDescription(event, { pastEvents, viewingNation })
 	const mentions = new Map<
 		string,

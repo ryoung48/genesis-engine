@@ -1,12 +1,18 @@
 import { STAR } from "@/model/celestial/star"
-import type {
-	GenesisClimate,
-	GenesisHydrology,
-	GenesisParams,
-	GenesisRainfall,
-	SphereMesh,
-} from ".."
 import { computeAetFromPet, fillPetMonthlyHargreaves } from "./hydrology"
+import type {
+	AssignEarthPastaClimateParams,
+	AssignPastaClimateParams,
+	ClassifyLandParams,
+	ClassifyOceanParams,
+	ComputePastaZonesParams,
+	GddiDayParams,
+	GddTotalParams,
+	GdmParams,
+	PastaDebug,
+} from "./types"
+
+export type { PastaDebug } from "./types"
 
 const ZONE_COLOR_MAP = {
 	Ofi: [220, 245, 255],
@@ -240,17 +246,17 @@ const OCEAN = {
 
 // Pre-resolved zone indices — avoids Map lookups and string allocations in the hot loop
 const Z = Object.fromEntries(
-	PASTA_LABELS.map((label, index) => [label, index]),
+	PASTA_LABELS.map((label) => [label, PASTA_LABELS.indexOf(label)]),
 ) as Record<string, number>
 
-function gdm(
-	temp: number,
-	monthDays: number,
-	base: number,
-	platStart: number,
-	platEnd: number,
-	comp: number,
-): number {
+function gdm({
+	temp,
+	monthDays,
+	base,
+	platStart,
+	platEnd,
+	comp,
+}: GdmParams): number {
 	const max = platStart - base
 	const backSlope = max / (comp - platEnd)
 	let gdd = temp - base
@@ -259,7 +265,7 @@ function gdm(
 	return (gdd > 0 ? gdd : 0) * monthDays
 }
 
-function gddiDay(insolationWm2: number, baseline: number): number {
+function gddiDay({ insolationWm2, baseline }: GddiDayParams): number {
 	const effective = insolationWm2 * 0.5
 	const v = (effective - baseline) * 0.1
 	return v < 0 ? 0 : v > 20 ? 20 : v
@@ -289,13 +295,13 @@ function longestRun(monthly: Float64Array): number {
 	return maxSum
 }
 
-function gddTotal(
-	gdd: Float64Array,
-	gint: Float64Array,
-	gddAcc: Float64Array,
-	giAcc: Float64Array,
-	threshold: number,
-): number {
+function gddTotal({
+	gdd,
+	gint,
+	gddAcc,
+	giAcc,
+	threshold,
+}: GddTotalParams): number {
 	for (let t = 0; t < 12; t++) giAcc[t] = gint[t]
 
 	for (let pass = 0; pass < 2; pass++) {
@@ -339,29 +345,42 @@ function gddTotal(
 	return allPos ? Infinity : max
 }
 
-function classifyOcean(
-	temps: Float64Array,
-	insol: Float64Array,
-	mGDDz: Float64Array,
-	mGInt: Float64Array,
-	gddAccBuf: Float64Array,
-	giAccBuf: Float64Array,
-	iceMin: number,
-	iceMax: number,
-	dpm: number,
-	warmest: number,
-	coldest: number,
-): { zone: number } {
+function classifyOcean({
+	temps,
+	insol,
+	mGDDz,
+	mGInt,
+	gddAccBuf,
+	giAccBuf,
+	iceMin,
+	iceMax,
+	dpm,
+	warmest,
+	coldest,
+}: ClassifyOceanParams): { zone: number } {
 	// Only need gddz for ocean classification
 	for (let m = 0; m < 12; m++) {
-		const g0 = gdm(temps[m], dpm, 0, 20, 40, 60)
-		const lightZero = gddiDay(insol[m], 0)
+		const g0 = gdm({
+			temp: temps[m],
+			monthDays: dpm,
+			base: 0,
+			platStart: 20,
+			platEnd: 40,
+			comp: 60,
+		})
+		const lightZero = gddiDay({ insolationWm2: insol[m], baseline: 0 })
 		const effectiveGDDz = g0 < lightZero * dpm ? g0 : lightZero * dpm
 		mGDDz[m] = g0 > 0 && lightZero > 0 ? effectiveGDDz : 0
 		const v = 15 * dpm - effectiveGDDz
 		mGInt[m] = v > 0 ? v : 0
 	}
-	const gddz = gddTotal(mGDDz, mGInt, gddAccBuf, giAccBuf, 1250)
+	const gddz = gddTotal({
+		gdd: mGDDz,
+		gint: mGInt,
+		gddAcc: gddAccBuf,
+		giAcc: giAccBuf,
+		threshold: 1250,
+	})
 
 	// Sea ice from ice accumulation model (1cm snow ≈ 10% cover, per Pasta spec):
 	//   minIce > 80mm (8cm) all months → permanent ice (Ofi)
@@ -381,22 +400,22 @@ function classifyOcean(
 // MinIce > 10cm (100mm w.e.) for CI, per Worldbuilding Pasta spec
 const ICE_THRESHOLD = 100
 
-function classifyLand(
-	temps: Float64Array,
-	rain: Float64Array,
-	insol: Float64Array,
-	petBuf: Float64Array,
-	aetBuf: Float64Array,
-	mGDD: Float64Array,
-	mGDDz: Float64Array,
-	mGInt: Float64Array,
-	gddAccBuf: Float64Array,
-	giAccBuf: Float64Array,
-	iceVal: number,
-	dpm: number,
-	warmest: number,
-	coldest: number,
-): {
+function classifyLand({
+	temps,
+	rain,
+	insol,
+	petBuf,
+	aetBuf,
+	mGDD,
+	mGDDz,
+	mGInt,
+	gddAccBuf,
+	giAccBuf,
+	iceVal,
+	dpm,
+	warmest,
+	coldest,
+}: ClassifyLandParams): {
 	zone: number
 	gdd: number
 	gint: number
@@ -412,10 +431,24 @@ function classifyLand(
 		gddWeightSum = 0
 	for (let m = 0; m < 12; m++) {
 		const temp = temps[m]
-		const g5 = gdm(temp, dpm, 5, 25, 40, 50)
-		const g0 = gdm(temp, dpm, 0, 20, 40, 60)
-		const lightStd = gddiDay(insol[m], 20)
-		const lightZero = gddiDay(insol[m], 0)
+		const g5 = gdm({
+			temp,
+			monthDays: dpm,
+			base: 5,
+			platStart: 25,
+			platEnd: 40,
+			comp: 50,
+		})
+		const g0 = gdm({
+			temp,
+			monthDays: dpm,
+			base: 0,
+			platStart: 20,
+			platEnd: 40,
+			comp: 60,
+		})
+		const lightStd = gddiDay({ insolationWm2: insol[m], baseline: 20 })
+		const lightZero = gddiDay({ insolationWm2: insol[m], baseline: 0 })
 		const ceiling = 15 * dpm
 		const effectiveGDDz = g0 < lightZero * dpm ? g0 : lightZero * dpm
 
@@ -433,8 +466,20 @@ function classifyLand(
 		gddWeightSum += g5
 	}
 
-	const gdd = gddTotal(mGDD, mGInt, gddAccBuf, giAccBuf, 1250)
-	const gddz = gddTotal(mGDDz, mGInt, gddAccBuf, giAccBuf, 1250)
+	const gdd = gddTotal({
+		gdd: mGDD,
+		gint: mGInt,
+		gddAcc: gddAccBuf,
+		giAcc: giAccBuf,
+		threshold: 1250,
+	})
+	const gddz = gddTotal({
+		gdd: mGDDz,
+		gint: mGInt,
+		gddAcc: gddAccBuf,
+		giAcc: giAccBuf,
+		threshold: 1250,
+	})
 	const gint = longestRun(mGInt)
 	const ar = petSum > 0 ? aetSum / petSum : 1
 	const gar = petGdd > 0 ? aetGdd / petGdd : 1
@@ -551,36 +596,27 @@ function classifyLand(
 	}
 }
 
-export interface PastaDebug {
-	gdd: Float32Array
-	gint: Float32Array
-	gdd_monthly: Float32Array
-	gint_monthly: Float32Array
-	minT: Float32Array
-	maxT: Float32Array
-}
-
 /**
  * Core Pasta classification from raw per-region arrays, flattened
  * [month * numRegions + region] for monthly fields. Shared by the procedural
  * model (assignPastaClimate) and the observed-Earth approximation
  * (assignEarthPastaClimate).
  */
-function computePastaZones(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	temperatureMonthly: Float32Array,
-	temperatureMax: Float32Array,
-	temperatureMin: Float32Array,
-	insolationMonthly: Float32Array,
-	rainfallMonthly: Float32Array,
-	petMonthly: Float32Array,
-	aetMonthly: Float32Array,
-	params: GenesisParams,
-	iceThickness?: Float32Array,
-	iceMinMonthly?: Float32Array,
-	iceMaxMonthly?: Float32Array,
-): { zones: Uint8Array; debug: PastaDebug } {
+function computePastaZones({
+	mesh,
+	isLand,
+	temperatureMonthly,
+	temperatureMax,
+	temperatureMin,
+	insolationMonthly,
+	rainfallMonthly,
+	petMonthly,
+	aetMonthly,
+	params,
+	iceThickness,
+	iceMinMonthly,
+	iceMaxMonthly,
+}: ComputePastaZonesParams): { zones: Uint8Array; debug: PastaDebug } {
 	const N = mesh.numRegions
 	const dpm = params.daysPerYear / 12
 	const output = new Uint8Array(N)
@@ -621,19 +657,19 @@ function computePastaZones(
 		debug.maxT[r] = warmest
 		if (!isLand[r]) {
 			// Ocean: skip AET/PET, only needs temps + insolation + ice
-			const result = classifyOcean(
+			const result = classifyOcean({
 				temps,
 				insol,
 				mGDDz,
 				mGInt,
 				gddAccBuf,
 				giAccBuf,
-				iceMinMonthly ? iceMinMonthly[r] : 0,
-				iceMaxMonthly ? iceMaxMonthly[r] : 0,
+				iceMin: iceMinMonthly ? iceMinMonthly[r] : 0,
+				iceMax: iceMaxMonthly ? iceMaxMonthly[r] : 0,
 				dpm,
 				warmest,
 				coldest,
-			)
+			})
 			output[r] = result.zone
 		} else {
 			for (let m = 0; m < 12; m++) {
@@ -642,7 +678,7 @@ function computePastaZones(
 				petBuf[m] = petMonthly[idx]
 				aetBuf[m] = aetMonthly[idx]
 			}
-			const result = classifyLand(
+			const result = classifyLand({
 				temps,
 				rain,
 				insol,
@@ -653,11 +689,11 @@ function computePastaZones(
 				mGInt,
 				gddAccBuf,
 				giAccBuf,
-				iceThickness ? iceThickness[r] : 0,
+				iceVal: iceThickness ? iceThickness[r] : 0,
 				dpm,
 				warmest,
 				coldest,
-			)
+			})
 			output[r] = result.zone
 			debug.gdd[r] = result.gdd
 			debug.gint[r] = result.gint === Infinity ? 99999 : result.gint
@@ -671,32 +707,32 @@ function computePastaZones(
 	return { zones: output, debug }
 }
 
-export function assignPastaClimate(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	climate: GenesisClimate,
-	rainfall: GenesisRainfall,
-	hydrology: GenesisHydrology,
-	params: GenesisParams,
-	iceThickness?: Float32Array,
-	iceMinMonthly?: Float32Array,
-	iceMaxMonthly?: Float32Array,
-): { zones: Uint8Array; debug: PastaDebug } {
-	return computePastaZones(
+export function assignPastaClimate({
+	mesh,
+	isLand,
+	climate,
+	rainfall,
+	hydrology,
+	params,
+	iceThickness,
+	iceMinMonthly,
+	iceMaxMonthly,
+}: AssignPastaClimateParams): { zones: Uint8Array; debug: PastaDebug } {
+	return computePastaZones({
 		mesh,
 		isLand,
-		climate.temperature_monthly,
-		climate.temperature_max,
-		climate.temperature_min,
-		climate.insolation_monthly,
-		rainfall.monthly,
-		climate.pet_monthly,
-		hydrology.aet_monthly,
+		temperatureMonthly: climate.temperature_monthly,
+		temperatureMax: climate.temperature_max,
+		temperatureMin: climate.temperature_min,
+		insolationMonthly: climate.insolation_monthly,
+		rainfallMonthly: rainfall.monthly,
+		petMonthly: climate.pet_monthly,
+		aetMonthly: hydrology.aet_monthly,
 		params,
 		iceThickness,
 		iceMinMonthly,
 		iceMaxMonthly,
-	)
+	})
 }
 
 /**
@@ -713,17 +749,19 @@ export function assignPastaClimate(
  * counterpart for either. Returns undefined if real climate or rainfall data
  * isn't attached.
  */
-export function assignEarthPastaClimate(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	climate: GenesisClimate,
-	rainfall: GenesisRainfall,
-	params: GenesisParams,
-	realDtrMonthly?: Float32Array,
-	iceThickness?: Float32Array,
-	iceMinMonthly?: Float32Array,
-	iceMaxMonthly?: Float32Array,
-): { zones: Uint8Array; debug: PastaDebug } | undefined {
+export function assignEarthPastaClimate({
+	mesh,
+	isLand,
+	climate,
+	rainfall,
+	params,
+	realDtrMonthly,
+	iceThickness,
+	iceMinMonthly,
+	iceMaxMonthly,
+}: AssignEarthPastaClimateParams):
+	| { zones: Uint8Array; debug: PastaDebug }
+	| undefined {
 	const temperatureMonthly = climate.real_temperature_monthly
 	const rainfallMonthly = rainfall.real_monthly
 	if (!temperatureMonthly || !rainfallMonthly) return undefined
@@ -769,13 +807,13 @@ export function assignEarthPastaClimate(
 		for (let m = 0; m < 12; m++) aetMonthly[m * N + r] = aetBuf[m]
 	}
 
-	return computePastaZones(
+	return computePastaZones({
 		mesh,
 		isLand,
 		temperatureMonthly,
 		temperatureMax,
 		temperatureMin,
-		climate.insolation_monthly,
+		insolationMonthly: climate.insolation_monthly,
 		rainfallMonthly,
 		petMonthly,
 		aetMonthly,
@@ -783,7 +821,7 @@ export function assignEarthPastaClimate(
 		iceThickness,
 		iceMinMonthly,
 		iceMaxMonthly,
-	)
+	})
 }
 
 export function pastaClimateColor(zoneCode: number): [number, number, number] {

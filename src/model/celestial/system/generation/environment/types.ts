@@ -1,4 +1,4 @@
-import type { Zone } from "../../../planet"
+import type { Zone } from "../../../planet/types"
 
 export interface Slot {
 	zone: Zone

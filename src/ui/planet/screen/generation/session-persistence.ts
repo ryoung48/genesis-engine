@@ -1,5 +1,8 @@
-﻿import type { MoonBody } from "@/model/celestial/moons"
-import type { SolarSystemState, SystemBody } from "@/model/celestial/system"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
+import type {
+	SolarSystemState,
+	SystemBody,
+} from "@/model/celestial/system/types"
 import { GENERATION_SESSION_STORAGE_KEY } from "./defaults"
 import {
 	GENERATION_PREVIEW_TABS,

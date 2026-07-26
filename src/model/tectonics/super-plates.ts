@@ -5,15 +5,16 @@
  * Faithful port of genesis's super-plates.js.
  */
 import type { PlateVec, SphereMesh, SuperPlateData } from ".."
+import type { BuildSuperPlatesParams } from "./types"
 
-export function buildSuperPlates(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plateSeeds: number[],
-	plateVec: Map<number, PlateVec>,
-	plateIsOcean: Set<number>,
-	plateDensity: Map<number, number>,
-): SuperPlateData {
+export function buildSuperPlates({
+	mesh,
+	r_plate,
+	plateSeeds,
+	plateVec,
+	plateIsOcean,
+	plateDensity,
+}: BuildSuperPlatesParams): SuperPlateData {
 	const { numRegions, adjOffset, adjList } = mesh
 	const numPlates = plateSeeds.length
 

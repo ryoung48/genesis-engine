@@ -1,11 +1,8 @@
-export type * from "./types"
-
 import { HOURS_PER_DAY } from "@/model/shared"
 import type {
 	DensityFromMassAndDiameterInput,
 	MassFromDensityInput,
 } from "./types"
-
 export const EARTH_DIAMETER_KM = 12_742
 export const EARTH_MASS_KG = 5.973886146404331e24
 export const EARTH_RADIUS_M = (EARTH_DIAMETER_KM * 1000) / 2

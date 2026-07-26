@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { MoonBody } from "@/model/celestial/moons"
-import { derivePlanetMassKg, moonSemiMajorAxisM } from "@/model/celestial/moons"
+import { MECHANICS } from "@/model/celestial/moons/mechanics"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import { type MainSequenceClass, STAR } from "@/model/celestial/star"
-import type { SystemBody } from "@/model/celestial/system"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+import { STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
 import {
 	SOL_MAIN_WORLD_NAME,
 	SOL_STAR_NAME,
 } from "@/model/celestial/system/sol-system"
+import type { SystemBody } from "@/model/celestial/system/types"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule"
 import {
 	computeMoonSurfaceTidesM,
 	computeSurfaceTidesM,
@@ -440,9 +443,7 @@ export function GenerationPlanetNavigator({
 		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
 	surfaceTidesM?: SurfaceTidesBreakdown
-	setTideLock: (
-		v: import("@/model/celestial/orbit-body").TideLock | null,
-	) => void
+	setTideLock: (v: TideLock | null) => void
 	setHoursPerDay: (v: number) => void
 	radiusSlider?: SliderDef
 	orbitalDistanceSlider?: SliderDef
@@ -473,7 +474,7 @@ export function GenerationPlanetNavigator({
 	setStarSubtype: (v: number) => void
 	setRestSeed: (v: number) => void
 	setObliquity: (v: number) => void
-	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
+	tidalSchedulePreview?: TidalSchedule
 	generationPreviewTab: GenerationPreviewTab
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
@@ -717,7 +718,7 @@ export function GenerationPlanetNavigator({
 	useEffect(() => {
 		setSeedInput(seedDisplay)
 	}, [seedDisplay])
-	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
+	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 	const focusSelection = useCallback(
 		(nextSelection: OrbitSelection) => {
 			if (!onFocusBody) return
@@ -776,13 +777,14 @@ export function GenerationPlanetNavigator({
 	const getMainWorldMoonOrbitDistance = useCallback(
 		(moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
-			moonSemiMajorAxisM({ moon, planetMassKg }) / (planetRadiusKm * 2000),
+			MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }) /
+				(planetRadiusKm * 2000),
 		[planetMassKg, planetRadiusKm],
 	)
 	const getBodyMoonOrbitDistance = useCallback(
 		(body: SystemBody, moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
-			moonSemiMajorAxisM({ moon, planetMassKg: body.massKg }) /
+			MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg: body.massKg }) /
 				(body.diameterKm * 1000),
 		[],
 	)
@@ -847,10 +849,13 @@ export function GenerationPlanetNavigator({
 					? undefined
 					: isMainWorld
 						? surfaceTidesM
-						: computeSurfaceTidesM(
-								body.moons,
-								{ diameterKm: body.diameterKm, tideLock: body.tideLock },
-								{
+						: computeSurfaceTidesM({
+								moons: body.moons,
+								planet: {
+									diameterKm: body.diameterKm,
+									tideLock: body.tideLock,
+								},
+								params: {
 									// This body's own rotation, not the main world's
 									// hoursPerDay slider -- matches the moon-level card's
 									// parentHoursPerDay convention below.
@@ -864,7 +869,7 @@ export function GenerationPlanetNavigator({
 											? SOL_STAR_NAME
 											: undefined,
 								},
-							)
+							})
 			const bodyTitle =
 				isMainWorld && !body.name
 					? appendSizeToTitle(
@@ -1086,7 +1091,8 @@ export function GenerationPlanetNavigator({
 			const parentPerihelionDeg = body.longitudeOfPerihelionDeg
 			const pd = isMainWorld
 				? (moon.semiMajorAxisPlanetDiameters ??
-					moonSemiMajorAxisM({ moon, planetMassKg }) / (planetRadiusKm * 2000))
+					MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }) /
+						(planetRadiusKm * 2000))
 				: getBodyMoonOrbitDistance(body, moon)
 			const parentTitle =
 				isMainWorld && !body.name
@@ -1182,9 +1188,9 @@ export function GenerationPlanetNavigator({
 									: undefined,
 							),
 					}),
-					surfaceTidesM: computeMoonSurfaceTidesM(
+					surfaceTidesM: computeMoonSurfaceTidesM({
 						moon,
-						{
+						parent: {
 							name:
 								showRealSolNames && isMainWorld
 									? SOL_MAIN_WORLD_NAME
@@ -1195,7 +1201,7 @@ export function GenerationPlanetNavigator({
 							diameterKm: parentDiameterKm,
 							moons: parentMoons,
 						},
-						{
+						params: {
 							hoursPerDay: parentHoursPerDay,
 							spectralClass,
 							starSubtype,
@@ -1206,7 +1212,7 @@ export function GenerationPlanetNavigator({
 									? SOL_STAR_NAME
 									: undefined,
 						},
-					),
+					}),
 					pdOverride: pd,
 					parentOrbitalPeriodDays,
 					onUpdateMoon:

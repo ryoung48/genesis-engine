@@ -1,5 +1,6 @@
 ﻿import { useMemo } from "react"
-import { type MainSequenceClass, STAR } from "@/model/celestial/star"
+import { STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import {
 	EMB_CONSTANTS,
 	EnergyBalanceModel,

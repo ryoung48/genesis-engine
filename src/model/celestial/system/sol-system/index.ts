@@ -1,36 +1,31 @@
 import { ASTRONOMICAL_DAYS_PER_YEAR, HOURS_PER_DAY } from "@/model/shared"
 import { createRng } from "@/model/shared/rng"
-import type { MoonBody } from "../../moons"
 import { MOON } from "../../moons"
+import type { MoonBody } from "../../moons/types"
 import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../orbit-body"
 import { PLANET } from "../../planet"
 import { STAR } from "../../star"
 import type { SolarSystemState, SystemBody } from "../types"
-import type { SolMoonSeed, SolPlanetSeed } from "./data"
-import {
-	SOL_PLANET_RINGS_BY_NAME,
-	SOL_PLANET_SEEDS,
-	SOL_STAR_AGE_GYR,
-} from "./data"
+import * as SOL_DATA from "./data"
+import type { BuildPlanetOptions, SolMoonSeed, SolPlanetSeed } from "./types"
 
-export {
-	SOL_EARTH_CLOUDS_TEXTURE_PATH,
-	SOL_EARTH_TEXTURE_PATH,
-	SOL_MAIN_WORLD_NAME,
-	SOL_PLANET_RINGS_BY_NAME,
-	SOL_PLANET_SEEDS,
-	SOL_SEED,
-	SOL_STAR_AGE_GYR,
-	SOL_STAR_NAME,
-	type SolMoonSeed,
-	type SolPlanetSeed,
-} from "./data"
+export const SOL_EARTH_CLOUDS_TEXTURE_PATH =
+	SOL_DATA.SOL_EARTH_CLOUDS_TEXTURE_PATH
+export const SOL_EARTH_TEXTURE_PATH = SOL_DATA.SOL_EARTH_TEXTURE_PATH
+export const SOL_MAIN_WORLD_NAME = SOL_DATA.SOL_MAIN_WORLD_NAME
+export const SOL_PLANET_RINGS_BY_NAME = SOL_DATA.SOL_PLANET_RINGS_BY_NAME
+export const SOL_PLANET_SEEDS = SOL_DATA.SOL_PLANET_SEEDS
+export const SOL_SEED = SOL_DATA.SOL_SEED
+export const SOL_STAR_AGE_GYR = SOL_DATA.SOL_STAR_AGE_GYR
+export const SOL_STAR_NAME = SOL_DATA.SOL_STAR_NAME
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-function estimateGasGiantInternalHeatTempK(
-	massEarths: number,
-	ageGyr: number,
-): number {
+function estimateGasGiantInternalHeatTempK({
+	massEarths,
+	ageGyr,
+}: {
+	massEarths: number
+	ageGyr: number
+}): number {
 	return (113.6 * massEarths ** 0.25) / ageGyr
 }
 
@@ -48,8 +43,15 @@ function rollExtras(seedTag: number) {
 	}
 }
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-function buildMoon(seed: SolMoonSeed, idx: number, seedTag: number): MoonBody {
+function buildMoon({
+	seed,
+	idx,
+	seedTag,
+}: {
+	seed: SolMoonSeed
+	idx: number
+	seedTag: number
+}): MoonBody {
 	const rolled = rollExtras(seedTag)
 	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
 	return {
@@ -92,36 +94,25 @@ function buildMoon(seed: SolMoonSeed, idx: number, seedTag: number): MoonBody {
 	}
 }
 
-interface BuildPlanetOptions {
-	/** Real orbital period needs the actual star's mass -- 1 (Sol) for the
-	 * static bodies here, but the main world can orbit an arbitrary
-	 * procedurally-generated star. Defaults to 1. */
-	starMassSol?: number
-	/** The main world's moons come from a live generation pipeline (already-
-	 * built MoonBody), not this file's static SolMoonSeed table -- bypasses
-	 * the seed.moons -> buildMoon() hydration below when supplied. */
-	moonsOverride?: MoonBody[]
-	/** Overrides the seed-authored texture -- only the real Sol seed's Earth
-	 * gets its real texture; a live main world under a different star
-	 * doesn't. */
-	textureOverride?: string
-}
-
 // The single body-hydration path for every Sol body, real or live: Mercury
 // through Pluto hydrate straight from their fixed SolPlanetSeed entries, and
 // the main world (Earth, or a procedurally generated homeworld) hydrates
 // from a freshly-built live seed object whose physical params get
 // overwritten with the user's current UI state before each call -- see
 // generate-system-bodies.ts's buildMainWorldSeed.
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-function buildPlanet(
-	seed: SolPlanetSeed,
-	seedTag: number,
-	idx: number,
+function buildPlanet({
+	seed,
+	seedTag,
+	idx,
 	/** Static seed hydration needs no overrides; live main worlds pass only
 	 * the star/moon/texture values that differ from the Sol table. */
-	options?: BuildPlanetOptions,
-): SystemBody {
+	options,
+}: {
+	seed: SolPlanetSeed
+	seedTag: number
+	idx: number
+	options?: BuildPlanetOptions
+}): SystemBody {
 	const rolled = rollExtras(seedTag)
 	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
 	const massKg = seed.massEarths * EARTH_MASS_KG
@@ -139,7 +130,12 @@ function buildPlanet(
 			: MOON.attachParentTideLocks({
 					moons: (seed.moons ?? []).map(
 						// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-						(moonSeed, i) => buildMoon(moonSeed, i + 1, seedTag * 100 + i + 1),
+						(moonSeed, i) =>
+							buildMoon({
+								seed: moonSeed,
+								idx: i + 1,
+								seedTag: seedTag * 100 + i + 1,
+							}),
 					),
 					parentIdx: idx,
 				})
@@ -153,7 +149,10 @@ function buildPlanet(
 	}))
 	const internalHeatTempK =
 		seed.group === "jovian"
-			? estimateGasGiantInternalHeatTempK(seed.massEarths, SOL_STAR_AGE_GYR)
+			? estimateGasGiantInternalHeatTempK({
+					massEarths: seed.massEarths,
+					ageGyr: SOL_STAR_AGE_GYR,
+				})
 			: 0
 	return {
 		idx,
@@ -228,9 +227,7 @@ function buildPlanet(
 }
 
 export const SOL_SYSTEM = {
-	buildMoon,
 	buildPlanet,
-	estimateGasGiantInternalHeatTempK,
 }
 
 const EARTH_SEED = SOL_PLANET_SEEDS.find((seed) => seed.isMainWorld)
@@ -241,7 +238,8 @@ if (!LUNA_SEED)
 
 const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_PLANET_SEEDS.map(
 	// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-	(seed, i) => buildPlanet(seed, i + 1, seed.isMainWorld ? -1 : i),
+	(seed, i) =>
+		buildPlanet({ seed, seedTag: i + 1, idx: seed.isMainWorld ? -1 : i }),
 ).sort(
 	// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 	(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
@@ -299,7 +297,7 @@ export const SOL_MAIN_WORLD_DEFAULTS = {
 } as const
 
 const SOL_LUNA_BUILT: MoonBody = MOON.attachParentTideLocks({
-	moons: [buildMoon(LUNA_SEED, 1, 0)],
+	moons: [buildMoon({ seed: LUNA_SEED, idx: 1, seedTag: 0 })],
 	parentIdx: -1,
 })[0]!
 export const SOL_LUNA_DEFAULT: MoonBody = {

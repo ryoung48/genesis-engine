@@ -1,6 +1,7 @@
 ﻿import type { BoundaryInfo, SphereMesh } from ".."
 import { SimplexNoise } from "../shared"
 import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
+import type { BuildTangentFrameParams } from "./types"
 
 const VOLC_MIN_SPACING = 0.015
 const VOLC_SIGMA_BASE = 0.005
@@ -78,14 +79,14 @@ export function getLipSpawnChance(volcanism: number): number {
 	return Math.min(1, frequency)
 }
 
-export function buildTangentFrame(
-	px: number,
-	py: number,
-	pz: number,
-	dx: number,
-	dy: number,
-	dz: number,
-): TangentFrame {
+export function buildTangentFrame({
+	px,
+	py,
+	pz,
+	dx,
+	dy,
+	dz,
+}: BuildTangentFrameParams): TangentFrame {
 	const dd = dx * px + dy * py + dz * pz
 	let ux = dx - dd * px
 	let uy = dy - dd * py
@@ -310,7 +311,14 @@ export function appendLargeIgneousProvinceSites(
 	const baseLipStr =
 		LIP_HEIGHT * (0.5 + random()) * (0.5 + upwelling) * landBoost
 	const baseLipSigma = LIP_SIGMA * (0.7 + 0.6 * random())
-	const lipFrame = buildTangentFrame(x, y, z, drift[0], drift[1], drift[2])
+	const lipFrame = buildTangentFrame({
+		px: x,
+		py: y,
+		pz: z,
+		dx: drift[0],
+		dy: drift[1],
+		dz: drift[2],
+	})
 
 	lipSites.push({
 		x,

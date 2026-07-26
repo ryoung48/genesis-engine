@@ -20,6 +20,7 @@ import type {
 	TopographySubMode,
 	VegetationSubMode,
 } from "./OverlayControls"
+import type { ResolveSubModeParams } from "./types"
 
 interface ModeBarProps {
 	colorMode: ColorMode
@@ -38,13 +39,13 @@ interface ModeBarProps {
 	isEarthImport?: boolean
 }
 
-function resolveSubMode(
-	baseMode: ColorMode,
-	vegetationSubMode: VegetationSubMode,
-	climateSubMode: ClimateSubMode,
-	elevationSubMode: "colored" | "grayscale",
-	topographySubMode: TopographySubMode,
-): ColorMode {
+function resolveSubMode({
+	baseMode,
+	vegetationSubMode,
+	climateSubMode,
+	elevationSubMode,
+	topographySubMode,
+}: ResolveSubModeParams): ColorMode {
 	if (baseMode === "vegetation") {
 		if (vegetationSubMode === "maps") return "vegetationMaps"
 		if (vegetationSubMode === "satellite") return "vegetationSatellite"
@@ -106,13 +107,13 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 				value={geographyMode}
 				onChange={(mode) => {
 					setColorMode(
-						resolveSubMode(
-							mode,
+						resolveSubMode({
+							baseMode: mode,
 							vegetationSubMode,
 							climateSubMode,
 							elevationSubMode,
 							topographySubMode,
-						),
+						}),
 					)
 					setGeographyMode(mode)
 				}}
@@ -166,13 +167,13 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 					onChange={(primary: MapModePrimary) => {
 						if (primary === "geography") {
 							setColorMode(
-								resolveSubMode(
-									geographyMode,
+								resolveSubMode({
+									baseMode: geographyMode,
 									vegetationSubMode,
 									climateSubMode,
 									elevationSubMode,
 									topographySubMode,
-								),
+								}),
 							)
 							return
 						}

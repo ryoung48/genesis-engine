@@ -1,6 +1,9 @@
+import type {
+	OrbitChemistry,
+	OrbitComposition,
+} from "@/model/celestial/orbit-body/types"
+import type { Zone } from "@/model/celestial/planet/types"
 import type { SharedRng } from "@/model/shared/rng"
-import type { OrbitChemistry, OrbitComposition } from "../../../../orbit-body"
-import type { Zone } from "../../../types"
 
 export interface ChooseChemistryInput {
 	rng: SharedRng

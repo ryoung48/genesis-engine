@@ -1,6 +1,7 @@
 ﻿import { describe, expect, it } from "vitest"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
-import { type MainSequenceClass, STAR } from "@/model/celestial/star"
+import { STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import {
 	BIOME_LABELS,
 	CLIMATE_LABELS,

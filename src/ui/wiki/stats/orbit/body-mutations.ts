@@ -1,13 +1,11 @@
-﻿import type { MoonBody } from "@/model/celestial/moons"
-import {
-	MOON,
-	moonOrbitalPeriodDaysFromSemiMajorAxisM,
-} from "@/model/celestial/moons"
+﻿import { MOON } from "@/model/celestial/moons"
+import { MECHANICS } from "@/model/celestial/moons/mechanics"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
-import type { SystemBody } from "@/model/celestial/system"
 import { SYSTEM } from "@/model/celestial/system"
+import type { SystemBody } from "@/model/celestial/system/types"
 
 export function updateBodyDiameter(
 	body: SystemBody,
@@ -96,7 +94,7 @@ export function updateMoonSemiMajorAxis(
 	return {
 		...moon,
 		semiMajorAxisPlanetDiameters: pd,
-		orbitalPeriodDays: moonOrbitalPeriodDaysFromSemiMajorAxisM({
+		orbitalPeriodDays: MECHANICS.moonOrbitalPeriodDaysFromSemiMajorAxisM({
 			semiMajorAxisM,
 			planetMassKg: parentBody.massKg,
 		}),

@@ -3,7 +3,7 @@
  * Port of src/model/history/events/population.ts
  */
 
-import { GOVERNMENT_TYPES, type GovernmentType } from "../../society/eras"
+import { GOVERNMENT_TYPES } from "../../society/eras"
 import { getSettlementEraTuning } from "../../society/settlement-tuning"
 import { EVT } from "../event-heap"
 import { PROV } from "../fields"
@@ -16,6 +16,7 @@ import {
 	isSovereign,
 	YEAR_MS,
 } from "../state"
+import type { GovernmentType } from "../../society/types";
 
 const MAX_ADJUSTMENT_RATE = 0.005
 const URBAN_GROWTH = 0.1

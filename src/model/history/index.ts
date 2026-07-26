@@ -144,7 +144,7 @@ function processEventsUntil(
 				runWar(state, dataBuf[0], rng)
 				break
 			case EVT.BATTLE:
-				runBattle(state, dataBuf[0], dataBuf[1], dataBuf[2], rng)
+				runBattle({ state, warIdx: dataBuf[0], eventAttacker: dataBuf[1], eventDefender: dataBuf[2], rng })
 				break
 			case EVT.SUCCESSION:
 				runSuccession(state, dataBuf[0], dataBuf[1], rng)

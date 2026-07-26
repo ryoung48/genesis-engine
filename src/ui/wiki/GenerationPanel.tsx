@@ -1,13 +1,18 @@
 import React, { useMemo, useState } from "react"
 import type { StageTiming } from "@/model"
-import type { MoonBody } from "@/model/celestial/moons"
-import type { SystemBody } from "@/model/celestial/system"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { SYSTEM } from "@/model/celestial/system"
-import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule"
-import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
+import type { SystemBody } from "@/model/celestial/system/types"
+import type {
+	SurfaceTidesBreakdown,
+	TidalSchedule,
+} from "@/model/climate/tidal-schedule"
+import { ERA_CONFIGS, ERA_ORDER } from "@/model/society/eras"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
+import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
 import { SocietyRunesPanel } from "../planet/controls/SocietyRunesPanel"
 import {
 	DEFAULT_WORLD_SECTIONS,
@@ -33,14 +38,13 @@ import {
 	getPostTimingSummary,
 } from "./timing/timing-summary"
 import { type WarWikiData, WarWikiPage } from "./war/WarWikiPage"
+import type { SocietyEra } from "../../model/society/types";
 
 interface GenerationPanelProps {
 	worldTab: "planet" | "society"
 	setWorldTab: (tab: "planet" | "society") => void
 	resetWorldDefaults: () => void
-	setTideLock: (
-		v: import("@/model/celestial/orbit-body").TideLock | null,
-	) => void
+	setTideLock: (v: TideLock | null) => void
 	setObliquity: (v: number) => void
 	restSeed: number
 	starName?: string
@@ -48,7 +52,7 @@ interface GenerationPanelProps {
 	setRestSeed: (v: number) => void
 	forceMainWorld: boolean
 	setForceMainWorld: (v: boolean) => void
-	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
+	tidalSchedulePreview?: TidalSchedule
 	surfaceTidesM?: SurfaceTidesBreakdown
 	orbitBodies?: SystemBody[]
 	/** Full sorted system body list (orbits + main world), used to resolve a
@@ -113,7 +117,7 @@ interface GenerationPanelProps {
 	 * panel) so all generated-world info lives in one place alongside the
 	 * generation controls that produced it. See WorldDetails' own doc for
 	 * why only "planetary" needs no extra gating. */
-	worldDetails: import("@/ui/planet/details/shared").DetailsDrawerBaseProps & {
+	worldDetails: DetailsDrawerBaseProps & {
 		hasGeneratedWorld: boolean
 	}
 	/** When set (a nation has been selected on the map), this wiki page

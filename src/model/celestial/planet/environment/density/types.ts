@@ -1,9 +1,9 @@
-import type { SharedRng } from "@/model/shared/rng"
 import type {
 	AtmosphereProfile,
 	OrbitClassification,
 	OrbitComposition,
-} from "../../../orbit-body"
+} from "@/model/celestial/orbit-body/types"
+import type { SharedRng } from "@/model/shared/rng"
 
 export interface DensityDescriptionInput {
 	earthRelative: number

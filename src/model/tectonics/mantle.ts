@@ -1,5 +1,6 @@
 ﻿import type { PlateVec, SphereMesh } from ".."
 import { eulerVelocityAt, makeRng } from "../shared"
+import type { ComputeMantleFieldParams } from "./types"
 
 const CONTINENTAL_DRAG_FACTOR = 0.35
 const OCEAN_DRAG_FACTOR = 1.0
@@ -51,7 +52,13 @@ function angularDistance(a: Vec3, b: Vec3): number {
 }
 
 function velocityAt(plate: PlateVec, pos: Vec3): Vec3 {
-	return eulerVelocityAt(plate.pole, plate.omega, pos[0], pos[1], pos[2])
+	return eulerVelocityAt({
+		pole: plate.pole,
+		omega: plate.omega,
+		x: pos[0],
+		y: pos[1],
+		z: pos[2],
+	})
 }
 
 export function normalizeMantleField(
@@ -129,14 +136,14 @@ export function projectMantleFieldToRegions(
 	return projected
 }
 
-export function computeMantleField(
-	plateVec: Map<number, PlateVec>,
-	plateSeeds: Iterable<number>,
-	plateIsOcean: Set<number>,
-	r_plate: Int32Array,
-	mesh: SphereMesh,
-	seed: number,
-): Float32Array {
+export function computeMantleField({
+	plateVec,
+	plateSeeds,
+	plateIsOcean,
+	r_plate,
+	mesh,
+	seed,
+}: ComputeMantleFieldParams): Float32Array {
 	const seedArr = Array.from(plateSeeds)
 	const plateArea = new Map<number, number>()
 	const plateCentroid = new Map<number, Vec3>()

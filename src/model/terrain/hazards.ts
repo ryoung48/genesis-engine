@@ -5,6 +5,7 @@
 	SphereMesh,
 } from ".."
 import { clamp01, smoothstep } from "../shared"
+import type { PropagateInfluenceParams, ComputeHazardsParams } from "./types"
 
 function gradualFalloff(distance: number, reach: number, power = 1.35): number {
 	if (!Number.isFinite(distance)) return 0
@@ -40,13 +41,13 @@ function normalizeField(
 	return normalized
 }
 
-function propagateInfluence(
-	mesh: SphereMesh,
-	seeds: number[],
-	base: Float32Array,
-	decay: number,
-	minValue: number,
-): Float32Array {
+function propagateInfluence({
+	mesh,
+	seeds,
+	base,
+	decay,
+	minValue,
+}: PropagateInfluenceParams): Float32Array {
 	const out = new Float32Array(base)
 	const queue = [...seeds]
 	const { adjOffset, adjList } = mesh
@@ -74,14 +75,14 @@ function thresholdField(source: Float32Array, minValue: number): Float32Array {
 	return out
 }
 
-export function computeHazards(
-	mesh: SphereMesh,
-	boundary: BoundaryInfo,
-	distFields: DistanceFields,
-	elevationKm: Float32Array,
-	isLand: Uint8Array,
-	hotspot?: Float32Array,
-): GenesisHazards {
+export function computeHazards({
+	mesh,
+	boundary,
+	distFields,
+	elevationKm,
+	isLand,
+	hotspot,
+}: ComputeHazardsParams): GenesisHazards {
 	const N = elevationKm.length
 	const earthquake = new Float32Array(N)
 	const volcano = new Float32Array(N)
@@ -137,13 +138,13 @@ export function computeHazards(
 		}
 	}
 
-	const quakeBelt = propagateInfluence(
+	const quakeBelt = propagateInfluence({
 		mesh,
-		quakeSeeds,
-		quakeSeedBase,
-		0.84,
-		0.09,
-	)
+		seeds: quakeSeeds,
+		base: quakeSeedBase,
+		decay: 0.84,
+		minValue: 0.09,
+	})
 
 	for (let r = 0; r < N; r++) {
 		const type = boundary.r_boundaryType[r]
@@ -229,13 +230,13 @@ export function computeHazards(
 	for (let r = 0; r < N; r++) {
 		if (strongEarthquakeSeeds[r] > 0) strongSeedList.push(r)
 	}
-	const diffusedEarthquake = propagateInfluence(
+	const diffusedEarthquake = propagateInfluence({
 		mesh,
-		strongSeedList,
-		strongEarthquakeSeeds,
-		0.78,
-		0.24,
-	)
+		seeds: strongSeedList,
+		base: strongEarthquakeSeeds,
+		decay: 0.78,
+		minValue: 0.24,
+	})
 	for (let r = 0; r < N; r++) {
 		earthquake[r] = diffusedEarthquake[r]
 		danger[r] = clamp01(

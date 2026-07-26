@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import type { RotateForProjectionParams } from "./types"
 
 const MAP_X_SCALE = 2 / Math.PI
 export const MAX_MAP_PROJECTION_LATITUDE_DEG = 90
@@ -10,13 +11,13 @@ function wrapLongitudeRadians(longitude: number, centerLongitude = 0): number {
 	return wrapped
 }
 
-function rotateForProjection(
-	x: number,
-	y: number,
-	z: number,
-	centerLongitude: number,
-	centerLatitude: number,
-) {
+function rotateForProjection({
+	x,
+	y,
+	z,
+	centerLongitude,
+	centerLatitude,
+}: RotateForProjectionParams) {
 	const cosLon = Math.cos(centerLongitude)
 	const sinLon = Math.sin(centerLongitude)
 	const xLon = cosLon * x + sinLon * y
@@ -60,13 +61,13 @@ export function createMapProjection(
 			return wrapLongitudeRadians(longitude, centerLongitude)
 		},
 		projectCartesian(x: number, y: number, z: number) {
-			const rotated = rotateForProjection(
+			const rotated = rotateForProjection({
 				x,
 				y,
 				z,
 				centerLongitude,
 				centerLatitude,
-			)
+			})
 			return {
 				lon: Math.atan2(rotated.y, rotated.x),
 				lat: Math.asin(THREE.MathUtils.clamp(rotated.z, -1, 1)),

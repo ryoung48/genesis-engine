@@ -13,6 +13,7 @@ import type {
 import { createRng, SimplexNoise } from "../shared"
 import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
 import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
+import type { BoundedBfsParams, ComputeDistanceFieldsParams } from "./types"
 
 type StageTiming = { Stage: string; ms: string }
 
@@ -62,13 +63,13 @@ function assignDistanceField(
 /**
  * Compute distance fields from mountains, oceans, coastlines, and land-coast.
  */
-export function computeDistanceFields(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plateIsOcean: Set<number>,
-	boundary: BoundaryInfo,
-	seed: number,
-): DistanceFields {
+export function computeDistanceFields({
+	mesh,
+	r_plate,
+	plateIsOcean,
+	boundary,
+	seed,
+}: ComputeDistanceFieldsParams): DistanceFields {
 	const { numRegions, adjOffset, adjList } = mesh
 
 	// Stress mountains: mountain seeds with subduct < 0.55
@@ -151,14 +152,14 @@ export function computeDistanceFields(
  * BFS that propagates hop-count distances from pre-seeded nodes up to halfWidth hops.
  * `canVisit(nr, r)` gates whether neighbor `nr` (from current node `r`) may be visited.
  */
-function boundedBfs(
-	dist: Float32Array,
-	seeds: number[],
-	halfWidth: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	canVisit: (nr: number, r: number) => boolean,
-): void {
+function boundedBfs({
+	dist,
+	seeds,
+	halfWidth,
+	adjOffset,
+	adjList,
+	canVisit,
+}: BoundedBfsParams): void {
 	let qi = 0
 	while (qi < seeds.length) {
 		const r = seeds[qi++]
@@ -293,14 +294,14 @@ export function blendElevation(
 			riftDist[r] = 0
 		}
 	}
-	boundedBfs(
-		riftDist,
-		riftSeeds,
-		riftHalfWidth,
+	boundedBfs({
+		dist: riftDist,
+		seeds: riftSeeds,
+		halfWidth: riftHalfWidth,
 		adjOffset,
 		adjList,
-		(nr, r) => r_plate[nr] === r_plate[r] && !r_isOcean[nr],
-	)
+		canVisit: (nr, r) => r_plate[nr] === r_plate[r] && !r_isOcean[nr],
+	})
 
 	// Pull-apart basin BFS (continental transform boundaries)
 	const PULL_APART_HW_BASE = 3
@@ -316,14 +317,14 @@ export function blendElevation(
 			pullApartDist[r] = 0
 		}
 	}
-	boundedBfs(
-		pullApartDist,
-		pullApartSeeds,
-		pullApartHalfWidth,
+	boundedBfs({
+		dist: pullApartDist,
+		seeds: pullApartSeeds,
+		halfWidth: pullApartHalfWidth,
 		adjOffset,
 		adjList,
-		(nr, _r) => !r_isOcean[nr],
-	)
+		canVisit: (nr, _r) => !r_isOcean[nr],
+	})
 	timing?.push({
 		Stage: "Coast boundary + rift BFS",
 		ms: (performance.now() - coastAndRiftStart).toFixed(1),
@@ -341,14 +342,14 @@ export function blendElevation(
 			ridgeDist[r] = 0
 		}
 	}
-	boundedBfs(
-		ridgeDist,
-		ridgeSeeds,
-		ridgeHalfWidth,
+	boundedBfs({
+		dist: ridgeDist,
+		seeds: ridgeSeeds,
+		halfWidth: ridgeHalfWidth,
 		adjOffset,
 		adjList,
-		(nr, _r) => !!r_isOcean[nr],
-	)
+		canVisit: (nr, _r) => !!r_isOcean[nr],
+	})
 
 	// Fracture zone BFS
 	const FRAC_HW_BASE = 3
@@ -361,14 +362,14 @@ export function blendElevation(
 			fractureDist[r] = 0
 		}
 	}
-	boundedBfs(
-		fractureDist,
-		fractureSeeds,
-		fractureHalfWidth,
+	boundedBfs({
+		dist: fractureDist,
+		seeds: fractureSeeds,
+		halfWidth: fractureHalfWidth,
 		adjOffset,
 		adjList,
-		(nr, _r) => !!r_isOcean[nr],
-	)
+		canVisit: (nr, _r) => !!r_isOcean[nr],
+	})
 
 	// Back-arc basin BFS
 	const baStart = Math.max(1, Math.round(2 * scaleFactor))

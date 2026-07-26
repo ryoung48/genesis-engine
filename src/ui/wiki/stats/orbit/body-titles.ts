@@ -1,6 +1,6 @@
-﻿import type { MoonBody } from "@/model/celestial/moons"
-import type { SystemBody } from "@/model/celestial/system"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import { SYSTEM } from "@/model/celestial/system"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { SIBLING_GROUP_LABEL } from "./constants"
 import { formatClassificationLabel } from "./formatters"
 

@@ -1,4 +1,4 @@
-import type { SphereMesh } from ".."
+import type { AssignKoppenClimateParams } from "./types"
 
 const KOPPEN_CLASSES = [
 	{
@@ -174,12 +174,12 @@ const CLASS_ID: Record<string, number> = Object.fromEntries(
  * rainfall.monthly) or observed-Earth arrays (climate.real_temperature_monthly,
  * rainfall.real_monthly) — the classification only needs these two fields.
  */
-export function assignKoppenClimate(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	temperatureMonthly: Float32Array,
-	rainfallMonthly: Float32Array,
-): Uint8Array {
+export function assignKoppenClimate({
+	mesh,
+	isLand,
+	temperatureMonthly,
+	rainfallMonthly,
+}: AssignKoppenClimateParams): Uint8Array {
 	const N = mesh.numRegions
 	const classes = new Uint8Array(N)
 

@@ -1,4 +1,4 @@
-﻿import type { SystemBody } from "@/model/celestial/system"
+﻿import type { SystemBody } from "@/model/celestial/system/types"
 
 export const ORBIT_STAT_HELP = {
 	longitudeOfPerihelion:

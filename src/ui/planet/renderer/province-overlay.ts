@@ -4,7 +4,12 @@ import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
-import type { GenesisViewMode } from "./types"
+import type {
+	CreateLineSegmentsParams,
+	CollectProvinceBorderMapPositionsParams,
+	BuildSelectedProvinceBorderGlobeParams,
+	BuildSelectedProvinceBorderMapParams,
+} from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 
@@ -46,13 +51,13 @@ function forEachProvinceBoundarySide(
 	}
 }
 
-function createLineSegments(
-	positions: number[],
-	color: number,
-	opacity: number,
-	visible: boolean,
-	opts?: { lineWidth?: number; resolution?: readonly [number, number] },
-) {
+function createLineSegments({
+	positions,
+	color,
+	opacity,
+	visible,
+	opts,
+}: CreateLineSegmentsParams) {
 	if (positions.length === 0) return null
 	const geometry = new LineSegmentsGeometry()
 	geometry.setPositions(positions)
@@ -120,13 +125,13 @@ export function collectProvinceBorderGlobePositions(
 	return positions
 }
 
-export function collectProvinceBorderMapPositions(
-	world: SerializedGenesisWorld,
-	province: number,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	zBoost: number,
-) {
+export function collectProvinceBorderMapPositions({
+	world,
+	province,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	zBoost,
+}: CollectProvinceBorderMapPositionsParams) {
 	if (!world.provinces) return []
 	const positions: number[] = []
 	const projection = createMapProjection(
@@ -177,60 +182,48 @@ export function collectProvinceBorderMapPositions(
 	return positions
 }
 
-export function buildSelectedProvinceBorderGlobe(
-	world: SerializedGenesisWorld,
-	province: number,
-	viewMode: GenesisViewMode,
-	elevationVisible: boolean,
-	opts?: {
-		color?: number
-		radiusBoost?: number
-		opacity?: number
-		lineWidth?: number
-		resolution?: readonly [number, number]
-	},
-) {
+export function buildSelectedProvinceBorderGlobe({
+	world,
+	province,
+	viewMode,
+	elevationVisible,
+	opts,
+}: BuildSelectedProvinceBorderGlobeParams) {
 	const positions = collectProvinceBorderGlobePositions(
 		world,
 		province,
 		opts?.radiusBoost ?? 0,
 		elevationVisible,
 	)
-	return createLineSegments(
+	return createLineSegments({
 		positions,
-		opts?.color ?? 0xf8fafc,
-		opts?.opacity ?? 0.95,
-		viewMode === "globe",
-		{ lineWidth: opts?.lineWidth, resolution: opts?.resolution },
-	)
+		color: opts?.color ?? 0xf8fafc,
+		opacity: opts?.opacity ?? 0.95,
+		visible: viewMode === "globe",
+		opts: { lineWidth: opts?.lineWidth, resolution: opts?.resolution },
+	})
 }
 
-export function buildSelectedProvinceBorderMap(
-	world: SerializedGenesisWorld,
-	province: number,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	viewMode: GenesisViewMode,
-	opts?: {
-		color?: number
-		opacity?: number
-		zBoost?: number
-		lineWidth?: number
-		resolution?: readonly [number, number]
-	},
-) {
-	const positions = collectProvinceBorderMapPositions(
+export function buildSelectedProvinceBorderMap({
+	world,
+	province,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	viewMode,
+	opts,
+}: BuildSelectedProvinceBorderMapParams) {
+	const positions = collectProvinceBorderMapPositions({
 		world,
 		province,
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
-		opts?.zBoost ?? 0,
-	)
-	return createLineSegments(
+		zBoost: opts?.zBoost ?? 0,
+	})
+	return createLineSegments({
 		positions,
-		opts?.color ?? 0xf8fafc,
-		opts?.opacity ?? 0.95,
-		viewMode === "map",
-		{ lineWidth: opts?.lineWidth, resolution: opts?.resolution },
-	)
+		color: opts?.color ?? 0xf8fafc,
+		opacity: opts?.opacity ?? 0.95,
+		visible: viewMode === "map",
+		opts: { lineWidth: opts?.lineWidth, resolution: opts?.resolution },
+	})
 }

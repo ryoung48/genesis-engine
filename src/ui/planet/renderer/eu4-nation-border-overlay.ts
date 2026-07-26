@@ -6,7 +6,13 @@ import type { Eu4ProvinceBorderGeometry } from "@/model/earth"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
 import { repeatMapPositions } from "./overlay-builders"
-import type { GenesisViewMode } from "./types"
+import type {
+	GenesisViewMode,
+	CollectEu4NationBorderMapPositionsParams,
+	CollectEu4ProvinceBorderMapPositionsParams,
+	BuildEu4SelectedProvinceBorderGlobeParams,
+	BuildEu4SelectedProvinceBorderMapParams,
+} from "./types"
 
 // Draws nation/province borders for Earth-imported worlds along the real EU4
 // province boundary vectors (scripts/build-eu4-province-borders.py) instead
@@ -449,14 +455,14 @@ export function collectEu4NationBorderGlobePositions(
 	return positions
 }
 
-export function collectEu4NationBorderMapPositions(
-	geometry: Eu4ProvinceBorderGeometry,
-	realIdToNation: Map<number, number>,
-	nation: number,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	z: number,
-) {
+export function collectEu4NationBorderMapPositions({
+	geometry,
+	realIdToNation,
+	nation,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	z,
+}: CollectEu4NationBorderMapPositionsParams) {
 	const positions: number[] = []
 	const projection = createMapProjection(
 		centerLongitudeDeg,
@@ -513,13 +519,13 @@ export function collectEu4ProvinceBorderGlobePositions(
 	return positions
 }
 
-export function collectEu4ProvinceBorderMapPositions(
-	geometry: Eu4ProvinceBorderGeometry,
-	provinceRealId: number,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	z: number,
-) {
+export function collectEu4ProvinceBorderMapPositions({
+	geometry,
+	provinceRealId,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	z,
+}: CollectEu4ProvinceBorderMapPositionsParams) {
 	const positions: number[] = []
 	const projection = createMapProjection(
 		centerLongitudeDeg,
@@ -546,14 +552,14 @@ export function collectEu4ProvinceBorderMapPositions(
 	return positions
 }
 
-export function buildEu4SelectedProvinceBorderGlobe(
-	geometry: Eu4ProvinceBorderGeometry,
-	provinceRealId: number,
-	viewMode: GenesisViewMode,
-	radius: number,
-	resolution: readonly [number, number],
-	opts: { color: number; opacity: number; lineWidth: number },
-) {
+export function buildEu4SelectedProvinceBorderGlobe({
+	geometry,
+	provinceRealId,
+	viewMode,
+	radius,
+	resolution,
+	opts,
+}: BuildEu4SelectedProvinceBorderGlobeParams) {
 	const positions = collectEu4ProvinceBorderGlobePositions(
 		geometry,
 		provinceRealId,
@@ -569,23 +575,23 @@ export function buildEu4SelectedProvinceBorderGlobe(
 	)
 }
 
-export function buildEu4SelectedProvinceBorderMap(
-	geometry: Eu4ProvinceBorderGeometry,
-	provinceRealId: number,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	viewMode: GenesisViewMode,
-	z: number,
-	resolution: readonly [number, number],
-	opts: { color: number; opacity: number; lineWidth: number },
-) {
-	const positions = collectEu4ProvinceBorderMapPositions(
+export function buildEu4SelectedProvinceBorderMap({
+	geometry,
+	provinceRealId,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	viewMode,
+	z,
+	resolution,
+	opts,
+}: BuildEu4SelectedProvinceBorderMapParams) {
+	const positions = collectEu4ProvinceBorderMapPositions({
 		geometry,
 		provinceRealId,
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
 		z,
-	)
+	})
 	return buildThickLineSegments2(
 		positions,
 		opts.color,

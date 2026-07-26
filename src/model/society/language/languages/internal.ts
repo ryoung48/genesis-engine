@@ -1,10 +1,11 @@
 import { CLUSTER } from "./clusters"
-import { createLanguageRng, type LanguageRng } from "./rng"
+import { createLanguageRng } from "./rng"
 import {
 	type Cluster,
 	type Language,
 	PhonemeCatalog,
 	type WordParams,
+	type LanguageRng,
 } from "./types"
 
 const baseVowels = ["a", "e", "i", "o", "u", "y"]

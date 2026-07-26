@@ -13,7 +13,7 @@ const DEVIATION_RANGE = [
 	-250, -230, -210, -190, -180, -160, -150, -130, -120, -100, -95, -75, -65,
 	-50, -40, 0, 5, 25, 35, 75, 85, 180, 200, 300, 350, 450,
 ] as const
-export function deviationToCelsius(deviation: number): number {
+function deviationToCelsius(deviation: number): number {
 	if (deviation <= DEVIATION_DOMAIN[0]) return DEVIATION_RANGE[0]
 	const lastIndex = DEVIATION_DOMAIN.length - 1
 	if (deviation >= DEVIATION_DOMAIN[lastIndex])
@@ -39,24 +39,21 @@ function celsiusForOrbitalDistance({
 	return 279 * (luminositySol / orbitalDistanceAU ** 2) ** 0.25 - 273.15
 }
 
-export function auFromTemperature({
+function auFromTemperature({
 	kelvinTemp,
 	luminositySol,
 }: TemperatureInput): number {
 	return (luminositySol / (kelvinTemp / 279) ** 4) ** 0.5
 }
 
-export function deviationToAU({
-	deviation,
-	luminositySol,
-}: DeviationInput): number {
+function deviationToAU({ deviation, luminositySol }: DeviationInput): number {
 	return auFromTemperature({
 		kelvinTemp: deviationToCelsius(deviation) + 273.15,
 		luminositySol,
 	})
 }
 
-export function estimateDeviationFromOrbitalDistance({
+function estimateDeviationFromOrbitalDistance({
 	orbitalDistanceAU,
 	luminositySol,
 }: OrbitalTemperatureInput): number {
@@ -77,8 +74,16 @@ export function estimateDeviationFromOrbitalDistance({
 	return closestDeviation
 }
 
-export function zoneFromDeviation(deviation: number): Zone {
+function zoneFromDeviation(deviation: number): Zone {
 	if (deviation >= 1) return "epistellar"
 	if (deviation <= -1) return "outer"
 	return "inner"
+}
+
+export const TEMPERATURE = {
+	deviationToCelsius,
+	auFromTemperature,
+	deviationToAU,
+	estimateDeviationFromOrbitalDistance,
+	zoneFromDeviation,
 }

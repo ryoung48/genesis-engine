@@ -4,6 +4,7 @@ import {
 	rollGreenhouseFactor,
 } from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
+import { ORBIT_BODY } from "../../orbit-body"
 import type {
 	AtmosphereProfile,
 	DensityProfile,
@@ -12,44 +13,28 @@ import type {
 	OrbitClassification,
 	OrbitComposition,
 	OrbitGroup,
-} from "../orbit-body"
-import { ORBIT_BODY } from "../orbit-body"
-import type { MainSequenceClass } from "../star"
-import { atmosphereCodeToProfile } from "./environment/atmosphere"
-import type { ClassifiedEnvironment } from "./environment/classification"
-import {
-	buildHydrosphereProfile,
-	hydrosphereWaterFraction,
-	rollClassificationAssignment,
-} from "./environment/classification"
-import { buildDensityProfile, rollAlbedo } from "./environment/density"
-import { deviationToCelsius } from "./environment/temperature"
-import type { TemperatureHydrosphereLossInput, Zone } from "./types"
-
-export {
-	hydrosphereCodeFromWaterPct,
-	rollClassificationAssignment,
-} from "./environment/classification"
-export { buildDensityProfile } from "./environment/density"
-export {
-	auFromTemperature,
-	deviationToAU,
-	estimateDeviationFromOrbitalDistance,
-	zoneFromDeviation,
-} from "./environment/temperature"
+} from "../../orbit-body/types"
+import type { MainSequenceClass } from "../../star/types"
+import { ATMOSPHERE } from "./atmosphere"
+import { DICE_TABLE } from "./classification/dice-table"
+import type { ClassifiedEnvironment } from "./classification/dice-table/types"
+import { HYDROSPHERE } from "./classification/hydrosphere"
+import { DENSITY } from "./density"
+import { TEMPERATURE } from "./temperature"
+import type { TemperatureHydrosphereLossInput, Zone } from "../types"
 
 function applyTemperatureHydrosphereLoss({
 	hydrosphereCode,
 	deviation,
 }: TemperatureHydrosphereLossInput): number {
 	if (hydrosphereCode >= 10) return hydrosphereCode
-	const kelvin = deviationToCelsius(deviation) + 273.15
+	const kelvin = TEMPERATURE.deviationToCelsius(deviation) + 273.15
 	if (kelvin > 353.15) return Math.max(0, hydrosphereCode - 6)
 	if (kelvin > 303.15) return Math.max(0, hydrosphereCode - 2)
 	return hydrosphereCode
 }
 
-export function classifyGroup(params: {
+function classifyGroup(params: {
 	/** Absent while a body is being classified from its size; explicit orbit
 	 * rolls and authored seeds supply the group to preserve that decision. */
 	groupHint?: OrbitGroup
@@ -61,7 +46,7 @@ export function classifyGroup(params: {
 	return "helian"
 }
 
-export function classifyBody(params: {
+function classifyBody(params: {
 	/** Absent while a body is being classified from its size; explicit orbit
 	 * rolls and authored seeds supply the group to preserve that decision. */
 	groupHint?: OrbitGroup
@@ -164,7 +149,7 @@ export function classifyBody(params: {
 // estimateAlbedo) -- that fallback still exists for a body that somehow
 // still lacks a stored albedo, but every newly generated body now gets a
 // real one from this roll instead of relying on it.
-export function buildClassificationEnvironment(params: {
+function buildClassificationEnvironment(params: {
 	rng: ReturnType<typeof createRng>
 	group: OrbitGroup
 	classification: OrbitClassification
@@ -199,7 +184,7 @@ export function buildClassificationEnvironment(params: {
 } {
 	const rolledEnvironment =
 		params.assignment ??
-		rollClassificationAssignment({
+		DICE_TABLE.rollClassificationAssignment({
 			rng: params.rng,
 			classification: params.classification,
 			sizeClass: params.sizeClass,
@@ -212,7 +197,7 @@ export function buildClassificationEnvironment(params: {
 		hydrosphereCode: rolledEnvironment.hydrosphereCode,
 		deviation: params.deviation,
 	})
-	const hydrosphere = buildHydrosphereProfile({
+	const hydrosphere = HYDROSPHERE.buildProfile({
 		rng: params.rng,
 		code: hydrosphereCode,
 	})
@@ -223,7 +208,7 @@ export function buildClassificationEnvironment(params: {
 					diameterKm: params.diameterKm,
 				})
 			: 0
-	const atmosphere = atmosphereCodeToProfile({
+	const atmosphere = ATMOSPHERE.codeToProfile({
 		rng: params.rng,
 		atmosphereCode: rolledEnvironment.atmosphereCode,
 		params: {
@@ -246,19 +231,19 @@ export function buildClassificationEnvironment(params: {
 						pressureBar: atmosphere?.pressureBar ?? 0,
 						atmosphereCode: atmosphere?.code ?? 0,
 					})
-	const albedo = rollAlbedo({
+	const albedo = DENSITY.rollAlbedo({
 		rng: params.rng,
 		composition: rolledEnvironment.composition,
 		atmosphere,
 		hydrosphereCode,
 	})
 	return {
-		density: buildDensityProfile({
+		density: DENSITY.buildProfile({
 			massKg: params.massKg,
 			diameterKm: params.diameterKm,
 			classification: params.classification,
 		}),
-		landCoverage: 1 - hydrosphereWaterFraction(hydrosphere),
+		landCoverage: 1 - HYDROSPHERE.waterFraction(hydrosphere),
 		hydrosphereCode,
 		hydrosphere,
 		composition: rolledEnvironment.composition,
@@ -269,4 +254,21 @@ export function buildClassificationEnvironment(params: {
 		greenhouseFactor,
 		albedo,
 	}
+}
+
+export const ENVIRONMENT = {
+	classifyGroup,
+	classifyBody,
+	buildClassificationEnvironment,
+	deviationToCelsius: TEMPERATURE.deviationToCelsius,
+	auFromTemperature: TEMPERATURE.auFromTemperature,
+	deviationToAU: TEMPERATURE.deviationToAU,
+	estimateDeviationFromOrbitalDistance:
+		TEMPERATURE.estimateDeviationFromOrbitalDistance,
+	zoneFromDeviation: TEMPERATURE.zoneFromDeviation,
+	codeFromWaterPct: HYDROSPHERE.codeFromWaterPct,
+	buildProfile: HYDROSPHERE.buildProfile,
+	waterFraction: HYDROSPHERE.waterFraction,
+	rollClassificationAssignment: DICE_TABLE.rollClassificationAssignment,
+	buildDensityProfile: DENSITY.buildProfile,
 }

@@ -11,31 +11,36 @@ import type {
 	SuperPlateData,
 } from ".."
 import { eulerVelocityAt, SimplexNoise } from "../shared"
+import type {
+	PlateVelocityAtParams,
+	FindCollisionsParams,
+	PropagateStressParams,
+} from "./types"
 
 const COLLISION_THRESHOLD = 0.75
 type StageTiming = { Stage: string; ms: string }
 
-function plateVelocityAt(
-	plateVec: Map<number, PlateVec>,
-	plateId: number,
-	x: number,
-	y: number,
-	z: number,
-): [number, number, number] {
+function plateVelocityAt({
+	plateVec,
+	plateId,
+	x,
+	y,
+	z,
+}: PlateVelocityAtParams): [number, number, number] {
 	const pv = plateVec.get(plateId)
 	if (!pv) return [0, 0, 0]
-	return eulerVelocityAt(pv.pole, pv.omega, x, y, z)
+	return eulerVelocityAt({ pole: pv.pole, omega: pv.omega, x, y, z })
 }
 
-function findCollisions(
-	mesh: SphereMesh,
-	r_xyz: Float32Array,
-	plateIsOcean: Set<number>,
-	r_plate: Int32Array,
-	plateVec: Map<number, PlateVec>,
-	plateDensity: Map<number, number>,
-	noise: SimplexNoise,
-): CollisionResult {
+function findCollisions({
+	mesh,
+	r_xyz,
+	plateIsOcean,
+	r_plate,
+	plateVec,
+	plateDensity,
+	noise,
+}: FindCollisionsParams): CollisionResult {
 	const dt = 1e-2 / Math.max(1, Math.sqrt(mesh.numRegions / 10000))
 	const { numRegions, adjOffset, adjList } = mesh
 
@@ -81,20 +86,20 @@ function findCollisions(
 				const dz = r_xyz[ri3 + 2] - r_xyz[ni3 + 2]
 				const dBefore = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
-				const v1 = plateVelocityAt(
+				const v1 = plateVelocityAt({
 					plateVec,
-					myPlate,
-					r_xyz[ri3],
-					r_xyz[ri3 + 1],
-					r_xyz[ri3 + 2],
-				)
-				const v2 = plateVelocityAt(
+					plateId: myPlate,
+					x: r_xyz[ri3],
+					y: r_xyz[ri3 + 1],
+					z: r_xyz[ri3 + 2],
+				})
+				const v2 = plateVelocityAt({
 					plateVec,
-					r_plate[nb],
-					r_xyz[ni3],
-					r_xyz[ni3 + 1],
-					r_xyz[ni3 + 2],
-				)
+					plateId: r_plate[nb],
+					x: r_xyz[ni3],
+					y: r_xyz[ni3 + 1],
+					z: r_xyz[ni3 + 2],
+				})
 				const ax = r_xyz[ri3] + v1[0] * dt,
 					ay = r_xyz[ri3 + 1] + v1[1] * dt,
 					az = r_xyz[ri3 + 2] + v1[2] * dt
@@ -177,16 +182,16 @@ function findCollisions(
 /**
  * Frontier-based BFS stress diffusion inward from boundaries.
  */
-function propagateStress(
-	mesh: SphereMesh,
-	r_stress: Float32Array,
-	r_subductFactor: Float32Array,
-	r_plate: Int32Array,
-	plateIsOcean: Set<number>,
-	decayFactor: number,
-	subductDecayFactor: number,
-	numPasses: number,
-): void {
+function propagateStress({
+	mesh,
+	r_stress,
+	r_subductFactor,
+	r_plate,
+	plateIsOcean,
+	decayFactor,
+	subductDecayFactor,
+	numPasses,
+}: PropagateStressParams): void {
 	const { adjOffset, adjList, numRegions } = mesh
 
 	let frontier: number[] = []
@@ -238,7 +243,7 @@ export function classifyBoundaries(
 
 	// Small-plate collisions (always computed)
 	const collisionsStart = performance.now()
-	const smallCol = findCollisions(
+	const smallCol = findCollisions({
 		mesh,
 		r_xyz,
 		plateIsOcean,
@@ -246,20 +251,20 @@ export function classifyBoundaries(
 		plateVec,
 		plateDensity,
 		noise,
-	)
+	})
 
 	const hasSuperPlates = superPlateData != null
 	let superCol: CollisionResult | null = null
 	if (hasSuperPlates) {
-		superCol = findCollisions(
+		superCol = findCollisions({
 			mesh,
 			r_xyz,
-			superPlateData.superPlateIsOcean,
-			superPlateData.r_superPlate,
-			superPlateData.superPlateVec,
-			superPlateData.superPlateDensity,
+			plateIsOcean: superPlateData.superPlateIsOcean,
+			r_plate: superPlateData.r_superPlate,
+			plateVec: superPlateData.superPlateVec,
+			plateDensity: superPlateData.superPlateDensity,
 			noise,
-		)
+		})
 	}
 	timing?.push({
 		Stage: "Collisions (dual)",
@@ -365,7 +370,7 @@ export function classifyBoundaries(
 	const stressStart = performance.now()
 
 	if (!hasSuperPlates || !superCol) {
-		propagateStress(
+		propagateStress({
 			mesh,
 			r_stress,
 			r_subductFactor,
@@ -374,34 +379,34 @@ export function classifyBoundaries(
 			decayFactor,
 			subductDecayFactor,
 			numPasses,
-		)
+		})
 	} else {
 		// Dual stress propagation: each layer within its own plates, then blend
 		const smallStress = new Float32Array(smallCol.r_stress)
 		const smallSubduct = new Float32Array(smallCol.r_subductFactor)
-		propagateStress(
+		propagateStress({
 			mesh,
-			smallStress,
-			smallSubduct,
+			r_stress: smallStress,
+			r_subductFactor: smallSubduct,
 			r_plate,
 			plateIsOcean,
 			decayFactor,
 			subductDecayFactor,
 			numPasses,
-		)
+		})
 
 		const superStress = new Float32Array(superCol.r_stress)
 		const superSubduct = new Float32Array(superCol.r_subductFactor)
-		propagateStress(
+		propagateStress({
 			mesh,
-			superStress,
-			superSubduct,
-			superPlateData!.r_superPlate,
-			superPlateData!.superPlateIsOcean,
+			r_stress: superStress,
+			r_subductFactor: superSubduct,
+			r_plate: superPlateData!.r_superPlate,
+			plateIsOcean: superPlateData!.superPlateIsOcean,
 			decayFactor,
 			subductDecayFactor,
 			numPasses,
-		)
+		})
 
 		// Blend propagated stress
 		for (let r = 0; r < numRegions; r++) {

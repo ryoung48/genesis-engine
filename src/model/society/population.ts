@@ -26,8 +26,13 @@
 
 import type { GenesisProvinces } from ".."
 import { createRng, DEFAULT_PLANET_RADIUS_KM } from "../shared"
-import type { GenesisLandmarks } from "../terrain"
 import type { SphereMesh } from "../types"
+import type {
+	PlaceCradlesParams,
+	ComputeProvinceHabitabilityParams,
+	ComputePopulationParams,
+	ProvincePopulation,
+} from "./types"
 
 // Habitability factors indexed by genesis codes
 
@@ -46,47 +51,21 @@ const HAB_TOPOGRAPHY = new Float32Array([1.0, 0.6, 0.8, 0.2, 0.6, 0, 0])
 // (e.g. desert rivers, arctic coasts).
 const HAB_WATER_BONUS = new Float32Array([0, 0.1, 0.1, 0.1])
 
-export interface ProvincePopulation {
-	/** Per-province habitability score */
-	habitability: Float32Array
-	/** Per-province rural population */
-	population: Float32Array
-	/** Aggregated global habitability score */
-	habitabilityScore: number
-	/** Total world population */
-	totalPopulation: number
-	/**
-	 * Per-province normalized migration arrival time (0 = cradle origin,
-	 * 1 = latest frontier reached). -1 for desolate/unreachable provinces.
-	 */
-	migrationWave?: Float32Array
-	/** Province indices where prehistoric cradles were seeded */
-	cradleProvinces?: Int32Array
-	/**
-	 * Era settlementWave threshold used during generation. Provinces with
-	 * migrationWave > settlementWave are unsettled (pop=0). Stored here so
-	 * the renderer can distinguish unsettled from settled-stateless provinces
-	 * without re-importing era configs.
-	 */
-	settlementWave?: number
-}
-
 /**
  * Computes per-province habitability scores by summing regional factors.
  * Skips regions belonging to desolate provinces. The same seed produces the
  * same jitter values, so calling this twice with identical inputs is stable.
  */
-export function computeProvinceHabitability(
-	provinces: GenesisProvinces,
-	_landmarks: GenesisLandmarks,
-	climateZones: Uint8Array,
-	vegetation: Uint8Array,
-	topography: Uint8Array,
-	oceanCoastal: Uint8Array,
-	lakeCoastal: Uint8Array,
-	riverVisible: Uint8Array,
-	seed: number,
-): Float32Array {
+export function computeProvinceHabitability({
+	provinces,
+	climateZones,
+	vegetation,
+	topography,
+	oceanCoastal,
+	lakeCoastal,
+	riverVisible,
+	seed,
+}: ComputeProvinceHabitabilityParams): Float32Array {
 	const { count, desolate, regionProvince } = provinces
 	const rng = createRng(seed + 77777)
 
@@ -124,29 +103,29 @@ export function computeProvinceHabitability(
 	return habitability
 }
 
-export function computePopulation(
-	provinces: GenesisProvinces,
-	landmarks: GenesisLandmarks,
-	climateZones: Uint8Array,
-	vegetation: Uint8Array,
-	topography: Uint8Array,
-	oceanCoastal: Uint8Array,
-	lakeCoastal: Uint8Array,
-	riverVisible: Uint8Array,
-	seed: number,
-	planetRadiusKm?: number,
-	numRegions?: number,
-	eraTargetPopulation?: number,
-	migrationWave?: Float32Array,
-	settlementWave?: number,
-	migrationFalloff?: number,
-): ProvincePopulation {
+export function computePopulation({
+	provinces,
+	landmarks,
+	climateZones,
+	vegetation,
+	topography,
+	oceanCoastal,
+	lakeCoastal,
+	riverVisible,
+	seed,
+	planetRadiusKm,
+	numRegions,
+	eraTargetPopulation,
+	migrationWave,
+	settlementWave,
+	migrationFalloff,
+}: ComputePopulationParams): ProvincePopulation {
 	const { count } = provinces
 
 	// Habitability is computed purely from terrain — migration never alters it.
-	const habitability = computeProvinceHabitability(
+	const habitability = computeProvinceHabitability({
 		provinces,
-		landmarks,
+		_landmarks: landmarks,
 		climateZones,
 		vegetation,
 		topography,
@@ -154,7 +133,7 @@ export function computePopulation(
 		lakeCoastal,
 		riverVisible,
 		seed,
-	)
+	})
 
 	const effectiveSettlementWave = settlementWave ?? 1.0
 
@@ -321,14 +300,14 @@ function bfsUpdateMinHops(
  * `minHops * (0.2 + normHab)` to spread geographically while favouring
  * habitable terrain.
  */
-function placeCradles(
-	continentProvinces: number[],
-	normHab: Float32Array,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	totalProvinces: number,
-	k: number,
-): number[] {
+function placeCradles({
+	continentProvinces,
+	normHab,
+	adjOffset,
+	adjList,
+	totalProvinces,
+	k,
+}: PlaceCradlesParams): number[] {
 	const capped = Math.min(k, continentProvinces.length)
 	if (capped === 0) return []
 
@@ -451,14 +430,14 @@ export function computeMigration(
 		Math.min(5, Math.round(continentAreaKm2 / KM2_PER_CRADLE)),
 	)
 
-	const cradleList = placeCradles(
+	const cradleList = placeCradles({
 		continentProvinces,
 		normHab,
-		pAdjOffset,
-		pAdjList,
-		count,
-		numCradles,
-	)
+		adjOffset: pAdjOffset,
+		adjList: pAdjList,
+		totalProvinces: count,
+		k: numCradles,
+	})
 
 	// Multi-source Dijkstra on the region graph. Edge cost is the average of
 	// the two endpoint travel costs; ocean regions use OCEAN_TRAVEL_COST.

@@ -17,12 +17,18 @@ import { regionTimezoneLabel } from "@/model/society"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
-	type ColorMode,
 	EU5_CLIMATE_CATEGORIES,
 	EU5_TOPOGRAPHY_CATEGORIES,
 	EU5_VEGETATION_CATEGORIES,
 } from "../colors"
 import type { DataVariant } from "../screen/shared/data-variant"
+import type {
+	GetHoverRainfallSeriesFromArraysParams,
+	GetHoverDtrSeriesParams,
+	GetHoverMonthlySeriesParams,
+	GetHoverMiseryParams,
+	GetHoverClimateDisplayParams,
+} from "./types"
 
 export interface HoverInfo {
 	region: number
@@ -204,13 +210,13 @@ export function getHoverRainfall(
 		: null
 }
 
-function getHoverRainfallSeriesFromArrays(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-	rainfallMonth: number,
-	annual: Float32Array | undefined,
-	monthly: Float32Array | undefined,
-): HoverRainfallSeries | null {
+function getHoverRainfallSeriesFromArrays({
+	hoverInfo,
+	world,
+	rainfallMonth,
+	annual,
+	monthly,
+}: GetHoverRainfallSeriesFromArraysParams): HoverRainfallSeries | null {
 	const region = hoverInfo?.region
 	const canShowRainfall =
 		region !== undefined &&
@@ -243,13 +249,13 @@ export function getHoverRealRainfall(
 	world: SerializedGenesisWorld | null,
 	rainfallMonth: number,
 ): HoverRainfallSeries | null {
-	return getHoverRainfallSeriesFromArrays(
+	return getHoverRainfallSeriesFromArrays({
 		hoverInfo,
 		world,
 		rainfallMonth,
-		world?.rainfall?.real_annual,
-		world?.rainfall?.real_monthly,
-	)
+		annual: world?.rainfall?.real_annual,
+		monthly: world?.rainfall?.real_monthly,
+	})
 }
 
 export function getHoverRainfallDiff(
@@ -257,13 +263,13 @@ export function getHoverRainfallDiff(
 	world: SerializedGenesisWorld | null,
 	rainfallMonth: number,
 ): HoverRainfallSeries | null {
-	return getHoverRainfallSeriesFromArrays(
+	return getHoverRainfallSeriesFromArrays({
 		hoverInfo,
 		world,
 		rainfallMonth,
-		world?.rainfall?.diff_annual,
-		world?.rainfall?.diff_monthly,
-	)
+		annual: world?.rainfall?.diff_annual,
+		monthly: world?.rainfall?.diff_monthly,
+	})
 }
 
 export function getHoverDtr(
@@ -271,22 +277,22 @@ export function getHoverDtr(
 	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 ): HoverDtr | null {
-	return getHoverDtrSeries(
+	return getHoverDtrSeries({
 		hoverInfo,
 		world,
 		dtrMonth,
-		world?.dtr_annual,
-		world?.dtr_monthly,
-	)
+		annual: world?.dtr_annual,
+		monthlySource: world?.dtr_monthly,
+	})
 }
 
-function getHoverDtrSeries(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-	dtrMonth: number,
-	annual: Float32Array | undefined,
-	monthlySource: Float32Array | undefined,
-): HoverDtr | null {
+function getHoverDtrSeries({
+	hoverInfo,
+	world,
+	dtrMonth,
+	annual,
+	monthlySource,
+}: GetHoverDtrSeriesParams): HoverDtr | null {
 	if (!(hoverInfo && world && annual)) return null
 	const r = hoverInfo.region
 	const annualValue = annual[r]
@@ -310,13 +316,13 @@ export function getHoverRealDtr(
 	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 ): HoverDtr | null {
-	return getHoverDtrSeries(
+	return getHoverDtrSeries({
 		hoverInfo,
 		world,
 		dtrMonth,
-		world?.observedDtr?.real_annual,
-		world?.observedDtr?.real_monthly,
-	)
+		annual: world?.observedDtr?.real_annual,
+		monthlySource: world?.observedDtr?.real_monthly,
+	})
 }
 
 export function getHoverDtrDiff(
@@ -324,22 +330,22 @@ export function getHoverDtrDiff(
 	world: SerializedGenesisWorld | null,
 	dtrMonth: number,
 ): HoverDtr | null {
-	return getHoverDtrSeries(
+	return getHoverDtrSeries({
 		hoverInfo,
 		world,
 		dtrMonth,
-		world?.observedDtr?.diff_annual,
-		world?.observedDtr?.diff_monthly,
-	)
+		annual: world?.observedDtr?.diff_annual,
+		monthlySource: world?.observedDtr?.diff_monthly,
+	})
 }
 
-function getHoverMonthlySeries(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-	month: number,
-	annual: Float32Array | undefined,
-	monthly: Float32Array | undefined,
-): HoverTemperatureSeries | null {
+function getHoverMonthlySeries({
+	hoverInfo,
+	world,
+	month,
+	annual,
+	monthly,
+}: GetHoverMonthlySeriesParams): HoverTemperatureSeries | null {
 	if (!(hoverInfo && world && annual)) return null
 	const r = hoverInfo.region
 	const annualValue = annual[r]
@@ -443,13 +449,13 @@ export function getHoverRealTemperature(
 	world: SerializedGenesisWorld | null,
 	temperatureMonth: number,
 ): HoverTemperatureSeries | null {
-	return getHoverMonthlySeries(
+	return getHoverMonthlySeries({
 		hoverInfo,
 		world,
-		temperatureMonth,
-		world?.climate?.real_temperature_avg,
-		world?.climate?.real_temperature_monthly,
-	)
+		month: temperatureMonth,
+		annual: world?.climate?.real_temperature_avg,
+		monthly: world?.climate?.real_temperature_monthly,
+	})
 }
 
 export function getHoverTemperatureDiff(
@@ -457,13 +463,13 @@ export function getHoverTemperatureDiff(
 	world: SerializedGenesisWorld | null,
 	temperatureMonth: number,
 ): HoverTemperatureSeries | null {
-	return getHoverMonthlySeries(
+	return getHoverMonthlySeries({
 		hoverInfo,
 		world,
-		temperatureMonth,
-		world?.climate?.temperature_diff_avg,
-		world?.climate?.temperature_diff_monthly,
-	)
+		month: temperatureMonth,
+		annual: world?.climate?.temperature_diff_avg,
+		monthly: world?.climate?.temperature_diff_monthly,
+	})
 }
 
 export function getHoverHumidity(
@@ -508,14 +514,14 @@ export function getHoverHumidityDiff(
  * touches observed data at all. Wind has no observed variant (no per-region
  * historical wind data exists), so it always comes from the model in both
  * modes. */
-export function getHoverMisery(
-	hoverInfo: HoverInfo | null,
-	world: SerializedGenesisWorld | null,
-	dtrMonth: number,
-	windSpeedMs: number | null,
-	monthlyWindSpeedMs: number[] | null,
-	useObserved: boolean,
-): HoverMisery | null {
+export function getHoverMisery({
+	hoverInfo,
+	world,
+	dtrMonth,
+	windSpeedMs,
+	monthlyWindSpeedMs,
+	useObserved,
+}: GetHoverMiseryParams): HoverMisery | null {
 	if (!(hoverInfo && world?.climate && world.dtr_annual)) return null
 	const r = hoverInfo.region
 	if (world.isLand && !world.isLand[r]) return null
@@ -842,14 +848,14 @@ export function getHoverDistCoastKm(
 		: null
 }
 
-export function getHoverClimateDisplay(
-	colorMode: ColorMode,
-	hoverPastaClimate: { code: string | null; name: string } | null,
-	hoverKoppenClimate: { code: string | null; name: string } | null,
-	hoverClimateZone: string | null,
-	hoverRealPastaClimate?: { code: string | null; name: string } | null,
-	hoverRealKoppenClimate?: { code: string | null; name: string } | null,
-): string | null {
+export function getHoverClimateDisplay({
+	colorMode,
+	hoverPastaClimate,
+	hoverKoppenClimate,
+	hoverClimateZone,
+	hoverRealPastaClimate,
+	hoverRealKoppenClimate,
+}: GetHoverClimateDisplayParams): string | null {
 	if (colorMode === "pastaClimate" && hoverPastaClimate) {
 		return hoverPastaClimate.name.toLowerCase()
 	}

@@ -10,8 +10,14 @@ import {
 	normalizeWordKey,
 	spawn,
 } from "./internal"
-import { createLanguageRng, type LanguageRng } from "./rng"
-import { Gender, type Language, PhonemeCatalog, type WordParams } from "./types"
+import { createLanguageRng } from "./rng"
+import {
+	Gender,
+	type Language,
+	PhonemeCatalog,
+	type WordParams,
+	type LanguageRng,
+} from "./types"
 
 export const LANGUAGE = {
 	word: {
@@ -280,37 +286,5 @@ export const LANGUAGE = {
 		})
 		lang.predefined = { ...base.predefined }
 		return lang
-	},
-	classify: (
-		lang: Language,
-	): {
-		extType: string | null
-		hasGemination: boolean
-	} => {
-		const baseSet = new Set(["a", "e", "i", "o", "u", "y", "w"])
-		const isBase = (c: string) => baseSet.has(c)
-		const catVowel = (v: string): string => {
-			const chars = [...v]
-			if (chars.length === 1)
-				return isBase(chars[0]) ? "diphthongs" : "diacritics"
-			const allBase = chars.every((c) => isBase(c))
-			if (allBase) return chars[0] === chars[1] ? "doubles" : "diphthongs"
-			return "mixed"
-		}
-		let extType: string | null = null
-		if (lang.diphthongs.length > 0) {
-			const cats = new Set(lang.diphthongs.map(catVowel))
-			extType = cats.size === 1 ? [...cats][0] : "mixed"
-		}
-		const hasGemination = lang.phonemes[PhonemeCatalog.MIDDLE_CONSONANT].some(
-			({ v }) => v.length >= 2 && v[0] === v[1],
-		)
-		return {
-			extType,
-			hasGemination,
-		}
-	},
-	vowel: (vowel: string) => {
-		return vowel.includes(PhonemeCatalog.FRONT_VOWEL)
 	},
 }

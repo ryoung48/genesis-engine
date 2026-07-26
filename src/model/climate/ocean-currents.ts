@@ -6,15 +6,19 @@
  * nearby continental land.
  */
 
-import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
+import type { SphereMesh } from ".."
 import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared"
-import type { GenesisLandmarks } from "../terrain"
 import {
 	applyLockedCurrentTemperatureEffect,
 	computeLockedOceanCurrents,
 } from "./locked/ocean-currents"
 import { computeCoastalWarmthFromOceanWarmth } from "./ocean-currents-shared"
 import { computeThermalEquator, getClimateGeometry, hadleyWidth } from "./rain"
+import type {
+	ApplyCurrentTemperatureEffectParams,
+	BuildOceanCurrentGridParams,
+	ComputeOceanCurrentsParams,
+} from "./types"
 import type { FlowGrid } from "./wind"
 import { rasterizeVectorGrid } from "./wind"
 
@@ -146,14 +150,21 @@ function classifyCurrentWarmth({
 	return sign * (effectiveEastFacing ? 1 : -1)
 }
 
-function seedCoastalNeighbors(
-	seeds: Float32Array,
-	oceanNeighbors: number[],
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	extraDepth: number,
-): void {
+function _seedCoastalNeighbors({
+	seeds,
+	oceanNeighbors,
+	mesh,
+	isLand,
+	isLake,
+	extraDepth,
+}: {
+	seeds: Float32Array
+	oceanNeighbors: number[]
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isLake: Uint8Array
+	extraDepth: number
+}): void {
 	const { adjOffset, adjList } = mesh
 	const visited = new Uint8Array(mesh.numRegions)
 	const queue = new Int32Array(mesh.numRegions)
@@ -191,16 +202,25 @@ function seedCoastalNeighbors(
 	}
 }
 
-function fillOceanBeltSeeds(
-	warmSeed: Float32Array,
-	coldSeed: Float32Array,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	latDeg: Float32Array,
-	lonBinByRegion: Int32Array,
-	teqByLon?: Float32Array,
+function _fillOceanBeltSeeds({
+	warmSeed,
+	coldSeed,
+	isLand,
+	isLake,
+	latDeg,
+	lonBinByRegion,
+	teqByLon,
 	hoursPerDay = 24,
-): void {
+}: {
+	warmSeed: Float32Array
+	coldSeed: Float32Array
+	isLand: Uint8Array
+	isLake: Uint8Array
+	latDeg: Float32Array
+	lonBinByRegion: Int32Array
+	teqByLon?: Float32Array
+	hoursPerDay?: number
+}): void {
 	const N = latDeg.length
 	// Warm equatorial belt narrows on fast rotators and widens on slow ones,
 	// tracking the Hadley cell half-width (30° at Earth, 18° at 6h day).
@@ -218,17 +238,27 @@ function fillOceanBeltSeeds(
 	}
 }
 
-function buildCoastSites(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isContinent: Uint8Array,
-	isLake: Uint8Array,
-	latDeg: Float32Array,
-	lonDeg: Float32Array,
-	regionBin: Int32Array,
-	distCoast: Float32Array,
-	avgEdgeKm: number,
-): CoastSite[] {
+function _buildCoastSites({
+	mesh,
+	isLand,
+	isContinent,
+	isLake,
+	latDeg,
+	lonDeg,
+	regionBin,
+	distCoast,
+	avgEdgeKm,
+}: {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isContinent: Uint8Array
+	isLake: Uint8Array
+	latDeg: Float32Array
+	lonDeg: Float32Array
+	regionBin: Int32Array
+	distCoast: Float32Array
+	avgEdgeKm: number
+}): CoastSite[] {
 	const { adjOffset, adjList } = mesh
 	const openScanSteps = Math.max(1, Math.round(4000 / avgEdgeKm))
 	const openOceanCoastKm = 300
@@ -264,17 +294,17 @@ function buildCoastSites(
 		for (const nb of oceanNeighbors) {
 			const dLon = wrapLonDeltaDeg(lonDeg[nb] - lonDeg[r])
 			if ((eastFacing && dLon <= 0) || (!eastFacing && dLon >= 0)) continue
-			const scanEnd = directionalOceanOpen(
-				nb,
-				eastFacing ? 1 : -1,
+			const scanEnd = directionalOceanOpen({
+				start: nb,
+				dir: eastFacing ? 1 : -1,
 				mesh,
 				isLand,
 				isContinent,
 				isLake,
 				latDeg,
 				lonDeg,
-				openScanSteps,
-			)
+				maxSteps: openScanSteps,
+			})
 			// distCoast is already real km (computeCoastDistances), not a hop
 			// count, so no further *avgEdgeKm conversion is needed here.
 			if (scanEnd >= 0 && distCoast[scanEnd] >= openOceanCoastKm) {
@@ -295,15 +325,31 @@ function buildCoastSites(
 	return sites
 }
 
-function computeOceanWarmthFromSeeds(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	warmSeed: Float32Array,
-	coldSeed: Float32Array,
-): Float32Array {
-	const warmDist = computeOceanSeedDistance(mesh, isLand, isLake, warmSeed)
-	const coldDist = computeOceanSeedDistance(mesh, isLand, isLake, coldSeed)
+function computeOceanWarmthFromSeeds({
+	mesh,
+	isLand,
+	isLake,
+	warmSeed,
+	coldSeed,
+}: {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isLake: Uint8Array
+	warmSeed: Float32Array
+	coldSeed: Float32Array
+}): Float32Array {
+	const warmDist = computeOceanSeedDistance({
+		mesh,
+		isLand,
+		isLake,
+		seeds: warmSeed,
+	})
+	const coldDist = computeOceanSeedDistance({
+		mesh,
+		isLand,
+		isLake,
+		seeds: coldSeed,
+	})
 	const oceanWarmth = new Float32Array(mesh.numRegions)
 
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -343,17 +389,27 @@ function computeOceanWarmthFromSeeds(
 	return oceanWarmth
 }
 
-function directionalOceanOpen(
-	start: number,
-	dir: 1 | -1,
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isContinent: Uint8Array,
-	isLake: Uint8Array,
-	latDeg: Float32Array,
-	lonDeg: Float32Array,
-	maxSteps: number,
-): number {
+function directionalOceanOpen({
+	start,
+	dir,
+	mesh,
+	isLand,
+	isContinent,
+	isLake,
+	latDeg,
+	lonDeg,
+	maxSteps,
+}: {
+	start: number
+	dir: 1 | -1
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isContinent: Uint8Array
+	isLake: Uint8Array
+	latDeg: Float32Array
+	lonDeg: Float32Array
+	maxSteps: number
+}): number {
 	const { adjOffset, adjList } = mesh
 	const visited = new Uint8Array(mesh.numRegions)
 	let current = start
@@ -393,12 +449,17 @@ function directionalOceanOpen(
 	return current
 }
 
-function computeOceanSeedDistance(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	seeds: Float32Array,
-): Int32Array {
+function computeOceanSeedDistance({
+	mesh,
+	isLand,
+	isLake,
+	seeds,
+}: {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isLake: Uint8Array
+	seeds: Float32Array
+}): Int32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const dist = new Int32Array(N).fill(-1)
@@ -432,23 +493,14 @@ function computeOceanSeedDistance(
  * Pipeline position: after computeTemperature and after an initial landmarks
  * pass on the pre-lake land mask.
  */
-export function computeOceanCurrents(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	distCoast: Float32Array,
-	landmarks: GenesisLandmarks,
-	params?: Pick<
-		Partial<GenesisParams>,
-		| "substellarLon"
-		| "eccentricity"
-		| "obliquity"
-		| "perihelion"
-		| "planetRadiusKm"
-		| "tideLock"
-		| "hoursPerDay"
-	>,
-	monthlyTEQ?: Float32Array[],
-): OceanCurrentResult {
+export function computeOceanCurrents({
+	mesh,
+	isLand,
+	distCoast,
+	landmarks,
+	params,
+	monthlyTEQ,
+}: ComputeOceanCurrentsParams): OceanCurrentResult {
 	if (params?.tideLock?.type === "solar") {
 		return computeLockedOceanCurrents({ mesh, isLand, landmarks, params })
 	}
@@ -474,7 +526,7 @@ export function computeOceanCurrents(
 		if (!isLand[r] && type === TYPE_LAKE) isLake[r] = 1
 	}
 
-	const coastSites = buildCoastSites(
+	const coastSites = _buildCoastSites({
 		mesh,
 		isLand,
 		isContinent,
@@ -484,7 +536,7 @@ export function computeOceanCurrents(
 		regionBin,
 		distCoast,
 		avgEdgeKm,
-	)
+	})
 
 	const oceanWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
 	const coastalWarmthMonthly = new Float32Array(N * CURRENT_EFFECT_MONTHS)
@@ -496,16 +548,16 @@ export function computeOceanCurrents(
 		const warmSeed = new Float32Array(N)
 		const coldSeed = new Float32Array(N)
 
-		fillOceanBeltSeeds(
+		_fillOceanBeltSeeds({
 			warmSeed,
 			coldSeed,
 			isLand,
 			isLake,
 			latDeg,
-			regionBin,
+			lonBinByRegion: regionBin,
 			teqByLon,
 			hoursPerDay,
-		)
+		})
 		for (const site of coastSites) {
 			const distFromReference = teqByLon
 				? Math.abs(latDeg[site.region] - teqByLon[site.lonBin])
@@ -517,33 +569,33 @@ export function computeOceanCurrents(
 				hoursPerDay,
 			})
 			if (warmth * coriolisWeight > 0.5) {
-				seedCoastalNeighbors(
-					warmSeed,
-					site.oceanNeighbors,
+				_seedCoastalNeighbors({
+					seeds: warmSeed,
+					oceanNeighbors: site.oceanNeighbors,
 					mesh,
 					isLand,
 					isLake,
-					WARM_COASTAL_SEED_DEPTH,
-				)
+					extraDepth: WARM_COASTAL_SEED_DEPTH,
+				})
 			} else if (warmth * coriolisWeight < -0.5) {
-				seedCoastalNeighbors(
-					coldSeed,
-					site.oceanNeighbors,
+				_seedCoastalNeighbors({
+					seeds: coldSeed,
+					oceanNeighbors: site.oceanNeighbors,
 					mesh,
 					isLand,
 					isLake,
-					COLD_COASTAL_SEED_DEPTH,
-				)
+					extraDepth: COLD_COASTAL_SEED_DEPTH,
+				})
 			}
 		}
 
-		const monthOceanWarmth = computeOceanWarmthFromSeeds(
+		const monthOceanWarmth = computeOceanWarmthFromSeeds({
 			mesh,
 			isLand,
 			isLake,
 			warmSeed,
 			coldSeed,
-		)
+		})
 		const monthCoastalWarmth = computeCoastalWarmthFromOceanWarmth({
 			mesh,
 			isLand,
@@ -578,17 +630,14 @@ export function computeOceanCurrents(
  * Ocean:  up to ±5°C for strong currents
  * Land:   up to ±3°C at coast, fading inland (coastalWarmth already fades)
  */
-export function applyCurrentTemperatureEffect(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	isLand: Uint8Array,
-	currents: OceanCurrentResult,
-	monthlyTEQ?: Float32Array[],
-	params?: Pick<
-		GenesisParams,
-		"substellarLon" | "eccentricity" | "obliquity" | "perihelion" | "tideLock"
-	>,
-): void {
+export function applyCurrentTemperatureEffect({
+	mesh,
+	climate,
+	isLand,
+	currents,
+	monthlyTEQ,
+	params,
+}: ApplyCurrentTemperatureEffectParams): void {
 	if (params?.tideLock?.type === "solar") {
 		applyLockedCurrentTemperatureEffect({
 			mesh,
@@ -603,7 +652,11 @@ export function applyCurrentTemperatureEffect(
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
 	const teqByBin =
 		computeAnnualTeq(monthlyTEQ) ??
-		computeThermalEquator(mesh, climate.temperature_avg, TEQ_BINS)
+		computeThermalEquator({
+			mesh,
+			temps: climate.temperature_avg,
+			numBins: TEQ_BINS,
+		})
 	const temperatureDeltaMonthly =
 		currents.temperatureDeltaMonthly ??
 		(currents.temperatureDeltaMonthly = new Float32Array(
@@ -677,18 +730,15 @@ export function applyCurrentTemperatureEffect(
 	}
 }
 
-export function buildOceanCurrentGrid(
-	mesh: SphereMesh,
-	oceanWarmth: Float32Array,
-	isLand: Uint8Array,
-	latDeg: Float32Array,
-	lonDeg: Float32Array,
+export function buildOceanCurrentGrid({
+	mesh,
+	oceanWarmth,
+	isLand,
+	latDeg,
+	lonDeg,
 	reverseCirculation = false,
-	_teqByLon?: Float32Array,
-	_regionBin?: Int32Array,
-	_hoursPerDay = 24,
-	planetRadiusKm?: number,
-): FlowGrid {
+	planetRadiusKm,
+}: BuildOceanCurrentGridParams): FlowGrid {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const gradX = new Float32Array(N)
@@ -795,9 +845,15 @@ export function buildOceanCurrentGrid(
 		}
 	}
 
-	return rasterizeVectorGrid(mesh, currentU, currentV, currentSpeed, {
-		scalar: oceanWarmth,
-		allowCell: (region) => !isLand[region] && coastalOcean[region] === 1,
-		isBlockedRegion: (region) => !!isLand[region],
+	return rasterizeVectorGrid({
+		mesh,
+		vectorU: currentU,
+		vectorV: currentV,
+		vectorSpeed: currentSpeed,
+		options: {
+			scalar: oceanWarmth,
+			allowCell: (region) => !isLand[region] && coastalOcean[region] === 1,
+			isBlockedRegion: (region) => !!isLand[region],
+		},
 	})
 }

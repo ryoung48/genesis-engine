@@ -1,24 +1,16 @@
-import type { GenesisNationHierarchy } from ".."
-import { WATER_ACCESS_BONUS } from "./water-access"
+import type { GenesisNationHierarchy } from "../.."
+import { WATER_ACCESS_BONUS } from "../water-access"
+import type { FanoutRanges, PartitionMembersParams } from "./types"
 
-type FanoutLevel = readonly [min: number, max: number, targetGroupSize: number]
-type FanoutRanges = readonly FanoutLevel[]
-
-// Flat: all subjects become direct children of the duchy capital (mirrors CK3
-// where counties are direct vassals of the duke with no intermediate tier).
 const DUCHY_FANOUT: FanoutRanges = []
 
-// One duchy-level split at depth 0; counties are flat-assigned at depth 1.
 const KINGDOM_FANOUT: FanoutRanges = [[2, 6, 4]]
 
-// Kingdom split at depth 0, duchy split at depth 1, then flat counties.
 const EMPIRE_FANOUT: FanoutRanges = [
 	[3, 8, 15],
 	[2, 6, 4],
 ]
 
-// Empire split at depth 0, kingdom split at depth 1, duchy split at depth 2,
-// then flat counties.
 export const HEGEMON_FANOUT: FanoutRanges = [
 	[3, 8, 80],
 	[3, 8, 15],
@@ -32,14 +24,15 @@ export function fanoutRangesForSize(size: number): FanoutRanges {
 	return DUCHY_FANOUT
 }
 
-/** Max direct children before a node is considered overextended, given nation size. */
 export function maxFanoutForNationSize(size: number): number {
 	const ranges = fanoutRangesForSize(size)
 	return ranges[0]?.[1] ?? Infinity
 }
 
 const TRIBUTE = 0.25
+
 const OVEREXTENSION = 0.9
+
 const URBAN_POP_SCALE = 10_000
 
 function hierarchyProvinceScore(
@@ -55,16 +48,16 @@ function hierarchyProvinceScore(
 	)
 }
 
-function partitionMembers(
-	seeds: Int32Array<ArrayBufferLike>,
-	members: Int32Array<ArrayBufferLike>,
-	adjOffset: Int32Array<ArrayBufferLike>,
-	adjList: Int32Array<ArrayBufferLike>,
-	provinceCount: number,
-	habitability?: Float32Array<ArrayBufferLike>,
-	urbanPop?: Float32Array<ArrayBufferLike>,
-	waterAccess?: Uint8Array<ArrayBufferLike>,
-): Int32Array[] {
+function partitionMembers({
+	seeds,
+	members,
+	adjOffset,
+	adjList,
+	provinceCount,
+	habitability,
+	urbanPop,
+	waterAccess,
+}: PartitionMembersParams): Int32Array[] {
 	const inMembers = new Uint8Array(provinceCount)
 	const unassigned = new Uint8Array(provinceCount)
 	for (let i = 0; i < members.length; i++) {
@@ -145,16 +138,16 @@ function partitionMembers(
 		const rest = leftovers.filter((province) => province !== seed)
 		const seedArray = new Int32Array(1)
 		seedArray[0] = seed
-		const extraGroups = partitionMembers(
-			seedArray,
-			Int32Array.from(rest),
+		const extraGroups = partitionMembers({
+			seeds: seedArray,
+			members: Int32Array.from(rest),
 			adjOffset,
 			adjList,
 			provinceCount,
 			habitability,
 			urbanPop,
 			waterAccess,
-		)
+		})
 		for (let i = 0; i < extraGroups.length; i++) {
 			result.push(Int32Array.from(extraGroups[i]))
 		}
@@ -279,8 +272,8 @@ export function rebalanceHierarchy(params: {
 	if (seedCount === 0) return
 
 	const seedList = Int32Array.from(seeds.slice(0, seedCount))
-	const regions = partitionMembers(
-		seedList,
+	const regions = partitionMembers({
+		seeds: seedList,
 		members,
 		adjOffset,
 		adjList,
@@ -288,7 +281,7 @@ export function rebalanceHierarchy(params: {
 		habitability,
 		urbanPop,
 		waterAccess,
-	)
+	})
 
 	for (let i = 0; i < regions.length; i++) {
 		const region = regions[i]

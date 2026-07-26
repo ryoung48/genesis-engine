@@ -1,14 +1,6 @@
 ﻿import type { GenesisPartition } from ".."
 import { buildIdentitySeeds, createRng } from "../shared"
-
-type GraphPartitionParams = {
-	nodeCount: number
-	adjOffset: Int32Array
-	adjList: Int32Array
-	active: Uint8Array
-	targetCount: number
-	seed: number
-}
+import type { GraphPartitionParams } from "./types"
 
 export function computeGraphPartition({
 	nodeCount,

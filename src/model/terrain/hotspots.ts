@@ -20,6 +20,7 @@ import {
 	getScaledFeatureCount,
 	type LipSite,
 } from "./volcanism"
+import type { ApplyHotspotsParams } from "./types"
 
 function findNearestR(
 	mesh: SphereMesh,
@@ -77,16 +78,16 @@ interface Dome {
 	isContinental: boolean
 }
 
-export function applyHotspots(
-	mesh: SphereMesh,
-	plates: TectonicPlate[],
-	plateAssignment: Int32Array,
-	elevation: Float32Array,
-	mantleUpwelling: Float32Array,
-	terrainFeatures: GenesisTerrainFeatures | undefined,
-	seed: number,
-	volcanism: number,
-): Float32Array {
+export function applyHotspots({
+	mesh,
+	plates,
+	plateAssignment,
+	elevation,
+	mantleUpwelling,
+	terrainFeatures,
+	seed,
+	volcanism,
+}: ApplyHotspotsParams): Float32Array {
 	const { numRegions, r_xyz } = mesh
 	const hotspotContrib = new Float32Array(numRegions)
 	if (volcanism <= 0) return hotspotContrib
@@ -184,14 +185,14 @@ export function applyHotspots(
 			sx /= sLen
 			sy /= sLen
 			sz /= sLen
-			const satFrame = buildTangentFrame(
-				sx,
-				sy,
-				sz,
-				parent.dx,
-				parent.dy,
-				parent.dz,
-			)
+			const satFrame = buildTangentFrame({
+				px: sx,
+				py: sy,
+				pz: sz,
+				dx: parent.dx,
+				dy: parent.dy,
+				dz: parent.dz,
+			})
 			domes.push({
 				x: sx,
 				y: sy,
@@ -254,7 +255,13 @@ export function applyHotspots(
 
 		const centerR = findNearestR(mesh, hx, hy, hz)
 		const plate = plates[plateAssignment[centerR]]
-		const drift = eulerVelocityAt(plate.pole, plate.omega, hx, hy, hz)
+		const drift = eulerVelocityAt({
+			pole: plate.pole,
+			omega: plate.omega,
+			x: hx,
+			y: hy,
+			z: hz,
+		})
 		const driftLen = Math.sqrt(
 			drift[0] * drift[0] + drift[1] * drift[1] + drift[2] * drift[2],
 		)
@@ -273,7 +280,14 @@ export function applyHotspots(
 
 		const baseRiftAngle = hsNoise3.noise3D(hx * 10, hy * 10, hz * 10) * Math.PI
 
-		const frame0 = buildTangentFrame(hx, hy, hz, drift[0], drift[1], drift[2])
+		const frame0 = buildTangentFrame({
+			px: hx,
+			py: hy,
+			pz: hz,
+			dx: drift[0],
+			dy: drift[1],
+			dz: drift[2],
+		})
 		domes.push({
 			x: hx,
 			y: hy,
@@ -339,7 +353,14 @@ export function applyHotspots(
 			cy /= nL
 			cz /= nL
 
-			const frameC = buildTangentFrame(cx, cy, cz, drift[0], drift[1], drift[2])
+			const frameC = buildTangentFrame({
+				px: cx,
+				py: cy,
+				pz: cz,
+				dx: drift[0],
+				dy: drift[1],
+				dz: drift[2],
+			})
 			domes.push({
 				x: cx,
 				y: cy,

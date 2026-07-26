@@ -9,7 +9,7 @@ import {
 	TERRAIN_ELEVATION_SCALE,
 	type TerrainGeometryArrays,
 } from "./terrain-geometry"
-import type { GenesisViewMode } from "./types"
+import type { GenesisViewMode, BuildMapWireframeParams } from "./types"
 
 interface MeshBuildResult {
 	mesh: THREE.Mesh
@@ -282,13 +282,13 @@ export function buildMapMesh(
 // mapMesh already paints the identical stripe for free, nothing else needs
 // to build or render this separately.
 
-export function buildMapWireframe(
-	world: SerializedGenesisWorld,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	wireframeVisible: boolean,
-	viewMode: GenesisViewMode,
-): THREE.LineSegments {
+export function buildMapWireframe({
+	world,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	wireframeVisible,
+	viewMode,
+}: BuildMapWireframeParams): THREE.LineSegments {
 	const { mesh } = world
 	const { numSides, halfedges, s_inner_t, s_outer_t, t_xyz } = mesh
 	const projection = createMapProjection(

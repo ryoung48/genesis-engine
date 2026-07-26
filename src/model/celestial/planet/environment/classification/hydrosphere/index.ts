@@ -1,5 +1,5 @@
 import { roll2d6 } from "@/model/shared/dice"
-import type { HydrosphereProfile } from "../../../../orbit-body"
+import type { HydrosphereProfile } from "../../../../orbit-body/types"
 import type { ClampInput } from "../types"
 import type {
 	BuildHydrosphereInput,
@@ -52,7 +52,7 @@ function waterPct({ rng, hydrosphereCode }: WaterPctInput) {
  * Never returns 11-13 (superdense/molten/gas-giant-core) -- those are
  * special-roll-only codes with no equivalent water-percentage band, not
  * reachable by editing an ordinary terrestrial world's land coverage. */
-export function hydrosphereCodeFromWaterPct(waterPct: number): number {
+function hydrosphereCodeFromWaterPct(waterPct: number): number {
 	const clamped = Math.max(0, Math.min(100, waterPct))
 	const index = WATER_BANDS.findIndex(
 		([lo, hi]) => clamped >= lo && clamped <= hi,
@@ -123,7 +123,7 @@ function distributeSurface({
 	}
 }
 
-export function buildHydrosphereProfile({
+function buildHydrosphereProfile({
 	rng,
 	code,
 }: BuildHydrosphereInput): HydrosphereProfile {
@@ -140,9 +140,13 @@ export function buildHydrosphereProfile({
 	}
 }
 
-export function hydrosphereWaterFraction(
-	hydrosphere: HydrosphereProfile,
-): number {
+function hydrosphereWaterFraction(hydrosphere: HydrosphereProfile): number {
 	const { major, minor, small } = hydrosphere.surface.water
 	return (major.pct + minor.pct + small.pct) / 100
+}
+
+export const HYDROSPHERE = {
+	codeFromWaterPct: hydrosphereCodeFromWaterPct,
+	buildProfile: buildHydrosphereProfile,
+	waterFraction: hydrosphereWaterFraction,
 }

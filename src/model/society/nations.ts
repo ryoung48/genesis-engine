@@ -7,9 +7,6 @@ import {
 import {
 	GOVERNMENT_TYPE_FAMILY,
 	GOVERNMENT_TYPES,
-	type GovernmentFamily,
-	type GovernmentMix,
-	type GovernmentType,
 	NATION_BUCKETS,
 } from "./eras"
 import {
@@ -22,6 +19,18 @@ import {
 } from "./hierarchy"
 import { clamp01, hslToRgb, rgbToHsl } from "./shared"
 import { computeProvinceWaterAccess, WATER_ACCESS_BONUS } from "./water-access"
+import type {
+	ClaimProvinceDynamicParams,
+	SelectSeedParams,
+	MarkBlockedParams,
+	RefineGovernmentSubtypeParams,
+	NationPlacementScoreParams,
+	BestClaimParams,
+	AssignGovernmentTypeParams,
+	GovernmentMix,
+	GovernmentType,
+	GovernmentFamily,
+} from "./types"
 
 // Hard cap on how far a nation can spread from its capital, in km.
 const MAX_NATION_SPREAD_KM = 2000
@@ -119,7 +128,7 @@ export function computeNations(params: {
 			provinces.adjOffset,
 			provinces.adjList,
 		)
-		const seedProvince = selectSeed(
+		const seedProvince = selectSeed({
 			target,
 			active,
 			assignment,
@@ -127,11 +136,11 @@ export function computeNations(params: {
 			habitability,
 			waterAccess,
 			provinceContinent,
-			components.componentId,
-			components.sizes,
-			provinces.adjOffset,
-			provinces.adjList,
-		)
+			componentId: components.componentId,
+			componentSizes: components.sizes,
+			adjOffset: provinces.adjOffset,
+			adjList: provinces.adjList,
+		})
 		if (seedProvince < 0) continue
 
 		const nation = seeds.length
@@ -152,7 +161,7 @@ export function computeNations(params: {
 		}
 
 		while (sizes[nation] < target) {
-			const claim = bestClaim(
+			const claim = bestClaim({
 				nation,
 				seedProvince,
 				frontier,
@@ -161,35 +170,35 @@ export function computeNations(params: {
 				habitability,
 				waterAccess,
 				r_xyz,
-				provinces.seeds,
-				provinces.adjOffset,
-				provinces.adjList,
+				provinceSeeds: provinces.seeds,
+				adjOffset: provinces.adjOffset,
+				adjList: provinces.adjList,
 				noise,
 				maxSpreadRad,
-			)
+			})
 			if (claim < 0) break
-			claimProvinceDynamic(
+			claimProvinceDynamic({
 				nation,
-				claim,
+				province: claim,
 				active,
 				assignment,
 				sizes,
 				frontier,
-				provinces.adjOffset,
-				provinces.adjList,
-			)
+				adjOffset: provinces.adjOffset,
+				adjList: provinces.adjList,
+			})
 			assigned++
 		}
 
 		const blockHops = Math.max(1, Math.round(Math.sqrt(target) * 0.5))
-		markBlocked(
-			seedProvince,
-			blockHops,
+		markBlocked({
+			start: seedProvince,
+			hops: blockHops,
 			active,
 			blocked,
-			provinces.adjOffset,
-			provinces.adjList,
-		)
+			adjOffset: provinces.adjOffset,
+			adjList: provinces.adjList,
+		})
 	}
 
 	if (assigned < activeCount) {
@@ -223,13 +232,13 @@ export function computeNations(params: {
 					const nation = assignment[provinces.adjList[j]]
 					if (nation < 0) continue
 					const score =
-						nationPlacementScore(
+						nationPlacementScore({
 							province,
 							habitability,
 							waterAccess,
 							provinceContinent,
-							members.length,
-						) -
+							target: members.length,
+						}) -
 						sizes[nation] * 0.02
 					if (score > bestScore) {
 						bestScore = score
@@ -249,22 +258,22 @@ export function computeNations(params: {
 
 			const nation = seeds.length
 			let seedProvince = members[0]
-			let seedScore = nationPlacementScore(
-				seedProvince,
+			let seedScore = nationPlacementScore({
+				province: seedProvince,
 				habitability,
 				waterAccess,
 				provinceContinent,
-				members.length,
-			)
+				target: members.length,
+			})
 			for (let i = 1; i < members.length; i++) {
 				const province = members[i]
-				const score = nationPlacementScore(
+				const score = nationPlacementScore({
 					province,
 					habitability,
 					waterAccess,
 					provinceContinent,
-					members.length,
-				)
+					target: members.length,
+				})
 				if (score > seedScore) {
 					seedProvince = province
 					seedScore = score
@@ -364,18 +373,18 @@ export function computeNations(params: {
 		const statehoodFraction = params.statehoodFraction ?? 0.75
 		const nationGovType = new Uint8Array(nationCount)
 		for (let i = 0; i < nationCount; i++) {
-			nationGovType[i] = assignGovernmentType(
-				i,
-				seeds[i],
-				sizes[i],
-				params.governmentMix,
+			nationGovType[i] = assignGovernmentType({
+				nationIndex: i,
+				capitalProvince: seeds[i],
+				nationSize: sizes[i],
+				eraMix: params.governmentMix,
 				sizeWeight,
 				habitability,
 				waterAccess,
-				params.migrationWave,
+				migrationWave: params.migrationWave,
 				statehoodFraction,
-				params.seed,
-			)
+				seed: params.seed,
+			})
 		}
 		if ((params.governmentMix.colonial ?? 0) > 0) {
 			assignColonialRelations({
@@ -578,13 +587,13 @@ const LARGE_NATION_CONTINENT_BONUS = 3.5
 const LARGE_NATION_CONTINENT_MIN_TARGET = 10
 const LARGE_NATION_CONTINENT_FULL_TARGET = 50
 
-function nationPlacementScore(
-	province: number,
-	habitability: Float32Array<ArrayBufferLike>,
-	waterAccess: Uint8Array<ArrayBufferLike>,
-	provinceContinent: Uint8Array<ArrayBufferLike> | undefined,
-	target: number,
-): number {
+function nationPlacementScore({
+	province,
+	habitability,
+	waterAccess,
+	provinceContinent,
+	target,
+}: NationPlacementScoreParams): number {
 	return (
 		habitability[province] +
 		waterAccess[province] * WATER_ACCESS_BONUS +
@@ -605,21 +614,21 @@ function continentPlacementBonus(
 	return sizeBias * LARGE_NATION_CONTINENT_BONUS
 }
 
-function bestClaim(
-	nation: number,
-	seedProvince: number,
-	frontier: Set<number>,
-	active: Uint8Array,
-	assignment: Int32Array,
-	habitability: Float32Array,
-	waterAccess: Uint8Array,
-	r_xyz: Float32Array,
-	provinceSeeds: Int32Array,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	noise: SimplexNoise,
-	maxSpreadRad: number,
-): number {
+function bestClaim({
+	nation,
+	seedProvince,
+	frontier,
+	active,
+	assignment,
+	habitability,
+	waterAccess,
+	r_xyz,
+	provinceSeeds,
+	adjOffset,
+	adjList,
+	noise,
+	maxSpreadRad,
+}: BestClaimParams): number {
 	let best = -1
 	let bestScore = -Infinity
 	for (const candidate of frontier) {
@@ -662,16 +671,16 @@ function bestClaim(
 	return best
 }
 
-function claimProvinceDynamic(
-	nation: number,
-	province: number,
-	active: Uint8Array,
-	assignment: Int32Array,
-	sizes: number[],
-	frontier: Set<number>,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-) {
+function claimProvinceDynamic({
+	nation,
+	province,
+	active,
+	assignment,
+	sizes,
+	frontier,
+	adjOffset,
+	adjList,
+}: ClaimProvinceDynamicParams) {
 	assignment[province] = nation
 	sizes[nation]++
 	frontier.delete(province)
@@ -685,19 +694,19 @@ function claimProvinceDynamic(
 	}
 }
 
-function selectSeed(
-	target: number,
-	active: Uint8Array,
-	assignment: Int32Array,
-	blocked: Uint8Array,
-	habitability: Float32Array,
-	waterAccess: Uint8Array,
-	provinceContinent: Uint8Array | undefined,
-	componentId: Int32Array,
-	componentSizes: number[],
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-): number {
+function selectSeed({
+	target,
+	active,
+	assignment,
+	blocked,
+	habitability,
+	waterAccess,
+	provinceContinent,
+	componentId,
+	componentSizes,
+	adjOffset,
+	adjList,
+}: SelectSeedParams): number {
 	let best = -1
 	let bestScore = -Infinity
 	let fallback = -1
@@ -717,13 +726,13 @@ function selectSeed(
 			1 + Math.min(openNeighbors, Math.max(1, Math.round(Math.sqrt(target))))
 		const sizeFactor = Math.min(componentSize, target) / Math.max(1, target)
 		const score =
-			nationPlacementScore(
-				p,
+			nationPlacementScore({
+				province: p,
 				habitability,
 				waterAccess,
 				provinceContinent,
 				target,
-			) *
+			}) *
 				blockedPenalty +
 			expansion +
 			sizeFactor
@@ -791,14 +800,14 @@ function buildOpenComponents(
 	return { componentId, sizes }
 }
 
-function markBlocked(
-	start: number,
-	hops: number,
-	active: Uint8Array,
-	blocked: Uint8Array,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-) {
+function markBlocked({
+	start,
+	hops,
+	active,
+	blocked,
+	adjOffset,
+	adjList,
+}: MarkBlockedParams) {
 	const queue = [start]
 	const dist = new Int32Array(blocked.length).fill(-1)
 	dist[start] = 0
@@ -998,18 +1007,18 @@ const SIZE_GOV_PRIORS: Array<{
 	},
 ]
 
-function assignGovernmentType(
-	nationIndex: number,
-	capitalProvince: number,
-	nationSize: number,
-	eraMix: import("./eras").GovernmentMix,
-	sizeWeight: number,
-	habitability: Float32Array,
-	waterAccess: Uint8Array,
-	migrationWave: Float32Array | undefined,
-	statehoodFraction: number,
-	seed: number,
-): number {
+function assignGovernmentType({
+	nationIndex,
+	capitalProvince,
+	nationSize,
+	eraMix,
+	sizeWeight,
+	habitability,
+	waterAccess,
+	migrationWave,
+	statehoodFraction,
+	seed,
+}: AssignGovernmentTypeParams): number {
 	// Look up size prior
 	const prior =
 		SIZE_GOV_PRIORS.find((p) => nationSize <= p.maxSize) ??
@@ -1119,26 +1128,26 @@ function assignGovernmentType(
 	h2 ^= h2 >>> 16
 	const r2 = (h2 >>> 0) / 0xffffffff
 
-	return refineGovernmentSubtype(
+	return refineGovernmentSubtype({
 		mainType,
-		nationSize,
+		size: nationSize,
 		wave,
 		hab,
 		water,
 		sizeWeight,
-		r2,
-	)
+		r: r2,
+	})
 }
 
-function refineGovernmentSubtype(
-	mainType: number,
-	size: number,
-	wave: number,
-	hab: number,
-	water: number,
-	sizeWeight: number,
-	r: number,
-): number {
+function refineGovernmentSubtype({
+	mainType,
+	size,
+	wave,
+	hab,
+	water,
+	sizeWeight,
+	r,
+}: RefineGovernmentSubtypeParams): number {
 	switch (mainType) {
 		case 0: {
 			// tribal → chiefdom, tribal monarchy, tribal federation, native council, steppe horde

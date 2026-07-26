@@ -1,5 +1,4 @@
-import type { LanguageRng } from "../rng"
-import { PhonemeCatalog } from "../types"
+import { PhonemeCatalog, type LanguageRng } from "../types"
 import { validTerms } from "."
 
 const orthography = (dice: LanguageRng): Record<string, string> => {

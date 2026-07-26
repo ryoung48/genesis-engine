@@ -1,3 +1,6 @@
+import type { TideLock } from "../celestial/orbit-body/types"
+import type { SocietyEra } from "../society/types";
+
 export interface TectonicPlate {
 	id: number
 	isOcean: boolean
@@ -48,7 +51,7 @@ export interface GenesisParams {
 	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
-	tideLock: import("../celestial/orbit-body").TideLock | null // null = not locked
+	tideLock: TideLock | null // null = not locked
 	substellarLon: number // longitude of the substellar point in degrees (0-360), default 0
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
@@ -74,7 +77,7 @@ export interface GenesisParams {
 	/** Seed for the sibling/system bodies shown in the Generation panel; 0 = Sol. Not used by terrain generation. */
 	restSeed?: number
 	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */
-	era?: import("../society/eras").SocietyEra
+	era?: SocietyEra
 }
 
 /** Result of findCollisions for one plate layer */

@@ -1,4 +1,6 @@
-import { type MainSequenceClass, STAR } from "@/model/celestial/star"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+import { STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
@@ -37,7 +39,7 @@ export function buildPlanetSliders(state: {
 	pressure: number
 	landDistribution: number
 	landCoverage: number
-	tideLock: import("@/model/celestial/orbit-body").TideLock | null
+	tideLock: TideLock | null
 	substellarLon: number
 	setPlanetRadiusKm: (v: number) => void
 	setObliquity: (v: number) => void
@@ -222,9 +224,7 @@ export function resetWorldDefaults(setters: {
 	setStarSubtype: (v: number) => void
 	setOrbitalDistanceAU: (v: number) => void
 	setHoursPerDay: (v: number) => void
-	setTideLock: (
-		v: import("@/model/celestial/orbit-body").TideLock | null,
-	) => void
+	setTideLock: (v: TideLock | null) => void
 	setSubstellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void

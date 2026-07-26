@@ -1,8 +1,9 @@
 import { createRng } from "@/model/shared/rng"
-import type { OrbitClassification, OrbitGroup } from "../../../orbit-body"
-import { zoneFromDeviation } from "../../environment/temperature"
+import type { OrbitClassification, OrbitGroup } from "../../../orbit-body/types"
+import { TEMPERATURE } from "../../environment/temperature"
 import type { HeatedClassInput } from "./types"
-export function describeRegime(
+
+function describeRegime(
 	totalHeating: number,
 ): "dead" | "low" | "active" | "extreme" {
 	if (totalHeating > 100) return "extreme"
@@ -10,7 +11,7 @@ export function describeRegime(
 	if (totalHeating > 1) return "low"
 	return "dead"
 }
-export function pickHeatedClass({
+function pickHeatedClass({
 	current,
 	sizeClass,
 	seed,
@@ -21,10 +22,10 @@ export function pickHeatedClass({
 	return "hebean"
 }
 
-export function nextSeismologyClass(params: {
+function nextSeismologyClass(params: {
 	current: OrbitClassification
 	group: OrbitGroup
-	zone: ReturnType<typeof zoneFromDeviation>
+	zone: ReturnType<typeof TEMPERATURE.zoneFromDeviation>
 	sizeClass: number
 	tidalHeating: number
 	totalHeating: number
@@ -58,4 +59,9 @@ export function nextSeismologyClass(params: {
 		return "meltball"
 	}
 	return next
+}
+
+export const RECLASSIFY = {
+	describeRegime,
+	nextSeismologyClass,
 }

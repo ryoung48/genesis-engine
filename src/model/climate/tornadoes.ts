@@ -17,7 +17,6 @@
  * Returns a normalised [0, 1] Float32Array. Land cells encode tornado risk;
  * ocean/lake cells are zero.
  */
-import type { GenesisParams, SphereMesh } from ".."
 import { clamp, piecewise, smoothstep } from "../shared"
 import {
 	TOPO_FLAT,
@@ -29,6 +28,7 @@ import {
 	TOPO_PLATEAU,
 } from "../terrain"
 import { computeThermalEquator, getClimateGeometry, hadleyWidth } from "./rain"
+import type { ComputeTornadoRiskParams } from "./types"
 
 /** Moisture availability by biome — grasslands peak, desert/jungle low. */
 function vegetationMoistureScore(biomeCode: number): number {
@@ -68,17 +68,17 @@ function terrainFactor(topoCode: number): number {
 	}
 }
 
-export function computeTornadoRisk(
-	mesh: SphereMesh,
-	temperatureAvg: Float32Array,
-	temperatureMax: Float32Array,
-	temperatureMin: Float32Array,
-	isLand: Uint8Array,
-	topography: Uint8Array,
-	vegetation: Uint8Array,
-	oceanDist: Float32Array,
-	params: Pick<GenesisParams, "hoursPerDay" | "tideLock">,
-): Float32Array {
+export function computeTornadoRisk({
+	mesh,
+	temperatureAvg,
+	temperatureMax,
+	temperatureMin,
+	isLand,
+	topography,
+	vegetation,
+	oceanDist,
+	params,
+}: ComputeTornadoRiskParams): Float32Array {
 	const N = mesh.numRegions
 
 	// No Coriolis on locked planets → no organized rotation → no tornadoes
@@ -114,7 +114,7 @@ export function computeTornadoRisk(
 	const transOut = ferrelWidth * 0.25
 
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
-	const annualTEQ = computeThermalEquator(mesh, temperatureAvg)
+	const annualTEQ = computeThermalEquator({ mesh, temps: temperatureAvg })
 
 	// --- Per-cell scoring ---
 	const risk = new Float32Array(N)

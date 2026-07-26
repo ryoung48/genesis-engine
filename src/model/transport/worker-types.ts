@@ -6,6 +6,8 @@ import type {
 	GenesisProvinces,
 	StageTiming,
 } from ".."
+import type { TideLock } from "../celestial/orbit-body/types"
+import type { TidalSchedule } from "../climate/tidal-schedule"
 import type { HistoryNote } from "../history"
 
 interface SerializedSphereMesh {
@@ -76,7 +78,7 @@ export interface SerializedGenesisWorld {
 	cycloneRisk?: Float32Array
 	tornadoRisk?: Float32Array
 	tidalRange?: Float32Array
-	tidalSchedule?: import("../climate/tidal-schedule").TidalSchedule
+	tidalSchedule?: TidalSchedule
 	hazards: {
 		earthquake: Float32Array
 		volcano: Float32Array
@@ -518,7 +520,7 @@ export type GenesisWorkerRequest =
 				orbitalDistanceAU?: number
 				daysPerYear?: number
 				hoursPerDay?: number
-				tideLock?: import("../celestial/orbit-body").TideLock | null
+				tideLock?: TideLock | null
 				substellarLon?: number
 				perihelion?: number
 				pressure?: number

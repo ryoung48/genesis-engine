@@ -2,12 +2,12 @@ import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { renderStatGrid } from "../shared/ui-atoms"
+import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	type WikiCountHistoryPoint,
 	type WikiTimelineEvent,
 	WikiTimelineSection,
-} from "../shared/WikiTimeline"
+} from "@/ui/wiki/shared/WikiTimeline"
 
 interface WarWikiNationMention {
 	tag: string

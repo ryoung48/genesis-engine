@@ -1,56 +1,9 @@
-export type SocietyEra =
-	| "paleolithic"
-	| "neolithic"
-	| "bronze"
-	| "iron"
-	| "lateMedieval"
-	| "earlyModern"
-	| "industrial"
-	| "information"
-
-/**
- * 29 government subtypes across 4 main groups plus colonial extensions.
- * Encoding: tribal 0–4, monarchy 5–12, republic 13–19, theocracy 20–22.
- * Indices 23–26 are republic extensions (socialist, junta, fascist, dictatorial).
- * Indices 27–28 are colonial types assigned by the post-pass (earlyModern+).
- */
-export type GovernmentType =
-	// tribal (0–4)
-	| "chiefdom" // 0: small hereditary chief — default tribal
-	| "tribal_monarchy" // 1: medium organised tribal kingdom
-	| "tribal_federation" // 2: medium+ multi-tribe council
-	| "native_council" // 3: small frontier indigenous council
-	| "steppe_horde" // 4: large nomadic confederation — Mongols, Huns, Xiongnu
-	// monarchy (5–12)
-	| "feudal_monarchy" // 5: decentralised lords-and-vassals — ancient/medieval
-	| "elective_monarchy" // 6: elected king — medium+
-	| "absolute_monarchy" // 7: centralised crown, patrimonial administration — large, earlyModern+
-	| "constitutional_monarchy" // 8: limited monarchy — earlyModern+
-	| "dynastic_signoria" // 9: republic fallen under one dynastic lord — small, earlyModern (Medici, Visconti)
-	| "warlord_state" // 10: fragmented post-imperial military rule — no legitimate succession
-	| "shogunate" // 11: military rule under a figurehead monarch — large, institutionalized
-	| "bureaucratic_monarchy" // 12: centralised crown, impersonal exam-selected bureaucracy — large (China)
-	// republic (13–19)
-	| "merchant_republic" // 13: trade oligarchy — small coastal core
-	| "oligarchic_republic" // 14: aristocratic senate — medium ancient core
-	| "free_city" // 15: self-governing city or league (poleis, Swiss cantons, HRE free cities) — medium
-	| "peasant_republic" // 16: lord-less free-peasant commune — small coastal/marsh (Dithmarschen, Frisia)
-	| "presidential_republic" // 17: elected executive — industrial+
-	| "parliamentary_republic" // 18: legislature-led — industrial+
-	| "pirate_republic" // 19: small outlaw haven — coastal, earlyModern
-	// theocracy (20–22)
-	| "theocracy" // 20: religious government — medium+, default
-	| "monastic_state" // 21: military-religious order — small coastal
-	| "imperial_cult" // 22: state religion as imperial authority — large
-	// republic extensions (23–26)
-	| "socialist_state" // 23: one-party socialist republic — industrial+
-	| "military_junta" // 24: authoritarian military regime — industrial+
-	| "fascist_state" // 25: totalitarian nationalist mass-party regime — industrial (WWII-era)
-	| "dictatorial_rule" // 26: personalist authoritarian rule, no military/party institution — industrial+
-	// colonial (27–28) — assigned by post-pass, not the normal gov mix
-	| "trading_company" // 27: chartered company rule — earlyModern+, coastal
-	| "settler_colony" // 28: settler-majority territory — industrial+, large
-
+import type {
+	EraConfig,
+	SocietyEra,
+	GovernmentType,
+	GovernmentFamily,
+} from "./types"
 export const GOVERNMENT_TYPES: GovernmentType[] = [
 	// tribal
 	"chiefdom",
@@ -120,14 +73,6 @@ export const GOVERNMENT_TYPE_LABELS: Record<GovernmentType, string> = {
 	trading_company: "Trading Company",
 	settler_colony: "Settler Colony",
 }
-
-export type GovernmentFamily =
-	| "tribal"
-	| "monarchy"
-	| "republic"
-	| "theocracy"
-	| "colonial"
-
 /** Which of the 5 top-level families each subtype belongs to. Republic
  * extensions (socialist/junta/fascist/dictatorial) count as "republic" here. */
 export const GOVERNMENT_TYPE_FAMILY: Record<GovernmentType, GovernmentFamily> =
@@ -162,60 +107,6 @@ export const GOVERNMENT_TYPE_FAMILY: Record<GovernmentType, GovernmentFamily> =
 		trading_company: "colonial",
 		settler_colony: "colonial",
 	}
-
-/** Fraction of nations assigned each government type. Must sum to ~1. */
-export interface GovernmentMix {
-	tribal: number
-	monarchy: number
-	republic: number
-	theocracy: number
-	/**
-	 * Target fraction of total province mass to convert to colonial government
-	 * via the post-pass. Drawn from tribal nations on different landmasses.
-	 * Does not need to be included in the tribal/monarchy/republic/theocracy sum.
-	 */
-	colonial?: number
-}
-
-interface EraConfig {
-	id: SocietyEra
-	label: string
-	/** Target world population at habitabilityScore = 1 */
-	targetPopulation: number
-	/**
-	 * Fraction (0–1) of non-desolate provinces that are settled, taken from
-	 * the lowest-wave end of the migration wave distribution. 1.0 = everywhere.
-	 */
-	settlementFraction: number
-	/**
-	 * Strength of the migration-distance falloff applied to population density.
-	 */
-	migrationFalloff: number
-	/**
-	 * Fraction (0–1) of settled provinces that are statehood-eligible.
-	 */
-	statehoodFraction: number
-	/** Whether to generate any nations */
-	hasNations: boolean
-	/** Normalized budget weights across NATION_BUCKETS (or nationBuckets) */
-	nationPercentages: number[]
-	/** Province-count size ranges; aligns with nationPercentages indices */
-	nationBuckets: [number, number][]
-	/**
-	 * Fraction of nations assigned each government type.
-	 * Tribal nations tend to be small (1–4 provinces); state governments larger.
-	 * Based on EU4 extended-timeline nation-count distributions.
-	 */
-	governmentMix: GovernmentMix
-	/**
-	 * How much nation size drives government type vs. era ideology (0–1).
-	 * 1.0 = size alone determines government (ancient world: large=monarchy, tiny=tribal).
-	 * 0.0 = era mix alone determines government (modern world: ideology transcends size).
-	 * Also scales spatial modifier strength — geography matters less in modernity.
-	 */
-	governmentSizeWeight: number
-}
-
 export const NATION_BUCKETS: [number, number][] = [
 	[251, 600],
 	[50, 250],

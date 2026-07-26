@@ -1,5 +1,5 @@
 export { computeCultures } from "./culture"
-export type { GovernmentType, SocietyEra } from "./eras"
+export type { GovernmentType, SocietyEra } from "./types"
 export {
 	DEFAULT_ERA,
 	ERA_ORDER,
@@ -8,7 +8,7 @@ export {
 	getEraConfig,
 	wavePercentileThreshold,
 } from "./eras"
-export type { CultureGenderSystem } from "./gender-system"
+export type { CultureGenderSystem } from "./types"
 export {
 	CULTURE_GENDER_SYSTEM,
 	normalizeCultureGenderSystem,
@@ -24,7 +24,7 @@ export {
 export type { LanguageNames } from "./language/names"
 export { createWorldNames } from "./language/names"
 export { computeNations } from "./nations"
-export type { ProvincePopulation } from "./population"
+export type { ProvincePopulation } from "./types"
 export {
 	computeMigration,
 	computePopulation,

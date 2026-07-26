@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
-import type { MoonBody } from "@/model/celestial/moons"
-import type { AtmosphereProfile } from "@/model/celestial/orbit-body"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule"
 import {
 	computeMoonTidalSchedule,
 	computeTidalSchedule,
@@ -32,7 +33,7 @@ function PlanetDetailContent({
 	unitSystem,
 	tidesEmptyLabel,
 }: {
-	tidalSchedulePreview?: import("@/model/climate/tidal-schedule").TidalSchedule
+	tidalSchedulePreview?: TidalSchedule
 	daysPerYear: number
 	isSolarLocked: boolean
 	climatePreview: ClimatePreviewData
@@ -191,7 +192,7 @@ export function LazyPlanetDetailTabs({
 	 * whichever moon is currently "focused" in the 3D view rather than always
 	 * showing its own moons' aggregate schedule. Sibling bodies/moons don't
 	 * pass this and just get the internally-computed one. */
-	tidalSchedulePreviewOverride?: import("@/model/climate/tidal-schedule").TidalSchedule
+	tidalSchedulePreviewOverride?: TidalSchedule
 	generationPreviewTab: GenerationPreviewTab
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
@@ -433,7 +434,7 @@ function LazyPlanetDetailTabsContent({
 	greenhouseFactor?: number
 	internalHeatTempK?: number
 	seismologyTotalHeatingK?: number
-	tidalSchedulePreviewOverride?: import("@/model/climate/tidal-schedule").TidalSchedule
+	tidalSchedulePreviewOverride?: TidalSchedule
 	generationPreviewTab: GenerationPreviewTab
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
@@ -533,27 +534,34 @@ function LazyPlanetDetailTabsContent({
 	const computedTidalSchedulePreview = useMemo(
 		() =>
 			moonContext
-				? computeMoonTidalSchedule(moonContext.moon, moonContext.parent, {
-						daysPerYear: moonTideContext?.daysPerYear ?? daysPerYear,
-						hoursPerDay: moonTideContext?.hoursPerDay ?? hoursPerDay,
-						spectralClass,
-						starSubtype,
-						orbitalDistanceAU,
-						eccentricity,
-						perihelion,
-					})
-				: moons.length > 0
-					? computeTidalSchedule(moons, {
-							seed,
-							daysPerYear,
-							hoursPerDay,
-							planetRadiusKm,
-							tideLock: null,
+				? computeMoonTidalSchedule({
+						moon: moonContext.moon,
+						parent: moonContext.parent,
+						params: {
+							daysPerYear: moonTideContext?.daysPerYear ?? daysPerYear,
+							hoursPerDay: moonTideContext?.hoursPerDay ?? hoursPerDay,
 							spectralClass,
 							starSubtype,
 							orbitalDistanceAU,
 							eccentricity,
 							perihelion,
+						},
+					})
+				: moons.length > 0
+					? computeTidalSchedule({
+							moons,
+							params: {
+								seed,
+								daysPerYear,
+								hoursPerDay,
+								planetRadiusKm,
+								tideLock: null,
+								spectralClass,
+								starSubtype,
+								orbitalDistanceAU,
+								eccentricity,
+								perihelion,
+							},
 						})
 					: undefined,
 		[

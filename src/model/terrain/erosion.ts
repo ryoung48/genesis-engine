@@ -1,5 +1,12 @@
 import type { SphereMesh } from ".."
 import { MinHeap, SimplexNoise, smoothstep } from "../shared"
+import type {
+	BuildGlacialBuffersParams,
+	WarpTerrainParams,
+	SmoothElevationParams,
+	SharpenRidgesParams,
+	ApplySoilCreepParams,
+} from "./types"
 
 /**
  * Core iteration kernel shared by smoothElevation, sharpenRidges, and applySoilCreep.
@@ -182,13 +189,13 @@ function priorityFloodCarve(
 // ----------------------------------------------------------------
 //  Domain warping via FBM simplex noise with greedy mesh walk (genesis port)
 // ----------------------------------------------------------------
-export function warpTerrain(
-	mesh: SphereMesh,
-	elev: Float32Array,
-	seed: number,
-	strength: number,
-	r_hotspot?: Float32Array | null,
-): Float32Array {
+export function warpTerrain({
+	mesh,
+	elev,
+	seed,
+	strength,
+	r_hotspot,
+}: WarpTerrainParams): Float32Array {
 	if (strength <= 0) return elev
 
 	const N = mesh.numRegions
@@ -292,13 +299,13 @@ export function warpTerrain(
 // ----------------------------------------------------------------
 //  Bilateral smoothing with coastline locking (genesis port)
 // ----------------------------------------------------------------
-export function smoothElevation(
-	mesh: SphereMesh,
-	elev: Float32Array,
-	r_isOcean: Uint8Array,
-	iterations: number,
-	strength: number,
-): void {
+export function smoothElevation({
+	mesh,
+	elev,
+	r_isOcean,
+	iterations,
+	strength,
+}: SmoothElevationParams): void {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 
@@ -342,13 +349,13 @@ interface GlacialBuffers {
 	numIceUpstream: Uint8Array
 }
 
-function buildGlacialBuffers(
-	N: number,
-	r_xyz: Float32Array,
-	r_isOcean: Uint8Array,
-	elev: Float32Array,
-	glacialStrength: number,
-): GlacialBuffers {
+function buildGlacialBuffers({
+	N,
+	r_xyz,
+	r_isOcean,
+	elev,
+	glacialStrength,
+}: BuildGlacialBuffersParams): GlacialBuffers {
 	const glacIdx = new Float32Array(N)
 	// At strength=1 glaciation starts at ~50° latitude; at 0.5 it starts at ~70°
 	const thresholdLat = Math.PI / 2 - (glacialStrength * Math.PI) / 4.5
@@ -415,13 +422,13 @@ export function erodeComposite(
 	// ---- Glacial precomputation (once — index is position-based) ----
 	let glacialBuffers: GlacialBuffers | null = null
 	if (gIters > 0 && glacialStrength > 0) {
-		glacialBuffers = buildGlacialBuffers(
+		glacialBuffers = buildGlacialBuffers({
 			N,
-			mesh.r_xyz,
+			r_xyz: mesh.r_xyz,
 			r_isOcean,
 			elev,
 			glacialStrength,
-		)
+		})
 	}
 	const glacIdx = glacialBuffers?.glacIdx ?? null
 	const iceTarget = glacialBuffers?.iceTarget ?? null
@@ -726,13 +733,13 @@ export function erodeComposite(
 // ----------------------------------------------------------------
 //  Ridge sharpening (genesis port)
 // ----------------------------------------------------------------
-export function sharpenRidges(
-	mesh: SphereMesh,
-	elev: Float32Array,
-	r_isOcean: Uint8Array,
-	iterations: number,
-	strength: number,
-): void {
+export function sharpenRidges({
+	mesh,
+	elev,
+	r_isOcean,
+	iterations,
+	strength,
+}: SharpenRidgesParams): void {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 
@@ -763,13 +770,13 @@ export function sharpenRidges(
 // ----------------------------------------------------------------
 //  Soil creep — Laplacian diffusion (genesis port)
 // ----------------------------------------------------------------
-export function applySoilCreep(
-	mesh: SphereMesh,
-	elev: Float32Array,
-	r_isOcean: Uint8Array,
-	iterations: number,
-	strength: number,
-): void {
+export function applySoilCreep({
+	mesh,
+	elev,
+	r_isOcean,
+	iterations,
+	strength,
+}: ApplySoilCreepParams): void {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 

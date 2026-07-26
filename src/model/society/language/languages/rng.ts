@@ -1,25 +1,5 @@
-﻿import {
-	createStringRng,
-	type SharedRng,
-	type WeightedValue as SharedWeightedValue,
-} from "@/model/shared"
-
-export type WeightedValue<T> = SharedWeightedValue<T>
-
-export interface LanguageRng {
-	readonly random: number
-	uniform(min?: number, max?: number): number
-	randint(min: number, max: number): number
-	choice<T>(arr: readonly T[]): T
-	weightedChoice<T>(arr: readonly WeightedValue<T>[]): T
-	shuffle<T>(arr: readonly T[]): T[]
-	sample<T>(arr: readonly T[], count: number): T[]
-	weightedSample<T>(
-		arr: readonly WeightedValue<T>[],
-		count: number,
-		unique?: boolean,
-	): T[]
-}
+﻿import { createStringRng, type SharedRng } from "@/model/shared"
+import type { LanguageRng, WeightedValue } from "./types"
 
 function wrapSharedRng(rng: SharedRng): LanguageRng {
 	return {

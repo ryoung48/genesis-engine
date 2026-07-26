@@ -1,6 +1,6 @@
 ﻿// Re-export all model-layer star types and functions
 
-import type { MainSequenceClass } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 
 export const SPECTRAL_CLASS_COLORS: Record<MainSequenceClass, string> = {
 	O: "#7cc6ff",

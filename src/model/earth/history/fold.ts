@@ -6,6 +6,15 @@ import type {
 	RawProvinceEvents,
 	RawWar,
 } from "./data-source"
+import type {
+	ApplyDiplomacyDeltaParams,
+	ApplyOrganizationDeltaParams,
+	ComputeActiveWarsParams,
+	FoldNationParams,
+	FoldParams,
+	FoldProvinceParams,
+	OrgParams,
+} from "./types"
 
 export interface FoldedProvinceState {
 	owner: string | null
@@ -152,7 +161,7 @@ function foldProvince({
 	fromTime,
 	toTime,
 	base,
-}: import("./types").FoldProvinceParams): FoldedProvinceState | undefined {
+}: FoldProvinceParams): FoldedProvinceState | undefined {
 	const entry = data.provinceEvents[rawId]
 	if (!entry) return base
 	const state: FoldedProvinceState = base
@@ -202,7 +211,7 @@ function foldNation({
 	fromTime,
 	toTime,
 	base,
-}: import("./types").FoldNationParams): FoldedNationState {
+}: FoldNationParams): FoldedNationState {
 	const entry = data.nationEvents[tag]
 	const state: FoldedNationState = base
 		? {
@@ -268,7 +277,7 @@ function applyDiplomacyDelta({
 	fromTime,
 	toTime,
 	nations,
-}: import("./types").ApplyDiplomacyDeltaParams): void {
+}: ApplyDiplomacyDeltaParams): void {
 	const touched = (tag: string) => {
 		let n = nations.get(tag)
 		if (!n) {
@@ -365,7 +374,7 @@ function applyOrganizationDelta({
 	toTime,
 	nations,
 	organizationSites,
-}: import("./types").ApplyOrganizationDeltaParams): void {
+}: ApplyOrganizationDeltaParams): void {
 	for (const e of data.organizationEvents) {
 		if (e.date <= fromTime || e.date > toTime) continue
 		if (e.kind === "join" || e.kind === "leave") {
@@ -417,7 +426,7 @@ function computeHreMemberNations(
 function computeActiveWars({
 	wars,
 	time,
-}: import("./types").ComputeActiveWarsParams): ActiveWar[] {
+}: ComputeActiveWarsParams): ActiveWar[] {
 	const active: ActiveWar[] = []
 	for (const war of wars) {
 		const attackers = new Set<string>()
@@ -457,7 +466,7 @@ function computeActiveWars({
 export function collectOrgMemberProvinceRawIds({
 	state,
 	orgId,
-}: import("./types").OrgParams): Set<number> {
+}: OrgParams): Set<number> {
 	const memberProvinceRawIds = new Set<number>()
 	if (orgId === "HRE") {
 		for (const [rawId, province] of state.provinces) {
@@ -497,7 +506,7 @@ export function collectOrgMemberProvinceRawIds({
 export function collectOrgForeignHolderNations({
 	state,
 	orgId,
-}: import("./types").OrgParams): Set<string> {
+}: OrgParams): Set<string> {
 	const foreignHolders = new Set<string>()
 	if (orgId !== "HRE") return foreignHolders
 	const owners = new Set<string>()
@@ -519,11 +528,7 @@ export function collectOrgForeignHolderNations({
  * present in `provinceIds`/`nationTags` -- callers pass the full known set
  * for a from-scratch fold, or just the entities that changed for a delta
  * fold from a checkpoint. */
-export function fold({
-	data,
-	time,
-	options,
-}: import("./types").FoldParams): FoldedState {
+export function fold({ data, time, options }: FoldParams): FoldedState {
 	const fromTime = options.base?.time ?? -Infinity
 	const provinces = new Map(options.base?.provinces)
 	const nations = new Map(options.base?.nations)

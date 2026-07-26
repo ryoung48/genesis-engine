@@ -1,4 +1,5 @@
 import type { SphereMesh } from ".."
+import type { EulerVelocityAtParams } from "./types"
 
 const RAD2DEG = 180 / Math.PI
 
@@ -16,13 +17,13 @@ export function smoothstep(edge0: number, edge1: number, x: number): number {
 	return t * t * (3 - 2 * t)
 }
 
-export function eulerVelocityAt(
-	pole: [number, number, number],
-	omega: number,
-	x: number,
-	y: number,
-	z: number,
-): [number, number, number] {
+export function eulerVelocityAt({
+	pole,
+	omega,
+	x,
+	y,
+	z,
+}: EulerVelocityAtParams): [number, number, number] {
 	const [px, py, pz] = pole
 	return [
 		omega * (py * z - pz * y),

@@ -404,9 +404,7 @@ export function createNames(context: LanguageNameContext): LanguageNames {
 	}
 }
 
-export const NAMES = {
-	create: createNames,
-}
+export const NAMES = {}
 
 export function createWorldNames(
 	world: Partial<

@@ -1,15 +1,16 @@
 import type React from "react"
-import type { MoonBody } from "@/model/celestial/moons"
-import type {
-	AtmosphereProfile,
-	SeismologyProfile,
-} from "@/model/celestial/orbit-body"
+import type { MoonBody, MoonOrbitRange } from "@/model/celestial/moons/types"
 import {
 	EARTH_DIAMETER_KM,
 	EARTH_MASS_KG,
 	ORBIT_BODY,
 } from "@/model/celestial/orbit-body"
-import type { SystemBody } from "@/model/celestial/system"
+import type {
+	AtmosphereProfile,
+	SeismologyProfile,
+	TideLock,
+} from "@/model/celestial/orbit-body/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
@@ -312,7 +313,7 @@ function buildMoonStats({
 	seismology?: SeismologyProfile
 	surfaceTidesM?: SurfaceTidesBreakdown
 	pd: number
-	orbitRange?: import("@/model/celestial/moons").MoonOrbitRange
+	orbitRange?: MoonOrbitRange
 	orbitalPeriodDays: number
 	/** Moon's own sidereal rotation period, in hours — independent of
 	 * orbitalPeriodDays (not assumed to be tidally locked). */
@@ -323,7 +324,7 @@ function buildMoonStats({
 	axialTiltDeg: number
 	parentOrbitalPeriodDays?: number
 	tideLockStat?: StatEntry
-	tideLock?: import("@/model/celestial/orbit-body").TideLock | null
+	tideLock?: TideLock | null
 	substellarLon?: number
 	editors?: {
 		diameter?: StatEntry["editor"]

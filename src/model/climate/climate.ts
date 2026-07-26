@@ -5,7 +5,8 @@
  */
 
 import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
-import { type MainSequenceClass, STAR } from "../celestial/star"
+import { STAR } from "../celestial/star"
+import type { MainSequenceClass } from "../celestial/star/types"
 import { getEffectiveObliquityDeg, HOURS_PER_DAY, TIME } from "../shared"
 
 import { EMB_CONSTANTS } from "./ebm/constants"

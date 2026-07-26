@@ -9,10 +9,10 @@
  * The substellar position shifts monthly via libration (eccentricity) and
  * declination (obliquity), so seasonal wind variation is captured.
  */
-import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
 import { clamp } from "../../shared/math"
 import { DEFAULT_SUBSTELLAR_LON } from "../../shared/units"
 import { getClimateGeometry } from "../rain"
+import type { ComputeLockedWindVectorsParams } from "../types"
 import type { WindSurface } from "../wind"
 import {
 	computeMonthlyLibration,
@@ -22,7 +22,13 @@ import {
 
 // Identical to the inline helper in wind.ts — kept local to avoid a circular
 // value import across the wind / locked-wind boundary.
-function surfaceWindFactor(r: number, surface: WindSurface): number {
+function surfaceWindFactor({
+	r,
+	surface,
+}: {
+	r: number
+	surface: WindSurface
+}): number {
 	const TOPO_OCEAN = 5
 	const TOPO_LAKE = 6
 	const topoCode = surface.topography?.[r]
@@ -93,17 +99,14 @@ function surfaceWindFactor(r: number, surface: WindSurface): number {
  *
  * Returns the same shape as computeWindVectors so callers are interchangeable.
  */
-export function computeLockedWindVectors(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	elevation_km: Float32Array,
-	params?: Pick<
-		GenesisParams,
-		"substellarLon" | "obliquity" | "eccentricity" | "perihelion" | "pressure"
-	>,
-	month?: number,
-	surface?: WindSurface,
-): {
+export function computeLockedWindVectors({
+	mesh,
+	climate,
+	elevation_km,
+	params,
+	month,
+	surface,
+}: ComputeLockedWindVectorsParams): {
 	windU: Float32Array
 	windV: Float32Array
 	pressure: Float32Array
@@ -274,7 +277,7 @@ export function computeLockedWindVectors(
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const base = (rawSpeed[r] / ref) * 10 * pressureFactor
-		windSpeed[r] = surface ? base * surfaceWindFactor(r, surface) : base
+		windSpeed[r] = surface ? base * surfaceWindFactor({ r, surface }) : base
 	}
 
 	return { windU, windV, pressure, windSpeed }

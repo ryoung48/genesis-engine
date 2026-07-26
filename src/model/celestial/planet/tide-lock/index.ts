@@ -1,8 +1,13 @@
 ﻿import { HOURS_PER_DAY } from "@/model/shared"
 import { roll2d6 } from "@/model/shared/dice"
 import type { createRng } from "@/model/shared/rng"
-import type { MoonBody } from "../moons"
-import type { TideLock } from "../orbit-body"
+import type { MoonBody } from "../../moons/types"
+import type { TideLock } from "../../orbit-body/types"
+import type {
+	MoonTideLockResult,
+	PlanetTideLockResult,
+	TideLockEffectResult,
+} from "./types"
 
 // Relative (not absolute) tolerance on the sidereal:orbital ratio -- these
 // periods span everything from hours (close-in moons) to centuries (distant
@@ -31,7 +36,7 @@ const RESONANCE_32_RATIO_TOLERANCE = 1e-3
  * so Mercury's real 3:2 resonance shows the same descriptor without needing
  * its own authored flag.
  */
-export function deriveTideLockStatus(params: {
+function deriveTideLockStatus(params: {
 	siderealDayHours: number
 	orbitalPeriodDays: number
 	tideLock: TideLock | null | undefined
@@ -152,13 +157,6 @@ function rollMoonLockDM(params: {
 	return dm
 }
 
-interface TideLockEffectResult {
-	siderealDayHours: number
-	axialTiltDeg: number
-	eccentricity: number
-	locked: boolean
-}
-
 // Ported from galaxy-gen's ROTATION.locks.effect -- the 2d6+dm roll that
 // turns the winning prospect's DM into an actual rotation outcome: unlocked
 // (roll<=4), a partial spin-down multiplier (5-8), a random slow rotation
@@ -230,18 +228,6 @@ function rollTideLockEffect(params: {
 	return { siderealDayHours, axialTiltDeg, eccentricity, locked }
 }
 
-interface PlanetTideLockResult {
-	siderealDayHours: number
-	axialTiltDeg: number
-	eccentricity: number
-	tideLock: TideLock | null
-	/** True when the result is a 1:1 lock specifically to the star (not to a
-	 * moon) -- generate-system-bodies.ts should reclassify a terrestrial body
-	 * to jani-lithic (epistellar)/vesperian (inner) when this is set, the
-	 * same way galaxy-gen's classify() does, unless it's already acheronian. */
-	starLocked: boolean
-}
-
 /**
  * Ported from galaxy-gen's ROTATION.locks.get (orbits/rotation/index.ts) --
  * the planet-side prospects (a planet locking to its star, or to one of its
@@ -257,7 +243,7 @@ interface PlanetTideLockResult {
  * input here mirrors what galaxy-gen's roll reads off the already-mostly-
  * built `orbit` at the point it calls ROTATION.locks.get.
  */
-export function rollPlanetTideLock(params: {
+function rollPlanetTideLock(params: {
 	rng: ReturnType<typeof createRng>
 	sizeClass: number
 	eccentricity: number
@@ -368,18 +354,6 @@ function rollMoonToPlanetLockDM(params: {
 	return dm
 }
 
-interface MoonTideLockResult {
-	siderealDayHours: number
-	axialTiltDeg: number
-	eccentricity: number
-	/** True on a full 1:1 lock -- generate-system-bodies.ts should set the
-	 * moon's own tideLock to { type: "planet", target: <parent idx> } when
-	 * this is set (mirroring galaxy-gen's `moon.lock = { type: "planet", idx:
-	 * orbit.idx }`), and leave it null otherwise (including for a 3:2
-	 * resonance, which changes rotation but not tideLock). */
-	locked: boolean
-}
-
 /**
  * Ported from galaxy-gen's ROTATION.locks.get's per-moon loop (orbits/
  * rotation/index.ts) -- rolls whether a moon ends up 1:1 locked to (always
@@ -394,7 +368,7 @@ interface MoonTideLockResult {
  * rollPlanetTideLock call, which needs to see the resulting locked/unlocked
  * moons to decide whether the PLANET should lock back to one of them.
  */
-export function rollMoonTideLock(params: {
+function rollMoonTideLock(params: {
 	rng: ReturnType<typeof createRng>
 	sizeClass: number
 	eccentricity: number
@@ -441,4 +415,10 @@ export function rollMoonTideLock(params: {
 		eccentricity: effect.eccentricity,
 		locked: effect.locked,
 	}
+}
+
+export const TIDE_LOCK = {
+	deriveTideLockStatus,
+	rollPlanetTideLock,
+	rollMoonTideLock,
 }

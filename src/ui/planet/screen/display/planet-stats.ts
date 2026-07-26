@@ -1,4 +1,5 @@
 ﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { getClimateGeometry } from "@/model/climate"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
@@ -40,7 +41,7 @@ export function computePlanetStats(
 		hoursPerDay: number
 		planetRadiusKm: number
 		pressure: number
-		tideLock: import("@/model/celestial/orbit-body").TideLock | null
+		tideLock: TideLock | null
 		seaLevel?: number
 		maxElevation?: number
 		avgWindSpeedMs?: number | null

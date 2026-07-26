@@ -23,8 +23,8 @@ import type {
 } from ".."
 import { MOON } from "../celestial/moons"
 import { SOLAR_MASS_KG } from "../celestial/orbit-body"
-import type { MainSequenceClass } from "../celestial/star"
 import { DEFAULT_SPECTRAL_CLASS, STAR } from "../celestial/star"
+import type { MainSequenceClass } from "../celestial/star/types"
 import type { PastaDebug } from "../climate"
 import {
 	applyCurrentTemperatureEffect,
@@ -55,6 +55,7 @@ import {
 	fillPetMonthlyHargreaves,
 	refreshClimatePetMonthly,
 } from "../climate"
+import type { TidalSchedule } from "../climate/tidal-schedule"
 import { computeTradeGoods, type LocationTradeGoods } from "../economy"
 import {
 	computeCoastDistances,
@@ -205,7 +206,7 @@ interface PostPipelineOutput {
 	cycloneRisk: Float32Array
 	tornadoRisk: Float32Array
 	tidalRange: Float32Array
-	tidalSchedule: import("../climate/tidal-schedule").TidalSchedule
+	tidalSchedule: TidalSchedule
 	landmarks: GenesisLandmarks
 	oceanCurrents: GenesisOceanCurrents | undefined
 	timings: StageTiming[]
@@ -330,17 +331,17 @@ export function runPostElevationPipeline(
 	t0 = performance.now()
 	const monthlyTEQ: Float32Array[] = new Array(12)
 	for (let month = 0; month < 12; month++) {
-		monthlyTEQ[month] = computeThermalEquator(
+		monthlyTEQ[month] = computeThermalEquator({
 			mesh,
-			climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-		)
+			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+		})
 	}
 	record("Post: thermal equator", t0)
 	onProgress?.("Post: thermal equator", 44)
 
 	// ── Moisture advection ─────────────────────────────────────────────
 	t0 = performance.now()
-	const { east: eastAdv, west: westAdv } = computeAdvection(
+	const { east: eastAdv, west: westAdv } = computeAdvection({
 		mesh,
 		elevation,
 		distCoast,
@@ -348,40 +349,40 @@ export function runPostElevationPipeline(
 		params,
 		isLand,
 		elevation_km,
-	)
+	})
 	record("Post: moisture advection", t0)
 	onProgress?.("Post: moisture advection", 50)
 
 	// ── Ocean currents ─────────────────────────────────────────────────
 	t0 = performance.now()
 	const oceanCurrents = enableOceanCurrents
-		? computeOceanCurrents(
+		? computeOceanCurrents({
 				mesh,
 				isLand,
 				distCoast,
-				currentLandmarks!,
+				landmarks: currentLandmarks!,
 				params,
 				monthlyTEQ,
-			)
+			})
 		: undefined
 	if (enableOceanCurrents) record("Post: ocean currents", t0)
 	if (oceanCurrents) {
 		t0 = performance.now()
-		applyCurrentTemperatureEffect(
+		applyCurrentTemperatureEffect({
 			mesh,
 			climate,
 			isLand,
-			oceanCurrents,
+			currents: oceanCurrents,
 			monthlyTEQ,
 			params,
-		)
+		})
 		refreshClimatePetMonthly({ climate, params })
 		record("Post: current temperature effect", t0)
 	}
 
 	// ── Rainfall ───────────────────────────────────────────────────────
 	t0 = performance.now()
-	const rain = computeMonthlyRain(
+	const rain = computeMonthlyRain({
 		mesh,
 		climate,
 		eastAdv,
@@ -390,8 +391,8 @@ export function runPostElevationPipeline(
 		params,
 		monthlyTEQ,
 		distCoast,
-		currentLandmarks,
-	)
+		landmarks: currentLandmarks,
+	})
 	record("Post: rainfall", t0)
 	onProgress?.("Post: rainfall", 54)
 	const rainfall: GenesisRainfall = {
@@ -421,20 +422,20 @@ export function runPostElevationPipeline(
 			elevation_km,
 		})
 		for (let month = 0; month < 12; month++) {
-			monthlyTEQ[month] = computeThermalEquator(
+			monthlyTEQ[month] = computeThermalEquator({
 				mesh,
-				climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-			)
+				temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+			})
 		}
 		if (oceanCurrents) {
-			applyCurrentTemperatureEffect(
+			applyCurrentTemperatureEffect({
 				mesh,
 				climate,
 				isLand,
-				oceanCurrents,
+				currents: oceanCurrents,
 				monthlyTEQ,
 				params,
-			)
+			})
 			refreshClimatePetMonthly({ climate, params })
 		}
 		record("Post: drain arid closed water", t0)
@@ -503,28 +504,11 @@ export function runPostElevationPipeline(
 		}
 		record("Post: rivers (real)", t0)
 	} else {
-		rivers = computeRivers(
-			mesh,
-			elevation,
-			rainfall,
-			climate,
-			hydrology,
-			riverLand,
-			params,
-		)
+		rivers = computeRivers({ mesh, elevation, rainfall, climate, hydrology, isLand: riverLand, params })
 		record("Post: rivers", t0)
 
 		t0 = performance.now()
-		computeLakes(
-			mesh,
-			elevation,
-			rainfall,
-			rivers.waterLevel,
-			rivers.basinId,
-			isLand,
-			emergedLand,
-			elevation_km,
-		)
+		computeLakes({ mesh, elevation, rainfall, waterLevel: rivers.waterLevel, basinId: rivers.basinId, isLand, emergedLand, elevationKm: elevation_km })
 		record("Post: lakes", t0)
 	}
 	onProgress?.("Post: rivers", 62)
@@ -550,20 +534,20 @@ export function runPostElevationPipeline(
 		elevation_km,
 	})
 	for (let month = 0; month < 12; month++) {
-		monthlyTEQ[month] = computeThermalEquator(
+		monthlyTEQ[month] = computeThermalEquator({
 			mesh,
-			climate.temperature_monthly.subarray(month * N, (month + 1) * N),
-		)
+			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
+		})
 	}
 	if (oceanCurrents) {
-		applyCurrentTemperatureEffect(
+		applyCurrentTemperatureEffect({
 			mesh,
 			climate,
 			isLand,
-			oceanCurrents,
+			currents: oceanCurrents,
 			monthlyTEQ,
 			params,
-		)
+		})
 		refreshClimatePetMonthly({ climate, params })
 	}
 	;({ monthly: dtr_monthly, annual: dtr_annual } = computeDiurnalRange({
@@ -655,20 +639,22 @@ export function runPostElevationPipeline(
 	// ── Ice (needed for pasta climate) ─────────────────────────────────
 	t0 = performance.now()
 	const { iceThickness, iceMinMonthly, iceMaxMonthly } = computeIceAccumulation(
-		mesh,
-		climate,
-		rainfall,
-		isLand,
-		distCoast,
-		15,
-		params.planetRadiusKm,
+		{
+			mesh,
+			climate,
+			rainfall,
+			isLand,
+			distCoast,
+			cycles: 15,
+			planetRadiusKm: params.planetRadiusKm,
+		},
 	)
 	record("Post: ice", t0)
 	onProgress?.("Post: ice", 58)
 
 	// ── Pasta climate (needed before vegetation) ───────────────────────
 	t0 = performance.now()
-	const pastaResult = assignPastaClimate(
+	const pastaResult = assignPastaClimate({
 		mesh,
 		isLand,
 		climate,
@@ -678,7 +664,7 @@ export function runPostElevationPipeline(
 		iceThickness,
 		iceMinMonthly,
 		iceMaxMonthly,
-	)
+	})
 	const pastaClimate: Uint8Array = pastaResult.zones
 	const pastaDebug: PastaDebug = pastaResult.debug
 
@@ -686,17 +672,17 @@ export function runPostElevationPipeline(
 	// procedural EBM output, when real temperature/rainfall are attached.
 	const earthPastaResult =
 		climate.real_temperature_monthly && rainfall.real_monthly
-			? assignEarthPastaClimate(
+			? assignEarthPastaClimate({
 					mesh,
 					isLand,
 					climate,
 					rainfall,
 					params,
-					observedDtr?.real_monthly,
+					realDtrMonthly: observedDtr?.real_monthly,
 					iceThickness,
 					iceMinMonthly,
 					iceMaxMonthly,
-				)
+				})
 			: undefined
 	const realPastaClimate: Uint8Array | undefined = earthPastaResult?.zones
 	const vegPastaZones = realPastaClimate ?? pastaClimate
@@ -722,16 +708,16 @@ export function runPostElevationPipeline(
 		}
 		garField[r] = petGdd > 0 ? aetGdd / petGdd : 1
 	}
-	const vegetation = assignVegetation(
+	const vegetation = assignVegetation({
 		mesh,
 		isLand,
 		climate,
 		rainfall,
-		makeRng(params.seed),
-		vegPastaZones,
-		vegPastaDebug.gdd,
-		garField,
-	)
+		rng: makeRng(params.seed),
+		pastaZones: vegPastaZones,
+		gdd: vegPastaDebug.gdd,
+		gar: garField,
+	})
 	record("Post: vegetation", t0)
 	onProgress?.("Post: vegetation", 60)
 
@@ -746,8 +732,8 @@ export function runPostElevationPipeline(
 	const starMassKg =
 		STAR.getStarMassSol({ cls, subtype: params.starSubtype ?? 5 }) *
 		SOLAR_MASS_KG
-	const tidalSchedule = computeTidalSchedule(
-		MOON.generateMoons({
+	const tidalSchedule = computeTidalSchedule({
+		moons: MOON.generateMoons({
 			count: 1,
 			seed: params.seed + 8831,
 			planetRadiusKm: params.planetRadiusKm,
@@ -755,15 +741,15 @@ export function runPostElevationPipeline(
 			starMassKg,
 		}),
 		params,
-	)
-	const tidalRange = computeSpringTideMap(
+	})
+	const tidalRange = computeSpringTideMap({
 		mesh,
 		isLand,
-		coastalMask,
-		tidalSchedule,
+		isCoastal: coastalMask,
+		schedule: tidalSchedule,
 		params,
 		landmarks,
-	)
+	})
 	record("Post: tidal range", t0)
 
 	// ── Topography ─────────────────────────────────────────────────────
@@ -808,64 +794,57 @@ export function runPostElevationPipeline(
 	// ── Climate zones ──────────────────────────────────────────────────
 	t0 = performance.now()
 	const climateZones =
-		assignEarthClimateZones(mesh, isLand, climate) ??
-		assignClimateZones(
+		assignEarthClimateZones({ mesh, isLand, climate }) ??
+		assignClimateZones({
 			mesh,
 			isLand,
-			climate.temperature_avg,
-			climate.temperature_min,
-			climate.temperature_max,
-		)
+			temperatureAvg: climate.temperature_avg,
+			temperatureMin: climate.temperature_min,
+			temperatureMax: climate.temperature_max,
+		})
 	record("Post: climate zones", t0)
 	onProgress?.("Post: climate zones", 64)
 
 	// ── Koppen climate ─────────────────────────────────────────────────
 	t0 = performance.now()
-	const koppenClimate = assignKoppenClimate(
+	const koppenClimate = assignKoppenClimate({
 		mesh,
 		isLand,
-		climate.temperature_monthly,
-		rainfall.monthly,
-	)
+		temperatureMonthly: climate.temperature_monthly,
+		rainfallMonthly: rainfall.monthly,
+	})
 	record("Post: koppen climate", t0)
 	onProgress?.("Post: koppen climate", 69)
 
 	// ── Hazards ────────────────────────────────────────────────────────
 	t0 = performance.now()
-	const hazards = computeHazards(
-		mesh,
-		boundary,
-		distFields,
-		elevation_km,
-		isLand,
-		r_hotspot,
-	)
+	const hazards = computeHazards({ mesh, boundary, distFields, elevationKm: elevation_km, isLand, hotspot: r_hotspot })
 	record("Post: hazards", t0)
 	onProgress?.("Post: hazards", 70)
 
 	t0 = performance.now()
-	const cycloneRisk = computeCycloneRisk(
+	const cycloneRisk = computeCycloneRisk({
 		mesh,
 		climate,
 		isLand,
 		topography,
 		params,
 		oceanCurrents,
-	)
+	})
 	record("Post: cyclones", t0)
 
 	t0 = performance.now()
-	const tornadoRisk = computeTornadoRisk(
+	const tornadoRisk = computeTornadoRisk({
 		mesh,
-		climate.temperature_avg,
-		climate.temperature_max,
-		climate.temperature_min,
+		temperatureAvg: climate.temperature_avg,
+		temperatureMax: climate.temperature_max,
+		temperatureMin: climate.temperature_min,
 		isLand,
 		topography,
 		vegetation,
 		oceanDist,
 		params,
-	)
+	})
 	record("Post: tornadoes", t0)
 
 	// ── Provinces ──────────────────────────────────────────────────────
@@ -879,26 +858,10 @@ export function runPostElevationPipeline(
 		planetRadiusKm: params.planetRadiusKm,
 	}
 	const provinces: GenesisProvinces = eu4ProvinceIds
-		? computeProvincesFromRaster(
-				mesh,
-				isLand,
-				eu4ProvinceIds,
-				params.seed,
-				provinceOptions,
-				eu4ProvinceFallbackSeeds,
-			)
+		? computeProvincesFromRaster({ mesh, isLand, regionIds: eu4ProvinceIds, seed: params.seed, options: provinceOptions, fallbackSeeds: eu4ProvinceFallbackSeeds })
 		: realProvinceSeeds && realProvinceSeeds.regions.length > 0
-			? computeWeightedProvinces(
-					mesh,
-					isLand,
-					topography,
-					realProvinceSeeds.regions,
-					realProvinceSeeds.names,
-					params.seed,
-					provinceOptions,
-					realProvinceSeeds.weights,
-				)
-			: computeProvinces(mesh, isLand, topography, params.seed, provinceOptions)
+			? computeWeightedProvinces({ mesh, isLand, _topography: topography, seedRegions: realProvinceSeeds.regions, seedNames: realProvinceSeeds.names, seed: params.seed, options: provinceOptions, seedWeights: realProvinceSeeds.weights })
+			: computeProvinces({ mesh, isLand, topography, seed: params.seed, options: provinceOptions })
 	record("Post: provinces", t0)
 	onProgress?.("Post: provinces", 72)
 
@@ -919,17 +882,7 @@ export function runPostElevationPipeline(
 	// from any cradle can be marked desolate, which in turn zeroes their
 	// population and habitability in the population pass below.
 	t0 = performance.now()
-	const rawHabitability = computeProvinceHabitability(
-		provinces,
-		landmarks,
-		climateZones,
-		vegetation,
-		topography,
-		oceanCoastal,
-		lakeCoastal,
-		rivers.visible,
-		params.seed,
-	)
+	const rawHabitability = computeProvinceHabitability({ provinces, _landmarks: landmarks, climateZones, vegetation, topography, oceanCoastal, lakeCoastal, riverVisible: rivers.visible, seed: params.seed })
 	const migration = computeMigration(
 		provinces,
 		rawHabitability,
@@ -992,23 +945,7 @@ export function runPostElevationPipeline(
 		}
 	}
 
-	const population: ProvincePopulation = computePopulation(
-		provinces,
-		landmarks,
-		climateZones,
-		vegetation,
-		topography,
-		oceanCoastal,
-		lakeCoastal,
-		rivers.visible,
-		params.seed,
-		params.planetRadiusKm,
-		N,
-		eraConfig.targetPopulation,
-		migration.migrationWave,
-		actualSettlementWave,
-		eraConfig.migrationFalloff,
-	)
+	const population: ProvincePopulation = computePopulation({ provinces, landmarks, climateZones, vegetation, topography, oceanCoastal, lakeCoastal, riverVisible: rivers.visible, seed: params.seed, planetRadiusKm: params.planetRadiusKm, numRegions: N, eraTargetPopulation: eraConfig.targetPopulation, migrationWave: migration.migrationWave, settlementWave: actualSettlementWave, migrationFalloff: eraConfig.migrationFalloff })
 	population.migrationWave = migration.migrationWave
 	population.cradleProvinces = migration.cradleProvinces
 	record("Post: population", t0)

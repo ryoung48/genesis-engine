@@ -1,4 +1,4 @@
-import type { MoonBody } from "../types"
+import type { MoonBody } from "@/model/celestial/moons/types"
 
 export interface HillSphereInput {
 	planetOrbitalDistanceM: number
@@ -39,4 +39,25 @@ export interface MoonPeriodBoundsInput {
 	starMassKg: number
 	planetRadiusKm: number
 	orbitalDistanceAU: number
+}
+
+export interface MoonPeriodBounds {
+	minDays: number
+	maxDays: number
+	valid: boolean
+}
+
+export interface OrbitalPosition {
+	latRad: number
+	lonRad: number
+	distanceM: number
+	trueAnomalyRad: number
+}
+
+export interface OrbitalPositionVector {
+	x: number
+	y: number
+	z: number
+	distanceM: number
+	trueAnomalyRad: number
 }

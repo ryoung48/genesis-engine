@@ -1,10 +1,4 @@
-import type { SocietyEra } from "./eras"
-
-interface SettlementEraTuning {
-	townMin: number
-	cityMin: number
-}
-
+import type { SocietyEra, SettlementEraTuning } from "./types"
 const LATE_MEDIEVAL_TUNING: SettlementEraTuning = {
 	townMin: 1_000,
 	cityMin: 8_000,

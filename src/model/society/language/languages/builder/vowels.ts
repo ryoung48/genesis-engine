@@ -1,5 +1,4 @@
-import type { LanguageRng } from "../rng"
-import { PhonemeCatalog, vowelRules } from "../types"
+import { PhonemeCatalog, vowelRules, type LanguageRng } from "../types"
 import { validTerms } from "."
 
 const basicVowels = {

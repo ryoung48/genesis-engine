@@ -9,6 +9,7 @@ import type { PlateVec, SphereMesh } from ".."
 import { buildSphereMesh } from "../mesh"
 import { makeRng, SimplexNoise } from "../shared"
 import { assignOceanLand, generatePlates } from "./plates"
+import type { ProjectCoarsePlatesParams } from "./types"
 
 const N_COARSE = 20000
 const COARSE_JITTER = 0.75
@@ -81,13 +82,13 @@ export function generateCoarsePlates(
  * Uses adjacency-walk on the coarse mesh with warm-starting for O(1)
  * amortized cost per region.
  */
-export function projectCoarsePlates(
-	mesh: SphereMesh,
-	coarseMesh: SphereMesh,
-	coarse_r_plate: Int32Array,
-	seed: number,
-	numPlates: number,
-): Int32Array {
+export function projectCoarsePlates({
+	mesh,
+	coarseMesh,
+	coarse_r_plate,
+	seed,
+	numPlates,
+}: ProjectCoarsePlatesParams): Int32Array {
 	const N = mesh.numRegions
 	const r_plate = new Int32Array(N)
 	const { adjOffset: cOff, adjList: cAdj, r_xyz: coarse_xyz } = coarseMesh

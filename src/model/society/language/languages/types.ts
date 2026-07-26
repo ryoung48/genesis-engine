@@ -1,5 +1,5 @@
 ﻿/* eslint-disable no-unused-vars */
-import type { LanguageRng, WeightedValue } from "./rng"
+import type { WeightedValue as SharedWeightedValue } from "@/model/shared"
 
 export const PhonemeCatalog = {
 	START_CONSONANT: "B",
@@ -203,3 +203,20 @@ export interface WordParams {
 	repeat?: boolean
 	stopChance?: number
 }
+
+export interface LanguageRng {
+	readonly random: number
+	uniform(min?: number, max?: number): number
+	randint(min: number, max: number): number
+	choice<T>(arr: readonly T[]): T
+	weightedChoice<T>(arr: readonly WeightedValue<T>[]): T
+	shuffle<T>(arr: readonly T[]): T[]
+	sample<T>(arr: readonly T[], count: number): T[]
+	weightedSample<T>(
+		arr: readonly WeightedValue<T>[],
+		count: number,
+		unique?: boolean,
+	): T[]
+}
+
+export type WeightedValue<T> = SharedWeightedValue<T>

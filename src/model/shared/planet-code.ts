@@ -6,9 +6,10 @@
 import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
-} from "@/model/celestial/star"
+} from "@/model/celestial/star/types"
 import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society"
 import type { GenesisParams } from ".."
+import type { TideLock } from "../celestial/orbit-body/types"
 import { SEED_MAX } from "./seeds"
 import { SLIDER_RANGES } from "./slider-ranges"
 
@@ -319,7 +320,7 @@ interface DecodedPlanetCode {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	tideLock: import("../celestial/orbit-body").TideLock | null
+	tideLock: TideLock | null
 	substellarLon: number
 	perihelion: number
 	pressure: number

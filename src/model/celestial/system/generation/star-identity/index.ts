@@ -1,7 +1,7 @@
 import { createRng } from "@/model/shared/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
-import { STAR } from "../../star"
-import { SOL_SEED, SOL_STAR_AGE_GYR } from "../sol-system"
+import { STAR } from "../../../star"
+import { SOL_SEED, SOL_STAR_AGE_GYR } from "../../sol-system"
 
 // Star age is rolled from its own salted rng derived from the same system
 // seed, decorrelated from the main body-generation rng sequence (created
@@ -10,8 +10,13 @@ import { SOL_SEED, SOL_STAR_AGE_GYR } from "../sol-system"
 // without needing to replay the whole body-generation sequence.
 const STAR_AGE_SEED_SALT = 0x9e3779b1
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function getStarAgeGyr(seed: number, massSol: number): number {
+function getStarAgeGyr({
+	seed,
+	massSol,
+}: {
+	seed: number
+	massSol: number
+}): number {
 	if (seed === SOL_SEED) return SOL_STAR_AGE_GYR
 	const rng = createRng(seed + STAR_AGE_SEED_SALT)
 	return STAR.rollStarAgeGyr({ rng, massSol })
@@ -24,7 +29,7 @@ export function getStarAgeGyr(seed: number, massSol: number): number {
  * wherever just a star label is needed. Sol keeps its real name (SOL_STAR_NAME
  * in sol-system.ts) untouched -- callers should check `seed === SOL_SEED`
  * themselves rather than calling this for Sol. */
-export function generateStarName(seed: number): string {
+function generateStarName(seed: number): string {
 	const lang = LANGUAGE.spawn(`system:${seed}`)
 	return LANGUAGE.word.simple({
 		lang,
@@ -33,3 +38,5 @@ export function generateStarName(seed: number): string {
 		slot: "star",
 	}).word
 }
+
+export const STAR_IDENTITY = { getStarAgeGyr, generateStarName }

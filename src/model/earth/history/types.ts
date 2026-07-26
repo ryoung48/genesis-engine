@@ -1,5 +1,13 @@
-import type { RawNationReference } from "./data-source"
-import type { FoldedState } from "./fold"
+import type { CheckpointCache } from "./checkpoint"
+import type { RawNationReference, RawWar } from "./data-source"
+import type { EarthHistoryEngine } from "./engine"
+import type {
+	ActiveOrganizationSite,
+	EarthHistoryData,
+	FoldedNationState,
+	FoldedProvinceState,
+	FoldedState,
+} from "./fold"
 import type { Eu4ProvinceMap } from "./import/eu4-province-map"
 
 export interface LonLat {
@@ -28,7 +36,7 @@ export interface FoldedStateToNationInfoParams {
 }
 
 export interface FoldAtCheckpointParams {
-	cache: import("./checkpoint").CheckpointCache
+	cache: CheckpointCache
 	time: number
 }
 
@@ -62,7 +70,7 @@ export interface CreateMembershipCategorizerParams {
 }
 
 export interface QueryEarthHistoryParams {
-	engine: import("./engine").EarthHistoryEngine
+	engine: EarthHistoryEngine
 	timeDays: number
 	nationReference?: Map<string, RawNationReference>
 	cultureNameById?: Map<string, string>
@@ -70,52 +78,52 @@ export interface QueryEarthHistoryParams {
 }
 
 export interface QueryEarthHistoryNationParams {
-	engine: import("./engine").EarthHistoryEngine
+	engine: EarthHistoryEngine
 	timeDays: number
 	tag: string
 }
 
 export interface FoldProvinceParams {
 	rawId: string
-	data: import("./fold").EarthHistoryData
+	data: EarthHistoryData
 	fromTime: number
 	toTime: number
-	base: import("./fold").FoldedProvinceState | undefined
+	base: FoldedProvinceState | undefined
 }
 
 export interface FoldNationParams {
 	tag: string
-	data: import("./fold").EarthHistoryData
+	data: EarthHistoryData
 	fromTime: number
 	toTime: number
-	base: import("./fold").FoldedNationState | undefined
+	base: FoldedNationState | undefined
 }
 
 export interface ApplyDiplomacyDeltaParams {
-	data: import("./fold").EarthHistoryData
+	data: EarthHistoryData
 	fromTime: number
 	toTime: number
-	nations: Map<string, import("./fold").FoldedNationState>
+	nations: Map<string, FoldedNationState>
 }
 
 export interface ApplyOrganizationDeltaParams {
-	data: import("./fold").EarthHistoryData
+	data: EarthHistoryData
 	fromTime: number
 	toTime: number
-	nations: Map<string, import("./fold").FoldedNationState>
-	organizationSites: Map<string, import("./fold").ActiveOrganizationSite>
+	nations: Map<string, FoldedNationState>
+	organizationSites: Map<string, ActiveOrganizationSite>
 }
 
 export interface ComputeActiveWarsParams {
-	wars: import("./data-source").RawWar[]
+	wars: RawWar[]
 	time: number
 }
 
 export interface FoldParams {
-	data: import("./fold").EarthHistoryData
+	data: EarthHistoryData
 	time: number
 	options: {
-		base?: import("./fold").FoldedState
+		base?: FoldedState
 		provinceIds: Iterable<string>
 		nationTags: Iterable<string>
 	}

@@ -1,22 +1,23 @@
-export type * from "./types"
-export {
-	DEFAULT_ORBITAL_DISTANCE_AU,
-	DEFAULT_SPECTRAL_CLASS,
-	DEFAULT_STAR_SUBTYPE,
-	MAIN_SEQUENCE_CLASSES,
+import type {
+	BlackbodyFractionInput,
+	InterpolateSeriesInput,
+	KeplerYearInput,
+	LerpInput,
+	MainSequenceClass,
+	RollStarAgeInput,
+	StarSpectralInput,
 } from "./types"
-
 import {
-	type BlackbodyFractionInput,
-	type InterpolateSeriesInput,
-	type KeplerYearInput,
-	type LerpInput,
-	MAIN_SEQUENCE_CLASSES,
-	type MainSequenceClass,
-	type RollStarAgeInput,
-	type StarSpectralInput,
+	DEFAULT_ORBITAL_DISTANCE_AU as DEFAULT_ORBITAL_DISTANCE_AU_VALUE,
+	DEFAULT_SPECTRAL_CLASS as DEFAULT_SPECTRAL_CLASS_VALUE,
+	DEFAULT_STAR_SUBTYPE as DEFAULT_STAR_SUBTYPE_VALUE,
+	MAIN_SEQUENCE_CLASSES as MAIN_SEQUENCE_CLASSES_VALUE,
 } from "./types"
 
+export const DEFAULT_ORBITAL_DISTANCE_AU = DEFAULT_ORBITAL_DISTANCE_AU_VALUE
+export const DEFAULT_SPECTRAL_CLASS = DEFAULT_SPECTRAL_CLASS_VALUE
+export const DEFAULT_STAR_SUBTYPE = DEFAULT_STAR_SUBTYPE_VALUE
+export const MAIN_SEQUENCE_CLASSES = MAIN_SEQUENCE_CLASSES_VALUE
 // Position ranges within the 20-entry V-class lookup tables
 const SPECTRAL_RANGES: Record<MainSequenceClass, [number, number]> = {
 	O: [0, 2],

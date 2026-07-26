@@ -719,27 +719,6 @@ export const CLUSTER = {
 		})
 		return morphemes
 	},
-	word: (cluster: Cluster, src: Language, repeat = false) => {
-		// pick a pattern from the selected group
-		const pattern = patternize(cluster, src)
-		// create the word from cluster defined morphemes (reverse order favors double vowels at the end)
-		let usedLongVowel = false
-		let usedDigraph = false
-		const word: string[] = []
-		pattern.forEach((template) => {
-			const updates = morpheme(cluster, src, {
-				template,
-				repeat,
-				word,
-				usedLongVowel,
-				usedDigraph,
-			})
-			usedLongVowel = updates.usedLongVowel
-			usedDigraph = updates.usedDigraph
-		})
-		// finalize word
-		return titleCase(CLUSTER.morphemes(cluster, src, repeat).join(""))
-	},
 	vowel: (vowel: string) => {
 		return ALL_VOWELS_SET.has(vowel)
 	},

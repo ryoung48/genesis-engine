@@ -1,8 +1,5 @@
-import {
-	MAIN_SEQUENCE_CLASSES,
-	type MainSequenceClass,
-	STAR,
-} from "@/model/celestial/star"
+import { MAIN_SEQUENCE_CLASSES, STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
 import { SLIDER_RANGES } from "@/model/shared"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
@@ -43,7 +40,10 @@ export function buildStarStats(params: {
 		cls: starClass,
 		subtype: starSubtype,
 	}).toFixed(3)
-	const starAgeGyr = SYSTEM.getStarAgeGyr(restSeed, starMassSolValue).toFixed(2)
+	const starAgeGyr = SYSTEM.getStarAgeGyr({
+		seed: restSeed,
+		massSol: starMassSolValue,
+	}).toFixed(2)
 
 	return [
 		{

@@ -23,14 +23,24 @@ function piecewiseAmp(enclosure: number): number {
 
 const DECAY_KM = 400
 
-export function computeSpringTideMap(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isCoastal: Uint8Array,
-	schedule: TidalSchedule,
-	params: Pick<GenesisParams, "seed" | "planetRadiusKm">,
-	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">,
-): Float32Array {
+export interface ComputeSpringTideMapInput {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isCoastal: Uint8Array
+	schedule: TidalSchedule
+	params: Pick<GenesisParams, "seed" | "planetRadiusKm">
+	/** Landmarks are absent when terrain landmark generation is disabled. */
+	landmarks?: Pick<GenesisLandmarks, "regionLandmark" | "type">
+}
+
+export function computeSpringTideMap({
+	mesh,
+	isLand,
+	isCoastal,
+	schedule,
+	params,
+	landmarks,
+}: ComputeSpringTideMapInput): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
 	const { maxForce } = schedule
@@ -77,6 +87,7 @@ export function computeSpringTideMap(
 		if (result[r] > 0) coastalIndices.push(r)
 	}
 	if (coastalIndices.length > 0) {
+		// biome-ignore lint/nursery/useMaxParams: native sort callback signature
 		coastalIndices.sort((a, b) => result[b]! - result[a]!)
 		const macroCount = Math.ceil(coastalIndices.length * TARGET_MACRO_FRACTION)
 		const mesoCount = Math.ceil(coastalIndices.length * TARGET_MESO_FRACTION)
@@ -99,7 +110,7 @@ export function computeSpringTideMap(
 	const hPri: number[] = []
 	const hIdx: number[] = []
 
-	function hPush(pri: number, r: number): void {
+	function hPush({ pri, r }: { pri: number; r: number }): void {
 		hPri.push(pri)
 		hIdx.push(r)
 		let i = hPri.length - 1
@@ -139,7 +150,7 @@ export function computeSpringTideMap(
 	for (let r = 0; r < N; r++) {
 		if (result[r] > 0 && isLand[r]) {
 			f[r] = result[r]
-			hPush(-result[r], r)
+			hPush({ pri: -result[r], r })
 		}
 	}
 
@@ -155,7 +166,7 @@ export function computeSpringTideMap(
 			const propagated = val * Math.exp(-edgeKm / DECAY_KM)
 			if (propagated > f[nb] + 1e-6) {
 				f[nb] = propagated
-				hPush(-propagated, nb)
+				hPush({ pri: -propagated, r: nb })
 			}
 		}
 	}

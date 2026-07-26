@@ -1,6 +1,6 @@
+import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "@/model/celestial/orbit-body"
+import type { DensityProfile } from "@/model/celestial/orbit-body/types"
 import { roll2d6 } from "@/model/shared/dice"
-import type { DensityProfile } from "../../../orbit-body"
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../../orbit-body"
 import type {
 	DensityDescriptionInput,
 	DensityProfileInput,
@@ -33,7 +33,7 @@ function describeDensity({
 	return "Compressed Metal"
 }
 
-export function buildDensityProfile({
+function buildDensityProfile({
 	massKg,
 	diameterKm,
 	classification,
@@ -48,7 +48,7 @@ export function buildDensityProfile({
 	}
 }
 
-export function rollAlbedo({
+function rollAlbedo({
 	rng,
 	composition,
 	atmosphere,
@@ -86,3 +86,5 @@ export function rollAlbedo({
 
 	return clamp({ value: albedo, min: 0.02, max: 0.98 })
 }
+
+export const DENSITY = { buildProfile: buildDensityProfile, rollAlbedo }

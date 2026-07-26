@@ -460,9 +460,15 @@ export function buildLockedOceanCurrentGrid({
 		currentSpeed[r] = Math.hypot(flowEast, flowNorth) * speedScale
 	}
 
-	return rasterizeVectorGrid(mesh, currentU, currentV, currentSpeed, {
-		scalar: oceanWarmth,
-		allowCell: (region) => !isLand[region],
-		isBlockedRegion: (region) => !!isLand[region],
+	return rasterizeVectorGrid({
+		mesh,
+		vectorU: currentU,
+		vectorV: currentV,
+		vectorSpeed: currentSpeed,
+		options: {
+			scalar: oceanWarmth,
+			allowCell: (region) => !isLand[region],
+			isBlockedRegion: (region) => !!isLand[region],
+		},
 	})
 }

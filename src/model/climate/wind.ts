@@ -69,10 +69,13 @@ function vegetationDragFactor(biomeCode: number | undefined): number {
  * `slope` is the normalized slopeScore [0, 1] used to add continuous
  * variation within each class without double-counting the class itself.
  */
-function topographyWindFactor(
-	topoCode: number | undefined,
-	slope: number,
-): number {
+function topographyWindFactor({
+	topoCode,
+	slope,
+}: {
+	topoCode: number | undefined
+	slope: number
+}): number {
 	let base: number
 	switch (topoCode) {
 		case TOPO_FLAT:
@@ -107,7 +110,13 @@ function topographyWindFactor(
  * Combined surface modifier for one region — product of vegetation drag,
  * topographic blocking, and coastal fetch bonus.
  */
-function surfaceWindFactor(r: number, surface: WindSurface): number {
+function surfaceWindFactor({
+	r,
+	surface,
+}: {
+	r: number
+	surface: WindSurface
+}): number {
 	const topoCode = surface.topography?.[r]
 	const isWater = topoCode === TOPO_OCEAN || topoCode === TOPO_LAKE
 	const slope = surface.slopeScore?.[r] ?? 0
@@ -115,7 +124,7 @@ function surfaceWindFactor(r: number, surface: WindSurface): number {
 	const vegFactor = isWater
 		? 1.0
 		: vegetationDragFactor(surface.vegetation?.[r])
-	const topoFactor = topographyWindFactor(topoCode, slope)
+	const topoFactor = topographyWindFactor({ topoCode, slope })
 	// Sea-breeze / fetch bonus: up to +12 % at coast, decaying over ~800 km inland.
 	const coastalFactor = isWater
 		? 1.0
@@ -155,13 +164,21 @@ interface RasterizeVectorGridOptions {
  * Empty cells (no mesh region) are filled by 3 passes of neighbour diffusion
  * so particle lookups never stall at holes.
  */
-export function rasterizeVectorGrid(
-	mesh: SphereMesh,
-	vectorU: Float32Array,
-	vectorV: Float32Array,
-	vectorSpeed: Float32Array,
-	options: RasterizeVectorGridOptions = {},
-): FlowGrid {
+export interface RasterizeVectorGridInput {
+	mesh: SphereMesh
+	vectorU: Float32Array
+	vectorV: Float32Array
+	vectorSpeed: Float32Array
+	options?: RasterizeVectorGridOptions
+}
+
+export function rasterizeVectorGrid({
+	mesh,
+	vectorU,
+	vectorV,
+	vectorSpeed,
+	options = {},
+}: RasterizeVectorGridInput): FlowGrid {
 	const W = 360
 	const H = 181
 	const u = new Float32Array(W * H)
@@ -267,13 +284,23 @@ export function rasterizeVectorGrid(
 	}
 }
 
-export function computeWindGrid(
-	mesh: SphereMesh,
-	windU: Float32Array,
-	windV: Float32Array,
-	windSpeed: Float32Array,
-): WindGrid {
-	return rasterizeVectorGrid(mesh, windU, windV, windSpeed)
+export function computeWindGrid({
+	mesh,
+	windU,
+	windV,
+	windSpeed,
+}: {
+	mesh: SphereMesh
+	windU: Float32Array
+	windV: Float32Array
+	windSpeed: Float32Array
+}): WindGrid {
+	return rasterizeVectorGrid({
+		mesh,
+		vectorU: windU,
+		vectorV: windV,
+		vectorSpeed: windSpeed,
+	})
 }
 
 export interface WindArrowData {
@@ -296,10 +323,13 @@ const CELL_BOUNDARY_PRESSURES = [-1.0, 1.0, -0.45, 0.25, -0.15, 0.1]
  * day length. Cell width = `hadleyWidth(hoursPerDay)` so fast rotators get
  * many narrow cells and slow rotators a single broad Hadley cell.
  */
-function bgPressureForRotation(
-	distFromTeq: number,
-	hoursPerDay: number,
-): number {
+function bgPressureForRotation({
+	distFromTeq,
+	hoursPerDay,
+}: {
+	distFromTeq: number
+	hoursPerDay: number
+}): number {
 	const hw = hadleyWidth(hoursPerDay)
 	const d = Math.min(distFromTeq, 90)
 	const cellIndex = Math.min(
@@ -318,13 +348,19 @@ function bgPressureForRotation(
  * Returns an arbitrary-unit pressure field (not in Pa) suitable for
  * deriving wind direction only.
  */
-function computePressureField(
-	mesh: SphereMesh,
-	temps: Float32Array,
-	elevation_km: Float32Array,
-	teqByLon: Float32Array,
-	hoursPerDay: number,
-): Float32Array {
+function computePressureField({
+	mesh,
+	temps,
+	elevation_km,
+	teqByLon,
+	hoursPerDay,
+}: {
+	mesh: SphereMesh
+	temps: Float32Array
+	elevation_km: Float32Array
+	teqByLon: Float32Array
+	hoursPerDay: number
+}): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const { latDeg, regionBin } = getClimateGeometry(mesh)
@@ -357,7 +393,7 @@ function computePressureField(
 		// Background cell pattern: width and count scale with rotation so fast
 		// rotators produce many narrow cells and slow rotators a single broad
 		// Hadley cell. Smoothstep between each boundary avoids hard speed jumps.
-		const bgPressure = bgPressureForRotation(distFromTeq, hoursPerDay)
+		const bgPressure = bgPressureForRotation({ distFromTeq, hoursPerDay })
 
 		// Thermal anomaly from low-elevation cells only — high terrain is excluded
 		// so cold mountain peaks don't create artificial pressure spikes.
@@ -398,10 +434,11 @@ function computePressureField(
  * Returns normalized wind vectors plus the raw pressure field (for optional
  * visualization). Does not modify any existing climate data.
  */
-export function computeWindVectors(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	elevation_km: Float32Array,
+export interface ComputeWindVectorsInput {
+	mesh: SphereMesh
+	climate: GenesisClimate
+	elevation_km: Float32Array
+	/** Defaults to Earth-like rotation and pressure when no planet parameters are available. */
 	params?: Pick<
 		GenesisParams,
 		| "obliquity"
@@ -411,24 +448,35 @@ export function computeWindVectors(
 		| "eccentricity"
 		| "perihelion"
 		| "pressure"
-	>,
-	month?: number,
-	surface?: WindSurface,
-): {
+	>
+	/** Omit to calculate annual-average wind vectors. */
+	month?: number
+	/** Omit when terrain roughness and ocean distance are unavailable. */
+	surface?: WindSurface
+}
+
+export function computeWindVectors({
+	mesh,
+	climate,
+	elevation_km,
+	params,
+	month,
+	surface,
+}: ComputeWindVectorsInput): {
 	windU: Float32Array
 	windV: Float32Array
 	pressure: Float32Array
 	windSpeed: Float32Array
 } {
 	if (params?.tideLock?.type === "solar") {
-		return computeLockedWindVectors(
+		return computeLockedWindVectors({
 			mesh,
 			climate,
 			elevation_km,
 			params,
 			month,
 			surface,
-		)
+		})
 	}
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
@@ -454,14 +502,14 @@ export function computeWindVectors(
 			? climate.temperature_monthly.subarray(month * N, (month + 1) * N)
 			: climate.temperature_avg
 
-	const teqByLon = computeThermalEquator(mesh, temps)
-	const pressure = computePressureField(
+	const teqByLon = computeThermalEquator({ mesh, temps })
+	const pressure = computePressureField({
 		mesh,
 		temps,
 		elevation_km,
 		teqByLon,
 		hoursPerDay,
-	)
+	})
 
 	const windU = new Float32Array(N)
 	const windV = new Float32Array(N)
@@ -528,7 +576,7 @@ export function computeWindVectors(
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
 		const base = (rawSpeed[r] / ref) * 10 * rotationFactor * pressureFactor
-		windSpeed[r] = surface ? base * surfaceWindFactor(r, surface) : base
+		windSpeed[r] = surface ? base * surfaceWindFactor({ r, surface }) : base
 	}
 
 	return { windU, windV, pressure, windSpeed }

@@ -5,7 +5,13 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import type { WindArrowData } from "@/model/climate"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
-import type { GenesisViewMode, RiverData } from "./types"
+import type {
+	GenesisViewMode,
+	RiverData,
+	CollectNationBorderMapPositionsParams,
+	BuildLandNationBordersGlobeParams,
+	BuildLandNationBordersMapParams,
+} from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 
@@ -337,13 +343,13 @@ export function collectAllNationBorderGlobePositions(
 	return positions
 }
 
-export function collectNationBorderMapPositions(
-	world: SerializedGenesisWorld,
-	nation: number,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	zBoost: number,
-) {
+export function collectNationBorderMapPositions({
+	world,
+	nation,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	zBoost,
+}: CollectNationBorderMapPositionsParams) {
 	if (!world.nations || !world.provinces) return []
 	const positions: number[] = []
 	const projection = createMapProjection(
@@ -1459,14 +1465,17 @@ function buildThickLineSegments2(
 	return { lines, material }
 }
 
-export function buildLandNationBordersGlobe(
-	world: SerializedGenesisWorld,
-	viewMode: GenesisViewMode,
-	visible: boolean,
-	elevationVisible: boolean,
-	resolution: [number, number],
-	opts?: { color?: number; lineWidth?: number; opacity?: number },
-): { lines: LineSegments2; material: LineMaterial } | null {
+export function buildLandNationBordersGlobe({
+	world,
+	viewMode,
+	visible,
+	elevationVisible,
+	resolution,
+	opts,
+}: BuildLandNationBordersGlobeParams): {
+	lines: LineSegments2
+	material: LineMaterial
+} | null {
 	const positions = collectAllLandNationBorderGlobePositions(
 		world,
 		elevationVisible,
@@ -1481,15 +1490,18 @@ export function buildLandNationBordersGlobe(
 	)
 }
 
-export function buildLandNationBordersMap(
-	world: SerializedGenesisWorld,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	viewMode: GenesisViewMode,
-	visible: boolean,
-	resolution: [number, number],
-	opts?: { color?: number; lineWidth?: number; opacity?: number },
-): { lines: LineSegments2; material: LineMaterial } | null {
+export function buildLandNationBordersMap({
+	world,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	viewMode,
+	visible,
+	resolution,
+	opts,
+}: BuildLandNationBordersMapParams): {
+	lines: LineSegments2
+	material: LineMaterial
+} | null {
 	const positions = repeatMapPositions(
 		collectAllLandNationBorderMapPositions(
 			world,

@@ -1,4 +1,4 @@
-import type { AtmosphereProfile } from "@/model/celestial/orbit-body"
+import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
 import {
 	formatTemperature,
 	type UnitSystem,

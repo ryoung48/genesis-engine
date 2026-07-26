@@ -1,5 +1,5 @@
-import type { createRng } from "../../../shared/rng"
-import type { OrbitClassification } from "../../orbit-body"
+import type { createRng } from "../../../../shared/rng"
+import type { OrbitClassification } from "../../../orbit-body/types"
 
 // Procedurally generated body textures (public/generated/<classification>/...)
 // -- only classifications with real art get a texturePath; anything else
@@ -28,11 +28,13 @@ const GENERATED_TEXTURE_FILES: Partial<Record<OrbitClassification, string[]>> =
 		],
 	}
 
-// biome-ignore lint/nursery/useMaxParams: pending domain params-object conversion
-export function pickGeneratedTexturePath(
-	rng: ReturnType<typeof createRng>,
-	classification: OrbitClassification,
-): string | undefined {
+export function pickGeneratedTexturePath({
+	rng,
+	classification,
+}: {
+	rng: ReturnType<typeof createRng>
+	classification: OrbitClassification
+}): string | undefined {
 	const files = GENERATED_TEXTURE_FILES[classification]
 	if (!files || files.length === 0) return undefined
 	const file = rng.choice(files)

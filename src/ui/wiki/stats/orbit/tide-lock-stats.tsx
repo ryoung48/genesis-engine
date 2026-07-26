@@ -1,6 +1,7 @@
-import type { MoonBody } from "@/model/celestial/moons"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import type { SystemBody } from "@/model/celestial/system"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import {
 	EditableStatValue,
 	type StatEntry,
@@ -79,10 +80,8 @@ function buildTideLockOptionButton(params: {
 }
 
 function buildTideLockEditorContent(params: {
-	tideLock: import("@/model/celestial/orbit-body").TideLock | null | undefined
-	onSetLock: (
-		lock: import("@/model/celestial/orbit-body").TideLock | null,
-	) => void
+	tideLock: TideLock | null | undefined
+	onSetLock: (lock: TideLock | null) => void
 	starTitle: string
 	starTarget: number
 	/** Present for a moon's card: the parent planet it can lock to. */
@@ -132,7 +131,7 @@ function buildTideLockEditorContent(params: {
 }
 
 export function buildTideLockStat(params: {
-	tideLock: import("@/model/celestial/orbit-body").TideLock | null | undefined
+	tideLock: TideLock | null | undefined
 	/** See OrbitBody.tideLockStatus's doc -- "1:1" whenever tideLock is set,
 	 * "3:2" for a spin-orbit resonance (tideLock stays null for that case),
 	 * undefined otherwise. Drives this stat's displayed descriptor: "1:1
@@ -152,9 +151,7 @@ export function buildTideLockStat(params: {
 	/** When set, the stat becomes editable: clicking the value opens a
 	 * dropdown of valid lock targets for this body (star + own moons for a
 	 * planet, or just its parent for a moon). */
-	onSetLock?: (
-		lock: import("@/model/celestial/orbit-body").TideLock | null,
-	) => void
+	onSetLock?: (lock: TideLock | null) => void
 	/** Present only on a moon's card -- the parent planet's SystemBody idx. */
 	parentTarget?: number
 }): StatEntry {
@@ -225,7 +222,7 @@ export function buildTideLockStat(params: {
 // around whatever it's now locked to. Returns undefined (leave the current
 // sidereal day alone) for "None" or a target this stat card can't resolve.
 export function resolveBodyTideLockSiderealDayHours(
-	lock: import("@/model/celestial/orbit-body").TideLock | null,
+	lock: TideLock | null,
 	body: SystemBody,
 ): number | undefined {
 	if (!lock) return undefined
@@ -238,7 +235,7 @@ export function resolveBodyTideLockSiderealDayHours(
 }
 
 export function resolveMoonTideLockSiderealDayHours(
-	lock: import("@/model/celestial/orbit-body").TideLock | null,
+	lock: TideLock | null,
 	moon: MoonBody,
 ): number | undefined {
 	if (!lock) return undefined
@@ -247,7 +244,7 @@ export function resolveMoonTideLockSiderealDayHours(
 }
 
 export function buildSubstellarLonStat(params: {
-	tideLock: import("@/model/celestial/orbit-body").TideLock | null | undefined
+	tideLock: TideLock | null | undefined
 	substellarLon: number | undefined
 	onSet?: (value: number) => void
 }): StatEntry | null {

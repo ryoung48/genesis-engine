@@ -1,5 +1,6 @@
 import type { GenesisClimate, GenesisParams } from "../.."
-import { type MainSequenceClass, STAR } from "../../celestial/star"
+import { STAR } from "../../celestial/star"
+import type { MainSequenceClass } from "../../celestial/star/types"
 import { TIME } from "../../shared/time"
 import {
 	getEffectiveObliquityDeg,

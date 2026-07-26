@@ -10,6 +10,11 @@ import {
 	DEFAULT_PLANET_RADIUS_KM,
 	meanEdgeLengthKm,
 } from "../shared"
+import type {
+	ComputeProvincesParams,
+	ComputeWeightedProvincesParams,
+	ComputeProvincesFromRasterParams,
+} from "./types"
 
 /**
  * Target mean province area. 37,000 km² is the mean real-world area of an EU4
@@ -27,20 +32,13 @@ export const PROVINCE_AREA_TARGET_KM2 = 37_000
 // assemblePartition's phase 5b.
 const SEA_CROSSING_RANGE_KM = 500
 
-export function computeProvinces(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	topography: Uint8Array,
-	seed: number,
-	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
-		oceanCoastal?: Uint8Array
-		lakeCoastal?: Uint8Array
-		riverVisible?: Uint8Array
-		planetRadiusKm?: number
-	},
-): GenesisProvinces {
+export function computeProvinces({
+	mesh,
+	isLand,
+	topography,
+	seed,
+	options,
+}: ComputeProvincesParams): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const rng = createRng(seed + 31337)
@@ -439,23 +437,16 @@ function assemblePartition(
  * larger real-world provinces) therefore claim more territory, while equal
  * weights degenerate to the plain unweighted case.
  */
-export function computeWeightedProvinces(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	_topography: Uint8Array,
-	seedRegions: Int32Array,
-	seedNames: string[],
-	seed: number,
-	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
-		oceanCoastal?: Uint8Array
-		lakeCoastal?: Uint8Array
-		riverVisible?: Uint8Array
-		planetRadiusKm?: number
-	},
-	seedWeights?: Float32Array,
-): GenesisProvinces {
+export function computeWeightedProvinces({
+	mesh,
+	isLand,
+	_topography,
+	seedRegions,
+	seedNames,
+	seed,
+	options,
+	seedWeights,
+}: ComputeWeightedProvincesParams): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
 	const rng = createRng(seed + 31337)
@@ -597,28 +588,14 @@ export function computeWeightedProvinces(
  * from mesh-adjacent assigned regions; larger unmapped land areas (outside
  * the source data's coverage) are left unassigned and render like ocean.
  */
-export function computeProvincesFromRaster(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	regionIds: Int16Array,
-	seed: number,
-	options?: {
-		climateZones?: Uint8Array
-		rainfall?: GenesisRainfall
-		oceanCoastal?: Uint8Array
-		lakeCoastal?: Uint8Array
-		riverVisible?: Uint8Array
-		planetRadiusKm?: number
-	},
-	/** A guaranteed-inside-the-source-polygon point per province id (see
-	 * scripts/build-eu4-provinces.py's representative_point output). Ids
-	 * that the raster sampling above never placed on any mesh region --
-	 * either too small to be any region's nearest sample, or sitting on
-	 * land the mesh's own coastline data doesn't recognize -- are force-
-	 * placed onto their nearest actual land region instead of silently
-	 * disappearing. */
-	fallbackSeeds?: { id: number; lon: number; lat: number }[],
-): GenesisProvinces {
+export function computeProvincesFromRaster({
+	mesh,
+	isLand,
+	regionIds,
+	seed,
+	options,
+	fallbackSeeds,
+}: ComputeProvincesFromRasterParams): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
 	const rng = createRng(seed + 44771)

@@ -12,8 +12,8 @@
  *   Ofi: minIce > 80mm (8cm) in all months → >80% minimum cover
  *   Of:  maxIce > 20mm (2cm) in at least 1 month → >20% maximum cover
  */
-import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
 import { meanEdgeLengthKm, TIME } from "../shared"
+import type { ComputeIceAccumulationParams } from "./types"
 
 // Positive degree-day melt factor: 4 mm w.e. per degree-day
 const MELT_FACTOR = 6.0
@@ -31,15 +31,15 @@ interface IceResult {
 	iceMaxMonthly: Float32Array
 }
 
-export function computeIceAccumulation(
-	mesh: SphereMesh,
-	climate: GenesisClimate,
-	rainfall: GenesisRainfall,
-	isLand: Uint8Array,
-	distCoast: Float32Array,
+export function computeIceAccumulation({
+	mesh,
+	climate,
+	rainfall,
+	isLand,
+	distCoast,
 	cycles = 15,
-	planetRadiusKm?: number,
-): IceResult {
+	planetRadiusKm,
+}: ComputeIceAccumulationParams): IceResult {
 	const N = mesh.numRegions
 	const ice = new Float32Array(N)
 	const iceMin = new Float32Array(N)

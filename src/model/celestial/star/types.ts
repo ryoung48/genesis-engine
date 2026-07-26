@@ -1,3 +1,4 @@
+import type { SharedRng } from "@/model/shared/rng"
 export const MAIN_SEQUENCE_CLASSES = [
 	"O",
 	"B",
@@ -40,6 +41,6 @@ export interface KeplerYearInput {
 }
 
 export interface RollStarAgeInput {
-	rng: Pick<import("@/model/shared/rng").SharedRng, "randint" | "uniform">
+	rng: Pick<SharedRng, "randint" | "uniform">
 	massSol: number
 }

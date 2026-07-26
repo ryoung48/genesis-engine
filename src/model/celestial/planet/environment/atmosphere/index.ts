@@ -1,5 +1,5 @@
+import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
 import { roll2d5, roll2d6 } from "@/model/shared/dice"
-import type { AtmosphereProfile } from "../../../orbit-body"
 import type { AtmosphereCodeInput, RollAtmosphereInput } from "./types"
 
 function rollAtmosphereBar({
@@ -25,7 +25,7 @@ function rollAtmosphereBar({
 	return 0
 }
 
-export function atmosphereCodeToProfile({
+function atmosphereCodeToProfile({
 	rng,
 	atmosphereCode,
 	params,
@@ -228,3 +228,5 @@ export function atmosphereCodeToProfile({
 		}),
 	}
 }
+
+export const ATMOSPHERE = { codeToProfile: atmosphereCodeToProfile }

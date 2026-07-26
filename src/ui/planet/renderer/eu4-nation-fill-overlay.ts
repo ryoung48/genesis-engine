@@ -3,7 +3,13 @@ import type { Eu4ProvinceFillGeometry } from "@/model/earth"
 import { darkenPoliticalAtElevation } from "../screen/display/color-helpers"
 import { createMapProjection } from "./map-projection"
 import { repeatMapPositions } from "./overlay-builders"
-import type { GenesisViewMode } from "./types"
+import type {
+	BuildStripeMeshParams,
+	BuildEu4NationFillGlobeParams,
+	BuildEu4NationFillMapParams,
+	BuildEu4OccupationStripesGlobeParams,
+	BuildEu4OccupationStripesMapParams,
+} from "./types"
 
 /** lon/lat (degrees) -> elevation in km, same convention as elevation_km
  * (sea level ~= 0, negative underwater). Optional -- when omitted, fill
@@ -334,14 +340,14 @@ function buildColoredMesh(
 	return { mesh }
 }
 
-export function buildEu4NationFillGlobe(
-	geometry: Eu4ProvinceFillGeometry,
-	colorForRawId: ColorForRawId,
-	viewMode: GenesisViewMode,
-	visible: boolean,
-	radius: number,
-	elevationKmForLonLat?: ElevationKmForLonLat,
-): { mesh: THREE.Mesh } | null {
+export function buildEu4NationFillGlobe({
+	geometry,
+	colorForRawId,
+	viewMode,
+	visible,
+	radius,
+	elevationKmForLonLat,
+}: BuildEu4NationFillGlobeParams): { mesh: THREE.Mesh } | null {
 	const groups = getTriangulatedGroups(geometry)
 	const lonLat = getGroupLonLat(geometry, groups)
 	const positions = getGlobePositions(geometry, lonLat, radius)
@@ -356,16 +362,16 @@ export function buildEu4NationFillGlobe(
 	return buildColoredMesh(positions, colors, viewMode === "globe" && visible)
 }
 
-export function buildEu4NationFillMap(
-	geometry: Eu4ProvinceFillGeometry,
-	colorForRawId: ColorForRawId,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	viewMode: GenesisViewMode,
-	visible: boolean,
-	z: number,
-	elevationKmForLonLat?: ElevationKmForLonLat,
-): { mesh: THREE.Mesh } | null {
+export function buildEu4NationFillMap({
+	geometry,
+	colorForRawId,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	viewMode,
+	visible,
+	z,
+	elevationKmForLonLat,
+}: BuildEu4NationFillMapParams): { mesh: THREE.Mesh } | null {
 	const groups = getTriangulatedGroups(geometry)
 	const lonLat = getGroupLonLat(geometry, groups)
 	const projection = createMapProjection(
@@ -463,14 +469,14 @@ function buildStripeAttributes(
 	return hasAny ? { colors, mask, hasAny } : null
 }
 
-function buildStripeMesh(
-	positions: Float32Array,
-	colors: Float32Array,
-	mask: Float32Array,
-	stripeVertexShader: string,
-	stripeFragmentShader: string,
-	visible: boolean,
-): { mesh: THREE.Mesh } | null {
+function buildStripeMesh({
+	positions,
+	colors,
+	mask,
+	stripeVertexShader,
+	stripeFragmentShader,
+	visible,
+}: BuildStripeMeshParams): { mesh: THREE.Mesh } | null {
 	const geometry = new THREE.BufferGeometry()
 	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
 	geometry.setAttribute("stripeColor", new THREE.BufferAttribute(colors, 3))
@@ -550,37 +556,37 @@ const MAP_STRIPE_FRAGMENT_SHADER = `
 	}
 `
 
-export function buildEu4OccupationStripesGlobe(
-	geometry: Eu4ProvinceFillGeometry,
-	colorForRawId: ColorForRawId,
-	viewMode: GenesisViewMode,
-	visible: boolean,
-	radius: number,
-): { mesh: THREE.Mesh } | null {
+export function buildEu4OccupationStripesGlobe({
+	geometry,
+	colorForRawId,
+	viewMode,
+	visible,
+	radius,
+}: BuildEu4OccupationStripesGlobeParams): { mesh: THREE.Mesh } | null {
 	const groups = getTriangulatedGroups(geometry)
 	const attrs = buildStripeAttributes(groups, colorForRawId)
 	if (!attrs) return null
 	const lonLat = getGroupLonLat(geometry, groups)
 	const positions = getGlobePositions(geometry, lonLat, radius)
-	return buildStripeMesh(
+	return buildStripeMesh({
 		positions,
-		attrs.colors,
-		attrs.mask,
-		GLOBE_STRIPE_VERTEX_SHADER,
-		GLOBE_STRIPE_FRAGMENT_SHADER,
-		viewMode === "globe" && visible,
-	)
+		colors: attrs.colors,
+		mask: attrs.mask,
+		stripeVertexShader: GLOBE_STRIPE_VERTEX_SHADER,
+		stripeFragmentShader: GLOBE_STRIPE_FRAGMENT_SHADER,
+		visible: viewMode === "globe" && visible,
+	})
 }
 
-export function buildEu4OccupationStripesMap(
-	geometry: Eu4ProvinceFillGeometry,
-	colorForRawId: ColorForRawId,
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	viewMode: GenesisViewMode,
-	visible: boolean,
-	z: number,
-): { mesh: THREE.Mesh } | null {
+export function buildEu4OccupationStripesMap({
+	geometry,
+	colorForRawId,
+	centerLongitudeDeg,
+	projectionLatitudeDeg,
+	viewMode,
+	visible,
+	z,
+}: BuildEu4OccupationStripesMapParams): { mesh: THREE.Mesh } | null {
 	const groups = getTriangulatedGroups(geometry)
 	const attrs = buildStripeAttributes(groups, colorForRawId)
 	if (!attrs) return null
@@ -599,14 +605,14 @@ export function buildEu4OccupationStripesMap(
 	)
 	// positions is already tripled (see getMapPositions); the stripe
 	// attributes need the same tripling to stay index-aligned with it.
-	return buildStripeMesh(
+	return buildStripeMesh({
 		positions,
-		repeatTripledColors(attrs.colors),
-		repeatTripledMask(attrs.mask),
-		MAP_STRIPE_VERTEX_SHADER,
-		MAP_STRIPE_FRAGMENT_SHADER,
-		viewMode === "map" && visible,
-	)
+		colors: repeatTripledColors(attrs.colors),
+		mask: repeatTripledMask(attrs.mask),
+		stripeVertexShader: MAP_STRIPE_VERTEX_SHADER,
+		stripeFragmentShader: MAP_STRIPE_FRAGMENT_SHADER,
+		visible: viewMode === "map" && visible,
+	})
 }
 
 function repeatTripledMask(mask: Float32Array): Float32Array {

@@ -1,16 +1,14 @@
-import { roll2d6, rollDice } from "@/model/shared/dice"
-import { createRng } from "@/model/shared/rng"
 import type {
 	OrbitChemistry,
 	OrbitClassification,
 	OrbitComposition,
-} from "../../../../orbit-body"
-import type { MainSequenceClass } from "../../../../star"
-import type { Zone } from "../../../types"
-import type { ClampInput } from "../types"
+} from "@/model/celestial/orbit-body/types"
+import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
+import type { Zone } from "@/model/celestial/planet/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { roll2d6, rollDice } from "@/model/shared/dice"
+import { createRng } from "@/model/shared/rng"
 import type { ChooseChemistryInput, ClassifiedEnvironment } from "./types"
-
-export type { ClassifiedEnvironment } from "./types"
 
 function clamp({ value, min, max }: ClampInput): number {
 	return Math.max(min, Math.min(max, value))
@@ -29,7 +27,7 @@ function chooseColdChemistry({
 	return "methane"
 }
 
-export function rollClassificationAssignment(params: {
+function rollClassificationAssignment(params: {
 	rng: ReturnType<typeof createRng>
 	classification: OrbitClassification
 	sizeClass: number
@@ -401,3 +399,5 @@ export function rollClassificationAssignment(params: {
 		}
 	}
 }
+
+export const DICE_TABLE = { rollClassificationAssignment }
