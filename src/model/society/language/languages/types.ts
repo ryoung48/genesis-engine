@@ -81,7 +81,7 @@ export interface Language {
 	articleChance: number
 	// predefined words
 	predefined: Record<string, string[]>
-	// per-language RNG â€” independent of the world dice
+	// per-language RNG — independent of the world dice
 	dice: LanguageRng
 }
 

@@ -1,6 +1,6 @@
-import * as THREE from "three"
-import { getSettlementRenderThresholds } from "@/model/society/settlement-tuning"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+﻿import * as THREE from "three"
+import { getSettlementRenderThresholds } from "@/model/society"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
 
 const TERRAIN_ELEVATION_SCALE = 0.04

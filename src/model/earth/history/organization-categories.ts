@@ -1,5 +1,9 @@
 import type { FoldedState } from "./fold"
 import { collectOrgForeignHolderNations } from "./fold"
+import type {
+	CreateMembershipCategorizerParams,
+	ListOrgMembersParams,
+} from "./types"
 
 /** One visual/political classification an org's territory or membership can
  * fall into (HRE's Prince-Elector, HSA's Trade Post, ...). Display order
@@ -62,10 +66,10 @@ interface OrgCategorySchema {
  * intrinsically a property of the OWNER (an Estate type, or "holds enclave
  * territory") rather than of the specific province, so it doesn't matter
  * which of an owner's provinces gets checked first. */
-export function listOrgMembers(
-	state: FoldedState,
-	categorize: OrgCategorizer,
-): Map<string, OrgProvinceCategory> {
+export function listOrgMembers({
+	state,
+	categorize,
+}: ListOrgMembersParams): Map<string, OrgProvinceCategory> {
 	const members = new Map<string, OrgProvinceCategory>()
 	for (const [rawId, province] of state.provinces) {
 		const owner = province.owner
@@ -138,7 +142,10 @@ function resolveHreEstateCategory(nation: {
 }
 
 function createHreCategorizer(state: FoldedState): OrgCategorizer {
-	const foreignHolderTags = collectOrgForeignHolderNations(state, "HRE")
+	const foreignHolderTags = collectOrgForeignHolderNations({
+		state,
+		orgId: "HRE",
+	})
 	const categoryByOwner = new Map<string, string>()
 	const categoryForOwner = (owner: string): string => {
 		let category = categoryByOwner.get(owner)
@@ -194,10 +201,10 @@ const HSA_CATEGORIES: OrgCategory[] = [
  * as Danzig, which should remain visible when country-level ownership hides
  * the local member tag. Otherwise a province counts as a plain member province
  * if its owner holds discrete membership (FoldedNationState.organizations). */
-function createMembershipCategorizer(
-	orgId: string,
-	siteRoles: readonly string[],
-): (state: FoldedState) => OrgCategorizer {
+function createMembershipCategorizer({
+	orgId,
+	siteRoles,
+}: CreateMembershipCategorizerParams): (state: FoldedState) => OrgCategorizer {
 	return (state: FoldedState): OrgCategorizer => {
 		const memberTags = new Set<string>()
 		for (const [tag, nation] of state.nations) {
@@ -231,10 +238,10 @@ function createMembershipCategorizer(
 
 const HSA_CATEGORY_SCHEMA: OrgCategorySchema = {
 	categories: HSA_CATEGORIES,
-	createCategorizer: createMembershipCategorizer("HSA", [
-		"kontor",
-		"trade_branch",
-	]),
+	createCategorizer: createMembershipCategorizer({
+		orgId: "HSA",
+		siteRoles: ["kontor", "trade_branch"],
+	}),
 }
 
 // --- Guelphs and Ghibellines ---------------------------------------------

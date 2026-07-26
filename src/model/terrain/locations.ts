@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Location (barony-level) partitioning within provinces.
  * Each province is subdivided into locations via competitive multi-source BFS,
  * constrained to stay within province boundaries. The number of locations per
@@ -6,8 +6,7 @@
  */
 
 import type { GenesisLocations, GenesisProvinces, SphereMesh } from ".."
-import { createRng } from "../shared/rng"
-import { meanEdgeLengthKm } from "../shared/units"
+import { createRng, meanEdgeLengthKm } from "../shared"
 import { PROVINCE_AREA_TARGET_KM2 } from "./provinces"
 
 // Target ~3 locations per standard province

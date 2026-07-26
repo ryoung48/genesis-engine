@@ -1,12 +1,13 @@
 import type { SphereMesh } from ".."
 
-export function computeCoastalWarmthFromOceanWarmth(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	isLake: Uint8Array,
-	oceanWarmth: Float32Array,
-	avgEdgeKm: number,
-): Float32Array {
+export function computeCoastalWarmthFromOceanWarmth(args: {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	isLake: Uint8Array
+	oceanWarmth: Float32Array
+	avgEdgeKm: number
+}): Float32Array {
+	const { mesh, isLand, isLake, oceanWarmth, avgEdgeKm } = args
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const coastalWarmth = new Float32Array(N)

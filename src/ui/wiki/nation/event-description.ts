@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Event flavor-text generation for genesis history events.
  * Ported (and slimmed) from src/components/world/charts/NationTab/EventDetails.tsx.
  * Operates on genesis's HistoryNote shape: { tag, time, data }.
@@ -9,7 +9,7 @@
  */
 
 import type { HistoryNote } from "@/model/history"
-import { YEAR_MS } from "@/model/history/state"
+import { YEAR_MS } from "@/model/history"
 
 type VictoryDegree =
 	| "decisive"

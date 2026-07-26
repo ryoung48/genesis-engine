@@ -1,4 +1,6 @@
-import { createStringRng } from "@/model/shared/rng"
+export { compressName } from "./compress"
+
+import { createStringRng } from "@/model/shared"
 import {
 	DEFAULT_GLYPH_ALPHABET,
 	type GlyphSet,

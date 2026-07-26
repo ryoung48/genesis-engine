@@ -1,10 +1,4 @@
-import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
-
-export const EARTH_DIAMETER_KM = 12742
-
-export const EARTH_MASS_KG = 5.973886146404331e24
-
-export const DAYS_PER_YEAR = 365.25
+﻿import type { SystemBody } from "@/model/celestial/system"
 
 export const ORBIT_STAT_HELP = {
 	longitudeOfPerihelion:

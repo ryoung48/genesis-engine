@@ -1,6 +1,5 @@
-import type { GenesisPartition } from ".."
-import { buildIdentitySeeds } from "../shared/identity-seeds"
-import { createRng } from "../shared/rng"
+﻿import type { GenesisPartition } from ".."
+import { buildIdentitySeeds, createRng } from "../shared"
 
 type GraphPartitionParams = {
 	nodeCount: number

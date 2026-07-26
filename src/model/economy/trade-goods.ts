@@ -1,5 +1,5 @@
-import { PASTA_LABELS } from "@/model/climate/pasta"
-import { makeRng } from "@/model/shared/rng"
+﻿import { PASTA_LABELS } from "@/model/climate"
+import { makeRng } from "@/model/shared"
 import { TRADE_GOOD_LABELS, TRADE_GOODS_TABLE } from "./trade-goods-table"
 
 export { TRADE_GOOD_LABELS }
@@ -92,15 +92,24 @@ const TOPO_TO_KEY: readonly (string | null)[] = [
 ]
 
 /** Returns "arid" or "cold_arid" for desert/sparse biomes when pasta is unavailable, otherwise null. */
-function aridFallback(biome: number, zone: number): string | null {
+function aridFallback({
+	biome,
+	zone,
+}: {
+	biome: number
+	zone: number
+}): string | null {
 	if (biome !== 1 && biome !== 2) return null
 	return zone <= 4 ? "cold_arid" : "arid"
 }
 
-function weightedPick(
-	rng: () => number,
-	entries: readonly (readonly [number, number])[],
-): number {
+function weightedPick({
+	rng,
+	entries,
+}: {
+	rng: () => number
+	entries: readonly (readonly [number, number])[]
+}): number {
 	let total = 0
 	for (const [, w] of entries) total += w
 	let r = rng() * total
@@ -113,7 +122,7 @@ function weightedPick(
 
 /**
  * Assigns a trade good to each location via a weighted draw from the
- * distribution table keyed by climate × vegetation × topography × coastal.
+ * distribution table keyed by climate Ã— vegetation Ã— topography Ã— coastal.
  * Locations whose parent province is desolate are skipped (material stays 0).
  */
 export function computeTradeGoods(params: {
@@ -186,7 +195,9 @@ export function computeTradeGoods(params: {
 		else if (PASTA_OCEANIC.has(pasta)) climateKey = "oceanic"
 		else if (PASTA_CONTINENTAL.has(pasta)) climateKey = "continental"
 		else if (PASTA_MEDITERRANEAN.has(pasta)) climateKey = "mediterranean"
-		else climateKey = aridFallback(biome, zone) ?? ZONE_TO_CLIMATE[zone] ?? null
+		else
+			climateKey =
+				aridFallback({ biome, zone }) ?? ZONE_TO_CLIMATE[zone] ?? null
 		if (!climateKey) continue // ocean zone
 
 		const vegKey = BIOME_TO_VEG[biome]
@@ -199,9 +210,9 @@ export function computeTradeGoods(params: {
 			const fallbackKey = `${climateKey}|${vegKey}|${topoKey}|inland`
 			const fallback = TRADE_GOODS_TABLE[fallbackKey]
 			if (!fallback || fallback.length === 0) continue
-			material[l] = weightedPick(rng, fallback)
+			material[l] = weightedPick({ rng, entries: fallback })
 		} else {
-			material[l] = weightedPick(rng, dist)
+			material[l] = weightedPick({ rng, entries: dist })
 		}
 	}
 

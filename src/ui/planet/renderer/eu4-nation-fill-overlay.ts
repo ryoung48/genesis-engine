@@ -1,5 +1,5 @@
-import * as THREE from "three"
-import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source"
+﻿import * as THREE from "three"
+import type { Eu4ProvinceFillGeometry } from "@/model/earth"
 import { darkenPoliticalAtElevation } from "../screen/display/color-helpers"
 import { createMapProjection } from "./map-projection"
 import { repeatMapPositions } from "./overlay-builders"

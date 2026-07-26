@@ -1,23 +1,20 @@
-import type { MoonBody, TideLock } from "../celestial/moons/moon-types"
+﻿import type { MoonBody } from "../celestial/moons"
 import {
-	AU_M,
 	derivePlanetMassKg,
 	keplerMoonPosition,
 	keplerMoonPositionCartesian,
-	M_SOL_KG,
 	moonPeriodBoundsDay,
 	moonSemiMajorAxisM,
-	resolveMoonOrbitHoursPerDay,
 	rocheLimitM,
-} from "../celestial/moons/orbital-mechanics"
-import type { MainSequenceClass } from "../celestial/star/star-types"
+} from "../celestial/moons"
 import {
-	DEFAULT_SPECTRAL_CLASS,
-	getStarDiameterSol,
-	getStarMassSol,
-	isValidSpectralClass,
-} from "../celestial/star/star-types"
-import type { GenesisParams } from "../types/tectonics"
+	ASTRONOMICAL_UNIT_M,
+	SOLAR_MASS_KG,
+	type TideLock,
+} from "../celestial/orbit-body"
+import type { MainSequenceClass } from "../celestial/star"
+import { DEFAULT_SPECTRAL_CLASS, STAR } from "../celestial/star"
+import type { GenesisParams } from "../types"
 import {
 	apparentDiameterRad,
 	EARTH_MOON_TIDE_REFERENCE,
@@ -66,10 +63,15 @@ interface TidalContributor {
 
 // Star diameter in metres (for eclipse apparent size comparison)
 function starDiameterM(spectralClass: string, starSubtype: number): number {
-	const cls = isValidSpectralClass(spectralClass)
+	const cls = STAR.isValidSpectralClass(spectralClass)
 		? spectralClass
 		: DEFAULT_SPECTRAL_CLASS
-	return getStarDiameterSol(cls as MainSequenceClass, starSubtype) * 1.392e9
+	return (
+		STAR.getStarDiameterSol({
+			cls: cls as MainSequenceClass,
+			subtype: starSubtype,
+		}) * 1.392e9
+	)
 }
 
 // Clamp moon orbital period to valid bounds and return adjusted moon + clamped flag
@@ -79,16 +81,14 @@ function validateMoon(
 	starMassKg: number,
 	planetRadiusKm: number,
 	orbitalDistanceAU: number,
-	hoursPerDay: number,
 ): { moon: MoonBody; clamped: boolean } {
-	const bounds = moonPeriodBoundsDay(
+	const bounds = moonPeriodBoundsDay({
 		moon,
 		planetMassKg,
 		starMassKg,
 		planetRadiusKm,
 		orbitalDistanceAU,
-		hoursPerDay,
-	)
+	})
 	if (!bounds.valid) {
 		return { moon: { ...moon, orbitalPeriodDays: 0 }, clamped: true }
 	}
@@ -105,14 +105,17 @@ function validateMoon(
 	}
 
 	// Recompute semi-major axis after period clamp to validate eccentricity
-	const a = moonSemiMajorAxisM(
-		{ ...moon, orbitalPeriodDays },
+	const a = moonSemiMajorAxisM({
+		moon: { ...moon, orbitalPeriodDays },
 		planetMassKg,
-		hoursPerDay,
-	)
+	})
 	const planetRadiusM = planetRadiusKm * 1000
 	const moonDiameterM = moon.diameterKm * 1000
-	const roche = rocheLimitM(planetRadiusM, moon.massKg, moonDiameterM)
+	const roche = rocheLimitM({
+		planetRadiusM,
+		moonMassKg: moon.massKg,
+		moonDiameterM,
+	})
 	const eMax = Math.max(0, 1 - roche / a)
 	if (eccentricity > eMax) {
 		eccentricity = eMax * 0.9
@@ -123,14 +126,14 @@ function validateMoon(
 }
 
 // Moon phase: illuminated fraction as seen from planet
-// Phase angle α = angle at moon between planet and star directions
+// Phase angle Î± = angle at moon between planet and star directions
 function moonIlluminatedFraction(
 	moonLatRad: number,
 	moonLonRad: number,
 	starLatRad: number,
 	starLonRad: number,
 ): number {
-	// cos α = dot product of unit vectors from planet to moon and planet to star
+	// cos Î± = dot product of unit vectors from planet to moon and planet to star
 	const cosMoon = Math.cos(moonLatRad)
 	const mx = cosMoon * Math.cos(moonLonRad)
 	const my = cosMoon * Math.sin(moonLonRad)
@@ -199,7 +202,6 @@ function buildMoonContributors(
 	moons: MoonBody[],
 	params: Pick<
 		GenesisParams,
-		| "hoursPerDay"
 		| "planetRadiusKm"
 		| "orbitalDistanceAU"
 		| "tideLock"
@@ -210,23 +212,14 @@ function buildMoonContributors(
 	contributors: TidalContributor[]
 	moonsClamped: boolean
 } {
-	const {
-		hoursPerDay,
-		planetRadiusKm,
-		orbitalDistanceAU,
-		spectralClass,
-		starSubtype,
-		tideLock,
-	} = params
-	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
-		hoursPerDay,
-		tideLock ?? null,
-	)
+	const { planetRadiusKm, orbitalDistanceAU, spectralClass, starSubtype } =
+		params
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-	const cls = isValidSpectralClass(spectralClass)
+	const cls = STAR.isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
 		: DEFAULT_SPECTRAL_CLASS
-	const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+	const starMassKg =
+		STAR.getStarMassSol({ cls, subtype: starSubtype }) * SOLAR_MASS_KG
 
 	let moonsClamped = false
 	const contributors = moons
@@ -237,26 +230,22 @@ function buildMoonContributors(
 				starMassKg,
 				planetRadiusKm,
 				orbitalDistanceAU,
-				moonOrbitHoursPerDay,
 			)
 			if (result.clamped) moonsClamped = true
 			return { moon: result.moon, index }
 		})
 		.filter(({ moon }) => moon.orbitalPeriodDays > 0)
 		.map(({ moon, index }) => {
-			const semiMajorAxisM = moonSemiMajorAxisM(
-				moon,
-				planetMassKg,
-				moonOrbitHoursPerDay,
-			)
+			const semiMajorAxisM = moonSemiMajorAxisM({ moon, planetMassKg })
 			return {
 				idx: moon.idx,
 				label: `Moon ${index + 1}`,
 				massKg: moon.massKg,
 				diameterKm: moon.diameterKm,
-				positionAt: (t: number) => keplerMoonPosition(moon, semiMajorAxisM, t),
+				positionAt: (t: number) =>
+					keplerMoonPosition({ moon, semiMajorAxisM, t }),
 				cartesianAt: (t: number) =>
-					keplerMoonPositionCartesian(moon, semiMajorAxisM, t),
+					keplerMoonPositionCartesian({ moon, semiMajorAxisM, t }),
 			}
 		})
 
@@ -481,7 +470,6 @@ export function computeMoonTidalSchedule(
 ): TidalSchedule {
 	const {
 		daysPerYear,
-		hoursPerDay,
 		spectralClass,
 		starSubtype,
 		orbitalDistanceAU,
@@ -489,12 +477,15 @@ export function computeMoonTidalSchedule(
 		perihelion,
 	} = params
 	const moonRadiusM = (moon.diameterKm * 1000) / 2
-	const moonSemiMajorM = moonSemiMajorAxisM(moon, parent.massKg, hoursPerDay)
+	const moonSemiMajorM = moonSemiMajorAxisM({
+		moon,
+		planetMassKg: parent.massKg,
+	})
 	const siblings = parent.moons.filter((sibling) => sibling.idx !== moon.idx)
 	const siblingSemiMajorM = new Map(
 		siblings.map((sibling) => [
 			sibling.idx,
-			moonSemiMajorAxisM(sibling, parent.massKg, hoursPerDay),
+			moonSemiMajorAxisM({ moon: sibling, planetMassKg: parent.massKg }),
 		]),
 	)
 
@@ -532,11 +523,11 @@ export function computeMoonTidalSchedule(
 						moonRadiusM,
 					)
 
-		const parentDistanceM = keplerMoonPosition(
+		const parentDistanceM = keplerMoonPosition({
 			moon,
-			moonSemiMajorM,
+			semiMajorAxisM: moonSemiMajorM,
 			t,
-		).distanceM
+		}).distanceM
 		const parentForce =
 			moon.tideLock?.type === "planet"
 				? 0
@@ -547,16 +538,20 @@ export function computeMoonTidalSchedule(
 						parentDistanceM,
 					)
 
-		const moonPos = keplerMoonPositionCartesian(moon, moonSemiMajorM, t)
+		const moonPos = keplerMoonPositionCartesian({
+			moon,
+			semiMajorAxisM: moonSemiMajorM,
+			t,
+		})
 		const siblingForces = siblings.map((sibling) => {
 			const lockedToSibling =
 				moon.tideLock?.type === "lunar" && moon.tideLock.target === sibling.idx
 			if (lockedToSibling) return 0
-			const siblingPos = keplerMoonPositionCartesian(
-				sibling,
-				siblingSemiMajorM.get(sibling.idx)!,
+			const siblingPos = keplerMoonPositionCartesian({
+				moon: sibling,
+				semiMajorAxisM: siblingSemiMajorM.get(sibling.idx)!,
 				t,
-			)
+			})
 			const dx = moonPos.x - siblingPos.x
 			const dy = moonPos.y - siblingPos.y
 			const dz = moonPos.z - siblingPos.z
@@ -642,7 +637,7 @@ export interface SurfaceTidesBreakdown {
 }
 
 // Theoretical peak (metres) for a planet -- every contributor (star + each
-// own moon) evaluated at its own periapsis and at the sub-point (cosψ=1)
+// own moon) evaluated at its own periapsis and at the sub-point (cosÏˆ=1)
 // simultaneously, using the same physical equilibrium-tide formula as
 // computeTidalSchedule's real time series above, rather than assuming they
 // all happen at once the way the sampled Spring/Neap max/min do. A true
@@ -662,23 +657,24 @@ export function computeSurfaceTidesM(
 	> & { starName?: string },
 ): SurfaceTidesBreakdown {
 	const {
-		hoursPerDay,
 		spectralClass,
 		starSubtype,
 		orbitalDistanceAU,
 		eccentricity,
 		starName,
 	} = params
-	const cls = isValidSpectralClass(spectralClass)
+	const cls = STAR.isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
 		: DEFAULT_SPECTRAL_CLASS
-	const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+	const starMassKg =
+		STAR.getStarMassSol({ cls, subtype: starSubtype }) * SOLAR_MASS_KG
 	const planetMassKg = derivePlanetMassKg(planet.diameterKm / 2)
 	const planetRadiusM = (planet.diameterKm / 2) * 1000
 
 	const contributions: SurfaceTidesContribution[] = []
 	if (planet.tideLock?.type !== "solar") {
-		const periapsisM = orbitalDistanceAU * (1 - eccentricity) * AU_M
+		const periapsisM =
+			orbitalDistanceAU * (1 - eccentricity) * ASTRONOMICAL_UNIT_M
 		contributions.push({
 			label: starName ?? "Star",
 			valueM: tideContribution(
@@ -698,7 +694,7 @@ export function computeSurfaceTidesM(
 		const lockedToMoon =
 			planet.tideLock?.type === "lunar" && planet.tideLock.target === moon.idx
 		if (lockedToMoon) return
-		const semiMajorAxisM = moonSemiMajorAxisM(moon, planetMassKg, hoursPerDay)
+		const semiMajorAxisM = moonSemiMajorAxisM({ moon, planetMassKg })
 		const periapsisM = semiMajorAxisM * (1 - moon.eccentricity)
 		contributions.push({
 			label: moon.name ?? `Moon ${index + 1}`,
@@ -745,23 +741,24 @@ export function computeMoonSurfaceTidesM(
 	> & { starName?: string },
 ): SurfaceTidesBreakdown {
 	const {
-		hoursPerDay,
 		spectralClass,
 		starSubtype,
 		orbitalDistanceAU,
 		eccentricity,
 		starName,
 	} = params
-	const cls = isValidSpectralClass(spectralClass)
+	const cls = STAR.isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
 		: DEFAULT_SPECTRAL_CLASS
-	const starMassKg = getStarMassSol(cls, starSubtype) * M_SOL_KG
+	const starMassKg =
+		STAR.getStarMassSol({ cls, subtype: starSubtype }) * SOLAR_MASS_KG
 	const moonRadiusM = (moon.diameterKm * 1000) / 2
 	const siblings = parent.moons.filter((sibling) => sibling.idx !== moon.idx)
 
 	const contributions: SurfaceTidesContribution[] = []
 	if (moon.tideLock?.type !== "solar") {
-		const periapsisM = orbitalDistanceAU * (1 - eccentricity) * AU_M
+		const periapsisM =
+			orbitalDistanceAU * (1 - eccentricity) * ASTRONOMICAL_UNIT_M
 		contributions.push({
 			label: starName ?? "Star",
 			valueM: tideContribution(
@@ -777,7 +774,10 @@ export function computeMoonSurfaceTidesM(
 		})
 	}
 
-	const moonSemiMajorM = moonSemiMajorAxisM(moon, parent.massKg, hoursPerDay)
+	const moonSemiMajorM = moonSemiMajorAxisM({
+		moon,
+		planetMassKg: parent.massKg,
+	})
 	const moonPeriapsisM = moonSemiMajorM * (1 - moon.eccentricity)
 	if (moon.tideLock?.type !== "planet") {
 		contributions.push({
@@ -795,11 +795,10 @@ export function computeMoonSurfaceTidesM(
 		const lockedToSibling =
 			moon.tideLock?.type === "lunar" && moon.tideLock.target === sibling.idx
 		if (lockedToSibling) continue
-		const siblingSemiMajorM = moonSemiMajorAxisM(
-			sibling,
-			parent.massKg,
-			hoursPerDay,
-		)
+		const siblingSemiMajorM = moonSemiMajorAxisM({
+			moon: sibling,
+			planetMassKg: parent.massKg,
+		})
 		const siblingPeriapsisM = siblingSemiMajorM * (1 - sibling.eccentricity)
 		const minSeparationM = Math.abs(moonPeriapsisM - siblingPeriapsisM)
 		contributions.push({

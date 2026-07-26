@@ -163,6 +163,7 @@ export const KOPPEN_LABELS = KOPPEN_CLASSES.map(
 ) as ReadonlyArray<string>
 
 const CLASS_ID: Record<string, number> = Object.fromEntries(
+	// biome-ignore lint/nursery/useMaxParams: native map callback
 	KOPPEN_CLASSES.map((entry, index) => [entry.code, index]),
 )
 

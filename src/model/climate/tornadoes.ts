@@ -18,7 +18,7 @@
  * ocean/lake cells are zero.
  */
 import type { GenesisParams, SphereMesh } from ".."
-import { clamp, piecewise, smoothstep } from "../shared/math"
+import { clamp, piecewise, smoothstep } from "../shared"
 import {
 	TOPO_FLAT,
 	TOPO_HILL,
@@ -27,7 +27,7 @@ import {
 	TOPO_MOUNTAIN,
 	TOPO_OCEAN,
 	TOPO_PLATEAU,
-} from "../terrain/classification"
+} from "../terrain"
 import { computeThermalEquator, getClimateGeometry, hadleyWidth } from "./rain"
 
 /** Moisture availability by biome — grasslands peak, desert/jungle low. */
@@ -181,6 +181,7 @@ export function computeTornadoRisk(
 	}
 	if (nonZero.length === 0) return risk
 
+	// biome-ignore lint/nursery/useMaxParams: native sort callback
 	nonZero.sort((a, b) => a - b)
 	const p99 =
 		nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]

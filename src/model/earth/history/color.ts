@@ -1,4 +1,5 @@
 import { DYNASTY_COLOR_PALETTE } from "./dynasty-color-palette"
+import type { HslToRgbParams } from "./types"
 
 /** Deterministic hash-based color for ids with no explicit reference color
  * (most EU4 cultures/governments have none). Shared by the map-mode renderer
@@ -8,10 +9,10 @@ export function hashColorForKey(key: string): [number, number, number] {
 	let h = 0
 	for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
 	const hue = (h % 360) / 360
-	return hslToRgb(hue, 0.55, 0.5)
+	return hslToRgb({ h: hue, s: 0.55, l: 0.5 })
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+function hslToRgb({ h, s, l }: HslToRgbParams): [number, number, number] {
 	const c = (1 - Math.abs(2 * l - 1)) * s
 	const x = c * (1 - Math.abs(((h * 6) % 2) - 1))
 	const m = l - c / 2

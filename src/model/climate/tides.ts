@@ -5,10 +5,11 @@ import type { SphereMesh } from ".."
  * (ocean or lake) neighbour.  Shared by the tidal model and classifyTopography
  * so the O(N×6) adjacency scan is not duplicated.
  */
-export function computeCoastalMask(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-): Uint8Array {
+export function computeCoastalMask(args: {
+	mesh: SphereMesh
+	isLand: Uint8Array
+}): Uint8Array {
+	const { mesh, isLand } = args
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const coastal = new Uint8Array(N)

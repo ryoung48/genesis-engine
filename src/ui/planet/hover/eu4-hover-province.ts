@@ -1,4 +1,4 @@
-import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source"
+﻿import type { Eu4ProvinceFillGeometry } from "@/model/earth"
 import { buildEu4ProvinceRingGroups } from "../renderer/eu4-province-geometry"
 
 interface BoundingBox {

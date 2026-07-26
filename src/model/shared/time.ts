@@ -1,12 +1,19 @@
 const daysPerYear = 365
 const daysPerMonth = 30
 const daysPerWeek = 7
-const hoursPerDay = 24
+// Unit conversions, unlike DEFAULT_HOURS_PER_DAY and EBM's HOURS_PER_DAY,
+// which are editable per-planet simulation defaults.
+export const HOURS_PER_DAY = 24
+const SECONDS_PER_HOUR = 3600
+export const SECONDS_PER_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR
+// Orbital mechanics uses a Julian year; calendar/simulation defaults may use
+// a distinct 365-day value.
+export const ASTRONOMICAL_DAYS_PER_YEAR = 365.25
 const minutesPerHour = 60
 const secondMS = 1000
 const minuteMS = secondMS * 60
 const hourMS = minuteMS * 60
-const dayMS = hourMS * hoursPerDay
+const dayMS = hourMS * HOURS_PER_DAY
 const weekMS = dayMS * daysPerWeek
 const monthMS = dayMS * daysPerMonth
 const yearMS = dayMS * daysPerYear
@@ -32,7 +39,7 @@ export const TIME = {
 		daysPerMonth,
 		daysPerWeek,
 		daysPerYear,
-		hoursPerDay,
+		hoursPerDay: HOURS_PER_DAY,
 		minutesPerHour,
 		secondMS,
 		minuteMS,

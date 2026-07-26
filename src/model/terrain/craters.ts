@@ -1,12 +1,11 @@
-/**
+﻿/**
  * Impact craters — stamps large circular depressions with rims and ejecta
  * blankets onto the elevation field. Applied after all terrain post-processing
  * so craters remain crisp and visible.
  */
 
 import type { SphereMesh } from ".."
-import { createRng } from "../shared/rng"
-import { SimplexNoise } from "../shared/simplex-noise"
+import { createRng, SimplexNoise } from "../shared"
 
 interface Crater {
 	cx: number
@@ -31,7 +30,7 @@ export function applyCraters(
 	const rng = createRng(seed + 4242)
 	const noise = new SimplexNoise(seed + 4243)
 
-	// Reference radius: 0.5× Earth ≈ 3185 km — current sizes calibrated here
+	// Reference radius: 0.5Ã— Earth ≈ 3185 km — current sizes calibrated here
 	const refRadius = 3185
 	const radiusRatio = planetRadiusKm / refRadius
 

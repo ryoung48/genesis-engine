@@ -1,8 +1,9 @@
+import { ensureHierarchyClean } from "../derive"
 import { EVT } from "../event-heap"
 import { PROV } from "../fields"
 import type { HistoryRng } from "../history-rng"
 import type { HistoryState } from "../state"
-import { ensureHierarchyClean, YEAR_MS } from "../state"
+import { YEAR_MS } from "../state"
 
 const SPREAD_INTERVAL_YEARS = 5
 /** Fraction of culture-border province pairs that are eligible for bleed. */

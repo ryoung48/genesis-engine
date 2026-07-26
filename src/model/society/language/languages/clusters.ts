@@ -1,4 +1,4 @@
-import { titleCase } from "@/model/shared/text"
+﻿import { titleCase } from "@/model/shared"
 import {
 	Cluster,
 	Language,
@@ -10,11 +10,11 @@ import {
 const range = (count: number): number[] =>
 	Array.from({ length: count }, (_, index) => index)
 
-const aVowels = ["a", "ä", "å", "á", "â", "ā"]
-const eVowels = ["e", "ë", "é", "ê", "ē"]
-const yiVowels = ["i", "y", "ï", "ÿ", "í", "ý", "î", "ī"]
-const iVowels = ["i", "ï", "í", "î", "ī"]
-const oVowels = ["o", "u", "ø", "ö", "ü", "ó", "ú", "ô", "û", "ō", "ū"]
+const aVowels = ["a", "Ť", "ť", "š", "Ţ", "Ä"]
+const eVowels = ["e", "ū", "ũ", "Ū", "Ä“"]
+const yiVowels = ["i", "y", "ů", "ſ", "ŭ", "Ž", "Ů", "Ä«"]
+const iVowels = ["i", "ů", "ŭ", "Ů", "Ä«"]
+const oVowels = ["o", "u", "Ÿ", "Ŷ", "ż", "ų", "ź", "Ŵ", "Ż", "Å", "Å«"]
 const feminineConsonants = ["l", "ll", "n", "nn", "s", "ss", "th", "x", "xx"]
 const singleUseLetters = ["b", "f", "j", "p", "w", "v", "x"]
 const YI_VOWEL_SET = new Set(yiVowels)
@@ -405,7 +405,7 @@ const feminineEndVowels = (cluster: Cluster, prev: string) => {
 		["m", "r", "s", "z"].includes(prev.slice(-1)) ||
 		["th", "sh", "h"].includes(prev.slice(-2))
 	) {
-		complex.push(...["ee", "ée", "ëe", "êe", "ae"])
+		complex.push(...["ee", "ũe", "ūe", "Ūe", "ae"])
 	}
 	return baseEndVowels(cluster).filter(
 		(v) => vowels.includes(v.v.slice(-1)) || complex.includes(v.v.slice(-2)),

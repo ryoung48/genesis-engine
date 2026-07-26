@@ -1,4 +1,4 @@
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+﻿import type { SerializedGenesisWorld } from "@/model/transport"
 
 function getProvinceAreaKm2(
 	world: SerializedGenesisWorld,

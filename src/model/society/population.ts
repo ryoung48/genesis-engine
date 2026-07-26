@@ -25,10 +25,9 @@
  */
 
 import type { GenesisProvinces } from ".."
-import { createRng } from "../shared/rng"
-import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
-import type { GenesisLandmarks } from "../terrain/landmarks"
-import type { SphereMesh } from "../types/mesh"
+import { createRng, DEFAULT_PLANET_RADIUS_KM } from "../shared"
+import type { GenesisLandmarks } from "../terrain"
+import type { SphereMesh } from "../types"
 
 // Habitability factors indexed by genesis codes
 
@@ -175,7 +174,7 @@ export function computePopulation(
 	const totalPop = targetPop * habitabilityScore
 
 	// Distribution weight = habitability shaped by distance from the cradles.
-	// Province share ∝ habitability * (1 - migrationWave)^falloff, so people
+	// Province share âˆ habitability * (1 - migrationWave)^falloff, so people
 	// concentrate near the cradles (strongly in early eras) while the frontier
 	// trends toward zero. falloff = 0 leaves the distribution at pure
 	// habitability. Renormalizing preserves the era's total population.

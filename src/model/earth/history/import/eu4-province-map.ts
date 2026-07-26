@@ -1,4 +1,4 @@
-import type { GenesisProvinces } from "../../../types/society"
+import type { GenesisProvinces } from "../../../types"
 
 export interface Eu4ProvinceMap {
 	/** compact province index -> raw EU4 province id */

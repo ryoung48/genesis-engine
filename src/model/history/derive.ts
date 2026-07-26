@@ -1,6 +1,6 @@
-import { maxFanoutForNationSize } from "../society/hierarchy"
+﻿import { maxFanoutForNationSize } from "../society"
 import { PROV } from "./fields"
-import { ensureHierarchyClean, type HistoryState } from "./state"
+import type { HistoryState } from "./state"
 
 const TRIBUTE = 0.25
 
@@ -16,6 +16,63 @@ export interface DerivedCache {
 
 function cacheKey(p: number, t: number): string {
 	return `${p}@${t}`
+}
+
+/** Rebuild live childOffset/childList/sovereign from parentCurrent. */
+export function ensureHierarchyClean(state: HistoryState): void {
+	if (!state.hierarchyDirty) return
+	const P = state.P
+	const parent = state.parentCurrent
+	const counts = new Int32Array(P)
+	for (let p = 0; p < P; p++) {
+		const par = parent[p]
+		if (par >= 0) counts[par]++
+	}
+	const offset = new Int32Array(P + 1)
+	for (let p = 0; p < P; p++) offset[p + 1] = offset[p] + counts[p]
+	const list = new Int32Array(offset[P])
+	const cursor = new Int32Array(P)
+	for (let p = 0; p < P; p++) {
+		const par = parent[p]
+		if (par >= 0) list[offset[par] + cursor[par]++] = p
+	}
+	state.childOffset = offset
+	state.childList = list
+
+	const sov = state.sovereignCurrent
+	for (let p = 0; p < P; p++) sov[p] = -1
+	for (let p = 0; p < P; p++) {
+		if (state.stateless[p]) continue
+		if (sov[p] !== -1) continue
+		let cur = p
+		let steps = 0
+		while (parent[cur] >= 0 && sov[cur] === -1) {
+			cur = parent[cur]
+			steps++
+			if (steps > P) {
+				throw new Error(
+					`Parent cycle detected while rebuilding hierarchy from province ${p}, stuck at ${cur}`,
+				)
+			}
+		}
+		const root = sov[cur] !== -1 ? sov[cur] : cur
+		let walk = p
+		steps = 0
+		while (walk !== root && sov[walk] === -1) {
+			sov[walk] = root
+			walk = parent[walk]
+			steps++
+			if (steps > P) {
+				throw new Error(
+					`Parent cycle detected while assigning sovereign for province ${p}, stuck at ${walk}`,
+				)
+			}
+			if (walk < 0) break
+		}
+		sov[p] = root
+	}
+	state.hierarchyDirty = false
+	state.hierarchyVersion++
 }
 
 export function sovereign(

@@ -1,8 +1,7 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from ".."
-import type { SocietyEra } from "../society/eras"
-import type { ProvincePopulation } from "../society/population"
-import type { GenesisLandmarks } from "../terrain/landmarks"
-import type { StageTiming } from "../types/tectonics"
+import type { ProvincePopulation, SocietyEra } from "../society"
+import type { GenesisLandmarks } from "../terrain"
+import type { StageTiming } from "../types"
 import { EVT } from "./event-heap"
 import { runBattle } from "./events/battle"
 import { initCultureSpread, runCultureSpread } from "./events/culture-spread"
@@ -201,6 +200,7 @@ export function simulateUntil(
 	state.time = targetTimeMs
 }
 
+export { historyMsToEu4Days } from "./eu4-days"
 export { createHistoryRng } from "./history-rng"
 export type { HistoryNote } from "./state"
 export { YEAR_MS } from "./state"

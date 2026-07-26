@@ -1,169 +1,17 @@
-import { capitalize, titleCase } from "@/model/shared/text"
+﻿import { capitalize, titleCase } from "@/model/shared"
 import { initClusters, randomizePhonemes } from "./builder"
 import { buildConsonants } from "./builder/consonants"
 import { buildBasicVowels, buildComplexVowels } from "./builder/vowels"
 import { CLUSTER } from "./clusters"
-import { createLanguageRng, type LanguageRng } from "./rng"
 import {
-	type Cluster,
-	Gender,
-	Language,
-	PhonemeCatalog,
-	WordParams,
-} from "./types"
-
-const spawn = (seed: string, dice: LanguageRng) => {
-	const lang: Language = {
-		seed,
-		dice,
-		stop: " ",
-		stopChance: 0,
-		basePhonemes: {
-			[PhonemeCatalog.START_CONSONANT]: [],
-			[PhonemeCatalog.MIDDLE_CONSONANT]: [],
-			[PhonemeCatalog.END_CONSONANT]: [],
-			[PhonemeCatalog.START_VOWEL]: [],
-			[PhonemeCatalog.FRONT_VOWEL]: [],
-			[PhonemeCatalog.MIDDLE_VOWEL]: [],
-			[PhonemeCatalog.BACK_VOWEL]: [],
-			[PhonemeCatalog.END_VOWEL]: [],
-		},
-		phonemes: {
-			[PhonemeCatalog.START_CONSONANT]: [],
-			[PhonemeCatalog.MIDDLE_CONSONANT]: [],
-			[PhonemeCatalog.END_CONSONANT]: [],
-			[PhonemeCatalog.START_VOWEL]: [],
-			[PhonemeCatalog.FRONT_VOWEL]: [],
-			[PhonemeCatalog.MIDDLE_VOWEL]: [],
-			[PhonemeCatalog.BACK_VOWEL]: [],
-			[PhonemeCatalog.END_VOWEL]: [],
-		},
-		vowels: [],
-		diphthongs: [],
-		digraphs: [],
-		clusters: {},
-		clusterTemplates: {},
-		seenWords: {},
-		slotWords: new Map(),
-		ending:
-			dice.random > 0.15
-				? PhonemeCatalog.MIDDLE_CONSONANT
-				: PhonemeCatalog.MIDDLE_VOWEL,
-		consonantChance: dice.uniform(0.1, 0.4),
-		surnames: {
-			patronymic: false,
-			suffix: {
-				male: [""],
-				female: [""],
-			},
-			epithets: [],
-		},
-		articleChance: dice.uniform(0, 0.05),
-		predefined: {},
-	}
-	return lang
-}
-
-const baseVowels = ["a", "e", "i", "o", "u", "y"]
-const KEY_ALIASES: Record<string, string> = {
-	nation: "region",
-	person_female: "female",
-	person_male: "male",
-}
-
-function normalizeWordKey(key: string): string {
-	return KEY_ALIASES[key] ?? key
-}
-
-function collectDigraphs(
-	consonantPhonemes: Partial<Record<PhonemeCatalog, string[]>>,
-): string[] {
-	return Array.from(
-		new Set(
-			Object.values(consonantPhonemes)
-				.flatMap((phonemes) => phonemes ?? [])
-				.filter(
-					(phoneme) =>
-						phoneme.length > 1 &&
-						!["ng", "str", "th", "sh", "dr", "br"].includes(phoneme),
-				),
-		),
-	)
-}
-
-function buildSlotSeed(
-	lang: Language,
-	key: string,
-	namespace: string,
-	slot: string,
-): string {
-	return `${lang.seed}:word:${normalizeWordKey(key)}:${namespace}:${slot}`
-}
-
-function spawnCluster(
-	lang: Language,
-	params: Pick<
-		WordParams,
-		"key" | "len" | "ending" | "stopChance" | "variation"
-	>,
-	longNames?: number,
-): Cluster {
-	return CLUSTER.spawn({
-		src: lang,
-		key: normalizeWordKey(params.key),
-		len: params.len,
-		ending: params.ending,
-		stopChance: params.stopChance,
-		variation: params.variation,
-		longNames,
-	})
-}
-
-function buildSlotWord({
-	lang,
-	key,
-	namespace,
-	slot,
-	len,
-	ending,
-	stopChance,
-	variation,
-	repeat = false,
-}: WordParams & {
-	namespace: string
-	slot: string
-}): { morphemes: string[]; word: string } {
-	const normalizedKey = normalizeWordKey(key)
-	const baseCluster = lang.clusters[normalizedKey]
-	const resolvedLen = len ?? baseCluster?.len
-	const resolvedEnding = ending ?? baseCluster?.ending ?? lang.ending
-	const resolvedStopChance = stopChance ?? baseCluster?.stopChance ?? 0
-	const resolvedVariation = variation ?? baseCluster?.variation ?? 10
-	const resolvedLongNames = baseCluster?.longNames
-	const slotLang: Language = {
-		...lang,
-		dice: createLanguageRng(
-			buildSlotSeed(lang, normalizedKey, namespace, slot),
-		),
-		clusters: {},
-		clusterTemplates: {},
-		seenWords: {},
-		slotWords: new Map(),
-	}
-	const cluster = spawnCluster(
-		slotLang,
-		{
-			key: normalizedKey,
-			len: resolvedLen,
-			ending: resolvedEnding,
-			stopChance: resolvedStopChance,
-			variation: resolvedVariation,
-		},
-		resolvedLongNames,
-	)
-	const morphemes = CLUSTER.morphemes(cluster, slotLang, repeat)
-	return { morphemes, word: titleCase(morphemes.join("")) }
-}
+	baseVowels,
+	buildSlotWord,
+	collectDigraphs,
+	normalizeWordKey,
+	spawn,
+} from "./internal"
+import { createLanguageRng, type LanguageRng } from "./rng"
+import { Gender, type Language, PhonemeCatalog, type WordParams } from "./types"
 
 export const LANGUAGE = {
 	word: {
@@ -253,9 +101,10 @@ export const LANGUAGE = {
 				})
 			}
 			if (!lang.clusters[normalizedKey]) {
-				lang.clusters[normalizedKey] = spawnCluster(lang, {
+				lang.clusters[normalizedKey] = CLUSTER.spawn({
+					src: lang,
 					key: normalizedKey,
-					len,
+					len: len,
 					ending: ending ?? lang.ending,
 					stopChance,
 					variation: variation ?? 10,
@@ -296,7 +145,7 @@ export const LANGUAGE = {
 			dice,
 			stops: stop !== " ",
 		})
-		const exoticCons = ["ñ", "ñg"].some((c) =>
+		const exoticCons = ["ű", "űg"].some((c) =>
 			consonantPhonemes[PhonemeCatalog.MIDDLE_CONSONANT].includes(c),
 		)
 		const { uniqueVowels, vowelPhonemes } = buildComplexVowels({

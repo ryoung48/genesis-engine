@@ -1,25 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { MoonBody } from "@/model/celestial/moons"
+import { derivePlanetMassKg, moonSemiMajorAxisM } from "@/model/celestial/moons"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { type MainSequenceClass, STAR } from "@/model/celestial/star"
+import type { SystemBody } from "@/model/celestial/system"
+import { SYSTEM } from "@/model/celestial/system"
 import {
-	computeSolarDayHours,
-	inferRetrogradeRotationFromAxialTiltDeg,
-} from "@/model/celestial/day-length"
-import type { MoonBody } from "@/model/celestial/moons/moon-types"
-import {
-	derivePlanetMassKg,
-	moonSemiMajorAxisM,
-	resolveMoonOrbitHoursPerDay,
-} from "@/model/celestial/moons/orbital-mechanics"
-import {
-	getStarLuminositySol,
-	getStarMassSol,
-	isValidSpectralClass,
-	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
-import {
-	SOL_LUNA_DEFAULT,
 	SOL_MAIN_WORLD_NAME,
-	SOL_SEED,
 	SOL_STAR_NAME,
 } from "@/model/celestial/system/sol-system"
 import {
@@ -27,12 +14,12 @@ import {
 	computeSurfaceTidesM,
 	type SurfaceTidesBreakdown,
 } from "@/model/climate/tidal-schedule"
-import { seedStringToNumber } from "@/model/shared/rng"
 import {
 	makeRandomSeedLabel,
 	normalizeSeedLabel,
 	resolveSeedLabel,
-} from "@/model/shared/seed-label"
+	seedStringToNumber,
+} from "@/model/shared"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
@@ -405,7 +392,6 @@ export function GenerationPlanetNavigator({
 	onRebuildSystemBody,
 	onResetSystemMoon,
 	surfaceTidesM,
-	tideLock,
 	setTideLock,
 	setHoursPerDay,
 	radiusSlider,
@@ -422,7 +408,6 @@ export function GenerationPlanetNavigator({
 	starName,
 	forceMainWorld,
 	setForceMainWorld,
-	hoursPerDay,
 	surfaceStats,
 	showRealSolNames,
 	spectralClass,
@@ -455,9 +440,8 @@ export function GenerationPlanetNavigator({
 		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
 	) => void
 	surfaceTidesM?: SurfaceTidesBreakdown
-	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	setTideLock: (
-		v: import("@/model/celestial/moons/moon-types").TideLock | null,
+		v: import("@/model/celestial/orbit-body").TideLock | null,
 	) => void
 	setHoursPerDay: (v: number) => void
 	radiusSlider?: SliderDef
@@ -475,7 +459,6 @@ export function GenerationPlanetNavigator({
 	forceMainWorld: boolean
 	setForceMainWorld: (v: boolean) => void
 	starName?: string
-	hoursPerDay: number
 	daysPerYear: number
 	surfaceStats: StatEntry[]
 	orbitalDistanceAU: number
@@ -519,10 +502,10 @@ export function GenerationPlanetNavigator({
 			const parentYearHours =
 				probeBody.orbitalPeriodDays * probeBody.siderealDayHours
 			const climateHoursPerDay =
-				computeSolarDayHours({
+				ORBIT_BODY.computeSolarDayHours({
 					siderealDayHours: probeMoon.siderealDayHours,
 					orbitalPeriodDays: parentYearHours / 24,
-					retrograde: inferRetrogradeRotationFromAxialTiltDeg(
+					retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 						probeMoon.axialTiltDeg,
 					),
 				}) ?? probeMoon.siderealDayHours
@@ -633,14 +616,16 @@ export function GenerationPlanetNavigator({
 	const [dataExpanded, setDataExpanded] = useState(false)
 	const [seedOverrides, setSeedOverrides] = useState<Record<string, string>>({})
 	const [rootSeedLabel, setRootSeedLabel] = useState(
-		restSeed === SOL_SEED ? "sol" : restSeed.toString(36).padStart(6, "0"),
+		restSeed === SYSTEM.SOL_SEED
+			? "sol"
+			: restSeed.toString(36).padStart(6, "0"),
 	)
 	const [seedInput, setSeedInput] = useState(rootSeedLabel)
 	const lastAppliedRootSeedRef = useRef<{
 		numeric: number
 		label: string
 	} | null>(null)
-	const starClass: MainSequenceClass = isValidSpectralClass(spectralClass)
+	const starClass: MainSequenceClass = STAR.isValidSpectralClass(spectralClass)
 		? spectralClass
 		: "G"
 	// showRealSolNames itself is already Sol-gated by the caller (real Sol
@@ -649,9 +634,9 @@ export function GenerationPlanetNavigator({
 	// so they should always render once generated. namesEnabled is the
 	// general "show whatever name this body/moon carries" gate;
 	// showRealSolNames stays reserved for the handful of hardcoded Sol
-	// fallbacks (SOL_STAR_NAME, SOL_MAIN_WORLD_NAME, SOL_LUNA_DEFAULT.name)
+	// fallbacks (SOL_STAR_NAME, SOL_MAIN_WORLD_NAME, SYSTEM.SOL_LUNA_DEFAULT.name)
 	// below.
-	const namesEnabled = restSeed === SOL_SEED ? showRealSolNames : true
+	const namesEnabled = restSeed === SYSTEM.SOL_SEED ? showRealSolNames : true
 	const starTitle = showRealSolNames
 		? SOL_STAR_NAME
 		: (starName ?? "Primary Star")
@@ -659,8 +644,14 @@ export function GenerationPlanetNavigator({
 		() => labelOrbitBodies(orbitBodies ?? [], namesEnabled),
 		[orbitBodies, namesEnabled],
 	)
-	const starMassSol = getStarMassSol(starClass, starSubtype)
-	const starLuminositySol = getStarLuminositySol(starClass, starSubtype)
+	const starMassSol = STAR.getStarMassSol({
+		cls: starClass,
+		subtype: starSubtype,
+	})
+	const starLuminositySol = STAR.getStarLuminositySol({
+		cls: starClass,
+		subtype: starSubtype,
+	})
 	const selectionKey = useCallback((target: OrbitSelection): string => {
 		if (target.kind === "star") return "star"
 		if (target.kind === "orbit") return `orbit:${target.bodyIndex}`
@@ -694,7 +685,7 @@ export function GenerationPlanetNavigator({
 		(target: OrbitSelection): number => {
 			const label = getSeedLabel(target)
 			if (target.kind === "star") {
-				return label === "sol" ? SOL_SEED : seedStringToNumber(label)
+				return label === "sol" ? SYSTEM.SOL_SEED : seedStringToNumber(label)
 			}
 			let parent: OrbitSelection
 			if (target.kind === "orbit") {
@@ -718,17 +709,15 @@ export function GenerationPlanetNavigator({
 			return
 		}
 		setRootSeedLabel(
-			restSeed === SOL_SEED ? "sol" : restSeed.toString(36).padStart(6, "0"),
+			restSeed === SYSTEM.SOL_SEED
+				? "sol"
+				: restSeed.toString(36).padStart(6, "0"),
 		)
 	}, [restSeed, rootSeedLabel])
 	useEffect(() => {
 		setSeedInput(seedDisplay)
 	}, [seedDisplay])
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
-		hoursPerDay,
-		tideLock,
-	)
 	const focusSelection = useCallback(
 		(nextSelection: OrbitSelection) => {
 			if (!onFocusBody) return
@@ -761,7 +750,7 @@ export function GenerationPlanetNavigator({
 		if (selection.kind === "star") {
 			const numericSeed =
 				normalized === "sol"
-					? SOL_SEED
+					? SYSTEM.SOL_SEED
 					: (resolveSeedLabel(normalized) ?? seedStringToNumber(normalized))
 			lastAppliedRootSeedRef.current = {
 				numeric: numericSeed,
@@ -787,14 +776,13 @@ export function GenerationPlanetNavigator({
 	const getMainWorldMoonOrbitDistance = useCallback(
 		(moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
-			moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay) /
-				(planetRadiusKm * 2000),
-		[moonOrbitHoursPerDay, planetMassKg, planetRadiusKm],
+			moonSemiMajorAxisM({ moon, planetMassKg }) / (planetRadiusKm * 2000),
+		[planetMassKg, planetRadiusKm],
 	)
 	const getBodyMoonOrbitDistance = useCallback(
 		(body: SystemBody, moon: MoonBody) =>
 			moon.semiMajorAxisPlanetDiameters ??
-			moonSemiMajorAxisM(moon, body.massKg, body.siderealDayHours) /
+			moonSemiMajorAxisM({ moon, planetMassKg: body.massKg }) /
 				(body.diameterKm * 1000),
 		[],
 	)
@@ -832,8 +820,9 @@ export function GenerationPlanetNavigator({
 					restSeed: getDerivedSeedNumber({ kind: "star" }),
 					// Sol is always a real G2V star -- its type isn't editable.
 					setSpectralClass:
-						restSeed === SOL_SEED ? undefined : setSpectralClass,
-					setStarSubtype: restSeed === SOL_SEED ? undefined : setStarSubtype,
+						restSeed === SYSTEM.SOL_SEED ? undefined : setSpectralClass,
+					setStarSubtype:
+						restSeed === SYSTEM.SOL_SEED ? undefined : setStarSubtype,
 				}),
 				children: starChildren.filter((entry) => entry.title),
 				emptyChildrenLabel: "No child orbits.",
@@ -871,7 +860,7 @@ export function GenerationPlanetNavigator({
 									orbitalDistanceAU: body.orbitalDistanceAU,
 									eccentricity: body.eccentricity,
 									starName:
-										showRealSolNames && restSeed === SOL_SEED
+										showRealSolNames && restSeed === SYSTEM.SOL_SEED
 											? SOL_STAR_NAME
 											: undefined,
 								},
@@ -917,7 +906,7 @@ export function GenerationPlanetNavigator({
 					tideLockStat: buildTideLockStat({
 						tideLock: body.tideLock,
 						tideLockStatus: body.tideLockStatus,
-						retrograde: inferRetrogradeRotationFromAxialTiltDeg(
+						retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 							body.axialTiltDeg,
 						),
 						starTitle,
@@ -958,8 +947,8 @@ export function GenerationPlanetNavigator({
 								moon,
 								moonIndex + 1,
 								namesEnabled,
-								isMainWorld && moonIndex === 0 && restSeed === SOL_SEED
-									? SOL_LUNA_DEFAULT.name
+								isMainWorld && moonIndex === 0 && restSeed === SYSTEM.SOL_SEED
+									? SYSTEM.SOL_LUNA_DEFAULT.name
 									: undefined,
 							),
 					}),
@@ -1045,8 +1034,10 @@ export function GenerationPlanetNavigator({
 										moon,
 										moonIndex + 1,
 										namesEnabled,
-										isMainWorld && moonIndex === 0 && restSeed === SOL_SEED
-											? SOL_LUNA_DEFAULT.name
+										isMainWorld &&
+											moonIndex === 0 &&
+											restSeed === SYSTEM.SOL_SEED
+											? SYSTEM.SOL_LUNA_DEFAULT.name
 											: undefined,
 									),
 									subtitle: "Moon",
@@ -1095,8 +1086,7 @@ export function GenerationPlanetNavigator({
 			const parentPerihelionDeg = body.longitudeOfPerihelionDeg
 			const pd = isMainWorld
 				? (moon.semiMajorAxisPlanetDiameters ??
-					moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay) /
-						(planetRadiusKm * 2000))
+					moonSemiMajorAxisM({ moon, planetMassKg }) / (planetRadiusKm * 2000))
 				: getBodyMoonOrbitDistance(body, moon)
 			const parentTitle =
 				isMainWorld && !body.name
@@ -1111,8 +1101,10 @@ export function GenerationPlanetNavigator({
 					moon,
 					selection.moonIndex + 1,
 					namesEnabled,
-					isMainWorld && selection.moonIndex === 0 && restSeed === SOL_SEED
-						? SOL_LUNA_DEFAULT.name
+					isMainWorld &&
+						selection.moonIndex === 0 &&
+						restSeed === SYSTEM.SOL_SEED
+						? SYSTEM.SOL_LUNA_DEFAULT.name
 						: undefined,
 				),
 				typeLabel: "Moon",
@@ -1142,7 +1134,7 @@ export function GenerationPlanetNavigator({
 					tideLockStat: buildTideLockStat({
 						tideLock: moon.tideLock,
 						tideLockStatus: moon.tideLockStatus,
-						retrograde: inferRetrogradeRotationFromAxialTiltDeg(
+						retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 							moon.axialTiltDeg,
 						),
 						starTitle,
@@ -1185,8 +1177,8 @@ export function GenerationPlanetNavigator({
 								siblingMoon,
 								moonIndex + 1,
 								namesEnabled,
-								isMainWorld && moonIndex === 0 && restSeed === SOL_SEED
-									? SOL_LUNA_DEFAULT.name
+								isMainWorld && moonIndex === 0 && restSeed === SYSTEM.SOL_SEED
+									? SYSTEM.SOL_LUNA_DEFAULT.name
 									: undefined,
 							),
 					}),
@@ -1210,7 +1202,7 @@ export function GenerationPlanetNavigator({
 							orbitalDistanceAU: parentOrbitalDistanceAU,
 							eccentricity: parentEccentricity,
 							starName:
-								showRealSolNames && restSeed === SOL_SEED
+								showRealSolNames && restSeed === SYSTEM.SOL_SEED
 									? SOL_STAR_NAME
 									: undefined,
 						},
@@ -1264,7 +1256,6 @@ export function GenerationPlanetNavigator({
 		getDerivedSeedNumber,
 		getMainWorldMoonOrbitDistance,
 		generationPreviewTab,
-		moonOrbitHoursPerDay,
 		onFocusBody,
 		onSelectGenerationPreviewTab,
 		onToggleSpin,

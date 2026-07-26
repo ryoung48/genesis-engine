@@ -7,7 +7,7 @@ import type {
 	RawWar,
 } from "./data-source"
 
-interface FoldedProvinceState {
+export interface FoldedProvinceState {
 	owner: string | null
 	controller: string | null
 	cultureId: string | null
@@ -19,7 +19,7 @@ interface FoldedProvinceState {
 	isHre: boolean
 }
 
-interface FoldedNationState {
+export interface FoldedNationState {
 	currentName: string | null
 	governmentType: string | null
 	/** Current government reform. Earth-history data here only supports one
@@ -82,7 +82,7 @@ interface ActiveWar {
 	defenders: Set<string>
 }
 
-interface ActiveOrganizationSite {
+export interface ActiveOrganizationSite {
 	orgId: string
 	provinceId: string
 	name: string
@@ -146,13 +146,13 @@ function emptyNationState(): FoldedNationState {
 	}
 }
 
-function foldProvince(
-	rawId: string,
-	data: EarthHistoryData,
-	fromTime: number,
-	toTime: number,
-	base: FoldedProvinceState | undefined,
-): FoldedProvinceState | undefined {
+function foldProvince({
+	rawId,
+	data,
+	fromTime,
+	toTime,
+	base,
+}: import("./types").FoldProvinceParams): FoldedProvinceState | undefined {
 	const entry = data.provinceEvents[rawId]
 	if (!entry) return base
 	const state: FoldedProvinceState = base
@@ -196,13 +196,13 @@ function foldProvince(
 	return state
 }
 
-function foldNation(
-	tag: string,
-	data: EarthHistoryData,
-	fromTime: number,
-	toTime: number,
-	base: FoldedNationState | undefined,
-): FoldedNationState {
+function foldNation({
+	tag,
+	data,
+	fromTime,
+	toTime,
+	base,
+}: import("./types").FoldNationParams): FoldedNationState {
 	const entry = data.nationEvents[tag]
 	const state: FoldedNationState = base
 		? {
@@ -263,12 +263,12 @@ function foldNation(
 	return state
 }
 
-function applyDiplomacyDelta(
-	data: EarthHistoryData,
-	fromTime: number,
-	toTime: number,
-	nations: Map<string, FoldedNationState>,
-): void {
+function applyDiplomacyDelta({
+	data,
+	fromTime,
+	toTime,
+	nations,
+}: import("./types").ApplyDiplomacyDeltaParams): void {
 	const touched = (tag: string) => {
 		let n = nations.get(tag)
 		if (!n) {
@@ -359,13 +359,13 @@ function applyDiplomacyDelta(
 	}
 }
 
-function applyOrganizationDelta(
-	data: EarthHistoryData,
-	fromTime: number,
-	toTime: number,
-	nations: Map<string, FoldedNationState>,
-	organizationSites: Map<string, ActiveOrganizationSite>,
-): void {
+function applyOrganizationDelta({
+	data,
+	fromTime,
+	toTime,
+	nations,
+	organizationSites,
+}: import("./types").ApplyOrganizationDeltaParams): void {
 	for (const e of data.organizationEvents) {
 		if (e.date <= fromTime || e.date > toTime) continue
 		if (e.kind === "join" || e.kind === "leave") {
@@ -414,7 +414,10 @@ function computeHreMemberNations(
  * replaying add/rem attacker/defender events. Per-province occupation for
  * territory striping is derived separately in adapter.ts from the standard
  * EU4 convention (owner !== controller), not from this war data. */
-function computeActiveWars(wars: RawWar[], time: number): ActiveWar[] {
+function computeActiveWars({
+	wars,
+	time,
+}: import("./types").ComputeActiveWarsParams): ActiveWar[] {
 	const active: ActiveWar[] = []
 	for (const war of wars) {
 		const attackers = new Set<string>()
@@ -451,10 +454,10 @@ function computeActiveWars(wars: RawWar[], time: number): ActiveWar[] {
  * follows that nation's full territory, with optional `member_seat` province
  * pins for city-league seats that should remain visible through conquest
  * (e.g. Danzig in HSA). */
-export function collectOrgMemberProvinceRawIds(
-	state: FoldedState,
-	orgId: string,
-): Set<number> {
+export function collectOrgMemberProvinceRawIds({
+	state,
+	orgId,
+}: import("./types").OrgParams): Set<number> {
 	const memberProvinceRawIds = new Set<number>()
 	if (orgId === "HRE") {
 		for (const [rawId, province] of state.provinces) {
@@ -491,10 +494,10 @@ export function collectOrgMemberProvinceRawIds(
  * isn't. Membership-based orgs (HSA) have no such distinction -- membership
  * there is a discrete relation, not inferred from ownership -- so this
  * always returns empty for them. */
-export function collectOrgForeignHolderNations(
-	state: FoldedState,
-	orgId: string,
-): Set<string> {
+export function collectOrgForeignHolderNations({
+	state,
+	orgId,
+}: import("./types").OrgParams): Set<string> {
 	const foreignHolders = new Set<string>()
 	if (orgId !== "HRE") return foreignHolders
 	const owners = new Set<string>()
@@ -516,35 +519,46 @@ export function collectOrgForeignHolderNations(
  * present in `provinceIds`/`nationTags` -- callers pass the full known set
  * for a from-scratch fold, or just the entities that changed for a delta
  * fold from a checkpoint. */
-export function fold(
-	data: EarthHistoryData,
-	time: number,
-	options: {
-		base?: FoldedState
-		provinceIds: Iterable<string>
-		nationTags: Iterable<string>
-	},
-): FoldedState {
+export function fold({
+	data,
+	time,
+	options,
+}: import("./types").FoldParams): FoldedState {
 	const fromTime = options.base?.time ?? -Infinity
 	const provinces = new Map(options.base?.provinces)
 	const nations = new Map(options.base?.nations)
 	const organizationSites = new Map(options.base?.organizationSites)
 
 	for (const rawId of options.provinceIds) {
-		const next = foldProvince(rawId, data, fromTime, time, provinces.get(rawId))
+		const next = foldProvince({
+			rawId,
+			data,
+			fromTime,
+			toTime: time,
+			base: provinces.get(rawId),
+		})
 		if (next) provinces.set(rawId, next)
 	}
 	for (const tag of options.nationTags) {
-		nations.set(tag, foldNation(tag, data, fromTime, time, nations.get(tag)))
+		nations.set(
+			tag,
+			foldNation({ tag, data, fromTime, toTime: time, base: nations.get(tag) }),
+		)
 	}
-	applyDiplomacyDelta(data, fromTime, time, nations)
-	applyOrganizationDelta(data, fromTime, time, nations, organizationSites)
+	applyDiplomacyDelta({ data, fromTime, toTime: time, nations })
+	applyOrganizationDelta({
+		data,
+		fromTime,
+		toTime: time,
+		nations,
+		organizationSites,
+	})
 
 	return {
 		time,
 		provinces,
 		nations,
-		activeWars: computeActiveWars(data.wars, time),
+		activeWars: computeActiveWars({ wars: data.wars, time }),
 		organizationSites,
 		hreMemberNations: computeHreMemberNations(provinces),
 	}

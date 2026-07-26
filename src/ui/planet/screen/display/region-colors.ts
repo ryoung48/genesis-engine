@@ -1,17 +1,20 @@
-import { GENESIS_TERRAIN_FEATURE } from "@/model"
-import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
-import { koppenClimateColor } from "@/model/climate/koppen"
-import { pastaClimateColor } from "@/model/climate/pasta"
-import { CHAOTIC_MAX, CHAOTIC_MIN } from "@/model/climate/vegetation"
-import { tradeGoodColor } from "@/model/economy/trade-goods"
-import { RELIGION_TYPE_COLORS } from "@/model/society/religion"
+﻿import { GENESIS_TERRAIN_FEATURE } from "@/model"
 import {
+	CHAOTIC_MAX,
+	CHAOTIC_MIN,
+	koppenClimateColor,
+	pastaClimateColor,
+	relativeHumidityFromTempRange,
+} from "@/model/climate"
+import { tradeGoodColor } from "@/model/economy"
+import {
+	RELIGION_TYPE_COLORS,
 	regionTimezoneOffset,
 	timezoneLandColor,
 	timezoneWaterColor,
-} from "@/model/society/timezone"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+} from "@/model/society"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import type { ColorMode } from "../../colors"
 import {
 	climateTempColor,
@@ -733,13 +736,13 @@ export function computeRegionColors(
 				}
 				annualAridity = petSum > 0 ? aetSum / petSum : 1
 			}
-			const modeledRh = relativeHumidityFromTempRange(
-				meanT,
-				dtr,
+			const modeledRh = relativeHumidityFromTempRange({
+				meanTempC: meanT,
+				dtrC: dtr,
 				annualAridity,
-				world.rainfall?.annual[r],
-				world.oceanDist[r],
-			)
+				annualRainfallMm: world.rainfall?.annual[r],
+				distFromOceanKm: world.oceanDist[r],
+			})
 			const value =
 				colorMode === "realHumidity"
 					? observedRh

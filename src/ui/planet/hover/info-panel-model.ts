@@ -1,14 +1,14 @@
 import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
-import { koppenClimateColor } from "@/model/climate/koppen"
-import { pastaClimateColor } from "@/model/climate/pasta"
-import { tradeGoodColor } from "@/model/economy/trade-goods"
-import { GOVERNMENT_TYPE_LABELS, GOVERNMENT_TYPES } from "@/model/society/eras"
+import { koppenClimateColor, pastaClimateColor } from "@/model/climate"
+import { tradeGoodColor } from "@/model/economy"
 import {
+	GOVERNMENT_TYPE_LABELS,
+	GOVERNMENT_TYPES,
 	RELIGION_TYPE_COLORS,
 	RELIGION_TYPE_NAMES,
-} from "@/model/society/religion"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+} from "@/model/society"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	type ColorMode,
 	climateTempColor,

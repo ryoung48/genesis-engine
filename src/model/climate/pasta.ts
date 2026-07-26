@@ -1,7 +1,4 @@
-import {
-	getStarPARFactor,
-	isValidSpectralClass,
-} from "@/model/celestial/star/star-types"
+import { STAR } from "@/model/celestial/star"
 import type {
 	GenesisClimate,
 	GenesisHydrology,
@@ -587,10 +584,10 @@ function computePastaZones(
 	const N = mesh.numRegions
 	const dpm = params.daysPerYear / 12
 	const output = new Uint8Array(N)
-	const cls = isValidSpectralClass(params.spectralClass)
+	const cls = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
-	const parFactor = getStarPARFactor(cls, params.starSubtype)
+	const parFactor = STAR.getStarPARFactor({ cls, subtype: params.starSubtype })
 
 	const debug: PastaDebug = {
 		gdd: new Float32Array(N),
@@ -749,13 +746,13 @@ export function assignEarthPastaClimate(
 
 	const dtrMonthly = realDtrMonthly ?? climate.temperature_monthly_range
 	const petMonthly = new Float32Array(12 * N)
-	fillPetMonthlyHargreaves(
+	fillPetMonthlyHargreaves({
 		temperatureMonthly,
-		dtrMonthly,
-		climate.insolation_monthly,
+		rangeMonthly: dtrMonthly,
+		insolationMonthly: climate.insolation_monthly,
 		petMonthly,
 		dpm,
-	)
+	})
 
 	const aetMonthly = new Float32Array(12 * N)
 	const rainBuf = new Float64Array(12)
@@ -768,7 +765,7 @@ export function assignEarthPastaClimate(
 			rainBuf[m] = rainfallMonthly[idx]
 			petBuf[m] = petMonthly[idx]
 		}
-		computeAetFromPet(rainBuf, petBuf, aetBuf)
+		computeAetFromPet({ rain: rainBuf, petBuf, aetBuf })
 		for (let m = 0; m < 12; m++) aetMonthly[m * N + r] = aetBuf[m]
 	}
 

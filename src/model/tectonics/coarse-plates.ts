@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Coarse reference grid for resolution-independent plate boundaries.
  * Generates plates on a fixed ~20K-region mesh, then projects onto any
  * high-res mesh with FBM noise perturbation for fractal boundaries.
@@ -7,8 +7,7 @@
 
 import type { PlateVec, SphereMesh } from ".."
 import { buildSphereMesh } from "../mesh"
-import { makeRng } from "../shared/rng"
-import { SimplexNoise } from "../shared/simplex-noise"
+import { makeRng, SimplexNoise } from "../shared"
 import { assignOceanLand, generatePlates } from "./plates"
 
 const N_COARSE = 20000

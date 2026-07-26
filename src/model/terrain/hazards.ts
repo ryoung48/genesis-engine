@@ -1,10 +1,10 @@
-import type {
+﻿import type {
 	BoundaryInfo,
 	DistanceFields,
 	GenesisHazards,
 	SphereMesh,
 } from ".."
-import { clamp01, smoothstep } from "../shared/math"
+import { clamp01, smoothstep } from "../shared"
 
 function gradualFalloff(distance: number, reach: number, power = 1.35): number {
 	if (!Number.isFinite(distance)) return 0

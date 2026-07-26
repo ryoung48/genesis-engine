@@ -1,4 +1,4 @@
-import * as THREE from "three"
+﻿import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
@@ -12,7 +12,7 @@ import {
 	SerializedGenesisWorld,
 	type SerializedNetwork,
 	type SerializedRouteKind,
-} from "@/model/transport/worker-types"
+} from "@/model/transport"
 import { createMapProjection } from "./map-projection"
 
 const TERRAIN_ELEVATION_SCALE = 0.04

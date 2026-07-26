@@ -1,4 +1,4 @@
-import { createRng } from "@/model/shared/rng"
+﻿import { createRng } from "@/model/shared"
 
 export const CULTURE_GENDER_SYSTEM = {
 	PATRIARCHAL: 0,

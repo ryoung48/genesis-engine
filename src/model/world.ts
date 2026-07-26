@@ -1,31 +1,27 @@
 import type { LocationTradeGoods } from "./economy/trade-goods"
 import type { GenesisLandmarks } from "./terrain/landmarks"
 import type {
+	BoundaryInfo,
+	DistanceFields,
 	GenesisClimate,
 	GenesisHazards,
 	GenesisHydrology,
+	GenesisLocations,
+	GenesisNationHierarchy,
 	GenesisObservedDtr,
 	GenesisObservedHumidity,
 	GenesisOceanCurrents,
-	GenesisRainfall,
-	GenesisVolcanism,
-} from "./types/climate"
-import type { SphereMesh } from "./types/mesh"
-import type {
-	GenesisLocations,
-	GenesisNationHierarchy,
+	GenesisParams,
 	GenesisPartition,
 	GenesisProvinces,
+	GenesisRainfall,
 	GenesisRivers,
-} from "./types/society"
-import type {
-	BoundaryInfo,
-	DistanceFields,
-	GenesisParams,
 	GenesisTerrainFeatures,
+	GenesisVolcanism,
+	SphereMesh,
 	StageTiming,
 	TectonicPlate,
-} from "./types/tectonics"
+} from "./types"
 
 export interface GenesisWorld {
 	mesh: SphereMesh

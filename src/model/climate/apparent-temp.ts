@@ -1,5 +1,5 @@
 // NWS Rothfusz heat index regression (T in °F, RH in %). Returns °F.
-function heatIndexF(tF: number, rh: number): number {
+function heatIndexF({ tF, rh }: { tF: number; rh: number }): number {
 	return (
 		-42.379 +
 		2.04901523 * tF +
@@ -15,7 +15,7 @@ function heatIndexF(tF: number, rh: number): number {
 
 // Canadian wind chill formula (T in °C, V in km/h). Returns °C.
 // Valid for T ≤ 10 °C and V ≥ 5 km/h.
-function windChillC(tempC: number, vKmh: number): number {
+function windChillC({ tempC, vKmh }: { tempC: number; vKmh: number }): number {
 	const v16 = Math.pow(vKmh, 0.16)
 	return 13.12 + 0.6215 * tempC - 11.37 * v16 + 0.3965 * tempC * v16
 }
@@ -29,18 +29,18 @@ function windChillC(tempC: number, vKmh: number): number {
  * @param windSpeedMs Wind speed in m/s
  * @returns Apparent temperature in °C
  */
-export function apparentTemperatureC(
-	tempC: number,
-	rhPercent: number,
-	windSpeedMs: number,
-): number {
+export function apparentTemperatureC({
+	tempC,
+	rhPercent,
+	windSpeedMs,
+}: ApparentTemperatureParams): number {
 	if (tempC >= 27) {
 		const tF = tempC * 1.8 + 32
-		return Math.max(tempC, (heatIndexF(tF, rhPercent) - 32) / 1.8)
+		return Math.max(tempC, (heatIndexF({ tF, rh: rhPercent }) - 32) / 1.8)
 	}
 
 	const vKmh = windSpeedMs * 3.6
-	const wc = vKmh >= 5 ? windChillC(tempC, vKmh) : tempC
+	const wc = vKmh >= 5 ? windChillC({ tempC, vKmh }) : tempC
 
 	if (tempC <= 10) return wc
 
@@ -48,3 +48,5 @@ export function apparentTemperatureC(
 	const t = (tempC - 10) / 17
 	return wc + (tempC - wc) * t
 }
+
+import type { ApparentTemperatureParams } from "./types"

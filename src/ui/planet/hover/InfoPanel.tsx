@@ -1,5 +1,5 @@
 import React from "react"
-import { titleCase } from "@/model/shared/text"
+import { titleCase } from "@/model/shared"
 import {
 	regionTimezoneOffset,
 	timezoneLandColor,

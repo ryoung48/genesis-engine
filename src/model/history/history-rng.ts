@@ -1,4 +1,4 @@
-import { createRng, type SharedRng } from "@/model/shared/rng"
+﻿import { createRng, type SharedRng } from "@/model/shared"
 
 export type HistoryRng = Pick<
 	SharedRng,

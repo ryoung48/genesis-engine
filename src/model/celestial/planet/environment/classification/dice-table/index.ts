@@ -1,0 +1,403 @@
+import { roll2d6, rollDice } from "@/model/shared/dice"
+import { createRng } from "@/model/shared/rng"
+import type {
+	OrbitChemistry,
+	OrbitClassification,
+	OrbitComposition,
+} from "../../../../orbit-body"
+import type { MainSequenceClass } from "../../../../star"
+import type { Zone } from "../../../types"
+import type { ClampInput } from "../types"
+import type { ChooseChemistryInput, ClassifiedEnvironment } from "./types"
+
+export type { ClassifiedEnvironment } from "./types"
+
+function clamp({ value, min, max }: ClampInput): number {
+	return Math.max(min, Math.min(max, value))
+}
+
+function chooseColdChemistry({
+	rng,
+	zone,
+	primary,
+	chemMod,
+	waterMax,
+}: ChooseChemistryInput): OrbitChemistry {
+	const chemRoll = rng.randint(1, 6) + (zone === "outer" ? 2 : 0) + chemMod
+	if (primary || chemRoll <= waterMax) return "water"
+	if (chemRoll <= 8) return "ammonia"
+	return "methane"
+}
+
+export function rollClassificationAssignment(params: {
+	rng: ReturnType<typeof createRng>
+	classification: OrbitClassification
+	sizeClass: number
+	zone: Zone
+	deviation: number
+	spectralClass: MainSequenceClass
+	isPrimaryWorld: boolean
+}): ClassifiedEnvironment {
+	const {
+		rng,
+		classification,
+		sizeClass,
+		zone,
+		spectralClass,
+		isPrimaryWorld,
+	} = params
+	const primary = isPrimaryWorld
+	const spectralChemMod =
+		spectralClass === "K" ? 2 : spectralClass === "M" ? 4 : 0
+	switch (classification) {
+		case "acheronian":
+		case "asphodelian":
+			return {
+				atmosphereCode: 1,
+				hydrosphereCode: 0,
+				composition: "rocky",
+			}
+		case "asteroid belt":
+			return {
+				atmosphereCode: 0,
+				hydrosphereCode: 0,
+				composition: "rocky",
+			}
+		case "asteroid": {
+			const composition =
+				rng.weightedChoice<OrbitComposition>([
+					{ v: "metallic", w: params.deviation >= 1.5 ? 1 : 0 },
+					{ v: "rocky", w: 3 },
+					{ v: "ice", w: params.deviation < -1.5 ? 6 : 0 },
+				]) ?? "rocky"
+			return {
+				atmosphereCode: 0,
+				hydrosphereCode: 0,
+				composition,
+				subtype: composition,
+			}
+		}
+		case "chthonian":
+			return {
+				atmosphereCode: 1,
+				hydrosphereCode: 0,
+				composition: "gas",
+			}
+		case "arid": {
+			const chemistry = chooseColdChemistry({
+				rng,
+				zone,
+				primary,
+				chemMod: spectralChemMod,
+				waterMax: 6,
+			})
+			const atmosphereCode =
+				chemistry === "water"
+					? clamp({ value: roll2d6(rng) - 7 + sizeClass, min: 2, max: 9 })
+					: (rng.weightedChoice([
+							{ v: 10, w: 8 },
+							{ v: 11, w: 2 },
+						]) ?? 10)
+			return {
+				atmosphereCode,
+				hydrosphereCode: rng.randint(1, 3),
+				chemistry,
+				subtype:
+					chemistry === "water"
+						? "darwinian"
+						: chemistry === "ammonia"
+							? "saganian"
+							: "asimovian",
+				composition: "rocky",
+			}
+		}
+		case "geo-cyclic": {
+			const atmosphereRoll = Math.max(rng.randint(1, 6), 1)
+			const atmosphereCode =
+				atmosphereRoll > 3
+					? (rng.weightedChoice([
+							{ v: 10, w: 8 },
+							{ v: 11, w: 2 },
+						]) ?? 10)
+					: 1
+			const hydrosphereCode = Math.max(
+				0,
+				roll2d6(rng) + sizeClass - 7 - (atmosphereCode === 1 ? 4 : 0),
+			)
+			const chemRoll = rng.randint(1, 6) + (zone === "outer" ? 2 : 0)
+			const chemistry =
+				primary || chemRoll <= 4
+					? "water"
+					: chemRoll <= 6
+						? "ammonia"
+						: "methane"
+			return {
+				atmosphereCode,
+				hydrosphereCode,
+				chemistry,
+				subtype:
+					chemistry === "water"
+						? "arean"
+						: chemistry === "ammonia"
+							? "utgardian"
+							: "titanian",
+				composition: "rocky",
+			}
+		}
+		case "geo-tidal": {
+			let chemMod = 0
+			if (zone === "epistellar") chemMod -= 2
+			if (zone === "outer") chemMod += 2
+			const chemRoll = rng.randint(1, 6) + chemMod
+			const chemistry =
+				primary || chemRoll <= 4
+					? "water"
+					: chemRoll <= 6
+						? "ammonia"
+						: "methane"
+			const atmosphereCode =
+				chemistry === "water"
+					? clamp({ value: roll2d6(rng) - 7 + sizeClass, min: 2, max: 9 })
+					: (rng.weightedChoice([
+							{ v: 10, w: 8 },
+							{ v: 11, w: 2 },
+						]) ?? 10)
+			return {
+				atmosphereCode,
+				hydrosphereCode: rollDice({ rng, count: 2, sides: 3 }) - 2,
+				chemistry,
+				subtype:
+					chemistry === "water"
+						? "promethean"
+						: chemistry === "ammonia"
+							? "burian"
+							: "atlan",
+				composition: chemistry === "methane" ? "ice" : "rocky",
+				eccentric: true,
+			}
+		}
+		case "hebean": {
+			let atmosphereCode = Math.max(1, rng.randint(1, 6) + sizeClass - 6)
+			if (atmosphereCode >= 2) atmosphereCode = 10
+			return {
+				atmosphereCode,
+				hydrosphereCode: clamp({
+					value: roll2d6(rng) + sizeClass - 11,
+					min: 0,
+					max: 11,
+				}),
+				eccentric: true,
+				composition: "rocky",
+			}
+		}
+		case "helian": {
+			const hydroRoll = rng.randint(1, 6)
+			return {
+				atmosphereCode: 13,
+				hydrosphereCode: hydroRoll <= 2 ? 0 : roll2d6(rng) - 1,
+				composition: "rocky",
+			}
+		}
+		case "jani-lithic": {
+			const atmosphereRoll = rng.randint(1, 6)
+			return {
+				atmosphereCode:
+					atmosphereRoll <= 3
+						? 0
+						: (rng.weightedChoice([
+								{ v: 10, w: 8 },
+								{ v: 11, w: 2 },
+							]) ?? 10),
+				hydrosphereCode: 0,
+				composition: "rocky",
+			}
+		}
+		case "jovian": {
+			let subtype = "unknown"
+			if (sizeClass === 16) {
+				if (params.deviation >= 1) subtype = "osirian"
+				else if (params.deviation >= -1) subtype = "brammian"
+				else if (params.deviation >= -1.5) subtype = "khonsonian"
+				else subtype = "neptunian"
+			} else if (sizeClass === 17) {
+				subtype = params.deviation >= -1.5 ? "junic" : "jovic"
+			} else {
+				subtype = params.deviation >= -1.5 ? "super-junic" : "super-jovic"
+			}
+			return {
+				atmosphereCode: 14,
+				hydrosphereCode: 13,
+				composition: "gas",
+				subtype,
+			}
+		}
+		case "meltball":
+			return {
+				atmosphereCode: 1,
+				hydrosphereCode: 12,
+				eccentric: true,
+				composition:
+					rng.weightedChoice<OrbitComposition>([
+						{ v: "rocky", w: 5 },
+						{ v: "metallic", w: zone === "epistellar" ? 1 : 0 },
+					]) ?? "rocky",
+			}
+		case "oceanic": {
+			const chemistry = chooseColdChemistry({
+				rng,
+				zone,
+				primary,
+				chemMod: spectralChemMod,
+				waterMax: 6,
+			})
+			const atmosphereRoll = rng.randint(1, 6)
+			const atmosphereCode =
+				chemistry === "water"
+					? clamp({
+							value:
+								roll2d6(rng) +
+								sizeClass -
+								6 -
+								(spectralClass === "K" ? 1 : spectralClass === "M" ? 2 : 0),
+							min: 2,
+							max: 12,
+						})
+					: atmosphereRoll === 1
+						? 1
+						: atmosphereRoll <= 4
+							? 10
+							: 12
+			return {
+				atmosphereCode,
+				hydrosphereCode:
+					rng.weightedChoice([
+						{ v: 10, w: 5 },
+						{ v: 11, w: 1 },
+					]) ?? 10,
+				chemistry,
+				subtype:
+					chemistry === "water"
+						? "pelagic"
+						: chemistry === "ammonia"
+							? "nunnic"
+							: "teathic",
+				composition: "rocky",
+			}
+		}
+		case "panthalassic": {
+			const chemRoll = rng.randint(1, 6) + spectralChemMod
+			const secondChemRoll = roll2d6(rng)
+			const chemistry =
+				chemRoll <= 6
+					? secondChemRoll <= 8
+						? "water"
+						: secondChemRoll <= 11
+							? "sulfur"
+							: "chlorine"
+					: "methane"
+			return {
+				atmosphereCode: Math.min(rng.randint(1, 6) + 8, 13),
+				hydrosphereCode: 11,
+				chemistry,
+				composition: "rocky",
+			}
+		}
+		case "rockball": {
+			let hydrosphereCode = roll2d6(rng) + sizeClass - 11
+			if (zone === "epistellar") hydrosphereCode -= 2
+			if (zone === "outer") hydrosphereCode += 2
+			return {
+				atmosphereCode: 0,
+				hydrosphereCode: clamp({ value: hydrosphereCode, min: 0, max: 10 }),
+				composition:
+					rng.weightedChoice<OrbitComposition>([
+						{ v: "rocky", w: 5 },
+						{ v: "metallic", w: zone === "outer" ? 0 : 1 },
+					]) ?? "rocky",
+			}
+		}
+		case "snowball": {
+			const chemRoll = rng.randint(1, 6) + (zone === "outer" ? 2 : 0)
+			return {
+				atmosphereCode: rng.randint(1, 6) <= 4 ? 0 : 1,
+				hydrosphereCode:
+					rng.randint(1, 6) <= 2 ? 10 : Math.max(1, roll2d6(rng) - 2),
+				chemistry:
+					chemRoll <= 4 ? "water" : chemRoll <= 6 ? "ammonia" : "methane",
+				composition: "ice",
+			}
+		}
+		case "stygian":
+			return {
+				atmosphereCode: 0,
+				hydrosphereCode: 0,
+				composition:
+					rng.weightedChoice<OrbitComposition>([
+						{ v: "rocky", w: 5 },
+						{ v: "metallic", w: zone === "outer" ? 0 : 1 },
+					]) ?? "rocky",
+			}
+		case "tectonic": {
+			const chemRoll =
+				rng.randint(1, 6) + spectralChemMod + (zone === "outer" ? 2 : 0)
+			const secondChemRoll = roll2d6(rng)
+			const chemistry =
+				primary || chemRoll <= 6
+					? secondChemRoll <= 8
+						? "water"
+						: secondChemRoll <= 11
+							? "sulfur"
+							: "chlorine"
+					: chemRoll <= 8
+						? "ammonia"
+						: "methane"
+			const atmosphereCode =
+				chemistry === "water"
+					? clamp({ value: roll2d6(rng) + sizeClass - 7, min: 2, max: 9 })
+					: (rng.weightedChoice([
+							{ v: 10, w: 8 },
+							{ v: 11, w: 2 },
+						]) ?? 10)
+			return {
+				atmosphereCode,
+				hydrosphereCode: rng.randint(4, 9),
+				chemistry,
+				subtype:
+					chemistry === "water"
+						? "gaian"
+						: chemistry === "sulfur"
+							? "thio-gaian"
+							: chemistry === "chlorine"
+								? "chloritic-gaian"
+								: chemistry === "ammonia"
+									? "amunian"
+									: "tartarian",
+				composition: "rocky",
+			}
+		}
+		case "telluric":
+			return {
+				atmosphereCode: rng.choice([11, 12, 12]),
+				hydrosphereCode: 0,
+				composition: "rocky",
+				subtype: params.deviation >= 1 ? "phosphorian" : "cytherean",
+			}
+		case "vesperian": {
+			const chemRoll = rng.randint(1, 6)
+			const chemistry = primary || chemRoll <= 11 ? "water" : "chlorine"
+			const atmosphereCode =
+				chemistry === "water"
+					? clamp({ value: roll2d6(rng) + sizeClass - 7, min: 2, max: 9 })
+					: (rng.weightedChoice([
+							{ v: 10, w: 8 },
+							{ v: 11, w: 2 },
+						]) ?? 10)
+			return {
+				atmosphereCode,
+				hydrosphereCode: Math.max(1, roll2d6(rng) - 2),
+				chemistry,
+				composition: "rocky",
+			}
+		}
+	}
+}

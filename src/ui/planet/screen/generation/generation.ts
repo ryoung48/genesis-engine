@@ -1,11 +1,11 @@
-import type { GenesisParams } from "@/model"
+﻿import type { GenesisParams } from "@/model"
 import type { HistoryNote } from "@/model/history"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
-} from "@/model/transport/worker-types"
+} from "@/model/transport"
 export type GenerationParams = GenesisParams
 
 interface ImportHeightmapParams {
@@ -29,7 +29,7 @@ interface ImportHeightmapParams {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
+	tideLock: import("@/model/celestial/orbit-body").TideLock | null
 	substellarLon: number
 	perihelion: number
 	pressure: number

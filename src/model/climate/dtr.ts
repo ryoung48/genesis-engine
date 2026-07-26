@@ -1,4 +1,5 @@
 import type { GenesisParams, GenesisRainfall } from ".."
+import { HOURS_PER_DAY } from "../shared"
 
 /**
  * Compute per-cell per-month diurnal temperature range (deg C) for use as the
@@ -21,17 +22,25 @@ import type { GenesisParams, GenesisRainfall } from ".."
  * @returns Object with `monthly` Float32Array of shape [12 * N] and `annual`
  *   Float32Array of shape [N], both in deg C
  */
-export function computeDiurnalRange(
-	rainfall: GenesisRainfall,
-	_elevationKm: Float32Array,
-	oceanDist: Float32Array | undefined,
-	isLand: Uint8Array,
-	params?: Pick<GenesisParams, "hoursPerDay" | "pressure" | "tideLock">,
-	daylight_hours_monthly?: Float32Array,
-): { monthly: Float32Array; annual: Float32Array } {
+export function computeDiurnalRange(args: {
+	rainfall: GenesisRainfall
+	elevationKm: Float32Array
+	oceanDist: Float32Array | undefined
+	isLand: Uint8Array
+	params?: Pick<GenesisParams, "hoursPerDay" | "pressure" | "tideLock">
+	daylight_hours_monthly?: Float32Array
+}): { monthly: Float32Array; annual: Float32Array } {
+	const {
+		rainfall,
+		elevationKm: _elevationKm,
+		oceanDist,
+		isLand,
+		params,
+		daylight_hours_monthly,
+	} = args
 	const N = isLand.length
 	const dtr_monthly = new Float32Array(12 * N)
-	const relHours = params?.hoursPerDay / 24
+	const relHours = params?.hoursPerDay / HOURS_PER_DAY
 	const landRegions: number[] = []
 	const oceanRegions: number[] = []
 	for (let r = 0; r < N; r++) {

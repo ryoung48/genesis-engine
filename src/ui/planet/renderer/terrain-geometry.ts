@@ -1,4 +1,4 @@
-// Pure typed-array geometry math shared between the main thread
+﻿// Pure typed-array geometry math shared between the main thread
 // (mesh-builders.ts, for on-demand rebuilds/fallbacks) and genesis.worker.ts
 // (which precomputes the default-colorMode geometry once, off the main
 // thread, so the initial "Generate"/"Load Earth" render doesn't have to run
@@ -6,7 +6,7 @@
 // Mesh/Material construction here -- callers wrap the returned arrays in
 // those themselves, since geometry/material objects aren't worker-safe to
 // hand back as-is (only their underlying typed arrays are transferable).
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import { getColor } from "../colors"
 import { createMapProjection } from "./map-projection"
 

@@ -1,7 +1,7 @@
-import {
+﻿import {
 	EARTH_DIAMETER_KM,
 	SOLAR_DIAMETER_KM,
-} from "@/model/celestial/body-metrics"
+} from "@/model/celestial/orbit-body"
 
 // Shared floor/ceiling for every rendered body's diameter — planets, moons,
 // and (via this same function) the star — when "realistic sizes" is on. A

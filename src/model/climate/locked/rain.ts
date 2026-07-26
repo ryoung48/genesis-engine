@@ -7,7 +7,7 @@ import {
 	ceilingScale,
 	computeRainBandWarpField,
 	getPressureRainFactor,
-} from "../rain"
+} from "../rain-shared"
 import {
 	computeMonthlyLibration,
 	computeMonthlyLockedDeclination,
@@ -46,15 +46,15 @@ export function computeTidalRain(
 		buildRegionGraph(mesh, isLand)
 
 	const ecc = params?.eccentricity ?? 0
-	const monthlyLibration = computeMonthlyLibration(
-		ecc,
-		params?.perihelion ?? 102,
-	)
-	const monthlyDeclination = computeMonthlyLockedDeclination(
-		params?.obliquity ?? 0,
-		ecc,
-		params?.perihelion ?? 102,
-	)
+	const monthlyLibration = computeMonthlyLibration({
+		eccentricity: ecc,
+		perihelion: params?.perihelion ?? 102,
+	})
+	const monthlyDeclination = computeMonthlyLockedDeclination({
+		obliquity: params?.obliquity ?? 0,
+		eccentricity: ecc,
+		perihelion: params?.perihelion ?? 102,
+	})
 
 	const logP = Math.log2(Math.max(0.1, pressure))
 	const terminatorStrength = clamp(0.1 + logP * 0.12, 0.02, 0.55)
@@ -87,11 +87,11 @@ export function computeTidalRain(
 		const noiseMul = Math.max(0, 1 + n)
 
 		for (let month = 0; month < 12; month++) {
-			const sub = getSubstellarDirWithOffsetAndDeclination(
-				params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
-				monthlyLibration[month],
-				monthlyDeclination[month],
-			)
+			const sub = getSubstellarDirWithOffsetAndDeclination({
+				substellarLon: params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
+				lonOffsetRad: monthlyLibration[month],
+				declinationRad: monthlyDeclination[month],
+			})
 			const ct = Math.max(-1, Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]))
 			const thetaDeg =
 				Math.acos(clamp(ct, -1, 1)) * RAD2DEG + boundaryWarpDeg[r]

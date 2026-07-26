@@ -1,21 +1,23 @@
-import type { GenesisClimate, GenesisParams, SphereMesh } from "../.."
-import {
-	getStarDiameterSol,
-	getStarTemperatureK,
-	isValidSpectralClass,
-	type MainSequenceClass,
-} from "../../celestial/star/star-types"
+import type { GenesisClimate, GenesisParams } from "../.."
+import { type MainSequenceClass, STAR } from "../../celestial/star"
 import { TIME } from "../../shared/time"
 import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
 } from "../../shared/units"
+import { EMB_CONSTANTS } from "../ebm/constants"
+import { elevToHeightKm } from "../elevation"
 import {
 	applyTemperatureNoise,
-	elevToHeightKm,
 	recomputeAnnualTemperatureStats,
-} from "../climate"
-import { EMB_CONSTANTS } from "../ebm/constants"
+} from "../temperature-shared"
+import type {
+	ComputeTidalTemperatureParams,
+	LockedDeclinationParams,
+	LockedMonthlyDaylightHoursParams,
+	MonthlyLibrationParams,
+	SubstellarDirectionParams,
+} from "../types"
 
 function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))
@@ -41,11 +43,12 @@ export function computeDailyLockedOrbit(
 	>,
 ): { flux: number[]; libration: number[]; solarLongitude: number[] } {
 	const { SIGMA, R_SUN, AU } = EMB_CONSTANTS.stellar
-	const cls: MainSequenceClass = isValidSpectralClass(params.spectralClass)
+	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
-	const T_star = getStarTemperatureK(cls, params.starSubtype)
-	const R_star = getStarDiameterSol(cls, params.starSubtype) * R_SUN
+	const T_star = STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
+	const R_star =
+		STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) * R_SUN
 	const d = params.orbitalDistanceAU * AU
 	const s0 =
 		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
@@ -55,10 +58,13 @@ export function computeDailyLockedOrbit(
 	const longP = perihelionRad + PI
 	const equinoxOffsetRad = (40 * 2 * Math.PI) / EMB_CONSTANTS.time.DAYS_PER_YEAR
 
-	const calcEccFromTrue = (
-		trueAnomaly: number,
-		eccentricity: number,
-	): number => {
+	const calcEccFromTrue = ({
+		trueAnomaly,
+		eccentricity,
+	}: {
+		trueAnomaly: number
+		eccentricity: number
+	}): number => {
 		const acosInput = clampAcosInput(
 			(eccentricity + Math.cos(trueAnomaly)) /
 				(1 + eccentricity * Math.cos(trueAnomaly)),
@@ -71,7 +77,7 @@ export function computeDailyLockedOrbit(
 	let trueL = -equinoxOffsetRad
 	let trueA = trueL - longP
 	while (trueA < 0) trueA += 2 * PI
-	let eccA = calcEccFromTrue(trueA, ecc)
+	let eccA = calcEccFromTrue({ trueAnomaly: trueA, eccentricity: ecc })
 	let meanL = eccA - ecc * Math.sin(eccA) + longP
 
 	const flux = new Array<number>(EMB_CONSTANTS.time.DAYS_PER_YEAR).fill(0)
@@ -118,10 +124,10 @@ export function computeDailyLockedOrbit(
  * Compute monthly substellar longitude offset due to optical libration
  * in eccentric synchronous rotation: λ_⋆(t) ≈ ν(t) - M(t)
  */
-export function computeMonthlyLibration(
-	eccentricity: number,
-	perihelion: number,
-): number[] {
+export function computeMonthlyLibration({
+	eccentricity,
+	perihelion,
+}: MonthlyLibrationParams): number[] {
 	const ecc = eccentricity
 	if (ecc < 1e-6) return new Array(12).fill(0)
 
@@ -132,13 +138,14 @@ export function computeMonthlyLibration(
 		starSubtype: 2,
 		orbitalDistanceAU: 1,
 	})
-	return Array.from({ length: 12 }, (_, month) => {
+	const monthly: number[] = []
+	for (let month = 0; month < 12; month++) {
 		const days = TIME.month.days(month)
-		return (
-			days.reduce((sum, day) => sum + libration[day], 0) /
-			Math.max(1, days.length)
-		)
-	})
+		let sum = 0
+		for (const day of days) sum += libration[day]
+		monthly.push(sum / Math.max(1, days.length))
+	}
+	return monthly
 }
 
 function getSignedEffectiveObliquityRad(obliquity: number): number {
@@ -146,19 +153,22 @@ function getSignedEffectiveObliquityRad(obliquity: number): number {
 	return isRetrogradeObliquity(obliquity) ? -magnitude : magnitude
 }
 
-export function computeLockedSubstellarDeclinationRad(
-	obliquity: number,
-	solarLongitudeRad: number,
-): number {
+export function computeLockedSubstellarDeclinationRad({
+	obliquity,
+	solarLongitudeRad,
+}: {
+	obliquity: number
+	solarLongitudeRad: number
+}): number {
 	const signedObliquityRad = getSignedEffectiveObliquityRad(obliquity)
 	return Math.asin(Math.sin(signedObliquityRad) * Math.sin(solarLongitudeRad))
 }
 
-export function computeMonthlyLockedDeclination(
-	obliquity: number,
-	eccentricity: number,
-	perihelion: number,
-): number[] {
+export function computeMonthlyLockedDeclination({
+	obliquity,
+	eccentricity,
+	perihelion,
+}: LockedDeclinationParams): number[] {
 	if (Math.abs(obliquity) < 1e-6) return new Array(12).fill(0)
 
 	const { solarLongitude } = computeDailyLockedOrbit({
@@ -168,24 +178,25 @@ export function computeMonthlyLockedDeclination(
 		starSubtype: 2,
 		orbitalDistanceAU: 1,
 	})
-	return Array.from({ length: 12 }, (_, month) => {
+	const monthly: number[] = []
+	for (let month = 0; month < 12; month++) {
 		const days = TIME.month.days(month)
-		return (
-			days.reduce(
-				(sum, day) =>
-					sum +
-					computeLockedSubstellarDeclinationRad(obliquity, solarLongitude[day]),
-				0,
-			) / Math.max(1, days.length)
-		)
-	})
+		let sum = 0
+		for (const day of days)
+			sum += computeLockedSubstellarDeclinationRad({
+				obliquity,
+				solarLongitudeRad: solarLongitude[day],
+			})
+		monthly.push(sum / Math.max(1, days.length))
+	}
+	return monthly
 }
 
-export function getSubstellarDirWithOffsetAndDeclination(
-	substellarLon: number,
-	lonOffsetRad: number,
-	declinationRad: number,
-): [number, number, number] {
+export function getSubstellarDirWithOffsetAndDeclination({
+	substellarLon,
+	lonOffsetRad,
+	declinationRad,
+}: SubstellarDirectionParams): [number, number, number] {
 	const subRad = (substellarLon % 360) * (Math.PI / 180) + lonOffsetRad
 	const cosDeclination = Math.cos(declinationRad)
 	return [
@@ -197,42 +208,37 @@ export function getSubstellarDirWithOffsetAndDeclination(
 
 function computeMonthlyOrbitalFlux(params: GenesisParams): number[] {
 	const { flux } = computeDailyLockedOrbit(params)
-	return Array.from({ length: 12 }, (_, month) => {
+	const monthly: number[] = []
+	for (let month = 0; month < 12; month++) {
 		const days = TIME.month.days(month)
-		return (
-			days.reduce((sum, day) => sum + flux[day], 0) / Math.max(1, days.length)
-		)
-	})
+		let sum = 0
+		for (const day of days) sum += flux[day]
+		monthly.push(sum / Math.max(1, days.length))
+	}
+	return monthly
 }
 
-export function computeLockedMonthlyDaylightHours(
-	mesh: SphereMesh,
-	params: Pick<
-		GenesisParams,
-		| "substellarLon"
-		| "eccentricity"
-		| "hoursPerDay"
-		| "obliquity"
-		| "perihelion"
-	>,
-): Float32Array {
+export function computeLockedMonthlyDaylightHours({
+	mesh,
+	params,
+}: LockedMonthlyDaylightHoursParams): Float32Array {
 	const N = mesh.numRegions
 	const monthly = new Float32Array(N * 12)
-	const monthlyLibration = computeMonthlyLibration(
-		params.eccentricity,
-		params.perihelion,
-	)
-	const monthlyDeclination = computeMonthlyLockedDeclination(
-		params.obliquity,
-		params.eccentricity,
-		params.perihelion,
-	)
+	const monthlyLibration = computeMonthlyLibration({
+		eccentricity: params.eccentricity,
+		perihelion: params.perihelion,
+	})
+	const monthlyDeclination = computeMonthlyLockedDeclination({
+		obliquity: params.obliquity,
+		eccentricity: params.eccentricity,
+		perihelion: params.perihelion,
+	})
 	for (let month = 0; month < 12; month++) {
-		const sub = getSubstellarDirWithOffsetAndDeclination(
-			params.substellarLon,
-			monthlyLibration[month],
-			monthlyDeclination[month],
-		)
+		const sub = getSubstellarDirWithOffsetAndDeclination({
+			substellarLon: params.substellarLon,
+			lonOffsetRad: monthlyLibration[month],
+			declinationRad: monthlyDeclination[month],
+		})
 		for (let r = 0; r < N; r++) {
 			const x = mesh.r_xyz[3 * r]
 			const y = mesh.r_xyz[3 * r + 1]
@@ -278,11 +284,12 @@ export function computeTidalTransportParams(
 	const ecc = params.eccentricity
 
 	const { SIGMA, R_SUN, AU } = EMB_CONSTANTS.stellar
-	const cls: MainSequenceClass = isValidSpectralClass(params.spectralClass)
+	const cls: MainSequenceClass = STAR.isValidSpectralClass(params.spectralClass)
 		? params.spectralClass
 		: "G"
-	const T_star = getStarTemperatureK(cls, params.starSubtype)
-	const R_star = getStarDiameterSol(cls, params.starSubtype) * R_SUN
+	const T_star = STAR.getStarTemperatureK({ cls, subtype: params.starSubtype })
+	const R_star =
+		STAR.getStarDiameterSol({ cls, subtype: params.starSubtype }) * R_SUN
 	const d = params.orbitalDistanceAU * AU
 	const S0 =
 		(SIGMA * Math.pow(T_star, 4) * Math.pow(R_star, 2)) / Math.pow(d, 2)
@@ -344,25 +351,28 @@ export function computeTidalTransportParams(
  * factor controls how uniform temperatures are (1 = perfectly uniform,
  * 0 = no heat redistribution).
  */
-export function computeTidalTemperature(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-	landFraction: number[],
-	params: GenesisParams,
-	oceanDist?: Float32Array,
-	elevation_km?: Float32Array,
-): GenesisClimate {
+export function computeTidalTemperature({
+	mesh,
+	elevation,
+	landFraction,
+	params,
+	oceanDist,
+	elevation_km,
+}: ComputeTidalTemperatureParams): GenesisClimate {
 	const N = mesh.numRegions
-	const monthlyLibration = computeMonthlyLibration(
-		params.eccentricity,
-		params.perihelion,
-	)
-	const monthlyDeclination = computeMonthlyLockedDeclination(
-		params.obliquity,
-		params.eccentricity,
-		params.perihelion,
-	)
-	const daylight_hours_monthly = computeLockedMonthlyDaylightHours(mesh, params)
+	const monthlyLibration = computeMonthlyLibration({
+		eccentricity: params.eccentricity,
+		perihelion: params.perihelion,
+	})
+	const monthlyDeclination = computeMonthlyLockedDeclination({
+		obliquity: params.obliquity,
+		eccentricity: params.eccentricity,
+		perihelion: params.perihelion,
+	})
+	const daylight_hours_monthly = computeLockedMonthlyDaylightHours({
+		mesh,
+		params,
+	})
 
 	const { T_mean_C, A1, A_night, eccAmplitude, LAPSE_RATE, tidalTd, contrast } =
 		computeTidalTransportParams(params)
@@ -385,11 +395,11 @@ export function computeTidalTemperature(
 		const z = mesh.r_xyz[3 * r + 2]
 
 		for (let month = 0; month < 12; month++) {
-			const sub = getSubstellarDirWithOffsetAndDeclination(
-				params.substellarLon,
-				monthlyLibration[month],
-				monthlyDeclination[month],
-			)
+			const sub = getSubstellarDirWithOffsetAndDeclination({
+				substellarLon: params.substellarLon,
+				lonOffsetRad: monthlyLibration[month],
+				declinationRad: monthlyDeclination[month],
+			})
 			const cosTheta = Math.max(
 				-1,
 				Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]),
@@ -400,7 +410,9 @@ export function computeTidalTemperature(
 
 			let T = T_mean_C + A1 * P1 + A_night * nightFrac
 
-			const hKm = elevation_km ? elevation_km[r] : elevToHeightKm(elevation[r])
+			const hKm = elevation_km
+				? elevation_km[r]
+				: elevToHeightKm({ elev: elevation[r] })
 			const lapseCorrection = hKm > 0 ? hKm * LAPSE_RATE : 0
 			T -= lapseCorrection
 
@@ -419,20 +431,23 @@ export function computeTidalTemperature(
 		}
 	}
 
-	applyTemperatureNoise(
+	applyTemperatureNoise({
 		mesh,
 		N,
-		params.seed ?? 0,
+		seed: params.seed ?? 0,
 		temperature_monthly,
 		temperature_monthly_nolapse,
-		(_r, x, y, z) => {
+		computeTaper: (...coordinates: [number, number, number, number]) => {
+			const x = coordinates[1]
+			const y = coordinates[2]
+			const z = coordinates[3]
 			let ct = -1
 			for (let month = 0; month < 12; month++) {
-				const baseSub = getSubstellarDirWithOffsetAndDeclination(
-					params.substellarLon,
-					monthlyLibration[month],
-					monthlyDeclination[month],
-				)
+				const baseSub = getSubstellarDirWithOffsetAndDeclination({
+					substellarLon: params.substellarLon,
+					lonOffsetRad: monthlyLibration[month],
+					declinationRad: monthlyDeclination[month],
+				})
 				const monthCt = Math.max(
 					-1,
 					Math.min(1, x * baseSub[0] + y * baseSub[1] + z * baseSub[2]),
@@ -444,16 +459,16 @@ export function computeTidalTemperature(
 				1 + Math.min(0, ct + 0.5) * 2,
 			)
 		},
-		() => true,
-	)
+		includeCell: () => true,
+	})
 
-	recomputeAnnualTemperatureStats(
+	recomputeAnnualTemperatureStats({
 		temperature_monthly,
 		temperature_avg,
 		temperature_min,
 		temperature_max,
 		N,
-	)
+	})
 
 	return {
 		temperature_avg,

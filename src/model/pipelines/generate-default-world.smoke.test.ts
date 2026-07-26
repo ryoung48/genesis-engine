@@ -1,17 +1,17 @@
-import { describe, expect, it } from "vitest"
+﻿import { describe, expect, it } from "vitest"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
+import { type MainSequenceClass, STAR } from "@/model/celestial/star"
 import {
-	getStarTemperatureK,
-	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import { EnergyBalanceModel } from "@/model/climate/ebm"
-import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
-import { PASTA_LABELS } from "@/model/climate/pasta"
-import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
-import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
-import { decodePlanetCode, encodePlanetCode } from "@/model/shared/planet-code"
-import { ERA_ORDER } from "@/model/society/eras"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
+	BIOME_LABELS,
+	CLIMATE_LABELS,
+	EMB_CONSTANTS,
+	EnergyBalanceModel,
+	PASTA_LABELS,
+} from "@/model/climate"
+import { TRADE_GOOD_LABELS } from "@/model/economy"
+import { decodePlanetCode, encodePlanetCode } from "@/model/shared"
+import { ERA_ORDER } from "@/model/society"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
 import type { GenesisParams } from ".."
@@ -91,10 +91,10 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 		},
 		stellar: {
 			...EMB_CONSTANTS.stellar,
-			T_SUN: getStarTemperatureK(
-				previewConfig.spectralClass as MainSequenceClass,
-				previewConfig.starSubtype,
-			),
+			T_SUN: STAR.getStarTemperatureK({
+				cls: previewConfig.spectralClass as MainSequenceClass,
+				subtype: previewConfig.starSubtype,
+			}),
 		},
 		time: {
 			HOURS_PER_DAY: previewConfig.hoursPerDay,
@@ -106,7 +106,7 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 		radius: previewConfig.radius * 1000,
 		pressure: previewConfig.pressure,
 	})
-	model.runModel(30, 0.5)
+	model.runModel({ years: 30, dtDays: 0.5 })
 
 	let totalWeightedTemp = 0
 	let totalArea = 0

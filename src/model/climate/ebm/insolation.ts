@@ -1,4 +1,6 @@
+import { HOURS_PER_DAY } from "../../shared"
 import { EMB_CONSTANTS } from "./constants"
+import type { InsolationComputeParams } from "./types"
 
 /* eslint-disable camelcase */
 function clampAcosInput(value: number): number {
@@ -6,11 +8,8 @@ function clampAcosInput(value: number): number {
 }
 
 export const INSOLATION = {
-	compute: (
-		lats: number[],
-		orbital: typeof EMB_CONSTANTS.orbital,
-		stellarOverride?: typeof EMB_CONSTANTS.stellar,
-	) => {
+	compute: (params: InsolationComputeParams) => {
+		const { lats, orbital, stellarOverride } = params
 		const { time, stellar: defaultStellar, grid } = EMB_CONSTANTS
 		const stellar = stellarOverride || defaultStellar
 		const _insolation: number[][] = new Array(grid.NUM_LAT)
@@ -30,10 +29,11 @@ export const INSOLATION = {
 
 		while (trueA < 0) trueA += 2 * PI
 
-		const calcEccFromTrue = (
-			trueAnomaly: number,
-			eccentricity: number,
-		): number => {
+		const calcEccFromTrue = (p: {
+			trueAnomaly: number
+			eccentricity: number
+		}): number => {
+			const { trueAnomaly, eccentricity } = p
 			const acosInput = clampAcosInput(
 				(eccentricity + Math.cos(trueAnomaly)) /
 					(1 + eccentricity * Math.cos(trueAnomaly)),
@@ -44,7 +44,7 @@ export const INSOLATION = {
 			return Math.acos(acosInput)
 		}
 
-		let eccA = calcEccFromTrue(trueA, ecc)
+		let eccA = calcEccFromTrue({ trueAnomaly: trueA, eccentricity: ecc })
 		let meanL = eccA - ecc * Math.sin(eccA) + longP
 		const s0 =
 			stellar.SIGMA *
@@ -86,13 +86,14 @@ export const INSOLATION = {
 
 				if (cosH0 <= -1) {
 					_insolation[i][day] = sConst * Math.sin(lat) * sinDeclination
-					_daylight_hours[i][day] = 24
+					_daylight_hours[i][day] = HOURS_PER_DAY
 				} else if (cosH0 >= 1) {
 					_insolation[i][day] = 0
 					_daylight_hours[i][day] = 0
 				} else {
 					const hourAngle = Math.acos(cosH0)
-					_daylight_hours[i][day] = (2 * hourAngle * 24) / (2 * Math.PI)
+					_daylight_hours[i][day] =
+						(2 * hourAngle * HOURS_PER_DAY) / (2 * Math.PI)
 					_insolation[i][day] =
 						(sConst *
 							(hourAngle * Math.sin(lat) * sinDeclination +

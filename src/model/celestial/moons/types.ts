@@ -1,0 +1,86 @@
+import type { SharedRng } from "../../shared/rng"
+import type { AtmosphereProfile, OrbitBody } from "../orbit-body"
+
+export type MoonOrbitRange = "inner" | "middle" | "outer" | "extreme"
+type ParentOrbitGroup =
+	| "asteroid belt"
+	| "dwarf"
+	| "terrestrial"
+	| "helian"
+	| "jovian"
+
+export interface MoonBody extends OrbitBody {
+	meanAnomalyAtEpochDeg: number
+	/** Unset on partial/authored moon records before orbital placement assigns
+	 * an inner/middle/outer band. */
+	orbitRange?: MoonOrbitRange
+	/** Unset alongside orbitRange before orbital placement calculates the
+	 * parent-diameter distance. */
+	semiMajorAxisPlanetDiameters?: number
+}
+
+interface MoonRngInput {
+	rng: SharedRng
+}
+export interface RollDieInput extends MoonRngInput {
+	sides: number
+}
+export interface RollMoonSizeClassInput extends MoonRngInput {
+	parentSizeClass: number
+	parentGroup: ParentOrbitGroup
+}
+export interface RollMoonDiameterInput extends MoonRngInput {
+	sizeClass: number
+}
+export interface RollMoonOrbitCandidateInput extends MoonRngInput {
+	morPd: number
+	moonMinimumPd: number
+	maxPd: number
+}
+export interface PendingMoon {
+	massKg: number
+	diameterKm: number
+	sizeClass: number
+	moonMinimumPd: number
+	orbitRange: MoonOrbitRange
+	radiusPd: number
+}
+export interface PlaceMoonOrbitsInput extends MoonRngInput {
+	moons: PendingMoon[]
+	morPd: number
+	maxStablePd: number
+	minimumSpacingPd: number
+}
+export interface AttachParentTideLocksInput {
+	moons: MoonBody[]
+	parentIdx: number
+}
+export interface RollMoonCountInput extends MoonRngInput {
+	parentGroup: ParentOrbitGroup
+	parentSizeClass: number
+	orbitalDistanceAU: number
+}
+export interface RollMoonEccentricityInput extends MoonRngInput {
+	range: MoonOrbitRange
+	sizeClass: number
+}
+export interface GenerateMoonsInput {
+	count: number
+	seed: number
+	planetRadiusKm: number
+	orbitalDistanceAU: number
+	starMassKg: number /** Defaults to terrestrial when omitted for ordinary rocky parents. */
+	parentGroup?: ParentOrbitGroup
+}
+
+// Fallback for any moon that doesn't get a rolled/authored atmosphere of its
+// own (see generateMoons() and sol-system.ts's SolMoonSeed table) -- most
+// moons in reality are airless, and an explicit vacuum profile keeps the
+// stats card's Atmosphere row from silently disappearing (the row is only
+// omitted when `atmosphere` is `undefined`, not when it's vacuum).
+export const DEFAULT_MOON_ATMOSPHERE: AtmosphereProfile = {
+	code: 0,
+	pressureBar: 0,
+	type: "vacuum",
+	breathable: false,
+}

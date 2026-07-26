@@ -20,7 +20,23 @@
 	"formatter": { "enabled": true, "indentStyle": "tab" },
 	"linter": {
 		"enabled": true,
-		"rules": { "recommended": false },
+		"rules": {
+			"recommended": false,
+			"nursery": { "noImportCycles": "error" },
+			"style": {
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"patterns": [
+							{
+								"group": ["@/model/**/internal", "@/model/**/types"],
+								"message": "Import through the domain's public index.ts API."
+							}
+						]
+					}
+				}
+			}
+		},
 		"includes": [
 			"**",
 			"!dist",
@@ -37,6 +53,30 @@
 		"parser": { "tailwindDirectives": true }
 	},
 	"overrides": [
+		{
+			"includes": ["src/model/celestial/**/*.ts"],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"useMaxParams": { "level": "error", "options": { "max": 1 } }
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/model/climate/**/*.ts",
+				"src/model/economy/**/*.ts",
+				"src/model/earth/**/*.ts"
+			],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"useMaxParams": { "level": "error", "options": { "max": 1 } }
+					}
+				}
+			}
+		},
 		{
 			"includes": ["**/*.{ts,tsx}"],
 			"linter": {
@@ -65,6 +105,7 @@
 						"noUnreachableSuper": "error",
 						"noUnsafeFinally": "error",
 						"noUnsafeOptionalChaining": "error",
+						"noUnusedFunctionParameters": "error",
 						"noUnusedLabels": "error",
 						"noUnusedPrivateClassMembers": "error",
 						"noUnusedVariables": "error",

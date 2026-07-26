@@ -1,37 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
-import { computeGravityG } from "@/model/celestial/body-metrics"
-import type { MoonBody } from "@/model/celestial/moons/moon-types"
+import type { MoonBody } from "@/model/celestial/moons"
+import { derivePlanetMassKg } from "@/model/celestial/moons"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { PLANET } from "@/model/celestial/planet"
+import type { MainSequenceClass } from "@/model/celestial/star"
+import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
 import {
-	derivePlanetMassKg,
-	resolveMoonOrbitHoursPerDay,
-} from "@/model/celestial/moons/orbital-mechanics"
-import type { MainSequenceClass } from "@/model/celestial/star/star-types"
-import {
-	DEFAULT_SPECTRAL_CLASS,
-	getKeplerYearYears,
-	getStarLuminositySol,
-	getStarMassSol,
-	isValidSpectralClass,
-} from "@/model/celestial/star/star-types"
-import {
-	generateStarName,
-	generateSystemBodies,
-	getStarAgeGyr,
+	type SolarSystemState,
+	SYSTEM,
 	type SystemBody,
-} from "@/model/celestial/system/generate-system-bodies"
+} from "@/model/celestial/system"
 import {
 	SOL_DEFAULT_SOLAR_SYSTEM,
 	SOL_EARTH_CLOUDS_TEXTURE_PATH,
-	SOL_LUNA_DEFAULT,
-	SOL_MAIN_WORLD_DEFAULTS,
-	SOL_SEED,
 	SOL_STAR_AGE_GYR,
-	type SolarSystemState,
 } from "@/model/celestial/system/sol-system"
-import { hydrosphereCodeFromWaterPct } from "@/model/celestial/system/system-environment"
-import { applySystemSeismology } from "@/model/celestial/system/system-seismology"
 import { apparentTemperatureC } from "@/model/climate/apparent-temp"
 import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
 import {
@@ -99,18 +84,16 @@ import {
 import type { HistoryNote } from "@/model/history"
 import { YEAR_MS } from "@/model/history"
 import { historyMsToEu4Days } from "@/model/history/eu4-days"
-import { SEED_MAX } from "@/model/shared/planet-code"
-import { seedStringToNumber } from "@/model/shared/rng"
 import {
 	formatSeedLabel,
-	makeRandomSeedLabel,
-	resolveSeedLabel,
-} from "@/model/shared/seed-label"
-import { titleCase } from "@/model/shared/text"
-import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
-} from "@/model/shared/units"
+	makeRandomSeedLabel,
+	resolveSeedLabel,
+	SEED_MAX,
+	seedStringToNumber,
+	titleCase,
+} from "@/model/shared"
 import {
 	GOVERNMENT_TYPE_LABELS,
 	GOVERNMENT_TYPES,
@@ -1774,7 +1757,7 @@ export const GenesisView: React.FC = () => {
 	const starSubtype = solarSystem.star.subtype
 	const restSeed =
 		solarSystem.star.seed === "sol"
-			? SOL_SEED
+			? SYSTEM.SOL_SEED
 			: seedStringToNumber(solarSystem.star.seed)
 	// Sol always shows its real, curated body names; a procedurally generated
 	// system's own language-generated names aren't spoilers either, so a body
@@ -1783,7 +1766,10 @@ export const GenesisView: React.FC = () => {
 	// undefined for Sol -- Sol's star uses its own hardcoded "Sol" name
 	// instead of a generated one.
 	const starName = useMemo(
-		() => (restSeed === SOL_SEED ? undefined : generateStarName(restSeed)),
+		() =>
+			restSeed === SYSTEM.SOL_SEED
+				? undefined
+				: SYSTEM.generateStarName(restSeed),
 		[restSeed],
 	)
 	const setRestSeed = useCallback((value: number) => {
@@ -1791,7 +1777,10 @@ export const GenesisView: React.FC = () => {
 			...current,
 			star: {
 				...current.star,
-				seed: value === SOL_SEED ? "sol" : value.toString(36).padStart(6, "0"),
+				seed:
+					value === SYSTEM.SOL_SEED
+						? "sol"
+						: value.toString(36).padStart(6, "0"),
 			},
 		}))
 	}, [])
@@ -1820,14 +1809,14 @@ export const GenesisView: React.FC = () => {
 	// --- Sibling solar system bodies (used by the GenerationPanel stat cards
 	// and by the solar system view) ---
 	const systemSeismologyContext = useMemo(() => {
-		const cls = isValidSpectralClass(spectralClass)
+		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: DEFAULT_SPECTRAL_CLASS
 		const surfaceTidesCallbacks = buildSurfaceTidesSeismologyCallbacks({
 			spectralClass,
 			starSubtype,
 		})
-		if (restSeed === SOL_SEED) {
+		if (restSeed === SYSTEM.SOL_SEED) {
 			return {
 				starAgeGyr: SOL_STAR_AGE_GYR,
 				starLuminositySol: 1,
@@ -1836,21 +1825,27 @@ export const GenesisView: React.FC = () => {
 			}
 		}
 		return {
-			starAgeGyr: getStarAgeGyr(restSeed, getStarMassSol(cls, starSubtype)),
-			starLuminositySol: getStarLuminositySol(cls, starSubtype),
+			starAgeGyr: SYSTEM.getStarAgeGyr(
+				restSeed,
+				STAR.getStarMassSol({ cls, subtype: starSubtype }),
+			),
+			starLuminositySol: STAR.getStarLuminositySol({
+				cls,
+				subtype: starSubtype,
+			}),
 			spectralClass: cls,
 			...surfaceTidesCallbacks,
 		}
 	}, [restSeed, spectralClass, starSubtype])
 
 	const generatedSystemBodies: SystemBody[] = useMemo(() => {
-		const cls = isValidSpectralClass(spectralClass)
+		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: DEFAULT_SPECTRAL_CLASS
-		if (restSeed !== SOL_SEED) {
+		if (restSeed !== SYSTEM.SOL_SEED) {
 			// Non-Sol: the main world (if any) is rolled fresh right alongside
 			// its siblings -- no external params to build here at all.
-			return generateSystemBodies({
+			return SYSTEM.generateSystemBodies({
 				seed: restSeed,
 				spectralClass: cls,
 				starSubtype,
@@ -1885,17 +1880,17 @@ export const GenesisView: React.FC = () => {
 			? (prev.atmosphere?.pressureBar ?? DEFAULT_WORLD_PARAMS.pressure)
 			: DEFAULT_WORLD_PARAMS.pressure
 		const tideLock = prev ? (prev.tideLock ?? null) : null
-		const moons = prev ? prev.moons : [{ ...SOL_LUNA_DEFAULT, idx: 1 }]
+		const moons = prev ? prev.moons : [{ ...SYSTEM.SOL_LUNA_DEFAULT, idx: 1 }]
 		const solMainWorldOverrides = {
-			name: SOL_MAIN_WORLD_DEFAULTS.name,
+			name: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.name,
 			orbitalDistanceAU,
 			diameterKm: planetRadiusKm * 2,
 			moons,
 			massKg: derivePlanetMassKg(planetRadiusKm),
-			gravityG: computeGravityG(
-				derivePlanetMassKg(planetRadiusKm),
-				planetRadiusKm * 2,
-			),
+			gravityG: ORBIT_BODY.computeGravityG({
+				massKg: derivePlanetMassKg(planetRadiusKm),
+				diameterKm: planetRadiusKm * 2,
+			}),
 			siderealDayHours: hoursPerDay,
 			eccentricity,
 			longitudeOfPerihelionDeg: perihelion,
@@ -1910,10 +1905,10 @@ export const GenesisView: React.FC = () => {
 				prev?.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
 			seaLevel: prev?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 			maxElevation: 6000,
-			albedo: SOL_MAIN_WORLD_DEFAULTS.albedo,
-			greenhouseFactor: SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
+			albedo: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.albedo,
+			greenhouseFactor: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
 		}
-		return generateSystemBodies({
+		return SYSTEM.generateSystemBodies({
 			seed: restSeed,
 			spectralClass: cls,
 			starSubtype,
@@ -1923,7 +1918,7 @@ export const GenesisView: React.FC = () => {
 	}, [restSeed, spectralClass, starSubtype, forceMainWorld])
 	const resetSourceSystemBodies = useMemo(
 		() =>
-			restSeed === SOL_SEED
+			restSeed === SYSTEM.SOL_SEED
 				? SOL_DEFAULT_SOLAR_SYSTEM.orbits
 				: generatedSystemBodies,
 		[generatedSystemBodies, restSeed],
@@ -1960,7 +1955,7 @@ export const GenesisView: React.FC = () => {
 		(updater: (body: SystemBody) => SystemBody) => {
 			setSolarSystem((current) => ({
 				...current,
-				orbits: applySystemSeismology({
+				orbits: PLANET.applySystemSeismology({
 					bodies: current.orbits.map((body) =>
 						body.isMainWorld ? updater(body) : body,
 					),
@@ -2007,7 +2002,7 @@ export const GenesisView: React.FC = () => {
 				// Keep hydrosphereCode (and its HYDROSPHERE_DESCRIPTIONS text) in
 				// sync with the hand-edited land coverage, instead of leaving it
 				// stuck at whatever value it was originally rolled with.
-				hydrosphereCode: hydrosphereCodeFromWaterPct((1 - value) * 100),
+				hydrosphereCode: PLANET.hydrosphereCodeFromWaterPct((1 - value) * 100),
 			})),
 		[updateMainWorldBody],
 	)
@@ -2041,14 +2036,14 @@ export const GenesisView: React.FC = () => {
 		[updateMainWorldBody],
 	)
 	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
-	const effectiveStarClass: MainSequenceClass = isValidSpectralClass(
+	const effectiveStarClass: MainSequenceClass = STAR.isValidSpectralClass(
 		spectralClass,
 	)
 		? spectralClass
 		: DEFAULT_SPECTRAL_CLASS
 
 	const setSpectralClass = useCallback((cls: string) => {
-		const nextClass: MainSequenceClass = isValidSpectralClass(cls)
+		const nextClass: MainSequenceClass = STAR.isValidSpectralClass(cls)
 			? cls
 			: DEFAULT_SPECTRAL_CLASS
 		setSolarSystem((current) => ({
@@ -2068,10 +2063,13 @@ export const GenesisView: React.FC = () => {
 	// depends on spectralClass/starSubtype, and deviation 0 is always exactly
 	// the new star's HZ center by construction (see generateSystemBodies), so
 	// no separate "preserve HZ position" math is needed here anymore.
-	const effectiveStarMassSol = getStarMassSol(effectiveStarClass, starSubtype)
+	const effectiveStarMassSol = STAR.getStarMassSol({
+		cls: effectiveStarClass,
+		subtype: starSubtype,
+	})
 	const tideLock = mainWorldSystemBody?.tideLock ?? null
 	const setTideLock = useCallback(
-		(lock: import("@/model/celestial/moons/moon-types").TideLock | null) =>
+		(lock: import("@/model/celestial/orbit-body").TideLock | null) =>
 			updateMainWorldBody((body) => {
 				const siderealDayHours = resolveBodyTideLockSiderealDayHours(lock, body)
 				return {
@@ -2120,10 +2118,14 @@ export const GenesisView: React.FC = () => {
 
 	const daysPerYear = useMemo(() => {
 		const keplerHours =
-			getKeplerYearYears(orbitalDistanceAU, effectiveStarMassSol) * 365.25 * 24
-		const dayHours = resolveMoonOrbitHoursPerDay(hoursPerDay, tideLock)
-		return Math.round(keplerHours / dayHours)
-	}, [orbitalDistanceAU, effectiveStarMassSol, hoursPerDay, tideLock])
+			STAR.getKeplerYearYears({
+				orbitalDistanceAU,
+				massSol: effectiveStarMassSol,
+			}) *
+			365.25 *
+			24
+		return Math.round(keplerHours / 24)
+	}, [orbitalDistanceAU, effectiveStarMassSol])
 
 	const effectiveDaysPerYear = tidallyLocked ? 1 : daysPerYear
 
@@ -2178,7 +2180,7 @@ export const GenesisView: React.FC = () => {
 	}, [world, pressure])
 	useEffect(() => {
 		sceneRef.current?.setGlobeCloudTexturePath(
-			restSeed === SOL_SEED ? SOL_EARTH_CLOUDS_TEXTURE_PATH : null,
+			restSeed === SYSTEM.SOL_SEED ? SOL_EARTH_CLOUDS_TEXTURE_PATH : null,
 		)
 	}, [restSeed])
 	useEffect(() => {
@@ -2974,10 +2976,10 @@ export const GenesisView: React.FC = () => {
 				// No registered schema: fall back to plain solid-member-color/
 				// white-elsewhere coloring, so a brand new org still renders
 				// reasonably before anyone gets around to giving it a real schema.
-				const memberProvinceRawIds = collectOrgMemberProvinceRawIds(
+				const memberProvinceRawIds = collectOrgMemberProvinceRawIds({
 					state,
-					orgRef.id,
-				)
+					orgId: orgRef.id,
+				})
 				const orgColor: [number, number, number] = [
 					orgRef.color[0] / 255,
 					orgRef.color[1] / 255,
@@ -3110,12 +3112,11 @@ export const GenesisView: React.FC = () => {
 						const dtr = monthlyDtr
 							? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
 							: worldForDisplay.dtr_annual[r]
-						humidity = relativeHumidityFromTempRange(
-							meanT,
-							dtr,
-							undefined,
-							worldForDisplay.rainfall?.annual[r],
-						)
+						humidity = relativeHumidityFromTempRange({
+							meanTempC: meanT,
+							dtrC: dtr,
+							annualRainfallMm: worldForDisplay.rainfall?.annual[r],
+						})
 					}
 				} else {
 					const dtr = monthlyDtr
@@ -3131,15 +3132,19 @@ export const GenesisView: React.FC = () => {
 						}
 						annualAridity = petSum > 0 ? aetSum / petSum : 1
 					}
-					humidity = relativeHumidityFromTempRange(
-						meanT,
-						dtr,
+					humidity = relativeHumidityFromTempRange({
+						meanTempC: meanT,
+						dtrC: dtr,
 						annualAridity,
-						worldForDisplay.rainfall?.annual[r],
-					)
+						annualRainfallMm: worldForDisplay.rainfall?.annual[r],
+					})
 				}
 				const [cr, cg, cb] = miseryColor(
-					apparentTemperatureC(meanT, humidity, windSpeed[r]),
+					apparentTemperatureC({
+						tempC: meanT,
+						rhPercent: humidity,
+						windSpeedMs: windSpeed[r],
+					}),
 				)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
@@ -3472,10 +3477,10 @@ export const GenesisView: React.FC = () => {
 		)
 		if (!orgRef) return null
 		const { state } = earthHistory.query
-		const memberProvinceRawIds = collectOrgMemberProvinceRawIds(
+		const memberProvinceRawIds = collectOrgMemberProvinceRawIds({
 			state,
-			orgRef.id,
-		)
+			orgId: orgRef.id,
+		})
 		if (memberProvinceRawIds.size === 0) return null
 		const memberProvinceCompactIndexes = new Set<number>()
 		for (const rawId of memberProvinceRawIds) {
@@ -3592,15 +3597,15 @@ export const GenesisView: React.FC = () => {
 				: world.oceanCurrents.oceanWarmth
 		const { latDeg, lonDeg, regionBin } = getClimateGeometry(world.mesh)
 		if (world.params.tideLock?.type === "solar") {
-			return buildLockedOceanCurrentGrid(
-				world.mesh,
-				warmth,
-				world.isLand,
+			return buildLockedOceanCurrentGrid({
+				mesh: world.mesh,
+				oceanWarmth: warmth,
+				isLand: world.isLand,
 				latDeg,
 				lonDeg,
-				world.params,
+				params: world.params,
 				currentMonth,
-			)
+			})
 		}
 		return buildOceanCurrentGrid(
 			world.mesh,
@@ -3639,17 +3644,20 @@ export const GenesisView: React.FC = () => {
 		scene.setSolarTerminatorVisible(showDaylight)
 		if (tidallyLocked) {
 			const selectedMonth = clockMonthMode === "annual" ? 5 : clockMonth
-			const monthlyLibration = computeMonthlyLibration(eccentricity, perihelion)
-			const monthlyDeclination = computeMonthlyLockedDeclination(
+			const monthlyLibration = computeMonthlyLibration({
+				eccentricity,
+				perihelion,
+			})
+			const monthlyDeclination = computeMonthlyLockedDeclination({
 				obliquity,
 				eccentricity,
 				perihelion,
-			)
-			const [sx, sy, sz] = getSubstellarDirWithOffsetAndDeclination(
+			})
+			const [sx, sy, sz] = getSubstellarDirWithOffsetAndDeclination({
 				substellarLon,
-				monthlyLibration[selectedMonth] ?? 0,
-				monthlyDeclination[selectedMonth] ?? 0,
-			)
+				lonOffsetRad: monthlyLibration[selectedMonth] ?? 0,
+				declinationRad: monthlyDeclination[selectedMonth] ?? 0,
+			})
 			scene.setSunDirection(sx, sy, sz, hoursPerDay)
 		} else {
 			const lightingMonth =
@@ -4720,10 +4728,11 @@ export const GenesisView: React.FC = () => {
 				// (matches whatever GenerationPanel's own preview is showing,
 				// including any live edits) and fall back to the static defaults
 				// only if it isn't available yet.
-				albedo: mainWorldSystemBody?.albedo ?? SOL_MAIN_WORLD_DEFAULTS.albedo,
+				albedo:
+					mainWorldSystemBody?.albedo ?? SYSTEM.SOL_MAIN_WORLD_DEFAULTS.albedo,
 				greenhouseFactor:
 					mainWorldSystemBody?.greenhouseFactor ??
-					SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
+					SYSTEM.SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
 				seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 				tideLock,
 				substellarLon,
@@ -5200,7 +5209,7 @@ export const GenesisView: React.FC = () => {
 			// transparent instead of a plain solid swatch, so the wiki
 			// doesn't silently overstate membership -- see
 			// collectOrgForeignHolderNations.
-			const striped = collectOrgForeignHolderNations(state, orgId).has(tag)
+			const striped = collectOrgForeignHolderNations({ state, orgId }).has(tag)
 			// For orgs whose categories split into rival sides (GG's
 			// Guelphs/Ghibellines) rather than just estate/site types, show
 			// which side this nation is on instead of the shared org name --
@@ -6902,7 +6911,7 @@ export const GenesisView: React.FC = () => {
 				)
 			}
 			if (orgId !== "HSA") {
-				return listOrgMembers(state, orgCategorizers.categorize)
+				return listOrgMembers({ state, categorize: orgCategorizers.categorize })
 			}
 			const categories = new Map<string, OrgProvinceCategory>()
 			for (const site of state.organizationSites.values()) {
@@ -6956,13 +6965,18 @@ export const GenesisView: React.FC = () => {
 		).sort((a, b) => a - b)
 		const countHistory: WikiCountHistoryPoint[] = transitionDates.map(
 			(date) => {
-				const foldedAtDate = fold(engine.data, date, {
-					provinceIds: engine.cache.provinceIds,
-					nationTags: engine.cache.nationTags,
+				const foldedAtDate = fold({
+					data: engine.data,
+					time: date,
+					options: {
+						provinceIds: engine.cache.provinceIds,
+						nationTags: engine.cache.nationTags,
+					},
 				})
 				return {
 					date,
-					count: collectOrgMemberProvinceRawIds(foldedAtDate, orgId).size,
+					count: collectOrgMemberProvinceRawIds({ state: foldedAtDate, orgId })
+						.size,
 				}
 			},
 		)
@@ -6972,20 +6986,27 @@ export const GenesisView: React.FC = () => {
 		) {
 			countHistory.unshift({
 				date: earthHistory.minDays,
-				count: collectOrgMemberProvinceRawIds(
-					fold(engine.data, earthHistory.minDays, {
-						provinceIds: engine.cache.provinceIds,
-						nationTags: engine.cache.nationTags,
+				count: collectOrgMemberProvinceRawIds({
+					state: fold({
+						data: engine.data,
+						time: earthHistory.minDays,
+						options: {
+							provinceIds: engine.cache.provinceIds,
+							nationTags: engine.cache.nationTags,
+						},
 					}),
 					orgId,
-				).size,
+				}).size,
 			})
 		}
 
 		// Current member territory, for the stat block and Environmental/
 		// Demographics distributions -- the exact same province set the map's
 		// striped border draws, so the numbers always agree with what's shown.
-		const memberProvinceRawIds = collectOrgMemberProvinceRawIds(state, orgId)
+		const memberProvinceRawIds = collectOrgMemberProvinceRawIds({
+			state,
+			orgId,
+		})
 		const provinceIndexes: number[] = []
 		for (const rawId of memberProvinceRawIds) {
 			const compact = earthImportRawIdToCompact?.get(rawId)
@@ -7603,7 +7624,7 @@ export const GenesisView: React.FC = () => {
 		(bodyIndex: number, updater: (body: SystemBody) => SystemBody) => {
 			setSolarSystem((current) => ({
 				...current,
-				orbits: applySystemSeismology({
+				orbits: PLANET.applySystemSeismology({
 					bodies: current.orbits.map((body, index) =>
 						index === bodyIndex ? updater(body) : body,
 					),
@@ -7628,7 +7649,7 @@ export const GenesisView: React.FC = () => {
 			if (bodyIndex === undefined) {
 				setSpectralClass(DEFAULT_WORLD_PARAMS.spectralClass)
 				setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
-				setRestSeed(SOL_SEED)
+				setRestSeed(SYSTEM.SOL_SEED)
 			}
 			if (bodyIndex === undefined) {
 				// Explicit, rather than relying on the generatedSystemBodies
@@ -7648,7 +7669,7 @@ export const GenesisView: React.FC = () => {
 					// seismology is frozen with surfaceTidesHeating: 0 -- re-run
 					// applySystemSeismology here with the real callbacks so the reset
 					// system's totals/regimes match every other recompute path.
-					orbits: applySystemSeismology({
+					orbits: PLANET.applySystemSeismology({
 						bodies: structuredClone(SOL_DEFAULT_SOLAR_SYSTEM.orbits),
 						...systemSeismologyContext,
 					}),
@@ -7657,7 +7678,7 @@ export const GenesisView: React.FC = () => {
 			}
 			setSolarSystem((current) => ({
 				...current,
-				orbits: applySystemSeismology({
+				orbits: PLANET.applySystemSeismology({
 					bodies: current.orbits.map((body, index) =>
 						index === bodyIndex
 							? structuredClone(resetSourceSystemBodies[index] ?? body)
@@ -7683,7 +7704,7 @@ export const GenesisView: React.FC = () => {
 		) => {
 			setSolarSystem((current) => ({
 				...current,
-				orbits: applySystemSeismology({
+				orbits: PLANET.applySystemSeismology({
 					bodies: current.orbits.map((body, index) => {
 						if (index !== bodyIndex) return body
 						return {
@@ -7738,10 +7759,8 @@ export const GenesisView: React.FC = () => {
 			solarSystemViewActive && systemBodiesRef.current.length > 0
 				? {
 						bodies: systemBodiesRef.current,
-						hoursPerDay,
-						tideLock,
 						daysPerYear: effectiveDaysPerYear,
-						spectralClass: isValidSpectralClass(spectralClass)
+						spectralClass: STAR.isValidSpectralClass(spectralClass)
 							? (spectralClass as MainSequenceClass)
 							: DEFAULT_SPECTRAL_CLASS,
 						starSubtype,
@@ -7752,7 +7771,7 @@ export const GenesisView: React.FC = () => {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SOL_SEED,
+						showRealNames: restSeed === SYSTEM.SOL_SEED,
 						namesEnabled,
 						starName,
 					}
@@ -7760,8 +7779,6 @@ export const GenesisView: React.FC = () => {
 		)
 	}, [
 		solarSystemViewActive,
-		hoursPerDay,
-		tideLock,
 		effectiveDaysPerYear,
 		spectralClass,
 		starSubtype,
@@ -7780,10 +7797,8 @@ export const GenesisView: React.FC = () => {
 			systemBodies.length > 0
 				? {
 						bodies: systemBodies,
-						hoursPerDay,
-						tideLock,
 						daysPerYear: effectiveDaysPerYear,
-						spectralClass: isValidSpectralClass(spectralClass)
+						spectralClass: STAR.isValidSpectralClass(spectralClass)
 							? (spectralClass as MainSequenceClass)
 							: DEFAULT_SPECTRAL_CLASS,
 						starSubtype,
@@ -7794,7 +7809,7 @@ export const GenesisView: React.FC = () => {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SOL_SEED,
+						showRealNames: restSeed === SYSTEM.SOL_SEED,
 						namesEnabled,
 						starName,
 					}
@@ -7803,8 +7818,6 @@ export const GenesisView: React.FC = () => {
 	}, [
 		systemBodies,
 		solarSystemViewActive,
-		hoursPerDay,
-		tideLock,
 		effectiveDaysPerYear,
 		spectralClass,
 		starSubtype,
@@ -8047,13 +8060,14 @@ export const GenesisView: React.FC = () => {
 		perihelion,
 	])
 
-	const solStarName = restSeed === SOL_SEED ? "Sol" : undefined
+	const solStarName = restSeed === SYSTEM.SOL_SEED ? "Sol" : undefined
 	const surfaceTidesM = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
 			return computeMoonSurfaceTidesM(
 				focusedMoon,
 				{
-					name: restSeed === SOL_SEED ? focusedMoonParent.name : undefined,
+					name:
+						restSeed === SYSTEM.SOL_SEED ? focusedMoonParent.name : undefined,
 					massKg: focusedMoonParent.massKg,
 					diameterKm: focusedMoonParent.diameterKm,
 					moons: focusedMoonParent.moons,
@@ -8106,12 +8120,11 @@ export const GenesisView: React.FC = () => {
 					worldTab={worldTab}
 					setWorldTab={setWorldTab}
 					resetWorldDefaults={handleResetDefaults}
-					tideLock={tideLock}
 					setTideLock={setTideLock}
 					setObliquity={setObliquity}
 					restSeed={restSeed}
 					starName={starName}
-					showRealSolNames={restSeed === SOL_SEED}
+					showRealSolNames={restSeed === SYSTEM.SOL_SEED}
 					setRestSeed={setRestSeed}
 					forceMainWorld={forceMainWorld}
 					setForceMainWorld={setForceMainWorld}
@@ -8126,7 +8139,6 @@ export const GenesisView: React.FC = () => {
 					onFocusBody={handleFocusBody}
 					currentFocus={currentFocus}
 					daysPerYear={daysPerYear}
-					hoursPerDay={hoursPerDay}
 					setHoursPerDay={setHoursPerDay}
 					planetRadiusKm={planetRadiusKm}
 					generatedMoons={displayMoons}

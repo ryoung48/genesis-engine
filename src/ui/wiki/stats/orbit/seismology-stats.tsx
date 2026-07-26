@@ -1,12 +1,11 @@
+import type { SeismologyProfile } from "@/model/celestial/orbit-body"
 import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { formatClassificationLabel } from "./formatters"
 
 export function buildSeismologyStats(
-	seismology:
-		| import("@/model/celestial/moons/moon-types").SeismologyProfile
-		| undefined,
+	seismology: SeismologyProfile | undefined,
 	surfaceTidesM?: SurfaceTidesBreakdown,
 ): StatEntry[] {
 	if (!seismology) return []

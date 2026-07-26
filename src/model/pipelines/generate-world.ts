@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Genesis pipeline orchestrator: generates a complete tectonic world.
  * Faithful port of genesis's planet-worker.js pipeline order.
  */
@@ -13,38 +13,37 @@ import type {
 	StageTiming,
 	TectonicPlate,
 } from ".."
-import { computeRoutes } from "../economy/routes"
+import { computeRoutes } from "../economy"
 import { buildSphereMesh } from "../mesh"
-import { createRng } from "../shared/rng"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
 	countContinents,
-} from "../shared/stats"
-import { getMaxOceanDepthKm } from "../shared/units"
-import { computeUrbanization } from "../society/urbanization"
+	createRng,
+	getMaxOceanDepthKm,
+} from "../shared"
+import { computeUrbanization } from "../society"
 import {
+	buildSuperPlates,
+	classifyBoundaries,
+	computeMantleField,
 	generateCoarsePlates,
 	projectCoarsePlates,
-} from "../tectonics/coarse-plates"
-import { classifyBoundaries } from "../tectonics/collision"
-import {
-	computeMantleField,
 	projectMantleFieldToRegions,
-} from "../tectonics/mantle"
-import { smoothAndReconnectPlates } from "../tectonics/plates"
-import { buildSuperPlates } from "../tectonics/super-plates"
-import { applyCraters } from "../terrain/craters"
-import { blendElevation, computeDistanceFields } from "../terrain/elevation"
+	smoothAndReconnectPlates,
+} from "../tectonics"
 import {
+	applyCraters,
+	applyHotspots,
+	applySeaLevelToElevation,
 	applySoilCreep,
+	blendElevation,
+	computeDistanceFields,
 	erodeComposite,
 	sharpenRidges,
 	smoothElevation,
 	warpTerrain,
-} from "../terrain/erosion"
-import { applyHotspots } from "../terrain/hotspots"
-import { applySeaLevelToElevation } from "../terrain/sea-level"
+} from "../terrain"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
@@ -626,8 +625,8 @@ export function generateGenesisWorld(
 	onProgress?.("urbanization", 80)
 
 	const infrastructure = withTiming("computeRoutes", infrastructureTiming, () =>
-		computeRoutes(
-			{
+		computeRoutes({
+			world: {
 				mesh,
 				params,
 				provinces: post.provinces,
@@ -635,14 +634,14 @@ export function generateGenesisWorld(
 				landmarks: provinceSociety.landmarks,
 				isLand,
 			},
-			{
+			inputs: {
 				urbanPopulation: urbanization.urbanPopulation,
 				settlementRegions: provinceSociety.settlementRegions,
 				settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
 				settlementPortRegions: provinceSociety.settlementPortRegions,
 				timings: infrastructureTiming,
 			},
-		),
+		}),
 	)
 	pipelineTiming.push(...infrastructureTiming)
 	onProgress?.("routes", 85)

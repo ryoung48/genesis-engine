@@ -1,11 +1,11 @@
-import { titleCase } from "@/model/shared/text"
+﻿import { titleCase } from "@/model/shared"
 import {
 	CULTURE_GENDER_SYSTEM,
 	type CultureGenderSystem,
 	normalizeCultureGenderSystem,
 	resolveLeaderGender,
-} from "@/model/society/gender-system"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+} from "@/model/society"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import { LANGUAGE } from "./languages"
 import type { Language } from "./languages/types"
 

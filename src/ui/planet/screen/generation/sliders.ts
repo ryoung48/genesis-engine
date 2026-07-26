@@ -1,17 +1,12 @@
-import {
-	getHabitableZoneAU,
-	getStarLuminositySol,
-	isValidSpectralClass,
-	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import { SOL_SEED } from "@/model/celestial/system/sol-system"
-import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import { type MainSequenceClass, STAR } from "@/model/celestial/star"
+import { SYSTEM } from "@/model/celestial/system"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getMaxOceanDepthKm,
-} from "@/model/shared/units"
-import type { SocietyEra } from "@/model/society/eras"
-import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
+	SLIDER_RANGES,
+} from "@/model/shared"
+import type { SocietyEra } from "@/model/society"
+import { computeSeaLevelOffsetKm } from "@/model/terrain"
 import type { UnitSystem } from "../shared/ui-format"
 import { DEFAULT_WORLD_PARAMS } from "./defaults"
 
@@ -42,7 +37,7 @@ export function buildPlanetSliders(state: {
 	pressure: number
 	landDistribution: number
 	landCoverage: number
-	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
+	tideLock: import("@/model/celestial/orbit-body").TideLock | null
 	substellarLon: number
 	setPlanetRadiusKm: (v: number) => void
 	setObliquity: (v: number) => void
@@ -66,17 +61,19 @@ export function buildPlanetSliders(state: {
 			set: state.setPlanetRadiusKm,
 		},
 		(() => {
-			const cls: MainSequenceClass = isValidSpectralClass(state.spectralClass)
+			const cls: MainSequenceClass = STAR.isValidSpectralClass(
+				state.spectralClass,
+			)
 				? state.spectralClass
 				: "G"
-			const lum = getStarLuminositySol(cls, state.starSubtype)
-			const hz = getHabitableZoneAU(lum)
+			const lum = STAR.getStarLuminositySol({ cls, subtype: state.starSubtype })
+			const hz = STAR.getHabitableZoneAU(lum)
 			const hzFactor = hz > 0 ? state.orbitalDistanceAU / hz : 1
 			return {
 				label: "Orbital Distance",
-				help: "Distance from the star relative to the habitable zone centre. 1.00× HZ = ideal insolation for liquid water.",
+				help: "Distance from the star relative to the habitable zone centre. 1.00Ã— HZ = ideal insolation for liquid water.",
 				value: hzFactor,
-				display: `${hzFactor.toFixed(2)}× HZ`,
+				display: `${hzFactor.toFixed(2)}Ã— HZ`,
 				min: 0.5,
 				max: 1.5,
 				step: 0.01,
@@ -226,7 +223,7 @@ export function resetWorldDefaults(setters: {
 	setOrbitalDistanceAU: (v: number) => void
 	setHoursPerDay: (v: number) => void
 	setTideLock: (
-		v: import("@/model/celestial/moons/moon-types").TideLock | null,
+		v: import("@/model/celestial/orbit-body").TideLock | null,
 	) => void
 	setSubstellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
@@ -249,7 +246,7 @@ export function resetWorldDefaults(setters: {
 	setters.setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
-	setters.setRestSeed(SOL_SEED)
+	setters.setRestSeed(SYSTEM.SOL_SEED)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)
 }

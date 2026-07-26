@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createStringRng } from "@/model/shared/rng"
+import { createStringRng } from "@/model/shared"
 import {
 	DEFAULT_GLYPH_ALPHABET,
 	type GlyphSet,

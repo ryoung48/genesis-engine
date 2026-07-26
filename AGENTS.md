@@ -13,6 +13,36 @@ Always check for duplicated logic before adding new code. Reuse or extract share
 
 Avoid barrel files. Import from the concrete module you need instead of adding or expanding `index.ts` re-export layers.
 
-## References
+## Plans
+- always write all plans to ./plans as md files
 
+## Implementation expectations
+
+- Make the smallest change that fully solves the problem.
+- Follow existing patterns before introducing a new abstraction.
+- Do not create a utility until there are at least two genuine callers.
+- Never use `_`-prefixed names to hide intentionally unused variables or parameters. Remove the unused variable, parameter, and any dead call-site argument instead.
+- All class implementations must have clear documentation explaining why the class is needed. Avoid classes and OOP where possible.
+- All optional type attributes must have clear documentation explaining why they are optional. Avoid optional types where possible.
+- Functions take at most one parameter. If a function needs more than one input, bundle them into a single object parameter (its type declared in the domain's `types.ts`, not inline). Exception: callbacks passed to native APIs whose call signature isn't ours to change (e.g. `Array.prototype.sort`/`reduce`/`map` comparators/callbacks). This is an interim manual rule until `lint/nursery/useMaxParams` is enabled in `biome.json`.
+
+# Module conventions (src/model)
+
+- **A domain is a distinct noun/concept** in the world model (`Cell`, `Province`, `Nation`) with its own shape + operations — or a layer that plays the same structural role (`shapers`, `hooks`, `utilities`).
+- **One UPPERCASE namespace object per domain** (`NATION`, `PROVINCE`, `CELL`) as its public API — not free functions, not a class.
+- **A folder that only groups unrelated domains (e.g. `celestial/` holding `star`, `moons`, `system`) is a category, not a domain.** Don't give it its own namespace object — a wrapper like `CELESTIAL` with no operations of its own, just delegating to `STAR`/`MOON`/`SYSTEM`, is a sign the folder should stay a plain directory. Give each real sub-domain inside it its own namespace object and its own barrel; don't collapse them behind one mega-barrel at the category folder's `index.ts`, since that's what invites everyone to reach past it into internals instead.
+- **`types.ts` = shape, `index.ts` = behavior.** Import types without pulling in logic. Never inline a type into its logic file just because only one file uses it — even a single-consumer type belongs in a `types.ts`. If that consumer is a flat file (not yet a folder), promote it to a `<name>/{index.ts,types.ts}` submodule rather than breaking the split.
+- **Barrel-only.** Import from a folder's `index.ts`, never reach into its internals.
+- **The barrel is the entry point, not a pass-through.** `index.ts` should export the domain's namespace object, not just re-export free functions/constants pulled in from sibling files with no namespace wrapping them — that's a re-export shim, not an API.
+- **Export the namespace object only, never its members destructured out alongside it.** Don't add `export const { fn1, fn2 } = DOMAIN` next to `export const DOMAIN = {...}` — callers use `DOMAIN.fn1`. A namespace's public surface should only include functions outside callers actually call — if nothing outside the domain calls a method, don't export it at all (keep it un-exported or `_`-prefixed private).
+- **`_`-prefixed methods are private.** Don't call them from outside their namespace object; do not export them at all.
+- **Nest sub-folders only for real sub-domains** (own types + operations worth a barrel), not for arbitrary depth. A type used by exactly one file counts as that file owning a real sub-domain: if that file is not the domain's `index.ts` entry point, promote it to its own `<name>/{index.ts,types.ts}` submodule instead of leaving the type in the parent `types.ts` or inlining it.
+- **Split a domain once its `index.ts` mixes multiple sub-concerns or grows past ~250-500 lines** (e.g. `cells` → `geography`/`navigation`/`weather`). When splitting: extract each sub-concern into its own `sub-folder/{index.ts,types.ts}`, keep the parent namespace object as the entry point, and have the parent re-export or delegate to the sub-domain's namespace object rather than inlining its logic.
+- **Reusable logic that isn't specific to the domain doesn't belong in a domain file** — move it to the most specific existing `utilities/*` sub-module (`math`, `array`, `text`, …), or create a new specific one. Avoid dumping it into a catch-all/generic file.
+
+# UI Conventions
+- Keep business logic out of React components.
 - For any UI or UX work, follow `src/ui/components/UI.md`.
+
+# Rule violations
+- If a change surfaces a violation of any rule above that is out of scope to fix now, log it in a new plan under `./plans` describing what is violated, where, and what future work would resolve it — and explicitly call it out to the user in the response.

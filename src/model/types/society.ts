@@ -132,13 +132,3 @@ export interface GenesisRivers {
 	/** Per-cell water surface elevation (only meaningful for lake cells) */
 	waterLevel: Float32Array
 }
-
-export const GENESIS_TOPOGRAPHY_LABELS = [
-	"flat",
-	"hill",
-	"plateau",
-	"mountains",
-	"marsh",
-	"ocean",
-	"lake",
-] as const

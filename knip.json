@@ -1,13 +1,9 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
-	"entry": ["src/model/genesis.worker.ts"],
+	"entry": ["src/model/genesis.worker.ts", "src/**/*.smoke.test.ts"],
 	"project": ["src/**/*.{ts,tsx,js,jsx}"],
 	"ignoreBinaries": ["python"],
 	"ignoreDependencies": ["tailwindcss", "babel-plugin-react-compiler"],
-	"ignore": [
-		"src/types/*.d.ts",
-		"src/model/society/language/**",
-		"src/model/celestial/moons/moon-types.ts"
-	],
+	"ignore": ["src/types/*.d.ts", "src/model/society/language/**"],
 	"tags": ["-lintignore"]
 }

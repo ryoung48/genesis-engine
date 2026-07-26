@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Distance fields and elevation assignment.
  * Faithful port of genesis's elevation.js distance-field + elevation logic.
  */
@@ -10,9 +10,8 @@ import type {
 	PlateVec,
 	SphereMesh,
 } from ".."
-import { createRng } from "../shared/rng"
-import { SimplexNoise } from "../shared/simplex-noise"
-import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
+import { createRng, SimplexNoise } from "../shared"
+import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
 import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
 
 type StageTiming = { Stage: string; ms: string }

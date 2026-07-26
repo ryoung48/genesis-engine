@@ -1,11 +1,11 @@
-import { createStringRng } from "@/model/shared/rng"
-import type { HeritageScript } from "@/model/society/script"
-import { layoutGlyphText } from "@/model/society/script/runegen/glyph-module"
+﻿import { createStringRng } from "@/model/shared"
+import type { HeritageScript } from "@/model/society"
 import {
 	getRuneDotRadius,
 	getRuneDots,
+	layoutGlyphText,
 	prepareRuneStrokes,
-} from "@/model/society/script/runegen/rune-renderer"
+} from "@/model/society"
 import { LABEL_OUTLINE_COLOR } from "./nation-label-overlay"
 
 const CELL_SCALE = 7

@@ -1,5 +1,4 @@
-import { SEED_MAX } from "@/model/shared/planet-code"
-import { seedStringToNumber } from "@/model/shared/rng"
+﻿import { SEED_MAX, seedStringToNumber } from "@/model/shared"
 
 export function formatSeedLabel(seed: number): string {
 	return seed.toString(36)

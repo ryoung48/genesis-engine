@@ -1,10 +1,11 @@
 import React from "react"
 import {
 	mapLinear,
+	PURPLES_STOPS,
+	SPECTRAL_STOPS,
 	sampleBasisColorStops,
 	sampleColorStops,
-} from "@/model/shared/color-interpolation"
-import { PURPLES_STOPS, SPECTRAL_STOPS } from "@/model/shared/color-palettes"
+} from "@/model/shared"
 import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import {

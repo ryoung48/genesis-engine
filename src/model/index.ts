@@ -1,33 +1,30 @@
-export type {
-	GenesisClimate,
-	GenesisHazards,
-	GenesisHydrology,
-	GenesisOceanCurrents,
-	GenesisRainfall,
-} from "./types/climate"
-export type { SphereMesh } from "./types/mesh"
-export type {
-	GenesisLocations,
-	GenesisNationHierarchy,
-	GenesisPartition,
-	GenesisProvinces,
-	GenesisRivers,
-} from "./types/society"
-export { GENESIS_TOPOGRAPHY_LABELS } from "./types/society"
+export {
+	GENESIS_TERRAIN_FEATURE,
+	GENESIS_TERRAIN_FEATURE_LABELS,
+} from "./tectonics"
 
+export { GENESIS_TOPOGRAPHY_LABELS } from "./terrain"
 export type {
 	BoundaryInfo,
 	CollisionResult,
 	DistanceFields,
+	GenesisClimate,
+	GenesisHazards,
+	GenesisHydrology,
+	GenesisLocations,
+	GenesisNationHierarchy,
+	GenesisOceanCurrents,
 	GenesisParams,
+	GenesisPartition,
+	GenesisProvinces,
+	GenesisRainfall,
+	GenesisRivers,
 	GenesisTerrainFeatures,
 	PlateVec,
+	SphereMesh,
 	StageTiming,
 	SuperPlateData,
 	TectonicPlate,
-} from "./types/tectonics"
-export {
-	GENESIS_TERRAIN_FEATURE,
-	GENESIS_TERRAIN_FEATURE_LABELS,
-} from "./types/tectonics"
+} from "./types"
+
 export type { GenesisWorld } from "./world"

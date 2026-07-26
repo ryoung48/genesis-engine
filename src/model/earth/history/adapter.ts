@@ -1,7 +1,11 @@
 import type { PoliticalMapWar } from "../../../ui/planet/screen/display/political-conflict-display"
-import type { RawNationReference } from "./data-source"
 import type { FoldedState } from "./fold"
-import type { Eu4ProvinceMap } from "./import/eu4-province-map"
+import type {
+	FindCentroidNearestProvinceParams,
+	FoldedStateToGenesisFrameParams,
+	FoldedStateToNationInfoParams,
+	LonLat,
+} from "./types"
 
 function isPlaceholderNationTag(tag: string): boolean {
 	return tag === "---" || tag === "XXX"
@@ -26,7 +30,7 @@ function assignNationIds(state: FoldedState): Map<string, number> {
 	}
 	const sorted = Array.from(tags).sort()
 	const ids = new Map<string, number>()
-	sorted.forEach((tag, i) => ids.set(tag, i))
+	for (const [i, tag] of sorted.entries()) ids.set(tag, i)
 	return ids
 }
 
@@ -82,10 +86,7 @@ export interface GenesisFrameFromHistory {
 /** Converts a lon/lat pair to a unit vector on the sphere, so per-nation
  * geographic centroids can be averaged without antimeridian/pole
  * wraparound issues (plain lon/lat averaging breaks near +-180 deg). */
-function lonLatToUnitVector(
-	lon: number,
-	lat: number,
-): [number, number, number] {
+function lonLatToUnitVector({ lon, lat }: LonLat): [number, number, number] {
 	const lonRad = (lon * Math.PI) / 180
 	const latRad = (lat * Math.PI) / 180
 	const cosLat = Math.cos(latRad)
@@ -98,11 +99,11 @@ function lonLatToUnitVector(
 
 /** Among `owned` (compact province indices), returns the one geographically
  * closest to their collective centroid -- null if none have coordinates. */
-function findCentroidNearestProvince(
-	owned: number[],
-	provinceMap: Eu4ProvinceMap,
-	provinceCoords: Map<string, { lon: number; lat: number }>,
-): number | null {
+function findCentroidNearestProvince({
+	owned,
+	provinceMap,
+	provinceCoords,
+}: FindCentroidNearestProvinceParams): number | null {
 	const vectors: { idx: number; v: [number, number, number] }[] = []
 	let sumX = 0
 	let sumY = 0
@@ -111,7 +112,7 @@ function findCentroidNearestProvince(
 		const rawId = String(provinceMap.compactToRealId[idx])
 		const coord = provinceCoords.get(rawId)
 		if (!coord) continue
-		const v = lonLatToUnitVector(coord.lon, coord.lat)
+		const v = lonLatToUnitVector(coord)
 		vectors.push({ idx, v })
 		sumX += v[0]
 		sumY += v[1]
@@ -139,14 +140,14 @@ function findCentroidNearestProvince(
 	return bestIdx
 }
 
-export function foldedStateToGenesisFrame(
-	state: FoldedState,
-	provinceMap: Eu4ProvinceMap,
-	nationReference?: Map<string, RawNationReference>,
-	cultureNameById?: Map<string, string>,
-	religionNameById?: Map<string, string>,
-	provinceCoords?: Map<string, { lon: number; lat: number }>,
-): GenesisFrameFromHistory {
+export function foldedStateToGenesisFrame({
+	state,
+	provinceMap,
+	nationReference,
+	cultureNameById,
+	religionNameById,
+	provinceCoords,
+}: FoldedStateToGenesisFrameParams): GenesisFrameFromHistory {
 	const count = provinceMap.compactToRealId.length
 	const assignment = new Int32Array(count).fill(-1)
 	const cultureByProvince: (string | null)[] = new Array(count).fill(null)
@@ -226,11 +227,11 @@ export function foldedStateToGenesisFrame(
 		if (!hasCapitalSeed && provinceCoords) {
 			const owned = ownedByNation.get(id)
 			if (owned && owned.length > 1) {
-				const centroidNearestIdx = findCentroidNearestProvince(
+				const centroidNearestIdx = findCentroidNearestProvince({
 					owned,
 					provinceMap,
 					provinceCoords,
-				)
+				})
 				if (centroidNearestIdx !== null) seeds[id] = centroidNearestIdx
 			}
 		}
@@ -298,10 +299,10 @@ export interface NationInfoFromHistory {
 	}[]
 }
 
-export function foldedStateToNationInfo(
-	state: FoldedState,
-	tag: string,
-): NationInfoFromHistory | null {
+export function foldedStateToNationInfo({
+	state,
+	tag,
+}: FoldedStateToNationInfoParams): NationInfoFromHistory | null {
 	const n = state.nations.get(tag)
 	if (!n) return null
 	const atWar: NationInfoFromHistory["atWar"] = []

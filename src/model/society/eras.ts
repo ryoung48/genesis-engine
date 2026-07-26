@@ -1,5 +1,3 @@
-import { NATION_BUCKETS } from "./nations"
-
 export type SocietyEra =
 	| "paleolithic"
 	| "neolithic"
@@ -217,6 +215,16 @@ interface EraConfig {
 	 */
 	governmentSizeWeight: number
 }
+
+export const NATION_BUCKETS: [number, number][] = [
+	[251, 600],
+	[50, 250],
+	[25, 49],
+	[10, 24],
+	[5, 9],
+	[2, 4],
+	[1, 1],
+]
 
 function normalize(values: number[]): number[] {
 	const sum = values.reduce((a, b) => a + b, 0) || 1

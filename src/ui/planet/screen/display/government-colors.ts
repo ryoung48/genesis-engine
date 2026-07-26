@@ -1,4 +1,4 @@
-import { GOVERNMENT_TYPES, type GovernmentType } from "@/model/society/eras"
+﻿import { GOVERNMENT_TYPES, type GovernmentType } from "@/model/society"
 
 export const GOVERNMENT_COLORS_BY_TYPE: Record<
 	GovernmentType,

@@ -1,8 +1,8 @@
-import type { GenesisRivers, SphereMesh } from ".."
+﻿import type { GenesisRivers, SphereMesh } from ".."
 import { BIOME_LABELS } from "../climate/vegetation"
-import { SimplexNoise } from "../shared/simplex-noise"
-import type { GenesisLandmarks } from "../terrain/landmarks"
-import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
+import { SimplexNoise } from "../shared"
+import type { GenesisLandmarks } from "./landmarks"
+import { LANDMARK_TYPE_LAKE } from "./landmarks"
 
 export const TOPO_FLAT = 0
 export const TOPO_HILL = 1
@@ -60,6 +60,16 @@ function computeSlopeScore(
 
 	return smoothedSlope
 }
+
+export const GENESIS_TOPOGRAPHY_LABELS = [
+	"flat",
+	"hill",
+	"plateau",
+	"mountains",
+	"marsh",
+	"ocean",
+	"lake",
+] as const
 
 export function classifyTopography(params: {
 	mesh: SphereMesh

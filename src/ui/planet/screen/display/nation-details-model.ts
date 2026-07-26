@@ -1,9 +1,10 @@
-import { GOVERNMENT_TYPE_LABELS, GOVERNMENT_TYPES } from "@/model/society/eras"
-import {
+﻿import {
+	GOVERNMENT_TYPE_LABELS,
+	GOVERNMENT_TYPES,
 	RELIGION_TYPE_COLORS,
 	RELIGION_TYPE_NAMES,
-} from "@/model/society/religion"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+} from "@/model/society"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import type { DistributionBucket } from "../../details/shared"
 import type { DisplayNationModel } from "./display-model"
 import { GOVERNMENT_COLORS_CSS } from "./government-colors"

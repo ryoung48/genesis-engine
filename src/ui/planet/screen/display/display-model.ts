@@ -1,4 +1,4 @@
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+﻿import type { SerializedGenesisWorld } from "@/model/transport"
 
 export interface DisplayNationModel {
 	assignment: Int32Array

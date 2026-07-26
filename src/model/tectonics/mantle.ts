@@ -1,6 +1,5 @@
-import type { PlateVec, SphereMesh } from ".."
-import { eulerVelocityAt } from "../shared/math"
-import { makeRng } from "../shared/rng"
+﻿import type { PlateVec, SphereMesh } from ".."
+import { eulerVelocityAt, makeRng } from "../shared"
 
 const CONTINENTAL_DRAG_FACTOR = 0.35
 const OCEAN_DRAG_FACTOR = 1.0

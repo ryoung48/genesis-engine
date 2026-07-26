@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react"
 import type { StageTiming } from "@/model"
-import type { MoonBody } from "@/model/celestial/moons/moon-types"
-import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
-import { SOL_SEED } from "@/model/celestial/system/sol-system"
+import type { MoonBody } from "@/model/celestial/moons"
+import type { SystemBody } from "@/model/celestial/system"
+import { SYSTEM } from "@/model/celestial/system"
 import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule"
 import { ERA_CONFIGS, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
@@ -38,9 +38,8 @@ interface GenerationPanelProps {
 	worldTab: "planet" | "society"
 	setWorldTab: (tab: "planet" | "society") => void
 	resetWorldDefaults: () => void
-	tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
 	setTideLock: (
-		v: import("@/model/celestial/moons/moon-types").TideLock | null,
+		v: import("@/model/celestial/orbit-body").TideLock | null,
 	) => void
 	setObliquity: (v: number) => void
 	restSeed: number
@@ -79,7 +78,6 @@ interface GenerationPanelProps {
 	 * current seed, without touching its parent body or any sibling moon. */
 	onResetSystemMoon?: (bodyIndex: number, moonIndex: number) => void
 	daysPerYear: number
-	hoursPerDay: number
 	setHoursPerDay: (v: number) => void
 	planetRadiusKm: number
 	generatedMoons: MoonBody[]
@@ -138,7 +136,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	worldTab,
 	setWorldTab,
 	resetWorldDefaults,
-	tideLock,
 	setTideLock,
 	setObliquity,
 	restSeed,
@@ -158,7 +155,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	onRebuildSystemBody,
 	onResetSystemMoon,
 	daysPerYear,
-	hoursPerDay,
 	setHoursPerDay,
 	planetRadiusKm,
 	generatedMoons,
@@ -288,7 +284,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								onRebuildSystemBody={onRebuildSystemBody}
 								onResetSystemMoon={onResetSystemMoon}
 								surfaceTidesM={surfaceTidesM}
-								tideLock={tideLock}
 								setTideLock={setTideLock}
 								setHoursPerDay={setHoursPerDay}
 								radiusSlider={radiusSlider}
@@ -306,7 +301,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								starName={starName}
 								forceMainWorld={forceMainWorld}
 								setForceMainWorld={setForceMainWorld}
-								hoursPerDay={hoursPerDay}
 								daysPerYear={daysPerYear}
 								surfaceStats={surfaceStats}
 								orbitalDistanceAU={orbitalDistanceAU}
@@ -314,7 +308,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								perihelion={perihelion}
 								axialTiltDisplay={axialTiltDisplay}
 								landCoverage={landCoverage}
-								showRealSolNames={showRealSolNames && restSeed === SOL_SEED}
+								showRealSolNames={
+									showRealSolNames && restSeed === SYSTEM.SOL_SEED
+								}
 								spectralClass={spectralClass}
 								setSpectralClass={setSpectralClass}
 								starSubtype={starSubtype}

@@ -1,7 +1,5 @@
 import type { SphereMesh } from ".."
-import { smoothstep } from "../shared/math"
-import { MinHeap } from "../shared/min-heap"
-import { SimplexNoise } from "../shared/simplex-noise"
+import { MinHeap, SimplexNoise, smoothstep } from "../shared"
 
 /**
  * Core iteration kernel shared by smoothElevation, sharpenRidges, and applySoilCreep.

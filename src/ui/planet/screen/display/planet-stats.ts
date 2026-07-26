@@ -1,15 +1,12 @@
-import {
-	computeSolarDayHours,
-	inferRetrogradeRotationFromAxialTiltDeg,
-} from "@/model/celestial/day-length"
-import { getClimateGeometry } from "@/model/climate/rain"
+﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { getClimateGeometry } from "@/model/climate"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getMaxOceanDepthKm,
 	meanEdgeLengthKm,
-} from "@/model/shared/units"
-import { computeSeaLevelOffsetKm } from "@/model/terrain/sea-level"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+} from "@/model/shared"
+import { computeSeaLevelOffsetKm } from "@/model/terrain"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	formatArea,
 	formatDistance,
@@ -43,7 +40,7 @@ export function computePlanetStats(
 		hoursPerDay: number
 		planetRadiusKm: number
 		pressure: number
-		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null
+		tideLock: import("@/model/celestial/orbit-body").TideLock | null
 		seaLevel?: number
 		maxElevation?: number
 		avgWindSpeedMs?: number | null
@@ -198,8 +195,9 @@ export function computePlanetStats(
 
 	const pressureValue = activeParams?.pressure ?? params.pressure
 	const isTidal = (activeParams?.tideLock ?? params.tideLock)?.type === "solar"
-	const retrograde = inferRetrogradeRotationFromAxialTiltDeg(obliquityValue)
-	const solarDayHours = computeSolarDayHours({
+	const retrograde =
+		ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(obliquityValue)
+	const solarDayHours = ORBIT_BODY.computeSolarDayHours({
 		siderealDayHours: hoursPerDayValue,
 		orbitalPeriodDays: daysPerYearValue,
 		retrograde,
@@ -243,7 +241,7 @@ export function computePlanetStats(
 			? [
 					{
 						label: "Spring Tide",
-						value: `${world.tidalSchedule.maxForce.toFixed(2)}× Earth`,
+						value: `${world.tidalSchedule.maxForce.toFixed(2)}Ã— Earth`,
 					},
 					...(() => {
 						const { events } = world.tidalSchedule

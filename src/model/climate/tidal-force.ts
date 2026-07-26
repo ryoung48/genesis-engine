@@ -1,8 +1,10 @@
-import { AU_M, M_SOL_KG } from "../celestial/moons/orbital-mechanics"
 import {
-	getStarMassSol,
-	type MainSequenceClass,
-} from "../celestial/star/star-types"
+	ASTRONOMICAL_UNIT_M,
+	EARTH_MASS_KG,
+	EARTH_RADIUS_M,
+	SOLAR_MASS_KG,
+} from "../celestial/orbit-body"
+import { type MainSequenceClass, STAR } from "../celestial/star"
 
 const TWO_PI = 2 * Math.PI
 
@@ -95,7 +97,7 @@ export function starTidalPosition(
 			Math.sqrt(1 + planetEccentricity) * Math.sin(E / 2),
 			Math.sqrt(1 - planetEccentricity) * Math.cos(E / 2),
 		)
-	const a = orbitalDistanceAU * AU_M
+	const a = orbitalDistanceAU * ASTRONOMICAL_UNIT_M
 	const r =
 		(a * (1 - planetEccentricity * planetEccentricity)) /
 		(1 + planetEccentricity * Math.cos(nu))
@@ -121,7 +123,9 @@ export function starTideContribution(
 	planetMassKg: number,
 	planetRadiusM: number,
 ): number {
-	const starMassKg = getStarMassSol(spectralClass, starSubtype) * M_SOL_KG
+	const starMassKg =
+		STAR.getStarMassSol({ cls: spectralClass, subtype: starSubtype }) *
+		SOLAR_MASS_KG
 	return tideContribution(
 		starLatRad,
 		starLonRad,
@@ -135,11 +139,9 @@ export function starTideContribution(
 }
 
 // Earth-Moon reference tidal scale at equator (lat=0, lon=0, moon overhead)
-// C_earth = (M_moon / M_earth) × (R_earth^4 / d_moon^3)
+// C_earth = (M_moon / M_earth) Ã— (R_earth^4 / d_moon^3)
 // P2(cos 0) = 1
 const EARTH_MOON_MASS_KG = 7.34e22
-const EARTH_MASS_KG = 5.973886146404331e24
-const EARTH_RADIUS_M = 6.371e6
 const EARTH_MOON_DIST_M = 3.844e8
 
 export const EARTH_MOON_TIDE_REFERENCE =

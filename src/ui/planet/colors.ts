@@ -1,25 +1,23 @@
-import { PASTA_LABELS } from "@/model/climate/pasta"
 import {
 	CHAOTIC_MAX,
+	PASTA_LABELS,
 	TEMPERATURE_BOUNDARY_BOREAL,
 	TEMPERATURE_BOUNDARY_SUBARCTIC,
 	TEMPERATURE_BOUNDARY_SUBTROPICAL,
 	TEMPERATURE_BOUNDARY_TEMPERATE,
 	TEMPERATURE_BOUNDARY_TROPICAL,
-} from "@/model/climate/vegetation"
+} from "@/model/climate"
 import {
+	BUPU_STOPS,
 	cssColorToRgb,
+	ORANGES_STOPS,
+	PURPLES_STOPS,
 	quantizeRgb,
 	type RgbColor,
 	sampleBasisColorStops,
 	sampleColorStops,
-} from "@/model/shared/color-interpolation"
-import {
-	BUPU_STOPS,
-	ORANGES_STOPS,
-	PURPLES_STOPS,
 	YL_OR_RD_STOPS,
-} from "@/model/shared/color-palettes"
+} from "@/model/shared"
 /**
  * Genesis elevation and temperature color mapping.
  */

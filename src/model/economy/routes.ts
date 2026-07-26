@@ -1,10 +1,13 @@
-import type { GenesisParams, SphereMesh } from ".."
-import { MinHeap } from "../shared/min-heap"
-import { regionDistanceKm, regionPathLengthKm } from "../shared/units"
-import { buildUrquhartEdgesFromFlat } from "../shared/urquhart"
-import type { SocietyEra } from "../society/eras"
-import { getSettlementEraTuning } from "../society/settlement-tuning"
-import type { GenesisLandmarks } from "../terrain/landmarks"
+﻿import type { GenesisParams, SphereMesh } from ".."
+import {
+	buildUrquhartEdgesFromFlat,
+	MinHeap,
+	regionDistanceKm,
+	regionPathLengthKm,
+} from "../shared"
+import type { SocietyEra } from "../society"
+import { getSettlementEraTuning } from "../society"
+import type { GenesisLandmarks } from "../terrain"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -12,8 +15,8 @@ import {
 	type Route,
 	type RouteEdge,
 	type SerializedRouteKind,
-} from "../transport/worker-types"
-import type { GenesisNationHierarchy, GenesisProvinces } from "../types/society"
+} from "../transport"
+import type { GenesisNationHierarchy, GenesisProvinces } from "../types"
 
 /**
  * Route computation runs mid-pipeline, before the GenesisWorld literal is
@@ -118,11 +121,15 @@ interface RouteComputation {
 	network: RouteEdge[]
 }
 
-function timed<T>(
-	label: string,
-	timings: Array<{ Stage: string; ms: string }> | undefined,
-	fn: () => T,
-): T {
+function timed<T>({
+	label,
+	timings,
+	fn,
+}: {
+	label: string
+	timings: Array<{ Stage: string; ms: string }> | undefined
+	fn: () => T
+}): T {
 	const t0 = performance.now()
 	const result = fn()
 	if (timings) {
@@ -176,19 +183,32 @@ interface SeaNeighborWorkspace {
 	stamp: number
 }
 
-function pairKey(a: number, b: number, span: number): number {
+function pairKey({
+	a,
+	b,
+	span,
+}: {
+	a: number
+	b: number
+	span: number
+}): number {
 	const from = Math.min(a, b)
 	const to = Math.max(a, b)
 	return from * span + to
 }
 
-function edgeKey(
-	a: number,
-	b: number,
-	kind: SerializedRouteKind,
-	span: number,
-): number {
-	return kind * span * span + pairKey(a, b, span)
+function edgeKey({
+	a,
+	b,
+	kind,
+	span,
+}: {
+	a: number
+	b: number
+	kind: SerializedRouteKind
+	span: number
+}): number {
+	return kind * span * span + pairKey({ a, b, span })
 }
 
 function networkKindForRouteKind(
@@ -197,10 +217,13 @@ function networkKindForRouteKind(
 	return kind === ROUTE_SEA ? kind : ROUTE_LAND_MINOR
 }
 
-function mergeNetworkKind(
-	current: SerializedRouteKind,
-	next: SerializedRouteKind,
-): SerializedRouteKind {
+function mergeNetworkKind({
+	current,
+	next,
+}: {
+	current: SerializedRouteKind
+	next: SerializedRouteKind
+}): SerializedRouteKind {
 	if (current === ROUTE_SEA || next === ROUTE_SEA) {
 		return ROUTE_SEA
 	}
@@ -251,10 +274,13 @@ function computeLandPassableMask(state: RouteWorld): Uint8Array {
 	return mask
 }
 
-function computeProvinceLandClusters(
-	state: RouteWorld,
-	landPassable: Uint8Array,
-): Int32Array {
+function computeProvinceLandClusters({
+	state,
+	landPassable,
+}: {
+	state: RouteWorld
+	landPassable: Uint8Array
+}): Int32Array {
 	const regionCluster = new Int32Array(state.regionProvince.length).fill(-1)
 	const provinceCluster = new Int32Array(state.P).fill(-1)
 	const queue = new Int32Array(state.regionProvince.length)
@@ -352,10 +378,13 @@ function computeWaterDepthPenalty(state: RouteWorld): Float32Array {
 	return penalty
 }
 
-function tangentProjectFlat(
-	regions: Int32Array | number[],
-	r_xyz: Float32Array,
-): Float64Array {
+function tangentProjectFlat({
+	regions,
+	r_xyz,
+}: {
+	regions: Int32Array | number[]
+	r_xyz: Float32Array
+}): Float64Array {
 	let cx = 0
 	let cy = 0
 	let cz = 0
@@ -402,12 +431,17 @@ function tangentProjectFlat(
 	return projected
 }
 
-function collectLandCandidatesByKind(
-	state: RouteWorld,
-	settlementRegions: Int32Array,
-	provinceClusters: Int32Array,
-	urbanPopulation: Float32Array,
-): LandCandidateGroupsByKind {
+function collectLandCandidatesByKind({
+	state,
+	settlementRegions,
+	provinceClusters,
+	urbanPopulation,
+}: {
+	state: RouteWorld
+	settlementRegions: Int32Array
+	provinceClusters: Int32Array
+	urbanPopulation: Float32Array
+}): LandCandidateGroupsByKind {
 	const thresholds = routePopulationThresholds(state.era)
 	const majorGroups = new Map<number, LandCandidateGroup>()
 	const minorGroups = new Map<number, LandCandidateGroup>()
@@ -433,9 +467,21 @@ function collectLandCandidatesByKind(
 			province,
 			region,
 		}
-		pushLandCandidate(minorGroups, groupKey, cluster, landmark, candidate)
+		pushLandCandidate({
+			groups: minorGroups,
+			groupKey,
+			cluster,
+			landmark,
+			candidate,
+		})
 		if (population > thresholds.majorSettlementMin) {
-			pushLandCandidate(majorGroups, groupKey, cluster, landmark, candidate)
+			pushLandCandidate({
+				groups: majorGroups,
+				groupKey,
+				cluster,
+				landmark,
+				candidate,
+			})
 		}
 	}
 	return {
@@ -444,13 +490,19 @@ function collectLandCandidatesByKind(
 	}
 }
 
-function pushLandCandidate(
-	groups: Map<number, LandCandidateGroup>,
-	groupKey: number,
-	cluster: number,
-	landmark: number,
-	candidate: RouteCandidate,
-): void {
+function pushLandCandidate({
+	groups,
+	groupKey,
+	cluster,
+	landmark,
+	candidate,
+}: {
+	groups: Map<number, LandCandidateGroup>
+	groupKey: number
+	cluster: number
+	landmark: number
+	candidate: RouteCandidate
+}): void {
 	const group = groups.get(groupKey)
 	if (group) {
 		group.candidates.push(candidate)
@@ -463,13 +515,19 @@ function pushLandCandidate(
 	})
 }
 
-function collectSeaCandidates(
-	state: RouteWorld,
-	settlementRegions: Int32Array,
-	settlementWaterLandmarks: Int32Array,
-	settlementPortRegions: Int32Array,
-	urbanPopulation: Float32Array,
-): SeaCandidateGroup[] {
+function collectSeaCandidates({
+	state,
+	settlementRegions,
+	settlementWaterLandmarks,
+	settlementPortRegions,
+	urbanPopulation,
+}: {
+	state: RouteWorld
+	settlementRegions: Int32Array
+	settlementWaterLandmarks: Int32Array
+	settlementPortRegions: Int32Array
+	urbanPopulation: Float32Array
+}): SeaCandidateGroup[] {
 	const thresholds = routePopulationThresholds(state.era)
 	const groups = new Map<number, SeaCandidateGroup>()
 	const minWaterBodySize =
@@ -503,18 +561,29 @@ function collectSeaCandidates(
 	return [...groups.values()]
 }
 
-function findLandPath(
-	state: RouteWorld,
-	workspace: SearchWorkspace,
-	startRegion: number,
-	endRegion: number,
-	cluster: number,
-	landmark: number,
-	landPassable: Uint8Array,
-	provinceClusters: Int32Array,
-	landEdgeUsed: Set<number>,
-	regionPairSpan: number,
-): number[] {
+function findLandPath({
+	state,
+	workspace,
+	startRegion,
+	endRegion,
+	cluster,
+	landmark,
+	landPassable,
+	provinceClusters,
+	landEdgeUsed,
+	regionPairSpan,
+}: {
+	state: RouteWorld
+	workspace: SearchWorkspace
+	startRegion: number
+	endRegion: number
+	cluster: number
+	landmark: number
+	landPassable: Uint8Array
+	provinceClusters: Int32Array
+	landEdgeUsed: Set<number>
+	regionPairSpan: number
+}): number[] {
 	if (startRegion < 0 || endRegion < 0) return []
 	workspace.stamp++
 	if (workspace.stamp === 0x7fffffff) {
@@ -562,7 +631,9 @@ function findLandPath(
 			}
 			const nextDistance =
 				workspace.distance[current] +
-				(landEdgeUsed.has(pairKey(current, neighbor, regionPairSpan))
+				(landEdgeUsed.has(
+					pairKey({ a: current, b: neighbor, span: regionPairSpan }),
+				)
 					? ROUTE_TUNING.land.existingEdgeCost
 					: ROUTE_TUNING.land.newEdgeCost)
 			if (
@@ -577,19 +648,28 @@ function findLandPath(
 		}
 	}
 
-	return reconstructPathFromTree(workspace, startRegion, endRegion, stamp)
+	return reconstructPathFromTree({ workspace, startRegion, endRegion, stamp })
 }
 
-function findSeaPathsToTargets(
-	state: RouteWorld,
-	workspace: SearchWorkspace,
-	startRegion: number,
-	targetRegions: ArrayLike<number>,
-	waterLandmark: number,
-	waterEdgeUsed: Set<number>,
-	waterDepthPenalty: Float32Array,
-	regionPairSpan: number,
-): number {
+function findSeaPathsToTargets({
+	state,
+	workspace,
+	startRegion,
+	targetRegions,
+	waterLandmark,
+	waterEdgeUsed,
+	waterDepthPenalty,
+	regionPairSpan,
+}: {
+	state: RouteWorld
+	workspace: SearchWorkspace
+	startRegion: number
+	targetRegions: ArrayLike<number>
+	waterLandmark: number
+	waterEdgeUsed: Set<number>
+	waterDepthPenalty: Float32Array
+	regionPairSpan: number
+}): number {
 	workspace.stamp++
 	if (workspace.stamp === 0x7fffffff) {
 		workspace.queued.fill(0)
@@ -642,7 +722,9 @@ function findSeaPathsToTargets(
 			}
 			const nextDistance =
 				workspace.distance[current] +
-				(waterEdgeUsed.has(pairKey(current, neighbor, regionPairSpan))
+				(waterEdgeUsed.has(
+					pairKey({ a: current, b: neighbor, span: regionPairSpan }),
+				)
 					? ROUTE_TUNING.sea.existingEdgeCost
 					: ROUTE_TUNING.sea.newEdgeCost) +
 				(waterDepthPenalty[current] + waterDepthPenalty[neighbor]) / 2
@@ -661,12 +743,17 @@ function findSeaPathsToTargets(
 	return stamp
 }
 
-function reconstructPathFromTree(
-	workspace: SearchWorkspace,
-	startRegion: number,
-	endRegion: number,
-	stamp: number,
-): number[] {
+function reconstructPathFromTree({
+	workspace,
+	startRegion,
+	endRegion,
+	stamp,
+}: {
+	workspace: SearchWorkspace
+	startRegion: number
+	endRegion: number
+	stamp: number
+}): number[] {
 	if (workspace.settled[endRegion] !== stamp) return []
 	const path: number[] = []
 	for (
@@ -681,11 +768,15 @@ function reconstructPathFromTree(
 	return path
 }
 
-function computeSeaRouteMaxLengthKm(
-	state: RouteWorld,
-	sourcePopulation: number,
-	targetPopulation: number,
-): number {
+function computeSeaRouteMaxLengthKm({
+	state,
+	sourcePopulation,
+	targetPopulation,
+}: {
+	state: RouteWorld
+	sourcePopulation: number
+	targetPopulation: number
+}): number {
 	const thresholds = routePopulationThresholds(state.era)
 	return sourcePopulation < thresholds.shortRouteMaxPop &&
 		targetPopulation < thresholds.shortRouteMaxPop
@@ -693,13 +784,19 @@ function computeSeaRouteMaxLengthKm(
 		: ROUTE_TUNING.sea.maxLengthKm
 }
 
-function collectSeaNeighborPairs(
-	state: RouteWorld,
-	waterLandmark: number,
-	candidates: SeaCandidateGroup["candidates"],
-	waterDepthPenalty: Float32Array,
-	workspace: SeaNeighborWorkspace,
-): Array<[number, number]> {
+function collectSeaNeighborPairs({
+	state,
+	waterLandmark,
+	candidates,
+	waterDepthPenalty,
+	workspace,
+}: {
+	state: RouteWorld
+	waterLandmark: number
+	candidates: SeaCandidateGroup["candidates"]
+	waterDepthPenalty: Float32Array
+	workspace: SeaNeighborWorkspace
+}): Array<[number, number]> {
 	workspace.stamp++
 	if (workspace.stamp === 0x7fffffff) {
 		workspace.queued.fill(0)
@@ -749,7 +846,9 @@ function collectSeaNeighborPairs(
 					neighborOwner >= 0 &&
 					currentOwner !== neighborOwner
 				) {
-					pairKeys.add(pairKey(currentOwner, neighborOwner, candidateSpan))
+					pairKeys.add(
+						pairKey({ a: currentOwner, b: neighborOwner, span: candidateSpan }),
+					)
 				}
 			}
 			const nextDistance =
@@ -777,25 +876,39 @@ function collectSeaNeighborPairs(
 				],
 		)
 		.sort(
+			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			([sourceA, targetA], [sourceB, targetB]) =>
 				sourceA - sourceB || targetA - targetB,
 		)
 }
 
-function appendLandRoutes(
-	state: RouteWorld,
-	kind: SerializedRouteKind,
-	candidateGroups: LandCandidateGroup[],
-	provinceClusters: Int32Array,
-	landPassable: Uint8Array,
-	workspace: SearchWorkspace,
-	landUsage: Set<number>,
-	regionPairSpan: number,
-	planetRadiusKm: number | undefined,
-	provincePairSpan: number,
-	blockedPairs: Set<number>,
-	routes: Route[],
-): void {
+function appendLandRoutes({
+	state,
+	kind,
+	candidateGroups,
+	provinceClusters,
+	landPassable,
+	workspace,
+	landUsage,
+	regionPairSpan,
+	planetRadiusKm,
+	provincePairSpan,
+	blockedPairs,
+	routes,
+}: {
+	state: RouteWorld
+	kind: SerializedRouteKind
+	candidateGroups: LandCandidateGroup[]
+	provinceClusters: Int32Array
+	landPassable: Uint8Array
+	workspace: SearchWorkspace
+	landUsage: Set<number>
+	regionPairSpan: number
+	planetRadiusKm: number | undefined
+	provincePairSpan: number
+	blockedPairs: Set<number>
+	routes: Route[]
+}): void {
 	const maxLengthKm =
 		kind === ROUTE_LAND_MAJOR
 			? ROUTE_TUNING.land.majorMaxLengthKm
@@ -806,19 +919,23 @@ function appendLandRoutes(
 		for (let i = 0; i < candidates.length; i++) {
 			candidateRegions[i] = candidates[i]?.region ?? -1
 		}
-		const points = tangentProjectFlat(candidateRegions, state.r_xyz)
+		const points = tangentProjectFlat({
+			regions: candidateRegions,
+			r_xyz: state.r_xyz,
+		})
 		const candidatePairs = buildUrquhartEdgesFromFlat(points).sort(
+			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			([sourceA, targetA], [sourceB, targetB]) =>
 				sourceA - sourceB || targetA - targetB,
 		)
 		for (const [sourceIndex, targetIndex] of candidatePairs) {
 			const source = candidates[sourceIndex]
 			const target = candidates[targetIndex]
-			const provincePairKey = pairKey(
-				source.province,
-				target.province,
-				provincePairSpan,
-			)
+			const provincePairKey = pairKey({
+				a: source.province,
+				b: target.province,
+				span: provincePairSpan,
+			})
 			if (blockedPairs.has(provincePairKey)) continue
 			if (
 				regionDistanceKm(
@@ -830,18 +947,18 @@ function appendLandRoutes(
 			) {
 				continue
 			}
-			const pathRegions = findLandPath(
+			const pathRegions = findLandPath({
 				state,
 				workspace,
-				source.region,
-				target.region,
+				startRegion: source.region,
+				endRegion: target.region,
 				cluster,
 				landmark,
 				landPassable,
 				provinceClusters,
-				landUsage,
+				landEdgeUsed: landUsage,
 				regionPairSpan,
-			)
+			})
 			if (pathRegions.length < 2) continue
 			if (
 				regionPathLengthKm(state.r_xyz, pathRegions, planetRadiusKm) >
@@ -857,25 +974,40 @@ function appendLandRoutes(
 			})
 			for (let i = 1; i < pathRegions.length; i++) {
 				landUsage.add(
-					pairKey(pathRegions[i - 1], pathRegions[i], regionPairSpan),
+					pairKey({
+						a: pathRegions[i - 1],
+						b: pathRegions[i],
+						span: regionPairSpan,
+					}),
 				)
 			}
 		}
 	}
 }
 
-function appendSeaRoutes(
-	state: RouteWorld,
-	candidateGroups: SeaCandidateGroup[],
-	waterDepthPenalty: Float32Array,
-	workspace: SearchWorkspace,
-	neighborWorkspace: SeaNeighborWorkspace,
-	seaUsage: Set<number>,
-	regionPairSpan: number,
-	urbanPopulation: Float32Array,
-	planetRadiusKm: number | undefined,
-	routes: Route[],
-): void {
+function appendSeaRoutes({
+	state,
+	candidateGroups,
+	waterDepthPenalty,
+	workspace,
+	neighborWorkspace,
+	seaUsage,
+	regionPairSpan,
+	urbanPopulation,
+	planetRadiusKm,
+	routes,
+}: {
+	state: RouteWorld
+	candidateGroups: SeaCandidateGroup[]
+	waterDepthPenalty: Float32Array
+	workspace: SearchWorkspace
+	neighborWorkspace: SeaNeighborWorkspace
+	seaUsage: Set<number>
+	regionPairSpan: number
+	urbanPopulation: Float32Array
+	planetRadiusKm: number | undefined
+	routes: Route[]
+}): void {
 	for (const { waterLandmark, candidates } of candidateGroups) {
 		if (candidates.length < 2) continue
 		const candidatePopulation = new Float32Array(candidates.length)
@@ -883,13 +1015,13 @@ function appendSeaRoutes(
 			candidatePopulation[i] =
 				urbanPopulation[candidates[i]?.province ?? -1] ?? 0
 		}
-		const candidatePairs = collectSeaNeighborPairs(
+		const candidatePairs = collectSeaNeighborPairs({
 			state,
 			waterLandmark,
 			candidates,
 			waterDepthPenalty,
-			neighborWorkspace,
-		)
+			workspace: neighborWorkspace,
+		})
 		const targetIndexScratch = new Int32Array(candidatePairs.length)
 		const targetPortScratch = new Int32Array(candidatePairs.length)
 		const maxLengthScratch = new Float32Array(candidatePairs.length)
@@ -912,7 +1044,11 @@ function appendSeaRoutes(
 				if (targetIndex < 0) continue
 				const target = candidates[targetIndex]
 				const targetPop = candidatePopulation[targetIndex] ?? 0
-				const maxLen = computeSeaRouteMaxLengthKm(state, sourcePop, targetPop)
+				const maxLen = computeSeaRouteMaxLengthKm({
+					state,
+					sourcePopulation: sourcePop,
+					targetPopulation: targetPop,
+				})
 				if (
 					Math.max(
 						regionDistanceKm(
@@ -942,22 +1078,22 @@ function appendSeaRoutes(
 				const target = candidates[targetIndex]
 				const maxLen = maxLengthScratch[i] ?? 0
 				singleTargetRegion[0] = targetPortScratch[i] ?? -1
-				const searchStamp = findSeaPathsToTargets(
+				const searchStamp = findSeaPathsToTargets({
 					state,
 					workspace,
-					source.portRegion,
-					singleTargetRegion,
+					startRegion: source.portRegion,
+					targetRegions: singleTargetRegion,
 					waterLandmark,
-					seaUsage,
+					waterEdgeUsed: seaUsage,
 					waterDepthPenalty,
 					regionPairSpan,
-				)
-				const waterPath = reconstructPathFromTree(
+				})
+				const waterPath = reconstructPathFromTree({
 					workspace,
-					source.portRegion,
-					target.portRegion,
-					searchStamp,
-				)
+					startRegion: source.portRegion,
+					endRegion: target.portRegion,
+					stamp: searchStamp,
+				})
 				if (waterPath.length < 2) continue
 				const pathRegions = [
 					source.anchorRegion,
@@ -978,7 +1114,11 @@ function appendSeaRoutes(
 				})
 				for (let i = 2; i < pathRegions.length - 1; i++) {
 					seaUsage.add(
-						pairKey(pathRegions[i - 1], pathRegions[i], regionPairSpan),
+						pairKey({
+							a: pathRegions[i - 1],
+							b: pathRegions[i],
+							span: regionPairSpan,
+						}),
 					)
 				}
 			}
@@ -986,11 +1126,15 @@ function appendSeaRoutes(
 	}
 }
 
-function buildRouteNetwork(
-	routes: Route[],
-	state: RouteWorld,
-	urbanPopulation: Float32Array,
-): RouteEdge[] {
+function buildRouteNetwork({
+	routes,
+	state,
+	urbanPopulation,
+}: {
+	routes: Route[]
+	state: RouteWorld
+	urbanPopulation: Float32Array
+}): RouteEdge[] {
 	const regionPairSpan = state.regionProvince.length
 	const edgeMap = new Map<number, RouteEdge>()
 	for (const route of routes) {
@@ -1002,15 +1146,18 @@ function buildRouteNetwork(
 			const fromRegion = route.pathRegions[i - 1]
 			const toRegion = route.pathRegions[i]
 			if (fromRegion === toRegion) continue
-			const key = edgeKey(
-				fromRegion,
-				toRegion,
-				networkKindForRouteKind(route.kind),
-				regionPairSpan,
-			)
+			const key = edgeKey({
+				a: fromRegion,
+				b: toRegion,
+				kind: networkKindForRouteKind(route.kind),
+				span: regionPairSpan,
+			})
 			const existing = edgeMap.get(key)
 			if (existing) {
-				existing.kind = mergeNetworkKind(existing.kind, route.kind)
+				existing.kind = mergeNetworkKind({
+					current: existing.kind,
+					next: route.kind,
+				})
 				existing.usage++
 				existing.weight += weight
 				continue
@@ -1025,14 +1172,18 @@ function buildRouteNetwork(
 		}
 	}
 	return [...edgeMap.values()].sort(
+		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 		(a, b) => a.kind - b.kind || b.usage - a.usage || b.weight - a.weight,
 	)
 }
 
-export function computeRoutes(
-	world: RouteWorldInput,
-	inputs: RouteInputs,
-): RouteComputation {
+export function computeRoutes({
+	world,
+	inputs,
+}: {
+	world: RouteWorldInput
+	inputs: RouteInputs
+}): RouteComputation {
 	const state = toRouteWorld(world)
 	const settlementRegions =
 		inputs.settlementRegions ?? new Int32Array(state.P).fill(-1)
@@ -1042,101 +1193,116 @@ export function computeRoutes(
 		inputs.settlementPortRegions ?? new Int32Array(state.P).fill(-1)
 	const { urbanPopulation } = inputs
 
-	const landPassable = timed(
-		"computeRoutes:computeLandPassableMask",
-		inputs.timings,
-		() => computeLandPassableMask(state),
-	)
-	const waterDepthPenalty = timed(
-		"computeRoutes:computeWaterDepthPenalty",
-		inputs.timings,
-		() => computeWaterDepthPenalty(state),
-	)
-	const provinceClusters = timed(
-		"computeRoutes:computeProvinceLandClusters",
-		inputs.timings,
-		() => computeProvinceLandClusters(state, landPassable),
-	)
+	const landPassable = timed({
+		label: "computeRoutes:computeLandPassableMask",
+		timings: inputs.timings,
+		fn: () => computeLandPassableMask(state),
+	})
+	const waterDepthPenalty = timed({
+		label: "computeRoutes:computeWaterDepthPenalty",
+		timings: inputs.timings,
+		fn: () => computeWaterDepthPenalty(state),
+	})
+	const provinceClusters = timed({
+		label: "computeRoutes:computeProvinceLandClusters",
+		timings: inputs.timings,
+		fn: () => computeProvinceLandClusters({ state, landPassable }),
+	})
 	const workspace = createSearchWorkspace(state.regionProvince.length)
 	const neighborWorkspace = createSeaNeighborWorkspace(
 		state.regionProvince.length,
 	)
 	const regionPairSpan = state.regionProvince.length
 	const provincePairSpan = state.P
-	const landCandidates = collectLandCandidatesByKind(
+	const landCandidates = collectLandCandidatesByKind({
 		state,
 		settlementRegions,
 		provinceClusters,
 		urbanPopulation,
-	)
+	})
 	const landUsage = new Set<number>()
 	const seaUsage = new Set<number>()
 	const routes: Route[] = []
 	const majorPairs = new Set<number>()
 
-	timed("computeRoutes:appendLandRoutes-major", inputs.timings, () =>
-		appendLandRoutes(
-			state,
-			ROUTE_LAND_MAJOR,
-			landCandidates.major,
-			provinceClusters,
-			landPassable,
-			workspace,
-			landUsage,
-			regionPairSpan,
-			world.params.planetRadiusKm,
-			provincePairSpan,
-			new Set<number>(),
-			routes,
-		),
-	)
+	timed({
+		label: "computeRoutes:appendLandRoutes-major",
+		timings: inputs.timings,
+		fn: () =>
+			appendLandRoutes({
+				state,
+				kind: ROUTE_LAND_MAJOR,
+				candidateGroups: landCandidates.major,
+				provinceClusters,
+				landPassable,
+				workspace,
+				landUsage,
+				regionPairSpan,
+				planetRadiusKm: world.params.planetRadiusKm,
+				provincePairSpan,
+				blockedPairs: new Set<number>(),
+				routes,
+			}),
+	})
 	for (const route of routes) {
 		if (route.kind !== ROUTE_LAND_MAJOR) continue
 		majorPairs.add(
-			pairKey(route.fromProvince, route.toProvince, provincePairSpan),
+			pairKey({
+				a: route.fromProvince,
+				b: route.toProvince,
+				span: provincePairSpan,
+			}),
 		)
 	}
-	timed("computeRoutes:appendLandRoutes-minor", inputs.timings, () =>
-		appendLandRoutes(
-			state,
-			ROUTE_LAND_MINOR,
-			landCandidates.minor,
-			provinceClusters,
-			landPassable,
-			workspace,
-			landUsage,
-			regionPairSpan,
-			world.params.planetRadiusKm,
-			provincePairSpan,
-			majorPairs,
-			routes,
-		),
-	)
-	timed("computeRoutes:appendSeaRoutes", inputs.timings, () =>
-		appendSeaRoutes(
-			state,
-			collectSeaCandidates(
+	timed({
+		label: "computeRoutes:appendLandRoutes-minor",
+		timings: inputs.timings,
+		fn: () =>
+			appendLandRoutes({
 				state,
-				settlementRegions,
-				settlementWaterLandmarks,
-				settlementPortRegions,
+				kind: ROUTE_LAND_MINOR,
+				candidateGroups: landCandidates.minor,
+				provinceClusters,
+				landPassable,
+				workspace,
+				landUsage,
+				regionPairSpan,
+				planetRadiusKm: world.params.planetRadiusKm,
+				provincePairSpan,
+				blockedPairs: majorPairs,
+				routes,
+			}),
+	})
+	timed({
+		label: "computeRoutes:appendSeaRoutes",
+		timings: inputs.timings,
+		fn: () =>
+			appendSeaRoutes({
+				state,
+				candidateGroups: collectSeaCandidates({
+					state,
+					settlementRegions,
+					settlementWaterLandmarks,
+					settlementPortRegions,
+					urbanPopulation,
+				}),
+				waterDepthPenalty,
+				workspace,
+				neighborWorkspace,
+				seaUsage,
+				regionPairSpan,
 				urbanPopulation,
-			),
-			waterDepthPenalty,
-			workspace,
-			neighborWorkspace,
-			seaUsage,
-			regionPairSpan,
-			urbanPopulation,
-			world.params.planetRadiusKm,
-			routes,
-		),
-	)
+				planetRadiusKm: world.params.planetRadiusKm,
+				routes,
+			}),
+	})
 
 	return {
 		routes,
-		network: timed("computeRoutes:buildRouteNetwork", inputs.timings, () =>
-			buildRouteNetwork(routes, state, urbanPopulation),
-		),
+		network: timed({
+			label: "computeRoutes:buildRouteNetwork",
+			timings: inputs.timings,
+			fn: () => buildRouteNetwork({ routes, state, urbanPopulation }),
+		}),
 	}
 }

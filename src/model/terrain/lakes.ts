@@ -1,5 +1,5 @@
-import type { GenesisRainfall, SphereMesh } from ".."
-import { MinHeap } from "../shared/min-heap"
+﻿import type { GenesisRainfall, SphereMesh } from ".."
+import { MinHeap } from "../shared"
 
 function computeSubgraphNeighborCount(
 	numRegions: number,

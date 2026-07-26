@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Heightmap import pipeline: samples a B&W equirectangular heightmap
  * onto a sphere mesh, derives synthetic plates, runs post-processing
  * and climate simulation.
@@ -9,14 +9,17 @@ import {
 	DEFAULT_ORBITAL_DISTANCE_AU,
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
-} from "../celestial/star/star-types"
-import { relativeHumidityFromVaporPressure } from "../climate/humidity"
-import { assignKoppenClimate } from "../climate/koppen"
-import { sampleMonthlyFloatRaster } from "../climate/observed-earth"
-import { buildRegionSpatialIndex, buildSphereMesh } from "../mesh"
-import { createRng } from "../shared/rng"
-import { computeOceanDistanceBFS, countContinents } from "../shared/stats"
+} from "../celestial/star"
 import {
+	assignKoppenClimate,
+	relativeHumidityFromVaporPressure,
+	sampleMonthlyFloatRaster,
+} from "../climate"
+import { buildRegionSpatialIndex, buildSphereMesh } from "../mesh"
+import {
+	computeOceanDistanceBFS,
+	countContinents,
+	createRng,
 	DEFAULT_DAYS_PER_YEAR,
 	DEFAULT_ECCENTRICITY,
 	DEFAULT_HOURS_PER_DAY,
@@ -25,23 +28,23 @@ import {
 	DEFAULT_PLANET_RADIUS_KM,
 	DEFAULT_SUBSTELLAR_LON,
 	getMaxOceanDepthKm,
-} from "../shared/units"
+} from "../shared"
 import {
 	buildDummyBoundary,
 	buildSyntheticPlates,
 	computeSimpleDistanceFields,
 	deriveSyntheticPlates,
-} from "../tectonics/synthetic-plates"
-import { buildCoastDensityWeight } from "../terrain/coast-density"
+} from "../tectonics"
 import {
+	applySeaLevelToElevation,
 	applySoilCreep,
+	buildCoastDensityWeight,
 	erodeComposite,
+	LANDMARK_TYPE_LAKE,
 	sharpenRidges,
 	smoothElevation,
 	warpTerrain,
-} from "../terrain/erosion"
-import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
-import { applySeaLevelToElevation } from "../terrain/sea-level"
+} from "../terrain"
 import { deriveProvinceSociety } from "./derive-province-society"
 import { runPostElevationPipeline } from "./post-elevation"
 
@@ -362,10 +365,10 @@ function attachObservedEarthHumidity(params: {
 			const vaporPressure = observedVaporPressureMonthly[idx]
 			const meanTemp = world.climate.real_temperature_monthly[idx]
 			if (Number.isFinite(vaporPressure) && Number.isFinite(meanTemp)) {
-				const observed = relativeHumidityFromVaporPressure(
-					meanTemp,
-					vaporPressure,
-				)
+				const observed = relativeHumidityFromVaporPressure({
+					meanTempC: meanTemp,
+					vaporPressureKpa: vaporPressure,
+				})
 				observedMonthly[idx] = observed
 				observedSum += observed
 				observedCount++

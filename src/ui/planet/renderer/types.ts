@@ -1,9 +1,9 @@
-import type { MoonBody } from "@/model/celestial/moons/moon-types"
-import type { WindArrowData } from "@/model/climate/wind"
+﻿import type { MoonBody } from "@/model/celestial/moons"
+import type { WindArrowData } from "@/model/climate"
 import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
-} from "@/model/transport/worker-types"
+} from "@/model/transport"
 import type { ColorMode } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
 import type { SolarSystemOverlayParams } from "./solar-system-overlay"
@@ -161,8 +161,6 @@ export interface GenesisScene {
 	setMoonOrbitOverlay(
 		moons: MoonBody[] | null,
 		planetRadiusKm: number,
-		hoursPerDay: number,
-		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,
@@ -171,8 +169,6 @@ export interface GenesisScene {
 	updateMoonOrbitOverlay(
 		moons: MoonBody[] | null,
 		planetRadiusKm: number,
-		hoursPerDay: number,
-		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
 		showGrid: boolean,
 		gridSpacing: number,
 		showEllipticalOrbits: boolean,

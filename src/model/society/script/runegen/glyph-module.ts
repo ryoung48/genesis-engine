@@ -1,4 +1,4 @@
-import { createStringRng } from "@/model/shared/rng"
+﻿import { createStringRng } from "@/model/shared"
 import {
 	Rune,
 	type RuneGeneratorOptions,

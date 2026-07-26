@@ -1,8 +1,8 @@
-import {
+﻿import {
 	LANDMARK_TYPE_LAKE,
 	LANDMARK_TYPE_OCEAN,
 	LANDMARK_TYPE_SEA,
-} from "../terrain/landmarks"
+} from "../terrain"
 
 interface SettlementRegionWorld {
 	mesh: {

@@ -1,8 +1,8 @@
-import {
+﻿import {
 	createStringRng,
 	type SharedRng,
 	type WeightedValue as SharedWeightedValue,
-} from "@/model/shared/rng"
+} from "@/model/shared"
 
 export type WeightedValue<T> = SharedWeightedValue<T>
 

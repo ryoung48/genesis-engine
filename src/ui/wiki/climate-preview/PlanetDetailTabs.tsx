@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import type {
-	AtmosphereProfile,
-	MoonBody,
-} from "@/model/celestial/moons/moon-types"
+import type { MoonBody } from "@/model/celestial/moons"
+import type { AtmosphereProfile } from "@/model/celestial/orbit-body"
 import {
 	computeMoonTidalSchedule,
 	computeTidalSchedule,

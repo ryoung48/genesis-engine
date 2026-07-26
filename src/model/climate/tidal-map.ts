@@ -1,10 +1,8 @@
 import type { GenesisParams, SphereMesh } from ".."
-import { makeRng } from "../shared/rng"
-import type { GenesisLandmarks } from "../terrain/landmarks"
-import { LANDMARK_TYPE_LAKE } from "../terrain/landmarks"
+import { makeRng } from "../shared"
+import type { GenesisLandmarks } from "../terrain"
+import { LANDMARK_TYPE_LAKE } from "../terrain"
 import type { TidalSchedule } from "./tidal-schedule"
-
-export { computeCoastalMask } from "./tides"
 
 const BASE_TIDAL_RANGE_M = 0.25
 

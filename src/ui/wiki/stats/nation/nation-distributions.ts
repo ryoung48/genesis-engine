@@ -1,4 +1,4 @@
-import { titleCase } from "@/model/shared/text"
+﻿import { titleCase } from "@/model/shared"
 import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
 import {
 	EU5_TOPOGRAPHY_CATEGORIES,

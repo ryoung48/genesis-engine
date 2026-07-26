@@ -5,22 +5,24 @@
 const CUM_MONTH_DAYS = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
+import type { DayOfYearParams } from "./types"
+
 export const EARTH_HISTORY_START_YEAR = 2
 const EARTH_HISTORY_END_YEAR = 9999
 
-function dayOfYear(month: number, day: number): number {
+function dayOfYear({ month, day }: DayOfYearParams): number {
 	return CUM_MONTH_DAYS[month - 1] + day
 }
 
 export function eu4DateToDays(dateStr: string): number {
 	const [y, m, d] = dateStr.split(".").map(Number)
-	const startD = dayOfYear(1, 1)
+	const startD = dayOfYear({ month: 1, day: 1 })
 	const yearDays = (y - EARTH_HISTORY_START_YEAR) * 365
-	return yearDays + dayOfYear(m, d) - startD
+	return yearDays + dayOfYear({ month: m, day: d }) - startD
 }
 
 function daysToEu4Date(days: number): string {
-	const startD = dayOfYear(1, 1)
+	const startD = dayOfYear({ month: 1, day: 1 })
 	const totalDays = days + startD
 	const yearIndex = Math.floor((totalDays - 1) / 365)
 	const y = EARTH_HISTORY_START_YEAR + yearIndex

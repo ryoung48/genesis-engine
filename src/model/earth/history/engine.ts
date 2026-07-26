@@ -1,4 +1,4 @@
-import type { GenesisProvinces } from "../../types/society"
+import type { GenesisProvinces } from "../../types"
 import {
 	foldedStateToGenesisFrame,
 	foldedStateToNationInfo,
@@ -27,6 +27,10 @@ import {
 	buildEu4ProvinceMap,
 	type Eu4ProvinceMap,
 } from "./import/eu4-province-map"
+import type {
+	QueryEarthHistoryNationParams,
+	QueryEarthHistoryParams,
+} from "./types"
 
 export interface EarthHistoryEngine {
 	provinceMap: Eu4ProvinceMap
@@ -187,30 +191,30 @@ interface EarthHistoryQuery {
 	frame: GenesisFrameFromHistory
 }
 
-export function queryEarthHistory(
-	engine: EarthHistoryEngine,
-	timeDays: number,
-	nationReference?: Map<string, RawNationReference>,
-	cultureNameById?: Map<string, string>,
-	religionNameById?: Map<string, string>,
-): EarthHistoryQuery {
-	const state = foldAtCheckpoint(engine.cache, timeDays)
-	const frame = foldedStateToGenesisFrame(
+export function queryEarthHistory({
+	engine,
+	timeDays,
+	nationReference,
+	cultureNameById,
+	religionNameById,
+}: QueryEarthHistoryParams): EarthHistoryQuery {
+	const state = foldAtCheckpoint({ cache: engine.cache, time: timeDays })
+	const frame = foldedStateToGenesisFrame({
 		state,
-		engine.provinceMap,
+		provinceMap: engine.provinceMap,
 		nationReference,
 		cultureNameById,
 		religionNameById,
-		engine.provinceCoords,
-	)
+		provinceCoords: engine.provinceCoords,
+	})
 	return { state, frame }
 }
 
-export function queryEarthHistoryNation(
-	engine: EarthHistoryEngine,
-	timeDays: number,
-	tag: string,
-): NationInfoFromHistory | null {
-	const state = foldAtCheckpoint(engine.cache, timeDays)
-	return foldedStateToNationInfo(state, tag)
+export function queryEarthHistoryNation({
+	engine,
+	timeDays,
+	tag,
+}: QueryEarthHistoryNationParams): NationInfoFromHistory | null {
+	const state = foldAtCheckpoint({ cache: engine.cache, time: timeDays })
+	return foldedStateToNationInfo({ state, tag })
 }

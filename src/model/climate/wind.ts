@@ -9,7 +9,7 @@
  *      + boundary-layer friction (~30% cross-isobar toward low)
  *
  * Rotation rate: the latitude at which geostrophic balance takes over scales
- * linearly with hoursPerDay (∝ 1/Ω), so fast rotators get narrow trade-wind
+ * linearly with hoursPerDay (âˆ 1/Î©), so fast rotators get narrow trade-wind
  * belts and slow rotators get broad ageostrophic circulation.
  *
  * Retrograde obliquity: the Coriolis sign is flipped so trades blow eastward
@@ -18,8 +18,12 @@
  * This is standalone — it does NOT feed the moisture advection system.
  */
 import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
-import { clamp, smoothstep } from "../shared/math"
-import { isRetrogradeObliquity } from "../shared/units"
+import {
+	clamp,
+	HOURS_PER_DAY,
+	isRetrogradeObliquity,
+	smoothstep,
+} from "../shared"
 import {
 	TOPO_FLAT,
 	TOPO_HILL,
@@ -28,7 +32,7 @@ import {
 	TOPO_MOUNTAIN,
 	TOPO_OCEAN,
 	TOPO_PLATEAU,
-} from "../terrain/classification"
+} from "../terrain"
 import { computeLockedWindVectors } from "./locked/wind"
 import { computeThermalEquator, getClimateGeometry, hadleyWidth } from "./rain"
 
@@ -122,7 +126,7 @@ function surfaceWindFactor(r: number, surface: WindSurface): number {
 
 /** 1°-resolution vector lookup grid for particle animation. */
 export interface FlowGrid {
-	/** Eastward component per cell, row-major lat×lon. */
+	/** Eastward component per cell, row-major latÃ—lon. */
 	u: Float32Array
 	/** Northward component per cell. */
 	v: Float32Array
@@ -147,7 +151,7 @@ interface RasterizeVectorGridOptions {
 }
 
 /**
- * Build a 360×181 lat/lon lookup grid from sparse mesh vector data.
+ * Build a 360Ã—181 lat/lon lookup grid from sparse mesh vector data.
  * Empty cells (no mesh region) are filled by 3 passes of neighbour diffusion
  * so particle lookups never stall at holes.
  */
@@ -439,7 +443,7 @@ export function computeWindVectors(
 	// faster rotation (short day) → narrower ageostrophic belt near equator.
 	// Clamped so very slow rotators stay ageostrophic almost everywhere.
 	const hoursPerDay = params?.hoursPerDay ?? 24
-	const geoTransitionLat = clamp((15 * hoursPerDay) / 24, 2, 75)
+	const geoTransitionLat = clamp((15 * hoursPerDay) / HOURS_PER_DAY, 2, 75)
 
 	// Retrograde planets rotate opposite direction → Coriolis deflects the
 	// other way, so trades blow eastward and westerlies blow westward.
@@ -509,14 +513,14 @@ export function computeWindVectors(
 	// Calibrate to approximate m/s:
 	// - 90th percentile of |∇P| → reference speed (10 m/s, typical trades/westerlies)
 	// - Rotation factor: slower rotation → faster surface winds, but boundary layer
-	//   friction decouples from geostrophic scaling, so ∝ log(hoursPerDay).
+	//   friction decouples from geostrophic scaling, so âˆ log(hoursPerDay).
 	// - Pressure factor: thinner atmosphere → less air mass resisting the same thermal
 	//   gradient → faster surface winds. 1 bar = neutral; scales as 1/√pressure.
 	const sorted = rawSpeed.slice().sort()
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
 	const ref = Math.max(pct90, 1e-6)
 	const rotationFactor = Math.min(
-		Math.log(clamp(hoursPerDay, 6, 192)) / Math.log(24),
+		Math.log(clamp(hoursPerDay, 6, 192)) / Math.log(HOURS_PER_DAY),
 		1.8,
 	)
 	const pressureFactor =

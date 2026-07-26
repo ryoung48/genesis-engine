@@ -1,19 +1,17 @@
-import { useMemo } from "react"
+﻿import { useMemo } from "react"
+import { type MainSequenceClass, STAR } from "@/model/celestial/star"
 import {
-	getStarDiameterSol,
-	getStarTemperatureK,
-	isValidSpectralClass,
-	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import { EnergyBalanceModel } from "@/model/climate/ebm"
-import { EMB_CONSTANTS } from "@/model/climate/ebm/constants"
-import { estimateGreenhouseFactor } from "@/model/climate/ebm/greenhouse-estimate"
+	EMB_CONSTANTS,
+	EnergyBalanceModel,
+	estimateGreenhouseFactor,
+} from "@/model/climate"
 import {
 	mapLinear,
+	PLASMA_STOPS,
+	PURPLES_STOPS,
 	rgbToCss,
 	sampleColorStops,
-} from "@/model/shared/color-interpolation"
-import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
+} from "@/model/shared"
 import type { RegularClimatePreviewData } from "@/ui/preview/types"
 
 interface EbmConfig {
@@ -96,12 +94,13 @@ export function useEbmPreview(config: EbmConfig) {
 		seismologyTotalHeatingK,
 	} = config
 	return useMemo<RegularClimatePreviewData>(() => {
-		const cls: MainSequenceClass = isValidSpectralClass(spectralClass)
+		const cls: MainSequenceClass = STAR.isValidSpectralClass(spectralClass)
 			? spectralClass
 			: "G"
-		const T_star = getStarTemperatureK(cls, starSubtype)
+		const T_star = STAR.getStarTemperatureK({ cls, subtype: starSubtype })
 		const R_star_m =
-			getStarDiameterSol(cls, starSubtype) * EMB_CONSTANTS.stellar.R_SUN
+			STAR.getStarDiameterSol({ cls, subtype: starSubtype }) *
+			EMB_CONSTANTS.stellar.R_SUN
 		const d_m = orbitalDistanceAU * EMB_CONSTANTS.stellar.AU
 		const modelConfig = {
 			orbital: {
@@ -129,7 +128,7 @@ export function useEbmPreview(config: EbmConfig) {
 			seismologyTotalHeatingK,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
-		model.runModel(30, 0.5)
+		model.runModel({ years: 30, dtDays: 0.5 })
 
 		const time = EMB_CONSTANTS.time
 		const sampledDays: number[] = []

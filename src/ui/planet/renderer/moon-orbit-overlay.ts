@@ -1,11 +1,10 @@
 import * as THREE from "three"
-import type { MoonBody, TideLock } from "@/model/celestial/moons/moon-types"
-import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
+import type { MoonBody } from "@/model/celestial/moons"
 import {
 	derivePlanetMassKg,
+	MOON,
 	moonSemiMajorAxisM,
-	resolveMoonOrbitHoursPerDay,
-} from "@/model/celestial/moons/orbital-mechanics"
+} from "@/model/celestial/moons"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -59,7 +58,7 @@ export function mod2pi(angle: number): number {
  * y = r·cos(lat)·sin(lon), z = r·sin(lat).  North pole = +Z,
  * equatorial plane = XY.  This matches the standard orbital mechanics
  * convention (Z-up), so we use the textbook rotation directly:
- *   R_z(Ω) · R_x(i) · R_z(ω)
+ *   R_z(Î©) · R_x(i) · R_z(Ï‰)
  *
  * P points toward periapsis; Q is 90° ahead in the orbit direction.
  */
@@ -233,8 +232,6 @@ export interface MoonOrbitState {
 export function buildMoonOrbitOverlay(
 	moons: MoonBody[],
 	planetRadiusKm: number,
-	hoursPerDay: number,
-	tideLock: TideLock | null,
 	initialDay: number,
 	showGrid: boolean,
 	gridSpacing: number,
@@ -267,10 +264,6 @@ export function buildMoonOrbitOverlay(
 	}
 
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
-		hoursPerDay,
-		tideLock,
-	)
 	// Scale all orbits to fit between 1.3 and 2.6 scene units
 	// (planet surface = 1.0 scene unit).
 	const SCENE_MIN = 1.35
@@ -284,14 +277,14 @@ export function buildMoonOrbitOverlay(
 						BODY_VISUAL_BASE_RADIUS,
 						realisticSizes,
 						moon.sizeClass ??
-							estimateMoonSizeClassFromDiameter(moon.diameterKm),
+							MOON.estimateMoonSizeClassFromDiameter(moon.diameterKm),
 					) / parentSceneRadiusForGlobalScaling
 				: moon.diameterKm / Math.max(planetRadiusKm * 2, 1),
 		),
 	)
 	const orbitPeriapses = layoutMoonOrbitPeriapsesForDisplay({
 		orbits: moons.map((moon, index) => {
-			const smaM = moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay)
+			const smaM = moonSemiMajorAxisM({ moon, planetMassKg })
 			return {
 				orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
 					smaM,

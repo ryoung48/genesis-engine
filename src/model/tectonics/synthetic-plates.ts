@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared helpers for deriving synthetic plate data from elevation.
  * Used by both the heightmap import pipeline and the stagnant lid pipeline
  * to construct the dummy BoundaryInfo / DistanceFields that downstream
@@ -10,7 +10,7 @@ import type {
 	SphereMesh,
 	TectonicPlate,
 } from ".."
-import { computeCoastDistances } from "../shared/stats"
+import { computeCoastDistances } from "../shared"
 
 export function deriveSyntheticPlates(
 	mesh: SphereMesh,

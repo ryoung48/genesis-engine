@@ -1,5 +1,4 @@
-import { MinHeap } from "../shared/min-heap"
-import { regionDistanceKm } from "../shared/units"
+﻿import { MinHeap, regionDistanceKm } from "../shared"
 
 // Early modern era travel speeds (km/day on ideal terrain)
 const LAND_SPEED_KM_PER_DAY = 30

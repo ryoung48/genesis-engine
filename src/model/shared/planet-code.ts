@@ -1,20 +1,19 @@
-/**
- * Planet code encode/decode ΓÇö stores the seed separately from the packed params
+﻿/**
+ * Planet code encode/decode Î“Ã‡Ŷ stores the seed separately from the packed params
  * segment so the seed stays recoverable across param format changes.
  */
 
 import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society/eras"
+} from "@/model/celestial/star"
+import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society"
 import type { GenesisParams } from ".."
+import { SEED_MAX } from "./seeds"
 import { SLIDER_RANGES } from "./slider-ranges"
 
 const DEFAULT_PRESSURE = 1.0
 const PLANET_CODE_PART_SEPARATOR = "."
-
-export const SEED_MAX = 2147483647
 type FieldSpec = {
 	name: string
 	min: number
@@ -320,7 +319,7 @@ interface DecodedPlanetCode {
 	orbitalDistanceAU: number
 	daysPerYear: number
 	hoursPerDay: number
-	tideLock: import("../celestial/moons/moon-types").TideLock | null
+	tideLock: import("../celestial/orbit-body").TideLock | null
 	substellarLon: number
 	perihelion: number
 	pressure: number

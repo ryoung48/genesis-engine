@@ -19,8 +19,8 @@ import type {
 	GenesisParams,
 	SphereMesh,
 } from ".."
-import { clamp, smoothstep } from "../shared/math"
-import { TOPO_OCEAN } from "../terrain/classification"
+import { clamp, HOURS_PER_DAY, smoothstep } from "../shared"
+import { TOPO_OCEAN } from "../terrain"
 import { computeThermalEquator, getClimateGeometry } from "./rain"
 
 export function computeCycloneRisk(
@@ -41,7 +41,7 @@ export function computeCycloneRisk(
 	// Slow rotators: the Coriolis no-go zone (radius = geoTransitionLat degrees
 	// from the thermal equator) engulfs the entire valid formation band (≤38°).
 	const hoursPerDay = params.hoursPerDay ?? 24
-	const noGoRadius = (15 * hoursPerDay) / 24 // same formula as wind model
+	const noGoRadius = (15 * hoursPerDay) / HOURS_PER_DAY // same formula as wind model
 	if (noGoRadius >= 38) return new Float32Array(N)
 
 	// --- SST threshold: global mean + 11°C (≈26°C on Earth) ---
@@ -160,6 +160,7 @@ export function computeCycloneRisk(
 	}
 	if (nonZero.length === 0) return combined
 
+	// biome-ignore lint/nursery/useMaxParams: native sort callback
 	nonZero.sort((a, b) => a - b)
 	const p99 =
 		nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]

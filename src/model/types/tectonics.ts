@@ -48,7 +48,7 @@ export interface GenesisParams {
 	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
-	tideLock: import("../celestial/moons/moon-types").TideLock | null // null = not locked
+	tideLock: import("../celestial/orbit-body").TideLock | null // null = not locked
 	substellarLon: number // longitude of the substellar point in degrees (0-360), default 0
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
 	pressure?: number // atmospheric pressure in bars, default 1.0
@@ -107,39 +107,6 @@ export interface DistanceFields {
 	distCoast: Float32Array
 	distCoastLand: Float32Array
 }
-
-export const GENESIS_TERRAIN_FEATURE_LABELS = [
-	"none",
-	"rift valley",
-	"pull-apart basin",
-	"back-arc basin",
-	"fold ridges",
-	"plateau uplift",
-	"continental interior",
-	"mid-ocean ridge",
-	"fracture zone",
-	"trench",
-	"coastal roughening",
-	"island arc",
-	"volcanic arc",
-	"large igneous province",
-] as const
-
-export const GENESIS_TERRAIN_FEATURE = {
-	RIFT_VALLEY: 1,
-	PULL_APART_BASIN: 2,
-	BACK_ARC_BASIN: 3,
-	FOLD_RIDGES: 4,
-	PLATEAU_UPLIFT: 5,
-	CONTINENTAL_INTERIOR: 6,
-	MID_OCEAN_RIDGE: 7,
-	FRACTURE_ZONE: 8,
-	TRENCH: 9,
-	COASTAL_ROUGHENING: 10,
-	ISLAND_ARC: 11,
-	VOLCANIC_ARC: 12,
-	LARGE_IGNEOUS_PROVINCE: 13,
-} as const
 
 export interface GenesisTerrainFeatures {
 	/** Per-cell bitmask of terrain features applied during blendElevation. */

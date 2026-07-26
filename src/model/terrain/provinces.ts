@@ -5,8 +5,11 @@
  */
 
 import type { GenesisProvinces, GenesisRainfall, SphereMesh } from ".."
-import { createRng } from "../shared/rng"
-import { DEFAULT_PLANET_RADIUS_KM, meanEdgeLengthKm } from "../shared/units"
+import {
+	createRng,
+	DEFAULT_PLANET_RADIUS_KM,
+	meanEdgeLengthKm,
+} from "../shared"
 
 /**
  * Target mean province area. 37,000 km² is the mean real-world area of an EU4

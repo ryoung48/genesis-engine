@@ -10,7 +10,7 @@
  */
 
 import type { GenesisParams } from ".."
-import type { GenesisNationHierarchy, GenesisProvinces } from "../types/society"
+import type { GenesisNationHierarchy, GenesisProvinces } from "../types"
 import { GOVERNMENT_TYPES, type GovernmentType } from "./eras"
 import type { ProvincePopulation } from "./population"
 import { getSettlementEraTuning } from "./settlement-tuning"

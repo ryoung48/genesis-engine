@@ -1,5 +1,6 @@
-import type { GovernmentType } from "@/model/society/eras"
+﻿import type { GovernmentType } from "@/model/society"
 import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
+import type { BlendRgbParams } from "./types"
 
 type EarthHistoryGovernmentFamily =
 	| "tribal"
@@ -79,11 +80,7 @@ function hashUint(key: string): number {
 	return h >>> 0
 }
 
-function blendRgb(
-	a: readonly [number, number, number],
-	b: readonly [number, number, number],
-	t: number,
-): [number, number, number] {
+function blendRgb({ a, b, t }: BlendRgbParams): [number, number, number] {
 	return [
 		a[0] + (b[0] - a[0]) * t,
 		a[1] + (b[1] - a[1]) * t,
@@ -166,7 +163,7 @@ export function getEarthHistoryGovernmentColor(params: {
 		(firstIndex + 1 + ((hash >>> 8) % (types.length - 1))) % types.length
 	const second = GOVERNMENT_COLORS_BY_TYPE[types[secondIndex]]
 	const t = ((hash >>> 16) & 0xff) / 255
-	return blendRgb(first, second, 0.2 + t * 0.6)
+	return blendRgb({ a: first, b: second, t: 0.2 + t * 0.6 })
 }
 
 export function formatEarthHistoryGovernmentLabel(params: {

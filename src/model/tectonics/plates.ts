@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Plate generation and ocean/land assignment — faithful port of genesis's
  * plates.js + ocean-land.js.
  *
@@ -11,7 +11,7 @@
  */
 
 import type { PlateVec, SphereMesh } from ".."
-import { makeRandInt, makeRng } from "../shared/rng"
+import { makeRandInt, makeRng } from "../shared"
 
 interface GeneratePlatesResult {
 	r_plate: Int32Array

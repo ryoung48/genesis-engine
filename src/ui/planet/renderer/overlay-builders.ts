@@ -2,8 +2,8 @@ import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { WindArrowData } from "@/model/climate/wind"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+import type { WindArrowData } from "@/model/climate"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
 import type { GenesisViewMode, RiverData } from "./types"
 
@@ -1238,7 +1238,7 @@ export function buildGlobeWindArrows(
 		const ty = py + wdy * shaftRad
 		const tz = pz + wdz * shaftRad
 
-		// Perpendicular in the sphere's tangent plane (outward × wind)
+		// Perpendicular in the sphere's tangent plane (outward Ã— wind)
 		const ox = px / radius
 		const oy = py / radius
 		const oz = pz / radius

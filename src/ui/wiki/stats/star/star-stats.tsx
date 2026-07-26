@@ -1,16 +1,10 @@
 import {
-	getHabitableZoneAU,
-	getStarDiameterSol,
-	getStarLabel,
-	getStarLuminositySol,
-	getStarMAO,
-	getStarMassSol,
-	getStarTemperatureK,
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import { getStarAgeGyr } from "@/model/celestial/system/generate-system-bodies"
-import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+	STAR,
+} from "@/model/celestial/star"
+import { SYSTEM } from "@/model/celestial/system"
+import { SLIDER_RANGES } from "@/model/shared"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { SPECTRAL_CLASS_COLORS } from "../../../planet/screen/generation/star-utils"
 
@@ -23,16 +17,33 @@ export function buildStarStats(params: {
 }): StatEntry[] {
 	const { starClass, starSubtype, restSeed, setSpectralClass, setStarSubtype } =
 		params
-	const typeStatValue = getStarLabel(starClass, starSubtype)
-	const starTempK = Math.round(getStarTemperatureK(starClass, starSubtype))
-	const starDiamSol = getStarDiameterSol(starClass, starSubtype).toFixed(3)
-	const starLuminosity = getStarLuminositySol(starClass, starSubtype)
+	const typeStatValue = STAR.getStarLabel({
+		cls: starClass,
+		subtype: starSubtype,
+	})
+	const starTempK = Math.round(
+		STAR.getStarTemperatureK({ cls: starClass, subtype: starSubtype }),
+	)
+	const starDiamSol = STAR.getStarDiameterSol({
+		cls: starClass,
+		subtype: starSubtype,
+	}).toFixed(3)
+	const starLuminosity = STAR.getStarLuminositySol({
+		cls: starClass,
+		subtype: starSubtype,
+	})
 	const starLumSol = starLuminosity.toFixed(3)
-	const starMassSolValue = getStarMassSol(starClass, starSubtype)
+	const starMassSolValue = STAR.getStarMassSol({
+		cls: starClass,
+		subtype: starSubtype,
+	})
 	const starMassSol = starMassSolValue.toFixed(3)
-	const starHzAU = getHabitableZoneAU(starLuminosity).toFixed(3)
-	const starMaoAU = getStarMAO(starClass, starSubtype).toFixed(3)
-	const starAgeGyr = getStarAgeGyr(restSeed, starMassSolValue).toFixed(2)
+	const starHzAU = STAR.getHabitableZoneAU(starLuminosity).toFixed(3)
+	const starMaoAU = STAR.getStarMAO({
+		cls: starClass,
+		subtype: starSubtype,
+	}).toFixed(3)
+	const starAgeGyr = SYSTEM.getStarAgeGyr(restSeed, starMassSolValue).toFixed(2)
 
 	return [
 		{

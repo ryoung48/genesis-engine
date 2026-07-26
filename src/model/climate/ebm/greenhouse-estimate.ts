@@ -1,5 +1,7 @@
-import type { SharedRng } from "@/model/shared/rng"
+﻿import type { SharedRng } from "@/model/shared"
+import { roll3d6 } from "@/model/shared/dice"
 import { EMB_CONSTANTS } from "./constants"
+import type { RollGreenhouseFactorParams } from "./types"
 
 // Heuristic for a generated (not real-data) world: scales greenhouseFactor
 // by sqrt(pressure) off Earth's fitted anchor at pressure=1 bar -- not a
@@ -56,10 +58,6 @@ export function estimateGreenhouseFactor(pressure: number): number {
  * every other thin-atmosphere body's estimate. That's a model-limitation
  * outlier to flag, not something to fit.
  */
-function roll3d(rng: Pick<SharedRng, "randint">): number {
-	return rng.randint(1, 6) + rng.randint(1, 6) + rng.randint(1, 6)
-}
-
 /**
  * Tabletop dice-based greenhouseFactor roll -- used at planet/moon generation
  * time (not for the real Sol seed data, which is individually hand-fitted;
@@ -83,10 +81,9 @@ function roll3d(rng: Pick<SharedRng, "randint">): number {
  * for them. Use rollGasGiantGreenhouseFactor instead.
  */
 export function rollGreenhouseFactor(
-	rng: Pick<SharedRng, "randint">,
-	pressureBar: number,
-	atmosphereCode: number,
+	params: RollGreenhouseFactorParams,
 ): number {
+	const { rng, pressureBar, atmosphereCode } = params
 	let factor = 0.5 * Math.sqrt(Math.max(pressureBar, 0))
 	if (atmosphereCode === 0) return factor
 	if (
@@ -94,7 +91,7 @@ export function rollGreenhouseFactor(
 		atmosphereCode === 13 ||
 		atmosphereCode === 14
 	) {
-		factor += roll3d(rng) * 0.01
+		factor += roll3d6(rng) * 0.01
 	} else if (atmosphereCode === 10 || atmosphereCode === 15) {
 		factor *= Math.max(rng.randint(1, 6) - 1, 0.5)
 	} else if (
@@ -104,7 +101,7 @@ export function rollGreenhouseFactor(
 		atmosphereCode === 17
 	) {
 		const roll = rng.randint(1, 6)
-		factor *= roll <= 5 ? roll : roll3d(rng)
+		factor *= roll <= 5 ? roll : roll3d6(rng)
 	}
 	return factor
 }

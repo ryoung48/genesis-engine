@@ -1,16 +1,22 @@
+import type { GenesisHydrology } from "../types"
 import type {
-	GenesisClimate,
-	GenesisHydrology,
-	GenesisParams,
-	GenesisRainfall,
-} from ".."
+	ComputeAetFromPetParams,
+	ComputeHydrologyFieldsParams,
+	FillPetMonthlyHargreavesParams,
+	RefreshClimatePetMonthlyParams,
+} from "./types"
 
-function petMonthHargreaves(
-	tas: number,
-	td: number,
-	raWm2: number,
-	dpm: number,
-): number {
+function petMonthHargreaves({
+	tas,
+	td,
+	raWm2,
+	dpm,
+}: {
+	tas: number
+	td: number
+	raWm2: number
+	dpm: number
+}): number {
 	const raMJ = raWm2 * 0.0864
 	// Thermal correction: latent heat of vaporization varies with temperature.
 	// From Hargreaves (1975) eq. 3: multiply by 238.8 / (595.5 - 0.55 * T).
@@ -22,47 +28,41 @@ function petMonthHargreaves(
 	return Math.max(0, petDay) * dpm
 }
 
-export function fillPetMonthlyHargreaves(
-	temperatureMonthly: Float32Array,
-	rangeMonthly: Float32Array,
-	insolationMonthly: Float32Array,
-	petMonthly: Float32Array,
-	dpm: number,
-): void {
+export function fillPetMonthlyHargreaves({
+	temperatureMonthly,
+	rangeMonthly,
+	insolationMonthly,
+	petMonthly,
+	dpm,
+}: FillPetMonthlyHargreavesParams): void {
 	for (let i = 0; i < temperatureMonthly.length; i++) {
-		petMonthly[i] = petMonthHargreaves(
-			temperatureMonthly[i],
-			rangeMonthly[i],
-			insolationMonthly[i],
+		petMonthly[i] = petMonthHargreaves({
+			tas: temperatureMonthly[i],
+			td: rangeMonthly[i],
+			raWm2: insolationMonthly[i],
 			dpm,
-		)
+		})
 	}
 }
 
-export function refreshClimatePetMonthly(
-	climate: Pick<
-		GenesisClimate,
-		| "temperature_monthly"
-		| "temperature_monthly_range"
-		| "insolation_monthly"
-		| "pet_monthly"
-	>,
-	params?: Pick<GenesisParams, "daysPerYear">,
-): void {
-	fillPetMonthlyHargreaves(
-		climate.temperature_monthly,
-		climate.temperature_monthly_range,
-		climate.insolation_monthly,
-		climate.pet_monthly,
-		params?.daysPerYear ?? 365 / 12,
-	)
+export function refreshClimatePetMonthly({
+	climate,
+	params,
+}: RefreshClimatePetMonthlyParams): void {
+	fillPetMonthlyHargreaves({
+		temperatureMonthly: climate.temperature_monthly,
+		rangeMonthly: climate.temperature_monthly_range,
+		insolationMonthly: climate.insolation_monthly,
+		petMonthly: climate.pet_monthly,
+		dpm: (params?.daysPerYear ?? 365) / 12,
+	})
 }
 
-export function computeAetFromPet(
-	rain: Float64Array,
-	petBuf: Float64Array,
-	aetBuf: Float64Array,
-): void {
+export function computeAetFromPet({
+	rain,
+	petBuf,
+	aetBuf,
+}: ComputeAetFromPetParams): void {
 	let soil = 250
 	for (let iter = 0; iter < 20; iter++) {
 		const startSoil = soil
@@ -97,11 +97,11 @@ const F_PERC = 0.3
 // Half-life ≈ ln(2) / K_GW ≈ 14 months.
 const K_GW = 0.05
 
-export function computeHydrologyFields(
-	climate: Pick<GenesisClimate, "pet_monthly">,
-	rainfall: Pick<GenesisRainfall, "monthly">,
-	isLand: Uint8Array,
-): GenesisHydrology {
+export function computeHydrologyFields({
+	climate,
+	rainfall,
+	isLand,
+}: ComputeHydrologyFieldsParams): GenesisHydrology {
 	const N = isLand.length
 	const aet_monthly = new Float32Array(12 * N)
 	const aridity_monthly = new Float32Array(12 * N)
@@ -120,7 +120,7 @@ export function computeHydrologyFields(
 			rain[m] = rainfall.monthly[idx]
 			petBuf[m] = climate.pet_monthly[idx]
 		}
-		computeAetFromPet(rain, petBuf, aetBuf)
+		computeAetFromPet({ rain, petBuf, aetBuf })
 		for (let m = 0; m < 12; m++) {
 			const idx = m * N + r
 			const pet = petBuf[m]

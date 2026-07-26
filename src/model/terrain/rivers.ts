@@ -6,8 +6,7 @@ import type {
 	GenesisRivers,
 	SphereMesh,
 } from ".."
-import { smoothstep } from "../shared/math"
-import { MinHeap } from "../shared/min-heap"
+import { MinHeap, smoothstep } from "../shared"
 
 function polylineLengthKm(
 	line: [number, number, number, number][],
@@ -129,7 +128,7 @@ export function computeRivers(
 	const passThroughMonth = new Float32Array(N)
 	const flowToTarget = new Float32Array(N)
 	// Reference discharge (m³/s) at which hydraulic-geometry scaling halves the loss.
-	// Loss fraction ∝ Q^-0.4, motivated by: wetted perimeter ~ Q^0.5, volume ~ Q^0.9.
+	// Loss fraction âˆ Q^-0.4, motivated by: wetted perimeter ~ Q^0.5, volume ~ Q^0.9.
 	const Q_REF = 500
 
 	for (let month = 0; month < 12; month++) {

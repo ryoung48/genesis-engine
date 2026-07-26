@@ -1,14 +1,15 @@
 import type React from "react"
-import { computeGravityG } from "@/model/celestial/body-metrics"
-import {
-	computeSolarDayHours,
-	inferRetrogradeRotationFromAxialTiltDeg,
-} from "@/model/celestial/day-length"
+import type { MoonBody } from "@/model/celestial/moons"
 import type {
 	AtmosphereProfile,
-	MoonBody,
-} from "@/model/celestial/moons/moon-types"
-import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
+	SeismologyProfile,
+} from "@/model/celestial/orbit-body"
+import {
+	EARTH_DIAMETER_KM,
+	EARTH_MASS_KG,
+	ORBIT_BODY,
+} from "@/model/celestial/orbit-body"
+import type { SystemBody } from "@/model/celestial/system"
 import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
@@ -23,7 +24,7 @@ import {
 	updateMoonDiameter,
 	updateMoonSemiMajorAxis,
 } from "./body-mutations"
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG, ORBIT_STAT_HELP } from "./constants"
+import { ORBIT_STAT_HELP } from "./constants"
 import {
 	buildPressureAtmosphereProfile,
 	describeTemperatureK,
@@ -147,7 +148,7 @@ function buildBodyStats({
 	unitSystem: UnitSystem
 	greenhouseFactor?: number
 	surfaceTidesM?: SurfaceTidesBreakdown
-	seismology?: import("@/model/celestial/moons/moon-types").SeismologyProfile
+	seismology?: SeismologyProfile
 	albedo?: number
 }): StatEntry[] {
 	const diameterRel = diameterKm / EARTH_DIAMETER_KM
@@ -308,10 +309,10 @@ function buildMoonStats({
 	atmosphere?: AtmosphereProfile | null
 	albedo?: number
 	greenhouseFactor?: number
-	seismology?: import("@/model/celestial/moons/moon-types").SeismologyProfile
+	seismology?: SeismologyProfile
 	surfaceTidesM?: SurfaceTidesBreakdown
 	pd: number
-	orbitRange?: import("@/model/celestial/moons/moon-types").MoonOrbitRange
+	orbitRange?: import("@/model/celestial/moons").MoonOrbitRange
 	orbitalPeriodDays: number
 	/** Moon's own sidereal rotation period, in hours — independent of
 	 * orbitalPeriodDays (not assumed to be tidally locked). */
@@ -322,7 +323,7 @@ function buildMoonStats({
 	axialTiltDeg: number
 	parentOrbitalPeriodDays?: number
 	tideLockStat?: StatEntry
-	tideLock?: import("@/model/celestial/moons/moon-types").TideLock | null
+	tideLock?: import("@/model/celestial/orbit-body").TideLock | null
 	substellarLon?: number
 	editors?: {
 		diameter?: StatEntry["editor"]
@@ -359,7 +360,8 @@ function buildMoonStats({
 			? {
 					siderealDayHours,
 					orbitalPeriodDays: parentOrbitalPeriodDays,
-					retrograde: inferRetrogradeRotationFromAxialTiltDeg(axialTiltDeg),
+					retrograde:
+						ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(axialTiltDeg),
 					siderealEditor: editors?.siderealDay,
 					tideLockStat,
 					tideLocked: !!tideLock,
@@ -512,7 +514,9 @@ export function buildOrbitBodyStats(params: {
 		dayLength: {
 			siderealDayHours: body.siderealDayHours,
 			orbitalPeriodDays: body.orbitalPeriodDays,
-			retrograde: inferRetrogradeRotationFromAxialTiltDeg(body.axialTiltDeg),
+			retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
+				body.axialTiltDeg,
+			),
 			tideLockStat,
 			tideLocked: !!body.tideLock,
 			siderealEditor: onUpdateBody
@@ -712,7 +716,10 @@ export function buildOrbitMoonStats(params: {
 		onUpdateMoon,
 	} = params
 	const pd = moon.semiMajorAxisPlanetDiameters ?? pdOverride ?? 0
-	const gravityG = computeGravityG(moon.massKg, moon.diameterKm)
+	const gravityG = ORBIT_BODY.computeGravityG({
+		massKg: moon.massKg,
+		diameterKm: moon.diameterKm,
+	})
 	return buildMoonStats({
 		diameterKm: moon.diameterKm,
 		massKg: moon.massKg,
@@ -768,12 +775,7 @@ export function buildOrbitMoonStats(params: {
 						display: `${pd.toFixed(1)} PD`,
 						set: (value: number) =>
 							onUpdateMoon((current, body) =>
-								updateMoonSemiMajorAxis(
-									current,
-									body,
-									value,
-									body.siderealDayHours,
-								),
+								updateMoonSemiMajorAxis(current, body, value),
 							),
 					},
 					siderealDay: {
@@ -863,10 +865,10 @@ export function buildMoonPreviewDataProps(params: {
 	const parentYearHours =
 		params.parentOrbitalPeriodDays * params.parentHoursPerDay
 	const climateHoursPerDay =
-		computeSolarDayHours({
+		ORBIT_BODY.computeSolarDayHours({
 			siderealDayHours: params.moon.siderealDayHours,
 			orbitalPeriodDays: parentYearHours / 24,
-			retrograde: inferRetrogradeRotationFromAxialTiltDeg(
+			retrograde: ORBIT_BODY.inferRetrogradeRotationFromAxialTiltDeg(
 				params.moon.axialTiltDeg,
 			),
 		}) ?? params.moon.siderealDayHours

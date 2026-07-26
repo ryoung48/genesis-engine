@@ -1,11 +1,14 @@
-import { dynastyColor, hashColorForKey } from "@/model/earth/history/color"
-import type { RawNationReference } from "@/model/earth/history/data-source"
-import type { FoldedState } from "@/model/earth/history/fold"
+﻿import type {
+	FoldedState,
+	OrgCategorizer,
+	RawNationReference,
+} from "@/model/earth"
 import {
+	dynastyColor,
 	EARTH_HISTORY_NO_GOVERNMENT_COLOR,
 	getEarthHistoryGovernmentColor,
-} from "@/model/earth/history/government"
-import type { OrgCategorizer } from "@/model/earth/history/organization-categories"
+	hashColorForKey,
+} from "@/model/earth"
 import { type ColorMode, OCEAN_LIGHT_BLUE } from "../../colors"
 import { getBaseMapMode } from "../shared/data-variant"
 import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"

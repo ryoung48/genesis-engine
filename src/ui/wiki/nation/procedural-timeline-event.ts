@@ -1,6 +1,6 @@
-import { formatEu4Days } from "@/model/earth/history/date"
+﻿import { formatEu4Days } from "@/model/earth"
 import type { HistoryNote } from "@/model/history"
-import { historyMsToEu4Days } from "@/model/history/eu4-days"
+import { historyMsToEu4Days } from "@/model/history"
 import type { WikiTimelineEvent } from "../shared/WikiTimeline"
 import { getEventDescription, getEventDotColor } from "./event-description"
 

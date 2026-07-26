@@ -1,4 +1,4 @@
-import type { GenesisProvinces } from "../types/society"
+import type { GenesisProvinces } from "../types"
 
 export const WATER_ACCESS_BONUS = 100
 

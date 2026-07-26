@@ -2,15 +2,20 @@ import {
 	GENESIS_TERRAIN_FEATURE_LABELS,
 	GENESIS_TOPOGRAPHY_LABELS,
 } from "@/model"
-import { apparentTemperatureC } from "@/model/climate/apparent-temp"
-import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
-import { KOPPEN_LABELS, koppenClimateName } from "@/model/climate/koppen"
-import { PASTA_LABELS, pastaClimateName } from "@/model/climate/pasta"
-import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
-import { TRADE_GOOD_LABELS } from "@/model/economy/trade-goods"
-import { regionTimezoneLabel } from "@/model/society/timezone"
-import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+import {
+	apparentTemperatureC,
+	BIOME_LABELS,
+	CLIMATE_LABELS,
+	KOPPEN_LABELS,
+	koppenClimateName,
+	PASTA_LABELS,
+	pastaClimateName,
+	relativeHumidityFromTempRange,
+} from "@/model/climate"
+import { TRADE_GOOD_LABELS } from "@/model/economy"
+import { regionTimezoneLabel } from "@/model/society"
+import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	type ColorMode,
 	EU5_CLIMATE_CATEGORIES,
@@ -377,24 +382,24 @@ function getHoverModeledHumiditySeries(
 
 	const annualRainfall = world.rainfall?.annual[r]
 	const distFromOceanKm = world.oceanDist[r]
-	const annual = relativeHumidityFromTempRange(
-		world.climate.temperature_avg[r],
-		world.dtr_annual[r],
+	const annual = relativeHumidityFromTempRange({
+		meanTempC: world.climate.temperature_avg[r],
+		dtrC: world.dtr_annual[r],
 		annualAridity,
-		annualRainfall,
+		annualRainfallMm: annualRainfall,
 		distFromOceanKm,
-	)
+	})
 	const monthly: number[] = []
 	if (world.dtr_monthly && world.climate.temperature_monthly) {
 		for (let m = 0; m < 12; m++) {
 			monthly.push(
-				relativeHumidityFromTempRange(
-					world.climate.temperature_monthly[m * N + r],
-					world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
+				relativeHumidityFromTempRange({
+					meanTempC: world.climate.temperature_monthly[m * N + r],
+					dtrC: world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
 					annualAridity,
-					annualRainfall,
+					annualRainfallMm: annualRainfall,
 					distFromOceanKm,
-				),
+				}),
 			)
 		}
 	}
@@ -542,13 +547,17 @@ export function getHoverMisery(
 			: modeledAnnualT
 	const annualRh =
 		observedHumidity?.annual ??
-		relativeHumidityFromTempRange(
-			annualT,
-			world.dtr_annual[r],
+		relativeHumidityFromTempRange({
+			meanTempC: annualT,
+			dtrC: world.dtr_annual[r],
 			annualAridity,
-			annualRainfall,
-		)
-	const annual = apparentTemperatureC(annualT, annualRh, annualWind)
+			annualRainfallMm: annualRainfall,
+		})
+	const annual = apparentTemperatureC({
+		tempC: annualT,
+		rhPercent: annualRh,
+		windSpeedMs: annualWind,
+	})
 
 	const monthly: number[] = []
 	if (world.dtr_monthly && world.climate.temperature_monthly) {
@@ -562,9 +571,16 @@ export function getHoverMisery(
 			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
 			const rh =
 				observedHumidity?.monthly[m] ??
-				relativeHumidityFromTempRange(T, dtr, annualAridity, annualRainfall)
+				relativeHumidityFromTempRange({
+					meanTempC: T,
+					dtrC: dtr,
+					annualAridity,
+					annualRainfallMm: annualRainfall,
+				})
 			const wind = monthlyWindSpeedMs?.[m] ?? annualWind
-			monthly.push(apparentTemperatureC(T, rh, wind))
+			monthly.push(
+				apparentTemperatureC({ tempC: T, rhPercent: rh, windSpeedMs: wind }),
+			)
 		}
 	}
 

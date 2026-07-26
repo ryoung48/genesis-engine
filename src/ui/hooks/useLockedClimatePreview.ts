@@ -1,16 +1,17 @@
-import { useMemo } from "react"
+﻿import { useMemo } from "react"
 import {
 	computeDailyLockedOrbit,
 	computeLockedSubstellarDeclinationRad,
 	computeTidalTransportParams,
 	getSubstellarDirWithOffsetAndDeclination,
-} from "@/model/climate/locked/heat"
+} from "@/model/climate"
 import {
 	mapLinear,
+	PLASMA_STOPS,
+	PURPLES_STOPS,
 	rgbToCss,
 	sampleColorStops,
-} from "@/model/shared/color-interpolation"
-import { PLASMA_STOPS, PURPLES_STOPS } from "@/model/shared/color-palettes"
+} from "@/model/shared"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
 
 interface LockedClimatePreviewConfig {
@@ -82,14 +83,14 @@ function buildLockedClimatePreview(
 		const y = Math.sin(lonRad)
 
 		for (let day = 0; day < dayCount; day++) {
-			const substellar = getSubstellarDirWithOffsetAndDeclination(
-				config.substellarLon,
-				libration[day],
-				computeLockedSubstellarDeclinationRad(
-					config.obliquity,
-					solarLongitude[day],
-				),
-			)
+			const substellar = getSubstellarDirWithOffsetAndDeclination({
+				substellarLon: config.substellarLon,
+				lonOffsetRad: libration[day],
+				declinationRad: computeLockedSubstellarDeclinationRad({
+					obliquity: config.obliquity,
+					solarLongitudeRad: solarLongitude[day],
+				}),
+			})
 			const cosTheta = Math.max(
 				-1,
 				Math.min(1, x * substellar[0] + y * substellar[1]),

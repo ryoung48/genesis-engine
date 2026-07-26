@@ -119,12 +119,12 @@ export function computeLockedWindVectors(
 	const perihelion = params?.perihelion ?? 102
 
 	// Monthly libration and declination — determine substellar position each month
-	const monthlyLibration = computeMonthlyLibration(eccentricity, perihelion)
-	const monthlyDeclination = computeMonthlyLockedDeclination(
+	const monthlyLibration = computeMonthlyLibration({ eccentricity, perihelion })
+	const monthlyDeclination = computeMonthlyLockedDeclination({
 		obliquity,
 		eccentricity,
 		perihelion,
-	)
+	})
 
 	// Select which month's substellar point to use (undefined → annual mean ≈ 0,0)
 	const libRad =
@@ -136,11 +136,11 @@ export function computeLockedWindVectors(
 			? monthlyDeclination[month]
 			: 0
 
-	const sub = getSubstellarDirWithOffsetAndDeclination(
+	const sub = getSubstellarDirWithOffsetAndDeclination({
 		substellarLon,
-		libRad,
-		decRad,
-	)
+		lonOffsetRad: libRad,
+		declinationRad: decRad,
+	})
 
 	// Primary pressure: minimum at substellar (hot), maximum at Substellar (cold)
 	const pressure = new Float32Array(N)

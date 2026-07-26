@@ -1,4 +1,4 @@
-import * as THREE from "three"
+﻿import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
@@ -9,15 +9,15 @@ import {
 	type Eu4ProvinceFillGeometry,
 	loadEu4ProvinceBorderGeometry,
 	loadEu4ProvinceFillGeometry,
-} from "@/model/earth/history/data-source"
+} from "@/model/earth"
 import { buildRegionSpatialIndex } from "@/model/mesh"
-import type { HeritageScript } from "@/model/society/script"
-import { SCRIPT } from "@/model/society/script"
+import type { HeritageScript } from "@/model/society"
+import { SCRIPT } from "@/model/society"
 import {
 	networkCount,
 	type SerializedGenesisWorld,
 	type SerializedNetwork,
-} from "@/model/transport/worker-types"
+} from "@/model/transport"
 import { formatClockTimeDisplay } from "../clock"
 import { type ColorMode, VEGETATION_WATER_BLUE } from "../colors"
 import type { LabelMode } from "../controls/OverlayControls"
@@ -4424,7 +4424,7 @@ export function createGenesisScene(
 		const oblRad = (obliquityDeg * Math.PI) / 180
 		const subSolarLat =
 			month === 0 ? 0 : oblRad * Math.sin((2 * Math.PI * (month - 4)) / 12)
-		// Spin angle: offset by π so noon (timeOfDay=hoursPerDay/2) faces +X (sun)
+		// Spin angle: offset by Ï€ so noon (timeOfDay=hoursPerDay/2) faces +X (sun)
 		const spinAngle = Math.PI + 2 * Math.PI * (timeOfDay / (hoursPerDay || 24))
 		currentSunHoursPerDay = hoursPerDay || 24
 		applyGlobeOrientation(subSolarLat, spinAngle)
@@ -4659,10 +4659,8 @@ export function createGenesisScene(
 	}
 
 	function setMoonOrbitOverlay(
-		moons: import("@/model/celestial/moons/moon-types").MoonBody[] | null,
+		moons: import("@/model/celestial/moons").MoonBody[] | null,
 		planetRadiusKm: number,
-		hoursPerDay: number,
-		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
 		day: number,
 		showGrid: boolean,
 		gridSpacing: number,
@@ -4674,8 +4672,6 @@ export function createGenesisScene(
 			moonOrbitState = buildMoonOrbitOverlay(
 				moons,
 				planetRadiusKm,
-				hoursPerDay,
-				tideLock,
 				day,
 				showGrid,
 				gridSpacing,
@@ -4687,10 +4683,8 @@ export function createGenesisScene(
 	}
 
 	function updateMoonOrbitOverlay(
-		moons: import("@/model/celestial/moons/moon-types").MoonBody[] | null,
+		moons: import("@/model/celestial/moons").MoonBody[] | null,
 		planetRadiusKm: number,
-		hoursPerDay: number,
-		tideLock: import("@/model/celestial/moons/moon-types").TideLock | null,
 		showGrid: boolean,
 		gridSpacing: number,
 		showEllipticalOrbits: boolean,
@@ -4698,8 +4692,6 @@ export function createGenesisScene(
 		setMoonOrbitOverlay(
 			moons,
 			planetRadiusKm,
-			hoursPerDay,
-			tideLock,
 			currentMoonOrbitDay,
 			showGrid,
 			gridSpacing,

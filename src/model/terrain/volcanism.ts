@@ -1,6 +1,6 @@
-import type { BoundaryInfo, SphereMesh } from ".."
-import { SimplexNoise } from "../shared/simplex-noise"
-import { GENESIS_TERRAIN_FEATURE } from "../types/tectonics"
+﻿import type { BoundaryInfo, SphereMesh } from ".."
+import { SimplexNoise } from "../shared"
+import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
 
 const VOLC_MIN_SPACING = 0.015
 const VOLC_SIGMA_BASE = 0.005

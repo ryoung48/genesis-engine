@@ -1,13 +1,16 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from ".."
-import { buildIdentitySeeds } from "../shared/identity-seeds"
-import { SimplexNoise } from "../shared/simplex-noise"
-import { DEFAULT_PLANET_RADIUS_KM } from "../shared/units"
+import {
+	buildIdentitySeeds,
+	DEFAULT_PLANET_RADIUS_KM,
+	SimplexNoise,
+} from "../shared"
 import {
 	GOVERNMENT_TYPE_FAMILY,
 	GOVERNMENT_TYPES,
 	type GovernmentFamily,
 	type GovernmentMix,
 	type GovernmentType,
+	NATION_BUCKETS,
 } from "./eras"
 import {
 	buildChildrenCSR,
@@ -24,19 +27,10 @@ import { computeProvinceWaterAccess, WATER_ACCESS_BONUS } from "./water-access"
 const MAX_NATION_SPREAD_KM = 2000
 
 // Province-mass weights per bucket — calibrated to EU4 extended-timeline 1350 AD data.
-// Each era overrides this via EraConfig.nationPercentages.
+// Each era overrides this via EraConfig.nationPercentages. NATION_BUCKETS is in eras.ts.
 const NATION_PERCENTAGES = normalize([
 	0.0, 0.11, 0.144, 0.194, 0.165, 0.251, 0.137,
 ])
-export const NATION_BUCKETS: [number, number][] = [
-	[251, 600],
-	[50, 250],
-	[25, 49],
-	[10, 24],
-	[5, 9],
-	[2, 4],
-	[1, 1],
-]
 export function computeNations(params: {
 	provinces: GenesisProvinces
 	coastal: Uint8Array

@@ -7,8 +7,8 @@
  */
 
 import type { GenesisClimate, GenesisParams, SphereMesh } from ".."
-import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared/units"
-import type { GenesisLandmarks } from "../terrain/landmarks"
+import { isRetrogradeObliquity, meanEdgeLengthKm } from "../shared"
+import type { GenesisLandmarks } from "../terrain"
 import {
 	applyLockedCurrentTemperatureEffect,
 	computeLockedOceanCurrents,
@@ -51,7 +51,15 @@ interface OceanCurrentResult {
 
 const OCEAN_CURRENT_SMOOTHING_PASSES = 2
 
-function piecewise(xs: number[], ys: number[], x: number): number {
+function piecewise({
+	xs,
+	ys,
+	x,
+}: {
+	xs: number[]
+	ys: number[]
+	x: number
+}): number {
 	if (x <= xs[0]) return ys[0]
 	for (let i = 1; i < xs.length; i++) {
 		if (x <= xs[i]) {
@@ -88,12 +96,17 @@ function hasFullMonthlyTeq(
 	return !!monthlyTEQ && monthlyTEQ.length === CURRENT_EFFECT_MONTHS
 }
 
-function computeSeasonalCurrentFactor(
-	monthlyTemp: number,
-	minMonthlyTemp: number,
-	maxMonthlyTemp: number,
-	isWarmCurrent: boolean,
-): number {
+function computeSeasonalCurrentFactor({
+	monthlyTemp,
+	minMonthlyTemp,
+	maxMonthlyTemp,
+	isWarmCurrent,
+}: {
+	monthlyTemp: number
+	minMonthlyTemp: number
+	maxMonthlyTemp: number
+	isWarmCurrent: boolean
+}): number {
 	const range = maxMonthlyTemp - minMonthlyTemp
 	const hotPhase = range <= 1e-6 ? 0.5 : (monthlyTemp - minMonthlyTemp) / range
 	return isWarmCurrent
@@ -108,12 +121,17 @@ interface CoastSite {
 	lonBin: number
 }
 
-function classifyCurrentWarmth(
-	distFromReference: number,
-	eastFacing: boolean,
-	reverseCirculation: boolean,
+function classifyCurrentWarmth({
+	distFromReference,
+	eastFacing,
+	reverseCirculation,
 	hoursPerDay = 24,
-): number {
+}: {
+	distFromReference: number
+	eastFacing: boolean
+	reverseCirculation: boolean
+	hoursPerDay?: number
+}): number {
 	if (distFromReference < 5) return 0
 	if (distFromReference >= 70) return -1
 	const hw = hadleyWidth(hoursPerDay)
@@ -432,13 +450,7 @@ export function computeOceanCurrents(
 	monthlyTEQ?: Float32Array[],
 ): OceanCurrentResult {
 	if (params?.tideLock?.type === "solar") {
-		return computeLockedOceanCurrents(
-			mesh,
-			isLand,
-			distCoast,
-			landmarks,
-			params,
-		)
+		return computeLockedOceanCurrents({ mesh, isLand, landmarks, params })
 	}
 	const N = mesh.numRegions
 	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
@@ -498,12 +510,12 @@ export function computeOceanCurrents(
 			const distFromReference = teqByLon
 				? Math.abs(latDeg[site.region] - teqByLon[site.lonBin])
 				: Math.abs(latDeg[site.region])
-			const warmth = classifyCurrentWarmth(
+			const warmth = classifyCurrentWarmth({
 				distFromReference,
-				site.eastFacing,
+				eastFacing: site.eastFacing,
 				reverseCirculation,
 				hoursPerDay,
-			)
+			})
 			if (warmth * coriolisWeight > 0.5) {
 				seedCoastalNeighbors(
 					warmSeed,
@@ -532,13 +544,13 @@ export function computeOceanCurrents(
 			warmSeed,
 			coldSeed,
 		)
-		const monthCoastalWarmth = computeCoastalWarmthFromOceanWarmth(
+		const monthCoastalWarmth = computeCoastalWarmthFromOceanWarmth({
 			mesh,
 			isLand,
 			isLake,
-			monthOceanWarmth,
+			oceanWarmth: monthOceanWarmth,
 			avgEdgeKm,
-		)
+		})
 		oceanWarmthMonthly.set(monthOceanWarmth, month * N)
 		coastalWarmthMonthly.set(monthCoastalWarmth, month * N)
 		for (let r = 0; r < N; r++) {
@@ -578,7 +590,13 @@ export function applyCurrentTemperatureEffect(
 	>,
 ): void {
 	if (params?.tideLock?.type === "solar") {
-		applyLockedCurrentTemperatureEffect(mesh, climate, isLand, currents, params)
+		applyLockedCurrentTemperatureEffect({
+			mesh,
+			climate,
+			isLand,
+			currents,
+			params,
+		})
 		return
 	}
 	const N = mesh.numRegions
@@ -626,24 +644,24 @@ export function applyCurrentTemperatureEffect(
 				? monthlyTEQ[m][regionBin[r]]
 				: teqAt(r)
 			const distFromTEQ = Math.abs(latDeg[r] - monthTeq)
-			const warmMaxAtLat = piecewise(
-				WARM_EFFECT_XS,
-				WARM_EFFECT_YS,
-				distFromTEQ,
-			)
-			const coldMaxAtLat = piecewise(
-				WARM_EFFECT_XS,
-				COLD_EFFECT_YS,
-				distFromTEQ,
-			)
+			const warmMaxAtLat = piecewise({
+				xs: WARM_EFFECT_XS,
+				ys: WARM_EFFECT_YS,
+				x: distFromTEQ,
+			})
+			const coldMaxAtLat = piecewise({
+				xs: WARM_EFFECT_XS,
+				ys: COLD_EFFECT_YS,
+				x: distFromTEQ,
+			})
 			let maxEffect = w > 0 ? warmMaxAtLat : coldMaxAtLat
 			if (isLand[r]) maxEffect *= LAND_CURRENT_EFFECT_SCALE
-			const seasonalFactor = computeSeasonalCurrentFactor(
-				climate.temperature_monthly[m * N + r],
+			const seasonalFactor = computeSeasonalCurrentFactor({
+				monthlyTemp: climate.temperature_monthly[m * N + r],
 				minMonthlyTemp,
 				maxMonthlyTemp,
-				w > 0,
-			)
+				isWarmCurrent: w > 0,
+			})
 			const delta = w * maxEffect * seasonalFactor
 			temperatureDeltaMonthly[m * N + r] = delta
 			climate.temperature_monthly[m * N + r] += delta

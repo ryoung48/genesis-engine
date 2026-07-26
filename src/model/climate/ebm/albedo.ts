@@ -1,4 +1,5 @@
 import { EMB_CONSTANTS } from "./constants"
+import type { IceAlbedoAtParams } from "./types"
 
 /* eslint-disable camelcase */
 
@@ -51,12 +52,8 @@ function smoothstep(t: number): number {
  * removes exactly that regime instead of widening the temperature transition
  * band, which wouldn't fix a spatial (cross-latitude) discontinuity anyway.
  */
-function iceAlbedoAt(
-	temperatureK: number,
-	baseAlbedo: number,
-	iceAlbedo: number,
-	couplingFactor: number,
-): number {
+function iceAlbedoAt(params: IceAlbedoAtParams): number {
+	const { temperatureK, baseAlbedo, iceAlbedo, couplingFactor } = params
 	const { ICE_LIMIT } = EMB_CONSTANTS.thermal
 	const t =
 		(temperatureK - (ICE_LIMIT - ICE_TRANSITION_HALF_WIDTH_K)) /
@@ -69,6 +66,7 @@ function iceAlbedoAt(
 
 export const ALBEDO = {
 	landFraction: () => {
+		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 		return Array.from({ length: EMB_CONSTANTS.grid.NUM_LAT }, (_, i) => {
 			const lat = Math.abs(
 				(-90 + (180 * i) / EMB_CONSTANTS.grid.NUM_LAT) as number,
@@ -117,7 +115,12 @@ export const ALBEDO = {
 		for (let i = 0; i < EMB_CONSTANTS.grid.NUM_LAT; i++) {
 			albedo[i][time] =
 				(iceAlbedoFeedback ?? true)
-					? iceAlbedoAt(temperature[i][time], base, ice, couplingFactor)
+					? iceAlbedoAt({
+							temperatureK: temperature[i][time],
+							baseAlbedo: base,
+							iceAlbedo: ice,
+							couplingFactor,
+						})
 					: base
 		}
 	},

@@ -1,4 +1,4 @@
-import { EARTH_HISTORY_START_YEAR } from "../earth/history/date"
+﻿import { EARTH_HISTORY_START_YEAR } from "../earth"
 import { YEAR_MS } from "./state"
 
 /** Converts the procedural sim's historyTime/frame.timeMs (ms, where

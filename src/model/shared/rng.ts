@@ -137,15 +137,3 @@ export function createStringRng(
 ): SharedRng {
 	return createRng(seedStringToNumber(seed), options)
 }
-
-function roll(rng: SharedRng, sides: number, count: number): number {
-	let total = 0
-	for (let i = 0; i < count; i++) {
-		total += rng.randint(1, sides)
-	}
-	return total
-}
-
-export function rollD(rng: SharedRng, count: number): number {
-	return roll(rng, 6, count)
-}

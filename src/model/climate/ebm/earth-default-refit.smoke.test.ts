@@ -24,6 +24,7 @@ function areaWeightedMean(model: EnergyBalanceModel): number {
 	let totalArea = 0
 	for (let i = 0; i < model.lats_deg.length; i++) {
 		const latAvg =
+			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			model.temperature[i].reduce((a, b) => a + b, 0) /
 			model.temperature[i].length
 		const areaWeight = model.dx[i]
@@ -44,7 +45,7 @@ describe("Earth greenhouseFactor refit (default ice-albedo feedback enabled)", (
 		for (let iter = 0; iter < 40; iter++) {
 			const mid = (lo + hi) / 2
 			const model = new EnergyBalanceModel(earthDefaultConfig(mid))
-			model.runModel(30, 0.5)
+			model.runModel({ years: 30, dtDays: 0.5 })
 			const avg = areaWeightedMean(model)
 			bestG = mid
 			bestTemp = avg

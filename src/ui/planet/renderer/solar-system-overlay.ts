@@ -1,21 +1,14 @@
 import * as THREE from "three"
 import type { Text } from "troika-three-text"
-import { SOLAR_DIAMETER_KM } from "@/model/celestial/body-metrics"
-import type { TideLock } from "@/model/celestial/moons/moon-types"
-import { estimateMoonSizeClassFromDiameter } from "@/model/celestial/moons/moon-utils"
 import {
 	derivePlanetMassKg,
+	MOON,
 	moonSemiMajorAxisM,
-	resolveMoonOrbitHoursPerDay,
-} from "@/model/celestial/moons/orbital-mechanics"
+} from "@/model/celestial/moons"
 import type { OrbitClassification } from "@/model/celestial/orbit-body"
-import {
-	getNonRealisticStarToPlanetRatio,
-	getStarDiameterSol,
-	getStarLabel,
-	type MainSequenceClass,
-} from "@/model/celestial/star/star-types"
-import type { SystemBody } from "@/model/celestial/system/generate-system-bodies"
+import { SOLAR_DIAMETER_KM } from "@/model/celestial/orbit-body"
+import { type MainSequenceClass, STAR } from "@/model/celestial/star"
+import type { SystemBody } from "@/model/celestial/system"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,
@@ -264,8 +257,6 @@ function loadBodyTexture(texturePath: string): THREE.Texture {
 function measureBodyMoonSystemOuterRadius(
 	body: SystemBody,
 	sceneRadius: number,
-	hoursPerDay: number,
-	tideLock: TideLock | null,
 	showEllipticalOrbits: boolean,
 	realisticSizes: boolean,
 ): number {
@@ -273,17 +264,13 @@ function measureBodyMoonSystemOuterRadius(
 
 	const planetRadiusKm = body.diameterKm / 2
 	const planetMassKg = derivePlanetMassKg(planetRadiusKm)
-	const moonOrbitHoursPerDay = resolveMoonOrbitHoursPerDay(
-		hoursPerDay,
-		body.isMainWorld ? tideLock : null,
-	)
 	const parentOccupiedRadiusRelativeToPlanet =
 		body.rings?.outerRadiusRelative ?? 1
 
 	const outerRadiusInMoonOverlayUnits = measureMoonOrbitOuterRadiusForDisplay({
 		orbits: body.moons.map((moon) => ({
 			orbitalDistancePlanetRadii: getMoonOrbitDistanceRelativeToPlanet(
-				moonSemiMajorAxisM(moon, planetMassKg, moonOrbitHoursPerDay),
+				moonSemiMajorAxisM({ moon, planetMassKg }),
 				planetRadiusKm,
 			),
 			eccentricity: showEllipticalOrbits ? moon.eccentricity : 0,
@@ -293,7 +280,8 @@ function measureBodyMoonSystemOuterRadius(
 					moon.diameterKm,
 					PLANET_SCENE_RADIUS,
 					realisticSizes,
-					moon.sizeClass ?? estimateMoonSizeClassFromDiameter(moon.diameterKm),
+					moon.sizeClass ??
+						MOON.estimateMoonSizeClassFromDiameter(moon.diameterKm),
 				) / Math.max(sceneRadius, 1e-6),
 			),
 		})),
@@ -416,9 +404,6 @@ export interface SolarSystemOverlayParams {
 	/** All bodies in the system (siblings + the main world), sorted by
 	 * generated orbital distance — see generateSystemBodies. */
 	bodies: SystemBody[]
-	hoursPerDay: number
-	/** Only applied to the main world's own moon system. */
-	tideLock: TideLock | null
 	/** The main world's real orbital period, used as the Kepler-scaling
 	 * reference for every other body's period. */
 	daysPerYear: number
@@ -537,8 +522,6 @@ export function buildSolarSystemOverlay(
 ): SolarSystemOverlayState {
 	const {
 		bodies,
-		hoursPerDay,
-		tideLock,
 		daysPerYear,
 		spectralClass,
 		starSubtype,
@@ -559,7 +542,10 @@ export function buildSolarSystemOverlay(
 	let currentSpinHours = 0
 
 	// --- Star ---
-	const starDiameterSol = getStarDiameterSol(spectralClass, starSubtype)
+	const starDiameterSol = STAR.getStarDiameterSol({
+		cls: spectralClass,
+		subtype: starSubtype,
+	})
 	const starDiameterKm = starDiameterSol * SOLAR_DIAMETER_KM
 	// Realistic mode uses the same shared floor/ceiling (and fixed
 	// Earth-diameter reference) as every other body in the scene — see
@@ -575,7 +561,10 @@ export function buildSolarSystemOverlay(
 				0,
 			)
 		: PLANET_SCENE_RADIUS *
-			getNonRealisticStarToPlanetRatio(spectralClass, starSubtype)
+			STAR.getNonRealisticStarToPlanetRatio({
+				cls: spectralClass,
+				subtype: starSubtype,
+			})
 	const starColorHex = STAR_COLOR_BY_CLASS[spectralClass] ?? "#fff772"
 	const starColor = new THREE.Color(starColorHex)
 	// A real photographic sun texture (NASA-derived, via Solar System Scope),
@@ -633,7 +622,7 @@ export function buildSolarSystemOverlay(
 				? "Sol"
 				: namesEnabled && starName
 					? starName
-					: `${getStarLabel(spectralClass, starSubtype)} Star`,
+					: `${STAR.getStarLabel({ cls: spectralClass, subtype: starSubtype })} Star`,
 		)
 		starNameLeader = createNameLeaderLine()
 		sizeNameLabel(starNameLabel, starRadius)
@@ -778,8 +767,6 @@ export function buildSolarSystemOverlay(
 		const moonState = buildMoonOrbitOverlay(
 			body.moons,
 			body.diameterKm / 2,
-			hoursPerDay,
-			body.isMainWorld ? tideLock : null,
 			initialDay,
 			false,
 			15,
@@ -801,8 +788,6 @@ export function buildSolarSystemOverlay(
 		const moonSystemOuterRadius = measureBodyMoonSystemOuterRadius(
 			body,
 			sceneRadius,
-			hoursPerDay,
-			tideLock,
 			showEllipticalOrbits,
 			showRealisticSizes,
 		)
@@ -853,8 +838,6 @@ export function buildSolarSystemOverlay(
 		p.moonState = buildMoonOrbitOverlay(
 			p.body.moons,
 			p.body.diameterKm / 2,
-			hoursPerDay,
-			p.body.isMainWorld ? tideLock : null,
 			currentDay,
 			false,
 			15,
@@ -928,8 +911,6 @@ export function buildSolarSystemOverlay(
 				: measureBodyMoonSystemOuterRadius(
 						p.body,
 						p.sceneRadius,
-						hoursPerDay,
-						tideLock,
 						showEllipticalOrbits,
 						showRealisticSizes,
 					)

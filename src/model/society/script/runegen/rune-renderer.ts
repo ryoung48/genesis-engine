@@ -1,4 +1,4 @@
-import { type SharedRng } from "@/model/shared/rng"
+﻿import { type SharedRng } from "@/model/shared"
 import { Chaikin } from "./chaikin"
 import { Point2D } from "./point2d"
 import { Rune } from "./rune"

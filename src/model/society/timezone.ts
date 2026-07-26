@@ -1,4 +1,4 @@
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+﻿import type { SerializedGenesisWorld } from "@/model/transport"
 
 const TIMEZONE_BAND_WATER: readonly [number, number, number][] = [
 	[0.635, 0.718, 0.725],

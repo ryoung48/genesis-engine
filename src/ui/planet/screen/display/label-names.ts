@@ -1,5 +1,5 @@
-import { getSettlementEraTuning } from "@/model/society/settlement-tuning"
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+﻿import { getSettlementEraTuning } from "@/model/society"
+import type { SerializedGenesisWorld } from "@/model/transport"
 
 interface LabelNameResolvers {
 	nation: (capitalProvince: number) => string

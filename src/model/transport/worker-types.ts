@@ -238,56 +238,6 @@ export interface SerializedGenesisWorld {
 	}
 }
 
-export interface SerializedProvinceTimelineInt {
-	times: Float64Array
-	values: Int32Array
-	offsets: Int32Array
-}
-
-export interface SerializedProvinceTimelineFloat {
-	times: Float64Array
-	values: Float32Array
-	offsets: Int32Array
-}
-
-interface SerializedRelationTimelines {
-	aIdx: Int32Array
-	bIdx: Int32Array
-	offsets: Int32Array
-	times: Float64Array
-	values: Int32Array
-}
-
-export interface SerializedTimelines {
-	P: number
-	startTimeMs: number
-	endTimeMs: number
-	parent: SerializedProvinceTimelineInt
-	assignment: SerializedProvinceTimelineInt
-	populationRural: SerializedProvinceTimelineFloat
-	populationUrban: SerializedProvinceTimelineFloat
-	development: SerializedProvinceTimelineFloat
-	consumption: SerializedProvinceTimelineFloat
-	leaderDynasty: SerializedProvinceTimelineInt
-	leaderNameSeed?: SerializedProvinceTimelineInt
-	leaderClaim: SerializedProvinceTimelineInt
-	leaderBirthYear?: SerializedProvinceTimelineFloat
-	occupation: SerializedProvinceTimelineInt
-	cultureBlendSecondary: SerializedProvinceTimelineInt
-	cultureBlendWeight: SerializedProvinceTimelineFloat
-	relations: SerializedRelationTimelines
-	nationColorKeys: Int32Array
-	nationColorValues: Float32Array
-	wars: Array<{
-		idx: number
-		attacker: number
-		defender: number
-		startTime: number
-		endTime?: number
-		rebel: boolean
-	}>
-}
-
 export interface SerializedHistoryFrame {
 	timeMs: number
 	assignment: Int32Array
@@ -568,7 +518,7 @@ export type GenesisWorkerRequest =
 				orbitalDistanceAU?: number
 				daysPerYear?: number
 				hoursPerDay?: number
-				tideLock?: import("../celestial/moons/moon-types").TideLock | null
+				tideLock?: import("../celestial/orbit-body").TideLock | null
 				substellarLon?: number
 				perihelion?: number
 				pressure?: number

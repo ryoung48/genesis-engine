@@ -13,8 +13,7 @@
  *   Of:  maxIce > 20mm (2cm) in at least 1 month → >20% maximum cover
  */
 import type { GenesisClimate, GenesisRainfall, SphereMesh } from ".."
-import { TIME } from "../shared/time"
-import { meanEdgeLengthKm } from "../shared/units"
+import { meanEdgeLengthKm, TIME } from "../shared"
 
 // Positive degree-day melt factor: 4 mm w.e. per degree-day
 const MELT_FACTOR = 6.0

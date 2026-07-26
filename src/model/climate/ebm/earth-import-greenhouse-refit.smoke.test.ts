@@ -1,11 +1,8 @@
-import { readFileSync } from "node:fs"
+﻿import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, it } from "vitest"
-import {
-	computeLandFraction,
-	computeTemperature,
-} from "@/model/climate/climate"
-import { decodePng } from "@/model/pipelines/node-png"
+import { computeLandFraction, computeTemperature } from "@/model/climate"
+import { decodePng } from "@/model/pipelines"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { importGenesisWorld } from "../../pipelines/import-heightmap"
 import { EMB_CONSTANTS } from "./constants"
@@ -175,7 +172,10 @@ describe("Earth GREENHOUSE_FACTOR refit against the real imported world", () => 
 		// not a synthetic proxy.
 		const world = importGenesisWorld(importParams)
 		const { meanBiasC: biasBefore } = landOnlyMeanBiasC(world)
-		const realLandFraction = computeLandFraction(world.mesh, world.isLand)
+		const realLandFraction = computeLandFraction({
+			mesh: world.mesh,
+			isLand: world.isLand,
+		})
 
 		const originalGreenhouseFactor = EMB_CONSTANTS.surface.GREENHOUSE_FACTOR
 		try {
@@ -187,15 +187,15 @@ describe("Earth GREENHOUSE_FACTOR refit against the real imported world", () => 
 			for (let iter = 0; iter < 30; iter++) {
 				const mid = (lo + hi) / 2
 				EMB_CONSTANTS.surface.GREENHOUSE_FACTOR = mid
-				const climate = computeTemperature(
-					world.mesh,
-					world.elevation,
-					realLandFraction,
-					world.params,
-					world.oceanDist,
-					world.isLand,
-					world.elevation_km,
-				)
+				const climate = computeTemperature({
+					mesh: world.mesh,
+					elevation: world.elevation,
+					landFraction: realLandFraction,
+					params: world.params,
+					oceanDist: world.oceanDist,
+					isLand: world.isLand,
+					elevation_km: world.elevation_km,
+				})
 				// Re-diff against the same real observed data already attached to
 				// `world` (real_temperature_avg doesn't depend on GREENHOUSE_FACTOR).
 				let n = 0

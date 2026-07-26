@@ -1,4 +1,5 @@
 import { type EarthHistoryData, type FoldedState, fold } from "./fold"
+import type { FoldAtCheckpointParams } from "./types"
 
 const DAYS_PER_CHECKPOINT = 25 * 365 // 25 years, matches typical EU4 scrub granularity
 
@@ -26,10 +27,10 @@ function checkpointFloor(time: number): number {
  * nearest preceding checkpoint (built and cached on first use) instead of
  * refolding from epoch every query -- this is what lets the UI slider scrub
  * without an O(all events since year 2) cost on every drag frame. */
-export function foldAtCheckpoint(
-	cache: CheckpointCache,
-	time: number,
-): FoldedState {
+export function foldAtCheckpoint({
+	cache,
+	time,
+}: FoldAtCheckpointParams): FoldedState {
 	const floor = checkpointFloor(time)
 	let checkpoint = cache.checkpoints.get(floor)
 	if (!checkpoint) {
@@ -38,17 +39,25 @@ export function foldAtCheckpoint(
 		// touched, not quadratic in checkpoint count.
 		const prevFloor = floor - DAYS_PER_CHECKPOINT
 		const prev = cache.checkpoints.get(prevFloor)
-		checkpoint = fold(cache.data, floor, {
-			base: prev,
-			provinceIds: cache.provinceIds,
-			nationTags: cache.nationTags,
+		checkpoint = fold({
+			data: cache.data,
+			time: floor,
+			options: {
+				base: prev,
+				provinceIds: cache.provinceIds,
+				nationTags: cache.nationTags,
+			},
 		})
 		cache.checkpoints.set(floor, checkpoint)
 	}
 	if (time === floor) return checkpoint
-	return fold(cache.data, time, {
-		base: checkpoint,
-		provinceIds: cache.provinceIds,
-		nationTags: cache.nationTags,
+	return fold({
+		data: cache.data,
+		time,
+		options: {
+			base: checkpoint,
+			provinceIds: cache.provinceIds,
+			nationTags: cache.nationTags,
+		},
 	})
 }

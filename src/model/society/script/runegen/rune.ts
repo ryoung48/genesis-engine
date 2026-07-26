@@ -1,4 +1,4 @@
-import { createStringRng, type SharedRng } from "@/model/shared/rng"
+﻿import { createStringRng, type SharedRng } from "@/model/shared"
 import { Point2D } from "./point2d"
 
 export type RuneTemplate =

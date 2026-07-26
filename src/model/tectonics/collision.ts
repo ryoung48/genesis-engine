@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Collision detection, stress propagation, and dual-layer super plate blending.
  * Faithful port of genesis's elevation.js collision/stress logic.
  */
@@ -10,8 +10,7 @@ import type {
 	SphereMesh,
 	SuperPlateData,
 } from ".."
-import { eulerVelocityAt } from "../shared/math"
-import { SimplexNoise } from "../shared/simplex-noise"
+import { eulerVelocityAt, SimplexNoise } from "../shared"
 
 const COLLISION_THRESHOLD = 0.75
 type StageTiming = { Stage: string; ms: string }

@@ -1,25 +1,23 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
+import type { GenesisProvinces } from "@/model"
 import type {
 	RawNationReference,
 	RawOrganizationReference,
-} from "@/model/earth/history/data-source"
+} from "@/model/earth"
 import {
+	createEarthHistoryEngine,
 	EARTH_HISTORY_DEFAULT_START_DAYS,
 	EARTH_HISTORY_MAX_DAYS,
 	EARTH_HISTORY_MIN_DAYS,
-	formatEu4Days,
-} from "@/model/earth/history/date"
-import {
-	createEarthHistoryEngine,
 	type EarthHistoryEngine,
+	formatEu4Days,
+	getHeritageIndex,
+	getNationReferenceIndex,
+	getOrganizationReferenceIndex,
+	getReligionIndex,
 	queryEarthHistory,
 	queryEarthHistoryNation,
-} from "@/model/earth/history/engine"
-import { getHeritageIndex } from "@/model/earth/history/reference/heritages"
-import { getNationReferenceIndex } from "@/model/earth/history/reference/nations"
-import { getOrganizationReferenceIndex } from "@/model/earth/history/reference/organizations"
-import { getReligionIndex } from "@/model/earth/history/reference/religion-groups"
-import type { GenesisProvinces } from "@/model/types/society"
+} from "@/model/earth"
 
 /**
  * Owns the earth-history engine lifecycle and scrubber time for an
@@ -136,18 +134,18 @@ export function useEarthHistoryTimeline(
 
 	const query = useMemo(() => {
 		if (!engine) return null
-		return queryEarthHistory(
+		return queryEarthHistory({
 			engine,
-			selectedDays,
-			nationReference ?? undefined,
-			cultureNameById ?? undefined,
-			religionNameById ?? undefined,
-		)
+			timeDays: selectedDays,
+			nationReference: nationReference ?? undefined,
+			cultureNameById: cultureNameById ?? undefined,
+			religionNameById: religionNameById ?? undefined,
+		})
 	}, [engine, selectedDays, nationReference, cultureNameById, religionNameById])
 
 	const queryNation = (tag: string) => {
 		if (!engine) return null
-		return queryEarthHistoryNation(engine, selectedDays, tag)
+		return queryEarthHistoryNation({ engine, timeDays: selectedDays, tag })
 	}
 
 	return {

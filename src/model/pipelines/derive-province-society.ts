@@ -1,19 +1,16 @@
-import type { GenesisParams, SphereMesh, StageTiming } from ".."
-import { computeSettlementAnchors } from "../settlements/compute-settlement-regions"
-import { computeCultures } from "../society/culture"
-import { getEraConfig } from "../society/eras"
-import { computeHeritages } from "../society/heritage"
-import { computeNations } from "../society/nations"
+﻿import type { GenesisParams, SphereMesh, StageTiming } from ".."
+import { computeSettlementAnchors } from "../settlements"
 import {
 	assignReligionTypes,
 	buildReligionColors,
+	computeCultures,
+	computeHeritages,
+	computeNations,
 	computeReligions,
-} from "../society/religion"
-import { deriveChildColors } from "../society/shared"
-import {
-	assignLandmarkIdentity,
-	type GenesisLandmarks,
-} from "../terrain/landmarks"
+	deriveChildColors,
+	getEraConfig,
+} from "../society"
+import { assignLandmarkIdentity, type GenesisLandmarks } from "../terrain"
 import { runPostElevationPipeline } from "./post-elevation"
 
 interface DeriveProvinceSocietyInput {

@@ -1,16 +1,17 @@
-/**
- * Hotspot volcanism ΓÇö mantle plumes with drift chains.
+﻿/**
+ * Hotspot volcanism Î“Ã‡Ŷ mantle plumes with drift chains.
  * Faithful port of genesis's dual-component model: broad thermal swell +
  * volcanic peak with domain-warped shape distortion, age-dependent texture,
  * drift elongation, summit calderas, and radial rift-zone ridges.
  */
 
-import { eulerVelocityAt } from "../shared/math"
-import { createRng } from "../shared/rng"
-import { SimplexNoise } from "../shared/simplex-noise"
-import { normalizeMantleField } from "../tectonics/mantle"
-import type { SphereMesh } from "../types/mesh"
-import type { GenesisTerrainFeatures, TectonicPlate } from "../types/tectonics"
+import { createRng, eulerVelocityAt, SimplexNoise } from "../shared"
+import { normalizeMantleField } from "../tectonics"
+import type {
+	GenesisTerrainFeatures,
+	SphereMesh,
+	TectonicPlate,
+} from "../types"
 import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,

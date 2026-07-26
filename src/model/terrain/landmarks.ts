@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Landmass / water body labeling via connected-component BFS.
  * Each region gets a landmark ID; each landmark has a type and size.
  * O(N) time, typed arrays only.
  */
 import type { GenesisPartition, GenesisProvinces, SphereMesh } from ".."
-import { buildIdentitySeeds } from "../shared/identity-seeds"
+import { buildIdentitySeeds } from "../shared"
 
 type LandmarkType = "continent" | "island" | "isle" | "ocean" | "sea" | "lake"
 

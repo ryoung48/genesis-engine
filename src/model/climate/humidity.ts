@@ -11,10 +11,10 @@ function clampRelativeHumidity(rh: number): number {
 	return rh
 }
 
-export function relativeHumidityFromVaporPressure(
-	meanTempC: number,
-	vaporPressureKpa: number,
-): number {
+export function relativeHumidityFromVaporPressure({
+	meanTempC,
+	vaporPressureKpa,
+}: RelativeHumidityFromVaporPressureParams): number {
 	return clampRelativeHumidity(
 		100 * (vaporPressureKpa / saturationVaporPressureKpa(meanTempC)),
 	)
@@ -43,10 +43,13 @@ function precipMoistureBoostC(annualRainfallMm: number): number {
 // Tmean ≤ 0 °C (cold polar dryness is already handled by DTR) and reaches
 // full strength at Tmean ≥ 30 °C. Ramps from 0 at 300 mm/yr to −13 °C at 0
 // mm/yr, pushing hot desert RH below 30 %.
-function dryAirDepressionC(
-	annualRainfallMm: number,
-	meanTempC: number,
-): number {
+function dryAirDepressionC({
+	annualRainfallMm,
+	meanTempC,
+}: Pick<
+	RelativeHumidityFromTempRangeParams,
+	"annualRainfallMm" | "meanTempC"
+>): number {
 	const deficit = 300 - annualRainfallMm
 	if (deficit <= 0) return 0
 	const tempGate = Math.max(0, Math.min(1, meanTempC / 30))
@@ -88,20 +91,20 @@ function continentalityDewpointC(distFromOceanKm: number): number {
  *
  * Result is clamped to 0–100.
  */
-export function relativeHumidityFromTempRange(
-	meanTempC: number,
-	dtrC: number,
-	annualAridity?: number,
-	annualRainfallMm?: number,
-	distFromOceanKm?: number,
-): number {
+export function relativeHumidityFromTempRange({
+	meanTempC,
+	dtrC,
+	annualAridity,
+	annualRainfallMm,
+	distFromOceanKm,
+}: RelativeHumidityFromTempRangeParams): number {
 	const bias =
 		annualAridity !== undefined ? aridDewpointBiasC(annualAridity) : 0
 	const moistureBoost =
 		annualRainfallMm !== undefined ? precipMoistureBoostC(annualRainfallMm) : 0
 	const dryDepression =
 		annualRainfallMm !== undefined
-			? dryAirDepressionC(annualRainfallMm, meanTempC)
+			? dryAirDepressionC({ annualRainfallMm, meanTempC })
 			: 0
 	const continentality =
 		distFromOceanKm !== undefined ? continentalityDewpointC(distFromOceanKm) : 0
@@ -118,3 +121,8 @@ export function relativeHumidityFromTempRange(
 		return clampRelativeHumidity(80 + 12 * (1 - Math.exp(-(rh - 80) / 4)))
 	return clampRelativeHumidity(rh)
 }
+
+import type {
+	RelativeHumidityFromTempRangeParams,
+	RelativeHumidityFromVaporPressureParams,
+} from "./types"
