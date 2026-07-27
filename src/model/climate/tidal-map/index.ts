@@ -76,7 +76,6 @@ function computeSpringTideMap({
 		if (result[r] > 0) coastalIndices.push(r)
 	}
 	if (coastalIndices.length > 0) {
-		// biome-ignore lint/nursery/useMaxParams: native sort callback signature
 		coastalIndices.sort((a, b) => result[b]! - result[a]!)
 		const macroCount = Math.ceil(coastalIndices.length * TARGET_MACRO_FRACTION)
 		const mesoCount = Math.ceil(coastalIndices.length * TARGET_MESO_FRACTION)

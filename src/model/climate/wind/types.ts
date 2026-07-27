@@ -27,7 +27,7 @@ export interface FlowGrid {
 	height: 181
 }
 
-export interface RasterizeVectorGridOptions {
+interface RasterizeVectorGridOptions {
 	scalar?: Float32Array
 	allowCell?: (region: number) => boolean
 	isBlockedRegion?: (region: number) => boolean

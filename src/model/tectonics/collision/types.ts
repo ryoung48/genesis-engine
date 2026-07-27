@@ -2,7 +2,7 @@ import type { SphereMesh } from "@/model/mesh/types"
 import type { SimplexNoise } from "@/model/shared/simplex-noise"
 import type { PlateVec, SuperPlateData } from "@/model/tectonics/types"
 
-export type StageTiming = { Stage: string; ms: string }
+type StageTiming = { Stage: string; ms: string }
 
 export interface PlateVelocityAtParams {
 	plateVec: Map<number, PlateVec>

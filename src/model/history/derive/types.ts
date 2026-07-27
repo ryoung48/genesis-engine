@@ -27,3 +27,21 @@ export interface NationMemberCountParams {
 	root: number
 	t: number
 }
+
+export interface DerivedLookupParams {
+	state: HistoryState
+	p: number
+	t?: number
+	cache?: DerivedCache
+}
+
+export interface DerivedAtTimeParams {
+	state: HistoryState
+	t?: number
+	cache?: DerivedCache
+}
+
+export interface WealthCurrentParams extends DerivedLookupParams {
+	exclude?: number
+	freedom: boolean
+}

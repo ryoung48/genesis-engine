@@ -349,7 +349,6 @@ function computeAdvection({
 			const moisture = attr === "east" ? east : west
 			const settled = new Uint8Array(N)
 			const queue = new PriorityQueue<{ region: number; moisture: number }>(
-				// biome-ignore lint/nursery/useMaxParams: third-party queue comparator signature
 				(a, b) => b.moisture - a.moisture,
 			)
 

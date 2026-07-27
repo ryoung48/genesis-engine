@@ -1,9 +1,10 @@
 import { VEGETATION } from "@/model/climate/vegetation"
-import type { SphereMesh } from "@/model/mesh/types"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
+import type {
+	ClassifyTopographyParams,
+	ComputeSlopeScoreParams,
+} from "@/model/terrain/classification/types"
 import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
-import type { GenesisRivers } from "@/model/terrain/rivers/types"
 
 const topoFlat = 0
 
@@ -19,11 +20,11 @@ const topoOcean = 5
 
 const topoLake = 6
 
-function computeSlopeScore(
-	mesh: SphereMesh,
-	elevationKm: Float32Array,
+function computeSlopeScore({
+	mesh,
+	elevationKm,
 	planetRadiusKm = 6371,
-): Float32Array {
+}: ComputeSlopeScoreParams): Float32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
 	const localSlope = new Float32Array(N)
@@ -78,19 +79,7 @@ const genesisTopographyLabels = [
 	"lake",
 ] as const
 
-function classifyTopography(params: {
-	mesh: SphereMesh
-	elevationKm: Float32Array
-	isLand: Uint8Array
-	rivers: Pick<GenesisRivers, "visible" | "terminal">
-	landmarks: Pick<GenesisLandmarks, "regionLandmark" | "type">
-	vegetation?: Uint8Array
-	slopeScore?: Float32Array
-	planetRadiusKm?: number
-	seed?: number
-	/** Pre-computed tidal range [0,1] per cell — boosts coastal marsh formation */
-	tidalRange?: Float32Array
-}): {
+function classifyTopography(params: ClassifyTopographyParams): {
 	topography: Uint8Array
 	coastal: Uint8Array
 	oceanCoastal: Uint8Array
@@ -107,7 +96,8 @@ function classifyTopography(params: {
 		tidalRange,
 	} = params
 	const slopeScore =
-		params.slopeScore ?? computeSlopeScore(mesh, elevationKm, planetRadiusKm)
+		params.slopeScore ??
+		computeSlopeScore({ mesh, elevationKm, planetRadiusKm })
 	const topography = new Uint8Array(mesh.numRegions)
 	const coastal = new Uint8Array(mesh.numRegions)
 	const { adjOffset, adjList, r_xyz } = mesh

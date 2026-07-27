@@ -135,15 +135,18 @@ function buildHoverRouteLabel(
 	let hasImperialRoute = false
 	let hasMinorRoute = false
 	let hasSeaRoute = false
-	TRANSPORT.forEachRoute(routes, (route) => {
-		if (!route.pathRegions.includes(hoverRegion)) return
-		if (route.kind === TRANSPORT.ROUTE_SEA) {
-			hasSeaRoute = true
-		} else if (route.kind === TRANSPORT.ROUTE_LAND_MAJOR) {
-			hasImperialRoute = true
-		} else if (route.kind === TRANSPORT.ROUTE_LAND_MINOR) {
-			hasMinorRoute = true
-		}
+	TRANSPORT.forEachRoute({
+		routes,
+		callback: (route) => {
+			if (!route.pathRegions.includes(hoverRegion)) return
+			if (route.kind === TRANSPORT.ROUTE_SEA) {
+				hasSeaRoute = true
+			} else if (route.kind === TRANSPORT.ROUTE_LAND_MAJOR) {
+				hasImperialRoute = true
+			} else if (route.kind === TRANSPORT.ROUTE_LAND_MINOR) {
+				hasMinorRoute = true
+			}
+		},
 	})
 	const labels: string[] = []
 	if (hasImperialRoute) labels.push("Major")

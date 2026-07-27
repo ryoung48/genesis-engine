@@ -160,17 +160,6 @@ export interface PlaceCradlesParams {
 	k: number
 }
 
-export interface PartitionMembersParams {
-	seeds: Int32Array<ArrayBufferLike>
-	members: Int32Array<ArrayBufferLike>
-	adjOffset: Int32Array<ArrayBufferLike>
-	adjList: Int32Array<ArrayBufferLike>
-	provinceCount: number
-	habitability?: Float32Array<ArrayBufferLike>
-	urbanPop?: Float32Array<ArrayBufferLike>
-	waterAccess?: Uint8Array<ArrayBufferLike>
-}
-
 export interface NationPlacementScoreParams {
 	province: number
 	habitability: Float32Array<ArrayBufferLike>

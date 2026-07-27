@@ -5,8 +5,8 @@ import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { SYSTEM } from "@/model/celestial/system"
-import { DATA } from "@/model/celestial/system/sol-system/data"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import type {
@@ -609,7 +609,7 @@ export function GenerationPlanetNavigator({
 	const [dataExpanded, setDataExpanded] = useState(false)
 	const [seedOverrides, setSeedOverrides] = useState<Record<string, string>>({})
 	const [rootSeedLabel, setRootSeedLabel] = useState(
-		restSeed === SYSTEM.SOL_SEED
+		restSeed === SOL_DATA.solSeed
 			? "sol"
 			: restSeed.toString(36).padStart(6, "0"),
 	)
@@ -627,11 +627,11 @@ export function GenerationPlanetNavigator({
 	// so they should always render once generated. namesEnabled is the
 	// general "show whatever name this body/moon carries" gate;
 	// showRealSolNames stays reserved for the handful of hardcoded Sol
-	// fallbacks (SOL_STAR_NAME, SOL_MAIN_WORLD_NAME, SYSTEM.SOL_LUNA_DEFAULT.name)
+	// fallbacks (SOL_STAR_NAME, SOL_MAIN_WORLD_NAME, SOL_SYSTEM.solLunaDefault.name)
 	// below.
-	const namesEnabled = restSeed === SYSTEM.SOL_SEED ? showRealSolNames : true
+	const namesEnabled = restSeed === SOL_DATA.solSeed ? showRealSolNames : true
 	const starTitle = showRealSolNames
-		? DATA.solStarName
+		? SOL_DATA.solStarName
 		: (starName ?? "Primary Star")
 	const labeledOrbits = useMemo(
 		() => labelOrbitBodies(orbitBodies ?? [], namesEnabled),
@@ -680,7 +680,9 @@ export function GenerationPlanetNavigator({
 		(target: OrbitSelection): number => {
 			const label = getSeedLabel(target)
 			if (target.kind === "star") {
-				return label === "sol" ? SYSTEM.SOL_SEED : RNG.seedStringToNumber(label)
+				return label === "sol"
+					? SOL_DATA.solSeed
+					: RNG.seedStringToNumber(label)
 			}
 			let parent: OrbitSelection
 			if (target.kind === "orbit") {
@@ -704,7 +706,7 @@ export function GenerationPlanetNavigator({
 			return
 		}
 		setRootSeedLabel(
-			restSeed === SYSTEM.SOL_SEED
+			restSeed === SOL_DATA.solSeed
 				? "sol"
 				: restSeed.toString(36).padStart(6, "0"),
 		)
@@ -745,7 +747,7 @@ export function GenerationPlanetNavigator({
 		if (selection.kind === "star") {
 			const numericSeed =
 				normalized === "sol"
-					? SYSTEM.SOL_SEED
+					? SOL_DATA.solSeed
 					: (SEED_LABEL.resolveSeedLabel(normalized) ??
 						RNG.seedStringToNumber(normalized))
 			lastAppliedRootSeedRef.current = {
@@ -794,7 +796,7 @@ export function GenerationPlanetNavigator({
 						body.isMainWorld && !body.name
 							? appendSizeToTitle(
 									showRealSolNames
-										? DATA.solMainWorldName
+										? SOL_DATA.solMainWorldName
 										: "Terrestrial Planet",
 									body.sizeClass,
 								)
@@ -819,9 +821,9 @@ export function GenerationPlanetNavigator({
 					restSeed: getDerivedSeedNumber({ kind: "star" }),
 					// Sol is always a real G2V star -- its type isn't editable.
 					setSpectralClass:
-						restSeed === SYSTEM.SOL_SEED ? undefined : setSpectralClass,
+						restSeed === SOL_DATA.solSeed ? undefined : setSpectralClass,
 					setStarSubtype:
-						restSeed === SYSTEM.SOL_SEED ? undefined : setStarSubtype,
+						restSeed === SOL_DATA.solSeed ? undefined : setStarSubtype,
 				}),
 				children: starChildren.filter((entry) => entry.title),
 				emptyChildrenLabel: "No child orbits.",
@@ -862,15 +864,17 @@ export function GenerationPlanetNavigator({
 									orbitalDistanceAU: body.orbitalDistanceAU,
 									eccentricity: body.eccentricity,
 									starName:
-										showRealSolNames && restSeed === SYSTEM.SOL_SEED
-											? DATA.solStarName
+										showRealSolNames && restSeed === SOL_DATA.solSeed
+											? SOL_DATA.solStarName
 											: undefined,
 								},
 							})
 			const bodyTitle =
 				isMainWorld && !body.name
 					? appendSizeToTitle(
-							showRealSolNames ? DATA.solMainWorldName : "Terrestrial Planet",
+							showRealSolNames
+								? SOL_DATA.solMainWorldName
+								: "Terrestrial Planet",
 							body.sizeClass,
 						)
 					: (labeledOrbits.find((entry) => entry.body === body)?.title ??
@@ -949,8 +953,8 @@ export function GenerationPlanetNavigator({
 								moon,
 								moonIndex + 1,
 								namesEnabled,
-								isMainWorld && moonIndex === 0 && restSeed === SYSTEM.SOL_SEED
-									? SYSTEM.SOL_LUNA_DEFAULT.name
+								isMainWorld && moonIndex === 0 && restSeed === SOL_DATA.solSeed
+									? SOL_SYSTEM.solLunaDefault.name
 									: undefined,
 							),
 					}),
@@ -1038,8 +1042,8 @@ export function GenerationPlanetNavigator({
 										namesEnabled,
 										isMainWorld &&
 											moonIndex === 0 &&
-											restSeed === SYSTEM.SOL_SEED
-											? SYSTEM.SOL_LUNA_DEFAULT.name
+											restSeed === SOL_DATA.solSeed
+											? SOL_SYSTEM.solLunaDefault.name
 											: undefined,
 									),
 									subtitle: "Moon",
@@ -1094,7 +1098,9 @@ export function GenerationPlanetNavigator({
 			const parentTitle =
 				isMainWorld && !body.name
 					? appendSizeToTitle(
-							showRealSolNames ? DATA.solMainWorldName : "Terrestrial Planet",
+							showRealSolNames
+								? SOL_DATA.solMainWorldName
+								: "Terrestrial Planet",
 							body.sizeClass,
 						)
 					: (labeledOrbits.find((entry) => entry.body === body)?.title ??
@@ -1106,8 +1112,8 @@ export function GenerationPlanetNavigator({
 					namesEnabled,
 					isMainWorld &&
 						selection.moonIndex === 0 &&
-						restSeed === SYSTEM.SOL_SEED
-						? SYSTEM.SOL_LUNA_DEFAULT.name
+						restSeed === SOL_DATA.solSeed
+						? SOL_SYSTEM.solLunaDefault.name
 						: undefined,
 				),
 				typeLabel: "Moon",
@@ -1180,8 +1186,8 @@ export function GenerationPlanetNavigator({
 								siblingMoon,
 								moonIndex + 1,
 								namesEnabled,
-								isMainWorld && moonIndex === 0 && restSeed === SYSTEM.SOL_SEED
-									? SYSTEM.SOL_LUNA_DEFAULT.name
+								isMainWorld && moonIndex === 0 && restSeed === SOL_DATA.solSeed
+									? SOL_SYSTEM.solLunaDefault.name
 									: undefined,
 							),
 					}),
@@ -1190,7 +1196,7 @@ export function GenerationPlanetNavigator({
 						parent: {
 							name:
 								showRealSolNames && isMainWorld
-									? DATA.solMainWorldName
+									? SOL_DATA.solMainWorldName
 									: showRealSolNames
 										? body.name
 										: undefined,
@@ -1205,8 +1211,8 @@ export function GenerationPlanetNavigator({
 							orbitalDistanceAU: parentOrbitalDistanceAU,
 							eccentricity: parentEccentricity,
 							starName:
-								showRealSolNames && restSeed === SYSTEM.SOL_SEED
-									? DATA.solStarName
+								showRealSolNames && restSeed === SOL_DATA.solSeed
+									? SOL_DATA.solStarName
 									: undefined,
 						},
 					}),

@@ -6,9 +6,10 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { SYSTEM } from "@/model/celestial/system"
+import { SYSTEM_GENERATION } from "@/model/celestial/system/generation"
+import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
-import { DATA } from "@/model/celestial/system/sol-system/data"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type {
 	SolarSystemState,
 	SystemBody,
@@ -1710,7 +1711,7 @@ export const GenesisView: React.FC = () => {
 	const starSubtype = solarSystem.star.subtype
 	const restSeed =
 		solarSystem.star.seed === "sol"
-			? SYSTEM.SOL_SEED
+			? SOL_DATA.solSeed
 			: RNG.seedStringToNumber(solarSystem.star.seed)
 	// Sol always shows its real, curated body names; a procedurally generated
 	// system's own language-generated names aren't spoilers either, so a body
@@ -1720,9 +1721,9 @@ export const GenesisView: React.FC = () => {
 	// instead of a generated one.
 	const starName = useMemo(
 		() =>
-			restSeed === SYSTEM.SOL_SEED
+			restSeed === SOL_DATA.solSeed
 				? undefined
-				: SYSTEM.generateStarName(restSeed),
+				: STAR_IDENTITY.generateStarName(restSeed),
 		[restSeed],
 	)
 	const setRestSeed = useCallback((value: number) => {
@@ -1731,7 +1732,7 @@ export const GenesisView: React.FC = () => {
 			star: {
 				...current.star,
 				seed:
-					value === SYSTEM.SOL_SEED
+					value === SOL_DATA.solSeed
 						? "sol"
 						: value.toString(36).padStart(6, "0"),
 			},
@@ -1770,16 +1771,16 @@ export const GenesisView: React.FC = () => {
 				spectralClass,
 				starSubtype,
 			})
-		if (restSeed === SYSTEM.SOL_SEED) {
+		if (restSeed === SOL_DATA.solSeed) {
 			return {
-				starAgeGyr: DATA.solStarAgeGyr,
+				starAgeGyr: SOL_DATA.solStarAgeGyr,
 				starLuminositySol: 1,
 				spectralClass: cls,
 				...surfaceTidesCallbacks,
 			}
 		}
 		return {
-			starAgeGyr: SYSTEM.getStarAgeGyr({
+			starAgeGyr: STAR_IDENTITY.getStarAgeGyr({
 				seed: restSeed,
 				massSol: STAR.getStarMassSol({ cls, subtype: starSubtype }),
 			}),
@@ -1796,10 +1797,10 @@ export const GenesisView: React.FC = () => {
 		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: STAR.defaultSpectralClass
-		if (restSeed !== SYSTEM.SOL_SEED) {
+		if (restSeed !== SOL_DATA.solSeed) {
 			// Non-Sol: the main world (if any) is rolled fresh right alongside
 			// its siblings -- no external params to build here at all.
-			return SYSTEM.generateSystemBodies({
+			return SYSTEM_GENERATION.generateSystemBodies({
 				seed: restSeed,
 				spectralClass: cls,
 				starSubtype,
@@ -1834,9 +1835,9 @@ export const GenesisView: React.FC = () => {
 			? (prev.atmosphere?.pressureBar ?? DEFAULT_WORLD_PARAMS.pressure)
 			: DEFAULT_WORLD_PARAMS.pressure
 		const tideLock = prev ? (prev.tideLock ?? null) : null
-		const moons = prev ? prev.moons : [{ ...SYSTEM.SOL_LUNA_DEFAULT, idx: 1 }]
+		const moons = prev ? prev.moons : [{ ...SOL_SYSTEM.solLunaDefault, idx: 1 }]
 		const solMainWorldOverrides = {
-			name: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.name,
+			name: SOL_SYSTEM.solMainWorldDefaults.name,
 			orbitalDistanceAU,
 			diameterKm: planetRadiusKm * 2,
 			moons,
@@ -1859,10 +1860,10 @@ export const GenesisView: React.FC = () => {
 				prev?.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
 			seaLevel: prev?.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
 			maxElevation: 6000,
-			albedo: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.albedo,
-			greenhouseFactor: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
+			albedo: SOL_SYSTEM.solMainWorldDefaults.albedo,
+			greenhouseFactor: SOL_SYSTEM.solMainWorldDefaults.greenhouseFactor,
 		}
-		return SYSTEM.generateSystemBodies({
+		return SYSTEM_GENERATION.generateSystemBodies({
 			seed: restSeed,
 			spectralClass: cls,
 			starSubtype,
@@ -1872,7 +1873,7 @@ export const GenesisView: React.FC = () => {
 	}, [restSeed, spectralClass, starSubtype, forceMainWorld])
 	const resetSourceSystemBodies = useMemo(
 		() =>
-			restSeed === SYSTEM.SOL_SEED
+			restSeed === SOL_DATA.solSeed
 				? SOL_SYSTEM.solDefaultSolarSystem.orbits
 				: generatedSystemBodies,
 		[generatedSystemBodies, restSeed],
@@ -2134,7 +2135,7 @@ export const GenesisView: React.FC = () => {
 	}, [world, pressure])
 	useEffect(() => {
 		sceneRef.current?.setGlobeCloudTexturePath(
-			restSeed === SYSTEM.SOL_SEED ? DATA.solEarthCloudsTexturePath : null,
+			restSeed === SOL_DATA.solSeed ? SOL_DATA.solEarthCloudsTexturePath : null,
 		)
 	}, [restSeed])
 	useEffect(() => {
@@ -4692,10 +4693,10 @@ export const GenesisView: React.FC = () => {
 				// including any live edits) and fall back to the static defaults
 				// only if it isn't available yet.
 				albedo:
-					mainWorldSystemBody?.albedo ?? SYSTEM.SOL_MAIN_WORLD_DEFAULTS.albedo,
+					mainWorldSystemBody?.albedo ?? SOL_SYSTEM.solMainWorldDefaults.albedo,
 				greenhouseFactor:
 					mainWorldSystemBody?.greenhouseFactor ??
-					SYSTEM.SOL_MAIN_WORLD_DEFAULTS.greenhouseFactor,
+					SOL_SYSTEM.solMainWorldDefaults.greenhouseFactor,
 				seismologyTotalHeatingK: mainWorldSystemBody?.seismology?.totalHeating,
 				tideLock,
 				substellarLon,
@@ -7625,7 +7626,7 @@ export const GenesisView: React.FC = () => {
 			if (bodyIndex === undefined) {
 				setSpectralClass(DEFAULT_WORLD_PARAMS.spectralClass)
 				setStarSubtype(DEFAULT_WORLD_PARAMS.starSubtype)
-				setRestSeed(SYSTEM.SOL_SEED)
+				setRestSeed(SOL_DATA.solSeed)
 			}
 			if (bodyIndex === undefined) {
 				// Explicit, rather than relying on the generatedSystemBodies
@@ -7747,7 +7748,7 @@ export const GenesisView: React.FC = () => {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SYSTEM.SOL_SEED,
+						showRealNames: restSeed === SOL_DATA.solSeed,
 						namesEnabled,
 						starName,
 					}
@@ -7785,7 +7786,7 @@ export const GenesisView: React.FC = () => {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SYSTEM.SOL_SEED,
+						showRealNames: restSeed === SOL_DATA.solSeed,
 						namesEnabled,
 						starName,
 					}
@@ -8039,14 +8040,14 @@ export const GenesisView: React.FC = () => {
 		perihelion,
 	])
 
-	const solStarName = restSeed === SYSTEM.SOL_SEED ? "Sol" : undefined
+	const solStarName = restSeed === SOL_DATA.solSeed ? "Sol" : undefined
 	const surfaceTidesM = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
 			return TIDAL_SCHEDULE.computeMoonSurfaceTidesM({
 				moon: focusedMoon,
 				parent: {
 					name:
-						restSeed === SYSTEM.SOL_SEED ? focusedMoonParent.name : undefined,
+						restSeed === SOL_DATA.solSeed ? focusedMoonParent.name : undefined,
 					massKg: focusedMoonParent.massKg,
 					diameterKm: focusedMoonParent.diameterKm,
 					moons: focusedMoonParent.moons,
@@ -8103,7 +8104,7 @@ export const GenesisView: React.FC = () => {
 					setObliquity={setObliquity}
 					restSeed={restSeed}
 					starName={starName}
-					showRealSolNames={restSeed === SYSTEM.SOL_SEED}
+					showRealSolNames={restSeed === SOL_DATA.solSeed}
 					setRestSeed={setRestSeed}
 					forceMainWorld={forceMainWorld}
 					setForceMainWorld={setForceMainWorld}

@@ -38,31 +38,31 @@ function buildHistoryFrame({
 	const hierarchyStartedAt = performance.now()
 	DERIVE.ensureHierarchyClean(state)
 	for (let province = 0; province < P; province++) {
-		parent[province] = FIELDS.prov.parent.get(state, province)
+		parent[province] = FIELDS.prov.parent.get({ state, p: province })
 	}
 	const hierarchyMs = performance.now() - hierarchyStartedAt
 
 	const provinceFieldsStartedAt = performance.now()
 	for (let province = 0; province < P; province++) {
-		assignment[province] = FIELDS.prov.assignment.get(state, province)
+		assignment[province] = FIELDS.prov.assignment.get({ state, p: province })
 		sovereign[province] = state.sovereignCurrent[province]
-		populationUrban[province] = FIELDS.prov.population.urban.get(
+		populationUrban[province] = FIELDS.prov.population.urban.get({
 			state,
-			province,
-		)
+			p: province,
+		})
 		populationTotal[province] =
-			FIELDS.prov.population.rural.get(state, province) +
+			FIELDS.prov.population.rural.get({ state, p: province }) +
 			populationUrban[province]
-		development[province] = FIELDS.prov.development.get(state, province)
-		consumption[province] = FIELDS.prov.consumption.get(state, province)
-		cultureBlendSecondary[province] = FIELDS.prov.cultureBlendSecondary.get(
+		development[province] = FIELDS.prov.development.get({ state, p: province })
+		consumption[province] = FIELDS.prov.consumption.get({ state, p: province })
+		cultureBlendSecondary[province] = FIELDS.prov.cultureBlendSecondary.get({
 			state,
-			province,
-		)
-		cultureBlendWeight[province] = FIELDS.prov.cultureBlendWeight.get(
+			p: province,
+		})
+		cultureBlendWeight[province] = FIELDS.prov.cultureBlendWeight.get({
 			state,
-			province,
-		)
+			p: province,
+		})
 		const color = state.nationColors.get(assignment[province])
 		if (!color) continue
 		const base = province * 3
@@ -85,7 +85,8 @@ function buildHistoryFrame({
 			defender: war.defender,
 			rebel: war.rebel,
 			occupied: Array.from({ length: P }, (_, province) => province).filter(
-				(province) => FIELDS.prov.occupation.get(state, province) === war.idx,
+				(province) =>
+					FIELDS.prov.occupation.get({ state, p: province }) === war.idx,
 			),
 		}))
 	const warsMs = performance.now() - warsStartedAt
@@ -96,16 +97,22 @@ function buildHistoryFrame({
 	for (let province = 0; province < P; province++) {
 		if (parent[province] < 0 && assignment[province] >= 0) {
 			sovereignCount++
-			leaderDynasty[province] = FIELDS.prov.leader.dynasty.get(state, province)
-			leaderNameSeed[province] = FIELDS.prov.leader.nameSeed.get(
+			leaderDynasty[province] = FIELDS.prov.leader.dynasty.get({
 				state,
-				province,
-			)
-			leaderClaim[province] = FIELDS.prov.leader.claim.get(state, province)
-			leaderBirthYear[province] = FIELDS.prov.leader.birthYear.get(
+				p: province,
+			})
+			leaderNameSeed[province] = FIELDS.prov.leader.nameSeed.get({
 				state,
-				province,
-			)
+				p: province,
+			})
+			leaderClaim[province] = FIELDS.prov.leader.claim.get({
+				state,
+				p: province,
+			})
+			leaderBirthYear[province] = FIELDS.prov.leader.birthYear.get({
+				state,
+				p: province,
+			})
 			nationWealth[province] = Math.max(
 				0,
 				state.habitability[province] - consumption[province],

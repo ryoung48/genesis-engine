@@ -1,4 +1,4 @@
-export interface SettlementRegionWorld {
+interface SettlementRegionWorld {
 	mesh: {
 		numRegions: number
 		adjOffset: Int32Array

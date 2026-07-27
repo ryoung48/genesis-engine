@@ -1,8 +1,10 @@
 import type {
 	CacheKeyParams,
-	DerivedCache,
+	DerivedAtTimeParams,
+	DerivedLookupParams,
 	NationMemberCountParams,
 	NationMembersParams,
+	WealthCurrentParams,
 } from "@/model/history/derive/types"
 import { FIELDS } from "@/model/history/fields"
 import type { HistoryState } from "@/model/history/state/types"
@@ -70,12 +72,12 @@ function ensureHierarchyClean(state: HistoryState): void {
 	state.hierarchyVersion++
 }
 
-function sovereign(
-	state: HistoryState,
-	p: number,
+function sovereign({
+	state,
+	p,
 	t = state.time,
-	cache?: DerivedCache,
-): number {
+	cache,
+}: DerivedLookupParams): number {
 	if (t === state.time) {
 		ensureHierarchyClean(state)
 		const s = state.sovereignCurrent[p]
@@ -86,11 +88,11 @@ function sovereign(
 	if (cached !== undefined) return cached
 
 	let current = p
-	let parent = FIELDS.prov.parent.get(state, current, t)
+	let parent = FIELDS.prov.parent.get({ state, p: current, time: t })
 	let steps = 0
 	while (parent >= 0) {
 		current = parent
-		parent = FIELDS.prov.parent.get(state, current, t)
+		parent = FIELDS.prov.parent.get({ state, p: current, time: t })
 		steps++
 		if (steps > state.P) {
 			throw new Error(
@@ -103,12 +105,12 @@ function sovereign(
 	return current
 }
 
-function children(
-	state: HistoryState,
-	p: number,
+function children({
+	state,
+	p,
 	t = state.time,
-	cache?: DerivedCache,
-): number[] {
+	cache,
+}: DerivedLookupParams): number[] {
 	if (t === state.time) {
 		ensureHierarchyClean(state)
 		const start = state.childOffset[p]
@@ -123,26 +125,26 @@ function children(
 
 	const result: number[] = []
 	for (let i = 0; i < state.P; i++) {
-		if (FIELDS.prov.parent.get(state, i, t) === p) result.push(i)
+		if (FIELDS.prov.parent.get({ state, p: i, time: t }) === p) result.push(i)
 	}
 	cache?.children?.set(key, result)
 	return result
 }
 
-function gravity(
-	state: HistoryState,
-	p: number,
+function gravity({
+	state,
+	p,
 	t = state.time,
-	cache?: DerivedCache,
-): number {
+	cache,
+}: DerivedLookupParams): number {
 	const key = cacheKey({ p, t })
 	const cached = cache?.gravity?.get(key)
 	if (cached !== undefined) return cached
 
-	const members = children(state, p, t, cache)
+	const members = children({ state, p, t, cache })
 	let value = state.habitability[p]
 	for (const child of members) {
-		value += gravity(state, child, t, cache) * TRIBUTE
+		value += gravity({ state, p: child, t, cache }) * TRIBUTE
 	}
 	const memberCount = nationMemberCount({ state, root: p, t })
 	if (members.length > HIERARCHY.maxFanoutForNationSize(memberCount))
@@ -161,7 +163,7 @@ function nationMembers({
 	const stack = [root]
 	while (stack.length > 0) {
 		const current = stack.pop()!
-		for (const child of children(state, current, t, cache)) {
+		for (const child of children({ state, p: current, t, cache })) {
 			result.push(child)
 			stack.push(child)
 		}
@@ -187,56 +189,57 @@ function nationMemberCount({
 	return count
 }
 
-function wealthOptimal(
-	state: HistoryState,
-	p: number,
+function wealthOptimal({
+	state,
+	p,
 	t = state.time,
-	cache?: DerivedCache,
-): number {
+	cache,
+}: DerivedLookupParams): number {
 	const key = cacheKey({ p, t })
 	const cached = cache?.wealthOptimal?.get(key)
 	if (cached !== undefined) return cached
-	const value = gravity(state, p, t, cache)
+	const value = gravity({ state, p, t, cache })
 	cache?.wealthOptimal?.set(key, value)
 	return value
 }
 
-function wealthCurrent(
-	state: HistoryState,
-	p: number,
+function wealthCurrent({
+	state,
+	p,
 	t = state.time,
-	cache?: DerivedCache,
-	exclude?: number,
+	cache,
+	exclude,
 	freedom = false,
-): number {
+}: WealthCurrentParams): number {
 	const key = `${cacheKey({ p, t })}:${exclude ?? -1}:${freedom ? 1 : 0}`
 	const cached = cache?.wealthCurrent?.get(key)
 	if (cached !== undefined) return cached
 
 	let collected =
-		state.habitability[p] - FIELDS.prov.consumption.get(state, p, t)
-	const directChildren = children(state, p, t, cache)
+		state.habitability[p] - FIELDS.prov.consumption.get({ state, p, time: t })
+	const directChildren = children({ state, p, t, cache })
 	for (const child of directChildren) {
 		if (child === exclude) continue
-		collected += wealthCurrent(state, child, t, cache, exclude) * TRIBUTE
+		collected +=
+			wealthCurrent({ state, p: child, t, cache, exclude, freedom }) * TRIBUTE
 	}
 	if (
 		directChildren.length >
 		HIERARCHY.maxFanoutForNationSize(nationMemberCount({ state, root: p, t }))
 	)
 		collected *= 0.9
-	if (!freedom && FIELDS.prov.parent.get(state, p, t) >= 0)
+	if (!freedom && FIELDS.prov.parent.get({ state, p, time: t }) >= 0)
 		collected *= 1 - TRIBUTE
 
 	cache?.wealthCurrent?.set(key, collected)
 	return collected
 }
 
-function nationAdjacency(
-	state: HistoryState,
+function nationAdjacency({
+	state,
 	t = state.time,
-	cache?: DerivedCache,
-): { offset: Int32Array; list: Int32Array } {
+	cache,
+}: DerivedAtTimeParams): { offset: Int32Array; list: Int32Array } {
 	if (t === state.time) {
 		ensureHierarchyClean(state)
 		if (
@@ -251,7 +254,7 @@ function nationAdjacency(
 
 	const neighborSets = new Map<number, Set<number>>()
 	for (let p = 0; p < state.P; p++) {
-		const a = sovereign(state, p, t, cache)
+		const a = sovereign({ state, p, t, cache })
 		if (state.desolate[p]) continue
 		if (!neighborSets.has(a)) neighborSets.set(a, new Set())
 		for (
@@ -259,7 +262,7 @@ function nationAdjacency(
 			i < state.provinceAdjOffset[p + 1];
 			i++
 		) {
-			const b = sovereign(state, state.provinceAdjList[i], t, cache)
+			const b = sovereign({ state, p: state.provinceAdjList[i], t, cache })
 			if (a !== b) neighborSets.get(a)?.add(b)
 		}
 	}
@@ -285,12 +288,12 @@ function nationAdjacency(
 	return value
 }
 
-function provinceWars(
-	state: HistoryState,
-	p: number,
+function provinceWars({
+	state,
+	p,
 	t = state.time,
-	cache?: DerivedCache,
-): number[] {
+	cache,
+}: DerivedLookupParams): number[] {
 	if (t === state.time) return state.provinceWars[p]
 	const key = cacheKey({ p, t })
 	const cached = cache?.provinceWars?.get(key)

@@ -1,5 +1,5 @@
 import { STAR } from "@/model/celestial/star"
-import { DATA } from "@/model/celestial/system/sol-system/data"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { RNG } from "@/model/shared/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
 
@@ -17,7 +17,7 @@ function getStarAgeGyr({
 	seed: number
 	massSol: number
 }): number {
-	if (seed === DATA.solSeed) return DATA.solStarAgeGyr
+	if (seed === SOL_DATA.solSeed) return SOL_DATA.solStarAgeGyr
 	const rng = RNG.createRng({ seed: seed + STAR_AGE_SEED_SALT })
 	return STAR.rollStarAgeGyr({ rng, massSol })
 }

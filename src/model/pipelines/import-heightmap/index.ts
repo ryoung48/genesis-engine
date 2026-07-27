@@ -621,12 +621,12 @@ function importGenesisWorld({
 					},
 				})
 			: undefined
-	const mesh = MESH.buildSphereMesh(
-		params.numPoints,
-		params.jitter,
+	const mesh = MESH.buildSphereMesh({
+		n: params.numPoints,
+		jitter: params.jitter,
 		rng,
 		densityWeight,
-	)
+	})
 	record("Sphere mesh (Fibonacci + Delaunay + pole)", t0)
 
 	onProgress?.("import:heightmap", 10)

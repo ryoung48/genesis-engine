@@ -6,7 +6,7 @@ import type {
 } from "@/model/celestial/system/generation/sol-seed/types"
 import type { HomeWorldParams } from "@/model/celestial/system/generation/types"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
-import { DATA } from "@/model/celestial/system/sol-system/data"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
@@ -51,7 +51,7 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 }
 
 function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
-	if (params.seed !== DATA.solSeed) return null
+	if (params.seed !== SOL_DATA.solSeed) return null
 	if (!params.solMainWorldOverrides) {
 		throw new Error(
 			"generateSystemBodies: Sol seed requires solMainWorldOverrides",
@@ -59,7 +59,7 @@ function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
 	}
 	const mainWorldSeed: SolPlanetSeed = {
 		...buildMainWorldSeed(params.solMainWorldOverrides),
-		cloudsTexturePath: DATA.solEarthCloudsTexturePath,
+		cloudsTexturePath: SOL_DATA.solEarthCloudsTexturePath,
 		inclinationDeg:
 			params.solMainWorldOverrides.inclinationDeg ??
 			SOL_SYSTEM.solMainWorldDefaults.inclinationDeg,
@@ -72,13 +72,13 @@ function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
 						seedTag: params.seed,
 						idx: -1,
 						options: {
-							textureOverride: DATA.solEarthTexturePath,
+							textureOverride: SOL_DATA.solEarthTexturePath,
 							moonsOverride: params.solMainWorldOverrides?.moons,
 						},
 					})
 				: body,
 		),
-		starAgeGyr: DATA.solStarAgeGyr,
+		starAgeGyr: SOL_DATA.solStarAgeGyr,
 		starLuminositySol: 1,
 		spectralClass: params.spectralClass,
 		...TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({

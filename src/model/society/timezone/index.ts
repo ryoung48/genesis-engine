@@ -1,6 +1,7 @@
 import type {
 	RegionTimezoneLabelParams,
 	RegionTimezoneOffsetParams,
+	SaturateDarkenParams,
 } from "@/model/society/timezone/types"
 
 const TIMEZONE_BAND_WATER: readonly [number, number, number][] = [
@@ -10,11 +11,11 @@ const TIMEZONE_BAND_WATER: readonly [number, number, number][] = [
 	[0.886, 0.659, 0.506],
 ]
 
-function saturateDarken(
-	[r, g, b]: readonly [number, number, number],
-	sat: number,
-	dark: number,
-): [number, number, number] {
+function saturateDarken({
+	color: [r, g, b],
+	sat,
+	dark,
+}: SaturateDarkenParams): [number, number, number] {
 	const luma = 0.299 * r + 0.587 * g + 0.114 * b
 	const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 	return [
@@ -25,7 +26,9 @@ function saturateDarken(
 }
 
 const TIMEZONE_BAND_LAND: readonly [number, number, number][] =
-	TIMEZONE_BAND_WATER.map((c) => saturateDarken(c, 1.9, 0.88))
+	TIMEZONE_BAND_WATER.map((color) =>
+		saturateDarken({ color, sat: 1.9, dark: 0.88 }),
+	)
 
 function timezoneOffset(lonDeg: number): number {
 	const offset = Math.round(lonDeg / 15)

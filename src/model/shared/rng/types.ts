@@ -1,6 +1,6 @@
 import type { SharedRng } from "@/model/shared/rng"
 
-export interface CreateRngOptions {
+interface CreateRngOptions {
 	nonPositiveWeightBehavior?: "first" | "undefined"
 }
 

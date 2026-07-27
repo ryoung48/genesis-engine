@@ -116,277 +116,271 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		if (slots[closestIndex]!.zone === "inner") primarySlotIndex = closestIndex
 	}
 
-	const bodies: SystemBody[] = slots.map(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-		(slot, siblingIdx) => {
-			const isMainWorld = slot.isMainWorld === true
-			const isPrimaryWorld = isMainWorld || siblingIdx === primarySlotIndex
-			let group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
-			// A main world can't be an asteroid belt (no surface to generate
-			// terrain on) -- reroll until it isn't. Low-probability in the inner
-			// zone already, so this terminates quickly.
-			while (isMainWorld && group === "asteroid belt") {
-				group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
-			}
-			let orbitalDistanceAU = PLANET.deviationToAU({
-				deviation: slot.deviation,
+	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
+		const isMainWorld = slot.isMainWorld === true
+		const isPrimaryWorld = isMainWorld || siblingIdx === primarySlotIndex
+		let group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
+		// A main world can't be an asteroid belt (no surface to generate
+		// terrain on) -- reroll until it isn't. Low-probability in the inner
+		// zone already, so this terminates quickly.
+		while (isMainWorld && group === "asteroid belt") {
+			group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
+		}
+		let orbitalDistanceAU = PLANET.deviationToAU({
+			deviation: slot.deviation,
+			luminositySol,
+		})
+		// Ported from galaxy-gen's forced-meltball roll (orbits/index.ts) -- a
+		// close-in epistellar dwarf beyond the star's dust-clearing boundary
+		// (getStarMAO) can get shoved into a scorching orbit instead of
+		// forming further out. Only ever checked for the very first slot in
+		// generation order (mirroring galaxy-gen's firstStarOrbit gate) and
+		// never for the main world.
+		let forceMeltball = false
+		if (
+			siblingIdx === 0 &&
+			!isMainWorld &&
+			slot.zone === "epistellar" &&
+			group === "dwarf" &&
+			rng.uniform(0, 1) <= 0.2
+		) {
+			const candidateAu = PLANET.auFromTemperature({
+				kelvinTemp: rng.uniform(1000, 2000),
 				luminositySol,
 			})
-			// Ported from galaxy-gen's forced-meltball roll (orbits/index.ts) -- a
-			// close-in epistellar dwarf beyond the star's dust-clearing boundary
-			// (getStarMAO) can get shoved into a scorching orbit instead of
-			// forming further out. Only ever checked for the very first slot in
-			// generation order (mirroring galaxy-gen's firstStarOrbit gate) and
-			// never for the main world.
-			let forceMeltball = false
-			if (
-				siblingIdx === 0 &&
-				!isMainWorld &&
-				slot.zone === "epistellar" &&
-				group === "dwarf" &&
-				rng.uniform(0, 1) <= 0.2
-			) {
-				const candidateAu = PLANET.auFromTemperature({
-					kelvinTemp: rng.uniform(1000, 2000),
-					luminositySol,
-				})
-				const maoAu = STAR.getStarMAO({
-					cls: spectralClass,
-					subtype: starSubtype,
-				})
-				if (candidateAu > maoAu) {
-					forceMeltball = true
-					orbitalDistanceAU = candidateAu
-				}
+			const maoAu = STAR.getStarMAO({
+				cls: spectralClass,
+				subtype: starSubtype,
+			})
+			if (candidateAu > maoAu) {
+				forceMeltball = true
+				orbitalDistanceAU = candidateAu
 			}
-			// A primary/main world is meant to be a significant, habitable-scale
-			// body -- floor its rolled size the way galaxy-gen floors `size` to
-			// at least 2 for its own primary designation, adapted to our
-			// terrestrial-sized (5-10) sizeClass band since classifyBody always
-			// reclassifies an isPrimaryWorld body to group "terrestrial".
-			const sizeClass = isPrimaryWorld
-				? Math.max(ROLLS.rollSizeClass({ rng, group }), 5)
-				: ROLLS.rollSizeClass({ rng, group })
-			const classification = PLANET.classifyBody({
-				groupHint: group,
-				zone: slot.zone,
-				orbitalDistanceAU,
-				sizeClass,
-				isPrimaryWorld,
-				isMoon: false,
-				tidal: false,
-				forceMeltball,
-			}).classification
-			const assignment = PLANET.rollClassificationAssignment({
-				rng,
-				classification,
-				sizeClass,
-				zone: slot.zone,
-				deviation: slot.deviation,
-				spectralClass,
-				isPrimaryWorld,
-			})
-			const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
-			const densityEarthRelative =
-				group === "asteroid belt"
-					? 0
-					: ROLLS.pickDensityEarthRelative({
-							rng,
-							group,
-							classification,
-							composition: assignment.composition,
-						})
-			const massKg =
-				group === "asteroid belt"
-					? 0
-					: ORBIT_BODY.massKgFromEarthRelativeDensity({
-							diameterKm,
-							densityEarthRelative,
-						})
-			// This is the pre-tide-lock "natural" rotation baseline -- see
-			// rollPlanetTideLock below, which may override it entirely.
-			const siderealDayHours =
-				group === "asteroid belt"
-					? 0
-					: ROLLS.rollSiderealDayHours({
-							rng,
-							isJovian: group === "jovian",
-							starAgeGyr,
-						})
-			// Moved up from this body's other orbital elements (previously rolled
-			// inline in the returned object below) because rollPlanetTideLock needs
-			// them as pre-lock inputs -- its own DM/roll may still adjust them
-			// further (circularizing eccentricity, flattening or flipping tilt).
-			const orbitalPeriodDays =
-				STAR.getKeplerYearYears({ orbitalDistanceAU, massSol: starMassSol }) *
-				DAYS_PER_YEAR
-			const eccentricity =
-				group === "asteroid belt" ? 0 : ROLLS.rollEccentricity(rng)
-			const rolledAxialTiltDeg =
-				group === "asteroid belt" ? 0 : ROLLS.rollAxialTiltDeg(rng)
-			const moonCount =
-				group === "asteroid belt"
-					? 0
-					: MOON.rollMoonCountForParent({
-							rng,
-							parentGroup: group,
-							parentSizeClass: sizeClass,
-							orbitalDistanceAU,
-						})
-			const moonSlotName = isMainWorld ? "main" : `orbit-${siblingIdx}`
-			const moons = MOON_PLACEMENT.place({
-				rng,
-				moonCount,
-				diameterKm,
-				orbitalDistanceAU,
-				starMassKg,
-				group,
-				isPrimaryWorld,
-				zone: slot.zone,
-				deviation: slot.deviation,
-				spectralClass,
-				starAgeGyr,
-				massKg,
-				moonSlotName,
-				nameBody,
-			})
-			const idx = isMainWorld ? -1 : siblingIdx
-			const moonsWithTideLocks = MOON.attachParentTideLocks({
-				moons,
-				parentIdx: idx,
-			}).map((moon) => ({
-				...moon,
-				tideLockStatus: PLANET.deriveTideLockStatus({
-					siderealDayHours: moon.siderealDayHours,
-					orbitalPeriodDays: moon.orbitalPeriodDays,
-					tideLock: moon.tideLock,
-				}),
-			}))
-			const environment = ENVIRONMENT.buildBodyEnvironment({
-				rng,
-				groupHint: group,
-				zone: slot.zone,
-				deviation: slot.deviation,
-				spectralClass,
-				diameterKm,
-				massKg,
-				orbitalDistanceAU,
-				isPrimaryWorld,
-				isMoon: false,
-				tidal: false,
-				forceMeltball,
-				assignment,
-			})
-			// Ported from galaxy-gen's ROTATION.locks.get (see tide-lock.ts) -- may
-			// override this body's rotation/tilt/eccentricity entirely (a partial
-			// spin-down, a 3:2 resonance, or a full 1:1 lock to its star or to one
-			// of its own already-planet-locked moons). Never applies to an asteroid
-			// belt, which has no rotation of its own to lock.
-			let finalSiderealDayHours = siderealDayHours
-			let finalAxialTiltDeg = rolledAxialTiltDeg
-			let finalEccentricity = eccentricity
-			let tideLock: TideLock | null = null
-			let finalEnvironment = environment
-			if (group !== "asteroid belt") {
-				const tideLockResult = PLANET.rollPlanetTideLock({
-					rng,
-					sizeClass,
-					eccentricity,
-					axialTiltDeg: rolledAxialTiltDeg,
-					atmospherePressureBar: environment.atmosphere?.pressureBar ?? 0,
-					starAgeGyr,
-					starMassSol,
-					orbitalDistanceAU,
-					orbitalPeriodDays,
-					baseSiderealDayHours: siderealDayHours,
-					moons: moonsWithTideLocks,
-					homeworld: isMainWorld,
-					rerollEccentricity: () => ROLLS.rollEccentricity(rng),
-				})
-				finalSiderealDayHours = tideLockResult.siderealDayHours
-				finalAxialTiltDeg = tideLockResult.axialTiltDeg
-				finalEccentricity = tideLockResult.eccentricity
-				tideLock = tideLockResult.tideLock
-				if (
-					tideLockResult.starLocked &&
-					environment.group === "terrestrial" &&
-					environment.classification !== "acheronian"
-				) {
-					finalEnvironment = ENVIRONMENT.buildForcedClassificationEnvironment({
+		}
+		// A primary/main world is meant to be a significant, habitable-scale
+		// body -- floor its rolled size the way galaxy-gen floors `size` to
+		// at least 2 for its own primary designation, adapted to our
+		// terrestrial-sized (5-10) sizeClass band since classifyBody always
+		// reclassifies an isPrimaryWorld body to group "terrestrial".
+		const sizeClass = isPrimaryWorld
+			? Math.max(ROLLS.rollSizeClass({ rng, group }), 5)
+			: ROLLS.rollSizeClass({ rng, group })
+		const classification = PLANET.classifyBody({
+			groupHint: group,
+			zone: slot.zone,
+			orbitalDistanceAU,
+			sizeClass,
+			isPrimaryWorld,
+			isMoon: false,
+			tidal: false,
+			forceMeltball,
+		}).classification
+		const assignment = PLANET.rollClassificationAssignment({
+			rng,
+			classification,
+			sizeClass,
+			zone: slot.zone,
+			deviation: slot.deviation,
+			spectralClass,
+			isPrimaryWorld,
+		})
+		const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
+		const densityEarthRelative =
+			group === "asteroid belt"
+				? 0
+				: ROLLS.pickDensityEarthRelative({
 						rng,
-						classification:
-							slot.zone === "epistellar" ? "jani-lithic" : "vesperian",
-						sizeClass,
-						zone: slot.zone,
-						deviation: slot.deviation,
-						spectralClass,
-						diameterKm,
-						massKg,
-						isPrimaryWorld,
+						group,
+						classification,
+						composition: assignment.composition,
 					})
-				}
-			}
-			return {
-				...finalEnvironment,
-				idx,
-				seed: isMainWorld ? "main-world" : `orbit-${siblingIdx + 1}`,
-				name: nameBody(isMainWorld ? "main-world" : `orbit-${siblingIdx}`),
-				isMainWorld,
-				zone: slot.zone,
-				texturePath: TEXTURE.pickGeneratedTexturePath({
-					rng,
-					classification: finalEnvironment.classification,
-				}),
-				rings:
-					finalEnvironment.group === "jovian"
-						? ROLLS.rollJovianRings(rng)
-						: undefined,
+		const massKg =
+			group === "asteroid belt"
+				? 0
+				: ORBIT_BODY.massKgFromEarthRelativeDensity({
+						diameterKm,
+						densityEarthRelative,
+					})
+		// This is the pre-tide-lock "natural" rotation baseline -- see
+		// rollPlanetTideLock below, which may override it entirely.
+		const siderealDayHours =
+			group === "asteroid belt"
+				? 0
+				: ROLLS.rollSiderealDayHours({
+						rng,
+						isJovian: group === "jovian",
+						starAgeGyr,
+					})
+		// Moved up from this body's other orbital elements (previously rolled
+		// inline in the returned object below) because rollPlanetTideLock needs
+		// them as pre-lock inputs -- its own DM/roll may still adjust them
+		// further (circularizing eccentricity, flattening or flipping tilt).
+		const orbitalPeriodDays =
+			STAR.getKeplerYearYears({ orbitalDistanceAU, massSol: starMassSol }) *
+			DAYS_PER_YEAR
+		const eccentricity =
+			group === "asteroid belt" ? 0 : ROLLS.rollEccentricity(rng)
+		const rolledAxialTiltDeg =
+			group === "asteroid belt" ? 0 : ROLLS.rollAxialTiltDeg(rng)
+		const moonCount =
+			group === "asteroid belt"
+				? 0
+				: MOON.rollMoonCountForParent({
+						rng,
+						parentGroup: group,
+						parentSizeClass: sizeClass,
+						orbitalDistanceAU,
+					})
+		const moonSlotName = isMainWorld ? "main" : `orbit-${siblingIdx}`
+		const moons = MOON_PLACEMENT.place({
+			rng,
+			moonCount,
+			diameterKm,
+			orbitalDistanceAU,
+			starMassKg,
+			group,
+			isPrimaryWorld,
+			zone: slot.zone,
+			deviation: slot.deviation,
+			spectralClass,
+			starAgeGyr,
+			massKg,
+			moonSlotName,
+			nameBody,
+		})
+		const idx = isMainWorld ? -1 : siblingIdx
+		const moonsWithTideLocks = MOON.attachParentTideLocks({
+			moons,
+			parentIdx: idx,
+		}).map((moon) => ({
+			...moon,
+			tideLockStatus: PLANET.deriveTideLockStatus({
+				siderealDayHours: moon.siderealDayHours,
+				orbitalPeriodDays: moon.orbitalPeriodDays,
+				tideLock: moon.tideLock,
+			}),
+		}))
+		const environment = ENVIRONMENT.buildBodyEnvironment({
+			rng,
+			groupHint: group,
+			zone: slot.zone,
+			deviation: slot.deviation,
+			spectralClass,
+			diameterKm,
+			massKg,
+			orbitalDistanceAU,
+			isPrimaryWorld,
+			isMoon: false,
+			tidal: false,
+			forceMeltball,
+			assignment,
+		})
+		// Ported from galaxy-gen's ROTATION.locks.get (see tide-lock.ts) -- may
+		// override this body's rotation/tilt/eccentricity entirely (a partial
+		// spin-down, a 3:2 resonance, or a full 1:1 lock to its star or to one
+		// of its own already-planet-locked moons). Never applies to an asteroid
+		// belt, which has no rotation of its own to lock.
+		let finalSiderealDayHours = siderealDayHours
+		let finalAxialTiltDeg = rolledAxialTiltDeg
+		let finalEccentricity = eccentricity
+		let tideLock: TideLock | null = null
+		let finalEnvironment = environment
+		if (group !== "asteroid belt") {
+			const tideLockResult = PLANET.rollPlanetTideLock({
+				rng,
+				sizeClass,
+				eccentricity,
+				axialTiltDeg: rolledAxialTiltDeg,
+				atmospherePressureBar: environment.atmosphere?.pressureBar ?? 0,
+				starAgeGyr,
+				starMassSol,
 				orbitalDistanceAU,
-				diameterKm,
-				massKg,
-				gravityG:
-					group === "asteroid belt"
-						? 0
-						: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
 				orbitalPeriodDays,
-				siderealDayHours: finalSiderealDayHours,
-				eccentricity: finalEccentricity,
-				longitudeOfPerihelionDeg: rng.uniform(0, 360),
-				axialTiltDeg: finalAxialTiltDeg,
-				inclinationDeg:
-					group === "asteroid belt" ? 0 : MOON.rollInclinationDeg(rng),
-				longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
-				tideLock,
-				tideLockStatus: PLANET.deriveTideLockStatus({
-					siderealDayHours: finalSiderealDayHours,
-					orbitalPeriodDays,
-					tideLock,
-				}),
-				substellarLon:
-					tideLock?.type === "solar" ? rng.uniform(0, 360) : undefined,
+				baseSiderealDayHours: siderealDayHours,
 				moons: moonsWithTideLocks,
-				// Terrain-generation-only fields, meaningless for anything but the
-				// main world -- set to Earth's own defaults (not rolled) per
-				// SOL_MAIN_WORLD_DEFAULTS/the UI's DEFAULT_WORLD_PARAMS, since the
-				// player edits these by hand afterward via the normal sliders.
-				...(isMainWorld
-					? {
-							landDistribution:
-								1 - SOL_SYSTEM.solMainWorldDefaults.landConcentration,
-							continentSizeVariety: EARTH_DEFAULT_CONTINENT_SIZE_VARIETY,
-							seaLevel: SOL_SYSTEM.solMainWorldDefaults.seaLevel,
-							maxElevation: SOL_SYSTEM.solMainWorldDefaults.maxElevation,
-						}
-					: {}),
+				homeworld: isMainWorld,
+				rerollEccentricity: () => ROLLS.rollEccentricity(rng),
+			})
+			finalSiderealDayHours = tideLockResult.siderealDayHours
+			finalAxialTiltDeg = tideLockResult.axialTiltDeg
+			finalEccentricity = tideLockResult.eccentricity
+			tideLock = tideLockResult.tideLock
+			if (
+				tideLockResult.starLocked &&
+				environment.group === "terrestrial" &&
+				environment.classification !== "acheronian"
+			) {
+				finalEnvironment = ENVIRONMENT.buildForcedClassificationEnvironment({
+					rng,
+					classification:
+						slot.zone === "epistellar" ? "jani-lithic" : "vesperian",
+					sizeClass,
+					zone: slot.zone,
+					deviation: slot.deviation,
+					spectralClass,
+					diameterKm,
+					massKg,
+					isPrimaryWorld,
+				})
 			}
-		},
-	)
+		}
+		return {
+			...finalEnvironment,
+			idx,
+			seed: isMainWorld ? "main-world" : `orbit-${siblingIdx + 1}`,
+			name: nameBody(isMainWorld ? "main-world" : `orbit-${siblingIdx}`),
+			isMainWorld,
+			zone: slot.zone,
+			texturePath: TEXTURE.pickGeneratedTexturePath({
+				rng,
+				classification: finalEnvironment.classification,
+			}),
+			rings:
+				finalEnvironment.group === "jovian"
+					? ROLLS.rollJovianRings(rng)
+					: undefined,
+			orbitalDistanceAU,
+			diameterKm,
+			massKg,
+			gravityG:
+				group === "asteroid belt"
+					? 0
+					: ORBIT_BODY.computeGravityG({ massKg, diameterKm }),
+			orbitalPeriodDays,
+			siderealDayHours: finalSiderealDayHours,
+			eccentricity: finalEccentricity,
+			longitudeOfPerihelionDeg: rng.uniform(0, 360),
+			axialTiltDeg: finalAxialTiltDeg,
+			inclinationDeg:
+				group === "asteroid belt" ? 0 : MOON.rollInclinationDeg(rng),
+			longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
+			tideLock,
+			tideLockStatus: PLANET.deriveTideLockStatus({
+				siderealDayHours: finalSiderealDayHours,
+				orbitalPeriodDays,
+				tideLock,
+			}),
+			substellarLon:
+				tideLock?.type === "solar" ? rng.uniform(0, 360) : undefined,
+			moons: moonsWithTideLocks,
+			// Terrain-generation-only fields, meaningless for anything but the
+			// main world -- set to Earth's own defaults (not rolled) per
+			// SOL_MAIN_WORLD_DEFAULTS/the UI's DEFAULT_WORLD_PARAMS, since the
+			// player edits these by hand afterward via the normal sliders.
+			...(isMainWorld
+				? {
+						landDistribution:
+							1 - SOL_SYSTEM.solMainWorldDefaults.landConcentration,
+						continentSizeVariety: EARTH_DEFAULT_CONTINENT_SIZE_VARIETY,
+						seaLevel: SOL_SYSTEM.solMainWorldDefaults.seaLevel,
+						maxElevation: SOL_SYSTEM.solMainWorldDefaults.maxElevation,
+					}
+				: {}),
+		}
+	})
 
 	return PLANET.applySystemSeismology({
-		bodies: bodies.sort(
-			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-			(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-		),
+		bodies: bodies.sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU),
 		starAgeGyr,
 		starLuminositySol: luminositySol,
 		spectralClass,

@@ -8,11 +8,11 @@ import type {
 	RunWarParams,
 	SeedInterstateWarsParams,
 	SeedRebellionsParams,
+	SeedWarStageParams,
 } from "@/model/history/events/war/types"
 import { FIELDS } from "@/model/history/fields"
 import type { HistoryRng } from "@/model/history/history-rng/types"
 import { type Relation, STATE } from "@/model/history/state"
-import type { HistoryState } from "@/model/history/state/types"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
 
@@ -52,7 +52,7 @@ function listWarTargets({ state, nation }: ListWarTargetsParams): {
 	hasWar: boolean
 	d: number
 }[] {
-	const wars = DERIVE.provinceWars(state, nation)
+	const wars = DERIVE.provinceWars({ state, p: nation })
 		.map((idx: number) => state.wars[idx])
 		.filter((w) => w.endTime === undefined)
 
@@ -109,14 +109,14 @@ function pickSeededOccupationCount(params: {
 	)
 }
 
-function seedWarStage(
-	state: HistoryState,
-	attacker: number,
-	defender: number,
-	rng: HistoryRng,
-	rebel = false,
-	forceOccupied = false,
-): void {
+function seedWarStage({
+	state,
+	attacker,
+	defender,
+	rng,
+	rebel,
+	forceOccupied,
+}: SeedWarStageParams): void {
 	const occupationCandidates = getDefenderOccupationCandidates({
 		state,
 		attacker,
@@ -242,7 +242,14 @@ function seedInterstateWars({ state, rng }: SeedInterstateWarsParams): void {
 		const target = targets[0]
 		if (!target) continue
 		const forceOccupied = !seededOccupiedWar && target.occupationCount > 0
-		seedWarStage(state, nation, target.n, rng, false, forceOccupied)
+		seedWarStage({
+			state,
+			attacker: nation,
+			defender: target.n,
+			rng,
+			rebel: false,
+			forceOccupied,
+		})
 		if (forceOccupied) seededOccupiedWar = true
 		engaged.add(nation)
 		engaged.add(target.n)
@@ -253,7 +260,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 	const directSubjects = []
 	for (let nation = 0; nation < state.P; nation++) {
 		if (state.desolate[nation]) continue
-		const parent = FIELDS.prov.parent.get(state, nation)
+		const parent = FIELDS.prov.parent.get({ state, p: nation })
 		if (parent < 0 || parent !== STATE.getSovereign({ state, p: nation }))
 			continue
 		directSubjects.push(nation)
@@ -267,7 +274,7 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 	for (const nation of rng.shuffle([...directSubjects])) {
 		if (seeded >= targetRebellions) break
 		const sovereignNation = STATE.getSovereign({ state, p: nation })
-		if (DERIVE.provinceWars(state, sovereignNation).length > 0) continue
+		if (DERIVE.provinceWars({ state, p: sovereignNation }).length > 0) continue
 		const threat = STATE.warThreat({
 			state,
 			attacker: sovereignNation,
@@ -277,7 +284,14 @@ function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 		if (threat <= 0.4) continue
 		STATE.releaseProvince({ state, p: nation, rng })
 		STATE.fixConnections({ state, nation, rng })
-		seedWarStage(state, sovereignNation, nation, rng, true)
+		seedWarStage({
+			state,
+			attacker: sovereignNation,
+			defender: nation,
+			rng,
+			rebel: true,
+			forceOccupied: false,
+		})
 		seeded++
 	}
 }
@@ -292,7 +306,7 @@ function initWar({ state, rng }: InitWarParams): void {
 }
 
 function runWar({ state, nation, rng }: RunWarParams): void {
-	const parent = FIELDS.prov.parent.get(state, nation)
+	const parent = FIELDS.prov.parent.get({ state, p: nation })
 	const sovereignNation = STATE.getSovereign({ state, p: nation })
 	const rulerRelation = STATE.getRulerRelation({ state, nation })
 
@@ -307,12 +321,18 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
 			if (rng.random() > closest.w) {
-				STATE.startWar(state, nation, closest.n, rng)
+				STATE.startWar({
+					state,
+					attacker: nation,
+					defender: closest.n,
+					rng,
+					rebel: false,
+				})
 			}
 		}
 	} else if (parent === sovereignNation) {
 		// Direct subject of the sovereign — consider rebellion
-		if (DERIVE.provinceWars(state, sovereignNation).length === 0) {
+		if (DERIVE.provinceWars({ state, p: sovereignNation }).length === 0) {
 			const threat = STATE.warThreat({
 				state,
 				attacker: sovereignNation,
@@ -327,7 +347,13 @@ function runWar({ state, nation, rng }: RunWarParams): void {
 				})
 				STATE.releaseProvince({ state, p: nation, rng })
 				if (rng.random() > threat) {
-					STATE.startWar(state, sovereignNation, nation, rng, true)
+					STATE.startWar({
+						state,
+						attacker: sovereignNation,
+						defender: nation,
+						rng,
+						rebel: true,
+					})
 				}
 				STATE.fixConnections({ state, nation, rng })
 			}

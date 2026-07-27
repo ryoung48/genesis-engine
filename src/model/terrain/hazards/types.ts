@@ -32,3 +32,9 @@ export interface ThresholdFieldParams {
 	source: Float32Array
 	minValue: number
 }
+
+export interface GradualFalloffParams {
+	distance: number
+	reach: number
+	power?: number
+}

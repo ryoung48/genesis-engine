@@ -306,6 +306,29 @@ export interface SerializedNetwork {
 	weight: Float32Array
 }
 
+export interface ForEachRouteParams {
+	routes: SerializedRoutes | null | undefined
+	callback: (route: {
+		fromProvince: number
+		toProvince: number
+		kind: SerializedRouteKind
+		pathRegions: Int32Array
+		index: number
+	}) => void
+}
+
+export interface ForEachEdgeParams {
+	network: SerializedNetwork | null | undefined
+	callback: (edge: {
+		fromRegion: number
+		toRegion: number
+		kind: SerializedRouteKind
+		usage: number
+		weight: number
+		index: number
+	}) => void
+}
+
 export type GenesisWorkerRequest =
 	| {
 			type: "generate"

@@ -1,6 +1,6 @@
 import type { SphereMesh } from "@/model/mesh/types"
 
-export interface ImportParams {
+interface ImportParams {
 	seed: number
 	numPoints: number
 	jitter: number
@@ -134,7 +134,7 @@ export interface RealProvinceInput {
 	weight: number
 }
 
-export type ProgressFn = (label: string, pct?: number) => void
+type ProgressFn = (label: string, pct?: number) => void
 
 export interface SampleBilinearParams {
 	pixels: Uint8Array

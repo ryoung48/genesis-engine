@@ -96,19 +96,20 @@ function initCultureSpread(state: HistoryState): void {
 			// Only the weaker side receives the blend.
 			const receiver = popP < popNb ? p : nb
 			const spreaderCulture = popP < popNb ? cultureNb : cultureP
-			if (FIELDS.prov.cultureBlendSecondary.get(state, receiver) >= 0) continue
-			FIELDS.prov.cultureBlendSecondary.set(
+			if (FIELDS.prov.cultureBlendSecondary.get({ state, p: receiver }) >= 0)
+				continue
+			FIELDS.prov.cultureBlendSecondary.set({
 				state,
-				receiver,
-				state.time,
-				spreaderCulture,
-			)
-			FIELDS.prov.cultureBlendWeight.set(
+				p: receiver,
+				time: state.time,
+				value: spreaderCulture,
+			})
+			FIELDS.prov.cultureBlendWeight.set({
 				state,
-				receiver,
-				state.time,
-				BLEED_START_WEIGHT,
-			)
+				p: receiver,
+				time: state.time,
+				value: BLEED_START_WEIGHT,
+			})
 		}
 	}
 
@@ -132,10 +133,10 @@ function runCultureSpread({
 	// --- Advance existing bleeds ---
 	for (let p = 0; p < P; p++) {
 		if (state.desolate[p]) continue
-		const secondary = FIELDS.prov.cultureBlendSecondary.get(state, p)
+		const secondary = FIELDS.prov.cultureBlendSecondary.get({ state, p })
 		if (secondary < 0) continue
 
-		let weight = FIELDS.prov.cultureBlendWeight.get(state, p)
+		let weight = FIELDS.prov.cultureBlendWeight.get({ state, p })
 
 		// The sovereign of this province determines the political culture pressure.
 		const sov = state.sovereignCurrent[p]
@@ -148,8 +149,8 @@ function runCultureSpread({
 			// Full conversion: province adopts the secondary culture.
 			const oldCulture = state.culture[p]
 			state.culture[p] = secondary
-			FIELDS.prov.cultureBlendSecondary.set(state, p, time, -1)
-			FIELDS.prov.cultureBlendWeight.set(state, p, time, 0)
+			FIELDS.prov.cultureBlendSecondary.set({ state, p, time, value: -1 })
+			FIELDS.prov.cultureBlendWeight.set({ state, p, time, value: 0 })
 			state.events.push({
 				tag: "culture converted",
 				time,
@@ -163,18 +164,29 @@ function runCultureSpread({
 			) {
 				const nb = state.provinceAdjList[i]
 				if (state.desolate[nb] || state.culture[nb] !== oldCulture) continue
-				if (FIELDS.prov.cultureBlendSecondary.get(state, nb) >= 0) continue
+				if (FIELDS.prov.cultureBlendSecondary.get({ state, p: nb }) >= 0)
+					continue
 				const eligibleEdge = isBleedEdge({
 					seedA: state.provinceSeeds[p],
 					seedB: state.provinceSeeds[nb],
 					probability: BLEED_INIT_PROBABILITY,
 				})
 				if (!eligibleEdge) continue
-				FIELDS.prov.cultureBlendSecondary.set(state, nb, time, secondary)
-				FIELDS.prov.cultureBlendWeight.set(state, nb, time, BLEED_START_WEIGHT)
+				FIELDS.prov.cultureBlendSecondary.set({
+					state,
+					p: nb,
+					time,
+					value: secondary,
+				})
+				FIELDS.prov.cultureBlendWeight.set({
+					state,
+					p: nb,
+					time,
+					value: BLEED_START_WEIGHT,
+				})
 			}
 		} else {
-			FIELDS.prov.cultureBlendWeight.set(state, p, time, weight)
+			FIELDS.prov.cultureBlendWeight.set({ state, p, time, value: weight })
 		}
 	}
 
@@ -182,7 +194,7 @@ function runCultureSpread({
 	const visited = new ProvincePairSet(P)
 	for (let p = 0; p < P; p++) {
 		if (state.desolate[p]) continue
-		if (FIELDS.prov.cultureBlendSecondary.get(state, p) >= 0) continue
+		if (FIELDS.prov.cultureBlendSecondary.get({ state, p }) >= 0) continue
 		const cultureP = state.culture[p]
 
 		for (
@@ -224,21 +236,22 @@ function runCultureSpread({
 			// The weaker culture's province is the receiver.
 			const receiver = popP < popNb ? p : nb
 			const spreaderCulture = popP < popNb ? cultureNb : cultureP
-			if (FIELDS.prov.cultureBlendSecondary.get(state, receiver) >= 0) continue
+			if (FIELDS.prov.cultureBlendSecondary.get({ state, p: receiver }) >= 0)
+				continue
 
 			if (rng.random() < NEW_BLEED_CHANCE) {
-				FIELDS.prov.cultureBlendSecondary.set(
+				FIELDS.prov.cultureBlendSecondary.set({
 					state,
-					receiver,
+					p: receiver,
 					time,
-					spreaderCulture,
-				)
-				FIELDS.prov.cultureBlendWeight.set(
+					value: spreaderCulture,
+				})
+				FIELDS.prov.cultureBlendWeight.set({
 					state,
-					receiver,
+					p: receiver,
 					time,
-					BLEED_START_WEIGHT,
-				)
+					value: BLEED_START_WEIGHT,
+				})
 			}
 		}
 	}

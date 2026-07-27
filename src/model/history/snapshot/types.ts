@@ -1,6 +1,6 @@
 import type { HistoryState } from "@/model/history/state/types"
 
-export interface HistoryFrameBuildProfile {
+interface HistoryFrameBuildProfile {
 	hierarchyMs: number
 	provinceFieldsMs: number
 	warsMs: number

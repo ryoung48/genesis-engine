@@ -24,7 +24,6 @@ function areaWeightedMean(model: EnergyBalanceModel): number {
 	let totalArea = 0
 	for (let i = 0; i < model.lats_deg.length; i++) {
 		const latAvg =
-			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			model.temperature[i].reduce((a, b) => a + b, 0) /
 			model.temperature[i].length
 		const areaWeight = model.dx[i]

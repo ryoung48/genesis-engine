@@ -39,3 +39,12 @@ export interface RunWarParams {
 	nation: number
 	rng: HistoryRng
 }
+
+export interface SeedWarStageParams {
+	state: HistoryState
+	attacker: number
+	defender: number
+	rng: HistoryRng
+	rebel: boolean
+	forceOccupied: boolean
+}

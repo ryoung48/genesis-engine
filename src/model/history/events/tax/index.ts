@@ -18,7 +18,7 @@ function peaceFraction({
 	const duration = end - start
 	if (duration <= 0) return 1
 
-	const wars = DERIVE.provinceWars(state, nation, end)
+	const wars = DERIVE.provinceWars({ state, p: nation, t: end })
 		.map((idx: number) => state.wars[idx])
 		.filter((w) => w.startTime <= end)
 
@@ -50,12 +50,15 @@ function initTax({ state }: InitTaxParams): void {
 function runTax({ state, nation, previousTime }: RunTaxParams): void {
 	const peace = peaceFraction({ state, nation, previous: previousTime })
 	const recovered = STATE.wealthOptimal({ state, p: nation }) * 0.1 * peace
-	FIELDS.prov.consumption.set(
+	FIELDS.prov.consumption.set({
 		state,
-		nation,
-		state.time,
-		Math.max(0, FIELDS.prov.consumption.get(state, nation) - recovered),
-	)
+		p: nation,
+		time: state.time,
+		value: Math.max(
+			0,
+			FIELDS.prov.consumption.get({ state, p: nation }) - recovered,
+		),
+	})
 
 	// Schedule next tax event
 	state.heap.enqueue(

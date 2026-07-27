@@ -1,5 +1,8 @@
 import { ELEVATION } from "@/model/climate/elevation"
-import type { ComputeSeaLevelOffsetKmParams } from "@/model/terrain/sea-level/types"
+import type {
+	ComputeSeaLevelOffsetKmParams,
+	HeightKmToElevParams,
+} from "@/model/terrain/sea-level/types"
 
 function computeSeaLevelOffsetKm({
 	seaLevel,
@@ -10,11 +13,11 @@ function computeSeaLevelOffsetKm({
 	return (seaLevel - 1) * maxDepthKm
 }
 
-function heightKmToElev(
-	heightKm: number,
+function heightKmToElev({
+	heightKm,
 	maxElevKm = 6,
 	maxDepthKm = 10,
-): number {
+}: HeightKmToElevParams): number {
 	if (heightKm <= 0) return heightKm / maxDepthKm
 	if (maxElevKm <= 0) return 0
 	if (heightKm >= maxElevKm) return 1
@@ -72,7 +75,11 @@ function applySeaLevelToElevation(params: {
 				maxDepthKm,
 			}) - seaLevelOffsetKm
 		elevation_km[r] = adjustedHeightKm
-		elevation[r] = heightKmToElev(adjustedHeightKm, maxElevKm, maxDepthKm)
+		elevation[r] = heightKmToElev({
+			heightKm: adjustedHeightKm,
+			maxElevKm,
+			maxDepthKm,
+		})
 	}
 
 	return {

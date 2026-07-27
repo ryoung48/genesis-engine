@@ -4,8 +4,8 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
-import { SYSTEM } from "@/model/celestial/system"
 import type { SystemBody } from "@/model/celestial/system/types"
+import { TIME } from "@/model/shared/time"
 
 export function updateBodyDiameter(
 	body: SystemBody,
@@ -56,7 +56,7 @@ export function updateBodyOrbitalDistance(
 		),
 		orbitalPeriodDays:
 			STAR.getKeplerYearYears({ orbitalDistanceAU, massSol: starMassSol }) *
-			SYSTEM.DAYS_PER_YEAR,
+			TIME.astronomicalDaysPerYear,
 	}
 }
 

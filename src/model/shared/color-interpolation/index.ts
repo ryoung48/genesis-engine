@@ -1,6 +1,7 @@
 import type {
 	BasisParams,
 	LerpParams,
+	MapLinearParams,
 	MixRgbParams,
 	RgbColor,
 	SampleBasisColorStopsParams,
@@ -60,14 +61,14 @@ function cssColorToRgb(value: string): RgbColor {
 	]
 }
 
-function mapLinear(
-	value: number,
-	domainStart: number,
-	domainEnd: number,
-	rangeStart: number,
-	rangeEnd: number,
+function mapLinear({
+	value,
+	domainStart,
+	domainEnd,
+	rangeStart,
+	rangeEnd,
 	clamp = false,
-): number {
+}: MapLinearParams): number {
 	if (domainStart === domainEnd) return rangeEnd
 	const t = (value - domainStart) / (domainEnd - domainStart)
 	const normalized = clamp ? MATH.clamp01(t) : t

@@ -16,7 +16,7 @@
 		"gen:world:earth-temp-compare": "vitest run --project smoke src/model/pipelines/earth-real-temperature-compare.smoke.test.ts",
 		"build:earth-real-population-eu4": "python scripts/regenerate-earth-population.py",
 		"build:earth-real-urban-population-eu4": "python scripts/regenerate-earth-population.py",
-		"knip": "knip",
+		"knip": "knip --fix",
 		"check:underscore-unused": "node scripts/quality/check-underscore-unused.mjs",
 		"fix:import-aliases": "node scripts/quality/fix-import-aliases.mjs",
 		"check:optional-attributes": "node scripts/quality/check-optional-attributes.mjs",

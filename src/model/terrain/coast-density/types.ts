@@ -1,4 +1,4 @@
-export interface CoastDensityOptions {
+interface CoastDensityOptions {
 	/** Extra weight added right at the coastline, decaying with distance. */
 	boost: number
 	/** Baseline weight for open land, away from the coast. */

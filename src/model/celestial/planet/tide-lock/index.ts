@@ -1,4 +1,4 @@
-﻿import type { MoonBody } from "@/model/celestial/moons/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type {
 	MoonTideLockResult,
@@ -267,7 +267,6 @@ function rollPlanetTideLock(params: {
 		starAgeGyr: params.starAgeGyr,
 	})
 	const totalMoonSizeClass = params.moons.reduce(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 		(sum, moon) => sum + (moon.sizeClass ?? 0),
 		0,
 	)
@@ -291,25 +290,22 @@ function rollPlanetTideLock(params: {
 		params.sizeClass > 0 && params.sizeClass < 16
 			? params.moons.filter((moon) => moon.tideLock?.type === "planet")
 			: []
-	lockedMoons.forEach(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-		(moon, index) => {
-			const siblingMoonCount = lockedMoons.length - 1
-			const moonDM =
-				rollMoonLockDM({
-					moonSizeClass: moon.sizeClass ?? 0,
-					moonSemiMajorAxisPlanetDiameters:
-						moon.semiMajorAxisPlanetDiameters ?? 0,
-					siblingMoonCount,
-				}) + generalDM
-			if (moonDM >= winnerDM) {
-				winnerDM = moonDM
-				winnerTideLock = { type: "lunar", target: moon.idx }
-				winnerPeriodHours = moon.orbitalPeriodDays * TIME.hoursPerDay
-			}
-			void index
-		},
-	)
+	lockedMoons.forEach((moon, index) => {
+		const siblingMoonCount = lockedMoons.length - 1
+		const moonDM =
+			rollMoonLockDM({
+				moonSizeClass: moon.sizeClass ?? 0,
+				moonSemiMajorAxisPlanetDiameters:
+					moon.semiMajorAxisPlanetDiameters ?? 0,
+				siblingMoonCount,
+			}) + generalDM
+		if (moonDM >= winnerDM) {
+			winnerDM = moonDM
+			winnerTideLock = { type: "lunar", target: moon.idx }
+			winnerPeriodHours = moon.orbitalPeriodDays * TIME.hoursPerDay
+		}
+		void index
+	})
 
 	const effect = rollTideLockEffect({
 		rng: params.rng,

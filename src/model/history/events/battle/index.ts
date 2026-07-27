@@ -128,16 +128,36 @@ function runBattle({
 	const defenderCost = baseCost * COST_MULTIPLIERS[defenderDegree]
 
 	// Distribute costs (simplified — no ally cost distribution for now)
-	FIELDS.prov.consumption.delta(state, war.attacker, state.time, attackerCost)
-	FIELDS.prov.consumption.delta(state, war.defender, state.time, defenderCost)
+	FIELDS.prov.consumption.delta({
+		state,
+		p: war.attacker,
+		time: state.time,
+		delta: attackerCost,
+	})
+	FIELDS.prov.consumption.delta({
+		state,
+		p: war.defender,
+		time: state.time,
+		delta: defenderCost,
+	})
 
 	if (outcome) {
 		if (restoration) {
-			FIELDS.prov.occupation.set(state, target, state.time, -1)
+			FIELDS.prov.occupation.set({
+				state,
+				p: target,
+				time: state.time,
+				value: -1,
+			})
 			const i = war.occupied.indexOf(target)
 			if (i >= 0) war.occupied.splice(i, 1)
 		} else {
-			FIELDS.prov.occupation.set(state, target, state.time, war.idx)
+			FIELDS.prov.occupation.set({
+				state,
+				p: target,
+				time: state.time,
+				value: war.idx,
+			})
 			if (!war.occupied.includes(target)) war.occupied.push(target)
 		}
 	}

@@ -65,7 +65,12 @@ async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 	while (simulationRunning) {
 		try {
 			historyTime += tickMs
-			HISTORY.simulateUntil(historyState, historyTime, historyRng)
+			HISTORY.simulateUntil({
+				state: historyState,
+				targetTimeMs: historyTime,
+				rng: historyRng,
+				validate: false,
+			})
 			const frame = SNAPSHOT.buildHistoryFrame({ state: historyState })
 			const newEvents = historyState.events.slice(historyEventCursor)
 			historyEventCursor = historyState.events.length

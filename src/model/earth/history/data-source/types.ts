@@ -1,11 +1,11 @@
-export interface RawEvent {
+interface RawEvent {
 	date: number
 	kind: string
 	payload: Record<string, unknown>
 	comment?: string
 }
 
-export interface RawProvinceEntry {
+interface RawProvinceEntry {
 	base: {
 		owner?: string
 		controller?: string
@@ -25,7 +25,7 @@ export interface RawProvinceEntry {
 	events: RawEvent[]
 }
 
-export interface RawNationEntry {
+interface RawNationEntry {
 	base: {
 		reforms: string[]
 		/** Raw EU4 province id (string), from history/countries/*.txt's
@@ -48,7 +48,7 @@ export interface RawWarParticipantEvent {
 	comment?: string
 }
 
-export interface RawWarBattleParticipant {
+interface RawWarBattleParticipant {
 	country: string
 	commander: string | null
 	infantry: number | null
@@ -58,7 +58,7 @@ export interface RawWarBattleParticipant {
 	losses: number | null
 }
 
-export interface RawWarBattle {
+interface RawWarBattle {
 	date: number
 	name: string
 	/** Raw EU4 province id where the battle took place, when recorded. */
@@ -113,7 +113,7 @@ export interface RawDiplomacyEvent {
 	payload: { firstTag: string; secondTag: string; subjectType?: string }
 }
 
-export interface RawOrganizationMembershipEvent {
+interface RawOrganizationMembershipEvent {
 	date: number
 	nationTag: string
 	kind: "join" | "leave"
@@ -126,7 +126,7 @@ export interface RawOrganizationMembershipEvent {
 	payload: { orgId: string; role?: string }
 }
 
-export interface RawOrganizationSiteEvent {
+interface RawOrganizationSiteEvent {
 	date: number
 	provinceId: string
 	kind: "siteStart" | "siteEnd"
@@ -151,7 +151,7 @@ export interface RawNationReference {
 	religion: string | null
 }
 
-export interface RawCulture {
+interface RawCulture {
 	id: string
 	name: string
 	primaryTag: string | null
@@ -167,7 +167,7 @@ export interface RawHeritage {
 	cultures: RawCulture[]
 }
 
-export interface RawReligion {
+interface RawReligion {
 	id: string
 	name: string
 	color: [number, number, number]

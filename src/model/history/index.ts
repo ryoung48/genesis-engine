@@ -8,12 +8,13 @@ import { TAX } from "@/model/history/events/tax"
 import { WAR } from "@/model/history/events/war"
 import { FIELDS } from "@/model/history/fields"
 import { HISTORY_RNG } from "@/model/history/history-rng"
-import type { HistoryRng } from "@/model/history/history-rng/types"
 import { STATE } from "@/model/history/state"
 import type { HistoryState } from "@/model/history/state/types"
 import type {
 	ProcessEventsUntilParams,
 	SeedColonyRelationsParams,
+	SimulateUntilParams,
+	TimedParams,
 } from "@/model/history/types"
 import type { StageTiming } from "@/model/pipelines/types"
 import type {
@@ -24,11 +25,7 @@ import type {
 } from "@/model/society/types"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
-function timed<T>(
-	label: string,
-	timings: StageTiming[] | undefined,
-	fn: () => T,
-): T {
+function timed<T>({ label, timings, fn }: TimedParams<T>): T {
 	const t0 = performance.now()
 	const result = fn()
 	if (timings) {
@@ -49,13 +46,13 @@ function seedColonyRelations({
 		const colonyCapital = seeds[col]
 		const colonizerCapital = seeds[colonizerId]
 		if (colonyCapital < 0 || colonizerCapital < 0) continue
-		FIELDS.rel.set(
+		FIELDS.rel.set({
 			state,
-			colonyCapital,
-			colonizerCapital,
-			STATE.rel.COLONY,
-			state.time,
-		)
+			a: colonyCapital,
+			b: colonizerCapital,
+			rel: STATE.rel.COLONY,
+			time: state.time,
+		})
 	}
 }
 
@@ -84,47 +81,64 @@ function initHistory(params: {
 }): HistoryState {
 	const startYear = params.startYear ?? 800
 	const rng = HISTORY_RNG.createHistoryRng(params.seed + 99999)
-	const state = timed("initHistory:createHistoryState", params.timings, () =>
-		STATE.createHistoryState({
-			nations: params.nations,
-			provinces: params.provinces,
-			population: params.population,
-			coastal: params.coastal,
-			riverVisible: params.riverVisible,
-			r_xyz: params.r_xyz,
-			cultures: params.cultures,
-			startYear,
-			rng,
-			waterAccess: params.waterAccess,
-			landmarks: params.landmarks,
-			regionProvince: params.regionProvince,
-			regionAdjOffset: params.regionAdjOffset,
-			regionAdjList: params.regionAdjList,
-			regionIsLand: params.regionIsLand,
-			era: params.era,
-		}),
-	)
+	const state = timed({
+		label: "initHistory:createHistoryState",
+		timings: params.timings,
+		fn: () =>
+			STATE.createHistoryState({
+				nations: params.nations,
+				provinces: params.provinces,
+				population: params.population,
+				coastal: params.coastal,
+				riverVisible: params.riverVisible,
+				r_xyz: params.r_xyz,
+				cultures: params.cultures,
+				startYear,
+				rng,
+				waterAccess: params.waterAccess,
+				landmarks: params.landmarks,
+				regionProvince: params.regionProvince,
+				regionAdjOffset: params.regionAdjOffset,
+				regionAdjList: params.regionAdjList,
+				regionIsLand: params.regionIsLand,
+				era: params.era,
+			}),
+	})
 
 	// Seed colony dependencies before init passes so subordinate colonies are
 	// excluded from independent diplomacy and subject formation.
 	seedColonyRelations({ state, nations: params.nations })
 
-	timed("initHistory:initDiplomacy", params.timings, () =>
-		DIPLOMACY.initDiplomacy({ state, rng }),
-	)
-	timed("initHistory:initWar", params.timings, () =>
-		WAR.initWar({ state, rng }),
-	)
-	timed("initHistory:initSuccession", params.timings, () =>
-		SUCCESSION.initSuccession({ state }),
-	)
-	timed("initHistory:initTax", params.timings, () => TAX.initTax({ state }))
-	timed("initHistory:initPopulation", params.timings, () =>
-		POPULATION.initPopulation({ state }),
-	)
-	timed("initHistory:initCultureSpread", params.timings, () =>
-		CULTURE_SPREAD.initCultureSpread(state),
-	)
+	timed({
+		label: "initHistory:initDiplomacy",
+		timings: params.timings,
+		fn: () => DIPLOMACY.initDiplomacy({ state, rng }),
+	})
+	timed({
+		label: "initHistory:initWar",
+		timings: params.timings,
+		fn: () => WAR.initWar({ state, rng }),
+	})
+	timed({
+		label: "initHistory:initSuccession",
+		timings: params.timings,
+		fn: () => SUCCESSION.initSuccession({ state }),
+	})
+	timed({
+		label: "initHistory:initTax",
+		timings: params.timings,
+		fn: () => TAX.initTax({ state }),
+	})
+	timed({
+		label: "initHistory:initPopulation",
+		timings: params.timings,
+		fn: () => POPULATION.initPopulation({ state }),
+	})
+	timed({
+		label: "initHistory:initCultureSpread",
+		timings: params.timings,
+		fn: () => CULTURE_SPREAD.initCultureSpread(state),
+	})
 
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
@@ -216,12 +230,12 @@ function processEventsUntil({
  * Leave off for real generation runs; the caller can still validate once at
  * the end (see validateLiveHierarchy) to catch corruption without paying
  * this cost after every event. */
-function simulateUntil(
-	state: HistoryState,
-	targetTimeMs: number,
-	rng: HistoryRng,
-	validate = false,
-): void {
+function simulateUntil({
+	state,
+	targetTimeMs,
+	rng,
+	validate,
+}: SimulateUntilParams): void {
 	processEventsUntil({ state, targetTime: targetTimeMs, rng, validate })
 	state.time = targetTimeMs
 }

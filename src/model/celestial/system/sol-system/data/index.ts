@@ -719,7 +719,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 	},
 ]
 
-export const DATA = {
+export const SOL_DATA = {
 	solSeed,
 	solStarAgeGyr,
 	solStarName,

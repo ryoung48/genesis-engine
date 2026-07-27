@@ -1,15 +1,14 @@
-import type { SphereMesh } from "@/model/mesh/types"
 import { RNG } from "@/model/shared/rng"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
-import type { Crater } from "@/model/terrain/craters/types"
+import type { ApplyCratersParams, Crater } from "@/model/terrain/craters/types"
 
-function applyCraters(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-	seed: number,
-	intensity: number,
+function applyCraters({
+	mesh,
+	elevation,
+	seed,
+	intensity,
 	planetRadiusKm = 3185,
-): void {
+}: ApplyCratersParams): void {
 	if (intensity <= 0) return
 
 	const { numRegions, r_xyz } = mesh

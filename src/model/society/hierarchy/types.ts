@@ -1,8 +1,4 @@
-export type FanoutLevel = readonly [
-	min: number,
-	max: number,
-	targetGroupSize: number,
-]
+type FanoutLevel = readonly [min: number, max: number, targetGroupSize: number]
 
 export type FanoutRanges = readonly FanoutLevel[]
 

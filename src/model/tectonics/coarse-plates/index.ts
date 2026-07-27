@@ -23,10 +23,14 @@ function generateCoarsePlates({
 	// Coarse mesh uses isolated RNG — matches source coarse-plates.js
 	const coarseRng = RNG.makeRng(seed + 137)
 	const coarsePoints = options.coarsePoints ?? N_COARSE
-	const coarseMesh = MESH.buildSphereMesh(coarsePoints, COARSE_JITTER, {
-		random: () => coarseRng(),
-		randint: (a: number, b: number) =>
-			a + Math.floor(coarseRng() * (b - a + 1)),
+	const coarseMesh = MESH.buildSphereMesh({
+		n: coarsePoints,
+		jitter: COARSE_JITTER,
+		rng: {
+			random: () => coarseRng(),
+			randint: (a: number, b: number) =>
+				a + Math.floor(coarseRng() * (b - a + 1)),
+		},
 	})
 
 	// generatePlates creates its own dual RNGs internally (seed+0.5 and seed)

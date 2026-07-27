@@ -1,6 +1,6 @@
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { SYSTEM } from "@/model/celestial/system"
+import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/planet/screen/generation/star-utils"
@@ -40,7 +40,7 @@ export function buildStarStats(params: {
 		cls: starClass,
 		subtype: starSubtype,
 	}).toFixed(3)
-	const starAgeGyr = SYSTEM.getStarAgeGyr({
+	const starAgeGyr = STAR_IDENTITY.getStarAgeGyr({
 		seed: restSeed,
 		massSol: starMassSolValue,
 	}).toFixed(2)

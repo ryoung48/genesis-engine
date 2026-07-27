@@ -22,7 +22,6 @@ function iceAlbedoAt(params: IceAlbedoAtParams): number {
 
 export const ALBEDO = {
 	landFraction: () => {
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 		return Array.from(
 			{ length: CONSTANTS.embConstants.grid.NUM_LAT },
 			(_, i) => {

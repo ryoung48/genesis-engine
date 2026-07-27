@@ -141,7 +141,13 @@ function processVassalDiplomacy({
 	// Probabilistic counter-war
 	const counterWarChance = 0.7 * (1 - threat)
 	if (rng.random() < counterWarChance) {
-		STATE.startWar(state, overlord, vassal, rng)
+		STATE.startWar({
+			state,
+			attacker: overlord,
+			defender: vassal,
+			rng,
+			rebel: false,
+		})
 	}
 }
 
@@ -166,7 +172,13 @@ function processPersonalUnionDiplomacy({
 
 	const counterWarChance = 0.7 * (1 - threat)
 	if (rng.random() < counterWarChance) {
-		STATE.startWar(state, senior, junior, rng)
+		STATE.startWar({
+			state,
+			attacker: senior,
+			defender: junior,
+			rng,
+			rebel: false,
+		})
 	}
 }
 
@@ -297,11 +309,18 @@ function seedSharedDynasties({ state, rng }: SeedSharedDynastiesParams): void {
 				STATE.wealthOptimal({ state, p: nb })
 					? [nation, nb]
 					: [nb, nation]
-			const seniorDynasty = FIELDS.prov.leader.dynasty.get(state, senior)
-			if (seniorDynasty === FIELDS.prov.leader.dynasty.get(state, junior))
+			const seniorDynasty = FIELDS.prov.leader.dynasty.get({ state, p: senior })
+			if (
+				seniorDynasty === FIELDS.prov.leader.dynasty.get({ state, p: junior })
+			)
 				continue
 
-			FIELDS.prov.leader.dynasty.set(state, junior, state.time, seniorDynasty)
+			FIELDS.prov.leader.dynasty.set({
+				state,
+				p: junior,
+				time: state.time,
+				value: seniorDynasty,
+			})
 			state.events.push({
 				tag: "dynasty spread",
 				time: state.time,
@@ -325,8 +344,8 @@ function seedInitialPersonalUnions({
 			const rel = STATE.getRelation({ state, a: nation, b: nb })
 			if (rel !== STATE.rel.FRIENDLY && rel !== STATE.rel.ALLY) continue
 			if (
-				FIELDS.prov.leader.dynasty.get(state, nation) !==
-				FIELDS.prov.leader.dynasty.get(state, nb)
+				FIELDS.prov.leader.dynasty.get({ state, p: nation }) !==
+				FIELDS.prov.leader.dynasty.get({ state, p: nb })
 			)
 				continue
 			if (rng.random() >= PERSONAL_UNION_SEED_CHANCE) continue

@@ -14,6 +14,15 @@ export interface LerpParams {
 	t: number
 }
 
+export interface MapLinearParams {
+	value: number
+	domainStart: number
+	domainEnd: number
+	rangeStart: number
+	rangeEnd: number
+	clamp?: boolean
+}
+
 export interface MixRgbParams {
 	a: RgbColor
 	b: RgbColor

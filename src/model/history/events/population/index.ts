@@ -131,8 +131,8 @@ function urbanization({ state, init }: UrbanizationParams): void {
 		let totalPop = 0
 		for (const prov of provinces) {
 			totalPop +=
-				FIELDS.prov.population.rural.get(state, prov) +
-				FIELDS.prov.population.urban.get(state, prov)
+				FIELDS.prov.population.rural.get({ state, p: prov }) +
+				FIELDS.prov.population.urban.get({ state, p: prov })
 		}
 
 		const { U, q } = nationProfile(state.governmentType[p])
@@ -155,12 +155,12 @@ function urbanization({ state, init }: UrbanizationParams): void {
 			const prov = sorted[idx]
 			state.leaderRuntime.targetUrban[prov] = sizes[idx] ?? 0
 			if (init) {
-				FIELDS.prov.population.urban.set(
+				FIELDS.prov.population.urban.set({
 					state,
-					prov,
-					state.time,
-					state.leaderRuntime.targetUrban[prov],
-				)
+					p: prov,
+					time: state.time,
+					value: state.leaderRuntime.targetUrban[prov],
+				})
 			}
 		}
 	}
@@ -178,10 +178,10 @@ function development({ state, init }: DevelopmentParams): void {
 	const cities: { province: number; dev: number; sourceNation: number }[] = []
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		if (FIELDS.prov.population.urban.get(state, p) >= cityMin) {
+		if (FIELDS.prov.population.urban.get({ state, p }) >= cityMin) {
 			cities.push({
 				province: p,
-				dev: urbanPopToDev(FIELDS.prov.population.urban.get(state, p)),
+				dev: urbanPopToDev(FIELDS.prov.population.urban.get({ state, p })),
 				sourceNation: STATE.getSovereign({ state, p }),
 			})
 		}
@@ -247,16 +247,28 @@ function development({ state, init }: DevelopmentParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		const cityDev = devFromCities[p]
-		const localDev = urbanPopToDev(FIELDS.prov.population.urban.get(state, p))
+		const localDev = urbanPopToDev(
+			FIELDS.prov.population.urban.get({ state, p }),
+		)
 		const targetDev = Math.max(cityDev, localDev)
 
 		if (init) {
-			FIELDS.prov.development.set(state, p, state.time, targetDev)
+			FIELDS.prov.development.set({
+				state,
+				p,
+				time: state.time,
+				value: targetDev,
+			})
 		} else {
-			const currentDev = FIELDS.prov.development.get(state, p)
+			const currentDev = FIELDS.prov.development.get({ state, p })
 			const gap = targetDev - currentDev
 			const rate = gap > 0 ? DEV_RISE : DEV_FALL
-			FIELDS.prov.development.set(state, p, state.time, currentDev + gap * rate)
+			FIELDS.prov.development.set({
+				state,
+				p,
+				time: state.time,
+				value: currentDev + gap * rate,
+			})
 		}
 	}
 }
@@ -286,11 +298,17 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 		if (state.desolate[p]) continue
 
 		const growth =
-			1 + devToGrowthRate(FIELDS.prov.development.get(state, p)) * yearFraction
-		const rural = FIELDS.prov.population.rural.get(state, p)
-		FIELDS.prov.population.rural.set(state, p, state.time, rural * growth)
+			1 +
+			devToGrowthRate(FIELDS.prov.development.get({ state, p })) * yearFraction
+		const rural = FIELDS.prov.population.rural.get({ state, p })
+		FIELDS.prov.population.rural.set({
+			state,
+			p,
+			time: state.time,
+			value: rural * growth,
+		})
 
-		const urban = FIELDS.prov.population.urban.get(state, p)
+		const urban = FIELDS.prov.population.urban.get({ state, p })
 		const targetPop = state.leaderRuntime.targetUrban[p]
 		const urbanGrowth = urban * growth
 		const maxAdjustment = urbanGrowth * MAX_ADJUSTMENT_RATE * yearFraction
@@ -306,7 +324,12 @@ function runPopulation({ state, previousTime }: RunPopulationParams): void {
 			finalPop = Math.max(urbanGrowth - adjustment, targetPop)
 		}
 
-		FIELDS.prov.population.urban.set(state, p, state.time, finalPop)
+		FIELDS.prov.population.urban.set({
+			state,
+			p,
+			time: state.time,
+			value: finalPop,
+		})
 	}
 
 	// Schedule next census

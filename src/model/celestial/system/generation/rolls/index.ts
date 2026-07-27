@@ -40,11 +40,7 @@ function rollOrbitGroup({
 						helian: 0.2,
 						jovian: 0.1,
 					}
-	const total = Object.values(weights).reduce(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-		(sum, value) => sum + value,
-		0,
-	)
+	const total = Object.values(weights).reduce((sum, value) => sum + value, 0)
 	let roll = rng.uniform(0, total)
 	for (const group of [
 		"asteroid belt",

@@ -1,4 +1,4 @@
-﻿import type { MoonBody } from "@/model/celestial/moons/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
 import { ENVIRONMENT } from "@/model/celestial/planet/environment"
 import { HEATING } from "@/model/celestial/planet/seismology/heating"
@@ -48,7 +48,6 @@ function applyBodySeismology(params: {
 		starAgeGyr,
 		densityEarthRelative,
 		moonSizeClassTotal: body.moons.reduce(
-			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			(sum, moon) => sum + (moon.sizeClass ?? 0),
 			0,
 		),

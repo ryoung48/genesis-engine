@@ -1,7 +1,7 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { SYSTEM } from "@/model/celestial/system"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import { UNITS } from "@/model/shared/units"
 import type { SocietyEra } from "@/model/society/types"
@@ -243,7 +243,7 @@ export function resetWorldDefaults(setters: {
 	setters.setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
-	setters.setRestSeed(SYSTEM.SOL_SEED)
+	setters.setRestSeed(SOL_DATA.solSeed)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)
 }

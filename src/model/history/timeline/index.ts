@@ -1,12 +1,9 @@
-type TimelineEntry<T> = { time: number; value: T }
+import type {
+	ReadTimelineParams,
+	WriteTimelineParams,
+} from "@/model/history/timeline/types"
 
-export type Timeline<T> = TimelineEntry<T>[]
-
-function read<T>(
-	timeline: Timeline<T>,
-	defaultValue: T,
-	time = Number.POSITIVE_INFINITY,
-): T {
+function read<T>({ timeline, defaultValue, time }: ReadTimelineParams<T>): T {
 	for (let i = timeline.length - 1; i >= 0; i--) {
 		const entry = timeline[i]
 		if (entry.time <= time) return entry.value
@@ -14,7 +11,7 @@ function read<T>(
 	return defaultValue
 }
 
-function write<T>(timeline: Timeline<T>, time: number, value: T): void {
+function write<T>({ timeline, time, value }: WriteTimelineParams<T>): void {
 	const last = timeline[timeline.length - 1]
 	if (last && Object.is(last.value, value)) return
 

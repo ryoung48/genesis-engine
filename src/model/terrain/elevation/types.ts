@@ -5,7 +5,7 @@ import type {
 	PlateVec,
 } from "@/model/tectonics/types"
 
-export type StageTiming = { Stage: string; ms: string }
+type StageTiming = { Stage: string; ms: string }
 
 export interface BoundedBfsParams {
 	dist: Float32Array

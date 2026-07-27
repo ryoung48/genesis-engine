@@ -1,4 +1,6 @@
 import type {
+	ForEachEdgeParams,
+	ForEachRouteParams,
 	Route,
 	RouteEdge,
 	SerializedNetwork,
@@ -72,16 +74,7 @@ function networkCount(network: SerializedNetwork | null | undefined): number {
 	return network?.kind.length ?? 0
 }
 
-function forEachRoute(
-	routes: SerializedRoutes | null | undefined,
-	callback: (route: {
-		fromProvince: number
-		toProvince: number
-		kind: SerializedRouteKind
-		pathRegions: Int32Array
-		index: number
-	}) => void,
-): void {
+function forEachRoute({ routes, callback }: ForEachRouteParams): void {
 	if (!routes) return
 	for (let i = 0; i < routes.kind.length; i++) {
 		callback({
@@ -97,17 +90,7 @@ function forEachRoute(
 	}
 }
 
-function forEachEdge(
-	network: SerializedNetwork | null | undefined,
-	callback: (edge: {
-		fromRegion: number
-		toRegion: number
-		kind: SerializedRouteKind
-		usage: number
-		weight: number
-		index: number
-	}) => void,
-): void {
+function forEachEdge({ network, callback }: ForEachEdgeParams): void {
 	if (!network) return
 	for (let i = 0; i < network.kind.length; i++) {
 		callback({

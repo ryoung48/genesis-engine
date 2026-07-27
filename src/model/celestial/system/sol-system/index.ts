@@ -3,7 +3,7 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
-import { DATA } from "@/model/celestial/system/sol-system/data"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type {
 	BuildPlanetOptions,
 	SolMoonSeed,
@@ -125,14 +125,12 @@ function buildPlanet({
 					parentIdx: idx,
 				})
 			: MOON.attachParentTideLocks({
-					moons: (seed.moons ?? []).map(
-						// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-						(moonSeed, i) =>
-							buildMoon({
-								seed: moonSeed,
-								idx: i + 1,
-								seedTag: seedTag * 100 + i + 1,
-							}),
+					moons: (seed.moons ?? []).map((moonSeed, i) =>
+						buildMoon({
+							seed: moonSeed,
+							idx: i + 1,
+							seedTag: seedTag * 100 + i + 1,
+						}),
 					),
 					parentIdx: idx,
 				})
@@ -148,7 +146,7 @@ function buildPlanet({
 		seed.group === "jovian"
 			? estimateGasGiantInternalHeatTempK({
 					massEarths: seed.massEarths,
-					ageGyr: DATA.solStarAgeGyr,
+					ageGyr: SOL_DATA.solStarAgeGyr,
 				})
 			: 0
 	return {
@@ -192,7 +190,7 @@ function buildPlanet({
 		classification: seed.classification,
 		texturePath: options?.textureOverride ?? seed.texturePath,
 		cloudsTexturePath: seed.cloudsTexturePath,
-		rings: DATA.solPlanetRingsByName[seed.name],
+		rings: SOL_DATA.solPlanetRingsByName[seed.name],
 		landDistribution: seed.landDistribution,
 		landCoverage: seed.landCoverage,
 		hydrosphereCode:
@@ -223,26 +221,21 @@ function buildPlanet({
 	}
 }
 
-const EARTH_SEED = DATA.solPlanetSeeds.find((seed) => seed.isMainWorld)
+const EARTH_SEED = SOL_DATA.solPlanetSeeds.find((seed) => seed.isMainWorld)
 if (!EARTH_SEED) throw new Error("SOL_PLANET_SEEDS is missing its Earth entry")
 const LUNA_SEED = EARTH_SEED.moons?.[0]
 if (!LUNA_SEED)
 	throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
 
-const SOL_SYSTEM_BODIES_RAW: SystemBody[] = DATA.solPlanetSeeds
-	.map(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-		(seed, i) =>
-			buildPlanet({ seed, seedTag: i + 1, idx: seed.isMainWorld ? -1 : i }),
+const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_DATA.solPlanetSeeds
+	.map((seed, i) =>
+		buildPlanet({ seed, seedTag: i + 1, idx: seed.isMainWorld ? -1 : i }),
 	)
-	.sort(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-		(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-	)
+	.sort((a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU)
 
 const solSystemBodies: SystemBody[] = PLANET.applySystemSeismology({
 	bodies: SOL_SYSTEM_BODIES_RAW,
-	starAgeGyr: DATA.solStarAgeGyr,
+	starAgeGyr: SOL_DATA.solStarAgeGyr,
 	starLuminositySol: 1,
 	spectralClass: "G",
 })

@@ -782,7 +782,6 @@ function collectSeaNeighborPairs({
 				],
 		)
 		.sort(
-			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			([sourceA, targetA], [sourceB, targetB]) =>
 				sourceA - sourceB || targetA - targetB,
 		)
@@ -830,7 +829,6 @@ function appendLandRoutes({
 			r_xyz: state.r_xyz,
 		})
 		const candidatePairs = URQUHART.buildUrquhartEdgesFromFlat(points).sort(
-			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			([sourceA, targetA], [sourceB, targetB]) =>
 				sourceA - sourceB || targetA - targetB,
 		)
@@ -1081,7 +1079,6 @@ function buildRouteNetwork({
 		}
 	}
 	return [...edgeMap.values()].sort(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 		(a, b) => a.kind - b.kind || b.usage - a.usage || b.weight - a.weight,
 	)
 }

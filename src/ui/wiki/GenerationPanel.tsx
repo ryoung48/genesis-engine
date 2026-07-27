@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import { SYSTEM } from "@/model/celestial/system"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type {
 	SurfaceTidesBreakdown,
@@ -316,7 +316,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								axialTiltDisplay={axialTiltDisplay}
 								landCoverage={landCoverage}
 								showRealSolNames={
-									showRealSolNames && restSeed === SYSTEM.SOL_SEED
+									showRealSolNames && restSeed === SOL_DATA.solSeed
 								}
 								spectralClass={spectralClass}
 								setSpectralClass={setSpectralClass}

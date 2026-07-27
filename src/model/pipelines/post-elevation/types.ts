@@ -27,7 +27,7 @@ import type {
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { GenesisRivers } from "@/model/terrain/rivers/types"
 
-export interface RealRiversInput {
+interface RealRiversInput {
 	lines: [number, number, number, number][][]
 	visible: Uint8Array
 	riverId: Int32Array

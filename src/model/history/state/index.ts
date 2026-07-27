@@ -2,7 +2,6 @@ import { DERIVE } from "@/model/history/derive"
 import type { DerivedCache } from "@/model/history/derive/types"
 import { EVENT_HEAP, EventHeap } from "@/model/history/event-heap"
 import { FIELDS } from "@/model/history/fields"
-import type { HistoryRng } from "@/model/history/history-rng/types"
 import type {
 	AddTerritoryParams,
 	BuildProvinceXyzParams,
@@ -25,12 +24,14 @@ import type {
 	IsSovereignParams,
 	ProvinceDistanceSqParams,
 	QueueBattleEventParams,
+	RebuildAssignmentParams,
 	ReleaseDisconnectedProvinceParams,
 	ReleaseProvinceParams,
 	ReleaseSubjectRelationsParams,
 	ResolveWarParams,
 	SetRelationParams,
 	SpawnLeaderParams,
+	StartWarParams,
 	ValidateLiveHierarchyParams,
 	ValidateParentArrayParams,
 	War,
@@ -40,7 +41,7 @@ import type {
 	WealthCurrentParams,
 	WealthOptimalParams,
 } from "@/model/history/state/types"
-import type { Timeline } from "@/model/history/timeline"
+import type { Timeline } from "@/model/history/timeline/types"
 import { HIERARCHY } from "@/model/society/hierarchy"
 
 const rel = {
@@ -113,12 +114,12 @@ function ensureNationColor({ state, province }: EnsureNationColorParams): void {
 	])
 }
 
-function rebuildAssignment(state: HistoryState, time = state.time): void {
+function rebuildAssignment({ state, time }: RebuildAssignmentParams): void {
 	DERIVE.ensureHierarchyClean(state)
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		const root = state.sovereignCurrent[p]
-		FIELDS.prov.assignment.set(state, p, time, root)
+		FIELDS.prov.assignment.set({ state, p, time, value: root })
 		if (state.parentCurrent[p] < 0) ensureNationColor({ state, province: p })
 	}
 }
@@ -155,11 +156,11 @@ function validateLiveHierarchy({
 }
 
 function getRelation({ state, a, b }: GetRelationParams): Relation {
-	return FIELDS.rel.get(state, a, b, state.time)
+	return FIELDS.rel.get({ state, a, b, time: state.time })
 }
 
 function setRelation({ state, a, b, rel }: SetRelationParams): void {
-	FIELDS.rel.set(state, a, b, rel, state.time)
+	FIELDS.rel.set({ state, a, b, rel, time: state.time })
 }
 
 function getRulerRelation({
@@ -180,7 +181,7 @@ function getRulerRelation({
 }
 
 function getSovereign({ state, p }: GetSovereignParams): number {
-	return DERIVE.sovereign(state, p, state.time)
+	return DERIVE.sovereign({ state, p, t: state.time })
 }
 
 function isSovereign({ state, p }: IsSovereignParams): boolean {
@@ -189,7 +190,7 @@ function isSovereign({ state, p }: IsSovereignParams): boolean {
 }
 
 function getChildren({ state, p }: GetChildrenParams): number[] {
-	return DERIVE.children(state, p, state.time)
+	return DERIVE.children({ state, p, t: state.time })
 }
 
 function getNationProvinces({
@@ -200,7 +201,7 @@ function getNationProvinces({
 	const stack = [root]
 	while (stack.length > 0) {
 		const current = stack.pop()!
-		for (const child of DERIVE.children(state, current, state.time)) {
+		for (const child of DERIVE.children({ state, p: current, t: state.time })) {
 			result.push(child)
 			stack.push(child)
 		}
@@ -212,7 +213,7 @@ function getNationNeighbors({
 	state,
 	nation,
 }: GetNationNeighborsParams): number[] {
-	const adjacency = DERIVE.nationAdjacency(state, state.time)
+	const adjacency = DERIVE.nationAdjacency({ state, t: state.time })
 	const result: number[] = []
 	for (
 		let i = adjacency.offset[nation];
@@ -241,7 +242,7 @@ function getProvinceNeighbors({
 }
 
 function wealthOptimal({ state, p }: WealthOptimalParams): number {
-	return DERIVE.wealthOptimal(state, p, state.time)
+	return DERIVE.wealthOptimal({ state, p, t: state.time })
 }
 
 function wealthCurrent({
@@ -251,7 +252,14 @@ function wealthCurrent({
 	freedom,
 	cache,
 }: WealthCurrentParams): number {
-	return DERIVE.wealthCurrent(state, p, state.time, cache, exclude, freedom)
+	return DERIVE.wealthCurrent({
+		state,
+		p,
+		t: state.time,
+		cache,
+		exclude,
+		freedom,
+	})
 }
 
 function makeDerivedCache(): DerivedCache {
@@ -276,7 +284,9 @@ function warStrengthSolo({
 		0.1,
 		wealthCurrent({ state, p, exclude, freedom: exclude === p, cache }),
 	)
-	return curr / (1 + DERIVE.provinceWars(state, p, state.time, cache).length)
+	return (
+		curr / (1 + DERIVE.provinceWars({ state, p, t: state.time, cache }).length)
+	)
 }
 
 function getWarAllies({
@@ -357,8 +367,8 @@ function warThreat({
 }
 
 function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
-	FIELDS.prov.parent.set(state, p, state.time, -1)
-	rebuildAssignment(state)
+	FIELDS.prov.parent.set({ state, p, time: state.time, value: -1 })
+	rebuildAssignment({ state, time: state.time })
 	spawnLeader({ state, p, rng })
 	state.heap.enqueue(
 		state.leaderRuntime.end[p],
@@ -372,7 +382,7 @@ function isProvinceConnectedToParent({
 	state,
 	province,
 }: IsProvinceConnectedToParentParams): boolean {
-	const parent = FIELDS.prov.parent.get(state, province)
+	const parent = FIELDS.prov.parent.get({ state, p: province })
 	if (parent < 0) return true
 
 	DERIVE.ensureHierarchyClean(state)
@@ -407,7 +417,12 @@ function releaseDisconnectedProvince({
 	rng,
 }: ReleaseDisconnectedProvinceParams): void {
 	if (state.occupationCurrent[province] >= 0) {
-		FIELDS.prov.occupation.set(state, province, state.time, -1)
+		FIELDS.prov.occupation.set({
+			state,
+			p: province,
+			time: state.time,
+			value: -1,
+		})
 	}
 	releaseProvince({ state, p: province, rng })
 	state.events.push({
@@ -463,13 +478,18 @@ function addTerritory({ state, nation, subjects }: AddTerritoryParams): void {
 		})
 	}
 	for (const member of members) {
-		FIELDS.prov.parent.set(state, member, state.time, -1)
+		FIELDS.prov.parent.set({ state, p: member, time: state.time, value: -1 })
 	}
-	FIELDS.prov.parent.set(state, nation, state.time, -1)
+	FIELDS.prov.parent.set({ state, p: nation, time: state.time, value: -1 })
 	for (const member of members) {
-		FIELDS.prov.parent.set(state, member, state.time, nextParent[member])
+		FIELDS.prov.parent.set({
+			state,
+			p: member,
+			time: state.time,
+			value: nextParent[member],
+		})
 	}
-	rebuildAssignment(state)
+	rebuildAssignment({ state, time: state.time })
 }
 
 function releaseSubjectRelations({
@@ -543,7 +563,7 @@ function fixConnections({ state, nation, rng }: FixConnectionsParams): void {
 		}
 	}
 
-	const overlord = FIELDS.prov.parent.get(state, nation)
+	const overlord = FIELDS.prov.parent.get({ state, p: nation })
 	if (
 		overlord >= 0 &&
 		!isProvinceConnectedToParent({ state, province: nation })
@@ -553,13 +573,13 @@ function fixConnections({ state, nation, rng }: FixConnectionsParams): void {
 	}
 }
 
-function startWar(
-	state: HistoryState,
-	attacker: number,
-	defender: number,
-	rng: HistoryRng,
-	rebel = false,
-): void {
+function startWar({
+	state,
+	attacker,
+	defender,
+	rng,
+	rebel,
+}: StartWarParams): void {
 	createActiveWar({ state, attacker, defender, rng, options: { rebel } })
 }
 
@@ -592,9 +612,21 @@ function createActiveWar({
 	state.wars.push(war)
 	state.provinceWars[attacker].push(war.idx)
 	state.provinceWars[defender].push(war.idx)
-	FIELDS.rel.set(state, attacker, defender, rel.WAR, startTime)
+	FIELDS.rel.set({
+		state,
+		a: attacker,
+		b: defender,
+		rel: rel.WAR,
+		time: startTime,
+	})
 	if (startTime < state.time) {
-		FIELDS.rel.set(state, attacker, defender, rel.WAR, state.time)
+		FIELDS.rel.set({
+			state,
+			a: attacker,
+			b: defender,
+			rel: rel.WAR,
+			time: state.time,
+		})
 	}
 	if (options.rebellion) {
 		state.events.push({
@@ -623,9 +655,19 @@ function createActiveWar({
 		),
 	)
 	for (const province of occupied) {
-		FIELDS.prov.occupation.set(state, province, startTime, war.idx)
+		FIELDS.prov.occupation.set({
+			state,
+			p: province,
+			time: startTime,
+			value: war.idx,
+		})
 		if (startTime < state.time) {
-			FIELDS.prov.occupation.set(state, province, state.time, war.idx)
+			FIELDS.prov.occupation.set({
+				state,
+				p: province,
+				time: state.time,
+				value: war.idx,
+			})
 		}
 		war.occupied.push(province)
 	}
@@ -655,7 +697,7 @@ function resolveWar({
 
 	for (const p of war.occupied) {
 		if (state.occupationCurrent[p] === war.idx) {
-			FIELDS.prov.occupation.set(state, p, state.time, -1)
+			FIELDS.prov.occupation.set({ state, p, time: state.time, value: -1 })
 		}
 	}
 	war.occupied.length = 0
@@ -818,27 +860,37 @@ function createHistoryState({
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
 		state.parentCurrent[p] = nations.parent[p]
-		FIELDS.prov.parent.set(state, p, startTime, nations.parent[p])
-		FIELDS.prov.assignment.set(state, p, startTime, nations.sovereign[p])
-		FIELDS.prov.population.rural.set(
+		FIELDS.prov.parent.set({
 			state,
 			p,
-			startTime,
-			population.population[p] * 0.95,
-		)
-		FIELDS.prov.population.urban.set(
+			time: startTime,
+			value: nations.parent[p],
+		})
+		FIELDS.prov.assignment.set({
 			state,
 			p,
-			startTime,
-			population.population[p] * 0.05,
-		)
-		FIELDS.prov.development.set(state, p, startTime, 0)
-		FIELDS.prov.consumption.set(state, p, startTime, 0)
-		FIELDS.prov.leader.dynasty.set(state, p, startTime, -1)
-		FIELDS.prov.leader.nameSeed.set(state, p, startTime, -1)
-		FIELDS.prov.leader.claim.set(state, p, startTime, 0)
-		FIELDS.prov.leader.birthYear.set(state, p, startTime, -1)
-		FIELDS.prov.occupation.set(state, p, startTime, -1)
+			time: startTime,
+			value: nations.sovereign[p],
+		})
+		FIELDS.prov.population.rural.set({
+			state,
+			p,
+			time: startTime,
+			value: population.population[p] * 0.95,
+		})
+		FIELDS.prov.population.urban.set({
+			state,
+			p,
+			time: startTime,
+			value: population.population[p] * 0.05,
+		})
+		FIELDS.prov.development.set({ state, p, time: startTime, value: 0 })
+		FIELDS.prov.consumption.set({ state, p, time: startTime, value: 0 })
+		FIELDS.prov.leader.dynasty.set({ state, p, time: startTime, value: -1 })
+		FIELDS.prov.leader.nameSeed.set({ state, p, time: startTime, value: -1 })
+		FIELDS.prov.leader.claim.set({ state, p, time: startTime, value: 0 })
+		FIELDS.prov.leader.birthYear.set({ state, p, time: startTime, value: -1 })
+		FIELDS.prov.occupation.set({ state, p, time: startTime, value: -1 })
 		if (nations.parent[p] < 0) ensureNationColor({ state, province: p })
 	}
 
@@ -849,7 +901,7 @@ function createHistoryState({
 		spawnLeader({ state, p, rng })
 	}
 	initDynasties({ state, rng })
-	rebuildAssignment(state, startTime)
+	rebuildAssignment({ state, time: startTime })
 
 	return state
 }
@@ -868,19 +920,19 @@ function spawnLeader({ state, p, rng, end }: SpawnLeaderParams): void {
 	state.leaderRuntime.idx[p]++
 	state.leaderRuntime.birth[p] = state.time - deltaYear(ageAtAccession)
 	state.leaderRuntime.end[p] = death
-	FIELDS.prov.leader.nameSeed.set(
+	FIELDS.prov.leader.nameSeed.set({
 		state,
 		p,
-		state.time,
-		rng.randint(1, 0x7fffffff),
-	)
-	FIELDS.prov.leader.claim.set(state, p, state.time, 3)
-	FIELDS.prov.leader.birthYear.set(
+		time: state.time,
+		value: rng.randint(1, 0x7fffffff),
+	})
+	FIELDS.prov.leader.claim.set({ state, p, time: state.time, value: 3 })
+	FIELDS.prov.leader.birthYear.set({
 		state,
 		p,
-		state.time,
-		state.leaderRuntime.birth[p] / yearMs,
-	)
+		time: state.time,
+		value: state.leaderRuntime.birth[p] / yearMs,
+	})
 }
 
 function initDynasties({ state, rng }: InitDynastiesParams): void {
@@ -891,7 +943,8 @@ function initDynasties({ state, rng }: InitDynastiesParams): void {
 		),
 	)
 	for (const p of shuffled) {
-		if (FIELDS.prov.leader.dynasty.get(state, p, state.time) >= 0) continue
+		if (FIELDS.prov.leader.dynasty.get({ state, p, time: state.time }) >= 0)
+			continue
 		const sameCulture: Array<{ dynasty: number; source: number }> = []
 		const other: Array<{ dynasty: number; source: number }> = []
 		const currentSovereign = (province: number): number => {
@@ -902,7 +955,11 @@ function initDynasties({ state, rng }: InitDynastiesParams): void {
 			return current
 		}
 		for (const nb of getProvinceNeighbors({ state, p })) {
-			const dynasty = FIELDS.prov.leader.dynasty.get(state, nb, state.time)
+			const dynasty = FIELDS.prov.leader.dynasty.get({
+				state,
+				p: nb,
+				time: state.time,
+			})
 			if (state.desolate[nb] || dynasty < 0) continue
 			const donor = { dynasty, source: currentSovereign(nb) }
 			if (state.culture[p] === state.culture[nb]) sameCulture.push(donor)
@@ -915,7 +972,12 @@ function initDynasties({ state, rng }: InitDynastiesParams): void {
 		else if (other.length > 0 && rng.random() < 0.05)
 			({ dynasty, source } = rng.choice(other))
 		if (dynasty < 0) dynasty = state.nextDynasty++
-		FIELDS.prov.leader.dynasty.set(state, p, state.time, dynasty)
+		FIELDS.prov.leader.dynasty.set({
+			state,
+			p,
+			time: state.time,
+			value: dynasty,
+		})
 		if (
 			source >= 0 &&
 			source !== p &&

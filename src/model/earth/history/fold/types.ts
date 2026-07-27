@@ -82,7 +82,7 @@ export interface ActiveWar {
 	defenders: Set<string>
 }
 
-export interface ActiveOrganizationSite {
+interface ActiveOrganizationSite {
 	orgId: string
 	provinceId: string
 	name: string

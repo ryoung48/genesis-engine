@@ -161,7 +161,6 @@ function computeTornadoRisk({
 	}
 	if (nonZero.length === 0) return risk
 
-	// biome-ignore lint/nursery/useMaxParams: native sort callback
 	nonZero.sort((a, b) => a - b)
 	const p99 =
 		nonZero[Math.min(nonZero.length - 1, Math.floor(0.99 * nonZero.length))]

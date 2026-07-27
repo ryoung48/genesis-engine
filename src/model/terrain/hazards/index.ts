@@ -2,13 +2,18 @@ import type { GenesisHazards } from "@/model/climate/types"
 import { MATH } from "@/model/shared/math"
 import type {
 	ComputeHazardsParams,
+	GradualFalloffParams,
 	NormalizeFieldParams,
 	PercentileParams,
 	PropagateInfluenceParams,
 	ThresholdFieldParams,
 } from "@/model/terrain/hazards/types"
 
-function gradualFalloff(distance: number, reach: number, power = 1.35): number {
+function gradualFalloff({
+	distance,
+	reach,
+	power = 1.35,
+}: GradualFalloffParams): number {
 	if (!Number.isFinite(distance)) return 0
 	return Math.pow(1 - MATH.clamp01(distance / reach), power)
 }
@@ -158,16 +163,16 @@ function computeHazards({
 		const subduct = MATH.clamp01(boundary.r_subductFactor[r])
 		const stress = stressNorm[r]
 		const localStress = MATH.smoothstep({ edge0: 0.06, edge1: 0.5, x: stress })
-		const mountainProximity = gradualFalloff(
-			distFields.distMountain[r],
-			tectonicReach,
-			0.9,
-		)
-		const coastalBoundaryProximity = gradualFalloff(
-			distFields.distCoastline[r],
-			coastalReach,
-			1.05,
-		)
+		const mountainProximity = gradualFalloff({
+			distance: distFields.distMountain[r],
+			reach: tectonicReach,
+			power: 0.9,
+		})
+		const coastalBoundaryProximity = gradualFalloff({
+			distance: distFields.distCoastline[r],
+			reach: coastalReach,
+			power: 1.05,
+		})
 		const volcanicProximity = Number.isFinite(distFields.distMountain[r])
 			? 1 -
 				MATH.smoothstep({

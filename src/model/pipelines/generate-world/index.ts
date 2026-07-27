@@ -233,7 +233,7 @@ function generateGenesisWorld({
 
 	// 1. Build hi-res sphere mesh
 	const mesh = withTiming("mesh", pipelineTiming, () =>
-		MESH.buildSphereMesh(params.numPoints, params.jitter, rng),
+		MESH.buildSphereMesh({ n: params.numPoints, jitter: params.jitter, rng }),
 	)
 	onProgress?.("mesh", 3)
 
@@ -457,13 +457,13 @@ function generateGenesisWorld({
 	// Impact craters (applied after all erosion so they stay crisp)
 	if (params.craters && params.craters > 0) {
 		withTiming("craters", pipelineTiming, () => {
-			CRATERS.applyCraters(
+			CRATERS.applyCraters({
 				mesh,
 				elevation,
-				params.seed,
-				params.craters,
-				params.planetRadiusKm,
-			)
+				seed: params.seed,
+				intensity: params.craters,
+				planetRadiusKm: params.planetRadiusKm,
+			})
 		})
 		onProgress?.("craters", 39)
 	}

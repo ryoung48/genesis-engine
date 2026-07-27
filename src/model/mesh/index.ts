@@ -4,17 +4,23 @@
  * Faithful port of genesis's sphere-mesh.js.
  */
 import Delaunator from "delaunator"
-import type { SphereMesh } from "@/model/mesh/types"
-import type { GenesisRng } from "@/model/shared/rng/types"
+import type {
+	AddPoleToMeshParams,
+	BuildSphereMeshParams,
+	GenerateAdaptiveFibonacciSphereParams,
+	GenerateFibonacciSphereParams,
+	SphereMesh,
+	StereographicProjectionParams,
+} from "@/model/mesh/types"
 
 /**
  * Fibonacci sphere with jitter — evenly-distributed points on a unit sphere.
  */
-function generateFibonacciSphere(
-	N: number,
-	jitter: number,
-	rng: GenesisRng,
-): Float32Array {
+function generateFibonacciSphere({
+	N,
+	jitter,
+	rng,
+}: GenerateFibonacciSphereParams): Float32Array {
 	const r_xyz = new Float32Array(3 * N)
 	const s = 3.6 / Math.sqrt(N)
 	const dlong = Math.PI * (3 - Math.sqrt(5))
@@ -54,15 +60,15 @@ function generateFibonacciSphere(
  * but sufficient to concentrate mesh resolution where it's wanted without
  * changing total point budget.
  */
-function generateAdaptiveFibonacciSphere(
-	targetN: number,
-	jitter: number,
-	rng: GenesisRng,
-	densityWeight: (latDeg: number, lonDeg: number) => number,
-): Float32Array {
+function generateAdaptiveFibonacciSphere({
+	targetN,
+	jitter,
+	rng,
+	densityWeight,
+}: GenerateAdaptiveFibonacciSphereParams): Float32Array {
 	const OVERSAMPLE = 8
 	const candidateN = targetN * OVERSAMPLE
-	const candidates = generateFibonacciSphere(candidateN, jitter, rng)
+	const candidates = generateFibonacciSphere({ N: candidateN, jitter, rng })
 
 	const weights = new Float32Array(candidateN)
 	let wMax = 0
@@ -116,7 +122,10 @@ function generateAdaptiveFibonacciSphere(
 /**
  * Stereographic projection from north pole (0,0,1) onto a plane.
  */
-function stereographicProjection(r_xyz: Float32Array, N: number): Float64Array {
+function stereographicProjection({
+	r_xyz,
+	N,
+}: StereographicProjectionParams): Float64Array {
 	const flat = new Float64Array(2 * N)
 	for (let i = 0; i < N; i++) {
 		const z = r_xyz[3 * i + 2]
@@ -130,11 +139,10 @@ function stereographicProjection(r_xyz: Float32Array, N: number): Float64Array {
 /**
  * Close the mesh by connecting hull edges to a pole point.
  */
-function addPoleToMesh(
-	poleId: number,
-	triangles: Uint32Array,
-	halfedges: Int32Array,
-): { triangles: Int32Array; halfedges: Int32Array } {
+function addPoleToMesh({ poleId, triangles, halfedges }: AddPoleToMeshParams): {
+	triangles: Int32Array
+	halfedges: Int32Array
+} {
 	const numSides = triangles.length
 	const next = (s: number) => (s % 3 === 2 ? s - 2 : s + 1)
 
@@ -177,16 +185,21 @@ function addPoleToMesh(
  * Build a sphere mesh from N Fibonacci-spiral points using
  * Delaunator + stereographic projection + pole closure.
  */
-function buildSphereMesh(
-	n: number,
-	jitter: number,
-	rng: GenesisRng,
-	densityWeight?: (latDeg: number, lonDeg: number) => number,
-): SphereMesh {
+function buildSphereMesh({
+	n,
+	jitter,
+	rng,
+	densityWeight,
+}: BuildSphereMeshParams): SphereMesh {
 	const baseXyz = densityWeight
-		? generateAdaptiveFibonacciSphere(n, jitter, rng, densityWeight)
-		: generateFibonacciSphere(n, jitter, rng)
-	const flat = stereographicProjection(baseXyz, n)
+		? generateAdaptiveFibonacciSphere({
+				targetN: n,
+				jitter,
+				rng,
+				densityWeight,
+			})
+		: generateFibonacciSphere({ N: n, jitter, rng })
+	const flat = stereographicProjection({ r_xyz: baseXyz, N: n })
 	const delaunay = new Delaunator(flat)
 
 	// Add pole point (N+1 regions total)
@@ -197,7 +210,11 @@ function buildSphereMesh(
 	r_xyz[3 * n + 1] = 0
 	r_xyz[3 * n + 2] = 1
 
-	const closed = addPoleToMesh(n, delaunay.triangles, delaunay.halfedges)
+	const closed = addPoleToMesh({
+		poleId: n,
+		triangles: delaunay.triangles,
+		halfedges: delaunay.halfedges,
+	})
 	const tris = closed.triangles
 	const hes = closed.halfedges
 

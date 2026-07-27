@@ -210,7 +210,6 @@ function buildMoonContributors({
 
 	let moonsClamped = false
 	const contributors = moons
-		// biome-ignore lint/nursery/useMaxParams: native map callback signature
 		.map((moon, index) => {
 			const result = validateMoon({
 				moon,
@@ -710,7 +709,6 @@ function computeSurfaceTidesM({
 	}
 
 	return {
-		// biome-ignore lint/nursery/useMaxParams: Array.reduce supplies accumulator and item separately.
 		totalM: contributions.reduce((sum, c) => sum + c.valueM, 0),
 		contributions,
 	}
@@ -810,7 +808,6 @@ function computeMoonSurfaceTidesM({
 	}
 
 	return {
-		// biome-ignore lint/nursery/useMaxParams: Array.reduce supplies accumulator and item separately.
 		totalM: contributions.reduce((sum, c) => sum + c.valueM, 0),
 		contributions,
 	}

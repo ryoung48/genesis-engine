@@ -2,7 +2,7 @@ import type { DerivedCache } from "@/model/history/derive/types"
 import type { EventHeap } from "@/model/history/event-heap"
 import type { HistoryRng } from "@/model/history/history-rng/types"
 import type { Relation } from "@/model/history/state"
-import type { Timeline } from "@/model/history/timeline"
+import type { Timeline } from "@/model/history/timeline/types"
 import type {
 	GenesisNationHierarchy,
 	GenesisProvinces,
@@ -11,6 +11,19 @@ import type {
 } from "@/model/society/types"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { Route, RouteEdge } from "@/model/transport/types"
+
+export interface RebuildAssignmentParams {
+	state: HistoryState
+	time: number
+}
+
+export interface StartWarParams {
+	state: HistoryState
+	attacker: number
+	defender: number
+	rng: HistoryRng
+	rebel: boolean
+}
 
 export interface War {
 	idx: number
@@ -23,7 +36,7 @@ export interface War {
 	occupied: number[]
 }
 
-export interface ActiveWarOptions {
+interface ActiveWarOptions {
 	rebel?: boolean
 	startTime?: number
 	nextBattleTime?: number
@@ -34,7 +47,7 @@ export interface ActiveWarOptions {
 	}
 }
 
-export interface LeaderRuntime {
+interface LeaderRuntime {
 	idx: Int32Array
 	birth: Float64Array
 	end: Float64Array

@@ -114,21 +114,28 @@ function buildLockedClimatePreview(
 		COLOR_INTERPOLATION.rgbToCss(
 			COLOR_INTERPOLATION.sampleColorStops({
 				stops: COLOR_PALETTES.plasmaStops,
-				t: COLOR_INTERPOLATION.mapLinear(value, insolMin, insolMax, 0, 1, true),
+				t: COLOR_INTERPOLATION.mapLinear({
+					value,
+					domainStart: insolMin,
+					domainEnd: insolMax,
+					rangeStart: 0,
+					rangeEnd: 1,
+					clamp: true,
+				}),
 			}),
 		)
 	const daylightColorFn = (hours: number) =>
 		COLOR_INTERPOLATION.rgbToCss(
 			COLOR_INTERPOLATION.sampleColorStops({
 				stops: COLOR_PALETTES.purplesStops,
-				t: COLOR_INTERPOLATION.mapLinear(
-					hours,
-					0,
-					config.hoursPerDay,
-					1,
-					0,
-					true,
-				),
+				t: COLOR_INTERPOLATION.mapLinear({
+					value: hours,
+					domainStart: 0,
+					domainEnd: config.hoursPerDay,
+					rangeStart: 1,
+					rangeEnd: 0,
+					clamp: true,
+				}),
 			}),
 		)
 

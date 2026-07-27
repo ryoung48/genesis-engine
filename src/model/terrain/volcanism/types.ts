@@ -47,7 +47,7 @@ export interface LargeIgneousProvinceParams {
 	markFeature: TerrainFeatureMarker
 }
 
-export type TerrainFeatureMarker = (
+type TerrainFeatureMarker = (
 	region: number,
 	feature: number,
 	delta: number,

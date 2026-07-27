@@ -1,3 +1,5 @@
+import type { GenesisRng } from "@/model/shared/rng/types"
+
 export interface SphereMesh {
 	numRegions: number
 	numTriangles: number
@@ -24,4 +26,35 @@ export interface SphereMesh {
 	s_inner_t: Int32Array
 	/** For each side s, the triangle on the outer (right) side */
 	s_outer_t: Int32Array
+}
+
+export interface GenerateFibonacciSphereParams {
+	N: number
+	jitter: number
+	rng: GenesisRng
+}
+
+export interface GenerateAdaptiveFibonacciSphereParams {
+	targetN: number
+	jitter: number
+	rng: GenesisRng
+	densityWeight: (latDeg: number, lonDeg: number) => number
+}
+
+export interface StereographicProjectionParams {
+	r_xyz: Float32Array
+	N: number
+}
+
+export interface AddPoleToMeshParams {
+	poleId: number
+	triangles: Uint32Array
+	halfedges: Int32Array
+}
+
+export interface BuildSphereMeshParams {
+	n: number
+	jitter: number
+	rng: GenesisRng
+	densityWeight?: (latDeg: number, lonDeg: number) => number
 }

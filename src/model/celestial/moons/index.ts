@@ -155,7 +155,6 @@ function rollMoonOrbitCandidate({
 			? nonExtremeRanges
 			: availableRanges
 	const totalWeight = sampledRanges.reduce(
-		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 		(sum, range) => sum + range.weight,
 		0,
 	)
@@ -179,7 +178,6 @@ function placeMoonOrbits({
 	for (const range of MOON_ORBIT_RANGE_ORDER) {
 		const rangeMoons = moons
 			.filter((moon) => moon.orbitRange === range)
-			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			.sort((a, b) => a.moonMinimumPd - b.moonMinimumPd)
 		if (rangeMoons.length === 0) continue
 		const config = ORBIT_RANGE_CONFIG[range]
@@ -190,11 +188,12 @@ function placeMoonOrbits({
 		)
 		for (let index = 0; index < rangeMoons.length; index++) {
 			const moon = rangeMoons[index]!
-			const reservePd = rangeMoons.slice(index + 1).reduce(
-				// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-				(sum, nextMoon) => sum + nextMoon.radiusPd * 2 + minimumSpacingPd,
-				0,
-			)
+			const reservePd = rangeMoons
+				.slice(index + 1)
+				.reduce(
+					(sum, nextMoon) => sum + nextMoon.radiusPd * 2 + minimumSpacingPd,
+					0,
+				)
 			const minPd = Math.max(
 				moon.moonMinimumPd,
 				rangeMinPd,

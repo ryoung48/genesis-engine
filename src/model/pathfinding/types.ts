@@ -1,6 +1,6 @@
 import type { MinHeap } from "@/model/shared/min-heap"
 
-export interface PathfindRequest {
+interface PathfindRequest {
 	startRegion: number
 	endRegion: number
 	allowLand: boolean

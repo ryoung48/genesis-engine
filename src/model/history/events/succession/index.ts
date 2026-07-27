@@ -45,7 +45,7 @@ function recordDynastySpread(params: {
 }
 
 function claim({ state, p, rng }: ClaimParams): void {
-	const dynasty = FIELDS.prov.leader.dynasty.get(state, p)
+	const dynasty = FIELDS.prov.leader.dynasty.get({ state, p })
 
 	const claimRoll =
 		rng.weightedChoice([
@@ -55,7 +55,7 @@ function claim({ state, p, rng }: ClaimParams): void {
 			{ v: 3 as const, w: 2 }, // strong
 		]) ?? 2
 
-	FIELDS.prov.leader.claim.set(state, p, state.time, claimRoll)
+	FIELDS.prov.leader.claim.set({ state, p, time: state.time, value: claimRoll })
 
 	if (claimRoll <= 1) {
 		// Look only at neighboring sovereign nations filtered by diplomatic relation
@@ -73,7 +73,12 @@ function claim({ state, p, rng }: ClaimParams): void {
 
 		if (candidates.length === 0) {
 			// No qualifying neighbor → new dynasty
-			FIELDS.prov.leader.dynasty.set(state, p, state.time, state.nextDynasty++)
+			FIELDS.prov.leader.dynasty.set({
+				state,
+				p,
+				time: state.time,
+				value: state.nextDynasty++,
+			})
 			return
 		}
 
@@ -84,7 +89,7 @@ function claim({ state, p, rng }: ClaimParams): void {
 				STATE.wealthOptimal({ state, p: a }),
 		)
 		const senior = candidates[0]
-		const seniorDynasty = FIELDS.prov.leader.dynasty.get(state, senior)
+		const seniorDynasty = FIELDS.prov.leader.dynasty.get({ state, p: senior })
 
 		// Personal union if same dynasty, different sovereign
 		if (seniorDynasty === dynasty) {
@@ -99,7 +104,12 @@ function claim({ state, p, rng }: ClaimParams): void {
 
 		// Spread dynasty
 		const previousDynasty = dynasty
-		FIELDS.prov.leader.dynasty.set(state, p, state.time, seniorDynasty)
+		FIELDS.prov.leader.dynasty.set({
+			state,
+			p,
+			time: state.time,
+			value: seniorDynasty,
+		})
 		recordDynastySpread({
 			state,
 			nation: p,
@@ -176,7 +186,7 @@ function runSuccession({
 	claim({ state, p: province, rng })
 
 	// Random subject rebellions during succession
-	const overlord = FIELDS.prov.parent.get(state, province)
+	const overlord = FIELDS.prov.parent.get({ state, p: province })
 	if (overlord < 0 && STATE.getChildren({ state, p: province }).length > 0) {
 		const subjects = rng
 			.shuffle(STATE.getChildren({ state, p: province }))
@@ -190,7 +200,7 @@ function runSuccession({
 		while (rebelCount < subjects.length && rng.random() < rebellionChance) {
 			const subject = subjects[rebelCount]
 			rebelCount++
-			if (FIELDS.prov.parent.get(state, subject) !== province) continue
+			if (FIELDS.prov.parent.get({ state, p: subject }) !== province) continue
 			STATE.releaseProvince({ state, p: subject, rng })
 			state.events.push({
 				tag: "rebellion",

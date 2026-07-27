@@ -54,16 +54,6 @@
 	},
 	"overrides": [
 		{
-			"includes": ["src/model/**/*.{ts,tsx}"],
-			"linter": {
-				"rules": {
-					"nursery": {
-						"useMaxParams": { "level": "error", "options": { "max": 1 } }
-					}
-				}
-			}
-		},
-		{
 			"includes": ["**/*.{ts,tsx}"],
 			"linter": {
 				"rules": {

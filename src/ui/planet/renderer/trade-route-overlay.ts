@@ -172,7 +172,7 @@ function buildTradeRouteCorridors(
 		adjacency.set(edge.toRegion, toList)
 	}
 	if (isPackedInfrastructureNetwork(edges)) {
-		TRANSPORT.forEachEdge(edges, appendEdge)
+		TRANSPORT.forEachEdge({ network: edges, callback: appendEdge })
 	} else {
 		for (const edge of edges) appendEdge(edge)
 	}

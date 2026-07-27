@@ -1911,6 +1911,63 @@ function pascalCase(name) {
 	return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
+function propertyCallbackTypeName(prop) {
+	const names = []
+	let current = prop
+	while (Node.isPropertyAssignment(current)) {
+		if (!Node.isIdentifier(current.getNameNode())) return null
+		names.unshift(current.getName())
+		let parent = current.getParent()
+		if (!Node.isObjectLiteralExpression(parent)) return null
+		parent = parent.getParent()
+		while (
+			Node.isAsExpression(parent) ||
+			Node.isSatisfiesExpression(parent) ||
+			Node.isParenthesizedExpression(parent)
+		) {
+			parent = parent.getParent()
+		}
+		if (Node.isVariableDeclaration(parent)) {
+			if (!Node.isIdentifier(parent.getNameNode())) return null
+			names.unshift(parent.getName())
+			return `${names.map(pascalCase).join("")}Params`
+		}
+		current = parent
+	}
+	return null
+}
+
+function nativeCallbackReason(fn) {
+	const call = fn.getParentIfKind(SyntaxKind.CallExpression)
+	if (!call || !call.getArguments().includes(fn)) return null
+	const declarations = call
+		.getExpression()
+		.getSymbol()
+		?.getDeclarations() ?? []
+	if (!declarations.some((decl) => /node_modules[\\/]typescript[\\/]lib[\\/]lib\..*\.d\.ts$/.test(decl.getSourceFile().getFilePath()))) {
+		return null
+	}
+	return "native callback signature"
+}
+
+function hasMaxParamsIgnore(fn) {
+	return fn.getFullText().includes("biome-ignore lint/nursery/useMaxParams")
+}
+
+function analyzeParameterType(param) {
+	const typeNode = param.getTypeNode()
+	if (typeNode) return analyzeDeclarationDependencies(typeNode)
+	const inferredType = param.getType().getText(param)
+	if (BUILTIN_NAMES.has(inferredType)) {
+		return { unsafe: null, refs: [], valueRefs: [] }
+	}
+	return {
+		unsafe: `no explicit type annotation and inferred '${inferredType}' is not a builtin type`,
+		refs: [],
+		valueRefs: [],
+	}
+}
+
 // A function's own `{ fnName }` shorthand inside its namespace object
 // literal (Step 2's output — this is the overwhelming majority of
 // functions post Steps 0-2) isn't itself an unsafe "referenced as a
@@ -1953,29 +2010,52 @@ function namespaceMemberCallSites(shorthandRef) {
 const flagged = []
 const paramsCandidates = []
 
+const nativeCallbackCandidates = []
+
 for (const sourceFile of project.getSourceFiles()) {
 	if (!inScope(sourceFile.getFilePath())) continue
 	const filePath = sourceFile.getFilePath()
 	const max = effectiveMax()
+	const rel = path.relative(SRC_ROOT, filePath).replace(/\\/g, "/")
+
+	for (const fn of [
+		...sourceFile.getDescendantsOfKind(SyntaxKind.ArrowFunction),
+		...sourceFile.getDescendantsOfKind(SyntaxKind.FunctionExpression),
+	]) {
+		if (fn.getParameters().length <= max) continue
+		const nativeReason = nativeCallbackReason(fn)
+		if (nativeReason && !hasMaxParamsIgnore(fn)) {
+			nativeCallbackCandidates.push({ fn, file: rel, reason: nativeReason })
+		}
+	}
 
 	const fns = [
-		...sourceFile.getFunctions(),
-		...sourceFile.getVariableDeclarations().filter((d) => {
+		...sourceFile.getFunctions().map((fn) => ({ fnDecl: fn, fn, typeName: null })),
+		...sourceFile.getVariableDeclarations().flatMap((d) => {
 			const init = d.getInitializer()
 			return init && (Node.isArrowFunction(init) || Node.isFunctionExpression(init))
+				? [{ fnDecl: d, fn: init, typeName: null }]
+				: []
+		}),
+		...sourceFile.getDescendantsOfKind(SyntaxKind.PropertyAssignment).flatMap((prop) => {
+			const init = prop.getInitializer()
+			if (!Node.isArrowFunction(init) && !Node.isFunctionExpression(init)) return []
+			const typeName = propertyCallbackTypeName(prop)
+			return typeName ? [{ fnDecl: prop, fn: init, typeName }] : []
 		}),
 	]
 
-	for (const fnDecl of fns) {
-		const isVarDecl = Node.isVariableDeclaration(fnDecl)
-		const fn = isVarDecl ? fnDecl.getInitializer() : fnDecl
+	for (const { fnDecl, fn, typeName: propertyTypeName } of fns) {
 		const name = fnDecl.getName()
 		if (!name) continue
 
 		const params = fn.getParameters()
 		if (params.length <= max) continue
 
-		const rel = path.relative(SRC_ROOT, filePath).replace(/\\/g, "/")
+		const nativeReason = nativeCallbackReason(fn)
+		if (nativeReason) {
+			continue
+		}
 
 		if (!fn.getBody()) {
 			flagged.push({ name, file: rel, reason: "overload signature (no body)" })
@@ -2037,6 +2117,17 @@ for (const sourceFile of project.getSourceFiles()) {
 				callSites.push(parent)
 				continue
 			}
+			if (
+				Node.isPropertyAssignment(fnDecl) &&
+				Node.isPropertyAccessExpression(parent) &&
+				parent.getNameNode() === r
+			) {
+				const call = parent.getParent()
+				if (Node.isCallExpression(call) && call.getExpression() === parent) {
+					callSites.push(call)
+					continue
+				}
+			}
 			if (Node.isShorthandPropertyAssignment(parent)) {
 				const nsCallSites = namespaceMemberCallSites(r)
 				if (nsCallSites) {
@@ -2062,11 +2153,7 @@ for (const sourceFile of project.getSourceFiles()) {
 		// Don't relocate a param's type into types.ts unless it's guaranteed
 		// to still resolve there — same safety check Steps 4/5 use, reused
 		// here on each param's bare type node instead of a whole declaration.
-		const analyses = params.map((p) => {
-			const t = p.getTypeNode()
-			if (!t) return { unsafe: "no explicit type annotation (would need to infer one)", refs: [], valueRefs: [] }
-			return analyzeDeclarationDependencies(t)
-		})
+		const analyses = params.map(analyzeParameterType)
 		const typeIssue = analyses.map((a) => a.unsafe).find(Boolean)
 		if (typeIssue) {
 			flagged.push({ name, file: rel, reason: typeIssue })
@@ -2075,7 +2162,7 @@ for (const sourceFile of project.getSourceFiles()) {
 		const externalTypeRefs = analyses.flatMap((a) => a.refs)
 		const externalValueRefs = analyses.flatMap((a) => a.valueRefs ?? [])
 
-		paramsCandidates.push({ fn, fnDecl, nameNode, name, file: rel, sourceFile, typesFilePath, typesFileIsNew, externalTypeRefs, externalValueRefs, callSites })
+		paramsCandidates.push({ fn, fnDecl, nameNode, name, typeName: propertyTypeName ?? `${pascalCase(name)}Params`, file: rel, sourceFile, typesFilePath, typesFileIsNew, externalTypeRefs, externalValueRefs, callSites })
 	}
 }
 
@@ -2085,7 +2172,7 @@ for (const sourceFile of project.getSourceFiles()) {
 // corrupted several functions' signatures the first time this ran unchecked.
 const byTargetAndName = new Map()
 for (const c of paramsCandidates) {
-	const typeName = `${pascalCase(c.name)}Params`
+	const typeName = c.typeName
 	const key = `${c.typesFilePath}::${typeName}`
 	if (!byTargetAndName.has(key)) byTargetAndName.set(key, [])
 	byTargetAndName.get(key).push(c)
@@ -2093,7 +2180,7 @@ for (const c of paramsCandidates) {
 const collidingKeys = new Set([...byTargetAndName.entries()].filter(([, list]) => list.length > 1).map(([key]) => key))
 const safeParamsCandidates = []
 for (const c of paramsCandidates) {
-	const typeName = `${pascalCase(c.name)}Params`
+	const typeName = c.typeName
 	const key = `${c.typesFilePath}::${typeName}`
 	if (collidingKeys.has(key)) {
 		flagged.push({
@@ -2107,9 +2194,8 @@ for (const c of paramsCandidates) {
 }
 
 let paramsFixed = 0
-for (const { fn, nameNode, name, file, sourceFile, typesFilePath, typesFileIsNew, externalTypeRefs, externalValueRefs, callSites } of safeParamsCandidates) {
+for (const { fn, nameNode, name, typeName, file, sourceFile, typesFilePath, typesFileIsNew, externalTypeRefs, externalValueRefs, callSites } of safeParamsCandidates) {
 	const params = fn.getParameters()
-	const typeName = `${pascalCase(name)}Params`
 
 	console.log(
 		`${CHECK_ONLY ? "[dry-run] " : ""}${file}: ${name}(${params.map((p) => p.getName()).join(", ")}) -> ${name}({ ${params.map((p) => p.getName()).join(", ")} }: ${typeName})` +
@@ -2128,11 +2214,17 @@ for (const { fn, nameNode, name, file, sourceFile, typesFilePath, typesFileIsNew
 	typesSourceFile.addInterface({
 		name: typeName,
 		isExported: true,
-		properties: params.map((p) => ({
-			name: p.getName(),
-			type: p.getTypeNode()?.getText() ?? p.getType().getText(p),
-			hasQuestionToken: p.hasQuestionToken() || p.hasInitializer(),
-		})),
+		properties: params.map((p) => {
+			const isOptional = p.hasQuestionToken() || p.hasInitializer()
+			return {
+				name: p.getName(),
+				type: p.getTypeNode()?.getText() ?? p.getType().getText(p),
+				hasQuestionToken: isOptional,
+				...(isOptional
+					? { docs: ["[JUSTIFICATION] This parameter has a default value in the generated function signature."] }
+					: {}),
+			}
+		}),
 	})
 
 	const importSpecifier = relativeSpecifier(sourceFile.getFilePath(), typesSourceFile.getFilePath())
@@ -2190,6 +2282,13 @@ for (const { fn, nameNode, name, file, sourceFile, typesFilePath, typesFileIsNew
 	fn.insertParameter(0, { name: destructureName, type: typeName })
 }
 
+for (const { fn, file, reason } of nativeCallbackCandidates) {
+	console.log(`${CHECK_ONLY ? "[dry-run] " : ""}${file}: added useMaxParams ignore for ${reason}`)
+	if (CHECK_ONLY) continue
+	touchedFiles.add(fn.getSourceFile().getFilePath())
+	fn.replaceWithText(`\n// biome-ignore lint/nursery/useMaxParams: ${reason}\n${fn.getText()}`)
+}
+
 // A param's type moving into the new ${Name}Params interface can strand
 // the source file's own import of it — same failure mode as Steps 4/5's
 // equivalent sweep (e.g. a type imported only to annotate that one now-
@@ -2211,7 +2310,7 @@ if (!CHECK_ONLY) {
 	}
 }
 
-console.log(`\n${CHECK_ONLY ? "Would fix" : "Fixed"} ${paramsFixed} function(s). ${flagged.length} flagged for manual review:`)
+console.log(`\n${CHECK_ONLY ? "Would fix" : "Fixed"} ${paramsFixed} function(s) and ${nativeCallbackCandidates.length} native callback suppression(s). ${flagged.length} flagged for manual review:`)
 for (const { name, file, reason } of flagged) {
 	console.log(`  ${file}: ${name} — ${reason}`)
 }

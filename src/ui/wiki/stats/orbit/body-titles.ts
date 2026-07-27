@@ -1,5 +1,5 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
-import { SYSTEM } from "@/model/celestial/system"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { SIBLING_GROUP_LABEL } from "@/ui/wiki/stats/orbit/constants"
 import { formatClassificationLabel } from "@/ui/wiki/stats/orbit/formatters"
@@ -13,7 +13,7 @@ export function getMoonSeedBaseName(params: {
 	const { moon, moonIndex, showRealSolNames, lunaFallback } = params
 	if (moon?.name) return moon.name
 	if (showRealSolNames && lunaFallback && moonIndex === 0)
-		return SYSTEM.SOL_LUNA_DEFAULT.name
+		return SOL_SYSTEM.solLunaDefault.name
 	return `moon-${moonIndex + 1}`
 }
 
