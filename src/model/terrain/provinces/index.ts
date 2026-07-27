@@ -1,6 +1,8 @@
-import type { GenesisProvinces, GenesisRainfall, SphereMesh } from "@/model"
+import type { GenesisRainfall } from "@/model/climate/types"
+import type { SphereMesh } from "@/model/mesh/types"
 import { RNG } from "@/model/shared/rng"
 import { UNITS } from "@/model/shared/units"
+import type { GenesisProvinces } from "@/model/society/types"
 import type {
 	CompetitiveBfsAssignParams,
 	ComputeProvincesFromRasterParams,

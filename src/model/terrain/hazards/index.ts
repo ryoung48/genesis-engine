@@ -1,4 +1,4 @@
-import type { GenesisHazards } from "@/model"
+import type { GenesisHazards } from "@/model/climate/types"
 import { MATH } from "@/model/shared/math"
 import type {
 	ComputeHazardsParams,

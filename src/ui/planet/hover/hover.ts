@@ -8,7 +8,7 @@ import { TIMEZONE } from "@/model/society/timezone"
 import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { CLASSIFICATION } from "@/model/terrain/classification"
 import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import {
 	EU5_CLIMATE_CATEGORIES,
 	EU5_TOPOGRAPHY_CATEGORIES,

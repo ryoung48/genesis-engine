@@ -1,4 +1,4 @@
-import type { GenesisProvinces } from "@/model/types/society"
+import type { GenesisProvinces } from "@/model/society/types"
 
 export interface ComputeProvinceWaterAccessParams {
 	provinces: Pick<GenesisProvinces, "count" | "regionProvince">

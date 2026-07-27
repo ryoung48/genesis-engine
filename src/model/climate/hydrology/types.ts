@@ -1,5 +1,5 @@
-import type { GenesisClimate, GenesisRainfall } from "@/model/types/climate"
-import type { GenesisParams } from "@/model/types/tectonics"
+import type { GenesisClimate, GenesisRainfall } from "@/model/climate/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 
 export type FillPetMonthlyHargreavesParams = {
 	temperatureMonthly: Float32Array

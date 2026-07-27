@@ -1,7 +1,7 @@
 ﻿import * as THREE from "three"
 import type { HeritageScript } from "@/model/society/script"
 import { COMPRESS } from "@/model/society/script/compress"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
 	computeLabelScale,

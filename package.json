@@ -17,12 +17,10 @@
 		"build:earth-real-population-eu4": "python scripts/regenerate-earth-population.py",
 		"build:earth-real-urban-population-eu4": "python scripts/regenerate-earth-population.py",
 		"knip": "knip",
-		"check:underscore-unused": "node scripts/check-underscore-unused.mjs",
-		"check:passthrough-exports": "node scripts/check-passthrough-exports.mjs",
-		"check:types-outside-types-file": "node scripts/check-types-outside-types-file.mjs",
-		"enforcer": "node scripts/enforcer.mjs",
-		"check:flat-file-sibling-folder": "node scripts/check-flat-file-sibling-folder.mjs",
-		"check:loose-files-in-domain": "node scripts/check-loose-files-in-domain.mjs"
+		"check:underscore-unused": "node scripts/quality/check-underscore-unused.mjs",
+		"fix:import-aliases": "node scripts/quality/fix-import-aliases.mjs",
+		"check:optional-attributes": "node scripts/quality/check-optional-attributes.mjs",
+		"enforcer": "node scripts/quality/enforcer.mjs"
 	},
 	"dependencies": {
 		"@datastructures-js/priority-queue": "^6.3.5",

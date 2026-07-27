@@ -1,9 +1,9 @@
+import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	GenesisParams,
 	GenesisTerrainFeatures,
-} from "@/model/types/tectonics"
+} from "@/model/tectonics/types"
 
 export interface TectonicPathResult {
 	elevation: Float32Array

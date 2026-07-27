@@ -1,5 +1,5 @@
 import type { Eu4ProvinceMap } from "@/model/earth/history/import/eu4-province-map/types"
-import type { GenesisProvinces } from "@/model/types"
+import type { GenesisProvinces } from "@/model/society/types"
 
 function buildEu4ProvinceMap(
 	provinces: GenesisProvinces,

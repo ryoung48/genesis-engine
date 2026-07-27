@@ -1,28 +1,27 @@
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
-import type { PastaDebug } from "@/model/climate/types"
-import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
-import type { ProvincePopulation } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type {
 	GenesisClimate,
 	GenesisHazards,
 	GenesisHydrology,
 	GenesisOceanCurrents,
 	GenesisRainfall,
-} from "@/model/types/climate"
-import type { SphereMesh } from "@/model/types/mesh"
+	PastaDebug,
+} from "@/model/climate/types"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
 import type {
 	GenesisLocations,
 	GenesisProvinces,
-	GenesisRivers,
-} from "@/model/types/society"
+	ProvincePopulation,
+} from "@/model/society/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
-	GenesisParams,
 	GenesisTerrainFeatures,
-	StageTiming,
-} from "@/model/types/tectonics"
+} from "@/model/tectonics/types"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
+import type { GenesisRivers } from "@/model/terrain/rivers/types"
 import type { GenesisWorld } from "@/model/world"
 
 export interface RealRiversInput {

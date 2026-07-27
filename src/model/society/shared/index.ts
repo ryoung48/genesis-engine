@@ -1,4 +1,3 @@
-import type { GenesisPartition } from "@/model"
 import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
 import { RNG } from "@/model/shared/rng"
 import type {
@@ -6,7 +5,10 @@ import type {
 	HslToRgbParams,
 	RgbToHslParams,
 } from "@/model/society/shared/types"
-import type { GraphPartitionParams } from "@/model/society/types"
+import type {
+	GenesisPartition,
+	GraphPartitionParams,
+} from "@/model/society/types"
 
 function computeGraphPartition({
 	nodeCount,

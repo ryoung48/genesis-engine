@@ -1,9 +1,9 @@
-import type { SphereMesh } from "@/model/types/mesh"
+import type { SphereMesh } from "@/model/mesh/types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
 	PlateVec,
-} from "@/model/types/tectonics"
+} from "@/model/tectonics/types"
 
 export type StageTiming = { Stage: string; ms: string }
 

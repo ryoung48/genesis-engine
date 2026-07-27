@@ -1,10 +1,10 @@
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
-} from "@/model/types/climate"
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisParams } from "@/model/types/tectonics"
+} from "@/model/climate/types"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams } from "@/model/pipelines/types"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
 export type LockedCurrentParams = Pick<
 	Partial<GenesisParams>,

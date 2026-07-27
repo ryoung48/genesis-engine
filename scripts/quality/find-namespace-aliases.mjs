@@ -9,7 +9,7 @@ import { readFileSync, globSync } from "node:fs"
 import path from "node:path"
 import ts from "typescript"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 
 const files = globSync("**/*.{ts,tsx}", { cwd: SRC_ROOT }).map((f) =>
 	path.join(SRC_ROOT, f),

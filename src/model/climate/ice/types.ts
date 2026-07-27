@@ -1,5 +1,5 @@
-import type { GenesisClimate, GenesisRainfall } from "@/model/types/climate"
-import type { SphereMesh } from "@/model/types/mesh"
+import type { GenesisClimate, GenesisRainfall } from "@/model/climate/types"
+import type { SphereMesh } from "@/model/mesh/types"
 
 export interface IceResult {
 	/** Final steady-state ice thickness per cell (mm w.e.) */

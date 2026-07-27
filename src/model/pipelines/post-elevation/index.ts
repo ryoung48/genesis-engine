@@ -1,11 +1,4 @@
-import type {
-	GenesisLocations,
-	GenesisProvinces,
-	GenesisRainfall,
-	GenesisRivers,
-	GenesisWorld,
-	StageTiming,
-} from "@/model"
+import type { GenesisWorld } from "@/model"
 import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
@@ -24,18 +17,23 @@ import { TIDAL_MAP } from "@/model/climate/tidal-map"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import { TIDES } from "@/model/climate/tides"
 import { TORNADOES } from "@/model/climate/tornadoes"
-import type { PastaDebug } from "@/model/climate/types"
+import type { GenesisRainfall, PastaDebug } from "@/model/climate/types"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
 import type {
 	PostPipelineInput,
 	PostPipelineOutput,
 } from "@/model/pipelines/post-elevation/types"
+import type { StageTiming } from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { ERAS } from "@/model/society/eras"
 import { POPULATION } from "@/model/society/population"
-import type { ProvincePopulation } from "@/model/society/types"
+import type {
+	GenesisLocations,
+	GenesisProvinces,
+	ProvincePopulation,
+} from "@/model/society/types"
 import { CLASSIFICATION } from "@/model/terrain/classification"
 import { HAZARDS } from "@/model/terrain/hazards"
 import { LAKES } from "@/model/terrain/lakes"
@@ -44,6 +42,7 @@ import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import { LOCATIONS } from "@/model/terrain/locations"
 import { PROVINCES } from "@/model/terrain/provinces"
 import { RIVERS } from "@/model/terrain/rivers"
+import type { GenesisRivers } from "@/model/terrain/rivers/types"
 
 const LAKE_RETENTION_THRESHOLD = 100
 

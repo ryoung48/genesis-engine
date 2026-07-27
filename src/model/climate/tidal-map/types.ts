@@ -1,7 +1,7 @@
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisParams } from "@/model/types/tectonics"
 
 export interface ComputeSpringTideMapInput {
 	mesh: SphereMesh

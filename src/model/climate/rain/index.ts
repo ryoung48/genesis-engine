@@ -1,5 +1,4 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import type { SphereMesh } from "@/model"
 import { ELEVATION } from "@/model/climate/elevation"
 import { RAIN as LOCKED_RAIN } from "@/model/climate/locked/rain"
 import type {
@@ -11,6 +10,7 @@ import type {
 	ComputeThermalEquatorParams,
 } from "@/model/climate/rain/types"
 import { RAIN_SHARED } from "@/model/climate/rain-shared"
+import type { SphereMesh } from "@/model/mesh/types"
 import { MATH } from "@/model/shared/math"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { UNITS } from "@/model/shared/units"

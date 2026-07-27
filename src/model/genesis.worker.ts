@@ -8,13 +8,13 @@ import type { HistoryState } from "@/model/history/state/types"
 import { PATHFIND } from "@/model/pathfinding"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import { TRANSPORT } from "@/model/transport"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
-} from "@/model/transport/worker-types"
-import { packNetwork, packRoutes } from "@/model/transport/worker-types"
+} from "@/model/transport/types"
 import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
@@ -217,8 +217,8 @@ function serializeWorld(
 		settlementRegions: world.settlementRegions,
 		settlementWaterLandmarks: world.settlementWaterLandmarks,
 		settlementPortRegions: world.settlementPortRegions,
-		routes: world.routes ? packRoutes(world.routes) : undefined,
-		network: world.network ? packNetwork(world.network) : undefined,
+		routes: world.routes ? TRANSPORT.packRoutes(world.routes) : undefined,
+		network: world.network ? TRANSPORT.packNetwork(world.network) : undefined,
 	}
 }
 

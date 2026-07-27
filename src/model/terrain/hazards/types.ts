@@ -1,5 +1,5 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { BoundaryInfo, DistanceFields } from "@/model/types/tectonics"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { BoundaryInfo, DistanceFields } from "@/model/tectonics/types"
 
 export interface PropagateInfluenceParams {
 	mesh: SphereMesh

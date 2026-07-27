@@ -1,4 +1,4 @@
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import type { ColorMode } from "../colors"
 import type { HoverInfo } from "./hover"
 

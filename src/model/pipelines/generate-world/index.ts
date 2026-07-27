@@ -1,15 +1,7 @@
-import type {
-	BoundaryInfo,
-	DistanceFields,
-	GenesisParams,
-	GenesisTerrainFeatures,
-	GenesisWorld,
-	SphereMesh,
-	StageTiming,
-	TectonicPlate,
-} from "@/model"
+import type { GenesisWorld } from "@/model"
 import { ROUTES } from "@/model/economy/routes"
-import { buildSphereMesh } from "@/model/mesh"
+import { MESH } from "@/model/mesh"
+import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
 import type {
 	ApplyPeakCompressionParams,
@@ -19,6 +11,7 @@ import type {
 	TectonicPathResult,
 } from "@/model/pipelines/generate-world/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"
@@ -28,6 +21,12 @@ import { COLLISION } from "@/model/tectonics/collision"
 import { MANTLE } from "@/model/tectonics/mantle"
 import { PLATES } from "@/model/tectonics/plates"
 import { SUPER_PLATES } from "@/model/tectonics/super-plates"
+import type {
+	BoundaryInfo,
+	DistanceFields,
+	GenesisTerrainFeatures,
+	TectonicPlate,
+} from "@/model/tectonics/types"
 import { CRATERS } from "@/model/terrain/craters"
 import { ELEVATION } from "@/model/terrain/elevation"
 import { EROSION } from "@/model/terrain/erosion"
@@ -231,7 +230,7 @@ function generateGenesisWorld({
 
 	// 1. Build hi-res sphere mesh
 	const mesh = withTiming("mesh", pipelineTiming, () =>
-		buildSphereMesh(params.numPoints, params.jitter, rng),
+		MESH.buildSphereMesh(params.numPoints, params.jitter, rng),
 	)
 	onProgress?.("mesh", 3)
 

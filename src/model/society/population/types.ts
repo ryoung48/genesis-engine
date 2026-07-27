@@ -1,5 +1,5 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisProvinces } from "@/model/types/society"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisProvinces } from "@/model/society/types"
 
 export interface BfsUpdateMinHopsParams {
 	start: number

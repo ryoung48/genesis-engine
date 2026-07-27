@@ -1,4 +1,3 @@
-import type { GenesisClimate, GenesisParams } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
@@ -12,6 +11,8 @@ import type {
 	TidalTransportParams,
 } from "@/model/climate/locked/heat/types"
 import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
+import type { GenesisClimate } from "@/model/climate/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
 

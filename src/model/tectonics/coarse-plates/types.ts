@@ -1,5 +1,5 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { PlateVec } from "@/model/types/tectonics"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { PlateVec } from "@/model/tectonics/types"
 
 export interface CoarsePlateOptions {
 	coarsePoints?: number

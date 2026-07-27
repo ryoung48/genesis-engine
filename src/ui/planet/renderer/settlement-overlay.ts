@@ -1,6 +1,6 @@
 ﻿import * as THREE from "three"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import type {
 	BuildGlobeRealSettlementsParams,

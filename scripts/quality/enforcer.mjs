@@ -64,19 +64,19 @@
 // collide with another function's.
 //
 // Usage:
-//   node scripts/enforcer.mjs [--dir=src/model/society]  # apply
-//   node scripts/enforcer.mjs --check [--dir=...]         # dry run
+//   node scripts/quality/enforcer.mjs [--dir=src/model/society]  # apply
+//   node scripts/quality/enforcer.mjs --check [--dir=...]         # dry run
 import path from "node:path"
 import { existsSync } from "node:fs"
 import { Node, Project, SyntaxKind } from "ts-morph"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 const CHECK_ONLY = process.argv.includes("--check")
 const dirArg = process.argv.find((a) => a.startsWith("--dir="))
 // ts-morph always returns forward-slash paths (even on Windows), so
 // normalize this the same way before comparing against them.
 const SCOPE_DIR = dirArg
-	? path.resolve(import.meta.dirname, "..", dirArg.slice(6)).replace(/\\/g, "/")
+	? path.resolve(import.meta.dirname, "..", "..", dirArg.slice(6)).replace(/\\/g, "/")
 	: null
 const stepArg = process.argv.find((a) => a.startsWith("--step="))
 // Which single step to run, or null to run the whole pipeline (0-6).
@@ -87,7 +87,7 @@ function runsStep(n) {
 
 function loadProject() {
 	const p = new Project({
-		tsConfigFilePath: path.resolve(import.meta.dirname, "..", "tsconfig.app.json"),
+		tsConfigFilePath: path.resolve(import.meta.dirname, "..", "..", "tsconfig.app.json"),
 	})
 	p.addSourceFilesAtPaths(path.join(SRC_ROOT, "**/*.{ts,tsx}"))
 	return p

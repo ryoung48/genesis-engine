@@ -1,5 +1,6 @@
-import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
+import type { SphereMesh } from "@/model/mesh/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
 import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/settlements"
 import { CULTURE } from "@/model/society/culture"
 import { ERAS } from "@/model/society/eras"

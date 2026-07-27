@@ -1,6 +1,6 @@
 import type { HistoryRng } from "@/model/history/history-rng/types"
 import type { HistoryState } from "@/model/history/state/types"
-import type { GenesisNationHierarchy } from "@/model/types/society"
+import type { GenesisNationHierarchy } from "@/model/society/types"
 
 export interface SeedColonyRelationsParams {
 	state: HistoryState

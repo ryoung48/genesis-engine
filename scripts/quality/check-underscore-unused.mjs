@@ -15,7 +15,7 @@ import ts from "typescript"
 
 const projectRoot = process.cwd()
 
-// Optional folder/path filter, e.g. `node scripts/check-underscore-unused.mjs src/model/celestial`
+// Optional folder/path filter, e.g. `node scripts/quality/check-underscore-unused.mjs src/model/celestial`
 // Only filters what gets reported — the full program is still built so
 // cross-file resolution stays accurate.
 const filterArg = process.argv[2]

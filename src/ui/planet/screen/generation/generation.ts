@@ -1,12 +1,12 @@
-﻿import type { GenesisParams } from "@/model"
-import type { TideLock } from "@/model/celestial/orbit-body/types"
+﻿import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type { HistoryNote } from "@/model/history/state/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
-} from "@/model/transport"
+} from "@/model/transport/types"
 
 export type GenerationParams = GenesisParams
 

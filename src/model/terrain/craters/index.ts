@@ -1,4 +1,4 @@
-import type { SphereMesh } from "@/model"
+import type { SphereMesh } from "@/model/mesh/types"
 import { RNG } from "@/model/shared/rng"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import type { Crater } from "@/model/terrain/craters/types"

@@ -1,4 +1,3 @@
-import type { GenesisNationHierarchy } from "@/model"
 import type {
 	BuildChildrenCSRParams,
 	BuildSovereignParams,
@@ -6,6 +5,7 @@ import type {
 	HierarchyProvinceScoreParams,
 	PartitionMembersParams,
 } from "@/model/society/hierarchy/types"
+import type { GenesisNationHierarchy } from "@/model/society/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
 const DUCHY_FANOUT: FanoutRanges = []

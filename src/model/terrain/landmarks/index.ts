@@ -1,5 +1,6 @@
-import type { GenesisPartition, GenesisProvinces, SphereMesh } from "@/model"
+import type { SphereMesh } from "@/model/mesh/types"
 import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
+import type { GenesisPartition, GenesisProvinces } from "@/model/society/types"
 import type {
 	ComputeLandmarksParams,
 	GenesisLandmarks,

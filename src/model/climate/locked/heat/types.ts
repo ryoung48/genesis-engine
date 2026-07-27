@@ -1,5 +1,5 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisParams } from "@/model/types/tectonics"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 
 export interface TidalTransportParams {
 	T_mean_C: number

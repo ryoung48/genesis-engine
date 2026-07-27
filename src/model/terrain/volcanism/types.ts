@@ -1,5 +1,5 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { BoundaryInfo } from "@/model/types/tectonics"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { BoundaryInfo } from "@/model/tectonics/types"
 
 export interface TangentFrame {
 	ux: number

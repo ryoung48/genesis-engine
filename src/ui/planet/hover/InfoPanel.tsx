@@ -2,14 +2,11 @@ import React from "react"
 import { TEXT } from "@/model/shared/text"
 import { TIMEZONE } from "@/model/society/timezone"
 import { LANDMARKS } from "@/model/terrain/landmarks"
-import {
-	forEachRoute,
-	ROUTE_LAND_MAJOR,
-	ROUTE_LAND_MINOR,
-	ROUTE_SEA,
-	type SerializedGenesisWorld,
-	type SerializedRoutes,
-} from "@/model/transport/worker-types"
+import { TRANSPORT } from "@/model/transport"
+import type {
+	SerializedGenesisWorld,
+	SerializedRoutes,
+} from "@/model/transport/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
@@ -138,13 +135,13 @@ function buildHoverRouteLabel(
 	let hasImperialRoute = false
 	let hasMinorRoute = false
 	let hasSeaRoute = false
-	forEachRoute(routes, (route) => {
+	TRANSPORT.forEachRoute(routes, (route) => {
 		if (!route.pathRegions.includes(hoverRegion)) return
-		if (route.kind === ROUTE_SEA) {
+		if (route.kind === TRANSPORT.ROUTE_SEA) {
 			hasSeaRoute = true
-		} else if (route.kind === ROUTE_LAND_MAJOR) {
+		} else if (route.kind === TRANSPORT.ROUTE_LAND_MAJOR) {
 			hasImperialRoute = true
-		} else if (route.kind === ROUTE_LAND_MINOR) {
+		} else if (route.kind === TRANSPORT.ROUTE_LAND_MINOR) {
 			hasMinorRoute = true
 		}
 	})

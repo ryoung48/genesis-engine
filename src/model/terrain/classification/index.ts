@@ -1,8 +1,9 @@
-import type { GenesisRivers, SphereMesh } from "@/model"
 import { VEGETATION } from "@/model/climate/vegetation"
+import type { SphereMesh } from "@/model/mesh/types"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { LANDMARKS } from "@/model/terrain/landmarks"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
+import type { GenesisRivers } from "@/model/terrain/rivers/types"
 
 const topoFlat = 0
 

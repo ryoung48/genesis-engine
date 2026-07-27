@@ -1,4 +1,4 @@
-﻿import type { SerializedGenesisWorld } from "@/model/transport"
+﻿import type { SerializedGenesisWorld } from "@/model/transport/types"
 
 function getReligionIndexForCulture(
 	world: Pick<SerializedGenesisWorld, "religions">,

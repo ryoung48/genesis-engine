@@ -1,4 +1,3 @@
-import type { PlateVec } from "@/model"
 import { RNG } from "@/model/shared/rng"
 import type {
 	AssignOceanLandParams,
@@ -6,6 +5,7 @@ import type {
 	GeneratePlatesResult,
 	SmoothAndReconnectPlatesParams,
 } from "@/model/tectonics/plates/types"
+import type { PlateVec } from "@/model/tectonics/types"
 
 function generatePlates({
 	mesh,

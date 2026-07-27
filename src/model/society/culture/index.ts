@@ -1,7 +1,7 @@
-import type { GenesisPartition } from "@/model"
 import type { ComputeCulturesParams } from "@/model/society/culture/types"
 import { GENDER_SYSTEM } from "@/model/society/gender-system"
 import { SHARED } from "@/model/society/shared"
+import type { GenesisPartition } from "@/model/society/types"
 
 function computeCultures({
 	provinces,

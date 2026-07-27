@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react"
-import type { StageTiming } from "@/model"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { SYSTEM } from "@/model/celestial/system"
@@ -8,6 +7,7 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
+import type { StageTiming } from "@/model/pipelines/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"

@@ -1,4 +1,3 @@
-import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
 import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { UNITS } from "@/model/shared/units"
@@ -19,6 +18,8 @@ import type {
 	AssignGovernmentTypeParams,
 	BestClaimParams,
 	ClaimProvinceDynamicParams,
+	GenesisNationHierarchy,
+	GenesisProvinces,
 	GovernmentFamily,
 	GovernmentMix,
 	GovernmentType,

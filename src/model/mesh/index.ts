@@ -5,7 +5,7 @@
  */
 import Delaunator from "delaunator"
 import type { GenesisRng } from "@/model/shared/rng/types"
-import type { SphereMesh } from "@/model/types/mesh"
+import type { SphereMesh } from "./types"
 
 /**
  * Fibonacci sphere with jitter — evenly-distributed points on a unit sphere.
@@ -177,7 +177,7 @@ function addPoleToMesh(
  * Build a sphere mesh from N Fibonacci-spiral points using
  * Delaunator + stereographic projection + pole closure.
  */
-export function buildSphereMesh(
+function buildSphereMesh(
 	n: number,
 	jitter: number,
 	rng: GenesisRng,
@@ -327,10 +327,7 @@ export function buildSphereMesh(
  * `{ numRegions, r_xyz }` structurally so it works with both the build-time
  * SphereMesh and the transport SerializedSphereMesh shape.
  */
-export function buildRegionSpatialIndex(mesh: {
-	numRegions: number
-	r_xyz: Float32Array
-}) {
+function buildRegionSpatialIndex(mesh: { numRegions: number; r_xyz: Float32Array }) {
 	const N = mesh.numRegions
 	const binsLon = 360
 	const binsLat = 180
@@ -395,4 +392,9 @@ export function buildRegionSpatialIndex(mesh: {
 			return best
 		},
 	}
+}
+
+export const MESH = {
+	buildSphereMesh,
+	buildRegionSpatialIndex,
 }

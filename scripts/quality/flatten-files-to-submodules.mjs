@@ -10,22 +10,22 @@
 // imports need adjusting, since it's now one directory level deeper.
 //
 // Usage:
-//   node scripts/flatten-files-to-submodules.mjs --dir=src/model/society          # apply
-//   node scripts/flatten-files-to-submodules.mjs --check --dir=src/model/society   # dry run
+//   node scripts/quality/flatten-files-to-submodules.mjs --dir=src/model/society          # apply
+//   node scripts/quality/flatten-files-to-submodules.mjs --check --dir=src/model/society   # dry run
 import path from "node:path"
 import { Project } from "ts-morph"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 const CHECK_ONLY = process.argv.includes("--check")
 const dirArg = process.argv.find((a) => a.startsWith("--dir="))
 if (!dirArg) {
-	console.error("Usage: node scripts/flatten-files-to-submodules.mjs --dir=src/path/to/domain")
+	console.error("Usage: node scripts/quality/flatten-files-to-submodules.mjs --dir=src/path/to/domain")
 	process.exit(1)
 }
-const SCOPE_DIR = path.resolve(import.meta.dirname, "..", dirArg.slice(6)).replace(/\\/g, "/")
+const SCOPE_DIR = path.resolve(import.meta.dirname, "..", "..", dirArg.slice(6)).replace(/\\/g, "/")
 
 const project = new Project({
-	tsConfigFilePath: path.resolve(import.meta.dirname, "..", "tsconfig.app.json"),
+	tsConfigFilePath: path.resolve(import.meta.dirname, "..", "..", "tsconfig.app.json"),
 })
 project.addSourceFilesAtPaths(path.join(SRC_ROOT, "**/*.{ts,tsx}"))
 

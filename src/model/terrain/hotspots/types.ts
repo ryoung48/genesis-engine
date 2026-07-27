@@ -1,8 +1,8 @@
-import type { SphereMesh } from "@/model/types/mesh"
+import type { SphereMesh } from "@/model/mesh/types"
 import type {
 	GenesisTerrainFeatures,
 	TectonicPlate,
-} from "@/model/types/tectonics"
+} from "@/model/tectonics/types"
 
 export interface Dome {
 	x: number

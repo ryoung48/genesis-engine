@@ -1,5 +1,5 @@
 ﻿import * as THREE from "three"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import { getColor } from "../colors"
 import { createMapProjection } from "./map-projection"
 import {

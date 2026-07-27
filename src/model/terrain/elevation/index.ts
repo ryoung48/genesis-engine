@@ -1,7 +1,10 @@
-import type { DistanceFields, GenesisTerrainFeatures } from "@/model"
 import { RNG } from "@/model/shared/rng"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
+import type {
+	DistanceFields,
+	GenesisTerrainFeatures,
+} from "@/model/tectonics/types"
 import type {
 	AssignDistanceFieldParams,
 	BlendElevationParams,

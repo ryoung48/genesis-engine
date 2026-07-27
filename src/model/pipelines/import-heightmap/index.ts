@@ -1,14 +1,10 @@
-import type {
-	GenesisParams,
-	GenesisWorld,
-	SphereMesh,
-	StageTiming,
-} from "@/model"
+import type { GenesisWorld } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
-import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
+import { MESH } from "@/model/mesh"
+import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
 import type {
 	ImportGenesisWorldParams,
@@ -25,6 +21,7 @@ import type {
 	SampleSingleBandFloatRasterParams,
 } from "@/model/pipelines/import-heightmap/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"
@@ -338,7 +335,7 @@ function buildRealRiversData(
 	const visible = new Uint8Array(N)
 	const riverId = new Int32Array(N).fill(-1)
 	const riverLengthKm = new Float32Array(N)
-	const index = buildRegionSpatialIndex(mesh)
+	const index = MESH.buildRegionSpatialIndex(mesh)
 
 	let maxStroke = 0
 	for (const line of lines) maxStroke = Math.max(maxStroke, line.strokeweig)
@@ -510,7 +507,7 @@ function resolveRealProvinceSeeds(
 	isLand: Uint8Array,
 	provinces: RealProvinceInput[],
 ): { regions: Int32Array; weights: Float32Array; names: string[] } {
-	const index = buildRegionSpatialIndex(mesh)
+	const index = MESH.buildRegionSpatialIndex(mesh)
 	const { adjOffset, adjList } = mesh
 	const regionOwner = new Map<number, number>() // region -> index into accepted[]
 	const accepted: { region: number; weight: number; name: string }[] = []
@@ -621,7 +618,7 @@ function importGenesisWorld({
 					},
 				})
 			: undefined
-	const mesh = buildSphereMesh(
+	const mesh = MESH.buildSphereMesh(
 		params.numPoints,
 		params.jitter,
 		rng,

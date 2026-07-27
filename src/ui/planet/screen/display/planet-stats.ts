@@ -3,7 +3,7 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { RAIN } from "@/model/climate/rain"
 import { UNITS } from "@/model/shared/units"
 import { SEA_LEVEL } from "@/model/terrain/sea-level"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import {
 	formatArea,
 	formatDistance,

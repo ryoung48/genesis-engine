@@ -2,17 +2,13 @@
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import {
-	forEachEdge,
-	networkCount,
-	ROUTE_LAND_MAJOR,
-	ROUTE_LAND_MINOR,
-	ROUTE_SEA,
-	type RouteEdge,
+import { TRANSPORT } from "@/model/transport"
+import type {
+	RouteEdge,
 	SerializedGenesisWorld,
-	type SerializedNetwork,
-	type SerializedRouteKind,
-} from "@/model/transport"
+	SerializedNetwork,
+	SerializedRouteKind,
+} from "@/model/transport/types"
 import { createMapProjection } from "./map-projection"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
@@ -25,19 +21,19 @@ const SEA_ROUTE_DASH_STYLE = {
 	gapSize: 0.004,
 } as const
 const TRADE_ROUTE_STYLE = {
-	[ROUTE_LAND_MAJOR]: {
+	[TRANSPORT.ROUTE_LAND_MAJOR]: {
 		color: 0xb91c1c,
 		baseWidth: 0.5,
 		opacity: 0.9,
 		dashed: false,
 	},
-	[ROUTE_LAND_MINOR]: {
+	[TRANSPORT.ROUTE_LAND_MINOR]: {
 		color: 0xd97706,
 		baseWidth: 0.35,
 		opacity: 0.68,
 		dashed: false,
 	},
-	[ROUTE_SEA]: {
+	[TRANSPORT.ROUTE_SEA]: {
 		color: 0x2563eb,
 		baseWidth: 1.2,
 		opacity: 0.82,
@@ -74,7 +70,7 @@ function infrastructureEdgesCount(
 	edges: readonly RouteEdge[] | SerializedNetwork,
 ): number {
 	return isPackedInfrastructureNetwork(edges)
-		? networkCount(edges)
+		? TRANSPORT.networkCount(edges)
 		: edges.length
 }
 
@@ -176,7 +172,7 @@ function buildTradeRouteCorridors(
 		adjacency.set(edge.toRegion, toList)
 	}
 	if (isPackedInfrastructureNetwork(edges)) {
-		forEachEdge(edges, appendEdge)
+		TRANSPORT.forEachEdge(edges, appendEdge)
 	} else {
 		for (const edge of edges) appendEdge(edge)
 	}
@@ -262,9 +258,9 @@ function buildTradeRouteCorridors(
 
 function createEmptyBatchedPositions(): BatchedPositions {
 	return {
-		[ROUTE_LAND_MAJOR]: [],
-		[ROUTE_LAND_MINOR]: [],
-		[ROUTE_SEA]: [],
+		[TRANSPORT.ROUTE_LAND_MAJOR]: [],
+		[TRANSPORT.ROUTE_LAND_MINOR]: [],
+		[TRANSPORT.ROUTE_SEA]: [],
 	}
 }
 
@@ -321,7 +317,11 @@ function appendBatchedLines(
 	batchedPositions: BatchedPositions,
 	resolution: OverlayResolution,
 ): void {
-	for (const kind of [ROUTE_LAND_MAJOR, ROUTE_LAND_MINOR, ROUTE_SEA] as const) {
+	for (const kind of [
+		TRANSPORT.ROUTE_LAND_MAJOR,
+		TRANSPORT.ROUTE_LAND_MINOR,
+		TRANSPORT.ROUTE_SEA,
+	] as const) {
 		const line = createBatchedLine(kind, batchedPositions[kind], resolution)
 		if (!line) continue
 		group.add(line.line)

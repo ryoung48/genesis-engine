@@ -1,8 +1,8 @@
-import type { GenesisRivers } from "@/model"
 import { MATH } from "@/model/shared/math"
 import { MinHeap } from "@/model/shared/min-heap"
 import type {
 	ComputeRiversParams,
+	GenesisRivers,
 	PolylineLengthKmParams,
 } from "@/model/terrain/rivers/types"
 

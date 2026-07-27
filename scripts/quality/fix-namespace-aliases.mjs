@@ -8,15 +8,15 @@
 // of the hand-rolled regex + import-clause text surgery this used before.
 //
 // Usage:
-//   node scripts/fix-namespace-aliases.mjs          # apply fixes
-//   node scripts/fix-namespace-aliases.mjs --check   # dry run, report only
+//   node scripts/quality/fix-namespace-aliases.mjs          # apply fixes
+//   node scripts/quality/fix-namespace-aliases.mjs --check   # dry run, report only
 import path from "node:path"
 import { Node, Project } from "ts-morph"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 const CHECK_ONLY = process.argv.includes("--check")
 
-const project = new Project({ tsConfigFilePath: path.resolve(import.meta.dirname, "..", "tsconfig.app.json") })
+const project = new Project({ tsConfigFilePath: path.resolve(import.meta.dirname, "..", "..", "tsconfig.app.json") })
 project.addSourceFilesAtPaths(path.join(SRC_ROOT, "**/*.{ts,tsx}"))
 
 function isFunctionValued(prop) {

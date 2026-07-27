@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { StageTiming } from "@/model"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
@@ -44,6 +43,7 @@ import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 import { EU4_DAYS } from "@/model/history/eu4-days"
 import { STATE } from "@/model/history/state"
 import type { HistoryNote } from "@/model/history/state/types"
+import type { StageTiming } from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { SEED_LABEL } from "@/model/shared/seed-label"
 import { SEEDS } from "@/model/shared/seeds"
@@ -57,7 +57,7 @@ import type {
 	GenesisWorkerRequest,
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
-} from "@/model/transport/worker-types"
+} from "@/model/transport/types"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"

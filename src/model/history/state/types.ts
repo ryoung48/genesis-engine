@@ -3,13 +3,14 @@ import type { EventHeap } from "@/model/history/event-heap"
 import type { HistoryRng } from "@/model/history/history-rng/types"
 import type { Relation } from "@/model/history/state"
 import type { Timeline } from "@/model/history/timeline"
-import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
-import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type {
 	GenesisNationHierarchy,
 	GenesisProvinces,
-} from "@/model/types/society"
+	ProvincePopulation,
+	SocietyEra,
+} from "@/model/society/types"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
+import type { Route, RouteEdge } from "@/model/transport/types"
 
 export interface War {
 	idx: number

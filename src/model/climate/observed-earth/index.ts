@@ -1,5 +1,6 @@
-import type { GenesisWorld, SphereMesh } from "@/model"
+import type { GenesisWorld } from "@/model"
 import type { SampleMonthlyFloatRasterParams } from "@/model/climate/observed-earth/types"
+import type { SphereMesh } from "@/model/mesh/types"
 
 function sampleMonthlyFloatRaster({
 	mesh,

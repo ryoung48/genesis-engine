@@ -1,5 +1,5 @@
 ﻿import { LanguageNames, NAMES } from "@/model/society/language/names"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 
 /**
  * Nation, province, culture and landmark names for the current world.

@@ -1,4 +1,4 @@
-import type { SphereMesh } from "@/model"
+import type { SphereMesh } from "@/model/mesh/types"
 
 function computeCoastalMask(args: {
 	mesh: SphereMesh

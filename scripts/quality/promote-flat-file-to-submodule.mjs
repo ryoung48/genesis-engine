@@ -14,22 +14,22 @@
 // in the test case this was built against; see below).
 //
 // Usage:
-//   node scripts/promote-flat-file-to-submodule.mjs --file=src/model/society/hierarchy.ts          # apply
-//   node scripts/promote-flat-file-to-submodule.mjs --check --file=...                              # dry run
+//   node scripts/quality/promote-flat-file-to-submodule.mjs --file=src/model/society/hierarchy.ts          # apply
+//   node scripts/quality/promote-flat-file-to-submodule.mjs --check --file=...                              # dry run
 import path from "node:path"
 import { Node, Project } from "ts-morph"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 const CHECK_ONLY = process.argv.includes("--check")
 const fileArg = process.argv.find((a) => a.startsWith("--file="))
 if (!fileArg) {
-	console.error("Usage: node scripts/promote-flat-file-to-submodule.mjs --file=src/path/to/file.ts")
+	console.error("Usage: node scripts/quality/promote-flat-file-to-submodule.mjs --file=src/path/to/file.ts")
 	process.exit(1)
 }
-const TARGET_FILE = path.resolve(import.meta.dirname, "..", fileArg.slice(7))
+const TARGET_FILE = path.resolve(import.meta.dirname, "..", "..", fileArg.slice(7))
 
 const project = new Project({
-	tsConfigFilePath: path.resolve(import.meta.dirname, "..", "tsconfig.app.json"),
+	tsConfigFilePath: path.resolve(import.meta.dirname, "..", "..", "tsconfig.app.json"),
 })
 project.addSourceFilesAtPaths(path.join(SRC_ROOT, "**/*.{ts,tsx}"))
 

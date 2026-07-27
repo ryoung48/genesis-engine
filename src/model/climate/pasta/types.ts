@@ -2,8 +2,8 @@ import type {
 	AssignPastaClimateParams,
 	PastaClassificationBuffers,
 } from "@/model/climate/types"
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisParams } from "@/model/types/tectonics"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 
 export type GdmParams = {
 	temp: number

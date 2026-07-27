@@ -13,7 +13,7 @@ import type {
 	TidalEvent,
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
-import type { GenesisParams } from "@/model/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 
 const MAX_TIDAL_SCHEDULE_SAMPLES = 2000
 

@@ -1,8 +1,8 @@
-import type { GenesisParams } from "@/model"
 import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import type {
 	DecodedPlanetCode,
 	EncodePlanetCodeParams,

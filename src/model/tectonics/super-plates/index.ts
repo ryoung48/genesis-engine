@@ -1,5 +1,5 @@
-import type { PlateVec, SuperPlateData } from "@/model"
 import type { BuildSuperPlatesParams } from "@/model/tectonics/super-plates/types"
+import type { PlateVec, SuperPlateData } from "@/model/tectonics/types"
 
 function buildSuperPlates({
 	mesh,

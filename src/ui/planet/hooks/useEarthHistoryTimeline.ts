@@ -1,5 +1,4 @@
 ﻿import { useEffect, useMemo, useState } from "react"
-import type { GenesisProvinces } from "@/model"
 import type {
 	RawNationReference,
 	RawOrganizationReference,
@@ -11,6 +10,7 @@ import { HERITAGES } from "@/model/earth/history/reference/heritages"
 import { NATIONS } from "@/model/earth/history/reference/nations"
 import { ORGANIZATIONS } from "@/model/earth/history/reference/organizations"
 import { RELIGION_GROUPS } from "@/model/earth/history/reference/religion-groups"
+import type { GenesisProvinces } from "@/model/society/types"
 
 /**
  * Owns the earth-history engine lifecycle and scrubber time for an

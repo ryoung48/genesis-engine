@@ -1,4 +1,3 @@
-import type { GenesisOceanCurrents, SphereMesh } from "@/model"
 import { HEAT } from "@/model/climate/locked/heat"
 import type {
 	ApplyLockedCurrentTemperatureEffectParams,
@@ -7,8 +6,10 @@ import type {
 	LockedCurrentParams,
 } from "@/model/climate/locked/ocean-currents/types"
 import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
+import type { GenesisOceanCurrents } from "@/model/climate/types"
 import { WIND } from "@/model/climate/wind"
 import type { FlowGrid } from "@/model/climate/wind/types"
+import type { SphereMesh } from "@/model/mesh/types"
 import { UNITS } from "@/model/shared/units"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 

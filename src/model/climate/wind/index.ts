@@ -1,4 +1,3 @@
-import type { SphereMesh } from "@/model"
 import { WIND as LOCKED_WIND } from "@/model/climate/locked/wind"
 import { RAIN } from "@/model/climate/rain"
 import type {
@@ -8,6 +7,7 @@ import type {
 	WindGrid,
 	WindSurface,
 } from "@/model/climate/wind/types"
+import type { SphereMesh } from "@/model/mesh/types"
 import { MATH } from "@/model/shared/math"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"

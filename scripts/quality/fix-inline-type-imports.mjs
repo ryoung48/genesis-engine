@@ -3,8 +3,8 @@
 // from "..."` statements.
 //
 // Usage:
-//   node scripts/fix-inline-type-imports.mjs          # apply fixes
-//   node scripts/fix-inline-type-imports.mjs --check   # dry run, report only
+//   node scripts/quality/fix-inline-type-imports.mjs          # apply fixes
+//   node scripts/quality/fix-inline-type-imports.mjs --check   # dry run, report only
 //
 // Handles the common case: `import("module").Identifier` or
 // `import("module").Identifier<TypeArgs>`. Skips (and reports) anything it
@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync, globSync } from "node:fs"
 import path from "node:path"
 import ts from "typescript"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 const CHECK_ONLY = process.argv.includes("--check")
 
 const files = globSync("**/*.{ts,tsx}", { cwd: SRC_ROOT }).map((f) =>

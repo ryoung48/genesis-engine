@@ -1,31 +1,34 @@
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
-import type { PastaDebug } from "@/model/climate/types"
-import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
-import type { ProvincePopulation } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
-import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type {
-	BoundaryInfo,
-	DistanceFields,
 	GenesisClimate,
 	GenesisHazards,
 	GenesisHydrology,
-	GenesisLocations,
-	GenesisNationHierarchy,
 	GenesisObservedDtr,
 	GenesisObservedHumidity,
 	GenesisOceanCurrents,
-	GenesisParams,
+	GenesisRainfall,
+	GenesisVolcanism,
+	PastaDebug,
+} from "@/model/climate/types"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
+import type { SphereMesh } from "@/model/mesh/types"
+import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type {
+	GenesisLocations,
+	GenesisNationHierarchy,
 	GenesisPartition,
 	GenesisProvinces,
-	GenesisRainfall,
-	GenesisRivers,
+	ProvincePopulation,
+} from "@/model/society/types"
+import type {
+	BoundaryInfo,
+	DistanceFields,
 	GenesisTerrainFeatures,
-	GenesisVolcanism,
-	SphereMesh,
-	StageTiming,
 	TectonicPlate,
-} from "@/model/types"
+} from "@/model/tectonics/types"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
+import type { GenesisRivers } from "@/model/terrain/rivers/types"
+import type { Route, RouteEdge } from "@/model/transport/types"
 
 export interface GenesisWorld {
 	mesh: SphereMesh

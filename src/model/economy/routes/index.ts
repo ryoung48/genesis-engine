@@ -15,14 +15,12 @@ import { UNITS } from "@/model/shared/units"
 import { URQUHART } from "@/model/shared/urquhart"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SocietyEra } from "@/model/society/types"
-import {
-	ROUTE_LAND_MAJOR,
-	ROUTE_LAND_MINOR,
-	ROUTE_SEA,
-	type Route,
-	type RouteEdge,
-	type SerializedRouteKind,
-} from "@/model/transport"
+import { TRANSPORT } from "@/model/transport"
+import type {
+	Route,
+	RouteEdge,
+	SerializedRouteKind,
+} from "@/model/transport/types"
 
 function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	const { provinces, nations } = input
@@ -121,7 +119,7 @@ function edgeKey({
 function networkKindForRouteKind(
 	kind: SerializedRouteKind,
 ): SerializedRouteKind {
-	return kind === ROUTE_SEA ? kind : ROUTE_LAND_MINOR
+	return kind === TRANSPORT.ROUTE_SEA ? kind : TRANSPORT.ROUTE_LAND_MINOR
 }
 
 function mergeNetworkKind({
@@ -131,12 +129,13 @@ function mergeNetworkKind({
 	current: SerializedRouteKind
 	next: SerializedRouteKind
 }): SerializedRouteKind {
-	if (current === ROUTE_SEA || next === ROUTE_SEA) {
-		return ROUTE_SEA
+	if (current === TRANSPORT.ROUTE_SEA || next === TRANSPORT.ROUTE_SEA) {
+		return TRANSPORT.ROUTE_SEA
 	}
-	return current === ROUTE_LAND_MAJOR || next === ROUTE_LAND_MAJOR
-		? ROUTE_LAND_MAJOR
-		: ROUTE_LAND_MINOR
+	return current === TRANSPORT.ROUTE_LAND_MAJOR ||
+		next === TRANSPORT.ROUTE_LAND_MAJOR
+		? TRANSPORT.ROUTE_LAND_MAJOR
+		: TRANSPORT.ROUTE_LAND_MINOR
 }
 
 function createSearchWorkspace(size: number): SearchWorkspace {
@@ -817,7 +816,7 @@ function appendLandRoutes({
 	routes: Route[]
 }): void {
 	const maxLengthKm =
-		kind === ROUTE_LAND_MAJOR
+		kind === TRANSPORT.ROUTE_LAND_MAJOR
 			? ROUTE_TUNING.land.majorMaxLengthKm
 			: ROUTE_TUNING.land.minorMaxLengthKm
 	for (const { cluster, landmark, candidates } of candidateGroups) {
@@ -1019,7 +1018,7 @@ function appendSeaRoutes({
 				routes.push({
 					fromProvince: source.province,
 					toProvince: target.province,
-					kind: ROUTE_SEA,
+					kind: TRANSPORT.ROUTE_SEA,
 					pathRegions,
 				})
 				for (let i = 2; i < pathRegions.length - 1; i++) {
@@ -1141,7 +1140,7 @@ function computeRoutes({
 		fn: () =>
 			appendLandRoutes({
 				state,
-				kind: ROUTE_LAND_MAJOR,
+				kind: TRANSPORT.ROUTE_LAND_MAJOR,
 				candidateGroups: landCandidates.major,
 				provinceClusters,
 				landPassable,
@@ -1155,7 +1154,7 @@ function computeRoutes({
 			}),
 	})
 	for (const route of routes) {
-		if (route.kind !== ROUTE_LAND_MAJOR) continue
+		if (route.kind !== TRANSPORT.ROUTE_LAND_MAJOR) continue
 		majorPairs.add(
 			pairKey({
 				a: route.fromProvince,
@@ -1170,7 +1169,7 @@ function computeRoutes({
 		fn: () =>
 			appendLandRoutes({
 				state,
-				kind: ROUTE_LAND_MINOR,
+				kind: TRANSPORT.ROUTE_LAND_MINOR,
 				candidateGroups: landCandidates.minor,
 				provinceClusters,
 				landPassable,

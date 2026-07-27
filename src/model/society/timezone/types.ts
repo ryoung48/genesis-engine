@@ -1,4 +1,4 @@
-import type { SerializedGenesisWorld } from "@/model/transport/worker-types"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 
 export interface RegionTimezoneOffsetParams {
 	world: SerializedGenesisWorld

@@ -1,6 +1,6 @@
-import type { GenesisLocations } from "@/model"
 import { RNG } from "@/model/shared/rng"
 import { UNITS } from "@/model/shared/units"
+import type { GenesisLocations } from "@/model/society/types"
 import type { ComputeLocationsParams } from "@/model/terrain/locations/types"
 import { PROVINCES } from "@/model/terrain/provinces"
 

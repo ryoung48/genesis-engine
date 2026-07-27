@@ -6,7 +6,7 @@
 // Mesh/Material construction here -- callers wrap the returned arrays in
 // those themselves, since geometry/material objects aren't worker-safe to
 // hand back as-is (only their underlying typed arrays are transferable).
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import { getColor } from "../colors"
 import { createMapProjection } from "./map-projection"
 

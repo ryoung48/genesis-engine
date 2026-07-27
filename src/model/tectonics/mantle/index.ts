@@ -1,4 +1,3 @@
-import type { PlateVec } from "@/model"
 import { MATH } from "@/model/shared/math"
 import { RNG } from "@/model/shared/rng"
 import type {
@@ -12,6 +11,7 @@ import type {
 	Vec3,
 	VelocityAtParams,
 } from "@/model/tectonics/mantle/types"
+import type { PlateVec } from "@/model/tectonics/types"
 
 const CONTINENTAL_DRAG_FACTOR = 0.35
 

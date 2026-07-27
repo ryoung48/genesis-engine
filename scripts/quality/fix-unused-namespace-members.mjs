@@ -11,15 +11,15 @@
 // whitespace correctly instead of manual position math.
 //
 // Usage:
-//   node scripts/fix-unused-namespace-members.mjs          # apply fixes
-//   node scripts/fix-unused-namespace-members.mjs --check   # dry run, report only
+//   node scripts/quality/fix-unused-namespace-members.mjs          # apply fixes
+//   node scripts/quality/fix-unused-namespace-members.mjs --check   # dry run, report only
 import path from "node:path"
 import { Node, Project, SyntaxKind } from "ts-morph"
 
-const SRC_ROOT = path.resolve(import.meta.dirname, "..", "src")
+const SRC_ROOT = path.resolve(import.meta.dirname, "..", "..", "src")
 const CHECK_ONLY = process.argv.includes("--check")
 
-const project = new Project({ tsConfigFilePath: path.resolve(import.meta.dirname, "..", "tsconfig.app.json") })
+const project = new Project({ tsConfigFilePath: path.resolve(import.meta.dirname, "..", "..", "tsconfig.app.json") })
 project.addSourceFilesAtPaths(path.join(SRC_ROOT, "**/*.{ts,tsx}"))
 
 function isFunctionValued(prop) {

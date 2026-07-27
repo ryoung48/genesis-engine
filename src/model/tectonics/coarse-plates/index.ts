@@ -1,4 +1,4 @@
-import { buildSphereMesh } from "@/model/mesh"
+import { MESH } from "@/model/mesh"
 import { RNG } from "@/model/shared/rng"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import type {
@@ -23,7 +23,7 @@ function generateCoarsePlates({
 	// Coarse mesh uses isolated RNG — matches source coarse-plates.js
 	const coarseRng = RNG.makeRng(seed + 137)
 	const coarsePoints = options.coarsePoints ?? N_COARSE
-	const coarseMesh = buildSphereMesh(coarsePoints, COARSE_JITTER, {
+	const coarseMesh = MESH.buildSphereMesh(coarsePoints, COARSE_JITTER, {
 		random: () => coarseRng(),
 		randint: (a: number, b: number) =>
 			a + Math.floor(coarseRng() * (b - a + 1)),

@@ -1,6 +1,6 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import type { SocietyEra } from "@/model/society/types"
-import type { GenesisParams } from "@/model/types/tectonics"
 
 export interface DecodedPlanetCode {
 	seed: number

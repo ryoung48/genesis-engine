@@ -4,7 +4,7 @@ import type {
 	FillPetMonthlyHargreavesParams,
 	RefreshClimatePetMonthlyParams,
 } from "@/model/climate/hydrology/types"
-import type { GenesisHydrology } from "@/model/types"
+import type { GenesisHydrology } from "@/model/climate/types"
 
 function petMonthHargreaves({
 	tas,

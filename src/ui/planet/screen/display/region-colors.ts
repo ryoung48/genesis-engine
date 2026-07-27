@@ -7,7 +7,7 @@ import { RELIGION } from "@/model/society/religion"
 import { TIMEZONE } from "@/model/society/timezone"
 import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import type { SerializedGenesisWorld } from "@/model/transport/types"
 import type { ColorMode } from "@/ui/planet/colors"
 import {
 	climateTempColor,

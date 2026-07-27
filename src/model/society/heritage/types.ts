@@ -1,4 +1,4 @@
-import type { GenesisPartition } from "@/model/types/society"
+import type { GenesisPartition } from "@/model/society/types"
 
 export interface ComputeHeritagesParams {
 	cultures: GenesisPartition

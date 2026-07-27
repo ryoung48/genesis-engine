@@ -1,4 +1,5 @@
-import type { GenesisParams, GenesisRainfall } from "@/model"
+import type { GenesisRainfall } from "@/model/climate/types"
+import type { GenesisParams } from "@/model/pipelines/types"
 import { TIME } from "@/model/shared/time"
 
 function computeDiurnalRange(args: {

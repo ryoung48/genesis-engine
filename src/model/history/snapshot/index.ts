@@ -2,7 +2,7 @@ import { DERIVE } from "@/model/history/derive"
 import { FIELDS } from "@/model/history/fields"
 import type { BuildHistoryFrameParams } from "@/model/history/snapshot/types"
 import { STATE } from "@/model/history/state"
-import type { SerializedHistoryFrame } from "@/model/transport"
+import type { SerializedHistoryFrame } from "@/model/transport/types"
 
 function buildHistoryFrame({
 	state,

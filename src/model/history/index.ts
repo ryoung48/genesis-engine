@@ -1,4 +1,3 @@
-import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
 import { EVENT_HEAP } from "@/model/history/event-heap"
 import { BATTLE } from "@/model/history/events/battle"
 import { CULTURE_SPREAD } from "@/model/history/events/culture-spread"
@@ -16,9 +15,14 @@ import type {
 	ProcessEventsUntilParams,
 	SeedColonyRelationsParams,
 } from "@/model/history/types"
-import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
+import type { StageTiming } from "@/model/pipelines/types"
+import type {
+	GenesisNationHierarchy,
+	GenesisProvinces,
+	ProvincePopulation,
+	SocietyEra,
+} from "@/model/society/types"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
-import type { StageTiming } from "@/model/types"
 
 function timed<T>(
 	label: string,

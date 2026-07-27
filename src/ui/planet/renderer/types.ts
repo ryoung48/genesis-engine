@@ -7,7 +7,7 @@ import type {
 import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
-} from "@/model/transport"
+} from "@/model/transport/types"
 import type { ColorMode } from "@/ui/planet/colors"
 import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
 import type {

@@ -1,4 +1,4 @@
-import type { StageTiming } from "@/model"
+import type { StageTiming } from "@/model/pipelines/types"
 
 export function formatTimingSeconds(ms: number): string {
 	return `${(ms / 1000).toFixed(ms >= 10000 ? 0 : 2)} s`

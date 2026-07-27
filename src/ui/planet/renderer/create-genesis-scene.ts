@@ -10,14 +10,14 @@ import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
 } from "@/model/earth/history/data-source/types"
-import { buildRegionSpatialIndex } from "@/model/mesh"
+import { MESH } from "@/model/mesh"
 import type { HeritageScript } from "@/model/society/script"
 import { SCRIPT } from "@/model/society/script"
-import {
-	networkCount,
-	type SerializedGenesisWorld,
-	type SerializedNetwork,
-} from "@/model/transport"
+import { TRANSPORT } from "@/model/transport"
+import type {
+	SerializedGenesisWorld,
+	SerializedNetwork,
+} from "@/model/transport/types"
 import { formatClockTimeDisplay } from "@/ui/planet/clock"
 import { type ColorMode, VEGETATION_WATER_BLUE } from "@/ui/planet/colors"
 import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
@@ -681,7 +681,7 @@ function buildElevationLookup(
 	if (!world?.mesh || !world.elevation_km) return undefined
 	let lookup = elevationLookupCache.get(world.mesh)
 	if (!lookup) {
-		const index = buildRegionSpatialIndex(world.mesh)
+		const index = MESH.buildRegionSpatialIndex(world.mesh)
 		const elevationKm = world.elevation_km
 		lookup = (lonDeg, latDeg) => {
 			const region = index.nearest(lonDeg, latDeg)
@@ -2267,7 +2267,7 @@ export function createGenesisScene(
 		if (
 			!currentWorld?.provinces ||
 			!infrastructureData ||
-			networkCount(infrastructureData) === 0 ||
+			TRANSPORT.networkCount(infrastructureData) === 0 ||
 			!infrastructureVisible
 		) {
 			return

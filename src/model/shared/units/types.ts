@@ -1,4 +1,4 @@
-import type { SphereMesh } from "@/model/types/mesh"
+import type { SphereMesh } from "@/model/mesh/types"
 
 export type MeshWithOptionalNeighborDist = Pick<SphereMesh, "numRegions"> & {
 	neighborDist?: Float32Array

@@ -1,5 +1,5 @@
-import type { GenesisRainfall } from "@/model/types/climate"
-import type { SphereMesh } from "@/model/types/mesh"
+import type { GenesisRainfall } from "@/model/climate/types"
+import type { SphereMesh } from "@/model/mesh/types"
 
 export interface ComputeProvincesParams {
 	mesh: SphereMesh
