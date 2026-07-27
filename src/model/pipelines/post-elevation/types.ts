@@ -9,7 +9,11 @@ import type {
 } from "@/model/climate/types"
 import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 import type { SphereMesh } from "@/model/mesh/types"
-import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type {
+	GenesisParams,
+	GenesisWorld,
+	StageTiming,
+} from "@/model/pipelines/types"
 import type {
 	GenesisLocations,
 	GenesisProvinces,
@@ -22,7 +26,6 @@ import type {
 } from "@/model/tectonics/types"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { GenesisRivers } from "@/model/terrain/rivers/types"
-import type { GenesisWorld } from "@/model/world"
 
 export interface RealRiversInput {
 	lines: [number, number, number, number][][]

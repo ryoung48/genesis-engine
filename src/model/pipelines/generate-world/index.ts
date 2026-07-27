@@ -1,4 +1,3 @@
-import type { GenesisWorld } from "@/model"
 import { ROUTES } from "@/model/economy/routes"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
@@ -11,7 +10,11 @@ import type {
 	TectonicPathResult,
 } from "@/model/pipelines/generate-world/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
-import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type {
+	GenesisParams,
+	GenesisWorld,
+	StageTiming,
+} from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"

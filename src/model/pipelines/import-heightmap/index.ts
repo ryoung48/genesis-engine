@@ -1,4 +1,3 @@
-import type { GenesisWorld } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
@@ -21,7 +20,11 @@ import type {
 	SampleSingleBandFloatRasterParams,
 } from "@/model/pipelines/import-heightmap/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
-import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
+import type {
+	GenesisParams,
+	GenesisWorld,
+	StageTiming,
+} from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"

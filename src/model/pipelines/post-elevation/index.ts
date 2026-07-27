@@ -1,4 +1,3 @@
-import type { GenesisWorld } from "@/model"
 import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
@@ -24,7 +23,7 @@ import type {
 	PostPipelineInput,
 	PostPipelineOutput,
 } from "@/model/pipelines/post-elevation/types"
-import type { StageTiming } from "@/model/pipelines/types"
+import type { GenesisWorld, StageTiming } from "@/model/pipelines/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { ERAS } from "@/model/society/eras"

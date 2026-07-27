@@ -54,21 +54,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["src/model/celestial/**/*.ts"],
-			"linter": {
-				"rules": {
-					"nursery": {
-						"useMaxParams": { "level": "error", "options": { "max": 1 } }
-					}
-				}
-			}
-		},
-		{
-			"includes": [
-				"src/model/climate/**/*.ts",
-				"src/model/economy/**/*.ts",
-				"src/model/earth/**/*.ts"
-			],
+			"includes": ["src/model/**/*.{ts,tsx}"],
 			"linter": {
 				"rules": {
 					"nursery": {
