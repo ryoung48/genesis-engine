@@ -11,8 +11,8 @@ import {
 } from "chart.js"
 import React, { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
-import { EARTH_MOON_TIDE_REFERENCE } from "@/model/climate/tidal-force"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule"
+import { TIDAL_FORCE } from "@/model/climate/tidal-force"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 
 ChartJS.register(
 	CategoryScale,
@@ -74,7 +74,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 			datasets.push({
 				label: contributorLabels[m] ?? `Moon ${m + 1}`,
 				data: events.map(
-					(e) => (e.moonForces[m] ?? 0) * EARTH_MOON_TIDE_REFERENCE,
+					(e) => (e.moonForces[m] ?? 0) * TIDAL_FORCE.earthMoonTideReference,
 				),
 				borderColor: MOON_COLORS[m % MOON_COLORS.length],
 				backgroundColor: "transparent",
@@ -88,7 +88,8 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 			datasets.push({
 				label: moonMoonPairLabels[p] ?? `Moon pair ${p + 1}`,
 				data: events.map(
-					(e) => (e.moonMoonForces[p] ?? 0) * EARTH_MOON_TIDE_REFERENCE,
+					(e) =>
+						(e.moonMoonForces[p] ?? 0) * TIDAL_FORCE.earthMoonTideReference,
 				),
 				borderColor: MOON_COLORS[p % MOON_COLORS.length],
 				backgroundColor: "transparent",
@@ -101,7 +102,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 
 		datasets.push({
 			label: "Solar",
-			data: events.map((e) => e.starForce * EARTH_MOON_TIDE_REFERENCE),
+			data: events.map((e) => e.starForce * TIDAL_FORCE.earthMoonTideReference),
 			borderColor: "#f59e0b", // amber-400
 			backgroundColor: "transparent",
 			borderWidth: compact ? 1 : 1.5,
@@ -112,7 +113,9 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 
 		datasets.push({
 			label: "Total",
-			data: events.map((e) => e.tidalForce * EARTH_MOON_TIDE_REFERENCE),
+			data: events.map(
+				(e) => e.tidalForce * TIDAL_FORCE.earthMoonTideReference,
+			),
 			borderColor: "#1e293b", // slate-800
 			backgroundColor: "transparent",
 			borderWidth: compact ? 1.5 : 2.5,
@@ -259,13 +262,16 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 				<span>
 					Spring:{" "}
 					<span className="font-mono text-slate-700">
-						{(maxForce * EARTH_MOON_TIDE_REFERENCE).toFixed(3)} m
+						{(maxForce * TIDAL_FORCE.earthMoonTideReference).toFixed(3)} m
 					</span>
 				</span>
 				<span>
 					Neap:{" "}
 					<span className="font-mono text-slate-700">
-						{(schedule.minForce * EARTH_MOON_TIDE_REFERENCE).toFixed(3)} m
+						{(schedule.minForce * TIDAL_FORCE.earthMoonTideReference).toFixed(
+							3,
+						)}{" "}
+						m
 					</span>
 				</span>
 				{!compact && schedule.moonsClamped && (

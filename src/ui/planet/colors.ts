@@ -1,13 +1,4 @@
 import {
-	CHAOTIC_MAX,
-	PASTA_LABELS,
-	TEMPERATURE_BOUNDARY_BOREAL,
-	TEMPERATURE_BOUNDARY_SUBARCTIC,
-	TEMPERATURE_BOUNDARY_SUBTROPICAL,
-	TEMPERATURE_BOUNDARY_TEMPERATE,
-	TEMPERATURE_BOUNDARY_TROPICAL,
-} from "@/model/climate"
-import {
 	BUPU_STOPS,
 	cssColorToRgb,
 	ORANGES_STOPS,
@@ -18,6 +9,9 @@ import {
 	sampleColorStops,
 	YL_OR_RD_STOPS,
 } from "@/model/shared"
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
+
 /**
  * Genesis elevation and temperature color mapping.
  */
@@ -541,27 +535,33 @@ function midpoint(a: number, b: number): number {
  */
 const climateTempStops: { t: number; r: number; g: number; b: number }[] = [
 	{
-		t: TEMPERATURE_BOUNDARY_SUBARCTIC,
+		t: VEGETATION.temperatureBoundarySubarctic,
 		r: 0xd3 / 255,
 		g: 0xef / 255,
 		b: 0xff / 255,
 	},
 	{
-		t: midpoint(TEMPERATURE_BOUNDARY_SUBARCTIC, TEMPERATURE_BOUNDARY_BOREAL),
+		t: midpoint(
+			VEGETATION.temperatureBoundarySubarctic,
+			VEGETATION.temperatureBoundaryBoreal,
+		),
 		r: 0x7f / 255,
 		g: 0xd0 / 255,
 		b: 0xff / 255,
 	},
 	{
-		t: midpoint(TEMPERATURE_BOUNDARY_BOREAL, TEMPERATURE_BOUNDARY_TEMPERATE),
+		t: midpoint(
+			VEGETATION.temperatureBoundaryBoreal,
+			VEGETATION.temperatureBoundaryTemperate,
+		),
 		r: 0x91 / 255,
 		g: 0xff / 255,
 		b: 0xdc / 255,
 	},
 	{
 		t: midpoint(
-			TEMPERATURE_BOUNDARY_TEMPERATE,
-			TEMPERATURE_BOUNDARY_SUBTROPICAL,
+			VEGETATION.temperatureBoundaryTemperate,
+			VEGETATION.temperatureBoundarySubtropical,
 		),
 		r: 0xe6 / 255,
 		g: 0xf5 / 255,
@@ -569,20 +569,20 @@ const climateTempStops: { t: number; r: number; g: number; b: number }[] = [
 	},
 	{
 		t: midpoint(
-			TEMPERATURE_BOUNDARY_SUBTROPICAL,
-			TEMPERATURE_BOUNDARY_TROPICAL,
+			VEGETATION.temperatureBoundarySubtropical,
+			VEGETATION.temperatureBoundaryTropical,
 		),
 		r: 0xff / 255,
 		g: 0xa7 / 255,
 		b: 0x5b / 255,
 	},
 	{
-		t: midpoint(TEMPERATURE_BOUNDARY_TROPICAL, CHAOTIC_MAX),
+		t: midpoint(VEGETATION.temperatureBoundaryTropical, VEGETATION.chaoticMax),
 		r: 0xff / 255,
 		g: 0x77 / 255,
 		b: 0x85 / 255,
 	},
-	{ t: CHAOTIC_MAX, r: 0x7e / 255, g: 0x43 / 255, b: 0x49 / 255 },
+	{ t: VEGETATION.chaoticMax, r: 0x7e / 255, g: 0x43 / 255, b: 0x49 / 255 },
 ]
 
 export function climateTempColor(celsius: number): [number, number, number] {
@@ -653,7 +653,7 @@ export function vegetationMapColor(
 }
 
 const PASTA_SATELLITE_TRUE_COLOR: Partial<
-	Record<(typeof PASTA_LABELS)[number], [number, number, number]>
+	Record<(typeof PASTA.pastaLabels)[number], [number, number, number]>
 > = {
 	Ofi: [240, 240, 240],
 	Ofd: [10, 10, 51],
@@ -770,7 +770,7 @@ const DEFAULT_PASTA_SATELLITE_OCEAN: [number, number, number] = [
 export function vegetationSatelliteColor(
 	pastaClimateCode: number,
 ): [number, number, number] {
-	const label = PASTA_LABELS[pastaClimateCode] ?? "ocean"
+	const label = PASTA.pastaLabels[pastaClimateCode] ?? "ocean"
 	const rgb = PASTA_SATELLITE_TRUE_COLOR[label]
 	if (!rgb) return DEFAULT_PASTA_SATELLITE_OCEAN
 	return [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255]

@@ -1,10 +1,5 @@
-import {
-	estimateGreenhouseFactor,
-	rollGasGiantGreenhouseFactor,
-	rollGreenhouseFactor,
-} from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
-import { ORBIT_BODY } from "../../orbit-body"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	AtmosphereProfile,
 	DensityProfile,
@@ -13,15 +8,19 @@ import type {
 	OrbitClassification,
 	OrbitComposition,
 	OrbitGroup,
-} from "../../orbit-body/types"
-import type { MainSequenceClass } from "../../star/types"
-import { ATMOSPHERE } from "./atmosphere"
-import { DICE_TABLE } from "./classification/dice-table"
-import type { ClassifiedEnvironment } from "./classification/dice-table/types"
-import { HYDROSPHERE } from "./classification/hydrosphere"
-import { DENSITY } from "./density"
-import { TEMPERATURE } from "./temperature"
-import type { TemperatureHydrosphereLossInput, Zone } from "../types"
+} from "@/model/celestial/orbit-body/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { ATMOSPHERE } from "@/model/celestial/planet/environment/atmosphere"
+import { DICE_TABLE } from "@/model/celestial/planet/environment/classification/dice-table"
+import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment/classification/dice-table/types"
+import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
+import { DENSITY } from "@/model/celestial/planet/environment/density"
+import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
+import type {
+	TemperatureHydrosphereLossInput,
+	Zone,
+} from "@/model/celestial/planet/types"
+import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 
 function applyTemperatureHydrosphereLoss({
 	hydrosphereCode,
@@ -223,10 +222,12 @@ function buildClassificationEnvironment(params: {
 	})
 	const greenhouseFactor =
 		params.group === "jovian"
-			? rollGasGiantGreenhouseFactor(params.rng)
+			? GREENHOUSE_ESTIMATE.rollGasGiantGreenhouseFactor(params.rng)
 			: params.greenhouseMode === "estimate"
-				? estimateGreenhouseFactor(atmosphere?.pressureBar ?? 0)
-				: rollGreenhouseFactor({
+				? GREENHOUSE_ESTIMATE.estimateGreenhouseFactor(
+						atmosphere?.pressureBar ?? 0,
+					)
+				: GREENHOUSE_ESTIMATE.rollGreenhouseFactor({
 						rng: params.rng,
 						pressureBar: atmosphere?.pressureBar ?? 0,
 						atmosphereCode: atmosphere?.code ?? 0,

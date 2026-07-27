@@ -1,23 +1,22 @@
-import { buildSurfaceTidesSeismologyCallbacks } from "@/model/climate/tidal-schedule"
 import { ASTRONOMICAL_DAYS_PER_YEAR } from "@/model/shared"
 import { createRng } from "@/model/shared/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
-import { MOON } from "../../../moons"
-import { ORBIT_BODY, SOLAR_MASS_KG } from "../../../orbit-body"
-import type { TideLock } from "../../../orbit-body/types"
-import { PLANET } from "../../../planet"
-import { STAR } from "../../../star"
-import { SOL_MAIN_WORLD_DEFAULTS } from "../../sol-system"
-import type { SystemBody } from "../../types"
+import { MOON } from "@/model/celestial/moons"
+import { ORBIT_BODY, SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+import { PLANET } from "@/model/celestial/planet"
+import { STAR } from "@/model/celestial/star"
+import { SOL_MAIN_WORLD_DEFAULTS } from "@/model/celestial/system/sol-system"
+import type { SystemBody } from "@/model/celestial/system/types"
 import {
 	buildBodyEnvironment,
 	buildForcedClassificationEnvironment,
 	EPISTELLAR_DEVIATIONS,
 	INNER_DEVIATIONS,
 	OUTER_DEVIATIONS,
-} from "../environment"
-import type { Slot } from "../environment/types"
-import { MOON_PLACEMENT } from "../moon-placement"
+} from "@/model/celestial/system/generation/environment"
+import type { Slot } from "@/model/celestial/system/generation/environment/types"
+import { MOON_PLACEMENT } from "@/model/celestial/system/generation/moon-placement"
 import {
 	pickDensityEarthRelative,
 	rollAxialTiltDeg,
@@ -27,11 +26,12 @@ import {
 	rollOrbitGroup,
 	rollSiderealDayHours,
 	rollSizeClass,
-} from "../rolls"
-import { SOL_SEED_BODIES } from "../sol-seed"
-import { STAR_IDENTITY } from "../star-identity"
-import { pickGeneratedTexturePath } from "../texture"
-import type { BodyGenerationParams } from "./types"
+} from "@/model/celestial/system/generation/rolls"
+import { SOL_SEED_BODIES } from "@/model/celestial/system/generation/sol-seed"
+import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
+import { pickGeneratedTexturePath } from "@/model/celestial/system/generation/texture"
+import type { BodyGenerationParams } from "@/model/celestial/system/generation/body/types"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 
 const DAYS_PER_YEAR = ASTRONOMICAL_DAYS_PER_YEAR
 // Mirrors the UI's DEFAULT_WORLD_PARAMS.continentSizeVariety (defaults.ts) --
@@ -403,7 +403,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		starAgeGyr,
 		starLuminositySol: luminositySol,
 		spectralClass,
-		...buildSurfaceTidesSeismologyCallbacks({
+		...TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({
 			spectralClass,
 			starSubtype,
 		}),

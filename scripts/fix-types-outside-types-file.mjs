@@ -523,6 +523,109 @@ if (runsStep(0)) {
 	console.log(
 		`${CHECK_ONLY ? "Would rewrite" : "Rewrote"} ${totalConsumerEdits} import(s) across ${totalConsumerFiles} consumer file(s), ${CHECK_ONLY ? "would remove" : "removed"} ${barrels.length} barrel(s).\n`,
 	)
+
+	// A single `export {...} from "./x"` statement mixed into an otherwise
+	// real file is the same "pass-through, not an entry point" problem as a
+	// whole barrel — just one statement instead of a whole file. Left in
+	// place, it's fragile in a different way than a whole barrel: nothing
+	// in this pipeline treats a re-export's module specifier as sensitive
+	// to a later move (Step 1 flattening the file one directory deeper,
+	// Step 4/5 relocating the thing it points at) the way an import
+	// specifier is, so it silently goes stale. Removing it now and
+	// redirecting every consumer straight to the real source — before
+	// anything else gets a chance to move — sidesteps that class of bug
+	// entirely instead of chasing it through every later step.
+	const strayReExports = []
+	for (const sf of project.getSourceFiles()) {
+		if (!inScope(sf.getFilePath())) continue
+		if (barrels.includes(sf)) continue // already handled above
+		for (const exp of sf.getExportDeclarations()) {
+			if (exp.getModuleSpecifierValue() === undefined) continue
+			if (exp.isNamespaceExport()) continue // `export * from` — needs a human call
+			strayReExports.push({ sourceFile: sf, exportDecl: exp })
+		}
+	}
+
+	console.log(
+		`${CHECK_ONLY ? "[dry-run] " : ""}${strayReExports.length} stray re-export statement(s) found${strayReExports.length > 0 ? ":" : "."}`,
+	)
+	for (const { sourceFile, exportDecl } of strayReExports) {
+		console.log(`  ${path.relative(SRC_ROOT, sourceFile.getFilePath()).replace(/\\/g, "/")}: ${exportDecl.getText()}`)
+	}
+
+	let strayEdits = 0
+	let strayConsumerFiles = new Set()
+	for (const { sourceFile, exportDecl } of strayReExports) {
+		const nameToSource = new Map()
+		const targetSourceFile = exportDecl.getModuleSpecifierSourceFile()
+		if (!targetSourceFile) continue
+		for (const named of exportDecl.getNamedExports()) {
+			nameToSource.set(named.getAliasNode()?.getText() ?? named.getName(), targetSourceFile)
+		}
+
+		const toRewrite = []
+		for (const consumer of project.getSourceFiles()) {
+			if (consumer === sourceFile) continue
+			for (const imp of consumer.getImportDeclarations()) {
+				if (imp.getModuleSpecifierSourceFile() !== sourceFile) continue
+				toRewrite.push({ consumer, imp, specifier: imp.getModuleSpecifierValue(), impWasTypeOnly: imp.isTypeOnly() })
+			}
+		}
+
+		if (CHECK_ONLY) {
+			strayEdits += toRewrite.reduce(
+				(n, { imp }) => n + imp.getNamedImports().filter((named) => nameToSource.has(named.getName())).length,
+				0,
+			)
+			continue
+		}
+
+		for (const { consumer, imp, specifier, impWasTypeOnly } of toRewrite) {
+			for (const named of imp.getNamedImports()) {
+				const importedName = named.getName()
+				const namedTargetFile = nameToSource.get(importedName)
+				if (!namedTargetFile) continue // not one of this re-export's names
+
+				strayConsumerFiles.add(consumer)
+				strayEdits++
+				touchedFiles.add(consumer.getFilePath())
+				const newSpecifier = specifier.startsWith(".")
+					? relativeSpecifier(consumer.getFilePath(), namedTargetFile.getFilePath())
+					: toModuleSpecifier(namedTargetFile.getFilePath())
+
+				named.remove()
+				if (imp.getNamedImports().length === 0 && !imp.getDefaultImport() && !imp.getNamespaceImport()) {
+					imp.remove()
+				}
+
+				const targetImport = consumer
+					.getImportDeclarations()
+					.find((i) => i.getModuleSpecifierValue() === newSpecifier && (impWasTypeOnly || !i.isTypeOnly()))
+				if (targetImport) {
+					if (!targetImport.getNamedImports().some((n) => n.getName() === importedName)) {
+						targetImport.addNamedImport(
+							impWasTypeOnly && !targetImport.isTypeOnly()
+								? { name: importedName, isTypeOnly: true }
+								: { name: importedName },
+						)
+					}
+				} else {
+					consumer.addImportDeclaration({
+						moduleSpecifier: newSpecifier,
+						namedImports: [{ name: importedName }],
+						isTypeOnly: impWasTypeOnly,
+					})
+				}
+			}
+		}
+
+		touchedFiles.add(sourceFile.getFilePath())
+		exportDecl.remove()
+	}
+
+	console.log(
+		`${CHECK_ONLY ? "Would rewrite" : "Rewrote"} ${strayEdits} import(s) across ${CHECK_ONLY ? "some" : strayConsumerFiles.size} consumer file(s), ${CHECK_ONLY ? "would remove" : "removed"} ${strayReExports.length} stray re-export(s).\n`,
+	)
 }
 
 // Running the whole pipeline in one process: Step 0 deletes whole files

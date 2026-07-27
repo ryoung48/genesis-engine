@@ -2,16 +2,16 @@ import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { WindArrowData } from "@/model/climate"
 import type { SerializedGenesisWorld } from "@/model/transport"
-import { createMapProjection } from "./map-projection"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import type {
 	GenesisViewMode,
 	RiverData,
 	CollectNationBorderMapPositionsParams,
 	BuildLandNationBordersGlobeParams,
 	BuildLandNationBordersMapParams,
-} from "./types"
+} from "@/ui/planet/renderer/types"
+import type { WindArrowData } from "@/model/climate/wind/types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 

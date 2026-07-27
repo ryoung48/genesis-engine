@@ -1,11 +1,11 @@
 ﻿import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, it } from "vitest"
-import { computeLandFraction, computeTemperature } from "@/model/climate"
 import { decodePng } from "@/model/pipelines"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
-import { importGenesisWorld } from "../../pipelines/import-heightmap"
-import { EMB_CONSTANTS } from "./constants"
+import { importGenesisWorld } from "@/model/pipelines/import-heightmap"
+import { CLIMATE } from "@/model/climate/climate"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
 
 // Re-fits GREENHOUSE_FACTOR against the REAL imported Earth world (real
 // heightmap, real coastline, real per-latitude land distribution, real
@@ -172,22 +172,23 @@ describe("Earth GREENHOUSE_FACTOR refit against the real imported world", () => 
 		// not a synthetic proxy.
 		const world = importGenesisWorld(importParams)
 		const { meanBiasC: biasBefore } = landOnlyMeanBiasC(world)
-		const realLandFraction = computeLandFraction({
+		const realLandFraction = CLIMATE.computeLandFraction({
 			mesh: world.mesh,
 			isLand: world.isLand,
 		})
 
-		const originalGreenhouseFactor = EMB_CONSTANTS.surface.GREENHOUSE_FACTOR
+		const originalGreenhouseFactor =
+			CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR
 		try {
 			let lo = 0.3
 			let hi = 1.2
-			let bestG = EMB_CONSTANTS.surface.GREENHOUSE_FACTOR
+			let bestG = CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR
 			let bestBias = biasBefore
 
 			for (let iter = 0; iter < 30; iter++) {
 				const mid = (lo + hi) / 2
-				EMB_CONSTANTS.surface.GREENHOUSE_FACTOR = mid
-				const climate = computeTemperature({
+				CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR = mid
+				const climate = CLIMATE.computeTemperature({
 					mesh: world.mesh,
 					elevation: world.elevation,
 					landFraction: realLandFraction,
@@ -224,7 +225,8 @@ describe("Earth GREENHOUSE_FACTOR refit against the real imported world", () => 
 				`Fitted GREENHOUSE_FACTOR = ${bestG}, land-only bias = ${bestBias.toFixed(3)}C`,
 			)
 		} finally {
-			EMB_CONSTANTS.surface.GREENHOUSE_FACTOR = originalGreenhouseFactor
+			CONSTANTS.embConstants.surface.GREENHOUSE_FACTOR =
+				originalGreenhouseFactor
 		}
 	}, 600_000)
 })

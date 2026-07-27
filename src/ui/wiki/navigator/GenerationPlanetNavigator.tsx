@@ -11,12 +11,7 @@ import {
 	SOL_STAR_NAME,
 } from "@/model/celestial/system/sol-system"
 import type { SystemBody } from "@/model/celestial/system/types"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule"
-import {
-	computeMoonSurfaceTidesM,
-	computeSurfaceTidesM,
-	type SurfaceTidesBreakdown,
-} from "@/model/climate/tidal-schedule"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import {
 	makeRandomSeedLabel,
 	normalizeSeedLabel,
@@ -31,33 +26,37 @@ import { PlusBoxIcon } from "@/ui/components/primitives/icons/PlusBoxIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { SproutIcon } from "@/ui/components/primitives/icons/SproutIcon"
 import { Surface } from "@/ui/components/primitives/Surface"
-import type { GenerationPreviewTab } from "../../planet/screen/generation/generation-preview"
-import type { SliderDef } from "../../planet/screen/generation/sliders"
-import type { UnitSystem } from "../../planet/screen/shared/ui-format"
+import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
+import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import {
 	isApproxSolarLocked,
 	LazyPlanetDetailTabs,
 	useAvgTempKPreview,
-} from "../climate-preview/PlanetDetailTabs"
-import { GpsFocusButton, renderStatGrid } from "../shared/ui-atoms"
+} from "@/ui/wiki/climate-preview/PlanetDetailTabs"
+import { GpsFocusButton, renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	buildMoonPreviewDataProps,
 	buildOrbitBodyStats,
 	buildOrbitMoonStats,
-} from "../stats/orbit/body-stat-cards"
+} from "@/ui/wiki/stats/orbit/body-stat-cards"
 import {
 	appendSizeToTitle,
 	getMoonSeedBaseName,
 	getSystemBodyKindLabel,
 	resolveMoonTitle,
 	resolveOrbitBodyTitle,
-} from "../stats/orbit/body-titles"
+} from "@/ui/wiki/stats/orbit/body-titles"
 import {
 	buildTideLockStat,
 	resolveBodyTideLockSiderealDayHours,
 	resolveMoonTideLockSiderealDayHours,
-} from "../stats/orbit/tide-lock-stats"
-import { buildStarStats } from "../stats/star/star-stats"
+} from "@/ui/wiki/stats/orbit/tide-lock-stats"
+import { buildStarStats } from "@/ui/wiki/stats/star/star-stats"
+import type {
+	TidalSchedule,
+	SurfaceTidesBreakdown,
+} from "@/model/climate/tidal-schedule/types"
 
 interface LabeledOrbitBody {
 	body: SystemBody
@@ -849,7 +848,7 @@ export function GenerationPlanetNavigator({
 					? undefined
 					: isMainWorld
 						? surfaceTidesM
-						: computeSurfaceTidesM({
+						: TIDAL_SCHEDULE.computeSurfaceTidesM({
 								moons: body.moons,
 								planet: {
 									diameterKm: body.diameterKm,
@@ -1188,7 +1187,7 @@ export function GenerationPlanetNavigator({
 									: undefined,
 							),
 					}),
-					surfaceTidesM: computeMoonSurfaceTidesM({
+					surfaceTidesM: TIDAL_SCHEDULE.computeMoonSurfaceTidesM({
 						moon,
 						parent: {
 							name:

@@ -1,7 +1,7 @@
 import { describe, it } from "vitest"
-import { ALBEDO } from "./albedo"
-import { EMB_CONSTANTS } from "./constants"
-import { EnergyBalanceModel } from "./index"
+import { ALBEDO } from "@/model/climate/ebm/albedo"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
 
 // Re-fits GREENHOUSE_FACTOR for the *actual* in-game default path --
 // computeTemperature() in climate.ts builds EnergyBalanceModel with no
@@ -11,8 +11,8 @@ import { EnergyBalanceModel } from "./index"
 // to keep its own (no-feedback) fitted constant stable for comparison.
 function earthDefaultConfig(greenhouseFactor: number) {
 	return {
-		orbital: { ...EMB_CONSTANTS.orbital },
-		radius: EMB_CONSTANTS.planet.EARTH_RADIUS,
+		orbital: { ...CONSTANTS.embConstants.orbital },
+		radius: CONSTANTS.embConstants.planet.EARTH_RADIUS,
 		pressure: 1.0,
 		landFraction: ALBEDO.landFraction(),
 		greenhouseFactor,

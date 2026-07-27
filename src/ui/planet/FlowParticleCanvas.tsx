@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from "react"
-import type { FlowGrid } from "@/model/climate/wind"
+import type { FlowGrid } from "@/model/climate/wind/types"
 
 const DEG2RAD = Math.PI / 180
 const PARTICLE_HALF = 1

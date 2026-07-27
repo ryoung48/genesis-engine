@@ -4,18 +4,18 @@
  * and climate simulation.
  */
 
-import type { GenesisParams, GenesisWorld, SphereMesh, StageTiming } from ".."
+import type {
+	GenesisParams,
+	GenesisWorld,
+	SphereMesh,
+	StageTiming,
+} from "@/model"
 import {
 	DEFAULT_ORBITAL_DISTANCE_AU,
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
-} from "../celestial/star"
-import {
-	assignKoppenClimate,
-	relativeHumidityFromVaporPressure,
-	sampleMonthlyFloatRaster,
-} from "../climate"
-import { buildRegionSpatialIndex, buildSphereMesh } from "../mesh"
+} from "@/model/celestial/star"
+import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
 import {
 	computeOceanDistanceBFS,
 	countContinents,
@@ -28,13 +28,13 @@ import {
 	DEFAULT_PLANET_RADIUS_KM,
 	DEFAULT_SUBSTELLAR_LON,
 	getMaxOceanDepthKm,
-} from "../shared"
+} from "@/model/shared"
 import {
 	buildDummyBoundary,
 	buildSyntheticPlates,
 	computeSimpleDistanceFields,
 	deriveSyntheticPlates,
-} from "../tectonics"
+} from "@/model/tectonics"
 import {
 	applySeaLevelToElevation,
 	applySoilCreep,
@@ -44,14 +44,17 @@ import {
 	sharpenRidges,
 	smoothElevation,
 	warpTerrain,
-} from "../terrain"
-import { deriveProvinceSociety } from "./derive-province-society"
-import { runPostElevationPipeline } from "./post-elevation"
+} from "@/model/terrain"
+import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
+import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
 import type {
 	SampleBilinearParams,
 	SampleSingleBandFloatRasterParams,
 	SampleCategoricalRasterParams,
-} from "./types"
+} from "@/model/pipelines/types"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { KOPPEN } from "@/model/climate/koppen"
+import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 
 interface ImportParams {
 	seed: number
@@ -350,7 +353,7 @@ function attachObservedEarthHumidity(params: {
 		return
 
 	const N = mesh.numRegions
-	const observedVaporPressureMonthly = sampleMonthlyFloatRaster({
+	const observedVaporPressureMonthly = OBSERVED_EARTH.sampleMonthlyFloatRaster({
 		mesh,
 		raster: realVaporPressureMonthly,
 		rasterW: realVaporPressureWidth,
@@ -370,7 +373,7 @@ function attachObservedEarthHumidity(params: {
 			const vaporPressure = observedVaporPressureMonthly[idx]
 			const meanTemp = world.climate.real_temperature_monthly[idx]
 			if (Number.isFinite(vaporPressure) && Number.isFinite(meanTemp)) {
-				const observed = relativeHumidityFromVaporPressure({
+				const observed = HUMIDITY.relativeHumidityFromVaporPressure({
 					meanTempC: meanTemp,
 					vaporPressureKpa: vaporPressure,
 				})
@@ -1235,7 +1238,7 @@ export function importGenesisWorld(
 
 	if (post.climate.real_temperature_monthly && post.rainfall.real_monthly) {
 		t0 = performance.now()
-		post.realKoppenClimate = assignKoppenClimate({
+		post.realKoppenClimate = KOPPEN.assignKoppenClimate({
 			mesh,
 			isLand,
 			temperatureMonthly: post.climate.real_temperature_monthly,

@@ -1,6 +1,9 @@
-﻿import { PASTA_LABELS } from "@/model/climate"
-import { makeRng } from "@/model/shared"
-import { TRADE_GOOD_LABELS, TRADE_GOODS_TABLE } from "./trade-goods-table"
+﻿import { makeRng } from "@/model/shared"
+import {
+	TRADE_GOOD_LABELS,
+	TRADE_GOODS_TABLE,
+} from "@/model/economy/trade-goods-table"
+import { PASTA } from "@/model/climate/pasta"
 
 export { TRADE_GOOD_LABELS }
 
@@ -40,7 +43,7 @@ const ZONE_TO_CLIMATE: readonly (string | null)[] = [
 // CMa/CMb (Submediterranean) + CAMa/CAMb (Mediterranean) → "mediterranean"
 // Ad* (Semidesert) + Ah* (Desert) → "arid"; cold variants Adc/Ahc → "cold_arid"
 function pastaIndex(label: string): number {
-	return PASTA_LABELS.indexOf(label as (typeof PASTA_LABELS)[number])
+	return PASTA.pastaLabels.indexOf(label as (typeof PASTA.pastaLabels)[number])
 }
 const PASTA_OCEANIC = new Set([
 	pastaIndex("CDa"),

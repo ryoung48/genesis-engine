@@ -1,7 +1,7 @@
 import { describe, it } from "vitest"
-import { ALBEDO } from "./albedo"
-import { EMB_CONSTANTS } from "./constants"
-import { EnergyBalanceModel } from "./index"
+import { ALBEDO } from "@/model/climate/ebm/albedo"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
 
 // Pins Earth's greenhouseFactor for the no-ice-feedback configuration (an
 // explicit, empirically-measured whole-body albedo with the temperature-
@@ -11,10 +11,10 @@ import { EnergyBalanceModel } from "./index"
 // fitted for computeTemperature()'s actual generation behavior.
 function earthConfig(greenhouseFactor: number) {
 	return {
-		orbital: { ...EMB_CONSTANTS.orbital },
-		radius: EMB_CONSTANTS.planet.EARTH_RADIUS,
+		orbital: { ...CONSTANTS.embConstants.orbital },
+		radius: CONSTANTS.embConstants.planet.EARTH_RADIUS,
 		pressure: 1.0,
-		albedo: EMB_CONSTANTS.surface.ALBEDO.BASE,
+		albedo: CONSTANTS.embConstants.surface.ALBEDO.BASE,
 		iceAlbedoFeedback: false,
 		landFraction: ALBEDO.landFraction(),
 		greenhouseFactor,

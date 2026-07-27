@@ -1,11 +1,5 @@
 ﻿import { useMemo } from "react"
 import {
-	computeDailyLockedOrbit,
-	computeLockedSubstellarDeclinationRad,
-	computeTidalTransportParams,
-	getSubstellarDirWithOffsetAndDeclination,
-} from "@/model/climate"
-import {
 	mapLinear,
 	PLASMA_STOPS,
 	PURPLES_STOPS,
@@ -13,6 +7,7 @@ import {
 	sampleColorStops,
 } from "@/model/shared"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
+import { HEAT } from "@/model/climate/locked/heat"
 
 interface LockedClimatePreviewConfig {
 	obliquity: number
@@ -48,7 +43,7 @@ function buildLockedClimatePreview(
 		obliquity: config.obliquity,
 		seismologyTotalHeatingK: config.seismologyTotalHeatingK,
 	} as const
-	const { flux, libration, solarLongitude } = computeDailyLockedOrbit({
+	const { flux, libration, solarLongitude } = HEAT.computeDailyLockedOrbit({
 		eccentricity: config.eccentricity,
 		perihelion: config.perihelion,
 		spectralClass: config.spectralClass,
@@ -67,7 +62,7 @@ function buildLockedClimatePreview(
 		dayLabels.push(`${day}`)
 	}
 	const { T_mean_C, A1, A_night, eccAmplitude } =
-		computeTidalTransportParams(previewParams)
+		HEAT.computeTidalTransportParams(previewParams)
 
 	const heat = longitudes.map(() => new Array<number>(dayCount).fill(0))
 	const insolation = longitudes.map(() => new Array<number>(dayCount).fill(0))
@@ -83,10 +78,10 @@ function buildLockedClimatePreview(
 		const y = Math.sin(lonRad)
 
 		for (let day = 0; day < dayCount; day++) {
-			const substellar = getSubstellarDirWithOffsetAndDeclination({
+			const substellar = HEAT.getSubstellarDirWithOffsetAndDeclination({
 				substellarLon: config.substellarLon,
 				lonOffsetRad: libration[day],
-				declinationRad: computeLockedSubstellarDeclinationRad({
+				declinationRad: HEAT.computeLockedSubstellarDeclinationRad({
 					obliquity: config.obliquity,
 					solarLongitudeRad: solarLongitude[day],
 				}),

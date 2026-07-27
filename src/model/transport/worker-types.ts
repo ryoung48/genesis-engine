@@ -5,10 +5,10 @@ import type {
 	GenesisPartition,
 	GenesisProvinces,
 	StageTiming,
-} from ".."
-import type { TideLock } from "../celestial/orbit-body/types"
-import type { TidalSchedule } from "../climate/tidal-schedule"
-import type { HistoryNote } from "../history"
+} from "@/model"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { HistoryNote } from "@/model/history"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 
 interface SerializedSphereMesh {
 	numRegions: number

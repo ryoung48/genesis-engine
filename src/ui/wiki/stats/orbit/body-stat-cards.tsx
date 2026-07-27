@@ -11,21 +11,20 @@ import type {
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
-import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { estimateAlbedo } from "@/ui/hooks/useEbmPreview"
-import type { GenerationPreviewTab } from "../../../planet/screen/generation/generation-preview"
-import type { SliderDef } from "../../../planet/screen/generation/sliders"
-import type { UnitSystem } from "../../../planet/screen/shared/ui-format"
-import { LazyPlanetDetailTabs } from "../../climate-preview/PlanetDetailTabs"
+import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
+import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
 import {
 	updateBodyDiameter,
 	updateBodyOrbitalDistance,
 	updateMoonDiameter,
 	updateMoonSemiMajorAxis,
-} from "./body-mutations"
-import { ORBIT_STAT_HELP } from "./constants"
+} from "@/ui/wiki/stats/orbit/body-mutations"
+import { ORBIT_STAT_HELP } from "@/ui/wiki/stats/orbit/constants"
 import {
 	buildPressureAtmosphereProfile,
 	describeTemperatureK,
@@ -38,13 +37,14 @@ import {
 	formatHydrosphereValuePrefix,
 	formatHydrosphereValueSuffix,
 	formatPressureBar,
-} from "./formatters"
-import { buildSeismologyStats } from "./seismology-stats"
+} from "@/ui/wiki/stats/orbit/formatters"
+import { buildSeismologyStats } from "@/ui/wiki/stats/orbit/seismology-stats"
 import {
 	buildDayLengthStats,
 	buildDirectionalAngleEditorConfig,
 	buildSubstellarLonStat,
-} from "./tide-lock-stats"
+} from "@/ui/wiki/stats/orbit/tide-lock-stats"
+import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule/types"
 
 function buildGroupClassStat(
 	group: string | undefined,

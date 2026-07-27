@@ -4,10 +4,6 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { SYSTEM } from "@/model/celestial/system"
 import type { SystemBody } from "@/model/celestial/system/types"
-import type {
-	SurfaceTidesBreakdown,
-	TidalSchedule,
-} from "@/model/climate/tidal-schedule"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
@@ -42,6 +38,10 @@ import {
 import { type WarWikiData, WarWikiPage } from "@/ui/wiki/war/WarWikiPage"
 import type { SocietyEra } from "@/model/society/types"
 import { ERAS } from "@/model/society/eras"
+import type {
+	TidalSchedule,
+	SurfaceTidesBreakdown,
+} from "@/model/climate/tidal-schedule/types"
 
 interface GenerationPanelProps {
 	worldTab: "planet" | "society"

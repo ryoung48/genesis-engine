@@ -1,6 +1,5 @@
 ﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import { getClimateGeometry } from "@/model/climate"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getMaxOceanDepthKm,
@@ -15,7 +14,8 @@ import {
 	formatTemperature,
 	formatTemperatureDelta,
 	type UnitSystem,
-} from "../shared/ui-format"
+} from "@/ui/planet/screen/shared/ui-format"
+import { RAIN } from "@/model/climate/rain"
 
 export interface PlanetStat {
 	label: string
@@ -148,7 +148,7 @@ export function computePlanetStats(
 
 	let poleEqGradientC: number | null = null
 	if (world?.climate?.temperature_avg && world?.mesh?.r_xyz) {
-		const { latDeg } = getClimateGeometry(world.mesh)
+		const { latDeg } = RAIN.getClimateGeometry(world.mesh)
 		const temp = world.climate.temperature_avg
 		let eqSum = 0,
 			eqCount = 0,

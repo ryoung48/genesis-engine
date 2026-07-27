@@ -2,13 +2,6 @@
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import {
-	BIOME_LABELS,
-	CLIMATE_LABELS,
-	EMB_CONSTANTS,
-	EnergyBalanceModel,
-	PASTA_LABELS,
-} from "@/model/climate"
 import { TRADE_GOOD_LABELS } from "@/model/economy"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
@@ -18,6 +11,10 @@ import type { GenesisParams } from "@/model"
 import type { GenesisWorld } from "@/model/world"
 import { generateGenesisWorld } from "@/model/pipelines/generate-world"
 import { ERAS } from "@/model/society/eras"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
 
 const SMOKE_PLANET_SEED = 14963991
 const SMOKE_PLANET_CODE = encodePlanetCode(SMOKE_PLANET_SEED, {
@@ -91,7 +88,7 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 			PERIHELION: previewConfig.perihelion,
 		},
 		stellar: {
-			...EMB_CONSTANTS.stellar,
+			...CONSTANTS.embConstants.stellar,
 			T_SUN: STAR.getStarTemperatureK({
 				cls: previewConfig.spectralClass as MainSequenceClass,
 				subtype: previewConfig.starSubtype,
@@ -101,7 +98,7 @@ function computePreviewAverageTempC(params: GenesisParams): number {
 			HOURS_PER_DAY: previewConfig.hoursPerDay,
 			YEAR_LENGTH_DAYS: previewConfig.daysPerYear,
 		},
-		landFraction: new Array(EMB_CONSTANTS.grid.NUM_LAT).fill(
+		landFraction: new Array(CONSTANTS.embConstants.grid.NUM_LAT).fill(
 			previewConfig.landFraction,
 		),
 		radius: previewConfig.radius * 1000,
@@ -293,13 +290,17 @@ describe("full world smoke generation", () => {
 		console.info("Smoke world fingerprint", fingerprint)
 		console.info("Hotspot above-water summary", world.volcanism.hotspotExposure)
 		console.info("Vegetation distribution")
-		console.table(summarizeDistribution(world.vegetation, BIOME_LABELS, [0]))
+		console.table(
+			summarizeDistribution(world.vegetation, VEGETATION.biomeLabels, [0]),
+		)
 		console.info("Basic climate distribution")
 		console.table(
-			summarizeDistribution(world.climateZones, CLIMATE_LABELS, [0]),
+			summarizeDistribution(world.climateZones, VEGETATION.climateLabels, [0]),
 		)
 		console.info("Pasta climate distribution")
-		console.table(summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]))
+		console.table(
+			summarizeDistribution(world.pastaClimate, PASTA.pastaLabels, [0]),
+		)
 		console.info("Topography distribution")
 		console.table(
 			summarizeDistribution(
@@ -480,7 +481,7 @@ describe("full world smoke generation", () => {
 				maxTempC: Number(summary.maxTempC.toFixed(1)),
 			})
 			console.table(
-				summarizeDistribution(world.pastaClimate, PASTA_LABELS, [0]),
+				summarizeDistribution(world.pastaClimate, PASTA.pastaLabels, [0]),
 			)
 			return { name, summary, exposure }
 		})

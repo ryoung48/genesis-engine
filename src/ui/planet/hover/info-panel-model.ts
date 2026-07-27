@@ -1,5 +1,4 @@
 import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
-import { koppenClimateColor, pastaClimateColor } from "@/model/climate"
 import { tradeGoodColor } from "@/model/economy"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
@@ -41,6 +40,8 @@ import {
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/planet/hover/hover"
 import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
+import { KOPPEN } from "@/model/climate/koppen"
+import { PASTA } from "@/model/climate/pasta"
 
 interface HoverChartData {
 	temps: number[]
@@ -267,13 +268,17 @@ export function buildClimateSwatchColor(
 			: null
 	}
 	if (colorMode === "pastaClimate" && world.pastaClimate)
-		return rgbToCss(pastaClimateColor(world.pastaClimate[hoverRegion]))
+		return rgbToCss(PASTA.pastaClimateColor(world.pastaClimate[hoverRegion]))
 	if (colorMode === "koppenClimate" && world.koppenClimate)
-		return rgbToCss(koppenClimateColor(world.koppenClimate[hoverRegion]))
+		return rgbToCss(KOPPEN.koppenClimateColor(world.koppenClimate[hoverRegion]))
 	if (colorMode === "realPastaClimate" && world.realPastaClimate)
-		return rgbToCss(pastaClimateColor(world.realPastaClimate[hoverRegion]))
+		return rgbToCss(
+			PASTA.pastaClimateColor(world.realPastaClimate[hoverRegion]),
+		)
 	if (colorMode === "realKoppenClimate" && world.realKoppenClimate)
-		return rgbToCss(koppenClimateColor(world.realKoppenClimate[hoverRegion]))
+		return rgbToCss(
+			KOPPEN.koppenClimateColor(world.realKoppenClimate[hoverRegion]),
+		)
 	if (colorMode === "realTemperature" && world.climate?.real_temperature_avg)
 		return rgbToCss(
 			climateTempColor(world.climate.real_temperature_avg[hoverRegion]),

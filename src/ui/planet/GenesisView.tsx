@@ -18,28 +18,6 @@ import type {
 	SolarSystemState,
 	SystemBody,
 } from "@/model/celestial/system/types"
-import { apparentTemperatureC } from "@/model/climate/apparent-temp"
-import { relativeHumidityFromTempRange } from "@/model/climate/humidity"
-import {
-	computeMonthlyLibration,
-	computeMonthlyLockedDeclination,
-	getSubstellarDirWithOffsetAndDeclination,
-} from "@/model/climate/locked/heat"
-import { buildLockedOceanCurrentGrid } from "@/model/climate/locked/ocean-currents"
-import { buildOceanCurrentGrid } from "@/model/climate/ocean-currents"
-import {
-	computeThermalEquatorLine,
-	getClimateGeometry,
-} from "@/model/climate/rain"
-import {
-	buildSurfaceTidesSeismologyCallbacks,
-	computeMoonSurfaceTidesM,
-	computeMoonTidalSchedule,
-	computeSurfaceTidesM,
-	computeTidalSchedule,
-} from "@/model/climate/tidal-schedule"
-import { BIOME_LABELS, CLIMATE_LABELS } from "@/model/climate/vegetation"
-import { computeWindGrid, computeWindVectors } from "@/model/climate/wind"
 import {
 	dynastyColor,
 	hashColorForKey,
@@ -295,6 +273,15 @@ import { WindParticleCanvas } from "@/ui/planet/WindParticleCanvas"
 import type { SocietyEra } from "@/model/society/types"
 import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
+import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
+import { RAIN } from "@/model/climate/rain"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { VEGETATION } from "@/model/climate/vegetation"
+import { WIND } from "@/model/climate/wind"
+import { HEAT } from "@/model/climate/locked/heat"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -1807,10 +1794,11 @@ export const GenesisView: React.FC = () => {
 		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
 			: DEFAULT_SPECTRAL_CLASS
-		const surfaceTidesCallbacks = buildSurfaceTidesSeismologyCallbacks({
-			spectralClass,
-			starSubtype,
-		})
+		const surfaceTidesCallbacks =
+			TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({
+				spectralClass,
+				starSubtype,
+			})
 		if (restSeed === SYSTEM.SOL_SEED) {
 			return {
 				starAgeGyr: SOL_STAR_AGE_GYR,
@@ -2765,7 +2753,7 @@ export const GenesisView: React.FC = () => {
 			return null
 		const month =
 			resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
-		return computeWindVectors({
+		return WIND.computeWindVectors({
 			mesh: world.mesh,
 			climate: world.climate,
 			elevation_km: world.elevation_km,
@@ -2805,7 +2793,7 @@ export const GenesisView: React.FC = () => {
 				return
 			}
 			results.push(
-				computeWindVectors({
+				WIND.computeWindVectors({
 					mesh: world.mesh,
 					climate: world.climate,
 					elevation_km: world.elevation_km,
@@ -2868,7 +2856,7 @@ export const GenesisView: React.FC = () => {
 
 	const windStats = useMemo(() => {
 		if (!world?.climate) return null
-		const vectors = computeWindVectors({
+		const vectors = WIND.computeWindVectors({
 			mesh: world.mesh,
 			climate: world.climate,
 			elevation_km: world.elevation_km,
@@ -3106,7 +3094,7 @@ export const GenesisView: React.FC = () => {
 						const dtr = monthlyDtr
 							? (monthlyDtr[offset + r] ?? worldForDisplay.dtr_annual[r])
 							: worldForDisplay.dtr_annual[r]
-						humidity = relativeHumidityFromTempRange({
+						humidity = HUMIDITY.relativeHumidityFromTempRange({
 							meanTempC: meanT,
 							dtrC: dtr,
 							annualRainfallMm: worldForDisplay.rainfall?.annual[r],
@@ -3126,7 +3114,7 @@ export const GenesisView: React.FC = () => {
 						}
 						annualAridity = petSum > 0 ? aetSum / petSum : 1
 					}
-					humidity = relativeHumidityFromTempRange({
+					humidity = HUMIDITY.relativeHumidityFromTempRange({
 						meanTempC: meanT,
 						dtrC: dtr,
 						annualAridity,
@@ -3134,7 +3122,7 @@ export const GenesisView: React.FC = () => {
 					})
 				}
 				const [cr, cg, cb] = miseryColor(
-					apparentTemperatureC({
+					APPARENT_TEMP.apparentTemperatureC({
 						tempC: meanT,
 						rhPercent: humidity,
 						windSpeedMs: windSpeed[r],
@@ -3562,7 +3550,7 @@ export const GenesisView: React.FC = () => {
 						(resolvedClimateMonth - 1) * N,
 						resolvedClimateMonth * N,
 					)
-		return computeThermalEquatorLine({ mesh: world.mesh, temps })
+		return RAIN.computeThermalEquatorLine({ mesh: world.mesh, temps })
 	}, [resolvedClimateMonth, world])
 
 	useEffect(() => {
@@ -3573,7 +3561,7 @@ export const GenesisView: React.FC = () => {
 
 	const windGrid = useMemo(() => {
 		if (!windVectors || !world) return null
-		return computeWindGrid({
+		return WIND.computeWindGrid({
 			mesh: world.mesh,
 			windU: windVectors.windU,
 			windV: windVectors.windV,
@@ -3589,9 +3577,9 @@ export const GenesisView: React.FC = () => {
 			monthlyWarmth && currentMonth > 0
 				? monthlyWarmth.subarray((currentMonth - 1) * N, currentMonth * N)
 				: world.oceanCurrents.oceanWarmth
-		const { latDeg, lonDeg } = getClimateGeometry(world.mesh)
+		const { latDeg, lonDeg } = RAIN.getClimateGeometry(world.mesh)
 		if (world.params.tideLock?.type === "solar") {
-			return buildLockedOceanCurrentGrid({
+			return LOCKED_OCEAN_CURRENTS.buildLockedOceanCurrentGrid({
 				mesh: world.mesh,
 				oceanWarmth: warmth,
 				isLand: world.isLand,
@@ -3601,7 +3589,7 @@ export const GenesisView: React.FC = () => {
 				currentMonth,
 			})
 		}
-		return buildOceanCurrentGrid({
+		return OCEAN_CURRENTS.buildOceanCurrentGrid({
 			mesh: world.mesh,
 			oceanWarmth: warmth,
 			isLand: world.isLand,
@@ -3635,16 +3623,16 @@ export const GenesisView: React.FC = () => {
 		scene.setSolarTerminatorVisible(showDaylight)
 		if (tidallyLocked) {
 			const selectedMonth = clockMonthMode === "annual" ? 5 : clockMonth
-			const monthlyLibration = computeMonthlyLibration({
+			const monthlyLibration = HEAT.computeMonthlyLibration({
 				eccentricity,
 				perihelion,
 			})
-			const monthlyDeclination = computeMonthlyLockedDeclination({
+			const monthlyDeclination = HEAT.computeMonthlyLockedDeclination({
 				obliquity,
 				eccentricity,
 				perihelion,
 			})
-			const [sx, sy, sz] = getSubstellarDirWithOffsetAndDeclination({
+			const [sx, sy, sz] = HEAT.getSubstellarDirWithOffsetAndDeclination({
 				substellarLon,
 				lonOffsetRad: monthlyLibration[selectedMonth] ?? 0,
 				declinationRad: monthlyDeclination[selectedMonth] ?? 0,
@@ -4074,7 +4062,7 @@ export const GenesisView: React.FC = () => {
 						(index) => rgbToCss(EU5_CLIMATE_COLORS[index]),
 					)
 				: buildDistribution(
-						CLIMATE_LABELS,
+						VEGETATION.climateLabels,
 						world?.climateZones,
 						(index) => rgbToCss(climateZoneColor(index)),
 						new Set([0]),
@@ -4091,7 +4079,7 @@ export const GenesisView: React.FC = () => {
 						(index) => rgbToCss(EU5_VEGETATION_COLORS[index]),
 					)
 				: buildDistribution(
-						BIOME_LABELS,
+						VEGETATION.biomeLabels,
 						world?.vegetation,
 						(index) => rgbToCss(vegetationColor(index)),
 						new Set([0]),
@@ -6483,7 +6471,7 @@ export const GenesisView: React.FC = () => {
 					(index) => rgbToCss(EU5_CLIMATE_COLORS[index]),
 				)
 			: buildDistributionForRegions(
-					CLIMATE_LABELS,
+					VEGETATION.climateLabels,
 					world.climateZones,
 					regionIndexes,
 					(index) => rgbToCss(climateZoneColor(index)),
@@ -6497,7 +6485,7 @@ export const GenesisView: React.FC = () => {
 					(index) => rgbToCss(EU5_VEGETATION_COLORS[index]),
 				)
 			: buildDistributionForRegions(
-					BIOME_LABELS,
+					VEGETATION.biomeLabels,
 					world.vegetation,
 					regionIndexes,
 					(index) => rgbToCss(vegetationColor(index)),
@@ -7055,7 +7043,7 @@ export const GenesisView: React.FC = () => {
 					(index) => rgbToCss(EU5_CLIMATE_COLORS[index]),
 				)
 			: buildDistributionForRegions(
-					CLIMATE_LABELS,
+					VEGETATION.climateLabels,
 					world.climateZones,
 					regionIndexes,
 					(index) => rgbToCss(climateZoneColor(index)),
@@ -7069,7 +7057,7 @@ export const GenesisView: React.FC = () => {
 					(index) => rgbToCss(EU5_VEGETATION_COLORS[index]),
 				)
 			: buildDistributionForRegions(
-					BIOME_LABELS,
+					VEGETATION.biomeLabels,
 					world.vegetation,
 					regionIndexes,
 					(index) => rgbToCss(vegetationColor(index)),
@@ -8008,7 +7996,7 @@ export const GenesisView: React.FC = () => {
 
 	const tidalSchedulePreview = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
-			return computeMoonTidalSchedule({
+			return TIDAL_SCHEDULE.computeMoonTidalSchedule({
 				moon: focusedMoon,
 				parent: {
 					idx: focusedMoonParent.idx,
@@ -8038,7 +8026,10 @@ export const GenesisView: React.FC = () => {
 			eccentricity,
 			perihelion,
 		}
-		return computeTidalSchedule({ moons: displayMoons, params: scheduleParams })
+		return TIDAL_SCHEDULE.computeTidalSchedule({
+			moons: displayMoons,
+			params: scheduleParams,
+		})
 	}, [
 		focusedMoon,
 		focusedMoonParent,
@@ -8058,7 +8049,7 @@ export const GenesisView: React.FC = () => {
 	const solStarName = restSeed === SYSTEM.SOL_SEED ? "Sol" : undefined
 	const surfaceTidesM = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
-			return computeMoonSurfaceTidesM({
+			return TIDAL_SCHEDULE.computeMoonSurfaceTidesM({
 				moon: focusedMoon,
 				parent: {
 					name:
@@ -8077,7 +8068,7 @@ export const GenesisView: React.FC = () => {
 				},
 			})
 		}
-		return computeSurfaceTidesM({
+		return TIDAL_SCHEDULE.computeSurfaceTidesM({
 			moons: displayMoons,
 			planet: { diameterKm: planetRadiusKm * 2, tideLock },
 			params: {

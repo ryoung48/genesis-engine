@@ -1,8 +1,6 @@
-import type { PastaDebug } from "./climate/pasta"
-import type { TidalSchedule } from "./climate/tidal-schedule"
-import type { LocationTradeGoods } from "./economy/trade-goods"
-import type { GenesisLandmarks } from "./terrain/landmarks"
-import type { Route, RouteEdge } from "./transport/worker-types"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -24,8 +22,10 @@ import type {
 	SphereMesh,
 	StageTiming,
 	TectonicPlate,
-} from "./types"
-import type { ProvincePopulation } from "./society/types";
+} from "@/model/types"
+import type { ProvincePopulation } from "@/model/society/types"
+import type { PastaDebug } from "@/model/climate/types"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 
 export interface GenesisWorld {
 	mesh: SphereMesh

@@ -1,5 +1,4 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
-import type { WindArrowData } from "@/model/climate"
 import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
@@ -8,13 +7,14 @@ import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
 } from "@/model/transport"
-import type { ColorMode } from "../colors"
-import type { LabelMode } from "../controls/OverlayControls"
+import type { ColorMode } from "@/ui/planet/colors"
+import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
 import type {
 	ColorForRawId,
 	ElevationKmForLonLat,
-} from "./eu4-nation-fill-overlay"
-import type { SolarSystemOverlayParams } from "./solar-system-overlay"
+} from "@/ui/planet/renderer/eu4-nation-fill-overlay"
+import type { SolarSystemOverlayParams } from "@/ui/planet/renderer/solar-system-overlay"
+import type { WindArrowData } from "@/model/climate/wind/types"
 
 export type { WindArrowData }
 

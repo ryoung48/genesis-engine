@@ -25,37 +25,6 @@ import { MOON } from "@/model/celestial/moons"
 import { SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
 import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import type { PastaDebug } from "@/model/climate"
-import {
-	applyCurrentTemperatureEffect,
-	applyDtrToClimateMinMax,
-	assignClimateZones,
-	assignEarthClimateZones,
-	assignEarthPastaClimate,
-	assignKoppenClimate,
-	assignPastaClimate,
-	assignVegetation,
-	attachObservedEarthClimate,
-	attachObservedEarthDtr,
-	attachObservedEarthRainfall,
-	computeAdvection,
-	computeCoastalMask,
-	computeCycloneRisk,
-	computeDiurnalRange,
-	computeHydrologyFields,
-	computeIceAccumulation,
-	computeLandFraction,
-	computeMonthlyRain,
-	computeOceanCurrents,
-	computeSpringTideMap,
-	computeTemperature,
-	computeThermalEquator,
-	computeTidalSchedule,
-	computeTornadoRisk,
-	fillPetMonthlyHargreaves,
-	refreshClimatePetMonthly,
-} from "@/model/climate"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule"
 import { computeTradeGoods, type LocationTradeGoods } from "@/model/economy"
 import {
 	computeCoastDistances,
@@ -79,6 +48,23 @@ import {
 import type { ProvincePopulation } from "@/model/society/types"
 import { ERAS } from "@/model/society/eras"
 import { POPULATION } from "@/model/society/population"
+import type { PastaDebug } from "@/model/climate/types"
+import { CLIMATE } from "@/model/climate/climate"
+import { CYCLONES } from "@/model/climate/cyclones"
+import { DTR } from "@/model/climate/dtr"
+import { HYDROLOGY } from "@/model/climate/hydrology"
+import { ICE } from "@/model/climate/ice"
+import { KOPPEN } from "@/model/climate/koppen"
+import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
+import { PASTA } from "@/model/climate/pasta"
+import { RAIN } from "@/model/climate/rain"
+import { TIDAL_MAP } from "@/model/climate/tidal-map"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { TIDES } from "@/model/climate/tides"
+import { TORNADOES } from "@/model/climate/tornadoes"
+import { VEGETATION } from "@/model/climate/vegetation"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 
 /**
  * Real (non-procedural) river network for the Earth-import path, already
@@ -305,8 +291,8 @@ export function runPostElevationPipeline(
 
 	// ── Climate ────────────────────────────────────────────────────────
 	let t0 = performance.now()
-	const landFraction = computeLandFraction({ mesh, isLand })
-	let climate = computeTemperature({
+	const landFraction = CLIMATE.computeLandFraction({ mesh, isLand })
+	let climate = CLIMATE.computeTemperature({
 		mesh,
 		elevation,
 		landFraction,
@@ -326,7 +312,7 @@ export function runPostElevationPipeline(
 	t0 = performance.now()
 	const monthlyTEQ: Float32Array[] = new Array(12)
 	for (let month = 0; month < 12; month++) {
-		monthlyTEQ[month] = computeThermalEquator({
+		monthlyTEQ[month] = RAIN.computeThermalEquator({
 			mesh,
 			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 		})
@@ -336,7 +322,7 @@ export function runPostElevationPipeline(
 
 	// ── Moisture advection ─────────────────────────────────────────────
 	t0 = performance.now()
-	const { east: eastAdv, west: westAdv } = computeAdvection({
+	const { east: eastAdv, west: westAdv } = RAIN.computeAdvection({
 		mesh,
 		elevation,
 		distCoast,
@@ -351,7 +337,7 @@ export function runPostElevationPipeline(
 	// ── Ocean currents ─────────────────────────────────────────────────
 	t0 = performance.now()
 	const oceanCurrents = enableOceanCurrents
-		? computeOceanCurrents({
+		? OCEAN_CURRENTS.computeOceanCurrents({
 				mesh,
 				isLand,
 				distCoast,
@@ -363,7 +349,7 @@ export function runPostElevationPipeline(
 	if (enableOceanCurrents) record("Post: ocean currents", t0)
 	if (oceanCurrents) {
 		t0 = performance.now()
-		applyCurrentTemperatureEffect({
+		OCEAN_CURRENTS.applyCurrentTemperatureEffect({
 			mesh,
 			climate,
 			isLand,
@@ -371,13 +357,13 @@ export function runPostElevationPipeline(
 			monthlyTEQ,
 			params,
 		})
-		refreshClimatePetMonthly({ climate, params })
+		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		record("Post: current temperature effect", t0)
 	}
 
 	// ── Rainfall ───────────────────────────────────────────────────────
 	t0 = performance.now()
-	const rain = computeMonthlyRain({
+	const rain = RAIN.computeMonthlyRain({
 		mesh,
 		climate,
 		eastAdv,
@@ -406,8 +392,8 @@ export function runPostElevationPipeline(
 	})
 	if (drainedClosedWater) {
 		t0 = performance.now()
-		const updatedLandFraction = computeLandFraction({ mesh, isLand })
-		climate = computeTemperature({
+		const updatedLandFraction = CLIMATE.computeLandFraction({ mesh, isLand })
+		climate = CLIMATE.computeTemperature({
 			mesh,
 			elevation,
 			landFraction: updatedLandFraction,
@@ -417,13 +403,13 @@ export function runPostElevationPipeline(
 			elevation_km,
 		})
 		for (let month = 0; month < 12; month++) {
-			monthlyTEQ[month] = computeThermalEquator({
+			monthlyTEQ[month] = RAIN.computeThermalEquator({
 				mesh,
 				temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 			})
 		}
 		if (oceanCurrents) {
-			applyCurrentTemperatureEffect({
+			OCEAN_CURRENTS.applyCurrentTemperatureEffect({
 				mesh,
 				climate,
 				isLand,
@@ -431,14 +417,14 @@ export function runPostElevationPipeline(
 				monthlyTEQ,
 				params,
 			})
-			refreshClimatePetMonthly({ climate, params })
+			HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 		}
 		record("Post: drain arid closed water", t0)
 	}
 
 	// ── Diurnal temperature range + PET ───────────────────────────────
 	t0 = performance.now()
-	let { monthly: dtr_monthly, annual: dtr_annual } = computeDiurnalRange({
+	let { monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
 		rainfall,
 		elevationKm: elevation_km,
 		oceanDist,
@@ -446,19 +432,19 @@ export function runPostElevationPipeline(
 		params,
 		daylight_hours_monthly: climate.daylight_hours_monthly,
 	})
-	fillPetMonthlyHargreaves({
+	HYDROLOGY.fillPetMonthlyHargreaves({
 		temperatureMonthly: climate.temperature_monthly,
 		rangeMonthly: dtr_monthly,
 		insolationMonthly: climate.insolation_monthly,
 		petMonthly: climate.pet_monthly,
 		dpm: params.daysPerYear / 12,
 	})
-	applyDtrToClimateMinMax({ climate, dtr_monthly, N })
+	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
 	record("Post: dtr + pet", t0)
 	onProgress?.("Post: dtr + pet", 56)
 
 	t0 = performance.now()
-	const hydrology = computeHydrologyFields({
+	const hydrology = HYDROLOGY.computeHydrologyFields({
 		climate,
 		rainfall,
 		isLand: riverLand,
@@ -536,7 +522,7 @@ export function runPostElevationPipeline(
 		computeCoastDistances(mesh, isLand, params.planetRadiusKm).distCoast,
 	)
 	oceanDist.set(computeOceanDistanceBFS(mesh, isLand, params.planetRadiusKm))
-	climate = computeTemperature({
+	climate = CLIMATE.computeTemperature({
 		mesh,
 		elevation,
 		landFraction,
@@ -546,13 +532,13 @@ export function runPostElevationPipeline(
 		elevation_km,
 	})
 	for (let month = 0; month < 12; month++) {
-		monthlyTEQ[month] = computeThermalEquator({
+		monthlyTEQ[month] = RAIN.computeThermalEquator({
 			mesh,
 			temps: climate.temperature_monthly.subarray(month * N, (month + 1) * N),
 		})
 	}
 	if (oceanCurrents) {
-		applyCurrentTemperatureEffect({
+		OCEAN_CURRENTS.applyCurrentTemperatureEffect({
 			mesh,
 			climate,
 			isLand,
@@ -560,9 +546,9 @@ export function runPostElevationPipeline(
 			monthlyTEQ,
 			params,
 		})
-		refreshClimatePetMonthly({ climate, params })
+		HYDROLOGY.refreshClimatePetMonthly({ climate, params })
 	}
-	;({ monthly: dtr_monthly, annual: dtr_annual } = computeDiurnalRange({
+	;({ monthly: dtr_monthly, annual: dtr_annual } = DTR.computeDiurnalRange({
 		rainfall,
 		elevationKm: elevation_km,
 		oceanDist,
@@ -570,14 +556,14 @@ export function runPostElevationPipeline(
 		params,
 		daylight_hours_monthly: climate.daylight_hours_monthly,
 	}))
-	fillPetMonthlyHargreaves({
+	HYDROLOGY.fillPetMonthlyHargreaves({
 		temperatureMonthly: climate.temperature_monthly,
 		rangeMonthly: dtr_monthly,
 		insolationMonthly: climate.insolation_monthly,
 		petMonthly: climate.pet_monthly,
 		dpm: params.daysPerYear / 12,
 	})
-	applyDtrToClimateMinMax({ climate, dtr_monthly, N })
+	CLIMATE.applyDtrToClimateMinMax({ climate, dtr_monthly, N })
 	record("Post: landmarks + distances + temperature (post-lake)", t0)
 	onProgress?.("Post: landmarks", 62)
 
@@ -594,7 +580,7 @@ export function runPostElevationPipeline(
 		realClimateScale !== undefined &&
 		realClimateNoData !== undefined
 	) {
-		attachObservedEarthClimate({
+		OBSERVED_EARTH.attachObservedEarthClimate({
 			mesh,
 			climate,
 			realClimateMonthly,
@@ -613,7 +599,7 @@ export function runPostElevationPipeline(
 		realPrecipScale !== undefined &&
 		realPrecipNoData !== undefined
 	) {
-		attachObservedEarthRainfall({
+		OBSERVED_EARTH.attachObservedEarthRainfall({
 			mesh,
 			rainfall,
 			realPrecipMonthly,
@@ -633,7 +619,7 @@ export function runPostElevationPipeline(
 		realDtrNoData !== undefined
 	) {
 		const dtrHolder = { dtr_monthly, observedDtr }
-		attachObservedEarthDtr({
+		OBSERVED_EARTH.attachObservedEarthDtr({
 			mesh,
 			world: dtrHolder,
 			realDtrMonthly,
@@ -650,8 +636,8 @@ export function runPostElevationPipeline(
 
 	// ── Ice (needed for pasta climate) ─────────────────────────────────
 	t0 = performance.now()
-	const { iceThickness, iceMinMonthly, iceMaxMonthly } = computeIceAccumulation(
-		{
+	const { iceThickness, iceMinMonthly, iceMaxMonthly } =
+		ICE.computeIceAccumulation({
 			mesh,
 			climate,
 			rainfall,
@@ -659,14 +645,13 @@ export function runPostElevationPipeline(
 			distCoast,
 			cycles: 15,
 			planetRadiusKm: params.planetRadiusKm,
-		},
-	)
+		})
 	record("Post: ice", t0)
 	onProgress?.("Post: ice", 58)
 
 	// ── Pasta climate (needed before vegetation) ───────────────────────
 	t0 = performance.now()
-	const pastaResult = assignPastaClimate({
+	const pastaResult = PASTA.assignPastaClimate({
 		mesh,
 		isLand,
 		climate,
@@ -684,7 +669,7 @@ export function runPostElevationPipeline(
 	// procedural EBM output, when real temperature/rainfall are attached.
 	const earthPastaResult =
 		climate.real_temperature_monthly && rainfall.real_monthly
-			? assignEarthPastaClimate({
+			? PASTA.assignEarthPastaClimate({
 					mesh,
 					isLand,
 					climate,
@@ -720,7 +705,7 @@ export function runPostElevationPipeline(
 		}
 		garField[r] = petGdd > 0 ? aetGdd / petGdd : 1
 	}
-	const vegetation = assignVegetation({
+	const vegetation = VEGETATION.assignVegetation({
 		mesh,
 		isLand,
 		climate,
@@ -737,14 +722,14 @@ export function runPostElevationPipeline(
 	// Computed before topography so the tidal bonus can nudge coastal marsh
 	// formation in classifyTopography.
 	t0 = performance.now()
-	const coastalMask = computeCoastalMask({ mesh, isLand })
+	const coastalMask = TIDES.computeCoastalMask({ mesh, isLand })
 	const cls = STAR.isValidSpectralClass(params.spectralClass)
 		? (params.spectralClass as MainSequenceClass)
 		: DEFAULT_SPECTRAL_CLASS
 	const starMassKg =
 		STAR.getStarMassSol({ cls, subtype: params.starSubtype ?? 5 }) *
 		SOLAR_MASS_KG
-	const tidalSchedule = computeTidalSchedule({
+	const tidalSchedule = TIDAL_SCHEDULE.computeTidalSchedule({
 		moons: MOON.generateMoons({
 			count: 1,
 			seed: params.seed + 8831,
@@ -754,7 +739,7 @@ export function runPostElevationPipeline(
 		}),
 		params,
 	})
-	const tidalRange = computeSpringTideMap({
+	const tidalRange = TIDAL_MAP.computeSpringTideMap({
 		mesh,
 		isLand,
 		isCoastal: coastalMask,
@@ -806,8 +791,8 @@ export function runPostElevationPipeline(
 	// ── Climate zones ──────────────────────────────────────────────────
 	t0 = performance.now()
 	const climateZones =
-		assignEarthClimateZones({ mesh, isLand, climate }) ??
-		assignClimateZones({
+		VEGETATION.assignEarthClimateZones({ mesh, isLand, climate }) ??
+		VEGETATION.assignClimateZones({
 			mesh,
 			isLand,
 			temperatureAvg: climate.temperature_avg,
@@ -819,7 +804,7 @@ export function runPostElevationPipeline(
 
 	// ── Koppen climate ─────────────────────────────────────────────────
 	t0 = performance.now()
-	const koppenClimate = assignKoppenClimate({
+	const koppenClimate = KOPPEN.assignKoppenClimate({
 		mesh,
 		isLand,
 		temperatureMonthly: climate.temperature_monthly,
@@ -842,7 +827,7 @@ export function runPostElevationPipeline(
 	onProgress?.("Post: hazards", 70)
 
 	t0 = performance.now()
-	const cycloneRisk = computeCycloneRisk({
+	const cycloneRisk = CYCLONES.computeCycloneRisk({
 		mesh,
 		climate,
 		isLand,
@@ -853,7 +838,7 @@ export function runPostElevationPipeline(
 	record("Post: cyclones", t0)
 
 	t0 = performance.now()
-	const tornadoRisk = computeTornadoRisk({
+	const tornadoRisk = TORNADOES.computeTornadoRisk({
 		mesh,
 		temperatureAvg: climate.temperature_avg,
 		temperatureMax: climate.temperature_max,

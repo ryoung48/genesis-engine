@@ -2,16 +2,6 @@ import {
 	GENESIS_TERRAIN_FEATURE_LABELS,
 	GENESIS_TOPOGRAPHY_LABELS,
 } from "@/model"
-import {
-	apparentTemperatureC,
-	BIOME_LABELS,
-	CLIMATE_LABELS,
-	KOPPEN_LABELS,
-	koppenClimateName,
-	PASTA_LABELS,
-	pastaClimateName,
-	relativeHumidityFromTempRange,
-} from "@/model/climate"
 import { TRADE_GOOD_LABELS } from "@/model/economy"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
@@ -29,6 +19,11 @@ import type {
 	GetHoverClimateDisplayParams,
 } from "@/ui/planet/hover/types"
 import { TIMEZONE } from "@/model/society/timezone"
+import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { KOPPEN } from "@/model/climate/koppen"
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
 
 export interface HoverInfo {
 	region: number
@@ -388,7 +383,7 @@ function getHoverModeledHumiditySeries(
 
 	const annualRainfall = world.rainfall?.annual[r]
 	const distFromOceanKm = world.oceanDist[r]
-	const annual = relativeHumidityFromTempRange({
+	const annual = HUMIDITY.relativeHumidityFromTempRange({
 		meanTempC: world.climate.temperature_avg[r],
 		dtrC: world.dtr_annual[r],
 		annualAridity,
@@ -399,7 +394,7 @@ function getHoverModeledHumiditySeries(
 	if (world.dtr_monthly && world.climate.temperature_monthly) {
 		for (let m = 0; m < 12; m++) {
 			monthly.push(
-				relativeHumidityFromTempRange({
+				HUMIDITY.relativeHumidityFromTempRange({
 					meanTempC: world.climate.temperature_monthly[m * N + r],
 					dtrC: world.dtr_monthly[m * N + r] ?? world.dtr_annual[r],
 					annualAridity,
@@ -553,13 +548,13 @@ export function getHoverMisery({
 			: modeledAnnualT
 	const annualRh =
 		observedHumidity?.annual ??
-		relativeHumidityFromTempRange({
+		HUMIDITY.relativeHumidityFromTempRange({
 			meanTempC: annualT,
 			dtrC: world.dtr_annual[r],
 			annualAridity,
 			annualRainfallMm: annualRainfall,
 		})
-	const annual = apparentTemperatureC({
+	const annual = APPARENT_TEMP.apparentTemperatureC({
 		tempC: annualT,
 		rhPercent: annualRh,
 		windSpeedMs: annualWind,
@@ -577,7 +572,7 @@ export function getHoverMisery({
 			const dtr = world.dtr_monthly[m * N + r] ?? world.dtr_annual[r]
 			const rh =
 				observedHumidity?.monthly[m] ??
-				relativeHumidityFromTempRange({
+				HUMIDITY.relativeHumidityFromTempRange({
 					meanTempC: T,
 					dtrC: dtr,
 					annualAridity,
@@ -585,7 +580,11 @@ export function getHoverMisery({
 				})
 			const wind = monthlyWindSpeedMs?.[m] ?? annualWind
 			monthly.push(
-				apparentTemperatureC({ tempC: T, rhPercent: rh, windSpeedMs: wind }),
+				APPARENT_TEMP.apparentTemperatureC({
+					tempC: T,
+					rhPercent: rh,
+					windSpeedMs: wind,
+				}),
 			)
 		}
 	}
@@ -611,7 +610,7 @@ export function getHoverClimateZone(
 			: "unmapped"
 	}
 	return hoverInfo && world?.climateZones && world?.isLand?.[hoverInfo.region]
-		? (CLIMATE_LABELS[world.climateZones[hoverInfo.region]] ?? null)
+		? (VEGETATION.climateLabels[world.climateZones[hoverInfo.region]] ?? null)
 		: null
 }
 
@@ -621,8 +620,8 @@ export function getHoverPastaClimate(
 ): { code: string | null; name: string } | null {
 	return hoverInfo && world?.pastaClimate
 		? {
-				code: PASTA_LABELS[world.pastaClimate[hoverInfo.region]] ?? null,
-				name: pastaClimateName(world.pastaClimate[hoverInfo.region]),
+				code: PASTA.pastaLabels[world.pastaClimate[hoverInfo.region]] ?? null,
+				name: PASTA.pastaClimateName(world.pastaClimate[hoverInfo.region]),
 			}
 		: null
 }
@@ -633,8 +632,9 @@ export function getHoverKoppenClimate(
 ): { code: string | null; name: string } | null {
 	return hoverInfo && world?.koppenClimate && world?.isLand?.[hoverInfo.region]
 		? {
-				code: KOPPEN_LABELS[world.koppenClimate[hoverInfo.region]] ?? null,
-				name: koppenClimateName(world.koppenClimate[hoverInfo.region]),
+				code:
+					KOPPEN.koppenLabels[world.koppenClimate[hoverInfo.region]] ?? null,
+				name: KOPPEN.koppenClimateName(world.koppenClimate[hoverInfo.region]),
 			}
 		: null
 }
@@ -645,8 +645,9 @@ export function getHoverRealPastaClimate(
 ): { code: string | null; name: string } | null {
 	return hoverInfo && world?.realPastaClimate
 		? {
-				code: PASTA_LABELS[world.realPastaClimate[hoverInfo.region]] ?? null,
-				name: pastaClimateName(world.realPastaClimate[hoverInfo.region]),
+				code:
+					PASTA.pastaLabels[world.realPastaClimate[hoverInfo.region]] ?? null,
+				name: PASTA.pastaClimateName(world.realPastaClimate[hoverInfo.region]),
 			}
 		: null
 }
@@ -659,8 +660,12 @@ export function getHoverRealKoppenClimate(
 		world?.realKoppenClimate &&
 		world?.isLand?.[hoverInfo.region]
 		? {
-				code: KOPPEN_LABELS[world.realKoppenClimate[hoverInfo.region]] ?? null,
-				name: koppenClimateName(world.realKoppenClimate[hoverInfo.region]),
+				code:
+					KOPPEN.koppenLabels[world.realKoppenClimate[hoverInfo.region]] ??
+					null,
+				name: KOPPEN.koppenClimateName(
+					world.realKoppenClimate[hoverInfo.region],
+				),
 			}
 		: null
 }
@@ -679,7 +684,7 @@ export function getHoverBiome(
 			: "unmapped"
 	}
 	return hoverInfo && world?.vegetation && world?.isLand?.[hoverInfo.region]
-		? (BIOME_LABELS[world.vegetation[hoverInfo.region]] ?? null)
+		? (VEGETATION.biomeLabels[world.vegetation[hoverInfo.region]] ?? null)
 		: null
 }
 

@@ -1,7 +1,5 @@
-import { estimateGreenhouseFactor } from "@/model/climate/ebm/greenhouse-estimate"
-import { buildSurfaceTidesSeismologyCallbacks } from "@/model/climate/tidal-schedule"
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../../orbit-body"
-import { PLANET } from "../../../planet"
+import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "@/model/celestial/orbit-body"
+import { PLANET } from "@/model/celestial/planet"
 import {
 	SOL_EARTH_CLOUDS_TEXTURE_PATH,
 	SOL_EARTH_TEXTURE_PATH,
@@ -10,10 +8,15 @@ import {
 	SOL_STAR_AGE_GYR,
 	SOL_SYSTEM,
 	SOL_SYSTEM_BODIES,
-} from "../../sol-system"
-import type { SolPlanetSeed } from "../../sol-system/types"
-import type { HomeWorldParams } from "../types"
-import type { SolSeedGenerationParams, SolSeedGenerationResult } from "./types"
+} from "@/model/celestial/system/sol-system"
+import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
+import type { HomeWorldParams } from "@/model/celestial/system/generation/types"
+import type {
+	SolSeedGenerationParams,
+	SolSeedGenerationResult,
+} from "@/model/celestial/system/generation/sol-seed/types"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 
 function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 	const density = PLANET.buildDensityProfile({
@@ -49,7 +52,8 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		maxElevation: mainWorld.maxElevation,
 		albedo: mainWorld.albedo,
 		greenhouseFactor:
-			mainWorld.greenhouseFactor ?? estimateGreenhouseFactor(pressureBar),
+			mainWorld.greenhouseFactor ??
+			GREENHOUSE_ESTIMATE.estimateGreenhouseFactor(pressureBar),
 	}
 }
 
@@ -84,7 +88,7 @@ function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
 		starAgeGyr: SOL_STAR_AGE_GYR,
 		starLuminositySol: 1,
 		spectralClass: params.spectralClass,
-		...buildSurfaceTidesSeismologyCallbacks({
+		...TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({
 			spectralClass: params.spectralClass,
 			starSubtype: params.starSubtype,
 		}),

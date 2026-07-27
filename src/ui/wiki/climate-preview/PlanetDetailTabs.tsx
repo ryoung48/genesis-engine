@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule"
-import {
-	computeMoonTidalSchedule,
-	computeTidalSchedule,
-} from "@/model/climate/tidal-schedule"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
 import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
@@ -19,9 +14,11 @@ import type {
 import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
-} from "../../planet/screen/generation/generation-preview"
-import type { UnitSystem } from "../../planet/screen/shared/ui-format"
-import { DataSectionSummary } from "../shared/ui-atoms"
+} from "@/ui/planet/screen/generation/generation-preview"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import { DataSectionSummary } from "@/ui/wiki/shared/ui-atoms"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 
 function PlanetDetailContent({
 	tidalSchedulePreview,
@@ -534,7 +531,7 @@ function LazyPlanetDetailTabsContent({
 	const computedTidalSchedulePreview = useMemo(
 		() =>
 			moonContext
-				? computeMoonTidalSchedule({
+				? TIDAL_SCHEDULE.computeMoonTidalSchedule({
 						moon: moonContext.moon,
 						parent: moonContext.parent,
 						params: {
@@ -548,7 +545,7 @@ function LazyPlanetDetailTabsContent({
 						},
 					})
 				: moons.length > 0
-					? computeTidalSchedule({
+					? TIDAL_SCHEDULE.computeTidalSchedule({
 							moons,
 							params: {
 								seed,

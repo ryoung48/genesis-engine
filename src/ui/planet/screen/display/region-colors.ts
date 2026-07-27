@@ -1,11 +1,4 @@
 ﻿import { GENESIS_TERRAIN_FEATURE } from "@/model"
-import {
-	CHAOTIC_MAX,
-	CHAOTIC_MIN,
-	koppenClimateColor,
-	pastaClimateColor,
-	relativeHumidityFromTempRange,
-} from "@/model/climate"
 import { tradeGoodColor } from "@/model/economy"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
@@ -66,6 +59,10 @@ import {
 } from "@/ui/planet/screen/display/religion-type"
 import { RELIGION } from "@/model/society/religion"
 import { TIMEZONE } from "@/model/society/timezone"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { KOPPEN } from "@/model/climate/koppen"
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
 
 /**
  * Relation values the diplomacy map mode colors by. These mirrored the
@@ -577,7 +574,7 @@ export function computeRegionColors(
 		const darkenMapWaterPastaClimate =
 			viewMode === "map" && colorMode === "pastaClimate"
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = pastaClimateColor(world.pastaClimate[r])
+			const [cr, cg, cb] = PASTA.pastaClimateColor(world.pastaClimate[r])
 			const factor = darkenMapWaterPastaClimate && isOceanRegion(r) ? 0.74 : 1
 			rgb[3 * r] = cr * factor
 			rgb[3 * r + 1] = cg * factor
@@ -588,7 +585,7 @@ export function computeRegionColors(
 
 	if (colorMode === "koppenClimate" && world.koppenClimate) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = koppenClimateColor(world.koppenClimate[r])
+			const [cr, cg, cb] = KOPPEN.koppenClimateColor(world.koppenClimate[r])
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -600,7 +597,7 @@ export function computeRegionColors(
 		const darkenMapWaterRealPastaClimate =
 			viewMode === "map" && colorMode === "realPastaClimate"
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = pastaClimateColor(world.realPastaClimate[r])
+			const [cr, cg, cb] = PASTA.pastaClimateColor(world.realPastaClimate[r])
 			const factor =
 				darkenMapWaterRealPastaClimate && isOceanRegion(r) ? 0.74 : 1
 			rgb[3 * r] = cr * factor
@@ -612,7 +609,7 @@ export function computeRegionColors(
 
 	if (colorMode === "realKoppenClimate" && world.realKoppenClimate) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = koppenClimateColor(world.realKoppenClimate[r])
+			const [cr, cg, cb] = KOPPEN.koppenClimateColor(world.realKoppenClimate[r])
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -634,11 +631,11 @@ export function computeRegionColors(
 			let [cr, cg, cb] = climateTempColor(world.climate.temperature_avg[r])
 			const minT = Math.min(
 				BLEND_THRESHOLD,
-				Math.max(CHAOTIC_MIN - world.climate.temperature_min[r], 0),
+				Math.max(VEGETATION.chaoticMin - world.climate.temperature_min[r], 0),
 			)
 			const maxT = Math.min(
 				BLEND_THRESHOLD,
-				Math.max(world.climate.temperature_max[r] - CHAOTIC_MAX, 0),
+				Math.max(world.climate.temperature_max[r] - VEGETATION.chaoticMax, 0),
 			)
 			if (minT > 0 && maxT > 0) {
 				const t = (minT + maxT) / 2 / BLEND_THRESHOLD
@@ -739,7 +736,7 @@ export function computeRegionColors(
 				}
 				annualAridity = petSum > 0 ? aetSum / petSum : 1
 			}
-			const modeledRh = relativeHumidityFromTempRange({
+			const modeledRh = HUMIDITY.relativeHumidityFromTempRange({
 				meanTempC: meanT,
 				dtrC: dtr,
 				annualAridity,

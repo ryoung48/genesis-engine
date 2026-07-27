@@ -2,11 +2,6 @@
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import {
-	EMB_CONSTANTS,
-	EnergyBalanceModel,
-	estimateGreenhouseFactor,
-} from "@/model/climate"
-import {
 	mapLinear,
 	PLASMA_STOPS,
 	PURPLES_STOPS,
@@ -14,6 +9,9 @@ import {
 	sampleColorStops,
 } from "@/model/shared"
 import type { RegularClimatePreviewData } from "@/ui/preview/types"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 
 interface EbmConfig {
 	obliquity: number
@@ -101,8 +99,8 @@ export function useEbmPreview(config: EbmConfig) {
 		const T_star = STAR.getStarTemperatureK({ cls, subtype: starSubtype })
 		const R_star_m =
 			STAR.getStarDiameterSol({ cls, subtype: starSubtype }) *
-			EMB_CONSTANTS.stellar.R_SUN
-		const d_m = orbitalDistanceAU * EMB_CONSTANTS.stellar.AU
+			CONSTANTS.embConstants.stellar.R_SUN
+		const d_m = orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU
 		const modelConfig = {
 			orbital: {
 				OBLIQUITY: obliquity,
@@ -110,7 +108,7 @@ export function useEbmPreview(config: EbmConfig) {
 				PERIHELION: perihelion,
 			},
 			stellar: {
-				...EMB_CONSTANTS.stellar,
+				...CONSTANTS.embConstants.stellar,
 				T_SUN: T_star,
 				R_SUN: R_star_m,
 				AU: d_m,
@@ -119,19 +117,22 @@ export function useEbmPreview(config: EbmConfig) {
 				HOURS_PER_DAY: hoursPerDay,
 				YEAR_LENGTH_DAYS: daysPerYear,
 			},
-			landFraction: new Array(EMB_CONSTANTS.grid.NUM_LAT).fill(landFraction),
+			landFraction: new Array(CONSTANTS.embConstants.grid.NUM_LAT).fill(
+				landFraction,
+			),
 			radius: radius * 1000, // km to meters
 			pressure,
 			albedo: albedoOverride ?? estimateAlbedo(landFraction),
 			greenhouseFactor:
-				greenhouseFactorOverride ?? estimateGreenhouseFactor(pressure),
+				greenhouseFactorOverride ??
+				GREENHOUSE_ESTIMATE.estimateGreenhouseFactor(pressure),
 			internalHeatTempK,
 			seismologyTotalHeatingK,
 		}
 		const model = new EnergyBalanceModel(modelConfig)
 		model.runModel({ years: 30, dtDays: 0.5 })
 
-		const time = EMB_CONSTANTS.time
+		const time = CONSTANTS.embConstants.time
 		const sampledDays: number[] = []
 		const dayLabels: string[] = []
 		for (let i = 0; i < time.DAYS_PER_YEAR; i += 10) {

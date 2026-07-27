@@ -1,7 +1,10 @@
 import React, { useCallback, useRef } from "react"
-import type { FlowGrid } from "@/model/climate/wind"
-import { oceanCurrentColor } from "./colors"
-import { FlowParticleCanvas, type FlowSample } from "./FlowParticleCanvas"
+import { oceanCurrentColor } from "@/ui/planet/colors"
+import {
+	FlowParticleCanvas,
+	type FlowSample,
+} from "@/ui/planet/FlowParticleCanvas"
+import type { FlowGrid } from "@/model/climate/wind/types"
 
 const NUM_PARTICLES = 2200
 const MIN_LIFETIME = 90

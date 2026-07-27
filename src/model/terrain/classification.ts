@@ -1,8 +1,8 @@
-﻿import type { GenesisRivers, SphereMesh } from ".."
-import { BIOME_LABELS } from "../climate/vegetation"
-import { SimplexNoise } from "../shared"
-import type { GenesisLandmarks } from "./landmarks"
-import { LANDMARK_TYPE_LAKE } from "./landmarks"
+﻿import type { GenesisRivers, SphereMesh } from "@/model"
+import { SimplexNoise } from "@/model/shared"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
+import { VEGETATION } from "@/model/climate/vegetation"
 
 export const TOPO_FLAT = 0
 export const TOPO_HILL = 1
@@ -119,7 +119,7 @@ export function classifyTopography(params: {
 	const noise1 = new SimplexNoise((params.seed ?? 0) + 7101)
 	const noise2 = new SimplexNoise((params.seed ?? 0) + 7102)
 	const noise3 = new SimplexNoise((params.seed ?? 0) + 7103)
-	const desertBiome = BIOME_LABELS.indexOf("desert")
+	const desertBiome = VEGETATION.biomeLabels.indexOf("desert")
 	const marshNoiseThreshold = 0.48
 	const marshScoreThreshold = 0.64
 
