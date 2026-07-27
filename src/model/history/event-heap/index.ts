@@ -1,11 +1,4 @@
-/**
- * Typed-array binary min-heap for the history event queue.
- * Events are sorted by time (ascending). Each event stores a type enum
- * and up to 4 int32 data fields.
- */
-
-/** Event type enum — maps to history event types */
-export const EVT = {
+const evt = {
 	WAR: 0,
 	BATTLE: 1,
 	SUCCESSION: 2,
@@ -16,22 +9,10 @@ export const EVT = {
 	CULTURE_SPREAD: 7,
 } as const
 
-type EventType = (typeof EVT)[keyof typeof EVT]
-
-/**
- * Data field layout per event type (indices into the 4-wide data slot):
- *
- * WAR:            [nation, previous, _, _]
- * BATTLE:         [war, attacker, defender, _]
- * SUCCESSION:     [province, idx, _, _]
- * TAX:            [nation, previous, _, _]
- * CENSUS:         [previous, _, _, _]  (previous stored as float64 via time2)
- * DIPLOMACY:      [nation, previous, _, _]
- * REGENCY:        [province, leader, _, _]
- * CULTURE_SPREAD: [_, _, _, _]  (no data; processes all provinces)
- */
+type EventType = (typeof evt)[keyof typeof evt]
 
 const INITIAL_CAPACITY = 1024
+
 const DATA_FIELDS = 4
 
 export class EventHeap {
@@ -175,4 +156,8 @@ export class EventHeap {
 			i = smallest
 		}
 	}
+}
+
+export const EVENT_HEAP = {
+	evt,
 }

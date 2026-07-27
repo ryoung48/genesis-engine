@@ -1,29 +1,21 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
-import { EVT } from "@/model/history/event-heap"
-import { runBattle } from "@/model/history/events/battle"
-import {
-	initCultureSpread,
-	runCultureSpread,
-} from "@/model/history/events/culture-spread"
-import { initDiplomacy, runDiplomacy } from "@/model/history/events/diplomacy"
-import {
-	initPopulation,
-	runPopulation,
-} from "@/model/history/events/population"
-import {
-	initSuccession,
-	runSuccession,
-} from "@/model/history/events/succession"
-import { initTax, runTax } from "@/model/history/events/tax"
-import { initWar, runWar } from "@/model/history/events/war"
-import { REL as REL_FIELD } from "@/model/history/fields"
-import { createHistoryRng, type HistoryRng } from "@/model/history/history-rng"
-import {
-	createHistoryState,
-	type HistoryState,
-	REL,
-	validateLiveHierarchy,
-} from "@/model/history/state"
+import { EVENT_HEAP } from "@/model/history/event-heap"
+import { BATTLE } from "@/model/history/events/battle"
+import { CULTURE_SPREAD } from "@/model/history/events/culture-spread"
+import { DIPLOMACY } from "@/model/history/events/diplomacy"
+import { POPULATION } from "@/model/history/events/population"
+import { SUCCESSION } from "@/model/history/events/succession"
+import { TAX } from "@/model/history/events/tax"
+import { WAR } from "@/model/history/events/war"
+import { FIELDS } from "@/model/history/fields"
+import { HISTORY_RNG } from "@/model/history/history-rng"
+import type { HistoryRng } from "@/model/history/history-rng/types"
+import { STATE } from "@/model/history/state"
+import type { HistoryState } from "@/model/history/state/types"
+import type {
+	ProcessEventsUntilParams,
+	SeedColonyRelationsParams,
+} from "@/model/history/types"
 import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
 import type { GenesisLandmarks } from "@/model/terrain"
 import type { StageTiming } from "@/model/types"
@@ -41,10 +33,10 @@ function timed<T>(
 	return result
 }
 
-function seedColonyRelations(
-	state: HistoryState,
-	nations: GenesisNationHierarchy | undefined,
-): void {
+function seedColonyRelations({
+	state,
+	nations,
+}: SeedColonyRelationsParams): void {
 	if (!nations?.nationColonizer) return
 	const { seeds, nationColonizer } = nations
 	for (let col = 0; col < nationColonizer.length; col++) {
@@ -53,17 +45,17 @@ function seedColonyRelations(
 		const colonyCapital = seeds[col]
 		const colonizerCapital = seeds[colonizerId]
 		if (colonyCapital < 0 || colonizerCapital < 0) continue
-		REL_FIELD.set(
+		FIELDS.rel.set(
 			state,
 			colonyCapital,
 			colonizerCapital,
-			REL.COLONY,
+			STATE.rel.COLONY,
 			state.time,
 		)
 	}
 }
 
-export function initHistory(params: {
+function initHistory(params: {
 	nations: GenesisNationHierarchy
 	provinces: GenesisProvinces
 	population: ProvincePopulation
@@ -87,59 +79,61 @@ export function initHistory(params: {
 	timings?: StageTiming[]
 }): HistoryState {
 	const startYear = params.startYear ?? 800
-	const rng = createHistoryRng(params.seed + 99999)
+	const rng = HISTORY_RNG.createHistoryRng(params.seed + 99999)
 	const state = timed("initHistory:createHistoryState", params.timings, () =>
-		createHistoryState(
-			params.nations,
-			params.provinces,
-			params.population,
-			params.coastal,
-			params.riverVisible,
-			params.r_xyz,
-			params.cultures,
+		STATE.createHistoryState({
+			nations: params.nations,
+			provinces: params.provinces,
+			population: params.population,
+			coastal: params.coastal,
+			riverVisible: params.riverVisible,
+			r_xyz: params.r_xyz,
+			cultures: params.cultures,
 			startYear,
 			rng,
-			params.waterAccess,
-			params.landmarks,
-			params.regionProvince,
-			params.regionAdjOffset,
-			params.regionAdjList,
-			params.regionIsLand,
-			params.era,
-		),
+			waterAccess: params.waterAccess,
+			landmarks: params.landmarks,
+			regionProvince: params.regionProvince,
+			regionAdjOffset: params.regionAdjOffset,
+			regionAdjList: params.regionAdjList,
+			regionIsLand: params.regionIsLand,
+			era: params.era,
+		}),
 	)
 
 	// Seed colony dependencies before init passes so subordinate colonies are
 	// excluded from independent diplomacy and subject formation.
-	seedColonyRelations(state, params.nations)
+	seedColonyRelations({ state, nations: params.nations })
 
 	timed("initHistory:initDiplomacy", params.timings, () =>
-		initDiplomacy(state, rng),
+		DIPLOMACY.initDiplomacy({ state, rng }),
 	)
-	timed("initHistory:initWar", params.timings, () => initWar(state, rng))
+	timed("initHistory:initWar", params.timings, () =>
+		WAR.initWar({ state, rng }),
+	)
 	timed("initHistory:initSuccession", params.timings, () =>
-		initSuccession(state, rng),
+		SUCCESSION.initSuccession({ state }),
 	)
-	timed("initHistory:initTax", params.timings, () => initTax(state, rng))
+	timed("initHistory:initTax", params.timings, () => TAX.initTax({ state }))
 	timed("initHistory:initPopulation", params.timings, () =>
-		initPopulation(state, rng),
+		POPULATION.initPopulation({ state }),
 	)
 	timed("initHistory:initCultureSpread", params.timings, () =>
-		initCultureSpread(state),
+		CULTURE_SPREAD.initCultureSpread(state),
 	)
 
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
-	seedColonyRelations(state, params.nations)
+	seedColonyRelations({ state, nations: params.nations })
 
 	return state
 }
 
-function processEventsUntil(
-	state: HistoryState,
-	targetTime: number,
-	rng: HistoryRng,
-	validate: boolean,
-): void {
+function processEventsUntil({
+	state,
+	targetTime,
+	rng,
+	validate,
+}: ProcessEventsUntilParams): void {
 	const dataBuf = new Int32Array(4)
 	while (!state.heap.isEmpty() && state.heap.peekTime() <= targetTime) {
 		state.time = state.heap.peekTime()
@@ -149,11 +143,11 @@ function processEventsUntil(
 		state.heap.dequeue()
 
 		switch (type) {
-			case EVT.WAR:
-				runWar(state, dataBuf[0], rng)
+			case EVENT_HEAP.evt.WAR:
+				WAR.runWar({ state, nation: dataBuf[0], rng })
 				break
-			case EVT.BATTLE:
-				runBattle({
+			case EVENT_HEAP.evt.BATTLE:
+				BATTLE.runBattle({
 					state,
 					warIdx: dataBuf[0],
 					eventAttacker: dataBuf[1],
@@ -161,19 +155,28 @@ function processEventsUntil(
 					rng,
 				})
 				break
-			case EVT.SUCCESSION:
-				runSuccession(state, dataBuf[0], dataBuf[1], rng)
+			case EVENT_HEAP.evt.SUCCESSION:
+				SUCCESSION.runSuccession({
+					state,
+					province: dataBuf[0],
+					leaderIdx: dataBuf[1],
+					rng,
+				})
 				break
-			case EVT.TAX:
-				runTax(state, dataBuf[0], time2, rng)
+			case EVENT_HEAP.evt.TAX:
+				TAX.runTax({
+					state,
+					nation: dataBuf[0],
+					previousTime: time2,
+				})
 				break
-			case EVT.CENSUS:
-				runPopulation(state, time2, rng)
+			case EVENT_HEAP.evt.CENSUS:
+				POPULATION.runPopulation({ state, previousTime: time2 })
 				break
-			case EVT.DIPLOMACY:
-				runDiplomacy(state, dataBuf[0], rng)
+			case EVENT_HEAP.evt.DIPLOMACY:
+				DIPLOMACY.runDiplomacy({ state, nation: dataBuf[0], rng })
 				break
-			case EVT.REGENCY: {
+			case EVENT_HEAP.evt.REGENCY: {
 				const province = dataBuf[0]
 				const leader = dataBuf[1]
 				if (state.leaderRuntime.idx[province] === leader) {
@@ -185,15 +188,19 @@ function processEventsUntil(
 				}
 				break
 			}
-			case EVT.CULTURE_SPREAD:
-				runCultureSpread(state, state.cultureCount, rng)
+			case EVENT_HEAP.evt.CULTURE_SPREAD:
+				CULTURE_SPREAD.runCultureSpread({
+					state,
+					cultureCount: state.cultureCount,
+					rng,
+				})
 				break
 		}
 		if (validate) {
-			validateLiveHierarchy(
+			STATE.validateLiveHierarchy({
 				state,
-				`after event type=${type} data=[${dataBuf[0]},${dataBuf[1]},${dataBuf[2]},${dataBuf[3]}] time=${state.time}`,
-			)
+				context: `after event type=${type} data=[${dataBuf[0]},${dataBuf[1]},${dataBuf[2]},${dataBuf[3]}] time=${state.time}`,
+			})
 		}
 	}
 }
@@ -205,17 +212,17 @@ function processEventsUntil(
  * Leave off for real generation runs; the caller can still validate once at
  * the end (see validateLiveHierarchy) to catch corruption without paying
  * this cost after every event. */
-export function simulateUntil(
+function simulateUntil(
 	state: HistoryState,
 	targetTimeMs: number,
 	rng: HistoryRng,
 	validate = false,
 ): void {
-	processEventsUntil(state, targetTimeMs, rng, validate)
+	processEventsUntil({ state, targetTime: targetTimeMs, rng, validate })
 	state.time = targetTimeMs
 }
 
-export { historyMsToEu4Days } from "./eu4-days"
-export { createHistoryRng } from "./history-rng"
-export type { HistoryNote } from "./state"
-export { YEAR_MS } from "./state"
+export const HISTORY = {
+	initHistory,
+	simulateUntil,
+}

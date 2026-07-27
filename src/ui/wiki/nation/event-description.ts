@@ -1,16 +1,9 @@
-﻿/**
- * Event flavor-text generation for genesis history events.
- * Ported (and slimmed) from src/components/world/charts/NationTab/EventDetails.tsx.
- * Operates on genesis's HistoryNote shape: { tag, time, data }.
- *
- * Helpers that required legacy world data (terrain, rank titles, landmarks,
- * alliance membership) are stubbed to return null — they can be filled in
- * later once genesis exposes equivalents.
- */
-
-import type { HistoryNote } from "@/model/history"
-import { YEAR_MS } from "@/model/history"
-import type { GrudgePhraseParams, WarStreakPhraseParams } from "./types"
+﻿import { STATE } from "@/model/history/state"
+import type { HistoryNote } from "@/model/history/state/types"
+import type {
+	GrudgePhraseParams,
+	WarStreakPhraseParams,
+} from "@/ui/wiki/nation/types"
 
 type VictoryDegree =
 	| "decisive"
@@ -255,7 +248,7 @@ const streakPhrase = (
 }
 
 const seasonPhrase = (time: number, seed: number): string | null => {
-	const MS_PER_MONTH = YEAR_MS / 12
+	const MS_PER_MONTH = STATE.yearMs / 12
 	const month = Math.floor((time / MS_PER_MONTH) % 12)
 	// 0-2 winter, 3-5 spring, 6-8 summer, 9-11 autumn (northern-hemisphere convention)
 	if (month < 3)
@@ -296,7 +289,7 @@ const warDurationPhrase = (
 		(e) => e.tag === "war started" && e.data.war === warIdx,
 	)
 	if (!started) return null
-	const years = Math.round((endTime - started.time) / YEAR_MS)
+	const years = Math.round((endTime - started.time) / STATE.yearMs)
 	if (years < 1)
 		return pick(["concluding rapidly", "a short-lived conflict"], seed)
 	if (years <= 3) return `a ${years}-year conflict`

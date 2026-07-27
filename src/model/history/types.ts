@@ -1,35 +1,15 @@
-import type { DerivedCache } from "./derive"
-import type { HistoryRng } from "./history-rng"
-import type { HistoryState, War } from "./state"
+import type { HistoryRng } from "@/model/history/history-rng/types"
+import type { HistoryState } from "@/model/history/state/types"
+import type { GenesisNationHierarchy } from "@/model/types/society"
 
-export interface QueueBattleEventParams {
+export interface SeedColonyRelationsParams {
 	state: HistoryState
-	warIdx: number
-	attacker: number
-	defender: number
-	time: number
+	nations: GenesisNationHierarchy | undefined
 }
 
-export interface WealthCurrentParams {
+export interface ProcessEventsUntilParams {
 	state: HistoryState
-	p: number
-	exclude?: number
-	freedom?: boolean
-	cache?: DerivedCache
-}
-
-export interface WarStrengthCoalitionParams {
-	state: HistoryState
-	attacker: number
-	defender: number
-	exclude?: number
-	cache?: DerivedCache
-}
-
-export interface ResolveWarParams {
-	state: HistoryState
-	war: War
+	targetTime: number
 	rng: HistoryRng
-	victory?: boolean
-	stalemate?: string
+	validate: boolean
 }

@@ -1,30 +1,35 @@
-import type { HistoryState, Relation } from "./state"
-import { read, type Timeline, write } from "./timeline"
+import type {
+	DeltaFieldParams,
+	RelationKeyParams,
+} from "@/model/history/fields/types"
+import type { Relation } from "@/model/history/state"
+import type { HistoryState } from "@/model/history/state/types"
+import { TIMELINE, type Timeline } from "@/model/history/timeline"
 
 function getField<T>(
 	timeline: Timeline<T>,
 	defaultValue: T,
 	time: number | undefined,
 ): T {
-	return read(timeline, defaultValue, time)
+	return TIMELINE.read(timeline, defaultValue, time)
 }
 
 function setField<T>(timeline: Timeline<T>, time: number, value: T): void {
-	write(timeline, time, value)
+	TIMELINE.write(timeline, time, value)
 }
 
-function deltaField(
-	timeline: Timeline<number>,
-	defaultValue: number,
-	time: number,
-	delta: number,
-): number {
-	const next = read(timeline, defaultValue, time) + delta
-	write(timeline, time, next)
+function deltaField({
+	timeline,
+	defaultValue,
+	time,
+	delta,
+}: DeltaFieldParams): number {
+	const next = TIMELINE.read(timeline, defaultValue, time) + delta
+	TIMELINE.write(timeline, time, next)
 	return next
 }
 
-export const PROV = {
+const prov = {
 	parent: {
 		get: (state: HistoryState, p: number, time = state.time) => {
 			if (time === state.time) return state.parentCurrent[p]
@@ -118,7 +123,12 @@ export const PROV = {
 			if (time >= state.time) state.consumptionCurrent[p] = value
 		},
 		delta: (state: HistoryState, p: number, time: number, delta: number) => {
-			const next = deltaField(state._consumption[p], 0, time, delta)
+			const next = deltaField({
+				timeline: state._consumption[p],
+				defaultValue: 0,
+				time,
+				delta,
+			})
 			if (time >= state.time) state.consumptionCurrent[p] = next
 			return next
 		},
@@ -200,7 +210,7 @@ export const PROV = {
 	},
 } as const
 
-function relationKey(state: HistoryState, a: number, b: number): number {
+function relationKey({ state, a, b }: RelationKeyParams): number {
 	return a * state.P + b
 }
 
@@ -221,7 +231,7 @@ function flipRelation(rel: Relation): Relation {
 	}
 }
 
-export const REL = {
+const rel = {
 	get: (
 		state: HistoryState,
 		a: number,
@@ -231,8 +241,10 @@ export const REL = {
 		if (time === state.time) {
 			return state.relationsCurrent[a * state.P + b] as Relation
 		}
-		const timeline = state._relations.get(relationKey(state, a, b))
-		return timeline ? (read(timeline, 7 as Relation, time) as Relation) : 7
+		const timeline = state._relations.get(relationKey({ state, a, b }))
+		return timeline
+			? (TIMELINE.read(timeline, 7 as Relation, time) as Relation)
+			: 7
 	},
 	set: (
 		state: HistoryState,
@@ -241,18 +253,23 @@ export const REL = {
 		rel: Relation,
 		time = state.time,
 	): void => {
-		const forwardKey = relationKey(state, a, b)
-		const backwardKey = relationKey(state, b, a)
+		const forwardKey = relationKey({ state, a, b })
+		const backwardKey = relationKey({ state, a: b, b: a })
 		const flipped = flipRelation(rel)
 		const forward = state._relations.get(forwardKey) ?? []
 		const backward = state._relations.get(backwardKey) ?? []
 		state._relations.set(forwardKey, forward)
 		state._relations.set(backwardKey, backward)
-		write(forward, time, flipped)
-		write(backward, time, rel)
+		TIMELINE.write(forward, time, flipped)
+		TIMELINE.write(backward, time, rel)
 		if (time >= state.time) {
 			state.relationsCurrent[forwardKey] = flipped
 			state.relationsCurrent[backwardKey] = rel
 		}
 	},
 } as const
+
+export const FIELDS = {
+	prov,
+	rel,
+}

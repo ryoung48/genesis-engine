@@ -1,30 +1,49 @@
-﻿import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
-import {
-	children,
-	type DerivedCache,
-	provinceWars as deriveProvinceWars,
-	wealthCurrent as deriveWealthCurrent,
-	wealthOptimal as deriveWealthOptimal,
-	ensureHierarchyClean,
-	nationAdjacency,
-	sovereign,
-} from "@/model/history/derive"
-import { EVT, EventHeap } from "@/model/history/event-heap"
-import { PROV, REL as REL_FIELD } from "@/model/history/fields"
-import type { HistoryRng } from "@/model/history/history-rng"
-import type { Timeline } from "@/model/history/timeline"
+import { DERIVE } from "@/model/history/derive"
+import type { DerivedCache } from "@/model/history/derive/types"
+import { EVENT_HEAP, EventHeap } from "@/model/history/event-heap"
+import { FIELDS } from "@/model/history/fields"
+import type { HistoryRng } from "@/model/history/history-rng/types"
 import type {
+	AddTerritoryParams,
+	BuildProvinceXyzParams,
+	CreateActiveWarParams,
+	CreateHistoryStateParams,
+	DiffYearsParams,
+	EnsureNationColorParams,
+	FixConnectionsParams,
+	GetChildrenParams,
+	GetNationNeighborsParams,
+	GetNationProvincesParams,
+	GetProvinceNeighborsParams,
+	GetRelationParams,
+	GetRulerRelationParams,
+	GetSovereignParams,
+	GetWarAlliesParams,
+	HistoryState,
+	InitDynastiesParams,
+	IsProvinceConnectedToParentParams,
+	IsSovereignParams,
+	ProvinceDistanceSqParams,
 	QueueBattleEventParams,
+	ReleaseDisconnectedProvinceParams,
+	ReleaseProvinceParams,
+	ReleaseSubjectRelationsParams,
 	ResolveWarParams,
+	SetRelationParams,
+	SpawnLeaderParams,
+	ValidateLiveHierarchyParams,
+	ValidateParentArrayParams,
+	War,
 	WarStrengthCoalitionParams,
+	WarStrengthSoloParams,
+	WarThreatParams,
 	WealthCurrentParams,
-} from "@/model/history/types"
+	WealthOptimalParams,
+} from "@/model/history/state/types"
+import type { Timeline } from "@/model/history/timeline"
 import { HIERARCHY } from "@/model/society/hierarchy"
-import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain"
-import type { Route, RouteEdge } from "@/model/transport"
 
-export const REL = {
+const rel = {
 	NONE: 0,
 	OVERLORD: 1,
 	VASSAL: 2,
@@ -39,152 +58,39 @@ export const REL = {
 	COLONY: 11,
 } as const
 
-export type Relation = (typeof REL)[keyof typeof REL]
-
-export interface War {
-	idx: number
-	attacker: number
-	defender: number
-	startTime: number
-	endTime?: number
-	rebel: boolean
-	/** Provinces currently occupied by the attacker in this war. */
-	occupied: number[]
-}
-
-interface ActiveWarOptions {
-	rebel?: boolean
-	startTime?: number
-	nextBattleTime?: number
-	occupied?: number[]
-	rebellion?: {
-		overlord: number
-		subject: number
-	}
-}
-
+export type Relation = (typeof rel)[keyof typeof rel]
 const DAYS_PER_YEAR = 365
+
 const DAYS_PER_MONTH = 30
+
 const HOURS_PER_DAY = 24
+
 const DAY_MS = HOURS_PER_DAY * 60 * 60 * 1000
-export const YEAR_MS = DAYS_PER_YEAR * DAY_MS
+
+const yearMs = DAYS_PER_YEAR * DAY_MS
+
 const MONTH_MS = DAYS_PER_MONTH * DAY_MS
 
-export function deltaYear(years: number): number {
-	return years * YEAR_MS
+function deltaYear(years: number): number {
+	return years * yearMs
 }
-export function deltaMonth(months: number): number {
+
+function deltaMonth(months: number): number {
 	return months * MONTH_MS
 }
-export function diffYears(a: number, b: number): number {
-	return (a - b) / YEAR_MS
-}
 
-interface LeaderRuntime {
-	idx: Int32Array
-	birth: Float64Array
-	end: Float64Array
-	targetUrban: Float32Array
-	nameSeed: Int32Array
-}
-
-export interface HistoryNote {
-	tag: string
-	time: number
-	data: Record<string, number | number[] | string | boolean | undefined>
-}
-
-export interface HistoryState {
-	P: number
-	time: number
-	era: SocietyEra
-
-	_parent: Timeline<number>[]
-	_assignment: Timeline<number>[]
-	_pop_rural: Timeline<number>[]
-	_pop_urban: Timeline<number>[]
-	_development: Timeline<number>[]
-	_consumption: Timeline<number>[]
-	_leader_dyn: Timeline<number>[]
-	_leader_name_seed: Timeline<number>[]
-	_leader_claim: Timeline<number>[]
-	_leader_birth_year: Timeline<number>[]
-	_occupation: Timeline<number>[]
-	_relations: Map<number, Timeline<Relation>>
-	_culture_blend_secondary: Timeline<number>[]
-	_culture_blend_weight: Timeline<number>[]
-
-	// Live current-time caches (mirror timeline state at state.time).
-	// Rebuilt from _parent when hierarchyDirty; written through on REL.set.
-	parentCurrent: Int32Array
-	childOffset: Int32Array
-	childList: Int32Array
-	sovereignCurrent: Int32Array
-	relationsCurrent: Uint8Array
-	hierarchyDirty: boolean
-	hierarchyVersion: number
-	_nationAdjCache?: { offset: Int32Array; list: Int32Array }
-	_nationAdjCacheVersion?: number
-
-	// Dense live-value mirrors of the per-province timelines.
-	// Read/written at state.time; timelines remain authoritative for historical queries.
-	assignmentCurrent: Int32Array
-	popRuralCurrent: Float32Array
-	popUrbanCurrent: Float32Array
-	developmentCurrent: Float32Array
-	consumptionCurrent: Float32Array
-	leaderDynCurrent: Int32Array
-	leaderNameSeedCurrent: Int32Array
-	leaderClaimCurrent: Uint8Array
-	leaderBirthYearCurrent: Float32Array
-	occupationCurrent: Int32Array
-
-	// Live current-time mirrors for culture blend fields.
-	cultureBlendSecondaryCurrent: Int32Array
-	cultureBlendWeightCurrent: Float32Array
-
-	// Live per-province war-index lists (mirror of provinceWars derivation).
-	provinceWars: number[][]
-
-	provinceSeeds: Int32Array
-	provinceAdjOffset: Int32Array
-	provinceAdjList: Int32Array
-	provinceSize: Int32Array
-	provinceColors: Float32Array
-	desolate: Uint8Array
-	stateless: Uint8Array
-	waterAccess: Uint8Array
-	regionProvince: Int32Array
-	regionAdjOffset: Int32Array
-	regionAdjList: Int32Array
-	regionIsLand: Uint8Array
-	r_xyz: Float32Array
-	province_xyz: Float32Array
-	habitability: Float32Array
-	culture: Int32Array
-	cultureCount: number
-	/** Per-province government type index into GOVERNMENT_TYPES (eras.ts) */
-	governmentType: Uint8Array
-
-	wars: War[]
-	events: HistoryNote[]
-	nextDynasty: number
-	heap: EventHeap
-	nationColors: Map<number, [number, number, number]>
-	leaderRuntime: LeaderRuntime
-	routes: Route[]
-	network: RouteEdge[]
-	landmarks: GenesisLandmarks
+function diffYears({ a, b }: DiffYearsParams): number {
+	return (a - b) / yearMs
 }
 
 function makeTimelineArray<T>(length: number): Timeline<T>[] {
 	return Array.from({ length }, (): Timeline<T> => [])
 }
 
-function buildProvinceXyz(
-	provinceSeeds: Int32Array,
-	r_xyz: Float32Array,
-): Float32Array {
+function buildProvinceXyz({
+	provinceSeeds,
+	r_xyz,
+}: BuildProvinceXyzParams): Float32Array {
 	const out = new Float32Array(provinceSeeds.length * 3)
 	for (let p = 0; p < provinceSeeds.length; p++) {
 		const src = provinceSeeds[p] * 3
@@ -196,7 +102,7 @@ function buildProvinceXyz(
 	return out
 }
 
-function ensureNationColor(state: HistoryState, province: number): void {
+function ensureNationColor({ state, province }: EnsureNationColorParams): void {
 	if (province < 0 || province >= state.P || state.nationColors.has(province))
 		return
 	const i = province * 3
@@ -208,20 +114,20 @@ function ensureNationColor(state: HistoryState, province: number): void {
 }
 
 function rebuildAssignment(state: HistoryState, time = state.time): void {
-	ensureHierarchyClean(state)
+	DERIVE.ensureHierarchyClean(state)
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		const root = state.sovereignCurrent[p]
-		PROV.assignment.set(state, p, time, root)
-		if (state.parentCurrent[p] < 0) ensureNationColor(state, p)
+		FIELDS.prov.assignment.set(state, p, time, root)
+		if (state.parentCurrent[p] < 0) ensureNationColor({ state, province: p })
 	}
 }
 
-function validateParentArray(
-	parent: Int32Array,
-	provinceCount: number,
-	context: string,
-): void {
+function validateParentArray({
+	parent,
+	provinceCount,
+	context,
+}: ValidateParentArrayParams): void {
 	for (let p = 0; p < provinceCount; p++) {
 		let current = p
 		let steps = 0
@@ -237,69 +143,64 @@ function validateParentArray(
 	}
 }
 
-export function validateLiveHierarchy(
-	state: HistoryState,
-	context: string,
-): void {
-	validateParentArray(state.parentCurrent, state.P, context)
+function validateLiveHierarchy({
+	state,
+	context,
+}: ValidateLiveHierarchyParams): void {
+	validateParentArray({
+		parent: state.parentCurrent,
+		provinceCount: state.P,
+		context,
+	})
 }
 
-export function getRelation(
-	state: HistoryState,
-	a: number,
-	b: number,
-): Relation {
-	return REL_FIELD.get(state, a, b, state.time)
+function getRelation({ state, a, b }: GetRelationParams): Relation {
+	return FIELDS.rel.get(state, a, b, state.time)
 }
 
-export function setRelation(
-	state: HistoryState,
-	a: number,
-	b: number,
-	rel: Relation,
-): void {
-	REL_FIELD.set(state, a, b, rel, state.time)
+function setRelation({ state, a, b, rel }: SetRelationParams): void {
+	FIELDS.rel.set(state, a, b, rel, state.time)
 }
 
-export function getRulerRelation(
-	state: HistoryState,
-	nation: number,
-): { ruler: number; relation: Relation } | undefined {
+function getRulerRelation({
+	state,
+	nation,
+}: GetRulerRelationParams): { ruler: number; relation: Relation } | undefined {
 	const P = state.P
 	const rels = state.relationsCurrent
 	const base = nation * P
 	for (let other = 0; other < P; other++) {
 		if (other === nation || state.desolate[other]) continue
-		const rel = rels[base + other] as Relation
-		if (rel === REL.OVERLORD || rel === REL.PU_SENIOR) {
-			return { ruler: other, relation: rel }
+		const relation = rels[base + other] as Relation
+		if (relation === rel.OVERLORD || relation === rel.PU_SENIOR) {
+			return { ruler: other, relation }
 		}
 	}
 	return undefined
 }
 
-export function getSovereign(state: HistoryState, p: number): number {
-	return sovereign(state, p, state.time)
+function getSovereign({ state, p }: GetSovereignParams): number {
+	return DERIVE.sovereign(state, p, state.time)
 }
 
-export function isSovereign(state: HistoryState, p: number): boolean {
-	ensureHierarchyClean(state)
+function isSovereign({ state, p }: IsSovereignParams): boolean {
+	DERIVE.ensureHierarchyClean(state)
 	return state.parentCurrent[p] < 0 && state.sovereignCurrent[p] >= 0
 }
 
-export function getChildren(state: HistoryState, p: number): number[] {
-	return children(state, p, state.time)
+function getChildren({ state, p }: GetChildrenParams): number[] {
+	return DERIVE.children(state, p, state.time)
 }
 
-export function getNationProvinces(
-	state: HistoryState,
-	root: number,
-): number[] {
+function getNationProvinces({
+	state,
+	root,
+}: GetNationProvincesParams): number[] {
 	const result = [root]
 	const stack = [root]
 	while (stack.length > 0) {
 		const current = stack.pop()!
-		for (const child of children(state, current, state.time)) {
+		for (const child of DERIVE.children(state, current, state.time)) {
 			result.push(child)
 			stack.push(child)
 		}
@@ -307,11 +208,11 @@ export function getNationProvinces(
 	return result
 }
 
-export function getNationNeighbors(
-	state: HistoryState,
-	nation: number,
-): number[] {
-	const adjacency = nationAdjacency(state, state.time)
+function getNationNeighbors({
+	state,
+	nation,
+}: GetNationNeighborsParams): number[] {
+	const adjacency = DERIVE.nationAdjacency(state, state.time)
 	const result: number[] = []
 	for (
 		let i = adjacency.offset[nation];
@@ -319,12 +220,15 @@ export function getNationNeighbors(
 		i++
 	) {
 		const nb = adjacency.list[i]
-		if (nb !== nation && isSovereign(state, nb)) result.push(nb)
+		if (nb !== nation && isSovereign({ state, p: nb })) result.push(nb)
 	}
 	return result
 }
 
-export function getProvinceNeighbors(state: HistoryState, p: number): number[] {
+function getProvinceNeighbors({
+	state,
+	p,
+}: GetProvinceNeighborsParams): number[] {
 	const result: number[] = []
 	for (
 		let i = state.provinceAdjOffset[p];
@@ -336,8 +240,8 @@ export function getProvinceNeighbors(state: HistoryState, p: number): number[] {
 	return result
 }
 
-export function wealthOptimal(state: HistoryState, p: number): number {
-	return deriveWealthOptimal(state, p, state.time)
+function wealthOptimal({ state, p }: WealthOptimalParams): number {
+	return DERIVE.wealthOptimal(state, p, state.time)
 }
 
 function wealthCurrent({
@@ -347,7 +251,7 @@ function wealthCurrent({
 	freedom,
 	cache,
 }: WealthCurrentParams): number {
-	return deriveWealthCurrent(state, p, state.time, cache, exclude, freedom)
+	return DERIVE.wealthCurrent(state, p, state.time, cache, exclude, freedom)
 }
 
 function makeDerivedCache(): DerivedCache {
@@ -362,42 +266,42 @@ function makeDerivedCache(): DerivedCache {
 	}
 }
 
-export function warStrengthSolo(
-	state: HistoryState,
-	p: number,
-	exclude?: number,
-	cache?: DerivedCache,
-): number {
+function warStrengthSolo({
+	state,
+	p,
+	exclude,
+	cache,
+}: WarStrengthSoloParams): number {
 	const curr = Math.max(
 		0.1,
 		wealthCurrent({ state, p, exclude, freedom: exclude === p, cache }),
 	)
-	return curr / (1 + deriveProvinceWars(state, p, state.time, cache).length)
+	return curr / (1 + DERIVE.provinceWars(state, p, state.time, cache).length)
 }
 
-function getWarAllies(
-	state: HistoryState,
-	nation: number,
-	type: "offensive" | "defensive",
-	target: number,
-): number[] {
+function getWarAllies({
+	state,
+	nation,
+	type,
+	target,
+}: GetWarAlliesParams): number[] {
 	const validRelMask = new Uint8Array(11)
-	validRelMask[REL.OVERLORD] = 1
-	validRelMask[REL.VASSAL] = 1
-	validRelMask[REL.PU_SENIOR] = 1
-	validRelMask[REL.PU_JUNIOR] = 1
-	if (type === "defensive") validRelMask[REL.ALLY] = 1
+	validRelMask[rel.OVERLORD] = 1
+	validRelMask[rel.VASSAL] = 1
+	validRelMask[rel.PU_SENIOR] = 1
+	validRelMask[rel.PU_JUNIOR] = 1
+	if (type === "defensive") validRelMask[rel.ALLY] = 1
 
 	const allies: number[] = []
-	ensureHierarchyClean(state)
+	DERIVE.ensureHierarchyClean(state)
 	const rels = state.relationsCurrent
 	const P = state.P
 	for (let i = 0; i < P; i++) {
 		if (i === nation || i === target) continue
 		if (state.parentCurrent[i] >= 0 || state.sovereignCurrent[i] < 0) continue
-		const rel = rels[nation * P + i]
-		if (!validRelMask[rel]) continue
-		if ((rels[i * P + target] as Relation) === REL.ALLY) continue
+		const relation = rels[nation * P + i] as Relation
+		if (!validRelMask[relation]) continue
+		if ((rels[i * P + target] as Relation) === rel.ALLY) continue
 		allies.push(i)
 	}
 	return allies
@@ -411,23 +315,35 @@ function warStrengthCoalition({
 	cache,
 }: WarStrengthCoalitionParams): { attacker: number; defender: number } {
 	const c = cache ?? makeDerivedCache()
-	const atkAllies = getWarAllies(state, attacker, "offensive", defender)
-	const defAllies = getWarAllies(state, defender, "defensive", attacker)
-	let atk = warStrengthSolo(state, attacker, exclude, c)
-	let def = warStrengthSolo(state, defender, exclude, c)
+	const atkAllies = getWarAllies({
+		state,
+		nation: attacker,
+		type: "offensive",
+		target: defender,
+	})
+	const defAllies = getWarAllies({
+		state,
+		nation: defender,
+		type: "defensive",
+		target: attacker,
+	})
+	let atk = warStrengthSolo({ state, p: attacker, exclude, cache: c })
+	let def = warStrengthSolo({ state, p: defender, exclude, cache: c })
 	for (const ally of atkAllies)
-		atk += warStrengthSolo(state, ally, undefined, c) * 0.5
+		atk +=
+			warStrengthSolo({ state, p: ally, exclude: undefined, cache: c }) * 0.5
 	for (const ally of defAllies)
-		def += warStrengthSolo(state, ally, undefined, c) * 0.5
+		def +=
+			warStrengthSolo({ state, p: ally, exclude: undefined, cache: c }) * 0.5
 	return { attacker: atk, defender: def }
 }
 
-export function warThreat(
-	state: HistoryState,
-	attacker: number,
-	defender: number,
-	exclude?: number,
-): number {
+function warThreat({
+	state,
+	attacker,
+	defender,
+	exclude,
+}: WarThreatParams): number {
 	const strength = warStrengthCoalition({
 		state,
 		attacker,
@@ -440,30 +356,26 @@ export function warThreat(
 	return 1 - atk / (atk + def)
 }
 
-export function releaseProvince(
-	state: HistoryState,
-	p: number,
-	rng: HistoryRng,
-): void {
-	PROV.parent.set(state, p, state.time, -1)
+function releaseProvince({ state, p, rng }: ReleaseProvinceParams): void {
+	FIELDS.prov.parent.set(state, p, state.time, -1)
 	rebuildAssignment(state)
-	spawnLeader(state, p, rng)
+	spawnLeader({ state, p, rng })
 	state.heap.enqueue(
 		state.leaderRuntime.end[p],
-		EVT.SUCCESSION,
+		EVENT_HEAP.evt.SUCCESSION,
 		p,
 		state.leaderRuntime.idx[p],
 	)
 }
 
-function isProvinceConnectedToParent(
-	state: HistoryState,
-	province: number,
-): boolean {
-	const parent = PROV.parent.get(state, province)
+function isProvinceConnectedToParent({
+	state,
+	province,
+}: IsProvinceConnectedToParentParams): boolean {
+	const parent = FIELDS.prov.parent.get(state, province)
 	if (parent < 0) return true
 
-	ensureHierarchyClean(state)
+	DERIVE.ensureHierarchyClean(state)
 	const nation = state.sovereignCurrent[province]
 	const visited = new Uint8Array(state.P)
 	const queue = [province]
@@ -488,16 +400,16 @@ function isProvinceConnectedToParent(
 	return false
 }
 
-function releaseDisconnectedProvince(
-	state: HistoryState,
-	province: number,
-	overlord: number,
-	rng: HistoryRng,
-): void {
+function releaseDisconnectedProvince({
+	state,
+	province,
+	overlord,
+	rng,
+}: ReleaseDisconnectedProvinceParams): void {
 	if (state.occupationCurrent[province] >= 0) {
-		PROV.occupation.set(state, province, state.time, -1)
+		FIELDS.prov.occupation.set(state, province, state.time, -1)
 	}
-	releaseProvince(state, province, rng)
+	releaseProvince({ state, p: province, rng })
 	state.events.push({
 		tag: "rebellion",
 		time: state.time,
@@ -509,15 +421,10 @@ function releaseDisconnectedProvince(
 	})
 }
 
-function addTerritory(
-	state: HistoryState,
-	nation: number,
-	subjects: number[],
-	_rng: HistoryRng,
-): void {
+function addTerritory({ state, nation, subjects }: AddTerritoryParams): void {
 	const members = Array.from(
 		new Set(
-			[...subjects, ...getNationProvinces(state, nation)].filter(
+			[...subjects, ...getNationProvinces({ state, root: nation })].filter(
 				(p) => p !== nation && !state.desolate[p],
 			),
 		),
@@ -546,7 +453,7 @@ function addTerritory(
 	})
 	// Depose leaders of absorbed sovereigns before parents are rewritten
 	for (const p of subjects) {
-		if (!isSovereign(state, p)) continue
+		if (!isSovereign({ state, p })) continue
 		state.leaderRuntime.end[p] = state.time
 		state.leaderRuntime.idx[p]++
 		state.events.push({
@@ -556,23 +463,31 @@ function addTerritory(
 		})
 	}
 	for (const member of members) {
-		PROV.parent.set(state, member, state.time, -1)
+		FIELDS.prov.parent.set(state, member, state.time, -1)
 	}
-	PROV.parent.set(state, nation, state.time, -1)
+	FIELDS.prov.parent.set(state, nation, state.time, -1)
 	for (const member of members) {
-		PROV.parent.set(state, member, state.time, nextParent[member])
+		FIELDS.prov.parent.set(state, member, state.time, nextParent[member])
 	}
 	rebuildAssignment(state)
 }
 
-function releaseSubjectRelations(state: HistoryState, nation: number): void {
+function releaseSubjectRelations({
+	state,
+	nation,
+}: ReleaseSubjectRelationsParams): void {
 	for (let other = 0; other < state.P; other++) {
 		if (other === nation || state.desolate[other]) continue
-		const rel = getRelation(state, nation, other)
-		if (rel === REL.NEUTRAL || rel === REL.NONE || rel === REL.WAR) continue
+		const relation = getRelation({ state, a: nation, b: other })
+		if (
+			relation === rel.NEUTRAL ||
+			relation === rel.NONE ||
+			relation === rel.WAR
+		)
+			continue
 
-		if (rel === REL.VASSAL) {
-			setRelation(state, nation, other, REL.NEUTRAL)
+		if (relation === rel.VASSAL) {
+			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
 			state.events.push({
 				tag: "vassalage ended",
 				time: state.time,
@@ -581,8 +496,8 @@ function releaseSubjectRelations(state: HistoryState, nation: number): void {
 			continue
 		}
 
-		if (rel === REL.OVERLORD) {
-			setRelation(state, nation, other, REL.NEUTRAL)
+		if (relation === rel.OVERLORD) {
+			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
 			state.events.push({
 				tag: "vassalage ended",
 				time: state.time,
@@ -591,8 +506,8 @@ function releaseSubjectRelations(state: HistoryState, nation: number): void {
 			continue
 		}
 
-		if (rel === REL.PU_JUNIOR) {
-			setRelation(state, nation, other, REL.NEUTRAL)
+		if (relation === rel.PU_JUNIOR) {
+			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
 			state.events.push({
 				tag: "personal union ended",
 				time: state.time,
@@ -601,8 +516,8 @@ function releaseSubjectRelations(state: HistoryState, nation: number): void {
 			continue
 		}
 
-		if (rel === REL.PU_SENIOR) {
-			setRelation(state, nation, other, REL.NEUTRAL)
+		if (relation === rel.PU_SENIOR) {
+			setRelation({ state, a: nation, b: other, rel: rel.NEUTRAL })
 			state.events.push({
 				tag: "personal union ended",
 				time: state.time,
@@ -612,55 +527,59 @@ function releaseSubjectRelations(state: HistoryState, nation: number): void {
 	}
 }
 
-export function fixConnections(
-	state: HistoryState,
-	nation: number,
-	rng: HistoryRng,
-): void {
+function fixConnections({ state, nation, rng }: FixConnectionsParams): void {
 	let disconnected = true
 	while (disconnected) {
 		disconnected = false
-		for (const subject of getChildren(state, nation)) {
-			if (isProvinceConnectedToParent(state, subject)) continue
+		for (const subject of getChildren({ state, p: nation })) {
+			if (isProvinceConnectedToParent({ state, province: subject })) continue
 			disconnected = true
-			releaseDisconnectedProvince(state, subject, nation, rng)
+			releaseDisconnectedProvince({
+				state,
+				province: subject,
+				overlord: nation,
+				rng,
+			})
 		}
 	}
 
-	const overlord = PROV.parent.get(state, nation)
-	if (overlord >= 0 && !isProvinceConnectedToParent(state, nation)) {
-		releaseDisconnectedProvince(state, nation, overlord, rng)
-		fixConnections(state, overlord, rng)
+	const overlord = FIELDS.prov.parent.get(state, nation)
+	if (
+		overlord >= 0 &&
+		!isProvinceConnectedToParent({ state, province: nation })
+	) {
+		releaseDisconnectedProvince({ state, province: nation, overlord, rng })
+		fixConnections({ state, nation: overlord, rng })
 	}
 }
 
-export function startWar(
+function startWar(
 	state: HistoryState,
 	attacker: number,
 	defender: number,
 	rng: HistoryRng,
 	rebel = false,
 ): void {
-	createActiveWar(state, attacker, defender, rng, { rebel })
+	createActiveWar({ state, attacker, defender, rng, options: { rebel } })
 }
 
-export function queueBattleEvent({
+function queueBattleEvent({
 	state,
 	warIdx,
 	attacker,
 	defender,
 	time,
 }: QueueBattleEventParams): void {
-	state.heap.enqueue(time, EVT.BATTLE, warIdx, attacker, defender)
+	state.heap.enqueue(time, EVENT_HEAP.evt.BATTLE, warIdx, attacker, defender)
 }
 
-export function createActiveWar(
-	state: HistoryState,
-	attacker: number,
-	defender: number,
-	rng: HistoryRng,
-	options: ActiveWarOptions = {},
-): War {
+function createActiveWar({
+	state,
+	attacker,
+	defender,
+	rng,
+	options = {},
+}: CreateActiveWarParams): War {
 	const startTime = options.startTime ?? state.time
 	const war: War = {
 		idx: state.wars.length,
@@ -673,9 +592,9 @@ export function createActiveWar(
 	state.wars.push(war)
 	state.provinceWars[attacker].push(war.idx)
 	state.provinceWars[defender].push(war.idx)
-	REL_FIELD.set(state, attacker, defender, REL.WAR, startTime)
+	FIELDS.rel.set(state, attacker, defender, rel.WAR, startTime)
 	if (startTime < state.time) {
-		REL_FIELD.set(state, attacker, defender, REL.WAR, state.time)
+		FIELDS.rel.set(state, attacker, defender, rel.WAR, state.time)
 	}
 	if (options.rebellion) {
 		state.events.push({
@@ -698,15 +617,15 @@ export function createActiveWar(
 			(options.occupied ?? []).filter(
 				(province) =>
 					province !== defender &&
-					getSovereign(state, province) === defender &&
+					getSovereign({ state, p: province }) === defender &&
 					state.occupationCurrent[province] < 0,
 			),
 		),
 	)
 	for (const province of occupied) {
-		PROV.occupation.set(state, province, startTime, war.idx)
+		FIELDS.prov.occupation.set(state, province, startTime, war.idx)
 		if (startTime < state.time) {
-			PROV.occupation.set(state, province, state.time, war.idx)
+			FIELDS.prov.occupation.set(state, province, state.time, war.idx)
 		}
 		war.occupied.push(province)
 	}
@@ -720,7 +639,7 @@ export function createActiveWar(
 	return war
 }
 
-export function resolveWar({
+function resolveWar({
 	state,
 	war,
 	rng,
@@ -729,12 +648,14 @@ export function resolveWar({
 }: ResolveWarParams): void {
 	war.endTime = state.time
 	const transferred = (
-		victory ? getNationProvinces(state, war.defender) : [...war.occupied]
-	).filter((p) => getSovereign(state, p) === war.defender)
+		victory
+			? getNationProvinces({ state, root: war.defender })
+			: [...war.occupied]
+	).filter((p) => getSovereign({ state, p }) === war.defender)
 
 	for (const p of war.occupied) {
 		if (state.occupationCurrent[p] === war.idx) {
-			PROV.occupation.set(state, p, state.time, -1)
+			FIELDS.prov.occupation.set(state, p, state.time, -1)
 		}
 	}
 	war.occupied.length = 0
@@ -748,13 +669,17 @@ export function resolveWar({
 	removeWar(war.defender)
 
 	if (victory) {
-		releaseSubjectRelations(state, war.defender)
+		releaseSubjectRelations({ state, nation: war.defender })
 	}
 	if (transferred.length > 0) {
-		addTerritory(state, war.attacker, transferred, rng)
+		addTerritory({
+			state,
+			nation: war.attacker,
+			subjects: transferred,
+		})
 	}
-	if (!victory) fixConnections(state, war.defender, rng)
-	setRelation(state, war.attacker, war.defender, REL.SUSPICIOUS)
+	if (!victory) fixConnections({ state, nation: war.defender, rng })
+	setRelation({ state, a: war.attacker, b: war.defender, rel: rel.SUSPICIOUS })
 
 	state.events.push({
 		tag: "war ended",
@@ -770,11 +695,7 @@ export function resolveWar({
 	})
 }
 
-export function provinceDistanceSq(
-	state: HistoryState,
-	a: number,
-	b: number,
-): number {
+function provinceDistanceSq({ state, a, b }: ProvinceDistanceSqParams): number {
 	const aBase = a * 3
 	const bBase = b * 3
 	const dx = state.province_xyz[aBase] - state.province_xyz[bBase]
@@ -783,26 +704,26 @@ export function provinceDistanceSq(
 	return dx * dx + dy * dy + dz * dz
 }
 
-export function createHistoryState(
-	nations: GenesisNationHierarchy,
-	provinces: GenesisProvinces,
-	population: ProvincePopulation,
-	coastal: Uint8Array,
-	riverVisible: Uint8Array,
-	r_xyz: Float32Array,
-	cultures: { assignment: Int32Array; count: number },
-	startYear: number,
-	rng: HistoryRng,
-	waterAccess?: Uint8Array,
-	landmarks?: GenesisLandmarks,
-	regionProvince?: Int32Array,
-	regionAdjOffset?: Int32Array,
-	regionAdjList?: Int32Array,
-	regionIsLand?: Uint8Array,
-	era: SocietyEra = "lateMedieval",
-): HistoryState {
+function createHistoryState({
+	nations,
+	provinces,
+	population,
+	coastal,
+	riverVisible,
+	r_xyz,
+	cultures,
+	startYear,
+	rng,
+	waterAccess,
+	landmarks,
+	regionProvince,
+	regionAdjOffset,
+	regionAdjList,
+	regionIsLand,
+	era = "lateMedieval",
+}: CreateHistoryStateParams): HistoryState {
 	const P = provinces.count
-	const startTime = startYear * YEAR_MS
+	const startTime = startYear * yearMs
 	const waterAccessLevels = waterAccess ?? new Uint8Array(P)
 	const stateless = new Uint8Array(P)
 	for (let p = 0; p < P; p++) {
@@ -838,7 +759,7 @@ export function createHistoryState(
 		childOffset: new Int32Array(P + 1),
 		childList: new Int32Array(0),
 		sovereignCurrent: new Int32Array(P).fill(-1),
-		relationsCurrent: new Uint8Array(P * P).fill(REL.NEUTRAL),
+		relationsCurrent: new Uint8Array(P * P).fill(rel.NEUTRAL),
 		hierarchyDirty: true,
 		hierarchyVersion: 0,
 		assignmentCurrent: new Int32Array(P).fill(-1),
@@ -867,7 +788,7 @@ export function createHistoryState(
 		regionAdjList: regionAdjList ?? new Int32Array(0),
 		regionIsLand: regionIsLand ?? new Uint8Array(0),
 		r_xyz,
-		province_xyz: buildProvinceXyz(provinces.seeds, r_xyz),
+		province_xyz: buildProvinceXyz({ provinceSeeds: provinces.seeds, r_xyz }),
 		habitability: population.habitability.slice(),
 		culture: cultures.assignment.slice(),
 		cultureCount: cultures.count,
@@ -897,48 +818,43 @@ export function createHistoryState(
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
 		state.parentCurrent[p] = nations.parent[p]
-		PROV.parent.set(state, p, startTime, nations.parent[p])
-		PROV.assignment.set(state, p, startTime, nations.sovereign[p])
-		PROV.population.rural.set(
+		FIELDS.prov.parent.set(state, p, startTime, nations.parent[p])
+		FIELDS.prov.assignment.set(state, p, startTime, nations.sovereign[p])
+		FIELDS.prov.population.rural.set(
 			state,
 			p,
 			startTime,
 			population.population[p] * 0.95,
 		)
-		PROV.population.urban.set(
+		FIELDS.prov.population.urban.set(
 			state,
 			p,
 			startTime,
 			population.population[p] * 0.05,
 		)
-		PROV.development.set(state, p, startTime, 0)
-		PROV.consumption.set(state, p, startTime, 0)
-		PROV.leader.dynasty.set(state, p, startTime, -1)
-		PROV.leader.nameSeed.set(state, p, startTime, -1)
-		PROV.leader.claim.set(state, p, startTime, 0)
-		PROV.leader.birthYear.set(state, p, startTime, -1)
-		PROV.occupation.set(state, p, startTime, -1)
-		if (nations.parent[p] < 0) ensureNationColor(state, p)
+		FIELDS.prov.development.set(state, p, startTime, 0)
+		FIELDS.prov.consumption.set(state, p, startTime, 0)
+		FIELDS.prov.leader.dynasty.set(state, p, startTime, -1)
+		FIELDS.prov.leader.nameSeed.set(state, p, startTime, -1)
+		FIELDS.prov.leader.claim.set(state, p, startTime, 0)
+		FIELDS.prov.leader.birthYear.set(state, p, startTime, -1)
+		FIELDS.prov.occupation.set(state, p, startTime, -1)
+		if (nations.parent[p] < 0) ensureNationColor({ state, province: p })
 	}
 
 	for (let p = 0; p < P; p++) {
 		if (provinces.desolate[p]) continue
 		if (state.stateless[p]) continue
 		if (nations.parent[p] >= 0) continue
-		spawnLeader(state, p, rng)
+		spawnLeader({ state, p, rng })
 	}
-	initDynasties(state, rng)
+	initDynasties({ state, rng })
 	rebuildAssignment(state, startTime)
 
 	return state
 }
 
-export function spawnLeader(
-	state: HistoryState,
-	p: number,
-	rng: HistoryRng,
-	end?: number,
-): void {
+function spawnLeader({ state, p, rng, end }: SpawnLeaderParams): void {
 	const death = end ?? state.time + deltaYear(rng.uniform(1, 60))
 	const ageAtAccession =
 		rng.weightedChoice([
@@ -952,17 +868,22 @@ export function spawnLeader(
 	state.leaderRuntime.idx[p]++
 	state.leaderRuntime.birth[p] = state.time - deltaYear(ageAtAccession)
 	state.leaderRuntime.end[p] = death
-	PROV.leader.nameSeed.set(state, p, state.time, rng.randint(1, 0x7fffffff))
-	PROV.leader.claim.set(state, p, state.time, 3)
-	PROV.leader.birthYear.set(
+	FIELDS.prov.leader.nameSeed.set(
 		state,
 		p,
 		state.time,
-		state.leaderRuntime.birth[p] / YEAR_MS,
+		rng.randint(1, 0x7fffffff),
+	)
+	FIELDS.prov.leader.claim.set(state, p, state.time, 3)
+	FIELDS.prov.leader.birthYear.set(
+		state,
+		p,
+		state.time,
+		state.leaderRuntime.birth[p] / yearMs,
 	)
 }
 
-function initDynasties(state: HistoryState, rng: HistoryRng): void {
+function initDynasties({ state, rng }: InitDynastiesParams): void {
 	const shuffled = rng.shuffle(
 		Array.from({ length: state.P }, (_, i) => i).filter(
 			(p) =>
@@ -970,7 +891,7 @@ function initDynasties(state: HistoryState, rng: HistoryRng): void {
 		),
 	)
 	for (const p of shuffled) {
-		if (PROV.leader.dynasty.get(state, p, state.time) >= 0) continue
+		if (FIELDS.prov.leader.dynasty.get(state, p, state.time) >= 0) continue
 		const sameCulture: Array<{ dynasty: number; source: number }> = []
 		const other: Array<{ dynasty: number; source: number }> = []
 		const currentSovereign = (province: number): number => {
@@ -980,8 +901,8 @@ function initDynasties(state: HistoryState, rng: HistoryRng): void {
 			}
 			return current
 		}
-		for (const nb of getProvinceNeighbors(state, p)) {
-			const dynasty = PROV.leader.dynasty.get(state, nb, state.time)
+		for (const nb of getProvinceNeighbors({ state, p })) {
+			const dynasty = FIELDS.prov.leader.dynasty.get(state, nb, state.time)
 			if (state.desolate[nb] || dynasty < 0) continue
 			const donor = { dynasty, source: currentSovereign(nb) }
 			if (state.culture[p] === state.culture[nb]) sameCulture.push(donor)
@@ -994,8 +915,13 @@ function initDynasties(state: HistoryState, rng: HistoryRng): void {
 		else if (other.length > 0 && rng.random() < 0.05)
 			({ dynasty, source } = rng.choice(other))
 		if (dynasty < 0) dynasty = state.nextDynasty++
-		PROV.leader.dynasty.set(state, p, state.time, dynasty)
-		if (source >= 0 && source !== p && dynasty >= 0 && isSovereign(state, p)) {
+		FIELDS.prov.leader.dynasty.set(state, p, state.time, dynasty)
+		if (
+			source >= 0 &&
+			source !== p &&
+			dynasty >= 0 &&
+			isSovereign({ state, p })
+		) {
 			state.events.push({
 				tag: "dynasty spread",
 				time: state.time,
@@ -1007,4 +933,34 @@ function initDynasties(state: HistoryState, rng: HistoryRng): void {
 			})
 		}
 	}
+}
+
+export const STATE = {
+	rel,
+	yearMs,
+	deltaYear,
+	deltaMonth,
+	diffYears,
+	validateLiveHierarchy,
+	getRelation,
+	setRelation,
+	getRulerRelation,
+	getSovereign,
+	isSovereign,
+	getChildren,
+	getNationProvinces,
+	getNationNeighbors,
+	getProvinceNeighbors,
+	wealthOptimal,
+	warStrengthSolo,
+	warThreat,
+	releaseProvince,
+	fixConnections,
+	startWar,
+	queueBattleEvent,
+	createActiveWar,
+	resolveWar,
+	provinceDistanceSq,
+	createHistoryState,
+	spawnLeader,
 }

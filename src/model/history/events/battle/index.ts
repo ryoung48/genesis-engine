@@ -1,41 +1,27 @@
-/**
- * BATTLE EVENT — individual battles within an ongoing war.
- * Port of src/model/history/events/battle.ts
- */
-
-import { PROV } from "../fields"
-import type { HistoryRng } from "../history-rng"
-import {
-	deltaMonth,
-	getNationProvinces,
-	getProvinceNeighbors,
-	type HistoryState,
-	isSovereign,
-	queueBattleEvent,
-	resolveWar,
-	type War,
-	warStrengthSolo,
-	warThreat,
-	wealthOptimal,
-} from "../state"
-import type { RunBattleParams } from "./types"
-
-type VictoryDegree =
-	| "decisive"
-	| "victory"
-	| "pyrrhic"
-	| "close"
-	| "defeat"
-	| "crushing"
+import type {
+	ExhaustedParams,
+	FindInvasionTargetParams,
+	FindReconquestTargetParams,
+	GetVictoryDegreeParams,
+	RunBattleParams,
+	VictoryDegree,
+} from "@/model/history/events/battle/types"
+import { FIELDS } from "@/model/history/fields"
+import { STATE } from "@/model/history/state"
 
 const EXHAUSTION_THRESHOLD = 0.25
 
-function exhausted(state: HistoryState, nation: number): boolean {
-	const optimal = wealthOptimal(state, nation)
-	return warStrengthSolo(state, nation) < optimal * EXHAUSTION_THRESHOLD
+function exhausted({ state, nation }: ExhaustedParams): boolean {
+	const optimal = STATE.wealthOptimal({ state, p: nation })
+	return (
+		STATE.warStrengthSolo({ state, p: nation }) < optimal * EXHAUSTION_THRESHOLD
+	)
 }
 
-function getVictoryDegree(margin: number, isWinner: boolean): VictoryDegree {
+function getVictoryDegree({
+	margin,
+	isWinner,
+}: GetVictoryDegreeParams): VictoryDegree {
 	if (isWinner) {
 		if (margin > 0.66) return "decisive"
 		if (margin > 0.33) return "victory"
@@ -56,18 +42,24 @@ const COST_MULTIPLIERS: Record<VictoryDegree, number> = {
 	crushing: 1.5,
 }
 
-function findInvasionTarget(
-	state: HistoryState,
-	war: War,
-	rng: HistoryRng,
-): number | null {
-	const attackerProvinces = getNationProvinces(state, war.attacker)
+function findInvasionTarget({
+	state,
+	war,
+	rng,
+}: FindInvasionTargetParams): number | null {
+	const attackerProvinces = STATE.getNationProvinces({
+		state,
+		root: war.attacker,
+	})
 	const attackerTerritory = new Set([...attackerProvinces, ...war.occupied])
-	const defenderProvinces = getNationProvinces(state, war.defender)
+	const defenderProvinces = STATE.getNationProvinces({
+		state,
+		root: war.defender,
+	})
 
 	const candidates = defenderProvinces.filter((p) => {
 		if (state.occupationCurrent[p] === war.idx) return false
-		const neighbors = getProvinceNeighbors(state, p)
+		const neighbors = STATE.getProvinceNeighbors({ state, p })
 		return neighbors.some((nb) => attackerTerritory.has(nb))
 	})
 
@@ -75,11 +67,13 @@ function findInvasionTarget(
 	return rng.shuffle(candidates)[0]
 }
 
-function findReconquestTarget(_state: HistoryState, war: War): number | null {
+function findReconquestTarget({
+	war,
+}: FindReconquestTargetParams): number | null {
 	return war.occupied.length > 0 ? war.occupied[war.occupied.length - 1] : null
 }
 
-export function runBattle({
+function runBattle({
 	state,
 	warIdx,
 	eventAttacker,
@@ -89,8 +83,11 @@ export function runBattle({
 	const war = state.wars[warIdx]
 	if (war.endTime !== undefined) return
 
-	if (!isSovereign(state, war.attacker) || !isSovereign(state, war.defender)) {
-		resolveWar({
+	if (
+		!STATE.isSovereign({ state, p: war.attacker }) ||
+		!STATE.isSovereign({ state, p: war.defender })
+	) {
+		STATE.resolveWar({
 			state,
 			war,
 			rng,
@@ -102,11 +99,11 @@ export function runBattle({
 
 	const restoration = war.attacker === eventDefender
 	const target = restoration
-		? findReconquestTarget(state, war)
-		: findInvasionTarget(state, war, rng)
+		? findReconquestTarget({ war })
+		: findInvasionTarget({ state, war, rng })
 
 	if (target === null) {
-		resolveWar({
+		STATE.resolveWar({
 			state,
 			war,
 			rng,
@@ -116,29 +113,31 @@ export function runBattle({
 		return
 	}
 
-	const odds = 1 - warThreat(state, war.attacker, war.defender)
+	const odds =
+		1 -
+		STATE.warThreat({ state, attacker: war.attacker, defender: war.defender })
 	const outcome = rng.random() < odds
 	const margin = rng.uniform(0, 1)
 
 	const attackerWon = outcome
-	const attackerDegree = getVictoryDegree(margin, attackerWon)
-	const defenderDegree = getVictoryDegree(margin, !attackerWon)
+	const attackerDegree = getVictoryDegree({ margin, isWinner: attackerWon })
+	const defenderDegree = getVictoryDegree({ margin, isWinner: !attackerWon })
 
-	const baseCost = wealthOptimal(state, target) * 0.5
+	const baseCost = STATE.wealthOptimal({ state, p: target }) * 0.5
 	const attackerCost = baseCost * COST_MULTIPLIERS[attackerDegree]
 	const defenderCost = baseCost * COST_MULTIPLIERS[defenderDegree]
 
 	// Distribute costs (simplified — no ally cost distribution for now)
-	PROV.consumption.delta(state, war.attacker, state.time, attackerCost)
-	PROV.consumption.delta(state, war.defender, state.time, defenderCost)
+	FIELDS.prov.consumption.delta(state, war.attacker, state.time, attackerCost)
+	FIELDS.prov.consumption.delta(state, war.defender, state.time, defenderCost)
 
 	if (outcome) {
 		if (restoration) {
-			PROV.occupation.set(state, target, state.time, -1)
+			FIELDS.prov.occupation.set(state, target, state.time, -1)
 			const i = war.occupied.indexOf(target)
 			if (i >= 0) war.occupied.splice(i, 1)
 		} else {
-			PROV.occupation.set(state, target, state.time, war.idx)
+			FIELDS.prov.occupation.set(state, target, state.time, war.idx)
 			if (!war.occupied.includes(target)) war.occupied.push(target)
 		}
 	}
@@ -161,17 +160,17 @@ export function runBattle({
 		},
 	})
 
-	const atkExhausted = exhausted(state, war.attacker)
-	const defExhausted = exhausted(state, war.defender)
+	const atkExhausted = exhausted({ state, nation: war.attacker })
+	const defExhausted = exhausted({ state, nation: war.defender })
 
 	const occupiedCount = war.occupied.length
 
 	if (outcome && restoration && occupiedCount === 0) {
-		resolveWar({ state, war, rng })
+		STATE.resolveWar({ state, war, rng })
 	} else if (outcome && target === war.defender) {
-		resolveWar({ state, war, rng, victory: true })
+		STATE.resolveWar({ state, war, rng, victory: true })
 	} else if (atkExhausted && defExhausted) {
-		resolveWar({
+		STATE.resolveWar({
 			state,
 			war,
 			rng,
@@ -180,23 +179,27 @@ export function runBattle({
 		})
 	} else if (eventAttacker === war.attacker && occupiedCount === 0) {
 		if (atkExhausted) {
-			resolveWar({ state, war, rng })
+			STATE.resolveWar({ state, war, rng })
 		} else {
-			queueBattleEvent({
+			STATE.queueBattleEvent({
 				state,
 				warIdx: war.idx,
 				attacker: war.attacker,
 				defender: war.defender,
-				time: state.time + deltaMonth(rng.uniform(4, 24)),
+				time: state.time + STATE.deltaMonth(rng.uniform(4, 24)),
 			})
 		}
 	} else {
-		queueBattleEvent({
+		STATE.queueBattleEvent({
 			state,
 			warIdx: war.idx,
 			attacker: outcome ? eventAttacker : eventDefender,
 			defender: outcome ? eventDefender : eventAttacker,
-			time: state.time + deltaMonth(rng.uniform(4, 24)),
+			time: state.time + STATE.deltaMonth(rng.uniform(4, 24)),
 		})
 	}
+}
+
+export const BATTLE = {
+	runBattle,
 }

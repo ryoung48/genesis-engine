@@ -1,7 +1,8 @@
 type TimelineEntry<T> = { time: number; value: T }
+
 export type Timeline<T> = TimelineEntry<T>[]
 
-export function read<T>(
+function read<T>(
 	timeline: Timeline<T>,
 	defaultValue: T,
 	time = Number.POSITIVE_INFINITY,
@@ -13,7 +14,7 @@ export function read<T>(
 	return defaultValue
 }
 
-export function write<T>(timeline: Timeline<T>, time: number, value: T): void {
+function write<T>(timeline: Timeline<T>, time: number, value: T): void {
 	const last = timeline[timeline.length - 1]
 	if (last && Object.is(last.value, value)) return
 
@@ -27,4 +28,9 @@ export function write<T>(timeline: Timeline<T>, time: number, value: T): void {
 	}
 
 	timeline.push({ time, value })
+}
+
+export const TIMELINE = {
+	read,
+	write,
 }

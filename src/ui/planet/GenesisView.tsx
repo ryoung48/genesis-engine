@@ -9,6 +9,8 @@ import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 import type {
 	SolarSystemState,
 	SystemBody,
@@ -40,9 +42,14 @@ import type {
 } from "@/model/earth/history/organization-categories/types"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
 import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
-import type { HistoryNote } from "@/model/history"
-import { YEAR_MS } from "@/model/history"
-import { historyMsToEu4Days } from "@/model/history/eu4-days"
+import { EU4_DAYS } from "@/model/history/eu4-days"
+import { STATE } from "@/model/history/state"
+import type { HistoryNote } from "@/model/history/state/types"
+import { RNG } from "@/model/shared/rng"
+import { SEED_LABEL } from "@/model/shared/seed-label"
+import { SEEDS } from "@/model/shared/seeds"
+import { TEXT } from "@/model/shared/text"
+import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
 import type { SocietyEra } from "@/model/society/types"
@@ -243,13 +250,6 @@ import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters
 import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organization-stats"
 import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
-import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
-import { DATA } from "@/model/celestial/system/sol-system/data"
-import { RNG } from "@/model/shared/rng"
-import { SEED_LABEL } from "@/model/shared/seed-label"
-import { SEEDS } from "@/model/shared/seeds"
-import { TEXT } from "@/model/shared/text"
-import { UNITS } from "@/model/shared/units"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -1551,7 +1551,7 @@ export const GenesisView: React.FC = () => {
 	const [proceduralHistoryFrame, setProceduralHistoryFrame] =
 		useState<SerializedHistoryFrame | null>(null)
 	const [proceduralHistoryTimeMs, setProceduralHistoryTimeMs] = useState(
-		800 * YEAR_MS,
+		800 * STATE.yearMs,
 	)
 	const [proceduralHistoryPlaying, setProceduralHistoryPlaying] =
 		useState(false)
@@ -1582,7 +1582,7 @@ export const GenesisView: React.FC = () => {
 				proceduralHistoryEventsRef.current =
 					proceduralHistoryEventsRef.current.concat(newEvents)
 			}
-			const days = historyMsToEu4Days(timeMs)
+			const days = EU4_DAYS.historyMsToEu4Days(timeMs)
 			const counts = new Map<number, number>()
 			for (const nationId of frame.assignment) {
 				if (nationId < 0) continue
@@ -1622,7 +1622,7 @@ export const GenesisView: React.FC = () => {
 		} else {
 			workerRef.current.postMessage({
 				type: "simulate",
-				tickMs: YEAR_MS,
+				tickMs: STATE.yearMs,
 			} satisfies GenesisWorkerRequest)
 			setProceduralHistoryPlaying(true)
 		}
@@ -4355,7 +4355,7 @@ export const GenesisView: React.FC = () => {
 			if (w === null) {
 				setProceduralHistoryFrame(null)
 				setProceduralHistoryPlaying(false)
-				setProceduralHistoryTimeMs(800 * YEAR_MS)
+				setProceduralHistoryTimeMs(800 * STATE.yearMs)
 				resetProceduralHistoryAccumulation()
 			}
 			setWorld(w)
@@ -6571,7 +6571,7 @@ export const GenesisView: React.FC = () => {
 			governmentLabel: selectedNation.governmentType,
 		})
 		const nationId = selectedNation.id
-		const currentDate = historyMsToEu4Days(proceduralHistoryTimeMs)
+		const currentDate = EU4_DAYS.historyMsToEu4Days(proceduralHistoryTimeMs)
 		const allEvents = proceduralHistoryEventsRef.current
 		const timelineEvents = allEvents
 			.filter((event) => eventInvolvesNation(event, nationId))
@@ -6599,7 +6599,7 @@ export const GenesisView: React.FC = () => {
 			vegetationDistribution: [],
 			showObservedDistributions: false,
 			provinceHistory: proceduralProvinceHistoryRef.current.get(nationId) ?? [],
-			dateRangeStart: historyMsToEu4Days(800 * YEAR_MS),
+			dateRangeStart: EU4_DAYS.historyMsToEu4Days(800 * STATE.yearMs),
 			dateRangeEnd: currentDate,
 			currentDate,
 			currentDateLabel: DATE.formatEu4Days(currentDate),
@@ -8528,9 +8528,9 @@ export const GenesisView: React.FC = () => {
 									onPlayPause={handleToggleProceduralHistoryPlayback}
 									simPlaying={proceduralHistoryPlaying}
 									formatLabel={(ms) =>
-										DATE.formatEu4Days(historyMsToEu4Days(ms))
+										DATE.formatEu4Days(EU4_DAYS.historyMsToEu4Days(ms))
 									}
-									stepValue={YEAR_MS}
+									stepValue={STATE.yearMs}
 								/>
 							</div>
 						</div>

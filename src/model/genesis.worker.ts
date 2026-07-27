@@ -1,14 +1,13 @@
 /// <reference lib="webworker" />
 
-import {
-	createHistoryRng,
-	initHistory,
-	simulateUntil,
-	YEAR_MS,
-} from "@/model/history"
-import { buildHistoryFrame } from "@/model/history/snapshot"
-import type { HistoryState } from "@/model/history/state"
+import { HISTORY } from "@/model/history"
+import { HISTORY_RNG } from "@/model/history/history-rng"
+import { SNAPSHOT } from "@/model/history/snapshot"
+import { STATE } from "@/model/history/state"
+import type { HistoryState } from "@/model/history/state/types"
 import { PATHFIND } from "@/model/pathfinding"
+import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
@@ -20,8 +19,6 @@ import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
 } from "@/ui/planet/renderer/terrain-geometry"
-import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
-import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -30,8 +27,8 @@ declare const self: DedicatedWorkerGlobalScope
 // PROCEDURAL-HISTORY-PLAN.md). historyState is (re)seeded at generate/import
 // time via initHistory (cheap - just seeds the start year, no simulateUntil).
 let historyState: HistoryState | null = null
-let historyRng: ReturnType<typeof createHistoryRng> | null = null
-let historyTime = 800 * YEAR_MS
+let historyRng: ReturnType<typeof HISTORY_RNG.createHistoryRng> | null = null
+let historyTime = 800 * STATE.yearMs
 let simulationRunning = false
 // Index into historyState.events already sent to the main thread, so each
 // "sim-progress" only carries newly-pushed events instead of the whole log.
@@ -61,15 +58,15 @@ function buildFrameTransferList(frame: SerializedHistoryFrame): Transferable[] {
 	]
 }
 
-async function runSimulation(tickMs = YEAR_MS): Promise<void> {
+async function runSimulation(tickMs = STATE.yearMs): Promise<void> {
 	if (!historyState || !historyRng) return
 	simulationRunning = true
 
 	while (simulationRunning) {
 		try {
 			historyTime += tickMs
-			simulateUntil(historyState, historyTime, historyRng)
-			const frame = buildHistoryFrame(historyState)
+			HISTORY.simulateUntil(historyState, historyTime, historyRng)
+			const frame = SNAPSHOT.buildHistoryFrame({ state: historyState })
 			const newEvents = historyState.events.slice(historyEventCursor)
 			historyEventCursor = historyState.events.length
 			const progress: GenesisWorkerResponse = {
@@ -575,7 +572,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			} satisfies GenesisWorkerResponse)
 			return
 		}
-		void runSimulation(message.tickMs ?? YEAR_MS)
+		void runSimulation(message.tickMs ?? STATE.yearMs)
 		return
 	}
 
@@ -664,7 +661,7 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 
 		historyState = null
 		historyRng = null
-		historyTime = 800 * YEAR_MS
+		historyTime = 800 * STATE.yearMs
 		simulationRunning = false
 		historyEventCursor = 0
 		if (
@@ -677,8 +674,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			generated.cultures
 		) {
 			progressCb("Initializing history", 95)
-			historyRng = createHistoryRng(generated.params.seed + 99999)
-			historyState = initHistory({
+			historyRng = HISTORY_RNG.createHistoryRng(generated.params.seed + 99999)
+			historyState = HISTORY.initHistory({
 				nations: generated.nations,
 				provinces: generated.provinces,
 				population: generated.population,
@@ -706,7 +703,9 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 
 		const world = attachPrecomputedGeometry(serializeWorld(generated))
 		progressCb("Done", 100)
-		const frame = historyState ? buildHistoryFrame(historyState) : undefined
+		const frame = historyState
+			? SNAPSHOT.buildHistoryFrame({ state: historyState })
+			: undefined
 		self.postMessage(
 			{ type: "done", world, frame } satisfies GenesisWorkerResponse,
 			frame

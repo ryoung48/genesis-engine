@@ -1,21 +1,13 @@
-﻿import type { SerializedHistoryFrame } from "../transport"
-import { ensureHierarchyClean } from "./derive"
-import { PROV } from "./fields"
-import { type HistoryState, REL } from "./state"
+import { DERIVE } from "@/model/history/derive"
+import { FIELDS } from "@/model/history/fields"
+import type { BuildHistoryFrameParams } from "@/model/history/snapshot/types"
+import { STATE } from "@/model/history/state"
+import type { SerializedHistoryFrame } from "@/model/transport"
 
-interface HistoryFrameBuildProfile {
-	hierarchyMs: number
-	provinceFieldsMs: number
-	warsMs: number
-	summaryMs: number
-	relationsMs: number
-	totalMs: number
-}
-
-export function buildHistoryFrame(
-	state: HistoryState,
-	profile?: HistoryFrameBuildProfile,
-): SerializedHistoryFrame {
+function buildHistoryFrame({
+	state,
+	profile,
+}: BuildHistoryFrameParams): SerializedHistoryFrame {
 	const startedAt = performance.now()
 	const P = state.P
 	const assignment = new Int32Array(P)
@@ -37,33 +29,40 @@ export function buildHistoryFrame(
 	const relationEntries = Array.from(state._relations.entries()).filter(
 		([, timeline]) =>
 			timeline.length > 0 &&
-			timeline[timeline.length - 1].value !== REL.NEUTRAL,
+			timeline[timeline.length - 1].value !== STATE.rel.NEUTRAL,
 	)
 	const relationA = new Int32Array(relationEntries.length)
 	const relationB = new Int32Array(relationEntries.length)
 	const relationValues = new Uint8Array(relationEntries.length)
 
 	const hierarchyStartedAt = performance.now()
-	ensureHierarchyClean(state)
+	DERIVE.ensureHierarchyClean(state)
 	for (let province = 0; province < P; province++) {
-		parent[province] = PROV.parent.get(state, province)
+		parent[province] = FIELDS.prov.parent.get(state, province)
 	}
 	const hierarchyMs = performance.now() - hierarchyStartedAt
 
 	const provinceFieldsStartedAt = performance.now()
 	for (let province = 0; province < P; province++) {
-		assignment[province] = PROV.assignment.get(state, province)
+		assignment[province] = FIELDS.prov.assignment.get(state, province)
 		sovereign[province] = state.sovereignCurrent[province]
-		populationUrban[province] = PROV.population.urban.get(state, province)
-		populationTotal[province] =
-			PROV.population.rural.get(state, province) + populationUrban[province]
-		development[province] = PROV.development.get(state, province)
-		consumption[province] = PROV.consumption.get(state, province)
-		cultureBlendSecondary[province] = PROV.cultureBlendSecondary.get(
+		populationUrban[province] = FIELDS.prov.population.urban.get(
 			state,
 			province,
 		)
-		cultureBlendWeight[province] = PROV.cultureBlendWeight.get(state, province)
+		populationTotal[province] =
+			FIELDS.prov.population.rural.get(state, province) +
+			populationUrban[province]
+		development[province] = FIELDS.prov.development.get(state, province)
+		consumption[province] = FIELDS.prov.consumption.get(state, province)
+		cultureBlendSecondary[province] = FIELDS.prov.cultureBlendSecondary.get(
+			state,
+			province,
+		)
+		cultureBlendWeight[province] = FIELDS.prov.cultureBlendWeight.get(
+			state,
+			province,
+		)
 		const color = state.nationColors.get(assignment[province])
 		if (!color) continue
 		const base = province * 3
@@ -86,7 +85,7 @@ export function buildHistoryFrame(
 			defender: war.defender,
 			rebel: war.rebel,
 			occupied: Array.from({ length: P }, (_, province) => province).filter(
-				(province) => PROV.occupation.get(state, province) === war.idx,
+				(province) => FIELDS.prov.occupation.get(state, province) === war.idx,
 			),
 		}))
 	const warsMs = performance.now() - warsStartedAt
@@ -97,10 +96,16 @@ export function buildHistoryFrame(
 	for (let province = 0; province < P; province++) {
 		if (parent[province] < 0 && assignment[province] >= 0) {
 			sovereignCount++
-			leaderDynasty[province] = PROV.leader.dynasty.get(state, province)
-			leaderNameSeed[province] = PROV.leader.nameSeed.get(state, province)
-			leaderClaim[province] = PROV.leader.claim.get(state, province)
-			leaderBirthYear[province] = PROV.leader.birthYear.get(state, province)
+			leaderDynasty[province] = FIELDS.prov.leader.dynasty.get(state, province)
+			leaderNameSeed[province] = FIELDS.prov.leader.nameSeed.get(
+				state,
+				province,
+			)
+			leaderClaim[province] = FIELDS.prov.leader.claim.get(state, province)
+			leaderBirthYear[province] = FIELDS.prov.leader.birthYear.get(
+				state,
+				province,
+			)
 			nationWealth[province] = Math.max(
 				0,
 				state.habitability[province] - consumption[province],
@@ -155,4 +160,8 @@ export function buildHistoryFrame(
 		cultureBlendSecondary,
 		cultureBlendWeight,
 	}
+}
+
+export const SNAPSHOT = {
+	buildHistoryFrame,
 }

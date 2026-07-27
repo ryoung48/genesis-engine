@@ -944,7 +944,13 @@ if (runsStep(2)) {
 			const camelName = toCamelCase(originalName)
 			if (camelName !== originalName) {
 				declNode.getNameNode().replaceWithText(camelName)
-				for (const r of sameFileRefs) r.replaceWithText(camelName)
+				for (const r of sameFileRefs) {
+					if (r.wasForgotten()) {
+						console.log(`  [WARNING] a same-file reference to ${originalName} was left unrewritten (nested inside another rewritten call) — fix by hand`)
+						continue
+					}
+					r.replaceWithText(camelName)
+				}
 			}
 			// Update bareFn.name in place: the shorthand-property insertion
 			// after this whole loop reads from this same array.
@@ -970,6 +976,17 @@ if (runsStep(2)) {
 				// only "reference" was re-exporting the bare name onward.
 				let needsImport = false
 				for (const ref of consumerRefs) {
+					// A ref captured during the earlier resolve pass can live
+					// inside text that a DIFFERENT candidate already rewrote
+					// this same run (e.g. nested inside that candidate's own
+					// call site) — forgetting this node. Skip rather than
+					// crash; surfaced so it's not silently dropped, since
+					// this reference genuinely won't get its namespace
+					// rewrite.
+					if (ref.wasForgotten()) {
+						console.log(`  [WARNING] a reference to ${name} in ${consumer.getFilePath().split("/src/")[1] ?? consumer.getFilePath()} was left unrewritten (nested inside another rewritten call) — fix by hand`)
+						continue
+					}
 					const parent = ref.getParent()
 					if (Node.isImportSpecifier(parent)) {
 						const importDecl = parent.getImportDeclaration()
@@ -1283,6 +1300,13 @@ for (const { sourceFile, namespaceName, objectLiteral } of namespaces) {
 		// and forget any node references still held into it, so this
 		// must run before those edits, not after.
 		for (const ref of refs) {
+			// Same defensive skip as Step 2/6: a ref can be nested inside
+			// another ref's own call site (rewritten earlier in this same
+			// loop), forgetting this node.
+			if (ref.wasForgotten()) {
+				console.log(`  [WARNING] a reference to ${namespaceName}.${memberName} was left unrewritten (nested inside another rewritten call) — fix by hand`)
+				continue
+			}
 			const propAccess = ref.getParent()
 			if (!Node.isPropertyAccessExpression(propAccess)) continue
 			const consumer = ref.getSourceFile()
@@ -1820,8 +1844,13 @@ applyImportsBatched(
 // Rewrite every consumer's import to the new module — batched across the
 // WHOLE step, not just within one declaration.
 for (const { consumer, imp, name } of allConsumerImportsToRewrite) {
+	if (imp.wasForgotten()) {
+		console.log(`  [WARNING] an import of ${name} in ${consumer.getFilePath().split("/src/")[1] ?? consumer.getFilePath()} was left unrewritten (nested inside another rewritten import) — fix by hand`)
+		continue
+	}
 	touchedFiles.add(consumer.getFilePath())
 	const named = imp.getNamedImports().find((n) => n.getName() === name)
+	if (!named) continue
 	named.remove()
 	if (imp.getNamedImports().length === 0 && !imp.getDefaultImport() && !imp.getNamespaceImport()) {
 		imp.remove()

@@ -1,62 +1,42 @@
-/**
- * WAR EVENT — evaluates whether a nation should start a war.
- * Port of src/model/history/events/war.ts
- */
+import { DERIVE } from "@/model/history/derive"
+import { EVENT_HEAP } from "@/model/history/event-heap"
+import type {
+	GetDefenderOccupationCandidatesParams,
+	InitWarParams,
+	ListWarTargetsParams,
+	NextEventParams,
+	RunWarParams,
+	SeedInterstateWarsParams,
+	SeedRebellionsParams,
+} from "@/model/history/events/war/types"
+import { FIELDS } from "@/model/history/fields"
+import type { HistoryRng } from "@/model/history/history-rng/types"
+import { type Relation, STATE } from "@/model/history/state"
+import type { HistoryState } from "@/model/history/state/types"
 
-import { provinceWars } from "../derive"
-import { EVT } from "../event-heap"
-import { PROV } from "../fields"
-import type { HistoryRng } from "../history-rng"
-import {
-	createActiveWar,
-	deltaMonth,
-	deltaYear,
-	fixConnections,
-	getNationNeighbors,
-	getNationProvinces,
-	getProvinceNeighbors,
-	getRelation,
-	getRulerRelation,
-	getSovereign,
-	type HistoryState,
-	isSovereign,
-	provinceDistanceSq,
-	REL,
-	type Relation,
-	releaseProvince,
-	startWar,
-	warThreat,
-	wealthOptimal,
-} from "../state"
-
-/** Relation-based threshold for attack willingness */
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
+
 const REBELLION_SEED_FRACTION = 0.0125
 
 const ATTACK_THRESHOLD: Record<number, number> = {
-	[REL.WAR]: 0,
-	[REL.RIVAL]: 0.8,
-	[REL.SUSPICIOUS]: 0.6,
-	[REL.NEUTRAL]: 0.45,
-	[REL.FRIENDLY]: 0.1,
-	[REL.ALLY]: 0,
-	[REL.VASSAL]: 0,
-	[REL.OVERLORD]: 0,
-	[REL.PU_SENIOR]: 0,
-	[REL.PU_JUNIOR]: 0,
-	[REL.NONE]: 0,
-	[REL.COLONY]: 0,
+	[STATE.rel.WAR]: 0,
+	[STATE.rel.RIVAL]: 0.8,
+	[STATE.rel.SUSPICIOUS]: 0.6,
+	[STATE.rel.NEUTRAL]: 0.45,
+	[STATE.rel.FRIENDLY]: 0.1,
+	[STATE.rel.ALLY]: 0,
+	[STATE.rel.VASSAL]: 0,
+	[STATE.rel.OVERLORD]: 0,
+	[STATE.rel.PU_SENIOR]: 0,
+	[STATE.rel.PU_JUNIOR]: 0,
+	[STATE.rel.NONE]: 0,
+	[STATE.rel.COLONY]: 0,
 }
 
-function nextEvent(
-	state: HistoryState,
-	province: number,
-	rng: HistoryRng,
-	years?: number,
-): void {
+function nextEvent({ state, province, rng, years }: NextEventParams): void {
 	state.heap.enqueue(
-		state.time + deltaYear(years ?? rng.uniform(5, 10)),
-		EVT.WAR,
+		state.time + STATE.deltaYear(years ?? rng.uniform(5, 10)),
+		EVENT_HEAP.evt.WAR,
 		province,
 		0,
 		0,
@@ -65,44 +45,45 @@ function nextEvent(
 	)
 }
 
-function listWarTargets(
-	state: HistoryState,
-	nation: number,
-): {
+function listWarTargets({ state, nation }: ListWarTargetsParams): {
 	n: number
 	threshold: number
 	w: number
 	hasWar: boolean
 	d: number
 }[] {
-	const wars = provinceWars(state, nation)
+	const wars = DERIVE.provinceWars(state, nation)
 		.map((idx: number) => state.wars[idx])
 		.filter((w) => w.endTime === undefined)
 
-	return getNationNeighbors(state, nation).map((nb) => {
-		const rel = getRelation(state, nation, nb) as Relation
+	return STATE.getNationNeighbors({ state, nation }).map((nb) => {
+		const rel = STATE.getRelation({ state, a: nation, b: nb }) as Relation
 		return {
 			n: nb,
 			threshold: ATTACK_THRESHOLD[rel] ?? 0,
-			w: warThreat(state, nation, nb),
+			w: STATE.warThreat({ state, attacker: nation, defender: nb }),
 			hasWar: wars.some((w) => w.defender === nb || w.attacker === nb),
-			d: provinceDistanceSq(state, nation, nb),
+			d: STATE.provinceDistanceSq({ state, a: nation, b: nb }),
 		}
 	})
 }
 
-function getDefenderOccupationCandidates(
-	state: HistoryState,
-	attacker: number,
-	defender: number,
-): number[] {
-	const attackerTerritory = new Set(getNationProvinces(state, attacker))
-	return getNationProvinces(state, defender).filter((province) => {
-		if (province === defender || state.occupationCurrent[province] >= 0)
-			return false
-		const neighbors = getProvinceNeighbors(state, province)
-		return neighbors.some((neighbor) => attackerTerritory.has(neighbor))
-	})
+function getDefenderOccupationCandidates({
+	state,
+	attacker,
+	defender,
+}: GetDefenderOccupationCandidatesParams): number[] {
+	const attackerTerritory = new Set(
+		STATE.getNationProvinces({ state, root: attacker }),
+	)
+	return STATE.getNationProvinces({ state, root: defender }).filter(
+		(province) => {
+			if (province === defender || state.occupationCurrent[province] >= 0)
+				return false
+			const neighbors = STATE.getProvinceNeighbors({ state, p: province })
+			return neighbors.some((neighbor) => attackerTerritory.has(neighbor))
+		},
+	)
 }
 
 function pickSeededOccupationCount(params: {
@@ -136,11 +117,11 @@ function seedWarStage(
 	rebel = false,
 	forceOccupied = false,
 ): void {
-	const occupationCandidates = getDefenderOccupationCandidates(
+	const occupationCandidates = getDefenderOccupationCandidates({
 		state,
 		attacker,
 		defender,
-	)
+	})
 	const canOccupy = occupationCandidates.length > 0
 	const progressed = forceOccupied
 		? canOccupy
@@ -166,7 +147,7 @@ function seedWarStage(
 			: []
 	const startTime =
 		state.time -
-		deltaYear(
+		STATE.deltaYear(
 			lateStage
 				? rng.uniform(2, 5)
 				: progressed
@@ -176,26 +157,33 @@ function seedWarStage(
 	const nextBattleTime =
 		state.time +
 		(lateStage
-			? deltaMonth(rng.uniform(0.25, 1.5))
-			: deltaMonth(rng.uniform(1, 4)))
+			? STATE.deltaMonth(rng.uniform(0.25, 1.5))
+			: STATE.deltaMonth(rng.uniform(1, 4)))
 
-	createActiveWar(state, attacker, defender, rng, {
-		rebel,
-		startTime,
-		nextBattleTime,
-		occupied,
-		rebellion: rebel ? { overlord: attacker, subject: defender } : undefined,
+	STATE.createActiveWar({
+		state,
+		attacker,
+		defender,
+		rng,
+		options: {
+			rebel,
+			startTime,
+			nextBattleTime,
+			occupied,
+			rebellion: rebel ? { overlord: attacker, subject: defender } : undefined,
+		},
 	})
 }
 
-function seedInterstateWars(state: HistoryState, rng: HistoryRng): void {
+function seedInterstateWars({ state, rng }: SeedInterstateWarsParams): void {
 	const sovereigns: { nation: number; size: number; wealth: number }[] = []
 	for (let nation = 0; nation < state.P; nation++) {
-		if (state.desolate[nation] || !isSovereign(state, nation)) continue
+		if (state.desolate[nation] || !STATE.isSovereign({ state, p: nation }))
+			continue
 		sovereigns.push({
 			nation,
-			size: getNationProvinces(state, nation).length,
-			wealth: wealthOptimal(state, nation),
+			size: STATE.getNationProvinces({ state, root: nation }).length,
+			wealth: STATE.wealthOptimal({ state, p: nation }),
 		})
 	}
 	const targetParticipants = Math.round(
@@ -213,28 +201,28 @@ function seedInterstateWars(state: HistoryState, rng: HistoryRng): void {
 		const nation = candidate.nation
 		if (engaged.size >= targetParticipants) break
 		if (engaged.has(nation)) continue
-		const targets = listWarTargets(state, nation)
+		const targets = listWarTargets({ state, nation })
 			.filter((target) => !target.hasWar && !engaged.has(target.n))
 			.filter((target) => {
-				const relation = getRelation(state, nation, target.n)
+				const relation = STATE.getRelation({ state, a: nation, b: target.n })
 				return (
-					relation !== REL.ALLY &&
-					relation !== REL.VASSAL &&
-					relation !== REL.OVERLORD &&
-					relation !== REL.PU_SENIOR &&
-					relation !== REL.PU_JUNIOR &&
-					relation !== REL.COLONY
+					relation !== STATE.rel.ALLY &&
+					relation !== STATE.rel.VASSAL &&
+					relation !== STATE.rel.OVERLORD &&
+					relation !== STATE.rel.PU_SENIOR &&
+					relation !== STATE.rel.PU_JUNIOR &&
+					relation !== STATE.rel.COLONY
 				)
 			})
 			.map((target) => ({
 				...target,
-				targetSize: getNationProvinces(state, target.n).length,
-				targetWealth: wealthOptimal(state, target.n),
-				occupationCount: getDefenderOccupationCandidates(
+				targetSize: STATE.getNationProvinces({ state, root: target.n }).length,
+				targetWealth: STATE.wealthOptimal({ state, p: target.n }),
+				occupationCount: getDefenderOccupationCandidates({
 					state,
-					nation,
-					target.n,
-				).length,
+					attacker: nation,
+					defender: target.n,
+				}).length,
 			}))
 			.sort((a, b) => {
 				const aOccupiable = a.occupationCount > 0 ? 1 : 0
@@ -261,12 +249,13 @@ function seedInterstateWars(state: HistoryState, rng: HistoryRng): void {
 	}
 }
 
-function seedRebellions(state: HistoryState, rng: HistoryRng): void {
+function seedRebellions({ state, rng }: SeedRebellionsParams): void {
 	const directSubjects = []
 	for (let nation = 0; nation < state.P; nation++) {
 		if (state.desolate[nation]) continue
-		const parent = PROV.parent.get(state, nation)
-		if (parent < 0 || parent !== getSovereign(state, nation)) continue
+		const parent = FIELDS.prov.parent.get(state, nation)
+		if (parent < 0 || parent !== STATE.getSovereign({ state, p: nation }))
+			continue
 		directSubjects.push(nation)
 	}
 	const targetRebellions = Math.round(
@@ -277,38 +266,39 @@ function seedRebellions(state: HistoryState, rng: HistoryRng): void {
 	let seeded = 0
 	for (const nation of rng.shuffle([...directSubjects])) {
 		if (seeded >= targetRebellions) break
-		const sovereignNation = getSovereign(state, nation)
-		if (provinceWars(state, sovereignNation).length > 0) continue
-		const threat = warThreat(state, sovereignNation, nation, nation)
+		const sovereignNation = STATE.getSovereign({ state, p: nation })
+		if (DERIVE.provinceWars(state, sovereignNation).length > 0) continue
+		const threat = STATE.warThreat({
+			state,
+			attacker: sovereignNation,
+			defender: nation,
+			exclude: nation,
+		})
 		if (threat <= 0.4) continue
-		releaseProvince(state, nation, rng)
-		fixConnections(state, nation, rng)
+		STATE.releaseProvince({ state, p: nation, rng })
+		STATE.fixConnections({ state, nation, rng })
 		seedWarStage(state, sovereignNation, nation, rng, true)
 		seeded++
 	}
 }
 
-export function initWar(state: HistoryState, rng: HistoryRng): void {
+function initWar({ state, rng }: InitWarParams): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		nextEvent(state, p, rng, rng.uniform(0, 5))
+		nextEvent({ state, province: p, rng, years: rng.uniform(0, 5) })
 	}
-	seedInterstateWars(state, rng)
-	seedRebellions(state, rng)
+	seedInterstateWars({ state, rng })
+	seedRebellions({ state, rng })
 }
 
-export function runWar(
-	state: HistoryState,
-	nation: number,
-	rng: HistoryRng,
-): void {
-	const parent = PROV.parent.get(state, nation)
-	const sovereignNation = getSovereign(state, nation)
-	const rulerRelation = getRulerRelation(state, nation)
+function runWar({ state, nation, rng }: RunWarParams): void {
+	const parent = FIELDS.prov.parent.get(state, nation)
+	const sovereignNation = STATE.getSovereign({ state, p: nation })
+	const rulerRelation = STATE.getRulerRelation({ state, nation })
 
 	// Only independent nations can act
 	if (parent < 0 && !rulerRelation) {
-		const viable = listWarTargets(state, nation).filter(
+		const viable = listWarTargets({ state, nation }).filter(
 			(t) => t.threshold > 0 && t.w < t.threshold && !t.hasWar,
 		)
 
@@ -317,27 +307,37 @@ export function runWar(
 			viable.sort((a, b) => a.d - b.d)
 			const closest = viable[0]
 			if (rng.random() > closest.w) {
-				startWar(state, nation, closest.n, rng)
+				STATE.startWar(state, nation, closest.n, rng)
 			}
 		}
 	} else if (parent === sovereignNation) {
 		// Direct subject of the sovereign — consider rebellion
-		if (provinceWars(state, sovereignNation).length === 0) {
-			const threat = warThreat(state, sovereignNation, nation, nation)
+		if (DERIVE.provinceWars(state, sovereignNation).length === 0) {
+			const threat = STATE.warThreat({
+				state,
+				attacker: sovereignNation,
+				defender: nation,
+				exclude: nation,
+			})
 			if (threat > 0.4 && rng.random() < threat) {
 				state.events.push({
 					tag: "rebellion",
 					time: state.time,
 					data: { overlord: sovereignNation, subject: nation },
 				})
-				releaseProvince(state, nation, rng)
+				STATE.releaseProvince({ state, p: nation, rng })
 				if (rng.random() > threat) {
-					startWar(state, sovereignNation, nation, rng, true)
+					STATE.startWar(state, sovereignNation, nation, rng, true)
 				}
-				fixConnections(state, nation, rng)
+				STATE.fixConnections({ state, nation, rng })
 			}
 		}
 	}
 
-	nextEvent(state, nation, rng)
+	nextEvent({ state, province: nation, rng })
+}
+
+export const WAR = {
+	initWar,
+	runWar,
 }

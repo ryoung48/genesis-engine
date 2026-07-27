@@ -1,28 +1,23 @@
-import { EVT } from "@/model/history/event-heap"
-import { PROV } from "@/model/history/fields"
-import type { HistoryRng } from "@/model/history/history-rng"
-import {
-	getNationProvinces,
-	getProvinceNeighbors,
-	getSovereign,
-	type HistoryState,
-	isSovereign,
-	YEAR_MS,
-} from "@/model/history/state"
+import { EVENT_HEAP } from "@/model/history/event-heap"
+import type {
+	DevelopmentParams,
+	HierarchyDepthParams,
+	InitPopulationParams,
+	LerpScaleParams,
+	NationProfile,
+	RankSizeCitiesParams,
+	RunPopulationParams,
+	UrbanizationParams,
+} from "@/model/history/events/population/types"
+import { FIELDS } from "@/model/history/fields"
+import { STATE } from "@/model/history/state"
 import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { GovernmentType } from "@/model/society/types"
 
 const MAX_ADJUSTMENT_RATE = 0.005
+
 const URBAN_GROWTH = 0.1
-
-// 1444 Urban Demographics Ruleset (two-input edition): each government type
-// carries its own urbanization share (U) and rank-size steepness (q).
-interface NationProfile {
-	U: number
-	q: number
-}
-
 const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 	// tribal — negligible true urbanization, flat-to-moderate hierarchy
 	chiefdom: { U: 0.015, q: 0.9 }, // single hereditary seat, no real hierarchy
@@ -73,12 +68,9 @@ function nationProfile(governmentTypeIndex: number): NationProfile {
 		: GOVERNMENT_PROFILES.feudal_monarchy
 }
 
-/** Below this settlement size, population is rural/nomadic rather than a town. */
 const TAU = 5_000
 
-// Rank-size hierarchy: grow the settlement count N until the smallest
-// settlement would fall below τ, then normalize sizes so they sum to urbanPop.
-function rankSizeCities(urbanPop: number, q: number): number[] {
+function rankSizeCities({ urbanPop, q }: RankSizeCitiesParams): number[] {
 	let N = 0
 	let H = 0
 	for (;;) {
@@ -93,8 +85,7 @@ function rankSizeCities(urbanPop: number, q: number): number[] {
 	return Array.from({ length: N }, (_, i) => (urbanPop * (i + 1) ** -q) / H)
 }
 
-// Piecewise linear interpolation across fixed domain/range points.
-function lerpScale(domain: number[], range: number[], v: number): number {
+function lerpScale({ domain, range, v }: LerpScaleParams): number {
 	const clamped = Math.max(domain[0], Math.min(domain[domain.length - 1], v))
 	for (let i = 0; i < domain.length - 1; i++) {
 		if (clamped <= domain[i + 1]) {
@@ -106,22 +97,22 @@ function lerpScale(domain: number[], range: number[], v: number): number {
 }
 
 function urbanPopToDev(pop: number): number {
-	return lerpScale(
-		[1_000, 5_000, 20_000, 100_000, 1_000_000],
-		[0.05, 0.1, 0.25, 0.65, 0.95],
-		pop,
-	)
+	return lerpScale({
+		domain: [1_000, 5_000, 20_000, 100_000, 1_000_000],
+		range: [0.05, 0.1, 0.25, 0.65, 0.95],
+		v: pop,
+	})
 }
 
 function devToGrowthRate(dev: number): number {
-	return lerpScale(
-		[0.0, 0.15, 0.35, 0.55, 0.75, 0.95],
-		[0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.002],
-		dev,
-	)
+	return lerpScale({
+		domain: [0.0, 0.15, 0.35, 0.55, 0.75, 0.95],
+		range: [0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.002],
+		v: dev,
+	})
 }
 
-function hierarchyDepth(state: HistoryState, province: number): number {
+function hierarchyDepth({ state, province }: HierarchyDepthParams): number {
 	let depth = 0
 	let current = province
 	while (state.parentCurrent[current] >= 0) {
@@ -131,17 +122,17 @@ function hierarchyDepth(state: HistoryState, province: number): number {
 	return depth
 }
 
-function urbanization(state: HistoryState, init: boolean): void {
+function urbanization({ state, init }: UrbanizationParams): void {
 	// Process each sovereign nation
 	for (let p = 0; p < state.P; p++) {
-		if (state.desolate[p] || !isSovereign(state, p)) continue
+		if (state.desolate[p] || !STATE.isSovereign({ state, p })) continue
 
-		const provinces = getNationProvinces(state, p)
+		const provinces = STATE.getNationProvinces({ state, root: p })
 		let totalPop = 0
 		for (const prov of provinces) {
 			totalPop +=
-				PROV.population.rural.get(state, prov) +
-				PROV.population.urban.get(state, prov)
+				FIELDS.prov.population.rural.get(state, prov) +
+				FIELDS.prov.population.urban.get(state, prov)
 		}
 
 		const { U, q } = nationProfile(state.governmentType[p])
@@ -150,21 +141,21 @@ function urbanization(state: HistoryState, init: boolean): void {
 		// Sort provinces by hierarchy depth ascending (sovereign = 0 gets the capital city),
 		// breaking ties by habitability so deeper-ranked provinces still differ meaningfully.
 		const sorted = provinces.slice().sort((a, b) => {
-			const da = hierarchyDepth(state, a)
-			const db = hierarchyDepth(state, b)
+			const da = hierarchyDepth({ state, province: a })
+			const db = hierarchyDepth({ state, province: b })
 			if (da !== db) return da - db
 			return state.habitability[b] - state.habitability[a]
 		})
 
 		// Rank-size hierarchy: N settlements whose sizes sum to exactly urbanPop.
-		let sizes = rankSizeCities(urbanPop, q)
+		let sizes = rankSizeCities({ urbanPop, q })
 		if (sizes.length > sorted.length) sizes = sizes.slice(0, sorted.length)
 
 		for (let idx = 0; idx < sorted.length; idx++) {
 			const prov = sorted[idx]
 			state.leaderRuntime.targetUrban[prov] = sizes[idx] ?? 0
 			if (init) {
-				PROV.population.urban.set(
+				FIELDS.prov.population.urban.set(
 					state,
 					prov,
 					state.time,
@@ -175,10 +166,9 @@ function urbanization(state: HistoryState, init: boolean): void {
 	}
 }
 
-/** Max spread distance in province hops (simplified from km-based) */
 const MAX_SPREAD_HOPS = 20
 
-function development(state: HistoryState, init: boolean): void {
+function development({ state, init }: DevelopmentParams): void {
 	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(state.era)
 	const BASE_DECAY = 0.75
 	const FOREIGN_DECAY = 0.65
@@ -188,11 +178,11 @@ function development(state: HistoryState, init: boolean): void {
 	const cities: { province: number; dev: number; sourceNation: number }[] = []
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
-		if (PROV.population.urban.get(state, p) >= cityMin) {
+		if (FIELDS.prov.population.urban.get(state, p) >= cityMin) {
 			cities.push({
 				province: p,
-				dev: urbanPopToDev(PROV.population.urban.get(state, p)),
-				sourceNation: getSovereign(state, p),
+				dev: urbanPopToDev(FIELDS.prov.population.urban.get(state, p)),
+				sourceNation: STATE.getSovereign({ state, p }),
 			})
 		}
 	}
@@ -217,10 +207,10 @@ function development(state: HistoryState, init: boolean): void {
 		const { province, dev, sourceNation, hops } = queue.shift()!
 		if (dev < 0.01 || hops >= MAX_SPREAD_HOPS) continue
 
-		const neighbors = getProvinceNeighbors(state, province)
+		const neighbors = STATE.getProvinceNeighbors({ state, p: province })
 		for (const nb of neighbors) {
 			if (state.desolate[nb]) continue
-			const nbNation = getSovereign(state, nb)
+			const nbNation = STATE.getSovereign({ state, p: nb })
 			const isForeign = nbNation !== sourceNation
 			const hasWaterAccess = state.waterAccess[nb] === 1
 
@@ -257,46 +247,50 @@ function development(state: HistoryState, init: boolean): void {
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 		const cityDev = devFromCities[p]
-		const localDev = urbanPopToDev(PROV.population.urban.get(state, p))
+		const localDev = urbanPopToDev(FIELDS.prov.population.urban.get(state, p))
 		const targetDev = Math.max(cityDev, localDev)
 
 		if (init) {
-			PROV.development.set(state, p, state.time, targetDev)
+			FIELDS.prov.development.set(state, p, state.time, targetDev)
 		} else {
-			const currentDev = PROV.development.get(state, p)
+			const currentDev = FIELDS.prov.development.get(state, p)
 			const gap = targetDev - currentDev
 			const rate = gap > 0 ? DEV_RISE : DEV_FALL
-			PROV.development.set(state, p, state.time, currentDev + gap * rate)
+			FIELDS.prov.development.set(state, p, state.time, currentDev + gap * rate)
 		}
 	}
 }
 
-export function initPopulation(state: HistoryState, _rng: HistoryRng): void {
-	urbanization(state, true)
-	development(state, true)
-	state.heap.enqueue(state.time + YEAR_MS, EVT.CENSUS, 0, 0, 0, 0, state.time)
+function initPopulation({ state }: InitPopulationParams): void {
+	urbanization({ state, init: true })
+	development({ state, init: true })
+	state.heap.enqueue(
+		state.time + STATE.yearMs,
+		EVENT_HEAP.evt.CENSUS,
+		0,
+		0,
+		0,
+		0,
+		state.time,
+	)
 }
 
-export function runPopulation(
-	state: HistoryState,
-	previousTime: number,
-	_rng: HistoryRng,
-): void {
+function runPopulation({ state, previousTime }: RunPopulationParams): void {
 	const duration = state.time - previousTime
-	const yearFraction = duration / YEAR_MS
+	const yearFraction = duration / STATE.yearMs
 
-	urbanization(state, false)
-	development(state, false)
+	urbanization({ state, init: false })
+	development({ state, init: false })
 
 	for (let p = 0; p < state.P; p++) {
 		if (state.desolate[p]) continue
 
 		const growth =
-			1 + devToGrowthRate(PROV.development.get(state, p)) * yearFraction
-		const rural = PROV.population.rural.get(state, p)
-		PROV.population.rural.set(state, p, state.time, rural * growth)
+			1 + devToGrowthRate(FIELDS.prov.development.get(state, p)) * yearFraction
+		const rural = FIELDS.prov.population.rural.get(state, p)
+		FIELDS.prov.population.rural.set(state, p, state.time, rural * growth)
 
-		const urban = PROV.population.urban.get(state, p)
+		const urban = FIELDS.prov.population.urban.get(state, p)
 		const targetPop = state.leaderRuntime.targetUrban[p]
 		const urbanGrowth = urban * growth
 		const maxAdjustment = urbanGrowth * MAX_ADJUSTMENT_RATE * yearFraction
@@ -312,9 +306,22 @@ export function runPopulation(
 			finalPop = Math.max(urbanGrowth - adjustment, targetPop)
 		}
 
-		PROV.population.urban.set(state, p, state.time, finalPop)
+		FIELDS.prov.population.urban.set(state, p, state.time, finalPop)
 	}
 
 	// Schedule next census
-	state.heap.enqueue(state.time + YEAR_MS, EVT.CENSUS, 0, 0, 0, 0, state.time)
+	state.heap.enqueue(
+		state.time + STATE.yearMs,
+		EVENT_HEAP.evt.CENSUS,
+		0,
+		0,
+		0,
+		0,
+		state.time,
+	)
+}
+
+export const POPULATION = {
+	initPopulation,
+	runPopulation,
 }
