@@ -10,11 +10,6 @@ import type {
 	SphereMesh,
 	StageTiming,
 } from "@/model"
-import {
-	DEFAULT_ORBITAL_DISTANCE_AU,
-	DEFAULT_SPECTRAL_CLASS,
-	DEFAULT_STAR_SUBTYPE,
-} from "@/model/celestial/star"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
@@ -55,6 +50,7 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "@/model/terrain"
+import { STAR } from "@/model/celestial/star"
 
 interface ImportParams {
 	seed: number
@@ -1031,9 +1027,10 @@ export function importGenesisWorld(
 		planetRadiusKm: params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM,
 		obliquity: params.obliquity ?? DEFAULT_OBLIQUITY_DEG,
 		eccentricity: params.eccentricity ?? DEFAULT_ECCENTRICITY,
-		spectralClass: params.spectralClass ?? DEFAULT_SPECTRAL_CLASS,
-		starSubtype: params.starSubtype ?? DEFAULT_STAR_SUBTYPE,
-		orbitalDistanceAU: params.orbitalDistanceAU ?? DEFAULT_ORBITAL_DISTANCE_AU,
+		spectralClass: params.spectralClass ?? STAR.defaultSpectralClass,
+		starSubtype: params.starSubtype ?? STAR.defaultStarSubtype,
+		orbitalDistanceAU:
+			params.orbitalDistanceAU ?? STAR.defaultOrbitalDistanceAu,
 		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
 		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
 		substellarLon: params.substellarLon ?? DEFAULT_SUBSTELLAR_LON,

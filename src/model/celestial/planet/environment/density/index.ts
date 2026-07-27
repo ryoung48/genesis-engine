@@ -1,11 +1,11 @@
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "@/model/celestial/orbit-body"
 import type { DensityProfile } from "@/model/celestial/orbit-body/types"
 import { roll2d6 } from "@/model/shared/dice"
 import type {
 	DensityDescriptionInput,
 	DensityProfileInput,
 	RollAlbedoInput,
-} from "./types"
+} from "@/model/celestial/planet/environment/density/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 function clamp({
 	value,
@@ -39,8 +39,8 @@ function buildDensityProfile({
 	classification,
 }: DensityProfileInput): DensityProfile | null {
 	if (massKg <= 0 || diameterKm <= 0) return null
-	const diameterEarths = diameterKm / EARTH_DIAMETER_KM
-	const massEarths = massKg / EARTH_MASS_KG
+	const diameterEarths = diameterKm / ORBIT_BODY.earthDiameterKm
+	const massEarths = massKg / ORBIT_BODY.earthMassKg
 	const earthRelative = massEarths / diameterEarths ** 3
 	return {
 		earthRelative,

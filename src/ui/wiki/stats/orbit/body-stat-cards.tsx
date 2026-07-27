@@ -1,10 +1,6 @@
 import type React from "react"
 import type { MoonBody, MoonOrbitRange } from "@/model/celestial/moons/types"
-import {
-	EARTH_DIAMETER_KM,
-	EARTH_MASS_KG,
-	ORBIT_BODY,
-} from "@/model/celestial/orbit-body"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	AtmosphereProfile,
 	SeismologyProfile,
@@ -152,8 +148,8 @@ function buildBodyStats({
 	seismology?: SeismologyProfile
 	albedo?: number
 }): StatEntry[] {
-	const diameterRel = diameterKm / EARTH_DIAMETER_KM
-	const massRelEarth = massKg / EARTH_MASS_KG
+	const diameterRel = diameterKm / ORBIT_BODY.earthDiameterKm
+	const massRelEarth = massKg / ORBIT_BODY.earthMassKg
 	const semiMajorAxisLabel =
 		semiMajorAxis.unit === "AU"
 			? `${semiMajorAxis.value.toFixed(semiMajorAxis.precision)} AU`
@@ -645,14 +641,14 @@ export function buildOrbitBodyStats(params: {
 		radiusEditor: onUpdateBody
 			? {
 					label: "Radius",
-					value: body.diameterKm / EARTH_DIAMETER_KM,
+					value: body.diameterKm / ORBIT_BODY.earthDiameterKm,
 					min: 0.1,
 					max: 18,
 					step: 0.01,
-					display: `${(body.diameterKm / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
+					display: `${(body.diameterKm / ORBIT_BODY.earthDiameterKm).toFixed(2)} R⊕`,
 					set: (value: number) =>
 						onUpdateBody((current) =>
-							updateBodyDiameter(current, value * EARTH_DIAMETER_KM),
+							updateBodyDiameter(current, value * ORBIT_BODY.earthDiameterKm),
 						),
 				}
 			: undefined,
@@ -757,14 +753,14 @@ export function buildOrbitMoonStats(params: {
 						onUpdateMoon((current) => ({ ...current, substellarLon: value })),
 					diameter: {
 						label: "Radius",
-						value: moon.diameterKm / EARTH_DIAMETER_KM,
+						value: moon.diameterKm / ORBIT_BODY.earthDiameterKm,
 						min: 0.01,
 						max: 3,
 						step: 0.01,
-						display: `${(moon.diameterKm / EARTH_DIAMETER_KM).toFixed(2)} R⊕`,
+						display: `${(moon.diameterKm / ORBIT_BODY.earthDiameterKm).toFixed(2)} R⊕`,
 						set: (value: number) =>
 							onUpdateMoon((current) =>
-								updateMoonDiameter(current, value * EARTH_DIAMETER_KM),
+								updateMoonDiameter(current, value * ORBIT_BODY.earthDiameterKm),
 							),
 					},
 					semiMajorAxis: {

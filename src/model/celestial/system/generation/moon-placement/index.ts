@@ -1,10 +1,13 @@
-import { MOON } from "../../../moons"
-import type { MoonBody } from "../../../moons/types"
-import { EARTH_MASS_KG } from "../../../orbit-body"
-import { PLANET } from "../../../planet"
-import { buildMoonEnvironment, enforceMoonTidalSafety } from "../environment"
-import { pickGeneratedTexturePath } from "../texture"
-import type { MoonPlacementInput, MoonPlacementResult } from "./types"
+import { MOON } from "@/model/celestial/moons"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import { PLANET } from "@/model/celestial/planet"
+import type {
+	MoonPlacementInput,
+	MoonPlacementResult,
+} from "@/model/celestial/system/generation/moon-placement/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
+import { TEXTURE } from "@/model/celestial/system/generation/texture"
 
 function place(params: MoonPlacementInput): MoonPlacementResult {
 	if (params.moonCount <= 0) return []
@@ -20,7 +23,7 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 		moons
 			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			.map((moon, moonIdx) => {
-				const moonEnvironment = buildMoonEnvironment({
+				const moonEnvironment = ENVIRONMENT.buildMoonEnvironment({
 					rng: params.rng,
 					diameterKm: moon.diameterKm,
 					massKg: moon.massKg,
@@ -42,7 +45,7 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 					starAgeGyr: params.starAgeGyr,
 					semiMajorAxisPlanetDiameters: moon.semiMajorAxisPlanetDiameters ?? 0,
 					orbitalPeriodDays: moon.orbitalPeriodDays,
-					planetMassEarths: params.massKg / EARTH_MASS_KG,
+					planetMassEarths: params.massKg / ORBIT_BODY.earthMassKg,
 					baseSiderealDayHours: moon.siderealDayHours,
 					rerollEccentricity: () =>
 						MOON.rollMoonEccentricity({
@@ -51,7 +54,7 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 							sizeClass: moonEnvironment.sizeClass,
 						}),
 				})
-				return enforceMoonTidalSafety({
+				return ENVIRONMENT.enforceMoonTidalSafety({
 					rng: params.rng,
 					parentMassKg: params.massKg,
 					parentDiameterKm: params.diameterKm,
@@ -61,7 +64,7 @@ function place(params: MoonPlacementInput): MoonPlacementResult {
 						siderealDayHours: moonTideLock.siderealDayHours,
 						axialTiltDeg: moonTideLock.axialTiltDeg,
 						eccentricity: moonTideLock.eccentricity,
-						texturePath: pickGeneratedTexturePath({
+						texturePath: TEXTURE.pickGeneratedTexturePath({
 							rng: params.rng,
 							classification: moonEnvironment.classification,
 						}),

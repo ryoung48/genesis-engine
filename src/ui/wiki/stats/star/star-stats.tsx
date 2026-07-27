@@ -1,9 +1,9 @@
-import { MAIN_SEQUENCE_CLASSES, STAR } from "@/model/celestial/star"
+import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
 import { SLIDER_RANGES } from "@/model/shared"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
-import { SPECTRAL_CLASS_COLORS } from "../../../planet/screen/generation/star-utils"
+import { SPECTRAL_CLASS_COLORS } from "@/ui/planet/screen/generation/star-utils"
 
 export function buildStarStats(params: {
 	starClass: MainSequenceClass
@@ -62,7 +62,7 @@ export function buildStarStats(params: {
 							content: (
 								<div className="flex w-56 flex-col gap-2 px-1 pt-0.5 pb-2">
 									<div className="flex flex-wrap gap-1">
-										{MAIN_SEQUENCE_CLASSES.map((spectralType) => {
+										{STAR.mainSequenceClasses.map((spectralType) => {
 											const color = SPECTRAL_CLASS_COLORS[spectralType]
 											const active = spectralType === starClass
 											return (

@@ -1,19 +1,19 @@
-import type { createRng } from "../../../../shared/rng"
-import type { MoonBody } from "../../../moons/types"
-import type { OrbitGroup } from "../../../orbit-body/types"
-import { PLANET } from "../../../planet"
-import type { ClassifiedEnvironment } from "../../../planet/environment/classification/dice-table/types"
-import type { Zone } from "../../../planet/types"
-import type { MainSequenceClass } from "../../../star/types"
-import type { SystemBody } from "../../types"
+import type { createRng } from "@/model/shared/rng"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
+import { PLANET } from "@/model/celestial/planet"
+import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment/classification/dice-table/types"
+import type { Zone } from "@/model/celestial/planet/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 
-export const EPISTELLAR_DEVIATIONS = [2.25, 1.75, 1.25]
-export const INNER_DEVIATIONS = [0.75, 0, -0.75]
-export const OUTER_DEVIATIONS = [
+const epistellarDeviations = [2.25, 1.75, 1.25]
+const innerDeviations = [0.75, 0, -0.75]
+const outerDeviations = [
 	-1.25, -1.75, -2.25, -2.75, -3.25, -3.75, -4, -4.25, -4.5,
 ]
 
-export function buildBodyEnvironment(params: {
+function buildBodyEnvironment(params: {
 	rng: ReturnType<typeof createRng>
 	/** Omitted when size alone should determine the group. */
 	groupHint?: OrbitGroup
@@ -90,7 +90,7 @@ export function buildBodyEnvironment(params: {
 // always derives it from mass/diameter, which don't change here) rather than
 // carried over -- galaxy-gen doesn't touch density on reclassify either,
 // since it's independent of classification other than its description label.
-export function buildForcedClassificationEnvironment(params: {
+function buildForcedClassificationEnvironment(params: {
 	rng: ReturnType<typeof createRng>
 	classification: "jani-lithic" | "vesperian"
 	sizeClass: number
@@ -146,7 +146,7 @@ export function buildForcedClassificationEnvironment(params: {
 	}
 }
 
-export function buildMoonEnvironment(params: {
+function buildMoonEnvironment(params: {
 	rng: ReturnType<typeof createRng>
 	diameterKm: number
 	massKg: number
@@ -232,7 +232,7 @@ const MAX_MOON_ECCENTRICITY_SAFETY_ATTEMPTS = 8
 // knob (eccentricity, which the heating formula is most sensitive to) a
 // bounded number of times and drops the moon entirely if no safe orbit is
 // found, exactly like galaxy-gen's discard-and-reroll loop.
-export function enforceMoonTidalSafety({
+function enforceMoonTidalSafety({
 	rng,
 	parentMassKg,
 	parentDiameterKm,
@@ -267,4 +267,14 @@ export function enforceMoonTidalSafety({
 	}
 	if (heating > PLANET.MAX_SAFE_MOON_TIDAL_HEATING) return null
 	return { ...moon, eccentricity }
+}
+
+export const ENVIRONMENT = {
+	epistellarDeviations,
+	innerDeviations,
+	outerDeviations,
+	buildBodyEnvironment,
+	buildForcedClassificationEnvironment,
+	buildMoonEnvironment,
+	enforceMoonTidalSafety,
 }

@@ -22,8 +22,7 @@ import type {
 	StageTiming,
 } from "@/model"
 import { MOON } from "@/model/celestial/moons"
-import { SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
-import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
+import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CLIMATE } from "@/model/climate/climate"
 import { CYCLONES } from "@/model/climate/cyclones"
@@ -66,6 +65,7 @@ import {
 	LANDMARK_TYPE_LAKE,
 	LANDMARK_TYPE_OCEAN,
 } from "@/model/terrain"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 /**
  * Real (non-procedural) river network for the Earth-import path, already
@@ -726,10 +726,10 @@ export function runPostElevationPipeline(
 	const coastalMask = TIDES.computeCoastalMask({ mesh, isLand })
 	const cls = STAR.isValidSpectralClass(params.spectralClass)
 		? (params.spectralClass as MainSequenceClass)
-		: DEFAULT_SPECTRAL_CLASS
+		: STAR.defaultSpectralClass
 	const starMassKg =
 		STAR.getStarMassSol({ cls, subtype: params.starSubtype ?? 5 }) *
-		SOLAR_MASS_KG
+		ORBIT_BODY.solarMassKg
 	const tidalSchedule = TIDAL_SCHEDULE.computeTidalSchedule({
 		moons: MOON.generateMoons({
 			count: 1,

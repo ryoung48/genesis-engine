@@ -1,12 +1,8 @@
-import { HOURS_PER_DAY, SECONDS_PER_DAY } from "../../shared"
-import { roll2d6 } from "../../shared/dice"
-import { createRng } from "../../shared/rng"
-import {
-	ASTRONOMICAL_UNIT_M,
-	GRAVITATIONAL_CONSTANT_M3_KG_S2,
-	ORBIT_BODY,
-} from "../orbit-body"
-import { MECHANICS } from "./mechanics"
+import { HOURS_PER_DAY, SECONDS_PER_DAY } from "@/model/shared"
+import { roll2d6 } from "@/model/shared/dice"
+import { createRng } from "@/model/shared/rng"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import {
 	type AttachParentTideLocksInput,
 	DEFAULT_MOON_ATMOSPHERE as DEFAULT_MOON_ATMOSPHERE_VALUE,
@@ -21,7 +17,7 @@ import {
 	type RollMoonEccentricityInput,
 	type RollMoonOrbitCandidateInput,
 	type RollMoonSizeClassInput,
-} from "./types"
+} from "@/model/celestial/moons/types"
 
 const TWO_PI = 2 * Math.PI
 
@@ -214,6 +210,8 @@ function placeMoonOrbits({
 
 const TIDE_LOCK_TOLERANCE_HOURS = 1e-6
 
+const defaultMoonAtmosphere = DEFAULT_MOON_ATMOSPHERE_VALUE
+
 export const MOON = {
 	/**
 	 * Centralized orbital-inclination roll, shared by every planet, moon, and
@@ -348,7 +346,8 @@ export const MOON = {
 		const planetRadiusM = planetRadiusKm * 1000
 		const planetDiameterM = planetRadiusM * 2
 		const planetDiameterKm = planetRadiusKm * 2
-		const planetOrbitalDistanceM = orbitalDistanceAU * ASTRONOMICAL_UNIT_M
+		const planetOrbitalDistanceM =
+			orbitalDistanceAU * ORBIT_BODY.astronomicalUnitM
 
 		const hill = MECHANICS.hillSphereM({
 			planetOrbitalDistanceM,
@@ -371,7 +370,7 @@ export const MOON = {
 				TWO_PI *
 				Math.sqrt(
 					(distM * distM * distM) /
-						(GRAVITATIONAL_CONSTANT_M3_KG_S2 * planetMassKg),
+						(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg),
 				)
 			return T / SECONDS_PER_DAY
 		}
@@ -461,6 +460,5 @@ export const MOON = {
 
 		return moons
 	},
+	defaultMoonAtmosphere,
 }
-
-export const DEFAULT_MOON_ATMOSPHERE = DEFAULT_MOON_ATMOSPHERE_VALUE

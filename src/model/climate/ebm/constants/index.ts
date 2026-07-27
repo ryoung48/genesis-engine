@@ -1,17 +1,14 @@
-import {
-	ASTRONOMICAL_UNIT_M,
-	EARTH_RADIUS_M,
-} from "@/model/celestial/orbit-body"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const embConstants = {
 	chaotic: { min: 10, max: 50 },
 	planet: {
-		EARTH_RADIUS: EARTH_RADIUS_M,
+		EARTH_RADIUS: ORBIT_BODY.earthRadiusM,
 	},
 	stellar: {
 		T_SUN: 5778,
 		R_SUN: 6.9634e8,
-		AU: ASTRONOMICAL_UNIT_M,
+		AU: ORBIT_BODY.astronomicalUnitM,
 		SIGMA: 5.67e-8,
 	},
 	time: {

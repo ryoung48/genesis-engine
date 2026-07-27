@@ -1,23 +1,20 @@
 import { ASTRONOMICAL_DAYS_PER_YEAR, HOURS_PER_DAY } from "@/model/shared"
 import { createRng } from "@/model/shared/rng"
-import { MOON } from "../../moons"
-import type { MoonBody } from "../../moons/types"
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../orbit-body"
-import { PLANET } from "../../planet"
-import { STAR } from "../../star"
-import type { SolarSystemState, SystemBody } from "../types"
-import * as SOL_DATA from "./data"
-import type { BuildPlanetOptions, SolMoonSeed, SolPlanetSeed } from "./types"
-
-export const SOL_EARTH_CLOUDS_TEXTURE_PATH =
-	SOL_DATA.SOL_EARTH_CLOUDS_TEXTURE_PATH
-export const SOL_EARTH_TEXTURE_PATH = SOL_DATA.SOL_EARTH_TEXTURE_PATH
-export const SOL_MAIN_WORLD_NAME = SOL_DATA.SOL_MAIN_WORLD_NAME
-export const SOL_PLANET_RINGS_BY_NAME = SOL_DATA.SOL_PLANET_RINGS_BY_NAME
-export const SOL_PLANET_SEEDS = SOL_DATA.SOL_PLANET_SEEDS
-export const SOL_SEED = SOL_DATA.SOL_SEED
-export const SOL_STAR_AGE_GYR = SOL_DATA.SOL_STAR_AGE_GYR
-export const SOL_STAR_NAME = SOL_DATA.SOL_STAR_NAME
+import { MOON } from "@/model/celestial/moons"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import { PLANET } from "@/model/celestial/planet"
+import { STAR } from "@/model/celestial/star"
+import type {
+	SolarSystemState,
+	SystemBody,
+} from "@/model/celestial/system/types"
+import type {
+	BuildPlanetOptions,
+	SolMoonSeed,
+	SolPlanetSeed,
+} from "@/model/celestial/system/sol-system/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 
 function estimateGasGiantInternalHeatTempK({
 	massEarths,
@@ -53,12 +50,12 @@ function buildMoon({
 	seedTag: number
 }): MoonBody {
 	const rolled = rollExtras(seedTag)
-	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
+	const diameterKm = seed.diameterEarths * ORBIT_BODY.earthDiameterKm
 	return {
 		idx,
 		name: seed.name,
 		texturePath: seed.texturePath,
-		massKg: seed.massEarths * EARTH_MASS_KG,
+		massKg: seed.massEarths * ORBIT_BODY.earthMassKg,
 		diameterKm,
 		sizeClass: MOON.estimateMoonSizeClassFromDiameter(diameterKm),
 		density: {
@@ -114,8 +111,8 @@ function buildPlanet({
 	options?: BuildPlanetOptions
 }): SystemBody {
 	const rolled = rollExtras(seedTag)
-	const diameterKm = seed.diameterEarths * EARTH_DIAMETER_KM
-	const massKg = seed.massEarths * EARTH_MASS_KG
+	const diameterKm = seed.diameterEarths * ORBIT_BODY.earthDiameterKm
+	const massKg = seed.massEarths * ORBIT_BODY.earthMassKg
 	const orbitalPeriodDays =
 		STAR.getKeplerYearYears({
 			orbitalDistanceAU: seed.au,
@@ -151,7 +148,7 @@ function buildPlanet({
 		seed.group === "jovian"
 			? estimateGasGiantInternalHeatTempK({
 					massEarths: seed.massEarths,
-					ageGyr: SOL_STAR_AGE_GYR,
+					ageGyr: DATA.solStarAgeGyr,
 				})
 			: 0
 	return {
@@ -195,7 +192,7 @@ function buildPlanet({
 		classification: seed.classification,
 		texturePath: options?.textureOverride ?? seed.texturePath,
 		cloudsTexturePath: seed.cloudsTexturePath,
-		rings: SOL_PLANET_RINGS_BY_NAME[seed.name],
+		rings: DATA.solPlanetRingsByName[seed.name],
 		landDistribution: seed.landDistribution,
 		landCoverage: seed.landCoverage,
 		hydrosphereCode:
@@ -226,39 +223,37 @@ function buildPlanet({
 	}
 }
 
-export const SOL_SYSTEM = {
-	buildPlanet,
-}
-
-const EARTH_SEED = SOL_PLANET_SEEDS.find((seed) => seed.isMainWorld)
+const EARTH_SEED = DATA.solPlanetSeeds.find((seed) => seed.isMainWorld)
 if (!EARTH_SEED) throw new Error("SOL_PLANET_SEEDS is missing its Earth entry")
 const LUNA_SEED = EARTH_SEED.moons?.[0]
 if (!LUNA_SEED)
 	throw new Error("Earth's SOL_PLANET_SEEDS entry is missing Luna")
 
-const SOL_SYSTEM_BODIES_RAW: SystemBody[] = SOL_PLANET_SEEDS.map(
-	// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-	(seed, i) =>
-		buildPlanet({ seed, seedTag: i + 1, idx: seed.isMainWorld ? -1 : i }),
-).sort(
-	// biome-ignore lint/nursery/useMaxParams: native Array callback signature
-	(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
-)
+const SOL_SYSTEM_BODIES_RAW: SystemBody[] = DATA.solPlanetSeeds
+	.map(
+		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
+		(seed, i) =>
+			buildPlanet({ seed, seedTag: i + 1, idx: seed.isMainWorld ? -1 : i }),
+	)
+	.sort(
+		// biome-ignore lint/nursery/useMaxParams: native Array callback signature
+		(a, b) => a.orbitalDistanceAU - b.orbitalDistanceAU,
+	)
 
-export const SOL_SYSTEM_BODIES: SystemBody[] = PLANET.applySystemSeismology({
+const solSystemBodies: SystemBody[] = PLANET.applySystemSeismology({
 	bodies: SOL_SYSTEM_BODIES_RAW,
-	starAgeGyr: SOL_STAR_AGE_GYR,
+	starAgeGyr: DATA.solStarAgeGyr,
 	starLuminositySol: 1,
 	spectralClass: "G",
 })
 
-export const SOL_DEFAULT_SOLAR_SYSTEM: SolarSystemState = {
+const solDefaultSolarSystem: SolarSystemState = {
 	star: {
 		class: "G",
 		subtype: 2,
 		seed: "sol",
 	},
-	orbits: SOL_SYSTEM_BODIES,
+	orbits: solSystemBodies,
 }
 
 // Centralized default parameters for Earth (the main world) and Luna (its
@@ -268,10 +263,10 @@ export const SOL_DEFAULT_SOLAR_SYSTEM: SolarSystemState = {
 // and the terrain-generation defaults below) are UI-slider-default-only
 // concepts with no equivalent on any other (non-editable) Sol body, so they
 // stay here rather than on the seed.
-export const SOL_MAIN_WORLD_DEFAULTS = {
+const solMainWorldDefaults = {
 	name: EARTH_SEED.name,
 	isMainWorld: true,
-	planetRadiusKm: (EARTH_SEED.diameterEarths * EARTH_DIAMETER_KM) / 2,
+	planetRadiusKm: (EARTH_SEED.diameterEarths * ORBIT_BODY.earthDiameterKm) / 2,
 	obliquity: EARTH_SEED.tiltDeg,
 	eccentricity: EARTH_SEED.eccentricity,
 	orbitalDistanceAU: EARTH_SEED.au,
@@ -300,11 +295,19 @@ const SOL_LUNA_BUILT: MoonBody = MOON.attachParentTideLocks({
 	moons: [buildMoon({ seed: LUNA_SEED, idx: 1, seedTag: 0 })],
 	parentIdx: -1,
 })[0]!
-export const SOL_LUNA_DEFAULT: MoonBody = {
+const solLunaDefault: MoonBody = {
 	...SOL_LUNA_BUILT,
 	tideLockStatus: PLANET.deriveTideLockStatus({
 		siderealDayHours: SOL_LUNA_BUILT.siderealDayHours,
 		orbitalPeriodDays: SOL_LUNA_BUILT.orbitalPeriodDays,
 		tideLock: SOL_LUNA_BUILT.tideLock,
 	}),
+}
+
+export const SOL_SYSTEM = {
+	buildPlanet,
+	solSystemBodies,
+	solDefaultSolarSystem,
+	solMainWorldDefaults,
+	solLunaDefault,
 }

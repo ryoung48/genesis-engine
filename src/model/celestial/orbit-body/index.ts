@@ -2,17 +2,17 @@ import { HOURS_PER_DAY } from "@/model/shared"
 import type {
 	DensityFromMassAndDiameterInput,
 	MassFromDensityInput,
-} from "./types"
-export const EARTH_DIAMETER_KM = 12_742
-export const EARTH_MASS_KG = 5.973886146404331e24
-export const EARTH_RADIUS_M = (EARTH_DIAMETER_KM * 1000) / 2
+} from "@/model/celestial/orbit-body/types"
+const earthDiameterKm = 12_742
+const earthMassKg = 5.973886146404331e24
+const earthRadiusM = (earthDiameterKm * 1000) / 2
 // Earth's real mean density. It keeps generated Earth-sized bodies at one
 // Earth mass when moon mechanics derive mass from a radius.
-export const EARTH_MEAN_DENSITY_KG_M3 = 5515
-export const SOLAR_DIAMETER_KM = 1_391_400
-export const SOLAR_MASS_KG = 1.989e30
-export const ASTRONOMICAL_UNIT_M = 1.496e11
-export const GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.674e-11
+const earthMeanDensityKgM3 = 5515
+const solarDiameterKm = 1_391_400
+const solarMassKg = 1.989e30
+const astronomicalUnitM = 1.496e11
+const gravitationalConstantM3KgS2 = 6.674e-11
 const ROCKY_SIZE_DIAMETER_BANDS_KM = [
 	[400, 800],
 	[1000, 2000],
@@ -80,8 +80,8 @@ export const ORBIT_BODY = {
 		massKg,
 		diameterKm,
 	}: DensityFromMassAndDiameterInput): number {
-		const diameterEarths = diameterKm / EARTH_DIAMETER_KM
-		const massEarths = massKg / EARTH_MASS_KG
+		const diameterEarths = diameterKm / earthDiameterKm
+		const massEarths = massKg / earthMassKg
 		return massEarths / diameterEarths ** 3
 	},
 
@@ -89,17 +89,17 @@ export const ORBIT_BODY = {
 		diameterKm,
 		densityEarthRelative,
 	}: MassFromDensityInput): number {
-		const diameterEarths = diameterKm / EARTH_DIAMETER_KM
+		const diameterEarths = diameterKm / earthDiameterKm
 		const massEarths = densityEarthRelative * diameterEarths ** 3
-		return massEarths * EARTH_MASS_KG
+		return massEarths * earthMassKg
 	},
 
 	computeGravityG({
 		massKg,
 		diameterKm,
 	}: DensityFromMassAndDiameterInput): number {
-		const massEarths = massKg / EARTH_MASS_KG
-		const diameterEarths = diameterKm / EARTH_DIAMETER_KM
+		const massEarths = massKg / earthMassKg
+		const diameterEarths = diameterKm / earthDiameterKm
 		return massEarths / diameterEarths ** 2
 	},
 
@@ -126,4 +126,12 @@ export const ORBIT_BODY = {
 	inferRetrogradeRotationFromAxialTiltDeg(axialTiltDeg: number): boolean {
 		return axialTiltDeg > 90
 	},
+	earthDiameterKm,
+	earthMassKg,
+	earthRadiusM,
+	earthMeanDensityKgM3,
+	solarDiameterKm,
+	solarMassKg,
+	astronomicalUnitM,
+	gravitationalConstantM3KgS2,
 }

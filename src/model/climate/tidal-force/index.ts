@@ -1,9 +1,3 @@
-import {
-	ASTRONOMICAL_UNIT_M,
-	EARTH_MASS_KG,
-	EARTH_RADIUS_M,
-	SOLAR_MASS_KG,
-} from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type {
 	ApparentDiameterRadParams,
@@ -13,6 +7,7 @@ import type {
 	StarTideContributionParams,
 	TideContributionParams,
 } from "@/model/climate/tidal-force/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const TWO_PI = 2 * Math.PI
 
@@ -96,7 +91,7 @@ function starTidalPosition({
 			Math.sqrt(1 + planetEccentricity) * Math.sin(E / 2),
 			Math.sqrt(1 - planetEccentricity) * Math.cos(E / 2),
 		)
-	const a = orbitalDistanceAU * ASTRONOMICAL_UNIT_M
+	const a = orbitalDistanceAU * ORBIT_BODY.astronomicalUnitM
 	const r =
 		(a * (1 - planetEccentricity * planetEccentricity)) /
 		(1 + planetEccentricity * Math.cos(nu))
@@ -124,7 +119,7 @@ function starTideContribution({
 }: StarTideContributionParams): number {
 	const starMassKg =
 		STAR.getStarMassSol({ cls: spectralClass, subtype: starSubtype }) *
-		SOLAR_MASS_KG
+		ORBIT_BODY.solarMassKg
 	return tideContribution({
 		bodyLatRad: starLatRad,
 		bodyLonRad: starLonRad,
@@ -142,8 +137,8 @@ const EARTH_MOON_MASS_KG = 7.34e22
 const EARTH_MOON_DIST_M = 3.844e8
 
 const earthMoonTideReference =
-	(EARTH_MOON_MASS_KG / EARTH_MASS_KG) *
-	(EARTH_RADIUS_M ** 4 / EARTH_MOON_DIST_M ** 3) *
+	(EARTH_MOON_MASS_KG / ORBIT_BODY.earthMassKg) *
+	(ORBIT_BODY.earthRadiusM ** 4 / EARTH_MOON_DIST_M ** 3) *
 	p2(1)
 
 function apparentDiameterRad({

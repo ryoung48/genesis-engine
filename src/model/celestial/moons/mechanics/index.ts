@@ -1,8 +1,3 @@
-import {
-	ASTRONOMICAL_UNIT_M,
-	EARTH_MEAN_DENSITY_KG_M3,
-	GRAVITATIONAL_CONSTANT_M3_KG_S2,
-} from "@/model/celestial/orbit-body"
 import { SECONDS_PER_DAY } from "@/model/shared"
 import type {
 	HillSphereInput,
@@ -15,7 +10,8 @@ import type {
 	OrbitalPosition,
 	OrbitalPositionVector,
 	RocheLimitInput,
-} from "./types"
+} from "@/model/celestial/moons/mechanics/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const TWO_PI = 2 * Math.PI
 function hillSphereM({
@@ -94,11 +90,11 @@ function keplerMoonPositionVector({
 	return { x, y, z, distanceM: r, trueAnomalyRad: nu }
 }
 
-export const TIDE_LOCK_TOLERANCE_HOURS = 1e-6
+const tideLockToleranceHours = 1e-6
 
 function derivePlanetMassKg(radiusKm: number): number {
 	const r = radiusKm * 1000
-	return EARTH_MEAN_DENSITY_KG_M3 * (4 / 3) * Math.PI * r * r * r
+	return ORBIT_BODY.earthMeanDensityKgM3 * (4 / 3) * Math.PI * r * r * r
 }
 
 function moonSemiMajorAxisM({
@@ -107,7 +103,7 @@ function moonSemiMajorAxisM({
 }: MoonSemiMajorAxisInput): number {
 	const T = moon.orbitalPeriodDays * SECONDS_PER_DAY
 	return Math.cbrt(
-		(GRAVITATIONAL_CONSTANT_M3_KG_S2 * planetMassKg * T * T) /
+		(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg * T * T) /
 			(TWO_PI * TWO_PI),
 	)
 }
@@ -119,7 +115,8 @@ function moonOrbitalPeriodDaysFromSemiMajorAxisM({
 	const periodSeconds =
 		TWO_PI *
 		Math.sqrt(
-			semiMajorAxisM ** 3 / (GRAVITATIONAL_CONSTANT_M3_KG_S2 * planetMassKg),
+			semiMajorAxisM ** 3 /
+				(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg),
 		)
 	return periodSeconds / SECONDS_PER_DAY
 }
@@ -132,7 +129,10 @@ function rocheLimitM({
 	const moonRadiusM = moonDiameterM / 2
 	const moonVol = (4 / 3) * Math.PI * moonRadiusM * moonRadiusM * moonRadiusM
 	const moonDensity = moonMassKg / moonVol
-	return planetRadiusM * Math.cbrt((2 * EARTH_MEAN_DENSITY_KG_M3) / moonDensity)
+	return (
+		planetRadiusM *
+		Math.cbrt((2 * ORBIT_BODY.earthMeanDensityKgM3) / moonDensity)
+	)
 }
 
 function moonPeriodBoundsDay({
@@ -144,7 +144,8 @@ function moonPeriodBoundsDay({
 }: MoonPeriodBoundsInput): MoonPeriodBounds {
 	const planetRadiusM = planetRadiusKm * 1000
 	const moonDiameterM = moon.diameterKm * 1000
-	const planetOrbitalDistanceM = orbitalDistanceAU * ASTRONOMICAL_UNIT_M
+	const planetOrbitalDistanceM =
+		orbitalDistanceAU * ORBIT_BODY.astronomicalUnitM
 	const roche = rocheLimitM({
 		planetRadiusM,
 		moonMassKg: moon.massKg,
@@ -157,7 +158,7 @@ function moonPeriodBoundsDay({
 		(TWO_PI *
 			Math.sqrt(
 				(distM * distM * distM) /
-					(GRAVITATIONAL_CONSTANT_M3_KG_S2 * planetMassKg),
+					(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg),
 			)) /
 		SECONDS_PER_DAY
 	return {
@@ -202,4 +203,5 @@ export const MECHANICS = {
 	moonPeriodBoundsDay,
 	keplerMoonPosition,
 	keplerMoonPositionCartesian,
+	tideLockToleranceHours,
 }

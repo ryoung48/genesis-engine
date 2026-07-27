@@ -1,11 +1,7 @@
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
-import {
-	ASTRONOMICAL_UNIT_M,
-	SOLAR_MASS_KG,
-} from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
+import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { TIDAL_FORCE } from "@/model/climate/tidal-force"
 import type {
@@ -17,6 +13,7 @@ import type {
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
 import type { GenesisParams } from "@/model/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const MAX_TIDAL_SCHEDULE_SAMPLES = 2000
 
@@ -29,7 +26,7 @@ function starDiameterM({
 }): number {
 	const cls = STAR.isValidSpectralClass(spectralClass)
 		? spectralClass
-		: DEFAULT_SPECTRAL_CLASS
+		: STAR.defaultSpectralClass
 	return (
 		STAR.getStarDiameterSol({
 			cls: cls as MainSequenceClass,
@@ -207,9 +204,9 @@ function buildMoonContributors({
 	const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 	const cls = STAR.isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
-		: DEFAULT_SPECTRAL_CLASS
+		: STAR.defaultSpectralClass
 	const starMassKg =
-		STAR.getStarMassSol({ cls, subtype: starSubtype }) * SOLAR_MASS_KG
+		STAR.getStarMassSol({ cls, subtype: starSubtype }) * ORBIT_BODY.solarMassKg
 
 	let moonsClamped = false
 	const contributors = moons
@@ -662,16 +659,16 @@ function computeSurfaceTidesM({
 	} = params
 	const cls = STAR.isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
-		: DEFAULT_SPECTRAL_CLASS
+		: STAR.defaultSpectralClass
 	const starMassKg =
-		STAR.getStarMassSol({ cls, subtype: starSubtype }) * SOLAR_MASS_KG
+		STAR.getStarMassSol({ cls, subtype: starSubtype }) * ORBIT_BODY.solarMassKg
 	const planetMassKg = MECHANICS.derivePlanetMassKg(planet.diameterKm / 2)
 	const planetRadiusM = (planet.diameterKm / 2) * 1000
 
 	const contributions: SurfaceTidesContribution[] = []
 	if (planet.tideLock?.type !== "solar") {
 		const periapsisM =
-			orbitalDistanceAU * (1 - eccentricity) * ASTRONOMICAL_UNIT_M
+			orbitalDistanceAU * (1 - eccentricity) * ORBIT_BODY.astronomicalUnitM
 		contributions.push({
 			label: starName ?? "Star",
 			valueM: TIDAL_FORCE.tideContribution({
@@ -749,16 +746,16 @@ function computeMoonSurfaceTidesM({
 	} = params
 	const cls = STAR.isValidSpectralClass(spectralClass)
 		? (spectralClass as MainSequenceClass)
-		: DEFAULT_SPECTRAL_CLASS
+		: STAR.defaultSpectralClass
 	const starMassKg =
-		STAR.getStarMassSol({ cls, subtype: starSubtype }) * SOLAR_MASS_KG
+		STAR.getStarMassSol({ cls, subtype: starSubtype }) * ORBIT_BODY.solarMassKg
 	const moonRadiusM = (moon.diameterKm * 1000) / 2
 	const siblings = parent.moons.filter((sibling) => sibling.idx !== moon.idx)
 
 	const contributions: SurfaceTidesContribution[] = []
 	if (moon.tideLock?.type !== "solar") {
 		const periapsisM =
-			orbitalDistanceAU * (1 - eccentricity) * ASTRONOMICAL_UNIT_M
+			orbitalDistanceAU * (1 - eccentricity) * ORBIT_BODY.astronomicalUnitM
 		contributions.push({
 			label: starName ?? "Star",
 			valueM: TIDAL_FORCE.tideContribution({

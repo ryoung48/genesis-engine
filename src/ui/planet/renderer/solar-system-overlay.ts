@@ -2,7 +2,6 @@ import * as THREE from "three"
 import type { Text } from "troika-three-text"
 import { MOON } from "@/model/celestial/moons"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
-import { SOLAR_DIAMETER_KM } from "@/model/celestial/orbit-body"
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
@@ -12,15 +11,15 @@ import {
 	getMoonOrbitDistanceRelativeToPlanet,
 	measureMoonOrbitOuterRadiusForDisplay,
 	scaleBodyDiameterToVisualRadius,
-} from "../moon-visual-scale"
+} from "@/ui/planet/moon-visual-scale"
 import {
 	createNameLabel,
 	createNameLeaderLine,
 	IDENTITY_QUATERNION,
 	sizeNameLabel,
 	updateLabelPlacement,
-} from "./body-name-label"
-import { boostCloudAlphaMap } from "./cloud-material"
+} from "@/ui/planet/renderer/body-name-label"
+import { boostCloudAlphaMap } from "@/ui/planet/renderer/cloud-material"
 import {
 	buildMoonOrbitOverlay,
 	type MoonOrbitState,
@@ -28,7 +27,8 @@ import {
 	orbitPoint,
 	perifocalBasis,
 	solveKepler,
-} from "./moon-orbit-overlay"
+} from "@/ui/planet/renderer/moon-orbit-overlay"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const DEG2RAD = Math.PI / 180
 
@@ -544,7 +544,7 @@ export function buildSolarSystemOverlay(
 		cls: spectralClass,
 		subtype: starSubtype,
 	})
-	const starDiameterKm = starDiameterSol * SOLAR_DIAMETER_KM
+	const starDiameterKm = starDiameterSol * ORBIT_BODY.solarDiameterKm
 	// Realistic mode uses the same shared floor/ceiling (and fixed
 	// Earth-diameter reference) as every other body in the scene — see
 	// scaleBodyDiameterToVisualRadius — so the star sits on the same absolute

@@ -1,22 +1,15 @@
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
 import type {
 	SolSeedGenerationParams,
 	SolSeedGenerationResult,
 } from "@/model/celestial/system/generation/sol-seed/types"
 import type { HomeWorldParams } from "@/model/celestial/system/generation/types"
-import {
-	SOL_EARTH_CLOUDS_TEXTURE_PATH,
-	SOL_EARTH_TEXTURE_PATH,
-	SOL_MAIN_WORLD_DEFAULTS,
-	SOL_SEED,
-	SOL_STAR_AGE_GYR,
-	SOL_SYSTEM,
-	SOL_SYSTEM_BODIES,
-} from "@/model/celestial/system/sol-system"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 
 function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 	const density = PLANET.buildDensityProfile({
@@ -31,8 +24,8 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		group: "terrestrial",
 		classification: "tectonic",
 		au: mainWorld.orbitalDistanceAU,
-		diameterEarths: mainWorld.diameterKm / EARTH_DIAMETER_KM,
-		massEarths: mainWorld.massKg / EARTH_MASS_KG,
+		diameterEarths: mainWorld.diameterKm / ORBIT_BODY.earthDiameterKm,
+		massEarths: mainWorld.massKg / ORBIT_BODY.earthMassKg,
 		gravityG: mainWorld.gravityG,
 		densityEarthRelative: density?.earthRelative ?? 1,
 		densityDescription: density?.description ?? "Rock and Metal",
@@ -46,7 +39,7 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		atmosphere: mainWorld.atmosphere ?? undefined,
 		landDistribution: mainWorld.landDistribution,
 		landCoverage:
-			mainWorld.landCoverage ?? SOL_MAIN_WORLD_DEFAULTS.landCoverage,
+			mainWorld.landCoverage ?? SOL_SYSTEM.solMainWorldDefaults.landCoverage,
 		continentSizeVariety: mainWorld.continentSizeVariety,
 		seaLevel: mainWorld.seaLevel,
 		maxElevation: mainWorld.maxElevation,
@@ -58,7 +51,7 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 }
 
 function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
-	if (params.seed !== SOL_SEED) return null
+	if (params.seed !== DATA.solSeed) return null
 	if (!params.solMainWorldOverrides) {
 		throw new Error(
 			"generateSystemBodies: Sol seed requires solMainWorldOverrides",
@@ -66,26 +59,26 @@ function generate(params: SolSeedGenerationParams): SolSeedGenerationResult {
 	}
 	const mainWorldSeed: SolPlanetSeed = {
 		...buildMainWorldSeed(params.solMainWorldOverrides),
-		cloudsTexturePath: SOL_EARTH_CLOUDS_TEXTURE_PATH,
+		cloudsTexturePath: DATA.solEarthCloudsTexturePath,
 		inclinationDeg:
 			params.solMainWorldOverrides.inclinationDeg ??
-			SOL_MAIN_WORLD_DEFAULTS.inclinationDeg,
+			SOL_SYSTEM.solMainWorldDefaults.inclinationDeg,
 	}
 	return PLANET.applySystemSeismology({
-		bodies: SOL_SYSTEM_BODIES.map((body) =>
+		bodies: SOL_SYSTEM.solSystemBodies.map((body) =>
 			body.isMainWorld
 				? SOL_SYSTEM.buildPlanet({
 						seed: mainWorldSeed,
 						seedTag: params.seed,
 						idx: -1,
 						options: {
-							textureOverride: SOL_EARTH_TEXTURE_PATH,
+							textureOverride: DATA.solEarthTexturePath,
 							moonsOverride: params.solMainWorldOverrides?.moons,
 						},
 					})
 				: body,
 		),
-		starAgeGyr: SOL_STAR_AGE_GYR,
+		starAgeGyr: DATA.solStarAgeGyr,
 		starLuminositySol: 1,
 		spectralClass: params.spectralClass,
 		...TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({

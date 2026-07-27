@@ -6,18 +6,18 @@ import type {
 	MainSequenceClass,
 	RollStarAgeInput,
 	StarSpectralInput,
-} from "./types"
+} from "@/model/celestial/star/types"
 import {
 	DEFAULT_ORBITAL_DISTANCE_AU as DEFAULT_ORBITAL_DISTANCE_AU_VALUE,
 	DEFAULT_SPECTRAL_CLASS as DEFAULT_SPECTRAL_CLASS_VALUE,
 	DEFAULT_STAR_SUBTYPE as DEFAULT_STAR_SUBTYPE_VALUE,
 	MAIN_SEQUENCE_CLASSES as MAIN_SEQUENCE_CLASSES_VALUE,
-} from "./types"
+} from "@/model/celestial/star/types"
 
-export const DEFAULT_ORBITAL_DISTANCE_AU = DEFAULT_ORBITAL_DISTANCE_AU_VALUE
-export const DEFAULT_SPECTRAL_CLASS = DEFAULT_SPECTRAL_CLASS_VALUE
-export const DEFAULT_STAR_SUBTYPE = DEFAULT_STAR_SUBTYPE_VALUE
-export const MAIN_SEQUENCE_CLASSES = MAIN_SEQUENCE_CLASSES_VALUE
+const defaultOrbitalDistanceAu = DEFAULT_ORBITAL_DISTANCE_AU_VALUE
+const defaultSpectralClass = DEFAULT_SPECTRAL_CLASS_VALUE
+const defaultStarSubtype = DEFAULT_STAR_SUBTYPE_VALUE
+const mainSequenceClasses = MAIN_SEQUENCE_CLASSES_VALUE
 // Position ranges within the 20-entry V-class lookup tables
 const SPECTRAL_RANGES: Record<MainSequenceClass, [number, number]> = {
 	O: [0, 2],
@@ -176,7 +176,7 @@ export const STAR = {
 	},
 
 	isValidSpectralClass(cls: string): cls is MainSequenceClass {
-		return (MAIN_SEQUENCE_CLASSES as readonly string[]).includes(cls)
+		return (mainSequenceClasses as readonly string[]).includes(cls)
 	},
 
 	getNonRealisticStarToPlanetRatio({
@@ -202,4 +202,8 @@ export const STAR = {
 		if (age > 14) age = rng.uniform(13, 14)
 		return age
 	},
+	defaultOrbitalDistanceAu,
+	defaultSpectralClass,
+	defaultStarSubtype,
+	mainSequenceClasses,
 }

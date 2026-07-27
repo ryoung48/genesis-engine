@@ -6,14 +6,9 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
-import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
+import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
-import {
-	SOL_DEFAULT_SOLAR_SYSTEM,
-	SOL_EARTH_CLOUDS_TEXTURE_PATH,
-	SOL_STAR_AGE_GYR,
-} from "@/model/celestial/system/sol-system"
 import type {
 	SolarSystemState,
 	SystemBody,
@@ -258,6 +253,8 @@ import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters
 import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organization-stats"
 import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -1708,7 +1705,7 @@ export const GenesisView: React.FC = () => {
 	const roughness = DEFAULT_WORLD_PARAMS.roughness
 	const [solarSystem, setSolarSystem] = useState<SolarSystemState>(() =>
 		structuredClone(
-			initialGenerationSession?.solarSystem ?? SOL_DEFAULT_SOLAR_SYSTEM,
+			initialGenerationSession?.solarSystem ?? SOL_SYSTEM.solDefaultSolarSystem,
 		),
 	)
 	const spectralClass = solarSystem.star.class
@@ -1769,7 +1766,7 @@ export const GenesisView: React.FC = () => {
 	const systemSeismologyContext = useMemo(() => {
 		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
+			: STAR.defaultSpectralClass
 		const surfaceTidesCallbacks =
 			TIDAL_SCHEDULE.buildSurfaceTidesSeismologyCallbacks({
 				spectralClass,
@@ -1777,7 +1774,7 @@ export const GenesisView: React.FC = () => {
 			})
 		if (restSeed === SYSTEM.SOL_SEED) {
 			return {
-				starAgeGyr: SOL_STAR_AGE_GYR,
+				starAgeGyr: DATA.solStarAgeGyr,
 				starLuminositySol: 1,
 				spectralClass: cls,
 				...surfaceTidesCallbacks,
@@ -1800,7 +1797,7 @@ export const GenesisView: React.FC = () => {
 	const generatedSystemBodies: SystemBody[] = useMemo(() => {
 		const cls = STAR.isValidSpectralClass(spectralClass)
 			? (spectralClass as MainSequenceClass)
-			: DEFAULT_SPECTRAL_CLASS
+			: STAR.defaultSpectralClass
 		if (restSeed !== SYSTEM.SOL_SEED) {
 			// Non-Sol: the main world (if any) is rolled fresh right alongside
 			// its siblings -- no external params to build here at all.
@@ -1878,7 +1875,7 @@ export const GenesisView: React.FC = () => {
 	const resetSourceSystemBodies = useMemo(
 		() =>
 			restSeed === SYSTEM.SOL_SEED
-				? SOL_DEFAULT_SOLAR_SYSTEM.orbits
+				? SOL_SYSTEM.solDefaultSolarSystem.orbits
 				: generatedSystemBodies,
 		[generatedSystemBodies, restSeed],
 	)
@@ -1999,12 +1996,12 @@ export const GenesisView: React.FC = () => {
 		spectralClass,
 	)
 		? spectralClass
-		: DEFAULT_SPECTRAL_CLASS
+		: STAR.defaultSpectralClass
 
 	const setSpectralClass = useCallback((cls: string) => {
 		const nextClass: MainSequenceClass = STAR.isValidSpectralClass(cls)
 			? cls
-			: DEFAULT_SPECTRAL_CLASS
+			: STAR.defaultSpectralClass
 		setSolarSystem((current) => ({
 			...current,
 			star: { ...current.star, class: nextClass },
@@ -2139,7 +2136,7 @@ export const GenesisView: React.FC = () => {
 	}, [world, pressure])
 	useEffect(() => {
 		sceneRef.current?.setGlobeCloudTexturePath(
-			restSeed === SYSTEM.SOL_SEED ? SOL_EARTH_CLOUDS_TEXTURE_PATH : null,
+			restSeed === SYSTEM.SOL_SEED ? DATA.solEarthCloudsTexturePath : null,
 		)
 	}, [restSeed])
 	useEffect(() => {
@@ -7648,7 +7645,7 @@ export const GenesisView: React.FC = () => {
 					// applySystemSeismology here with the real callbacks so the reset
 					// system's totals/regimes match every other recompute path.
 					orbits: PLANET.applySystemSeismology({
-						bodies: structuredClone(SOL_DEFAULT_SOLAR_SYSTEM.orbits),
+						bodies: structuredClone(SOL_SYSTEM.solDefaultSolarSystem.orbits),
 						...systemSeismologyContext,
 					}),
 				}))
@@ -7740,7 +7737,7 @@ export const GenesisView: React.FC = () => {
 						daysPerYear: effectiveDaysPerYear,
 						spectralClass: STAR.isValidSpectralClass(spectralClass)
 							? (spectralClass as MainSequenceClass)
-							: DEFAULT_SPECTRAL_CLASS,
+							: STAR.defaultSpectralClass,
 						starSubtype,
 						initialDay: solarSystemElapsedHoursRef.current / 24,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,
@@ -7778,7 +7775,7 @@ export const GenesisView: React.FC = () => {
 						daysPerYear: effectiveDaysPerYear,
 						spectralClass: STAR.isValidSpectralClass(spectralClass)
 							? (spectralClass as MainSequenceClass)
-							: DEFAULT_SPECTRAL_CLASS,
+							: STAR.defaultSpectralClass,
 						starSubtype,
 						initialDay: solarSystemElapsedHoursRef.current / 24,
 						showEllipticalOrbits: showSolarSystemEllipticalOrbits,

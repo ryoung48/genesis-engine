@@ -1,7 +1,4 @@
-﻿import {
-	EARTH_DIAMETER_KM,
-	SOLAR_DIAMETER_KM,
-} from "@/model/celestial/orbit-body"
+﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 // Shared floor/ceiling for every rendered body's diameter — planets, moons,
 // and (via this same function) the star — when "realistic sizes" is on. A
@@ -11,7 +8,7 @@
 // swallowing the scene. Between the two, every body renders at its true
 // relative diameter.
 const MIN_BODY_DIAMETER_KM = 400
-const MAX_BODY_DIAMETER_KM = 5 * SOLAR_DIAMETER_KM
+const MAX_BODY_DIAMETER_KM = 5 * ORBIT_BODY.solarDiameterKm
 export const BODY_VISUAL_BASE_RADIUS = 0.12
 
 // The pre-"realistic sizes" behavior, taking its shape from galaxy-gen's
@@ -66,7 +63,7 @@ export function scaleBodyDiameterToVisualRadius(
 		Math.max(diameterKm, MIN_BODY_DIAMETER_KM),
 		MAX_BODY_DIAMETER_KM,
 	)
-	const ratio = clampedDiameterKm / EARTH_DIAMETER_KM
+	const ratio = clampedDiameterKm / ORBIT_BODY.earthDiameterKm
 	return baseVisualRadius * ratio
 }
 

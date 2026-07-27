@@ -1,12 +1,15 @@
-import { roll2d6 } from "../../../../shared/dice"
-import type { createRng } from "../../../../shared/rng"
-import { EARTH_DIAMETER_KM, ORBIT_BODY } from "../../../orbit-body"
-import type { OrbitClassification, OrbitGroup } from "../../../orbit-body/types"
-import type { Zone } from "../../../planet/types"
-import type { RingProfile } from "../../types"
-import type { DensityComposition } from "../types"
+import { roll2d6 } from "@/model/shared/dice"
+import type { createRng } from "@/model/shared/rng"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import type {
+	OrbitClassification,
+	OrbitGroup,
+} from "@/model/celestial/orbit-body/types"
+import type { Zone } from "@/model/celestial/planet/types"
+import type { RingProfile } from "@/model/celestial/system/types"
+import type { DensityComposition } from "@/model/celestial/system/generation/rolls/types"
 
-export function rollOrbitGroup({
+function rollOrbitGroup({
 	rng,
 	zone,
 }: {
@@ -56,7 +59,7 @@ export function rollOrbitGroup({
 	return "dwarf"
 }
 
-export function rollSizeClass({
+function rollSizeClass({
 	rng,
 	group,
 }: {
@@ -70,7 +73,7 @@ export function rollSizeClass({
 	return rng.randint(16, 18)
 }
 
-export function rollDiameterKmFromSizeClass({
+function rollDiameterKmFromSizeClass({
 	rng,
 	sizeClass,
 }: {
@@ -82,9 +85,9 @@ export function rollDiameterKmFromSizeClass({
 		const [minKm, maxKm] = ORBIT_BODY.sizeClassToRockyDiameterRangeKm(sizeClass)
 		return rng.uniform(minKm, maxKm)
 	}
-	if (sizeClass === 16) return rng.uniform(2, 6) * EARTH_DIAMETER_KM
-	if (sizeClass === 17) return rng.uniform(6, 12) * EARTH_DIAMETER_KM
-	if (sizeClass === 18) return rng.uniform(8, 18) * EARTH_DIAMETER_KM
+	if (sizeClass === 16) return rng.uniform(2, 6) * ORBIT_BODY.earthDiameterKm
+	if (sizeClass === 17) return rng.uniform(6, 12) * ORBIT_BODY.earthDiameterKm
+	if (sizeClass === 18) return rng.uniform(8, 18) * ORBIT_BODY.earthDiameterKm
 	const minKm = 1200 + sizeClass * 1600
 	const maxKm = minKm + 1600
 	return rng.uniform(minKm, maxKm)
@@ -160,7 +163,7 @@ function rollDensityFromComposition({
 	return DENSITY_TABLE[description as string][densityRoll]
 }
 
-export function pickDensityEarthRelative({
+function pickDensityEarthRelative({
 	rng,
 	group,
 	classification,
@@ -188,7 +191,7 @@ export function pickDensityEarthRelative({
 // Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts), with
 // the star-companion/moon/stellar-age modifiers dropped — none of those
 // apply to a plain sibling planet around a lone main-sequence star.
-export function rollEccentricity(rng: ReturnType<typeof createRng>): number {
+function rollEccentricity(rng: ReturnType<typeof createRng>): number {
 	const roll = roll2d6(rng)
 	if (roll <= 5) return 0
 	if (roll <= 7) return rng.uniform(0.01, 0.03)
@@ -199,7 +202,7 @@ export function rollEccentricity(rng: ReturnType<typeof createRng>): number {
 }
 
 // Ported from galaxy-gen's MATH.tilt.compute (non-homeworld branch).
-export function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
+function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 	const standard = roll2d6(rng)
 	if (standard <= 4) return rng.uniform(0.01, 0.1)
 	if (standard <= 5) return rng.uniform(0.2, 1.2)
@@ -225,7 +228,7 @@ export function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 // anchor for "complex", with "minor" scaled down to a fainter, narrower band.
 const JOVIAN_RING_COLOR_CHOICES = [0xd8c69a, 0xcac2b0, 0xb8c4cf, 0xa89f8f]
 
-export function rollJovianRings(
+function rollJovianRings(
 	rng: ReturnType<typeof createRng>,
 ): RingProfile | undefined {
 	const tier = rng.weightedChoice([
@@ -248,7 +251,7 @@ export function rollJovianRings(
 // table, including its stellar-age modifier (older stars' systems roll
 // slower base rotations), but without the tidal-lock cascade (locks/effect),
 // since decorative siblings don't need the full lock simulation.
-export function rollSiderealDayHours({
+function rollSiderealDayHours({
 	rng,
 	isJovian,
 	starAgeGyr,
@@ -266,4 +269,15 @@ export function rollSiderealDayHours({
 		rotation += base
 	}
 	return rotation * rng.uniform(0.95, 1.05)
+}
+
+export const ROLLS = {
+	rollOrbitGroup,
+	rollSizeClass,
+	rollDiameterKmFromSizeClass,
+	pickDensityEarthRelative,
+	rollEccentricity,
+	rollAxialTiltDeg,
+	rollJovianRings,
+	rollSiderealDayHours,
 }

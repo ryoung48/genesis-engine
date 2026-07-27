@@ -6,10 +6,6 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
-import {
-	SOL_MAIN_WORLD_NAME,
-	SOL_STAR_NAME,
-} from "@/model/celestial/system/sol-system"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import type {
@@ -57,6 +53,7 @@ import {
 	resolveMoonTideLockSiderealDayHours,
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildStarStats } from "@/ui/wiki/stats/star/star-stats"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 
 interface LabeledOrbitBody {
 	body: SystemBody
@@ -638,7 +635,7 @@ export function GenerationPlanetNavigator({
 	// below.
 	const namesEnabled = restSeed === SYSTEM.SOL_SEED ? showRealSolNames : true
 	const starTitle = showRealSolNames
-		? SOL_STAR_NAME
+		? DATA.solStarName
 		: (starName ?? "Primary Star")
 	const labeledOrbits = useMemo(
 		() => labelOrbitBodies(orbitBodies ?? [], namesEnabled),
@@ -797,7 +794,9 @@ export function GenerationPlanetNavigator({
 					title:
 						body.isMainWorld && !body.name
 							? appendSizeToTitle(
-									showRealSolNames ? SOL_MAIN_WORLD_NAME : "Terrestrial Planet",
+									showRealSolNames
+										? DATA.solMainWorldName
+										: "Terrestrial Planet",
 									body.sizeClass,
 								)
 							: (labeledOrbits.find((entry) => entry.body === body)?.title ??
@@ -865,14 +864,14 @@ export function GenerationPlanetNavigator({
 									eccentricity: body.eccentricity,
 									starName:
 										showRealSolNames && restSeed === SYSTEM.SOL_SEED
-											? SOL_STAR_NAME
+											? DATA.solStarName
 											: undefined,
 								},
 							})
 			const bodyTitle =
 				isMainWorld && !body.name
 					? appendSizeToTitle(
-							showRealSolNames ? SOL_MAIN_WORLD_NAME : "Terrestrial Planet",
+							showRealSolNames ? DATA.solMainWorldName : "Terrestrial Planet",
 							body.sizeClass,
 						)
 					: (labeledOrbits.find((entry) => entry.body === body)?.title ??
@@ -1096,7 +1095,7 @@ export function GenerationPlanetNavigator({
 			const parentTitle =
 				isMainWorld && !body.name
 					? appendSizeToTitle(
-							showRealSolNames ? SOL_MAIN_WORLD_NAME : "Terrestrial Planet",
+							showRealSolNames ? DATA.solMainWorldName : "Terrestrial Planet",
 							body.sizeClass,
 						)
 					: (labeledOrbits.find((entry) => entry.body === body)?.title ??
@@ -1192,7 +1191,7 @@ export function GenerationPlanetNavigator({
 						parent: {
 							name:
 								showRealSolNames && isMainWorld
-									? SOL_MAIN_WORLD_NAME
+									? DATA.solMainWorldName
 									: showRealSolNames
 										? body.name
 										: undefined,
@@ -1208,7 +1207,7 @@ export function GenerationPlanetNavigator({
 							eccentricity: parentEccentricity,
 							starName:
 								showRealSolNames && restSeed === SYSTEM.SOL_SEED
-									? SOL_STAR_NAME
+									? DATA.solStarName
 									: undefined,
 						},
 					}),

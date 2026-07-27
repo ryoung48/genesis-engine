@@ -1,7 +1,9 @@
 import { HOURS_PER_DAY } from "@/model/shared"
-import { DEFAULT_MOON_ATMOSPHERE } from "../../../moons"
-import type { SystemBody } from "../../types"
-import type { SolPlanetSeed } from "../types"
+import type { SystemBody } from "@/model/celestial/system/types"
+import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
+import { MOON } from "@/model/celestial/moons"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+
 // live from the UI at generation time (see buildHomeBody), so its entry here
 // only carries the values that AREN'T user-editable: real Bond albedo,
 // fitted greenhouseFactor, and Luna's real orbital data.
@@ -16,26 +18,21 @@ import type { SolPlanetSeed } from "../types"
 // near-circular moon orbits longitude of perihelion isn't a stable/meaningful
 // real figure either, so those are still rolled the same way any other
 // exception with all four fixed to real values.
-
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../../orbit-body"
-
 // Every moon should carry an explicit atmosphere so its stats card shows an
 // Atmosphere row -- omitting the field (rather than stating "none") used to
 // silently drop the row for every real airless moon here (Phobos, Io,
 // Callisto, ...), while Titan/Luna (which do have one authored) showed it
 // fine.
-const NO_MOON_ATMOSPHERE = DEFAULT_MOON_ATMOSPHERE
+const NO_MOON_ATMOSPHERE = MOON.defaultMoonAtmosphere
 
-export const SOL_SEED = 0
-export const SOL_STAR_AGE_GYR = 4.6
-export const SOL_STAR_NAME = "Sol"
-export const SOL_MAIN_WORLD_NAME = "Earth"
-export const SOL_EARTH_TEXTURE_PATH = "/sol/earth/2k_earth.jpg"
-export const SOL_EARTH_CLOUDS_TEXTURE_PATH = "/sol/earth/2k_earth_clouds.jpg"
+const solSeed = 0
+const solStarAgeGyr = 4.6
+const solStarName = "Sol"
+const solMainWorldName = "Earth"
+const solEarthTexturePath = "/sol/earth/2k_earth.jpg"
+const solEarthCloudsTexturePath = "/sol/earth/2k_earth_clouds.jpg"
 
-export const SOL_PLANET_RINGS_BY_NAME: Partial<
-	Record<string, SystemBody["rings"]>
-> = {
+const solPlanetRingsByName: Partial<Record<string, SystemBody["rings"]>> = {
 	Saturn: {
 		innerRadiusRelative: 1.52,
 		outerRadiusRelative: 2.08,
@@ -70,7 +67,7 @@ export const SOL_PLANET_RINGS_BY_NAME: Partial<
  * internal heat (it radiates ~2.6x what it receives from the Sun) is what
  * closes that exact gap.
  */
-export const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
+const solPlanetSeeds: SolPlanetSeed[] = [
 	{
 		name: "Mercury",
 		group: "dwarf",
@@ -129,11 +126,11 @@ export const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		longitudeOfPerihelionDeg: 131.533,
 	},
 	{
-		name: SOL_MAIN_WORLD_NAME,
+		name: solMainWorldName,
 		isMainWorld: true,
 		group: "terrestrial",
-		texturePath: SOL_EARTH_TEXTURE_PATH,
-		cloudsTexturePath: SOL_EARTH_CLOUDS_TEXTURE_PATH,
+		texturePath: solEarthTexturePath,
+		cloudsTexturePath: solEarthCloudsTexturePath,
 		// Matches classifyBody()'s isPrimaryWorld branch in
 		// generate-system-bodies.ts -- Earth is now built live by buildPlanet()
 		// exactly like every other body here, just from a live seed object
@@ -190,8 +187,8 @@ export const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 				group: "dwarf",
 				classification: "rockball",
 				texturePath: "/sol/earth/moon.jpg",
-				diameterEarths: 3474 / EARTH_DIAMETER_KM,
-				massEarths: 7.34e22 / EARTH_MASS_KG,
+				diameterEarths: 3474 / ORBIT_BODY.earthDiameterKm,
+				massEarths: 7.34e22 / ORBIT_BODY.earthMassKg,
 				gravityG: 0.166,
 				densityEarthRelative: 0.607,
 				densityDescription: "Mostly Rock",
@@ -721,3 +718,14 @@ export const SOL_PLANET_SEEDS: SolPlanetSeed[] = [
 		],
 	},
 ]
+
+export const DATA = {
+	solSeed,
+	solStarAgeGyr,
+	solStarName,
+	solMainWorldName,
+	solEarthTexturePath,
+	solEarthCloudsTexturePath,
+	solPlanetRingsByName,
+	solPlanetSeeds,
+}

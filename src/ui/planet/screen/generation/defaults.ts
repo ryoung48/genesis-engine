@@ -1,9 +1,6 @@
-﻿import {
-	DEFAULT_SPECTRAL_CLASS,
-	DEFAULT_STAR_SUBTYPE,
-} from "@/model/celestial/star"
-import { SYSTEM } from "@/model/celestial/system"
+﻿import { SYSTEM } from "@/model/celestial/system"
 import { ERAS } from "@/model/society/eras"
+import { STAR } from "@/model/celestial/star"
 
 export const PLANET_SEED_STORAGE_KEY = "genesis:lastPlanetSeed"
 export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"
@@ -20,8 +17,8 @@ export const DEFAULT_WORLD_PARAMS = {
 	planetRadiusKm: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.planetRadiusKm,
 	obliquity: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.obliquity,
 	eccentricity: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.eccentricity,
-	spectralClass: DEFAULT_SPECTRAL_CLASS,
-	starSubtype: DEFAULT_STAR_SUBTYPE,
+	spectralClass: STAR.defaultSpectralClass,
+	starSubtype: STAR.defaultStarSubtype,
 	orbitalDistanceAU: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.orbitalDistanceAU,
 	daysPerYear: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.daysPerYear,
 	hoursPerDay: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.hoursPerDay,

@@ -1,37 +1,22 @@
 import { MOON } from "@/model/celestial/moons"
-import { ORBIT_BODY, SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
 import type { BodyGenerationParams } from "@/model/celestial/system/generation/body/types"
-import {
-	buildBodyEnvironment,
-	buildForcedClassificationEnvironment,
-	EPISTELLAR_DEVIATIONS,
-	INNER_DEVIATIONS,
-	OUTER_DEVIATIONS,
-} from "@/model/celestial/system/generation/environment"
 import type { Slot } from "@/model/celestial/system/generation/environment/types"
 import { MOON_PLACEMENT } from "@/model/celestial/system/generation/moon-placement"
-import {
-	pickDensityEarthRelative,
-	rollAxialTiltDeg,
-	rollDiameterKmFromSizeClass,
-	rollEccentricity,
-	rollJovianRings,
-	rollOrbitGroup,
-	rollSiderealDayHours,
-	rollSizeClass,
-} from "@/model/celestial/system/generation/rolls"
 import { SOL_SEED_BODIES } from "@/model/celestial/system/generation/sol-seed"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
-import { pickGeneratedTexturePath } from "@/model/celestial/system/generation/texture"
-import { SOL_MAIN_WORLD_DEFAULTS } from "@/model/celestial/system/sol-system"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import { ASTRONOMICAL_DAYS_PER_YEAR } from "@/model/shared"
 import { createRng } from "@/model/shared/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
+import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
+import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
+import { ROLLS } from "@/model/celestial/system/generation/rolls"
+import { TEXTURE } from "@/model/celestial/system/generation/texture"
 
 const DAYS_PER_YEAR = ASTRONOMICAL_DAYS_PER_YEAR
 // Mirrors the UI's DEFAULT_WORLD_PARAMS.continentSizeVariety (defaults.ts) --
@@ -59,7 +44,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		cls: spectralClass,
 		subtype: starSubtype,
 	})
-	const starMassKg = SOLAR_MASS_KG
+	const starMassKg = ORBIT_BODY.solarMassKg
 
 	// Every non-Sol system gets its own procedurally generated language (see
 	// LANGUAGE.spawn/planet-name.ts), used to name every sibling planet and
@@ -81,7 +66,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 
 	const slots: Slot[] = [
 		...rng
-			.sample(EPISTELLAR_DEVIATIONS, epistellarCount)
+			.sample(ENVIRONMENT.epistellarDeviations, epistellarCount)
 			.map((deviation) => ({ zone: "epistellar" as const, deviation })),
 		// One inner slot is reserved for the main world (deviation 0, the
 		// "temperate" slot -- always exactly the HZ center, see deviationToAU)
@@ -94,13 +79,13 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		...rng
 			.sample(
 				forceMainWorld
-					? INNER_DEVIATIONS.filter((d) => d !== 0)
-					: INNER_DEVIATIONS,
+					? ENVIRONMENT.innerDeviations.filter((d) => d !== 0)
+					: ENVIRONMENT.innerDeviations,
 				forceMainWorld ? Math.max(0, innerCount - 1) : innerCount,
 			)
 			.map((deviation) => ({ zone: "inner" as const, deviation })),
 		...rng
-			.sample(OUTER_DEVIATIONS, outerCount)
+			.sample(ENVIRONMENT.outerDeviations, outerCount)
 			.map((deviation) => ({ zone: "outer" as const, deviation })),
 	]
 
@@ -136,12 +121,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		(slot, siblingIdx) => {
 			const isMainWorld = slot.isMainWorld === true
 			const isPrimaryWorld = isMainWorld || siblingIdx === primarySlotIndex
-			let group = rollOrbitGroup({ rng, zone: slot.zone })
+			let group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
 			// A main world can't be an asteroid belt (no surface to generate
 			// terrain on) -- reroll until it isn't. Low-probability in the inner
 			// zone already, so this terminates quickly.
 			while (isMainWorld && group === "asteroid belt") {
-				group = rollOrbitGroup({ rng, zone: slot.zone })
+				group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
 			}
 			let orbitalDistanceAU = PLANET.deviationToAU({
 				deviation: slot.deviation,
@@ -180,8 +165,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			// terrestrial-sized (5-10) sizeClass band since classifyBody always
 			// reclassifies an isPrimaryWorld body to group "terrestrial".
 			const sizeClass = isPrimaryWorld
-				? Math.max(rollSizeClass({ rng, group }), 5)
-				: rollSizeClass({ rng, group })
+				? Math.max(ROLLS.rollSizeClass({ rng, group }), 5)
+				: ROLLS.rollSizeClass({ rng, group })
 			const classification = PLANET.classifyBody({
 				groupHint: group,
 				zone: slot.zone,
@@ -201,11 +186,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				spectralClass,
 				isPrimaryWorld,
 			})
-			const diameterKm = rollDiameterKmFromSizeClass({ rng, sizeClass })
+			const diameterKm = ROLLS.rollDiameterKmFromSizeClass({ rng, sizeClass })
 			const densityEarthRelative =
 				group === "asteroid belt"
 					? 0
-					: pickDensityEarthRelative({
+					: ROLLS.pickDensityEarthRelative({
 							rng,
 							group,
 							classification,
@@ -223,7 +208,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			const siderealDayHours =
 				group === "asteroid belt"
 					? 0
-					: rollSiderealDayHours({
+					: ROLLS.rollSiderealDayHours({
 							rng,
 							isJovian: group === "jovian",
 							starAgeGyr,
@@ -235,9 +220,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			const orbitalPeriodDays =
 				STAR.getKeplerYearYears({ orbitalDistanceAU, massSol: starMassSol }) *
 				DAYS_PER_YEAR
-			const eccentricity = group === "asteroid belt" ? 0 : rollEccentricity(rng)
+			const eccentricity =
+				group === "asteroid belt" ? 0 : ROLLS.rollEccentricity(rng)
 			const rolledAxialTiltDeg =
-				group === "asteroid belt" ? 0 : rollAxialTiltDeg(rng)
+				group === "asteroid belt" ? 0 : ROLLS.rollAxialTiltDeg(rng)
 			const moonCount =
 				group === "asteroid belt"
 					? 0
@@ -276,7 +262,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					tideLock: moon.tideLock,
 				}),
 			}))
-			const environment = buildBodyEnvironment({
+			const environment = ENVIRONMENT.buildBodyEnvironment({
 				rng,
 				groupHint: group,
 				zone: slot.zone,
@@ -315,7 +301,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					baseSiderealDayHours: siderealDayHours,
 					moons: moonsWithTideLocks,
 					homeworld: isMainWorld,
-					rerollEccentricity: () => rollEccentricity(rng),
+					rerollEccentricity: () => ROLLS.rollEccentricity(rng),
 				})
 				finalSiderealDayHours = tideLockResult.siderealDayHours
 				finalAxialTiltDeg = tideLockResult.axialTiltDeg
@@ -326,7 +312,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 					environment.group === "terrestrial" &&
 					environment.classification !== "acheronian"
 				) {
-					finalEnvironment = buildForcedClassificationEnvironment({
+					finalEnvironment = ENVIRONMENT.buildForcedClassificationEnvironment({
 						rng,
 						classification:
 							slot.zone === "epistellar" ? "jani-lithic" : "vesperian",
@@ -347,13 +333,13 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				name: nameBody(isMainWorld ? "main-world" : `orbit-${siblingIdx}`),
 				isMainWorld,
 				zone: slot.zone,
-				texturePath: pickGeneratedTexturePath({
+				texturePath: TEXTURE.pickGeneratedTexturePath({
 					rng,
 					classification: finalEnvironment.classification,
 				}),
 				rings:
 					finalEnvironment.group === "jovian"
-						? rollJovianRings(rng)
+						? ROLLS.rollJovianRings(rng)
 						: undefined,
 				orbitalDistanceAU,
 				diameterKm,
@@ -385,10 +371,11 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				// player edits these by hand afterward via the normal sliders.
 				...(isMainWorld
 					? {
-							landDistribution: 1 - SOL_MAIN_WORLD_DEFAULTS.landConcentration,
+							landDistribution:
+								1 - SOL_SYSTEM.solMainWorldDefaults.landConcentration,
 							continentSizeVariety: EARTH_DEFAULT_CONTINENT_SIZE_VARIETY,
-							seaLevel: SOL_MAIN_WORLD_DEFAULTS.seaLevel,
-							maxElevation: SOL_MAIN_WORLD_DEFAULTS.maxElevation,
+							seaLevel: SOL_SYSTEM.solMainWorldDefaults.seaLevel,
+							maxElevation: SOL_SYSTEM.solMainWorldDefaults.maxElevation,
 						}
 					: {}),
 			}

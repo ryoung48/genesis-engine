@@ -1,6 +1,6 @@
-import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "../../../orbit-body"
-import type { OrbitGroup } from "../../../orbit-body/types"
-import type { MoonTidalHeatingInput } from "./types"
+import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
+import type { MoonTidalHeatingInput } from "@/model/celestial/planet/seismology/heating/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 function computeResidualHeating(params: {
 	sizeClass: number
@@ -49,8 +49,8 @@ function computeMoonTidalHeatingRaw(params: {
 
 	return (
 		(10.83 *
-			(params.parentMassKg / EARTH_MASS_KG) ** 2 *
-			(params.moonDiameterKm / EARTH_DIAMETER_KM) ** 2 *
+			(params.parentMassKg / ORBIT_BODY.earthMassKg) ** 2 *
+			(params.moonDiameterKm / ORBIT_BODY.earthDiameterKm) ** 2 *
 			params.eccentricity ** 2) /
 		(distanceMillionKm ** 5 *
 			params.orbitalPeriodDays *

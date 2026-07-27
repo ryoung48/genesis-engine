@@ -992,6 +992,16 @@ if (runsStep(2)) {
 						if (exportDecl.getNamedExports().length === 0 && !exportDecl.isNamespaceExport()) {
 							exportDecl.remove()
 						}
+					} else if (Node.isShorthandPropertyAssignment(parent) && parent.getNameNode() === ref) {
+						// `{ SOL_SEED }` is both the key and the value at
+						// once — replacing just the identifier text would
+						// leave `{ SOL_SYSTEM.solSeed }`, which isn't valid
+						// shorthand syntax. Expand it to a real key: value
+						// pair instead, keeping the original bare name as
+						// the key so whoever consumes *this* object's
+						// property (e.g. `SYSTEM.SOL_SEED`) is unaffected.
+						parent.replaceWithText(`${ref.getText()}: ${namespaceName}.${name}`)
+						needsImport = true
 					} else {
 						ref.replaceWithText(`${namespaceName}.${name}`)
 						needsImport = true

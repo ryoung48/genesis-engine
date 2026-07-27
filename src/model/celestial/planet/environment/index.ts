@@ -14,13 +14,11 @@ import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment
 import { HYDROSPHERE } from "@/model/celestial/planet/environment/classification/hydrosphere"
 import { DENSITY } from "@/model/celestial/planet/environment/density"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
-import type {
-	TemperatureHydrosphereLossInput,
-	Zone,
-} from "@/model/celestial/planet/types"
+import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 import { createRng } from "@/model/shared/rng"
+import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/environment/types"
 
 function applyTemperatureHydrosphereLoss({
 	hydrosphereCode,
