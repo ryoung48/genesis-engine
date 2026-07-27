@@ -1,6 +1,5 @@
 ﻿import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
 import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
-import { computeSettlementAnchors } from "@/model/settlements"
 import { CULTURE } from "@/model/society/culture"
 import { ERAS } from "@/model/society/eras"
 import { HERITAGE } from "@/model/society/heritage"
@@ -8,6 +7,7 @@ import { NATIONS } from "@/model/society/nations"
 import { RELIGION } from "@/model/society/religion"
 import { SHARED } from "@/model/society/shared"
 import { assignLandmarkIdentity, type GenesisLandmarks } from "@/model/terrain"
+import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/settlements"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
@@ -178,8 +178,8 @@ export function deriveProvinceSociety({
 		}),
 	)
 	const settlementAnchors = record("settlement anchors", () =>
-		computeSettlementAnchors(
-			{
+		COMPUTE_SETTLEMENT_REGIONS.computeSettlementAnchors({
+			world: {
 				mesh,
 				provinces: post.provinces,
 				topography: post.topography,
@@ -188,8 +188,8 @@ export function deriveProvinceSociety({
 				isLand,
 				landmarks,
 			},
-			eraStatehoodMask,
-		),
+			activeProvinceMask: eraStatehoodMask,
+		}),
 	)
 
 	return {
