@@ -1,9 +1,3 @@
-﻿/**
- * Heightmap import pipeline: samples a B&W equirectangular heightmap
- * onto a sphere mesh, derives synthetic plates, runs post-processing
- * and climate simulation.
- */
-
 import type {
 	GenesisParams,
 	GenesisWorld,
@@ -14,13 +8,6 @@ import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
-import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
-import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
-import type {
-	SampleBilinearParams,
-	SampleCategoricalRasterParams,
-	SampleSingleBandFloatRasterParams,
-} from "@/model/pipelines/types"
 import {
 	computeOceanDistanceBFS,
 	countContinents,
@@ -51,129 +38,22 @@ import {
 	warpTerrain,
 } from "@/model/terrain"
 import { STAR } from "@/model/celestial/star"
-
-interface ImportParams {
-	seed: number
-	numPoints: number
-	jitter: number
-	grayscale: Uint8Array
-	imageWidth: number
-	imageHeight: number
-	coastlineMask?: Uint8Array
-	maskWidth?: number
-	maskHeight?: number
-	coastDensityBoost?: number
-	lakeMask?: Uint8Array
-	lakeMaskWidth?: number
-	lakeMaskHeight?: number
-	riverLines?: { points: number[]; strokeweig: number; name?: string | null }[]
-	/** Real-world named lake polygons (Natural Earth ne_50m_lakes), used to
-	 * label lake landmarks with their real name instead of a generated one. */
-	lakeNames?: { name: string; ring: [number, number][] }[]
-	/** Real-world province centers + land-area weights (e.g. from
-	 * classified_provinces_weighted.json), used to assign provinces from
-	 * real data instead of the procedural BFS partition -- see
-	 * computeWeightedProvinces. */
-	realProvinces?: { name: string; lon: number; lat: number; weight: number }[]
-	realClimateMonthly?: Int16Array
-	realClimateWidth?: number
-	realClimateHeight?: number
-	realClimateMonths?: number
-	realClimateScale?: number
-	realClimateNoData?: number
-	realPrecipMonthly?: Int16Array
-	realPrecipWidth?: number
-	realPrecipHeight?: number
-	realPrecipMonths?: number
-	realPrecipScale?: number
-	realPrecipNoData?: number
-	realDtrMonthly?: Int16Array
-	realDtrWidth?: number
-	realDtrHeight?: number
-	realDtrMonths?: number
-	realDtrScale?: number
-	realDtrNoData?: number
-	realVaporPressureMonthly?: Int16Array
-	realVaporPressureWidth?: number
-	realVaporPressureHeight?: number
-	realVaporPressureMonths?: number
-	realVaporPressureScale?: number
-	realVaporPressureNoData?: number
-	/**
-	 * Real-world elevation (meters, single band), sampled onto each region
-	 * and substituted for elevation_km after applySeaLevelToElevation. This
-	 * can cover land only (WorldClim-style) or include ocean bathymetry; any
-	 * region the raster has no coverage for keeps the heightmap-derived
-	 * value. The 8-bit grayscale heightmap's sqrt-curve reconstruction has
-	 * its own systematic error independent of terrain-warp/erosion
-	 * (overestimates mid-range elevation, underestimates the highest peaks --
-	 * see earth-real-temperature-compare.smoke.test.ts's elevation-bin
-	 * diagnostic), so this replaces it outright wherever real data exists.
-	 */
-	realElevationRaster?: Int16Array
-	realElevationWidth?: number
-	realElevationHeight?: number
-	realElevationScale?: number
-	realElevationNoData?: number
-	/** EU5 (Project Caesar) location topography/vegetation/climate category
-	 * codes, sampled nearest-neighbor onto each region. Index into the
-	 * matching EU5_*_CATEGORIES array in src/ui/planet/colors.ts. */
-	eu5TopographyRaster?: Int16Array
-	eu5TopographyWidth?: number
-	eu5TopographyHeight?: number
-	eu5TopographyNoData?: number
-	eu5VegetationRaster?: Int16Array
-	eu5VegetationWidth?: number
-	eu5VegetationHeight?: number
-	eu5VegetationNoData?: number
-	eu5ClimateRaster?: Int16Array
-	eu5ClimateWidth?: number
-	eu5ClimateHeight?: number
-	eu5ClimateNoData?: number
-	/** Rasterized EU4 province-id map (see scripts/build-eu4-provinces.py),
-	 * sampled nearest-neighbor onto each land region and used to assign
-	 * provinces directly from real polygon boundaries -- see
-	 * computeProvincesFromRaster. Takes priority over `realProvinces` when
-	 * both are present. */
-	eu4ProvincesRaster?: Int16Array
-	eu4ProvincesWidth?: number
-	eu4ProvincesHeight?: number
-	eu4ProvincesNoData?: number
-	/** Guaranteed-inside-polygon fallback point per eu4ProvincesRaster source
-	 * id (see scripts/build-eu4-provinces.py), used to force-place ids the
-	 * raster sampling missed entirely -- see computeProvincesFromRaster. */
-	eu4ProvinceFallbackSeeds?: { id: number; lon: number; lat: number }[]
-	terrainWarp: number
-	smoothing: number
-	hydraulicErosion: number
-	thermalErosion: number
-	ridgeSharpening: number
-	glacialErosion: number
-	seaLevel: number
-	volcanism?: number
-	craters?: number
-	maxElevation?: number
-	planetRadiusKm?: number
-	obliquity?: number
-	eccentricity?: number
-	spectralClass?: string
-	starSubtype?: number
-	orbitalDistanceAU?: number
-	daysPerYear?: number
-	hoursPerDay?: number
-	tidallyLocked?: boolean
-	substellarLon?: number
-	perihelion?: number
-	pressure?: number
-	/** Real per-body EBM overrides -- see GenesisParams.albedo/greenhouseFactor
-	 * doc. Pass both for a known real body (e.g. importing the real Earth
-	 * heightmap); leave unset for a generic imported heightmap. */
-	albedo?: number
-	greenhouseFactor?: number
-	seismologyTotalHeatingK?: number
-}
-
-type ProgressFn = (label: string, pct?: number) => void
+import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
+import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import type {
+	RealRiverLineInput,
+	RealProvinceInput,
+	SampleBilinearParams,
+	SampleSingleBandFloatRasterParams,
+	SampleCategoricalRasterParams,
+	SampleHeightmapParams,
+	SampleCoastlineMaskParams,
+	ReconcileElevationWithMaskParams,
+	PointInRingParams,
+	MatchRealLakeNamesParams,
+	MergeEu4LandMaskParams,
+	ImportGenesisWorldParams,
+} from "@/model/pipelines/import-heightmap/types"
 
 function createTimingRecorder() {
 	const timings: StageTiming[] = []
@@ -187,8 +67,6 @@ function createTimingRecorder() {
 		},
 	}
 }
-
-// ── Bilinear sampling ──────────────────────────────────────────────
 
 function sampleBilinear({
 	pixels,
@@ -221,12 +99,12 @@ function grayscaleToElevation(v: number): number {
 	return Math.sqrt((v - 1) / 254)
 }
 
-function sampleHeightmap(
-	mesh: SphereMesh,
-	grayscale: Uint8Array,
-	imgW: number,
-	imgH: number,
-): Float32Array {
+function sampleHeightmap({
+	mesh,
+	grayscale,
+	imgW,
+	imgH,
+}: SampleHeightmapParams): Float32Array {
 	const N = mesh.numRegions
 	const { r_xyz } = mesh
 	const elevation = new Float32Array(N)
@@ -249,10 +127,6 @@ function sampleHeightmap(
 	return elevation
 }
 
-/** Single-band variant of sampleMonthlyFloatRaster (no month dimension) --
- * same equirectangular lon/lat -> pixel convention. Returns NaN for regions
- * where every bilinear tap is nodata (e.g. ocean, for a land-only raster
- * like WorldClim elevation). */
 function sampleSingleBandFloatRaster({
 	mesh,
 	raster,
@@ -389,17 +263,12 @@ function attachObservedEarthHumidity(params: {
 	}
 }
 
-// Nearest-neighbor sample of a binary land/ocean mask (255 = land, 0 =
-// ocean), using the same lat/lon -> pixel convention as sampleHeightmap.
-// Nearest (not bilinear) is deliberate: the mask is a hard vector boundary,
-// not a continuous field, so blending would just reintroduce the blur this
-// is meant to eliminate.
-function sampleCoastlineMask(
-	mesh: SphereMesh,
-	mask: Uint8Array,
-	maskW: number,
-	maskH: number,
-): Uint8Array {
+function sampleCoastlineMask({
+	mesh,
+	mask,
+	maskW,
+	maskH,
+}: SampleCoastlineMaskParams): Uint8Array {
 	const N = mesh.numRegions
 	const { r_xyz } = mesh
 	const isLand = new Uint8Array(N)
@@ -423,11 +292,6 @@ function sampleCoastlineMask(
 	return isLand
 }
 
-// Nearest-neighbor sample of an EU5 categorical raster (topography/
-// vegetation/climate code per pixel). Nearest, not bilinear -- category
-// codes aren't a continuous field, so interpolating them is meaningless.
-// Returns -1 for regions the raster has no coverage for (nodata, or outside
-// the EU5 map's extent).
 function sampleCategoricalRaster({
 	mesh,
 	raster,
@@ -463,15 +327,11 @@ function sampleCategoricalRaster({
 	return out
 }
 
-// Clamps elevation sign to match the authoritative coastline mask so that
-// erosion/smoothing/warp passes can never redraw the land/ocean boundary
-// the vector coastline established. `epsilon` keeps clamped cells strictly
-// on the correct side of sea level without introducing a visible plateau.
-function reconcileElevationWithMask(
-	elevation: Float32Array,
-	maskIsLand: Uint8Array,
-	epsilon: number,
-): void {
+function reconcileElevationWithMask({
+	elevation,
+	maskIsLand,
+	epsilon,
+}: ReconcileElevationWithMaskParams): void {
 	for (let r = 0; r < elevation.length; r++) {
 		if (maskIsLand[r]) {
 			if (elevation[r] <= 0) elevation[r] = epsilon
@@ -479,14 +339,6 @@ function reconcileElevationWithMask(
 			if (elevation[r] > 0) elevation[r] = -epsilon
 		}
 	}
-}
-
-// ── Real rivers/lakes (vector data) ─────────────────────────────────
-
-interface RealRiverLineInput {
-	points: number[] // flat [lon0, lat0, lon1, lat1, ...] degrees
-	strokeweig: number
-	name?: string | null
 }
 
 function buildRealRiversData(
@@ -586,12 +438,7 @@ function buildRealRiversData(
 	}
 }
 
-/** Point-in-polygon test (ray casting) for a lon/lat ring. */
-function pointInRing(
-	lonDeg: number,
-	latDeg: number,
-	ring: [number, number][],
-): boolean {
+function pointInRing({ lonDeg, latDeg, ring }: PointInRingParams): boolean {
 	let inside = false
 	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
 		const [xi, yi] = ring[i]
@@ -604,18 +451,12 @@ function pointInRing(
 	return inside
 }
 
-/**
- * Matches lake landmarks (small water bodies from computeLandmarks) to real
- * named lake polygons (Natural Earth) by testing each landmark's centroid
- * for containment, falling back to nearest polygon centroid within a small
- * radius to tolerate mesh-resolution/simplification mismatches.
- */
-function matchRealLakeNames(
-	mesh: SphereMesh,
-	landmarks: { regionLandmark: Int32Array; type: Uint8Array; count: number },
-	lakeLandmarkType: number,
-	lakePolygons: { name: string; ring: [number, number][] }[],
-): (string | null)[] {
+function matchRealLakeNames({
+	mesh,
+	landmarks,
+	lakeLandmarkType,
+	lakePolygons,
+}: MatchRealLakeNamesParams): (string | null)[] {
 	const realNames = new Array<string | null>(landmarks.count).fill(null)
 	if (!lakePolygons.length) return realNames
 
@@ -660,7 +501,7 @@ function matchRealLakeNames(
 
 		let matched: string | null = null
 		for (const { name, ring } of lakePolygons) {
-			if (pointInRing(lon, lat, ring)) {
+			if (pointInRing({ lonDeg: lon, latDeg: lat, ring })) {
 				matched = name
 				break
 			}
@@ -685,19 +526,6 @@ function matchRealLakeNames(
 	return realNames
 }
 
-interface RealProvinceInput {
-	name: string
-	lon: number
-	lat: number
-	weight: number
-}
-
-// Resolves each real-world province center to a mesh region, snapping off-
-// land hits (heightmap/mask discrepancies near coastlines) onto the nearest
-// land region within a few adjacency hops, and dropping any seed whose
-// resolved region collides with an already-placed seed (keeping whichever
-// has the larger land_area_weight -- the mesh is fine-grained enough
-// relative to province count that collisions should be rare).
 function resolveRealProvinceSeeds(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
@@ -750,19 +578,11 @@ function resolveRealProvinceSeeds(
 	}
 }
 
-// Folds a rasterized real-world province-id map (e.g. eu4-provinces.bin) into
-// a coastline mask as extra land, so real islands too small to appear in the
-// coastline mask itself (e.g. the Maldives, Rapa Nui atolls) still register
-// as land for mesh density weighting -- without adding any per-mesh-point
-// cost, unlike boosting density around a list of extra points directly (that
-// approach made mesh generation noticeably slower). Only usable when both
-// rasters share the same pixel grid; mismatched sizes are silently ignored
-// rather than resampled, matching the lakeMask-merge convention below.
-function mergeEu4LandMask(
-	mask: Uint8Array,
-	eu4Raster: Int16Array,
-	eu4Nodata: number,
-): Uint8Array {
+function mergeEu4LandMask({
+	mask,
+	eu4Raster,
+	eu4Nodata,
+}: MergeEu4LandMaskParams): Uint8Array {
 	const merged = new Uint8Array(mask.length)
 	for (let i = 0; i < mask.length; i++) {
 		merged[i] = mask[i] >= 128 || eu4Raster[i] !== eu4Nodata ? 255 : 0
@@ -770,12 +590,10 @@ function mergeEu4LandMask(
 	return merged
 }
 
-// ── Main import pipeline ───────────────────────────────────────────
-
-export function importGenesisWorld(
-	params: ImportParams,
-	onProgress?: ProgressFn,
-): GenesisWorld {
+function importGenesisWorld({
+	params,
+	onProgress,
+}: ImportGenesisWorldParams): GenesisWorld {
 	const { timings, record } = createTimingRecorder()
 	const rng = createRng(params.seed)
 
@@ -788,11 +606,11 @@ export function importGenesisWorld(
 		params.eu4ProvincesRaster &&
 		params.eu4ProvincesWidth === params.maskWidth &&
 		params.eu4ProvincesHeight === params.maskHeight
-			? mergeEu4LandMask(
-					params.coastlineMask,
-					params.eu4ProvincesRaster,
-					params.eu4ProvincesNoData ?? -32768,
-				)
+			? mergeEu4LandMask({
+					mask: params.coastlineMask,
+					eu4Raster: params.eu4ProvincesRaster,
+					eu4Nodata: params.eu4ProvincesNoData ?? -32768,
+				})
 			: params.coastlineMask
 	const densityWeight =
 		densityCoastlineMask && params.maskWidth && params.maskHeight
@@ -834,12 +652,12 @@ export function importGenesisWorld(
 
 	onProgress?.("import:heightmap", 10)
 	t0 = performance.now()
-	const elevation = sampleHeightmap(
+	const elevation = sampleHeightmap({
 		mesh,
-		params.grayscale,
-		params.imageWidth,
-		params.imageHeight,
-	)
+		grayscale: params.grayscale,
+		imgW: params.imageWidth,
+		imgH: params.imageHeight,
+	})
 	record("Heightmap sampling", t0)
 
 	// Authoritative land/ocean mask from vector coastline data, if provided.
@@ -849,13 +667,13 @@ export function importGenesisWorld(
 	let maskIsLand: Uint8Array | undefined
 	if (params.coastlineMask && params.maskWidth && params.maskHeight) {
 		t0 = performance.now()
-		maskIsLand = sampleCoastlineMask(
+		maskIsLand = sampleCoastlineMask({
 			mesh,
-			params.coastlineMask,
-			params.maskWidth,
-			params.maskHeight,
-		)
-		reconcileElevationWithMask(elevation, maskIsLand, 0.02)
+			mask: params.coastlineMask,
+			maskW: params.maskWidth,
+			maskH: params.maskHeight,
+		})
+		reconcileElevationWithMask({ elevation, maskIsLand, epsilon: 0.02 })
 		record("Coastline mask reconciliation", t0)
 	}
 
@@ -875,7 +693,8 @@ export function importGenesisWorld(
 	// Warp can shift elevation sign near the coast; re-clamp to the mask
 	// before deriving r_isOcean so erosion/smoothing operate on the correct
 	// boundary from the start.
-	if (maskIsLand) reconcileElevationWithMask(elevation, maskIsLand, 0.02)
+	if (maskIsLand)
+		reconcileElevationWithMask({ elevation, maskIsLand, epsilon: 0.02 })
 
 	const r_isOcean = new Uint8Array(mesh.numRegions)
 	if (maskIsLand) {
@@ -955,7 +774,8 @@ export function importGenesisWorld(
 	// the coast even though r_isOcean itself was fixed going in — reconcile
 	// once more so the coastline that reaches isLand/plates/climate below is
 	// still exactly the vector mask, not wherever erosion left it.
-	if (maskIsLand) reconcileElevationWithMask(elevation, maskIsLand, 0.02)
+	if (maskIsLand)
+		reconcileElevationWithMask({ elevation, maskIsLand, epsilon: 0.02 })
 
 	// Derive synthetic plates
 	t0 = performance.now()
@@ -986,12 +806,12 @@ export function importGenesisWorld(
 	// the start rather than only after a later reconciliation pass.
 	let realLakeRegions: Uint8Array | undefined
 	if (params.lakeMask && params.lakeMaskWidth && params.lakeMaskHeight) {
-		realLakeRegions = sampleCoastlineMask(
+		realLakeRegions = sampleCoastlineMask({
 			mesh,
-			params.lakeMask,
-			params.lakeMaskWidth,
-			params.lakeMaskHeight,
-		)
+			mask: params.lakeMask,
+			maskW: params.lakeMaskWidth,
+			maskH: params.lakeMaskHeight,
+		})
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if (realLakeRegions[r]) isLand[r] = 0
 		}
@@ -1167,7 +987,7 @@ export function importGenesisWorld(
 	// climate, not the procedural EBM output. See runPostElevationPipeline's
 	// "Observed Earth climate" step.
 	t0 = performance.now()
-	const post = runPostElevationPipeline({
+	const post = POST_ELEVATION.runPostElevationPipeline({
 		mesh,
 		elevation,
 		elevation_km,
@@ -1245,7 +1065,7 @@ export function importGenesisWorld(
 	}
 
 	t0 = performance.now()
-	const provinceSociety = deriveProvinceSociety({
+	const provinceSociety = DERIVE_PROVINCE_SOCIETY.deriveProvinceSociety({
 		mesh,
 		params: genesisParams,
 		post,
@@ -1256,12 +1076,12 @@ export function importGenesisWorld(
 
 	if (params.lakeNames?.length) {
 		t0 = performance.now()
-		provinceSociety.landmarks.realNames = matchRealLakeNames(
+		provinceSociety.landmarks.realNames = matchRealLakeNames({
 			mesh,
-			provinceSociety.landmarks,
-			LANDMARK_TYPE_LAKE,
-			params.lakeNames,
-		)
+			landmarks: provinceSociety.landmarks,
+			lakeLandmarkType: LANDMARK_TYPE_LAKE,
+			lakePolygons: params.lakeNames,
+		})
 		record("Real lake name matching", t0)
 	}
 
@@ -1327,4 +1147,8 @@ export function importGenesisWorld(
 		continentCount: countContinents(mesh, isLand),
 		timings: [...timings, ...post.timings, ...provinceSociety.timings],
 	}
+}
+
+export const IMPORT_HEIGHTMAP = {
+	importGenesisWorld,
 }

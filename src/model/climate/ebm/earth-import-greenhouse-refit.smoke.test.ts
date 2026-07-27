@@ -3,9 +3,9 @@ import { join } from "node:path"
 import { describe, it } from "vitest"
 import { CLIMATE } from "@/model/climate/climate"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
-import { decodePng } from "@/model/pipelines"
-import { importGenesisWorld } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
+import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import { NODE_PNG } from "@/model/pipelines/node-png"
 
 // Re-fits GREENHOUSE_FACTOR against the REAL imported Earth world (real
 // heightmap, real coastline, real per-latitude land distribution, real
@@ -21,7 +21,7 @@ const HEIGHTMAP_DIR = join(process.cwd(), "public", "heightmap")
 
 function loadGrayscale(filename: string) {
 	const buffer = readFileSync(join(HEIGHTMAP_DIR, filename))
-	return decodePng(buffer)
+	return NODE_PNG.decodePng(buffer)
 }
 
 function loadRealClimate(prefix: string) {
@@ -83,7 +83,9 @@ function loadRealElevation() {
 	}
 }
 
-function landOnlyMeanBiasC(world: ReturnType<typeof importGenesisWorld>): {
+function landOnlyMeanBiasC(
+	world: ReturnType<typeof IMPORT_HEIGHTMAP.importGenesisWorld>,
+): {
 	meanBiasC: number
 	n: number
 } {
@@ -170,7 +172,7 @@ describe("Earth GREENHOUSE_FACTOR refit against the real imported world", () => 
 		// every bisection iteration below (none of that depends on
 		// GREENHOUSE_FACTOR). This is the world whose OWN bias we're zeroing,
 		// not a synthetic proxy.
-		const world = importGenesisWorld(importParams)
+		const world = IMPORT_HEIGHTMAP.importGenesisWorld({ params: importParams })
 		const { meanBiasC: biasBefore } = landOnlyMeanBiasC(world)
 		const realLandFraction = CLIMATE.computeLandFraction({
 			mesh: world.mesh,

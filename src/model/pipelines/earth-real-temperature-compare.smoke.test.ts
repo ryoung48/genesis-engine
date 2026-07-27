@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
-import { importGenesisWorld } from "./import-heightmap"
-import { decodePng } from "./node-png"
+import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
+import { NODE_PNG } from "@/model/pipelines/node-png"
 
 const HEIGHTMAP_DIR = join(process.cwd(), "public", "heightmap")
 
 function loadGrayscale(filename: string) {
 	const buffer = readFileSync(join(HEIGHTMAP_DIR, filename))
-	return decodePng(buffer)
+	return NODE_PNG.decodePng(buffer)
 }
 
 function loadRealClimate(prefix: string) {
@@ -102,63 +102,65 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 		const realPrecip = loadRealClimate("earth-real-precipitation")
 		const realElevation = loadRealElevation()
 
-		const world = importGenesisWorld({
-			seed: 14963991,
-			numPoints: DEFAULT_WORLD_PARAMS.numPoints,
-			jitter: DEFAULT_WORLD_PARAMS.jitter,
-			grayscale: earth.grayscale,
-			imageWidth: earth.width,
-			imageHeight: earth.height,
-			coastlineMask: coastline.grayscale,
-			maskWidth: coastline.width,
-			maskHeight: coastline.height,
-			lakeMask: lake.grayscale,
-			lakeMaskWidth: lake.width,
-			lakeMaskHeight: lake.height,
-			riverLines,
-			realClimateMonthly: realClimate.monthly,
-			realClimateWidth: realClimate.width,
-			realClimateHeight: realClimate.height,
-			realClimateMonths: realClimate.months,
-			realClimateScale: realClimate.scale,
-			realClimateNoData: realClimate.nodata,
-			realPrecipMonthly: realPrecip.monthly,
-			realPrecipWidth: realPrecip.width,
-			realPrecipHeight: realPrecip.height,
-			realPrecipMonths: realPrecip.months,
-			realPrecipScale: realPrecip.scale,
-			realPrecipNoData: realPrecip.nodata,
-			realElevationRaster: realElevation.raster,
-			realElevationWidth: realElevation.width,
-			realElevationHeight: realElevation.height,
-			realElevationScale: realElevation.scale,
-			realElevationNoData: realElevation.nodata,
-			// Zeroed, not DEFAULT_WORLD_PARAMS -- those are tuned for shaping
-			// synthetic noise into plausible terrain. A real Earth heightmap
-			// already IS realistic terrain; warping/smoothing/eroding it distorts
-			// real elevation instead of preserving it. applySoilCreep still runs
-			// unconditionally downstream regardless of these.
-			terrainWarp: 0,
-			smoothing: 0,
-			hydraulicErosion: 0,
-			thermalErosion: 0,
-			ridgeSharpening: 0,
-			glacialErosion: 0,
-			seaLevel: DEFAULT_WORLD_PARAMS.seaLevel,
-			volcanism: 1,
-			craters: 0,
-			maxElevation: DEFAULT_WORLD_PARAMS.maxElevation,
-			planetRadiusKm: DEFAULT_WORLD_PARAMS.planetRadiusKm,
-			obliquity: DEFAULT_WORLD_PARAMS.obliquity,
-			eccentricity: DEFAULT_WORLD_PARAMS.eccentricity,
-			spectralClass: DEFAULT_WORLD_PARAMS.spectralClass,
-			starSubtype: DEFAULT_WORLD_PARAMS.starSubtype,
-			orbitalDistanceAU: DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
-			daysPerYear: DEFAULT_WORLD_PARAMS.daysPerYear,
-			hoursPerDay: DEFAULT_WORLD_PARAMS.hoursPerDay,
-			substellarLon: DEFAULT_WORLD_PARAMS.substellarLon,
-			perihelion: DEFAULT_WORLD_PARAMS.perihelion,
-			pressure: DEFAULT_WORLD_PARAMS.pressure,
+		const world = IMPORT_HEIGHTMAP.importGenesisWorld({
+			params: {
+				seed: 14963991,
+				numPoints: DEFAULT_WORLD_PARAMS.numPoints,
+				jitter: DEFAULT_WORLD_PARAMS.jitter,
+				grayscale: earth.grayscale,
+				imageWidth: earth.width,
+				imageHeight: earth.height,
+				coastlineMask: coastline.grayscale,
+				maskWidth: coastline.width,
+				maskHeight: coastline.height,
+				lakeMask: lake.grayscale,
+				lakeMaskWidth: lake.width,
+				lakeMaskHeight: lake.height,
+				riverLines,
+				realClimateMonthly: realClimate.monthly,
+				realClimateWidth: realClimate.width,
+				realClimateHeight: realClimate.height,
+				realClimateMonths: realClimate.months,
+				realClimateScale: realClimate.scale,
+				realClimateNoData: realClimate.nodata,
+				realPrecipMonthly: realPrecip.monthly,
+				realPrecipWidth: realPrecip.width,
+				realPrecipHeight: realPrecip.height,
+				realPrecipMonths: realPrecip.months,
+				realPrecipScale: realPrecip.scale,
+				realPrecipNoData: realPrecip.nodata,
+				realElevationRaster: realElevation.raster,
+				realElevationWidth: realElevation.width,
+				realElevationHeight: realElevation.height,
+				realElevationScale: realElevation.scale,
+				realElevationNoData: realElevation.nodata,
+				// Zeroed, not DEFAULT_WORLD_PARAMS -- those are tuned for shaping
+				// synthetic noise into plausible terrain. A real Earth heightmap
+				// already IS realistic terrain; warping/smoothing/eroding it distorts
+				// real elevation instead of preserving it. applySoilCreep still runs
+				// unconditionally downstream regardless of these.
+				terrainWarp: 0,
+				smoothing: 0,
+				hydraulicErosion: 0,
+				thermalErosion: 0,
+				ridgeSharpening: 0,
+				glacialErosion: 0,
+				seaLevel: DEFAULT_WORLD_PARAMS.seaLevel,
+				volcanism: 1,
+				craters: 0,
+				maxElevation: DEFAULT_WORLD_PARAMS.maxElevation,
+				planetRadiusKm: DEFAULT_WORLD_PARAMS.planetRadiusKm,
+				obliquity: DEFAULT_WORLD_PARAMS.obliquity,
+				eccentricity: DEFAULT_WORLD_PARAMS.eccentricity,
+				spectralClass: DEFAULT_WORLD_PARAMS.spectralClass,
+				starSubtype: DEFAULT_WORLD_PARAMS.starSubtype,
+				orbitalDistanceAU: DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
+				daysPerYear: DEFAULT_WORLD_PARAMS.daysPerYear,
+				hoursPerDay: DEFAULT_WORLD_PARAMS.hoursPerDay,
+				substellarLon: DEFAULT_WORLD_PARAMS.substellarLon,
+				perihelion: DEFAULT_WORLD_PARAMS.perihelion,
+				pressure: DEFAULT_WORLD_PARAMS.pressure,
+			},
 		})
 
 		const { climate, isLand, mesh, elevation_km } = world

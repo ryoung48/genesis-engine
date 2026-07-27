@@ -9,8 +9,6 @@ import {
 import { buildHistoryFrame } from "@/model/history/snapshot"
 import type { HistoryState } from "@/model/history/state"
 import { PATHFIND } from "@/model/pathfinding"
-import { generateGenesisWorld } from "@/model/pipelines/generate-world"
-import { importGenesisWorld } from "@/model/pipelines/import-heightmap"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
@@ -22,6 +20,8 @@ import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
 } from "@/ui/planet/renderer/terrain-geometry"
+import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -111,7 +111,7 @@ interface PathfindSeedWorld {
 let lastGeneratedWorld: PathfindSeedWorld | null = null
 
 function clonePathfindSeedWorld(
-	world: ReturnType<typeof generateGenesisWorld>,
+	world: ReturnType<typeof GENERATE_WORLD.generateGenesisWorld>,
 ): PathfindSeedWorld {
 	return {
 		params: { planetRadiusKm: world.params.planetRadiusKm },
@@ -128,7 +128,7 @@ function clonePathfindSeedWorld(
 	}
 }
 function serializeWorld(
-	world: ReturnType<typeof generateGenesisWorld>,
+	world: ReturnType<typeof GENERATE_WORLD.generateGenesisWorld>,
 ): SerializedGenesisWorld {
 	return {
 		mesh: world.mesh,
@@ -647,11 +647,17 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 	}
 
 	try {
-		let generated: ReturnType<typeof generateGenesisWorld>
+		let generated: ReturnType<typeof GENERATE_WORLD.generateGenesisWorld>
 		if (message.type === "generate") {
-			generated = generateGenesisWorld(message.params, progressCb)
+			generated = GENERATE_WORLD.generateGenesisWorld({
+				params: message.params,
+				onProgress: progressCb,
+			})
 		} else if (message.type === "import") {
-			generated = importGenesisWorld(message.params, progressCb)
+			generated = IMPORT_HEIGHTMAP.importGenesisWorld({
+				params: message.params,
+				onProgress: progressCb,
+			})
 		} else {
 			return
 		}

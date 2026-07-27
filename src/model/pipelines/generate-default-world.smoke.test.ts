@@ -8,13 +8,13 @@ import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
-import { generateGenesisWorld } from "@/model/pipelines/generate-world"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared"
 import { ERAS } from "@/model/society/eras"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { GenesisWorld } from "@/model/world"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
+import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 
 const SMOKE_PLANET_SEED = 14963991
 const SMOKE_PLANET_CODE = encodePlanetCode(SMOKE_PLANET_SEED, {
@@ -252,7 +252,7 @@ describe("full world smoke generation", () => {
 	it("generates a world using the configured smoke planet code", () => {
 		const params = buildSmokeParams(SMOKE_PLANET_CODE)
 		const previewAvgTempC = computePreviewAverageTempC(params)
-		const world = generateGenesisWorld(params)
+		const world = GENERATE_WORLD.generateGenesisWorld({ params })
 		const summary = summarizeWorld(world)
 		const fingerprint = computeWorldFingerprint(world)
 
@@ -467,7 +467,7 @@ describe("full world smoke generation", () => {
 		]
 
 		const results = scenarioParams.map(({ name, params }) => {
-			const world = generateGenesisWorld(params)
+			const world = GENERATE_WORLD.generateGenesisWorld({ params })
 			const summary = summarizeWorld(world)
 			const exposure = world.volcanism.hotspotExposure
 			console.info("Volcanic climate scenario", {
@@ -502,7 +502,9 @@ describe("full world smoke generation", () => {
 
 	it("neolithic era leaves most land stateless", () => {
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
-		const world = generateGenesisWorld({ ...base, era: "neolithic" })
+		const world = GENERATE_WORLD.generateGenesisWorld({
+			params: { ...base, era: "neolithic" },
+		})
 		const provinceCount = world.provinces?.count ?? 0
 		const nationCount = world.nations?.count ?? 0
 
@@ -526,7 +528,9 @@ describe("full world smoke generation", () => {
 
 	it("late medieval era leaves no stateless non-desolate provinces", () => {
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
-		const world = generateGenesisWorld({ ...base, era: "lateMedieval" })
+		const world = GENERATE_WORLD.generateGenesisWorld({
+			params: { ...base, era: "lateMedieval" },
+		})
 
 		let statelessProvinces = 0
 		const sovereign = world.nations?.sovereign
@@ -554,7 +558,9 @@ describe("full world smoke generation", () => {
 
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
 		for (const era of ERAS.eraOrder) {
-			const world = generateGenesisWorld({ ...base, era })
+			const world = GENERATE_WORLD.generateGenesisWorld({
+				params: { ...base, era },
+			})
 			if (
 				!world.nations ||
 				!world.provinces ||

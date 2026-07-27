@@ -1,8 +1,3 @@
-﻿/**
- * Genesis pipeline orchestrator: generates a complete tectonic world.
- * Faithful port of genesis's planet-worker.js pipeline order.
- */
-
 import type {
 	BoundaryInfo,
 	DistanceFields,
@@ -15,8 +10,6 @@ import type {
 } from "@/model"
 import { ROUTES } from "@/model/economy/routes"
 import { buildSphereMesh } from "@/model/mesh"
-import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
-import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
@@ -46,8 +39,15 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "@/model/terrain"
-
-type ProgressFn = (label: string, pct?: number) => void
+import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
+import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import type {
+	TectonicPathResult,
+	ProgressFn,
+	ApplyPeakCompressionParams,
+	SummarizeHotspotExposureParams,
+	GenerateGenesisWorldParams,
+} from "@/model/pipelines/generate-world/types"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
 	console.time(label)
@@ -58,7 +58,7 @@ function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
 	return result
 }
 
-function applyPeakCompression(elev: Float32Array, N: number): void {
+function applyPeakCompression({ elev, N }: ApplyPeakCompressionParams): void {
 	for (let r = 0; r < N; r++) {
 		if (elev[r] > 0) elev[r] = Math.pow(elev[r], 0.92)
 	}
@@ -74,11 +74,11 @@ function clampHotspots(raw: Float32Array): Float32Array {
 
 const HOTSPOT_EXPOSURE_THRESHOLD = 0.01
 
-function summarizeHotspotExposure(
-	hotspot: Float32Array,
-	beforeFloodLand: Uint8Array,
-	finalLand: Uint8Array,
-) {
+function summarizeHotspotExposure({
+	hotspot,
+	beforeFloodLand,
+	finalLand,
+}: SummarizeHotspotExposureParams) {
 	let activeCells = 0
 	let aboveWaterBeforeFlood = 0
 	let aboveWaterAfterFlood = 0
@@ -94,15 +94,6 @@ function summarizeHotspotExposure(
 		aboveWaterBeforeFlood,
 		aboveWaterAfterFlood,
 	}
-}
-
-interface TectonicPathResult {
-	elevation: Float32Array
-	terrainFeatures: GenesisTerrainFeatures | undefined
-	boundary: BoundaryInfo
-	distFields: DistanceFields
-	r_hotspot: Float32Array
-	r_mantleUpwelling: Float32Array
 }
 
 function runActivePath(
@@ -227,7 +218,7 @@ function runActivePath(
 
 	// 11. Peak compression (Math.pow(elev, 0.92) for positive elevations)
 	withTiming("peak-compression", pipelineTiming, () => {
-		applyPeakCompression(elevation, mesh.numRegions)
+		applyPeakCompression({ elev: elevation, N: mesh.numRegions })
 	})
 	onProgress?.("peak-compression", 29)
 
@@ -241,10 +232,10 @@ function runActivePath(
 	}
 }
 
-export function generateGenesisWorld(
-	params: GenesisParams,
-	onProgress?: ProgressFn,
-): GenesisWorld {
+function generateGenesisWorld({
+	params,
+	onProgress,
+}: GenerateGenesisWorldParams): GenesisWorld {
 	const rng = createRng(params.seed)
 	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []
@@ -595,7 +586,7 @@ export function generateGenesisWorld(
 
 	// 14–22. Shared post-elevation pipeline (climate → population)
 	const post = withTiming("post-pipeline", pipelineTiming, () =>
-		runPostElevationPipeline({
+		POST_ELEVATION.runPostElevationPipeline({
 			mesh,
 			elevation,
 			elevation_km,
@@ -619,13 +610,13 @@ export function generateGenesisWorld(
 
 	// Summarise hotspot exposure using the final isLand (after post-elevation
 	// lake clearing) so the stored count stays consistent with world.isLand.
-	const hotspotExposure = summarizeHotspotExposure(
-		r_hotspot,
-		preCraterLand,
-		isLand,
-	)
+	const hotspotExposure = summarizeHotspotExposure({
+		hotspot: r_hotspot,
+		beforeFloodLand: preCraterLand,
+		finalLand: isLand,
+	})
 
-	const provinceSociety = deriveProvinceSociety({
+	const provinceSociety = DERIVE_PROVINCE_SOCIETY.deriveProvinceSociety({
 		mesh,
 		params,
 		post,
@@ -742,4 +733,8 @@ export function generateGenesisWorld(
 		monthlyTEQ: post.monthlyTEQ,
 		timings,
 	}
+}
+
+export const GENERATE_WORLD = {
+	generateGenesisWorld,
 }

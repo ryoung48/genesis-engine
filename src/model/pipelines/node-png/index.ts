@@ -1,17 +1,7 @@
 import { inflateSync } from "node:zlib"
-
-// Minimal PNG decoder for Node scripts/tests that need pixel data without a
-// canvas/DOM (the browser path uses `loadImageAsGrayscale` via <canvas>).
-// Supports non-interlaced, non-palette PNGs (color types 0/2/4/6, bit depth 8),
-// which covers every heightmap/mask asset this project ships.
+import type { DecodedPng, PaethParams } from "@/model/pipelines/node-png/types"
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
-
-interface DecodedPng {
-	grayscale: Uint8Array
-	width: number
-	height: number
-}
 
 function channelsForColorType(colorType: number): number {
 	switch (colorType) {
@@ -28,7 +18,7 @@ function channelsForColorType(colorType: number): number {
 	}
 }
 
-function paeth(a: number, b: number, c: number): number {
+function paeth({ a, b, c }: PaethParams): number {
 	const p = a + b - c
 	const pa = Math.abs(p - a)
 	const pb = Math.abs(p - b)
@@ -38,7 +28,7 @@ function paeth(a: number, b: number, c: number): number {
 	return c
 }
 
-export function decodePng(buffer: Buffer): DecodedPng {
+function decodePng(buffer: Buffer): DecodedPng {
 	for (let i = 0; i < PNG_SIGNATURE.length; i++) {
 		if (buffer[i] !== PNG_SIGNATURE[i]) throw new Error("Not a PNG file")
 	}
@@ -111,7 +101,7 @@ export function decodePng(buffer: Buffer): DecodedPng {
 					value = rawValue + Math.floor((a + b) / 2)
 					break
 				case 4:
-					value = rawValue + paeth(a, b, c)
+					value = rawValue + paeth({ a, b, c })
 					break
 				default:
 					throw new Error(`Unsupported PNG filter type: ${filterType}`)
@@ -136,4 +126,8 @@ export function decodePng(buffer: Buffer): DecodedPng {
 	}
 
 	return { grayscale, width, height }
+}
+
+export const NODE_PNG = {
+	decodePng,
 }

@@ -1,5 +1,4 @@
-﻿import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
-import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
+import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
 import { CULTURE } from "@/model/society/culture"
 import { ERAS } from "@/model/society/eras"
 import { HERITAGE } from "@/model/society/heritage"
@@ -8,12 +7,13 @@ import { RELIGION } from "@/model/society/religion"
 import { SHARED } from "@/model/society/shared"
 import { assignLandmarkIdentity, type GenesisLandmarks } from "@/model/terrain"
 import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/settlements"
+import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
 	params: Pick<GenesisParams, "seed" | "planetRadiusKm" | "era">
 	post: Pick<
-		ReturnType<typeof runPostElevationPipeline>,
+		ReturnType<typeof POST_ELEVATION.runPostElevationPipeline>,
 		| "coastal"
 		| "eraSettledMask"
 		| "eraStatehoodMask"
@@ -40,7 +40,7 @@ interface DerivedProvinceSociety {
 	timings: StageTiming[]
 }
 
-export function deriveProvinceSociety({
+function deriveProvinceSociety({
 	mesh,
 	params,
 	post,
@@ -204,4 +204,8 @@ export function deriveProvinceSociety({
 		settlementPortRegions: settlementAnchors.settlementPortRegions,
 		timings,
 	}
+}
+
+export const DERIVE_PROVINCE_SOCIETY = {
+	deriveProvinceSociety,
 }
