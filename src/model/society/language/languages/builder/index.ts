@@ -1,9 +1,10 @@
-import { CLUSTER } from "../clusters"
+import { CLUSTER } from "@/model/society/language/languages/clusters"
 import {
 	type Language,
 	PhonemeCatalog,
 	type WeightedDistribution,
-} from "../types"
+} from "@/model/society/language/languages/types"
+import type { ValidTermsParams } from "@/model/society/language/languages/builder/types"
 
 interface CustomClusterParams {
 	len?: number
@@ -20,7 +21,7 @@ interface CustomClusterParams {
  * @param letters
  * @returns list prospects that pass
  */
-export const validTerms = (prospects: string[], letters: string[]) =>
+const validTerms = ({ prospects, letters }: ValidTermsParams) =>
 	prospects.filter((c) => c.split("").every((l) => letters.includes(l)))
 
 function buildDistribution<T>(
@@ -34,7 +35,7 @@ function buildDistribution<T>(
 	}))
 }
 
-export const randomizePhonemes = (src: Language) => {
+const randomizePhonemes = (src: Language) => {
 	Object.entries(src.basePhonemes).forEach(([k, v]) => {
 		const condensed = new Map<string, number>()
 		v.forEach((c) => {
@@ -47,7 +48,7 @@ export const randomizePhonemes = (src: Language) => {
 	})
 }
 
-export const initClusters = (params: {
+const initClusters = (params: {
 	src: Language
 	shortFirst?: boolean
 	shortSurnames?: boolean
@@ -119,4 +120,10 @@ export const initClusters = (params: {
 	}
 	// similar first names
 	src.clusters.female.patterns = src.clusters.male.patterns
+}
+
+export const BUILDER = {
+	validTerms,
+	randomizePhonemes,
+	initClusters,
 }

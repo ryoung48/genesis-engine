@@ -12,25 +12,23 @@ import {
 } from "@/model/earth"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { buildRegionSpatialIndex } from "@/model/mesh"
-import type { HeritageScript } from "@/model/society"
-import { SCRIPT } from "@/model/society"
 import {
 	networkCount,
 	type SerializedGenesisWorld,
 	type SerializedNetwork,
 } from "@/model/transport"
-import { formatClockTimeDisplay } from "../clock"
-import { type ColorMode, VEGETATION_WATER_BLUE } from "../colors"
-import type { LabelMode } from "../controls/OverlayControls"
-import { boostCloudAlphaMap } from "./cloud-material"
+import { formatClockTimeDisplay } from "@/ui/planet/clock"
+import { type ColorMode, VEGETATION_WATER_BLUE } from "@/ui/planet/colors"
+import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
+import { boostCloudAlphaMap } from "@/ui/planet/renderer/cloud-material"
 import {
 	buildCoastlineGlobeLines,
 	buildCoastlineMapLines,
 	type CoastlineLineData,
 	deriveCoastlineFromWorld,
 	loadCoastlineLines,
-} from "./coastline-overlay"
-import { disposeGroup, disposeObject3D } from "./disposal"
+} from "@/ui/planet/renderer/coastline-overlay"
+import { disposeGroup, disposeObject3D } from "@/ui/planet/renderer/disposal"
 import {
 	buildEu4NationBorderContext,
 	buildEu4NationBordersGlobe,
@@ -42,7 +40,7 @@ import {
 	collectEu4NationBorderMapPositions,
 	collectEu4ProvinceBorderGlobePositions,
 	collectEu4ProvinceBorderMapPositions,
-} from "./eu4-nation-border-overlay"
+} from "@/ui/planet/renderer/eu4-nation-border-overlay"
 import {
 	buildEu4NationFillGlobe,
 	buildEu4NationFillMap,
@@ -52,13 +50,13 @@ import {
 	type ElevationKmForLonLat,
 	updateEu4NationFillGlobeColors,
 	updateEu4NationFillMapColors,
-} from "./eu4-nation-fill-overlay"
-import { getRegionFocusTargets } from "./focus"
-import { createMapProjection } from "./map-projection"
+} from "@/ui/planet/renderer/eu4-nation-fill-overlay"
+import { getRegionFocusTargets } from "@/ui/planet/renderer/focus"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
 	buildGlobeMeasurementOverlay,
 	buildMapMeasurementOverlay,
-} from "./measurement-overlay"
+} from "@/ui/planet/renderer/measurement-overlay"
 import {
 	applyFaceRegionColors,
 	applyMapColorModeColors,
@@ -67,12 +65,12 @@ import {
 	buildMapWireframe,
 	buildTerrainMesh,
 	buildTerrainWireframe,
-} from "./mesh-builders"
+} from "@/ui/planet/renderer/mesh-builders"
 import {
 	buildMoonOrbitOverlay,
 	type MoonOrbitState,
-} from "./moon-orbit-overlay"
-import { shouldRebuildNationBordersForVisibilityChange } from "./nation-border-visibility"
+} from "@/ui/planet/renderer/moon-orbit-overlay"
+import { shouldRebuildNationBordersForVisibilityChange } from "@/ui/planet/renderer/nation-border-visibility"
 import {
 	buildGlobeHeritageLabels,
 	buildGlobeNationLabels,
@@ -87,7 +85,7 @@ import {
 	disposePool,
 	EARTH_HISTORY_LABEL_SCALE_CURVE,
 	updateGlobeLabelOrientations,
-} from "./nation-label-overlay"
+} from "@/ui/planet/renderer/nation-label-overlay"
 import {
 	buildGlobeNationScripts,
 	buildMapNationScripts,
@@ -98,7 +96,7 @@ import {
 	type PendingNationScriptTextureQueue,
 	processPendingNationScriptTextures,
 	type ScriptTextureCacheEntry,
-} from "./nation-script-overlay"
+} from "@/ui/planet/renderer/nation-script-overlay"
 import {
 	buildGlobeGrid,
 	buildGlobeHierarchyOverlay,
@@ -117,34 +115,34 @@ import {
 	collectNationBorderGlobePositions,
 	collectNationBorderMapPositions,
 	repeatMapPositions,
-} from "./overlay-builders"
-import { PngStreamWriter } from "./PngStreamWriter"
+} from "@/ui/planet/renderer/overlay-builders"
+import { PngStreamWriter } from "@/ui/planet/renderer/PngStreamWriter"
 import {
 	buildGlobePathfindingOverlay,
 	buildMapPathfindingOverlay,
-} from "./pathfinding-overlay"
+} from "@/ui/planet/renderer/pathfinding-overlay"
 import {
 	buildSelectedProvinceBorderGlobe,
 	buildSelectedProvinceBorderMap,
 	collectProvinceBorderGlobePositions,
 	collectProvinceBorderMapPositions,
-} from "./province-overlay"
-import { createRenderScheduler } from "./render-scheduler"
+} from "@/ui/planet/renderer/province-overlay"
+import { createRenderScheduler } from "@/ui/planet/renderer/render-scheduler"
 import {
 	buildGlobeRealSettlements,
 	buildGlobeSettlements,
 	buildMapRealSettlements,
 	buildMapSettlements,
-} from "./settlement-overlay"
+} from "@/ui/planet/renderer/settlement-overlay"
 import {
 	buildSolarSystemOverlay,
 	type SolarSystemOverlayParams,
 	type SolarSystemOverlayState,
-} from "./solar-system-overlay"
+} from "@/ui/planet/renderer/solar-system-overlay"
 import {
 	buildGlobeTradeRoutes,
 	buildMapTradeRoutes,
-} from "./trade-route-overlay"
+} from "@/ui/planet/renderer/trade-route-overlay"
 import type {
 	GenesisHoverInfo,
 	GenesisScene,
@@ -152,7 +150,9 @@ import type {
 	OrgHighlightSpec,
 	RiverData,
 	WindArrowData,
-} from "./types"
+} from "@/ui/planet/renderer/types"
+import type { HeritageScript } from "@/model/society/script"
+import { SCRIPT } from "@/model/society/script"
 
 const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
 const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc
@@ -1872,7 +1872,13 @@ export function createGenesisScene(
 			settlementUrbanPop,
 			elevationVisible,
 		)
-		mapSettlements = buildMapSettlements({ world: currentWorld, locations: settlementLocations, urbanPop: settlementUrbanPop, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg })
+		mapSettlements = buildMapSettlements({
+			world: currentWorld,
+			locations: settlementLocations,
+			urbanPop: settlementUrbanPop,
+			centerLongitudeDeg: currentMapCenterLongitudeDeg,
+			projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+		})
 		if (globeSettlements) globeGroup.add(globeSettlements)
 		if (mapSettlements) {
 			addMapSlideClones(mapSettlements)
@@ -1897,8 +1903,24 @@ export function createGenesisScene(
 		) {
 			return
 		}
-		globeEu4Settlements = buildGlobeRealSettlements({ lats: eu4SettlementLats, lons: eu4SettlementLons, populations: eu4SettlementPopulation, provinceIds: eu4SettlementProvinceIds, capitalProvinceIds: eu4CapitalProvinceIds, indices: eu4SettlementIndices })
-		mapEu4Settlements = buildMapRealSettlements({ lats: eu4SettlementLats, lons: eu4SettlementLons, populations: eu4SettlementPopulation, provinceIds: eu4SettlementProvinceIds, capitalProvinceIds: eu4CapitalProvinceIds, indices: eu4SettlementIndices, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg })
+		globeEu4Settlements = buildGlobeRealSettlements({
+			lats: eu4SettlementLats,
+			lons: eu4SettlementLons,
+			populations: eu4SettlementPopulation,
+			provinceIds: eu4SettlementProvinceIds,
+			capitalProvinceIds: eu4CapitalProvinceIds,
+			indices: eu4SettlementIndices,
+		})
+		mapEu4Settlements = buildMapRealSettlements({
+			lats: eu4SettlementLats,
+			lons: eu4SettlementLons,
+			populations: eu4SettlementPopulation,
+			provinceIds: eu4SettlementProvinceIds,
+			capitalProvinceIds: eu4CapitalProvinceIds,
+			indices: eu4SettlementIndices,
+			centerLongitudeDeg: currentMapCenterLongitudeDeg,
+			projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+		})
 		if (globeEu4Settlements) globeGroup.add(globeEu4Settlements)
 		if (mapEu4Settlements) {
 			addMapSlideClones(mapEu4Settlements)
@@ -2381,7 +2403,14 @@ export function createGenesisScene(
 						)
 					} else {
 						disposeObject3D(globeGroup, globeNationFill)
-						const globeFill = buildEu4NationFillGlobe({ geometry: cachedEu4FillGeometry, colorForRawId: currentNationFillColorForRawId, viewMode: currentViewMode, visible: true, radius: globeRadius, elevationKmForLonLat: elevationLookup })
+						const globeFill = buildEu4NationFillGlobe({
+							geometry: cachedEu4FillGeometry,
+							colorForRawId: currentNationFillColorForRawId,
+							viewMode: currentViewMode,
+							visible: true,
+							radius: globeRadius,
+							elevationKmForLonLat: elevationLookup,
+						})
 						globeNationFill = globeFill?.mesh ?? null
 						globeNationFillRadius = globeFill ? globeRadius : null
 						if (globeNationFill) globeGroup.add(globeNationFill)
@@ -2403,7 +2432,16 @@ export function createGenesisScene(
 						)
 					} else {
 						disposeObject3D(scene, mapNationFill)
-						const mapFill = buildEu4NationFillMap({ geometry: cachedEu4FillGeometry, colorForRawId: currentNationFillColorForRawId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, visible: true, z: mapZ, elevationKmForLonLat: elevationLookup })
+						const mapFill = buildEu4NationFillMap({
+							geometry: cachedEu4FillGeometry,
+							colorForRawId: currentNationFillColorForRawId,
+							centerLongitudeDeg: currentMapCenterLongitudeDeg,
+							projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+							viewMode: currentViewMode,
+							visible: true,
+							z: mapZ,
+							elevationKmForLonLat: elevationLookup,
+						})
 						mapNationFill = mapFill?.mesh ?? null
 						mapNationFillParams = mapFill
 							? {
@@ -2447,8 +2485,22 @@ export function createGenesisScene(
 							console.error("Failed to load EU4 province fill geometry:", err)
 						})
 				} else {
-					const globeStripes = buildEu4OccupationStripesGlobe({ geometry: cachedEu4FillGeometry, colorForRawId: currentOccupationStripeColorForRawId, viewMode: currentViewMode, visible: true, radius: elevationVisible ? 1.002 : 1.0005 })
-					const mapStripes = buildEu4OccupationStripesMap({ geometry: cachedEu4FillGeometry, colorForRawId: currentOccupationStripeColorForRawId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, visible: true, z: 0.0003 })
+					const globeStripes = buildEu4OccupationStripesGlobe({
+						geometry: cachedEu4FillGeometry,
+						colorForRawId: currentOccupationStripeColorForRawId,
+						viewMode: currentViewMode,
+						visible: true,
+						radius: elevationVisible ? 1.002 : 1.0005,
+					})
+					const mapStripes = buildEu4OccupationStripesMap({
+						geometry: cachedEu4FillGeometry,
+						colorForRawId: currentOccupationStripeColorForRawId,
+						centerLongitudeDeg: currentMapCenterLongitudeDeg,
+						projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+						viewMode: currentViewMode,
+						visible: true,
+						z: 0.0003,
+					})
 					if (globeStripes) {
 						globeOccupationStripes = globeStripes.mesh
 						globeGroup.add(globeOccupationStripes)
@@ -2534,8 +2586,21 @@ export function createGenesisScene(
 		}
 
 		if (worldForBorders && landNationBordersVisible) {
-			const globeLand = buildLandNationBordersGlobe({ world: worldForBorders, viewMode: currentViewMode, visible: landNationBordersVisible, elevationVisible, resolution: [w, h] })
-			const mapLand = buildLandNationBordersMap({ world: worldForBorders, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, visible: landNationBordersVisible, resolution: [w, h] })
+			const globeLand = buildLandNationBordersGlobe({
+				world: worldForBorders,
+				viewMode: currentViewMode,
+				visible: landNationBordersVisible,
+				elevationVisible,
+				resolution: [w, h],
+			})
+			const mapLand = buildLandNationBordersMap({
+				world: worldForBorders,
+				centerLongitudeDeg: currentMapCenterLongitudeDeg,
+				projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+				viewMode: currentViewMode,
+				visible: landNationBordersVisible,
+				resolution: [w, h],
+			})
 			if (globeLand) {
 				globeLandNationBorders = globeLand.lines
 				landNationBorderMaterials.push(globeLand.material)
@@ -2638,8 +2703,24 @@ export function createGenesisScene(
 			const provinceRealId = currentWorld.provinces.realIds?.[selectedProvince]
 			if (provinceRealId === undefined) return
 			const geometry = cachedEu4BorderGeometry
-			const globeBorder = buildEu4SelectedProvinceBorderGlobe({ geometry, provinceRealId, viewMode: currentViewMode, radius: 1.006, resolution, opts: { color: 0xfffbeb, opacity: 0.95, lineWidth: 4 } })
-			const mapBorder = buildEu4SelectedProvinceBorderMap({ geometry, provinceRealId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, z: 0.007, resolution, opts: { color: 0xfffbeb, opacity: 0.95, lineWidth: 4 } })
+			const globeBorder = buildEu4SelectedProvinceBorderGlobe({
+				geometry,
+				provinceRealId,
+				viewMode: currentViewMode,
+				radius: 1.006,
+				resolution,
+				opts: { color: 0xfffbeb, opacity: 0.95, lineWidth: 4 },
+			})
+			const mapBorder = buildEu4SelectedProvinceBorderMap({
+				geometry,
+				provinceRealId,
+				centerLongitudeDeg: currentMapCenterLongitudeDeg,
+				projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+				viewMode: currentViewMode,
+				z: 0.007,
+				resolution,
+				opts: { color: 0xfffbeb, opacity: 0.95, lineWidth: 4 },
+			})
 			if (globeBorder) {
 				globeSelectedProvinceBorder = globeBorder.lines
 				globeGroup.add(globeSelectedProvinceBorder)
@@ -2653,18 +2734,31 @@ export function createGenesisScene(
 			return
 		}
 
-		globeSelectedProvinceBorder = buildSelectedProvinceBorderGlobe({ world: currentWorld, province: selectedProvince, viewMode: currentViewMode, elevationVisible, opts: {
-        				color: 0xfffbeb,
-        				radiusBoost: 0.003,
-        				lineWidth: 4,
-        				resolution,
-        			} })
-		mapSelectedProvinceBorder = buildSelectedProvinceBorderMap({ world: currentWorld, province: selectedProvince, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, viewMode: currentViewMode, opts: {
-        				color: 0xfffbeb,
-        				zBoost: 0.004,
-        				lineWidth: 4,
-        				resolution,
-        			} })
+		globeSelectedProvinceBorder = buildSelectedProvinceBorderGlobe({
+			world: currentWorld,
+			province: selectedProvince,
+			viewMode: currentViewMode,
+			elevationVisible,
+			opts: {
+				color: 0xfffbeb,
+				radiusBoost: 0.003,
+				lineWidth: 4,
+				resolution,
+			},
+		})
+		mapSelectedProvinceBorder = buildSelectedProvinceBorderMap({
+			world: currentWorld,
+			province: selectedProvince,
+			centerLongitudeDeg: currentMapCenterLongitudeDeg,
+			projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+			viewMode: currentViewMode,
+			opts: {
+				color: 0xfffbeb,
+				zBoost: 0.004,
+				lineWidth: 4,
+				resolution,
+			},
+		})
 		if (globeSelectedProvinceBorder) globeGroup.add(globeSelectedProvinceBorder)
 		if (mapSelectedProvinceBorder) {
 			addMapSlideClones(mapSelectedProvinceBorder)
@@ -2851,7 +2945,13 @@ export function createGenesisScene(
 			globeGroup.add(terrainWireframe)
 		}
 		if (wireframeVisible && currentWorld) {
-			mapWireframe = buildMapWireframe({ world: currentWorld, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, wireframeVisible, viewMode: currentViewMode })
+			mapWireframe = buildMapWireframe({
+				world: currentWorld,
+				centerLongitudeDeg: currentMapCenterLongitudeDeg,
+				projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+				wireframeVisible,
+				viewMode: currentViewMode,
+			})
 			addMapSlideClones(mapWireframe)
 			scene.add(mapWireframe)
 		}
@@ -3579,7 +3679,13 @@ export function createGenesisScene(
 			? target === "province"
 				? provinceRealId === undefined
 					? []
-					: collectEu4ProvinceBorderMapPositions({ geometry: cachedEu4BorderGeometry!, provinceRealId, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, z: 0.007 })
+					: collectEu4ProvinceBorderMapPositions({
+							geometry: cachedEu4BorderGeometry!,
+							provinceRealId,
+							centerLongitudeDeg: currentMapCenterLongitudeDeg,
+							projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+							z: 0.007,
+						})
 				: (() => {
 						const worldForBorders = getWorldForBorders()
 						const nation = worldForBorders?.nations?.assignment[province]
@@ -3588,17 +3694,36 @@ export function createGenesisScene(
 							? buildRealIdToNation(worldForBorders)
 							: null
 						return realIdToNation
-							? collectEu4NationBorderMapPositions({ geometry: cachedEu4BorderGeometry!, realIdToNation, nation, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, z: 0.001 })
+							? collectEu4NationBorderMapPositions({
+									geometry: cachedEu4BorderGeometry!,
+									realIdToNation,
+									nation,
+									centerLongitudeDeg: currentMapCenterLongitudeDeg,
+									projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+									z: 0.001,
+								})
 							: []
 					})()
 			: target === "province"
-				? collectProvinceBorderMapPositions({ world: currentWorld, province, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, zBoost: 0.004 })
+				? collectProvinceBorderMapPositions({
+						world: currentWorld,
+						province,
+						centerLongitudeDeg: currentMapCenterLongitudeDeg,
+						projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+						zBoost: 0.004,
+					})
 				: (() => {
 						if (!currentWorld.nations) return []
 						const nation = currentWorld.nations.assignment[province]
 						return nation < 0
 							? []
-							: collectNationBorderMapPositions({ world: currentWorld, nation, centerLongitudeDeg: currentMapCenterLongitudeDeg, projectionLatitudeDeg: currentMapProjectionLatitudeDeg, zBoost: 0.001 })
+							: collectNationBorderMapPositions({
+									world: currentWorld,
+									nation,
+									centerLongitudeDeg: currentMapCenterLongitudeDeg,
+									projectionLatitudeDeg: currentMapProjectionLatitudeDeg,
+									zBoost: 0.001,
+								})
 					})()
 		pulseGlobe = makeThickPulseLine(globePositions, lineWidth)
 		pulseMap = makeThickPulseLine(mapPositions, lineWidth)

@@ -1,8 +1,8 @@
-import type { GenesisParams, GenesisProvinces } from ".."
-import type { GenesisLandmarks } from "../terrain"
-import type { SimplexNoise } from "../shared"
-import type { GenesisNationHierarchy } from "../types"
-import { CULTURE_GENDER_SYSTEM } from "./gender-system"
+import type { GenesisParams, GenesisProvinces } from "@/model"
+import type { GenesisLandmarks } from "@/model/terrain"
+import type { SimplexNoise } from "@/model/shared"
+import type { GenesisNationHierarchy } from "@/model/types"
+import { GENDER_SYSTEM } from "@/model/society/gender-system"
 
 export interface ClaimProvinceDynamicParams {
 	nation: number
@@ -242,7 +242,7 @@ export type GovernmentFamily =
 	| "colonial"
 
 export type CultureGenderSystem =
-	(typeof CULTURE_GENDER_SYSTEM)[keyof typeof CULTURE_GENDER_SYSTEM]
+	(typeof GENDER_SYSTEM.cultureGenderSystem)[keyof typeof GENDER_SYSTEM.cultureGenderSystem]
 
 export type LeaderGender = "male" | "female"
 

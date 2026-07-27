@@ -1,17 +1,13 @@
-﻿import type { GenesisParams, SphereMesh, StageTiming } from ".."
-import { computeSettlementAnchors } from "../settlements"
-import {
-	assignReligionTypes,
-	buildReligionColors,
-	computeCultures,
-	computeHeritages,
-	computeNations,
-	computeReligions,
-	deriveChildColors,
-	getEraConfig,
-} from "../society"
-import { assignLandmarkIdentity, type GenesisLandmarks } from "../terrain"
-import { runPostElevationPipeline } from "./post-elevation"
+﻿import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
+import { computeSettlementAnchors } from "@/model/settlements"
+import { assignLandmarkIdentity, type GenesisLandmarks } from "@/model/terrain"
+import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
+import { CULTURE } from "@/model/society/culture"
+import { ERAS } from "@/model/society/eras"
+import { HERITAGE } from "@/model/society/heritage"
+import { NATIONS } from "@/model/society/nations"
+import { RELIGION } from "@/model/society/religion"
+import { SHARED } from "@/model/society/shared"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
@@ -32,10 +28,10 @@ interface DeriveProvinceSocietyInput {
 }
 
 interface DerivedProvinceSociety {
-	nations: ReturnType<typeof computeNations> | undefined
-	cultures: ReturnType<typeof computeCultures> | undefined
-	heritages: ReturnType<typeof computeHeritages> | undefined
-	religions: ReturnType<typeof computeReligions> | undefined
+	nations: ReturnType<typeof NATIONS.computeNations> | undefined
+	cultures: ReturnType<typeof CULTURE.computeCultures> | undefined
+	heritages: ReturnType<typeof HERITAGE.computeHeritages> | undefined
+	religions: ReturnType<typeof RELIGION.computeReligions> | undefined
 	religionTypes: Uint8Array | undefined
 	landmarks: GenesisLandmarks
 	settlementRegions: Int32Array
@@ -58,13 +54,13 @@ export function deriveProvinceSociety({
 		return result
 	}
 
-	let cultures: ReturnType<typeof computeCultures> | undefined
-	let heritages: ReturnType<typeof computeHeritages> | undefined
-	let religions: ReturnType<typeof computeReligions> | undefined
+	let cultures: ReturnType<typeof CULTURE.computeCultures> | undefined
+	let heritages: ReturnType<typeof HERITAGE.computeHeritages> | undefined
+	let religions: ReturnType<typeof RELIGION.computeReligions> | undefined
 	let religionTypes: Uint8Array | undefined
-	let nations: ReturnType<typeof computeNations> | undefined
+	let nations: ReturnType<typeof NATIONS.computeNations> | undefined
 
-	const eraConfig = getEraConfig(params.era)
+	const eraConfig = ERAS.getEraConfig(params.era)
 
 	// Pre-computed masks arrive from post-elevation where migration.migrationWave
 	// is guaranteed. undefined means "all non-desolate provinces qualify".
@@ -102,7 +98,7 @@ export function deriveProvinceSociety({
 			const isEarthImportRaster = !!post.provinces.realIds
 			if (eraConfig.hasNations && !isEarthImportRaster) {
 				nations = record("nations", () =>
-					computeNations({
+					NATIONS.computeNations({
 						provinces: post.provinces,
 						coastal: post.coastal,
 						riverVisible: post.rivers.visible,
@@ -134,10 +130,20 @@ export function deriveProvinceSociety({
 					}
 					return m
 				})()
-			cultures = computeCultures(post.provinces!, params.seed, settledMask)
-			heritages = computeHeritages(cultures!, params.seed)
-			religions = computeReligions(cultures!, params.seed)
-			religionTypes = assignReligionTypes({
+			cultures = CULTURE.computeCultures({
+				provinces: post.provinces!,
+				seed: params.seed,
+				settledMask,
+			})
+			heritages = HERITAGE.computeHeritages({
+				cultures: cultures!,
+				seed: params.seed,
+			})
+			religions = RELIGION.computeReligions({
+				cultures: cultures!,
+				seed: params.seed,
+			})
+			religionTypes = RELIGION.assignReligionTypes({
 				religionCount: religions!.count,
 				cultureToReligion: religions!.assignment,
 				cultureCount: cultures!.count,
@@ -148,11 +154,11 @@ export function deriveProvinceSociety({
 				sizeWeight: eraConfig.governmentSizeWeight ?? 0.55,
 				seed: params.seed,
 			})
-			religions!.colors = buildReligionColors({
+			religions!.colors = RELIGION.buildReligionColors({
 				religionCount: religions!.count,
 				religionTypes,
 			})
-			cultures!.colors = deriveChildColors({
+			cultures!.colors = SHARED.deriveChildColors({
 				childCount: cultures!.count,
 				childToParent: heritages!.assignment,
 				parentColors: heritages!.colors,

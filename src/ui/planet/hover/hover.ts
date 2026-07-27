@@ -13,22 +13,22 @@ import {
 	relativeHumidityFromTempRange,
 } from "@/model/climate"
 import { TRADE_GOOD_LABELS } from "@/model/economy"
-import { regionTimezoneLabel } from "@/model/society"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	EU5_CLIMATE_CATEGORIES,
 	EU5_TOPOGRAPHY_CATEGORIES,
 	EU5_VEGETATION_CATEGORIES,
-} from "../colors"
-import type { DataVariant } from "../screen/shared/data-variant"
+} from "@/ui/planet/colors"
+import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 import type {
 	GetHoverRainfallSeriesFromArraysParams,
 	GetHoverDtrSeriesParams,
 	GetHoverMonthlySeriesParams,
 	GetHoverMiseryParams,
 	GetHoverClimateDisplayParams,
-} from "./types"
+} from "@/ui/planet/hover/types"
+import { TIMEZONE } from "@/model/society/timezone"
 
 export interface HoverInfo {
 	region: number
@@ -175,7 +175,7 @@ export function getHoverTimezone(
 	// Reuse the colorer's band resolution so the hovered offset always matches
 	// the stripe under the cursor: land follows its province/nation, water
 	// follows the region's own longitude.
-	return regionTimezoneLabel(world, hoverInfo.region)
+	return TIMEZONE.regionTimezoneLabel({ world, region: hoverInfo.region })
 }
 
 export function getHoverTemperatureDelta(

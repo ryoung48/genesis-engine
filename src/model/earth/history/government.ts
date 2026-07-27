@@ -1,6 +1,6 @@
-﻿import type { GovernmentType } from "@/model/society"
-import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
-import type { BlendRgbParams } from "./types"
+﻿import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
+import type { BlendRgbParams } from "@/model/earth/history/types"
+import type { GovernmentType } from "@/model/society/types"
 
 type EarthHistoryGovernmentFamily =
 	| "tribal"

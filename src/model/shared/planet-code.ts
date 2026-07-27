@@ -7,11 +7,12 @@ import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/types"
-import { DEFAULT_ERA, ERA_ORDER, type SocietyEra } from "@/model/society"
-import type { GenesisParams } from ".."
-import type { TideLock } from "../celestial/orbit-body/types"
-import { SEED_MAX } from "./seeds"
-import { SLIDER_RANGES } from "./slider-ranges"
+import type { GenesisParams } from "@/model"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
+import { SEED_MAX } from "@/model/shared/seeds"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import { SocietyEra } from "@/model/society/types"
+import { ERAS } from "@/model/society/eras"
 
 const DEFAULT_PRESSURE = 1.0
 const PLANET_CODE_PART_SEPARATOR = "."
@@ -199,10 +200,10 @@ const FIELD_SPECS: FieldSpec[] = [
 		name: "era",
 		min: 0,
 		step: 1,
-		count: ERA_ORDER.length,
+		count: ERAS.eraOrder.length,
 		read: (p) => {
-			const era = p.era ?? DEFAULT_ERA
-			const idx = ERA_ORDER.indexOf(era)
+			const era = p.era ?? ERAS.defaultEra
+			const idx = ERAS.eraOrder.indexOf(era)
 			return idx >= 0 ? idx : 0
 		},
 	},
@@ -390,7 +391,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		volcanism: decodedFields.volcanism,
 		craters: craters > 0 ? craters : undefined,
 		maxElevation: decodedFields.maxElevation,
-		era: ERA_ORDER[eraIdx] ?? DEFAULT_ERA,
+		era: ERAS.eraOrder[eraIdx] ?? ERAS.defaultEra,
 		restSeed: decodedFields.restSeed ?? 0,
 	}
 }

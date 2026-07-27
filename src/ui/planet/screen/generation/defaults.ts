@@ -3,7 +3,7 @@
 	DEFAULT_STAR_SUBTYPE,
 } from "@/model/celestial/star"
 import { SYSTEM } from "@/model/celestial/system"
-import { DEFAULT_ERA } from "@/model/society"
+import { ERAS } from "@/model/society/eras"
 
 export const PLANET_SEED_STORAGE_KEY = "genesis:lastPlanetSeed"
 export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"
@@ -38,5 +38,5 @@ export const DEFAULT_WORLD_PARAMS = {
 	pressure: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.pressureBar,
 	substellarLon: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.substellarLon,
 	perihelion: SYSTEM.SOL_MAIN_WORLD_DEFAULTS.perihelion,
-	era: DEFAULT_ERA,
+	era: ERAS.defaultEra,
 } as const

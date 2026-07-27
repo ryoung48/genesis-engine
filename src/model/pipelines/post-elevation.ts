@@ -20,12 +20,12 @@ import type {
 	GenesisWorld,
 	SphereMesh,
 	StageTiming,
-} from ".."
-import { MOON } from "../celestial/moons"
-import { SOLAR_MASS_KG } from "../celestial/orbit-body"
-import { DEFAULT_SPECTRAL_CLASS, STAR } from "../celestial/star"
-import type { MainSequenceClass } from "../celestial/star/types"
-import type { PastaDebug } from "../climate"
+} from "@/model"
+import { MOON } from "@/model/celestial/moons"
+import { SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
+import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { PastaDebug } from "@/model/climate"
 import {
 	applyCurrentTemperatureEffect,
 	applyDtrToClimateMinMax,
@@ -54,23 +54,15 @@ import {
 	computeTornadoRisk,
 	fillPetMonthlyHargreaves,
 	refreshClimatePetMonthly,
-} from "../climate"
-import type { TidalSchedule } from "../climate/tidal-schedule"
-import { computeTradeGoods, type LocationTradeGoods } from "../economy"
+} from "@/model/climate"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule"
+import { computeTradeGoods, type LocationTradeGoods } from "@/model/economy"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
 	makeRng,
-} from "../shared"
-import type { ProvincePopulation } from "../society"
-import {
-	computeMigration,
-	computePopulation,
-	computeProvinceHabitability,
-	getEraConfig,
-	wavePercentileThreshold,
-} from "../society"
-import type { GenesisLandmarks } from "../terrain"
+} from "@/model/shared"
+import type { GenesisLandmarks } from "@/model/terrain"
 import {
 	classifyTopography,
 	computeHazards,
@@ -83,7 +75,10 @@ import {
 	computeWeightedProvinces,
 	LANDMARK_TYPE_LAKE,
 	LANDMARK_TYPE_OCEAN,
-} from "../terrain"
+} from "@/model/terrain"
+import type { ProvincePopulation } from "@/model/society/types"
+import { ERAS } from "@/model/society/eras"
+import { POPULATION } from "@/model/society/population"
 
 /**
  * Real (non-procedural) river network for the Earth-import path, already
@@ -504,11 +499,28 @@ export function runPostElevationPipeline(
 		}
 		record("Post: rivers (real)", t0)
 	} else {
-		rivers = computeRivers({ mesh, elevation, rainfall, climate, hydrology, isLand: riverLand, params })
+		rivers = computeRivers({
+			mesh,
+			elevation,
+			rainfall,
+			climate,
+			hydrology,
+			isLand: riverLand,
+			params,
+		})
 		record("Post: rivers", t0)
 
 		t0 = performance.now()
-		computeLakes({ mesh, elevation, rainfall, waterLevel: rivers.waterLevel, basinId: rivers.basinId, isLand, emergedLand, elevationKm: elevation_km })
+		computeLakes({
+			mesh,
+			elevation,
+			rainfall,
+			waterLevel: rivers.waterLevel,
+			basinId: rivers.basinId,
+			isLand,
+			emergedLand,
+			elevationKm: elevation_km,
+		})
 		record("Post: lakes", t0)
 	}
 	onProgress?.("Post: rivers", 62)
@@ -818,7 +830,14 @@ export function runPostElevationPipeline(
 
 	// ── Hazards ────────────────────────────────────────────────────────
 	t0 = performance.now()
-	const hazards = computeHazards({ mesh, boundary, distFields, elevationKm: elevation_km, isLand, hotspot: r_hotspot })
+	const hazards = computeHazards({
+		mesh,
+		boundary,
+		distFields,
+		elevationKm: elevation_km,
+		isLand,
+		hotspot: r_hotspot,
+	})
 	record("Post: hazards", t0)
 	onProgress?.("Post: hazards", 70)
 
@@ -858,10 +877,32 @@ export function runPostElevationPipeline(
 		planetRadiusKm: params.planetRadiusKm,
 	}
 	const provinces: GenesisProvinces = eu4ProvinceIds
-		? computeProvincesFromRaster({ mesh, isLand, regionIds: eu4ProvinceIds, seed: params.seed, options: provinceOptions, fallbackSeeds: eu4ProvinceFallbackSeeds })
+		? computeProvincesFromRaster({
+				mesh,
+				isLand,
+				regionIds: eu4ProvinceIds,
+				seed: params.seed,
+				options: provinceOptions,
+				fallbackSeeds: eu4ProvinceFallbackSeeds,
+			})
 		: realProvinceSeeds && realProvinceSeeds.regions.length > 0
-			? computeWeightedProvinces({ mesh, isLand, _topography: topography, seedRegions: realProvinceSeeds.regions, seedNames: realProvinceSeeds.names, seed: params.seed, options: provinceOptions, seedWeights: realProvinceSeeds.weights })
-			: computeProvinces({ mesh, isLand, topography, seed: params.seed, options: provinceOptions })
+			? computeWeightedProvinces({
+					mesh,
+					isLand,
+					_topography: topography,
+					seedRegions: realProvinceSeeds.regions,
+					seedNames: realProvinceSeeds.names,
+					seed: params.seed,
+					options: provinceOptions,
+					seedWeights: realProvinceSeeds.weights,
+				})
+			: computeProvinces({
+					mesh,
+					isLand,
+					topography,
+					seed: params.seed,
+					options: provinceOptions,
+				})
 	record("Post: provinces", t0)
 	onProgress?.("Post: provinces", 72)
 
@@ -882,14 +923,24 @@ export function runPostElevationPipeline(
 	// from any cradle can be marked desolate, which in turn zeroes their
 	// population and habitability in the population pass below.
 	t0 = performance.now()
-	const rawHabitability = computeProvinceHabitability({ provinces, _landmarks: landmarks, climateZones, vegetation, topography, oceanCoastal, lakeCoastal, riverVisible: rivers.visible, seed: params.seed })
-	const migration = computeMigration(
+	const rawHabitability = POPULATION.computeProvinceHabitability({
 		provinces,
-		rawHabitability,
+		_landmarks: landmarks,
+		climateZones,
+		vegetation,
+		topography,
+		oceanCoastal,
+		lakeCoastal,
+		riverVisible: rivers.visible,
+		seed: params.seed,
+	})
+	const migration = POPULATION.computeMigration({
+		provinces,
+		habitability: rawHabitability,
 		mesh,
-		params.planetRadiusKm,
-		N,
-	)
+		planetRadiusKm: params.planetRadiusKm,
+		numRegions: N,
+	})
 	// Mark provinces unreachable from any cradle as desolate so they are
 	// excluded from the population pass.
 	for (let p = 0; p < provinces.count; p++) {
@@ -900,22 +951,22 @@ export function runPostElevationPipeline(
 
 	// ── Population ─────────────────────────────────────────────────────
 	t0 = performance.now()
-	const eraConfig = getEraConfig(params.era)
+	const eraConfig = ERAS.getEraConfig(params.era)
 
 	// Percentile-based wave thresholds computed here where migrationWave is
 	// guaranteed. Both are passed through to derive-province-society.
-	const actualSettlementWave = wavePercentileThreshold(
-		migration.migrationWave,
-		provinces.desolate,
-		eraConfig.settlementFraction,
-	)
+	const actualSettlementWave = ERAS.wavePercentileThreshold({
+		migrationWave: migration.migrationWave,
+		desolate: provinces.desolate,
+		fraction: eraConfig.settlementFraction,
+	})
 	const statehoodOverallFraction =
 		eraConfig.settlementFraction * eraConfig.statehoodFraction
-	const actualStatehoodWave = wavePercentileThreshold(
-		migration.migrationWave,
-		provinces.desolate,
-		statehoodOverallFraction,
-	)
+	const actualStatehoodWave = ERAS.wavePercentileThreshold({
+		migrationWave: migration.migrationWave,
+		desolate: provinces.desolate,
+		fraction: statehoodOverallFraction,
+	})
 
 	// Build per-province era masks using migration.migrationWave directly.
 	// settledMask: provinces within the settlement percentile (get cultures/pop)
@@ -945,7 +996,23 @@ export function runPostElevationPipeline(
 		}
 	}
 
-	const population: ProvincePopulation = computePopulation({ provinces, landmarks, climateZones, vegetation, topography, oceanCoastal, lakeCoastal, riverVisible: rivers.visible, seed: params.seed, planetRadiusKm: params.planetRadiusKm, numRegions: N, eraTargetPopulation: eraConfig.targetPopulation, migrationWave: migration.migrationWave, settlementWave: actualSettlementWave, migrationFalloff: eraConfig.migrationFalloff })
+	const population: ProvincePopulation = POPULATION.computePopulation({
+		provinces,
+		landmarks,
+		climateZones,
+		vegetation,
+		topography,
+		oceanCoastal,
+		lakeCoastal,
+		riverVisible: rivers.visible,
+		seed: params.seed,
+		planetRadiusKm: params.planetRadiusKm,
+		numRegions: N,
+		eraTargetPopulation: eraConfig.targetPopulation,
+		migrationWave: migration.migrationWave,
+		settlementWave: actualSettlementWave,
+		migrationFalloff: eraConfig.migrationFalloff,
+	})
 	population.migrationWave = migration.migrationWave
 	population.cradleProvinces = migration.cradleProvinces
 	record("Post: population", t0)

@@ -12,17 +12,16 @@ import type {
 	SphereMesh,
 	StageTiming,
 	TectonicPlate,
-} from ".."
-import { computeRoutes } from "../economy"
-import { buildSphereMesh } from "../mesh"
+} from "@/model"
+import { computeRoutes } from "@/model/economy"
+import { buildSphereMesh } from "@/model/mesh"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
 	countContinents,
 	createRng,
 	getMaxOceanDepthKm,
-} from "../shared"
-import { computeUrbanization } from "../society"
+} from "@/model/shared"
 import {
 	buildSuperPlates,
 	classifyBoundaries,
@@ -31,7 +30,7 @@ import {
 	projectCoarsePlates,
 	projectMantleFieldToRegions,
 	smoothAndReconnectPlates,
-} from "../tectonics"
+} from "@/model/tectonics"
 import {
 	applyCraters,
 	applyHotspots,
@@ -43,9 +42,10 @@ import {
 	sharpenRidges,
 	smoothElevation,
 	warpTerrain,
-} from "../terrain"
-import { deriveProvinceSociety } from "./derive-province-society"
-import { runPostElevationPipeline } from "./post-elevation"
+} from "@/model/terrain"
+import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
+import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
+import { URBANIZATION } from "@/model/society/urbanization"
 
 type ProgressFn = (label: string, pct?: number) => void
 
@@ -130,7 +130,14 @@ function runActivePath(
 		)
 	}
 
-	const coarseMantleField = computeMantleField({ plateVec: coarse.coarsePlateVec, plateSeeds: coarse.coarsePlateSeeds, plateIsOcean: coarse.coarsePlateIsOcean, r_plate: coarse.coarse_r_plate, mesh: coarse.coarseMesh, seed: params.seed })
+	const coarseMantleField = computeMantleField({
+		plateVec: coarse.coarsePlateVec,
+		plateSeeds: coarse.coarsePlateSeeds,
+		plateIsOcean: coarse.coarsePlateIsOcean,
+		r_plate: coarse.coarse_r_plate,
+		mesh: coarse.coarseMesh,
+		seed: params.seed,
+	})
 	const r_mantleUpwelling = projectMantleFieldToRegions(
 		coarseMantleField,
 		coarse.coarseMesh,
@@ -141,7 +148,14 @@ function runActivePath(
 	let superPlateData = null
 	if (params.numPlates >= 8) {
 		superPlateData = withTiming("super-plates", pipelineTiming, () =>
-			buildSuperPlates({ mesh, r_plate, plateSeeds: plateIds, plateVec: coarse.coarsePlateVec, plateIsOcean: coarse.coarsePlateIsOcean, plateDensity }),
+			buildSuperPlates({
+				mesh,
+				r_plate,
+				plateSeeds: plateIds,
+				plateVec: coarse.coarsePlateVec,
+				plateIsOcean: coarse.coarsePlateIsOcean,
+				plateDensity,
+			}),
 		)
 		onProgress?.("super-plates", 12)
 	}
@@ -165,7 +179,13 @@ function runActivePath(
 
 	// 8. Distance fields
 	const distFields = withTiming("distance-fields", pipelineTiming, () =>
-		computeDistanceFields({ mesh, r_plate, plateIsOcean: coarse.coarsePlateIsOcean, boundary, seed: params.seed }),
+		computeDistanceFields({
+			mesh,
+			r_plate,
+			plateIsOcean: coarse.coarsePlateIsOcean,
+			boundary,
+			seed: params.seed,
+		}),
 	)
 	onProgress?.("distance-fields", 16)
 
@@ -191,7 +211,16 @@ function runActivePath(
 	const r_hotspot = withTiming("hotspots", pipelineTiming, () =>
 		volcanism <= 0
 			? new Float32Array(mesh.numRegions)
-			: applyHotspots({ mesh, plates, plateAssignment, elevation, mantleUpwelling: r_mantleUpwelling, terrainFeatures, seed: params.seed, volcanism }),
+			: applyHotspots({
+					mesh,
+					plates,
+					plateAssignment,
+					elevation,
+					mantleUpwelling: r_mantleUpwelling,
+					terrainFeatures,
+					seed: params.seed,
+					volcanism,
+				}),
 	)
 	clampHotspots(r_hotspot)
 	onProgress?.("hotspots", 29)
@@ -254,7 +283,13 @@ export function generateGenesisWorld(
 	// 3. Project coarse plates → hi-res mesh with FBM noise perturbation
 	onProgress?.("project", 11)
 	const r_plate = withTiming("project", pipelineTiming, () =>
-		projectCoarsePlates({ mesh, coarseMesh: coarse.coarseMesh, coarse_r_plate: coarse.coarse_r_plate, seed: params.seed, numPlates: params.numPlates }),
+		projectCoarsePlates({
+			mesh,
+			coarseMesh: coarse.coarseMesh,
+			coarse_r_plate: coarse.coarse_r_plate,
+			seed: params.seed,
+			numPlates: params.numPlates,
+		}),
 	)
 
 	// 4. Smooth projected boundaries + reconnect fragments
@@ -316,7 +351,13 @@ export function generateGenesisWorld(
 		// Terrain warp — first, before ocean detection or smoothing
 		if (params.terrainWarp > 0) {
 			const postStageStart = performance.now()
-			warpTerrain({ mesh, elev: elevation, seed: params.seed, strength: params.terrainWarp, r_hotspot })
+			warpTerrain({
+				mesh,
+				elev: elevation,
+				seed: params.seed,
+				strength: params.terrainWarp,
+				r_hotspot,
+			})
 			postTiming.push({
 				Stage: `Terrain warp (strength=${params.terrainWarp.toFixed(2)})`,
 				ms: (performance.now() - postStageStart).toFixed(1),
@@ -334,7 +375,13 @@ export function generateGenesisWorld(
 			const smoothIters = Math.round(1 + params.smoothing * 4)
 			const smoothStr = 0.2 + params.smoothing * 0.5
 			const postStageStart = performance.now()
-			smoothElevation({ mesh, elev: elevation, r_isOcean: ocean, iterations: smoothIters, strength: smoothStr })
+			smoothElevation({
+				mesh,
+				elev: elevation,
+				r_isOcean: ocean,
+				iterations: smoothIters,
+				strength: smoothStr,
+			})
 			postTiming.push({
 				Stage: `Smoothing (${smoothIters} iters, str=${smoothStr.toFixed(2)})`,
 				ms: (performance.now() - postStageStart).toFixed(1),
@@ -379,7 +426,13 @@ export function generateGenesisWorld(
 			const rsIters = Math.round(1 + params.ridgeSharpening * 3)
 			const rsStr = params.ridgeSharpening * 0.08
 			const postStageStart = performance.now()
-			sharpenRidges({ mesh, elev: elevation, r_isOcean: ocean, iterations: rsIters, strength: rsStr })
+			sharpenRidges({
+				mesh,
+				elev: elevation,
+				r_isOcean: ocean,
+				iterations: rsIters,
+				strength: rsStr,
+			})
 			postTiming.push({
 				Stage: `Ridge sharpening (${rsIters} iters)`,
 				ms: (performance.now() - postStageStart).toFixed(1),
@@ -388,7 +441,13 @@ export function generateGenesisWorld(
 
 		// Always-on soil creep
 		const postStageStart = performance.now()
-		applySoilCreep({ mesh, elev: elevation, r_isOcean: ocean, iterations: 3, strength: 0.1125 })
+		applySoilCreep({
+			mesh,
+			elev: elevation,
+			r_isOcean: ocean,
+			iterations: 3,
+			strength: 0.1125,
+		})
 		postTiming.push({
 			Stage: "Soil creep (3 iters)",
 			ms: (performance.now() - postStageStart).toFixed(1),
@@ -580,7 +639,7 @@ export function generateGenesisWorld(
 	// of geography, hierarchy and settlement size, so they run here instead.
 	const infrastructureTiming: StageTiming[] = []
 	const urbanization = withTiming("urbanization", infrastructureTiming, () =>
-		computeUrbanization({
+		URBANIZATION.computeUrbanization({
 			params,
 			provinces: post.provinces,
 			nations: provinceSociety.nations,

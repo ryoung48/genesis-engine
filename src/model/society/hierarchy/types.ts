@@ -16,3 +16,20 @@ export interface PartitionMembersParams {
 	urbanPop?: Float32Array<ArrayBufferLike>
 	waterAccess?: Uint8Array<ArrayBufferLike>
 }
+
+export interface HierarchyProvinceScoreParams {
+	province: number
+	habitability: Float32Array<ArrayBufferLike>
+	urbanPop: Float32Array<ArrayBufferLike>
+	waterAccess: Uint8Array<ArrayBufferLike>
+}
+
+export interface BuildChildrenCSRParams {
+	parent: Int32Array<ArrayBufferLike>
+	provinceCount: number
+}
+
+export interface BuildSovereignParams {
+	parent: Int32Array<ArrayBufferLike>
+	provinceCount: number
+}

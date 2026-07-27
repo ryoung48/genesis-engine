@@ -95,14 +95,6 @@ import {
 	seedStringToNumber,
 	titleCase,
 } from "@/model/shared"
-import {
-	GOVERNMENT_TYPE_LABELS,
-	GOVERNMENT_TYPES
-} from "@/model/society/eras"
-import {
-	RELIGION_TYPE_COLORS,
-	RELIGION_TYPE_NAMES,
-} from "@/model/society/religion"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
 	GenesisWorkerRequest,
@@ -115,28 +107,28 @@ import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { GenerationPanel } from "../wiki/GenerationPanel"
-import { eventInvolvesNation } from "../wiki/nation/event-description"
-import type { NationWikiData } from "../wiki/nation/NationWikiPage"
-import { buildProceduralWikiTimelineEvent } from "../wiki/nation/procedural-timeline-event"
-import type { OrganizationWikiData } from "../wiki/organization/OrganizationWikiPage"
+import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
+import { eventInvolvesNation } from "@/ui/wiki/nation/event-description"
+import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
+import { buildProceduralWikiTimelineEvent } from "@/ui/wiki/nation/procedural-timeline-event"
+import type { OrganizationWikiData } from "@/ui/wiki/organization/OrganizationWikiPage"
 import type {
 	WikiTimelineEvent as NationTimelineEvent,
 	WikiCountHistoryPoint,
-} from "../wiki/shared/WikiTimeline"
+} from "@/ui/wiki/shared/WikiTimeline"
 import {
 	buildDistributionForRegions,
 	buildEu5TopographyDistribution,
 	buildStringIdDistributionForProvinces,
-} from "../wiki/stats/nation/nation-distributions"
-import { buildNationWikiStats } from "../wiki/stats/nation/nation-stats"
-import { updateBodyDiameter } from "../wiki/stats/orbit/body-mutations"
-import { buildPressureAtmosphereProfile } from "../wiki/stats/orbit/formatters"
-import { resolveBodyTideLockSiderealDayHours } from "../wiki/stats/orbit/tide-lock-stats"
-import { buildOrganizationWikiStats } from "../wiki/stats/organization/organization-stats"
-import type { WarWikiData } from "../wiki/war/WarWikiPage"
-import { scaleClockDialHourToDayLength } from "./clock"
-import type { ColorMode } from "./colors"
+} from "@/ui/wiki/stats/nation/nation-distributions"
+import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
+import { updateBodyDiameter } from "@/ui/wiki/stats/orbit/body-mutations"
+import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters"
+import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
+import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organization-stats"
+import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
+import { scaleClockDialHourToDayLength } from "@/ui/planet/clock"
+import type { ColorMode } from "@/ui/planet/colors"
 import {
 	climateZoneColor,
 	EU5_CLIMATE_CATEGORIES,
@@ -147,9 +139,9 @@ import {
 	OCEAN_LIGHT_BLUE,
 	vegetationColor,
 	windSpeedColor,
-} from "./colors"
-import { EarthHistoryBookmarks } from "./controls/EarthHistoryBookmarks"
-import { ModeBar } from "./controls/ModeBar"
+} from "@/ui/planet/colors"
+import { EarthHistoryBookmarks } from "@/ui/planet/controls/EarthHistoryBookmarks"
+import { ModeBar } from "@/ui/planet/controls/ModeBar"
 import {
 	type ClimateSubMode,
 	type ExportWidthPreset,
@@ -158,11 +150,11 @@ import {
 	OverlayControls,
 	type TopographySubMode,
 	type VegetationSubMode,
-} from "./controls/OverlayControls"
-import { SimulationControls } from "./controls/SimulationControls"
-import type { DistributionBucket } from "./details/shared"
-import { useEarthHistoryTimeline } from "./hooks/useEarthHistoryTimeline"
-import { findEu4ProvinceForLonLat } from "./hover/eu4-hover-province"
+} from "@/ui/planet/controls/OverlayControls"
+import { SimulationControls } from "@/ui/planet/controls/SimulationControls"
+import type { DistributionBucket } from "@/ui/planet/details/shared"
+import { useEarthHistoryTimeline } from "@/ui/planet/hooks/useEarthHistoryTimeline"
+import { findEu4ProvinceForLonLat } from "@/ui/planet/hover/eu4-hover-province"
 import {
 	getHoverBiome,
 	getHoverClimateDisplay,
@@ -202,89 +194,89 @@ import {
 	getHoverTopography,
 	type HoverInfo,
 	type HoverMisery,
-} from "./hover/hover"
-import { InfoPanel } from "./hover/InfoPanel"
-import { canHandlePlanetClick } from "./measurement-click"
-import { OceanCurrentParticleCanvas } from "./OceanCurrentParticleCanvas"
+} from "@/ui/planet/hover/hover"
+import { InfoPanel } from "@/ui/planet/hover/InfoPanel"
+import { canHandlePlanetClick } from "@/ui/planet/measurement-click"
+import { OceanCurrentParticleCanvas } from "@/ui/planet/OceanCurrentParticleCanvas"
 import {
 	createGenesisScene,
 	type GenesisScene,
 	type GenesisViewMode,
 	type OrgHighlightSpec,
-} from "./renderer"
+} from "@/ui/planet/renderer"
 import {
 	buildDisplayNationModel,
 	buildDisplayWorld,
 	buildNationAdjacency,
-} from "./screen/display/display-model"
-import { createDisplayNames } from "./screen/display/display-names"
+} from "@/ui/planet/screen/display/display-model"
+import { createDisplayNames } from "@/ui/planet/screen/display/display-names"
 import {
 	computeEarthHistoryOccupationOverlay,
 	computeEarthHistoryRegionColors,
 	computeOrgStripeOverlay,
-} from "./screen/display/earth-history-region-colors"
+} from "@/ui/planet/screen/display/earth-history-region-colors"
 import {
 	buildCultureLabelNames,
 	buildHeritageLabelNames,
 	buildNationDynastyLabelNames,
 	buildNationLabelNames,
 	buildSettlementLabelNames,
-} from "./screen/display/label-names"
+} from "@/ui/planet/screen/display/label-names"
 import {
 	buildNationSizeDistribution,
 	buildSelectedNationDetails,
-} from "./screen/display/nation-details-model"
-import { computePlanetStats } from "./screen/display/planet-stats"
+} from "@/ui/planet/screen/display/nation-details-model"
+import { computePlanetStats } from "@/ui/planet/screen/display/planet-stats"
 import {
 	computeRegionColors,
 	getTopographyColor,
-} from "./screen/display/region-colors"
+} from "@/ui/planet/screen/display/region-colors"
 import {
 	DEFAULT_WORLD_PARAMS,
 	GENERATION_SESSION_STORAGE_KEY,
 	PLANET_SEED_STORAGE_KEY,
 	VIEW_PREFS_STORAGE_KEY,
-} from "./screen/generation/defaults"
+} from "@/ui/planet/screen/generation/defaults"
 import {
 	type GenerationCallbacks,
 	type GenerationParams,
 	generateWorld,
 	importHeightmap,
 	loadImageAsGrayscale,
-} from "./screen/generation/generation"
+} from "@/ui/planet/screen/generation/generation"
 import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
-} from "./screen/generation/generation-preview"
+} from "@/ui/planet/screen/generation/generation-preview"
 import {
 	loadGenerationSessionSnapshot,
 	loadGenerationSessionSnapshotSync,
 	saveGenerationSessionSnapshot,
-} from "./screen/generation/session-persistence"
+} from "@/ui/planet/screen/generation/session-persistence"
 import {
 	buildPlanetSliders,
 	buildTerrainSliders,
 	resetWorldDefaults,
-} from "./screen/generation/sliders"
+} from "@/ui/planet/screen/generation/sliders"
 import {
 	DEFAULT_VIEW_PREFS,
 	parseStoredViewPrefs,
 	serializeStoredViewPrefs,
-} from "./screen/generation/view-prefs"
+} from "@/ui/planet/screen/generation/view-prefs"
 import {
 	historyTimeToMonth,
 	historyYearToTime,
-} from "./screen/history/history-time"
+} from "@/ui/planet/screen/history/history-time"
 import {
 	applyDataVariant,
 	type DataVariant,
 	getBaseMapMode,
 	getDataVariant,
-} from "./screen/shared/data-variant"
+} from "@/ui/planet/screen/shared/data-variant"
 import type {
 	NationMapMode,
 	PopulationMapMode,
-} from "./screen/shared/map-modes"
+} from "@/ui/planet/screen/shared/map-modes"
 import {
 	DEFAULT_GEOGRAPHY_MODE,
 	getMapModePrimary,
@@ -292,15 +284,17 @@ import {
 	isDebugNationMode,
 	normalizeGeographyColorMode,
 	normalizeNationMapMode,
-} from "./screen/shared/map-modes"
+} from "@/ui/planet/screen/shared/map-modes"
 import {
 	formatDistance,
 	rgbToCss,
 	type UnitSystem,
-} from "./screen/shared/ui-format"
-import { SolarSystemControls } from "./solar-system/SolarSystemControls"
-import { WindParticleCanvas } from "./WindParticleCanvas"
-import type { SocietyEra } from "../../model/society/types";
+} from "@/ui/planet/screen/shared/ui-format"
+import { SolarSystemControls } from "@/ui/planet/solar-system/SolarSystemControls"
+import { WindParticleCanvas } from "@/ui/planet/WindParticleCanvas"
+import type { SocietyEra } from "@/model/society/types"
+import { ERAS } from "@/model/society/eras"
+import { RELIGION } from "@/model/society/religion"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -2750,7 +2744,14 @@ export const GenesisView: React.FC = () => {
 		if (iceThickness <= 0 && iceMax <= 0) return null
 		return `${(iceThickness / 1000).toFixed(2)} m (${(iceMin / 1000).toFixed(2)}-${(iceMax / 1000).toFixed(2)})`
 	})()
-	const hoverClimateDisplay = getHoverClimateDisplay({ colorMode, hoverPastaClimate, hoverKoppenClimate, hoverClimateZone, hoverRealPastaClimate, hoverRealKoppenClimate })
+	const hoverClimateDisplay = getHoverClimateDisplay({
+		colorMode,
+		hoverPastaClimate,
+		hoverKoppenClimate,
+		hoverClimateZone,
+		hoverRealPastaClimate,
+		hoverRealKoppenClimate,
+	})
 
 	// Shared wind computation — runs when wind arrows or wind color mode is active
 	const windVectors = useMemo(() => {
@@ -2856,7 +2857,14 @@ export const GenesisView: React.FC = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hoverInfo?.region, monthlyWindReady, hoverInfo])
 
-	const hoverMisery: HoverMisery | null = getHoverMisery({ hoverInfo, world: worldForDisplay, dtrMonth, windSpeedMs: hoverWindSpeed, monthlyWindSpeedMs: hoverWindMonthly?.map((w) => w.speedMs) ?? null, useObserved: colorMode === "realMisery" })
+	const hoverMisery: HoverMisery | null = getHoverMisery({
+		hoverInfo,
+		world: worldForDisplay,
+		dtrMonth,
+		windSpeedMs: hoverWindSpeed,
+		monthlyWindSpeedMs: hoverWindMonthly?.map((w) => w.speedMs) ?? null,
+		useObserved: colorMode === "realMisery",
+	})
 
 	const windStats = useMemo(() => {
 		if (!world?.climate) return null
@@ -3943,7 +3951,7 @@ export const GenesisView: React.FC = () => {
 			"rgb(230, 84, 61)", // 19 trading company
 			"rgb(245, 140, 128)", // 20 settler colony
 		]
-		const counts = new Array(GOVERNMENT_TYPES.length).fill(0)
+		const counts = new Array(ERAS.governmentTypes.length).fill(0)
 		const govType = worldForDisplay?.nations?.governmentType
 		if (govType && nationModel) {
 			for (const nationId of nationModel.counts.keys()) {
@@ -3951,8 +3959,8 @@ export const GenesisView: React.FC = () => {
 				if (t >= 0 && t < counts.length) counts[t]++
 			}
 		}
-		return GOVERNMENT_TYPES.map((key, i) => ({
-			label: GOVERNMENT_TYPE_LABELS[key],
+		return ERAS.governmentTypes.map((key, i) => ({
+			label: ERAS.governmentTypeLabels[key],
 			count: counts[i] ?? 0,
 			color: GOV_COLORS[i] ?? "rgb(148, 163, 184)",
 		}))
@@ -3982,7 +3990,7 @@ export const GenesisView: React.FC = () => {
 		for (const nationId of nationModel.counts.keys()) {
 			nationBuckets.set(
 				nationId,
-				new Array<number>(RELIGION_TYPE_NAMES.length).fill(0),
+				new Array<number>(RELIGION.religionTypeNames.length).fill(0),
 			)
 		}
 
@@ -4001,7 +4009,9 @@ export const GenesisView: React.FC = () => {
 		}
 
 		// Pick the dominant religion type per nation, then count nations by type
-		const typeCounts = new Array<number>(RELIGION_TYPE_NAMES.length).fill(0)
+		const typeCounts = new Array<number>(
+			RELIGION.religionTypeNames.length,
+		).fill(0)
 		for (const buckets of nationBuckets.values()) {
 			let best = -1
 			let bestCount = 0
@@ -4014,14 +4024,16 @@ export const GenesisView: React.FC = () => {
 			if (best >= 0) typeCounts[best]++
 		}
 
-		return RELIGION_TYPE_NAMES.map((label, i) => {
-			const [r, g, b] = RELIGION_TYPE_COLORS[i]!
-			return {
-				label,
-				count: typeCounts[i] ?? 0,
-				color: rgbToCss([r, g, b]),
-			}
-		}).filter((bucket) => bucket.count > 0)
+		return RELIGION.religionTypeNames
+			.map((label, i) => {
+				const [r, g, b] = RELIGION.religionTypeColors[i]!
+				return {
+					label,
+					count: typeCounts[i] ?? 0,
+					color: rgbToCss([r, g, b]),
+				}
+			})
+			.filter((bucket) => bucket.count > 0)
 	}, [
 		worldForDisplay?.nations?.assignment,
 		worldForDisplay?.cultures?.assignment,
@@ -6593,7 +6605,14 @@ export const GenesisView: React.FC = () => {
 		const timelineEvents = allEvents
 			.filter((event) => eventInvolvesNation(event, nationId))
 			.map((event, index) =>
-				buildProceduralWikiTimelineEvent({ event, viewingNation: nationId, pastEvents: allEvents, getNationName, getNationColor, index }),
+				buildProceduralWikiTimelineEvent({
+					event,
+					viewingNation: nationId,
+					pastEvents: allEvents,
+					getNationName,
+					getNationColor,
+					index,
+				}),
 			)
 		return {
 			title: selectedNation.name,

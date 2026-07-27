@@ -1,13 +1,11 @@
-﻿import type { GenesisParams, SphereMesh } from ".."
+﻿import type { GenesisParams, SphereMesh } from "@/model"
 import {
 	buildUrquhartEdgesFromFlat,
 	MinHeap,
 	regionDistanceKm,
 	regionPathLengthKm,
-} from "../shared"
-import type { SocietyEra } from "../society"
-import { getSettlementEraTuning } from "../society"
-import type { GenesisLandmarks } from "../terrain"
+} from "@/model/shared"
+import type { GenesisLandmarks } from "@/model/terrain"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -15,8 +13,10 @@ import {
 	type Route,
 	type RouteEdge,
 	type SerializedRouteKind,
-} from "../transport"
-import type { GenesisNationHierarchy, GenesisProvinces } from "../types"
+} from "@/model/transport"
+import type { GenesisNationHierarchy, GenesisProvinces } from "@/model/types"
+import type { SocietyEra } from "@/model/society/types"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 
 /**
  * Route computation runs mid-pipeline, before the GenesisWorld literal is
@@ -94,7 +94,7 @@ const ROUTE_TUNING = {
 } as const
 
 function routePopulationThresholds(era: SocietyEra) {
-	const tuning = getSettlementEraTuning(era)
+	const tuning = SETTLEMENT_TUNING.getSettlementEraTuning(era)
 	return {
 		majorSettlementMin: tuning.cityMin * 2,
 		minorSettlementMin: tuning.townMin,

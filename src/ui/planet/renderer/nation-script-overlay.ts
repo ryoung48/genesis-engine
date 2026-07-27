@@ -1,8 +1,6 @@
 ﻿import * as THREE from "three"
-import type { HeritageScript } from "@/model/society"
-import { compressName } from "@/model/society"
 import type { SerializedGenesisWorld } from "@/model/transport"
-import { createMapProjection } from "./map-projection"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
 	computeLabelScale,
 	globeLabelStubLength,
@@ -15,9 +13,14 @@ import {
 	nationCapitalProvince,
 	nationCapitalRegion,
 	nationProvinceCount,
-} from "./nation-label-overlay"
-import { renderScriptTexture } from "./script-texture"
-import { globeScaleForPop, mapRadiusForPop } from "./settlement-overlay"
+} from "@/ui/planet/renderer/nation-label-overlay"
+import { renderScriptTexture } from "@/ui/planet/renderer/script-texture"
+import {
+	globeScaleForPop,
+	mapRadiusForPop,
+} from "@/ui/planet/renderer/settlement-overlay"
+import type { HeritageScript } from "@/model/society/script"
+import { COMPRESS } from "@/model/society/script/compress"
 
 const SCRIPT_HEIGHT_FACTOR = 0.45
 const SCRIPT_GLOBE_GAP_FACTOR = 0.12
@@ -282,11 +285,11 @@ export function buildGlobeNationScripts(
 		const script = scripts.get(heritageIdx)
 		if (!script) continue
 
-		const text = compressName(
+		const text = COMPRESS.compressName({
 			name,
-			script.compressionRatio,
-			`heritage:${heritageIdx}`,
-		)
+			ratio: script.compressionRatio,
+			seedSalt: `heritage:${heritageIdx}`,
+		})
 		if (!text) continue
 
 		const capitalProvince = nationCapitalProvince(world, nationIdx)
@@ -390,11 +393,11 @@ export function buildMapNationScripts(
 		const script = scripts.get(heritageIdx)
 		if (!script) continue
 
-		const text = compressName(
+		const text = COMPRESS.compressName({
 			name,
-			script.compressionRatio,
-			`heritage:${heritageIdx}`,
-		)
+			ratio: script.compressionRatio,
+			seedSalt: `heritage:${heritageIdx}`,
+		})
 		if (!text) continue
 
 		const capitalRegion = nationCapitalRegion(world, nationIdx)

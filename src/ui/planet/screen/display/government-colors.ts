@@ -1,4 +1,5 @@
-﻿import { GOVERNMENT_TYPES, type GovernmentType } from "@/model/society"
+﻿import { GovernmentType } from "@/model/society/types"
+import { ERAS } from "@/model/society/eras"
 
 export const GOVERNMENT_COLORS_BY_TYPE: Record<
 	GovernmentType,
@@ -42,7 +43,7 @@ export const GOVERNMENT_COLORS_BY_TYPE: Record<
 }
 
 export const GOVERNMENT_COLORS_CSS: Record<number, string> = Object.fromEntries(
-	GOVERNMENT_TYPES.map((type, index) => {
+	ERAS.governmentTypes.map((type, index) => {
 		const [r, g, b] = GOVERNMENT_COLORS_BY_TYPE[type]
 		return [
 			index,
@@ -54,6 +55,6 @@ export const GOVERNMENT_COLORS_CSS: Record<number, string> = Object.fromEntries(
 export function governmentColorForIndex(
 	index: number,
 ): [number, number, number] {
-	const type = GOVERNMENT_TYPES[index] ?? "feudal_monarchy"
+	const type = ERAS.governmentTypes[index] ?? "feudal_monarchy"
 	return GOVERNMENT_COLORS_BY_TYPE[type]
 }

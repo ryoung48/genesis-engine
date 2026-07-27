@@ -7,15 +7,9 @@ import {
 	relativeHumidityFromTempRange,
 } from "@/model/climate"
 import { tradeGoodColor } from "@/model/economy"
-import {
-	RELIGION_TYPE_COLORS,
-	regionTimezoneOffset,
-	timezoneLandColor,
-	timezoneWaterColor,
-} from "@/model/society"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
-import type { ColorMode } from "../../colors"
+import type { ColorMode } from "@/ui/planet/colors"
 import {
 	climateTempColor,
 	climateZoneColor,
@@ -51,22 +45,27 @@ import {
 	vegetationMapColor,
 	vegetationSatelliteColor,
 	volcanicLandColor,
-} from "../../colors"
-import type { DangerSubMode } from "../../controls/OverlayControls"
-import { getDataVariant } from "../shared/data-variant"
-import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
-import { getProvincePopulationDensity } from "../shared/population-density"
+} from "@/ui/planet/colors"
+import type { DangerSubMode } from "@/ui/planet/controls/OverlayControls"
+import { getDataVariant } from "@/ui/planet/screen/shared/data-variant"
+import type {
+	NationMapMode,
+	PopulationMapMode,
+} from "@/ui/planet/screen/shared/map-modes"
+import { getProvincePopulationDensity } from "@/ui/planet/screen/shared/population-density"
 import {
 	darkenClimateAtElevation,
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
-} from "./color-helpers"
-import { governmentColorForIndex } from "./government-colors"
-import type { PoliticalMapWar } from "./political-conflict-display"
+} from "@/ui/planet/screen/display/color-helpers"
+import { governmentColorForIndex } from "@/ui/planet/screen/display/government-colors"
+import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
 import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
-} from "./religion-type"
+} from "@/ui/planet/screen/display/religion-type"
+import { RELIGION } from "@/model/society/religion"
+import { TIMEZONE } from "@/model/society/timezone"
 
 /**
  * Relation values the diplomacy map mode colors by. These mirrored the
@@ -275,7 +274,9 @@ export function computeRegionColors(
 			const p = provinces ? provinces.regionProvince[r] : -1
 			if (p < 0) {
 				// Water: the timezone stripe under the region itself.
-				const [cr, cg, cb] = timezoneWaterColor(regionTimezoneOffset(world, r))
+				const [cr, cg, cb] = TIMEZONE.timezoneWaterColor(
+					TIMEZONE.regionTimezoneOffset({ world, region: r }),
+				)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb
@@ -288,7 +289,9 @@ export function computeRegionColors(
 				continue
 			}
 			// Land: the province's single zone (its nation's capital zone if any).
-			const base = timezoneLandColor(regionTimezoneOffset(world, r))
+			const base = TIMEZONE.timezoneLandColor(
+				TIMEZONE.regionTimezoneOffset({ world, region: r }),
+			)
 			const [cr, cg, cb] = darkenPoliticalAtElevation(
 				base,
 				world.elevation_km[r],
@@ -1373,8 +1376,8 @@ export function computeRegionColors(
 					} else {
 						const typeColor =
 							getReligionColorForProvince(world, p) ??
-							RELIGION_TYPE_COLORS[typeIdx] ??
-							RELIGION_TYPE_COLORS[0]
+							RELIGION.religionTypeColors[typeIdx] ??
+							RELIGION.religionTypeColors[0]
 						const [cr, cg, cb] = darkenPartitionAtElevation(
 							[typeColor[0], typeColor[1], typeColor[2]],
 							world.elevation_km[r],

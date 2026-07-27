@@ -1,13 +1,9 @@
-﻿import {
-	GOVERNMENT_TYPE_LABELS,
-	GOVERNMENT_TYPES,
-	RELIGION_TYPE_COLORS,
-	RELIGION_TYPE_NAMES,
-} from "@/model/society"
-import type { SerializedGenesisWorld } from "@/model/transport"
-import type { DistributionBucket } from "../../details/shared"
-import type { DisplayNationModel } from "./display-model"
-import { GOVERNMENT_COLORS_CSS } from "./government-colors"
+﻿import type { SerializedGenesisWorld } from "@/model/transport"
+import type { DistributionBucket } from "@/ui/planet/details/shared"
+import type { DisplayNationModel } from "@/ui/planet/screen/display/display-model"
+import { GOVERNMENT_COLORS_CSS } from "@/ui/planet/screen/display/government-colors"
+import { ERAS } from "@/model/society/eras"
+import { RELIGION } from "@/model/society/religion"
 
 interface NationDetailsData {
 	id: number
@@ -137,9 +133,9 @@ export function buildSelectedNationDetails(params: {
 	}))
 
 	const govIdx = world.nations.governmentType?.[selectedNationId] ?? -1
-	const govKey = govIdx >= 0 ? (GOVERNMENT_TYPES[govIdx] ?? null) : null
+	const govKey = govIdx >= 0 ? (ERAS.governmentTypes[govIdx] ?? null) : null
 	const governmentType = govKey
-		? (GOVERNMENT_TYPE_LABELS[govKey] ?? null)
+		? (ERAS.governmentTypeLabels[govKey] ?? null)
 		: null
 	const governmentColor =
 		govIdx >= 0 ? (GOVERNMENT_COLORS_CSS[govIdx] ?? null) : null
@@ -180,14 +176,14 @@ export function buildSelectedNationDetails(params: {
 			getLabel: (id) => {
 				const typeId = world.religionTypes?.[id] ?? -1
 				return typeId >= 0
-					? (RELIGION_TYPE_NAMES[typeId] ?? `Religion #${id}`)
+					? (RELIGION.religionTypeNames[typeId] ?? `Religion #${id}`)
 					: `Religion #${id}`
 			},
 			getColor: (id) => {
 				const typeId = world.religionTypes?.[id] ?? -1
 				if (typeId < 0) return colorFromPartition(world.religions, id)
 				const [r, g, b] =
-					RELIGION_TYPE_COLORS[typeId] ?? RELIGION_TYPE_COLORS[0]
+					RELIGION.religionTypeColors[typeId] ?? RELIGION.religionTypeColors[0]
 				return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
 			},
 		}),

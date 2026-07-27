@@ -1,8 +1,6 @@
-﻿import type { GenesisNationHierarchy, GenesisProvinces } from ".."
-import type { ProvincePopulation, SocietyEra } from "../society"
-import { fanoutRangesForSize, rebalanceHierarchy } from "../society"
-import type { GenesisLandmarks } from "../terrain"
-import type { Route, RouteEdge } from "../transport"
+﻿import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
+import type { GenesisLandmarks } from "@/model/terrain"
+import type { Route, RouteEdge } from "@/model/transport"
 import {
 	children,
 	type DerivedCache,
@@ -12,17 +10,19 @@ import {
 	ensureHierarchyClean,
 	nationAdjacency,
 	sovereign,
-} from "./derive"
-import { EVT, EventHeap } from "./event-heap"
-import { PROV, REL as REL_FIELD } from "./fields"
-import type { HistoryRng } from "./history-rng"
-import type { Timeline } from "./timeline"
+} from "@/model/history/derive"
+import { EVT, EventHeap } from "@/model/history/event-heap"
+import { PROV, REL as REL_FIELD } from "@/model/history/fields"
+import type { HistoryRng } from "@/model/history/history-rng"
+import type { Timeline } from "@/model/history/timeline"
 import type {
 	QueueBattleEventParams,
 	WealthCurrentParams,
 	WarStrengthCoalitionParams,
 	ResolveWarParams,
-} from "./types"
+} from "@/model/history/types"
+import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
+import { HIERARCHY } from "@/model/society/hierarchy"
 
 export const REL = {
 	NONE: 0,
@@ -530,13 +530,13 @@ function addTerritory(
 	nextParent[nation] = -1
 	for (const member of members) nextParent[member] = -1
 
-	rebalanceHierarchy({
+	HIERARCHY.rebalanceHierarchy({
 		capital: nation,
 		members: Int32Array.from(members),
 		parent: nextParent,
 		depth: nextDepth,
 		currentDepth: 0,
-		fanoutRanges: fanoutRangesForSize(members.length),
+		fanoutRanges: HIERARCHY.fanoutRangesForSize(members.length),
 		habitability: state.habitability,
 		urbanPop: state.popUrbanCurrent,
 		waterAccess: state.waterAccess,

@@ -1,23 +1,32 @@
-import type { GenesisNationHierarchy, GenesisProvinces } from ".."
-import type { ProvincePopulation, SocietyEra } from "../society"
-import type { GenesisLandmarks } from "../terrain"
-import type { StageTiming } from "../types"
-import { EVT } from "./event-heap"
-import { runBattle } from "./events/battle"
-import { initCultureSpread, runCultureSpread } from "./events/culture-spread"
-import { initDiplomacy, runDiplomacy } from "./events/diplomacy"
-import { initPopulation, runPopulation } from "./events/population"
-import { initSuccession, runSuccession } from "./events/succession"
-import { initTax, runTax } from "./events/tax"
-import { initWar, runWar } from "./events/war"
-import { REL as REL_FIELD } from "./fields"
-import { createHistoryRng, type HistoryRng } from "./history-rng"
+import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
+import type { GenesisLandmarks } from "@/model/terrain"
+import type { StageTiming } from "@/model/types"
+import { EVT } from "@/model/history/event-heap"
+import { runBattle } from "@/model/history/events/battle"
+import {
+	initCultureSpread,
+	runCultureSpread,
+} from "@/model/history/events/culture-spread"
+import { initDiplomacy, runDiplomacy } from "@/model/history/events/diplomacy"
+import {
+	initPopulation,
+	runPopulation,
+} from "@/model/history/events/population"
+import {
+	initSuccession,
+	runSuccession,
+} from "@/model/history/events/succession"
+import { initTax, runTax } from "@/model/history/events/tax"
+import { initWar, runWar } from "@/model/history/events/war"
+import { REL as REL_FIELD } from "@/model/history/fields"
+import { createHistoryRng, type HistoryRng } from "@/model/history/history-rng"
 import {
 	createHistoryState,
 	type HistoryState,
 	REL,
 	validateLiveHierarchy,
-} from "./state"
+} from "@/model/history/state"
+import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
 
 function timed<T>(
 	label: string,
@@ -144,7 +153,13 @@ function processEventsUntil(
 				runWar(state, dataBuf[0], rng)
 				break
 			case EVT.BATTLE:
-				runBattle({ state, warIdx: dataBuf[0], eventAttacker: dataBuf[1], eventDefender: dataBuf[2], rng })
+				runBattle({
+					state,
+					warIdx: dataBuf[0],
+					eventAttacker: dataBuf[1],
+					eventDefender: dataBuf[2],
+					rng,
+				})
 				break
 			case EVT.SUCCESSION:
 				runSuccession(state, dataBuf[0], dataBuf[1], rng)

@@ -1,23 +1,17 @@
 ﻿import { capitalize, titleCase } from "@/model/shared"
-import { initClusters, randomizePhonemes } from "./builder"
-import { buildConsonants } from "./builder/consonants"
-import { buildBasicVowels, buildComplexVowels } from "./builder/vowels"
-import { CLUSTER } from "./clusters"
-import {
-	baseVowels,
-	buildSlotWord,
-	collectDigraphs,
-	normalizeWordKey,
-	spawn,
-} from "./internal"
-import { createLanguageRng } from "./rng"
+import { CLUSTER } from "@/model/society/language/languages/clusters"
 import {
 	Gender,
 	type Language,
 	PhonemeCatalog,
 	type WordParams,
 	type LanguageRng,
-} from "./types"
+} from "@/model/society/language/languages/types"
+import { BUILDER } from "@/model/society/language/languages/builder"
+import { INTERNAL } from "@/model/society/language/languages/internal"
+import { RNG } from "@/model/society/language/languages/rng"
+import { CONSONANTS } from "@/model/society/language/languages/builder/consonants"
+import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 
 export const LANGUAGE = {
 	word: {
@@ -92,9 +86,9 @@ export const LANGUAGE = {
 			stopChance,
 			variation,
 		}: WordParams) => {
-			const normalizedKey = normalizeWordKey(key)
+			const normalizedKey = INTERNAL.normalizeWordKey(key)
 			if (slot) {
-				return buildSlotWord({
+				return INTERNAL.buildSlotWord({
 					lang,
 					key: normalizedKey,
 					namespace: namespace ?? normalizedKey,
@@ -128,7 +122,7 @@ export const LANGUAGE = {
 		},
 	},
 	spawn: (seed: string) => {
-		const lang = spawn(seed, createLanguageRng(seed))
+		const lang = INTERNAL.spawn({ seed, dice: RNG.createLanguageRng(seed) })
 		const dice = lang.dice
 
 		const stop = dice.weightedChoice([
@@ -144,8 +138,8 @@ export const LANGUAGE = {
 			lang.articleChance = dice.uniform(0.1, 0.4)
 		}
 
-		const vowels = buildBasicVowels({ ending: lang.ending, dice })
-		const { consonantPhonemes } = buildConsonants({
+		const vowels = VOWELS.buildBasicVowels({ ending: lang.ending, dice })
+		const { consonantPhonemes } = CONSONANTS.buildConsonants({
 			ending: lang.ending,
 			vowels,
 			dice,
@@ -154,7 +148,7 @@ export const LANGUAGE = {
 		const exoticCons = ["ű", "űg"].some((c) =>
 			consonantPhonemes[PhonemeCatalog.MIDDLE_CONSONANT].includes(c),
 		)
-		const { uniqueVowels, vowelPhonemes } = buildComplexVowels({
+		const { uniqueVowels, vowelPhonemes } = VOWELS.buildComplexVowels({
 			vowels,
 			consonants: consonantPhonemes[PhonemeCatalog.END_CONSONANT],
 			exoticCons,
@@ -162,13 +156,15 @@ export const LANGUAGE = {
 			dice,
 		})
 		lang.vowels = uniqueVowels
-		lang.diphthongs = lang.vowels.filter((v) => !baseVowels.includes(v))
-		lang.digraphs = collectDigraphs(consonantPhonemes)
+		lang.diphthongs = lang.vowels.filter(
+			(v) => !INTERNAL.baseVowels.includes(v),
+		)
+		lang.digraphs = INTERNAL.collectDigraphs(consonantPhonemes)
 		lang.basePhonemes = { ...consonantPhonemes, ...vowelPhonemes }
-		randomizePhonemes(lang)
+		BUILDER.randomizePhonemes(lang)
 
 		const shortSurnames = dice.random > 0.9
-		initClusters({
+		BUILDER.initClusters({
 			shortSurnames,
 			shortFirst:
 				lang.ending === PhonemeCatalog.MIDDLE_VOWEL && dice.random > 0.9,
@@ -190,7 +186,7 @@ export const LANGUAGE = {
 				lang.phonemes[PhonemeCatalog.END_CONSONANT],
 			)
 			const endVowel = dice.weightedChoice(
-				CLUSTER.endVowels(lang.clusters.female, end).filter(
+				CLUSTER.endVowels({ cluster: lang.clusters.female, prev: end }).filter(
 					(v: { v: string }) => v.v.length < 2,
 				),
 			)
@@ -266,7 +262,10 @@ export const LANGUAGE = {
 			seed == null
 				? `${base.seed}:dialect:${base.dice.randint(0, 2147483647)}`
 				: `${base.seed}:dialect:${seed}`
-		const lang = spawn(dialectSeed, createLanguageRng(dialectSeed))
+		const lang = INTERNAL.spawn({
+			seed: dialectSeed,
+			dice: RNG.createLanguageRng(dialectSeed),
+		})
 		lang.ending = base.ending
 		lang.stop = base.stop
 		lang.stopChance = base.stopChance
@@ -276,8 +275,8 @@ export const LANGUAGE = {
 		lang.vowels = [...base.vowels]
 		lang.diphthongs = [...base.diphthongs]
 		lang.digraphs = [...base.digraphs]
-		randomizePhonemes(lang)
-		initClusters({ src: lang })
+		BUILDER.randomizePhonemes(lang)
+		BUILDER.initClusters({ src: lang })
 		Object.keys(lang.clusters).forEach((k) => {
 			lang.clusters[k].patterns = base.clusters[k].patterns
 			lang.clusters[k].stopChance = base.clusters[k].stopChance

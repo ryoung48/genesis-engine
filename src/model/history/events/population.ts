@@ -1,13 +1,6 @@
-/**
- * POPULATION / CENSUS EVENT — growth, urbanization, development spread.
- * Port of src/model/history/events/population.ts
- */
-
-import { GOVERNMENT_TYPES } from "../../society/eras"
-import { getSettlementEraTuning } from "../../society/settlement-tuning"
-import { EVT } from "../event-heap"
-import { PROV } from "../fields"
-import type { HistoryRng } from "../history-rng"
+import { EVT } from "@/model/history/event-heap"
+import { PROV } from "@/model/history/fields"
+import type { HistoryRng } from "@/model/history/history-rng"
 import {
 	getNationProvinces,
 	getProvinceNeighbors,
@@ -15,8 +8,10 @@ import {
 	type HistoryState,
 	isSovereign,
 	YEAR_MS,
-} from "../state"
-import type { GovernmentType } from "../../society/types";
+} from "@/model/history/state"
+import type { GovernmentType } from "@/model/society/types"
+import { ERAS } from "@/model/society/eras"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 
 const MAX_ADJUSTMENT_RATE = 0.005
 const URBAN_GROWTH = 0.1
@@ -72,7 +67,7 @@ const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {
 }
 
 function nationProfile(governmentTypeIndex: number): NationProfile {
-	const label = GOVERNMENT_TYPES[governmentTypeIndex]
+	const label = ERAS.governmentTypes[governmentTypeIndex]
 	return label
 		? GOVERNMENT_PROFILES[label]
 		: GOVERNMENT_PROFILES.feudal_monarchy
@@ -184,7 +179,7 @@ function urbanization(state: HistoryState, init: boolean): void {
 const MAX_SPREAD_HOPS = 20
 
 function development(state: HistoryState, init: boolean): void {
-	const { cityMin } = getSettlementEraTuning(state.era)
+	const { cityMin } = SETTLEMENT_TUNING.getSettlementEraTuning(state.era)
 	const BASE_DECAY = 0.75
 	const FOREIGN_DECAY = 0.65
 	const WATER_ACCESS_BONUS = 1.1

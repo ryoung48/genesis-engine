@@ -8,37 +8,40 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule"
-import { ERA_CONFIGS, ERA_ORDER } from "@/model/society/eras"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
 import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
-import { SocietyRunesPanel } from "../planet/controls/SocietyRunesPanel"
+import { SocietyRunesPanel } from "@/ui/planet/controls/SocietyRunesPanel"
 import {
 	DEFAULT_WORLD_SECTIONS,
 	toggleSection,
 	type WorldSection,
-} from "../planet/details/drawer-state"
-import { WorldDetails } from "../planet/details/world/WorldDetails"
-import type { GenerationPreviewTab } from "../planet/screen/generation/generation-preview"
-import type { SliderDef } from "../planet/screen/generation/sliders"
-import type { UnitSystem } from "../planet/screen/shared/ui-format"
-import { type NationWikiData, NationWikiPage } from "./nation/NationWikiPage"
-import { GenerationPlanetNavigator } from "./navigator/GenerationPlanetNavigator"
+} from "@/ui/planet/details/drawer-state"
+import { WorldDetails } from "@/ui/planet/details/world/WorldDetails"
+import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
+import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import {
+	type NationWikiData,
+	NationWikiPage,
+} from "@/ui/wiki/nation/NationWikiPage"
+import { GenerationPlanetNavigator } from "@/ui/wiki/navigator/GenerationPlanetNavigator"
 import {
 	type OrganizationWikiData,
 	OrganizationWikiPage,
-} from "./organization/OrganizationWikiPage"
-import { buildSurfaceStats } from "./stats/orbit/surface-stats"
-import { GenerationTimingChart } from "./timing/GenerationTimingChart"
+} from "@/ui/wiki/organization/OrganizationWikiPage"
+import { buildSurfaceStats } from "@/ui/wiki/stats/orbit/surface-stats"
+import { GenerationTimingChart } from "@/ui/wiki/timing/GenerationTimingChart"
 import {
 	formatTimingSeconds,
 	getComputeRoutesTimingSummary,
 	getGenerationTimingSummary,
 	getPostTimingSummary,
-} from "./timing/timing-summary"
-import { type WarWikiData, WarWikiPage } from "./war/WarWikiPage"
-import type { SocietyEra } from "../../model/society/types";
+} from "@/ui/wiki/timing/timing-summary"
+import { type WarWikiData, WarWikiPage } from "@/ui/wiki/war/WarWikiPage"
+import type { SocietyEra } from "@/model/society/types"
+import { ERAS } from "@/model/society/eras"
 
 interface GenerationPanelProps {
 	worldTab: "planet" | "society"
@@ -725,8 +728,8 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 									Era Preset
 								</p>
 								<div className="grid grid-cols-2 gap-1.5">
-									{ERA_ORDER.map((eraId) => {
-										const cfg = ERA_CONFIGS[eraId]
+									{ERAS.eraOrder.map((eraId) => {
+										const cfg = ERAS.eraConfigs[eraId]
 										const pop = cfg.targetPopulation
 										const popLabel =
 											pop >= 1e9
@@ -761,7 +764,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 									})}
 								</div>
 								{(() => {
-									const cfg = ERA_CONFIGS[era]
+									const cfg = ERAS.eraConfigs[era]
 									return (
 										<div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 space-y-1">
 											<div className="flex justify-between text-[10px]">

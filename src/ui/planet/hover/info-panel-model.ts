@@ -1,12 +1,6 @@
 import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
 import { koppenClimateColor, pastaClimateColor } from "@/model/climate"
 import { tradeGoodColor } from "@/model/economy"
-import {
-	GOVERNMENT_TYPE_LABELS,
-	GOVERNMENT_TYPES,
-	RELIGION_TYPE_COLORS,
-	RELIGION_TYPE_NAMES,
-} from "@/model/society"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
@@ -21,27 +15,32 @@ import {
 	vegetationColor,
 	vegetationMapColor,
 	vegetationSatelliteColor,
-} from "../colors"
-import { GOVERNMENT_COLORS_CSS } from "../screen/display/government-colors"
+} from "@/ui/planet/colors"
+import { GOVERNMENT_COLORS_CSS } from "@/ui/planet/screen/display/government-colors"
 import {
 	getTerrainFeatureColor,
 	getTopographyColor,
 	toPastelNationColor,
-} from "../screen/display/region-colors"
+} from "@/ui/planet/screen/display/region-colors"
 import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
-} from "../screen/display/religion-type"
-import type { DataVariant } from "../screen/shared/data-variant"
-import { getBaseMapMode, getDataVariant } from "../screen/shared/data-variant"
-import type { PopulationMapMode } from "../screen/shared/map-modes"
-import { getProvincePopulationDensity } from "../screen/shared/population-density"
+} from "@/ui/planet/screen/display/religion-type"
+import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
+import {
+	getBaseMapMode,
+	getDataVariant,
+} from "@/ui/planet/screen/shared/data-variant"
+import type { PopulationMapMode } from "@/ui/planet/screen/shared/map-modes"
+import { getProvincePopulationDensity } from "@/ui/planet/screen/shared/population-density"
 import {
 	formatDensity,
 	rgbToCss,
 	type UnitSystem,
-} from "../screen/shared/ui-format"
-import type { HoverInfo, HoverTerrainFeature } from "./hover"
+} from "@/ui/planet/screen/shared/ui-format"
+import type { HoverInfo, HoverTerrainFeature } from "@/ui/planet/hover/hover"
+import { ERAS } from "@/model/society/eras"
+import { RELIGION } from "@/model/society/religion"
 
 interface HoverChartData {
 	temps: number[]
@@ -483,11 +482,11 @@ export function buildDemographicDisplayData(params: {
 		if (typeIdx < 0) return null
 		const typeColor =
 			getReligionColorForProvince(world, hoverProvince) ??
-			RELIGION_TYPE_COLORS[typeIdx] ??
-			RELIGION_TYPE_COLORS[0]
+			RELIGION.religionTypeColors[typeIdx] ??
+			RELIGION.religionTypeColors[0]
 		return {
 			label: "Religion",
-			value: RELIGION_TYPE_NAMES[typeIdx] ?? "Unknown",
+			value: RELIGION.religionTypeNames[typeIdx] ?? "Unknown",
 			color: rgbToCss([typeColor[0], typeColor[1], typeColor[2]]),
 		}
 	}
@@ -511,8 +510,8 @@ export function buildGovernmentDisplayData(params: {
 	// governmentType is per-province (like leaderDynasty), so hoverNationId
 	// (a province index in the display system) indexes it directly.
 	const typeIndex = world.nations.governmentType[hoverNationId] ?? 4
-	const key = GOVERNMENT_TYPES[typeIndex]
-	const label = key ? (GOVERNMENT_TYPE_LABELS[key] ?? key) : "Kingdom"
+	const key = ERAS.governmentTypes[typeIndex]
+	const label = key ? (ERAS.governmentTypeLabels[key] ?? key) : "Kingdom"
 	return {
 		label,
 		color: GOVERNMENT_COLORS_CSS[typeIndex] ?? GOVERNMENT_COLORS_CSS[7],

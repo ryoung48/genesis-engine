@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createStringRng } from "@/model/shared"
 import {
-	DEFAULT_GLYPH_ALPHABET,
 	type GlyphSet,
-	generateGlyphSet,
+	GLYPH_MODULE,
 } from "@/model/society/script/runegen/glyph-module"
 import type {
 	RuneGeneratorOptions,
@@ -45,7 +44,10 @@ const GRID_COLUMNS = 8
 const GRID_ROWS = 4
 const GRID_CHARS = Array.from(
 	{ length: GRID_COLUMNS * GRID_ROWS },
-	(_, i) => DEFAULT_GLYPH_ALPHABET[i % DEFAULT_GLYPH_ALPHABET.length],
+	(_, i) =>
+		GLYPH_MODULE.defaultGlyphAlphabet[
+			i % GLYPH_MODULE.defaultGlyphAlphabet.length
+		],
 )
 // Target on-screen line height for the wrapped text preview, well below the
 // canvas's native raw pixel size
@@ -62,11 +64,11 @@ function buildPreview(
 	const dice = createStringRng(seed)
 	const glyphSeed = `${seed}:glyphs:${Math.floor(dice.random() * 1e9).toString(36)}`
 	return {
-		glyphs: generateGlyphSet(
-			DEFAULT_GLYPH_ALPHABET.join(""),
-			generatorOptions,
-			glyphSeed,
-		),
+		glyphs: GLYPH_MODULE.generateGlyphSet({
+			alphabet: GLYPH_MODULE.defaultGlyphAlphabet.join(""),
+			options: generatorOptions,
+			seed: glyphSeed,
+		}),
 		render: {
 			...RuneRenderer.getPreset(6),
 			...renderKnobs,

@@ -1,6 +1,14 @@
-import type { GenesisNationHierarchy } from "../.."
-import { WATER_ACCESS_BONUS } from "../water-access"
-import type { FanoutRanges, PartitionMembersParams } from "./types"
+import type { GenesisNationHierarchy } from "@/model"
+import type {
+	FanoutRanges,
+	PartitionMembersParams,
+} from "@/model/society/hierarchy/types"
+import { WATER_ACCESS } from "@/model/society/water-access"
+import type {
+	HierarchyProvinceScoreParams,
+	BuildChildrenCSRParams,
+	BuildSovereignParams,
+} from "@/model/society/hierarchy/types"
 
 const DUCHY_FANOUT: FanoutRanges = []
 
@@ -11,20 +19,20 @@ const EMPIRE_FANOUT: FanoutRanges = [
 	[2, 6, 4],
 ]
 
-export const HEGEMON_FANOUT: FanoutRanges = [
+const hegemonFanout: FanoutRanges = [
 	[3, 8, 80],
 	[3, 8, 15],
 	[2, 6, 4],
 ]
 
-export function fanoutRangesForSize(size: number): FanoutRanges {
-	if (size >= 251) return HEGEMON_FANOUT
+function fanoutRangesForSize(size: number): FanoutRanges {
+	if (size >= 251) return hegemonFanout
 	if (size >= 50) return EMPIRE_FANOUT
 	if (size >= 10) return KINGDOM_FANOUT
 	return DUCHY_FANOUT
 }
 
-export function maxFanoutForNationSize(size: number): number {
+function maxFanoutForNationSize(size: number): number {
 	const ranges = fanoutRangesForSize(size)
 	return ranges[0]?.[1] ?? Infinity
 }
@@ -35,16 +43,16 @@ const OVEREXTENSION = 0.9
 
 const URBAN_POP_SCALE = 10_000
 
-function hierarchyProvinceScore(
-	province: number,
-	habitability: Float32Array<ArrayBufferLike>,
-	urbanPop: Float32Array<ArrayBufferLike>,
-	waterAccess: Uint8Array<ArrayBufferLike>,
-): number {
+function hierarchyProvinceScore({
+	province,
+	habitability,
+	urbanPop,
+	waterAccess,
+}: HierarchyProvinceScoreParams): number {
 	return (
 		habitability[province] +
 		urbanPop[province] / URBAN_POP_SCALE +
-		waterAccess[province] * WATER_ACCESS_BONUS
+		waterAccess[province] * WATER_ACCESS.waterAccessBonus
 	)
 }
 
@@ -124,12 +132,18 @@ function partitionMembers({
 			for (let i = 1; i < leftovers.length; i++) {
 				const candidate = leftovers[i]
 				if (
-					hierarchyProvinceScore(
-						candidate,
+					hierarchyProvinceScore({
+						province: candidate,
 						habitability,
 						urbanPop,
 						waterAccess,
-					) > hierarchyProvinceScore(seed, habitability, urbanPop, waterAccess)
+					}) >
+					hierarchyProvinceScore({
+						province: seed,
+						habitability,
+						urbanPop,
+						waterAccess,
+					})
 				) {
 					seed = candidate
 				}
@@ -155,7 +169,7 @@ function partitionMembers({
 	return result
 }
 
-export function rebalanceHierarchy(params: {
+function rebalanceHierarchy(params: {
 	capital: number
 	members: Int32Array<ArrayBufferLike>
 	parent: Int32Array<ArrayBufferLike>
@@ -218,12 +232,12 @@ export function rebalanceHierarchy(params: {
 
 		if (seedCount === 0) {
 			for (let i = 0; i < members.length; i++) {
-				const score = hierarchyProvinceScore(
-					members[i],
+				const score = hierarchyProvinceScore({
+					province: members[i],
 					habitability,
 					urbanPop,
 					waterAccess,
-				)
+				})
 				if (score > bestScore) {
 					bestScore = score
 					bestIdx = i
@@ -257,7 +271,12 @@ export function rebalanceHierarchy(params: {
 				if (d < 0) continue
 				const score =
 					d * 1000 +
-					hierarchyProvinceScore(p, habitability, urbanPop, waterAccess)
+					hierarchyProvinceScore({
+						province: p,
+						habitability,
+						urbanPop,
+						waterAccess,
+					})
 				if (score > bestScore) {
 					bestScore = score
 					bestIdx = i
@@ -308,10 +327,13 @@ export function rebalanceHierarchy(params: {
 	}
 }
 
-export function buildChildrenCSR(
-	parent: Int32Array<ArrayBufferLike>,
-	provinceCount: number,
-): Pick<GenesisNationHierarchy, "childOffset" | "childList"> {
+function buildChildrenCSR({
+	parent,
+	provinceCount,
+}: BuildChildrenCSRParams): Pick<
+	GenesisNationHierarchy,
+	"childOffset" | "childList"
+> {
 	const childOffset = new Int32Array(provinceCount + 1)
 	for (let p = 0; p < provinceCount; p++) {
 		const par = parent[p]
@@ -331,10 +353,10 @@ export function buildChildrenCSR(
 	return { childOffset, childList }
 }
 
-export function buildSovereign(
-	parent: Int32Array<ArrayBufferLike>,
-	provinceCount: number,
-): Int32Array {
+function buildSovereign({
+	parent,
+	provinceCount,
+}: BuildSovereignParams): Int32Array {
 	const sovereign = new Int32Array(provinceCount).fill(-1)
 	for (let p = 0; p < provinceCount; p++) {
 		let current = p
@@ -350,7 +372,7 @@ export function buildSovereign(
 	return sovereign
 }
 
-export function computeGravity(params: {
+function computeGravity(params: {
 	habitability: Float32Array<ArrayBufferLike>
 	childOffset: Int32Array<ArrayBufferLike>
 	childList: Int32Array<ArrayBufferLike>
@@ -399,4 +421,14 @@ export function computeGravity(params: {
 	}
 
 	return gravity
+}
+
+export const HIERARCHY = {
+	hegemonFanout,
+	fanoutRangesForSize,
+	maxFanoutForNationSize,
+	rebalanceHierarchy,
+	buildChildrenCSR,
+	buildSovereign,
+	computeGravity,
 }

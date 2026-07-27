@@ -1,6 +1,6 @@
-﻿import { maxFanoutForNationSize } from "../society"
-import { PROV } from "./fields"
-import type { HistoryState } from "./state"
+﻿import { PROV } from "@/model/history/fields"
+import type { HistoryState } from "@/model/history/state"
+import { HIERARCHY } from "@/model/society/hierarchy"
 
 const TRIBUTE = 0.25
 
@@ -150,7 +150,8 @@ function gravity(
 		value += gravity(state, child, t, cache) * TRIBUTE
 	}
 	const memberCount = nationMemberCount(state, p, t)
-	if (members.length > maxFanoutForNationSize(memberCount)) value *= 0.9
+	if (members.length > HIERARCHY.maxFanoutForNationSize(memberCount))
+		value *= 0.9
 	cache?.gravity?.set(key, value)
 	return value
 }
@@ -226,7 +227,7 @@ export function wealthCurrent(
 	}
 	if (
 		directChildren.length >
-		maxFanoutForNationSize(nationMemberCount(state, p, t))
+		HIERARCHY.maxFanoutForNationSize(nationMemberCount(state, p, t))
 	)
 		collected *= 0.9
 	if (!freedom && PROV.parent.get(state, p, t) >= 0) collected *= 1 - TRIBUTE

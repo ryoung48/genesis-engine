@@ -11,13 +11,13 @@ import {
 } from "@/model/climate"
 import { TRADE_GOOD_LABELS } from "@/model/economy"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared"
-import { ERA_ORDER } from "@/model/society"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
-import type { GenesisParams } from ".."
-import type { GenesisWorld } from "../world"
-import { generateGenesisWorld } from "./generate-world"
+import type { GenesisParams } from "@/model"
+import type { GenesisWorld } from "@/model/world"
+import { generateGenesisWorld } from "@/model/pipelines/generate-world"
+import { ERAS } from "@/model/society/eras"
 
 const SMOKE_PLANET_SEED = 14963991
 const SMOKE_PLANET_CODE = encodePlanetCode(SMOKE_PLANET_SEED, {
@@ -552,7 +552,7 @@ describe("full world smoke generation", () => {
 		]
 
 		const base = buildSmokeParams(SMOKE_PLANET_CODE)
-		for (const era of ERA_ORDER) {
+		for (const era of ERAS.eraOrder) {
 			const world = generateGenesisWorld({ ...base, era })
 			if (
 				!world.nations ||

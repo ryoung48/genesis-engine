@@ -1,5 +1,5 @@
-﻿import { createWorldNames, type LanguageNames } from "@/model/society"
-import type { SerializedGenesisWorld } from "@/model/transport"
+﻿import type { SerializedGenesisWorld } from "@/model/transport"
+import { LanguageNames, NAMES } from "@/model/society/language/names"
 
 /**
  * Nation, province, culture and landmark names for the current world.
@@ -13,5 +13,5 @@ import type { SerializedGenesisWorld } from "@/model/transport"
 export function createDisplayNames(
 	world: SerializedGenesisWorld,
 ): LanguageNames {
-	return createWorldNames(world)
+	return NAMES.createWorldNames(world)
 }

@@ -1,12 +1,8 @@
 ﻿import { createStringRng } from "@/model/shared"
-import type { HeritageScript } from "@/model/society"
-import {
-	getRuneDotRadius,
-	getRuneDots,
-	layoutGlyphText,
-	prepareRuneStrokes,
-} from "@/model/society"
-import { LABEL_OUTLINE_COLOR } from "./nation-label-overlay"
+import { LABEL_OUTLINE_COLOR } from "@/ui/planet/renderer/nation-label-overlay"
+import type { HeritageScript } from "@/model/society/script"
+import { GLYPH_MODULE } from "@/model/society/script/runegen/glyph-module"
+import { RUNE_RENDERER } from "@/model/society/script/runegen/rune-renderer"
 
 const CELL_SCALE = 7
 // Layout spacing scales with the render scale (like stroke width already
@@ -55,7 +51,7 @@ function drawOutlineDot(
 
 function drawHeadlineBars(
 	ctx: CanvasRenderingContext2D,
-	layout: NonNullable<ReturnType<typeof layoutGlyphText>>,
+	layout: NonNullable<ReturnType<typeof GLYPH_MODULE.layoutGlyphText>>,
 	padding: number,
 	margin: number,
 ) {
@@ -71,7 +67,7 @@ function drawHeadlineBars(
 function drawCursiveConnectors(
 	ctx: CanvasRenderingContext2D,
 	script: HeritageScript,
-	layout: NonNullable<ReturnType<typeof layoutGlyphText>>,
+	layout: NonNullable<ReturnType<typeof GLYPH_MODULE.layoutGlyphText>>,
 	scale: number,
 	padding: number,
 	margin: number,
@@ -133,13 +129,16 @@ export function renderScriptTexture(
 	const paddedWidth = glyphWidth + padding * 2
 	const paddedHeight = glyphHeight + padding * 2
 	const spaceWidth = Math.max(1, Math.round(paddedWidth * SPACE_WIDTH_FACTOR))
-	const layout = layoutGlyphText(text, {
-		paddedWidth,
-		paddedHeight,
-		spaceWidth,
-		gap,
-		lineGap,
-		wrapWidth: options?.wrapWidth,
+	const layout = GLYPH_MODULE.layoutGlyphText({
+		text,
+		config: {
+			paddedWidth,
+			paddedHeight,
+			spaceWidth,
+			gap,
+			lineGap,
+			wrapWidth: options?.wrapWidth,
+		},
 	})
 	if (!layout) return null
 
@@ -158,9 +157,13 @@ export function renderScriptTexture(
 		if (!rune) continue
 
 		const rng = createStringRng(`${text}:${placement.char}:${index}`)
-		const strokes = prepareRuneStrokes(rune, renderOptions, rng)
-		const dots = getRuneDots(rune, renderOptions)
-		const dotRadius = getRuneDotRadius(renderOptions)
+		const strokes = RUNE_RENDERER.prepareRuneStrokes({
+			rune,
+			options: renderOptions,
+			rng,
+		})
+		const dots = RUNE_RENDERER.getRuneDots({ rune, options: renderOptions })
+		const dotRadius = RUNE_RENDERER.getRuneDotRadius(renderOptions)
 		const tx = placement.x + padding + margin
 		const ty = placement.y + padding + margin
 

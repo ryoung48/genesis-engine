@@ -1,5 +1,5 @@
-﻿import { getSettlementEraTuning } from "@/model/society"
-import type { SerializedGenesisWorld } from "@/model/transport"
+﻿import type { SerializedGenesisWorld } from "@/model/transport"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 
 interface LabelNameResolvers {
 	nation: (capitalProvince: number) => string
@@ -29,7 +29,9 @@ export function buildSettlementLabelNames(
 ): string[] | null {
 	if (!world?.settlementRegions || !world.urbanPopulation || !resolvers)
 		return null
-	const { townMin } = getSettlementEraTuning(world.params?.era)
+	const { townMin } = SETTLEMENT_TUNING.getSettlementEraTuning(
+		world.params?.era,
+	)
 	const provinceCount = world.provinces?.count ?? world.settlementRegions.length
 	const names: string[] = new Array(provinceCount)
 	for (let p = 0; p < provinceCount; p++) {

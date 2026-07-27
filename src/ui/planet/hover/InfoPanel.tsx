@@ -1,10 +1,5 @@
 import React from "react"
 import { titleCase } from "@/model/shared"
-import {
-	regionTimezoneOffset,
-	timezoneLandColor,
-	timezoneWaterColor,
-} from "@/model/society/timezone"
 import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import {
 	forEachRoute,
@@ -27,13 +22,13 @@ import {
 	tornadoLandColor,
 	volcanicLandColor,
 	windSpeedColor,
-} from "../colors"
-import { monthLabels } from "../screen/shared/constants"
-import type { DataVariant } from "../screen/shared/data-variant"
+} from "@/ui/planet/colors"
+import { monthLabels } from "@/ui/planet/screen/shared/constants"
+import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 import {
 	getMapModePrimary,
 	type PopulationMapMode,
-} from "../screen/shared/map-modes"
+} from "@/ui/planet/screen/shared/map-modes"
 import {
 	formatDistance,
 	formatElevation,
@@ -43,7 +38,7 @@ import {
 	formatTemperatureDelta,
 	rgbToCss,
 	type UnitSystem,
-} from "../screen/shared/ui-format"
+} from "@/ui/planet/screen/shared/ui-format"
 import type {
 	HoverDtr,
 	HoverHazards,
@@ -57,8 +52,8 @@ import type {
 	HoverRiver,
 	HoverTemperatureSeries,
 	HoverTerrainFeature,
-} from "./hover"
-import { getHoverTradeGood } from "./hover"
+} from "@/ui/planet/hover/hover"
+import { getHoverTradeGood } from "@/ui/planet/hover/hover"
 import {
 	aetColor,
 	currentImpactColor,
@@ -72,7 +67,7 @@ import {
 	petColor,
 	rainColor,
 	tempColor,
-} from "./info-panel-format"
+} from "@/ui/planet/hover/info-panel-format"
 import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
@@ -84,7 +79,8 @@ import {
 	buildTopographySwatchColor,
 	buildTradeGoodSwatchColor,
 	buildVegetationSwatchColor,
-} from "./info-panel-model"
+} from "@/ui/planet/hover/info-panel-model"
+import { TIMEZONE } from "@/model/society/timezone"
 
 const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 
@@ -466,8 +462,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		hoverRegion !== null && world
 			? rgbToCss(
 					(hoverIsLand ?? true)
-						? timezoneLandColor(regionTimezoneOffset(world, hoverRegion))
-						: timezoneWaterColor(regionTimezoneOffset(world, hoverRegion)),
+						? TIMEZONE.timezoneLandColor(
+								TIMEZONE.regionTimezoneOffset({ world, region: hoverRegion }),
+							)
+						: TIMEZONE.timezoneWaterColor(
+								TIMEZONE.regionTimezoneOffset({ world, region: hoverRegion }),
+							),
 				)
 			: null
 	const terrainFeatureSwatches = showGeography

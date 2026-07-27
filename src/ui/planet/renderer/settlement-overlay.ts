@@ -1,12 +1,12 @@
 ﻿import * as THREE from "three"
-import { getSettlementRenderThresholds } from "@/model/society"
 import type { SerializedGenesisWorld } from "@/model/transport"
-import { createMapProjection } from "./map-projection"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import type {
 	BuildGlobeRealSettlementsParams,
 	BuildMapRealSettlementsParams,
 	BuildMapSettlementsParams,
-} from "./types"
+} from "@/ui/planet/renderer/types"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 const SETTLEMENT_LIFT = 0.005
@@ -219,7 +219,9 @@ const TIER_VISUALS = [
 >
 
 function settlementTiers(world: SerializedGenesisWorld): SettlementTier[] {
-	const thresholds = getSettlementRenderThresholds(world.params?.era)
+	const thresholds = SETTLEMENT_TUNING.getSettlementRenderThresholds(
+		world.params?.era,
+	)
 	return TIER_VISUALS.map((visual, index) => ({
 		...visual,
 		minPop: thresholds[index],
