@@ -9,8 +9,8 @@ import type {
 import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
 import { WIND } from "@/model/climate/wind"
 import type { FlowGrid } from "@/model/climate/wind/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
 import { UNITS } from "@/model/shared/units"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
 const CURRENT_EFFECT_MONTHS = 12
 

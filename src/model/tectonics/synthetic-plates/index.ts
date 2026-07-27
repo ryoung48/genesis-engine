@@ -1,10 +1,10 @@
 import type { BoundaryInfo, DistanceFields, TectonicPlate } from "@/model"
 import { STATS } from "@/model/shared/stats"
 import type {
-	DeriveSyntheticPlatesParams,
-	BuildSyntheticPlatesParams,
 	BuildDummyBoundaryParams,
+	BuildSyntheticPlatesParams,
 	ComputeSimpleDistanceFieldsParams,
+	DeriveSyntheticPlatesParams,
 } from "@/model/tectonics/synthetic-plates/types"
 
 function deriveSyntheticPlates({

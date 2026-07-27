@@ -1,3 +1,4 @@
+import { RNG } from "@/model/shared/rng"
 import type {
 	GenerateGlyphSetParams,
 	LayoutGlyphTextParams,
@@ -8,7 +9,6 @@ import {
 	type RuneMotif,
 	type RuneTemplate,
 } from "@/model/society/script/runegen/rune"
-import { RNG } from "@/model/shared/rng"
 
 export type GlyphSet = Record<string, Rune>
 

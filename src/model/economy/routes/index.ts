@@ -10,6 +10,9 @@ import type {
 	SeaNeighborWorkspace,
 	SearchWorkspace,
 } from "@/model/economy/routes/types"
+import { MinHeap } from "@/model/shared/min-heap"
+import { UNITS } from "@/model/shared/units"
+import { URQUHART } from "@/model/shared/urquhart"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SocietyEra } from "@/model/society/types"
 import {
@@ -20,9 +23,6 @@ import {
 	type RouteEdge,
 	type SerializedRouteKind,
 } from "@/model/transport"
-import { MinHeap } from "@/model/shared/min-heap"
-import { UNITS } from "@/model/shared/units"
-import { URQUHART } from "@/model/shared/urquhart"
 
 function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	const { provinces, nations } = input

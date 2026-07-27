@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { StageTiming } from "@/model"
-import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
@@ -53,7 +52,7 @@ import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
 import type { SocietyEra } from "@/model/society/types"
-import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
+import { CLASSIFICATION } from "@/model/terrain/classification"
 import type {
 	GenesisWorkerRequest,
 	SerializedGenesisWorld,
@@ -250,6 +249,8 @@ import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters
 import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organization-stats"
 import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
+
+const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -4076,7 +4077,7 @@ export const GenesisView: React.FC = () => {
 							const color = getTopographyColor(index)
 							return color ? rgbToCss(color) : "rgb(148, 163, 184)"
 						},
-						new Set([TOPO_LAKE, TOPO_OCEAN]),
+						new Set([CLASSIFICATION.topoLake, CLASSIFICATION.topoOcean]),
 					),
 		[showObservedDistributions, world?.eu5Topography, world?.topography],
 	)
@@ -6488,7 +6489,7 @@ export const GenesisView: React.FC = () => {
 						const color = getTopographyColor(index)
 						return color ? rgbToCss(color) : "rgb(148, 163, 184)"
 					},
-					new Set([TOPO_LAKE, TOPO_OCEAN]),
+					new Set([CLASSIFICATION.topoLake, CLASSIFICATION.topoOcean]),
 				)
 
 		return {
@@ -7069,7 +7070,7 @@ export const GenesisView: React.FC = () => {
 						const topoColor = getTopographyColor(index)
 						return topoColor ? rgbToCss(topoColor) : "rgb(148, 163, 184)"
 					},
-					new Set([TOPO_LAKE, TOPO_OCEAN]),
+					new Set([CLASSIFICATION.topoLake, CLASSIFICATION.topoOcean]),
 				)
 
 		return {

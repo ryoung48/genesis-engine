@@ -1,9 +1,9 @@
 import type { SphereMesh } from "@/model"
 import type {
 	ClampParams,
-	SmoothstepParams,
-	PiecewiseParams,
 	EulerVelocityAtParams,
+	PiecewiseParams,
+	SmoothstepParams,
 } from "@/model/shared/math/types"
 
 const RAD2DEG = 180 / Math.PI

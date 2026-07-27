@@ -1,5 +1,5 @@
-import type { SharedRng } from "@/model/shared/rng"
 import type { RollDiceInput } from "@/model/shared/dice/types"
+import type { SharedRng } from "@/model/shared/rng"
 
 function rollDice({ rng, count, sides }: RollDiceInput): number {
 	let total = 0

@@ -1,7 +1,5 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
-import type { SystemBody } from "@/model/celestial/system/types"
 import { ENVIRONMENT } from "@/model/celestial/planet/environment"
 import { HEATING } from "@/model/celestial/planet/seismology/heating"
 import { RECLASSIFY } from "@/model/celestial/planet/seismology/reclassify"
@@ -9,6 +7,8 @@ import type {
 	SeedForMoonInput,
 	SeismologyProfile,
 } from "@/model/celestial/planet/seismology/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { RNG } from "@/model/shared/rng"
 
 function seedForBody(body: SystemBody): number {

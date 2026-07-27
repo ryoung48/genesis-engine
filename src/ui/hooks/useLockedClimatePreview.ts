@@ -1,8 +1,8 @@
 ﻿import { useMemo } from "react"
 import { HEAT } from "@/model/climate/locked/heat"
-import type { LockedClimatePreviewData } from "@/ui/preview/types"
 import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color-palettes"
+import type { LockedClimatePreviewData } from "@/ui/preview/types"
 
 interface LockedClimatePreviewConfig {
 	obliquity: number

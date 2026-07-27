@@ -1,10 +1,10 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import { UNITS } from "@/model/shared/units"
 import type {
-	ComputeOceanDistanceBFSParams,
 	ComputeCoastDistancesParams,
+	ComputeOceanDistanceBFSParams,
 	CountContinentsParams,
 } from "@/model/shared/stats/types"
+import { UNITS } from "@/model/shared/units"
 
 const SEA_AREA_THRESHOLD_KM2 = 200_000
 

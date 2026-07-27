@@ -3,13 +3,13 @@ import type {
 	OrbitClassification,
 	OrbitComposition,
 } from "@/model/celestial/orbit-body/types"
-import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
-import type { Zone } from "@/model/celestial/planet/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
 import type {
 	ChooseChemistryInput,
 	ClassifiedEnvironment,
 } from "@/model/celestial/planet/environment/classification/dice-table/types"
+import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
+import type { Zone } from "@/model/celestial/planet/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { DICE } from "@/model/shared/dice"
 import { RNG } from "@/model/shared/rng"
 

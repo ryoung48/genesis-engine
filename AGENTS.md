@@ -25,6 +25,7 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 - All class implementations must have clear documentation explaining why the class is needed. Avoid classes and OOP where possible.
 - All optional type attributes must have clear documentation explaining why they are optional. Avoid optional types where possible.
 - Functions take at most one parameter. If a function needs more than one input, bundle them into a single object parameter (its type declared in the domain's `types.ts`, not inline). Exception: callbacks passed to native APIs whose call signature isn't ours to change (e.g. `Array.prototype.sort`/`reduce`/`map` comparators/callbacks). This is an interim manual rule until `lint/nursery/useMaxParams` is enabled in `biome.json`.
+- always use string unions instead of enums
 
 # Module conventions (src/model)
 

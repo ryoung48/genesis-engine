@@ -1,12 +1,12 @@
-import { MATH } from "@/model/shared/math"
 import type {
-	RgbColor,
 	BasisParams,
 	LerpParams,
 	MixRgbParams,
-	SampleColorStopsParams,
+	RgbColor,
 	SampleBasisColorStopsParams,
+	SampleColorStopsParams,
 } from "@/model/shared/color-interpolation/types"
+import { MATH } from "@/model/shared/math"
 
 function lerp({ a, b, t }: LerpParams): number {
 	return a + (b - a) * t

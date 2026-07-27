@@ -1,3 +1,4 @@
+import { TEXT } from "@/model/shared/text"
 import { GENDER_SYSTEM } from "@/model/society/gender-system"
 import { LANGUAGE } from "@/model/society/language/languages"
 import type { Language } from "@/model/society/language/languages/types"
@@ -13,7 +14,6 @@ import type {
 } from "@/model/society/language/names/types"
 import { CultureGenderSystem } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/transport"
-import { TEXT } from "@/model/shared/text"
 
 export interface LanguageNameLeaderEntry {
 	time: number

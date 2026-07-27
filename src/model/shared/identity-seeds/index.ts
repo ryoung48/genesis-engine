@@ -1,5 +1,5 @@
-import { RNG } from "@/model/shared/rng"
 import type { BuildIdentitySeedsParams } from "@/model/shared/identity-seeds/types"
+import { RNG } from "@/model/shared/rng"
 
 function buildIdentitySeeds({
 	count,

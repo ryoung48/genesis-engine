@@ -1,4 +1,5 @@
-﻿import { BUILDER } from "@/model/society/language/languages/builder"
+﻿import { TEXT } from "@/model/shared/text"
+import { BUILDER } from "@/model/society/language/languages/builder"
 import { CONSONANTS } from "@/model/society/language/languages/builder/consonants"
 import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
@@ -11,7 +12,6 @@ import {
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
-import { TEXT } from "@/model/shared/text"
 
 export const LANGUAGE = {
 	word: {

@@ -1,7 +1,8 @@
 ﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { RAIN } from "@/model/climate/rain"
-import { computeSeaLevelOffsetKm } from "@/model/terrain"
+import { UNITS } from "@/model/shared/units"
+import { SEA_LEVEL } from "@/model/terrain/sea-level"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	formatArea,
@@ -11,7 +12,6 @@ import {
 	formatTemperatureDelta,
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
-import { UNITS } from "@/model/shared/units"
 
 export interface PlanetStat {
 	label: string
@@ -219,7 +219,10 @@ export function computePlanetStats(
 	let seaLevelShiftStat: PlanetStat | null = null
 	if (seaLevelValue != null && seaLevelValue !== 1) {
 		const maxDepthKm = UNITS.getMaxOceanDepthKm(radiusKm)
-		const offsetKm = computeSeaLevelOffsetKm(seaLevelValue, maxDepthKm)
+		const offsetKm = SEA_LEVEL.computeSeaLevelOffsetKm({
+			seaLevel: seaLevelValue,
+			maxDepthKm,
+		})
 		const sign = offsetKm >= 0 ? "+" : "−"
 		const absValue =
 			unitSystem === "imperial"

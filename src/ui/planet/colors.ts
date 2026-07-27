@@ -1,8 +1,8 @@
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
-import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 import type { RgbColor } from "@/model/shared/color-interpolation/types"
+import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 
 /**
  * Genesis elevation and temperature color mapping.

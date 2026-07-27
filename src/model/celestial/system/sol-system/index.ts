@@ -1,18 +1,18 @@
 import { MOON } from "@/model/celestial/moons"
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
-import type {
-	SolarSystemState,
-	SystemBody,
-} from "@/model/celestial/system/types"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 import type {
 	BuildPlanetOptions,
 	SolMoonSeed,
 	SolPlanetSeed,
 } from "@/model/celestial/system/sol-system/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import { DATA } from "@/model/celestial/system/sol-system/data"
+import type {
+	SolarSystemState,
+	SystemBody,
+} from "@/model/celestial/system/types"
 import { RNG } from "@/model/shared/rng"
 import { TIME } from "@/model/shared/time"
 

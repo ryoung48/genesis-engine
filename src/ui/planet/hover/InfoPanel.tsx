@@ -1,6 +1,7 @@
 import React from "react"
+import { TEXT } from "@/model/shared/text"
 import { TIMEZONE } from "@/model/society/timezone"
-import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 import {
 	forEachRoute,
 	ROUTE_LAND_MAJOR,
@@ -80,7 +81,6 @@ import {
 	rgbToCss,
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
-import { TEXT } from "@/model/shared/text"
 
 const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 
@@ -173,7 +173,9 @@ function buildHoverPortLabel(
 	const landmarkTypeCode = world.landmarks?.type?.[landmarkId]
 	const landmarkType =
 		typeof landmarkTypeCode === "number"
-			? TEXT.titleCase(LANDMARK_TYPES[landmarkTypeCode] ?? "water body")
+			? TEXT.titleCase(
+					LANDMARKS.landmarkTypes[landmarkTypeCode] ?? "water body",
+				)
 			: "Water Body"
 	return `${getLandmarkName(landmarkId)} (${landmarkType})`
 }

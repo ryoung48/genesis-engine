@@ -1,29 +1,29 @@
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import type { PastaDebug } from "@/model/climate/types"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
+import type { ProvincePopulation } from "@/model/society/types"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
+import type {
+	GenesisClimate,
+	GenesisHazards,
+	GenesisHydrology,
+	GenesisOceanCurrents,
+	GenesisRainfall,
+} from "@/model/types/climate"
 import type { SphereMesh } from "@/model/types/mesh"
 import type {
-	GenesisParams,
+	GenesisLocations,
+	GenesisProvinces,
+	GenesisRivers,
+} from "@/model/types/society"
+import type {
 	BoundaryInfo,
 	DistanceFields,
+	GenesisParams,
 	GenesisTerrainFeatures,
 	StageTiming,
 } from "@/model/types/tectonics"
-import type {
-	GenesisClimate,
-	GenesisRainfall,
-	GenesisHydrology,
-	GenesisHazards,
-	GenesisOceanCurrents,
-} from "@/model/types/climate"
-import type {
-	GenesisRivers,
-	GenesisProvinces,
-	GenesisLocations,
-} from "@/model/types/society"
-import type { PastaDebug } from "@/model/climate/types"
 import type { GenesisWorld } from "@/model/world"
-import type { ProvincePopulation } from "@/model/society/types"
-import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
 
 export interface RealRiversInput {
 	lines: [number, number, number, number][][]

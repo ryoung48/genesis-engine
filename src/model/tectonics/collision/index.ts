@@ -1,11 +1,11 @@
 import type { BoundaryInfo, CollisionResult } from "@/model"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MATH } from "@/model/shared/math"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 import type {
-	PlateVelocityAtParams,
-	FindCollisionsParams,
-	PropagateStressParams,
 	ClassifyBoundariesParams,
+	FindCollisionsParams,
+	PlateVelocityAtParams,
+	PropagateStressParams,
 } from "@/model/tectonics/collision/types"
 
 const COLLISION_THRESHOLD = 0.75

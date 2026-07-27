@@ -1,9 +1,10 @@
-﻿import { ELEVATION } from "@/model/climate/elevation"
+import { ELEVATION } from "@/model/climate/elevation"
+import type { ComputeSeaLevelOffsetKmParams } from "@/model/terrain/sea-level/types"
 
-export function computeSeaLevelOffsetKm(
-	seaLevel: number,
-	maxDepthKm: number,
-): number {
+function computeSeaLevelOffsetKm({
+	seaLevel,
+	maxDepthKm,
+}: ComputeSeaLevelOffsetKmParams): number {
 	if (seaLevel === 1) return 0
 	if (seaLevel < 1) return -(1 - seaLevel) * maxDepthKm
 	return (seaLevel - 1) * maxDepthKm
@@ -33,7 +34,7 @@ function heightKmToElev(
 	return (lo + hi) * 0.5
 }
 
-export function applySeaLevelToElevation(params: {
+function applySeaLevelToElevation(params: {
 	baseElevation: Float32Array
 	maxElevKm: number
 	maxDepthKm: number
@@ -44,7 +45,7 @@ export function applySeaLevelToElevation(params: {
 	seaLevelOffsetKm: number
 } {
 	const { baseElevation, maxElevKm, maxDepthKm, seaLevel } = params
-	const seaLevelOffsetKm = computeSeaLevelOffsetKm(seaLevel, maxDepthKm)
+	const seaLevelOffsetKm = computeSeaLevelOffsetKm({ seaLevel, maxDepthKm })
 	if (seaLevelOffsetKm === 0) {
 		const elevation_km = new Float32Array(baseElevation.length)
 		for (let r = 0; r < baseElevation.length; r++) {
@@ -79,4 +80,9 @@ export function applySeaLevelToElevation(params: {
 		elevation_km,
 		seaLevelOffsetKm,
 	}
+}
+
+export const SEA_LEVEL = {
+	computeSeaLevelOffsetKm,
+	applySeaLevelToElevation,
 }

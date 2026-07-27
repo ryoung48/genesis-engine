@@ -1,6 +1,5 @@
 ﻿import { describe, expect, it } from "vitest"
 import type { GenesisParams } from "@/model"
-import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
@@ -8,13 +7,16 @@ import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
+import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import { PLANET_CODE } from "@/model/shared/planet-code"
 import { ERAS } from "@/model/society/eras"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
+import { CLASSIFICATION } from "@/model/terrain/classification"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 import type { GenesisWorld } from "@/model/world"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
-import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
-import { PLANET_CODE } from "@/model/shared/planet-code"
+
+const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
 const SMOKE_PLANET_SEED = 14963991
 const SMOKE_PLANET_CODE = PLANET_CODE.encodePlanetCode({
@@ -320,7 +322,9 @@ describe("full world smoke generation", () => {
 			function isLakeLandmark(r: number): boolean {
 				if (!world.landmarks) return false
 				const lid = world.landmarks.regionLandmark[r]
-				return lid >= 0 && world.landmarks.type[lid] === LANDMARK_TYPE_LAKE
+				return (
+					lid >= 0 && world.landmarks.type[lid] === LANDMARKS.landmarkTypeLake
+				)
 			}
 
 			// ── Land coastal cells (enclosure-based source values) ────────────

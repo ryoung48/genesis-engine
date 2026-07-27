@@ -1,8 +1,8 @@
+import { RNG as SHARED_RNG, SharedRng } from "@/model/shared/rng"
 import type {
 	LanguageRng,
 	WeightedValue,
 } from "@/model/society/language/languages/types"
-import { SharedRng, RNG as SHARED_RNG } from "@/model/shared/rng"
 
 function wrapSharedRng(rng: SharedRng): LanguageRng {
 	return {

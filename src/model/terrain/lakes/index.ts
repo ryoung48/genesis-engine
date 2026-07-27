@@ -1,17 +1,20 @@
-﻿import type {
+import { MinHeap } from "@/model/shared/min-heap"
+import type {
+	ComputeLakeSurfaceParams,
 	ComputeLakesParams,
+	ComputeSubgraphNeighborCountParams,
+	EstimateSubgraphDiameterParams,
 	SelectCompactLakeFallbackParams,
 	SelectConnectedLakeCellsParams,
 	TrimLakeCorridorsParams,
-} from "@/model/terrain/types"
-import { MinHeap } from "@/model/shared/min-heap"
+} from "@/model/terrain/lakes/types"
 
-function computeSubgraphNeighborCount(
-	numRegions: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	cells: number[],
-): Uint8Array {
+function computeSubgraphNeighborCount({
+	numRegions,
+	adjOffset,
+	adjList,
+	cells,
+}: ComputeSubgraphNeighborCountParams): Uint8Array {
 	const inSubgraph = new Uint8Array(numRegions)
 	const neighborCount = new Uint8Array(numRegions)
 	for (const cell of cells) inSubgraph[cell] = 1
@@ -25,10 +28,10 @@ function computeSubgraphNeighborCount(
 	return neighborCount
 }
 
-function computeLakeSurface(
-	lakeCells: number[],
-	elevation: Float32Array,
-): number {
+function computeLakeSurface({
+	lakeCells,
+	elevation,
+}: ComputeLakeSurfaceParams): number {
 	let lakeSurface = elevation[lakeCells[0]]
 	for (const cell of lakeCells) {
 		lakeSurface = Math.max(lakeSurface, elevation[cell])
@@ -36,12 +39,12 @@ function computeLakeSurface(
 	return lakeSurface + 1e-7
 }
 
-function estimateSubgraphDiameter(
-	numRegions: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	cells: number[],
-): number {
+function estimateSubgraphDiameter({
+	numRegions,
+	adjOffset,
+	adjList,
+	cells,
+}: EstimateSubgraphDiameterParams): number {
 	if (cells.length <= 1) return 0
 
 	const inSubgraph = new Uint8Array(numRegions)
@@ -138,15 +141,18 @@ function trimLakeCorridors({
 }: TrimLakeCorridorsParams): { lakeCells: number[]; lakeSurface: number } {
 	if (lakeCells.length === 0) return { lakeCells: [], lakeSurface: 0 }
 	if (lakeCells.length <= 3) {
-		return { lakeCells, lakeSurface: computeLakeSurface(lakeCells, elevation) }
+		return {
+			lakeCells,
+			lakeSurface: computeLakeSurface({ lakeCells, elevation }),
+		}
 	}
 
-	const basinNeighborCount = computeSubgraphNeighborCount(
+	const basinNeighborCount = computeSubgraphNeighborCount({
 		numRegions,
 		adjOffset,
 		adjList,
-		basinCells,
-	)
+		cells: basinCells,
+	})
 	const inLake = new Uint8Array(numRegions)
 	const isCorridor = new Uint8Array(numRegions)
 	for (const cell of lakeCells) inLake[cell] = 1
@@ -218,12 +224,12 @@ function trimLakeCorridors({
 		if (component.length >= lakeCells.length) continue
 		if (component.length < 5 || attachments.size > 2) continue
 
-		const diameter = estimateSubgraphDiameter(
+		const diameter = estimateSubgraphDiameter({
 			numRegions,
 			adjOffset,
 			adjList,
-			component,
-		)
+			cells: component,
+		})
 		const averageBasinNeighbors = basinNeighborSum / component.length
 		const widthEstimate = component.length / Math.max(1, diameter + 1)
 
@@ -238,7 +244,10 @@ function trimLakeCorridors({
 
 	const trimmedLakeCells = lakeCells.filter((cell) => !pruned[cell])
 	if (trimmedLakeCells.length === lakeCells.length) {
-		return { lakeCells, lakeSurface: computeLakeSurface(lakeCells, elevation) }
+		return {
+			lakeCells,
+			lakeSurface: computeLakeSurface({ lakeCells, elevation }),
+		}
 	}
 	if (trimmedLakeCells.length === 0) {
 		const fallbackTarget =
@@ -253,13 +262,16 @@ function trimLakeCorridors({
 		})
 		return {
 			lakeCells: fallbackLakeCells,
-			lakeSurface: computeLakeSurface(fallbackLakeCells, elevation),
+			lakeSurface: computeLakeSurface({
+				lakeCells: fallbackLakeCells,
+				elevation,
+			}),
 		}
 	}
 
 	return {
 		lakeCells: trimmedLakeCells,
-		lakeSurface: computeLakeSurface(trimmedLakeCells, elevation),
+		lakeSurface: computeLakeSurface({ lakeCells: trimmedLakeCells, elevation }),
 	}
 }
 
@@ -285,12 +297,12 @@ function selectConnectedLakeCells({
 	frontierKey.fill(Number.POSITIVE_INFINITY)
 
 	for (const cell of basinCells) inBasin[cell] = 1
-	const basinNeighborCount = computeSubgraphNeighborCount(
+	const basinNeighborCount = computeSubgraphNeighborCount({
 		numRegions,
 		adjOffset,
 		adjList,
-		basinCells,
-	)
+		cells: basinCells,
+	})
 
 	let seed = basinCells[0]
 	for (const cell of basinCells) {
@@ -331,7 +343,7 @@ function selectConnectedLakeCells({
 	})
 }
 
-export function computeLakes({
+function computeLakes({
 	mesh,
 	elevation,
 	rainfall,
@@ -397,4 +409,8 @@ export function computeLakes({
 			continue
 		isLand[r] = 0
 	}
+}
+
+export const LAKES = {
+	computeLakes,
 }

@@ -1,4 +1,7 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
+import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
 import { HIERARCHY } from "@/model/society/hierarchy"
 import type {
@@ -25,9 +28,6 @@ import type {
 	SelectSeedParams,
 } from "@/model/society/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
-import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
-import { UNITS } from "@/model/shared/units"
 
 const MAX_NATION_SPREAD_KM = 2000
 

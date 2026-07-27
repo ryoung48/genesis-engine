@@ -1,3 +1,5 @@
+import { RNG } from "@/model/shared/rng"
+import { UNITS } from "@/model/shared/units"
 import type {
 	BfsUpdateMinHopsParams,
 	ComputeMigrationParams,
@@ -8,8 +10,6 @@ import type {
 	PlaceCradlesParams,
 	ProvincePopulation,
 } from "@/model/society/types"
-import { RNG } from "@/model/shared/rng"
-import { UNITS } from "@/model/shared/units"
 
 const HAB_CLIMATE = new Float32Array([
 	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,

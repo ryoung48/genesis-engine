@@ -2,6 +2,7 @@ import * as THREE from "three"
 import type { Text } from "troika-three-text"
 import { MOON } from "@/model/celestial/moons"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
@@ -28,7 +29,6 @@ import {
 	perifocalBasis,
 	solveKepler,
 } from "@/ui/planet/renderer/moon-orbit-overlay"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const DEG2RAD = Math.PI / 180
 

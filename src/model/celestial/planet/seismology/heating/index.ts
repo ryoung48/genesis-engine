@@ -1,6 +1,6 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
 import type { MoonTidalHeatingInput } from "@/model/celestial/planet/seismology/heating/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 function computeResidualHeating(params: {
 	sizeClass: number

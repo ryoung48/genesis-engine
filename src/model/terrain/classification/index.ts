@@ -1,16 +1,22 @@
-﻿import type { GenesisRivers, SphereMesh } from "@/model"
+import type { GenesisRivers, SphereMesh } from "@/model"
 import { VEGETATION } from "@/model/climate/vegetation"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain/landmarks"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { LANDMARKS } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
-export const TOPO_FLAT = 0
-export const TOPO_HILL = 1
-export const TOPO_PLATEAU = 2
-export const TOPO_MOUNTAIN = 3
-export const TOPO_MARSH = 4
-export const TOPO_OCEAN = 5
-export const TOPO_LAKE = 6
+const topoFlat = 0
+
+const topoHill = 1
+
+const topoPlateau = 2
+
+const topoMountain = 3
+
+const topoMarsh = 4
+
+const topoOcean = 5
+
+const topoLake = 6
 
 function computeSlopeScore(
 	mesh: SphereMesh,
@@ -61,7 +67,7 @@ function computeSlopeScore(
 	return smoothedSlope
 }
 
-export const GENESIS_TOPOGRAPHY_LABELS = [
+const genesisTopographyLabels = [
 	"flat",
 	"hill",
 	"plateau",
@@ -71,7 +77,7 @@ export const GENESIS_TOPOGRAPHY_LABELS = [
 	"lake",
 ] as const
 
-export function classifyTopography(params: {
+function classifyTopography(params: {
 	mesh: SphereMesh
 	elevationKm: Float32Array
 	isLand: Uint8Array
@@ -108,7 +114,7 @@ export function classifyTopography(params: {
 	function isLake(r: number): boolean {
 		if (isLand[r]) return false
 		const lid = regionLandmark[r]
-		return lid >= 0 && landmarkType[lid] === LANDMARK_TYPE_LAKE
+		return lid >= 0 && landmarkType[lid] === LANDMARKS.landmarkTypeLake
 	}
 	const adjacentLake = new Uint8Array(mesh.numRegions)
 	const adjacentOcean = new Uint8Array(mesh.numRegions)
@@ -134,11 +140,11 @@ export function classifyTopography(params: {
 
 	for (let r = 0; r < mesh.numRegions; r++) {
 		if (isLake(r)) {
-			topography[r] = TOPO_LAKE
+			topography[r] = topoLake
 			continue
 		}
 		if (!isLand[r]) {
-			topography[r] = TOPO_OCEAN
+			topography[r] = topoOcean
 			continue
 		}
 
@@ -201,7 +207,7 @@ export function classifyTopography(params: {
 		if (adjacentOcean[r] || adjacentLake[r]) coastal[r] = 1
 
 		if (marsh[r]) {
-			topography[r] = TOPO_MARSH
+			topography[r] = topoMarsh
 			continue
 		}
 		if (
@@ -209,21 +215,21 @@ export function classifyTopography(params: {
 			(elevation >= 1.2 && slope >= 0.45) ||
 			(elevation > 0.5 && slope > 0.6)
 		) {
-			topography[r] = TOPO_MOUNTAIN
+			topography[r] = topoMountain
 			continue
 		}
 		if (
 			(elevation >= 1.0 && slope < 0.3) ||
 			(elevation >= 0.8 && slope < 0.2)
 		) {
-			topography[r] = TOPO_PLATEAU
+			topography[r] = topoPlateau
 			continue
 		}
 		if (elevation > 0.1 && slope >= 0.2) {
-			topography[r] = TOPO_HILL
+			topography[r] = topoHill
 			continue
 		}
-		topography[r] = TOPO_FLAT
+		topography[r] = topoFlat
 	}
 
 	return {
@@ -233,4 +239,16 @@ export function classifyTopography(params: {
 		lakeCoastal: adjacentLake,
 		slopeScore,
 	}
+}
+
+export const CLASSIFICATION = {
+	topoFlat,
+	topoHill,
+	topoPlateau,
+	topoMountain,
+	topoMarsh,
+	topoOcean,
+	topoLake,
+	genesisTopographyLabels,
+	classifyTopography,
 }

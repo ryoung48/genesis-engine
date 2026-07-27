@@ -1,4 +1,3 @@
-export { GENESIS_TOPOGRAPHY_LABELS } from "./terrain"
 export type {
 	BoundaryInfo,
 	CollisionResult,

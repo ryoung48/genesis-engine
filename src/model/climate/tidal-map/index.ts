@@ -1,6 +1,6 @@
 import type { ComputeSpringTideMapInput } from "@/model/climate/tidal-map/types"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import { RNG } from "@/model/shared/rng"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 
 const BASE_TIDAL_RANGE_M = 0.25
 
@@ -42,7 +42,7 @@ function computeSpringTideMap({
 	function isLandmarkLake(r: number): boolean {
 		if (!landmarks) return false
 		const lid = landmarks.regionLandmark[r]
-		return lid >= 0 && landmarks.type[lid] === LANDMARK_TYPE_LAKE
+		return lid >= 0 && landmarks.type[lid] === LANDMARKS.landmarkTypeLake
 	}
 	const isOcean = (r: number) => !isLand[r] && !isLandmarkLake(r)
 

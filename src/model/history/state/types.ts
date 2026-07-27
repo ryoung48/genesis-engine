@@ -4,7 +4,7 @@ import type { HistoryRng } from "@/model/history/history-rng/types"
 import type { Relation } from "@/model/history/state"
 import type { Timeline } from "@/model/history/timeline"
 import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type {
 	GenesisNationHierarchy,

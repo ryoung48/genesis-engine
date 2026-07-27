@@ -1,24 +1,17 @@
-﻿/**
- * Location (barony-level) partitioning within provinces.
- * Each province is subdivided into locations via competitive multi-source BFS,
- * constrained to stay within province boundaries. The number of locations per
- * province scales with its area relative to LOCATION_AREA_TARGET_KM2.
- */
-
-import type { GenesisLocations, GenesisProvinces, SphereMesh } from "@/model"
-import { PROVINCE_AREA_TARGET_KM2 } from "@/model/terrain/provinces"
+import type { GenesisLocations } from "@/model"
 import { RNG } from "@/model/shared/rng"
 import { UNITS } from "@/model/shared/units"
+import type { ComputeLocationsParams } from "@/model/terrain/locations/types"
+import { PROVINCES } from "@/model/terrain/provinces"
 
-// Target ~3 locations per standard province
-const LOCATION_AREA_TARGET_KM2 = PROVINCE_AREA_TARGET_KM2 / 2
+const LOCATION_AREA_TARGET_KM2 = PROVINCES.provinceAreaTargetKm2 / 2
 
-export function computeLocations(
-	provinces: GenesisProvinces,
-	mesh: SphereMesh,
-	seed: number,
-	options?: { planetRadiusKm?: number },
-): GenesisLocations {
+function computeLocations({
+	provinces,
+	mesh,
+	seed,
+	options,
+}: ComputeLocationsParams): GenesisLocations {
 	const { adjOffset, adjList } = mesh
 	const N = mesh.numRegions
 	const P = provinces.count
@@ -137,4 +130,8 @@ export function computeLocations(
 		size,
 		colors: new Float32Array(locationCount * 3),
 	}
+}
+
+export const LOCATIONS = {
+	computeLocations,
 }

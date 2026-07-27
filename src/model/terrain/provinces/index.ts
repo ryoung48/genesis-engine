@@ -1,35 +1,20 @@
-/**
- * Province partitioning for the genesis pipeline.
- * Competitive multi-source BFS on SphereMesh CSR adjacency.
- * O(N) time, all typed arrays, no object allocation in hot path.
- */
-
 import type { GenesisProvinces, GenesisRainfall, SphereMesh } from "@/model"
+import { RNG } from "@/model/shared/rng"
+import { UNITS } from "@/model/shared/units"
 import type {
+	CompetitiveBfsAssignParams,
 	ComputeProvincesFromRasterParams,
 	ComputeProvincesParams,
 	ComputeWeightedProvincesParams,
-} from "@/model/terrain/types"
-import { RNG } from "@/model/shared/rng"
-import { UNITS } from "@/model/shared/units"
+	GenerateProvinceColorsParams,
+	HslToRgbParams,
+} from "@/model/terrain/provinces/types"
 
-/**
- * Target mean province area. 37,000 km² is the mean real-world area of an EU4
- * extended-timeline land province, measured from the Earth-aligned fill
- * vectors in public/earth-history/reference (3,522 land provinces totalling
- * 131.0M km², mean 37,203 km², median 20,035 km²). Matching the mean rather
- * than the median reproduces EU4's province *count* on an Earth-sized world;
- * the generator's own size spread is tighter than EU4's, which has a long
- * tail of Siberian/Saharan wasteland-scale cells pulling its mean well above
- * its median.
- */
-export const PROVINCE_AREA_TARGET_KM2 = 37_000
-// How far a coastal province's frontier may expand across open ocean before
-// giving up on finding a neighbor -- caps sea-crossing adjacency search, see
-// assemblePartition's phase 5b.
+const provinceAreaTargetKm2 = 37_000
+
 const SEA_CROSSING_RANGE_KM = 500
 
-export function computeProvinces({
+function computeProvinces({
 	mesh,
 	isLand,
 	topography,
@@ -66,7 +51,7 @@ export function computeProvinces({
 		1,
 		Math.round(
 			(landCount * regionAreaKm2) /
-				PROVINCE_AREA_TARGET_KM2 /
+				provinceAreaTargetKm2 /
 				SEED_PACKING_EFFICIENCY,
 		),
 	)
@@ -133,12 +118,12 @@ export function computeProvinces({
 	// Normal edges processed first; mountain-to-mountain crossings deferred
 	// to the next round, making ridges natural province boundaries.
 
-	const regionProvince = competitiveBfsAssign(
+	const regionProvince = competitiveBfsAssign({
 		mesh,
 		isLand,
 		topography,
-		seedsArr,
-	)
+		seeds: seedsArr,
+	})
 
 	return assemblePartition(
 		mesh,
@@ -151,17 +136,12 @@ export function computeProvinces({
 	)
 }
 
-/**
- * Assigns every land region to whichever seed reaches it first via BFS
- * flood-fill from all seeds simultaneously, deferring mountain-to-mountain
- * crossings so ridges become natural province boundaries.
- */
-function competitiveBfsAssign(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	topography: Uint8Array,
-	seeds: Int32Array,
-): Int32Array {
+function competitiveBfsAssign({
+	mesh,
+	isLand,
+	topography,
+	seeds,
+}: CompetitiveBfsAssignParams): Int32Array {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const provinceCount = seeds.length
@@ -198,11 +178,6 @@ function competitiveBfsAssign(
 	return regionProvince
 }
 
-/**
- * Phases 3-6 shared by both the procedural BFS partition (computeProvinces)
- * and the real-data weighted partition (computeWeightedProvinces): province
- * sizes, water access, desolate classification, adjacency, and colors.
- */
 function assemblePartition(
 	mesh: SphereMesh,
 	isLand: Uint8Array,
@@ -408,7 +383,7 @@ function assemblePartition(
 		if (component >= 0) landmassId[p] = component
 	}
 
-	const colors = generateProvinceColors(provinceCount, rng)
+	const colors = generateProvinceColors({ count: provinceCount, rng })
 
 	return {
 		regionProvince,
@@ -426,19 +401,7 @@ function assemblePartition(
 	}
 }
 
-/**
- * Assigns provinces from real-world seed data (e.g. imported Earth province
- * centers) instead of the procedural BFS in computeProvinces. Each seed
- * already has a fixed mesh region (resolved by the caller).
- *
- * Boundaries come from a multiplicatively-weighted multi-source Dijkstra on
- * geodesic distance -- every region joins whichever seed reaches it first,
- * where each seed's frontier expands at a rate proportional to its land-area
- * weight (a geodesic weighted Voronoi diagram). Higher-weight seeds (e.g.
- * larger real-world provinces) therefore claim more territory, while equal
- * weights degenerate to the plain unweighted case.
- */
-export function computeWeightedProvinces({
+function computeWeightedProvinces({
 	mesh,
 	isLand,
 	seedRegions,
@@ -578,17 +541,7 @@ export function computeWeightedProvinces({
 	return { ...result, names: seedNames }
 }
 
-/**
- * Assigns provinces directly from a rasterized real-world province-id map
- * (e.g. a rasterized EU4 province GeoJSON) instead of Voronoi-partitioning
- * from seed points. Each mesh region's raw id (sampled from the raster by
- * the caller, -1 = no data) is remapped to a compact province index, so
- * boundaries exactly follow the source polygons rather than approximating
- * them from centroid seeds. Small gaps from rasterization seams are filled
- * from mesh-adjacent assigned regions; larger unmapped land areas (outside
- * the source data's coverage) are left unassigned and render like ocean.
- */
-export function computeProvincesFromRaster({
+function computeProvincesFromRaster({
 	mesh,
 	isLand,
 	regionIds,
@@ -693,7 +646,7 @@ export function computeProvincesFromRaster({
 	return { ...result, names, realIds }
 }
 
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+function hslToRgb({ h, s, l }: HslToRgbParams): [number, number, number] {
 	const c = (1 - Math.abs(2 * l - 1)) * s
 	const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
 	const m = l - c / 2
@@ -722,10 +675,10 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 	return [r + m, g + m, b + m]
 }
 
-function generateProvinceColors(
-	count: number,
-	rng: { random(): number },
-): Float32Array {
+function generateProvinceColors({
+	count,
+	rng,
+}: GenerateProvinceColorsParams): Float32Array {
 	const colors = new Float32Array(count * 3)
 	const GOLDEN_RATIO = 0.618033988749895
 	let hue = rng.random()
@@ -733,7 +686,7 @@ function generateProvinceColors(
 		hue = (hue + GOLDEN_RATIO) % 1
 		const sat = 0.45 + rng.random() * 0.3
 		const lit = 0.4 + rng.random() * 0.25
-		const [r, g, b] = hslToRgb(hue * 360, sat, lit)
+		const [r, g, b] = hslToRgb({ h: hue * 360, s: sat, l: lit })
 		colors[3 * i] = r
 		colors[3 * i + 1] = g
 		colors[3 * i + 2] = b
@@ -756,4 +709,11 @@ function emptyProvinces(N: number): GenesisProvinces {
 		size: new Int32Array(0),
 		colors: new Float32Array(0),
 	}
+}
+
+export const PROVINCES = {
+	provinceAreaTargetKm2,
+	computeProvinces,
+	computeWeightedProvinces,
+	computeProvincesFromRaster,
 }

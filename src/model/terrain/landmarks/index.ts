@@ -1,31 +1,13 @@
-﻿/**
- * Landmass / water body labeling via connected-component BFS.
- * Each region gets a landmark ID; each landmark has a type and size.
- * O(N) time, typed arrays only.
- */
 import type { GenesisPartition, GenesisProvinces, SphereMesh } from "@/model"
 import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
+import type {
+	ComputeLandmarksParams,
+	GenesisLandmarks,
+	IncrementCountParams,
+	LandmarkType,
+} from "@/model/terrain/landmarks/types"
 
-type LandmarkType = "continent" | "island" | "isle" | "ocean" | "sea" | "lake"
-
-export interface GenesisLandmarks {
-	/** Per-region landmark index */
-	regionLandmark: Int32Array
-	/** Per-landmark type code (index into LANDMARK_TYPES) */
-	type: Uint8Array
-	/** Per-landmark region count */
-	size: Int32Array
-	/** Dominant culture on the landmark, or the dominant bordering culture for water landmarks */
-	dominantCulture?: Int32Array
-	/** Deterministic per-landmark display/name seed */
-	nameSeeds?: Int32Array
-	/** Real-world name per landmark (Earth import, lake landmarks only). */
-	realNames?: (string | null)[]
-	/** Total number of landmarks */
-	count: number
-}
-
-export const LANDMARK_TYPES: LandmarkType[] = [
+const landmarkTypes: LandmarkType[] = [
 	"continent", // 0
 	"island", // 1
 	"isle", // 2
@@ -35,17 +17,21 @@ export const LANDMARK_TYPES: LandmarkType[] = [
 ]
 
 const LANDMARK_TYPE_CONTINENT = 0
-const LANDMARK_TYPE_ISLAND = 1
-const LANDMARK_TYPE_ISLE = 2
-export const LANDMARK_TYPE_OCEAN = 3
-const LANDMARK_TYPE_SEA = 4
-const LANDMARK_TYPE_LAKE = 5
-export { LANDMARK_TYPE_SEA, LANDMARK_TYPE_LAKE }
 
-export function computeLandmarks(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-): GenesisLandmarks {
+const LANDMARK_TYPE_ISLAND = 1
+
+const LANDMARK_TYPE_ISLE = 2
+
+const landmarkTypeOcean = 3
+
+const landmarkTypeSea = 4
+
+const landmarkTypeLake = 5
+
+function computeLandmarks({
+	mesh,
+	isLand,
+}: ComputeLandmarksParams): GenesisLandmarks {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 
@@ -90,9 +76,9 @@ export function computeLandmarks(
 	for (let i = 0; i < count; i++) {
 		const ratio = sizes[i] / N
 		if (isWater[i]) {
-			if (ratio >= 0.01) type[i] = LANDMARK_TYPE_OCEAN
-			else if (ratio >= 0.001) type[i] = LANDMARK_TYPE_SEA
-			else type[i] = LANDMARK_TYPE_LAKE
+			if (ratio >= 0.01) type[i] = landmarkTypeOcean
+			else if (ratio >= 0.001) type[i] = landmarkTypeSea
+			else type[i] = landmarkTypeLake
 		} else {
 			if (ratio >= 0.01) type[i] = LANDMARK_TYPE_CONTINENT
 			else if (ratio >= 0.001) type[i] = LANDMARK_TYPE_ISLAND
@@ -108,7 +94,7 @@ export function computeLandmarks(
 	}
 }
 
-function incrementCount(counts: Map<number, number>, key: number): void {
+function incrementCount({ counts, key }: IncrementCountParams): void {
 	counts.set(key, (counts.get(key) ?? 0) + 1)
 }
 
@@ -127,7 +113,7 @@ function pickDominantCulture(counts: Map<number, number>): number {
 	return culture
 }
 
-export function assignLandmarkIdentity(params: {
+function assignLandmarkIdentity(params: {
 	mesh: SphereMesh
 	landmarks: GenesisLandmarks
 	provinces?: Pick<GenesisProvinces, "regionProvince">
@@ -164,7 +150,8 @@ export function assignLandmarkIdentity(params: {
 		if (landmarkId < 0 || !isLand[region]) continue
 		const provinceId = regionProvince[region] ?? -1
 		const cultureId = provinceId >= 0 ? (assignment[provinceId] ?? -1) : -1
-		if (cultureId >= 0) incrementCount(internalCounts[landmarkId], cultureId)
+		if (cultureId >= 0)
+			incrementCount({ counts: internalCounts[landmarkId], key: cultureId })
 	}
 
 	for (let region = 0; region < mesh.numRegions; region++) {
@@ -180,7 +167,8 @@ export function assignLandmarkIdentity(params: {
 			if (!isLand[neighbor]) continue
 			const provinceId = regionProvince[neighbor] ?? -1
 			const cultureId = provinceId >= 0 ? (assignment[provinceId] ?? -1) : -1
-			if (cultureId >= 0) incrementCount(borderCounts[landmarkId], cultureId)
+			if (cultureId >= 0)
+				incrementCount({ counts: borderCounts[landmarkId], key: cultureId })
 		}
 	}
 
@@ -200,4 +188,13 @@ export function assignLandmarkIdentity(params: {
 			seed: seed + 6103,
 		}),
 	}
+}
+
+export const LANDMARKS = {
+	landmarkTypes,
+	landmarkTypeOcean,
+	computeLandmarks,
+	assignLandmarkIdentity,
+	landmarkTypeSea,
+	landmarkTypeLake,
 }

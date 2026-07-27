@@ -1,12 +1,12 @@
 import { buildSphereMesh } from "@/model/mesh"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { RNG } from "@/model/shared/rng"
-import { PLATES } from "@/model/tectonics/plates"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 import type {
 	CoarsePlateResult,
-	ProjectCoarsePlatesParams,
 	GenerateCoarsePlatesParams,
+	ProjectCoarsePlatesParams,
 } from "@/model/tectonics/coarse-plates/types"
+import { PLATES } from "@/model/tectonics/plates"
 
 const N_COARSE = 20000
 

@@ -1,7 +1,7 @@
-import type { SystemBody } from "@/model/celestial/system/types"
-import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { TIME } from "@/model/shared/time"
 
 // live from the UI at generation time (see buildHomeBody), so its entry here

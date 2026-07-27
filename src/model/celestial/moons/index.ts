@@ -1,4 +1,3 @@
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import {
 	type AttachParentTideLocksInput,
@@ -15,6 +14,7 @@ import {
 	type RollMoonOrbitCandidateInput,
 	type RollMoonSizeClassInput,
 } from "@/model/celestial/moons/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { DICE } from "@/model/shared/dice"
 import { RNG } from "@/model/shared/rng"
 import { TIME } from "@/model/shared/time"

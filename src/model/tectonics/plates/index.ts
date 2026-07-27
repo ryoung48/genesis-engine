@@ -1,9 +1,9 @@
 import type { PlateVec } from "@/model"
 import { RNG } from "@/model/shared/rng"
 import type {
-	GeneratePlatesResult,
-	GeneratePlatesParams,
 	AssignOceanLandParams,
+	GeneratePlatesParams,
+	GeneratePlatesResult,
 	SmoothAndReconnectPlatesParams,
 } from "@/model/tectonics/plates/types"
 

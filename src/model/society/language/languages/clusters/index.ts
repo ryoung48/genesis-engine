@@ -1,3 +1,4 @@
+import { TEXT } from "@/model/shared/text"
 import type {
 	BasePatternizeParams,
 	EndConsonantsParams,
@@ -27,7 +28,6 @@ import {
 	STOP_CHAR,
 	vowelRules,
 } from "@/model/society/language/languages/types"
-import { TEXT } from "@/model/shared/text"
 
 const range = (count: number): number[] =>
 	Array.from({ length: count }, (_, index) => index)

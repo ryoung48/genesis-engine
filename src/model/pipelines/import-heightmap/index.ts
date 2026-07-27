@@ -4,41 +4,35 @@ import type {
 	SphereMesh,
 	StageTiming,
 } from "@/model"
+import { STAR } from "@/model/celestial/star"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
-import {
-	applySeaLevelToElevation,
-	applySoilCreep,
-	buildCoastDensityWeight,
-	erodeComposite,
-	LANDMARK_TYPE_LAKE,
-	sharpenRidges,
-	smoothElevation,
-	warpTerrain,
-} from "@/model/terrain"
-import { STAR } from "@/model/celestial/star"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
-import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 import type {
-	RealRiverLineInput,
-	RealProvinceInput,
-	SampleBilinearParams,
-	SampleSingleBandFloatRasterParams,
-	SampleCategoricalRasterParams,
-	SampleHeightmapParams,
-	SampleCoastlineMaskParams,
-	ReconcileElevationWithMaskParams,
-	PointInRingParams,
+	ImportGenesisWorldParams,
 	MatchRealLakeNamesParams,
 	MergeEu4LandMaskParams,
-	ImportGenesisWorldParams,
+	PointInRingParams,
+	RealProvinceInput,
+	RealRiverLineInput,
+	ReconcileElevationWithMaskParams,
+	SampleBilinearParams,
+	SampleCategoricalRasterParams,
+	SampleCoastlineMaskParams,
+	SampleHeightmapParams,
+	SampleSingleBandFloatRasterParams,
 } from "@/model/pipelines/import-heightmap/types"
+import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"
 import { SYNTHETIC_PLATES } from "@/model/tectonics/synthetic-plates"
+import { COAST_DENSITY } from "@/model/terrain/coast-density"
+import { EROSION } from "@/model/terrain/erosion"
+import { LANDMARKS } from "@/model/terrain/landmarks"
+import { SEA_LEVEL } from "@/model/terrain/sea-level"
 
 function createTimingRecorder() {
 	const timings: StageTiming[] = []
@@ -599,11 +593,11 @@ function importGenesisWorld({
 			: params.coastlineMask
 	const densityWeight =
 		densityCoastlineMask && params.maskWidth && params.maskHeight
-			? buildCoastDensityWeight(
-					densityCoastlineMask,
-					params.maskWidth,
-					params.maskHeight,
-					{
+			? COAST_DENSITY.buildCoastDensityWeight({
+					mask: densityCoastlineMask,
+					width: params.maskWidth,
+					height: params.maskHeight,
+					options: {
 						boost: params.coastDensityBoost ?? 8,
 						// Only usable when the lake mask matches the coastline
 						// mask's resolution (both are rasterized at the same
@@ -625,7 +619,7 @@ function importGenesisWorld({
 								? params.eu4ProvincesRaster
 								: undefined,
 					},
-				)
+				})
 			: undefined
 	const mesh = buildSphereMesh(
 		params.numPoints,
@@ -665,7 +659,7 @@ function importGenesisWorld({
 	// Post-processing
 	if (params.terrainWarp > 0) {
 		t0 = performance.now()
-		warpTerrain({
+		EROSION.warpTerrain({
 			mesh,
 			elev: elevation,
 			seed: params.seed,
@@ -695,7 +689,7 @@ function importGenesisWorld({
 		const smoothIters = Math.round(1 + params.smoothing * 4)
 		const smoothStr = 0.2 + params.smoothing * 0.5
 		t0 = performance.now()
-		smoothElevation({
+		EROSION.smoothElevation({
 			mesh,
 			elev: elevation,
 			r_isOcean,
@@ -713,20 +707,20 @@ function importGenesisWorld({
 		const talusSlope = 1.2 - params.thermalErosion * 0.4
 		const kThermal = params.thermalErosion * 0.15
 		t0 = performance.now()
-		erodeComposite(
+		EROSION.erodeComposite({
 			mesh,
-			elevation,
+			elev: elevation,
 			r_isOcean,
 			hIters,
-			hK,
-			0.5,
-			1.0,
+			K: hK,
+			m: 0.5,
+			dt: 1.0,
 			tIters,
 			talusSlope,
 			kThermal,
 			gIters,
-			params.glacialErosion,
-		)
+			glacialStrength: params.glacialErosion,
+		})
 		record(`Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`, t0)
 	}
 
@@ -734,7 +728,7 @@ function importGenesisWorld({
 		const rsIters = Math.round(1 + params.ridgeSharpening * 3)
 		const rsStr = params.ridgeSharpening * 0.08
 		t0 = performance.now()
-		sharpenRidges({
+		EROSION.sharpenRidges({
 			mesh,
 			elev: elevation,
 			r_isOcean,
@@ -745,7 +739,7 @@ function importGenesisWorld({
 	}
 
 	t0 = performance.now()
-	applySoilCreep({
+	EROSION.applySoilCreep({
 		mesh,
 		elev: elevation,
 		r_isOcean,
@@ -850,12 +844,13 @@ function importGenesisWorld({
 	const maxElevKm = (genesisParams.maxElevation ?? 6000) / 1000
 	const maxDepthKm = UNITS.getMaxOceanDepthKm(genesisParams.planetRadiusKm)
 	const baseElevation = elevation.slice()
-	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
-		baseElevation,
-		maxElevKm,
-		maxDepthKm,
-		seaLevel: genesisParams.seaLevel,
-	})
+	const { elevation: finalElevation, elevation_km } =
+		SEA_LEVEL.applySeaLevelToElevation({
+			baseElevation,
+			maxElevKm,
+			maxDepthKm,
+			seaLevel: genesisParams.seaLevel,
+		})
 	elevation.set(finalElevation)
 
 	// Real-world elevation override: the 8-bit grayscale heightmap's
@@ -1065,7 +1060,7 @@ function importGenesisWorld({
 		provinceSociety.landmarks.realNames = matchRealLakeNames({
 			mesh,
 			landmarks: provinceSociety.landmarks,
-			lakeLandmarkType: LANDMARK_TYPE_LAKE,
+			lakeLandmarkType: LANDMARKS.landmarkTypeLake,
 			lakePolygons: params.lakeNames,
 		})
 		record("Real lake name matching", t0)

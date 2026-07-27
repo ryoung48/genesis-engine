@@ -4,9 +4,9 @@ import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
-import type { RegularClimatePreviewData } from "@/ui/preview/types"
 import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color-palettes"
+import type { RegularClimatePreviewData } from "@/ui/preview/types"
 
 interface EbmConfig {
 	obliquity: number

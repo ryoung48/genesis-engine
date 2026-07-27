@@ -1,8 +1,8 @@
 import type {
-	GenesisTerrainFeatures,
 	BoundaryInfo,
 	DistanceFields,
 	GenesisParams,
+	GenesisTerrainFeatures,
 } from "@/model/types/tectonics"
 
 export interface TectonicPathResult {

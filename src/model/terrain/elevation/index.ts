@@ -1,38 +1,21 @@
-﻿/**
- * Distance fields and elevation assignment.
- * Faithful port of genesis's elevation.js distance-field + elevation logic.
- */
-
+import type { DistanceFields, GenesisTerrainFeatures } from "@/model"
+import { RNG } from "@/model/shared/rng"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import type {
-	BoundaryInfo,
-	DistanceFields,
-	GenesisTerrainFeatures,
-	PlateVec,
-	SphereMesh,
-} from "@/model"
-import type {
+	AssignDistanceFieldParams,
+	BlendElevationParams,
 	BoundedBfsParams,
 	ComputeDistanceFieldsParams,
-} from "@/model/terrain/types"
-import {
-	applyVolcanicArcs,
-	getVolcanicActivityThreshold,
-} from "@/model/terrain/volcanism"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
-import { RNG } from "@/model/shared/rng"
-import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
+} from "@/model/terrain/elevation/types"
+import { VOLCANISM } from "@/model/terrain/volcanism"
 
-type StageTiming = { Stage: string; ms: string }
-
-// ----------------------------------------------------------------
-//  Randomized BFS distance field (genesis port)
-// ----------------------------------------------------------------
-function assignDistanceField(
-	mesh: SphereMesh,
-	seeds: Iterable<number>,
-	stops: Set<number>,
-	seedVal: number,
-): Float32Array {
+function assignDistanceField({
+	mesh,
+	seeds,
+	stops,
+	seedVal,
+}: AssignDistanceFieldParams): Float32Array {
 	const { numRegions, adjOffset, adjList } = mesh
 	const dist = new Float32Array(numRegions).fill(Infinity)
 	const isStop = new Uint8Array(numRegions)
@@ -67,10 +50,7 @@ function assignDistanceField(
 	return dist
 }
 
-/**
- * Compute distance fields from mountains, oceans, coastlines, and land-coast.
- */
-export function computeDistanceFields({
+function computeDistanceFields({
 	mesh,
 	r_plate,
 	plateIsOcean,
@@ -91,24 +71,24 @@ export function computeDistanceFields({
 		...boundary.ocean_r,
 	])
 
-	const distMountain = assignDistanceField(
+	const distMountain = assignDistanceField({
 		mesh,
-		stress_mountain_r,
-		boundary.ocean_r,
-		seed + 1,
-	)
-	const distOcean = assignDistanceField(
+		seeds: stress_mountain_r,
+		stops: boundary.ocean_r,
+		seedVal: seed + 1,
+	})
+	const distOcean = assignDistanceField({
 		mesh,
-		boundary.ocean_r,
-		boundary.coastline_r,
-		seed + 2,
-	)
-	const distCoastline = assignDistanceField(
+		seeds: boundary.ocean_r,
+		stops: boundary.coastline_r,
+		seedVal: seed + 2,
+	})
+	const distCoastline = assignDistanceField({
 		mesh,
-		boundary.coastline_r,
-		stop_r,
-		seed + 3,
-	)
+		seeds: boundary.coastline_r,
+		stops: stop_r,
+		seedVal: seed + 3,
+	})
 
 	// Ocean/land mask
 	const r_isOcean = new Uint8Array(numRegions)
@@ -128,7 +108,12 @@ export function computeDistanceFields({
 			}
 		}
 	}
-	const distCoast = assignDistanceField(mesh, coastSeeds, new Set(), seed + 4)
+	const distCoast = assignDistanceField({
+		mesh,
+		seeds: coastSeeds,
+		stops: new Set(),
+		seedVal: seed + 4,
+	})
 
 	// Land-only coast distance: propagates only through land
 	const landCoastSeeds = new Set<number>()
@@ -145,20 +130,16 @@ export function computeDistanceFields({
 	for (let r = 0; r < numRegions; r++) {
 		if (r_isOcean[r]) oceanBarriers.add(r)
 	}
-	const distCoastLand = assignDistanceField(
+	const distCoastLand = assignDistanceField({
 		mesh,
-		landCoastSeeds,
-		oceanBarriers,
-		seed + 5,
-	)
+		seeds: landCoastSeeds,
+		stops: oceanBarriers,
+		seedVal: seed + 5,
+	})
 
 	return { distMountain, distOcean, distCoastline, distCoast, distCoastLand }
 }
 
-/**
- * BFS that propagates hop-count distances from pre-seeded nodes up to halfWidth hops.
- * `canVisit(nr, r)` gates whether neighbor `nr` (from current node `r`) may be visited.
- */
 function boundedBfs({
 	dist,
 	seeds,
@@ -182,22 +163,18 @@ function boundedBfs({
 	}
 }
 
-/**
- * Assign elevation from distance fields, stress, noise, and tectonic features.
- * Faithful port of genesis's main elevation loop.
- */
-export function blendElevation(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plateVec: Map<number, PlateVec>,
-	plateIsOcean: Set<number>,
-	distFields: DistanceFields,
-	boundary: BoundaryInfo,
-	roughness: number,
-	volcanism: number,
-	seed: number,
-	timing?: StageTiming[],
-): {
+function blendElevation({
+	mesh,
+	r_plate,
+	plateVec,
+	plateIsOcean,
+	distFields,
+	boundary,
+	roughness,
+	volcanism,
+	seed,
+	timing,
+}: BlendElevationParams): {
 	elevation: Float32Array
 	terrainFeatures: GenesisTerrainFeatures
 } {
@@ -969,7 +946,7 @@ export function blendElevation(
 	if (volcanism > 0) {
 		const arcNoise = new SimplexNoise(seed + 307)
 		const maxArcDist = Math.max(5, Math.round(5 * scaleFactor))
-		const threshold = getVolcanicActivityThreshold(0.2, volcanism)
+		const threshold = VOLCANISM.getVolcanicActivityThreshold(0.2, volcanism)
 		const arcDist = new Float32Array(numRegions).fill(maxArcDist + 1)
 		const arcStress = new Float32Array(numRegions)
 		const arcSeedsList: number[] = []
@@ -1036,7 +1013,7 @@ export function blendElevation(
 	})
 
 	const volcanicArcsStart = performance.now()
-	applyVolcanicArcs({
+	VOLCANISM.applyVolcanicArcs({
 		mesh,
 		elevation: elev,
 		boundary,
@@ -1064,4 +1041,9 @@ export function blendElevation(
 			dominantMagnitude,
 		},
 	}
+}
+
+export const ELEVATION = {
+	computeDistanceFields,
+	blendElevation,
 }

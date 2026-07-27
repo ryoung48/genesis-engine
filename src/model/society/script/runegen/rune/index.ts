@@ -1,5 +1,5 @@
+import { RNG, SharedRng } from "@/model/shared/rng"
 import { Point2D } from "@/model/society/script/runegen/point2d"
-import { SharedRng, RNG } from "@/model/shared/rng"
 
 export type RuneTemplate =
 	| "random1"

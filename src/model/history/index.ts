@@ -17,7 +17,7 @@ import type {
 	SeedColonyRelationsParams,
 } from "@/model/history/types"
 import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { StageTiming } from "@/model/types"
 
 function timed<T>(

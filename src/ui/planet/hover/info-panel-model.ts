@@ -1,10 +1,10 @@
-import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
 import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	type ColorMode,
@@ -148,7 +148,7 @@ export function buildHoverChartData(
 			world.landmarks != null &&
 			world.landmarks.regionLandmark[region] >= 0 &&
 			world.landmarks.type[world.landmarks.regionLandmark[region]] ===
-				LANDMARK_TYPE_LAKE
+				LANDMARKS.landmarkTypeLake
 				? 1
 				: undefined,
 		iceThickness: world.iceThickness?.[region] ?? 0,

@@ -1,5 +1,5 @@
-import type { PlateVec } from "@/model/types/tectonics"
 import type { SphereMesh } from "@/model/types/mesh"
+import type { PlateVec } from "@/model/types/tectonics"
 
 export interface GeneratePlatesResult {
 	r_plate: Int32Array

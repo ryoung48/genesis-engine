@@ -1,6 +1,6 @@
-﻿import { SYSTEM } from "@/model/celestial/system"
+﻿import { STAR } from "@/model/celestial/star"
+import { SYSTEM } from "@/model/celestial/system"
 import { ERAS } from "@/model/society/eras"
-import { STAR } from "@/model/celestial/star"
 
 export const PLANET_SEED_STORAGE_KEY = "genesis:lastPlanetSeed"
 export const VIEW_PREFS_STORAGE_KEY = "genesis:viewPrefs"

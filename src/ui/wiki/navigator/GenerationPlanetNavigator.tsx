@@ -6,12 +6,15 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
+import { DATA } from "@/model/celestial/system/sol-system/data"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
+import { RNG } from "@/model/shared/rng"
+import { SEED_LABEL } from "@/model/shared/seed-label"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
@@ -47,9 +50,6 @@ import {
 	resolveMoonTideLockSiderealDayHours,
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildStarStats } from "@/ui/wiki/stats/star/star-stats"
-import { DATA } from "@/model/celestial/system/sol-system/data"
-import { RNG } from "@/model/shared/rng"
-import { SEED_LABEL } from "@/model/shared/seed-label"
 
 interface LabeledOrbitBody {
 	body: SystemBody

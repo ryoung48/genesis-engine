@@ -2,15 +2,15 @@ import type { PlateVec } from "@/model"
 import { MATH } from "@/model/shared/math"
 import { RNG } from "@/model/shared/rng"
 import type {
-	MantleCell,
-	Vec3,
-	ComputeMantleFieldParams,
-	DotParams,
-	CrossParams,
-	SubParams,
 	AngularDistanceParams,
-	VelocityAtParams,
+	ComputeMantleFieldParams,
+	CrossParams,
+	DotParams,
+	MantleCell,
 	ProjectMantleFieldToRegionsParams,
+	SubParams,
+	Vec3,
+	VelocityAtParams,
 } from "@/model/tectonics/mantle/types"
 
 const CONTINENTAL_DRAG_FACTOR = 0.35

@@ -1,15 +1,7 @@
 import { RAIN } from "@/model/climate/rain"
 import type { ComputeTornadoRiskParams } from "@/model/climate/tornadoes/types"
-import {
-	TOPO_FLAT,
-	TOPO_HILL,
-	TOPO_LAKE,
-	TOPO_MARSH,
-	TOPO_MOUNTAIN,
-	TOPO_OCEAN,
-	TOPO_PLATEAU,
-} from "@/model/terrain"
 import { MATH } from "@/model/shared/math"
+import { CLASSIFICATION } from "@/model/terrain/classification"
 
 function vegetationMoistureScore(biomeCode: number): number {
 	switch (biomeCode) {
@@ -32,15 +24,15 @@ function vegetationMoistureScore(biomeCode: number): number {
 
 function terrainFactor(topoCode: number): number {
 	switch (topoCode) {
-		case TOPO_FLAT:
+		case CLASSIFICATION.topoFlat:
 			return 1.0
-		case TOPO_MARSH:
+		case CLASSIFICATION.topoMarsh:
 			return 0.9
-		case TOPO_PLATEAU:
+		case CLASSIFICATION.topoPlateau:
 			return 0.75
-		case TOPO_HILL:
+		case CLASSIFICATION.topoHill:
 			return 0.5
-		case TOPO_MOUNTAIN:
+		case CLASSIFICATION.topoMountain:
 			return 0.1
 		default:
 			return 0.0 // ocean / lake
@@ -101,7 +93,8 @@ function computeTornadoRisk({
 	for (let r = 0; r < N; r++) {
 		// Only score land cells that have defined topography
 		const topo = topography[r]
-		if (topo === TOPO_OCEAN || topo === TOPO_LAKE) continue
+		if (topo === CLASSIFICATION.topoOcean || topo === CLASSIFICATION.topoLake)
+			continue
 
 		// a. Seasonal temperature range — high range = continental = strong fronts
 		const annualRange = temperatureMax[r] - temperatureMin[r]

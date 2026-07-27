@@ -1,8 +1,8 @@
 import { HEAT } from "@/model/climate/locked/heat"
 import type { ComputeTidalRainParams } from "@/model/climate/locked/rain/types"
 import { RAIN_SHARED } from "@/model/climate/rain-shared"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MATH } from "@/model/shared/math"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { UNITS } from "@/model/shared/units"
 
 const RAD2DEG = 180 / Math.PI

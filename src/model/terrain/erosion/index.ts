@@ -1,26 +1,25 @@
-import type { SphereMesh } from "@/model"
+import { MATH } from "@/model/shared/math"
+import { MinHeap } from "@/model/shared/min-heap"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 import type {
 	ApplySoilCreepParams,
 	BuildGlacialBuffersParams,
+	DiffuseIterationParams,
+	ErodeCompositeParams,
+	GlacialBuffers,
+	PriorityFloodCarveParams,
 	SharpenRidgesParams,
 	SmoothElevationParams,
 	WarpTerrainParams,
-} from "@/model/terrain/types"
-import { MinHeap } from "@/model/shared/min-heap"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
-import { MATH } from "@/model/shared/math"
+} from "@/model/terrain/erosion/types"
 
-/**
- * Core iteration kernel shared by smoothElevation, sharpenRidges, and applySoilCreep.
- * For each cell in `cells`, calls `compute(r)` and batch-writes the result back to `elev`.
- */
-function diffuseIteration(
-	cells: ArrayLike<number>,
-	elev: Float32Array,
-	N: number,
-	iterations: number,
-	compute: (r: number) => number,
-): void {
+function diffuseIteration({
+	cells,
+	elev,
+	N,
+	iterations,
+	compute,
+}: DiffuseIterationParams): void {
 	const tmp = new Float32Array(N)
 	const n = cells.length
 	for (let iter = 0; iter < iterations; iter++) {
@@ -33,15 +32,12 @@ function diffuseIteration(
 	}
 }
 
-// ----------------------------------------------------------------
-//  Priority-flood pit resolution with canyon carving (genesis port)
-// ----------------------------------------------------------------
-function priorityFloodCarve(
-	mesh: SphereMesh,
-	elev: Float32Array,
-	r_isOcean: Uint8Array,
-	carveStrength: number,
-): void {
+function priorityFloodCarve({
+	mesh,
+	elev,
+	r_isOcean,
+	carveStrength,
+}: PriorityFloodCarveParams): void {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
 	const EPS = 1e-7
@@ -188,10 +184,7 @@ function priorityFloodCarve(
 	}
 }
 
-// ----------------------------------------------------------------
-//  Domain warping via FBM simplex noise with greedy mesh walk (genesis port)
-// ----------------------------------------------------------------
-export function warpTerrain({
+function warpTerrain({
 	mesh,
 	elev,
 	seed,
@@ -298,10 +291,7 @@ export function warpTerrain({
 	return elev
 }
 
-// ----------------------------------------------------------------
-//  Bilateral smoothing with coastline locking (genesis port)
-// ----------------------------------------------------------------
-export function smoothElevation({
+function smoothElevation({
 	mesh,
 	elev,
 	r_isOcean,
@@ -324,31 +314,30 @@ export function smoothElevation({
 	}
 
 	const allCells = new Uint32Array(N).map((_, i) => i)
-	diffuseIteration(allCells, elev, N, iterations, (r) => {
-		if (locked[r]) return elev[r]
-		const h = elev[r]
-		let wSum = 0,
-			hSum = 0
-		for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
-			const nh = elev[adjList[i]]
-			const diff = Math.abs(nh - h)
-			const w = 1 / (1 + diff * 8)
-			wSum += w
-			hSum += nh * w
-		}
-		if (wSum > 0) {
-			const avg = hSum / wSum
-			return h + (avg - h) * strength
-		}
-		return h
+	diffuseIteration({
+		cells: allCells,
+		elev,
+		N,
+		iterations,
+		compute: (r) => {
+			if (locked[r]) return elev[r]
+			const h = elev[r]
+			let wSum = 0,
+				hSum = 0
+			for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
+				const nh = elev[adjList[i]]
+				const diff = Math.abs(nh - h)
+				const w = 1 / (1 + diff * 8)
+				wSum += w
+				hSum += nh * w
+			}
+			if (wSum > 0) {
+				const avg = hSum / wSum
+				return h + (avg - h) * strength
+			}
+			return h
+		},
 	})
-}
-
-interface GlacialBuffers {
-	glacIdx: Float32Array
-	iceTarget: Int32Array
-	iceFlow: Float32Array
-	numIceUpstream: Uint8Array
 }
 
 function buildGlacialBuffers({
@@ -389,23 +378,20 @@ function buildGlacialBuffers({
 	}
 }
 
-// ----------------------------------------------------------------
-//  Composite erosion: hydraulic (stream power) + thermal (genesis port)
-// ----------------------------------------------------------------
-export function erodeComposite(
-	mesh: SphereMesh,
-	elev: Float32Array,
-	r_isOcean: Uint8Array,
-	hIters: number,
-	K: number,
-	m: number,
-	dt: number,
-	tIters: number,
-	talusSlope: number,
-	kThermal: number,
-	gIters: number = 0,
-	glacialStrength: number = 0,
-): void {
+function erodeComposite({
+	mesh,
+	elev,
+	r_isOcean,
+	hIters,
+	K,
+	m,
+	dt,
+	tIters,
+	talusSlope,
+	kThermal,
+	gIters = 0,
+	glacialStrength = 0,
+}: ErodeCompositeParams): void {
 	const totalIters = Math.max(hIters, tIters, gIters)
 	if (totalIters <= 0) return
 
@@ -426,7 +412,7 @@ export function erodeComposite(
 
 	// Initial priority-flood pit resolution
 	if (hIters > 0) {
-		priorityFloodCarve(mesh, elev, r_isOcean, 0.5)
+		priorityFloodCarve({ mesh, elev, r_isOcean, carveStrength: 0.5 })
 	}
 
 	// ---- Glacial precomputation (once — index is position-based) ----
@@ -492,7 +478,7 @@ export function erodeComposite(
 	for (let iter = 0; iter < totalIters; iter++) {
 		if (!midFloodDone && iter >= midFloodIter) {
 			midFloodDone = true
-			priorityFloodCarve(mesh, elev, r_isOcean, 0.85)
+			priorityFloodCarve({ mesh, elev, r_isOcean, carveStrength: 0.85 })
 		}
 
 		const glacialThisIter = iter < gIters && glacIdx !== null
@@ -740,10 +726,7 @@ export function erodeComposite(
 	}
 }
 
-// ----------------------------------------------------------------
-//  Ridge sharpening (genesis port)
-// ----------------------------------------------------------------
-export function sharpenRidges({
+function sharpenRidges({
 	mesh,
 	elev,
 	r_isOcean,
@@ -759,28 +742,31 @@ export function sharpenRidges({
 	}
 
 	const original = new Float32Array(elev)
-	diffuseIteration(landCells, elev, N, iterations, (r) => {
-		const h = elev[r]
-		const count = adjOffset[r + 1] - adjOffset[r]
-		if (count === 0) return h
-		let sum = 0
-		for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
-			sum += elev[adjList[i]]
-		}
-		const avg = sum / count
-		if (h > avg) {
-			const h_new = h + (h - avg) * strength
-			const cap = original[r] * 1.5
-			return h_new > cap ? cap : h_new
-		}
-		return h
+	diffuseIteration({
+		cells: landCells,
+		elev,
+		N,
+		iterations,
+		compute: (r) => {
+			const h = elev[r]
+			const count = adjOffset[r + 1] - adjOffset[r]
+			if (count === 0) return h
+			let sum = 0
+			for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
+				sum += elev[adjList[i]]
+			}
+			const avg = sum / count
+			if (h > avg) {
+				const h_new = h + (h - avg) * strength
+				const cap = original[r] * 1.5
+				return h_new > cap ? cap : h_new
+			}
+			return h
+		},
 	})
 }
 
-// ----------------------------------------------------------------
-//  Soil creep — Laplacian diffusion (genesis port)
-// ----------------------------------------------------------------
-export function applySoilCreep({
+function applySoilCreep({
 	mesh,
 	elev,
 	r_isOcean,
@@ -803,18 +789,32 @@ export function applySoilCreep({
 		if (!coastal) interiorLand.push(r)
 	}
 
-	diffuseIteration(interiorLand, elev, N, iterations, (r) => {
-		const h = elev[r]
-		let sum = 0,
-			count = 0
-		for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
-			if (!r_isOcean[adjList[i]]) {
-				sum += elev[adjList[i]]
-				count++
+	diffuseIteration({
+		cells: interiorLand,
+		elev,
+		N,
+		iterations,
+		compute: (r) => {
+			const h = elev[r]
+			let sum = 0,
+				count = 0
+			for (let i = adjOffset[r]; i < adjOffset[r + 1]; i++) {
+				if (!r_isOcean[adjList[i]]) {
+					sum += elev[adjList[i]]
+					count++
+				}
 			}
-		}
-		if (count === 0) return h
-		const avg = sum / count
-		return h + (avg - h) * strength
+			if (count === 0) return h
+			const avg = sum / count
+			return h + (avg - h) * strength
+		},
 	})
+}
+
+export const EROSION = {
+	warpTerrain,
+	smoothElevation,
+	erodeComposite,
+	sharpenRidges,
+	applySoilCreep,
 }

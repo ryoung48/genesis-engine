@@ -1,8 +1,8 @@
+import { RNG } from "@/model/shared/rng"
 import type {
 	CompressNameParams,
 	CompressWordParams,
 } from "@/model/society/script/compress/types"
-import { RNG } from "@/model/shared/rng"
 
 function normalizeName(name: string): string {
 	return name

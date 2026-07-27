@@ -64,8 +64,8 @@
 // collide with another function's.
 //
 // Usage:
-//   node scripts/fix-types-outside-types-file.mjs [--dir=src/model/society]  # apply
-//   node scripts/fix-types-outside-types-file.mjs --check [--dir=...]         # dry run
+//   node scripts/enforcer.mjs [--dir=src/model/society]  # apply
+//   node scripts/enforcer.mjs --check [--dir=...]         # dry run
 import path from "node:path"
 import { existsSync } from "node:fs"
 import { Node, Project, SyntaxKind } from "ts-morph"

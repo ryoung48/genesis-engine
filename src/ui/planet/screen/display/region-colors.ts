@@ -1,12 +1,12 @@
-﻿import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
-import { HUMIDITY } from "@/model/climate/humidity"
+﻿import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
 import { RELIGION } from "@/model/society/religion"
 import { TIMEZONE } from "@/model/society/timezone"
-import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import type { ColorMode } from "@/ui/planet/colors"
 import {
@@ -176,7 +176,9 @@ const TERRAIN_FEATURE_COLORS: Record<number, [number, number, number]> = {
 	[TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN]: [0.95, 0.55, 0.22],
 	[TERRAIN_FEATURES.genesisTerrainFeature.FOLD_RIDGES]: [0.55, 0.24, 0.13],
 	[TERRAIN_FEATURES.genesisTerrainFeature.PLATEAU_UPLIFT]: [0.8, 0.65, 0.28],
-	[TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_INTERIOR]: [0.45, 0.63, 0.21],
+	[TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_INTERIOR]: [
+		0.45, 0.63, 0.21,
+	],
 	[TERRAIN_FEATURES.genesisTerrainFeature.MID_OCEAN_RIDGE]: [0.17, 0.73, 0.88],
 	[TERRAIN_FEATURES.genesisTerrainFeature.FRACTURE_ZONE]: [0.18, 0.47, 0.92],
 	[TERRAIN_FEATURES.genesisTerrainFeature.TRENCH]: [0.07, 0.17, 0.46],
@@ -252,7 +254,8 @@ export function computeRegionColors(
 		if (!world.landmarks) return false
 		const landmark = world.landmarks.regionLandmark[region]
 		return (
-			landmark >= 0 && world.landmarks.type[landmark] === LANDMARK_TYPE_LAKE
+			landmark >= 0 &&
+			world.landmarks.type[landmark] === LANDMARKS.landmarkTypeLake
 		)
 	}
 	const isLandRegion = (region: number) => {

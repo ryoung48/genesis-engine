@@ -11,10 +11,10 @@ import type {
 	ComputeThermalEquatorParams,
 } from "@/model/climate/rain/types"
 import { RAIN_SHARED } from "@/model/climate/rain-shared"
-import { LANDMARK_TYPE_OCEAN } from "@/model/terrain"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MATH } from "@/model/shared/math"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { UNITS } from "@/model/shared/units"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 
 const DEG2RAD = Math.PI / 180
 
@@ -120,7 +120,10 @@ function buildRainRegionMask({
 	for (let r = 0; r < isLand.length; r++) {
 		if (rainMask[r]) continue
 		const landmarkId = landmarks.regionLandmark[r]
-		if (landmarkId >= 0 && landmarks.type[landmarkId] !== LANDMARK_TYPE_OCEAN) {
+		if (
+			landmarkId >= 0 &&
+			landmarks.type[landmarkId] !== LANDMARKS.landmarkTypeOcean
+		) {
 			rainMask[r] = 1
 		}
 	}

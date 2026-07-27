@@ -1,6 +1,6 @@
-import type { PlateVec, SuperPlateData } from "@/model/types/tectonics"
-import type { SphereMesh } from "@/model/types/mesh"
 import type { SimplexNoise } from "@/model/shared/simplex-noise"
+import type { SphereMesh } from "@/model/types/mesh"
+import type { PlateVec, SuperPlateData } from "@/model/types/tectonics"
 
 export type StageTiming = { Stage: string; ms: string }
 

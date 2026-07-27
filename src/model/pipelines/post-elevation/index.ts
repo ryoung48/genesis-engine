@@ -7,6 +7,7 @@ import type {
 	StageTiming,
 } from "@/model"
 import { MOON } from "@/model/celestial/moons"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CLIMATE } from "@/model/climate/climate"
@@ -26,30 +27,23 @@ import { TORNADOES } from "@/model/climate/tornadoes"
 import type { PastaDebug } from "@/model/climate/types"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
-import { ERAS } from "@/model/society/eras"
-import { POPULATION } from "@/model/society/population"
-import type { ProvincePopulation } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain"
-import {
-	classifyTopography,
-	computeHazards,
-	computeLakes,
-	computeLandmarks,
-	computeLocations,
-	computeProvinces,
-	computeProvincesFromRaster,
-	computeRivers,
-	computeWeightedProvinces,
-	LANDMARK_TYPE_LAKE,
-	LANDMARK_TYPE_OCEAN,
-} from "@/model/terrain"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	PostPipelineInput,
 	PostPipelineOutput,
 } from "@/model/pipelines/post-elevation/types"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
+import { ERAS } from "@/model/society/eras"
+import { POPULATION } from "@/model/society/population"
+import type { ProvincePopulation } from "@/model/society/types"
+import { CLASSIFICATION } from "@/model/terrain/classification"
+import { HAZARDS } from "@/model/terrain/hazards"
+import { LAKES } from "@/model/terrain/lakes"
+import { LANDMARKS } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
+import { LOCATIONS } from "@/model/terrain/locations"
+import { PROVINCES } from "@/model/terrain/provinces"
+import { RIVERS } from "@/model/terrain/rivers"
 
 const LAKE_RETENTION_THRESHOLD = 100
 
@@ -67,7 +61,10 @@ function reconcileClosedWaterBodies(params: {
 	for (let r = 0; r < isLand.length; r++) {
 		if (isLand[r]) continue
 		const landmarkId = landmarks.regionLandmark[r]
-		if (landmarkId < 0 || landmarks.type[landmarkId] !== LANDMARK_TYPE_LAKE)
+		if (
+			landmarkId < 0 ||
+			landmarks.type[landmarkId] !== LANDMARKS.landmarkTypeLake
+		)
 			continue
 		rainfallSum[landmarkId] += rainfall.annual[r]
 		rainfallCount[landmarkId]++
@@ -78,7 +75,10 @@ function reconcileClosedWaterBodies(params: {
 		if (isLand[r]) continue
 		if (protectedRegions?.[r]) continue
 		const landmarkId = landmarks.regionLandmark[r]
-		if (landmarkId < 0 || landmarks.type[landmarkId] !== LANDMARK_TYPE_LAKE)
+		if (
+			landmarkId < 0 ||
+			landmarks.type[landmarkId] !== LANDMARKS.landmarkTypeLake
+		)
 			continue
 
 		const avgRain =
@@ -161,7 +161,7 @@ function runPostElevationPipeline(
 	onProgress?.("Post: climate", 42)
 
 	t0 = performance.now()
-	const currentLandmarks = computeLandmarks(mesh, isLand)
+	const currentLandmarks = LANDMARKS.computeLandmarks({ mesh, isLand })
 	record("Post: current landmarks", t0)
 
 	const N = mesh.numRegions
@@ -341,7 +341,7 @@ function runPostElevationPipeline(
 		}
 		record("Post: rivers (real)", t0)
 	} else {
-		rivers = computeRivers({
+		rivers = RIVERS.computeRivers({
 			mesh,
 			elevation,
 			rainfall,
@@ -353,7 +353,7 @@ function runPostElevationPipeline(
 		record("Post: rivers", t0)
 
 		t0 = performance.now()
-		computeLakes({
+		LAKES.computeLakes({
 			mesh,
 			elevation,
 			rainfall,
@@ -373,7 +373,7 @@ function runPostElevationPipeline(
 	// temperature so continentality reflects the finalized water geometry.
 	// Ice, pasta climate, and vegetation run below on the corrected climate.
 	t0 = performance.now()
-	const landmarks = computeLandmarks(mesh, isLand)
+	const landmarks = LANDMARKS.computeLandmarks({ mesh, isLand })
 	distCoast.set(
 		STATS.computeCoastDistances({
 			mesh,
@@ -618,7 +618,7 @@ function runPostElevationPipeline(
 	// ── Topography ─────────────────────────────────────────────────────
 	t0 = performance.now()
 	const { topography, coastal, oceanCoastal, lakeCoastal, slopeScore } =
-		classifyTopography({
+		CLASSIFICATION.classifyTopography({
 			mesh,
 			elevationKm: elevation_km,
 			isLand,
@@ -642,7 +642,8 @@ function runPostElevationPipeline(
 			const nb = mesh.adjList[j]
 			if (isLand[nb]) continue
 			if (
-				landmarks.type[landmarks.regionLandmark[nb]] === LANDMARK_TYPE_OCEAN
+				landmarks.type[landmarks.regionLandmark[nb]] ===
+				LANDMARKS.landmarkTypeOcean
 			) {
 				touchesOcean = true
 				break
@@ -681,7 +682,7 @@ function runPostElevationPipeline(
 
 	// ── Hazards ────────────────────────────────────────────────────────
 	t0 = performance.now()
-	const hazards = computeHazards({
+	const hazards = HAZARDS.computeHazards({
 		mesh,
 		boundary,
 		distFields,
@@ -728,7 +729,7 @@ function runPostElevationPipeline(
 		planetRadiusKm: params.planetRadiusKm,
 	}
 	const provinces: GenesisProvinces = eu4ProvinceIds
-		? computeProvincesFromRaster({
+		? PROVINCES.computeProvincesFromRaster({
 				mesh,
 				isLand,
 				regionIds: eu4ProvinceIds,
@@ -737,7 +738,7 @@ function runPostElevationPipeline(
 				fallbackSeeds: eu4ProvinceFallbackSeeds,
 			})
 		: realProvinceSeeds && realProvinceSeeds.regions.length > 0
-			? computeWeightedProvinces({
+			? PROVINCES.computeWeightedProvinces({
 					mesh,
 					isLand,
 					_topography: topography,
@@ -747,7 +748,7 @@ function runPostElevationPipeline(
 					options: provinceOptions,
 					seedWeights: realProvinceSeeds.weights,
 				})
-			: computeProvinces({
+			: PROVINCES.computeProvinces({
 					mesh,
 					isLand,
 					topography,
@@ -760,12 +761,12 @@ function runPostElevationPipeline(
 	const { waterAccess, riverAccess, lakeAccess } = provinces
 
 	t0 = performance.now()
-	const locations: GenesisLocations = computeLocations(
+	const locations: GenesisLocations = LOCATIONS.computeLocations({
 		provinces,
 		mesh,
-		params.seed,
-		{ planetRadiusKm: params.planetRadiusKm },
-	)
+		seed: params.seed,
+		options: { planetRadiusKm: params.planetRadiusKm },
+	})
 	record("Post: locations", t0)
 	onProgress?.("Post: locations", 73)
 

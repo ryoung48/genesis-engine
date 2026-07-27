@@ -8,18 +8,10 @@ import type {
 	WindGrid,
 	WindSurface,
 } from "@/model/climate/wind/types"
-import {
-	TOPO_FLAT,
-	TOPO_HILL,
-	TOPO_LAKE,
-	TOPO_MARSH,
-	TOPO_MOUNTAIN,
-	TOPO_OCEAN,
-	TOPO_PLATEAU,
-} from "@/model/terrain"
 import { MATH } from "@/model/shared/math"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
+import { CLASSIFICATION } from "@/model/terrain/classification"
 
 function vegetationDragFactor(biomeCode: number | undefined): number {
 	switch (biomeCode) {
@@ -49,25 +41,25 @@ function topographyWindFactor({
 }): number {
 	let base: number
 	switch (topoCode) {
-		case TOPO_FLAT:
+		case CLASSIFICATION.topoFlat:
 			base = 1.0
 			break
-		case TOPO_MARSH:
+		case CLASSIFICATION.topoMarsh:
 			base = 0.93
 			break
-		case TOPO_HILL:
+		case CLASSIFICATION.topoHill:
 			base = 0.88
 			break
-		case TOPO_PLATEAU:
+		case CLASSIFICATION.topoPlateau:
 			base = 0.93
 			break
-		case TOPO_MOUNTAIN:
+		case CLASSIFICATION.topoMountain:
 			base = 0.58
 			break
-		case TOPO_OCEAN:
+		case CLASSIFICATION.topoOcean:
 			base = 1.1
 			break
-		case TOPO_LAKE:
+		case CLASSIFICATION.topoLake:
 			base = 1.08
 			break
 		default:
@@ -85,7 +77,9 @@ function surfaceWindFactor({
 	surface: WindSurface
 }): number {
 	const topoCode = surface.topography?.[r]
-	const isWater = topoCode === TOPO_OCEAN || topoCode === TOPO_LAKE
+	const isWater =
+		topoCode === CLASSIFICATION.topoOcean ||
+		topoCode === CLASSIFICATION.topoLake
 	const slope = surface.slopeScore?.[r] ?? 0
 
 	const vegFactor = isWater

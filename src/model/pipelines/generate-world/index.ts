@@ -10,36 +10,29 @@ import type {
 } from "@/model"
 import { ROUTES } from "@/model/economy/routes"
 import { buildSphereMesh } from "@/model/mesh"
-import { URBANIZATION } from "@/model/society/urbanization"
-import {
-	applyCraters,
-	applyHotspots,
-	applySeaLevelToElevation,
-	applySoilCreep,
-	blendElevation,
-	computeDistanceFields,
-	erodeComposite,
-	sharpenRidges,
-	smoothElevation,
-	warpTerrain,
-} from "@/model/terrain"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
-import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 import type {
-	TectonicPathResult,
-	ProgressFn,
 	ApplyPeakCompressionParams,
-	SummarizeHotspotExposureParams,
 	GenerateGenesisWorldParams,
+	ProgressFn,
+	SummarizeHotspotExposureParams,
+	TectonicPathResult,
 } from "@/model/pipelines/generate-world/types"
+import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"
+import { URBANIZATION } from "@/model/society/urbanization"
 import { COARSE_PLATES } from "@/model/tectonics/coarse-plates"
 import { COLLISION } from "@/model/tectonics/collision"
 import { MANTLE } from "@/model/tectonics/mantle"
 import { PLATES } from "@/model/tectonics/plates"
 import { SUPER_PLATES } from "@/model/tectonics/super-plates"
+import { CRATERS } from "@/model/terrain/craters"
+import { ELEVATION } from "@/model/terrain/elevation"
+import { EROSION } from "@/model/terrain/erosion"
+import { HOTSPOTS } from "@/model/terrain/hotspots"
+import { SEA_LEVEL } from "@/model/terrain/sea-level"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
 	console.time(label)
@@ -162,7 +155,7 @@ function runActivePath(
 
 	// 8. Distance fields
 	const distFields = withTiming("distance-fields", pipelineTiming, () =>
-		computeDistanceFields({
+		ELEVATION.computeDistanceFields({
 			mesh,
 			r_plate,
 			plateIsOcean: coarse.coarsePlateIsOcean,
@@ -174,18 +167,18 @@ function runActivePath(
 
 	// 9. Elevation assignment
 	const blendResult = withTiming("elevation", pipelineTiming, () =>
-		blendElevation(
+		ELEVATION.blendElevation({
 			mesh,
 			r_plate,
-			coarse.coarsePlateVec,
-			coarse.coarsePlateIsOcean,
+			plateVec: coarse.coarsePlateVec,
+			plateIsOcean: coarse.coarsePlateIsOcean,
 			distFields,
 			boundary,
-			params.roughness,
+			roughness: params.roughness,
 			volcanism,
-			params.seed,
-			elevationTiming,
-		),
+			seed: params.seed,
+			timing: elevationTiming,
+		}),
 	)
 	const { elevation, terrainFeatures } = blendResult
 	onProgress?.("elevation", 26)
@@ -194,7 +187,7 @@ function runActivePath(
 	const r_hotspot = withTiming("hotspots", pipelineTiming, () =>
 		volcanism <= 0
 			? new Float32Array(mesh.numRegions)
-			: applyHotspots({
+			: HOTSPOTS.applyHotspots({
 					mesh,
 					plates,
 					plateAssignment,
@@ -339,7 +332,7 @@ function generateGenesisWorld({
 		// Terrain warp — first, before ocean detection or smoothing
 		if (params.terrainWarp > 0) {
 			const postStageStart = performance.now()
-			warpTerrain({
+			EROSION.warpTerrain({
 				mesh,
 				elev: elevation,
 				seed: params.seed,
@@ -363,7 +356,7 @@ function generateGenesisWorld({
 			const smoothIters = Math.round(1 + params.smoothing * 4)
 			const smoothStr = 0.2 + params.smoothing * 0.5
 			const postStageStart = performance.now()
-			smoothElevation({
+			EROSION.smoothElevation({
 				mesh,
 				elev: elevation,
 				r_isOcean: ocean,
@@ -389,20 +382,20 @@ function generateGenesisWorld({
 			const talusSlope = 1.2 - params.thermalErosion * 0.4
 			const kThermal = params.thermalErosion * 0.15
 			const postStageStart = performance.now()
-			erodeComposite(
+			EROSION.erodeComposite({
 				mesh,
-				elevation,
-				ocean,
+				elev: elevation,
+				r_isOcean: ocean,
 				hIters,
-				hK,
-				0.5,
-				1.0,
+				K: hK,
+				m: 0.5,
+				dt: 1.0,
 				tIters,
 				talusSlope,
 				kThermal,
 				gIters,
-				params.glacialErosion,
-			)
+				glacialStrength: params.glacialErosion,
+			})
 			postTiming.push({
 				Stage: `Erosion composite (h=${hIters}, t=${tIters}, g=${gIters})`,
 				ms: (performance.now() - postStageStart).toFixed(1),
@@ -414,7 +407,7 @@ function generateGenesisWorld({
 			const rsIters = Math.round(1 + params.ridgeSharpening * 3)
 			const rsStr = params.ridgeSharpening * 0.08
 			const postStageStart = performance.now()
-			sharpenRidges({
+			EROSION.sharpenRidges({
 				mesh,
 				elev: elevation,
 				r_isOcean: ocean,
@@ -429,7 +422,7 @@ function generateGenesisWorld({
 
 		// Always-on soil creep
 		const postStageStart = performance.now()
-		applySoilCreep({
+		EROSION.applySoilCreep({
 			mesh,
 			elev: elevation,
 			r_isOcean: ocean,
@@ -462,7 +455,7 @@ function generateGenesisWorld({
 	// Impact craters (applied after all erosion so they stay crisp)
 	if (params.craters && params.craters > 0) {
 		withTiming("craters", pipelineTiming, () => {
-			applyCraters(
+			CRATERS.applyCraters(
 				mesh,
 				elevation,
 				params.seed,
@@ -476,12 +469,13 @@ function generateGenesisWorld({
 	const maxElevKm = (params.maxElevation ?? 6000) / 1000
 	const maxDepthKm = UNITS.getMaxOceanDepthKm(params.planetRadiusKm)
 	const baseElevation = elevation.slice()
-	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
-		baseElevation,
-		maxElevKm,
-		maxDepthKm,
-		seaLevel: params.seaLevel,
-	})
+	const { elevation: finalElevation, elevation_km } =
+		SEA_LEVEL.applySeaLevelToElevation({
+			baseElevation,
+			maxElevKm,
+			maxDepthKm,
+			seaLevel: params.seaLevel,
+		})
 	elevation.set(finalElevation)
 	const emergedLand = new Uint8Array(mesh.numRegions)
 	for (let r = 0; r < mesh.numRegions; r++) {

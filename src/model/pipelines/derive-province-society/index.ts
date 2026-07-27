@@ -1,13 +1,14 @@
 import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
+import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/settlements"
 import { CULTURE } from "@/model/society/culture"
 import { ERAS } from "@/model/society/eras"
 import { HERITAGE } from "@/model/society/heritage"
 import { NATIONS } from "@/model/society/nations"
 import { RELIGION } from "@/model/society/religion"
 import { SHARED } from "@/model/society/shared"
-import { assignLandmarkIdentity, type GenesisLandmarks } from "@/model/terrain"
-import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/settlements"
-import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
+import { LANDMARKS } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
@@ -168,7 +169,7 @@ function deriveProvinceSociety({
 	}
 
 	const landmarks = record("landmark identity", () =>
-		assignLandmarkIdentity({
+		LANDMARKS.assignLandmarkIdentity({
 			mesh,
 			landmarks: post.landmarks,
 			provinces: post.provinces,

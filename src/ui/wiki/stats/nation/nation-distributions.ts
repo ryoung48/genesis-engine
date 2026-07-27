@@ -1,10 +1,10 @@
-﻿import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
+﻿import { TEXT } from "@/model/shared/text"
+import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
 import {
 	EU5_TOPOGRAPHY_CATEGORIES,
 	EU5_TOPOGRAPHY_COLORS,
 	EU5_TOPOGRAPHY_MERGE_LABEL,
 } from "@/ui/planet/colors"
-import { TEXT } from "@/model/shared/text"
 
 /** Same bucketing idea as GenesisView.tsx's world-level buildDistribution,
  * restricted to the mesh region/cell indexes inside one nation -- so

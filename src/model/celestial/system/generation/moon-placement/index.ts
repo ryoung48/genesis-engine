@@ -1,12 +1,12 @@
 import { MOON } from "@/model/celestial/moons"
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
+import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
 import type {
 	MoonPlacementInput,
 	MoonPlacementResult,
 } from "@/model/celestial/system/generation/moon-placement/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
 import { TEXTURE } from "@/model/celestial/system/generation/texture"
 
 function place(params: MoonPlacementInput): MoonPlacementResult {

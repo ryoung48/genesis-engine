@@ -1,5 +1,5 @@
 // Phase 1 of the two-phase "types live at the lowest level that needs
-// them" refactor (see fix-types-outside-types-file.mjs for phase 2).
+// them" refactor (see enforcer.mjs for phase 2).
 //
 // Moves every top-level flat file in a directory (skipping index.ts and
 // types.ts) into its own `<name>/index.ts` submodule folder — a pure file

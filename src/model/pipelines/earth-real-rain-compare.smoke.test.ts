@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { NODE_PNG } from "@/model/pipelines/node-png"
+import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 
 const HEIGHTMAP_DIR = join(process.cwd(), "public", "heightmap")
 

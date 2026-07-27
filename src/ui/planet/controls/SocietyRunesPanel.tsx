@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { RNG } from "@/model/shared/rng"
 import {
 	GLYPH_MODULE,
 	type GlyphSet,
@@ -12,7 +13,6 @@ import {
 	type RuneRenderOptions,
 } from "@/model/society/script/runegen/rune-renderer"
 import { renderScriptTexture } from "@/ui/planet/renderer/script-texture"
-import { RNG } from "@/model/shared/rng"
 
 type TemplateOption = {
 	value: RuneTemplate

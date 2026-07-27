@@ -1,4 +1,6 @@
 import React from "react"
+import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import {
@@ -7,8 +9,6 @@ import {
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
-import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
-import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 
 interface LockedClimatePreviewProps {
 	preview: LockedClimatePreviewData

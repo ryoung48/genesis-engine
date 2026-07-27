@@ -1,5 +1,5 @@
-import { UNITS } from "@/model/shared/units"
 import type { SliderRange } from "@/model/shared/slider-ranges/types"
+import { UNITS } from "@/model/shared/units"
 
 const RADIUS_MIN = Math.round((UNITS.defaultPlanetRadiusKm * 0.5) / 100) * 100
 

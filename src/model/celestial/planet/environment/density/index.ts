@@ -1,10 +1,10 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { DensityProfile } from "@/model/celestial/orbit-body/types"
 import type {
 	DensityDescriptionInput,
 	DensityProfileInput,
 	RollAlbedoInput,
 } from "@/model/celestial/planet/environment/density/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { DICE } from "@/model/shared/dice"
 
 function clamp({

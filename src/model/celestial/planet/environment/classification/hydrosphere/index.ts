@@ -1,11 +1,11 @@
 import type { HydrosphereProfile } from "@/model/celestial/orbit-body/types"
-import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
 import type {
 	BuildHydrosphereInput,
 	CountBodiesInput,
 	DistributeSurfaceInput,
 	WaterPctInput,
 } from "@/model/celestial/planet/environment/classification/hydrosphere/types"
+import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
 import { DICE } from "@/model/shared/dice"
 
 function clamp({ value, min, max }: ClampInput): number {

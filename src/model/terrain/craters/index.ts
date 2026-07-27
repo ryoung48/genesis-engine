@@ -1,24 +1,9 @@
-﻿/**
- * Impact craters — stamps large circular depressions with rims and ejecta
- * blankets onto the elevation field. Applied after all terrain post-processing
- * so craters remain crisp and visible.
- */
-
 import type { SphereMesh } from "@/model"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { RNG } from "@/model/shared/rng"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import type { Crater } from "@/model/terrain/craters/types"
 
-interface Crater {
-	cx: number
-	cy: number
-	cz: number
-	radius: number // angular radius in radians
-	depth: number // bowl depth (elevation units)
-	rimHeight: number // rim elevation boost
-	cosThresh: number // early-out: cos(radius * 2.5)
-}
-
-export function applyCraters(
+function applyCraters(
 	mesh: SphereMesh,
 	elevation: Float32Array,
 	seed: number,
@@ -119,4 +104,8 @@ export function applyCraters(
 			elevation[r] += totalDelta
 		}
 	}
+}
+
+export const CRATERS = {
+	applyCraters,
 }

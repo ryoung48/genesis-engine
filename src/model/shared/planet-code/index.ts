@@ -3,16 +3,16 @@ import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/types"
-import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
-import { ERAS } from "@/model/society/eras"
-import { SEEDS } from "@/model/shared/seeds"
 import type {
 	DecodedPlanetCode,
-	FieldSpec,
-	ToIndexParams,
-	FromIndexParams,
 	EncodePlanetCodeParams,
+	FieldSpec,
+	FromIndexParams,
+	ToIndexParams,
 } from "@/model/shared/planet-code/types"
+import { SEEDS } from "@/model/shared/seeds"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import { ERAS } from "@/model/society/eras"
 
 const DEFAULT_PRESSURE = 1.0
 

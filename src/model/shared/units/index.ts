@@ -1,7 +1,7 @@
 import type {
 	MeanEdgeLengthKmParams,
-	RegionPathLengthKmParams,
 	RegionDistanceKmParams,
+	RegionPathLengthKmParams,
 } from "@/model/shared/units/types"
 
 const defaultPlanetRadiusKm = 6371

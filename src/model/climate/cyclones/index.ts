@@ -1,8 +1,8 @@
 import type { ComputeCycloneRiskParams } from "@/model/climate/cyclones/types"
 import { RAIN } from "@/model/climate/rain"
-import { TOPO_OCEAN } from "@/model/terrain"
 import { MATH } from "@/model/shared/math"
 import { TIME } from "@/model/shared/time"
+import { CLASSIFICATION } from "@/model/terrain/classification"
 
 function computeCycloneRisk({
 	mesh,
@@ -44,7 +44,7 @@ function computeCycloneRisk({
 		// Lakes (TOPO_LAKE) are excluded — only true open ocean cells can generate
 		// cyclones. isLand is 0 for both ocean and lake so topography is the
 		// reliable discriminator here.
-		if (topography[r] !== TOPO_OCEAN) continue
+		if (topography[r] !== CLASSIFICATION.topoOcean) continue
 
 		// Peak monthly SST over the annual cycle
 		let peakTemp = -Infinity
@@ -97,13 +97,13 @@ function computeCycloneRisk({
 	let head = 0
 	while (head < queue.length) {
 		const r = queue[head++]
-		if (topography[r] !== TOPO_OCEAN) continue
+		if (topography[r] !== CLASSIFICATION.topoOcean) continue
 		const propagated = trackDensity[r] * TRACK_DECAY
 		if (propagated <= TRACK_MIN) continue
 		for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
 			const nb = adjList[j]
 			// Storms die on land and lakes — don't propagate through either
-			if (topography[nb] !== TOPO_OCEAN) continue
+			if (topography[nb] !== CLASSIFICATION.topoOcean) continue
 			if (propagated > trackDensity[nb] + 1e-4) {
 				trackDensity[nb] = propagated
 				queue.push(nb)

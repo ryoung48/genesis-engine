@@ -1,21 +1,17 @@
-import {
-	LANDMARK_TYPE_LAKE,
-	LANDMARK_TYPE_OCEAN,
-	LANDMARK_TYPE_SEA,
-} from "@/model/terrain"
 import type {
-	SettlementAnchors,
+	ComputeSettlementAnchorsParams,
 	GetLargestAdjacentWaterRegionParams,
 	InlandPriorityParams,
-	ComputeSettlementAnchorsParams,
+	SettlementAnchors,
 } from "@/model/settlements/types"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 
 const LAKE_TOPOGRAPHY = 6
 
 const WATER_LANDMARK_TYPES = new Set([
-	LANDMARK_TYPE_OCEAN,
-	LANDMARK_TYPE_SEA,
-	LANDMARK_TYPE_LAKE,
+	LANDMARKS.landmarkTypeOcean,
+	LANDMARKS.landmarkTypeSea,
+	LANDMARKS.landmarkTypeLake,
 ])
 
 function getLargestAdjacentWaterRegion({

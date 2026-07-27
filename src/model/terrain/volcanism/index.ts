@@ -1,61 +1,57 @@
-﻿import type { BoundaryInfo, SphereMesh } from "@/model"
-import type { BuildTangentFrameParams } from "@/model/terrain/types"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
+import type {
+	AppendLipSitesParams,
+	BuildTangentFrameParams,
+	GetScaledFeatureCountParams,
+	LargeIgneousProvinceParams,
+	LipSite,
+	TangentFrame,
+	VolcanicArcParams,
+} from "@/model/terrain/volcanism/types"
 
 const VOLC_MIN_SPACING = 0.015
+
 const VOLC_SIGMA_BASE = 0.005
+
 const VOLC_HEIGHT_BASE = 0.4
+
 const VOLC_HEIGHT_VAR_BASE = 0.7
+
 const VOLC_HEIGHT_VAR_RANGE = 0.6
+
 const VOLC_SIGMA_VAR_BASE = 0.6
+
 const VOLC_SIGMA_VAR_RANGE = 0.8
+
 const VOLC_SUBDUCT_THRESH = 0.45
 
 const LIP_SIGMA = 0.12
+
 const LIP_HEIGHT = 0.02
+
 const LIP_LOBE_COUNT = 6
+
 const LIP_LOBE_OFFSET = 0.6
+
 const LIP_LOBE_SIGMA = 0.6
+
 const LIP_LOBE_STRENGTH = 0.9
-
-interface TangentFrame {
-	ux: number
-	uy: number
-	uz: number
-	vx: number
-	vy: number
-	vz: number
-}
-
-export interface LipSite {
-	x: number
-	y: number
-	z: number
-	height: number
-	sigma: number
-}
-
-type TerrainFeatureMarker = (
-	region: number,
-	feature: number,
-	delta: number,
-) => void
 
 function getVolcanismFrequency(volcanism: number): number {
 	return Math.max(0, volcanism)
 }
 
-export function getScaledFeatureCount(
-	baseCount: number,
-	volcanism: number,
-): number {
+function getScaledFeatureCount({
+	baseCount,
+	volcanism,
+}: GetScaledFeatureCountParams): number {
 	const frequency = getVolcanismFrequency(volcanism)
 	if (frequency <= 0) return 0
 	return Math.max(1, Math.round(baseCount * Math.sqrt(frequency)))
 }
 
-export function getVolcanicActivityThreshold(
+function getVolcanicActivityThreshold(
 	baseThreshold: number,
 	volcanism: number,
 	minThreshold = 0.05,
@@ -73,13 +69,13 @@ function getVolcanicArcSpacing(volcanism: number): number {
 	return VOLC_MIN_SPACING / Math.sqrt(frequency)
 }
 
-export function getLipSpawnChance(volcanism: number): number {
+function getLipSpawnChance(volcanism: number): number {
 	const frequency = getVolcanismFrequency(volcanism)
 	if (frequency <= 0) return 0
 	return Math.min(1, frequency)
 }
 
-export function buildTangentFrame({
+function buildTangentFrame({
 	px,
 	py,
 	pz,
@@ -101,17 +97,7 @@ export function buildTangentFrame({
 	return { ux, uy, uz, vx, vy, vz }
 }
 
-interface VolcanicArcParams {
-	mesh: SphereMesh
-	elevation: Float32Array
-	boundary: BoundaryInfo
-	maxStress: number
-	seed: number
-	volcanism: number
-	markFeature: TerrainFeatureMarker
-}
-
-export function applyVolcanicArcs({
+function applyVolcanicArcs({
 	mesh,
 	elevation,
 	boundary,
@@ -286,18 +272,7 @@ export function applyVolcanicArcs({
 	return uplift
 }
 
-interface AppendLipSitesParams {
-	x: number
-	y: number
-	z: number
-	drift: [number, number, number]
-	upwelling: number
-	volcanism: number
-	isOcean: boolean
-	random: () => number
-}
-
-export function appendLargeIgneousProvinceSites(
+function appendLargeIgneousProvinceSites(
 	lipSites: LipSite[],
 	{
 		x,
@@ -360,15 +335,7 @@ export function appendLargeIgneousProvinceSites(
 	}
 }
 
-interface LargeIgneousProvinceParams {
-	mesh: SphereMesh
-	elevation: Float32Array
-	lipSites: LipSite[]
-	seed: number
-	markFeature: TerrainFeatureMarker
-}
-
-export function applyLargeIgneousProvinces({
+function applyLargeIgneousProvinces({
 	mesh,
 	elevation,
 	lipSites,
@@ -405,4 +372,14 @@ export function applyLargeIgneousProvinces({
 	}
 
 	return uplift
+}
+
+export const VOLCANISM = {
+	getScaledFeatureCount,
+	getVolcanicActivityThreshold,
+	getLipSpawnChance,
+	buildTangentFrame,
+	applyVolcanicArcs,
+	appendLargeIgneousProvinceSites,
+	applyLargeIgneousProvinces,
 }

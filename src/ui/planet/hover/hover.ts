@@ -1,5 +1,3 @@
-import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
-import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
@@ -7,7 +5,9 @@ import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 import { TIMEZONE } from "@/model/society/timezone"
-import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
+import { CLASSIFICATION } from "@/model/terrain/classification"
+import { LANDMARKS } from "@/model/terrain/landmarks"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
 	EU5_CLIMATE_CATEGORIES,
@@ -22,6 +22,8 @@ import type {
 	GetHoverRainfallSeriesFromArraysParams,
 } from "@/ui/planet/hover/types"
 import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
+
+const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
 export interface HoverInfo {
 	region: number
@@ -193,7 +195,7 @@ export function getHoverRainfall(
 			(world?.landmarks != null &&
 				world.landmarks.regionLandmark[region] >= 0 &&
 				world.landmarks.type[world.landmarks.regionLandmark[region]] ===
-					LANDMARK_TYPE_LAKE))
+					LANDMARKS.landmarkTypeLake))
 	return hoverInfo && world?.rainfall && canShowRainfall
 		? rainfallMonth === 0
 			? world.rainfall.annual[region]
@@ -218,7 +220,7 @@ function getHoverRainfallSeriesFromArrays({
 			(world?.landmarks != null &&
 				world.landmarks.regionLandmark[region] >= 0 &&
 				world.landmarks.type[world.landmarks.regionLandmark[region]] ===
-					LANDMARK_TYPE_LAKE))
+					LANDMARKS.landmarkTypeLake))
 	if (!(hoverInfo && world && canShowRainfall)) return null
 	const r = hoverInfo.region
 	const N = world.mesh.numRegions
@@ -704,7 +706,7 @@ export function getHoverLandmark(
 	if (landmarkId < 0) return null
 	return {
 		id: landmarkId,
-		type: LANDMARK_TYPES[world.landmarks.type[landmarkId]] ?? null,
+		type: LANDMARKS.landmarkTypes[world.landmarks.type[landmarkId]] ?? null,
 		size: world.landmarks.size[landmarkId] ?? null,
 	}
 }
@@ -824,8 +826,13 @@ export function getHoverTerrainFeature(
 	const mask = world.terrainFeatures.featureMask[r]
 	if (!mask) return null
 	const all: string[] = []
-	for (let bit = 1; bit < TERRAIN_FEATURES.genesisTerrainFeatureLabels.length; bit++) {
-		if (mask & (1 << (bit - 1))) all.push(TERRAIN_FEATURES.genesisTerrainFeatureLabels[bit])
+	for (
+		let bit = 1;
+		bit < TERRAIN_FEATURES.genesisTerrainFeatureLabels.length;
+		bit++
+	) {
+		if (mask & (1 << (bit - 1)))
+			all.push(TERRAIN_FEATURES.genesisTerrainFeatureLabels[bit])
 	}
 	return {
 		dominant:

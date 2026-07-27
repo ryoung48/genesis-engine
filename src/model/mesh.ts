@@ -4,8 +4,8 @@
  * Faithful port of genesis's sphere-mesh.js.
  */
 import Delaunator from "delaunator"
-import type { SphereMesh } from "@/model/types/mesh"
 import type { GenesisRng } from "@/model/shared/rng/types"
+import type { SphereMesh } from "@/model/types/mesh"
 
 /**
  * Fibonacci sphere with jitter — evenly-distributed points on a unit sphere.

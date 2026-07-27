@@ -1,6 +1,6 @@
 import type { MinHeap } from "@/model/shared/min-heap"
 import type { SocietyEra } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type { SphereMesh } from "@/model/types/mesh"
 import type {

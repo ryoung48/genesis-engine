@@ -2,12 +2,12 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
-import type { SocietyEra } from "@/model/society/types"
-import { computeSeaLevelOffsetKm } from "@/model/terrain"
-import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import { UNITS } from "@/model/shared/units"
+import type { SocietyEra } from "@/model/society/types"
+import { SEA_LEVEL } from "@/model/terrain/sea-level"
+import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 
 const SR = SLIDER_RANGES
 
@@ -194,10 +194,10 @@ export function buildTerrainSliders(state: {
 			help: "Shifts the final shoreline after volcanism and craters are applied. 1.00x keeps the baseline sea level unchanged.",
 			value: state.seaLevel,
 			display: (() => {
-				const offsetKm = computeSeaLevelOffsetKm(
-					state.seaLevel,
-					UNITS.getMaxOceanDepthKm(UNITS.defaultPlanetRadiusKm),
-				)
+				const offsetKm = SEA_LEVEL.computeSeaLevelOffsetKm({
+					seaLevel: state.seaLevel,
+					maxDepthKm: UNITS.getMaxOceanDepthKm(UNITS.defaultPlanetRadiusKm),
+				})
 				const sign = offsetKm > 0 ? "+" : offsetKm < 0 ? "−" : ""
 				if (state.unitSystem === "imperial") {
 					return `${sign}${Math.round(Math.abs(offsetKm) * 3280.84).toLocaleString()} ft`

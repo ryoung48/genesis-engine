@@ -1,24 +1,16 @@
-﻿import type { SphereMesh } from "@/model/types"
-import type { ApplyHotspotsParams } from "@/model/terrain/types"
-import {
-	appendLargeIgneousProvinceSites,
-	applyLargeIgneousProvinces,
-	buildTangentFrame,
-	getLipSpawnChance,
-	getScaledFeatureCount,
-	type LipSite,
-} from "@/model/terrain/volcanism"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MATH } from "@/model/shared/math"
 import { RNG } from "@/model/shared/rng"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MANTLE } from "@/model/tectonics/mantle"
+import type {
+	ApplyHotspotsParams,
+	Dome,
+	FindNearestRParams,
+} from "@/model/terrain/hotspots/types"
+import { VOLCANISM } from "@/model/terrain/volcanism"
+import type { LipSite } from "@/model/terrain/volcanism/types"
 
-function findNearestR(
-	mesh: SphereMesh,
-	px: number,
-	py: number,
-	pz: number,
-): number {
+function findNearestR({ mesh, px, py, pz }: FindNearestRParams): number {
 	let bestDot = -2,
 		bestR = 0
 	for (let r = 0; r < mesh.numRegions; r++) {
@@ -34,42 +26,7 @@ function findNearestR(
 	return bestR
 }
 
-interface Dome {
-	x: number
-	y: number
-	z: number
-	strength: number
-	baseStrength: number
-	sigma: number
-	chainIndex: number
-	chainLength: number
-	dx: number
-	dy: number
-	dz: number
-	ux: number
-	uy: number
-	uz: number
-	vx: number
-	vy: number
-	vz: number
-	riftAngles: number[]
-	// Pre-computed
-	cosThreshPeak: number
-	invS2: number
-	swellSigma: number
-	swellStrength: number
-	cosThreshSwell: number
-	invS2Swell: number
-	driftStretch: number
-	hasCaldera: boolean
-	calderaSigma: number
-	calderaDepth: number
-	invS2Caldera: number
-	ageFactor: number
-	isContinental: boolean
-}
-
-export function applyHotspots({
+function applyHotspots({
 	mesh,
 	plates,
 	plateAssignment,
@@ -83,7 +40,10 @@ export function applyHotspots({
 	const hotspotContrib = new Float32Array(numRegions)
 	if (volcanism <= 0) return hotspotContrib
 	const dominantMagnitude = terrainFeatures?.dominantMagnitude
-	const NUM_HOTSPOTS = getScaledFeatureCount(8, volcanism)
+	const NUM_HOTSPOTS = VOLCANISM.getScaledFeatureCount({
+		baseCount: 8,
+		volcanism,
+	})
 	const CHAIN_LENGTH = 6
 	const CHAIN_DECAY = 0.65
 	const CHAIN_SPACING = 0.06
@@ -176,7 +136,7 @@ export function applyHotspots({
 			sx /= sLen
 			sy /= sLen
 			sz /= sLen
-			const satFrame = buildTangentFrame({
+			const satFrame = VOLCANISM.buildTangentFrame({
 				px: sx,
 				py: sy,
 				pz: sz,
@@ -224,7 +184,7 @@ export function applyHotspots({
 				const cx = sinPhiVal * Math.cos(theta)
 				const cy = sinPhiVal * Math.sin(theta)
 				const cz = cosPhiVal
-				const candidateRegion = findNearestR(mesh, cx, cy, cz)
+				const candidateRegion = findNearestR({ mesh, px: cx, py: cy, pz: cz })
 				const score =
 					mantleNorm[candidateRegion] +
 					(hsPosRng.random() - 0.5) * HOTSPOT_UPWELLING_JITTER
@@ -244,7 +204,7 @@ export function applyHotspots({
 			hz = cosPhiVal
 		}
 
-		const centerR = findNearestR(mesh, hx, hy, hz)
+		const centerR = findNearestR({ mesh, px: hx, py: hy, pz: hz })
 		const plate = plates[plateAssignment[centerR]]
 		const drift = MATH.eulerVelocityAt({
 			pole: plate.pole,
@@ -271,7 +231,7 @@ export function applyHotspots({
 
 		const baseRiftAngle = hsNoise3.noise3D(hx * 10, hy * 10, hz * 10) * Math.PI
 
-		const frame0 = buildTangentFrame({
+		const frame0 = VOLCANISM.buildTangentFrame({
 			px: hx,
 			py: hy,
 			pz: hz,
@@ -344,7 +304,7 @@ export function applyHotspots({
 			cy /= nL
 			cz /= nL
 
-			const frameC = buildTangentFrame({
+			const frameC = VOLCANISM.buildTangentFrame({
 				px: cx,
 				py: cy,
 				pz: cz,
@@ -373,11 +333,11 @@ export function applyHotspots({
 			}
 		}
 
-		const lipRegion = findNearestR(mesh, cx, cy, cz)
+		const lipRegion = findNearestR({ mesh, px: cx, py: cy, pz: cz })
 		const upwelling = mantleNorm ? Math.max(0, mantleNorm[lipRegion]) : 0.5
-		const lipSpawnChance = getLipSpawnChance(volcanism)
+		const lipSpawnChance = VOLCANISM.getLipSpawnChance(volcanism)
 		if (lipSpawnChance >= 1 || hsRng.random() <= lipSpawnChance) {
-			appendLargeIgneousProvinceSites(lipSites, {
+			VOLCANISM.appendLargeIgneousProvinceSites(lipSites, {
 				x: cx,
 				y: cy,
 				z: cz,
@@ -560,7 +520,7 @@ export function applyHotspots({
 		}
 	}
 
-	const lipContrib = applyLargeIgneousProvinces({
+	const lipContrib = VOLCANISM.applyLargeIgneousProvinces({
 		mesh,
 		elevation,
 		lipSites,
@@ -572,4 +532,8 @@ export function applyHotspots({
 	}
 
 	return hotspotContrib
+}
+
+export const HOTSPOTS = {
+	applyHotspots,
 }

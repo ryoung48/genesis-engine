@@ -1,3 +1,4 @@
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type {
 	ApparentDiameterRadParams,
@@ -7,7 +8,6 @@ import type {
 	StarTideContributionParams,
 	TideContributionParams,
 } from "@/model/climate/tidal-force/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const TWO_PI = 2 * Math.PI
 

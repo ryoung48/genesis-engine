@@ -2,7 +2,7 @@ import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 import type { PastaDebug } from "@/model/climate/types"
 import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 import type { ProvincePopulation } from "@/model/society/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type {
 	BoundaryInfo,

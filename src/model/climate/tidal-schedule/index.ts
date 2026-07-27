@@ -1,5 +1,6 @@
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
@@ -13,7 +14,6 @@ import type {
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
 import type { GenesisParams } from "@/model/types"
-import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 
 const MAX_TIDAL_SCHEDULE_SAMPLES = 2000
 

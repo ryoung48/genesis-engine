@@ -1,12 +1,12 @@
 import type { GenesisRivers } from "@/model"
-import type { ComputeRiversParams } from "@/model/terrain/types"
-import { MinHeap } from "@/model/shared/min-heap"
 import { MATH } from "@/model/shared/math"
+import { MinHeap } from "@/model/shared/min-heap"
+import type {
+	ComputeRiversParams,
+	PolylineLengthKmParams,
+} from "@/model/terrain/rivers/types"
 
-function polylineLengthKm(
-	line: [number, number, number, number][],
-	radiusKm: number,
-): number {
+function polylineLengthKm({ line, radiusKm }: PolylineLengthKmParams): number {
 	let sum = 0
 	for (let i = 1; i < line.length; i++) {
 		const [lon0, lat0] = line[i - 1]
@@ -25,7 +25,7 @@ function polylineLengthKm(
 	return sum
 }
 
-export function computeRivers({
+function computeRivers({
 	mesh,
 	elevation,
 	rainfall,
@@ -311,7 +311,7 @@ export function computeRivers({
 			// adopt that river's ID (same river system). Otherwise assign a new one.
 			const lastCell = lineCells[lineCells.length - 1]
 			const id = riverId[lastCell] >= 0 ? riverId[lastCell] : nextRiverId++
-			const lineLengthKm = polylineLengthKm(line, radiusKm)
+			const lineLengthKm = polylineLengthKm({ line, radiusKm })
 			lines.push(line)
 			lineRiverIds.push(id)
 			riverSystemLengths[id] = (riverSystemLengths[id] ?? 0) + lineLengthKm
@@ -381,4 +381,8 @@ export function computeRivers({
 		basinId,
 		waterLevel,
 	}
+}
+
+export const RIVERS = {
+	computeRivers,
 }

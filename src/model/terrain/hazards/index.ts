@@ -1,16 +1,19 @@
-﻿import type { GenesisHazards } from "@/model"
+import type { GenesisHazards } from "@/model"
+import { MATH } from "@/model/shared/math"
 import type {
 	ComputeHazardsParams,
+	NormalizeFieldParams,
+	PercentileParams,
 	PropagateInfluenceParams,
-} from "@/model/terrain/types"
-import { MATH } from "@/model/shared/math"
+	ThresholdFieldParams,
+} from "@/model/terrain/hazards/types"
 
 function gradualFalloff(distance: number, reach: number, power = 1.35): number {
 	if (!Number.isFinite(distance)) return 0
 	return Math.pow(1 - MATH.clamp01(distance / reach), power)
 }
 
-function percentile(values: number[], q: number): number {
+function percentile({ values, q }: PercentileParams): number {
 	if (values.length === 0) return 0
 	values.sort((a, b) => a - b)
 	const index = Math.min(
@@ -20,16 +23,16 @@ function percentile(values: number[], q: number): number {
 	return values[index]
 }
 
-function normalizeField(
-	values: Float32Array,
-	percentileQ: number,
-): Float32Array {
+function normalizeField({
+	values,
+	percentileQ,
+}: NormalizeFieldParams): Float32Array {
 	const samples: number[] = []
 	for (let i = 0; i < values.length; i++) {
 		const value = values[i]
 		if (Number.isFinite(value) && value > 1e-5) samples.push(value)
 	}
-	const scale = percentile(samples, percentileQ)
+	const scale = percentile({ values: samples, q: percentileQ })
 	const normalized = new Float32Array(values.length)
 	if (scale <= 1e-6) return normalized
 	const invScale = 1 / scale
@@ -65,7 +68,10 @@ function propagateInfluence({
 	return out
 }
 
-function thresholdField(source: Float32Array, minValue: number): Float32Array {
+function thresholdField({
+	source,
+	minValue,
+}: ThresholdFieldParams): Float32Array {
 	const out = new Float32Array(source.length)
 	for (let i = 0; i < source.length; i++) {
 		if (source[i] >= minValue) out[i] = source[i]
@@ -73,7 +79,7 @@ function thresholdField(source: Float32Array, minValue: number): Float32Array {
 	return out
 }
 
-export function computeHazards({
+function computeHazards({
 	mesh,
 	boundary,
 	distFields,
@@ -86,9 +92,12 @@ export function computeHazards({
 	const volcano = new Float32Array(N)
 	const danger = new Float32Array(N)
 
-	const stressNorm = normalizeField(boundary.r_stress, 0.97)
+	const stressNorm = normalizeField({
+		values: boundary.r_stress,
+		percentileQ: 0.97,
+	})
 	const hotspotNorm = hotspot
-		? normalizeField(hotspot, 0.95)
+		? normalizeField({ values: hotspot, percentileQ: 0.95 })
 		: new Float32Array(N)
 
 	const tectonicReach = Math.max(7, Math.round(16 * Math.sqrt(N / 10000)))
@@ -105,7 +114,7 @@ export function computeHazards({
 	}
 	const boundaryStressCutoff = Math.max(
 		0.3,
-		percentile(boundaryStressValues, 0.82),
+		percentile({ values: boundaryStressValues, q: 0.82 }),
 	)
 
 	for (let r = 0; r < N; r++) {
@@ -232,7 +241,10 @@ export function computeHazards({
 		volcano[r] = MATH.clamp01(volc)
 	}
 
-	const strongEarthquakeSeeds = thresholdField(earthquake, 0.8)
+	const strongEarthquakeSeeds = thresholdField({
+		source: earthquake,
+		minValue: 0.8,
+	})
 	const strongSeedList: number[] = []
 	for (let r = 0; r < N; r++) {
 		if (strongEarthquakeSeeds[r] > 0) strongSeedList.push(r)
@@ -256,4 +268,8 @@ export function computeHazards({
 	}
 
 	return { earthquake, volcano, danger }
+}
+
+export const HAZARDS = {
+	computeHazards,
 }

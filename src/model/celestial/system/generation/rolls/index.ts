@@ -4,8 +4,8 @@ import type {
 	OrbitGroup,
 } from "@/model/celestial/orbit-body/types"
 import type { Zone } from "@/model/celestial/planet/types"
-import type { RingProfile } from "@/model/celestial/system/types"
 import type { DensityComposition } from "@/model/celestial/system/generation/rolls/types"
+import type { RingProfile } from "@/model/celestial/system/types"
 import { DICE } from "@/model/shared/dice"
 import { RNG } from "@/model/shared/rng"
 

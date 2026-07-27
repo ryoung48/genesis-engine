@@ -1,3 +1,4 @@
+import { RNG } from "@/model/shared/rng"
 import {
 	GLYPH_MODULE,
 	type GlyphSet,
@@ -6,7 +7,6 @@ import {
 	RuneRenderer,
 	type RuneRenderOptions,
 } from "@/model/society/script/runegen/rune-renderer"
-import { RNG } from "@/model/shared/rng"
 
 export interface HeritageScript {
 	glyphs: GlyphSet

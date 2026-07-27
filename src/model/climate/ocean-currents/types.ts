@@ -1,4 +1,4 @@
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
