@@ -1,11 +1,9 @@
-﻿import type { GenesisParams, SphereMesh } from "@/model"
 import {
 	buildUrquhartEdgesFromFlat,
 	MinHeap,
 	regionDistanceKm,
 	regionPathLengthKm,
 } from "@/model/shared"
-import type { GenesisLandmarks } from "@/model/terrain"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -14,45 +12,20 @@ import {
 	type RouteEdge,
 	type SerializedRouteKind,
 } from "@/model/transport"
-import type { GenesisNationHierarchy, GenesisProvinces } from "@/model/types"
 import type { SocietyEra } from "@/model/society/types"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
-
-/**
- * Route computation runs mid-pipeline, before the GenesisWorld literal is
- * assembled, so it takes the world's sub-objects directly the same way
- * deriveProvinceSociety does rather than the (fully optional) world type.
- */
-interface RouteWorldInput {
-	mesh: Pick<SphereMesh, "r_xyz" | "adjOffset" | "adjList">
-	params: Pick<GenesisParams, "planetRadiusKm" | "era">
-	provinces: Pick<
-		GenesisProvinces,
-		"count" | "desolate" | "regionProvince" | "adjOffset" | "adjList"
-	>
-	nations: Pick<GenesisNationHierarchy, "sovereign">
-	landmarks: GenesisLandmarks
-	isLand: Uint8Array
-}
-
-/**
- * Flattened view the search helpers read. Derived from RouteWorldInput at the
- * top of computeRoutes; internal to this module.
- */
-interface RouteWorld {
-	/** Province count. */
-	P: number
-	era: SocietyEra
-	desolate: Uint8Array
-	/** Settled but nation-less provinces, impassable to routes. */
-	stateless: Uint8Array
-	regionProvince: Int32Array
-	regionAdjOffset: Int32Array
-	regionAdjList: Int32Array
-	regionIsLand: Uint8Array
-	r_xyz: Float32Array
-	landmarks: GenesisLandmarks
-}
+import type {
+	RouteWorldInput,
+	RouteWorld,
+	RouteInputs,
+	RouteComputation,
+	RouteCandidate,
+	LandCandidateGroup,
+	LandCandidateGroupsByKind,
+	SeaCandidateGroup,
+	SearchWorkspace,
+	SeaNeighborWorkspace,
+} from "@/model/economy/routes/types"
 
 function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	const { provinces, nations } = input
@@ -103,24 +76,6 @@ function routePopulationThresholds(era: SocietyEra) {
 	}
 }
 
-interface RouteInputs {
-	/**
-	 * Per-province urban population, sizing settlements into major/minor/port
-	 * route candidates. Supplied by the urbanization pipeline stage; this used
-	 * to be read out of the sim's population timelines.
-	 */
-	urbanPopulation: Float32Array
-	settlementRegions?: Int32Array
-	settlementWaterLandmarks?: Int32Array
-	settlementPortRegions?: Int32Array
-	timings?: Array<{ Stage: string; ms: string }>
-}
-
-interface RouteComputation {
-	routes: Route[]
-	network: RouteEdge[]
-}
-
 function timed<T>({
 	label,
 	timings,
@@ -136,51 +91,6 @@ function timed<T>({
 		timings.push({ Stage: label, ms: (performance.now() - t0).toFixed(1) })
 	}
 	return result
-}
-
-interface RouteCandidate {
-	province: number
-	region: number
-}
-
-interface LandCandidateGroup {
-	cluster: number
-	landmark: number
-	candidates: RouteCandidate[]
-}
-
-interface LandCandidateGroupsByKind {
-	major: LandCandidateGroup[]
-	minor: LandCandidateGroup[]
-}
-
-interface SeaCandidateGroup {
-	waterLandmark: number
-	candidates: Array<{
-		province: number
-		anchorRegion: number
-		portRegion: number
-	}>
-}
-
-interface SearchWorkspace {
-	distance: Float32Array
-	prev: Int32Array
-	queued: Int32Array
-	settled: Int32Array
-	targetStamp: Int32Array
-	targetCount: Int32Array
-	heap: MinHeap
-	stamp: number
-}
-
-interface SeaNeighborWorkspace {
-	distance: Float32Array
-	owner: Int32Array
-	queued: Int32Array
-	settled: Int32Array
-	heap: MinHeap
-	stamp: number
 }
 
 function pairKey({
@@ -1177,7 +1087,7 @@ function buildRouteNetwork({
 	)
 }
 
-export function computeRoutes({
+function computeRoutes({
 	world,
 	inputs,
 }: {
@@ -1305,4 +1215,8 @@ export function computeRoutes({
 			fn: () => buildRouteNetwork({ routes, state, urbanPopulation }),
 		}),
 	}
+}
+
+export const ROUTES = {
+	computeRoutes,
 }

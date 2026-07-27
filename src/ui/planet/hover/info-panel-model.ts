@@ -1,5 +1,4 @@
 import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
-import { tradeGoodColor } from "@/model/economy"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
@@ -42,6 +41,7 @@ import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
 
 interface HoverChartData {
 	temps: number[]
@@ -531,5 +531,5 @@ export function buildTradeGoodSwatchColor(
 	materialIndex: number,
 ): string | null {
 	if (materialIndex <= 0) return null
-	return rgbToCss(tradeGoodColor(materialIndex))
+	return rgbToCss(TRADE_GOODS.tradeGoodColor(materialIndex))
 }

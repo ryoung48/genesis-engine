@@ -2,7 +2,6 @@ import {
 	GENESIS_TERRAIN_FEATURE_LABELS,
 	GENESIS_TOPOGRAPHY_LABELS,
 } from "@/model"
-import { TRADE_GOOD_LABELS } from "@/model/economy"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
@@ -24,6 +23,7 @@ import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 
 export interface HoverInfo {
 	region: number
@@ -889,7 +889,7 @@ export function getHoverTradeGood(
 	if (l == null || l < 0 || l >= world.tradeGoods.length) return null
 	const idx = world.tradeGoods[l]
 	if (!idx) return null
-	const raw = TRADE_GOOD_LABELS[idx] ?? "unknown"
+	const raw = TRADE_GOODS_TABLE.tradeGoodLabels[idx] ?? "unknown"
 	const name = raw.replace(/^goods_/, "").replace(/_/g, " ")
 	return { name, materialIndex: idx }
 }

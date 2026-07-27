@@ -1,5 +1,4 @@
 ﻿import { GENESIS_TERRAIN_FEATURE } from "@/model"
-import { tradeGoodColor } from "@/model/economy"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import type { ColorMode } from "@/ui/planet/colors"
@@ -63,6 +62,7 @@ import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
 
 /**
  * Relation values the diplomacy map mode colors by. These mirrored the
@@ -1453,7 +1453,7 @@ export function computeRegionColors(
 			} else {
 				const l = regionLocation[r]
 				const tgIdx = l != null && l >= 0 ? (world.tradeGoods[l] ?? 0) : 0
-				const [cr, cg, cb] = tradeGoodColor(tgIdx)
+				const [cr, cg, cb] = TRADE_GOODS.tradeGoodColor(tgIdx)
 				rgb[3 * r] = cr
 				rgb[3 * r + 1] = cg
 				rgb[3 * r + 2] = cb

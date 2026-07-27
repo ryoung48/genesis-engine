@@ -2,7 +2,6 @@
 import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { TRADE_GOOD_LABELS } from "@/model/economy"
 import { decodePlanetCode, encodePlanetCode } from "@/model/shared"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
@@ -15,6 +14,7 @@ import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 
 const SMOKE_PLANET_SEED = 14963991
 const SMOKE_PLANET_CODE = encodePlanetCode(SMOKE_PLANET_SEED, {
@@ -405,7 +405,7 @@ describe("full world smoke generation", () => {
 			console.table(
 				summarizeDistribution(
 					world.tradeGoods.material,
-					TRADE_GOOD_LABELS,
+					TRADE_GOODS_TABLE.tradeGoodLabels,
 					[0],
 				),
 			)

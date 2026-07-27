@@ -1,10 +1,4 @@
-// AUTO-GENERATED — do not edit. Run scripts/gen-trade-goods-table.py to regenerate.
-
-/**
- * Trade good names. Index 0 is reserved for 'none' (unassigned).
- * Indices 1..N correspond to the materials in the distribution table.
- */
-export const TRADE_GOOD_LABELS: readonly string[] = [
+const tradeGoodLabels: readonly string[] = [
 	"none",
 	"alum",
 	"amber",
@@ -60,12 +54,6 @@ export const TRADE_GOOD_LABELS: readonly string[] = [
 	"wool",
 ] as const
 
-/**
- * Weighted distribution table for trade good assignment.
- * Key format: "<climate>|<vegetation>|<topography>|<coastal>"
- * Value: pairs of [materialIndex, weight] where materialIndex is 1-based
- * into TRADE_GOOD_LABELS and weight is the raw location_count.
- */
 export const TRADE_GOODS_TABLE: Readonly<
 	Record<string, readonly (readonly [number, number])[]>
 > = {
@@ -4889,4 +4877,5 @@ export const TRADE_GOODS_TABLE: Readonly<
 		[32, 1],
 		[41, 1],
 	],
+	tradeGoodLabels,
 }

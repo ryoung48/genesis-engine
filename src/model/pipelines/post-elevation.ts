@@ -25,7 +25,6 @@ import { MOON } from "@/model/celestial/moons"
 import { SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
 import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { computeTradeGoods, type LocationTradeGoods } from "@/model/economy"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
@@ -65,6 +64,8 @@ import { TIDES } from "@/model/climate/tides"
 import { TORNADOES } from "@/model/climate/tornadoes"
 import { VEGETATION } from "@/model/climate/vegetation"
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 
 /**
  * Real (non-procedural) river network for the Earth-import path, already
@@ -1006,7 +1007,7 @@ export function runPostElevationPipeline(
 	// ── Trade goods ─────────────────────────────────────────────────────
 	t0 = performance.now()
 	const tradeGoods = locations
-		? computeTradeGoods({
+		? TRADE_GOODS.computeTradeGoods({
 				seed: params.seed,
 				locations,
 				provinces,

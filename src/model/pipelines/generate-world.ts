@@ -13,7 +13,6 @@ import type {
 	StageTiming,
 	TectonicPlate,
 } from "@/model"
-import { computeRoutes } from "@/model/economy"
 import { buildSphereMesh } from "@/model/mesh"
 import {
 	computeCoastDistances,
@@ -46,6 +45,7 @@ import {
 import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
 import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
 import { URBANIZATION } from "@/model/society/urbanization"
+import { ROUTES } from "@/model/economy/routes"
 
 type ProgressFn = (label: string, pct?: number) => void
 
@@ -649,7 +649,7 @@ export function generateGenesisWorld(
 	onProgress?.("urbanization", 80)
 
 	const infrastructure = withTiming("computeRoutes", infrastructureTiming, () =>
-		computeRoutes({
+		ROUTES.computeRoutes({
 			world: {
 				mesh,
 				params,

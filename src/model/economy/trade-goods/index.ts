@@ -1,30 +1,15 @@
-﻿import { makeRng } from "@/model/shared"
-import {
-	TRADE_GOOD_LABELS,
-	TRADE_GOODS_TABLE,
-} from "@/model/economy/trade-goods-table"
+import { makeRng } from "@/model/shared"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 import { PASTA } from "@/model/climate/pasta"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 
-export { TRADE_GOOD_LABELS }
-
-/** Formats a raw trade good label (e.g. "goods_gold", "fiber_crops") for display. */
-export function tradeGoodDisplayName(label: string): string {
+function tradeGoodDisplayName(label: string): string {
 	return label
 		.replace(/^goods_/, "")
 		.replace(/_/g, " ")
 		.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-/** Per-location trade good assignment. material[l] is 0 = unassigned, else 1-based index into TRADE_GOOD_LABELS. */
-export interface LocationTradeGoods {
-	material: Uint8Array
-}
-
-// Climate zone code → table climate key (mirrors CLIMATE_LABELS order)
-// 0=ocean → null, 1=arctic, 2=subarctic, 3=boreal → "arctic"
-// 4=temperate → "continental" default (pasta refines to "oceanic" or "mediterranean")
-// 5=subtropical → "subtropical" default (pasta refines to "mediterranean")
-// 6=tropical, 7=infernal → "tropical", 8=chaotic → "arctic"
 const ZONE_TO_CLIMATE: readonly (string | null)[] = [
 	null, // 0 ocean
 	"arctic", // 1 arctic
@@ -37,30 +22,28 @@ const ZONE_TO_CLIMATE: readonly (string | null)[] = [
 	"arctic", // 8 chaotic (fallback)
 ]
 
-// Pasta codes that refine the coarse climate zone.
-// CDa/CDap (Oceanic Temperate) + CEa/CEap (Oceanic Boreal) → "oceanic"
-// CDb/CDbp (Continental Temperate) → "continental"
-// CMa/CMb (Submediterranean) + CAMa/CAMb (Mediterranean) → "mediterranean"
-// Ad* (Semidesert) + Ah* (Desert) → "arid"; cold variants Adc/Ahc → "cold_arid"
 function pastaIndex(label: string): number {
 	return PASTA.pastaLabels.indexOf(label as (typeof PASTA.pastaLabels)[number])
 }
+
 const PASTA_OCEANIC = new Set([
 	pastaIndex("CDa"),
 	pastaIndex("CDap"),
 	pastaIndex("CEa"),
 	pastaIndex("CEap"),
 ])
+
 const PASTA_CONTINENTAL = new Set([pastaIndex("CDb"), pastaIndex("CDbp")])
+
 const PASTA_MEDITERRANEAN = new Set([
 	pastaIndex("CMa"),
 	pastaIndex("CMb"),
 	pastaIndex("CAMa"),
 	pastaIndex("CAMb"),
 ])
-// Cold desert/semidesert pasta codes → "cold_arid"
+
 const PASTA_COLD_ARID = new Set([pastaIndex("Adc"), pastaIndex("Ahc")])
-// Warm/hot/hyperseasonal desert and semidesert pasta codes → "arid"
+
 const PASTA_ARID = new Set([
 	pastaIndex("Ada"),
 	pastaIndex("Adh"),
@@ -70,8 +53,6 @@ const PASTA_ARID = new Set([
 	pastaIndex("Ahe"),
 ])
 
-// Biome code → table vegetation key (mirrors BIOME_LABELS order)
-// 0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle
 const BIOME_TO_VEG: readonly (string | null)[] = [
 	null, // 0 ocean
 	"desert", // 1 desert
@@ -82,8 +63,6 @@ const BIOME_TO_VEG: readonly (string | null)[] = [
 	"jungle", // 6 jungle
 ]
 
-// Topography code → table topography key
-// 0=flat, 1=hill, 2=plateau, 3=mountain, 4=marsh, 5=ocean(skip), 6=lake(skip)
 const TOPO_TO_KEY: readonly (string | null)[] = [
 	"flatland", // 0 flat
 	"hills", // 1 hill
@@ -94,7 +73,6 @@ const TOPO_TO_KEY: readonly (string | null)[] = [
 	null, // 6 lake — no material
 ]
 
-/** Returns "arid" or "cold_arid" for desert/sparse biomes when pasta is unavailable, otherwise null. */
 function aridFallback({
 	biome,
 	zone,
@@ -123,12 +101,7 @@ function weightedPick({
 	return entries[entries.length - 1]![0]
 }
 
-/**
- * Assigns a trade good to each location via a weighted draw from the
- * distribution table keyed by climate Ã— vegetation Ã— topography Ã— coastal.
- * Locations whose parent province is desolate are skipped (material stays 0).
- */
-export function computeTradeGoods(params: {
+function computeTradeGoods(params: {
 	seed: number
 	locations: {
 		count: number
@@ -222,18 +195,10 @@ export function computeTradeGoods(params: {
 	return { material }
 }
 
-/** Deterministic per-material color derived from its 1-based index. Returns [r,g,b] in 0..1. */
-export function tradeGoodColor(
-	materialIndex: number,
-): [number, number, number] {
+function tradeGoodColor(materialIndex: number): [number, number, number] {
 	return TRADE_GOOD_COLORS[materialIndex] ?? TRADE_GOOD_COLORS[0]!
 }
 
-/**
- * Curated colors for each trade good, indexed by material index.
- * Index 0 = unassigned (neutral gray). Indices 1–52 correspond to TRADE_GOOD_LABELS.
- * Colors sourced from tinto reference palette where available; approximated otherwise.
- */
 const TRADE_GOOD_COLORS: readonly [number, number, number][] = [
 	[0.35, 0.33, 0.32], //  0: none         — neutral gray
 	[0.412, 0.275, 0.263], //  1: alum         — #694643
@@ -289,3 +254,9 @@ const TRADE_GOOD_COLORS: readonly [number, number, number][] = [
 	[0.333, 0.204, 0.314], // 51: wine         — #553450
 	[0.467, 0.51, 0.522], // 52: wool         — #778285
 ]
+
+export const TRADE_GOODS = {
+	tradeGoodDisplayName,
+	computeTradeGoods,
+	tradeGoodColor,
+}

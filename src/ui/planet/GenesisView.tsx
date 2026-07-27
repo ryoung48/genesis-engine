@@ -21,11 +21,6 @@ import type {
 import { DATA_SOURCE } from "@/model/earth/history/data-source"
 import { FOLD } from "@/model/earth/history/fold"
 import { ORGANIZATION_CATEGORIES } from "@/model/earth/history/organization-categories"
-import {
-	TRADE_GOOD_LABELS,
-	tradeGoodColor,
-	tradeGoodDisplayName,
-} from "@/model/economy/trade-goods"
 import type { HistoryNote } from "@/model/history"
 import { YEAR_MS } from "@/model/history"
 import { historyMsToEu4Days } from "@/model/history/eu4-days"
@@ -261,6 +256,8 @@ import type {
 	OrgProvinceCategory,
 	OrgCategorizer,
 } from "@/model/earth/history/organization-categories/types"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -4090,22 +4087,26 @@ export const GenesisView: React.FC = () => {
 	const tradeGoodsDistribution = useMemo(() => {
 		const material = world?.tradeGoods
 		if (!material) return []
-		const counts = new Array<number>(TRADE_GOOD_LABELS.length).fill(0)
+		const counts = new Array<number>(
+			TRADE_GOODS_TABLE.tradeGoodLabels.length,
+		).fill(0)
 		for (let i = 0; i < material.length; i++) {
 			const idx = material[i]!
 			if (idx > 0 && idx < counts.length) counts[idx]++
 		}
-		return TRADE_GOOD_LABELS.flatMap((label, index) => {
-			if (index === 0 || counts[index] === 0) return []
-			const [r, g, b] = tradeGoodColor(index)
-			return [
-				{
-					label: tradeGoodDisplayName(label),
-					count: counts[index]!,
-					color: rgbToCss([r!, g!, b!]),
-				},
-			]
-		}).sort((a, b) => b.count - a.count)
+		return TRADE_GOODS_TABLE.tradeGoodLabels
+			.flatMap((label, index) => {
+				if (index === 0 || counts[index] === 0) return []
+				const [r, g, b] = TRADE_GOODS.tradeGoodColor(index)
+				return [
+					{
+						label: TRADE_GOODS.tradeGoodDisplayName(label),
+						count: counts[index]!,
+						color: rgbToCss([r!, g!, b!]),
+					},
+				]
+			})
+			.sort((a, b) => b.count - a.count)
 	}, [world?.tradeGoods])
 
 	const measureDistanceKm = useMemo(() => {
