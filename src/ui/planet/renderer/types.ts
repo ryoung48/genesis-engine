@@ -1,9 +1,5 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import type {
-	Eu4ProvinceBorderGeometry,
-	Eu4ProvinceFillGeometry,
-} from "@/model/earth"
-import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
 } from "@/model/transport"
@@ -15,6 +11,10 @@ import type {
 } from "@/ui/planet/renderer/eu4-nation-fill-overlay"
 import type { SolarSystemOverlayParams } from "@/ui/planet/renderer/solar-system-overlay"
 import type { WindArrowData } from "@/model/climate/wind/types"
+import type {
+	Eu4ProvinceBorderGeometry,
+	Eu4ProvinceFillGeometry,
+} from "@/model/earth/history/data-source/types"
 
 export type { WindArrowData }
 

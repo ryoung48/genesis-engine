@@ -1,14 +1,5 @@
-import { eu4DateToDays } from "../date"
-
-/** Ported from geo-explorer's src/components/map/DateControls.tsx era-grouped
- * preset list (hardcoded there too -- no separate bookmark data file exists
- * upstream). See docs/earth-history-plan.md "Bookmarks". */
-interface EarthHistoryBookmark {
-	date: number
-	eu4Date: string
-	label: string
-	era: string
-}
+import { DATE } from "@/model/earth/history/date"
+import type { EarthHistoryBookmark } from "@/model/earth/history/reference/bookmarks/types"
 
 const RAW_BOOKMARKS: { eu4Date: string; label: string; era: string }[] = [
 	// Prehistoric Era -- pre-2AD coverage is sourced from Cliopatria's
@@ -174,12 +165,18 @@ const RAW_BOOKMARKS: { eu4Date: string; label: string; era: string }[] = [
 	{ eu4Date: "2026.1.12", label: "2026 Present Day", era: "Modern Era" },
 ]
 
-export const EARTH_HISTORY_BOOKMARKS: EarthHistoryBookmark[] =
-	RAW_BOOKMARKS.map((b) => ({
+const earthHistoryBookmarks: EarthHistoryBookmark[] = RAW_BOOKMARKS.map(
+	(b) => ({
 		...b,
-		date: eu4DateToDays(b.eu4Date),
-	}))
-
-export const EARTH_HISTORY_BOOKMARK_ERAS: string[] = Array.from(
-	new Set(EARTH_HISTORY_BOOKMARKS.map((b) => b.era)),
+		date: DATE.eu4DateToDays(b.eu4Date),
+	}),
 )
+
+const earthHistoryBookmarkEras: string[] = Array.from(
+	new Set(earthHistoryBookmarks.map((b) => b.era)),
+)
+
+export const BOOKMARKS = {
+	earthHistoryBookmarks,
+	earthHistoryBookmarkEras,
+}

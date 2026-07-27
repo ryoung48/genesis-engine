@@ -4,12 +4,6 @@ import { TrackballControls } from "three/examples/jsm/controls/TrackballControls
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import {
-	type Eu4ProvinceBorderGeometry,
-	type Eu4ProvinceFillGeometry,
-	loadEu4ProvinceBorderGeometry,
-	loadEu4ProvinceFillGeometry,
-} from "@/model/earth"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { buildRegionSpatialIndex } from "@/model/mesh"
 import {
@@ -153,6 +147,11 @@ import type {
 } from "@/ui/planet/renderer/types"
 import type { HeritageScript } from "@/model/society/script"
 import { SCRIPT } from "@/model/society/script"
+import { DATA_SOURCE } from "@/model/earth/history/data-source"
+import type {
+	Eu4ProvinceBorderGeometry,
+	Eu4ProvinceFillGeometry,
+} from "@/model/earth/history/data-source/types"
 
 const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
 const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc
@@ -2358,7 +2357,7 @@ export function createGenesisScene(
 
 		if (worldForBorders?.isEarthImport) {
 			if (!cachedEu4BorderGeometry) {
-				loadEu4ProvinceBorderGeometry()
+				DATA_SOURCE.loadEu4ProvinceBorderGeometry()
 					.then((geometry) => {
 						cachedEu4BorderGeometry = geometry
 						rebuildNationBorders()
@@ -2374,7 +2373,7 @@ export function createGenesisScene(
 
 			if (currentNationFillColorForRawId) {
 				if (!cachedEu4FillGeometry) {
-					loadEu4ProvinceFillGeometry()
+					DATA_SOURCE.loadEu4ProvinceFillGeometry()
 						.then((fillGeometry) => {
 							cachedEu4FillGeometry = fillGeometry
 							rebuildNationBorders()
@@ -2475,7 +2474,7 @@ export function createGenesisScene(
 			mapOccupationStripes = null
 			if (currentOccupationStripeColorForRawId) {
 				if (!cachedEu4FillGeometry) {
-					loadEu4ProvinceFillGeometry()
+					DATA_SOURCE.loadEu4ProvinceFillGeometry()
 						.then((fillGeometry) => {
 							cachedEu4FillGeometry = fillGeometry
 							rebuildNationBorders()
@@ -2689,7 +2688,7 @@ export function createGenesisScene(
 
 		if (currentWorld.isEarthImport) {
 			if (!cachedEu4BorderGeometry) {
-				loadEu4ProvinceBorderGeometry()
+				DATA_SOURCE.loadEu4ProvinceBorderGeometry()
 					.then((geometry) => {
 						cachedEu4BorderGeometry = geometry
 						rebuildSelectedProvinceBorder()

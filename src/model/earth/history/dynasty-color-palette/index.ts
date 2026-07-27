@@ -1,8 +1,3 @@
-/** EU4's own common/dynasty_colors/00_dynasty_colors.txt -- a much wider
- * fixed palette (400 colors) than a small hand-picked list, so distinct
- * dynasties are far less likely to collide on a similar hue. Values are
- * 0-255 RGB triples, straight from the game file; dynastyColor (color.ts)
- * hashes a dynasty name into an index and normalizes to 0-1. */
 export const DYNASTY_COLOR_PALETTE: ReadonlyArray<
 	readonly [number, number, number]
 > = [

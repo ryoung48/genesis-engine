@@ -1,26 +1,18 @@
-import type { PoliticalMapWar } from "../../../ui/planet/screen/display/political-conflict-display"
-import type { FoldedState } from "./fold"
+import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
+import type { LonLat } from "@/model/earth/history/types"
 import type {
-	FindCentroidNearestProvinceParams,
+	GenesisFrameFromHistory,
+	NationInfoFromHistory,
 	FoldedStateToGenesisFrameParams,
+	FindCentroidNearestProvinceParams,
 	FoldedStateToNationInfoParams,
-	LonLat,
-} from "./types"
+} from "@/model/earth/history/adapter/types"
+import type { FoldedState } from "@/model/earth/history/fold/types"
 
 function isPlaceholderNationTag(tag: string): boolean {
 	return tag === "---" || tag === "XXX"
 }
 
-/** Assigns a stable internal numeric id per nation tag encountered as a
- * province owner *or controller* in `state` -- a war's attacker may only
- * ever appear as a controller (e.g. a rebel faction that never owns
- * territory outright), so it still needs an id to be stripeable. This is a
- * simplified placeholder for the fuller mechanism docs/earth-history-plan.md
- * describes ("Nation ID mapping": seed internal nation ids the same way
- * NATION.build derives them from a province partition, just from real
- * ownership instead of flood-fill) -- that integration with NATION.build is
- * not implemented yet. Deterministic (sorted tag order) so ids are stable
- * across calls for the same tag set. */
 function assignNationIds(state: FoldedState): Map<string, number> {
 	const tags = new Set<string>()
 	for (const p of state.provinces.values()) {
@@ -34,58 +26,6 @@ function assignNationIds(state: FoldedState): Map<string, number> {
 	return ids
 }
 
-export interface GenesisFrameFromHistory {
-	/** Per compact province index: internal nation id, or -1 if unowned. */
-	assignment: Int32Array
-	/** Per compact province index: culture id, or null. */
-	cultureByProvince: (string | null)[]
-	/** Per compact province index: religion id, or null. */
-	religionByProvince: (string | null)[]
-	nationIds: Map<string, number>
-	/** Per nation id: the compact province index to anchor the nation label
-	 * at. Prefers the real capital (history/countries/*.txt's `capital`
-	 * field, tracked over time as `capitalChange` events) when that
-	 * province is currently owned by the same nation; otherwise falls back
-	 * to the owned province geographically closest to the centroid of all
-	 * its owned provinces (see provinceCoords param) -- important for
-	 * tags with no capital data at all (e.g. Cliopatria-sourced pre-2AD
-	 * polities), where the naive "first scanned" index could land on the
-	 * edge of a nation's territory instead of somewhere central. Falls
-	 * back further to whatever was scanned first if coordinates are
-	 * missing for every owned province. Matches the shape of the
-	 * procedural world.nations.seeds array so nation-label placement
-	 * (nation-label-overlay.ts's nationCapitalRegion) works unmodified
-	 * against a shadow world built from this frame. -1 for an id with no
-	 * owned provinces (shouldn't normally happen). */
-	seeds: Int32Array
-	/** Per nation id: display name, from reference/nations.json when
-	 * available, falling back to the raw EU4 tag. */
-	names: string[]
-	/** `occupied` follows EU4 convention: a province is occupied whenever its
-	 * controller differs from its owner. We track both fields per province
-	 * (see FoldedProvinceState), so this needs no extra siege/occupation
-	 * data beyond what's already converted from owner/controller events. */
-	activeWars: PoliticalMapWar[]
-	/** Per compact province index: culture partition id, or -1. Paired with
-	 * cultureNames for the culture map-mode label overlay (see
-	 * buildGlobePartitionLabels in nation-label-overlay.ts) -- a different id
-	 * space from the procedural world.cultures.assignment, so it can't reuse
-	 * that field/the buildGlobeCultureLabels wrapper. */
-	cultureAssignment: Int32Array
-	cultureCount: number
-	cultureNames: string[]
-	/** Same shape as culture, for religion -- which has no procedural
-	 * label-overlay equivalent at all (world.religions is culture-indexed,
-	 * not province-indexed, and there is no buildGlobeReligionLabels in the
-	 * procedural system). */
-	religionAssignment: Int32Array
-	religionCount: number
-	religionNames: string[]
-}
-
-/** Converts a lon/lat pair to a unit vector on the sphere, so per-nation
- * geographic centroids can be averaged without antimeridian/pole
- * wraparound issues (plain lon/lat averaging breaks near +-180 deg). */
 function lonLatToUnitVector({ lon, lat }: LonLat): [number, number, number] {
 	const lonRad = (lon * Math.PI) / 180
 	const latRad = (lat * Math.PI) / 180
@@ -97,8 +37,6 @@ function lonLatToUnitVector({ lon, lat }: LonLat): [number, number, number] {
 	]
 }
 
-/** Among `owned` (compact province indices), returns the one geographically
- * closest to their collective centroid -- null if none have coordinates. */
 function findCentroidNearestProvince({
 	owned,
 	provinceMap,
@@ -140,7 +78,7 @@ function findCentroidNearestProvince({
 	return bestIdx
 }
 
-export function foldedStateToGenesisFrame({
+function foldedStateToGenesisFrame({
 	state,
 	provinceMap,
 	nationReference,
@@ -276,30 +214,7 @@ export function foldedStateToGenesisFrame({
 	}
 }
 
-export interface NationInfoFromHistory {
-	tag: string
-	name: string | null
-	governmentType: string | null
-	governmentReform: string | null
-	ruler: { name: string; dynasty?: string } | null
-	overlord: string | null
-	overlordSubjectType: string | null
-	vassals: string[]
-	vassalSubjectTypes: Array<{ tag: string; subjectType: string }>
-	unionSeniorOf: string[]
-	unionJuniorPartner: string | null
-	allies: string[]
-	guarantees: string[]
-	royalMarriages: string[]
-	atWar: {
-		warId: string
-		name: string
-		isRebel: boolean
-		asAttacker: boolean
-	}[]
-}
-
-export function foldedStateToNationInfo({
+function foldedStateToNationInfo({
 	state,
 	tag,
 }: FoldedStateToNationInfoParams): NationInfoFromHistory | null {
@@ -341,4 +256,9 @@ export function foldedStateToNationInfo({
 		royalMarriages: Array.from(n.royalMarriages),
 		atWar,
 	}
+}
+
+export const ADAPTER = {
+	foldedStateToGenesisFrame,
+	foldedStateToNationInfo,
 }

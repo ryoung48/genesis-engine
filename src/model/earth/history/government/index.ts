@@ -1,19 +1,14 @@
-﻿import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
-import type { BlendRgbParams } from "@/model/earth/history/types"
+import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
 import type { GovernmentType } from "@/model/society/types"
+import type {
+	EarthHistoryGovernmentFamily,
+	BlendRgbParams,
+} from "@/model/earth/history/government/types"
 
-type EarthHistoryGovernmentFamily =
-	| "tribal"
-	| "monarchy"
-	| "republic"
-	| "theocracy"
-
-/** Ordered list of families, for building a stable-order distribution
- * (e.g. Social's "Government" chart for Earth-imported worlds). */
-export const EARTH_HISTORY_GOVERNMENT_FAMILIES: readonly EarthHistoryGovernmentFamily[] =
+const earthHistoryGovernmentFamilies: readonly EarthHistoryGovernmentFamily[] =
 	["tribal", "monarchy", "republic", "theocracy"]
 
-export const EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS: Record<
+const earthHistoryGovernmentFamilyLabels: Record<
 	EarthHistoryGovernmentFamily,
 	string
 > = {
@@ -23,11 +18,7 @@ export const EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS: Record<
 	theocracy: "Theocracy",
 }
 
-/** One fixed, legend-stable color per family -- distinct from
- * getEarthHistoryGovernmentColor below, which deliberately hashes in a
- * random family subtype + blend for per-nation map-fill variety and would
- * make a distribution chart's legend inconsistent nation to nation. */
-export const EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS: Record<
+const earthHistoryGovernmentFamilyColors: Record<
 	EarthHistoryGovernmentFamily,
 	[number, number, number]
 > = {
@@ -37,9 +28,7 @@ export const EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS: Record<
 	theocracy: GOVERNMENT_COLORS_BY_TYPE.theocracy,
 }
 
-export const EARTH_HISTORY_NO_GOVERNMENT_COLOR: [number, number, number] = [
-	0.2, 0.2, 0.22,
-]
+const earthHistoryNoGovernmentColor: [number, number, number] = [0.2, 0.2, 0.22]
 
 const FAMILY_TYPES: Record<
 	EarthHistoryGovernmentFamily,
@@ -119,7 +108,7 @@ function currentEarthHistoryReformLabel(
 	return formatGovernmentReformLabel(normalized)
 }
 
-export function getEarthHistoryGovernmentFamily(
+function getEarthHistoryGovernmentFamily(
 	governmentType: string | null,
 ): EarthHistoryGovernmentFamily | null {
 	switch (normalizeGovernmentBase(governmentType)) {
@@ -138,7 +127,7 @@ export function getEarthHistoryGovernmentFamily(
 	}
 }
 
-export function getEarthHistoryGovernmentColor(params: {
+function getEarthHistoryGovernmentColor(params: {
 	governmentType: string | null
 	governmentReform?: string | null
 }): [number, number, number] | null {
@@ -166,7 +155,7 @@ export function getEarthHistoryGovernmentColor(params: {
 	return blendRgb({ a: first, b: second, t: 0.2 + t * 0.6 })
 }
 
-export function formatEarthHistoryGovernmentLabel(params: {
+function formatEarthHistoryGovernmentLabel(params: {
 	governmentType: string | null
 	governmentReform?: string | null
 }): string | null {
@@ -175,4 +164,14 @@ export function formatEarthHistoryGovernmentLabel(params: {
 	const reformLabel = currentEarthHistoryReformLabel(params.governmentReform)
 	if (!reformLabel) return toDisplayLabel(family)
 	return `${toDisplayLabel(family)} (${reformLabel})`
+}
+
+export const GOVERNMENT = {
+	earthHistoryGovernmentFamilies,
+	earthHistoryGovernmentFamilyLabels,
+	earthHistoryGovernmentFamilyColors,
+	earthHistoryNoGovernmentColor,
+	getEarthHistoryGovernmentFamily,
+	getEarthHistoryGovernmentColor,
+	formatEarthHistoryGovernmentLabel,
 }

@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState } from "react"
-import {
-	EARTH_HISTORY_BOOKMARK_ERAS,
-	EARTH_HISTORY_BOOKMARKS,
-} from "@/model/earth/history/reference/bookmarks"
 import { IconButton } from "@/ui/components/primitives/IconButton"
+import { BOOKMARKS } from "@/model/earth/history/reference/bookmarks"
 
 interface EarthHistoryBookmarksProps {
 	onSelect: (dateDays: number) => void
@@ -35,7 +32,7 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 	const nearestBookmark =
 		selectedDate === undefined
 			? undefined
-			: EARTH_HISTORY_BOOKMARKS.reduce((nearest, bookmark) =>
+			: BOOKMARKS.earthHistoryBookmarks.reduce((nearest, bookmark) =>
 					Math.abs(bookmark.date - selectedDate) <
 					Math.abs(nearest.date - selectedDate)
 						? bookmark
@@ -76,14 +73,15 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 					ref={popupRef}
 					className={`absolute left-1/2 z-30 max-h-80 w-72 -translate-x-1/2 overflow-y-auto rounded-lg border border-white/20 bg-slate-900/95 p-3 shadow-xl backdrop-blur ${popupPositionClassName}`}
 				>
-					{EARTH_HISTORY_BOOKMARK_ERAS.map((era) => (
+					{BOOKMARKS.earthHistoryBookmarkEras.map((era) => (
 						<div key={era} className="mb-3 last:mb-0">
 							<div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-400">
 								{era}
 							</div>
 							<div className="flex flex-wrap gap-1">
-								{EARTH_HISTORY_BOOKMARKS.filter((b) => b.era === era).map(
-									(bookmark) => {
+								{BOOKMARKS.earthHistoryBookmarks
+									.filter((b) => b.era === era)
+									.map((bookmark) => {
 										const isNearest = bookmark === nearestBookmark
 										return (
 											<button
@@ -102,8 +100,7 @@ export const EarthHistoryBookmarks: React.FC<EarthHistoryBookmarksProps> = ({
 												{bookmark.label}
 											</button>
 										)
-									},
-								)}
+									})}
 							</div>
 						</div>
 					))}

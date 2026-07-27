@@ -1,11 +1,7 @@
 import React, { useState } from "react"
-import {
-	eu4DaysToYear,
-	formatEu4Days,
-	formatEu4Year,
-} from "@/model/earth/history/date"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
+import { DATE } from "@/model/earth/history/date"
 
 /** One timeline entry shared by the nation and organization wiki pages --
  * built by GenesisView from the earth-history engine's raw events. Mentions
@@ -441,7 +437,7 @@ function CountHistoryChart({
 	>()
 	for (const event of timelineEvents) {
 		if (event.date < start || event.date > end) continue
-		const year = eu4DaysToYear(event.date)
+		const year = DATE.eu4DaysToYear(event.date)
 		const entry = eventYears.get(year)
 		if (entry) {
 			entry.count++
@@ -607,7 +603,7 @@ function CountHistoryChart({
 						<span className="font-semibold">{countAt(hoverDate)}</span>
 						<span className="text-slate-300">
 							{" "}
-							{countUnitLabel} · {formatEu4Days(hoverDate)}
+							{countUnitLabel} · {DATE.formatEu4Days(hoverDate)}
 						</span>
 					</div>
 				) : null}
@@ -652,15 +648,15 @@ function CountHistoryChart({
 							<span className="text-slate-300">
 								{" "}
 								event{hoveredYearEntry.count === 1 ? "" : "s"} ·{" "}
-								{formatEu4Year(hoveredYearEntry.year)}
+								{DATE.formatEu4Year(hoveredYearEntry.year)}
 							</span>
 						</div>
 					) : null}
 				</div>
 			) : null}
 			<div className="mt-0.5 flex justify-between font-mono text-[7px] text-slate-400">
-				<span>{formatEu4Year(eu4DaysToYear(start))}</span>
-				<span>{formatEu4Year(eu4DaysToYear(end))}</span>
+				<span>{DATE.formatEu4Year(DATE.eu4DaysToYear(start))}</span>
+				<span>{DATE.formatEu4Year(DATE.eu4DaysToYear(end))}</span>
 			</div>
 		</div>
 	)

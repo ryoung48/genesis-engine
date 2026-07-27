@@ -1,15 +1,15 @@
 ﻿import * as THREE from "three"
-import type { Eu4ProvinceFillGeometry } from "@/model/earth"
-import { darkenPoliticalAtElevation } from "../screen/display/color-helpers"
-import { createMapProjection } from "./map-projection"
-import { repeatMapPositions } from "./overlay-builders"
+import { darkenPoliticalAtElevation } from "@/ui/planet/screen/display/color-helpers"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
+import { repeatMapPositions } from "@/ui/planet/renderer/overlay-builders"
 import type {
 	BuildStripeMeshParams,
 	BuildEu4NationFillGlobeParams,
 	BuildEu4NationFillMapParams,
 	BuildEu4OccupationStripesGlobeParams,
 	BuildEu4OccupationStripesMapParams,
-} from "./types"
+} from "@/ui/planet/renderer/types"
+import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source/types"
 
 /** lon/lat (degrees) -> elevation in km, same convention as elevation_km
  * (sea level ~= 0, negative underwater). Optional -- when omitted, fill

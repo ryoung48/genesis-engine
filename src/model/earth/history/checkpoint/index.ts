@@ -1,16 +1,16 @@
-import { type EarthHistoryData, type FoldedState, fold } from "./fold"
-import type { FoldAtCheckpointParams } from "./types"
+import { FOLD } from "@/model/earth/history/fold"
+import type {
+	CheckpointCache,
+	FoldAtCheckpointParams,
+} from "@/model/earth/history/checkpoint/types"
+import type {
+	EarthHistoryData,
+	FoldedState,
+} from "@/model/earth/history/fold/types"
 
-const DAYS_PER_CHECKPOINT = 25 * 365 // 25 years, matches typical EU4 scrub granularity
+const DAYS_PER_CHECKPOINT = 25 * 365
 
-export interface CheckpointCache {
-	data: EarthHistoryData
-	provinceIds: string[]
-	nationTags: string[]
-	checkpoints: Map<number, FoldedState>
-}
-
-export function createCheckpointCache(data: EarthHistoryData): CheckpointCache {
+function createCheckpointCache(data: EarthHistoryData): CheckpointCache {
 	return {
 		data,
 		provinceIds: Object.keys(data.provinceEvents),
@@ -23,11 +23,7 @@ function checkpointFloor(time: number): number {
 	return Math.floor(time / DAYS_PER_CHECKPOINT) * DAYS_PER_CHECKPOINT
 }
 
-/** Returns folded state at `time`, replaying only the delta since the
- * nearest preceding checkpoint (built and cached on first use) instead of
- * refolding from epoch every query -- this is what lets the UI slider scrub
- * without an O(all events since year 2) cost on every drag frame. */
-export function foldAtCheckpoint({
+function foldAtCheckpoint({
 	cache,
 	time,
 }: FoldAtCheckpointParams): FoldedState {
@@ -39,7 +35,7 @@ export function foldAtCheckpoint({
 		// touched, not quadratic in checkpoint count.
 		const prevFloor = floor - DAYS_PER_CHECKPOINT
 		const prev = cache.checkpoints.get(prevFloor)
-		checkpoint = fold({
+		checkpoint = FOLD.fold({
 			data: cache.data,
 			time: floor,
 			options: {
@@ -51,7 +47,7 @@ export function foldAtCheckpoint({
 		cache.checkpoints.set(floor, checkpoint)
 	}
 	if (time === floor) return checkpoint
-	return fold({
+	return FOLD.fold({
 		data: cache.data,
 		time,
 		options: {
@@ -60,4 +56,9 @@ export function foldAtCheckpoint({
 			nationTags: cache.nationTags,
 		},
 	})
+}
+
+export const CHECKPOINT = {
+	createCheckpointCache,
+	foldAtCheckpoint,
 }

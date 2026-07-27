@@ -18,43 +18,9 @@ import type {
 	SolarSystemState,
 	SystemBody,
 } from "@/model/celestial/system/types"
-import {
-	dynastyColor,
-	hashColorForKey,
-	rgb01ToCss,
-} from "@/model/earth/history/color"
-import {
-	type Eu4ProvinceFillGeometry,
-	loadEu4ProvinceFillGeometry,
-	type RawOrganizationReference,
-	type RawWarParticipantEvent,
-} from "@/model/earth/history/data-source"
-import {
-	eu4DateToDays,
-	eu4DaysToYear,
-	formatEu4Days,
-} from "@/model/earth/history/date"
-import {
-	collectOrgForeignHolderNations,
-	collectOrgMemberProvinceRawIds,
-	type FoldedState,
-	fold,
-} from "@/model/earth/history/fold"
-import {
-	EARTH_HISTORY_GOVERNMENT_FAMILIES,
-	EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS,
-	EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS,
-	EARTH_HISTORY_NO_GOVERNMENT_COLOR,
-	formatEarthHistoryGovernmentLabel,
-	getEarthHistoryGovernmentColor,
-	getEarthHistoryGovernmentFamily,
-} from "@/model/earth/history/government"
-import {
-	listOrgMembers,
-	ORG_CATEGORY_SCHEMAS,
-	type OrgCategorizer,
-	type OrgProvinceCategory,
-} from "@/model/earth/history/organization-categories"
+import { DATA_SOURCE } from "@/model/earth/history/data-source"
+import { FOLD } from "@/model/earth/history/fold"
+import { ORGANIZATION_CATEGORIES } from "@/model/earth/history/organization-categories"
 import {
 	TRADE_GOOD_LABELS,
 	tradeGoodColor,
@@ -282,6 +248,19 @@ import { VEGETATION } from "@/model/climate/vegetation"
 import { WIND } from "@/model/climate/wind"
 import { HEAT } from "@/model/climate/locked/heat"
 import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
+import { COLOR } from "@/model/earth/history/color"
+import { DATE } from "@/model/earth/history/date"
+import { GOVERNMENT } from "@/model/earth/history/government"
+import type {
+	RawWarParticipantEvent,
+	RawOrganizationReference,
+	Eu4ProvinceFillGeometry,
+} from "@/model/earth/history/data-source/types"
+import type { FoldedState } from "@/model/earth/history/fold/types"
+import type {
+	OrgProvinceCategory,
+	OrgCategorizer,
+} from "@/model/earth/history/organization-categories/types"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -426,7 +405,7 @@ function hydeTimeToEu4Days(label: string): number {
 	const match = label.match(/^(-?\d+)-(\d{2})-(\d{2}) /)
 	if (!match) throw new Error(`Unsupported HYDE time label: ${label}`)
 	const [, year, month, day] = match
-	return eu4DateToDays(`${Number(year)}.${Number(month)}.${Number(day)}`)
+	return DATE.eu4DateToDays(`${Number(year)}.${Number(month)}.${Number(day)}`)
 }
 
 function findSortedTimeBracket(
@@ -663,7 +642,7 @@ function buildInterpolatedProvinceTimelineSlice(params: {
 		population,
 		totalPopulation,
 		sourceTimeDays: selectedDays,
-		sourceTimeLabel: formatEu4Days(selectedDays),
+		sourceTimeLabel: DATE.formatEu4Days(selectedDays),
 	}
 }
 
@@ -1088,7 +1067,7 @@ function formatRebelName(rebelType?: unknown): string {
 }
 
 function paletteColorForDynasty(dynasty: string): string {
-	return rgb01ToCss(dynastyColor(dynasty))
+	return COLOR.rgb01ToCss(COLOR.dynastyColor(dynasty))
 }
 
 function formatRulerAgeLabel(
@@ -1098,12 +1077,12 @@ function formatRulerAgeLabel(
 ): string | null {
 	if (
 		typeof deathDate === "string" &&
-		eu4DateToDays(deathDate) <= selectedDays
+		DATE.eu4DateToDays(deathDate) <= selectedDays
 	) {
 		return "Deceased"
 	}
 	if (typeof birthDate !== "string") return null
-	const age = Math.floor((selectedDays - eu4DateToDays(birthDate)) / 365)
+	const age = Math.floor((selectedDays - DATE.eu4DateToDays(birthDate)) / 365)
 	return Number.isFinite(age) && age >= 0 ? String(age) : null
 }
 
@@ -1209,7 +1188,7 @@ function pushTimelineEvent(
 	events.push({
 		id: params.id,
 		date: params.date,
-		dateLabel: formatEu4Days(params.date),
+		dateLabel: DATE.formatEu4Days(params.date),
 		type: params.type,
 		typeColor: timelineTypeColor(params.type),
 		description: params.description,
@@ -1228,7 +1207,7 @@ function pushTimelineEvent(
 // organization-categories.ts's colors are 0-255 (organizations.json
 // convention); rgb01ToCss expects 0-1.
 function rgb255ToCss(rgb: [number, number, number]): string {
-	return rgb01ToCss([rgb[0] / 255, rgb[1] / 255, rgb[2] / 255])
+	return COLOR.rgb01ToCss([rgb[0] / 255, rgb[1] / 255, rgb[2] / 255])
 }
 
 export const GenesisView: React.FC = () => {
@@ -1481,7 +1460,7 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		if (!world?.isEarthImport) return
 		setSelectedTimeMs(
-			historyYearToTime(eu4DaysToYear(earthHistory.selectedDays)),
+			historyYearToTime(DATE.eu4DaysToYear(earthHistory.selectedDays)),
 		)
 	}, [world?.isEarthImport, earthHistory.selectedDays])
 	const [earthRealPopulation, setEarthRealPopulation] =
@@ -2405,7 +2384,7 @@ export const GenesisView: React.FC = () => {
 				cancelled = true
 			}
 		}
-		loadEu4ProvinceFillGeometry()
+		DATA_SOURCE.loadEu4ProvinceFillGeometry()
 			.then((geometry) => {
 				if (!cancelled) setEu4HoverFillGeometry(geometry)
 			})
@@ -2897,7 +2876,7 @@ export const GenesisView: React.FC = () => {
 			categorize: OrgCategorizer
 			categoryColor: (categoryId: string) => [number, number, number]
 		} | null => {
-			const schema = ORG_CATEGORY_SCHEMAS[orgRef.id]
+			const schema = ORGANIZATION_CATEGORIES.orgCategorySchemas[orgRef.id]
 			if (!schema) return null
 			const categorize = schema.createCategorizer(state)
 			const colorCache = new Map<string, [number, number, number]>()
@@ -2958,7 +2937,7 @@ export const GenesisView: React.FC = () => {
 				// No registered schema: fall back to plain solid-member-color/
 				// white-elsewhere coloring, so a brand new org still renders
 				// reasonably before anyone gets around to giving it a real schema.
-				const memberProvinceRawIds = collectOrgMemberProvinceRawIds({
+				const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
 					state,
 					orgId: orgRef.id,
 				})
@@ -3250,29 +3229,29 @@ export const GenesisView: React.FC = () => {
 			: null
 		const nationColor = owner
 			? nationRef
-				? rgb01ToCss([
+				? COLOR.rgb01ToCss([
 						nationRef.color[0] / 255,
 						nationRef.color[1] / 255,
 						nationRef.color[2] / 255,
 					])
-				: rgb01ToCss(hashColorForKey(`nation:${owner}`))
+				: COLOR.rgb01ToCss(COLOR.hashColorForKey(`nation:${owner}`))
 			: null
 
 		const nationState = owner
 			? (earthHistory.query.state.nations.get(owner) ?? null)
 			: null
 		const governmentLabel = nationState
-			? formatEarthHistoryGovernmentLabel({
+			? GOVERNMENT.formatEarthHistoryGovernmentLabel({
 					governmentType: nationState.governmentType,
 					governmentReform: nationState.governmentReform,
 				})
 			: null
-		const governmentColorRgb = getEarthHistoryGovernmentColor({
+		const governmentColorRgb = GOVERNMENT.getEarthHistoryGovernmentColor({
 			governmentType: nationState?.governmentType ?? null,
 			governmentReform: nationState?.governmentReform,
 		})
-		const governmentColor = rgb01ToCss(
-			governmentColorRgb ?? EARTH_HISTORY_NO_GOVERNMENT_COLOR,
+		const governmentColor = COLOR.rgb01ToCss(
+			governmentColorRgb ?? GOVERNMENT.earthHistoryNoGovernmentColor,
 		)
 
 		const cultureId = ps?.cultureId
@@ -3283,7 +3262,9 @@ export const GenesisView: React.FC = () => {
 			? earthHistory.cultureColorById?.get(cultureId)
 			: null
 		const cultureColor = cultureId
-			? rgb01ToCss(cultureColorRgb ?? hashColorForKey(`culture:${cultureId}`))
+			? COLOR.rgb01ToCss(
+					cultureColorRgb ?? COLOR.hashColorForKey(`culture:${cultureId}`),
+				)
 			: null
 
 		const provinceName = meta?.name ?? null
@@ -3299,8 +3280,8 @@ export const GenesisView: React.FC = () => {
 			? earthHistory.religionColorById?.get(religionId)
 			: null
 		const religionColor = religionId
-			? rgb01ToCss(
-					religionColorRgb ?? hashColorForKey(`religion:${religionId}`),
+			? COLOR.rgb01ToCss(
+					religionColorRgb ?? COLOR.hashColorForKey(`religion:${religionId}`),
 				)
 			: null
 
@@ -3459,7 +3440,7 @@ export const GenesisView: React.FC = () => {
 		)
 		if (!orgRef) return null
 		const { state } = earthHistory.query
-		const memberProvinceRawIds = collectOrgMemberProvinceRawIds({
+		const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
 			state,
 			orgId: orgRef.id,
 		})
@@ -3862,7 +3843,7 @@ export const GenesisView: React.FC = () => {
 		const tagById = new Map<number, string>()
 		for (const [tag, id] of nationIds) tagById.set(id, tag)
 		const counts = new Map<
-			(typeof EARTH_HISTORY_GOVERNMENT_FAMILIES)[number],
+			(typeof GOVERNMENT.earthHistoryGovernmentFamilies)[number],
 			number
 		>()
 		for (const nationId of earthNationProvinceCounts.keys()) {
@@ -3870,14 +3851,14 @@ export const GenesisView: React.FC = () => {
 			const governmentType = tag
 				? (nations.get(tag)?.governmentType ?? null)
 				: null
-			const family = getEarthHistoryGovernmentFamily(governmentType)
+			const family = GOVERNMENT.getEarthHistoryGovernmentFamily(governmentType)
 			if (!family) continue
 			counts.set(family, (counts.get(family) ?? 0) + 1)
 		}
-		return EARTH_HISTORY_GOVERNMENT_FAMILIES.map((family) => ({
-			label: EARTH_HISTORY_GOVERNMENT_FAMILY_LABELS[family],
+		return GOVERNMENT.earthHistoryGovernmentFamilies.map((family) => ({
+			label: GOVERNMENT.earthHistoryGovernmentFamilyLabels[family],
 			count: counts.get(family) ?? 0,
-			color: rgbToCss(EARTH_HISTORY_GOVERNMENT_FAMILY_COLORS[family]),
+			color: rgbToCss(GOVERNMENT.earthHistoryGovernmentFamilyColors[family]),
 		}))
 	}, [world?.isEarthImport, earthHistory.query, earthNationProvinceCounts])
 
@@ -5063,16 +5044,16 @@ export const GenesisView: React.FC = () => {
 			if (isRebelTag(otherTag)) return "#020617"
 			const ref = earthHistory.nationReference?.get(otherTag)
 			return ref
-				? rgb01ToCss([
+				? COLOR.rgb01ToCss([
 						ref.color[0] / 255,
 						ref.color[1] / 255,
 						ref.color[2] / 255,
 					])
-				: rgb01ToCss([0.5, 0.5, 0.5])
+				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
 		const title = resolveNationName(tag)
 		const color = resolveNationColor(tag)
-		const governmentLabel = formatEarthHistoryGovernmentLabel({
+		const governmentLabel = GOVERNMENT.formatEarthHistoryGovernmentLabel({
 			governmentType: nationState?.governmentType ?? null,
 			governmentReform: nationState?.governmentReform ?? null,
 		})
@@ -5175,12 +5156,12 @@ export const GenesisView: React.FC = () => {
 		const resolveOrganizationColor = (orgId: string): string => {
 			const ref = earthHistory.organizationReference?.get(orgId)
 			return ref
-				? rgb01ToCss([
+				? COLOR.rgb01ToCss([
 						ref.color[0] / 255,
 						ref.color[1] / 255,
 						ref.color[2] / 255,
 					])
-				: rgb01ToCss([0.5, 0.5, 0.5])
+				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
 		const organizationIds = new Set<string>(nationState?.organizations.keys())
 		if (state.hreMemberNations.has(tag)) organizationIds.add("HRE")
@@ -5192,14 +5173,18 @@ export const GenesisView: React.FC = () => {
 			// transparent instead of a plain solid swatch, so the wiki
 			// doesn't silently overstate membership -- see
 			// collectOrgForeignHolderNations.
-			const striped = collectOrgForeignHolderNations({ state, orgId }).has(tag)
+			const striped = FOLD.collectOrgForeignHolderNations({ state, orgId }).has(
+				tag,
+			)
 			// For orgs whose categories split into rival sides (GG's
 			// Guelphs/Ghibellines) rather than just estate/site types, show
 			// which side this nation is on instead of the shared org name --
 			// see OrgCategory.factionLabel.
 			const role = nationState?.organizations.get(orgId)
 			const category = role
-				? ORG_CATEGORY_SCHEMAS[orgId]?.categories.find((c) => c.id === role)
+				? ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.find(
+						(c) => c.id === role,
+					)
 				: undefined
 			return {
 				id: orgId,
@@ -5208,7 +5193,7 @@ export const GenesisView: React.FC = () => {
 					earthHistory.organizationReference?.get(orgId)?.name ??
 					orgId,
 				color: category?.color
-					? rgb01ToCss([
+					? COLOR.rgb01ToCss([
 							category.color[0] / 255,
 							category.color[1] / 255,
 							category.color[2] / 255,
@@ -5339,7 +5324,7 @@ export const GenesisView: React.FC = () => {
 		): NationTimelineEvent["organizations"][number] => {
 			const ref = earthHistory.organizationReference?.get(orgId)
 			const category = categoryId
-				? ORG_CATEGORY_SCHEMAS[orgId]?.categories.find(
+				? ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.find(
 						(c) => c.id === categoryId,
 					)
 				: undefined
@@ -5348,8 +5333,8 @@ export const GenesisView: React.FC = () => {
 				id: orgId,
 				name: category?.factionLabel ?? ref?.name ?? orgId,
 				color: color
-					? rgb01ToCss([color[0] / 255, color[1] / 255, color[2] / 255])
-					: rgb01ToCss([0.5, 0.5, 0.5]),
+					? COLOR.rgb01ToCss([color[0] / 255, color[1] / 255, color[2] / 255])
+					: COLOR.rgb01ToCss([0.5, 0.5, 0.5]),
 			}
 		}
 		const warMention = (war: {
@@ -5398,7 +5383,7 @@ export const GenesisView: React.FC = () => {
 				cultureId.replace(/_/g, " "),
 			color: rgbToCss(
 				earthHistory.cultureColorById?.get(cultureId) ??
-					hashColorForKey(`culture:${cultureId}`),
+					COLOR.hashColorForKey(`culture:${cultureId}`),
 			),
 		})
 		const religionMention = (
@@ -5410,7 +5395,7 @@ export const GenesisView: React.FC = () => {
 				religionId.replace(/_/g, " "),
 			color: rgbToCss(
 				earthHistory.religionColorById?.get(religionId) ??
-					hashColorForKey(`religion:${religionId}`),
+					COLOR.hashColorForKey(`religion:${religionId}`),
 			),
 		})
 		const dynastyMention = (
@@ -5668,7 +5653,7 @@ export const GenesisView: React.FC = () => {
 							id: dateId,
 							date: event.date,
 							type: "Government",
-							description: `${title} changed government to ${formatEarthHistoryGovernmentLabel({ governmentType, governmentReform: null })}.`,
+							description: `${title} changed government to ${GOVERNMENT.formatEarthHistoryGovernmentLabel({ governmentType, governmentReform: null })}.`,
 							comment: eventComment(event.comment),
 							nations,
 						})
@@ -6383,7 +6368,7 @@ export const GenesisView: React.FC = () => {
 			mergedTimelineEvents.push({
 				id: `territory:${tag}:${date}:merged`,
 				date,
-				dateLabel: formatEu4Days(date),
+				dateLabel: DATE.formatEu4Days(date),
 				type: mergedType,
 				typeColor: timelineTypeColor(mergedType),
 				description: buildMergedTerritoryDescription(group),
@@ -6405,7 +6390,7 @@ export const GenesisView: React.FC = () => {
 			mergedTimelineEvents.push({
 				id: `culture:${tag}:${date}:merged`,
 				date,
-				dateLabel: formatEu4Days(date),
+				dateLabel: DATE.formatEu4Days(date),
 				type: "Culture",
 				typeColor: timelineTypeColor("Culture"),
 				description: buildMergedProvinceAttributeDescription(group, "culture"),
@@ -6427,7 +6412,7 @@ export const GenesisView: React.FC = () => {
 			mergedTimelineEvents.push({
 				id: `religion:${tag}:${date}:merged`,
 				date,
-				dateLabel: formatEu4Days(date),
+				dateLabel: DATE.formatEu4Days(date),
 				type: "Religion",
 				typeColor: timelineTypeColor("Religion"),
 				description: buildMergedProvinceAttributeDescription(group, "religion"),
@@ -6525,7 +6510,7 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart: earthHistory.minDays,
 			dateRangeEnd: earthHistory.maxDays,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: formatEu4Days(earthHistory.selectedDays),
+			currentDateLabel: DATE.formatEu4Days(earthHistory.selectedDays),
 			timelineEvents,
 			onBack: () => setSelectedWikiNationTag(null),
 			onFocusNation: () => focusNation(tag),
@@ -6619,7 +6604,7 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart: historyMsToEu4Days(800 * YEAR_MS),
 			dateRangeEnd: currentDate,
 			currentDate,
-			currentDateLabel: formatEu4Days(currentDate),
+			currentDateLabel: DATE.formatEu4Days(currentDate),
 			timelineEvents,
 			onBack: () => setSelectedNationId(null),
 			onFocusNation: () => {
@@ -6691,12 +6676,12 @@ export const GenesisView: React.FC = () => {
 		const resolveNationColor = (otherTag: string): string => {
 			const ref = earthHistory.nationReference?.get(otherTag)
 			return ref
-				? rgb01ToCss([
+				? COLOR.rgb01ToCss([
 						ref.color[0] / 255,
 						ref.color[1] / 255,
 						ref.color[2] / 255,
 					])
-				: rgb01ToCss([0.5, 0.5, 0.5])
+				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
 		const nationMention = (otherTag: string) =>
 			isRebelTag(otherTag)
@@ -6711,7 +6696,7 @@ export const GenesisView: React.FC = () => {
 						name: resolveNationName(otherTag),
 						color: resolveNationColor(otherTag),
 					}
-		const color = rgb01ToCss([
+		const color = COLOR.rgb01ToCss([
 			orgRef.color[0] / 255,
 			orgRef.color[1] / 255,
 			orgRef.color[2] / 255,
@@ -6719,13 +6704,13 @@ export const GenesisView: React.FC = () => {
 		const orgMention = { id: orgId, name: orgRef.name, color }
 		const mentionForRole = (categoryId?: string): typeof orgMention => {
 			const category = categoryId
-				? ORG_CATEGORY_SCHEMAS[orgId]?.categories.find(
+				? ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.find(
 						(c) => c.id === categoryId,
 					)
 				: undefined
 			if (!category) return orgMention
 			const categoryColor = category.color
-				? rgb01ToCss([
+				? COLOR.rgb01ToCss([
 						category.color[0] / 255,
 						category.color[1] / 255,
 						category.color[2] / 255,
@@ -6894,7 +6879,10 @@ export const GenesisView: React.FC = () => {
 				)
 			}
 			if (orgId !== "HSA") {
-				return listOrgMembers({ state, categorize: orgCategorizers.categorize })
+				return ORGANIZATION_CATEGORIES.listOrgMembers({
+					state,
+					categorize: orgCategorizers.categorize,
+				})
 			}
 			const categories = new Map<string, OrgProvinceCategory>()
 			for (const site of state.organizationSites.values()) {
@@ -6915,10 +6903,14 @@ export const GenesisView: React.FC = () => {
 			return categories
 		})()
 		const categoryLabelById = new Map(
-			ORG_CATEGORY_SCHEMAS[orgId]?.categories.map((c) => [c.id, c] as const),
+			ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.map(
+				(c) => [c.id, c] as const,
+			),
 		)
 		const categoryOrderById = new Map(
-			ORG_CATEGORY_SCHEMAS[orgId]?.categories.map((c, i) => [c.id, i] as const),
+			ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.map(
+				(c, i) => [c.id, i] as const,
+			),
 		)
 		const members = Array.from(memberCategories.entries())
 			.map(([memberTag, memberCategory]) => {
@@ -6948,7 +6940,7 @@ export const GenesisView: React.FC = () => {
 		).sort((a, b) => a - b)
 		const countHistory: WikiCountHistoryPoint[] = transitionDates.map(
 			(date) => {
-				const foldedAtDate = fold({
+				const foldedAtDate = FOLD.fold({
 					data: engine.data,
 					time: date,
 					options: {
@@ -6958,8 +6950,10 @@ export const GenesisView: React.FC = () => {
 				})
 				return {
 					date,
-					count: collectOrgMemberProvinceRawIds({ state: foldedAtDate, orgId })
-						.size,
+					count: FOLD.collectOrgMemberProvinceRawIds({
+						state: foldedAtDate,
+						orgId,
+					}).size,
 				}
 			},
 		)
@@ -6969,8 +6963,8 @@ export const GenesisView: React.FC = () => {
 		) {
 			countHistory.unshift({
 				date: earthHistory.minDays,
-				count: collectOrgMemberProvinceRawIds({
-					state: fold({
+				count: FOLD.collectOrgMemberProvinceRawIds({
+					state: FOLD.fold({
 						data: engine.data,
 						time: earthHistory.minDays,
 						options: {
@@ -6986,7 +6980,7 @@ export const GenesisView: React.FC = () => {
 		// Current member territory, for the stat block and Environmental/
 		// Demographics distributions -- the exact same province set the map's
 		// striped border draws, so the numbers always agree with what's shown.
-		const memberProvinceRawIds = collectOrgMemberProvinceRawIds({
+		const memberProvinceRawIds = FOLD.collectOrgMemberProvinceRawIds({
 			state,
 			orgId,
 		})
@@ -7097,7 +7091,7 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart: earthHistory.minDays,
 			dateRangeEnd: earthHistory.maxDays,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: formatEu4Days(earthHistory.selectedDays),
+			currentDateLabel: DATE.formatEu4Days(earthHistory.selectedDays),
 			timelineEvents,
 			onBack: () => setSelectedWikiOrganizationId(null),
 			onSelectNation: (targetTag: string) => {
@@ -7164,12 +7158,12 @@ export const GenesisView: React.FC = () => {
 			if (isRebelTag(otherTag)) return "#020617"
 			const ref = earthHistory.nationReference?.get(otherTag)
 			return ref
-				? rgb01ToCss([
+				? COLOR.rgb01ToCss([
 						ref.color[0] / 255,
 						ref.color[1] / 255,
 						ref.color[2] / 255,
 					])
-				: rgb01ToCss([0.5, 0.5, 0.5])
+				: COLOR.rgb01ToCss([0.5, 0.5, 0.5])
 		}
 		const nationMention = (otherTag: string) =>
 			isRebelTag(otherTag)
@@ -7206,7 +7200,7 @@ export const GenesisView: React.FC = () => {
 		const dates = war.events.map((event) => event.date)
 		const dateRangeStart = Math.min(...dates)
 		const dateRangeEnd = Math.max(...dates)
-		const dateRangeLabel = `${formatEu4Days(dateRangeStart)} – ${formatEu4Days(dateRangeEnd)}`
+		const dateRangeLabel = `${DATE.formatEu4Days(dateRangeStart)} – ${DATE.formatEu4Days(dateRangeEnd)}`
 
 		const stats: StatEntry[] = []
 		if (war.warGoalType)
@@ -7525,7 +7519,7 @@ export const GenesisView: React.FC = () => {
 			dateRangeStart,
 			dateRangeEnd,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: formatEu4Days(earthHistory.selectedDays),
+			currentDateLabel: DATE.formatEu4Days(earthHistory.selectedDays),
 			onBack: () => setSelectedWikiWarId(null),
 			onSelectNation: (targetTag: string) => {
 				setSelectedWikiNationTag(targetTag)
@@ -8535,7 +8529,9 @@ export const GenesisView: React.FC = () => {
 									floating={false}
 									onPlayPause={handleToggleProceduralHistoryPlayback}
 									simPlaying={proceduralHistoryPlaying}
-									formatLabel={(ms) => formatEu4Days(historyMsToEu4Days(ms))}
+									formatLabel={(ms) =>
+										DATE.formatEu4Days(historyMsToEu4Days(ms))
+									}
 									stepValue={YEAR_MS}
 								/>
 							</div>

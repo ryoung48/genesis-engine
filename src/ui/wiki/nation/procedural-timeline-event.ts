@@ -1,8 +1,11 @@
-﻿import { formatEu4Days } from "@/model/earth"
-import { historyMsToEu4Days } from "@/model/history"
-import type { WikiTimelineEvent } from "../shared/WikiTimeline"
-import { getEventDescription, getEventDotColor } from "./event-description"
-import type { BuildProceduralWikiTimelineEventParams } from "./types"
+﻿import { historyMsToEu4Days } from "@/model/history"
+import type { WikiTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
+import {
+	getEventDescription,
+	getEventDotColor,
+} from "@/ui/wiki/nation/event-description"
+import type { BuildProceduralWikiTimelineEventParams } from "@/ui/wiki/nation/types"
+import { DATE } from "@/model/earth/history/date"
 
 const NATION_TOKEN_RE = /#(-?\d+)/g
 
@@ -38,7 +41,7 @@ export function buildProceduralWikiTimelineEvent({
 	return {
 		id: `${event.tag}-${event.time}-${viewingNation}-${index}`,
 		date,
-		dateLabel: formatEu4Days(date),
+		dateLabel: DATE.formatEu4Days(date),
 		type: event.tag,
 		typeColor: getEventDotColor(event, viewingNation),
 		description,

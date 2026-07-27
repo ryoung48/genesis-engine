@@ -1,102 +1,16 @@
 import type {
-	RawDiplomacyEvent,
-	RawNationEvents,
-	RawNationReference,
-	RawOrganizationEvent,
-	RawProvinceEvents,
-	RawWar,
-} from "./data-source"
-import type {
+	FoldedProvinceState,
+	FoldedNationState,
+	ActiveWar,
+	FoldedState,
+	FoldProvinceParams,
+	FoldNationParams,
 	ApplyDiplomacyDeltaParams,
 	ApplyOrganizationDeltaParams,
 	ComputeActiveWarsParams,
-	FoldNationParams,
 	FoldParams,
-	FoldProvinceParams,
 	OrgParams,
-} from "./types"
-
-export interface FoldedProvinceState {
-	owner: string | null
-	controller: string | null
-	cultureId: string | null
-	religionId: string | null
-	cores: Set<string>
-	/** Whether the province is currently part of the Holy Roman Empire, from
-	 * EU4 province history's `hre` field (base/dated changes tracked the same
-	 * way as owner/culture/religion). */
-	isHre: boolean
-}
-
-export interface FoldedNationState {
-	currentName: string | null
-	governmentType: string | null
-	/** Current government reform. Earth-history data here only supports one
-	 * active reform at a time for a nation. */
-	governmentReform: string | null
-	ruler: { name: string; dynasty?: string } | null
-	/** Raw EU4 province id (string) of the nation's current capital, from
-	 * history/countries/*.txt's `capital` field (dated changes tracked as
-	 * `capitalChange` events). Used to anchor the nation label at the real
-	 * capital instead of an arbitrary owned province -- see adapter.ts. */
-	capitalProvinceId: string | null
-	overlord: string | null
-	overlordSubjectType: string | null
-	vassals: Set<string>
-	vassalSubjectTypes: Map<string, string>
-	/** Junior partners of a personal union this nation is the senior/ruling
-	 * side of -- same "who's subordinate to us" role vassals plays for
-	 * dependencyStart/End. */
-	unionSeniorOf: Set<string>
-	/** The senior partner of a personal union this nation is the junior/
-	 * subordinate side of, or null -- same role overlord plays for
-	 * dependencyStart/End. Diplomacy events' unionStart nationTag/firstTag is
-	 * always the senior partner (see docs/earth-history-plan.md / raw
-	 * diplomacy.json), so this direction is recoverable straight from the
-	 * event rather than guessed. */
-	unionJuniorPartner: string | null
-	allies: Set<string>
-	guarantees: Set<string>
-	royalMarriages: Set<string>
-	/** Whether this nation currently holds the Holy Roman Emperor title, from
-	 * diplomacy.json's emperorStart/emperorEnd events (sourced from
-	 * geo-explorer's hand-curated hre.json, not EU4's own country history --
-	 * see convert_emperors in build-eu4-history-events.py). */
-	isEmperor: boolean
-	/** Whether this nation currently holds Imperial Elector status, from
-	 * geo-explorer's countries.json (a dated `elector` boolean per country --
-	 * see _load_elector_transitions in build-eu4-history-events.py). Combined
-	 * with governmentType/governmentReform to classify HRE membership into
-	 * Prince-Elector vs. Archbishop-Elector (see resolveHreEstateCategory in
-	 * organization-categories.ts). */
-	isElector: boolean
-	/** International organizations (by id, e.g. "HSA") this nation currently
-	 * holds discrete join/leave membership in, mapped to its role within that
-	 * org -- see organizations.json / convert_organizations. Most orgs only
-	 * ever use the plain "member" role (matching organization-categories.ts'
-	 * HSA-style single-category schema); orgs with sub-categories (e.g. the
-	 * Guelphs and Ghibellines org's "guelphLeader"/"guelphMember"/
-	 * "ghibellineLeader"/"ghibellineMember") use role to pick which one
-	 * applies. Does NOT include HRE membership, which is territorial rather
-	 * than a discrete relation -- see FoldedState's hreMemberNations, computed
-	 * separately from province ownership. */
-	organizations: Map<string, string>
-}
-
-interface ActiveWar {
-	warId: string
-	name: string
-	isRebel: boolean
-	attackers: Set<string>
-	defenders: Set<string>
-}
-
-export interface ActiveOrganizationSite {
-	orgId: string
-	provinceId: string
-	name: string
-	role: string
-}
+} from "@/model/earth/history/fold/types"
 
 function normalizeNationTag(tag: string | null | undefined): string | null {
 	if (!tag || tag === "---" || tag === "XXX") return null
@@ -105,32 +19,6 @@ function normalizeNationTag(tag: string | null | undefined): string | null {
 
 function isGenericEarlyGovernmentReform(reformId: string | null | undefined) {
 	return !!reformId && /^early_gov_reform_\d+$/.test(reformId)
-}
-
-export interface EarthHistoryData {
-	provinceEvents: RawProvinceEvents
-	nationEvents: RawNationEvents
-	nationReference?: Map<string, RawNationReference>
-	wars: RawWar[]
-	diplomacy: RawDiplomacyEvent[]
-	organizationEvents: RawOrganizationEvent[]
-}
-
-export interface FoldedState {
-	time: number
-	provinces: Map<string, FoldedProvinceState>
-	nations: Map<string, FoldedNationState>
-	activeWars: ActiveWar[]
-	/** Active province-level organization sites (e.g. Hanseatic kontors).
-	 * These are not member states and do not affect member-territory
-	 * highlighting; they are separate places associated with an organization. */
-	organizationSites: Map<string, ActiveOrganizationSite>
-	/** Nation tags that currently own at least one HRE-flagged province --
-	 * HRE membership is territorial (see FoldedProvinceState.isHre), not a
-	 * discrete per-nation relation, so unlike organizations.json's
-	 * join/leave events (folded onto FoldedNationState.organizations) this
-	 * is recomputed fresh from province state on every fold. */
-	hreMemberNations: Set<string>
 }
 
 function emptyNationState(): FoldedNationState {
@@ -403,12 +291,6 @@ function applyOrganizationDelta({
 	}
 }
 
-/** Nation tags currently owning at least one HRE-flagged province, i.e.
- * territorial HRE membership (see FoldedState.hreMemberNations' doc). Full
- * scan of `provinces` every call -- provinces carries every province ever
- * touched cumulatively (via foldProvince's base-chaining), so this is the
- * only way to get a complete current membership set, not just the delta
- * since the last checkpoint. */
 function computeHreMemberNations(
 	provinces: Map<string, FoldedProvinceState>,
 ): Set<string> {
@@ -419,10 +301,6 @@ function computeHreMemberNations(
 	return members
 }
 
-/** Reports which nations are actively fighting in each war as of `time`, by
- * replaying add/rem attacker/defender events. Per-province occupation for
- * territory striping is derived separately in adapter.ts from the standard
- * EU4 convention (owner !== controller), not from this war data. */
 function computeActiveWars({
 	wars,
 	time,
@@ -452,18 +330,7 @@ function computeActiveWars({
 	return active
 }
 
-/** Raw EU4 province ids currently belonging to an organization's territory
- * at `state`'s time, for the map's territory highlight
- * (eu4-nation-fill-overlay.ts's buildOrgFillGlobe/Map). HRE is territorial --
- * a province counts iff its own `isHre` flag is set, regardless of which
- * nation owns it, so a nation only partially inside the empire highlights
- * just its HRE provinces. Every other organization (e.g. Hanseatic League) is
- * membership-based -- a province counts iff its current owner's nation holds
- * discrete membership (FoldedNationState.organizations), so the highlight
- * follows that nation's full territory, with optional `member_seat` province
- * pins for city-league seats that should remain visible through conquest
- * (e.g. Danzig in HSA). */
-export function collectOrgMemberProvinceRawIds({
+function collectOrgMemberProvinceRawIds({
 	state,
 	orgId,
 }: OrgParams): Set<number> {
@@ -491,19 +358,7 @@ export function collectOrgMemberProvinceRawIds({
 	return memberProvinceRawIds
 }
 
-/** Nations that currently own at least one of an organization's member
- * provinces but aren't themselves "seated" in it -- i.e. they hold enclave
- * territory without genuinely being part of the organization. Only
- * meaningful for territorial orgs (HRE): a real historical nuance is that
- * Venice's Terraferma mainland (Padua, Verona, ...) stayed formally inside
- * the Empire even after Venice -- never an Imperial Estate, never seated in
- * the Reichstag -- conquered it. The proxy used here is a nation's own
- * capital: a genuine Imperial polity's capital is itself HRE territory,
- * while a foreign conqueror's capital (Venice's own lagoon city, never HRE)
- * isn't. Membership-based orgs (HSA) have no such distinction -- membership
- * there is a discrete relation, not inferred from ownership -- so this
- * always returns empty for them. */
-export function collectOrgForeignHolderNations({
+function collectOrgForeignHolderNations({
 	state,
 	orgId,
 }: OrgParams): Set<string> {
@@ -523,12 +378,7 @@ export function collectOrgForeignHolderNations({
 	return foreignHolders
 }
 
-/** Folds all events in `(base?.time ?? -Infinity, time]` onto `base` (or a
- * from-scratch state if no base is given). Only touches provinces/nations
- * present in `provinceIds`/`nationTags` -- callers pass the full known set
- * for a from-scratch fold, or just the entities that changed for a delta
- * fold from a checkpoint. */
-export function fold({ data, time, options }: FoldParams): FoldedState {
+function fold({ data, time, options }: FoldParams): FoldedState {
 	const fromTime = options.base?.time ?? -Infinity
 	const provinces = new Map(options.base?.provinces)
 	const nations = new Map(options.base?.nations)
@@ -567,4 +417,10 @@ export function fold({ data, time, options }: FoldParams): FoldedState {
 		organizationSites,
 		hreMemberNations: computeHreMemberNations(provinces),
 	}
+}
+
+export const FOLD = {
+	collectOrgMemberProvinceRawIds,
+	collectOrgForeignHolderNations,
+	fold,
 }

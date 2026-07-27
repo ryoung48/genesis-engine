@@ -1,18 +1,11 @@
-import { loadReligionGroups, type RawReligionGroup } from "../data-source"
-
-interface ReligionIndex {
-	groups: RawReligionGroup[]
-	/** religion id -> [r, g, b] 0-255 */
-	religionColor: Map<string, [number, number, number]>
-	/** religion id -> religion group id */
-	religionToGroup: Map<string, string>
-}
+import { DATA_SOURCE } from "@/model/earth/history/data-source"
+import type { ReligionIndex } from "@/model/earth/history/reference/religion-groups/types"
 
 let indexPromise: Promise<ReligionIndex> | null = null
 
-export function getReligionIndex(): Promise<ReligionIndex> {
+function getReligionIndex(): Promise<ReligionIndex> {
 	if (!indexPromise) {
-		indexPromise = loadReligionGroups().then((groups) => {
+		indexPromise = DATA_SOURCE.loadReligionGroups().then((groups) => {
 			const religionColor = new Map<string, [number, number, number]>()
 			const religionToGroup = new Map<string, string>()
 			for (const group of groups) {
@@ -25,4 +18,8 @@ export function getReligionIndex(): Promise<ReligionIndex> {
 		})
 	}
 	return indexPromise
+}
+
+export const RELIGION_GROUPS = {
+	getReligionIndex,
 }

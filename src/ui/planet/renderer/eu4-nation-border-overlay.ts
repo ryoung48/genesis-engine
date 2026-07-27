@@ -2,17 +2,17 @@
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { Eu4ProvinceBorderGeometry } from "@/model/earth"
 import type { SerializedGenesisWorld } from "@/model/transport"
-import { createMapProjection } from "./map-projection"
-import { repeatMapPositions } from "./overlay-builders"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
+import { repeatMapPositions } from "@/ui/planet/renderer/overlay-builders"
 import type {
 	GenesisViewMode,
 	CollectEu4NationBorderMapPositionsParams,
 	CollectEu4ProvinceBorderMapPositionsParams,
 	BuildEu4SelectedProvinceBorderGlobeParams,
 	BuildEu4SelectedProvinceBorderMapParams,
-} from "./types"
+} from "@/ui/planet/renderer/types"
+import type { Eu4ProvinceBorderGeometry } from "@/model/earth/history/data-source/types"
 
 // Draws nation/province borders for Earth-imported worlds along the real EU4
 // province boundary vectors (scripts/build-eu4-province-borders.py) instead

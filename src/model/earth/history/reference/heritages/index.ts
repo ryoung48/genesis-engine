@@ -1,16 +1,11 @@
-import { loadHeritages, type RawHeritage } from "../data-source"
-
-interface HeritageIndex {
-	heritages: RawHeritage[]
-	/** culture id -> heritage id */
-	cultureToHeritage: Map<string, string>
-}
+import { DATA_SOURCE } from "@/model/earth/history/data-source"
+import type { HeritageIndex } from "@/model/earth/history/reference/heritages/types"
 
 let indexPromise: Promise<HeritageIndex> | null = null
 
-export function getHeritageIndex(): Promise<HeritageIndex> {
+function getHeritageIndex(): Promise<HeritageIndex> {
 	if (!indexPromise) {
-		indexPromise = loadHeritages().then((heritages) => {
+		indexPromise = DATA_SOURCE.loadHeritages().then((heritages) => {
 			const cultureToHeritage = new Map<string, string>()
 			for (const heritage of heritages) {
 				for (const culture of heritage.cultures) {
@@ -21,4 +16,8 @@ export function getHeritageIndex(): Promise<HeritageIndex> {
 		})
 	}
 	return indexPromise
+}
+
+export const HERITAGES = {
+	getHeritageIndex,
 }

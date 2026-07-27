@@ -1,23 +1,16 @@
 ﻿import { useEffect, useMemo, useState } from "react"
 import type { GenesisProvinces } from "@/model"
+import { ENGINE } from "@/model/earth/history/engine"
+import { DATE } from "@/model/earth/history/date"
+import { HERITAGES } from "@/model/earth/history/reference/heritages"
+import { NATIONS } from "@/model/earth/history/reference/nations"
+import { ORGANIZATIONS } from "@/model/earth/history/reference/organizations"
+import { RELIGION_GROUPS } from "@/model/earth/history/reference/religion-groups"
 import type {
-	RawNationReference,
 	RawOrganizationReference,
-} from "@/model/earth"
-import {
-	createEarthHistoryEngine,
-	EARTH_HISTORY_DEFAULT_START_DAYS,
-	EARTH_HISTORY_MAX_DAYS,
-	EARTH_HISTORY_MIN_DAYS,
-	type EarthHistoryEngine,
-	formatEu4Days,
-	getHeritageIndex,
-	getNationReferenceIndex,
-	getOrganizationReferenceIndex,
-	getReligionIndex,
-	queryEarthHistory,
-	queryEarthHistoryNation,
-} from "@/model/earth"
+	RawNationReference,
+} from "@/model/earth/history/data-source/types"
+import type { EarthHistoryEngine } from "@/model/earth/history/engine/types"
 
 /**
  * Owns the earth-history engine lifecycle and scrubber time for an
@@ -32,7 +25,7 @@ export function useEarthHistoryTimeline(
 ) {
 	const [engine, setEngine] = useState<EarthHistoryEngine | null>(null)
 	const [selectedDays, setSelectedDays] = useState(
-		EARTH_HISTORY_DEFAULT_START_DAYS,
+		DATE.earthHistoryDefaultStartDays,
 	)
 	const [loading, setLoading] = useState(false)
 	const [nationReference, setNationReference] = useState<Map<
@@ -62,9 +55,9 @@ export function useEarthHistoryTimeline(
 
 	useEffect(() => {
 		if (!isEarthImport) return
-		getNationReferenceIndex().then(setNationReference)
-		getOrganizationReferenceIndex().then(setOrganizationReference)
-		getReligionIndex().then((index) => {
+		NATIONS.getNationReferenceIndex().then(setNationReference)
+		ORGANIZATIONS.getOrganizationReferenceIndex().then(setOrganizationReference)
+		RELIGION_GROUPS.getReligionIndex().then((index) => {
 			const scaled = new Map<string, [number, number, number]>()
 			const names = new Map<string, string>()
 			for (const group of index.groups) {
@@ -80,7 +73,7 @@ export function useEarthHistoryTimeline(
 			setReligionColorById(scaled)
 			setReligionNameById(names)
 		})
-		getHeritageIndex().then((index) => {
+		HERITAGES.getHeritageIndex().then((index) => {
 			const names = new Map<string, string>()
 			const colors = new Map<string, [number, number, number]>()
 			for (const heritage of index.heritages) {
@@ -107,17 +100,17 @@ export function useEarthHistoryTimeline(
 		}
 		let cancelled = false
 		setLoading(true)
-		createEarthHistoryEngine(provinces)
+		ENGINE.createEarthHistoryEngine(provinces)
 			.then((result) => {
 				if (!cancelled) {
 					setEngine(result)
 					setSelectedDays(
 						result
 							? Math.min(
-									Math.max(EARTH_HISTORY_DEFAULT_START_DAYS, result.minDate),
+									Math.max(DATE.earthHistoryDefaultStartDays, result.minDate),
 									result.maxDate,
 								)
-							: EARTH_HISTORY_DEFAULT_START_DAYS,
+							: DATE.earthHistoryDefaultStartDays,
 					)
 				}
 			})
@@ -134,7 +127,7 @@ export function useEarthHistoryTimeline(
 
 	const query = useMemo(() => {
 		if (!engine) return null
-		return queryEarthHistory({
+		return ENGINE.queryEarthHistory({
 			engine,
 			timeDays: selectedDays,
 			nationReference: nationReference ?? undefined,
@@ -145,7 +138,11 @@ export function useEarthHistoryTimeline(
 
 	const queryNation = (tag: string) => {
 		if (!engine) return null
-		return queryEarthHistoryNation({ engine, timeDays: selectedDays, tag })
+		return ENGINE.queryEarthHistoryNation({
+			engine,
+			timeDays: selectedDays,
+			tag,
+		})
 	}
 
 	return {
@@ -171,8 +168,8 @@ export function useEarthHistoryTimeline(
 		// 2..9999 Extended-Timeline-mod range, which is almost entirely
 		// empty for us and made the slider impractical to scrub. Falls back
 		// to the full range while the engine is still loading.
-		minDays: engine?.minDate ?? EARTH_HISTORY_MIN_DAYS,
-		maxDays: engine?.maxDate ?? EARTH_HISTORY_MAX_DAYS,
-		formatLabel: formatEu4Days,
+		minDays: engine?.minDate ?? DATE.earthHistoryMinDays,
+		maxDays: engine?.maxDate ?? DATE.earthHistoryMaxDays,
+		formatLabel: DATE.formatEu4Days,
 	}
 }

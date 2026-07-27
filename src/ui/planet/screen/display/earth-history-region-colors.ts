@@ -1,21 +1,18 @@
-﻿import type {
-	FoldedState,
-	OrgCategorizer,
-	RawNationReference,
-} from "@/model/earth"
-import {
-	dynastyColor,
-	EARTH_HISTORY_NO_GOVERNMENT_COLOR,
-	getEarthHistoryGovernmentColor,
-	hashColorForKey,
-} from "@/model/earth"
-import { type ColorMode, OCEAN_LIGHT_BLUE } from "../../colors"
-import { getBaseMapMode } from "../shared/data-variant"
-import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
+﻿import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/planet/colors"
+import { getBaseMapMode } from "@/ui/planet/screen/shared/data-variant"
+import type {
+	NationMapMode,
+	PopulationMapMode,
+} from "@/ui/planet/screen/shared/map-modes"
 import {
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
-} from "./color-helpers"
+} from "@/ui/planet/screen/display/color-helpers"
+import { COLOR } from "@/model/earth/history/color"
+import { GOVERNMENT } from "@/model/earth/history/government"
+import type { RawNationReference } from "@/model/earth/history/data-source/types"
+import type { FoldedState } from "@/model/earth/history/fold/types"
+import type { OrgCategorizer } from "@/model/earth/history/organization-categories/types"
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 
@@ -143,7 +140,7 @@ export function computeEarthHistoryRegionColors(params: {
 	const colorFor = (key: string): [number, number, number] => {
 		let c = colorCache.get(key)
 		if (!c) {
-			c = hashColorForKey(key)
+			c = COLOR.hashColorForKey(key)
 			colorCache.set(key, c)
 		}
 		return c
@@ -185,14 +182,14 @@ export function computeEarthHistoryRegionColors(params: {
 			}
 			if (nationMode === "government") {
 				const nation = state.nations.get(owner)
-				const governmentColor = getEarthHistoryGovernmentColor({
+				const governmentColor = GOVERNMENT.getEarthHistoryGovernmentColor({
 					governmentType: nation?.governmentType ?? null,
 					governmentReform: nation?.governmentReform,
 				})
 				write(
 					r,
 					darkenPoliticalAtElevation(
-						governmentColor ?? EARTH_HISTORY_NO_GOVERNMENT_COLOR,
+						governmentColor ?? GOVERNMENT.earthHistoryNoGovernmentColor,
 						elevationKm[r] ?? 0,
 					),
 				)
@@ -207,7 +204,7 @@ export function computeEarthHistoryRegionColors(params: {
 				write(
 					r,
 					darkenPoliticalAtElevation(
-						dynasty ? dynastyColor(dynasty) : [0.35, 0.33, 0.32],
+						dynasty ? COLOR.dynastyColor(dynasty) : [0.35, 0.33, 0.32],
 						elevationKm[r] ?? 0,
 					),
 				)
@@ -275,7 +272,7 @@ function buildOccupationColorForTag(
 			const ref = nationReference.get(tag)
 			c = ref
 				? [ref.color[0] / 255, ref.color[1] / 255, ref.color[2] / 255]
-				: hashColorForKey(`nation:${tag}`)
+				: COLOR.hashColorForKey(`nation:${tag}`)
 			colorCache.set(tag, c)
 		}
 		return c
