@@ -2,6 +2,11 @@ import { STAR } from "@/model/celestial/star"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
+import { SYNTHETIC_PLATES } from "@/model/geography/tectonics/synthetic-plates"
+import { COAST_DENSITY } from "@/model/geography/terrain/coast-density"
+import { EROSION } from "@/model/geography/terrain/erosion"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
@@ -25,14 +30,9 @@ import type {
 	GenesisWorld,
 	StageTiming,
 } from "@/model/pipelines/types"
-import { RNG } from "@/model/shared/rng"
-import { STATS } from "@/model/shared/stats"
+import { STATS } from "@/model/shared/math/stats"
+import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
-import { SYNTHETIC_PLATES } from "@/model/tectonics/synthetic-plates"
-import { COAST_DENSITY } from "@/model/terrain/coast-density"
-import { EROSION } from "@/model/terrain/erosion"
-import { LANDMARKS } from "@/model/terrain/landmarks"
-import { SEA_LEVEL } from "@/model/terrain/sea-level"
 
 function createTimingRecorder() {
 	const timings: StageTiming[] = []

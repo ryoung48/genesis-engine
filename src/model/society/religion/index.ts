@@ -1,5 +1,5 @@
+import { GRAPH_PARTITION } from "@/model/society/graph-partition"
 import type { ComputeReligionsParams } from "@/model/society/religion/types"
-import { SHARED } from "@/model/society/shared"
 import type { GenesisPartition } from "@/model/society/types"
 
 const religionTypeNames = [
@@ -52,7 +52,7 @@ function computeReligions({
 			activeCount++
 		}
 	}
-	return SHARED.computeGraphPartition({
+	return GRAPH_PARTITION.computeGraphPartition({
 		nodeCount: cultures.count,
 		adjOffset: cultures.adjOffset,
 		adjList: cultures.adjList,

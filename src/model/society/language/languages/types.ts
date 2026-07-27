@@ -1,5 +1,5 @@
 ﻿/* eslint-disable no-unused-vars */
-import type { WeightedValue as SharedWeightedValue } from "@/model/shared/rng"
+import type { WeightedValue as SharedWeightedValue } from "@/model/shared/random/rng"
 
 export const PhonemeCatalog = {
 	START_CONSONANT: "B",

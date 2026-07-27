@@ -1,15 +1,15 @@
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 import type { GenesisParams, StageTiming } from "@/model/pipelines/types"
-import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/settlements"
 import { CULTURE } from "@/model/society/culture"
 import { ERAS } from "@/model/society/eras"
+import { GRAPH_PARTITION } from "@/model/society/graph-partition"
 import { HERITAGE } from "@/model/society/heritage"
+import { COMPUTE_SETTLEMENT_REGIONS } from "@/model/society/infrastructure/settlements"
 import { NATIONS } from "@/model/society/nations"
 import { RELIGION } from "@/model/society/religion"
-import { SHARED } from "@/model/society/shared"
-import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh
@@ -160,7 +160,7 @@ function deriveProvinceSociety({
 				religionCount: religions!.count,
 				religionTypes,
 			})
-			cultures!.colors = SHARED.deriveChildColors({
+			cultures!.colors = GRAPH_PARTITION.deriveChildColors({
 				childCount: cultures!.count,
 				childToParent: heritages!.assignment,
 				parentColors: heritages!.colors,

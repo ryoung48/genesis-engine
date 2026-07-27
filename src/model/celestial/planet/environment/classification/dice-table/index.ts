@@ -10,8 +10,8 @@ import type {
 import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { DICE } from "@/model/shared/dice"
-import { RNG } from "@/model/shared/rng"
+import { DICE } from "@/model/shared/random/dice"
+import { RNG } from "@/model/shared/random/rng"
 
 function clamp({ value, min, max }: ClampInput): number {
 	return Math.max(min, Math.min(max, value))

@@ -2,14 +2,14 @@
 import type {
 	RawNationReference,
 	RawOrganizationReference,
-} from "@/model/earth/history/data-source/types"
-import { DATE } from "@/model/earth/history/date"
-import { ENGINE } from "@/model/earth/history/engine"
-import type { EarthHistoryEngine } from "@/model/earth/history/engine/types"
-import { HERITAGES } from "@/model/earth/history/reference/heritages"
-import { NATIONS } from "@/model/earth/history/reference/nations"
-import { ORGANIZATIONS } from "@/model/earth/history/reference/organizations"
-import { RELIGION_GROUPS } from "@/model/earth/history/reference/religion-groups"
+} from "@/model/history/earth/data-source/types"
+import { DATE } from "@/model/history/earth/date"
+import { ENGINE } from "@/model/history/earth/engine"
+import type { EarthHistoryEngine } from "@/model/history/earth/engine/types"
+import { HERITAGES } from "@/model/history/earth/reference/heritages"
+import { NATIONS } from "@/model/history/earth/reference/nations"
+import { ORGANIZATIONS } from "@/model/history/earth/reference/organizations"
+import { RELIGION_GROUPS } from "@/model/history/earth/reference/religion-groups"
 import type { GenesisProvinces } from "@/model/society/types"
 
 /**

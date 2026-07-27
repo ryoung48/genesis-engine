@@ -1,4 +1,4 @@
-import { RNG as SHARED_RNG, SharedRng } from "@/model/shared/rng"
+import { RNG as SHARED_RNG, SharedRng } from "@/model/shared/random/rng"
 import type {
 	LanguageRng,
 	WeightedValue,

@@ -1,8 +1,8 @@
-﻿import { COLOR } from "@/model/earth/history/color"
-import type { RawNationReference } from "@/model/earth/history/data-source/types"
-import type { FoldedState } from "@/model/earth/history/fold/types"
-import { GOVERNMENT } from "@/model/earth/history/government"
-import type { OrgCategorizer } from "@/model/earth/history/organization-categories/types"
+﻿import { COLOR } from "@/model/history/earth/color"
+import type { RawNationReference } from "@/model/history/earth/data-source/types"
+import type { FoldedState } from "@/model/history/earth/fold/types"
+import { GOVERNMENT } from "@/model/history/earth/government"
+import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
 import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/planet/colors"
 import {
 	darkenPoliticalAtElevation,

@@ -1,5 +1,5 @@
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 
 // Procedurally generated body textures (public/generated/<classification>/...)
 // -- only classifications with real art get a texturePath; anything else

@@ -1,6 +1,6 @@
 import type { ComputeCulturesParams } from "@/model/society/culture/types"
 import { GENDER_SYSTEM } from "@/model/society/gender-system"
-import { SHARED } from "@/model/society/shared"
+import { GRAPH_PARTITION } from "@/model/society/graph-partition"
 import type { GenesisPartition } from "@/model/society/types"
 
 function computeCultures({
@@ -16,7 +16,7 @@ function computeCultures({
 		active[i] = 1
 		activeCount++
 	}
-	const partition = SHARED.computeGraphPartition({
+	const partition = GRAPH_PARTITION.computeGraphPartition({
 		nodeCount: provinces.count,
 		adjOffset: provinces.adjOffset,
 		adjList: provinces.adjList,

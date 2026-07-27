@@ -4,7 +4,7 @@ import type {
 } from "@/model/celestial/orbit-body/types"
 import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import type { HeatedClassInput } from "@/model/celestial/planet/seismology/reclassify/types"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 
 function describeRegime(
 	totalHeating: number,

@@ -3,11 +3,11 @@ import type { WindArrowData } from "@/model/climate/wind/types"
 import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
-} from "@/model/earth/history/data-source/types"
+} from "@/model/history/earth/data-source/types"
 import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
-} from "@/model/transport/types"
+} from "@/model/worker-protocol/types"
 import type { ColorMode } from "@/ui/planet/colors"
 import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
 import type {

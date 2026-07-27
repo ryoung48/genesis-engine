@@ -1,4 +1,5 @@
-import type { SettlementEraTuning, SocietyEra } from "@/model/society/types"
+import type { SettlementEraTuning } from "@/model/society/settlement-tuning/types"
+import type { SocietyEra } from "@/model/society/types"
 
 const LATE_MEDIEVAL_TUNING: SettlementEraTuning = {
 	townMin: 1_000,

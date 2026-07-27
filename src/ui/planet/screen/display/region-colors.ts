@@ -2,12 +2,12 @@
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
-import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { RELIGION } from "@/model/society/religion"
 import { TIMEZONE } from "@/model/society/timezone"
-import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
-import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { ColorMode } from "@/ui/planet/colors"
 import {
 	climateTempColor,

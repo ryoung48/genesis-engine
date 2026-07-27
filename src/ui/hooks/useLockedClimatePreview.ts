@@ -1,7 +1,7 @@
 ﻿import { useMemo } from "react"
-import { HEAT } from "@/model/climate/locked/heat"
-import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
-import { COLOR_PALETTES } from "@/model/shared/color-palettes"
+import { HEAT } from "@/model/climate/tidal-locked/heat"
+import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
 
 interface LockedClimatePreviewConfig {

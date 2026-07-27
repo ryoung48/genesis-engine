@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { BOOKMARKS } from "@/model/earth/history/reference/bookmarks"
+import { BOOKMARKS } from "@/model/history/earth/reference/bookmarks"
 import { IconButton } from "@/ui/components/primitives/IconButton"
 
 interface EarthHistoryBookmarksProps {

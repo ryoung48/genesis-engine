@@ -1,7 +1,7 @@
 import type { GenesisClimate } from "@/model/climate/types"
+import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
 export interface ClimateGeometry {
 	latDeg: Float32Array

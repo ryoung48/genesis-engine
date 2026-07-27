@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { DATE } from "@/model/earth/history/date"
+import { DATE } from "@/model/history/earth/date"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 

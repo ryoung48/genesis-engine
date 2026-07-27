@@ -3,7 +3,7 @@ import type {
 	AtmosphereCodeInput,
 	RollAtmosphereInput,
 } from "@/model/celestial/planet/environment/atmosphere/types"
-import { DICE } from "@/model/shared/dice"
+import { DICE } from "@/model/shared/random/dice"
 
 function rollAtmosphereBar({
 	rng,

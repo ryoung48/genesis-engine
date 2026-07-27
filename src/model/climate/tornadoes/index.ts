@@ -1,7 +1,7 @@
 import { RAIN } from "@/model/climate/rain"
 import type { ComputeTornadoRiskParams } from "@/model/climate/tornadoes/types"
-import { MATH } from "@/model/shared/math"
-import { CLASSIFICATION } from "@/model/terrain/classification"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { MATH } from "@/model/shared/math/core"
 
 function vegetationMoistureScore(biomeCode: number): number {
 	switch (biomeCode) {

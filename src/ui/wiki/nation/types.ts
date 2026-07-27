@@ -1,4 +1,4 @@
-import type { HistoryNote } from "@/model/history/state/types"
+import type { HistoryNote } from "@/model/history/generated/state/types"
 
 export interface GrudgePhraseParams {
 	pastEvents: HistoryNote[]

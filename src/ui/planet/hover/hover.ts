@@ -3,12 +3,12 @@ import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
-import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
+import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import { TIMEZONE } from "@/model/society/timezone"
-import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
-import { CLASSIFICATION } from "@/model/terrain/classification"
-import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import {
 	EU5_CLIMATE_CATEGORIES,
 	EU5_TOPOGRAPHY_CATEGORIES,

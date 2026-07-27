@@ -13,7 +13,7 @@ import type {
 	SpawnSeededLanguageParams,
 } from "@/model/society/language/names/types"
 import { CultureGenderSystem } from "@/model/society/types"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 
 export interface LanguageNameLeaderEntry {
 	time: number

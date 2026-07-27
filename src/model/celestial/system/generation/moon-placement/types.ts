@@ -2,7 +2,7 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 
 export interface MoonPlacementInput {
 	rng: ReturnType<typeof RNG.createRng>

@@ -2,7 +2,7 @@ import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { createMapProjection } from "@/ui/planet/renderer/map-projection"
 
 export interface CoastlineLineData {

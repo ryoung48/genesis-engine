@@ -1,4 +1,4 @@
-﻿import { RNG } from "@/model/shared/rng"
+﻿import { RNG } from "@/model/shared/random/rng"
 import type { HeritageScript } from "@/model/society/script"
 import { GLYPH_MODULE } from "@/model/society/script/runegen/glyph-module"
 import { RUNE_RENDERER } from "@/model/society/script/runegen/rune-renderer"

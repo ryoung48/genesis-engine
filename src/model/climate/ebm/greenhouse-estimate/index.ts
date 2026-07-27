@@ -1,7 +1,7 @@
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import type { RollGreenhouseFactorParams } from "@/model/climate/ebm/greenhouse-estimate/types"
-import { DICE } from "@/model/shared/dice"
-import type { SharedRng } from "@/model/shared/rng"
+import { DICE } from "@/model/shared/random/dice"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 function estimateGreenhouseFactor(pressure: number): number {
 	return (

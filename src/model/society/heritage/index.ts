@@ -1,5 +1,5 @@
+import { GRAPH_PARTITION } from "@/model/society/graph-partition"
 import type { ComputeHeritagesParams } from "@/model/society/heritage/types"
-import { SHARED } from "@/model/society/shared"
 import type { GenesisPartition } from "@/model/society/types"
 
 function computeHeritages({
@@ -14,7 +14,7 @@ function computeHeritages({
 			activeCount++
 		}
 	}
-	return SHARED.computeGraphPartition({
+	return GRAPH_PARTITION.computeGraphPartition({
 		nodeCount: cultures.count,
 		adjOffset: cultures.adjOffset,
 		adjList: cultures.adjList,

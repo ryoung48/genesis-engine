@@ -18,7 +18,7 @@ import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/e
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 
 function applyTemperatureHydrosphereLoss({
 	hydrosphereCode,

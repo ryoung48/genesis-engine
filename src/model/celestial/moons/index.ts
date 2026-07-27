@@ -15,8 +15,8 @@ import {
 	type RollMoonSizeClassInput,
 } from "@/model/celestial/moons/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
-import { DICE } from "@/model/shared/dice"
-import { RNG } from "@/model/shared/rng"
+import { DICE } from "@/model/shared/random/dice"
+import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 
 const TWO_PI = 2 * Math.PI

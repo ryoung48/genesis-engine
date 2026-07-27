@@ -1,6 +1,6 @@
 import { STAR } from "@/model/celestial/star"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
 
 // Star age is rolled from its own salted rng derived from the same system

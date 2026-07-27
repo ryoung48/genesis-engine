@@ -5,8 +5,8 @@ import type {
 	PlanetTideLockResult,
 	TideLockEffectResult,
 } from "@/model/celestial/planet/tide-lock/types"
-import { DICE } from "@/model/shared/dice"
-import { RNG } from "@/model/shared/rng"
+import { DICE } from "@/model/shared/random/dice"
+import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 
 // Relative (not absolute) tolerance on the sidereal:orbital ratio -- these

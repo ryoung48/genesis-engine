@@ -1,4 +1,4 @@
-import type { GenesisRng } from "@/model/shared/rng/types"
+import type { GenesisRng } from "@/model/shared/random/rng/types"
 
 export interface SphereMesh {
 	numRegions: number

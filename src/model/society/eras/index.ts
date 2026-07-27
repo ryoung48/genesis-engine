@@ -1,6 +1,8 @@
-import type { WavePercentileThresholdParams } from "@/model/society/eras/types"
 import type {
 	EraConfig,
+	WavePercentileThresholdParams,
+} from "@/model/society/eras/types"
+import type {
 	GovernmentFamily,
 	GovernmentType,
 	SocietyEra,

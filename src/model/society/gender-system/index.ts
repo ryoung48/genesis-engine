@@ -1,4 +1,4 @@
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 import type {
 	AssignCultureGenderSystemsParams,
 	ResolveLeaderGenderParams,

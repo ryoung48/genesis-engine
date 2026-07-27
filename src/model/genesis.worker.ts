@@ -1,20 +1,20 @@
 /// <reference lib="webworker" />
 
-import { HISTORY } from "@/model/history"
-import { HISTORY_RNG } from "@/model/history/history-rng"
-import { SNAPSHOT } from "@/model/history/snapshot"
-import { STATE } from "@/model/history/state"
-import type { HistoryState } from "@/model/history/state/types"
-import { PATHFIND } from "@/model/pathfinding"
+import { HISTORY } from "@/model/history/generated"
+import { HISTORY_RNG } from "@/model/history/generated/history-rng"
+import { SNAPSHOT } from "@/model/history/generated/snapshot"
+import { STATE } from "@/model/history/generated/state"
+import type { HistoryState } from "@/model/history/generated/state/types"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
-import { TRANSPORT } from "@/model/transport"
+import { PATHFIND } from "@/model/society/infrastructure/pathfinding"
+import { TRANSPORT } from "@/model/society/infrastructure/transport"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
-} from "@/model/transport/types"
+} from "@/model/worker-protocol/types"
 import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,

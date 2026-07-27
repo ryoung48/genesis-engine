@@ -1,4 +1,4 @@
-﻿import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source/types"
+﻿import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 
 interface Eu4ProvinceRingGroup {
 	provinceId: number

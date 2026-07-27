@@ -1,4 +1,4 @@
-import type { SharedRng } from "@/model/shared/rng"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { Rune } from "@/model/society/script/runegen/rune"
 import type { RuneRenderOptions } from "@/model/society/script/runegen/rune-renderer"
 

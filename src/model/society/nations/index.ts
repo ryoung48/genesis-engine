@@ -1,32 +1,32 @@
-import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { SimplexNoise } from "@/model/shared/math/simplex-noise"
+import { IDENTITY_SEEDS } from "@/model/shared/random/identity-seeds"
 import { UNITS } from "@/model/shared/units"
 import { ERAS } from "@/model/society/eras"
+import { GRAPH_PARTITION } from "@/model/society/graph-partition"
 import { HIERARCHY } from "@/model/society/hierarchy"
-import type {
-	BuildNationPlanParams,
-	BuildOpenComponentsParams,
-	ColorDistanceParams,
-	ContinentPlacementBonusParams,
-	GroupByNationParams,
-	IntegerMassParams,
-	ProvinceSeedDistanceParams,
-	SpreadBucketSizesParams,
-} from "@/model/society/nations/types"
-import { SHARED } from "@/model/society/shared"
 import type {
 	AssignGovernmentTypeParams,
 	BestClaimParams,
+	BuildNationPlanParams,
+	BuildOpenComponentsParams,
 	ClaimProvinceDynamicParams,
+	ColorDistanceParams,
+	ContinentPlacementBonusParams,
+	GovernmentMix,
+	GroupByNationParams,
+	IntegerMassParams,
+	MarkBlockedParams,
+	NationPlacementScoreParams,
+	ProvinceSeedDistanceParams,
+	RefineGovernmentSubtypeParams,
+	SelectSeedParams,
+	SpreadBucketSizesParams,
+} from "@/model/society/nations/types"
+import type {
 	GenesisNationHierarchy,
 	GenesisProvinces,
 	GovernmentFamily,
-	GovernmentMix,
 	GovernmentType,
-	MarkBlockedParams,
-	NationPlacementScoreParams,
-	RefineGovernmentSubtypeParams,
-	SelectSeedParams,
 } from "@/model/society/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
@@ -617,7 +617,7 @@ function continentPlacementBonus({
 	target,
 }: ContinentPlacementBonusParams): number {
 	if (!provinceContinent?.[province]) return 0
-	const sizeBias = SHARED.clamp01(
+	const sizeBias = GRAPH_PARTITION.clamp01(
 		(target - LARGE_NATION_CONTINENT_MIN_TARGET) /
 			(LARGE_NATION_CONTINENT_FULL_TARGET - LARGE_NATION_CONTINENT_MIN_TARGET),
 	)
@@ -1362,7 +1362,7 @@ function nationColorsFromProvinces(params: {
 function buildNationColorCandidates(
 	baseColor: [number, number, number],
 ): [number, number, number][] {
-	const [baseHue, baseSat, baseLight] = SHARED.rgbToHsl({
+	const [baseHue, baseSat, baseLight] = GRAPH_PARTITION.rgbToHsl({
 		r: baseColor[0],
 		g: baseColor[1],
 		b: baseColor[2],
@@ -1375,9 +1375,11 @@ function buildNationColorCandidates(
 		for (const satOffset of satOffsets) {
 			for (const lightOffset of lightOffsets) {
 				const hue = (baseHue + hueOffset + 1) % 1
-				const sat = SHARED.clamp01(baseSat + satOffset)
-				const light = SHARED.clamp01(baseLight + lightOffset)
-				candidates.push(SHARED.hslToRgb({ h: hue * 360, s: sat, l: light }))
+				const sat = GRAPH_PARTITION.clamp01(baseSat + satOffset)
+				const light = GRAPH_PARTITION.clamp01(baseLight + lightOffset)
+				candidates.push(
+					GRAPH_PARTITION.hslToRgb({ h: hue * 360, s: sat, l: light }),
+				)
 			}
 		}
 	}

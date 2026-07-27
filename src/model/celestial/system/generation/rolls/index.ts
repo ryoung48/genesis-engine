@@ -6,8 +6,8 @@ import type {
 import type { Zone } from "@/model/celestial/planet/types"
 import type { DensityComposition } from "@/model/celestial/system/generation/rolls/types"
 import type { RingProfile } from "@/model/celestial/system/types"
-import { DICE } from "@/model/shared/dice"
-import { RNG } from "@/model/shared/rng"
+import { DICE } from "@/model/shared/random/dice"
+import { RNG } from "@/model/shared/random/rng"
 
 function rollOrbitGroup({
 	rng,

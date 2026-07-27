@@ -1,6 +1,6 @@
 ﻿import * as THREE from "three"
 import { Text } from "troika-three-text"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {

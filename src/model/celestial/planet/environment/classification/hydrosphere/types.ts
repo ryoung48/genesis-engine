@@ -1,4 +1,4 @@
-import type { SharedRng } from "@/model/shared/rng"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface WaterPctInput {
 	rng: SharedRng

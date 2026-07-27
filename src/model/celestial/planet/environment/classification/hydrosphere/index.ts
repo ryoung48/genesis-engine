@@ -6,7 +6,7 @@ import type {
 	WaterPctInput,
 } from "@/model/celestial/planet/environment/classification/hydrosphere/types"
 import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
-import { DICE } from "@/model/shared/dice"
+import { DICE } from "@/model/shared/random/dice"
 
 function clamp({ value, min, max }: ClampInput): number {
 	return Math.max(min, Math.min(max, value))

@@ -5,7 +5,7 @@ import type {
 	DensityProfileInput,
 	RollAlbedoInput,
 } from "@/model/celestial/planet/environment/density/types"
-import { DICE } from "@/model/shared/dice"
+import { DICE } from "@/model/shared/random/dice"
 
 function clamp({
 	value,

@@ -2,9 +2,9 @@ import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
 } from "@/model/climate/types"
+import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisParams } from "@/model/pipelines/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
 
 export interface OceanCurrentResult {
 	/** Per-cell ocean warmth: -1 (cold) to +1 (warm). Zero for land. */

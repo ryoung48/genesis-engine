@@ -1,11 +1,11 @@
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
-import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ERAS } from "@/model/society/eras"
+import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { RELIGION } from "@/model/society/religion"
-import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
-import { LANDMARKS } from "@/model/terrain/landmarks"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import {
 	type ColorMode,
 	climateTempColor,

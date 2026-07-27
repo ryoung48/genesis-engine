@@ -1,5 +1,5 @@
 ﻿import * as THREE from "three"
-import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source/types"
+import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import { repeatMapPositions } from "@/ui/planet/renderer/overlay-builders"
 import type {

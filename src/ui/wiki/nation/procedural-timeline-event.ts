@@ -1,5 +1,5 @@
-﻿import { DATE } from "@/model/earth/history/date"
-import { EU4_DAYS } from "@/model/history/eu4-days"
+﻿import { DATE } from "@/model/history/earth/date"
+import { EU4_DAYS } from "@/model/history/generated/eu4-days"
 import {
 	getEventDescription,
 	getEventDotColor,

@@ -1,4 +1,3 @@
-import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
 import type {
 	ApplyCurrentTemperatureEffectParams,
 	BuildOceanCurrentGridParams,
@@ -8,6 +7,7 @@ import type {
 } from "@/model/climate/ocean-currents/types"
 import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
 import { RAIN } from "@/model/climate/rain"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/tidal-locked/ocean-currents"
 import { WIND } from "@/model/climate/wind"
 import type { FlowGrid } from "@/model/climate/wind/types"
 import type { SphereMesh } from "@/model/mesh/types"

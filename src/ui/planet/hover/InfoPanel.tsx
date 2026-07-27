@@ -1,12 +1,10 @@
 import React from "react"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { TEXT } from "@/model/shared/text"
+import { TRANSPORT } from "@/model/society/infrastructure/transport"
+import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import { TIMEZONE } from "@/model/society/timezone"
-import { LANDMARKS } from "@/model/terrain/landmarks"
-import { TRANSPORT } from "@/model/transport"
-import type {
-	SerializedGenesisWorld,
-	SerializedRoutes,
-} from "@/model/transport/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"

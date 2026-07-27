@@ -1,31 +1,29 @@
+import type { PastaDebug } from "@/model/climate/pasta/types"
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 import type {
 	GenesisClimate,
-	GenesisHazards,
 	GenesisHydrology,
 	GenesisOceanCurrents,
 	GenesisRainfall,
-	PastaDebug,
 } from "@/model/climate/types"
-import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
+import type {
+	BoundaryInfo,
+	DistanceFields,
+	GenesisTerrainFeatures,
+} from "@/model/geography/tectonics/types"
+import type { GenesisHazards } from "@/model/geography/terrain/hazards/types"
+import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
+import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
+import type { GenesisRivers } from "@/model/geography/terrain/rivers/types"
 import type { SphereMesh } from "@/model/mesh/types"
 import type {
 	GenesisParams,
 	GenesisWorld,
 	StageTiming,
 } from "@/model/pipelines/types"
-import type {
-	GenesisLocations,
-	GenesisProvinces,
-	ProvincePopulation,
-} from "@/model/society/types"
-import type {
-	BoundaryInfo,
-	DistanceFields,
-	GenesisTerrainFeatures,
-} from "@/model/tectonics/types"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks/types"
-import type { GenesisRivers } from "@/model/terrain/rivers/types"
+import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
+import type { ProvincePopulation } from "@/model/society/population/types"
+import type { GenesisProvinces } from "@/model/society/types"
 
 interface RealRiversInput {
 	lines: [number, number, number, number][][]

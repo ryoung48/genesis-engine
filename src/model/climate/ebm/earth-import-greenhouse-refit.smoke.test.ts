@@ -4,7 +4,7 @@ import { describe, it } from "vitest"
 import { CLIMATE } from "@/model/climate/climate"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
-import { NODE_PNG } from "@/model/pipelines/node-png"
+import { NODE_PNG } from "@/model/shared/node-png"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 
 // Re-fits GREENHOUSE_FACTOR against the REAL imported Earth world (real

@@ -1,5 +1,5 @@
-﻿import { STATE } from "@/model/history/state"
-import type { HistoryNote } from "@/model/history/state/types"
+﻿import { STATE } from "@/model/history/generated/state"
+import type { HistoryNote } from "@/model/history/generated/state/types"
 import type {
 	GrudgePhraseParams,
 	WarStreakPhraseParams,

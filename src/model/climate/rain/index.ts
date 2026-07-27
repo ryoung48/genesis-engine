@@ -1,6 +1,5 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
 import { ELEVATION } from "@/model/climate/elevation"
-import { RAIN as LOCKED_RAIN } from "@/model/climate/locked/rain"
 import type {
 	BuildRainRegionMaskParams,
 	ClimateGeometry,
@@ -10,11 +9,12 @@ import type {
 	ComputeThermalEquatorParams,
 } from "@/model/climate/rain/types"
 import { RAIN_SHARED } from "@/model/climate/rain-shared"
+import { RAIN as LOCKED_RAIN } from "@/model/climate/tidal-locked/rain"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import type { SphereMesh } from "@/model/mesh/types"
-import { MATH } from "@/model/shared/math"
-import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { MATH } from "@/model/shared/math/core"
+import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { UNITS } from "@/model/shared/units"
-import { LANDMARKS } from "@/model/terrain/landmarks"
 
 const DEG2RAD = Math.PI / 180
 

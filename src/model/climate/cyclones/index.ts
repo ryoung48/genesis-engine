@@ -1,8 +1,8 @@
 import type { ComputeCycloneRiskParams } from "@/model/climate/cyclones/types"
 import { RAIN } from "@/model/climate/rain"
-import { MATH } from "@/model/shared/math"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { MATH } from "@/model/shared/math/core"
 import { TIME } from "@/model/shared/time"
-import { CLASSIFICATION } from "@/model/terrain/classification"
 
 function computeCycloneRisk({
 	mesh,

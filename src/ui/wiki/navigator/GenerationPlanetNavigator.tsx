@@ -13,8 +13,8 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
-import { RNG } from "@/model/shared/rng"
-import { SEED_LABEL } from "@/model/shared/seed-label"
+import { RNG } from "@/model/shared/random/rng"
+import { SEED_LABEL } from "@/model/shared/random/seed-label"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"

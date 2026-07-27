@@ -1,6 +1,6 @@
 import React from "react"
-import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
-import { COLOR_PALETTES } from "@/model/shared/color-palettes"
+import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
 import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import {

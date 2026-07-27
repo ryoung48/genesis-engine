@@ -2,8 +2,8 @@
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import type { Eu4ProvinceBorderGeometry } from "@/model/earth/history/data-source/types"
-import type { SerializedGenesisWorld } from "@/model/transport/types"
+import type { Eu4ProvinceBorderGeometry } from "@/model/history/earth/data-source/types"
+import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import { repeatMapPositions } from "@/ui/planet/renderer/overlay-builders"
 import type {

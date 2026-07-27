@@ -1,6 +1,6 @@
 import type { ComputeSpringTideMapInput } from "@/model/climate/tidal-map/types"
-import { RNG } from "@/model/shared/rng"
-import { LANDMARKS } from "@/model/terrain/landmarks"
+import { LANDMARKS } from "@/model/geography/terrain/landmarks"
+import { RNG } from "@/model/shared/random/rng"
 
 const BASE_TIDAL_RANGE_M = 0.25
 

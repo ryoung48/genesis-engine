@@ -1,4 +1,4 @@
-import type { SharedRng } from "@/model/shared/rng"
+import type { SharedRng } from "@/model/shared/random/rng"
 export const MAIN_SEQUENCE_CLASSES = [
 	"O",
 	"B",

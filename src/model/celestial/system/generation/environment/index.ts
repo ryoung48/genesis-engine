@@ -5,7 +5,7 @@ import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 
 const epistellarDeviations = [2.25, 1.75, 1.25]
 const innerDeviations = [0.75, 0, -0.75]

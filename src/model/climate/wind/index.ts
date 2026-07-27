@@ -1,5 +1,5 @@
-import { WIND as LOCKED_WIND } from "@/model/climate/locked/wind"
 import { RAIN } from "@/model/climate/rain"
+import { WIND as LOCKED_WIND } from "@/model/climate/tidal-locked/wind"
 import type {
 	ComputeWindVectorsInput,
 	FlowGrid,
@@ -7,11 +7,11 @@ import type {
 	WindGrid,
 	WindSurface,
 } from "@/model/climate/wind/types"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import type { SphereMesh } from "@/model/mesh/types"
-import { MATH } from "@/model/shared/math"
+import { MATH } from "@/model/shared/math/core"
 import { TIME } from "@/model/shared/time"
 import { UNITS } from "@/model/shared/units"
-import { CLASSIFICATION } from "@/model/terrain/classification"
 
 function vegetationDragFactor(biomeCode: number | undefined): number {
 	switch (biomeCode) {

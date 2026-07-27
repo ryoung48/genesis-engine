@@ -1,4 +1,4 @@
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 import {
 	GLYPH_MODULE,
 	type GlyphSet,

@@ -1,4 +1,19 @@
-import { ROUTES } from "@/model/economy/routes"
+import { COARSE_PLATES } from "@/model/geography/tectonics/coarse-plates"
+import { COLLISION } from "@/model/geography/tectonics/collision"
+import { MANTLE } from "@/model/geography/tectonics/mantle"
+import { PLATES } from "@/model/geography/tectonics/plates"
+import { SUPER_PLATES } from "@/model/geography/tectonics/super-plates"
+import type {
+	BoundaryInfo,
+	DistanceFields,
+	GenesisTerrainFeatures,
+	TectonicPlate,
+} from "@/model/geography/tectonics/types"
+import { CRATERS } from "@/model/geography/terrain/craters"
+import { ELEVATION } from "@/model/geography/terrain/elevation"
+import { EROSION } from "@/model/geography/terrain/erosion"
+import { HOTSPOTS } from "@/model/geography/terrain/hotspots"
+import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
@@ -15,26 +30,11 @@ import type {
 	GenesisWorld,
 	StageTiming,
 } from "@/model/pipelines/types"
-import { RNG } from "@/model/shared/rng"
-import { STATS } from "@/model/shared/stats"
+import { STATS } from "@/model/shared/math/stats"
+import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
+import { ROUTES } from "@/model/society/infrastructure/trade/routing/network"
 import { URBANIZATION } from "@/model/society/urbanization"
-import { COARSE_PLATES } from "@/model/tectonics/coarse-plates"
-import { COLLISION } from "@/model/tectonics/collision"
-import { MANTLE } from "@/model/tectonics/mantle"
-import { PLATES } from "@/model/tectonics/plates"
-import { SUPER_PLATES } from "@/model/tectonics/super-plates"
-import type {
-	BoundaryInfo,
-	DistanceFields,
-	GenesisTerrainFeatures,
-	TectonicPlate,
-} from "@/model/tectonics/types"
-import { CRATERS } from "@/model/terrain/craters"
-import { ELEVATION } from "@/model/terrain/elevation"
-import { EROSION } from "@/model/terrain/erosion"
-import { HOTSPOTS } from "@/model/terrain/hotspots"
-import { SEA_LEVEL } from "@/model/terrain/sea-level"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
 	console.time(label)

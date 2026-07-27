@@ -9,7 +9,7 @@ import type {
 } from "@/model/celestial/planet/seismology/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 
 function seedForBody(body: SystemBody): number {
 	return (body.idx + 2) * 10_007 + Math.round(body.orbitalDistanceAU * 1_000)

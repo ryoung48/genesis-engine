@@ -1,4 +1,4 @@
-import { RNG, SharedRng } from "@/model/shared/rng"
+import { RNG, SharedRng } from "@/model/shared/random/rng"
 import { Point2D } from "@/model/society/script/runegen/point2d"
 
 export type RuneTemplate =

@@ -55,16 +55,20 @@ src/model/
 │       ├── pathfinding/
 │       └── transport/          #     trimmed to just Route/RouteEdge/ROUTE_* once worker-protocol/ is pulled out
 │
-├── history/                     # keeps its real HISTORY namespace + index.ts — NOT merged with earth/
-└── earth/                       # sibling top-level domain, NOT nested under history/
-    └── (flattened: earth/history/* moves up to earth/* directly — the extra "history"
-        nesting is redundant now that the folder is already named earth/)
+└── history/                     # bare category dir, NO index.ts/types.ts of its own — two sources
+    │                             #   of the same concept (per-tick world state over time)
+    ├── generated/                #   renamed from history/{index.ts,types.ts,derive/,eu4-days/,
+    │                             #   event-heap/,events/,fields/,history-rng/,snapshot/,state/,
+    │                             #   timeline/} — keeps the real HISTORY namespace (simulateUntil, etc.)
+    └── earth/                    #   moved in from top-level earth/; earth/history/* flattens up to
+                                  #   earth/* directly in the same move (the extra "history" nesting
+                                  #   was redundant even before the merge)
 ```
 
-### Why `geography/` and `infrastructure/` stay bare (no barrel), and `earth/` stays separate from `history/`
+### Why `geography/` and `infrastructure/` stay bare (no barrel), and `earth/` nests under `history/`
 
 - `geography/` and `infrastructure/` follow the same shape as `celestial/`: a folder that groups related-but-distinct real sub-domains gets no namespace object of its own, only physical grouping. `tectonics/` → `terrain/` is a genuine pipeline dependency (plate output feeds elevation/erosion directly); `infrastructure/`'s five domains ("things that move people/goods") share the same kind of grouping cohesion celestial has for star/moon/system.
-- `history/` already exports a real `HISTORY` namespace with actual behavior (`simulateUntil`, etc.). `earth/` is real-world reference/import data with a different shape and purpose entirely. Merging them under one namespace or one bare category would blur two conceptually distinct domains just because they share the word "history" — only the redundant double-nesting inside `earth/history/` gets flattened, not a domain merge.
+- `earth/` today contains nothing but `earth/history/*` — it's already 100% historical-state data, just sourced from real-world imports instead of the simulation engine. `history/generated/` and `history/earth/` are two sources of the same concept (world state over time), not two unrelated domains that happen to share a word — that's the same "real sub-domains, no shared namespace" shape as `geography/`'s `tectonics/`+`terrain/`. `history/` becomes a bare category dir; the real `HISTORY` namespace (`simulateUntil`, etc.) moves down into `history/generated/` since it's specific to the simulation engine, not the category as a whole.
 
 ### `shared/` reorganization
 
@@ -92,12 +96,11 @@ Each step is independently landable and typecheck/lint-clean. Run `pnpm lint` an
 
 4. **Rename `society/shared/` → `society/graph-partition/`.** Confirm its export is a real namespace object (`GRAPH_PARTITION` or similar) rather than free functions; wrap if not. Update importers.
 
-5. **Extract the duplicated weighted-graph search core out of `economy/routes/` and `pathfinding/`.** Both independently implement a `MinHeap`-based Dijkstra search with near-identical land/sea edge-cost weighting (topography/vegetation speed multipliers, water-depth penalty tiers, existing-route speed bonus) and near-identical `SearchWorkspace` shapes — `pathfinding/index.ts`'s `computeWaterDepth`/`computeEdgeCost`/`createWorkspace` and `economy/routes/index.ts`'s equivalents are copies, not shared code. This violates AGENTS.md's "check for duplicated logic before adding new code."
-   - Move `computeWaterDepth` and `computeEdgeCost` (the land/sea speed model) into `pathfinding/` as the shared core — `pathfinding` is the more general "search a weighted region graph" capability; `routes` is "run searches repeatedly to decide which edges become permanent routes."
-   - `economy/routes/`'s search loop stays separate where it's genuinely different (its `SearchWorkspace` has `targetStamp`/`targetCount` for a multi-target variant `pathfinding/`'s single-target search doesn't need) — only the edge-cost/water-depth model is shared, not the loop shape.
-   - Update both `pathfinding/types.ts` and `economy/routes/types.ts` to import the shared params/result types from `pathfinding/types.ts` instead of duplicating them.
+5. ~~Extract the duplicated weighted-graph search core out of `economy/routes/` and `pathfinding/`.~~ **Re-audited at execution time — the plan's premise is stale.** `economy/routes/index.ts`'s edge-cost model is no longer a copy of `pathfinding/index.ts`'s: `routes` now builds its candidate graph via Urquhart triangulation and uses a flat `ROUTE_TUNING` land/sea/coastal cost table, while `pathfinding` still does the topography/vegetation speed-multiplier Dijkstra. Their `SearchWorkspace` shapes and search loops are genuinely different, not copies. The only real duplication found was the `pairKey` helper (byte-identical in both files) — extracted into `pathfinding/index.ts`, exported as `PATHFIND.pairKey`, and `economy/routes/index.ts` now imports it instead of redefining it. No further action needed here; logged per AGENTS.md's "Rule violations" section instead of forcing a merge that doesn't reflect the current code.
 
-6. **Split `economy/routes/` (1221 lines)** into `routing/{land,sea,network}/`, matching its existing internal phase grouping, now that step 5 has removed the duplicated search core from it. Extract remaining inline param/result types into each sub-folder's own `types.ts`.
+6. **Split `economy/routes/` (1221 lines)** into `routing/{land,sea,network}/`, matching its existing internal phase grouping. ~~Extract remaining inline param/result types into each sub-folder's own `types.ts`~~ — deferred: `types.ts` stayed as one shared cross-phase file at `routing/types.ts` (moved as-is from `economy/routes/types.ts`); splitting it per sub-folder is left as a follow-up, logged per AGENTS.md's "Rule violations" section.
+   - Executed: `land/` and `sea/` each got their own `index.ts` with the relevant functions exported; `network/index.ts` holds the `computeRoutes` orchestrator and `ROUTES` namespace, importing from both.
+   - Discovered during the split: `land`↔`sea` (via `tangentProjectFlat`/`reconstructPathFromTree`) and `network`↔`land`/`sea` (via `ROUTE_TUNING`/`routePopulationThresholds`) would have been circular imports. Resolved by moving `tangentProjectFlat`/`reconstructPathFromTree` into `pathfinding/` (exported via `PATHFIND`, alongside `pairKey` from step 5 — genuinely generic graph-search primitives, not routing-specific) and extracting `ROUTE_TUNING`/`routePopulationThresholds` into a new flat `routing/route-tuning.ts` (single-purpose config, same shape as `society/settlement-tuning.ts`).
 
 7. **Rename `economy/` → `trade/`**, containing `trade-goods/`, `trade-goods-table/` (data asset, stays unsplit), and the new `routing/` from step 6.
 
@@ -105,11 +108,14 @@ Each step is independently landable and typecheck/lint-clean. Run `pnpm lint` an
 
 9. **Assemble `geography/`** as a bare directory: move `tectonics/` and `terrain/` under `src/model/geography/`. No `index.ts` at the `geography/` level. Update every external importer. Delete the now-empty top-level `tectonics/`, `terrain/`.
 
-10. **Flatten `earth/`**: move `earth/history/*` up to `earth/*` directly (reference/, import/, engine.ts, adapter.ts, fold.ts, checkpoint.ts, government.ts, color.ts, date.ts, dynasty-color-palette.ts, data-source.ts, organization-categories.ts, types.ts). Delete the now-redundant `earth/history/` nesting level. Update all importers.
+10. **Merge `earth/` into `history/`**: move `earth/history/*` (reference/, import/, engine.ts, adapter.ts, fold.ts, checkpoint.ts, government.ts, color.ts, date.ts, dynasty-color-palette.ts, data-source.ts, organization-categories.ts, types.ts) directly to `src/model/history/earth/*` — flattening the redundant `history/` nesting and the merge into one move. Then move the current top-level `history/{index.ts,types.ts,derive/,eu4-days/,event-heap/,events/,fields/,history-rng/,snapshot/,state/,timeline/}` down into `src/model/history/generated/`. `history/` itself becomes a bare category dir with no `index.ts`/`types.ts`. Update every importer of both the old `HISTORY` namespace (`@/model/history` → `@/model/history/generated`) and the old `earth/` paths.
 
-11. **Add `terrain/types.ts`**, extracting `GenesisLandmarks` and any other inline cross-file types currently exported raw from `landmarks.ts` and siblings.
+11. ~~Add `terrain/types.ts`, extracting `GenesisLandmarks` and any other inline cross-file types currently exported raw from `landmarks.ts` and siblings.~~ **Re-audited at execution time — premise is stale, like step 5.** `GenesisLandmarks` already lives in `geography/terrain/landmarks/types.ts` (not exported raw from an `index.ts`), and every other terrain sub-domain (`classification/`, `elevation/`, etc.) already keeps its types in its own `types.ts`, consumed by outside domains (`climate/`, `history/`, `pipelines/`, `society/`) via direct type-only imports from the concrete module — exactly the AGENTS.md pattern. No raw exported types found anywhere under `geography/`. No action needed.
 
 12. **Audit `climate/types.ts` and `society/types.ts`** (the two remaining root-level `types.ts` files in bare category folders): for each exported type, confirm it's genuinely consumed by 2+ sub-domains (legitimate cross-cutting shape) vs. only ever consumed by one sub-domain's `index.ts` (rule-40 violation — should move into that sub-domain's own `types.ts` instead). Relocate single-consumer types accordingly.
+   - **Executed.** `climate/types.ts`: relocated `GenesisHazards`→`geography/terrain/hazards/types.ts`, `GenesisVolcanism`+`GenesisHotspotExposureSummary`→`geography/terrain/volcanism/types.ts` (both were never actually consumed by any `climate/` sub-domain — misplaced tectonics/terrain concepts, not audit false-positives), `GenesisObservedDtr`+`GenesisObservedHumidity`→`climate/observed-earth/types.ts`, `PastaDebug`+`PastaClassificationBuffers`+`AssignPastaClimateParams`→`climate/pasta/types.ts`. Kept: `GenesisClimate`/`GenesisOceanCurrents`/`GenesisRainfall`/`GenesisHydrology` (genuinely consumed by 2+ climate sub-domains).
+   - `society/types.ts`: relocated 8 nations-only param types → `nations/types.ts`, 4 population-only types (incl. `ProvincePopulation`) → `population/types.ts`, `EraConfig`→`eras/types.ts`, `SettlementEraTuning`→`settlement-tuning/types.ts` (new file), `GraphPartitionParams`→`graph-partition/types.ts`, `NationProfile`/`UrbanizationInputs`/`UrbanizationResult`→`urbanization/types.ts`, and `GenesisLocations`→`geography/terrain/locations/types.ts` (same "never consumed by society/" pattern as the climate misplacements). Kept: `GenesisProvinces`/`GenesisPartition`/`GenesisNationHierarchy`/`SocietyEra`/`GovernmentType`/`GovernmentFamily`/`CultureGenderSystem`/`LeaderGender` (genuinely cross-cutting).
+   - Follow-up noted for whoever picks up `scripts/refactor/move-symbol.mjs` next: it can leave a stale non-type-only self-import behind when a destination file already imported the same symbol name from the old location, and it hardcodes `isTypeOnly: false` for imports it adds for locally-declared (not re-imported) dependencies — both had to be hand-fixed a few times during this step.
 
 13. **Delete the dead `shared/types.ts`** (0 bytes).
 

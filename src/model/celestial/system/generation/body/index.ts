@@ -14,7 +14,7 @@ import { TEXTURE } from "@/model/celestial/system/generation/texture"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 import { LANGUAGE } from "@/model/society/language/languages"
 

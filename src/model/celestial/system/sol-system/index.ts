@@ -13,7 +13,7 @@ import type {
 	SolarSystemState,
 	SystemBody,
 } from "@/model/celestial/system/types"
-import { RNG } from "@/model/shared/rng"
+import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 
 function estimateGasGiantInternalHeatTempK({
