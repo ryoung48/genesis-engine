@@ -1,5 +1,5 @@
-import type { createRng } from "@/model/shared/rng"
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
+import { RNG } from "@/model/shared/rng"
 
 // Procedurally generated body textures (public/generated/<classification>/...)
 // -- only classifications with real art get a texturePath; anything else
@@ -32,7 +32,7 @@ function pickGeneratedTexturePath({
 	rng,
 	classification,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	classification: OrbitClassification
 }): string | undefined {
 	const files = GENERATED_TEXTURE_FILES[classification]

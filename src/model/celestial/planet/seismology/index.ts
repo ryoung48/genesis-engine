@@ -1,12 +1,15 @@
-﻿import { createRng } from "@/model/shared/rng"
-import type { MoonBody } from "../../moons/types"
-import type { OrbitClassification } from "../../orbit-body/types"
-import type { MainSequenceClass } from "../../star/types"
-import type { SystemBody } from "../../system/types"
-import { ENVIRONMENT } from "../environment"
-import { HEATING } from "./heating"
-import { RECLASSIFY } from "./reclassify"
-import type { SeedForMoonInput, SeismologyProfile } from "./types"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
+import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import type { SystemBody } from "@/model/celestial/system/types"
+import { ENVIRONMENT } from "@/model/celestial/planet/environment"
+import { HEATING } from "@/model/celestial/planet/seismology/heating"
+import { RECLASSIFY } from "@/model/celestial/planet/seismology/reclassify"
+import type {
+	SeedForMoonInput,
+	SeismologyProfile,
+} from "@/model/celestial/planet/seismology/types"
+import { RNG } from "@/model/shared/rng"
 
 function seedForBody(body: SystemBody): number {
 	return (body.idx + 2) * 10_007 + Math.round(body.orbitalDistanceAU * 1_000)
@@ -112,7 +115,7 @@ function applyMoonSeismology(params: {
 	const nextGroup = group
 	const rerolled = shouldReclassify
 		? ENVIRONMENT.buildClassificationEnvironment({
-				rng: createRng(seedForMoon({ parent, moon })),
+				rng: RNG.createRng({ seed: seedForMoon({ parent, moon }) }),
 				group: nextGroup,
 				classification: nextClassification,
 				sizeClass,
@@ -212,7 +215,7 @@ function applySystemSeismology(params: {
 			luminositySol: params.starLuminositySol,
 		})
 		const rerolled = ENVIRONMENT.buildClassificationEnvironment({
-			rng: createRng(seedForBody(seismologyBody)),
+			rng: RNG.createRng({ seed: seedForBody(seismologyBody) }),
 			group: seismologyBody.group,
 			classification: nextClassification,
 			sizeClass: seismologyBody.sizeClass,

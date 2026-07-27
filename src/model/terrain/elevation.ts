@@ -9,11 +9,18 @@ import type {
 	GenesisTerrainFeatures,
 	PlateVec,
 	SphereMesh,
-} from ".."
-import { createRng, SimplexNoise } from "../shared"
-import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
-import type { BoundedBfsParams, ComputeDistanceFieldsParams } from "./types"
-import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
+} from "@/model"
+import { GENESIS_TERRAIN_FEATURE } from "@/model/tectonics"
+import type {
+	BoundedBfsParams,
+	ComputeDistanceFieldsParams,
+} from "@/model/terrain/types"
+import {
+	applyVolcanicArcs,
+	getVolcanicActivityThreshold,
+} from "@/model/terrain/volcanism"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { RNG } from "@/model/shared/rng"
 
 type StageTiming = { Stage: string; ms: string }
 
@@ -38,7 +45,7 @@ function assignDistanceField(
 	}
 
 	// Deterministic shuffle RNG
-	const prng = createRng(seedVal)
+	const prng = RNG.createRng({ seed: seedVal })
 	const randInt = (n: number) => Math.floor(prng.random() * n)
 
 	for (let qi = 0; qi < queue.length; qi++) {

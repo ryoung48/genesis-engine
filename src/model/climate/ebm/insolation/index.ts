@@ -1,6 +1,6 @@
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import type { InsolationComputeParams } from "@/model/climate/ebm/insolation/types"
-import { HOURS_PER_DAY } from "@/model/shared"
+import { TIME } from "@/model/shared/time"
 
 function clampAcosInput(value: number): number {
 	return Math.max(-1, Math.min(1, value))
@@ -85,14 +85,14 @@ export const INSOLATION = {
 
 				if (cosH0 <= -1) {
 					_insolation[i][day] = sConst * Math.sin(lat) * sinDeclination
-					_daylight_hours[i][day] = HOURS_PER_DAY
+					_daylight_hours[i][day] = TIME.hoursPerDay
 				} else if (cosH0 >= 1) {
 					_insolation[i][day] = 0
 					_daylight_hours[i][day] = 0
 				} else {
 					const hourAngle = Math.acos(cosH0)
 					_daylight_hours[i][day] =
-						(2 * hourAngle * HOURS_PER_DAY) / (2 * Math.PI)
+						(2 * hourAngle * TIME.hoursPerDay) / (2 * Math.PI)
 					_insolation[i][day] =
 						(sConst *
 							(hourAngle * Math.sin(lat) * sinDeclination +

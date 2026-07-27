@@ -1,16 +1,8 @@
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
-import {
-	BUPU_STOPS,
-	cssColorToRgb,
-	ORANGES_STOPS,
-	PURPLES_STOPS,
-	quantizeRgb,
-	type RgbColor,
-	sampleBasisColorStops,
-	sampleColorStops,
-	YL_OR_RD_STOPS,
-} from "@/model/shared"
+import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color-palettes"
+import type { RgbColor } from "@/model/shared/color-interpolation/types"
 
 /**
  * Genesis elevation and temperature color mapping.
@@ -287,11 +279,11 @@ const landColorStops: RgbColor[] = [
 function elevationToColor(km: number, maxElevKm = 6): [number, number, number] {
 	if (km <= 0) {
 		const t = 1 - Math.max(0, Math.min(1, (km + 5) / 5))
-		return sampleColorStops(oceanColorStops, t)
+		return COLOR_INTERPOLATION.sampleColorStops({ stops: oceanColorStops, t })
 	}
 
 	const t = Math.max(0, Math.min(1, km / maxElevKm))
-	return sampleColorStops(landColorStops, t)
+	return COLOR_INTERPOLATION.sampleColorStops({ stops: landColorStops, t })
 }
 
 /**
@@ -351,14 +343,24 @@ export function temperatureColor(celsius: number): [number, number, number] {
 
 export function daylightColor(hours: number): [number, number, number] {
 	const normalized = Math.max(0, Math.min(1, 1 - hours / 24))
-	return quantizeRgb(sampleColorStops(PURPLES_STOPS, normalized))
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleColorStops({
+			stops: COLOR_PALETTES.purplesStops,
+			t: normalized,
+		}),
+	)
 }
 
 export function temperatureDeltaColor(
 	celsiusDelta: number,
 ): [number, number, number] {
 	const normalized = Math.pow(Math.max(0, Math.min(1, celsiusDelta / 60)), 0.8)
-	return quantizeRgb(sampleColorStops(YL_OR_RD_STOPS, normalized))
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleColorStops({
+			stops: COLOR_PALETTES.ylOrRdStops,
+			t: normalized,
+		}),
+	)
 }
 
 const observedDiffStops: { v: number; r: number; g: number; b: number }[] = [
@@ -809,8 +811,11 @@ export function oceanCurrentColor(warmth: number): [number, number, number] {
 }
 
 export function dangerColor(score: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(DANGER_BASIS_STOPS, Math.max(0, Math.min(1, score))),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleBasisColorStops({
+			stops: DANGER_BASIS_STOPS,
+			t: Math.max(0, Math.min(1, score)),
+		}),
 	)
 }
 
@@ -820,7 +825,7 @@ const DANGER_BASIS_STOPS: RgbColor[] = [
 	"#f97316",
 	"#dc2626",
 	"#fff7ed",
-].map(cssColorToRgb)
+].map(COLOR_INTERPOLATION.cssColorToRgb)
 const HOTSPOT_BASIS_STOPS: RgbColor[] = [
 	"#0f172a",
 	"#1d4ed8",
@@ -828,25 +833,28 @@ const HOTSPOT_BASIS_STOPS: RgbColor[] = [
 	"#facc15",
 	"#fb7185",
 	"#fff7ed",
-].map(cssColorToRgb)
+].map(COLOR_INTERPOLATION.cssColorToRgb)
 const SLOPE_BASIS_STOPS: RgbColor[] = [
 	"#f8fafc",
 	"#d9f99d",
 	"#facc15",
 	"#f97316",
 	"#7f1d1d",
-].map(cssColorToRgb)
+].map(COLOR_INTERPOLATION.cssColorToRgb)
 const TORNADO_LAND_STOPS: RgbColor[] = [
 	"#ffffff", // no risk — pure white
 	"#d9f99d", // lime-200
 	"#84cc16", // lime-500
 	"#3f6212", // lime-900 — ominous dark green
-].map(cssColorToRgb)
+].map(COLOR_INTERPOLATION.cssColorToRgb)
 
 /** Land color for tornado sub-mode: white → lime → dark forest green. */
 export function tornadoLandColor(risk: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(TORNADO_LAND_STOPS, Math.max(0, Math.min(1, risk))),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleBasisColorStops({
+			stops: TORNADO_LAND_STOPS,
+			t: Math.max(0, Math.min(1, risk)),
+		}),
 	)
 }
 
@@ -898,15 +906,15 @@ const EARTHQUAKE_LAND_STOPS: RgbColor[] = [
 	"#ffedd5", // very light orange
 	"#fdba74", // light orange
 	"#f97316", // orange
-].map(cssColorToRgb)
+].map(COLOR_INTERPOLATION.cssColorToRgb)
 
 /** Land color for earthquake sub-mode: white → light yellow → amber → orange. */
 export function earthquakeLandColor(score: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(
-			EARTHQUAKE_LAND_STOPS,
-			Math.max(0, Math.min(1, score)),
-		),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleBasisColorStops({
+			stops: EARTHQUAKE_LAND_STOPS,
+			t: Math.max(0, Math.min(1, score)),
+		}),
 	)
 }
 
@@ -917,19 +925,22 @@ export function volcanicLandColor(score: number): [number, number, number] {
 }
 
 export function hotspotColor(score: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(HOTSPOT_BASIS_STOPS, Math.max(0, Math.min(1, score))),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleBasisColorStops({
+			stops: HOTSPOT_BASIS_STOPS,
+			t: Math.max(0, Math.min(1, score)),
+		}),
 	)
 }
 
 export function populationColor(
 	normalizedDensity: number,
 ): [number, number, number] {
-	return quantizeRgb(
-		sampleColorStops(
-			ORANGES_STOPS,
-			Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4),
-		),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleColorStops({
+			stops: COLOR_PALETTES.orangesStops,
+			t: Math.pow(Math.max(0, Math.min(1, normalizedDensity)), 0.4),
+		}),
 	)
 }
 
@@ -1001,8 +1012,11 @@ export function migrationColor(
 }
 
 export function developmentColor(t: number): [number, number, number] {
-	return quantizeRgb(
-		sampleColorStops(BUPU_STOPS, Math.pow(Math.max(0, Math.min(1, t)), 0.9)),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleColorStops({
+			stops: COLOR_PALETTES.bupuStops,
+			t: Math.pow(Math.max(0, Math.min(1, t)), 0.9),
+		}),
 	)
 }
 
@@ -1156,11 +1170,11 @@ export function miseryColor(apparentTempC: number): [number, number, number] {
 }
 
 export function slopeColor(normalizedSlope: number): [number, number, number] {
-	return quantizeRgb(
-		sampleBasisColorStops(
-			SLOPE_BASIS_STOPS,
-			Math.pow(Math.max(0, Math.min(1, normalizedSlope)), 0.7),
-		),
+	return COLOR_INTERPOLATION.quantizeRgb(
+		COLOR_INTERPOLATION.sampleBasisColorStops({
+			stops: SLOPE_BASIS_STOPS,
+			t: Math.pow(Math.max(0, Math.min(1, normalizedSlope)), 0.7),
+		}),
 	)
 }
 
@@ -1175,7 +1189,7 @@ const windSpeedStops: RgbColor[] = [
 
 export function windSpeedColor(speedMs: number): [number, number, number] {
 	const t = Math.max(0, Math.min(1, speedMs / 30))
-	return sampleColorStops(windSpeedStops, t)
+	return COLOR_INTERPOLATION.sampleColorStops({ stops: windSpeedStops, t })
 }
 
 export function getColor(

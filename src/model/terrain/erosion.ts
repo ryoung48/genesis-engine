@@ -1,12 +1,14 @@
-import type { SphereMesh } from ".."
-import { MinHeap, SimplexNoise, smoothstep } from "../shared"
+import type { SphereMesh } from "@/model"
 import type {
 	ApplySoilCreepParams,
 	BuildGlacialBuffersParams,
 	SharpenRidgesParams,
 	SmoothElevationParams,
 	WarpTerrainParams,
-} from "./types"
+} from "@/model/terrain/types"
+import { MinHeap } from "@/model/shared/min-heap"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { MATH } from "@/model/shared/math"
 
 /**
  * Core iteration kernel shared by smoothElevation, sharpenRidges, and applySoilCreep.
@@ -363,9 +365,17 @@ function buildGlacialBuffers({
 		if (r_isOcean[r]) continue
 		const z = r_xyz[3 * r + 2]
 		const polarDist = Math.abs(Math.asin(Math.max(-1, Math.min(1, z))))
-		const latFactor = smoothstep(thresholdLat, Math.PI / 2, polarDist)
-		const elevFactor = smoothstep(0.5, 0.9, elev[r])
-		const latScale = smoothstep(Math.PI / 8, Math.PI / 3, polarDist)
+		const latFactor = MATH.smoothstep({
+			edge0: thresholdLat,
+			edge1: Math.PI / 2,
+			x: polarDist,
+		})
+		const elevFactor = MATH.smoothstep({ edge0: 0.5, edge1: 0.9, x: elev[r] })
+		const latScale = MATH.smoothstep({
+			edge0: Math.PI / 8,
+			edge1: Math.PI / 3,
+			x: polarDist,
+		})
 		glacIdx[r] =
 			Math.max(latFactor, elevFactor * 0.3 * (0.3 + 0.7 * latScale)) *
 			glacialStrength

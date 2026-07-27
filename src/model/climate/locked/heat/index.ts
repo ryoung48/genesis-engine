@@ -13,10 +13,7 @@ import type {
 } from "@/model/climate/locked/heat/types"
 import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
 import { TIME } from "@/model/shared/time"
-import {
-	getEffectiveObliquityDeg,
-	isRetrogradeObliquity,
-} from "@/model/shared/units"
+import { UNITS } from "@/model/shared/units"
 
 function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))
@@ -149,8 +146,8 @@ function computeMonthlyLibration({
 }
 
 function getSignedEffectiveObliquityRad(obliquity: number): number {
-	const magnitude = (getEffectiveObliquityDeg(obliquity) * Math.PI) / 180
-	return isRetrogradeObliquity(obliquity) ? -magnitude : magnitude
+	const magnitude = (UNITS.getEffectiveObliquityDeg(obliquity) * Math.PI) / 180
+	return UNITS.isRetrogradeObliquity(obliquity) ? -magnitude : magnitude
 }
 
 function computeLockedSubstellarDeclinationRad({

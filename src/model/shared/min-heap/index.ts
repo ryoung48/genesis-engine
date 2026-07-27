@@ -1,4 +1,3 @@
-/** Min-heap keyed on an external Float32Array. */
 export class MinHeap {
 	private _key: Float32Array
 	private _data: number[] = []

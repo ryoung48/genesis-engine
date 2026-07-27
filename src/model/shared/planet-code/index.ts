@@ -1,28 +1,22 @@
-﻿/**
- * Planet code encode/decode Î“Ã‡Ŷ stores the seed separately from the packed params
- * segment so the seed stays recoverable across param format changes.
- */
-
 import type { GenesisParams } from "@/model"
-import type { TideLock } from "@/model/celestial/orbit-body/types"
 import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/types"
-import { SEED_MAX } from "@/model/shared/seeds"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 import { ERAS } from "@/model/society/eras"
-import { SocietyEra } from "@/model/society/types"
+import { SEEDS } from "@/model/shared/seeds"
+import type {
+	DecodedPlanetCode,
+	FieldSpec,
+	ToIndexParams,
+	FromIndexParams,
+	EncodePlanetCodeParams,
+} from "@/model/shared/planet-code/types"
 
 const DEFAULT_PRESSURE = 1.0
+
 const PLANET_CODE_PART_SEPARATOR = "."
-type FieldSpec = {
-	name: string
-	min: number
-	step: number
-	count: number
-	read: (params: GenesisParams) => number
-}
 
 function rangeCount(r: { min: number; max: number; step: number }): number {
 	return Math.round((r.max - r.min) / r.step) + 1
@@ -38,9 +32,9 @@ const FIELD_SPECS: FieldSpec[] = [
 		name: "restSeed",
 		min: 0,
 		step: 1,
-		count: SEED_MAX,
+		count: SEEDS.seedMax,
 		read: (p) =>
-			Math.max(0, Math.min(SEED_MAX - 1, Math.floor(p.restSeed ?? 0))),
+			Math.max(0, Math.min(SEEDS.seedMax - 1, Math.floor(p.restSeed ?? 0))),
 	},
 	{
 		name: "numPoints",
@@ -234,20 +228,14 @@ function clampPressure(value?: number): number {
 	return Math.max(0.1, Math.min(100, value))
 }
 
-function toIndex(
-	value: number,
-	field: Pick<FieldSpec, "min" | "step" | "count">,
-): number {
+function toIndex({ value, field }: ToIndexParams): number {
 	return Math.max(
 		0,
 		Math.min(field.count - 1, Math.round((value - field.min) / field.step)),
 	)
 }
 
-function fromIndex(
-	index: number,
-	field: Pick<FieldSpec, "min" | "step">,
-): number {
+function fromIndex({ index, field }: FromIndexParams): number {
 	const raw = field.min + index * field.step
 	const decimals = field.step < 1 ? String(field.step).split(".")[1].length : 0
 	return decimals > 0 ? parseFloat(raw.toFixed(decimals)) : raw
@@ -287,7 +275,7 @@ function parseSeedPart(seedPart: string): number | null {
 	}
 
 	const seed = Number(packed)
-	if (!Number.isInteger(seed) || seed < 0 || seed >= SEED_MAX) return null
+	if (!Number.isInteger(seed) || seed < 0 || seed >= SEEDS.seedMax) return null
 	return seed
 }
 
@@ -295,44 +283,19 @@ function encodePlanetParams(params: GenesisParams): string {
 	let packed = 0n
 	for (const field of FIELD_SPECS) {
 		packed =
-			packed * BigInt(field.count) + BigInt(toIndex(field.read(params), field))
+			packed * BigInt(field.count) +
+			BigInt(toIndex({ value: field.read(params), field }))
 	}
 	return packed.toString(36).padStart(PARAMS_BASE_LEN, "0")
 }
 
-export function encodePlanetCode(seed: number, params: GenesisParams): string {
+function encodePlanetCode({ seed, params }: EncodePlanetCodeParams): string {
 	const seedPart = BigInt(seed).toString(36)
 	const paramsPart = encodePlanetParams(params)
 	return [seedPart, paramsPart].join(PLANET_CODE_PART_SEPARATOR)
 }
 
-interface DecodedPlanetCode {
-	seed: number
-	numPoints: number
-	landDistribution: number
-	seaLevel: number
-	continentSizeVariety: number
-	landCoverage: number
-	planetRadiusKm: number
-	obliquity: number
-	eccentricity: number
-	spectralClass: string
-	starSubtype: number
-	orbitalDistanceAU: number
-	daysPerYear: number
-	hoursPerDay: number
-	tideLock: TideLock | null
-	substellarLon: number
-	perihelion: number
-	pressure: number
-	volcanism: number
-	craters?: number
-	maxElevation: number
-	era: SocietyEra
-	restSeed: number
-}
-
-export function decodePlanetCode(code: string): DecodedPlanetCode | null {
+function decodePlanetCode(code: string): DecodedPlanetCode | null {
 	const parts = parsePlanetCodeParts(code)
 	if (!parts) return null
 
@@ -357,7 +320,7 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		const field = FIELD_SPECS[i]
 		const index = Number(packed % BigInt(field.count))
 		packed = packed / BigInt(field.count)
-		decodedFields[field.name] = fromIndex(index, field)
+		decodedFields[field.name] = fromIndex({ index, field })
 	}
 	if (packed !== 0n) return null
 
@@ -394,4 +357,9 @@ export function decodePlanetCode(code: string): DecodedPlanetCode | null {
 		era: ERAS.eraOrder[eraIdx] ?? ERAS.defaultEra,
 		restSeed: decodedFields.restSeed ?? 0,
 	}
+}
+
+export const PLANET_CODE = {
+	encodePlanetCode,
+	decodePlanetCode,
 }

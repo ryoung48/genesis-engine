@@ -12,12 +12,6 @@ import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
 } from "@/model/climate/tidal-schedule/types"
-import {
-	makeRandomSeedLabel,
-	normalizeSeedLabel,
-	resolveSeedLabel,
-	seedStringToNumber,
-} from "@/model/shared"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
@@ -54,6 +48,8 @@ import {
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildStarStats } from "@/ui/wiki/stats/star/star-stats"
 import { DATA } from "@/model/celestial/system/sol-system/data"
+import { RNG } from "@/model/shared/rng"
+import { SEED_LABEL } from "@/model/shared/seed-label"
 
 interface LabeledOrbitBody {
 	body: SystemBody
@@ -659,11 +655,13 @@ export function GenerationPlanetNavigator({
 			if (target.kind === "star") return rootSeedLabel
 			if (target.kind === "orbit") {
 				const body = systemBodies?.[target.bodyIndex]
-				return normalizeSeedLabel(body?.seed ?? `orbit-${target.bodyIndex + 1}`)
+				return SEED_LABEL.normalizeSeedLabel(
+					body?.seed ?? `orbit-${target.bodyIndex + 1}`,
+				)
 			}
 			const body = systemBodies?.[target.bodyIndex]
 			const moon = body?.moons[target.moonIndex]
-			return normalizeSeedLabel(
+			return SEED_LABEL.normalizeSeedLabel(
 				getMoonSeedBaseName({
 					moon,
 					moonIndex: target.moonIndex,
@@ -682,7 +680,7 @@ export function GenerationPlanetNavigator({
 		(target: OrbitSelection): number => {
 			const label = getSeedLabel(target)
 			if (target.kind === "star") {
-				return label === "sol" ? SYSTEM.SOL_SEED : seedStringToNumber(label)
+				return label === "sol" ? SYSTEM.SOL_SEED : RNG.seedStringToNumber(label)
 			}
 			let parent: OrbitSelection
 			if (target.kind === "orbit") {
@@ -691,7 +689,7 @@ export function GenerationPlanetNavigator({
 				parent = { kind: "orbit", bodyIndex: target.bodyIndex }
 			}
 			const parentLabel = getSeedLabel(parent)
-			return seedStringToNumber(`${parentLabel}/${label}`)
+			return RNG.seedStringToNumber(`${parentLabel}/${label}`)
 		},
 		[getSeedLabel],
 	)
@@ -739,7 +737,7 @@ export function GenerationPlanetNavigator({
 		[focusSelection],
 	)
 	const applySeedInput = useCallback(() => {
-		const normalized = normalizeSeedLabel(seedInput)
+		const normalized = SEED_LABEL.normalizeSeedLabel(seedInput)
 		if (seedInput.trim() === "") {
 			setSeedInput(seedDisplay)
 			return
@@ -748,7 +746,8 @@ export function GenerationPlanetNavigator({
 			const numericSeed =
 				normalized === "sol"
 					? SYSTEM.SOL_SEED
-					: (resolveSeedLabel(normalized) ?? seedStringToNumber(normalized))
+					: (SEED_LABEL.resolveSeedLabel(normalized) ??
+						RNG.seedStringToNumber(normalized))
 			lastAppliedRootSeedRef.current = {
 				numeric: numericSeed,
 				label: normalized,
@@ -768,7 +767,7 @@ export function GenerationPlanetNavigator({
 	// apply/regenerate. Applying is exclusively the Generate button's job (or
 	// Enter), so a dice click never fires off a regeneration by itself.
 	const randomizeSeed = useCallback(() => {
-		setSeedInput(makeRandomSeedLabel())
+		setSeedInput(SEED_LABEL.makeRandomSeedLabel())
 	}, [])
 	const getMainWorldMoonOrbitDistance = useCallback(
 		(moon: MoonBody) =>

@@ -1,10 +1,13 @@
-﻿import type { GenesisHazards } from ".."
-import { clamp01, smoothstep } from "../shared"
-import type { ComputeHazardsParams, PropagateInfluenceParams } from "./types"
+﻿import type { GenesisHazards } from "@/model"
+import type {
+	ComputeHazardsParams,
+	PropagateInfluenceParams,
+} from "@/model/terrain/types"
+import { MATH } from "@/model/shared/math"
 
 function gradualFalloff(distance: number, reach: number, power = 1.35): number {
 	if (!Number.isFinite(distance)) return 0
-	return Math.pow(1 - clamp01(distance / reach), power)
+	return Math.pow(1 - MATH.clamp01(distance / reach), power)
 }
 
 function percentile(values: number[], q: number): number {
@@ -31,7 +34,7 @@ function normalizeField(
 	if (scale <= 1e-6) return normalized
 	const invScale = 1 / scale
 	for (let i = 0; i < values.length; i++) {
-		normalized[i] = clamp01(values[i] * invScale)
+		normalized[i] = MATH.clamp01(values[i] * invScale)
 	}
 	return normalized
 }
@@ -143,9 +146,9 @@ export function computeHazards({
 
 	for (let r = 0; r < N; r++) {
 		const type = boundary.r_boundaryType[r]
-		const subduct = clamp01(boundary.r_subductFactor[r])
+		const subduct = MATH.clamp01(boundary.r_subductFactor[r])
 		const stress = stressNorm[r]
-		const localStress = smoothstep(0.06, 0.5, stress)
+		const localStress = MATH.smoothstep({ edge0: 0.06, edge1: 0.5, x: stress })
 		const mountainProximity = gradualFalloff(
 			distFields.distMountain[r],
 			tectonicReach,
@@ -157,10 +160,19 @@ export function computeHazards({
 			1.05,
 		)
 		const volcanicProximity = Number.isFinite(distFields.distMountain[r])
-			? 1 - smoothstep(0, volcanicReach, distFields.distMountain[r])
+			? 1 -
+				MATH.smoothstep({
+					edge0: 0,
+					edge1: volcanicReach,
+					x: distFields.distMountain[r],
+				})
 			: 0
 		const hotspotScore = hotspotNorm[r]
-		const relief = smoothstep(0.6, 4.5, Math.max(0, elevationKm[r]))
+		const relief = MATH.smoothstep({
+			edge0: 0.6,
+			edge1: 4.5,
+			x: Math.max(0, elevationKm[r]),
+		})
 		const land = isLand[r] ? 1 : 0
 		const activeBoundary = type === 1 || type === 2 || type === 3
 		const activeMargin =
@@ -216,8 +228,8 @@ export function computeHazards({
 			volc = 0
 		}
 
-		earthquake[r] = clamp01(quake)
-		volcano[r] = clamp01(volc)
+		earthquake[r] = MATH.clamp01(quake)
+		volcano[r] = MATH.clamp01(volc)
 	}
 
 	const strongEarthquakeSeeds = thresholdField(earthquake, 0.8)
@@ -234,7 +246,7 @@ export function computeHazards({
 	})
 	for (let r = 0; r < N; r++) {
 		earthquake[r] = diffusedEarthquake[r]
-		danger[r] = clamp01(
+		danger[r] = MATH.clamp01(
 			Math.max(
 				earthquake[r] * 0.98,
 				volcano[r],

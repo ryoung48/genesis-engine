@@ -5,11 +5,12 @@
  * Faithful port of genesis's coarse-plates.js.
  */
 
-import type { PlateVec, SphereMesh } from ".."
-import { buildSphereMesh } from "../mesh"
-import { makeRng, SimplexNoise } from "../shared"
-import { assignOceanLand, generatePlates } from "./plates"
-import type { ProjectCoarsePlatesParams } from "./types"
+import type { PlateVec, SphereMesh } from "@/model"
+import { buildSphereMesh } from "@/model/mesh"
+import { assignOceanLand, generatePlates } from "@/model/tectonics/plates"
+import type { ProjectCoarsePlatesParams } from "@/model/tectonics/types"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { RNG } from "@/model/shared/rng"
 
 const N_COARSE = 20000
 const COARSE_JITTER = 0.75
@@ -40,7 +41,7 @@ export function generateCoarsePlates(
 	options: CoarsePlateOptions = {},
 ): CoarsePlateResult {
 	// Coarse mesh uses isolated RNG — matches source coarse-plates.js
-	const coarseRng = makeRng(seed + 137)
+	const coarseRng = RNG.makeRng(seed + 137)
 	const coarsePoints = options.coarsePoints ?? N_COARSE
 	const coarseMesh = buildSphereMesh(coarsePoints, COARSE_JITTER, {
 		random: () => coarseRng(),

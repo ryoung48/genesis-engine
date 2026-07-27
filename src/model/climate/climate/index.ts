@@ -14,7 +14,8 @@ import { INSOLATION } from "@/model/climate/ebm/insolation"
 import { ELEVATION } from "@/model/climate/elevation"
 import { HEAT } from "@/model/climate/locked/heat"
 import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
-import { getEffectiveObliquityDeg, HOURS_PER_DAY, TIME } from "@/model/shared"
+import { TIME } from "@/model/shared/time"
+import { UNITS } from "@/model/shared/units"
 
 function getStellarCls(params: GenesisParams): MainSequenceClass {
 	return STAR.isValidSpectralClass(params.spectralClass)
@@ -113,7 +114,7 @@ function computeMonthlyDaylightHours({
 		lats,
 		orbital: {
 			...CONSTANTS.embConstants.orbital,
-			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
+			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
 			ECCENTRICITY: params.eccentricity,
 			PERIHELION: params.perihelion,
 		},
@@ -124,7 +125,7 @@ function computeMonthlyDaylightHours({
 		monthlyRanges[month] = _daylight_hours.map((row) => {
 			let sum = 0
 			for (const day of days) sum += row[day]
-			return (sum / Math.max(1, days.length)) * (hoursPerDay / HOURS_PER_DAY)
+			return (sum / Math.max(1, days.length)) * (hoursPerDay / TIME.hoursPerDay)
 		})
 	}
 
@@ -187,7 +188,7 @@ function computeTemperature({
 	const d_m = params.orbitalDistanceAU * CONSTANTS.embConstants.stellar.AU
 	const ebm = new EnergyBalanceModel({
 		orbital: {
-			OBLIQUITY: getEffectiveObliquityDeg(params.obliquity),
+			OBLIQUITY: UNITS.getEffectiveObliquityDeg(params.obliquity),
 			ECCENTRICITY: params.eccentricity,
 			PERIHELION: params.perihelion,
 		},

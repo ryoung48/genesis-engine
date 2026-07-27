@@ -1,4 +1,3 @@
-import { createStringRng } from "@/model/shared"
 import type {
 	GenerateGlyphSetParams,
 	LayoutGlyphTextParams,
@@ -9,6 +8,7 @@ import {
 	type RuneMotif,
 	type RuneTemplate,
 } from "@/model/society/script/runegen/rune"
+import { RNG } from "@/model/shared/rng"
 
 export type GlyphSet = Record<string, Rune>
 
@@ -43,7 +43,7 @@ function generateGlyphSet({
 }: GenerateGlyphSetParams): GlyphSet {
 	const glyphs: GlyphSet = {}
 	const chars = alphabet.split("")
-	const dice = createStringRng(seed ?? Date.now().toString(36))
+	const dice = RNG.createStringRng({ seed: seed ?? Date.now().toString(36) })
 	const useHouseStyle =
 		!options.forceTemplate &&
 		(!options.seedTemplate || options.seedTemplate === "any")
@@ -102,7 +102,7 @@ function generateGlyphSet({
 
 		for (let attempt = 0; attempt < MAX_GLYPH_TRIES; attempt++) {
 			const runeSeed = Math.floor(dice.random() * 1e9).toString(36)
-			const runeRng = createStringRng(runeSeed)
+			const runeRng = RNG.createStringRng({ seed: runeSeed })
 			let styleTemplate: RuneTemplate | undefined
 			if (useHouseStyle) {
 				styleTemplate =

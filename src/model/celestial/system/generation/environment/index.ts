@@ -1,4 +1,3 @@
-import type { createRng } from "@/model/shared/rng"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
@@ -6,6 +5,7 @@ import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import type { SystemBody } from "@/model/celestial/system/types"
+import { RNG } from "@/model/shared/rng"
 
 const epistellarDeviations = [2.25, 1.75, 1.25]
 const innerDeviations = [0.75, 0, -0.75]
@@ -14,7 +14,7 @@ const outerDeviations = [
 ]
 
 function buildBodyEnvironment(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	/** Omitted when size alone should determine the group. */
 	groupHint?: OrbitGroup
 	zone: Zone
@@ -91,7 +91,7 @@ function buildBodyEnvironment(params: {
 // carried over -- galaxy-gen doesn't touch density on reclassify either,
 // since it's independent of classification other than its description label.
 function buildForcedClassificationEnvironment(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	classification: "jani-lithic" | "vesperian"
 	sizeClass: number
 	zone: Zone
@@ -147,7 +147,7 @@ function buildForcedClassificationEnvironment(params: {
 }
 
 function buildMoonEnvironment(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	diameterKm: number
 	massKg: number
 	orbitalDistanceAU: number
@@ -238,7 +238,7 @@ function enforceMoonTidalSafety({
 	parentDiameterKm,
 	moon,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	parentMassKg: number
 	parentDiameterKm: number
 	moon: MoonBody

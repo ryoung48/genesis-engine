@@ -2,8 +2,8 @@ import { HEAT } from "@/model/climate/locked/heat"
 import type { ComputeLockedWindVectorsParams } from "@/model/climate/locked/wind/types"
 import { RAIN } from "@/model/climate/rain"
 import type { WindSurface } from "@/model/climate/wind/types"
-import { clamp } from "@/model/shared/math"
-import { DEFAULT_SUBSTELLAR_LON } from "@/model/shared/units"
+import { MATH } from "@/model/shared/math"
+import { UNITS } from "@/model/shared/units"
 
 function surfaceWindFactor({
 	r,
@@ -91,7 +91,7 @@ function computeLockedWindVectors({
 	const { adjOffset, adjList, r_xyz } = mesh
 	const { edgeEastward, edgeNorthward } = RAIN.getClimateGeometry(mesh)
 
-	const substellarLon = params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON
+	const substellarLon = params?.substellarLon ?? UNITS.defaultSubstellarLon
 	const obliquity = params?.obliquity ?? 0
 	const eccentricity = params?.eccentricity ?? 0
 	const perihelion = params?.perihelion ?? 102
@@ -137,7 +137,11 @@ function computeLockedWindVectors({
 		const x = r_xyz[3 * r]
 		const y = r_xyz[3 * r + 1]
 		const z = r_xyz[3 * r + 2]
-		cellCt[r] = clamp(x * sub[0] + y * sub[1] + z * sub[2], -1, 1)
+		cellCt[r] = MATH.clamp({
+			value: x * sub[0] + y * sub[1] + z * sub[2],
+			lo: -1,
+			hi: 1,
+		})
 	}
 
 	// Reference temperature binned by stellar angle (cos θ mapped to [0, BINS)).

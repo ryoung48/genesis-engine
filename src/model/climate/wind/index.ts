@@ -9,12 +9,6 @@ import type {
 	WindSurface,
 } from "@/model/climate/wind/types"
 import {
-	clamp,
-	HOURS_PER_DAY,
-	isRetrogradeObliquity,
-	smoothstep,
-} from "@/model/shared"
-import {
 	TOPO_FLAT,
 	TOPO_HILL,
 	TOPO_LAKE,
@@ -23,6 +17,9 @@ import {
 	TOPO_OCEAN,
 	TOPO_PLATEAU,
 } from "@/model/terrain"
+import { MATH } from "@/model/shared/math"
+import { TIME } from "@/model/shared/time"
+import { UNITS } from "@/model/shared/units"
 
 function vegetationDragFactor(biomeCode: number | undefined): number {
 	switch (biomeCode) {
@@ -253,7 +250,7 @@ function bgPressureForRotation({
 	const d1 = (cellIndex + 1) * hw
 	const p0 = CELL_BOUNDARY_PRESSURES[cellIndex]
 	const p1 = CELL_BOUNDARY_PRESSURES[cellIndex + 1]
-	return p0 + (p1 - p0) * smoothstep(d0, d1, d)
+	return p0 + (p1 - p0) * MATH.smoothstep({ edge0: d0, edge1: d1, x: d })
 }
 
 function computePressureField({
@@ -372,11 +369,17 @@ function computeWindVectors({
 	// faster rotation (short day) → narrower ageostrophic belt near equator.
 	// Clamped so very slow rotators stay ageostrophic almost everywhere.
 	const hoursPerDay = params?.hoursPerDay ?? 24
-	const geoTransitionLat = clamp((15 * hoursPerDay) / HOURS_PER_DAY, 2, 75)
+	const geoTransitionLat = MATH.clamp({
+		value: (15 * hoursPerDay) / TIME.hoursPerDay,
+		lo: 2,
+		hi: 75,
+	})
 
 	// Retrograde planets rotate opposite direction → Coriolis deflects the
 	// other way, so trades blow eastward and westerlies blow westward.
-	const coriolisSign = isRetrogradeObliquity(params?.obliquity ?? 0) ? -1 : 1
+	const coriolisSign = UNITS.isRetrogradeObliquity(params?.obliquity ?? 0)
+		? -1
+		: 1
 
 	const temps =
 		month !== undefined && month >= 0 && month < 12
@@ -425,7 +428,11 @@ function computeWindVectors({
 		const windFricNorth = -gradPNorth
 
 		// Blend: geostrophic dominates above geoTransitionLat, friction always 30%
-		const geoWeight = smoothstep(0, geoTransitionLat, absLat)
+		const geoWeight = MATH.smoothstep({
+			edge0: 0,
+			edge1: geoTransitionLat,
+			x: absLat,
+		})
 		const u = geoWeight * windGeoEast + 0.3 * windFricEast
 		const v = geoWeight * windGeoNorth + 0.3 * windFricNorth
 
@@ -449,7 +456,8 @@ function computeWindVectors({
 	const pct90 = sorted[Math.floor(0.9 * N)] ?? 1e-6
 	const ref = Math.max(pct90, 1e-6)
 	const rotationFactor = Math.min(
-		Math.log(clamp(hoursPerDay, 6, 192)) / Math.log(HOURS_PER_DAY),
+		Math.log(MATH.clamp({ value: hoursPerDay, lo: 6, hi: 192 })) /
+			Math.log(TIME.hoursPerDay),
 		1.8,
 	)
 	const pressureFactor =

@@ -4,17 +4,14 @@
  * O(N) time, all typed arrays, no object allocation in hot path.
  */
 
-import type { GenesisProvinces, GenesisRainfall, SphereMesh } from ".."
-import {
-	createRng,
-	DEFAULT_PLANET_RADIUS_KM,
-	meanEdgeLengthKm,
-} from "../shared"
+import type { GenesisProvinces, GenesisRainfall, SphereMesh } from "@/model"
 import type {
 	ComputeProvincesFromRasterParams,
 	ComputeProvincesParams,
 	ComputeWeightedProvincesParams,
-} from "./types"
+} from "@/model/terrain/types"
+import { RNG } from "@/model/shared/rng"
+import { UNITS } from "@/model/shared/units"
 
 /**
  * Target mean province area. 37,000 km² is the mean real-world area of an EU4
@@ -41,15 +38,18 @@ export function computeProvinces({
 }: ComputeProvincesParams): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList } = mesh
-	const rng = createRng(seed + 31337)
+	const rng = RNG.createRng({ seed: seed + 31337 })
 
 	// Count land regions
 	let landCount = 0
 	for (let r = 0; r < N; r++) if (isLand[r]) landCount++
 	if (landCount === 0) return emptyProvinces(N)
 
-	const planetRadiusKm = options?.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
-	const avgEdgeKm = meanEdgeLengthKm(mesh, options?.planetRadiusKm)
+	const planetRadiusKm = options?.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({
+		mesh,
+		planetRadiusKm: options?.planetRadiusKm,
+	})
 	const regionAreaKm2 = avgEdgeKm * avgEdgeKm * Math.sqrt(3) * 0.5
 	// Greedy seed placement below rejects candidates that fall inside an
 	// existing seed's claim radius, so it lands fewer seeds than asked for and
@@ -209,7 +209,7 @@ function assemblePartition(
 	regionProvince: Int32Array,
 	seedsArr: Int32Array,
 	provinceCount: number,
-	rng: ReturnType<typeof createRng>,
+	rng: ReturnType<typeof RNG.createRng>,
 	options?: {
 		climateZones?: Uint8Array
 		rainfall?: GenesisRainfall
@@ -294,8 +294,9 @@ function assemblePartition(
 	// see computeProvincesFromRaster) claims only a coastal buffer of ocean
 	// instead of flooding the entire remaining basin before meeting anyone.
 	{
-		const planetRadiusKm = options?.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
-		const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
+		const planetRadiusKm =
+			options?.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
+		const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
 		const maxSeaHops = Math.max(
 			1,
 			Math.round(SEA_CROSSING_RANGE_KM / avgEdgeKm),
@@ -448,9 +449,9 @@ export function computeWeightedProvinces({
 }: ComputeWeightedProvincesParams): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
-	const rng = createRng(seed + 31337)
+	const rng = RNG.createRng({ seed: seed + 31337 })
 	const provinceCount = seedRegions.length
-	const planetRadiusKm = options?.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
+	const planetRadiusKm = options?.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
 
 	if (provinceCount === 0 || !seedRegions.some((r) => isLand[r]))
 		return emptyProvinces(N)
@@ -597,7 +598,7 @@ export function computeProvincesFromRaster({
 }: ComputeProvincesFromRasterParams): GenesisProvinces {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, r_xyz } = mesh
-	const rng = createRng(seed + 44771)
+	const rng = RNG.createRng({ seed: seed + 44771 })
 
 	const idToIndex = new Map<number, number>()
 	const regionProvince = new Int32Array(N).fill(-1)

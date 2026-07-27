@@ -7,7 +7,8 @@ import type {
 	PathfindResult,
 	SearchWorkspace,
 } from "@/model/pathfinding/types"
-import { MinHeap, regionDistanceKm } from "@/model/shared"
+import { MinHeap } from "@/model/shared/min-heap"
+import { UNITS } from "@/model/shared/units"
 
 const LAND_SPEED_KM_PER_DAY = 30
 
@@ -84,7 +85,12 @@ function computeEdgeCost({
 	allowLand,
 	allowSea,
 }: ComputeEdgeCostParams): { cost: number; isLand: boolean } {
-	const distKm = regionDistanceKm(graph.r_xyz, from, to, graph.planetRadiusKm)
+	const distKm = UNITS.regionDistanceKm({
+		r_xyz: graph.r_xyz,
+		fromRegion: from,
+		toRegion: to,
+		planetRadiusKm: graph.planetRadiusKm,
+	})
 	const fromLand = !graph.regionIsLand || !!graph.regionIsLand[from]
 	const toLand = !graph.regionIsLand || !!graph.regionIsLand[to]
 	const isLandEdge = fromLand && toLand
@@ -329,7 +335,12 @@ function pathfind({ graph, request }: PathfindParams): PathfindResult {
 	for (let i = 1; i < path.length; i++) {
 		const from = path[i - 1]
 		const to = path[i]
-		const dist = regionDistanceKm(graph.r_xyz, from, to, graph.planetRadiusKm)
+		const dist = UNITS.regionDistanceKm({
+			r_xyz: graph.r_xyz,
+			fromRegion: from,
+			toRegion: to,
+			planetRadiusKm: graph.planetRadiusKm,
+		})
 		totalKm += dist
 		const { cost, isLand } = computeEdgeCost({
 			graph,

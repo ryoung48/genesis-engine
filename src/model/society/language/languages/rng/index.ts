@@ -1,8 +1,8 @@
-import { createStringRng, type SharedRng } from "@/model/shared"
 import type {
 	LanguageRng,
 	WeightedValue,
 } from "@/model/society/language/languages/types"
+import { SharedRng, RNG as SHARED_RNG } from "@/model/shared/rng"
 
 function wrapSharedRng(rng: SharedRng): LanguageRng {
 	return {
@@ -26,7 +26,10 @@ function wrapSharedRng(rng: SharedRng): LanguageRng {
 
 function createLanguageRng(seed: string): LanguageRng {
 	return wrapSharedRng(
-		createStringRng(seed, { nonPositiveWeightBehavior: "first" }),
+		SHARED_RNG.createStringRng({
+			seed,
+			options: { nonPositiveWeightBehavior: "first" },
+		}),
 	)
 }
 

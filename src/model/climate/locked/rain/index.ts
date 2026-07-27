@@ -1,9 +1,9 @@
 import { HEAT } from "@/model/climate/locked/heat"
 import type { ComputeTidalRainParams } from "@/model/climate/locked/rain/types"
 import { RAIN_SHARED } from "@/model/climate/rain-shared"
-import { clamp } from "@/model/shared/math"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
-import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "@/model/shared/units"
+import { MATH } from "@/model/shared/math"
+import { UNITS } from "@/model/shared/units"
 
 const RAD2DEG = 180 / Math.PI
 
@@ -15,9 +15,9 @@ function computeTidalRain({
 	distCoast,
 }: ComputeTidalRainParams): { monthly: Float32Array; annual: Float32Array } {
 	const N = mesh.numRegions
-	const pressure = clamp(params?.pressure ?? 1, 0.1, 10)
+	const pressure = MATH.clamp({ value: params?.pressure ?? 1, lo: 0.1, hi: 10 })
 	const pressureRainFactor = RAIN_SHARED.getPressureRainFactor(params?.pressure)
-	void meanEdgeLengthKm(mesh, params?.planetRadiusKm)
+	void UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm: params?.planetRadiusKm })
 	const { landRegions, landNeighborOffset, landNeighborList } =
 		RAIN_SHARED.buildRegionGraph({ mesh, mask: isLand })
 
@@ -33,8 +33,16 @@ function computeTidalRain({
 	})
 
 	const logP = Math.log2(Math.max(0.1, pressure))
-	const terminatorStrength = clamp(0.1 + logP * 0.12, 0.02, 0.55)
-	const nightsideDrizzle = clamp((logP - 0.5) * 0.05, 0, 0.15)
+	const terminatorStrength = MATH.clamp({
+		value: 0.1 + logP * 0.12,
+		lo: 0.02,
+		hi: 0.55,
+	})
+	const nightsideDrizzle = MATH.clamp({
+		value: (logP - 0.5) * 0.05,
+		lo: 0,
+		hi: 0.15,
+	})
 
 	const seed = params?.seed ?? 0
 	const sn1 = new SimplexNoise(seed + 4001)
@@ -60,7 +68,9 @@ function computeTidalRain({
 		const ceiling = RAIN_SHARED.ceilingScale(temp)
 		// distCoast is already real km (computeCoastDistances), not a hop
 		// count, so no further *avgEdgeKm conversion is needed here.
-		const moistureAvail = distCoast ? clamp(1 - distCoast[r] / 2835, 0, 1) : 1
+		const moistureAvail = distCoast
+			? MATH.clamp({ value: 1 - distCoast[r] / 2835, lo: 0, hi: 1 })
+			: 1
 
 		const n =
 			sn1.noise3D(x * FREQ1, y * FREQ1, z * FREQ1) * AMP1 +
@@ -69,20 +79,24 @@ function computeTidalRain({
 
 		for (let month = 0; month < 12; month++) {
 			const sub = HEAT.getSubstellarDirWithOffsetAndDeclination({
-				substellarLon: params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
+				substellarLon: params?.substellarLon ?? UNITS.defaultSubstellarLon,
 				lonOffsetRad: monthlyLibration[month],
 				declinationRad: monthlyDeclination[month],
 			})
 			const ct = Math.max(-1, Math.min(1, x * sub[0] + y * sub[1] + z * sub[2]))
 			const thetaDeg =
-				Math.acos(clamp(ct, -1, 1)) * RAD2DEG + boundaryWarpDeg[r]
+				Math.acos(MATH.clamp({ value: ct, lo: -1, hi: 1 })) * RAD2DEG +
+				boundaryWarpDeg[r]
 
 			const convection = ct > 0 ? 2 * ct ** 8 : 0
 			const termDist = Math.abs(thetaDeg - 85)
 			const terminator =
 				Math.exp((-termDist * termDist) / (2 * 18 * 18)) * terminatorStrength
 			const nightside =
-				ct < 0.1 ? nightsideDrizzle * clamp(1 - (thetaDeg - 95) / 70, 0, 1) : 0
+				ct < 0.1
+					? nightsideDrizzle *
+						MATH.clamp({ value: 1 - (thetaDeg - 95) / 70, lo: 0, hi: 1 })
+					: 0
 
 			const weight = convection + terminator + nightside
 			monthly[month * N + r] =

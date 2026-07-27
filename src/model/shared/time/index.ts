@@ -1,22 +1,35 @@
+import type { IntegerRangeParams } from "@/model/shared/time/types"
+
 const daysPerYear = 365
+
 const daysPerMonth = 30
+
 const daysPerWeek = 7
-// Unit conversions, unlike DEFAULT_HOURS_PER_DAY and EBM's HOURS_PER_DAY,
-// which are editable per-planet simulation defaults.
-export const HOURS_PER_DAY = 24
+
+const hoursPerDay = 24
+
 const SECONDS_PER_HOUR = 3600
-export const SECONDS_PER_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR
-// Orbital mechanics uses a Julian year; calendar/simulation defaults may use
-// a distinct 365-day value.
-export const ASTRONOMICAL_DAYS_PER_YEAR = 365.25
+
+const secondsPerDay = hoursPerDay * SECONDS_PER_HOUR
+
+const astronomicalDaysPerYear = 365.25
+
 const minutesPerHour = 60
+
 const secondMS = 1000
+
 const minuteMS = secondMS * 60
+
 const hourMS = minuteMS * 60
-const dayMS = hourMS * HOURS_PER_DAY
+
+const dayMS = hourMS * hoursPerDay
+
 const weekMS = dayMS * daysPerWeek
+
 const monthMS = dayMS * daysPerMonth
+
 const yearMS = dayMS * daysPerYear
+
 const monthsPerYear = Math.round(daysPerYear / daysPerMonth)
 
 const createEpoch = (): Date => {
@@ -27,9 +40,10 @@ const createEpoch = (): Date => {
 }
 
 const EPOCH = createEpoch()
+
 const EPOCH_YEAR = EPOCH.getFullYear()
 
-function integerRange(start: number, end: number): number[] {
+function integerRange({ start, end }: IntegerRangeParams): number[] {
 	const length = Math.max(0, end - start)
 	return Array.from({ length }, (_, index) => start + index)
 }
@@ -39,7 +53,7 @@ export const TIME = {
 		daysPerMonth,
 		daysPerWeek,
 		daysPerYear,
-		hoursPerDay: HOURS_PER_DAY,
+		hoursPerDay: hoursPerDay,
 		minutesPerHour,
 		secondMS,
 		minuteMS,
@@ -113,7 +127,7 @@ export const TIME = {
 		days: (month: number) => {
 			const startDay = Math.floor((month * TIME.constants.daysPerYear) / 12)
 			const endDay = Math.floor(((month + 1) * TIME.constants.daysPerYear) / 12)
-			return integerRange(startDay, endDay)
+			return integerRange({ start: startDay, end: endDay })
 		},
 	},
 	season: (month: number) => {
@@ -126,4 +140,7 @@ export const TIME = {
 		if (spring.includes(month)) return "spring"
 		if (fall.includes(month)) return "autumn"
 	},
+	hoursPerDay,
+	secondsPerDay,
+	astronomicalDaysPerYear,
 }

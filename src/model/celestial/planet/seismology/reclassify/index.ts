@@ -1,7 +1,10 @@
-import { createRng } from "@/model/shared/rng"
-import type { OrbitClassification, OrbitGroup } from "../../../orbit-body/types"
-import { TEMPERATURE } from "../../environment/temperature"
-import type { HeatedClassInput } from "./types"
+import type {
+	OrbitClassification,
+	OrbitGroup,
+} from "@/model/celestial/orbit-body/types"
+import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
+import type { HeatedClassInput } from "@/model/celestial/planet/seismology/reclassify/types"
+import { RNG } from "@/model/shared/rng"
 
 function describeRegime(
 	totalHeating: number,
@@ -18,7 +21,9 @@ function pickHeatedClass({
 }: HeatedClassInput): OrbitClassification {
 	if (current !== "rockball" && current !== "geo-cyclic") return current
 	if (sizeClass >= 4)
-		return createRng(seed).uniform(0, 1) < 1 / 3 ? "geo-tidal" : "hebean"
+		return RNG.createRng({ seed }).uniform(0, 1) < 1 / 3
+			? "geo-tidal"
+			: "hebean"
 	return "hebean"
 }
 

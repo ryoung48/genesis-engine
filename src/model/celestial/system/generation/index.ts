@@ -1,8 +1,8 @@
-import { ASTRONOMICAL_DAYS_PER_YEAR } from "@/model/shared"
-import { BODY_GENERATION } from "./body"
-import type { GenerateSystemBodiesParams } from "./types"
+import { BODY_GENERATION } from "@/model/celestial/system/generation/body"
+import type { GenerateSystemBodiesParams } from "@/model/celestial/system/generation/types"
+import { TIME } from "@/model/shared/time"
 
-export const DAYS_PER_YEAR = ASTRONOMICAL_DAYS_PER_YEAR
+export const DAYS_PER_YEAR = TIME.astronomicalDaysPerYear
 
 function generateSystemBodies(params: GenerateSystemBodiesParams) {
 	return BODY_GENERATION.generateSystemBodies(params)

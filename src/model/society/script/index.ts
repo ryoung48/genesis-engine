@@ -1,4 +1,3 @@
-import { createStringRng } from "@/model/shared"
 import {
 	GLYPH_MODULE,
 	type GlyphSet,
@@ -7,6 +6,7 @@ import {
 	RuneRenderer,
 	type RuneRenderOptions,
 } from "@/model/society/script/runegen/rune-renderer"
+import { RNG } from "@/model/shared/rng"
 
 export interface HeritageScript {
 	glyphs: GlyphSet
@@ -18,7 +18,7 @@ const DOT_STYLES: RuneRenderOptions["dotStyle"][] = ["fill", "outline", "small"]
 
 export const SCRIPT = {
 	spawn(seed: string): HeritageScript {
-		const dice = createStringRng(seed)
+		const dice = RNG.createStringRng({ seed })
 		const glyphSeed = `${seed}:glyphs:${Math.floor(dice.random() * 1e9).toString(36)}`
 		const dotStyle = dice.choice(DOT_STYLES)
 		return {

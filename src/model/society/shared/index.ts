@@ -1,11 +1,12 @@
 import type { GenesisPartition } from "@/model"
-import { buildIdentitySeeds, createRng } from "@/model/shared"
 import type {
 	GeneratePartitionColorsParams,
 	HslToRgbParams,
 	RgbToHslParams,
 } from "@/model/society/shared/types"
 import type { GraphPartitionParams } from "@/model/society/types"
+import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
+import { RNG } from "@/model/shared/rng"
 
 function computeGraphPartition({
 	nodeCount,
@@ -19,7 +20,7 @@ function computeGraphPartition({
 	for (let i = 0; i < nodeCount; i++) if (active[i]) activeCount++
 	if (activeCount === 0) return emptyPartition(nodeCount)
 
-	const rng = createRng(seed)
+	const rng = RNG.createRng({ seed })
 	const desiredCount = Math.max(1, Math.min(activeCount, targetCount))
 	const nodesPerPartition = Math.max(1, activeCount / desiredCount)
 	// Maximum spacing where the hex exclusion ball (1 + 3s(s+1) nodes) still
@@ -129,8 +130,8 @@ function computeGraphPartition({
 	return {
 		assignment,
 		seeds: new Int32Array(seeds),
-		languageSeeds: buildIdentitySeeds(count, seed),
-		nameSeeds: buildIdentitySeeds(count, seed + 3109),
+		languageSeeds: IDENTITY_SEEDS.buildIdentitySeeds({ count, seed }),
+		nameSeeds: IDENTITY_SEEDS.buildIdentitySeeds({ count, seed: seed + 3109 }),
 		count,
 		adjOffset: groupAdjOffset,
 		adjList: groupAdjList,
@@ -157,7 +158,7 @@ function deriveChildColors(params: {
 	}
 
 	for (const [parent, siblings] of groups) {
-		const rng = createRng(seed + parent * 8191)
+		const rng = RNG.createRng({ seed: seed + parent * 8191 })
 		const [baseH, baseS, baseL] = rgbToHsl({
 			r: parentColors[3 * parent],
 			g: parentColors[3 * parent + 1],

@@ -1,6 +1,9 @@
 import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
-import { roll2d5, roll2d6 } from "@/model/shared/dice"
-import type { AtmosphereCodeInput, RollAtmosphereInput } from "./types"
+import type {
+	AtmosphereCodeInput,
+	RollAtmosphereInput,
+} from "@/model/celestial/planet/environment/atmosphere/types"
+import { DICE } from "@/model/shared/dice"
 
 function rollAtmosphereBar({
 	rng,
@@ -102,7 +105,7 @@ function atmosphereCodeToProfile({
 			breathable: true,
 		}
 	} else if (code === 10) {
-		let roll = roll2d5(rng)
+		let roll = DICE.roll2d5(rng)
 		if (params.sizeClass <= 4) roll -= 2
 		if (params.deviation >= 1.5) roll -= 2
 		if (params.deviation <= -1.5) roll += 2
@@ -168,7 +171,7 @@ function atmosphereCodeToProfile({
 			}
 		}
 	} else if (code === 11 || code === 12) {
-		let roll = roll2d6(rng)
+		let roll = DICE.roll2d6(rng)
 		if (params.sizeClass <= 4) roll -= 3
 		if (params.sizeClass >= 8) roll += 2
 		if (params.deviation >= 1.5) roll += 4

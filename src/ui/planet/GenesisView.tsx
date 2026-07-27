@@ -43,16 +43,6 @@ import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 import type { HistoryNote } from "@/model/history"
 import { YEAR_MS } from "@/model/history"
 import { historyMsToEu4Days } from "@/model/history/eu4-days"
-import {
-	formatSeedLabel,
-	getEffectiveObliquityDeg,
-	isRetrogradeObliquity,
-	makeRandomSeedLabel,
-	resolveSeedLabel,
-	SEED_MAX,
-	seedStringToNumber,
-	titleCase,
-} from "@/model/shared"
 import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
 import type { SocietyEra } from "@/model/society/types"
@@ -255,6 +245,11 @@ import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organiz
 import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { DATA } from "@/model/celestial/system/sol-system/data"
+import { RNG } from "@/model/shared/rng"
+import { SEED_LABEL } from "@/model/shared/seed-label"
+import { SEEDS } from "@/model/shared/seeds"
+import { TEXT } from "@/model/shared/text"
+import { UNITS } from "@/model/shared/units"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction
@@ -303,7 +298,7 @@ function buildDistribution(
 
 	return labels
 		.map((label, index) => ({
-			label: titleCase(label),
+			label: TEXT.titleCase(label),
 			count: counts[index] ?? 0,
 			color: colorFn(index),
 		}))
@@ -1206,7 +1201,7 @@ function rgb255ToCss(rgb: [number, number, number]): string {
 
 export const GenesisView: React.FC = () => {
 	const makeRandomSeed = useCallback(
-		() => Math.floor(Math.random() * SEED_MAX),
+		() => Math.floor(Math.random() * SEEDS.seedMax),
 		[],
 	)
 	// Refs
@@ -1683,11 +1678,13 @@ export const GenesisView: React.FC = () => {
 	const initialStoredSeed = (() => {
 		if (typeof window === "undefined") return null
 		const stored = window.localStorage.getItem(PLANET_SEED_STORAGE_KEY)
-		return stored ? resolveSeedLabel(stored) : null
+		return stored ? SEED_LABEL.resolveSeedLabel(stored) : null
 	})()
 	const initialSeed = initialStoredSeed ?? makeRandomSeed()
 	const [seed, setSeed] = useState(() => initialSeed)
-	const [seedInput, setSeedInput] = useState(() => formatSeedLabel(initialSeed))
+	const [seedInput, setSeedInput] = useState(() =>
+		SEED_LABEL.formatSeedLabel(initialSeed),
+	)
 	const [seedInputDirty, setSeedInputDirty] = useState(false)
 	const [seedError, setSeedError] = useState(false)
 	const [exportWidthPreset, setExportWidthPreset] =
@@ -1713,7 +1710,7 @@ export const GenesisView: React.FC = () => {
 	const restSeed =
 		solarSystem.star.seed === "sol"
 			? SYSTEM.SOL_SEED
-			: seedStringToNumber(solarSystem.star.seed)
+			: RNG.seedStringToNumber(solarSystem.star.seed)
 	// Sol always shows its real, curated body names; a procedurally generated
 	// system's own language-generated names aren't spoilers either, so a body
 	// name is always shown once it exists.
@@ -2148,7 +2145,10 @@ export const GenesisView: React.FC = () => {
 	}, [world])
 	useEffect(() => {
 		if (typeof window === "undefined") return
-		window.localStorage.setItem(PLANET_SEED_STORAGE_KEY, formatSeedLabel(seed))
+		window.localStorage.setItem(
+			PLANET_SEED_STORAGE_KEY,
+			SEED_LABEL.formatSeedLabel(seed),
+		)
 	}, [seed])
 	useEffect(() => {
 		if (typeof window === "undefined") return
@@ -3570,7 +3570,7 @@ export const GenesisView: React.FC = () => {
 			isLand: world.isLand,
 			latDeg,
 			lonDeg,
-			reverseCirculation: isRetrogradeObliquity(world.params.obliquity),
+			reverseCirculation: UNITS.isRetrogradeObliquity(world.params.obliquity),
 			planetRadiusKm: world.params.planetRadiusKm,
 		})
 	}, [world, showOceanCurrents, currentMonth])
@@ -4484,7 +4484,7 @@ export const GenesisView: React.FC = () => {
 	)
 	useEffect(() => {
 		if (!seedInputDirty) {
-			setSeedInput(formatSeedLabel(seed))
+			setSeedInput(SEED_LABEL.formatSeedLabel(seed))
 			setSeedError(false)
 		}
 	}, [seed, seedInputDirty])
@@ -4499,7 +4499,7 @@ export const GenesisView: React.FC = () => {
 	)
 
 	const resolveSeedInput = useCallback(() => {
-		return resolveSeedLabel(seedInput)
+		return SEED_LABEL.resolveSeedLabel(seedInput)
 	}, [seedInput])
 	const handleReturnToPlanetView = useCallback(() => {
 		setSolarSystemViewActive(false)
@@ -4571,10 +4571,10 @@ export const GenesisView: React.FC = () => {
 		if (!trimmed) {
 			setSeedInputDirty(false)
 			setSeedError(false)
-			setSeedInput(formatSeedLabel(seed))
+			setSeedInput(SEED_LABEL.formatSeedLabel(seed))
 			return
 		}
-		const parsed = resolveSeedLabel(trimmed)
+		const parsed = SEED_LABEL.resolveSeedLabel(trimmed)
 		if (parsed === null) {
 			setSeedError(true)
 			return
@@ -4582,7 +4582,7 @@ export const GenesisView: React.FC = () => {
 		setSeedError(false)
 		setSeedInputDirty(false)
 		setSeed(parsed)
-		setSeedInput(formatSeedLabel(parsed))
+		setSeedInput(SEED_LABEL.formatSeedLabel(parsed))
 	}, [seed, seedInput])
 
 	const handleSeedInputChange = useCallback((nextSeed: string) => {
@@ -4850,8 +4850,8 @@ export const GenesisView: React.FC = () => {
 		[setters],
 	)
 	const handleRandomizeCode = useCallback(() => {
-		const nextLabel = makeRandomSeedLabel()
-		const nextSeed = resolveSeedLabel(nextLabel)
+		const nextLabel = SEED_LABEL.makeRandomSeedLabel()
+		const nextSeed = SEED_LABEL.resolveSeedLabel(nextLabel)
 		if (nextSeed === null) return
 		setSeed(nextSeed)
 		setSeedInput(nextLabel)
@@ -4913,7 +4913,7 @@ export const GenesisView: React.FC = () => {
 	const setAxialTiltDirection = useCallback(
 		(value: number) => {
 			const retrograde = value === 1
-			const baseTilt = getEffectiveObliquityDeg(obliquity)
+			const baseTilt = UNITS.getEffectiveObliquityDeg(obliquity)
 			setObliquity(retrograde ? 180 - baseTilt : baseTilt)
 		},
 		[obliquity, setObliquity],

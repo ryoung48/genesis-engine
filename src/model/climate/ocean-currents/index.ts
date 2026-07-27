@@ -11,7 +11,7 @@ import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
 import { RAIN } from "@/model/climate/rain"
 import { WIND } from "@/model/climate/wind"
 import type { FlowGrid } from "@/model/climate/wind/types"
-import { isRetrogradeObliquity, meanEdgeLengthKm } from "@/model/shared"
+import { UNITS } from "@/model/shared/units"
 
 const DEG2RAD = Math.PI / 180
 
@@ -486,9 +486,12 @@ function computeOceanCurrents({
 		})
 	}
 	const N = mesh.numRegions
-	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({
+		mesh,
+		planetRadiusKm: params?.planetRadiusKm,
+	})
 	const { latDeg, lonDeg, regionBin } = RAIN.getClimateGeometry(mesh)
-	const reverseCirculation = isRetrogradeObliquity(params?.obliquity ?? 0)
+	const reverseCirculation = UNITS.isRetrogradeObliquity(params?.obliquity ?? 0)
 	const hoursPerDay = params?.hoursPerDay ?? 24
 	// Coriolis scales with rotation rate; below ~96h days the gyre-based east/west
 	// coast seeding fades out and belt seeds (warm tropics, cold poles) dominate.
@@ -788,7 +791,9 @@ function buildOceanCurrentGrid({
 	}
 
 	// BFS from land to find ocean cells within the coastal display band.
-	const maxCoastHops = Math.round(600 / meanEdgeLengthKm(mesh, planetRadiusKm))
+	const maxCoastHops = Math.round(
+		600 / UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm }),
+	)
 	const coastalOcean = new Uint8Array(N)
 	const bfsQueue = new Int32Array(N)
 	const bfsDist = new Int32Array(N).fill(-1)

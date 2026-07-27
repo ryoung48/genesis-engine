@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createStringRng } from "@/model/shared"
 import {
 	GLYPH_MODULE,
 	type GlyphSet,
@@ -13,6 +12,7 @@ import {
 	type RuneRenderOptions,
 } from "@/model/society/script/runegen/rune-renderer"
 import { renderScriptTexture } from "@/ui/planet/renderer/script-texture"
+import { RNG } from "@/model/shared/rng"
 
 type TemplateOption = {
 	value: RuneTemplate
@@ -61,7 +61,7 @@ function buildPreview(
 	>,
 	seed: string,
 ): GeneratedPreview {
-	const dice = createStringRng(seed)
+	const dice = RNG.createStringRng({ seed })
 	const glyphSeed = `${seed}:glyphs:${Math.floor(dice.random() * 1e9).toString(36)}`
 	return {
 		glyphs: GLYPH_MODULE.generateGlyphSet({
@@ -120,7 +120,7 @@ export function SocietyRunesPanel() {
 
 	const handleGenerate = () => {
 		const nextSeed = Date.now().toString(36)
-		const dice = createStringRng(nextSeed)
+		const dice = RNG.createStringRng({ seed: nextSeed })
 		setSeed(nextSeed)
 		setSeedTemplate(dice.choice(TEMPLATE_VALUES))
 		setMaxDots(dice.choice([0, 1, 2]))

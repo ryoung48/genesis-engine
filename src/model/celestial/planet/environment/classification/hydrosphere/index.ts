@@ -1,12 +1,12 @@
-import { roll2d6 } from "@/model/shared/dice"
-import type { HydrosphereProfile } from "../../../../orbit-body/types"
-import type { ClampInput } from "../types"
+import type { HydrosphereProfile } from "@/model/celestial/orbit-body/types"
+import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
 import type {
 	BuildHydrosphereInput,
 	CountBodiesInput,
 	DistributeSurfaceInput,
 	WaterPctInput,
-} from "./types"
+} from "@/model/celestial/planet/environment/classification/hydrosphere/types"
+import { DICE } from "@/model/shared/dice"
 
 function clamp({ value, min, max }: ClampInput): number {
 	return Math.max(min, Math.min(max, value))
@@ -127,7 +127,7 @@ function buildHydrosphereProfile({
 	rng,
 	code,
 }: BuildHydrosphereInput): HydrosphereProfile {
-	const distribution = roll2d6(rng) - 2
+	const distribution = DICE.roll2d6(rng) - 2
 	const water = waterPct({ rng, hydrosphereCode: code })
 	const land = 100 - water
 	return {

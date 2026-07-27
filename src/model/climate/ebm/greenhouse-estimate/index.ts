@@ -1,7 +1,7 @@
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import type { RollGreenhouseFactorParams } from "@/model/climate/ebm/greenhouse-estimate/types"
-import type { SharedRng } from "@/model/shared"
-import { roll3d6 } from "@/model/shared/dice"
+import type { SharedRng } from "@/model/shared/rng"
+import { DICE } from "@/model/shared/dice"
 
 function estimateGreenhouseFactor(pressure: number): number {
 	return (
@@ -19,7 +19,7 @@ function rollGreenhouseFactor(params: RollGreenhouseFactorParams): number {
 		atmosphereCode === 13 ||
 		atmosphereCode === 14
 	) {
-		factor += roll3d6(rng) * 0.01
+		factor += DICE.roll3d6(rng) * 0.01
 	} else if (atmosphereCode === 10 || atmosphereCode === 15) {
 		factor *= Math.max(rng.randint(1, 6) - 1, 0.5)
 	} else if (
@@ -29,7 +29,7 @@ function rollGreenhouseFactor(params: RollGreenhouseFactorParams): number {
 		atmosphereCode === 17
 	) {
 		const roll = rng.randint(1, 6)
-		factor *= roll <= 5 ? roll : roll3d6(rng)
+		factor *= roll <= 5 ? roll : DICE.roll3d6(rng)
 	}
 	return factor
 }

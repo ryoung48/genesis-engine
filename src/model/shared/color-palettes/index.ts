@@ -1,4 +1,4 @@
-type RgbColor = [number, number, number]
+import type { RgbColor } from "@/model/shared/color-palettes/types"
 
 function hexToRgb(hex: string): RgbColor {
 	const normalized = hex.replace("#", "")
@@ -13,7 +13,7 @@ function palette(...stops: string[]): readonly RgbColor[] {
 	return stops.map(hexToRgb)
 }
 
-export const BUPU_STOPS = palette(
+const bupuStops = palette(
 	"#f7fcfd",
 	"#e0ecf4",
 	"#bfd3e6",
@@ -25,7 +25,7 @@ export const BUPU_STOPS = palette(
 	"#4d004b",
 )
 
-export const ORANGES_STOPS = palette(
+const orangesStops = palette(
 	"#fff5eb",
 	"#fee6ce",
 	"#fdd0a2",
@@ -37,7 +37,7 @@ export const ORANGES_STOPS = palette(
 	"#7f2704",
 )
 
-export const PURPLES_STOPS = palette(
+const purplesStops = palette(
 	"#fcfbfd",
 	"#efedf5",
 	"#dadaeb",
@@ -49,7 +49,7 @@ export const PURPLES_STOPS = palette(
 	"#3f007d",
 )
 
-export const YL_OR_RD_STOPS = palette(
+const ylOrRdStops = palette(
 	"#ffffcc",
 	"#ffeda0",
 	"#fed976",
@@ -61,7 +61,7 @@ export const YL_OR_RD_STOPS = palette(
 	"#800026",
 )
 
-export const PLASMA_STOPS = palette(
+const plasmaStops = palette(
 	"#0d0887",
 	"#41049d",
 	"#6a00a8",
@@ -75,16 +75,7 @@ export const PLASMA_STOPS = palette(
 	"#f0f921",
 )
 
-/**
- * ColorBrewer/d3 "Spectral" 11-class diverging scheme, reordered cold->hot
- * (d3.interpolateSpectral's raw t=0..1 goes hot-red->cold-purple; this array
- * is reversed so index 0 is the cold end and the last index is the hot end,
- * matching how callers normalize a real min..max range here). Sample with
- * sampleBasisColorStops (not sampleColorStops) to reproduce d3's smoothed
- * basis-spline interpolation through these control colors, not a plain
- * linear blend between adjacent stops.
- */
-export const SPECTRAL_STOPS = palette(
+const spectralStops = palette(
 	"#5e4fa2",
 	"#3288bd",
 	"#66c2a5",
@@ -97,3 +88,12 @@ export const SPECTRAL_STOPS = palette(
 	"#d53e4f",
 	"#9e0142",
 )
+
+export const COLOR_PALETTES = {
+	bupuStops,
+	orangesStops,
+	purplesStops,
+	ylOrRdStops,
+	plasmaStops,
+	spectralStops,
+}

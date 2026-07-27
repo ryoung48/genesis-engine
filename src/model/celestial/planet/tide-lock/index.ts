@@ -1,13 +1,13 @@
-﻿import { HOURS_PER_DAY } from "@/model/shared"
-import { roll2d6 } from "@/model/shared/dice"
-import type { createRng } from "@/model/shared/rng"
-import type { MoonBody } from "../../moons/types"
-import type { TideLock } from "../../orbit-body/types"
+﻿import type { MoonBody } from "@/model/celestial/moons/types"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type {
 	MoonTideLockResult,
 	PlanetTideLockResult,
 	TideLockEffectResult,
-} from "./types"
+} from "@/model/celestial/planet/tide-lock/types"
+import { DICE } from "@/model/shared/dice"
+import { RNG } from "@/model/shared/rng"
+import { TIME } from "@/model/shared/time"
 
 // Relative (not absolute) tolerance on the sidereal:orbital ratio -- these
 // periods span everything from hours (close-in moons) to centuries (distant
@@ -42,7 +42,7 @@ function deriveTideLockStatus(params: {
 	tideLock: TideLock | null | undefined
 }): "1:1" | "3:2" | undefined {
 	if (params.tideLock) return "1:1"
-	const orbitalHours = params.orbitalPeriodDays * HOURS_PER_DAY
+	const orbitalHours = params.orbitalPeriodDays * TIME.hoursPerDay
 	if (orbitalHours <= 0 || params.siderealDayHours <= 0) return undefined
 	const ratio = params.siderealDayHours / orbitalHours
 	if (Math.abs(ratio - 1.5) < RESONANCE_32_RATIO_TOLERANCE) return "3:2"
@@ -165,7 +165,7 @@ function rollMoonLockDM(params: {
 // forced for a homeworld, or a 1-in-36 chance otherwise -- knocks it back
 // down to a lower outcome instead).
 function rollTideLockEffect(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	dm: number
 	periodHours: number
 	axialTiltDeg: number
@@ -177,7 +177,7 @@ function rollTideLockEffect(params: {
 }): TideLockEffectResult {
 	const { rng, dm, periodHours, homeworld, baseSiderealDayHours, broke } =
 		params
-	const roll = roll2d6(rng) + dm
+	const roll = DICE.roll2d6(rng) + dm
 
 	if (roll <= 4) {
 		return {
@@ -197,9 +197,10 @@ function rollTideLockEffect(params: {
 	else if (roll === 6) siderealDayHours = baseSiderealDayHours * 2
 	else if (roll === 7) siderealDayHours = baseSiderealDayHours * 3
 	else if (roll === 8) siderealDayHours = baseSiderealDayHours * 5
-	else if (roll === 9) siderealDayHours = rng.randint(1, 6) * 5 * HOURS_PER_DAY
+	else if (roll === 9)
+		siderealDayHours = rng.randint(1, 6) * 5 * TIME.hoursPerDay
 	else if (roll === 10)
-		siderealDayHours = rng.randint(1, 6) * 10 * HOURS_PER_DAY
+		siderealDayHours = rng.randint(1, 6) * 10 * TIME.hoursPerDay
 	// A "3:2" spin-orbit resonance means 3 rotations per 2 orbits (real
 	// Mercury's case) -- i.e. the sidereal day is 2/3 of the orbital period
 	// (rotation is FASTER than the orbit), not periodHours*3/2 (which would
@@ -210,7 +211,7 @@ function rollTideLockEffect(params: {
 	// and reads as "Day Infinite" in the UI instead of the correct
 	// (finite, if long) 2-years-per-solar-day result real Mercury has.
 	else if (roll === 11) siderealDayHours = (periodHours * 2) / 3
-	else if (!broke && (roll2d6(rng) === 12 || homeworld)) {
+	else if (!broke && (DICE.roll2d6(rng) === 12 || homeworld)) {
 		return rollTideLockEffect({ ...params, dm: 0, broke: true })
 	} else {
 		siderealDayHours = periodHours
@@ -219,7 +220,7 @@ function rollTideLockEffect(params: {
 
 	if (roll === 10 && axialTiltDeg < 90) axialTiltDeg = 180 - axialTiltDeg
 	if (roll >= 11 && axialTiltDeg > 3) {
-		axialTiltDeg = roll2d6(rng) / 10
+		axialTiltDeg = DICE.roll2d6(rng) / 10
 	}
 	if (roll >= 12 && eccentricity > 0.1) {
 		eccentricity = Math.min(eccentricity, params.rerollEccentricity())
@@ -244,7 +245,7 @@ function rollTideLockEffect(params: {
  * built `orbit` at the point it calls ROTATION.locks.get.
  */
 function rollPlanetTideLock(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	sizeClass: number
 	eccentricity: number
 	axialTiltDeg: number
@@ -278,7 +279,7 @@ function rollPlanetTideLock(params: {
 
 	let winnerDM = starDM + generalDM
 	let winnerTideLock: TideLock = { type: "solar", target: 0 }
-	let winnerPeriodHours = params.orbitalPeriodDays * HOURS_PER_DAY
+	let winnerPeriodHours = params.orbitalPeriodDays * TIME.hoursPerDay
 
 	// Only an already-planet-locked moon (mirroring galaxy-gen's
 	// lockedMoons -- a moon that already keeps one face toward this planet)
@@ -304,7 +305,7 @@ function rollPlanetTideLock(params: {
 			if (moonDM >= winnerDM) {
 				winnerDM = moonDM
 				winnerTideLock = { type: "lunar", target: moon.idx }
-				winnerPeriodHours = moon.orbitalPeriodDays * HOURS_PER_DAY
+				winnerPeriodHours = moon.orbitalPeriodDays * TIME.hoursPerDay
 			}
 			void index
 		},
@@ -369,7 +370,7 @@ function rollMoonToPlanetLockDM(params: {
  * moons to decide whether the PLANET should lock back to one of them.
  */
 function rollMoonTideLock(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	sizeClass: number
 	eccentricity: number
 	axialTiltDeg: number
@@ -397,7 +398,7 @@ function rollMoonTideLock(params: {
 	const effect = rollTideLockEffect({
 		rng: params.rng,
 		dm: generalDM + moonDM,
-		periodHours: params.orbitalPeriodDays * HOURS_PER_DAY,
+		periodHours: params.orbitalPeriodDays * TIME.hoursPerDay,
 		axialTiltDeg: params.axialTiltDeg,
 		eccentricity: params.eccentricity,
 		rerollEccentricity: params.rerollEccentricity,

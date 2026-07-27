@@ -1,5 +1,5 @@
-import { createStringRng, type SharedRng } from "@/model/shared"
 import { Point2D } from "@/model/society/script/runegen/point2d"
+import { SharedRng, RNG } from "@/model/shared/rng"
 
 export type RuneTemplate =
 	| "random1"
@@ -82,7 +82,7 @@ export class Rune {
 		seed?: string,
 	) {
 		const seedStr = seed ?? Date.now().toString(36)
-		this.rng = rng ?? createStringRng(seedStr)
+		this.rng = rng ?? RNG.createStringRng({ seed: seedStr })
 		this.seed = seedStr
 		this.allowDiscontinuousStrokes = Boolean(options.allowDiscontinuousStrokes)
 
@@ -727,7 +727,7 @@ export class Rune {
 		rune.maxDots = this.maxDots
 		rune.allowDiscontinuousStrokes = this.allowDiscontinuousStrokes
 		rune.seed = this.seed
-		rune.rng = createStringRng(this.seed)
+		rune.rng = RNG.createStringRng({ seed: this.seed })
 		rune.hSym = false
 		rune.vSym = false
 
@@ -751,7 +751,7 @@ export class Rune {
 		rune.maxDots = this.maxDots
 		rune.allowDiscontinuousStrokes = this.allowDiscontinuousStrokes
 		rune.seed = this.seed
-		rune.rng = createStringRng(this.seed)
+		rune.rng = RNG.createStringRng({ seed: this.seed })
 		rune.hSym = false
 		rune.vSym = false
 
@@ -775,7 +775,7 @@ export class Rune {
 		rune.maxDots = this.maxDots
 		rune.allowDiscontinuousStrokes = this.allowDiscontinuousStrokes
 		rune.seed = this.seed
-		rune.rng = createStringRng(this.seed)
+		rune.rng = RNG.createStringRng({ seed: this.seed })
 		rune.hSym = false
 		rune.vSym = false
 

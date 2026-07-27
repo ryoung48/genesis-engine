@@ -1,4 +1,3 @@
-import { createRng, DEFAULT_PLANET_RADIUS_KM } from "@/model/shared"
 import type {
 	BfsUpdateMinHopsParams,
 	ComputeMigrationParams,
@@ -9,6 +8,8 @@ import type {
 	PlaceCradlesParams,
 	ProvincePopulation,
 } from "@/model/society/types"
+import { RNG } from "@/model/shared/rng"
+import { UNITS } from "@/model/shared/units"
 
 const HAB_CLIMATE = new Float32Array([
 	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,
@@ -31,7 +32,7 @@ function computeProvinceHabitability({
 	seed,
 }: ComputeProvinceHabitabilityParams): Float32Array {
 	const { count, desolate, regionProvince } = provinces
-	const rng = createRng(seed + 77777)
+	const rng = RNG.createRng({ seed: seed + 77777 })
 
 	const habitability = new Float32Array(count)
 	// Track best water access per province: 0=none, 1=river, 2=lake, 3=ocean
@@ -294,7 +295,7 @@ function computeMigration({
 	provinces,
 	habitability,
 	mesh,
-	planetRadiusKm = DEFAULT_PLANET_RADIUS_KM,
+	planetRadiusKm = UNITS.defaultPlanetRadiusKm,
 	numRegions,
 }: ComputeMigrationParams): {
 	migrationWave: Float32Array

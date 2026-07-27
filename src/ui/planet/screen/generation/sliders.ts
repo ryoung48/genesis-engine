@@ -2,15 +2,12 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
-import {
-	DEFAULT_PLANET_RADIUS_KM,
-	getMaxOceanDepthKm,
-	SLIDER_RANGES,
-} from "@/model/shared"
 import type { SocietyEra } from "@/model/society/types"
 import { computeSeaLevelOffsetKm } from "@/model/terrain"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
+import { UNITS } from "@/model/shared/units"
 
 const SR = SLIDER_RANGES
 
@@ -58,7 +55,7 @@ export function buildPlanetSliders(state: {
 			label: "Radius",
 			help: "Sets the planet's physical size for climate and distance calculations.",
 			value: state.planetRadiusKm,
-			display: `${(state.planetRadiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x`,
+			display: `${(state.planetRadiusKm / UNITS.defaultPlanetRadiusKm).toFixed(2)}x`,
 			...SR.planetRadiusKm,
 			set: state.setPlanetRadiusKm,
 		},
@@ -199,7 +196,7 @@ export function buildTerrainSliders(state: {
 			display: (() => {
 				const offsetKm = computeSeaLevelOffsetKm(
 					state.seaLevel,
-					getMaxOceanDepthKm(DEFAULT_PLANET_RADIUS_KM),
+					UNITS.getMaxOceanDepthKm(UNITS.defaultPlanetRadiusKm),
 				)
 				const sign = offsetKm > 0 ? "+" : offsetKm < 0 ? "−" : ""
 				if (state.unitSystem === "imperial") {

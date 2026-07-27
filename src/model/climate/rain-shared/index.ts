@@ -2,14 +2,15 @@ import type {
 	BuildRegionGraphParams,
 	ComputeRainBandWarpFieldParams,
 } from "@/model/climate/rain-shared/types"
-import { piecewise, SimplexNoise } from "@/model/shared"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { MATH } from "@/model/shared/math"
 
 const ceilingScale = (x: number) =>
-	piecewise(
-		[-14, -8, 2, 12, 18, 40, 60, 90],
-		[40, 62, 83, 125, 165, 300, 150, 0],
+	MATH.piecewise({
+		domain: [-14, -8, 2, 12, 18, 40, 60, 90],
+		range: [40, 62, 83, 125, 165, 300, 150, 0],
 		x,
-	)
+	})
 
 function getPressureRainFactor(pressure: number | undefined): number {
 	return Math.pow(1 / (pressure ?? 1.0), 0.4)

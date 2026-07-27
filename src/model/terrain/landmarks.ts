@@ -3,8 +3,8 @@
  * Each region gets a landmark ID; each landmark has a type and size.
  * O(N) time, typed arrays only.
  */
-import type { GenesisPartition, GenesisProvinces, SphereMesh } from ".."
-import { buildIdentitySeeds } from "../shared"
+import type { GenesisPartition, GenesisProvinces, SphereMesh } from "@/model"
+import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
 
 type LandmarkType = "continent" | "island" | "isle" | "ocean" | "sea" | "lake"
 
@@ -143,7 +143,10 @@ export function assignLandmarkIdentity(params: {
 		return {
 			...landmarks,
 			dominantCulture,
-			nameSeeds: buildIdentitySeeds(landmarks.count, seed + 6103),
+			nameSeeds: IDENTITY_SEEDS.buildIdentitySeeds({
+				count: landmarks.count,
+				seed: seed + 6103,
+			}),
 		}
 	}
 
@@ -192,6 +195,9 @@ export function assignLandmarkIdentity(params: {
 	return {
 		...landmarks,
 		dominantCulture,
-		nameSeeds: buildIdentitySeeds(landmarks.count, seed + 6103),
+		nameSeeds: IDENTITY_SEEDS.buildIdentitySeeds({
+			count: landmarks.count,
+			seed: seed + 6103,
+		}),
 	}
 }

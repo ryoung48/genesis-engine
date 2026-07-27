@@ -1,4 +1,4 @@
-﻿import { createRng, type SharedRng } from "@/model/shared"
+﻿import { SharedRng, RNG } from "@/model/shared/rng"
 
 export type HistoryRng = Pick<
 	SharedRng,
@@ -6,5 +6,5 @@ export type HistoryRng = Pick<
 >
 
 export function createHistoryRng(seed: number): HistoryRng {
-	return createRng(seed)
+	return RNG.createRng({ seed })
 }

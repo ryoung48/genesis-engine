@@ -4,14 +4,9 @@ import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
-import {
-	mapLinear,
-	PLASMA_STOPS,
-	PURPLES_STOPS,
-	rgbToCss,
-	sampleColorStops,
-} from "@/model/shared"
 import type { RegularClimatePreviewData } from "@/ui/preview/types"
+import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 
 interface EbmConfig {
 	obliquity: number
@@ -149,18 +144,18 @@ export function useEbmPreview(config: EbmConfig) {
 			}
 		}
 		const insolColorFn = (val: number) =>
-			rgbToCss(
-				sampleColorStops(
-					PLASMA_STOPS,
-					mapLinear(val, insolMin, insolMax, 0, 1, true),
-				),
+			COLOR_INTERPOLATION.rgbToCss(
+				COLOR_INTERPOLATION.sampleColorStops({
+					stops: COLOR_PALETTES.plasmaStops,
+					t: COLOR_INTERPOLATION.mapLinear(val, insolMin, insolMax, 0, 1, true),
+				}),
 			)
 		const daylightColorFn = (hours: number) =>
-			rgbToCss(
-				sampleColorStops(
-					PURPLES_STOPS,
-					mapLinear(hours, 0, hoursPerDay, 1, 0, true),
-				),
+			COLOR_INTERPOLATION.rgbToCss(
+				COLOR_INTERPOLATION.sampleColorStops({
+					stops: COLOR_PALETTES.purplesStops,
+					t: COLOR_INTERPOLATION.mapLinear(hours, 0, hoursPerDay, 1, 0, true),
+				}),
 			)
 
 		// Calculate global average temperature (area-weighted)

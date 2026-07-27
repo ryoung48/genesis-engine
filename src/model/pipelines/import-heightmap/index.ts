@@ -9,19 +9,6 @@ import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
 import {
-	computeOceanDistanceBFS,
-	countContinents,
-	createRng,
-	DEFAULT_DAYS_PER_YEAR,
-	DEFAULT_ECCENTRICITY,
-	DEFAULT_HOURS_PER_DAY,
-	DEFAULT_OBLIQUITY_DEG,
-	DEFAULT_PERIHELION,
-	DEFAULT_PLANET_RADIUS_KM,
-	DEFAULT_SUBSTELLAR_LON,
-	getMaxOceanDepthKm,
-} from "@/model/shared"
-import {
 	buildDummyBoundary,
 	buildSyntheticPlates,
 	computeSimpleDistanceFields,
@@ -54,6 +41,9 @@ import type {
 	MergeEu4LandMaskParams,
 	ImportGenesisWorldParams,
 } from "@/model/pipelines/import-heightmap/types"
+import { RNG } from "@/model/shared/rng"
+import { STATS } from "@/model/shared/stats"
+import { UNITS } from "@/model/shared/units"
 
 function createTimingRecorder() {
 	const timings: StageTiming[] = []
@@ -595,7 +585,7 @@ function importGenesisWorld({
 	onProgress,
 }: ImportGenesisWorldParams): GenesisWorld {
 	const { timings, record } = createTimingRecorder()
-	const rng = createRng(params.seed)
+	const rng = RNG.createRng({ seed: params.seed })
 
 	onProgress?.("import:mesh", 3)
 	let t0 = performance.now()
@@ -788,7 +778,7 @@ function importGenesisWorld({
 	const distFields = computeSimpleDistanceFields(
 		mesh,
 		elevation,
-		params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM,
+		params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
 	)
 	record("Synthetic plates + boundary", t0)
 	onProgress?.("import:plates", 25)
@@ -817,11 +807,11 @@ function importGenesisWorld({
 		}
 	}
 
-	const oceanDist = computeOceanDistanceBFS(
+	const oceanDist = STATS.computeOceanDistanceBFS({
 		mesh,
 		isLand,
-		params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM,
-	)
+		planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
+	})
 	record("Ocean distance (BFS)", t0)
 	onProgress?.("import:oceanDist", 28)
 
@@ -844,17 +834,17 @@ function importGenesisWorld({
 		glacialErosion: params.glacialErosion,
 		seaLevel: params.seaLevel,
 		volcanism: params.volcanism ?? 0.5,
-		planetRadiusKm: params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM,
-		obliquity: params.obliquity ?? DEFAULT_OBLIQUITY_DEG,
-		eccentricity: params.eccentricity ?? DEFAULT_ECCENTRICITY,
+		planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
+		obliquity: params.obliquity ?? UNITS.defaultObliquityDeg,
+		eccentricity: params.eccentricity ?? UNITS.defaultEccentricity,
 		spectralClass: params.spectralClass ?? STAR.defaultSpectralClass,
 		starSubtype: params.starSubtype ?? STAR.defaultStarSubtype,
 		orbitalDistanceAU:
 			params.orbitalDistanceAU ?? STAR.defaultOrbitalDistanceAu,
-		daysPerYear: params.daysPerYear ?? DEFAULT_DAYS_PER_YEAR,
-		hoursPerDay: params.hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
-		substellarLon: params.substellarLon ?? DEFAULT_SUBSTELLAR_LON,
-		perihelion: params.perihelion ?? DEFAULT_PERIHELION,
+		daysPerYear: params.daysPerYear ?? UNITS.defaultDaysPerYear,
+		hoursPerDay: params.hoursPerDay ?? UNITS.defaultHoursPerDay,
+		substellarLon: params.substellarLon ?? UNITS.defaultSubstellarLon,
+		perihelion: params.perihelion ?? UNITS.defaultPerihelion,
 		pressure: params.pressure ?? 1.0,
 		albedo: params.albedo,
 		greenhouseFactor: params.greenhouseFactor,
@@ -862,7 +852,7 @@ function importGenesisWorld({
 	}
 
 	const maxElevKm = (genesisParams.maxElevation ?? 6000) / 1000
-	const maxDepthKm = getMaxOceanDepthKm(genesisParams.planetRadiusKm)
+	const maxDepthKm = UNITS.getMaxOceanDepthKm(genesisParams.planetRadiusKm)
 	const baseElevation = elevation.slice()
 	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
 		baseElevation,
@@ -1144,7 +1134,7 @@ function importGenesisWorld({
 		settlementWaterLandmarks: provinceSociety.settlementWaterLandmarks,
 		settlementPortRegions: provinceSociety.settlementPortRegions,
 		oceanCurrents: post.oceanCurrents,
-		continentCount: countContinents(mesh, isLand),
+		continentCount: STATS.countContinents({ mesh, isLand }),
 		timings: [...timings, ...post.timings, ...provinceSociety.timings],
 	}
 }

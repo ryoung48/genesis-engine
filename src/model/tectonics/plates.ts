@@ -10,8 +10,8 @@
  * - assignOceanLand creates its own makeRng(seed+42)
  */
 
-import type { PlateVec, SphereMesh } from ".."
-import { makeRandInt, makeRng } from "../shared"
+import type { PlateVec, SphereMesh } from "@/model"
+import { RNG } from "@/model/shared/rng"
 
 interface GeneratePlatesResult {
 	r_plate: Int32Array
@@ -31,8 +31,8 @@ export function generatePlates(
 ): GeneratePlatesResult {
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const r_plate = new Int32Array(numRegions).fill(-1)
-	const rng = makeRng(seed + 0.5)
-	const randInt = makeRandInt(seed)
+	const rng = RNG.makeRng(seed + 0.5)
+	const randInt = RNG.makeRandInt(seed)
 
 	// Farthest-point seed distribution with top-3 jitter
 	const plateSeeds = new Set<number>()
@@ -346,7 +346,7 @@ export function assignOceanLand(
 	continentSizeVariety: number = 0,
 	landCoverage: number = 0.3,
 ): Set<number> {
-	const rng = makeRng(seed + 42)
+	const rng = RNG.makeRng(seed + 42)
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const plateIds = Array.from(plateSeeds)
 	const numPlates = plateIds.length

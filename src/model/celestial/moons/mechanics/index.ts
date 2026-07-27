@@ -1,4 +1,3 @@
-import { SECONDS_PER_DAY } from "@/model/shared"
 import type {
 	HillSphereInput,
 	KeplerEquationInput,
@@ -12,6 +11,7 @@ import type {
 	RocheLimitInput,
 } from "@/model/celestial/moons/mechanics/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { TIME } from "@/model/shared/time"
 
 const TWO_PI = 2 * Math.PI
 function hillSphereM({
@@ -101,7 +101,7 @@ function moonSemiMajorAxisM({
 	moon,
 	planetMassKg,
 }: MoonSemiMajorAxisInput): number {
-	const T = moon.orbitalPeriodDays * SECONDS_PER_DAY
+	const T = moon.orbitalPeriodDays * TIME.secondsPerDay
 	return Math.cbrt(
 		(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg * T * T) /
 			(TWO_PI * TWO_PI),
@@ -118,7 +118,7 @@ function moonOrbitalPeriodDaysFromSemiMajorAxisM({
 			semiMajorAxisM ** 3 /
 				(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg),
 		)
-	return periodSeconds / SECONDS_PER_DAY
+	return periodSeconds / TIME.secondsPerDay
 }
 
 function rocheLimitM({
@@ -160,7 +160,7 @@ function moonPeriodBoundsDay({
 				(distM * distM * distM) /
 					(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg),
 			)) /
-		SECONDS_PER_DAY
+		TIME.secondsPerDay
 	return {
 		minDays: periodFromDist(roche * 1.5),
 		maxDays: periodFromDist(maxStable),

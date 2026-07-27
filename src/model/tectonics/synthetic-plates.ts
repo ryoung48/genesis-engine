@@ -9,8 +9,8 @@ import type {
 	DistanceFields,
 	SphereMesh,
 	TectonicPlate,
-} from ".."
-import { computeCoastDistances } from "../shared"
+} from "@/model"
+import { STATS } from "@/model/shared/stats"
 
 export function deriveSyntheticPlates(
 	mesh: SphereMesh,
@@ -114,11 +114,11 @@ export function computeSimpleDistanceFields(
 	const N = mesh.numRegions
 	const isLand = new Uint8Array(N)
 	for (let r = 0; r < N; r++) isLand[r] = elevation[r] > 0 ? 1 : 0
-	const { distCoast, distCoastLand } = computeCoastDistances(
+	const { distCoast, distCoastLand } = STATS.computeCoastDistances({
 		mesh,
 		isLand,
 		planetRadiusKm,
-	)
+	})
 	return {
 		distMountain: new Float32Array(N),
 		distOcean: new Float32Array(N),

@@ -4,8 +4,9 @@
  * so craters remain crisp and visible.
  */
 
-import type { SphereMesh } from ".."
-import { createRng, SimplexNoise } from "../shared"
+import type { SphereMesh } from "@/model"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { RNG } from "@/model/shared/rng"
 
 interface Crater {
 	cx: number
@@ -27,7 +28,7 @@ export function applyCraters(
 	if (intensity <= 0) return
 
 	const { numRegions, r_xyz } = mesh
-	const rng = createRng(seed + 4242)
+	const rng = RNG.createRng({ seed: seed + 4242 })
 	const noise = new SimplexNoise(seed + 4243)
 
 	// Reference radius: 0.5Ã— Earth ≈ 3185 km — current sizes calibrated here

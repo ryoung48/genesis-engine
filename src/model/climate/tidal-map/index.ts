@@ -1,6 +1,6 @@
 import type { ComputeSpringTideMapInput } from "@/model/climate/tidal-map/types"
-import { makeRng } from "@/model/shared"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
+import { RNG } from "@/model/shared/rng"
 
 const BASE_TIDAL_RANGE_M = 0.25
 
@@ -36,7 +36,7 @@ function computeSpringTideMap({
 
 	if (maxForce <= 0) return new Float32Array(N)
 
-	const rng = makeRng(params.seed ^ 0x7a3f)
+	const rng = RNG.makeRng(params.seed ^ 0x7a3f)
 	const planetRadiusKm = params.planetRadiusKm
 
 	function isLandmarkLake(r: number): boolean {

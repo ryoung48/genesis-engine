@@ -1,9 +1,9 @@
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SYSTEM } from "@/model/celestial/system"
-import { SLIDER_RANGES } from "@/model/shared"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/planet/screen/generation/star-utils"
+import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
 
 export function buildStarStats(params: {
 	starClass: MainSequenceClass

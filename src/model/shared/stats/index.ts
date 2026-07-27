@@ -1,33 +1,18 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
-import type { SphereMesh } from ".."
-import { DEFAULT_PLANET_RADIUS_KM } from "./units"
+import { UNITS } from "@/model/shared/units"
+import type {
+	ComputeOceanDistanceBFSParams,
+	ComputeCoastDistancesParams,
+	CountContinentsParams,
+} from "@/model/shared/stats/types"
 
-// Any connected water body at least this large (in real km²) counts as a
-// valid oceanDist source. This is intentionally NOT a fraction of the mesh
-// point count (unlike landmarks.ts's ocean/sea/lake classification, which
-// exists for other purposes) — a ratio-based threshold conflates "large
-// lake at low mesh resolution" with "large lake at high resolution", and on
-// a real-Earth-scale mesh it misclassifies genuinely large seas (Caspian
-// ~371,000 km², Black Sea ~436,000 km²) as too-small-to-count, since they're
-// tiny relative to Earth's real ocean area even though they're geographically
-// significant. 200,000 km² sits comfortably below both while still excluding
-// small lakes that shouldn't count as moderating "distance to open water".
 const SEA_AREA_THRESHOLD_KM2 = 200_000
 
-/**
- * Multi-source shortest-path distance from the nearest sufficiently-large
- * body of water, in km. Uses each edge's real chord distance
- * (mesh.neighborDist, scaled by planet radius) rather than a hop count ×
- * global-average-edge-length — hop count assumes uniform region size, which
- * adaptive/coastline-biased meshes (see coast-density.ts) deliberately
- * violate: coastal cells are much smaller than interior ones, so a "hop"
- * there covers far less real distance.
- */
-export function computeOceanDistanceBFS(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	planetRadiusKm: number,
-): Float32Array {
+function computeOceanDistanceBFS({
+	mesh,
+	isLand,
+	planetRadiusKm,
+}: ComputeOceanDistanceBFSParams): Float32Array {
 	const { numRegions, adjOffset, adjList, neighborDist } = mesh
 	// Full-precision working distances during the algorithm — comparing a
 	// dequeued entry's exact candidate against a Float32Array-rounded
@@ -132,22 +117,14 @@ export function computeOceanDistanceBFS(
 	return oceanDist
 }
 
-/**
- * Shortest-path coast-distance fields from an isLand mask, in km (real edge
- * distance, same rationale as computeOceanDistanceBFS — hop count assumes
- * uniform region size, which the adaptive mesh violates).
- * distCoast: distance from the nearest coast boundary (land or water side),
- *   every region reachable (single connected mesh).
- * distCoastLand: distance from the nearest coast, land cells only, computed
- *   over land-only edges — water cells are never visited and stay Infinity
- *   by design (matches prior hop-count behavior; only land cells are
- *   meaningful for this field).
- */
-export function computeCoastDistances(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	planetRadiusKm: number = DEFAULT_PLANET_RADIUS_KM,
-): { distCoast: Float32Array; distCoastLand: Float32Array } {
+function computeCoastDistances({
+	mesh,
+	isLand,
+	planetRadiusKm = UNITS.defaultPlanetRadiusKm,
+}: ComputeCoastDistancesParams): {
+	distCoast: Float32Array
+	distCoastLand: Float32Array
+} {
 	const N = mesh.numRegions
 	const { adjOffset, adjList, neighborDist } = mesh
 
@@ -223,7 +200,7 @@ export function computeCoastDistances(
 	return { distCoast, distCoastLand }
 }
 
-export function countContinents(mesh: SphereMesh, isLand: Uint8Array): number {
+function countContinents({ mesh, isLand }: CountContinentsParams): number {
 	const { numRegions, adjOffset, adjList } = mesh
 	let totalLand = 0
 	for (let r = 0; r < numRegions; r++) {
@@ -258,4 +235,10 @@ export function countContinents(mesh: SphereMesh, isLand: Uint8Array): number {
 	}
 
 	return count
+}
+
+export const STATS = {
+	computeOceanDistanceBFS,
+	computeCoastDistances,
+	countContinents,
 }

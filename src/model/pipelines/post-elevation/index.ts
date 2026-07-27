@@ -26,11 +26,6 @@ import { TORNADOES } from "@/model/climate/tornadoes"
 import type { PastaDebug } from "@/model/climate/types"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
-import {
-	computeCoastDistances,
-	computeOceanDistanceBFS,
-	makeRng,
-} from "@/model/shared"
 import { ERAS } from "@/model/society/eras"
 import { POPULATION } from "@/model/society/population"
 import type { ProvincePopulation } from "@/model/society/types"
@@ -53,6 +48,8 @@ import type {
 	PostPipelineInput,
 	PostPipelineOutput,
 } from "@/model/pipelines/post-elevation/types"
+import { RNG } from "@/model/shared/rng"
+import { STATS } from "@/model/shared/stats"
 
 const LAKE_RETENTION_THRESHOLD = 100
 
@@ -378,9 +375,19 @@ function runPostElevationPipeline(
 	t0 = performance.now()
 	const landmarks = computeLandmarks(mesh, isLand)
 	distCoast.set(
-		computeCoastDistances(mesh, isLand, params.planetRadiusKm).distCoast,
+		STATS.computeCoastDistances({
+			mesh,
+			isLand,
+			planetRadiusKm: params.planetRadiusKm,
+		}).distCoast,
 	)
-	oceanDist.set(computeOceanDistanceBFS(mesh, isLand, params.planetRadiusKm))
+	oceanDist.set(
+		STATS.computeOceanDistanceBFS({
+			mesh,
+			isLand,
+			planetRadiusKm: params.planetRadiusKm,
+		}),
+	)
 	climate = CLIMATE.computeTemperature({
 		mesh,
 		elevation,
@@ -569,7 +576,7 @@ function runPostElevationPipeline(
 		isLand,
 		climate,
 		rainfall,
-		rng: makeRng(params.seed),
+		rng: RNG.makeRng(params.seed),
 		pastaZones: vegPastaZones,
 		gdd: vegPastaDebug.gdd,
 		gar: garField,

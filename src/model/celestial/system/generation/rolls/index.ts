@@ -1,5 +1,3 @@
-import { roll2d6 } from "@/model/shared/dice"
-import type { createRng } from "@/model/shared/rng"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	OrbitClassification,
@@ -8,12 +6,14 @@ import type {
 import type { Zone } from "@/model/celestial/planet/types"
 import type { RingProfile } from "@/model/celestial/system/types"
 import type { DensityComposition } from "@/model/celestial/system/generation/rolls/types"
+import { DICE } from "@/model/shared/dice"
+import { RNG } from "@/model/shared/rng"
 
 function rollOrbitGroup({
 	rng,
 	zone,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	zone: Zone
 }): OrbitGroup {
 	const weights: Record<OrbitGroup, number> =
@@ -63,7 +63,7 @@ function rollSizeClass({
 	rng,
 	group,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	group: OrbitGroup
 }): number {
 	if (group === "asteroid belt") return -1
@@ -77,7 +77,7 @@ function rollDiameterKmFromSizeClass({
 	rng,
 	sizeClass,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	sizeClass: number
 }): number {
 	if (sizeClass < 0) return 0
@@ -145,7 +145,7 @@ function rollDensityFromComposition({
 	rng,
 	composition,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	composition: DensityComposition
 }): number {
 	const description = rng.weightedChoice([
@@ -159,7 +159,7 @@ function rollDensityFromComposition({
 		{ v: "Mostly Metal", w: composition === "metallic" ? 5 : 0 },
 		{ v: "Compressed Metal", w: composition === "metallic" ? 1 : 0 },
 	])
-	const densityRoll = roll2d6(rng) - 2
+	const densityRoll = DICE.roll2d6(rng) - 2
 	return DENSITY_TABLE[description as string][densityRoll]
 }
 
@@ -169,7 +169,7 @@ function pickDensityEarthRelative({
 	classification,
 	composition,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	group: OrbitGroup
 	classification: OrbitClassification
 	/** Omitted before classification has produced a composition; the
@@ -191,8 +191,8 @@ function pickDensityEarthRelative({
 // Ported from galaxy-gen's MATH.orbits.eccentricity (orbits/index.ts), with
 // the star-companion/moon/stellar-age modifiers dropped — none of those
 // apply to a plain sibling planet around a lone main-sequence star.
-function rollEccentricity(rng: ReturnType<typeof createRng>): number {
-	const roll = roll2d6(rng)
+function rollEccentricity(rng: ReturnType<typeof RNG.createRng>): number {
+	const roll = DICE.roll2d6(rng)
 	if (roll <= 5) return 0
 	if (roll <= 7) return rng.uniform(0.01, 0.03)
 	if (roll <= 9) return rng.uniform(0.04, 0.09)
@@ -202,8 +202,8 @@ function rollEccentricity(rng: ReturnType<typeof createRng>): number {
 }
 
 // Ported from galaxy-gen's MATH.tilt.compute (non-homeworld branch).
-function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
-	const standard = roll2d6(rng)
+function rollAxialTiltDeg(rng: ReturnType<typeof RNG.createRng>): number {
+	const standard = DICE.roll2d6(rng)
 	if (standard <= 4) return rng.uniform(0.01, 0.1)
 	if (standard <= 5) return rng.uniform(0.2, 1.2)
 	if (standard <= 6) return rng.uniform(1, 6)
@@ -229,7 +229,7 @@ function rollAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 const JOVIAN_RING_COLOR_CHOICES = [0xd8c69a, 0xcac2b0, 0xb8c4cf, 0xa89f8f]
 
 function rollJovianRings(
-	rng: ReturnType<typeof createRng>,
+	rng: ReturnType<typeof RNG.createRng>,
 ): RingProfile | undefined {
 	const tier = rng.weightedChoice([
 		{ v: "none", w: 6 },
@@ -256,16 +256,16 @@ function rollSiderealDayHours({
 	isJovian,
 	starAgeGyr,
 }: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	isJovian: boolean
 	starAgeGyr: number
 }): number {
 	const mult = isJovian ? 2 : 4
 	const ageMod = Math.floor(starAgeGyr / 2)
-	let base = (roll2d6(rng) - 2) * mult + 2 + rng.randint(1, 6) + ageMod
+	let base = (DICE.roll2d6(rng) - 2) * mult + 2 + rng.randint(1, 6) + ageMod
 	let rotation = base
 	while (base > 40 && rng.randint(1, 6) >= 5) {
-		base = (roll2d6(rng) - 2) * mult + rng.randint(1, 6)
+		base = (DICE.roll2d6(rng) - 2) * mult + rng.randint(1, 6)
 		rotation += base
 	}
 	return rotation * rng.uniform(0.95, 1.05)

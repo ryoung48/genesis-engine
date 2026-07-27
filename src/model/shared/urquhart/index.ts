@@ -1,12 +1,16 @@
 import Delaunator from "delaunator"
+import type {
+	EdgeKeyParams,
+	SquaredDistanceParams,
+} from "@/model/shared/urquhart/types"
 
-function edgeKey(a: number, b: number, span: number): number {
+function edgeKey({ a, b, span }: EdgeKeyParams): number {
 	const from = a < b ? a : b
 	const to = a < b ? b : a
 	return from * span + to
 }
 
-export function buildUrquhartEdgesFromFlat(
+function buildUrquhartEdgesFromFlat(
 	flatPoints: ArrayLike<number>,
 ): Array<[number, number]> {
 	const pointCount = Math.floor(flatPoints.length / 2)
@@ -20,18 +24,18 @@ export function buildUrquhartEdgesFromFlat(
 		const a = delaunay.triangles[triangle]
 		const b = delaunay.triangles[triangle + 1]
 		const c = delaunay.triangles[triangle + 2]
-		const ab = squaredDistance(flatPoints, a, b)
-		const bc = squaredDistance(flatPoints, b, c)
-		const ca = squaredDistance(flatPoints, c, a)
+		const ab = squaredDistance({ flatPoints, a, b })
+		const bc = squaredDistance({ flatPoints, a: b, b: c })
+		const ca = squaredDistance({ flatPoints, a: c, b: a })
 		if (ab >= bc && ab >= ca) {
-			kept.add(edgeKey(b, c, pointCount))
-			kept.add(edgeKey(c, a, pointCount))
+			kept.add(edgeKey({ a: b, b: c, span: pointCount }))
+			kept.add(edgeKey({ a: c, b: a, span: pointCount }))
 		} else if (bc >= ab && bc >= ca) {
-			kept.add(edgeKey(a, b, pointCount))
-			kept.add(edgeKey(c, a, pointCount))
+			kept.add(edgeKey({ a, b, span: pointCount }))
+			kept.add(edgeKey({ a: c, b: a, span: pointCount }))
 		} else {
-			kept.add(edgeKey(a, b, pointCount))
-			kept.add(edgeKey(b, c, pointCount))
+			kept.add(edgeKey({ a, b, span: pointCount }))
+			kept.add(edgeKey({ a: b, b: c, span: pointCount }))
 		}
 	}
 
@@ -41,11 +45,7 @@ export function buildUrquhartEdgesFromFlat(
 	]) as Array<[number, number]>
 }
 
-function squaredDistance(
-	flatPoints: ArrayLike<number>,
-	a: number,
-	b: number,
-): number {
+function squaredDistance({ flatPoints, a, b }: SquaredDistanceParams): number {
 	const ax = flatPoints[a * 2] ?? 0
 	const ay = flatPoints[a * 2 + 1] ?? 0
 	const bx = flatPoints[b * 2] ?? 0
@@ -53,4 +53,8 @@ function squaredDistance(
 	const dx = ax - bx
 	const dy = ay - by
 	return dx * dx + dy * dy
+}
+
+export const URQUHART = {
+	buildUrquhartEdgesFromFlat,
 }

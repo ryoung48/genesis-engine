@@ -1,13 +1,8 @@
 ﻿import { useMemo } from "react"
 import { HEAT } from "@/model/climate/locked/heat"
-import {
-	mapLinear,
-	PLASMA_STOPS,
-	PURPLES_STOPS,
-	rgbToCss,
-	sampleColorStops,
-} from "@/model/shared"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
+import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 
 interface LockedClimatePreviewConfig {
 	obliquity: number
@@ -116,18 +111,25 @@ function buildLockedClimatePreview(
 	}
 
 	const insolColorFn = (value: number) =>
-		rgbToCss(
-			sampleColorStops(
-				PLASMA_STOPS,
-				mapLinear(value, insolMin, insolMax, 0, 1, true),
-			),
+		COLOR_INTERPOLATION.rgbToCss(
+			COLOR_INTERPOLATION.sampleColorStops({
+				stops: COLOR_PALETTES.plasmaStops,
+				t: COLOR_INTERPOLATION.mapLinear(value, insolMin, insolMax, 0, 1, true),
+			}),
 		)
 	const daylightColorFn = (hours: number) =>
-		rgbToCss(
-			sampleColorStops(
-				PURPLES_STOPS,
-				mapLinear(hours, 0, config.hoursPerDay, 1, 0, true),
-			),
+		COLOR_INTERPOLATION.rgbToCss(
+			COLOR_INTERPOLATION.sampleColorStops({
+				stops: COLOR_PALETTES.purplesStops,
+				t: COLOR_INTERPOLATION.mapLinear(
+					hours,
+					0,
+					config.hoursPerDay,
+					1,
+					0,
+					true,
+				),
+			}),
 		)
 
 	return {

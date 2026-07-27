@@ -1,11 +1,6 @@
 ﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { RAIN } from "@/model/climate/rain"
-import {
-	DEFAULT_PLANET_RADIUS_KM,
-	getMaxOceanDepthKm,
-	meanEdgeLengthKm,
-} from "@/model/shared"
 import { computeSeaLevelOffsetKm } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
@@ -16,6 +11,7 @@ import {
 	formatTemperatureDelta,
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
+import { UNITS } from "@/model/shared/units"
 
 export interface PlanetStat {
 	label: string
@@ -61,7 +57,11 @@ export function computePlanetStats(
 	const surfaceAreaKm2 = 4 * Math.PI * radiusKm * radiusKm
 
 	let avgCellLengthKm: number | null = null
-	if (world) avgCellLengthKm = meanEdgeLengthKm(world.mesh, radiusKm)
+	if (world)
+		avgCellLengthKm = UNITS.meanEdgeLengthKm({
+			mesh: world.mesh,
+			planetRadiusKm: radiusKm,
+		})
 
 	let landAreaKm2: number | null = null
 	let landPercent: number | null = null
@@ -218,7 +218,7 @@ export function computePlanetStats(
 	const seaLevelValue = activeParams?.seaLevel ?? params.seaLevel
 	let seaLevelShiftStat: PlanetStat | null = null
 	if (seaLevelValue != null && seaLevelValue !== 1) {
-		const maxDepthKm = getMaxOceanDepthKm(radiusKm)
+		const maxDepthKm = UNITS.getMaxOceanDepthKm(radiusKm)
 		const offsetKm = computeSeaLevelOffsetKm(seaLevelValue, maxDepthKm)
 		const sign = offsetKm >= 0 ? "+" : "−"
 		const absValue =
@@ -287,7 +287,7 @@ export function computePlanetStats(
 		{ label: "Pressure", value: `${pressureValue.toFixed(1)} bar` },
 		{
 			label: "Radius",
-			value: `${(radiusKm / DEFAULT_PLANET_RADIUS_KM).toFixed(2)}x`,
+			value: `${(radiusKm / UNITS.defaultPlanetRadiusKm).toFixed(2)}x`,
 		},
 		{
 			label: "Continents",

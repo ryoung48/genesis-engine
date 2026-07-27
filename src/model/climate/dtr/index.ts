@@ -1,5 +1,5 @@
 import type { GenesisParams, GenesisRainfall } from "@/model"
-import { HOURS_PER_DAY } from "@/model/shared"
+import { TIME } from "@/model/shared/time"
 
 function computeDiurnalRange(args: {
 	rainfall: GenesisRainfall
@@ -19,7 +19,7 @@ function computeDiurnalRange(args: {
 	} = args
 	const N = isLand.length
 	const dtr_monthly = new Float32Array(12 * N)
-	const relHours = params?.hoursPerDay / HOURS_PER_DAY
+	const relHours = params?.hoursPerDay / TIME.hoursPerDay
 	const landRegions: number[] = []
 	const oceanRegions: number[] = []
 	for (let r = 0; r < N; r++) {

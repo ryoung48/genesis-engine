@@ -1,10 +1,10 @@
-﻿import { MinHeap } from "../shared"
-import type {
+﻿import type {
 	ComputeLakesParams,
 	SelectCompactLakeFallbackParams,
 	SelectConnectedLakeCellsParams,
 	TrimLakeCorridorsParams,
-} from "./types"
+} from "@/model/terrain/types"
+import { MinHeap } from "@/model/shared/min-heap"
 
 function computeSubgraphNeighborCount(
 	numRegions: number,

@@ -1,7 +1,8 @@
 import type { ComputeCycloneRiskParams } from "@/model/climate/cyclones/types"
 import { RAIN } from "@/model/climate/rain"
-import { clamp, HOURS_PER_DAY, smoothstep } from "@/model/shared"
 import { TOPO_OCEAN } from "@/model/terrain"
+import { MATH } from "@/model/shared/math"
+import { TIME } from "@/model/shared/time"
 
 function computeCycloneRisk({
 	mesh,
@@ -21,7 +22,7 @@ function computeCycloneRisk({
 	// Slow rotators: the Coriolis no-go zone (radius = geoTransitionLat degrees
 	// from the thermal equator) engulfs the entire valid formation band (≤38°).
 	const hoursPerDay = params.hoursPerDay ?? 24
-	const noGoRadius = (15 * hoursPerDay) / HOURS_PER_DAY // same formula as wind model
+	const noGoRadius = (15 * hoursPerDay) / TIME.hoursPerDay // same formula as wind model
 	if (noGoRadius >= 38) return new Float32Array(N)
 
 	// --- SST threshold: global mean + 11°C (≈26°C on Earth) ---
@@ -52,7 +53,11 @@ function computeCycloneRisk({
 			if (t > peakTemp) peakTemp = t
 		}
 
-		const sstScore = clamp((peakTemp - SST_THRESHOLD) / SST_RANGE, 0, 1)
+		const sstScore = MATH.clamp({
+			value: (peakTemp - SST_THRESHOLD) / SST_RANGE,
+			lo: 0,
+			hi: 1,
+		})
 		if (sstScore <= 0) continue
 
 		// Latitude from thermal equator — must be inside formation band
@@ -61,8 +66,12 @@ function computeCycloneRisk({
 
 		// Smooth bell: zero within no-go zone, peaks midway, zero beyond 38°
 		const latFactor =
-			smoothstep(noGoRadius, noGoRadius + 8, distFromTeq) *
-			(1 - smoothstep(30, 38, distFromTeq))
+			MATH.smoothstep({
+				edge0: noGoRadius,
+				edge1: noGoRadius + 8,
+				x: distFromTeq,
+			}) *
+			(1 - MATH.smoothstep({ edge0: 30, edge1: 38, x: distFromTeq }))
 		if (latFactor <= 0) continue
 
 		// Warm-current boost: hot currents raise effective SST

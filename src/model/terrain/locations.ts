@@ -5,9 +5,10 @@
  * province scales with its area relative to LOCATION_AREA_TARGET_KM2.
  */
 
-import type { GenesisLocations, GenesisProvinces, SphereMesh } from ".."
-import { createRng, meanEdgeLengthKm } from "../shared"
-import { PROVINCE_AREA_TARGET_KM2 } from "./provinces"
+import type { GenesisLocations, GenesisProvinces, SphereMesh } from "@/model"
+import { PROVINCE_AREA_TARGET_KM2 } from "@/model/terrain/provinces"
+import { RNG } from "@/model/shared/rng"
+import { UNITS } from "@/model/shared/units"
 
 // Target ~3 locations per standard province
 const LOCATION_AREA_TARGET_KM2 = PROVINCE_AREA_TARGET_KM2 / 2
@@ -22,9 +23,12 @@ export function computeLocations(
 	const N = mesh.numRegions
 	const P = provinces.count
 
-	const rng = createRng(seed ^ 0xba120035)
+	const rng = RNG.createRng({ seed: seed ^ 0xba120035 })
 
-	const avgEdgeKm = meanEdgeLengthKm(mesh, options?.planetRadiusKm)
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({
+		mesh,
+		planetRadiusKm: options?.planetRadiusKm,
+	})
 	const regionAreaKm2 = avgEdgeKm * avgEdgeKm * Math.sqrt(3) * 0.5
 
 	// Collect regions per province

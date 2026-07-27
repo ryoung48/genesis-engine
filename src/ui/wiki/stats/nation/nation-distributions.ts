@@ -1,10 +1,10 @@
-﻿import { titleCase } from "@/model/shared"
-import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
+﻿import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
 import {
 	EU5_TOPOGRAPHY_CATEGORIES,
 	EU5_TOPOGRAPHY_COLORS,
 	EU5_TOPOGRAPHY_MERGE_LABEL,
-} from "../../../planet/colors"
+} from "@/ui/planet/colors"
+import { TEXT } from "@/model/shared/text"
 
 /** Same bucketing idea as GenesisView.tsx's world-level buildDistribution,
  * restricted to the mesh region/cell indexes inside one nation -- so
@@ -27,7 +27,7 @@ export function buildDistributionForRegions(
 	}
 	return labels
 		.map((label, index) => ({
-			label: titleCase(label),
+			label: TEXT.titleCase(label),
 			count: counts[index] ?? 0,
 			color: colorFn(index),
 		}))
@@ -79,7 +79,7 @@ export function buildEu5TopographyDistribution(params: {
 	}
 	return Array.from(counts.entries())
 		.map(([label, count]) => ({
-			label: titleCase(label),
+			label: TEXT.titleCase(label),
 			count,
 			color: rgbToCss(EU5_TOPOGRAPHY_MERGE_COLOR[label]),
 		}))

@@ -11,42 +11,44 @@ import type {
 	ComputeThermalEquatorParams,
 } from "@/model/climate/rain/types"
 import { RAIN_SHARED } from "@/model/climate/rain-shared"
-import {
-	clamp,
-	DEFAULT_PLANET_RADIUS_KM,
-	getRegionLatLonDegrees,
-	isRetrogradeObliquity,
-	meanEdgeLengthKm,
-	piecewise,
-	SimplexNoise,
-	smoothstep,
-} from "@/model/shared"
 import { LANDMARK_TYPE_OCEAN } from "@/model/terrain"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { MATH } from "@/model/shared/math"
+import { UNITS } from "@/model/shared/units"
 
 const DEG2RAD = Math.PI / 180
 
 const EAST_MOISTURE_WIN_BIAS = 1.03
 
 const itczScale = (x: number) =>
-	piecewise([0, 0.26, 0.6, 0.93], [1, 0.7, 0.2, 0], x)
+	MATH.piecewise({ domain: [0, 0.26, 0.6, 0.93], range: [1, 0.7, 0.2, 0], x })
 
 const subsidenceScale = (x: number) =>
-	piecewise([0.5, 0.66, 0.83, 1, 1.16, 1.33], [0, 0.5, 1, 1, 0.5, 0], x)
+	MATH.piecewise({
+		domain: [0.5, 0.66, 0.83, 1, 1.16, 1.33],
+		range: [0, 0.5, 1, 1, 0.5, 0],
+		x,
+	})
 
-const eastStormScale = (x: number) => piecewise([0.33, 1.16, 3], [0, 0.8, 1], x)
+const eastStormScale = (x: number) =>
+	MATH.piecewise({ domain: [0.33, 1.16, 3], range: [0, 0.8, 1], x })
 
 const westerliesScale = (x: number) =>
-	piecewise([1.33, 1.66, 3], [0, 1, 0.8], x)
+	MATH.piecewise({ domain: [1.33, 1.66, 3], range: [0, 1, 0.8], x })
 
 const hadleyWidth = (x: number) =>
-	piecewise([6, 12, 24, 48, 96, 192, 384], [18, 25, 30, 40, 55, 65, 70], x)
+	MATH.piecewise({
+		domain: [6, 12, 24, 48, 96, 192, 384],
+		range: [18, 25, 30, 40, 55, 65, 70],
+		x,
+	})
 const climateGeometryCache = new WeakMap<SphereMesh, ClimateGeometry>()
 
 function getClimateGeometry(mesh: SphereMesh): ClimateGeometry {
 	const cached = climateGeometryCache.get(mesh)
 	if (cached) return cached
 
-	const { latDeg, lonDeg } = getRegionLatLonDegrees(mesh)
+	const { latDeg, lonDeg } = MATH.getRegionLatLonDegrees(mesh)
 	const N = mesh.numRegions
 	const absLatDeg = new Float32Array(N)
 	const sinLat = new Float32Array(N)
@@ -218,7 +220,7 @@ function computeAdvection({
 
 	const planetRadiusKm =
 		typeof params === "number" ? params : params?.planetRadiusKm
-	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
 	const scale = 94.5 / avgEdgeKm
 	// computeCoastDistances now returns real km (not a hop count), so this
 	// threshold is compared against distCoast directly in km — no more
@@ -230,7 +232,7 @@ function computeAdvection({
 
 	const { adjOffset, adjList, neighborDist } = mesh
 	const land = isLand
-	const planetRadiusKmResolved = planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM
+	const planetRadiusKmResolved = planetRadiusKm ?? UNITS.defaultPlanetRadiusKm
 
 	const computePair = (teqByLon: Float32Array) => {
 		const basinLabel = new Int32Array(N).fill(-1)
@@ -269,7 +271,12 @@ function computeAdvection({
 				basinSize[basinLabel[r]] >= minBasinSize
 			) {
 				sourceMoisture[r] =
-					wet * smoothstep(0, deepOceanThreshold, distCoast[r])
+					wet *
+					MATH.smoothstep({
+						edge0: 0,
+						edge1: deepOceanThreshold,
+						x: distCoast[r],
+					})
 			}
 		}
 
@@ -292,16 +299,16 @@ function computeAdvection({
 			const distToTeq = Math.abs(lat - teq)
 
 			if (attr === "east") {
-				const zonalStrength = piecewise(
-					[0, 10, 25, 35, 50],
-					[0.7, 1, 1, 0.4, 0],
-					absLat,
-				)
-				const meridionalStrength = piecewise(
-					[0, 5, 15, 30, 40],
-					[0, 0.2, 0.55, 0.8, 0],
-					distToTeq,
-				)
+				const zonalStrength = MATH.piecewise({
+					domain: [0, 10, 25, 35, 50],
+					range: [0.7, 1, 1, 0.4, 0],
+					x: absLat,
+				})
+				const meridionalStrength = MATH.piecewise({
+					domain: [0, 5, 15, 30, 40],
+					range: [0, 0.2, 0.55, 0.8, 0],
+					x: distToTeq,
+				})
 				const teqDir = teq > lat ? 1 : teq < lat ? -1 : 0
 				const flowEast = -zonalStrength
 				const flowNorth = teqDir * meridionalStrength
@@ -311,18 +318,22 @@ function computeAdvection({
 					(eastward * flowEast + northward * flowNorth) / flowNorm
 				return alignment >= 0.35
 			}
-			const subtropicalJet = piecewise(
-				[20, 28, 32, 40],
-				[0, 0.75, 1.1, 0.3],
-				absLat,
-			)
-			const polarJet = piecewise([45, 52, 60, 70], [0, 0.45, 0.9, 0], absLat)
+			const subtropicalJet = MATH.piecewise({
+				domain: [20, 28, 32, 40],
+				range: [0, 0.75, 1.1, 0.3],
+				x: absLat,
+			})
+			const polarJet = MATH.piecewise({
+				domain: [45, 52, 60, 70],
+				range: [0, 0.45, 0.9, 0],
+				x: absLat,
+			})
 			const zonalStrength = Math.max(0.7, subtropicalJet, polarJet)
-			const polewardStrength = piecewise(
-				[22, 30, 45, 60, 75],
-				[0, 0.2, 0.55, 0.35, 0],
-				absLat,
-			)
+			const polewardStrength = MATH.piecewise({
+				domain: [22, 30, 45, 60, 75],
+				range: [0, 0.2, 0.55, 0.35, 0],
+				x: absLat,
+			})
 			const poleDir = lat >= teq ? 1 : -1
 			const flowEast = zonalStrength
 			const flowNorth = poleDir * polewardStrength
@@ -441,10 +452,15 @@ function computeWeight({
 	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
 	const moisture = Math.max(eastMoisture, westMoisture)
 	const itcz = itczScale(dist) * moisture
-	const suppression = 1 - clamp(subsidenceScale(dist), 0, 1)
+	const suppression =
+		1 - MATH.clamp({ value: subsidenceScale(dist), lo: 0, hi: 1 })
 	const eastStorms = eastStormScale(dist) * eastMoisture
 	const westerlies = westerliesScale(dist) * westMoisture
-	return clamp(Math.max(itcz * suppression, eastStorms, westerlies), 0, 1)
+	return MATH.clamp({
+		value: Math.max(itcz * suppression, eastStorms, westerlies),
+		lo: 0,
+		hi: 1,
+	})
 }
 
 function computeMonthlyRain({
@@ -470,7 +486,7 @@ function computeMonthlyRain({
 	}
 
 	const N = mesh.numRegions
-	const reverseCirculation = isRetrogradeObliquity(params?.obliquity ?? 0)
+	const reverseCirculation = UNITS.isRetrogradeObliquity(params?.obliquity ?? 0)
 	const pressureRainFactor = RAIN_SHARED.getPressureRainFactor(params?.pressure)
 
 	const { latDeg, regionBin } = getClimateGeometry(mesh)

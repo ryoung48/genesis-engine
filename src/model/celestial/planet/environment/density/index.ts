@@ -1,11 +1,11 @@
 import type { DensityProfile } from "@/model/celestial/orbit-body/types"
-import { roll2d6 } from "@/model/shared/dice"
 import type {
 	DensityDescriptionInput,
 	DensityProfileInput,
 	RollAlbedoInput,
 } from "@/model/celestial/planet/environment/density/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { DICE } from "@/model/shared/dice"
 
 function clamp({
 	value,
@@ -56,11 +56,11 @@ function rollAlbedo({
 }: RollAlbedoInput): number {
 	let albedo = 0
 	if (composition === "rocky" || composition === "metallic") {
-		albedo = (roll2d6(rng) - 2) * 0.02 + 0.04
+		albedo = (DICE.roll2d6(rng) - 2) * 0.02 + 0.04
 	} else if (composition === "ice") {
-		albedo = (roll2d6(rng) - 3) * 0.05 + 0.2
+		albedo = (DICE.roll2d6(rng) - 3) * 0.05 + 0.2
 	} else if (composition === "gas") {
-		albedo = 0.05 * roll2d6(rng) + 0.05
+		albedo = 0.05 * DICE.roll2d6(rng) + 0.05
 	}
 
 	if (
@@ -69,19 +69,19 @@ function rollAlbedo({
 		atmosphere.type === "trace" ||
 		atmosphere.subtype === "very thin"
 	) {
-		albedo += (roll2d6(rng) - 3) * 0.01
+		albedo += (DICE.roll2d6(rng) - 3) * 0.01
 	} else if (atmosphere.subtype === "very dense") {
-		albedo += roll2d6(rng) * 0.03
+		albedo += DICE.roll2d6(rng) * 0.03
 	} else if (atmosphere.type === "breathable") {
-		albedo += roll2d6(rng) * 0.01
+		albedo += DICE.roll2d6(rng) * 0.01
 	} else {
-		albedo += (roll2d6(rng) - 2) * 0.05
+		albedo += (DICE.roll2d6(rng) - 2) * 0.05
 	}
 
 	if (hydrosphereCode >= 2 && hydrosphereCode <= 5) {
-		albedo += (roll2d6(rng) - 2) * 0.02
+		albedo += (DICE.roll2d6(rng) - 2) * 0.02
 	} else if (hydrosphereCode >= 6) {
-		albedo += (roll2d6(rng) - 4) * 0.03
+		albedo += (DICE.roll2d6(rng) - 4) * 0.03
 	}
 
 	return clamp({ value: albedo, min: 0.02, max: 0.98 })

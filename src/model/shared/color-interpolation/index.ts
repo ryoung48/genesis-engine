@@ -1,21 +1,30 @@
-import { clamp01 } from "./math"
-import type { BasisParams } from "./types"
+import { MATH } from "@/model/shared/math"
+import type {
+	RgbColor,
+	BasisParams,
+	LerpParams,
+	MixRgbParams,
+	SampleColorStopsParams,
+	SampleBasisColorStopsParams,
+} from "@/model/shared/color-interpolation/types"
 
-export type RgbColor = [number, number, number]
-
-function lerp(a: number, b: number, t: number): number {
+function lerp({ a, b, t }: LerpParams): number {
 	return a + (b - a) * t
 }
 
-function mixRgb(a: RgbColor, b: RgbColor, t: number): RgbColor {
-	return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
+function mixRgb({ a, b, t }: MixRgbParams): RgbColor {
+	return [
+		lerp({ a: a[0], b: b[0], t }),
+		lerp({ a: a[1], b: b[1], t }),
+		lerp({ a: a[2], b: b[2], t }),
+	]
 }
 
-export function rgbToCss([r, g, b]: RgbColor): string {
+function rgbToCss([r, g, b]: RgbColor): string {
 	return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
 }
 
-export function quantizeRgb([r, g, b]: RgbColor): RgbColor {
+function quantizeRgb([r, g, b]: RgbColor): RgbColor {
 	return [
 		Math.round(r * 255) / 255,
 		Math.round(g * 255) / 255,
@@ -23,7 +32,7 @@ export function quantizeRgb([r, g, b]: RgbColor): RgbColor {
 	]
 }
 
-export function cssColorToRgb(value: string): RgbColor {
+function cssColorToRgb(value: string): RgbColor {
 	if (value.startsWith("#")) {
 		const hex = value.slice(1)
 		if (hex.length === 3) {
@@ -51,7 +60,7 @@ export function cssColorToRgb(value: string): RgbColor {
 	]
 }
 
-export function mapLinear(
+function mapLinear(
 	value: number,
 	domainStart: number,
 	domainEnd: number,
@@ -61,20 +70,17 @@ export function mapLinear(
 ): number {
 	if (domainStart === domainEnd) return rangeEnd
 	const t = (value - domainStart) / (domainEnd - domainStart)
-	const normalized = clamp ? clamp01(t) : t
-	return lerp(rangeStart, rangeEnd, normalized)
+	const normalized = clamp ? MATH.clamp01(t) : t
+	return lerp({ a: rangeStart, b: rangeEnd, t: normalized })
 }
 
-export function sampleColorStops(
-	stops: readonly RgbColor[],
-	t: number,
-): RgbColor {
+function sampleColorStops({ stops, t }: SampleColorStopsParams): RgbColor {
 	if (stops.length === 0) return [0, 0, 0]
 	if (stops.length === 1) return [...stops[0]]
-	const clamped = clamp01(t)
+	const clamped = MATH.clamp01(t)
 	const scaled = clamped * (stops.length - 1)
 	const index = Math.min(stops.length - 2, Math.floor(scaled))
-	return mixRgb(stops[index], stops[index + 1], scaled - index)
+	return mixRgb({ a: stops[index], b: stops[index + 1], t: scaled - index })
 }
 
 function basis({ t, v0, v1, v2, v3 }: BasisParams): number {
@@ -89,15 +95,15 @@ function basis({ t, v0, v1, v2, v3 }: BasisParams): number {
 	)
 }
 
-export function sampleBasisColorStops(
-	stops: readonly RgbColor[],
-	t: number,
-): RgbColor {
+function sampleBasisColorStops({
+	stops,
+	t,
+}: SampleBasisColorStopsParams): RgbColor {
 	if (stops.length === 0) return [0, 0, 0]
 	if (stops.length === 1) return [...stops[0]]
 
 	const n = stops.length - 1
-	const clamped = clamp01(t)
+	const clamped = MATH.clamp01(t)
 	const raw = clamped * n
 	const index = clamped >= 1 ? n - 1 : Math.floor(raw)
 	const localT = raw - index
@@ -117,4 +123,13 @@ export function sampleBasisColorStops(
 		basis({ t: localT, v0: v0[1], v1: v1[1], v2: v2[1], v3: v3[1] }),
 		basis({ t: localT, v0: v0[2], v1: v1[2], v2: v2[2], v3: v3[2] }),
 	]
+}
+
+export const COLOR_INTERPOLATION = {
+	rgbToCss,
+	quantizeRgb,
+	cssColorToRgb,
+	mapLinear,
+	sampleColorStops,
+	sampleBasisColorStops,
 }

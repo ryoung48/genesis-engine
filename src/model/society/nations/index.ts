@@ -1,9 +1,4 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
-import {
-	buildIdentitySeeds,
-	DEFAULT_PLANET_RADIUS_KM,
-	SimplexNoise,
-} from "@/model/shared"
 import { ERAS } from "@/model/society/eras"
 import { HIERARCHY } from "@/model/society/hierarchy"
 import type {
@@ -30,6 +25,9 @@ import type {
 	SelectSeedParams,
 } from "@/model/society/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { IDENTITY_SEEDS } from "@/model/shared/identity-seeds"
+import { UNITS } from "@/model/shared/units"
 
 const MAX_NATION_SPREAD_KM = 2000
 
@@ -83,7 +81,8 @@ function computeNations(params: {
 		r_xyz,
 	} = params
 	const maxSpreadRad =
-		MAX_NATION_SPREAD_KM / (params.planetRadiusKm ?? DEFAULT_PLANET_RADIUS_KM)
+		MAX_NATION_SPREAD_KM /
+		(params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm)
 	const provinceCount = provinces.count
 	if (provinceCount === 0) return emptyPartition(provinceCount)
 
@@ -417,7 +416,10 @@ function computeNations(params: {
 		assignment,
 		seeds: new Int32Array(seeds),
 		languageSeeds: new Int32Array(0),
-		nameSeeds: buildIdentitySeeds(nationCount, params.seed + 4103),
+		nameSeeds: IDENTITY_SEEDS.buildIdentitySeeds({
+			count: nationCount,
+			seed: params.seed + 4103,
+		}),
 		count: nationCount,
 		adjOffset,
 		adjList,

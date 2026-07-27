@@ -1,7 +1,7 @@
 import { PASTA } from "@/model/climate/pasta"
 import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
-import { makeRng } from "@/model/shared"
+import { RNG } from "@/model/shared/rng"
 
 function tradeGoodDisplayName(label: string): string {
 	return label
@@ -151,7 +151,7 @@ function computeTradeGoods(params: {
 
 		// Seed per location: mix seed and location index
 		const locSeed = (seed ^ (Math.imul(l, 0x9e3779b9) >>> 0)) >>> 0
-		const rng = makeRng(locSeed)
+		const rng = RNG.makeRng(locSeed)
 
 		// Pick a representative region at random for all attributes including coastal
 		const r = regions[Math.floor(rng() * regions.length)]!

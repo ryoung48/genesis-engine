@@ -1,14 +1,6 @@
-﻿/**
- * Hotspot volcanism Î“Ã‡Ŷ mantle plumes with drift chains.
- * Faithful port of genesis's dual-component model: broad thermal swell +
- * volcanic peak with domain-warped shape distortion, age-dependent texture,
- * drift elongation, summit calderas, and radial rift-zone ridges.
- */
-
-import { createRng, eulerVelocityAt, SimplexNoise } from "../shared"
-import { normalizeMantleField } from "../tectonics"
-import type { SphereMesh } from "../types"
-import type { ApplyHotspotsParams } from "./types"
+﻿import { normalizeMantleField } from "@/model/tectonics"
+import type { SphereMesh } from "@/model/types"
+import type { ApplyHotspotsParams } from "@/model/terrain/types"
 import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,
@@ -16,7 +8,10 @@ import {
 	getLipSpawnChance,
 	getScaledFeatureCount,
 	type LipSite,
-} from "./volcanism"
+} from "@/model/terrain/volcanism"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { MATH } from "@/model/shared/math"
+import { RNG } from "@/model/shared/rng"
 
 function findNearestR(
 	mesh: SphereMesh,
@@ -111,8 +106,8 @@ export function applyHotspots({
 	const HOTSPOT_UPWELLING_CANDIDATES = 8
 	const HOTSPOT_UPWELLING_JITTER = 0.3
 	const DOME_AGE_BROADENING = 0.03
-	const hsRng = createRng(seed + 999)
-	const hsPosRng = createRng(seed + 1001)
+	const hsRng = RNG.createRng({ seed: seed + 999 })
+	const hsPosRng = RNG.createRng({ seed: seed + 1001 })
 	const hsNoise = new SimplexNoise(seed + 501)
 	const hsNoise2 = new SimplexNoise(seed + 502)
 	const hsNoise3 = new SimplexNoise(seed + 503)
@@ -251,7 +246,7 @@ export function applyHotspots({
 
 		const centerR = findNearestR(mesh, hx, hy, hz)
 		const plate = plates[plateAssignment[centerR]]
-		const drift = eulerVelocityAt({
+		const drift = MATH.eulerVelocityAt({
 			pole: plate.pole,
 			omega: plate.omega,
 			x: hx,

@@ -1,4 +1,3 @@
-import { titleCase } from "@/model/shared"
 import type {
 	BasePatternizeParams,
 	EndConsonantsParams,
@@ -28,6 +27,7 @@ import {
 	STOP_CHAR,
 	vowelRules,
 } from "@/model/society/language/languages/types"
+import { TEXT } from "@/model/shared/text"
 
 const range = (count: number): number[] =>
 	Array.from({ length: count }, (_, index) => index)
@@ -659,7 +659,7 @@ const morpheme = ({ cluster, src, params }: MorphemeParams) => {
 export const CLUSTER = {
 	endVowels,
 	simple: (cluster: Cluster, src: Language, template: string) =>
-		titleCase(
+		TEXT.titleCase(
 			syllable({
 				cluster,
 				src,

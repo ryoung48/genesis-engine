@@ -1,8 +1,9 @@
-import { HOURS_PER_DAY } from "@/model/shared"
 import type {
 	DensityFromMassAndDiameterInput,
 	MassFromDensityInput,
 } from "@/model/celestial/orbit-body/types"
+import { TIME } from "@/model/shared/time"
+
 const earthDiameterKm = 12_742
 const earthMassKg = 5.973886146404331e24
 const earthRadiusM = (earthDiameterKm * 1000) / 2
@@ -112,7 +113,7 @@ export const ORBIT_BODY = {
 		if (!(siderealDayHours > 0) || !(orbitalPeriodDays > 0)) return null
 
 		const siderealCyclesPerHour = 1 / siderealDayHours
-		const orbitalCyclesPerHour = 1 / (orbitalPeriodDays * HOURS_PER_DAY)
+		const orbitalCyclesPerHour = 1 / (orbitalPeriodDays * TIME.hoursPerDay)
 		const solarCyclesPerHour = retrograde
 			? siderealCyclesPerHour + orbitalCyclesPerHour
 			: siderealCyclesPerHour - orbitalCyclesPerHour

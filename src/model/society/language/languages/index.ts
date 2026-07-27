@@ -1,5 +1,4 @@
-﻿import { capitalize, titleCase } from "@/model/shared"
-import { BUILDER } from "@/model/society/language/languages/builder"
+﻿import { BUILDER } from "@/model/society/language/languages/builder"
 import { CONSONANTS } from "@/model/society/language/languages/builder/consonants"
 import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
@@ -12,6 +11,7 @@ import {
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
+import { TEXT } from "@/model/shared/text"
 
 export const LANGUAGE = {
 	word: {
@@ -44,7 +44,7 @@ export const LANGUAGE = {
 				{ v: "i", w: 1 },
 				{ v: "ese", w: 1 },
 			])
-			return capitalize(cleaned + suffix)
+			return TEXT.capitalize(cleaned + suffix)
 		},
 		language: (morphemes: string[], dice: LanguageRng) => {
 			const prefix = morphemes.slice(0, -1).join("")
@@ -71,7 +71,7 @@ export const LANGUAGE = {
 				{ v: "a", w: 1 },
 				{ v: "ese", w: 1 },
 			])
-			return capitalize(cleaned + suffix)
+			return TEXT.capitalize(cleaned + suffix)
 		},
 		firstName: (lang: Language, gender: Gender) =>
 			LANGUAGE.word.simple({ lang, key: gender }),
@@ -115,7 +115,7 @@ export const LANGUAGE = {
 				lang,
 				repeat,
 			)
-			return { morphemes, word: titleCase(morphemes.join("")) }
+			return { morphemes, word: TEXT.titleCase(morphemes.join("")) }
 		},
 		unique: (params: WordParams): { morphemes: string[]; word: string } => {
 			return LANGUAGE.word.simple(params)

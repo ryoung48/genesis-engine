@@ -2,7 +2,8 @@ import type {
 	ComputeIceAccumulationParams,
 	IceResult,
 } from "@/model/climate/ice/types"
-import { meanEdgeLengthKm, TIME } from "@/model/shared"
+import { TIME } from "@/model/shared/time"
+import { UNITS } from "@/model/shared/units"
 
 const MELT_FACTOR = 6.0
 
@@ -33,7 +34,7 @@ function computeIceAccumulation({
 	// km — see computeCoastDistances — so this converts the old "~8 hops"
 	// heuristic into an equivalent km distance rather than comparing hops
 	// against km directly).
-	const avgEdgeKm = meanEdgeLengthKm(mesh, planetRadiusKm)
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({ mesh, planetRadiusKm })
 	const COAST_FADE = 8 * avgEdgeKm
 	const coastBoost = new Float32Array(N)
 	for (let r = 0; r < N; r++) {

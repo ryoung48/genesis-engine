@@ -1,7 +1,7 @@
-﻿import type { BoundaryInfo, SphereMesh } from ".."
-import { SimplexNoise } from "../shared"
-import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
-import type { BuildTangentFrameParams } from "./types"
+﻿import type { BoundaryInfo, SphereMesh } from "@/model"
+import { GENESIS_TERRAIN_FEATURE } from "@/model/tectonics"
+import type { BuildTangentFrameParams } from "@/model/terrain/types"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
 
 const VOLC_MIN_SPACING = 0.015
 const VOLC_SIGMA_BASE = 0.005

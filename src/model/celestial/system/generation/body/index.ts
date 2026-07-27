@@ -10,15 +10,15 @@ import { SOL_SEED_BODIES } from "@/model/celestial/system/generation/sol-seed"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import { ASTRONOMICAL_DAYS_PER_YEAR } from "@/model/shared"
-import { createRng } from "@/model/shared/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { ENVIRONMENT } from "@/model/celestial/system/generation/environment"
 import { ROLLS } from "@/model/celestial/system/generation/rolls"
 import { TEXTURE } from "@/model/celestial/system/generation/texture"
+import { RNG } from "@/model/shared/rng"
+import { TIME } from "@/model/shared/time"
 
-const DAYS_PER_YEAR = ASTRONOMICAL_DAYS_PER_YEAR
+const DAYS_PER_YEAR = TIME.astronomicalDaysPerYear
 // Mirrors the UI's DEFAULT_WORLD_PARAMS.continentSizeVariety (defaults.ts) --
 // duplicated here since this model-layer file must not import from the UI
 // layer. A rolled main world's continentSizeVariety starts at this Earth-like
@@ -38,7 +38,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const { seed, spectralClass, starSubtype, forceMainWorld } = params
 	const solBodies = SOL_SEED_BODIES.generate(params)
 	if (solBodies) return solBodies
-	const rng = createRng(seed)
+	const rng = RNG.createRng({ seed })
 
 	const luminositySol = STAR.getStarLuminositySol({
 		cls: spectralClass,

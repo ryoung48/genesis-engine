@@ -9,8 +9,8 @@ import type {
 import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
 import { WIND } from "@/model/climate/wind"
 import type { FlowGrid } from "@/model/climate/wind/types"
-import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "@/model/shared/units"
 import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import { UNITS } from "@/model/shared/units"
 
 const CURRENT_EFFECT_MONTHS = 12
 
@@ -75,7 +75,7 @@ function buildLakeMask({
 function computeMonthlySubstellarDirections(
 	params?: LockedCurrentParams,
 ): Array<[number, number, number]> {
-	const substellarLon = params?.substellarLon ?? DEFAULT_SUBSTELLAR_LON
+	const substellarLon = params?.substellarLon ?? UNITS.defaultSubstellarLon
 	const obliquity = params?.obliquity ?? 0
 	const eccentricity = params?.eccentricity ?? 0
 	const perihelion = params?.perihelion ?? 102
@@ -201,7 +201,10 @@ function computeLockedOceanCurrents({
 	params,
 }: ComputeLockedOceanCurrentsParams): GenesisOceanCurrents {
 	const N = mesh.numRegions
-	const avgEdgeKm = meanEdgeLengthKm(mesh, params?.planetRadiusKm)
+	const avgEdgeKm = UNITS.meanEdgeLengthKm({
+		mesh,
+		planetRadiusKm: params?.planetRadiusKm,
+	})
 	const isLake = buildLakeMask({ numRegions: N, isLand, landmarks })
 	const monthlyDirs = computeMonthlySubstellarDirections(params)
 

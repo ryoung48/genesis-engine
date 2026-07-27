@@ -10,13 +10,6 @@ import type {
 } from "@/model"
 import { ROUTES } from "@/model/economy/routes"
 import { buildSphereMesh } from "@/model/mesh"
-import {
-	computeCoastDistances,
-	computeOceanDistanceBFS,
-	countContinents,
-	createRng,
-	getMaxOceanDepthKm,
-} from "@/model/shared"
 import { URBANIZATION } from "@/model/society/urbanization"
 import {
 	buildSuperPlates,
@@ -48,6 +41,9 @@ import type {
 	SummarizeHotspotExposureParams,
 	GenerateGenesisWorldParams,
 } from "@/model/pipelines/generate-world/types"
+import { RNG } from "@/model/shared/rng"
+import { STATS } from "@/model/shared/stats"
+import { UNITS } from "@/model/shared/units"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
 	console.time(label)
@@ -111,7 +107,7 @@ function runActivePath(
 ): TectonicPathResult {
 	// 5. Plate density (ocean: 3.0–3.5, land: 2.4–2.9)
 	const plateDensity = new Map<number, number>()
-	const densityRng = createRng(params.seed + 777)
+	const densityRng = RNG.createRng({ seed: params.seed + 777 })
 	for (const pid of plateIds) {
 		const oceanDensity = 3.0 + densityRng.random() * 0.5
 		const landDensity = 2.4 + densityRng.random() * 0.5
@@ -236,7 +232,7 @@ function generateGenesisWorld({
 	params,
 	onProgress,
 }: GenerateGenesisWorldParams): GenesisWorld {
-	const rng = createRng(params.seed)
+	const rng = RNG.createRng({ seed: params.seed })
 	const volcanism = params.volcanism ?? 1
 	const pipelineTiming: StageTiming[] = []
 	const elevationTiming: StageTiming[] = []
@@ -477,7 +473,7 @@ function generateGenesisWorld({
 	}
 
 	const maxElevKm = (params.maxElevation ?? 6000) / 1000
-	const maxDepthKm = getMaxOceanDepthKm(params.planetRadiusKm)
+	const maxDepthKm = UNITS.getMaxOceanDepthKm(params.planetRadiusKm)
 	const baseElevation = elevation.slice()
 	const { elevation: finalElevation, elevation_km } = applySeaLevelToElevation({
 		baseElevation,
@@ -526,7 +522,11 @@ function generateGenesisWorld({
 		}
 	}
 	const finalCoastDist = withTiming("coastDist", pipelineTiming, () =>
-		computeCoastDistances(mesh, isLand, params.planetRadiusKm),
+		STATS.computeCoastDistances({
+			mesh,
+			isLand,
+			planetRadiusKm: params.planetRadiusKm,
+		}),
 	)
 	distFields.distCoast = finalCoastDist.distCoast
 	distFields.distCoastLand = finalCoastDist.distCoastLand
@@ -534,7 +534,11 @@ function generateGenesisWorld({
 
 	// 13. Ocean distance (BFS hop count → km)
 	const oceanDist = withTiming("oceanDist", pipelineTiming, () =>
-		computeOceanDistanceBFS(mesh, isLand, params.planetRadiusKm),
+		STATS.computeOceanDistanceBFS({
+			mesh,
+			isLand,
+			planetRadiusKm: params.planetRadiusKm,
+		}),
 	)
 	onProgress?.("oceanDist", 39)
 	// 17. Small ocean detection — patches < 0.1% of land become lakes so rivers drain through them
@@ -729,7 +733,7 @@ function generateGenesisWorld({
 		routes: infrastructure.routes,
 		network: infrastructure.network,
 		oceanCurrents: post.oceanCurrents,
-		continentCount: countContinents(mesh, isLand),
+		continentCount: STATS.countContinents({ mesh, isLand }),
 		monthlyTEQ: post.monthlyTEQ,
 		timings,
 	}

@@ -1,6 +1,3 @@
-import { HOURS_PER_DAY, SECONDS_PER_DAY } from "@/model/shared"
-import { roll2d6 } from "@/model/shared/dice"
-import { createRng } from "@/model/shared/rng"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
 import {
@@ -18,6 +15,9 @@ import {
 	type RollMoonOrbitCandidateInput,
 	type RollMoonSizeClassInput,
 } from "@/model/celestial/moons/types"
+import { DICE } from "@/model/shared/dice"
+import { RNG } from "@/model/shared/rng"
+import { TIME } from "@/model/shared/time"
 
 const TWO_PI = 2 * Math.PI
 
@@ -49,8 +49,8 @@ function rollDie({ rng, sides }: RollDieInput): number {
 // planets use, where axial tilt past 90° is itself what makes a body's spin
 // read as retrograde once composed with the render's tilt quaternion (see
 // buildMoonMesh), rather than needing a separate retrograde flag.
-function rollMoonAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
-	const standard = roll2d6(rng)
+function rollMoonAxialTiltDeg(rng: ReturnType<typeof RNG.createRng>): number {
+	const standard = DICE.roll2d6(rng)
 	if (standard <= 4) return rng.uniform(0.01, 0.1)
 	if (standard <= 5) return rng.uniform(0.2, 1.2)
 	if (standard <= 6) return rng.uniform(1, 6)
@@ -72,11 +72,13 @@ function rollMoonAxialTiltDeg(rng: ReturnType<typeof createRng>): number {
 // baseline still stands unmodified for callers that don't run that
 // enrichment step (post-elevation.ts's tidal-schedule-only moon, whose own
 // rotation period is never read downstream).
-function rollMoonSiderealDayHours(rng: ReturnType<typeof createRng>): number {
-	let base = (roll2d6(rng) - 2) * 3 + 2 + rng.randint(1, 6)
+function rollMoonSiderealDayHours(
+	rng: ReturnType<typeof RNG.createRng>,
+): number {
+	let base = (DICE.roll2d6(rng) - 2) * 3 + 2 + rng.randint(1, 6)
 	let rotation = base
 	while (base > 40 && rng.randint(1, 6) >= 5) {
-		base = (roll2d6(rng) - 2) * 3 + rng.randint(1, 6)
+		base = (DICE.roll2d6(rng) - 2) * 3 + rng.randint(1, 6)
 		rotation += base
 	}
 	return rotation * rng.uniform(0.95, 1.05)
@@ -226,7 +228,7 @@ export const MOON = {
 	 *   11        Extreme      (3D × 5) − 1D
 	 *   12        Retrograde   roll again, result subtracted from 180
 	 */
-	rollInclinationDeg(rng: ReturnType<typeof createRng>): number {
+	rollInclinationDeg(rng: ReturnType<typeof RNG.createRng>): number {
 		const roll = rollDie({ rng, sides: 2 })
 		if (roll <= 6) return rollDie({ rng, sides: 1 }) / 2
 		if (roll === 7) return rollDie({ rng, sides: 1 })
@@ -263,7 +265,7 @@ export const MOON = {
 			...moon,
 			tideLock:
 				Math.abs(
-					moon.siderealDayHours - moon.orbitalPeriodDays * HOURS_PER_DAY,
+					moon.siderealDayHours - moon.orbitalPeriodDays * TIME.hoursPerDay,
 				) < TIDE_LOCK_TOLERANCE_HOURS
 					? { type: "planet", target: parentIdx }
 					: null,
@@ -341,7 +343,7 @@ export const MOON = {
 	}: GenerateMoonsInput): MoonBody[] {
 		if (count <= 0) return []
 
-		const rng = createRng(seed)
+		const rng = RNG.createRng({ seed })
 		const planetMassKg = MECHANICS.derivePlanetMassKg(planetRadiusKm)
 		const planetRadiusM = planetRadiusKm * 1000
 		const planetDiameterM = planetRadiusM * 2
@@ -372,7 +374,7 @@ export const MOON = {
 					(distM * distM * distM) /
 						(ORBIT_BODY.gravitationalConstantM3KgS2 * planetMassKg),
 				)
-			return T / SECONDS_PER_DAY
+			return T / TIME.secondsPerDay
 		}
 
 		const moons: MoonBody[] = []

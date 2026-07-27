@@ -1,7 +1,7 @@
-import { createRng } from "@/model/shared/rng"
 import { LANGUAGE } from "@/model/society/language/languages"
 import { STAR } from "@/model/celestial/star"
 import { DATA } from "@/model/celestial/system/sol-system/data"
+import { RNG } from "@/model/shared/rng"
 
 // Star age is rolled from its own salted rng derived from the same system
 // seed, decorrelated from the main body-generation rng sequence (created
@@ -18,7 +18,7 @@ function getStarAgeGyr({
 	massSol: number
 }): number {
 	if (seed === DATA.solSeed) return DATA.solStarAgeGyr
-	const rng = createRng(seed + STAR_AGE_SEED_SALT)
+	const rng = RNG.createRng({ seed: seed + STAR_AGE_SEED_SALT })
 	return STAR.rollStarAgeGyr({ rng, massSol })
 }
 

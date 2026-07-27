@@ -1,6 +1,5 @@
 import { RAIN } from "@/model/climate/rain"
 import type { ComputeTornadoRiskParams } from "@/model/climate/tornadoes/types"
-import { clamp, piecewise, smoothstep } from "@/model/shared"
 import {
 	TOPO_FLAT,
 	TOPO_HILL,
@@ -10,6 +9,7 @@ import {
 	TOPO_OCEAN,
 	TOPO_PLATEAU,
 } from "@/model/terrain"
+import { MATH } from "@/model/shared/math"
 
 function vegetationMoistureScore(biomeCode: number): number {
 	switch (biomeCode) {
@@ -105,15 +105,19 @@ function computeTornadoRisk({
 
 		// a. Seasonal temperature range — high range = continental = strong fronts
 		const annualRange = temperatureMax[r] - temperatureMin[r]
-		const rangeScore = smoothstep(
-			globalMeanRange * 0.4,
-			globalMeanRange * 1.5,
-			annualRange,
-		)
+		const rangeScore = MATH.smoothstep({
+			edge0: globalMeanRange * 0.4,
+			edge1: globalMeanRange * 1.5,
+			x: annualRange,
+		})
 
 		// b. Summer surface heating — proxy for low-level CAPE
 		//    Scales relative to global mean so hot and cold planets behave correctly
-		const heatScore = clamp((temperatureMax[r] - globalMean - 5) / 12, 0, 1)
+		const heatScore = MATH.clamp({
+			value: (temperatureMax[r] - globalMean - 5) / 12,
+			lo: 0,
+			hi: 1,
+		})
 
 		// c. Moisture via vegetation biome
 		const moistureScore = vegetationMoistureScore(vegetation[r])
@@ -122,13 +126,17 @@ function computeTornadoRisk({
 		const teq = annualTEQ[regionBin[r]]
 		const distFromTeq = Math.abs(latDeg[r] - teq)
 		const latFactor =
-			smoothstep(ferrelInner, ferrelInner + transIn, distFromTeq) *
+			MATH.smoothstep({
+				edge0: ferrelInner,
+				edge1: ferrelInner + transIn,
+				x: distFromTeq,
+			}) *
 			(1 -
-				smoothstep(
-					ferrelOuter - transOut,
-					ferrelOuter + transOut * 0.5,
-					distFromTeq,
-				))
+				MATH.smoothstep({
+					edge0: ferrelOuter - transOut,
+					edge1: ferrelOuter + transOut * 0.5,
+					x: distFromTeq,
+				}))
 
 		if (latFactor <= 0) continue
 
@@ -138,11 +146,11 @@ function computeTornadoRisk({
 
 		// f. Continental position — sweet spot ~400 km from ocean
 		//    Coastal = uniform maritime air; deep interior = too dry
-		const contFactor = piecewise(
-			[0, 50, 400, 1500, 4000],
-			[0.1, 0.5, 1.0, 0.75, 0.45],
-			oceanDist[r],
-		)
+		const contFactor = MATH.piecewise({
+			domain: [0, 50, 400, 1500, 4000],
+			range: [0.1, 0.5, 1.0, 0.75, 0.45],
+			x: oceanDist[r],
+		})
 
 		risk[r] =
 			rangeScore *

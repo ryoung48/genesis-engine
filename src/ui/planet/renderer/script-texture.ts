@@ -1,8 +1,8 @@
-﻿import { createStringRng } from "@/model/shared"
-import type { HeritageScript } from "@/model/society/script"
+﻿import type { HeritageScript } from "@/model/society/script"
 import { GLYPH_MODULE } from "@/model/society/script/runegen/glyph-module"
 import { RUNE_RENDERER } from "@/model/society/script/runegen/rune-renderer"
 import { LABEL_OUTLINE_COLOR } from "@/ui/planet/renderer/nation-label-overlay"
+import { RNG } from "@/model/shared/rng"
 
 const CELL_SCALE = 7
 // Layout spacing scales with the render scale (like stroke width already
@@ -156,7 +156,9 @@ export function renderScriptTexture(
 		const rune = script.glyphs[placement.char]
 		if (!rune) continue
 
-		const rng = createStringRng(`${text}:${placement.char}:${index}`)
+		const rng = RNG.createStringRng({
+			seed: `${text}:${placement.char}:${index}`,
+		})
 		const strokes = RUNE_RENDERER.prepareRuneStrokes({
 			rune,
 			options: renderOptions,

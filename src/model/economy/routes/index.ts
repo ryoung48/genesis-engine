@@ -10,12 +10,6 @@ import type {
 	SeaNeighborWorkspace,
 	SearchWorkspace,
 } from "@/model/economy/routes/types"
-import {
-	buildUrquhartEdgesFromFlat,
-	MinHeap,
-	regionDistanceKm,
-	regionPathLengthKm,
-} from "@/model/shared"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SocietyEra } from "@/model/society/types"
 import {
@@ -26,6 +20,9 @@ import {
 	type RouteEdge,
 	type SerializedRouteKind,
 } from "@/model/transport"
+import { MinHeap } from "@/model/shared/min-heap"
+import { UNITS } from "@/model/shared/units"
+import { URQUHART } from "@/model/shared/urquhart"
 
 function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	const { provinces, nations } = input
@@ -833,7 +830,7 @@ function appendLandRoutes({
 			regions: candidateRegions,
 			r_xyz: state.r_xyz,
 		})
-		const candidatePairs = buildUrquhartEdgesFromFlat(points).sort(
+		const candidatePairs = URQUHART.buildUrquhartEdgesFromFlat(points).sort(
 			// biome-ignore lint/nursery/useMaxParams: native Array callback signature
 			([sourceA, targetA], [sourceB, targetB]) =>
 				sourceA - sourceB || targetA - targetB,
@@ -848,12 +845,12 @@ function appendLandRoutes({
 			})
 			if (blockedPairs.has(provincePairKey)) continue
 			if (
-				regionDistanceKm(
-					state.r_xyz,
-					source.region,
-					target.region,
+				UNITS.regionDistanceKm({
+					r_xyz: state.r_xyz,
+					fromRegion: source.region,
+					toRegion: target.region,
 					planetRadiusKm,
-				) > maxLengthKm
+				}) > maxLengthKm
 			) {
 				continue
 			}
@@ -871,8 +868,11 @@ function appendLandRoutes({
 			})
 			if (pathRegions.length < 2) continue
 			if (
-				regionPathLengthKm(state.r_xyz, pathRegions, planetRadiusKm) >
-				maxLengthKm
+				UNITS.regionPathLengthKm({
+					r_xyz: state.r_xyz,
+					pathRegions,
+					planetRadiusKm,
+				}) > maxLengthKm
 			) {
 				continue
 			}
@@ -961,18 +961,18 @@ function appendSeaRoutes({
 				})
 				if (
 					Math.max(
-						regionDistanceKm(
-							state.r_xyz,
-							source.anchorRegion,
-							target.anchorRegion,
+						UNITS.regionDistanceKm({
+							r_xyz: state.r_xyz,
+							fromRegion: source.anchorRegion,
+							toRegion: target.anchorRegion,
 							planetRadiusKm,
-						),
-						regionDistanceKm(
-							state.r_xyz,
-							source.portRegion,
-							target.portRegion,
+						}),
+						UNITS.regionDistanceKm({
+							r_xyz: state.r_xyz,
+							fromRegion: source.portRegion,
+							toRegion: target.portRegion,
 							planetRadiusKm,
-						),
+						}),
 					) > maxLen
 				) {
 					continue
@@ -1010,11 +1010,11 @@ function appendSeaRoutes({
 					...waterPath,
 					target.anchorRegion,
 				]
-				const lengthKm = regionPathLengthKm(
-					state.r_xyz,
+				const lengthKm = UNITS.regionPathLengthKm({
+					r_xyz: state.r_xyz,
 					pathRegions,
 					planetRadiusKm,
-				)
+				})
 				if (lengthKm > maxLen) continue
 				routes.push({
 					fromProvince: source.province,

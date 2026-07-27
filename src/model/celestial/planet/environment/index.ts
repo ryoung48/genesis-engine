@@ -17,8 +17,8 @@ import { TEMPERATURE } from "@/model/celestial/planet/environment/temperature"
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
-import { createRng } from "@/model/shared/rng"
 import type { TemperatureHydrosphereLossInput } from "@/model/celestial/planet/environment/types"
+import { RNG } from "@/model/shared/rng"
 
 function applyTemperatureHydrosphereLoss({
 	hydrosphereCode,
@@ -147,7 +147,7 @@ function classifyBody(params: {
 // still lacks a stored albedo, but every newly generated body now gets a
 // real one from this roll instead of relying on it.
 function buildClassificationEnvironment(params: {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	group: OrbitGroup
 	classification: OrbitClassification
 	sizeClass: number

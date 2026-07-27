@@ -8,23 +8,26 @@ import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
 import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
-import { decodePlanetCode, encodePlanetCode } from "@/model/shared"
 import { ERAS } from "@/model/society/eras"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { GenesisWorld } from "@/model/world"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/generation-preview"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
+import { PLANET_CODE } from "@/model/shared/planet-code"
 
 const SMOKE_PLANET_SEED = 14963991
-const SMOKE_PLANET_CODE = encodePlanetCode(SMOKE_PLANET_SEED, {
+const SMOKE_PLANET_CODE = PLANET_CODE.encodePlanetCode({
 	seed: SMOKE_PLANET_SEED,
-	...DEFAULT_WORLD_PARAMS,
-	tideLock: null,
+	params: {
+		seed: SMOKE_PLANET_SEED,
+		...DEFAULT_WORLD_PARAMS,
+		tideLock: null,
+	},
 })
 
 function buildSmokeParams(code: string): GenesisParams {
-	const decoded = decodePlanetCode(code)
+	const decoded = PLANET_CODE.decodePlanetCode(code)
 	if (!decoded) throw new Error(`Invalid smoke planet code: ${code}`)
 
 	return {

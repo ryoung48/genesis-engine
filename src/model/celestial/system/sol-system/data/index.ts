@@ -1,8 +1,8 @@
-import { HOURS_PER_DAY } from "@/model/shared"
 import type { SystemBody } from "@/model/celestial/system/types"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
+import { TIME } from "@/model/shared/time"
 
 // live from the UI at generation time (see buildHomeBody), so its entry here
 // only carries the values that AREN'T user-editable: real Bond albedo,
@@ -192,7 +192,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 				gravityG: 0.166,
 				densityEarthRelative: 0.607,
 				densityDescription: "Mostly Rock",
-				rotationHours: 27.3 * HOURS_PER_DAY,
+				rotationHours: 27.3 * TIME.hoursPerDay,
 				tiltDeg: 6.7,
 				eccentricity: 0.055,
 				pd: 30.17,

@@ -9,13 +9,14 @@ import type {
 	PlateVec,
 	SphereMesh,
 	SuperPlateData,
-} from ".."
-import { eulerVelocityAt, SimplexNoise } from "../shared"
+} from "@/model"
 import type {
 	FindCollisionsParams,
 	PlateVelocityAtParams,
 	PropagateStressParams,
-} from "./types"
+} from "@/model/tectonics/types"
+import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { MATH } from "@/model/shared/math"
 
 const COLLISION_THRESHOLD = 0.75
 type StageTiming = { Stage: string; ms: string }
@@ -29,7 +30,7 @@ function plateVelocityAt({
 }: PlateVelocityAtParams): [number, number, number] {
 	const pv = plateVec.get(plateId)
 	if (!pv) return [0, 0, 0]
-	return eulerVelocityAt({ pole: pv.pole, omega: pv.omega, x, y, z })
+	return MATH.eulerVelocityAt({ pole: pv.pole, omega: pv.omega, x, y, z })
 }
 
 function findCollisions({

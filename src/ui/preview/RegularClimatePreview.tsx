@@ -1,11 +1,4 @@
 import React from "react"
-import {
-	mapLinear,
-	PURPLES_STOPS,
-	SPECTRAL_STOPS,
-	sampleBasisColorStops,
-	sampleColorStops,
-} from "@/model/shared"
 import { HeatmapChart } from "@/ui/components/composites/charts/HeatmapChart"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import {
@@ -13,7 +6,9 @@ import {
 	rgbToCss,
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
-import type { RegularClimatePreviewData } from "./types"
+import type { RegularClimatePreviewData } from "@/ui/preview/types"
+import { COLOR_INTERPOLATION } from "@/model/shared/color-interpolation"
+import { COLOR_PALETTES } from "@/model/shared/color-palettes"
 
 interface RegularClimatePreviewProps {
 	preview: RegularClimatePreviewData
@@ -42,10 +37,10 @@ function buildNormalizedTemperatureColorFn(
 	}
 	return (value: number) =>
 		rgbToCss(
-			sampleBasisColorStops(
-				SPECTRAL_STOPS,
-				mapLinear(value, min, max, 0, 1, true),
-			),
+			COLOR_INTERPOLATION.sampleBasisColorStops({
+				stops: COLOR_PALETTES.spectralStops,
+				t: COLOR_INTERPOLATION.mapLinear(value, min, max, 0, 1, true),
+			}),
 		)
 }
 
@@ -62,7 +57,10 @@ function buildNormalizedDaylightColorFn(
 	}
 	return (value: number) =>
 		rgbToCss(
-			sampleColorStops(PURPLES_STOPS, mapLinear(value, min, max, 1, 0, true)),
+			COLOR_INTERPOLATION.sampleColorStops({
+				stops: COLOR_PALETTES.purplesStops,
+				t: COLOR_INTERPOLATION.mapLinear(value, min, max, 1, 0, true),
+			}),
 		)
 }
 

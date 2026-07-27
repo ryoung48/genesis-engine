@@ -1,4 +1,3 @@
-import { titleCase } from "@/model/shared"
 import { GENDER_SYSTEM } from "@/model/society/gender-system"
 import { LANGUAGE } from "@/model/society/language/languages"
 import type { Language } from "@/model/society/language/languages/types"
@@ -14,6 +13,7 @@ import type {
 } from "@/model/society/language/names/types"
 import { CultureGenderSystem } from "@/model/society/types"
 import type { SerializedGenesisWorld } from "@/model/transport"
+import { TEXT } from "@/model/shared/text"
 
 export interface LanguageNameLeaderEntry {
 	time: number
@@ -213,7 +213,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 		const lang = getLanguage({ context, provinceIdx: index })
 		if (!lang) return fallback
 
-		const name = titleCase(
+		const name = TEXT.titleCase(
 			LANGUAGE.word.simple({
 				lang,
 				key,
@@ -240,7 +240,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 		const cached = cache.get(index)
 		if (cached) return cached
 		if (!lang) return fallback
-		const name = titleCase(
+		const name = TEXT.titleCase(
 			LANGUAGE.word.simple({
 				lang,
 				key,
@@ -411,7 +411,7 @@ function createNames(context: LanguageNameContext): LanguageNames {
 				}) === "female"
 					? "female"
 					: "male"
-			const name = titleCase(
+			const name = TEXT.titleCase(
 				LANGUAGE.word.simple({
 					lang,
 					key,

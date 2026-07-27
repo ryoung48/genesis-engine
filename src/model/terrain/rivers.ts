@@ -1,6 +1,7 @@
-import type { GenesisRivers } from ".."
-import { MinHeap, smoothstep } from "../shared"
-import type { ComputeRiversParams } from "./types"
+import type { GenesisRivers } from "@/model"
+import type { ComputeRiversParams } from "@/model/terrain/types"
+import { MinHeap } from "@/model/shared/min-heap"
+import { MATH } from "@/model/shared/math"
 
 function polylineLengthKm(
 	line: [number, number, number, number][],
@@ -108,7 +109,7 @@ export function computeRivers({
 	const runoffBoost = new Float32Array(N)
 	const passThroughElevBoost = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		const elev = smoothstep(0, 0.5, elevation[r])
+		const elev = MATH.smoothstep({ edge0: 0, edge1: 0.5, x: elevation[r] })
 		runoffBoost[r] = 1 + elev * 0.5
 		passThroughElevBoost[r] = elev * 0.003
 	}
@@ -138,7 +139,9 @@ export function computeRivers({
 			flowToTarget[r] =
 				totalMm > 0 ? ((totalMm / 1000) * cellAreaM2) / secondsPerMonth : 0
 			const pet = climate.pet_monthly[idx]
-			const loss = 0.001 + smoothstep(0, monthlyPetHigh, pet) * 0.004
+			const loss =
+				0.001 +
+				MATH.smoothstep({ edge0: 0, edge1: monthlyPetHigh, x: pet }) * 0.004
 			passThroughMonth[r] = Math.min(0.999, 1 - loss + passThroughElevBoost[r])
 		}
 
@@ -149,9 +152,17 @@ export function computeRivers({
 			if (target >= 0) {
 				const temp = climate.temperature_monthly[mOff + target]
 				let pt = passThroughMonth[target]
-				pt *= 0.9 + 0.1 * smoothstep(0.2, 0.9, aridityMonthly[mOff + target])
-				if (temp <= 0) pt *= smoothstep(-20, 0, temp)
-				else if (temp >= 90) pt *= smoothstep(150, 90, temp)
+				pt *=
+					0.9 +
+					0.1 *
+						MATH.smoothstep({
+							edge0: 0.2,
+							edge1: 0.9,
+							x: aridityMonthly[mOff + target],
+						})
+				if (temp <= 0) pt *= MATH.smoothstep({ edge0: -20, edge1: 0, x: temp })
+				else if (temp >= 90)
+					pt *= MATH.smoothstep({ edge0: 150, edge1: 90, x: temp })
 				// Larger rivers lose proportionally less: scale loss by Q^-0.4
 				const inFlow = flowToTarget[r]
 				if (inFlow > 0) pt = 1 - (1 - pt) / Math.pow(1 + inFlow / Q_REF, 0.4)

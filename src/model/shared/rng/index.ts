@@ -1,3 +1,8 @@
+import type {
+	CreateRngParams,
+	CreateStringRngParams,
+} from "@/model/shared/rng/types"
+
 export type WeightedValue<T> = { v: T; w: number }
 
 export interface SharedRng {
@@ -15,13 +20,7 @@ export interface SharedRng {
 	): T[]
 }
 
-export type GenesisRng = Pick<SharedRng, "random" | "randint">
-
-interface CreateRngOptions {
-	nonPositiveWeightBehavior?: "first" | "undefined"
-}
-
-export function seedStringToNumber(seed: string): number {
+function seedStringToNumber(seed: string): number {
 	const normalized = seed.trim().toLowerCase()
 	if (/^[0-9a-z]+$/.test(normalized)) {
 		const parsed = Number.parseInt(normalized, 36)
@@ -36,7 +35,7 @@ export function seedStringToNumber(seed: string): number {
 	return Math.abs(hash) || 1
 }
 
-export function makeRng(seed: number): () => number {
+function makeRng(seed: number): () => number {
 	let s = (Math.abs(Math.floor(seed * 9301 + 49297)) % 2147483646) + 1
 	return () => {
 		s = (s * 16807) % 2147483647
@@ -44,15 +43,12 @@ export function makeRng(seed: number): () => number {
 	}
 }
 
-export function makeRandInt(seed: number): (n: number) => number {
+function makeRandInt(seed: number): (n: number) => number {
 	const r = makeRng(seed)
 	return (n: number) => Math.floor(r() * n)
 }
 
-export function createRng(
-	seed: number,
-	options: CreateRngOptions = {},
-): SharedRng {
+function createRng({ seed, options = {} }: CreateRngParams): SharedRng {
 	const random = makeRng(seed)
 	const nonPositiveWeightBehavior =
 		options.nonPositiveWeightBehavior ?? "undefined"
@@ -131,9 +127,14 @@ export function createRng(
 	}
 }
 
-export function createStringRng(
-	seed: string,
-	options?: CreateRngOptions,
-): SharedRng {
-	return createRng(seedStringToNumber(seed), options)
+function createStringRng({ seed, options }: CreateStringRngParams): SharedRng {
+	return createRng({ seed: seedStringToNumber(seed), options })
+}
+
+export const RNG = {
+	seedStringToNumber,
+	makeRng,
+	makeRandInt,
+	createRng,
+	createStringRng,
 }

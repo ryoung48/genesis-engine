@@ -1,8 +1,8 @@
-import { createStringRng } from "@/model/shared"
 import type {
 	CompressNameParams,
 	CompressWordParams,
 } from "@/model/society/script/compress/types"
+import { RNG } from "@/model/shared/rng"
 
 function normalizeName(name: string): string {
 	return name
@@ -22,7 +22,7 @@ function compressWord({ word, ratio, seedSalt }: CompressWordParams): string {
 		{ length: word.length - 1 },
 		(_, index) => index + 1,
 	)
-	const selected = createStringRng(`${seedSalt}:${word}`)
+	const selected = RNG.createStringRng({ seed: `${seedSalt}:${word}` })
 		.sample(remainingIndices, Math.max(0, target - 1))
 		.sort((a, b) => a - b)
 

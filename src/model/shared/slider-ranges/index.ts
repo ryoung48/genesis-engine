@@ -1,9 +1,9 @@
-import { DEFAULT_PLANET_RADIUS_KM } from "./units"
+import { UNITS } from "@/model/shared/units"
+import type { SliderRange } from "@/model/shared/slider-ranges/types"
 
-type SliderRange = { min: number; max: number; step: number }
+const RADIUS_MIN = Math.round((UNITS.defaultPlanetRadiusKm * 0.5) / 100) * 100
 
-const RADIUS_MIN = Math.round((DEFAULT_PLANET_RADIUS_KM * 0.5) / 100) * 100
-const RADIUS_MAX = Math.round((DEFAULT_PLANET_RADIUS_KM * 4) / 100) * 100
+const RADIUS_MAX = Math.round((UNITS.defaultPlanetRadiusKm * 4) / 100) * 100
 
 export const SLIDER_RANGES = {
 	// terrain

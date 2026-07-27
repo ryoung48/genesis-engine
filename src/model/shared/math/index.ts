@@ -1,23 +1,28 @@
-import type { SphereMesh } from ".."
-import type { EulerVelocityAtParams } from "./types"
+import type { SphereMesh } from "@/model"
+import type {
+	ClampParams,
+	SmoothstepParams,
+	PiecewiseParams,
+	EulerVelocityAtParams,
+} from "@/model/shared/math/types"
 
 const RAD2DEG = 180 / Math.PI
 
-export function clamp(value: number, lo: number, hi: number): number {
+function clamp({ value, lo, hi }: ClampParams): number {
 	return Math.max(lo, Math.min(hi, value))
 }
 
-export function clamp01(value: number): number {
+function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))
 }
 
-export function smoothstep(edge0: number, edge1: number, x: number): number {
+function smoothstep({ edge0, edge1, x }: SmoothstepParams): number {
 	if (edge0 === edge1) return x >= edge0 ? 1 : 0
 	const t = clamp01((x - edge0) / (edge1 - edge0))
 	return t * t * (3 - 2 * t)
 }
 
-export function eulerVelocityAt({
+function eulerVelocityAt({
 	pole,
 	omega,
 	x,
@@ -32,7 +37,7 @@ export function eulerVelocityAt({
 	]
 }
 
-export function getRegionLatLonDegrees(mesh: SphereMesh): {
+function getRegionLatLonDegrees(mesh: SphereMesh): {
 	latDeg: Float32Array
 	lonDeg: Float32Array
 } {
@@ -47,11 +52,7 @@ export function getRegionLatLonDegrees(mesh: SphereMesh): {
 	return { latDeg, lonDeg }
 }
 
-export function piecewise(
-	domain: number[],
-	range: number[],
-	x: number,
-): number {
+function piecewise({ domain, range, x }: PiecewiseParams): number {
 	if (x <= domain[0]) return range[0]
 	if (x >= domain[domain.length - 1]) return range[range.length - 1]
 	for (let i = 1; i < domain.length; i++) {
@@ -61,4 +62,13 @@ export function piecewise(
 		}
 	}
 	return range[range.length - 1]
+}
+
+export const MATH = {
+	clamp,
+	clamp01,
+	smoothstep,
+	eulerVelocityAt,
+	getRegionLatLonDegrees,
+	piecewise,
 }

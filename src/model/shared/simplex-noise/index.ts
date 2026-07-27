@@ -1,4 +1,4 @@
-import { makeRng } from "./rng"
+import { RNG } from "@/model/shared/rng"
 
 const G: [number, number, number][] = [
 	[1, 1, 0],
@@ -20,7 +20,7 @@ export class SimplexNoise {
 	private readonly pm12: Uint8Array
 
 	constructor(seed: number = 0) {
-		const rng = makeRng(seed)
+		const rng = RNG.makeRng(seed)
 		const p = new Uint8Array(256)
 		for (let i = 0; i < 256; i++) p[i] = i
 		for (let i = 255; i > 0; i--) {

@@ -1,9 +1,9 @@
-import { createRng } from "@/model/shared"
 import type {
 	AssignCultureGenderSystemsParams,
 	ResolveLeaderGenderParams,
 } from "@/model/society/gender-system/types"
 import type { CultureGenderSystem, LeaderGender } from "@/model/society/types"
+import { RNG } from "@/model/shared/rng"
 
 const cultureGenderSystem = {
 	PATRIARCHAL: 0,
@@ -25,7 +25,7 @@ function assignCultureGenderSystems({
 	count,
 	seed,
 }: AssignCultureGenderSystemsParams): Uint8Array {
-	const rng = createRng(seed)
+	const rng = RNG.createRng({ seed })
 	const systems = new Uint8Array(count)
 	for (let index = 0; index < count; index++) {
 		const roll = rng.random()

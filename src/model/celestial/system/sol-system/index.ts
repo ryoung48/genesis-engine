@@ -1,5 +1,3 @@
-import { ASTRONOMICAL_DAYS_PER_YEAR, HOURS_PER_DAY } from "@/model/shared"
-import { createRng } from "@/model/shared/rng"
 import { MOON } from "@/model/celestial/moons"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import { PLANET } from "@/model/celestial/planet"
@@ -15,6 +13,8 @@ import type {
 } from "@/model/celestial/system/sol-system/types"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { DATA } from "@/model/celestial/system/sol-system/data"
+import { RNG } from "@/model/shared/rng"
+import { TIME } from "@/model/shared/time"
 
 function estimateGasGiantInternalHeatTempK({
 	massEarths,
@@ -27,7 +27,7 @@ function estimateGasGiantInternalHeatTempK({
 }
 
 function rng(seedTag: number) {
-	return createRng(1_000_000 + seedTag)
+	return RNG.createRng({ seed: 1_000_000 + seedTag })
 }
 
 function rollExtras(seedTag: number) {
@@ -69,7 +69,7 @@ function buildMoon({
 			(1 - seed.landCoverage) * 100,
 		),
 		atmosphere: seed.atmosphere,
-		orbitalPeriodDays: seed.rotationHours / HOURS_PER_DAY,
+		orbitalPeriodDays: seed.rotationHours / TIME.hoursPerDay,
 		// Real named moons here are (like nearly every major moon in our own
 		// solar system) tidally locked, so this happens to equal the orbital
 		// period above — but it's the moon's actual sidereal rotation period
@@ -117,7 +117,7 @@ function buildPlanet({
 		STAR.getKeplerYearYears({
 			orbitalDistanceAU: seed.au,
 			massSol: options?.starMassSol ?? 1,
-		}) * ASTRONOMICAL_DAYS_PER_YEAR
+		}) * TIME.astronomicalDaysPerYear
 	const moons = (
 		options?.moonsOverride
 			? MOON.attachParentTideLocks({

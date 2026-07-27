@@ -7,7 +7,7 @@ import type {
 } from "@/model/climate/ebm/energy-balance-model/types"
 import { INSOLATION } from "@/model/climate/ebm/insolation"
 import { UTILS } from "@/model/climate/ebm/utils"
-import { HOURS_PER_DAY, SECONDS_PER_DAY } from "@/model/shared"
+import { TIME } from "@/model/shared/time"
 
 export class EnergyBalanceModel {
 	lats: number[] = []
@@ -45,7 +45,7 @@ export class EnergyBalanceModel {
 	private computeDiffusionCoefficients(): void {
 		const { grid, time, planet } = CONSTANTS.embConstants
 		const hoursPerDay = this.config.time?.HOURS_PER_DAY || time.HOURS_PER_DAY
-		const rotationFactor = Math.pow(hoursPerDay / HOURS_PER_DAY, 0.5)
+		const rotationFactor = Math.pow(hoursPerDay / TIME.hoursPerDay, 0.5)
 		const radiusRatio =
 			planet.EARTH_RADIUS / (this.config.radius || planet.EARTH_RADIUS)
 		const radiusFactor = radiusRatio * radiusRatio
@@ -231,7 +231,7 @@ export class EnergyBalanceModel {
 		const yearLengthDays =
 			this.config.time?.YEAR_LENGTH_DAYS || time.DAYS_PER_YEAR
 		const secondsPerSampleDay =
-			(yearLengthDays / time.DAYS_PER_YEAR) * SECONDS_PER_DAY
+			(yearLengthDays / time.DAYS_PER_YEAR) * TIME.secondsPerDay
 		const dt = dtDays * secondsPerSampleDay
 		const stepsPerDay = Math.floor(1 / dtDays)
 		const totalSteps = time.DAYS_PER_YEAR * stepsPerDay * years

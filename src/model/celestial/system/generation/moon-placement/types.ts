@@ -1,11 +1,11 @@
-import type { createRng } from "@/model/shared/rng"
-import type { MoonBody } from "../../../moons/types"
-import type { OrbitGroup } from "../../../orbit-body/types"
-import type { Zone } from "../../../planet/types"
-import type { MainSequenceClass } from "../../../star/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { OrbitGroup } from "@/model/celestial/orbit-body/types"
+import type { Zone } from "@/model/celestial/planet/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { RNG } from "@/model/shared/rng"
 
 export interface MoonPlacementInput {
-	rng: ReturnType<typeof createRng>
+	rng: ReturnType<typeof RNG.createRng>
 	moonCount: number
 	diameterKm: number
 	orbitalDistanceAU: number

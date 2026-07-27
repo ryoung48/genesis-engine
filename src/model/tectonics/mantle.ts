@@ -1,6 +1,7 @@
-﻿import type { PlateVec, SphereMesh } from ".."
-import { eulerVelocityAt, makeRng } from "../shared"
-import type { ComputeMantleFieldParams } from "./types"
+﻿import type { PlateVec, SphereMesh } from "@/model"
+import type { ComputeMantleFieldParams } from "@/model/tectonics/types"
+import { MATH } from "@/model/shared/math"
+import { RNG } from "@/model/shared/rng"
 
 const CONTINENTAL_DRAG_FACTOR = 0.35
 const OCEAN_DRAG_FACTOR = 1.0
@@ -52,7 +53,7 @@ function angularDistance(a: Vec3, b: Vec3): number {
 }
 
 function velocityAt(plate: PlateVec, pos: Vec3): Vec3 {
-	return eulerVelocityAt({
+	return MATH.eulerVelocityAt({
 		pole: plate.pole,
 		omega: plate.omega,
 		x: pos[0],
@@ -260,7 +261,7 @@ export function computeMantleField({
 		if (convCount > points.length * 0.4) convPoints.push(...points)
 	}
 
-	const mantleRng = makeRng(seed + 9999)
+	const mantleRng = RNG.makeRng(seed + 9999)
 	const mantleCenters: MantleCell[] = []
 	const placedPositions: Vec3[] = []
 	const isFarEnough = (candidate: Vec3) =>
