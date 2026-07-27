@@ -1,6 +1,6 @@
 import React from "react"
 import { Bar } from "react-chartjs-2"
-import { ContinuousLegend } from "../../primitives/charts/ContinuousLegend"
+import { ContinuousLegend } from "@/ui/components/primitives/charts/ContinuousLegend"
 
 interface HeatmapChartProps {
 	matrix: readonly (readonly number[])[]

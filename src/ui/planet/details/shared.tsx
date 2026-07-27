@@ -1,6 +1,6 @@
 import { type DistributionChartBucket as DistributionBucket } from "@/ui/components/composites/DistributionChart"
 import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
-import type { PlanetStat } from "../screen/display/planet-stats"
+import type { PlanetStat } from "@/ui/planet/screen/display/planet-stats"
 
 export type { DistributionBucket }
 

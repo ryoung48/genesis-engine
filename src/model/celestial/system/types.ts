@@ -1,5 +1,5 @@
-import type { MoonBody } from "../moons/types"
-import type { OrbitBody } from "../orbit-body/types"
+import type { MoonBody } from "@/model/celestial/moons/types"
+import type { OrbitBody } from "@/model/celestial/orbit-body/types"
 
 export interface RingProfile {
 	innerRadiusRelative: number
@@ -55,7 +55,7 @@ export type SystemBody = Omit<OrbitBody, GeneratedBodyFields> &
 		maxElevation?: number
 	}
 
-import type { MainSequenceClass } from "../star/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 
 export interface SolarSystemState {
 	star: {

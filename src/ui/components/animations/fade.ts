@@ -1,4 +1,4 @@
-import { cx } from "../lib"
+import { cx } from "@/ui/components/lib"
 
 export function fadeVisibilityClassName(
 	visible: boolean,

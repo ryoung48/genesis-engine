@@ -2,7 +2,7 @@ import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
 import {
 	formatTemperature,
 	type UnitSystem,
-} from "../../../planet/screen/shared/ui-format"
+} from "@/ui/planet/screen/shared/ui-format"
 
 export function formatHours(
 	hours: number,

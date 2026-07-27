@@ -1,6 +1,6 @@
 import React from "react"
-import { cx } from "../lib"
-import { uiTokens } from "../tokens"
+import { cx } from "@/ui/components/lib"
+import { uiTokens } from "@/ui/components/tokens"
 
 type IconButtonTone = "panel" | "overlay"
 type IconButtonSize = "sm" | "md"

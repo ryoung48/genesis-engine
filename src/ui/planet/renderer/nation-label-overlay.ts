@@ -2,8 +2,11 @@
 import { Text } from "troika-three-text"
 import type { SerializedGenesisWorld } from "@/model/transport/types"
 import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
-import { createMapProjection } from "./map-projection"
-import { globeScaleForPop, mapRadiusForPop } from "./settlement-overlay"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
+import {
+	globeScaleForPop,
+	mapRadiusForPop,
+} from "@/ui/planet/renderer/settlement-overlay"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 const LABEL_LIFT_GLOBE = 0.005

@@ -1,5 +1,5 @@
 import * as THREE from "three"
-import type { RotateForProjectionParams } from "./types"
+import type { RotateForProjectionParams } from "@/ui/planet/renderer/types"
 
 const MAP_X_SCALE = 2 / Math.PI
 export const MAX_MAP_PROJECTION_LATITUDE_DEG = 90

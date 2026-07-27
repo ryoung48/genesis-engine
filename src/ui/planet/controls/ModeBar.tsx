@@ -1,26 +1,26 @@
 import React from "react"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
-import type { ColorMode } from "../colors"
-import { getBaseMapMode } from "../screen/shared/data-variant"
+import type { ColorMode } from "@/ui/planet/colors"
+import { ModeButtonGroup } from "@/ui/planet/controls/mode-controls"
+import type {
+	ClimateSubMode,
+	TopographySubMode,
+	VegetationSubMode,
+} from "@/ui/planet/controls/OverlayControls"
+import type { ResolveSubModeParams } from "@/ui/planet/controls/types"
+import { getBaseMapMode } from "@/ui/planet/screen/shared/data-variant"
 import type {
 	MapModePrimary,
 	NationMapMode,
 	PopulationMapMode,
 	SocietyMapMode,
-} from "../screen/shared/map-modes"
+} from "@/ui/planet/screen/shared/map-modes"
 import {
 	getMapModePrimary,
 	getVisibleGeographyModeOptions,
 	getVisibleSocietyModeOptions,
 	PRIMARY_MAP_MODE_OPTIONS,
-} from "../screen/shared/map-modes"
-import { ModeButtonGroup } from "./mode-controls"
-import type {
-	ClimateSubMode,
-	TopographySubMode,
-	VegetationSubMode,
-} from "./OverlayControls"
-import type { ResolveSubModeParams } from "./types"
+} from "@/ui/planet/screen/shared/map-modes"
 
 interface ModeBarProps {
 	colorMode: ColorMode

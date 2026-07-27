@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom"
-import { APP_PATHS } from "./app-routes"
-import { GenesisView } from "./ui/planet/GenesisView"
+import { APP_PATHS } from "@/app-routes"
+import { GenesisView } from "@/ui/planet/GenesisView"
 
 function App() {
 	return (

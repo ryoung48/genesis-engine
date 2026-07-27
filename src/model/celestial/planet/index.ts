@@ -1,7 +1,7 @@
-import { ENVIRONMENT } from "./environment"
-import { SEISMOLOGY } from "./seismology"
-import { SIZE_CLASS } from "./size-class"
-import { TIDE_LOCK } from "./tide-lock"
+import { ENVIRONMENT } from "@/model/celestial/planet/environment"
+import { SEISMOLOGY } from "@/model/celestial/planet/seismology"
+import { SIZE_CLASS } from "@/model/celestial/planet/size-class"
+import { TIDE_LOCK } from "@/model/celestial/planet/tide-lock"
 
 export const PLANET = {
 	auFromTemperature: ENVIRONMENT.auFromTemperature,

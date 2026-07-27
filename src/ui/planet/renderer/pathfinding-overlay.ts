@@ -2,8 +2,8 @@ import * as THREE from "three"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
-import { createMapProjection } from "./map-projection"
-import type { GenesisViewMode } from "./types"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
+import type { GenesisViewMode } from "@/ui/planet/renderer/types"
 
 const PATHFIND_ARC_RADIUS = 1.02
 const PATHFIND_LINE_COLOR = 0x000000

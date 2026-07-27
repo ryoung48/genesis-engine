@@ -1,5 +1,5 @@
 import React from "react"
-import { cx } from "../lib"
+import { cx } from "@/ui/components/lib"
 import {
 	type UiBlur,
 	type UiBorderTone,
@@ -7,7 +7,7 @@ import {
 	type UiShadow,
 	type UiSurfaceTone,
 	uiTokens,
-} from "../tokens"
+} from "@/ui/components/tokens"
 
 type SurfacePadding = "none" | "sm" | "md" | "lg"
 

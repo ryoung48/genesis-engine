@@ -1,6 +1,6 @@
 import React from "react"
-import { cx } from "../lib"
-import { Button } from "./Button"
+import { cx } from "@/ui/components/lib"
+import { Button } from "@/ui/components/primitives/Button"
 
 interface PaginationProps {
 	pageIndex: number

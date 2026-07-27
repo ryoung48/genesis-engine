@@ -4,7 +4,7 @@ import type {
 	SerializedNetwork,
 	SerializedRouteKind,
 	SerializedRoutes,
-} from "./types"
+} from "@/model/transport/types"
 
 const ROUTE_LAND_MAJOR = 0
 const ROUTE_LAND_MINOR = 1

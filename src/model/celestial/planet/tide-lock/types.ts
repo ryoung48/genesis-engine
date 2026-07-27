@@ -1,4 +1,4 @@
-import type { TideLock } from "../../orbit-body/types"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 
 export interface TideLockEffectResult {
 	siderealDayHours: number

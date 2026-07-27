@@ -5,7 +5,7 @@ import {
 } from "@/ui/components/composites/EditableStatValue"
 import { CrosshairsGpsIcon } from "@/ui/components/primitives/icons/CrosshairsGpsIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
-import type { SliderDef } from "../../planet/screen/generation/sliders"
+import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
 
 export function GpsFocusButton({ onClick }: { onClick: () => void }) {
 	return (

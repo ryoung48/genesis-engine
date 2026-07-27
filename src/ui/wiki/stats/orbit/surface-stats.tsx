@@ -1,6 +1,6 @@
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
-import type { SliderDef } from "../../../planet/screen/generation/sliders"
-import { renderMiniSlider } from "../../shared/ui-atoms"
+import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
+import { renderMiniSlider } from "@/ui/wiki/shared/ui-atoms"
 
 export function buildSurfaceStats(
 	planetSliders: SliderDef[],

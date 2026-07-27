@@ -1,8 +1,8 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
 import { SYSTEM } from "@/model/celestial/system"
 import type { SystemBody } from "@/model/celestial/system/types"
-import { SIBLING_GROUP_LABEL } from "./constants"
-import { formatClassificationLabel } from "./formatters"
+import { SIBLING_GROUP_LABEL } from "@/ui/wiki/stats/orbit/constants"
+import { formatClassificationLabel } from "@/ui/wiki/stats/orbit/formatters"
 
 export function getMoonSeedBaseName(params: {
 	moon: MoonBody | undefined

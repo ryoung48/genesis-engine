@@ -1,4 +1,4 @@
-import type { ColorMode } from "../../colors"
+import type { ColorMode } from "@/ui/planet/colors"
 import type {
 	ClimateSubMode,
 	DangerSubMode,
@@ -6,11 +6,14 @@ import type {
 	MeasureMode,
 	TopographySubMode,
 	VegetationSubMode,
-} from "../../controls/OverlayControls"
-import type { GenesisViewMode } from "../../renderer"
-import type { NationMapMode, PopulationMapMode } from "../shared/map-modes"
-import { DEFAULT_GEOGRAPHY_MODE } from "../shared/map-modes"
-import type { UnitSystem } from "../shared/ui-format"
+} from "@/ui/planet/controls/OverlayControls"
+import type { GenesisViewMode } from "@/ui/planet/renderer"
+import type {
+	NationMapMode,
+	PopulationMapMode,
+} from "@/ui/planet/screen/shared/map-modes"
+import { DEFAULT_GEOGRAPHY_MODE } from "@/ui/planet/screen/shared/map-modes"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 
 interface StoredViewPrefs {
 	colorMode: ColorMode

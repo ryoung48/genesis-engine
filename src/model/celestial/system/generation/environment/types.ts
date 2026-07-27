@@ -1,4 +1,4 @@
-import type { Zone } from "../../../planet/types"
+import type { Zone } from "@/model/celestial/planet/types"
 
 export interface Slot {
 	zone: Zone

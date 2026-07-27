@@ -1,6 +1,6 @@
-import type { MoonBody, MoonOrbitRange } from "../../moons/types"
-import type { AtmosphereProfile } from "../../orbit-body/types"
-import type { SystemBody } from "../types"
+import type { MoonBody, MoonOrbitRange } from "@/model/celestial/moons/types"
+import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
+import type { SystemBody } from "@/model/celestial/system/types"
 
 export interface SolMoonSeed {
 	name: string

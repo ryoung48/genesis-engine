@@ -3,7 +3,7 @@ import {
 	formatAreaKm2,
 	formatCount,
 	formatDensity,
-} from "../nation/nation-stats"
+} from "@/ui/wiki/stats/nation/nation-stats"
 
 /** Same "Total Area"/"Population" shape as buildNationWikiStats, but summed
  * over an organization's current member territory (see

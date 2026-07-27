@@ -1,9 +1,9 @@
-import type { Zone } from "../../types"
 import type {
 	DeviationInput,
 	OrbitalTemperatureInput,
 	TemperatureInput,
-} from "./types"
+} from "@/model/celestial/planet/environment/temperature/types"
+import type { Zone } from "@/model/celestial/planet/types"
 
 const DEVIATION_DOMAIN = [
 	-4.5, -4.0, -4.0, -3.5, -3.5, -3.0, -3.0, -2.5, -2.5, -2.0, -2.0, -1.5, -1.5,

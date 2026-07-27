@@ -7,14 +7,14 @@ import {
 	getMoonOrbitDistanceRelativeToPlanet,
 	layoutMoonOrbitPeriapsesForDisplay,
 	scaleBodyDiameterToVisualRadius,
-} from "../moon-visual-scale"
+} from "@/ui/planet/moon-visual-scale"
 import {
 	createNameLabel,
 	createNameLeaderLine,
 	sizeNameLabel,
 	type Text,
 	updateLabelPlacement,
-} from "./body-name-label"
+} from "@/ui/planet/renderer/body-name-label"
 
 const MOON_COLORS_HEX = [0x0ea5e9, 0x8b5cf6, 0x10b981]
 const TWO_PI = 2 * Math.PI

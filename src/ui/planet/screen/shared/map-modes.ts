@@ -1,4 +1,4 @@
-import type { ColorMode } from "../../colors"
+import type { ColorMode } from "@/ui/planet/colors"
 
 export type PopulationMapMode =
 	| "density"

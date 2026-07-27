@@ -9,7 +9,7 @@ import type {
 	SerializedNetwork,
 	SerializedRouteKind,
 } from "@/model/transport/types"
-import { createMapProjection } from "./map-projection"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 const GLOBE_Z_LIFT = 0.009

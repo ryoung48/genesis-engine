@@ -10,7 +10,10 @@ import {
 } from "chart.js"
 import React, { useMemo } from "react"
 import { Bar } from "react-chartjs-2"
-import { formatTimingSeconds, type TimingEntry } from "./timing-summary"
+import {
+	formatTimingSeconds,
+	type TimingEntry,
+} from "@/ui/wiki/timing/timing-summary"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip)
 

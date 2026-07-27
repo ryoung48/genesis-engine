@@ -4,8 +4,8 @@
  * Faithful port of genesis's sphere-mesh.js.
  */
 import Delaunator from "delaunator"
+import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisRng } from "@/model/shared/rng/types"
-import type { SphereMesh } from "./types"
 
 /**
  * Fibonacci sphere with jitter — evenly-distributed points on a unit sphere.
@@ -327,7 +327,10 @@ function buildSphereMesh(
  * `{ numRegions, r_xyz }` structurally so it works with both the build-time
  * SphereMesh and the transport SerializedSphereMesh shape.
  */
-function buildRegionSpatialIndex(mesh: { numRegions: number; r_xyz: Float32Array }) {
+function buildRegionSpatialIndex(mesh: {
+	numRegions: number
+	r_xyz: Float32Array
+}) {
 	const N = mesh.numRegions
 	const binsLon = 360
 	const binsLat = 180

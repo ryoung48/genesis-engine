@@ -9,8 +9,11 @@ import {
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
-import { getMoonSeedBaseName } from "./body-titles"
-import { formatHours, formatLocalCalendarValue } from "./formatters"
+import { getMoonSeedBaseName } from "@/ui/wiki/stats/orbit/body-titles"
+import {
+	formatHours,
+	formatLocalCalendarValue,
+} from "@/ui/wiki/stats/orbit/formatters"
 
 export function buildDayLengthStats(params: {
 	siderealDayHours: number

@@ -1,6 +1,6 @@
 import React from "react"
-import { cx } from "../lib"
-import { Surface } from "../primitives/Surface"
+import { cx } from "@/ui/components/lib"
+import { Surface } from "@/ui/components/primitives/Surface"
 
 interface FloatingPanelProps extends React.HTMLAttributes<HTMLDivElement> {
 	interactive?: boolean

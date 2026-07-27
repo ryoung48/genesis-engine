@@ -1,7 +1,7 @@
 import React, { useState } from "react"
-import { Surface } from "../primitives/Surface"
-import { Swatch } from "../primitives/Swatch"
-import { uiTokens } from "../tokens"
+import { Surface } from "@/ui/components/primitives/Surface"
+import { Swatch } from "@/ui/components/primitives/Swatch"
+import { uiTokens } from "@/ui/components/tokens"
 
 export interface DistributionChartBucket {
 	label: string

@@ -1,5 +1,5 @@
 import React from "react"
-import { cx } from "../lib"
+import { cx } from "@/ui/components/lib"
 
 type TooltipPosition = "top" | "bottom"
 type TooltipAlign = "start" | "center" | "end"

@@ -3,11 +3,11 @@ import type {
 	SolarSystemState,
 	SystemBody,
 } from "@/model/celestial/system/types"
-import { GENERATION_SESSION_STORAGE_KEY } from "./defaults"
+import { GENERATION_SESSION_STORAGE_KEY } from "@/ui/planet/screen/generation/defaults"
 import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
-} from "./generation-preview"
+} from "@/ui/planet/screen/generation/generation-preview"
 
 type FocusTarget = {
 	bodyIndex: number

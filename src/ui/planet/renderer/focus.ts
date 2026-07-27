@@ -1,4 +1,4 @@
-import { createMapProjection } from "./map-projection"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 
 export function getRegionFocusTargets(params: {
 	meshXYZ: Float32Array

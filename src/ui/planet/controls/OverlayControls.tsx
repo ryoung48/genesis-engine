@@ -19,22 +19,22 @@ import {
 	clampClockDialHour,
 	formatClockTimeDisplay,
 	scaleClockDialHourToDayLength,
-} from "../clock"
-import type { ColorMode } from "../colors"
-import type { GenesisViewMode } from "../renderer"
-import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "../renderer/map-projection"
-import { gridSpacingOptions } from "../screen/shared/constants"
+} from "@/ui/planet/clock"
+import type { ColorMode } from "@/ui/planet/colors"
+import type { GenesisViewMode } from "@/ui/planet/renderer"
+import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "@/ui/planet/renderer/map-projection"
+import { gridSpacingOptions } from "@/ui/planet/screen/shared/constants"
 import {
 	type DataVariant,
 	getAvailableVariants,
 	getBaseMapMode,
-} from "../screen/shared/data-variant"
+} from "@/ui/planet/screen/shared/data-variant"
 import type {
 	NationMapMode,
 	PopulationMapMode,
-} from "../screen/shared/map-modes"
-import type { UnitSystem } from "../screen/shared/ui-format"
-import { formatDistance } from "../screen/shared/ui-format"
+} from "@/ui/planet/screen/shared/map-modes"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import { formatDistance } from "@/ui/planet/screen/shared/ui-format"
 
 export type MeasureMode = "off" | "ruler" | "pathfinding"
 export type DangerSubMode =

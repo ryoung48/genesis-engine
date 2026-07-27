@@ -1,8 +1,8 @@
 import React from "react"
-import { IconButton } from "../primitives/IconButton"
-import { CheckIcon } from "../primitives/icons/CheckIcon"
-import { CopyIcon } from "../primitives/icons/CopyIcon"
-import { Tooltip } from "../primitives/Tooltip"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { CheckIcon } from "@/ui/components/primitives/icons/CheckIcon"
+import { CopyIcon } from "@/ui/components/primitives/icons/CopyIcon"
+import { Tooltip } from "@/ui/components/primitives/Tooltip"
 
 interface CopyButtonProps
 	extends Omit<

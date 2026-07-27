@@ -1,4 +1,4 @@
-import type { MeasureMode } from "./controls/OverlayControls"
+import type { MeasureMode } from "@/ui/planet/controls/OverlayControls"
 
 export function canHandlePlanetClick(
 	measureMode: MeasureMode,

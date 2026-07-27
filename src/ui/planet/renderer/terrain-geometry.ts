@@ -7,8 +7,8 @@
 // those themselves, since geometry/material objects aren't worker-safe to
 // hand back as-is (only their underlying typed arrays are transferable).
 import type { SerializedGenesisWorld } from "@/model/transport/types"
-import { getColor } from "../colors"
-import { createMapProjection } from "./map-projection"
+import { getColor } from "@/ui/planet/colors"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 
 export const TERRAIN_ELEVATION_SCALE = 0.04
 

@@ -2,8 +2,8 @@ import * as THREE from "three"
 import { Line2 } from "three/examples/jsm/lines/Line2.js"
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js"
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
-import { createMapProjection } from "./map-projection"
-import type { GenesisViewMode } from "./types"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
+import type { GenesisViewMode } from "@/ui/planet/renderer/types"
 
 const MEASURE_ARC_RADIUS = 1.02
 const MEASURE_LINE_COLOR = 0x000000

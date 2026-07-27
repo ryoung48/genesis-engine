@@ -1,6 +1,6 @@
 import type { SerializedGenesisWorld } from "@/model/transport/types"
-import type { ColorMode } from "../colors"
-import type { HoverInfo } from "./hover"
+import type { ColorMode } from "@/ui/planet/colors"
+import type { HoverInfo } from "@/ui/planet/hover/hover"
 
 export interface GetHoverRainfallSeriesFromArraysParams {
 	hoverInfo: HoverInfo | null

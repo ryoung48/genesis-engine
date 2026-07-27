@@ -1,15 +1,18 @@
 ﻿import * as THREE from "three"
 import type { SerializedGenesisWorld } from "@/model/transport/types"
-import { getColor } from "../colors"
-import { createMapProjection } from "./map-projection"
+import { getColor } from "@/ui/planet/colors"
+import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
 	type MapGeometryArrays,
 	TERRAIN_ELEVATION_SCALE,
 	type TerrainGeometryArrays,
-} from "./terrain-geometry"
-import type { BuildMapWireframeParams, GenesisViewMode } from "./types"
+} from "@/ui/planet/renderer/terrain-geometry"
+import type {
+	BuildMapWireframeParams,
+	GenesisViewMode,
+} from "@/ui/planet/renderer/types"
 
 interface MeshBuildResult {
 	mesh: THREE.Mesh

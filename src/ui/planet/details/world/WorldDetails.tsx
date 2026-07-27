@@ -7,9 +7,9 @@ import {
 import { Pagination } from "@/ui/components/primitives/Pagination"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import type { WorldSection } from "../drawer-state"
-import type { DetailsDrawerBaseProps } from "../shared"
-import { DetailRow, formatPopulation } from "../shared"
+import type { WorldSection } from "@/ui/planet/details/drawer-state"
+import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
+import { DetailRow, formatPopulation } from "@/ui/planet/details/shared"
 
 // Matches GenerationPanel's own top-level collapsible blocks ("Generate",
 // "Moons"/"Orbits", "Climate") exactly -- a Surface sibling in the panel's
