@@ -7,11 +7,7 @@
 
 import { createRng, eulerVelocityAt, SimplexNoise } from "../shared"
 import { normalizeMantleField } from "../tectonics"
-import type {
-	GenesisTerrainFeatures,
-	SphereMesh,
-	TectonicPlate,
-} from "../types"
+import type { SphereMesh } from "../types"
 import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,

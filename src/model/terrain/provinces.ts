@@ -440,7 +440,6 @@ function assemblePartition(
 export function computeWeightedProvinces({
 	mesh,
 	isLand,
-	_topography,
 	seedRegions,
 	seedNames,
 	seed,

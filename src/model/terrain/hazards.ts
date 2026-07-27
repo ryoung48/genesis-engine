@@ -1,9 +1,4 @@
-﻿import type {
-	BoundaryInfo,
-	DistanceFields,
-	GenesisHazards,
-	SphereMesh,
-} from ".."
+﻿import type { GenesisHazards } from ".."
 import { clamp01, smoothstep } from "../shared"
 import type { PropagateInfluenceParams, ComputeHazardsParams } from "./types"
 

@@ -1,11 +1,4 @@
-import type {
-	GenesisClimate,
-	GenesisHydrology,
-	GenesisParams,
-	GenesisRainfall,
-	GenesisRivers,
-	SphereMesh,
-} from ".."
+import type { GenesisRivers } from ".."
 import { MinHeap, smoothstep } from "../shared"
 import type { ComputeRiversParams } from "./types"
 

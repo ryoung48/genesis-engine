@@ -4,7 +4,7 @@
  * fine-grained detail from individual plate interactions.
  * Faithful port of genesis's super-plates.js.
  */
-import type { PlateVec, SphereMesh, SuperPlateData } from ".."
+import type { PlateVec, SuperPlateData } from ".."
 import type { BuildSuperPlatesParams } from "./types"
 
 export function buildSuperPlates({
@@ -222,7 +222,7 @@ export function buildSuperPlates({
 			if (largest) {
 				const pv = plateVec.get(largest.pid)
 				if (pv) {
-					superPlateVec.set(sp, { pole: [...pv.pole], omega: pv.omega })
+					superPlateVec.set(sp, { pole: [...pv.pole] as [number, number, number], omega: pv.omega })
 					continue
 				}
 			}

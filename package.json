@@ -20,6 +20,7 @@
 		"check:underscore-unused": "node scripts/check-underscore-unused.mjs",
 		"check:passthrough-exports": "node scripts/check-passthrough-exports.mjs",
 		"check:types-outside-types-file": "node scripts/check-types-outside-types-file.mjs",
+		"fix:types-outside-types-file": "node scripts/fix-types-outside-types-file.mjs",
 		"check:flat-file-sibling-folder": "node scripts/check-flat-file-sibling-folder.mjs",
 		"check:loose-files-in-domain": "node scripts/check-loose-files-in-domain.mjs"
 	},

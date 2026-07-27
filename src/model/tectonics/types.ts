@@ -1,3 +1,7 @@
+import type { SphereMesh } from "../types/mesh"
+import type { PlateVec } from "../types/tectonics"
+import type { SimplexNoise } from "../shared/simplex-noise"
+
 export interface ProjectCoarsePlatesParams {
 	mesh: SphereMesh
 	coarseMesh: SphereMesh

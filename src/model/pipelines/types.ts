@@ -1,3 +1,5 @@
+import type { SphereMesh } from "../types/mesh"
+
 export interface SampleBilinearParams {
 	pixels: Uint8Array
 	imgW: number

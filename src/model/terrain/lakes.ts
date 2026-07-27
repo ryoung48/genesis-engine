@@ -1,5 +1,4 @@
-﻿import type { GenesisRainfall, SphereMesh } from ".."
-import { MinHeap } from "../shared"
+﻿import { MinHeap } from "../shared"
 import type {
 	SelectCompactLakeFallbackParams,
 	TrimLakeCorridorsParams,

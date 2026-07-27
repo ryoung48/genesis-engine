@@ -1,3 +1,7 @@
+import type { HistoryState, War } from "./state"
+import type { HistoryRng } from "./history-rng"
+import type { DerivedCache } from "./derive"
+
 export interface QueueBattleEventParams {
 	state: HistoryState
 	warIdx: number

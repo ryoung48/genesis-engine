@@ -111,7 +111,16 @@ function relativeSpecifier(fromFilePath, toFilePath) {
 	return rel.startsWith(".") ? rel : `./${rel}`
 }
 
+// Test files (`*.test.ts`, `*.smoke.test.ts`, ...) aren't domain modules —
+// flattening one into its own submodule, wrapping its exports into a
+// namespace, extracting its types, or bundling its params is never correct,
+// regardless of --dir scope.
+function isTestFile(filePath) {
+	return /\.test\.tsx?$/.test(filePath)
+}
+
 function inScope(filePath) {
+	if (isTestFile(filePath)) return false
 	return !SCOPE_DIR || filePath === SCOPE_DIR || filePath.startsWith(`${SCOPE_DIR}/`)
 }
 
@@ -127,7 +136,7 @@ const BUILTIN_NAMES = new Set([
 	"Readonly", "Pick", "Omit", "Exclude", "Extract", "ReturnType",
 	"Parameters", "InstanceType", "Map", "ReadonlyMap", "Set", "ReadonlySet",
 	"Date", "RegExp", "Error", "Function", "Iterable", "IterableIterator",
-	"Generator", "PromiseLike", "WeakMap", "WeakSet", "ArrayBuffer", "ArrayBufferLike",
+	"Generator", "PromiseLike", "WeakMap", "WeakSet", "ArrayBuffer", "ArrayBufferLike", "ArrayLike",
 	"Uint8Array", "Uint16Array", "Uint32Array", "Int8Array", "Int16Array",
 	"Int32Array", "Float32Array", "Float64Array", "Math", "JSON", "console",
 	"number", "string", "boolean", "void", "null", "undefined", "any",
@@ -544,7 +553,13 @@ if (runsStep(1)) {
 		const newDir = `${dir}/${baseName}`
 		const newIndexPath = `${newDir}/index${ext}`
 
-		if (project.getDirectory(newDir)) continue // already a submodule — nothing to flatten
+		// Check for the actual index file, not just directory existence —
+		// an empty leftover directory (e.g. from a prior run that got
+		// reverted without `git clean`, or one Step 4/5 created for a new
+		// types.ts) would otherwise look like "already a submodule" and
+		// silently block flattening forever, even though there's nothing
+		// there.
+		if (existsSync(newIndexPath)) continue // already a submodule — nothing to flatten
 
 		console.log(
 			`${CHECK_ONLY ? "[dry-run] " : ""}[flatten] ${path.relative(SRC_ROOT, sourceFile.getFilePath()).replace(/\\/g, "/")} -> ${path.relative(SRC_ROOT, newIndexPath).replace(/\\/g, "/")}`,
@@ -574,7 +589,7 @@ if (runsStep(1)) {
 	for (const p of movedIndexPaths) touchedFiles.add(p)
 
 	console.log(
-		`${CHECK_ONLY ? "Would flatten" : "Flattened"} ${CHECK_ONLY ? flatCandidates.filter((sf) => !project.getDirectory(`${path.dirname(sf.getFilePath())}/${sf.getBaseNameWithoutExtension()}`)).length : movedIndexPaths.length} file(s) into submodules.\n`,
+		`${CHECK_ONLY ? "Would flatten" : "Flattened"} ${CHECK_ONLY ? flatCandidates.filter((sf) => !existsSync(`${path.dirname(sf.getFilePath())}/${sf.getBaseNameWithoutExtension()}/index${sf.getExtension()}`)).length : movedIndexPaths.length} file(s) into submodules.\n`,
 	)
 }
 
@@ -2112,10 +2127,18 @@ async function flush(reload) {
 		const stillExisting = [...allTouchedFilesEver].filter((f) => existsSync(f))
 		if (stillExisting.length > 0) {
 			const { execFileSync } = await import("node:child_process")
-			execFileSync("npx", ["biome", "format", "--write", ...stillExisting], {
-				stdio: "inherit",
-				shell: true,
-			})
+			// Windows caps a single command line at ~8191 chars — a large
+			// run (a whole domain, not just one submodule) can easily blow
+			// past that with full absolute paths. Chunk into batches small
+			// enough to always stay under it regardless of path length.
+			const CHUNK_SIZE = 50
+			for (let i = 0; i < stillExisting.length; i += CHUNK_SIZE) {
+				const chunk = stillExisting.slice(i, i + CHUNK_SIZE)
+				execFileSync("npx", ["biome", "format", "--write", ...chunk], {
+					stdio: "inherit",
+					shell: true,
+				})
+			}
 		}
 	}
 
