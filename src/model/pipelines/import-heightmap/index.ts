@@ -9,12 +9,6 @@ import { KOPPEN } from "@/model/climate/koppen"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
 import {
-	buildDummyBoundary,
-	buildSyntheticPlates,
-	computeSimpleDistanceFields,
-	deriveSyntheticPlates,
-} from "@/model/tectonics"
-import {
 	applySeaLevelToElevation,
 	applySoilCreep,
 	buildCoastDensityWeight,
@@ -44,6 +38,7 @@ import type {
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"
+import { SYNTHETIC_PLATES } from "@/model/tectonics/synthetic-plates"
 
 function createTimingRecorder() {
 	const timings: StageTiming[] = []
@@ -769,17 +764,18 @@ function importGenesisWorld({
 
 	// Derive synthetic plates
 	t0 = performance.now()
-	const { plateAssignment, plateIds, plateIsOcean } = deriveSyntheticPlates(
+	const { plateAssignment, plateIds, plateIsOcean } =
+		SYNTHETIC_PLATES.deriveSyntheticPlates({ mesh, elevation })
+	const plates = SYNTHETIC_PLATES.buildSyntheticPlates({
+		plateIds,
+		plateIsOcean,
+	})
+	const boundary = SYNTHETIC_PLATES.buildDummyBoundary({ mesh, elevation })
+	const distFields = SYNTHETIC_PLATES.computeSimpleDistanceFields({
 		mesh,
 		elevation,
-	)
-	const plates = buildSyntheticPlates(plateIds, plateIsOcean)
-	const boundary = buildDummyBoundary(mesh, elevation)
-	const distFields = computeSimpleDistanceFields(
-		mesh,
-		elevation,
-		params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
-	)
+		planetRadiusKm: params.planetRadiusKm ?? UNITS.defaultPlanetRadiusKm,
+	})
 	record("Synthetic plates + boundary", t0)
 	onProgress?.("import:plates", 25)
 

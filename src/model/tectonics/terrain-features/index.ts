@@ -1,4 +1,4 @@
-export const GENESIS_TERRAIN_FEATURE_LABELS = [
+const genesisTerrainFeatureLabels = [
 	"none",
 	"rift valley",
 	"pull-apart basin",
@@ -15,7 +15,7 @@ export const GENESIS_TERRAIN_FEATURE_LABELS = [
 	"large igneous province",
 ] as const
 
-export const GENESIS_TERRAIN_FEATURE = {
+const genesisTerrainFeature = {
 	RIFT_VALLEY: 1,
 	PULL_APART_BASIN: 2,
 	BACK_ARC_BASIN: 3,
@@ -30,3 +30,8 @@ export const GENESIS_TERRAIN_FEATURE = {
 	VOLCANIC_ARC: 12,
 	LARGE_IGNEOUS_PROVINCE: 13,
 } as const
+
+export const TERRAIN_FEATURES = {
+	genesisTerrainFeatureLabels,
+	genesisTerrainFeature,
+}

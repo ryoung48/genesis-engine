@@ -2128,6 +2128,18 @@ for (const { fn, nameNode, name, file, sourceFile, typesFilePath, typesFileIsNew
 	// — either direct calls to the bare name, or (the namespace-member
 	// case) every `NAMESPACE.fnName(...)` call site found project-wide.
 	for (const call of callSites) {
+		// A call site captured during the resolve phase can be inside
+		// ANOTHER function's call site being rewritten first in this same
+		// mutate phase (e.g. `dot(cross(a, b), c)` — rewriting dot's call
+		// replaces its whole text, including the nested cross(...) call,
+		// forgetting that node). Skipping avoids the crash, but the nested
+		// call is left calling the new destructured signature with old
+		// positional args — genuinely broken, not self-healing — so this
+		// has to be surfaced, not silently dropped.
+		if (call.wasForgotten()) {
+			console.log(`  [WARNING] a call site for ${name} was left unrewritten (nested inside another rewritten call) — now calling ${name}({ ${typeName} }) with old positional args; fix by hand`)
+			continue
+		}
 		const args = call.getArguments()
 		const objLiteral = params
 			.map((p, i) => {

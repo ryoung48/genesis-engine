@@ -1,7 +1,7 @@
 ﻿import type { BoundaryInfo, SphereMesh } from "@/model"
-import { GENESIS_TERRAIN_FEATURE } from "@/model/tectonics"
 import type { BuildTangentFrameParams } from "@/model/terrain/types"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 
 const VOLC_MIN_SPACING = 0.015
 const VOLC_SIGMA_BASE = 0.005
@@ -275,7 +275,11 @@ export function applyVolcanicArcs({
 		if (volcUplift > 0.001) {
 			elevation[r] += volcUplift
 			uplift[r] = volcUplift
-			markFeature(r, GENESIS_TERRAIN_FEATURE.VOLCANIC_ARC, volcUplift)
+			markFeature(
+				r,
+				TERRAIN_FEATURES.genesisTerrainFeature.VOLCANIC_ARC,
+				volcUplift,
+			)
 		}
 	}
 
@@ -392,7 +396,11 @@ export function applyLargeIgneousProvinces({
 		if (total > 0.001) {
 			elevation[r] += total
 			uplift[r] = total
-			markFeature(r, GENESIS_TERRAIN_FEATURE.LARGE_IGNEOUS_PROVINCE, total)
+			markFeature(
+				r,
+				TERRAIN_FEATURES.genesisTerrainFeature.LARGE_IGNEOUS_PROVINCE,
+				total,
+			)
 		}
 	}
 

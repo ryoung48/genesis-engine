@@ -10,7 +10,6 @@ import type {
 	PlateVec,
 	SphereMesh,
 } from "@/model"
-import { GENESIS_TERRAIN_FEATURE } from "@/model/tectonics"
 import type {
 	BoundedBfsParams,
 	ComputeDistanceFieldsParams,
@@ -21,6 +20,7 @@ import {
 } from "@/model/terrain/volcanism"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { RNG } from "@/model/shared/rng"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 
 type StageTiming = { Stage: string; ms: string }
 
@@ -544,7 +544,11 @@ export function blendElevation(
 						riftEffect = 0.04 * (1 - fade) * 0.2
 					}
 					elev[r] += riftEffect
-					markFeature(r, GENESIS_TERRAIN_FEATURE.RIFT_VALLEY, riftEffect)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.RIFT_VALLEY,
+						riftEffect,
+					)
 				}
 			}
 
@@ -563,7 +567,11 @@ export function blendElevation(
 						paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
 					}
 					elev[r] += paEffect
-					markFeature(r, GENESIS_TERRAIN_FEATURE.PULL_APART_BASIN, paEffect)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.PULL_APART_BASIN,
+						paEffect,
+					)
 				}
 			}
 
@@ -586,7 +594,11 @@ export function blendElevation(
 					}
 					elev[r] += baEffect
 					backArc[r] = baEffect
-					markFeature(r, GENESIS_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN,
+						baEffect,
+					)
 				}
 			}
 
@@ -623,7 +635,11 @@ export function blendElevation(
 					const foldEffect = foldCentered * foldAmp * ampMod
 					elev[r] += foldEffect
 					foldRidge[r] = foldEffect
-					markFeature(r, GENESIS_TERRAIN_FEATURE.FOLD_RIDGES, foldEffect)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.FOLD_RIDGES,
+						foldEffect,
+					)
 				}
 			}
 
@@ -705,7 +721,7 @@ export function blendElevation(
 				elev[r] += interiorEffect
 				markFeature(
 					r,
-					GENESIS_TERRAIN_FEATURE.CONTINENTAL_INTERIOR,
+					TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_INTERIOR,
 					interiorEffect,
 				)
 			}
@@ -714,7 +730,11 @@ export function blendElevation(
 			if (isPlateauZone && tectonicActivity > 0.1) {
 				const plateauEffect = 0.025 * tectonicActivity * (1 - sf)
 				elev[r] += plateauEffect
-				markFeature(r, GENESIS_TERRAIN_FEATURE.PLATEAU_UPLIFT, plateauEffect)
+				markFeature(
+					r,
+					TERRAIN_FEATURES.genesisTerrainFeature.PLATEAU_UPLIFT,
+					plateauEffect,
+				)
 			}
 		} else {
 			// ---- Ocean floor ----
@@ -751,7 +771,11 @@ export function blendElevation(
 				const ridgeN = ridgedFbm(x * 3, y * 3, z * 3, 4)
 				const ridgeEffect = (0.12 * ridgeN + 0.06) * ridgeFade
 				elev[r] += ridgeEffect
-				markFeature(r, GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE, ridgeEffect)
+				markFeature(
+					r,
+					TERRAIN_FEATURES.genesisTerrainFeature.MID_OCEAN_RIDGE,
+					ridgeEffect,
+				)
 			}
 
 			// Fracture zones
@@ -761,14 +785,22 @@ export function blendElevation(
 				const ft = fd / fractureHalfWidth
 				const fractureEffect = -0.03 * (1 - ft)
 				elev[r] += fractureEffect
-				markFeature(r, GENESIS_TERRAIN_FEATURE.FRACTURE_ZONE, fractureEffect)
+				markFeature(
+					r,
+					TERRAIN_FEATURES.genesisTerrainFeature.FRACTURE_ZONE,
+					fractureEffect,
+				)
 			}
 
 			// Trenches
 			if (btype === 1) {
 				const trenchEffect = -(0.15 + 0.15 * stressNorm)
 				elev[r] += trenchEffect
-				markFeature(r, GENESIS_TERRAIN_FEATURE.TRENCH, trenchEffect)
+				markFeature(
+					r,
+					TERRAIN_FEATURES.genesisTerrainFeature.TRENCH,
+					trenchEffect,
+				)
 			}
 
 			// Back-arc basin (ocean)
@@ -790,7 +822,11 @@ export function blendElevation(
 					}
 					elev[r] += baEffect
 					backArc[r] = baEffect
-					markFeature(r, GENESIS_TERRAIN_FEATURE.BACK_ARC_BASIN, baEffect)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN,
+						baEffect,
+					)
 				}
 			}
 
@@ -857,7 +893,11 @@ export function blendElevation(
 			if (subSup > 0 && coastNoise1 > 0) coastNoise1 *= 1 - subSup
 			elev[r] += coastNoise1
 			coastal[r] += coastNoise1
-			markFeature(r, GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING, coastNoise1)
+			markFeature(
+				r,
+				TERRAIN_FEATURES.genesisTerrainFeature.COASTAL_ROUGHENING,
+				coastNoise1,
+			)
 
 			// Layer 3: Coastline-aware domain warping
 			const warpReach = isPassiveCoast ? 1.2 : 1.5
@@ -879,7 +919,11 @@ export function blendElevation(
 				if (subSup > 0 && warpDelta > 0) warpDelta *= 1 - subSup
 				elev[r] += warpDelta
 				coastal[r] += warpDelta
-				markFeature(r, GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING, warpDelta)
+				markFeature(
+					r,
+					TERRAIN_FEATURES.genesisTerrainFeature.COASTAL_ROUGHENING,
+					warpDelta,
+				)
 			}
 
 			// Layer 2: Island scattering
@@ -906,7 +950,11 @@ export function blendElevation(
 					bump *= 1 - subSup / 0.3
 					elev[r] += bump
 					coastal[r] += bump
-					markFeature(r, GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING, bump)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.COASTAL_ROUGHENING,
+						bump,
+					)
 				}
 			}
 		}
@@ -973,7 +1021,11 @@ export function blendElevation(
 				}
 				elev[r] += uplift
 				if (uplift > 0.001) {
-					markFeature(r, GENESIS_TERRAIN_FEATURE.ISLAND_ARC, uplift)
+					markFeature(
+						r,
+						TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC,
+						uplift,
+					)
 				}
 			}
 		}

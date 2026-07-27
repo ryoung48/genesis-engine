@@ -1,13 +1,7 @@
-/**
- * Super plates: groups connected same-type plates into ~20 larger tectonic
- * units that move cohesively, producing broad genesisic belts while preserving
- * fine-grained detail from individual plate interactions.
- * Faithful port of genesis's super-plates.js.
- */
-import type { PlateVec, SuperPlateData } from ".."
-import type { BuildSuperPlatesParams } from "./types"
+import type { PlateVec, SuperPlateData } from "@/model"
+import type { BuildSuperPlatesParams } from "@/model/tectonics/super-plates/types"
 
-export function buildSuperPlates({
+function buildSuperPlates({
 	mesh,
 	r_plate,
 	plateSeeds,
@@ -281,4 +275,8 @@ export function buildSuperPlates({
 		superPlateDensity,
 		numSuperPlates,
 	}
+}
+
+export const SUPER_PLATES = {
+	buildSuperPlates,
 }

@@ -1,7 +1,5 @@
-import {
-	GENESIS_TERRAIN_FEATURE_LABELS,
-	GENESIS_TOPOGRAPHY_LABELS,
-} from "@/model"
+import { GENESIS_TOPOGRAPHY_LABELS } from "@/model"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
@@ -826,12 +824,12 @@ export function getHoverTerrainFeature(
 	const mask = world.terrainFeatures.featureMask[r]
 	if (!mask) return null
 	const all: string[] = []
-	for (let bit = 1; bit < GENESIS_TERRAIN_FEATURE_LABELS.length; bit++) {
-		if (mask & (1 << (bit - 1))) all.push(GENESIS_TERRAIN_FEATURE_LABELS[bit])
+	for (let bit = 1; bit < TERRAIN_FEATURES.genesisTerrainFeatureLabels.length; bit++) {
+		if (mask & (1 << (bit - 1))) all.push(TERRAIN_FEATURES.genesisTerrainFeatureLabels[bit])
 	}
 	return {
 		dominant:
-			GENESIS_TERRAIN_FEATURE_LABELS[
+			TERRAIN_FEATURES.genesisTerrainFeatureLabels[
 				world.terrainFeatures.dominantFeature[r]
 			] ?? null,
 		all,

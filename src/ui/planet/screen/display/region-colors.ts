@@ -1,4 +1,4 @@
-﻿import { GENESIS_TERRAIN_FEATURE } from "@/model"
+﻿import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
@@ -171,17 +171,17 @@ export function toPastelNationColor(
 }
 
 const TERRAIN_FEATURE_COLORS: Record<number, [number, number, number]> = {
-	[GENESIS_TERRAIN_FEATURE.RIFT_VALLEY]: [0.82, 0.29, 0.22],
-	[GENESIS_TERRAIN_FEATURE.PULL_APART_BASIN]: [0.7, 0.22, 0.18],
-	[GENESIS_TERRAIN_FEATURE.BACK_ARC_BASIN]: [0.95, 0.55, 0.22],
-	[GENESIS_TERRAIN_FEATURE.FOLD_RIDGES]: [0.55, 0.24, 0.13],
-	[GENESIS_TERRAIN_FEATURE.PLATEAU_UPLIFT]: [0.8, 0.65, 0.28],
-	[GENESIS_TERRAIN_FEATURE.CONTINENTAL_INTERIOR]: [0.45, 0.63, 0.21],
-	[GENESIS_TERRAIN_FEATURE.MID_OCEAN_RIDGE]: [0.17, 0.73, 0.88],
-	[GENESIS_TERRAIN_FEATURE.FRACTURE_ZONE]: [0.18, 0.47, 0.92],
-	[GENESIS_TERRAIN_FEATURE.TRENCH]: [0.07, 0.17, 0.46],
-	[GENESIS_TERRAIN_FEATURE.COASTAL_ROUGHENING]: [0.98, 0.9, 0.5],
-	[GENESIS_TERRAIN_FEATURE.ISLAND_ARC]: [0.9, 0.4, 0.72],
+	[TERRAIN_FEATURES.genesisTerrainFeature.RIFT_VALLEY]: [0.82, 0.29, 0.22],
+	[TERRAIN_FEATURES.genesisTerrainFeature.PULL_APART_BASIN]: [0.7, 0.22, 0.18],
+	[TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN]: [0.95, 0.55, 0.22],
+	[TERRAIN_FEATURES.genesisTerrainFeature.FOLD_RIDGES]: [0.55, 0.24, 0.13],
+	[TERRAIN_FEATURES.genesisTerrainFeature.PLATEAU_UPLIFT]: [0.8, 0.65, 0.28],
+	[TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_INTERIOR]: [0.45, 0.63, 0.21],
+	[TERRAIN_FEATURES.genesisTerrainFeature.MID_OCEAN_RIDGE]: [0.17, 0.73, 0.88],
+	[TERRAIN_FEATURES.genesisTerrainFeature.FRACTURE_ZONE]: [0.18, 0.47, 0.92],
+	[TERRAIN_FEATURES.genesisTerrainFeature.TRENCH]: [0.07, 0.17, 0.46],
+	[TERRAIN_FEATURES.genesisTerrainFeature.COASTAL_ROUGHENING]: [0.98, 0.9, 0.5],
+	[TERRAIN_FEATURES.genesisTerrainFeature.ISLAND_ARC]: [0.9, 0.4, 0.72],
 }
 
 export function getTerrainFeatureColor(

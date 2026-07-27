@@ -1,5 +1,4 @@
-﻿import { normalizeMantleField } from "@/model/tectonics"
-import type { SphereMesh } from "@/model/types"
+﻿import type { SphereMesh } from "@/model/types"
 import type { ApplyHotspotsParams } from "@/model/terrain/types"
 import {
 	appendLargeIgneousProvinceSites,
@@ -12,6 +11,7 @@ import {
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MATH } from "@/model/shared/math"
 import { RNG } from "@/model/shared/rng"
+import { MANTLE } from "@/model/tectonics/mantle"
 
 function findNearestR(
 	mesh: SphereMesh,
@@ -111,7 +111,7 @@ export function applyHotspots({
 	const hsNoise = new SimplexNoise(seed + 501)
 	const hsNoise2 = new SimplexNoise(seed + 502)
 	const hsNoise3 = new SimplexNoise(seed + 503)
-	const mantleNorm = normalizeMantleField(mantleUpwelling)
+	const mantleNorm = MANTLE.normalizeMantleField(mantleUpwelling)
 
 	// FBM helpers
 	function fbm(

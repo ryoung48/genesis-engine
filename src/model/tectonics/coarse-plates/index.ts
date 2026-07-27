@@ -1,45 +1,25 @@
-﻿/**
- * Coarse reference grid for resolution-independent plate boundaries.
- * Generates plates on a fixed ~20K-region mesh, then projects onto any
- * high-res mesh with FBM noise perturbation for fractal boundaries.
- * Faithful port of genesis's coarse-plates.js.
- */
-
-import type { PlateVec, SphereMesh } from "@/model"
 import { buildSphereMesh } from "@/model/mesh"
-import { assignOceanLand, generatePlates } from "@/model/tectonics/plates"
-import type { ProjectCoarsePlatesParams } from "@/model/tectonics/types"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { RNG } from "@/model/shared/rng"
+import { PLATES } from "@/model/tectonics/plates"
+import type {
+	CoarsePlateResult,
+	ProjectCoarsePlatesParams,
+	GenerateCoarsePlatesParams,
+} from "@/model/tectonics/coarse-plates/types"
 
 const N_COARSE = 20000
+
 const COARSE_JITTER = 0.75
 
-interface CoarsePlateOptions {
-	coarsePoints?: number
-}
-
-interface CoarsePlateResult {
-	coarseMesh: SphereMesh
-	coarse_r_plate: Int32Array
-	coarsePlateSeeds: Set<number>
-	coarsePlateVec: Map<number, PlateVec>
-	coarsePlateIsOcean: Set<number>
-}
-
-/**
- * Generate plates and ocean/land on a fixed coarse reference mesh.
- * Matches source: makeRng(seed+137) only for mesh building,
- * generatePlates and assignOceanLand use raw seed internally.
- */
-export function generateCoarsePlates(
-	seed: number,
-	numPlates: number,
-	landDistribution: number,
-	continentSizeVariety: number,
-	landCoverage: number,
-	options: CoarsePlateOptions = {},
-): CoarsePlateResult {
+function generateCoarsePlates({
+	seed,
+	numPlates,
+	landDistribution,
+	continentSizeVariety,
+	landCoverage,
+	options = {},
+}: GenerateCoarsePlatesParams): CoarsePlateResult {
 	// Coarse mesh uses isolated RNG — matches source coarse-plates.js
 	const coarseRng = RNG.makeRng(seed + 137)
 	const coarsePoints = options.coarsePoints ?? N_COARSE
@@ -54,18 +34,18 @@ export function generateCoarsePlates(
 		r_plate: coarse_r_plate,
 		plateSeeds: coarsePlateSeeds,
 		plateVec: coarsePlateVec,
-	} = generatePlates(coarseMesh, numPlates, seed)
+	} = PLATES.generatePlates({ mesh: coarseMesh, numPlates, seed })
 
 	// assignOceanLand creates its own RNG internally (seed+42)
-	const coarsePlateIsOcean = assignOceanLand(
-		coarseMesh,
-		coarse_r_plate,
-		coarsePlateSeeds,
+	const coarsePlateIsOcean = PLATES.assignOceanLand({
+		mesh: coarseMesh,
+		r_plate: coarse_r_plate,
+		plateSeeds: coarsePlateSeeds,
 		seed,
 		landDistribution,
 		continentSizeVariety,
 		landCoverage,
-	)
+	})
 
 	return {
 		coarseMesh,
@@ -76,14 +56,7 @@ export function generateCoarsePlates(
 	}
 }
 
-/**
- * Project coarse plate assignments onto a high-res mesh via nearest-neighbor
- * with FBM noise perturbation for fractal plate boundaries.
- *
- * Uses adjacency-walk on the coarse mesh with warm-starting for O(1)
- * amortized cost per region.
- */
-export function projectCoarsePlates({
+function projectCoarsePlates({
 	mesh,
 	coarseMesh,
 	coarse_r_plate,
@@ -179,4 +152,9 @@ export function projectCoarsePlates({
 	}
 
 	return r_plate
+}
+
+export const COARSE_PLATES = {
+	generateCoarsePlates,
+	projectCoarsePlates,
 }

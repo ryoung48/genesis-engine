@@ -1,25 +1,14 @@
-﻿/**
- * Collision detection, stress propagation, and dual-layer super plate blending.
- * Faithful port of genesis's elevation.js collision/stress logic.
- */
-
-import type {
-	BoundaryInfo,
-	CollisionResult,
-	PlateVec,
-	SphereMesh,
-	SuperPlateData,
-} from "@/model"
-import type {
-	FindCollisionsParams,
-	PlateVelocityAtParams,
-	PropagateStressParams,
-} from "@/model/tectonics/types"
+import type { BoundaryInfo, CollisionResult } from "@/model"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { MATH } from "@/model/shared/math"
+import type {
+	PlateVelocityAtParams,
+	FindCollisionsParams,
+	PropagateStressParams,
+	ClassifyBoundariesParams,
+} from "@/model/tectonics/collision/types"
 
 const COLLISION_THRESHOLD = 0.75
-type StageTiming = { Stage: string; ms: string }
 
 function plateVelocityAt({
 	plateVec,
@@ -180,9 +169,6 @@ function findCollisions({
 	}
 }
 
-/**
- * Frontier-based BFS stress diffusion inward from boundaries.
- */
 function propagateStress({
 	mesh,
 	r_stress,
@@ -223,22 +209,18 @@ function propagateStress({
 	}
 }
 
-/**
- * Classify boundaries with dual-layer super plate blending (genesis port).
- * Runs findCollisions on both small plates and super plates, then blends.
- */
-export function classifyBoundaries(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plateSeeds: number[],
-	plateVec: Map<number, PlateVec>,
-	plateIsOcean: Set<number>,
-	plateDensity: Map<number, number>,
-	superPlateData: SuperPlateData | null,
-	seed: number,
-	spread: number,
-	timing?: StageTiming[],
-): BoundaryInfo {
+function classifyBoundaries({
+	mesh,
+	r_plate,
+	plateSeeds,
+	plateVec,
+	plateIsOcean,
+	plateDensity,
+	superPlateData,
+	seed,
+	spread,
+	timing,
+}: ClassifyBoundariesParams): BoundaryInfo {
 	const { numRegions, r_xyz } = mesh
 	const noise = new SimplexNoise(seed)
 
@@ -462,4 +444,8 @@ export function classifyBoundaries(
 		r_bothOcean,
 		r_hasOcean,
 	}
+}
+
+export const COLLISION = {
+	classifyBoundaries,
 }

@@ -12,15 +12,6 @@ import { ROUTES } from "@/model/economy/routes"
 import { buildSphereMesh } from "@/model/mesh"
 import { URBANIZATION } from "@/model/society/urbanization"
 import {
-	buildSuperPlates,
-	classifyBoundaries,
-	computeMantleField,
-	generateCoarsePlates,
-	projectCoarsePlates,
-	projectMantleFieldToRegions,
-	smoothAndReconnectPlates,
-} from "@/model/tectonics"
-import {
 	applyCraters,
 	applyHotspots,
 	applySeaLevelToElevation,
@@ -44,6 +35,11 @@ import type {
 import { RNG } from "@/model/shared/rng"
 import { STATS } from "@/model/shared/stats"
 import { UNITS } from "@/model/shared/units"
+import { COARSE_PLATES } from "@/model/tectonics/coarse-plates"
+import { COLLISION } from "@/model/tectonics/collision"
+import { MANTLE } from "@/model/tectonics/mantle"
+import { PLATES } from "@/model/tectonics/plates"
+import { SUPER_PLATES } from "@/model/tectonics/super-plates"
 
 function withTiming<T>(label: string, timings: StageTiming[], fn: () => T): T {
 	console.time(label)
@@ -97,7 +93,7 @@ function runActivePath(
 	r_plate: Int32Array,
 	plates: TectonicPlate[],
 	plateIds: number[],
-	coarse: ReturnType<typeof generateCoarsePlates>,
+	coarse: ReturnType<typeof COARSE_PLATES.generateCoarsePlates>,
 	params: GenesisParams,
 	volcanism: number,
 	plateAssignment: Int32Array,
@@ -117,7 +113,7 @@ function runActivePath(
 		)
 	}
 
-	const coarseMantleField = computeMantleField({
+	const coarseMantleField = MANTLE.computeMantleField({
 		plateVec: coarse.coarsePlateVec,
 		plateSeeds: coarse.coarsePlateSeeds,
 		plateIsOcean: coarse.coarsePlateIsOcean,
@@ -125,17 +121,17 @@ function runActivePath(
 		mesh: coarse.coarseMesh,
 		seed: params.seed,
 	})
-	const r_mantleUpwelling = projectMantleFieldToRegions(
+	const r_mantleUpwelling = MANTLE.projectMantleFieldToRegions({
 		coarseMantleField,
-		coarse.coarseMesh,
+		coarseMesh: coarse.coarseMesh,
 		mesh,
-	)
+	})
 
 	// 6. Build super plates (skip if < 8 plates)
 	let superPlateData = null
 	if (params.numPlates >= 8) {
 		superPlateData = withTiming("super-plates", pipelineTiming, () =>
-			buildSuperPlates({
+			SUPER_PLATES.buildSuperPlates({
 				mesh,
 				r_plate,
 				plateSeeds: plateIds,
@@ -149,18 +145,18 @@ function runActivePath(
 
 	// 7. Collision + stress (dual-layer with super plates)
 	const boundary = withTiming("collision", pipelineTiming, () =>
-		classifyBoundaries(
+		COLLISION.classifyBoundaries({
 			mesh,
 			r_plate,
-			plateIds,
-			coarse.coarsePlateVec,
-			coarse.coarsePlateIsOcean,
+			plateSeeds: plateIds,
+			plateVec: coarse.coarsePlateVec,
+			plateIsOcean: coarse.coarsePlateIsOcean,
 			plateDensity,
 			superPlateData,
-			params.seed,
-			5,
-			elevationTiming,
-		),
+			seed: params.seed,
+			spread: 5,
+			timing: elevationTiming,
+		}),
 	)
 	onProgress?.("collision", 14)
 
@@ -258,19 +254,19 @@ function generateGenesisWorld({
 	// 2. Generate coarse plates on fixed 20K mesh
 	onProgress?.("coarse-plates", 5)
 	const coarse = withTiming("coarse-plates", pipelineTiming, () =>
-		generateCoarsePlates(
-			params.seed,
-			params.numPlates,
-			params.landDistribution,
-			params.continentSizeVariety,
-			params.landCoverage,
-		),
+		COARSE_PLATES.generateCoarsePlates({
+			seed: params.seed,
+			numPlates: params.numPlates,
+			landDistribution: params.landDistribution,
+			continentSizeVariety: params.continentSizeVariety,
+			landCoverage: params.landCoverage,
+		}),
 	)
 
 	// 3. Project coarse plates → hi-res mesh with FBM noise perturbation
 	onProgress?.("project", 11)
 	const r_plate = withTiming("project", pipelineTiming, () =>
-		projectCoarsePlates({
+		COARSE_PLATES.projectCoarsePlates({
 			mesh,
 			coarseMesh: coarse.coarseMesh,
 			coarse_r_plate: coarse.coarse_r_plate,
@@ -283,7 +279,12 @@ function generateGenesisWorld({
 	const plateIds = Array.from(coarse.coarsePlateSeeds)
 	onProgress?.("smooth-plates", 12)
 	withTiming("smooth-plates", pipelineTiming, () => {
-		smoothAndReconnectPlates(mesh, r_plate, plateIds, 3)
+		PLATES.smoothAndReconnectPlates({
+			mesh,
+			r_plate,
+			plateSeeds: plateIds,
+			numPasses: 3,
+		})
 	})
 
 	// Build TectonicPlate[] and plateAssignment

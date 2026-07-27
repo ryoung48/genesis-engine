@@ -1,33 +1,43 @@
-﻿import type { PlateVec, SphereMesh } from "@/model"
-import type { ComputeMantleFieldParams } from "@/model/tectonics/types"
+import type { PlateVec } from "@/model"
 import { MATH } from "@/model/shared/math"
 import { RNG } from "@/model/shared/rng"
+import type {
+	MantleCell,
+	Vec3,
+	ComputeMantleFieldParams,
+	DotParams,
+	CrossParams,
+	SubParams,
+	AngularDistanceParams,
+	VelocityAtParams,
+	ProjectMantleFieldToRegionsParams,
+} from "@/model/tectonics/mantle/types"
 
 const CONTINENTAL_DRAG_FACTOR = 0.35
+
 const OCEAN_DRAG_FACTOR = 1.0
+
 const SIZE_VEL_POWER = 0.5
+
 const SIZE_VEL_MIN_FACTOR = 0.4
+
 const SIZE_VEL_MAX_FACTOR = 2.5
+
 const MANTLE_CELLS = 5
+
 const MANTLE_ROTATION_STRENGTH = 0.6
+
 const MANTLE_DOMINANT_STRENGTH = 2.0
+
 const MANTLE_MINOR_STRENGTH = 0.7
+
 const MIN_CELL_SEPARATION = 0.6
 
-type Vec3 = [number, number, number]
-
-interface MantleCell {
-	pos: Vec3
-	radialSign: number
-	rotSign: number
-	strength: number
-}
-
-function dot(a: Vec3, b: Vec3): number {
+function dot({ a, b }: DotParams): number {
 	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-function cross(a: Vec3, b: Vec3): Vec3 {
+function cross({ a, b }: CrossParams): Vec3 {
 	return [
 		a[1] * b[2] - a[2] * b[1],
 		a[2] * b[0] - a[0] * b[2],
@@ -35,12 +45,12 @@ function cross(a: Vec3, b: Vec3): Vec3 {
 	]
 }
 
-function sub(a: Vec3, b: Vec3): Vec3 {
+function sub({ a, b }: SubParams): Vec3 {
 	return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
 function length3(a: Vec3): number {
-	return Math.sqrt(dot(a, a))
+	return Math.sqrt(dot({ a, b: a }))
 }
 
 function normalize(a: Vec3): Vec3 {
@@ -48,11 +58,11 @@ function normalize(a: Vec3): Vec3 {
 	return len > 1e-12 ? [a[0] / len, a[1] / len, a[2] / len] : [0, 0, 1]
 }
 
-function angularDistance(a: Vec3, b: Vec3): number {
-	return Math.acos(Math.max(-1, Math.min(1, dot(a, b))))
+function angularDistance({ a, b }: AngularDistanceParams): number {
+	return Math.acos(Math.max(-1, Math.min(1, dot({ a, b }))))
 }
 
-function velocityAt(plate: PlateVec, pos: Vec3): Vec3 {
+function velocityAt({ plate, pos }: VelocityAtParams): Vec3 {
 	return MATH.eulerVelocityAt({
 		pole: plate.pole,
 		omega: plate.omega,
@@ -62,9 +72,7 @@ function velocityAt(plate: PlateVec, pos: Vec3): Vec3 {
 	})
 }
 
-export function normalizeMantleField(
-	mantleField: Float32Array,
-): Float32Array | null {
+function normalizeMantleField(mantleField: Float32Array): Float32Array | null {
 	let mantleMax = 0
 	for (let r = 0; r < mantleField.length; r++) {
 		const value = Math.abs(mantleField[r])
@@ -79,11 +87,11 @@ export function normalizeMantleField(
 	return normalized
 }
 
-export function projectMantleFieldToRegions(
-	coarseMantleField: Float32Array,
-	coarseMesh: SphereMesh,
-	mesh: SphereMesh,
-): Float32Array {
+function projectMantleFieldToRegions({
+	coarseMantleField,
+	coarseMesh,
+	mesh,
+}: ProjectMantleFieldToRegionsParams): Float32Array {
 	const projected = new Float32Array(mesh.numRegions)
 	const { adjOffset, adjList, r_xyz: coarse_xyz } = coarseMesh
 	const { r_xyz } = mesh
@@ -137,7 +145,7 @@ export function projectMantleFieldToRegions(
 	return projected
 }
 
-export function computeMantleField({
+function computeMantleField({
 	plateVec,
 	plateSeeds,
 	plateIsOcean,
@@ -251,12 +259,12 @@ export function computeMantleField({
 		if (!plateA || !plateB || !centroidA || !centroidB) continue
 
 		let convCount = 0
-		const normal = normalize(sub(centroidB, centroidA))
+		const normal = normalize(sub({ a: centroidB, b: centroidA }))
 		for (const point of points) {
-			const vA = velocityAt(plateA, point)
-			const vB = velocityAt(plateB, point)
-			const vRel = sub(vA, vB)
-			if (-dot(vRel, normal) > 0.05) convCount++
+			const vA = velocityAt({ plate: plateA, pos: point })
+			const vB = velocityAt({ plate: plateB, pos: point })
+			const vRel = sub({ a: vA, b: vB })
+			if (-dot({ a: vRel, b: normal }) > 0.05) convCount++
 		}
 		if (convCount > points.length * 0.4) convPoints.push(...points)
 	}
@@ -266,7 +274,7 @@ export function computeMantleField({
 	const placedPositions: Vec3[] = []
 	const isFarEnough = (candidate: Vec3) =>
 		placedPositions.every(
-			(placed) => 1 - dot(candidate, placed) >= MIN_CELL_SEPARATION,
+			(placed) => 1 - dot({ a: candidate, b: placed }) >= MIN_CELL_SEPARATION,
 		)
 
 	const numDown = Math.min(Math.ceil(MANTLE_CELLS / 2), convPoints.length)
@@ -285,7 +293,10 @@ export function computeMantleField({
 				const normalizedPoint = normalize(point)
 				let minDistance = Infinity
 				for (const placed of placedPositions) {
-					minDistance = Math.min(minDistance, 1 - dot(normalizedPoint, placed))
+					minDistance = Math.min(
+						minDistance,
+						1 - dot({ a: normalizedPoint, b: placed }),
+					)
 				}
 				if (
 					minDistance >= MIN_CELL_SEPARATION &&
@@ -327,7 +338,7 @@ export function computeMantleField({
 		for (const point of candidates) {
 			let minDistance = Infinity
 			for (const placed of placedPositions) {
-				minDistance = Math.min(minDistance, 1 - dot(point, placed))
+				minDistance = Math.min(minDistance, 1 - dot({ a: point, b: placed }))
 			}
 			if (minDistance >= MIN_CELL_SEPARATION && minDistance > bestDistance) {
 				bestDistance = minDistance
@@ -338,7 +349,7 @@ export function computeMantleField({
 			for (const point of candidates) {
 				let minDistance = Infinity
 				for (const placed of placedPositions) {
-					minDistance = Math.min(minDistance, 1 - dot(point, placed))
+					minDistance = Math.min(minDistance, 1 - dot({ a: point, b: placed }))
 				}
 				if (minDistance > bestDistance) {
 					bestDistance = minDistance
@@ -382,11 +393,11 @@ export function computeMantleField({
 		let flowZ = 0
 
 		for (const cell of mantleCenters) {
-			const radialBasis = cross(cross(pos, cell.pos), pos)
+			const radialBasis = cross({ a: cross({ a: pos, b: cell.pos }), b: pos })
 			const radialLength = length3(radialBasis)
 			if (radialLength < 1e-10) continue
 
-			const angle = angularDistance(pos, cell.pos)
+			const angle = angularDistance({ a: pos, b: cell.pos })
 			if (angle < 1e-6) continue
 
 			const radialX = radialBasis[0] / radialLength
@@ -414,7 +425,7 @@ export function computeMantleField({
 
 		let radialSum = 0
 		for (const cell of mantleCenters) {
-			const angle = angularDistance(pos, cell.pos)
+			const angle = angularDistance({ a: pos, b: cell.pos })
 			if (angle < 1e-6) continue
 			radialSum += (cell.radialSign * cell.strength) / (0.5 + angle * angle)
 		}
@@ -424,4 +435,10 @@ export function computeMantleField({
 	}
 
 	return mantleField
+}
+
+export const MANTLE = {
+	normalizeMantleField,
+	projectMantleFieldToRegions,
+	computeMantleField,
 }

@@ -1,21 +1,16 @@
-﻿/**
- * Shared helpers for deriving synthetic plate data from elevation.
- * Used by both the heightmap import pipeline and the stagnant lid pipeline
- * to construct the dummy BoundaryInfo / DistanceFields that downstream
- * climate + river systems require.
- */
-import type {
-	BoundaryInfo,
-	DistanceFields,
-	SphereMesh,
-	TectonicPlate,
-} from "@/model"
+import type { BoundaryInfo, DistanceFields, TectonicPlate } from "@/model"
 import { STATS } from "@/model/shared/stats"
+import type {
+	DeriveSyntheticPlatesParams,
+	BuildSyntheticPlatesParams,
+	BuildDummyBoundaryParams,
+	ComputeSimpleDistanceFieldsParams,
+} from "@/model/tectonics/synthetic-plates/types"
 
-export function deriveSyntheticPlates(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-): {
+function deriveSyntheticPlates({
+	mesh,
+	elevation,
+}: DeriveSyntheticPlatesParams): {
 	plateAssignment: Int32Array
 	plateIds: number[]
 	plateIsOcean: Set<number>
@@ -51,10 +46,10 @@ export function deriveSyntheticPlates(
 	return { plateAssignment: r_plate, plateIds, plateIsOcean }
 }
 
-export function buildSyntheticPlates(
-	plateIds: number[],
-	plateIsOcean: Set<number>,
-): TectonicPlate[] {
+function buildSyntheticPlates({
+	plateIds,
+	plateIsOcean,
+}: BuildSyntheticPlatesParams): TectonicPlate[] {
 	return plateIds.map((pid, idx) => ({
 		id: idx,
 		isOcean: plateIsOcean.has(pid),
@@ -67,10 +62,10 @@ export function buildSyntheticPlates(
 	}))
 }
 
-export function buildDummyBoundary(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-): BoundaryInfo {
+function buildDummyBoundary({
+	mesh,
+	elevation,
+}: BuildDummyBoundaryParams): BoundaryInfo {
 	const mountain_r = new Set<number>()
 	const coastline_r = new Set<number>()
 	const ocean_r = new Set<number>()
@@ -106,11 +101,11 @@ export function buildDummyBoundary(
 	}
 }
 
-export function computeSimpleDistanceFields(
-	mesh: SphereMesh,
-	elevation: Float32Array,
-	planetRadiusKm?: number,
-): DistanceFields {
+function computeSimpleDistanceFields({
+	mesh,
+	elevation,
+	planetRadiusKm,
+}: ComputeSimpleDistanceFieldsParams): DistanceFields {
 	const N = mesh.numRegions
 	const isLand = new Uint8Array(N)
 	for (let r = 0; r < N; r++) isLand[r] = elevation[r] > 0 ? 1 : 0
@@ -126,4 +121,11 @@ export function computeSimpleDistanceFields(
 		distCoast,
 		distCoastLand,
 	}
+}
+
+export const SYNTHETIC_PLATES = {
+	deriveSyntheticPlates,
+	buildSyntheticPlates,
+	buildDummyBoundary,
+	computeSimpleDistanceFields,
 }

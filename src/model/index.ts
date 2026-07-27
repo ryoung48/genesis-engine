@@ -1,8 +1,3 @@
-export {
-	GENESIS_TERRAIN_FEATURE,
-	GENESIS_TERRAIN_FEATURE_LABELS,
-} from "./tectonics"
-
 export { GENESIS_TOPOGRAPHY_LABELS } from "./terrain"
 export type {
 	BoundaryInfo,

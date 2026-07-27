@@ -1,4 +1,4 @@
-import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
+import { TERRAIN_FEATURES } from "@/model/tectonics/terrain-features"
 import { KOPPEN } from "@/model/climate/koppen"
 import { PASTA } from "@/model/climate/pasta"
 import { TRADE_GOODS } from "@/model/economy/trade-goods"
@@ -190,8 +190,8 @@ export function buildTerrainFeatureSwatches(
 			),
 		),
 	).map((feature) => {
-		const featureIndex = GENESIS_TERRAIN_FEATURE_LABELS.indexOf(
-			feature as (typeof GENESIS_TERRAIN_FEATURE_LABELS)[number],
+		const featureIndex = TERRAIN_FEATURES.genesisTerrainFeatureLabels.indexOf(
+			feature as (typeof TERRAIN_FEATURES.genesisTerrainFeatureLabels)[number],
 		)
 		const featureColor =
 			featureIndex >= 0 ? getTerrainFeatureColor(featureIndex) : null

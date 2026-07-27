@@ -1,34 +1,17 @@
-﻿/**
- * Plate generation and ocean/land assignment — faithful port of genesis's
- * plates.js + ocean-land.js.
- *
- * Key source-matching details:
- * - Dual RNG streams: makeRng(seed+0.5) for floats, makeRandInt(seed) for ints
- * - Two-at-a-time fused seed placement
- * - Region-index plate IDs (r_plate[pid] = pid)
- * - Internal smoothAndReconnectPlates call before Euler pole assignment
- * - assignOceanLand creates its own makeRng(seed+42)
- */
-
-import type { PlateVec, SphereMesh } from "@/model"
+import type { PlateVec } from "@/model"
 import { RNG } from "@/model/shared/rng"
+import type {
+	GeneratePlatesResult,
+	GeneratePlatesParams,
+	AssignOceanLandParams,
+	SmoothAndReconnectPlatesParams,
+} from "@/model/tectonics/plates/types"
 
-interface GeneratePlatesResult {
-	r_plate: Int32Array
-	plateSeeds: Set<number>
-	plateVec: Map<number, PlateVec>
-}
-
-/**
- * Generate tectonic plates via farthest-point seeding + round-robin flood fill.
- * Matches source's generatePlates exactly: dual RNG, two-at-a-time seeding,
- * region-index IDs, internal smoothing + Euler pole assignment.
- */
-export function generatePlates(
-	mesh: SphereMesh,
-	numPlates: number,
-	seed: number,
-): GeneratePlatesResult {
+function generatePlates({
+	mesh,
+	numPlates,
+	seed,
+}: GeneratePlatesParams): GeneratePlatesResult {
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const r_plate = new Int32Array(numRegions).fill(-1)
 	const rng = RNG.makeRng(seed + 0.5)
@@ -307,12 +290,12 @@ export function generatePlates(
 		}
 	}
 
-	smoothAndReconnectPlates(
+	smoothAndReconnectPlates({
 		mesh,
 		r_plate,
-		plateIds,
-		Math.round(3 - 2 * lowPlateT),
-	)
+		plateSeeds: plateIds,
+		numPasses: Math.round(3 - 2 * lowPlateT),
+	})
 
 	// Assign an Euler pole + angular velocity per plate
 	const plateVec = new Map<number, PlateVec>()
@@ -332,20 +315,15 @@ export function generatePlates(
 	return { r_plate, plateSeeds, plateVec }
 }
 
-/**
- * Assign ocean/land via farthest-point continent seeding with round-robin
- * growth, separation guarantees, and trapped sea absorption.
- * Creates its own RNG from makeRng(seed + 42) matching source ocean-land.js.
- */
-export function assignOceanLand(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plateSeeds: Set<number>,
-	seed: number,
-	landDistribution: number,
-	continentSizeVariety: number = 0,
-	landCoverage: number = 0.3,
-): Set<number> {
+function assignOceanLand({
+	mesh,
+	r_plate,
+	plateSeeds,
+	seed,
+	landDistribution,
+	continentSizeVariety = 0,
+	landCoverage = 0.3,
+}: AssignOceanLandParams): Set<number> {
 	const rng = RNG.makeRng(seed + 42)
 	const { numRegions, r_xyz, adjOffset, adjList } = mesh
 	const plateIds = Array.from(plateSeeds)
@@ -620,16 +598,12 @@ export function assignOceanLand(
 	return plateIsOcean
 }
 
-/**
- * Smooth plate boundaries via majority-vote and reconnect disconnected fragments.
- * Faithful port of genesis's smoothAndReconnectPlates.
- */
-export function smoothAndReconnectPlates(
-	mesh: SphereMesh,
-	r_plate: Int32Array,
-	plateSeeds: number[],
-	numPasses: number,
-): void {
+function smoothAndReconnectPlates({
+	mesh,
+	r_plate,
+	plateSeeds,
+	numPasses,
+}: SmoothAndReconnectPlatesParams): void {
 	const { numRegions, adjOffset, adjList } = mesh
 
 	// Build seed lookup for protection during smoothing.
@@ -754,4 +728,10 @@ export function smoothAndReconnectPlates(
 			}
 		}
 	}
+}
+
+export const PLATES = {
+	generatePlates,
+	assignOceanLand,
+	smoothAndReconnectPlates,
 }
