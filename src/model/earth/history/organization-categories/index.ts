@@ -1,12 +1,12 @@
 import { FOLD } from "@/model/earth/history/fold"
 import type { FoldedState } from "@/model/earth/history/fold/types"
 import type {
-	OrgCategory,
-	OrgProvinceCategory,
-	OrgCategorySchema,
-	OrgCategorizer,
-	ListOrgMembersParams,
 	CreateMembershipCategorizerParams,
+	ListOrgMembersParams,
+	OrgCategorizer,
+	OrgCategory,
+	OrgCategorySchema,
+	OrgProvinceCategory,
 } from "@/model/earth/history/organization-categories/types"
 
 function listOrgMembers({

@@ -1,9 +1,9 @@
-import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
-import type { GovernmentType } from "@/model/society/types"
 import type {
-	EarthHistoryGovernmentFamily,
 	BlendRgbParams,
+	EarthHistoryGovernmentFamily,
 } from "@/model/earth/history/government/types"
+import type { GovernmentType } from "@/model/society/types"
+import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
 
 const earthHistoryGovernmentFamilies: readonly EarthHistoryGovernmentFamily[] =
 	["tribal", "monarchy", "republic", "theocracy"]

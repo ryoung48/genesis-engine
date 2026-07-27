@@ -874,7 +874,14 @@ export function buildSolarSystemOverlay(
 			const a = (i / ORBIT_SEGMENTS) * TWO_PI
 			orbitPoints.push(
 				p.kepler
-					? orbitPoint(a, p.kepler.a, p.kepler.b, p.kepler.ae, p.kepler.P, p.kepler.Q)
+					? orbitPoint(
+							a,
+							p.kepler.a,
+							p.kepler.b,
+							p.kepler.ae,
+							p.kepler.P,
+							p.kepler.Q,
+						)
 					: new THREE.Vector3(
 							p.orbitRadius * Math.cos(a),
 							p.orbitRadius * Math.sin(a),
@@ -974,7 +981,14 @@ export function buildSolarSystemOverlay(
 			const a = (i / ORBIT_SEGMENTS) * TWO_PI
 			orbitPoints.push(
 				p.kepler
-					? orbitPoint(a, p.kepler.a, p.kepler.b, p.kepler.ae, p.kepler.P, p.kepler.Q)
+					? orbitPoint(
+							a,
+							p.kepler.a,
+							p.kepler.b,
+							p.kepler.ae,
+							p.kepler.P,
+							p.kepler.Q,
+						)
 					: new THREE.Vector3(
 							p.orbitRadius * Math.cos(a),
 							p.orbitRadius * Math.sin(a),
@@ -1043,7 +1057,14 @@ export function buildSolarSystemOverlay(
 			const period = periodDaysFor(p.kepler.a)
 			const M = mod2pi(p.meanAnomalyAtEpoch + (TWO_PI * day) / period)
 			const E = solveKepler(M, p.kepler.e)
-			const pos = orbitPoint(E, p.kepler.a, p.kepler.b, p.kepler.ae, p.kepler.P, p.kepler.Q)
+			const pos = orbitPoint(
+				E,
+				p.kepler.a,
+				p.kepler.b,
+				p.kepler.ae,
+				p.kepler.P,
+				p.kepler.Q,
+			)
 			p.bodyGroup.position.copy(pos)
 			p.moonState?.setDay(day)
 		}
@@ -1098,11 +1119,23 @@ export function buildSolarSystemOverlay(
 
 	function updateLabelOrientations(camera: THREE.PerspectiveCamera): void {
 		if (starNameLabel && starNameLeader) {
-			updateLabelPlacement(starNameLabel, starNameLeader, starRadius, IDENTITY_QUATERNION, camera)
+			updateLabelPlacement(
+				starNameLabel,
+				starNameLeader,
+				starRadius,
+				IDENTITY_QUATERNION,
+				camera,
+			)
 		}
 		for (const p of placed) {
 			if (p.nameLabel && p.nameLeader) {
-				updateLabelPlacement(p.nameLabel, p.nameLeader, p.sceneRadius, IDENTITY_QUATERNION, camera)
+				updateLabelPlacement(
+					p.nameLabel,
+					p.nameLeader,
+					p.sceneRadius,
+					IDENTITY_QUATERNION,
+					camera,
+				)
 			}
 			p.moonState?.updateLabelOrientations?.(camera)
 		}

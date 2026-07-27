@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
 import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
+import {
+	GENERATION_PREVIEW_TABS,
+	type GenerationPreviewTab,
+} from "@/ui/planet/screen/generation/generation-preview"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
 import { RegularClimatePreview } from "@/ui/preview/RegularClimatePreview"
 import { TidalCalendarChart } from "@/ui/preview/TidalCalendarChart"
@@ -11,14 +18,7 @@ import type {
 	LockedClimatePreviewData,
 	RegularClimatePreviewData,
 } from "@/ui/preview/types"
-import {
-	GENERATION_PREVIEW_TABS,
-	type GenerationPreviewTab,
-} from "@/ui/planet/screen/generation/generation-preview"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import { DataSectionSummary } from "@/ui/wiki/shared/ui-atoms"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
 
 function PlanetDetailContent({
 	tidalSchedulePreview,

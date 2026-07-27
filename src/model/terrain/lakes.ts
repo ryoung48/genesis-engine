@@ -1,9 +1,9 @@
 ﻿import { MinHeap } from "../shared"
 import type {
-	SelectCompactLakeFallbackParams,
-	TrimLakeCorridorsParams,
-	SelectConnectedLakeCellsParams,
 	ComputeLakesParams,
+	SelectCompactLakeFallbackParams,
+	SelectConnectedLakeCellsParams,
+	TrimLakeCorridorsParams,
 } from "./types"
 
 function computeSubgraphNeighborCount(

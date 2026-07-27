@@ -1,8 +1,8 @@
-import { piecewise, SimplexNoise } from "@/model/shared"
 import type {
 	BuildRegionGraphParams,
 	ComputeRainBandWarpFieldParams,
 } from "@/model/climate/rain-shared/types"
+import { piecewise, SimplexNoise } from "@/model/shared"
 
 const ceilingScale = (x: number) =>
 	piecewise(

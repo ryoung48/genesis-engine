@@ -5,7 +5,14 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js"
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js"
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js"
 import type { MoonBody } from "@/model/celestial/moons/types"
+import { DATA_SOURCE } from "@/model/earth/history/data-source"
+import type {
+	Eu4ProvinceBorderGeometry,
+	Eu4ProvinceFillGeometry,
+} from "@/model/earth/history/data-source/types"
 import { buildRegionSpatialIndex } from "@/model/mesh"
+import type { HeritageScript } from "@/model/society/script"
+import { SCRIPT } from "@/model/society/script"
 import {
 	networkCount,
 	type SerializedGenesisWorld,
@@ -145,13 +152,6 @@ import type {
 	RiverData,
 	WindArrowData,
 } from "@/ui/planet/renderer/types"
-import type { HeritageScript } from "@/model/society/script"
-import { SCRIPT } from "@/model/society/script"
-import { DATA_SOURCE } from "@/model/earth/history/data-source"
-import type {
-	Eu4ProvinceBorderGeometry,
-	Eu4ProvinceFillGeometry,
-} from "@/model/earth/history/data-source/types"
 
 const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
 const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc

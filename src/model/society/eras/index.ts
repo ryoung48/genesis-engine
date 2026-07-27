@@ -1,10 +1,10 @@
+import type { WavePercentileThresholdParams } from "@/model/society/eras/types"
 import type {
 	EraConfig,
-	SocietyEra,
-	GovernmentType,
 	GovernmentFamily,
+	GovernmentType,
+	SocietyEra,
 } from "@/model/society/types"
-import type { WavePercentileThresholdParams } from "@/model/society/eras/types"
 
 const governmentTypes: GovernmentType[] = [
 	// tribal

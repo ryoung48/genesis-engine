@@ -1,7 +1,7 @@
 import type {
 	Language,
-	WordParams,
 	LanguageRng,
+	WordParams,
 } from "@/model/society/language/languages/types"
 
 export interface BuildSlotSeedParams {

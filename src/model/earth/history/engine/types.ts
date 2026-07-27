@@ -1,11 +1,11 @@
 import type { GenesisFrameFromHistory } from "@/model/earth/history/adapter/types"
 import type { CheckpointCache } from "@/model/earth/history/checkpoint/types"
+import type { RawNationReference } from "@/model/earth/history/data-source/types"
 import type {
 	EarthHistoryData,
 	FoldedState,
 } from "@/model/earth/history/fold/types"
 import type { Eu4ProvinceMap } from "@/model/earth/history/import/eu4-province-map/types"
-import type { RawNationReference } from "@/model/earth/history/data-source/types"
 
 export interface EarthHistoryEngine {
 	provinceMap: Eu4ProvinceMap

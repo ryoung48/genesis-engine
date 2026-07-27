@@ -18,9 +18,33 @@ import type {
 	SolarSystemState,
 	SystemBody,
 } from "@/model/celestial/system/types"
+import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { HEAT } from "@/model/climate/locked/heat"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
+import { RAIN } from "@/model/climate/rain"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { VEGETATION } from "@/model/climate/vegetation"
+import { WIND } from "@/model/climate/wind"
+import { COLOR } from "@/model/earth/history/color"
 import { DATA_SOURCE } from "@/model/earth/history/data-source"
+import type {
+	Eu4ProvinceFillGeometry,
+	RawOrganizationReference,
+	RawWarParticipantEvent,
+} from "@/model/earth/history/data-source/types"
+import { DATE } from "@/model/earth/history/date"
 import { FOLD } from "@/model/earth/history/fold"
+import type { FoldedState } from "@/model/earth/history/fold/types"
+import { GOVERNMENT } from "@/model/earth/history/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/earth/history/organization-categories"
+import type {
+	OrgCategorizer,
+	OrgProvinceCategory,
+} from "@/model/earth/history/organization-categories/types"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 import type { HistoryNote } from "@/model/history"
 import { YEAR_MS } from "@/model/history"
 import { historyMsToEu4Days } from "@/model/history/eu4-days"
@@ -34,6 +58,9 @@ import {
 	seedStringToNumber,
 	titleCase,
 } from "@/model/shared"
+import { ERAS } from "@/model/society/eras"
+import { RELIGION } from "@/model/society/religion"
+import type { SocietyEra } from "@/model/society/types"
 import { TOPO_LAKE, TOPO_OCEAN } from "@/model/terrain/classification"
 import type {
 	GenesisWorkerRequest,
@@ -46,26 +73,6 @@ import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfFullIcon"
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
-import { eventInvolvesNation } from "@/ui/wiki/nation/event-description"
-import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
-import { buildProceduralWikiTimelineEvent } from "@/ui/wiki/nation/procedural-timeline-event"
-import type { OrganizationWikiData } from "@/ui/wiki/organization/OrganizationWikiPage"
-import type {
-	WikiTimelineEvent as NationTimelineEvent,
-	WikiCountHistoryPoint,
-} from "@/ui/wiki/shared/WikiTimeline"
-import {
-	buildDistributionForRegions,
-	buildEu5TopographyDistribution,
-	buildStringIdDistributionForProvinces,
-} from "@/ui/wiki/stats/nation/nation-distributions"
-import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
-import { updateBodyDiameter } from "@/ui/wiki/stats/orbit/body-mutations"
-import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters"
-import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
-import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organization-stats"
-import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
 import { scaleClockDialHourToDayLength } from "@/ui/planet/clock"
 import type { ColorMode } from "@/ui/planet/colors"
 import {
@@ -231,33 +238,26 @@ import {
 } from "@/ui/planet/screen/shared/ui-format"
 import { SolarSystemControls } from "@/ui/planet/solar-system/SolarSystemControls"
 import { WindParticleCanvas } from "@/ui/planet/WindParticleCanvas"
-import type { SocietyEra } from "@/model/society/types"
-import { ERAS } from "@/model/society/eras"
-import { RELIGION } from "@/model/society/religion"
-import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
-import { HUMIDITY } from "@/model/climate/humidity"
-import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
-import { RAIN } from "@/model/climate/rain"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import { VEGETATION } from "@/model/climate/vegetation"
-import { WIND } from "@/model/climate/wind"
-import { HEAT } from "@/model/climate/locked/heat"
-import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
-import { COLOR } from "@/model/earth/history/color"
-import { DATE } from "@/model/earth/history/date"
-import { GOVERNMENT } from "@/model/earth/history/government"
+import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
+import { eventInvolvesNation } from "@/ui/wiki/nation/event-description"
+import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
+import { buildProceduralWikiTimelineEvent } from "@/ui/wiki/nation/procedural-timeline-event"
+import type { OrganizationWikiData } from "@/ui/wiki/organization/OrganizationWikiPage"
 import type {
-	RawWarParticipantEvent,
-	RawOrganizationReference,
-	Eu4ProvinceFillGeometry,
-} from "@/model/earth/history/data-source/types"
-import type { FoldedState } from "@/model/earth/history/fold/types"
-import type {
-	OrgProvinceCategory,
-	OrgCategorizer,
-} from "@/model/earth/history/organization-categories/types"
-import { TRADE_GOODS } from "@/model/economy/trade-goods"
-import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
+	WikiTimelineEvent as NationTimelineEvent,
+	WikiCountHistoryPoint,
+} from "@/ui/wiki/shared/WikiTimeline"
+import {
+	buildDistributionForRegions,
+	buildEu5TopographyDistribution,
+	buildStringIdDistributionForProvinces,
+} from "@/ui/wiki/stats/nation/nation-distributions"
+import { buildNationWikiStats } from "@/ui/wiki/stats/nation/nation-stats"
+import { updateBodyDiameter } from "@/ui/wiki/stats/orbit/body-mutations"
+import { buildPressureAtmosphereProfile } from "@/ui/wiki/stats/orbit/formatters"
+import { resolveBodyTideLockSiderealDayHours } from "@/ui/wiki/stats/orbit/tide-lock-stats"
+import { buildOrganizationWikiStats } from "@/ui/wiki/stats/organization/organization-stats"
+import type { WarWikiData } from "@/ui/wiki/war/WarWikiPage"
 
 const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 // "coming from" convention: negate u/v to get the source direction

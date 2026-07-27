@@ -1,7 +1,7 @@
 import { createStringRng } from "@/model/shared"
 import {
-	type GlyphSet,
 	GLYPH_MODULE,
+	type GlyphSet,
 } from "@/model/society/script/runegen/glyph-module"
 import {
 	RuneRenderer,

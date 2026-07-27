@@ -3,16 +3,16 @@
  * segment so the seed stays recoverable across param format changes.
  */
 
+import type { GenesisParams } from "@/model"
+import type { TideLock } from "@/model/celestial/orbit-body/types"
 import {
 	MAIN_SEQUENCE_CLASSES,
 	type MainSequenceClass,
 } from "@/model/celestial/star/types"
-import type { GenesisParams } from "@/model"
-import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { SEED_MAX } from "@/model/shared/seeds"
 import { SLIDER_RANGES } from "@/model/shared/slider-ranges"
-import { SocietyEra } from "@/model/society/types"
 import { ERAS } from "@/model/society/eras"
+import { SocietyEra } from "@/model/society/types"
 
 const DEFAULT_PRESSURE = 1.0
 const PLANET_CODE_PART_SEPARATOR = "."

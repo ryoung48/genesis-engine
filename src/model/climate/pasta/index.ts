@@ -1,18 +1,18 @@
 import { STAR } from "@/model/celestial/star"
+import { HYDROLOGY } from "@/model/climate/hydrology"
+import type {
+	AssignEarthPastaClimateParams,
+	ClassifyLandParams,
+	ClassifyOceanParams,
+	ComputePastaZonesParams,
+	GddiDayParams,
+	GddTotalParams,
+	GdmParams,
+} from "@/model/climate/pasta/types"
 import type {
 	AssignPastaClimateParams,
 	PastaDebug,
 } from "@/model/climate/types"
-import { HYDROLOGY } from "@/model/climate/hydrology"
-import type {
-	GdmParams,
-	GddiDayParams,
-	GddTotalParams,
-	ClassifyOceanParams,
-	ClassifyLandParams,
-	ComputePastaZonesParams,
-	AssignEarthPastaClimateParams,
-} from "@/model/climate/pasta/types"
 
 const ZONE_COLOR_MAP = {
 	Ofi: [220, 245, 255],

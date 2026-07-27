@@ -1,11 +1,11 @@
-﻿import { historyMsToEu4Days } from "@/model/history"
-import type { WikiTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
+﻿import { DATE } from "@/model/earth/history/date"
+import { historyMsToEu4Days } from "@/model/history"
 import {
 	getEventDescription,
 	getEventDotColor,
 } from "@/ui/wiki/nation/event-description"
 import type { BuildProceduralWikiTimelineEventParams } from "@/ui/wiki/nation/types"
-import { DATE } from "@/model/earth/history/date"
+import type { WikiTimelineEvent } from "@/ui/wiki/shared/WikiTimeline"
 
 const NATION_TOKEN_RE = /#(-?\d+)/g
 

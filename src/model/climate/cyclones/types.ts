@@ -1,8 +1,8 @@
-import type { SphereMesh } from "@/model/types/mesh"
 import type {
 	GenesisClimate,
 	GenesisOceanCurrents,
 } from "@/model/types/climate"
+import type { SphereMesh } from "@/model/types/mesh"
 import type { GenesisParams } from "@/model/types/tectonics"
 
 export type ComputeCycloneRiskParams = {

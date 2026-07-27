@@ -1,17 +1,17 @@
 import type { SphereMesh } from "@/model"
-import { isRetrogradeObliquity, meanEdgeLengthKm } from "@/model/shared"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
+import type {
+	ApplyCurrentTemperatureEffectParams,
+	BuildOceanCurrentGridParams,
+	CoastSite,
+	ComputeOceanCurrentsParams,
+	OceanCurrentResult,
+} from "@/model/climate/ocean-currents/types"
 import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
 import { RAIN } from "@/model/climate/rain"
 import { WIND } from "@/model/climate/wind"
-import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/locked/ocean-currents"
-import type {
-	OceanCurrentResult,
-	CoastSite,
-	ComputeOceanCurrentsParams,
-	ApplyCurrentTemperatureEffectParams,
-	BuildOceanCurrentGridParams,
-} from "@/model/climate/ocean-currents/types"
 import type { FlowGrid } from "@/model/climate/wind/types"
+import { isRetrogradeObliquity, meanEdgeLengthKm } from "@/model/shared"
 
 const DEG2RAD = Math.PI / 180
 

@@ -1,4 +1,9 @@
 import { GENESIS_TERRAIN_FEATURE_LABELS } from "@/model"
+import { KOPPEN } from "@/model/climate/koppen"
+import { PASTA } from "@/model/climate/pasta"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { ERAS } from "@/model/society/eras"
+import { RELIGION } from "@/model/society/religion"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
@@ -14,6 +19,7 @@ import {
 	vegetationMapColor,
 	vegetationSatelliteColor,
 } from "@/ui/planet/colors"
+import type { HoverInfo, HoverTerrainFeature } from "@/ui/planet/hover/hover"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/planet/screen/display/government-colors"
 import {
 	getTerrainFeatureColor,
@@ -36,12 +42,6 @@ import {
 	rgbToCss,
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
-import type { HoverInfo, HoverTerrainFeature } from "@/ui/planet/hover/hover"
-import { ERAS } from "@/model/society/eras"
-import { RELIGION } from "@/model/society/religion"
-import { KOPPEN } from "@/model/climate/koppen"
-import { PASTA } from "@/model/climate/pasta"
-import { TRADE_GOODS } from "@/model/economy/trade-goods"
 
 interface HoverChartData {
 	temps: number[]

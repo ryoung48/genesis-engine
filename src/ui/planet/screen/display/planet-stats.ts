@@ -1,5 +1,6 @@
 ﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+import { RAIN } from "@/model/climate/rain"
 import {
 	DEFAULT_PLANET_RADIUS_KM,
 	getMaxOceanDepthKm,
@@ -15,7 +16,6 @@ import {
 	formatTemperatureDelta,
 	type UnitSystem,
 } from "@/ui/planet/screen/shared/ui-format"
-import { RAIN } from "@/model/climate/rain"
 
 export interface PlanetStat {
 	label: string

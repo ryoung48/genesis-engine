@@ -1,13 +1,13 @@
-import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
-import type { LonLat } from "@/model/earth/history/types"
 import type {
+	FindCentroidNearestProvinceParams,
+	FoldedStateToGenesisFrameParams,
+	FoldedStateToNationInfoParams,
 	GenesisFrameFromHistory,
 	NationInfoFromHistory,
-	FoldedStateToGenesisFrameParams,
-	FindCentroidNearestProvinceParams,
-	FoldedStateToNationInfoParams,
 } from "@/model/earth/history/adapter/types"
 import type { FoldedState } from "@/model/earth/history/fold/types"
+import type { LonLat } from "@/model/earth/history/types"
+import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
 
 function isPlaceholderNationTag(tag: string): boolean {
 	return tag === "---" || tag === "XXX"

@@ -1,13 +1,13 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisParams } from "@/model/types/tectonics"
-import type {
-	GenesisProvinces,
-	GenesisNationHierarchy,
-} from "@/model/types/society"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
-import type { SocietyEra } from "@/model/society/types"
-import type { Route, RouteEdge } from "@/model/transport/worker-types"
 import type { MinHeap } from "@/model/shared/min-heap"
+import type { SocietyEra } from "@/model/society/types"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks"
+import type { Route, RouteEdge } from "@/model/transport/worker-types"
+import type { SphereMesh } from "@/model/types/mesh"
+import type {
+	GenesisNationHierarchy,
+	GenesisProvinces,
+} from "@/model/types/society"
+import type { GenesisParams } from "@/model/types/tectonics"
 
 export interface RouteWorldInput {
 	mesh: Pick<SphereMesh, "r_xyz" | "adjOffset" | "adjList">

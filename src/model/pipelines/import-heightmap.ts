@@ -15,7 +15,17 @@ import {
 	DEFAULT_SPECTRAL_CLASS,
 	DEFAULT_STAR_SUBTYPE,
 } from "@/model/celestial/star"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { KOPPEN } from "@/model/climate/koppen"
+import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { buildRegionSpatialIndex, buildSphereMesh } from "@/model/mesh"
+import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
+import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
+import type {
+	SampleBilinearParams,
+	SampleCategoricalRasterParams,
+	SampleSingleBandFloatRasterParams,
+} from "@/model/pipelines/types"
 import {
 	computeOceanDistanceBFS,
 	countContinents,
@@ -45,16 +55,6 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "@/model/terrain"
-import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
-import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
-import type {
-	SampleBilinearParams,
-	SampleSingleBandFloatRasterParams,
-	SampleCategoricalRasterParams,
-} from "@/model/pipelines/types"
-import { HUMIDITY } from "@/model/climate/humidity"
-import { KOPPEN } from "@/model/climate/koppen"
-import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 
 interface ImportParams {
 	seed: number

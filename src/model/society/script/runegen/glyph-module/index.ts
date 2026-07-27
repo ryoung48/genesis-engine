@@ -1,14 +1,14 @@
 import { createStringRng } from "@/model/shared"
+import type {
+	GenerateGlyphSetParams,
+	LayoutGlyphTextParams,
+} from "@/model/society/script/runegen/glyph-module/types"
 import {
 	Rune,
 	type RuneGeneratorOptions,
 	type RuneMotif,
 	type RuneTemplate,
 } from "@/model/society/script/runegen/rune"
-import type {
-	GenerateGlyphSetParams,
-	LayoutGlyphTextParams,
-} from "@/model/society/script/runegen/glyph-module/types"
 
 export type GlyphSet = Record<string, Rune>
 

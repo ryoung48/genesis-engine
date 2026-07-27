@@ -1,6 +1,6 @@
 import type { GenesisPartition } from "@/model"
-import { SHARED } from "@/model/society/shared"
 import type { ComputeReligionsParams } from "@/model/society/religion/types"
+import { SHARED } from "@/model/society/shared"
 
 const religionTypeNames = [
 	"Animistic",

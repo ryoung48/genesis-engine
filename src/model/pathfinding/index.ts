@@ -1,62 +1,27 @@
-﻿import { MinHeap, regionDistanceKm } from "../shared"
+import type {
+	ComputeEdgeCostParams,
+	ComputeWaterDepthParams,
+	PairKeyParams,
+	PathfindGraph,
+	PathfindParams,
+	PathfindResult,
+	SearchWorkspace,
+} from "@/model/pathfinding/types"
+import { MinHeap, regionDistanceKm } from "@/model/shared"
 
-// Early modern era travel speeds (km/day on ideal terrain)
 const LAND_SPEED_KM_PER_DAY = 30
+
 const SEA_SPEED_KM_PER_DAY = 100
 
-// Topography categories: 0=flat, 1=hill, 2=plateau, 3=mountains, 4=marsh, 5=ocean, 6=lake
-// Speed multiplier relative to flat land (higher = faster)
 const TOPOGRAPHY_SPEED = [1.0, 0.6, 0.8, 0.2, 0.6, 0, 0] as const
 
-// Vegetation categories: 0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle
-// Speed multiplier relative to grasslands (higher = faster)
 const VEGETATION_SPEED = [0, 0.67, 0.83, 1.0, 0.91, 0.77, 0.56] as const
 
-// Route network cost multiplier (existing roads/trails are faster)
 const EXISTING_ROUTE_SPEED_BONUS = 2.0
 
-// Coastal water depth penalties for sea travel (speed reduction)
 const COASTAL_SPEED_MULT = 0.5
+
 const NEAR_COAST_SPEED_MULT = 0.8
-
-interface PathfindRequest {
-	startRegion: number
-	endRegion: number
-	allowLand: boolean
-	allowSea: boolean
-}
-
-interface PathfindResult {
-	pathRegions: number[]
-	distanceKm: number
-	landKm: number
-	seaKm: number
-	travelDays: number
-	reachable: boolean
-}
-
-interface PathfindGraph {
-	numRegions: number
-	adjOffset: Int32Array
-	adjList: Int32Array
-	r_xyz: Float32Array
-	regionIsLand: Uint8Array | null
-	vegetation: Uint8Array | null
-	topography: Uint8Array | null
-	waterDepth: Int32Array | null
-	routeEdges: Set<number>
-	planetRadiusKm: number
-	regionProvince: Int32Array | null
-	desolate: Uint8Array | null
-}
-
-interface SearchWorkspace {
-	distance: Float32Array
-	prev: Int32Array
-	queued: Int32Array
-	settled: Int32Array
-	heap: MinHeap
-}
 
 function createWorkspace(size: number): SearchWorkspace {
 	const distance = new Float32Array(size)
@@ -70,12 +35,12 @@ function createWorkspace(size: number): SearchWorkspace {
 	}
 }
 
-function computeWaterDepth(
-	numRegions: number,
-	adjOffset: Int32Array,
-	adjList: Int32Array,
-	regionIsLand: Uint8Array | null,
-): Int32Array {
+function computeWaterDepth({
+	numRegions,
+	adjOffset,
+	adjList,
+	regionIsLand,
+}: ComputeWaterDepthParams): Int32Array {
 	const depth = new Int32Array(numRegions).fill(-1)
 	const queue = new Int32Array(numRegions)
 	let head = 0
@@ -106,19 +71,19 @@ function computeWaterDepth(
 	return depth
 }
 
-function pairKey(a: number, b: number, span: number): number {
+function pairKey({ a, b, span }: PairKeyParams): number {
 	const from = Math.min(a, b)
 	const to = Math.max(a, b)
 	return from * span + to
 }
 
-function computeEdgeCost(
-	graph: PathfindGraph,
-	from: number,
-	to: number,
-	allowLand: boolean,
-	allowSea: boolean,
-): { cost: number; isLand: boolean } {
+function computeEdgeCost({
+	graph,
+	from,
+	to,
+	allowLand,
+	allowSea,
+}: ComputeEdgeCostParams): { cost: number; isLand: boolean } {
 	const distKm = regionDistanceKm(graph.r_xyz, from, to, graph.planetRadiusKm)
 	const fromLand = !graph.regionIsLand || !!graph.regionIsLand[from]
 	const toLand = !graph.regionIsLand || !!graph.regionIsLand[to]
@@ -155,7 +120,7 @@ function computeEdgeCost(
 		}
 
 		// Existing route bonus (doubles effective speed)
-		const key = pairKey(from, to, graph.numRegions)
+		const key = pairKey({ a: from, b: to, span: graph.numRegions })
 		if (graph.routeEdges.has(key)) {
 			speedMult *= EXISTING_ROUTE_SPEED_BONUS
 		}
@@ -193,7 +158,7 @@ function computeEdgeCost(
 		}
 
 		// Existing sea route bonus
-		const key = pairKey(from, to, graph.numRegions)
+		const key = pairKey({ a: from, b: to, span: graph.numRegions })
 		if (graph.routeEdges.has(key)) {
 			speedMult *= EXISTING_ROUTE_SPEED_BONUS
 		}
@@ -204,7 +169,7 @@ function computeEdgeCost(
 
 	// Mixed land/sea edge (coastal crossing) - allow but penalize
 	if (allowLand && allowSea) {
-		const key = pairKey(from, to, graph.numRegions)
+		const key = pairKey({ a: from, b: to, span: graph.numRegions })
 		// Use average of land and sea speeds with penalty
 		const mixedSpeed =
 			((LAND_SPEED_KM_PER_DAY + SEA_SPEED_KM_PER_DAY) / 2) * 0.67
@@ -220,10 +185,7 @@ function computeEdgeCost(
 	return { cost: Infinity, isLand: fromLand }
 }
 
-export function pathfind(
-	graph: PathfindGraph,
-	request: PathfindRequest,
-): PathfindResult {
+function pathfind({ graph, request }: PathfindParams): PathfindResult {
 	if (
 		request.startRegion < 0 ||
 		request.endRegion < 0 ||
@@ -273,12 +235,12 @@ export function pathfind(
 	// Compute water depth if needed for sea travel
 	const waterDepth =
 		request.allowSea && !graph.waterDepth
-			? computeWaterDepth(
-					graph.numRegions,
-					graph.adjOffset,
-					graph.adjList,
-					graph.regionIsLand,
-				)
+			? computeWaterDepth({
+					numRegions: graph.numRegions,
+					adjOffset: graph.adjOffset,
+					adjList: graph.adjList,
+					regionIsLand: graph.regionIsLand,
+				})
 			: graph.waterDepth
 
 	const effectiveGraph: PathfindGraph = {
@@ -321,13 +283,13 @@ export function pathfind(
 				if (prov >= 0 && effectiveGraph.desolate[prov]) continue
 			}
 
-			const { cost } = computeEdgeCost(
-				effectiveGraph,
-				current,
-				neighbor,
-				request.allowLand,
-				request.allowSea,
-			)
+			const { cost } = computeEdgeCost({
+				graph: effectiveGraph,
+				from: current,
+				to: neighbor,
+				allowLand: request.allowLand,
+				allowSea: request.allowSea,
+			})
 			if (cost === Infinity) continue
 
 			const nextDistance = distance[current] + cost
@@ -369,13 +331,13 @@ export function pathfind(
 		const to = path[i]
 		const dist = regionDistanceKm(graph.r_xyz, from, to, graph.planetRadiusKm)
 		totalKm += dist
-		const { cost, isLand } = computeEdgeCost(
+		const { cost, isLand } = computeEdgeCost({
 			graph,
 			from,
 			to,
-			request.allowLand,
-			request.allowSea,
-		)
+			allowLand: request.allowLand,
+			allowSea: request.allowSea,
+		})
 		totalDays += cost
 		if (isLand) {
 			landKm += dist
@@ -392,4 +354,8 @@ export function pathfind(
 		travelDays: Math.ceil(totalDays),
 		reachable: true,
 	}
+}
+
+export const PATHFIND = {
+	pathfind,
 }

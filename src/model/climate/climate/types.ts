@@ -1,6 +1,6 @@
+import type { GenesisClimate } from "@/model/types/climate"
 import type { SphereMesh } from "@/model/types/mesh"
 import type { GenesisParams } from "@/model/types/tectonics"
-import type { GenesisClimate } from "@/model/types/climate"
 
 export interface MeshLatitudeGeometry {
 	latDegByRegion: Float64Array

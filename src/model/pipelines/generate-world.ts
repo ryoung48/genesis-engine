@@ -13,7 +13,10 @@ import type {
 	StageTiming,
 	TectonicPlate,
 } from "@/model"
+import { ROUTES } from "@/model/economy/routes"
 import { buildSphereMesh } from "@/model/mesh"
+import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
+import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
@@ -21,6 +24,7 @@ import {
 	createRng,
 	getMaxOceanDepthKm,
 } from "@/model/shared"
+import { URBANIZATION } from "@/model/society/urbanization"
 import {
 	buildSuperPlates,
 	classifyBoundaries,
@@ -42,10 +46,6 @@ import {
 	smoothElevation,
 	warpTerrain,
 } from "@/model/terrain"
-import { deriveProvinceSociety } from "@/model/pipelines/derive-province-society"
-import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
-import { URBANIZATION } from "@/model/society/urbanization"
-import { ROUTES } from "@/model/economy/routes"
 
 type ProgressFn = (label: string, pct?: number) => void
 

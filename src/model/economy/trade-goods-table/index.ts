@@ -55,7 +55,9 @@ const tradeGoodLabels: readonly string[] = [
 ] as const
 
 export const TRADE_GOODS_TABLE: Readonly<
-	Record<string, readonly (readonly [number, number])[]>
+	Record<string, readonly (readonly [number, number])[] | readonly string[]> & {
+		tradeGoodLabels: readonly string[]
+	}
 > = {
 	"arctic|desert|hills|inland": [
 		[5, 1],

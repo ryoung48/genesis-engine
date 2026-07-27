@@ -1,18 +1,18 @@
-﻿import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/planet/colors"
+﻿import { COLOR } from "@/model/earth/history/color"
+import type { RawNationReference } from "@/model/earth/history/data-source/types"
+import type { FoldedState } from "@/model/earth/history/fold/types"
+import { GOVERNMENT } from "@/model/earth/history/government"
+import type { OrgCategorizer } from "@/model/earth/history/organization-categories/types"
+import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/planet/colors"
+import {
+	darkenPoliticalAtElevation,
+	darkenVegetationAtElevation,
+} from "@/ui/planet/screen/display/color-helpers"
 import { getBaseMapMode } from "@/ui/planet/screen/shared/data-variant"
 import type {
 	NationMapMode,
 	PopulationMapMode,
 } from "@/ui/planet/screen/shared/map-modes"
-import {
-	darkenPoliticalAtElevation,
-	darkenVegetationAtElevation,
-} from "@/ui/planet/screen/display/color-helpers"
-import { COLOR } from "@/model/earth/history/color"
-import { GOVERNMENT } from "@/model/earth/history/government"
-import type { RawNationReference } from "@/model/earth/history/data-source/types"
-import type { FoldedState } from "@/model/earth/history/fold/types"
-import type { OrgCategorizer } from "@/model/earth/history/organization-categories/types"
 
 const UNOWNED_GRAY: [number, number, number] = [0.75, 0.75, 0.75]
 

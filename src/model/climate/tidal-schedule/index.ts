@@ -7,16 +7,16 @@ import {
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import type { GenesisParams } from "@/model/types"
 import { TIDAL_FORCE } from "@/model/climate/tidal-force"
 import type {
+	EclipseType,
+	SurfaceTidesBreakdown,
+	SurfaceTidesContribution,
+	TidalContributor,
 	TidalEvent,
 	TidalSchedule,
-	TidalContributor,
-	SurfaceTidesContribution,
-	SurfaceTidesBreakdown,
-	EclipseType,
 } from "@/model/climate/tidal-schedule/types"
+import type { GenesisParams } from "@/model/types"
 
 const MAX_TIDAL_SCHEDULE_SAMPLES = 2000
 

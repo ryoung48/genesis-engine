@@ -1,16 +1,16 @@
 import type { GenesisOceanCurrents, SphereMesh } from "@/model"
-import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "@/model/shared/units"
-import type { GenesisLandmarks } from "@/model/terrain/landmarks"
-import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
-import { WIND } from "@/model/climate/wind"
 import { HEAT } from "@/model/climate/locked/heat"
-import type { FlowGrid } from "@/model/climate/wind/types"
 import type {
-	LockedCurrentParams,
-	ComputeLockedOceanCurrentsParams,
 	ApplyLockedCurrentTemperatureEffectParams,
 	BuildLockedOceanCurrentGridParams,
+	ComputeLockedOceanCurrentsParams,
+	LockedCurrentParams,
 } from "@/model/climate/locked/ocean-currents/types"
+import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
+import { WIND } from "@/model/climate/wind"
+import type { FlowGrid } from "@/model/climate/wind/types"
+import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "@/model/shared/units"
+import type { GenesisLandmarks } from "@/model/terrain/landmarks"
 
 const CURRENT_EFFECT_MONTHS = 12
 

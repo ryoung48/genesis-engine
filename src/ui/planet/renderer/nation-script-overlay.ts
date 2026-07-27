@@ -1,4 +1,6 @@
 ﻿import * as THREE from "three"
+import type { HeritageScript } from "@/model/society/script"
+import { COMPRESS } from "@/model/society/script/compress"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
@@ -19,8 +21,6 @@ import {
 	globeScaleForPop,
 	mapRadiusForPop,
 } from "@/ui/planet/renderer/settlement-overlay"
-import type { HeritageScript } from "@/model/society/script"
-import { COMPRESS } from "@/model/society/script/compress"
 
 const SCRIPT_HEIGHT_FACTOR = 0.45
 const SCRIPT_GLOBE_GAP_FACTOR = 0.12

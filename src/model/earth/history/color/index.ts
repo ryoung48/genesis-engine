@@ -1,5 +1,5 @@
-import { DYNASTY_COLOR_PALETTE } from "@/model/earth/history/dynasty-color-palette"
 import type { HslToRgbParams } from "@/model/earth/history/color/types"
+import { DYNASTY_COLOR_PALETTE } from "@/model/earth/history/dynasty-color-palette"
 
 function hashColorForKey(key: string): [number, number, number] {
 	let h = 0

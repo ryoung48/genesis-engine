@@ -1,4 +1,5 @@
 ﻿import * as THREE from "three"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import type {
@@ -6,7 +7,6 @@ import type {
 	BuildMapRealSettlementsParams,
 	BuildMapSettlementsParams,
 } from "@/ui/planet/renderer/types"
-import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 
 const TERRAIN_ELEVATION_SCALE = 0.04
 const SETTLEMENT_LIFT = 0.005

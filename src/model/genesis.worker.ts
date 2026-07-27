@@ -1,27 +1,27 @@
 /// <reference lib="webworker" />
 
 import {
-	computeMapGeometryArrays,
-	computeTerrainGeometryArrays,
-} from "@/ui/planet/renderer/terrain-geometry"
-import {
 	createHistoryRng,
 	initHistory,
 	simulateUntil,
 	YEAR_MS,
-} from "./history"
-import { buildHistoryFrame } from "./history/snapshot"
-import type { HistoryState } from "./history/state"
-import { pathfind } from "./pathfinding/pathfind"
-import { generateGenesisWorld } from "./pipelines/generate-world"
-import { importGenesisWorld } from "./pipelines/import-heightmap"
+} from "@/model/history"
+import { buildHistoryFrame } from "@/model/history/snapshot"
+import type { HistoryState } from "@/model/history/state"
+import { PATHFIND } from "@/model/pathfinding"
+import { generateGenesisWorld } from "@/model/pipelines/generate-world"
+import { importGenesisWorld } from "@/model/pipelines/import-heightmap"
 import type {
 	GenesisWorkerRequest,
 	GenesisWorkerResponse,
 	SerializedGenesisWorld,
 	SerializedHistoryFrame,
-} from "./transport/worker-types"
-import { packNetwork, packRoutes } from "./transport/worker-types"
+} from "@/model/transport/worker-types"
+import { packNetwork, packRoutes } from "@/model/transport/worker-types"
+import {
+	computeMapGeometryArrays,
+	computeTerrainGeometryArrays,
+} from "@/ui/planet/renderer/terrain-geometry"
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -603,8 +603,8 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 			}
 		}
 
-		const result = pathfind(
-			{
+		const result = PATHFIND.pathfind({
+			graph: {
 				numRegions,
 				adjOffset: world.mesh.adjOffset,
 				adjList: world.mesh.adjList,
@@ -618,13 +618,13 @@ self.onmessage = (event: MessageEvent<GenesisWorkerRequest>) => {
 				regionProvince: world.regionProvince,
 				desolate: world.desolate,
 			},
-			{
+			request: {
 				startRegion: message.startRegion,
 				endRegion: message.endRegion,
 				allowLand: message.allowLand,
 				allowSea: message.allowSea,
 			},
-		)
+		})
 
 		self.postMessage({
 			type: "pathfind-result",

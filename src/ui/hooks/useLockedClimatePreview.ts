@@ -1,4 +1,5 @@
 ﻿import { useMemo } from "react"
+import { HEAT } from "@/model/climate/locked/heat"
 import {
 	mapLinear,
 	PLASMA_STOPS,
@@ -7,7 +8,6 @@ import {
 	sampleColorStops,
 } from "@/model/shared"
 import type { LockedClimatePreviewData } from "@/ui/preview/types"
-import { HEAT } from "@/model/climate/locked/heat"
 
 interface LockedClimatePreviewConfig {
 	obliquity: number

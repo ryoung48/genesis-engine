@@ -1,20 +1,20 @@
 import type { GenesisClimate, GenesisParams, SphereMesh } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { getEffectiveObliquityDeg, HOURS_PER_DAY, TIME } from "@/model/shared"
-import { INSOLATION } from "@/model/climate/ebm/insolation"
-import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
-import { ELEVATION } from "@/model/climate/elevation"
-import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
-import { CONSTANTS } from "@/model/climate/ebm/constants"
-import { HEAT } from "@/model/climate/locked/heat"
 import type {
-	MeshLatitudeGeometry,
+	ApplyDtrToClimateMinMaxParams,
 	ComputeLandFractionParams,
 	ComputeMonthlyDaylightHoursParams,
-	ApplyDtrToClimateMinMaxParams,
 	ComputeTemperatureParams,
+	MeshLatitudeGeometry,
 } from "@/model/climate/climate/types"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { INSOLATION } from "@/model/climate/ebm/insolation"
+import { ELEVATION } from "@/model/climate/elevation"
+import { HEAT } from "@/model/climate/locked/heat"
+import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
+import { getEffectiveObliquityDeg, HOURS_PER_DAY, TIME } from "@/model/shared"
 
 function getStellarCls(params: GenesisParams): MainSequenceClass {
 	return STAR.isValidSpectralClass(params.spectralClass)

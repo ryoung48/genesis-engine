@@ -1,19 +1,19 @@
 import { titleCase } from "@/model/shared"
-import type { SerializedGenesisWorld } from "@/model/transport"
+import { GENDER_SYSTEM } from "@/model/society/gender-system"
 import { LANGUAGE } from "@/model/society/language/languages"
 import type { Language } from "@/model/society/language/languages/types"
-import { CultureGenderSystem } from "@/model/society/types"
-import { GENDER_SYSTEM } from "@/model/society/gender-system"
 import type {
-	GetLanguageParams,
-	SpawnSeededLanguageParams,
-	GetHeritageLanguageParams,
-	GetCultureLanguageParams,
-	GetLeaderEntryParams,
-	BuildNationSlotParams,
-	BuildNamedGroupSlotParams,
 	BuildLeaderSlotParams,
+	BuildNamedGroupSlotParams,
+	BuildNationSlotParams,
+	GetCultureLanguageParams,
+	GetHeritageLanguageParams,
+	GetLanguageParams,
+	GetLeaderEntryParams,
+	SpawnSeededLanguageParams,
 } from "@/model/society/language/names/types"
+import { CultureGenderSystem } from "@/model/society/types"
+import type { SerializedGenesisWorld } from "@/model/transport"
 
 export interface LanguageNameLeaderEntry {
 	time: number

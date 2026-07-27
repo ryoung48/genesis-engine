@@ -1,6 +1,6 @@
 import type { GenesisPartition } from "@/model"
-import { SHARED } from "@/model/society/shared"
 import type { ComputeHeritagesParams } from "@/model/society/heritage/types"
+import { SHARED } from "@/model/society/shared"
 
 function computeHeritages({
 	cultures,

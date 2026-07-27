@@ -1,4 +1,3 @@
-import { createRng } from "@/model/shared/rng"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type {
 	AtmosphereProfile,
@@ -9,7 +8,6 @@ import type {
 	OrbitComposition,
 	OrbitGroup,
 } from "@/model/celestial/orbit-body/types"
-import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { ATMOSPHERE } from "@/model/celestial/planet/environment/atmosphere"
 import { DICE_TABLE } from "@/model/celestial/planet/environment/classification/dice-table"
 import type { ClassifiedEnvironment } from "@/model/celestial/planet/environment/classification/dice-table/types"
@@ -20,7 +18,9 @@ import type {
 	TemperatureHydrosphereLossInput,
 	Zone,
 } from "@/model/celestial/planet/types"
+import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
+import { createRng } from "@/model/shared/rng"
 
 function applyTemperatureHydrosphereLoss({
 	hydrosphereCode,

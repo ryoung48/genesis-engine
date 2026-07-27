@@ -1,7 +1,7 @@
 import { describe, it } from "vitest"
 import { ALBEDO } from "@/model/climate/ebm/albedo"
-import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 
 // Re-fits GREENHOUSE_FACTOR for the *actual* in-game default path --
 // computeTemperature() in climate.ts builds EnergyBalanceModel with no

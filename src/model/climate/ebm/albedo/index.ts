@@ -1,5 +1,5 @@
-import { CONSTANTS } from "@/model/climate/ebm/constants"
 import type { IceAlbedoAtParams } from "@/model/climate/ebm/albedo/types"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
 
 const ICE_TRANSITION_HALF_WIDTH_K = 8
 

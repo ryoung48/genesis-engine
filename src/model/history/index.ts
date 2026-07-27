@@ -1,6 +1,4 @@
 import type { GenesisNationHierarchy, GenesisProvinces } from "@/model"
-import type { GenesisLandmarks } from "@/model/terrain"
-import type { StageTiming } from "@/model/types"
 import { EVT } from "@/model/history/event-heap"
 import { runBattle } from "@/model/history/events/battle"
 import {
@@ -27,6 +25,8 @@ import {
 	validateLiveHierarchy,
 } from "@/model/history/state"
 import type { ProvincePopulation, SocietyEra } from "@/model/society/types"
+import type { GenesisLandmarks } from "@/model/terrain"
+import type { StageTiming } from "@/model/types"
 
 function timed<T>(
 	label: string,

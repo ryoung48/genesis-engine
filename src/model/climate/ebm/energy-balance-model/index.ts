@@ -1,13 +1,13 @@
-import { HOURS_PER_DAY, SECONDS_PER_DAY } from "@/model/shared"
 import { ALBEDO } from "@/model/climate/ebm/albedo"
 import type { EBMConfig } from "@/model/climate/ebm/config"
-import { INSOLATION } from "@/model/climate/ebm/insolation"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
-import { UTILS } from "@/model/climate/ebm/utils"
 import type {
-	StepTemperatureParams,
 	RunModelParams,
+	StepTemperatureParams,
 } from "@/model/climate/ebm/energy-balance-model/types"
+import { INSOLATION } from "@/model/climate/ebm/insolation"
+import { UTILS } from "@/model/climate/ebm/utils"
+import { HOURS_PER_DAY, SECONDS_PER_DAY } from "@/model/shared"
 
 export class EnergyBalanceModel {
 	lats: number[] = []

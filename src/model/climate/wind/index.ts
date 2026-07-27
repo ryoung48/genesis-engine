@@ -1,4 +1,13 @@
 import type { SphereMesh } from "@/model"
+import { WIND as LOCKED_WIND } from "@/model/climate/locked/wind"
+import { RAIN } from "@/model/climate/rain"
+import type {
+	ComputeWindVectorsInput,
+	FlowGrid,
+	RasterizeVectorGridInput,
+	WindGrid,
+	WindSurface,
+} from "@/model/climate/wind/types"
 import {
 	clamp,
 	HOURS_PER_DAY,
@@ -14,15 +23,6 @@ import {
 	TOPO_OCEAN,
 	TOPO_PLATEAU,
 } from "@/model/terrain"
-import { RAIN } from "@/model/climate/rain"
-import { WIND as LOCKED_WIND } from "@/model/climate/locked/wind"
-import type {
-	WindSurface,
-	FlowGrid,
-	RasterizeVectorGridInput,
-	ComputeWindVectorsInput,
-	WindGrid,
-} from "@/model/climate/wind/types"
 
 function vegetationDragFactor(biomeCode: number | undefined): number {
 	switch (biomeCode) {

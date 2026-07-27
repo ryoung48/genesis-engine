@@ -1,11 +1,11 @@
 import type { SphereMesh } from ".."
 import { MinHeap, SimplexNoise, smoothstep } from "../shared"
 import type {
-	BuildGlacialBuffersParams,
-	WarpTerrainParams,
-	SmoothElevationParams,
-	SharpenRidgesParams,
 	ApplySoilCreepParams,
+	BuildGlacialBuffersParams,
+	SharpenRidgesParams,
+	SmoothElevationParams,
+	WarpTerrainParams,
 } from "./types"
 
 /**

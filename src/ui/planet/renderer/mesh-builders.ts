@@ -9,7 +9,7 @@ import {
 	TERRAIN_ELEVATION_SCALE,
 	type TerrainGeometryArrays,
 } from "./terrain-geometry"
-import type { GenesisViewMode, BuildMapWireframeParams } from "./types"
+import type { BuildMapWireframeParams, GenesisViewMode } from "./types"
 
 interface MeshBuildResult {
 	mesh: THREE.Mesh

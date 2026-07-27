@@ -1,6 +1,6 @@
 import type { GenesisLandmarks } from "@/model/terrain/landmarks"
-import type { SphereMesh } from "@/model/types/mesh"
 import type { GenesisClimate } from "@/model/types/climate"
+import type { SphereMesh } from "@/model/types/mesh"
 import type { GenesisParams } from "@/model/types/tectonics"
 
 export interface ClimateGeometry {

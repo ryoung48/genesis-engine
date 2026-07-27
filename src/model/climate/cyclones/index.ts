@@ -1,7 +1,7 @@
+import type { ComputeCycloneRiskParams } from "@/model/climate/cyclones/types"
+import { RAIN } from "@/model/climate/rain"
 import { clamp, HOURS_PER_DAY, smoothstep } from "@/model/shared"
 import { TOPO_OCEAN } from "@/model/terrain"
-import { RAIN } from "@/model/climate/rain"
-import type { ComputeCycloneRiskParams } from "@/model/climate/cyclones/types"
 
 function computeCycloneRisk({
 	mesh,

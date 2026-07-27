@@ -25,11 +25,33 @@ import { MOON } from "@/model/celestial/moons"
 import { SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
 import { DEFAULT_SPECTRAL_CLASS, STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { CLIMATE } from "@/model/climate/climate"
+import { CYCLONES } from "@/model/climate/cyclones"
+import { DTR } from "@/model/climate/dtr"
+import { HYDROLOGY } from "@/model/climate/hydrology"
+import { ICE } from "@/model/climate/ice"
+import { KOPPEN } from "@/model/climate/koppen"
+import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
+import { PASTA } from "@/model/climate/pasta"
+import { RAIN } from "@/model/climate/rain"
+import { TIDAL_MAP } from "@/model/climate/tidal-map"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import { TIDES } from "@/model/climate/tides"
+import { TORNADOES } from "@/model/climate/tornadoes"
+import type { PastaDebug } from "@/model/climate/types"
+import { VEGETATION } from "@/model/climate/vegetation"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 import {
 	computeCoastDistances,
 	computeOceanDistanceBFS,
 	makeRng,
 } from "@/model/shared"
+import { ERAS } from "@/model/society/eras"
+import { POPULATION } from "@/model/society/population"
+import type { ProvincePopulation } from "@/model/society/types"
 import type { GenesisLandmarks } from "@/model/terrain"
 import {
 	classifyTopography,
@@ -44,28 +66,6 @@ import {
 	LANDMARK_TYPE_LAKE,
 	LANDMARK_TYPE_OCEAN,
 } from "@/model/terrain"
-import type { ProvincePopulation } from "@/model/society/types"
-import { ERAS } from "@/model/society/eras"
-import { POPULATION } from "@/model/society/population"
-import type { PastaDebug } from "@/model/climate/types"
-import { CLIMATE } from "@/model/climate/climate"
-import { CYCLONES } from "@/model/climate/cyclones"
-import { DTR } from "@/model/climate/dtr"
-import { HYDROLOGY } from "@/model/climate/hydrology"
-import { ICE } from "@/model/climate/ice"
-import { KOPPEN } from "@/model/climate/koppen"
-import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
-import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
-import { PASTA } from "@/model/climate/pasta"
-import { RAIN } from "@/model/climate/rain"
-import { TIDAL_MAP } from "@/model/climate/tidal-map"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import { TIDES } from "@/model/climate/tides"
-import { TORNADOES } from "@/model/climate/tornadoes"
-import { VEGETATION } from "@/model/climate/vegetation"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
-import { TRADE_GOODS } from "@/model/economy/trade-goods"
-import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
 
 /**
  * Real (non-procedural) river network for the Earth-import path, already

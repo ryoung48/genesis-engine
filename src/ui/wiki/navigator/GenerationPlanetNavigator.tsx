@@ -12,6 +12,10 @@ import {
 } from "@/model/celestial/system/sol-system"
 import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import type {
+	SurfaceTidesBreakdown,
+	TidalSchedule,
+} from "@/model/climate/tidal-schedule/types"
 import {
 	makeRandomSeedLabel,
 	normalizeSeedLabel,
@@ -53,10 +57,6 @@ import {
 	resolveMoonTideLockSiderealDayHours,
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 import { buildStarStats } from "@/ui/wiki/stats/star/star-stats"
-import type {
-	TidalSchedule,
-	SurfaceTidesBreakdown,
-} from "@/model/climate/tidal-schedule/types"
 
 interface LabeledOrbitBody {
 	body: SystemBody

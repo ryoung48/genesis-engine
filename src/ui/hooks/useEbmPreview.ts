@@ -1,6 +1,9 @@
 ﻿import { useMemo } from "react"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 import {
 	mapLinear,
 	PLASMA_STOPS,
@@ -9,9 +12,6 @@ import {
 	sampleColorStops,
 } from "@/model/shared"
 import type { RegularClimatePreviewData } from "@/ui/preview/types"
-import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
-import { CONSTANTS } from "@/model/climate/ebm/constants"
-import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
 
 interface EbmConfig {
 	obliquity: number

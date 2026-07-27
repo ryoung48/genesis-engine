@@ -1,22 +1,22 @@
 import type { GenesisClimate, GenesisParams } from "@/model"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { ELEVATION } from "@/model/climate/elevation"
+import type {
+	ComputeTidalTemperatureParams,
+	LockedDeclinationParams,
+	LockedMonthlyDaylightHoursParams,
+	MonthlyLibrationParams,
+	SubstellarDirectionParams,
+	TidalTransportParams,
+} from "@/model/climate/locked/heat/types"
+import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
 import { TIME } from "@/model/shared/time"
 import {
 	getEffectiveObliquityDeg,
 	isRetrogradeObliquity,
 } from "@/model/shared/units"
-import { ELEVATION } from "@/model/climate/elevation"
-import { TEMPERATURE_SHARED } from "@/model/climate/temperature-shared"
-import { CONSTANTS } from "@/model/climate/ebm/constants"
-import type {
-	TidalTransportParams,
-	MonthlyLibrationParams,
-	LockedDeclinationParams,
-	SubstellarDirectionParams,
-	LockedMonthlyDaylightHoursParams,
-	ComputeTidalTemperatureParams,
-} from "@/model/climate/locked/heat/types"
 
 function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))

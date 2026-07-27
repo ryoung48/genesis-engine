@@ -1,17 +1,17 @@
 ﻿import { capitalize, titleCase } from "@/model/shared"
+import { BUILDER } from "@/model/society/language/languages/builder"
+import { CONSONANTS } from "@/model/society/language/languages/builder/consonants"
+import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
+import { INTERNAL } from "@/model/society/language/languages/internal"
+import { RNG } from "@/model/society/language/languages/rng"
 import {
 	Gender,
 	type Language,
+	type LanguageRng,
 	PhonemeCatalog,
 	type WordParams,
-	type LanguageRng,
 } from "@/model/society/language/languages/types"
-import { BUILDER } from "@/model/society/language/languages/builder"
-import { INTERNAL } from "@/model/society/language/languages/internal"
-import { RNG } from "@/model/society/language/languages/rng"
-import { CONSONANTS } from "@/model/society/language/languages/builder/consonants"
-import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 
 export const LANGUAGE = {
 	word: {

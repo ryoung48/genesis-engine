@@ -11,9 +11,9 @@ import {
 	meanEdgeLengthKm,
 } from "../shared"
 import type {
+	ComputeProvincesFromRasterParams,
 	ComputeProvincesParams,
 	ComputeWeightedProvincesParams,
-	ComputeProvincesFromRasterParams,
 } from "./types"
 
 /**

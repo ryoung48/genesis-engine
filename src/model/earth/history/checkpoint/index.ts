@@ -1,8 +1,8 @@
-import { FOLD } from "@/model/earth/history/fold"
 import type {
 	CheckpointCache,
 	FoldAtCheckpointParams,
 } from "@/model/earth/history/checkpoint/types"
+import { FOLD } from "@/model/earth/history/fold"
 import type {
 	EarthHistoryData,
 	FoldedState,

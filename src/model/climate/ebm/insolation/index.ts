@@ -1,6 +1,6 @@
-import { HOURS_PER_DAY } from "@/model/shared"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
 import type { InsolationComputeParams } from "@/model/climate/ebm/insolation/types"
+import { HOURS_PER_DAY } from "@/model/shared"
 
 function clampAcosInput(value: number): number {
 	return Math.max(-1, Math.min(1, value))

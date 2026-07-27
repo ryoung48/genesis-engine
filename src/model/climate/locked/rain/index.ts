@@ -1,9 +1,9 @@
+import { HEAT } from "@/model/climate/locked/heat"
+import type { ComputeTidalRainParams } from "@/model/climate/locked/rain/types"
+import { RAIN_SHARED } from "@/model/climate/rain-shared"
 import { clamp } from "@/model/shared/math"
 import { SimplexNoise } from "@/model/shared/simplex-noise"
 import { DEFAULT_SUBSTELLAR_LON, meanEdgeLengthKm } from "@/model/shared/units"
-import { RAIN_SHARED } from "@/model/climate/rain-shared"
-import { HEAT } from "@/model/climate/locked/heat"
-import type { ComputeTidalRainParams } from "@/model/climate/locked/rain/types"
 
 const RAD2DEG = 180 / Math.PI
 

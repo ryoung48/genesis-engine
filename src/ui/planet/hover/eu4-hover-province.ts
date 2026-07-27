@@ -1,5 +1,5 @@
-﻿import { buildEu4ProvinceRingGroups } from "@/ui/planet/renderer/eu4-province-geometry"
-import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source/types"
+﻿import type { Eu4ProvinceFillGeometry } from "@/model/earth/history/data-source/types"
+import { buildEu4ProvinceRingGroups } from "@/ui/planet/renderer/eu4-province-geometry"
 
 interface BoundingBox {
 	minLon: number

@@ -1,6 +1,7 @@
+import type { ComputeSpringTideMapInput } from "@/model/climate/tidal-map/types"
 import { makeRng } from "@/model/shared"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
-import type { ComputeSpringTideMapInput } from "@/model/climate/tidal-map/types"
+
 const BASE_TIDAL_RANGE_M = 0.25
 
 const ENC_BREAKS = [0, 0.5, 0.67, 0.833, 0.92]

@@ -1,8 +1,8 @@
-import { meanEdgeLengthKm, TIME } from "@/model/shared"
 import type {
-	IceResult,
 	ComputeIceAccumulationParams,
+	IceResult,
 } from "@/model/climate/ice/types"
+import { meanEdgeLengthKm, TIME } from "@/model/shared"
 
 const MELT_FACTOR = 6.0
 

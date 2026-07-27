@@ -1,6 +1,6 @@
 import type {
-	RelativeHumidityFromVaporPressureParams,
 	RelativeHumidityFromTempRangeParams,
+	RelativeHumidityFromVaporPressureParams,
 } from "@/model/climate/humidity/types"
 
 function saturationVaporPressureKpa(tempC: number): number {

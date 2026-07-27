@@ -1,3 +1,8 @@
+import type {
+	GenesisClimate,
+	GenesisHydrology,
+	GenesisRainfall,
+} from "../types/climate"
 import type { SphereMesh } from "../types/mesh"
 import type {
 	BoundaryInfo,
@@ -6,7 +11,6 @@ import type {
 	GenesisTerrainFeatures,
 	TectonicPlate,
 } from "../types/tectonics"
-import type { GenesisClimate, GenesisHydrology, GenesisRainfall } from "../types/climate"
 
 export interface BoundedBfsParams {
 	dist: Float32Array

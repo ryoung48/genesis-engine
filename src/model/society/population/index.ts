@@ -1,14 +1,14 @@
 import { createRng, DEFAULT_PLANET_RADIUS_KM } from "@/model/shared"
 import type {
-	PlaceCradlesParams,
-	ComputeProvinceHabitabilityParams,
-	ComputePopulationParams,
-	ProvincePopulation,
-} from "@/model/society/types"
-import type {
 	BfsUpdateMinHopsParams,
 	ComputeMigrationParams,
 } from "@/model/society/population/types"
+import type {
+	ComputePopulationParams,
+	ComputeProvinceHabitabilityParams,
+	PlaceCradlesParams,
+	ProvincePopulation,
+} from "@/model/society/types"
 
 const HAB_CLIMATE = new Float32Array([
 	0, 0.01, 0.1, 0.6, 1.25, 1.0, 0.8, 0.01, 0.01,

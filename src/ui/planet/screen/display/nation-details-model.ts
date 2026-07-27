@@ -1,9 +1,9 @@
-﻿import type { SerializedGenesisWorld } from "@/model/transport"
+﻿import { ERAS } from "@/model/society/eras"
+import { RELIGION } from "@/model/society/religion"
+import type { SerializedGenesisWorld } from "@/model/transport"
 import type { DistributionBucket } from "@/ui/planet/details/shared"
 import type { DisplayNationModel } from "@/ui/planet/screen/display/display-model"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/planet/screen/display/government-colors"
-import { ERAS } from "@/model/society/eras"
-import { RELIGION } from "@/model/society/religion"
 
 interface NationDetailsData {
 	id: number

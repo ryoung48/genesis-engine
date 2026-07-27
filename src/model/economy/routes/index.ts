@@ -1,9 +1,23 @@
+import type {
+	LandCandidateGroup,
+	LandCandidateGroupsByKind,
+	RouteCandidate,
+	RouteComputation,
+	RouteInputs,
+	RouteWorld,
+	RouteWorldInput,
+	SeaCandidateGroup,
+	SeaNeighborWorkspace,
+	SearchWorkspace,
+} from "@/model/economy/routes/types"
 import {
 	buildUrquhartEdgesFromFlat,
 	MinHeap,
 	regionDistanceKm,
 	regionPathLengthKm,
 } from "@/model/shared"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
+import type { SocietyEra } from "@/model/society/types"
 import {
 	ROUTE_LAND_MAJOR,
 	ROUTE_LAND_MINOR,
@@ -12,20 +26,6 @@ import {
 	type RouteEdge,
 	type SerializedRouteKind,
 } from "@/model/transport"
-import type { SocietyEra } from "@/model/society/types"
-import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
-import type {
-	RouteWorldInput,
-	RouteWorld,
-	RouteInputs,
-	RouteComputation,
-	RouteCandidate,
-	LandCandidateGroup,
-	LandCandidateGroupsByKind,
-	SeaCandidateGroup,
-	SearchWorkspace,
-	SeaNeighborWorkspace,
-} from "@/model/economy/routes/types"
 
 function toRouteWorld(input: RouteWorldInput): RouteWorld {
 	const { provinces, nations } = input

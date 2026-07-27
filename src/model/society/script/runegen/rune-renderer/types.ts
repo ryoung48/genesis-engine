@@ -1,6 +1,6 @@
+import type { SharedRng } from "@/model/shared/rng"
 import type { Rune } from "@/model/society/script/runegen/rune"
 import type { RuneRenderOptions } from "@/model/society/script/runegen/rune-renderer"
-import type { SharedRng } from "@/model/shared/rng"
 
 export interface PrepareRuneStrokesParams {
 	rune: Rune

@@ -1,16 +1,16 @@
 import type {
-	RawWar,
-	RawDiplomacyEvent,
-	RawOrganizationReference,
-	RawNationReference,
-	RawHeritage,
-	RawReligionGroup,
-	RawProvinceGeography,
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
-	RawProvinceEvents,
+	RawDiplomacyEvent,
+	RawHeritage,
 	RawNationEvents,
+	RawNationReference,
 	RawOrganizationEvent,
+	RawOrganizationReference,
+	RawProvinceEvents,
+	RawProvinceGeography,
+	RawReligionGroup,
+	RawWar,
 } from "@/model/earth/history/data-source/types"
 
 const EARTH_HISTORY_BASE = "/earth-history"

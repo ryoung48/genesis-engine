@@ -1,10 +1,10 @@
-import {
-	PhonemeCatalog,
-	vowelRules,
-	type LanguageRng,
-} from "@/model/society/language/languages/types"
 import { BUILDER } from "@/model/society/language/languages/builder"
 import type { DiphthongsParams } from "@/model/society/language/languages/builder/vowels/types"
+import {
+	type LanguageRng,
+	PhonemeCatalog,
+	vowelRules,
+} from "@/model/society/language/languages/types"
 
 const basicVowels = {
 	A: "a",

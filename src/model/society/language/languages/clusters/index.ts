@@ -1,4 +1,26 @@
 import { titleCase } from "@/model/shared"
+import type {
+	BasePatternizeParams,
+	EndConsonantsParams,
+	EndVowelsParams,
+	FeminineEndVowelsParams,
+	FemininePatternParams,
+	FindLastNonVowelCharParams,
+	HasDigraphParams,
+	HasLongVowelParams,
+	HasMorphParams,
+	HasSegmentMatchParams,
+	LeadingVowelCountParams,
+	MasculineEndConsonantsParams,
+	MorphemeParams,
+	NewMorphParams,
+	NotHarshParams,
+	PatternizeParams,
+	SyllableParams,
+	TrailingVowelCountParams,
+	ValidLetterParams,
+	WordLengthParams,
+} from "@/model/society/language/languages/clusters/types"
 import {
 	Cluster,
 	Language,
@@ -6,28 +28,6 @@ import {
 	STOP_CHAR,
 	vowelRules,
 } from "@/model/society/language/languages/types"
-import type {
-	HasSegmentMatchParams,
-	FindLastNonVowelCharParams,
-	TrailingVowelCountParams,
-	LeadingVowelCountParams,
-	WordLengthParams,
-	BasePatternizeParams,
-	FemininePatternParams,
-	PatternizeParams,
-	NotHarshParams,
-	ValidLetterParams,
-	HasLongVowelParams,
-	HasDigraphParams,
-	FeminineEndVowelsParams,
-	EndVowelsParams,
-	MasculineEndConsonantsParams,
-	EndConsonantsParams,
-	SyllableParams,
-	HasMorphParams,
-	NewMorphParams,
-	MorphemeParams,
-} from "@/model/society/language/languages/clusters/types"
 
 const range = (count: number): number[] =>
 	Array.from({ length: count }, (_, index) => index)

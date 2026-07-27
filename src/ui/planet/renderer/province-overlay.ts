@@ -5,10 +5,10 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import type { SerializedGenesisWorld } from "@/model/transport"
 import { createMapProjection } from "./map-projection"
 import type {
-	CreateLineSegmentsParams,
-	CollectProvinceBorderMapPositionsParams,
 	BuildSelectedProvinceBorderGlobeParams,
 	BuildSelectedProvinceBorderMapParams,
+	CollectProvinceBorderMapPositionsParams,
+	CreateLineSegmentsParams,
 } from "./types"
 
 const TERRAIN_ELEVATION_SCALE = 0.04

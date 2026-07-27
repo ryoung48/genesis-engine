@@ -6,12 +6,12 @@ import {
 } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type {
-	StarTidalPosition,
-	TideContributionParams,
+	ApparentDiameterRadParams,
 	MoonMoonTideContributionParams,
+	StarTidalPosition,
 	StarTidalPositionParams,
 	StarTideContributionParams,
-	ApparentDiameterRadParams,
+	TideContributionParams,
 } from "@/model/climate/tidal-force/types"
 
 const TWO_PI = 2 * Math.PI

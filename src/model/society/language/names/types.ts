@@ -1,8 +1,8 @@
 import type {
 	LanguageNameContext,
-	LanguageNameProvince,
-	LanguageNameNation,
 	LanguageNameLeaderEntry,
+	LanguageNameNation,
+	LanguageNameProvince,
 } from "@/model/society/language/names"
 
 export interface GetLanguageParams {

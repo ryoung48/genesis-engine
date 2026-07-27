@@ -1,16 +1,16 @@
 ﻿import { useEffect, useMemo, useState } from "react"
 import type { GenesisProvinces } from "@/model"
-import { ENGINE } from "@/model/earth/history/engine"
+import type {
+	RawNationReference,
+	RawOrganizationReference,
+} from "@/model/earth/history/data-source/types"
 import { DATE } from "@/model/earth/history/date"
+import { ENGINE } from "@/model/earth/history/engine"
+import type { EarthHistoryEngine } from "@/model/earth/history/engine/types"
 import { HERITAGES } from "@/model/earth/history/reference/heritages"
 import { NATIONS } from "@/model/earth/history/reference/nations"
 import { ORGANIZATIONS } from "@/model/earth/history/reference/organizations"
 import { RELIGION_GROUPS } from "@/model/earth/history/reference/religion-groups"
-import type {
-	RawOrganizationReference,
-	RawNationReference,
-} from "@/model/earth/history/data-source/types"
-import type { EarthHistoryEngine } from "@/model/earth/history/engine/types"
 
 /**
  * Owns the earth-history engine lifecycle and scrubber time for an

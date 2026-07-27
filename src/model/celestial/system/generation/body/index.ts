@@ -1,13 +1,9 @@
-import { ASTRONOMICAL_DAYS_PER_YEAR } from "@/model/shared"
-import { createRng } from "@/model/shared/rng"
-import { LANGUAGE } from "@/model/society/language/languages"
 import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY, SOLAR_MASS_KG } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { PLANET } from "@/model/celestial/planet"
 import { STAR } from "@/model/celestial/star"
-import { SOL_MAIN_WORLD_DEFAULTS } from "@/model/celestial/system/sol-system"
-import type { SystemBody } from "@/model/celestial/system/types"
+import type { BodyGenerationParams } from "@/model/celestial/system/generation/body/types"
 import {
 	buildBodyEnvironment,
 	buildForcedClassificationEnvironment,
@@ -30,8 +26,12 @@ import {
 import { SOL_SEED_BODIES } from "@/model/celestial/system/generation/sol-seed"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { pickGeneratedTexturePath } from "@/model/celestial/system/generation/texture"
-import type { BodyGenerationParams } from "@/model/celestial/system/generation/body/types"
+import { SOL_MAIN_WORLD_DEFAULTS } from "@/model/celestial/system/sol-system"
+import type { SystemBody } from "@/model/celestial/system/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { ASTRONOMICAL_DAYS_PER_YEAR } from "@/model/shared"
+import { createRng } from "@/model/shared/rng"
+import { LANGUAGE } from "@/model/society/language/languages"
 
 const DAYS_PER_YEAR = ASTRONOMICAL_DAYS_PER_YEAR
 // Mirrors the UI's DEFAULT_WORLD_PARAMS.continentSizeVariety (defaults.ts) --

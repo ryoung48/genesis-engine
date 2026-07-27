@@ -1,7 +1,7 @@
 import React, { useState } from "react"
+import { DATE } from "@/model/earth/history/date"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
-import { DATE } from "@/model/earth/history/date"
 
 /** One timeline entry shared by the nation and organization wiki pages --
  * built by GenesisView from the earth-history engine's raw events. Mentions

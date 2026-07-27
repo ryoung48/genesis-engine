@@ -1,3 +1,5 @@
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
 import {
 	BUPU_STOPS,
 	cssColorToRgb,
@@ -9,8 +11,6 @@ import {
 	sampleColorStops,
 	YL_OR_RD_STOPS,
 } from "@/model/shared"
-import { PASTA } from "@/model/climate/pasta"
-import { VEGETATION } from "@/model/climate/vegetation"
 
 /**
  * Genesis elevation and temperature color mapping.

@@ -1,14 +1,14 @@
 import type {
-	FoldedProvinceState,
-	FoldedNationState,
 	ActiveWar,
-	FoldedState,
-	FoldProvinceParams,
-	FoldNationParams,
 	ApplyDiplomacyDeltaParams,
 	ApplyOrganizationDeltaParams,
 	ComputeActiveWarsParams,
+	FoldedNationState,
+	FoldedProvinceState,
+	FoldedState,
+	FoldNationParams,
 	FoldParams,
+	FoldProvinceParams,
 	OrgParams,
 } from "@/model/earth/history/fold/types"
 

@@ -12,8 +12,8 @@ import type {
 } from ".."
 import { createRng, SimplexNoise } from "../shared"
 import { GENESIS_TERRAIN_FEATURE } from "../tectonics"
-import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
 import type { BoundedBfsParams, ComputeDistanceFieldsParams } from "./types"
+import { applyVolcanicArcs, getVolcanicActivityThreshold } from "./volcanism"
 
 type StageTiming = { Stage: string; ms: string }
 

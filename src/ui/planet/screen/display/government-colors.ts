@@ -1,5 +1,5 @@
-﻿import { GovernmentType } from "@/model/society/types"
-import { ERAS } from "@/model/society/eras"
+﻿import { ERAS } from "@/model/society/eras"
+import { GovernmentType } from "@/model/society/types"
 
 export const GOVERNMENT_COLORS_BY_TYPE: Record<
 	GovernmentType,

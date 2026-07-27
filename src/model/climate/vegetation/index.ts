@@ -1,9 +1,9 @@
 import { PASTA } from "@/model/climate/pasta"
 import type {
-	BiomeCode,
 	AssignClimateZonesParams,
 	AssignEarthClimateZonesParams,
 	AssignVegetationParams,
+	BiomeCode,
 } from "@/model/climate/vegetation/types"
 
 const climateLabels = [

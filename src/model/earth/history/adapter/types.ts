@@ -1,8 +1,8 @@
-import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
+import type { RawNationReference } from "@/model/earth/history/data-source/types"
 import type { FoldedState } from "@/model/earth/history/fold/types"
 import type { Eu4ProvinceMap } from "@/model/earth/history/import/eu4-province-map/types"
-import type { RawNationReference } from "@/model/earth/history/data-source/types"
 import type { LonLat } from "@/model/earth/history/types"
+import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
 
 export interface GenesisFrameFromHistory {
 	/** Per compact province index: internal nation id, or -1 if unowned. */

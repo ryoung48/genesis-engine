@@ -1,4 +1,11 @@
 ﻿import { GENESIS_TERRAIN_FEATURE } from "@/model"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { KOPPEN } from "@/model/climate/koppen"
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
+import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { RELIGION } from "@/model/society/religion"
+import { TIMEZONE } from "@/model/society/timezone"
 import { LANDMARK_TYPE_LAKE } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import type { ColorMode } from "@/ui/planet/colors"
@@ -39,12 +46,6 @@ import {
 	volcanicLandColor,
 } from "@/ui/planet/colors"
 import type { DangerSubMode } from "@/ui/planet/controls/OverlayControls"
-import { getDataVariant } from "@/ui/planet/screen/shared/data-variant"
-import type {
-	NationMapMode,
-	PopulationMapMode,
-} from "@/ui/planet/screen/shared/map-modes"
-import { getProvincePopulationDensity } from "@/ui/planet/screen/shared/population-density"
 import {
 	darkenClimateAtElevation,
 	darkenPoliticalAtElevation,
@@ -56,13 +57,12 @@ import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
 } from "@/ui/planet/screen/display/religion-type"
-import { RELIGION } from "@/model/society/religion"
-import { TIMEZONE } from "@/model/society/timezone"
-import { HUMIDITY } from "@/model/climate/humidity"
-import { KOPPEN } from "@/model/climate/koppen"
-import { PASTA } from "@/model/climate/pasta"
-import { VEGETATION } from "@/model/climate/vegetation"
-import { TRADE_GOODS } from "@/model/economy/trade-goods"
+import { getDataVariant } from "@/ui/planet/screen/shared/data-variant"
+import type {
+	NationMapMode,
+	PopulationMapMode,
+} from "@/ui/planet/screen/shared/map-modes"
+import { getProvincePopulationDensity } from "@/ui/planet/screen/shared/population-density"
 
 /**
  * Relation values the diplomacy map mode colors by. These mirrored the

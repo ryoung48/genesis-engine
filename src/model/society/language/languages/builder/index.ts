@@ -1,10 +1,10 @@
+import type { ValidTermsParams } from "@/model/society/language/languages/builder/types"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
 import {
 	type Language,
 	PhonemeCatalog,
 	type WeightedDistribution,
 } from "@/model/society/language/languages/types"
-import type { ValidTermsParams } from "@/model/society/language/languages/builder/types"
 
 interface CustomClusterParams {
 	len?: number

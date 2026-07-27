@@ -222,7 +222,10 @@ export function buildSuperPlates({
 			if (largest) {
 				const pv = plateVec.get(largest.pid)
 				if (pv) {
-					superPlateVec.set(sp, { pole: [...pv.pole] as [number, number, number], omega: pv.omega })
+					superPlateVec.set(sp, {
+						pole: [...pv.pole] as [number, number, number],
+						omega: pv.omega,
+					})
 					continue
 				}
 			}

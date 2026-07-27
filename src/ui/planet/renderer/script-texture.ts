@@ -1,8 +1,8 @@
 ﻿import { createStringRng } from "@/model/shared"
-import { LABEL_OUTLINE_COLOR } from "@/ui/planet/renderer/nation-label-overlay"
 import type { HeritageScript } from "@/model/society/script"
 import { GLYPH_MODULE } from "@/model/society/script/runegen/glyph-module"
 import { RUNE_RENDERER } from "@/model/society/script/runegen/rune-renderer"
+import { LABEL_OUTLINE_COLOR } from "@/ui/planet/renderer/nation-label-overlay"
 
 const CELL_SCALE = 7
 // Layout spacing scales with the render scale (like stroke width already

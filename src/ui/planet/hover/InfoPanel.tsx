@@ -1,5 +1,6 @@
 import React from "react"
 import { titleCase } from "@/model/shared"
+import { TIMEZONE } from "@/model/society/timezone"
 import { LANDMARK_TYPES } from "@/model/terrain/landmarks"
 import {
 	forEachRoute,
@@ -23,22 +24,6 @@ import {
 	volcanicLandColor,
 	windSpeedColor,
 } from "@/ui/planet/colors"
-import { monthLabels } from "@/ui/planet/screen/shared/constants"
-import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
-import {
-	getMapModePrimary,
-	type PopulationMapMode,
-} from "@/ui/planet/screen/shared/map-modes"
-import {
-	formatDistance,
-	formatElevation,
-	formatFlowRate,
-	formatPrecipitation,
-	formatTemperature,
-	formatTemperatureDelta,
-	rgbToCss,
-	type UnitSystem,
-} from "@/ui/planet/screen/shared/ui-format"
 import type {
 	HoverDtr,
 	HoverHazards,
@@ -80,7 +65,22 @@ import {
 	buildTradeGoodSwatchColor,
 	buildVegetationSwatchColor,
 } from "@/ui/planet/hover/info-panel-model"
-import { TIMEZONE } from "@/model/society/timezone"
+import { monthLabels } from "@/ui/planet/screen/shared/constants"
+import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
+import {
+	getMapModePrimary,
+	type PopulationMapMode,
+} from "@/ui/planet/screen/shared/map-modes"
+import {
+	formatDistance,
+	formatElevation,
+	formatFlowRate,
+	formatPrecipitation,
+	formatTemperature,
+	formatTemperatureDelta,
+	rgbToCss,
+	type UnitSystem,
+} from "@/ui/planet/screen/shared/ui-format"
 
 const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 

@@ -1,6 +1,6 @@
 import type {
-	RegionTimezoneOffsetParams,
 	RegionTimezoneLabelParams,
+	RegionTimezoneOffsetParams,
 } from "@/model/society/timezone/types"
 
 const TIMEZONE_BAND_WATER: readonly [number, number, number][] = [

@@ -4,16 +4,22 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import { SYSTEM } from "@/model/celestial/system"
 import type { SystemBody } from "@/model/celestial/system/types"
+import type {
+	SurfaceTidesBreakdown,
+	TidalSchedule,
+} from "@/model/climate/tidal-schedule/types"
+import { ERAS } from "@/model/society/eras"
+import type { SocietyEra } from "@/model/society/types"
 import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
-import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
 import { SocietyRunesPanel } from "@/ui/planet/controls/SocietyRunesPanel"
 import {
 	DEFAULT_WORLD_SECTIONS,
 	toggleSection,
 	type WorldSection,
 } from "@/ui/planet/details/drawer-state"
+import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
 import { WorldDetails } from "@/ui/planet/details/world/WorldDetails"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
@@ -36,12 +42,6 @@ import {
 	getPostTimingSummary,
 } from "@/ui/wiki/timing/timing-summary"
 import { type WarWikiData, WarWikiPage } from "@/ui/wiki/war/WarWikiPage"
-import type { SocietyEra } from "@/model/society/types"
-import { ERAS } from "@/model/society/eras"
-import type {
-	TidalSchedule,
-	SurfaceTidesBreakdown,
-} from "@/model/climate/tidal-schedule/types"
 
 interface GenerationPanelProps {
 	worldTab: "planet" | "society"

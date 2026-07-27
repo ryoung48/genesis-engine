@@ -1,5 +1,16 @@
 import { PriorityQueue } from "@datastructures-js/priority-queue"
 import type { SphereMesh } from "@/model"
+import { ELEVATION } from "@/model/climate/elevation"
+import { RAIN as LOCKED_RAIN } from "@/model/climate/locked/rain"
+import type {
+	BuildRainRegionMaskParams,
+	ClimateGeometry,
+	ComputeAdvectionParams,
+	ComputeMonthlyRainParams,
+	ComputeRainWeightParams,
+	ComputeThermalEquatorParams,
+} from "@/model/climate/rain/types"
+import { RAIN_SHARED } from "@/model/climate/rain-shared"
 import {
 	clamp,
 	DEFAULT_PLANET_RADIUS_KM,
@@ -11,17 +22,6 @@ import {
 	smoothstep,
 } from "@/model/shared"
 import { LANDMARK_TYPE_OCEAN } from "@/model/terrain"
-import { ELEVATION } from "@/model/climate/elevation"
-import { RAIN_SHARED } from "@/model/climate/rain-shared"
-import { RAIN as LOCKED_RAIN } from "@/model/climate/locked/rain"
-import type {
-	ClimateGeometry,
-	BuildRainRegionMaskParams,
-	ComputeThermalEquatorParams,
-	ComputeAdvectionParams,
-	ComputeRainWeightParams,
-	ComputeMonthlyRainParams,
-} from "@/model/climate/rain/types"
 
 const DEG2RAD = Math.PI / 180
 

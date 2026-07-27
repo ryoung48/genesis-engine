@@ -1,15 +1,15 @@
+import { ERAS } from "@/model/society/eras"
+import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type {
 	GovernmentType,
 	NationProfile,
 	UrbanizationInputs,
 	UrbanizationResult,
 } from "@/model/society/types"
-import { ERAS } from "@/model/society/eras"
-import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type {
-	RankSizeCitiesParams,
-	LerpScaleParams,
 	ComputeDevelopmentParams,
+	LerpScaleParams,
+	RankSizeCitiesParams,
 } from "@/model/society/urbanization/types"
 
 const GOVERNMENT_PROFILES: Record<GovernmentType, NationProfile> = {

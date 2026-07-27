@@ -1,8 +1,8 @@
-import { SimplexNoise } from "@/model/shared"
 import type {
 	ApplyTemperatureNoiseParams,
 	RecomputeAnnualTemperatureStatsParams,
 } from "@/model/climate/temperature-shared/types"
+import { SimplexNoise } from "@/model/shared"
 
 function applyTemperatureNoise({
 	mesh,

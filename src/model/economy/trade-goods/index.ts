@@ -1,7 +1,7 @@
-import { makeRng } from "@/model/shared"
-import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
 import { PASTA } from "@/model/climate/pasta"
 import type { LocationTradeGoods } from "@/model/economy/trade-goods/types"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
+import { makeRng } from "@/model/shared"
 
 function tradeGoodDisplayName(label: string): string {
 	return label
@@ -180,11 +180,15 @@ function computeTradeGoods(params: {
 		if (!vegKey) continue // ocean biome
 
 		const key = `${climateKey}|${vegKey}|${topoKey}|${coast}`
-		const dist = TRADE_GOODS_TABLE[key]
+		const dist = TRADE_GOODS_TABLE[key] as
+			| readonly (readonly [number, number])[]
+			| undefined
 		if (!dist || dist.length === 0) {
 			// Fallback: drop coastal → try inland
 			const fallbackKey = `${climateKey}|${vegKey}|${topoKey}|inland`
-			const fallback = TRADE_GOODS_TABLE[fallbackKey]
+			const fallback = TRADE_GOODS_TABLE[fallbackKey] as
+				| readonly (readonly [number, number])[]
+				| undefined
 			if (!fallback || fallback.length === 0) continue
 			material[l] = weightedPick({ rng, entries: fallback })
 		} else {

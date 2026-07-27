@@ -1,17 +1,18 @@
-import type { GenesisProvinces } from "@/model/types"
 import { ADAPTER } from "@/model/earth/history/adapter"
-import { CHECKPOINT } from "@/model/earth/history/checkpoint"
-import { EU4_PROVINCE_MAP } from "@/model/earth/history/import/eu4-province-map"
-import { DATA_SOURCE } from "@/model/earth/history/data-source"
-import { DATE } from "@/model/earth/history/date"
 import type { NationInfoFromHistory } from "@/model/earth/history/adapter/types"
+import { CHECKPOINT } from "@/model/earth/history/checkpoint"
+import { DATA_SOURCE } from "@/model/earth/history/data-source"
 import type { RawNationReference } from "@/model/earth/history/data-source/types"
+import { DATE } from "@/model/earth/history/date"
 import type {
 	EarthHistoryEngine,
 	EarthHistoryQuery,
-	QueryEarthHistoryParams,
 	QueryEarthHistoryNationParams,
+	QueryEarthHistoryParams,
 } from "@/model/earth/history/engine/types"
+import { EU4_PROVINCE_MAP } from "@/model/earth/history/import/eu4-province-map"
+import type { GenesisProvinces } from "@/model/types"
+
 const SENTINEL_DATE_CUTOFF = DATE.eu4DateToDays("2100.1.1")
 
 function computeDateRange(data: {

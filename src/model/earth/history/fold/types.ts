@@ -1,10 +1,10 @@
 import type {
-	RawWar,
 	RawDiplomacyEvent,
-	RawNationReference,
-	RawProvinceEvents,
 	RawNationEvents,
+	RawNationReference,
 	RawOrganizationEvent,
+	RawProvinceEvents,
+	RawWar,
 } from "@/model/earth/history/data-source/types"
 
 export interface FoldedProvinceState {

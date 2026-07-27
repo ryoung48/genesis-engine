@@ -1,9 +1,9 @@
+import { HEAT } from "@/model/climate/locked/heat"
+import type { ComputeLockedWindVectorsParams } from "@/model/climate/locked/wind/types"
+import { RAIN } from "@/model/climate/rain"
+import type { WindSurface } from "@/model/climate/wind/types"
 import { clamp } from "@/model/shared/math"
 import { DEFAULT_SUBSTELLAR_LON } from "@/model/shared/units"
-import { RAIN } from "@/model/climate/rain"
-import { HEAT } from "@/model/climate/locked/heat"
-import type { WindSurface } from "@/model/climate/wind/types"
-import type { ComputeLockedWindVectorsParams } from "@/model/climate/locked/wind/types"
 
 function surfaceWindFactor({
 	r,

@@ -1,7 +1,7 @@
 import * as THREE from "three"
-import type { MoonBody } from "@/model/celestial/moons/types"
 import { MOON } from "@/model/celestial/moons"
 import { MECHANICS } from "@/model/celestial/moons/mechanics"
+import type { MoonBody } from "@/model/celestial/moons/types"
 import {
 	BODY_VISUAL_BASE_RADIUS,
 	getMoonOrbitDistanceRelativeToPlanet,

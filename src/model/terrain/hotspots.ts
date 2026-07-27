@@ -8,6 +8,7 @@
 import { createRng, eulerVelocityAt, SimplexNoise } from "../shared"
 import { normalizeMantleField } from "../tectonics"
 import type { SphereMesh } from "../types"
+import type { ApplyHotspotsParams } from "./types"
 import {
 	appendLargeIgneousProvinceSites,
 	applyLargeIgneousProvinces,
@@ -16,7 +17,6 @@ import {
 	getScaledFeatureCount,
 	type LipSite,
 } from "./volcanism"
-import type { ApplyHotspotsParams } from "./types"
 
 function findNearestR(
 	mesh: SphereMesh,

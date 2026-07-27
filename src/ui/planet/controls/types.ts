@@ -1,5 +1,9 @@
 import type { ColorMode } from "../colors"
-import type { ClimateSubMode, TopographySubMode, VegetationSubMode } from "./OverlayControls"
+import type {
+	ClimateSubMode,
+	TopographySubMode,
+	VegetationSubMode,
+} from "./OverlayControls"
 
 export interface ResolveSubModeParams {
 	baseMode: ColorMode

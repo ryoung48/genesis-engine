@@ -1,7 +1,7 @@
-import type { SphereMesh } from "@/model/types/mesh"
-import type { GenesisClimate } from "@/model/types/climate"
-import type { GenesisParams } from "@/model/types/tectonics"
 import type { WindSurface } from "@/model/climate/wind/types"
+import type { GenesisClimate } from "@/model/types/climate"
+import type { SphereMesh } from "@/model/types/mesh"
+import type { GenesisParams } from "@/model/types/tectonics"
 
 export type ComputeLockedWindVectorsParams = {
 	mesh: SphereMesh

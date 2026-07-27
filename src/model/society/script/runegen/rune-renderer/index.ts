@@ -1,8 +1,8 @@
 import { Chaikin } from "@/model/society/script/runegen/chaikin"
 import { Point2D } from "@/model/society/script/runegen/point2d"
 import type {
-	PrepareRuneStrokesParams,
 	GetRuneDotsParams,
+	PrepareRuneStrokesParams,
 } from "@/model/society/script/runegen/rune-renderer/types"
 
 export type RuneRenderOptions = {

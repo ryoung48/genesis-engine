@@ -7,10 +7,10 @@ import {
 	getMaxOceanDepthKm,
 	SLIDER_RANGES,
 } from "@/model/shared"
-import { computeSeaLevelOffsetKm } from "@/model/terrain"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
-import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 import type { SocietyEra } from "@/model/society/types"
+import { computeSeaLevelOffsetKm } from "@/model/terrain"
+import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
+import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 
 const SR = SLIDER_RANGES
 

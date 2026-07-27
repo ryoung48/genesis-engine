@@ -1,3 +1,5 @@
+import { RAIN } from "@/model/climate/rain"
+import type { ComputeTornadoRiskParams } from "@/model/climate/tornadoes/types"
 import { clamp, piecewise, smoothstep } from "@/model/shared"
 import {
 	TOPO_FLAT,
@@ -8,8 +10,6 @@ import {
 	TOPO_OCEAN,
 	TOPO_PLATEAU,
 } from "@/model/terrain"
-import { RAIN } from "@/model/climate/rain"
-import type { ComputeTornadoRiskParams } from "@/model/climate/tornadoes/types"
 
 function vegetationMoistureScore(biomeCode: number): number {
 	switch (biomeCode) {

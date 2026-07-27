@@ -1,16 +1,16 @@
 import { CLUSTER } from "@/model/society/language/languages/clusters"
+import type {
+	BuildSlotSeedParams,
+	SpawnClusterParams,
+	SpawnParams,
+} from "@/model/society/language/languages/internal/types"
+import { RNG } from "@/model/society/language/languages/rng"
 import {
 	type Cluster,
 	type Language,
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
-import { RNG } from "@/model/society/language/languages/rng"
-import type {
-	BuildSlotSeedParams,
-	SpawnClusterParams,
-	SpawnParams,
-} from "@/model/society/language/languages/internal/types"
 
 const baseVowels = ["a", "e", "i", "o", "u", "y"]
 

@@ -1,7 +1,7 @@
 import { createStringRng } from "@/model/shared"
 import type {
-	CompressWordParams,
 	CompressNameParams,
+	CompressWordParams,
 } from "@/model/society/script/compress/types"
 
 function normalizeName(name: string): string {

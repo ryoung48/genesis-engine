@@ -4,32 +4,32 @@ import {
 	DEFAULT_PLANET_RADIUS_KM,
 	SimplexNoise,
 } from "@/model/shared"
-import type {
-	ClaimProvinceDynamicParams,
-	SelectSeedParams,
-	MarkBlockedParams,
-	RefineGovernmentSubtypeParams,
-	NationPlacementScoreParams,
-	BestClaimParams,
-	AssignGovernmentTypeParams,
-	GovernmentMix,
-	GovernmentType,
-	GovernmentFamily,
-} from "@/model/society/types"
 import { ERAS } from "@/model/society/eras"
 import { HIERARCHY } from "@/model/society/hierarchy"
-import { SHARED } from "@/model/society/shared"
-import { WATER_ACCESS } from "@/model/society/water-access"
 import type {
-	IntegerMassParams,
 	BuildNationPlanParams,
-	SpreadBucketSizesParams,
-	ContinentPlacementBonusParams,
-	ProvinceSeedDistanceParams,
 	BuildOpenComponentsParams,
-	GroupByNationParams,
 	ColorDistanceParams,
+	ContinentPlacementBonusParams,
+	GroupByNationParams,
+	IntegerMassParams,
+	ProvinceSeedDistanceParams,
+	SpreadBucketSizesParams,
 } from "@/model/society/nations/types"
+import { SHARED } from "@/model/society/shared"
+import type {
+	AssignGovernmentTypeParams,
+	BestClaimParams,
+	ClaimProvinceDynamicParams,
+	GovernmentFamily,
+	GovernmentMix,
+	GovernmentType,
+	MarkBlockedParams,
+	NationPlacementScoreParams,
+	RefineGovernmentSubtypeParams,
+	SelectSeedParams,
+} from "@/model/society/types"
+import { WATER_ACCESS } from "@/model/society/water-access"
 
 const MAX_NATION_SPREAD_KM = 2000
 

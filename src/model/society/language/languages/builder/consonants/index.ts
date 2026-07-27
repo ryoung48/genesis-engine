@@ -1,9 +1,9 @@
-import {
-	PhonemeCatalog,
-	type LanguageRng,
-} from "@/model/society/language/languages/types"
 import { BUILDER } from "@/model/society/language/languages/builder"
 import type { MapOrthoParams } from "@/model/society/language/languages/builder/consonants/types"
+import {
+	type LanguageRng,
+	PhonemeCatalog,
+} from "@/model/society/language/languages/types"
 
 const orthography = (dice: LanguageRng): Record<string, string> => {
 	return {

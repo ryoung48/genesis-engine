@@ -1,5 +1,5 @@
-﻿import { YEAR_MS } from "@/model/history/state"
-import { DATE } from "@/model/earth/history/date"
+﻿import { DATE } from "@/model/earth/history/date"
+import { YEAR_MS } from "@/model/history/state"
 
 /** Converts the procedural sim's historyTime/frame.timeMs (ms, where
  * ms / YEAR_MS is the absolute calendar year) onto the same EU4-days axis

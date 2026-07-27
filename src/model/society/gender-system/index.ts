@@ -1,9 +1,9 @@
 import { createRng } from "@/model/shared"
-import type { CultureGenderSystem, LeaderGender } from "@/model/society/types"
 import type {
 	AssignCultureGenderSystemsParams,
 	ResolveLeaderGenderParams,
 } from "@/model/society/gender-system/types"
+import type { CultureGenderSystem, LeaderGender } from "@/model/society/types"
 
 const cultureGenderSystem = {
 	PATRIARCHAL: 0,

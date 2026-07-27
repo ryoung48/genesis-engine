@@ -1,6 +1,6 @@
 import type {
-	PastaClassificationBuffers,
 	AssignPastaClimateParams,
+	PastaClassificationBuffers,
 } from "@/model/climate/types"
 import type { SphereMesh } from "@/model/types/mesh"
 import type { GenesisParams } from "@/model/types/tectonics"

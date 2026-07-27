@@ -1,13 +1,13 @@
 ﻿import type { GenesisParams, SphereMesh, StageTiming } from "@/model"
-import { computeSettlementAnchors } from "@/model/settlements"
-import { assignLandmarkIdentity, type GenesisLandmarks } from "@/model/terrain"
 import { runPostElevationPipeline } from "@/model/pipelines/post-elevation"
+import { computeSettlementAnchors } from "@/model/settlements"
 import { CULTURE } from "@/model/society/culture"
 import { ERAS } from "@/model/society/eras"
 import { HERITAGE } from "@/model/society/heritage"
 import { NATIONS } from "@/model/society/nations"
 import { RELIGION } from "@/model/society/religion"
 import { SHARED } from "@/model/society/shared"
+import { assignLandmarkIdentity, type GenesisLandmarks } from "@/model/terrain"
 
 interface DeriveProvinceSocietyInput {
 	mesh: SphereMesh

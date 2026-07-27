@@ -9,9 +9,9 @@ import {
 	isSovereign,
 	YEAR_MS,
 } from "@/model/history/state"
-import type { GovernmentType } from "@/model/society/types"
 import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
+import type { GovernmentType } from "@/model/society/types"
 
 const MAX_ADJUSTMENT_RATE = 0.005
 const URBAN_GROWTH = 0.1

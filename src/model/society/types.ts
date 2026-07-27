@@ -1,8 +1,8 @@
 import type { GenesisParams, GenesisProvinces } from "@/model"
-import type { GenesisLandmarks } from "@/model/terrain"
 import type { SimplexNoise } from "@/model/shared"
-import type { GenesisNationHierarchy } from "@/model/types"
 import { GENDER_SYSTEM } from "@/model/society/gender-system"
+import type { GenesisLandmarks } from "@/model/terrain"
+import type { GenesisNationHierarchy } from "@/model/types"
 
 export interface ClaimProvinceDynamicParams {
 	nation: number

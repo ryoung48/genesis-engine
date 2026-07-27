@@ -1,5 +1,10 @@
 import { EARTH_DIAMETER_KM, EARTH_MASS_KG } from "@/model/celestial/orbit-body"
 import { PLANET } from "@/model/celestial/planet"
+import type {
+	SolSeedGenerationParams,
+	SolSeedGenerationResult,
+} from "@/model/celestial/system/generation/sol-seed/types"
+import type { HomeWorldParams } from "@/model/celestial/system/generation/types"
 import {
 	SOL_EARTH_CLOUDS_TEXTURE_PATH,
 	SOL_EARTH_TEXTURE_PATH,
@@ -10,13 +15,8 @@ import {
 	SOL_SYSTEM_BODIES,
 } from "@/model/celestial/system/sol-system"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
-import type { HomeWorldParams } from "@/model/celestial/system/generation/types"
-import type {
-	SolSeedGenerationParams,
-	SolSeedGenerationResult,
-} from "@/model/celestial/system/generation/sol-seed/types"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
+import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 
 function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 	const density = PLANET.buildDensityProfile({

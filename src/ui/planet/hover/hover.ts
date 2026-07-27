@@ -2,6 +2,13 @@ import {
 	GENESIS_TERRAIN_FEATURE_LABELS,
 	GENESIS_TOPOGRAPHY_LABELS,
 } from "@/model"
+import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
+import { HUMIDITY } from "@/model/climate/humidity"
+import { KOPPEN } from "@/model/climate/koppen"
+import { PASTA } from "@/model/climate/pasta"
+import { VEGETATION } from "@/model/climate/vegetation"
+import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
+import { TIMEZONE } from "@/model/society/timezone"
 import { LANDMARK_TYPE_LAKE, LANDMARK_TYPES } from "@/model/terrain"
 import type { SerializedGenesisWorld } from "@/model/transport"
 import {
@@ -9,21 +16,14 @@ import {
 	EU5_TOPOGRAPHY_CATEGORIES,
 	EU5_VEGETATION_CATEGORIES,
 } from "@/ui/planet/colors"
-import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 import type {
-	GetHoverRainfallSeriesFromArraysParams,
-	GetHoverDtrSeriesParams,
-	GetHoverMonthlySeriesParams,
-	GetHoverMiseryParams,
 	GetHoverClimateDisplayParams,
+	GetHoverDtrSeriesParams,
+	GetHoverMiseryParams,
+	GetHoverMonthlySeriesParams,
+	GetHoverRainfallSeriesFromArraysParams,
 } from "@/ui/planet/hover/types"
-import { TIMEZONE } from "@/model/society/timezone"
-import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
-import { HUMIDITY } from "@/model/climate/humidity"
-import { KOPPEN } from "@/model/climate/koppen"
-import { PASTA } from "@/model/climate/pasta"
-import { VEGETATION } from "@/model/climate/vegetation"
-import { TRADE_GOODS_TABLE } from "@/model/economy/trade-goods-table"
+import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 
 export interface HoverInfo {
 	region: number

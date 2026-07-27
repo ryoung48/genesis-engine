@@ -12,8 +12,8 @@ import type {
 } from ".."
 import { eulerVelocityAt, SimplexNoise } from "../shared"
 import type {
-	PlateVelocityAtParams,
 	FindCollisionsParams,
+	PlateVelocityAtParams,
 	PropagateStressParams,
 } from "./types"
 

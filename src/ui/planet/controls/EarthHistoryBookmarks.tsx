@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react"
-import { IconButton } from "@/ui/components/primitives/IconButton"
 import { BOOKMARKS } from "@/model/earth/history/reference/bookmarks"
+import { IconButton } from "@/ui/components/primitives/IconButton"
 
 interface EarthHistoryBookmarksProps {
 	onSelect: (dateDays: number) => void

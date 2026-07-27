@@ -11,6 +11,7 @@ import type {
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
+import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule/types"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { estimateAlbedo } from "@/ui/hooks/useEbmPreview"
@@ -44,7 +45,6 @@ import {
 	buildDirectionalAngleEditorConfig,
 	buildSubstellarLonStat,
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
-import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule/types"
 
 function buildGroupClassStat(
 	group: string | undefined,

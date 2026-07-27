@@ -1,5 +1,5 @@
 import type { TideLock } from "../celestial/orbit-body/types"
-import type { SocietyEra } from "../society/types";
+import type { SocietyEra } from "../society/types"
 
 export interface TectonicPlate {
 	id: number

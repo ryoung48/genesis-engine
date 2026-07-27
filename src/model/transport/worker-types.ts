@@ -7,8 +7,8 @@ import type {
 	StageTiming,
 } from "@/model"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import type { HistoryNote } from "@/model/history"
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import type { HistoryNote } from "@/model/history"
 
 interface SerializedSphereMesh {
 	numRegions: number
