@@ -1,10 +1,10 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState } from "@/model/history/generated/state/types"
 
 export interface NextEventParams {
 	state: HistoryState
 	province: number
-	rng: HistoryRng
+	rng: SharedRng
 	years?: number
 }
 
@@ -21,30 +21,30 @@ export interface GetDefenderOccupationCandidatesParams {
 
 export interface SeedInterstateWarsParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface SeedRebellionsParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface InitWarParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface RunWarParams {
 	state: HistoryState
 	nation: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface SeedWarStageParams {
 	state: HistoryState
 	attacker: number
 	defender: number
-	rng: HistoryRng
+	rng: SharedRng
 	rebel: boolean
 	forceOccupied: boolean
 }

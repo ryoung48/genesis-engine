@@ -5,12 +5,9 @@ import type {
 	DistributeSurfaceInput,
 	WaterPctInput,
 } from "@/model/celestial/planet/environment/classification/hydrosphere/types"
-import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
+import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
 
-function clamp({ value, min, max }: ClampInput): number {
-	return Math.max(min, Math.min(max, value))
-}
 const WATER_BANDS: [number, number][] = [
 	[0, 5],
 	[5, 15],
@@ -41,7 +38,7 @@ const MAJOR_BANDS: [number, number][] = [
 
 function waterPct({ rng, hydrosphereCode }: WaterPctInput) {
 	const [lo, hi] =
-		WATER_BANDS[clamp({ value: hydrosphereCode, min: 0, max: 10 })]!
+		WATER_BANDS[MATH.clamp({ value: hydrosphereCode, lo: 0, hi: 10 })]!
 	return rng.uniform(lo, hi)
 }
 
@@ -83,7 +80,9 @@ function distributeSurface({
 		small: { pct: 0 },
 	}
 	if (targetPct <= 0) return empty
-	const [majLo, majHi] = MAJOR_BANDS[clamp({ value: code, min: 0, max: 10 })]!
+	const [majLo, majHi] = MAJOR_BANDS[
+		MATH.clamp({ value: code, lo: 0, hi: 10 })
+	]!
 	const majorShare = rng.uniform(majLo, majHi)
 	const smallShareOfRest =
 		rng.uniform(0.05, 0.5) * Math.max(0.1, 1 - majorShare)

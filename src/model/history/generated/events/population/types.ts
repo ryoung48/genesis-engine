@@ -10,12 +10,6 @@ export interface RankSizeCitiesParams {
 	q: number
 }
 
-export interface LerpScaleParams {
-	domain: number[]
-	range: number[]
-	v: number
-}
-
 export interface HierarchyDepthParams {
 	state: HistoryState
 	province: number

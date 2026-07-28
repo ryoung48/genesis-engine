@@ -1,4 +1,4 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState } from "@/model/history/generated/state/types"
 import type { StageTiming } from "@/model/pipelines/types"
 import type { GenesisNationHierarchy } from "@/model/society/types"
@@ -11,7 +11,7 @@ export interface SeedColonyRelationsParams {
 export interface ProcessEventsUntilParams {
 	state: HistoryState
 	targetTime: number
-	rng: HistoryRng
+	rng: SharedRng
 	validate: boolean
 }
 
@@ -24,6 +24,6 @@ export interface TimedParams<T> {
 export interface SimulateUntilParams {
 	state: HistoryState
 	targetTimeMs: number
-	rng: HistoryRng
+	rng: SharedRng
 	validate: boolean
 }

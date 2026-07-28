@@ -18,6 +18,12 @@ export interface SmoothstepParams {
 	x: number
 }
 
+export interface LerpParams {
+	start: number
+	end: number
+	position: number
+}
+
 export interface PiecewiseParams {
 	domain: number[]
 	range: number[]

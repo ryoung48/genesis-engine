@@ -10,7 +10,7 @@ import type {
 import { MATH } from "@/model/shared/math/core"
 
 function lerp({ a, b, t }: LerpParams): number {
-	return a + (b - a) * t
+	return MATH.lerp({ start: a, end: b, position: t })
 }
 
 function mixRgb({ a, b, t }: MixRgbParams): RgbColor {

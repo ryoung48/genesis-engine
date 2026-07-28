@@ -3,7 +3,6 @@ import type {
 	DevelopmentParams,
 	HierarchyDepthParams,
 	InitPopulationParams,
-	LerpScaleParams,
 	NationProfile,
 	RankSizeCitiesParams,
 	RunPopulationParams,
@@ -11,6 +10,7 @@ import type {
 } from "@/model/history/generated/events/population/types"
 import { FIELDS } from "@/model/history/generated/fields"
 import { STATE } from "@/model/history/generated/state"
+import { MATH } from "@/model/shared/math/core"
 import { ERAS } from "@/model/society/eras"
 import { SETTLEMENT_TUNING } from "@/model/society/settlement-tuning"
 import type { GovernmentType } from "@/model/society/types"
@@ -85,30 +85,19 @@ function rankSizeCities({ urbanPop, q }: RankSizeCitiesParams): number[] {
 	return Array.from({ length: N }, (_, i) => (urbanPop * (i + 1) ** -q) / H)
 }
 
-function lerpScale({ domain, range, v }: LerpScaleParams): number {
-	const clamped = Math.max(domain[0], Math.min(domain[domain.length - 1], v))
-	for (let i = 0; i < domain.length - 1; i++) {
-		if (clamped <= domain[i + 1]) {
-			const t = (clamped - domain[i]) / (domain[i + 1] - domain[i])
-			return range[i] + t * (range[i + 1] - range[i])
-		}
-	}
-	return range[range.length - 1]
-}
-
 function urbanPopToDev(pop: number): number {
-	return lerpScale({
+	return MATH.piecewise({
 		domain: [1_000, 5_000, 20_000, 100_000, 1_000_000],
 		range: [0.05, 0.1, 0.25, 0.65, 0.95],
-		v: pop,
+		x: pop,
 	})
 }
 
 function devToGrowthRate(dev: number): number {
-	return lerpScale({
+	return MATH.piecewise({
 		domain: [0.0, 0.15, 0.35, 0.55, 0.75, 0.95],
 		range: [0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.002],
-		v: dev,
+		x: dev,
 	})
 }
 

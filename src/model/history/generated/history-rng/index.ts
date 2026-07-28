@@ -1,7 +1,6 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
-import { RNG } from "@/model/shared/random/rng"
+import { RNG, type SharedRng } from "@/model/shared/random/rng"
 
-function createHistoryRng(seed: number): HistoryRng {
+function createHistoryRng(seed: number): SharedRng {
 	return RNG.createRng({ seed })
 }
 

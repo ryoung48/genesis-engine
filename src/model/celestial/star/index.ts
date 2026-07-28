@@ -2,11 +2,11 @@ import type {
 	BlackbodyFractionInput,
 	InterpolateSeriesInput,
 	KeplerYearInput,
-	LerpInput,
 	MainSequenceClass,
 	RollStarAgeInput,
 	StarSpectralInput,
 } from "@/model/celestial/star/types"
+import { MATH } from "@/model/shared/math/core"
 import {
 	DEFAULT_ORBITAL_DISTANCE_AU as DEFAULT_ORBITAL_DISTANCE_AU_VALUE,
 	DEFAULT_SPECTRAL_CLASS as DEFAULT_SPECTRAL_CLASS_VALUE,
@@ -85,10 +85,6 @@ function parFractionNormalized(T_K: number): number {
 	return par / parSol
 }
 
-function lerp({ start, end, position }: LerpInput): number {
-	return start + (end - start) * position
-}
-
 function interpolateSeries({
 	position,
 	values,
@@ -96,16 +92,16 @@ function interpolateSeries({
 	const n = values.length
 	if (n === 0) return 0
 	if (n === 1) return values[0]
-	if (position <= 0) return lerp({ start: values[0], end: values[1], position })
+	if (position <= 0) return MATH.lerp({ start: values[0], end: values[1], position })
 	const maxPos = n - 1
 	if (position >= maxPos)
-		return lerp({
+		return MATH.lerp({
 			start: values[n - 2],
 			end: values[n - 1],
 			position: position - (n - 2),
 		})
 	const i = Math.floor(position)
-	return lerp({ start: values[i], end: values[i + 1], position: position - i })
+	return MATH.lerp({ start: values[i], end: values[i + 1], position: position - i })
 }
 
 function getStarSpectralPosition({ cls, subtype }: StarSpectralInput): number {

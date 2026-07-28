@@ -1,10 +1,10 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { Relation } from "@/model/history/generated/state"
 import type { HistoryState } from "@/model/history/generated/state/types"
 
 export interface RollTransitionParams {
 	current: Relation
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface CanBeRivalsParams {
@@ -29,20 +29,20 @@ export interface ProcessVassalDiplomacyParams {
 	state: HistoryState
 	vassal: number
 	overlord: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface ProcessPersonalUnionDiplomacyParams {
 	state: HistoryState
 	junior: number
 	senior: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface NextEventParams {
 	state: HistoryState
 	province: number
-	rng: HistoryRng
+	rng: SharedRng
 	years?: number
 }
 
@@ -50,36 +50,36 @@ export interface ClassifyInitialNeighborRelationParams {
 	state: HistoryState
 	a: number
 	b: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface SeedNeighborRelationsParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface SeedInitialVassalsParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface SeedSharedDynastiesParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface SeedInitialPersonalUnionsParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface InitDiplomacyParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface RunDiplomacyParams {
 	state: HistoryState
 	nation: number
-	rng: HistoryRng
+	rng: SharedRng
 }

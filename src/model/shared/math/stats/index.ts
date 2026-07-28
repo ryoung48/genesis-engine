@@ -1,9 +1,9 @@
-import { PriorityQueue } from "@datastructures-js/priority-queue"
 import type {
 	ComputeCoastDistancesParams,
 	ComputeOceanDistanceBFSParams,
 	CountContinentsParams,
 } from "@/model/shared/math/stats/types"
+import { PriorityHeap } from "@/model/shared/min-heap"
 import { UNITS } from "@/model/shared/units"
 
 const SEA_AREA_THRESHOLD_KM2 = 200_000
@@ -24,9 +24,7 @@ function computeOceanDistanceBFS({
 	// the final return value.
 	const dist = new Float64Array(numRegions).fill(Infinity)
 	const settled = new Uint8Array(numRegions)
-	const queue = new PriorityQueue<{ region: number; dist: number }>(
-		(a, b) => a.dist - b.dist,
-	)
+	const queue = new PriorityHeap<number>()
 
 	// Label connected water components and measure each one's real area, so
 	// seeding isn't gated on a separate module's ratio-based ocean/sea/lake
@@ -70,13 +68,13 @@ function computeOceanDistanceBFS({
 		)
 			continue
 		dist[r] = 0
-		queue.enqueue({ region: r, dist: 0 })
+		queue.push(0, r)
 	}
 
-	while (!queue.isEmpty()) {
-		const next = queue.dequeue()
+	while (queue.size > 0) {
+		const next = queue.pop()
 		if (!next) break
-		const { region: r, dist: d } = next
+		const { key: d, value: r } = next
 		if (settled[r]) continue
 		if (d > dist[r] + 1e-6) continue
 		settled[r] = 1
@@ -86,7 +84,7 @@ function computeOceanDistanceBFS({
 			const candidate = d + neighborDist[j] * planetRadiusKm
 			if (candidate < dist[nb]) {
 				dist[nb] = candidate
-				queue.enqueue({ region: nb, dist: candidate })
+				queue.push(candidate, nb)
 			}
 		}
 	}
@@ -147,17 +145,15 @@ function computeCoastDistances({
 	function dijkstra(sources: number[], restrictToLand: boolean): Float64Array {
 		const dist = new Float64Array(N).fill(Infinity)
 		const settled = new Uint8Array(N)
-		const queue = new PriorityQueue<{ region: number; dist: number }>(
-			(a, b) => a.dist - b.dist,
-		)
+		const queue = new PriorityHeap<number>()
 		for (const r of sources) {
 			dist[r] = 0
-			queue.enqueue({ region: r, dist: 0 })
+			queue.push(0, r)
 		}
-		while (!queue.isEmpty()) {
-			const next = queue.dequeue()
+		while (queue.size > 0) {
+			const next = queue.pop()
 			if (!next) break
-			const { region: r, dist: d } = next
+			const { key: d, value: r } = next
 			if (settled[r]) continue
 			if (d > dist[r] + 1e-6) continue
 			settled[r] = 1
@@ -168,7 +164,7 @@ function computeCoastDistances({
 				const candidate = d + neighborDist[j] * planetRadiusKm
 				if (candidate < dist[nb]) {
 					dist[nb] = candidate
-					queue.enqueue({ region: nb, dist: candidate })
+					queue.push(candidate, nb)
 				}
 			}
 		}

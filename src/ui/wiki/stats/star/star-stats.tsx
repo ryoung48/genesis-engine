@@ -1,7 +1,7 @@
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
-import { SLIDER_RANGES } from "@/model/genesis-params/ranges"
+import { SLIDER_RANGES } from "@/model/pipelines/genesis-params/ranges"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/planet/screen/generation/star-utils"
 

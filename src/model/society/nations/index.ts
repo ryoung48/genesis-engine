@@ -1,3 +1,4 @@
+import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
 import { IDENTITY_SEEDS } from "@/model/shared/random/identity-seeds"
 import { UNITS } from "@/model/shared/units"
@@ -32,7 +33,7 @@ import { WATER_ACCESS } from "@/model/society/water-access"
 
 const MAX_NATION_SPREAD_KM = 2000
 
-const NATION_PERCENTAGES = normalize([
+const NATION_PERCENTAGES = MATH.normalize([
 	0.0, 0.11, 0.144, 0.194, 0.165, 0.251, 0.137,
 ])
 
@@ -1260,11 +1261,6 @@ function refineGovernmentSubtype({
 		}
 	}
 	return getGovIdx().chiefdom
-}
-
-function normalize(values: number[]): number[] {
-	const sum = values.reduce((acc, value) => acc + value, 0) || 1
-	return values.map((value) => value / sum)
 }
 
 function groupByNation({

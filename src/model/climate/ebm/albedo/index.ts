@@ -1,20 +1,17 @@
 import type { IceAlbedoAtParams } from "@/model/climate/ebm/albedo/types"
 import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { MATH } from "@/model/shared/math/core"
 
 const ICE_TRANSITION_HALF_WIDTH_K = 8
-
-function smoothstep(t: number): number {
-	const clamped = Math.min(1, Math.max(0, t))
-	return clamped * clamped * (3 - 2 * clamped)
-}
 
 function iceAlbedoAt(params: IceAlbedoAtParams): number {
 	const { temperatureK, baseAlbedo, iceAlbedo, couplingFactor } = params
 	const { ICE_LIMIT } = CONSTANTS.embConstants.thermal
-	const t =
-		(temperatureK - (ICE_LIMIT - ICE_TRANSITION_HALF_WIDTH_K)) /
-		(2 * ICE_TRANSITION_HALF_WIDTH_K)
-	const warmthFraction = smoothstep(t)
+	const warmthFraction = MATH.smoothstep({
+		edge0: ICE_LIMIT - ICE_TRANSITION_HALF_WIDTH_K,
+		edge1: ICE_LIMIT + ICE_TRANSITION_HALF_WIDTH_K,
+		x: temperatureK,
+	})
 	const fullFeedback =
 		iceAlbedo * (1 - warmthFraction) + baseAlbedo * warmthFraction
 	return baseAlbedo + (fullFeedback - baseAlbedo) * couplingFactor

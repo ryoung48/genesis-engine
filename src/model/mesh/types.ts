@@ -1,4 +1,4 @@
-import type { GenesisRng } from "@/model/shared/random/rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface SphereMesh {
 	numRegions: number
@@ -31,13 +31,13 @@ export interface SphereMesh {
 export interface GenerateFibonacciSphereParams {
 	N: number
 	jitter: number
-	rng: GenesisRng
+	rng: SharedRng
 }
 
 export interface GenerateAdaptiveFibonacciSphereParams {
 	targetN: number
 	jitter: number
-	rng: GenesisRng
+	rng: SharedRng
 	densityWeight: (latDeg: number, lonDeg: number) => number
 }
 
@@ -55,6 +55,6 @@ export interface AddPoleToMeshParams {
 export interface BuildSphereMeshParams {
 	n: number
 	jitter: number
-	rng: GenesisRng
+	rng: SharedRng
 	densityWeight?: (latDeg: number, lonDeg: number) => number
 }

@@ -1,11 +1,9 @@
 import { BUILDER } from "@/model/society/language/languages/builder"
 import type { MapOrthoParams } from "@/model/society/language/languages/builder/consonants/types"
-import {
-	type LanguageRng,
-	PhonemeCatalog,
-} from "@/model/society/language/languages/types"
+import { PhonemeCatalog } from "@/model/society/language/languages/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
-const orthography = (dice: LanguageRng): Record<string, string> => {
+const orthography = (dice: SharedRng): Record<string, string> => {
 	return {
 		ŋ: "ng",
 		ð: "th",
@@ -32,7 +30,7 @@ const mapOrtho = ({ ortho, sounds }: MapOrthoParams) =>
 const buildConsonants = (params: {
 	ending: PhonemeCatalog
 	vowels: string[]
-	dice: LanguageRng
+	dice: SharedRng
 	stops: boolean
 }) => {
 	const ortho = orthography(params.dice)

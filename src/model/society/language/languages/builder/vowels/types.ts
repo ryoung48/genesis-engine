@@ -1,7 +1,7 @@
-import type { LanguageRng } from "@/model/society/language/languages/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface DiphthongsParams {
 	vowels: string[]
 	consonants: string[]
-	dice: LanguageRng
+	dice: SharedRng
 }

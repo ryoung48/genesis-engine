@@ -7,6 +7,7 @@ import type {
 	GovernmentType,
 	SocietyEra,
 } from "@/model/society/types"
+import { MATH } from "@/model/shared/math/core"
 
 const governmentTypes: GovernmentType[] = [
 	// tribal
@@ -120,11 +121,6 @@ const nationBuckets: [number, number][] = [
 	[1, 1],
 ]
 
-function normalize(values: number[]): number[] {
-	const sum = values.reduce((a, b) => a + b, 0) || 1
-	return values.map((v) => v / sum)
-}
-
 const eraConfigs: Record<SocietyEra, EraConfig> = {
 	paleolithic: {
 		id: "paleolithic",
@@ -151,7 +147,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		statehoodFraction: 0.08,
 		hasNations: true,
 		// Only tiny chiefdoms (1–4 provinces)
-		nationPercentages: normalize([0, 0, 0, 0, 0.15, 0.35, 0.5]),
+		nationPercentages: MATH.normalize([0, 0, 0, 0, 0.15, 0.35, 0.5]),
 		nationBuckets: nationBuckets,
 		governmentMix: {
 			tribal: 0.92,
@@ -173,7 +169,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		hasNations: true,
 		// Count-calibrated against Bronze Age size-tier targets:
 		// 56% [1], 33% [2-4], 9% [5-9], 2% [10-24], 1% [25-49], 0% [50-250], 0% [251-600]
-		nationPercentages: normalize([
+		nationPercentages: MATH.normalize([
 			0.0, 0.0, 0.128, 0.1176, 0.218, 0.3426, 0.1938,
 		]),
 		nationBuckets: nationBuckets,
@@ -197,7 +193,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		hasNations: true,
 		// Count-calibrated against Iron Age size-tier targets:
 		// 41% [1], 38% [2-4], 15% [5-9], 4% [10-24], 1% [25-49], 1% [50-250], 1% [251-600]
-		nationPercentages: normalize([
+		nationPercentages: MATH.normalize([
 			0.4524, 0.1595, 0.0393, 0.0723, 0.1116, 0.1212, 0.0436,
 		]),
 		nationBuckets: nationBuckets,
@@ -231,7 +227,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		// shares: the previous weights assumed the 50-250 bucket averaged 150
 		// provinces, which handed it 26.8% of all provinces. In 1444 the only
 		// nation above 49 is Ming at 113, so that bucket is really 4.4%.
-		nationPercentages: normalize([
+		nationPercentages: MATH.normalize([
 			0.0, 0.044, 0.138, 0.257, 0.16, 0.273, 0.128,
 		]),
 		// Top bucket stays empty and the 50+ tier is capped near Ming's 113
@@ -265,7 +261,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		hasNations: true,
 		// Count-calibrated against Renaissance / Early Modern size-tier targets:
 		// 51% [1], 33% [2-4], 8% [5-9], 5% [10-24], 2% [25-49], 1% [50-250], 1% [251-600]
-		nationPercentages: normalize([
+		nationPercentages: MATH.normalize([
 			0.4524, 0.1595, 0.0787, 0.0904, 0.0595, 0.1053, 0.0542,
 		]),
 		nationBuckets: nationBuckets,
@@ -289,7 +285,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		hasNations: true,
 		// Count-calibrated against Industrial size-tier targets:
 		// 36% [1], 30% [2-4], 16% [5-9], 8% [10-24], 4% [25-49], 4% [50-250], 3% [251-600]
-		nationPercentages: normalize([
+		nationPercentages: MATH.normalize([
 			0.5322, 0.2502, 0.0617, 0.0567, 0.0467, 0.0375, 0.015,
 		]),
 		nationBuckets: nationBuckets,
@@ -313,7 +309,7 @@ const eraConfigs: Record<SocietyEra, EraConfig> = {
 		hasNations: true,
 		// Count-calibrated against modern nation-state size-tier targets:
 		// 22% [1], 15% [2-4], 21% [5-9], 23% [10-24], 10% [25-49], 6% [50-250], 3% [251-600]
-		nationPercentages: normalize([
+		nationPercentages: MATH.normalize([
 			0.405, 0.2856, 0.1174, 0.1241, 0.0466, 0.0143, 0.007,
 		]),
 		nationBuckets: nationBuckets,

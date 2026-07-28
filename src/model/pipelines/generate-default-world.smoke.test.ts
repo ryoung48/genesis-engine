@@ -5,7 +5,6 @@ import { CONSTANTS } from "@/model/climate/ebm/constants"
 import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
 import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION } from "@/model/climate/vegetation"
-import { PLANET_CODE } from "@/model/genesis-params/code"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { GENERATE_WORLD } from "@/model/pipelines/generate-world"
@@ -18,53 +17,12 @@ import { buildGenerationPreviewConfig } from "@/ui/planet/screen/generation/gene
 const GENESIS_TOPOGRAPHY_LABELS = CLASSIFICATION.genesisTopographyLabels
 
 const SMOKE_PLANET_SEED = 14963991
-const SMOKE_PLANET_CODE = PLANET_CODE.encodePlanetCode({
-	seed: SMOKE_PLANET_SEED,
-	params: {
+
+function buildSmokeParams(): GenesisParams {
+	return {
 		seed: SMOKE_PLANET_SEED,
 		...DEFAULT_WORLD_PARAMS,
 		tideLock: null,
-	},
-})
-
-function buildSmokeParams(code: string): GenesisParams {
-	const decoded = PLANET_CODE.decodePlanetCode(code)
-	if (!decoded) throw new Error(`Invalid smoke planet code: ${code}`)
-
-	return {
-		seed: decoded.seed,
-		numPoints: decoded.numPoints ?? DEFAULT_WORLD_PARAMS.numPoints,
-		numPlates: DEFAULT_WORLD_PARAMS.numPlates,
-		landDistribution:
-			decoded.landDistribution ?? DEFAULT_WORLD_PARAMS.landDistribution,
-		continentSizeVariety:
-			decoded.continentSizeVariety ?? DEFAULT_WORLD_PARAMS.continentSizeVariety,
-		landCoverage: decoded.landCoverage ?? DEFAULT_WORLD_PARAMS.landCoverage,
-		jitter: DEFAULT_WORLD_PARAMS.jitter,
-		roughness: DEFAULT_WORLD_PARAMS.roughness,
-		terrainWarp: DEFAULT_WORLD_PARAMS.terrainWarp,
-		smoothing: DEFAULT_WORLD_PARAMS.smoothing,
-		hydraulicErosion: DEFAULT_WORLD_PARAMS.hydraulicErosion,
-		thermalErosion: DEFAULT_WORLD_PARAMS.thermalErosion,
-		ridgeSharpening: DEFAULT_WORLD_PARAMS.ridgeSharpening,
-		glacialErosion: DEFAULT_WORLD_PARAMS.glacialErosion,
-		seaLevel: decoded.seaLevel ?? DEFAULT_WORLD_PARAMS.seaLevel,
-		volcanism: decoded.volcanism ?? DEFAULT_WORLD_PARAMS.volcanism,
-		craters: decoded.craters ?? DEFAULT_WORLD_PARAMS.craters,
-		planetRadiusKm:
-			decoded.planetRadiusKm ?? DEFAULT_WORLD_PARAMS.planetRadiusKm,
-		obliquity: decoded.obliquity ?? DEFAULT_WORLD_PARAMS.obliquity,
-		eccentricity: decoded.eccentricity ?? DEFAULT_WORLD_PARAMS.eccentricity,
-		spectralClass: decoded.spectralClass ?? DEFAULT_WORLD_PARAMS.spectralClass,
-		starSubtype: decoded.starSubtype ?? DEFAULT_WORLD_PARAMS.starSubtype,
-		orbitalDistanceAU:
-			decoded.orbitalDistanceAU ?? DEFAULT_WORLD_PARAMS.orbitalDistanceAU,
-		daysPerYear: decoded.daysPerYear ?? DEFAULT_WORLD_PARAMS.daysPerYear,
-		hoursPerDay: decoded.hoursPerDay ?? DEFAULT_WORLD_PARAMS.hoursPerDay,
-		tideLock: decoded.tideLock,
-		substellarLon: decoded.substellarLon ?? DEFAULT_WORLD_PARAMS.substellarLon,
-		perihelion: decoded.perihelion ?? DEFAULT_WORLD_PARAMS.perihelion,
-		pressure: decoded.pressure ?? DEFAULT_WORLD_PARAMS.pressure,
 	}
 }
 
@@ -253,15 +211,14 @@ function summarizeDistribution(
 }
 
 describe("full world smoke generation", () => {
-	it("generates a world using the configured smoke planet code", () => {
-		const params = buildSmokeParams(SMOKE_PLANET_CODE)
+	it("generates a world using the configured smoke params", () => {
+		const params = buildSmokeParams()
 		const previewAvgTempC = computePreviewAverageTempC(params)
 		const world = GENERATE_WORLD.generateGenesisWorld({ params })
 		const summary = summarizeWorld(world)
 		const fingerprint = computeWorldFingerprint(world)
 
-		console.info("Smoke planet code", SMOKE_PLANET_CODE)
-		console.info("Decoded smoke params", {
+		console.info("Smoke params", {
 			seed: params.seed,
 			numPoints: params.numPoints,
 			numPlates: params.numPlates,
@@ -429,7 +386,7 @@ describe("full world smoke generation", () => {
 	}, 300_000)
 
 	it("logs pasta distributions for frozen, refuge, and hothouse volcanic scenarios", () => {
-		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const base = buildSmokeParams()
 		const scenarioParams: Array<{
 			name: string
 			params: GenesisParams
@@ -507,7 +464,7 @@ describe("full world smoke generation", () => {
 	}, 300_000)
 
 	it("neolithic era leaves most land stateless", () => {
-		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const base = buildSmokeParams()
 		const world = GENERATE_WORLD.generateGenesisWorld({
 			params: { ...base, era: "neolithic" },
 		})
@@ -533,7 +490,7 @@ describe("full world smoke generation", () => {
 	}, 120_000)
 
 	it("late medieval era leaves no stateless non-desolate provinces", () => {
-		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const base = buildSmokeParams()
 		const world = GENERATE_WORLD.generateGenesisWorld({
 			params: { ...base, era: "lateMedieval" },
 		})
@@ -562,7 +519,7 @@ describe("full world smoke generation", () => {
 			{ label: "0.75+", lo: 0.75, hi: Infinity },
 		]
 
-		const base = buildSmokeParams(SMOKE_PLANET_CODE)
+		const base = buildSmokeParams()
 		for (const era of ERAS.eraOrder) {
 			const world = GENERATE_WORLD.generateGenesisWorld({
 				params: { ...base, era },

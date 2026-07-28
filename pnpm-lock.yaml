@@ -11,9 +11,6 @@ importers:
 
   .:
     dependencies:
-      '@datastructures-js/priority-queue':
-        specifier: ^6.3.5
-        version: 6.3.5
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.2.4(rolldown-vite@7.2.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@24.12.2)(jiti@2.6.1)(yaml@2.8.4))
@@ -226,12 +223,6 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
-
-  '@datastructures-js/heap@4.3.7':
-    resolution: {integrity: sha512-Dx4un7Uj0dVxkfoq4RkpzsY2OrvNJgQYZ3n3UlGdl88RxxdHd7oTi21/l3zoxUUe0sXFuNUrfmWqlHzqnoN6Ug==}
-
-  '@datastructures-js/priority-queue@6.3.5':
-    resolution: {integrity: sha512-NmdmvLnkUyG67W6Iy8tP+865ILq5VDyZh90c8lHMOkYYydUNzOV0QNPCRAuj4AoHSm/V2DeuYvDKnvALaCwLvA==}
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
@@ -1488,12 +1479,6 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.3.11':
     optional: true
-
-  '@datastructures-js/heap@4.3.7': {}
-
-  '@datastructures-js/priority-queue@6.3.5':
-    dependencies:
-      '@datastructures-js/heap': 4.3.7
 
   '@dimforge/rapier3d-compat@0.12.0': {}
 

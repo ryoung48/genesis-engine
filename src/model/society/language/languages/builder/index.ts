@@ -39,7 +39,7 @@ const randomizePhonemes = (src: Language) => {
 	Object.entries(src.basePhonemes).forEach(([k, v]) => {
 		const condensed = new Map<string, number>()
 		v.forEach((c) => {
-			condensed.set(c, (condensed.get(c) || 0) + src.dice.random)
+			condensed.set(c, (condensed.get(c) || 0) + src.dice.random())
 		})
 		src.phonemes[k as PhonemeCatalog] = buildDistribution(
 			Array.from(condensed, ([v, w]) => ({ v, w })),

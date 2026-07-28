@@ -1,4 +1,4 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState } from "@/model/history/generated/state/types"
 
 export interface IsBleedEdgeParams {
@@ -15,5 +15,5 @@ export interface ComputeCulturePopulationsParams {
 export interface RunCultureSpreadParams {
 	state: HistoryState
 	cultureCount: number
-	rng: HistoryRng
+	rng: SharedRng
 }

@@ -1,4 +1,4 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState } from "@/model/history/generated/state/types"
 
 export interface InitSuccessionParams {
@@ -8,7 +8,7 @@ export interface InitSuccessionParams {
 export interface ClaimParams {
 	state: HistoryState
 	p: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface RegencyParams {
@@ -20,5 +20,5 @@ export interface RunSuccessionParams {
 	state: HistoryState
 	province: number
 	leaderIdx: number
-	rng: HistoryRng
+	rng: SharedRng
 }

@@ -4,14 +4,13 @@ import { CONSONANTS } from "@/model/society/language/languages/builder/consonant
 import { VOWELS } from "@/model/society/language/languages/builder/vowels"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
 import { INTERNAL } from "@/model/society/language/languages/internal"
-import { RNG } from "@/model/society/language/languages/rng"
 import {
 	Gender,
 	type Language,
-	type LanguageRng,
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
+import { RNG, type SharedRng } from "@/model/shared/random/rng"
 
 export const LANGUAGE = {
 	word: {
@@ -46,7 +45,7 @@ export const LANGUAGE = {
 			])
 			return TEXT.capitalize(cleaned + suffix)
 		},
-		language: (morphemes: string[], dice: LanguageRng) => {
+		language: (morphemes: string[], dice: SharedRng) => {
 			const prefix = morphemes.slice(0, -1).join("")
 			let index = prefix.length - 1
 			while (index >= 0 && CLUSTER.vowel(prefix[index])) {
@@ -122,7 +121,7 @@ export const LANGUAGE = {
 		},
 	},
 	spawn: (seed: string) => {
-		const lang = INTERNAL.spawn({ seed, dice: RNG.createLanguageRng(seed) })
+		const lang = INTERNAL.spawn({ seed, dice: RNG.createStringRng({ seed, options: { nonPositiveWeightBehavior: "first" } }) })
 		const dice = lang.dice
 
 		const stop = dice.weightedChoice([
@@ -163,17 +162,17 @@ export const LANGUAGE = {
 		lang.basePhonemes = { ...consonantPhonemes, ...vowelPhonemes }
 		BUILDER.randomizePhonemes(lang)
 
-		const shortSurnames = dice.random > 0.9
+		const shortSurnames = dice.random() > 0.9
 		BUILDER.initClusters({
 			shortSurnames,
 			shortFirst:
-				lang.ending === PhonemeCatalog.MIDDLE_VOWEL && dice.random > 0.9,
+				lang.ending === PhonemeCatalog.MIDDLE_VOWEL && dice.random() > 0.9,
 			src: lang,
 		})
 		const cluster = CLUSTER.spawn({ src: lang, key: "generic", len: 1 })
 
 		lang.surnames.patronymic =
-			stop === " " && !shortSurnames && dice.random > 0.8
+			stop === " " && !shortSurnames && dice.random() > 0.8
 		if (lang.surnames.patronymic) {
 			const vowels = dice.weightedSample(
 				lang.phonemes[PhonemeCatalog.MIDDLE_VOWEL],
@@ -200,9 +199,9 @@ export const LANGUAGE = {
 			!lang.surnames.patronymic &&
 			!shortSurnames &&
 			stop === " " &&
-			dice.random > 0.8
+			dice.random() > 0.8
 		) {
-			if (dice.random > 0.2) {
+			if (dice.random() > 0.2) {
 				const vowels = dice.weightedSample(
 					lang.phonemes[PhonemeCatalog.MIDDLE_VOWEL],
 					2,
@@ -264,7 +263,7 @@ export const LANGUAGE = {
 				: `${base.seed}:dialect:${seed}`
 		const lang = INTERNAL.spawn({
 			seed: dialectSeed,
-			dice: RNG.createLanguageRng(dialectSeed),
+			dice: RNG.createStringRng({ seed: dialectSeed, options: { nonPositiveWeightBehavior: "first" } }),
 		})
 		lang.ending = base.ending
 		lang.stop = base.stop

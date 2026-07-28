@@ -252,7 +252,7 @@ function clonePhonemes(phonemes: Cluster["phonemes"]): Cluster["phonemes"] {
 }
 
 const wordLength = ({ cluster, src }: WordLengthParams) => {
-	const mod = src.dice.random < cluster.longNames ? 1 : 0
+	const mod = src.dice.random() < cluster.longNames ? 1 : 0
 	return cluster.len + mod
 }
 
@@ -265,13 +265,13 @@ const basePatternize = ({ cluster, src }: BasePatternizeParams) => {
 	}
 	const len = wordLength({ cluster, src })
 	let prev: string =
-		src.dice.random > 0.3
+		src.dice.random() > 0.3
 			? PhonemeCatalog.MIDDLE_VOWEL
 			: PhonemeCatalog.MIDDLE_CONSONANT
 	let stopped = false
 	const pattern = range(len).map((_, i) => {
 		prev = cluster.patterns[next[prev.slice(-1)]]
-		if (!stopped && i !== len - 1 && src.dice.random < cluster.stopChance) {
+		if (!stopped && i !== len - 1 && src.dice.random() < cluster.stopChance) {
 			prev = `${prev}${STOP_CHAR}`
 			stopped = true
 		}
@@ -341,7 +341,7 @@ const femininePattern = ({ cluster, src }: FemininePatternParams) => {
 	if (
 		hasContent &&
 		src.ending === PhonemeCatalog.MIDDLE_CONSONANT &&
-		src.dice.random < src.consonantChance
+		src.dice.random() < src.consonantChance
 	) {
 		const e = pattern.length - 1
 		const cl = new RegExp(
@@ -628,7 +628,7 @@ const morpheme = ({ cluster, src, params }: MorphemeParams) => {
 			valid.push(curr)
 		}
 	}
-	const idx = ~~(src.dice.random * valid.length)
+	const idx = ~~(src.dice.random() * valid.length)
 	let prospect = !valid[idx] || repeat ? cluster.newSyl : valid[idx]
 	// create a new morpheme if none valid or '*' is chosen
 	if (prospect === cluster.newSyl) {

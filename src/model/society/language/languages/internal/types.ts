@@ -1,8 +1,8 @@
 import type {
 	Language,
-	LanguageRng,
 	WordParams,
 } from "@/model/society/language/languages/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface BuildSlotSeedParams {
 	lang: Language
@@ -22,5 +22,5 @@ export interface SpawnClusterParams {
 
 export interface SpawnParams {
 	seed: string
-	dice: LanguageRng
+	dice: SharedRng
 }

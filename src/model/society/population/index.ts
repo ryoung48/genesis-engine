@@ -1,3 +1,4 @@
+import { PriorityHeap } from "@/model/shared/min-heap"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
 import type {
@@ -158,69 +159,6 @@ const OCEAN_TRAVEL_COST = 1.0
 const MIN_HAB_FOR_COST = 0.1
 
 const KM2_PER_CRADLE = 18e6
-
-class MinHeap {
-	private readonly keys: number[] = []
-	private readonly vals: number[] = []
-
-	get size(): number {
-		return this.keys.length
-	}
-
-	push(key: number, val: number): void {
-		const i = this.keys.length
-		this.keys.push(key)
-		this.vals.push(val)
-		this._up(i)
-	}
-
-	pop(): [number, number] | undefined {
-		const n = this.keys.length
-		if (n === 0) return undefined
-		const k = this.keys[0]
-		const v = this.vals[0]
-		const lastK = this.keys.pop()!
-		const lastV = this.vals.pop()!
-		if (this.keys.length > 0) {
-			this.keys[0] = lastK
-			this.vals[0] = lastV
-			this._down(0)
-		}
-		return [k, v]
-	}
-
-	private _up(i: number): void {
-		while (i > 0) {
-			const p = (i - 1) >> 1
-			if (this.keys[p] <= this.keys[i]) break
-			this._swap(p, i)
-			i = p
-		}
-	}
-
-	private _down(i: number): void {
-		const n = this.keys.length
-		while (true) {
-			let m = i
-			const l = 2 * i + 1
-			const r = l + 1
-			if (l < n && this.keys[l] < this.keys[m]) m = l
-			if (r < n && this.keys[r] < this.keys[m]) m = r
-			if (m === i) break
-			this._swap(m, i)
-			i = m
-		}
-	}
-
-	private _swap(a: number, b: number): void {
-		const tk = this.keys[a]
-		const tv = this.vals[a]
-		this.keys[a] = this.keys[b]
-		this.vals[a] = this.vals[b]
-		this.keys[b] = tk
-		this.vals[b] = tv
-	}
-}
 
 function bfsUpdateMinHops({
 	start,
@@ -392,7 +330,7 @@ function computeMigration({
 		return 1.0 / Math.max(normHab[p], MIN_HAB_FOR_COST)
 	}
 
-	const heap = new MinHeap()
+	const heap = new PriorityHeap<number>()
 	for (const cradleP of cradleList) {
 		const seedR = provinceSeedRegions[cradleP]
 		if (seedR >= 0 && seedR < N && dist[seedR] > 0) {
@@ -402,7 +340,7 @@ function computeMigration({
 	}
 
 	while (heap.size > 0) {
-		const [d, r] = heap.pop()!
+		const { key: d, value: r } = heap.pop()!
 		if (d > dist[r]) continue // stale lazy entry
 		const costR = regionTravelCost(r)
 		for (let j = rAdjOffset[r], jEnd = rAdjOffset[r + 1]; j < jEnd; j++) {

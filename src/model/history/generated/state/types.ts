@@ -1,7 +1,7 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { DerivedCache } from "@/model/history/generated/derive/types"
 import type { EventHeap } from "@/model/history/generated/event-heap"
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { Relation } from "@/model/history/generated/state"
 import type { Timeline } from "@/model/history/generated/timeline/types"
 import type {
@@ -24,7 +24,7 @@ export interface StartWarParams {
 	state: HistoryState
 	attacker: number
 	defender: number
-	rng: HistoryRng
+	rng: SharedRng
 	rebel: boolean
 }
 
@@ -174,7 +174,7 @@ export interface WarStrengthCoalitionParams {
 export interface ResolveWarParams {
 	state: HistoryState
 	war: War
-	rng: HistoryRng
+	rng: SharedRng
 	victory?: boolean
 	stalemate?: string
 }
@@ -282,7 +282,7 @@ export interface WarThreatParams {
 export interface ReleaseProvinceParams {
 	state: HistoryState
 	p: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface IsProvinceConnectedToParentParams {
@@ -294,7 +294,7 @@ export interface ReleaseDisconnectedProvinceParams {
 	state: HistoryState
 	province: number
 	overlord: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface AddTerritoryParams {
@@ -311,14 +311,14 @@ export interface ReleaseSubjectRelationsParams {
 export interface FixConnectionsParams {
 	state: HistoryState
 	nation: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface CreateActiveWarParams {
 	state: HistoryState
 	attacker: number
 	defender: number
-	rng: HistoryRng
+	rng: SharedRng
 	options?: ActiveWarOptions
 }
 
@@ -337,7 +337,7 @@ export interface CreateHistoryStateParams {
 	r_xyz: Float32Array
 	cultures: { assignment: Int32Array; count: number }
 	startYear: number
-	rng: HistoryRng
+	rng: SharedRng
 	waterAccess?: Uint8Array
 	landmarks?: GenesisLandmarks
 	regionProvince?: Int32Array
@@ -350,11 +350,11 @@ export interface CreateHistoryStateParams {
 export interface SpawnLeaderParams {
 	state: HistoryState
 	p: number
-	rng: HistoryRng
+	rng: SharedRng
 	end?: number
 }
 
 export interface InitDynastiesParams {
 	state: HistoryState
-	rng: HistoryRng
+	rng: SharedRng
 }

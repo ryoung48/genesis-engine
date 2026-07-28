@@ -2,6 +2,7 @@ import type { SphereMesh } from "@/model/mesh/types"
 import type {
 	ClampParams,
 	EulerVelocityAtParams,
+	LerpParams,
 	PiecewiseParams,
 	SmoothstepParams,
 } from "@/model/shared/math/core/types"
@@ -14,6 +15,15 @@ function clamp({ value, lo, hi }: ClampParams): number {
 
 function clamp01(value: number): number {
 	return Math.max(0, Math.min(1, value))
+}
+
+function normalize(values: number[]): number[] {
+	const sum = values.reduce((a, b) => a + b, 0) || 1
+	return values.map((v) => v / sum)
+}
+
+function lerp({ start, end, position }: LerpParams): number {
+	return start + (end - start) * position
 }
 
 function smoothstep({ edge0, edge1, x }: SmoothstepParams): number {
@@ -67,6 +77,8 @@ function piecewise({ domain, range, x }: PiecewiseParams): number {
 export const MATH = {
 	clamp,
 	clamp01,
+	lerp,
+	normalize,
 	smoothstep,
 	eulerVelocityAt,
 	getRegionLatLonDegrees,

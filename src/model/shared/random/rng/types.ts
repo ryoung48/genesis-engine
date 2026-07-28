@@ -1,10 +1,6 @@
-import type { SharedRng } from "@/model/shared/random/rng"
-
 interface CreateRngOptions {
 	nonPositiveWeightBehavior?: "first" | "undefined"
 }
-
-export type GenesisRng = Pick<SharedRng, "random" | "randint">
 
 export interface CreateRngParams {
 	seed: number

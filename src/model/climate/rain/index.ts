@@ -1,4 +1,3 @@
-import { PriorityQueue } from "@datastructures-js/priority-queue"
 import { ELEVATION } from "@/model/climate/elevation"
 import type {
 	BuildRainRegionMaskParams,
@@ -14,6 +13,7 @@ import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import type { SphereMesh } from "@/model/mesh/types"
 import { MATH } from "@/model/shared/math/core"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
+import { PriorityHeap } from "@/model/shared/min-heap"
 import { UNITS } from "@/model/shared/units"
 
 const DEG2RAD = Math.PI / 180
@@ -348,23 +348,23 @@ function computeAdvection({
 		const assignRain = (attr: "east" | "west") => {
 			const moisture = attr === "east" ? east : west
 			const settled = new Uint8Array(N)
-			const queue = new PriorityQueue<{ region: number; moisture: number }>(
-				(a, b) => b.moisture - a.moisture,
-			)
+			// Max-heap on moisture: push the negated value into the min-heap.
+			const queue = new PriorityHeap<number>()
 
 			for (let r = 0; r < N; r++) {
 				if (!land[r] && sourceMoisture[r] > 1e-3) {
 					moisture[r] = sourceMoisture[r]
-					queue.enqueue({ region: r, moisture: sourceMoisture[r] })
+					queue.push(-sourceMoisture[r], r)
 				}
 			}
 
-			while (!queue.isEmpty()) {
-				const next = queue.dequeue()
+			while (queue.size > 0) {
+				const next = queue.pop()
 				if (!next) break
-				const r = next.region
+				const r = next.value
+				const nextMoisture = -next.key
 				if (settled[r]) continue
-				if (next.moisture + 1e-3 < moisture[r]) continue
+				if (nextMoisture + 1e-3 < moisture[r]) continue
 				settled[r] = 1
 				const heightKm = elevation_km
 					? elevation_km[r]
@@ -396,7 +396,7 @@ function computeAdvection({
 					)
 					if (!settled[nb] && m > moisture[nb] + 1e-3) {
 						moisture[nb] = m
-						queue.enqueue({ region: nb, moisture: m })
+						queue.push(-m, nb)
 					}
 				}
 			}

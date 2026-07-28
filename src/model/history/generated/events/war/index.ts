@@ -11,7 +11,7 @@ import type {
 	SeedWarStageParams,
 } from "@/model/history/generated/events/war/types"
 import { FIELDS } from "@/model/history/generated/fields"
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import { type Relation, STATE } from "@/model/history/generated/state"
 
 const INTERSTATE_WAR_SEED_FRACTION = 0.025
@@ -90,7 +90,7 @@ function pickSeededOccupationCount(params: {
 	candidateCount: number
 	lateStage: boolean
 	rebel: boolean
-	rng: HistoryRng
+	rng: SharedRng
 }): number {
 	const { candidateCount, lateStage, rebel, rng } = params
 	if (candidateCount <= 0) return 0

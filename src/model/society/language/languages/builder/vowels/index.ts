@@ -1,10 +1,10 @@
 import { BUILDER } from "@/model/society/language/languages/builder"
 import type { DiphthongsParams } from "@/model/society/language/languages/builder/vowels/types"
 import {
-	type LanguageRng,
 	PhonemeCatalog,
 	vowelRules,
 } from "@/model/society/language/languages/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 const basicVowels = {
 	A: "a",
@@ -15,7 +15,7 @@ const basicVowels = {
 	Y: "i",
 }
 
-const exoticVowels = (dice: LanguageRng) => {
+const exoticVowels = (dice: SharedRng) => {
 	const umlauts = {
 		A: dice.choice(["ä", "å", "aä"]),
 		E: dice.choice(["ë", "ë", "aë"]),
@@ -155,7 +155,7 @@ const diphthongs = ({ vowels, consonants, dice }: DiphthongsParams) => {
 
 const buildBasicVowels = (params: {
 	ending: PhonemeCatalog
-	dice: LanguageRng
+	dice: SharedRng
 }) => {
 	const vowelCount = 3
 	const i = params.dice.weightedChoice([
@@ -177,7 +177,7 @@ const buildComplexVowels = (params: {
 	vowels: string[]
 	stops: number
 	exoticCons: boolean
-	dice: LanguageRng
+	dice: SharedRng
 }) => {
 	const { vowels, consonants, exoticCons, stops, dice } = params
 	const doubles = {
@@ -202,7 +202,7 @@ const buildComplexVowels = (params: {
 		)
 		.map((v) => vowelOrthography[v])
 		.filter((v) => v)
-	const allVowels = dice.random > 0.9 ? vowels : specialVowels.concat(vowels)
+	const allVowels = dice.random() > 0.9 ? vowels : specialVowels.concat(vowels)
 	const validVowels = (rules: string[]) =>
 		allVowels.filter((v) => v.length < 2 || rules.includes(v))
 	return {

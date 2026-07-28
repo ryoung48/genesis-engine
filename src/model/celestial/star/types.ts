@@ -24,12 +24,6 @@ export interface BlackbodyFractionInput {
 	temperatureK: number
 }
 
-export interface LerpInput {
-	start: number
-	end: number
-	position: number
-}
-
 export interface InterpolateSeriesInput {
 	position: number
 	values: number[]

@@ -1,4 +1,4 @@
-import type { SliderRange } from "@/model/genesis-params/ranges/types"
+import type { SliderRange } from "@/model/pipelines/genesis-params/ranges/types"
 import { UNITS } from "@/model/shared/units"
 
 const RADIUS_MIN = Math.round((UNITS.defaultPlanetRadiusKm * 0.5) / 100) * 100

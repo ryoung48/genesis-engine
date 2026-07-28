@@ -7,15 +7,11 @@ import type {
 	ChooseChemistryInput,
 	ClassifiedEnvironment,
 } from "@/model/celestial/planet/environment/classification/dice-table/types"
-import type { ClampInput } from "@/model/celestial/planet/environment/classification/types"
 import type { Zone } from "@/model/celestial/planet/types"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
+import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
 import { RNG } from "@/model/shared/random/rng"
-
-function clamp({ value, min, max }: ClampInput): number {
-	return Math.max(min, Math.min(max, value))
-}
 
 function chooseColdChemistry({
 	rng,
@@ -94,7 +90,7 @@ function rollClassificationAssignment(params: {
 			})
 			const atmosphereCode =
 				chemistry === "water"
-					? clamp({ value: DICE.roll2d6(rng) - 7 + sizeClass, min: 2, max: 9 })
+					? MATH.clamp({ value: DICE.roll2d6(rng) - 7 + sizeClass, lo: 2, hi: 9 })
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },
@@ -158,7 +154,7 @@ function rollClassificationAssignment(params: {
 						: "methane"
 			const atmosphereCode =
 				chemistry === "water"
-					? clamp({ value: DICE.roll2d6(rng) - 7 + sizeClass, min: 2, max: 9 })
+					? MATH.clamp({ value: DICE.roll2d6(rng) - 7 + sizeClass, lo: 2, hi: 9 })
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },
@@ -182,10 +178,10 @@ function rollClassificationAssignment(params: {
 			if (atmosphereCode >= 2) atmosphereCode = 10
 			return {
 				atmosphereCode,
-				hydrosphereCode: clamp({
+				hydrosphereCode: MATH.clamp({
 					value: DICE.roll2d6(rng) + sizeClass - 11,
-					min: 0,
-					max: 11,
+					lo: 0,
+					hi: 11,
 				}),
 				eccentric: true,
 				composition: "rocky",
@@ -254,14 +250,14 @@ function rollClassificationAssignment(params: {
 			const atmosphereRoll = rng.randint(1, 6)
 			const atmosphereCode =
 				chemistry === "water"
-					? clamp({
+					? MATH.clamp({
 							value:
 								DICE.roll2d6(rng) +
 								sizeClass -
 								6 -
 								(spectralClass === "K" ? 1 : spectralClass === "M" ? 2 : 0),
-							min: 2,
-							max: 12,
+							lo: 2,
+							hi: 12,
 						})
 					: atmosphereRoll === 1
 						? 1
@@ -309,7 +305,7 @@ function rollClassificationAssignment(params: {
 			if (zone === "outer") hydrosphereCode += 2
 			return {
 				atmosphereCode: 0,
-				hydrosphereCode: clamp({ value: hydrosphereCode, min: 0, max: 10 }),
+				hydrosphereCode: MATH.clamp({ value: hydrosphereCode, lo: 0, hi: 10 }),
 				composition:
 					rng.weightedChoice<OrbitComposition>([
 						{ v: "rocky", w: 5 },
@@ -354,7 +350,7 @@ function rollClassificationAssignment(params: {
 						: "methane"
 			const atmosphereCode =
 				chemistry === "water"
-					? clamp({ value: DICE.roll2d6(rng) + sizeClass - 7, min: 2, max: 9 })
+					? MATH.clamp({ value: DICE.roll2d6(rng) + sizeClass - 7, lo: 2, hi: 9 })
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },
@@ -388,7 +384,7 @@ function rollClassificationAssignment(params: {
 			const chemistry = primary || chemRoll <= 11 ? "water" : "chlorine"
 			const atmosphereCode =
 				chemistry === "water"
-					? clamp({ value: DICE.roll2d6(rng) + sizeClass - 7, min: 2, max: 9 })
+					? MATH.clamp({ value: DICE.roll2d6(rng) + sizeClass - 7, lo: 2, hi: 9 })
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },

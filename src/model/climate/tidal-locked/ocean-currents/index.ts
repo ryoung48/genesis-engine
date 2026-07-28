@@ -11,6 +11,7 @@ import { WIND } from "@/model/climate/wind"
 import type { FlowGrid } from "@/model/climate/wind/types"
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import { MATH } from "@/model/shared/math/core"
 import { UNITS } from "@/model/shared/units"
 
 const CURRENT_EFFECT_MONTHS = 12
@@ -20,18 +21,6 @@ const LOCKED_WARMTH_SMOOTHING_PASSES = 6
 const LOCKED_VECTOR_SMOOTHING_PASSES = 2
 
 const TYPE_LAKE = 5
-
-function clamp({
-	value,
-	min,
-	max,
-}: {
-	value: number
-	min: number
-	max: number
-}): number {
-	return Math.max(min, Math.min(max, value))
-}
 
 function normalizeField({
 	field,
@@ -51,7 +40,7 @@ function normalizeField({
 			field[i] = 0
 			continue
 		}
-		field[i] = clamp({ value: field[i] / maxAbs, min: -1, max: 1 })
+		field[i] = MATH.clamp({ value: field[i] / maxAbs, lo: -1, hi: 1 })
 	}
 }
 

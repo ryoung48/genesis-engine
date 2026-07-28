@@ -8,6 +8,7 @@ import type {
 	HslToRgbParams,
 } from "@/model/geography/terrain/provinces/types"
 import type { SphereMesh } from "@/model/mesh/types"
+import { PriorityHeap } from "@/model/shared/min-heap"
 import { RNG } from "@/model/shared/random/rng"
 import { UNITS } from "@/model/shared/units"
 import type { GenesisProvinces } from "@/model/society/types"
@@ -438,78 +439,21 @@ function computeWeightedProvinces({
 	const regionProvince = new Int32Array(N).fill(-1)
 	const bestCost = new Float64Array(N).fill(Infinity)
 
-	// Binary min-heap of [cost, region, province] triples, flattened into
-	// parallel arrays to avoid per-node object allocation.
-	const heapCost: number[] = []
-	const heapRegion: number[] = []
-	const heapProvince: number[] = []
-	function heapPush(cost: number, region: number, province: number) {
-		let i = heapCost.length
-		heapCost.push(cost)
-		heapRegion.push(region)
-		heapProvince.push(province)
-		while (i > 0) {
-			const parent = (i - 1) >> 1
-			if (heapCost[parent] <= heapCost[i]) break
-			;[heapCost[parent], heapCost[i]] = [heapCost[i], heapCost[parent]]
-			;[heapRegion[parent], heapRegion[i]] = [heapRegion[i], heapRegion[parent]]
-			;[heapProvince[parent], heapProvince[i]] = [
-				heapProvince[i],
-				heapProvince[parent],
-			]
-			i = parent
-		}
-	}
-	function heapPop(): [number, number, number] | undefined {
-		const n = heapCost.length
-		if (n === 0) return undefined
-		const top: [number, number, number] = [
-			heapCost[0],
-			heapRegion[0],
-			heapProvince[0],
-		]
-		const last = n - 1
-		heapCost[0] = heapCost[last]
-		heapRegion[0] = heapRegion[last]
-		heapProvince[0] = heapProvince[last]
-		heapCost.pop()
-		heapRegion.pop()
-		heapProvince.pop()
-		let i = 0
-		const size = heapCost.length
-		for (;;) {
-			const left = 2 * i + 1
-			const right = 2 * i + 2
-			let smallest = i
-			if (left < size && heapCost[left] < heapCost[smallest]) smallest = left
-			if (right < size && heapCost[right] < heapCost[smallest]) smallest = right
-			if (smallest === i) break
-			;[heapCost[smallest], heapCost[i]] = [heapCost[i], heapCost[smallest]]
-			;[heapRegion[smallest], heapRegion[i]] = [
-				heapRegion[i],
-				heapRegion[smallest],
-			]
-			;[heapProvince[smallest], heapProvince[i]] = [
-				heapProvince[i],
-				heapProvince[smallest],
-			]
-			i = smallest
-		}
-		return top
-	}
+	const heap = new PriorityHeap<[number, number]>()
 
 	for (let i = 0; i < provinceCount; i++) {
 		const r = seedRegions[i]
 		if (!isLand[r] || regionProvince[r] >= 0) continue
 		regionProvince[r] = i
 		bestCost[r] = 0
-		heapPush(0, r, i)
+		heap.push(0, [r, i])
 	}
 
-	while (heapCost.length > 0) {
-		const popped = heapPop()
+	while (heap.size > 0) {
+		const popped = heap.pop()
 		if (!popped) break
-		const [cost, r, p] = popped
+		const cost = popped.key
+		const [r, p] = popped.value
 		if (cost > bestCost[r] || regionProvince[r] !== p) continue
 		const rx = r_xyz[3 * r]
 		const ry = r_xyz[3 * r + 1]
@@ -525,7 +469,7 @@ function computeWeightedProvinces({
 			if (nextCost < bestCost[nb]) {
 				bestCost[nb] = nextCost
 				regionProvince[nb] = p
-				heapPush(nextCost, nb, p)
+				heap.push(nextCost, [nb, p])
 			}
 		}
 	}

@@ -84,23 +84,6 @@ function aridFallback({
 	return zone <= 4 ? "cold_arid" : "arid"
 }
 
-function weightedPick({
-	rng,
-	entries,
-}: {
-	rng: () => number
-	entries: readonly (readonly [number, number])[]
-}): number {
-	let total = 0
-	for (const [, w] of entries) total += w
-	let r = rng() * total
-	for (const [idx, w] of entries) {
-		r -= w
-		if (r <= 0) return idx
-	}
-	return entries[entries.length - 1]![0]
-}
-
 function computeTradeGoods(params: {
 	seed: number
 	locations: {
@@ -151,10 +134,10 @@ function computeTradeGoods(params: {
 
 		// Seed per location: mix seed and location index
 		const locSeed = (seed ^ (Math.imul(l, 0x9e3779b9) >>> 0)) >>> 0
-		const rng = RNG.makeRng(locSeed)
+		const dice = RNG.createRng({ seed: locSeed })
 
 		// Pick a representative region at random for all attributes including coastal
-		const r = regions[Math.floor(rng() * regions.length)]!
+		const r = regions[Math.floor(dice.random() * regions.length)]!
 
 		const zone = climateZones[r]!
 		const biome = vegetation[r]!
@@ -190,9 +173,11 @@ function computeTradeGoods(params: {
 				| readonly (readonly [number, number])[]
 				| undefined
 			if (!fallback || fallback.length === 0) continue
-			material[l] = weightedPick({ rng, entries: fallback })
+			material[l] = dice.weightedChoice(
+				fallback.map(([v, w]) => ({ v, w })),
+			)!
 		} else {
-			material[l] = weightedPick({ rng, entries: dist })
+			material[l] = dice.weightedChoice(dist.map(([v, w]) => ({ v, w })))!
 		}
 	}
 

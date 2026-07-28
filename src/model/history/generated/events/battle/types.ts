@@ -1,4 +1,4 @@
-import type { HistoryRng } from "@/model/history/generated/history-rng/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState, War } from "@/model/history/generated/state/types"
 
 export type VictoryDegree =
@@ -14,7 +14,7 @@ export interface RunBattleParams {
 	warIdx: number
 	eventAttacker: number
 	eventDefender: number
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface ExhaustedParams {
@@ -30,7 +30,7 @@ export interface GetVictoryDegreeParams {
 export interface FindInvasionTargetParams {
 	state: HistoryState
 	war: War
-	rng: HistoryRng
+	rng: SharedRng
 }
 
 export interface FindReconquestTargetParams {

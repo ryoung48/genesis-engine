@@ -5,19 +5,9 @@ import type {
 	DensityProfileInput,
 	RollAlbedoInput,
 } from "@/model/celestial/planet/environment/density/types"
+import { MATH } from "@/model/shared/math/core"
 import { DICE } from "@/model/shared/random/dice"
 
-function clamp({
-	value,
-	min,
-	max,
-}: {
-	value: number
-	min: number
-	max: number
-}): number {
-	return Math.max(min, Math.min(max, value))
-}
 function describeDensity({
 	earthRelative,
 	classification,
@@ -84,7 +74,7 @@ function rollAlbedo({
 		albedo += (DICE.roll2d6(rng) - 4) * 0.03
 	}
 
-	return clamp({ value: albedo, min: 0.02, max: 0.98 })
+	return MATH.clamp({ value: albedo, lo: 0.02, hi: 0.98 })
 }
 
 export const DENSITY = { buildProfile: buildDensityProfile, rollAlbedo }

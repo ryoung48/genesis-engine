@@ -4,13 +4,13 @@ import type {
 	SpawnClusterParams,
 	SpawnParams,
 } from "@/model/society/language/languages/internal/types"
-import { RNG } from "@/model/society/language/languages/rng"
 import {
 	type Cluster,
 	type Language,
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
+import { RNG } from "@/model/shared/random/rng"
 
 const baseVowels = ["a", "e", "i", "o", "u", "y"]
 
@@ -99,7 +99,7 @@ const spawn = ({ seed, dice }: SpawnParams) => {
 		seenWords: {},
 		slotWords: new Map(),
 		ending:
-			dice.random > 0.15
+			dice.random() > 0.15
 				? PhonemeCatalog.MIDDLE_CONSONANT
 				: PhonemeCatalog.MIDDLE_VOWEL,
 		consonantChance: dice.uniform(0.1, 0.4),
@@ -140,9 +140,10 @@ function buildSlotWord({
 	const resolvedLongNames = baseCluster?.longNames
 	const slotLang: Language = {
 		...lang,
-		dice: RNG.createLanguageRng(
-			buildSlotSeed({ lang, key: normalizedKey, namespace, slot }),
-		),
+		dice: RNG.createStringRng({
+			seed: buildSlotSeed({ lang, key: normalizedKey, namespace, slot }),
+			options: { nonPositiveWeightBehavior: "first" },
+		}),
 		clusters: {},
 		clusterTemplates: {},
 		seenWords: {},

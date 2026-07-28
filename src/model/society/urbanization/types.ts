@@ -10,12 +10,6 @@ export interface RankSizeCitiesParams {
 	q: number
 }
 
-export interface LerpScaleParams {
-	domain: number[]
-	range: number[]
-	v: number
-}
-
 export interface ComputeDevelopmentParams {
 	inputs: UrbanizationInputs
 	urbanPopulation: Float32Array
