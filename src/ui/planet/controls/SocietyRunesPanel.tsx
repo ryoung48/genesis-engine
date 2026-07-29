@@ -7,7 +7,7 @@ import {
 import type {
 	RuneGeneratorOptions,
 	RuneTemplate,
-} from "@/model/society/script/runegen/rune"
+} from "@/model/society/script/runegen/rune/types"
 import {
 	RuneRenderer,
 	type RuneRenderOptions,

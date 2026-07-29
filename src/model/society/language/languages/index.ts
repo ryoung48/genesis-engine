@@ -1,4 +1,5 @@
-﻿import { TEXT } from "@/model/shared/text"
+﻿import { RNG, type SharedRng } from "@/model/shared/random/rng"
+import { TEXT } from "@/model/shared/text"
 import { BUILDER } from "@/model/society/language/languages/builder"
 import { CONSONANTS } from "@/model/society/language/languages/builder/consonants"
 import { VOWELS } from "@/model/society/language/languages/builder/vowels"
@@ -10,7 +11,6 @@ import {
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
-import { RNG, type SharedRng } from "@/model/shared/random/rng"
 
 export const LANGUAGE = {
 	word: {
@@ -121,7 +121,13 @@ export const LANGUAGE = {
 		},
 	},
 	spawn: (seed: string) => {
-		const lang = INTERNAL.spawn({ seed, dice: RNG.createStringRng({ seed, options: { nonPositiveWeightBehavior: "first" } }) })
+		const lang = INTERNAL.spawn({
+			seed,
+			dice: RNG.createStringRng({
+				seed,
+				options: { nonPositiveWeightBehavior: "first" },
+			}),
+		})
 		const dice = lang.dice
 
 		const stop = dice.weightedChoice([
@@ -263,7 +269,10 @@ export const LANGUAGE = {
 				: `${base.seed}:dialect:${seed}`
 		const lang = INTERNAL.spawn({
 			seed: dialectSeed,
-			dice: RNG.createStringRng({ seed: dialectSeed, options: { nonPositiveWeightBehavior: "first" } }),
+			dice: RNG.createStringRng({
+				seed: dialectSeed,
+				options: { nonPositiveWeightBehavior: "first" },
+			}),
 		})
 		lang.ending = base.ending
 		lang.stop = base.stop

@@ -447,10 +447,10 @@ function computeWeight({
 	teq,
 	eastMoisture,
 	westMoisture,
-	daysPerYear,
+	hoursPerDay,
 	bandOffsetDeg = 0,
 }: ComputeRainWeightParams): number {
-	const hadley = hadleyWidth(daysPerYear)
+	const hadley = hadleyWidth(hoursPerDay)
 	const dist = Math.abs(cellLat - (teq + bandOffsetDeg)) / hadley
 	const moisture = Math.max(eastMoisture, westMoisture)
 	const itcz = itczScale(dist) * moisture
@@ -529,7 +529,7 @@ function computeMonthlyRain({
 				teq,
 				eastMoisture: e,
 				westMoisture: w,
-				daysPerYear: params?.daysPerYear ?? 365,
+				hoursPerDay: params?.hoursPerDay ?? 24,
 				bandOffsetDeg: boundaryWarpDeg[r],
 			})
 			const monthTemp = climate.temperature_monthly[month * N + r]

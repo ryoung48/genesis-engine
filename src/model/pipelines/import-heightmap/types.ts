@@ -1,5 +1,3 @@
-import type { SphereMesh } from "@/model/mesh/types"
-
 interface ImportParams {
 	seed: number
 	numPoints: number
@@ -121,84 +119,7 @@ interface ImportParams {
 	seismologyTotalHeatingK?: number
 }
 
-export interface RealRiverLineInput {
-	points: number[] // flat [lon0, lat0, lon1, lat1, ...] degrees
-	strokeweig: number
-	name?: string | null
-}
-
-export interface RealProvinceInput {
-	name: string
-	lon: number
-	lat: number
-	weight: number
-}
-
 type ProgressFn = (label: string, pct?: number) => void
-
-export interface SampleBilinearParams {
-	pixels: Uint8Array
-	imgW: number
-	imgH: number
-	px: number
-	py: number
-}
-
-export interface SampleSingleBandFloatRasterParams {
-	mesh: SphereMesh
-	raster: Int16Array
-	rasterW: number
-	rasterH: number
-	scale: number
-	nodata: number
-}
-
-export interface SampleCategoricalRasterParams {
-	mesh: SphereMesh
-	raster: Int16Array
-	rasterW: number
-	rasterH: number
-	nodata: number
-}
-
-export interface SampleHeightmapParams {
-	mesh: SphereMesh
-	grayscale: Uint8Array
-	imgW: number
-	imgH: number
-}
-
-export interface SampleCoastlineMaskParams {
-	mesh: SphereMesh
-	mask: Uint8Array
-	maskW: number
-	maskH: number
-}
-
-export interface ReconcileElevationWithMaskParams {
-	elevation: Float32Array
-	maskIsLand: Uint8Array
-	epsilon: number
-}
-
-export interface PointInRingParams {
-	lonDeg: number
-	latDeg: number
-	ring: [number, number][]
-}
-
-export interface MatchRealLakeNamesParams {
-	mesh: SphereMesh
-	landmarks: { regionLandmark: Int32Array; type: Uint8Array; count: number }
-	lakeLandmarkType: number
-	lakePolygons: { name: string; ring: [number, number][] }[]
-}
-
-export interface MergeEu4LandMaskParams {
-	mask: Uint8Array
-	eu4Raster: Int16Array
-	eu4Nodata: number
-}
 
 export interface ImportGenesisWorldParams {
 	params: ImportParams

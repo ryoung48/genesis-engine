@@ -46,7 +46,7 @@ export type ComputeRainWeightParams = {
 	teq: number
 	eastMoisture: number
 	westMoisture: number
-	daysPerYear: number
+	hoursPerDay: number
 	bandOffsetDeg: number
 }
 

@@ -80,9 +80,8 @@ function distributeSurface({
 		small: { pct: 0 },
 	}
 	if (targetPct <= 0) return empty
-	const [majLo, majHi] = MAJOR_BANDS[
-		MATH.clamp({ value: code, lo: 0, hi: 10 })
-	]!
+	const [majLo, majHi] =
+		MAJOR_BANDS[MATH.clamp({ value: code, lo: 0, hi: 10 })]!
 	const majorShare = rng.uniform(majLo, majHi)
 	const smallShareOfRest =
 		rng.uniform(0.05, 0.5) * Math.max(0.1, 1 - majorShare)

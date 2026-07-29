@@ -1,6 +1,6 @@
-import type { SharedRng } from "@/model/shared/random/rng"
 import type { Relation } from "@/model/history/generated/state"
 import type { HistoryState } from "@/model/history/generated/state/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface RollTransitionParams {
 	current: Relation

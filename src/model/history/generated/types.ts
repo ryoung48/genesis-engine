@@ -1,6 +1,6 @@
-import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState } from "@/model/history/generated/state/types"
 import type { StageTiming } from "@/model/pipelines/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type { GenesisNationHierarchy } from "@/model/society/types"
 
 export interface SeedColonyRelationsParams {

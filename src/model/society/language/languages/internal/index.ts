@@ -1,3 +1,4 @@
+import { RNG } from "@/model/shared/random/rng"
 import { CLUSTER } from "@/model/society/language/languages/clusters"
 import type {
 	BuildSlotSeedParams,
@@ -10,7 +11,6 @@ import {
 	PhonemeCatalog,
 	type WordParams,
 } from "@/model/society/language/languages/types"
-import { RNG } from "@/model/shared/random/rng"
 
 const baseVowels = ["a", "e", "i", "o", "u", "y"]
 

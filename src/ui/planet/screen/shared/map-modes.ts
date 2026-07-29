@@ -1,4 +1,6 @@
 import type { ColorMode } from "@/ui/planet/colors"
+import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
+import { getBaseMapMode } from "@/ui/planet/screen/shared/data-variant"
 
 export type PopulationMapMode =
 	| "density"
@@ -233,4 +235,81 @@ export function getVisibleSocietyModeOptions(
 		...trailingDemographicOptions,
 		["timezone", "Timezones"],
 	]
+}
+
+export function syncLabelModeToMapMode(params: {
+	labelMode: LabelMode
+	colorMode: ColorMode
+	nationMode: NationMapMode
+	populationMode: PopulationMapMode
+	isEarthImport: boolean
+}): LabelMode {
+	const { labelMode, colorMode, nationMode, populationMode, isEarthImport } =
+		params
+	const anyActive =
+		labelMode.nations ||
+		labelMode.dynasty ||
+		labelMode.culture ||
+		labelMode.heritage ||
+		labelMode.religion
+	if (!anyActive) return labelMode
+
+	const politicalFallback = {
+		...labelMode,
+		nations: nationMode !== "dynasty",
+		dynasty: nationMode === "dynasty",
+		culture: false,
+		heritage: false,
+		religion: false,
+	}
+
+	if (getBaseMapMode(colorMode) === "population") {
+		if (populationMode === "culture") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: true,
+				heritage: false,
+				religion: false,
+			}
+		}
+		if (populationMode === "religion") {
+			// Real per-province religion labels only exist for Earth imports
+			// (see create-genesis-scene.ts's earthHistoryLabelPartitions);
+			// the procedural generator has no religion label overlay at all
+			// (world.religions is culture-indexed, not province-indexed), so
+			// procedural worlds keep the previous heritage-label
+			// approximation rather than showing nothing.
+			return isEarthImport
+				? {
+						...labelMode,
+						nations: false,
+						dynasty: false,
+						culture: false,
+						heritage: false,
+						religion: true,
+					}
+				: {
+						...labelMode,
+						nations: false,
+						dynasty: false,
+						culture: false,
+						heritage: true,
+						religion: false,
+					}
+		}
+		if (populationMode === "heritage") {
+			return {
+				...labelMode,
+				nations: false,
+				dynasty: false,
+				culture: false,
+				heritage: true,
+				religion: false,
+			}
+		}
+		return politicalFallback
+	}
+	return politicalFallback
 }

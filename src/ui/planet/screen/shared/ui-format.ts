@@ -5,12 +5,13 @@ const KM_TO_FT = 3280.839895
 const MM_TO_IN = 0.0393701
 const M3S_TO_FT3S = 35.314667
 const KM2_TO_MI2 = 0.386102
+const WIND_DIR_LABELS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
 export function rgbToCss([r, g, b]: [number, number, number]): string {
 	return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
 }
 
-function formatWithUnit(
+export function formatWithUnit(
 	value: number,
 	unit: string,
 	digits: number,
@@ -50,7 +51,7 @@ export function formatTemperatureDelta(
 	)
 }
 
-function compactFeet(feet: number): string {
+export function compactFeet(feet: number): string {
 	const abs = Math.abs(feet)
 	const sign = feet < 0 ? "-" : ""
 	if (abs >= 1_000_000)
@@ -138,4 +139,10 @@ export function formatFlowRate(
 ): string {
 	const value = unitSystem === "imperial" ? valueM3s * M3S_TO_FT3S : valueM3s
 	return `${formatValue(value)} ${unitSystem === "imperial" ? "ft³/s" : "m³/s"}`
+}
+
+// "coming from" convention: negate u/v to get the source direction
+export function windDirectionLabel(u: number, v: number): string {
+	const deg = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360
+	return WIND_DIR_LABELS[Math.round(deg / 45) % 8] ?? "N"
 }

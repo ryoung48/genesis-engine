@@ -1,5 +1,5 @@
-import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState, War } from "@/model/history/generated/state/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export type VictoryDegree =
 	| "decisive"

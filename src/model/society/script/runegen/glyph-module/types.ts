@@ -1,4 +1,4 @@
-import type { RuneGeneratorOptions } from "@/model/society/script/runegen/rune"
+import type { RuneGeneratorOptions } from "@/model/society/script/runegen/rune/types"
 
 export interface GenerateGlyphSetParams {
 	alphabet: string

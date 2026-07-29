@@ -6,13 +6,13 @@ import type {
 	RollStarAgeInput,
 	StarSpectralInput,
 } from "@/model/celestial/star/types"
-import { MATH } from "@/model/shared/math/core"
 import {
 	DEFAULT_ORBITAL_DISTANCE_AU as DEFAULT_ORBITAL_DISTANCE_AU_VALUE,
 	DEFAULT_SPECTRAL_CLASS as DEFAULT_SPECTRAL_CLASS_VALUE,
 	DEFAULT_STAR_SUBTYPE as DEFAULT_STAR_SUBTYPE_VALUE,
 	MAIN_SEQUENCE_CLASSES as MAIN_SEQUENCE_CLASSES_VALUE,
 } from "@/model/celestial/star/types"
+import { MATH } from "@/model/shared/math/core"
 
 const defaultOrbitalDistanceAu = DEFAULT_ORBITAL_DISTANCE_AU_VALUE
 const defaultSpectralClass = DEFAULT_SPECTRAL_CLASS_VALUE
@@ -92,7 +92,8 @@ function interpolateSeries({
 	const n = values.length
 	if (n === 0) return 0
 	if (n === 1) return values[0]
-	if (position <= 0) return MATH.lerp({ start: values[0], end: values[1], position })
+	if (position <= 0)
+		return MATH.lerp({ start: values[0], end: values[1], position })
 	const maxPos = n - 1
 	if (position >= maxPos)
 		return MATH.lerp({
@@ -101,7 +102,11 @@ function interpolateSeries({
 			position: position - (n - 2),
 		})
 	const i = Math.floor(position)
-	return MATH.lerp({ start: values[i], end: values[i + 1], position: position - i })
+	return MATH.lerp({
+		start: values[i],
+		end: values[i + 1],
+		position: position - i,
+	})
 }
 
 function getStarSpectralPosition({ cls, subtype }: StarSpectralInput): number {

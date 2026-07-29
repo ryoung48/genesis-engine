@@ -3,14 +3,15 @@ import type {
 	GenerateGlyphSetParams,
 	LayoutGlyphTextParams,
 } from "@/model/society/script/runegen/glyph-module/types"
-import {
-	Rune,
-	type RuneGeneratorOptions,
-	type RuneMotif,
-	type RuneTemplate,
-} from "@/model/society/script/runegen/rune"
+import { RUNE } from "@/model/society/script/runegen/rune"
+import type {
+	RuneData,
+	RuneGeneratorOptions,
+	RuneMotif,
+	RuneTemplate,
+} from "@/model/society/script/runegen/rune/types"
 
-export type GlyphSet = Record<string, Rune>
+export type GlyphSet = Record<string, RuneData>
 
 const defaultGlyphAlphabet = "abcdefghijklmnopqrstuvwxyz".split("")
 
@@ -97,7 +98,7 @@ function generateGlyphSet({
 		const weightBand = useFrequencyWeights ? frequencyBand : options.weightBand
 
 		const others = Object.values(glyphs)
-		let best: Rune | null = null
+		let best: RuneData | null = null
 		let bestDistance = -1
 
 		for (let attempt = 0; attempt < MAX_GLYPH_TRIES; attempt++) {
@@ -113,28 +114,30 @@ function generateGlyphSet({
 							: secondary
 			}
 
-			const candidate = new Rune(
-				{
+			const candidate = RUNE.generate({
+				options: {
 					...options,
 					motif,
 					maxDots,
 					weightBand,
 					...(styleTemplate ? { forceTemplate: styleTemplate } : {}),
 				},
-				runeRng,
-				runeSeed,
-			)
+				rng: runeRng,
+				seed: runeSeed,
+			})
 			const distance =
 				others.length === 0
 					? Number.POSITIVE_INFINITY
-					: Math.min(...others.map((other) => candidate.diff(other)))
+					: Math.min(
+							...others.map((other) => RUNE.diff({ a: candidate, b: other })),
+						)
 			if (distance > bestDistance) {
 				best = candidate
 				bestDistance = distance
 			}
 			const minDiff = Math.round(
 				(MIN_GLYPH_DIFF * candidate.width * candidate.height) /
-					(Rune.WIDTH * Rune.HEIGHT),
+					(RUNE.WIDTH * RUNE.HEIGHT),
 			)
 			if (bestDistance >= minDiff) break
 		}

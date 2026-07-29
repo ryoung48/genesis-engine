@@ -1,7 +1,7 @@
+import type { SharedRng } from "@/model/shared/random/rng"
 import { BUILDER } from "@/model/society/language/languages/builder"
 import type { MapOrthoParams } from "@/model/society/language/languages/builder/consonants/types"
 import { PhonemeCatalog } from "@/model/society/language/languages/types"
-import type { SharedRng } from "@/model/shared/random/rng"
 
 const orthography = (dice: SharedRng): Record<string, string> => {
 	return {

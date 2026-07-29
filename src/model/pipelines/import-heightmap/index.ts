@@ -1,29 +1,15 @@
 import { STAR } from "@/model/celestial/star"
-import { HUMIDITY } from "@/model/climate/humidity"
 import { KOPPEN } from "@/model/climate/koppen"
-import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
 import { SYNTHETIC_PLATES } from "@/model/geography/tectonics/synthetic-plates"
 import { COAST_DENSITY } from "@/model/geography/terrain/coast-density"
 import { EROSION } from "@/model/geography/terrain/erosion"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { MESH } from "@/model/mesh"
-import type { SphereMesh } from "@/model/mesh/types"
 import { DERIVE_PROVINCE_SOCIETY } from "@/model/pipelines/derive-province-society"
-import type {
-	ImportGenesisWorldParams,
-	MatchRealLakeNamesParams,
-	MergeEu4LandMaskParams,
-	PointInRingParams,
-	RealProvinceInput,
-	RealRiverLineInput,
-	ReconcileElevationWithMaskParams,
-	SampleBilinearParams,
-	SampleCategoricalRasterParams,
-	SampleCoastlineMaskParams,
-	SampleHeightmapParams,
-	SampleSingleBandFloatRasterParams,
-} from "@/model/pipelines/import-heightmap/types"
+import { REAL_EARTH_DATA } from "@/model/pipelines/import-heightmap/real-earth-data"
+import { SAMPLING } from "@/model/pipelines/import-heightmap/sampling"
+import type { ImportGenesisWorldParams } from "@/model/pipelines/import-heightmap/types"
 import { POST_ELEVATION } from "@/model/pipelines/post-elevation"
 import type {
 	GenesisParams,
@@ -47,528 +33,6 @@ function createTimingRecorder() {
 	}
 }
 
-function sampleBilinear({
-	pixels,
-	imgW,
-	imgH,
-	px,
-	py,
-}: SampleBilinearParams): number {
-	py = Math.max(0, Math.min(py, imgH - 1))
-	const x0 = Math.floor(px)
-	const y0 = Math.floor(py)
-	const x1 = (x0 + 1) % imgW
-	const y1 = Math.min(y0 + 1, imgH - 1)
-	const fx = px - x0
-	const fy = py - y0
-	const v00 = pixels[y0 * imgW + (((x0 % imgW) + imgW) % imgW)]
-	const v10 = pixels[y0 * imgW + x1]
-	const v01 = pixels[y1 * imgW + (((x0 % imgW) + imgW) % imgW)]
-	const v11 = pixels[y1 * imgW + x1]
-	return (
-		v00 * (1 - fx) * (1 - fy) +
-		v10 * fx * (1 - fy) +
-		v01 * (1 - fx) * fy +
-		v11 * fx * fy
-	)
-}
-
-function grayscaleToElevation(v: number): number {
-	if (v < 1) return -0.5
-	return Math.sqrt((v - 1) / 254)
-}
-
-function sampleHeightmap({
-	mesh,
-	grayscale,
-	imgW,
-	imgH,
-}: SampleHeightmapParams): Float32Array {
-	const N = mesh.numRegions
-	const { r_xyz } = mesh
-	const elevation = new Float32Array(N)
-
-	for (let r = 0; r < N; r++) {
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-
-		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
-		const lon = Math.atan2(y, x)
-
-		const px = (lon / Math.PI + 1) * 0.5 * imgW
-		const py = (0.5 - lat / Math.PI) * imgH
-
-		const gray = sampleBilinear({ pixels: grayscale, imgW, imgH, px, py })
-		elevation[r] = grayscaleToElevation(gray)
-	}
-
-	return elevation
-}
-
-function sampleSingleBandFloatRaster({
-	mesh,
-	raster,
-	rasterW,
-	rasterH,
-	scale,
-	nodata,
-}: SampleSingleBandFloatRasterParams): Float32Array {
-	const N = mesh.numRegions
-	const { r_xyz } = mesh
-	const out = new Float32Array(N)
-
-	for (let r = 0; r < N; r++) {
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-
-		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
-		const lon = Math.atan2(y, x)
-		const px = (lon / Math.PI + 1) * 0.5 * rasterW
-		const py = (0.5 - lat / Math.PI) * rasterH
-
-		const x0 = Math.floor(px)
-		const y0 = Math.floor(py)
-		const x1 = (x0 + 1) % rasterW
-		const y1 = Math.min(y0 + 1, rasterH - 1)
-		const fx = px - x0
-		const fy = py - y0
-		const xi0 = (((x0 % rasterW) + rasterW) % rasterW) | 0
-		const yi0 = Math.max(0, Math.min(rasterH - 1, y0)) | 0
-
-		const q00 = raster[yi0 * rasterW + xi0]
-		const q10 = raster[yi0 * rasterW + x1]
-		const q01 = raster[y1 * rasterW + xi0]
-		const q11 = raster[y1 * rasterW + x1]
-		const v00 = q00 === nodata ? NaN : q00 * scale
-		const v10 = q10 === nodata ? NaN : q10 * scale
-		const v01 = q01 === nodata ? NaN : q01 * scale
-		const v11 = q11 === nodata ? NaN : q11 * scale
-
-		let weighted = 0
-		let weightSum = 0
-		if (Number.isFinite(v00)) {
-			const w = (1 - fx) * (1 - fy)
-			weighted += v00 * w
-			weightSum += w
-		}
-		if (Number.isFinite(v10)) {
-			const w = fx * (1 - fy)
-			weighted += v10 * w
-			weightSum += w
-		}
-		if (Number.isFinite(v01)) {
-			const w = (1 - fx) * fy
-			weighted += v01 * w
-			weightSum += w
-		}
-		if (Number.isFinite(v11)) {
-			const w = fx * fy
-			weighted += v11 * w
-			weightSum += w
-		}
-
-		out[r] = weightSum > 0 ? weighted / weightSum : NaN
-	}
-
-	return out
-}
-
-function attachObservedEarthHumidity(params: {
-	mesh: SphereMesh
-	world: {
-		climate: GenesisWorld["climate"]
-		observedHumidity?: GenesisWorld["observedHumidity"]
-	}
-	realVaporPressureMonthly: Int16Array
-	realVaporPressureWidth: number
-	realVaporPressureHeight: number
-	realVaporPressureMonths: number
-	realVaporPressureScale: number
-	realVaporPressureNoData: number
-}): void {
-	const {
-		mesh,
-		world,
-		realVaporPressureMonthly,
-		realVaporPressureWidth,
-		realVaporPressureHeight,
-		realVaporPressureMonths,
-		realVaporPressureScale,
-		realVaporPressureNoData,
-	} = params
-	if (realVaporPressureMonths !== 12 || !world.climate.real_temperature_monthly)
-		return
-
-	const N = mesh.numRegions
-	const observedVaporPressureMonthly = OBSERVED_EARTH.sampleMonthlyFloatRaster({
-		mesh,
-		raster: realVaporPressureMonthly,
-		rasterW: realVaporPressureWidth,
-		rasterH: realVaporPressureHeight,
-		months: realVaporPressureMonths,
-		scale: realVaporPressureScale,
-		nodata: realVaporPressureNoData,
-	})
-	const observedMonthly = new Float32Array(N * realVaporPressureMonths)
-	const observedAnnual = new Float32Array(N)
-
-	for (let r = 0; r < N; r++) {
-		let observedSum = 0
-		let observedCount = 0
-		for (let month = 0; month < realVaporPressureMonths; month++) {
-			const idx = month * N + r
-			const vaporPressure = observedVaporPressureMonthly[idx]
-			const meanTemp = world.climate.real_temperature_monthly[idx]
-			if (Number.isFinite(vaporPressure) && Number.isFinite(meanTemp)) {
-				const observed = HUMIDITY.relativeHumidityFromVaporPressure({
-					meanTempC: meanTemp,
-					vaporPressureKpa: vaporPressure,
-				})
-				observedMonthly[idx] = observed
-				observedSum += observed
-				observedCount++
-			} else {
-				observedMonthly[idx] = NaN
-			}
-		}
-		observedAnnual[r] = observedCount > 0 ? observedSum / observedCount : NaN
-	}
-
-	world.observedHumidity = {
-		real_monthly: observedMonthly,
-		real_annual: observedAnnual,
-	}
-}
-
-function sampleCoastlineMask({
-	mesh,
-	mask,
-	maskW,
-	maskH,
-}: SampleCoastlineMaskParams): Uint8Array {
-	const N = mesh.numRegions
-	const { r_xyz } = mesh
-	const isLand = new Uint8Array(N)
-
-	for (let r = 0; r < N; r++) {
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-
-		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
-		const lon = Math.atan2(y, x)
-
-		const px = ((((lon / Math.PI + 1) * 0.5 * maskW) % maskW) + maskW) % maskW
-		const py = Math.max(0, Math.min(maskH - 1, (0.5 - lat / Math.PI) * maskH))
-
-		const xi = Math.min(maskW - 1, Math.round(px))
-		const yi = Math.min(maskH - 1, Math.round(py))
-		isLand[r] = mask[yi * maskW + xi] >= 128 ? 1 : 0
-	}
-
-	return isLand
-}
-
-function sampleCategoricalRaster({
-	mesh,
-	raster,
-	rasterW,
-	rasterH,
-	nodata,
-}: SampleCategoricalRasterParams): Int16Array {
-	const N = mesh.numRegions
-	const { r_xyz } = mesh
-	const out = new Int16Array(N)
-
-	for (let r = 0; r < N; r++) {
-		const x = r_xyz[3 * r]
-		const y = r_xyz[3 * r + 1]
-		const z = r_xyz[3 * r + 2]
-
-		const lat = Math.asin(Math.max(-1, Math.min(1, z)))
-		const lon = Math.atan2(y, x)
-
-		const px =
-			((((lon / Math.PI + 1) * 0.5 * rasterW) % rasterW) + rasterW) % rasterW
-		const py = Math.max(
-			0,
-			Math.min(rasterH - 1, (0.5 - lat / Math.PI) * rasterH),
-		)
-
-		const xi = Math.min(rasterW - 1, Math.round(px))
-		const yi = Math.min(rasterH - 1, Math.round(py))
-		const value = raster[yi * rasterW + xi]
-		out[r] = value === nodata ? -1 : value
-	}
-
-	return out
-}
-
-function reconcileElevationWithMask({
-	elevation,
-	maskIsLand,
-	epsilon,
-}: ReconcileElevationWithMaskParams): void {
-	for (let r = 0; r < elevation.length; r++) {
-		if (maskIsLand[r]) {
-			if (elevation[r] <= 0) elevation[r] = epsilon
-		} else {
-			if (elevation[r] > 0) elevation[r] = -epsilon
-		}
-	}
-}
-
-function buildRealRiversData(
-	mesh: SphereMesh,
-	lines: RealRiverLineInput[],
-	elevation_km: Float32Array,
-	planetRadiusKm: number,
-): {
-	lines: [number, number, number, number][][]
-	visible: Uint8Array
-	riverId: Int32Array
-	riverLengthKm: Float32Array
-	riverNames: (string | null)[]
-	minFlow: number
-	maxFlow: number
-} {
-	const N = mesh.numRegions
-	const visible = new Uint8Array(N)
-	const riverId = new Int32Array(N).fill(-1)
-	const riverLengthKm = new Float32Array(N)
-	const index = MESH.buildRegionSpatialIndex(mesh)
-
-	let maxStroke = 0
-	for (const line of lines) maxStroke = Math.max(maxStroke, line.strokeweig)
-	if (maxStroke <= 0) maxStroke = 1
-
-	const outLines: [number, number, number, number][][] = []
-
-	lines.forEach((line, lineIdx) => {
-		const numPoints = line.points.length / 2
-		if (numPoints < 2) return
-
-		// Flow is a rendering-only proxy derived from Natural Earth's
-		// strokeweig (there's no real discharge simulation here) — scaled
-		// into a plausible-looking m3/s-ish range so line-width normalization
-		// (which expects flow-like magnitudes) still produces sensible output.
-		const flow = (line.strokeweig / maxStroke) * 5000
-
-		const quad: [number, number, number, number][] = []
-		let lengthKm = 0
-		let prevXyz: [number, number, number] | null = null
-		for (let i = 0; i < numPoints; i++) {
-			const lonDeg = line.points[2 * i]
-			const latDeg = line.points[2 * i + 1]
-			const lonR = (lonDeg * Math.PI) / 180
-			const latR = (latDeg * Math.PI) / 180
-			const cosLat = Math.cos(latR)
-			const xyz: [number, number, number] = [
-				cosLat * Math.cos(lonR),
-				cosLat * Math.sin(lonR),
-				Math.sin(latR),
-			]
-			if (prevXyz) {
-				const dx = xyz[0] - prevXyz[0]
-				const dy = xyz[1] - prevXyz[1]
-				const dz = xyz[2] - prevXyz[2]
-				lengthKm += Math.sqrt(dx * dx + dy * dy + dz * dz) * planetRadiusKm
-			}
-			prevXyz = xyz
-
-			const region = index.nearest(lonDeg, latDeg)
-			const elevKm = region >= 0 ? elevation_km[region] : 0
-			quad.push([lonDeg, latDeg, flow, elevKm])
-
-			if (region >= 0) {
-				visible[region] = 1
-				riverId[region] = lineIdx
-			}
-		}
-		outLines.push(quad)
-
-		for (let i = 0; i < numPoints; i++) {
-			const region = index.nearest(line.points[2 * i], line.points[2 * i + 1])
-			if (region >= 0) riverLengthKm[region] = lengthKm
-		}
-	})
-
-	let minFlow = Infinity
-	let maxFlow = 0
-	for (const line of outLines)
-		for (const [, , flow] of line) {
-			minFlow = Math.min(minFlow, flow)
-			maxFlow = Math.max(maxFlow, flow)
-		}
-	if (!Number.isFinite(minFlow)) minFlow = 0
-
-	const riverNames = lines.map((line) => line.name ?? null)
-
-	return {
-		lines: outLines,
-		visible,
-		riverId,
-		riverLengthKm,
-		riverNames,
-		minFlow,
-		maxFlow: maxFlow || 1,
-	}
-}
-
-function pointInRing({ lonDeg, latDeg, ring }: PointInRingParams): boolean {
-	let inside = false
-	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-		const [xi, yi] = ring[i]
-		const [xj, yj] = ring[j]
-		const intersects =
-			yi > latDeg !== yj > latDeg &&
-			lonDeg < ((xj - xi) * (latDeg - yi)) / (yj - yi) + xi
-		if (intersects) inside = !inside
-	}
-	return inside
-}
-
-function matchRealLakeNames({
-	mesh,
-	landmarks,
-	lakeLandmarkType,
-	lakePolygons,
-}: MatchRealLakeNamesParams): (string | null)[] {
-	const realNames = new Array<string | null>(landmarks.count).fill(null)
-	if (!lakePolygons.length) return realNames
-
-	const { r_xyz } = mesh
-	const sumX = new Float64Array(landmarks.count)
-	const sumY = new Float64Array(landmarks.count)
-	const sumZ = new Float64Array(landmarks.count)
-	const counts = new Int32Array(landmarks.count)
-	for (let r = 0; r < mesh.numRegions; r++) {
-		const landmarkId = landmarks.regionLandmark[r]
-		if (landmarkId < 0 || landmarks.type[landmarkId] !== lakeLandmarkType)
-			continue
-		sumX[landmarkId] += r_xyz[3 * r]
-		sumY[landmarkId] += r_xyz[3 * r + 1]
-		sumZ[landmarkId] += r_xyz[3 * r + 2]
-		counts[landmarkId]++
-	}
-
-	const polygonCentroids = lakePolygons.map(({ ring }) => {
-		let lonSum = 0
-		let latSum = 0
-		for (const [lon, lat] of ring) {
-			lonSum += lon
-			latSum += lat
-		}
-		return [lonSum / ring.length, latSum / ring.length] as [number, number]
-	})
-
-	const NEAREST_THRESHOLD_DEG = 3
-
-	for (let landmarkId = 0; landmarkId < landmarks.count; landmarkId++) {
-		if (
-			landmarks.type[landmarkId] !== lakeLandmarkType ||
-			counts[landmarkId] === 0
-		)
-			continue
-		const x = sumX[landmarkId] / counts[landmarkId]
-		const y = sumY[landmarkId] / counts[landmarkId]
-		const z = sumZ[landmarkId] / counts[landmarkId]
-		const lat = (Math.asin(Math.max(-1, Math.min(1, z))) * 180) / Math.PI
-		const lon = (Math.atan2(y, x) * 180) / Math.PI
-
-		let matched: string | null = null
-		for (const { name, ring } of lakePolygons) {
-			if (pointInRing({ lonDeg: lon, latDeg: lat, ring })) {
-				matched = name
-				break
-			}
-		}
-		if (!matched) {
-			let bestDist = Infinity
-			let bestIdx = -1
-			for (let i = 0; i < polygonCentroids.length; i++) {
-				const [clon, clat] = polygonCentroids[i]
-				const d = Math.hypot(clon - lon, clat - lat)
-				if (d < bestDist) {
-					bestDist = d
-					bestIdx = i
-				}
-			}
-			if (bestIdx >= 0 && bestDist <= NEAREST_THRESHOLD_DEG)
-				matched = lakePolygons[bestIdx].name
-		}
-		realNames[landmarkId] = matched
-	}
-
-	return realNames
-}
-
-function resolveRealProvinceSeeds(
-	mesh: SphereMesh,
-	isLand: Uint8Array,
-	provinces: RealProvinceInput[],
-): { regions: Int32Array; weights: Float32Array; names: string[] } {
-	const index = MESH.buildRegionSpatialIndex(mesh)
-	const { adjOffset, adjList } = mesh
-	const regionOwner = new Map<number, number>() // region -> index into accepted[]
-	const accepted: { region: number; weight: number; name: string }[] = []
-
-	function nearestLandRegion(lonDeg: number, latDeg: number): number {
-		const start = index.nearest(lonDeg, latDeg)
-		if (start < 0) return -1
-		if (isLand[start]) return start
-		// BFS outward for the nearest land region.
-		const visited = new Set<number>([start])
-		let frontier = [start]
-		for (let hop = 0; hop < 8 && frontier.length > 0; hop++) {
-			const next: number[] = []
-			for (const r of frontier) {
-				for (let j = adjOffset[r], jEnd = adjOffset[r + 1]; j < jEnd; j++) {
-					const nb = adjList[j]
-					if (visited.has(nb)) continue
-					visited.add(nb)
-					if (isLand[nb]) return nb
-					next.push(nb)
-				}
-			}
-			frontier = next
-		}
-		return -1
-	}
-
-	for (const p of provinces) {
-		const region = nearestLandRegion(p.lon, p.lat)
-		if (region < 0) continue
-		const existingIdx = regionOwner.get(region)
-		if (existingIdx === undefined) {
-			regionOwner.set(region, accepted.length)
-			accepted.push({ region, weight: p.weight, name: p.name })
-		} else if (p.weight > accepted[existingIdx].weight) {
-			accepted[existingIdx] = { region, weight: p.weight, name: p.name }
-		}
-	}
-
-	return {
-		regions: Int32Array.from(accepted.map((a) => a.region)),
-		weights: Float32Array.from(accepted.map((a) => a.weight)),
-		names: accepted.map((a) => a.name),
-	}
-}
-
-function mergeEu4LandMask({
-	mask,
-	eu4Raster,
-	eu4Nodata,
-}: MergeEu4LandMaskParams): Uint8Array {
-	const merged = new Uint8Array(mask.length)
-	for (let i = 0; i < mask.length; i++) {
-		merged[i] = mask[i] >= 128 || eu4Raster[i] !== eu4Nodata ? 255 : 0
-	}
-	return merged
-}
-
 function importGenesisWorld({
 	params,
 	onProgress,
@@ -585,7 +49,7 @@ function importGenesisWorld({
 		params.eu4ProvincesRaster &&
 		params.eu4ProvincesWidth === params.maskWidth &&
 		params.eu4ProvincesHeight === params.maskHeight
-			? mergeEu4LandMask({
+			? REAL_EARTH_DATA.mergeEu4LandMask({
 					mask: params.coastlineMask,
 					eu4Raster: params.eu4ProvincesRaster,
 					eu4Nodata: params.eu4ProvincesNoData ?? -32768,
@@ -631,7 +95,7 @@ function importGenesisWorld({
 
 	onProgress?.("import:heightmap", 10)
 	t0 = performance.now()
-	const elevation = sampleHeightmap({
+	const elevation = SAMPLING.sampleHeightmap({
 		mesh,
 		grayscale: params.grayscale,
 		imgW: params.imageWidth,
@@ -646,13 +110,17 @@ function importGenesisWorld({
 	let maskIsLand: Uint8Array | undefined
 	if (params.coastlineMask && params.maskWidth && params.maskHeight) {
 		t0 = performance.now()
-		maskIsLand = sampleCoastlineMask({
+		maskIsLand = SAMPLING.sampleCoastlineMask({
 			mesh,
 			mask: params.coastlineMask,
 			maskW: params.maskWidth,
 			maskH: params.maskHeight,
 		})
-		reconcileElevationWithMask({ elevation, maskIsLand, epsilon: 0.02 })
+		REAL_EARTH_DATA.reconcileElevationWithMask({
+			elevation,
+			maskIsLand,
+			epsilon: 0.02,
+		})
 		record("Coastline mask reconciliation", t0)
 	}
 
@@ -673,7 +141,11 @@ function importGenesisWorld({
 	// before deriving r_isOcean so erosion/smoothing operate on the correct
 	// boundary from the start.
 	if (maskIsLand)
-		reconcileElevationWithMask({ elevation, maskIsLand, epsilon: 0.02 })
+		REAL_EARTH_DATA.reconcileElevationWithMask({
+			elevation,
+			maskIsLand,
+			epsilon: 0.02,
+		})
 
 	const r_isOcean = new Uint8Array(mesh.numRegions)
 	if (maskIsLand) {
@@ -754,7 +226,11 @@ function importGenesisWorld({
 	// once more so the coastline that reaches isLand/plates/climate below is
 	// still exactly the vector mask, not wherever erosion left it.
 	if (maskIsLand)
-		reconcileElevationWithMask({ elevation, maskIsLand, epsilon: 0.02 })
+		REAL_EARTH_DATA.reconcileElevationWithMask({
+			elevation,
+			maskIsLand,
+			epsilon: 0.02,
+		})
 
 	// Derive synthetic plates
 	t0 = performance.now()
@@ -786,7 +262,7 @@ function importGenesisWorld({
 	// the start rather than only after a later reconciliation pass.
 	let realLakeRegions: Uint8Array | undefined
 	if (params.lakeMask && params.lakeMaskWidth && params.lakeMaskHeight) {
-		realLakeRegions = sampleCoastlineMask({
+		realLakeRegions = SAMPLING.sampleCoastlineMask({
 			mesh,
 			mask: params.lakeMask,
 			maskW: params.lakeMaskWidth,
@@ -866,7 +342,7 @@ function importGenesisWorld({
 		params.realElevationScale !== undefined &&
 		params.realElevationNoData !== undefined
 	) {
-		const realElevationM = sampleSingleBandFloatRaster({
+		const realElevationM = SAMPLING.sampleSingleBandFloatRaster({
 			mesh,
 			raster: params.realElevationRaster,
 			rasterW: params.realElevationWidth,
@@ -885,7 +361,7 @@ function importGenesisWorld({
 		params.eu5TopographyWidth &&
 		params.eu5TopographyHeight &&
 		params.eu5TopographyNoData !== undefined
-			? sampleCategoricalRaster({
+			? SAMPLING.sampleCategoricalRaster({
 					mesh,
 					raster: params.eu5TopographyRaster,
 					rasterW: params.eu5TopographyWidth,
@@ -898,7 +374,7 @@ function importGenesisWorld({
 		params.eu5VegetationWidth &&
 		params.eu5VegetationHeight &&
 		params.eu5VegetationNoData !== undefined
-			? sampleCategoricalRaster({
+			? SAMPLING.sampleCategoricalRaster({
 					mesh,
 					raster: params.eu5VegetationRaster,
 					rasterW: params.eu5VegetationWidth,
@@ -911,7 +387,7 @@ function importGenesisWorld({
 		params.eu5ClimateWidth &&
 		params.eu5ClimateHeight &&
 		params.eu5ClimateNoData !== undefined
-			? sampleCategoricalRaster({
+			? SAMPLING.sampleCategoricalRaster({
 					mesh,
 					raster: params.eu5ClimateRaster,
 					rasterW: params.eu5ClimateWidth,
@@ -920,10 +396,12 @@ function importGenesisWorld({
 				})
 			: undefined
 
-	let realRivers: ReturnType<typeof buildRealRiversData> | undefined
+	let realRivers:
+		| ReturnType<typeof REAL_EARTH_DATA.buildRealRiversData>
+		| undefined
 	if (params.riverLines?.length) {
 		t0 = performance.now()
-		realRivers = buildRealRiversData(
+		realRivers = REAL_EARTH_DATA.buildRealRiversData(
 			mesh,
 			params.riverLines,
 			elevation_km,
@@ -932,10 +410,12 @@ function importGenesisWorld({
 		record("Real river snapping", t0)
 	}
 
-	let realProvinceSeeds: ReturnType<typeof resolveRealProvinceSeeds> | undefined
+	let realProvinceSeeds:
+		| ReturnType<typeof REAL_EARTH_DATA.resolveRealProvinceSeeds>
+		| undefined
 	if (params.realProvinces?.length) {
 		t0 = performance.now()
-		realProvinceSeeds = resolveRealProvinceSeeds(
+		realProvinceSeeds = REAL_EARTH_DATA.resolveRealProvinceSeeds(
 			mesh,
 			isLand,
 			params.realProvinces,
@@ -951,7 +431,7 @@ function importGenesisWorld({
 		params.eu4ProvincesNoData !== undefined
 	) {
 		t0 = performance.now()
-		eu4ProvinceIds = sampleCategoricalRaster({
+		eu4ProvinceIds = SAMPLING.sampleCategoricalRaster({
 			mesh,
 			raster: params.eu4ProvincesRaster,
 			rasterW: params.eu4ProvincesWidth,
@@ -1021,7 +501,7 @@ function importGenesisWorld({
 		params.realVaporPressureNoData !== undefined
 	) {
 		t0 = performance.now()
-		attachObservedEarthHumidity({
+		REAL_EARTH_DATA.attachObservedEarthHumidity({
 			mesh,
 			world: post,
 			realVaporPressureMonthly: params.realVaporPressureMonthly,
@@ -1057,7 +537,7 @@ function importGenesisWorld({
 
 	if (params.lakeNames?.length) {
 		t0 = performance.now()
-		provinceSociety.landmarks.realNames = matchRealLakeNames({
+		provinceSociety.landmarks.realNames = REAL_EARTH_DATA.matchRealLakeNames({
 			mesh,
 			landmarks: provinceSociety.landmarks,
 			lakeLandmarkType: LANDMARKS.landmarkTypeLake,

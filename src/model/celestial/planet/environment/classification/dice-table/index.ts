@@ -90,7 +90,11 @@ function rollClassificationAssignment(params: {
 			})
 			const atmosphereCode =
 				chemistry === "water"
-					? MATH.clamp({ value: DICE.roll2d6(rng) - 7 + sizeClass, lo: 2, hi: 9 })
+					? MATH.clamp({
+							value: DICE.roll2d6(rng) - 7 + sizeClass,
+							lo: 2,
+							hi: 9,
+						})
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },
@@ -154,7 +158,11 @@ function rollClassificationAssignment(params: {
 						: "methane"
 			const atmosphereCode =
 				chemistry === "water"
-					? MATH.clamp({ value: DICE.roll2d6(rng) - 7 + sizeClass, lo: 2, hi: 9 })
+					? MATH.clamp({
+							value: DICE.roll2d6(rng) - 7 + sizeClass,
+							lo: 2,
+							hi: 9,
+						})
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },
@@ -350,7 +358,11 @@ function rollClassificationAssignment(params: {
 						: "methane"
 			const atmosphereCode =
 				chemistry === "water"
-					? MATH.clamp({ value: DICE.roll2d6(rng) + sizeClass - 7, lo: 2, hi: 9 })
+					? MATH.clamp({
+							value: DICE.roll2d6(rng) + sizeClass - 7,
+							lo: 2,
+							hi: 9,
+						})
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },
@@ -384,7 +396,11 @@ function rollClassificationAssignment(params: {
 			const chemistry = primary || chemRoll <= 11 ? "water" : "chlorine"
 			const atmosphereCode =
 				chemistry === "water"
-					? MATH.clamp({ value: DICE.roll2d6(rng) + sizeClass - 7, lo: 2, hi: 9 })
+					? MATH.clamp({
+							value: DICE.roll2d6(rng) + sizeClass - 7,
+							lo: 2,
+							hi: 9,
+						})
 					: (rng.weightedChoice([
 							{ v: 10, w: 8 },
 							{ v: 11, w: 2 },

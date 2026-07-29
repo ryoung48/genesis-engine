@@ -80,10 +80,7 @@ function drawCursiveConnectors(
 			const leftRune = script.glyphs[left.char]
 			const rightRune = script.glyphs[right.char]
 			if (!leftRune || !rightRune) continue
-			if (
-				leftRune.getTemplate() !== "cursive" ||
-				rightRune.getTemplate() !== "cursive"
-			) {
+			if (leftRune.template !== "cursive" || rightRune.template !== "cursive") {
 				continue
 			}
 			const x1 = left.x + padding + margin + leftRune.width * scale - overlap

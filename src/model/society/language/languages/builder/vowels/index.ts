@@ -1,10 +1,10 @@
+import type { SharedRng } from "@/model/shared/random/rng"
 import { BUILDER } from "@/model/society/language/languages/builder"
 import type { DiphthongsParams } from "@/model/society/language/languages/builder/vowels/types"
 import {
 	PhonemeCatalog,
 	vowelRules,
 } from "@/model/society/language/languages/types"
-import type { SharedRng } from "@/model/shared/random/rng"
 
 const basicVowels = {
 	A: "a",

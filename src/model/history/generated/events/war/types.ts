@@ -1,5 +1,5 @@
-import type { SharedRng } from "@/model/shared/random/rng"
 import type { HistoryState } from "@/model/history/generated/state/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 
 export interface NextEventParams {
 	state: HistoryState

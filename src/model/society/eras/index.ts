@@ -1,3 +1,4 @@
+import { MATH } from "@/model/shared/math/core"
 import type {
 	EraConfig,
 	WavePercentileThresholdParams,
@@ -7,7 +8,6 @@ import type {
 	GovernmentType,
 	SocietyEra,
 } from "@/model/society/types"
-import { MATH } from "@/model/shared/math/core"
 
 const governmentTypes: GovernmentType[] = [
 	// tribal

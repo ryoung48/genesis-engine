@@ -1,9 +1,9 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import type { DerivedCache } from "@/model/history/generated/derive/types"
 import type { EventHeap } from "@/model/history/generated/event-heap"
-import type { SharedRng } from "@/model/shared/random/rng"
 import type { Relation } from "@/model/history/generated/state"
 import type { Timeline } from "@/model/history/generated/timeline/types"
+import type { SharedRng } from "@/model/shared/random/rng"
 import type {
 	Route,
 	RouteEdge,

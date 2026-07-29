@@ -15,7 +15,7 @@ import type {
 import { DEFAULT_GEOGRAPHY_MODE } from "@/ui/planet/screen/shared/map-modes"
 import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 
-interface StoredViewPrefs {
+export interface StoredViewPrefs {
 	colorMode: ColorMode
 	geographyMode: ColorMode
 	nationMode: NationMapMode

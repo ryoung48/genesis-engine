@@ -1,4 +1,4 @@
-import type { SimplexNoise } from "@/model/shared/math/simplex-noise"
+import type { GenesisProvinces } from "@/model/society/types"
 
 export interface IntegerMassParams {
 	total: number
@@ -18,118 +18,6 @@ export interface SpreadBucketSizesParams {
 	count: number
 }
 
-export interface ContinentPlacementBonusParams {
-	province: number
-	provinceContinent: Uint8Array<ArrayBufferLike> | undefined
-	target: number
-}
-
-export interface ProvinceSeedDistanceParams {
-	aProvince: number
-	bProvince: number
-	provinceSeeds: Int32Array
-	r_xyz: Float32Array
-}
-
-export interface BuildOpenComponentsParams {
-	active: Uint8Array
-	assignment: Int32Array
-	adjOffset: Int32Array
-	adjList: Int32Array
-}
-
-export interface GroupByNationParams {
-	assignment: Int32Array
-	nationCount: number
-	provinceCount: number
-}
-
-export interface ColorDistanceParams {
-	a: [number, number, number]
-	b: [number, number, number]
-}
-
-export interface ClaimProvinceDynamicParams {
-	nation: number
-	province: number
-	active: Uint8Array
-	assignment: Int32Array
-	sizes: number[]
-	frontier: Set<number>
-	adjOffset: Int32Array
-	adjList: Int32Array
-}
-
-export interface SelectSeedParams {
-	target: number
-	active: Uint8Array
-	assignment: Int32Array
-	blocked: Uint8Array
-	habitability: Float32Array
-	waterAccess: Uint8Array
-	provinceContinent: Uint8Array | undefined
-	componentId: Int32Array
-	componentSizes: number[]
-	adjOffset: Int32Array
-	adjList: Int32Array
-}
-
-export interface MarkBlockedParams {
-	start: number
-	hops: number
-	active: Uint8Array
-	blocked: Uint8Array
-	adjOffset: Int32Array
-	adjList: Int32Array
-}
-
-export interface RefineGovernmentSubtypeParams {
-	mainType: number
-	size: number
-	wave: number
-	hab: number
-	water: number
-	sizeWeight: number
-	r: number
-}
-
-export interface NationPlacementScoreParams {
-	province: number
-	habitability: Float32Array<ArrayBufferLike>
-	waterAccess: Uint8Array<ArrayBufferLike>
-	provinceContinent: Uint8Array<ArrayBufferLike> | undefined
-	target: number
-}
-
-export interface BestClaimParams {
-	nation: number
-	seedProvince: number
-	frontier: Set<number>
-	active: Uint8Array
-	assignment: Int32Array
-	habitability: Float32Array
-	waterAccess: Uint8Array
-	r_xyz: Float32Array
-	provinceSeeds: Int32Array
-	adjOffset: Int32Array
-	adjList: Int32Array
-	noise: SimplexNoise
-	maxSpreadRad: number
-}
-
-export interface AssignGovernmentTypeParams {
-	nationIndex: number
-	capitalProvince: number
-	nationSize: number
-	eraMix: GovernmentMix
-	sizeWeight: number
-	habitability: Float32Array
-	waterAccess: Uint8Array
-	migrationWave: Float32Array | undefined
-	statehoodFraction: number
-	seed: number
-}
-
 export interface GovernmentMix {
 	tribal: number
 	monarchy: number
@@ -141,4 +29,47 @@ export interface GovernmentMix {
 	 * Does not need to be included in the tribal/monarchy/republic/theocracy sum.
 	 */
 	colonial?: number
+}
+
+export interface ComputeNationsParams {
+	provinces: GenesisProvinces
+	coastal: Uint8Array
+	riverVisible: Uint8Array
+	/** [JUSTIFICATION] callers rarely have water access pre-computed; when omitted it's derived from coastal/riverVisible via WATER_ACCESS.computeProvinceWaterAccess */
+	waterAccess?: Uint8Array
+	/** [JUSTIFICATION] the large-nation continent-spread bonus only applies to planets that track per-province continent ids; not every caller supplies one */
+	provinceContinent?: Uint8Array
+	habitability: Float32Array
+	r_xyz: Float32Array
+	seed: number
+	/** [JUSTIFICATION] defaults to UNITS.defaultPlanetRadiusKm when the caller doesn't model a custom planet size */
+	planetRadiusKm?: number
+	/** [JUSTIFICATION] when provided, only provinces where eraActiveMask[p] === 1 are eligible for nations; omitted entirely outside era-gated pipelines */
+	eraActiveMask?: Uint8Array
+	/** [JUSTIFICATION] era-specific nation budget percentages (must align with nationBuckets); omitted callers fall back to the default NATION_PERCENTAGES */
+	nationPercentages?: number[]
+	/** [JUSTIFICATION] era-specific province-size ranges for nation buckets; omitted callers fall back to ERAS.nationBuckets */
+	nationBuckets?: [number, number][]
+	/** [JUSTIFICATION] government assignment is an optional feature — omitted entirely for callers that don't model government type */
+	governmentMix?: GovernmentMix
+	/**
+	 * 0–1: how much nation size drives government type vs. era ideology.
+	 * 1.0 = size prior dominates (ancient). 0.0 = era mix dominates (modern).
+	 * Also scales spatial modifier strength.
+	 * [JUSTIFICATION] only meaningful when governmentMix is supplied; defaults to 0.55 otherwise
+	 */
+	governmentSizeWeight?: number
+	/**
+	 * Per-province migration wave (0 = settlement cradle, 1 = frontier).
+	 * Frontier nations skew tribal; core nations skew toward established states.
+	 * [JUSTIFICATION] not every pipeline computes a migration wave; the frontier/core tribal skew is simply skipped when absent
+	 */
+	migrationWave?: Float32Array
+	/**
+	 * Era statehood fraction (0–1). The frontier→tribal skew represents proximity
+	 * to stateless societies; as statehood approaches 1.0 (no stateless land left,
+	 * e.g. information age) the skew fades to zero.
+	 * [JUSTIFICATION] only meaningful when governmentMix is supplied; defaults to 0.75 otherwise
+	 */
+	statehoodFraction?: number
 }

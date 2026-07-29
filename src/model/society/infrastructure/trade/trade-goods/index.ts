@@ -173,9 +173,7 @@ function computeTradeGoods(params: {
 				| readonly (readonly [number, number])[]
 				| undefined
 			if (!fallback || fallback.length === 0) continue
-			material[l] = dice.weightedChoice(
-				fallback.map(([v, w]) => ({ v, w })),
-			)!
+			material[l] = dice.weightedChoice(fallback.map(([v, w]) => ({ v, w })))!
 		} else {
 			material[l] = dice.weightedChoice(dist.map(([v, w]) => ({ v, w })))!
 		}

@@ -18,7 +18,6 @@ import type {
 	SerializedGenesisWorld,
 	SerializedNetwork,
 } from "@/model/worker-protocol/types"
-import { formatClockTimeDisplay } from "@/ui/planet/clock"
 import { type ColorMode, VEGETATION_WATER_BLUE } from "@/ui/planet/colors"
 import type { LabelMode } from "@/ui/planet/controls/OverlayControls"
 import { boostCloudAlphaMap } from "@/ui/planet/renderer/cloud-material"
@@ -53,6 +52,12 @@ import {
 	updateEu4NationFillMapColors,
 } from "@/ui/planet/renderer/eu4-nation-fill-overlay"
 import { getRegionFocusTargets } from "@/ui/planet/renderer/focus"
+import {
+	addMapSlideClones,
+	applyMapExportVisibility,
+	normalizeMapCenterLongitudeDeg,
+	renderMapExportPng,
+} from "@/ui/planet/renderer/map-export"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
 	buildGlobeMeasurementOverlay,
@@ -117,7 +122,6 @@ import {
 	collectNationBorderMapPositions,
 	repeatMapPositions,
 } from "@/ui/planet/renderer/overlay-builders"
-import { PngStreamWriter } from "@/ui/planet/renderer/PngStreamWriter"
 import {
 	buildGlobePathfindingOverlay,
 	buildMapPathfindingOverlay,
@@ -141,6 +145,13 @@ import {
 	type SolarSystemOverlayState,
 } from "@/ui/planet/renderer/solar-system-overlay"
 import {
+	buildSolarTerminatorRingPoints,
+	createSolarTerminatorBand,
+	createSolarTerminatorLabelSprite,
+	getSolarTerminatorLabelText,
+	projectSolarTerminatorPointsToMap,
+} from "@/ui/planet/renderer/solar-terminator"
+import {
 	buildGlobeTradeRoutes,
 	buildMapTradeRoutes,
 } from "@/ui/planet/renderer/trade-route-overlay"
@@ -153,7 +164,7 @@ import type {
 	WindArrowData,
 } from "@/ui/planet/renderer/types"
 
-const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
+export const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
 const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc
 const SOLAR_TERMINATOR_HAIRLINE_COLOR = 0x0f172a
 const SOLAR_TERMINATOR_BAND_COLOR = 0xe2e8f0
@@ -161,12 +172,7 @@ const SOLAR_TERMINATOR_RADIUS = 1.02
 const SOLAR_TERMINATOR_ELEVATED_RADIUS = 1.05
 const SOLAR_TERMINATOR_BAND_HALF_WIDTH = 0.008
 const SOLAR_TERMINATOR_LABEL_COUNT = 24
-const SOLAR_TERMINATOR_LABEL_RENDER_ORDER = 1002
-const SOLAR_TERMINATOR_LABEL_TEXT_COLOR = "#0f172a"
-const SOLAR_TERMINATOR_LABEL_BG_FILL = "rgba(248, 250, 252, 0.94)"
-const SOLAR_TERMINATOR_LABEL_BG_STROKE = "rgba(148, 163, 184, 0.55)"
-const SOLAR_TERMINATOR_LABEL_BASE_FONT_PX = 12
-const SOLAR_TERMINATOR_LABEL_TEXTURE_SCALE = 2
+export const SOLAR_TERMINATOR_LABEL_RENDER_ORDER = 1002
 const GLOBE_CLOUD_RADIUS = 1.035
 
 const globeCloudTextureLoader = new THREE.TextureLoader()
@@ -180,216 +186,6 @@ function loadGlobeCloudTexture(texturePath: string): THREE.Texture {
 	texture.userData.sharedTexture = true
 	globeCloudTextureCache.set(texturePath, texture)
 	return texture
-}
-
-function drawRoundedRect(
-	ctx: CanvasRenderingContext2D,
-	x: number,
-	y: number,
-	width: number,
-	height: number,
-	radius: number,
-) {
-	ctx.beginPath()
-	ctx.moveTo(x + radius, y)
-	ctx.lineTo(x + width - radius, y)
-	ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-	ctx.lineTo(x + width, y + height - radius)
-	ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-	ctx.lineTo(x + radius, y + height)
-	ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-	ctx.lineTo(x, y + radius)
-	ctx.quadraticCurveTo(x, y, x + radius, y)
-	ctx.closePath()
-}
-
-function createSolarTerminatorBand(
-	points: THREE.Vector3[],
-	radius: number,
-	halfWidth: number,
-): THREE.BufferGeometry {
-	const positions = new Float32Array(points.length * 2 * 3)
-	const indices: number[] = []
-
-	for (let index = 0; index < points.length; index++) {
-		const direction = points[index]!.clone().normalize()
-		const inner = direction.clone().multiplyScalar(radius - halfWidth)
-		const outer = direction.clone().multiplyScalar(radius + halfWidth)
-		const offset = index * 6
-		positions[offset] = inner.x
-		positions[offset + 1] = inner.y
-		positions[offset + 2] = inner.z
-		positions[offset + 3] = outer.x
-		positions[offset + 4] = outer.y
-		positions[offset + 5] = outer.z
-	}
-
-	for (let index = 0; index < points.length - 1; index++) {
-		const base = index * 2
-		indices.push(base, base + 1, base + 3, base, base + 3, base + 2)
-	}
-
-	const geometry = new THREE.BufferGeometry()
-	geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3))
-	geometry.setIndex(indices)
-	return geometry
-}
-
-function createSolarTerminatorLabelSprite(label: string): {
-	sprite: THREE.Sprite
-	aspect: number
-} | null {
-	if (typeof document === "undefined") return null
-	const canvas = document.createElement("canvas")
-	const ctx = canvas.getContext("2d")
-	if (!ctx) return null
-	const textureScale = SOLAR_TERMINATOR_LABEL_TEXTURE_SCALE
-	const scaledFontPx = SOLAR_TERMINATOR_LABEL_BASE_FONT_PX * textureScale
-	ctx.font = `500 ${scaledFontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`
-	const textMetrics = ctx.measureText(label)
-	const width = Math.ceil(textMetrics.width / textureScale + 14)
-	const height = 22
-	canvas.width = width * textureScale
-	canvas.height = height * textureScale
-	ctx.setTransform(textureScale, 0, 0, textureScale, 0, 0)
-	ctx.font = `500 ${SOLAR_TERMINATOR_LABEL_BASE_FONT_PX}px ui-monospace, SFMono-Regular, Menlo, monospace`
-	ctx.textAlign = "center"
-	ctx.textBaseline = "middle"
-	ctx.fillStyle = SOLAR_TERMINATOR_LABEL_BG_FILL
-	drawRoundedRect(ctx, 0.5, 0.5, width - 1, height - 1, 6)
-	ctx.fill()
-	ctx.strokeStyle = SOLAR_TERMINATOR_LABEL_BG_STROKE
-	ctx.lineWidth = 1
-	ctx.stroke()
-	ctx.fillStyle = SOLAR_TERMINATOR_LABEL_TEXT_COLOR
-	ctx.fillText(label, width / 2, height / 2 + 0.5)
-	const texture = new THREE.CanvasTexture(canvas)
-	texture.needsUpdate = true
-	texture.colorSpace = THREE.SRGBColorSpace
-	const material = new THREE.SpriteMaterial({
-		map: texture,
-		transparent: true,
-		depthTest: false,
-		depthWrite: false,
-	})
-	const sprite = new THREE.Sprite(material)
-	sprite.renderOrder = SOLAR_TERMINATOR_LABEL_RENDER_ORDER
-	return { sprite, aspect: width / height }
-}
-
-function getSolarTerminatorLabelText(params: {
-	anchor: THREE.Vector3
-	sunDirection: THREE.Vector3
-	hoursPerDay: number
-	useMeridiem: boolean
-}) {
-	const { anchor, sunDirection, hoursPerDay, useMeridiem } = params
-	const latitude = Math.asin(anchor.z)
-	const declination = Math.asin(sunDirection.z)
-	const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
-	const sinH0 = Math.sin(h0)
-	const denom = Math.max(
-		1e-6,
-		Math.abs(Math.cos(latitude) * Math.cos(declination)),
-	)
-	const cosHourAngle = THREE.MathUtils.clamp(
-		(sinH0 - Math.sin(latitude) * Math.sin(declination)) / denom,
-		-1,
-		1,
-	)
-	const hourAngleMagnitude = Math.acos(cosHourAngle)
-	const east = new THREE.Vector3(-anchor.y, anchor.x, 0)
-	if (east.lengthSq() < 1e-6) east.set(0, 1, 0)
-	east.normalize()
-	const isSunrise = east.dot(sunDirection) > 0
-	const localHours =
-		12 +
-		((isSunrise ? -hourAngleMagnitude : hourAngleMagnitude) * hoursPerDay) /
-			(2 * Math.PI)
-	return `${isSunrise ? "↑" : "↓"} ${formatClockTimeDisplay(
-		localHours,
-		hoursPerDay,
-		useMeridiem,
-	)}`
-}
-
-function buildSolarTerminatorRingPoints(
-	sunDirection: THREE.Vector3,
-	radius: number,
-): THREE.Vector3[] | null {
-	const sunDir = sunDirection.clone().normalize()
-	if (sunDir.lengthSq() === 0) return null
-	const reference =
-		Math.abs(sunDir.z) > 0.9
-			? new THREE.Vector3(1, 0, 0)
-			: new THREE.Vector3(0, 0, 1)
-	const uAxis = new THREE.Vector3().crossVectors(reference, sunDir).normalize()
-	const vAxis = new THREE.Vector3().crossVectors(sunDir, uAxis).normalize()
-	const h0 = THREE.MathUtils.degToRad(SOLAR_TERMINATOR_ALTITUDE_DEG)
-	const sinH0 = Math.sin(h0)
-	const cosH0 = Math.cos(h0)
-	const sampleCount = 192
-	const points: THREE.Vector3[] = []
-	for (let index = 0; index <= sampleCount; index++) {
-		const t = (index / sampleCount) * Math.PI * 2
-		const ring = uAxis
-			.clone()
-			.multiplyScalar(Math.cos(t))
-			.addScaledVector(vAxis, Math.sin(t))
-		points.push(
-			sunDir
-				.clone()
-				.multiplyScalar(sinH0)
-				.addScaledVector(ring, cosH0)
-				.normalize()
-				.multiplyScalar(radius),
-		)
-	}
-	return points
-}
-
-function projectSolarTerminatorPointsToMap(
-	points: THREE.Vector3[],
-	centerLongitudeDeg: number,
-	projectionLatitudeDeg: number,
-	zOffset: number,
-): THREE.Vector3[][] {
-	const projection = createMapProjection(
-		centerLongitudeDeg,
-		projectionLatitudeDeg,
-	)
-	const segments: THREE.Vector3[][] = []
-	let currentSegment: THREE.Vector3[] = []
-	const seamThreshold = projection.repeatWidth * 0.5
-
-	for (let index = 0; index < points.length; index++) {
-		const point = points[index]!
-		const lon = Math.atan2(point.y, point.x)
-		const lat = Math.asin(
-			THREE.MathUtils.clamp(point.z / Math.max(point.length(), 1e-6), -1, 1),
-		)
-		const projected = projection.projectRadians(lon, lat, zOffset)
-		const nextPoint = new THREE.Vector3(
-			projection.clampX(projected[0]),
-			projection.clampY(projected[1]),
-			projected[2],
-		)
-		const previousPoint = currentSegment[currentSegment.length - 1]
-
-		if (
-			previousPoint &&
-			Math.abs(nextPoint.x - previousPoint.x) > seamThreshold
-		) {
-			if (currentSegment.length > 1) segments.push(currentSegment)
-			currentSegment = [nextPoint]
-			continue
-		}
-
-		currentSegment.push(nextPoint)
-	}
-
-	if (currentSegment.length > 1) segments.push(currentSegment)
-	return segments
 }
 
 function reapplyMeshOverlayState(params: {
@@ -451,9 +247,7 @@ function reapplyMeshOverlayState(params: {
 	)
 }
 
-const MAP_REPEAT_WIDTH = 4
 const CONTROL_SETTLE_FRAMES = 2
-const MAP_EXPORT_TILE_CAP = 2048
 
 interface MapExportOptions {
 	width: number
@@ -461,7 +255,7 @@ interface MapExportOptions {
 	onProgress?: (percent: number, label: string) => void
 }
 
-interface ExportRenderTargetLike {
+export interface ExportRenderTargetLike {
 	width?: number
 	height?: number
 	texture?:
@@ -474,7 +268,7 @@ interface ExportRenderTargetLike {
 	dispose: () => void
 }
 
-interface MapExportVisibilityTarget {
+export interface MapExportVisibilityTarget {
 	object: THREE.Object3D | null
 	visible: boolean
 }
@@ -484,7 +278,7 @@ interface MapExportDependencies {
 	yieldToMainThread?: () => Promise<void>
 }
 
-interface ExportRendererLike {
+export interface ExportRendererLike {
 	capabilities: {
 		maxTextureSize: number
 	}
@@ -499,173 +293,6 @@ interface ExportRendererLike {
 		height: number,
 		buffer: Uint8Array,
 	) => void
-}
-
-function normalizeMapCenterLongitudeDeg(longitudeDeg: number): number {
-	return ((((longitudeDeg + 180) % 360) + 360) % 360) - 180
-}
-
-function linearChannelToSrgb8(channel: number): number {
-	const normalized = THREE.MathUtils.clamp(channel / 255, 0, 1)
-	const srgb =
-		normalized <= 0.0031308
-			? normalized * 12.92
-			: 1.055 * Math.pow(normalized, 1 / 2.4) - 0.055
-	return Math.round(THREE.MathUtils.clamp(srgb, 0, 1) * 255)
-}
-
-const MAP_EXPORT_BAND_HEIGHT = 512
-
-function renderMapExportPng(params: {
-	scene: THREE.Scene
-	renderer: ExportRendererLike
-	camera: THREE.OrthographicCamera
-	width: number
-	height: number
-	onProgress?: (percent: number, label: string) => void
-	createRenderTarget: (width: number, height: number) => ExportRenderTargetLike
-	yieldToMainThread?: () => Promise<void>
-}): Promise<Blob> {
-	const {
-		scene,
-		renderer,
-		camera,
-		width,
-		height,
-		onProgress,
-		createRenderTarget,
-		yieldToMainThread,
-	} = params
-	const maxTileWidth = Math.max(
-		1,
-		Math.min(MAP_EXPORT_TILE_CAP, renderer.capabilities.maxTextureSize),
-	)
-	const previousTarget = renderer.getRenderTarget()
-	const previousFrustum = {
-		left: camera.left,
-		right: camera.right,
-		top: camera.top,
-		bottom: camera.bottom,
-	}
-
-	const pngWriter = new PngStreamWriter(
-		width,
-		height,
-		(rowsCompleted, totalRows) => {
-			onProgress?.(
-				Math.round((rowsCompleted / totalRows) * 100),
-				`Encoding row ${rowsCompleted}/${totalRows}`,
-			)
-		},
-	)
-
-	const renderBands = async () => {
-		onProgress?.(0, "Preparing export")
-		let bandIndex = 0
-		const totalBands = Math.ceil(height / MAP_EXPORT_BAND_HEIGHT)
-
-		for (let y = 0; y < height; y += MAP_EXPORT_BAND_HEIGHT) {
-			const bandHeight = Math.min(MAP_EXPORT_BAND_HEIGHT, height - y)
-			const bytesPerRow = width * 4
-			const bandPixels = new Uint8Array(bandHeight * bytesPerRow)
-
-			for (let x = 0; x < width; x += maxTileWidth) {
-				const tileWidth = Math.min(maxTileWidth, width - x)
-				const target = createRenderTarget(tileWidth, bandHeight)
-				const targetTexture = Array.isArray(target.texture)
-					? target.texture[0]
-					: target.texture
-				if (targetTexture) targetTexture.colorSpace = THREE.LinearSRGBColorSpace
-				try {
-					camera.left = -2 + (4 * x) / width
-					camera.right = -2 + (4 * (x + tileWidth)) / width
-					camera.top = 1 - (2 * y) / height
-					camera.bottom = 1 - (2 * (y + bandHeight)) / height
-					camera.updateProjectionMatrix()
-					renderer.setRenderTarget(target)
-					renderer.render(scene, camera)
-					const pixels = new Uint8Array(tileWidth * bandHeight * 4)
-					renderer.readRenderTargetPixels(
-						target,
-						0,
-						0,
-						tileWidth,
-						bandHeight,
-						pixels,
-					)
-					for (let row = 0; row < bandHeight; row++) {
-						const srcRow = bandHeight - row - 1
-						for (let col = 0; col < tileWidth; col++) {
-							const srcOffset = (srcRow * tileWidth + col) * 4
-							const destOffset = (row * width + (x + col)) * 4
-							bandPixels[destOffset] = linearChannelToSrgb8(
-								pixels[srcOffset] ?? 0,
-							)
-							bandPixels[destOffset + 1] = linearChannelToSrgb8(
-								pixels[srcOffset + 1] ?? 0,
-							)
-							bandPixels[destOffset + 2] = linearChannelToSrgb8(
-								pixels[srcOffset + 2] ?? 0,
-							)
-							bandPixels[destOffset + 3] = pixels[srcOffset + 3] ?? 255
-						}
-					}
-				} finally {
-					renderer.setRenderTarget(previousTarget)
-					target.dispose()
-				}
-			}
-
-			await pngWriter.writeBand(bandPixels, bandHeight)
-			bandIndex++
-			onProgress?.(
-				Math.round((bandIndex / totalBands) * 100),
-				`Rendering band ${bandIndex}/${totalBands}`,
-			)
-			await yieldToMainThread?.()
-		}
-
-		return pngWriter.finalize()
-	}
-
-	return renderBands().finally(() => {
-		camera.left = previousFrustum.left
-		camera.right = previousFrustum.right
-		camera.top = previousFrustum.top
-		camera.bottom = previousFrustum.bottom
-		camera.updateProjectionMatrix()
-		renderer.setRenderTarget(previousTarget)
-	})
-}
-
-function applyMapExportVisibility(
-	targets: ReadonlyArray<MapExportVisibilityTarget>,
-): () => void {
-	const snapshot = new Map<THREE.Object3D, boolean>()
-	for (const target of targets) {
-		if (!target.object) continue
-		snapshot.set(target.object, target.object.visible)
-		target.object.visible = target.visible
-	}
-	return () => {
-		for (const [object, visible] of snapshot) {
-			object.visible = visible
-		}
-	}
-}
-
-function addMapSlideClones(object: THREE.Object3D) {
-	const clones: THREE.Object3D[] = []
-	const cloneL = object.clone()
-	const cloneR = object.clone()
-	cloneL.visible = true
-	cloneR.visible = true
-	cloneL.position.x -= MAP_REPEAT_WIDTH
-	cloneR.position.x += MAP_REPEAT_WIDTH
-	clones.push(cloneL, cloneR)
-	for (const clone of clones) {
-		object.add(clone)
-	}
 }
 
 // lon/lat -> elevation_km, via nearest-mesh-region snapping (same technique
