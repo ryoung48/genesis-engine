@@ -298,6 +298,8 @@ export function importHeightmap(
 	realPrecip?: RealClimateRaster,
 	realDtr?: RealClimateRaster,
 	realVaporPressure?: RealClimateRaster,
+	realWindU?: RealClimateRaster,
+	realWindV?: RealClimateRaster,
 	realElevation?: RealElevationRaster,
 	eu5Topography?: Eu5CategoricalRaster,
 	eu5Vegetation?: Eu5CategoricalRaster,
@@ -353,6 +355,13 @@ export function importHeightmap(
 			realVaporPressureMonths: realVaporPressure?.months,
 			realVaporPressureScale: realVaporPressure?.scale,
 			realVaporPressureNoData: realVaporPressure?.nodata,
+			realWindUMonthly: realWindU?.monthly,
+			realWindVMonthly: realWindV?.monthly,
+			realWindWidth: realWindU?.width,
+			realWindHeight: realWindU?.height,
+			realWindMonths: realWindU?.months,
+			realWindScale: realWindU?.scale,
+			realWindNoData: realWindU?.nodata,
 			realElevationRaster: realElevation?.raster,
 			realElevationWidth: realElevation?.width,
 			realElevationHeight: realElevation?.height,
@@ -421,6 +430,8 @@ export function importHeightmap(
 		if (realPrecip) transfer.push(realPrecip.monthly.buffer)
 		if (realDtr) transfer.push(realDtr.monthly.buffer)
 		if (realVaporPressure) transfer.push(realVaporPressure.monthly.buffer)
+		if (realWindU) transfer.push(realWindU.monthly.buffer)
+		if (realWindV) transfer.push(realWindV.monthly.buffer)
 		if (realElevation) transfer.push(realElevation.raster.buffer)
 		worker.postMessage(request, transfer)
 	})

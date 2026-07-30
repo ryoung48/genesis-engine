@@ -10,7 +10,6 @@ import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,
 } from "@/model/history/earth/data-source/types"
-import { MESH } from "@/model/mesh"
 import { TRANSPORT } from "@/model/society/infrastructure/transport"
 import type { HeritageScript } from "@/model/society/script"
 import { SCRIPT } from "@/model/society/script"
@@ -47,7 +46,6 @@ import {
 	buildEu4OccupationStripesGlobe,
 	buildEu4OccupationStripesMap,
 	type ColorForRawId,
-	type ElevationKmForLonLat,
 	updateEu4NationFillGlobeColors,
 	updateEu4NationFillMapColors,
 } from "@/ui/planet/renderer/eu4-nation-fill-overlay"
@@ -86,12 +84,14 @@ import {
 	buildMapNationLabels,
 	buildMapPartitionLabels,
 	buildMapSettlementLabels,
-	createNationLabelPools,
 	createSettlementLabelPools,
-	disposePool,
 	EARTH_HISTORY_LABEL_SCALE_CURVE,
 	updateGlobeLabelOrientations,
 } from "@/ui/planet/renderer/nation-label-overlay"
+import {
+	createNationLabelPools,
+	disposePool,
+} from "@/ui/planet/renderer/nation-label-overlay/pool"
 import {
 	buildGlobeNationScripts,
 	buildMapNationScripts,
@@ -103,25 +103,35 @@ import {
 	processPendingNationScriptTextures,
 	type ScriptTextureCacheEntry,
 } from "@/ui/planet/renderer/nation-script-overlay"
+import { repeatMapPositions } from "@/ui/planet/renderer/overlay-builders"
 import {
 	buildGlobeGrid,
+	buildMapGrid,
+} from "@/ui/planet/renderer/overlay-builders/grid"
+import {
 	buildGlobeHierarchyOverlay,
-	buildGlobeRivers,
-	buildGlobeThermalEquator,
-	buildGlobeWindArrows,
+	buildMapHierarchyOverlay,
+} from "@/ui/planet/renderer/overlay-builders/hierarchy"
+import {
 	buildLandNationBordersGlobe,
 	buildLandNationBordersMap,
-	buildMapGrid,
-	buildMapHierarchyOverlay,
-	buildMapRivers,
-	buildMapThermalEquator,
-	buildMapWindArrows,
 	collectAllNationBorderGlobePositions,
 	collectAllNationBorderMapPositions,
 	collectNationBorderGlobePositions,
 	collectNationBorderMapPositions,
-	repeatMapPositions,
-} from "@/ui/planet/renderer/overlay-builders"
+} from "@/ui/planet/renderer/overlay-builders/nation-borders"
+import {
+	buildGlobeRivers,
+	buildMapRivers,
+} from "@/ui/planet/renderer/overlay-builders/rivers"
+import {
+	buildGlobeThermalEquator,
+	buildMapThermalEquator,
+} from "@/ui/planet/renderer/overlay-builders/thermal-equator"
+import {
+	buildGlobeWindArrows,
+	buildMapWindArrows,
+} from "@/ui/planet/renderer/overlay-builders/wind-arrows"
 import {
 	buildGlobePathfindingOverlay,
 	buildMapPathfindingOverlay,
@@ -150,7 +160,17 @@ import {
 	createSolarTerminatorLabelSprite,
 	getSolarTerminatorLabelText,
 	projectSolarTerminatorPointsToMap,
+	SOLAR_TERMINATOR_ALTITUDE_DEG,
+	SOLAR_TERMINATOR_BAND_COLOR,
+	SOLAR_TERMINATOR_BAND_HALF_WIDTH,
+	SOLAR_TERMINATOR_ELEVATED_RADIUS,
+	SOLAR_TERMINATOR_HAIRLINE_COLOR,
+	SOLAR_TERMINATOR_LABEL_COUNT,
+	SOLAR_TERMINATOR_LABEL_RENDER_ORDER,
+	SOLAR_TERMINATOR_LINE_COLOR,
+	SOLAR_TERMINATOR_RADIUS,
 } from "@/ui/planet/renderer/solar-terminator"
+import { loadGlobeCloudTexture } from "@/ui/planet/renderer/textures"
 import {
 	buildGlobeTradeRoutes,
 	buildMapTradeRoutes,
@@ -163,30 +183,9 @@ import type {
 	RiverData,
 	WindArrowData,
 } from "@/ui/planet/renderer/types"
+import { buildElevationLookup } from "@/ui/planet/screen/display/region-colors"
 
-export const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
-const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc
-const SOLAR_TERMINATOR_HAIRLINE_COLOR = 0x0f172a
-const SOLAR_TERMINATOR_BAND_COLOR = 0xe2e8f0
-const SOLAR_TERMINATOR_RADIUS = 1.02
-const SOLAR_TERMINATOR_ELEVATED_RADIUS = 1.05
-const SOLAR_TERMINATOR_BAND_HALF_WIDTH = 0.008
-const SOLAR_TERMINATOR_LABEL_COUNT = 24
-export const SOLAR_TERMINATOR_LABEL_RENDER_ORDER = 1002
 const GLOBE_CLOUD_RADIUS = 1.035
-
-const globeCloudTextureLoader = new THREE.TextureLoader()
-const globeCloudTextureCache = new Map<string, THREE.Texture>()
-
-function loadGlobeCloudTexture(texturePath: string): THREE.Texture {
-	const cached = globeCloudTextureCache.get(texturePath)
-	if (cached) return cached
-	const texture = globeCloudTextureLoader.load(texturePath)
-	texture.colorSpace = THREE.SRGBColorSpace
-	texture.userData.sharedTexture = true
-	globeCloudTextureCache.set(texturePath, texture)
-	return texture
-}
 
 function reapplyMeshOverlayState(params: {
 	world: SerializedGenesisWorld
@@ -300,24 +299,6 @@ export interface ExportRendererLike {
 // Keyed by mesh object identity so it's built once per world's mesh, not
 // once per rebuildNationBorders() call (which fires on most color-mode/
 // timeline changes, far more often than the mesh itself changes).
-const elevationLookupCache = new WeakMap<object, ElevationKmForLonLat>()
-
-function buildElevationLookup(
-	world: SerializedGenesisWorld | null | undefined,
-): ElevationKmForLonLat | undefined {
-	if (!world?.mesh || !world.elevation_km) return undefined
-	let lookup = elevationLookupCache.get(world.mesh)
-	if (!lookup) {
-		const index = MESH.buildRegionSpatialIndex(world.mesh)
-		const elevationKm = world.elevation_km
-		lookup = (lonDeg, latDeg) => {
-			const region = index.nearest(lonDeg, latDeg)
-			return region >= 0 ? elevationKm[region] : 0
-		}
-		elevationLookupCache.set(world.mesh, lookup)
-	}
-	return lookup
-}
 
 export function createGenesisScene(
 	canvas: HTMLCanvasElement,

@@ -422,13 +422,20 @@ function computeWindVectors({
 		const windFricNorth = -gradPNorth
 
 		// Blend: geostrophic dominates above geoTransitionLat, friction always 30%
+		// zonally. Friction's *meridional* share is additionally ramped in with
+		// latitude (same curve as geoWeight): near the equator the pressure
+		// gradient is dominated by the north-south pull toward the thermal
+		// equator, and applying the full 30% there produces strong cross-
+		// equatorial flow that annual-mean observed trade winds don't show
+		// (real near-equatorial dynamics stay mostly zonal despite weak
+		// Coriolis, which this simple friction term doesn't capture).
 		const geoWeight = MATH.smoothstep({
 			edge0: 0,
 			edge1: geoTransitionLat,
 			x: absLat,
 		})
 		const u = geoWeight * windGeoEast + 0.3 * windFricEast
-		const v = geoWeight * windGeoNorth + 0.3 * windFricNorth
+		const v = geoWeight * windGeoNorth + geoWeight * 0.3 * windFricNorth
 
 		// Raw speed proxy = pressure gradient magnitude (same for both geo+friction)
 		rawSpeed[r] = Math.hypot(gradPEast, gradPNorth)
@@ -441,7 +448,11 @@ function computeWindVectors({
 	}
 
 	// Calibrate to approximate m/s:
-	// - 90th percentile of |∇P| → reference speed (10 m/s, typical trades/westerlies)
+	// - 90th percentile of |∇P| → reference speed (6.7 m/s, the observed p90 of
+	//   NCEP/NCAR annual-mean 10 m wind speed -- see
+	//   earth-real-wind-compare.smoke.test.ts. Previously hardcoded to 10 m/s,
+	//   which had no empirical grounding and ran too fast across every
+	//   latitude band versus observed Earth wind.)
 	// - Rotation factor: slower rotation → faster surface winds, but boundary layer
 	//   friction decouples from geostrophic scaling, so âˆ log(hoursPerDay).
 	// - Pressure factor: thinner atmosphere → less air mass resisting the same thermal
@@ -456,10 +467,78 @@ function computeWindVectors({
 	)
 	const pressureFactor =
 		1.0 / Math.sqrt(Math.max(params?.pressure ?? 1.0, 0.01))
+	const REFERENCE_SPEED_MS = 6.7
 	const windSpeed = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
-		const base = (rawSpeed[r] / ref) * 10 * rotationFactor * pressureFactor
+		const base =
+			(rawSpeed[r] / ref) * REFERENCE_SPEED_MS * rotationFactor * pressureFactor
 		windSpeed[r] = surface ? base * surfaceWindFactor({ r, surface }) : base
+	}
+
+	return { windU, windV, pressure, windSpeed }
+}
+
+/** Builds the same {windU, windV, pressure, windSpeed} shape as
+ * computeWindVectors (windU/windV are unit direction vectors, windSpeed the
+ * magnitude in m/s; pressure is unused for observed data and left zeroed)
+ * but sourced from GenesisWorld.observedWind (NCEP/NCAR reanalysis, sampled
+ * onto mesh regions by attachObservedEarthWind) instead of the procedural
+ * pressure-gradient model -- lets the wind particle overlay render real
+ * Earth wind for comparison/tuning against the model (see the "Wind" ->
+ * "Observed (NCEP)" toggle in OverlayControls). */
+function observedWindVectorsForMonth({
+	observedWind,
+	numRegions,
+	month,
+}: {
+	observedWind:
+		| { real_u_monthly?: Float32Array; real_v_monthly?: Float32Array }
+		| undefined
+	numRegions: number
+	month?: number
+}): {
+	windU: Float32Array
+	windV: Float32Array
+	pressure: Float32Array
+	windSpeed: Float32Array
+} {
+	const windU = new Float32Array(numRegions)
+	const windV = new Float32Array(numRegions)
+	const pressure = new Float32Array(numRegions)
+	const windSpeed = new Float32Array(numRegions)
+	const realU = observedWind?.real_u_monthly
+	const realV = observedWind?.real_v_monthly
+	if (!realU || !realV) return { windU, windV, pressure, windSpeed }
+
+	for (let r = 0; r < numRegions; r++) {
+		let u: number
+		let v: number
+		if (month !== undefined && month >= 0 && month < 12) {
+			u = realU[month * numRegions + r]
+			v = realV[month * numRegions + r]
+		} else {
+			let uSum = 0
+			let vSum = 0
+			let count = 0
+			for (let m = 0; m < 12; m++) {
+				const uu = realU[m * numRegions + r]
+				const vv = realV[m * numRegions + r]
+				if (Number.isFinite(uu) && Number.isFinite(vv)) {
+					uSum += uu
+					vSum += vv
+					count++
+				}
+			}
+			u = count > 0 ? uSum / count : NaN
+			v = count > 0 ? vSum / count : NaN
+		}
+		if (!Number.isFinite(u) || !Number.isFinite(v)) continue
+		const speed = Math.hypot(u, v)
+		windSpeed[r] = speed
+		if (speed > 1e-9) {
+			windU[r] = u / speed
+			windV[r] = v / speed
+		}
 	}
 
 	return { windU, windV, pressure, windSpeed }
@@ -469,4 +548,5 @@ export const WIND = {
 	rasterizeVectorGrid,
 	computeWindGrid,
 	computeWindVectors,
+	observedWindVectorsForMonth,
 }

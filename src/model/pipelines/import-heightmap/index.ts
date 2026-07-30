@@ -487,6 +487,13 @@ function importGenesisWorld({
 		realDtrMonths: params.realDtrMonths,
 		realDtrScale: params.realDtrScale,
 		realDtrNoData: params.realDtrNoData,
+		realWindUMonthly: params.realWindUMonthly,
+		realWindVMonthly: params.realWindVMonthly,
+		realWindWidth: params.realWindWidth,
+		realWindHeight: params.realWindHeight,
+		realWindMonths: params.realWindMonths,
+		realWindScale: params.realWindScale,
+		realWindNoData: params.realWindNoData,
 		onProgress,
 	})
 	record("Post-elevation pipeline", t0)
@@ -584,6 +591,7 @@ function importGenesisWorld({
 		dtr_monthly: post.dtr_monthly,
 		observedDtr: post.observedDtr,
 		observedHumidity: post.observedHumidity,
+		observedWind: post.observedWind,
 		iceThickness: post.iceThickness,
 		iceMinMonthly: post.iceMinMonthly,
 		iceMaxMonthly: post.iceMaxMonthly,

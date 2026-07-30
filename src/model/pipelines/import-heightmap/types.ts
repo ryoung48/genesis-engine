@@ -45,6 +45,13 @@ interface ImportParams {
 	realVaporPressureMonths?: number
 	realVaporPressureScale?: number
 	realVaporPressureNoData?: number
+	realWindUMonthly?: Int16Array
+	realWindVMonthly?: Int16Array
+	realWindWidth?: number
+	realWindHeight?: number
+	realWindMonths?: number
+	realWindScale?: number
+	realWindNoData?: number
 	/**
 	 * Real-world elevation (meters, single band), sampled onto each region
 	 * and substituted for elevation_km after applySeaLevelToElevation. This

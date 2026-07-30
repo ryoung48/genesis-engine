@@ -2,6 +2,7 @@ import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type {
 	GenesisObservedDtr,
 	GenesisObservedHumidity,
+	GenesisObservedWind,
 } from "@/model/climate/observed-earth/types"
 import type { PastaDebug } from "@/model/climate/pasta/types"
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
@@ -172,6 +173,7 @@ export interface GenesisWorld {
 	dtr_monthly: Float32Array
 	observedDtr?: GenesisObservedDtr
 	observedHumidity?: GenesisObservedHumidity
+	observedWind?: GenesisObservedWind
 	hydrology: GenesisHydrology
 	isLand: Uint8Array
 	riverLand: Uint8Array

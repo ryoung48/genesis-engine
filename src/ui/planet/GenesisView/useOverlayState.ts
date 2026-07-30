@@ -120,6 +120,9 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showWindArrows, setShowWindArrows] = useState(
 		initialViewPrefs.showWindArrows,
 	)
+	const [showRealWind, setShowRealWind] = useState(
+		initialViewPrefs.showRealWind,
+	)
 	const [showOceanCurrents, setShowOceanCurrents] = useState(
 		initialViewPrefs.showOceanCurrents,
 	)
@@ -224,6 +227,7 @@ export function useOverlayState(input: OverlayStateInput) {
 				showThermalEquator,
 				showCoastlines,
 				showWindArrows,
+				showRealWind,
 				showGdd,
 				showGint,
 				showPet,
@@ -292,6 +296,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showThermalEquator,
 		showCoastlines,
 		showWindArrows,
+		showRealWind,
 		showGdd,
 		showGint,
 		showPet,
@@ -369,6 +374,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowNationHierarchy,
 		setShowOceanCurrents,
 		setShowPet,
+		setShowRealWind,
 		setShowRivers,
 		setShowSolarSystemAxialTilt,
 		setShowSolarSystemBodyNames,
@@ -398,6 +404,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showNationHierarchy,
 		showOceanCurrents,
 		showPet,
+		showRealWind,
 		showRivers,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,

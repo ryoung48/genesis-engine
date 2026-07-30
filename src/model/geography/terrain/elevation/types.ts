@@ -263,3 +263,143 @@ export interface IslandArcsParams {
 	elev: Float32Array
 	markFeature: MarkFeatureFn
 }
+
+/** Shared back-arc basin uplift/depression step, used by both land and ocean regions. */
+export interface BackArcBasinParams {
+	r: number
+	ctx: ElevationRegionContext
+}
+
+/** A single-region feature step keyed on a region's unit-sphere position. */
+export interface RegionPointParams {
+	r: number
+	x: number
+	y: number
+	z: number
+	ctx: ElevationRegionContext
+}
+
+export interface TectonicActivityParams {
+	r: number
+	sf: number
+	ctx: ElevationRegionContext
+}
+
+export interface TectonicActivityResult {
+	dMtn: number
+	tectonicActivity: number
+	isPlateauZone: boolean
+}
+
+export interface FoldRidgesParams {
+	r: number
+	x: number
+	y: number
+	z: number
+	sf: number
+	tectonicActivity: number
+	ctx: ElevationRegionContext
+}
+
+export interface LandNoiseParams {
+	r: number
+	x: number
+	y: number
+	z: number
+	wx: number
+	wy: number
+	wz: number
+	stressNorm: number
+	tectonicActivity: number
+	isPlateauZone: boolean
+	ctx: ElevationRegionContext
+}
+
+export interface MountainDetailParams {
+	r: number
+	wx: number
+	wy: number
+	wz: number
+	stressNorm: number
+	ctx: ElevationRegionContext
+}
+
+export interface InteriorPlateauUpliftParams {
+	r: number
+	x: number
+	y: number
+	z: number
+	sf: number
+	tectonicActivity: number
+	isPlateauZone: boolean
+	ctx: ElevationRegionContext
+}
+
+/** Combined result of all boundary-relative BFS passes feeding the main elevation loop. */
+export interface TectonicBfsFieldsParams {
+	mesh: SphereMesh
+	r_plate: Int32Array
+	boundary: BoundaryInfo
+	r_isOcean: Uint8Array
+	scaleFactor: number
+	maxStress: number
+	timing?: StageTiming[]
+}
+
+export interface TectonicBfsFieldsResult {
+	riftDist: Float32Array
+	riftHalfWidth: number
+	pullApartDist: Float32Array
+	pullApartHalfWidth: number
+	ridgeDist: Float32Array
+	ridgeHalfWidth: number
+	fractureDist: Float32Array
+	fractureHalfWidth: number
+	backArcDist: Float32Array
+	backArcStress: Float32Array
+	baStart: number
+	baPeak: number
+	baEnd: number
+	r_coastDist: Float32Array
+	coastStressMax: Float32Array
+	coastSubductMax: Float32Array
+	coastConvergent: Uint8Array
+}
+
+export interface MainElevationLoopParams {
+	mesh: SphereMesh
+	r_isOcean: Uint8Array
+	r_subductFactor: Float32Array
+	r_stress: Float32Array
+	r_boundaryType: Int8Array
+	distMountain: Float32Array
+	distOcean: Float32Array
+	distCoastline: Float32Array
+	maxStress: number
+	warpScale: number
+	warpOctaves: number
+	eps: number
+	noise: SimplexNoise
+	fbm: FbmFn
+	regionCtx: ElevationRegionContext
+	genesisicPowerField: Float32Array
+	timing?: StageTiming[]
+}
+
+export interface PostProcessingArcsParams {
+	mesh: SphereMesh
+	r_plate: Int32Array
+	r_isOcean: Uint8Array
+	r_boundaryType: Int8Array
+	r_bothOcean: Uint8Array
+	r_subductFactor: Float32Array
+	r_stress: Float32Array
+	boundary: BoundaryInfo
+	maxStress: number
+	scaleFactor: number
+	volcanism: number
+	seed: number
+	elev: Float32Array
+	markFeature: MarkFeatureFn
+	timing?: StageTiming[]
+}

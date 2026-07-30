@@ -1,9 +1,5 @@
 import * as THREE from "three"
 import { formatClockTimeDisplay } from "@/ui/planet/clock"
-import {
-	SOLAR_TERMINATOR_ALTITUDE_DEG,
-	SOLAR_TERMINATOR_LABEL_RENDER_ORDER,
-} from "@/ui/planet/renderer/create-genesis-scene"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 
 export function createSolarTerminatorBand(
@@ -225,3 +221,21 @@ const SOLAR_TERMINATOR_LABEL_BG_STROKE = "rgba(148, 163, 184, 0.55)"
 const SOLAR_TERMINATOR_LABEL_BASE_FONT_PX = 12
 
 const SOLAR_TERMINATOR_LABEL_TEXTURE_SCALE = 2
+
+export const SOLAR_TERMINATOR_ALTITUDE_DEG = -0.833
+
+export const SOLAR_TERMINATOR_LINE_COLOR = 0xf8fafc
+
+export const SOLAR_TERMINATOR_HAIRLINE_COLOR = 0x0f172a
+
+export const SOLAR_TERMINATOR_BAND_COLOR = 0xe2e8f0
+
+export const SOLAR_TERMINATOR_RADIUS = 1.02
+
+export const SOLAR_TERMINATOR_ELEVATED_RADIUS = 1.05
+
+export const SOLAR_TERMINATOR_BAND_HALF_WIDTH = 0.008
+
+export const SOLAR_TERMINATOR_LABEL_COUNT = 24
+
+export const SOLAR_TERMINATOR_LABEL_RENDER_ORDER = 1002

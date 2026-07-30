@@ -7,23 +7,24 @@ import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"
 import { RELIGION } from "@/model/society/religion"
 import {
-	climateZoneColor,
 	EU5_CLIMATE_CATEGORIES,
 	EU5_CLIMATE_COLORS,
 	EU5_VEGETATION_CATEGORIES,
 	EU5_VEGETATION_COLORS,
-	vegetationColor,
 } from "@/ui/planet/colors"
+import { climateZoneColor } from "@/ui/planet/colors/misc"
+import { vegetationColor } from "@/ui/planet/colors/vegetation"
 import type { DistributionBucket } from "@/ui/planet/details/shared"
 import type { WorldDistributionsInput } from "@/ui/planet/GenesisView/types"
 import { buildNationAdjacency } from "@/ui/planet/screen/display/display-model"
 import { buildNationSizeDistribution } from "@/ui/planet/screen/display/nation-details-model"
-import { getTopographyColor } from "@/ui/planet/screen/display/region-colors"
+import { getTopographyColor } from "@/ui/planet/screen/display/region-colors/palette"
 import { rgbToCss } from "@/ui/planet/screen/shared/ui-format"
 import {
 	buildDistribution,
 	buildEu5TopographyDistribution,
 } from "@/ui/wiki/stats/nation/nation-distributions"
+
 /**
  * Builds every aggregate chart series the world-details panel renders --
  * nation sizes, governments, religion types, trade goods and the

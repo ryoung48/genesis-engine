@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from "react"
 import type { FlowGrid } from "@/model/climate/wind/types"
-import { oceanCurrentColor } from "@/ui/planet/colors"
+import { oceanCurrentColor } from "@/ui/planet/colors/misc"
 import {
 	FlowParticleCanvas,
 	type FlowSample,

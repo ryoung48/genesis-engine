@@ -5,6 +5,7 @@ import type {
 } from "@/model/geography/tectonics/types"
 import type {
 	AssignDistanceFieldParams,
+	BackArcBasinParams,
 	BackArcBfsParams,
 	BackArcBfsResult,
 	BlendElevationParams,
@@ -15,21 +16,32 @@ import type {
 	CoastBoundaryBfsResult,
 	ComputeDistanceFieldsParams,
 	ElevationRegionContext,
+	FoldRidgesParams,
 	FractureBfsParams,
 	FractureBfsResult,
+	InteriorPlateauUpliftParams,
 	IslandArcsParams,
 	LandCoastSeedsResult,
+	LandNoiseParams,
 	LandRegionElevationParams,
+	MainElevationLoopParams,
+	MountainDetailParams,
 	OceanLandMaskParams,
 	OceanRegionElevationParams,
+	PostProcessingArcsParams,
 	PullApartBfsParams,
 	PullApartBfsResult,
+	RegionPointParams,
 	RidgeBfsParams,
 	RidgeBfsResult,
 	RiftBfsParams,
 	RiftBfsResult,
 	StressMountainSeedsParams,
 	StressNormalizationParams,
+	TectonicActivityParams,
+	TectonicActivityResult,
+	TectonicBfsFieldsParams,
+	TectonicBfsFieldsResult,
 } from "@/model/geography/terrain/elevation/types"
 import { VOLCANISM } from "@/model/geography/terrain/volcanism"
 import { SimplexNoise } from "@/model/shared/math/simplex-noise"
@@ -485,6 +497,266 @@ function _computeCoastBoundaryBfs({
 	}
 }
 
+/** Back-arc basin uplift/depression — shared by land and ocean region elevation. */
+function _applyBackArcBasin({ r, ctx }: BackArcBasinParams): void {
+	const {
+		distMountain,
+		backArcDist,
+		backArcStress,
+		baStart,
+		baPeak,
+		baEnd,
+		elev,
+		backArc,
+		markFeature,
+	} = ctx
+	const bad = backArcDist[r]
+	if (bad === Infinity || bad < baStart) return
+	const dMtn = distMountain[r]
+	const genesisyFactor =
+		dMtn !== Infinity && dMtn < bad ? Math.max(0, dMtn / bad) : 1.0
+	let baEffect = 0
+	if (bad <= baPeak) {
+		const t = (bad - baStart) / Math.max(1, baPeak - baStart)
+		const s = t * t * (3 - 2 * t)
+		baEffect = -0.1 * backArcStress[r] * s * genesisyFactor
+	} else if (bad <= baEnd) {
+		const t = (bad - baPeak) / Math.max(1, baEnd - baPeak)
+		const s = t * t * (3 - 2 * t)
+		baEffect = -0.1 * backArcStress[r] * (1 - s) * genesisyFactor
+	}
+	elev[r] += baEffect
+	backArc[r] = baEffect
+	markFeature(
+		r,
+		TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN,
+		baEffect,
+	)
+}
+
+/** Rift valley floor/shoulder profile for a land region straddling a continental rift. */
+function _applyRiftValley({ r, x, y, z, ctx }: RegionPointParams): void {
+	const { riftDist, riftHalfWidth, scaleFactor, riftFbm, elev, markFeature } =
+		ctx
+	const rd = riftDist[r]
+	if (rd === Infinity) return
+	const floorEnd = Math.max(2, Math.round(2.5 * scaleFactor))
+	const shoulderEnd = Math.max(3, Math.round(4 * scaleFactor))
+	let riftEffect = 0
+	if (rd <= 0.5) {
+		riftEffect = -0.25
+		riftEffect += riftFbm(x * 8, y * 8, z * 8) * 0.05
+	} else if (rd <= floorEnd) {
+		const t = rd / floorEnd
+		riftEffect = -0.2 * (1 - t * 0.3)
+		riftEffect += riftFbm(x * 8, y * 8, z * 8) * 0.04 * (1 - t)
+	} else if (rd <= shoulderEnd) {
+		const t = (rd - floorEnd) / (shoulderEnd - floorEnd)
+		riftEffect = 0.04 * (1 - t)
+	} else if (riftHalfWidth > shoulderEnd) {
+		const t = (rd - shoulderEnd) / (riftHalfWidth - shoulderEnd)
+		const fadeT = Math.min(1, t)
+		const fade = fadeT * fadeT * (3 - 2 * fadeT)
+		riftEffect = 0.04 * (1 - fade) * 0.2
+	}
+	elev[r] += riftEffect
+	markFeature(r, TERRAIN_FEATURES.genesisTerrainFeature.RIFT_VALLEY, riftEffect)
+}
+
+/** Pull-apart basin depression for a land region near a continental transform fault. */
+function _applyPullApartBasin({ r, x, y, z, ctx }: RegionPointParams): void {
+	const { pullApartDist, pullApartHalfWidth, riftFbm, elev, markFeature } = ctx
+	const pd = pullApartDist[r]
+	if (pd === Infinity) return
+	let paEffect = 0
+	if (pd <= 0.5) {
+		paEffect = -0.18
+		paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.04
+	} else if (pd <= pullApartHalfWidth) {
+		const t = pd / pullApartHalfWidth
+		const fade = t * t * (3 - 2 * t)
+		paEffect = -0.12 * (1 - fade)
+		paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
+	}
+	elev[r] += paEffect
+	markFeature(
+		r,
+		TERRAIN_FEATURES.genesisTerrainFeature.PULL_APART_BASIN,
+		paEffect,
+	)
+}
+
+/**
+ * Proximity-to-mountain component of tectonic activity, plus plateau-zone test.
+ * Callers combine the returned `tectonicActivity` with stress via
+ * `Math.max(stressNorm, tectonicActivity)` to get the effective activity level.
+ */
+function _computeTectonicActivity({
+	r,
+	sf,
+	ctx,
+}: TectonicActivityParams): TectonicActivityResult {
+	const { distMountain, tectonicReach, plateauStart } = ctx
+	const dMtn = distMountain[r]
+	const rawProximity =
+		dMtn === Infinity || dMtn >= tectonicReach ? 0 : 1 - dMtn / tectonicReach
+	const tectonicActivity = rawProximity * rawProximity
+	const isPlateauZone = sf < 0.45 && dMtn !== Infinity && dMtn > plateauStart
+	return { dMtn, tectonicActivity, isPlateauZone }
+}
+
+/** Fold-ridge wrinkling aligned to plate motion direction. */
+function _applyFoldRidges({
+	r,
+	x,
+	y,
+	z,
+	sf,
+	tectonicActivity,
+	ctx,
+}: FoldRidgesParams): void {
+	const { r_plate, plateVec, foldFbm, noiseMag, elev, foldRidge, markFeature } =
+		ctx
+	const pid = r_plate[r]
+	const pv = plateVec.get(pid)
+	const foldActivity = tectonicActivity * tectonicActivity
+	if (!pv || foldActivity <= 0.01) return
+	const u = x * pv.pole[0] + y * pv.pole[1] + z * pv.pole[2]
+	const phaseWarp = foldFbm(x * 3 + 55.3, y * 3 + 33.7, z * 3 + 17.2, 2) * 0.08
+	const FOLD_FREQ = 30
+	const phase = (u + phaseWarp) * FOLD_FREQ * Math.PI
+	const ridge = 1 - Math.abs(Math.sin(phase))
+	const foldCentered = ridge - 0.36
+	const ampMod =
+		0.6 + 0.4 * foldFbm(x * 4 + 88.1, y * 4 + 62.3, z * 4 + 41.7, 2)
+	const elevBoost = 1 + 4 * Math.max(0, elev[r])
+	const foldAmp =
+		foldActivity * Math.max(0, 1 - sf * 1.5) * noiseMag * 0.8 * elevBoost
+	const foldEffect = foldCentered * foldAmp * ampMod
+	elev[r] += foldEffect
+	foldRidge[r] = foldEffect
+	markFeature(r, TERRAIN_FEATURES.genesisTerrainFeature.FOLD_RIDGES, foldEffect)
+}
+
+/** Base fractal + fine detail noise layering for land regions, plateau-suppressed. */
+function _applyLandNoise({
+	r,
+	wx,
+	wy,
+	wz,
+	stressNorm,
+	tectonicActivity,
+	isPlateauZone,
+	ctx,
+}: LandNoiseParams): void {
+	const { fbm, ridgedFbm, noise, noiseMag, elev } = ctx
+	const blend = Math.min(1, stressNorm * 3)
+	const smoothNoise = fbm(wx, wy, wz) * noiseMag
+	const ridgedNoisev = ridgedFbm(wx, wy, wz) * noiseMag * 1.5
+	const noiseVal = smoothNoise * (1 - blend) + ridgedNoisev * blend
+	const detailNoise =
+		noise.fbm(wx * 4 + 22.1, wy * 4 + 6.8, wz * 4 + 15.4, 4, 0.5) *
+		noiseMag *
+		0.5
+	const noiseActivity = Math.min(1, stressNorm * 4)
+	const plateauSuppress = isPlateauZone
+		? Math.max(0.3, 1 - tectonicActivity * 0.6)
+		: 1.0
+	const noiseScale = (0.25 + 0.75 * noiseActivity) * plateauSuppress
+	const fineNoise =
+		noise.fbm(wx * 8 + 41.7, wy * 8 + 13.2, wz * 8 + 27.9, 3, 0.5) *
+		noiseMag *
+		0.25
+	const fineScale = Math.sqrt(noiseScale)
+	elev[r] += (noiseVal + detailNoise) * noiseScale + fineNoise * fineScale
+}
+
+/** Mountain dissection ridging plus sharp summit peak spikes for high land elevation. */
+function _applyMountainDetail({
+	r,
+	wx,
+	wy,
+	wz,
+	stressNorm,
+	ctx,
+}: MountainDetailParams): void {
+	const { noise, noiseMag, elev } = ctx
+
+	const DISSECT_THRESHOLD = 0.12
+	if (elev[r] > DISSECT_THRESHOLD) {
+		const elevExcess = elev[r] - DISSECT_THRESHOLD
+		const dissectVal = noise.fbm(
+			wx * 16 + 71.3,
+			wy * 16 + 44.8,
+			wz * 16 + 29.1,
+			3,
+			0.5,
+		)
+		const dissectAmp = Math.sqrt(elevExcess) * stressNorm * noiseMag * 0.4
+		elev[r] += dissectVal * dissectAmp
+	}
+
+	const SUMMIT_THRESHOLD = 0.65
+	if (elev[r] > SUMMIT_THRESHOLD && stressNorm > 0.2) {
+		const excess = elev[r] - SUMMIT_THRESHOLD
+		const peakNoise = noise.ridgedFbm(
+			wx * 24 + 91.3,
+			wy * 24 + 55.7,
+			wz * 24 + 38.2,
+			3,
+			0.5,
+			0.5,
+			1.0,
+		)
+		const spike = Math.max(0, peakNoise - 0.45)
+		elev[r] += spike * excess * stressNorm * 1.2
+	}
+}
+
+/** Continental interior uplift ramp plus additional plateau uplift boost. */
+function _applyInteriorAndPlateauUplift({
+	r,
+	x,
+	y,
+	z,
+	sf,
+	tectonicActivity,
+	isPlateauZone,
+	ctx,
+}: InteriorPlateauUpliftParams): void {
+	const { distCoastLand, interiorBand, fbm, elev, markFeature } = ctx
+
+	const lcd = distCoastLand[r]
+	if (lcd < Infinity) {
+		const tDown = Math.min(lcd / interiorBand, 1)
+		const sDown = tDown * tDown * (3 - 2 * tDown)
+		const tUp = Math.min(lcd / (interiorBand * 0.4), 1)
+		const sUp = tUp * tUp * (3 - 2 * tUp)
+		const INTERIOR_BASE = 0.06
+		const INTERIOR_TECTONIC = 0.16
+		const interiorUplift = INTERIOR_BASE + tectonicActivity * INTERIOR_TECTONIC
+		const baseBias = -0.08 * (1 - sDown) + interiorUplift * sUp
+		const mod = 1.0 + 0.2 * fbm(x * 2 + 19.3, y * 2 + 7.6, z * 2 + 13.1, 2)
+		const interiorEffect = baseBias * mod
+		elev[r] += interiorEffect
+		markFeature(
+			r,
+			TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_INTERIOR,
+			interiorEffect,
+		)
+	}
+
+	if (isPlateauZone && tectonicActivity > 0.1) {
+		const plateauEffect = 0.025 * tectonicActivity * (1 - sf)
+		elev[r] += plateauEffect
+		markFeature(
+			r,
+			TERRAIN_FEATURES.genesisTerrainFeature.PLATEAU_UPLIFT,
+			plateauEffect,
+		)
+	}
+}
+
 /** Applies all continental (non-ocean-plate) elevation effects for one region. */
 function _computeLandRegionElevation({
 	r,
@@ -499,35 +771,7 @@ function _computeLandRegionElevation({
 	genesisicPower,
 	ctx,
 }: LandRegionElevationParams): void {
-	const {
-		distMountain,
-		distCoastLand,
-		r_plate,
-		plateVec,
-		riftDist,
-		riftHalfWidth,
-		pullApartDist,
-		pullApartHalfWidth,
-		backArcDist,
-		backArcStress,
-		baStart,
-		baPeak,
-		baEnd,
-		scaleFactor,
-		tectonicReach,
-		interiorBand,
-		plateauStart,
-		noiseMag,
-		fbm,
-		ridgedFbm,
-		foldFbm,
-		riftFbm,
-		noise,
-		elev,
-		markFeature,
-		backArc,
-		foldRidge,
-	} = ctx
+	const { fbm, elev } = ctx
 
 	// Subduction suppression
 	if (sf > 0.5 && elev[r] > 0) {
@@ -550,214 +794,44 @@ function _computeLandRegionElevation({
 		elev[r] -= 0.06 * (1 - forelandT)
 	}
 
-	// Rift valley
-	{
-		const rd = riftDist[r]
-		if (rd !== Infinity) {
-			const floorEnd = Math.max(2, Math.round(2.5 * scaleFactor))
-			const shoulderEnd = Math.max(3, Math.round(4 * scaleFactor))
-			let riftEffect = 0
-			if (rd <= 0.5) {
-				riftEffect = -0.25
-				riftEffect += riftFbm(x * 8, y * 8, z * 8) * 0.05
-			} else if (rd <= floorEnd) {
-				const t = rd / floorEnd
-				riftEffect = -0.2 * (1 - t * 0.3)
-				riftEffect += riftFbm(x * 8, y * 8, z * 8) * 0.04 * (1 - t)
-			} else if (rd <= shoulderEnd) {
-				const t = (rd - floorEnd) / (shoulderEnd - floorEnd)
-				riftEffect = 0.04 * (1 - t)
-			} else if (riftHalfWidth > shoulderEnd) {
-				const t = (rd - shoulderEnd) / (riftHalfWidth - shoulderEnd)
-				const fadeT = Math.min(1, t)
-				const fade = fadeT * fadeT * (3 - 2 * fadeT)
-				riftEffect = 0.04 * (1 - fade) * 0.2
-			}
-			elev[r] += riftEffect
-			markFeature(
-				r,
-				TERRAIN_FEATURES.genesisTerrainFeature.RIFT_VALLEY,
-				riftEffect,
-			)
-		}
-	}
+	_applyRiftValley({ r, x, y, z, ctx })
+	_applyPullApartBasin({ r, x, y, z, ctx })
+	_applyBackArcBasin({ r, ctx })
 
-	// Pull-apart basins (continental transform faults)
-	{
-		const pd = pullApartDist[r]
-		if (pd !== Infinity) {
-			let paEffect = 0
-			if (pd <= 0.5) {
-				paEffect = -0.18
-				paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.04
-			} else if (pd <= pullApartHalfWidth) {
-				const t = pd / pullApartHalfWidth
-				const fade = t * t * (3 - 2 * t)
-				paEffect = -0.12 * (1 - fade)
-				paEffect += riftFbm(x * 10, y * 10, z * 10) * 0.03 * (1 - fade)
-			}
-			elev[r] += paEffect
-			markFeature(
-				r,
-				TERRAIN_FEATURES.genesisTerrainFeature.PULL_APART_BASIN,
-				paEffect,
-			)
-		}
-	}
+	// Tectonic activity (for noise scaling + fold ridges), including stress contribution
+	const {
+		dMtn,
+		tectonicActivity: proximityActivity,
+		isPlateauZone,
+	} = _computeTectonicActivity({ r, sf, ctx })
+	void dMtn
+	const tectonicActivity = Math.max(stressNorm, proximityActivity)
 
-	// Back-arc basin
-	{
-		const bad = backArcDist[r]
-		if (bad !== Infinity && bad >= baStart) {
-			const dMtn = distMountain[r]
-			const genesisyFactor =
-				dMtn !== Infinity && dMtn < bad ? Math.max(0, dMtn / bad) : 1.0
-			let baEffect = 0
-			if (bad <= baPeak) {
-				const t = (bad - baStart) / Math.max(1, baPeak - baStart)
-				const s = t * t * (3 - 2 * t)
-				baEffect = -0.1 * backArcStress[r] * s * genesisyFactor
-			} else if (bad <= baEnd) {
-				const t = (bad - baPeak) / Math.max(1, baEnd - baPeak)
-				const s = t * t * (3 - 2 * t)
-				baEffect = -0.1 * backArcStress[r] * (1 - s) * genesisyFactor
-			}
-			elev[r] += baEffect
-			backArc[r] = baEffect
-			markFeature(
-				r,
-				TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN,
-				baEffect,
-			)
-		}
-	}
-
-	// Tectonic activity (for noise scaling + fold ridges)
-	const dMtn = distMountain[r]
-	const rawProximity =
-		dMtn === Infinity || dMtn >= tectonicReach ? 0 : 1 - dMtn / tectonicReach
-	const tectonicActivity = Math.max(stressNorm, rawProximity * rawProximity)
-
-	// Fold ridges
-	{
-		const pid = r_plate[r]
-		const pv = plateVec.get(pid)
-		const foldActivity = tectonicActivity * tectonicActivity
-		if (pv && foldActivity > 0.01) {
-			const u = x * pv.pole[0] + y * pv.pole[1] + z * pv.pole[2]
-			const phaseWarp =
-				foldFbm(x * 3 + 55.3, y * 3 + 33.7, z * 3 + 17.2, 2) * 0.08
-			const FOLD_FREQ = 30
-			const phase = (u + phaseWarp) * FOLD_FREQ * Math.PI
-			const ridge = 1 - Math.abs(Math.sin(phase))
-			const foldCentered = ridge - 0.36
-			const ampMod =
-				0.6 + 0.4 * foldFbm(x * 4 + 88.1, y * 4 + 62.3, z * 4 + 41.7, 2)
-			const elevBoost = 1 + 4 * Math.max(0, elev[r])
-			const foldAmp =
-				foldActivity * Math.max(0, 1 - sf * 1.5) * noiseMag * 0.8 * elevBoost
-			const foldEffect = foldCentered * foldAmp * ampMod
-			elev[r] += foldEffect
-			foldRidge[r] = foldEffect
-			markFeature(
-				r,
-				TERRAIN_FEATURES.genesisTerrainFeature.FOLD_RIDGES,
-				foldEffect,
-			)
-		}
-	}
-
-	// Plateau zone
-	const isPlateauZone = sf < 0.45 && dMtn !== Infinity && dMtn > plateauStart
-
-	// Noise
-	const blend = Math.min(1, stressNorm * 3)
-	const smoothNoise = fbm(wx, wy, wz) * noiseMag
-	const ridgedNoisev = ridgedFbm(wx, wy, wz) * noiseMag * 1.5
-	const noiseVal = smoothNoise * (1 - blend) + ridgedNoisev * blend
-	const detailNoise =
-		noise.fbm(wx * 4 + 22.1, wy * 4 + 6.8, wz * 4 + 15.4, 4, 0.5) *
-		noiseMag *
-		0.5
-	const noiseActivity = Math.min(1, stressNorm * 4)
-	const plateauSuppress = isPlateauZone
-		? Math.max(0.3, 1 - tectonicActivity * 0.6)
-		: 1.0
-	const noiseScale = (0.25 + 0.75 * noiseActivity) * plateauSuppress
-	const fineNoise =
-		noise.fbm(wx * 8 + 41.7, wy * 8 + 13.2, wz * 8 + 27.9, 3, 0.5) *
-		noiseMag *
-		0.25
-	const fineScale = Math.sqrt(noiseScale)
-	elev[r] += (noiseVal + detailNoise) * noiseScale + fineNoise * fineScale
-
-	// Mountain dissection
-	{
-		const DISSECT_THRESHOLD = 0.12
-		if (elev[r] > DISSECT_THRESHOLD) {
-			const elevExcess = elev[r] - DISSECT_THRESHOLD
-			const dissectVal = noise.fbm(
-				wx * 16 + 71.3,
-				wy * 16 + 44.8,
-				wz * 16 + 29.1,
-				3,
-				0.5,
-			)
-			const dissectAmp = Math.sqrt(elevExcess) * stressNorm * noiseMag * 0.4
-			elev[r] += dissectVal * dissectAmp
-		}
-	}
-
-	// Summit peaks
-	{
-		const SUMMIT_THRESHOLD = 0.65
-		if (elev[r] > SUMMIT_THRESHOLD && stressNorm > 0.2) {
-			const excess = elev[r] - SUMMIT_THRESHOLD
-			const peakNoise = noise.ridgedFbm(
-				wx * 24 + 91.3,
-				wy * 24 + 55.7,
-				wz * 24 + 38.2,
-				3,
-				0.5,
-				0.5,
-				1.0,
-			)
-			const spike = Math.max(0, peakNoise - 0.45)
-			elev[r] += spike * excess * stressNorm * 1.2
-		}
-	}
-
-	// Continental interior uplift
-	const lcd = distCoastLand[r]
-	if (lcd < Infinity) {
-		const tDown = Math.min(lcd / interiorBand, 1)
-		const sDown = tDown * tDown * (3 - 2 * tDown)
-		const tUp = Math.min(lcd / (interiorBand * 0.4), 1)
-		const sUp = tUp * tUp * (3 - 2 * tUp)
-		const INTERIOR_BASE = 0.06
-		const INTERIOR_TECTONIC = 0.16
-		const interiorUplift = INTERIOR_BASE + tectonicActivity * INTERIOR_TECTONIC
-		const baseBias = -0.08 * (1 - sDown) + interiorUplift * sUp
-		const mod = 1.0 + 0.2 * fbm(x * 2 + 19.3, y * 2 + 7.6, z * 2 + 13.1, 2)
-		const interiorEffect = baseBias * mod
-		elev[r] += interiorEffect
-		markFeature(
-			r,
-			TERRAIN_FEATURES.genesisTerrainFeature.CONTINENTAL_INTERIOR,
-			interiorEffect,
-		)
-	}
-
-	// Plateau uplift boost
-	if (isPlateauZone && tectonicActivity > 0.1) {
-		const plateauEffect = 0.025 * tectonicActivity * (1 - sf)
-		elev[r] += plateauEffect
-		markFeature(
-			r,
-			TERRAIN_FEATURES.genesisTerrainFeature.PLATEAU_UPLIFT,
-			plateauEffect,
-		)
-	}
+	_applyFoldRidges({ r, x, y, z, sf, tectonicActivity, ctx })
+	_applyLandNoise({
+		r,
+		x,
+		y,
+		z,
+		wx,
+		wy,
+		wz,
+		stressNorm,
+		tectonicActivity,
+		isPlateauZone,
+		ctx,
+	})
+	_applyMountainDetail({ r, wx, wy, wz, stressNorm, ctx })
+	_applyInteriorAndPlateauUplift({
+		r,
+		x,
+		y,
+		z,
+		sf,
+		tectonicActivity,
+		isPlateauZone,
+		ctx,
+	})
 }
 
 /** Applies all ocean-plate elevation effects for one region. */
@@ -774,24 +848,17 @@ function _computeOceanRegionElevation({
 	ctx,
 }: OceanRegionElevationParams): void {
 	const {
-		distMountain,
 		distCoast,
 		coastConvergent,
 		ridgeDist,
 		ridgeHalfWidth,
 		fractureDist,
 		fractureHalfWidth,
-		backArcDist,
-		backArcStress,
-		baStart,
-		baPeak,
-		baEnd,
 		noiseMag,
 		fbm,
 		ridgedFbm,
 		elev,
 		markFeature,
-		backArc,
 		margins,
 	} = ctx
 
@@ -858,31 +925,7 @@ function _computeOceanRegionElevation({
 	}
 
 	// Back-arc basin (ocean)
-	{
-		const bad = backArcDist[r]
-		if (bad !== Infinity && bad >= baStart) {
-			const dMtn2 = distMountain[r]
-			const genesisyFactor =
-				dMtn2 !== Infinity && dMtn2 < bad ? Math.max(0, dMtn2 / bad) : 1.0
-			let baEffect = 0
-			if (bad <= baPeak) {
-				const t = (bad - baStart) / Math.max(1, baPeak - baStart)
-				const s = t * t * (3 - 2 * t)
-				baEffect = -0.1 * backArcStress[r] * s * genesisyFactor
-			} else if (bad <= baEnd) {
-				const t = (bad - baPeak) / Math.max(1, baEnd - baPeak)
-				const s = t * t * (3 - 2 * t)
-				baEffect = -0.1 * backArcStress[r] * (1 - s) * genesisyFactor
-			}
-			elev[r] += baEffect
-			backArc[r] = baEffect
-			markFeature(
-				r,
-				TERRAIN_FEATURES.genesisTerrainFeature.BACK_ARC_BASIN,
-				baEffect,
-			)
-		}
-	}
+	_applyBackArcBasin({ r, ctx })
 
 	// Ocean noise
 	elev[r] += fbm(wx, wy, wz) * noiseMag * 0.3
@@ -1104,87 +1147,18 @@ function _computeIslandArcs({
 	}
 }
 
-function blendElevation({
+/** Runs all boundary-relative BFS passes (rift, pull-apart, ridge, fracture, back-arc, coast). */
+function _computeTectonicBfsFields({
 	mesh,
 	r_plate,
-	plateVec,
-	plateIsOcean,
-	distFields,
 	boundary,
-	roughness,
-	volcanism,
-	seed,
+	r_isOcean,
+	scaleFactor,
+	maxStress,
 	timing,
-}: BlendElevationParams): {
-	elevation: Float32Array
-	terrainFeatures: GenesisTerrainFeatures
-} {
-	const { numRegions, r_xyz } = mesh
-	const { distMountain, distOcean, distCoastline, distCoast, distCoastLand } =
-		distFields
-	const { r_stress, r_subductFactor, r_boundaryType, r_bothOcean, r_hasOcean } =
+}: TectonicBfsFieldsParams): TectonicBfsFieldsResult {
+	const { r_boundaryType, r_bothOcean, r_hasOcean, r_subductFactor, r_stress } =
 		boundary
-
-	const elev = new Float32Array(numRegions)
-	const featureMask = new Uint32Array(numRegions)
-	const dominantFeature = new Uint8Array(numRegions)
-	const dominantMagnitude = new Float32Array(numRegions)
-	const noiseMag = roughness
-
-	function markFeature(r: number, feature: number, delta: number) {
-		const magnitude = Math.abs(delta)
-		if (magnitude <= 1e-5) return
-		featureMask[r] |= 1 << (feature - 1)
-		if (magnitude > dominantMagnitude[r]) {
-			dominantMagnitude[r] = magnitude
-			dominantFeature[r] = feature
-		}
-	}
-
-	const noise = new SimplexNoise(seed)
-	const foldNoise = new SimplexNoise(seed + 557)
-	const riftNoise = new SimplexNoise(seed + 419)
-
-	// Source uses default persistence (2/3) for most fbm calls.
-	// Only detail/fine noise uses explicit 0.5.
-	function fbm(x: number, y: number, z: number, octaves = 5): number {
-		return noise.fbm(x, y, z, octaves)
-	}
-
-	function ridgedFbm(x: number, y: number, z: number, octaves = 4): number {
-		return noise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
-	}
-
-	function foldFbm(x: number, y: number, z: number, octaves = 4): number {
-		return foldNoise.fbm(x, y, z, octaves)
-	}
-
-	function riftFbm(x: number, y: number, z: number, octaves = 3): number {
-		return riftNoise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
-	}
-
-	const r_isOcean = _computeOceanLandMask({ numRegions, r_plate, plateIsOcean })
-	const coastal = new Float32Array(numRegions)
-	const margins = new Float32Array(numRegions)
-	const backArc = new Float32Array(numRegions)
-	const foldRidge = new Float32Array(numRegions)
-	const genesisicPowerField = new Float32Array(numRegions)
-
-	const maxStress = _computeStressNormalization({ numRegions, r_stress })
-
-	const scaleFactor = Math.sqrt(numRegions / 10000)
-	const eps = 1e-3
-	const warpScale = 0.4
-	const warpOctaves = numRegions > 200000 ? 2 : 3
-
-	const INTERIOR_BAND_BASE = 16
-	const interiorBand = Math.max(4, Math.round(INTERIOR_BAND_BASE * scaleFactor))
-	const TECTONIC_REACH_BASE = 20
-	const tectonicReach = Math.max(
-		6,
-		Math.round(TECTONIC_REACH_BASE * scaleFactor),
-	)
-	const plateauStart = Math.max(2, Math.round(3 * scaleFactor))
 
 	// Rift + pull-apart BFS
 	const coastAndRiftStart = performance.now()
@@ -1250,44 +1224,51 @@ function blendElevation({
 		ms: (performance.now() - ridgeAndBackArcStart).toFixed(1),
 	})
 
-	// ---- Main elevation loop ----
-	const mainElevationLoopStart = performance.now()
-	const regionCtx: ElevationRegionContext = {
-		distMountain,
-		distCoast,
-		distCoastLand,
-		r_plate,
-		plateVec,
+	return {
 		riftDist,
 		riftHalfWidth,
 		pullApartDist,
 		pullApartHalfWidth,
+		ridgeDist,
+		ridgeHalfWidth,
+		fractureDist,
+		fractureHalfWidth,
 		backArcDist,
 		backArcStress,
 		baStart,
 		baPeak,
 		baEnd,
-		ridgeDist,
-		ridgeHalfWidth,
-		fractureDist,
-		fractureHalfWidth,
+		r_coastDist,
+		coastStressMax,
+		coastSubductMax,
 		coastConvergent,
-		scaleFactor,
-		interiorBand,
-		tectonicReach,
-		plateauStart,
-		noiseMag,
-		fbm,
-		ridgedFbm,
-		foldFbm,
-		riftFbm,
-		noise,
-		elev,
-		markFeature,
-		backArc,
-		foldRidge,
-		margins,
 	}
+}
+
+/** Per-region elevation baseline (mountain/ocean/coast distance blend) plus land/ocean effects. */
+function _runMainElevationLoop({
+	mesh,
+	r_isOcean,
+	r_subductFactor,
+	r_stress,
+	r_boundaryType,
+	distMountain,
+	distOcean,
+	distCoastline,
+	maxStress,
+	warpScale,
+	warpOctaves,
+	eps,
+	noise,
+	fbm,
+	regionCtx,
+	genesisicPowerField,
+	timing,
+}: MainElevationLoopParams): void {
+	const { numRegions, r_xyz } = mesh
+	const { elev } = regionCtx
+	const mainElevationLoopStart = performance.now()
+
 	for (let r = 0; r < numRegions; r++) {
 		const isOceanPlate = r_isOcean[r]
 		const sf = r_subductFactor[r]
@@ -1354,33 +1335,26 @@ function blendElevation({
 		Stage: "Main elevation loop (land+ocean)",
 		ms: (performance.now() - mainElevationLoopStart).toFixed(1),
 	})
+}
 
-	// ---- Coastal roughening ----
-	const coastalRougheningStart = performance.now()
-	_applyCoastalRoughening({
-		numRegions,
-		r_xyz,
-		r_coastDist,
-		coastStressMax,
-		coastSubductMax,
-		coastConvergent,
-		r_isOcean,
-		r_stress,
-		maxStress,
-		scaleFactor,
-		noiseMag,
-		seed,
-		fbm,
-		elev,
-		coastal,
-		markFeature,
-	})
-	timing?.push({
-		Stage: "Coastal roughening",
-		ms: (performance.now() - coastalRougheningStart).toFixed(1),
-	})
-
-	// ---- Island arcs ----
+/** Island-arc uplift BFS (if volcanism enabled) followed by named volcanic arc features. */
+function _applyPostProcessingArcs({
+	mesh,
+	r_plate,
+	r_isOcean,
+	r_boundaryType,
+	r_bothOcean,
+	r_subductFactor,
+	r_stress,
+	boundary,
+	maxStress,
+	scaleFactor,
+	volcanism,
+	seed,
+	elev,
+	markFeature,
+	timing,
+}: PostProcessingArcsParams): void {
 	const islandArcsStart = performance.now()
 	if (volcanism > 0) {
 		_computeIslandArcs({
@@ -1417,6 +1391,217 @@ function blendElevation({
 	timing?.push({
 		Stage: "Volcanic arcs",
 		ms: (performance.now() - volcanicArcsStart).toFixed(1),
+	})
+}
+
+function blendElevation({
+	mesh,
+	r_plate,
+	plateVec,
+	plateIsOcean,
+	distFields,
+	boundary,
+	roughness,
+	volcanism,
+	seed,
+	timing,
+}: BlendElevationParams): {
+	elevation: Float32Array
+	terrainFeatures: GenesisTerrainFeatures
+} {
+	const { numRegions, r_xyz } = mesh
+	const { distMountain, distOcean, distCoastline, distCoast, distCoastLand } =
+		distFields
+	const { r_stress, r_subductFactor, r_boundaryType, r_bothOcean } = boundary
+
+	const elev = new Float32Array(numRegions)
+	const featureMask = new Uint32Array(numRegions)
+	const dominantFeature = new Uint8Array(numRegions)
+	const dominantMagnitude = new Float32Array(numRegions)
+	const noiseMag = roughness
+
+	function markFeature(r: number, feature: number, delta: number) {
+		const magnitude = Math.abs(delta)
+		if (magnitude <= 1e-5) return
+		featureMask[r] |= 1 << (feature - 1)
+		if (magnitude > dominantMagnitude[r]) {
+			dominantMagnitude[r] = magnitude
+			dominantFeature[r] = feature
+		}
+	}
+
+	const noise = new SimplexNoise(seed)
+	const foldNoise = new SimplexNoise(seed + 557)
+	const riftNoise = new SimplexNoise(seed + 419)
+
+	// Source uses default persistence (2/3) for most fbm calls.
+	// Only detail/fine noise uses explicit 0.5.
+	function fbm(x: number, y: number, z: number, octaves = 5): number {
+		return noise.fbm(x, y, z, octaves)
+	}
+
+	function ridgedFbm(x: number, y: number, z: number, octaves = 4): number {
+		return noise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
+	}
+
+	function foldFbm(x: number, y: number, z: number, octaves = 4): number {
+		return foldNoise.fbm(x, y, z, octaves)
+	}
+
+	function riftFbm(x: number, y: number, z: number, octaves = 3): number {
+		return riftNoise.ridgedFbm(x, y, z, octaves, 2.0, 0.5, 1.0)
+	}
+
+	const r_isOcean = _computeOceanLandMask({ numRegions, r_plate, plateIsOcean })
+	const coastal = new Float32Array(numRegions)
+	const margins = new Float32Array(numRegions)
+	const backArc = new Float32Array(numRegions)
+	const foldRidge = new Float32Array(numRegions)
+	const genesisicPowerField = new Float32Array(numRegions)
+
+	const maxStress = _computeStressNormalization({ numRegions, r_stress })
+
+	const scaleFactor = Math.sqrt(numRegions / 10000)
+	const eps = 1e-3
+	const warpScale = 0.4
+	const warpOctaves = numRegions > 200000 ? 2 : 3
+
+	const INTERIOR_BAND_BASE = 16
+	const interiorBand = Math.max(4, Math.round(INTERIOR_BAND_BASE * scaleFactor))
+	const TECTONIC_REACH_BASE = 20
+	const tectonicReach = Math.max(
+		6,
+		Math.round(TECTONIC_REACH_BASE * scaleFactor),
+	)
+	const plateauStart = Math.max(2, Math.round(3 * scaleFactor))
+
+	const bfsFields = _computeTectonicBfsFields({
+		mesh,
+		r_plate,
+		boundary,
+		r_isOcean,
+		scaleFactor,
+		maxStress,
+		timing,
+	})
+	const {
+		riftDist,
+		riftHalfWidth,
+		pullApartDist,
+		pullApartHalfWidth,
+		ridgeDist,
+		ridgeHalfWidth,
+		fractureDist,
+		fractureHalfWidth,
+		backArcDist,
+		backArcStress,
+		baStart,
+		baPeak,
+		baEnd,
+		r_coastDist,
+		coastStressMax,
+		coastSubductMax,
+		coastConvergent,
+	} = bfsFields
+
+	// ---- Main elevation loop ----
+	const regionCtx: ElevationRegionContext = {
+		distMountain,
+		distCoast,
+		distCoastLand,
+		r_plate,
+		plateVec,
+		riftDist,
+		riftHalfWidth,
+		pullApartDist,
+		pullApartHalfWidth,
+		backArcDist,
+		backArcStress,
+		baStart,
+		baPeak,
+		baEnd,
+		ridgeDist,
+		ridgeHalfWidth,
+		fractureDist,
+		fractureHalfWidth,
+		coastConvergent,
+		scaleFactor,
+		interiorBand,
+		tectonicReach,
+		plateauStart,
+		noiseMag,
+		fbm,
+		ridgedFbm,
+		foldFbm,
+		riftFbm,
+		noise,
+		elev,
+		markFeature,
+		backArc,
+		foldRidge,
+		margins,
+	}
+	_runMainElevationLoop({
+		mesh,
+		r_isOcean,
+		r_subductFactor,
+		r_stress,
+		r_boundaryType,
+		distMountain,
+		distOcean,
+		distCoastline,
+		maxStress,
+		warpScale,
+		warpOctaves,
+		eps,
+		noise,
+		fbm,
+		regionCtx,
+		genesisicPowerField,
+		timing,
+	})
+
+	// ---- Coastal roughening ----
+	const coastalRougheningStart = performance.now()
+	_applyCoastalRoughening({
+		numRegions,
+		r_xyz,
+		r_coastDist,
+		coastStressMax,
+		coastSubductMax,
+		coastConvergent,
+		r_isOcean,
+		r_stress,
+		maxStress,
+		scaleFactor,
+		noiseMag,
+		seed,
+		fbm,
+		elev,
+		coastal,
+		markFeature,
+	})
+	timing?.push({
+		Stage: "Coastal roughening",
+		ms: (performance.now() - coastalRougheningStart).toFixed(1),
+	})
+
+	_applyPostProcessingArcs({
+		mesh,
+		r_plate,
+		r_isOcean,
+		r_boundaryType,
+		r_bothOcean,
+		r_subductFactor,
+		r_stress,
+		boundary,
+		maxStress,
+		scaleFactor,
+		volcanism,
+		seed,
+		elev,
+		markFeature,
+		timing,
 	})
 
 	void coastal

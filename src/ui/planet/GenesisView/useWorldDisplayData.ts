@@ -74,6 +74,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		colorMode,
 		dataVariant,
 		showWindArrows,
+		showRealWind,
 		resolvedClimateMonth,
 		temperatureMonth,
 		rainfallMonth,
@@ -342,6 +343,13 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 			return null
 		const month =
 			resolvedClimateMonth > 0 ? resolvedClimateMonth - 1 : undefined
+		if (showRealWind) {
+			return WIND.observedWindVectorsForMonth({
+				observedWind: world.observedWind,
+				numRegions: world.mesh.numRegions,
+				month,
+			})
+		}
 		return WIND.computeWindVectors({
 			mesh: world.mesh,
 			climate: world.climate,
@@ -355,7 +363,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 				oceanDist: world.oceanDist,
 			},
 		})
-	}, [world, showWindArrows, colorMode, resolvedClimateMonth])
+	}, [world, showWindArrows, showRealWind, colorMode, resolvedClimateMonth])
 
 	// Monthly wind: computed lazily across setTimeout ticks when wind is active
 	const monthlyWindRef = useRef<
@@ -370,6 +378,18 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		if (!world?.climate || !windActive) {
 			monthlyWindRef.current = []
 			setMonthlyWindReady(false)
+			return
+		}
+		if (showRealWind) {
+			const numRegions = world.mesh.numRegions
+			monthlyWindRef.current = Array.from({ length: 12 }, (_, m) =>
+				WIND.observedWindVectorsForMonth({
+					observedWind: world.observedWind,
+					numRegions,
+					month: m,
+				}),
+			)
+			setMonthlyWindReady(true)
 			return
 		}
 		const results: typeof monthlyWindRef.current = []
@@ -402,7 +422,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		return () => {
 			setMonthlyWindReady(false)
 		}
-	}, [world, windActive])
+	}, [world, windActive, showRealWind])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const projectToScreen = useCallback(

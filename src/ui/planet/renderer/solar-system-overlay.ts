@@ -29,10 +29,19 @@ import {
 	perifocalBasis,
 	solveKepler,
 } from "@/ui/planet/renderer/moon-orbit-overlay"
+import {
+	buildAsteroidField,
+	updateAsteroidField,
+} from "@/ui/planet/renderer/solar-system-overlay/asteroid-field"
+import {
+	createStarGlowTexture,
+	loadBodyTexture,
+	loadGrayscaleSunTexture,
+} from "@/ui/planet/renderer/solar-system-overlay/textures"
 
 const DEG2RAD = Math.PI / 180
 
-const TWO_PI = 2 * Math.PI
+export const TWO_PI = 2 * Math.PI
 const ORBIT_SEGMENTS = 256
 const PLANET_SCENE_RADIUS = BODY_VISUAL_BASE_RADIUS
 const MOON_SYSTEM_SCENE_MIN = 1.35
@@ -43,13 +52,8 @@ const MIN_MOON_VISUAL_RADIUS = 0.004
 // AU-based distance would either bunch everything near the star or spread it
 // beyond any reasonable camera distance depending on spectral class.
 const ORBIT_GAP_STAR_RADII = 1.5
-const GLOW_TEXTURE_SIZE = 128
 const BELT_SCENE_RADIUS = 0.05
-const BELT_WIDTH = 0.12
-const ASTEROID_COUNT_PER_BELT = 900
-const ASTEROID_MIN_SCALE = 0.006
-const ASTEROID_MAX_SCALE = 0.02
-const ASTEROID_Z_JITTER = 0.02
+export const BELT_WIDTH = 0.12
 // Fallbacks only for a body whose classification isn't in
 // CLASSIFICATION_COLOR below (shouldn't happen in practice, since every
 // classification is mapped) -- MAIN_WORLD_COLOR for the main world,
@@ -89,10 +93,6 @@ const CLASSIFICATION_COLOR: Partial<Record<OrbitClassification, number>> = {
 	telluric: 0x8b0000,
 	vesperian: 0xdaa520,
 }
-const textureLoader = new THREE.TextureLoader()
-const sharedBodyTextureCache = new Map<string, THREE.Texture>()
-let sharedGrayscaleSunTexture: THREE.CanvasTexture | null = null
-let grayscaleSunTextureLoadPromise: Promise<THREE.CanvasTexture> | null = null
 
 const GROUP_LABEL: Record<SystemBody["group"], string> = {
 	"asteroid belt": "Asteroid Belt",
@@ -139,95 +139,9 @@ const STAR_COLOR_BY_CLASS: Record<MainSequenceClass, string> = {
 // orange keeps showing through. Desaturating to grayscale first (keeping only
 // luminance, i.e. granulation/limb-darkening detail) lets the spectral-class
 // tint fully determine the star's color instead of fighting the photo's hue.
-function loadGrayscaleSunTexture(
-	onReady: (texture: THREE.CanvasTexture) => void,
-): { cancel(): void } {
-	let cancelled = false
-	if (sharedGrayscaleSunTexture) {
-		onReady(sharedGrayscaleSunTexture)
-		return {
-			cancel() {
-				cancelled = true
-			},
-		}
-	}
-	if (!grayscaleSunTextureLoadPromise) {
-		grayscaleSunTextureLoadPromise = new Promise((resolve) => {
-			textureLoader.load("/sol/2k_sun.jpg", (loaded) => {
-				const image = loaded.image as HTMLImageElement
-				const canvas = document.createElement("canvas")
-				canvas.width = image.width
-				canvas.height = image.height
-				const ctx = canvas.getContext("2d")
-				if (ctx) {
-					ctx.drawImage(image, 0, 0)
-					const data = ctx.getImageData(0, 0, canvas.width, canvas.height)
-					const pixels = data.data
-					for (let i = 0; i < pixels.length; i += 4) {
-						const luminance =
-							0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
-						pixels[i] = luminance
-						pixels[i + 1] = luminance
-						pixels[i + 2] = luminance
-					}
-					ctx.putImageData(data, 0, 0)
-				}
-				loaded.dispose()
-				const grayTexture = new THREE.CanvasTexture(canvas)
-				grayTexture.needsUpdate = true
-				grayTexture.userData.sharedTexture = true
-				sharedGrayscaleSunTexture = grayTexture
-				resolve(grayTexture)
-			})
-		})
-	}
-	grayscaleSunTextureLoadPromise.then((texture) => {
-		if (cancelled) return
-		onReady(texture)
-	})
-	return {
-		cancel() {
-			cancelled = true
-		},
-	}
-}
-
-function withAlpha(hex: string, alpha: number): string {
-	const r = Number.parseInt(hex.slice(1, 3), 16)
-	const g = Number.parseInt(hex.slice(3, 5), 16)
-	const b = Number.parseInt(hex.slice(5, 7), 16)
-	return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
 // Renders a soft white-hot core fading through the star's own color and out
 // to transparent — the same core+glow gradient galaxy-gen's system map uses,
 // applied here as a camera-facing sprite texture.
-function createStarGlowTexture(hexColor: string): THREE.CanvasTexture {
-	const canvas = document.createElement("canvas")
-	canvas.width = GLOW_TEXTURE_SIZE
-	canvas.height = GLOW_TEXTURE_SIZE
-	const ctx = canvas.getContext("2d")
-	const center = GLOW_TEXTURE_SIZE / 2
-	if (ctx) {
-		const gradient = ctx.createRadialGradient(
-			center,
-			center,
-			GLOW_TEXTURE_SIZE * 0.03,
-			center,
-			center,
-			center,
-		)
-		gradient.addColorStop(0, "#ffffff")
-		gradient.addColorStop(0.33, hexColor)
-		gradient.addColorStop(0.67, withAlpha(hexColor, 0.3))
-		gradient.addColorStop(1, withAlpha(hexColor, 0))
-		ctx.fillStyle = gradient
-		ctx.fillRect(0, 0, GLOW_TEXTURE_SIZE, GLOW_TEXTURE_SIZE)
-	}
-	const texture = new THREE.CanvasTexture(canvas)
-	texture.needsUpdate = true
-	return texture
-}
 
 function bodySceneRadius(
 	diameterKm: number,
@@ -240,16 +154,6 @@ function bodySceneRadius(
 		realisticSizes,
 		sizeClass,
 	)
-}
-
-function loadBodyTexture(texturePath: string): THREE.Texture {
-	const cached = sharedBodyTextureCache.get(texturePath)
-	if (cached) return cached
-	const texture = textureLoader.load(texturePath)
-	texture.colorSpace = THREE.SRGBColorSpace
-	texture.userData.sharedTexture = true
-	sharedBodyTextureCache.set(texturePath, texture)
-	return texture
 }
 
 function measureBodyMoonSystemOuterRadius(
@@ -291,7 +195,7 @@ function measureBodyMoonSystemOuterRadius(
 	return outerRadiusInMoonOverlayUnits * sceneRadius
 }
 
-interface AsteroidFieldData {
+export interface AsteroidFieldData {
 	mesh: THREE.InstancedMesh
 	count: number
 	angles: Float32Array
@@ -306,97 +210,6 @@ interface AsteroidFieldData {
 // each on its own randomized circular sub-orbit (slightly jittered radius and
 // out-of-plane offset) plus a random tumble, so the belt reads as a lively
 // swarm rather than a flat static band.
-function buildAsteroidField(orbitRadius: number): AsteroidFieldData {
-	const count = ASTEROID_COUNT_PER_BELT
-	const geometry = new THREE.IcosahedronGeometry(1, 0)
-	const material = new THREE.MeshStandardMaterial({
-		color: 0xb0b0b0,
-		roughness: 1,
-		metalness: 0,
-	})
-	const mesh = new THREE.InstancedMesh(geometry, material, count)
-	const angles = new Float32Array(count)
-	const radii = new Float32Array(count)
-	const zOffsets = new Float32Array(count)
-	const scales = new Float32Array(count)
-	const rotationAxes: THREE.Vector3[] = []
-	const rotationSpeeds = new Float32Array(count)
-
-	const dummy = new THREE.Object3D()
-	const color = new THREE.Color()
-	for (let i = 0; i < count; i++) {
-		angles[i] = Math.random() * TWO_PI
-		radii[i] = orbitRadius + (Math.random() - 0.5) * BELT_WIDTH
-		zOffsets[i] = (Math.random() - 0.5) * ASTEROID_Z_JITTER
-		scales[i] =
-			ASTEROID_MIN_SCALE +
-			Math.random() * (ASTEROID_MAX_SCALE - ASTEROID_MIN_SCALE)
-		rotationAxes.push(
-			new THREE.Vector3(
-				Math.random() - 0.5,
-				Math.random() - 0.5,
-				Math.random() - 0.5,
-			).normalize(),
-		)
-		rotationSpeeds[i] = (Math.random() - 0.5) * 2
-
-		dummy.position.set(
-			radii[i] * Math.cos(angles[i]),
-			radii[i] * Math.sin(angles[i]),
-			zOffsets[i],
-		)
-		dummy.scale.setScalar(scales[i])
-		dummy.rotation.set(
-			Math.random() * TWO_PI,
-			Math.random() * TWO_PI,
-			Math.random() * TWO_PI,
-		)
-		dummy.updateMatrix()
-		mesh.setMatrixAt(i, dummy.matrix)
-
-		const shade = 0.5 + Math.random() * 0.5
-		color.setRGB(shade, shade * 0.97, shade * 0.92)
-		mesh.setColorAt(i, color)
-	}
-	mesh.instanceMatrix.needsUpdate = true
-	if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-
-	return {
-		mesh,
-		count,
-		angles,
-		radii,
-		zOffsets,
-		scales,
-		rotationAxes,
-		rotationSpeeds,
-	}
-}
-
-function updateAsteroidField(
-	field: AsteroidFieldData,
-	dummy: THREE.Object3D,
-	day: number,
-	period: number,
-): void {
-	const angularRate = TWO_PI / period
-	for (let i = 0; i < field.count; i++) {
-		const angle = field.angles[i] + angularRate * day
-		dummy.position.set(
-			field.radii[i] * Math.cos(angle),
-			field.radii[i] * Math.sin(angle),
-			field.zOffsets[i],
-		)
-		dummy.scale.setScalar(field.scales[i])
-		dummy.quaternion.setFromAxisAngle(
-			field.rotationAxes[i],
-			field.rotationSpeeds[i] * day,
-		)
-		dummy.updateMatrix()
-		field.mesh.setMatrixAt(i, dummy.matrix)
-	}
-	field.mesh.instanceMatrix.needsUpdate = true
-}
 
 export interface SolarSystemOverlayParams {
 	/** All bodies in the system (siblings + the main world), sorted by

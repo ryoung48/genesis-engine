@@ -272,9 +272,67 @@ function attachObservedEarthDtr(params: {
 	}
 }
 
+function attachObservedEarthWind(params: {
+	mesh: SphereMesh
+	world: {
+		observedWind?: GenesisWorld["observedWind"]
+	}
+	realWindUMonthly: Int16Array
+	realWindVMonthly: Int16Array
+	realWindWidth: number
+	realWindHeight: number
+	realWindMonths: number
+	realWindScale: number
+	realWindNoData: number
+}): void {
+	const {
+		mesh,
+		world,
+		realWindUMonthly,
+		realWindVMonthly,
+		realWindWidth,
+		realWindHeight,
+		realWindMonths,
+		realWindScale,
+		realWindNoData,
+	} = params
+	if (realWindMonths !== 12) return
+
+	const N = mesh.numRegions
+	const observedU = sampleMonthlyFloatRaster({
+		mesh,
+		raster: realWindUMonthly,
+		rasterW: realWindWidth,
+		rasterH: realWindHeight,
+		months: realWindMonths,
+		scale: realWindScale,
+		nodata: realWindNoData,
+	})
+	const observedV = sampleMonthlyFloatRaster({
+		mesh,
+		raster: realWindVMonthly,
+		rasterW: realWindWidth,
+		rasterH: realWindHeight,
+		months: realWindMonths,
+		scale: realWindScale,
+		nodata: realWindNoData,
+	})
+	const observedSpeed = new Float32Array(N * realWindMonths)
+	for (let i = 0; i < observedSpeed.length; i++) {
+		observedSpeed[i] = Math.hypot(observedU[i], observedV[i])
+	}
+
+	world.observedWind = {
+		real_u_monthly: observedU,
+		real_v_monthly: observedV,
+		real_speed_monthly: observedSpeed,
+	}
+}
+
 export const OBSERVED_EARTH = {
 	sampleMonthlyFloatRaster,
 	attachObservedEarthClimate,
 	attachObservedEarthRainfall,
 	attachObservedEarthDtr,
+	attachObservedEarthWind,
 }

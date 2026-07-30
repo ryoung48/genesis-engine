@@ -8,24 +8,28 @@ import { RELIGION } from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import {
 	type ColorMode,
-	climateTempColor,
-	climateZoneColor,
 	EU5_CLIMATE_COLORS,
 	EU5_TOPOGRAPHY_COLORS,
 	EU5_VEGETATION_COLORS,
-	temperatureDifferenceColor,
 	VEGETATION_WATER_BLUE,
+} from "@/ui/planet/colors"
+import { climateZoneColor } from "@/ui/planet/colors/misc"
+import {
+	climateTempColor,
+	temperatureDifferenceColor,
+} from "@/ui/planet/colors/temperature"
+import {
 	vegetationColor,
 	vegetationMapColor,
 	vegetationSatelliteColor,
-} from "@/ui/planet/colors"
+} from "@/ui/planet/colors/vegetation"
 import type { HoverInfo, HoverTerrainFeature } from "@/ui/planet/hover/hover"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/planet/screen/display/government-colors"
 import {
 	getTerrainFeatureColor,
 	getTopographyColor,
 	toPastelNationColor,
-} from "@/ui/planet/screen/display/region-colors"
+} from "@/ui/planet/screen/display/region-colors/palette"
 import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,

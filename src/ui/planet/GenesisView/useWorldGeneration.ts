@@ -10,6 +10,8 @@ import {
 	loadEarthRealElevation,
 	loadEarthRealPrecip,
 	loadEarthRealVaporPressure,
+	loadEarthRealWindU,
+	loadEarthRealWindV,
 	loadEu4Provinces,
 	loadEu5Categorical,
 	loadOptionalJson,
@@ -343,6 +345,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				nodata: number
 			},
 			realVaporPressure?: MonthlyRasterAsset,
+			realWindU?: MonthlyRasterAsset,
+			realWindV?: MonthlyRasterAsset,
 			realElevation?: {
 				raster: Int16Array
 				width: number
@@ -436,6 +440,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				realPrecip,
 				realDtr,
 				realVaporPressure,
+				realWindU,
+				realWindV,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -483,6 +489,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				realPrecip,
 				realDtr,
 				realVaporPressure,
+				realWindU,
+				realWindV,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -512,6 +520,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				loadEarthRealPrecip(),
 				loadEarthRealDtr(),
 				loadEarthRealVaporPressure(),
+				loadEarthRealWindU(),
+				loadEarthRealWindV(),
 				loadEarthRealElevation(),
 				loadEu5Categorical("eu5-topography"),
 				loadEu5Categorical("eu5-vegetation"),
@@ -541,6 +551,8 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				realPrecip,
 				realDtr,
 				realVaporPressure,
+				realWindU,
+				realWindV,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,

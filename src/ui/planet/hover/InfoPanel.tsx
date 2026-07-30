@@ -1,24 +1,19 @@
 import React from "react"
-import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { TEXT } from "@/model/shared/text"
-import { TRANSPORT } from "@/model/society/infrastructure/transport"
 import type { SerializedRoutes } from "@/model/society/infrastructure/transport/types"
 import { TIMEZONE } from "@/model/society/timezone"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
 import { SeriesBars } from "@/ui/components/primitives/charts/SeriesBars"
-import { LabeledValueRow } from "@/ui/components/primitives/LabeledValueRow"
-import { Swatch } from "@/ui/components/primitives/Swatch"
 import {
 	type ColorMode,
 	cycloneLandColor,
 	dangerColor,
-	daylightColor,
 	tidalTierColor,
 	tornadoLandColor,
 	volcanicLandColor,
-	windSpeedColor,
 } from "@/ui/planet/colors"
+import { daylightColor } from "@/ui/planet/colors/misc"
 import type {
 	HoverDtr,
 	HoverHazards,
@@ -49,6 +44,13 @@ import {
 	tempColor,
 } from "@/ui/planet/hover/info-panel-format"
 import {
+	buildHoverPortLabel,
+	buildHoverRouteLabel,
+	buildSummary,
+	computeLakeAverageAnnualPrecipitation,
+	windSpeedColorCss,
+} from "@/ui/planet/hover/info-panel-labels"
+import {
 	buildClimateSwatchColor,
 	buildDemographicDisplayData,
 	buildGovernmentDisplayData,
@@ -60,6 +62,11 @@ import {
 	buildTradeGoodSwatchColor,
 	buildVegetationSwatchColor,
 } from "@/ui/planet/hover/info-panel-model"
+import {
+	MultiSwatchRow,
+	Row,
+	SwatchRow,
+} from "@/ui/planet/hover/info-panel-rows"
 import { monthLabels } from "@/ui/planet/screen/shared/constants"
 import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 import {
@@ -79,176 +86,10 @@ import {
 
 const MONTH_SHORT = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 
-function buildSummary(
-	value: number | undefined,
-	options: {
-		prefix?: string
-		unit?: string
-		formatValue?: (value: number) => string
-	},
-): string | undefined {
-	if (value === undefined) return undefined
-
-	const prefix = options.prefix?.trim()
-	const formatted = options.formatValue
-		? options.formatValue(value)
-		: `${value}`
-	const unit = options.unit?.trim()
-
-	return [prefix, formatted, unit].filter(Boolean).join(" ")
-}
-
-function computeLakeAverageAnnualPrecipitation(
-	hoverLandmark: HoverLandmark | null,
-	world: SerializedGenesisWorld | null,
-): number | null {
-	if (
-		hoverLandmark?.type !== "lake" ||
-		!world?.rainfall?.annual ||
-		!world.landmarks?.regionLandmark
-	) {
-		return null
-	}
-
-	let sum = 0
-	let count = 0
-	for (let region = 0; region < world.mesh.numRegions; region++) {
-		if (world.landmarks.regionLandmark[region] !== hoverLandmark.id) continue
-		sum += world.rainfall.annual[region] ?? 0
-		count++
-	}
-
-	return count > 0 ? sum / count : null
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-	return <LabeledValueRow label={label} value={value} tone="overlay" />
-}
-
-function buildHoverRouteLabel(
-	hoverRegion: number | null,
-	routes: SerializedRoutes | null,
-): string | null {
-	if (hoverRegion === null || !routes) return null
-	let hasImperialRoute = false
-	let hasMinorRoute = false
-	let hasSeaRoute = false
-	TRANSPORT.forEachRoute({
-		routes,
-		callback: (route) => {
-			if (!route.pathRegions.includes(hoverRegion)) return
-			if (route.kind === TRANSPORT.ROUTE_SEA) {
-				hasSeaRoute = true
-			} else if (route.kind === TRANSPORT.ROUTE_LAND_MAJOR) {
-				hasImperialRoute = true
-			} else if (route.kind === TRANSPORT.ROUTE_LAND_MINOR) {
-				hasMinorRoute = true
-			}
-		},
-	})
-	const labels: string[] = []
-	if (hasImperialRoute) labels.push("Major")
-	if (hasMinorRoute) labels.push("Minor")
-	if (hasSeaRoute) labels.push("Sea")
-	return labels.length > 0 ? labels.join(" / ") : null
-}
-
-function buildHoverPortLabel(
-	hoverProvince: number | null,
-	world: SerializedGenesisWorld | null,
-	getLandmarkName: (landmarkId: number) => string,
-): string | null {
-	if (
-		hoverProvince === null ||
-		hoverProvince < 0 ||
-		!world?.settlementWaterLandmarks ||
-		hoverProvince >= world.settlementWaterLandmarks.length
-	) {
-		return null
-	}
-	const landmarkId = world.settlementWaterLandmarks[hoverProvince]
-	if (landmarkId < 0) return null
-	const landmarkTypeCode = world.landmarks?.type?.[landmarkId]
-	const landmarkType =
-		typeof landmarkTypeCode === "number"
-			? TEXT.titleCase(
-					LANDMARKS.landmarkTypes[landmarkTypeCode] ?? "water body",
-				)
-			: "Water Body"
-	return `${getLandmarkName(landmarkId)} (${landmarkType})`
-}
-
-function SwatchRow({
-	label,
-	value,
-	color,
-	striped = false,
-	stripeBackground = "rgba(15, 23, 42, 0.85)",
-}: {
-	label: string
-	value: string
-	color: string | null
-	striped?: boolean
-	stripeBackground?: string
-}) {
-	return (
-		<LabeledValueRow
-			label={label}
-			tone="overlay"
-			value={
-				<span className="flex items-center gap-1.5 font-mono text-[10px] text-slate-100">
-					<Swatch
-						color={color}
-						striped={striped}
-						stripeBackground={stripeBackground}
-						className="border-white/15"
-					/>
-					<span>{value}</span>
-				</span>
-			}
-		/>
-	)
-}
-
-function MultiSwatchRow({
-	label,
-	values,
-}: {
-	label: string
-	values: Array<{ label: string; color: string | null }>
-}) {
-	return (
-		<LabeledValueRow
-			label={label}
-			tone="overlay"
-			value={
-				<span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 font-mono text-[10px] text-slate-100">
-					{values.map((value, index) => (
-						<React.Fragment key={`${value.label}-${index}`}>
-							<span className="inline-flex items-center gap-1.5">
-								<Swatch color={value.color} className="border-white/15" />
-								<span>{value.label}</span>
-							</span>
-							{index < values.length - 1 && (
-								<span className="text-slate-500">,</span>
-							)}
-						</React.Fragment>
-					))}
-				</span>
-			}
-		/>
-	)
-}
-
 interface DemographicEntry {
 	label: string
 	value: string
 	color: string | null
-}
-
-function windSpeedColorCss(speed: number): string {
-	const [r, g, b] = windSpeedColor(speed)
-	return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`
 }
 
 interface InfoPanelProps {

@@ -65,6 +65,29 @@ def resample_month(data: np.ndarray, width: int, height: int) -> np.ndarray:
     return out
 
 
+def _repair_seam_column(monthly: np.ndarray) -> None:
+    """Overwrite column 0 (the antimeridian) with the average of its cyclic
+    neighbors, in place.
+
+    Source grids re-centered from 0-360 to -180..180 via np.roll (see
+    build_earth_real_wind.py) have shown a corrupt seam column exactly at the
+    roll boundary -- e.g. NCEP/NCAR wind LTM data had column 0 spiking to
+    30-60 m/s against neighbors around 4 m/s, in every month. resample_month's
+    bilinear wrap is correct given a truly periodic source, so this guards
+    against a bad source sample at the seam rather than trusting it blindly.
+    """
+    width = monthly.shape[2]
+    left = monthly[:, :, width - 1]
+    right = monthly[:, :, 1]
+    with np.errstate(invalid="ignore"):
+        avg = np.where(
+            np.isfinite(left) & np.isfinite(right),
+            (left + right) / 2.0,
+            np.nan,
+        )
+    monthly[:, :, 0] = avg
+
+
 def build_monthly_stack(
     width: int,
     height: int,
@@ -73,6 +96,7 @@ def build_monthly_stack(
     monthly = np.empty((MONTHS, height, width), dtype=np.float32)
     for month in range(1, MONTHS + 1):
         monthly[month - 1] = resample_month(month_loader(month), width, height)
+    _repair_seam_column(monthly)
     return monthly
 
 

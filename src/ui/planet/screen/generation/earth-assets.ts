@@ -105,6 +105,14 @@ export async function loadEarthRealVaporPressure(): Promise<MonthlyRasterAsset> 
 	)
 }
 
+export async function loadEarthRealWindU(): Promise<MonthlyRasterAsset> {
+	return loadEarthMonthlyRaster("earth-real-wind-u", "observed wind (u)")
+}
+
+export async function loadEarthRealWindV(): Promise<MonthlyRasterAsset> {
+	return loadEarthMonthlyRaster("earth-real-wind-v", "observed wind (v)")
+}
+
 export async function loadEarthRealElevation(): Promise<{
 	raster: Int16Array
 	width: number

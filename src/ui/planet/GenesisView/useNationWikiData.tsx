@@ -12,23 +12,40 @@ import { ShieldHalfFullIcon } from "@/ui/components/primitives/icons/ShieldHalfF
 import { SwordCrossIcon } from "@/ui/components/primitives/icons/SwordCrossIcon"
 import { Swatch } from "@/ui/components/primitives/Swatch"
 import {
-	climateZoneColor,
 	EU5_CLIMATE_CATEGORIES,
 	EU5_CLIMATE_COLORS,
 	EU5_VEGETATION_CATEGORIES,
 	EU5_VEGETATION_COLORS,
-	vegetationColor,
 } from "@/ui/planet/colors"
+import { climateZoneColor } from "@/ui/planet/colors/misc"
+import { vegetationColor } from "@/ui/planet/colors/vegetation"
+import {
+	cultureMention,
+	organizationMention,
+	personDisplay,
+	religionMention,
+	warMention,
+} from "@/ui/planet/GenesisView/nation-wiki-mentions"
+import {
+	buildMergedProvinceAttributeDescription,
+	buildMergedTerritoryDescription,
+	formatPayloadLabel,
+	formatSignedValue,
+	mergeById,
+	mergedTerritoryType,
+	mergeEventComments,
+	mergeNations,
+	payloadValue,
+} from "@/ui/planet/GenesisView/nation-wiki-timeline-format"
 import type { NationWikiDataInput } from "@/ui/planet/GenesisView/types"
 import {
 	nationFocusDistanceScale,
 	SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 } from "@/ui/planet/renderer/focus"
-import { getTopographyColor } from "@/ui/planet/screen/display/region-colors"
+import { getTopographyColor } from "@/ui/planet/screen/display/region-colors/palette"
 import { rgbToCss } from "@/ui/planet/screen/shared/ui-format"
 import type { NationWikiData } from "@/ui/wiki/nation/NationWikiPage"
 import {
-	cleanEu4Identifier,
 	eventComment,
 	formatRebelName,
 	formatRulerStatLabel,
@@ -425,33 +442,6 @@ export function useNationWikiData(
 				color: getProvinceColor(provinceId) ?? fallbackColor,
 			}
 		}
-		const organizationMention = (
-			orgId: string,
-			categoryId?: string,
-		): NationTimelineEvent["organizations"][number] => {
-			const ref = earthHistory.organizationReference?.get(orgId)
-			const category = categoryId
-				? ORGANIZATION_CATEGORIES.orgCategorySchemas[orgId]?.categories.find(
-						(c) => c.id === categoryId,
-					)
-				: undefined
-			const color = category?.color ?? ref?.color
-			return {
-				id: orgId,
-				name: category?.factionLabel ?? ref?.name ?? orgId,
-				color: color
-					? COLOR.rgb01ToCss([color[0] / 255, color[1] / 255, color[2] / 255])
-					: COLOR.rgb01ToCss([0.5, 0.5, 0.5]),
-			}
-		}
-		const warMention = (war: {
-			warId: string
-			name: string
-		}): NationTimelineEvent["wars"][number] => ({
-			id: war.warId,
-			name: war.name,
-			color: "#b91c1c",
-		})
 		// Index every war's participant span once so territory/control-change
 		// events below can guess which war (if any) caused them: a transfer
 		// between two nations that were both belligerents in some war whose
@@ -480,269 +470,6 @@ export function useNationWikiData(
 				return span.war
 			}
 			return null
-		}
-		const cultureMention = (
-			cultureId: string,
-		): NationTimelineEvent["cultures"][number] => ({
-			id: cultureId,
-			name:
-				earthHistory.cultureNameById?.get(cultureId) ??
-				cultureId.replace(/_/g, " "),
-			color: rgbToCss(
-				earthHistory.cultureColorById?.get(cultureId) ??
-					COLOR.hashColorForKey(`culture:${cultureId}`),
-			),
-		})
-		const religionMention = (
-			religionId: string,
-		): NationTimelineEvent["religions"][number] => ({
-			id: religionId,
-			name:
-				earthHistory.religionNameById?.get(religionId) ??
-				religionId.replace(/_/g, " "),
-			color: rgbToCss(
-				earthHistory.religionColorById?.get(religionId) ??
-					COLOR.hashColorForKey(`religion:${religionId}`),
-			),
-		})
-		const dynastyMention = (
-			dynasty: string,
-		): NationTimelineEvent["dynasties"][number] => ({
-			id: dynasty,
-			name: dynasty,
-			color: paletteColorForDynasty(dynasty),
-		})
-		const personDisplay = (payload: Record<string, unknown>) => {
-			const name = String(payload.name ?? payload.monarchName ?? "unknown")
-			const dynasty =
-				typeof payload.dynasty === "string" && payload.dynasty.trim()
-					? payload.dynasty
-					: null
-			return {
-				description: dynasty ? `${name} ${dynasty}` : name,
-				dynasties: dynasty ? [dynastyMention(dynasty)] : [],
-			}
-		}
-		const mergeById = <T extends { id: string | number }>(items: T[]): T[] => {
-			const seen = new Set<string | number>()
-			const merged: T[] = []
-			for (const item of items) {
-				if (seen.has(item.id)) continue
-				seen.add(item.id)
-				merged.push(item)
-			}
-			return merged
-		}
-		const mergeNations = (
-			items: NationTimelineEvent["nations"],
-		): NationTimelineEvent["nations"] => {
-			const seen = new Set<string>()
-			const merged: NationTimelineEvent["nations"] = []
-			for (const item of items) {
-				const key = item.link === false ? `${item.tag}:${item.name}` : item.tag
-				if (seen.has(key)) continue
-				seen.add(key)
-				merged.push(item)
-			}
-			return merged
-		}
-		const formatList = (items: string[]): string => {
-			if (items.length <= 2) return items.join(" and ")
-			return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`
-		}
-		const formatPayloadLabel = (value: unknown): string =>
-			typeof value === "string"
-				? cleanEu4Identifier(value)
-				: value === true
-					? "yes"
-					: value === false
-						? "no"
-						: String(value)
-		const payloadValue = (
-			payload: Record<string, unknown>,
-			...keys: string[]
-		): unknown => {
-			for (const key of keys) {
-				if (payload[key] !== undefined) return payload[key]
-			}
-			return payload.value
-		}
-		const formatSignedValue = (value: unknown): string =>
-			typeof value === "number" && value > 0 ? `+${value}` : String(value)
-		const mergeEventComments = (
-			events: NationTimelineEvent[],
-		): string | undefined => {
-			const comments = Array.from(
-				new Set(events.map((event) => event.comment).filter(Boolean)),
-			)
-			return comments.length > 0 ? comments.join(" | ") : undefined
-		}
-		const escapeRegExp = (value: string): string =>
-			value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-		const buildMergedTerritoryDescription = (
-			events: NationTimelineEvent[],
-		): string => {
-			const actionEntries = new Map<
-				string,
-				Map<
-					string | null,
-					{
-						objects: string[]
-						objectKeys: string[]
-						separator: "to" | "from"
-						warName: string | null
-					}
-				>
-			>()
-			const fallbackClauses: string[] = []
-			for (const event of events) {
-				const clause = event.description
-					.replace(new RegExp(`^${escapeRegExp(title)} `), "")
-					.replace(/\.$/, "")
-				const match =
-					/^(took control of|lost control of|gained|lost) (.+)$/.exec(clause)
-				if (!match) {
-					fallbackClauses.push(clause)
-					continue
-				}
-				const [, action] = match
-				let object = match[2]
-				// Individual events append " (War Name)" (see
-				// findWarForTransfer) when a war looks responsible -- pull
-				// that off before parsing the to/from clause below.
-				const warSuffixMatch = /^(.+) \(([^()]+)\)$/.exec(object)
-				const warName = warSuffixMatch?.[2] ?? null
-				if (warSuffixMatch) object = warSuffixMatch[1]
-				const targetMatch = /^(.+) (to|from) (.+)$/.exec(object)
-				const objectName = targetMatch?.[1] ?? object
-				const separator =
-					(targetMatch?.[2] as "to" | "from" | undefined) ?? "to"
-				const targetName = targetMatch?.[3] ?? null
-				const targetEntries = actionEntries.get(action) ?? new Map()
-				// Dedup key is the bare province name (not the full "X to/from
-				// Y" clause) so the ownership/control cross-filtering below
-				// (which compares against "gained"/"lost" entries that never
-				// carry a target suffix) matches correctly regardless of
-				// which nation the control side names.
-				const entry = targetEntries.get(targetName) ?? {
-					objects: [],
-					objectKeys: [],
-					separator,
-					warName,
-				}
-				entry.objects.push(objectName)
-				entry.objectKeys.push(objectName)
-				// Only keep the war name if every province merged into this
-				// clause agrees on it -- an ambiguous mix stays unlabeled
-				// rather than naming one war for provinces it didn't cause.
-				if (entry.warName !== warName) entry.warName = null
-				targetEntries.set(targetName, entry)
-				actionEntries.set(action, targetEntries)
-			}
-			for (const [ownershipAction, controlAction] of [
-				["gained", "took control of"],
-				["lost", "lost control of"],
-			] as const) {
-				const ownershipObjects = new Set<string>()
-				for (const entry of actionEntries.get(ownershipAction)?.values() ??
-					[]) {
-					for (const objectKey of entry.objectKeys)
-						ownershipObjects.add(objectKey)
-				}
-				if (ownershipObjects.size === 0) continue
-				const controlTargets = actionEntries.get(controlAction)
-				if (!controlTargets) continue
-				for (const [targetName, entry] of controlTargets) {
-					const filteredObjects: string[] = []
-					const filteredObjectKeys: string[] = []
-					for (let index = 0; index < entry.objectKeys.length; index++) {
-						if (ownershipObjects.has(entry.objectKeys[index])) continue
-						filteredObjects.push(entry.objects[index])
-						filteredObjectKeys.push(entry.objectKeys[index])
-					}
-					if (filteredObjects.length > 0) {
-						controlTargets.set(targetName, {
-							objects: filteredObjects,
-							objectKeys: filteredObjectKeys,
-							separator: entry.separator,
-							warName: entry.warName,
-						})
-					} else {
-						controlTargets.delete(targetName)
-					}
-				}
-				if (controlTargets.size === 0) {
-					actionEntries.delete(controlAction)
-				}
-			}
-			const clauseEntries = Array.from(actionEntries.entries()).flatMap(
-				([action, targetEntries]) =>
-					Array.from(targetEntries.entries()).map(([targetName, entry]) => ({
-						text: targetName
-							? `${action} ${formatList(entry.objects)} ${entry.separator} ${targetName}`
-							: `${action} ${formatList(entry.objects)}`,
-						warName: entry.warName,
-					})),
-			)
-			const clauses = [
-				...clauseEntries.map((entry) => entry.text),
-				...fallbackClauses,
-			]
-			// War names sit at the very end of the whole sentence rather than
-			// inline after whichever clause happened to carry one -- a
-			// parenthetical mid-sentence reads as if it qualifies only that
-			// clause, and readers expect the "why" to cap off the sentence.
-			const warNames = Array.from(
-				new Set(
-					clauseEntries
-						.map((entry) => entry.warName)
-						.filter((warName): warName is string => warName !== null),
-				),
-			)
-			// formatList's "A, B, and C" is for a list of nouns -- these are
-			// full verb clauses (one per distinct action, e.g. "gained ..."
-			// and "lost control of ..."), and running them together with
-			// "and" reads as one run-on sentence. Semicolons keep each action
-			// visually separate.
-			const warSuffix = warNames.length > 0 ? ` (${warNames.join(", ")})` : ""
-			return `${title} ${clauses.join("; ")}${warSuffix}.`
-		}
-		const buildMergedProvinceAttributeDescription = (
-			events: NationTimelineEvent[],
-			attribute: "culture" | "religion",
-		): string => {
-			const valueEntries = new Map<string, string[]>()
-			const fallbackClauses: string[] = []
-			const pattern = new RegExp(`^(.+) changed ${attribute} to (.+)$`)
-			for (const event of events) {
-				const clause = event.description.replace(/\.$/, "")
-				const match = pattern.exec(clause)
-				if (!match) {
-					fallbackClauses.push(clause)
-					continue
-				}
-				const [, provinceName, valueName] = match
-				const entries = valueEntries.get(valueName) ?? []
-				entries.push(provinceName)
-				valueEntries.set(valueName, entries)
-			}
-			const clauses = [
-				...Array.from(valueEntries.entries()).map(
-					([valueName, provinceNames]) =>
-						`${formatList(provinceNames)} changed ${attribute} to ${valueName}`,
-				),
-				...fallbackClauses,
-			]
-			return `${formatList(clauses)}.`
-		}
-		const mergedTerritoryType = (events: NationTimelineEvent[]): string => {
-			const signs = new Set(
-				events
-					.map((event) => /\(([+-])\)$/.exec(event.type)?.[1])
-					.filter((sign): sign is string => sign !== undefined),
-			)
-			if (signs.size === 1) return `Territory (${Array.from(signs)[0]})`
-			return "Territory"
 		}
 		const ownedProvinceCountByDate = new Map<number, number>()
 		const territoryDeltasByDate = new Map<number, number>()
@@ -894,7 +621,7 @@ export function useNationWikiData(
 						const cultureId = String(
 							payloadValue(event.payload, "cultureId") ?? "",
 						)
-						const culture = cultureMention(cultureId)
+						const culture = cultureMention(earthHistory, cultureId)
 						const verb =
 							event.kind === "acceptedCultureAdd"
 								? "accepted"
@@ -918,7 +645,9 @@ export function useNationWikiData(
 							event.kind === "religion"
 								? String(payloadValue(event.payload, "religionId") ?? "")
 								: ""
-						const religion = religionId ? religionMention(religionId) : null
+						const religion = religionId
+							? religionMention(earthHistory, religionId)
+							: null
 						pushTimelineEvent(timelineEvents, {
 							id: dateId,
 							date: event.date,
@@ -945,7 +674,7 @@ export function useNationWikiData(
 									: `${title} became an elector.`,
 							comment: eventComment(event.comment),
 							nations,
-							organizations: [organizationMention("HRE")],
+							organizations: [organizationMention(earthHistory, "HRE")],
 						})
 						break
 					case "govRank":
@@ -1160,7 +889,7 @@ export function useNationWikiData(
 					controllerRebelType = isRebelTag(nextTag) ? nextRebelType : undefined
 				} else if (owner === tag && event.kind === "culture") {
 					const cultureId = String(event.payload.cultureId ?? "")
-					const culture = cultureMention(cultureId)
+					const culture = cultureMention(earthHistory, cultureId)
 					pushTimelineEvent(timelineEvents, {
 						id: eventId,
 						date: event.date,
@@ -1173,7 +902,7 @@ export function useNationWikiData(
 					})
 				} else if (owner === tag && event.kind === "religion") {
 					const religionId = String(event.payload.religionId ?? "")
-					const religion = religionMention(religionId)
+					const religion = religionMention(earthHistory, religionId)
 					pushTimelineEvent(timelineEvents, {
 						id: eventId,
 						date: event.date,
@@ -1196,7 +925,7 @@ export function useNationWikiData(
 						comment: eventComment(event.comment),
 						nations,
 						provinces,
-						organizations: [organizationMention("HRE")],
+						organizations: [organizationMention(earthHistory, "HRE")],
 					})
 				}
 			}
@@ -1226,7 +955,7 @@ export function useNationWikiData(
 						? `${title} became Emperor of the Holy Roman Empire.`
 						: `${title}'s reign as Emperor of the Holy Roman Empire ended.`,
 					nations,
-					organizations: [organizationMention("HRE")],
+					organizations: [organizationMention(earthHistory, "HRE")],
 				})
 				continue
 			}
@@ -1298,7 +1027,7 @@ export function useNationWikiData(
 			)
 				continue
 			const orgId = event.payload.orgId
-			const org = organizationMention(orgId, event.payload.role)
+			const org = organizationMention(earthHistory, orgId, event.payload.role)
 			const joined = event.kind === "join"
 			pushTimelineEvent(timelineEvents, {
 				id: `organization:${orgId}:${event.date}:${index}`,
@@ -1478,7 +1207,7 @@ export function useNationWikiData(
 				dateLabel: DATE.formatEu4Days(date),
 				type: mergedType,
 				typeColor: timelineTypeColor(mergedType),
-				description: buildMergedTerritoryDescription(group),
+				description: buildMergedTerritoryDescription(group, title),
 				comment: mergeEventComments(group),
 				nations: mergeNations(group.flatMap((event) => event.nations)),
 				provinces: mergeById(group.flatMap((event) => event.provinces)),

@@ -7,19 +7,19 @@ import { FOLD } from "@/model/history/earth/fold"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgProvinceCategory } from "@/model/history/earth/organization-categories/types"
 import {
-	climateZoneColor,
 	EU5_CLIMATE_CATEGORIES,
 	EU5_CLIMATE_COLORS,
 	EU5_VEGETATION_CATEGORIES,
 	EU5_VEGETATION_COLORS,
-	vegetationColor,
 } from "@/ui/planet/colors"
+import { climateZoneColor } from "@/ui/planet/colors/misc"
+import { vegetationColor } from "@/ui/planet/colors/vegetation"
 import type { OrganizationWikiDataInput } from "@/ui/planet/GenesisView/types"
 import {
 	nationFocusDistanceScale,
 	SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE,
 } from "@/ui/planet/renderer/focus"
-import { getTopographyColor } from "@/ui/planet/screen/display/region-colors"
+import { getTopographyColor } from "@/ui/planet/screen/display/region-colors/palette"
 import { rgbToCss } from "@/ui/planet/screen/shared/ui-format"
 import {
 	isRebelTag,

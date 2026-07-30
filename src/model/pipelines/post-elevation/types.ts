@@ -102,6 +102,14 @@ export interface PostPipelineInput {
 	realDtrMonths?: number
 	realDtrScale?: number
 	realDtrNoData?: number
+	/** Observed-Earth monthly 10m wind u/v rasters (m/s * scale, NCEP/NCAR reanalysis). */
+	realWindUMonthly?: Int16Array
+	realWindVMonthly?: Int16Array
+	realWindWidth?: number
+	realWindHeight?: number
+	realWindMonths?: number
+	realWindScale?: number
+	realWindNoData?: number
 }
 
 export interface PostPipelineOutput {
@@ -127,6 +135,7 @@ export interface PostPipelineOutput {
 	dtr_monthly: Float32Array
 	observedDtr?: GenesisWorld["observedDtr"]
 	observedHumidity?: GenesisWorld["observedHumidity"]
+	observedWind?: GenesisWorld["observedWind"]
 	waterAccess: Uint8Array
 	riverAccess: Uint8Array
 	lakeAccess: Uint8Array

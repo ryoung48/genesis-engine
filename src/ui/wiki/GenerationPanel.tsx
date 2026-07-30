@@ -28,7 +28,7 @@ import {
 	type NationWikiData,
 	NationWikiPage,
 } from "@/ui/wiki/nation/NationWikiPage"
-import { GenerationPlanetNavigator } from "@/ui/wiki/navigator/GenerationPlanetNavigator"
+import { GenerationPlanetNavigator } from "@/ui/wiki/navigator/GenerationPlanetNavigator/GenerationPlanetNavigator"
 import {
 	type OrganizationWikiData,
 	OrganizationWikiPage,

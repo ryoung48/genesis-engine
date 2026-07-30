@@ -168,6 +168,7 @@ export type WorldDisplayDataInput = {
 	colorMode: ColorMode
 	dataVariant: DataVariant
 	showWindArrows: boolean
+	showRealWind: boolean
 	resolvedClimateMonth: number
 	temperatureMonth: number
 	rainfallMonth: number

@@ -133,6 +133,13 @@ function runPostElevationPipeline(
 		realDtrMonths,
 		realDtrScale,
 		realDtrNoData,
+		realWindUMonthly,
+		realWindVMonthly,
+		realWindWidth,
+		realWindHeight,
+		realWindMonths,
+		realWindScale,
+		realWindNoData,
 	} = input
 	const timings: StageTiming[] = []
 	function record(stage: string, startMs: number) {
@@ -493,6 +500,30 @@ function runPostElevationPipeline(
 			realDtrNoData,
 		})
 		observedDtr = dtrHolder.observedDtr
+	}
+	let observedWind: GenesisWorld["observedWind"] | undefined
+	if (
+		realWindUMonthly &&
+		realWindVMonthly &&
+		realWindWidth &&
+		realWindHeight &&
+		realWindMonths &&
+		realWindScale !== undefined &&
+		realWindNoData !== undefined
+	) {
+		const windHolder: { observedWind?: GenesisWorld["observedWind"] } = {}
+		OBSERVED_EARTH.attachObservedEarthWind({
+			mesh,
+			world: windHolder,
+			realWindUMonthly,
+			realWindVMonthly,
+			realWindWidth,
+			realWindHeight,
+			realWindMonths,
+			realWindScale,
+			realWindNoData,
+		})
+		observedWind = windHolder.observedWind
 	}
 	record("Post: observed Earth climate", t0)
 	onProgress?.("Post: observed Earth climate", 57)
@@ -906,6 +937,7 @@ function runPostElevationPipeline(
 		dtr_annual,
 		dtr_monthly,
 		observedDtr,
+		observedWind,
 		waterAccess,
 		riverAccess,
 		lakeAccess,

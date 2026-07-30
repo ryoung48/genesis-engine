@@ -4,18 +4,22 @@ import { COMPRESS } from "@/model/society/script/compress"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
 import {
-	computeLabelScale,
-	globeLabelStubLength,
-	globeLabelTangentOffset,
 	LABEL_FONT_SIZE_GLOBE,
 	LABEL_FONT_SIZE_MAP,
 	LABEL_RENDER_ORDER,
-	labelPositionGlobe,
-	labelPositionMap,
+} from "@/ui/planet/renderer/nation-label-overlay"
+import {
 	nationCapitalProvince,
 	nationCapitalRegion,
 	nationProvinceCount,
-} from "@/ui/planet/renderer/nation-label-overlay"
+} from "@/ui/planet/renderer/nation-label-overlay/nation-lookup"
+import {
+	computeLabelScale,
+	globeLabelStubLength,
+	globeLabelTangentOffset,
+	labelPositionGlobe,
+	labelPositionMap,
+} from "@/ui/planet/renderer/nation-label-overlay/positioning"
 import { renderScriptTexture } from "@/ui/planet/renderer/script-texture"
 import {
 	globeScaleForPop,

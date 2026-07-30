@@ -191,6 +191,7 @@ export const GenesisView: React.FC = () => {
 		setShowSolarSystemEllipticalOrbits,
 		setShowSolarSystemInclination,
 		setShowSolarSystemRealisticSizes,
+		setShowRealWind,
 		setShowThermalEquator,
 		setShowWindArrows,
 		setShowWireframe,
@@ -213,6 +214,7 @@ export const GenesisView: React.FC = () => {
 		showNationHierarchy,
 		showOceanCurrents,
 		showPet,
+		showRealWind,
 		showRivers,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,
@@ -874,6 +876,7 @@ export const GenesisView: React.FC = () => {
 		colorMode,
 		dataVariant,
 		showWindArrows,
+		showRealWind,
 		resolvedClimateMonth,
 		temperatureMonth,
 		rainfallMonth,
@@ -1985,6 +1988,8 @@ export const GenesisView: React.FC = () => {
 							setShowCoastlines={setShowCoastlines}
 							showWindArrows={showWindArrows}
 							setShowWindArrows={setShowWindArrows}
+							showRealWind={showRealWind}
+							setShowRealWind={setShowRealWind}
 							showGdd={showGdd}
 							setShowGdd={setShowGdd}
 							showGint={showGint}

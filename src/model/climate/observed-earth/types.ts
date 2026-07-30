@@ -21,3 +21,9 @@ export interface GenesisObservedHumidity {
 	real_monthly?: Float32Array // [month * N + r] observed monthly relative humidity % for imported Earth worlds
 	real_annual?: Float32Array // per-cell observed annual-mean relative humidity %
 }
+
+export interface GenesisObservedWind {
+	real_u_monthly?: Float32Array // [month * N + r] observed monthly eastward wind m/s (NCEP/NCAR 10m reanalysis)
+	real_v_monthly?: Float32Array // [month * N + r] observed monthly northward wind m/s
+	real_speed_monthly?: Float32Array // [month * N + r] hypot(u, v)
+}

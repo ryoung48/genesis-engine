@@ -1,47 +1,69 @@
 ﻿import * as THREE from "three"
 import { Text } from "troika-three-text"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
-import jedarFontUrl from "@/ui/assets/fonts/Jedar.otf"
 import { createMapProjection } from "@/ui/planet/renderer/map-projection"
+import {
+	nationCapitalProvince,
+	nationCapitalRegion,
+	nationProvinceCount,
+} from "@/ui/planet/renderer/nation-label-overlay/nation-lookup"
+import {
+	createLabelPool,
+	createNationLabelPools,
+	disposePool,
+	ensurePoolSize,
+	hideUnusedPool,
+	prepareLabelGroup,
+} from "@/ui/planet/renderer/nation-label-overlay/pool"
+import {
+	computeLabelScale,
+	globeLabelStubLength,
+	globeLabelTangentOffset,
+	labelPositionGlobe,
+	labelPositionMap,
+	localCameraQuaternion,
+	orientGlobeLabel,
+	updateLabelLeaderLine,
+} from "@/ui/planet/renderer/nation-label-overlay/positioning"
 import {
 	globeScaleForPop,
 	mapRadiusForPop,
 } from "@/ui/planet/renderer/settlement-overlay"
 
-const TERRAIN_ELEVATION_SCALE = 0.04
-const LABEL_LIFT_GLOBE = 0.005
-const LABEL_LIFT_MAP = 0.008
-const MAP_Z_ELEVATION_FACTOR = 0.5
+export const TERRAIN_ELEVATION_SCALE = 0.04
+export const LABEL_LIFT_GLOBE = 0.005
+export const LABEL_LIFT_MAP = 0.008
+export const MAP_Z_ELEVATION_FACTOR = 0.5
 
-const LABEL_OFFSET_GLOBE_Y = 0.003
-const LABEL_OFFSET_MAP_X = 0
-const LABEL_OFFSET_MAP_Y = 0.001
-const LABEL_MAP_FONT_GAP_FACTOR = 0.08
-const LABEL_GLOBE_FONT_GAP_FACTOR = 0.04
+export const LABEL_OFFSET_GLOBE_Y = 0.003
+export const LABEL_OFFSET_MAP_X = 0
+export const LABEL_OFFSET_MAP_Y = 0.001
+export const LABEL_MAP_FONT_GAP_FACTOR = 0.08
+export const LABEL_GLOBE_FONT_GAP_FACTOR = 0.04
 
 const LABEL_FONT_SIZE_GLOBE = 0.0035
 const LABEL_FONT_SIZE_MAP = 0.0044
-const LABEL_OUTLINE_WIDTH = 0.2
+export const LABEL_OUTLINE_WIDTH = 0.2
 const LABEL_OUTLINE_COLOR = 0x0f172a
-const LABEL_TEXT_COLOR = "#f1f5f9"
+export const LABEL_TEXT_COLOR = "#f1f5f9"
 const LABEL_RENDER_ORDER = 1001
 
-const LABEL_LEADER_COLOR = 0xf8fafc
-const LABEL_LEADER_OPACITY = 0.55
-const LABEL_LEADER_RENDER_ORDER = 1000
-const LABEL_LEADER_HEIGHT_FACTOR = 1.8
+export const LABEL_LEADER_COLOR = 0xf8fafc
+export const LABEL_LEADER_OPACITY = 0.55
+export const LABEL_LEADER_RENDER_ORDER = 1000
+export const LABEL_LEADER_HEIGHT_FACTOR = 1.8
 
-const MIN_LABEL_SCALE = 0.5
-const MAX_LABEL_SCALE = 4.5
+export const MIN_LABEL_SCALE = 0.5
+export const MAX_LABEL_SCALE = 4.5
 
-const GLOBE_BASE_POSITION = new THREE.Vector3()
-const GLOBE_CAMERA_LOCAL_POSITION = new THREE.Vector3()
-const GLOBE_TO_CAMERA = new THREE.Vector3()
-const GLOBE_GROUP_WORLD_QUATERNION = new THREE.Quaternion()
-const GLOBE_LOCAL_CAMERA_QUATERNION = new THREE.Quaternion()
-const GLOBE_CAMERA_UP = new THREE.Vector3()
-const GLOBE_PROJECTED_UP = new THREE.Vector3()
-const GLOBE_STUB_TIP = new THREE.Vector3()
+export const GLOBE_BASE_POSITION = new THREE.Vector3()
+export const GLOBE_CAMERA_LOCAL_POSITION = new THREE.Vector3()
+export const GLOBE_TO_CAMERA = new THREE.Vector3()
+export const GLOBE_GROUP_WORLD_QUATERNION = new THREE.Quaternion()
+export const GLOBE_LOCAL_CAMERA_QUATERNION = new THREE.Quaternion()
+export const GLOBE_CAMERA_UP = new THREE.Vector3()
+export const GLOBE_PROJECTED_UP = new THREE.Vector3()
+export const GLOBE_STUB_TIP = new THREE.Vector3()
 
 // Labels are children of globeGroup, which carries its own rotation (axial
 // tilt + day/night spin). Billboarding against camera.quaternion directly
@@ -49,75 +71,15 @@ const GLOBE_STUB_TIP = new THREE.Vector3()
 // labels once the globe isn't at its identity orientation. Composing with
 // the inverse of the group's world quaternion cancels the parent rotation
 // so the label's resulting *world* orientation is a true camera billboard.
-function localCameraQuaternion(
-	group: THREE.Object3D,
-	camera: THREE.PerspectiveCamera,
-): THREE.Quaternion {
-	group.getWorldQuaternion(GLOBE_GROUP_WORLD_QUATERNION)
-	return GLOBE_LOCAL_CAMERA_QUATERNION.copy(GLOBE_GROUP_WORLD_QUATERNION)
-		.invert()
-		.multiply(camera.quaternion)
-}
 
-interface LabelPool {
+export interface LabelPool {
 	items: Text[]
 	leaders: THREE.Line[]
 }
 
-interface NationLabelPools {
+export interface NationLabelPools {
 	globe: LabelPool
 	map: LabelPool
-}
-
-function createLabelPool(): LabelPool {
-	return { items: [], leaders: [] }
-}
-
-function createNationLabelPools(): NationLabelPools {
-	return {
-		globe: createLabelPool(),
-		map: createLabelPool(),
-	}
-}
-
-function createLabelLeaderLine(): THREE.Line {
-	const geometry = new THREE.BufferGeometry().setFromPoints([
-		new THREE.Vector3(),
-		new THREE.Vector3(),
-	])
-	const material = new THREE.LineBasicMaterial({
-		color: LABEL_LEADER_COLOR,
-		transparent: true,
-		opacity: LABEL_LEADER_OPACITY,
-		depthWrite: false,
-	})
-	const line = new THREE.Line(geometry, material)
-	line.renderOrder = LABEL_LEADER_RENDER_ORDER
-	line.visible = false
-	line.frustumCulled = false
-	return line
-}
-
-function ensurePoolSize(pool: LabelPool, count: number) {
-	while (pool.items.length < count) {
-		const text = new Text()
-		text.font = jedarFontUrl
-		text.fontSize = LABEL_FONT_SIZE_GLOBE
-		text.fontWeight = 500
-		text.color = LABEL_TEXT_COLOR
-		text.strokeWidth = LABEL_OUTLINE_WIDTH
-		text.strokeColor = LABEL_OUTLINE_COLOR
-		text.anchorX = "center"
-		text.anchorY = "middle"
-		text.textRenderingMode = "distanceField"
-		text.renderOrder = LABEL_RENDER_ORDER
-		text.frustumCulled = true
-		text.visible = false
-		const leader = createLabelLeaderLine()
-		text.userData.leaderLine = leader
-		pool.items.push(text)
-		pool.leaders.push(leader)
-	}
 }
 
 function applyGlobeLabelStyle(text: Text) {
@@ -130,78 +92,7 @@ function applyMapLabelStyle(text: Text) {
 	text.anchorY = "bottom"
 }
 
-function hideUnusedPool(pool: LabelPool, usedCount: number) {
-	for (let i = usedCount; i < pool.items.length; i++) {
-		const text = pool.items[i]
-		if (text.visible) text.visible = false
-		const leader = pool.leaders[i]
-		if (leader && leader.visible) leader.visible = false
-	}
-}
-
-function prepareLabelGroup(targetGroup?: THREE.Group): THREE.Group {
-	const group = targetGroup ?? new THREE.Group()
-	group.clear()
-	return group
-}
-
-function disposePool(pool: LabelPool) {
-	for (const text of pool.items) {
-		text.dispose()
-	}
-	for (const leader of pool.leaders) {
-		leader.geometry.dispose()
-		;(leader.material as THREE.Material).dispose()
-	}
-	pool.items = []
-	pool.leaders = []
-}
-
-function nationCapitalRegion(
-	world: SerializedGenesisWorld,
-	nationIdx: number,
-): number {
-	const nationSeeds = world.nations?.seeds
-	if (!nationSeeds || nationIdx < 0 || nationIdx >= nationSeeds.length) {
-		return -1
-	}
-	const capitalProvince = nationSeeds[nationIdx]
-	if (capitalProvince < 0) return -1
-	const provinceSeeds = world.provinces?.seeds
-	if (!provinceSeeds || capitalProvince >= provinceSeeds.length) return -1
-	return provinceSeeds[capitalProvince]
-}
-
-function nationCapitalProvince(
-	world: SerializedGenesisWorld,
-	nationIdx: number,
-): number {
-	const nationSeeds = world.nations?.seeds
-	if (!nationSeeds || nationIdx < 0 || nationIdx >= nationSeeds.length) {
-		return -1
-	}
-	return nationSeeds[nationIdx] ?? -1
-}
-
-function nationProvinceCount(
-	world: SerializedGenesisWorld,
-	nationIdx: number,
-): number {
-	const directCount = world.nations?.size?.[nationIdx]
-	if (typeof directCount === "number" && directCount > 0) return directCount
-
-	const assignment = world.nations?.assignment
-	const provinceCount = world.provinces?.count ?? 0
-	if (!assignment || provinceCount <= 0) return 0
-
-	let count = 0
-	for (let province = 0; province < provinceCount; province++) {
-		if (assignment[province] === nationIdx) count++
-	}
-	return count
-}
-
-interface LabelScaleCurve {
+export interface LabelScaleCurve {
 	exponent: number
 	factor: number
 	maxScale: number
@@ -215,7 +106,7 @@ interface LabelScaleCurve {
  * compressed large real empires together almost indistinguishably (e.g.
  * Vijayanagara's 33 provinces and Ming's 113 both landing near/at the same
  * clamped scale). */
-const DEFAULT_LABEL_SCALE_CURVE: LabelScaleCurve = {
+export const DEFAULT_LABEL_SCALE_CURVE: LabelScaleCurve = {
 	exponent: 0.55,
 	factor: 0.5,
 	maxScale: MAX_LABEL_SCALE,
@@ -230,118 +121,16 @@ export const EARTH_HISTORY_LABEL_SCALE_CURVE: LabelScaleCurve = {
 	factor: 0.32,
 	maxScale: 6,
 }
-
-function computeLabelScale(
-	componentSize: number,
-	name: string,
-	curve: LabelScaleCurve = DEFAULT_LABEL_SCALE_CURVE,
-): number {
-	const areaScale = 0.1 + Math.pow(componentSize, curve.exponent) * curve.factor
-	const lengthPenalty = Math.max(0.7, 1 - Math.max(0, name.length - 12) * 0.02)
-	return THREE.MathUtils.clamp(
-		areaScale * lengthPenalty,
-		MIN_LABEL_SCALE,
-		curve.maxScale,
-	)
-}
-
-function labelPositionGlobe(
-	r_xyz: Float32Array,
-	elevation: Float32Array,
-	region: number,
-	elevationVisible = true,
-) {
-	const x = r_xyz[3 * region]
-	const y = r_xyz[3 * region + 1]
-	const z = r_xyz[3 * region + 2]
-	const len = Math.sqrt(x * x + y * y + z * z) || 1
-	const nx = x / len
-	const ny = y / len
-	const nz = z / len
-	const elev = elevation[region]
-	const adj = elevationVisible
-		? elev > 0
-			? elev * TERRAIN_ELEVATION_SCALE
-			: elev * TERRAIN_ELEVATION_SCALE * 0.3
-		: 0
-	return {
-		normal: new THREE.Vector3(nx, ny, nz),
-		radius: 1 + adj + LABEL_LIFT_GLOBE,
-	}
-}
-
-function labelPositionMap(
-	projection: ReturnType<typeof createMapProjection>,
-	r_xyz: Float32Array,
-	elevation: Float32Array,
-	region: number,
-	markerRadius: number,
-	fontSize: number,
-): [number, number, number] {
-	const projected = projection.projectCartesian(
-		r_xyz[3 * region],
-		r_xyz[3 * region + 1],
-		r_xyz[3 * region + 2],
-	)
-	const elev = elevation[region]
-	const adj =
-		elev > 0
-			? elev * TERRAIN_ELEVATION_SCALE
-			: elev * TERRAIN_ELEVATION_SCALE * 0.3
-	const z = LABEL_LIFT_MAP + adj * MAP_Z_ELEVATION_FACTOR
-	const [x, y] = projection.projectRadians(projected.lon, projected.lat, z)
-	return [
-		x + LABEL_OFFSET_MAP_X,
-		y +
-			markerRadius +
-			fontSize * LABEL_MAP_FONT_GAP_FACTOR +
-			LABEL_OFFSET_MAP_Y,
-		z,
-	]
-}
-
-type GlobeLabelLike = THREE.Object3D & {
+export type GlobeLabelLike = THREE.Object3D & {
 	visible: boolean
 	userData: Record<string, unknown>
 }
-
-function orientGlobeLabel(
-	label: GlobeLabelLike,
-	cameraQuaternion: THREE.Quaternion,
-) {
-	label.quaternion.copy(cameraQuaternion)
-}
-
 // The leader line is a short radial stub (straight out from the surface, like
 // the solar terminator's leader stubs). The label itself floats further out,
 // nudged tangentially toward the on-screen "up" direction so it reads above
 // its marker the same way map-view labels sit above their marker dot instead
 // of overlapping it. Bigger/more important names get a taller tangential
 // nudge (scaled by font size) so they sit further from their marker.
-function globeLabelStubLength(markerScale: number): number {
-	return markerScale * 0.5 + LABEL_OFFSET_GLOBE_Y
-}
-
-function globeLabelTangentOffset(fontSize: number): number {
-	return (
-		fontSize * LABEL_GLOBE_FONT_GAP_FACTOR +
-		fontSize * LABEL_LEADER_HEIGHT_FACTOR
-	)
-}
-
-function updateLabelLeaderLine(
-	label: GlobeLabelLike,
-	basePosition: THREE.Vector3,
-): void {
-	const leader = label.userData.leaderLine as THREE.Line | undefined
-	if (!leader) return
-	const positions = (leader.geometry as THREE.BufferGeometry).attributes
-		.position as THREE.BufferAttribute
-	positions.setXYZ(0, basePosition.x, basePosition.y, basePosition.z)
-	positions.setXYZ(1, label.position.x, label.position.y, label.position.z)
-	positions.needsUpdate = true
-	leader.geometry.computeBoundingSphere()
-}
 
 function updateGlobeLabelPosition(
 	label: GlobeLabelLike,
@@ -872,13 +661,13 @@ export function buildMapHeritageLabels(
 
 // ── Settlement labels ─────────────────────────────────────────────────────────
 
-const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
-const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.0018
-const SETTLEMENT_LOG_MIN = Math.log10(1_000)
-const SETTLEMENT_LOG_MAX = Math.log10(1_000_000)
-const SETTLEMENT_LABEL_OFFSET_GLOBE_Y = 0.001
-const SETTLEMENT_LABEL_LIFT_GLOBE = 0.002
-const SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION = 0.003
+export const SETTLEMENT_LABEL_FONT_SIZE_GLOBE = 0.00145
+export const SETTLEMENT_LABEL_FONT_SIZE_MAP = 0.0018
+export const SETTLEMENT_LOG_MIN = Math.log10(1_000)
+export const SETTLEMENT_LOG_MAX = Math.log10(1_000_000)
+export const SETTLEMENT_LABEL_OFFSET_GLOBE_Y = 0.001
+export const SETTLEMENT_LABEL_LIFT_GLOBE = 0.002
+export const SETTLEMENT_LABEL_LIFT_GLOBE_ELEVATION = 0.003
 
 function settlementFontScale(pop: number): number {
 	const v = Math.log10(Math.max(1_000, pop))
