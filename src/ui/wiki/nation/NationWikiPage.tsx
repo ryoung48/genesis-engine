@@ -2,6 +2,8 @@ import React from "react"
 import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
 import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { EntityChip } from "@/ui/components/composites/EntityChip"
+import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
@@ -9,6 +11,7 @@ import { GpsFocusButton, renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	type WikiCountHistoryPoint,
 	type WikiTimelineEvent,
+	WikiSection,
 	WikiTimelineSection,
 } from "@/ui/wiki/shared/WikiTimeline"
 
@@ -69,65 +72,24 @@ export interface NationWikiData {
 	onSelectWar: (warId: string) => void
 }
 
-// Always-open section: everything on the page stays visible so the reader
-// scans by scrolling instead of toggling accordions open one at a time.
-function WikiSection({
-	title,
-	meta,
-	children,
-}: {
-	title: string
-	meta?: React.ReactNode
-	children: React.ReactNode
-}) {
-	return (
-		<Surface
-			tone="panel"
-			borderTone="default"
-			radius="xl"
-			className="border-t border-slate-200 px-3 py-2.5"
-		>
-			<div className="mb-1.5 flex items-baseline justify-between gap-2">
-				<span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-					{title}
-				</span>
-				{meta ? (
-					<span className="font-mono text-[8px] text-slate-400">{meta}</span>
-				) : null}
-			</div>
-			{children}
-		</Surface>
-	)
-}
-
 export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 	return (
 		<div className="space-y-2 overflow-x-hidden">
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
-				<div className="border-b border-slate-200 pb-3">
-					<h1
-						className="text-[30px] leading-snug text-slate-950"
-						style={{ fontFamily: "var(--font-jedar)" }}
-					>
-						{nation.title}
-					</h1>
-					<div className="mt-0.5 flex items-center justify-between gap-3">
-						<div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
+				<WikiPageHeader
+					title={nation.title}
+					action={<GpsFocusButton onClick={nation.onFocusNation} />}
+					meta={
+						<>
 							<Swatch color={nation.color} />
 							<span>Nation</span>
 							<span>·</span>
-							<InlineTextButton
-								onClick={nation.onBack}
-								className="text-slate-500"
-							>
+							<InlineTextButton onClick={nation.onBack} className="text-slate-500">
 								{nation.planetTitle}
 							</InlineTextButton>
-						</div>
-						<div className="flex shrink-0 items-center">
-							<GpsFocusButton onClick={nation.onFocusNation} />
-						</div>
-					</div>
-				</div>
+						</>
+					}
+				/>
 				<div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
 					{renderStatGrid(nation.stats)}
 					{nation.dependencies.map((group) => (
@@ -135,20 +97,16 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 							<span className="text-[9px] text-slate-400">{group.label}</span>
 							<div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 font-mono text-[9px] text-slate-700">
 								{group.nations.map((entry, index) => (
-									<span
-										key={entry.tag}
-										className="inline-flex items-center gap-1"
-									>
-										<Swatch color={entry.color} />
-										<InlineTextButton
+									<React.Fragment key={entry.tag}>
+										<EntityChip
+											name={entry.name}
+											color={entry.color}
 											onClick={() => nation.onSelectNation(entry.tag)}
-										>
-											{entry.name}
-										</InlineTextButton>
+										/>
 										{index < group.nations.length - 1 ? (
 											<span className="text-slate-400">,&nbsp;</span>
 										) : null}
-									</span>
+									</React.Fragment>
 								))}
 							</div>
 						</React.Fragment>
@@ -158,26 +116,22 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 							<span className="text-[9px] text-slate-400">Organizations</span>
 							<div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 font-mono text-[9px] text-slate-700">
 								{nation.organizations.map((org, index) => (
-									<span key={org.id} className="inline-flex items-center gap-1">
-										<Swatch
+									<React.Fragment key={org.id}>
+										<EntityChip
+											name={org.name}
 											color={org.striped ? nation.color : org.color}
 											striped={org.striped}
-											stripeBackground="transparent"
 											title={
 												org.striped
 													? `Holds ${org.name} territory, but isn't a member`
 													: undefined
 											}
-										/>
-										<InlineTextButton
 											onClick={() => nation.onSelectOrganization(org.id)}
-										>
-											{org.name}
-										</InlineTextButton>
+										/>
 										{index < nation.organizations.length - 1 ? (
 											<span className="text-slate-400">,&nbsp;</span>
 										) : null}
-									</span>
+									</React.Fragment>
 								))}
 							</div>
 						</React.Fragment>

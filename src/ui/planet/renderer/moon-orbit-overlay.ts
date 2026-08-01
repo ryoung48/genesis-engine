@@ -121,7 +121,7 @@ function buildMoonMesh(
 		map = loadMoonTexture(texturePath)
 	} else {
 		if (!sharedMoonTexture) {
-			sharedMoonTexture = textureLoader.load("/sol/earth/moon.jpg")
+			sharedMoonTexture = textureLoader.load("/textures/celestial/sol/earth/moon.jpg")
 			sharedMoonTexture.colorSpace = THREE.SRGBColorSpace
 			sharedMoonTexture.userData.sharedTexture = true
 		}

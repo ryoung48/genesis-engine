@@ -1,5 +1,6 @@
 import React from "react"
-import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
+import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import type { ColorMode } from "@/ui/planet/colors"
 
 export interface ClimateToggleSectionProps {
@@ -42,13 +43,9 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 	}
 	return (
 		<div>
-			<button
-				type="button"
-				onClick={() => setClimateExpanded((v) => !v)}
-				className="flex items-center justify-between w-full text-[11px] font-medium text-slate-200 hover:text-slate-100 transition-colors"
-			>
-				<span>
-					{colorMode === "temperature" ||
+			<CollapsibleSectionHeader
+				title={
+					colorMode === "temperature" ||
 					colorMode === "realTemperature" ||
 					colorMode === "temperatureDiff" ||
 					colorMode === "dtr" ||
@@ -58,13 +55,11 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 						? "Temperature"
 						: colorMode === "wind"
 							? "Wind"
-							: "Rainfall"}
-				</span>
-				<ChevronIcon
-					direction={climateExpanded ? "up" : "down"}
-					className="h-3 w-3 text-slate-400"
-				/>
-			</button>
+							: "Rainfall"
+				}
+				expanded={climateExpanded}
+				onToggle={() => setClimateExpanded((v) => !v)}
+			/>
 			{climateExpanded && (
 				<div className="mt-1.5 space-y-1.5">
 					{(colorMode === "precipitation" ||
@@ -73,28 +68,17 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 						colorMode === "humidity" ||
 						colorMode === "realHumidity" ||
 						colorMode === "humidityDiff") && (
-						<div className="flex items-center gap-4 text-[11px] font-medium">
-							<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-								<input
-									type="radio"
-									name="rain-sub"
-									checked={baseColorMode === "precipitation"}
-									onChange={() => setColorMode("precipitation")}
-									className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-								Precipitation
-							</label>
-							<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-								<input
-									type="radio"
-									name="rain-sub"
-									checked={baseColorMode === "humidity"}
-									onChange={() => setColorMode("humidity")}
-									className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-								Humidity
-							</label>
-						</div>
+						<SegmentedControl
+							options={[
+								{ value: "precipitation" as const, label: "Precipitation" },
+								{ value: "humidity" as const, label: "Humidity" },
+							]}
+							value={
+								baseColorMode === "humidity" ? "humidity" : "precipitation"
+							}
+							onChange={setColorMode}
+							tone="overlay"
+						/>
 					)}
 					{(colorMode === "temperature" ||
 						colorMode === "realTemperature" ||
@@ -103,38 +87,20 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 						colorMode === "realDtr" ||
 						colorMode === "dtrDiff" ||
 						baseColorMode === "misery") && (
-						<div className="flex items-center gap-4 text-[11px] font-medium">
-							<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-								<input
-									type="radio"
-									name="temp-sub"
-									checked={baseColorMode === "temperature"}
-									onChange={() => setColorMode("temperature")}
-									className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-								Temp
-							</label>
-							<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-								<input
-									type="radio"
-									name="temp-sub"
-									checked={baseColorMode === "dtr"}
-									onChange={() => setColorMode("dtr")}
-									className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-								DTR
-							</label>
-							<label className="flex items-center gap-2 cursor-pointer text-slate-300 has-[:checked]:text-slate-100">
-								<input
-									type="radio"
-									name="temp-sub"
-									checked={baseColorMode === "misery"}
-									onChange={() => setColorMode("misery")}
-									className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-								MI
-							</label>
-						</div>
+						<SegmentedControl
+							options={[
+								{ value: "temperature" as const, label: "Temp" },
+								{ value: "dtr" as const, label: "DTR" },
+								{ value: "misery" as const, label: "MI" },
+							]}
+							value={
+								baseColorMode === "dtr" || baseColorMode === "misery"
+									? baseColorMode
+									: "temperature"
+							}
+							onChange={setColorMode}
+							tone="overlay"
+						/>
 					)}
 				</div>
 			)}

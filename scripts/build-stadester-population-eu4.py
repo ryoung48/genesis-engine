@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import re
 from pathlib import Path
@@ -15,7 +16,7 @@ DEFAULT_SOURCE_DIR = Path(
 DEFAULT_PROVINCE_GEOJSON = Path(
     r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-urban-population-eu4"
 DEFAULT_FILENAME_PREFIX = "stadester_urban"
 DEFAULT_FIELD_LABEL = "urban_population"
@@ -151,13 +152,15 @@ def build_assets(
         scaled = np.clip(scaled, 0, np.iinfo(np.int16).max)
         quantized[time_index] = scaled.astype(np.int16)
 
-    bin_path = output_dir / f"{prefix}.bin"
+    bin_path = output_dir / f"{prefix}.bin.gz"
     meta_path = output_dir / f"{prefix}.json"
-    quantized.astype("<i2", copy=False).tofile(bin_path)
+    with gzip.open(bin_path, "wb", compresslevel=9) as f:
+        f.write(quantized.astype("<i2", copy=False).tobytes())
 
     metadata = {
         "version": 1,
         "format": "int16-time-major",
+        "compression": "gzip",
         "field": f"stadester_eu4_province_{field_label}_people",
         "encoding": {
             "kind": "linear",

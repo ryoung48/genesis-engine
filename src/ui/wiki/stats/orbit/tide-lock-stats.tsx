@@ -6,8 +6,10 @@ import {
 	EditableStatValue,
 	type StatEntry,
 } from "@/ui/components/composites/EditableStatValue"
+import { uiTokens } from "@/ui/components/tokens"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
+import { Slider } from "@/ui/components/primitives/Slider"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
 import { getMoonSeedBaseName } from "@/ui/wiki/stats/orbit/body-titles"
 import {
@@ -95,7 +97,7 @@ function buildTideLockEditorContent(params: {
 	const { tideLock, onSetLock } = params
 	return (
 		<div className="flex w-40 flex-col gap-1 px-1 pt-0.5 pb-2">
-			<span className="mb-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+			<span className={`mb-1 ${uiTokens.type.labelSm} text-slate-500`}>
 				Tide Lock
 			</span>
 			{buildTideLockOptionButton({
@@ -306,22 +308,20 @@ export function buildDirectionalAngleEditorConfig(params: {
 								)}
 							</button>
 						</UITooltip>
-						<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+						<span className={`${uiTokens.type.labelSm} text-slate-500`}>
 							{params.label}
 						</span>
 					</div>
-					<span className="font-mono text-[10px] text-slate-400">
-						{params.value.toFixed(1)}°
-					</span>
 				</div>
-				<input
-					type="range"
+				<Slider
+					className="mt-3"
+					label={null}
+					value={`${params.value.toFixed(1)}°`}
 					min={min}
 					max={max}
 					step={0.5}
-					value={params.value}
-					onChange={(event) => params.onSet(parseFloat(event.target.value))}
-					className="mt-3 h-1 w-full cursor-pointer rounded-lg accent-slate-900"
+					inputValue={params.value}
+					onChange={params.onSet}
 				/>
 			</div>
 		),

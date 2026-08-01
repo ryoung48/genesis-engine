@@ -1,7 +1,9 @@
 import React, { useState } from "react"
 import { DATE } from "@/model/history/earth/date"
+import { EntityChip } from "@/ui/components/composites/EntityChip"
+import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { Surface } from "@/ui/components/primitives/Surface"
-import { Swatch } from "@/ui/components/primitives/Swatch"
+import { uiChartPalette, uiPalette, uiTokens } from "@/ui/components/tokens"
 
 /** One timeline entry shared by the nation and organization wiki pages --
  * built by GenesisView from the earth-history engine's raw events. Mentions
@@ -235,32 +237,26 @@ function renderLinkedTimelineText(
 			(mention.kind === "nation" && !mention.link)
 		) {
 			nodes.push(
-				<span
+				<EntityChip
 					key={`${mention.key}:${key++}`}
-					className="inline-flex items-center gap-1 align-baseline"
-				>
-					<Swatch color={mention.color} className="shrink-0" />
-					<span>{mention.name}</span>
-				</span>,
+					name={mention.name}
+					color={mention.color}
+				/>,
 			)
 		} else {
 			nodes.push(
-				<button
+				<EntityChip
 					key={`${mention.key}:${key++}`}
-					type="button"
-					onClick={(e) => {
-						e.stopPropagation()
+					name={mention.name}
+					color={mention.color}
+					onClick={() => {
 						if (mention.kind === "nation") refs.onSelectNation(mention.tag)
 						else if (mention.kind === "province")
 							refs.onSelectProvince(mention.id)
 						else if (mention.kind === "war") refs.onSelectWar(mention.id)
 						else refs.onSelectOrganization(mention.id)
 					}}
-					className="inline-flex items-center gap-1 align-baseline underline"
-				>
-					<Swatch color={mention.color} className="shrink-0" />
-					<span>{mention.name}</span>
-				</button>,
+				/>,
 			)
 		}
 		cursor = match.index + mention.name.length
@@ -290,7 +286,7 @@ function TimelineEventRow({
 						? "text-slate-500 opacity-80"
 						: "text-slate-600"
 			}`}
-			style={{ borderColor: isPresent ? "#4f46e5" : event.typeColor }}
+			style={{ borderColor: isPresent ? uiPalette.accent : event.typeColor }}
 		>
 			<div>
 				<button
@@ -437,7 +433,7 @@ function CountHistoryChart({
 	>()
 	for (const event of timelineEvents) {
 		if (event.date < start || event.date > end) continue
-		const year = DATE.eu4DaysToYear(event.date)
+		const year = DATE.historyDaysToYear(event.date)
 		const entry = eventYears.get(year)
 		if (entry) {
 			entry.count++
@@ -499,7 +495,7 @@ function CountHistoryChart({
 	return (
 		<div className="mb-2">
 			<div className="mb-1 flex items-baseline justify-between gap-2">
-				<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+				<span className={`${uiTokens.type.labelSm} text-slate-500`}>
 					{countChartLabel}
 				</span>
 				<div className="flex items-center gap-1.5">
@@ -556,16 +552,16 @@ function CountHistoryChart({
 							x2={100}
 							y1={yPx(tick)}
 							y2={yPx(tick)}
-							stroke="#e2e8f0"
+							stroke={uiChartPalette.gridLine}
 							strokeWidth={1}
 							vectorEffect="non-scaling-stroke"
 						/>
 					))}
-					<path d={areaPath} fill="rgba(22, 163, 74, 0.1)" stroke="none" />
+					<path d={areaPath} fill={uiChartPalette.successFill} stroke="none" />
 					<path
 						d={path}
 						fill="none"
-						stroke="#16a34a"
+						stroke={uiChartPalette.successStroke}
 						strokeWidth={2}
 						strokeLinejoin="round"
 						strokeLinecap="round"
@@ -577,7 +573,7 @@ function CountHistoryChart({
 							x2={xPct(hoverDate)}
 							y1={0}
 							y2={PLOT_HEIGHT}
-							stroke="#94a3b8"
+							stroke={uiChartPalette.referenceLine}
 							strokeWidth={1}
 							vectorEffect="non-scaling-stroke"
 						/>
@@ -587,7 +583,7 @@ function CountHistoryChart({
 						x2={xPct(currentDate)}
 						y1={0}
 						y2={PLOT_HEIGHT}
-						stroke="#4f46e5"
+						stroke={uiPalette.accent}
 						strokeWidth={1.5}
 						strokeDasharray="4 3"
 						vectorEffect="non-scaling-stroke"
@@ -603,7 +599,7 @@ function CountHistoryChart({
 						<span className="font-semibold">{countAt(hoverDate)}</span>
 						<span className="text-slate-300">
 							{" "}
-							{countUnitLabel} · {DATE.formatEu4Days(hoverDate)}
+							{countUnitLabel} · {DATE.formatHistoryDays(hoverDate)}
 						</span>
 					</div>
 				) : null}
@@ -655,8 +651,8 @@ function CountHistoryChart({
 				</div>
 			) : null}
 			<div className="mt-0.5 flex justify-between font-mono text-[7px] text-slate-400">
-				<span>{DATE.formatEu4Year(DATE.eu4DaysToYear(start))}</span>
-				<span>{DATE.formatEu4Year(DATE.eu4DaysToYear(end))}</span>
+				<span>{DATE.formatEu4Year(DATE.historyDaysToYear(start))}</span>
+				<span>{DATE.formatEu4Year(DATE.historyDaysToYear(end))}</span>
 			</div>
 		</div>
 	)
@@ -713,9 +709,7 @@ export function WikiTimelineSection({
 				onSelectDate={refs.onSelectDate}
 			/>
 			{timelineEvents.length === 0 ? (
-				<div className="py-1 text-center text-[10px] text-slate-400">
-					No recorded events
-				</div>
+				<EmptyState className="py-1" message="No recorded events" />
 			) : (
 				<div className="space-y-1">
 					{pastEvents.map((event) => (
@@ -737,9 +731,7 @@ export function WikiTimelineSection({
 							/>
 						))
 					) : (
-						<div className="py-0.5 text-center text-[10px] text-slate-400">
-							No events on this date
-						</div>
+						<EmptyState className="py-0.5" message="No events on this date" />
 					)}
 					{futureEvents.map((event) => (
 						<TimelineEventRow

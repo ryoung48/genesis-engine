@@ -58,7 +58,7 @@ class OrganizationSite(NamedTuple):
 #   meeting in 1669, and the secondary cross-check list of Hansa Proper member
 #   cities.
 # - Province ids for trade branches were resolved by sampling
-#   public/heightmap/eu4-provinces.bin.gz at modern city coordinates and
+#   public/earth-data/eu4-provinces.bin.gz at modern city coordinates and
 #   cross-checking those hits against public/earth-history/events/provinces.json
 #   names. This is a coordinate-to-EU4-province mapping method, not a historical
 #   source by itself.

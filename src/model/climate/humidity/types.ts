@@ -1,8 +1,3 @@
-export type RelativeHumidityFromVaporPressureParams = {
-	meanTempC: number
-	vaporPressureKpa: number
-}
-
 export type RelativeHumidityFromTempRangeParams = {
 	meanTempC: number
 	dtrC: number

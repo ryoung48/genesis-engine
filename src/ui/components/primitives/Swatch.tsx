@@ -1,5 +1,6 @@
 import React from "react"
 import { cx } from "@/ui/components/lib"
+import { uiPalette } from "@/ui/components/tokens"
 
 type SwatchShape = "square" | "round"
 type SwatchSize = "sm" | "md"
@@ -25,7 +26,7 @@ interface SwatchProps extends React.HTMLAttributes<HTMLSpanElement> {
 export const Swatch: React.FC<SwatchProps> = ({
 	color,
 	striped = false,
-	stripeBackground = "rgba(15, 23, 42, 0.85)",
+	stripeBackground = uiPalette.swatch.stripeBackground,
 	shape = "square",
 	size = "sm",
 	className,
@@ -42,8 +43,8 @@ export const Swatch: React.FC<SwatchProps> = ({
 			)}
 			style={{
 				borderColor: striped
-					? "rgba(255,255,255,0.15)"
-					: "rgba(203, 213, 225, 0.8)",
+					? uiPalette.swatch.stripedBorder
+					: uiPalette.swatch.plainBorder,
 				...(striped
 					? {
 							backgroundImage: `repeating-linear-gradient(135deg, ${color} 0 2px, ${stripeBackground} 2px 4px)`,

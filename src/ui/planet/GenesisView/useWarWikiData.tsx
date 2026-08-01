@@ -101,7 +101,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 		const dates = war.events.map((event) => event.date)
 		const dateRangeStart = Math.min(...dates)
 		const dateRangeEnd = Math.max(...dates)
-		const dateRangeLabel = `${DATE.formatEu4Days(dateRangeStart)} – ${DATE.formatEu4Days(dateRangeEnd)}`
+		const dateRangeLabel = `${DATE.formatHistoryDays(dateRangeStart)} – ${DATE.formatHistoryDays(dateRangeEnd)}`
 
 		const stats: StatEntry[] = []
 		if (war.warGoalType)
@@ -420,7 +420,7 @@ export function useWarWikiData(input: WarWikiDataInput): WarWikiData | null {
 			dateRangeStart,
 			dateRangeEnd,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: DATE.formatEu4Days(earthHistory.selectedDays),
+			currentDateLabel: DATE.formatHistoryDays(earthHistory.selectedDays),
 			onBack: () => setSelectedWikiWarId(null),
 			onSelectNation: (targetTag: string) => {
 				setSelectedWikiNationTag(targetTag)

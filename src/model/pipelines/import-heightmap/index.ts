@@ -494,29 +494,29 @@ function importGenesisWorld({
 		realWindMonths: params.realWindMonths,
 		realWindScale: params.realWindScale,
 		realWindNoData: params.realWindNoData,
+		realCurrentUMonthly: params.realCurrentUMonthly,
+		realCurrentVMonthly: params.realCurrentVMonthly,
+		realCurrentWidth: params.realCurrentWidth,
+		realCurrentHeight: params.realCurrentHeight,
+		realCurrentMonths: params.realCurrentMonths,
+		realCurrentScale: params.realCurrentScale,
+		realCurrentNoData: params.realCurrentNoData,
+		realSstAnomalyMonthly: params.realSstAnomalyMonthly,
+		realSstAnomalyWidth: params.realSstAnomalyWidth,
+		realSstAnomalyHeight: params.realSstAnomalyHeight,
+		realSstAnomalyMonths: params.realSstAnomalyMonths,
+		realSstAnomalyScale: params.realSstAnomalyScale,
+		realSstAnomalyNoData: params.realSstAnomalyNoData,
 		onProgress,
 	})
 	record("Post-elevation pipeline", t0)
 	onProgress?.("import:post-pipeline", 70)
 
-	if (
-		params.realVaporPressureMonthly &&
-		params.realVaporPressureWidth &&
-		params.realVaporPressureHeight &&
-		params.realVaporPressureMonths &&
-		params.realVaporPressureScale !== undefined &&
-		params.realVaporPressureNoData !== undefined
-	) {
+	if (post.climate.real_temperature_monthly) {
 		t0 = performance.now()
 		REAL_EARTH_DATA.attachObservedEarthHumidity({
 			mesh,
 			world: post,
-			realVaporPressureMonthly: params.realVaporPressureMonthly,
-			realVaporPressureWidth: params.realVaporPressureWidth,
-			realVaporPressureHeight: params.realVaporPressureHeight,
-			realVaporPressureMonths: params.realVaporPressureMonths,
-			realVaporPressureScale: params.realVaporPressureScale,
-			realVaporPressureNoData: params.realVaporPressureNoData,
 		})
 		record("Observed Earth humidity sampling", t0)
 	}
@@ -592,6 +592,7 @@ function importGenesisWorld({
 		observedDtr: post.observedDtr,
 		observedHumidity: post.observedHumidity,
 		observedWind: post.observedWind,
+		observedCurrent: post.observedCurrent,
 		iceThickness: post.iceThickness,
 		iceMinMonthly: post.iceMinMonthly,
 		iceMaxMonthly: post.iceMaxMonthly,

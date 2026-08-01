@@ -1,9 +1,9 @@
 import * as THREE from "three"
 import {
-	AsteroidFieldData,
 	BELT_WIDTH,
 	TWO_PI,
-} from "@/ui/planet/renderer/solar-system-overlay"
+} from "@/ui/planet/renderer/solar-system-overlay/constants"
+import type { AsteroidFieldData } from "@/ui/planet/renderer/solar-system-overlay/types"
 
 // Scatters a field of small, irregularly-scaled rocks around a belt's ring —
 // each on its own randomized circular sub-orbit (slightly jittered radius and

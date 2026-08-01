@@ -1,5 +1,6 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
 import type {
+	GenesisObservedCurrent,
 	GenesisObservedDtr,
 	GenesisObservedHumidity,
 	GenesisObservedWind,
@@ -174,6 +175,7 @@ export interface GenesisWorld {
 	observedDtr?: GenesisObservedDtr
 	observedHumidity?: GenesisObservedHumidity
 	observedWind?: GenesisObservedWind
+	observedCurrent?: GenesisObservedCurrent
 	hydrology: GenesisHydrology
 	isLand: Uint8Array
 	riverLand: Uint8Array

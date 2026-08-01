@@ -10,9 +10,9 @@ import {
 	LABEL_OUTLINE_WIDTH,
 	LABEL_RENDER_ORDER,
 	LABEL_TEXT_COLOR,
-	LabelPool,
-	NationLabelPools,
-} from "@/ui/planet/renderer/nation-label-overlay"
+	type LabelPool,
+	type NationLabelPools,
+} from "@/ui/planet/renderer/nation-label-overlay/constants"
 
 export function createLabelPool(): LabelPool {
 	return { items: [], leaders: [] }

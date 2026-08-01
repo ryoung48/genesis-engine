@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react"
-import { EU4_DAYS } from "@/model/history/generated/eu4-days"
+import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { HistoryNote } from "@/model/history/generated/state/types"
 import type {
@@ -54,7 +54,7 @@ export function useProceduralHistory(input: ProceduralHistoryInput) {
 				proceduralHistoryEventsRef.current =
 					proceduralHistoryEventsRef.current.concat(newEvents)
 			}
-			const days = EU4_DAYS.historyMsToEu4Days(timeMs)
+			const days = HISTORY_DAYS.historyMsToDays(timeMs)
 			const counts = new Map<number, number>()
 			for (const nationId of frame.assignment) {
 				if (nationId < 0) continue

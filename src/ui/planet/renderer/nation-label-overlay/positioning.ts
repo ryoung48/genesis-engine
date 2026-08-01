@@ -4,7 +4,7 @@ import {
 	DEFAULT_LABEL_SCALE_CURVE,
 	GLOBE_GROUP_WORLD_QUATERNION,
 	GLOBE_LOCAL_CAMERA_QUATERNION,
-	GlobeLabelLike,
+	type GlobeLabelLike,
 	LABEL_GLOBE_FONT_GAP_FACTOR,
 	LABEL_LEADER_HEIGHT_FACTOR,
 	LABEL_LIFT_GLOBE,
@@ -13,11 +13,11 @@ import {
 	LABEL_OFFSET_GLOBE_Y,
 	LABEL_OFFSET_MAP_X,
 	LABEL_OFFSET_MAP_Y,
-	LabelScaleCurve,
+	type LabelScaleCurve,
 	MAP_Z_ELEVATION_FACTOR,
 	MIN_LABEL_SCALE,
 	TERRAIN_ELEVATION_SCALE,
-} from "@/ui/planet/renderer/nation-label-overlay"
+} from "@/ui/planet/renderer/nation-label-overlay/constants"
 
 export function labelPositionGlobe(
 	r_xyz: Float32Array,

@@ -10,10 +10,16 @@ import type {
 import type { StageTiming } from "@/model/pipelines/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
-import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
+import { Button } from "@/ui/components/primitives/Button"
+import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
+import { IconButton } from "@/ui/components/primitives/IconButton"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
+import { ToggleChip } from "@/ui/components/primitives/ToggleChip"
+import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
+import { uiTokens } from "@/ui/components/tokens"
 import { SocietyRunesPanel } from "@/ui/planet/controls/SocietyRunesPanel"
+import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
 import {
 	DEFAULT_WORLD_SECTIONS,
 	toggleSection,
@@ -272,7 +278,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
 			<div className="flex-1 min-h-0 overflow-y-auto space-y-3">
-				<div className="rounded-[20px] bg-slate-50 px-3 py-3 space-y-3">
+				<div className="rounded-2xl bg-slate-50 px-3 py-3 space-y-3">
 					{nationWiki ? (
 						<NationWikiPage nation={nationWiki} />
 					) : organizationWiki ? (
@@ -352,28 +358,11 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							className="px-3 py-3"
 						>
 							<div className="space-y-1.5">
-								<button
-									type="button"
+								<DisclosureButton
+									label="Generate"
+									expanded={generateExpanded}
 									onClick={() => setGenerateExpanded((current) => !current)}
-									className="flex w-full items-center justify-between gap-3 text-left"
-								>
-									<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-										Generate
-									</span>
-									<svg
-										width="12"
-										height="12"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										className={`text-slate-400 transition-transform ${generateExpanded ? "rotate-180" : ""}`}
-									>
-										<polyline points="6 9 12 15 18 9" />
-									</svg>
-								</button>
+								/>
 								{generateExpanded ? (
 									<div className="space-y-2.5 pt-1.5">
 										<div className="space-y-2">
@@ -400,23 +389,27 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																seedError ? "text-red-500" : "text-slate-700"
 															}`}
 														/>
-														<button
-															type="button"
+														<IconButton
+															tone="panel"
+															size="sm"
+															shape="rounded"
 															onClick={onRandomizeSeed}
 															disabled={generating}
 															aria-label="Generate new seed"
-															className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
 															title="New seed"
+															className="shadow-none backdrop-blur-none"
 														>
 															<DiceMultipleOutlineIcon className="h-4 w-4" />
-														</button>
-														<button
-															type="button"
+														</IconButton>
+														<IconButton
+															tone="panel"
+															size="sm"
+															shape="rounded"
 															onClick={handleEarthImport}
 															disabled={generating}
 															aria-label="Load Earth seed"
-															className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
 															title="Load Earth"
+															className="shadow-none backdrop-blur-none"
 														>
 															<svg
 																className="h-4 w-4"
@@ -427,19 +420,18 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 																<title>earth</title>
 																<path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
 															</svg>
-														</button>
-														<button
-															type="button"
+														</IconButton>
+														<Button
+															tone="panel"
+															selected
 															onClick={handleGenerate}
 															disabled={generating}
-															aria-label={
-																generating ? "Generating" : "Generate"
-															}
-															className="rounded-md border border-slate-900 bg-slate-900 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-white transition-all hover:bg-slate-800 hover:border-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+															aria-label={generating ? "Generating" : "Generate"}
 															title={generating ? "Generating..." : "Generate"}
+															className="px-2.5 py-1.5"
 														>
 															Generate
-														</button>
+														</Button>
 													</div>
 												</div>
 											</div>
@@ -470,75 +462,34 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 										{generationTimingSummary && (
 											<div className="pt-1">
 												<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
-													<button
-														type="button"
-														onClick={() => {
-															setShowGenerationTimings((current) => !current)
-															if (showGenerationTimings)
-																setTimingDrillDown(null)
-														}}
-														className="flex w-full items-center justify-between gap-3 text-left"
-													>
-														<div>
-															<div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-																Timing
-															</div>
-														</div>
-														<div className="flex items-center gap-2">
+													<DisclosureButton
+														label="Timing"
+														expanded={showGenerationTimings}
+														trailing={
 															<span className="font-mono text-[10px] text-slate-400">
 																{formatTimingSeconds(
 																	generationTimingSummary.totalMs,
 																)}
 															</span>
-															<svg
-																width="12"
-																height="12"
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth="2"
-																strokeLinecap="round"
-																strokeLinejoin="round"
-																className={`text-slate-400 transition-transform ${showGenerationTimings ? "rotate-180" : ""}`}
-															>
-																<polyline points="6 9 12 15 18 9" />
-															</svg>
-														</div>
-													</button>
+														}
+														onClick={() => {
+															setShowGenerationTimings((current) => !current)
+															if (showGenerationTimings)
+																setTimingDrillDown(null)
+														}}
+													/>
 													{showGenerationTimings && (
 														<div className="mt-3 space-y-3">
 															{timingDrillDown === "post" &&
 															postTimingSummary ? (
 																<div className="space-y-2">
-																	<div className="flex items-center gap-2">
-																		<button
-																			type="button"
-																			onClick={() => setTimingDrillDown(null)}
-																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-																		>
-																			<svg
-																				width="10"
-																				height="10"
-																				viewBox="0 0 24 24"
-																				fill="none"
-																				stroke="currentColor"
-																				strokeWidth="2"
-																				strokeLinecap="round"
-																				strokeLinejoin="round"
-																			>
-																				<polyline points="15 18 9 12 15 6" />
-																			</svg>
-																			Back
-																		</button>
-																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-																			Post breakdown
-																		</div>
-																		<span className="ml-auto font-mono text-[10px] text-slate-400">
-																			{formatTimingSeconds(
-																				postTimingSummary.totalMs,
-																			)}
-																		</span>
-																	</div>
+																	<DrillDownBreadcrumbHeader
+																		title="Post breakdown"
+																		trailingValue={formatTimingSeconds(
+																			postTimingSummary.totalMs,
+																		)}
+																		onBack={() => setTimingDrillDown(null)}
+																	/>
 																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
 																		<GenerationTimingChart
 																			entries={postTimingSummary.entries}
@@ -555,35 +506,13 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															) : timingDrillDown === "computeRoutes" &&
 																computeRoutesTimingSummary ? (
 																<div className="space-y-2">
-																	<div className="flex items-center gap-2">
-																		<button
-																			type="button"
-																			onClick={() => setTimingDrillDown(null)}
-																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-																		>
-																			<svg
-																				width="10"
-																				height="10"
-																				viewBox="0 0 24 24"
-																				fill="none"
-																				stroke="currentColor"
-																				strokeWidth="2"
-																				strokeLinecap="round"
-																				strokeLinejoin="round"
-																			>
-																				<polyline points="15 18 9 12 15 6" />
-																			</svg>
-																			Back
-																		</button>
-																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-																			Compute routes breakdown
-																		</div>
-																		<span className="ml-auto font-mono text-[10px] text-slate-400">
-																			{formatTimingSeconds(
-																				computeRoutesTimingSummary.totalMs,
-																			)}
-																		</span>
-																	</div>
+																	<DrillDownBreadcrumbHeader
+																		title="Compute routes breakdown"
+																		trailingValue={formatTimingSeconds(
+																			computeRoutesTimingSummary.totalMs,
+																		)}
+																		onBack={() => setTimingDrillDown(null)}
+																	/>
 																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
 																		<GenerationTimingChart
 																			entries={
@@ -602,46 +531,23 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															) : typeof timingDrillDown === "object" &&
 																timingDrillDown?.kind === "other" ? (
 																<div className="space-y-2">
-																	<div className="flex items-center gap-2">
-																		<button
-																			type="button"
-																			onClick={() => {
-																				const parent = timingDrillDown.parent
-																				if (parent === "pipeline")
-																					setTimingDrillDown(null)
-																				else setTimingDrillDown(parent)
-																			}}
-																			className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700"
-																		>
-																			<svg
-																				width="10"
-																				height="10"
-																				viewBox="0 0 24 24"
-																				fill="none"
-																				stroke="currentColor"
-																				strokeWidth="2"
-																				strokeLinecap="round"
-																				strokeLinejoin="round"
-																			>
-																				<polyline points="15 18 9 12 15 6" />
-																			</svg>
-																			Back
-																		</button>
-																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-																			Other items
-																		</div>
-																		<span className="ml-auto font-mono text-[10px] text-slate-400">
-																			{formatTimingSeconds(
-																				timingDrillDown.parent === "pipeline"
-																					? (generationTimingSummary?.totalMs ??
-																							0)
-																					: timingDrillDown.parent === "post"
-																						? (postTimingSummary?.totalMs ?? 0)
-																						: (computeRoutesTimingSummary?.totalMs ??
-																							0),
-																			)}
-																		</span>
-																	</div>
+									<DrillDownBreadcrumbHeader
+																		title="Other items"
+																		trailingValue={formatTimingSeconds(
+																			timingDrillDown.parent === "pipeline"
+																				? (generationTimingSummary?.totalMs ?? 0)
+																				: timingDrillDown.parent === "post"
+																					? (postTimingSummary?.totalMs ?? 0)
+																					: (computeRoutesTimingSummary?.totalMs ??
+																						0),
+																		)}
+																		onBack={() => {
+																			const parent = timingDrillDown.parent
+																			if (parent === "pipeline")
+																				setTimingDrillDown(null)
+																			else setTimingDrillDown(parent)
+																		}}
+																	/>
 																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
 																		<GenerationTimingChart
 																			entries={
@@ -660,7 +566,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															) : (
 																<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
 																	<div className="mb-2 flex items-center justify-between px-1">
-																		<div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+																		<div className={`${uiTokens.type.controlWide} text-slate-500`}>
 																			Pipeline
 																		</div>
 																		<span className="font-mono text-[10px] text-slate-400">
@@ -708,9 +614,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 				</div>
 
 				<div className="hidden" aria-hidden="true">
-					<div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
+					<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
 						<div className="flex items-center justify-between gap-2">
-							<p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 px-0.5">
+							<p className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}>
 								Society
 							</p>
 							<SegmentedControl
@@ -724,7 +630,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						</div>
 						{societySubtab === "era" ? (
 							<>
-								<p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 px-0.5">
+								<p className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}>
 									Era Preset
 								</p>
 								<div className="grid grid-cols-2 gap-1.5">
@@ -739,15 +645,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 													: `${Math.round(pop / 1e3)}K`
 										const active = era === eraId
 										return (
-											<button
+											<ToggleChip
 												key={eraId}
-												type="button"
+												active={active}
 												onClick={() => setEra(eraId)}
-												className={`rounded-lg border px-2.5 py-2 text-left transition-all ${
-													active
-														? "border-slate-900 bg-slate-900 text-white"
-														: "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-												}`}
 											>
 												<div
 													className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${active ? "text-white" : "text-slate-700"}`}
@@ -759,7 +660,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 												>
 													~{popLabel} pop
 												</div>
-											</button>
+											</ToggleChip>
 										)
 									})}
 								</div>

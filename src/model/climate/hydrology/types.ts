@@ -32,3 +32,24 @@ export type ComputeHydrologyFieldsParams = {
 	rainfall: Pick<GenesisRainfall, "monthly">
 	isLand: Uint8Array
 }
+
+export type ComputeObservedAridityParams = {
+	isLand: Uint8Array
+	realTemperatureMonthly?: Float32Array
+	modeledTemperatureMonthly: Float32Array
+	realDtrMonthly?: Float32Array
+	modeledDtrMonthly: Float32Array
+	realRainfallMonthly?: Float32Array
+	modeledRainfallMonthly: Float32Array
+	insolationMonthly: Float32Array
+	dpm: number
+}
+
+export type ObservedAridityResult = {
+	temperatureMonthly: Float32Array
+	rainfallMonthly: Float32Array
+	dtrMonthly: Float32Array
+	pet_monthly: Float32Array
+	aet_monthly: Float32Array
+	aridity_monthly: Float32Array
+}

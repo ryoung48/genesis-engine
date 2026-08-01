@@ -1,4 +1,5 @@
 import React from "react"
+import { uiTokens } from "@/ui/components/tokens"
 
 interface SeriesBarsProps {
 	values: readonly number[]
@@ -42,7 +43,7 @@ export const SeriesBars: React.FC<SeriesBarsProps> = ({
 	return (
 		<div>
 			<div className="mb-2 flex items-baseline justify-between">
-				<span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">
+				<span className={`${uiTokens.type.labelWide} text-slate-400`}>
 					{label}
 				</span>
 				<span className="font-mono text-[9px] text-slate-500">{summary}</span>

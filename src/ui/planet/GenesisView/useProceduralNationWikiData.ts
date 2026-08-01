@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { DATE } from "@/model/history/earth/date"
-import { EU4_DAYS } from "@/model/history/generated/eu4-days"
+import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { ProceduralNationWikiDataInput } from "@/ui/planet/GenesisView/types"
 import { SINGLE_PROVINCE_FOCUS_DISTANCE_SCALE } from "@/ui/planet/renderer/focus"
@@ -43,7 +43,7 @@ export function useProceduralNationWikiData(
 			governmentLabel: selectedNation.governmentType,
 		})
 		const nationId = selectedNation.id
-		const currentDate = EU4_DAYS.historyMsToEu4Days(proceduralHistoryTimeMs)
+		const currentDate = HISTORY_DAYS.historyMsToDays(proceduralHistoryTimeMs)
 		const allEvents = proceduralHistoryEventsRef.current
 		const timelineEvents = allEvents
 			.filter((event) => eventInvolvesNation(event, nationId))
@@ -71,10 +71,10 @@ export function useProceduralNationWikiData(
 			vegetationDistribution: [],
 			showObservedDistributions: false,
 			provinceHistory: proceduralProvinceHistoryRef.current.get(nationId) ?? [],
-			dateRangeStart: EU4_DAYS.historyMsToEu4Days(800 * STATE.yearMs),
+			dateRangeStart: HISTORY_DAYS.historyMsToDays(800 * STATE.yearMs),
 			dateRangeEnd: currentDate,
 			currentDate,
-			currentDateLabel: DATE.formatEu4Days(currentDate),
+			currentDateLabel: DATE.formatHistoryDays(currentDate),
 			timelineEvents,
 			onBack: () => setSelectedNationId(null),
 			onFocusNation: () => {

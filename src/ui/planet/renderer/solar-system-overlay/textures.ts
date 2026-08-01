@@ -26,7 +26,7 @@ export function loadGrayscaleSunTexture(
 	}
 	if (!grayscaleSunTextureLoadPromise) {
 		grayscaleSunTextureLoadPromise = new Promise((resolve) => {
-			textureLoader.load("/sol/2k_sun.jpg", (loaded) => {
+			textureLoader.load("/textures/celestial/sol/2k_sun.jpg", (loaded) => {
 				const image = loaded.image as HTMLImageElement
 				const canvas = document.createElement("canvas")
 				canvas.width = image.width

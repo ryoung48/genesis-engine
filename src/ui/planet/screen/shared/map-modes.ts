@@ -47,7 +47,6 @@ const DEFAULT_GEOGRAPHY_MODE_OPTIONS: ReadonlyArray<
 	["precipitation", "Rain"],
 	["realPrecipitation", "Observed Rain"],
 	["precipitationDiff", "Rain Diff"],
-	["humidity", "Humidity"],
 	["dangerZones", "Danger"],
 	["trade_goods", "Trade Goods"],
 ]

@@ -1,5 +1,7 @@
 import React from "react"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
+import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import { formatDistance } from "@/ui/planet/screen/shared/ui-format"
 import type { MeasureMode } from "./types"
@@ -91,52 +93,37 @@ export const MeasureSection: React.FC<MeasureSectionProps> = ({
 			</label>
 			{measureExpanded && (
 				<div className="space-y-1.5">
-					<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-						<span>Ruler</span>
-						<input
-							type="radio"
-							name="measure-mode"
-							checked={measureMode === "ruler"}
-							onChange={() => setMeasureMode("ruler")}
-							className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-						/>
-					</label>
-					<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-						<span>Pathfinding</span>
-						<input
-							type="radio"
-							name="measure-mode"
-							checked={measureMode === "pathfinding"}
-							onChange={() => setMeasureMode("pathfinding")}
-							className="h-3 w-3 rounded-full border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-						/>
-					</label>
+					<SegmentedControl
+						options={[
+							{ value: "ruler" as const, label: "Ruler" },
+							{ value: "pathfinding" as const, label: "Pathfinding" },
+						]}
+						value={measureMode === "off" ? "ruler" : measureMode}
+						onChange={setMeasureMode}
+						tone="overlay"
+					/>
 					{measureMode === "pathfinding" && (
 						<div className="space-y-1.5">
-							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-								<span>
-									Land Travel{" "}
-									{formatTravelRateLabel(LAND_TRAVEL_KM_PER_DAY, unitSystem)}
-								</span>
-								<input
-									type="checkbox"
-									checked={pathfindingLand}
-									onChange={(e) => setPathfindingLand(e.target.checked)}
-									className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-							</label>
-							<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-300">
-								<span>
-									Sea Travel{" "}
-									{formatTravelRateLabel(SEA_TRAVEL_KM_PER_DAY, unitSystem)}
-								</span>
-								<input
-									type="checkbox"
-									checked={pathfindingSea}
-									onChange={(e) => setPathfindingSea(e.target.checked)}
-									className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-								/>
-							</label>
+							<ToggleRow
+								label={
+									<>
+										Land Travel{" "}
+										{formatTravelRateLabel(LAND_TRAVEL_KM_PER_DAY, unitSystem)}
+									</>
+								}
+								checked={pathfindingLand}
+								onChange={setPathfindingLand}
+							/>
+							<ToggleRow
+								label={
+									<>
+										Sea Travel{" "}
+										{formatTravelRateLabel(SEA_TRAVEL_KM_PER_DAY, unitSystem)}
+									</>
+								}
+								checked={pathfindingSea}
+								onChange={setPathfindingSea}
+							/>
 							{pathfindingResult && (
 								<div className="rounded bg-white/5 px-2 py-1.5 font-mono text-[10px] text-slate-300">
 									<div>

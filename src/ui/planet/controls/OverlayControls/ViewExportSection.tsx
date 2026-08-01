@@ -1,7 +1,9 @@
 import React from "react"
+import { Button } from "@/ui/components/primitives/Button"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
 import { GlobeIcon } from "@/ui/components/primitives/icons/GlobeIcon"
 import { MapIcon } from "@/ui/components/primitives/icons/MapIcon"
+import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import type { GenesisViewMode } from "@/ui/planet/renderer"
 import { MAX_MAP_PROJECTION_LATITUDE_DEG } from "@/ui/planet/renderer/map-projection"
@@ -102,27 +104,17 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 			</div>
 			{viewMode === "map" && (
 				<div className="space-y-1.5">
-					<div className="flex items-baseline justify-between gap-3">
-						<label className="text-[11px] font-medium text-slate-300">
-							Projection Latitude
-						</label>
-						<span className="font-mono text-[11px] text-slate-400">
-							{draftMapProjectionLatitude.toFixed(0)}°
-						</span>
-					</div>
-					<input
-						type="range"
+					<LabeledSlider
+						label="Projection Latitude"
+						value={`${draftMapProjectionLatitude.toFixed(0)}°`}
 						min={-MAX_MAP_PROJECTION_LATITUDE_DEG}
 						max={MAX_MAP_PROJECTION_LATITUDE_DEG}
 						step={1}
-						value={draftMapProjectionLatitude}
-						onChange={(e) =>
-							setDraftMapProjectionLatitude(Number(e.target.value))
-						}
+						numericValue={draftMapProjectionLatitude}
+						onChange={setDraftMapProjectionLatitude}
 						onPointerUp={commitMapProjectionLatitude}
 						onKeyUp={commitMapProjectionLatitude}
 						onBlur={commitMapProjectionLatitude}
-						className="w-full accent-slate-100"
 					/>
 				</div>
 			)}
@@ -180,34 +172,24 @@ export const ViewExportSection: React.FC<ViewExportSectionProps> = ({
 							/>
 						</div>
 						<div className="space-y-1.5">
-							<div className="flex items-baseline justify-between gap-3">
-								<label className="text-[11px] font-medium text-slate-300">
-									Export Longitude
-								</label>
-								<span className="font-mono text-[11px] text-slate-400">
-									{exportCenterLongitude.toFixed(0)}°
-								</span>
-							</div>
-							<input
-								type="range"
+							<LabeledSlider
+								label="Export Longitude"
+								value={`${exportCenterLongitude.toFixed(0)}°`}
 								min={-180}
 								max={180}
 								step={1}
-								value={exportCenterLongitude}
-								onChange={(e) =>
-									setExportCenterLongitude(Number(e.target.value))
-								}
-								className="w-full accent-slate-100"
+								numericValue={exportCenterLongitude}
+								onChange={setExportCenterLongitude}
 							/>
 						</div>
-						<button
-							type="button"
+						<Button
+							tone="overlay"
 							onClick={onExport}
 							disabled={exportDisabled}
-							className="w-full rounded-md border border-white/10 bg-white/8 px-2.5 py-1.5 text-[11px] font-medium text-slate-100 transition hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-50"
+							className="w-full border-white/10 bg-white/8 px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal text-slate-100 hover:bg-white/12"
 						>
 							{exportBusy ? `Exporting ${exportWidthPreset}w` : "Export PNG"}
-						</button>
+						</Button>
 						{exportProgress && (
 							<div className="space-y-1">
 								<div className="flex items-center justify-between gap-2 text-[10px] text-slate-400">

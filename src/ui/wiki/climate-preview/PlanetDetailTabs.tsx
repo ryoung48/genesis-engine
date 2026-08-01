@@ -9,6 +9,8 @@ import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
 } from "@/ui/planet/screen/generation/generation-preview"
+import { EmptyState } from "@/ui/components/primitives/EmptyState"
+import { uiTokens } from "@/ui/components/tokens"
 import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
 import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
 import { RegularClimatePreview } from "@/ui/preview/RegularClimatePreview"
@@ -60,7 +62,7 @@ function PlanetDetailContent({
 							setDetailTab(tab)
 							if (tab !== "tides") onSelectGenerationPreviewTab(tab)
 						}}
-						className={`px-2 pb-1.5 text-[9px] font-semibold uppercase tracking-[0.08em] transition-colors border-b-2 ${
+						className={`px-2 pb-1.5 ${uiTokens.type.controlSm} transition-colors border-b-2 ${
 							detailTab === tab
 								? "border-slate-700 text-slate-900"
 								: "border-transparent text-slate-400 hover:text-slate-600"
@@ -79,9 +81,7 @@ function PlanetDetailContent({
 							compact={true}
 						/>
 					) : (
-						<div className="flex h-32 items-center justify-center text-[10px] text-slate-400">
-							{tidesEmptyLabel ?? "No tides"}
-						</div>
+						<EmptyState minHeight={128} message={tidesEmptyLabel ?? "No tides"} />
 					)}
 				</div>
 			) : (
@@ -232,9 +232,11 @@ export function LazyPlanetDetailTabs({
 			tidesEmptyLabel={tidesEmptyLabel}
 		/>
 	) : (
-		<div className="mt-2 flex h-32 items-center justify-center px-1 text-[10px] text-slate-400">
-			No climate preview for this object
-		</div>
+		<EmptyState
+			className="mt-2 px-1"
+			minHeight={128}
+			message="No climate preview for this object"
+		/>
 	)
 
 	if (inline) {

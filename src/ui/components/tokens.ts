@@ -1,3 +1,45 @@
+/** Palette entries for hardcoded per-domain colors that used to be inlined
+ * as hex literals at each call site (war swatch, chart series, ...). */
+export const uiPalette = {
+	war: "#b91c1c",
+	/** Shared accent used for "current date"/"active" reference markers
+	 * (WikiTimeline's current-date line, star-stats' active chip). */
+	accent: "#4f46e5",
+	activeDark: "#0f172a",
+	/** `Swatch` primitive's own defaults (striped/plain border, striped
+	 * fill's second color). */
+	swatch: {
+		stripeBackground: "rgba(15, 23, 42, 0.85)",
+		stripedBorder: "rgba(255, 255, 255, 0.15)",
+		plainBorder: "rgba(203, 213, 225, 0.8)",
+	},
+} as const
+
+/** Chart.js / inline-SVG chart palettes -- kept here instead of per-file
+ * arrays/hex literals so all chart accents share one place to retint. */
+export const uiChartPalette = {
+	/** Rotating series colors for per-moon tidal-force lines. */
+	moon: ["#0ea5e9", "#8b5cf6", "#10b981"] as const,
+	solar: "#f59e0b",
+	total: "#1e293b",
+	/** Descending-emphasis tiers for the timing bar chart (rank 0, 1-3, 4+). */
+	timingTiers: ["#0f172a", "#1e293b", "#334155"] as const,
+	successFill: "rgba(22, 163, 74, 0.1)",
+	successStroke: "#16a34a",
+	axisText: "#64748b",
+	axisTextStrong: "#475569",
+	gridLine: "#e2e8f0",
+	gridLineTranslucent: "rgba(148, 163, 184, 0.2)",
+	referenceLine: "#94a3b8",
+	tooltipBg: "#ffffff",
+	/** Tone dots used by `ContributionTooltipContent`. */
+	tone: {
+		neutral: "bg-slate-500",
+		warm: "bg-amber-500",
+		cool: "bg-sky-500",
+	},
+} as const
+
 export const uiTokens = {
 	surface: {
 		canvas: "bg-slate-100",
@@ -40,11 +82,15 @@ export const uiTokens = {
 	type: {
 		label: "font-mono text-[9px] uppercase tracking-[0.12em]",
 		labelWide: "font-mono text-[9px] uppercase tracking-[0.16em]",
+		labelSm: "text-[8px] font-semibold uppercase tracking-[0.08em]",
 		control: "text-[10px] font-semibold uppercase tracking-[0.08em]",
+		controlSm: "text-[9px] font-semibold uppercase tracking-[0.08em]",
 		controlWide: "text-[10px] font-semibold uppercase tracking-[0.12em]",
+		controlLoose: "text-[10px] font-semibold uppercase tracking-[0.14em]",
 		value: "font-mono text-[11px]",
 		valueSm: "font-mono text-[10px]",
 		title: "text-sm font-semibold tracking-tight",
+		hero: "text-[30px] leading-snug [font-family:var(--font-jedar)]",
 	},
 } as const
 

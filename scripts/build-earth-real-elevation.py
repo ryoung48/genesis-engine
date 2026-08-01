@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from build_earth_real_raster import INT16_NODATA, load_month_array, resample_mon
 
 DEFAULT_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public\wc2.1_10m_elev.tif")
 DEFAULT_BATHY_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public\elev.tif")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-elevation"
 # Native WorldClim 10-arcmin resolution -- full precision, no need to
 # downsample (the raw int16 is already compact: 2160*1080*2 bytes ~= 4.4MB).
@@ -55,7 +56,7 @@ def build_asset(
         resampled[bathy_mask] = bathy_resampled[bathy_mask]
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    bin_path = output_dir / f"{prefix}.bin"
+    bin_path = output_dir / f"{prefix}.bin.gz"
     meta_path = output_dir / f"{prefix}.json"
 
     quantized = np.full(resampled.shape, INT16_NODATA, dtype=np.int16)
@@ -65,11 +66,13 @@ def build_asset(
         np.iinfo(np.int16).min + 1,
         np.iinfo(np.int16).max,
     ).astype(np.int16)
-    quantized.astype("<i2", copy=False).tofile(bin_path)
+    with gzip.open(bin_path, "wb", compresslevel=9) as f:
+        f.write(quantized.astype("<i2", copy=False).tobytes())
 
     metadata = {
         "version": 1,
         "format": "int16-single-band",
+        "compression": "gzip",
         "field": "worldclim_elevation_m",
         "width": width,
         "height": height,

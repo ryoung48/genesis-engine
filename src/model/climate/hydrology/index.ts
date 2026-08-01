@@ -1,7 +1,9 @@
 import type {
 	ComputeAetFromPetParams,
 	ComputeHydrologyFieldsParams,
+	ComputeObservedAridityParams,
 	FillPetMonthlyHargreavesParams,
+	ObservedAridityResult,
 	RefreshClimatePetMonthlyParams,
 } from "@/model/climate/hydrology/types"
 import type { GenesisHydrology } from "@/model/climate/types"
@@ -151,9 +153,81 @@ function computeHydrologyFields({
 	return { aet_monthly, aridity_monthly, baseflow_monthly }
 }
 
+function mergeWithModeledFallback(
+	real: Float32Array | undefined,
+	modeled: Float32Array,
+): Float32Array {
+	if (!real) return modeled
+	const out = new Float32Array(real.length)
+	for (let i = 0; i < real.length; i++) {
+		const v = real[i]
+		out[i] = Number.isFinite(v) ? v : modeled[i]
+	}
+	return out
+}
+
+// Shared by both real-Earth pasta classification (assignEarthPastaClimate)
+// and observed humidity (attachObservedEarthHumidity) so "how wet is this
+// cell, really" is computed exactly once and agrees between the two. Falls
+// back to the modeled value per month/cell wherever the observed raster has
+// no coverage, rather than propagating NaN through the water-balance
+// iteration for an entire cell.
+function computeObservedAridity(
+	params: ComputeObservedAridityParams,
+): ObservedAridityResult | undefined {
+	const {
+		isLand,
+		realTemperatureMonthly,
+		modeledTemperatureMonthly,
+		realDtrMonthly,
+		modeledDtrMonthly,
+		realRainfallMonthly,
+		modeledRainfallMonthly,
+		insolationMonthly,
+		dpm,
+	} = params
+	if (!realTemperatureMonthly || !realRainfallMonthly) return undefined
+
+	const N = isLand.length
+	const temperatureMonthly = mergeWithModeledFallback(
+		realTemperatureMonthly,
+		modeledTemperatureMonthly,
+	)
+	const dtrMonthly = mergeWithModeledFallback(realDtrMonthly, modeledDtrMonthly)
+	const rainfallMonthly = mergeWithModeledFallback(
+		realRainfallMonthly,
+		modeledRainfallMonthly,
+	)
+
+	const pet_monthly = new Float32Array(12 * N)
+	fillPetMonthlyHargreaves({
+		temperatureMonthly,
+		rangeMonthly: dtrMonthly,
+		insolationMonthly,
+		petMonthly: pet_monthly,
+		dpm,
+	})
+
+	const { aet_monthly, aridity_monthly } = computeHydrologyFields({
+		climate: { pet_monthly },
+		rainfall: { monthly: rainfallMonthly },
+		isLand,
+	})
+
+	return {
+		temperatureMonthly,
+		rainfallMonthly,
+		dtrMonthly,
+		pet_monthly,
+		aet_monthly,
+		aridity_monthly,
+	}
+}
+
 export const HYDROLOGY = {
 	fillPetMonthlyHargreaves,
 	refreshClimatePetMonthly,
 	computeAetFromPet,
 	computeHydrologyFields,
+	computeObservedAridity,
 }

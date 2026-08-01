@@ -3,20 +3,48 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from build_earth_real_raster import build_monthly_stack, load_month_array, write_asset
+import netCDF4 as nc
+import numpy as np
+
+from build_earth_real_raster import build_monthly_stack, write_asset
 
 
-DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_tavg")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-temperature"
 DEFAULT_WIDTH = 360
 DEFAULT_HEIGHT = 180
 MONTHS = 12
 SCALE = 10.0
+KELVIN_TO_CELSIUS = 273.15
+
+# NCEP/NCAR Reanalysis 1 — 2m air temperature long-term monthly climatology
+# (1991-2020), T62 Gaussian grid, lon 0..360 (prime-meridian start), lat
+# 88.5..-88.5 (north first) -- same lineage/grid as the wind and ocean-current
+# LTM data already used elsewhere, and unlike WorldClim (land-only station
+# interpolation) this covers the whole globe including ocean, so ocean cells
+# no longer fall back to a land-only gap.
+SOURCE = (
+    "NCEP/NCAR Reanalysis 1 — 2m air temperature, long-term monthly mean "
+    "(1991-2020) (downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface_gauss)"
+)
 
 
-def month_path(source_dir: Path, month: int) -> Path:
-    return source_dir / f"wc2.1_10m_tavg_{month:02d}.tif"
+def load_air_temp(path: Path) -> np.ndarray:
+    """Load the NCEP/NCAR 2m air temp LTM (already a 12-month (month, lat,
+    lon) climatology), re-centered to lon -180..180 and converted Kelvin ->
+    Celsius."""
+    with nc.Dataset(path) as ds:
+        climatology = np.asarray(ds.variables["air"][:], dtype=np.float32)
+        lon = np.asarray(ds.variables["lon"][:], dtype=np.float64)
+
+    shift = int(np.argmin(np.abs(lon - 180.0)))
+    climatology = np.roll(climatology, -shift, axis=2)
+
+    out = np.array(climatology, dtype=np.float32, copy=True)
+    out[out < -900] = np.nan
+    out -= KELVIN_TO_CELSIUS
+    return out
 
 
 def build_asset(
@@ -26,27 +54,29 @@ def build_asset(
     width: int,
     height: int,
 ) -> tuple[Path, Path]:
-    def month_loader(month: int):
-        tif_path = month_path(source_dir, month)
-        if not tif_path.exists():
-            raise FileNotFoundError(f"Missing source raster: {tif_path}")
-        return load_month_array(tif_path)
+    source_path = source_dir / "air.2m.mon.ltm.1991-2020.nc"
+    if not source_path.exists():
+        raise FileNotFoundError(f"Missing source file: {source_path}")
 
-    monthly = build_monthly_stack(width, height, month_loader)
+    stack = load_air_temp(source_path)
+    monthly = build_monthly_stack(width, height, lambda m: stack[m - 1])
     return write_asset(
         monthly,
         output_dir,
         prefix,
-        field="worldclim_monthly_tavg_celsius",
+        field="ncep_monthly_air_temp_2m_celsius",
         scale_factor=SCALE,
-        stored_scale=0.1,
-        source=str(source_dir),
+        stored_scale=1.0 / SCALE,
+        source=SOURCE,
     )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build compact Earth monthly observed-temperature assets from WorldClim GeoTIFFs."
+        description=(
+            "Build compact Earth monthly observed-temperature (2m air temp, "
+            "full globe incl. ocean) assets from NCEP/NCAR reanalysis NetCDF."
+        )
     )
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

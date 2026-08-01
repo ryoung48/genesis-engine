@@ -7,6 +7,7 @@ import {
 import { Pagination } from "@/ui/components/primitives/Pagination"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
+import { uiTokens } from "@/ui/components/tokens"
 import type { WorldSection } from "@/ui/planet/details/drawer-state"
 import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
 import { DetailRow, formatPopulation } from "@/ui/planet/details/shared"
@@ -39,7 +40,7 @@ function TopLevelSection({
 					onClick={onToggle}
 					className="flex w-full items-center justify-between gap-3 text-left"
 				>
-					<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+					<span className={`${uiTokens.type.controlLoose} text-slate-500`}>
 						{title}
 					</span>
 					<svg

@@ -55,11 +55,11 @@ function formatEu4Date(dateStr: string): string {
 	return `${formatEu4Year(year)}.${month}.${day}`
 }
 
-function formatEu4Days(days: number): string {
+function formatHistoryDays(days: number): string {
 	return formatEu4Date(daysToEu4Date(days))
 }
 
-function eu4DaysToYear(days: number): number {
+function historyDaysToYear(days: number): number {
 	return earthHistoryStartYear + Math.floor(days / 365)
 }
 
@@ -76,6 +76,6 @@ export const DATE = {
 	earthHistoryDefaultStartDays,
 	eu4DateToDays,
 	formatEu4Year,
-	formatEu4Days,
-	eu4DaysToYear,
+	formatHistoryDays,
+	historyDaysToYear,
 }

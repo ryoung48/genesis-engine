@@ -1,5 +1,5 @@
 ﻿import { DATE } from "@/model/history/earth/date"
-import { EU4_DAYS } from "@/model/history/generated/eu4-days"
+import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import {
 	getEventDescription,
 	getEventDotColor,
@@ -37,11 +37,11 @@ export function buildProceduralWikiTimelineEvent({
 		mentions.set(idStr, { tag: idStr, name, color, link: true })
 		return name
 	})
-	const date = EU4_DAYS.historyMsToEu4Days(event.time)
+	const date = HISTORY_DAYS.historyMsToDays(event.time)
 	return {
 		id: `${event.tag}-${event.time}-${viewingNation}-${index}`,
 		date,
-		dateLabel: DATE.formatEu4Days(date),
+		dateLabel: DATE.formatHistoryDays(date),
 		type: event.tag,
 		typeColor: getEventDotColor(event, viewingNation),
 		description,

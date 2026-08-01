@@ -27,7 +27,7 @@ DEFAULT_SOURCE = Path(r"C:\Users\rayou\projects\geo-explorer\public")
 DEFAULT_OUTPUT = Path("public/earth-history/events")
 DEFAULT_REFERENCE_DIR = Path("public/earth-history/reference")
 DEFAULT_AUDITS_DIR = Path("public/earth-history/audits")
-DEFAULT_PROVINCE_SEEDS = Path("public/heightmap/eu4-provinces-seeds.json")
+DEFAULT_PROVINCE_SEEDS = Path("public/earth-data/eu4-provinces-seeds.json")
 DEFAULT_PROVINCE_NAMES_TOPOJSON = Path(
     r"C:\Users\rayou\projects\geo-explorer\public\provinces.topojson"
 )

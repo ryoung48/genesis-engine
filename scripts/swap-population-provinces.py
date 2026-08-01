@@ -12,7 +12,7 @@ from pathlib import Path
 
 from eu4_population_swaps import apply_population_swaps
 
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_TOTAL_PREFIX = "earth-real-population-eu4"
 DEFAULT_URBAN_PREFIX = "earth-real-urban-population-eu4"
 

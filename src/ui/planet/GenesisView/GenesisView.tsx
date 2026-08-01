@@ -8,7 +8,7 @@ import { WIND } from "@/model/climate/wind"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
-import { EU4_DAYS } from "@/model/history/generated/eu4-days"
+import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { StageTiming } from "@/model/pipelines/types"
 import { SEED_LABEL } from "@/model/shared/random/seed-label"
@@ -191,7 +191,6 @@ export const GenesisView: React.FC = () => {
 		setShowSolarSystemEllipticalOrbits,
 		setShowSolarSystemInclination,
 		setShowSolarSystemRealisticSizes,
-		setShowRealWind,
 		setShowThermalEquator,
 		setShowWindArrows,
 		setShowWireframe,
@@ -214,7 +213,6 @@ export const GenesisView: React.FC = () => {
 		showNationHierarchy,
 		showOceanCurrents,
 		showPet,
-		showRealWind,
 		showRivers,
 		showSolarSystemAxialTilt,
 		showSolarSystemBodyNames,
@@ -302,7 +300,7 @@ export const GenesisView: React.FC = () => {
 	const [selectedTimeMs, setSelectedTimeMs] = useState(simStartTimeMs)
 	// Earth-imported worlds scrub real Gregorian dates via earthHistory's own
 	// slider. selectedTimeMs tracks it so Social's population/culture/heritage/
-	// religion counts follow the scrubber. eu4DaysToYear/historyYearToTime share
+	// religion counts follow the scrubber. historyDaysToYear/historyYearToTime share
 	// the same linear year axis, so this is a direct year-for-year mapping, not
 	// a rescale.
 	const earthHistory = useEarthHistoryTimeline(
@@ -312,7 +310,7 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		if (!world?.isEarthImport) return
 		setSelectedTimeMs(
-			historyYearToTime(DATE.eu4DaysToYear(earthHistory.selectedDays)),
+			historyYearToTime(DATE.historyDaysToYear(earthHistory.selectedDays)),
 		)
 	}, [world?.isEarthImport, earthHistory.selectedDays])
 	const [earthRealPopulation, setEarthRealPopulation] =
@@ -876,7 +874,6 @@ export const GenesisView: React.FC = () => {
 		colorMode,
 		dataVariant,
 		showWindArrows,
-		showRealWind,
 		resolvedClimateMonth,
 		temperatureMonth,
 		rainfallMonth,
@@ -884,20 +881,31 @@ export const GenesisView: React.FC = () => {
 		earthHistoryPlaying,
 	})
 
+	// A single Model/Observed/Diff radio drives every observed-vs-model
+	// overlay (color mode variants, wind, ocean currents) instead of each
+	// having its own toggle.
+	const showRealWind = dataVariant === "observed"
+	const showRealOceanCurrents = dataVariant === "observed"
+
 	const windStats = useMemo(() => {
 		if (!world?.climate) return null
-		const vectors = WIND.computeWindVectors({
-			mesh: world.mesh,
-			climate: world.climate,
-			elevation_km: world.elevation_km,
-			params: world.params,
-			surface: {
-				vegetation: world.vegetation,
-				topography: world.topography,
-				slopeScore: world.slopeScore,
-				oceanDist: world.oceanDist,
-			},
-		})
+		const vectors = showRealWind
+			? WIND.observedWindVectorsForMonth({
+					observedWind: world.observedWind,
+					numRegions: world.mesh.numRegions,
+				})
+			: WIND.computeWindVectors({
+					mesh: world.mesh,
+					climate: world.climate,
+					elevation_km: world.elevation_km,
+					params: world.params,
+					surface: {
+						vegetation: world.vegetation,
+						topography: world.topography,
+						slopeScore: world.slopeScore,
+						oceanDist: world.oceanDist,
+					},
+				})
 		const speeds = vectors.windSpeed
 		let sum = 0
 		let max = 0
@@ -907,7 +915,7 @@ export const GenesisView: React.FC = () => {
 			if (s > max) max = s
 		}
 		return { avg: speeds.length > 0 ? sum / speeds.length : 0, max }
-	}, [world])
+	}, [world, showRealWind])
 
 	// Resolves the per-org category schema (organization-categories.ts) into
 	// a ready-to-use categorizer + color lookup for one folded state --
@@ -1036,7 +1044,16 @@ export const GenesisView: React.FC = () => {
 	}, [windVectors, world])
 
 	const oceanCurrentGrid = useMemo(() => {
-		if (!world?.oceanCurrents || !showOceanCurrents) return null
+		if (!world || !showOceanCurrents) return null
+		if (showRealOceanCurrents) {
+			return OCEAN_CURRENTS.observedOceanCurrentGridForMonth({
+				mesh: world.mesh,
+				isLand: world.isLand,
+				observedCurrent: world.observedCurrent,
+				month: currentMonth > 0 ? currentMonth - 1 : undefined,
+			})
+		}
+		if (!world.oceanCurrents) return null
 		const N = world.mesh.numRegions
 		const monthlyWarmth = world.oceanCurrents.oceanWarmthMonthly
 		const warmth =
@@ -1064,7 +1081,7 @@ export const GenesisView: React.FC = () => {
 			reverseCirculation: UNITS.isRetrogradeObliquity(world.params.obliquity),
 			planetRadiusKm: world.params.planetRadiusKm,
 		})
-	}, [world, showOceanCurrents, currentMonth])
+	}, [world, showOceanCurrents, showRealOceanCurrents, currentMonth])
 
 	// Particles replace the static arrow overlay — keep arrows cleared
 	useEffect(() => {
@@ -1501,6 +1518,17 @@ export const GenesisView: React.FC = () => {
 		mainWorldSystemBody,
 	})
 
+	// Earth import shows real-world observed data by default; a fresh
+	// procedural generation shows the EBM-modeled climate.
+	const handleGenerateWithDataVariant = useCallback(() => {
+		handleSetDataVariant("generated")
+		handleGenerate()
+	}, [handleGenerate, handleSetDataVariant])
+	const handleEarthImportWithDataVariant = useCallback(() => {
+		handleSetDataVariant("observed")
+		handleEarthImport()
+	}, [handleEarthImport, handleSetDataVariant])
+
 	const {
 		exportWidthPreset,
 		setExportWidthPreset,
@@ -1660,6 +1688,7 @@ export const GenesisView: React.FC = () => {
 					maxElevation,
 					avgWindSpeedMs: windStats?.avg ?? null,
 					maxWindSpeedMs: windStats?.max ?? null,
+					useObservedTemperature: dataVariant === "observed",
 				},
 				unitSystem,
 			),
@@ -1680,6 +1709,7 @@ export const GenesisView: React.FC = () => {
 			world,
 			worldForDisplay,
 			windStats,
+			dataVariant,
 		],
 	)
 
@@ -1788,8 +1818,8 @@ export const GenesisView: React.FC = () => {
 					generationPreviewTab={generationPreviewTab}
 					onSelectGenerationPreviewTab={setGenerationPreviewTab}
 					unitSystem={unitSystem}
-					handleGenerate={handleGenerate}
-					handleEarthImport={handleEarthImport}
+					handleGenerate={handleGenerateWithDataVariant}
+					handleEarthImport={handleEarthImportWithDataVariant}
 					onClose={() => setGenerationPanelOpen(false)}
 					worldDetails={{
 						hasGeneratedWorld: !!world && !generating,
@@ -1988,8 +2018,6 @@ export const GenesisView: React.FC = () => {
 							setShowCoastlines={setShowCoastlines}
 							showWindArrows={showWindArrows}
 							setShowWindArrows={setShowWindArrows}
-							showRealWind={showRealWind}
-							setShowRealWind={setShowRealWind}
 							showGdd={showGdd}
 							setShowGdd={setShowGdd}
 							showGint={showGint}
@@ -2173,7 +2201,7 @@ export const GenesisView: React.FC = () => {
 									onPlayPause={handleToggleProceduralHistoryPlayback}
 									simPlaying={proceduralHistoryPlaying}
 									formatLabel={(ms) =>
-										DATE.formatEu4Days(EU4_DAYS.historyMsToEu4Days(ms))
+										DATE.formatHistoryDays(HISTORY_DAYS.historyMsToDays(ms))
 									}
 									stepValue={STATE.yearMs}
 								/>

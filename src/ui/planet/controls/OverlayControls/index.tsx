@@ -9,6 +9,7 @@ import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { RefreshIcon } from "@/ui/components/primitives/icons/RefreshIcon"
 import { TransferUpIcon } from "@/ui/components/primitives/icons/TransferUpIcon"
+import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 import {
 	getAvailableVariants,
@@ -60,8 +61,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowCoastlines,
 	showWindArrows,
 	setShowWindArrows,
-	showRealWind,
-	setShowRealWind,
 	showGdd,
 	setShowGdd,
 	showGint,
@@ -272,15 +271,12 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 								action={headerAction}
 							/>
 							<div className="space-y-3">
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Wireframe</span>
-									<input
-										type="checkbox"
-										checked={showWireframe}
-										onChange={() => setShowWireframe(!showWireframe)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
+								<ToggleRow
+									label="Wireframe"
+									checked={showWireframe}
+									onChange={() => setShowWireframe(!showWireframe)}
+									labelClassName="text-slate-200"
+								/>
 
 								<MeasureSection
 									measureExpanded={measureExpanded}
@@ -338,8 +334,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									showWindArrows={showWindArrows}
 									setShowWindArrows={setShowWindArrows}
 									isEarthImport={isEarthImport}
-									showRealWind={showRealWind}
-									setShowRealWind={setShowRealWind}
 									showOceanCurrents={showOceanCurrents}
 									setShowOceanCurrents={setShowOceanCurrents}
 									showThermalEquator={showThermalEquator}

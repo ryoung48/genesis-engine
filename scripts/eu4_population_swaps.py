@@ -1,5 +1,5 @@
 """Shared province-population corrections, applied as a postprocessing step
-after regenerating public/heightmap/earth-real-population-eu4.* and
+after regenerating public/earth-data/earth-real-population-eu4.* and
 earth-real-urban-population-eu4.* from the Stadester rasters
 (build-stadester-population-eu4.py). A handful of provinces have their
 total- and urban-population data mismatched at the source; this swaps the
@@ -12,6 +12,7 @@ nothing else to remember.
 
 from __future__ import annotations
 
+import gzip
 import json
 from pathlib import Path
 
@@ -24,7 +25,12 @@ def _load(output_dir: Path, prefix: str) -> tuple[dict, np.ndarray, Path]:
     meta_path = output_dir / f"{prefix}.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     bin_path = output_dir / meta["bin"]
-    values = np.fromfile(bin_path, dtype="<i2").reshape(
+    raw = (
+        gzip.open(bin_path, "rb").read()
+        if meta.get("compression") == "gzip"
+        else bin_path.read_bytes()
+    )
+    values = np.frombuffer(raw, dtype="<i2").reshape(
         meta["timeCount"], meta["provinceCount"]
     )
     return meta, values, bin_path
@@ -57,7 +63,8 @@ def apply_population_swaps_to_prefix(output_dir: Path, prefix: str) -> None:
     for province_a, province_b in POPULATION_PROVINCE_SWAPS:
         values = _swap_columns(meta, values, province_a, province_b)
 
-    values.astype("<i2", copy=False).tofile(bin_path)
+    with gzip.open(bin_path, "wb", compresslevel=9) as f:
+        f.write(values.astype("<i2", copy=False).tobytes())
 
 
 def apply_population_swaps(

@@ -52,11 +52,32 @@ export interface RealUrbanPopulationSlice {
 	sourceTimeLabel: string
 }
 
+/** A server may already transparently decode a *.gz file via the standard
+ * Content-Encoding response header (e.g. Vite's dev static middleware does
+ * this) -- decompressing again here would double-decode garbage. Only run
+ * DecompressionStream when the bytes are still actually gzipped. */
+async function fetchMaybeGzippedBinary(
+	url: string,
+	compression: "gzip" | undefined,
+	label: string,
+): Promise<ArrayBuffer> {
+	const res = await fetch(url)
+	if (!res.ok) {
+		throw new Error(`Failed to load ${label}: ${res.status}`)
+	}
+	const alreadyDecoded = res.headers.get("content-encoding") === "gzip"
+	return compression === "gzip" && !alreadyDecoded
+		? await new Response(
+				res.body?.pipeThrough(new DecompressionStream("gzip")),
+			).arrayBuffer()
+		: await res.arrayBuffer()
+}
+
 async function loadEarthMonthlyRaster(
 	prefix: string,
 	label: string,
 ): Promise<MonthlyRasterAsset> {
-	const metaRes = await fetch(`/heightmap/${prefix}.json`)
+	const metaRes = await fetch(`/earth-data/${prefix}.json`)
 	if (!metaRes.ok) {
 		throw new Error(`Failed to load ${label} metadata: ${metaRes.status}`)
 	}
@@ -67,12 +88,13 @@ async function loadEarthMonthlyRaster(
 		months: number
 		scale: number
 		nodata: number
+		compression?: "gzip"
 	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(`Failed to load ${label} raster: ${binRes.status}`)
-	}
-	const buffer = await binRes.arrayBuffer()
+	const buffer = await fetchMaybeGzippedBinary(
+		`/earth-data/${meta.bin}`,
+		meta.compression,
+		`${label} raster`,
+	)
 	return {
 		monthly: new Int16Array(buffer),
 		width: meta.width,
@@ -113,6 +135,48 @@ export async function loadEarthRealWindV(): Promise<MonthlyRasterAsset> {
 	return loadEarthMonthlyRaster("earth-real-wind-v", "observed wind (v)")
 }
 
+/** Optional: unlike the other observed-Earth rasters, ocean-current/SST-anomaly
+ * assets aren't shipped by default (see scripts/build-earth-real-current.py) --
+ * missing files degrade to "Observed" ocean currents being unavailable rather
+ * than failing the whole Earth import. */
+async function loadEarthMonthlyRasterOptional(
+	prefix: string,
+	label: string,
+): Promise<MonthlyRasterAsset | undefined> {
+	try {
+		return await loadEarthMonthlyRaster(prefix, label)
+	} catch {
+		return undefined
+	}
+}
+
+export async function loadEarthRealCurrentU(): Promise<
+	MonthlyRasterAsset | undefined
+> {
+	return loadEarthMonthlyRasterOptional(
+		"earth-real-current-u",
+		"observed ocean current (u)",
+	)
+}
+
+export async function loadEarthRealCurrentV(): Promise<
+	MonthlyRasterAsset | undefined
+> {
+	return loadEarthMonthlyRasterOptional(
+		"earth-real-current-v",
+		"observed ocean current (v)",
+	)
+}
+
+export async function loadEarthRealSstAnomaly(): Promise<
+	MonthlyRasterAsset | undefined
+> {
+	return loadEarthMonthlyRasterOptional(
+		"earth-real-sst-anomaly",
+		"observed SST anomaly",
+	)
+}
+
 export async function loadEarthRealElevation(): Promise<{
 	raster: Int16Array
 	width: number
@@ -120,7 +184,7 @@ export async function loadEarthRealElevation(): Promise<{
 	scale: number
 	nodata: number
 }> {
-	const metaRes = await fetch("/heightmap/earth-real-elevation.json")
+	const metaRes = await fetch("/earth-data/earth-real-elevation.json")
 	if (!metaRes.ok) {
 		throw new Error(
 			`Failed to load observed elevation metadata: ${metaRes.status}`,
@@ -132,14 +196,13 @@ export async function loadEarthRealElevation(): Promise<{
 		height: number
 		scale: number
 		nodata: number
+		compression?: "gzip"
 	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(
-			`Failed to load observed elevation raster: ${binRes.status}`,
-		)
-	}
-	const buffer = await binRes.arrayBuffer()
+	const buffer = await fetchMaybeGzippedBinary(
+		`/earth-data/${meta.bin}`,
+		meta.compression,
+		"observed elevation raster",
+	)
 	return {
 		raster: new Int16Array(buffer),
 		width: meta.width,
@@ -153,7 +216,7 @@ async function loadEarthProvinceTimeline(
 	prefix: string,
 	label: string,
 ): Promise<Eu4PopulationTimelineAsset> {
-	const metaRes = await fetch(`/heightmap/${prefix}.json`)
+	const metaRes = await fetch(`/earth-data/${prefix}.json`)
 	if (!metaRes.ok) {
 		throw new Error(`Failed to load ${label} metadata: ${metaRes.status}`)
 	}
@@ -165,12 +228,13 @@ async function loadEarthProvinceTimeline(
 		times: string[]
 		encoding: { scale: number }
 		nodata: number
+		compression?: "gzip"
 	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(`Failed to load ${label} asset: ${binRes.status}`)
-	}
-	const buffer = await binRes.arrayBuffer()
+	const buffer = await fetchMaybeGzippedBinary(
+		`/earth-data/${meta.bin}`,
+		meta.compression,
+		`${label} asset`,
+	)
 	const rawProvinceIds = Int32Array.from(meta.rawProvinceIds)
 	const rawIdToIndex = new Map<number, number>()
 	for (let i = 0; i < rawProvinceIds.length; i++) {
@@ -271,7 +335,7 @@ export function buildInterpolatedProvinceTimelineSlice(params: {
 		population,
 		totalPopulation,
 		sourceTimeDays: selectedDays,
-		sourceTimeLabel: DATE.formatEu4Days(selectedDays),
+		sourceTimeLabel: DATE.formatHistoryDays(selectedDays),
 	}
 }
 
@@ -338,7 +402,7 @@ export interface Eu4GhslSettlementAsset {
 }
 
 export async function loadEu4GhslSettlements(): Promise<Eu4GhslSettlementAsset> {
-	const metaRes = await fetch("/heightmap/eu4-ghsl-settlements.json")
+	const metaRes = await fetch("/earth-data/eu4-ghsl-settlements.json")
 	if (!metaRes.ok) {
 		throw new Error(
 			`Failed to load GHSL settlements metadata: ${metaRes.status}`,
@@ -353,12 +417,13 @@ export async function loadEu4GhslSettlements(): Promise<Eu4GhslSettlementAsset> 
 		provinceIds: number[]
 		encoding: { scale: number }
 		nodata: number
+		compression?: "gzip"
 	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(`Failed to load GHSL settlements asset: ${binRes.status}`)
-	}
-	const buffer = await binRes.arrayBuffer()
+	const buffer = await fetchMaybeGzippedBinary(
+		`/earth-data/${meta.bin}`,
+		meta.compression,
+		"GHSL settlements asset",
+	)
 	const populationValueCount = meta.timeCount * meta.settlementCount
 	const values = new Int16Array(buffer, 0, populationValueCount)
 	const coordsView = new DataView(buffer, populationValueCount * 2)
@@ -444,7 +509,7 @@ export async function loadEu5Categorical(prefix: string): Promise<{
 	nodata: number
 	categories: string[]
 }> {
-	const metaRes = await fetch(`/heightmap/${prefix}.json`)
+	const metaRes = await fetch(`/earth-data/${prefix}.json`)
 	if (!metaRes.ok) {
 		throw new Error(`Failed to load ${prefix} metadata: ${metaRes.status}`)
 	}
@@ -456,7 +521,7 @@ export async function loadEu5Categorical(prefix: string): Promise<{
 		nodata: number
 		categories: string[]
 	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
+	const binRes = await fetch(`/earth-data/${meta.bin}`)
 	if (!binRes.ok) {
 		throw new Error(`Failed to load ${prefix} raster: ${binRes.status}`)
 	}
@@ -480,7 +545,7 @@ export async function loadEu4Provinces(): Promise<{
 	height: number
 	nodata: number
 }> {
-	const metaRes = await fetch("/heightmap/eu4-provinces.json")
+	const metaRes = await fetch("/earth-data/eu4-provinces.json")
 	if (!metaRes.ok) {
 		throw new Error(`Failed to load EU4 provinces metadata: ${metaRes.status}`)
 	}
@@ -491,21 +556,11 @@ export async function loadEu4Provinces(): Promise<{
 		nodata: number
 		compression?: "gzip"
 	}
-	const binRes = await fetch(`/heightmap/${meta.bin}`)
-	if (!binRes.ok) {
-		throw new Error(`Failed to load EU4 provinces raster: ${binRes.status}`)
-	}
-	// A server may already transparently decode a *.gz file via the standard
-	// Content-Encoding response header (e.g. Vite's dev static middleware
-	// does this) -- decompressing again here would double-decode garbage.
-	// Only run DecompressionStream when the bytes are still actually gzipped.
-	const alreadyDecoded = binRes.headers.get("content-encoding") === "gzip"
-	const buffer =
-		meta.compression === "gzip" && !alreadyDecoded
-			? await new Response(
-					binRes.body?.pipeThrough(new DecompressionStream("gzip")),
-				).arrayBuffer()
-			: await binRes.arrayBuffer()
+	const buffer = await fetchMaybeGzippedBinary(
+		`/earth-data/${meta.bin}`,
+		meta.compression,
+		"EU4 provinces raster",
+	)
 	return {
 		raster: new Int16Array(buffer),
 		width: meta.width,

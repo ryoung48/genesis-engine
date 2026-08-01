@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "format": "int16-month-major",
+  "field": "ncep_monthly_air_temp_2m_celsius",
+  "width": 360,
+  "height": 180,
+  "months": 12,
+  "scale": 0.1,
+  "nodata": -32768,
+  "source": "NCEP/NCAR Reanalysis 1 \u2014 2m air temperature, long-term monthly mean (1991-2020) (downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface_gauss)",
+  "bin": "earth-real-temperature.bin.gz",
+  "compression": "gzip"
+}

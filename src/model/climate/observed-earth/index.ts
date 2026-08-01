@@ -329,10 +329,90 @@ function attachObservedEarthWind(params: {
 	}
 }
 
+function attachObservedEarthCurrent(params: {
+	mesh: SphereMesh
+	world: {
+		observedCurrent?: GenesisWorld["observedCurrent"]
+	}
+	realCurrentUMonthly: Int16Array
+	realCurrentVMonthly: Int16Array
+	realCurrentWidth: number
+	realCurrentHeight: number
+	realCurrentMonths: number
+	realCurrentScale: number
+	realCurrentNoData: number
+	realSstAnomalyMonthly: Int16Array
+	realSstAnomalyWidth: number
+	realSstAnomalyHeight: number
+	realSstAnomalyMonths: number
+	realSstAnomalyScale: number
+	realSstAnomalyNoData: number
+}): void {
+	const {
+		mesh,
+		world,
+		realCurrentUMonthly,
+		realCurrentVMonthly,
+		realCurrentWidth,
+		realCurrentHeight,
+		realCurrentMonths,
+		realCurrentScale,
+		realCurrentNoData,
+		realSstAnomalyMonthly,
+		realSstAnomalyWidth,
+		realSstAnomalyHeight,
+		realSstAnomalyMonths,
+		realSstAnomalyScale,
+		realSstAnomalyNoData,
+	} = params
+	if (realCurrentMonths !== 12 || realSstAnomalyMonths !== 12) return
+
+	const N = mesh.numRegions
+	const observedU = sampleMonthlyFloatRaster({
+		mesh,
+		raster: realCurrentUMonthly,
+		rasterW: realCurrentWidth,
+		rasterH: realCurrentHeight,
+		months: realCurrentMonths,
+		scale: realCurrentScale,
+		nodata: realCurrentNoData,
+	})
+	const observedV = sampleMonthlyFloatRaster({
+		mesh,
+		raster: realCurrentVMonthly,
+		rasterW: realCurrentWidth,
+		rasterH: realCurrentHeight,
+		months: realCurrentMonths,
+		scale: realCurrentScale,
+		nodata: realCurrentNoData,
+	})
+	const observedSpeed = new Float32Array(N * realCurrentMonths)
+	for (let i = 0; i < observedSpeed.length; i++) {
+		observedSpeed[i] = Math.hypot(observedU[i], observedV[i])
+	}
+	const observedSstAnomaly = sampleMonthlyFloatRaster({
+		mesh,
+		raster: realSstAnomalyMonthly,
+		rasterW: realSstAnomalyWidth,
+		rasterH: realSstAnomalyHeight,
+		months: realSstAnomalyMonths,
+		scale: realSstAnomalyScale,
+		nodata: realSstAnomalyNoData,
+	})
+
+	world.observedCurrent = {
+		real_u_monthly: observedU,
+		real_v_monthly: observedV,
+		real_speed_monthly: observedSpeed,
+		real_sst_anomaly_monthly: observedSstAnomaly,
+	}
+}
+
 export const OBSERVED_EARTH = {
 	sampleMonthlyFloatRaster,
 	attachObservedEarthClimate,
 	attachObservedEarthRainfall,
 	attachObservedEarthDtr,
 	attachObservedEarthWind,
+	attachObservedEarthCurrent,
 }

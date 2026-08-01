@@ -1,5 +1,5 @@
 import { HUMIDITY } from "@/model/climate/humidity"
-import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
+import { HYDROLOGY } from "@/model/climate/hydrology"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
 import type {
@@ -12,63 +12,100 @@ import type {
 } from "@/model/pipelines/import-heightmap/real-earth-data/types"
 import type { GenesisWorld } from "@/model/pipelines/types"
 
+// WorldClim's vapor-pressure product estimates actual vapor pressure from
+// daily minimum temperature (dewpoint ≈ Tmin), which is unreliable at the
+// extremes: it goes wildly supersaturated in the deep-cold Antarctic
+// interior, and runs systematically high in low-DTR climates like the
+// Amazon (Tmin stays close to Tmean there, so the Tmin-derived vapor
+// pressure is inflated relative to Tmean's saturation point). Rather than
+// trust that derived product, this reuses the same dewpoint-depression
+// heuristic as modeled RH (HUMIDITY.relativeHumidityFromTempRange), just fed
+// with observed inputs (real temperature, real DTR, real rainfall) instead
+// of modeled ones -- "observed RH" becomes "the same RH model, grounded in
+// real climatology" rather than a second, less trustworthy data source.
 function attachObservedEarthHumidity(params: {
 	mesh: SphereMesh
 	world: {
 		climate: GenesisWorld["climate"]
+		rainfall?: GenesisWorld["rainfall"]
+		oceanDist?: GenesisWorld["oceanDist"]
+		dtr_monthly?: GenesisWorld["dtr_monthly"]
+		observedDtr?: GenesisWorld["observedDtr"]
 		observedHumidity?: GenesisWorld["observedHumidity"]
+		isLand?: GenesisWorld["isLand"]
+		params?: GenesisWorld["params"]
 	}
-	realVaporPressureMonthly: Int16Array
-	realVaporPressureWidth: number
-	realVaporPressureHeight: number
-	realVaporPressureMonths: number
-	realVaporPressureScale: number
-	realVaporPressureNoData: number
 }): void {
-	const {
-		mesh,
-		world,
-		realVaporPressureMonthly,
-		realVaporPressureWidth,
-		realVaporPressureHeight,
-		realVaporPressureMonths,
-		realVaporPressureScale,
-		realVaporPressureNoData,
-	} = params
-	if (realVaporPressureMonths !== 12 || !world.climate.real_temperature_monthly)
-		return
+	const { mesh, world } = params
+	const realTempMonthly = world.climate.real_temperature_monthly
+	if (!realTempMonthly) return
 
 	const N = mesh.numRegions
-	const observedVaporPressureMonthly = OBSERVED_EARTH.sampleMonthlyFloatRaster({
-		mesh,
-		raster: realVaporPressureMonthly,
-		rasterW: realVaporPressureWidth,
-		rasterH: realVaporPressureHeight,
-		months: realVaporPressureMonths,
-		scale: realVaporPressureScale,
-		nodata: realVaporPressureNoData,
-	})
-	const observedMonthly = new Float32Array(N * realVaporPressureMonths)
+
+	// Observed aridity: shared with real-Earth pasta classification
+	// (assignEarthPastaClimate) via HYDROLOGY.computeObservedAridity, so both
+	// agree on "how wet is this cell, really" instead of maintaining two
+	// separate real-data water-balance computations.
+	const observed = world.isLand
+		? HYDROLOGY.computeObservedAridity({
+				isLand: world.isLand,
+				realTemperatureMonthly: realTempMonthly,
+				modeledTemperatureMonthly: world.climate.temperature_monthly,
+				realDtrMonthly: world.observedDtr?.real_monthly,
+				modeledDtrMonthly:
+					world.dtr_monthly ?? new Float32Array(12 * N),
+				realRainfallMonthly: world.rainfall?.real_monthly,
+				modeledRainfallMonthly:
+					world.rainfall?.monthly ?? new Float32Array(12 * N),
+				insolationMonthly: world.climate.insolation_monthly,
+				dpm: (world.params?.daysPerYear ?? 365) / 12,
+			})
+		: undefined
+	const observedAet = observed?.aet_monthly
+	const observedPet = observed?.pet_monthly
+
+	const observedMonthly = new Float32Array(12 * N)
 	const observedAnnual = new Float32Array(N)
 
 	for (let r = 0; r < N; r++) {
+		let annualAridity: number | undefined
+		if (observedAet && observedPet) {
+			let aetSum = 0
+			let petSum = 0
+			for (let m = 0; m < 12; m++) {
+				aetSum += observedAet[m * N + r]
+				petSum += observedPet[m * N + r]
+			}
+			annualAridity = petSum > 0 ? aetSum / petSum : 1
+		}
+		const annualRainfallMm = world.rainfall?.real_annual?.[r]
+		const distFromOceanKm = world.oceanDist?.[r]
+
 		let observedSum = 0
 		let observedCount = 0
-		for (let month = 0; month < realVaporPressureMonths; month++) {
+		for (let month = 0; month < 12; month++) {
 			const idx = month * N + r
-			const vaporPressure = observedVaporPressureMonthly[idx]
-			const meanTemp = world.climate.real_temperature_monthly[idx]
-			if (Number.isFinite(vaporPressure) && Number.isFinite(meanTemp)) {
-				const observed = HUMIDITY.relativeHumidityFromVaporPressure({
-					meanTempC: meanTemp,
-					vaporPressureKpa: vaporPressure,
-				})
-				observedMonthly[idx] = observed
-				observedSum += observed
-				observedCount++
-			} else {
+			const meanTempC = realTempMonthly[idx]
+			if (!Number.isFinite(meanTempC)) {
 				observedMonthly[idx] = NaN
+				continue
 			}
+			const dtrC =
+				world.observedDtr?.real_monthly?.[idx] ?? world.dtr_monthly?.[idx]
+			if (!Number.isFinite(dtrC)) {
+				observedMonthly[idx] = NaN
+				continue
+			}
+			const observed = HUMIDITY.relativeHumidityFromTempRange({
+				meanTempC,
+				dtrC: dtrC as number,
+				annualAridity,
+				annualRainfallMm,
+				distFromOceanKm,
+			})
+			observedMonthly[idx] = observed
+			observedSum += observed
+			observedCount++
 		}
 		observedAnnual[r] = observedCount > 0 ? observedSum / observedCount : NaN
 	}

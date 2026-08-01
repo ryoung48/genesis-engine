@@ -1,7 +1,7 @@
 import type { OrbitClassification } from "@/model/celestial/orbit-body/types"
 import { RNG } from "@/model/shared/random/rng"
 
-// Procedurally generated body textures (public/generated/<classification>/...)
+// Procedurally generated body textures (public/textures/celestial/generated/<classification>/...)
 // -- only classifications with real art get a texturePath; anything else
 // (tectonic, oceanic, panthalassic, helian, ...) is left unset and falls back
 // to the renderer's plain "blue" solid-color material, same as before this
@@ -38,7 +38,7 @@ function pickGeneratedTexturePath({
 	const files = GENERATED_TEXTURE_FILES[classification]
 	if (!files || files.length === 0) return undefined
 	const file = rng.choice(files)
-	return `/generated/${classification}/${file}`
+	return `/textures/celestial/generated/${classification}/${file}`
 }
 
 export const TEXTURE = {

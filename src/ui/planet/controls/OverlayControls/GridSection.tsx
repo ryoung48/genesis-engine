@@ -1,5 +1,6 @@
 import React from "react"
 import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
+import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
 import { gridSpacingOptions } from "@/ui/planet/screen/shared/constants"
 
 export interface GridSectionProps {
@@ -44,28 +45,17 @@ export const GridSection: React.FC<GridSectionProps> = ({
 			</label>
 			{gridSpacingExpanded && (
 				<div className={showGrid ? "space-y-1.5" : "space-y-1.5 opacity-50"}>
-					<div className="flex justify-between items-baseline">
-						<label className="text-[11px] font-medium text-slate-300">
-							Grid Spacing
-						</label>
-						<span className="font-mono text-[11px] text-slate-400">
-							{gridSpacing}°
-						</span>
-					</div>
-					<input
-						type="range"
+					<LabeledSlider
+						label="Grid Spacing"
+						value={`${gridSpacing}°`}
 						min={0}
 						max={gridSpacingOptions.length - 1}
 						step={1}
-						value={Math.max(0, gridSpacingOptions.indexOf(gridSpacing))}
-						onChange={(e) =>
-							setGridSpacing(
-								gridSpacingOptions[Number(e.target.value)] ??
-									gridSpacingOptions[0],
-							)
+						numericValue={Math.max(0, gridSpacingOptions.indexOf(gridSpacing))}
+						onChange={(v) =>
+							setGridSpacing(gridSpacingOptions[v] ?? gridSpacingOptions[0])
 						}
 						disabled={!showGrid}
-						className="w-full accent-slate-100 disabled:cursor-not-allowed"
 					/>
 				</div>
 			)}

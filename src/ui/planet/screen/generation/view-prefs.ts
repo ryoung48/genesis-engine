@@ -38,7 +38,6 @@ export interface StoredViewPrefs {
 	showThermalEquator: boolean
 	showCoastlines: boolean
 	showWindArrows: boolean
-	showRealWind: boolean
 	showGdd: boolean
 	showGint: boolean
 	showPet: boolean
@@ -163,7 +162,6 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showThermalEquator: false,
 	showCoastlines: false,
 	showWindArrows: false,
-	showRealWind: false,
 	showGdd: false,
 	showGint: false,
 	showPet: false,
@@ -338,10 +336,6 @@ export function parseStoredViewPrefs(
 			showWindArrows: readBoolean(
 				parsed.showWindArrows,
 				DEFAULT_VIEW_PREFS.showWindArrows,
-			),
-			showRealWind: readBoolean(
-				parsed.showRealWind,
-				DEFAULT_VIEW_PREFS.showRealWind,
 			),
 			showGdd: readBoolean(parsed.showGdd, DEFAULT_VIEW_PREFS.showGdd),
 			showGint: readBoolean(parsed.showGint, DEFAULT_VIEW_PREFS.showGint),

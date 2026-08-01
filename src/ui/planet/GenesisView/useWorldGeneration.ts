@@ -6,9 +6,12 @@ import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { WorldGenerationInput } from "@/ui/planet/GenesisView/types"
 import {
 	loadEarthRealClimate,
+	loadEarthRealCurrentU,
+	loadEarthRealCurrentV,
 	loadEarthRealDtr,
 	loadEarthRealElevation,
 	loadEarthRealPrecip,
+	loadEarthRealSstAnomaly,
 	loadEarthRealVaporPressure,
 	loadEarthRealWindU,
 	loadEarthRealWindV,
@@ -347,6 +350,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 			realVaporPressure?: MonthlyRasterAsset,
 			realWindU?: MonthlyRasterAsset,
 			realWindV?: MonthlyRasterAsset,
+			realCurrentU?: MonthlyRasterAsset,
+			realCurrentV?: MonthlyRasterAsset,
+			realSstAnomaly?: MonthlyRasterAsset,
 			realElevation?: {
 				raster: Int16Array
 				width: number
@@ -442,6 +448,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				realVaporPressure,
 				realWindU,
 				realWindV,
+				realCurrentU,
+				realCurrentV,
+				realSstAnomaly,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -491,6 +500,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				realVaporPressure,
 				realWindU,
 				realWindV,
+				realCurrentU,
+				realCurrentV,
+				realSstAnomaly,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,
@@ -499,10 +511,10 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				eu4ProvinceFallbackSeeds,
 				lakeNames,
 			] = await Promise.all([
-				loadImageAsGrayscale("/heightmap/earth.png"),
-				loadImageAsGrayscale("/heightmap/coastline-mask.png"),
-				loadImageAsGrayscale("/heightmap/lake-mask.png"),
-				fetch("/heightmap/river-lines.json").then((res) => {
+				loadImageAsGrayscale("/earth-data/earth.png"),
+				loadImageAsGrayscale("/earth-data/coastline-mask.png"),
+				loadImageAsGrayscale("/earth-data/lake-mask.png"),
+				fetch("/earth-data/river-lines.json").then((res) => {
 					if (!res.ok)
 						throw new Error(`Failed to load river lines: ${res.status}`)
 					return res.json() as Promise<{
@@ -515,22 +527,25 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				}),
 				loadOptionalJson<
 					{ name: string; lon: number; lat: number; weight: number }[]
-				>("/heightmap/earth-provinces-weighted.json"),
+				>("/earth-data/earth-provinces-weighted.json"),
 				loadEarthRealClimate(),
 				loadEarthRealPrecip(),
 				loadEarthRealDtr(),
 				loadEarthRealVaporPressure(),
 				loadEarthRealWindU(),
 				loadEarthRealWindV(),
+				loadEarthRealCurrentU(),
+				loadEarthRealCurrentV(),
+				loadEarthRealSstAnomaly(),
 				loadEarthRealElevation(),
 				loadEu5Categorical("eu5-topography"),
 				loadEu5Categorical("eu5-vegetation"),
 				loadEu5Categorical("eu5-climate"),
 				loadEu4Provinces(),
 				loadOptionalJson<{ id: number; lon: number; lat: number }[]>(
-					"/heightmap/eu4-provinces-seeds.json",
+					"/earth-data/eu4-provinces-seeds.json",
 				),
-				fetch("/heightmap/lake-names.json").then((res) => {
+				fetch("/earth-data/lake-names.json").then((res) => {
 					if (!res.ok)
 						throw new Error(`Failed to load lake names: ${res.status}`)
 					return res.json() as Promise<{
@@ -553,6 +568,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 				realVaporPressure,
 				realWindU,
 				realWindV,
+				realCurrentU,
+				realCurrentV,
+				realSstAnomaly,
 				realElevation,
 				eu5Topography,
 				eu5Vegetation,

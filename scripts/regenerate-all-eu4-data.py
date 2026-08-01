@@ -68,7 +68,7 @@ STEPS: list[tuple[str, str, list[str]]] = [
             "--source",
             "{ghsl_source}",
             "--population-asset",
-            "public/heightmap/earth-real-population-eu4.json",
+            "public/earth-data/earth-real-population-eu4.json",
             "--province-geojson",
             "{geojson}",
         ],

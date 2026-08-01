@@ -1,6 +1,6 @@
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { Slider } from "@/ui/components/primitives/Slider"
 import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
-import { renderMiniSlider } from "@/ui/wiki/shared/ui-atoms"
 
 export function buildSurfaceStats(
 	planetSliders: SliderDef[],
@@ -43,31 +43,48 @@ export function buildSurfaceStats(
 						set: (value: number) => landCoverageSlider.set(1 - value),
 						content: (
 							<div className="flex w-44 flex-col gap-3 px-1 pt-0.5 pb-2">
-								{renderMiniSlider(
-									{
-										...landCoverageSlider,
-										value: hydrosphere,
-										display: `${Math.round(hydrosphere * 100)}%`,
-										set: (value: number) => landCoverageSlider.set(1 - value),
-									},
-									"Hydrosphere",
-									`${Math.round(hydrosphere * 100)}%`,
-								)}
-								{compositionSlider
-									? renderMiniSlider(
-											compositionSlider,
-											`${compositionLabel} Concentration`,
-										)
-									: null}
-								{landVariationSlider
-									? renderMiniSlider(
-											landVariationSlider,
-											`${variationLabel} Variation`,
-										)
-									: null}
-								{seaLevelSlider
-									? renderMiniSlider(seaLevelSlider, "Sea Level")
-									: null}
+								<Slider
+									label="Hydrosphere"
+									value={`${Math.round(hydrosphere * 100)}%`}
+									min={landCoverageSlider.min}
+									max={landCoverageSlider.max}
+									step={landCoverageSlider.step}
+									inputValue={hydrosphere}
+									onChange={(value) => landCoverageSlider.set(1 - value)}
+								/>
+								{compositionSlider ? (
+									<Slider
+										label={`${compositionLabel} Concentration`}
+										value={compositionSlider.display}
+										min={compositionSlider.min}
+										max={compositionSlider.max}
+										step={compositionSlider.step}
+										inputValue={compositionSlider.value}
+										onChange={compositionSlider.set}
+									/>
+								) : null}
+								{landVariationSlider ? (
+									<Slider
+										label={`${variationLabel} Variation`}
+										value={landVariationSlider.display}
+										min={landVariationSlider.min}
+										max={landVariationSlider.max}
+										step={landVariationSlider.step}
+										inputValue={landVariationSlider.value}
+										onChange={landVariationSlider.set}
+									/>
+								) : null}
+								{seaLevelSlider ? (
+									<Slider
+										label="Sea Level"
+										value={seaLevelSlider.display}
+										min={seaLevelSlider.min}
+										max={seaLevelSlider.max}
+										step={seaLevelSlider.step}
+										inputValue={seaLevelSlider.value}
+										onChange={seaLevelSlider.set}
+									/>
+								) : null}
 							</div>
 						),
 					}

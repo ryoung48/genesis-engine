@@ -16,7 +16,7 @@ INT16_NODATA = -32768
 DEFAULT_GEOJSON = Path(
     r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_WIDTH = 4096
 DEFAULT_HEIGHT = 2048
 DEFAULT_PREFIX = "eu4-provinces"

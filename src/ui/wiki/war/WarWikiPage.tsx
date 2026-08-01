@@ -1,7 +1,11 @@
+import { ChipGroup } from "@/ui/components/composites/ChipGroup"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { EntityChip } from "@/ui/components/composites/EntityChip"
+import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
+import { uiPalette } from "@/ui/components/tokens"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	type WikiCountHistoryPoint,
@@ -59,15 +63,13 @@ function NationLink({
 }) {
 	const active = nation.active ?? true
 	return (
-		<span
-			className={`inline-flex items-center gap-1 ${active ? "" : "opacity-40"}`}
+		<EntityChip
+			name={nation.name}
+			color={nation.color}
+			dimmed={!active}
 			title={active ? undefined : "Not a participant at the selected date"}
-		>
-			<Swatch color={nation.color} />
-			<InlineTextButton onClick={() => onSelectNation(nation.tag)}>
-				{nation.name}
-			</InlineTextButton>
-		</span>
+			onClick={() => onSelectNation(nation.tag)}
+		/>
 	)
 }
 
@@ -85,20 +87,15 @@ function ParticipantGroup({
 }) {
 	if (group.nations.length === 0) return null
 	return (
-		<div className="py-1.5 first:pt-0 last:pb-0">
-			<div className="mb-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-				{SIDE_LABELS[group.side]} ({group.nations.length})
-			</div>
-			<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px] text-slate-700">
-				{group.nations.map((nation) => (
-					<NationLink
-						key={nation.tag}
-						nation={nation}
-						onSelectNation={onSelectNation}
-					/>
-				))}
-			</div>
-		</div>
+		<ChipGroup label={SIDE_LABELS[group.side]} count={group.nations.length}>
+			{group.nations.map((nation) => (
+				<NationLink
+					key={nation.tag}
+					nation={nation}
+					onSelectNation={onSelectNation}
+				/>
+			))}
+		</ChipGroup>
 	)
 }
 
@@ -112,22 +109,19 @@ export function WarWikiPage({ war }: { war: WarWikiData }) {
 	return (
 		<div className="space-y-2 overflow-x-hidden">
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
-				<div className="border-b border-slate-200 pb-3">
-					<h1
-						className="text-[30px] leading-snug text-slate-950"
-						style={{ fontFamily: "var(--font-jedar)" }}
-					>
-						{war.name}
-					</h1>
-					<div className="mt-0.5 flex items-center gap-2 text-[12px] text-slate-500">
-						<Swatch color="#b91c1c" />
-						<span>{war.dateRangeLabel}</span>
-						<span>·</span>
-						<InlineTextButton onClick={war.onBack} className="text-slate-500">
-							{war.planetTitle}
-						</InlineTextButton>
-					</div>
-				</div>
+				<WikiPageHeader
+					title={war.name}
+					meta={
+						<>
+							<Swatch color={uiPalette.war} />
+							<span>{war.dateRangeLabel}</span>
+							<span>·</span>
+							<InlineTextButton onClick={war.onBack} className="text-slate-500">
+								{war.planetTitle}
+							</InlineTextButton>
+						</>
+					}
+				/>
 				<div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
 					{renderStatGrid(war.stats)}
 				</div>

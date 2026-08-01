@@ -13,6 +13,7 @@ import {
 	type RuneRenderOptions,
 } from "@/model/society/script/runegen/rune-renderer"
 import { renderScriptTexture } from "@/ui/planet/renderer/script-texture"
+import { uiTokens } from "@/ui/components/tokens"
 
 type TemplateOption = {
 	value: RuneTemplate
@@ -182,7 +183,7 @@ export function SocietyRunesPanel() {
 				<button
 					type="button"
 					onClick={handleGenerate}
-					className="rounded-md border border-slate-900 bg-slate-900 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-white transition-colors hover:bg-slate-800"
+					className={`rounded-md border border-slate-900 bg-slate-900 px-2 py-1 ${uiTokens.type.controlSm} text-white transition-colors hover:bg-slate-800`}
 				>
 					Regenerate
 				</button>

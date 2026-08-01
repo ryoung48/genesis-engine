@@ -3,6 +3,7 @@ import type {
 	BuildOceanCurrentGridParams,
 	CoastSite,
 	ComputeOceanCurrentsParams,
+	ObservedOceanCurrentGridParams,
 	OceanCurrentResult,
 } from "@/model/climate/ocean-currents/types"
 import { OCEAN_CURRENTS_SHARED } from "@/model/climate/ocean-currents-shared"
@@ -836,8 +837,102 @@ function buildOceanCurrentGrid({
 	})
 }
 
+// SST anomaly (°C vs zonal mean) at which the warm/cold color scale saturates
+// to the same ±1 range the procedural oceanWarmth scalar uses -- tuned to the
+// magnitude of real western-boundary currents like the Gulf Stream/Kuroshio.
+const SST_ANOMALY_SATURATION_C = 4
+
+/** Builds the same FlowGrid shape as buildOceanCurrentGrid (u/v direction,
+ * speed, and a -1..+1 warm/cold scalar for oceanCurrentColor) but sourced
+ * from GenesisWorld.observedCurrent (GODAS surface current + OISST SST
+ * anomaly, sampled onto mesh regions by attachObservedEarthCurrent) instead
+ * of the procedural warmth-gradient model -- lets the ocean current particle
+ * overlay render real Earth currents for comparison against the model (see
+ * the "Ocean Currents" -> "Observed (NOAA)" toggle in OverlayControls). */
+function observedOceanCurrentGridForMonth({
+	mesh,
+	isLand,
+	observedCurrent,
+	month,
+}: ObservedOceanCurrentGridParams): FlowGrid {
+	const N = mesh.numRegions
+	const currentU = new Float32Array(N)
+	const currentV = new Float32Array(N)
+	const currentSpeed = new Float32Array(N)
+	const warmth = new Float32Array(N)
+
+	const realU = observedCurrent?.real_u_monthly
+	const realV = observedCurrent?.real_v_monthly
+	const realSst = observedCurrent?.real_sst_anomaly_monthly
+	if (realU && realV) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r]) continue
+			let u: number
+			let v: number
+			if (month !== undefined && month >= 0 && month < 12) {
+				u = realU[month * N + r]
+				v = realV[month * N + r]
+			} else {
+				let uSum = 0
+				let vSum = 0
+				let count = 0
+				for (let m = 0; m < 12; m++) {
+					const uu = realU[m * N + r]
+					const vv = realV[m * N + r]
+					if (Number.isFinite(uu) && Number.isFinite(vv)) {
+						uSum += uu
+						vSum += vv
+						count++
+					}
+				}
+				u = count > 0 ? uSum / count : NaN
+				v = count > 0 ? vSum / count : NaN
+			}
+			if (!Number.isFinite(u) || !Number.isFinite(v)) continue
+			currentU[r] = u
+			currentV[r] = v
+			currentSpeed[r] = Math.hypot(u, v)
+		}
+	}
+	if (realSst) {
+		for (let r = 0; r < N; r++) {
+			if (isLand[r]) continue
+			let sst: number
+			if (month !== undefined && month >= 0 && month < 12) {
+				sst = realSst[month * N + r]
+			} else {
+				let sum = 0
+				let count = 0
+				for (let m = 0; m < 12; m++) {
+					const v = realSst[m * N + r]
+					if (Number.isFinite(v)) {
+						sum += v
+						count++
+					}
+				}
+				sst = count > 0 ? sum / count : NaN
+			}
+			if (!Number.isFinite(sst)) continue
+			warmth[r] = Math.max(-1, Math.min(1, sst / SST_ANOMALY_SATURATION_C))
+		}
+	}
+
+	return WIND.rasterizeVectorGrid({
+		mesh,
+		vectorU: currentU,
+		vectorV: currentV,
+		vectorSpeed: currentSpeed,
+		options: {
+			scalar: warmth,
+			allowCell: (region) => !isLand[region] && currentSpeed[region] > 0,
+			isBlockedRegion: (region) => !!isLand[region],
+		},
+	})
+}
+
 export const OCEAN_CURRENTS = {
 	computeOceanCurrents,
 	applyCurrentTemperatureEffect,
 	buildOceanCurrentGrid,
+	observedOceanCurrentGridForMonth,
 }

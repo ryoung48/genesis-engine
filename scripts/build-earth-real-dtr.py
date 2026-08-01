@@ -8,7 +8,7 @@ from build_earth_real_raster import build_monthly_stack, load_month_array, write
 
 DEFAULT_TMAX_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_tmax")
 DEFAULT_TMIN_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_tmin")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-dtr"
 DEFAULT_WIDTH = 360
 DEFAULT_HEIGHT = 180

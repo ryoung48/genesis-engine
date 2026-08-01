@@ -25,8 +25,8 @@ function fetchLineData(url: string): Promise<CoastlineLineData> {
 export function loadCoastlineLines(): Promise<CoastlineLineData> {
 	if (!cachedLines) {
 		cachedLines = Promise.all([
-			fetchLineData("/heightmap/coastline-lines.json"),
-			fetchLineData("/heightmap/lake-lines.json"),
+			fetchLineData("/earth-data/coastline-lines.json"),
+			fetchLineData("/earth-data/lake-lines.json"),
 		]).then(([coastline, lakes]) => ({
 			rings: [...coastline.rings, ...lakes.rings],
 		}))

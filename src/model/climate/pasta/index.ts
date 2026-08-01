@@ -743,12 +743,23 @@ function assignEarthPastaClimate({
 }: AssignEarthPastaClimateParams):
 	| { zones: Uint8Array; debug: PastaDebug }
 	| undefined {
-	const temperatureMonthly = climate.real_temperature_monthly
-	const rainfallMonthly = rainfall.real_monthly
-	if (!temperatureMonthly || !rainfallMonthly) return undefined
+	const dpm = params.daysPerYear / 12
+	const observed = HYDROLOGY.computeObservedAridity({
+		isLand,
+		realTemperatureMonthly: climate.real_temperature_monthly,
+		modeledTemperatureMonthly: climate.temperature_monthly,
+		realDtrMonthly,
+		modeledDtrMonthly: climate.temperature_monthly_range,
+		realRainfallMonthly: rainfall.real_monthly,
+		modeledRainfallMonthly: rainfall.monthly,
+		insolationMonthly: climate.insolation_monthly,
+		dpm,
+	})
+	if (!observed) return undefined
+	const { temperatureMonthly, rainfallMonthly, pet_monthly, aet_monthly } =
+		observed
 
 	const N = mesh.numRegions
-	const dpm = params.daysPerYear / 12
 	const temperatureMax = new Float32Array(N)
 	const temperatureMin = new Float32Array(N)
 	for (let r = 0; r < N; r++) {
@@ -763,31 +774,6 @@ function assignEarthPastaClimate({
 		temperatureMin[r] = cold
 	}
 
-	const dtrMonthly = realDtrMonthly ?? climate.temperature_monthly_range
-	const petMonthly = new Float32Array(12 * N)
-	HYDROLOGY.fillPetMonthlyHargreaves({
-		temperatureMonthly,
-		rangeMonthly: dtrMonthly,
-		insolationMonthly: climate.insolation_monthly,
-		petMonthly,
-		dpm,
-	})
-
-	const aetMonthly = new Float32Array(12 * N)
-	const rainBuf = new Float64Array(12)
-	const petBuf = new Float64Array(12)
-	const aetBuf = new Float64Array(12)
-	for (let r = 0; r < N; r++) {
-		if (!isLand[r]) continue
-		for (let m = 0; m < 12; m++) {
-			const idx = m * N + r
-			rainBuf[m] = rainfallMonthly[idx]
-			petBuf[m] = petMonthly[idx]
-		}
-		HYDROLOGY.computeAetFromPet({ rain: rainBuf, petBuf, aetBuf })
-		for (let m = 0; m < 12; m++) aetMonthly[m * N + r] = aetBuf[m]
-	}
-
 	return computePastaZones({
 		mesh,
 		isLand,
@@ -796,8 +782,8 @@ function assignEarthPastaClimate({
 		temperatureMin,
 		insolationMonthly: climate.insolation_monthly,
 		rainfallMonthly,
-		petMonthly,
-		aetMonthly,
+		petMonthly: pet_monthly,
+		aetMonthly: aet_monthly,
 		params,
 		iceThickness,
 		iceMinMonthly,

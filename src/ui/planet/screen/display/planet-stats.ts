@@ -42,6 +42,7 @@ export function computePlanetStats(
 		maxElevation?: number
 		avgWindSpeedMs?: number | null
 		maxWindSpeedMs?: number | null
+		useObservedTemperature?: boolean
 	},
 	unitSystem: UnitSystem,
 ): PlanetStat[] {
@@ -106,36 +107,67 @@ export function computePlanetStats(
 		avgLocationAreaKm2 = landAreaKm2 / world.locations.count
 	}
 
+	// Observed Earth data has no per-cell diurnal min/max (only monthly
+	// means), so "observed" min/max fall back to the min/max monthly mean
+	// across all cells rather than the model's daily-extreme fields --
+	// the closest available substitute, not the same quantity.
+	const useObservedTemperature =
+		!!params.useObservedTemperature && !!world?.climate?.real_temperature_avg
+	const annualTempSource = useObservedTemperature
+		? world?.climate?.real_temperature_avg
+		: world?.climate?.temperature_avg
+	const monthlyTempSource = useObservedTemperature
+		? world?.climate?.real_temperature_monthly
+		: undefined
+
 	let avgAnnualTempC: number | null = null
-	if (world?.climate?.temperature_avg) {
+	if (annualTempSource) {
 		let sum = 0
-		for (let i = 0; i < world.climate.temperature_avg.length; i++)
-			sum += world.climate.temperature_avg[i]
-		avgAnnualTempC = sum / Math.max(1, world.climate.temperature_avg.length)
+		let count = 0
+		for (let i = 0; i < annualTempSource.length; i++) {
+			const v = annualTempSource[i]
+			if (!Number.isFinite(v)) continue
+			sum += v
+			count++
+		}
+		avgAnnualTempC = count > 0 ? sum / count : null
 	}
 
 	let minAnnualTempC: number | null = null
-	if (world?.climate?.temperature_min) {
+	let maxAnnualTempC: number | null = null
+	if (useObservedTemperature && monthlyTempSource) {
 		minAnnualTempC = Infinity
-		for (let i = 0; i < world.climate.temperature_min.length; i++) {
-			minAnnualTempC = Math.min(
-				minAnnualTempC,
-				world.climate.temperature_min[i],
-			)
+		maxAnnualTempC = -Infinity
+		for (let i = 0; i < monthlyTempSource.length; i++) {
+			const v = monthlyTempSource[i]
+			if (!Number.isFinite(v)) continue
+			if (v < minAnnualTempC) minAnnualTempC = v
+			if (v > maxAnnualTempC) maxAnnualTempC = v
 		}
 		if (!Number.isFinite(minAnnualTempC)) minAnnualTempC = null
-	}
-
-	let maxAnnualTempC: number | null = null
-	if (world?.climate?.temperature_max) {
-		maxAnnualTempC = -Infinity
-		for (let i = 0; i < world.climate.temperature_max.length; i++) {
-			maxAnnualTempC = Math.max(
-				maxAnnualTempC,
-				world.climate.temperature_max[i],
-			)
-		}
 		if (!Number.isFinite(maxAnnualTempC)) maxAnnualTempC = null
+	} else {
+		if (world?.climate?.temperature_min) {
+			minAnnualTempC = Infinity
+			for (let i = 0; i < world.climate.temperature_min.length; i++) {
+				minAnnualTempC = Math.min(
+					minAnnualTempC,
+					world.climate.temperature_min[i],
+				)
+			}
+			if (!Number.isFinite(minAnnualTempC)) minAnnualTempC = null
+		}
+
+		if (world?.climate?.temperature_max) {
+			maxAnnualTempC = -Infinity
+			for (let i = 0; i < world.climate.temperature_max.length; i++) {
+				maxAnnualTempC = Math.max(
+					maxAnnualTempC,
+					world.climate.temperature_max[i],
+				)
+			}
+			if (!Number.isFinite(maxAnnualTempC)) maxAnnualTempC = null
+		}
 	}
 
 	let avgAnnualPrecipMm: number | null = null
@@ -147,20 +179,22 @@ export function computePlanetStats(
 	}
 
 	let poleEqGradientC: number | null = null
-	if (world?.climate?.temperature_avg && world?.mesh?.r_xyz) {
+	if (annualTempSource && world?.mesh?.r_xyz) {
 		const { latDeg } = RAIN.getClimateGeometry(world.mesh)
-		const temp = world.climate.temperature_avg
+		const temp = annualTempSource
 		let eqSum = 0,
 			eqCount = 0,
 			polSum = 0,
 			polCount = 0
 		for (let r = 0; r < temp.length; r++) {
+			const v = temp[r]
+			if (!Number.isFinite(v)) continue
 			const lat = Math.abs(latDeg[r])
 			if (lat < 15) {
-				eqSum += temp[r]
+				eqSum += v
 				eqCount++
 			} else if (lat > 60) {
-				polSum += temp[r]
+				polSum += v
 				polCount++
 			}
 		}

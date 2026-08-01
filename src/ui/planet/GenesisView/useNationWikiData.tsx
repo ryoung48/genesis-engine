@@ -1204,7 +1204,7 @@ export function useNationWikiData(
 			mergedTimelineEvents.push({
 				id: `territory:${tag}:${date}:merged`,
 				date,
-				dateLabel: DATE.formatEu4Days(date),
+				dateLabel: DATE.formatHistoryDays(date),
 				type: mergedType,
 				typeColor: timelineTypeColor(mergedType),
 				description: buildMergedTerritoryDescription(group, title),
@@ -1226,7 +1226,7 @@ export function useNationWikiData(
 			mergedTimelineEvents.push({
 				id: `culture:${tag}:${date}:merged`,
 				date,
-				dateLabel: DATE.formatEu4Days(date),
+				dateLabel: DATE.formatHistoryDays(date),
 				type: "Culture",
 				typeColor: timelineTypeColor("Culture"),
 				description: buildMergedProvinceAttributeDescription(group, "culture"),
@@ -1248,7 +1248,7 @@ export function useNationWikiData(
 			mergedTimelineEvents.push({
 				id: `religion:${tag}:${date}:merged`,
 				date,
-				dateLabel: DATE.formatEu4Days(date),
+				dateLabel: DATE.formatHistoryDays(date),
 				type: "Religion",
 				typeColor: timelineTypeColor("Religion"),
 				description: buildMergedProvinceAttributeDescription(group, "religion"),
@@ -1346,7 +1346,7 @@ export function useNationWikiData(
 			dateRangeStart: earthHistory.minDays,
 			dateRangeEnd: earthHistory.maxDays,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: DATE.formatEu4Days(earthHistory.selectedDays),
+			currentDateLabel: DATE.formatHistoryDays(earthHistory.selectedDays),
 			timelineEvents,
 			onBack: () => setSelectedWikiNationTag(null),
 			onFocusNation: () => focusNation(tag),

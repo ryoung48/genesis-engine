@@ -52,6 +52,19 @@ interface ImportParams {
 	realWindMonths?: number
 	realWindScale?: number
 	realWindNoData?: number
+	realCurrentUMonthly?: Int16Array
+	realCurrentVMonthly?: Int16Array
+	realCurrentWidth?: number
+	realCurrentHeight?: number
+	realCurrentMonths?: number
+	realCurrentScale?: number
+	realCurrentNoData?: number
+	realSstAnomalyMonthly?: Int16Array
+	realSstAnomalyWidth?: number
+	realSstAnomalyHeight?: number
+	realSstAnomalyMonths?: number
+	realSstAnomalyScale?: number
+	realSstAnomalyNoData?: number
 	/**
 	 * Real-world elevation (meters, single band), sampled onto each region
 	 * and substituted for elevation_km after applySeaLevelToElevation. This

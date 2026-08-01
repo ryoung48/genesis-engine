@@ -43,7 +43,7 @@ DEFAULT_SOURCE = Path(
 )
 DEFAULT_EVENTS_DIR = Path("public/earth-history/events")
 DEFAULT_REFERENCE_DIR = Path("public/earth-history/reference")
-DEFAULT_SEEDS = Path("public/heightmap/eu4-provinces-seeds.json")
+DEFAULT_SEEDS = Path("public/earth-data/eu4-provinces-seeds.json")
 
 EU4_COVERAGE_START_YEAR = 2
 EU4_COVERAGE_START_DATE = eu4_date_to_days("2.1.1")

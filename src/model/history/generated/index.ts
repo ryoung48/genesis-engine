@@ -1,7 +1,6 @@
 import type { GenesisLandmarks } from "@/model/geography/terrain/landmarks/types"
 import { EVENT_HEAP } from "@/model/history/generated/event-heap"
 import { BATTLE } from "@/model/history/generated/events/battle"
-import { CULTURE_SPREAD } from "@/model/history/generated/events/culture-spread"
 import { DIPLOMACY } from "@/model/history/generated/events/diplomacy"
 import { POPULATION } from "@/model/history/generated/events/population"
 import { SUCCESSION } from "@/model/history/generated/events/succession"
@@ -134,12 +133,6 @@ function initHistory(params: {
 		timings: params.timings,
 		fn: () => POPULATION.initPopulation({ state }),
 	})
-	timed({
-		label: "initHistory:initCultureSpread",
-		timings: params.timings,
-		fn: () => CULTURE_SPREAD.initCultureSpread(state),
-	})
-
 	// Re-seed COLONY relations so init passes cannot leave them downgraded.
 	seedColonyRelations({ state, nations: params.nations })
 
@@ -206,13 +199,6 @@ function processEventsUntil({
 				}
 				break
 			}
-			case EVENT_HEAP.evt.CULTURE_SPREAD:
-				CULTURE_SPREAD.runCultureSpread({
-					state,
-					cultureCount: state.cultureCount,
-					rng,
-				})
-				break
 		}
 		if (validate) {
 			STATE.validateLiveHierarchy({

@@ -3,7 +3,9 @@ import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { SLIDER_RANGES } from "@/model/pipelines/genesis-params/ranges"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { Slider } from "@/ui/components/primitives/Slider"
 import { SPECTRAL_CLASS_COLORS } from "@/ui/planet/screen/generation/star-utils"
+import { uiPalette } from "@/ui/components/tokens"
 
 export function buildStarStats(params: {
 	starClass: MainSequenceClass
@@ -72,8 +74,8 @@ export function buildStarStats(params: {
 													onClick={() => setSpectralClass(spectralType)}
 													style={{
 														backgroundColor: active ? color : undefined,
-														borderColor: active ? "#0f172a" : undefined,
-														color: active ? "#0f172a" : undefined,
+														borderColor: active ? uiPalette.activeDark : undefined,
+														color: active ? uiPalette.activeDark : undefined,
 													}}
 													className={`rounded border px-2 py-0.5 text-[9px] font-bold transition-all ${
 														active
@@ -86,27 +88,15 @@ export function buildStarStats(params: {
 											)
 										})}
 									</div>
-									<div className="flex flex-col gap-1">
-										<div className="flex items-center justify-between">
-											<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-												Subtype
-											</span>
-											<span className="font-mono text-[10px] text-slate-400">
-												{typeStatValue}
-											</span>
-										</div>
-										<input
-											type="range"
-											min={SLIDER_RANGES.starSubtype.min}
-											max={SLIDER_RANGES.starSubtype.max}
-											step={SLIDER_RANGES.starSubtype.step}
-											value={starSubtype}
-											onChange={(event) =>
-												setStarSubtype(parseFloat(event.target.value))
-											}
-											className="mt-1 h-1 w-full cursor-pointer rounded-lg accent-slate-900"
-										/>
-									</div>
+									<Slider
+										label="Subtype"
+										value={typeStatValue}
+										min={SLIDER_RANGES.starSubtype.min}
+										max={SLIDER_RANGES.starSubtype.max}
+										step={SLIDER_RANGES.starSubtype.step}
+										inputValue={starSubtype}
+										onChange={setStarSubtype}
+									/>
 								</div>
 							),
 						}

@@ -1,9 +1,9 @@
 """Canonical way to regenerate the observed-population assets.
 
 - Total population comes from the HYDE NetCDF aggregation
-  (public/heightmap/earth-real-population-eu4.*).
+  (public/earth-data/earth-real-population-eu4.*).
 - Urban population comes from the Stadester urban raster set
-  (public/heightmap/earth-real-urban-population-eu4.*).
+  (public/earth-data/earth-real-urban-population-eu4.*).
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ DEFAULT_URBAN_SOURCE_DIR = Path(
 DEFAULT_PROVINCE_GEOJSON = Path(
     r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
-DEFAULT_PROVINCE_META = Path("public/heightmap/eu4-provinces.json")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_PROVINCE_META = Path("public/earth-data/eu4-provinces.json")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_URBAN_PREFIX = "earth-real-urban-population-eu4"
 DEFAULT_TOTAL_PREFIX = "earth-real-population-eu4"
 DEFAULT_SCALE = 2000.0

@@ -140,6 +140,19 @@ function runPostElevationPipeline(
 		realWindMonths,
 		realWindScale,
 		realWindNoData,
+		realCurrentUMonthly,
+		realCurrentVMonthly,
+		realCurrentWidth,
+		realCurrentHeight,
+		realCurrentMonths,
+		realCurrentScale,
+		realCurrentNoData,
+		realSstAnomalyMonthly,
+		realSstAnomalyWidth,
+		realSstAnomalyHeight,
+		realSstAnomalyMonths,
+		realSstAnomalyScale,
+		realSstAnomalyNoData,
 	} = input
 	const timings: StageTiming[] = []
 	function record(stage: string, startMs: number) {
@@ -524,6 +537,43 @@ function runPostElevationPipeline(
 			realWindNoData,
 		})
 		observedWind = windHolder.observedWind
+	}
+	let observedCurrent: GenesisWorld["observedCurrent"] | undefined
+	if (
+		realCurrentUMonthly &&
+		realCurrentVMonthly &&
+		realCurrentWidth &&
+		realCurrentHeight &&
+		realCurrentMonths &&
+		realCurrentScale !== undefined &&
+		realCurrentNoData !== undefined &&
+		realSstAnomalyMonthly &&
+		realSstAnomalyWidth &&
+		realSstAnomalyHeight &&
+		realSstAnomalyMonths &&
+		realSstAnomalyScale !== undefined &&
+		realSstAnomalyNoData !== undefined
+	) {
+		const currentHolder: { observedCurrent?: GenesisWorld["observedCurrent"] } =
+			{}
+		OBSERVED_EARTH.attachObservedEarthCurrent({
+			mesh,
+			world: currentHolder,
+			realCurrentUMonthly,
+			realCurrentVMonthly,
+			realCurrentWidth,
+			realCurrentHeight,
+			realCurrentMonths,
+			realCurrentScale,
+			realCurrentNoData,
+			realSstAnomalyMonthly,
+			realSstAnomalyWidth,
+			realSstAnomalyHeight,
+			realSstAnomalyMonths,
+			realSstAnomalyScale,
+			realSstAnomalyNoData,
+		})
+		observedCurrent = currentHolder.observedCurrent
 	}
 	record("Post: observed Earth climate", t0)
 	onProgress?.("Post: observed Earth climate", 57)
@@ -938,6 +988,7 @@ function runPostElevationPipeline(
 		dtr_monthly,
 		observedDtr,
 		observedWind,
+		observedCurrent,
 		waterAccess,
 		riverAccess,
 		lakeAccess,

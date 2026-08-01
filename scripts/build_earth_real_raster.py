@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import json
 from pathlib import Path
 from typing import Callable
@@ -111,7 +112,7 @@ def write_asset(
     source: str,
 ) -> tuple[Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    bin_path = output_dir / f"{prefix}.bin"
+    bin_path = output_dir / f"{prefix}.bin.gz"
     meta_path = output_dir / f"{prefix}.json"
 
     quantized = np.full(monthly.shape, INT16_NODATA, dtype=np.int16)
@@ -121,11 +122,14 @@ def write_asset(
         np.iinfo(np.int16).min + 1,
         np.iinfo(np.int16).max,
     ).astype(np.int16)
-    quantized.astype("<i2", copy=False).tofile(bin_path)
+    raw_bytes = quantized.astype("<i2", copy=False).tobytes()
+    with gzip.open(bin_path, "wb", compresslevel=9) as f:
+        f.write(raw_bytes)
 
     metadata = {
         "version": 1,
         "format": "int16-month-major",
+        "compression": "gzip",
         "field": field,
         "width": int(monthly.shape[2]),
         "height": int(monthly.shape[1]),

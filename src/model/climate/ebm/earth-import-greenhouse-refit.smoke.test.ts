@@ -17,7 +17,7 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 // jump). Bisects against the actual land-only WorldClim mean, not the
 // textbook ~14.8C whole-Earth (land+ocean) figure -- land-only is colder.
 
-const HEIGHTMAP_DIR = join(process.cwd(), "public", "heightmap")
+const HEIGHTMAP_DIR = join(process.cwd(), "public", "earth-data")
 
 function loadGrayscale(filename: string) {
 	const buffer = readFileSync(join(HEIGHTMAP_DIR, filename))

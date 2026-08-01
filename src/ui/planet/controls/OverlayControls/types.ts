@@ -57,8 +57,6 @@ export interface OverlayControlsProps {
 	setShowCoastlines: (v: boolean) => void
 	showWindArrows: boolean
 	setShowWindArrows: (v: boolean) => void
-	showRealWind: boolean
-	setShowRealWind: (v: boolean) => void
 	showGdd: boolean
 	setShowGdd: (v: boolean) => void
 	showGint: boolean

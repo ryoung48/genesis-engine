@@ -67,3 +67,16 @@ export type BuildOceanCurrentGridParams = {
 	reverseCirculation?: boolean
 	planetRadiusKm?: number
 }
+
+export type ObservedOceanCurrentGridParams = {
+	mesh: SphereMesh
+	isLand: Uint8Array
+	observedCurrent:
+		| {
+				real_u_monthly?: Float32Array
+				real_v_monthly?: Float32Array
+				real_sst_anomaly_monthly?: Float32Array
+		  }
+		| undefined
+	month?: number
+}

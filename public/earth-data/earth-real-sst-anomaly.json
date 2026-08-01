@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "format": "int16-month-major",
+  "field": "oisst_monthly_sst_anomaly_c",
+  "width": 360,
+  "height": 180,
+  "months": 12,
+  "scale": 0.01,
+  "nodata": -32768,
+  "source": "NOAA OISST v2 \u2014 long-term monthly mean SST (1991-2020), anomaly vs monthly zonal (same-latitude) mean (downloads.psl.noaa.gov/Datasets/noaa.oisst.v2)",
+  "bin": "earth-real-sst-anomaly.bin.gz",
+  "compression": "gzip"
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "format": "int16-month-major",
+  "field": "ncep_monthly_wind_v_ms",
+  "width": 360,
+  "height": 180,
+  "months": 12,
+  "scale": 0.01,
+  "nodata": -32768,
+  "source": "NCEP/NCAR Reanalysis 1 \u2014 10m u/v wind, long-term monthly mean (downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface_gauss)",
+  "bin": "earth-real-wind-v.bin.gz",
+  "compression": "gzip"
+}

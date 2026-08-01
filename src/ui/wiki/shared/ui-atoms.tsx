@@ -3,23 +3,25 @@ import {
 	EditableStatValue,
 	type StatEntry,
 } from "@/ui/components/composites/EditableStatValue"
+import { IconButton } from "@/ui/components/primitives/IconButton"
+import { ChevronIcon } from "@/ui/components/primitives/icons/ChevronIcon"
 import { CrosshairsGpsIcon } from "@/ui/components/primitives/icons/CrosshairsGpsIcon"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
-import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
+import { uiTokens } from "@/ui/components/tokens"
 
 export function GpsFocusButton({ onClick }: { onClick: () => void }) {
 	return (
-		<button
-			type="button"
+		<IconButton
+			tone="borderless"
+			size="xs"
 			onClick={(event) => {
 				event.preventDefault()
 				onClick()
 			}}
-			className="flex h-3.5 w-3.5 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
 			aria-label="Focus on this body"
 		>
 			<CrosshairsGpsIcon className="h-3 w-3" />
-		</button>
+		</IconButton>
 	)
 }
 
@@ -63,49 +65,21 @@ export function renderStatGrid(stats: StatEntry[]) {
 	))
 }
 
-export function renderMiniSlider(
-	slider: SliderDef,
-	label = slider.label,
-	value = slider.display,
-) {
-	return (
-		<div className="flex flex-col gap-1">
-			<div className="flex items-center justify-between gap-3">
-				<span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-					{label}
-				</span>
-				<span className="font-mono text-[10px] text-slate-400">{value}</span>
-			</div>
-			<input
-				type="range"
-				min={slider.min}
-				max={slider.max}
-				step={slider.step}
-				value={slider.value}
-				onChange={(e) => slider.set(parseFloat(e.target.value))}
-				className="h-1 w-full cursor-pointer rounded-lg accent-slate-900"
-			/>
-		</div>
-	)
-}
-
+// Rendered as a native <summary> (not DisclosureButton) because it lives
+// inside a <details> element and relies on the browser's built-in
+// open/close toggle -- but it reuses the shared ChevronIcon (see B1/A3) so
+// no chevron SVG is hand-rolled here.
 export function DataSectionSummary() {
 	return (
-		<summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+		<summary
+			className={`flex cursor-pointer list-none items-center justify-between gap-2 ${uiTokens.type.controlSm} text-slate-500`}
+		>
 			<span>Climate</span>
-			<svg
-				width="12"
-				height="12"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				strokeWidth="2"
-				strokeLinecap="round"
-				strokeLinejoin="round"
+			<ChevronIcon
+				width={12}
+				height={12}
 				className="text-slate-400 transition-transform group-open:rotate-180"
-			>
-				<polyline points="6 9 12 15 18 9" />
-			</svg>
+			/>
 		</summary>
 	)
 }

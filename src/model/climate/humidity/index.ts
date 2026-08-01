@@ -1,7 +1,4 @@
-import type {
-	RelativeHumidityFromTempRangeParams,
-	RelativeHumidityFromVaporPressureParams,
-} from "@/model/climate/humidity/types"
+import type { RelativeHumidityFromTempRangeParams } from "@/model/climate/humidity/types"
 
 function saturationVaporPressureKpa(tempC: number): number {
 	return 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3))
@@ -11,15 +8,6 @@ function clampRelativeHumidity(rh: number): number {
 	if (rh <= 0) return 0
 	if (rh >= 100) return 100
 	return rh
-}
-
-function relativeHumidityFromVaporPressure({
-	meanTempC,
-	vaporPressureKpa,
-}: RelativeHumidityFromVaporPressureParams): number {
-	return clampRelativeHumidity(
-		100 * (vaporPressureKpa / saturationVaporPressureKpa(meanTempC)),
-	)
 }
 
 function aridDewpointBiasC(aridity: number): number {
@@ -82,6 +70,5 @@ function relativeHumidityFromTempRange({
 }
 
 export const HUMIDITY = {
-	relativeHumidityFromVaporPressure,
 	relativeHumidityFromTempRange,
 }

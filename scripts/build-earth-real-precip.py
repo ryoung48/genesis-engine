@@ -7,7 +7,7 @@ from build_earth_real_raster import build_monthly_stack, load_month_array, write
 
 
 DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_prec")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-precipitation"
 DEFAULT_WIDTH = 360
 DEFAULT_HEIGHT = 180

@@ -66,7 +66,7 @@ export type ColorMode =
  * field's distinct values from locations.gpkg). The per-region category
  * codes stored on GenesisWorld.eu5Topography/eu5Vegetation/eu5Climate are
  * indices into these arrays; keep them in sync with the .json `categories`
- * field the build script writes to public/heightmap/eu5-*.json.
+ * field the build script writes to public/earth-data/eu5-*.json.
  */
 export const EU5_TOPOGRAPHY_CATEGORIES = [
 	"atoll",

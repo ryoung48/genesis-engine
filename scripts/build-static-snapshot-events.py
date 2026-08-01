@@ -7,7 +7,7 @@ this script can be re-run once per snapshot file to layer in more anchors
 (e.g. a world_bc500.geojson, world_1000ad.geojson series).
 
 For each EU4 province (via its representative point, from
-public/heightmap/eu4-provinces-seeds.json), finds which named polygon (if
+public/earth-data/eu4-provinces-seeds.json), finds which named polygon (if
 any) in the snapshot contains it, and:
   - reuses an existing EU4 nation's tag when its `name` in
     reference/nations.json matches the polygon's NAME (case-insensitive),
@@ -52,7 +52,7 @@ from eu4_date import eu4_date_to_days
 
 DEFAULT_EVENTS_DIR = Path("public/earth-history/events")
 DEFAULT_REFERENCE_DIR = Path("public/earth-history/reference")
-DEFAULT_SEEDS = Path("public/heightmap/eu4-provinces-seeds.json")
+DEFAULT_SEEDS = Path("public/earth-data/eu4-provinces-seeds.json")
 
 
 def slugify(name: str) -> str:

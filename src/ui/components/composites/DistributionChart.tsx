@@ -47,7 +47,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 		return (
 			<div className="flex items-center gap-2">
 				<span
-					className="w-[72px] shrink-0 truncate text-[8px] font-semibold uppercase tracking-[0.08em] text-slate-500"
+					className={`w-[72px] shrink-0 truncate ${uiTokens.type.labelSm} text-slate-500`}
 					title={title}
 				>
 					{title}

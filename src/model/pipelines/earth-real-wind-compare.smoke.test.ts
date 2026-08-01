@@ -33,7 +33,7 @@ import { DEFAULT_WORLD_PARAMS } from "@/ui/planet/screen/generation/defaults"
 // regional wind features, so per-cell errors here mostly measure "how much
 // regional detail is the model missing," not "is the model broken."
 
-const HEIGHTMAP_DIR = join(process.cwd(), "public", "heightmap")
+const HEIGHTMAP_DIR = join(process.cwd(), "public", "earth-data")
 
 function loadGrayscale(filename: string) {
 	const buffer = readFileSync(join(HEIGHTMAP_DIR, filename))

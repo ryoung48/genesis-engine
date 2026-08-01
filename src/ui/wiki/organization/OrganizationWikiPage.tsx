@@ -1,6 +1,10 @@
+import { ChipGroup } from "@/ui/components/composites/ChipGroup"
 import type { DistributionChartBucket } from "@/ui/components/composites/DistributionChart"
 import { DistributionChart } from "@/ui/components/composites/DistributionChart"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { EntityChip } from "@/ui/components/composites/EntityChip"
+import { WikiPageHeader } from "@/ui/components/composites/WikiPageHeader"
+import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { Swatch } from "@/ui/components/primitives/Swatch"
@@ -91,19 +95,13 @@ function NationLink({
 	onSelectNation: (tag: string) => void
 }) {
 	return (
-		<span className="inline-flex items-center gap-1">
-			<Swatch
-				color={nation.color}
-				striped={nation.striped}
-				stripeBackground="transparent"
-				title={
-					nation.striped ? "Holds territory, but isn't a member" : undefined
-				}
-			/>
-			<InlineTextButton onClick={() => onSelectNation(nation.tag)}>
-				{nation.name}
-			</InlineTextButton>
-		</span>
+		<EntityChip
+			name={nation.name}
+			color={nation.color}
+			striped={nation.striped}
+			title={nation.striped ? "Holds territory, but isn't a member" : undefined}
+			onClick={() => onSelectNation(nation.tag)}
+		/>
 	)
 }
 
@@ -157,7 +155,7 @@ function MemberList({
 	onSelectNation: (tag: string) => void
 }) {
 	return (
-		<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px] text-slate-700">
+		<>
 			{members.map((member) => (
 				<NationLink
 					key={member.tag}
@@ -165,7 +163,7 @@ function MemberList({
 					onSelectNation={onSelectNation}
 				/>
 			))}
-		</div>
+		</>
 	)
 }
 
@@ -178,25 +176,22 @@ export function OrganizationWikiPage({
 	return (
 		<div className="space-y-2 overflow-x-hidden">
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
-				<div className="border-b border-slate-200 pb-3">
-					<h1
-						className="text-[30px] leading-snug text-slate-950"
-						style={{ fontFamily: "var(--font-jedar)" }}
-					>
-						{organization.name}
-					</h1>
-					<div className="mt-0.5 flex items-center gap-2 text-[12px] text-slate-500">
-						<Swatch color={organization.color} />
-						<span>Organization</span>
-						<span>·</span>
-						<InlineTextButton
-							onClick={organization.onBack}
-							className="text-slate-500"
-						>
-							{organization.planetTitle}
-						</InlineTextButton>
-					</div>
-				</div>
+				<WikiPageHeader
+					title={organization.name}
+					meta={
+						<>
+							<Swatch color={organization.color} />
+							<span>Organization</span>
+							<span>·</span>
+							<InlineTextButton
+								onClick={organization.onBack}
+								className="text-slate-500"
+							>
+								{organization.planetTitle}
+							</InlineTextButton>
+						</>
+					}
+				/>
 				<div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
 					{renderStatGrid(organization.stats)}
 				</div>
@@ -204,46 +199,43 @@ export function OrganizationWikiPage({
 
 			<WikiSection title={`Members (${organization.members.length})`}>
 				{organization.members.length === 0 ? (
-					<div className="text-[10px] text-slate-400">
-						No current members as of {organization.currentDateLabel}.
-					</div>
-				) : groups.length === 0 ? (
-					<MemberList
-						members={organization.members}
-						onSelectNation={organization.onSelectNation}
+					<EmptyState
+						centered={false}
+						message={`No current members as of ${organization.currentDateLabel}.`}
 					/>
+				) : groups.length === 0 ? (
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[9px] text-slate-700">
+						<MemberList
+							members={organization.members}
+							onSelectNation={organization.onSelectNation}
+						/>
+					</div>
 				) : (
 					<div className="divide-y divide-slate-200">
 						{groups.map((group) => (
-							<div key={group.label} className="py-1.5 first:pt-0 last:pb-0">
-								<div className="mb-0.5 flex items-center gap-1">
-									<Swatch
-										color={group.color}
-										striped={group.striped}
-										stripeBackground="transparent"
-									/>
-									<span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-										{group.label} ({group.members.length})
-									</span>
-								</div>
+							<ChipGroup
+								key={group.label}
+								label={group.label}
+								count={group.members.length}
+								color={group.color}
+								striped={group.striped}
+							>
 								<MemberList
 									members={group.members}
 									onSelectNation={organization.onSelectNation}
 								/>
-							</div>
+							</ChipGroup>
 						))}
 						{uncategorized.length > 0 ? (
-							<div className="py-1.5 first:pt-0 last:pb-0">
-								<div className="mb-0.5 flex items-center gap-1">
-									<span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-										Holds Territory, Not a Member ({uncategorized.length})
-									</span>
-								</div>
+							<ChipGroup
+								label="Holds Territory, Not a Member"
+								count={uncategorized.length}
+							>
 								<MemberList
 									members={uncategorized}
 									onSelectNation={organization.onSelectNation}
 								/>
-							</div>
+							</ChipGroup>
 						) : null}
 					</div>
 				)}

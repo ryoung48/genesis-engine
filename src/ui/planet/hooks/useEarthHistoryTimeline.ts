@@ -170,6 +170,6 @@ export function useEarthHistoryTimeline(
 		// to the full range while the engine is still loading.
 		minDays: engine?.minDate ?? DATE.earthHistoryMinDays,
 		maxDays: engine?.maxDate ?? DATE.earthHistoryMaxDays,
-		formatLabel: DATE.formatEu4Days,
+		formatLabel: DATE.formatHistoryDays,
 	}
 }

@@ -16,6 +16,8 @@ import type {
 import { RNG } from "@/model/shared/random/rng"
 import { SEED_LABEL } from "@/model/shared/random/seed-label"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
+import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { Surface } from "@/ui/components/primitives/Surface"
 import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
 import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
@@ -1021,9 +1023,11 @@ export function GenerationPlanetNavigator({
 					{viewModel.stats.length > 0 ? (
 						renderStatGrid(viewModel.stats)
 					) : (
-						<div className="col-span-2 text-[11px] text-slate-400">
-							No editable stats available.
-						</div>
+						<EmptyState
+							centered={false}
+							className="col-span-2 text-[11px]"
+							message="No editable stats available."
+						/>
 					)}
 				</div>
 			</Surface>
@@ -1038,28 +1042,11 @@ export function GenerationPlanetNavigator({
 					className="border-t border-slate-200 px-3 py-3"
 				>
 					<div className="space-y-1.5">
-						<button
-							type="button"
+						<DisclosureButton
+							label={`${viewModel.childrenLabel} (${viewModel.children.length})`}
+							expanded={childrenExpanded}
 							onClick={() => setChildrenExpanded((current) => !current)}
-							className="flex w-full items-center justify-between gap-3 text-left"
-						>
-							<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-								{viewModel.childrenLabel} ({viewModel.children.length})
-							</span>
-							<svg
-								width="12"
-								height="12"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								className={`text-slate-400 transition-transform ${childrenExpanded ? "rotate-180" : ""}`}
-							>
-								<polyline points="6 9 12 15 18 9" />
-							</svg>
-						</button>
+						/>
 						{childrenExpanded ? (
 							<>
 								{viewModel.children.length > 0 ? (
@@ -1105,28 +1092,11 @@ export function GenerationPlanetNavigator({
 					className="border-t border-slate-200 px-3 py-3"
 				>
 					<div className="space-y-1.5">
-						<button
-							type="button"
+						<DisclosureButton
+							label="Climate"
+							expanded={dataExpanded}
 							onClick={() => setDataExpanded((current) => !current)}
-							className="flex w-full items-center justify-between gap-3 text-left"
-						>
-							<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-								Climate
-							</span>
-							<svg
-								width="12"
-								height="12"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth="2"
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								className={`text-slate-400 transition-transform ${dataExpanded ? "rotate-180" : ""}`}
-							>
-								<polyline points="6 9 12 15 18 9" />
-							</svg>
-						</button>
+						/>
 						{dataExpanded ? viewModel.dataContent : null}
 					</div>
 				</Surface>

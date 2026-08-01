@@ -220,7 +220,7 @@ export function pushTimelineEvent(
 	events.push({
 		id: params.id,
 		date: params.date,
-		dateLabel: DATE.formatEu4Days(params.date),
+		dateLabel: DATE.formatHistoryDays(params.date),
 		type: params.type,
 		typeColor: timelineTypeColor(params.type),
 		description: params.description,

@@ -6,6 +6,8 @@ import { IconButton } from "@/ui/components/primitives/IconButton"
 import { DetailsIcon } from "@/ui/components/primitives/icons/DetailsIcon"
 import { GearIcon } from "@/ui/components/primitives/icons/GearIcon"
 import { TransferDownIcon } from "@/ui/components/primitives/icons/TransferDownIcon"
+import { LabeledSlider } from "@/ui/components/primitives/LabeledSlider"
+import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import { Tooltip } from "@/ui/components/primitives/Tooltip"
 
 interface SolarSystemClockProps {
@@ -111,104 +113,64 @@ export const SolarSystemControls: React.FC<SolarSystemControlsProps> = ({
 								action={headerAction}
 							/>
 							<div className="space-y-3">
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Elliptical Orbits</span>
-									<input
-										type="checkbox"
-										checked={showEllipticalOrbits}
-										onChange={(e) => setShowEllipticalOrbits(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Inclination</span>
-									<input
-										type="checkbox"
-										checked={showInclination}
-										onChange={(e) => setShowInclination(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Axial Tilt</span>
-									<input
-										type="checkbox"
-										checked={showAxialTilt}
-										onChange={(e) => setShowAxialTilt(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Daylight</span>
-									<input
-										type="checkbox"
-										checked={showDaylight}
-										onChange={(e) => setShowDaylight(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Realistic Sizes</span>
-									<input
-										type="checkbox"
-										checked={showRealisticSizes}
-										onChange={(e) => setShowRealisticSizes(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
-								<label className="flex items-center justify-between gap-3 text-[11px] font-medium text-slate-200">
-									<span>Body Names</span>
-									<input
-										type="checkbox"
-										checked={showBodyNames}
-										onChange={(e) => setShowBodyNames(e.target.checked)}
-										className="h-4 w-4 rounded border-white/20 bg-slate-900 text-slate-100 focus:ring-slate-100/20"
-									/>
-								</label>
+								<ToggleRow
+									label="Elliptical Orbits"
+									checked={showEllipticalOrbits}
+									onChange={setShowEllipticalOrbits}
+									labelClassName="text-slate-200"
+								/>
+								<ToggleRow
+									label="Inclination"
+									checked={showInclination}
+									onChange={setShowInclination}
+									labelClassName="text-slate-200"
+								/>
+								<ToggleRow
+									label="Axial Tilt"
+									checked={showAxialTilt}
+									onChange={setShowAxialTilt}
+									labelClassName="text-slate-200"
+								/>
+								<ToggleRow
+									label="Daylight"
+									checked={showDaylight}
+									onChange={setShowDaylight}
+									labelClassName="text-slate-200"
+								/>
+								<ToggleRow
+									label="Realistic Sizes"
+									checked={showRealisticSizes}
+									onChange={setShowRealisticSizes}
+									labelClassName="text-slate-200"
+								/>
+								<ToggleRow
+									label="Body Names"
+									checked={showBodyNames}
+									onChange={setShowBodyNames}
+									labelClassName="text-slate-200"
+								/>
 								{clock && (
 									<div className="space-y-3 border-t border-white/10 pt-3">
-										<div className="space-y-1">
-											<div className="flex items-center justify-between">
-												<label className="text-[11px] font-medium text-slate-300">
-													Rotation
-												</label>
-												<span className="font-mono text-[11px] text-slate-400">
-													{formatClockHours(clock.rotationPeriodHours)}
-												</span>
-											</div>
-											<input
-												type="range"
-												min={0}
-												max={1}
-												step={0.001}
-												value={clock.rotationFraction}
-												onChange={(e) =>
-													clock.setRotationFraction(Number(e.target.value))
-												}
-												className="m-0 block w-full accent-slate-100"
-											/>
-										</div>
-										<div className="space-y-1">
-											<div className="flex items-center justify-between">
-												<label className="text-[11px] font-medium text-slate-300">
-													Orbit
-												</label>
-												<span className="font-mono text-[11px] text-slate-400">
-													{formatClockDays(clock.orbitalPeriodDays)}
-												</span>
-											</div>
-											<input
-												type="range"
-												min={0}
-												max={1}
-												step={0.001}
-												value={clock.orbitFraction}
-												onChange={(e) =>
-													clock.setOrbitFraction(Number(e.target.value))
-												}
-												className="m-0 block w-full accent-slate-100"
-											/>
-										</div>
+										<LabeledSlider
+											label="Rotation"
+											value={formatClockHours(clock.rotationPeriodHours)}
+											min={0}
+											max={1}
+											step={0.001}
+											numericValue={clock.rotationFraction}
+											onChange={clock.setRotationFraction}
+											sliderClassName="m-0 block"
+										/>
+										<LabeledSlider
+											label="Orbit"
+											value={formatClockDays(clock.orbitalPeriodDays)}
+											min={0}
+											max={1}
+											step={0.001}
+											numericValue={clock.orbitFraction}
+											onChange={clock.setOrbitFraction}
+											sliderClassName="m-0 block"
+										/>
 									</div>
 								)}
 							</div>

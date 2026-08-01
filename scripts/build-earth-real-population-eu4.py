@@ -12,11 +12,11 @@ from PIL import Image, ImageDraw
 
 INT16_NODATA = -32768
 DEFAULT_SOURCE_NETCDF = Path(r"C:\Users\rayou\Downloads\population.nc")
-DEFAULT_PROVINCE_META = Path("public/heightmap/eu4-provinces.json")
+DEFAULT_PROVINCE_META = Path("public/earth-data/eu4-provinces.json")
 DEFAULT_PROVINCE_GEOJSON = Path(
     r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-population-eu4"
 DEFAULT_SCALE = 2000.0
 DEFAULT_FIELD_NAME = "population"
@@ -178,13 +178,15 @@ def build_assets(
         scaled = np.clip(scaled, 0, np.iinfo(np.int16).max)
         quantized[time_index] = scaled.astype(np.int16)
 
-    bin_path = output_dir / f"{prefix}.bin"
+    bin_path = output_dir / f"{prefix}.bin.gz"
     meta_path = output_dir / f"{prefix}.json"
-    quantized.astype("<i2", copy=False).tofile(bin_path)
+    with gzip.open(bin_path, "wb", compresslevel=9) as f:
+        f.write(quantized.astype("<i2", copy=False).tobytes())
 
     metadata = {
         "version": 1,
         "format": "int16-time-major",
+        "compression": "gzip",
         "field": f"hyde_eu4_province_{field_name}_people",
         "encoding": {
             "kind": "linear",

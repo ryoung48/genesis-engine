@@ -74,13 +74,17 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		colorMode,
 		dataVariant,
 		showWindArrows,
-		showRealWind,
 		resolvedClimateMonth,
 		temperatureMonth,
 		rainfallMonth,
 		dtrMonth,
 		earthHistoryPlaying,
 	} = input
+
+	// A single Model/Observed/Diff radio drives every observed-vs-model
+	// overlay (color mode variants, wind, ocean currents) instead of each
+	// having its own toggle.
+	const showRealWind = dataVariant === "observed"
 
 	const hoverElevationKm = getHoverElevationKm(hoverInfo, worldForDisplay)
 	const hoverTopography = getHoverTopography(

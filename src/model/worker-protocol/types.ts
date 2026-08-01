@@ -145,6 +145,12 @@ export interface SerializedGenesisWorld {
 		real_v_monthly?: Float32Array
 		real_speed_monthly?: Float32Array
 	}
+	observedCurrent?: {
+		real_u_monthly?: Float32Array
+		real_v_monthly?: Float32Array
+		real_speed_monthly?: Float32Array
+		real_sst_anomaly_monthly?: Float32Array
+	}
 	rivers: {
 		lines: [number, number, number, number][][]
 		maxFlow: number
@@ -350,6 +356,19 @@ export type GenesisWorkerRequest =
 				realWindMonths?: number
 				realWindScale?: number
 				realWindNoData?: number
+				realCurrentUMonthly?: Int16Array
+				realCurrentVMonthly?: Int16Array
+				realCurrentWidth?: number
+				realCurrentHeight?: number
+				realCurrentMonths?: number
+				realCurrentScale?: number
+				realCurrentNoData?: number
+				realSstAnomalyMonthly?: Int16Array
+				realSstAnomalyWidth?: number
+				realSstAnomalyHeight?: number
+				realSstAnomalyMonths?: number
+				realSstAnomalyScale?: number
+				realSstAnomalyNoData?: number
 				realElevationRaster?: Int16Array
 				realElevationWidth?: number
 				realElevationHeight?: number

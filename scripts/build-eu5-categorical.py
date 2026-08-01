@@ -15,7 +15,7 @@ UINT8_NODATA = 255
 DEFAULT_TIF = Path(r"c:\Users\rayou\Downloads\EU5toGIS\EU5toGIS\datasets\locations.tif")
 DEFAULT_TIF_L = Path(r"c:\Users\rayou\Downloads\EU5toGIS\EU5toGIS\datasets\locations_L.tif")
 DEFAULT_GPKG = Path(r"c:\Users\rayou\Downloads\EU5toGIS\EU5toGIS\datasets\locations.gpkg")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_WIDTH = 360
 DEFAULT_HEIGHT = 180
 

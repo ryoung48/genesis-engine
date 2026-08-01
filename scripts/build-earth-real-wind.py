@@ -10,7 +10,7 @@ from build_earth_real_raster import build_monthly_stack, write_asset
 
 
 DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\ncep-wind")
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_WIDTH = 360
 DEFAULT_HEIGHT = 180
 MONTHS = 12

@@ -110,6 +110,21 @@ export interface PostPipelineInput {
 	realWindMonths?: number
 	realWindScale?: number
 	realWindNoData?: number
+	/** Observed-Earth monthly surface ocean current u/v rasters (m/s * scale, GODAS). */
+	realCurrentUMonthly?: Int16Array
+	realCurrentVMonthly?: Int16Array
+	realCurrentWidth?: number
+	realCurrentHeight?: number
+	realCurrentMonths?: number
+	realCurrentScale?: number
+	realCurrentNoData?: number
+	/** Observed-Earth monthly SST anomaly raster vs zonal mean (°C * scale, NOAA OISST). */
+	realSstAnomalyMonthly?: Int16Array
+	realSstAnomalyWidth?: number
+	realSstAnomalyHeight?: number
+	realSstAnomalyMonths?: number
+	realSstAnomalyScale?: number
+	realSstAnomalyNoData?: number
 }
 
 export interface PostPipelineOutput {
@@ -136,6 +151,7 @@ export interface PostPipelineOutput {
 	observedDtr?: GenesisWorld["observedDtr"]
 	observedHumidity?: GenesisWorld["observedHumidity"]
 	observedWind?: GenesisWorld["observedWind"]
+	observedCurrent?: GenesisWorld["observedCurrent"]
 	waterAccess: Uint8Array
 	riverAccess: Uint8Array
 	lakeAccess: Uint8Array

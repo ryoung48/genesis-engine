@@ -14,7 +14,7 @@
 			"!scripts",
 			"!scripts/**",
 			"!public/earth-history/events/*.json",
-			"!public/heightmap/coastline-lines.json"
+			"!public/earth-data/coastline-lines.json"
 		]
 	},
 	"formatter": { "enabled": true, "indentStyle": "tab" },

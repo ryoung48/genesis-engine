@@ -65,7 +65,7 @@ function loadProvinceCoordinates(): Promise<
 	Map<string, { lon: number; lat: number }>
 > {
 	if (!provinceCoordinatesPromise) {
-		provinceCoordinatesPromise = fetch("/heightmap/eu4-provinces-seeds.json", {
+		provinceCoordinatesPromise = fetch("/earth-data/eu4-provinces-seeds.json", {
 			cache: "no-store",
 		})
 			.then((res) => {

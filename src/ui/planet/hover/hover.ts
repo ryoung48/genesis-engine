@@ -467,6 +467,18 @@ export function getHoverTemperatureDiff(
 	})
 }
 
+function getHoverObservedAnnualWindSpeed(
+	world: SerializedGenesisWorld,
+	region: number,
+): number | undefined {
+	const monthlySource = world.observedWind?.real_speed_monthly
+	if (!monthlySource) return undefined
+	const N = world.mesh.numRegions
+	let sum = 0
+	for (let m = 0; m < 12; m++) sum += monthlySource[m * N + region]
+	return sum / 12
+}
+
 export function getHoverHumidity(
 	hoverInfo: HoverInfo | null,
 	world: SerializedGenesisWorld | null,
@@ -502,13 +514,11 @@ export function getHoverHumidityDiff(
 	}
 }
 
-/** `useObserved` selects the data source for both temperature and humidity
+/** `useObserved` selects the data source for temperature, humidity, and wind
  * together (the "misery"/"realMisery" colorMode pair, mirroring
  * temperature/realTemperature) -- observed values are used where available
  * and fall back to the modeled estimate only when missing, model mode never
- * touches observed data at all. Wind has no observed variant (no per-region
- * historical wind data exists), so it always comes from the model in both
- * modes. */
+ * touches observed data at all. */
 export function getHoverMisery({
 	hoverInfo,
 	world,
@@ -539,7 +549,11 @@ export function getHoverMisery({
 	}
 
 	const annualRainfall = world.rainfall?.annual[r]
-	const annualWind = windSpeedMs ?? 0
+	const modeledAnnualWind = windSpeedMs ?? 0
+	const observedAnnualWind = useObserved
+		? getHoverObservedAnnualWindSpeed(world, r)
+		: undefined
+	const annualWind = observedAnnualWind ?? modeledAnnualWind
 	const modeledAnnualT = world.climate.temperature_avg[r]
 	const observedAnnualT = world.climate.real_temperature_avg?.[r]
 	const annualT =
@@ -578,7 +592,11 @@ export function getHoverMisery({
 					annualAridity,
 					annualRainfallMm: annualRainfall,
 				})
-			const wind = monthlyWindSpeedMs?.[m] ?? annualWind
+			const observedWindMonthly = useObserved
+				? world.observedWind?.real_speed_monthly?.[m * N + r]
+				: undefined
+			const wind =
+				observedWindMonthly ?? monthlyWindSpeedMs?.[m] ?? annualWind
 			monthly.push(
 				APPARENT_TEMP.apparentTemperatureC({
 					tempC: T,

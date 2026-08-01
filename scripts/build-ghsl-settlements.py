@@ -19,6 +19,7 @@ as abandoned rather than eternally populated).
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import re
 import struct
@@ -36,11 +37,11 @@ _LABEL_YEAR_RE = re.compile(r"^(-?\d+)-\d{2}-\d{2} ")
 DEFAULT_SOURCE = Path(
     r"C:\Users\rayou\Downloads\metro_adjusted_rasters_and_json\stadester_ghsl.json"
 )
-DEFAULT_POPULATION_ASSET = Path("public/heightmap/earth-real-population-eu4.json")
+DEFAULT_POPULATION_ASSET = Path("public/earth-data/earth-real-population-eu4.json")
 DEFAULT_PROVINCE_GEOJSON = Path(
     r"c:\Users\rayou\projects\geo-explorer\public\eu4-extended-timeline-aligned.json"
 )
-DEFAULT_OUTPUT_DIR = Path("public/heightmap")
+DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "eu4-ghsl-settlements"
 DEFAULT_SCALE = 2000.0
 HOLD_FLAT_AFTER_YEAR = 1950
@@ -231,17 +232,20 @@ def build_assets(
         quantized[:, i] = scaled.astype(np.int16)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    bin_path = output_dir / f"{prefix}.bin"
+    bin_path = output_dir / f"{prefix}.bin.gz"
     meta_path = output_dir / f"{prefix}.json"
 
-    with bin_path.open("wb") as f:
-        f.write(quantized.astype("<i2", copy=False).tobytes())
-        for lat, lon in zip(lats, lons):
-            f.write(struct.pack("<ff", lat, lon))
+    raw = bytearray()
+    raw += quantized.astype("<i2", copy=False).tobytes()
+    for lat, lon in zip(lats, lons):
+        raw += struct.pack("<ff", lat, lon)
+    with gzip.open(bin_path, "wb", compresslevel=9) as f:
+        f.write(raw)
 
     metadata = {
         "version": 1,
         "format": "eu4-ghsl-settlements-v1",
+        "compression": "gzip",
         "field": "ghsl_settlement_population_people",
         "encoding": {
             "kind": "linear",

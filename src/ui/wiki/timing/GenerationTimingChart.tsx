@@ -10,6 +10,7 @@ import {
 } from "chart.js"
 import React, { useMemo } from "react"
 import { Bar } from "react-chartjs-2"
+import { uiChartPalette } from "@/ui/components/tokens"
 import {
 	formatTimingSeconds,
 	type TimingEntry,
@@ -27,7 +28,11 @@ export const GenerationTimingChart: React.FC<{
 		const labels = entries.map((entry) => entry.label)
 		const values = entries.map((entry) => entry.ms)
 		const backgroundColor = entries.map((_, idx) =>
-			idx === 0 ? "#0f172a" : idx < 4 ? "#1e293b" : "#334155",
+			idx === 0
+				? uiChartPalette.timingTiers[0]
+				: idx < 4
+					? uiChartPalette.timingTiers[1]
+					: uiChartPalette.timingTiers[2],
 		)
 
 		const data: ChartData<"bar"> = {

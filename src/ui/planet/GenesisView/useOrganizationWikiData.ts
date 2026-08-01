@@ -515,7 +515,7 @@ export function useOrganizationWikiData(
 			dateRangeStart: earthHistory.minDays,
 			dateRangeEnd: earthHistory.maxDays,
 			currentDate: earthHistory.selectedDays,
-			currentDateLabel: DATE.formatEu4Days(earthHistory.selectedDays),
+			currentDateLabel: DATE.formatHistoryDays(earthHistory.selectedDays),
 			timelineEvents,
 			onBack: () => setSelectedWikiOrganizationId(null),
 			onSelectNation: (targetTag: string) => {

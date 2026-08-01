@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
 import { TIDAL_FORCE } from "@/model/climate/tidal-force"
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import { uiChartPalette } from "@/ui/components/tokens"
 
 ChartJS.register(
 	CategoryScale,
@@ -23,11 +24,7 @@ ChartJS.register(
 	Legend,
 )
 
-const MOON_COLORS = [
-	"#0ea5e9", // sky-500
-	"#8b5cf6", // violet-500
-	"#10b981", // emerald-500
-]
+const MOON_COLORS = uiChartPalette.moon
 
 interface TidalCalendarChartProps {
 	schedule: TidalSchedule
@@ -103,7 +100,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 		datasets.push({
 			label: "Solar",
 			data: events.map((e) => e.starForce * TIDAL_FORCE.earthMoonTideReference),
-			borderColor: "#f59e0b", // amber-400
+			borderColor: uiChartPalette.solar,
 			backgroundColor: "transparent",
 			borderWidth: compact ? 1 : 1.5,
 			borderDash: [4, 2],
@@ -116,7 +113,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 			data: events.map(
 				(e) => e.tidalForce * TIDAL_FORCE.earthMoonTideReference,
 			),
-			borderColor: "#1e293b", // slate-800
+			borderColor: uiChartPalette.total,
 			backgroundColor: "transparent",
 			borderWidth: compact ? 1.5 : 2.5,
 			pointRadius: 0,
@@ -144,7 +141,7 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 					display: true,
 					position: "top" as const,
 					labels: {
-						color: "#475569",
+						color: uiChartPalette.axisTextStrong,
 						boxWidth: 16,
 						boxHeight: 2,
 						font: { size: 9, family: "monospace" },
@@ -154,10 +151,10 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 				tooltip: {
 					mode: "index" as const,
 					intersect: false,
-					backgroundColor: "#ffffff",
-					titleColor: "#475569",
-					bodyColor: "#1e293b",
-					borderColor: "#e2e8f0",
+					backgroundColor: uiChartPalette.tooltipBg,
+					titleColor: uiChartPalette.axisTextStrong,
+					bodyColor: uiChartPalette.total,
+					borderColor: uiChartPalette.gridLine,
 					borderWidth: 1,
 					callbacks: {
 						title: (items) => `Day ${items[0]?.label ?? ""}`,
@@ -170,35 +167,35 @@ export const TidalCalendarChart: React.FC<TidalCalendarChartProps> = ({
 				x: {
 					type: "category" as const,
 					ticks: {
-						color: "#64748b",
+						color: uiChartPalette.axisText,
 						font: { size: compact ? 8 : 9, family: "monospace" },
 						maxTicksLimit: compact ? 6 : 10,
 						maxRotation: 0,
 					},
-					grid: { color: "rgba(148,163,184,0.2)" },
+					grid: { color: uiChartPalette.gridLineTranslucent },
 					title: compact
 						? { display: false }
 						: {
 								display: true,
 								text: "Day of year",
-								color: "#64748b",
+								color: uiChartPalette.axisText,
 								font: { size: 10 },
 							},
 				},
 				y: {
 					ticks: {
-						color: "#64748b",
+						color: uiChartPalette.axisText,
 						font: { size: compact ? 8 : 9, family: "monospace" },
 						callback: (v) => `${Number(v).toFixed(3)} m`,
 						maxTicksLimit: compact ? 4 : 6,
 					},
-					grid: { color: "rgba(148,163,184,0.2)" },
+					grid: { color: uiChartPalette.gridLineTranslucent },
 					title: compact
 						? { display: false }
 						: {
 								display: true,
 								text: "Equilibrium tidal height (m)",
-								color: "#64748b",
+								color: uiChartPalette.axisText,
 								font: { size: 10 },
 							},
 				},
