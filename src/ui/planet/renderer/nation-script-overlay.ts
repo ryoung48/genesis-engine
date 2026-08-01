@@ -7,7 +7,7 @@ import {
 	LABEL_FONT_SIZE_GLOBE,
 	LABEL_FONT_SIZE_MAP,
 	LABEL_RENDER_ORDER,
-} from "@/ui/planet/renderer/nation-label-overlay"
+} from "@/ui/planet/renderer/nation-label-overlay/constants"
 import {
 	nationCapitalProvince,
 	nationCapitalRegion,

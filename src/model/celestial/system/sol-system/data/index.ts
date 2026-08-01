@@ -93,6 +93,12 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 0,
 		inclinationDeg: 3.38,
 		longitudeOfPerihelionDeg: 77.457,
+		// No separate perihelionDeg despite Mercury's large eccentricity
+		// (0.2056, highest of any planet): its ~0.03 deg axial tilt means the
+		// EBM sees essentially no latitude-dependent declination swing to get
+		// out of phase in the first place, so the Ls-frame/fixed-frame
+		// mismatch that mattered for Mars barely moves Mercury's simulated
+		// temperatures either way.
 	},
 	{
 		name: "Venus",
@@ -243,6 +249,20 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 0.0084,
 		inclinationDeg: 5.65,
 		longitudeOfPerihelionDeg: 336.041,
+		// EBM insolation input (see OrbitBody.perihelionDeg's doc) -- NOT the
+		// same quantity as longitudeOfPerihelionDeg above. That field is the
+		// real, fixed-ecliptic-frame value used to orient Mars's orbit
+		// ellipse in the 3D view; this one is Ls (areocentric solar
+		// longitude) at APHELION in Mars's own vernal-equinox-referenced
+		// frame, which is what insolation/index.ts's orbital.PERIHELION
+		// actually consumes. Real Mars perihelion falls at the well-known
+		// Ls=251 deg (shortly before southern summer solstice, driving
+		// Mars's real global dust-storm season), so aphelion is 180 deg
+		// later at Ls=71. Feeding the raw longitudeOfPerihelionDeg value into
+		// the EBM instead gets the hemisphere backwards -- verified by
+		// comparing peak polar insolation under each value directly against
+		// the insolation math.
+		perihelionDeg: 71,
 		moons: [
 			{
 				name: "Phobos",
@@ -337,6 +357,12 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 1.4332,
 		inclinationDeg: 6.09,
 		longitudeOfPerihelionDeg: 14.754,
+		// EBM insolation input (see OrbitBody.perihelionDeg's doc) -- Ls
+		// (heliocentric solar longitude, in Jupiter's own vernal-equinox
+		// frame) at APHELION. Real Jupiter perihelion falls at Ls ~= 57-58 deg
+		// (shortly before its own northern summer solstice at Ls=90), so
+		// aphelion sits 180 deg later at Ls ~= 237.5.
+		perihelionDeg: 237.5,
 		moons: [
 			{
 				name: "Io",
@@ -452,6 +478,12 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 1.9196,
 		inclinationDeg: 5.51,
 		longitudeOfPerihelionDeg: 92.432,
+		// EBM insolation input (see OrbitBody.perihelionDeg's doc). Real
+		// Saturn perihelion falls at Ls ~= 280 deg (shortly after its own
+		// northern winter solstice, making southern summer -- which happens
+		// near perihelion -- shorter and hotter than northern summer), so
+		// aphelion sits 180 deg earlier/later at Ls ~= 100.
+		perihelionDeg: 100,
 		moons: [
 			{
 				name: "Enceladus",
@@ -539,6 +571,10 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 1.3257,
 		inclinationDeg: 6.48,
 		longitudeOfPerihelionDeg: 170.964,
+		// EBM insolation input (see OrbitBody.perihelionDeg's doc). Real
+		// Uranus perihelion falls near its own northern autumn equinox, at
+		// Ls ~= 182 deg, so aphelion sits 180 deg earlier/later at Ls ~= 2.
+		perihelionDeg: 2,
 		moons: [
 			{
 				name: "Titania",
@@ -619,6 +655,10 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 2.4833,
 		inclinationDeg: 6.43,
 		longitudeOfPerihelionDeg: 44.971,
+		// No separate perihelionDeg: Neptune's eccentricity (0.009) is small
+		// enough that real published seasonal-forcing studies put its
+		// perihelion-timing effect at ~0.2K -- the Ls-frame/fixed-frame
+		// mismatch that mattered for Mars isn't worth chasing here.
 		moons: [
 			{
 				name: "Triton",
@@ -691,6 +731,12 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 44.2956,
 		inclinationDeg: 11.88,
 		longitudeOfPerihelionDeg: 224.067,
+		// No separate perihelionDeg despite Pluto's large eccentricity
+		// (0.248) and extreme tilt (119.6 deg): unlike Mars/Jupiter/Saturn/
+		// Uranus, Pluto's real Ls-at-perihelion isn't a fixed number -- it
+		// precesses on a ~3.7 Myr cycle, so there's no single "real" value to
+		// verify against the way there is for the others. Left as the
+		// fixed-frame value rather than guess a specific current-epoch Ls.
 		moons: [
 			{
 				name: "Charon",

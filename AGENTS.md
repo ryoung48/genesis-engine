@@ -17,6 +17,7 @@ Avoid barrel files. Import from the concrete module you need instead of adding o
 - always write all plans to ./plans as md files
 
 ## Refactoring
+- Use `scripts/refactor/rename-symbol.mjs <file> <oldName> <newName>` to rename a top-level exported symbol — updates every project-wide reference, including property-access usages like `OLD_NAME.someMethod`.
 - Use `scripts/refactor/move-module.mjs <from> <to>` to move/rename files or folders — rewrites every importer (relative and `@/...` alias) project-wide.
 - Use `scripts/refactor/move-symbol.mjs <fromFile> <toFile> <symbol...>` to extract named exports into another file — moves the declarations, resolves transitive imports on both ends, drops now-unused imports in the source file, and repoints every importer.
 

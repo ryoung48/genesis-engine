@@ -75,23 +75,27 @@ import {
 	type MoonOrbitState,
 } from "@/ui/planet/renderer/moon-orbit-overlay"
 import { shouldRebuildNationBordersForVisibilityChange } from "@/ui/planet/renderer/nation-border-visibility"
+import { EARTH_HISTORY_LABEL_SCALE_CURVE } from "@/ui/planet/renderer/nation-label-overlay/constants"
+import {
+	buildGlobeNationLabels,
+	buildMapNationLabels,
+} from "@/ui/planet/renderer/nation-label-overlay/nation-labels"
+import { updateGlobeLabelOrientations } from "@/ui/planet/renderer/nation-label-overlay/orientation"
 import {
 	buildGlobeHeritageLabels,
-	buildGlobeNationLabels,
 	buildGlobePartitionLabels,
-	buildGlobeSettlementLabels,
 	buildMapHeritageLabels,
-	buildMapNationLabels,
 	buildMapPartitionLabels,
-	buildMapSettlementLabels,
-	createSettlementLabelPools,
-	EARTH_HISTORY_LABEL_SCALE_CURVE,
-	updateGlobeLabelOrientations,
-} from "@/ui/planet/renderer/nation-label-overlay"
+} from "@/ui/planet/renderer/nation-label-overlay/partition-labels"
 import {
 	createNationLabelPools,
 	disposePool,
 } from "@/ui/planet/renderer/nation-label-overlay/pool"
+import {
+	buildGlobeSettlementLabels,
+	buildMapSettlementLabels,
+	createSettlementLabelPools,
+} from "@/ui/planet/renderer/nation-label-overlay/settlement-labels"
 import {
 	buildGlobeNationScripts,
 	buildMapNationScripts,

@@ -28,6 +28,7 @@ __pycache__/
 
 
 scripts/namelists
+plans/
 audits
 .opencode
 scripts/planets/output/
