@@ -90,7 +90,6 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	const hoverTopography = getHoverTopography(
 		hoverInfo,
 		worldForDisplay,
-		dataVariant,
 	)
 	const hoverCoordinates = useMemo(
 		() => getHoverCoordinates(hoverInfo, worldForDisplay),
@@ -146,7 +145,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 	const hoverClimateZone = getHoverClimateZone(
 		hoverInfo,
 		worldForDisplay,
-		dataVariant,
+		colorMode,
 	)
 	const hoverPastaClimate = getHoverPastaClimate(hoverInfo, worldForDisplay)
 	const hoverKoppenClimate = getHoverKoppenClimate(hoverInfo, worldForDisplay)
@@ -158,7 +157,7 @@ export function useWorldDisplayData(input: WorldDisplayDataInput) {
 		hoverInfo,
 		worldForDisplay,
 	)
-	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay, dataVariant)
+	const hoverBiome = getHoverBiome(hoverInfo, worldForDisplay, colorMode)
 	const earthImportRawIdToCompact = useMemo(() => {
 		const realIds = worldForDisplay?.provinces?.realIds
 		if (!realIds) return null

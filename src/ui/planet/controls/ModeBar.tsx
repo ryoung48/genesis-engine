@@ -93,7 +93,8 @@ export const ModeBar: React.FC<ModeBarProps> = ({
 			mode !== "realDtr" &&
 			mode !== "dtrDiff" &&
 			mode !== "realPrecipitation" &&
-			mode !== "precipitationDiff",
+			mode !== "precipitationDiff" &&
+			(!isEarthImport || (mode !== "dangerZones" && mode !== "trade_goods")),
 	)
 	const societyOptions = getVisibleSocietyModeOptions(
 		debugMapModes,

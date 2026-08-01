@@ -8,7 +8,6 @@ import { RELIGION } from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import {
 	type ColorMode,
-	EU5_TOPOGRAPHY_COLORS,
 	VEGETATION_WATER_BLUE,
 } from "@/ui/planet/colors"
 import { climateZoneColor } from "@/ui/planet/colors/misc"
@@ -32,7 +31,6 @@ import {
 	getReligionColorForProvince,
 	getReligionTypeIndexForProvince,
 } from "@/ui/planet/screen/display/religion-type"
-import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 import {
 	getBaseMapMode,
 	getDataVariant,
@@ -344,19 +342,7 @@ export function buildVegetationSwatchColor(
 export function buildTopographySwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
-	dataVariant: DataVariant,
 ): string | null {
-	if (
-		hoverRegion !== null &&
-		world &&
-		dataVariant === "observed" &&
-		world.isEarthImport
-	) {
-		const code = world.eu5Topography?.[hoverRegion] ?? -1
-		return code >= 0 && code < EU5_TOPOGRAPHY_COLORS.length
-			? rgbToCss(EU5_TOPOGRAPHY_COLORS[code])
-			: null
-	}
 	if (hoverRegion === null || !world?.topography) return null
 	const color = getTopographyColor(world.topography[hoverRegion])
 	return color ? rgbToCss(color) : null

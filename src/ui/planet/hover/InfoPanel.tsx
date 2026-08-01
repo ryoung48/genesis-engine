@@ -291,13 +291,13 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 					? hoverDtrDiff
 					: null
 	const climateColor = showGeography
-		? buildClimateSwatchColor(hoverRegion, world, colorMode, dataVariant)
+		? buildClimateSwatchColor(hoverRegion, world, colorMode)
 		: null
 	const vegetationSwatch = showGeography
 		? buildVegetationSwatchColor(hoverRegion, world, colorMode)
 		: null
 	const topographySwatch = showGeography
-		? buildTopographySwatchColor(hoverRegion, world, dataVariant)
+		? buildTopographySwatchColor(hoverRegion, world)
 		: null
 	const timezoneSwatch =
 		hoverRegion !== null && world
@@ -888,7 +888,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								}
 								showValues
 							/>
-						) : colorMode === "realTemperature" &&
+						) : dataVariant === "observed" &&
 							hoverRealTemperature &&
 							hoverRealTemperature.monthly.length === 12 ? (
 							<SeriesBars
@@ -1041,7 +1041,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 								}
 								showValues
 							/>
-						) : colorMode === "realPrecipitation" &&
+						) : dataVariant === "observed" &&
 							hoverRealRainfall &&
 							hoverRealRainfall.monthly.length === 12 ? (
 							<SeriesBars
