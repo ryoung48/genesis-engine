@@ -1,4 +1,3 @@
-import type * as THREE from "three"
 import { disposeGroup, disposeObject3D } from "@/ui/planet/renderer/disposal"
 import type { GenesisContext } from "@/ui/planet/renderer/genesis-scene/context"
 import {
@@ -13,12 +12,10 @@ export interface DisposeControllerDeps {
 	removeEventListeners: () => void
 	disposeAnimationLoop: () => void
 	disposeLabelPools: () => void
-	/** The org-name label overlay's group refs + pools -- still owned
-	 * directly by create-genesis-scene.ts (see labels.ts's doc comment on
-	 * why: it's a permanently-null-const, pre-existing dead code left
-	 * as-is). */
-	globeOrgLabel: THREE.Group | null
-	mapOrgLabel: THREE.Group | null
+	/** The org-name label overlay's pools -- still owned directly by
+	 * create-genesis-scene.ts (see labels.ts's doc comment on why: the
+	 * group refs it pairs with, ctx.globeOrgLabel/ctx.mapOrgLabel, are
+	 * permanently-null pre-existing dead code left as-is). */
 	orgLabelPools: ReturnType<typeof createNationLabelPools>
 }
 
@@ -73,8 +70,8 @@ export function createDisposeController(
 		disposeGroup(ctx.scene, ctx.mapInfrastructure)
 		disposeGroup(ctx.globeGroup, ctx.globeNationLabels)
 		disposeGroup(ctx.scene, ctx.mapNationLabels)
-		disposeGroup(ctx.globeGroup, deps.globeOrgLabel)
-		disposeGroup(ctx.scene, deps.mapOrgLabel)
+		disposeGroup(ctx.globeGroup, ctx.globeOrgLabel)
+		disposeGroup(ctx.scene, ctx.mapOrgLabel)
 		disposePool(deps.orgLabelPools.globe)
 		disposePool(deps.orgLabelPools.map)
 		if (ctx.globeNationScripts) ctx.globeGroup.remove(ctx.globeNationScripts)

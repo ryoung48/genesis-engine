@@ -169,6 +169,14 @@ export interface GenesisContext {
 		seeds: Int32Array
 		names: string[]
 	} | null
+	/** International organization label (HRE, Hanseatic League, ...) group
+	 * refs -- currently always null (pre-existing dead code the org-label
+	 * overlay never actually populates; see overlay-controllers/labels.ts's
+	 * doc comment). Kept on ctx so overlay-visibility-controller.ts and
+	 * dispose.ts both read the same (always-null) refs instead of each
+	 * holding their own local const. */
+	globeOrgLabel: THREE.Group | null
+	mapOrgLabel: THREE.Group | null
 	globeNationLabels: THREE.Group | null
 	mapNationLabels: THREE.Group | null
 	globeNationScripts: THREE.Group | null

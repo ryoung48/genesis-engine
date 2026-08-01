@@ -226,3 +226,77 @@ re-export barrel (every line is `export {...} from "./concrete-file"`),
 which is the exact pattern AGENTS.md's barrel-file rule forbids. Flagged
 separately; not fixed here since it's pre-existing and unrelated to this
 split (see `plans/nation-label-overlay-barrel-violation.md`).
+
+## Follow-up trim (2026-08-01) — 1144 -> 500 lines
+
+The 1144-line "natural floor" from the previous pass turned out to have
+more room after all: five more pieces came out cleanly, landing
+`create-genesis-scene.ts` at exactly 500 lines.
+
+1. **`types.ts`** — `MapExportOptions`, `ExportRenderTargetLike`,
+   `MapExportVisibilityTarget`, `MapExportDependencies`,
+   `ExportRendererLike` moved out of `create-genesis-scene.ts` via
+   `scripts/refactor/move-symbol.mjs`. `export.ts` (and `map-export.ts`,
+   which also referenced them) now import these from `types.ts` instead of
+   reaching back into `create-genesis-scene.ts` -- fixes the backwards
+   controller-imports-from-its-own-parent dependency the previous pass left
+   in place.
+2. **`overlay-visibility-controller.ts`** — `updateOverlayVisibility()`,
+   the ~210-line mechanical `.visible`-toggling pass over every overlay
+   object. Placed directly in `genesis-scene/`, not
+   `overlay-controllers/`, matching `terrain-controller.ts`'s precedent:
+   `overlay-controllers/` is for files that own a single overlay's own
+   mesh/group state, while this is a cross-cutting aggregator that reads
+   every other controller's state off `ctx`.
+3. **`overlay-aggregator.ts`** — `rebuildOverlays()`, same
+   directly-in-`genesis-scene/` placement and reasoning as above. Calls
+   into all ten overlay controllers' own `rebuild()`/`setVisible()` methods
+   plus terrain/nation-borders/labels, exactly as the original plan's
+   "thin aggregator" language described.
+4. **`lighting-controller.ts`** — the sun/atmosphere/cloud cluster:
+   `setAtmospherePressure`, `setGlobeCloudTexturePath`,
+   `applyGlobeOrientation`, `setSunPosition`, `setSunDirection`,
+   `syncMapLighting`, `setFullAmbient`, plus the `SUN_DIST`/`Y_AXIS`/
+   `Z_AXIS` constants and the sun-position initialization side effect
+   (moved into the controller factory body, so it still runs once at
+   controller-construction time in the same relative position it used to
+   run in `create-genesis-scene.ts`).
+5. **`view-state-controller.ts`** — the thin scene-state setters
+   (`setViewMode`, `setWireframeVisible`, `setGridVisible`,
+   `setGridSpacing`, `setEarthHistoryNationOverride`,
+   `setOrganizationHighlight`, `setElevationVisible`) plus
+   `projectToScreen`, grouped into one file since none of them was large
+   enough alone to justify its own module and they're all "small piece of
+   cross-cutting scene state" in the same way.
+
+### `ctx.globeOrgLabel`/`ctx.mapOrgLabel`
+
+Both fields moved from local `const globeOrgLabel/mapOrgLabel = null` in
+`create-genesis-scene.ts` onto `GenesisContext` (initialized `null` in
+`scene-setup.ts`), so `overlay-visibility-controller.ts` and `dispose.ts`
+both read the same (permanently-null, pre-existing dead-code) refs off
+`ctx` instead of each taking their own copy as a constructor `deps`
+parameter. No behavior change -- these were already always `null`.
+
+### Final state
+
+`create-genesis-scene.ts`: **1144 -> 500 lines** (4516 lines originally).
+24 files under `genesis-scene/` now (20 + `types.ts`,
+`overlay-visibility-controller.ts`, `overlay-aggregator.ts`,
+`lighting-controller.ts`, `view-state-controller.ts`), 5370 lines total
+under `genesis-scene/`. `npm run typecheck` and
+`./node_modules/.bin/biome check` are both clean on every file touched in
+this pass (a handful of pre-existing files elsewhere under
+`genesis-scene/` -- `animation-loop.ts`, `camera-focus-controller.ts`,
+`interaction-controller.ts`, `solar-system-controller.ts`,
+`terrain-controller.ts`, and most of `overlay-controllers/` -- report
+CRLF line-ending format findings from `biome check`, but those files
+weren't touched in this pass and predate it). `GenesisScene`'s public
+return shape and `createGenesisScene`'s signature are unchanged; both
+callers (`GenesisView.tsx`, `renderer/index.ts`) still typecheck.
+
+This is the genuine floor now: what's left in `create-genesis-scene.ts`
+is controller construction, `deps` wiring, canvas/controls event-listener
+registration, and the final `return { ...GenesisScene methods }`
+assembly -- pure wiring, one line per controller/method, nothing left
+that reads as its own concern.

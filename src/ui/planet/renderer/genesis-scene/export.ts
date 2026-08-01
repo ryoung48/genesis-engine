@@ -1,11 +1,11 @@
 import * as THREE from "three"
+import type { GenesisContext } from "@/ui/planet/renderer/genesis-scene/context"
 import type {
 	ExportRendererLike,
 	MapExportDependencies,
 	MapExportOptions,
 	MapExportVisibilityTarget,
-} from "@/ui/planet/renderer/create-genesis-scene"
-import type { GenesisContext } from "@/ui/planet/renderer/genesis-scene/context"
+} from "@/ui/planet/renderer/genesis-scene/types"
 import {
 	applyMapExportVisibility,
 	renderMapExportPng,

@@ -3,7 +3,7 @@ import {
 	ExportRendererLike,
 	ExportRenderTargetLike,
 	MapExportVisibilityTarget,
-} from "@/ui/planet/renderer/create-genesis-scene"
+} from "@/ui/planet/renderer/genesis-scene/types"
 import { PngStreamWriter } from "@/ui/planet/renderer/PngStreamWriter"
 
 export function normalizeMapCenterLongitudeDeg(longitudeDeg: number): number {

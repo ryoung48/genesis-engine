@@ -290,6 +290,8 @@ export function buildGenesisSceneSetup(
 		mapRiverMaterials: [],
 		currentOrgHighlight: null,
 		earthHistoryNationOverride: null,
+		globeOrgLabel: null,
+		mapOrgLabel: null,
 		globeNationLabels: null,
 		mapNationLabels: null,
 		globeNationScripts: null,
