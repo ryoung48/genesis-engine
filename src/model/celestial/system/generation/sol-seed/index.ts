@@ -33,6 +33,7 @@ function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 		tiltDeg: mainWorld.axialTiltDeg,
 		eccentricity: mainWorld.eccentricity,
 		longitudeOfPerihelionDeg: mainWorld.longitudeOfPerihelionDeg,
+		lsAphelionDeg: mainWorld.lsAphelionDeg,
 		inclinationDeg: mainWorld.inclinationDeg,
 		tideLock: mainWorld.tideLock,
 		substellarLon: mainWorld.substellarLon,

@@ -439,9 +439,17 @@ export function computeRegionColors(
 		return rgb
 	}
 
+	const isObservedVegetation =
+		colorMode === "realVegetation" || colorMode === "realVegetationMaps"
+	const vegetation = isObservedVegetation
+		? world.realVegetation
+		: world.vegetation
 	if (
-		(colorMode === "vegetation" || colorMode === "vegetationMaps") &&
-		world.vegetation
+		(colorMode === "vegetation" ||
+			colorMode === "vegetationMaps" ||
+			colorMode === "realVegetation" ||
+			colorMode === "realVegetationMaps") &&
+		vegetation
 	) {
 		for (let r = 0; r < N; r++) {
 			if (isOceanRegion(r)) {
@@ -451,11 +459,11 @@ export function computeRegionColors(
 				rgb[3 * r + 2] = cb
 			} else {
 				const biomeColor =
-					colorMode === "vegetationMaps"
-						? vegetationMapColor(world.vegetation[r], world.climateZones?.[r])
-						: vegetationColor(world.vegetation[r])
+					colorMode === "vegetationMaps" || colorMode === "realVegetationMaps"
+						? vegetationMapColor(vegetation[r], world.climateZones?.[r])
+						: vegetationColor(vegetation[r])
 				const [cr, cg, cb] =
-					colorMode === "vegetationMaps"
+					colorMode === "vegetationMaps" || colorMode === "realVegetationMaps"
 						? biomeColor
 						: darkenVegetationAtElevation(biomeColor, world.elevation_km[r])
 				rgb[3 * r] = cr
@@ -466,11 +474,17 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "vegetationSatellite" && world.pastaClimate) {
+	const satellitePastaClimate =
+		colorMode === "realVegetationSatellite"
+			? world.realPastaClimate
+			: world.pastaClimate
+	if (
+		(colorMode === "vegetationSatellite" ||
+			colorMode === "realVegetationSatellite") &&
+		satellitePastaClimate
+	) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = isOceanRegion(r)
-				? VEGETATION_WATER_BLUE
-				: vegetationSatelliteColor(world.pastaClimate[r])
+			const [cr, cg, cb] = vegetationSatelliteColor(satellitePastaClimate[r])
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb
@@ -525,7 +539,10 @@ export function computeRegionColors(
 		return rgb
 	}
 
-	if (colorMode === "climate" && world.climate) {
+	if (
+		(colorMode === "climate" || colorMode === "realClimate") &&
+		world.climate
+	) {
 		const BLEND_THRESHOLD = 15
 		const chaoticRgb = climateZoneColor(8)
 		for (let r = 0; r < N; r++) {
@@ -536,14 +553,31 @@ export function computeRegionColors(
 				rgb[3 * r + 2] = cb
 				continue
 			}
-			let [cr, cg, cb] = climateTempColor(world.climate.temperature_avg[r])
+			const temperatureAvg =
+				colorMode === "realClimate"
+					? world.climate.real_temperature_avg?.[r]
+					: world.climate.temperature_avg[r]
+			let temperatureMin = world.climate.temperature_min[r]
+			let temperatureMax = world.climate.temperature_max[r]
+			if (colorMode === "realClimate" && world.climate.real_temperature_monthly) {
+				temperatureMin = Infinity
+				temperatureMax = -Infinity
+				for (let month = 0; month < 12; month++) {
+					const temperature = world.climate.real_temperature_monthly[month * N + r]
+					if (temperature < temperatureMin) temperatureMin = temperature
+					if (temperature > temperatureMax) temperatureMax = temperature
+				}
+			}
+			let [cr, cg, cb] = climateTempColor(
+				temperatureAvg ?? world.climate.temperature_avg[r],
+			)
 			const minT = Math.min(
 				BLEND_THRESHOLD,
-				Math.max(VEGETATION.chaoticMin - world.climate.temperature_min[r], 0),
+				Math.max(VEGETATION.chaoticMin - temperatureMin, 0),
 			)
 			const maxT = Math.min(
 				BLEND_THRESHOLD,
-				Math.max(world.climate.temperature_max[r] - VEGETATION.chaoticMax, 0),
+				Math.max(temperatureMax - VEGETATION.chaoticMax, 0),
 			)
 			if (minT > 0 && maxT > 0) {
 				const t = (minT + maxT) / 2 / BLEND_THRESHOLD

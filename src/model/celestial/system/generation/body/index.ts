@@ -119,13 +119,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
 		const isMainWorld = slot.isMainWorld === true
 		const isPrimaryWorld = isMainWorld || siblingIdx === primarySlotIndex
-		let group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
-		// A main world can't be an asteroid belt (no surface to generate
-		// terrain on) -- reroll until it isn't. Low-probability in the inner
-		// zone already, so this terminates quickly.
-		while (isMainWorld && group === "asteroid belt") {
-			group = ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
-		}
+		// Primary worlds are terrestrial before their physical size is rolled,
+		// so their size and classification stay consistent rather than relabeling
+		// a previously rolled giant as tectonic later.
+		const group = isPrimaryWorld
+			? "terrestrial"
+			: ROLLS.rollOrbitGroup({ rng, zone: slot.zone })
 		let orbitalDistanceAU = PLANET.deviationToAU({
 			deviation: slot.deviation,
 			luminositySol,
@@ -157,20 +156,12 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				orbitalDistanceAU = candidateAu
 			}
 		}
-		// A primary/main world is meant to be a significant, habitable-scale
-		// body -- floor its rolled size the way galaxy-gen floors `size` to
-		// at least 2 for its own primary designation, adapted to our
-		// terrestrial-sized (5-10) sizeClass band since classifyBody always
-		// reclassifies an isPrimaryWorld body to group "terrestrial".
-		const sizeClass = isPrimaryWorld
-			? Math.max(ROLLS.rollSizeClass({ rng, group }), 5)
-			: ROLLS.rollSizeClass({ rng, group })
+		const sizeClass = ROLLS.rollSizeClass({ rng, group })
 		const classification = PLANET.classifyBody({
 			groupHint: group,
 			zone: slot.zone,
 			orbitalDistanceAU,
 			sizeClass,
-			isPrimaryWorld,
 			isMoon: false,
 			tidal: false,
 			forceMeltball,
@@ -350,9 +341,16 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			siderealDayHours: finalSiderealDayHours,
 			eccentricity: finalEccentricity,
 			longitudeOfPerihelionDeg: rng.uniform(0, 360),
+			// Independently rolled, not derived from longitudeOfPerihelionDeg
+			// above -- see OrbitBody.lsAphelionDeg's doc. For a procedurally
+			// generated body neither angle has any real-world meaning, so
+			// there's no "correct" value being risked by rolling them
+			// separately; this just avoids quietly reusing one arbitrary
+			// roll for two conceptually distinct purposes.
+			lsAphelionDeg: rng.uniform(0, 360),
 			axialTiltDeg: finalAxialTiltDeg,
 			inclinationDeg:
-				group === "asteroid belt" ? 0 : MOON.rollInclinationDeg(rng),
+				group === "asteroid belt" ? 0 : ORBIT_BODY.rollInclinationDeg(rng),
 			longitudeOfAscendingNodeDeg: rng.uniform(0, 360),
 			tideLock,
 			tideLockStatus: PLANET.deriveTideLockStatus({

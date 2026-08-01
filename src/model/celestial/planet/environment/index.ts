@@ -50,7 +50,6 @@ function classifyBody(params: {
 	zone: Zone
 	orbitalDistanceAU: number
 	sizeClass: number
-	isPrimaryWorld: boolean
 	isMoon: boolean
 	tidal: boolean
 	/** Ported from galaxy-gen's forced-meltball roll (orbits/index.ts) -- a
@@ -65,15 +64,12 @@ function classifyBody(params: {
 		zone,
 		orbitalDistanceAU,
 		sizeClass,
-		isPrimaryWorld,
 		isMoon,
 		tidal,
 		forceMeltball,
 	} = params
 	if (forceMeltball) return { group: "dwarf", classification: "meltball" }
 	const group = classifyGroup({ groupHint: params.groupHint, sizeClass })
-	if (isPrimaryWorld)
-		return { group: "terrestrial", classification: "tectonic" }
 	if (group === "asteroid belt") {
 		return { group, classification: isMoon ? "asteroid" : "asteroid belt" }
 	}

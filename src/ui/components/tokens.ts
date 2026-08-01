@@ -85,6 +85,7 @@ export const uiTokens = {
 		labelSm: "text-[8px] font-semibold uppercase tracking-[0.08em]",
 		control: "text-[10px] font-semibold uppercase tracking-[0.08em]",
 		controlSm: "text-[9px] font-semibold uppercase tracking-[0.08em]",
+		controlTextSm: "text-[9px] font-semibold tracking-[0.08em]",
 		controlWide: "text-[10px] font-semibold uppercase tracking-[0.12em]",
 		controlLoose: "text-[10px] font-semibold uppercase tracking-[0.14em]",
 		value: "font-mono text-[11px]",

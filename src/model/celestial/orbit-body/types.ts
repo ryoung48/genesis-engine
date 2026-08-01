@@ -177,6 +177,18 @@ export interface OrbitBody {
 	inclinationDeg: number
 	longitudeOfAscendingNodeDeg: number
 	longitudeOfPerihelionDeg: number
+	/**
+	 * EBM seasonal-insolation perihelion input, in degrees -- NOT the same
+	 * quantity as longitudeOfPerihelionDeg above. insolation/index.ts's
+	 * orbital.PERIHELION is (Ls_at_perihelion - 180), i.e. Ls (the body's own
+	 * areocentric/heliocentric solar longitude, 0 = the body's own vernal
+	 * equinox) at APHELION -- not the fixed-frame longitude of perihelion
+	 * used to orient the 3D orbit. These angles use different reference frames
+	 * and must be authored independently. Falls back to
+	 * longitudeOfPerihelionDeg when unset for generated bodies without a
+	 * seasonal reference value.
+	 */
+	lsAphelionDeg?: number
 	axialTiltDeg: number
 	/** Bond albedo, 0..1 — real measured value where known, otherwise unset. */
 	albedo?: number

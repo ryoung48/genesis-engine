@@ -84,7 +84,7 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 						>
 							{numeric}
 						</span>
-						{unit && <span>{unit}</span>}
+						{unit && <span className="ml-1">{unit}</span>}
 					</>
 				}
 			>

@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import type { ColorMode } from "@/ui/planet/colors"
 import type { VegetationSubMode } from "./types"
 
@@ -25,7 +25,9 @@ export const VegetationModeSection: React.FC<VegetationModeSectionProps> = ({
 		colorMode !== "vegetation" &&
 		colorMode !== "vegetationMaps" &&
 		colorMode !== "vegetationSatellite" &&
-		colorMode !== "eu5Vegetation"
+		colorMode !== "realVegetation" &&
+		colorMode !== "realVegetationMaps" &&
+		colorMode !== "realVegetationSatellite"
 	) {
 		return null
 	}
@@ -38,7 +40,9 @@ export const VegetationModeSection: React.FC<VegetationModeSectionProps> = ({
 			/>
 			{vegetationExpanded && (
 				<div className="mt-1.5 space-y-1.5">
-					<SegmentedControl
+					<RadioGroup
+						label="Vegetation mode"
+						orientation="horizontal"
 						options={[
 							{ value: "base" as const, label: "Base" },
 							{ value: "maps" as const, label: "Maps" },
@@ -47,15 +51,24 @@ export const VegetationModeSection: React.FC<VegetationModeSectionProps> = ({
 						value={vegetationSubMode}
 						onChange={(v) => {
 							setVegetationSubMode(v)
+							const observed =
+								colorMode === "realVegetation" ||
+								colorMode === "realVegetationMaps" ||
+								colorMode === "realVegetationSatellite"
 							setColorMode(
 								v === "base"
-									? "vegetation"
+									? observed
+										? "realVegetation"
+										: "vegetation"
 									: v === "maps"
-										? "vegetationMaps"
-										: "vegetationSatellite",
+										? observed
+											? "realVegetationMaps"
+											: "vegetationMaps"
+										: observed
+											? "realVegetationSatellite"
+											: "vegetationSatellite",
 							)
 						}}
-						tone="overlay"
 					/>
 				</div>
 			)}

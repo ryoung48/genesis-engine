@@ -98,6 +98,8 @@ export interface SerializedGenesisWorld {
 		}
 	}
 	climateZones: Uint8Array
+	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
+	realClimateZones?: Uint8Array
 	pastaClimate: Uint8Array
 	pastaDebug?: {
 		gdd: Float32Array
@@ -117,6 +119,8 @@ export interface SerializedGenesisWorld {
 	realKoppenClimate?: Uint8Array
 	realPastaClimate?: Uint8Array
 	vegetation: Uint8Array
+	/** [JUSTIFICATION] Present only for Earth imports, where it is classified from observed climate data. */
+	realVegetation?: Uint8Array
 	topography: Uint8Array
 	eu5Topography?: Int16Array
 	eu5Vegetation?: Int16Array

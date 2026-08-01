@@ -55,7 +55,17 @@ export interface SolPlanetSeed {
 	tideLock?: SystemBody["tideLock"]
 	substellarLon?: number
 	inclinationDeg?: number
+	/** [JUSTIFICATION] Procedurally generated and non-orbital display bodies
+	 * retain their seeded fallback rather than carrying a physical node. */
+	longitudeOfAscendingNodeDeg?: number
 	longitudeOfPerihelionDeg?: number
+	/** See OrbitBody.lsAphelionDeg's doc -- the EBM's actual seasonal-
+	 * insolation input, distinct from longitudeOfPerihelionDeg above.
+	 * Required (not optional, unlike longitudeOfPerihelionDeg) so every real
+	 * Sol planet entry has to state its own real value explicitly rather than
+	 * silently inherit the wrong quantity -- no fallback chain exists for
+	 * this field. */
+	lsAphelionDeg: number
 	isMainWorld?: boolean
 	rings?: SystemBody["rings"]
 }

@@ -188,7 +188,6 @@ function buildMoonEnvironment(params: {
 		zone: params.zone,
 		orbitalDistanceAU: params.orbitalDistanceAU,
 		sizeClass,
-		isPrimaryWorld: params.isPrimaryWorld,
 		isMoon: true,
 		tidal,
 	})

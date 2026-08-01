@@ -205,7 +205,8 @@ export function GenerationPlanetNavigator({
 				isSolarLocked: probeMoon.tideLock?.type === "solar",
 				obliquity: probeMoon.axialTiltDeg,
 				eccentricity: probeBody.eccentricity,
-				perihelion: probeBody.longitudeOfPerihelionDeg,
+				perihelion:
+					probeBody.lsAphelionDeg ?? probeBody.longitudeOfPerihelionDeg,
 				spectralClass,
 				starSubtype,
 				orbitalDistanceAU: probeBody.orbitalDistanceAU,
@@ -229,7 +230,8 @@ export function GenerationPlanetNavigator({
 				),
 				obliquity: probeBody.axialTiltDeg,
 				eccentricity: probeBody.eccentricity,
-				perihelion: probeBody.longitudeOfPerihelionDeg,
+				perihelion:
+					probeBody.lsAphelionDeg ?? probeBody.longitudeOfPerihelionDeg,
 				spectralClass,
 				starSubtype,
 				orbitalDistanceAU: probeBody.orbitalDistanceAU,
@@ -672,10 +674,12 @@ export function GenerationPlanetNavigator({
 								if (updated.eccentricity !== body.eccentricity)
 									eccentricitySlider?.set(updated.eccentricity)
 								if (
-									updated.longitudeOfPerihelionDeg !==
-									body.longitudeOfPerihelionDeg
+									updated.lsAphelionDeg !== body.lsAphelionDeg
 								)
-									perihelionSlider?.set(updated.longitudeOfPerihelionDeg)
+									perihelionSlider?.set(
+										updated.lsAphelionDeg ??
+											updated.longitudeOfPerihelionDeg,
+									)
 								if (updated.axialTiltDeg !== body.axialTiltDeg)
 									axialTiltSlider?.set(updated.axialTiltDeg)
 								if (
@@ -706,7 +710,9 @@ export function GenerationPlanetNavigator({
 							starSubtype={starSubtype}
 							orbitalDistanceAU={body.orbitalDistanceAU}
 							eccentricity={body.eccentricity}
-							perihelion={body.longitudeOfPerihelionDeg}
+							perihelion={
+								body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg
+							}
 							obliquity={body.axialTiltDeg}
 							substellarLon={body.substellarLon ?? 0}
 							landCoverage={body.landCoverage}
@@ -786,7 +792,8 @@ export function GenerationPlanetNavigator({
 			const parentOrbitalPeriodDays = body.orbitalPeriodDays
 			const parentOrbitalDistanceAU = body.orbitalDistanceAU
 			const parentEccentricity = body.eccentricity
-			const parentPerihelionDeg = body.longitudeOfPerihelionDeg
+			const parentPerihelionDeg =
+				body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg
 			const pd = isMainWorld
 				? (moon.semiMajorAxisPlanetDiameters ??
 					MECHANICS.moonSemiMajorAxisM({ moon, planetMassKg }) /

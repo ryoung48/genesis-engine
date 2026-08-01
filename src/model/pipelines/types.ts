@@ -151,6 +151,8 @@ export interface GenesisWorld {
 	tidalSchedule?: TidalSchedule
 	/** Per-cell biome code (0=ocean, 1=desert, 2=sparse, 3=grasslands, 4=woods, 5=forest, 6=jungle) */
 	vegetation: Uint8Array
+	/** [JUSTIFICATION] Present only for Earth imports, where it is classified from observed climate data. */
+	realVegetation?: Uint8Array
 	/** Per-cell topography code, index into GENESIS_TOPOGRAPHY_LABELS */
 	topography: Uint8Array
 	/** Per-cell EU5 (Project Caesar) location topography code, -1 if unmapped. Index into EU5_TOPOGRAPHY_CATEGORIES in src/ui/planet/colors.ts. Earth-import only. */

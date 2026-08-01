@@ -8,9 +8,7 @@ import { RELIGION } from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import {
 	type ColorMode,
-	EU5_CLIMATE_COLORS,
 	EU5_TOPOGRAPHY_COLORS,
-	EU5_VEGETATION_COLORS,
 	VEGETATION_WATER_BLUE,
 } from "@/ui/planet/colors"
 import { climateZoneColor } from "@/ui/planet/colors/misc"
@@ -262,15 +260,8 @@ export function buildClimateSwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
 	colorMode: ColorMode,
-	dataVariant: DataVariant,
 ): string | null {
 	if (hoverRegion === null || !world) return null
-	if (dataVariant === "observed" && world.isEarthImport) {
-		const code = world.eu5Climate?.[hoverRegion] ?? -1
-		return code >= 0 && code < EU5_CLIMATE_COLORS.length
-			? rgbToCss(EU5_CLIMATE_COLORS[code])
-			: null
-	}
 	if (colorMode === "pastaClimate" && world.pastaClimate)
 		return rgbToCss(PASTA.pastaClimateColor(world.pastaClimate[hoverRegion]))
 	if (colorMode === "koppenClimate" && world.koppenClimate)
@@ -295,8 +286,13 @@ export function buildClimateSwatchColor(
 		)
 	if (!world.climateZones) return null
 	return rgbToCss(
-		colorMode === "climate" && world.climate
-			? climateTempColor(world.climate.temperature_avg[hoverRegion])
+		(colorMode === "climate" || colorMode === "realClimate") && world.climate
+			? climateTempColor(
+					colorMode === "realClimate"
+						? (world.climate.real_temperature_avg?.[hoverRegion] ??
+								world.climate.temperature_avg[hoverRegion])
+						: world.climate.temperature_avg[hoverRegion],
+				)
 			: climateZoneColor(world.climateZones[hoverRegion]),
 	)
 }
@@ -305,38 +301,43 @@ export function buildVegetationSwatchColor(
 	hoverRegion: number | null,
 	world: SerializedGenesisWorld | null,
 	colorMode: ColorMode,
-	dataVariant: DataVariant,
 ): string | null {
-	if (
-		hoverRegion !== null &&
-		world &&
-		dataVariant === "observed" &&
-		world.isEarthImport
-	) {
-		const code = world.eu5Vegetation?.[hoverRegion] ?? -1
-		return code >= 0 && code < EU5_VEGETATION_COLORS.length
-			? rgbToCss(EU5_VEGETATION_COLORS[code])
-			: null
-	}
 	if (
 		hoverRegion === null ||
 		!world ||
-		(colorMode === "vegetationSatellite"
-			? !world.pastaClimate
-			: !world.vegetation)
+		((colorMode === "vegetationSatellite" ||
+			colorMode === "realVegetationSatellite")
+			? !(colorMode === "realVegetationSatellite"
+					? world.realPastaClimate
+					: world.pastaClimate)
+			: !(colorMode === "realVegetation" || colorMode === "realVegetationMaps"
+					? world.realVegetation
+					: world.vegetation))
 	) {
 		return null
 	}
-	const color = !world.isLand?.[hoverRegion]
-		? VEGETATION_WATER_BLUE
-		: colorMode === "vegetationSatellite" && world.pastaClimate
-			? vegetationSatelliteColor(world.pastaClimate[hoverRegion])
-			: colorMode === "vegetationMaps"
+	const vegetation =
+		colorMode === "realVegetation" || colorMode === "realVegetationMaps"
+			? world.realVegetation
+			: world.vegetation
+	const satellitePastaClimate =
+		colorMode === "realVegetationSatellite"
+			? world.realPastaClimate
+			: world.pastaClimate
+	const color =
+		(colorMode === "vegetationSatellite" ||
+			colorMode === "realVegetationSatellite") &&
+		satellitePastaClimate
+			? vegetationSatelliteColor(satellitePastaClimate[hoverRegion])
+			: !world.isLand?.[hoverRegion]
+				? VEGETATION_WATER_BLUE
+			: (colorMode === "vegetationMaps" || colorMode === "realVegetationMaps") &&
+				vegetation
 				? vegetationMapColor(
-						world.vegetation[hoverRegion],
+						vegetation[hoverRegion],
 						world.climateZones?.[hoverRegion],
 					)
-				: vegetationColor(world.vegetation[hoverRegion])
+				: vegetationColor(vegetation?.[hoverRegion] ?? 0)
 	return rgbToCss(color)
 }
 

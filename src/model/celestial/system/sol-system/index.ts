@@ -33,7 +33,7 @@ function rng(seedTag: number) {
 function rollExtras(seedTag: number) {
 	const r = rng(seedTag)
 	return {
-		inclinationDeg: MOON.rollInclinationDeg(r),
+		inclinationDeg: ORBIT_BODY.rollInclinationDeg(r),
 		longitudeOfAscendingNodeDeg: r.uniform(0, 360),
 		longitudeOfPerihelionDeg: r.uniform(0, 360),
 		meanAnomalyAtEpochDeg: r.uniform(0, 360),
@@ -211,9 +211,11 @@ function buildPlanet({
 		eccentricity: seed.eccentricity,
 		longitudeOfPerihelionDeg:
 			seed.longitudeOfPerihelionDeg ?? rolled.longitudeOfPerihelionDeg,
+		lsAphelionDeg: seed.lsAphelionDeg,
 		axialTiltDeg: seed.tiltDeg,
 		inclinationDeg: seed.inclinationDeg ?? rolled.inclinationDeg,
-		longitudeOfAscendingNodeDeg: rolled.longitudeOfAscendingNodeDeg,
+		longitudeOfAscendingNodeDeg:
+			seed.longitudeOfAscendingNodeDeg ?? rolled.longitudeOfAscendingNodeDeg,
 		moons,
 		albedo: seed.albedo,
 		greenhouseFactor: seed.greenhouseFactor,
@@ -267,7 +269,7 @@ const solMainWorldDefaults = {
 	hoursPerDay: EARTH_SEED.rotationHours,
 	pressureBar: 1,
 	substellarLon: 0,
-	perihelion: EARTH_SEED.longitudeOfPerihelionDeg ?? 102,
+	perihelion: EARTH_SEED.lsAphelionDeg,
 	inclinationDeg: EARTH_SEED.inclinationDeg ?? 0,
 	moonCount: EARTH_SEED.moons?.length ?? 1,
 	albedo: EARTH_SEED.albedo,

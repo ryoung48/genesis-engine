@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import type { DataVariant } from "@/ui/planet/screen/shared/data-variant"
 
@@ -54,9 +54,7 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 	// Model/Observed regardless of what's colored on the map -- so the radio
 	// surfaces whenever either overlay is on, not just when colorMode itself
 	// has variants.
-	const showDataVariantRadio =
-		isEarthImport &&
-		(availableVariants.length > 1 || showWindArrows || showOceanCurrents)
+	const showDataVariantRadio = isEarthImport
 	return (
 		<div>
 			<CollapsibleSectionHeader
@@ -103,7 +101,9 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 					/>
 					{showDataVariantRadio && (
 						<div className="pt-1">
-							<SegmentedControl
+							<RadioGroup
+								label="Data source"
+								orientation="horizontal"
 								options={[
 									{ value: "generated", label: "Model" },
 									{ value: "observed", label: "Observed" },
@@ -113,7 +113,6 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 								]}
 								value={dataVariant}
 								onChange={setDataVariant}
-								tone="overlay"
 							/>
 						</div>
 					)}

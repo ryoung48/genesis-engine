@@ -214,33 +214,6 @@ const TIDE_LOCK_TOLERANCE_HOURS = 1e-6
 const defaultMoonAtmosphere = DEFAULT_MOON_ATMOSPHERE_VALUE
 
 export const MOON = {
-	/**
-	 * Centralized orbital-inclination roll, shared by every planet, moon, and
-	 * sibling body in the system so they all use the same table:
-	 *
-	 *   2D roll   Severity     Degrees
-	 *   2–6       Very Low     1D ÷ 2
-	 *   7         Low          1D
-	 *   8         Moderate     2D
-	 *   9         High         (2D × 3) + 1D
-	 *   10        Very High    (1D + 1) × 5 + 1D
-	 *   11        Extreme      (3D × 5) − 1D
-	 *   12        Retrograde   roll again, result subtracted from 180
-	 */
-	rollInclinationDeg(rng: ReturnType<typeof RNG.createRng>): number {
-		const roll = rollDie({ rng, sides: 2 })
-		if (roll <= 6) return rollDie({ rng, sides: 1 }) / 2
-		if (roll === 7) return rollDie({ rng, sides: 1 })
-		if (roll === 8) return rollDie({ rng, sides: 2 })
-		if (roll === 9)
-			return rollDie({ rng, sides: 2 }) * 3 + rollDie({ rng, sides: 1 })
-		if (roll === 10)
-			return (rollDie({ rng, sides: 1 }) + 1) * 5 + rollDie({ rng, sides: 1 })
-		if (roll === 11)
-			return rollDie({ rng, sides: 3 }) * 5 - rollDie({ rng, sides: 1 })
-		return 180 - MOON.rollInclinationDeg(rng)
-	},
-
 	estimateMoonSizeClassFromDiameter(diameterKm: number): number {
 		return ORBIT_BODY.estimateRockySizeClassFromDiameterKm(diameterKm)
 	},
@@ -428,7 +401,7 @@ export const MOON = {
 				range: orbitRange,
 				sizeClass,
 			})
-			const inclinationDeg = MOON.rollInclinationDeg(rng)
+			const inclinationDeg = ORBIT_BODY.rollInclinationDeg(rng)
 			const longitudeOfAscendingNodeDeg = rng.uniform(0, 360)
 			const longitudeOfPerihelionDeg = rng.uniform(0, 360)
 			const meanAnomalyAtEpochDeg = rng.uniform(0, 360)

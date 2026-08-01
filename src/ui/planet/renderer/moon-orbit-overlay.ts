@@ -324,7 +324,10 @@ export function buildMoonOrbitOverlay(
 
 		const Omega = (moon.longitudeOfAscendingNodeDeg * Math.PI) / 180
 		const inc = ((showInclination ? moon.inclinationDeg : 0) * Math.PI) / 180
-		const omega = (moon.longitudeOfPerihelionDeg * Math.PI) / 180
+		const omega =
+			((moon.longitudeOfPerihelionDeg - moon.longitudeOfAscendingNodeDeg) *
+				Math.PI) /
+			180
 		const M0 = (moon.meanAnomalyAtEpochDeg * Math.PI) / 180
 
 		const { P, Q } = perifocalBasis(Omega, inc, omega)

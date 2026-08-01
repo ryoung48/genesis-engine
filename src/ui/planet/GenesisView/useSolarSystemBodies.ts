@@ -160,8 +160,11 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		const eccentricity = prev
 			? prev.eccentricity
 			: DEFAULT_WORLD_PARAMS.eccentricity
-		const perihelion = prev
+		const longitudeOfPerihelionDeg = prev
 			? prev.longitudeOfPerihelionDeg
+			: DEFAULT_WORLD_PARAMS.perihelion
+		const lsAphelionDeg = prev
+			? (prev.lsAphelionDeg ?? DEFAULT_WORLD_PARAMS.perihelion)
 			: DEFAULT_WORLD_PARAMS.perihelion
 		const obliquity = prev ? prev.axialTiltDeg : DEFAULT_WORLD_PARAMS.obliquity
 		const substellarLon = prev
@@ -184,7 +187,8 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 			}),
 			siderealDayHours: hoursPerDay,
 			eccentricity,
-			longitudeOfPerihelionDeg: perihelion,
+			longitudeOfPerihelionDeg,
+			lsAphelionDeg,
 			axialTiltDeg: obliquity,
 			substellarLon,
 			atmosphere: buildPressureAtmosphereProfile(pressure),
@@ -378,13 +382,13 @@ export function useSolarSystemBodies(input: SolarSystemBodiesInput) {
 		[updateMainWorldBody],
 	)
 	const perihelion =
-		mainWorldSystemBody?.longitudeOfPerihelionDeg ??
+		mainWorldSystemBody?.lsAphelionDeg ??
 		DEFAULT_WORLD_PARAMS.perihelion
 	const setPerihelion = useCallback(
 		(value: number) =>
 			updateMainWorldBody((body) => ({
 				...body,
-				longitudeOfPerihelionDeg: value,
+				lsAphelionDeg: value,
 			})),
 		[updateMainWorldBody],
 	)

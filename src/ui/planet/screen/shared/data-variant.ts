@@ -29,9 +29,16 @@ const VARIANT_FAMILIES: Partial<
 	misery: { generated: "misery", observed: "realMisery" },
 	pastaClimate: { generated: "pastaClimate", observed: "realPastaClimate" },
 	koppenClimate: { generated: "koppenClimate", observed: "realKoppenClimate" },
-	climate: { generated: "climate", observed: "eu5Climate" },
-	topography: { generated: "topography", observed: "eu5Topography" },
-	vegetation: { generated: "vegetation", observed: "eu5Vegetation" },
+	climate: { generated: "climate", observed: "realClimate" },
+	vegetation: { generated: "vegetation", observed: "realVegetation" },
+	vegetationMaps: {
+		generated: "vegetationMaps",
+		observed: "realVegetationMaps",
+	},
+	vegetationSatellite: {
+		generated: "vegetationSatellite",
+		observed: "realVegetationSatellite",
+	},
 }
 
 export function getBaseMapMode(mode: ColorMode): ColorMode {

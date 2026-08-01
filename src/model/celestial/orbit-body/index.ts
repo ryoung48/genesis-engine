@@ -2,6 +2,8 @@ import type {
 	DensityFromMassAndDiameterInput,
 	MassFromDensityInput,
 } from "@/model/celestial/orbit-body/types"
+import { DICE } from "@/model/shared/random/dice"
+import { RNG } from "@/model/shared/random/rng"
 import { TIME } from "@/model/shared/time"
 
 const earthDiameterKm = 12_742
@@ -126,6 +128,22 @@ export const ORBIT_BODY = {
 
 	inferRetrogradeRotationFromAxialTiltDeg(axialTiltDeg: number): boolean {
 		return axialTiltDeg > 90
+	},
+
+	/**
+	 * Rolls an orbit's inclination from the shared 2d6 table. This belongs to
+	 * orbit bodies because planets and moons use the same orbital mechanic.
+	 */
+	rollInclinationDeg(rng: ReturnType<typeof RNG.createRng>): number {
+		const roll = DICE.roll2d6(rng)
+		if (roll <= 6) return rng.randint(1, 6) / 2
+		if (roll === 7) return rng.randint(1, 6)
+		if (roll === 8) return DICE.roll2d6(rng)
+		if (roll === 9) return DICE.roll2d6(rng) * 3 + rng.randint(1, 6)
+		if (roll === 10)
+			return (rng.randint(1, 6) + 1) * 5 + rng.randint(1, 6)
+		if (roll === 11) return DICE.roll3d6(rng) * 5 - rng.randint(1, 6)
+		return 180 - ORBIT_BODY.rollInclinationDeg(rng)
 	},
 	earthDiameterKm,
 	earthMassKg,

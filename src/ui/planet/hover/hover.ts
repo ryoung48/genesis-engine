@@ -10,9 +10,7 @@ import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-go
 import { TIMEZONE } from "@/model/society/timezone"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import {
-	EU5_CLIMATE_CATEGORIES,
 	EU5_TOPOGRAPHY_CATEGORIES,
-	EU5_VEGETATION_CATEGORIES,
 } from "@/ui/planet/colors"
 import type {
 	GetHoverClimateDisplayParams,
@@ -621,14 +619,12 @@ export function getHoverClimateZone(
 ): string | null {
 	if (!hoverInfo || !world) return null
 	const region = hoverInfo.region
-	if (dataVariant === "observed" && world.isEarthImport) {
-		const code = world.eu5Climate?.[region] ?? -1
-		return code >= 0
-			? formatObservedCategoryLabel(EU5_CLIMATE_CATEGORIES[code])
-			: "unmapped"
-	}
-	return hoverInfo && world?.climateZones && world?.isLand?.[hoverInfo.region]
-		? (VEGETATION.climateLabels[world.climateZones[hoverInfo.region]] ?? null)
+	const climateZones =
+		dataVariant === "observed" && world.isEarthImport
+			? world.realClimateZones
+			: world.climateZones
+	return climateZones && world.isLand?.[region]
+		? (VEGETATION.climateLabels[climateZones[region]] ?? null)
 		: null
 }
 
@@ -695,14 +691,12 @@ export function getHoverBiome(
 ): string | null {
 	if (!hoverInfo || !world) return null
 	const region = hoverInfo.region
-	if (dataVariant === "observed" && world.isEarthImport) {
-		const code = world.eu5Vegetation?.[region] ?? -1
-		return code >= 0
-			? formatObservedCategoryLabel(EU5_VEGETATION_CATEGORIES[code])
-			: "unmapped"
-	}
-	return hoverInfo && world?.vegetation && world?.isLand?.[hoverInfo.region]
-		? (VEGETATION.biomeLabels[world.vegetation[hoverInfo.region]] ?? null)
+	const vegetation =
+		dataVariant === "observed" && world.isEarthImport
+			? world.realVegetation
+			: world.vegetation
+	return vegetation && world.isLand?.[region]
+		? (VEGETATION.biomeLabels[vegetation[region]] ?? null)
 		: null
 }
 

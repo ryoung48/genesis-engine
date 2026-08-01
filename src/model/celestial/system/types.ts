@@ -16,6 +16,7 @@ type GeneratedBodyFields =
 	| "atmosphere"
 	| "siderealDayHours"
 	| "longitudeOfPerihelionDeg"
+	| "lsAphelionDeg"
 	| "axialTiltDeg"
 	| "inclinationDeg"
 	| "longitudeOfAscendingNodeDeg"

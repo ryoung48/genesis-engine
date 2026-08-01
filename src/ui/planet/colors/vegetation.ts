@@ -61,15 +61,16 @@ const biomeMapColors: [number, number, number][] = [
 const PASTA_SATELLITE_TRUE_COLOR: Partial<
 	Record<(typeof PASTA.pastaLabels)[number], [number, number, number]>
 > = {
-	Ofi: [240, 240, 240],
-	Ofd: [10, 10, 51],
-	Ofg: [10, 10, 51],
-	Og: [10, 10, 51],
-	Oc: [10, 10, 51],
-	Ot: [10, 10, 51],
-	Oh: [10, 10, 51],
-	Or: [10, 10, 51],
-	Oe: [10, 10, 51],
+	// Pasta ocean classes use the satellite vegetation ocean palette.
+	Ofi: [190, 208, 226], // permanent frozen ocean
+	Ofd: [20, 30, 66], // seasonal frozen ocean
+	Ofg: [20, 30, 66], // barren seasonal frozen ocean
+	Og: [20, 30, 66], // barren ocean
+	Oc: [20, 30, 66], // cool ocean
+	Ot: [20, 30, 66], // tropical ocean
+	Oh: [20, 30, 66], // hot ocean
+	Or: [20, 30, 66], // torrid ocean
+	Oe: [20, 30, 66], // extraseasonal ocean
 	TUr: [41, 63, 13],
 	TUrp: [42, 65, 16],
 	TUf: [55, 74, 20],
@@ -168,7 +169,7 @@ const PASTA_SATELLITE_TRUE_COLOR: Partial<
 }
 
 const DEFAULT_PASTA_SATELLITE_OCEAN: [number, number, number] = [
-	VEGETATION_WATER_BLUE[0],
-	VEGETATION_WATER_BLUE[1],
-	VEGETATION_WATER_BLUE[2],
+	20 / 255,
+	30 / 255,
+	66 / 255,
 ]

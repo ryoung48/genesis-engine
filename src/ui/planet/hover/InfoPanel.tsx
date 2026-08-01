@@ -294,7 +294,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		? buildClimateSwatchColor(hoverRegion, world, colorMode, dataVariant)
 		: null
 	const vegetationSwatch = showGeography
-		? buildVegetationSwatchColor(hoverRegion, world, colorMode, dataVariant)
+		? buildVegetationSwatchColor(hoverRegion, world, colorMode)
 		: null
 	const topographySwatch = showGeography
 		? buildTopographySwatchColor(hoverRegion, world, dataVariant)

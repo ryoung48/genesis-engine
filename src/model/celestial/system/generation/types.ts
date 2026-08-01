@@ -19,6 +19,8 @@ export interface HomeWorldParams {
 	eccentricity: number
 	/** Only real Sol data supplies this stable orbital element. */
 	longitudeOfPerihelionDeg?: number
+	/** EBM seasonal-insolation input, in the body's Ls frame. */
+	lsAphelionDeg: number
 	axialTiltDeg: number
 	/** Only real Sol data supplies this stable orbital element. */
 	inclinationDeg?: number

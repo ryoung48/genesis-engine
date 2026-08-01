@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import { ToggleRow } from "@/ui/components/primitives/ToggleRow"
 import type { ColorMode } from "@/ui/planet/colors"
 import type { ClimateSubMode } from "./types"
@@ -43,6 +43,7 @@ export const ClimateModeSection: React.FC<ClimateModeSectionProps> = ({
 }) => {
 	if (
 		colorMode !== "climate" &&
+		colorMode !== "realClimate" &&
 		colorMode !== "pastaClimate" &&
 		colorMode !== "koppenClimate" &&
 		colorMode !== "realPastaClimate" &&
@@ -60,7 +61,9 @@ export const ClimateModeSection: React.FC<ClimateModeSectionProps> = ({
 			/>
 			{climateExpanded && (
 				<div className="mt-1.5 space-y-1.5">
-					<SegmentedControl
+					<RadioGroup
+						label="Climate mode"
+						orientation="horizontal"
 						options={[
 							{ value: "basic" as const, label: "Basic" },
 							{ value: "pasta" as const, label: "Pasta" },
@@ -69,15 +72,24 @@ export const ClimateModeSection: React.FC<ClimateModeSectionProps> = ({
 						value={climateSubMode}
 						onChange={(v) => {
 							setClimateSubMode(v)
+							const observed =
+								colorMode === "realClimate" ||
+								colorMode === "realPastaClimate" ||
+								colorMode === "realKoppenClimate"
 							setColorMode(
 								v === "basic"
-									? "climate"
+									? observed
+										? "realClimate"
+										: "climate"
 									: v === "pasta"
-										? "pastaClimate"
-										: "koppenClimate",
+										? observed
+											? "realPastaClimate"
+											: "pastaClimate"
+										: observed
+											? "realKoppenClimate"
+											: "koppenClimate",
 							)
 						}}
-						tone="overlay"
 					/>
 					<div className="border-t border-white/10" />
 					<ToggleRow label="GDD" checked={showGdd} onChange={setShowGdd} />

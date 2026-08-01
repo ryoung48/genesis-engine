@@ -133,6 +133,8 @@ export interface PostPipelineOutput {
 	monthlyTEQ: Float32Array[]
 	hydrology: GenesisHydrology
 	vegetation: Uint8Array
+	/** [JUSTIFICATION] Present only for Earth imports, where it is classified from observed climate data. */
+	realVegetation?: Uint8Array
 	rivers: GenesisRivers
 	iceThickness: Float32Array
 	iceMinMonthly: Float32Array
@@ -141,6 +143,8 @@ export interface PostPipelineOutput {
 	coastal: Uint8Array
 	slopeScore: Float32Array
 	climateZones: Uint8Array
+	/** [JUSTIFICATION] Present only for Earth imports, where zones are classified from observed temperatures. */
+	realClimateZones?: Uint8Array
 	koppenClimate: Uint8Array
 	realKoppenClimate?: Uint8Array
 	realPastaClimate?: Uint8Array

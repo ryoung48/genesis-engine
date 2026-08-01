@@ -626,8 +626,6 @@ function runPostElevationPipeline(
 				})
 			: undefined
 	const realPastaClimate: Uint8Array | undefined = earthPastaResult?.zones
-	const vegPastaZones = realPastaClimate ?? pastaClimate
-	const vegPastaDebug = earthPastaResult?.debug ?? pastaDebug
 	record("Post: pasta climate", t0)
 	onProgress?.("Post: pasta climate", 59)
 
@@ -655,10 +653,22 @@ function runPostElevationPipeline(
 		climate,
 		rainfall,
 		rng: RNG.makeRng(params.seed),
-		pastaZones: vegPastaZones,
-		gdd: vegPastaDebug.gdd,
+		pastaZones: pastaClimate,
+		gdd: pastaDebug.gdd,
 		gar: garField,
 	})
+	const realVegetation = earthPastaResult
+		? VEGETATION.assignVegetation({
+				mesh,
+				isLand,
+				climate,
+				rainfall,
+				rng: RNG.makeRng(params.seed),
+				pastaZones: earthPastaResult.zones,
+				gdd: earthPastaResult.debug.gdd,
+				gar: garField,
+			})
+		: undefined
 	record("Post: vegetation", t0)
 	onProgress?.("Post: vegetation", 60)
 
@@ -735,15 +745,18 @@ function runPostElevationPipeline(
 
 	// ── Climate zones ──────────────────────────────────────────────────
 	t0 = performance.now()
-	const climateZones =
-		VEGETATION.assignEarthClimateZones({ mesh, isLand, climate }) ??
-		VEGETATION.assignClimateZones({
-			mesh,
-			isLand,
-			temperatureAvg: climate.temperature_avg,
-			temperatureMin: climate.temperature_min,
-			temperatureMax: climate.temperature_max,
-		})
+	const climateZones = VEGETATION.assignClimateZones({
+		mesh,
+		isLand,
+		temperatureAvg: climate.temperature_avg,
+		temperatureMin: climate.temperature_min,
+		temperatureMax: climate.temperature_max,
+	})
+	const realClimateZones = VEGETATION.assignEarthClimateZones({
+		mesh,
+		isLand,
+		climate,
+	})
 	record("Post: climate zones", t0)
 	onProgress?.("Post: climate zones", 64)
 
@@ -972,6 +985,7 @@ function runPostElevationPipeline(
 		monthlyTEQ,
 		hydrology,
 		vegetation,
+		realVegetation,
 		rivers,
 		iceThickness,
 		iceMinMonthly,
@@ -980,6 +994,7 @@ function runPostElevationPipeline(
 		coastal,
 		slopeScore,
 		climateZones,
+		realClimateZones,
 		koppenClimate,
 		pastaClimate,
 		pastaDebug,

@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import type { ColorMode } from "@/ui/planet/colors"
 
 export interface ClimateToggleSectionProps {
@@ -68,7 +68,9 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 						colorMode === "humidity" ||
 						colorMode === "realHumidity" ||
 						colorMode === "humidityDiff") && (
-						<SegmentedControl
+						<RadioGroup
+							label="Precipitation mode"
+							orientation="horizontal"
 							options={[
 								{ value: "precipitation" as const, label: "Precipitation" },
 								{ value: "humidity" as const, label: "Humidity" },
@@ -77,7 +79,6 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 								baseColorMode === "humidity" ? "humidity" : "precipitation"
 							}
 							onChange={setColorMode}
-							tone="overlay"
 						/>
 					)}
 					{(colorMode === "temperature" ||
@@ -87,7 +88,9 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 						colorMode === "realDtr" ||
 						colorMode === "dtrDiff" ||
 						baseColorMode === "misery") && (
-						<SegmentedControl
+						<RadioGroup
+							label="Temperature mode"
+							orientation="horizontal"
 							options={[
 								{ value: "temperature" as const, label: "Temp" },
 								{ value: "dtr" as const, label: "DTR" },
@@ -99,7 +102,6 @@ export const ClimateToggleSection: React.FC<ClimateToggleSectionProps> = ({
 									: "temperature"
 							}
 							onChange={setColorMode}
-							tone="overlay"
 						/>
 					)}
 				</div>

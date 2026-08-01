@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import type { ColorMode } from "@/ui/planet/colors"
 import type { TopographySubMode } from "./types"
 
@@ -37,7 +37,9 @@ export const TopographyModeSection: React.FC<TopographyModeSectionProps> = ({
 			/>
 			{topographyExpanded && (
 				<div className="mt-1.5 space-y-1.5">
-					<SegmentedControl
+					<RadioGroup
+						label="Topography mode"
+						orientation="horizontal"
 						options={[
 							{ value: "classification" as const, label: "Classification" },
 							{ value: "slope" as const, label: "Slope" },
@@ -47,7 +49,6 @@ export const TopographyModeSection: React.FC<TopographyModeSectionProps> = ({
 							setTopographySubMode(v)
 							setColorMode(v === "classification" ? "topography" : "slope")
 						}}
-						tone="overlay"
 					/>
 				</div>
 			)}

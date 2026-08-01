@@ -177,7 +177,7 @@ function buildBodyStats({
 		{
 			label: "Perihelion",
 			value: `${longitudeOfPerihelionDeg.value.toFixed(1)}°`,
-			help: ORBIT_STAT_HELP.longitudeOfPerihelion,
+			help: ORBIT_STAT_HELP.lsAphelion,
 			editor: longitudeOfPerihelionDeg.editor,
 		},
 		{
@@ -548,19 +548,21 @@ export function buildOrbitBodyStats(params: {
 				: undefined,
 		},
 		longitudeOfPerihelionDeg: {
-			value: body.longitudeOfPerihelionDeg,
+			value: body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg,
 			editor: onUpdateBody
 				? {
 						label: "Perihelion",
-						value: body.longitudeOfPerihelionDeg,
+						value: body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg,
 						min: 0,
 						max: 360,
 						step: 1,
-						display: `${body.longitudeOfPerihelionDeg.toFixed(0)}°`,
+						display: `${(
+							body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg
+						).toFixed(0)}°`,
 						set: (value: number) =>
 							onUpdateBody((current) => ({
 								...current,
-								longitudeOfPerihelionDeg: value,
+								lsAphelionDeg: value,
 							})),
 					}
 				: undefined,

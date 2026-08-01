@@ -1,8 +1,8 @@
 ﻿import type { SystemBody } from "@/model/celestial/system/types"
 
 export const ORBIT_STAT_HELP = {
-	longitudeOfPerihelion:
-		"Longitude of perihelion. Where the closest point of the orbit sits, measured from a fixed reference direction.",
+	lsAphelion:
+		"Solar longitude at aphelion in degrees. Sets when peak insolation occurs during the year.",
 }
 
 export const SIBLING_GROUP_LABEL: Record<SystemBody["group"], string> = {

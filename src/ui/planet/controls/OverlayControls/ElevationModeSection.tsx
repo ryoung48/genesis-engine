@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import type { ColorMode } from "@/ui/planet/colors"
 
 export interface ElevationModeSectionProps {
@@ -30,7 +30,9 @@ export const ElevationModeSection: React.FC<ElevationModeSectionProps> = ({
 			/>
 			{elevationExpanded && (
 				<div className="mt-1.5 space-y-1.5">
-					<SegmentedControl
+					<RadioGroup
+						label="Elevation mode"
+						orientation="horizontal"
 						options={[
 							{ value: "colored" as const, label: "Colored" },
 							{ value: "grayscale" as const, label: "Grayscale" },
@@ -40,7 +42,6 @@ export const ElevationModeSection: React.FC<ElevationModeSectionProps> = ({
 							setElevationSubMode(v)
 							setColorMode(v === "colored" ? "terrain" : "landHeightmap")
 						}}
-						tone="overlay"
 					/>
 				</div>
 			)}
