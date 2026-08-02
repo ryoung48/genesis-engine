@@ -58,3 +58,9 @@ export function resolveMoonTitle(
 export function getSystemBodyKindLabel(body: SystemBody): string {
 	return formatClassificationLabel(body.classification)
 }
+
+export function getMoonKindLabel(moon: MoonBody): string {
+	return moon.classification
+		? formatClassificationLabel(moon.classification)
+		: "Moon"
+}

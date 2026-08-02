@@ -52,8 +52,7 @@ function attachObservedEarthHumidity(params: {
 				realTemperatureMonthly: realTempMonthly,
 				modeledTemperatureMonthly: world.climate.temperature_monthly,
 				realDtrMonthly: world.observedDtr?.real_monthly,
-				modeledDtrMonthly:
-					world.dtr_monthly ?? new Float32Array(12 * N),
+				modeledDtrMonthly: world.dtr_monthly ?? new Float32Array(12 * N),
 				realRainfallMonthly: world.rainfall?.real_monthly,
 				modeledRainfallMonthly:
 					world.rainfall?.monthly ?? new Float32Array(12 * N),

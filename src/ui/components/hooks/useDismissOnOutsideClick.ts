@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react"
+import { type RefObject, useEffect } from "react"
 
 /** Calls `onDismiss` when a pointerdown lands outside `ref`'s element, but
  * only while `active` is true -- shared by every popover/editor that closes

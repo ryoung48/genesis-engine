@@ -3,23 +3,23 @@ import type { MoonBody } from "@/model/celestial/moons/types"
 import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
 import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
 import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
-import { useEbmPreview } from "@/ui/hooks/useEbmPreview"
-import { useLockedClimatePreview } from "@/ui/hooks/useLockedClimatePreview"
+import { EmptyState } from "@/ui/components/primitives/EmptyState"
+import { uiTokens } from "@/ui/components/tokens"
 import {
 	GENERATION_PREVIEW_TABS,
 	type GenerationPreviewTab,
-} from "@/ui/planet/screen/generation/generation-preview"
-import { EmptyState } from "@/ui/components/primitives/EmptyState"
-import { uiTokens } from "@/ui/components/tokens"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
-import { LockedClimatePreview } from "@/ui/preview/LockedClimatePreview"
-import { RegularClimatePreview } from "@/ui/preview/RegularClimatePreview"
-import { TidalCalendarChart } from "@/ui/preview/TidalCalendarChart"
+} from "@/ui/genesis/generation/generation-preview"
+import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import { LockedClimatePreview } from "@/ui/wiki/climate-preview/LockedClimatePreview"
+import { RegularClimatePreview } from "@/ui/wiki/climate-preview/RegularClimatePreview"
+import { TidalCalendarChart } from "@/ui/wiki/climate-preview/TidalCalendarChart"
 import type {
 	ClimatePreviewData,
 	LockedClimatePreviewData,
 	RegularClimatePreviewData,
-} from "@/ui/preview/types"
+} from "@/ui/wiki/climate-preview/types"
+import { useEbmPreview } from "@/ui/wiki/climate-preview/useEbmPreview"
+import { useLockedClimatePreview } from "@/ui/wiki/climate-preview/useLockedClimatePreview"
 import { DataSectionSummary } from "@/ui/wiki/shared/ui-atoms"
 
 function PlanetDetailContent({
@@ -81,7 +81,10 @@ function PlanetDetailContent({
 							compact={true}
 						/>
 					) : (
-						<EmptyState minHeight={128} message={tidesEmptyLabel ?? "No tides"} />
+						<EmptyState
+							minHeight={128}
+							message={tidesEmptyLabel ?? "No tides"}
+						/>
 					)}
 				</div>
 			) : (

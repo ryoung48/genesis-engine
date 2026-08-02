@@ -95,6 +95,13 @@ export interface PostPipelineInput {
 	realPrecipMonths?: number
 	realPrecipScale?: number
 	realPrecipNoData?: number
+	/** Observed-Earth monthly total cloud-cover raster (fraction * scale). */
+	realCloudCoverMonthly?: Int16Array
+	realCloudCoverWidth?: number
+	realCloudCoverHeight?: number
+	realCloudCoverMonths?: number
+	realCloudCoverScale?: number
+	realCloudCoverNoData?: number
 	/** Observed-Earth monthly diurnal temperature range raster (°C * scale). */
 	realDtrMonthly?: Int16Array
 	realDtrWidth?: number
@@ -129,6 +136,11 @@ export interface PostPipelineInput {
 
 export interface PostPipelineOutput {
 	climate: GenesisClimate
+	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
+	observedCloudCover?: {
+		real_monthly: Float32Array
+		real_annual: Float32Array
+	}
 	rainfall: GenesisRainfall
 	monthlyTEQ: Float32Array[]
 	hydrology: GenesisHydrology

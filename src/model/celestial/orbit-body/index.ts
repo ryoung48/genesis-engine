@@ -140,8 +140,7 @@ export const ORBIT_BODY = {
 		if (roll === 7) return rng.randint(1, 6)
 		if (roll === 8) return DICE.roll2d6(rng)
 		if (roll === 9) return DICE.roll2d6(rng) * 3 + rng.randint(1, 6)
-		if (roll === 10)
-			return (rng.randint(1, 6) + 1) * 5 + rng.randint(1, 6)
+		if (roll === 10) return (rng.randint(1, 6) + 1) * 5 + rng.randint(1, 6)
 		if (roll === 11) return DICE.roll3d6(rng) * 5 - rng.randint(1, 6)
 		return 180 - ORBIT_BODY.rollInclinationDeg(rng)
 	},

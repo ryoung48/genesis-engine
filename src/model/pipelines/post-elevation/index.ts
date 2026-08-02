@@ -127,6 +127,12 @@ function runPostElevationPipeline(
 		realPrecipMonths,
 		realPrecipScale,
 		realPrecipNoData,
+		realCloudCoverMonthly,
+		realCloudCoverWidth,
+		realCloudCoverHeight,
+		realCloudCoverMonths,
+		realCloudCoverScale,
+		realCloudCoverNoData,
 		realDtrMonthly,
 		realDtrWidth,
 		realDtrHeight,
@@ -492,6 +498,30 @@ function runPostElevationPipeline(
 			realPrecipScale,
 			realPrecipNoData,
 		})
+	}
+	let observedCloudCover: GenesisWorld["observedCloudCover"] | undefined
+	if (
+		realCloudCoverMonthly &&
+		realCloudCoverWidth &&
+		realCloudCoverHeight &&
+		realCloudCoverMonths &&
+		realCloudCoverScale !== undefined &&
+		realCloudCoverNoData !== undefined
+	) {
+		const cloudCoverHolder: {
+			observedCloudCover?: GenesisWorld["observedCloudCover"]
+		} = {}
+		OBSERVED_EARTH.attachObservedEarthCloudCover({
+			mesh,
+			world: cloudCoverHolder,
+			realCloudCoverMonthly,
+			realCloudCoverWidth,
+			realCloudCoverHeight,
+			realCloudCoverMonths,
+			realCloudCoverScale,
+			realCloudCoverNoData,
+		})
+		observedCloudCover = cloudCoverHolder.observedCloudCover
 	}
 	if (
 		realDtrMonthly &&
@@ -981,6 +1011,7 @@ function runPostElevationPipeline(
 
 	return {
 		climate,
+		observedCloudCover,
 		rainfall,
 		monthlyTEQ,
 		hydrology,

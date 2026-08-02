@@ -1,0 +1,13 @@
+{
+	"version": 1,
+	"format": "int16-month-major",
+	"compression": "gzip",
+	"field": "era5_monthly_total_cloud_cover_fraction",
+	"width": 632,
+	"height": 316,
+	"months": 12,
+	"scale": 0.0001,
+	"nodata": -32768,
+	"source": "ERA5 monthly mean total cloud cover (1991-2020 climatology; ECMWF/Copernicus Climate Change Service)",
+	"bin": "earth-real-cloud-cover.bin.gz"
+}

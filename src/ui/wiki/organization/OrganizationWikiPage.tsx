@@ -245,7 +245,7 @@ export function OrganizationWikiPage({
 				title="Environmental"
 				meta={organization.showObservedDistributions ? "Observed" : null}
 			>
-				<div className="space-y-1.5">
+				<div className="space-y-1">
 					<DistributionChart
 						title="Climate"
 						buckets={organization.climateDistribution}
@@ -268,7 +268,7 @@ export function OrganizationWikiPage({
 			</WikiSection>
 
 			<WikiSection title="Demographics">
-				<div className="space-y-1.5">
+				<div className="space-y-1">
 					<DistributionChart
 						title="Culture"
 						buckets={organization.cultureDistribution}

@@ -1,13 +1,13 @@
 {
-  "version": 1,
-  "format": "int16-month-major",
-  "field": "ncep_monthly_air_temp_2m_celsius",
-  "width": 360,
-  "height": 180,
-  "months": 12,
-  "scale": 0.1,
-  "nodata": -32768,
-  "source": "NCEP/NCAR Reanalysis 1 \u2014 2m air temperature, long-term monthly mean (1991-2020) (downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface_gauss)",
-  "bin": "earth-real-temperature.bin.gz",
-  "compression": "gzip"
+	"version": 1,
+	"format": "int16-month-major",
+	"compression": "gzip",
+	"field": "worldclim_ncep_monthly_air_temp_celsius",
+	"width": 632,
+	"height": 316,
+	"months": 12,
+	"scale": 0.1,
+	"nodata": -32768,
+	"source": "WorldClim 2.1 \u2014 5 arc-minute monthly mean temperature (1970-2000) over land; NCEP/NCAR Reanalysis 1 \u2014 2m air temperature long-term monthly mean (1991-2020) used where WorldClim is missing, including ocean (worldclim.org/data/worldclim21.html; downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface_gauss)",
+	"bin": "earth-real-temperature.bin.gz"
 }

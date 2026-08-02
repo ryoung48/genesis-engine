@@ -1,6 +1,6 @@
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { Slider } from "@/ui/components/primitives/Slider"
-import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
+import type { SliderDef } from "@/ui/genesis/generation/sliders"
 
 export function buildSurfaceStats(
 	planetSliders: SliderDef[],

@@ -13,23 +13,23 @@ import type { SocietyEra } from "@/model/society/types"
 import { Button } from "@/ui/components/primitives/Button"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
 import { IconButton } from "@/ui/components/primitives/IconButton"
+import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
 import { Surface } from "@/ui/components/primitives/Surface"
 import { ToggleChip } from "@/ui/components/primitives/ToggleChip"
-import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { uiTokens } from "@/ui/components/tokens"
-import { SocietyRunesPanel } from "@/ui/planet/controls/SocietyRunesPanel"
-import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
+import { SocietyRunesPanel } from "@/ui/genesis/controls/SocietyRunesPanel"
 import {
 	DEFAULT_WORLD_SECTIONS,
 	toggleSection,
 	type WorldSection,
-} from "@/ui/planet/details/drawer-state"
-import type { DetailsDrawerBaseProps } from "@/ui/planet/details/shared"
-import { WorldDetails } from "@/ui/planet/details/world/WorldDetails"
-import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
-import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+} from "@/ui/genesis/details/drawer-state"
+import type { DetailsDrawerBaseProps } from "@/ui/genesis/details/shared"
+import { WorldDetails } from "@/ui/genesis/details/world/WorldDetails"
+import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
+import type { SliderDef } from "@/ui/genesis/generation/sliders"
+import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import { DrillDownBreadcrumbHeader } from "@/ui/wiki/DrillDownBreadcrumbHeader"
 import {
 	type NationWikiData,
 	NationWikiPage,
@@ -355,9 +355,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 							tone="panel"
 							borderTone="default"
 							radius="xl"
-							className="px-3 py-3"
+							className="px-3 py-2"
 						>
-							<div className="space-y-1.5">
+							<div className="space-y-1">
 								<DisclosureButton
 									label="Generate"
 									expanded={generateExpanded}
@@ -426,7 +426,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															selected
 															onClick={handleGenerate}
 															disabled={generating}
-															aria-label={generating ? "Generating" : "Generate"}
+															aria-label={
+																generating ? "Generating" : "Generate"
+															}
 															title={generating ? "Generating..." : "Generate"}
 															className="px-2.5 py-1.5"
 														>
@@ -531,11 +533,12 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															) : typeof timingDrillDown === "object" &&
 																timingDrillDown?.kind === "other" ? (
 																<div className="space-y-2">
-									<DrillDownBreadcrumbHeader
+																	<DrillDownBreadcrumbHeader
 																		title="Other items"
 																		trailingValue={formatTimingSeconds(
 																			timingDrillDown.parent === "pipeline"
-																				? (generationTimingSummary?.totalMs ?? 0)
+																				? (generationTimingSummary?.totalMs ??
+																						0)
 																				: timingDrillDown.parent === "post"
 																					? (postTimingSummary?.totalMs ?? 0)
 																					: (computeRoutesTimingSummary?.totalMs ??
@@ -566,7 +569,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 															) : (
 																<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
 																	<div className="mb-2 flex items-center justify-between px-1">
-																		<div className={`${uiTokens.type.controlWide} text-slate-500`}>
+																		<div
+																			className={`${uiTokens.type.controlWide} text-slate-500`}
+																		>
 																			Pipeline
 																		</div>
 																		<span className="font-mono text-[10px] text-slate-400">
@@ -616,7 +621,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 				<div className="hidden" aria-hidden="true">
 					<div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
 						<div className="flex items-center justify-between gap-2">
-							<p className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}>
+							<p
+								className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}
+							>
 								Society
 							</p>
 							<SegmentedControl
@@ -630,7 +637,9 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 						</div>
 						{societySubtab === "era" ? (
 							<>
-								<p className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}>
+								<p
+									className={`${uiTokens.type.controlLoose} text-slate-400 px-0.5`}
+								>
 									Era Preset
 								</p>
 								<div className="grid grid-cols-2 gap-1.5">

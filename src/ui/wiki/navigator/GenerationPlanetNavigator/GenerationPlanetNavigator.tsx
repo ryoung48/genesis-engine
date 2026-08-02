@@ -18,20 +18,18 @@ import { SEED_LABEL } from "@/model/shared/random/seed-label"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
 import { EmptyState } from "@/ui/components/primitives/EmptyState"
+import { InlineTextButton } from "@/ui/components/primitives/InlineTextButton"
 import { Surface } from "@/ui/components/primitives/Surface"
-import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
-import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
+import type { SliderDef } from "@/ui/genesis/generation/sliders"
+import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import {
 	isApproxSolarLocked,
 	LazyPlanetDetailTabs,
 	useAvgTempKPreview,
 } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
 import { labelOrbitBodies } from "@/ui/wiki/navigator/GenerationPlanetNavigator/label-orbit-bodies"
-import type { OrbitChildCardModel } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitChildCard"
-import { OrbitChildCard } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitChildCard"
 import { OrbitHeader } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitHeader"
-import { OrbitInsertPlaceholder } from "@/ui/wiki/navigator/GenerationPlanetNavigator/OrbitInsertPlaceholder"
 import { renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	buildMoonPreviewDataProps,
@@ -40,6 +38,7 @@ import {
 } from "@/ui/wiki/stats/orbit/body-stat-cards"
 import {
 	appendSizeToTitle,
+	getMoonKindLabel,
 	getMoonSeedBaseName,
 	getSystemBodyKindLabel,
 	resolveMoonTitle,
@@ -56,6 +55,13 @@ type OrbitSelection =
 	| { kind: "star" }
 	| { kind: "orbit"; bodyIndex: number }
 	| { kind: "orbit-moon"; bodyIndex: number; moonIndex: number }
+
+interface OrbitChildCardModel {
+	key: string
+	title: string
+	subtitle: string
+	onClick: () => void
+}
 
 interface OrbitNavigatorViewModel {
 	title: string
@@ -301,10 +307,6 @@ export function GenerationPlanetNavigator({
 			bodyIndex: currentFocus.bodyIndex,
 		})
 	}, [currentFocus])
-	const [childrenExpanded, setChildrenExpanded] = useState(false)
-	const [orbitInsertRowsByKey, setOrbitInsertRowsByKey] = useState<
-		Record<string, boolean>
-	>({})
 	const [dataExpanded, setDataExpanded] = useState(false)
 	const [seedOverrides, setSeedOverrides] = useState<Record<string, string>>({})
 	const [rootSeedLabel, setRootSeedLabel] = useState(
@@ -673,12 +675,9 @@ export function GenerationPlanetNavigator({
 									dayLengthSlider?.set(updated.siderealDayHours)
 								if (updated.eccentricity !== body.eccentricity)
 									eccentricitySlider?.set(updated.eccentricity)
-								if (
-									updated.lsAphelionDeg !== body.lsAphelionDeg
-								)
+								if (updated.lsAphelionDeg !== body.lsAphelionDeg)
 									perihelionSlider?.set(
-										updated.lsAphelionDeg ??
-											updated.longitudeOfPerihelionDeg,
+										updated.lsAphelionDeg ?? updated.longitudeOfPerihelionDeg,
 									)
 								if (updated.axialTiltDeg !== body.axialTiltDeg)
 									axialTiltSlider?.set(updated.axialTiltDeg)
@@ -710,9 +709,7 @@ export function GenerationPlanetNavigator({
 							starSubtype={starSubtype}
 							orbitalDistanceAU={body.orbitalDistanceAU}
 							eccentricity={body.eccentricity}
-							perihelion={
-								body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg
-							}
+							perihelion={body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg}
 							obliquity={body.axialTiltDeg}
 							substellarLon={body.substellarLon ?? 0}
 							landCoverage={body.landCoverage}
@@ -749,7 +746,7 @@ export function GenerationPlanetNavigator({
 											? SOL_SYSTEM.solLunaDefault.name
 											: undefined,
 									),
-									subtitle: "Moon",
+									subtitle: getMoonKindLabel(moon),
 									onClick: () =>
 										selectAndFocus({
 											kind: "orbit-moon",
@@ -1036,69 +1033,37 @@ export function GenerationPlanetNavigator({
 							message="No editable stats available."
 						/>
 					)}
+					{viewModel.children.length > 0 ? (
+						<>
+							<span className="text-[9px] text-slate-400">
+								{viewModel.childrenLabel} ({viewModel.children.length})
+							</span>
+							<div className="flex flex-wrap items-center gap-y-0.5 font-mono text-[9px] text-slate-700">
+								{viewModel.children.map((child, index) => (
+									<span key={child.key}>
+										<InlineTextButton
+											onClick={child.onClick}
+											className="text-slate-700"
+										>
+											{child.title}
+										</InlineTextButton>
+										{index < viewModel.children.length - 1 ? ", " : ""}
+									</span>
+								))}
+							</div>
+						</>
+					) : null}
 				</div>
 			</Surface>
-
-			{selection.kind === "star" ||
-			(selection.kind === "orbit" &&
-				systemBodies?.[selection.bodyIndex]?.group !== "asteroid belt") ? (
-				<Surface
-					tone="panel"
-					borderTone="default"
-					radius="xl"
-					className="border-t border-slate-200 px-3 py-3"
-				>
-					<div className="space-y-1.5">
-						<DisclosureButton
-							label={`${viewModel.childrenLabel} (${viewModel.children.length})`}
-							expanded={childrenExpanded}
-							onClick={() => setChildrenExpanded((current) => !current)}
-						/>
-						{childrenExpanded ? (
-							<>
-								{viewModel.children.length > 0 ? (
-									<div className="space-y-1.5">
-										{viewModel.children.map((child) => {
-											const { key, ...cardProps } = child
-											return (
-												<React.Fragment key={key}>
-													{orbitInsertRowsByKey[key] ? (
-														<OrbitInsertPlaceholder />
-													) : null}
-													<OrbitChildCard
-														{...cardProps}
-														insertRowsVisible={!!orbitInsertRowsByKey[key]}
-														onToggleInsertRows={() =>
-															setOrbitInsertRowsByKey((current) => ({
-																...current,
-																[key]: !current[key],
-															}))
-														}
-													/>
-													{orbitInsertRowsByKey[key] ? (
-														<OrbitInsertPlaceholder />
-													) : null}
-												</React.Fragment>
-											)
-										})}
-									</div>
-								) : (
-									<OrbitInsertPlaceholder />
-								)}
-							</>
-						) : null}
-					</div>
-				</Surface>
-			) : null}
 
 			{viewModel.dataContent ? (
 				<Surface
 					tone="panel"
 					borderTone="default"
 					radius="xl"
-					className="border-t border-slate-200 px-3 py-3"
+					className="border-t border-slate-200 px-3 py-2"
 				>
-					<div className="space-y-1.5">
+					<div className="space-y-1">
 						<DisclosureButton
 							label="Climate"
 							expanded={dataExpanded}

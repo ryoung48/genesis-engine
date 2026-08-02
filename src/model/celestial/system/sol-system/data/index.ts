@@ -26,7 +26,8 @@ const solStarAgeGyr = 4.6
 const solStarName = "Sol"
 const solMainWorldName = "Earth"
 const solEarthTexturePath = "/textures/celestial/sol/earth/2k_earth.jpg"
-const solEarthCloudsTexturePath = "/textures/celestial/sol/earth/2k_earth_clouds.jpg"
+const solEarthCloudsTexturePath =
+	"/textures/celestial/sol/earth/2k_earth_clouds.jpg"
 
 const solPlanetRingsByName: Partial<Record<string, SystemBody["rings"]>> = {
 	Saturn: {
@@ -171,7 +172,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		albedo: 0.3,
 		/** Bisected directly against the real imported Earth world's own
 		 * land-only WorldClim bias (zeroed exactly; see
-		 * ebm/earth-import-greenhouse-refit.smoke.test.ts), with the
+		 * test/earth/earth-import-greenhouse-refit.smoke.test.ts), with the
 		 * temperature-driven ice-albedo feedback ON (default) -- was 0.534
 		 * when that feedback was disabled. useEbmPreview.ts never disables it
 		 * for this override, so the calibration has to match, not the model

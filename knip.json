@@ -1,6 +1,6 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
-	"entry": ["src/model/genesis.worker.ts", "src/**/*.smoke.test.ts"],
+	"entry": ["src/model/genesis.worker.ts", "src/test/**/*.smoke.test.ts"],
 	"project": ["src/**/*.{ts,tsx,js,jsx}"],
 	"ignoreBinaries": ["python"],
 	"ignoreDependencies": ["tailwindcss", "babel-plugin-react-compiler"],

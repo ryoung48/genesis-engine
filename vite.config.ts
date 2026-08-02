@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
 					extends: true,
 					test: {
 						name: "smoke",
-						include: ["src/**/*.smoke.test.ts"],
+						include: ["src/test/**/*.smoke.test.ts"],
 						fileParallelism: false,
 						sequence: {
 							groupOrder: 1,

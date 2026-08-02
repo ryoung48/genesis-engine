@@ -229,17 +229,17 @@ const PASTA_NAMES: Record<(typeof pastaLabels)[number], string> = {
 	Ahe: "Hyperseasonal Desert",
 }
 
-const TH_COOL = 15
+const TH_COOL = 10
 
-const TH_COLD = -10
+const TH_COLD = -4
 
-const TH_FRIGID = -30
+const TH_FRIGID = -35
 
-const TH_HOT = 40
+const TH_HOT = 50
 
-const TH_TORRID = 60
+const TH_TORRID = 70
 
-const TH_BOIL = 90
+const TH_BOIL = 100
 
 const OCEAN = {
 	torrid: TH_TORRID,
@@ -302,7 +302,7 @@ function gddTotal({
 	gint,
 	gddAcc,
 	giAcc,
-	threshold,
+	gintInterruptionThreshold,
 }: GddTotalParams): number {
 	for (let t = 0; t < 12; t++) giAcc[t] = gint[t]
 
@@ -333,7 +333,11 @@ function gddTotal({
 			const prev = t === 0 ? gddAcc[11] : gddAcc[t - 1]
 			const sum = gdd[t] + prev
 			if (gdd[t] > 0) gddAcc[t] = sum
-			else if (giAcc[t] > threshold) gddAcc[t] = 0
+			else if (
+				gintInterruptionThreshold !== null &&
+				giAcc[t] > gintInterruptionThreshold
+			)
+				gddAcc[t] = 0
 			else gddAcc[t] = sum
 		}
 	}
@@ -381,7 +385,7 @@ function classifyOcean({
 		gint: mGInt,
 		gddAcc: gddAccBuf,
 		giAcc: giAccBuf,
-		threshold: 1250,
+		gintInterruptionThreshold: null,
 	})
 
 	// Sea ice from ice accumulation model (1cm snow ≈ 10% cover, per Pasta spec):
@@ -414,6 +418,7 @@ function classifyLand({
 	giAccBuf,
 	iceVal,
 	dpm,
+	gintThreshold,
 	warmest,
 	coldest,
 }: ClassifyLandParams): {
@@ -472,14 +477,14 @@ function classifyLand({
 		gint: mGInt,
 		gddAcc: gddAccBuf,
 		giAcc: giAccBuf,
-		threshold: 1250,
+		gintInterruptionThreshold: gintThreshold,
 	})
 	const gddz = gddTotal({
 		gdd: mGDDz,
 		gint: mGInt,
 		gddAcc: gddAccBuf,
 		giAcc: giAccBuf,
-		threshold: 1250,
+		gintInterruptionThreshold: null,
 	})
 	const gint = longestRun(mGInt)
 	const ar = petSum > 0 ? aetSum / petSum : 1
@@ -488,18 +493,12 @@ function classifyLand({
 	const gpr = gddWeightSum > 0 ? precGdd / gddWeightSum : 0
 	const grs = aetAvg > 0 ? gpr / aetAvg : 1
 	const evr = annualPrecip > 0 ? aetSum / annualPrecip : 1
-	// Growing-season precipitation-to-PET ratio: how much does growing-season
-	// rainfall exceed atmospheric demand? GDD-weighting discounts winter months
-	// (g5 ≈ 0 below 5°C), so winter snowpack doesn't inflate the numerator.
-	// This correctly requires extraordinary growing-season wetness for the pluvial
-	// flag, unlike evr which fires too easily in cold climates where PET is low.
 	const gsPrecipToPet = petGdd > 0 ? precGdd / petGdd : 1
-
 	const cool = coldest > TH_COLD && coldest <= TH_COOL
 	const cold = coldest > TH_FRIGID && coldest <= TH_COLD
 	const hot = warmest >= TH_HOT && warmest < TH_TORRID
 	const torrid = warmest >= TH_TORRID && warmest < TH_BOIL
-	const lowGrS = grs < 0.8
+	const lowGrS = grs < 0.9
 	const pluvial = gsPrecipToPet > 2.5
 	const groupT = warmest < TH_HOT && coldest > TH_COOL
 	const groupC = warmest < TH_HOT && coldest <= TH_COOL
@@ -535,7 +534,7 @@ function classifyLand({
 		} else if (hot && cool) zone = Z.EFa
 		else zone = Z.EFb
 	} else if (groupT) {
-		const eu = gint < 1250
+		const eu = gint < gintThreshold
 		if (gar < 0.5) {
 			zone = eu ? (pluvial ? Z.TUAp : Z.TUA) : pluvial ? Z.TQAp : Z.TQA
 		} else if (eu) {
@@ -550,7 +549,7 @@ function classifyLand({
 			if (lowGrS) zone = cool ? Z.CAMa : Z.CAMb
 			else zone = cool ? (pluvial ? Z.CAap : Z.CAa) : pluvial ? Z.CAbp : Z.CAb
 		} else if (lowGrS) zone = cool ? Z.CMa : Z.CMb
-		else if (gint < 1250 && cool) {
+		else if (gint < gintThreshold && cool) {
 			zone = ar > 0.75 ? (pluvial ? Z.CTfp : Z.CTf) : pluvial ? Z.CTsp : Z.CTs
 		} else if (gdd < 1300) {
 			if (cool) zone = pluvial ? Z.CEap : Z.CEa
@@ -572,7 +571,7 @@ function classifyLand({
 			if (hot) zone = Z.HMa
 			else if (torrid) zone = Z.HMb
 			else zone = Z.HMc
-		} else if (gint < 1250 && hot) {
+		} else if (gint < gintThreshold && hot) {
 			zone = ar > 0.75 ? (pluvial ? Z.HTfp : Z.HTf) : pluvial ? Z.HTsp : Z.HTs
 		} else if (hot) zone = pluvial ? Z.HDap : Z.HDa
 		else if (torrid) zone = pluvial ? Z.HDbp : Z.HDb
@@ -583,7 +582,7 @@ function classifyLand({
 			if (lowGrS) zone = ss ? Z.EAMa : Z.EAMb
 			else zone = ss ? (pluvial ? Z.EAap : Z.EAa) : pluvial ? Z.EAbp : Z.EAb
 		} else if (lowGrS) zone = ss ? Z.EMa : Z.EMb
-		else if (gint < 1250 && ss) {
+		else if (gint < gintThreshold && ss) {
 			zone = ar > 0.75 ? (pluvial ? Z.ETfp : Z.ETf) : pluvial ? Z.ETsp : Z.ETs
 		} else {
 			zone = ss ? (pluvial ? Z.EDap : Z.EDa) : pluvial ? Z.EDbp : Z.EDb
@@ -686,6 +685,7 @@ function computePastaZones({
 				giAccBuf,
 				iceVal: iceThickness ? iceThickness[r] : 0,
 				dpm,
+				gintThreshold: params.pastaGintThreshold,
 				warmest,
 				coldest,
 			})
@@ -756,8 +756,13 @@ function assignEarthPastaClimate({
 		dpm,
 	})
 	if (!observed) return undefined
-	const { temperatureMonthly, rainfallMonthly, pet_monthly, aet_monthly } =
-		observed
+	const {
+		temperatureMonthly,
+		dtrMonthly,
+		rainfallMonthly,
+		pet_monthly,
+		aet_monthly,
+	} = observed
 
 	const N = mesh.numRegions
 	const temperatureMax = new Float32Array(N)
@@ -766,9 +771,11 @@ function assignEarthPastaClimate({
 		let hot = -Infinity
 		let cold = Infinity
 		for (let m = 0; m < 12; m++) {
-			const t = temperatureMonthly[m * N + r]
-			if (t > hot) hot = t
-			if (t < cold) cold = t
+			const index = m * N + r
+			const mean = temperatureMonthly[index]
+			const halfDtr = dtrMonthly[index] / 2
+			if (mean + halfDtr > hot) hot = mean + halfDtr
+			if (mean - halfDtr < cold) cold = mean - halfDtr
 		}
 		temperatureMax[r] = hot
 		temperatureMin[r] = cold

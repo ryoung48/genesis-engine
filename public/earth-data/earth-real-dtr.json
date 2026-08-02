@@ -1,13 +1,13 @@
 {
-  "version": 1,
-  "format": "int16-month-major",
-  "field": "worldclim_monthly_dtr_celsius",
-  "width": 360,
-  "height": 180,
-  "months": 12,
-  "scale": 0.1,
-  "nodata": -32768,
-  "source": "C:\\Users\\rayou\\Downloads\\wc2.1_10m_tmax - C:\\Users\\rayou\\Downloads\\wc2.1_10m_tmin",
-  "bin": "earth-real-dtr.bin.gz",
-  "compression": "gzip"
+	"version": 1,
+	"format": "int16-month-major",
+	"compression": "gzip",
+	"field": "worldclim_ncep_monthly_dtr_celsius",
+	"width": 632,
+	"height": 316,
+	"months": 12,
+	"scale": 0.1,
+	"nodata": -32768,
+	"source": "WorldClim 2.1 \u2014 5 arc-minute monthly maximum minus minimum temperature (1970-2000) over land; NCEP/NCAR Reanalysis 1 \u2014 2m maximum minus minimum temperature long-term monthly mean (1991-2020) where WorldClim is missing, including ocean",
+	"bin": "earth-real-dtr.bin.gz"
 }

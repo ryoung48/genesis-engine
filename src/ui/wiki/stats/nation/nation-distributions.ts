@@ -4,7 +4,7 @@ import {
 	EU5_TOPOGRAPHY_CATEGORIES,
 	EU5_TOPOGRAPHY_COLORS,
 	EU5_TOPOGRAPHY_MERGE_LABEL,
-} from "@/ui/planet/colors"
+} from "@/ui/genesis/shared/colors"
 
 /** Same bucketing idea as GenesisView.tsx's world-level buildDistribution,
  * restricted to the mesh region/cell indexes inside one nation -- so

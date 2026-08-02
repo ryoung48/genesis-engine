@@ -62,9 +62,9 @@ export function WikiSection({
 			tone="panel"
 			borderTone="default"
 			radius="xl"
-			className="border-t border-slate-200 px-3 py-2.5"
+			className="border-t border-slate-200 px-3 py-2"
 		>
-			<div className="mb-1.5 flex items-baseline justify-between gap-2">
+			<div className="mb-1 flex items-baseline justify-between gap-2">
 				<span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
 					{title}
 				</span>

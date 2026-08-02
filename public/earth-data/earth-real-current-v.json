@@ -1,13 +1,13 @@
 {
-  "version": 1,
-  "format": "int16-month-major",
-  "field": "godas_monthly_current_v_ms",
-  "width": 360,
-  "height": 180,
-  "months": 12,
-  "scale": 0.001,
-  "nodata": -32768,
-  "source": "NOAA GODAS \u2014 surface ocean current (ucur/vcur), long-term monthly mean (1991-2020) (downloads.psl.noaa.gov/Datasets/godas)",
-  "bin": "earth-real-current-v.bin.gz",
-  "compression": "gzip"
+	"version": 1,
+	"format": "int16-month-major",
+	"field": "godas_monthly_current_v_ms",
+	"width": 360,
+	"height": 180,
+	"months": 12,
+	"scale": 0.001,
+	"nodata": -32768,
+	"source": "NOAA GODAS \u2014 surface ocean current (ucur/vcur), long-term monthly mean (1991-2020) (downloads.psl.noaa.gov/Datasets/godas)",
+	"bin": "earth-real-current-v.bin.gz",
+	"compression": "gzip"
 }

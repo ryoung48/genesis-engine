@@ -9,6 +9,13 @@ export type FillPetMonthlyHargreavesParams = {
 	dpm: number
 }
 
+export type PetMonthHargreavesParams = {
+	tas: number
+	td: number
+	raWm2: number
+	dpm: number
+}
+
 export type RefreshClimatePetMonthlyParams = {
 	climate: Pick<
 		GenesisClimate,

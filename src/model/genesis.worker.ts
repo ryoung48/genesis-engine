@@ -18,7 +18,7 @@ import type {
 import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
-} from "@/ui/planet/renderer/terrain-geometry"
+} from "@/ui/genesis/renderer/terrain-geometry"
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -215,6 +215,7 @@ function serializeWorld(
 		monthlyTEQ: world.monthlyTEQ,
 		dtr_annual: world.dtr_annual,
 		dtr_monthly: world.dtr_monthly,
+		observedCloudCover: world.observedCloudCover,
 		hydrology: world.hydrology
 			? { aet_monthly: world.hydrology.aet_monthly }
 			: undefined,
@@ -445,6 +446,10 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 	if (world.slopeScore) add(world.slopeScore.buffer)
 	if (world.dtr_annual) add(world.dtr_annual.buffer)
 	if (world.dtr_monthly) add(world.dtr_monthly.buffer)
+	if (world.observedCloudCover?.real_monthly)
+		add(world.observedCloudCover.real_monthly.buffer)
+	if (world.observedCloudCover?.real_annual)
+		add(world.observedCloudCover.real_annual.buffer)
 	if (world.observedDtr?.real_monthly)
 		add(world.observedDtr.real_monthly.buffer)
 	if (world.observedDtr?.real_annual) add(world.observedDtr.real_annual.buffer)

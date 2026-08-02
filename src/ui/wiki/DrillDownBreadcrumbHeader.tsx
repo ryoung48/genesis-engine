@@ -16,9 +16,7 @@ export const DrillDownBreadcrumbHeader: React.FC<
 > = ({ title, trailingValue, onBack }) => (
 	<div className="flex items-center gap-2">
 		<DisclosureButton label="Back" direction="back" onClick={onBack} />
-		<div className={`${uiTokens.type.controlWide} text-slate-500`}>
-			{title}
-		</div>
+		<div className={`${uiTokens.type.controlWide} text-slate-500`}>{title}</div>
 		<span className="ml-auto font-mono text-[10px] text-slate-400">
 			{trailingValue}
 		</span>

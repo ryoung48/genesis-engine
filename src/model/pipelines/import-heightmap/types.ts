@@ -33,6 +33,13 @@ interface ImportParams {
 	realPrecipMonths?: number
 	realPrecipScale?: number
 	realPrecipNoData?: number
+	/** Observed-Earth monthly total cloud-cover raster (fraction * scale). */
+	realCloudCoverMonthly?: Int16Array
+	realCloudCoverWidth?: number
+	realCloudCoverHeight?: number
+	realCloudCoverMonths?: number
+	realCloudCoverScale?: number
+	realCloudCoverNoData?: number
 	realDtrMonthly?: Int16Array
 	realDtrWidth?: number
 	realDtrHeight?: number
@@ -127,6 +134,8 @@ interface ImportParams {
 	orbitalDistanceAU?: number
 	daysPerYear?: number
 	hoursPerDay?: number
+	/** [JUSTIFICATION] Import callers may omit this newer Pasta tuning option. */
+	pastaGintThreshold?: number
 	tidallyLocked?: boolean
 	substellarLon?: number
 	perihelion?: number

@@ -10,8 +10,8 @@ import { Swatch } from "@/ui/components/primitives/Swatch"
 import { GpsFocusButton, renderStatGrid } from "@/ui/wiki/shared/ui-atoms"
 import {
 	type WikiCountHistoryPoint,
-	type WikiTimelineEvent,
 	WikiSection,
+	type WikiTimelineEvent,
 	WikiTimelineSection,
 } from "@/ui/wiki/shared/WikiTimeline"
 
@@ -84,7 +84,10 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 							<Swatch color={nation.color} />
 							<span>Nation</span>
 							<span>·</span>
-							<InlineTextButton onClick={nation.onBack} className="text-slate-500">
+							<InlineTextButton
+								onClick={nation.onBack}
+								className="text-slate-500"
+							>
 								{nation.planetTitle}
 							</InlineTextButton>
 						</>
@@ -143,7 +146,7 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 				title="Environmental"
 				meta={nation.showObservedDistributions ? "Observed" : null}
 			>
-				<div className="space-y-1.5">
+				<div className="space-y-1">
 					<DistributionChart
 						title="Climate"
 						buckets={nation.climateDistribution}
@@ -166,7 +169,7 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 			</WikiSection>
 
 			<WikiSection title="Demographics">
-				<div className="space-y-1.5">
+				<div className="space-y-1">
 					<DistributionChart
 						title="Culture"
 						buckets={nation.cultureDistribution}

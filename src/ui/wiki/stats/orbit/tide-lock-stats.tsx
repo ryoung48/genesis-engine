@@ -6,11 +6,11 @@ import {
 	EditableStatValue,
 	type StatEntry,
 } from "@/ui/components/composites/EditableStatValue"
-import { uiTokens } from "@/ui/components/tokens"
 import { AxisRotateClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateClockwiseIcon"
 import { AxisRotateCounterClockwiseIcon } from "@/ui/components/primitives/icons/AxisRotateCounterClockwiseIcon"
 import { Slider } from "@/ui/components/primitives/Slider"
 import { Tooltip as UITooltip } from "@/ui/components/primitives/Tooltip"
+import { uiTokens } from "@/ui/components/tokens"
 import { getMoonSeedBaseName } from "@/ui/wiki/stats/orbit/body-titles"
 import {
 	formatHours,

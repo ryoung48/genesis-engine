@@ -25,7 +25,7 @@ export type GddTotalParams = {
 	gint: Float64Array
 	gddAcc: Float64Array
 	giAcc: Float64Array
-	threshold: number
+	gintInterruptionThreshold: number | null
 }
 
 export type ClassifyOceanParams = PastaClassificationBuffers & {
@@ -43,6 +43,7 @@ export type ClassifyLandParams = PastaClassificationBuffers & {
 	mGDD: Float64Array
 	iceVal: number
 	dpm: number
+	gintThreshold: number
 	warmest: number
 	coldest: number
 }

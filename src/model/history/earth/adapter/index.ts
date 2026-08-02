@@ -7,7 +7,7 @@ import type {
 } from "@/model/history/earth/adapter/types"
 import type { FoldedState } from "@/model/history/earth/fold/types"
 import type { LonLat } from "@/model/history/earth/types"
-import type { PoliticalMapWar } from "@/ui/planet/screen/display/political-conflict-display"
+import type { PoliticalMapWar } from "@/ui/genesis/political/political-conflict-display"
 
 function isPlaceholderNationTag(tag: string): boolean {
 	return tag === "---" || tag === "XXX"

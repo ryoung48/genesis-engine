@@ -4,6 +4,7 @@ import type {
 	ComputeObservedAridityParams,
 	FillPetMonthlyHargreavesParams,
 	ObservedAridityResult,
+	PetMonthHargreavesParams,
 	RefreshClimatePetMonthlyParams,
 } from "@/model/climate/hydrology/types"
 import type { GenesisHydrology } from "@/model/climate/types"
@@ -13,17 +14,8 @@ function petMonthHargreaves({
 	td,
 	raWm2,
 	dpm,
-}: {
-	tas: number
-	td: number
-	raWm2: number
-	dpm: number
-}): number {
+}: PetMonthHargreavesParams): number {
 	const raMJ = raWm2 * 0.0864
-	// Thermal correction: latent heat of vaporization varies with temperature.
-	// From Hargreaves (1975) eq. 3: multiply by 238.8 / (595.5 - 0.55 * T).
-	// This factor ≈ 0.41 at typical temperatures and was omitted from the
-	// Hargreaves-Samani shorthand, causing ~2.4× overestimation without it.
 	const lambda = 595.5 - 0.55 * tas
 	const petDay =
 		0.0023 * (tas + 17.8) * Math.sqrt(Math.max(2, td)) * raMJ * (238.8 / lambda)

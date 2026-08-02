@@ -45,16 +45,16 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 
 	if (variant === "compact") {
 		return (
-			<div className="flex items-center gap-2">
+			<div className="flex items-center gap-1.5">
 				<span
-					className={`w-[72px] shrink-0 truncate ${uiTokens.type.labelSm} text-slate-500`}
+					className="w-[72px] shrink-0 truncate text-[9px] text-slate-400"
 					title={title}
 				>
 					{title}
 				</span>
 				<div className="relative min-w-0 flex-1">
 					<div
-						className="flex h-2.5 gap-[2px] overflow-hidden rounded-full bg-slate-100"
+						className="flex h-1.5 gap-px overflow-hidden rounded-full bg-slate-100"
 						onPointerLeave={() => setHoveredIndex(null)}
 					>
 						{visibleBuckets.map((bucket, index) => (

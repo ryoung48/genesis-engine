@@ -60,14 +60,8 @@ function classifyBody(params: {
 	 * a non-main-world sibling. */
 	forceMeltball?: boolean
 }): { group: OrbitGroup; classification: OrbitClassification } {
-	const {
-		zone,
-		orbitalDistanceAU,
-		sizeClass,
-		isMoon,
-		tidal,
-		forceMeltball,
-	} = params
+	const { zone, orbitalDistanceAU, sizeClass, isMoon, tidal, forceMeltball } =
+		params
 	if (forceMeltball) return { group: "dwarf", classification: "meltball" }
 	const group = classifyGroup({ groupHint: params.groupHint, sizeClass })
 	if (group === "asteroid belt") {

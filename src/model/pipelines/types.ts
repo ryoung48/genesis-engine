@@ -65,6 +65,7 @@ export interface GenesisParams {
 	orbitalDistanceAU: number // orbital semi-major axis in AU, default 1.0
 	daysPerYear: number // orbital year length in local days, default 365
 	hoursPerDay: number // rotation period expressed as local hours per day, default 24
+	pastaGintThreshold: number // GInt needed for a zero-GDD period to interrupt accumulation, default 1250
 	tideLock: TideLock | null // null = not locked
 	substellarLon: number // longitude of the substellar point in degrees (0-360), default 0
 	perihelion: number // argument of perihelion in degrees (0-360), default 90
@@ -114,6 +115,11 @@ export interface GenesisWorld {
 	isEarthImport?: boolean
 	timings?: StageTiming[]
 	climate: GenesisClimate
+	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
+	observedCloudCover?: {
+		real_monthly: Float32Array
+		real_annual: Float32Array
+	}
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
 	oceanDist: Float32Array
 	rainfall: GenesisRainfall

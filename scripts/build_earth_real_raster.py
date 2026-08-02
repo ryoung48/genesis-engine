@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import gzip
 import json
+from io import BytesIO
 from pathlib import Path
 from typing import Callable
+from zipfile import ZipFile
 
 import numpy as np
+import netCDF4 as nc
 from PIL import Image
 
 
@@ -13,14 +16,44 @@ MONTHS = 12
 INT16_NODATA = -32768
 
 
+def _replace_nodata(data: np.ndarray, nodata: object) -> np.ndarray:
+    if nodata is None:
+        return data
+    nodata_value = np.float32(nodata)
+    data[data <= nodata_value * np.float32(0.99)] = np.nan
+    return data
+
+
 def load_month_array(path: Path) -> np.ndarray:
     with Image.open(path) as img:
         nodata = img.tag_v2.get(42113)
         data = np.array(img, dtype=np.float32, copy=True)
-    if nodata is not None:
-        nodata_value = np.float32(nodata)
-        data[data <= nodata_value * np.float32(0.99)] = np.nan
-    return data
+    return _replace_nodata(data, nodata)
+
+
+def load_month_from_archive(archive_path: Path, filename: str) -> np.ndarray:
+    with ZipFile(archive_path) as archive:
+        with archive.open(filename) as source:
+            with Image.open(BytesIO(source.read())) as image:
+                nodata = image.tag_v2.get(42113)
+                data = np.array(image, dtype=np.float32, copy=True)
+    return _replace_nodata(data, nodata)
+
+
+def load_ncep_monthly(path: Path, variable_name: str) -> np.ndarray:
+    """Load and re-center a monthly NCEP Gaussian-grid field."""
+    with nc.Dataset(path) as dataset:
+        data = np.asarray(dataset.variables[variable_name][:], dtype=np.float32)
+        longitude = np.asarray(dataset.variables["lon"][:], dtype=np.float64)
+
+    shift = int(np.argmin(np.abs(longitude - 180.0)))
+    monthly = np.roll(data, -shift, axis=2)
+    monthly[monthly < -900] = np.nan
+    return monthly
+
+
+def fill_missing(primary: np.ndarray, fallback: np.ndarray) -> np.ndarray:
+    return np.where(np.isfinite(primary), primary, fallback)
 
 
 def resample_month(data: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -28,15 +61,18 @@ def resample_month(data: np.ndarray, width: int, height: int) -> np.ndarray:
     x = ((np.arange(width, dtype=np.float64) + 0.5) / width) * src_width - 0.5
     y = ((np.arange(height, dtype=np.float64) + 0.5) / height) * src_height - 0.5
 
-    x0 = np.floor(x).astype(np.int32)
-    y0 = np.floor(y).astype(np.int32)
-    x1 = (x0 + 1) % src_width
-    y1 = np.clip(y0 + 1, 0, src_height - 1)
-    x0 = np.mod(x0, src_width)
-    y0 = np.clip(y0, 0, src_height - 1)
+    x0_floor = np.floor(x).astype(np.int32)
+    y0_floor = np.floor(y).astype(np.int32)
+    x1 = (x0_floor + 1) % src_width
+    y1 = np.clip(y0_floor + 1, 0, src_height - 1)
+    x0 = np.mod(x0_floor, src_width)
+    y0 = np.clip(y0_floor, 0, src_height - 1)
 
-    fx = (x - x0).astype(np.float32)
-    fy = (y - y0).astype(np.float32)
+    # Calculate fractions from the unwrapped source coordinates. Using the
+    # wrapped/clipped array indices here causes extrapolation at the seams when
+    # a target grid is finer than its source raster.
+    fx = (x - x0_floor).astype(np.float32)
+    fy = (y - y0_floor).astype(np.float32)
 
     top_left = data[np.ix_(y0, x0)]
     top_right = data[np.ix_(y0, x1)]

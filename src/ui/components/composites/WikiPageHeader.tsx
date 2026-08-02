@@ -23,7 +23,9 @@ export const WikiPageHeader: React.FC<WikiPageHeaderProps> = ({
 			<h1 className={`min-w-0 flex-1 text-slate-950 ${uiTokens.type.hero}`}>
 				{title}
 			</h1>
-			{action ? <div className="flex items-center gap-1 pt-1">{action}</div> : null}
+			{action ? (
+				<div className="flex items-center gap-1 pt-1">{action}</div>
+			) : null}
 		</div>
 		<div className="mt-0.5 flex items-center justify-between gap-3">
 			<div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-500">

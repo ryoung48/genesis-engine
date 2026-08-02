@@ -134,6 +134,11 @@ export interface SerializedGenesisWorld {
 	riverLand: Uint8Array
 	dtr_annual: Float32Array
 	dtr_monthly: Float32Array
+	/** [JUSTIFICATION] Present only for Earth imports with an observed cloud-cover raster. */
+	observedCloudCover?: {
+		real_monthly: Float32Array
+		real_annual: Float32Array
+	}
 	observedDtr?: {
 		real_monthly?: Float32Array
 		real_annual?: Float32Array
@@ -341,6 +346,13 @@ export type GenesisWorkerRequest =
 				realPrecipMonths?: number
 				realPrecipScale?: number
 				realPrecipNoData?: number
+				/** Observed-Earth monthly total cloud-cover raster (fraction * scale). */
+				realCloudCoverMonthly?: Int16Array
+				realCloudCoverWidth?: number
+				realCloudCoverHeight?: number
+				realCloudCoverMonths?: number
+				realCloudCoverScale?: number
+				realCloudCoverNoData?: number
 				realDtrMonthly?: Int16Array
 				realDtrWidth?: number
 				realDtrHeight?: number

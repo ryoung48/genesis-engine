@@ -3,20 +3,33 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from build_earth_real_raster import build_monthly_stack, load_month_array, write_asset
+import numpy as np
+
+from build_earth_real_raster import (
+    build_monthly_stack,
+    fill_missing,
+    load_month_from_archive,
+    load_ncep_monthly,
+    write_asset,
+)
 
 
-DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads\wc2.1_10m_prec")
+DEFAULT_SOURCE_DIR = Path(r"C:\Users\rayou\Downloads")
 DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "earth-real-precipitation"
-DEFAULT_WIDTH = 360
-DEFAULT_HEIGHT = 180
+DEFAULT_WIDTH = 632
+DEFAULT_HEIGHT = 316
 MONTHS = 12
 SCALE = 1.0
+SECONDS_PER_DAY = 24 * 60 * 60
+MONTH_LENGTHS_1991_2020 = np.array(
+    [31.0, 28.26666667, 31.0, 30.0, 31.0, 30.0, 31.0, 31.0, 30.0, 31.0, 30.0, 31.0],
+    dtype=np.float32,
+)
 
 
-def month_path(source_dir: Path, month: int) -> Path:
-    return source_dir / f"wc2.1_10m_prec_{month:02d}.tif"
+def month_filename(month: int) -> str:
+    return f"wc2.1_5m_prec_{month:02d}.tif"
 
 
 def build_asset(
@@ -26,21 +39,42 @@ def build_asset(
     width: int,
     height: int,
 ) -> tuple[Path, Path]:
-    def month_loader(month: int):
-        tif_path = month_path(source_dir, month)
-        if not tif_path.exists():
-            raise FileNotFoundError(f"Missing source raster: {tif_path}")
-        return load_month_array(tif_path)
+    archive_path = source_dir / "wc2.1_5m_prec.zip"
+    ncep_path = source_dir / "prate.sfc.mon.ltm.nc"
+    if not archive_path.exists():
+        raise FileNotFoundError(f"Missing source archive: {archive_path}")
+    if not ncep_path.exists():
+        raise FileNotFoundError(f"Missing source file: {ncep_path}")
 
-    monthly = build_monthly_stack(width, height, month_loader)
+    def month_loader(month: int):
+        return load_month_from_archive(archive_path, month_filename(month))
+
+    worldclim_monthly = build_monthly_stack(width, height, month_loader)
+    ncep_rate = load_ncep_monthly(ncep_path, "prate")
+    ncep_monthly_mm = ncep_rate * (MONTH_LENGTHS_1991_2020 * SECONDS_PER_DAY).reshape(
+        12,
+        1,
+        1,
+    )
+    ncep_monthly = build_monthly_stack(
+        width,
+        height,
+        lambda month: ncep_monthly_mm[month - 1],
+    )
+    monthly = fill_missing(worldclim_monthly, ncep_monthly)
     return write_asset(
         monthly,
         output_dir,
         prefix,
-        field="worldclim_monthly_precipitation_mm",
+        field="worldclim_ncep_monthly_precipitation_mm",
         scale_factor=SCALE,
         stored_scale=1.0,
-        source=str(source_dir),
+        source=(
+            "WorldClim 2.1 — 5 arc-minute monthly precipitation (1970-2000) "
+            "over land; NCEP/NCAR Reanalysis 1 — surface precipitation rate "
+            "long-term monthly mean (1991-2020), converted to monthly mm where "
+            "WorldClim is missing, including ocean"
+        ),
     )
 
 

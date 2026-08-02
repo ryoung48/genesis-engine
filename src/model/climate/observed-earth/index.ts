@@ -203,6 +203,60 @@ function attachObservedEarthRainfall(params: {
 	rainfall.diff_annual = diffAnnual
 }
 
+function attachObservedEarthCloudCover(params: {
+	mesh: SphereMesh
+	world: {
+		observedCloudCover?: GenesisWorld["observedCloudCover"]
+	}
+	realCloudCoverMonthly: Int16Array
+	realCloudCoverWidth: number
+	realCloudCoverHeight: number
+	realCloudCoverMonths: number
+	realCloudCoverScale: number
+	realCloudCoverNoData: number
+}): void {
+	const {
+		mesh,
+		world,
+		realCloudCoverMonthly,
+		realCloudCoverWidth,
+		realCloudCoverHeight,
+		realCloudCoverMonths,
+		realCloudCoverScale,
+		realCloudCoverNoData,
+	} = params
+	if (realCloudCoverMonths !== 12) return
+
+	const N = mesh.numRegions
+	const monthly = sampleMonthlyFloatRaster({
+		mesh,
+		raster: realCloudCoverMonthly,
+		rasterW: realCloudCoverWidth,
+		rasterH: realCloudCoverHeight,
+		months: realCloudCoverMonths,
+		scale: realCloudCoverScale,
+		nodata: realCloudCoverNoData,
+	})
+	const annual = new Float32Array(N)
+
+	for (let r = 0; r < N; r++) {
+		let sum = 0
+		let count = 0
+		for (let month = 0; month < realCloudCoverMonths; month++) {
+			const value = monthly[month * N + r]
+			if (!Number.isFinite(value)) continue
+			sum += value
+			count++
+		}
+		annual[r] = count > 0 ? sum / count : NaN
+	}
+
+	world.observedCloudCover = {
+		real_monthly: monthly,
+		real_annual: annual,
+	}
+}
+
 function attachObservedEarthDtr(params: {
 	mesh: SphereMesh
 	world: {
@@ -411,6 +465,7 @@ function attachObservedEarthCurrent(params: {
 export const OBSERVED_EARTH = {
 	sampleMonthlyFloatRaster,
 	attachObservedEarthClimate,
+	attachObservedEarthCloudCover,
 	attachObservedEarthRainfall,
 	attachObservedEarthDtr,
 	attachObservedEarthWind,

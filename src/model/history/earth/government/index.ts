@@ -3,7 +3,7 @@ import type {
 	EarthHistoryGovernmentFamily,
 } from "@/model/history/earth/government/types"
 import type { GovernmentType } from "@/model/society/types"
-import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/planet/screen/display/government-colors"
+import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/genesis/political/government-colors"
 
 const earthHistoryGovernmentFamilies: readonly EarthHistoryGovernmentFamily[] =
 	["tribal", "monarchy", "republic", "theocracy"]

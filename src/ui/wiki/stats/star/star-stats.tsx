@@ -4,8 +4,8 @@ import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity
 import { SLIDER_RANGES } from "@/model/pipelines/genesis-params/ranges"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { Slider } from "@/ui/components/primitives/Slider"
-import { SPECTRAL_CLASS_COLORS } from "@/ui/planet/screen/generation/star-utils"
 import { uiPalette } from "@/ui/components/tokens"
+import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 
 export function buildStarStats(params: {
 	starClass: MainSequenceClass
@@ -74,7 +74,9 @@ export function buildStarStats(params: {
 													onClick={() => setSpectralClass(spectralType)}
 													style={{
 														backgroundColor: active ? color : undefined,
-														borderColor: active ? uiPalette.activeDark : undefined,
+														borderColor: active
+															? uiPalette.activeDark
+															: undefined,
 														color: active ? uiPalette.activeDark : undefined,
 													}}
 													className={`rounded border px-2 py-0.5 text-[9px] font-bold transition-all ${

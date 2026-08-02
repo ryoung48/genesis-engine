@@ -21,7 +21,11 @@ export const ChipGroup: React.FC<ChipGroupProps> = ({
 	<div className="py-1.5 first:pt-0 last:pb-0">
 		<div className="mb-0.5 flex items-center gap-1">
 			{color ? (
-				<Swatch color={color} striped={striped} stripeBackground="transparent" />
+				<Swatch
+					color={color}
+					striped={striped}
+					stripeBackground="transparent"
+				/>
 			) : null}
 			<span className="text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500">
 				{label} ({count})

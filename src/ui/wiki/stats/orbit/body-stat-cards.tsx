@@ -10,11 +10,11 @@ import type { SystemBody } from "@/model/celestial/system/types"
 import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule/types"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
-import { estimateAlbedo } from "@/ui/hooks/useEbmPreview"
-import type { GenerationPreviewTab } from "@/ui/planet/screen/generation/generation-preview"
-import type { SliderDef } from "@/ui/planet/screen/generation/sliders"
-import type { UnitSystem } from "@/ui/planet/screen/shared/ui-format"
+import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
+import type { SliderDef } from "@/ui/genesis/generation/sliders"
+import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
 import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
+import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
 	updateBodyDiameter,
 	updateBodyOrbitalDistance,
