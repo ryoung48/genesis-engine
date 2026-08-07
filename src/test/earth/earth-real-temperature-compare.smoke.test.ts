@@ -29,6 +29,13 @@ const ELEVATION_BINS = [
 	{ label: "3km+", lo: 3, hi: Infinity },
 ]
 
+const SAHARA_BOUNDS = {
+	minLat: 15,
+	maxLat: 33,
+	minLon: -17,
+	maxLon: 35,
+}
+
 describe("EBM temperature vs observed Earth climate (land only)", () => {
 	it("imports the real Earth heightmap and compares modeled vs WorldClim land temperatures", () => {
 		const earth = loadEarthGrayscale("earth.png")
@@ -106,6 +113,7 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 
 		const realAvg = climate.real_temperature_avg!
 		const diffAvg = climate.temperature_diff_avg!
+		const noLapseMonthly = climate.temperature_monthly_nolapse
 		const r_xyz = mesh.r_xyz
 		function latDegAt(r: number): number {
 			const z = r_xyz[r * 3 + 2]
@@ -138,6 +146,11 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			n: 0,
 			sumDiff: 0,
 		}))
+		let saharaCells = 0
+		let saharaModeledSum = 0
+		let saharaNoLapseSum = 0
+		let saharaObservedSum = 0
+		let saharaElevationSum = 0
 
 		for (let r = 0; r < mesh.numRegions; r++) {
 			if (!isLand[r]) continue
@@ -153,6 +166,22 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 			else justRight++
 
 			const lat = latDegAt(r)
+			const lon = (Math.atan2(r_xyz[r * 3 + 1], r_xyz[r * 3]) * 180) / Math.PI
+			if (
+				lat >= SAHARA_BOUNDS.minLat &&
+				lat < SAHARA_BOUNDS.maxLat &&
+				lon >= SAHARA_BOUNDS.minLon &&
+				lon < SAHARA_BOUNDS.maxLon
+			) {
+				let noLapseAnnual = 0
+				for (let month = 0; month < 12; month++)
+					noLapseAnnual += noLapseMonthly[month * mesh.numRegions + r]
+				saharaCells++
+				saharaModeledSum += climate.temperature_avg[r]
+				saharaNoLapseSum += noLapseAnnual / 12
+				saharaObservedSum += observed
+				saharaElevationSum += elevation_km[r]
+			}
 			const band = bandStats.find((b) => lat >= b.lo && lat < b.hi)
 			if (band) {
 				band.n++
@@ -225,8 +254,17 @@ describe("EBM temperature vs observed Earth climate (land only)", () => {
 				meanBiasC: b.n > 0 ? Number((b.sumDiff / b.n).toFixed(2)) : NaN,
 			})),
 		)
+		console.info("Sahara diagnostic (15–33°N, 17°W–35°E; land only)")
+		console.table({
+			cells: saharaCells,
+			modeledC: Number((saharaModeledSum / saharaCells).toFixed(2)),
+			noLapseC: Number((saharaNoLapseSum / saharaCells).toFixed(2)),
+			observedC: Number((saharaObservedSum / saharaCells).toFixed(2)),
+			elevationKm: Number((saharaElevationSum / saharaCells).toFixed(2)),
+		})
 
 		expect(n).toBeGreaterThan(0)
+		expect(saharaCells).toBeGreaterThan(0)
 		expect(Number.isFinite(meanBiasC)).toBe(true)
 	}, 600_000)
 })

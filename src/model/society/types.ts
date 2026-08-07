@@ -60,6 +60,11 @@ export interface GenesisPartition {
 	size: Int32Array
 	/** Per-partition RGB colors, length count*3 */
 	colors: Float32Array
+	/** Per-node secondary (bleeding) partition index, -1 = no blend. Only
+	 * populated for partitions that render border-bleed stripes (culture). */
+	blendSecondary?: Int32Array
+	/** Per-node blend weight [0, 1] toward blendSecondary. */
+	blendWeight?: Float32Array
 }
 
 export interface GenesisNationHierarchy extends GenesisPartition {

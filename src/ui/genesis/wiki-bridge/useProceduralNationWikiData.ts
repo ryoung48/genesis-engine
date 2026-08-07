@@ -35,8 +35,26 @@ export function useProceduralNationWikiData(
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	return useMemo<NationWikiData | null>(() => {
 		if (world?.isEarthImport || !selectedNation) return null
+		// Procedural worlds carry no per-province areaKm2 (that's an
+		// Earth-import-only field -- see attachEarthProvinceAreas / planet-stats'
+		// avgProvinceAreaKm2 comment), so approximate the same way the world
+		// panel does: total land area / province count, scaled by this nation's
+		// province share.
+		let totalAreaKm2 = 0
+		const radiusKm = world?.params?.planetRadiusKm
+		if (world?.elevation && world.provinces?.count && radiusKm) {
+			let landCells = 0
+			for (let i = 0; i < world.elevation.length; i++) {
+				if (world.elevation[i] > 0) landCells++
+			}
+			const landPercent = landCells / Math.max(1, world.elevation.length)
+			const surfaceAreaKm2 = 4 * Math.PI * radiusKm * radiusKm
+			const landAreaKm2 = surfaceAreaKm2 * landPercent
+			const avgProvinceAreaKm2 = landAreaKm2 / world.provinces.count
+			totalAreaKm2 = avgProvinceAreaKm2 * selectedNation.provinceCount
+		}
 		const stats = buildNationWikiStats({
-			totalAreaKm2: 0,
+			totalAreaKm2,
 			totalPopulation: selectedNation.totalPopulation,
 			totalUrbanPopulation: 0,
 			provinceCount: selectedNation.provinceCount,
@@ -66,9 +84,9 @@ export function useProceduralNationWikiData(
 			organizations: [],
 			cultureDistribution: selectedNation.cultureDistribution,
 			religionDistribution: selectedNation.religionDistribution,
-			climateDistribution: [],
-			topographyDistribution: [],
-			vegetationDistribution: [],
+			climateDistribution: selectedNation.climateDistribution,
+			topographyDistribution: selectedNation.topographyDistribution,
+			vegetationDistribution: selectedNation.vegetationDistribution,
 			showObservedDistributions: false,
 			provinceHistory: proceduralProvinceHistoryRef.current.get(nationId) ?? [],
 			dateRangeStart: HISTORY_DAYS.historyMsToDays(800 * STATE.yearMs),

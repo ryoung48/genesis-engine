@@ -139,6 +139,11 @@ export interface SerializedGenesisWorld {
 		real_monthly: Float32Array
 		real_annual: Float32Array
 	}
+	/** [JUSTIFICATION] Derived only while importing Earth from observed temperature, rainfall, and DTR rasters. */
+	observedHydrology?: {
+		aet_monthly: Float32Array
+		pet_monthly: Float32Array
+	}
 	observedDtr?: {
 		real_monthly?: Float32Array
 		real_annual?: Float32Array
@@ -232,6 +237,18 @@ export interface SerializedGenesisWorld {
 	realSettlement?: {
 		names: (string | null)[]
 		population: Float32Array
+		/** Real lon/lat per compact province index, parallel to `names` --
+		 * lets settlement-label placement use the settlement's exact real
+		 * coordinate instead of the procedural settlementRegions seed cell
+		 * (see buildGlobeSettlementLabels/buildMapSettlementLabels). Only
+		 * meaningful where names[p] is non-null. */
+		lons: Float32Array
+		lats: Float32Array
+		/** Compact province index used by the Earth settlement marker overlay,
+		 * parallel to `names`; -1 where names[p] is null. This keeps labels
+		 * and markers matched when a historical anchor differs from its GHSL
+		 * population carrier. */
+		sourceIndex: Int32Array
 	}
 	monthlyTEQ?: Float32Array[]
 	/** Per-location trade good index (0=unassigned, 1-based into TRADE_GOOD_LABELS). */

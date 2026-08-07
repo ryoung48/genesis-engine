@@ -5,9 +5,11 @@ import type {
 	ClaimProvinceDynamicParams,
 	ContinentPlacementBonusParams,
 	MarkBlockedParams,
+	MigrationWavePlacementMultiplierParams,
 	NationPlacementScoreParams,
 	ProvinceSeedDistanceParams,
 	SelectSeedParams,
+	TargetSizeBiasParams,
 } from "@/model/society/nations/placement/types"
 import { WATER_ACCESS } from "@/model/society/water-access"
 
@@ -24,6 +26,25 @@ const LARGE_NATION_CONTINENT_BONUS = 3.5
 const LARGE_NATION_CONTINENT_MIN_TARGET = 10
 
 const LARGE_NATION_CONTINENT_FULL_TARGET = 50
+
+const LARGE_NATION_WAVE_BIAS = 0.35
+
+function largeNationSizeBias({ target }: TargetSizeBiasParams): number {
+	return GRAPH_PARTITION.clamp01(
+		(target - LARGE_NATION_CONTINENT_MIN_TARGET) /
+			(LARGE_NATION_CONTINENT_FULL_TARGET - LARGE_NATION_CONTINENT_MIN_TARGET),
+	)
+}
+
+function migrationWavePlacementMultiplier({
+	province,
+	target,
+	migrationWave,
+}: MigrationWavePlacementMultiplierParams): number {
+	if (!migrationWave) return 1
+	const wave = GRAPH_PARTITION.clamp01(migrationWave[province])
+	return 1 - wave * largeNationSizeBias({ target }) * LARGE_NATION_WAVE_BIAS
+}
 
 function nationPlacementScore({
 	province,
@@ -45,10 +66,7 @@ function continentPlacementBonus({
 	target,
 }: ContinentPlacementBonusParams): number {
 	if (!provinceContinent?.[province]) return 0
-	const sizeBias = GRAPH_PARTITION.clamp01(
-		(target - LARGE_NATION_CONTINENT_MIN_TARGET) /
-			(LARGE_NATION_CONTINENT_FULL_TARGET - LARGE_NATION_CONTINENT_MIN_TARGET),
-	)
+	const sizeBias = largeNationSizeBias({ target })
 	return sizeBias * LARGE_NATION_CONTINENT_BONUS
 }
 
@@ -141,6 +159,7 @@ function selectSeed({
 	blocked,
 	habitability,
 	waterAccess,
+	migrationWave,
 	provinceContinent,
 	componentId,
 	componentSizes,
@@ -173,6 +192,11 @@ function selectSeed({
 				provinceContinent,
 				target,
 			}) *
+				migrationWavePlacementMultiplier({
+					province: p,
+					target,
+					migrationWave,
+				}) *
 				blockedPenalty +
 			expansion +
 			sizeFactor

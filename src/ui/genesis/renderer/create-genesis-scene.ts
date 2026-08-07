@@ -186,7 +186,6 @@ export function createGenesisScene(
 		setNationFillColorForRawId,
 		setNationOccupationStripeColorForRawId,
 		setNationBordersVisible,
-		setLandNationBordersVisible,
 		setSelectedProvince,
 	} = nationBordersController
 
@@ -332,8 +331,6 @@ export function createGenesisScene(
 		for (const mat of context.pulseMaterials) mat.resolution.set(w, h)
 		for (const mat of context.infrastructureMaterials) mat.resolution.set(w, h)
 		for (const mat of context.nationBorderMaterials) mat.resolution.set(w, h)
-		for (const mat of context.landNationBorderMaterials)
-			mat.resolution.set(w, h)
 		if (context.selectedProvince >= 0) rebuildSelectedProvinceBorder()
 		requestRender()
 	}
@@ -431,7 +428,6 @@ export function createGenesisScene(
 		setHoveredRegion,
 		setNationBordersVisible,
 		setEarthHistoryNationOverride,
-		setLandNationBordersVisible,
 		setOrganizationHighlight,
 		setViewMode,
 		setWireframeVisible,

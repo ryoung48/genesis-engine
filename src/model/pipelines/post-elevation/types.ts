@@ -141,6 +141,8 @@ export interface PostPipelineOutput {
 		real_monthly: Float32Array
 		real_annual: Float32Array
 	}
+	/** [JUSTIFICATION] Derived only while importing Earth from observed temperature, rainfall, and DTR rasters. */
+	observedHydrology?: GenesisWorld["observedHydrology"]
 	rainfall: GenesisRainfall
 	monthlyTEQ: Float32Array[]
 	hydrology: GenesisHydrology

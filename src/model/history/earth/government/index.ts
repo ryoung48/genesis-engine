@@ -1,6 +1,7 @@
 import type {
 	BlendRgbParams,
 	EarthHistoryGovernmentFamily,
+	GovernmentReformLabelParams,
 } from "@/model/history/earth/government/types"
 import type { GovernmentType } from "@/model/society/types"
 import { GOVERNMENT_COLORS_BY_TYPE } from "@/ui/genesis/political/government-colors"
@@ -100,9 +101,9 @@ function significantEarthHistoryReforms(
 		.sort()
 }
 
-function currentEarthHistoryReformLabel(
-	governmentReform: string | null | undefined,
-): string | null {
+function formatEarthHistoryGovernmentReformLabel({
+	governmentReform,
+}: GovernmentReformLabelParams): string | null {
 	const normalized = governmentReform?.trim().toLowerCase() ?? ""
 	if (!normalized) return null
 	return formatGovernmentReformLabel(normalized)
@@ -161,7 +162,9 @@ function formatEarthHistoryGovernmentLabel(params: {
 }): string | null {
 	const family = getEarthHistoryGovernmentFamily(params.governmentType)
 	if (!family) return normalizeGovernmentBase(params.governmentType)
-	const reformLabel = currentEarthHistoryReformLabel(params.governmentReform)
+	const reformLabel = formatEarthHistoryGovernmentReformLabel({
+		governmentReform: params.governmentReform,
+	})
 	if (!reformLabel) return toDisplayLabel(family)
 	return `${toDisplayLabel(family)} (${reformLabel})`
 }
@@ -173,5 +176,6 @@ export const GOVERNMENT = {
 	earthHistoryNoGovernmentColor,
 	getEarthHistoryGovernmentFamily,
 	getEarthHistoryGovernmentColor,
+	formatEarthHistoryGovernmentReformLabel,
 	formatEarthHistoryGovernmentLabel,
 }

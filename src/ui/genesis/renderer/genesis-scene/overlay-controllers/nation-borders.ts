@@ -26,8 +26,6 @@ import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import { shouldRebuildNationBordersForVisibilityChange } from "@/ui/genesis/renderer/nation-border-visibility"
 import { repeatMapPositions } from "@/ui/genesis/renderer/overlay-builders"
 import {
-	buildLandNationBordersGlobe,
-	buildLandNationBordersMap,
 	collectAllNationBorderGlobePositions,
 	collectAllNationBorderMapPositions,
 } from "@/ui/genesis/renderer/overlay-builders/nation-borders"
@@ -79,12 +77,8 @@ export function createNationBordersController(
 	function rebuildNationBorders() {
 		disposeObject3D(ctx.globeGroup, ctx.globeNationBorders)
 		disposeObject3D(ctx.scene, ctx.mapNationBorders)
-		disposeObject3D(ctx.globeGroup, ctx.globeLandNationBorders)
-		disposeObject3D(ctx.scene, ctx.mapLandNationBorders)
 		ctx.globeNationBorders = null
 		ctx.mapNationBorders = null
-		ctx.globeLandNationBorders = null
-		ctx.mapLandNationBorders = null
 		// The fill mesh is intentionally NOT disposed unconditionally here
 		// (unlike the border lines above, which must always be fully rebuilt
 		// since their segment set is re-filtered every call) -- see the
@@ -92,7 +86,6 @@ export function createNationBordersController(
 		// nation ownership changed and only disposes/rebuilds it when the
 		// radius/projection actually changed.
 		ctx.nationBorderMaterials = []
-		ctx.landNationBorderMaterials = []
 
 		const w = ctx.canvas.clientWidth || 1
 		const h = ctx.canvas.clientHeight || 1
@@ -258,39 +251,6 @@ export function createNationBordersController(
 				}
 			}
 
-			if (borderContext && ctx.landNationBordersVisible) {
-				const globeLand = buildEu4NationBordersGlobe(
-					geometry,
-					borderContext,
-					ctx.currentViewMode,
-					ctx.landNationBordersVisible,
-					ctx.elevationVisible ? 1.004 : 1.001,
-					[w, h],
-					{ color: 0x7d556f, opacity: 0.9, lineWidth: 2 },
-				)
-				const mapLand = buildEu4NationBordersMap(
-					geometry,
-					borderContext,
-					ctx.currentMapCenterLongitudeDeg,
-					ctx.currentMapProjectionLatitudeDeg,
-					ctx.currentViewMode,
-					ctx.landNationBordersVisible,
-					0.001,
-					[w, h],
-					{ color: 0x7d556f, opacity: 0.9, lineWidth: 2 },
-				)
-				if (globeLand) {
-					ctx.globeLandNationBorders = globeLand.lines
-					ctx.landNationBorderMaterials.push(globeLand.material)
-					ctx.globeGroup.add(ctx.globeLandNationBorders)
-				}
-				if (mapLand) {
-					ctx.mapLandNationBorders = mapLand.lines
-					ctx.landNationBorderMaterials.push(mapLand.material)
-					ctx.scene.add(ctx.mapLandNationBorders)
-				}
-			}
-
 			if (borderContext && ctx.nationBordersVisible) {
 				const BORDER_BASE_WIDTH = 1.2
 				const globeThin = buildEu4NationBordersGlobe(
@@ -329,34 +289,6 @@ export function createNationBordersController(
 
 			deps.updateOverlayVisibility()
 			return
-		}
-
-		if (worldForBorders && ctx.landNationBordersVisible) {
-			const globeLand = buildLandNationBordersGlobe({
-				world: worldForBorders,
-				viewMode: ctx.currentViewMode,
-				visible: ctx.landNationBordersVisible,
-				elevationVisible: ctx.elevationVisible,
-				resolution: [w, h],
-			})
-			const mapLand = buildLandNationBordersMap({
-				world: worldForBorders,
-				centerLongitudeDeg: ctx.currentMapCenterLongitudeDeg,
-				projectionLatitudeDeg: ctx.currentMapProjectionLatitudeDeg,
-				viewMode: ctx.currentViewMode,
-				visible: ctx.landNationBordersVisible,
-				resolution: [w, h],
-			})
-			if (globeLand) {
-				ctx.globeLandNationBorders = globeLand.lines
-				ctx.landNationBorderMaterials.push(globeLand.material)
-				ctx.globeGroup.add(ctx.globeLandNationBorders)
-			}
-			if (mapLand) {
-				ctx.mapLandNationBorders = mapLand.lines
-				ctx.landNationBorderMaterials.push(mapLand.material)
-				ctx.scene.add(ctx.mapLandNationBorders)
-			}
 		}
 
 		if (worldForBorders && ctx.nationBordersVisible) {
@@ -543,22 +475,6 @@ export function createNationBordersController(
 		deps.updateOverlayVisibility()
 	}
 
-	function setLandNationBordersVisible(visible: boolean) {
-		if (ctx.landNationBordersVisible === visible) return
-		ctx.landNationBordersVisible = visible
-		if (
-			shouldRebuildNationBordersForVisibilityChange({
-				nextVisible: visible,
-				hasGlobeOverlay: ctx.globeLandNationBorders !== null,
-				hasMapOverlay: ctx.mapLandNationBorders !== null,
-			})
-		) {
-			rebuildNationBorders()
-			return
-		}
-		deps.updateOverlayVisibility()
-	}
-
 	function setSelectedProvince(provinceId: number | null) {
 		ctx.selectedProvince = provinceId ?? -1
 		rebuildSelectedProvinceBorder()
@@ -571,7 +487,6 @@ export function createNationBordersController(
 		setNationFillColorForRawId,
 		setNationOccupationStripeColorForRawId,
 		setNationBordersVisible,
-		setLandNationBordersVisible,
 		setSelectedProvince,
 	}
 }

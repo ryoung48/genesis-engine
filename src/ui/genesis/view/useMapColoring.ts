@@ -8,6 +8,7 @@ import type { FoldedState } from "@/model/history/earth/fold/types"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ORGANIZATION_CATEGORIES } from "@/model/history/earth/organization-categories"
 import type { OrgCategorizer } from "@/model/history/earth/organization-categories/types"
+import { RELIGION } from "@/model/society/religion"
 import type { OrgHighlightSpec } from "@/ui/genesis/renderer"
 import {
 	miseryColor,
@@ -427,8 +428,7 @@ export function useMapColoring(input: MapColoringInput) {
 			? (earthHistory.query.state.nations.get(owner) ?? null)
 			: null
 		const governmentLabel = nationState
-			? GOVERNMENT.formatEarthHistoryGovernmentLabel({
-					governmentType: nationState.governmentType,
+			? GOVERNMENT.formatEarthHistoryGovernmentReformLabel({
 					governmentReform: nationState.governmentReform,
 				})
 			: null
@@ -557,9 +557,88 @@ export function useMapColoring(input: MapColoringInput) {
 
 	const occupationStripeColorForRawId = useMemo<null>(() => null, [])
 
-	// Culture bleed stripes were driven by the sim's culture-spread event, which
-	// no longer exists, so there is no secondary culture to blend toward.
-	const cultureBlendOverlay: Float32Array | null = null
+	// Earth-imported worlds swap in the real historical culture/religion
+	// partitions and have no per-province blend data of their own. Procedural
+	// worlds carry a static border-bleed pass (computePartitionBorderBlend, run
+	// once at generation time in CULTURE.computeCultures / RELIGION.computeReligions)
+	// that approximates the old per-tick culture-spread simulation's visible
+	// stripes.
+	const cultureBlendOverlay = useMemo(() => {
+		if (worldForDisplay?.isEarthImport || !worldForDisplay?.provinces) {
+			return null
+		}
+		const { regionProvince, desolate } = worldForDisplay.provinces
+		const N = regionProvince.length
+
+		if (populationMode === "culture") {
+			if (!worldForDisplay.cultures?.blendSecondary) return null
+			const { colors, blendSecondary } = worldForDisplay.cultures
+			const overlay = new Float32Array(N * 4)
+			let hasAny = false
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0 || desolate[p]) continue
+				const secondary = blendSecondary[p]
+				if (secondary < 0) continue
+				const base = r * 4
+				overlay[base] = colors[3 * secondary]
+				overlay[base + 1] = colors[3 * secondary + 1]
+				overlay[base + 2] = colors[3 * secondary + 2]
+				overlay[base + 3] = 1
+				hasAny = true
+			}
+			return hasAny ? overlay : null
+		}
+
+		if (populationMode === "religion") {
+			const { cultures, religions, religionTypes } = worldForDisplay
+			if (!cultures?.blendSecondary || !religions || !religionTypes) {
+				return null
+			}
+			// Religion has no border-bleed pass of its own -- it rides the same
+			// province-level culture bleed (cultures.blendSecondary) and just
+			// looks up the bled-to culture's religion, so religion stripes
+			// appear on exactly the same provinces as culture stripes rather
+			// than bleeding over an entire (much coarser) religion region.
+			// Colored by religion TYPE (animistic, monotheistic, ...), matching
+			// the base religion fill -- not the individual religion's own color
+			// or the culture's color.
+			const overlay = new Float32Array(N * 4)
+			let hasAny = false
+			for (let r = 0; r < N; r++) {
+				const p = regionProvince[r]
+				if (p < 0 || desolate[p]) continue
+				const primaryCulture = cultures.assignment[p]
+				if (primaryCulture < 0) continue
+				const secondaryCulture = cultures.blendSecondary[p]
+				if (secondaryCulture < 0) continue
+				const secondaryReligion = religions.assignment[secondaryCulture]
+				if (secondaryReligion < 0) continue
+				const typeIdx = religionTypes[secondaryReligion]
+				// Skip the stripe when the bled-to culture practices the same
+				// religion type as the province's own culture -- nothing would be
+				// visually different from the base fill.
+				const primaryReligion = religions.assignment[primaryCulture]
+				if (
+					primaryReligion >= 0 &&
+					religionTypes[primaryReligion] === typeIdx
+				) {
+					continue
+				}
+				const typeColor =
+					RELIGION.religionTypeColors[typeIdx] ?? RELIGION.religionTypeColors[0]
+				const base = r * 4
+				overlay[base] = typeColor[0]
+				overlay[base + 1] = typeColor[1]
+				overlay[base + 2] = typeColor[2]
+				overlay[base + 3] = 1
+				hasAny = true
+			}
+			return hasAny ? overlay : null
+		}
+
+		return null
+	}, [worldForDisplay, populationMode])
 	const earthHistorySceneNationOverride = usePlaybackSampledValue(
 		worldForDisplay?.isEarthImport && earthHistory.query
 			? {

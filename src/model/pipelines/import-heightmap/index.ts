@@ -523,6 +523,7 @@ function importGenesisWorld({
 		t0 = performance.now()
 		REAL_EARTH_DATA.attachObservedEarthHumidity({
 			mesh,
+			isLand,
 			world: post,
 		})
 		record("Observed Earth humidity sampling", t0)
@@ -599,6 +600,7 @@ function importGenesisWorld({
 		dtr_annual: post.dtr_annual,
 		dtr_monthly: post.dtr_monthly,
 		observedCloudCover: post.observedCloudCover,
+		observedHydrology: post.observedHydrology,
 		observedDtr: post.observedDtr,
 		observedHumidity: post.observedHumidity,
 		observedWind: post.observedWind,

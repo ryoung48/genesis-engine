@@ -78,7 +78,6 @@ export interface GenesisScene {
 			names: string[]
 		} | null,
 	): void
-	setLandNationBordersVisible(visible: boolean): void
 	/** Pass null to clear the highlight (e.g. no org wiki page open). */
 	setOrganizationHighlight(spec: OrgHighlightSpec | null): void
 	setViewMode(mode: GenesisViewMode): void
@@ -345,25 +344,6 @@ export interface CollectNationBorderMapPositionsParams {
 	centerLongitudeDeg: number
 	projectionLatitudeDeg: number
 	zBoost: number
-}
-
-export interface BuildLandNationBordersGlobeParams {
-	world: SerializedGenesisWorld
-	viewMode: GenesisViewMode
-	visible: boolean
-	elevationVisible: boolean
-	resolution: [number, number]
-	opts?: { color?: number; lineWidth?: number; opacity?: number }
-}
-
-export interface BuildLandNationBordersMapParams {
-	world: SerializedGenesisWorld
-	centerLongitudeDeg: number
-	projectionLatitudeDeg: number
-	viewMode: GenesisViewMode
-	visible: boolean
-	resolution: [number, number]
-	opts?: { color?: number; lineWidth?: number; opacity?: number }
 }
 
 export interface CollectProvinceBorderMapPositionsParams {

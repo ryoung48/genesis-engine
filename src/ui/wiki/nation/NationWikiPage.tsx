@@ -78,7 +78,6 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 			<Surface tone="panelMuted" radius="xl" className="px-3 py-3">
 				<WikiPageHeader
 					title={nation.title}
-					action={<GpsFocusButton onClick={nation.onFocusNation} />}
 					meta={
 						<>
 							<Swatch color={nation.color} />
@@ -92,6 +91,7 @@ export function NationWikiPage({ nation }: { nation: NationWikiData }) {
 							</InlineTextButton>
 						</>
 					}
+					metaAction={<GpsFocusButton onClick={nation.onFocusNation} />}
 				/>
 				<div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
 					{renderStatGrid(nation.stats)}

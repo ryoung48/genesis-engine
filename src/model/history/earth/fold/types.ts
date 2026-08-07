@@ -17,6 +17,14 @@ export interface FoldedProvinceState {
 	 * EU4 province history's `hre` field (base/dated changes tracked the same
 	 * way as owner/culture/religion). */
 	isHre: boolean
+	/** EU4 base tax/production/manpower development values. Unlike
+	 * owner/culture/religion these have no `base` field -- the source data
+	 * anchors them as dated events at EU4_COVERAGE_START_DATE instead (see
+	 * PROVINCE_SETTLEMENT_EVENT_KINDS in build-eu4-history-events.py), so they
+	 * default to 0 until the first such event is folded in. */
+	baseTax: number
+	baseProduction: number
+	baseManpower: number
 }
 
 export interface FoldedNationState {

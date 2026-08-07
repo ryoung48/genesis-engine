@@ -216,6 +216,7 @@ function serializeWorld(
 		dtr_annual: world.dtr_annual,
 		dtr_monthly: world.dtr_monthly,
 		observedCloudCover: world.observedCloudCover,
+		observedHydrology: world.observedHydrology,
 		hydrology: world.hydrology
 			? { aet_monthly: world.hydrology.aet_monthly }
 			: undefined,
@@ -257,11 +258,13 @@ function partitionBuffers(p: {
 	adjList: Int32Array
 	size: Int32Array
 	colors: Float32Array
+	blendSecondary?: Int32Array
+	blendWeight?: Float32Array
 }): Transferable[] {
 	const languageSeeds = p.languageSeeds ?? new Int32Array(0)
 	const nameSeeds = p.nameSeeds ?? new Int32Array(0)
 	const genderSystems = p.genderSystems ?? new Uint8Array(0)
-	return [
+	const buffers = [
 		p.assignment.buffer as ArrayBuffer,
 		p.seeds.buffer as ArrayBuffer,
 		languageSeeds.buffer as ArrayBuffer,
@@ -272,6 +275,9 @@ function partitionBuffers(p: {
 		p.size.buffer as ArrayBuffer,
 		p.colors.buffer as ArrayBuffer,
 	]
+	if (p.blendSecondary) buffers.push(p.blendSecondary.buffer as ArrayBuffer)
+	if (p.blendWeight) buffers.push(p.blendWeight.buffer as ArrayBuffer)
+	return buffers
 }
 
 function nationBuffers(n: {
@@ -450,6 +456,10 @@ function buildTransferList(world: SerializedGenesisWorld): Transferable[] {
 		add(world.observedCloudCover.real_monthly.buffer)
 	if (world.observedCloudCover?.real_annual)
 		add(world.observedCloudCover.real_annual.buffer)
+	if (world.observedHydrology?.aet_monthly)
+		add(world.observedHydrology.aet_monthly.buffer)
+	if (world.observedHydrology?.pet_monthly)
+		add(world.observedHydrology.pet_monthly.buffer)
 	if (world.observedDtr?.real_monthly)
 		add(world.observedDtr.real_monthly.buffer)
 	if (world.observedDtr?.real_annual) add(world.observedDtr.real_annual.buffer)

@@ -27,7 +27,19 @@ export function buildSettlementLabelNames(
 	world: SerializedGenesisWorld | null,
 	resolvers: LabelNameResolvers | null,
 ): string[] | null {
-	if (!world?.settlementRegions || !world.urbanPopulation || !resolvers)
+	// Earth-import worlds skip the procedural urbanization pipeline entirely
+	// (see derive-province-society.ts), so world.urbanPopulation is undefined
+	// there -- real names/population instead come from the real GHSL
+	// settlement slice (realSettlement), keyed by the same compact province
+	// index. Its lon/lat (also on realSettlement) is what lets
+	// buildGlobeSettlementLabels/buildMapSettlementLabels place these at the
+	// settlement's real coordinate instead of the procedural seed region.
+	const realNames = world?.realSettlement?.names
+	if (
+		!world?.settlementRegions ||
+		(!world.urbanPopulation && !realNames) ||
+		!resolvers
+	)
 		return null
 	const { townMin } = SETTLEMENT_TUNING.getSettlementEraTuning(
 		world.params?.era,
@@ -35,8 +47,15 @@ export function buildSettlementLabelNames(
 	const provinceCount = world.provinces?.count ?? world.settlementRegions.length
 	const names: string[] = new Array(provinceCount)
 	for (let p = 0; p < provinceCount; p++) {
+		const realName = realNames?.[p]
+		if (realName) {
+			// GenesisView applies the Earth-import eligibility rule before this
+			// list is built: real name AND (population OR (nation capital AND city)).
+			names[p] = realName
+			continue
+		}
 		const settlementRegion = world.settlementRegions[p] ?? -1
-		const pop = world.urbanPopulation[p] ?? 0
+		const pop = world.urbanPopulation?.[p] ?? 0
 		names[p] =
 			settlementRegion >= 0 && pop >= townMin ? resolvers.province(p) : ""
 	}

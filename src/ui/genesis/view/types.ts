@@ -296,7 +296,6 @@ export type GenesisSceneSyncInput = {
 	setDraftMapProjectionLatitude: (latitude: number) => void
 	exportCenterLongitude: number
 	showNationBorders: boolean
-	showLandBorders: boolean
 	showNationHierarchy: boolean
 	showWireframe: boolean
 	showCoastlines: boolean

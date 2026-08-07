@@ -2,6 +2,8 @@ import type { SampleMonthlyFloatRasterParams } from "@/model/climate/observed-ea
 import type { SphereMesh } from "@/model/mesh/types"
 import type { GenesisWorld } from "@/model/pipelines/types"
 
+const REAL_DTR_FLOOR_C = 6
+
 function sampleMonthlyFloatRaster({
 	mesh,
 	raster,
@@ -292,6 +294,15 @@ function attachObservedEarthDtr(params: {
 		scale: realDtrScale,
 		nodata: realDtrNoData,
 	})
+	// Coastal/small-island mesh cells can sample this raster's ocean fallback
+	// (NCEP reanalysis, ~1-3C diurnal range) instead of land, which collapses
+	// the day/night swing enough to misclassify mild-winter Mediterranean-type
+	// land as frost-free "tropical" downstream in pasta climate. Floor at a
+	// plausible land minimum here, at the source, so every consumer of
+	// observedDtr (pasta, humidity, UI) sees the corrected value.
+	for (let i = 0; i < observedMonthly.length; i++)
+		if (observedMonthly[i] < REAL_DTR_FLOOR_C)
+			observedMonthly[i] = REAL_DTR_FLOOR_C
 	const observedAnnual = new Float32Array(N)
 	const diffMonthly = new Float32Array(N * realDtrMonths)
 	const diffAnnual = new Float32Array(N)

@@ -120,6 +120,11 @@ export interface GenesisWorld {
 		real_monthly: Float32Array
 		real_annual: Float32Array
 	}
+	/** [JUSTIFICATION] Derived only while importing Earth from observed temperature, rainfall, and DTR rasters. */
+	observedHydrology?: {
+		aet_monthly: Float32Array
+		pet_monthly: Float32Array
+	}
 	/** Distance from nearest ocean cell in km (land cells only, 0 for ocean) */
 	oceanDist: Float32Array
 	rainfall: GenesisRainfall

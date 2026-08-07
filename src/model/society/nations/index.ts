@@ -84,6 +84,7 @@ function computeNations(params: ComputeNationsParams): GenesisNationHierarchy {
 			blocked,
 			habitability,
 			waterAccess,
+			migrationWave: params.migrationWave,
 			provinceContinent,
 			componentId: components.componentId,
 			componentSizes: components.sizes,

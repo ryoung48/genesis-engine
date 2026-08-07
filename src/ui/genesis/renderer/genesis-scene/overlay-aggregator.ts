@@ -47,8 +47,6 @@ export function createOverlayAggregatorController(
 		disposeGroup(ctx.scene, ctx.mapSolarTerminator)
 		disposeObject3D(ctx.globeGroup, ctx.globeNationBorders)
 		disposeObject3D(ctx.scene, ctx.mapNationBorders)
-		disposeObject3D(ctx.globeGroup, ctx.globeLandNationBorders)
-		disposeObject3D(ctx.scene, ctx.mapLandNationBorders)
 		disposeObject3D(ctx.globeGroup, ctx.globeNationFill)
 		disposeObject3D(ctx.scene, ctx.mapNationFill)
 		disposeObject3D(ctx.globeGroup, ctx.globeOccupationStripes)
@@ -78,8 +76,6 @@ export function createOverlayAggregatorController(
 		ctx.mapSolarTerminator = null
 		ctx.globeNationBorders = null
 		ctx.mapNationBorders = null
-		ctx.globeLandNationBorders = null
-		ctx.mapLandNationBorders = null
 		ctx.globeNationFill = null
 		ctx.mapNationFill = null
 		ctx.globeNationFillRadius = null
@@ -87,7 +83,6 @@ export function createOverlayAggregatorController(
 		ctx.globeOccupationStripes = null
 		ctx.mapOccupationStripes = null
 		ctx.nationBorderMaterials = []
-		ctx.landNationBorderMaterials = []
 		ctx.pulseGlobe = null
 		ctx.pulseMap = null
 		ctx.pulse = null

@@ -88,4 +88,4 @@ b5ushj
 claude --resume b4f38b78-14c8-47dc-bcc4-d62e7b281103
 codex resume 019f8775-0271-7a70-8d80-a58fe1d0b10b
 
-claude --resume 85ce9e51-822c-4dab-a683-e33c504c68f3 --dangerously-skip-permissions
+claude --resume 5ca7876a-0acf-4bb3-a61f-019a5cb5223a --dangerously-skip-permissions

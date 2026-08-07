@@ -22,9 +22,8 @@ import { DangerSection } from "./DangerSection"
 import { ElevationModeSection } from "./ElevationModeSection"
 import { GeographySection } from "./GeographySection"
 import { GridSection } from "./GridSection"
-import { LabelsSection } from "./LabelsSection"
 import { MeasureSection } from "./MeasureSection"
-import { PoliticalSection } from "./PoliticalSection"
+import { SocietySection } from "./SocietySection"
 import { TopographyModeSection } from "./TopographyModeSection"
 import type { OverlayControlsProps } from "./types"
 import { VegetationModeSection } from "./VegetationModeSection"
@@ -75,8 +74,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	setShowGrid,
 	showNationBorders,
 	setShowNationBorders,
-	showLandBorders,
-	setShowLandBorders,
 	showNationHierarchy,
 	setShowNationHierarchy,
 	nationMode,
@@ -151,9 +148,8 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 	isEarthImport = false,
 }) => {
 	const [gridSpacingExpanded, setGridSpacingExpanded] = React.useState(false)
-	const [politicalExpanded, setPoliticalExpanded] = React.useState(false)
+	const [societyExpanded, setSocietyExpanded] = React.useState(false)
 	const [geographyExpanded, setGeographyExpanded] = React.useState(false)
-	const [labelsExpanded, setLabelsExpanded] = React.useState(false)
 	const [clockExpanded, setClockExpanded] = React.useState(false)
 	const [vegetationExpanded, setVegetationExpanded] = React.useState(false)
 	const [climateExpanded, setClimateExpanded] = React.useState(false)
@@ -329,8 +325,6 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setShowElevation={setShowElevation}
 									showRivers={showRivers}
 									setShowRivers={setShowRivers}
-									showInfrastructure={showInfrastructure}
-									setShowInfrastructure={setShowInfrastructure}
 									showWindArrows={showWindArrows}
 									setShowWindArrows={setShowWindArrows}
 									isEarthImport={isEarthImport}
@@ -345,25 +339,21 @@ export const OverlayControls: React.FC<OverlayControlsProps> = ({
 									setDataVariant={setDataVariant}
 								/>
 
-								<PoliticalSection
-									politicalExpanded={politicalExpanded}
-									setPoliticalExpanded={setPoliticalExpanded}
+								<SocietySection
+									societyExpanded={societyExpanded}
+									setSocietyExpanded={setSocietyExpanded}
 									showNationHierarchy={showNationHierarchy}
 									setShowNationHierarchy={setShowNationHierarchy}
-									showLandBorders={showLandBorders}
-									setShowLandBorders={setShowLandBorders}
 									showNationBorders={showNationBorders}
 									setShowNationBorders={setShowNationBorders}
-								/>
-
-								<LabelsSection
-									labelsExpanded={labelsExpanded}
-									setLabelsExpanded={setLabelsExpanded}
+									showInfrastructure={showInfrastructure}
+									setShowInfrastructure={setShowInfrastructure}
 									colorMode={colorMode}
 									populationMode={populationMode}
 									nationMode={nationMode}
 									labelMode={labelMode}
 									setLabelMode={setLabelMode}
+									isEarthImport={isEarthImport}
 								/>
 
 								<ClimateToggleSection

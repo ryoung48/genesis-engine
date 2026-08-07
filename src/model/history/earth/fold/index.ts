@@ -61,6 +61,9 @@ function foldProvince({
 				religionId: entry.base.religion ?? null,
 				cores: new Set(entry.base.cores),
 				isHre: false,
+				baseTax: 0,
+				baseProduction: 0,
+				baseManpower: 0,
 			}
 	for (const e of entry.events) {
 		if (e.date <= fromTime || e.date > toTime) continue
@@ -87,6 +90,15 @@ function foldProvince({
 				break
 			case "hre":
 				state.isHre = e.payload.member as boolean
+				break
+			case "baseTax":
+				state.baseTax = e.payload.value as number
+				break
+			case "baseProduction":
+				state.baseProduction = e.payload.value as number
+				break
+			case "baseManpower":
+				state.baseManpower = e.payload.value as number
 				break
 		}
 	}

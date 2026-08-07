@@ -1,6 +1,5 @@
 import { disposeGroup } from "@/ui/genesis/renderer/disposal"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
-import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
 import {
 	buildGlobeRealSettlements,
 	buildGlobeSettlements,
@@ -48,7 +47,6 @@ export function createSettlementsController(
 		})
 		if (ctx.globeSettlements) ctx.globeGroup.add(ctx.globeSettlements)
 		if (ctx.mapSettlements) {
-			addMapSlideClones(ctx.mapSettlements)
 			if (ctx.mapMesh) ctx.mapSettlements.position.copy(ctx.mapMesh.position)
 			ctx.scene.add(ctx.mapSettlements)
 		}
@@ -90,7 +88,6 @@ export function createSettlementsController(
 		})
 		if (ctx.globeEu4Settlements) ctx.globeGroup.add(ctx.globeEu4Settlements)
 		if (ctx.mapEu4Settlements) {
-			addMapSlideClones(ctx.mapEu4Settlements)
 			if (ctx.mapMesh) ctx.mapEu4Settlements.position.copy(ctx.mapMesh.position)
 			ctx.scene.add(ctx.mapEu4Settlements)
 		}

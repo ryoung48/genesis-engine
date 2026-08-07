@@ -9,7 +9,7 @@ const GLOBE_CLOUD_RADIUS = 1.035
 export const DEFAULT_AMBIENT_INTENSITY = 0.55
 export const DEFAULT_SUN_INTENSITY = 2.8
 export const DEFAULT_WATER_SPECULAR = 0x5f8fb5
-export const DEFAULT_CONTROLS_MIN_DISTANCE = 1.2
+export const DEFAULT_CONTROLS_MIN_DISTANCE = 1.03
 export const DEFAULT_CONTROLS_MAX_DISTANCE = 12
 // The camera's far clipping plane is fixed at construction time (see
 // `camera.far` below), but the solar-system view's camera distance scales
@@ -76,7 +76,7 @@ export function buildGenesisSceneSetup(
 	mapControls.screenSpacePanning = true
 	mapControls.enableZoom = true
 	mapControls.minZoom = 0.5
-	mapControls.maxZoom = 20
+	mapControls.maxZoom = 60
 	mapControls.zoomToCursor = true
 	mapControls.enabled = false
 
@@ -338,10 +338,6 @@ export function buildGenesisSceneSetup(
 		globeSelectedProvinceBorder: null,
 		mapSelectedProvinceBorder: null,
 		nationBordersVisible: false,
-		globeLandNationBorders: null,
-		mapLandNationBorders: null,
-		landNationBordersVisible: false,
-		landNationBorderMaterials: [],
 		selectedProvince: -1,
 		focusTween: null,
 		pulseGlobe: null,

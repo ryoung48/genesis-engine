@@ -23,6 +23,7 @@ import gzip
 import json
 import re
 import struct
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
@@ -33,6 +34,7 @@ from shapely.geometry import shape
 from shapely.strtree import STRtree
 
 _LABEL_YEAR_RE = re.compile(r"^(-?\d+)-\d{2}-\d{2} ")
+_INVERTED_ARABIC_ARTICLE_RE = re.compile(r"^(.+), Al-$", re.IGNORECASE)
 
 DEFAULT_SOURCE = Path(
     r"C:\Users\rayou\Downloads\metro_adjusted_rasters_and_json\stadester_ghsl.json"
@@ -45,6 +47,28 @@ DEFAULT_OUTPUT_DIR = Path("public/earth-data")
 DEFAULT_PREFIX = "eu4-ghsl-settlements"
 DEFAULT_SCALE = 2000.0
 HOLD_FLAT_AFTER_YEAR = 1950
+SINGAPORE_ESTIMATED_POPULATION = {
+    "1300": 1_000,
+    "1400": 2_000,
+    "1500": 3_000,
+    "1600": 5_000,
+    "1700": 5_000,
+    "1800": 1_000,
+    "1819": 1_000,
+    "1830": 20_000,
+    "1840": 30_000,
+    "1850": 50_000,
+    "1860": 80_000,
+    "1870": 100_000,
+}
+VIETNAM_NAME_FIXES = {
+    "?i?n Bi�n Ph?": "Dien Bien Phu", "H?i D??ng": "Hai Duong",
+    "H?i Ph�ng": "Hai Phong", "??ng H?i": "Dong Hoi",
+    "?? N?ng": "Da Nang", "Hu?": "Hue", "C?n Th?": "Can Tho",
+    "Thành Pho Ho' Chí Minh": "Ho Chi Minh City", "Ha noi": "Hanoi",
+    "Ph� Y�n": "Phu Yen", "Th�i Nguy�n": "Thai Nguyen",
+    "V?nh Y�n": "Vinh Yen", "Thanh Ho�": "Thanh Hoa",
+}
 INT16_NODATA = -32768
 NO_PROVINCE_ID = -1
 
@@ -60,9 +84,108 @@ def clean_settlement_name(entry: dict) -> str:
         filtered.append(part)
         seen.add(part)
     if filtered:
-        return filtered[0]
+        return normalize_settlement_name(filtered[0])
     fallback = str(entry.get("key") or "").strip()
-    return "" if fallback == "0" else fallback
+    return "" if fallback == "0" else normalize_settlement_name(fallback)
+
+
+def normalize_settlement_name(name: str) -> str:
+    """Convert source-only inverted Arabic articles into display order."""
+    match = _INVERTED_ARABIC_ARTICLE_RE.match(name)
+    display_name = f"Al-{match.group(1)}" if match else name
+    ascii_name = unicodedata.normalize("NFKD", display_name).encode("ascii", "ignore").decode()
+    return ascii_name or display_name
+
+
+def normalize_vietnamese_name(name: str) -> str:
+    fixed = VIETNAM_NAME_FIXES.get(name, name)
+    return unicodedata.normalize("NFKD", fixed).encode("ascii", "ignore").decode()
+
+
+def normalize_name(value: str) -> str:
+    ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
+    return " ".join(ascii_value.casefold().split())
+
+
+def population_with_interventions(entry: dict) -> dict[str, float]:
+    """Apply narrow, documented estimates where the source has a known gap."""
+    population = dict(entry["population"])
+    if entry.get("sourceKey") == "stadester-Singapore-Singapore":
+        population.update(SINGAPORE_ESTIMATED_POPULATION)
+    return population
+
+
+def agglomeration_group_key(entry: dict) -> str:
+    """Return an identity shared only by alternate estimates of one metro.
+
+    ``is_agglomeration_of`` is source metadata, unlike the display name: it
+    explicitly tells us that borough- and city-labelled records are estimates
+    of the same agglomeration. Country is included because agglomeration names
+    such as London are not globally unique.
+    """
+    agglomeration = entry.get("is_agglomeration_of")
+    if not agglomeration:
+        return f"settlement:{entry.get('key', '')}"
+    country = entry.get("country") or entry.get("country+") or ""
+    return f"agglomeration:{normalize_name(str(agglomeration))}:{normalize_name(str(country))}"
+
+
+def consolidate_agglomerations(
+    entries: list[tuple[dict, str, float, float, np.ndarray]],
+) -> list[tuple[str, float, float, np.ndarray]]:
+    """Collapse competing agglomeration estimates without double counting.
+
+    A source group can contain both a city-centre record and borough-labelled
+    records that already estimate the whole metro. Summing them would count
+    the same people multiple times. Instead, use the canonical city's location
+    and name, and retain the largest available estimate at each time point.
+    This also fills a stale or zeroed source series from another estimate in
+    the same explicitly declared agglomeration.
+    """
+    explicit_agglomerations: list[tuple[str, str, str]] = []
+    for entry, name, _, _, _ in entries:
+        agglomeration = entry.get("is_agglomeration_of")
+        if not agglomeration:
+            continue
+        country = str(entry.get("country") or entry.get("country+") or "")
+        explicit_agglomerations.append(
+            (
+                normalize_name(str(agglomeration)),
+                country,
+                agglomeration_group_key(entry),
+            )
+        )
+
+    grouped: dict[str, list[tuple[dict, str, float, float, np.ndarray]]] = defaultdict(list)
+    for entry in entries:
+        source, name, _, _, _ = entry
+        group_key = agglomeration_group_key(source)
+        source_key = str(source.get("sourceKey") or "")
+        if not source.get("is_agglomeration_of"):
+            matching_groups = {
+                candidate_key
+                for agglomeration, country, candidate_key in explicit_agglomerations
+                if agglomeration == normalize_name(name)
+                and source_key.endswith(f"-{country}")
+            }
+            if len(matching_groups) == 1:
+                group_key = next(iter(matching_groups))
+        grouped[group_key].append(entry)
+
+    consolidated: list[tuple[str, float, float, np.ndarray]] = []
+    for group in grouped.values():
+        canonical = min(
+            group,
+            key=lambda item: (
+                normalize_name(item[1])
+                != normalize_name(str(item[0].get("is_agglomeration_of") or item[1])),
+                not bool(item[0].get("is_agglomeration_of")),
+                item[1],
+            ),
+        )
+        population = np.maximum.reduce([item[4] for item in group])
+        consolidated.append((canonical[1], canonical[2], canonical[3], population))
+    return consolidated
 
 
 def load_target_years(population_asset_path: Path) -> list[int]:
@@ -188,30 +311,39 @@ def build_assets(
         data = json.load(f)
     print(f"loaded {len(data)} settlements")
 
-    names: list[str] = []
-    lats: list[float] = []
-    lons: list[float] = []
-    rows: list[np.ndarray] = []
+    entries: list[tuple[dict, str, float, float, np.ndarray]] = []
 
     skipped = 0
-    for entry in data.values():
+    for source_key, source_entry in data.items():
+        entry = {**source_entry, "sourceKey": source_key}
         coords = entry.get("coords")
         population_by_year = entry.get("population")
         if not coords or len(coords) != 2 or not population_by_year:
             skipped += 1
             continue
         lat, lon = coords
-        resampled = resample_settlement(population_by_year, target_years)
+        resampled = resample_settlement(
+            population_with_interventions(entry), target_years
+        )
         if not np.any(resampled > 0):
             skipped += 1
             continue
-        names.append(clean_settlement_name(entry))
-        lats.append(lat)
-        lons.append(lon)
-        rows.append(resampled)
+        name = clean_settlement_name(entry)
+        if str(entry.get("sourceKey") or "").endswith("-Vietnam"):
+            name = normalize_vietnamese_name(name)
+        entries.append((entry, name, lat, lon, resampled))
+
+    consolidated = consolidate_agglomerations(entries)
+    names = [name for name, _, _, _ in consolidated]
+    lats = [lat for _, lat, _, _ in consolidated]
+    lons = [lon for _, _, lon, _ in consolidated]
+    rows = [population for _, _, _, population in consolidated]
 
     settlement_count = len(names)
-    print(f"kept {settlement_count} settlements, skipped {skipped}")
+    print(
+        f"kept {settlement_count} consolidated settlements from {len(entries)} "
+        f"source records, skipped {skipped}"
+    )
 
     print("assigning settlements to provinces ...")
     province_ids = assign_provinces(lats, lons, province_geojson)
@@ -262,6 +394,14 @@ def build_assets(
         "maxRepresentablePopulation": int(np.iinfo(np.int16).max * scale),
         "maxObservedPopulation": global_max_population,
         "clippedValues": clipped_values,
+        "agglomerationConsolidation": {
+            "kind": "source_is_agglomeration_of_pointwise_max",
+            "sourceRecordCount": len(entries),
+            "settlementCount": settlement_count,
+        },
+		"populationInterventions": {
+			"Singapore": "estimated 1819-1870; interpolates to source observations",
+		},
         "source": str(source_path),
         "populationAsset": str(population_asset_path),
         "recordLayout": "population: int16[timeCount][settlementCount] time-major, "

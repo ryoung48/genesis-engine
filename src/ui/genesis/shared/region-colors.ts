@@ -362,10 +362,23 @@ export function computeRegionColors(
 		return rgb
 	}
 
+	const cloudAetMonthly =
+		world.observedHydrology?.aet_monthly ?? world.hydrology?.aet_monthly
+	const cloudPetMonthly =
+		world.observedHydrology?.pet_monthly ?? world.climate?.pet_monthly
+	const cloudRainfallMonthly =
+		world.rainfall?.real_monthly ?? world.rainfall?.monthly
+	const cloudDtrMonthly = world.observedDtr?.real_monthly ?? world.dtr_monthly
+	const cloudTemperatureMonthly =
+		world.climate?.real_temperature_monthly ??
+		world.climate?.temperature_monthly
 	if (
 		colorMode === "cloudCover" &&
-		world.climate?.pet_monthly &&
-		world.hydrology?.aet_monthly
+		cloudAetMonthly &&
+		cloudPetMonthly &&
+		cloudRainfallMonthly &&
+		cloudDtrMonthly &&
+		cloudTemperatureMonthly
 	) {
 		const monthlyOffset = rainfallMonth > 0 ? (rainfallMonth - 1) * N : 0
 		for (let r = 0; r < N; r++) {
@@ -380,16 +393,24 @@ export function computeRegionColors(
 			if (rainfallMonth === 0) {
 				for (let month = 0; month < 12; month++) {
 					const idx = month * N + r
-					cloudFraction += CLOUD_COVER.fromAetPet({
-						aetMm: world.hydrology.aet_monthly[idx],
-						petMm: world.climate.pet_monthly[idx],
+					cloudFraction += CLOUD_COVER.estimate({
+						aetMm: cloudAetMonthly[idx],
+						petMm: cloudPetMonthly[idx],
+						rainfallMm: cloudRainfallMonthly[idx],
+						dtrC: cloudDtrMonthly[idx],
+						temperatureC: cloudTemperatureMonthly[idx],
+						oceanDistanceKm: world.oceanDist[r],
 					})
 				}
 				cloudFraction /= 12
 			} else {
-				cloudFraction = CLOUD_COVER.fromAetPet({
-					aetMm: world.hydrology.aet_monthly[monthlyOffset + r],
-					petMm: world.climate.pet_monthly[monthlyOffset + r],
+				cloudFraction = CLOUD_COVER.estimate({
+					aetMm: cloudAetMonthly[monthlyOffset + r],
+					petMm: cloudPetMonthly[monthlyOffset + r],
+					rainfallMm: cloudRainfallMonthly[monthlyOffset + r],
+					dtrC: cloudDtrMonthly[monthlyOffset + r],
+					temperatureC: cloudTemperatureMonthly[monthlyOffset + r],
+					oceanDistanceKm: world.oceanDist[r],
 				})
 			}
 			const [cr, cg, cb] = cloudCoverColor(cloudFraction)

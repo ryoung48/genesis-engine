@@ -73,6 +73,12 @@ STEPS: list[tuple[str, str, list[str]]] = [
             "{geojson}",
         ],
     ),
+    ("GHSL historical names", "inject-settlement-name-history.py", []),
+    (
+        "EU4 province settlements",
+        "build-eu4-province-settlements.py",
+        ["--province-geojson", "{geojson}"],
+    ),
 ]
 
 

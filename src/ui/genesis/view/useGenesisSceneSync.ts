@@ -24,7 +24,6 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 		setDraftMapProjectionLatitude,
 		exportCenterLongitude,
 		showNationBorders,
-		showLandBorders,
 		showNationHierarchy,
 		showWireframe,
 		showCoastlines,
@@ -49,10 +48,6 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 	useEffect(() => {
 		sceneRef.current?.setNationBordersVisible(showNationBorders)
 	}, [showNationBorders])
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	useEffect(() => {
-		sceneRef.current?.setLandNationBordersVisible(showLandBorders)
-	}, [showLandBorders])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
 		const scene = sceneRef.current
@@ -159,9 +154,14 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 				eu4GhslSettlements,
 				earthHistory.selectedDays,
 			)
-			const indices = population
-				? topSettlementIndices(population, eu4GhslSettlements.provinceIds)
-				: []
+			const realSettlement = worldForDisplay?.realSettlement
+			const indices = realSettlement
+				? realSettlement.names.flatMap((name, provinceIndex) =>
+						name ? [provinceIndex] : [],
+					)
+				: population
+					? topSettlementIndices(population, eu4GhslSettlements.provinceIds)
+					: []
 			// worldForDisplay.nations.seeds is stale procedural-world data --
 			// buildDisplayWorld overrides assignment/sovereign/colors/etc for
 			// earth-history playback but never seeds (display-model.ts), and
@@ -182,10 +182,12 @@ export function useGenesisSceneSync(input: GenesisSceneSyncInput) {
 				}
 			}
 			scene.setEu4Settlements(
-				eu4GhslSettlements.lats,
-				eu4GhslSettlements.lons,
-				population,
-				eu4GhslSettlements.provinceIds,
+				realSettlement?.lats ?? eu4GhslSettlements.lats,
+				realSettlement?.lons ?? eu4GhslSettlements.lons,
+				realSettlement?.population ?? population,
+				realSettlement
+					? Int32Array.from(worldForDisplay?.provinces.realIds ?? [])
+					: eu4GhslSettlements.provinceIds,
 				capitalProvinceIds,
 				indices,
 			)

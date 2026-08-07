@@ -29,7 +29,6 @@ export function createExportController(
 	function syncMapExportObjectPositions() {
 		const mapObjects = [
 			ctx.mapWireframe,
-			ctx.mapLandNationBorders,
 			ctx.mapNationBorders,
 			ctx.mapSelectedProvinceBorder,
 			ctx.mapGrid,
@@ -66,7 +65,6 @@ export function createExportController(
 			{ object: ctx.globeGrid, visible: false },
 			{ object: ctx.globeThermalEquator, visible: false },
 			{ object: ctx.globeRivers, visible: false },
-			{ object: ctx.globeLandNationBorders, visible: false },
 			{ object: ctx.globeNationBorders, visible: false },
 			{ object: ctx.globeSelectedProvinceBorder, visible: false },
 			{ object: ctx.globeMeasureLine, visible: false },
@@ -93,10 +91,6 @@ export function createExportController(
 				visible: ctx.solarTerminatorVisible,
 			},
 			{ object: ctx.mapRivers, visible: ctx.riversVisible },
-			{
-				object: ctx.mapLandNationBorders,
-				visible: ctx.landNationBordersVisible,
-			},
 			{
 				object: ctx.mapNationBorders,
 				visible: ctx.nationBordersVisible,

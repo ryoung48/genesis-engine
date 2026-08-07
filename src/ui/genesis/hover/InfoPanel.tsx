@@ -469,6 +469,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 		>
 			<div ref={hoverCardRef} className="space-y-0.5">
 				{hoverCoordinates && <Row label="Coords" value={hoverCoordinates} />}
+				{hoverRegion !== null && (
+					<Row label="Region" value={`${hoverRegion}`} />
+				)}
 				{showGeography && (
 					<>
 						{world?.isEarthImport && earthHistoryHoverOverride ? (
@@ -694,7 +697,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						)}
 						{colorMode === "cloudCover" && hoverCloudCover && (
 							<Row
-								label="Modeled Cloud"
+								label="Cloud Cover"
 								value={`${(hoverCloudCover.value * 100).toFixed(0)}%`}
 							/>
 						)}
@@ -710,7 +713,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 						)}
 						{colorMode === "realCloudCover" && hoverRealCloudCover && (
 							<Row
-								label="Observed Cloud"
+								label="Observed Clouds"
 								value={`${(hoverRealCloudCover.value * 100).toFixed(0)}%`}
 							/>
 						)}
@@ -911,7 +914,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 							<SeriesBars
 								values={hoverCloudCover.monthly}
 								labels={MONTH_SHORT}
-								label="Modeled Cloud"
+								label="Cloud Cover"
 								colorForValue={(value) => rgbToCss(cloudCoverColor(value))}
 								activeIndex={activeBarIndex}
 								summary={buildSummary(hoverCloudCover.annual, {

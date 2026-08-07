@@ -17,7 +17,6 @@ const TERRAIN_ELEVATION_SCALE = 0.04
 const GLOBE_Z_LIFT = 0.009
 const MAP_Z_LIFT = 0.012
 const MAP_Z_ELEVATION_FACTOR = 0.5
-const MAP_SEAM_THRESHOLD = 2
 const SEA_ROUTE_DASH_STYLE = {
 	dashSize: 0.006,
 	gapSize: 0.004,
@@ -331,14 +330,37 @@ function appendBatchedLines(
 	}
 }
 
-function splitMapPoints(points: THREE.Vector3[]): THREE.Vector3[][] {
+// Corridors that cross the antimeridian relative to the current view
+// project to a huge jump in map-space x. Rather than dropping the
+// crossing edge (which is fine for coastline polygons but leaves real
+// connectivity data like trade routes visibly disconnected), each
+// crossing edge is split and extended to the map's left/right border --
+// the slide clones added by addMapSlideClones() then make the route
+// appear to continue seamlessly off one edge and back in on the other.
+function splitMapPoints(
+	points: THREE.Vector3[],
+	halfWidth: number,
+	repeatWidth: number,
+): THREE.Vector3[][] {
 	if (points.length < 2) return points.length === 0 ? [] : [points]
 	const segments: THREE.Vector3[][] = [[points[0]]]
 	for (let i = 1; i < points.length; i++) {
 		const current = points[i]
 		const previous = points[i - 1]
-		if (Math.abs(current.x - previous.x) > MAP_SEAM_THRESHOLD) {
-			segments.push([current])
+		if (Math.abs(current.x - previous.x) > halfWidth) {
+			const sign = Math.sign(previous.x) || 1
+			const unwrappedCurrentX = current.x - sign * repeatWidth
+			const edgeX = sign * halfWidth
+			const denom = unwrappedCurrentX - previous.x
+			const t = THREE.MathUtils.clamp(
+				denom !== 0 ? (edgeX - previous.x) / denom : 0,
+				0,
+				1,
+			)
+			const y = THREE.MathUtils.lerp(previous.y, current.y, t)
+			const z = THREE.MathUtils.lerp(previous.z, current.z, t)
+			segments[segments.length - 1].push(new THREE.Vector3(edgeX, y, z))
+			segments.push([new THREE.Vector3(-edgeX, y, z), current])
 			continue
 		}
 		segments[segments.length - 1].push(current)
@@ -394,7 +416,11 @@ export function buildMapTradeRoutes(
 		const points = corridor.regions.map((region) =>
 			regionPositionMap(projection, world.mesh.r_xyz, world.elevation, region),
 		)
-		for (const segment of splitMapPoints(points)) {
+		for (const segment of splitMapPoints(
+			points,
+			projection.halfWidth,
+			projection.repeatWidth,
+		)) {
 			appendPolylineSegments(batchedPositions[corridor.kind], segment)
 		}
 	}

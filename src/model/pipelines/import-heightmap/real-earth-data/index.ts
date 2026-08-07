@@ -25,18 +25,19 @@ import type { GenesisWorld } from "@/model/pipelines/types"
 // real climatology" rather than a second, less trustworthy data source.
 function attachObservedEarthHumidity(params: {
 	mesh: SphereMesh
+	isLand: Uint8Array
 	world: {
 		climate: GenesisWorld["climate"]
 		rainfall?: GenesisWorld["rainfall"]
 		oceanDist?: GenesisWorld["oceanDist"]
 		dtr_monthly?: GenesisWorld["dtr_monthly"]
 		observedDtr?: GenesisWorld["observedDtr"]
+		observedHydrology?: GenesisWorld["observedHydrology"]
 		observedHumidity?: GenesisWorld["observedHumidity"]
-		isLand?: GenesisWorld["isLand"]
 		params?: GenesisWorld["params"]
 	}
 }): void {
-	const { mesh, world } = params
+	const { mesh, isLand, world } = params
 	const realTempMonthly = world.climate.real_temperature_monthly
 	if (!realTempMonthly) return
 
@@ -46,22 +47,25 @@ function attachObservedEarthHumidity(params: {
 	// (assignEarthPastaClimate) via HYDROLOGY.computeObservedAridity, so both
 	// agree on "how wet is this cell, really" instead of maintaining two
 	// separate real-data water-balance computations.
-	const observed = world.isLand
-		? HYDROLOGY.computeObservedAridity({
-				isLand: world.isLand,
-				realTemperatureMonthly: realTempMonthly,
-				modeledTemperatureMonthly: world.climate.temperature_monthly,
-				realDtrMonthly: world.observedDtr?.real_monthly,
-				modeledDtrMonthly: world.dtr_monthly ?? new Float32Array(12 * N),
-				realRainfallMonthly: world.rainfall?.real_monthly,
-				modeledRainfallMonthly:
-					world.rainfall?.monthly ?? new Float32Array(12 * N),
-				insolationMonthly: world.climate.insolation_monthly,
-				dpm: (world.params?.daysPerYear ?? 365) / 12,
-			})
-		: undefined
+	const observed = HYDROLOGY.computeObservedAridity({
+		isLand,
+		realTemperatureMonthly: realTempMonthly,
+		modeledTemperatureMonthly: world.climate.temperature_monthly,
+		realDtrMonthly: world.observedDtr?.real_monthly,
+		modeledDtrMonthly: world.dtr_monthly ?? new Float32Array(12 * N),
+		realRainfallMonthly: world.rainfall?.real_monthly,
+		modeledRainfallMonthly: world.rainfall?.monthly ?? new Float32Array(12 * N),
+		insolationMonthly: world.climate.insolation_monthly,
+		dpm: (world.params?.daysPerYear ?? 365) / 12,
+	})
 	const observedAet = observed?.aet_monthly
 	const observedPet = observed?.pet_monthly
+	if (observedAet && observedPet) {
+		world.observedHydrology = {
+			aet_monthly: observedAet,
+			pet_monthly: observedPet,
+		}
+	}
 
 	const observedMonthly = new Float32Array(12 * N)
 	const observedAnnual = new Float32Array(N)

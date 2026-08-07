@@ -19,8 +19,8 @@ function buildRiverGroup(
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
 	const height = canvas.clientHeight || 1
-	const minWidth = 0.4
-	const maxWidth = 1.6
+	const minWidth = 0.25
+	const maxWidth = 1.0
 	const binStep = 0.05
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)
@@ -193,8 +193,8 @@ export function buildMapRivers(
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
 	const height = canvas.clientHeight || 1
-	const minWidth = 0.4
-	const maxWidth = 1.6
+	const minWidth = 0.25
+	const maxWidth = 1.0
 	const binStep = 0.05
 	const logMin = Math.log(1 + rivers.minFlow)
 	const logMax = Math.log(1 + rivers.maxFlow)

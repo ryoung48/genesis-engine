@@ -8,28 +8,42 @@ import type {
 	BuildMapSettlementsParams,
 } from "@/ui/genesis/renderer/types"
 
-const TERRAIN_ELEVATION_SCALE = 0.04
-const SETTLEMENT_LIFT = 0.005
-const MAP_Z_LIFT = 0.005
-const MAP_Z_ELEVATION_FACTOR = 0.5
-const SETTLEMENT_GLOBE_SCALE_MULTIPLIER = 0.75
-const SETTLEMENT_MAP_RADIUS_MULTIPLIER = 0.5
-
-// ── Tier definitions ─────────────────────────────────────────────────────────
-
-interface SettlementTier {
-	minPop: number
-	maxPop: number
-	label: string
-	/** Canvas texture factory */
-	buildTexture: (isCapital: boolean) => THREE.CanvasTexture
-	/** Min/max sprite scale for globe mode (interpolated by urbanPop) */
-	minGlobeScale: number
-	maxGlobeScale: number
-	/** Min/max circle radius for map mode (interpolated by urbanPop) */
-	minMapRadius: number
-	maxMapRadius: number
+/** Stable id for a procedural settlement, shared between its marker (here)
+ * and its label (settlement-labels.ts) so marker-driven culling (see
+ * settlement-marker-collision.ts) can find its matching label. Keyed by
+ * compact province index `p`, since procedural settlements are built one
+ * per province in that same loop on both the marker and label side. Not
+ * the province id itself: today there's exactly one settlement per
+ * province, but if that ever changes, only this function's implementation
+ * needs to change, not every marker/label builder that calls it. */
+export function settlementId(p: number): string {
+	return `p${p}`
 }
+
+/** Stable id for a real-Earth-import (GHSL) settlement -- same purpose as
+ * settlementId() above, but keyed by the raw GHSL settlement array index
+ * (see BuildGlobeRealSettlementsParams.indices) instead of a compact
+ * province index, since that's the index space
+ * buildGlobeRealSettlements/buildMapRealSettlements actually iterate over.
+ * Distinct prefix from settlementId() so the two index spaces (both
+ * small integers starting at 0) can't collide in a shared visibility map. */
+export function ghslSettlementId(i: number): string {
+	return `g${i}`
+}
+
+const TERRAIN_ELEVATION_SCALE = 0.04
+export const SETTLEMENT_LIFT = 0.005
+export const MAP_Z_LIFT = 0.005
+const MAP_Z_ELEVATION_FACTOR = 0.5
+
+// Fixed marker footprint -- no population-based size variance. Population
+// still gates whether a settlement is rendered at all (see
+// settlementExists), just not how big its dot is. Capitals get a fixed
+// bump over ordinary settlements (see CAPITAL_SCALE_MULTIPLIER) so they
+// stand out a little on top of their distinct ring+dot pattern.
+const GLOBE_MARKER_SCALE = 0.003
+const MAP_MARKER_RADIUS = 0.001
+export const CAPITAL_SCALE_MULTIPLIER = 1.35
 
 function makeCanvasTexture(
 	size: number,
@@ -48,21 +62,10 @@ function makeCanvasTexture(
 }
 
 // Styling constants
-const RING_COLOR = "#1e293b"
-const RING_WIDTH_RATIO = 0.06 // fraction of canvas size
-const CROSS_COLOR = "#1e293b"
-const CROSS_WIDTH_RATIO = 0.045
+const OUTLINE_COLOR = "#000000"
+const OUTLINE_WIDTH_RATIO = 0.08 // fraction of canvas size
 const FILL_COLOR = "#ffffff"
-const SOLID_BLACK = "#0f172a"
-const CAPITAL_FILL_COLOR = "#dc2626"
-
-interface SettlementVisualStyle {
-	fillColor: string
-}
-
-function getSettlementVisualStyle(isCapital: boolean): SettlementVisualStyle {
-	return { fillColor: isCapital ? CAPITAL_FILL_COLOR : FILL_COLOR }
-}
+const CAPITAL_DOT_COLOR = "#000000"
 
 function drawRing(
 	ctx: CanvasRenderingContext2D,
@@ -79,25 +82,6 @@ function drawRing(
 	ctx.stroke()
 }
 
-function drawCross(
-	ctx: CanvasRenderingContext2D,
-	cx: number,
-	cy: number,
-	size: number,
-	lineWidth: number,
-	color: string,
-) {
-	ctx.strokeStyle = color
-	ctx.lineWidth = lineWidth
-	ctx.lineCap = "round"
-	ctx.beginPath()
-	ctx.moveTo(cx - size, cy)
-	ctx.lineTo(cx + size, cy)
-	ctx.moveTo(cx, cy - size)
-	ctx.lineTo(cx, cy + size)
-	ctx.stroke()
-}
-
 function drawFilledCircle(
 	ctx: CanvasRenderingContext2D,
 	cx: number,
@@ -111,126 +95,41 @@ function drawFilledCircle(
 	ctx.fill()
 }
 
-const TIER_VISUALS = [
-	{
-		minGlobeScale: 0.0025,
-		maxGlobeScale: 0.005,
-		minMapRadius: 0.0008,
-		maxMapRadius: 0.0017,
-		buildTexture: (isCapital) =>
-			makeCanvasTexture(128, (ctx, w) => {
-				const style = getSettlementVisualStyle(isCapital)
-				const cx = w / 2
-				const cy = w / 2
-				const r = w * 0.4
-				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
-				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
-			}),
-	},
-	{
-		minGlobeScale: 0.005,
-		maxGlobeScale: 0.0065,
-		minMapRadius: 0.0017,
-		maxMapRadius: 0.0022,
-		buildTexture: (isCapital) =>
-			makeCanvasTexture(128, (ctx, w) => {
-				const style = getSettlementVisualStyle(isCapital)
-				const cx = w / 2
-				const cy = w / 2
-				const r = w * 0.42
-				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
-				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
-			}),
-	},
-	{
-		minGlobeScale: 0.0055,
-		maxGlobeScale: 0.0075,
-		minMapRadius: 0.0018,
-		maxMapRadius: 0.0027,
-		buildTexture: (isCapital) =>
-			makeCanvasTexture(128, (ctx, w) => {
-				const style = getSettlementVisualStyle(isCapital)
-				const cx = w / 2
-				const cy = w / 2
-				const r = w * 0.38
-				drawFilledCircle(ctx, cx, cy, r, style.fillColor)
-				drawRing(ctx, cx, cy, r, w * RING_WIDTH_RATIO, RING_COLOR)
-				drawCross(ctx, cx, cy, r * 0.55, w * CROSS_WIDTH_RATIO, CROSS_COLOR)
-			}),
-	},
-	{
-		minGlobeScale: 0.007,
-		maxGlobeScale: 0.01,
-		minMapRadius: 0.0024,
-		maxMapRadius: 0.0033,
-		buildTexture: (isCapital) =>
-			makeCanvasTexture(128, (ctx, w) => {
-				const style = getSettlementVisualStyle(isCapital)
-				const cx = w / 2
-				const cy = w / 2
-				const outerR = w * 0.42
-				const innerR = w * 0.35
-				const lw = w * RING_WIDTH_RATIO
-				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
-				drawRing(ctx, cx, cy, outerR, lw * 0.5, RING_COLOR)
-				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
-			}),
-	},
-	{
-		minGlobeScale: 0.009,
-		maxGlobeScale: 0.012,
-		minMapRadius: 0.003,
-		maxMapRadius: 0.004,
-		buildTexture: (isCapital) =>
-			makeCanvasTexture(128, (ctx, w) => {
-				const style = getSettlementVisualStyle(isCapital)
-				const cx = w / 2
-				const cy = w / 2
-				const outerR = w * 0.42
-				const innerR = w * 0.35
-				const lw = w * RING_WIDTH_RATIO
-				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
-				drawRing(ctx, cx, cy, outerR, lw * 0.5, RING_COLOR)
-				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
-				drawCross(ctx, cx, cy, innerR * 0.6, w * CROSS_WIDTH_RATIO, CROSS_COLOR)
-			}),
-	},
-	{
-		minGlobeScale: 0.011,
-		maxGlobeScale: 0.018,
-		minMapRadius: 0.004,
-		maxMapRadius: 0.0065,
-		buildTexture: (isCapital) =>
-			makeCanvasTexture(128, (ctx, w) => {
-				const style = getSettlementVisualStyle(isCapital)
-				const cx = w / 2
-				const cy = w / 2
-				const outerR = w * 0.42
-				const innerR = w * 0.35
-				const lw = w * RING_WIDTH_RATIO
-				drawFilledCircle(ctx, cx, cy, outerR, style.fillColor)
-				drawRing(ctx, cx, cy, outerR, lw * 0.5, RING_COLOR)
-				drawFilledCircle(ctx, cx, cy, innerR, SOLID_BLACK)
-				drawRing(ctx, cx, cy, innerR, lw * 0.5, RING_COLOR)
-			}),
-	},
-] as const satisfies ReadonlyArray<
-	Omit<SettlementTier, "minPop" | "maxPop" | "label">
->
+// Two fixed patterns: a plain white circle for ordinary settlements, and a
+// black dot inside a black-outlined circle for capitals -- see
+// GenesisView.tsx's/nation seeds' capitalProvinceIds for how "capital" is
+// determined. Built once and reused by every marker (globe, map, procedural,
+// and EU4-import alike).
+let _normalTexture: THREE.CanvasTexture | undefined
+let _capitalTexture: THREE.CanvasTexture | undefined
 
-function settlementTiers(world: SerializedGenesisWorld): SettlementTier[] {
-	const thresholds = SETTLEMENT_TUNING.getSettlementRenderThresholds(
-		world.params?.era,
-	)
-	return TIER_VISUALS.map((visual, index) => ({
-		...visual,
-		minPop: thresholds[index],
-		maxPop: thresholds[index + 1] ?? Infinity,
-		label:
-			thresholds[index + 1] === undefined
-				? `>${thresholds[index].toLocaleString()}`
-				: `${thresholds[index].toLocaleString()}-${thresholds[index + 1].toLocaleString()}`,
-	}))
+function normalTexture(): THREE.CanvasTexture {
+	if (!_normalTexture) {
+		_normalTexture = makeCanvasTexture(128, (ctx, w) => {
+			const cx = w / 2
+			const cy = w / 2
+			drawFilledCircle(ctx, cx, cy, w * 0.42, FILL_COLOR)
+			drawRing(ctx, cx, cy, w * 0.42, w * OUTLINE_WIDTH_RATIO, OUTLINE_COLOR)
+		})
+	}
+	return _normalTexture
+}
+
+function capitalTexture(): THREE.CanvasTexture {
+	if (!_capitalTexture) {
+		_capitalTexture = makeCanvasTexture(128, (ctx, w) => {
+			const cx = w / 2
+			const cy = w / 2
+			drawFilledCircle(ctx, cx, cy, w * 0.42, FILL_COLOR)
+			drawRing(ctx, cx, cy, w * 0.42, w * OUTLINE_WIDTH_RATIO, OUTLINE_COLOR)
+			drawFilledCircle(ctx, cx, cy, w * 0.16, CAPITAL_DOT_COLOR)
+		})
+	}
+	return _capitalTexture
+}
+
+function textureFor(isCapital: boolean): THREE.CanvasTexture {
+	return isCapital ? capitalTexture() : normalTexture()
 }
 
 function collectCapitalProvinces(
@@ -247,57 +146,29 @@ function collectCapitalProvinces(
 	return capitals
 }
 
-function getTierIndex(urbanPop: number, tiers: SettlementTier[]): number {
-	for (let t = 0; t < tiers.length; t++) {
-		if (urbanPop >= tiers[t].minPop && urbanPop < tiers[t].maxPop) return t
-	}
-	if (urbanPop >= tiers[tiers.length - 1]!.minPop) return tiers.length - 1
-	return -1
-}
-
-/** Fraction [0, 1] of where `pop` sits within its tier's range (log scale). */
-function tierFraction(pop: number, tier: SettlementTier): number {
-	const lo = Math.log10(Math.max(1, tier.minPop))
-	const hi = Math.log10(
-		Number.isFinite(tier.maxPop) ? tier.maxPop : tier.minPop * 100,
-	)
-	const v = Math.log10(Math.max(1, pop))
-	const range = hi - lo || 1
-	return Math.max(0, Math.min(1, (v - lo) / range))
+/** Minimum population for a settlement to be rendered at all -- the lowest
+ * of SETTLEMENT_TUNING's era-scaled render thresholds. Existence only:
+ * doesn't affect marker size, which is fixed (GLOBE_MARKER_SCALE/
+ * MAP_MARKER_RADIUS). */
+function settlementExists(
+	pop: number,
+	era: SerializedGenesisWorld["params"]["era"] | undefined,
+): boolean {
+	return pop >= SETTLEMENT_TUNING.getSettlementRenderThresholds(era)[0]
 }
 
 export function globeScaleForPop(
-	pop: number,
-	era: SerializedGenesisWorld["params"]["era"] | undefined = "lateMedieval",
+	_pop: number,
+	_era?: SerializedGenesisWorld["params"]["era"],
 ): number {
-	const tiers = settlementTiers({
-		params: { era },
-	} as SerializedGenesisWorld)
-	const t = getTierIndex(pop, tiers)
-	if (t < 0) return 0
-	const tier = tiers[t]
-	const f = tierFraction(pop, tier)
-	return (
-		(tier.minGlobeScale + (tier.maxGlobeScale - tier.minGlobeScale) * f) *
-		SETTLEMENT_GLOBE_SCALE_MULTIPLIER
-	)
+	return GLOBE_MARKER_SCALE
 }
 
 export function mapRadiusForPop(
-	pop: number,
-	era: SerializedGenesisWorld["params"]["era"] | undefined = "lateMedieval",
+	_pop: number,
+	_era?: SerializedGenesisWorld["params"]["era"],
 ): number {
-	const tiers = settlementTiers({
-		params: { era },
-	} as SerializedGenesisWorld)
-	const t = getTierIndex(pop, tiers)
-	if (t < 0) return 0
-	const tier = tiers[t]
-	const f = tierFraction(pop, tier)
-	return (
-		(tier.minMapRadius + (tier.maxMapRadius - tier.minMapRadius) * f) *
-		SETTLEMENT_MAP_RADIUS_MULTIPLIER
-	)
+	return MAP_MARKER_RADIUS
 }
 
 // ── Globe settlements ───────────────────────────────────────────────────────
@@ -337,21 +208,13 @@ export function buildGlobeSettlements(
 
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
-	const tiers = settlementTiers(world)
-
-	// Pre-build textures per tier
-	const tierTextures = tiers.map((tier) => ({
-		normal: tier.buildTexture(false),
-		capital: tier.buildTexture(true),
-	}))
 	const capitalProvinces = collectCapitalProvinces(world, locations.length)
 
 	for (let p = 0; p < locations.length; p++) {
 		const r = locations[p]
 		if (r < 0) continue
 		const pop = urbanPop[p] ?? 0
-		const t = getTierIndex(pop, tiers)
-		if (t < 0) continue
+		if (!settlementExists(pop, world.params?.era)) continue
 
 		const [px, py, pz] = settlementPositionGlobe(
 			r_xyz,
@@ -359,23 +222,26 @@ export function buildGlobeSettlements(
 			r,
 			elevationVisible,
 		)
-		const scale = globeScaleForPop(pop, world.params?.era)
 		const isCapital = capitalProvinces.has(p)
 
 		const spriteMat = new THREE.SpriteMaterial({
-			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
+			map: textureFor(isCapital),
 			depthWrite: false,
 			transparent: true,
 		})
-		spriteMat.userData = {
-			fillColor: isCapital ? CAPITAL_FILL_COLOR : FILL_COLOR,
-			isCapital,
-		}
+		spriteMat.userData = { isCapital }
 		const sprite = new THREE.Sprite(spriteMat)
 		sprite.position.set(px, py, pz)
-		sprite.scale.setScalar(scale)
+		sprite.scale.setScalar(
+			GLOBE_MARKER_SCALE * (isCapital ? CAPITAL_SCALE_MULTIPLIER : 1),
+		)
 		sprite.renderOrder = 998
-		sprite.userData = { isCapital, province: p }
+		sprite.userData = {
+			isCapital,
+			province: p,
+			settlementPop: pop,
+			settlementId: settlementId(p),
+		}
 		group.add(sprite)
 	}
 
@@ -421,42 +287,47 @@ export function buildMapSettlements({
 	)
 	const { r_xyz } = world.mesh
 	const elevation = world.elevation
-	const tiers = settlementTiers(world)
-
-	// Pre-build textures per tier
-	const tierTextures = tiers.map((tier) => ({
-		normal: tier.buildTexture(false),
-		capital: tier.buildTexture(true),
-	}))
 	const capitalProvinces = collectCapitalProvinces(world, locations.length)
+	// Wrap-around copies are built as flat siblings here (matching
+	// buildMapSettlementLabels' wrapOffsets), NOT via addMapSlideClones --
+	// that helper deep-clones the whole group as a single child subtree,
+	// which breaks applySettlementMarkerCollisionCulling: it only inspects
+	// direct group.children, so a cloned subtree gets treated (and
+	// shown/hidden) as one giant marker instead of its individual dots.
+	const wrapOffsets = [-projection.repeatWidth, 0, projection.repeatWidth]
 
 	for (let p = 0; p < locations.length; p++) {
 		const r = locations[p]
 		if (r < 0) continue
 		const pop = urbanPop[p] ?? 0
-		const t = getTierIndex(pop, tiers)
-		if (t < 0) continue
+		if (!settlementExists(pop, world.params?.era)) continue
 
 		const [px, py, pz] = settlementPositionMap(projection, r_xyz, elevation, r)
-		const radius = mapRadiusForPop(pop, world.params?.era)
 		const isCapital = capitalProvinces.has(p)
+		const radius =
+			MAP_MARKER_RADIUS * (isCapital ? CAPITAL_SCALE_MULTIPLIER : 1)
 
-		const circleGeo = new THREE.CircleGeometry(radius, 16)
-		const mat = new THREE.MeshBasicMaterial({
-			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
-			depthWrite: false,
-			transparent: true,
-			side: THREE.DoubleSide,
-		})
-		mat.userData = {
-			fillColor: isCapital ? CAPITAL_FILL_COLOR : FILL_COLOR,
-			isCapital,
+		for (const wrapOffset of wrapOffsets) {
+			const circleGeo = new THREE.CircleGeometry(radius, 16)
+			const mat = new THREE.MeshBasicMaterial({
+				map: textureFor(isCapital),
+				depthWrite: false,
+				transparent: true,
+				side: THREE.DoubleSide,
+			})
+			mat.userData = { isCapital }
+			const circle = new THREE.Mesh(circleGeo, mat)
+			circle.position.set(px + wrapOffset, py, pz)
+			circle.renderOrder = 998
+			circle.userData = {
+				isCapital,
+				province: p,
+				settlementPop: pop,
+				settlementId: settlementId(p),
+				baseRadius: radius,
+			}
+			group.add(circle)
 		}
-		const circle = new THREE.Mesh(circleGeo, mat)
-		circle.position.set(px, py, pz)
-		circle.renderOrder = 998
-		circle.userData = { isCapital, province: p }
-		group.add(circle)
 	}
 
 	return group
@@ -468,18 +339,10 @@ export function buildMapSettlements({
 // styling reuses world.nations.seeds the same way the procedural overlay's
 // collectCapitalProvinces does -- see GenesisView.tsx's capitalProvinceIds
 // (raw EU4 ids, not compact indices, since these settlements are matched to
-// provinces by raw id). Reuses the same tier textures as the procedural
-// overlay for a consistent look. ───────────────────────────────────────────
+// provinces by raw id). Reuses the same fixed-pattern textures as the
+// procedural overlay for a consistent look. ────────────────────────────────
 
-const DEFAULT_ERA: SerializedGenesisWorld["params"]["era"] = "lateMedieval"
-
-function realSettlementTiers(): SettlementTier[] {
-	return settlementTiers({
-		params: { era: DEFAULT_ERA },
-	} as SerializedGenesisWorld)
-}
-
-function lonLatToUnitXyz(
+export function lonLatToUnitXyz(
 	lonDeg: number,
 	latDeg: number,
 ): [number, number, number] {
@@ -498,32 +361,31 @@ export function buildGlobeRealSettlements({
 	indices,
 }: BuildGlobeRealSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
-	const tiers = realSettlementTiers()
-	const tierTextures = tiers.map((tier) => ({
-		normal: tier.buildTexture(false),
-		capital: tier.buildTexture(true),
-	}))
 
 	for (const i of indices) {
 		const pop = populations[i]
-		const t = getTierIndex(pop, tiers)
-		if (t < 0) continue
 
 		const isCapital = capitalProvinceIds.has(provinceIds[i])
 		const [nx, ny, nz] = lonLatToUnitXyz(lons[i], lats[i])
 		const radius = 1 + SETTLEMENT_LIFT
-		const scale = globeScaleForPop(pop, DEFAULT_ERA)
 
 		const spriteMat = new THREE.SpriteMaterial({
-			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
+			map: textureFor(isCapital),
 			depthWrite: false,
 			transparent: true,
 		})
 		const sprite = new THREE.Sprite(spriteMat)
 		sprite.position.set(nx * radius, ny * radius, nz * radius)
-		sprite.scale.setScalar(scale)
+		sprite.scale.setScalar(
+			GLOBE_MARKER_SCALE * (isCapital ? CAPITAL_SCALE_MULTIPLIER : 1),
+		)
 		sprite.renderOrder = 998
-		sprite.userData = { settlement: i, isCapital }
+		sprite.userData = {
+			settlement: i,
+			isCapital,
+			settlementPop: pop,
+			settlementId: ghslSettlementId(i),
+		}
 		group.add(sprite)
 	}
 
@@ -541,37 +403,42 @@ export function buildMapRealSettlements({
 	projectionLatitudeDeg,
 }: BuildMapRealSettlementsParams): THREE.Group {
 	const group = new THREE.Group()
-	const tiers = realSettlementTiers()
-	const tierTextures = tiers.map((tier) => ({
-		normal: tier.buildTexture(false),
-		capital: tier.buildTexture(true),
-	}))
 	const projection = createMapProjection(
 		centerLongitudeDeg,
 		projectionLatitudeDeg,
 	)
+	// See buildMapSettlements' comment: flat wrap-offset siblings, not
+	// addMapSlideClones, so collision culling can see each dot individually.
+	const wrapOffsets = [-projection.repeatWidth, 0, projection.repeatWidth]
 
 	for (const i of indices) {
 		const pop = populations[i]
-		const t = getTierIndex(pop, tiers)
-		if (t < 0) continue
 
 		const isCapital = capitalProvinceIds.has(provinceIds[i])
 		const [x, y, z] = projection.projectDegrees(lons[i], lats[i], MAP_Z_LIFT)
-		const radius = mapRadiusForPop(pop, DEFAULT_ERA)
+		const radius =
+			MAP_MARKER_RADIUS * (isCapital ? CAPITAL_SCALE_MULTIPLIER : 1)
 
-		const circleGeo = new THREE.CircleGeometry(radius, 16)
-		const mat = new THREE.MeshBasicMaterial({
-			map: isCapital ? tierTextures[t].capital : tierTextures[t].normal,
-			depthWrite: false,
-			transparent: true,
-			side: THREE.DoubleSide,
-		})
-		const circle = new THREE.Mesh(circleGeo, mat)
-		circle.position.set(x, y, z)
-		circle.renderOrder = 998
-		circle.userData = { settlement: i, isCapital }
-		group.add(circle)
+		for (const wrapOffset of wrapOffsets) {
+			const circleGeo = new THREE.CircleGeometry(radius, 16)
+			const mat = new THREE.MeshBasicMaterial({
+				map: textureFor(isCapital),
+				depthWrite: false,
+				transparent: true,
+				side: THREE.DoubleSide,
+			})
+			const circle = new THREE.Mesh(circleGeo, mat)
+			circle.position.set(x + wrapOffset, y, z)
+			circle.renderOrder = 998
+			circle.userData = {
+				settlement: i,
+				isCapital,
+				settlementPop: pop,
+				settlementId: ghslSettlementId(i),
+				baseRadius: radius,
+			}
+			group.add(circle)
+		}
 	}
 
 	return group

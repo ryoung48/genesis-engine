@@ -36,7 +36,8 @@ function computeDiurnalRange(args: {
 			const daylightWet = 1 - Math.E ** (-rain / 100)
 			const daylightAmp = 0.6 * (1 - 0.5 * daylightWet)
 			const daylightFactor = 1 - daylightAmp * (2 * dayFrac - 1) ** 2
-			dtr_monthly[idx] = 3 * relHours ** 0.55 * daylightFactor
+			const oceanVariability = 3 * relHours ** 0.55 * daylightFactor
+			dtr_monthly[idx] = 6 + oceanVariability
 		}
 	}
 
@@ -50,7 +51,7 @@ function computeDiurnalRange(args: {
 			const daylightWet = 1 - Math.E ** (-rain / 100)
 			const daylightAmp = 0.6 * (1 - 0.5 * daylightWet)
 			const daylightFactor = 1 - daylightAmp * (2 * dayFrac - 1) ** 2
-			const rainFactor = 4 + 12 * Math.E ** (-rain / 85)
+			const rainVariability = 12 * Math.E ** (-rain / 85)
 			const dayAlpha = 0.2 + 0.23 * Math.E ** (-rain / 90)
 			const dayFactor = relHours ** dayAlpha
 
@@ -58,7 +59,11 @@ function computeDiurnalRange(args: {
 			const landFactor = Math.min(1, 1 - Math.E ** (-distKm / 900))
 
 			dtr_monthly[idx] =
-				rainFactor * dayFactor * (1 + landFactor * landAlpha) * daylightFactor
+				6 +
+				rainVariability *
+					dayFactor *
+					(1 + landFactor * landAlpha) *
+					daylightFactor
 		}
 	}
 

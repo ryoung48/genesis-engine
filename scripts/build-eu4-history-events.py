@@ -404,6 +404,39 @@ event at EU4_COVERAGE_START_DATE instead, leaving `base` unclaimed
 (None) so earlier sources' own base/events are free to describe what
 happened before EU4's own coverage starts."""
 
+PROVINCE_SETTLEMENT_EVENT_KINDS = {
+    "capitalName",
+    "baseTax",
+    "baseProduction",
+    "baseManpower",
+    "citySize",
+    "centerOfTrade",
+    "isCity",
+    "fort",
+    "tradeGoods",
+}
+
+
+def _base_settlement_events(entries: list[tuple[str | None, object]]) -> list[dict]:
+    """Anchor raw EU4 settlement state at the source coverage start.
+
+    EU4 stores a province's initial city name, development, city flag, fort,
+    and trade-center tier outside dated blocks. Keeping those as events gives
+    the settlement layer one uniform dated representation without claiming
+    that the values apply before EU4's historical coverage.
+    """
+    events = []
+    for key, value in entries:
+        if key is None or is_date_key(key):
+            continue
+        converted = _province_history_payload(key, value)
+        if converted is None:
+            continue
+        kind, payload = converted
+        if kind in PROVINCE_SETTLEMENT_EVENT_KINDS:
+            events.append(_event(EU4_COVERAGE_START_DATE, kind, payload))
+    return events
+
 
 def convert_provinces(source: Path, province_names_topojson: Path | None = None) -> dict:
     names = (
@@ -445,7 +478,7 @@ def convert_provinces(source: Path, province_names_topojson: Path | None = None)
             "wasteland": province_id in wasteland_ids,
         }
 
-        events = []
+        events = _base_settlement_events(entries)
         if raw_base.get("owner"):
             events.append(
                 _event(EU4_COVERAGE_START_DATE, "owner", {"tag": raw_base["owner"]})
@@ -501,7 +534,11 @@ def convert_provinces(source: Path, province_names_topojson: Path | None = None)
                     events.append(_event(date, "hre", {"member": sub_value == "yes"}, comments))
                 else:
                     converted = _province_history_payload(sub_key, sub_value)
-                    if converted is not None and (comments or sub_key in {"revolt", "unrest", "tribal_owner"}):
+                    if converted is not None and (
+                        comments
+                        or sub_key in {"revolt", "unrest", "tribal_owner"}
+                        or converted[0] in PROVINCE_SETTLEMENT_EVENT_KINDS
+                    ):
                         kind, payload = converted
                         events.append(_event(date, kind, payload, comments))
                         if sub_key == "tribal_owner" and isinstance(sub_value, str):

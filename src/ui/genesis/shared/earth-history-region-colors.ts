@@ -7,7 +7,11 @@ import {
 	darkenPoliticalAtElevation,
 	darkenVegetationAtElevation,
 } from "@/ui/genesis/shared/color-helpers"
-import { type ColorMode, OCEAN_LIGHT_BLUE } from "@/ui/genesis/shared/colors"
+import {
+	type ColorMode,
+	developmentColor,
+	OCEAN_LIGHT_BLUE,
+} from "@/ui/genesis/shared/colors"
 import { getBaseMapMode } from "@/ui/genesis/shared/data-variant"
 import type {
 	NationMapMode,
@@ -51,8 +55,10 @@ function buildNationColorByTag(
  *
  * Returns null for any (colorMode, nationMode, populationMode) combination
  * this doesn't cover -- callers should fall back to computeRegionColors
- * (still correct for terrain/climate/density/development/etc, which aren't
- * part of this engine's scope). */
+ * (still correct for terrain/climate/density/etc, which aren't part of this
+ * engine's scope). Development IS covered here (unlike density/urban) since
+ * baseTax/baseProduction/baseManpower are folded per-date state, not a
+ * static world.development array. */
 export function computeEarthHistoryRegionColors(params: {
 	colorMode: string
 	nationMode: NationMapMode
@@ -106,6 +112,9 @@ export function computeEarthHistoryRegionColors(params: {
 	const isDemographic =
 		getBaseMapMode(colorMode as ColorMode) === "population" &&
 		(populationMode === "culture" || populationMode === "religion")
+	const isDevelopment =
+		getBaseMapMode(colorMode as ColorMode) === "population" &&
+		populationMode === "development"
 	// density/urban (any variant -- generated/observed/diff) has no
 	// per-region rendering path here: it falls through to the plain
 	// computeRegionColors in region-colors.ts, which reads world.population/
@@ -115,7 +124,7 @@ export function computeEarthHistoryRegionColors(params: {
 	// version of this function routed the generated variant through one, but
 	// that overlay was never implemented, which left the map solid gray for
 	// Model/Density on earth-import worlds.
-	if (!isPolitical && !isDemographic) return null
+	if (!isPolitical && !isDemographic && !isDevelopment) return null
 
 	const N = regionProvince.length
 	const rgb = new Float32Array(N * 3)
@@ -145,6 +154,18 @@ export function computeEarthHistoryRegionColors(params: {
 		}
 		return c
 	}
+
+	// Precomputed once over the (much smaller) province set rather than the
+	// region set below, same normalization approach region-colors.ts uses for
+	// the procedural world.development array.
+	let maxDevelopment = 0
+	if (isDevelopment) {
+		for (const ps of state.provinces.values()) {
+			const dev = ps.baseTax + ps.baseProduction + ps.baseManpower
+			if (dev > maxDevelopment) maxDevelopment = dev
+		}
+	}
+	const invDevelopmentMax = maxDevelopment > 0 ? 1 / maxDevelopment : 0
 
 	for (let r = 0; r < N; r++) {
 		const p = regionProvince[r]
@@ -212,6 +233,25 @@ export function computeEarthHistoryRegionColors(params: {
 				const color = nationColorByTag.get(owner) ?? colorFor(`nation:${owner}`)
 				write(r, darkenPoliticalAtElevation(color, elevationKm[r] ?? 0))
 			}
+			continue
+		}
+
+		if (isDevelopment) {
+			if (suppressFill || desolate[p]) {
+				write(
+					r,
+					darkenPoliticalAtElevation([0.35, 0.33, 0.32], elevationKm[r] ?? 0),
+				)
+				continue
+			}
+			const dev = ps ? ps.baseTax + ps.baseProduction + ps.baseManpower : 0
+			write(
+				r,
+				darkenVegetationAtElevation(
+					developmentColor(dev * invDevelopmentMax),
+					elevationKm[r] ?? 0,
+				),
+			)
 			continue
 		}
 

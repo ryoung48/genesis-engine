@@ -224,10 +224,6 @@ export interface GenesisContext {
 	globeSelectedProvinceBorder: THREE.Object3D | null
 	mapSelectedProvinceBorder: THREE.Object3D | null
 	nationBordersVisible: boolean
-	globeLandNationBorders: LineSegments2 | null
-	mapLandNationBorders: LineSegments2 | null
-	landNationBordersVisible: boolean
-	landNationBorderMaterials: LineMaterial[]
 	/** Interaction-controller state (not yet extracted) that
 	 * rebuildSelectedProvinceBorder reads. */
 	selectedProvince: number

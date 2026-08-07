@@ -48,8 +48,6 @@ export function createDisposeController(
 		disposeGroup(ctx.scene, ctx.mapSolarTerminator)
 		disposeObject3D(ctx.globeGroup, ctx.globeNationBorders)
 		disposeObject3D(ctx.scene, ctx.mapNationBorders)
-		disposeObject3D(ctx.globeGroup, ctx.globeLandNationBorders)
-		disposeObject3D(ctx.scene, ctx.mapLandNationBorders)
 		disposeObject3D(ctx.globeGroup, ctx.globeNationFill)
 		disposeObject3D(ctx.scene, ctx.mapNationFill)
 		disposeObject3D(ctx.globeGroup, ctx.globeOccupationStripes)

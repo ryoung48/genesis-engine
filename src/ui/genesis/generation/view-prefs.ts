@@ -31,7 +31,6 @@ export interface StoredViewPrefs {
 	showWireframe: boolean
 	showGrid: boolean
 	showNationBorders: boolean
-	showLandBorders: boolean
 	showNationHierarchy: boolean
 	labelMode: LabelMode
 	showElevation: boolean
@@ -151,7 +150,6 @@ export const DEFAULT_VIEW_PREFS: StoredViewPrefs = {
 	showWireframe: false,
 	showGrid: true,
 	showNationBorders: false,
-	showLandBorders: false,
 	showNationHierarchy: false,
 	labelMode: {
 		nations: false,
@@ -315,10 +313,6 @@ export function parseStoredViewPrefs(
 			showNationBorders: readBoolean(
 				parsed.showNationBorders,
 				DEFAULT_VIEW_PREFS.showNationBorders,
-			),
-			showLandBorders: readBoolean(
-				parsed.showLandBorders,
-				DEFAULT_VIEW_PREFS.showLandBorders,
 			),
 			showNationHierarchy: readBoolean(
 				parsed.showNationHierarchy,

@@ -105,9 +105,6 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showNationBorders, setShowNationBorders] = useState(
 		initialViewPrefs.showNationBorders,
 	)
-	const [showLandBorders, setShowLandBorders] = useState(
-		initialViewPrefs.showLandBorders,
-	)
 	const [showNationHierarchy, setShowNationHierarchy] = useState(
 		initialViewPrefs.showNationHierarchy,
 	)
@@ -145,6 +142,13 @@ export function useOverlayState(input: OverlayStateInput) {
 			}),
 		)
 	}, [nationMode, colorMode, populationMode, isEarthImport])
+	useEffect(() => {
+		setLabelMode((prev) =>
+			prev.settlements === showInfrastructure
+				? prev
+				: { ...prev, settlements: showInfrastructure },
+		)
+	}, [showInfrastructure])
 	const [showElevation, setShowElevation] = useState(
 		initialViewPrefs.showElevation,
 	)
@@ -217,7 +221,6 @@ export function useOverlayState(input: OverlayStateInput) {
 				showWireframe,
 				showGrid,
 				showNationBorders,
-				showLandBorders,
 				showNationHierarchy,
 				labelMode,
 				showElevation,
@@ -284,7 +287,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		showGrid,
 		showInfrastructure,
 		showNationBorders,
-		showLandBorders,
 		showNationHierarchy,
 		labelMode,
 		showElevation,
@@ -364,7 +366,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		setShowGint,
 		setShowGrid,
 		setShowInfrastructure,
-		setShowLandBorders,
 		setShowNationBorders,
 		setShowNationHierarchy,
 		setShowOceanCurrents,
@@ -393,7 +394,6 @@ export function useOverlayState(input: OverlayStateInput) {
 		showGint,
 		showGrid,
 		showInfrastructure,
-		showLandBorders,
 		showNationBorders,
 		showNationHierarchy,
 		showOceanCurrents,

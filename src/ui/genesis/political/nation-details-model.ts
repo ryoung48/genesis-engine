@@ -1,8 +1,15 @@
-﻿import { ERAS } from "@/model/society/eras"
+﻿import { VEGETATION } from "@/model/climate/vegetation"
+import { CLASSIFICATION } from "@/model/geography/terrain/classification"
+import { TEXT } from "@/model/shared/text"
+import { ERAS } from "@/model/society/eras"
 import { RELIGION } from "@/model/society/religion"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import type { DistributionBucket } from "@/ui/genesis/details/shared"
 import { GOVERNMENT_COLORS_CSS } from "@/ui/genesis/political/government-colors"
+import { climateZoneColor } from "@/ui/genesis/shared/colors/misc"
+import { vegetationColor } from "@/ui/genesis/shared/colors/vegetation"
+import { getTopographyColor } from "@/ui/genesis/shared/region-colors/palette"
+import { rgbToCss } from "@/ui/genesis/shared/ui-format"
 import type { DisplayNationModel } from "@/ui/genesis/view/display-model"
 
 interface NationDetailsData {
@@ -21,6 +28,9 @@ interface NationDetailsData {
 	cultureDistribution: DistributionBucket[]
 	heritageDistribution: DistributionBucket[]
 	religionDistribution: DistributionBucket[]
+	climateDistribution: DistributionBucket[]
+	vegetationDistribution: DistributionBucket[]
+	topographyDistribution: DistributionBucket[]
 }
 
 function colorFromPartition(
@@ -52,6 +62,45 @@ function buildPartitionDistribution(params: {
 			color: params.getColor(id),
 		}))
 		.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+}
+
+/** Tallies a per-region zone array (climate/vegetation/topography -- all
+ * indexed by mesh region, not province) over just the regions belonging to
+ * this nation's provinces, via provinces.regionProvince's region->province
+ * map. */
+function buildRegionZoneDistribution(params: {
+	memberProvinces: ReadonlySet<number>
+	regionProvince: Int32Array
+	values: ArrayLike<number> | undefined
+	getLabel: (zone: number) => string
+	getColor: (zone: number) => string
+	excludeZones?: ReadonlySet<number>
+}): DistributionBucket[] {
+	const {
+		memberProvinces,
+		regionProvince,
+		values,
+		getLabel,
+		getColor,
+		excludeZones,
+	} = params
+	const counts = new Map<number, number>()
+	if (values) {
+		for (let region = 0; region < regionProvince.length; region++) {
+			const province = regionProvince[region]
+			if (province < 0 || !memberProvinces.has(province)) continue
+			const zone = values[region]
+			if (zone == null || excludeZones?.has(zone)) continue
+			counts.set(zone, (counts.get(zone) ?? 0) + 1)
+		}
+	}
+	return Array.from(counts.entries())
+		.map(([zone, count]) => ({
+			label: getLabel(zone),
+			count,
+			color: getColor(zone),
+		}))
+		.sort((a, b) => b.count - a.count)
 }
 
 function getNationNeighborIds(params: {
@@ -121,6 +170,7 @@ export function buildSelectedNationDetails(params: {
 		memberProvinces.push(province)
 		totalPopulation += world.population?.population[province] ?? 0
 	}
+	const memberProvinceSet = new Set(memberProvinces)
 
 	const neighbors = getNationNeighborIds({
 		selectedNationId,
@@ -186,6 +236,41 @@ export function buildSelectedNationDetails(params: {
 					RELIGION.religionTypeColors[typeId] ?? RELIGION.religionTypeColors[0]
 				return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`
 			},
+		}),
+		climateDistribution: buildRegionZoneDistribution({
+			memberProvinces: memberProvinceSet,
+			regionProvince: world.provinces.regionProvince,
+			values: world.climateZones,
+			getLabel: (zone) =>
+				TEXT.titleCase(VEGETATION.climateLabels[zone] ?? `Climate #${zone}`),
+			getColor: (zone) => rgbToCss(climateZoneColor(zone)),
+			excludeZones: new Set([0]),
+		}),
+		vegetationDistribution: buildRegionZoneDistribution({
+			memberProvinces: memberProvinceSet,
+			regionProvince: world.provinces.regionProvince,
+			values: world.vegetation,
+			getLabel: (zone) =>
+				TEXT.titleCase(VEGETATION.biomeLabels[zone] ?? `Biome #${zone}`),
+			getColor: (zone) => rgbToCss(vegetationColor(zone)),
+			excludeZones: new Set([0]),
+		}),
+		topographyDistribution: buildRegionZoneDistribution({
+			memberProvinces: memberProvinceSet,
+			regionProvince: world.provinces.regionProvince,
+			values: world.topography,
+			getLabel: (zone) =>
+				TEXT.titleCase(
+					CLASSIFICATION.genesisTopographyLabels[zone] ?? `Topography #${zone}`,
+				),
+			getColor: (zone) => {
+				const color = getTopographyColor(zone)
+				return color ? rgbToCss(color) : "rgb(148, 163, 184)"
+			},
+			excludeZones: new Set([
+				CLASSIFICATION.topoLake,
+				CLASSIFICATION.topoOcean,
+			]),
 		}),
 	}
 }

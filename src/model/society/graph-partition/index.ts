@@ -77,10 +77,9 @@ function computeGraphPartition({
 		}
 	}
 
-	const count = seeds.length
 	const assignment = new Int32Array(nodeCount).fill(-1)
 	const queue: number[] = []
-	for (let i = 0; i < count; i++) {
+	for (let i = 0; i < seeds.length; i++) {
 		const seedNode = seeds[i]
 		assignment[seedNode] = i
 		queue.push(seedNode)
@@ -98,6 +97,32 @@ function computeGraphPartition({
 		}
 	}
 
+	// Active nodes still unreached here are in a connected component the
+	// seed walk above never entered at all (e.g. an island whose adjacency
+	// never touches any chosen seed's component) -- not just "far from a
+	// seed" but graph-disconnected from every one of them, so no amount of
+	// flood-fill from the existing seeds would ever reach them. Give each
+	// such component its own seed so these don't end up with assignment -1
+	// (population but no culture/religion/etc.).
+	for (let i = 0; i < activeCount; i++) {
+		const node = activeNodes[i]
+		if (assignment[node] >= 0) continue
+		const group = seeds.length
+		seeds.push(node)
+		assignment[node] = group
+		queue.push(node)
+		while (head < queue.length) {
+			const curr = queue[head++]
+			for (let j = adjOffset[curr], jEnd = adjOffset[curr + 1]; j < jEnd; j++) {
+				const nb = adjList[j]
+				if (!active[nb] || assignment[nb] >= 0) continue
+				assignment[nb] = group
+				queue.push(nb)
+			}
+		}
+	}
+
+	const count = seeds.length
 	const size = new Int32Array(count)
 	for (let i = 0; i < nodeCount; i++) {
 		const group = assignment[i]
@@ -149,12 +174,34 @@ function deriveChildColors(params: {
 	const { childCount, childToParent, parentColors, seed } = params
 	const colors = new Float32Array(childCount * 3)
 	const groups = new Map<number, number[]>()
+	const orphans: number[] = []
 	for (let i = 0; i < childCount; i++) {
 		const parent = childToParent[i]
-		if (parent < 0) continue
+		if (parent < 0) {
+			// No parent (e.g. a zero-size/inactive partition node the parent
+			// graph excluded) -- colors stays zero-initialized (black) unless
+			// given its own fallback color below, so these don't render as
+			// literal black on the map.
+			orphans.push(i)
+			continue
+		}
 		const siblings = groups.get(parent)
 		if (siblings) siblings.push(i)
 		else groups.set(parent, [i])
+	}
+	if (orphans.length > 0) {
+		const rng = RNG.createRng({ seed: seed + 7919 })
+		const goldenRatio = 0.618033988749895
+		let hue = rng.random()
+		for (const child of orphans) {
+			hue = (hue + goldenRatio) % 1
+			const sat = 0.45 + rng.random() * 0.3
+			const lit = 0.4 + rng.random() * 0.25
+			const [r, g, b] = hslToRgb({ h: hue * 360, s: sat, l: lit })
+			colors[3 * child] = r
+			colors[3 * child + 1] = g
+			colors[3 * child + 2] = b
+		}
 	}
 
 	for (const [parent, siblings] of groups) {

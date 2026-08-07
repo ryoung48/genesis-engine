@@ -408,6 +408,51 @@ export interface Eu4GhslSettlementAsset {
 	provinceIds: Int32Array
 }
 
+export interface Eu4ProvinceSettlementAsset {
+	settlements: Record<string, Eu4ProvinceSettlement>
+}
+
+export interface Eu4ProvinceSettlement {
+	ghslSettlementIndex: number | null
+	ghslPopulationCarrierIndices: number[]
+	longitude: number
+	latitude: number
+	events: Eu4ProvinceSettlementEvent[]
+	preEu4NameHistory: Eu4ProvinceSettlementNameHistory[]
+}
+
+export interface Eu4ProvinceSettlementNameHistory {
+	name: string
+	foundedYear: number
+	endYear: number | null
+	importance: number
+	ghslSettlementIndex: number
+	ghslPopulationCarrierIndices: number[]
+}
+
+export type Eu4ProvinceSettlementEvent =
+	| {
+			date: number
+			kind: "capitalName"
+			payload: { name: string }
+	  }
+	| {
+			date: number
+			kind: string
+			payload: Record<string, unknown>
+	  }
+
+export interface Eu4ProvinceSettlementNameParams {
+	settlement: Eu4ProvinceSettlement
+	selectedDays: number
+}
+
+export interface Eu4ProvinceSettlementPopulationCarrierParams {
+	settlement: Eu4ProvinceSettlement
+	selectedDays: number
+	population: Float32Array
+}
+
 export async function loadEu4GhslSettlements(): Promise<Eu4GhslSettlementAsset> {
 	const metaRes = await fetch("/earth-data/eu4-ghsl-settlements.json")
 	if (!metaRes.ok) {
@@ -451,6 +496,112 @@ export async function loadEu4GhslSettlements(): Promise<Eu4GhslSettlementAsset> 
 		names: meta.names,
 		provinceIds: Int32Array.from(meta.provinceIds),
 	}
+}
+
+export async function loadEu4ProvinceSettlements(): Promise<Eu4ProvinceSettlementAsset> {
+	const response = await fetch("/earth-data/eu4-province-settlements.json")
+	if (!response.ok) {
+		throw new Error(
+			`Failed to load EU4 province settlements: ${response.status}`,
+		)
+	}
+	return response.json() as Promise<Eu4ProvinceSettlementAsset>
+}
+
+/** Return the EU4 city flag active on the selected date. */
+export function resolveEu4ProvinceSettlementIsCity({
+	settlement,
+	selectedDays,
+}: Eu4ProvinceSettlementNameParams): boolean {
+	let isCity = false
+	for (const event of settlement.events) {
+		if (event.kind !== "isCity" || event.date > selectedDays) continue
+		const value = event.payload.value
+		if (typeof value === "boolean") isCity = value
+	}
+	return isCity
+}
+
+function findActivePreEu4SettlementName({
+	settlement,
+	selectedDays,
+}: Eu4ProvinceSettlementNameParams): Eu4ProvinceSettlementNameHistory | null {
+	if (DATE.historyDaysToYear(selectedDays) >= 2) return null
+	const year = DATE.historyDaysToYear(selectedDays)
+	let active: Eu4ProvinceSettlementNameHistory | null = null
+	for (const entry of settlement.preEu4NameHistory) {
+		if (entry.foundedYear > year) continue
+		if (entry.endYear !== null && year >= entry.endYear) continue
+		if (
+			!active ||
+			entry.importance > active.importance ||
+			(entry.importance === active.importance &&
+				entry.foundedYear > active.foundedYear)
+		) {
+			active = entry
+		}
+	}
+	return active
+}
+
+/** The latest EU4 capital-name event at the selected date is the province's
+ * authoritative settlement label. GHSL names only enrich coordinates and
+ * population; they never choose the displayed identity. */
+export function resolveEu4ProvinceSettlementName({
+	settlement,
+	selectedDays,
+}: Eu4ProvinceSettlementNameParams): string | null {
+	const historicalName = findActivePreEu4SettlementName({
+		settlement,
+		selectedDays,
+	})
+	if (historicalName) return historicalName.name
+	let name: string | null = null
+	for (const event of settlement.events) {
+		if (event.kind !== "capitalName" || event.date > selectedDays) continue
+		const candidateName = event.payload.name
+		if (typeof candidateName === "string") name = candidateName
+	}
+	return name
+}
+
+export function resolveEu4ProvinceSettlementCarrier({
+	settlement,
+	selectedDays,
+}: Eu4ProvinceSettlementNameParams): number | null {
+	return (
+		findActivePreEu4SettlementName({ settlement, selectedDays })
+			?.ghslSettlementIndex ?? settlement.ghslSettlementIndex
+	)
+}
+
+/** Select the best available GHSL population carrier without moving the
+ * settlement's historical name/location anchor. Multiple source points can
+ * cover different periods; they are alternatives, never summed. */
+export function resolveEu4ProvinceSettlementPopulationCarrier({
+	settlement,
+	selectedDays,
+	population,
+}: Eu4ProvinceSettlementPopulationCarrierParams): number | null {
+	const historicalName = findActivePreEu4SettlementName({
+		settlement,
+		selectedDays,
+	})
+	const anchor =
+		historicalName?.ghslSettlementIndex ?? settlement.ghslSettlementIndex
+	const populationCarriers =
+		historicalName?.ghslPopulationCarrierIndices ??
+		settlement.ghslPopulationCarrierIndices
+	let carrier = anchor
+	let largestPopulation = anchor === null ? 0 : population[anchor]
+	for (const candidate of populationCarriers) {
+		const candidatePopulation = population[candidate]
+		if (candidatePopulation > largestPopulation) {
+			carrier = candidate
+			largestPopulation = candidatePopulation
+		}
+	}
+	return carrier
 }
 
 /** Interpolated population per settlement at selectedDays, same time-bracket

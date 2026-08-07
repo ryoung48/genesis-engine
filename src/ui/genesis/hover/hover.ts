@@ -257,12 +257,25 @@ export function getHoverModeledCloudCover({
 	world,
 	rainfallMonth,
 }: GetHoverModeledCloudCoverParams): HoverRainfallSeries | null {
+	const aetMonthly =
+		world?.observedHydrology?.aet_monthly ?? world?.hydrology?.aet_monthly
+	const petMonthly =
+		world?.observedHydrology?.pet_monthly ?? world?.climate?.pet_monthly
+	const rainfallMonthly =
+		world?.rainfall?.real_monthly ?? world?.rainfall?.monthly
+	const dtrMonthly = world?.observedDtr?.real_monthly ?? world?.dtr_monthly
+	const temperatureMonthly =
+		world?.climate?.real_temperature_monthly ??
+		world?.climate?.temperature_monthly
 	if (
 		!(
 			hoverInfo &&
 			world?.isLand?.[hoverInfo.region] &&
-			world.climate?.pet_monthly &&
-			world.hydrology?.aet_monthly
+			aetMonthly &&
+			petMonthly &&
+			rainfallMonthly &&
+			dtrMonthly &&
+			temperatureMonthly
 		)
 	)
 		return null
@@ -272,9 +285,13 @@ export function getHoverModeledCloudCover({
 	for (let m = 0; m < 12; m++) {
 		const idx = m * N + r
 		monthly.push(
-			CLOUD_COVER.fromAetPet({
-				aetMm: world.hydrology.aet_monthly[idx],
-				petMm: world.climate.pet_monthly[idx],
+			CLOUD_COVER.estimate({
+				aetMm: aetMonthly[idx],
+				petMm: petMonthly[idx],
+				rainfallMm: rainfallMonthly[idx],
+				dtrC: dtrMonthly[idx],
+				temperatureC: temperatureMonthly[idx],
+				oceanDistanceKm: world.oceanDist[r],
 			}),
 		)
 	}

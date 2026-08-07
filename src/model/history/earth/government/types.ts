@@ -9,3 +9,7 @@ export interface BlendRgbParams {
 	b: readonly [number, number, number]
 	t: number
 }
+
+export interface GovernmentReformLabelParams {
+	governmentReform: string | null | undefined
+}

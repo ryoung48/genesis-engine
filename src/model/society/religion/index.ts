@@ -52,6 +52,11 @@ function computeReligions({
 			activeCount++
 		}
 	}
+	// Border-bleed stripes are computed at province level (not here, over the
+	// culture graph) once religionTypes is known -- see derive-province-society,
+	// which has provinces.adjOffset/adjList available. Blending over this
+	// culture-graph partition would bleed entire culture regions into a
+	// neighboring religion instead of just the border provinces.
 	return GRAPH_PARTITION.computeGraphPartition({
 		nodeCount: cultures.count,
 		adjOffset: cultures.adjOffset,

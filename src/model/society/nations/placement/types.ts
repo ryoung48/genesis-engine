@@ -14,6 +14,16 @@ export interface ContinentPlacementBonusParams {
 	target: number
 }
 
+export interface MigrationWavePlacementMultiplierParams {
+	province: number
+	target: number
+	migrationWave: Float32Array | undefined
+}
+
+export interface TargetSizeBiasParams {
+	target: number
+}
+
 export interface BestClaimParams {
 	nation: number
 	seedProvince: number
@@ -48,6 +58,7 @@ export interface SelectSeedParams {
 	blocked: Uint8Array
 	habitability: Float32Array
 	waterAccess: Uint8Array
+	migrationWave: Float32Array | undefined
 	provinceContinent: Uint8Array | undefined
 	componentId: Int32Array
 	componentSizes: number[]

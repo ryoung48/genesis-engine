@@ -133,7 +133,7 @@ function buildRainRegionMask({
 
 const TEQ_NUM_BINS = 120
 
-const TEQ_HALF_WIN = 10
+const TEQ_HALF_WIN = 5
 
 function computeTEQBins({
 	mesh,

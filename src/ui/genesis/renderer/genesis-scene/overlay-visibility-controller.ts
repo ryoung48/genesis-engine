@@ -45,14 +45,6 @@ export function createOverlayVisibilityController(
 			if (ctx.mapMesh)
 				ctx.mapOccupationStripes.position.copy(ctx.mapMesh.position)
 		}
-		if (ctx.globeLandNationBorders)
-			ctx.globeLandNationBorders.visible =
-				ctx.currentViewMode === "globe" && ctx.landNationBordersVisible
-		if (ctx.mapLandNationBorders) {
-			ctx.mapLandNationBorders.visible = showMap && ctx.landNationBordersVisible
-			if (ctx.mapMesh)
-				ctx.mapLandNationBorders.position.copy(ctx.mapMesh.position)
-		}
 		if (ctx.globeNationBorders)
 			ctx.globeNationBorders.visible =
 				ctx.currentViewMode === "globe" && ctx.nationBordersVisible

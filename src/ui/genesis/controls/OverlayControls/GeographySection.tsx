@@ -11,8 +11,6 @@ export interface GeographySectionProps {
 	setShowElevation: (v: boolean) => void
 	showRivers: boolean
 	setShowRivers: (v: boolean) => void
-	showInfrastructure: boolean
-	setShowInfrastructure: (v: boolean) => void
 	showWindArrows: boolean
 	setShowWindArrows: (v: boolean) => void
 	isEarthImport: boolean
@@ -34,8 +32,6 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 	setShowElevation,
 	showRivers,
 	setShowRivers,
-	showInfrastructure,
-	setShowInfrastructure,
 	showWindArrows,
 	setShowWindArrows,
 	isEarthImport,
@@ -73,11 +69,6 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 						label="Rivers"
 						checked={showRivers}
 						onChange={setShowRivers}
-					/>
-					<ToggleRow
-						label="Infrastructure"
-						checked={showInfrastructure}
-						onChange={setShowInfrastructure}
 					/>
 					<ToggleRow
 						label="Wind"

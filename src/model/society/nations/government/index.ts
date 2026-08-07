@@ -245,6 +245,7 @@ function refineGovernmentSubtype({
 				return getGovIdx().presidential_republic
 			}
 			// Pre-modern republics
+			if (size === 1 && r < 0.3) return getGovIdx().free_city
 			if (water >= 2 && size <= 3 && r < 0.06)
 				return getGovIdx().pirate_republic // small remote coastal havens
 			if (water >= 1 && size <= 4 && hab >= 0.4 && r < 0.1)
@@ -253,9 +254,6 @@ function refineGovernmentSubtype({
 				return getGovIdx().merchant_republic // coastal core
 			if (water >= 1 && size <= 6 && wave >= 0 && wave < 0.3 && r < 0.55)
 				return getGovIdx().merchant_republic
-			if (size >= 6 && size <= 12 && water >= 1 && r < 0.3)
-				return getGovIdx().free_city // self-governing city or canton
-			if (size >= 10 && r < 0.4) return getGovIdx().free_city // league of free cities
 			if (size >= 8 && wave >= 0 && wave < 0.28)
 				return getGovIdx().oligarchic_republic
 			return getGovIdx().merchant_republic // default

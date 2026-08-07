@@ -1,6 +1,6 @@
 import React from "react"
 import { CollapsibleSectionHeader } from "@/ui/components/composites/CollapsibleSectionHeader"
-import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
+import { RadioGroup } from "@/ui/components/primitives/RadioGroup"
 import type { ColorMode } from "@/ui/genesis/shared/colors"
 import type { DangerSubMode } from "./types"
 
@@ -35,7 +35,9 @@ export const DangerSection: React.FC<DangerSectionProps> = ({
 			/>
 			{dangerExpanded && (
 				<div className="mt-1.5 space-y-1.5">
-					<SegmentedControl
+					<RadioGroup
+						label="Danger mode"
+						orientation="horizontal"
 						options={[
 							{ value: "earthquake" as const, label: "Earthquakes" },
 							{ value: "volcanic" as const, label: "Volcanic" },
@@ -57,8 +59,6 @@ export const DangerSection: React.FC<DangerSectionProps> = ({
 						]}
 						value={dangerSubMode}
 						onChange={setDangerSubMode}
-						tone="overlay"
-						className="flex-wrap"
 					/>
 				</div>
 			)}

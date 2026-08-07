@@ -71,8 +71,6 @@ export interface OverlayControlsProps {
 	setShowGrid: (v: boolean) => void
 	showNationBorders: boolean
 	setShowNationBorders: (v: boolean) => void
-	showLandBorders: boolean
-	setShowLandBorders: (v: boolean) => void
 	showNationHierarchy: boolean
 	setShowNationHierarchy: (v: boolean) => void
 	nationMode: NationMapMode

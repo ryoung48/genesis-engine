@@ -30,15 +30,20 @@ import {
 import { EarthHistoryBookmarks } from "@/ui/genesis/generation/EarthHistoryBookmarks"
 import {
 	attachEarthProvinceAreas,
-	buildBestSettlementByProvince,
 	buildGhslSettlementPopulationSlice,
 	buildRealPopulationSlice,
 	buildRealUrbanPopulationSlice,
 	Eu4GhslSettlementAsset,
 	Eu4PopulationTimelineAsset,
+	Eu4ProvinceSettlementAsset,
 	loadEarthRealPopulationEu4,
 	loadEarthRealUrbanPopulationEu4,
 	loadEu4GhslSettlements,
+	loadEu4ProvinceSettlements,
+	resolveEu4ProvinceSettlementCarrier,
+	resolveEu4ProvinceSettlementIsCity,
+	resolveEu4ProvinceSettlementName,
+	resolveEu4ProvinceSettlementPopulationCarrier,
 } from "@/ui/genesis/generation/earth-assets"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import {
@@ -179,7 +184,6 @@ export const GenesisView: React.FC = () => {
 		setShowGint,
 		setShowGrid,
 		setShowInfrastructure,
-		setShowLandBorders,
 		setShowNationBorders,
 		setShowNationHierarchy,
 		setShowOceanCurrents,
@@ -208,7 +212,6 @@ export const GenesisView: React.FC = () => {
 		showGint,
 		showGrid,
 		showInfrastructure,
-		showLandBorders,
 		showNationBorders,
 		showNationHierarchy,
 		showOceanCurrents,
@@ -319,12 +322,15 @@ export const GenesisView: React.FC = () => {
 		useState<Eu4PopulationTimelineAsset | null>(null)
 	const [eu4GhslSettlements, setEu4GhslSettlements] =
 		useState<Eu4GhslSettlementAsset | null>(null)
+	const [eu4ProvinceSettlements, setEu4ProvinceSettlements] =
+		useState<Eu4ProvinceSettlementAsset | null>(null)
 	useEffect(() => {
 		if (!world?.isEarthImport) {
 			setEarthHistoryPlaying(false)
 			setEarthRealPopulation(null)
 			setEarthRealUrbanPopulation(null)
 			setEu4GhslSettlements(null)
+			setEu4ProvinceSettlements(null)
 			return
 		}
 		let cancelled = false
@@ -351,6 +357,14 @@ export const GenesisView: React.FC = () => {
 			.catch((error) => {
 				console.error("Failed to load GHSL settlements asset", error)
 				if (!cancelled) setEu4GhslSettlements(null)
+			})
+		loadEu4ProvinceSettlements()
+			.then((asset) => {
+				if (!cancelled) setEu4ProvinceSettlements(asset)
+			})
+			.catch((error) => {
+				console.error("Failed to load EU4 province settlements asset", error)
+				if (!cancelled) setEu4ProvinceSettlements(null)
 			})
 		return () => {
 			cancelled = true
@@ -663,28 +677,65 @@ export const GenesisView: React.FC = () => {
 		const realSettlementSlice =
 			displayWorld.isEarthImport &&
 			eu4GhslSettlements &&
+			eu4ProvinceSettlements &&
 			displayProvinces.realIds
 				? (() => {
+						const nationCapitalProvinceIndices = new Set(
+							earthHistory.query?.frame.seeds ?? [],
+						)
 						const population = buildGhslSettlementPopulationSlice(
 							eu4GhslSettlements,
 							earthHistory.selectedDays,
 						)
 						if (!population) return null
-						const bestByProvince = buildBestSettlementByProvince(
-							population,
-							eu4GhslSettlements.provinceIds,
-						)
 						const provinceCount = displayProvinces.count
 						const names = new Array<string | null>(provinceCount).fill(null)
 						const pops = new Float32Array(provinceCount)
+						const lons = new Float32Array(provinceCount)
+						const lats = new Float32Array(provinceCount)
+						const sourceIndex = new Int32Array(provinceCount).fill(-1)
 						const realIds = displayProvinces.realIds!
 						for (let compactIdx = 0; compactIdx < provinceCount; compactIdx++) {
-							const settlementIdx = bestByProvince.get(realIds[compactIdx])
-							if (settlementIdx === undefined) continue
-							names[compactIdx] = eu4GhslSettlements.names[settlementIdx]
-							pops[compactIdx] = population[settlementIdx]
+							const settlement =
+								eu4ProvinceSettlements.settlements[String(realIds[compactIdx])]
+							if (!settlement) continue
+							const name = resolveEu4ProvinceSettlementName({
+								settlement,
+								selectedDays: earthHistory.selectedDays,
+							})
+							const anchorIndex = resolveEu4ProvinceSettlementCarrier({
+								settlement,
+								selectedDays: earthHistory.selectedDays,
+							})
+							const populationIndex =
+								resolveEu4ProvinceSettlementPopulationCarrier({
+									settlement,
+									selectedDays: earthHistory.selectedDays,
+									population,
+								})
+							const hasPopulation =
+								populationIndex !== null && population[populationIndex] > 0
+							const isCity = resolveEu4ProvinceSettlementIsCity({
+								settlement,
+								selectedDays: earthHistory.selectedDays,
+							})
+							const isNationCapital =
+								nationCapitalProvinceIndices.has(compactIdx)
+							if (!name || (!hasPopulation && !(isNationCapital && isCity)))
+								continue
+							names[compactIdx] = name
+							if (anchorIndex === null) {
+								lons[compactIdx] = settlement.longitude
+								lats[compactIdx] = settlement.latitude
+							} else {
+								lons[compactIdx] = eu4GhslSettlements.lons[anchorIndex]
+								lats[compactIdx] = eu4GhslSettlements.lats[anchorIndex]
+							}
+							if (populationIndex !== null)
+								pops[compactIdx] = population[populationIndex]
+							sourceIndex[compactIdx] = compactIdx
 						}
-						return { names, population: pops }
+						return { names, population: pops, lons, lats, sourceIndex }
 					})()
 				: null
 		return realPopulationSlice ||
@@ -710,7 +761,9 @@ export const GenesisView: React.FC = () => {
 		earthRealPopulation,
 		earthRealUrbanPopulation,
 		eu4GhslSettlements,
+		eu4ProvinceSettlements,
 		earthHistory.selectedDays,
+		earthHistory.query,
 	])
 	useEffect(() => {
 		let cancelled = false
@@ -1436,7 +1489,6 @@ export const GenesisView: React.FC = () => {
 		setDraftMapProjectionLatitude,
 		exportCenterLongitude,
 		showNationBorders,
-		showLandBorders,
 		showNationHierarchy,
 		showWireframe,
 		showCoastlines,
@@ -2035,8 +2087,6 @@ export const GenesisView: React.FC = () => {
 							setShowGrid={setShowGrid}
 							showNationBorders={showNationBorders}
 							setShowNationBorders={setShowNationBorders}
-							showLandBorders={showLandBorders}
-							setShowLandBorders={setShowLandBorders}
 							showNationHierarchy={showNationHierarchy}
 							setShowNationHierarchy={setShowNationHierarchy}
 							nationMode={nationMode}

@@ -1,5 +1,11 @@
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { updateGlobeLabelOrientations } from "@/ui/genesis/renderer/nation-label-overlay/orientation"
+import { applySettlementLabelScreenScale } from "@/ui/genesis/renderer/nation-label-overlay/settlement-labels"
+import {
+	applySettlementLabelCulling,
+	applySettlementMarkerCollisionCulling,
+	applySettlementMarkerScreenScale,
+} from "@/ui/genesis/renderer/nation-label-overlay/settlement-marker-collision"
 import { processPendingNationScriptTextures } from "@/ui/genesis/renderer/nation-script-overlay"
 import { createRenderScheduler } from "@/ui/genesis/renderer/render-scheduler"
 import {
@@ -100,12 +106,6 @@ export function createAnimationLoopController(
 						mat.linewidth = mat.userData.baseWidth * zoomScale
 					}
 				}
-				if (ctx.landNationBorderMaterials.length > 0) {
-					const zoomScale = Math.sqrt(ctx.mapCamera.zoom)
-					for (const mat of ctx.landNationBorderMaterials) {
-						mat.linewidth = mat.userData.baseWidth * zoomScale
-					}
-				}
 				const scriptTextureProgress = processPendingNationScriptTextures(
 					ctx.pendingNationScriptTextureQueue,
 					ctx.nationScriptTextureCache,
@@ -118,6 +118,27 @@ export function createAnimationLoopController(
 					keepAnimating ||
 					scriptTextureProgress.pending > 0 ||
 					scriptTextureProgress.processed > 0
+				{
+					applySettlementMarkerScreenScale(ctx, ctx.mapSettlements)
+					applySettlementMarkerScreenScale(ctx, ctx.mapEu4Settlements)
+					applySettlementLabelScreenScale(ctx, ctx.mapSettlementLabels)
+					const mapSettlementVisibility = new Map<string, boolean>()
+					applySettlementMarkerCollisionCulling(
+						ctx,
+						ctx.mapSettlements,
+						mapSettlementVisibility,
+					)
+					applySettlementMarkerCollisionCulling(
+						ctx,
+						ctx.mapEu4Settlements,
+						mapSettlementVisibility,
+					)
+					applySettlementLabelCulling(
+						ctx.mapSettlementLabels,
+						mapSettlementVisibility,
+						true,
+					)
+				}
 				ctx.renderer.render(ctx.scene, ctx.mapCamera)
 				return keepAnimating
 			}
@@ -133,13 +154,6 @@ export function createAnimationLoopController(
 				const dist = ctx.camera.position.length()
 				const zoomScale = Math.pow(3 / dist, 0.3)
 				for (const mat of ctx.nationBorderMaterials) {
-					mat.linewidth = mat.userData.baseWidth * zoomScale
-				}
-			}
-			if (ctx.landNationBorderMaterials.length > 0) {
-				const dist = ctx.camera.position.length()
-				const zoomScale = 3 / dist
-				for (const mat of ctx.landNationBorderMaterials) {
 					mat.linewidth = mat.userData.baseWidth * zoomScale
 				}
 			}
@@ -197,6 +211,27 @@ export function createAnimationLoopController(
 				ctx.camera,
 				LABEL_CULLING_ENABLED,
 			)
+			{
+				applySettlementMarkerScreenScale(ctx, ctx.globeSettlements)
+				applySettlementMarkerScreenScale(ctx, ctx.globeEu4Settlements)
+				applySettlementLabelScreenScale(ctx, ctx.globeSettlementLabels)
+				const globeSettlementVisibility = new Map<string, boolean>()
+				applySettlementMarkerCollisionCulling(
+					ctx,
+					ctx.globeSettlements,
+					globeSettlementVisibility,
+				)
+				applySettlementMarkerCollisionCulling(
+					ctx,
+					ctx.globeEu4Settlements,
+					globeSettlementVisibility,
+				)
+				applySettlementLabelCulling(
+					ctx.globeSettlementLabels,
+					globeSettlementVisibility,
+					false,
+				)
+			}
 			updateGlobeLabelOrientations(
 				ctx.globeCultureLabels,
 				ctx.camera,

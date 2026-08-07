@@ -60,7 +60,7 @@ const governmentTypeLabels: Record<GovernmentType, string> = {
 	dynastic_signoria: "Dynastic Signoria",
 	warlord_state: "Warlord State",
 	shogunate: "Shogunate",
-	bureaucratic_monarchy: "Bureaucratic Monarchy",
+	bureaucratic_monarchy: "Imperial Bureaucracy",
 	merchant_republic: "Merchant Republic",
 	oligarchic_republic: "Oligarchic Republic",
 	free_city: "Free City",

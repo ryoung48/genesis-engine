@@ -33,9 +33,14 @@ function getSettlementEraTuning(
 }
 
 function getSettlementRenderThresholds(
-	_era?: SocietyEra,
+	era?: SocietyEra,
 ): readonly [number, number, number, number, number, number] {
-	return [1_000, 10_000, 20_000, 50_000, 200_000, 1_000_000] as const
+	// tier[0] must match getSettlementEraTuning(era).townMin -- that's the
+	// same threshold buildSettlementLabelNames uses to decide whether a
+	// settlement gets a label, so a mismatch here means markers render for
+	// settlements whose label was filtered out (circle with no name).
+	const { townMin } = getSettlementEraTuning(era)
+	return [townMin, 10_000, 20_000, 50_000, 200_000, 1_000_000] as const
 }
 
 export const SETTLEMENT_TUNING = {
