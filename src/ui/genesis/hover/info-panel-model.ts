@@ -326,7 +326,16 @@ export function buildVegetationSwatchColor(
 		(colorMode === "vegetationSatellite" ||
 			colorMode === "realVegetationSatellite") &&
 		satellitePastaClimate
-			? vegetationSatelliteColor(satellitePastaClimate[hoverRegion])
+			? vegetationSatelliteColor(
+					satellitePastaClimate[hoverRegion],
+					(colorMode === "realVegetationSatellite"
+						? (world.climate.real_temperature_avg ??
+							world.climate.temperature_avg)
+						: world.climate.temperature_avg)[hoverRegion],
+					(colorMode === "realVegetationSatellite"
+						? (world.rainfall.real_annual ?? world.rainfall.annual)
+						: world.rainfall.annual)[hoverRegion],
+				)
 			: !world.isLand?.[hoverRegion]
 				? VEGETATION_WATER_BLUE
 				: (colorMode === "vegetationMaps" ||

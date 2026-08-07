@@ -17,6 +17,12 @@ export function createOverlayVisibilityController(
 ) {
 	function updateOverlayVisibility() {
 		const showMap = ctx.currentViewMode === "map" && !ctx.solarSystemActive
+		ctx.globeCloudMesh.visible =
+			ctx.cloudsVisible && ctx.currentViewMode === "globe"
+		if (ctx.mapCloudMesh) {
+			ctx.mapCloudMesh.visible = ctx.cloudsVisible && showMap
+			if (ctx.mapMesh) ctx.mapCloudMesh.position.copy(ctx.mapMesh.position)
+		}
 		if (ctx.globeCoastlineOverlay)
 			ctx.globeCoastlineOverlay.visible =
 				ctx.coastlineOverlayVisible && ctx.currentViewMode === "globe"

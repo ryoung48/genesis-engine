@@ -62,6 +62,9 @@ export interface GenesisContext {
 	atmosMesh: THREE.Mesh
 	globeCloudMat: THREE.MeshBasicMaterial
 	globeCloudMesh: THREE.Mesh
+	mapCloudMat: THREE.ShaderMaterial
+	mapCloudMesh: THREE.Mesh | null
+	cloudsVisible: boolean
 	starGeo: THREE.BufferGeometry
 	starMat: THREE.PointsMaterial
 

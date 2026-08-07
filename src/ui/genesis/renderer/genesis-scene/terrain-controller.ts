@@ -3,13 +3,16 @@ import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { disposeObject3D } from "@/ui/genesis/renderer/disposal"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
 import { DEFAULT_WATER_SPECULAR } from "@/ui/genesis/renderer/genesis-scene/scene-setup"
+import { addMapSlideClones } from "@/ui/genesis/renderer/map-export"
 import {
 	applyFaceRegionColors,
 	applyMapColorModeColors,
 	applyTerrainColorModeColors,
+	buildMapCloudMesh,
 	buildMapMesh,
 	buildTerrainMesh,
 } from "@/ui/genesis/renderer/mesh-builders"
+import { getSatelliteStyleTexture } from "@/ui/genesis/renderer/satellite-texture"
 import type {
 	GenesisHoverInfo,
 	GenesisViewMode,
@@ -154,7 +157,8 @@ export function createTerrainController(
 		const useVegetationWaterMaterial =
 			mode === "vegetation" ||
 			mode === "vegetationMaps" ||
-			mode === "vegetationSatellite"
+			mode === "vegetationSatellite" ||
+			mode === "realVegetationSatellite"
 		if (useTerrainWaterMaterial) {
 			ctx.waterMat.color.set(0xffffff)
 			ctx.waterMat.opacity = 0.12
@@ -187,13 +191,57 @@ export function createTerrainController(
 		}
 	}
 
+	// The satellite noise/relief shading is uniform-gated rather than baked
+	// into the shader at compile time, since switching color modes normally
+	// takes the recolorModeColorsInPlace fast path (vertex-color-only, no
+	// mesh/material rebuild) -- see refreshMeshColors below.
+	function applySatelliteDetailForMode(mode: ColorMode) {
+		const texture = ctx.currentWorld
+			? getSatelliteStyleTexture(ctx.currentWorld, mode)
+			: null
+		const enabled = texture !== null
+
+		const terrainShader = ctx.terrainMesh?.material as
+			| (THREE.Material & {
+					userData: { shader?: THREE.WebGLProgramParametersWithUniforms }
+			  })
+			| undefined
+		if (terrainShader?.userData.shader) {
+			terrainShader.userData.shader.uniforms.uSatelliteDetail.value = enabled
+				? 1
+				: 0
+			if (texture)
+				terrainShader.userData.shader.uniforms.uSatelliteMap.value = texture
+		}
+		const mapMaterial = ctx.mapMesh?.material as
+			| THREE.ShaderMaterial
+			| undefined
+		if (mapMaterial?.uniforms.uSatelliteDetail) {
+			mapMaterial.uniforms.uSatelliteDetail.value = enabled ? 1 : 0
+			if (texture) mapMaterial.uniforms.uSatelliteMap.value = texture
+		}
+	}
+
+	// mapCloudMesh uses the shared, persistent ctx.mapCloudMat (mirrors
+	// globeCloudMat, never disposed per-rebuild) -- disposeObject3D would
+	// dispose that shared material's GPU program on every terrain rebuild, so
+	// this only tears down the geometry wrapper and detaches from the scene.
+	function disposeMapCloudMesh() {
+		if (!ctx.mapCloudMesh) return
+		ctx.scene.remove(ctx.mapCloudMesh)
+		ctx.mapCloudMesh.geometry.dispose()
+		ctx.mapCloudMesh = null
+	}
+
 	function rebuildTerrain() {
 		if (!ctx.currentWorld) return
 		disposeObject3D(ctx.globeGroup, ctx.terrainMesh)
 		disposeObject3D(ctx.scene, ctx.mapMesh)
+		disposeMapCloudMesh()
 		deps.resetMapSolarTerminator()
 		ctx.terrainMesh = null
 		ctx.mapMesh = null
+		ctx.mapCloudMesh = null
 		const terrainBuild = buildTerrainMesh(
 			ctx.currentWorld,
 			ctx.currentColorMode,
@@ -213,6 +261,9 @@ export function createTerrainController(
 		ctx.mapFaceToRegion = mapBuild.faceToRegion
 		ctx.globeGroup.add(ctx.terrainMesh)
 		ctx.scene.add(ctx.mapMesh)
+		ctx.mapCloudMesh = buildMapCloudMesh(ctx.mapMesh.geometry, ctx.mapCloudMat)
+		addMapSlideClones(ctx.mapCloudMesh)
+		ctx.scene.add(ctx.mapCloudMesh)
 		reapplyMeshOverlayState({
 			world: ctx.currentWorld,
 			colorMode: ctx.currentColorMode,
@@ -249,8 +300,10 @@ export function createTerrainController(
 			deps.resetHoveredRegion()
 			disposeObject3D(ctx.globeGroup, ctx.terrainMesh)
 			disposeObject3D(ctx.scene, ctx.mapMesh)
+			disposeMapCloudMesh()
 			ctx.terrainMesh = null
 			ctx.mapMesh = null
+			ctx.mapCloudMesh = null
 			deps.rebuildOverlays()
 			deps.emitHover(null)
 			return
@@ -275,6 +328,7 @@ export function createTerrainController(
 		if (mode === ctx.currentColorMode) return
 		ctx.currentColorMode = mode
 		applyWaterMaterialForMode(mode)
+		applySatelliteDetailForMode(mode)
 		refreshMeshColors()
 	}
 
@@ -290,6 +344,7 @@ export function createTerrainController(
 		ctx.currentColorMode = mode
 		ctx.currentRegionColors = colors
 		applyWaterMaterialForMode(mode)
+		applySatelliteDetailForMode(mode)
 		refreshMeshColors()
 	}
 

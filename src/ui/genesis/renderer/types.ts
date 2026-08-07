@@ -122,6 +122,7 @@ export interface GenesisScene {
 	setSolarTerminatorVisible(visible: boolean): void
 	setAtmospherePressure(pressureBar: number): void
 	setGlobeCloudTexturePath(texturePath: string | null): void
+	setCloudsVisible(visible: boolean): void
 	setCoastlineOverlayVisible(visible: boolean): void
 	setFullAmbient(enabled: boolean): void
 	focusOnNation(

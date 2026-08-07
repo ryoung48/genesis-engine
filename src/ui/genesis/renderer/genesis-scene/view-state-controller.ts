@@ -90,7 +90,6 @@ export function createViewStateController(
 		if (ctx.mapMesh) ctx.mapMesh.visible = isMap
 		ctx.waterMesh.visible = !isMap
 		ctx.atmosMesh.visible = !isMap && ctx.sun.intensity > 0
-		ctx.globeCloudMesh.visible = false
 		if (ctx.globeSolarTerminator) ctx.globeSolarTerminator.visible = !isMap
 		if (ctx.mapSolarTerminator) ctx.mapSolarTerminator.visible = isMap
 		deps.updateOverlayVisibility()

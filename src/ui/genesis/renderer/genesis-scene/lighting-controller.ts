@@ -10,6 +10,7 @@ import { loadGlobeCloudTexture } from "@/ui/genesis/renderer/textures"
 export interface LightingControllerDeps {
 	requestRender: () => void
 	rebuildSolarTerminator: () => void
+	updateOverlayVisibility: () => void
 }
 
 const SUN_DIST = 10
@@ -45,17 +46,17 @@ export function createLightingController(
 	}
 
 	function setGlobeCloudTexturePath(texturePath: string | null): void {
-		if (!texturePath) {
-			ctx.globeCloudMat.alphaMap = null
-			ctx.globeCloudMat.needsUpdate = true
-			ctx.globeCloudMesh.visible = false
-			deps.requestRender()
-			return
-		}
-		ctx.globeCloudMat.alphaMap = loadGlobeCloudTexture(texturePath)
+		const texture = texturePath ? loadGlobeCloudTexture(texturePath) : null
+		ctx.globeCloudMat.alphaMap = texture
 		ctx.globeCloudMat.needsUpdate = true
-		ctx.globeCloudMesh.visible = false
+		if (texture) ctx.mapCloudMat.uniforms.uCloudMap.value = texture
 		deps.requestRender()
+	}
+
+	function setCloudsVisible(visible: boolean): void {
+		if (ctx.cloudsVisible === visible) return
+		ctx.cloudsVisible = visible
+		deps.updateOverlayVisibility()
 	}
 
 	function applyGlobeOrientation(subSolarLatRad: number, spinAngle: number) {
@@ -159,6 +160,7 @@ export function createLightingController(
 	return {
 		setAtmospherePressure,
 		setGlobeCloudTexturePath,
+		setCloudsVisible,
 		setSunPosition,
 		setSunDirection,
 		syncMapLighting,

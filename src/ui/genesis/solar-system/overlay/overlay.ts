@@ -234,6 +234,12 @@ export function buildSolarSystemOverlay(
 		let cloudsMesh: THREE.Mesh | undefined
 		if (body.cloudsTexturePath) {
 			const cloudsTexture = loadBodyTexture(body.cloudsTexturePath)
+			// boostCloudAlphaMap below flips its V sample to match a texture
+			// stored north-row-first (see cloud-material.ts); loadBodyTexture
+			// doesn't set that (its other use -- the surface "map" texture --
+			// is correct as-is with the browser's default flipY), so it must
+			// be set here, per-instance, for the clouds path specifically.
+			cloudsTexture.flipY = false
 			const cloudsMaterial = new THREE.MeshStandardMaterial({
 				color: 0xffffff,
 				alphaMap: cloudsTexture,

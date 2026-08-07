@@ -558,13 +558,25 @@ export function computeRegionColors(
 		colorMode === "realVegetationSatellite"
 			? world.realPastaClimate
 			: world.pastaClimate
+	const satelliteTemperature =
+		colorMode === "realVegetationSatellite"
+			? (world.climate.real_temperature_avg ?? world.climate.temperature_avg)
+			: world.climate.temperature_avg
+	const satelliteRainfall =
+		colorMode === "realVegetationSatellite"
+			? (world.rainfall.real_annual ?? world.rainfall.annual)
+			: world.rainfall.annual
 	if (
 		(colorMode === "vegetationSatellite" ||
 			colorMode === "realVegetationSatellite") &&
 		satellitePastaClimate
 	) {
 		for (let r = 0; r < N; r++) {
-			const [cr, cg, cb] = vegetationSatelliteColor(satellitePastaClimate[r])
+			const [cr, cg, cb] = vegetationSatelliteColor(
+				satellitePastaClimate[r],
+				satelliteTemperature[r],
+				satelliteRainfall[r],
+			)
 			rgb[3 * r] = cr
 			rgb[3 * r + 1] = cg
 			rgb[3 * r + 2] = cb

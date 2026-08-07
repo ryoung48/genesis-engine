@@ -19,13 +19,86 @@ export function vegetationMapColor(
 	return biomeMapColors[biomeCode] ?? biomeMapColors[0]
 }
 
+/** Continuous satellite-style land/ocean color driven by mean annual
+ * temperature (°C) and annual rainfall (mm), replacing the old flat
+ * per-PASTA-class lookup so neighboring regions with similar climate blend
+ * smoothly instead of jumping between discrete swatches at class
+ * boundaries. `pastaClimateCode` is only consulted to tell ocean regions
+ * (PASTA "O*" classes) from land. */
 export function vegetationSatelliteColor(
 	pastaClimateCode: number,
+	tempC: number,
+	rainMm: number,
 ): [number, number, number] {
 	const label = PASTA.pastaLabels[pastaClimateCode] ?? "ocean"
-	const rgb = PASTA_SATELLITE_TRUE_COLOR[label]
-	if (!rgb) return DEFAULT_PASTA_SATELLITE_OCEAN
-	return [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255]
+	if (label === "ocean" || label.startsWith("O")) {
+		return oceanSatelliteColor(tempC)
+	}
+	return landSatelliteColor(tempC, rainMm)
+}
+
+/** Icy pale blue below freezing, deep navy open water above -- smoothstepped
+ * across a few degrees either side of 0C rather than the old hard split
+ * between the "*fi" (frozen) and every other ocean PASTA class. */
+function oceanSatelliteColor(tempC: number): [number, number, number] {
+	const FROZEN: [number, number, number] = [190 / 255, 208 / 255, 226 / 255]
+	const OPEN: [number, number, number] = [20 / 255, 30 / 255, 66 / 255]
+	const f = smoothstep(-3, 2, tempC)
+	return lerpRgb(FROZEN, OPEN, f)
+}
+
+/** Three temperature bands (cold/temperate/hot) each spanning a dry->wet
+ * moisture gradient, bilinearly interpolated so any (temp, rain) pair maps
+ * to a unique continuous color -- an approximation of a Whittaker biome
+ * diagram rendered as satellite-true colors instead of biome labels. */
+const TEMP_STOPS = [-20, 5, 30]
+
+const DRY_COLORS: [number, number, number][] = [
+	[196, 188, 162], // cold + dry: pale tundra/polar desert
+	[176, 156, 88], // temperate + dry: golden steppe/grassland
+	[214, 178, 120], // hot + dry: desert sand
+]
+
+const WET_COLORS: [number, number, number][] = [
+	[35, 58, 38], // cold + wet: dark boreal conifer forest
+	[70, 98, 48], // temperate + wet: mixed/deciduous forest green
+	[28, 62, 24], // hot + wet: deep tropical rainforest green
+]
+
+function landSatelliteColor(
+	tempC: number,
+	rainMm: number,
+): [number, number, number] {
+	const moisture = clamp01(Math.sqrt(Math.max(0, rainMm)) / Math.sqrt(2500))
+
+	let seg = 0
+	while (seg < TEMP_STOPS.length - 2 && tempC > TEMP_STOPS[seg + 1]) seg++
+	const lo = TEMP_STOPS[seg]
+	const hi = TEMP_STOPS[seg + 1]
+	const tFrac = clamp01((tempC - lo) / (hi - lo))
+
+	const colorAt = (i: number): [number, number, number] =>
+		lerpRgb(DRY_COLORS[i], WET_COLORS[i], moisture)
+
+	const [r, g, b] = lerpRgb(colorAt(seg), colorAt(seg + 1), tFrac)
+	return [r / 255, g / 255, b / 255]
+}
+
+function clamp01(x: number): number {
+	return Math.min(1, Math.max(0, x))
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+	const t = clamp01((x - edge0) / (edge1 - edge0))
+	return t * t * (3 - 2 * t)
+}
+
+function lerpRgb(
+	a: [number, number, number],
+	b: [number, number, number],
+	t: number,
+): [number, number, number] {
+	return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
 
 const biomeBaseColors: [number, number, number][] = [
@@ -58,118 +131,3 @@ const biomeMapColors: [number, number, number][] = [
 	[0x94 / 255, 0xda / 255, 0xc4 / 255],
 ]
 
-const PASTA_SATELLITE_TRUE_COLOR: Partial<
-	Record<(typeof PASTA.pastaLabels)[number], [number, number, number]>
-> = {
-	// Pasta ocean classes use the satellite vegetation ocean palette.
-	Ofi: [190, 208, 226], // permanent frozen ocean
-	Ofd: [20, 30, 66], // seasonal frozen ocean
-	Ofg: [20, 30, 66], // barren seasonal frozen ocean
-	Og: [20, 30, 66], // barren ocean
-	Oc: [20, 30, 66], // cool ocean
-	Ot: [20, 30, 66], // tropical ocean
-	Oh: [20, 30, 66], // hot ocean
-	Or: [20, 30, 66], // torrid ocean
-	Oe: [20, 30, 66], // extraseasonal ocean
-	TUr: [41, 63, 13],
-	TUrp: [42, 65, 16],
-	TUf: [55, 74, 20],
-	TUfp: [59, 80, 24],
-	TUs: [75, 85, 33],
-	TUsp: [89, 102, 47],
-	TUA: [107, 105, 53],
-	TUAp: [124, 116, 63],
-	TQf: [59, 78, 23],
-	TQfp: [54, 73, 24],
-	TQs: [75, 80, 35],
-	TQsp: [67, 76, 30],
-	TQA: [107, 105, 53],
-	TQAp: [124, 116, 63],
-	TF: [78, 84, 66],
-	TG: [98, 91, 59],
-	CTf: [59, 78, 23],
-	CTfp: [54, 73, 24],
-	CTs: [75, 80, 35],
-	CTsp: [67, 76, 30],
-	CDa: [60, 78, 23],
-	CDap: [36, 54, 15],
-	CDb: [55, 75, 21],
-	CDbp: [38, 62, 11],
-	CEa: [60, 63, 29],
-	CEap: [38, 52, 18],
-	CEb: [49, 61, 18],
-	CEbp: [52, 64, 25],
-	CEc: [62, 71, 24],
-	CEcp: [64, 74, 27],
-	CMa: [60, 73, 26],
-	CMb: [51, 63, 22],
-	CAMa: [103, 97, 54],
-	CAMb: [118, 108, 68],
-	CAa: [105, 98, 58],
-	CAap: [58, 68, 25],
-	CAb: [102, 100, 55],
-	CAbp: [94, 87, 55],
-	CFa: [78, 84, 66],
-	CFb: [93, 88, 54],
-	CG: [98, 91, 59],
-	CI: [240, 240, 240],
-	HTf: [55, 74, 20],
-	HTfp: [59, 80, 24],
-	HTs: [75, 85, 33],
-	HTsp: [89, 102, 47],
-	HDa: [60, 78, 23],
-	HDap: [36, 54, 15],
-	HDb: [55, 75, 21],
-	HDbp: [38, 62, 11],
-	HDc: [62, 71, 24],
-	HDcp: [64, 74, 27],
-	HMa: [60, 73, 26],
-	HMb: [51, 63, 22],
-	HMc: [51, 63, 22],
-	HAMa: [103, 97, 54],
-	HAMb: [118, 108, 68],
-	HAMc: [118, 108, 68],
-	HAa: [107, 105, 53],
-	HAap: [124, 116, 63],
-	HAb: [107, 105, 53],
-	HAbp: [124, 116, 63],
-	HAc: [107, 105, 53],
-	HAcp: [124, 116, 63],
-	HFa: [78, 84, 66],
-	HFb: [93, 88, 54],
-	HFc: [93, 88, 54],
-	HG: [98, 91, 59],
-	ETf: [59, 78, 23],
-	ETfp: [54, 73, 24],
-	ETs: [75, 80, 35],
-	ETsp: [67, 76, 30],
-	EDa: [60, 78, 23],
-	EDap: [36, 54, 15],
-	EDb: [55, 75, 21],
-	EDbp: [38, 62, 11],
-	EMa: [60, 73, 26],
-	EMb: [51, 63, 22],
-	EAMa: [103, 97, 54],
-	EAMb: [118, 108, 68],
-	EAa: [105, 98, 58],
-	EAap: [58, 68, 25],
-	EAb: [102, 100, 55],
-	EAbp: [94, 87, 55],
-	EFa: [78, 84, 66],
-	EFb: [93, 88, 54],
-	EG: [98, 91, 59],
-	Ada: [167, 137, 95],
-	Aha: [238, 210, 156],
-	Adc: [177, 153, 110],
-	Ahc: [208, 181, 141],
-	Adh: [167, 137, 95],
-	Ahh: [238, 210, 156],
-	Ade: [177, 153, 110],
-	Ahe: [208, 181, 141],
-}
-
-const DEFAULT_PASTA_SATELLITE_OCEAN: [number, number, number] = [
-	20 / 255,
-	30 / 255,
-	66 / 255,
-]

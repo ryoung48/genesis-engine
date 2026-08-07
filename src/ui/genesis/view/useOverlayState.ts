@@ -111,6 +111,7 @@ export function useOverlayState(input: OverlayStateInput) {
 	const [showThermalEquator, setShowThermalEquator] = useState(
 		initialViewPrefs.showThermalEquator,
 	)
+	const [showClouds, setShowClouds] = useState(initialViewPrefs.showClouds)
 	const [showCoastlines, setShowCoastlines] = useState(
 		initialViewPrefs.showCoastlines,
 	)
@@ -225,6 +226,7 @@ export function useOverlayState(input: OverlayStateInput) {
 				labelMode,
 				showElevation,
 				showThermalEquator,
+				showClouds,
 				showCoastlines,
 				showWindArrows,
 				showGdd,
@@ -292,6 +294,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		showElevation,
 		showRivers,
 		showThermalEquator,
+		showClouds,
 		showCoastlines,
 		showWindArrows,
 		showGdd,
@@ -359,6 +362,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setPathfindingSea,
 		setPopulationMode,
 		setShowAet,
+		setShowClouds,
 		setShowCoastlines,
 		setShowDaylight,
 		setShowElevation,
@@ -387,6 +391,7 @@ export function useOverlayState(input: OverlayStateInput) {
 		setVegetationSubMode,
 		setViewMode,
 		showAet,
+		showClouds,
 		showCoastlines,
 		showDaylight,
 		showElevation,

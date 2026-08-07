@@ -1,8 +1,12 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
 import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js"
-import { boostCloudAlphaMap } from "@/ui/genesis/renderer/cloud-material"
+import {
+	boostCloudAlphaMap,
+	createMapCloudMaterial,
+} from "@/ui/genesis/renderer/cloud-material"
 import type { GenesisContext } from "@/ui/genesis/renderer/genesis-scene/context"
+import { createPlaceholderSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
 
 const GLOBE_CLOUD_RADIUS = 1.035
 
@@ -179,6 +183,10 @@ export function buildGenesisSceneSetup(
 	globeCloudMesh.visible = false
 	globeGroup.add(globeCloudMesh)
 
+	const mapCloudMat = createMapCloudMaterial(
+		createPlaceholderSatelliteTexture(),
+	)
+
 	// Starfield
 	const starCount = 3000
 	const starPositions = new Float32Array(starCount * 3)
@@ -220,6 +228,9 @@ export function buildGenesisSceneSetup(
 		atmosMesh,
 		globeCloudMat,
 		globeCloudMesh,
+		mapCloudMat,
+		mapCloudMesh: null,
+		cloudsVisible: false,
 		starGeo,
 		starMat,
 		terrainMesh: null,

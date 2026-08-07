@@ -10,11 +10,8 @@ function buildRiverGroup(
 	rivers: RiverData,
 	canvas: HTMLCanvasElement,
 	riverMaterials: LineMaterial[],
-	toPosition: (
-		lonDeg: number,
-		latDeg: number,
-		elev: number,
-	) => [number, number, number],
+	toUnitPosition: (lonDeg: number, latDeg: number) => [number, number, number],
+	elevToRadius: (elev: number) => number,
 ) {
 	const group = new THREE.Group()
 	const width = canvas.clientWidth || 1
@@ -76,12 +73,23 @@ function buildRiverGroup(
 	for (const polyline of rivers.lines) {
 		if (polyline.length < 2) continue
 		const flowValues = polyline.map(([, , flow]) => flow)
+		const elevValues = polyline.map(([, , , elev]) => elev)
 		let positions: [number, number, number][]
 		let smoothFlows: number[]
 
 		if (polyline.length >= 3) {
-			const controlPoints = polyline.map(([lon, lat, , elev]) => {
-				const [x, y, z] = toPosition(lon, lat, elev)
+			// Elevation is interpolated linearly across the original (un-
+			// smoothed) control points -- same technique as smoothFlows below
+			// -- rather than being baked into the 3D points before splining.
+			// A Catmull-Rom curve through fully-elevated points can overshoot
+			// past its control points' heights on tight bends, which floated
+			// rivers above the actual (lower, triangle-averaged) terrain
+			// surface between region centers once elevation was toggled on.
+			// Splining only the on-sphere shape and interpolating height
+			// separately keeps every point's radius within [min, max] of its
+			// two neighboring control points -- it can't overshoot.
+			const controlPoints = polyline.map(([lon, lat]) => {
+				const [x, y, z] = toUnitPosition(lon, lat)
 				return new THREE.Vector3(x, y, z)
 			})
 			const curve = new THREE.CatmullRomCurve3(
@@ -92,7 +100,25 @@ function buildRiverGroup(
 			)
 			const smoothPointCount = polyline.length * 3
 			const smoothed = curve.getPoints(smoothPointCount)
-			positions = smoothed.map((point) => [point.x, point.y, point.z])
+			positions = smoothed.map((point, index) => {
+				const t = index / smoothPointCount
+				const step = t * (polyline.length - 1)
+				const lower = Math.floor(step)
+				const upper = Math.min(lower + 1, polyline.length - 1)
+				const elev =
+					elevValues[lower] +
+					(elevValues[upper] - elevValues[lower]) * (step - lower)
+				const radius = elevToRadius(elev)
+				const length =
+					Math.sqrt(
+						point.x * point.x + point.y * point.y + point.z * point.z,
+					) || 1
+				return [
+					(point.x / length) * radius,
+					(point.y / length) * radius,
+					(point.z / length) * radius,
+				]
+			})
 			smoothFlows = smoothed.map((_, index) => {
 				const t = index / smoothPointCount
 				const step = t * (polyline.length - 1)
@@ -104,9 +130,11 @@ function buildRiverGroup(
 				)
 			})
 		} else {
-			positions = polyline.map(([lon, lat, , elev]) =>
-				toPosition(lon, lat, elev),
-			)
+			positions = polyline.map(([lon, lat, , elev]) => {
+				const [x, y, z] = toUnitPosition(lon, lat)
+				const radius = elevToRadius(elev)
+				return [x * radius, y * radius, z * radius]
+			})
 			smoothFlows = flowValues
 		}
 
@@ -154,21 +182,19 @@ export function buildGlobeRivers(
 		rivers,
 		canvas,
 		globeRiverMaterials,
-		(lonDeg, latDeg, elev) => {
+		(lonDeg, latDeg) => {
 			const lon = THREE.MathUtils.degToRad(lonDeg)
 			const lat = THREE.MathUtils.degToRad(latDeg)
 			const cosLat = Math.cos(lat)
+			return [cosLat * Math.cos(lon), cosLat * Math.sin(lon), Math.sin(lat)]
+		},
+		(elev) => {
 			const elevationFactor = elevationVisible
 				? elev > 0
 					? elev * TERRAIN_ELEVATION_SCALE
 					: elev * TERRAIN_ELEVATION_SCALE * 0.3
 				: 0
-			const radius = 1 + elevationFactor + lift
-			return [
-				radius * cosLat * Math.cos(lon),
-				radius * cosLat * Math.sin(lon),
-				radius * Math.sin(lat),
-			]
+			return 1 + elevationFactor + lift
 		},
 	)
 	group.visible = riversVisible && viewMode === "globe"

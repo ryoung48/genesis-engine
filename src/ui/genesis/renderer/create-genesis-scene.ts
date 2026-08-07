@@ -404,10 +404,12 @@ export function createGenesisScene(
 	const lightingController = createLightingController(context, {
 		requestRender: () => requestRender(),
 		rebuildSolarTerminator: () => rebuildSolarTerminator(),
+		updateOverlayVisibility: () => updateOverlayVisibility(),
 	})
 	const {
 		setAtmospherePressure,
 		setGlobeCloudTexturePath,
+		setCloudsVisible,
 		setSunPosition,
 		setSunDirection,
 		syncMapLighting,
@@ -478,6 +480,7 @@ export function createGenesisScene(
 		setSolarTerminatorVisible,
 		setAtmospherePressure,
 		setGlobeCloudTexturePath,
+		setCloudsVisible,
 		setCoastlineOverlayVisible,
 		setFullAmbient,
 		focusOnNation,

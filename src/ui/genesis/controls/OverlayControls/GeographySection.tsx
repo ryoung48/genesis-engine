@@ -18,6 +18,8 @@ export interface GeographySectionProps {
 	setShowOceanCurrents: (v: boolean) => void
 	showThermalEquator: boolean
 	setShowThermalEquator: (v: boolean) => void
+	showClouds: boolean
+	setShowClouds: (v: boolean) => void
 	showCoastlines: boolean
 	setShowCoastlines: (v: boolean) => void
 	availableVariants: DataVariant[]
@@ -39,6 +41,8 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 	setShowOceanCurrents,
 	showThermalEquator,
 	setShowThermalEquator,
+	showClouds,
+	setShowClouds,
 	showCoastlines,
 	setShowCoastlines,
 	availableVariants,
@@ -84,6 +88,11 @@ export const GeographySection: React.FC<GeographySectionProps> = ({
 						label="Thermal Equator"
 						checked={showThermalEquator}
 						onChange={setShowThermalEquator}
+					/>
+					<ToggleRow
+						label="Clouds"
+						checked={showClouds}
+						onChange={setShowClouds}
 					/>
 					<ToggleRow
 						label="Coastlines"

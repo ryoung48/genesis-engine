@@ -224,6 +224,8 @@ export const GenesisView: React.FC = () => {
 		showSolarSystemInclination,
 		showSolarSystemRealisticSizes,
 		showThermalEquator,
+		showClouds,
+		setShowClouds,
 		showWindArrows,
 		showWireframe,
 		solarSystemControlsExpanded,
@@ -592,11 +594,16 @@ export const GenesisView: React.FC = () => {
 	useEffect(() => {
 		sceneRef.current?.setAtmospherePressure(world?.params.pressure ?? pressure)
 	}, [world, pressure])
+	// Always the real Earth cloud texture, for every planet -- no per-planet
+	// procedural generation.
 	useEffect(() => {
 		sceneRef.current?.setGlobeCloudTexturePath(
-			restSeed === SOL_DATA.solSeed ? SOL_DATA.solEarthCloudsTexturePath : null,
+			SOL_DATA.solEarthCloudsTexturePath,
 		)
-	}, [restSeed])
+	}, [])
+	useEffect(() => {
+		sceneRef.current?.setCloudsVisible(showClouds)
+	}, [showClouds])
 	useEffect(() => {
 		if (!world) {
 			setHoverInfo(null)
@@ -2069,6 +2076,8 @@ export const GenesisView: React.FC = () => {
 							setShowRivers={setShowRivers}
 							showThermalEquator={showThermalEquator}
 							setShowThermalEquator={setShowThermalEquator}
+							showClouds={showClouds}
+							setShowClouds={setShowClouds}
 							showCoastlines={showCoastlines}
 							setShowCoastlines={setShowCoastlines}
 							showWindArrows={showWindArrows}

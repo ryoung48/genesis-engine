@@ -178,8 +178,11 @@ export function GenerationPlanetNavigator({
 	// The solar-lock UI button that used setObliquity was removed; kept as a
 	// prop for now since GenesisView still threads it through.
 	void setObliquity
-	const [selection, setSelection] = useState<OrbitSelection>({
-		kind: "star",
+	const [selection, setSelection] = useState<OrbitSelection>(() => {
+		const mainWorldIndex = systemBodies?.findIndex((body) => body.isMainWorld) ?? -1
+		return mainWorldIndex >= 0
+			? { kind: "orbit", bodyIndex: mainWorldIndex }
+			: { kind: "star" }
 	})
 	// Runs the same climate simulation the "Preview" section uses, but
 	// unconditionally -- independent of whether that section is expanded --
@@ -635,20 +638,7 @@ export function GenerationPlanetNavigator({
 									if (siderealDayHours !== undefined)
 										setHoursPerDay(siderealDayHours)
 								}
-							: onUpdateSystemBody
-								? (lock) =>
-										onUpdateSystemBody(selection.bodyIndex, (current) => {
-											const siderealDayHours =
-												resolveBodyTideLockSiderealDayHours(lock, current)
-											return {
-												...current,
-												tideLock: lock,
-												...(siderealDayHours !== undefined
-													? { siderealDayHours }
-													: {}),
-											}
-										})
-								: undefined,
+							: undefined,
 						resolveSiblingMoonLabel: (moon, moonIndex) =>
 							resolveMoonTitle(
 								moon,
@@ -688,9 +678,7 @@ export function GenerationPlanetNavigator({
 								)
 									onUpdateSystemBody?.(selection.bodyIndex, () => updated)
 							}
-						: onUpdateSystemBody && selection.bodyIndex >= 0
-							? (updater) => onUpdateSystemBody(selection.bodyIndex, updater)
-							: undefined,
+						: undefined,
 				}),
 				dataContent:
 					body.group === "asteroid belt" ? undefined : (
@@ -857,7 +845,7 @@ export function GenerationPlanetNavigator({
 								bodyIndex: selection.bodyIndex,
 							}),
 						onSetLock:
-							onUpdateSystemMoon && selection.bodyIndex >= 0
+							isMainWorld && onUpdateSystemMoon && selection.bodyIndex >= 0
 								? (lock) =>
 										onUpdateSystemMoon(
 											selection.bodyIndex,
@@ -920,7 +908,7 @@ export function GenerationPlanetNavigator({
 					pdOverride: pd,
 					parentOrbitalPeriodDays,
 					onUpdateMoon:
-						onUpdateSystemMoon && selection.bodyIndex >= 0
+						isMainWorld && onUpdateSystemMoon && selection.bodyIndex >= 0
 							? (updater) =>
 									onUpdateSystemMoon(
 										selection.bodyIndex,

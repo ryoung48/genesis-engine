@@ -2,6 +2,10 @@
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { createMapProjection } from "@/ui/genesis/renderer/map-projection"
 import {
+	createPlaceholderSatelliteTexture,
+	getSatelliteStyleTexture,
+} from "@/ui/genesis/renderer/satellite-texture"
+import {
 	computeMapGeometryArrays,
 	computeTerrainGeometryArrays,
 	type MapGeometryArrays,
@@ -70,6 +74,14 @@ export function buildTerrainMesh(
 		dithering: true,
 	})
 	material.onBeforeCompile = (shader) => {
+		const satelliteTexture = getSatelliteStyleTexture(world, colorMode)
+		shader.uniforms.uSatelliteDetail = {
+			value: satelliteTexture ? 1 : 0,
+		}
+		shader.uniforms.uSatelliteMap = {
+			value: satelliteTexture ?? createPlaceholderSatelliteTexture(),
+		}
+		material.userData.shader = shader
 		// Normals now come from the geometry's own (properly smoothed)
 		// "normal" attribute — no need to fake one from raw position here.
 		shader.vertexShader = shader.vertexShader.replace(
@@ -89,11 +101,20 @@ export function buildTerrainMesh(
 			`varying vec3 vOccColor;
 			varying float vOccMask;
 			varying vec3 vWorldPos;
+			uniform float uSatelliteDetail;
+			uniform sampler2D uSatelliteMap;
 			void main() {`,
 		)
 		shader.fragmentShader = shader.fragmentShader.replace(
 			"#include <color_fragment>",
 			`#include <color_fragment>
+			if (uSatelliteDetail > 0.5) {
+				vec3 n = normalize(vWorldPos);
+				float lon = atan(n.y, n.x);
+				float lat = asin(clamp(n.z, -1.0, 1.0));
+				vec2 satUv = vec2((lon + 3.14159265) / 6.2831853, 0.5 - lat / 3.14159265);
+				diffuseColor.rgb = texture2D(uSatelliteMap, satUv).rgb;
+			}
 			if (vOccMask > 0.5) {
 				float lon = atan(vWorldPos.y, vWorldPos.x);
 				float lat = asin(clamp(vWorldPos.z / length(vWorldPos), -1.0, 1.0));
@@ -206,12 +227,19 @@ export function buildMapMesh(
 		new THREE.BufferAttribute(new Float32Array(vertexCount), 1),
 	)
 
+	const mapSatelliteTexture = getSatelliteStyleTexture(world, colorMode)
 	const material = new THREE.ShaderMaterial({
 		side: THREE.DoubleSide,
 		uniforms: {
 			uAmbient: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
 			uSunDirection: { value: new THREE.Vector3(1.0, 0.0, 0.0) },
 			uSunLight: { value: new THREE.Vector3(0.0, 0.0, 0.0) },
+			uSatelliteDetail: {
+				value: mapSatelliteTexture ? 1 : 0,
+			},
+			uSatelliteMap: {
+				value: mapSatelliteTexture ?? createPlaceholderSatelliteTexture(),
+			},
 		},
 		vertexShader: `
 			attribute vec3 color;
@@ -236,6 +264,8 @@ export function buildMapMesh(
 			uniform vec3 uAmbient;
 			uniform vec3 uSunDirection;
 			uniform vec3 uSunLight;
+			uniform float uSatelliteDetail;
+			uniform sampler2D uSatelliteMap;
 			varying vec3 vColor;
 			varying vec3 vOccColor;
 			varying float vOccMask;
@@ -250,7 +280,12 @@ export function buildMapMesh(
 				);
 				float daylight = max(dot(normalize(surfaceNormal), normalize(uSunDirection)), 0.0);
 				vec3 light = uAmbient + (uSunLight * daylight);
-				vec3 finalColor = vColor * light;
+				vec3 baseColor = vColor;
+				if (uSatelliteDetail > 0.5) {
+					vec2 satUv = vec2((vLonLat.x + 3.14159265) / 6.2831853, 0.5 - vLonLat.y / 3.14159265);
+					baseColor = texture2D(uSatelliteMap, satUv).rgb;
+				}
+				vec3 finalColor = baseColor * light;
 				if (vOccMask > 0.5) {
 					float stripe = fract((vWorldPos.x + vWorldPos.y) * 150.0);
 					if (stripe > 0.25 && stripe < 0.75) {
@@ -273,6 +308,25 @@ export function buildMapMesh(
 		mesh: meshObject,
 		faceToRegion,
 	}
+}
+
+/** Cloud overlay plane for the flat map, sharing the just-built map mesh's
+ * position/lonLat buffers (so it always matches whatever projection/center
+ * longitude produced them) with a material that samples the equirect cloud
+ * texture via that lonLat attribute -- see createMapCloudMaterial. Caller
+ * (terrain-controller.ts's rebuildTerrain) is expected to addMapSlideClones
+ * and add it to the scene alongside mapMesh, matching every other flat
+ * overlay's build pattern. */
+export function buildMapCloudMesh(
+	mapMeshGeometry: THREE.BufferGeometry,
+	material: THREE.Material,
+): THREE.Mesh {
+	const geometry = new THREE.BufferGeometry()
+	geometry.setAttribute("position", mapMeshGeometry.getAttribute("position"))
+	geometry.setAttribute("lonLat", mapMeshGeometry.getAttribute("lonLat"))
+	const mesh = new THREE.Mesh(geometry, material)
+	mesh.renderOrder = 2
+	return mesh
 }
 
 // buildMapOccupationOverlay was removed: it duplicated, via a full clone of
