@@ -1,6 +1,6 @@
 import { describe, it } from "vitest"
-import { CLIMATE } from "@/model/climate/climate"
-import { CONSTANTS } from "@/model/climate/ebm/constants"
+import { CLIMATE } from "@/model/climate/classification/climate"
+import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {

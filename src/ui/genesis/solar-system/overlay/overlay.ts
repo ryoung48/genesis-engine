@@ -71,6 +71,7 @@ export function buildSolarSystemOverlay(
 		showRealNames,
 		namesEnabled,
 		starName,
+		mainWorldTexture,
 	} = params
 
 	const group = new THREE.Group()
@@ -202,27 +203,36 @@ export function buildSolarSystemOverlay(
 		const bodyGroup = new THREE.Group()
 		const isGasGiant = body.group === "jovian"
 		const texturePath = body.texturePath
-		const material = texturePath
+		// The main world's own simulated terrain/vegetation, standing in for
+		// its static texturePath image -- see mainWorldTexture's doc comment.
+		const mainWorldSatelliteMap = body.isMainWorld ? mainWorldTexture : null
+		const material = mainWorldSatelliteMap
 			? new THREE.MeshStandardMaterial({
-					map: loadBodyTexture(texturePath),
+					map: mainWorldSatelliteMap,
 					roughness: 1,
 					metalness: 0,
 				})
-			: isGasGiant
+			: texturePath
 				? new THREE.MeshStandardMaterial({
-						map: loadBodyTexture(
-							"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
-						),
+						map: loadBodyTexture(texturePath),
 						roughness: 1,
 						metalness: 0,
 					})
-				: new THREE.MeshStandardMaterial({
-						color:
-							CLASSIFICATION_COLOR[body.classification] ??
-							(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR),
-						roughness: 0.9,
-						metalness: 0,
-					})
+				: isGasGiant
+					? new THREE.MeshStandardMaterial({
+							map: loadBodyTexture(
+								"/textures/celestial/sol/jupiter/2k_jupiter.jpg",
+							),
+							roughness: 1,
+							metalness: 0,
+						})
+					: new THREE.MeshStandardMaterial({
+							color:
+								CLASSIFICATION_COLOR[body.classification] ??
+								(body.isMainWorld ? MAIN_WORLD_COLOR : ROCKY_SIBLING_COLOR),
+							roughness: 0.9,
+							metalness: 0,
+						})
 		const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), material)
 		// SphereGeometry's poles sit on ±Y, but this scene's equatorial plane is
 		// XY (Z-north) — textured bodies need the same quarter-turn so their
@@ -756,7 +766,11 @@ export function buildSolarSystemOverlay(
 		if (object === starMesh) return { bodyIndex: -1 }
 		for (let i = 0; i < placed.length; i++) {
 			const p = placed[i]!
-			if (p.mesh === object || p.ringMesh === object) {
+			if (
+				p.mesh === object ||
+				p.cloudsMesh === object ||
+				p.ringMesh === object
+			) {
 				return { bodyIndex: i }
 			}
 			const moonIndex = p.moonState?.getMoonIndexForMesh?.(object)
@@ -765,8 +779,13 @@ export function buildSolarSystemOverlay(
 		return null
 	}
 
-	function updateBodies(nextBodies: SystemBody[]) {
+	function updateBodies(
+		nextBodies: SystemBody[],
+		nextMainWorldTexture?: THREE.DataTexture | null,
+	) {
 		if (nextBodies.length !== placed.length) return false
+		if ((nextMainWorldTexture ?? null) !== (mainWorldTexture ?? null))
+			return false
 
 		for (let i = 0; i < placed.length; i++) {
 			const p = placed[i]!

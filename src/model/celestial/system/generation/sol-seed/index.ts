@@ -8,8 +8,8 @@ import type { HomeWorldParams } from "@/model/celestial/system/generation/types"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
-import { GREENHOUSE_ESTIMATE } from "@/model/climate/ebm/greenhouse-estimate"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
+import { GREENHOUSE_ESTIMATE } from "@/model/climate/temperature/ebm/greenhouse-estimate"
 
 function buildMainWorldSeed(mainWorld: HomeWorldParams): SolPlanetSeed {
 	const density = PLANET.buildDensityProfile({

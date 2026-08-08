@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react"
-import { APPARENT_TEMP } from "@/model/climate/apparent-temp"
-import { HUMIDITY } from "@/model/climate/humidity"
+import { HUMIDITY } from "@/model/climate/precipitation/humidity"
+import { APPARENT_TEMP } from "@/model/climate/temperature/apparent-temp"
 import { COLOR } from "@/model/history/earth/color"
 import type { RawOrganizationReference } from "@/model/history/earth/data-source/types"
 import { FOLD } from "@/model/history/earth/fold"

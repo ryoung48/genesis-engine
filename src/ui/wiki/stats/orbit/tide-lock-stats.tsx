@@ -287,35 +287,33 @@ export function buildDirectionalAngleEditorConfig(params: {
 		max,
 		content: (
 			<div className="flex w-44 flex-col px-1 pt-0.5 pb-2">
-				<div className="flex items-center justify-between gap-2">
-					<div className="flex items-center gap-2 min-w-0">
-						<UITooltip
-							content={
-								isRetrograde ? "switch to prograde" : "switch to retrograde"
-							}
-							position="top"
-							align="center"
-						>
-							<button
-								type="button"
-								onClick={params.onToggleDirection}
-								className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-							>
-								{isRetrograde ? (
-									<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
-								) : (
-									<AxisRotateClockwiseIcon className="h-3 w-3" />
-								)}
-							</button>
-						</UITooltip>
-						<span className={`${uiTokens.type.labelSm} text-slate-500`}>
-							{params.label}
-						</span>
-					</div>
-				</div>
 				<Slider
-					className="mt-3"
-					label={null}
+					label={
+						<span className="flex min-w-0 items-center gap-2">
+							<UITooltip
+								content={
+									isRetrograde ? "switch to prograde" : "switch to retrograde"
+								}
+								position="top"
+								align="center"
+							>
+								<button
+									type="button"
+									onClick={params.onToggleDirection}
+									className="flex h-4 w-4 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+								>
+									{isRetrograde ? (
+										<AxisRotateCounterClockwiseIcon className="h-3 w-3" />
+									) : (
+										<AxisRotateClockwiseIcon className="h-3 w-3" />
+									)}
+								</button>
+							</UITooltip>
+							<span className={`${uiTokens.type.labelSm} text-slate-500`}>
+								{params.label}
+							</span>
+						</span>
+					}
 					value={`${params.value.toFixed(1)}°`}
 					min={min}
 					max={max}

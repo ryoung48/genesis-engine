@@ -1,5 +1,5 @@
 ﻿import { useMemo } from "react"
-import { HEAT } from "@/model/climate/tidal-locked/heat"
+import { HEAT } from "@/model/climate/temperature/tidal-locked"
 import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
 import type { LockedClimatePreviewData } from "@/ui/wiki/climate-preview/types"

@@ -225,7 +225,7 @@ export function resetWorldDefaults(setters: {
 	setSubstellarLon: (v: number) => void
 	setPerihelion: (v: number) => void
 	setPressure: (v: number) => void
-	setRestSeed: (v: number) => void
+	setSeed: (v: number) => void
 	setSeaLevel: (v: number) => void
 	setEra: (v: SocietyEra) => void
 }): void {
@@ -243,7 +243,7 @@ export function resetWorldDefaults(setters: {
 	setters.setSubstellarLon(DEFAULT_WORLD_PARAMS.substellarLon)
 	setters.setPerihelion(DEFAULT_WORLD_PARAMS.perihelion)
 	setters.setPressure(DEFAULT_WORLD_PARAMS.pressure)
-	setters.setRestSeed(SOL_DATA.solSeed)
+	setters.setSeed(SOL_DATA.solSeed)
 	setters.setSeaLevel(DEFAULT_WORLD_PARAMS.seaLevel)
 	setters.setEra(DEFAULT_WORLD_PARAMS.era)
 }

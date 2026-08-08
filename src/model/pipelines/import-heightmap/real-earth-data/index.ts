@@ -1,5 +1,5 @@
-import { HUMIDITY } from "@/model/climate/humidity"
-import { HYDROLOGY } from "@/model/climate/hydrology"
+import { HYDROLOGY } from "@/model/climate/classification/hydrology"
+import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { MESH } from "@/model/mesh"
 import type { SphereMesh } from "@/model/mesh/types"
 import type {

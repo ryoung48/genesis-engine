@@ -10,12 +10,10 @@ import { SPECTRAL_CLASS_COLORS } from "@/ui/genesis/generation/star-utils"
 export function buildStarStats(params: {
 	starClass: MainSequenceClass
 	starSubtype: number
-	restSeed: number
 	setSpectralClass?: (value: string) => void
 	setStarSubtype?: (value: number) => void
 }): StatEntry[] {
-	const { starClass, starSubtype, restSeed, setSpectralClass, setStarSubtype } =
-		params
+	const { starClass, starSubtype, setSpectralClass, setStarSubtype } = params
 	const typeStatValue = STAR.getStarLabel({
 		cls: starClass,
 		subtype: starSubtype,
@@ -43,7 +41,6 @@ export function buildStarStats(params: {
 		subtype: starSubtype,
 	}).toFixed(3)
 	const starAgeGyr = STAR_IDENTITY.getStarAgeGyr({
-		seed: restSeed,
 		massSol: starMassSolValue,
 	}).toFixed(2)
 
@@ -51,6 +48,7 @@ export function buildStarStats(params: {
 		{
 			label: "Type",
 			value: typeStatValue,
+			swatchColor: SPECTRAL_CLASS_COLORS[starClass],
 			editor:
 				setSpectralClass && setStarSubtype
 					? {

@@ -1,8 +1,8 @@
-﻿import { CLOUD_COVER } from "@/model/climate/cloud-cover"
-import { HUMIDITY } from "@/model/climate/humidity"
-import { KOPPEN } from "@/model/climate/koppen"
-import { PASTA } from "@/model/climate/pasta"
-import { VEGETATION } from "@/model/climate/vegetation"
+﻿import { KOPPEN } from "@/model/climate/classification/koppen"
+import { PASTA } from "@/model/climate/classification/pasta"
+import { VEGETATION } from "@/model/climate/classification/vegetation"
+import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
+import { HUMIDITY } from "@/model/climate/precipitation/humidity"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { MESH } from "@/model/mesh"
 import { TRADE_GOODS } from "@/model/society/infrastructure/trade/trade-goods"
@@ -573,7 +573,7 @@ export function computeRegionColors(
 	) {
 		for (let r = 0; r < N; r++) {
 			const [cr, cg, cb] = vegetationSatelliteColor(
-				satellitePastaClimate[r],
+				world.isLand[r] !== 0,
 				satelliteTemperature[r],
 				satelliteRainfall[r],
 			)

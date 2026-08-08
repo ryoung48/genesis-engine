@@ -13,8 +13,8 @@
 			"!.hotspot-baseline/**",
 			"!scripts",
 			"!scripts/**",
-			"!public/earth-history/events/*.json",
-			"!public/earth-data/coastline-lines.json"
+			"!public",
+			"!public/**"
 		]
 	},
 	"formatter": { "enabled": true, "indentStyle": "tab" },
@@ -43,7 +43,9 @@
 			"!coverage",
 			"!coverage/**",
 			"!.hotspot-baseline",
-			"!.hotspot-baseline/**"
+			"!.hotspot-baseline/**",
+			"!public",
+			"!public/**"
 		]
 	},
 	"javascript": {

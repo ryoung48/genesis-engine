@@ -1,6 +1,6 @@
 ﻿import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import { RAIN } from "@/model/climate/rain"
+import { RAIN } from "@/model/climate/precipitation/rain"
 import { SEA_LEVEL } from "@/model/geography/terrain/sea-level"
 import { UNITS } from "@/model/shared/units"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"

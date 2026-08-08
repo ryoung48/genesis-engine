@@ -1,5 +1,5 @@
 import { STAR } from "@/model/celestial/star"
-import { KOPPEN } from "@/model/climate/koppen"
+import { KOPPEN } from "@/model/climate/classification/koppen"
 import { SYNTHETIC_PLATES } from "@/model/geography/tectonics/synthetic-plates"
 import { COAST_DENSITY } from "@/model/geography/terrain/coast-density"
 import { EROSION } from "@/model/geography/terrain/erosion"

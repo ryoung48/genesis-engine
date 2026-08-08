@@ -1,12 +1,12 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
+import type { PastaDebug } from "@/model/climate/classification/pasta/types"
 import type {
 	GenesisObservedCurrent,
 	GenesisObservedDtr,
 	GenesisObservedHumidity,
 	GenesisObservedWind,
 } from "@/model/climate/observed-earth/types"
-import type { PastaDebug } from "@/model/climate/pasta/types"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type {
 	GenesisClimate,
 	GenesisHydrology,
@@ -89,8 +89,6 @@ export interface GenesisParams {
 	 * jovian -- see that doc's explanation of why it breaks their
 	 * temperature calibration. */
 	seismologyTotalHeatingK?: number
-	/** Seed for the sibling/system bodies shown in the Generation panel; 0 = Sol. Not used by terrain generation. */
-	restSeed?: number
 	/** Society era preset; controls population, settlement coverage, and nation-formation thresholds */
 	era?: SocietyEra
 }

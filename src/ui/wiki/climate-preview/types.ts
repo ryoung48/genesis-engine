@@ -1,4 +1,4 @@
-﻿import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+﻿import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 
 interface ClimatePreviewCommon {
 	avgTemp: number

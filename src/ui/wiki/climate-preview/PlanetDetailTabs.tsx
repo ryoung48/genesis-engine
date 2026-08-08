@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
 import type { MoonBody } from "@/model/celestial/moons/types"
 import type { AtmosphereProfile } from "@/model/celestial/orbit-body/types"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
+import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import { EmptyState } from "@/ui/components/primitives/EmptyState"
 import { uiTokens } from "@/ui/components/tokens"
 import {
@@ -31,6 +31,9 @@ function PlanetDetailContent({
 	onSelectGenerationPreviewTab,
 	unitSystem,
 	tidesEmptyLabel,
+	generateContent,
+	observerContent,
+	onDetailTabChange,
 }: {
 	tidalSchedulePreview?: TidalSchedule
 	daysPerYear: number
@@ -40,27 +43,59 @@ function PlanetDetailContent({
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	tidesEmptyLabel?: string
+	/** Only present on the main world's card -- adds a "generate" tab, first
+	 * in order, ahead of insolation/light/tides, holding the Generate button
+	 * and its progress/timing instead of a separate section below. */
+	generateContent?: ReactNode
+	/** Angular-size comparison for the selected body, shown in the final
+	 * Observer tab. */
+	observerContent?: ReactNode
+	/** Reports the active tab on every change (including the initial default)
+	 * -- lets the navigator know whether "generate" currently has focus, so
+	 * it can decide whether switching planets should reset this card at all. */
+	onDetailTabChange?: (
+		tab: GenerationPreviewTab | "tides" | "generate" | "observer",
+	) => void
 }) {
-	const [detailTab, setDetailTab] = useState<GenerationPreviewTab | "tides">(
-		generationPreviewTab,
-	)
+	// Defaults per destination, not per whatever tab was last viewed
+	// elsewhere: the main world (has generateContent) opens on "generate",
+	// everything else opens on "climate". A `key` on the parent
+	// LazyPlanetDetailTabs (keyed by selection) remounts this on every
+	// navigation so this initializer re-runs instead of carrying over state.
+	const [detailTab, setDetailTab] = useState<
+		GenerationPreviewTab | "tides" | "generate" | "observer"
+	>(() => (generateContent ? "generate" : "climate"))
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: onDetailTabChange intentionally excluded -- callers pass an inline closure that would otherwise re-fire this on every parent render.
+	useEffect(() => {
+		onDetailTabChange?.(detailTab)
+	}, [detailTab])
+
+	const tabs = [
+		...(generateContent
+			? [{ tab: "generate" as const, label: "generate" }]
+			: []),
+		...GENERATION_PREVIEW_TABS.map(([tab, label]) => ({
+			tab,
+			label: label.toLowerCase(),
+		})),
+		{ tab: "tides" as const, label: "tides" },
+		...(observerContent
+			? [{ tab: "observer" as const, label: "observer" }]
+			: []),
+	]
 
 	return (
 		<div className="mt-2">
 			<div className="flex gap-0 border-b border-slate-100">
-				{[
-					...GENERATION_PREVIEW_TABS.map(([tab, label]) => ({
-						tab,
-						label: label.toLowerCase(),
-					})),
-					{ tab: "tides" as const, label: "tides" },
-				].map(({ tab, label }) => (
+				{tabs.map(({ tab, label }) => (
 					<button
 						key={tab}
 						type="button"
 						onClick={() => {
 							setDetailTab(tab)
-							if (tab !== "tides") onSelectGenerationPreviewTab(tab)
+							if (tab !== "tides" && tab !== "generate" && tab !== "observer")
+								onSelectGenerationPreviewTab(tab)
 						}}
 						className={`px-2 pb-1.5 ${uiTokens.type.controlSm} transition-colors border-b-2 ${
 							detailTab === tab
@@ -72,7 +107,11 @@ function PlanetDetailContent({
 					</button>
 				))}
 			</div>
-			{detailTab === "tides" ? (
+			{detailTab === "generate" ? (
+				<div className="px-1 py-1">{generateContent}</div>
+			) : detailTab === "observer" ? (
+				<div className="px-1 py-1">{observerContent}</div>
+			) : detailTab === "tides" ? (
 				<div className="px-1 py-1" style={{ minHeight: 140 }}>
 					{tidalSchedulePreview && tidalSchedulePreview.events.length > 0 ? (
 						<TidalCalendarChart
@@ -147,6 +186,9 @@ export function LazyPlanetDetailTabs({
 	unitSystem,
 	inline,
 	tidesEmptyLabel,
+	generateContent,
+	observerContent,
+	onDetailTabChange,
 }: {
 	seed: number
 	moons: MoonBody[]
@@ -198,6 +240,18 @@ export function LazyPlanetDetailTabs({
 	unitSystem: UnitSystem
 	inline?: boolean
 	tidesEmptyLabel?: string
+	/** Only present on the main world's card -- adds a "generate" tab, first
+	 * in order, ahead of insolation/light/tides, holding the Generate button
+	 * and its progress/timing instead of a separate section below. */
+	generateContent?: ReactNode
+	/** Angular-size comparison for the selected body, shown in the final
+	 * Observer tab. */
+	observerContent?: ReactNode
+	/** Reports the active tab on every change (including the initial
+	 * default) -- see PlanetDetailContent's own doc. */
+	onDetailTabChange?: (
+		tab: GenerationPreviewTab | "tides" | "generate" | "observer",
+	) => void
 }) {
 	const [enabled, setEnabled] = useState(false)
 	const canRenderClimate =
@@ -233,6 +287,9 @@ export function LazyPlanetDetailTabs({
 			onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 			unitSystem={unitSystem}
 			tidesEmptyLabel={tidesEmptyLabel}
+			generateContent={generateContent}
+			observerContent={observerContent}
+			onDetailTabChange={onDetailTabChange}
 		/>
 	) : (
 		<EmptyState
@@ -403,6 +460,9 @@ function LazyPlanetDetailTabsContent({
 	onSelectGenerationPreviewTab,
 	unitSystem,
 	tidesEmptyLabel,
+	generateContent,
+	observerContent,
+	onDetailTabChange,
 }: {
 	seed: number
 	moons: MoonBody[]
@@ -441,6 +501,11 @@ function LazyPlanetDetailTabsContent({
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	tidesEmptyLabel?: string
+	generateContent?: ReactNode
+	observerContent?: ReactNode
+	onDetailTabChange?: (
+		tab: GenerationPreviewTab | "tides" | "generate" | "observer",
+	) => void
 }) {
 	const pressureBar = atmosphere?.pressureBar ?? 0
 	const landFraction = Math.max(0, Math.min(1, landCoverage))
@@ -514,25 +579,6 @@ function LazyPlanetDetailTabsContent({
 	const regularPreview = useEbmPreview(regularPreviewConfig)
 	const lockedPreview = useLockedClimatePreview(lockedPreviewConfig)
 	const climatePreview = isSolarLocked ? lockedPreview : regularPreview
-	const previewAxis = "lats" in climatePreview ? climatePreview.lats : null
-	const previewRowMeans = useMemo(
-		() =>
-			climatePreview.heat.map((row) =>
-				row.length > 0
-					? row.reduce((sum, value) => sum + value, 0) / row.length
-					: 0,
-			),
-		[climatePreview],
-	)
-	useEffect(() => {
-		console.log("[ClimatePreview] lat means", {
-			seed,
-			isSolarLocked,
-			previewAxis,
-			previewRowMeans,
-			generationPreviewTab,
-		})
-	}, [seed, isSolarLocked, previewAxis, previewRowMeans, generationPreviewTab])
 	const computedTidalSchedulePreview = useMemo(
 		() =>
 			moonContext
@@ -597,6 +643,9 @@ function LazyPlanetDetailTabsContent({
 			onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 			unitSystem={unitSystem}
 			tidesEmptyLabel={tidesEmptyLabel}
+			generateContent={generateContent}
+			observerContent={observerContent}
+			onDetailTabChange={onDetailTabChange}
 		/>
 	)
 }

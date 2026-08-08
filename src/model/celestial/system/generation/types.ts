@@ -44,8 +44,10 @@ export interface HomeWorldParams {
 
 export interface GenerateSystemBodiesParams {
 	seed: number
-	spectralClass: MainSequenceClass
-	starSubtype: number
+	/** Overrides the traditional G2V Sol-equivalent star every generated
+	 * system otherwise gets -- omit for that default. */
+	spectralClass?: MainSequenceClass
+	starSubtype?: number
 	/** Whether to reserve the temperate deviation-0 slot for a main world. */
 	forceMainWorld: boolean
 	/** Only consulted for the real Sol seed; ignored for other seeds. */

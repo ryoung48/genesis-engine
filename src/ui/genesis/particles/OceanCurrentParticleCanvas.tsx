@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from "react"
-import type { FlowGrid } from "@/model/climate/wind/types"
+import type { FlowGrid } from "@/model/climate/weather/wind/types"
 import {
 	FlowParticleCanvas,
 	type FlowSample,

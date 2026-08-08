@@ -60,6 +60,19 @@ export const CLASSIFICATION_COLOR: Partial<
 	vesperian: 0xdaa520,
 }
 
+/** Converts CLASSIFICATION_COLOR's Three.js hex numbers (e.g. 0x7cfc00) into
+ * CSS hex strings for 2D UI (the Swatch primitive) -- null for an
+ * unclassified body (e.g. an asteroid belt slot still being rolled) rather
+ * than guessing. */
+export function classificationSwatchColor(
+	classification: string | undefined,
+): string | null {
+	const hex = classification
+		? CLASSIFICATION_COLOR[classification as OrbitClassification]
+		: undefined
+	return hex === undefined ? null : `#${hex.toString(16).padStart(6, "0")}`
+}
+
 export const GROUP_LABEL: Record<SystemBody["group"], string> = {
 	"asteroid belt": "Asteroid Belt",
 	dwarf: "Dwarf World",

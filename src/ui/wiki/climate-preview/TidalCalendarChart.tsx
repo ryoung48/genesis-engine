@@ -11,8 +11,8 @@ import {
 } from "chart.js"
 import React, { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
-import { TIDAL_FORCE } from "@/model/climate/tidal-force"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import { TIDAL_FORCE } from "@/model/climate/ocean/tides/tidal-force"
+import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import { uiChartPalette } from "@/ui/components/tokens"
 
 ChartJS.register(

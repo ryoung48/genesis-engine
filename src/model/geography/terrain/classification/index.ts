@@ -1,4 +1,4 @@
-import { VEGETATION } from "@/model/climate/vegetation"
+import { VEGETATION } from "@/model/climate/classification/vegetation"
 import type {
 	ClassifyTopographyParams,
 	ComputeSlopeScoreParams,

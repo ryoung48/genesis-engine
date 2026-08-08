@@ -1,5 +1,5 @@
 import * as THREE from "three"
-import type { WindArrowData } from "@/model/climate/wind/types"
+import type { WindArrowData } from "@/model/climate/weather/wind/types"
 import {
 	ARROW_HEAD_DEG,
 	ARROW_HEAD_SPREAD,

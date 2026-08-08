@@ -63,13 +63,21 @@ export interface SolarSystemOverlayParams {
 	 * generate-system-bodies.ts) — undefined for the real Sol seed, which
 	 * uses its own hardcoded "Sol" (behind showRealNames) instead. */
 	starName?: string
+	/** The main world's real simulated terrain/vegetation, rendered as its
+	 * surface in place of texturePath's static image — null for a real Earth
+	 * import (which keeps its curated photo) or while no world has been
+	 * simulated yet. See useSolarSystemView's mainWorldSatelliteTexture. */
+	mainWorldTexture?: THREE.DataTexture | null
 }
 
 export interface SolarSystemOverlayState {
 	group: THREE.Group
 	suggestedCameraDistance: number
 	setDay(day: number): void
-	updateBodies(bodies: SystemBody[]): boolean
+	updateBodies(
+		bodies: SystemBody[],
+		mainWorldTexture?: THREE.DataTexture | null,
+	): boolean
 	/** Re-billboards every visible name label to face the camera — call this
 	 * every frame the solar-system view is active (labels don't rotate with
 	 * anything else in the scene, so there's no other hook that keeps them

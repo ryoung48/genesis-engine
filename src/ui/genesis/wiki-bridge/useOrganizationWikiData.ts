@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { VEGETATION } from "@/model/climate/vegetation"
+import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { COLOR } from "@/model/history/earth/color"
 import { DATE } from "@/model/history/earth/date"

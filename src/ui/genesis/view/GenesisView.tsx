@@ -1,18 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
-import { RAIN } from "@/model/climate/rain"
-import { HEAT } from "@/model/climate/tidal-locked/heat"
-import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/tidal-locked/ocean-currents"
-import { WIND } from "@/model/climate/wind"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { OCEAN_CURRENTS as LOCKED_OCEAN_CURRENTS } from "@/model/climate/ocean/tidal-locked"
+import { RAIN } from "@/model/climate/precipitation/rain"
+import { HEAT } from "@/model/climate/temperature/tidal-locked"
+import { WIND } from "@/model/climate/weather/wind"
 import { DATA_SOURCE } from "@/model/history/earth/data-source"
 import type { Eu4ProvinceFillGeometry } from "@/model/history/earth/data-source/types"
 import { DATE } from "@/model/history/earth/date"
 import { HISTORY_DAYS } from "@/model/history/generated/history-days"
 import { STATE } from "@/model/history/generated/state"
 import type { StageTiming } from "@/model/pipelines/types"
-import { SEED_LABEL } from "@/model/shared/random/seed-label"
-import { SEEDS } from "@/model/shared/random/seeds"
 import { UNITS } from "@/model/shared/units"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { FloatingPanel } from "@/ui/components/composites/FloatingPanel"
@@ -24,7 +22,6 @@ import {
 import { SimulationControls } from "@/ui/genesis/controls/SimulationControls"
 import {
 	DEFAULT_WORLD_PARAMS,
-	PLANET_SEED_STORAGE_KEY,
 	VIEW_PREFS_STORAGE_KEY,
 } from "@/ui/genesis/generation/defaults"
 import { EarthHistoryBookmarks } from "@/ui/genesis/generation/EarthHistoryBookmarks"
@@ -101,10 +98,6 @@ import { useWarWikiData } from "@/ui/genesis/wiki-bridge/useWarWikiData"
 import { GenerationPanel } from "@/ui/wiki/GenerationPanel"
 
 export const GenesisView: React.FC = () => {
-	const makeRandomSeed = useCallback(
-		() => Math.floor(Math.random() * SEEDS.seedMax),
-		[],
-	)
 	// Refs
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const viewportRef = useRef<HTMLDivElement>(null)
@@ -480,20 +473,6 @@ export const GenesisView: React.FC = () => {
 		end: null,
 	})
 
-	// Generation params
-	const initialStoredSeed = (() => {
-		if (typeof window === "undefined") return null
-		const stored = window.localStorage.getItem(PLANET_SEED_STORAGE_KEY)
-		return stored ? SEED_LABEL.resolveSeedLabel(stored) : null
-	})()
-	const initialSeed = initialStoredSeed ?? makeRandomSeed()
-	const [seed, setSeed] = useState(() => initialSeed)
-	const [seedInput, setSeedInput] = useState(() =>
-		SEED_LABEL.formatSeedLabel(initialSeed),
-	)
-	const [seedInputDirty, setSeedInputDirty] = useState(false)
-	const [seedError, setSeedError] = useState(false)
-
 	// Planet params
 	const numPoints = DEFAULT_WORLD_PARAMS.numPoints
 	const jitter = DEFAULT_WORLD_PARAMS.jitter
@@ -519,9 +498,7 @@ export const GenesisView: React.FC = () => {
 		perihelion,
 		planetRadiusKm,
 		pressure,
-		rebuildSystemBody,
-		resetSystemMoon,
-		restSeed,
+		seed,
 		ridgeSharpening,
 		seaLevel,
 		setAxialTiltDirection,
@@ -536,7 +513,7 @@ export const GenesisView: React.FC = () => {
 		setPerihelion,
 		setPlanetRadiusKm,
 		setPressure,
-		setRestSeed,
+		setSeed,
 		setSeaLevel,
 		setSolarSystem,
 		setSpectralClass,
@@ -560,7 +537,6 @@ export const GenesisView: React.FC = () => {
 		tidallyLocked,
 		tideLock,
 		updateEditableSystemBody,
-		updateEditableSystemMoon,
 	} = useSolarSystemBodies({ initialGenerationSession })
 	const scaledClockHour = scaleClockDialHourToDayLength(clockHour, hoursPerDay)
 
@@ -611,13 +587,6 @@ export const GenesisView: React.FC = () => {
 		}
 		setGenerationTimings(world.timings ?? null)
 	}, [world])
-	useEffect(() => {
-		if (typeof window === "undefined") return
-		window.localStorage.setItem(
-			PLANET_SEED_STORAGE_KEY,
-			SEED_LABEL.formatSeedLabel(seed),
-		)
-	}, [seed])
 	// --- Color mode guard ---
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -1517,13 +1486,9 @@ export const GenesisView: React.FC = () => {
 		generating,
 		generationProgress,
 		generationLabel,
-		handleApplySeed,
-		handleEarthImport,
 		handleGenerate,
-		handleRandomizeCode,
 		handleResetDefaults,
 		handleReturnToPlanetView,
-		handleSeedInputChange,
 	} = useWorldGeneration({
 		sceneRef,
 		workerRef,
@@ -1541,11 +1506,7 @@ export const GenesisView: React.FC = () => {
 		recordProceduralFrame,
 		seed,
 		setSeed,
-		seedInput,
-		setSeedInput,
-		seedInputDirty,
-		setSeedInputDirty,
-		setSeedError,
+		setDataVariant: handleSetDataVariant,
 		setters,
 		era,
 		numPoints,
@@ -1577,17 +1538,6 @@ export const GenesisView: React.FC = () => {
 		pressure,
 		mainWorldSystemBody,
 	})
-
-	// Earth import shows real-world observed data by default; a fresh
-	// procedural generation shows the EBM-modeled climate.
-	const handleGenerateWithDataVariant = useCallback(() => {
-		handleSetDataVariant("generated")
-		handleGenerate()
-	}, [handleGenerate, handleSetDataVariant])
-	const handleEarthImportWithDataVariant = useCallback(() => {
-		handleSetDataVariant("observed")
-		handleEarthImport()
-	}, [handleEarthImport, handleSetDataVariant])
 
 	const {
 		exportWidthPreset,
@@ -1787,6 +1737,7 @@ export const GenesisView: React.FC = () => {
 	} = useSolarSystemView({
 		sceneRef,
 		initialGenerationSession,
+		world,
 		solarSystem,
 		setSolarSystem,
 		skipNextGeneratedSystemBodiesSyncRef,
@@ -1805,7 +1756,6 @@ export const GenesisView: React.FC = () => {
 		starSubtype,
 		starName,
 		namesEnabled,
-		restSeed,
 		seed,
 		solarSystemViewActive,
 		setSolarSystemViewActive,
@@ -1833,10 +1783,10 @@ export const GenesisView: React.FC = () => {
 					resetWorldDefaults={handleResetDefaults}
 					setTideLock={setTideLock}
 					setObliquity={setObliquity}
-					restSeed={restSeed}
+					seed={seed}
 					starName={starName}
-					showRealSolNames={restSeed === SOL_DATA.solSeed}
-					setRestSeed={setRestSeed}
+					showRealSolNames={seed === SOL_DATA.solSeed}
+					setSeed={setSeed}
 					forceMainWorld={forceMainWorld}
 					setForceMainWorld={setForceMainWorld}
 					tidalSchedulePreview={tidalSchedulePreview}
@@ -1844,9 +1794,6 @@ export const GenesisView: React.FC = () => {
 					orbitBodies={systemBodies.filter((b) => !b.isMainWorld)}
 					systemBodies={systemBodies}
 					onUpdateSystemBody={updateEditableSystemBody}
-					onUpdateSystemMoon={updateEditableSystemMoon}
-					onRebuildSystemBody={rebuildSystemBody}
-					onResetSystemMoon={resetSystemMoon}
 					onFocusBody={handleFocusBody}
 					currentFocus={currentFocus}
 					daysPerYear={daysPerYear}
@@ -1865,11 +1812,6 @@ export const GenesisView: React.FC = () => {
 					obliquity={obliquity}
 					era={era}
 					setEra={setEra}
-					seedInput={seedInput}
-					setSeedInput={handleSeedInputChange}
-					onApplySeed={handleApplySeed}
-					seedError={seedError}
-					onRandomizeSeed={handleRandomizeCode}
 					generating={generating}
 					generationLabel={generationLabel}
 					generationProgress={generationProgress}
@@ -1878,8 +1820,7 @@ export const GenesisView: React.FC = () => {
 					generationPreviewTab={generationPreviewTab}
 					onSelectGenerationPreviewTab={setGenerationPreviewTab}
 					unitSystem={unitSystem}
-					handleGenerate={handleGenerateWithDataVariant}
-					handleEarthImport={handleEarthImportWithDataVariant}
+					handleGenerate={handleGenerate}
 					onClose={() => setGenerationPanelOpen(false)}
 					worldDetails={{
 						hasGeneratedWorld: !!world && !generating,

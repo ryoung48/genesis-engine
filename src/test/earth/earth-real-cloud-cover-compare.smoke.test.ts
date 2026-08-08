@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { CLOUD_COVER } from "@/model/climate/cloud-cover"
+import { CLOUD_COVER } from "@/model/climate/precipitation/cloud-cover"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {

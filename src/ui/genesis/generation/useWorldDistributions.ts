@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { VEGETATION } from "@/model/climate/vegetation"
+import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { GOVERNMENT } from "@/model/history/earth/government"
 import { ERAS } from "@/model/society/eras"

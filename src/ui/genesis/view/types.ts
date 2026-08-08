@@ -5,7 +5,7 @@ import type {
 	SolarSystemState,
 	SystemBody,
 } from "@/model/celestial/system/types"
-import type { WIND } from "@/model/climate/wind"
+import type { WIND } from "@/model/climate/weather/wind"
 import type {
 	Eu4ProvinceFillGeometry,
 	RawOrganizationReference,
@@ -120,7 +120,11 @@ export type OverlayStateInput = SolarSystemBodiesInput & {
 
 export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	sceneRef: SceneRef
-	seed: number
+	/** The main world's own simulated data -- used to render its real
+	 * generated terrain/vegetation as the solar-system-view surface texture
+	 * instead of the curated Earth photo, for every main world except a real
+	 * Earth import (see useSolarSystemView's mainWorldSatelliteTexture). */
+	world: SerializedGenesisWorld | null
 	solarSystem: SolarSystemState
 	setSolarSystem: Dispatch<SetStateAction<SolarSystemState>>
 	skipNextGeneratedSystemBodiesSyncRef: RefObject<boolean>
@@ -141,7 +145,7 @@ export type SolarSystemViewInput = SolarSystemBodiesInput & {
 	// a generated one, so there is no generated name to pass for that system.
 	starName: string | undefined
 	namesEnabled: boolean
-	restSeed: number
+	seed: number
 	solarSystemViewActive: boolean
 	setSolarSystemViewActive: Dispatch<SetStateAction<boolean>>
 	showSolarSystemEllipticalOrbits: boolean
@@ -239,11 +243,10 @@ export type WorldGenerationInput = {
 	) => void
 	seed: number
 	setSeed: (seed: number) => void
-	seedInput: string
-	setSeedInput: (seedInput: string) => void
-	seedInputDirty: boolean
-	setSeedInputDirty: (dirty: boolean) => void
-	setSeedError: (error: boolean) => void
+	/** Flips the display data source -- an Earth-import Generate (seed ===
+	 * SOL_DATA.solSeed) shows real observed data by default; every other
+	 * seed shows the EBM-modeled "generated" climate. */
+	setDataVariant: (variant: "generated" | "observed") => void
 	setters: Parameters<typeof resetWorldDefaults>[0]
 	era: SocietyEra
 	numPoints: number

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { DTR } from "@/model/climate/dtr"
+import { DTR } from "@/model/climate/temperature/dtr"
 import type { GenesisRainfall } from "@/model/climate/types"
 
 function createRainfall({ rainMm }: { rainMm: number }): GenesisRainfall {

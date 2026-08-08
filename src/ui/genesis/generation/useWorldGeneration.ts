@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
 import { STATE } from "@/model/history/generated/state"
-import { SEED_LABEL } from "@/model/shared/random/seed-label"
 import type { SerializedGenesisWorld } from "@/model/worker-protocol/types"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {
@@ -55,11 +55,7 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		recordProceduralFrame,
 		seed,
 		setSeed,
-		seedInput,
-		setSeedInput,
-		seedInputDirty,
-		setSeedInputDirty,
-		setSeedError,
+		setDataVariant,
 		setters,
 		era,
 		numPoints,
@@ -233,14 +229,6 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		],
 	)
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	useEffect(() => {
-		if (!seedInputDirty) {
-			setSeedInput(SEED_LABEL.formatSeedLabel(seed))
-			setSeedError(false)
-		}
-	}, [seed, seedInputDirty])
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleGenerateWorld = useCallback(
 		(overrideSeed: number, overrides?: Partial<GenerationParams>) => {
 			setSelectedTimeMs(simStartTimeMs)
@@ -250,62 +238,9 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		[currentParams, generationCallbacks, simStartTimeMs],
 	)
 
-	const resolveSeedInput = useCallback(() => {
-		return SEED_LABEL.resolveSeedLabel(seedInput)
-	}, [seedInput])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	const handleReturnToPlanetView = useCallback(() => {
 		setSolarSystemViewActive(false)
-	}, [])
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	const handleGenerate = useCallback(() => {
-		if (seedInput.trim()) {
-			const nextSeed = resolveSeedInput()
-			if (nextSeed === null) {
-				setSeedError(true)
-				window.setTimeout(() => setSeedError(false), 1500)
-				return
-			}
-			setSeedError(false)
-			handleReturnToPlanetView()
-			handleGenerateWorld(nextSeed)
-			return
-		}
-		handleReturnToPlanetView()
-		handleGenerateWorld(seed)
-	}, [
-		handleGenerateWorld,
-		handleReturnToPlanetView,
-		resolveSeedInput,
-		seed,
-		seedInput,
-	])
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	const handleApplySeed = useCallback(() => {
-		const trimmed = seedInput.trim()
-		if (!trimmed) {
-			setSeedInputDirty(false)
-			setSeedError(false)
-			setSeedInput(SEED_LABEL.formatSeedLabel(seed))
-			return
-		}
-		const parsed = SEED_LABEL.resolveSeedLabel(trimmed)
-		if (parsed === null) {
-			setSeedError(true)
-			return
-		}
-		setSeedError(false)
-		setSeedInputDirty(false)
-		setSeed(parsed)
-		setSeedInput(SEED_LABEL.formatSeedLabel(parsed))
-	}, [seed, seedInput])
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	const handleSeedInputChange = useCallback((nextSeed: string) => {
-		setSeedInput(nextSeed)
-		setSeedInputDirty(true)
-		setSeedError(false)
 	}, [])
 
 	const handleImportHeightmap = useCallback(
@@ -594,31 +529,40 @@ export function useWorldGeneration(input: WorldGenerationInput) {
 		}
 	}, [handleImportHeightmap, handleReturnToPlanetView])
 
+	// The single Generate entry point: seed === SOL_DATA.solSeed is what
+	// "earth import" means -- rather than a separate button/action, loading
+	// the real Earth rasters is just what Generate does once the seed you've
+	// staged (via OrbitHeader's seed box/dice/earth-import shortcut) equals
+	// Sol's. Every other seed runs the ordinary procedural pipeline.
+	const handleGenerate = useCallback(() => {
+		if (seed === SOL_DATA.solSeed) {
+			setDataVariant("observed")
+			void handleEarthImport()
+			return
+		}
+		setDataVariant("generated")
+		handleReturnToPlanetView()
+		handleGenerateWorld(seed)
+	}, [
+		handleEarthImport,
+		handleGenerateWorld,
+		handleReturnToPlanetView,
+		seed,
+		setDataVariant,
+	])
+
 	const handleResetDefaults = useCallback(
 		() => resetWorldDefaults(setters),
 		[setters],
 	)
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
-	const handleRandomizeCode = useCallback(() => {
-		const nextLabel = SEED_LABEL.makeRandomSeedLabel()
-		const nextSeed = SEED_LABEL.resolveSeedLabel(nextLabel)
-		if (nextSeed === null) return
-		setSeed(nextSeed)
-		setSeedInput(nextLabel)
-		setSeedInputDirty(false)
-		setSeedError(false)
-	}, [])
 
 	return {
 		generating,
 		generationProgress,
 		generationLabel,
-		handleApplySeed,
 		handleEarthImport,
 		handleGenerate,
-		handleRandomizeCode,
 		handleResetDefaults,
 		handleReturnToPlanetView,
-		handleSeedInputChange,
 	}
 }

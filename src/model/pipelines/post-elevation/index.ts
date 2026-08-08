@@ -2,23 +2,23 @@ import { MOON } from "@/model/celestial/moons"
 import { ORBIT_BODY } from "@/model/celestial/orbit-body"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
-import { CLIMATE } from "@/model/climate/climate"
-import { CYCLONES } from "@/model/climate/cyclones"
-import { DTR } from "@/model/climate/dtr"
-import { HYDROLOGY } from "@/model/climate/hydrology"
-import { ICE } from "@/model/climate/ice"
-import { KOPPEN } from "@/model/climate/koppen"
+import { CLIMATE } from "@/model/climate/classification/climate"
+import { HYDROLOGY } from "@/model/climate/classification/hydrology"
+import { ICE } from "@/model/climate/classification/ice"
+import { KOPPEN } from "@/model/climate/classification/koppen"
+import { PASTA } from "@/model/climate/classification/pasta"
+import type { PastaDebug } from "@/model/climate/classification/pasta/types"
+import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { OBSERVED_EARTH } from "@/model/climate/observed-earth"
-import { OCEAN_CURRENTS } from "@/model/climate/ocean-currents"
-import { PASTA } from "@/model/climate/pasta"
-import type { PastaDebug } from "@/model/climate/pasta/types"
-import { RAIN } from "@/model/climate/rain"
-import { TIDAL_MAP } from "@/model/climate/tidal-map"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
-import { TIDES } from "@/model/climate/tides"
-import { TORNADOES } from "@/model/climate/tornadoes"
+import { OCEAN_CURRENTS } from "@/model/climate/ocean/currents"
+import { COASTAL_MASK } from "@/model/climate/ocean/tides/coastal-mask"
+import { TIDAL_MAP } from "@/model/climate/ocean/tides/tidal-map"
+import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
+import { RAIN } from "@/model/climate/precipitation/rain"
+import { DTR } from "@/model/climate/temperature/dtr"
 import type { GenesisRainfall } from "@/model/climate/types"
-import { VEGETATION } from "@/model/climate/vegetation"
+import { CYCLONES } from "@/model/climate/weather/cyclones"
+import { TORNADOES } from "@/model/climate/weather/tornadoes"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { HAZARDS } from "@/model/geography/terrain/hazards"
 import { LAKES } from "@/model/geography/terrain/lakes"
@@ -706,7 +706,7 @@ function runPostElevationPipeline(
 	// Computed before topography so the tidal bonus can nudge coastal marsh
 	// formation in classifyTopography.
 	t0 = performance.now()
-	const coastalMask = TIDES.computeCoastalMask({ mesh, isLand })
+	const coastalMask = COASTAL_MASK.computeCoastalMask({ mesh, isLand })
 	const cls = STAR.isValidSpectralClass(params.spectralClass)
 		? (params.spectralClass as MainSequenceClass)
 		: STAR.defaultSpectralClass

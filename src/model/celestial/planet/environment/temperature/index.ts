@@ -9,9 +9,17 @@ const DEVIATION_DOMAIN = [
 	-4.5, -4.0, -4.0, -3.5, -3.5, -3.0, -3.0, -2.5, -2.5, -2.0, -2.0, -1.5, -1.5,
 	-1.0, -1.0, -0.5, -0.5, 0.5, 0.5, 1.0, 1.0, 1.5, 1.5, 2.0, 2.0, 2.5,
 ] as const
+// The two breakpoints straddling deviation 0 (indices 16/17, at -0.5/0.5)
+// were 5/25 -- interpolating to 15C at deviation 0 exactly. But
+// auFromTemperature/celsiusForOrbitalDistance's blackbody formula only
+// resolves deviation 0 back to exactly 1 AU (at luminositySol 1) for a
+// 279K/5.85C target (279 being that formula's own equilibrium constant), not
+// Earth's real warmed 15C surface temp. Recentered on 5.85C (keeping the
+// same 20-wide spread the original 5/25 pair had) so a forced main world at
+// the habitable-zone center actually lands at 1 AU around a Sol-like star.
 const DEVIATION_RANGE = [
 	-250, -230, -210, -190, -180, -160, -150, -130, -120, -100, -95, -75, -65,
-	-50, -40, 0, 5, 25, 35, 75, 85, 180, 200, 300, 350, 450,
+	-50, -40, 0, -4.15, 15.85, 35, 75, 85, 180, 200, 300, 350, 450,
 ] as const
 function deviationToCelsius(deviation: number): number {
 	if (deviation <= DEVIATION_DOMAIN[0]) return DEVIATION_RANGE[0]

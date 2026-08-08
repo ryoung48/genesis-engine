@@ -1,4 +1,4 @@
-import { PASTA } from "@/model/climate/pasta"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { RNG } from "@/model/shared/random/rng"
 import type { LocationTradeGoods } from "@/model/society/infrastructure/trade/trade-goods/types"
 import { TRADE_GOODS_TABLE } from "@/model/society/infrastructure/trade/trade-goods-table"

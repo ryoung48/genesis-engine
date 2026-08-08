@@ -7,12 +7,14 @@ import type {
 	TideLock,
 } from "@/model/celestial/orbit-body/types"
 import type { SystemBody } from "@/model/celestial/system/types"
-import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule/types"
+import type { SurfaceTidesBreakdown } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
+import { Slider } from "@/ui/components/primitives/Slider"
 import type { GenerationPreviewTab } from "@/ui/genesis/generation/generation-preview"
 import type { SliderDef } from "@/ui/genesis/generation/sliders"
 import type { UnitSystem } from "@/ui/genesis/shared/ui-format"
+import { classificationSwatchColor } from "@/ui/genesis/solar-system/overlay/constants"
 import { LazyPlanetDetailTabs } from "@/ui/wiki/climate-preview/PlanetDetailTabs"
 import { estimateAlbedo } from "@/ui/wiki/climate-preview/useEbmPreview"
 import {
@@ -21,7 +23,6 @@ import {
 	updateMoonDiameter,
 	updateMoonSemiMajorAxis,
 } from "@/ui/wiki/stats/orbit/body-mutations"
-import { ORBIT_STAT_HELP } from "@/ui/wiki/stats/orbit/constants"
 import {
 	buildPressureAtmosphereProfile,
 	describeTemperatureK,
@@ -42,6 +43,49 @@ import {
 	buildSubstellarLonStat,
 } from "@/ui/wiki/stats/orbit/tide-lock-stats"
 
+interface OrbitalShapeEditorParams {
+	eccentricity: number
+	perihelionDeg: number
+	onSetEccentricity: (value: number) => void
+	onSetPerihelion: (value: number) => void
+}
+
+function buildOrbitalShapeEditor(
+	params: OrbitalShapeEditorParams,
+): NonNullable<StatEntry["editor"]> {
+	return {
+		label: "Eccentricity",
+		value: params.eccentricity,
+		min: 0,
+		max: 0.9,
+		step: 0.001,
+		display: params.eccentricity.toFixed(4),
+		set: params.onSetEccentricity,
+		content: (
+			<div className="flex w-44 flex-col gap-3 px-1 pt-0.5 pb-2">
+				<Slider
+					label="Eccentricity"
+					value={params.eccentricity.toFixed(4)}
+					min={0}
+					max={0.9}
+					step={0.001}
+					inputValue={params.eccentricity}
+					onChange={params.onSetEccentricity}
+				/>
+				<Slider
+					label="Perihelion"
+					value={`${params.perihelionDeg.toFixed(1)}°`}
+					min={0}
+					max={360}
+					step={1}
+					inputValue={params.perihelionDeg}
+					onChange={params.onSetPerihelion}
+				/>
+			</div>
+		),
+	}
+}
+
 function buildGroupClassStat(
 	group: string | undefined,
 	classification: string | undefined,
@@ -54,10 +98,8 @@ function buildGroupClassStat(
 	return [
 		{
 			label: "Class",
-			value:
-				classLabel && classLabel !== groupLabel
-					? `${groupLabel} · ${classLabel}`
-					: groupLabel,
+			value: classLabel ?? groupLabel,
+			swatchColor: classificationSwatchColor(classification),
 		},
 	]
 }
@@ -70,7 +112,6 @@ function buildBodyStats({
 	orbitalPeriodDays,
 	dayLength,
 	eccentricity,
-	longitudeOfPerihelionDeg,
 	inclinationDeg,
 	axialTiltDeg,
 	diameterKm,
@@ -120,7 +161,6 @@ function buildBodyStats({
 		moonOrbitalPeriodDays?: number
 	} | null
 	eccentricity: { value: number; editor?: StatEntry["editor"] }
-	longitudeOfPerihelionDeg: { value: number; editor?: StatEntry["editor"] }
 	inclinationDeg: { value: number; editor?: StatEntry["editor"] }
 	axialTiltDeg: { value: number; editor?: StatEntry["editor"] }
 	diameterKm: number
@@ -173,12 +213,6 @@ function buildBodyStats({
 			label: "Eccentricity",
 			value: eccentricity.value.toFixed(4),
 			editor: eccentricity.editor,
-		},
-		{
-			label: "Perihelion",
-			value: `${longitudeOfPerihelionDeg.value.toFixed(1)}°`,
-			help: ORBIT_STAT_HELP.lsAphelion,
-			editor: longitudeOfPerihelionDeg.editor,
 		},
 		{
 			label: "Inclination",
@@ -281,7 +315,6 @@ function buildMoonStats({
 	orbitalPeriodDays,
 	siderealDayHours,
 	eccentricity,
-	longitudeOfPerihelionDeg,
 	inclinationDeg,
 	axialTiltDeg,
 	parentOrbitalPeriodDays,
@@ -315,7 +348,6 @@ function buildMoonStats({
 	 * orbitalPeriodDays (not assumed to be tidally locked). */
 	siderealDayHours: number
 	eccentricity: number
-	longitudeOfPerihelionDeg: number
 	inclinationDeg: number
 	axialTiltDeg: number
 	parentOrbitalPeriodDays?: number
@@ -327,7 +359,6 @@ function buildMoonStats({
 		semiMajorAxis?: StatEntry["editor"]
 		siderealDay?: StatEntry["editor"]
 		eccentricity?: StatEntry["editor"]
-		longitudeOfPerihelion?: StatEntry["editor"]
 		inclination?: StatEntry["editor"]
 		axialTilt?: StatEntry["editor"]
 		substellarLon?: (value: number) => void
@@ -366,10 +397,6 @@ function buildMoonStats({
 				}
 			: null,
 		eccentricity: { value: eccentricity, editor: editors?.eccentricity },
-		longitudeOfPerihelionDeg: {
-			value: longitudeOfPerihelionDeg,
-			editor: editors?.longitudeOfPerihelion,
-		},
 		inclinationDeg: { value: inclinationDeg, editor: editors?.inclination },
 		axialTiltDeg: { value: axialTiltDeg, editor: editors?.axialTilt },
 		diameterKm,
@@ -423,6 +450,13 @@ export function buildOrbitBodyStats(params: {
 	 * onAvgTempKChange. Undefined until that preview has produced a result. */
 	avgTempK?: number
 	unitSystem: UnitSystem
+	/** The Semi Major Axis editor's min/max are always ±10% of this value
+	 * (defaults to the body's own current orbitalDistanceAU, i.e. no fixed
+	 * baseline) rather than one fixed 0.01-60 AU span for every body --
+	 * callers that track a frozen post-generation baseline (see
+	 * GenerationPlanetNavigator) pass it here so the range stays a stable,
+	 * balanced window instead of recentering on every edit. */
+	orbitalDistanceBaselineAU?: number
 }): StatEntry[] {
 	const {
 		body,
@@ -437,6 +471,7 @@ export function buildOrbitBodyStats(params: {
 		onToggleSpin,
 		avgTempK,
 		unitSystem,
+		orbitalDistanceBaselineAU,
 	} = params
 	if (body.group === "asteroid belt") {
 		return [
@@ -491,8 +526,8 @@ export function buildOrbitBodyStats(params: {
 				? {
 						label: "Semi Major Axis",
 						value: body.orbitalDistanceAU,
-						min: 0.01,
-						max: 60,
+						min: (orbitalDistanceBaselineAU ?? body.orbitalDistanceAU) * 0.9,
+						max: (orbitalDistanceBaselineAU ?? body.orbitalDistanceAU) * 1.1,
 						step: 0.01,
 						display: `${body.orbitalDistanceAU.toFixed(3)} AU`,
 						set: (value: number) =>
@@ -535,36 +570,17 @@ export function buildOrbitBodyStats(params: {
 		eccentricity: {
 			value: body.eccentricity,
 			editor: onUpdateBody
-				? {
-						label: "Eccentricity",
-						value: body.eccentricity,
-						min: 0,
-						max: 0.9,
-						step: 0.001,
-						display: body.eccentricity.toFixed(4),
-						set: (value: number) =>
+				? buildOrbitalShapeEditor({
+						eccentricity: body.eccentricity,
+						perihelionDeg: body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg,
+						onSetEccentricity: (value: number) =>
 							onUpdateBody((current) => ({ ...current, eccentricity: value })),
-					}
-				: undefined,
-		},
-		longitudeOfPerihelionDeg: {
-			value: body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg,
-			editor: onUpdateBody
-				? {
-						label: "Perihelion",
-						value: body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg,
-						min: 0,
-						max: 360,
-						step: 1,
-						display: `${(
-							body.lsAphelionDeg ?? body.longitudeOfPerihelionDeg
-						).toFixed(0)}°`,
-						set: (value: number) =>
+						onSetPerihelion: (value: number) =>
 							onUpdateBody((current) => ({
 								...current,
 								lsAphelionDeg: value,
 							})),
-					}
+					})
 				: undefined,
 		},
 		inclinationDeg: {
@@ -742,7 +758,6 @@ export function buildOrbitMoonStats(params: {
 		orbitalPeriodDays: moon.orbitalPeriodDays,
 		siderealDayHours: moon.siderealDayHours,
 		eccentricity: moon.eccentricity,
-		longitudeOfPerihelionDeg: moon.longitudeOfPerihelionDeg,
 		inclinationDeg: moon.inclinationDeg,
 		axialTiltDeg: moon.axialTiltDeg,
 		parentOrbitalPeriodDays,
@@ -790,29 +805,20 @@ export function buildOrbitMoonStats(params: {
 								siderealDayHours: value,
 							})),
 					},
-					eccentricity: {
-						label: "Eccentricity",
-						value: moon.eccentricity,
-						min: 0,
-						max: 0.9,
-						step: 0.001,
-						display: moon.eccentricity.toFixed(4),
-						set: (value: number) =>
-							onUpdateMoon((current) => ({ ...current, eccentricity: value })),
-					},
-					longitudeOfPerihelion: {
-						label: "Perihelion",
-						value: moon.longitudeOfPerihelionDeg,
-						min: 0,
-						max: 360,
-						step: 1,
-						display: `${moon.longitudeOfPerihelionDeg.toFixed(1)}°`,
-						set: (value: number) =>
+					eccentricity: buildOrbitalShapeEditor({
+						eccentricity: moon.eccentricity,
+						perihelionDeg: moon.longitudeOfPerihelionDeg,
+						onSetEccentricity: (value: number) =>
+							onUpdateMoon((current) => ({
+								...current,
+								eccentricity: value,
+							})),
+						onSetPerihelion: (value: number) =>
 							onUpdateMoon((current) => ({
 								...current,
 								longitudeOfPerihelionDeg: value,
 							})),
-					},
+					}),
 					inclination: {
 						label: "Inclination",
 						value: moon.inclinationDeg,

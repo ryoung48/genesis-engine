@@ -1,5 +1,5 @@
-import { KOPPEN } from "@/model/climate/koppen"
-import { PASTA } from "@/model/climate/pasta"
+import { KOPPEN } from "@/model/climate/classification/koppen"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { TERRAIN_FEATURES } from "@/model/geography/tectonics/terrain-features"
 import { LANDMARKS } from "@/model/geography/terrain/landmarks"
 import { ERAS } from "@/model/society/eras"
@@ -327,7 +327,7 @@ export function buildVegetationSwatchColor(
 			colorMode === "realVegetationSatellite") &&
 		satellitePastaClimate
 			? vegetationSatelliteColor(
-					satellitePastaClimate[hoverRegion],
+					world.isLand[hoverRegion] !== 0,
 					(colorMode === "realVegetationSatellite"
 						? (world.climate.real_temperature_avg ??
 							world.climate.temperature_avg)

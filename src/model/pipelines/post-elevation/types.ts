@@ -1,5 +1,5 @@
-import type { PastaDebug } from "@/model/climate/pasta/types"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import type { PastaDebug } from "@/model/climate/classification/pasta/types"
+import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type {
 	GenesisClimate,
 	GenesisHydrology,

@@ -268,7 +268,7 @@ function buildSatelliteTexture(
 		const cached = regionColorCache.get(region)
 		if (cached) return cached
 		const [r, g, b] = vegetationSatelliteColor(
-			pastaClimate[region],
+			world.isLand[region] !== 0,
 			temperature_avg[region],
 			rainfallAnnual[region],
 		)

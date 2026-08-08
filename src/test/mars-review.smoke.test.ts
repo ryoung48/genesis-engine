@@ -1,6 +1,6 @@
 import { describe, it } from "vitest"
-import { CONSTANTS } from "@/model/climate/ebm/constants"
-import { EnergyBalanceModel } from "@/model/climate/ebm/energy-balance-model"
+import { CONSTANTS } from "@/model/climate/temperature/ebm/constants"
+import { EnergyBalanceModel } from "@/model/climate/temperature/ebm/energy-balance-model"
 
 // Ad-hoc realism check for Mars's EBM output against its known real climate.
 // Uses the exact per-body values from sol-system.ts's Mars entry (au,

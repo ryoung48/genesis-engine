@@ -1,25 +1,18 @@
-import { STAR } from "@/model/celestial/star"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import { RNG } from "@/model/shared/random/rng"
+import { TEXT } from "@/model/shared/text"
 import { LANGUAGE } from "@/model/society/language/languages"
 
-// Star age is rolled from its own salted rng derived from the same system
-// seed, decorrelated from the main body-generation rng sequence (created
-// with a fresh `createRng` instance below) so callers (e.g. the UI's star
-// stat card) can reproduce the exact same value from just (seed, massSol)
-// without needing to replay the whole body-generation sequence.
-const STAR_AGE_SEED_SALT = 0x9e3779b1
-
-function getStarAgeGyr({
-	seed,
-	massSol,
-}: {
-	seed: number
-	massSol: number
-}): number {
-	if (seed === SOL_DATA.solSeed) return SOL_DATA.solStarAgeGyr
-	const rng = RNG.createRng({ seed: seed + STAR_AGE_SEED_SALT })
-	return STAR.rollStarAgeGyr({ rng, massSol })
+// Every generated system's forced main world is a literal Earth clone (see
+// body/index.ts), so its star should read as roughly Sol-like too -- but a
+// star whose mass gives it a shorter main-sequence lifespan than Sol's own
+// age can't actually BE that old, so this caps at whichever is smaller:
+// Sol's real age, or this star's own main-sequence lifespan (same formula as
+// STAR.rollStarAgeGyr's mainSequenceLifespanGyr). A star picked heavier than
+// Sol (shorter-lived) reads as older-for-its-type instead of impossibly
+// ancient; anything at or lighter than Sol just gets Sol's own age.
+function getStarAgeGyr({ massSol }: { massSol: number }): number {
+	const mainSequenceLifespanGyr = 10 / massSol ** 2.5
+	return Math.min(mainSequenceLifespanGyr, SOL_DATA.solStarAgeGyr)
 }
 
 /** The star's own name, from the same per-system language every sibling
@@ -31,12 +24,16 @@ function getStarAgeGyr({
  * themselves rather than calling this for Sol. */
 function generateStarName(seed: number): string {
 	const lang = LANGUAGE.spawn(`system:${seed}`)
-	return LANGUAGE.word.simple({
-		lang,
-		key: "region",
-		namespace: "planet",
-		slot: "star",
-	}).word
+	// LANGUAGE.word.simple's slot-based path returns the raw (lowercase) word
+	// -- every other caller (see names/index.ts) title-cases it themselves.
+	return TEXT.titleCase(
+		LANGUAGE.word.simple({
+			lang,
+			key: "region",
+			namespace: "planet",
+			slot: "star",
+		}).word,
+	)
 }
 
 export const STAR_IDENTITY = { getStarAgeGyr, generateStarName }

@@ -6,16 +6,13 @@ import type { SystemBody } from "@/model/celestial/system/types"
 import type {
 	SurfaceTidesBreakdown,
 	TidalSchedule,
-} from "@/model/climate/tidal-schedule/types"
+} from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { StageTiming } from "@/model/pipelines/types"
 import { ERAS } from "@/model/society/eras"
 import type { SocietyEra } from "@/model/society/types"
 import { Button } from "@/ui/components/primitives/Button"
 import { DisclosureButton } from "@/ui/components/primitives/DisclosureButton"
-import { IconButton } from "@/ui/components/primitives/IconButton"
-import { DiceMultipleOutlineIcon } from "@/ui/components/primitives/icons/DiceMultipleOutlineIcon"
 import { SegmentedControl } from "@/ui/components/primitives/SegmentedControl"
-import { Surface } from "@/ui/components/primitives/Surface"
 import { ToggleChip } from "@/ui/components/primitives/ToggleChip"
 import { uiTokens } from "@/ui/components/tokens"
 import { SocietyRunesPanel } from "@/ui/genesis/controls/SocietyRunesPanel"
@@ -55,10 +52,10 @@ interface GenerationPanelProps {
 	resetWorldDefaults: () => void
 	setTideLock: (v: TideLock | null) => void
 	setObliquity: (v: number) => void
-	restSeed: number
+	seed: number
 	starName?: string
 	showRealSolNames: boolean
-	setRestSeed: (v: number) => void
+	setSeed: (v: number) => void
 	forceMainWorld: boolean
 	setForceMainWorld: (v: boolean) => void
 	tidalSchedulePreview?: TidalSchedule
@@ -77,19 +74,6 @@ interface GenerationPanelProps {
 		bodyIndex: number,
 		updater: (body: SystemBody) => SystemBody,
 	) => void
-	onUpdateSystemMoon?: (
-		bodyIndex: number,
-		moonIndex: number,
-		updater: (moon: MoonBody, parentBody: SystemBody) => MoonBody,
-	) => void
-	/** Rebuilds one body (and everything nested inside it, e.g. its own
-	 * moons) back to its freshly-generated defaults for the current seed,
-	 * without touching any other body -- or, called with no bodyIndex,
-	 * rebuilds the whole system. */
-	onRebuildSystemBody?: (bodyIndex?: number) => void
-	/** Resets a single moon back to its freshly-generated defaults for the
-	 * current seed, without touching its parent body or any sibling moon. */
-	onResetSystemMoon?: (bodyIndex: number, moonIndex: number) => void
 	daysPerYear: number
 	setHoursPerDay: (v: number) => void
 	planetRadiusKm: number
@@ -106,11 +90,6 @@ interface GenerationPanelProps {
 	obliquity: number
 	era: SocietyEra
 	setEra: (v: SocietyEra) => void
-	seedInput: string
-	setSeedInput: (v: string) => void
-	onApplySeed: () => void
-	seedError: boolean
-	onRandomizeSeed: () => void
 	generating: boolean
 	generationLabel: string
 	generationProgress: number
@@ -120,7 +99,6 @@ interface GenerationPanelProps {
 	onSelectGenerationPreviewTab: (tab: GenerationPreviewTab) => void
 	unitSystem: UnitSystem
 	handleGenerate: () => void
-	handleEarthImport: () => void
 	onClose?: () => void
 	/** World Details -- folded in here (rather than a separate right-side
 	 * panel) so all generated-world info lives in one place alongside the
@@ -151,12 +129,12 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	resetWorldDefaults,
 	setTideLock,
 	setObliquity,
-	restSeed,
+	seed,
 	starName,
 	showRealSolNames,
 	forceMainWorld,
 	setForceMainWorld,
-	setRestSeed,
+	setSeed,
 	tidalSchedulePreview,
 	surfaceTidesM,
 	orbitBodies,
@@ -164,9 +142,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	onFocusBody,
 	currentFocus,
 	onUpdateSystemBody,
-	onUpdateSystemMoon,
-	onRebuildSystemBody,
-	onResetSystemMoon,
 	daysPerYear,
 	setHoursPerDay,
 	planetRadiusKm,
@@ -183,11 +158,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	obliquity,
 	era,
 	setEra,
-	seedInput,
-	setSeedInput,
-	onApplySeed,
-	seedError,
-	onRandomizeSeed,
 	generating,
 	generationLabel,
 	generationProgress,
@@ -197,7 +167,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 	onSelectGenerationPreviewTab,
 	unitSystem,
 	handleGenerate,
-	handleEarthImport,
 	onClose,
 	worldDetails,
 	nationWiki,
@@ -206,10 +175,15 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 }) => {
 	const [societySubtab, setSocietySubtab] = useState<"era" | "runes">("era")
 	const [showGenerationTimings, setShowGenerationTimings] = useState(false)
-	const [generateExpanded, setGenerateExpanded] = useState(true)
 	const [openWorldSections, setOpenWorldSections] = useState<
 		ReadonlySet<WorldSection>
 	>(DEFAULT_WORLD_SECTIONS)
+	// Portal target for GenerationPlanetNavigator's Preview section, placed
+	// below WorldDetails (see the JSX below) so Preview renders after every
+	// other section instead of directly under the orbit header where that
+	// component would otherwise put it inline. Starts null until the ref
+	// callback fires after mount.
+	const [previewSlot, setPreviewSlot] = useState<HTMLDivElement | null>(null)
 	void generatedMoons
 	void obliquity
 	void worldTab
@@ -267,13 +241,172 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 		(slider) => slider.label === "Substellar Lon",
 	)
 	const surfaceStats = buildSurfaceStats(planetSliders, terrainSliders)
-	const selectedOrbitBody =
-		currentFocus &&
-		currentFocus.bodyIndex >= 0 &&
-		currentFocus.moonIndex === undefined
-			? systemBodies?.[currentFocus.bodyIndex]
-			: null
-	const showMainWorldGenerationControls = !!selectedOrbitBody?.isMainWorld
+
+	const generateContent = (
+		<div className="space-y-2.5 pt-1.5">
+			<Button
+				tone="panel"
+				selected
+				onClick={handleGenerate}
+				disabled={generating}
+				aria-label={generating ? "Generating" : "Generate"}
+				title={generating ? "Generating..." : "Generate"}
+				className="w-full px-2.5 py-1.5"
+			>
+				Generate
+			</Button>
+
+			{generating ? (
+				<div className="space-y-1">
+					<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
+						<span>{generationLabel}</span>
+						<span>{Math.round(generationProgress)}%</span>
+					</div>
+					<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+						<div
+							className="h-full rounded-full bg-slate-900 transition-all duration-200"
+							style={{
+								width: `${Math.max(0, Math.min(100, generationProgress))}%`,
+							}}
+						/>
+					</div>
+				</div>
+			) : null}
+
+			{generationTimingSummary && (
+				<div className="pt-1">
+					<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
+						<DisclosureButton
+							label="Timing"
+							expanded={showGenerationTimings}
+							trailing={
+								<span className="font-mono text-[10px] text-slate-400">
+									{formatTimingSeconds(generationTimingSummary.totalMs)}
+								</span>
+							}
+							onClick={() => {
+								setShowGenerationTimings((current) => !current)
+								if (showGenerationTimings) setTimingDrillDown(null)
+							}}
+						/>
+						{showGenerationTimings && (
+							<div className="mt-3 space-y-3">
+								{timingDrillDown === "post" && postTimingSummary ? (
+									<div className="space-y-2">
+										<DrillDownBreadcrumbHeader
+											title="Post breakdown"
+											trailingValue={formatTimingSeconds(
+												postTimingSummary.totalMs,
+											)}
+											onBack={() => setTimingDrillDown(null)}
+										/>
+										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+											<GenerationTimingChart
+												entries={postTimingSummary.entries}
+												onBarClick={(label) => {
+													if (label === "Other")
+														setTimingDrillDown({
+															kind: "other",
+															parent: "post",
+														})
+												}}
+											/>
+										</div>
+									</div>
+								) : timingDrillDown === "computeRoutes" &&
+									computeRoutesTimingSummary ? (
+									<div className="space-y-2">
+										<DrillDownBreadcrumbHeader
+											title="Compute routes breakdown"
+											trailingValue={formatTimingSeconds(
+												computeRoutesTimingSummary.totalMs,
+											)}
+											onBack={() => setTimingDrillDown(null)}
+										/>
+										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+											<GenerationTimingChart
+												entries={computeRoutesTimingSummary.entries}
+												onBarClick={(label) => {
+													if (label === "Other")
+														setTimingDrillDown({
+															kind: "other",
+															parent: "computeRoutes",
+														})
+												}}
+											/>
+										</div>
+									</div>
+								) : typeof timingDrillDown === "object" &&
+									timingDrillDown?.kind === "other" ? (
+									<div className="space-y-2">
+										<DrillDownBreadcrumbHeader
+											title="Other items"
+											trailingValue={formatTimingSeconds(
+												timingDrillDown.parent === "pipeline"
+													? (generationTimingSummary?.totalMs ?? 0)
+													: timingDrillDown.parent === "post"
+														? (postTimingSummary?.totalMs ?? 0)
+														: (computeRoutesTimingSummary?.totalMs ?? 0),
+											)}
+											onBack={() => {
+												const parent = timingDrillDown.parent
+												if (parent === "pipeline") setTimingDrillDown(null)
+												else setTimingDrillDown(parent)
+											}}
+										/>
+										<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+											<GenerationTimingChart
+												entries={
+													timingDrillDown.parent === "pipeline"
+														? (generationTimingSummary?.otherEntries ?? [])
+														: timingDrillDown.parent === "post"
+															? (postTimingSummary?.otherEntries ?? [])
+															: (computeRoutesTimingSummary?.otherEntries ?? [])
+												}
+											/>
+										</div>
+									</div>
+								) : (
+									<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+										<div className="mb-2 flex items-center justify-between px-1">
+											<div
+												className={`${uiTokens.type.controlWide} text-slate-500`}
+											>
+												Pipeline
+											</div>
+											<span className="font-mono text-[10px] text-slate-400">
+												{formatTimingSeconds(generationTimingSummary.totalMs)}
+											</span>
+										</div>
+										<GenerationTimingChart
+											entries={generationTimingSummary.entries}
+											onBarClick={(label) => {
+												if (label === "post-pipeline" && postTimingSummary)
+													setTimingDrillDown("post")
+												else if (
+													label === "computeRoutes" &&
+													computeRoutesTimingSummary
+												)
+													setTimingDrillDown("computeRoutes")
+												else if (
+													label === "Other" &&
+													generationTimingSummary.otherEntries.length > 0
+												)
+													setTimingDrillDown({
+														kind: "other",
+														parent: "pipeline",
+													})
+											}}
+										/>
+									</div>
+								)}
+							</div>
+						)}
+					</div>
+				</div>
+			)}
+		</div>
+	)
 
 	return (
 		<div className="w-full xl:w-[460px] xl:max-w-[36vw] shrink-0 h-auto xl:h-full flex flex-col border-b xl:border-b-0 xl:border-r border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -293,9 +426,6 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								onFocusBody={onFocusBody}
 								currentFocus={currentFocus}
 								onUpdateSystemBody={onUpdateSystemBody}
-								onUpdateSystemMoon={onUpdateSystemMoon}
-								onRebuildSystemBody={onRebuildSystemBody}
-								onResetSystemMoon={onResetSystemMoon}
 								surfaceTidesM={surfaceTidesM}
 								setTideLock={setTideLock}
 								setHoursPerDay={setHoursPerDay}
@@ -310,7 +440,7 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								isRetrograde={isRetrograde}
 								onToggleSpin={onToggleSpin}
 								planetRadiusKm={planetRadiusKm}
-								restSeed={restSeed}
+								seed={seed}
 								starName={starName}
 								forceMainWorld={forceMainWorld}
 								setForceMainWorld={setForceMainWorld}
@@ -321,20 +451,21 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 								perihelion={perihelion}
 								axialTiltDisplay={axialTiltDisplay}
 								landCoverage={landCoverage}
-								showRealSolNames={
-									showRealSolNames && restSeed === SOL_DATA.solSeed
-								}
+								showRealSolNames={showRealSolNames && seed === SOL_DATA.solSeed}
 								spectralClass={spectralClass}
 								setSpectralClass={setSpectralClass}
 								starSubtype={starSubtype}
 								setStarSubtype={setStarSubtype}
-								setRestSeed={setRestSeed}
+								setSeed={setSeed}
 								setObliquity={setObliquity}
 								tidalSchedulePreview={tidalSchedulePreview}
 								generationPreviewTab={generationPreviewTab}
 								onSelectGenerationPreviewTab={onSelectGenerationPreviewTab}
 								unitSystem={unitSystem}
 								onClose={onClose}
+								generateContent={generateContent}
+								generating={generating}
+								previewContainer={previewSlot}
 							/>
 
 							<WorldDetails
@@ -344,278 +475,10 @@ export const GenerationPanel: React.FC<GenerationPanelProps> = ({
 									setOpenWorldSections((prev) => toggleSection(prev, section))
 								}
 							/>
+
+							<div ref={setPreviewSlot} />
 						</>
 					)}
-
-					{showMainWorldGenerationControls &&
-					!nationWiki &&
-					!organizationWiki &&
-					!warWiki ? (
-						<Surface
-							tone="panel"
-							borderTone="default"
-							radius="xl"
-							className="px-3 py-2"
-						>
-							<div className="space-y-1">
-								<DisclosureButton
-									label="Generate"
-									expanded={generateExpanded}
-									onClick={() => setGenerateExpanded((current) => !current)}
-								/>
-								{generateExpanded ? (
-									<div className="space-y-2.5 pt-1.5">
-										<div className="space-y-2">
-											<div className="flex items-stretch gap-1.5">
-												<div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5">
-													<div className="flex items-center gap-1.5">
-														<span className="font-mono text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-															Seed
-														</span>
-														<input
-															type="text"
-															value={seedInput}
-															onChange={(e) => setSeedInput(e.target.value)}
-															onBlur={onApplySeed}
-															onKeyDown={(e) => {
-																if (e.key === "Enter") {
-																	e.preventDefault()
-																	onApplySeed()
-																}
-															}}
-															disabled={generating}
-															placeholder="World seed"
-															className={`min-w-0 flex-1 bg-transparent border-none font-mono text-[11px] focus:ring-0 focus:outline-none placeholder:text-slate-300 disabled:opacity-50 ${
-																seedError ? "text-red-500" : "text-slate-700"
-															}`}
-														/>
-														<IconButton
-															tone="panel"
-															size="sm"
-															shape="rounded"
-															onClick={onRandomizeSeed}
-															disabled={generating}
-															aria-label="Generate new seed"
-															title="New seed"
-															className="shadow-none backdrop-blur-none"
-														>
-															<DiceMultipleOutlineIcon className="h-4 w-4" />
-														</IconButton>
-														<IconButton
-															tone="panel"
-															size="sm"
-															shape="rounded"
-															onClick={handleEarthImport}
-															disabled={generating}
-															aria-label="Load Earth seed"
-															title="Load Earth"
-															className="shadow-none backdrop-blur-none"
-														>
-															<svg
-																className="h-4 w-4"
-																viewBox="0 0 24 24"
-																fill="currentColor"
-																aria-hidden="true"
-															>
-																<title>earth</title>
-																<path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
-															</svg>
-														</IconButton>
-														<Button
-															tone="panel"
-															selected
-															onClick={handleGenerate}
-															disabled={generating}
-															aria-label={
-																generating ? "Generating" : "Generate"
-															}
-															title={generating ? "Generating..." : "Generate"}
-															className="px-2.5 py-1.5"
-														>
-															Generate
-														</Button>
-													</div>
-												</div>
-											</div>
-											{seedError && (
-												<p className="mt-1 border-t border-slate-200 pt-2 text-[11px] font-medium text-red-500">
-													Invalid seed
-												</p>
-											)}
-										</div>
-
-										{generating ? (
-											<div className="space-y-1">
-												<div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">
-													<span>{generationLabel}</span>
-													<span>{Math.round(generationProgress)}%</span>
-												</div>
-												<div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-													<div
-														className="h-full rounded-full bg-slate-900 transition-all duration-200"
-														style={{
-															width: `${Math.max(0, Math.min(100, generationProgress))}%`,
-														}}
-													/>
-												</div>
-											</div>
-										) : null}
-
-										{generationTimingSummary && (
-											<div className="pt-1">
-												<div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 shadow-sm shadow-slate-200/20">
-													<DisclosureButton
-														label="Timing"
-														expanded={showGenerationTimings}
-														trailing={
-															<span className="font-mono text-[10px] text-slate-400">
-																{formatTimingSeconds(
-																	generationTimingSummary.totalMs,
-																)}
-															</span>
-														}
-														onClick={() => {
-															setShowGenerationTimings((current) => !current)
-															if (showGenerationTimings)
-																setTimingDrillDown(null)
-														}}
-													/>
-													{showGenerationTimings && (
-														<div className="mt-3 space-y-3">
-															{timingDrillDown === "post" &&
-															postTimingSummary ? (
-																<div className="space-y-2">
-																	<DrillDownBreadcrumbHeader
-																		title="Post breakdown"
-																		trailingValue={formatTimingSeconds(
-																			postTimingSummary.totalMs,
-																		)}
-																		onBack={() => setTimingDrillDown(null)}
-																	/>
-																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-																		<GenerationTimingChart
-																			entries={postTimingSummary.entries}
-																			onBarClick={(label) => {
-																				if (label === "Other")
-																					setTimingDrillDown({
-																						kind: "other",
-																						parent: "post",
-																					})
-																			}}
-																		/>
-																	</div>
-																</div>
-															) : timingDrillDown === "computeRoutes" &&
-																computeRoutesTimingSummary ? (
-																<div className="space-y-2">
-																	<DrillDownBreadcrumbHeader
-																		title="Compute routes breakdown"
-																		trailingValue={formatTimingSeconds(
-																			computeRoutesTimingSummary.totalMs,
-																		)}
-																		onBack={() => setTimingDrillDown(null)}
-																	/>
-																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-																		<GenerationTimingChart
-																			entries={
-																				computeRoutesTimingSummary.entries
-																			}
-																			onBarClick={(label) => {
-																				if (label === "Other")
-																					setTimingDrillDown({
-																						kind: "other",
-																						parent: "computeRoutes",
-																					})
-																			}}
-																		/>
-																	</div>
-																</div>
-															) : typeof timingDrillDown === "object" &&
-																timingDrillDown?.kind === "other" ? (
-																<div className="space-y-2">
-																	<DrillDownBreadcrumbHeader
-																		title="Other items"
-																		trailingValue={formatTimingSeconds(
-																			timingDrillDown.parent === "pipeline"
-																				? (generationTimingSummary?.totalMs ??
-																						0)
-																				: timingDrillDown.parent === "post"
-																					? (postTimingSummary?.totalMs ?? 0)
-																					: (computeRoutesTimingSummary?.totalMs ??
-																						0),
-																		)}
-																		onBack={() => {
-																			const parent = timingDrillDown.parent
-																			if (parent === "pipeline")
-																				setTimingDrillDown(null)
-																			else setTimingDrillDown(parent)
-																		}}
-																	/>
-																	<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-																		<GenerationTimingChart
-																			entries={
-																				timingDrillDown.parent === "pipeline"
-																					? (generationTimingSummary?.otherEntries ??
-																						[])
-																					: timingDrillDown.parent === "post"
-																						? (postTimingSummary?.otherEntries ??
-																							[])
-																						: (computeRoutesTimingSummary?.otherEntries ??
-																							[])
-																			}
-																		/>
-																	</div>
-																</div>
-															) : (
-																<div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-																	<div className="mb-2 flex items-center justify-between px-1">
-																		<div
-																			className={`${uiTokens.type.controlWide} text-slate-500`}
-																		>
-																			Pipeline
-																		</div>
-																		<span className="font-mono text-[10px] text-slate-400">
-																			{formatTimingSeconds(
-																				generationTimingSummary.totalMs,
-																			)}
-																		</span>
-																	</div>
-																	<GenerationTimingChart
-																		entries={generationTimingSummary.entries}
-																		onBarClick={(label) => {
-																			if (
-																				label === "post-pipeline" &&
-																				postTimingSummary
-																			)
-																				setTimingDrillDown("post")
-																			else if (
-																				label === "computeRoutes" &&
-																				computeRoutesTimingSummary
-																			)
-																				setTimingDrillDown("computeRoutes")
-																			else if (
-																				label === "Other" &&
-																				generationTimingSummary.otherEntries
-																					.length > 0
-																			)
-																				setTimingDrillDown({
-																					kind: "other",
-																					parent: "pipeline",
-																				})
-																		}}
-																	/>
-																</div>
-															)}
-														</div>
-													)}
-												</div>
-											</div>
-										)}
-									</div>
-								) : null}
-							</div>
-						</Surface>
-					) : null}
 				</div>
 
 				<div className="hidden" aria-hidden="true">

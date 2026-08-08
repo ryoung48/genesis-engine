@@ -1,5 +1,5 @@
 ﻿import type { MoonBody } from "@/model/celestial/moons/types"
-import type { WindArrowData } from "@/model/climate/wind/types"
+import type { WindArrowData } from "@/model/climate/weather/wind/types"
 import type {
 	Eu4ProvinceBorderGeometry,
 	Eu4ProvinceFillGeometry,

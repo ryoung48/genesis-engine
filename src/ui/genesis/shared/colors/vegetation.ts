@@ -1,4 +1,3 @@
-import { PASTA } from "@/model/climate/pasta"
 import { VEGETATION_WATER_BLUE } from "@/ui/genesis/shared/colors"
 
 export function vegetationColor(biomeCode: number): [number, number, number] {
@@ -23,18 +22,14 @@ export function vegetationMapColor(
  * temperature (°C) and annual rainfall (mm), replacing the old flat
  * per-PASTA-class lookup so neighboring regions with similar climate blend
  * smoothly instead of jumping between discrete swatches at class
- * boundaries. `pastaClimateCode` is only consulted to tell ocean regions
- * (PASTA "O*" classes) from land. */
+ * boundaries. `isLand` is the final terrain mask, which correctly retains
+ * drained lakebeds and other below-sea-level land as land. */
 export function vegetationSatelliteColor(
-	pastaClimateCode: number,
+	isLand: boolean,
 	tempC: number,
 	rainMm: number,
 ): [number, number, number] {
-	const label = PASTA.pastaLabels[pastaClimateCode] ?? "ocean"
-	if (label === "ocean" || label.startsWith("O")) {
-		return oceanSatelliteColor(tempC)
-	}
-	return landSatelliteColor(tempC, rainMm)
+	return isLand ? landSatelliteColor(tempC, rainMm) : oceanSatelliteColor(tempC)
 }
 
 /** Icy pale blue below freezing, deep navy open water above -- smoothstepped
@@ -98,7 +93,11 @@ function lerpRgb(
 	b: [number, number, number],
 	t: number,
 ): [number, number, number] {
-	return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+	return [
+		a[0] + (b[0] - a[0]) * t,
+		a[1] + (b[1] - a[1]) * t,
+		a[2] + (b[2] - a[2]) * t,
+	]
 }
 
 const biomeBaseColors: [number, number, number][] = [
@@ -130,4 +129,3 @@ const biomeMapColors: [number, number, number][] = [
 	[0x94 / 255, 0xda / 255, 0xc4 / 255],
 	[0x94 / 255, 0xda / 255, 0xc4 / 255],
 ]
-

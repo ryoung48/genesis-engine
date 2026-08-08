@@ -1,5 +1,5 @@
 import type { SeismologyProfile } from "@/model/celestial/planet/seismology/types"
-import type { SurfaceTidesBreakdown } from "@/model/climate/tidal-schedule/types"
+import type { SurfaceTidesBreakdown } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import { ContributionTooltipContent } from "@/ui/components/composites/ContributionTooltipContent"
 import type { StatEntry } from "@/ui/components/composites/EditableStatValue"
 import { formatClassificationLabel } from "@/ui/wiki/stats/orbit/formatters"

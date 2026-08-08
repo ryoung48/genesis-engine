@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { PASTA } from "@/model/climate/pasta"
+import { PASTA } from "@/model/climate/classification/pasta"
 import { IMPORT_HEIGHTMAP } from "@/model/pipelines/import-heightmap"
 import { DEFAULT_WORLD_PARAMS } from "@/ui/genesis/generation/defaults"
 import {

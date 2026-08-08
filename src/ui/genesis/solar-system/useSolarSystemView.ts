@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { STAR } from "@/model/celestial/star"
 import type { MainSequenceClass } from "@/model/celestial/star/types"
 import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
+import { RNG } from "@/model/shared/random/rng"
 import { GENERATION_SESSION_STORAGE_KEY } from "@/ui/genesis/generation/defaults"
 import { GENERATION_PREVIEW_TABS } from "@/ui/genesis/generation/generation-preview"
 import {
 	loadGenerationSessionSnapshot,
 	saveGenerationSessionSnapshot,
 } from "@/ui/genesis/generation/session-persistence"
+import { getSatelliteTexture } from "@/ui/genesis/renderer/satellite-texture"
 import type { SolarSystemViewInput } from "@/ui/genesis/view/types"
 
 /**
@@ -25,6 +27,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	const {
 		sceneRef,
 		initialGenerationSession,
+		world,
 		solarSystem,
 		setSolarSystem,
 		skipNextGeneratedSystemBodiesSyncRef,
@@ -43,7 +46,6 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		starSubtype,
 		starName,
 		namesEnabled,
-		restSeed,
 		seed,
 		solarSystemViewActive,
 		setSolarSystemViewActive,
@@ -79,6 +81,40 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 	// whole overlay (and re-fetching every body's texture) on every tick.
 	const solarSystemElapsedHoursRef = useRef(solarSystemElapsedHours)
 	solarSystemElapsedHoursRef.current = solarSystemElapsedHours
+	// The main world's real simulated terrain/vegetation, rendered as its
+	// solar-system-view surface texture -- for every main world except a real
+	// Earth import, which keeps the curated Earth photo (its "real" surface
+	// already has an authentic-looking texture; a satellite render of a real
+	// Earth import would also be redundant with the observed/real color modes
+	// the flat wiki map already exposes for it). Reuses the exact same
+	// DataTexture the wiki 2D map's "Satellite" color mode builds (and its
+	// own WeakMap-keyed cache), so switching to/from the solar-system view
+	// costs nothing extra once that map's been viewed once.
+	const mainWorldSatelliteTexture = useMemo(() => {
+		// A seed edit immediately rebuilds the solar-system bodies, while the
+		// previous world's terrain remains in state until the next generation
+		// completes. Do not carry that terrain texture onto the new main world:
+		// returning null restores its default Earth texture until its matching
+		// generated world arrives.
+		if (!world || world.isEarthImport || world.params.seed !== seed) return null
+		const texture = getSatelliteTexture(world, "vegetationSatellite")
+		if (!texture) return null
+		// getSatelliteTexture's DataTexture defaults to flipY=false, matching
+		// the wiki 2D map mesh's own UV setup (row 0 = north, sampled directly).
+		// A standard THREE.SphereGeometry expects the same orientation image
+		// textures get (flipY=true, like loadBodyTexture's), so used as-is here
+		// the sphere renders upside down -- south pole at the north. Clone
+		// (not mutate) the shared cached instance so the wiki map's own use of
+		// it is untouched, and flip just this sphere-bound copy.
+		const sphereTexture = texture.clone()
+		sphereTexture.flipY = true
+		sphereTexture.needsUpdate = true
+		// Not cached by satellite-texture.ts's own WeakMap (it's a derived
+		// clone) -- must not be disposed when this view's overlay tears
+		// down/rebuilds, same as loadBodyTexture's own shared-texture marking.
+		sphereTexture.userData.sharedTexture = true
+		return sphereTexture
+	}, [world, seed])
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -98,9 +134,10 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SOL_DATA.solSeed,
+						showRealNames: seed === SOL_DATA.solSeed,
 						namesEnabled,
 						starName,
+						mainWorldTexture: mainWorldSatelliteTexture,
 					}
 				: null,
 		)
@@ -114,9 +151,10 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemAxialTilt,
 		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
-		restSeed,
+		seed,
 		starName,
 		showSolarSystemDaylight,
+		mainWorldSatelliteTexture,
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -137,9 +175,10 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 						showAxialTilt: showSolarSystemAxialTilt,
 						showRealisticSizes: showSolarSystemRealisticSizes,
 						showBodyNames: showSolarSystemBodyNames,
-						showRealNames: restSeed === SOL_DATA.solSeed,
+						showRealNames: seed === SOL_DATA.solSeed,
 						namesEnabled,
 						starName,
+						mainWorldTexture: mainWorldSatelliteTexture,
 					}
 				: null,
 		)
@@ -154,9 +193,10 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		showSolarSystemAxialTilt,
 		showSolarSystemRealisticSizes,
 		showSolarSystemBodyNames,
-		restSeed,
+		seed,
 		starName,
 		showSolarSystemDaylight,
+		mainWorldSatelliteTexture,
 	])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state setters and the scene/worker refs arrive as hook parameters here, so Biome cannot see their useState/useRef origin; adding them would change effect timing.
 	useEffect(() => {
@@ -196,8 +236,18 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		void loadGenerationSessionSnapshot()
 			.then((snapshot) => {
 				if (cancelled || !snapshot) return
+				// Only worth arming: the generated-bodies sync effect in
+				// useSolarSystemBodies only re-fires (and needs skipping) when this
+				// restore actually changes the derived seed -- e.g. still-Sol snapshots
+				// leave the seed unchanged, so that effect never fires here at all,
+				// and an armed flag would instead wrongly eat the *next* unrelated
+				// seed change (e.g. the first post-refresh dice click) far later.
+				const snapshotSeed =
+					snapshot.solarSystem.star.seed === "sol"
+						? SOL_DATA.solSeed
+						: RNG.seedStringToNumber(snapshot.solarSystem.star.seed)
 				skipNextGeneratedSystemBodiesSyncRef.current =
-					snapshot.solarSystem.orbits.length > 0
+					snapshot.solarSystem.orbits.length > 0 && snapshotSeed !== seed
 				setSolarSystem(snapshot.solarSystem)
 				setSolarSystemViewActive(snapshot.solarSystemViewActive)
 				setGenerationPanelOpen(snapshot.generationPanelOpen)
@@ -398,14 +448,13 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		perihelion,
 	])
 
-	const solStarName = restSeed === SOL_DATA.solSeed ? "Sol" : undefined
+	const solStarName = seed === SOL_DATA.solSeed ? "Sol" : undefined
 	const surfaceTidesM = useMemo(() => {
 		if (focusedMoon && focusedMoonParent) {
 			return TIDAL_SCHEDULE.computeMoonSurfaceTidesM({
 				moon: focusedMoon,
 				parent: {
-					name:
-						restSeed === SOL_DATA.solSeed ? focusedMoonParent.name : undefined,
+					name: seed === SOL_DATA.solSeed ? focusedMoonParent.name : undefined,
 					massKg: focusedMoonParent.massKg,
 					diameterKm: focusedMoonParent.diameterKm,
 					moons: focusedMoonParent.moons,
@@ -444,7 +493,7 @@ export function useSolarSystemView(input: SolarSystemViewInput) {
 		orbitalDistanceAU,
 		eccentricity,
 		solStarName,
-		restSeed,
+		seed,
 	])
 
 	return {

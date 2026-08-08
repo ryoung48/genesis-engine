@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { WIND } from "@/model/climate/wind"
+import { WIND } from "@/model/climate/weather/wind"
 import {
 	getHoverBiome,
 	getHoverClimateDisplay,

@@ -1,4 +1,4 @@
-import { ELEVATION } from "@/model/climate/elevation"
+import { ELEVATION } from "@/model/geography/terrain/elevation"
 import type {
 	ComputeSeaLevelOffsetKmParams,
 	HeightKmToElevParams,

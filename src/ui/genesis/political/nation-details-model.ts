@@ -1,4 +1,4 @@
-﻿import { VEGETATION } from "@/model/climate/vegetation"
+﻿import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { CLASSIFICATION } from "@/model/geography/terrain/classification"
 import { TEXT } from "@/model/shared/text"
 import { ERAS } from "@/model/society/eras"

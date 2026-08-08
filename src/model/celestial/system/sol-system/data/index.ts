@@ -180,7 +180,7 @@ const solPlanetSeeds: SolPlanetSeed[] = [
 		greenhouseFactor: 0.578,
 		/** Real Earth sea-level pressure (~1 bar), matching every sibling
 		 * body's own hand-authored atmosphere below. Without this, the static
-		 * Sol system's Earth entry (restSeed === SOL_SEED, unlike the live
+		 * Sol system's Earth entry (seed === SOL_SEED, unlike the live
 		 * procedurally-generated path in GenesisView.tsx, which builds its own
 		 * atmosphere from the live pressure slider before calling buildPlanet)
 		 * has no atmosphere at all -- buildPlanet() reads seed.atmosphere

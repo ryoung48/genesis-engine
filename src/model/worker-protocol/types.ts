@@ -1,5 +1,5 @@
 import type { TideLock } from "@/model/celestial/orbit-body/types"
-import type { TidalSchedule } from "@/model/climate/tidal-schedule/types"
+import type { TidalSchedule } from "@/model/climate/ocean/tides/tidal-schedule/types"
 import type { GenesisLocations } from "@/model/geography/terrain/locations/types"
 import type { HistoryNote } from "@/model/history/generated/state/types"
 import type { GenesisParams, StageTiming } from "@/model/pipelines/types"

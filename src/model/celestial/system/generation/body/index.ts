@@ -12,18 +12,23 @@ import { SOL_SEED_BODIES } from "@/model/celestial/system/generation/sol-seed"
 import { STAR_IDENTITY } from "@/model/celestial/system/generation/star-identity"
 import { TEXTURE } from "@/model/celestial/system/generation/texture"
 import { SOL_SYSTEM } from "@/model/celestial/system/sol-system"
+import { SOL_DATA } from "@/model/celestial/system/sol-system/data"
+import type { SolPlanetSeed } from "@/model/celestial/system/sol-system/types"
 import type { SystemBody } from "@/model/celestial/system/types"
-import { TIDAL_SCHEDULE } from "@/model/climate/tidal-schedule"
+import { TIDAL_SCHEDULE } from "@/model/climate/ocean/tides/tidal-schedule"
 import { RNG } from "@/model/shared/random/rng"
+import { TEXT } from "@/model/shared/text"
 import { TIME } from "@/model/shared/time"
 import { LANGUAGE } from "@/model/society/language/languages"
 
 const DAYS_PER_YEAR = TIME.astronomicalDaysPerYear
-// Mirrors the UI's DEFAULT_WORLD_PARAMS.continentSizeVariety (defaults.ts) --
-// duplicated here since this model-layer file must not import from the UI
-// layer. A rolled main world's continentSizeVariety starts at this Earth-like
-// default, edited by hand afterward via the normal slider.
-const EARTH_DEFAULT_CONTINENT_SIZE_VARIETY = 0.35
+// A forced main world is a literal Earth clone (same radius/mass/density/
+// atmosphere/day length/tilt/eccentricity/texture as the real Sol seed data),
+// just re-positioned to the new star's own habitable-zone center and given a
+// procedurally generated name instead of rolling its own physical stats --
+// see the isMainWorld branch below.
+const EARTH_SEED = SOL_DATA.solPlanetSeeds.find((seed) => seed.isMainWorld)!
+const LUNA_SEED = EARTH_SEED.moons![0]!
 
 /**
  * Generates the rest of the (single-star) solar system around the already-
@@ -35,7 +40,9 @@ const EARTH_DEFAULT_CONTINENT_SIZE_VARIETY = 0.35
  * orbitalDistanceAU — siblings are generated around it, never replacing it.
  */
 function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
-	const { seed, spectralClass, starSubtype, forceMainWorld } = params
+	const { seed, forceMainWorld } = params
+	const spectralClass = params.spectralClass ?? STAR.defaultSpectralClass
+	const starSubtype = params.starSubtype ?? STAR.defaultStarSubtype
 	const solBodies = SOL_SEED_BODIES.generate(params)
 	if (solBodies) return solBodies
 	const rng = RNG.createRng({ seed })
@@ -52,13 +59,17 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	// each carrying an unrelated one-off name. Sol keeps its real, curated
 	// names untouched (see the seed === SOL_SEED branch above).
 	const systemLanguage = LANGUAGE.spawn(`system:${seed}`)
+	// LANGUAGE.word.simple's slot-based path returns the raw (lowercase) word
+	// -- every other caller (see names/index.ts) title-cases it themselves.
 	const nameBody = (slot: string): string =>
-		LANGUAGE.word.simple({
-			lang: systemLanguage,
-			key: "region",
-			namespace: "planet",
-			slot,
-		}).word
+		TEXT.titleCase(
+			LANGUAGE.word.simple({
+				lang: systemLanguage,
+				key: "region",
+				namespace: "planet",
+				slot,
+			}).word,
+		)
 
 	const epistellarCount = rng.randint(0, 2)
 	const innerCount = rng.randint(1, 3)
@@ -71,8 +82,8 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		// One inner slot is reserved for the main world (deviation 0, the
 		// "temperate" slot -- always exactly the HZ center, see deviationToAU)
 		// when forceMainWorld is set -- same guarantee galaxy-gen gives its
-		// homeworld. It's rolled through the exact same pipeline as any other
-		// slot below, just tagged isMainWorld/isPrimaryWorld true.
+		// homeworld. Unlike every other slot, this one isn't rolled at all: see
+		// the isMainWorld branch below, which builds a literal Earth/Luna clone.
 		...(forceMainWorld
 			? [{ zone: "inner" as const, deviation: 0, isMainWorld: true }]
 			: []),
@@ -93,7 +104,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		cls: spectralClass,
 		subtype: starSubtype,
 	})
-	const starAgeGyr = STAR_IDENTITY.getStarAgeGyr({ seed, massSol: starMassSol })
+	const starAgeGyr = STAR_IDENTITY.getStarAgeGyr({ massSol: starMassSol })
 
 	// Ported from galaxy-gen's non-homeworld "primary" bias (orbits/index.ts)
 	// -- even a system with no forced main world still gets one significant,
@@ -117,8 +128,29 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 	}
 
 	const bodies: SystemBody[] = slots.map((slot, siblingIdx) => {
-		const isMainWorld = slot.isMainWorld === true
-		const isPrimaryWorld = isMainWorld || siblingIdx === primarySlotIndex
+		if (slot.isMainWorld) {
+			const orbitalDistanceAU = PLANET.deviationToAU({
+				deviation: slot.deviation,
+				luminositySol,
+			})
+			const mainWorldSeed: SolPlanetSeed = {
+				...EARTH_SEED,
+				seed: "main-world",
+				name: nameBody("main-world"),
+				au: orbitalDistanceAU,
+				moons: [{ ...LUNA_SEED, name: nameBody("main-moon-1") }],
+			}
+			return {
+				...SOL_SYSTEM.buildPlanet({
+					seed: mainWorldSeed,
+					seedTag: siblingIdx + 1,
+					idx: -1,
+					options: { starMassSol },
+				}),
+				zone: slot.zone,
+			}
+		}
+		const isPrimaryWorld = siblingIdx === primarySlotIndex
 		// Primary worlds are terrestrial before their physical size is rolled,
 		// so their size and classification stay consistent rather than relabeling
 		// a previously rolled giant as tectonic later.
@@ -133,12 +165,10 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		// close-in epistellar dwarf beyond the star's dust-clearing boundary
 		// (getStarMAO) can get shoved into a scorching orbit instead of
 		// forming further out. Only ever checked for the very first slot in
-		// generation order (mirroring galaxy-gen's firstStarOrbit gate) and
-		// never for the main world.
+		// generation order (mirroring galaxy-gen's firstStarOrbit gate).
 		let forceMeltball = false
 		if (
 			siblingIdx === 0 &&
-			!isMainWorld &&
 			slot.zone === "epistellar" &&
 			group === "dwarf" &&
 			rng.uniform(0, 1) <= 0.2
@@ -222,7 +252,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 						parentSizeClass: sizeClass,
 						orbitalDistanceAU,
 					})
-		const moonSlotName = isMainWorld ? "main" : `orbit-${siblingIdx}`
+		const moonSlotName = `orbit-${siblingIdx}`
 		const moons = MOON_PLACEMENT.place({
 			rng,
 			moonCount,
@@ -239,7 +269,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			moonSlotName,
 			nameBody,
 		})
-		const idx = isMainWorld ? -1 : siblingIdx
+		const idx = siblingIdx
 		const moonsWithTideLocks = MOON.attachParentTideLocks({
 			moons,
 			parentIdx: idx,
@@ -289,7 +319,7 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 				orbitalPeriodDays,
 				baseSiderealDayHours: siderealDayHours,
 				moons: moonsWithTideLocks,
-				homeworld: isMainWorld,
+				homeworld: false,
 				rerollEccentricity: () => ROLLS.rollEccentricity(rng),
 			})
 			finalSiderealDayHours = tideLockResult.siderealDayHours
@@ -318,9 +348,9 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 		return {
 			...finalEnvironment,
 			idx,
-			seed: isMainWorld ? "main-world" : `orbit-${siblingIdx + 1}`,
-			name: nameBody(isMainWorld ? "main-world" : `orbit-${siblingIdx}`),
-			isMainWorld,
+			seed: `orbit-${siblingIdx + 1}`,
+			name: nameBody(`orbit-${siblingIdx}`),
+			isMainWorld: false,
 			zone: slot.zone,
 			texturePath: TEXTURE.pickGeneratedTexturePath({
 				rng,
@@ -361,19 +391,6 @@ function generateSystemBodies(params: BodyGenerationParams): SystemBody[] {
 			substellarLon:
 				tideLock?.type === "solar" ? rng.uniform(0, 360) : undefined,
 			moons: moonsWithTideLocks,
-			// Terrain-generation-only fields, meaningless for anything but the
-			// main world -- set to Earth's own defaults (not rolled) per
-			// SOL_MAIN_WORLD_DEFAULTS/the UI's DEFAULT_WORLD_PARAMS, since the
-			// player edits these by hand afterward via the normal sliders.
-			...(isMainWorld
-				? {
-						landDistribution:
-							1 - SOL_SYSTEM.solMainWorldDefaults.landConcentration,
-						continentSizeVariety: EARTH_DEFAULT_CONTINENT_SIZE_VARIETY,
-						seaLevel: SOL_SYSTEM.solMainWorldDefaults.seaLevel,
-						maxElevation: SOL_SYSTEM.solMainWorldDefaults.maxElevation,
-					}
-				: {}),
 		}
 	})
 

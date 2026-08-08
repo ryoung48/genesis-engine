@@ -96,4 +96,25 @@ for (const sf of project.getSourceFiles()) {
 }
 
 await project.save();
+
+// Clean up any directories left empty by the move (recursively, so an empty
+// parent left behind by removing its last empty child also gets removed).
+function removeEmptyDirs(dirAbs) {
+	if (!fs.existsSync(dirAbs) || !fs.statSync(dirAbs).isDirectory()) return;
+	for (const entry of fs.readdirSync(dirAbs)) {
+		removeEmptyDirs(path.join(dirAbs, entry));
+	}
+	if (fs.readdirSync(dirAbs).length === 0) {
+		fs.rmdirSync(dirAbs);
+		console.log(`Removed empty dir: ${path.relative(repoRoot, dirAbs)}`);
+	}
+}
+
+for (const { from } of pairs) {
+	const fromAbs = path.resolve(repoRoot, from);
+	if (fs.existsSync(fromAbs) && fs.statSync(fromAbs).isDirectory()) {
+		removeEmptyDirs(fromAbs);
+	}
+}
+
 console.log("Done. Run `pnpm typecheck` and `pnpm lint` to verify.");

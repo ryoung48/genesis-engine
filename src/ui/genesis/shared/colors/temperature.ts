@@ -1,4 +1,4 @@
-import { VEGETATION } from "@/model/climate/vegetation"
+import { VEGETATION } from "@/model/climate/classification/vegetation"
 import { COLOR_INTERPOLATION } from "@/model/shared/color/color-interpolation"
 import { COLOR_PALETTES } from "@/model/shared/color/color-palettes"
 import { midpoint } from "@/ui/genesis/shared/colors/misc"

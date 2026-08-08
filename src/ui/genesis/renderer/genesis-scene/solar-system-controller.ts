@@ -215,7 +215,10 @@ export function createSolarSystemController(
 		}
 		if (
 			!ctx.solarSystemOverlayState ||
-			!ctx.solarSystemOverlayState.updateBodies(params.bodies)
+			!ctx.solarSystemOverlayState.updateBodies(
+				params.bodies,
+				params.mainWorldTexture,
+			)
 		) {
 			setSolarSystemOverlay({
 				...params,

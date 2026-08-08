@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react"
 import { Popover } from "@/ui/components/composites/Popover"
 import { Slider } from "@/ui/components/primitives/Slider"
+import { Swatch } from "@/ui/components/primitives/Swatch"
 
 interface StatEditor {
 	label: string
@@ -24,6 +25,10 @@ export interface StatEntry {
 	valueHelpTarget?: "all" | "prefix"
 	editor?: StatEditor
 	valueAction?: ReactNode
+	/** A small color swatch shown immediately before the value (e.g. a
+	 * planet's classification color, or a star's spectral-class color) --
+	 * omitted/null renders no swatch. */
+	swatchColor?: string | null
 }
 
 // Units that stay glued to the number, underlined as part of the clickable
@@ -63,6 +68,7 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 	if (!editor) {
 		return (
 			<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
+				{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
 				{valueNode}
 			</span>
 		)
@@ -72,6 +78,7 @@ export function EditableStatValue({ stat }: { stat: StatEntry }) {
 
 	return (
 		<span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-700">
+			{stat.swatchColor ? <Swatch color={stat.swatchColor} /> : null}
 			<Popover
 				open={visible}
 				onDismiss={() => setVisible(false)}
